@@ -64,7 +64,7 @@ function usePoll(fn, ms, deps) {
     const tick = async () => {
       try {
         const d = await fn();
-        if (alive) { setData(d); setError(null); }
+        if (alive) { setData(d); setError(null); usePoll.lastOk = Date.now() / 1000; }
       } catch (e) {
         if (alive) setError(e && e.message ? e.message : String(e));
       }

@@ -68,7 +68,9 @@ def _state_db(profile: str) -> Path:
 
 
 def _board(now: float) -> dict:
-    return _cached("board", 1.5, lambda: core.read_board(HOME / "kanban.db", now))
+    # karty misji z INDEX.md czytamy zawsze, także zakończone dawno (postęp misji)
+    mission_ids = [c for m in core.parse_missions(_index_md()) for c in m["cards"]]
+    return _cached("board", 1.5, lambda: core.read_board(HOME / "kanban.db", now, extra_ids=mission_ids))
 
 
 def _index_md() -> str:
@@ -83,7 +85,8 @@ def _current_tool(task: dict) -> dict | None:
     worker = task.get("worker") or task.get("assignee")
     if not worker:
         return None
-    _, msgs = core.read_session_messages(_state_db(worker), task.get("session_id"), task.get("started_at"), limit=12)
+    sid, since = core.worker_session(task)
+    _, msgs = core.read_session_messages(_state_db(worker), sid, since, limit=12)
     items = [i for i in core.activity_from_messages(msgs) if i["kind"] == "tool"]
     return items[-1] if items else None
 
@@ -122,8 +125,8 @@ async def agent(name: str):
     live = cards["running"][:1]
     if live:
         t = live[0]
-        session_id, msgs = await asyncio.to_thread(
-            core.read_session_messages, _state_db(name), t.get("session_id"), t.get("started_at"), 160)
+        sid, since = core.worker_session(t)
+        session_id, msgs = await asyncio.to_thread(core.read_session_messages, _state_db(name), sid, since, 160)
         activity = core.activity_from_messages(msgs)
 
     dirs = []
@@ -218,6 +221,9 @@ async def _ensure_session(client: httpx.AsyncClient, name: str, base: str, key: 
         r = await client.get(f"{base}/api/sessions/{sid}", headers=headers)
         if r.status_code == 200:
             return sid
+        if r.status_code != 404:
+            # chwilowy błąd gatewaya (restart): nie zakładamy nowej sesji, żeby nie zgubić rozmowy
+            raise HTTPException(502, _api_error(r, name))
     # tytuły sesji w Hermesie są unikalne: agent + czas
     title = f"TARS HQ · {name} · {time.strftime('%Y-%m-%d %H:%M:%S')}"
     r = await client.post(f"{base}/api/sessions", headers=headers, json={"title": title})

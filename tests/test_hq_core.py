@@ -319,3 +319,46 @@ def test_plugin_api_helpers(tmp_path, monkeypatch):
     env.write_text('# c\nAPI_SERVER_KEY="abc123abc123abc123"\nexport X=1\n', encoding="utf-8")
     base, key = api._api_target("tars")
     assert base.endswith("/p/tars") and key == "abc123abc123abc123"
+
+
+# ------------------------------------------------------------ regresje z przeglądu
+
+def test_judge_reads_own_session_not_implementers(home):
+    board = core.read_board(home / "kanban.db", NOW)
+    t = next(x for x in board["tasks"] if x["id"] == "t_a2")      # tars-web, ocenia tars
+    assert core.worker_session(t) == (None, NOW - 60)              # szukamy sesji TARS-a od startu jego runu
+    sher = next(x for x in board["tasks"] if x["id"] == "t_a1")
+    assert core.worker_session(sher)[0] == "sess-sher"
+
+
+def test_fallback_skips_chat_sessions(home):
+    db = home / "profiles/tars-sherlock/state.db"
+    conn = sqlite3.connect(db)
+    conn.execute("INSERT INTO sessions VALUES ('chat-hq', 'api_server', ?)", (NOW - 10,))
+    conn.commit(); conn.close()
+    sid, _ = core.read_session_messages(db, None, since=NOW - 601)
+    assert sid == "sess-sher"
+
+
+def test_old_block_reason_and_old_mission_cards(home):
+    conn = sqlite3.connect(home / "kanban.db")
+    conn.execute("UPDATE task_events SET created_at = ? WHERE task_id = 't_a3'", (int(NOW) - 30 * 86400,))
+    conn.commit(); conn.close()
+    board = core.read_board(home / "kanban.db", NOW, extra_ids=["t_a7"])
+    st = core.build_state(FLEET, board, INDEX.replace("t_a6, t_dead", "t_a6, t_a7"), NOW)
+    assert st["decisions"][0]["reason"].startswith("Która data")
+    m = st["missions"][0]
+    assert m["missing"] == [] and m["done"] == 2                  # t_a7 zakończona 29 dni temu liczy się
+
+
+def test_outputs_prune_heavy_dirs(tmp_path):
+    tars = tmp_path / "tars"
+    ws = tars / "workspaces" / "tars-web"
+    (ws / "out").mkdir(parents=True)
+    (ws / "out" / "a.png").write_bytes(b"x")
+    nm = ws / "node_modules" / "pkg"
+    nm.mkdir(parents=True)
+    for i in range(50):
+        (nm / f"f{i}.js").write_text("", encoding="utf-8")
+    files = core.list_outputs([ws], core.Roots(tars_dir=tars))
+    assert [f["name"] for f in files] == ["a.png"]

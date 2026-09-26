@@ -81,8 +81,9 @@ TASK_COLS = ("id", "title", "body", "assignee", "status", "priority", "created_a
              "session_id", "block_kind", "skills", "last_failure_error")
 
 
-def read_board(db_path: Path, now: float, window_s: int = 7 * 86400) -> dict:
-    """Karty otwarte + zakończone w oknie czasu, zdarzenia, profil bieżącego runu."""
+def read_board(db_path: Path, now: float, window_s: int = 7 * 86400, extra_ids: Iterable[str] = ()) -> dict:
+    """Karty otwarte + zakończone w oknie czasu (+ extra_ids, np. karty misji), zdarzenia, profil
+    i start bieżącego runu, ostatnia blokada każdej zablokowanej karty (bez względu na wiek)."""
     conn = _connect_ro(db_path)
     if conn is None:
         return {"tasks": [], "events": [], "ok": False}
@@ -94,16 +95,32 @@ def read_board(db_path: Path, now: float, window_s: int = 7 * 86400) -> dict:
             f"SELECT {sel} FROM tasks WHERE status IN ({','.join('?' * len(OPEN))}) "
             f"OR COALESCE(completed_at, created_at) >= ?", (*OPEN, since)).fetchall()
         tasks = [dict(r) for r in rows]
-        run_profile: dict[int, str] = {}
+        have = {t["id"] for t in tasks}
+        extra = [i for i in dict.fromkeys(extra_ids) if i not in have]
+        if extra:
+            q = f"SELECT {sel} FROM tasks WHERE id IN ({','.join('?' * len(extra))})"
+            tasks += [dict(r) for r in conn.execute(q, extra)]
+        runs: dict[int, dict] = {}
         run_ids = [t["current_run_id"] for t in tasks if t.get("current_run_id")]
         if run_ids and "task_runs" in _tables(conn):
-            q = f"SELECT id, profile FROM task_runs WHERE id IN ({','.join('?' * len(run_ids))})"
-            run_profile = {r["id"]: r["profile"] for r in conn.execute(q, run_ids)}
+            q = f"SELECT id, profile, started_at FROM task_runs WHERE id IN ({','.join('?' * len(run_ids))})"
+            runs = {r["id"]: dict(r) for r in conn.execute(q, run_ids)}
         for t in tasks:
-            t["worker"] = run_profile.get(t.get("current_run_id")) or None
+            run = runs.get(t.get("current_run_id")) or {}
+            t["worker"] = run.get("profile") or None
+            t["run_started_at"] = run.get("started_at")
         events = [dict(r) for r in conn.execute(
             "SELECT task_id, kind, payload, created_at FROM task_events WHERE created_at >= ? "
             "ORDER BY created_at DESC, id DESC LIMIT 400", (since,))]
+        blocked = [t["id"] for t in tasks if t.get("status") == "blocked"]
+        if blocked:
+            seen_blocked = {e["task_id"] for e in events if e["kind"] == "blocked"}
+            missing = [b for b in blocked if b not in seen_blocked]
+            for tid in missing:
+                row = conn.execute("SELECT task_id, kind, payload, created_at FROM task_events WHERE task_id = ? "
+                                   "AND kind = 'blocked' ORDER BY created_at DESC, id DESC LIMIT 1", (tid,)).fetchone()
+                if row:
+                    events.append(dict(row))
         for e in events:
             e["payload"] = _payload(e.get("payload"))
         return {"tasks": tasks, "events": events, "ok": True}
@@ -241,7 +258,10 @@ def read_session_messages(state_db: Path, session_id: str | None, since: float |
         if not session_id and "sessions" in tables and since:
             scols = _columns(conn, "sessions")
             if "started_at" in scols:
-                row = conn.execute("SELECT id FROM sessions WHERE started_at >= ? ORDER BY started_at DESC LIMIT 1",
+                # tylko sesje pracowników: bez rozmów (API/HQ, Telegram) i rutyn crona
+                src = " AND COALESCE(source, '') NOT IN ('api_server', 'tars-hq', 'telegram', 'cron')" \
+                    if "source" in scols else ""
+                row = conn.execute(f"SELECT id FROM sessions WHERE started_at >= ?{src} ORDER BY started_at DESC LIMIT 1",
                                    (since - 5,)).fetchone()
                 session_id = row["id"] if row else None
         if not session_id:
@@ -350,6 +370,14 @@ def derive_status(name: str, cards: dict[str, list[dict]], now: float) -> dict:
     return {"status": "idle", "headline": "", "task_id": None}
 
 
+def worker_session(t: dict) -> tuple[str | None, float | None]:
+    """(session_id, od kiedy) sesji tego, kto teraz pracuje nad kartą. session_id karty należy do
+    wykonawcy; gdy kartę trzyma inny profil (np. TARS-sędzia), szukamy jego sesji po starcie runu."""
+    if t.get("worker") and t["worker"] != t.get("assignee"):
+        return None, t.get("run_started_at") or t.get("started_at")
+    return t.get("session_id"), t.get("run_started_at") or t.get("started_at")
+
+
 def card_brief(t: dict) -> dict:
     return {k: t.get(k) for k in ("id", "title", "status", "assignee", "worker", "created_at", "started_at",
                                   "completed_at", "block_kind", "priority")}
@@ -446,10 +474,16 @@ def safe_path(raw: str, roots: Roots) -> Path | None:
     return None
 
 
+SKIP_DIRS = {"node_modules", ".git", "__pycache__", ".cache", "archiwum", ".astro", "dist-cache"}
+SCAN_MAX = 5000   # twardy limit plików na jedno zapytanie (duże projekty)
+
+
 def list_outputs(dirs: Iterable[Path], roots: Roots, limit: int = OUTPUT_LIMIT) -> list[dict]:
-    """Pliki wynikowe (najpierw katalogi out/), najnowsze pierwsze, bez plików roboczych."""
+    """Pliki wynikowe (najpierw katalogi out/), najnowsze pierwsze, bez plików roboczych.
+    Katalogi robocze (node_modules, .git…) są pomijane już przy przechodzeniu drzewa."""
     seen, files = set(), []
     allowed = roots.allowed()
+    scanned = 0
     for d in dirs:
         try:
             d = d.resolve()
@@ -457,19 +491,24 @@ def list_outputs(dirs: Iterable[Path], roots: Roots, limit: int = OUTPUT_LIMIT) 
             continue
         if not d.is_dir() or not any(_within(d, r) for r in allowed):
             continue
-        for p in d.rglob("*"):
-            if len(files) > limit * 4:
-                break
-            parts = set(p.parts)
-            if not p.is_file() or parts & {"node_modules", ".git", "__pycache__", ".cache", "archiwum"}:
-                continue
-            if p.name.startswith(".") or p in seen:
-                continue
-            seen.add(p)
-            st = p.stat()
-            files.append({"path": str(p), "name": p.name, "rel": str(p.relative_to(d)), "size": st.st_size,
-                          "mtime": st.st_mtime, "kind": KIND_BY_EXT.get(p.suffix.lower(), "other"),
-                          "in_out": "out" in p.relative_to(d).parts})
+        for root, subdirs, names in os.walk(d):
+            subdirs[:] = [s for s in subdirs if s not in SKIP_DIRS and not s.startswith(".")]
+            for n in names:
+                scanned += 1
+                if scanned > SCAN_MAX:
+                    break
+                p = Path(root) / n
+                if n.startswith(".") or p in seen or p.is_symlink():
+                    continue
+                seen.add(p)
+                try:
+                    st = p.stat()
+                except OSError:
+                    continue
+                rel = p.relative_to(d)
+                files.append({"path": str(p), "name": n, "rel": str(rel), "size": st.st_size,
+                              "mtime": st.st_mtime, "kind": KIND_BY_EXT.get(p.suffix.lower(), "other"),
+                              "in_out": "out" in rel.parts})
     files.sort(key=lambda f: (not f["in_out"], -f["mtime"]))
     return files[:limit]
 

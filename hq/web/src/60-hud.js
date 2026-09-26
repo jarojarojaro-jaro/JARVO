@@ -3,7 +3,8 @@
 function Hud({ state, error, onDecisions, now }) {
   const b = (state && state.board) || {};
   const d = (state && state.decisions) || [];
-  const stale = !state || (now - state.ts > 20);
+  // świeżość liczona zegarem przeglądarki (odporne na różnicę zegarów serwera i klienta)
+  const stale = !state || !usePoll.lastOk || (Date.now() / 1000 - usePoll.lastOk > 20);
   const chips = [
     ["W toku", b.running || 0, "work"],
     ["Ocena", b.review || 0, "warn"],

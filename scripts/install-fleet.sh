@@ -72,6 +72,7 @@ done
 for a in $AGENTS; do
   envf="$DATA/profiles/$a/.env"
   if ! grep -qE '^API_SERVER_KEY=.{16,}' "$envf" 2>/dev/null; then
+    [[ -s "$envf" && -n "$(tail -c1 "$envf")" ]] && echo >> "$envf"   # plik bez końcowego \n
     echo "API_SERVER_KEY=$($PY -c 'import secrets; print(secrets.token_hex(32))')" >> "$envf"
     chmod 600 "$envf"
     echo "  + API_SERVER_KEY dla $a"

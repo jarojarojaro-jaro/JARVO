@@ -56,7 +56,7 @@ const EVENT_PL = {
 };
 
 function FilePreview({ file, onClose }) {
-  const url = useBlobUrl(file.path);
+  const url = useBlobUrl(["image", "video", "pdf"].includes(file.kind) ? file.path : null);
   const [text, setText] = useState(null);
   useEffect(() => {
     if (file.kind !== "text" && file.kind !== "html") return;
