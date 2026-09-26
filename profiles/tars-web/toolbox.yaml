@@ -3,7 +3,7 @@ agent: tars-web
 # Wersje npm przypina infra/node/package.json (jedno źródło prawdy); tutaj: opis i healthchecki.
 tools:
   - {name: lighthouse, source: https://github.com/GoogleChrome/lighthouse, license: Apache-2.0, version: see-infra, install: {method: npm, spec: lighthouse}, integration: cli, used_by_skills: [audyt-strony], healthcheck: "lighthouse --version", autonomy: A0}
-  - {name: unlighthouse, source: https://github.com/harlan-zw/unlighthouse, license: MIT, version: see-infra, install: {method: npm, spec: "@unlighthouse/cli"}, integration: cli, used_by_skills: [audyt-strony], healthcheck: "unlighthouse --help", autonomy: A0}
+  - {name: unlighthouse, source: https://github.com/harlan-zw/unlighthouse, license: MIT, version: see-infra, install: {method: npm, spec: "@unlighthouse/cli"}, integration: cli, used_by_skills: [audyt-strony], healthcheck: "unlighthouse-ci --help", autonomy: A0}
   - {name: axe-core, source: https://github.com/dequelabs/axe-core, license: MPL-2.0, version: see-infra, install: {method: npm, spec: axe-core}, integration: skill-script, used_by_skills: [audyt-strony], healthcheck: "node -e \"require('axe-core')\"", autonomy: A0}
   - {name: playwright-core, source: https://github.com/microsoft/playwright, license: Apache-2.0, version: see-infra, install: {method: npm, spec: playwright-core}, integration: skill-script, used_by_skills: [audyt-strony, brand-z-url, nowa-strona], healthcheck: "node -e \"require('playwright-core')\"", autonomy: A0}
   - {name: linkinator, source: https://github.com/JustinBeckwith/linkinator, license: MIT, version: see-infra, install: {method: npm, spec: linkinator}, integration: cli, used_by_skills: [audyt-strony], healthcheck: "linkinator --version", autonomy: A0}

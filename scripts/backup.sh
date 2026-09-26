@@ -2,12 +2,13 @@
 # Nocny backup floty TARS (restic → zewnętrzne repozytorium S3/B2/SFTP). Uruchamiaj z crona hosta:
 #   15 3 * * * /srv/tars/repo/scripts/backup.sh >> /srv/tars/backups/backup.log 2>&1
 #
-# Wymaga /srv/tars/secrets/restic.env:
+# Wymaga /srv/tars/restic.env (root, chmod 600; celowo poza /srv/tars/secrets, który widzą agenci):
 #   RESTIC_REPOSITORY=s3:https://…/tars-backup   (albo b2:…, sftp:…)
 #   RESTIC_PASSWORD=…                            (przechowuj też POZA serwerem!)
 #   AWS_ACCESS_KEY_ID=… / AWS_SECRET_ACCESS_KEY=…  (albo B2_ACCOUNT_ID / B2_ACCOUNT_KEY)
 set -euo pipefail
-set -a; source /srv/tars/secrets/restic.env; set +a
+RESTIC_ENV="${TARS_RESTIC_ENV:-/srv/tars/restic.env}"   # root, 0600, POZA /srv/tars/secrets (kontener go nie widzi)
+set -a; source "$RESTIC_ENV"; set +a
 
 DATA=/srv/tars/data
 STAGE=/srv/tars/backups/stage

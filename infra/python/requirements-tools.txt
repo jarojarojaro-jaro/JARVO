@@ -1,7 +1,7 @@
 # Narzędzia Pythona floty TARS → /opt/tars/venv (Python 3.12 przez uv, osobno od środowiska Hermesa).
-# Wersje przypięte; aktualizacja = PR.
+# Wersje przypięte (≥ 14 dni od wydania, jak kwarantanna npm w obrazie); aktualizacja = PR + `make pins`.
 trafilatura==2.2.0
 yt-dlp==2026.8.19
 faster-whisper==1.2.1
 auto-editor==29.3.1
-rembg[cli]==2.0.85
+rembg[cpu,cli]==2.0.84

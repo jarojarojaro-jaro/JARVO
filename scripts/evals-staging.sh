@@ -35,8 +35,8 @@ PY=/opt/hermes/.venv/bin/python
 
 QUOTED=""
 [[ ${#ARGS[@]} -gt 0 ]] && printf -v QUOTED ' %q' "${ARGS[@]}"
-# bez -u: s6 /init startuje jako root, a wrapper obrazu sam obniża uprawnienia do użytkownika hermes
-"${COMPOSE[@]}" run --rm --no-deps -T -e HERMES_DASHBOARD=0 hermes bash -c "
+# bez init-a s6 (--entrypoint ""): żadnego gatewaya, dispatchera ani dashboardu; od razu jako hermes
+"${COMPOSE[@]}" run --rm --no-deps -T --entrypoint "" -u 10000:10000 -e HOME=/opt/data hermes bash -c "
   set -e
   bash /opt/tars/repo/scripts/install-fleet.sh --first-run --no-restart >/dev/null
   echo '▶ Flota zainstalowana na stagingu, start evals'

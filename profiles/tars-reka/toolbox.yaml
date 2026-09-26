@@ -4,7 +4,7 @@ tools:
   - {name: pandoc, source: https://github.com/jgm/pandoc, license: GPL-2.0 (CLI, osobny program), version: apt, install: {method: apt, spec: pandoc}, integration: cli, used_by_skills: [dokumenty], healthcheck: "pandoc --version", autonomy: A1}
   - {name: ocrmypdf, source: https://github.com/ocrmypdf/OCRmyPDF, license: MPL-2.0, version: apt, install: {method: apt, spec: "ocrmypdf tesseract-ocr-pol"}, integration: cli, used_by_skills: [dokumenty], healthcheck: "ocrmypdf --version", autonomy: A1}
   - {name: qpdf, source: https://github.com/qpdf/qpdf, license: Apache-2.0, version: apt, install: {method: apt, spec: qpdf}, integration: cli, used_by_skills: [dokumenty], healthcheck: "qpdf --version", autonomy: A1}
-  - {name: docling, source: https://github.com/docling-project/docling, license: MIT, version: optional, install: {method: uv-tool, spec: docling}, integration: cli, used_by_skills: [dokumenty], healthcheck: "docling --version", autonomy: A0, notes: "INSTALL_DOCLING=1"}
+  - {name: docling, optional: true, source: https://github.com/docling-project/docling, license: MIT, version: optional, install: {method: uv-tool, spec: docling}, integration: cli, used_by_skills: [dokumenty], healthcheck: "docling --version", autonomy: A0, notes: "INSTALL_DOCLING=1"}
 
 sidecars:
   - name: gotenberg

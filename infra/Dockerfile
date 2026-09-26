@@ -53,13 +53,19 @@ ENV PATH="/opt/tars/node/node_modules/.bin:${PATH}:/opt/tars/venv/bin"
 # dembrandt steruje własną wersją playwright-core; dociągamy pasującą Chromium do katalogu przeglądarek Hermesa
 RUN cd /opt/tars/node && npx --no-install dembrandt install-browser || echo "dembrandt install-browser: pominięte (sprawdź healthcheck)"
 
-# --- narzędzia Pythona (osobny venv na Pythonie 3.12, żeby nie ruszać środowiska Hermesa)
+# --- narzędzia Pythona (osobny venv na Pythonie 3.12, żeby nie ruszać środowiska Hermesa).
+# Interpreter pobrany przez uv musi leżeć poza /root, inaczej venv nie działa dla użytkownika hermes.
+ENV UV_PYTHON_INSTALL_DIR=/opt/tars/uv-python
 COPY infra/python/ /opt/tars/python/
 RUN uv venv /opt/tars/venv --python 3.12 && \
     VIRTUAL_ENV=/opt/tars/venv uv pip install -r /opt/tars/python/requirements-tools.txt && \
-    if [ "$INSTALL_DOCLING" = "1" ] || [ "$INSTALL_MANIM" = "1" ]; then \
-      VIRTUAL_ENV=/opt/tars/venv uv pip install $( [ "$INSTALL_DOCLING" = "1" ] && echo docling==2.130.0 ) \
-                                               $( [ "$INSTALL_MANIM" = "1" ] && echo manim==0.21.0 ) ; \
+    # auto-editor ściąga swoją binarkę przy pierwszym uruchomieniu do site-packages (w runtime tylko do odczytu)
+    /opt/tars/venv/bin/auto-editor --version && \
+    if [ "$INSTALL_DOCLING" = "1" ]; then \
+      VIRTUAL_ENV=/opt/tars/venv uv pip install "$(grep -E '^docling==' /opt/tars/python/requirements-optional.txt)"; \
+    fi && \
+    if [ "$INSTALL_MANIM" = "1" ]; then \
+      VIRTUAL_ENV=/opt/tars/venv uv pip install "$(grep -E '^manim==' /opt/tars/python/requirements-optional.txt)"; \
     fi
 
 # --- claude-seo: runtime skryptów dla skilli SEO (ten sam commit co w vendor/skills.lock.yaml)

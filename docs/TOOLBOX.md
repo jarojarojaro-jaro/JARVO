@@ -195,6 +195,14 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 | claude-seo | `/opt/tars/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
 | sidecary | sieć `tars-net` | SearXNG (`SEARXNG_URL`), Crawl4AI (`CRAWL4AI_URL`), Gotenberg (`GOTENBERG_URL`), Valkey |
 
+Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmianą):
+- globalny npmrc obrazu ma `min-release-age = 14` i `engine-strict`: przypinamy wersje npm starsze niż 14 dni
+  i zgodne z Node obrazu; tę samą zasadę stosujemy do pinów Pythona,
+- interpreter Pythona dla venv pobiera `uv` do `/opt/tars/uv-python` (nie do `/root`, niedostępnego dla `hermes`),
+- puppeteer (zależność `critical`) nie pobiera własnej Chrome: `PUPPETEER_EXECUTABLE_PATH` wskazuje wspólną Chromium,
+- auto-editor pobiera swoją binarkę przy budowie obrazu (w runtime katalog pakietów jest tylko do odczytu),
+- crawl całej witryny: komenda `unlighthouse-ci` (pakiet `@unlighthouse/cli`).
+
 Skrypty `.cjs` ładują moduły przez `NODE_PATH`, a ESM-owe pakiety (np. `favicons`) przez `importGlobal()`.
 Skrypty Pythona, które potrzebują bibliotek z venv narzędzi, same przełączają się na `/opt/tars/venv`.
 

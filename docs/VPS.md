@@ -71,7 +71,8 @@ Rekomendacje:
 /srv/tars/
 ├── repo/                 # klon tego repo → /opt/tars/repo (tylko do odczytu w kontenerze)
 ├── compose/              # .env compose (obrazy, sekrety usług, TARS_BIND_IP) + tars.env (ID Telegrama)
-├── secrets/              # host.env i <agent>.env (klucze), restic.env → /opt/tars/secrets (ro)
+├── secrets/              # host.env i <agent>.env (klucze) → /opt/tars/secrets (ro), grupa 10000, 2750/640
+├── restic.env            # dane dostępowe backupu (root, 600), poza kontenerem
 ├── build/                # wynik scripts/build.py → /opt/tars/build (ro): dystrybucje profili, config hosta
 ├── data/
 │   ├── hermes/           # → /opt/data: profile, pamięć, sesje, kanban.db, cron
@@ -125,7 +126,11 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 - tylko w `.env` profili (uprawnienia `0600`), nigdy w git,
 - **osobny klucz OpenRouter dla każdego agenta z limitem kredytów.** Widać koszt per agent,
   a wyciek jednego klucza ma ograniczony zasięg,
-- backupy szyfrowane (restic szyfruje domyślnie), a hasło do repozytorium backupu trzymasz poza VPS.
+- backupy szyfrowane (restic szyfruje domyślnie), a hasło do repozytorium backupu trzymasz poza VPS,
+- **granica zaufania:** wszyscy agenci działają w jednym kontenerze jako ten sam użytkownik (`hermes`),
+  więc agent z terminalem technicznie może przeczytać klucze innych agentów. Łagodzą to limity na kluczach,
+  zgody na ryzykowne komendy i to, że dane dostępowe backupu (`/srv/tars/restic.env`) oraz `compose/.env`
+  w ogóle nie trafiają do kontenera. Pełna izolacja kluczy wymagałaby osobnych kontenerów per agent.
 
 ---
 

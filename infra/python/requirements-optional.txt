@@ -1,4 +1,4 @@
 # Ciężkie narzędzia opcjonalne (build-arg INSTALL_DOCLING=1 / INSTALL_MANIM=1).
 # docling pobiera modele ML (~1–2 GB); manim wymaga cairo/pango (+ LaTeX dla wzorów).
-docling==2.130.0
+docling==2.126.0
 manim==0.21.0

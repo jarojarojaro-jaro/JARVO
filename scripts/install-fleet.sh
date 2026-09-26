@@ -19,6 +19,14 @@ done
 
 log() { printf '▶ %s\n' "$*"; }
 [[ -f "$BUILD/BUILD.json" ]] || { echo "Brak $BUILD/BUILD.json: najpierw scripts/build.py"; exit 1; }
+if [[ -d "$SECRETS" ]] && ! ls "$SECRETS" >/dev/null 2>&1; then
+  echo "✗ $SECRETS jest nieczytelny dla użytkownika $(id -un) (uid $(id -u)). Na hoście:"
+  echo "  sudo chgrp -R 10000 /srv/tars/secrets && sudo chmod 2750 /srv/tars/secrets && sudo chmod 640 /srv/tars/secrets/*.env"
+  exit 1
+fi
+for f in "$SECRETS"/*.env; do
+  [[ -e "$f" && ! -r "$f" ]] && { echo "✗ $f nieczytelny (uprawnienia): sudo chgrp 10000 $f && sudo chmod 640 $f"; exit 1; }
+done
 AGENTS=$($PY -c "import json;print(' '.join(a['agent'] for a in json.load(open('$BUILD/BUILD.json'))['agents']))")
 
 # 1. katalogi floty i szablony wiedzy

@@ -180,7 +180,10 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 
 ### Faza 0: Fundament i spike techniczny
 - 🟡 Postawić VPS według [RUNBOOK.md](RUNBOOK.md) (skrypty gotowe: `bootstrap-vps.sh`, `deploy.sh`).
-- 🟡 Obraz pochodny Hermesa (`infra/Dockerfile`) z narzędziami MVP (test budowy w toku).
+- ✅ Obraz pochodny Hermesa (`infra/Dockerfile`) z narzędziami MVP, zbudowany na opublikowanym obrazie Hermesa 0.21.5.
+- ✅ Test end-to-end w Dockerze: prawdziwy `deploy.sh` (walidacja, build, instalacja i aktualizacja 5 profili,
+  healthchecki), audyt strony z Lighthouse/axe, rendery grafik, PDF przez Gotenberg, SearXNG, patrol na prawdziwej
+  tablicy i cron z bramką skryptu (`wakeAgent=false` → zero tokenów). Bez modeli LLM i bez Telegrama.
 - ✅ Model sandboxu: agenci wykonują komendy w kontenerze Hermesa, bez gniazda Dockera.
 - ✅ `hermes profile install` z lokalnego katalogu i `hermes profile update --force-config`.
 - ✅ Izolacja snajpera: `.no-bundled-skills`, profil widzi wyłącznie swoje skille.

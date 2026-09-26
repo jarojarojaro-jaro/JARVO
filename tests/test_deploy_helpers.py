@@ -118,3 +118,18 @@ def test_prune_removes_only_managed_skills_missing_from_build(tmp_path):
     assert not old_own.exists() and not old_vendor.exists()
     assert (profile / "web/audyt-strony").exists()
     assert agent_made.exists() and hidden.exists()
+
+
+# ------------------------------------------------------------------ check-pins
+
+def test_version_range_check():
+    from conftest import load_script
+    pins = load_script("scripts/check-pins.py")
+    ok = pins.node_satisfies
+    assert ok(None, "26.5.1") is True
+    assert ok(">=22.18.0", "26.5.1") is True
+    assert ok("^22.22.0 || >= 24.8.0", "26.5.1") is True
+    assert ok("^22.22.0 || >= 24.8.0", "23.1.0") is False
+    assert ok(">=18 <20", "26.5.1") is False
+    assert ok("<4.0 >=3.11", "3.12.0") is True
+    assert ok(">=3.13", "3.12.0") is False

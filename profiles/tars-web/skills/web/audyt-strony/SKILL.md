@@ -45,5 +45,5 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
 - [ ] priorytety P0–P3 i top 3 na górze.
 
 ## Uwagi
-- Audytujesz **tylko** wskazane strony; crawl całej witryny (`unlighthouse`) tylko, gdy karta o to prosi.
+- Audytujesz **tylko** wskazane strony; crawl całej witryny (`unlighthouse-ci --site <url>`) tylko, gdy karta o to prosi.
 - Wyniki Lighthouse wahają się: przy wątpliwościach 3 pomiary i mediana.

@@ -49,11 +49,15 @@ log "Start usług"
 "${COMPOSE[@]}" "${PROFILES[@]}" up -d
 
 PY=/opt/hermes/.venv/bin/python
+# Jednorazowe kroki bez init-a s6 (--entrypoint ""): na wspólnym wolumenie danych init wznowiłby
+# drugi gateway i dashboard. Od razu jako użytkownik hermes (uid 10000), repo tylko do odczytu.
+ONEOFF=(run --rm --no-deps -T --entrypoint "" -u 10000:10000 -e HOME=/tmp
+        -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/opt/tars/repo)
 log "Walidacja repo"
-"${COMPOSE[@]}" run --rm --no-deps -T hermes "$PY" /opt/tars/repo/scripts/validate.py
+"${COMPOSE[@]}" "${ONEOFF[@]}" hermes "$PY" /opt/tars/repo/scripts/validate.py
 
 log "Build dystrybucji profili"
-"${COMPOSE[@]}" run --rm --no-deps -T \
+"${COMPOSE[@]}" "${ONEOFF[@]}" \
   -v "${TARS_BUILD:-/srv/tars/build}:/out" -v "$COMPOSE_DIR:/opt/tars/compose:ro" \
   -e TARS_HERMES_PYTHON="$PY" \
   hermes "$PY" /opt/tars/repo/scripts/build.py --hermes-src /opt/hermes --out /out \

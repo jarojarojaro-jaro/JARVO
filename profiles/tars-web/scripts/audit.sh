@@ -22,6 +22,16 @@ run() {  # run <nazwa> <komenda...>
   echo "▶ $name" >&2
   if "$@" >"$OUT/$name.log" 2>&1; then STATUS[$name]="ok"; else STATUS[$name]="błąd (zob. $OUT/$name.log)"; fi
 }
+run_findings() {  # jak run, ale kod 1 z poprawnym JSON-em = narzędzie działa i coś znalazło (seo_check, linkinator)
+  local name="$1"; shift
+  echo "▶ $name" >&2
+  "$@" >"$OUT/$name.log" 2>"$OUT/$name.err"
+  local rc=$?
+  if [[ $rc -eq 0 ]]; then STATUS[$name]="ok"
+  elif [[ $rc -eq 1 ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$OUT/$name.log" 2>/dev/null; then
+    STATUS[$name]="ok (są znaleziska)"
+  else STATUS[$name]="błąd (zob. $OUT/$name.log, $OUT/$name.err)"; fi
+}
 
 CHROME_FLAGS="--headless=new --no-sandbox --disable-gpu"
 run lighthouse-mobile lighthouse "$URL" --quiet --chrome-flags="$CHROME_FLAGS" \
@@ -29,9 +39,9 @@ run lighthouse-mobile lighthouse "$URL" --quiet --chrome-flags="$CHROME_FLAGS" \
 run lighthouse-desktop lighthouse "$URL" --quiet --chrome-flags="$CHROME_FLAGS" --preset=desktop \
   --output=json --output=html --output-path="$OUT/lighthouse-desktop"
 run axe node "$HERE/a11y.cjs" "$URL" "$OUT/axe.json"
-run links linkinator "$URL" --recurse --format JSON --timeout 15000 --concurrency 10 --skip "^(?!${URL%/})"
+run_findings links linkinator "$URL" --recurse --format JSON --timeout 15000 --concurrency 10 --skip "^(?!${URL%/})"
 [[ -f "$OUT/links.log" ]] && cp "$OUT/links.log" "$OUT/links.json"
-run seo python3 "$HERE/seo_check.py" "$URL" --json
+run_findings seo python3 "$HERE/seo_check.py" "$URL" --json
 [[ -f "$OUT/seo.log" ]] && cp "$OUT/seo.log" "$OUT/seo.json"
 run screenshots node "$HERE/screenshots.cjs" "$URL" "$OUT/screenshots"
 

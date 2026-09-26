@@ -2,7 +2,8 @@
 # Miesięczny test odtworzenia backupu (cron hosta: 40 4 1 * *). Odtwarza ostatni snapshot do katalogu
 # tymczasowego i sprawdza, czy kluczowe pliki są czytelne. Wynik → /srv/tars/backups/restore-test.log.
 set -euo pipefail
-set -a; source /srv/tars/secrets/restic.env; set +a
+RESTIC_ENV="${TARS_RESTIC_ENV:-/srv/tars/restic.env}"   # root, 0600, POZA /srv/tars/secrets (kontener go nie widzi)
+set -a; source "$RESTIC_ENV"; set +a
 TMP="$(mktemp -d /srv/tars/backups/restore-XXXX)"
 trap 'rm -rf "$TMP"' EXIT
 

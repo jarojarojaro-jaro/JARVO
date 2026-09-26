@@ -86,7 +86,8 @@ command -v tailscale >/dev/null || curl -fsSL https://tailscale.com/install.sh |
 
 log "Katalogi /srv/tars"
 install -d -m 755 -o "$USER_NAME" -g "$USER_NAME" /srv/tars /srv/tars/compose /srv/tars/backups
-install -d -m 700 -o "$USER_NAME" -g "$USER_NAME" /srv/tars/secrets
+# sekrety: edytuje je $USER_NAME, czyta kontener (grupa 10000 = użytkownik hermes); setgid → nowe pliki dziedziczą grupę
+install -d -m 2750 -o "$USER_NAME" -g 10000 /srv/tars/secrets
 # dane i build należą do użytkownika hermes w kontenerze (uid 10000)
 install -d -m 755 -o 10000 -g 10000 /srv/tars/data /srv/tars/data/hermes /srv/tars/build
 install -d -m 755 /srv/tars/data/valkey /srv/tars/data/uptime-kuma /srv/tars/data/beszel
@@ -109,8 +110,10 @@ if [[ -d /srv/tars/repo ]]; then
     target="/srv/tars/secrets/$(basename "$f" .example)"
     [[ -f "$target" ]] || cp "$f" "$target"
   done
-  chown -R "$USER_NAME:$USER_NAME" /srv/tars/compose /srv/tars/secrets
-  chmod 600 /srv/tars/compose/.env /srv/tars/secrets/*.env
+  chown -R "$USER_NAME:$USER_NAME" /srv/tars/compose
+  chown "$USER_NAME:10000" /srv/tars/secrets/*.env
+  chmod 600 /srv/tars/compose/.env
+  chmod 640 /srv/tars/secrets/*.env
 fi
 
 cat <<EOF

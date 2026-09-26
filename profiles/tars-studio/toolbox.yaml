@@ -2,7 +2,7 @@ agent: tars-studio
 
 tools:
   - {name: hyperframes, source: https://github.com/heygen-com/hyperframes, license: Apache-2.0, version: npx-pinned-by-skill, install: {method: npm, spec: "hyperframes (npx)"}, integration: cli, used_by_skills: [film-z-kodu, hyperframes, product-launch-video], healthcheck: "npx --yes hyperframes --version", autonomy: A1}
-  - {name: manim, source: https://github.com/ManimCommunity/manim, license: MIT, version: image, install: {method: uv-tool, spec: manim}, integration: cli, used_by_skills: [manim-video], healthcheck: "manim --version", autonomy: A1, notes: "Wymaga cairo/pango (apt) i LaTeX dla wzorów; instalowane z INSTALL_MANIM=1."}
+  - {name: manim, optional: true, source: https://github.com/ManimCommunity/manim, license: MIT, version: image, install: {method: uv-tool, spec: manim}, integration: cli, used_by_skills: [manim-video], healthcheck: "manim --version", autonomy: A1, notes: "Wymaga cairo/pango (apt) i LaTeX dla wzorów; instalowane z INSTALL_MANIM=1."}
   - {name: ffmpeg, source: https://ffmpeg.org, license: LGPL/GPL, version: image, install: {method: image, spec: "w obrazie Hermesa"}, integration: cli, used_by_skills: [film-z-kodu], healthcheck: "ffmpeg -version", autonomy: A1}
   - {name: faster-whisper, source: https://github.com/SYSTRAN/faster-whisper, license: MIT, version: see-infra, install: {method: pip-venv, spec: faster-whisper}, integration: skill-script, used_by_skills: [film-z-kodu], healthcheck: "/opt/tars/venv/bin/python -c 'import faster_whisper'", autonomy: A1}
   - {name: auto-editor, source: https://github.com/WyattBlue/auto-editor, license: Unlicense, version: see-infra, install: {method: uv-tool, spec: auto-editor}, integration: cli, used_by_skills: [film-z-kodu], healthcheck: "auto-editor --version", autonomy: A1}
@@ -15,6 +15,7 @@ sidecars:
     image: ghcr.io/gitroomhq/postiz-app
     license: AGPL-3.0
     url_env: POSTIZ_URL
+    optional: true           # sidecar dochodzi, gdy Studio zacznie publikować
     healthcheck: "curl -fsS \"$POSTIZ_URL\" >/dev/null"
 
 hermes_skills: [manim-video, baoyu-infographic, humanizer, social-media-content-calendar, creative-ideation, meme-generation, excalidraw, concept-diagrams]

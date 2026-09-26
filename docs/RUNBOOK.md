@@ -11,7 +11,8 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 
 | Co | Po co | Uwagi |
 |---|---|---|
-| VPS x86_64, Ubuntu 24.04 (albo Debian 12), region UE | wszystko działa tutaj | start: **4 vCPU / 8 GB / 80 GB**, cała flota wygodnie: **8 vCPU / 16 GB / 160 GB** |
+| VPS x86_64, Ubuntu 24.04 (albo Debian 12), region UE | wszystko działa tutaj | start: **4 vCPU / 8 GB / 80 GB**, cała flota wygodnie: **8 vCPU / 16 GB / 160 GB** (sam obraz `tars-hermes` ma ok. 9–10 GB, sidecary ok. 5 GB) |
+| Darmowe konto Docker Hub | `docker login` na serwerze | anonimowe pobieranie obrazów ma limit, który na współdzielonych IP VPS-ów łatwo wyczerpać |
 | Klucz SSH (ed25519) | logowanie na serwer | hasła będą wyłączone |
 | Konto [Tailscale](https://tailscale.com) (darmowe) | prywatny dostęp do serwera i paneli | nic nie wystawiamy publicznie |
 | Konto [OpenRouter](https://openrouter.ai) z kredytami | modele, obrazy, wideo | **6 kluczy**: host + 5 agentów, każdy z limitem kredytów |
@@ -92,7 +93,10 @@ Zainstaluj Tailscale też na laptopie i telefonie. Od teraz łącz się przez `s
 
 ## 4. Konfiguracja na serwerze
 
-Wszystkie pliki mają już szablony (utworzył je bootstrap) i uprawnienia 600.
+Wszystkie pliki mają już szablony (utworzył je bootstrap). `compose/.env` ma tryb 600. Pliki w `secrets/`
+mają tryb 640 i grupę `10000` (użytkownik `hermes` w kontenerze), bo instalator floty czyta je z kontenera.
+Nowe pliki w tym katalogu dziedziczą grupę (setgid), a przy ręcznym kopiowaniu użyj
+`sudo chgrp 10000 plik && chmod 640 plik`.
 
 **`/srv/tars/compose/.env`** (docker compose):
 ```ini
@@ -147,7 +151,9 @@ Co się dzieje (i co powinieneś zobaczyć):
 | walidacja repo | `Walidacja: 0 błędów` |
 | build dystrybucji | `✓ tars: … skilli, 4 rutyn cron`, `✓ tars-sherlock: …` itd.; brak linii `!` o Telegramie |
 | instalacja floty | `Instalacja profilu …` ×5, `✅ Flota zainstalowana` |
-| healthchecki | `✓` przy narzędziach; pojedyncze `✗` opisz i sprawdź w sekcji 9 |
+| healthchecki | `✓` przy narzędziach, `○` przy opcjonalnych (docling, manim, postiz); każdy `✗` sprawdź w sekcji 10 |
+
+Przed pierwszym wdrożeniem zaloguj się do Docker Hub (`docker login`), żeby nie trafić na limit pobrań.
 
 Po udanym wdrożeniu przypnij obrazy do digestów (powtarzalne wdrożenia):
 
@@ -183,15 +189,15 @@ o Tobie, z której korzystają wszyscy agenci. Brand kity dodajesz poleceniem: �
 
 ## 8. Backupy, monitoring, zamknięcie SSH
 
-**Backup (restic):**
+**Backup (restic):** dane dostępowe trzymamy w `/srv/tars/restic.env` (root, 600), celowo **poza**
+`/srv/tars/secrets`, bo ten katalog jest widoczny w kontenerze agentów.
 ```bash
-cat > /srv/tars/secrets/restic.env <<'EOF'
-RESTIC_REPOSITORY=b2:tars-backup:/vps
-RESTIC_PASSWORD=…            # zapisz TAKŻE poza serwerem (menedżer haseł)
-B2_ACCOUNT_ID=…
-B2_ACCOUNT_KEY=…
-EOF
-chmod 600 /srv/tars/secrets/restic.env
+sudo install -m 600 /dev/null /srv/tars/restic.env
+sudo nano /srv/tars/restic.env
+#   RESTIC_REPOSITORY=b2:tars-backup:/vps
+#   RESTIC_PASSWORD=…            # zapisz TAKŻE poza serwerem (menedżer haseł)
+#   B2_ACCOUNT_ID=…
+#   B2_ACCOUNT_KEY=…
 sudo bash /srv/tars/repo/scripts/backup.sh          # pierwszy przebieg ręcznie
 sudo crontab -e
 # 15 3 * * * /srv/tars/repo/scripts/backup.sh >> /srv/tars/backups/backup.log 2>&1
@@ -238,4 +244,6 @@ Wyjątek to skille tworzone przez agentów: zbiera je `harvest-skills.sh`.
 | agent odpowiada błędem 401/402 | zły klucz OpenRouter albo wyczerpany limit kredytów tego klucza |
 | `✗` w healthchecku narzędzia | `docker exec -u hermes tars-hermes bash -lc '<komenda z toolbox.yaml>'` i przebudowa obrazu, jeśli brakuje pakietu |
 | walidacja przy deployu nie przechodzi | deploy zatrzymuje się przed zmianą floty; popraw błąd w repo (lokalnie `make validate`) |
+| `install-fleet.sh`: „nieczytelny” przy sekretach | złe uprawnienia `secrets/` → `sudo chgrp -R 10000 /srv/tars/secrets && sudo chmod 2750 /srv/tars/secrets && sudo chmod 640 /srv/tars/secrets/*.env` |
+| `toomanyrequests: You have reached your unauthenticated pull rate limit` | limit Docker Hub → `docker login` (darmowe konto) i ponów `deploy.sh` |
 | brak miejsca na dysku | `docker system prune`, stare rendery w `/srv/tars/data/hermes/tars/workspaces/*/` |

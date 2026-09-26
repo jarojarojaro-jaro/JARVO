@@ -247,9 +247,11 @@ def check_scripts(r: Report) -> None:
         if any(p in SKIP_DIRS for p in path.parts) or not path.is_file():
             continue
         if path.suffix == ".py":
-            res = subprocess.run([sys.executable, "-m", "py_compile", str(path)], capture_output=True, text=True)
-            if res.returncode:
-                r.err(f"{path.relative_to(fl.REPO_ROOT)}: błąd składni Pythona: {res.stderr.strip()[:200]}")
+            # kompilacja w pamięci: repo w kontenerze jest tylko do odczytu (py_compile chce zapisać .pyc)
+            try:
+                compile(path.read_text(encoding="utf-8"), str(path), "exec", dont_inherit=True)
+            except SyntaxError as exc:
+                r.err(f"{path.relative_to(fl.REPO_ROOT)}: błąd składni Pythona: {exc.msg} (linia {exc.lineno})")
         elif path.suffix == ".sh":
             res = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True)
             if res.returncode:

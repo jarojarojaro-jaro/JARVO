@@ -19,14 +19,18 @@ for a in fl.load_fleet().active():
     for t in (data.get("tools") or []) + (data.get("sidecars") or []):
         hc = t.get("healthcheck")
         if hc:
-            print(f"{a.name}\t{t['name']}\t{hc}")
+            print(f"{a.name}\t{t['name']}\t{'1' if t.get('optional') else '0'}\t{hc}")
 PY
 )
 
-while IFS=$'\t' read -r agent name cmd; do
+skipped=0
+while IFS=$'\t' read -r agent name optional cmd; do
   [[ -z "$agent" ]] && continue
   if timeout 60 bash -c "$cmd" >/dev/null 2>&1; then
     printf '  ✓ %-14s %s\n' "$agent" "$name"
+  elif [[ "$optional" == "1" ]]; then
+    printf '  ○ %-14s %s  (opcjonalne, niezainstalowane)\n' "$agent" "$name"
+    skipped=$((skipped + 1))
   else
     printf '  ✗ %-14s %s  (%s)\n' "$agent" "$name" "$cmd"
     fails=$((fails + 1))
@@ -35,5 +39,5 @@ done <<< "$checks"
 
 echo "  ▸ kanban: $(hermes kanban stats --json 2>/dev/null | $PY -c 'import json,sys; d=json.load(sys.stdin); print(d.get("by_status"))' 2>/dev/null || echo 'niedostępny')"
 echo "  ▸ gateway: $(hermes gateway status 2>&1 | head -1)"
-[[ $fails -eq 0 ]] && echo "Wszystkie healthchecki OK" || echo "Niepowodzenia: $fails"
+[[ $fails -eq 0 ]] && echo "Healthchecki OK (pominięte opcjonalne: $skipped)" || echo "Niepowodzenia: $fails (pominięte opcjonalne: $skipped)"
 exit $fails
