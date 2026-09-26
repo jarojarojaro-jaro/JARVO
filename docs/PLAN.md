@@ -184,10 +184,10 @@ Cel: potwierdzić na prawdziwym Hermesie, że klocki działają tak, jak mówi d
 - [ ] Telegram: jeden bot, supergrupa z tematami, `profile_routes` z `thread_id` → różne profile.
 - [ ] Spisać ADR-y dla decyzji z sekcji 7.
 
-### Faza 1: MVP: TARS + 2 specjalistów
+### Faza 1: MVP: TARS + Sherlock
 - [ ] Szkielet repo (struktura z sekcji 5), `fleet.yaml`, szablony.
 - [ ] Profil `tars`: SOUL z osobowością, skill „roster”, protokół zlecania (kanban vs delegate).
-- [ ] Dwóch pierwszych specjalistów (propozycja: `tars-research` + ten najbardziej przydatny dla Ciebie).
+- [ ] `tars-sherlock` jako pierwszy snajper (najprostsze narzędzia, test pętli sędziego).
 - [ ] `scripts/install.sh`: jedna komenda stawia całą flotę.
 - [ ] Walidatory w `tests/` + pierwsze evals (routing: czy TARS oddaje właściwemu specjaliście).
 
@@ -203,10 +203,11 @@ Cel: potwierdzić na prawdziwym Hermesie, że klocki działają tak, jak mówi d
       nawyki, preferencje) i zapisuje profil użytkownika, z którego korzystają wszyscy.
 - [ ] Zasady prywatności: co gdzie jest przechowywane, co nigdy nie opuszcza maszyny.
 
-### Faza 4: Pełna flota (kilkunastu specjalistów)
+### Faza 4: Reszta floty v1, potem kolejni specjaliści
 - [ ] Każdy specjalista według kontraktu z sekcji 4: SOUL, 3–8 skilli, knowledge w `references/`, evals.
 - [ ] Integracje MCP per specjalista (kalendarz, mail, notatki, dysk, bank export…).
-- [ ] Budowa iteracyjna: 1–2 specjalistów na raz, każdy „dogfoodowany” przed kolejnym.
+- [ ] Kolejność: `tars-web` → `tars-studio` → `tars-reka`, każdy „dogfoodowany” przed kolejnym.
+- [ ] Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, TARS ocenia).
 
 ### Faza 5: Automatyzacje i rój
 - [ ] Rutyny cron: poranny brief (TARS zbiera od specjalistów), przegląd tygodnia, przypomnienia.
@@ -232,35 +233,30 @@ Wake word, Home Assistant, aplikacja mobilna, serwer 24/7 z backupami, kolejne s
 
 | # | Decyzja | Rekomendacja | Dlaczego |
 |---|---|---|---|
-| D1 | Lista specjalistów | Wybierasz Ty (propozycja w sekcji 8) | To Twoje życie i Twoje potrzeby |
-| D2 | Modele | Frontier dla TARS-a (np. Claude), tańsze dla specjalistów; zmiana per profil w `config.yaml` | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
+| D1 | Lista specjalistów | ✅ Ustalone: flota v1 (sekcja 8) | |
+| D2 | Modele | OpenRouter jako jeden klucz do modeli, obrazów i wideo; najmocniejszy model dla TARS-a, mocny dla snajperów | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
 | D3 | Gdzie działa | Mały VPS lub domowy serwer z Dockerem (s6 pilnuje gatewaya); laptop do developmentu | TARS dostępny 24/7 z Telegrama |
 | D4 | Główny kanał | Telegram (grupa z tematami) + CLI; desktop jako dodatek | Najtańszy start, działa z telefonu |
 | D5 | Wspólna pamięć | Honcho (self-host, jeśli prywatność jest priorytetem) | Natywny model „wspólny użytkownik, osobni agenci” |
-| D6 | Nazewnictwo profili | Prefiks `tars-` (`tars-fin`, `tars-dev`…) | Profile stają się komendami w shellu, a prefiks unika kolizji |
+| D6 | Nazewnictwo profili | Prefiks `tars-` (`tars-web`, `tars-sherlock`…) | Profile stają się komendami w shellu, a prefiks unika kolizji |
 | D7 | Język | Polski domyślnie, skille technicznie po angielsku tam, gdzie pomaga modelowi | Naturalna rozmowa i precyzyjne instrukcje |
 
 ---
 
-## 8. Propozycja floty (do wyboru i przycięcia)
+## 8. Flota v1
+
+Pięć profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędziego) jest w
+[FLEET.md](FLEET.md), a rejestr maszynowy w [`fleet.yaml`](../fleet.yaml).
 
 | Profil | Rola |
 |---|---|
-| `tars` | Dyspozytor, osobowość, pierwsza linia, poranny brief |
-| `tars-research` | Research w sieci, weryfikacja faktów, raporty ze źródłami |
-| `tars-dev` | Programowanie, repozytoria, code review, automatyzacje skryptami |
-| `tars-ops` | Serwer, backupy, Docker, bezpieczeństwo sprzętu i kont |
-| `tars-fin` | Budżet, wydatki, oszczędzanie, inwestycje (bez wykonywania transakcji) |
-| `tars-biz` | Strategia, pomysły biznesowe, analiza rynku, oferty |
-| `tars-write` | Teksty, maile, social media, korekta, tłumaczenia |
-| `tars-learn` | Nauka: plany, fiszki, tłumaczenie trudnych tematów |
-| `tars-health` | Trening, dieta, sen, nawyki (z zastrzeżeniami medycznymi) |
-| `tars-plan` | Kalendarz, zadania, cele, przeglądy tygodnia |
-| `tars-home` | Dom, zakupy, porównywanie produktów, naprawy |
-| `tars-travel` | Podróże: planowanie, loty, noclegi, plany dnia |
-| `tars-legal` | Urzędy, umowy, pisma, prawo PL w ogólnym zarysie (nie porada prawna) |
+| `tars` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje |
+| `tars-web` | Web Senior Dev: strony od faviconu po SEO, uczy się marki |
+| `tars-sherlock` | Researcher-detektyw: wiele źródeł, weryfikacja faktów |
+| `tars-studio` | Marketing i kreacja: grafiki, filmy (kod + AI), social media |
+| `tars-reka` | Prawa ręka: generalista, który wykonuje i ogarnia wszystko |
 
----
+Kolejni specjaliści dojdą później, każdy według tego samego kontraktu.
 
 ## 9. Zasady projektu
 
