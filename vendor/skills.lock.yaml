@@ -1,0 +1,140 @@
+# Skille zewnętrzne (third-party), które scripts/build.py kopiuje do profili agentów.
+#
+# Każde źródło jest przypięte do konkretnego commita. Aktualizacja = zmiana `rev` w PR
+# (przejrzyj diff upstreamu!). Licencja jest kopiowana razem ze skillem (LICENSE-UPSTREAM).
+# Źródło `hermes` to drzewo Hermesa z obrazu Docker (/opt/hermes), więc jego wersja
+# jest zawsze zgodna z wersją uruchomionego Hermesa.
+#
+# `dest` = <kategoria>/<nazwa> w skills/ profilu. Rodziny skilli, które odwołują się do
+# siebie ścieżkami względnymi (../hyperframes-animation/…, ../seo/references/…), MUSZĄ
+# lądować w tej samej kategorii.
+
+version: 1
+
+sources:
+  hermes:
+    type: hermes-tree
+    license: MIT
+    notice: "Copyright (c) Nous Research. Hermes Agent, MIT License."
+  marketingskills:
+    type: git
+    repo: https://github.com/coreyhaines31/marketingskills
+    rev: 5b2c0007766c6a1cf1d53fd8fc73e979e0821022
+    license: MIT
+    license_file: LICENSE
+  web-quality-skills:
+    type: git
+    repo: https://github.com/addyosmani/web-quality-skills
+    rev: afa8da942115f2961fdbfa80807ea0b232ff6c00
+    license: MIT
+    license_file: LICENSE
+  claude-seo:
+    type: git
+    repo: https://github.com/AgriciDaniel/claude-seo
+    rev: e77e783e38eeb738424eb72117abbd2dacdd88af
+    license: MIT
+    license_file: LICENSE
+    # Skille wołają "${CLAUDE_PLUGIN_ROOT}/scripts/claude-seo"; obraz Dockera instaluje
+    # ten sam commit do /opt/tars/vendor/claude-seo i ustawia CLAUDE_PLUGIN_ROOT.
+  anthropic-skills:
+    type: git
+    repo: https://github.com/anthropics/skills
+    rev: 33375500bcea98d610eb30ce10ac4e59b89c390d
+    license: Apache-2.0
+    license_file: per-skill        # każdy skill ma własny LICENSE.txt (bierzemy tylko Apache-2.0)
+  hyperframes:
+    type: git
+    repo: https://github.com/heygen-com/hyperframes
+    rev: 8798e40da8d56b2f0f3be0b74198d0cbbec1dc06
+    license: Apache-2.0
+    license_file: LICENSE
+
+agents:
+  tars-sherlock:
+    - {source: hermes, path: skills/research/grounded-citations, dest: research/grounded-citations}
+    - {source: hermes, path: skills/web/blocked-page-recovery, dest: research/blocked-page-recovery}
+    - {source: hermes, path: optional-skills/research/searxng-search, dest: research/searxng-search}
+    - {source: hermes, path: optional-skills/research/duckduckgo-search, dest: research/duckduckgo-search}
+    - {source: hermes, path: optional-skills/research/scrapling, dest: research/scrapling}
+    - {source: hermes, path: skills/research/arxiv, dest: research/arxiv}
+    - {source: hermes, path: skills/media/youtube-content, dest: research/youtube-content}
+    - {source: hermes, path: optional-skills/social-media/reddit-reading, dest: research/reddit-reading}
+    - {source: hermes, path: optional-skills/research/rss-feeds, dest: research/rss-feeds}
+    - {source: hermes, path: optional-skills/research/blogwatcher, dest: research/blogwatcher}
+    - {source: hermes, path: skills/research/competitor-news-monitor, dest: research/competitor-news-monitor}
+    - {source: hermes, path: optional-skills/research/domain-intel, dest: research/domain-intel}
+    - {source: hermes, path: optional-skills/research/osint-investigation, dest: research/osint-investigation}
+    - {source: marketingskills, path: skills/competitor-profiling, dest: market/competitor-profiling}
+    - {source: marketingskills, path: skills/customer-research, dest: market/customer-research}
+
+  tars-web:
+    - {source: web-quality-skills, path: skills/web-quality-audit, dest: web-quality/web-quality-audit}
+    - {source: web-quality-skills, path: skills/core-web-vitals, dest: web-quality/core-web-vitals}
+    - {source: web-quality-skills, path: skills/performance, dest: web-quality/performance}
+    - {source: web-quality-skills, path: skills/accessibility, dest: web-quality/accessibility}
+    - {source: web-quality-skills, path: skills/best-practices, dest: web-quality/best-practices}
+    - {source: claude-seo, path: skills/seo, dest: seo/seo}
+    - {source: claude-seo, path: skills/seo-audit, dest: seo/seo-audit}
+    - {source: claude-seo, path: skills/seo-technical, dest: seo/seo-technical}
+    - {source: claude-seo, path: skills/seo-page, dest: seo/seo-page}
+    - {source: claude-seo, path: skills/seo-schema, dest: seo/seo-schema}
+    - {source: claude-seo, path: skills/seo-images, dest: seo/seo-images}
+    - {source: claude-seo, path: skills/seo-sitemap, dest: seo/seo-sitemap}
+    - {source: claude-seo, path: skills/seo-plan, dest: seo/seo-plan}
+    - {source: claude-seo, path: skills/seo-hreflang, dest: seo/seo-hreflang}
+    - {source: claude-seo, path: skills/seo-content-brief, dest: seo/seo-content-brief}
+    - {source: claude-seo, path: skills/seo-geo, dest: seo/seo-geo}
+    - {source: claude-seo, path: skills/seo-local, dest: seo/seo-local}
+    - {source: claude-seo, path: skills/seo-programmatic, dest: seo/seo-programmatic}
+    - {source: marketingskills, path: skills/cro, dest: marketing/cro}
+    - {source: marketingskills, path: skills/site-architecture, dest: marketing/site-architecture}
+    - {source: marketingskills, path: skills/competitors, dest: marketing/competitors}
+    - {source: anthropic-skills, path: skills/frontend-design, dest: design/frontend-design}
+    - {source: anthropic-skills, path: skills/webapp-testing, dest: design/webapp-testing}
+    - {source: hermes, path: skills/creative/popular-web-designs, dest: design/popular-web-designs}
+    - {source: hermes, path: skills/creative/design-md, dest: design/design-md}
+    - {source: hermes, path: skills/creative/claude-design, dest: design/claude-design}
+    - {source: hermes, path: optional-skills/creative/impeccable, dest: design/impeccable}
+    - {source: hermes, path: optional-skills/web-development/scrollcraft, dest: design/scrollcraft}
+    - {source: hermes, path: optional-skills/web-development/publish-site, dest: deploy/publish-site}
+    - {source: hermes, path: optional-skills/web-development/cloudflare-temporary-deploy, dest: deploy/cloudflare-temporary-deploy}
+
+  tars-studio:
+    - {source: marketingskills, path: skills/copywriting, dest: marketing/copywriting}
+    - {source: marketingskills, path: skills/copy-editing, dest: marketing/copy-editing}
+    - {source: marketingskills, path: skills/social, dest: marketing/social}
+    - {source: marketingskills, path: skills/content-strategy, dest: marketing/content-strategy}
+    - {source: marketingskills, path: skills/launch, dest: marketing/launch}
+    - {source: marketingskills, path: skills/image, dest: marketing/image}
+    - {source: marketingskills, path: skills/video, dest: marketing/video}
+    - {source: marketingskills, path: skills/ad-creative, dest: marketing/ad-creative}
+    - {source: marketingskills, path: skills/ads, dest: marketing/ads}
+    - {source: marketingskills, path: skills/marketing-psychology, dest: marketing/marketing-psychology}
+    - {source: marketingskills, path: skills/product-marketing, dest: marketing/product-marketing}
+    - {source: marketingskills, path: skills/marketing-ideas, dest: marketing/marketing-ideas}
+    - {source: marketingskills, path: skills/emails, dest: marketing/emails}
+    - {source: hyperframes, path: skills/hyperframes, dest: video/hyperframes}
+    - {source: hyperframes, path: skills/hyperframes-core, dest: video/hyperframes-core}
+    - {source: hyperframes, path: skills/hyperframes-animation, dest: video/hyperframes-animation}
+    - {source: hyperframes, path: skills/hyperframes-creative, dest: video/hyperframes-creative}
+    - {source: hyperframes, path: skills/hyperframes-cli, dest: video/hyperframes-cli}
+    - {source: hyperframes, path: skills/media-use, dest: video/media-use}
+    - {source: hyperframes, path: skills/general-video, dest: video/general-video}
+    - {source: hyperframes, path: skills/product-launch-video, dest: video/product-launch-video}
+    - {source: hyperframes, path: skills/faceless-explainer, dest: video/faceless-explainer}
+    - {source: hyperframes, path: skills/motion-graphics, dest: video/motion-graphics}
+    - {source: hyperframes, path: skills/embedded-captions, dest: video/embedded-captions}
+    - {source: hyperframes, path: skills/slideshow, dest: video/slideshow}
+    - {source: anthropic-skills, path: skills/canvas-design, dest: design/canvas-design}
+    - {source: anthropic-skills, path: skills/theme-factory, dest: design/theme-factory}
+    - {source: hermes, path: skills/creative/manim-video, dest: creative/manim-video}
+    - {source: hermes, path: skills/creative/baoyu-infographic, dest: creative/baoyu-infographic}
+    - {source: hermes, path: skills/creative/humanizer, dest: creative/humanizer}
+    - {source: hermes, path: optional-skills/creative/social-media-content-calendar, dest: creative/social-media-content-calendar}
+    - {source: hermes, path: optional-skills/creative/creative-ideation, dest: creative/creative-ideation}
+    - {source: hermes, path: optional-skills/creative/meme-generation, dest: creative/meme-generation}
+    - {source: hermes, path: optional-skills/creative/excalidraw, dest: creative/excalidraw}
+    - {source: hermes, path: optional-skills/creative/concept-diagrams, dest: creative/concept-diagrams}
+
+  tars-reka:
+    - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}

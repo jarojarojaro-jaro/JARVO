@@ -1,72 +1,114 @@
-# Rejestr floty TARS: jedno źródło prawdy o tym, kto istnieje.
-# Skrypty (scripts/gen-fleet.py, do napisania) generują z tego: opisy profili
-# (routing kanbana), skill "roster" dla TARS-a i trasy gateway.profile_routes.
-# Szczegóły ról: docs/FLEET.md · anatomia agenta: docs/PROFILE-SPEC.md
+# Rejestr floty TARS: jedno źródło prawdy o tym, kto istnieje i jak jest spięty.
+#
+# scripts/build.py czyta ten plik i generuje:
+#   - profile.yaml każdego agenta (opis → routing kanbana),
+#   - skill `roster` TARS-a (kto istnieje, co umie, jakie skille przypinać do kart),
+#   - rubryki sędziego (skill `sdlc-review` TARS-a) z profiles/<agent>/quality/rubric.md,
+#   - model w config.yaml (z poziomu `model_tier`),
+#   - config hosta (trasy Telegrama `gateway.profile_routes`).
+#
+# Szczegóły ról: docs/FLEET.md · anatomia agenta: docs/PROFILE-SPEC.md · Boss: docs/BOSS.md
 # Poziomy autonomii: A0 odczyt, A1 szkice we własnym workspace, A2 po zgodzie człowieka, A3 nigdy.
 
-version: 1
+version: 2
 
 orchestrator: tars
+reviewer: tars            # recenzent kart: snajperzy wołają kanban_request_review(reviewer=<to>)
+
+# Modele przez OpenRouter (zweryfikowane z https://openrouter.ai/api/v1/models, 2026-09-26).
+# scripts/check-models.py sprawdza przed wdrożeniem, czy każdy identyfikator nadal istnieje.
+models:
+  provider: openrouter
+  tiers:
+    frontier: anthropic/claude-opus-5.5     # TARS: orkiestracja i ocena
+    strong: anthropic/claude-sonnet-5       # snajperzy i prawa ręka
+    fast: anthropic/claude-haiku-4.5        # subagenci, zadania pomocnicze, rutyny
+  media:
+    image: openrouter                       # image_gen.provider (domyślny łańcuch modeli wtyczki)
+    video: openrouter                       # video_gen.provider (domyślny model wtyczki)
 
 agents:
   - name: tars
     kind: orchestrator
     title: "Main Judge"
+    emoji: "🛰️"
     description: >-
-      Main Judge floty. Przyjmuje zlecenia, rozbija je na zadania kanbana dla specjalistów,
-      ocenia wyniki według Definition of Done i raportuje. Sam nie wykonuje pracy dziedzinowej.
+      Main Judge floty. Przyjmuje zlecenia, zakłada misje, rozbija je na karty kanbana dla
+      specjalistów, ocenia wyniki według Definition of Done i raportuje. Sam nie wykonuje
+      pracy dziedzinowej.
     model_tier: frontier
-    toolsets: [kanban, memory]
-    autonomy_max: A1          # tworzy karty i ocenia; niczego nie wykonuje
-    status: planned
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: general       # wątek ogólny grupy „TARS HQ” + Twój DM
+    status: active
 
   - name: tars-sherlock
     kind: specialist
     title: "Researcher-detektyw"
+    emoji: "🔎"
     description: >-
       Wieloźródłowy research i weryfikacja faktów: rozbija pytanie na wątki, sprawdza źródła
       pierwotne, potwierdza twierdzenia krzyżowo i oddaje raport z cytatami i poziomem pewności.
+      Research rynku, konkurencji, produktów, słów kluczowych, monitoring.
     model_tier: strong
-    autonomy_max: A1          # czyta i pisze raporty
-    status: planned
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: sherlock
+    pin_skills: [metoda-sherlocka]
+    status: active
 
   - name: tars-web
     kind: specialist
     title: "Web Senior Dev"
+    emoji: "🌐"
     description: >-
       Strony internetowe od A do Z: nowe strony i landingi produktowe, ulepszanie istniejących,
-      SEO techniczne, favicony i meta, optymalizacja obrazów, responsywność, wydajność,
-      dostępność, wdrożenie. Uczy się marki z istniejącej strony.
+      SEO techniczne, favicony i meta, optymalizacja obrazów, responsywność, wydajność (Core Web
+      Vitals), dostępność, wdrożenie. Uczy się marki z istniejącej strony.
     model_tier: strong
-    autonomy_max: A1          # wdrożenie na produkcję = A2 (Twoja zgoda)
-    status: planned
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: web
+    status: active
 
   - name: tars-studio
     kind: specialist
     title: "Marketing i kreacja"
+    emoji: "🎬"
     description: >-
-      Grafiki promocyjne, posty na social media, filmy z kodu i generowane przez AI, kampanie
-      i kalendarze publikacji, zgodnie z brand kitem. Przygotowuje pakiety, nie publikuje bez zgody.
+      Grafiki promocyjne, posty na social media, filmy z kodu i generowane przez AI, copy,
+      kampanie i kalendarze publikacji, zgodnie z brand kitem. Przygotowuje pakiety,
+      nie publikuje bez zgody.
     model_tier: strong
-    autonomy_max: A1          # publikacja i reklamy = A2 (Twoja zgoda)
-    status: planned
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: studio
+    status: active
 
   - name: tars-reka
     kind: generalist
     title: "Prawa ręka"
+    emoji: "🦾"
     description: >-
-      Generalista wykonawczy: szybkie zadania, prototypy, sklejanie wyników specjalistów,
-      organizacja, propozycje. Ma dostęp do skilli wszystkich agentów, bez ich głębi i pamięci.
+      Generalista wykonawczy: szybkie zadania, dokumenty i konwersje, prototypy, organizacja,
+      składanie wyników specjalistów w pakiet końcowy misji. Zna skille wszystkich agentów
+      (tylko do odczytu), bez ich głębi i pamięci.
     model_tier: strong
-    autonomy_max: A1          # e-maile i akcje zewnętrzne = A2 (Twoja zgoda)
-    status: planned
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: reka
+    status: active
 
 shared:
-  user_memory: honcho        # decyzja D5, do potwierdzenia (self-host na VPS)
-  brand_kits: knowledge/brands
+  user_memory: builtin          # MVP: pamięć wbudowana + wspólny profil użytkownika; faza 3: honcho
+  user_profile: knowledge/user/USER.md      # na VPS: /opt/data/tars/knowledge/user/USER.md
+  brand_kits: knowledge/brands              # na VPS: /opt/data/tars/knowledge/brands/
+  missions_dir: /opt/data/tars/missions
+  workspaces_dir: /opt/data/tars/workspaces
   protocol: shared/protocol/kontrakt-zlecenia.md
+  timezone: Europe/Warsaw
 
 infra:
-  host: vps                  # decyzja D3: ustalone, patrz docs/VPS.md
-  llm_provider: openrouter   # decyzja D2: rekomendacja, do potwierdzenia
+  host: vps
+  hermes_image: nousresearch/hermes-agent:latest   # przypnij do wersji/digestu przy pierwszym wdrożeniu
   channels: [telegram, cli, desktop]

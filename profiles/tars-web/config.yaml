@@ -1,0 +1,55 @@
+# tars-web: Web Senior Dev. Tokeny @@...@@ podstawia scripts/build.py.
+model:
+  provider: "@@PROVIDER@@"
+  default: "@@MODEL@@"
+
+agent:
+  reasoning_effort: medium
+  max_turns: 300
+
+timezone: "@@TIMEZONE@@"
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  nudge_interval: 12
+
+skills:
+  creation_nudge_interval: 20
+
+web:
+  search_backend: searxng
+
+platform_toolsets:
+  cli: [terminal, file, web, browser, vision, delegation, memory, skills, todo, session_search]
+  telegram: [terminal, file, web, browser, vision, delegation, memory, skills, todo, session_search, clarify]
+  cron: [terminal, file, web, browser, memory, skills]
+
+terminal:
+  backend: local
+  cwd: "@@WORKSPACES_DIR@@/tars-web"
+  timeout: 600
+
+delegation:
+  model: "@@DELEGATION_MODEL@@"
+  provider: "@@PROVIDER@@"
+  max_concurrent_children: 3
+
+approvals:
+  mode: smart
+  timeout: 300
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+  smart_policy: >-
+    Always ESCALATE: production deployments (netlify deploy --prod, wrangler pages deploy to a production
+    branch, vercel --prod, gh-pages to a live domain), git push to main/master of a user repository,
+    DNS or domain changes, deleting remote resources, paid services.
+  deny:
+    - "rm -rf /*"
+    - "git push --force*"
+    - "* | sh"
+    - "* | bash"
+
+security:
+  protected_instruction_files: true

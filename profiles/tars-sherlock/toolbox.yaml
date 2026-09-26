@@ -1,0 +1,57 @@
+agent: tars-sherlock
+
+tools:
+  - name: trafilatura
+    source: https://github.com/adbar/trafilatura
+    license: Apache-2.0
+    version: "2.2.0"
+    install: {method: uv-tool-venv, spec: "trafilatura==2.2.0"}
+    integration: skill-script
+    used_by_skills: [metoda-sherlocka, weryfikacja-faktow]
+    healthcheck: "/opt/tars/venv/bin/python -c 'import trafilatura'"
+    autonomy: A0
+  - name: yt-dlp
+    source: https://github.com/yt-dlp/yt-dlp
+    license: Unlicense
+    version: "latest-pinned-in-image"
+    install: {method: uv-tool, spec: "yt-dlp"}
+    integration: cli
+    used_by_skills: [youtube-content]
+    healthcheck: "yt-dlp --version"
+    autonomy: A0
+  - name: docling
+    source: https://github.com/docling-project/docling
+    license: MIT
+    version: "image"
+    install: {method: uv-tool, spec: "docling"}
+    integration: cli
+    used_by_skills: [weryfikacja-faktow]
+    healthcheck: "docling --version"
+    autonomy: A0
+    notes: "Ciężki (modele ML). Instalowany w obrazie tylko z INSTALL_DOCLING=1."
+  - name: exiftool
+    source: https://github.com/exiftool/exiftool
+    license: GPL-3.0 (CLI, osobny program)
+    version: apt
+    install: {method: apt, spec: libimage-exiftool-perl}
+    integration: cli
+    used_by_skills: [weryfikacja-faktow]
+    healthcheck: "exiftool -ver"
+    autonomy: A0
+
+sidecars:
+  - name: searxng
+    image: searxng/searxng
+    license: AGPL-3.0
+    url_env: SEARXNG_URL
+    healthcheck: "curl -fsS \"$SEARXNG_URL/search?q=test&format=json\" >/dev/null"
+  - name: crawl4ai
+    image: unclecode/crawl4ai
+    license: Apache-2.0
+    url_env: CRAWL4AI_URL
+    healthcheck: "curl -fsS \"$CRAWL4AI_URL/health\" >/dev/null"
+
+hermes_skills: [grounded-citations, blocked-page-recovery, searxng-search, duckduckgo-search, scrapling, arxiv, youtube-content, reddit-reading, rss-feeds, blogwatcher, competitor-news-monitor, domain-intel, osint-investigation]
+hermes_plugins: [crawl4ai, openalex]   # opcjonalnie: `hermes -p tars-sherlock plugins install <nazwa>`
+mcp_servers: []
+env_requires: [OPENROUTER_API_KEY]

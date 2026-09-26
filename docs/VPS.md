@@ -11,22 +11,22 @@ wiele profili, a każdy gateway jest pilnowany i restartowany osobno.
 
 ```
                     Internet
-                       │  (brak otwartych portów poza opcjonalnym 443)
+                       │  (brak otwartych portów; SSH tylko do czasu Tailscale)
         ┌──────────────┴──────────────────────────────────────────────┐
         │ VPS (Ubuntu LTS, Docker)                                     │
         │                                                              │
         │  ┌───────────────────────────────┐    sieć wewnętrzna tars-net│
         │  │ tars-hermes (nasz obraz)      │◄──────────┬──────────┐     │
         │  │  FROM nousresearch/hermes-agent│           │          │     │
-        │  │  + toolbox (ffmpeg, lighthouse,│      ┌────┴───┐ ┌────┴───┐ │
-        │  │    playwright, yt-dlp, …)     │      │searxng │ │crawl4ai│ │
-        │  │  s6: gateway (multipleks)     │      └────────┘ └────────┘ │
-        │  │  profile: tars, tars-web,     │      ┌────────┐ ┌────────┐ │
-        │  │  tars-sherlock, tars-studio,  │      │ honcho │ │ postiz │ │
-        │  │  tars-reka                    │      │+postgres│ │+pg+redis│
-        │  └──────────────┬────────────────┘      └────────┘ └────────┘ │
-        │        /opt/data (wolumen)              monitoring: beszel,   │
-        │                                         uptime-kuma           │
+        │  │  + toolbox (lighthouse, sharp, │      ┌────┴───┐ ┌────┴───┐ │
+        │  │    pandoc, ocr, whisper, …)   │      │searxng │ │crawl4ai│ │
+        │  │  s6: gateway (multipleks)     │      │+valkey │ └────────┘ │
+        │  │  profile: tars, tars-web,     │      └────────┘ ┌────────┐ │
+        │  │  tars-sherlock, tars-studio,  │                 │gotenberg│ │
+        │  │  tars-reka                    │                 └────────┘ │
+        │  └──────────────┬────────────────┘   później: honcho, postiz  │
+        │        /opt/data (wolumen)           monitoring (opcja):      │
+        │                                      uptime-kuma, beszel      │
         │  Tailscale ◄── Ty: SSH, dashboard Hermesa, desktop app       │
         └──────────────────────────────────────────────────────────────┘
                        │
@@ -40,8 +40,8 @@ Kluczowe decyzje:
   wszystkich agentów. Budowany przez `infra/Dockerfile`, przypięty do konkretnej wersji Hermesa.
 - **Ciężkie usługi jako sidecary** (osobne kontenery w sieci `tars-net`), a Hermes łączy się z nimi po nazwie.
 - **Kontener Hermesa jest sandboxem.** Agenci wykonują komendy wewnątrz kontenera (backend
-  `local` w kontenerze) i nie dostają gniazda Dockera, które dawałoby im władzę nad hostem.
-  Do potwierdzenia w fazie 0 (ADR).
+  `local` w kontenerze) i nie dostają gniazda Dockera, które dawałoby im władzę nad hostem
+  (`infra/docker-compose.yml` go nie montuje).
 - **Telegram nie wymaga otwartych portów:** gateway łączy się wychodząco (long polling).
 - **Panele i SSH tylko przez Tailscale.** Z zewnątrz nic nie jest widoczne.
 
@@ -55,7 +55,7 @@ rendering kodu (FFmpeg, HyperFrames, Manim), przeglądarki, transkrypcję i usł
 | Etap | CPU | RAM | Dysk | Co działa |
 |---|---|---|---|---|
 | MVP (faza 1) | 4 vCPU | 8 GB | 80 GB NVMe | Hermes + TARS + Sherlock, SearXNG, Crawl4AI |
-| Flota v1 | 8 vCPU | 16 GB | 160–240 GB NVMe | + Web (Chromium, Lighthouse), Studio (render wideo), Honcho, Postiz, monitoring |
+| Flota v1 | 8 vCPU | 16 GB | 160–240 GB NVMe | + Web (Chromium, Lighthouse), Studio (render wideo), monitoring; później Honcho, Postiz |
 | Flota v1 + Langfuse | 8 vCPU | 32 GB | 240 GB+ NVMe | + self-hostowany Langfuse (ClickHouse jest pamięciożerny) |
 
 Rekomendacje:
@@ -69,33 +69,34 @@ Rekomendacje:
 
 ```
 /srv/tars/
-├── repo/                 # klon tego repo (tylko do odczytu dla agentów)
-├── compose/              # docker-compose.yml + .env infrastruktury (poza git)
+├── repo/                 # klon tego repo → /opt/tars/repo (tylko do odczytu w kontenerze)
+├── compose/              # .env compose (obrazy, sekrety usług, TARS_BIND_IP) + tars.env (ID Telegrama)
+├── secrets/              # host.env i <agent>.env (klucze), restic.env → /opt/tars/secrets (ro)
+├── build/                # wynik scripts/build.py → /opt/tars/build (ro): dystrybucje profili, config hosta
 ├── data/
-│   ├── hermes/           # → /opt/data w kontenerze: wszystkie profile, pamięć, sesje, kanban.db
-│   ├── workspaces/       # katalogi robocze agentów (strony, rendery, raporty)
-│   ├── knowledge/        # brand kity i wiedza wspólna o Tobie
-│   ├── searxng/  honcho-db/  postiz-db/  …
-└── backups/              # lokalny staging dumpów przed wysyłką
+│   ├── hermes/           # → /opt/data: profile, pamięć, sesje, kanban.db, cron
+│   │   └── tars/         # missions/ (dziennik misji), workspaces/<agent>/, knowledge/ (brand kity, USER.md), state/
+│   ├── valkey/  uptime-kuma/  beszel/
+├── staging/              # izolowane dane do evals (scripts/evals-staging.sh)
+└── backups/              # staging kopii SQLite, logi backupu i testu odtworzenia
 ```
 
 ---
 
 ## 4. Usługi (docker compose)
 
-| Usługa | Po co | Licencja | Kiedy |
+| Usługa | Po co | Licencja | Stan |
 |---|---|---|---|
-| `tars-hermes` | agent, gateway, wszystkie profile | MIT | MVP |
-| `searxng` (+ valkey) | darmowa metawyszukiwarka dla Sherlocka | AGPL-3.0 | MVP |
-| `crawl4ai` | ekstrakcja stron do Markdown (wtyczka Hermesa `crawl4ai`) | Apache-2.0 | MVP |
-| `honcho` (+ postgres/pgvector) | wspólna pamięć o Tobie | AGPL-3.0 | faza 3 |
-| `postiz` (+ postgres, redis) | kolejka publikacji social media po Twojej akceptacji | AGPL-3.0 | Studio |
-| `archivebox` | archiwum dowodów Sherlocka (kopie stron-źródeł) | MIT | opcjonalnie |
-| `gotenberg` / `stirling-pdf` | konwersje dokumentów i PDF dla prawej ręki | MIT | opcjonalnie |
-| `uptime-kuma` | healthchecki i alerty na Telegram | MIT | faza 2 |
-| `beszel` | CPU/RAM/dysk, alerty | MIT | faza 2 |
-| `langfuse` | ślady, koszty, oceny sędziego | MIT (core) | faza 6 |
-| `caddy` | HTTPS, tylko jeśli coś musi być publiczne (podglądy stron, webhooki) | Apache-2.0 | w razie potrzeby |
+| `tars-hermes` | agent, gateway, wszystkie profile, dashboard (hasło) | MIT | ✅ w compose |
+| `searxng` (+ `valkey`) | darmowa metawyszukiwarka (JSON) dla Sherlocka i TARS-a | AGPL-3.0 | ✅ w compose |
+| `crawl4ai` | ekstrakcja stron do Markdown | Apache-2.0 | ✅ w compose |
+| `gotenberg` | HTML/Markdown/Office → PDF dla prawej ręki | MIT | ✅ w compose |
+| `uptime-kuma` | healthchecki i alerty | MIT | ✅ profil `monitoring` |
+| `beszel` (+ agent) | CPU/RAM/dysk, alerty | MIT | ✅ profil `monitoring` |
+| `honcho` (+ postgres/pgvector) | wspólna pamięć o Tobie | AGPL-3.0 | ⬜ faza 3, jeśli MVP pamięci nie wystarczy |
+| `postiz` (+ postgres, redis) | kolejka publikacji social media po Twojej akceptacji | AGPL-3.0 | ⬜ gdy Studio zacznie publikować |
+| `langfuse` | ślady, koszty, oceny sędziego | MIT (core) | ⬜ faza 6 |
+| `caddy` | HTTPS, tylko jeśli coś musi być publiczne (podglądy stron, webhooki) | Apache-2.0 | ⬜ w razie potrzeby |
 
 Licencje AGPL/GPL są bezpieczne przy **prywatnym self-hostingu** (nie rozpowszechniamy
 zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji).
@@ -109,7 +110,7 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 - użytkownik `tars` bez roota, logowanie SSH tylko kluczem, `PermitRootLogin no`,
 - po postawieniu Tailscale: SSH tylko w sieci Tailscale, a publiczny port 22 zamknięty,
 - firewall (UFW): domyślnie blokada ruchu przychodzącego; 80/443 otwarte tylko, gdy działa Caddy,
-- CrowdSec (ochrona SSH/Caddy).
+- fail2ban na SSH (bootstrap); CrowdSec, jeśli kiedyś wystawimy Caddy.
 
 **Agenci:**
 - zatwierdzanie ryzykownych komend w Hermesie **włączone**,
@@ -130,12 +131,13 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 
 ## 6. Backupy
 
-- **Co:** `data/hermes` (profile, pamięć, sesje, `state.db`, `kanban.db`; spójny zrzut przez
-  `hermes backup`), dumpy Postgresa (Honcho, Postiz), `data/knowledge`, `data/workspaces` (bez renderów tymczasowych).
+- **Co:** `data/hermes` (profile, pamięć, sesje, misje, wiedza, workspace’y bez cache i `node_modules`),
+  bazy SQLite (`state.db`, `kanban.db`…) jako spójne kopie online (`sqlite3 .backup`), `compose/` i `secrets/`.
+  Dumpy Postgresa dojdą razem z Honcho/Postiz. Skrypt: `scripts/backup.sh`.
 - **Czym:** restic → magazyn S3-kompatybilny poza VPS (inny dostawca albo region).
 - **Kiedy:** co noc, retencja 7 dziennych / 4 tygodniowe / 12 miesięcznych.
-- **Test odtworzenia:** raz w miesiącu automat odtwarza backup do katalogu tymczasowego
-  i raportuje wynik na Telegram. Backup, którego nikt nie odtworzył, nie jest backupem.
+- **Test odtworzenia:** raz w miesiącu `scripts/restore-test.sh` odtwarza ostatni snapshot do katalogu
+  tymczasowego i sprawdza kluczowe pliki (wynik w logu). Backup, którego nikt nie odtworzył, nie jest backupem.
 
 ---
 
@@ -155,18 +157,20 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: scripts/deploy.sh
 ```
 
-`scripts/deploy.sh` (idempotentny):
-1. `git pull` w `/srv/tars/repo`,
-2. walidacja (`tests/`: frontmatter skilli, `distribution.yaml`, spójność `fleet.yaml`, szablony),
-3. przebudowa obrazu, jeśli zmienił się któryś `toolbox.yaml` albo wersja Hermesa,
-4. `docker compose up -d`,
-5. instalacja lub aktualizacja profili (`hermes profile install ./profiles/<x>` przy pierwszym razie, potem aktualizacja),
-6. generator floty (`gen-fleet.py`): opisy profili, skill `roster` TARS-a, trasy Telegrama, protokół w SOUL-ach,
-7. healthchecki narzędzi z `toolbox.yaml`,
-8. smoke evals (kilka szybkich scenariuszy per agent).
+`scripts/deploy.sh` (idempotentny; szczegóły w [RUNBOOK.md](RUNBOOK.md)):
+1. `git pull --ff-only` w `/srv/tars/repo`,
+2. przebudowa obrazu, gdy zmienił się `infra/Dockerfile`, `infra/node/` albo `infra/python/` (albo `--rebuild`),
+3. `docker compose up -d`,
+4. walidacja repo w kontenerze (`scripts/validate.py`); błąd zatrzymuje wdrożenie przed zmianą floty,
+5. build dystrybucji (`scripts/build.py`): SOUL z protokołem, tokeny modeli, roster, rubryki, skille zewnętrzne, cron,
+   config hosta z trasami Telegrama,
+6. `install-fleet.sh` w kontenerze: config i sekrety hosta, `hermes profile install/update` każdego agenta,
+   usunięcie skilli wycofanych z repo, sekrety agentów, tablica kanban, restart gatewaya (przez s6),
+7. healthchecki narzędzi z `toolbox.yaml`.
 
-**Staging:** osobny projekt compose `tars-staging` na tym samym VPS, z własnym katalogiem danych
-i osobnym botem testowym na Telegramie. Każda zmiana SOUL, skilli albo wersji Hermesa idzie najpierw tam.
+**Staging:** `scripts/evals-staging.sh` uruchamia jednorazowy kontener z tym samym obrazem i buildem, ale na
+osobnym katalogu danych (`/srv/tars/staging`) i bez gatewaya, więc scenariusze evals nie ruszają produkcyjnej
+tablicy ani Telegrama. Osobny bot testowy dojdzie, gdy będziemy testować routing Telegrama przed zmianą tras.
 
 **Wersje:** Hermes przypięty do wersji albo digestu obrazu. Aktualizacja Hermesa to świadoma decyzja
 (np. raz w miesiącu): najpierw staging, potem produkcja. Rollback: poprzedni tag repo i poprzedni obraz.
@@ -184,14 +188,6 @@ i osobnym botem testowym na Telegramie. Każda zmiana SOUL, skilli albo wersji H
 
 ---
 
-## 10. Checklist postawienia serwera (runbook fazy 0/1)
+## 10. Postawienie serwera
 
-- [ ] VPS utworzony (x86_64, UE, rozmiar z sekcji 2), klucz SSH dodany
-- [ ] hardening systemu (użytkownik, SSH, UFW, unattended-upgrades, CrowdSec)
-- [ ] Docker + compose, Tailscale; SSH przełączony na Tailscale
-- [ ] `git clone` repo do `/srv/tars/repo`
-- [ ] `compose/.env` + `.env` profili z kluczami (OpenRouter per agent, token bota Telegram)
-- [ ] `scripts/deploy.sh` przechodzi na czysto
-- [ ] Telegram: bot odpowiada tylko Tobie, wątki trafiają do właściwych agentów
-- [ ] backup nocny działa + pierwszy test odtworzenia
-- [ ] monitoring i alerty na Telegram działają
+Krok po kroku, z komendami: [RUNBOOK.md](RUNBOOK.md).

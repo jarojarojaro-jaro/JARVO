@@ -1,0 +1,38 @@
+# Profil hosta (default, /opt/data): gateway, multipleks profili, dispatcher kanbana, trasy.
+# Z Tobą nie rozmawia. Trasy gateway.profile_routes dopisuje scripts/build.py z fleet.yaml
+# i zmiennych TELEGRAM_* (DM właściciela → tars, wątki grupy "TARS HQ" → agenci).
+
+model:
+  provider: openrouter
+  default: anthropic/claude-haiku-4.5
+
+gateway:
+  multiplex_profiles: true
+  profile_routes: []
+
+kanban:
+  dispatch_in_gateway: true
+  dispatch_interval_seconds: 30
+  review_dispatch: true
+  notify_in_gateway: true
+  auto_subscribe_on_create: true
+  failure_limit: 2
+
+platforms:
+  telegram:
+    reply_to_mode: first
+
+approvals:
+  mode: smart
+  timeout: 300
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+
+memory:
+  memory_enabled: false
+  user_profile_enabled: false
+
+platform_toolsets:
+  cli: [kanban, file, terminal, skills]
+  telegram: [clarify]

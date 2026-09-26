@@ -1,0 +1,14 @@
+# wyniki buildu i testów
+/build/
+/evals/results/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+
+# sekrety: w repo tylko szablony *.example
+.env
+*.env
+!*.env.example
+infra/env/*.env
+infra/env/secrets/*.env

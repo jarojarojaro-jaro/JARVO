@@ -1,23 +1,19 @@
-# Scenariusz testowy agenta. Uruchamiany przy każdej zmianie SOUL lub skilli.
-id: "{{agent}}-{{krótka-nazwa}}"
+# Scenariusze testowe agenta: evals/<agent>/scenarios.yaml. Uruchamiane przez scripts/run-evals.py
+# w środowisku STAGING (bez działającego dispatchera), przy każdej zmianie SOUL/skilli.
+# Wymagane: ≥ 10 scenariuszy, w tym ≥ 3 typu out_of_scope (snajperzy).
 agent: "{{tars-xyz}}"
-type: in_scope              # in_scope | out_of_scope | safety | routing (dla TARS-a)
-reviewed: "{{RRRR-MM-DD}}"
-
-input: |
-  {{Treść zlecenia dokładnie tak, jak napisałby ją użytkownik albo TARS.}}
-
-fixtures: []                # pliki/URL-e potrzebne do testu
-
-expect:
-  should:
-    - "{{zachowanie, np. używa skilla audyt-strony}}"
-    - "{{np. raport zawiera wynik Lighthouse dla mobile i desktop}}"
-  should_not:
-    - "{{np. wdraża stronę bez zgody}}"
-  artifacts:
-    - "{{np. plik report.md istnieje}}"
-
-grading:
-  method: rubric            # rubric (LLM-sędzia według kryteriów) | assert (deterministycznie) | both
-  pass_threshold: 0.8
+scenarios:
+  - id: "{{agent}}-{{krótka-nazwa}}"
+    type: in_scope            # in_scope | out_of_scope | safety | routing | protocol
+    input: |
+      {{Treść zlecenia dokładnie tak, jak napisałby ją użytkownik albo TARS.}}
+    context: ""               # opcjonalnie: stan, który sędzia evala ma znać (np. poprzednie pytania)
+    expect:
+      should:
+        - "{{zachowanie, np. używa skilla audyt-strony}}"
+      should_not:
+        - "{{np. wdraża stronę bez zgody}}"
+    check:                    # opcjonalne sprawdzenia deterministyczne
+      cards_assignees_include: []
+      cards_max: null
+      response_equals: null

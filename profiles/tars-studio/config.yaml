@@ -1,0 +1,59 @@
+# tars-studio: marketing i kreacja. Tokeny @@...@@ podstawia scripts/build.py.
+model:
+  provider: "@@PROVIDER@@"
+  default: "@@MODEL@@"
+
+agent:
+  reasoning_effort: medium
+  max_turns: 300
+
+timezone: "@@TIMEZONE@@"
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  nudge_interval: 12
+
+skills:
+  creation_nudge_interval: 20
+
+web:
+  search_backend: searxng
+
+image_gen:
+  provider: openrouter          # domyślny łańcuch modeli wtyczki (jakość → fallback)
+
+video_gen:
+  provider: openrouter          # katalog modeli pobierany na żywo z OpenRouter
+
+platform_toolsets:
+  cli: [terminal, file, web, browser, vision, image_gen, video_gen, tts, delegation, memory, skills, todo, session_search]
+  telegram: [terminal, file, web, browser, vision, image_gen, video_gen, tts, delegation, memory, skills, todo, session_search, clarify]
+  cron: [terminal, file, web, memory, skills]
+
+terminal:
+  backend: local
+  cwd: "@@WORKSPACES_DIR@@/tars-studio"
+  timeout: 900                  # rendering wideo trwa
+
+delegation:
+  model: "@@DELEGATION_MODEL@@"
+  provider: "@@PROVIDER@@"
+  max_concurrent_children: 3
+
+approvals:
+  mode: smart
+  timeout: 300
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+  smart_policy: >-
+    Always ESCALATE: publishing or scheduling posts on any platform, sending e-mails or messages,
+    starting or changing paid ad campaigns, uploading content to third-party accounts.
+  deny:
+    - "rm -rf /*"
+    - "* | sh"
+    - "* | bash"
+
+security:
+  protected_instruction_files: true

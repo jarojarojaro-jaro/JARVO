@@ -1,0 +1,59 @@
+# tars-reka: prawa ręka. Pełny katalog skilli Hermesa (brak .no-bundled-skills) + skille snajperów
+# tylko do odczytu (build zamontowany :ro w kontenerze). Tokeny @@...@@ podstawia scripts/build.py.
+model:
+  provider: "@@PROVIDER@@"
+  default: "@@MODEL@@"
+
+agent:
+  reasoning_effort: medium
+  max_turns: 250
+
+timezone: "@@TIMEZONE@@"
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  nudge_interval: 10
+
+skills:
+  creation_nudge_interval: 15
+  external_dirs:
+    - "@@BUILD_DIR@@/profiles/tars-sherlock/skills"
+    - "@@BUILD_DIR@@/profiles/tars-web/skills"
+    - "@@BUILD_DIR@@/profiles/tars-studio/skills"
+
+web:
+  search_backend: searxng
+
+platform_toolsets:
+  cli: [terminal, file, web, browser, vision, code_execution, delegation, memory, skills, todo, session_search]
+  telegram: [terminal, file, web, browser, vision, code_execution, delegation, memory, skills, todo, session_search, clarify]
+  cron: [terminal, file, web, memory, skills]
+
+terminal:
+  backend: local
+  cwd: "@@WORKSPACES_DIR@@/tars-reka"
+  timeout: 600
+
+delegation:
+  model: "@@DELEGATION_MODEL@@"
+  provider: "@@PROVIDER@@"
+  max_concurrent_children: 3
+
+approvals:
+  mode: smart
+  timeout: 300
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+  smart_policy: >-
+    Always ESCALATE: sending e-mails or messages, actions on third-party accounts, purchases,
+    deleting files outside /opt/data/tars/workspaces and /opt/data/tars/missions.
+  deny:
+    - "rm -rf /*"
+    - "git push --force*"
+    - "* | sh"
+    - "* | bash"
+
+security:
+  protected_instruction_files: true

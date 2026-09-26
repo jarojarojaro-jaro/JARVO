@@ -7,6 +7,18 @@ Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prom
 knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
 każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
 
+**Stan: wszystkie pięć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
+
+| Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
+|---|---|---|---|---|---|
+| `tars` | [SOUL](../profiles/tars/SOUL.md) | [10 w `skills/fleet/`](../profiles/tars/skills/fleet) + generowany `roster` | — | patrol, brief, przegląd, raport floty | [12](../evals/tars/scenarios.yaml) |
+| `tars-sherlock` | [SOUL](../profiles/tars-sherlock/SOUL.md) | [6 w `skills/sherlock/`](../profiles/tars-sherlock/skills/sherlock) | 15 (Hermes, marketingskills) | search_fanout, extract, sources | [11](../evals/tars-sherlock/scenarios.yaml) |
+| `tars-web` | [SOUL](../profiles/tars-web/SOUL.md) | [7 w `skills/web/`](../profiles/tars-web/skills/web) | 30 (web-quality, claude-seo, marketingskills, Anthropic, Hermes) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract | [11](../evals/tars-web/scenarios.yaml) |
+| `tars-studio` | [SOUL](../profiles/tars-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/tars-studio/skills/studio) | 35 (marketingskills, HyperFrames, Anthropic, Hermes) | render_html, check_media, subtitles | [11](../evals/tars-studio/scenarios.yaml) |
+| `tars-reka` | [SOUL](../profiles/tars-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/tars-reka/skills/reka) | skill-creator + skille wszystkich snajperów (`external_dirs`) + katalog Hermesa | pack, to_pdf | [11](../evals/tars-reka/scenarios.yaml) |
+
+Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
+
 Legenda przy skillach:
 - **[H]**: skill, który już istnieje w Hermesie (`skills/` albo `optional-skills/`) i tylko go instalujemy w profilu,
 - **[T]**: skill, który piszemy sami w tym repo.
@@ -24,7 +36,8 @@ Legenda przy skillach:
 ## Warstwa wspólna: wiedza o Tobie i Twoich markach
 
 Snajperzy nie dzielą się skillami, ale wszyscy znają **Ciebie**:
-- **profil użytkownika**: kim jesteś, czym się zajmujesz, preferencje (wspólna pamięć, np. Honcho),
+- **profil użytkownika**: kim jesteś, czym się zajmujesz, preferencje (MVP: `knowledge/user/USER.md`
+  z wywiadu onboardingowego TARS-a; później wspólny provider pamięci, np. Honcho),
 - **brand kity** w `knowledge/brands/<marka>/`: logo, kolory, fonty, ton komunikacji, `DESIGN.md`.
   Brand kit tworzy `tars-web` albo `tars-studio` („naucz się mojej marki z tej strony”),
   a korzystają z niego obaj. Marka to wiedza o Tobie, nie o dziedzinie, dlatego jest wspólna.

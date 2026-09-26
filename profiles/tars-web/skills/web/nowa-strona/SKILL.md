@@ -1,0 +1,42 @@
+---
+name: nowa-strona
+description: "Nowa strona od briefu do podglądu (Astro, mobile-first)."
+version: 1.0.0
+author: TARS
+license: MIT
+metadata:
+  hermes:
+    tags: [web, astro, build, frontend]
+    related_skills: [frontend-design, design-md, popular-web-designs, favicon-i-meta, optymalizacja-obrazow, audyt-strony, wdrozenie]
+  tars:
+    agent: tars-web
+    autonomy: A1
+    reviewed: 2026-09-26
+---
+
+# Nowa strona
+
+## Kroki
+1. **Brief → plan strony** (`out/PLAN.md`): cel, odbiorca, sekcje (kolejność i treść każdej), CTA, brand kit, języki.
+   Brak treści? Roboczy tekst oznaczony `[SZKIC]` (copy docelowe robi `tars-studio`).
+2. **Kierunek wizualny:** brand kit (`DESIGN.md`, tokeny) → zasady z `frontend-design`. Brak brand kitu → wybierz
+   bazę z `popular-web-designs`, uzasadnij w PLAN.md i zapytaj przez `kanban_block(kind="needs_input")`, jeśli wybór jest kluczowy.
+3. **Szkielet (Astro):**
+   ```bash
+   cd out && npm create astro@latest site -- --template minimal --no-install --no-git --skip-houston --yes
+   cd site && npm install
+   ```
+   Tokeny marki jako CSS custom properties (`src/styles/tokens.css`). Bez ciężkich frameworków UI, jeśli niepotrzebne.
+4. **Budowa sekcji:** semantyczny HTML, mobile-first, `<picture>` z AVIF/WebP (`optymalizacja-obrazow`),
+   formularze z etykietami, widoczny fokus, `prefers-reduced-motion`.
+5. **Head:** skill `favicon-i-meta` (komplet ikon, manifest, OG, JSON-LD Organization/WebSite, canonical, lang).
+6. **Build i podgląd:** `npm run build` → `npx astro preview --host 0.0.0.0 --port 4321` (w tle) albo statyczny serwer z `dist/`.
+7. **Kontrola jakości:** `audyt-strony` na podglądzie → popraw do budżetów → zapisz wyniki przed/po.
+8. **Raport:** `out/RAPORT.md` (co powstało, jak uruchomić, wyniki, samokontrola DoD). Wdrożenie tylko przez `wdrozenie` (A2).
+
+## DoD (domyślne, karta może zaostrzyć)
+- [ ] `npm run build` bez błędów,
+- [ ] Lighthouse mobile ≥ 90 × 4 kategorie,
+- [ ] zrzuty 375/768/1440 bez poziomego przewijania,
+- [ ] komplet head (favicony, manifest, OG, JSON-LD, canonical, lang),
+- [ ] zgodność z brand kitem, tekst roboczy oznaczony `[SZKIC]`.

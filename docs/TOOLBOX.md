@@ -1,8 +1,9 @@
 # Toolbox floty: narzędzia open-source per agent
 
 **Weryfikacja: 2026-09-26.** Każde repo sprawdzone bezpośrednio z GitHuba: czy istnieje,
-jaka jest licencja (z pliku LICENSE) i kiedy był ostatni commit. Wersje przypinamy dopiero
-w `toolbox.yaml` agenta, przy faktycznej instalacji w fazie 0/1.
+jaka jest licencja (z pliku LICENSE) i kiedy był ostatni commit. Ten dokument to **katalog kandydatów**.
+To, co faktycznie jest zainstalowane, opisują `profiles/<agent>/toolbox.yaml` (z healthcheckami)
+i sekcja „Stan instalacji” na końcu.
 
 Legenda integracji: **CLI** (terminal + skill), **skrypt** (w `scripts/` skilla), **sidecar**
 (kontener na VPS), **plugin** (katalog Hermesa), **MCP** (serwer MCP), **[H]** (skill z katalogu Hermesa).
@@ -175,3 +176,29 @@ w przejrzane testy regresji), `gonogo` (wynik evali → decyzja o wdrożeniu).
 
 Każde nowe narzędzie przed dodaniem do `toolbox.yaml`: licencja, aktywność (ostatni commit
 w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
+
+---
+
+## Stan instalacji (co naprawdę jest w obrazie `tars-hermes`)
+
+Źródło prawdy: [`infra/Dockerfile`](../infra/Dockerfile), [`infra/node/package.json`](../infra/node/package.json),
+[`infra/python/requirements-tools.txt`](../infra/python/requirements-tools.txt), sidecary w
+[`infra/docker-compose.yml`](../infra/docker-compose.yml). Healthchecki: `scripts/healthcheck.sh`.
+
+| Warstwa | Gdzie | Co |
+|---|---|---|
+| obraz Hermesa | `/opt/hermes` | Python 3.14 Hermesa (nie ruszamy), Node, `uv`, ffmpeg/ffprobe, Chromium |
+| pakiety systemowe | apt | pandoc, qpdf, ocrmypdf + tesseract (pol, eng), exiftool, jq, sqlite3, fonty z polskimi znakami |
+| przeglądarka | `/usr/local/bin/chromium` (`CHROME_PATH`) | jedna Chromium z obrazu Hermesa dla Lighthouse, Playwright i skryptów |
+| narzędzia Node | `/opt/tars/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | lighthouse, @unlighthouse/cli, axe-core, playwright-core, sharp, svgo, favicons, critical, linkinator, html-validate, dembrandt |
+| narzędzia Pythona | venv `/opt/tars/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, faster-whisper, auto-editor, rembg; opcjonalnie docling, manim |
+| claude-seo | `/opt/tars/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
+| sidecary | sieć `tars-net` | SearXNG (`SEARXNG_URL`), Crawl4AI (`CRAWL4AI_URL`), Gotenberg (`GOTENBERG_URL`), Valkey |
+
+Skrypty `.cjs` ładują moduły przez `NODE_PATH`, a ESM-owe pakiety (np. `favicons`) przez `importGlobal()`.
+Skrypty Pythona, które potrzebują bibliotek z venv narzędzi, same przełączają się na `/opt/tars/venv`.
+
+**MCP:** serwery MCP dopisujemy w `config.yaml` profilu, w sekcji `mcp_servers` (Hermes nie czyta
+`mcp.json` z profilu). Zasada bez zmian: tylko te serwery, których agent naprawdę używa, bo każde
+narzędzie w schemacie kosztuje tokeny przy każdym zapytaniu.
+

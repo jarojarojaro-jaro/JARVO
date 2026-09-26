@@ -1,0 +1,46 @@
+<!doctype html>
+<!-- Szablon grafiki social TARS Studio. Render: node $HERMES_HOME/scripts/render_html.cjs base.html out/x --size 1080x1350
+     Tokeny marki podmień w :root (z brand kitu). Layout dopasowuje się do proporcji przez media queries aspect-ratio. -->
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --brand-primary: #1f4fff;
+    --brand-accent: #ffb400;
+    --brand-bg: #0d1117;
+    --brand-text: #ffffff;
+    --font-heading: "Inter", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, sans-serif;
+    --pad: 72px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100vw; height: 100vh; }
+  body {
+    background: var(--brand-bg); color: var(--brand-text); font-family: var(--font-body);
+    display: grid; grid-template-rows: auto 1fr auto; padding: var(--pad); gap: 32px;
+  }
+  .logo { height: 56px; }
+  .logo img { height: 100%; }
+  .content { align-self: center; display: flex; flex-direction: column; gap: 28px; }
+  .eyebrow { color: var(--brand-accent); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 30px; }
+  h1 { font-family: var(--font-heading); font-size: 92px; line-height: 1.02; letter-spacing: -0.02em; }
+  p { font-size: 40px; line-height: 1.3; opacity: .9; max-width: 22ch; }
+  .cta { justify-self: start; background: var(--brand-primary); color: #fff; font-weight: 700;
+         font-size: 36px; padding: 22px 40px; border-radius: 999px; }
+  /* 9:16 (stories/reels): bezpieczna strefa na UI platformy */
+  @media (max-aspect-ratio: 10/16) { body { padding: 250px var(--pad); } h1 { font-size: 104px; } }
+  /* poziome (OG, LinkedIn, YouTube): mniejszy nagłówek, więcej oddechu */
+  @media (min-aspect-ratio: 16/10) { h1 { font-size: 72px; } p { font-size: 32px; max-width: 32ch; } .content { gap: 20px; } }
+</style>
+</head>
+<body>
+  <div class="logo"><!-- <img src="logo.svg" alt="Marka"> --></div>
+  <div class="content">
+    <div class="eyebrow">Nowość</div>
+    <h1>Nagłówek w jednej myśli</h1>
+    <p>Jedno zdanie wsparcia, które mówi, co zyskuje odbiorca.</p>
+  </div>
+  <div class="cta">Sprawdź →</div>
+</body>
+</html>

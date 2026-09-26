@@ -1,0 +1,147 @@
+# Flota TARS na VPS. Uruchamiane przez scripts/deploy.sh z katalogu /srv/tars/repo:
+#   docker compose -f infra/docker-compose.yml --env-file /srv/tars/compose/.env up -d
+#
+# Porty: nic nie jest publikowane publicznie. Dashboard/Desktop (9119) i panele monitoringu
+# wiążemy do TARS_BIND_IP (domyślnie 127.0.0.1; ustaw IP Tailscale, żeby sięgać z laptopa/telefonu).
+# Telegram działa bez portów (long polling).
+#
+# Profile compose:
+#   (domyślny)  hermes + searxng + valkey + crawl4ai + gotenberg
+#   monitoring  uptime-kuma + beszel (hub + agent)
+
+name: tars
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  hermes:
+    <<: *restart
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      args:
+        HERMES_IMAGE: ${HERMES_IMAGE:-nousresearch/hermes-agent:latest}
+        INSTALL_DOCLING: ${INSTALL_DOCLING:-0}
+        INSTALL_MANIM: ${INSTALL_MANIM:-0}
+    image: tars-hermes:local
+    container_name: tars-hermes
+    command: gateway run
+    environment:
+      HERMES_DASHBOARD: "1"
+      # Dashboard na adresie innym niż loopback wymaga uwierzytelniania (inaczej Hermes go nie uruchomi).
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: ${DASHBOARD_USER:-tars}
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: ${DASHBOARD_PASSWORD:?ustaw DASHBOARD_PASSWORD w compose/.env}
+      HERMES_DASHBOARD_BASIC_AUTH_SECRET: ${DASHBOARD_SESSION_SECRET:-}
+      TZ: ${TZ:-Europe/Warsaw}
+      HERMES_TIMEZONE: ${TZ:-Europe/Warsaw}
+      SEARXNG_URL: http://searxng:8080
+      CRAWL4AI_URL: http://crawl4ai:11235
+      CRAWL4AI_API_TOKEN: ${CRAWL4AI_API_TOKEN:-}
+      GOTENBERG_URL: http://gotenberg:3000
+    volumes:
+      - ${TARS_DATA:-/srv/tars/data}/hermes:/opt/data
+      - ${TARS_REPO:-/srv/tars/repo}:/opt/tars/repo:ro
+      - ${TARS_BUILD:-/srv/tars/build}:/opt/tars/build:ro
+      - ${TARS_SECRETS:-/srv/tars/secrets}:/opt/tars/secrets:ro
+    ports:
+      - "${TARS_BIND_IP:-127.0.0.1}:9119:9119"     # dashboard + Hermes Desktop (Remote Gateway)
+    depends_on:
+      searxng: {condition: service_started}
+      gotenberg: {condition: service_started}
+    shm_size: "1gb"                                  # Chromium (Lighthouse, Playwright, rendery)
+    deploy:
+      resources:
+        limits:
+          memory: ${HERMES_MEM_LIMIT:-10g}
+          cpus: "${HERMES_CPUS:-6}"
+    networks: [tars-net]
+
+  searxng:
+    <<: *restart
+    image: ${IMAGE_SEARXNG:-searxng/searxng:latest}
+    container_name: tars-searxng
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?ustaw SEARXNG_SECRET w compose/.env}
+      SEARXNG_REDIS_URL: redis://valkey:6379/0
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    depends_on: [valkey]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID]
+    deploy:
+      resources:
+        limits: {memory: 1g}
+    networks: [tars-net]
+
+  valkey:
+    <<: *restart
+    image: ${IMAGE_VALKEY:-valkey/valkey:8-alpine}
+    container_name: tars-valkey
+    command: valkey-server --save 30 1 --loglevel warning
+    volumes:
+      - ${TARS_DATA:-/srv/tars/data}/valkey:/data
+    deploy:
+      resources:
+        limits: {memory: 256m}
+    networks: [tars-net]
+
+  crawl4ai:
+    <<: *restart
+    image: ${IMAGE_CRAWL4AI:-unclecode/crawl4ai:latest}
+    container_name: tars-crawl4ai
+    environment:
+      CRAWL4AI_API_TOKEN: ${CRAWL4AI_API_TOKEN:-}
+    shm_size: "1gb"
+    deploy:
+      resources:
+        limits: {memory: 3g}
+    networks: [tars-net]
+
+  gotenberg:
+    <<: *restart
+    image: ${IMAGE_GOTENBERG:-gotenberg/gotenberg:8}
+    container_name: tars-gotenberg
+    deploy:
+      resources:
+        limits: {memory: 1g}
+    networks: [tars-net]
+
+  uptime-kuma:
+    <<: *restart
+    profiles: [monitoring]
+    image: ${IMAGE_UPTIME_KUMA:-louislam/uptime-kuma:2}
+    container_name: tars-uptime-kuma
+    volumes:
+      - ${TARS_DATA:-/srv/tars/data}/uptime-kuma:/app/data
+    ports:
+      - "${TARS_BIND_IP:-127.0.0.1}:3001:3001"
+    networks: [tars-net]
+
+  beszel:
+    <<: *restart
+    profiles: [monitoring]
+    image: ${IMAGE_BESZEL:-henrygd/beszel:latest}
+    container_name: tars-beszel
+    volumes:
+      - ${TARS_DATA:-/srv/tars/data}/beszel:/beszel_data
+    ports:
+      - "${TARS_BIND_IP:-127.0.0.1}:8090:8090"
+    networks: [tars-net]
+
+  beszel-agent:
+    <<: *restart
+    profiles: [monitoring]
+    image: ${IMAGE_BESZEL_AGENT:-henrygd/beszel-agent:latest}
+    container_name: tars-beszel-agent
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      LISTEN: "45876"
+      KEY: ${BESZEL_AGENT_KEY:-}
+
+networks:
+  tars-net:
+    driver: bridge

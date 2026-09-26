@@ -5,8 +5,9 @@
 > rozmawiać osobno, a TARS je koordynuje. Wszystko jest skonfigurowane z góry, więc nie
 > zaczynasz od pustej kartki.
 
-Stan: szkic v0.2 (2026-09-26). Oparty na lekturze kodu i dokumentacji
-`NousResearch/hermes-agent` (main, wrzesień 2026).
+Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa do postawienia na VPS**
+([RUNBOOK.md](RUNBOOK.md)). Oparty na lekturze kodu i dokumentacji `NousResearch/hermes-agent`
+(main, wrzesień 2026) i testach na prawdziwym Hermesie. Postęp: sekcja 6.
 
 **Dokumenty projektu:**
 | Dokument | O czym |
@@ -15,7 +16,10 @@ Stan: szkic v0.2 (2026-09-26). Oparty na lekturze kodu i dokumentacji
 | [FLEET.md](FLEET.md) | specyfikacja agentów floty v1 |
 | [PROFILE-SPEC.md](PROFILE-SPEC.md) | anatomia agenta: 10 warstw, kontrakt zlecenia, Definition of Ready |
 | [TOOLBOX.md](TOOLBOX.md) | zweryfikowane narzędzia open-source per agent + polityka licencji |
+| [BOSS.md](BOSS.md) | mechanika Main Judge'a: misje, kolejka decyzji, patrol, sędziowanie, eskalacje |
 | [VPS.md](VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring, wdrożenia |
+| [RUNBOOK.md](RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
+| [SOURCES.md](SOURCES.md) | źródła, atrybucje i licencje |
 
 ---
 
@@ -31,7 +35,7 @@ Naszą pracą jest ich *wypełnienie i spięcie*, a nie przepisywanie rdzenia:
 | Rozmowy z każdym osobno | Aliasy CLI (`tars-fin chat`), **Bot Mode** w aplikacji desktopowej (lista botów, czaty grupowe, boty piszące do siebie), Telegram/Discord/Slack |
 | Jednego bota na Telegramie, który rozdziela rozmowy | **Gateway z multipleksacją** + `gateway.profile_routes` (routing po czacie lub wątku do profilu) |
 | Swarmu, czyli współpracy specjalistów | **Kanban**: trwała tablica zadań współdzielona przez profile, z orkiestratorem routującym po opisie profilu; do szybkich podzadań `delegate_task` |
-| Wspólnej wiedzy o użytkowniku | **Honcho**: jeden „user peer” współdzielony przez wszystkie profile, osobny „AI peer” dla każdego profilu (albo inny memory provider) |
+| Wspólnej wiedzy o użytkowniku | MVP: plik `knowledge/user/USER.md` z wywiadu onboardingowego + pamięć użytkownika TARS-a (kontekst trafia do kart). Później **Honcho**: wspólny „user peer”, osobny „AI peer” na profil |
 | Izolacji specjalistów („snajperów”) | `hermes profile create --no-skills`: profil bez domyślnego katalogu skilli, dostaje tylko to, co mu damy |
 | Oceny wyników przez szefa | Statusy kanbana `review` / `kanban_request_changes` / `kanban_complete`: praca wraca do orkiestratora do akceptacji |
 | Automatyzacji | Wbudowany **cron** z dostarczaniem na dowolną platformę |
@@ -81,8 +85,8 @@ Zasady:
                                          │ kanban_create / delegate_task
           ┌───────────────┬──────────────┼──────────────┬───────────────┐
           ▼               ▼              ▼              ▼               ▼
-     tars-research    tars-dev      tars-fin       tars-health     tars-… (kilkanaście)
-     (profil)         (profil)      (profil)       (profil)
+     tars-sherlock    tars-web      tars-studio    tars-reka       tars-… (kolejni)
+     (research)       (strony)      (kreacja)      (prawa ręka)
      SOUL + skille    SOUL + skille SOUL + skille  SOUL + skille
      własna pamięć    własna pamięć …
           ▲               ▲              ▲              ▲
@@ -90,7 +94,7 @@ Zasady:
                (alias CLI, Bot Chat w desktopie, własny temat na Telegramie)
 
   Wspólne warstwy (dla wszystkich profili):
-   • pamięć o Tobie    → Honcho: wspólny user peer, osobny AI peer na profil
+   • pamięć o Tobie    → MVP: USER.md + pamięć TARS-a; później Honcho (wspólny user peer)
    • (brak wspólnych skilli: każdy snajper ma wyłącznie swoje)
    • tablica zadań     → ~/.hermes/kanban.db (współdzielona przez profile)
 ```
@@ -124,12 +128,11 @@ Każdy specjalista to katalog w `profiles/<nazwa>/`, będący **Hermes profile d
 profiles/tars-fin/
 ├── distribution.yaml   # nazwa, wersja, opis, wymagane zmienne env
 ├── SOUL.md             # tożsamość, zakres, czego NIE robi, kiedy oddaje zadanie, ton
-├── config.yaml         # model, dozwolone toolsety, terminal.cwd, zatwierdzanie komend
-├── mcp.json            # integracje (np. arkusze, bank export, kalendarz)
+├── config.yaml         # model, toolsety, terminal.cwd, zgody, mcp_servers (integracje MCP)
 ├── skills/             # procedury domenowe (SKILL.md + scripts/ + references/)
 │   ├── budzet-miesieczny/SKILL.md
 │   └── analiza-wyciagu/SKILL.md
-├── cron/jobs.json      # rutyny (instalowane jako wstrzymane, włączamy świadomie)
+├── cron/jobs.yaml      # rutyny (build → jobs.json; instalowane jako wstrzymane)
 └── README.md
 ```
 
@@ -156,94 +159,79 @@ to jeden wpis i jeden katalog, bez ręcznej edycji w pięciu miejscach.
 
 ---
 
-## 5. Struktura tego repo (docelowo)
+## 5. Struktura tego repo
+
+Aktualna mapa jest w [README](../README.md#mapa-repo). Najważniejsze przepływy:
 
 ```
-TARS/
-├── README.md
-├── fleet.yaml                  # rejestr specjalistów (źródło prawdy)
-├── docs/
-│   ├── PLAN.md                 # ten dokument
-│   ├── PROFILE-SPEC.md         # kontrakt profilu + szablony
-│   └── adr/                    # decyzje architektoniczne (krótkie, numerowane)
-├── profiles/                   # każdy podkatalog = Hermes profile distribution
-│   ├── tars/                   # dyspozytor
-│   ├── tars-research/
-│   └── …
-├── shared/
-│   ├── templates/              # szablony SOUL.md / SKILL.md / toolbox.yaml / evals
-│   └── protocol/               # kontrakt zlecenia (wklejany do SOUL każdego agenta przez generator)
-├── knowledge/brands/           # szablon brand kitu (prawdziwe brand kity żyją na VPS)
-├── infra/                      # Dockerfile (obraz pochodny Hermesa), docker-compose, konfiguracje sidecarów
-├── scripts/
-│   ├── deploy.sh               # wdrożenie na VPS (idempotentne, patrz VPS.md)
-│   ├── install.sh              # instaluje całą flotę na maszynie (idempotentnie)
-│   ├── update.sh               # hermes profile update dla wszystkich
-│   ├── new-specialist.sh       # scaffolding nowego specjalisty z szablonu
-│   ├── gen-fleet.py            # fleet.yaml → routes, opisy, skill „roster”
-│   └── harvest-skills.sh       # zbiera skille, które agenci sami stworzyli, do przeglądu
-├── evals/                      # scenariusze testowe per specjalista + routing TARS-a
-└── tests/                      # walidacja: frontmatter, distribution.yaml, spójność floty
+fleet.yaml + profiles/<agent>/ + shared/protocol/ + vendor/skills.lock.yaml
+   └─ scripts/build.py ──► build/profiles/<agent>/   (dystrybucje Hermesa: SOUL z protokołem, tokeny,
+                          build/host/config.yaml       roster, rubryki, skille zewnętrzne, cron z ID)
+scripts/deploy.sh (VPS) ──► validate → build → install-fleet.sh (hermes profile install/update,
+                            sekrety, prune skilli, kanban) → healthcheck → restart gatewaya
 ```
 
 ---
 
 ## 6. Roadmapa
 
+Legenda: ✅ zrobione i sprawdzone lokalnie (testy, prawdziwy Hermes) · 🟡 zakodowane, czeka na test na VPS
+z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
+
 ### Faza 0: Fundament i spike techniczny
-Cel: potwierdzić na prawdziwym Hermesie, że klocki działają tak, jak mówi dokumentacja.
-- [ ] Postawić VPS według runbooka z [VPS.md](VPS.md#10-checklist-postawienia-serwera-runbook-fazy-01).
-- [ ] Zbudować obraz pochodny Hermesa (`infra/Dockerfile`) z narzędziami MVP i przejść healthchecki.
-- [ ] Potwierdzić model sandboxu: agenci wykonują komendy w kontenerze Hermesa, bez gniazda Dockera.
-- [ ] `hermes profile install ./profiles/<x>` z lokalnego katalogu działa (bez pushowania).
-- [ ] Profil `--no-skills` widzi wyłącznie swoje skille (izolacja snajpera).
-- [ ] Pętla judge: snajper → `review` → TARS `request_changes` → poprawka → `complete`.
-- [ ] Kanban: profil A tworzy kartę dla profilu B, B ją wykonuje, A odbiera wynik.
-- [ ] Telegram: jeden bot, supergrupa z tematami, `profile_routes` z `thread_id` → różne profile.
-- [ ] Spisać ADR-y dla decyzji z sekcji 7.
+- 🟡 Postawić VPS według [RUNBOOK.md](RUNBOOK.md) (skrypty gotowe: `bootstrap-vps.sh`, `deploy.sh`).
+- 🟡 Obraz pochodny Hermesa (`infra/Dockerfile`) z narzędziami MVP (test budowy w toku).
+- ✅ Model sandboxu: agenci wykonują komendy w kontenerze Hermesa, bez gniazda Dockera.
+- ✅ `hermes profile install` z lokalnego katalogu i `hermes profile update --force-config`.
+- ✅ Izolacja snajpera: `.no-bundled-skills`, profil widzi wyłącznie swoje skille.
+- 🟡 Pętla judge: snajper → `review` → TARS `request_changes` → poprawka → `complete` (tor review skonfigurowany).
+- 🟡 Kanban między profilami: karta od TARS-a, wykonanie przez snajpera, wynik wraca.
+- 🟡 Telegram: jeden bot, supergrupa z tematami, `profile_routes` z `thread_id` (config generowany i testowany).
+- ✅ Decyzje spisane w sekcji 7 (zamiast osobnych ADR-ów).
 
 ### Faza 1: MVP: TARS + Sherlock
-- [ ] Szkielet repo (struktura z sekcji 5), `fleet.yaml`, szablony.
-- [ ] Profil `tars`: SOUL z osobowością, skill „roster”, protokół zlecania (kanban vs delegate).
-- [ ] `tars-sherlock` jako pierwszy snajper (najprostsze narzędzia, test pętli sędziego).
-- [ ] `scripts/install.sh`: jedna komenda stawia całą flotę.
-- [ ] Walidatory w `tests/` + pierwsze evals (routing: czy TARS oddaje właściwemu specjaliście).
+- ✅ Szkielet repo, `fleet.yaml`, szablony, generator (`scripts/build.py`).
+- ✅ Profil `tars`: SOUL, roster generowany z floty, protokół zlecania, 10 skilli dowodzenia ([BOSS.md](BOSS.md)).
+- ✅ `tars-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
+- ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
+- ✅ Walidator + testy (`make validate`, `make test`, CI) + 56 scenariuszy evals.
 
 ### Faza 2: Kanały
-- [ ] CLI: aliasy dla każdego profilu.
-- [ ] Telegram: jedna grupa „TARS HQ”, jeden temat na specjalistę plus temat ogólny do TARS-a.
-- [ ] Desktop: Bot Mode (lista botów, awatary, sekcje, czat grupowy floty).
-- [ ] (opcjonalnie) głos: transkrypcja notatek głosowych, TTS.
+- ✅ CLI: aliasy profili (`hermes profile install --alias`).
+- 🟡 Telegram: „TARS HQ”, temat na specjalistę, General dla TARS-a.
+- ⬜ Desktop: Bot Mode (lista botów, awatary, czat grupowy floty).
+- ⬜ (opcjonalnie) głos: transkrypcja notatek głosowych, TTS.
 
-### Faza 3: Pamięć i onboarding („żeby znał Ciebie od pierwszego dnia”)
-- [ ] Wspólna pamięć o użytkowniku (Honcho: wspólny user peer, AI peer na profil).
-- [ ] Skill **onboarding-wywiad**: TARS przeprowadza z Tobą rozmowę startową (cele, praca,
-      nawyki, preferencje) i zapisuje profil użytkownika, z którego korzystają wszyscy.
-- [ ] Zasady prywatności: co gdzie jest przechowywane, co nigdy nie opuszcza maszyny.
+### Faza 3: Pamięć i onboarding
+- ✅ Skill `onboarding-interview`: wywiad startowy → `knowledge/user/USER.md`.
+- ✅ MVP pamięci o Tobie: USER.md + pamięć użytkownika TARS-a, kontekst przekazywany w kartach.
+- ⬜ Wspólny provider pamięci (Honcho self-host) po sprawdzeniu MVP w praktyce.
+- ⬜ Zasady prywatności: co gdzie leży, co nigdy nie opuszcza serwera.
 
 ### Faza 4: Reszta floty v1, potem kolejni specjaliści
-- [ ] Każdy specjalista według kontraktu z sekcji 4: SOUL, 3–8 skilli, knowledge w `references/`, evals.
-- [ ] Integracje MCP per specjalista (kalendarz, mail, notatki, dysk, bank export…).
-- [ ] Kolejność: `tars-web` → `tars-studio` → `tars-reka`, każdy „dogfoodowany” przed kolejnym.
-- [ ] Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, TARS ocenia).
+- ✅ `tars-web`, `tars-studio`, `tars-reka` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
+- ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
+- ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
+- ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, TARS ocenia).
+- ⬜ Kolejni specjaliści (`make new-agent`), np. finanse, zdrowie, dom.
 
 ### Faza 5: Automatyzacje i rój
-- [ ] Rutyny cron: poranny brief (TARS zbiera od specjalistów), przegląd tygodnia, przypomnienia.
-- [ ] Gotowe „przepływy roju” jako skille TARS-a (np. *decyzja zakupowa*: research → finanse → rekomendacja).
+- ✅ Rutyny: patrol co 30 min (bez modelu, gdy spokój), poranny brief, przegląd tygodnia, świeżość wiedzy.
+- ✅ Wzorce roju w `dispatch-playbook` (research → wykonanie → złożenie, zależności kart).
 
 ### Faza 6: Jakość, koszty, bezpieczeństwo
-- [ ] Evals odpalane przy każdej zmianie SOUL/skilli (regresje zachowań i routingu).
-- [ ] Budżet kosztów: frontier tylko dla TARS-a i trudnych ról, tańsze modele dla reszty; `/usage`, `/insights`.
-- [ ] Bezpieczeństwo: zatwierdzanie komend, backend Docker dla ryzykownych profili, sekrety tylko w `.env`.
+- ✅ Evals na stagingu (`scripts/evals-staging.sh`), sędzia LLM + sprawdzenia deterministyczne.
+- ✅ Koszty: poziomy modeli w `fleet.yaml`, osobny klucz OpenRouter z limitem na agenta.
+- ✅ Bezpieczeństwo: zgody (A2 tylko z człowiekiem, praca bez nadzoru = odmowa), sekrety tylko w `.env`, Tailscale.
+- ⬜ Przegląd kosztów po 2 tygodniach, korekta poziomów modeli.
 
 ### Faza 7: Pętla samodoskonalenia
-- [ ] Hermes sam tworzy i poprawia skille podczas pracy. `harvest-skills.sh` zbiera te
-      zmiany z `~/.hermes/profiles/*/skills`, a my je przeglądamy i commitujemy do repo.
-      Dzięki temu flota uczy się, a repo zostaje źródłem prawdy.
-- [ ] Wersjonowanie floty (tagi), changelog.
+- ✅ `harvest-skills.sh`: skille utworzone lub zmienione przez agentów → przegląd → repo.
+- ✅ `fleet-improvement` TARS-a: wnioski z przeglądu tygodnia jako propozycje zmian.
+- ⬜ Wersjonowanie floty (tagi), changelog wydań.
 
 ### Faza ∞
-Wake word, Home Assistant, aplikacja mobilna, serwer 24/7 z backupami, kolejne specjalizacje…
+Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
 
 ---
 
@@ -252,10 +240,10 @@ Wake word, Home Assistant, aplikacja mobilna, serwer 24/7 z backupami, kolejne s
 | # | Decyzja | Rekomendacja | Dlaczego |
 |---|---|---|---|
 | D1 | Lista specjalistów | ✅ Ustalone: flota v1 (sekcja 8) | |
-| D2 | Modele | OpenRouter jako jeden klucz do modeli, obrazów i wideo; najmocniejszy model dla TARS-a, mocny dla snajperów | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
+| D2 | Modele | ✅ OpenRouter (modele, obrazy, wideo); poziomy w `fleet.yaml`: frontier dla TARS-a, strong dla snajperów, fast do delegacji | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
 | D3 | Gdzie działa | ✅ Ustalone: VPS (x86_64, UE), Docker, szczegóły w [VPS.md](VPS.md) | |
-| D4 | Główny kanał | Telegram (grupa z tematami) + CLI; desktop jako dodatek | Najtańszy start, działa z telefonu |
-| D5 | Wspólna pamięć | Honcho (self-host, jeśli prywatność jest priorytetem) | Natywny model „wspólny użytkownik, osobni agenci” |
+| D4 | Główny kanał | ✅ Telegram (DM + grupa „TARS HQ” z tematami) + CLI; desktop jako dodatek | Najtańszy start, działa z telefonu |
+| D5 | Wspólna pamięć | ✅ MVP: wbudowana pamięć + USER.md z onboardingu; Honcho (self-host) w fazie 3, gdy MVP okaże się za mały | Mniej ruchomych części na start; Honcho nadal pasuje do modelu „wspólny użytkownik, osobni agenci” |
 | D6 | Nazewnictwo profili | Prefiks `tars-` (`tars-web`, `tars-sherlock`…) | Profile stają się komendami w shellu, a prefiks unika kolizji |
 | D7 | Język | Polski domyślnie, skille technicznie po angielsku tam, gdzie pomaga modelowi | Naturalna rozmowa i precyzyjne instrukcje |
 

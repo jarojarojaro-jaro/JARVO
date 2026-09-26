@@ -1,0 +1,24 @@
+# SearXNG dla floty TARS: wewnętrzna metawyszukiwarka (dostęp tylko z sieci tars-net).
+use_default_settings: true
+
+general:
+  instance_name: "TARS Search"
+  debug: false
+
+server:
+  # sekret podaje zmienna SEARXNG_SECRET (compose); limiter wyłączony, bo instancja jest prywatna
+  limiter: false
+  image_proxy: false
+  method: "GET"
+
+search:
+  safe_search: 0
+  autocomplete: "duckduckgo"
+  default_lang: "all"
+  # JSON jest wymagany przez wtyczkę Hermesa (web.search_backend: searxng) i search_fanout.py
+  formats:
+    - html
+    - json
+
+ui:
+  default_locale: "pl"

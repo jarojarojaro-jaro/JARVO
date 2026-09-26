@@ -1,0 +1,9 @@
+name: tars-reka
+version: 0.1.0
+description: "Prawa ręka: szybkie zadania, dokumenty i konwersje, prototypy, składanie pakietów misji."
+author: "TARS fleet"
+license: MIT
+env_requires:
+  - name: OPENROUTER_API_KEY
+    description: "Klucz OpenRouter dla prawej ręki (osobny klucz z limitem kredytów)"
+    required: true

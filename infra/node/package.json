@@ -1,0 +1,19 @@
+{
+  "name": "tars-node-tools",
+  "private": true,
+  "description": "Narzędzia Node floty TARS (instalowane w obrazie do /opt/tars/node). Wersje przypięte; aktualizacja = PR + `make pins` (obraz Hermesa odrzuca wersje młodsze niż 14 dni: npm min-release-age).",
+  "license": "MIT",
+  "dependencies": {
+    "@unlighthouse/cli": "0.18.0",
+    "axe-core": "4.13.0",
+    "critical": "8.0.0",
+    "dembrandt": "0.32.2",
+    "favicons": "7.3.1",
+    "html-validate": "11.15.0",
+    "lighthouse": "13.4.1",
+    "linkinator": "8.1.0",
+    "playwright-core": "1.63.0",
+    "sharp": "0.35.4",
+    "svgo": "4.1.0"
+  }
+}

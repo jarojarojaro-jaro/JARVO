@@ -19,9 +19,9 @@ granice i testy, a nie tylko dobry prompt.
  │ 4. Skrypty (skills/*/scripts/)                wykonywane, nie czytane │
  ├───────────────────────────────────────────────────────────────┤
  │ 5. Toolbox (narzędzia OSS na VPS)             toolbox.yaml       │
- │ 6. Integracje (mcp.json, pluginy, .env)                          │
+ │ 6. Integracje (mcp_servers w config.yaml, pluginy, .env)         │
  │ 7. Pamięć (własna + wspólna o użytkowniku)                       │
- │ 8. Rutyny (cron/jobs.json)                                       │
+ │ 8. Rutyny (cron/jobs.yaml → jobs.json przy buildzie)             │
  ├───────────────────────────────────────────────────────────────┤
  │ 9. Granice (autonomia, toolsety, sandbox, zgody)                 │
  │ 10. Jakość (DoD, rubryka sędziego, evals)                        │
@@ -127,7 +127,8 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 
 ## 6. Integracje
 
-- `mcp.json`: serwery MCP agenta (tylko te, których naprawdę używa),
+- serwery MCP agenta w `config.yaml` profilu, sekcja `mcp_servers` (tylko te, których naprawdę używa).
+  Hermes czyta MCP wyłącznie z `config.yaml`; plik `mcp.json` w profilu jest ignorowany,
 - pluginy Hermesa w `config.yaml` (`plugins.enabled`),
 - sekrety **wyłącznie** w `.env` profilu (nigdy w repo); w dystrybucji tylko `env_requires` w `distribution.yaml`.
 
@@ -138,7 +139,7 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 | Warstwa | Gdzie | Kto pisze |
 |---|---|---|
 | Pamięć własna agenta | `memories/MEMORY.md` profilu | agent (np. „ta strona używa Tailwind”) |
-| Wiedza o Tobie | wspólny provider pamięci (np. Honcho, user peer) | wszyscy, każdy z własnej perspektywy |
+| Wiedza o Tobie | MVP: `knowledge/user/USER.md` (onboarding) + pamięć użytkownika TARS-a; później wspólny provider (np. Honcho) | TARS (onboarding), agenci czytają |
 | Brand kity | `knowledge/brands/<marka>/` | `tars-web` / `tars-studio` |
 | Historia zleceń | kanban (`kanban.db`) | TARS i agenci |
 
@@ -224,26 +225,27 @@ Agent wchodzi do floty (`status: active` w `fleet.yaml`) dopiero, gdy:
 
 ---
 
-## Struktura katalogu agenta (docelowo)
+## Struktura katalogu agenta (tak jest zbudowane repo)
 
 ```
 profiles/tars-web/
 ├── distribution.yaml        # manifest dystrybucji Hermesa
 ├── SOUL.md                  # main prompt
-├── config.yaml              # model, toolsety, terminal, pluginy
-├── mcp.json                 # integracje MCP
-├── toolbox.yaml             # narzędzia OSS (nasz manifest)
+├── config.yaml              # model (@@MODEL@@ z fleet.yaml), toolsety per platforma, zgody, mcp_servers
+├── .no-bundled-skills       # snajper: bez katalogu skilli Hermesa (izolacja)
+├── toolbox.yaml             # narzędzia OSS (nasz manifest + healthchecki)
 ├── skills/
-│   ├── audyt-strony/
-│   │   ├── SKILL.md
-│   │   ├── references/      # knowledge pack workflowu
-│   │   └── scripts/         # automaty
-│   └── …
-├── knowledge/               # wiedza przekrojowa agenta
+│   └── web/                 # kategoria (DESCRIPTION.md generuje build)
+│       ├── audyt-strony/
+│       │   ├── SKILL.md     # opis ≤ 60 znaków, metadata.tars: agent, autonomy, reviewed
+│       │   └── references/  # knowledge pack workflowu
+│       └── …
+├── scripts/                 # automaty wołane jako $HERMES_HOME/scripts/<plik>
 ├── quality/
-│   └── rubric.md            # rubryka dla sędziego
-├── cron/jobs.json
+│   └── rubric.md            # rubryka dla sędziego (kopiowana do sdlc-review TARS-a)
+├── cron/jobs.yaml           # rutyny (tylko TARS); build → cron/jobs.json ze stałymi ID
 ├── README.md
 └── CHANGELOG.md
-evals/tars-web/*.yaml        # scenariusze testowe (poza dystrybucją)
+evals/tars-web/scenarios.yaml   # scenariusze testowe (poza dystrybucją)
+vendor/skills.lock.yaml         # skille zewnętrzne tego agenta (dokładane przy buildzie)
 ```
