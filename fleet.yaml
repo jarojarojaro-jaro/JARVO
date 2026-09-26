@@ -40,6 +40,9 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: general       # wątek ogólny grupy „TARS HQ” + Twój DM
+    hq_room: bridge    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_label: "Mostek dowodzenia"
+    hq_short: "TARS"
     status: active
 
   - name: tars-sherlock
@@ -55,6 +58,9 @@ agents:
     autonomy_max: A1
     telegram_topic: sherlock
     pin_skills: [metoda-sherlocka]
+    hq_room: study    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_label: "Gabinet śledczy"
+    hq_short: "Sherlock"
     status: active
 
   - name: tars-web
@@ -69,6 +75,9 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: web
+    hq_room: devlab    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_label: "Pracownia webowa"
+    hq_short: "Web"
     status: active
 
   - name: tars-studio
@@ -83,6 +92,9 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: studio
+    hq_room: atelier    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_label: "Atelier kreatywne"
+    hq_short: "Studio"
     status: active
 
   - name: tars-reka
@@ -97,6 +109,9 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: reka
+    hq_room: workshop    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_label: "Warsztat"
+    hq_short: "Ręka"
     status: active
 
 shared:

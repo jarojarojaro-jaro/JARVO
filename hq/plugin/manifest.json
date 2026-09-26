@@ -1,0 +1,15 @@
+{
+  "name": "tars-hq",
+  "label": "TARS HQ",
+  "description": "Kwatera floty TARS: pokoje agentów z podglądem pracy na żywo, misje, decyzje i czat z szefem albo dowolnym agentem.",
+  "icon": "Sparkles",
+  "version": "0.1.0",
+  "tab": {
+    "path": "/hq",
+    "override": "/",
+    "position": "end"
+  },
+  "entry": "dist/index.js",
+  "css": "dist/style.css",
+  "api": "plugin_api.py"
+}

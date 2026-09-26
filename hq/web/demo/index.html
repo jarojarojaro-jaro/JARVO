@@ -1,0 +1,77 @@
+<meta charset="utf-8">
+<title>TARS HQ</title>
+<meta name="description" content="Kwatera floty TARS: pokoje agentów z podglądem pracy na żywo (tryb demo z symulowaną flotą).">
+<style>
+  /* Tokeny udające motyw dashboardu Hermesa (plugin czyta --color-*). */
+  :root {
+    --color-background: #F1F3F6;
+    --color-card: #FFFFFF;
+    --color-muted: #F1F4F7;
+    --color-foreground: #17212C;
+    --color-card-foreground: #17212C;
+    --color-muted-foreground: #5B6777;
+    --color-border: #DCE2E9;
+    --demo-note: #FFF6DC;
+    --demo-note-ink: #5E4500;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --color-background: #0B1017;
+      --color-card: #131A24;
+      --color-muted: #1B2430;
+      --color-foreground: #E6ECF3;
+      --color-card-foreground: #E6ECF3;
+      --color-muted-foreground: #94A2B2;
+      --color-border: #263243;
+      --demo-note: #2A2412;
+      --demo-note-ink: #F1DC9C;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-background: #0B1017;
+    --color-card: #131A24;
+    --color-muted: #1B2430;
+    --color-foreground: #E6ECF3;
+    --color-card-foreground: #E6ECF3;
+    --color-muted-foreground: #94A2B2;
+    --color-border: #263243;
+    --demo-note: #2A2412;
+    --demo-note-ink: #F1DC9C;
+  }
+  html, body { background: var(--color-background); }
+  body { padding: 12px 16px 0; color: var(--color-foreground); }
+  .demo-note { max-width: 1480px; margin: 0 auto 12px; padding: 8px 12px; border-radius: 8px; background: var(--demo-note);
+    color: var(--demo-note-ink); font: 14px/1.45 "Atkinson Hyperlegible", system-ui, sans-serif; }
+  .demo-note strong { font-weight: 700; }
+  #hq { max-width: 1480px; margin: 0 auto; }
+</style>
+<link rel="stylesheet" href="style.css">
+
+<p class="demo-note"><strong>Tryb demo.</strong> Flota jest symulowana: misja „Ziarno” toczy się sama. Kliknij pokój, odpowiedz na decyzję
+  albo napisz do TARS-a. Na serwerze ta sama strona pokazuje prawdziwą pracę agentów.</p>
+<div id="hq"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script>
+  // Podkładka SDK dashboardu Hermesa: to samo, czego plugin używa z window.__HERMES_PLUGIN_SDK__.
+  window.__HERMES_PLUGIN_SDK__ = {
+    React: window.React,
+    hooks: {
+      useState: React.useState, useEffect: React.useEffect, useCallback: React.useCallback, useMemo: React.useMemo,
+      useRef: React.useRef, useContext: React.useContext, createContext: React.createContext,
+    },
+    components: {},
+    fetchJSON: function () { return Promise.reject(new Error("Brak backendu w trybie demo")); },
+  };
+  window.__HERMES_PLUGINS__ = {
+    register: function (name, Component) {
+      ReactDOM.createRoot(document.getElementById("hq")).render(React.createElement(Component));
+    },
+  };
+</script>
+<script src="fleet.js"></script>
+<script src="mock.js"></script>
+<script src="app.js"></script>

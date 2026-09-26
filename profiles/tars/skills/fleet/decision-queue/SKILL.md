@@ -48,6 +48,10 @@ Dla każdej odpowiedzi:
 
 Niejasna odpowiedź → dopytaj tylko o niejasną pozycję. Resztę wdroż od razu.
 
+Odpowiedzi przychodzą też z **TARS HQ** (panel „Decyzje” w dashboardzie) jako wiadomość w formacie
+`Decyzja do karty <task_id> („<tytuł>”, <agent>): <treść>`. Traktuj ją tak samo jak odpowiedź na liście:
+wykonaj kroki 1–4 dla wskazanej karty i potwierdź jednym zdaniem, co odblokowałeś.
+
 ## Przypomnienia
 Nieodpowiedziane decyzje wracają w porannym briefie (`daily-brief`). Po 3 dniach bez odpowiedzi
 zapytaj, czy misja jest nadal aktualna.

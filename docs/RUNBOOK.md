@@ -171,8 +171,10 @@ bash scripts/pin-images.sh      # zapisuje digesty w /srv/tars/compose/.env (rep
    docker exec -u hermes tars-hermes hermes kanban list
    ```
    Po kilku–kilkunastu minutach: recenzja TARS-a (status `review` → `done` albo prośba o poprawki) i raport w DM.
-4. **Dashboard:** `http://<ip-tailscale>:9119`, login `tars` + `DASHBOARD_PASSWORD` z `compose/.env`
-   (tablica kanban, sesje, koszty). Bez hasła Hermes nie uruchomi dashboardu poza localhostem.
+4. **TARS HQ:** `http://<ip-tailscale>:9119`, login `tars` + `DASHBOARD_PASSWORD` z `compose/.env`.
+   Strona główna to budynek floty: pokoje agentów z podglądem pracy, decyzje, misje i czat ([HQ.md](HQ.md)).
+   Pozostałe zakładki dashboardu Hermesa (sesje, cron, logi, konfiguracja) zostają w menu.
+   Kontrola: `/api/plugins/tars-hq/health` po zalogowaniu pokazuje klucze API profili i dostępność gatewaya.
 
 ## 7. Włączenie rutyn i onboarding
 

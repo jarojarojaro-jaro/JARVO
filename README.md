@@ -13,6 +13,12 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 | 🎬 `tars-studio` | marketing i kreacja: grafiki social, filmy z kodu, obrazy/wideo AI (OpenRouter), copy PL |
 | 🦾 `tars-reka` | prawa ręka: generalista ze wszystkimi skillami, składa pakiety misji, dokumenty, prototypy |
 
+## TARS HQ
+
+Dashboard floty w przeglądarce: budynek z pokojami agentów, dymki z tym, co każdy robi teraz, podgląd pracy
+na żywo, wyniki, decyzje i czat z TARS-em albo dowolnym agentem. Szczegóły: [docs/HQ.md](docs/HQ.md).
+Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
+
 ## Szybki start
 
 ```bash
@@ -35,6 +41,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy).
 | [`vendor/skills.lock.yaml`](vendor/skills.lock.yaml) | skille zewnętrzne przypięte do commitów (licencje w [docs/SOURCES.md](docs/SOURCES.md)) |
 | [`evals/<agent>/`](evals) | scenariusze testowe zachowań (routing, protokół, bezpieczeństwo, poza zakresem) |
 | [`scripts/`](scripts) | build dystrybucji, walidator, deploy, instalacja floty, backupy, evals, narzędzia |
+| [`hq/`](hq) | TARS HQ: plugin dashboardu (backend, frontend, demo) |
 | [`infra/`](infra) | obraz `tars-hermes` (Hermes + narzędzia), docker compose z sidecarami, szablony env |
 | [`knowledge/`](knowledge) | szablony wiedzy (brand kit) kopiowane na serwer |
 | [`tests/`](tests) | testy pytest |
@@ -50,6 +57,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy).
 | [PROFILE-SPEC.md](docs/PROFILE-SPEC.md) | anatomia agenta: 10 warstw, kontrakt zlecenia, Definition of Ready |
 | [TOOLBOX.md](docs/TOOLBOX.md) | narzędzia open-source per agent i stan instalacji w obrazie |
 | [VPS.md](docs/VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring |
+| [HQ.md](docs/HQ.md) | TARS HQ: GUI floty, architektura, bezpieczeństwo, pokoje |
 | [RUNBOOK.md](docs/RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [SOURCES.md](docs/SOURCES.md) | źródła, atrybucje i licencje |
 

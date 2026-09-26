@@ -67,6 +67,28 @@ for a in $AGENTS; do
   fi
 done
 
+# 3b. klucze API profili: multipleksowany gateway obsługuje /p/<profil>/ tylko z własnym API_SERVER_KEY
+#     profilu (z niego korzysta TARS HQ do rozmów z agentami). Generujemy brakujące, istniejących nie ruszamy.
+for a in $AGENTS; do
+  envf="$DATA/profiles/$a/.env"
+  if ! grep -qE '^API_SERVER_KEY=.{16,}' "$envf" 2>/dev/null; then
+    echo "API_SERVER_KEY=$($PY -c 'import secrets; print(secrets.token_hex(32))')" >> "$envf"
+    chmod 600 "$envf"
+    echo "  + API_SERVER_KEY dla $a"
+  fi
+done
+
+# 3c. TARS HQ: plugin dashboardu (strona główna dashboardu na :9119)
+if [[ -d "$BUILD/plugins/tars-hq" ]]; then
+  log "TARS HQ (plugin dashboardu)"
+  mkdir -p "$DATA/plugins"
+  rm -rf "$DATA/plugins/tars-hq.new" && cp -r "$BUILD/plugins/tars-hq" "$DATA/plugins/tars-hq.new"
+  rm -rf "$DATA/plugins/tars-hq" && mv "$DATA/plugins/tars-hq.new" "$DATA/plugins/tars-hq"
+  # pluginy użytkownika muszą być jawnie włączone (zabezpieczenie Hermesa)
+  hermes plugins enable tars-hq >/dev/null 2>&1 || $PY "$REPO/scripts/enable_plugin.py" "$DATA/config.yaml" tars-hq
+  HQ_CHANGED=1
+fi
+
 # 4. tablica kanban
 if [[ $FIRST -eq 1 || ! -f "$DATA/kanban.db" ]]; then
   log "Tablica kanban"
@@ -81,9 +103,13 @@ if [[ $RESUME -eq 1 ]]; then
   done
 fi
 
-# 6. restart gatewaya (nowe trasy, profile, skille od nowej sesji); w kontenerze przez s6
+# 6. restart gatewaya (nowe trasy, profile, skille, klucze API od nowej sesji); w kontenerze przez s6
 if [[ $RESTART -eq 1 ]]; then
   log "Restart gatewaya"
   hermes gateway restart || echo "  ! restart gatewaya nieudany: sprawdź 'hermes gateway status'"
+  # dashboard montuje backend pluginów przy starcie procesu: po zmianie TARS HQ restartujemy tylko jego
+  if [[ "${HQ_CHANGED:-0}" -eq 1 && -d /run/service/dashboard ]]; then
+    /command/s6-svc -r /run/service/dashboard 2>/dev/null && echo "  ↻ dashboard (TARS HQ)" || echo "  ! restart dashboardu nieudany"
+  fi
 fi
 echo "✅ Flota zainstalowana: $AGENTS"

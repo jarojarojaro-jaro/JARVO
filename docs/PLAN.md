@@ -17,6 +17,7 @@ Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa 
 | [PROFILE-SPEC.md](PROFILE-SPEC.md) | anatomia agenta: 10 warstw, kontrakt zlecenia, Definition of Ready |
 | [TOOLBOX.md](TOOLBOX.md) | zweryfikowane narzędzia open-source per agent + polityka licencji |
 | [BOSS.md](BOSS.md) | mechanika Main Judge'a: misje, kolejka decyzji, patrol, sędziowanie, eskalacje |
+| [HQ.md](HQ.md) | TARS HQ: GUI floty (pokoje agentów, praca na żywo, czat) |
 | [VPS.md](VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring, wdrożenia |
 | [RUNBOOK.md](RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [SOURCES.md](SOURCES.md) | źródła, atrybucje i licencje |
@@ -202,6 +203,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
 - 🟡 Telegram: „TARS HQ”, temat na specjalistę, General dla TARS-a.
+- ✅ TARS HQ: GUI floty w dashboardzie Hermesa (pokoje agentów, praca na żywo, decyzje, misje, czat), test na prawdziwym Hermesie ([HQ.md](HQ.md)).
 - ⬜ Desktop: Bot Mode (lista botów, awatary, czat grupowy floty).
 - ⬜ (opcjonalnie) głos: transkrypcja notatek głosowych, TTS.
 

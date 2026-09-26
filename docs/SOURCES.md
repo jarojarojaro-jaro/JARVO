@@ -44,7 +44,18 @@ Autorstwo zaznaczamy w polu `author` skilla.
 | [stanford-oval/storm](https://github.com/stanford-oval/storm) | MIT | `metoda-sherlocka`: pytania z wielu perspektyw przed wyszukiwaniem |
 | Hermes Agent `sdlc-review` (J. Wolniewicz + Hermes Agent) | MIT | `sdlc-review` TARS-a: adaptacja z rubrykami agentów, soczewkami i eskalacją po 3 rundach |
 
-## 4. Obowiązki licencyjne w skrócie
+## 4. TARS HQ (GUI)
+
+| Projekt | Rola | Licencja |
+|---|---|---|
+| [htm](https://github.com/developit/htm) 3.1.1 | składnia podobna do JSX bez kompilacji (`hq/web/vendor/`, z licencją) | Apache-2.0 |
+| React | dostarczany przez SDK dashboardu Hermesa; w trybie demo 18.3.1 z cdnjs | MIT |
+| Bricolage Grotesque, Atkinson Hyperlegible, JetBrains Mono | kroje (Google Fonts) | OFL-1.1 |
+
+Grafika pokoi i figurek jest rysowana w SVG w tym repo; inspiracja stylistyką klocków, bez użycia
+znaków towarowych ani zasobów producentów zabawek.
+
+## 5. Obowiązki licencyjne w skrócie
 
 | Licencja | Co robimy |
 |---|---|

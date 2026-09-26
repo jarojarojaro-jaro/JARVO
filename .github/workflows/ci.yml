@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "22"
       - name: Zależności testów
-        run: pip install pyyaml pytest
+        run: pip install pyyaml pytest fastapi httpx
       - name: Walidacja repo
         run: python scripts/validate.py
       - name: Testy

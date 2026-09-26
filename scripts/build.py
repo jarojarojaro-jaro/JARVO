@@ -468,6 +468,10 @@ def main(argv: list[str] | None = None) -> int:
         summary.append({"agent": agent.name, "skills": n_skills, "cron_jobs": n_jobs})
         print(f"✓ {agent.name}: {n_skills} skilli, {n_jobs} rutyn cron")
 
+    import hqbuild  # TARS HQ: plugin dashboardu (pokoje agentów, czat, decyzje)
+    hq_dir = hqbuild.build_plugin(out / "plugins" / "tars-hq", fleet)
+    print(f"✓ TARS HQ: {hq_dir.relative_to(out)}")
+
     notes = build_host(fleet, out / "host", env)
     for note in notes:
         print(f"! {note}")
@@ -480,6 +484,7 @@ def main(argv: list[str] | None = None) -> int:
         "built_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "repo_rev": repo_rev,
         "agents": summary,
+        "plugins": ["tars-hq"],
         "vendored": report,
         "notes": notes,
     })

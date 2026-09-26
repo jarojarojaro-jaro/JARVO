@@ -66,6 +66,8 @@ def check_fleet(fleet: fl.Fleet, r: Report) -> None:
             r.err(f"{a.name}: nazwa profilu musi być [a-z0-9-]")
         if a.status == "active" and not a.dir.is_dir():
             r.err(f"{a.name}: brak katalogu profiles/{a.name}")
+        if a.hq_room not in fl.HQ_ROOMS:
+            r.err(f"{a.name}: hq_room {a.hq_room!r} spoza {sorted(fl.HQ_ROOMS)}")
         if len(a.description) < 40:
             r.warn(f"{a.name}: krótki opis (routing kanbana opiera się na opisie)")
     for d in fl.PROFILES_DIR.iterdir():
@@ -278,6 +280,34 @@ def check_secrets(r: Report) -> None:
                 r.err(f"{path.relative_to(fl.REPO_ROOT)}: wygląda na {label}")
 
 
+def check_hq(r: Report) -> None:
+    """TARS HQ (plugin dashboardu): pliki, manifest, zgodność pokoi z grafiką, licencja htm."""
+    import json
+    hq = fl.REPO_ROOT / "hq"
+    if not hq.exists():
+        return
+    for rel in ("plugin/manifest.json", "plugin/plugin_api.py", "plugin/hq_core.py", "web/style.css",
+                "web/vendor/htm.umd.js", "web/vendor/LICENSE-htm", "web/demo/index.html", "web/demo/mock.js"):
+        if not (hq / rel).exists():
+            r.err(f"hq: brak {rel}")
+    try:
+        manifest = json.loads((hq / "plugin" / "manifest.json").read_text(encoding="utf-8"))
+        for key in ("name", "label", "entry", "tab"):
+            if not manifest.get(key):
+                r.err(f"hq/manifest.json: brak pola {key}")
+    except (OSError, ValueError) as exc:
+        r.err(f"hq/manifest.json: {exc}")
+    src = sorted((hq / "web" / "src").glob("*.js"))
+    if not src:
+        r.err("hq/web/src: brak plików źródłowych")
+    art = (hq / "web" / "src" / "20-art.js")
+    if art.exists():
+        block = art.read_text(encoding="utf-8").split("const ROOMS = {", 1)[-1].split("};", 1)[0]
+        js_rooms = set(re.findall(r"^\s+(\w+):\s*\{", block, re.M))
+        if js_rooms != fl.HQ_ROOMS:
+            r.err(f"hq: pokoje w 20-art.js {sorted(js_rooms)} ≠ fleetlib.HQ_ROOMS {sorted(fl.HQ_ROOMS)}")
+
+
 def run() -> Report:
     r = Report()
     fleet = fl.load_fleet()
@@ -293,6 +323,7 @@ def run() -> Report:
         extra = {"roster"} if a.name == fleet.orchestrator else set()
         check_cron(a, own[a.name] | extra, vendored, r)
     check_evals(fleet, r)
+    check_hq(r)
     check_scripts(r)
     check_secrets(r)
     return r
