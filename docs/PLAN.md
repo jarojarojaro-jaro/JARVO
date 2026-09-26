@@ -23,7 +23,8 @@ Naszą pracą jest ich *wypełnienie i spięcie*, a nie przepisywanie rdzenia:
 | Jednego bota na Telegramie, który rozdziela rozmowy | **Gateway z multipleksacją** + `gateway.profile_routes` (routing po czacie lub wątku do profilu) |
 | Swarmu, czyli współpracy specjalistów | **Kanban**: trwała tablica zadań współdzielona przez profile, z orkiestratorem routującym po opisie profilu; do szybkich podzadań `delegate_task` |
 | Wspólnej wiedzy o użytkowniku | **Honcho**: jeden „user peer” współdzielony przez wszystkie profile, osobny „AI peer” dla każdego profilu (albo inny memory provider) |
-| Wspólnych skilli | `skills.external_dirs`: katalog skilli skanowany przez każdy profil |
+| Izolacji specjalistów („snajperów”) | `hermes profile create --no-skills`: profil bez domyślnego katalogu skilli, dostaje tylko to, co mu damy |
+| Oceny wyników przez szefa | Statusy kanbana `review` / `kanban_request_changes` / `kanban_complete`: praca wraca do orkiestratora do akceptacji |
 | Automatyzacji | Wbudowany **cron** z dostarczaniem na dowolną platformę |
 
 Filozofia Hermesa pasuje do nas idealnie: *„rdzeń jest wąski, możliwości żyją na
@@ -37,7 +38,30 @@ wie jednak coraz więcej o Tobie.
 
 ---
 
-## 2. Architektura docelowa
+## 2. Model: jeden Main Judge, flota snajperów (w stylu firstmate)
+
+Inspiracja: [firstmate](https://github.com/kunchenguid/firstmate), w którym *rozmawiasz z jednym
+agentem, a on prowadzi załogę*: rozdziela zadania, nadzoruje je do końca i eskaluje
+do Ciebie tylko prawdziwe decyzje. Stan żyje na dysku, więc wszystko przeżywa restart.
+
+Zasady:
+1. **Specjalista = snajper.** Jedna dziedzina, własne skille, własna wiedza, własna pamięć.
+   Zero wspólnego katalogu skilli: profile tworzone z `--no-skills`, a toolsety
+   ograniczone do tego, czego dziedzina potrzebuje. Czego nie umie, tego nie robi. Oddaje zadanie szefowi.
+2. **TARS = Main Judge (orkiestrator).** Sam nie wykonuje pracy dziedzinowej. Robi cztery rzeczy:
+   - **intake:** rozumie, czego chcesz, dopytuje tylko o prawdziwe decyzje,
+   - **dispatch:** rozbija cel na karty kanbana i przypisuje je właściwym snajperom,
+   - **judge:** każdy wynik wraca w statusie `review`, a TARS go ocenia według kryteriów
+     z karty: akceptuje (`complete`) albo odsyła do poprawki (`request_changes`),
+   - **raport:** oddaje Ci jeden, sprawdzony wynik.
+3. **Bezpośredni kontakt zostaje.** Z każdym snajperem możesz pogadać osobno, ale praca
+   wieloetapowa zawsze idzie przez szefa.
+4. **Jedyna rzecz wspólna:** wiedza o *Tobie* (kim jesteś, preferencje). Każdy snajper
+   dostaje ją do kontekstu, ale nie wie nic o dziedzinach innych snajperów.
+5. **Nadzór bez palenia tokenów:** dispatcher kanbana i heartbeaty pilnują floty, a TARS
+   budzi się tylko, gdy coś wymaga oceny albo Twojej decyzji.
+
+## 3. Architektura docelowa
 
 ```
                          ┌──────────────────────────────┐
@@ -57,8 +81,8 @@ wie jednak coraz więcej o Tobie.
                (alias CLI, Bot Chat w desktopie, własny temat na Telegramie)
 
   Wspólne warstwy (dla wszystkich profili):
-   • shared/skills     → skills.external_dirs (protokół przekazywania zadań, styl TARS, PL)
    • pamięć o Tobie    → Honcho: wspólny user peer, osobny AI peer na profil
+   • (brak wspólnych skilli: każdy snajper ma wyłącznie swoje)
    • tablica zadań     → ~/.hermes/kanban.db (współdzielona przez profile)
 ```
 
@@ -80,7 +104,7 @@ wie jednak coraz więcej o Tobie.
 
 ---
 
-## 3. Anatomia specjalisty („kontrakt profilu”)
+## 4. Anatomia specjalisty („kontrakt profilu”)
 
 Każdy specjalista to katalog w `profiles/<nazwa>/`, będący **Hermes profile distribution**:
 
@@ -109,7 +133,7 @@ evals/tars-fin/*.yaml   # scenariusze testowe: pytanie → oczekiwane zachowanie
 3. *Jak pracuję*: domyślne procedury i które skille wołam w jakiej sytuacji.
 4. *Zasady bezpieczeństwa*: np. finanse bez wykonywania przelewów, zdrowie z zastrzeżeniem,
    że to nie porada medyczna.
-5. *Protokół przekazania*: jak zgłosić, że zadanie należy do innego specjalisty (wspólny skill).
+5. *Protokół przekazania*: gdy zadanie wykracza poza dziedzinę, oddaje je TARS-owi (`kanban_block` z powodem), nigdy nie improwizuje.
 6. *Język*: domyślnie polski.
 
 **Rejestr floty:** `fleet.yaml` to jedno źródło prawdy o tym, kto istnieje: nazwa, opis
@@ -120,7 +144,7 @@ to jeden wpis i jeden katalog, bez ręcznej edycji w pięciu miejscach.
 
 ---
 
-## 4. Struktura tego repo (docelowo)
+## 5. Struktura tego repo (docelowo)
 
 ```
 TARS/
@@ -135,7 +159,6 @@ TARS/
 │   ├── tars-research/
 │   └── …
 ├── shared/
-│   ├── skills/                 # wspólne skille (external_dirs dla wszystkich profili)
 │   └── templates/              # szablony SOUL.md / SKILL.md / evals dla nowych specjalistów
 ├── scripts/
 │   ├── install.sh              # instaluje całą flotę na maszynie (idempotentnie)
@@ -149,19 +172,20 @@ TARS/
 
 ---
 
-## 5. Roadmapa
+## 6. Roadmapa
 
 ### Faza 0: Fundament i spike techniczny
 Cel: potwierdzić na prawdziwym Hermesie, że klocki działają tak, jak mówi dokumentacja.
 - [ ] Zainstalować Hermesa w środowisku testowym.
 - [ ] `hermes profile install ./profiles/<x>` z lokalnego katalogu działa (bez pushowania).
-- [ ] `skills.external_dirs` → wspólny skill widoczny w dwóch profilach.
+- [ ] Profil `--no-skills` widzi wyłącznie swoje skille (izolacja snajpera).
+- [ ] Pętla judge: snajper → `review` → TARS `request_changes` → poprawka → `complete`.
 - [ ] Kanban: profil A tworzy kartę dla profilu B, B ją wykonuje, A odbiera wynik.
 - [ ] Telegram: jeden bot, supergrupa z tematami, `profile_routes` z `thread_id` → różne profile.
-- [ ] Spisać ADR-y dla decyzji z sekcji 6.
+- [ ] Spisać ADR-y dla decyzji z sekcji 7.
 
 ### Faza 1: MVP: TARS + 2 specjalistów
-- [ ] Szkielet repo (struktura z sekcji 4), `fleet.yaml`, szablony.
+- [ ] Szkielet repo (struktura z sekcji 5), `fleet.yaml`, szablony.
 - [ ] Profil `tars`: SOUL z osobowością, skill „roster”, protokół zlecania (kanban vs delegate).
 - [ ] Dwóch pierwszych specjalistów (propozycja: `tars-research` + ten najbardziej przydatny dla Ciebie).
 - [ ] `scripts/install.sh`: jedna komenda stawia całą flotę.
@@ -180,7 +204,7 @@ Cel: potwierdzić na prawdziwym Hermesie, że klocki działają tak, jak mówi d
 - [ ] Zasady prywatności: co gdzie jest przechowywane, co nigdy nie opuszcza maszyny.
 
 ### Faza 4: Pełna flota (kilkunastu specjalistów)
-- [ ] Każdy specjalista według kontraktu z sekcji 3: SOUL, 3–8 skilli, knowledge w `references/`, evals.
+- [ ] Każdy specjalista według kontraktu z sekcji 4: SOUL, 3–8 skilli, knowledge w `references/`, evals.
 - [ ] Integracje MCP per specjalista (kalendarz, mail, notatki, dysk, bank export…).
 - [ ] Budowa iteracyjna: 1–2 specjalistów na raz, każdy „dogfoodowany” przed kolejnym.
 
@@ -204,11 +228,11 @@ Wake word, Home Assistant, aplikacja mobilna, serwer 24/7 z backupami, kolejne s
 
 ---
 
-## 6. Decyzje do podjęcia (z rekomendacjami)
+## 7. Decyzje do podjęcia (z rekomendacjami)
 
 | # | Decyzja | Rekomendacja | Dlaczego |
 |---|---|---|---|
-| D1 | Lista specjalistów | Wybierasz Ty (propozycja w sekcji 7) | To Twoje życie i Twoje potrzeby |
+| D1 | Lista specjalistów | Wybierasz Ty (propozycja w sekcji 8) | To Twoje życie i Twoje potrzeby |
 | D2 | Modele | Frontier dla TARS-a (np. Claude), tańsze dla specjalistów; zmiana per profil w `config.yaml` | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
 | D3 | Gdzie działa | Mały VPS lub domowy serwer z Dockerem (s6 pilnuje gatewaya); laptop do developmentu | TARS dostępny 24/7 z Telegrama |
 | D4 | Główny kanał | Telegram (grupa z tematami) + CLI; desktop jako dodatek | Najtańszy start, działa z telefonu |
@@ -218,7 +242,7 @@ Wake word, Home Assistant, aplikacja mobilna, serwer 24/7 z backupami, kolejne s
 
 ---
 
-## 7. Propozycja floty (do wyboru i przycięcia)
+## 8. Propozycja floty (do wyboru i przycięcia)
 
 | Profil | Rola |
 |---|---|
@@ -238,7 +262,7 @@ Wake word, Home Assistant, aplikacja mobilna, serwer 24/7 z backupami, kolejne s
 
 ---
 
-## 8. Zasady projektu
+## 9. Zasady projektu
 
 1. **Nie forkujemy Hermesa.** Budujemy na krawędziach (profile, skille, MCP, pluginy).
    Jeśli czegoś brakuje w rdzeniu, najpierw szukamy rozwiązania w skillu lub pluginie.
