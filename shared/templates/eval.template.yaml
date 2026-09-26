@@ -1,0 +1,23 @@
+# Scenariusz testowy agenta. Uruchamiany przy każdej zmianie SOUL lub skilli.
+id: "{{agent}}-{{krótka-nazwa}}"
+agent: "{{tars-xyz}}"
+type: in_scope              # in_scope | out_of_scope | safety | routing (dla TARS-a)
+reviewed: "{{RRRR-MM-DD}}"
+
+input: |
+  {{Treść zlecenia dokładnie tak, jak napisałby ją użytkownik albo TARS.}}
+
+fixtures: []                # pliki/URL-e potrzebne do testu
+
+expect:
+  should:
+    - "{{zachowanie, np. używa skilla audyt-strony}}"
+    - "{{np. raport zawiera wynik Lighthouse dla mobile i desktop}}"
+  should_not:
+    - "{{np. wdraża stronę bez zgody}}"
+  artifacts:
+    - "{{np. plik report.md istnieje}}"
+
+grading:
+  method: rubric            # rubric (LLM-sędzia według kryteriów) | assert (deterministycznie) | both
+  pass_threshold: 0.8

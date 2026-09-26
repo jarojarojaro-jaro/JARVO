@@ -5,8 +5,17 @@
 > rozmawiać osobno, a TARS je koordynuje. Wszystko jest skonfigurowane z góry, więc nie
 > zaczynasz od pustej kartki.
 
-Stan: szkic v0.1 (2026-09-26). Oparty na lekturze kodu i dokumentacji
+Stan: szkic v0.2 (2026-09-26). Oparty na lekturze kodu i dokumentacji
 `NousResearch/hermes-agent` (main, wrzesień 2026).
+
+**Dokumenty projektu:**
+| Dokument | O czym |
+|---|---|
+| [PLAN.md](PLAN.md) | wizja, architektura, roadmapa, decyzje (ten plik) |
+| [FLEET.md](FLEET.md) | specyfikacja agentów floty v1 |
+| [PROFILE-SPEC.md](PROFILE-SPEC.md) | anatomia agenta: 10 warstw, kontrakt zlecenia, Definition of Ready |
+| [TOOLBOX.md](TOOLBOX.md) | zweryfikowane narzędzia open-source per agent + polityka licencji |
+| [VPS.md](VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring, wdrożenia |
 
 ---
 
@@ -106,6 +115,9 @@ Zasady:
 
 ## 4. Anatomia specjalisty („kontrakt profilu”)
 
+> Pełna wersja: [PROFILE-SPEC.md](PROFILE-SPEC.md) (10 warstw agenta, szablony, poziomy autonomii,
+> kontrakt zlecenia). Poniżej skrót.
+
 Każdy specjalista to katalog w `profiles/<nazwa>/`, będący **Hermes profile distribution**:
 
 ```
@@ -159,8 +171,12 @@ TARS/
 │   ├── tars-research/
 │   └── …
 ├── shared/
-│   └── templates/              # szablony SOUL.md / SKILL.md / evals dla nowych specjalistów
+│   ├── templates/              # szablony SOUL.md / SKILL.md / toolbox.yaml / evals
+│   └── protocol/               # kontrakt zlecenia (wklejany do SOUL każdego agenta przez generator)
+├── knowledge/brands/           # szablon brand kitu (prawdziwe brand kity żyją na VPS)
+├── infra/                      # Dockerfile (obraz pochodny Hermesa), docker-compose, konfiguracje sidecarów
 ├── scripts/
+│   ├── deploy.sh               # wdrożenie na VPS (idempotentne, patrz VPS.md)
 │   ├── install.sh              # instaluje całą flotę na maszynie (idempotentnie)
 │   ├── update.sh               # hermes profile update dla wszystkich
 │   ├── new-specialist.sh       # scaffolding nowego specjalisty z szablonu
@@ -176,7 +192,9 @@ TARS/
 
 ### Faza 0: Fundament i spike techniczny
 Cel: potwierdzić na prawdziwym Hermesie, że klocki działają tak, jak mówi dokumentacja.
-- [ ] Zainstalować Hermesa w środowisku testowym.
+- [ ] Postawić VPS według runbooka z [VPS.md](VPS.md#10-checklist-postawienia-serwera-runbook-fazy-01).
+- [ ] Zbudować obraz pochodny Hermesa (`infra/Dockerfile`) z narzędziami MVP i przejść healthchecki.
+- [ ] Potwierdzić model sandboxu: agenci wykonują komendy w kontenerze Hermesa, bez gniazda Dockera.
 - [ ] `hermes profile install ./profiles/<x>` z lokalnego katalogu działa (bez pushowania).
 - [ ] Profil `--no-skills` widzi wyłącznie swoje skille (izolacja snajpera).
 - [ ] Pętla judge: snajper → `review` → TARS `request_changes` → poprawka → `complete`.
@@ -235,7 +253,7 @@ Wake word, Home Assistant, aplikacja mobilna, serwer 24/7 z backupami, kolejne s
 |---|---|---|---|
 | D1 | Lista specjalistów | ✅ Ustalone: flota v1 (sekcja 8) | |
 | D2 | Modele | OpenRouter jako jeden klucz do modeli, obrazów i wideo; najmocniejszy model dla TARS-a, mocny dla snajperów | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
-| D3 | Gdzie działa | Mały VPS lub domowy serwer z Dockerem (s6 pilnuje gatewaya); laptop do developmentu | TARS dostępny 24/7 z Telegrama |
+| D3 | Gdzie działa | ✅ Ustalone: VPS (x86_64, UE), Docker, szczegóły w [VPS.md](VPS.md) | |
 | D4 | Główny kanał | Telegram (grupa z tematami) + CLI; desktop jako dodatek | Najtańszy start, działa z telefonu |
 | D5 | Wspólna pamięć | Honcho (self-host, jeśli prywatność jest priorytetem) | Natywny model „wspólny użytkownik, osobni agenci” |
 | D6 | Nazewnictwo profili | Prefiks `tars-` (`tars-web`, `tars-sherlock`…) | Profile stają się komendami w shellu, a prefiks unika kolizji |

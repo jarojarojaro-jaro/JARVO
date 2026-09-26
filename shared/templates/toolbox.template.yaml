@@ -1,0 +1,30 @@
+# Manifest narzędzi agenta. Instalator VPS czyta te pliki i buduje obraz / sidecary.
+# Każda wersja przypięta. Healthcheck musi przejść na VPS, zanim agent dostanie status active.
+
+agent: tars-xyz
+
+tools:
+  - name: example-cli
+    source: https://github.com/owner/repo
+    license: MIT
+    version: "1.2.3"                 # przypięta wersja (albo digest obrazu)
+    install:
+      method: npm                    # npm | pip | uv | apt | binary | docker-sidecar | hermes-plugin | mcp
+      spec: "example-cli@1.2.3"
+    integration: cli                 # cli | skill-script | sidecar | hermes-plugin | mcp
+    used_by_skills: [nazwa-workflowu]
+    healthcheck: "example-cli --version"
+    autonomy: A1
+    notes: ""
+
+sidecars:
+  - name: example-service
+    image: owner/image:1.2.3
+    license: AGPL-3.0
+    url_env: EXAMPLE_URL             # zmienna w .env profilu, np. http://example-service:8080
+    healthcheck: "curl -fsS $EXAMPLE_URL/health"
+
+hermes_skills: []                    # skille z katalogu Hermesa [H], np. official/research/searxng-search
+hermes_plugins: []                   # wtyczki z plugin-catalog, np. crawl4ai
+mcp_servers: []                      # np. netlify, cloudflare, context7
+env_requires: []                     # klucze API potrzebne narzędziom (tylko nazwy!)

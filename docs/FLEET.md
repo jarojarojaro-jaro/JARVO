@@ -3,17 +3,21 @@
 Pierwsza flota: **Main Judge + 4 agentów**. Każdy agent to osobny profil Hermesa
 (osobna dystrybucja w `profiles/<nazwa>/`). Rejestr maszynowy jest w [`fleet.yaml`](../fleet.yaml).
 
+Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prompt, workflowy,
+knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
+każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
+
 Legenda przy skillach:
 - **[H]**: skill, który już istnieje w Hermesie (`skills/` albo `optional-skills/`) i tylko go instalujemy w profilu,
 - **[T]**: skill, który piszemy sami w tym repo.
 
-| Profil | Rola | Typ |
-|---|---|---|
-| `tars` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator |
-| `tars-web` | Web Senior Dev: strony od faviconu po SEO | snajper |
-| `tars-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper |
-| `tars-studio` | Marketing i kreacja: grafiki, wideo, social media | snajper |
-| `tars-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista |
+| Profil | Rola | Typ | Maks. autonomia bez zgody |
+|---|---|---|---|
+| `tars` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator | A1 (tworzy karty, ocenia) |
+| `tars-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
+| `tars-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A0/A1 (czyta, pisze raporty) |
+| `tars-studio` | Marketing i kreacja: grafiki, wideo, social media | snajper | A1 (tworzy; publikacja i reklamy = A2) |
+| `tars-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
 ---
 
@@ -86,8 +90,9 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
 - [T] `favicon-i-meta`: generowanie kompletu ikon, manifestu i meta z jednego logo
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`
 
-**Narzędzia:** terminal, pliki, przeglądarka (Playwright), Node.js. Kandydaci do weryfikacji
-w fazie 0: Lighthouse CLI, axe-core, sharp.
+**Narzędzia:** terminal, pliki, przeglądarka, Node.js, a do tego Lighthouse, Unlighthouse, axe-core,
+Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate i MCP
+`context7`/`netlify`/`cloudflare`. Pełna lista: [TOOLBOX.md](TOOLBOX.md#tars-web-web-senior-dev).
 
 **Rubryka sędziego (DoD):** strona buduje się bez błędów, Lighthouse ≥ 90 we wszystkich
 kategoriach (albo uzasadnienie), komplet faviconów i meta, poprawne zrzuty mobile i desktop,
@@ -119,7 +124,9 @@ składa całość i **weryfikuje**, co jest prawdą.
 - [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł),
   [T] `raport-sledztwa` (format raportu), [T] `research-seo` (słowa kluczowe i konkurencja, dla `tars-web` i `tars-studio`)
 
-**Narzędzia:** wyszukiwanie w sieci, przeglądarka, ekstrakcja stron, delegowanie.
+**Narzędzia:** wielu dostawców wyszukiwania naraz (własny SearXNG, Brave, Exa…), Crawl4AI,
+trafilatura, Docling (PDF-y), yt-dlp (transkrypcje), OpenAlex (nauka), ArchiveBox (archiwum dowodów),
+delegowanie wątków. Pełna lista: [TOOLBOX.md](TOOLBOX.md#tars-sherlock-researcher-detektyw).
 
 **Rubryka sędziego (DoD):** każde kluczowe twierdzenie ma źródło, podany poziom pewności,
 sprzeczności wypisane, daty źródeł podane, jasna odpowiedź na pierwotne pytanie.
@@ -145,7 +152,9 @@ sprzeczności wypisane, daty źródeł podane, jasna odpowiedź na pierwotne pyt
 - **wideo z kodu:** HyperFrames (HTML → MP4) [H], Manim [H], do rozważenia Remotion
   (uwaga na licencję dla firm) i Motion Canvas/Revideo, montaż przez FFmpeg,
 - **grafiki z kodu:** szablony HTML/CSS renderowane do PNG, infografiki,
-- **AI:** wtyczki Hermesa `image_gen` i `video_gen` z providerem **OpenRouter** (są w kodzie Hermesa), opcjonalnie ComfyUI.
+- **AI:** wtyczki Hermesa `image_gen` i `video_gen` z providerem **OpenRouter** (są w kodzie Hermesa),
+- **publikacja:** Postiz (self-host) jako kolejka, a post wychodzi dopiero po Twojej akceptacji.
+Pełna lista: [TOOLBOX.md](TOOLBOX.md#tars-studio-marketing-i-kreacja).
 
 **Skille:**
 - [H] `hyperframes`, `manim-video`, `baoyu-infographic`, `social-media-content-calendar`,

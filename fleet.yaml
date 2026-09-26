@@ -1,7 +1,8 @@
 # Rejestr floty TARS: jedno źródło prawdy o tym, kto istnieje.
 # Skrypty (scripts/gen-fleet.py, do napisania) generują z tego: opisy profili
 # (routing kanbana), skill "roster" dla TARS-a i trasy gateway.profile_routes.
-# Szczegóły ról: docs/FLEET.md
+# Szczegóły ról: docs/FLEET.md · anatomia agenta: docs/PROFILE-SPEC.md
+# Poziomy autonomii: A0 odczyt, A1 szkice we własnym workspace, A2 po zgodzie człowieka, A3 nigdy.
 
 version: 1
 
@@ -16,6 +17,7 @@ agents:
       ocenia wyniki według Definition of Done i raportuje. Sam nie wykonuje pracy dziedzinowej.
     model_tier: frontier
     toolsets: [kanban, memory]
+    autonomy_max: A1          # tworzy karty i ocenia; niczego nie wykonuje
     status: planned
 
   - name: tars-sherlock
@@ -25,6 +27,7 @@ agents:
       Wieloźródłowy research i weryfikacja faktów: rozbija pytanie na wątki, sprawdza źródła
       pierwotne, potwierdza twierdzenia krzyżowo i oddaje raport z cytatami i poziomem pewności.
     model_tier: strong
+    autonomy_max: A1          # czyta i pisze raporty
     status: planned
 
   - name: tars-web
@@ -35,6 +38,7 @@ agents:
       SEO techniczne, favicony i meta, optymalizacja obrazów, responsywność, wydajność,
       dostępność, wdrożenie. Uczy się marki z istniejącej strony.
     model_tier: strong
+    autonomy_max: A1          # wdrożenie na produkcję = A2 (Twoja zgoda)
     status: planned
 
   - name: tars-studio
@@ -44,6 +48,7 @@ agents:
       Grafiki promocyjne, posty na social media, filmy z kodu i generowane przez AI, kampanie
       i kalendarze publikacji, zgodnie z brand kitem. Przygotowuje pakiety, nie publikuje bez zgody.
     model_tier: strong
+    autonomy_max: A1          # publikacja i reklamy = A2 (Twoja zgoda)
     status: planned
 
   - name: tars-reka
@@ -53,8 +58,15 @@ agents:
       Generalista wykonawczy: szybkie zadania, prototypy, sklejanie wyników specjalistów,
       organizacja, propozycje. Ma dostęp do skilli wszystkich agentów, bez ich głębi i pamięci.
     model_tier: strong
+    autonomy_max: A1          # e-maile i akcje zewnętrzne = A2 (Twoja zgoda)
     status: planned
 
 shared:
-  user_memory: honcho        # decyzja D5, do potwierdzenia
+  user_memory: honcho        # decyzja D5, do potwierdzenia (self-host na VPS)
   brand_kits: knowledge/brands
+  protocol: shared/protocol/kontrakt-zlecenia.md
+
+infra:
+  host: vps                  # decyzja D3: ustalone, patrz docs/VPS.md
+  llm_provider: openrouter   # decyzja D2: rekomendacja, do potwierdzenia
+  channels: [telegram, cli, desktop]
