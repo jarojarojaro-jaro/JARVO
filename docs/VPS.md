@@ -16,14 +16,16 @@ wiele profili, a każdy gateway jest pilnowany i restartowany osobno.
         │ VPS (Ubuntu LTS, Docker)                                     │
         │                                                              │
         │  ┌───────────────────────────────┐    sieć wewnętrzna tars-net│
-        │  │ tars-hermes (nasz obraz)      │◄──────────┬──────────┐     │
-        │  │  FROM nousresearch/hermes-agent│           │          │     │
-        │  │  + toolbox (lighthouse, sharp, │      ┌────┴───┐ ┌────┴───┐ │
-        │  │    pandoc, ocr, whisper, …)   │      │searxng │ │crawl4ai│ │
-        │  │  s6: gateway (multipleks)     │      │+valkey │ └────────┘ │
-        │  │  profile: tars, tars-web,     │      └────────┘ ┌────────┐ │
-        │  │  tars-sherlock, tars-studio,  │                 │gotenberg│ │
-        │  │  tars-reka                    │                 └────────┘ │
+        │  │ tars-hermes (nasz obraz)      │◄──────────┐                │
+        │  │  FROM nousresearch/hermes-agent│           │                │
+        │  │  + toolbox (lighthouse, sharp, │      ┌────┴───┐            │
+        │  │    pandoc, ocr, parakeet, …)  │      │searxng │            │
+        │  │  przeglądarki: Lightpanda +   │      │+valkey │            │
+        │  │    1× Chromium (render/PDF)   │      └────────┘            │
+        │  │  s6: gateway (multipleks)     │                            │
+        │  │  profile: tars, tars-web,     │                            │
+        │  │  tars-sherlock, tars-studio,  │                            │
+        │  │  tars-reka                    │                            │
         │  └──────────────┬────────────────┘   później: honcho, postiz  │
         │        /opt/data (wolumen)           monitoring (opcja):      │
         │                                      uptime-kuma, beszel      │
@@ -38,7 +40,9 @@ Kluczowe decyzje:
   jeden katalog do backupu, s6 restartuje każdy gateway osobno.
 - **Nasz obraz pochodny:** `FROM nousresearch/hermes-agent:<wersja>` + narzędzia z `toolbox.yaml`
   wszystkich agentów. Budowany przez `infra/Dockerfile`, przypięty do konkretnej wersji Hermesa.
-- **Ciężkie usługi jako sidecary** (osobne kontenery w sieci `tars-net`), a Hermes łączy się z nimi po nazwie.
+- **Sidecar tylko wtedy, gdy musi być usługą** (SearXNG). Ekstrakcja stron i PDF działają w obrazie
+  na żądanie (trafilatura, Lightpanda, pandoc + Chromium): proces żyje tylko na czas zadania, więc
+  w spoczynku nie zajmuje RAM-u. Tak cała flota mieści się na VPS z 8 GB.
 - **Kontener Hermesa jest sandboxem.** Agenci wykonują komendy wewnątrz kontenera (backend
   `local` w kontenerze) i nie dostają gniazda Dockera, które dawałoby im władzę nad hostem
   (`infra/docker-compose.yml` go nie montuje).
@@ -50,18 +54,68 @@ Kluczowe decyzje:
 ## 2. Rozmiar serwera
 
 Bez GPU. Generowanie obrazów i wideo AI idzie przez API (OpenRouter), a lokalnie liczymy tylko
-rendering kodu (FFmpeg, HyperFrames, Manim), przeglądarki, transkrypcję i usługi.
+rendering kodu (FFmpeg, HyperFrames), przeglądarki, transkrypcję i usługi.
+
+**Cel: VPS 4 vCPU / 8 GB RAM / 80 GB NVMe dla całej floty (5 agentów).**
+
+| | Zmierzone (Docker, Hermes 0.21.5) |
+|---|---|
+| obraz `tars-hermes` | **4,4 GB** (z tego 2,7 GB to sam obraz Hermesa) + SearXNG 0,26 GB + Valkey 0,04 GB |
+| dysk na start | ok. **6 GB**: obrazy + model mowy 0,65 GB (pobierany przy pierwszej wiadomości głosowej) |
+| RAM w spoczynku | **ok. 0,7 GB**: gateway 350 MB, dashboard 185 MB, SearXNG 130 MB, Valkey 6 MB |
+
+RAM narzędzi zmierzony w kontenerze (szczyt, proces żyje tylko na czas zadania):
+
+| Zadanie | RAM | Czas |
+|---|---|---|
+| przeglądanie przez Lightpandę (agent-browser, strona z ciężkim JS) | ~35 MB | 0,4 s |
+| to samo w Chromium (zrzuty ekranu, trudne strony) | ~100–250 MB | 0,9 s |
+| Lighthouse, 1 strona mobile | ~340 MB | 11 s |
+| transkrypcja Parakeet (36 s wideo → tekst/SRT, 2 wątki CPU) | ~1,0 GB | 10–12 s |
+| dembrandt (tokeny marki ze strony) | ~170 MB | 9 s |
+| Markdown → PDF (pandoc + Chromium) | ~70 MB | 0,4 s |
+| pracownik kanbana (proces Hermesa z agentem) | ~250–350 MB (szac.) | cały czas trwania karty |
+
+**Budżet 8 GB (najgorszy realny przypadek naraz):** spoczynek 0,7 + 3 pracowników 1,0 + przeglądarki 0,4 +
+Lighthouse 0,35 + transkrypcja 1,0 ≈ **3,5 GB**. Sufity w compose: Hermes 5 GB, SearXNG 384 MB, Valkey 96 MB.
+Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników z RAM hosta),
+`max_in_progress_per_profile: 2`, `delegation.max_concurrent_children` 2–3, jedna transkrypcja naraz
+(blokada w `tars-stt`), swap 4 GB (`bootstrap-vps.sh`, swappiness 10).
 
 | Etap | CPU | RAM | Dysk | Co działa |
 |---|---|---|---|---|
-| MVP (faza 1) | 4 vCPU | 8 GB | 80 GB NVMe | Hermes + TARS + Sherlock, SearXNG, Crawl4AI |
-| Flota v1 | 8 vCPU | 16 GB | 160–240 GB NVMe | + Web (Chromium, Lighthouse), Studio (render wideo), monitoring; później Honcho, Postiz |
-| Flota v1 + Langfuse | 8 vCPU | 32 GB | 240 GB+ NVMe | + self-hostowany Langfuse (ClickHouse jest pamięciożerny) |
+| Flota v1 (cała) | 4 vCPU | **8 GB** | 80 GB NVMe | 5 agentów, SearXNG, Lighthouse, PDF, transkrypcja; monitoring (+0,2 GB) |
+| + dodatki obrazu | 4 vCPU | 8 GB | 80 GB | `TARS_EXTRAS` (niżej): zwiększa dysk, nie RAM w spoczynku |
+| + Langfuse / Honcho | 8 vCPU | 16 GB | 160 GB+ | self-hostowane ślady i pamięć (ClickHouse i Postgres są pamięciożerne) |
+
+**Dodatki obrazu** (`TARS_EXTRAS` w `compose/.env`, potem `deploy.sh --rebuild`), domyślnie wyłączone:
+
+| Dodatek | Co daje | Dysk |
+|---|---|---|
+| `rembg` | wycinanie tła ze zdjęć (Studio) | ~0,5 GB + model 170 MB |
+| `media` | auto-editor: automatyczne cięcie ciszy w nagraniach | ~0,2 GB |
+| `office` | LibreOffice: XLSX/PPTX/DOC → PDF | ~0,5 GB |
+| `docling` | PDF/DOCX → Markdown z modelami ML (tabele, układ) | ~1–2 GB |
+| `manim` | animacje matematyczne (+ LaTeX) | ~1 GB |
+
+Co zmieniliśmy względem pierwszej wersji (9,5 GB obrazu, sidecary 5 GB, limit 10 GB RAM):
+- **Gotenberg** (LibreOffice + Chromium w osobnym kontenerze, 1,7 GB) → `to_pdf.py`: pandoc + Chromium z obrazu;
+  LibreOffice tylko jako dodatek `office`.
+- **Crawl4AI** (drugi Chromium + Python, ~3 GB obrazu, do 3 GB RAM) → trafilatura (`extract.py`), `web_extract`
+  Hermesa i Lightpanda (`lightpanda fetch --dump markdown <url>`).
+- **faster-whisper** → **Parakeet TDT 0.6B v3** (int8, ONNX, 25 języków z polskim): lepszy polski,
+  uruchamiany na żądanie jako komenda STT Hermesa, 0 MB w spoczynku.
+- **Chromium dla agentów → Lightpanda** (przeglądarka w Zig: ~30 MB na sesję, 3–5× mniej niż Chromium);
+  Chromium zostaje jeden, z obrazu Hermesa, do zrzutów, PDF i Lighthouse. Wyleciały dwie dodatkowe kopie
+  Chromium (dembrandt) i pakiety z własną przeglądarką (Unlighthouse, critical).
+- Obraz: bez cache instalatorów w warstwach (1,9 GB), bez `chmod -R` (duplikował 2,7 GB), bez bibliotek ML
+  dembrandta dla nieużywanej flagi `--ai` (0,5 GB).
 
 Rekomendacje:
 - **x86_64**, nie ARM: część narzędzi medialnych i buildów łatwiej działa na x86,
 - **region UE** (Polska/Niemcy): niskie opóźnienia i RODO,
-- dysk rośnie głównie przez wideo i workspace’y, więc stare rendery sprzątamy rutyną cron.
+- dysk rośnie głównie przez wideo i workspace’y, więc stare rendery sprzątamy rutyną cron;
+  `deploy.sh --rebuild` usuwa poprzedni obraz i stary cache budowania.
 
 ---
 
@@ -90,8 +144,8 @@ Rekomendacje:
 |---|---|---|---|
 | `tars-hermes` | agent, gateway, wszystkie profile, dashboard (hasło) | MIT | ✅ w compose |
 | `searxng` (+ `valkey`) | darmowa metawyszukiwarka (JSON) dla Sherlocka i TARS-a | AGPL-3.0 | ✅ w compose |
-| `crawl4ai` | ekstrakcja stron do Markdown | Apache-2.0 | ✅ w compose |
-| `gotenberg` | HTML/Markdown/Office → PDF dla prawej ręki | MIT | ✅ w compose |
+| ~~`crawl4ai`~~ | zastąpiony: trafilatura + Lightpanda w obrazie (bez stałego kontenera) | | ❌ usunięty (RAM) |
+| ~~`gotenberg`~~ | zastąpiony: `to_pdf.py` (pandoc + Chromium, LibreOffice jako dodatek) | | ❌ usunięty (RAM) |
 | `uptime-kuma` | healthchecki i alerty | MIT | ✅ profil `monitoring` |
 | `beszel` (+ agent) | CPU/RAM/dysk, alerty | MIT | ✅ profil `monitoring` |
 | `honcho` (+ postgres/pgvector) | wspólna pamięć o Tobie | AGPL-3.0 | ⬜ faza 3, jeśli MVP pamięci nie wystarczy |

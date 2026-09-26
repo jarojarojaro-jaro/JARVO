@@ -3,15 +3,12 @@ agent: tars-reka
 tools:
   - {name: pandoc, source: https://github.com/jgm/pandoc, license: GPL-2.0 (CLI, osobny program), version: apt, install: {method: apt, spec: pandoc}, integration: cli, used_by_skills: [dokumenty], healthcheck: "pandoc --version", autonomy: A1}
   - {name: ocrmypdf, source: https://github.com/ocrmypdf/OCRmyPDF, license: MPL-2.0, version: apt, install: {method: apt, spec: "ocrmypdf tesseract-ocr-pol"}, integration: cli, used_by_skills: [dokumenty], healthcheck: "ocrmypdf --version", autonomy: A1}
+  - {name: chromium-pdf, source: https://www.chromium.org, license: BSD-3-Clause, version: image, install: {method: image, spec: "chrome-headless-shell z obrazu Hermesa"}, integration: skill-script, used_by_skills: [dokumenty, zlozenie-pakietu], healthcheck: "chromium --version", autonomy: A1, notes: "to_pdf.py: pandoc → HTML → PDF; proces tylko na czas konwersji."}
+  - {name: libreoffice, optional: true, source: https://www.libreoffice.org, license: MPL-2.0, version: apt, install: {method: apt, spec: "libreoffice-*-nogui"}, integration: skill-script, used_by_skills: [dokumenty], healthcheck: "soffice --version", autonomy: A1, notes: "XLSX/PPTX/DOC→PDF; tylko z TARS_EXTRAS=\"office\" (~0,5 GB dysku)."}
   - {name: qpdf, source: https://github.com/qpdf/qpdf, license: Apache-2.0, version: apt, install: {method: apt, spec: qpdf}, integration: cli, used_by_skills: [dokumenty], healthcheck: "qpdf --version", autonomy: A1}
-  - {name: docling, optional: true, source: https://github.com/docling-project/docling, license: MIT, version: optional, install: {method: uv-tool, spec: docling}, integration: cli, used_by_skills: [dokumenty], healthcheck: "docling --version", autonomy: A0, notes: "INSTALL_DOCLING=1"}
+  - {name: docling, optional: true, source: https://github.com/docling-project/docling, license: MIT, version: optional, install: {method: uv-tool, spec: docling}, integration: cli, used_by_skills: [dokumenty], healthcheck: "docling --version", autonomy: A0, notes: "TARS_EXTRAS=\"docling\""}
 
-sidecars:
-  - name: gotenberg
-    image: gotenberg/gotenberg:8
-    license: MIT
-    url_env: GOTENBERG_URL
-    healthcheck: "curl -fsS \"$GOTENBERG_URL/health\" >/dev/null"
+sidecars: []
 
 hermes_skills: [all-bundled]     # pełny katalog wbudowanych skilli Hermesa (brak .no-bundled-skills)
 hermes_plugins: [document-reader]

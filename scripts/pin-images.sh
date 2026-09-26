@@ -18,6 +18,4 @@ current() { grep -E "^$1=" "$ENV_FILE" | cut -d= -f2- | sed 's/@sha256:.*//'; }
 pin HERMES_IMAGE "$(current HERMES_IMAGE || echo nousresearch/hermes-agent:latest)"
 pin IMAGE_SEARXNG "$(current IMAGE_SEARXNG || echo searxng/searxng:latest)"
 pin IMAGE_VALKEY "$(current IMAGE_VALKEY || echo valkey/valkey:8-alpine)"
-pin IMAGE_CRAWL4AI "$(current IMAGE_CRAWL4AI || echo unclecode/crawl4ai:latest)"
-pin IMAGE_GOTENBERG "$(current IMAGE_GOTENBERG || echo gotenberg/gotenberg:8)"
 echo "✅ Przypięte. Następny deploy użyje dokładnie tych obrazów (przebuduj: deploy.sh --rebuild)."

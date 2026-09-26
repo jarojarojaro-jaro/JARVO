@@ -1,12 +1,15 @@
 # Flota TARS na VPS. Uruchamiane przez scripts/deploy.sh z katalogu /srv/tars/repo:
 #   docker compose -f infra/docker-compose.yml --env-file /srv/tars/compose/.env up -d
 #
+# Budżet: VPS 8 GB RAM (4 vCPU). Limity niżej sumują się do ~5,5 GB (+0,4 GB z profilem monitoring);
+# reszta zostaje dla systemu i cache dysku. Limity to sufity, nie rezerwacje: w spoczynku flota bierze ~1 GB.
+#
 # Porty: nic nie jest publikowane publicznie. Dashboard/Desktop (9119) i panele monitoringu
 # wiążemy do TARS_BIND_IP (domyślnie 127.0.0.1; ustaw IP Tailscale, żeby sięgać z laptopa/telefonu).
 # Telegram działa bez portów (long polling).
 #
 # Profile compose:
-#   (domyślny)  hermes + searxng + valkey + crawl4ai + gotenberg
+#   (domyślny)  hermes + searxng + valkey
 #   monitoring  uptime-kuma + beszel (hub + agent)
 
 name: tars
@@ -22,8 +25,7 @@ services:
       dockerfile: infra/Dockerfile
       args:
         HERMES_IMAGE: ${HERMES_IMAGE:-nousresearch/hermes-agent:latest}
-        INSTALL_DOCLING: ${INSTALL_DOCLING:-0}
-        INSTALL_MANIM: ${INSTALL_MANIM:-0}
+        TARS_EXTRAS: ${TARS_EXTRAS:-}
     image: tars-hermes:local
     container_name: tars-hermes
     command: gateway run
@@ -36,9 +38,6 @@ services:
       TZ: ${TZ:-Europe/Warsaw}
       HERMES_TIMEZONE: ${TZ:-Europe/Warsaw}
       SEARXNG_URL: http://searxng:8080
-      CRAWL4AI_URL: http://crawl4ai:11235
-      CRAWL4AI_API_TOKEN: ${CRAWL4AI_API_TOKEN:-}
-      GOTENBERG_URL: http://gotenberg:3000
     volumes:
       - ${TARS_DATA:-/srv/tars/data}/hermes:/opt/data
       - ${TARS_REPO:-/srv/tars/repo}:/opt/tars/repo:ro
@@ -48,13 +47,13 @@ services:
       - "${TARS_BIND_IP:-127.0.0.1}:9119:9119"     # dashboard + Hermes Desktop (Remote Gateway)
     depends_on:
       searxng: {condition: service_started}
-      gotenberg: {condition: service_started}
-    shm_size: "1gb"                                  # Chromium (Lighthouse, Playwright, rendery)
+    shm_size: "512mb"                                # jedna Chromium naraz (Lighthouse, PDF, zrzuty)
     deploy:
       resources:
         limits:
-          memory: ${HERMES_MEM_LIMIT:-10g}
-          cpus: "${HERMES_CPUS:-6}"
+          # gateway + dashboard + ≤ 3 pracowników kanbana + przeglądarka + chwilowo STT (~1,2 GB)
+          memory: ${HERMES_MEM_LIMIT:-5g}
+          cpus: "${HERMES_CPUS:-4}"
     networks: [tars-net]
 
   searxng:
@@ -73,40 +72,19 @@ services:
     cap_add: [CHOWN, SETGID, SETUID]
     deploy:
       resources:
-        limits: {memory: 1g}
+        limits: {memory: 384m}
     networks: [tars-net]
 
   valkey:
     <<: *restart
     image: ${IMAGE_VALKEY:-valkey/valkey:8-alpine}
     container_name: tars-valkey
-    command: valkey-server --save 30 1 --loglevel warning
+    command: valkey-server --save 30 1 --loglevel warning --maxmemory 48mb --maxmemory-policy allkeys-lru
     volumes:
       - ${TARS_DATA:-/srv/tars/data}/valkey:/data
     deploy:
       resources:
-        limits: {memory: 256m}
-    networks: [tars-net]
-
-  crawl4ai:
-    <<: *restart
-    image: ${IMAGE_CRAWL4AI:-unclecode/crawl4ai:latest}
-    container_name: tars-crawl4ai
-    environment:
-      CRAWL4AI_API_TOKEN: ${CRAWL4AI_API_TOKEN:-}
-    shm_size: "1gb"
-    deploy:
-      resources:
-        limits: {memory: 3g}
-    networks: [tars-net]
-
-  gotenberg:
-    <<: *restart
-    image: ${IMAGE_GOTENBERG:-gotenberg/gotenberg:8}
-    container_name: tars-gotenberg
-    deploy:
-      resources:
-        limits: {memory: 1g}
+        limits: {memory: 96m}
     networks: [tars-net]
 
   uptime-kuma:
@@ -118,6 +96,9 @@ services:
       - ${TARS_DATA:-/srv/tars/data}/uptime-kuma:/app/data
     ports:
       - "${TARS_BIND_IP:-127.0.0.1}:3001:3001"
+    deploy:
+      resources:
+        limits: {memory: 256m}
     networks: [tars-net]
 
   beszel:
@@ -129,6 +110,9 @@ services:
       - ${TARS_DATA:-/srv/tars/data}/beszel:/beszel_data
     ports:
       - "${TARS_BIND_IP:-127.0.0.1}:8090:8090"
+    deploy:
+      resources:
+        limits: {memory: 128m}
     networks: [tars-net]
 
   beszel-agent:
@@ -142,6 +126,9 @@ services:
     environment:
       LISTEN: "45876"
       KEY: ${BESZEL_AGENT_KEY:-}
+    deploy:
+      resources:
+        limits: {memory: 64m}
 
 networks:
   tars-net:

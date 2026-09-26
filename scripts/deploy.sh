@@ -43,6 +43,10 @@ fi
 if [[ $REBUILD -eq 1 ]]; then
   log "Budowa obrazu tars-hermes (narzędzia agentów)"
   "${COMPOSE[@]}" build --pull hermes
+  # poprzedni obraz tars-hermes (~4,4 GB) zostaje bez nazwy, a cache budowania rośnie z każdą wersją:
+  # sprzątamy, żeby dysk VPS nie puchł (cache z ostatnich 7 dni zostaje dla szybkich przebudów)
+  docker image prune -f >/dev/null || true
+  docker builder prune -f --filter until=168h >/dev/null || true
 fi
 
 log "Start usług"

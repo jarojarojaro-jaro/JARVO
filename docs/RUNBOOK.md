@@ -11,7 +11,7 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 
 | Co | Po co | Uwagi |
 |---|---|---|
-| VPS x86_64, Ubuntu 24.04 (albo Debian 12), region UE | wszystko działa tutaj | start: **4 vCPU / 8 GB / 80 GB**, cała flota wygodnie: **8 vCPU / 16 GB / 160 GB** (sam obraz `tars-hermes` ma ok. 9–10 GB, sidecary ok. 5 GB) |
+| VPS x86_64, Ubuntu 24.04 (albo Debian 12), region UE | wszystko działa tutaj | cała flota: **4 vCPU / 8 GB / 80 GB** (obraz `tars-hermes` 4,4 GB, na start ok. 6 GB dysku; RAM w spoczynku ok. 0,7 GB, w szczycie ok. 3,5 GB; szczegóły: [VPS.md §2](VPS.md#2-rozmiar-serwera)) |
 | Darmowe konto Docker Hub | `docker login` na serwerze | anonimowe pobieranie obrazów ma limit, który na współdzielonych IP VPS-ów łatwo wyczerpać |
 | Klucz SSH (ed25519) | logowanie na serwer | hasła będą wyłączone |
 | Konto [Tailscale](https://tailscale.com) (darmowe) | prywatny dostęp do serwera i paneli | nic nie wystawiamy publicznie |
@@ -103,8 +103,9 @@ Nowe pliki w tym katalogu dziedziczą grupę (setgid), a przy ręcznym kopiowani
 TARS_BIND_IP=100.101.102.103      # IP Tailscale: dashboard i panele tylko w Twojej sieci
 SEARXNG_SECRET=…                  # wygenerowany przez bootstrap, zostaw
 DASHBOARD_PASSWORD=…              # hasło do dashboardu (użytkownik: tars), wygenerowane przez bootstrap
-HERMES_MEM_LIMIT=10g              # przy 8 GB RAM: 5g
-HERMES_CPUS=6                     # przy 4 vCPU: 3
+HERMES_MEM_LIMIT=5g               # sufit RAM kontenera Hermesa (VPS 8 GB); przy 16 GB można 10g
+HERMES_CPUS=4
+TARS_EXTRAS=                      # opcjonalnie: rembg media office docling manim (więcej dysku, nie RAM)
 ```
 
 **`/srv/tars/compose/tars.env`** (ID Telegrama, nie sekrety):
@@ -147,7 +148,7 @@ Co się dzieje (i co powinieneś zobaczyć):
 | Krok | Oczekiwany wynik |
 |---|---|
 | budowa obrazu `tars-hermes:local` | kilkanaście minut za pierwszym razem |
-| start usług | `hermes`, `searxng`, `valkey`, `crawl4ai`, `gotenberg` w stanie `running` |
+| start usług | `hermes`, `searxng`, `valkey` w stanie `running` |
 | walidacja repo | `Walidacja: 0 błędów` |
 | build dystrybucji | `✓ tars: … skilli, 4 rutyn cron`, `✓ tars-sherlock: …` itd.; brak linii `!` o Telegramie |
 | instalacja floty | `Instalacja profilu …` ×5, `✅ Flota zainstalowana` |
@@ -207,7 +208,7 @@ sudo crontab -e
 ```
 
 **Monitoring (opcjonalnie):** `bash scripts/deploy.sh --no-pull --monitoring`, potem Uptime Kuma
-`http://<ip-tailscale>:3001` (monitory: dashboard 9119, SearXNG, Gotenberg) i Beszel `http://<ip-tailscale>:8090`
+`http://<ip-tailscale>:3001` (monitory: dashboard 9119, SearXNG) i Beszel `http://<ip-tailscale>:8090`
 (klucz agenta z panelu → `BESZEL_AGENT_KEY` w `compose/.env` → ponownie `--monitoring`).
 
 **SSH tylko przez Tailscale** (gdy `ssh tars@<ip-tailscale>` działa):
@@ -249,3 +250,6 @@ Wyjątek to skille tworzone przez agentów: zbiera je `harvest-skills.sh`.
 | `install-fleet.sh`: „nieczytelny” przy sekretach | złe uprawnienia `secrets/` → `sudo chgrp -R 10000 /srv/tars/secrets && sudo chmod 2750 /srv/tars/secrets && sudo chmod 640 /srv/tars/secrets/*.env` |
 | `toomanyrequests: You have reached your unauthenticated pull rate limit` | limit Docker Hub → `docker login` (darmowe konto) i ponów `deploy.sh` |
 | brak miejsca na dysku | `docker system prune`, stare rendery w `/srv/tars/data/hermes/tars/workspaces/*/` |
+| mało RAM-u, OOM w `docker logs` / `dmesg` | `docker stats`; zmniejsz `kanban.max_in_progress` w `profiles/_host/config.yaml` (domyślnie 3) i `deploy.sh --no-pull`; sprawdź swap (`swapon --show`) |
+| pierwsza wiadomość głosowa długo się przetwarza | pobiera się model Parakeet (0,65 GB) do `/srv/tars/data/hermes/tars/models`; raz. Z góry: `docker exec -u hermes tars-hermes tars-stt --prefetch` |
+| przeglądarka agenta nie widzi strony (pusta treść) | Lightpanda nie obsługuje wszystkiego; Hermes sam przełącza na Chromium przy zrzutach i błędach. Gdy strona uparcie nie działa: `browser.engine: chrome` w `profiles/<agent>/config.yaml` |

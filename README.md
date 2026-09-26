@@ -28,7 +28,8 @@ make models          # czy modele z fleet.yaml istnieją na OpenRouter
 ```
 
 Wdrożenie na VPS krok po kroku: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** (bootstrap serwera, Telegram,
-sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy).
+sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mieści się na VPS
+**4 vCPU / 8 GB RAM / 80 GB**: obraz 4,4 GB, w spoczynku ok. 0,7 GB RAM (pomiary: [VPS.md §2](docs/VPS.md#2-rozmiar-serwera)).
 
 ## Mapa repo
 

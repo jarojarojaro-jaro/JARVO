@@ -33,7 +33,7 @@ Karta „złożenie” ma rodziców: karty merytoryczne misji (już zaakceptowan
    - sekcja na każdą rolę: najważniejsze pliki (z krótkim opisem), kluczowe liczby z raportów (np. Lighthouse, liczba źródeł),
    - „Do decyzji” zebrane z raportów kart (publikacja, wdrożenie, budżet),
    - rozbieżności między wynikami kart (np. inna nazwa produktu w grafikach i na stronie), jeśli są.
-4. Opcjonalnie (jeśli karta prosi): `INDEX.pdf` przez `dokumenty` (pandoc/Gotenberg).
+4. Opcjonalnie (jeśli karta prosi): `INDEX.pdf` przez `dokumenty` (pandoc + Chromium).
 5. Samokontrola: każdy plik z `metadata.artifacts` rodziców jest w pakiecie, linki w INDEX.md działają (ścieżki względne).
 
 ## DoD

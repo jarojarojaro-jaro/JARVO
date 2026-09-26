@@ -17,6 +17,15 @@ kanban:
   notify_in_gateway: true
   auto_subscribe_on_create: true
   failure_limit: 2
+  # VPS 8 GB: każdy pracownik to osobny proces Hermesa (~300–400 MB) + ewentualnie przeglądarka.
+  # Bez tych kluczy Hermes liczy limit z RAM hosta (8 GB → 8 pracowników), za dużo na ten budżet.
+  max_in_progress: 3
+  max_in_progress_per_profile: 2
+
+# Wiadomości głosowe z Telegrama transkrybuje gateway: Parakeet przez tars-stt (bez faster-whisper).
+stt:
+  provider: local_command
+  language: pl
 
 platforms:
   telegram:

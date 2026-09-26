@@ -12,6 +12,15 @@ są opisane osobno w [TOOLBOX.md](TOOLBOX.md), razem z polityką licencji.
 
 Hermesa nie forkujemy: używamy oficjalnego obrazu i rozszerzamy go na krawędziach (profile, skille, narzędzia).
 
+Komponenty obrazu `tars-hermes` o znaczeniu licencyjnym (pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md)):
+
+| Projekt | Rola | Licencja |
+|---|---|---|
+| [Lightpanda](https://github.com/lightpanda-io/browser) 0.4.0 | przeglądarka headless dla `browser_*` (binarka z oficjalnego obrazu, tylko `strip`) | AGPL-3.0 |
+| [agent-browser](https://github.com/vercel-labs/agent-browser) | sterownik narzędzi przeglądarki Hermesa | Apache-2.0 |
+| [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (NVIDIA), eksport ONNX [istupakov/parakeet-tdt-0.6b-v3-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx) | model rozpoznawania mowy (pobierany przy pierwszym użyciu, nie w repo ani w obrazie) | CC-BY-4.0 |
+| [onnx-asr](https://github.com/istupakov/onnx-asr) + [ONNX Runtime](https://github.com/microsoft/onnxruntime) | uruchamianie modelu mowy na CPU | MIT |
+
 ## 2. Skille dołączane do agentów (vendoring)
 
 Kopiowane przy buildzie z przypiętych commitów zapisanych w [`vendor/skills.lock.yaml`](../vendor/skills.lock.yaml).
@@ -61,7 +70,8 @@ znaków towarowych ani zasobów producentów zabawek.
 |---|---|
 | MIT | zachowujemy informację o prawach autorskich i licencję (`LICENSE-UPSTREAM` przy każdym skillu) |
 | Apache-2.0 | licencja przy skillu, `NOTICE` źródła (jeśli istnieje), treść bez zmian (zmiany oznaczylibyśmy w pliku) |
-| AGPL-3.0 (SearXNG, opcjonalnie Postiz) | usługi uruchamiamy bez modyfikacji, tylko prywatnie; zmieniona wersja udostępniana przez sieć innym wymagałaby publikacji źródeł |
+| AGPL-3.0 (SearXNG, Lightpanda, opcjonalnie Postiz) | programy uruchamiamy bez modyfikacji (Lightpanda: binarka z oficjalnego obrazu, tylko usunięte symbole debugowania), tylko prywatnie; zmieniona wersja udostępniana przez sieć innym wymagałaby publikacji źródeł |
+| CC-BY-4.0 (model Parakeet) | uznanie autorstwa (NVIDIA) w tym pliku; model pobierany z Hugging Face, nie redystrybuujemy go |
 
 Aktualizacja źródła = zmiana `rev` w locku (pełny SHA), build, przegląd różnic w skillach, evals, commit.
 Walidator odrzuca źródło bez przypiętego SHA albo bez licencji.

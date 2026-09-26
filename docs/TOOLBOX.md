@@ -22,16 +22,16 @@ obserwowalność przez Langfuse w `plugins/observability/`.
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
 | [Lighthouse](https://github.com/GoogleChrome/lighthouse) | audyt wydajności, SEO, dostępności, dobrych praktyk | Apache-2.0 | 2026-09 | CLI + skrypt |
-| [Unlighthouse](https://github.com/harlan-zw/unlighthouse) | Lighthouse dla **całej** witryny naraz | MIT | 2026-09 | CLI |
 | [axe-core](https://github.com/dequelabs/axe-core) + [axe-core-npm](https://github.com/dequelabs/axe-core-npm) | audyt dostępności (WCAG) | MPL-2.0 | 2026-09 | CLI + skrypt |
 | [Playwright](https://github.com/microsoft/playwright) | zrzuty na wielu szerokościach, testy responsywności | Apache-2.0 | 2026-09 | skrypt |
+| [agent-browser](https://github.com/vercel-labs/agent-browser) | sterownik narzędzi `browser_*` Hermesa (natywna binarka Rust) | Apache-2.0 | 2026-09 | Hermes |
+| [Lightpanda](https://github.com/lightpanda-io/browser) | lekka przeglądarka headless dla agentów (~30 MB na sesję); Chromium tylko do renderu | AGPL-3.0 (osobny program) | 2026-09 | silnik `browser.engine` |
 | [sharp](https://github.com/lovell/sharp) | konwersja i kompresja obrazów (AVIF/WebP), warianty `srcset` | Apache-2.0 | 2026-09 | skrypt |
 | [favicons](https://github.com/itgalaxy/favicons) | komplet faviconów, ikon i manifestu z jednego pliku | MIT | 2026-09 | skrypt |
 | [pwa-asset-generator](https://github.com/elegantapp/pwa-asset-generator) | ikony i splash screeny PWA | MIT | 2026-09 | CLI |
 | [SVGO](https://github.com/svg/svgo) | optymalizacja SVG (logo, ikony) | MIT | 2026-08 | CLI |
 | [linkinator](https://github.com/JustinBeckwith/linkinator) | wykrywanie martwych linków | MIT | 2026-09 | CLI |
 | [html-validate](https://github.com/html-validate/html-validate) | walidacja HTML | MIT | 2026-09 | CLI |
-| [critical](https://github.com/addyosmani/critical) | krytyczny CSS (szybszy pierwszy render) | Apache-2.0 | 2026-09 | skrypt |
 | [glyphhanger](https://github.com/zachleat/glyphhanger) | subsetting fontów | MIT | 2026-06 | CLI |
 | [dembrandt](https://github.com/dembrandt/dembrandt) | **wyciąga system designu ze strony** (logo, kolory, typografia, odstępy) jako tokeny W3C, czyli podstawa `brand-z-url` | MIT | 2026-09 | CLI + skrypt |
 | [CSS Analyzer](https://github.com/projectwallace/css-analyzer) | statystyki CSS (kolory, fonty, złożoność) do audytów | MIT | 2026-09 | skrypt |
@@ -46,8 +46,8 @@ Z Hermesa:
   `webflow`, `wordpress-com`, `figma`, `deepwiki`,
 - **plugin:** `image-utils`.
 
-Odrzucone lub opcjonalne: `lighthouse-ci` (ostatni commit 2025-06; Lighthouse + Unlighthouse
-wystarczają), `pa11y` (dubluje axe), `validator/vnu` (wymaga Javy; html-validate wystarcza na start).
+Odrzucone lub opcjonalne: `lighthouse-ci` (ostatni commit 2025-06), Unlighthouse i critical (każdy ciągnie
+własną przeglądarkę i ~0,3 GB; całą witrynę audytujemy `audit.sh` po kolei na wybranych URL-ach z sitemapy), `pa11y` (dubluje axe), `validator/vnu` (wymaga Javy; html-validate wystarcza na start).
 
 ---
 
@@ -56,7 +56,8 @@ wystarczają), `pa11y` (dubluje axe), `validator/vnu` (wymaga Javy; html-validat
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
 | [SearXNG](https://github.com/searxng/searxng) | własna metawyszukiwarka (70+ silników), bez kluczy i limitów | AGPL-3.0 | 2026-09 | sidecar + dostawca `searxng` |
-| [Crawl4AI](https://github.com/unclecode/crawl4ai) | ekstrakcja stron (także JS) do Markdown | Apache-2.0 | 2026-09 | sidecar + plugin `crawl4ai` |
+| [trafilatura](https://github.com/adbar/trafilatura) | czysta treść artykułów (`extract.py`) | Apache-2.0 | 2026-09 | skrypt |
+| [Lightpanda](https://github.com/lightpanda-io/browser) | strony z JS do Markdown bez Chromium: `lightpanda fetch --dump markdown <url>`; silnik `browser_*` | AGPL-3.0 (osobny program) | 2026-09 | CLI + Hermes |
 | [Scrapling](https://github.com/D4Vinci/Scrapling) | odporny scraping (skill [H] `scrapling`) | BSD-3 | 2026-09 | CLI |
 | [trafilatura](https://github.com/adbar/trafilatura) | czysty tekst artykułów, metadane, daty publikacji | Apache-2.0 | 2026-09 | skrypt |
 | [Docling](https://github.com/docling-project/docling) | PDF-y, raporty, tabele → Markdown | MIT | 2026-09 | skrypt |
@@ -80,7 +81,8 @@ Inspiracje metodyczne (czytamy i przenosimy pomysły do skilli, nie instalujemy)
 
 Odrzucone: `waybackpy` (ostatni commit 2022; do Wayback Machine wystarczy jego publiczne API przez `curl`),
 `sherlock-project` (wyszukiwanie ludzi po nickach, sprzeczne z zasadą „nie śledzimy osób prywatnych”),
-self-host Firecrawl (AGPL i ciężki; Crawl4AI robi to samo, a Firecrawl zostaje jako opcjonalny płatny dostawca przez wtyczkę Hermesa).
+self-host Firecrawl (AGPL i ciężki; Firecrawl zostaje jako opcjonalny płatny dostawca przez wtyczkę Hermesa),
+Crawl4AI (był sidecarem: drugi Chromium, ~3 GB obrazu i do 3 GB RAM; trafilatura + Lightpanda + `web_extract` Hermesa robią to samo na VPS 8 GB).
 
 ---
 
@@ -94,11 +96,11 @@ self-host Firecrawl (AGPL i ciężki; Crawl4AI robi to samo, a Firecrawl zostaje
 | [Revideo](https://github.com/redotvideo/revideo) | fork Motion Canvas do renderingu programowego | MIT | 2026-07 | per projekt |
 | [Manim CE](https://github.com/ManimCommunity/manim) | animacje edukacyjne i matematyczne (skill [H] `manim-video`) | MIT | 2026-09 | CLI |
 | FFmpeg | montaż, konwersje, napisy, formaty platform | LGPL/GPL | n/d | CLI |
-| [auto-editor](https://github.com/WyattBlue/auto-editor) | automatyczne wycinanie ciszy z nagrań | Unlicense | 2026-09 | CLI |
-| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | transkrypcja i napisy na CPU | MIT | 2026-09 | CLI |
+| [auto-editor](https://github.com/WyattBlue/auto-editor) | automatyczne wycinanie ciszy z nagrań (dodatek `media`) | Unlicense | 2026-09 | CLI |
+| [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) | transkrypcja i napisy na CPU (int8, 25 języków z polskim), też wiadomości głosowe Hermesa | CC-BY-4.0 (model) / MIT | 2026-07 | `tars-stt` |
 | [Kokoro](https://github.com/hexgrad/kokoro) | lektor TTS offline (alternatywnie TTS przez API Hermesa) | Apache-2.0 | 2025-08 | skrypt |
 | [Satori](https://github.com/vercel/satori) + [resvg](https://github.com/linebender/resvg) | grafiki z HTML/JSX → SVG → PNG (posty, OG images, banery) | MPL-2.0 / Apache-2.0 | 2026-09 | skrypt |
-| [rembg](https://github.com/danielgatis/rembg) | usuwanie tła ze zdjęć produktów (CPU) | MIT | 2026-09 | CLI |
+| [rembg](https://github.com/danielgatis/rembg) | usuwanie tła ze zdjęć produktów (CPU; dodatek `rembg`) | MIT | 2026-09 | CLI |
 | [sharp](https://github.com/lovell/sharp) | przycinanie i eksport w wymiarach platform | Apache-2.0 | 2026-09 | skrypt |
 | [Postiz](https://github.com/gitroomhq/postiz-app) | kolejka i harmonogram publikacji; Studio przygotowuje, Ty akceptujesz | AGPL-3.0 | 2026-09 | sidecar |
 | [Penpot](https://github.com/penpot/penpot) | otwarte narzędzie do projektowania (opcjonalnie, ciężkie) | MPL-2.0 | 2026-09 | sidecar (opcja) |
@@ -125,9 +127,10 @@ Odrzucone: ComfyUI self-host (GPL-3.0, wymaga GPU; generowanie idzie przez API),
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
 | [Pandoc](https://github.com/jgm/pandoc) | konwersje dokumentów (MD ↔ DOCX ↔ PDF ↔ HTML) | GPL-2.0 | 2026-09 | CLI |
-| [Gotenberg](https://github.com/gotenberg/gotenberg) | HTML/Office → PDF przez API (LibreOffice + Chromium w środku) | MIT | 2026-09 | sidecar |
+| Chromium (z obrazu) + pandoc | Markdown/HTML/DOCX → PDF (`to_pdf.py`), bez osobnej usługi | BSD / GPL-2.0 | n/d | skrypt |
+| [LibreOffice](https://www.libreoffice.org) | XLSX/PPTX/DOC → PDF (dodatek `office`) | MPL-2.0 | 2026-09 | CLI |
 | [OCRmyPDF](https://github.com/ocrmypdf/OCRmyPDF) | OCR skanów | MPL-2.0 | 2026-09 | CLI |
-| [Docling](https://github.com/docling-project/docling) | czytanie dokumentów, tabel, PDF-ów | MIT | 2026-09 | skrypt |
+| [Docling](https://github.com/docling-project/docling) | czytanie dokumentów, tabel, PDF-ów (dodatek `docling`) | MIT | 2026-09 | skrypt |
 | [Stirling-PDF](https://github.com/Stirling-Tools/Stirling-PDF) | operacje na PDF (łączenie, podpisy, kompresja) | MIT | 2026-09 | sidecar (opcja) |
 
 Z Hermesa: pełny katalog skilli [H] + skille snajperów (tylko do odczytu), plugins
@@ -189,19 +192,22 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 |---|---|---|
 | obraz Hermesa | `/opt/hermes` | Python 3.14 Hermesa (nie ruszamy), Node, `uv`, ffmpeg/ffprobe, Chromium |
 | pakiety systemowe | apt | pandoc, qpdf, ocrmypdf + tesseract (pol, eng), exiftool, jq, sqlite3, fonty z polskimi znakami |
-| przeglądarka | `/usr/local/bin/chromium` (`CHROME_PATH`) | jedna Chromium z obrazu Hermesa dla Lighthouse, Playwright i skryptów |
-| narzędzia Node | `/opt/tars/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | lighthouse, @unlighthouse/cli, axe-core, playwright-core, sharp, svgo, favicons, critical, linkinator, html-validate, dembrandt |
-| narzędzia Pythona | venv `/opt/tars/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, faster-whisper, auto-editor, rembg; opcjonalnie docling, manim |
+| przeglądarki | `/usr/local/bin/lightpanda`, `/usr/local/bin/chromium` (`CHROME_PATH`) | Lightpanda dla `browser_*` agentów (agent-browser); jedna Chromium z obrazu Hermesa dla zrzutów, PDF, Lighthouse, Playwright i dembrandta |
+| narzędzia Node | `/opt/tars/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt |
+| narzędzia Pythona | venv `/opt/tars/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet); dodatki `TARS_EXTRAS`: rembg, auto-editor, docling, manim |
 | claude-seo | `/opt/tars/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
-| sidecary | sieć `tars-net` | SearXNG (`SEARXNG_URL`), Crawl4AI (`CRAWL4AI_URL`), Gotenberg (`GOTENBERG_URL`), Valkey |
+| sidecary | sieć `tars-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
 
 Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmianą):
 - globalny npmrc obrazu ma `min-release-age = 14` i `engine-strict`: przypinamy wersje npm starsze niż 14 dni
   i zgodne z Node obrazu; tę samą zasadę stosujemy do pinów Pythona,
 - interpreter Pythona dla venv pobiera `uv` do `/opt/tars/uv-python` (nie do `/root`, niedostępnego dla `hermes`),
-- puppeteer (zależność `critical`) nie pobiera własnej Chrome: `PUPPETEER_EXECUTABLE_PATH` wskazuje wspólną Chromium,
-- auto-editor pobiera swoją binarkę przy budowie obrazu (w runtime katalog pakietów jest tylko do odczytu),
-- crawl całej witryny: komenda `unlighthouse-ci` (pakiet `@unlighthouse/cli`).
+- jedna Chromium: `playwright-core` (także dembrandta, przez `overrides`) i Playwright claude-seo są przypięte do wersji,
+  której przeglądarka jest w obrazie Hermesa; Dockerfile uruchamia ją testowo i zatrzyma build przy niezgodności,
+- `AGENT_BROWSER_EXECUTABLE_PATH` celowo nieustawione: agent-browser użyłby go też dla silnika lightpanda,
+- bez cache instalatorów w warstwach (`UV_NO_CACHE`, `npm cache clean`) i bez `chmod -R` (kopiuje całe drzewo do nowej warstwy),
+- auto-editor (dodatek `media`) pobiera swoją binarkę przy budowie obrazu (w runtime katalog pakietów jest tylko do odczytu),
+- rozpoznawanie mowy: `/opt/tars/bin/tars-stt` (Hermes: `HERMES_LOCAL_STT_COMMAND`, `stt.provider: local_command`).
 
 Skrypty `.cjs` ładują moduły przez `NODE_PATH`, a ESM-owe pakiety (np. `favicons`) przez `importGlobal()`.
 Skrypty Pythona, które potrzebują bibliotek z venv narzędzi, same przełączają się na `/opt/tars/venv`.

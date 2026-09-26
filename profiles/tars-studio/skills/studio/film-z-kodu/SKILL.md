@@ -21,8 +21,8 @@ metadata:
 |---|---|
 | promo produktu, reels z tekstem i animacją, launch | **HyperFrames** (`hyperframes`, `product-launch-video`, `motion-graphics`) |
 | explainer bez nagrań (tekst → wideo) | HyperFrames `faceless-explainer` |
-| matematyka, algorytmy, wykresy w ruchu | **Manim** (`manim-video`) |
-| cięcie nagrań, łączenie, napisy, formaty | **FFmpeg** (+ `auto-editor`, `scripts/subtitles.py`) |
+| matematyka, algorytmy, wykresy w ruchu | **Manim** (`manim-video`; dodatek obrazu `manim`, sprawdź `command -v manim`) |
+| cięcie nagrań, łączenie, napisy, formaty | **FFmpeg** (+ `scripts/subtitles.py`; cięcie ciszy: `auto-editor`, jeśli jest, inaczej `ffmpeg -af silenceremove`) |
 | ujęcia fotorealistyczne / b-roll | generacja AI (`generacja-ai`), potem montaż |
 
 HyperFrames: `media-use` (muzyka, lektor, stock) wymaga zalogowanego CLI HeyGen. Bez tego używaj własnych
@@ -34,7 +34,7 @@ materiałów, zdjęć/ilustracji z AI i lektora TTS (narzędzie `text_to_speech`
 3. **Storyboard:** tabela scen (czas, obraz, tekst na ekranie, animacja, dźwięk). Maksymalnie 1 myśl na scenę.
 4. **Budowa:** kompozycja HyperFrames/Manim zgodnie ze skillem silnika; kolory i fonty z brand kitu.
 5. **Render:** MP4 H.264/AAC, 30 fps, docelowa rozdzielczość. Najpierw podgląd w niskiej jakości, potem finał.
-6. **Napisy:** `python3 $HERMES_HOME/scripts/subtitles.py wideo.mp4 --burn` (transkrypcja faster-whisper → SRT → wypalenie),
+6. **Napisy:** `python3 $HERMES_HOME/scripts/subtitles.py wideo.mp4 --burn` (transkrypcja Parakeet przez `tars-stt` → SRT → wypalenie),
    korekta tekstu SRT przed wypaleniem.
 7. **QA:** `check_media.py` (rozdzielczość, długość, waga), obejrzyj klatki kluczowe (vision): pierwsza klatka jako
    miniatura, czytelność napisów, brak obciętych elementów w bezpiecznej strefie.

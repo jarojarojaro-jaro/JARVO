@@ -45,5 +45,7 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
 - [ ] priorytety P0–P3 i top 3 na górze.
 
 ## Uwagi
-- Audytujesz **tylko** wskazane strony; crawl całej witryny (`unlighthouse-ci --site <url>`) tylko, gdy karta o to prosi.
+- Audytujesz **tylko** wskazane strony. Gdy karta prosi o całą witrynę: weź URL-e z `sitemap.xml`, wybierz
+  reprezentatywne (strona główna, po 1–2 z każdego typu, maks. 10) i puść `audit.sh` **po kolei**, nie równolegle
+  (jedna Chromium naraz; VPS ma 8 GB RAM).
 - Wyniki Lighthouse wahają się: przy wątpliwościach 3 pomiary i mediana.

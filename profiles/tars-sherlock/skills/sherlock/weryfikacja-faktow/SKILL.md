@@ -30,7 +30,7 @@ Werdykty: **potwierdzone** · **częściowo** (z doprecyzowaniem) · **niepotwie
 ## Procedura dla jednego twierdzenia
 1. **Rozbij** na sprawdzalne elementy: kto, co, kiedy, ile, gdzie.
 2. **Źródło pierwotne:** gdzie to pierwszy raz ogłoszono (dokument, rejestr, dane, oficjalny komunikat)?
-   Czytaj oryginał (`extract.py`, PDF → Docling, wideo → `youtube-content`).
+   Czytaj oryginał (`extract.py`, PDF → `read_file` albo Docling, jeśli jest; wideo → `youtube-content`).
 3. **Czytanie lateralne:** zamiast wierzyć stronie, sprawdź, co **inni** mówią o niej i o twierdzeniu.
 4. **Drugie niezależne źródło:** niezależne = nie cytuje pierwszego i nie jest przedrukiem.
 5. **Liczby:** przelicz (procenty, sumy, waluty, jednostki). Sprawdź, czy porównywane okresy są porównywalne.

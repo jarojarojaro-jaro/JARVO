@@ -4,7 +4,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/<ty>/TARS/<gałąź>/scripts/bootstrap-vps.sh -o bootstrap-vps.sh
 #   sudo bash bootstrap-vps.sh --user tars --repo https://github.com/<ty>/TARS.git [--branch main] [--ssh-key "ssh-ed25519 ..."]
 #
-# Robi: aktualizacje, automatyczne łatki, użytkownik bez roota, twardy SSH (tylko klucze), UFW,
+# Robi: aktualizacje, automatyczne łatki, swap 4 GB, użytkownik bez roota, twardy SSH (tylko klucze), UFW,
 # Docker + compose, Tailscale (logowanie ręcznie), katalogi /srv/tars, klon repo, szablony env.
 # NIE robi: logowania do Tailscale, wpisywania kluczy API, zamykania portu 22 (po sprawdzeniu Tailscale: --lock-ssh).
 set -euo pipefail
@@ -44,6 +44,18 @@ apt-get update -y && apt-get upgrade -y
 apt-get install -y ca-certificates curl git ufw unattended-upgrades jq restic sqlite3 fail2ban
 dpkg-reconfigure -f noninteractive unattended-upgrades
 timedatectl set-timezone Europe/Warsaw || true
+
+log "Swap i pamięć (VPS 8 GB): plik wymiany jako bufor na piki"
+# Flota w spoczynku bierze ~1 GB; piki (Lighthouse, transkrypcja, kilku pracowników naraz) do ~4–5 GB.
+# Swap chroni przed OOM-killerem przy zbiegu pików; swappiness 10 = sięgamy po niego dopiero pod presją.
+if ! swapon --show=NAME --noheadings | grep -q .; then
+  SWAP_GB="${TARS_SWAP_GB:-4}"
+  fallocate -l "${SWAP_GB}G" /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=$((SWAP_GB * 1024)) status=none
+  chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
+  grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+printf 'vm.swappiness = 10\nvm.vfs_cache_pressure = 50\n' > /etc/sysctl.d/90-tars.conf
+sysctl --system >/dev/null || true
 
 log "Użytkownik $USER_NAME"
 id "$USER_NAME" >/dev/null 2>&1 || adduser --disabled-password --gecos "" "$USER_NAME"

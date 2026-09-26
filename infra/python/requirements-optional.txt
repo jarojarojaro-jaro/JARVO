@@ -1,4 +1,10 @@
-# Ciężkie narzędzia opcjonalne (build-arg INSTALL_DOCLING=1 / INSTALL_MANIM=1).
-# docling pobiera modele ML (~1–2 GB); manim wymaga cairo/pango (+ LaTeX dla wzorów).
+# Dodatki opcjonalne: build-arg TARS_EXTRAS (compose/.env), np. TARS_EXTRAS="rembg media".
+#   rembg   → rembg (wycinanie tła; numba/scipy/scikit-image, ~0,5 GB; model u2net ~170 MB przy 1. użyciu)
+#   media   → auto-editor (automatyczne cięcie ciszy w nagraniach, ~0,2 GB)
+#   docling → docling (PDF/DOCX→Markdown z modelami ML, ~1–2 GB)
+#   manim   → manim (animacje matematyczne; + cairo/pango i LaTeX z apt, ~1 GB)
+#   office  → LibreOffice z apt (XLSX/PPTX/DOC→PDF w to_pdf.py, ~0,5 GB), bez pakietu Pythona
+rembg[cpu,cli]==2.0.84
+auto-editor==29.3.1
 docling==2.126.0
 manim==0.21.0

@@ -1,0 +1,4 @@
+# Ograniczenia (uv pip install -c) dla venv claude-seo: Playwright w wersji, której Chromium
+# (chrome-headless-shell 1243) jest już w obrazie Hermesa, więc bez pobierania drugiej przeglądarki.
+# Przy zmianie obrazu Hermesa Dockerfile uruchamia przeglądarkę testowo i zatrzyma build przy niezgodności.
+playwright==1.63.0

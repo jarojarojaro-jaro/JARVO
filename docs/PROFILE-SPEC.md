@@ -114,8 +114,8 @@ licencję, sposób instalacji, sposób integracji i komendę healthcheck.
 Sposoby integracji (od najlżejszego):
 1. **CLI przez terminal + skill**: skill uczy agenta, jak używać narzędzia (większość przypadków),
 2. **skrypt w skillu:** opakowanie narzędzia w powtarzalną procedurę,
-3. **usługa sidecar** (kontener na VPS), z którą agent rozmawia przez HTTP (SearXNG, Crawl4AI…),
-4. **wtyczka Hermesa** z katalogu (np. `crawl4ai`, `openalex`, `langfuse`),
+3. **usługa sidecar** (kontener na VPS), z którą agent rozmawia przez HTTP (SearXNG…); tylko gdy narzędzie musi działać stale, inaczej proces na żądanie w obrazie,
+4. **wtyczka Hermesa** z katalogu (np. `openalex`, `langfuse`),
 5. **serwer MCP** (np. Netlify, Cloudflare, Figma).
 
 Tak samo robi rdzeń Hermesa („footprint ladder”): nie dodajemy narzędzia do schematu modelu,

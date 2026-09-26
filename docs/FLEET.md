@@ -103,7 +103,7 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
 - [T] `favicon-i-meta`: generowanie kompletu ikon, manifestu i meta z jednego logo
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`
 
-**Narzędzia:** terminal, pliki, przeglądarka, Node.js, a do tego Lighthouse, Unlighthouse, axe-core,
+**Narzędzia:** terminal, pliki, przeglądarka (Lightpanda, Chromium do zrzutów), Node.js, a do tego Lighthouse, axe-core,
 Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate i MCP
 `context7`/`netlify`/`cloudflare`. Pełna lista: [TOOLBOX.md](TOOLBOX.md#tars-web-web-senior-dev).
 
@@ -137,8 +137,8 @@ składa całość i **weryfikuje**, co jest prawdą.
 - [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł),
   [T] `raport-sledztwa` (format raportu), [T] `research-seo` (słowa kluczowe i konkurencja, dla `tars-web` i `tars-studio`)
 
-**Narzędzia:** wielu dostawców wyszukiwania naraz (własny SearXNG, Brave, Exa…), Crawl4AI,
-trafilatura, Docling (PDF-y), yt-dlp (transkrypcje), OpenAlex (nauka), ArchiveBox (archiwum dowodów),
+**Narzędzia:** wielu dostawców wyszukiwania naraz (własny SearXNG, Brave, Exa…), trafilatura i Lightpanda (strony z JS do Markdown),
+Docling (PDF-y, dodatek obrazu), yt-dlp (transkrypcje), OpenAlex (nauka), ArchiveBox (archiwum dowodów),
 delegowanie wątków. Pełna lista: [TOOLBOX.md](TOOLBOX.md#tars-sherlock-researcher-detektyw).
 
 **Rubryka sędziego (DoD):** każde kluczowe twierdzenie ma źródło, podany poziom pewności,

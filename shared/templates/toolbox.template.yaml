@@ -25,6 +25,6 @@ sidecars:
     healthcheck: "curl -fsS $EXAMPLE_URL/health"
 
 hermes_skills: []                    # skille z katalogu Hermesa [H], np. official/research/searxng-search
-hermes_plugins: []                   # wtyczki z plugin-catalog, np. crawl4ai
+hermes_plugins: []                   # wtyczki z plugin-catalog, np. openalex
 mcp_servers: []                      # np. netlify, cloudflare, context7
 env_requires: []                     # klucze API potrzebne narzędziom (tylko nazwy!)

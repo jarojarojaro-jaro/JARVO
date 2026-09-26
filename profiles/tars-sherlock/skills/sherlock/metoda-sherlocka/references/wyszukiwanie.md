@@ -5,7 +5,8 @@
 - `python3 $HERMES_HOME/scripts/search_fanout.py "<zapytanie>" [--lang pl] [--category general|news|science|it] [--time month|year]`:
   jedno zapytanie → wiele kategorii/języków, deduplikacja URL-i, JSON. Używaj przy szerokim rozpoznaniu.
 - `python3 $HERMES_HOME/scripts/extract.py <url>`: czysta treść strony + data publikacji + autor (trafilatura). Lepsze niż surowy HTML.
-- przeglądarka (`browser_*`): strony z JavaScriptem, tabele, logowanie **nie**.
+- `lightpanda fetch --dump markdown <url>`: strona z JavaScriptem (SPA), gdy `extract.py` zwraca pusto; ~30 MB RAM, bez Chromium.
+- przeglądarka (`browser_*`): klikanie, formularze wyszukiwania, tabele, zrzuty (silnik Lightpanda, Chromium przy zrzutach); logowanie **nie**.
 - skille: `searxng-search`, `duckduckgo-search` (inny indeks = niezależność), `scrapling`, `blocked-page-recovery`,
   `arxiv` (nauka), `youtube-content` (transkrypcje), `reddit-reading` (opinie użytkowników), `rss-feeds`.
 
