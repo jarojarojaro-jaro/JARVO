@@ -375,3 +375,83 @@ def test_gave_up_card_is_a_failed_decision(home):
     failed = [d for d in st["decisions"] if d.get("kind") == "failed"]
     assert [d["task_id"] for d in failed] == ["t_a2"]
     assert failed[0]["reason"] == "Error: Unknown skill(s): x" and failed[0]["failures"] == 2
+
+
+# --------------------------------------------------------------------------- okno karty
+
+ZIARNO_BRIEF = """CEL: Jednostronicowy landing HTML dla kawiarni „Ziarno”.
+KONTEKST: „Ziarno” — specialty coffee w Krakowie, otwarcie 19.10.2026.
+Ma działać offline jako pojedynczy plik.
+WEJŚCIA: brand kit /opt/data/tars/knowledge/brands/ziarno/brand.md (nazwa, paleta).
+DoD:
+- pojedynczy plik index.html, poprawny HTML5,
+- responsywny (poprawnie wygląda na mobile),
+WYJŚCIA: out/index.html
+GRANICE: autonomia A1 (bez publikacji/wdrożenia); budżet ~45 min; nie ruszać innych plików."""
+
+
+def test_parse_brief_sections():
+    b = core.parse_brief(ZIARNO_BRIEF)
+    assert b["cel"] == "Jednostronicowy landing HTML dla kawiarni „Ziarno”."
+    assert b["kontekst"].endswith("pojedynczy plik.") and "\n" in b["kontekst"]
+    assert b["dod"].startswith("- pojedynczy plik index.html")
+    assert b["wyjscia"] == "out/index.html" and b["granice"].startswith("autonomia A1")
+    assert "intro" not in b
+    # warianty z markdownem i bez polskich znaków
+    b = core.parse_brief("Karta dla Studia.\n\n**CEL:** grafika 4:5\n**Wyjscia:** out/post.png, out/post-9x16.png")
+    assert b == {"intro": "Karta dla Studia.", "cel": "grafika 4:5", "wyjscia": "out/post.png, out/post-9x16.png"}
+    # zlecenie bez sekcji: GUI pokazuje je w całości
+    assert core.parse_brief("Zrób research konkurencji.") == {}
+    assert core.parse_brief(None) == {}
+
+
+def test_expected_outputs_from_wyjscia():
+    assert core.expected_outputs("out/index.html") == ["out/index.html"]
+    assert core.expected_outputs("pliki w out/: raport.md (raport), out/dane.csv; out/raport.md") == \
+        ["raport.md", "out/dane.csv", "out/raport.md"]
+    assert core.expected_outputs("patrz https://ziarno.pl/menu.html") == []
+    assert core.expected_outputs(None) == []
+
+
+def test_task_outputs_marks_expected_file(tmp_path):
+    tars = tmp_path / "tars"
+    ws = tars / "missions" / "M-1" / "web"
+    (ws / "out").mkdir(parents=True)
+    (ws / "README.md").write_text("cel", encoding="utf-8")
+    (ws / "out" / "index.html").write_text("<!doctype html>", encoding="utf-8")
+    (ws / "out" / "shot-375.png").write_bytes(b"png")
+    os.utime(ws / "out" / "index.html", (NOW - 600, NOW - 600))      # starszy niż zrzut, a i tak pierwszy
+    files = core.task_outputs({"workspace_path": str(ws), "body": ZIARNO_BRIEF}, core.Roots(tars_dir=tars))
+    assert files[0]["rel"] == "out/index.html" and files[0]["main"] and files[0]["kind"] == "html"
+    assert [f["name"] for f in files[1:]] == ["shot-375.png", "README.md"]
+    assert not any(f["main"] for f in files[1:])
+    assert core.task_outputs({"workspace_path": None, "body": ZIARNO_BRIEF}, core.Roots(tars_dir=tars)) == []
+
+
+def test_site_root_and_file(tmp_path):
+    tars = tmp_path / "tars"
+    roots = core.Roots(tars_dir=tars)
+    ws = tars / "missions" / "M-1" / "web"
+    (ws / "out" / "img").mkdir(parents=True)
+    (ws / "out" / "index.html").write_text("<h1>x</h1>", encoding="utf-8")
+    (ws / "out" / "img" / "logo.png").write_bytes(b"png")
+    (ws / "out" / ".env").write_text("SECRET=1", encoding="utf-8")
+    (ws / "site" / "dist" / "blog").mkdir(parents=True)
+    (ws / "site" / "dist" / "blog" / "index.html").write_text("post", encoding="utf-8")
+    (ws / "notes.html").write_text("n", encoding="utf-8")
+    (tmp_path / "secret.txt").write_text("s", encoding="utf-8")
+    (ws / "out" / "leak").symlink_to(tmp_path / "secret.txt")
+
+    root = core.site_root((ws / "out" / "index.html").resolve(), roots)
+    assert root == (ws / "out").resolve()
+    # zbudowany serwis: od najbliższego dist/, żeby działały ścieżki /assets/…
+    assert core.site_root((ws / "site" / "dist" / "blog" / "index.html").resolve(), roots) == (ws / "site" / "dist").resolve()
+    assert core.site_root((ws / "notes.html").resolve(), roots) == ws.resolve()
+
+    assert core.site_file(root, "index.html", roots) == (ws / "out" / "index.html").resolve()
+    assert core.site_file(root, "", roots) == (ws / "out" / "index.html").resolve()        # katalog → index.html
+    assert core.site_file(root, "img/logo.png", roots) == (ws / "out" / "img" / "logo.png").resolve()
+    assert core.site_file(root, "../notes.html", roots) is None                          # poza stroną
+    assert core.site_file(root, ".env", roots) is None                                   # ukryte pliki
+    assert core.site_file(root, "leak", roots) is None                                   # symlink na zewnątrz
+    assert core.site_file(root, "img/..%2f..%2fnotes.html", roots) is None

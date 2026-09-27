@@ -15,6 +15,10 @@ def test_tokens_from_one_color():
     t = it.tokens("#89cff0")
     assert t["fos"] == "#89cff0"
     assert t["fos-bg"] == "#070a0c" and t["fos-lo"] == "#3e5d6c"
+    # drugi kolor do wyróżnień (cel karty): bursztyn, dla ciepłego fosforu błękit, albo z palety
+    assert t["fos-alt"] == "#ffb000"
+    assert it.tokens("#ffb000")["fos-alt"] == "#89cff0"
+    assert it.tokens("#41ff7a", "#ff5577")["fos-alt"] == "#ff5577"
 
 
 def test_install_writes_themes_and_sets_default(tmp_path):

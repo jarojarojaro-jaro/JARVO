@@ -182,6 +182,9 @@ async def task(task_id: str):
     t = await asyncio.to_thread(core.read_task_detail, HOME / "kanban.db", task_id)
     if not t:
         raise HTTPException(404, "Nie ma takiej karty")
+    t["brief"] = core.parse_brief(t.get("body"))
+    t["expected"] = core.expected_outputs(t["brief"].get("wyjscia"))
+    t["outputs"] = await asyncio.to_thread(core.task_outputs, t, ROOTS)
     return t
 
 
@@ -203,6 +206,159 @@ async def file(path: str, download: bool = False):
     return FileResponse(p, media_type=media, headers=headers,
                         filename=p.name if download else None,
                         content_disposition_type="attachment" if download else "inline")
+
+
+# ------------------------------------------------------------------ „Odpal”: podgląd stron na :9120
+# Strona zrobiona przez agenta otwiera się w nowej karcie z osobnego portu, pod adresem z losowym
+# tokenem (wydaje go tylko zalogowany dashboard). Nagłówek CSP sandbox daje jej nieprzezroczyste
+# pochodzenie: skrypty strony działają, ale nie widzą sesji dashboardu i nie wyślą do niego ciasteczek.
+PREVIEW_PORT = int(os.environ.get("TARS_PREVIEW_PORT", "9120"))
+PREVIEW_TTL = 12 * 3600
+PREVIEW_CSP = ("sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads "
+               "allow-popups-to-escape-sandbox")
+# stan wspólny dla ponownych importów pluginu (dashboard może przeładować pluginy w tym samym procesie)
+_preview = sys.modules.setdefault("tars_hq_preview_state", type(sys)("tars_hq_preview_state"))
+if not hasattr(_preview, "tokens"):
+    _preview.tokens = {}      # token → (katalog strony, ważny do)
+    _preview.error = None
+
+
+def _preview_handler():
+    import mimetypes
+    from http.server import BaseHTTPRequestHandler
+    from urllib.parse import unquote, urlsplit
+
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "tars-preview"
+        sys_version = ""
+
+        def log_message(self, *a):  # bez logów każdego żądania
+            pass
+
+        def _fail(self, code: int, text: str):
+            # send_error wkłada tekst do linii statusu (latin-1): polskie znaki by go wysadziły
+            data = f"<!doctype html><meta charset=utf-8><title>{code}</title><p>{text}</p>".encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Security-Policy", "sandbox")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _serve(self, body: bool):
+            path = unquote(urlsplit(self.path).path)
+            token, _, rel = path.lstrip("/").partition("/")
+            entry = _preview.tokens.get(token)
+            if not entry or entry[1] < time.time():
+                return self._fail(404, "Link wygasł. Kliknij „Odpal” w TARS HQ jeszcze raz.")
+            if not rel and not path.endswith("/"):
+                self.send_response(301)
+                self.send_header("Location", f"/{token}/")
+                return self.end_headers()
+            p = core.site_file(entry[0], rel, ROOTS)
+            if p is None:
+                return self._fail(404, "Nie ma takiego pliku.")
+            ctype = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
+            if ctype.startswith("text/") or ctype in ("application/javascript", "application/json", "image/svg+xml"):
+                ctype += "; charset=utf-8"
+            data = p.read_bytes() if body else b""
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(p.stat().st_size))
+            self.send_header("Content-Security-Policy", PREVIEW_CSP)
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")   # moduły JS i fonty z nieprzezroczystego pochodzenia
+            self.end_headers()
+            if body:
+                self.wfile.write(data)
+
+        def do_GET(self):
+            self._serve(True)
+
+        def do_HEAD(self):
+            self._serve(False)
+
+    return Handler
+
+
+def _start_preview() -> None:
+    if getattr(_preview, "server", None) or PREVIEW_PORT == 0:
+        return
+    import threading
+    from http.server import ThreadingHTTPServer
+
+    try:
+        srv = ThreadingHTTPServer(("0.0.0.0", PREVIEW_PORT), _preview_handler())
+    except OSError as exc:
+        _preview.error = f"port {PREVIEW_PORT} zajęty ({exc.strerror})"
+        return
+    srv.daemon_threads = True
+    _preview.server = srv
+    threading.Thread(target=srv.serve_forever, name="tars-preview", daemon=True).start()
+
+
+try:
+    _start_preview()
+except Exception as _exc:
+    _preview.error = str(_exc)
+
+
+@router.post("/site")
+async def site(request: Request):
+    """Adres podglądu strony dla pliku wynikowego (HTML): {port, path}; przeglądarka składa host."""
+    body = await request.json()
+    p = core.safe_path(str(body.get("path") or ""), ROOTS)
+    if p is None:
+        raise HTTPException(404, "Plik poza katalogami floty albo nie istnieje")
+    if not getattr(_preview, "server", None):
+        raise HTTPException(503, f"Podgląd stron nie działa: {_preview.error or 'serwer nie wystartował'}")
+    root = core.site_root(p, ROOTS)
+    now = time.time()
+    for tok, (r, exp) in list(_preview.tokens.items()):
+        if exp < now:
+            _preview.tokens.pop(tok, None)
+    token = next((tok for tok, (r, exp) in _preview.tokens.items() if r == root and exp - now > 3600), None)
+    if token is None:
+        import secrets
+        token = secrets.token_urlsafe(18)
+        _preview.tokens[token] = (root, now + PREVIEW_TTL)
+    rel = p.relative_to(root).as_posix()
+    return {"port": PREVIEW_PORT, "path": f"/{token}/{rel}"}
+
+
+# ------------------------------------------------------ „Pokaż w folderze”: Eksplorator Windows (WSL)
+# Folder otwiera pomocnik na hoście (scripts/updater.py), bo tylko on ma explorer.exe. Dashboard
+# zostawia prośbę z samą ścieżką pliku; pomocnik sprawdza ją jeszcze raz po swojej stronie.
+REVEAL_REQUEST = core.TARS_DIR / "state" / "reveal-request"
+
+
+@router.post("/reveal")
+async def reveal(request: Request):
+    body = await request.json()
+    p = core.safe_path(str(body.get("path") or ""), ROOTS)
+    if p is None:
+        raise HTTPException(404, "Plik poza katalogami floty albo nie istnieje")
+    host = _update_state()
+    if not host.get("online") or not (host.get("host") or {}).get("explorer"):
+        raise HTTPException(503, "Otwieranie folderu działa w lokalnej instalacji (WSL) z uruchomionym "
+                                 "scripts/local-up.sh. Ścieżkę możesz skopiować.")
+    REVEAL_REQUEST.parent.mkdir(parents=True, exist_ok=True)
+    tmp = REVEAL_REQUEST.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"path": str(p), "at": time.time()}), encoding="utf-8")
+    tmp.replace(REVEAL_REQUEST)
+    return JSONResponse({"ok": True}, status_code=202)
+
+
+@router.get("/host")
+async def host_info():
+    """Co umie host: otwieranie folderów (WSL), ścieżka danych po stronie Windows, port podglądu."""
+    st = _update_state()
+    h = st.get("host") or {}
+    return {"explorer": bool(st.get("online") and h.get("explorer")), "data_win": h.get("data_win"),
+            "data_host": h.get("data_host"), "preview": bool(getattr(_preview, "server", None)),
+            "preview_port": PREVIEW_PORT}
 
 
 # --------------------------------------------------------------------------- czat

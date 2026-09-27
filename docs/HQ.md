@@ -20,7 +20,9 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Mostek TARS-a | kanban | ekran „Tablica floty” z prawdziwymi licznikami kolumn; TARS-monolit ocenia, gdy w torze review jest karta |
 | Panel agenta: Teraz | sesja pracownika w `state.db` profilu | karta, nad którą pracuje, czas, sygnał życia i oś kroków na żywo (narzędzia, wypowiedzi, błędy) |
 | Panel agenta: Karty | kanban | karty agenta według stanu (7 dni), klik otwiera kartę z historią i komentarzami |
+| Okno karty | kanban + katalog roboczy karty | na wierzchu **cel** (inny kolor), kontekst, **wynik** (pliki z `WYJŚCIA` oznaczone ★) i raport wykonawcy; pełne zlecenie (wejścia, DoD, granice), komentarze i historia zwinięte |
 | Panel agenta: Wyniki | katalogi robocze | pliki z `out/`: miniatury grafik, podgląd tekstu, PDF, wideo |
+| Akcje pliku wynikowego | plugin + pomocnik hosta | **▶ Odpal** (strona HTML w nowej karcie, `:9120`), **Pokaż w folderze** (Eksplorator Windows w lokalnej instalacji WSL; gdzie indziej: **Kopiuj ścieżkę**), **Pobierz**, podgląd/kod |
 | Panel agenta: Czat | API gatewaya | rozmowa bezpośrednia z agentem (sesja HQ, osobna od Telegrama) |
 | Panel agenta: O agencie | fleet.yaml, SOUL, skille | opis, model, autonomia, parametry osobowości, workflowy |
 | Centrala: Decyzje | kanban (`blocked` + `needs_input`) | pytania agentów; odpowiedź idzie do TARS-a, który odblokowuje kartę i zapisuje decyzję |
@@ -39,6 +41,8 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ GET  /api/plugins/tars-hq/agent/<a>    co 2,5 s przy otwartym panelu: karty, oś kroków, wyniki
         ├─ GET  /api/plugins/tars-hq/task/<id>    karta z historią i komentarzami
         ├─ GET  /api/plugins/tars-hq/file?path=   podgląd pliku z katalogów floty
+        ├─ POST /api/plugins/tars-hq/site        link „Odpal” (token) ─► :9120 serwer podglądu stron w pluginie
+        ├─ POST /api/plugins/tars-hq/reveal      prośba „Pokaż w folderze” ─► pomocnik hosta (explorer.exe)
         ├─ GET  /api/plugins/tars-hq/chat/<a>/history
         ├─ POST /api/plugins/tars-hq/chat/<a>/send ─► gateway :8642 /p/<agent>/api/sessions/<id>/chat/stream (SSE)
         ├─ POST /api/plugins/tars-hq/chat/<a>/reset
@@ -73,6 +77,12 @@ pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartu
 - Podgląd plików tylko z `/opt/data/tars/{workspaces,missions,knowledge}`, po rozwiązaniu symlinków.
   Pliki wysyłane z nagłówkiem `Content-Security-Policy: sandbox` i `nosniff`, HTML jako zwykły tekst:
   strona wygenerowana przez agenta nie wykona skryptu w sesji dashboardu.
+- **▶ Odpal**: strona agenta idzie z osobnego portu 9120 (ten sam `TARS_BIND_IP`), tylko pod adresem z losowym
+  tokenem, który wydaje zalogowany dashboard (ważny 12 h, znika przy restarcie). Nagłówek `CSP: sandbox` bez
+  `allow-same-origin` daje stronie nieprzezroczyste pochodzenie: jej skrypty działają, ale nie czytają ciasteczek
+  i nie wyślą ich do dashboardu. Nowa karta nie ma `window.opener`. Pliki ukryte, `..` i symlinki na zewnątrz: 404.
+- **Pokaż w folderze**: dashboard zapisuje tylko prośbę ze ścieżką (`state/reveal-request`); `scripts/updater.py`
+  na hoście sprawdza ją ponownie (tylko `tars/{workspaces,missions,knowledge}`) i woła `explorer.exe /select,…`.
 - Odczyt kanbana i transkrypcji w trybie SQLite `mode=ro`. HQ niczego nie zapisuje poza mapą sesji czatu
   (`/opt/data/tars/state/hq-sessions.json`); zmiany na tablicy robią agenci przez swoje narzędzia.
 
@@ -136,4 +146,6 @@ Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zost
 | czat: „Gateway odrzucił klucz” | klucz w `.env` profilu zmieniony bez restartu gatewaya: `hermes gateway restart` |
 | czat: „No LLM provider configured” | profil nie ma `OPENROUTER_API_KEY` w `/srv/tars/secrets/<agent>.env` |
 | pokój „Pracuje”, ale dymek „cisza…” | pracownik nie wysłał sygnału od 3 min; szczegóły w panelu, patrol zgłosi problem sam |
+| „▶ Odpal” otwiera pustą kartę / „nie można połączyć” | port 9120 nieopublikowany: kontener sprzed tej wersji, `bash scripts/local-up.sh` (lokalnie) albo `deploy.sh` go odtworzy |
+| brak „Pokaż w folderze”, jest „Kopiuj ścieżkę” | pomocnik hosta nie działa albo to nie WSL: `bash scripts/local-up.sh` (uruchamia `scripts/updater.py`) |
 | `/api/plugins/tars-hq/health` | pokazuje, czy każdy profil ma klucz i czy gateway odpowiada na `/p/<agent>` |

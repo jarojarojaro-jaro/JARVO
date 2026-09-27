@@ -59,7 +59,7 @@ input, textarea, select { background-color: var(--fos-bg) !important; }
 .hermes-chat-xterm-host { outline: 3px double var(--fos-mid); outline-offset: 6px; }
 
 /* ---- TARS HQ (plugin) ---- */
-.thq-root { --thq-accent: var(--fos); }
+.thq-root, .thq-modal-back { --thq-accent: var(--fos); --thq-accent-ink: var(--fos-bg); --thq-goal: var(--fos-alt); }
 .thq-headbar, .thq-root { font-family: var(--theme-font-sans); }
 .thq-stat, .thq-panel, .thq-dock, .thq-target, .thq-decision, .thq-mission, .thq-chip {
   border-radius: 0 !important; border-color: var(--fos-mid) !important; background: transparent !important;
@@ -93,3 +93,16 @@ div[class*="hover:text-foreground"]:hover { background: color-mix(in srgb, var(-
 .thq-modal { border-radius: 0 !important; border: 2px solid var(--fos-mid); background: var(--fos-bg2) !important;
   color: var(--fos) !important; font-family: var(--theme-font-sans) !important; box-shadow: 0 0 40px rgba(0, 0, 0, .8) !important; }
 .thq-modal-head h3 { font-family: var(--theme-font-display) !important; font-weight: 400 !important; font-size: 26px !important; letter-spacing: .06em; }
+
+/* okno karty: cel w drugim kolorze palety, reszta w fosforze */
+.thq-goal { border-radius: 0 !important; background: color-mix(in srgb, var(--fos-alt) 8%, transparent) !important;
+  border-color: var(--fos-alt) !important; color: var(--fos-alt) !important; text-shadow: 0 0 6px color-mix(in srgb, var(--fos-alt) 45%, transparent); }
+.thq-goal-label { font-family: var(--theme-font-display) !important; font-size: 18px !important; font-weight: 400 !important; letter-spacing: .12em !important; }
+.thq-out, .thq-act-btn { border-radius: 0 !important; border-color: var(--fos-mid) !important; background: transparent !important; color: var(--fos) !important; }
+.thq-out.is-main { border-color: var(--fos) !important; border-width: 2px; }
+.thq-act-btn:hover { background: color-mix(in srgb, var(--fos) 14%, transparent) !important; }
+.thq-act-btn.is-run { background: var(--fos) !important; color: var(--fos-bg) !important; text-shadow: none; }
+.thq-more { border-color: var(--fos-lo) !important; }
+.thq-task-meta code { background: none !important; color: var(--fos-mid) !important; }
+.thq-more > summary { font-family: var(--theme-font-display) !important; font-weight: 400 !important; font-size: 19px !important; color: var(--fos-mid) !important; }
+.thq-more > summary:hover { color: var(--fos) !important; }

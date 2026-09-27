@@ -4,7 +4,7 @@
 # Budżet: VPS 8 GB RAM (4 vCPU). Limity niżej sumują się do ~5,5 GB (+0,4 GB z profilem monitoring);
 # reszta zostaje dla systemu i cache dysku. Limity to sufity, nie rezerwacje: w spoczynku flota bierze ~1 GB.
 #
-# Porty: nic nie jest publikowane publicznie. Dashboard/Desktop (9119) i panele monitoringu
+# Porty: nic nie jest publikowane publicznie. Dashboard/Desktop (9119), podgląd stron HQ (9120) i panele monitoringu
 # wiążemy do TARS_BIND_IP (domyślnie 127.0.0.1; ustaw IP Tailscale, żeby sięgać z laptopa/telefonu).
 # Telegram działa bez portów (long polling).
 #
@@ -45,6 +45,7 @@ services:
       - ${TARS_SECRETS:-/srv/tars/secrets}:/opt/tars/secrets:ro
     ports:
       - "${TARS_BIND_IP:-127.0.0.1}:9119:9119"     # dashboard + Hermes Desktop (Remote Gateway)
+      - "${TARS_BIND_IP:-127.0.0.1}:9120:9120"     # TARS HQ „Odpal”: podgląd stron agentów (link z tokenem)
     depends_on:
       searxng: {condition: service_started}
     shm_size: "512mb"                                # jedna Chromium naraz (Lighthouse, PDF, zrzuty)

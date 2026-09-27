@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Pomocnik aktualizacji TARS: przycisk „Aktualizuj” w dashboardzie bez dawania kontenerowi dostępu do Dockera.
+"""Pomocnik hosta TARS: przycisk „Aktualizuj” i „Pokaż w folderze” w dashboardzie bez dawania kontenerowi
+dostępu do Dockera ani do hosta.
 
     python3 scripts/updater.py [--compose DIR] [--build DIR] [--once]
 
@@ -8,7 +9,10 @@ Działa na HOŚCIE (VPS albo WSL), obok kontenera, jako użytkownik z dostępem 
   dashboardu (ile commitów brakuje i jakie) do <HERMES_HOME>/tars/state/update.json w kontenerze,
 - co kilka sekund sprawdza, czy dashboard poprosił o aktualizację (plik update-request); wtedy uruchamia
   scripts/deploy.sh (git pull + budowa obrazu, gdy trzeba + instalacja floty) i raportuje postęp.
-Dashboard nigdy nie wykonuje poleceń: może tylko poprosić o `check` albo `update` tej samej gałęzi.
+- lokalnie w WSL otwiera Eksplorator Windows na pliku wynikowym (plik reveal-request z samą ścieżką;
+  pomocnik przelicza ją na ścieżkę hosta i sprawdza, że leży w katalogach wyników floty).
+Dashboard nigdy nie wykonuje poleceń: może tylko poprosić o `check` albo `update` tej samej gałęzi
+albo o pokazanie pliku wyników w Eksploratorze.
 Uruchamiany przez scripts/local-up.sh (lokalnie) albo usługę systemd tars-updater (VPS, bootstrap-vps.sh).
 """
 
@@ -17,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -28,8 +33,11 @@ STATE_DIR = "/opt/data/tars/state"
 CHECK_EVERY = int(os.environ.get("TARS_UPDATE_CHECK", "60"))
 # TARS_AUTO_UPDATE=1: nowa wersja instaluje się sama, bez klikania w dashboardzie
 AUTO_UPDATE = os.environ.get("TARS_AUTO_UPDATE", "0") == "1"
-POLL_EVERY = 5
+POLL_EVERY = 2   # prośby z dashboardu (folder ma się otworzyć od razu)
 LOG_TAIL = 40
+DATA_IN = "/opt/data"
+# tylko wyniki floty (jak podgląd plików w HQ): nigdy klucze, profile ani konfiguracja
+REVEAL_ROOTS = ("tars/workspaces", "tars/missions", "tars/knowledge")
 
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
@@ -52,14 +60,65 @@ def put_state(state: dict) -> bool:
     return r.returncode == 0
 
 
-def take_request() -> str | None:
-    """Prośba z dashboardu (`check` albo `update`); usuwana przy odczycie."""
+def take_requests() -> tuple[str | None, str | None]:
+    """Prośby z dashboardu: aktualizacja (`check`/`update`) i ścieżka do pokazania; usuwane przy odczycie."""
     r = run(["docker", "exec", "-u", "hermes", CONTAINER, "sh", "-c",
-             f"f={STATE_DIR}/update-request; [ -f $f ] && cat $f && rm -f $f"])
+             f"cd {STATE_DIR} 2>/dev/null || exit 0; for f in update-request reveal-request; do "
+             f"[ -f $f ] && printf '%s\\t' $f && tr -d '\\n\\t' < $f && echo && rm -f $f; done; true"])
     if r.returncode != 0:
+        return None, None
+    upd = rev = None
+    for line in r.stdout.splitlines():
+        name, _, body = line.partition("\t")
+        if name == "update-request":
+            word = body.strip().split()[0] if body.strip() else ""
+            upd = word if word in ("check", "update") else None
+        elif name == "reveal-request":
+            try:
+                rev = str(json.loads(body).get("path") or "") or None
+            except ValueError:
+                rev = None
+    return upd, rev
+
+
+def host_info() -> dict:
+    """Katalog danych kontenera na hoście i czy da się otworzyć Eksplorator (WSL)."""
+    r = run(["docker", "inspect", CONTAINER, "--format",
+             '{{range .Mounts}}{{if eq .Destination "' + DATA_IN + '"}}{{.Source}}{{end}}{{end}}'])
+    data_host = r.stdout.strip() if r.returncode == 0 else ""
+    explorer = bool(data_host and shutil.which("explorer.exe") and shutil.which("wslpath"))
+    data_win = None
+    if explorer:
+        w = run(["wslpath", "-w", data_host])
+        data_win = w.stdout.strip() if w.returncode == 0 else None
+    return {"explorer": explorer, "data_host": data_host or None, "data_win": data_win}
+
+
+def host_path(path: str, data_host: str) -> Path | None:
+    """Ścieżka z kontenera (/opt/data/…) → plik na hoście, tylko w katalogach wyników floty."""
+    if not path.startswith(DATA_IN + "/") or "\x00" in path:
         return None
-    req = r.stdout.strip().split()[0] if r.stdout.strip() else ""
-    return req if req in ("check", "update") else None
+    base = Path(data_host).resolve()
+    p = (base / path[len(DATA_IN) + 1:]).resolve()
+    if not p.exists() or not any(p.is_relative_to(base / r) for r in REVEAL_ROOTS):
+        return None
+    return p
+
+
+def reveal(path: str, host: dict) -> None:
+    """Eksplorator Windows z zaznaczonym plikiem (albo otwartym katalogiem)."""
+    if not host.get("explorer"):
+        return
+    p = host_path(path, host["data_host"])
+    if p is None:
+        print(f"reveal: odrzucona ścieżka {path!r}", file=sys.stderr)
+        return
+    w = run(["wslpath", "-w", str(p)])
+    if w.returncode != 0:
+        return
+    arg = f"/select,{w.stdout.strip()}" if p.is_file() else w.stdout.strip()
+    # explorer.exe zwraca 1 także po sukcesie; nie czekamy na okno
+    subprocess.Popen(["explorer.exe", arg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def check(base: dict) -> dict:
@@ -111,15 +170,29 @@ def main(argv: list[str]) -> int:
     if args.repo:
         ROOT = Path(args.repo).resolve()
     state: dict = {"mode": args.mode, "state": "idle", "updater_pid": os.getpid(), "auto": AUTO_UPDATE}
+    try:  # po samorestarcie (niżej): stan „done” zostaje, żeby dashboard sam się odświeżył
+        state.update(json.loads(os.environ.pop("TARS_UPDATER_STATE", "") or "{}"), updater_pid=os.getpid())
+    except ValueError:
+        pass
+    me = Path(__file__).resolve()
+    my_code = me.read_bytes()
     next_check = 0.0
     while True:
         try:
-            req = take_request()
+            if not (state.get("host") or {}).get("data_host"):
+                state["host"] = host_info()
+            req, rev = take_requests()
+            if rev:
+                reveal(rev, state["host"])
             if req is None and AUTO_UPDATE and state.get("behind", 0) > 0 and state.get("state") != "failed":
                 req = "update"
             if req == "update":
                 state = update(args, state)
                 next_check = time.time() + CHECK_EVERY
+                if state.get("state") == "done" and me.read_bytes() != my_code:
+                    # aktualizacja zmieniła też tego pomocnika: wczytujemy nową wersję (ten sam PID)
+                    os.environ["TARS_UPDATER_STATE"] = json.dumps(state, ensure_ascii=False)
+                    os.execv(sys.executable, [sys.executable, str(me), *argv])
             elif req == "check" or time.time() >= next_check:
                 # „done”/„failed” zostają do następnej aktualizacji (panel pokazuje „odśwież” albo błąd)
                 keep = state.get("state") if state.get("state") in ("done", "failed") else "idle"

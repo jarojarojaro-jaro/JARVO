@@ -19,6 +19,7 @@
   --thq-bad: #D2392E;
   --thq-info: #2C6ED5;
   --thq-idle: #8793A2;
+  --thq-goal: #D98A00;       /* cel karty: inny kolor niż reszta okna */
   --thq-radius: 10px;
   --thq-display: "Bricolage Grotesque", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
   --thq-ui: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
@@ -333,6 +334,8 @@
 .thq-msg-body p { margin: 0 0 6px; } .thq-msg-body p:last-child { margin-bottom: 0; }
 .thq-msg-who { font-size: 1.2rem; padding-top: 4px; }
 .thq-md ul, .thq-md ol { margin: 4px 0 6px; padding-left: 20px; }
+.thq-md ul { list-style: disc; } .thq-md ol { list-style: decimal; }
+.thq-md li { margin: 2px 0; }
 .thq-md pre { margin: 6px 0; padding: 8px; border-radius: 6px; background: rgba(0,0,0,.08); overflow-x: auto; font: 0.8rem var(--thq-mono); }
 .thq-md .thq-md-h { font-weight: 700; }
 .thq-md a { color: var(--thq-info); }
@@ -430,3 +433,43 @@
 .thq-chips-toggle:hover { color: var(--thq-ink); }
 .thq-mout { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font: 0.8rem/1.4 var(--thq-mono); }
 .thq-mout .thq-link { text-align: left; overflow-wrap: anywhere; }
+
+/* ---- okno karty: cel, kontekst i wynik na wierzchu, reszta zwinięta ---- */
+.thq-task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 12px; font-size: 0.88rem; }
+.thq-task-meta code { padding: 0; background: none; color: var(--thq-muted); font: 0.76rem var(--thq-mono); }
+.thq-goal { margin: 0 0 14px; padding: 10px 14px 12px; border: 1px solid color-mix(in srgb, var(--thq-goal) 45%, transparent);
+  border-left: 4px solid var(--thq-goal); border-radius: 8px; background: color-mix(in srgb, var(--thq-goal) 9%, transparent);
+  color: var(--thq-goal); font-size: 1.04rem; font-weight: 600; line-height: 1.45; }
+.thq-goal > p, .thq-goal .thq-md p { margin: 0; }
+.thq-goal-label { display: block; margin-bottom: 4px; font: 700 0.72rem/1 var(--thq-ui); letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.85; }
+.thq-task-sec > h4:first-child { margin-top: 14px; }
+.thq-task-sec.is-bad > h4 { color: var(--thq-bad); }
+.thq-outs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.thq-out { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; border: 1px solid var(--thq-line); border-radius: 8px; }
+.thq-out.is-main { border-color: var(--thq-accent); }
+.thq-out.is-missing { border-style: dashed; color: var(--thq-muted); }
+.thq-out-name { padding: 0; border: 0; background: none; color: inherit; font: 700 0.9rem/1.3 var(--thq-mono); text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+button.thq-out-name:hover { text-decoration: underline; }
+.thq-out-meta { margin-right: auto; font-size: 0.78rem; color: var(--thq-muted); }
+.thq-file-acts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.thq-act-btn { padding: 5px 10px; border: 1px solid var(--thq-line); border-radius: 6px; background: var(--thq-surface-2); color: var(--thq-ink);
+  font: 700 0.8rem/1.1 var(--thq-ui); cursor: pointer; white-space: nowrap; }
+.thq-act-btn:hover { border-color: var(--thq-accent); }
+.thq-act-btn.is-run { border-color: var(--thq-accent); background: var(--thq-accent); color: var(--thq-accent-ink); }
+.thq-act-note { font-size: 0.78rem; color: var(--thq-muted); }
+.thq-act-note.is-bad { color: var(--thq-bad); }
+.thq-more { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--thq-line); }
+.thq-more > summary { list-style: none; cursor: pointer; font: 700 0.78rem/1.8 var(--thq-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--thq-muted); }
+.thq-more > summary::-webkit-details-marker { display: none; }
+.thq-more > summary::before { content: "▸ "; }
+.thq-more[open] > summary::before { content: "▾ "; }
+.thq-more > summary .thq-muted { margin-left: 6px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.thq-more > summary:hover { color: var(--thq-ink); }
+.thq-brief-part > h4 { margin-top: 12px; }
+.thq-more-files { margin-top: 6px; border-top: 0; padding-top: 0; }
+.thq-more-files > summary { font-size: 0.74rem; }
+.thq-outs.is-small .thq-out { padding: 5px 10px; }
+.thq-preview-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 10px; }
+.thq-preview-bar .thq-path { margin: 0; }
+.thq-mout li { display: flex; align-items: center; gap: 8px; }
+.thq-mout .thq-act-btn { padding: 2px 7px; font-size: 0.72rem; }

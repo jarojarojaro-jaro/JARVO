@@ -32,12 +32,19 @@ def shade(c: tuple[int, int, int], k: float) -> str:
     return "#" + "".join(f"{round(v * k):02x}" for v in c)
 
 
-def tokens(color: str) -> dict[str, str]:
+AMBER, BLUE = "#ffb000", "#89cff0"
+
+
+def tokens(color: str, accent: str | None = None) -> dict[str, str]:
+    """Odcienie fosforu z jednego koloru + drugi kolor (--fos-alt) do wyróżnień, np. celu karty.
+    Bez `accent`: bursztyn, a dla ciepłego fosforu (czerwony > niebieski) błękit."""
     c = rgb(color)
+    alt = accent or (BLUE if c[0] > c[2] + 40 else AMBER)
     return {
         "fos": shade(c, 1.0), "fos-mid": shade(c, 0.82), "fos-lo": shade(c, 0.45),
         "fos-bg": shade(c, 0.05), "fos-bg2": shade(c, 0.08),
         "fos-glow": f"rgba({c[0]}, {c[1]}, {c[2]}, 0.45)",
+        "fos-alt": shade(rgb(alt), 1.0),
     }
 
 
@@ -80,7 +87,7 @@ def icons_css(text: str) -> str:
 
 
 def theme(entry: dict, css: str) -> dict:
-    t = tokens(entry["color"])
+    t = tokens(entry["color"], entry.get("accent"))
     root = ":root { " + " ".join(f"--{k}: {v};" for k, v in t.items()) + " }\n"
     return {
         "name": entry["name"],

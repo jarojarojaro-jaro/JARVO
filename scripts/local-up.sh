@@ -63,11 +63,13 @@ if [[ "$(stat -c %u "$L/build")" != "10000" || "$(stat -c %u "$L/data")" != "100
   sudo chown -R 10000:10000 "$L/build" "$L/data"
 fi
 
-# pierwsza instalacja raz; później przebudowa obrazu tylko, gdy zmieniło się infra/ (Dockerfile, pakiety)
+# pierwsza instalacja raz; później przebudowa obrazu tylko, gdy zmieniło się to, z czego się go buduje
+# (Dockerfile, pakiety, skrypty w obrazie). Sama zmiana docker-compose.yml (np. nowy port) odtwarza kontener bez budowy.
 FLAGS=(--no-pull)
+BUILT="$(cat "$L/compose/.infra-tree" 2>/dev/null || true)"
 if [[ ! -f "$L/.installed" ]]; then
   FLAGS+=(--first-run)
-elif [[ "$(git -C "$ROOT" rev-parse HEAD:infra 2>/dev/null)" != "$(cat "$L/compose/.infra-tree" 2>/dev/null)" ]]; then
+elif [[ -z "$BUILT" ]] || ! git -C "$ROOT" diff --quiet "$BUILT" HEAD:infra -- Dockerfile node python bin 2>/dev/null; then
   FLAGS+=(--rebuild)
 fi
 TARS_COMPOSE_DIR="$L/compose" TARS_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"

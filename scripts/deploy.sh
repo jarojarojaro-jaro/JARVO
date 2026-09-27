@@ -35,7 +35,7 @@ if [[ $PULL -eq 1 ]]; then
   before="$(git rev-parse HEAD)"
   git pull --ff-only
   after="$(git rev-parse HEAD)"
-  if [[ "$before" != "$after" ]] && git diff --name-only "$before" "$after" | grep -qE '^infra/(Dockerfile|node/|python/)'; then
+  if [[ "$before" != "$after" ]] && git diff --name-only "$before" "$after" | grep -qE '^infra/(Dockerfile|node/|python/|bin/)'; then
     REBUILD=1
   fi
 fi

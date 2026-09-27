@@ -534,6 +534,92 @@ def _within(p: Path, root: Path) -> bool:
         return False
 
 
+# ------------------------------------------------------------------------- zlecenie karty
+# Format zlecenia z dispatch-playbook TARS-a: CEL / KONTEKST / WEJŚCIA / DoD / WYJŚCIA / GRANICE.
+BRIEF_KEYS = {"cel": "cel", "kontekst": "kontekst", "wejścia": "wejscia", "wejscia": "wejscia",
+              "dod": "dod", "wyjścia": "wyjscia", "wyjscia": "wyjscia", "granice": "granice"}
+_BRIEF_LINE = re.compile(r"^\s*(?:[-*#>]+\s*)?\**\s*(" + "|".join(BRIEF_KEYS) + r")\s*\**\s*:\**\s*(.*)$", re.I)
+_OUT_PATH = re.compile(r"(?<![\w/])((?:[\w.-]+/)*[\w-][\w.-]*\.[A-Za-z0-9]{1,5})\b")
+
+
+def parse_brief(body: str | None) -> dict:
+    """Zlecenie karty → sekcje (cel, kontekst, wejscia, dod, wyjscia, granice). Tekst przed pierwszą
+    sekcją trafia do `intro`. Zlecenie bez sekcji: pusty słownik (GUI pokazuje je w całości)."""
+    sections: dict[str, list[str]] = {}
+    key = "intro"
+    for line in (body or "").splitlines():
+        m = _BRIEF_LINE.match(line)
+        if m:
+            key = BRIEF_KEYS[m.group(1).lower()]
+            sections.setdefault(key, [])
+            if m.group(2).strip():
+                sections[key].append(m.group(2).rstrip())
+            continue
+        sections.setdefault(key, []).append(line.rstrip())
+    out = {k: "\n".join(v).strip() for k, v in sections.items()}
+    out = {k: v for k, v in out.items() if v}
+    return out if set(out) - {"intro"} else {}
+
+
+def expected_outputs(wyjscia: str | None) -> list[str]:
+    """Nazwy plików z sekcji WYJŚCIA (np. „out/index.html”), w kolejności, bez powtórzeń."""
+    seen: list[str] = []
+    text = re.sub(r"\S+://\S+|www\.\S+", " ", wyjscia or "")     # adresy stron to nie pliki
+    for m in _OUT_PATH.finditer(text):
+        p = m.group(1).lstrip("./")
+        if p not in seen:
+            seen.append(p)
+    return seen
+
+
+def task_outputs(task: dict, roots: Roots, limit: int = 12) -> list[dict]:
+    """Pliki wynikowe karty z jej katalogu roboczego; pliki wymienione w WYJŚCIA mają `main`."""
+    ws = task.get("workspace_path")
+    if not ws:
+        return []
+    files = list_outputs([Path(ws)], roots, limit=200)
+    wanted = expected_outputs(parse_brief(task.get("body")).get("wyjscia"))
+    for f in files:
+        rel = f["rel"].replace(os.sep, "/")
+        f["main"] = any(rel == w or rel.endswith("/" + w) or f["name"] == w for w in wanted)
+    files.sort(key=lambda f: (not f["main"], not f["in_out"], -f["mtime"]))
+    return files[:limit]
+
+
+# ------------------------------------------------------------------------ „Odpal” (podgląd stron)
+# Katalogi, od których liczymy stronę: ścieżki absolutne (/assets/…) w zbudowanym serwisie działają.
+SITE_DIRS = {"out", "dist", "build", "public", "site", "_site", "www"}
+
+
+def site_root(file: Path, roots: Roots) -> Path:
+    """Katalog serwowany jako strona dla pliku: najbliższy przodek o nazwie z SITE_DIRS (do 4 poziomów
+    w górę, nie wyżej niż dozwolone katalogi), inaczej katalog pliku."""
+    allowed = roots.allowed()
+    for d in list(file.parents)[:4]:
+        if not any(_within(d, r) and d != r for r in allowed):
+            break
+        if d.name.lower() in SITE_DIRS:
+            return d
+    return file.parent
+
+
+def site_file(root: Path, rel: str, roots: Roots) -> Path | None:
+    """Plik strony pod `root` dla ścieżki z adresu (katalog → index.html). Bez plików ukrytych,
+    bez wyjścia poza `root` i poza dozwolone katalogi (także przez symlinki)."""
+    parts = [p for p in rel.split("/") if p]
+    if any(p.startswith(".") or "\x00" in p or "\\" in p for p in parts):
+        return None
+    try:
+        p = root.joinpath(*parts).resolve(strict=True)
+        if p.is_dir():
+            p = (p / "index.html").resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    if not _within(p, root.resolve()) or not p.is_file():
+        return None
+    return p if safe_path(str(p), roots) else None
+
+
 def agent_stats(name: str, tasks: list[dict], events: list[dict], now: float) -> dict:
     """Jakość z ostatnich 7 dni: karty zamknięte, przyjęte za pierwszym razem, poprawki."""
     week = now - 7 * 86400

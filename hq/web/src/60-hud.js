@@ -125,7 +125,9 @@ function MissionOutputs({ files, onOpenFile }) {
   return html`<ul class="thq-mout" aria-label="Wyniki misji">
     ${files.map((f) => html`<li key=${f.path}>
       <button type="button" class="thq-link" onClick=${() => onOpenFile && onOpenFile(f)} title=${f.rel}>
-        ${f.in_out ? "★ " : ""}${f.rel}</button></li>`)}
+        ${f.in_out ? "★ " : ""}${f.rel}</button>
+      ${f.kind === "html" && html`<button type="button" class="thq-act-btn is-run" title="Otwórz stronę w nowej karcie"
+        onClick=${() => openSite(f.path).catch((e) => alert(e.message))}>▶ Odpal</button>`}</li>`)}
   </ul>`;
 }
 

@@ -69,7 +69,7 @@ function App() {
             onClose=${() => setSelected(null)} onOpenTask=${setTaskId} onOpenFile=${setFile} pending=${pending} onPendingDone=${() => setPending(null)}/>`
         : html`<${Center} state=${state} agents=${agents} onAnswer=${answer} onOpenTask=${setTaskId} onOpenFile=${setFile} focus=${focus}/>`}
     </main>
-    ${taskId && html`<${TaskModal} taskId=${taskId} agents=${agents} onClose=${() => setTaskId(null)}/>`}
+    ${taskId && html`<${TaskModal} taskId=${taskId} agents=${agents} onClose=${() => setTaskId(null)} onOpenFile=${setFile}/>`}
     ${file && html`<${FilePreview} file=${file} onClose=${() => setFile(null)}/>`}
   </div>`;
 }

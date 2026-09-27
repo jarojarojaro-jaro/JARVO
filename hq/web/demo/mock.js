@@ -254,11 +254,46 @@
       stats: { done_7d: cards.done.length + 6, first_pass_7d: cards.done.length + 5, changes_7d: 1 }, ts: now() };
   }
 
+  const SAMPLE_SITE = `<!doctype html><html lang="pl"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Ziarno</title><style>body{margin:0;font:18px/1.6 Georgia,serif;background:#F3E6D3;color:#3B2416}header{padding:72px 24px;background:#6B3E26;color:#F3E6D3;text-align:center}
+h1{font-size:64px;margin:0}section{max-width:640px;margin:0 auto;padding:32px 24px}.map{height:180px;background:#ccc;display:grid;place-items:center}
+a.btn{display:inline-block;padding:12px 22px;background:#6B3E26;color:#F3E6D3;text-decoration:none;border-radius:6px}</style>
+<header><h1>Ziarno</h1><p>Kawa, która ma korzenie.</p></header><section><h2>O nas</h2><p>Specialty coffee na Kazimierzu. Otwarcie 19.10.2026.</p>
+<h2>Godziny otwarcia</h2><p>pn–pt 7:30–19:00 · sb–nd 9:00–18:00</p><div class="map">mapa — do osadzenia</div><p><a class="btn" href="#">Zarezerwuj stolik</a></p></section></html>`;
+
+  function parseBrief(body) {
+    const keys = { cel: "cel", kontekst: "kontekst", "wejścia": "wejscia", dod: "dod", "wyjścia": "wyjscia", granice: "granice" };
+    const out = {};
+    let key = "intro";
+    for (const line of body.split("\n")) {
+      const m = /^\s*\**\s*(cel|kontekst|wejścia|dod|wyjścia|granice)\s*\**\s*:\**\s*(.*)$/i.exec(line);
+      if (m) { key = keys[m[1].toLowerCase()]; out[key] = m[2] ? [m[2]] : []; continue; }
+      (out[key] = out[key] || []).push(line);
+    }
+    return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, v.join("\n").trim()]).filter(([, v]) => v));
+  }
+
   function task(id) {
     const c = S.cards[id];
     if (!c) throw new Error("Nie ma takiej karty");
-    return { ...brief(c), body: `**CEL:** ${c.title}.\n\n**DoD:**\n- wynik w out/ zgodny z brand kitem Ziarno\n- raport z decyzjami i ryzykami\n\n**GRANICE:** bez publikacji i wdrożeń (A2).`,
-      events: c.events.slice(), comments: c.comments || [], result: c.status === "done" ? "Zatwierdzone przez TARS-a." : null };
+    const web = c.assignee === "tars-web";
+    const outName = web ? "index.html" : c.assignee === "tars-studio" ? "post-otwarcie-4x5.png" : "raport.md";
+    const body = `CEL: ${c.title}.
+KONTEKST: „Ziarno” — specialty coffee w Krakowie, otwarcie 19.10.2026. Ton ciepły, rzemieślniczy, bez korpomowy.
+WEJŚCIA: brand kit /opt/data/tars/knowledge/brands/ziarno/brand.md; wyniki Sherlocka w ../sherlock/out/.
+DoD:
+- wynik w out/ zgodny z brand kitem Ziarno (paleta, ton, hasło),
+- responsywny, bez błędów w konsoli,
+- krótki raport z decyzjami i ryzykami.
+WYJŚCIA: out/${outName}
+GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać innych plików.`;
+    const done = c.status === "done";
+    const kind = web ? "html" : outName.endsWith(".png") ? "image" : "text";
+    const outputs = done ? [{ path: `/opt/data/tars/missions/M-demo/${c.assignee}/out/${outName}`, name: outName, rel: `out/${outName}`,
+      kind, size: 14200, mtime: (c.completed_at || now()) - 30, in_out: true, main: true, color: "#6B3E26" }] : [];
+    return { ...brief(c), body, brief: parseBrief(body), expected: [`out/${outName}`], outputs,
+      events: c.events.slice(), comments: c.comments || [],
+      result: done ? `Gotowe: ${outName} w out/. Sprawdzone na 375/768/1440 px, bez poziomego przewijania, konsola czysta.` : null };
   }
 
   function svgFor(name, color) {
@@ -274,6 +309,8 @@
     const all = Object.values(OUTPUTS).flat();
     const hit = all.find(([n]) => n === name);
     if (hit && hit[1] === "image") return svgFor(name, hit[2]);
+    if (name.endsWith(".html")) return new Blob([SAMPLE_SITE], { type: "text/plain" });
+    if (name.endsWith(".png")) return svgFor(name, "#6B3E26");
     return new Blob([`# ${name}\n\nPrzykładowa zawartość w trybie demo.\n\n- Konkurencja: 11 kawiarni specialty w promieniu 1,5 km\n- Mediana ceny flat white: 17 zł\n- Luka: brak śniadań wegańskich przed 8:00\n`], { type: "text/plain" });
   }
 
@@ -342,6 +379,9 @@
     history: async (name) => ({ session_id: "demo", messages: chatOf(name).slice() }),
     reset: async (name) => { S.chats[name] = []; return { ok: true }; },
     retry: async () => ({ ok: true }),
+    site: async () => ({ url: URL.createObjectURL(new Blob([SAMPLE_SITE], { type: "text/html" })) }),
+    reveal: async () => { throw new Error("W trybie demo nie ma hosta: folder otwiera się w lokalnej instalacji."); },
+    host: async () => ({ explorer: false, preview: true, data_win: "\\\\wsl.localhost\\Ubuntu\\home\\ty\\tars-local\\data\\hermes" }),
     fileBlob,
     send,
   };

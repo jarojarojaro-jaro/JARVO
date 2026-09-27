@@ -63,6 +63,9 @@ const liveApi = {
   history: (name) => SDK.fetchJSON(`${API_ROOT}/chat/${encodeURIComponent(name)}/history`),
   reset: (name) => SDK.fetchJSON(`${API_ROOT}/chat/${encodeURIComponent(name)}/reset`, { method: "POST" }),
   retry: (id) => SDK.fetchJSON(`${API_ROOT}/task/${encodeURIComponent(id)}/retry`, { method: "POST" }),
+  site: (path) => SDK.fetchJSON(`${API_ROOT}/site`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
+  reveal: (path) => SDK.fetchJSON(`${API_ROOT}/reveal`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
+  host: () => SDK.fetchJSON(`${API_ROOT}/host`),
   async fileBlob(path) {
     const res = await rawFetch(`${API_ROOT}/file?path=${encodeURIComponent(path)}`);
     return res.blob();
@@ -93,4 +96,51 @@ function useBlobUrl(path) {
     return () => { alive = false; if (made) URL.revokeObjectURL(made); };
   }, [path]);
   return url;
+}
+
+// Co umie host (Eksplorator w WSL, podgląd stron): pytamy raz na pół minuty, wszystkie okna dzielą wynik.
+let hostCache = { at: 0, p: null };
+function hostInfo() {
+  if (!hostCache.p || Date.now() - hostCache.at > 30000) {
+    hostCache = { at: Date.now(), p: api.host().catch(() => ({})) };
+  }
+  return hostCache.p;
+}
+
+function useHost() {
+  const [h, setH] = useState({});
+  useEffect(() => { let alive = true; hostInfo().then((x) => alive && setH(x || {})); return () => { alive = false; }; }, []);
+  return h;
+}
+
+// „Odpal”: strona w nowej karcie z serwera podglądu (osobny port, link z tokenem). Kartę otwieramy od razu
+// (blokada wyskakujących okien), odcinamy jej dostęp do dashboardu (opener) i dopiero potem ładujemy adres.
+async function openSite(path) {
+  const w = window.open("", "_blank");
+  if (w) { w.opener = null; w.document.title = "Uruchamiam…"; }
+  try {
+    const r = await api.site(path);
+    const url = r.url || `${location.protocol}//${location.hostname}:${r.port}${r.path}`;
+    if (w) w.location.href = url; else window.open(url, "_blank", "noopener");
+  } catch (e) {
+    if (w) w.close();
+    throw e;
+  }
+}
+
+async function downloadFile(file) {
+  const b = await api.fileBlob(file.path);
+  const u = URL.createObjectURL(b);
+  const a = document.createElement("a");
+  a.href = u; a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 5000);
+}
+
+// Ścieżka do wklejenia w Eksploratorze/terminalu: po stronie Windows (WSL), hosta albo kontenera.
+function hostPathOf(path, host) {
+  const rest = path.startsWith("/opt/data/") ? path.slice("/opt/data/".length) : null;
+  if (rest != null && host.data_win) return `${host.data_win.replace(/\\$/, "")}\\${rest.split("/").join("\\")}`;
+  if (rest != null && host.data_host) return `${host.data_host.replace(/\/$/, "")}/${rest}`;
+  return path;
 }

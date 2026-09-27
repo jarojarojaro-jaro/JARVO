@@ -2,9 +2,17 @@
 
 const TABS = [["now", "Teraz"], ["cards", "Karty"], ["outputs", "Wyniki"], ["chat", "Czat"], ["about", "O agencie"]];
 
+// Otwarte okna jedno na drugim (karta → podgląd pliku): Escape zamyka tylko to na wierzchu.
+const MODAL_STACK = [];
+
 function Modal({ title, onClose, children, wide }) {
+  const me = useRef({});
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
+    MODAL_STACK.push(me.current);
+    return () => { const i = MODAL_STACK.indexOf(me.current); if (i >= 0) MODAL_STACK.splice(i, 1); };
+  }, []);
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && MODAL_STACK[MODAL_STACK.length - 1] === me.current && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
@@ -17,32 +25,104 @@ function Modal({ title, onClose, children, wide }) {
   </div>`;
 }
 
-function TaskModal({ taskId, agents, onClose }) {
+// Akcje pliku wynikowego: podgląd, „Odpal” (HTML w nowej karcie), folder w Eksploratorze, pobranie.
+function FileActions({ file, onPreview, compact }) {
+  const host = useHost();
+  const [note, setNote] = useState(null);
+  const say = (text, bad) => { setNote({ text, bad }); setTimeout(() => setNote(null), bad ? 6000 : 3500); };
+  const run = (fn, okText) => async (e) => {
+    e.stopPropagation();
+    try { await fn(); if (okText) say(okText); } catch (err) { say(err.message || String(err), true); }
+  };
+  const copy = run(async () => {
+    const text = hostPathOf(file.path, host);
+    await navigator.clipboard.writeText(text);
+  }, "Ścieżka skopiowana");
+  return html`<span class=${cx("thq-file-acts", compact && "is-compact")}>
+    ${file.kind === "html" && html`<button type="button" class="thq-act-btn is-run" onClick=${run(() => openSite(file.path))}
+      title="Otwórz stronę w nowej karcie przeglądarki">▶ Odpal</button>`}
+    ${onPreview && html`<button type="button" class="thq-act-btn" onClick=${(e) => { e.stopPropagation(); onPreview(file); }}
+      title="Podgląd w oknie">${file.kind === "html" ? "Kod" : "Podgląd"}</button>`}
+    ${host.explorer
+      ? html`<button type="button" class="thq-act-btn" onClick=${run(() => api.reveal(file.path), "Otwieram Eksplorator…")}
+          title=${hostPathOf(file.path, host)}>Pokaż w folderze</button>`
+      : html`<button type="button" class="thq-act-btn" onClick=${copy} title=${hostPathOf(file.path, host)}>Kopiuj ścieżkę</button>`}
+    ${!compact && html`<button type="button" class="thq-act-btn" onClick=${run(() => downloadFile(file))} title="Zapisz plik na dysku">Pobierz</button>`}
+    ${note && html`<span class=${cx("thq-act-note", note.bad && "is-bad")} role="status">${note.text}</span>`}
+  </span>`;
+}
+
+function OutRow({ f, onOpenFile, small }) {
+  return html`<li class=${cx("thq-out", f.main && "is-main")}>
+    <button type="button" class="thq-out-name" onClick=${() => onOpenFile(f)} title=${f.path}>${f.main ? "★ " : ""}${f.rel}</button>
+    <span class="thq-out-meta">${bytes(f.size)} · ${ago(f.mtime)}</span>
+    <${FileActions} file=${f} onPreview=${onOpenFile} compact=${small}/>
+  </li>`;
+}
+
+function TaskOutputs({ t, onOpenFile }) {
+  const files = t.outputs || [];
+  const missing = (t.expected || []).filter((w) => !files.some((f) => f.rel === w || f.rel.endsWith(`/${w}`) || f.name === w));
+  if (!files.length && !missing.length) return null;
+  // na wierzchu to, co zamówiono w WYJŚCIA (albo katalog out/); pliki pomocnicze zwinięte
+  const hasMain = files.some((f) => f.main);
+  const top = files.filter((f) => (hasMain ? f.main : f.in_out));
+  const shown = top.length ? top : files.slice(0, 3);
+  const other = files.filter((f) => !shown.includes(f));
+  return html`<section class="thq-task-sec"><h4>Wynik</h4>
+    <ul class="thq-outs">
+      ${shown.map((f) => html`<${OutRow} key=${f.path} f=${f} onOpenFile=${onOpenFile}/>`)}
+      ${missing.map((w) => html`<li key=${w} class="thq-out is-missing"><span class="thq-out-name">${w}</span>
+        <span class="thq-out-meta">${t.status === "done" ? "nie ma w katalogu karty" : "jeszcze nie ma"}</span></li>`)}
+    </ul>
+    ${other.length > 0 && html`<details class="thq-more thq-more-files"><summary>Pozostałe pliki <span class="thq-count">${other.length}</span></summary>
+      <ul class="thq-outs is-small">${other.map((f) => html`<${OutRow} key=${f.path} f=${f} onOpenFile=${onOpenFile} small=${true}/>`)}</ul>
+    </details>`}
+  </section>`;
+}
+
+const BRIEF_REST = [["wejscia", "Wejścia"], ["dod", "Kryteria gotowości (DoD)"], ["wyjscia", "Wyjścia"], ["granice", "Granice"]];
+
+function TaskModal({ taskId, agents, onClose, onOpenFile }) {
   const [t, setT] = useState(null);
   const [err, setErr] = useState(null);
   useEffect(() => { api.task(taskId).then(setT).catch((e) => setErr(e.message)); }, [taskId]);
   const who = (n) => { const a = agents.find((x) => x.name === n); return a ? `${a.emoji} ${a.short || a.name}` : n || "—"; };
+  const b = (t && t.brief) || {};
+  const structured = !!(b.cel || b.kontekst);
+  const rest = BRIEF_REST.filter(([k]) => b[k]);
+  const failed = t && t.last_failure_error && t.status !== "done";
   return html`<${Modal} title=${t ? t.title : "Karta"} onClose=${onClose} wide=${true}>
     ${err && html`<p class="thq-error">${err}</p>`}
     ${!t && !err && html`<p class="thq-muted">Wczytuję kartę…</p>`}
     ${t && html`<div class="thq-task">
-      <dl class="thq-facts">
-        <div><dt>Stan</dt><dd><span class=${cx("thq-pill", `is-card-${t.status}`)}>${CARD_STATUS[t.status] || t.status}</span></dd></div>
-        <div><dt>Wykonawca</dt><dd>${who(t.assignee)}</dd></div>
-        <div><dt>Założona</dt><dd>${ago(t.created_at)}</dd></div>
-        ${t.completed_at && html`<div><dt>Zakończona</dt><dd>${ago(t.completed_at)}</dd></div>`}
-        <div><dt>ID</dt><dd><code>${t.id}</code></dd></div>
-      </dl>
-      ${t.body && html`<section><h4>Zlecenie</h4><${Markdown} text=${t.body}/></section>`}
-      ${t.result && html`<section><h4>Wynik</h4><${Markdown} text=${t.result}/></section>`}
-      ${t.comments && t.comments.length > 0 && html`<section><h4>Komentarze</h4>
+      <p class="thq-task-meta">
+        <span class=${cx("thq-pill", `is-card-${t.status}`)}>${CARD_STATUS[t.status] || t.status}</span>
+        <span>${who(t.assignee)}</span>
+        <span class="thq-muted">${t.completed_at ? `zakończona ${ago(t.completed_at)}` : `założona ${ago(t.created_at)}`}</span>
+        <code class="thq-muted">${t.id}</code>
+      </p>
+      ${structured && b.cel && html`<section class="thq-goal" aria-label="Cel"><span class="thq-goal-label">Cel</span>
+        <${Markdown} text=${b.cel}/></section>`}
+      ${structured && b.kontekst && html`<section class="thq-task-sec"><h4>Kontekst</h4><${Markdown} text=${b.kontekst}/></section>`}
+      ${failed && html`<section class="thq-task-sec is-bad"><h4>Ostatni błąd</h4><pre class="thq-decision-err">${t.last_failure_error}</pre></section>`}
+      <${TaskOutputs} t=${t} onOpenFile=${onOpenFile}/>
+      ${t.result && html`<section class="thq-task-sec"><h4>Raport wykonawcy</h4><${Markdown} text=${t.result}/></section>`}
+      ${structured && (rest.length > 0 || b.intro) && html`<details class="thq-more"><summary>Pełne zlecenie
+          <span class="thq-muted">${rest.map(([, l]) => l.split(" (")[0].toLowerCase()).join(", ")}</span></summary>
+        ${b.intro && html`<${Markdown} text=${b.intro}/>`}
+        ${rest.map(([k, label]) => html`<div key=${k} class="thq-brief-part"><h4>${label}</h4><${Markdown} text=${b[k]}/></div>`)}
+      </details>`}
+      ${!structured && t.body && html`<details class="thq-more" open=${t.body.length < 500}><summary>Zlecenie</summary>
+        <${Markdown} text=${t.body}/></details>`}
+      ${t.comments && t.comments.length > 0 && html`<details class="thq-more"><summary>Komentarze <span class="thq-count">${t.comments.length}</span></summary>
         ${t.comments.map((c, i) => html`<div key=${i} class="thq-comment"><strong>${who(c.author)}</strong> <span class="thq-muted">${ago(c.created_at)}</span><${Markdown} text=${c.body}/></div>`)}
-      </section>`}
-      <section><h4>Historia</h4><ol class="thq-timeline">
+      </details>`}
+      <details class="thq-more"><summary>Historia <span class="thq-count">${(t.events || []).length}</span></summary><ol class="thq-timeline">
         ${(t.events || []).map((e, i) => html`<li key=${i}><span class="thq-muted">${clock(e.created_at)}</span> ${EVENT_PL[e.kind] || e.kind}
           ${e.payload && e.payload.reason ? html`<em> „${e.payload.reason}”</em>` : null}
           ${e.payload && e.payload.summary ? html`<em> ${e.payload.summary}</em>` : null}</li>`)}
-      </ol></section>
+      </ol></details>
     </div>`}
   </${Modal}>`;
 }
@@ -63,12 +143,12 @@ function FilePreview({ file, onClose }) {
     api.fileBlob(file.path).then((b) => b.text()).then((t) => setText(t.slice(0, 60000))).catch(() => setText("Nie udało się wczytać pliku."));
   }, [file.path]);
   return html`<${Modal} title=${file.name} onClose=${onClose} wide=${true}>
-    <p class="thq-muted thq-path">${file.path} · ${bytes(file.size)}</p>
+    <div class="thq-preview-bar"><p class="thq-muted thq-path">${file.path} · ${bytes(file.size)}</p><${FileActions} file=${file}/></div>
     ${file.kind === "image" && (url ? html`<img class="thq-preview-img" src=${url} alt=${file.name}/>` : html`<p class="thq-muted">Wczytuję…</p>`)}
     ${file.kind === "video" && url && html`<video class="thq-preview-img" src=${url} controls></video>`}
     ${file.kind === "pdf" && url && html`<iframe class="thq-preview-pdf" src=${url} title=${file.name}></iframe>`}
     ${(file.kind === "text" || file.kind === "html") && html`<pre class="thq-preview-text">${text == null ? "Wczytuję…" : text}</pre>`}
-    ${["archive", "doc", "other"].includes(file.kind) && html`<p>Tego typu pliku nie da się podejrzeć w przeglądarce. Leży na serwerze pod ścieżką powyżej.</p>`}
+    ${["archive", "doc", "other"].includes(file.kind) && html`<p>Tego typu pliku nie da się podejrzeć w przeglądarce. Pobierz go albo otwórz folder przyciskami wyżej.</p>`}
   </${Modal}>`;
 }
 
