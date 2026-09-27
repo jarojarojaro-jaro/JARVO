@@ -129,6 +129,23 @@ class Fleet:
     def provider(self) -> str:
         return self.raw["models"]["provider"]
 
+    def apply_model_overrides(self, env: dict[str, str]) -> None:
+        """Wybór dostawcy bez edycji repo: TARS_MODEL_PROVIDER=<zestaw z models.presets> i opcjonalnie
+        TARS_MODEL_FRONTIER / _STRONG / _FAST (np. z compose/tars.env)."""
+        models = self.raw["models"]
+        chosen = (env.get("TARS_MODEL_PROVIDER") or "").strip()
+        if chosen and chosen != models["provider"]:
+            presets = models.get("presets") or {}
+            if chosen not in presets:
+                raise ValueError(f"TARS_MODEL_PROVIDER={chosen}: brak zestawu w fleet.yaml (models.presets: "
+                                 f"{', '.join(sorted(presets)) or 'pusto'})")
+            models["provider"] = chosen
+            models["tiers"] = dict(presets[chosen])
+        for tier in list(models["tiers"]):
+            value = (env.get(f"TARS_MODEL_{tier.upper()}") or "").strip()
+            if value:
+                models["tiers"][tier] = value
+
     def agent(self, name: str) -> Agent:
         for a in self.agents:
             if a.name == name:

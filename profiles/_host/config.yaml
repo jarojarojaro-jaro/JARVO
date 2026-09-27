@@ -2,7 +2,7 @@
 # Z Tobą nie rozmawia. Trasy gateway.profile_routes dopisuje scripts/build.py z fleet.yaml
 # i zmiennych TELEGRAM_* (DM właściciela → tars, wątki grupy "TARS HQ" → agenci).
 
-model:
+model:                      # nadpisywane przez scripts/build.py: dostawca floty i model `fast`
   provider: openrouter
   default: anthropic/claude-haiku-4.5
 

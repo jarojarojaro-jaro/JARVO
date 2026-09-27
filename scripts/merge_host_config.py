@@ -12,6 +12,7 @@ Inne klucze w pliku docelowym (np. dopisane przez Hermesa) zostają. Zachowuje k
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -69,10 +70,21 @@ def main(argv: list[str]) -> int:
         target.setdefault("platforms", {})
         target["platforms"].setdefault("telegram", {})
         deep_merge(target["platforms"]["telegram"], fleet["platforms"]["telegram"])
+    # model hosta: z floty, gdy go brak, przy --force-model albo gdy nadal jest tym, co flota ustawiła
+    # ostatnio (zmiana dostawcy floty go aktualizuje; model wybrany ręcznie przez /model zostaje)
+    marker = target_path.parent / ".tars-host-model.json"
+    try:
+        last = json.loads(marker.read_text(encoding="utf-8"))
+    except Exception:
+        last = None
     for key in ONLY_IF_MISSING:
-        if key in fleet and (force_model or not target.get(key)):
+        current = target.get(key)
+        untouched = last is not None and isinstance(current, dict) and dict(current) == last
+        if key in fleet and (force_model or not current or untouched):
             target[key] = fleet[key]
     dump(target, target_path)
+    if isinstance(target.get("model"), dict) and dict(target["model"]) == dict(fleet.get("model") or {}):
+        marker.write_text(json.dumps(dict(target["model"])), encoding="utf-8")
     routes = (target.get("gateway") or {}).get("profile_routes") or []
     print(f"config hosta: {target_path} (tras Telegrama: {len(routes)})")
     return 0

@@ -360,6 +360,8 @@ def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str]) -> list[str]:
         notes.append("Brak TELEGRAM_HQ_CHAT_ID: grupa „TARS HQ” nie ma tras (działa tylko DM).")
     config.setdefault("gateway", {})["profile_routes"] = routes
     config["timezone"] = fleet.raw.get("shared", {}).get("timezone", "Europe/Warsaw")
+    # host (gateway, zadania pomocnicze kanbana) używa dostawcy floty i jej najszybszego modelu
+    config["model"] = {"provider": fleet.provider, "default": fleet.model_for("fast")}
     out.mkdir(parents=True, exist_ok=True)
     header = "# Wygenerowane przez scripts/build.py z profiles/_host/config.yaml + fleet.yaml. Nie edytuj na serwerze.\n"
     (out / "config.yaml").write_text(header + fl.dump_yaml(config), encoding="utf-8")
@@ -449,6 +451,8 @@ def main(argv: list[str] | None = None) -> int:
         name, _, path = item.partition("=")
         local_src[name] = Path(path).resolve()
     env = read_env_file(Path(args.env_file) if args.env_file else None)
+    fleet.apply_model_overrides(env)
+    print(f"Modele: {fleet.provider} · " + ", ".join(f"{t}={m}" for t, m in fleet.tiers.items()))
     protocol = (fl.REPO_ROOT / fleet.raw["shared"]["protocol"]).read_text(encoding="utf-8")
 
     profiles_out = out / "profiles"

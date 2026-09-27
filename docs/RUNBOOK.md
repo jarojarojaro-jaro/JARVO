@@ -136,6 +136,15 @@ zadziała; `install-fleet.sh` wypisze ostrzeżenie.
 
 ---
 
+### Dostawca modeli (OpenRouter, CommandCode…)
+
+Domyślnie agenci używają OpenRoutera. Inny dostawca dla całej floty: w `compose/tars.env` ustaw
+`TARS_MODEL_PROVIDER` na nazwę zestawu z `fleet.yaml` → `models.presets` (`commandcode-anthropic`:
+Claude przez CommandCode, `commandcode`: DeepSeek/Kimi przez CommandCode) i wdroż. Lokalnie jednym
+poleceniem: `TARS_MODEL_PROVIDER=commandcode bash scripts/local-up.sh`. Host (zadania pomocnicze
+kanbana) dostaje najszybszy model zestawu, chyba że wybrano mu model ręcznie przez `/model`.
+`make models` sprawdza, czy modele wybranego zestawu istnieją u dostawcy.
+
 ### Klucze dostawców i logowanie (OAuth)
 
 Każdy agent floty to osobny profil Hermesa z własnym `.env`, a Hermes celowo ich nie miesza (izolacja kluczy

@@ -15,14 +15,26 @@ version: 2
 orchestrator: tars
 reviewer: tars            # recenzent kart: snajperzy wołają kanban_request_review(reviewer=<to>)
 
-# Modele przez OpenRouter (zweryfikowane z https://openrouter.ai/api/v1/models, 2026-09-26).
-# scripts/check-models.py sprawdza przed wdrożeniem, czy każdy identyfikator nadal istnieje.
+# Dostawca modeli i modele na poziomach. Domyślnie OpenRouter; inny dostawca bez edycji repo:
+# w compose/tars.env ustaw TARS_MODEL_PROVIDER=<nazwa zestawu z `presets`> (klucz dostawcy dodaj
+# w dashboardzie Keys przy profilu „default”: trafi do wszystkich agentów). Pojedynczy model można
+# nadpisać przez TARS_MODEL_FRONTIER / TARS_MODEL_STRONG / TARS_MODEL_FAST.
+# scripts/check-models.py sprawdza przed wdrożeniem, czy identyfikatory istnieją u dostawcy.
 models:
   provider: openrouter
-  tiers:
+  tiers:                                    # zestaw openrouter (zweryfikowany 2026-09-26)
     frontier: anthropic/claude-opus-5.5     # TARS: orkiestracja i ocena
     strong: anthropic/claude-sonnet-5       # snajperzy i prawa ręka
     fast: anthropic/claude-haiku-4.5        # subagenci, zadania pomocnicze, rutyny
+  presets:                                  # nazwa zestawu = dostawca Hermesa (zweryfikowane 2026-09-27)
+    commandcode-anthropic:                  # CommandCode, modele Claude (ten sam klucz COMMANDCODE_API_KEY)
+      frontier: claude-opus-5-5
+      strong: claude-sonnet-5
+      fast: claude-haiku-4-5-20251001
+    commandcode:                            # CommandCode, modele otwarte (taniej)
+      frontier: deepseek/deepseek-v4-pro
+      strong: moonshotai/Kimi-K3
+      fast: deepseek/deepseek-v4-flash
   media:
     image: openrouter                       # image_gen.provider (domyślny łańcuch modeli wtyczki)
     video: openrouter                       # video_gen.provider (domyślny model wtyczki)
