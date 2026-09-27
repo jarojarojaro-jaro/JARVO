@@ -43,6 +43,8 @@ fi
 if [[ $REBUILD -eq 1 ]]; then
   log "Budowa obrazu tars-hermes (narzędzia agentów)"
   "${COMPOSE[@]}" build --pull hermes
+  # z której wersji infra/ zbudowano obraz (local-up przebudowuje tylko, gdy się zmieniła)
+  git -C "$ROOT" rev-parse HEAD:infra > "$COMPOSE_DIR/.infra-tree" 2>/dev/null || true
   # poprzedni obraz tars-hermes (~4,4 GB) zostaje bez nazwy, a cache budowania rośnie z każdą wersją:
   # sprzątamy, żeby dysk VPS nie puchł (cache z ostatnich 7 dni zostaje dla szybkich przebudów)
   docker image prune -f >/dev/null || true

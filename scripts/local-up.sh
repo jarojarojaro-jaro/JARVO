@@ -63,7 +63,15 @@ if [[ "$(stat -c %u "$L/build")" != "10000" || "$(stat -c %u "$L/data")" != "100
   sudo chown -R 10000:10000 "$L/build" "$L/data"
 fi
 
-TARS_COMPOSE_DIR="$L/compose" TARS_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" --first-run --no-pull
+# pierwsza instalacja raz; później przebudowa obrazu tylko, gdy zmieniło się infra/ (Dockerfile, pakiety)
+FLAGS=(--no-pull)
+if [[ ! -f "$L/.installed" ]]; then
+  FLAGS+=(--first-run)
+elif [[ "$(git -C "$ROOT" rev-parse HEAD:infra 2>/dev/null)" != "$(cat "$L/compose/.infra-tree" 2>/dev/null)" ]]; then
+  FLAGS+=(--rebuild)
+fi
+TARS_COMPOSE_DIR="$L/compose" TARS_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"
+touch "$L/.installed"
 
 # pomocnik aktualizacji: przycisk „Aktualizuj” w dashboardzie (git pull + deploy na prośbę z panelu)
 if [[ -f "$L/updater.pid" ]] && kill -0 "$(cat "$L/updater.pid")" 2>/dev/null; then kill "$(cat "$L/updater.pid")" || true; fi
