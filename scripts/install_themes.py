@@ -41,6 +41,44 @@ def tokens(color: str) -> dict[str, str]:
     }
 
 
+def icon_svg(rows: list[str]) -> str:
+    """Siatka pikseli ("#" = zapalony) → SVG (prostokąty scalone w wierszach)."""
+    d = []
+    for y, row in enumerate(rows):
+        x = 0
+        while x < len(row):
+            if row[x] == "#":
+                start = x
+                while x < len(row) and row[x] == "#":
+                    x += 1
+                d.append(f"M{start} {y}h{x - start}v1h-{x - start}z")
+            else:
+                x += 1
+    w, h = max(map(len, rows)), len(rows)
+    return (f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {w} {h}' shape-rendering='crispEdges'>"
+            f"<path d='{''.join(d)}'/></svg>")
+
+
+def icons_css(text: str) -> str:
+    """icons.txt → reguły CSS: każda pozycja menu dostaje swoją ikonkę jako zmienną --fos-ic."""
+    icons: dict[str, list[str]] = {}
+    key = None
+    for line in text.splitlines():
+        if line.startswith("#") and not set(line.strip()) <= {"#", "."}:
+            continue
+        if line.startswith("= "):
+            key = line[2:].strip()
+            icons[key] = []
+        elif key and line.strip():
+            icons[key].append(line.strip())
+    out = []
+    for href, rows in icons.items():
+        url = "url(\"data:image/svg+xml," + icon_svg(rows).replace("<", "%3C").replace(">", "%3E") + "\")"
+        sel = "aside nav a" if href == "default" else f'aside nav a[href$="{href}"]'
+        out.append(f"{sel} {{ --fos-ic: {url}; }}")
+    return "\n".join(out) + "\n"
+
+
 def theme(entry: dict, css: str) -> dict:
     t = tokens(entry["color"])
     root = ":root { " + " ".join(f"--{k}: {v};" for k, v in t.items()) + " }\n"
@@ -103,6 +141,8 @@ def main(argv: list[str]) -> int:
     src = repo / "branding" / "fosfor"
     spec = yaml.safe_load((src / "palettes.yaml").read_text(encoding="utf-8"))
     css = (src / "theme.css").read_text(encoding="utf-8")
+    if (src / "icons.txt").is_file():
+        css += "\n/* ikonki menu (z icons.txt) */\n" + icons_css((src / "icons.txt").read_text(encoding="utf-8"))
     out = home / "dashboard-themes"
     out.mkdir(parents=True, exist_ok=True)
     for entry in spec["themes"]:
