@@ -106,3 +106,9 @@ div[class*="hover:text-foreground"]:hover { background: color-mix(in srgb, var(-
 .thq-task-meta code { background: none !important; color: var(--fos-mid) !important; }
 .thq-more > summary { font-family: var(--theme-font-display) !important; font-weight: 400 !important; font-size: 19px !important; color: var(--fos-mid) !important; }
 .thq-more > summary:hover { color: var(--fos) !important; }
+
+/* czat: pliki i zdjęcia w fosforze */
+.thq-pathlink { color: var(--fos) !important; }
+.thq-media-img, .thq-media-file, .thq-attach-item { border-radius: 0 !important; border-color: var(--fos-mid) !important; background: transparent !important; }
+.thq-media-img img, .thq-md-img, .thq-attach-item img { border-radius: 0 !important; }
+.thq-chat.is-drop { outline-color: var(--fos) !important; }

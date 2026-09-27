@@ -37,7 +37,7 @@ POLL_EVERY = 2   # prośby z dashboardu (folder ma się otworzyć od razu)
 LOG_TAIL = 40
 DATA_IN = "/opt/data"
 # tylko wyniki floty (jak podgląd plików w HQ): nigdy klucze, profile ani konfiguracja
-REVEAL_ROOTS = ("tars/workspaces", "tars/missions", "tars/knowledge")
+REVEAL_ROOTS = ("tars/workspaces", "tars/missions", "tars/knowledge", "tars/inbox")
 
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:

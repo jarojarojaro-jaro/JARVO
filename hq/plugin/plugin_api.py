@@ -210,16 +210,17 @@ async def file(path: str, download: bool = False):
 
 # ------------------------------------------------------------------ „Odpal”: podgląd stron na :9120
 # Strona zrobiona przez agenta otwiera się w nowej karcie z osobnego portu, pod adresem z losowym
-# tokenem (wydaje go tylko zalogowany dashboard). Nagłówek CSP sandbox daje jej nieprzezroczyste
+# tokenem (wydaje go zalogowany dashboard albo agent przez scripts/tars_link.py; wspólny plik linków). Nagłówek CSP sandbox daje jej nieprzezroczyste
 # pochodzenie: skrypty strony działają, ale nie widzą sesji dashboardu i nie wyślą do niego ciasteczek.
 PREVIEW_PORT = int(os.environ.get("TARS_PREVIEW_PORT", "9120"))
-PREVIEW_TTL = 12 * 3600
+# adres, pod którym przeglądarka widzi serwer podglądu (compose: IP z TARS_BIND_IP); agenci biorą go
+# z env albo z pliku state/preview.json, który zapisujemy przy starcie
+PREVIEW_URL = os.environ.get("TARS_PREVIEW_URL") or f"http://localhost:{PREVIEW_PORT}"
 PREVIEW_CSP = ("sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads "
                "allow-popups-to-escape-sandbox")
 # stan wspólny dla ponownych importów pluginu (dashboard może przeładować pluginy w tym samym procesie)
 _preview = sys.modules.setdefault("tars_hq_preview_state", type(sys)("tars_hq_preview_state"))
-if not hasattr(_preview, "tokens"):
-    _preview.tokens = {}      # token → (katalog strony, ważny do)
+if not hasattr(_preview, "error"):
     _preview.error = None
 
 
@@ -248,14 +249,15 @@ def _preview_handler():
         def _serve(self, body: bool):
             path = unquote(urlsplit(self.path).path)
             token, _, rel = path.lstrip("/").partition("/")
-            entry = _preview.tokens.get(token)
-            if not entry or entry[1] < time.time():
-                return self._fail(404, "Link wygasł. Kliknij „Odpal” w TARS HQ jeszcze raz.")
+            root = core.link_root(core.LINKS_FILE, token, time.time())
+            if root is None:
+                return self._fail(404, "Link wygasł albo jest błędny. Kliknij „▶ Odpal” w TARS HQ jeszcze raz. "
+                                       "/ This link expired or is wrong: click “▶ Run” in TARS HQ again.")
             if not rel and not path.endswith("/"):
                 self.send_response(301)
                 self.send_header("Location", f"/{token}/")
                 return self.end_headers()
-            p = core.site_file(entry[0], rel, ROOTS)
+            p = core.site_file(root, rel, ROOTS)
             if p is None:
                 return self._fail(404, "Nie ma takiego pliku.")
             ctype = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
@@ -297,6 +299,12 @@ def _start_preview() -> None:
     srv.daemon_threads = True
     _preview.server = srv
     threading.Thread(target=srv.serve_forever, name="tars-preview", daemon=True).start()
+    try:
+        info = core.TARS_DIR / "state" / "preview.json"
+        info.parent.mkdir(parents=True, exist_ok=True)
+        info.write_text(json.dumps({"url": PREVIEW_URL, "port": PREVIEW_PORT}), encoding="utf-8")
+    except OSError:
+        pass
 
 
 try:
@@ -315,15 +323,7 @@ async def site(request: Request):
     if not getattr(_preview, "server", None):
         raise HTTPException(503, f"Podgląd stron nie działa: {_preview.error or 'serwer nie wystartował'}")
     root = core.site_root(p, ROOTS)
-    now = time.time()
-    for tok, (r, exp) in list(_preview.tokens.items()):
-        if exp < now:
-            _preview.tokens.pop(tok, None)
-    token = next((tok for tok, (r, exp) in _preview.tokens.items() if r == root and exp - now > 3600), None)
-    if token is None:
-        import secrets
-        token = secrets.token_urlsafe(18)
-        _preview.tokens[token] = (root, now + PREVIEW_TTL)
+    token = await asyncio.to_thread(core.link_for, core.LINKS_FILE, root, time.time())
     rel = p.relative_to(root).as_posix()
     return {"port": PREVIEW_PORT, "path": f"/{token}/{rel}"}
 
@@ -470,8 +470,10 @@ def chat_messages(raw: list[dict]) -> list[dict]:
         role, content = m.get("role"), m.get("content")
         if m.get("display_kind") == "hidden":
             continue
-        if role == "user" and isinstance(content, str):
-            out.append({"role": "user", "text": content, "ts": m.get("timestamp")})
+        if role == "user":
+            text = core.user_text(content)
+            if text:
+                out.append({"role": "user", "text": text, "ts": m.get("timestamp")})
         elif role == "assistant":
             calls = m.get("tool_calls")
             if isinstance(calls, str):
@@ -494,9 +496,23 @@ def chat_messages(raw: list[dict]) -> list[dict]:
 async def chat_send(name: str, request: Request):
     _agent(name)
     body = await request.json()
-    message = str(body.get("message") or "").strip()
+    attachments = []
+    for raw in body.get("attachments") or []:
+        p = core.safe_path(str(raw), ROOTS)
+        if p is None:
+            raise HTTPException(400, f"Załącznik poza katalogami floty albo nie istnieje: {raw}")
+        attachments.append(str(p))
+    message = core.compose_message(str(body.get("message") or ""), attachments)
     if not message:
         raise HTTPException(400, "Pusta wiadomość")
+    # obrazy idą też jako części wiadomości: model z widzeniem je zobaczy, bez widzenia Hermes zamieni je
+    # na opis (vision_analyze). Tylko data:image, najwyżej 4 i ~8 MB razem (limit gatewaya to 10 MB).
+    images = [str(u) for u in (body.get("images") or [])[:4]
+              if isinstance(u, str) and u.startswith(("data:image/png;", "data:image/jpeg;", "data:image/webp;", "data:image/gif;"))]
+    if sum(len(u) for u in images) > 8_000_000:
+        raise HTTPException(413, "Obrazy są za duże (razem ponad ~6 MB). Wyślij mniej naraz.")
+    payload = [{"type": "text", "text": message}, *({"type": "image_url", "image_url": {"url": u}} for u in images)] \
+        if images else message
     base, key = _api_target(name)
     if not key:
         raise HTTPException(503, f"Profil {name} nie ma API_SERVER_KEY. Uruchom deploy (install-fleet go generuje).")
@@ -516,7 +532,7 @@ async def chat_send(name: str, request: Request):
             async with client.stream(
                     "POST", f"{base}/api/sessions/{sid}/chat/stream",
                     headers={"Authorization": f"Bearer {key}", "Accept": "text/event-stream"},
-                    json={"message": message}) as r:
+                    json={"message": payload}) as r:
                 if r.status_code >= 300:
                     await r.aread()
                     err = {"message": _api_error(r, name)}
@@ -532,6 +548,31 @@ async def chat_send(name: str, request: Request):
     return StreamingResponse(stream(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no",
                                       "X-TARS-HQ-Session": sid})
+
+
+@router.post("/upload")
+async def upload(request: Request):
+    """Plik z czatu HQ (wklejony, przeciągnięty, z 📎) → /opt/data/tars/inbox/<data>/<nazwa>."""
+    from urllib.parse import unquote
+
+    inbox = core.TARS_DIR / "inbox"
+    target = core.upload_target(inbox, unquote(request.headers.get("X-File-Name", "")), time.time())
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_name(f".{target.name}.part")
+    size = 0
+    try:
+        with tmp.open("wb") as f:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > core.UPLOAD_MAX:
+                    raise HTTPException(413, f"Plik większy niż {core.UPLOAD_MAX // 2**20} MB")
+                f.write(chunk)
+        if not size:
+            raise HTTPException(400, "Pusty plik")
+        tmp.replace(target)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return core.file_entry(target, inbox)
 
 
 @router.post("/chat/{name}/reset")

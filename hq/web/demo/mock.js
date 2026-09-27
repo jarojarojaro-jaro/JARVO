@@ -339,14 +339,15 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
     const byAgent = {
       "tars-sherlock": [[["web_search", msg.slice(0, 50)]], "Sprawdziłem wstępnie. Mam 3 źródła pierwotne, ale zanim dam liczby, potwierdzę je krzyżowo. Jeśli to ma być pełne śledztwo, zleć je przez TARS-a, wtedy dostaniesz raport z cytatami."],
       "tars-web": [[["read_file", "knowledge/brands/ziarno/BRAND.md"]], "Mogę to zrobić w ramach landingu Ziarno. Budżety jakości zostają: LCP poniżej 2,5 s, CLS poniżej 0,1, Lighthouse 90+. Wdrożenie na produkcję tylko po Twojej zgodzie."],
-      "tars-studio": [[["skill_view", "formaty-platform"]], "Zrobię to w formatach 4:5 i 9:16, w kolorach z brand kitu Ziarno. Publikacja dopiero po Twojej akceptacji."],
+      "tars-studio": [[["skill_view", "formaty-platform"]], "Zrobię to w formatach 4:5 i 9:16, w kolorach z brand kitu Ziarno. Publikacja dopiero po Twojej akceptacji. Pierwsza wersja:\n\nMEDIA:/opt/data/tars/workspaces/tars-studio/out/ig-1080x1350.png\nMEDIA:/opt/data/tars/workspaces/tars-studio/out/kalendarz.csv\n\nPodgląd na żywo: http://localhost:9120/demo/index.html, pliki w `/opt/data/tars/workspaces/tars-studio/out/ig-1080x1350.png`."],
       "tars-reka": [[["terminal", "python3 -c '…'"]], "Zrobione, wynik w out/. Jeśli to część misji, TARS dopnie to do pakietu końcowego."],
     };
     const [tools, text] = byAgent[name] || [[], "Jasne."];
     return { tools, text };
   }
 
-  async function* send(name, msg) {
+  async function* send(name, msg, extra) {
+    if (extra && extra.attachments) msg = [msg, ...extra.attachments.map((a) => `📎 ${a}`)].filter(Boolean).join("\n");
     const chat = chatOf(name);
     chat.push({ role: "user", text: msg, ts: now() });
     const r = reply(name, msg);
@@ -379,6 +380,7 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
     history: async (name) => ({ session_id: "demo", messages: chatOf(name).slice() }),
     reset: async (name) => { S.chats[name] = []; return { ok: true }; },
     retry: async () => ({ ok: true }),
+    upload: async (file) => ({ path: `/opt/data/tars/inbox/demo/${file.name}`, name: file.name, rel: file.name, size: file.size, kind: /^image\//.test(file.type) ? "image" : "other" }),
     site: async () => ({ url: URL.createObjectURL(new Blob([SAMPLE_SITE], { type: "text/html" })) }),
     reveal: async () => { throw new Error("W trybie demo nie ma hosta: folder otwiera się w lokalnej instalacji."); },
     host: async () => ({ explorer: false, preview: true, data_win: "\\\\wsl.localhost\\Ubuntu\\home\\ty\\tars-local\\data\\hermes" }),

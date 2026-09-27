@@ -35,7 +35,8 @@ Szablon: `references/card-template.md`. Minimum:
 ```
 CEL: <co ma powstać, 1–2 zdania>
 KONTEKST: <dla kogo, po co, decyzje już podjęte, marka, ton, ograniczenia>
-WEJŚCIA: <pliki/URL; brand kit: @@KNOWLEDGE_DIR@@/brands/<marka>/; wyniki rodziców: ich katalogi out/>
+WEJŚCIA: <pliki/URL; brand kit: @@KNOWLEDGE_DIR@@/brands/<marka>/; wyniki rodziców: ich katalogi out/;
+         zdjęcia i pliki od użytkownika: pełne ścieżki /opt/data/tars/inbox/… (z linii 📎 w rozmowie)>
 DoD:
 - <mierzalny warunek 1>
 - <mierzalny warunek 2>

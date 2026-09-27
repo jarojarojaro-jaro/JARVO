@@ -38,6 +38,8 @@ services:
       TZ: ${TZ:-Europe/Warsaw}
       HERMES_TIMEZONE: ${TZ:-Europe/Warsaw}
       SEARXNG_URL: http://searxng:8080
+      # adres serwera podglądu („▶ Odpal”, linki agentów z scripts/tars_link.py) widziany z przeglądarki
+      TARS_PREVIEW_URL: http://${TARS_BIND_IP:-127.0.0.1}:9120
     volumes:
       - ${TARS_DATA:-/srv/tars/data}/hermes:/opt/data
       - ${TARS_REPO:-/srv/tars/repo}:/opt/tars/repo:ro

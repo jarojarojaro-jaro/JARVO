@@ -473,3 +473,24 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-preview-bar .thq-path { margin: 0; }
 .thq-mout li { display: flex; align-items: center; gap: 8px; }
 .thq-mout .thq-act-btn { padding: 2px 7px; font-size: 0.72rem; }
+
+/* ---- czat: pliki i zdjęcia ---- */
+.thq-pathlink { padding: 0; border: 0; background: none; color: var(--thq-info); font: 600 0.86em var(--thq-mono); text-align: left;
+  text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; cursor: pointer; }
+.thq-md a { overflow-wrap: anywhere; }
+.thq-md-img { display: block; max-width: min(100%, 420px); max-height: 320px; margin: 6px 0; border-radius: 6px; }
+.thq-media-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.thq-media-img { padding: 0; border: 1px solid var(--thq-line); border-radius: 8px; background: var(--thq-surface-2); overflow: hidden; cursor: zoom-in; }
+.thq-media-img img { display: block; max-width: min(320px, 70vw); max-height: 240px; }
+.thq-media-img > span { display: block; padding: 18px 14px; font-size: 0.8rem; }
+.thq-media-file { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 8px; border: 1px solid var(--thq-line); border-radius: 8px; }
+.thq-media-file.is-bad { color: var(--thq-muted); font-size: 0.8rem; border-style: dashed; }
+.thq-attach { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 6px 10px 0; }
+.thq-attach-item { display: flex; align-items: center; gap: 6px; max-width: 240px; padding: 3px 4px 3px 3px; border: 1px solid var(--thq-line); border-radius: 8px; font-size: 0.78rem; }
+.thq-attach-item img, .thq-attach-ic { width: 34px; height: 34px; flex: none; object-fit: cover; border-radius: 5px; display: grid; place-items: center; background: var(--thq-surface-2); }
+.thq-attach-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thq-attach-st { color: var(--thq-muted); white-space: nowrap; }
+.thq-attach-item.is-err { border-color: var(--thq-bad); } .thq-attach-item.is-err .thq-attach-st { color: var(--thq-bad); }
+.thq-attach-x { flex: none; padding: 0 4px; border: 0; background: none; color: var(--thq-muted); font-size: 1rem; cursor: pointer; }
+.thq-attach-btn { flex: none; font-size: 1.05rem; padding-inline: 10px; }
+.thq-chat.is-drop { outline: 2px dashed var(--thq-accent); outline-offset: -4px; }

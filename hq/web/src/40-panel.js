@@ -34,10 +34,7 @@ function FileActions({ file, onPreview, compact }) {
     e.stopPropagation();
     try { await fn(); if (okText) say(okText); } catch (err) { say(err.message || String(err), true); }
   };
-  const copy = run(async () => {
-    const text = hostPathOf(file.path, host);
-    await navigator.clipboard.writeText(text);
-  }, "Ścieżka skopiowana");
+  const copy = run(() => copyText(hostPathOf(file.path, host)), L("Ścieżka skopiowana", "Path copied"));
   return html`<span class=${cx("thq-file-acts", compact && "is-compact")}>
     ${file.kind === "html" && html`<button type="button" class="thq-act-btn is-run" onClick=${run(() => openSite(file.path))}
       title="Otwórz stronę w nowej karcie przeglądarki">▶ Odpal</button>`}
@@ -47,7 +44,9 @@ function FileActions({ file, onPreview, compact }) {
       ? html`<button type="button" class="thq-act-btn" onClick=${run(() => api.reveal(file.path), "Otwieram Eksplorator…")}
           title=${hostPathOf(file.path, host)}>Pokaż w folderze</button>`
       : html`<button type="button" class="thq-act-btn" onClick=${copy} title=${hostPathOf(file.path, host)}>Kopiuj ścieżkę</button>`}
-    ${!compact && html`<button type="button" class="thq-act-btn" onClick=${run(() => downloadFile(file))} title="Zapisz plik na dysku">Pobierz</button>`}
+    ${file.kind === "image" && html`<button type="button" class="thq-act-btn" onClick=${run(() => copyImage(file), L("Obraz w schowku: wklej go w czacie", "Image copied: paste it into a chat"))}
+      title=${L("Skopiuj obraz do schowka (np. do Telegrama)", "Copy the image to the clipboard (e.g. for Telegram)")}>${L("Kopiuj obraz", "Copy image")}</button>`}
+    ${!compact && html`<button type="button" class="thq-act-btn" onClick=${run(() => downloadFile(file))} title=${L("Zapisz plik na dysku", "Save the file to disk")}>${L("Pobierz", "Download")}</button>`}
     ${note && html`<span class=${cx("thq-act-note", note.bad && "is-bad")} role="status">${note.text}</span>`}
   </span>`;
 }
@@ -58,6 +57,27 @@ function OutRow({ f, onOpenFile, small }) {
     <span class="thq-out-meta">${bytes(f.size)} · ${ago(f.mtime)}</span>
     <${FileActions} file=${f} onPreview=${onOpenFile} compact=${small}/>
   </li>`;
+}
+
+// Plik w wiadomości (MEDIA: od agenta, 📎 od Ciebie): obraz jako miniatura, inny plik jako nazwa z akcjami.
+function MediaFile({ path }) {
+  const open = React.useContext(FileCtx);
+  const f = fileFromPath(path);
+  const [url, setUrl] = useState(null);
+  const [bad, setBad] = useState(false);
+  useEffect(() => {
+    if (f.kind !== "image") return undefined;
+    let alive = true, made = null;
+    api.fileBlob(path).then((b) => { if (alive) { made = URL.createObjectURL(b); setUrl(made); } }).catch(() => alive && setBad(true));
+    return () => { alive = false; if (made) URL.revokeObjectURL(made); };
+  }, [path]);
+  if (bad) return html`<span class="thq-media-file is-bad" title=${path}>${f.name} · ${L("poza katalogami floty albo nie istnieje", "outside fleet folders or missing")}</span>`;
+  if (f.kind === "image") {
+    return html`<button type="button" class="thq-media-img" onClick=${() => open && open(f)} title=${`${f.name} · ${L("kliknij: podgląd, kopiuj, pobierz", "click: preview, copy, download")}`}>
+      ${url ? html`<img src=${url} alt=${f.name}/>` : html`<span class="thq-muted">${f.name}</span>`}</button>`;
+  }
+  return html`<span class="thq-media-file"><button type="button" class="thq-pathlink" onClick=${() => open && open(f)}>${f.name}</button>
+    <${FileActions} file=${f} compact=${true}/></span>`;
 }
 
 function TaskOutputs({ t, onOpenFile }) {
@@ -143,7 +163,7 @@ function FilePreview({ file, onClose }) {
     api.fileBlob(file.path).then((b) => b.text()).then((t) => setText(t.slice(0, 60000))).catch(() => setText("Nie udało się wczytać pliku."));
   }, [file.path]);
   return html`<${Modal} title=${file.name} onClose=${onClose} wide=${true}>
-    <div class="thq-preview-bar"><p class="thq-muted thq-path">${file.path} · ${bytes(file.size)}</p><${FileActions} file=${file}/></div>
+    <div class="thq-preview-bar"><p class="thq-muted thq-path">${file.path}${file.size != null ? ` · ${bytes(file.size)}` : ""}</p><${FileActions} file=${file}/></div>
     ${file.kind === "image" && (url ? html`<img class="thq-preview-img" src=${url} alt=${file.name}/>` : html`<p class="thq-muted">Wczytuję…</p>`)}
     ${file.kind === "video" && url && html`<video class="thq-preview-img" src=${url} controls></video>`}
     ${file.kind === "pdf" && url && html`<iframe class="thq-preview-pdf" src=${url} title=${file.name}></iframe>`}

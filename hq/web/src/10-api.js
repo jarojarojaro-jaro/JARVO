@@ -63,6 +63,12 @@ const liveApi = {
   history: (name) => SDK.fetchJSON(`${API_ROOT}/chat/${encodeURIComponent(name)}/history`),
   reset: (name) => SDK.fetchJSON(`${API_ROOT}/chat/${encodeURIComponent(name)}/reset`, { method: "POST" }),
   retry: (id) => SDK.fetchJSON(`${API_ROOT}/task/${encodeURIComponent(id)}/retry`, { method: "POST" }),
+  async upload(file) {
+    const res = await rawFetch(`${API_ROOT}/upload`, {
+      method: "POST", headers: { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name || "plik") }, body: file,
+    });
+    return res.json();
+  },
   site: (path) => SDK.fetchJSON(`${API_ROOT}/site`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
   reveal: (path) => SDK.fetchJSON(`${API_ROOT}/reveal`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
   host: () => SDK.fetchJSON(`${API_ROOT}/host`),
@@ -70,11 +76,11 @@ const liveApi = {
     const res = await rawFetch(`${API_ROOT}/file?path=${encodeURIComponent(path)}`);
     return res.blob();
   },
-  async *send(name, message) {
+  async *send(name, message, extra) {
     const res = await rawFetch(`${API_ROOT}/chat/${encodeURIComponent(name)}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, ...(extra || {}) }),
     });
     yield* readSSE(res);
   },
@@ -143,4 +149,47 @@ function hostPathOf(path, host) {
   if (rest != null && host.data_win) return `${host.data_win.replace(/\\$/, "")}\\${rest.split("/").join("\\")}`;
   if (rest != null && host.data_host) return `${host.data_host.replace(/\/$/, "")}/${rest}`;
   return path;
+}
+
+// Schowek: na http (np. adres Tailscale) przeglądarka nie daje navigator.clipboard, stąd zapas dla tekstu.
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return; }
+  const t = document.createElement("textarea");
+  t.value = text; t.style.position = "fixed"; t.style.opacity = "0";
+  document.body.appendChild(t); t.select();
+  const ok = document.execCommand("copy");
+  t.remove();
+  if (!ok) throw new Error(L("Przeglądarka nie pozwoliła skopiować.", "The browser blocked copying."));
+}
+
+async function toPng(blob) {
+  if (blob.type === "image/png") return blob;
+  const bmp = await createImageBitmap(blob);
+  const c = document.createElement("canvas");
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext("2d").drawImage(bmp, 0, 0);
+  return new Promise((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("PNG"))), "image/png"));
+}
+
+// Obraz do schowka: wklejasz go potem w Telegramie, mailu, innym czacie (jak „Kopiuj obraz” w przeglądarce).
+async function copyImage(file) {
+  if (!(navigator.clipboard && navigator.clipboard.write && window.ClipboardItem && window.isSecureContext)) {
+    throw new Error(L("Kopiowanie obrazu działa na localhost albo https. Użyj „Pobierz”.", "Copying images needs localhost or https. Use “Download”."));
+  }
+  const png = await toPng(await api.fileBlob(file.path));
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+}
+
+// Zdjęcie do wiadomości: najwyżej 1600 px po dłuższym boku, JPEG (mały plik mieści się w limicie gatewaya).
+async function imageDataUrl(file) {
+  const small = file.size < 400 * 1024 && /^image\/(png|jpeg|webp|gif)$/.test(file.type);
+  if (small) return new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = bad; r.readAsDataURL(file); });
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85);
 }

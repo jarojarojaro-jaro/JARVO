@@ -31,7 +31,7 @@ ACTIVITY_LIMIT = 40
 OUTPUT_LIMIT = 60
 
 # Pliki, które GUI może pokazać (podgląd wyników agentów). Wszystko inne jest poza zasięgiem.
-PREVIEW_ROOTS = ("workspaces", "missions", "knowledge")
+PREVIEW_ROOTS = ("workspaces", "missions", "knowledge", "inbox")   # inbox: pliki wysłane w czacie HQ
 
 KIND_BY_EXT = {
     **{e: "image" for e in (".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".svg")},
@@ -534,6 +534,80 @@ def _within(p: Path, root: Path) -> bool:
         return False
 
 
+# ------------------------------------------------------------------------- załączniki czatu
+ATTACH_MARK = "📎 "            # linia wiadomości ze ścieżką załącznika (czytelna dla agenta i dla GUI)
+UPLOAD_MAX = 50 * 1024 * 1024
+
+
+def safe_upload_name(raw: str | None) -> str:
+    """Nazwa pliku z przeglądarki → bezpieczna nazwa w inbox (bez katalogów, ukrycia i znaków innych niż litery, cyfry, „._-”)."""
+    name = Path(str(raw or "").replace("\\", "/")).name
+    stem, dot, ext = name.rpartition(".")
+    if not dot:
+        stem, ext = name, ""
+    stem = re.sub(r"[^\w.-]+", "_", stem, flags=re.UNICODE).strip("._-")[:80] or "plik"
+    ext = re.sub(r"[^A-Za-z0-9]", "", ext)[:8].lower()
+    return f"{stem}.{ext}" if ext else stem
+
+
+def upload_target(inbox: Path, raw_name: str | None, now: float) -> Path:
+    """Wolna ścieżka w inbox/<data>/ (plik.png, plik-2.png…)."""
+    day = inbox / time.strftime("%Y-%m-%d", time.localtime(now))
+    name = safe_upload_name(raw_name)
+    stem, dot, ext = name.rpartition(".")
+    if not dot:
+        stem, ext = name, ""
+    p, n = day / name, 1
+    while p.exists():
+        n += 1
+        p = day / (f"{stem}-{n}.{ext}" if ext else f"{stem}-{n}")
+    return p
+
+
+def file_entry(p: Path, base: Path | None = None) -> dict:
+    st = p.stat()
+    return {"path": str(p), "name": p.name, "rel": str(p.relative_to(base)) if base else p.name, "size": st.st_size,
+            "mtime": st.st_mtime, "kind": KIND_BY_EXT.get(p.suffix.lower(), "other"), "in_out": False}
+
+
+def message_text(content: Any) -> str:
+    """Tekst wiadomości z historii gatewaya: zwykły napis albo lista części (tekst + obrazy)."""
+    if isinstance(content, str):
+        s = content.strip()
+        if not (s.startswith("[") and '"type"' in s):
+            return content
+        try:
+            content = json.loads(s)
+        except ValueError:
+            return content
+    if isinstance(content, list):
+        return "\n".join(p.get("text", "") for p in content
+                         if isinstance(p, dict) and p.get("type") in ("text", "input_text") and p.get("text"))
+    return ""
+
+
+_IMAGE_PLACEHOLDER = re.compile(r"^\[(?:screenshot|image|obraz)\]\s*$", re.M | re.I)
+
+
+def user_text(content: Any) -> str:
+    """Wiadomość użytkownika do dymka: bez znaczników obrazów, którymi gateway zastępuje wysłane zdjęcia
+    (te same zdjęcia GUI pokazuje z linii 📎)."""
+    text = message_text(content)
+    if ATTACH_MARK.strip() in text:
+        text = _IMAGE_PLACEHOLDER.sub("", text).rstrip()
+    return text
+
+
+def compose_message(text: str, attachments: list[str]) -> str:
+    """Wiadomość do agenta: tekst + ścieżki załączników (agent czyta pliki swoimi narzędziami)."""
+    text = (text or "").strip()
+    if not attachments:
+        return text
+    lines = "\n".join(ATTACH_MARK + a for a in attachments)
+    head = text or "(bez komentarza)"
+    return f"{head}\n\nZałączniki (pliki na dysku floty):\n{lines}"
+
+
 # ------------------------------------------------------------------------- zlecenie karty
 # Format zlecenia z dispatch-playbook TARS-a: CEL / KONTEKST / WEJŚCIA / DoD / WYJŚCIA / GRANICE.
 BRIEF_KEYS = {"cel": "cel", "kontekst": "kontekst", "wejścia": "wejscia", "wejscia": "wejscia",
@@ -601,6 +675,51 @@ def site_root(file: Path, roots: Roots) -> Path:
         if d.name.lower() in SITE_DIRS:
             return d
     return file.parent
+
+
+# Linki podglądu wspólne dla dashboardu („▶ Odpal”) i agentów (scripts/tars_link.py): token → katalog strony.
+LINKS_FILE = TARS_DIR / "state" / "preview-links.json"
+LINK_TTL = 7 * 86400
+LINKS_MAX = 500
+
+
+def links_load(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def link_for(path: Path, root: Path, now: float, ttl: float = LINK_TTL) -> str:
+    """Token dla katalogu strony (ten sam, póki ważny jeszcze co najmniej pół terminu). Zapis pod blokadą,
+    bo dashboard i agenci dopisują do tego samego pliku."""
+    import fcntl
+    import secrets
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path.with_suffix(".lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        data = {t: v for t, v in links_load(path).items()
+                if isinstance(v, dict) and float(v.get("exp", 0)) > now}
+        for tok, v in data.items():
+            if v.get("root") == str(root) and float(v["exp"]) - now > ttl / 2:
+                return tok
+        tok = secrets.token_urlsafe(18)
+        data[tok] = {"root": str(root), "exp": now + ttl}
+        if len(data) > LINKS_MAX:   # najstarsze wypadają
+            data = dict(sorted(data.items(), key=lambda kv: kv[1]["exp"])[-LINKS_MAX:])
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        tmp.replace(path)
+    return tok
+
+
+def link_root(path: Path, token: str, now: float) -> Path | None:
+    v = links_load(path).get(token) if token else None
+    if not isinstance(v, dict) or float(v.get("exp", 0)) <= now:
+        return None
+    return Path(v["root"])
 
 
 def site_file(root: Path, rel: str, roots: Roots) -> Path | None:

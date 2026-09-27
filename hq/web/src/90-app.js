@@ -1,6 +1,11 @@
 // Aplikacja TARS HQ: budynek + panel (agent albo Centrala) + dock czatu.
 
+const useHostI18n = (SDK && SDK.useI18n) || (() => null);
+
 function App() {
+  // język dashboardu: zmiana w przełączniku przerysowuje całe HQ
+  const i18n = useHostI18n();
+  HQ_LANG = (i18n && i18n.locale) || null;
   const [state, error] = usePoll(() => api.state(), 3000, []);
   const [fleet, setFleet] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -49,11 +54,11 @@ function App() {
   if (!state && !fleet.length) {
     return html`<div class="thq-root"><div class="thq-loading">
       <span class="thq-brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-      <p>${error ? `Nie mogę połączyć się z flotą: ${error}` : "Otwieram kwaterę…"}</p>
+      <p>${error ? L(`Nie mogę połączyć się z flotą: ${error}`, `Cannot reach the fleet: ${error}`) : L("Otwieram kwaterę…", "Opening headquarters…")}</p>
     </div></div>`;
   }
 
-  return html`<div class=${cx("thq-root", selected && "has-selection")}>
+  return html`<${FileCtx.Provider} value=${setFile}><div class=${cx("thq-root", selected && "has-selection")}>
     ${!header && html`<${Hud} state=${state} error=${error} now=${now} onDecisions=${openDecisions}/>`}
     <main class="thq-main">
       <div class="thq-left">
@@ -71,7 +76,7 @@ function App() {
     </main>
     ${taskId && html`<${TaskModal} taskId=${taskId} agents=${agents} onClose=${() => setTaskId(null)} onOpenFile=${setFile}/>`}
     ${file && html`<${FilePreview} file=${file} onClose=${() => setFile(null)}/>`}
-  </div>`;
+  </div></${FileCtx.Provider}>`;
 }
 
 if (window.__HERMES_PLUGINS__ && window.__HERMES_PLUGINS__.register) {

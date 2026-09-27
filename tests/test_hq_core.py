@@ -455,3 +455,45 @@ def test_site_root_and_file(tmp_path):
     assert core.site_file(root, ".env", roots) is None                                   # ukryte pliki
     assert core.site_file(root, "leak", roots) is None                                   # symlink na zewnątrz
     assert core.site_file(root, "img/..%2f..%2fnotes.html", roots) is None
+
+
+# --------------------------------------------------------------------------- załączniki czatu
+
+def test_upload_names_and_targets(tmp_path):
+    assert core.safe_upload_name("zdjęcie z telefonu (1).JPG") == "zdjęcie_z_telefonu_1.jpg"
+    assert core.safe_upload_name("../../profiles/.env") == "plik.env"      # bez katalogów i bez ukrycia
+    assert core.safe_upload_name("C:\\Users\\ja\\Pulpit\\foto.png") == "foto.png"
+    assert core.safe_upload_name("") == "plik"
+    t1 = core.upload_target(tmp_path, "foto.png", NOW)
+    assert t1.parent.parent == tmp_path and t1.name == "foto.png"
+    t1.parent.mkdir(parents=True)
+    t1.write_bytes(b"x")
+    assert core.upload_target(tmp_path, "foto.png", NOW).name == "foto-2.png"
+
+
+def test_compose_message_and_user_text():
+    msg = core.compose_message("Co tu jest?", ["/opt/data/tars/inbox/2026-09-28/foto.png"])
+    assert msg.startswith("Co tu jest?\n\nZałączniki")
+    assert msg.endswith("📎 /opt/data/tars/inbox/2026-09-28/foto.png")
+    assert core.compose_message("  ", ["/a.png"]).startswith("(bez komentarza)")
+    assert core.compose_message("sam tekst", []) == "sam tekst"
+    # historia gatewaya: znaczniki obrazów znikają, gdy zdjęcia są w liniach 📎
+    assert core.user_text(msg + "\n[screenshot]\n[screenshot]") == msg
+    assert core.user_text("[screenshot]") == "[screenshot]"
+    # treść jako lista części (tekst + obraz) albo jej zapis JSON
+    parts = [{"type": "text", "text": "hej"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64,AA"}}]
+    assert core.message_text(parts) == "hej"
+    assert core.message_text(json.dumps(parts)) == "hej"
+    assert core.message_text("[nie json") == "[nie json"
+
+
+def test_preview_links_shared_file(tmp_path):
+    links = tmp_path / "state" / "preview-links.json"
+    site = tmp_path / "tars" / "missions" / "M-1" / "web" / "out"
+    t1 = core.link_for(links, site, NOW)
+    assert core.link_for(links, site, NOW + 3600) == t1                  # ten sam katalog → ten sam link
+    assert core.link_root(links, t1, NOW + 60) == site
+    assert core.link_root(links, t1, NOW + core.LINK_TTL + 1) is None   # wygasł
+    assert core.link_root(links, "zly-token", NOW) is None
+    t2 = core.link_for(links, site, NOW + core.LINK_TTL * 0.6)           # mniej niż pół terminu → nowy
+    assert t2 != t1
