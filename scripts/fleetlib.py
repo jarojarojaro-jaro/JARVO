@@ -129,6 +129,12 @@ class Fleet:
     def provider(self) -> str:
         return self.raw["models"]["provider"]
 
+    @property
+    def fallback(self) -> dict | None:
+        """Model zapasowy wybranego zestawu (fallback_providers Hermesa) albo None."""
+        fb = (self.raw["models"].get("fallback") or {}).get(self.provider)
+        return dict(fb) if isinstance(fb, dict) and fb.get("provider") and fb.get("model") else None
+
     def apply_model_overrides(self, env: dict[str, str]) -> None:
         """Wybór dostawcy bez edycji repo: TARS_MODEL_PROVIDER=<zestaw z models.presets> i opcjonalnie
         TARS_MODEL_FRONTIER / _STRONG / _FAST (np. z compose/tars.env)."""

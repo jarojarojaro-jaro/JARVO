@@ -399,6 +399,11 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         p = dest / rel
         if p.exists():
             p.write_text(render_tokens(p.read_text(encoding="utf-8"), tokens), encoding="utf-8")
+    # model zapasowy zestawu: agent nie milknie, gdy główny model odmówi (np. poza planem)
+    if fleet.fallback and (dest / "config.yaml").exists():
+        fb = fleet.fallback
+        with (dest / "config.yaml").open("a", encoding="utf-8") as f:
+            f.write(f'\nfallback_providers:\n  - provider: "{fb["provider"]}"\n    model: "{fb["model"]}"\n')
 
     # skille własne → tokeny w SKILL.md i references
     for md in (dest / "skills").rglob("*.md"):

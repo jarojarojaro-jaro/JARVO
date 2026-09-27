@@ -53,10 +53,13 @@ for a in $AGENTS; do
   src="$BUILD/profiles/$a"
   if [[ -d "$DATA/profiles/$a" && -f "$DATA/profiles/$a/distribution.yaml" ]]; then
     log "Aktualizacja profilu $a"
+    $PY "$REPO/scripts/profile_model.py" snapshot "$DATA/profiles/$a"
     hermes profile update "$a" --force-config --yes
+    $PY "$REPO/scripts/profile_model.py" restore "$DATA/profiles/$a"
   else
     log "Instalacja profilu $a"
     hermes profile install "$src" --yes --alias
+    $PY "$REPO/scripts/profile_model.py" restore "$DATA/profiles/$a"
   fi
   # usuń skille floty/vendorowane, których nie ma już w buildzie (skille utworzone przez agenta zostają)
   $PY "$REPO/scripts/prune_skills.py" "$src/skills" "$DATA/profiles/$a/skills"

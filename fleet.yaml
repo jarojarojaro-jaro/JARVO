@@ -27,14 +27,18 @@ models:
     strong: anthropic/claude-sonnet-5       # snajperzy i prawa ręka
     fast: anthropic/claude-haiku-4.5        # subagenci, zadania pomocnicze, rutyny
   presets:                                  # nazwa zestawu = dostawca Hermesa (zweryfikowane 2026-09-27)
-    commandcode-anthropic:                  # CommandCode, modele Claude (ten sam klucz COMMANDCODE_API_KEY)
+    commandcode:                            # CommandCode, modele z podstawowych planów (DeepSeek, Kimi)
+      frontier: deepseek/deepseek-v4-pro
+      strong: moonshotai/Kimi-K2.6
+      fast: deepseek/deepseek-v4-flash
+    commandcode-anthropic:                  # CommandCode, Claude: wymaga planu „Provider” lub wyższego
       frontier: claude-opus-5-5
       strong: claude-sonnet-5
       fast: claude-haiku-4-5-20251001
-    commandcode:                            # CommandCode, modele otwarte (taniej)
-      frontier: deepseek/deepseek-v4-pro
-      strong: moonshotai/Kimi-K3
-      fast: deepseek/deepseek-v4-flash
+  # model zapasowy, gdy główny odmówi (np. „model poza planem”); klucz: nazwa zestawu
+  fallback:
+    commandcode-anthropic: {provider: commandcode, model: deepseek/deepseek-v4-pro}
+    commandcode: {provider: commandcode, model: deepseek/deepseek-v4-flash}
   media:
     image: openrouter                       # image_gen.provider (domyślny łańcuch modeli wtyczki)
     video: openrouter                       # video_gen.provider (domyślny model wtyczki)
