@@ -44,8 +44,8 @@ function App() {
     <${Hud} state=${state} error=${error} now=${now} onDecisions=${() => { setSelected(null); setFocus("decisions"); setTimeout(() => setFocus(null), 600); }}/>
     <main class="thq-main">
       <div class="thq-scene">
-        <${Building} agents=${agents} board=${(state && state.board) || {}} selected=${selected} onSelect=${select}/>
-        <p class="thq-hint">Kliknij pokój, żeby zobaczyć, nad czym pracuje agent.</p>
+        <${Building} agents=${agents} board=${(state && state.board) || {}} selected=${selected} onSelect=${select} online=${!error}/>
+        <p class="thq-hint">Kliknij pokój, żeby zobaczyć, nad czym pracuje agent. Na telefonie przesuń wieżę palcem.</p>
       </div>
       ${selected
         ? html`<${AgentPanel} key=${selected} name=${selected} agents=${agents} fleet=${fleet} tab=${tab} setTab=${setTab}

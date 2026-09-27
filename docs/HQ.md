@@ -76,25 +76,40 @@ pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartu
 - Odczyt kanbana i transkrypcji w trybie SQLite `mode=ro`. HQ niczego nie zapisuje poza mapą sesji czatu
   (`/opt/data/tars/state/hq-sessions.json`); zmiany na tablicy robią agenci przez swoje narzędzia.
 
-## 4. Pokoje
+## 4. Wieża TARS (wygląd)
+
+Scena to **przekrój bazy-wieżowca w pixel arcie**, nocą, jak model z klocków przecięty na pół: płaskie
+cięcie konstrukcji, a pokoje mają głębię (tylna ściana, podłoga w perspektywie, meble). Rysunek powstaje
+w kodzie (`hq/web/src/20-art.js`) na siatce 400 pikseli logicznych i skaluje się w SVG bez rozmycia.
+
+- **Dach:** neon „TARS”, antena z migającym światłem, talerz, zbiornik na wodę.
+- **Mostek dowodzenia** (`bridge`): **TARS jako szef w garniturze** (postać 2× większa od załogi) za
+  pulpitem dowodzenia, fotel dyrektorski, okno na miasto, ekran „Tablica floty” (liczniki kanbana na żywo),
+  panel „Załoga” z lampką statusu każdego agenta, robot-monolit TARS (pracuje, gdy flota pracuje).
+- **Piętra załogi:** po dwa pokoje na piętro wokół szybu windy; winda jeździ, gdy ktoś pracuje. Przy
+  nieparzystej liczbie agentów wolne miejsce zajmuje magazyn. Nowi agenci dokładają piętra.
+- **Maszynownia** (piwnica pod ulicą): szafy serwerowe i rdzeń zasilania; zielony „GATEWAY ONLINE”,
+  czerwony, gdy HQ traci połączenie z flotą.
 
 Pokój przypisuje `hq_room` w `fleet.yaml`, a krótką nazwę na szyldzie `hq_short`:
 
-| `hq_room` | Wystrój | Figurka |
+| `hq_room` | Wystrój | Postać |
 |---|---|---|
-| `bridge` | okno na kosmos, ekran „Tablica floty” z licznikami kanbana, pulpit, fotel właściciela | TARS: monolit z czterech płyt i paska wyświetlacza |
-| `study` | regał z książkami, tablica korkowa z czerwoną nitką, biurko z lampą bankierską, lupa | detektyw w kaszkiecie i szaliku |
-| `devlab` | szkic makiety, neon `</>`, dwa monitory z kodem, kubek z parą, roślina | programista w bluzie i słuchawkach |
-| `atelier` | tło fotograficzne z produktem, softbox, aparat na statywie, sztaluga z paletą marki, klaps | kreatywna w berecie |
-| `workshop` | tablica z narzędziami, stół warsztatowy, ramię robota, paczki (liczba = kolejka kart) | mechanik w czapce i ogrodniczkach |
-| `office` | domyślny pokój dla nowych agentów: biurko, laptop, zegar | figurka w krawacie |
+| `bridge` | jak wyżej | szef TARS: czarny garnitur, biała koszula, czerwony krawat |
+| `study` | regał z książkami, tablica dowodów z czerwonymi nitkami, zegar, globus, biurko z lampą bankierską | detektyw w kaszkiecie i szaliku (lupa przy pracy) |
+| `devlab` | szafa serwerowa z diodami, tablica z makietą, neon `</>`, dwa monitory z kodem, kubek z parą | programista w bluzie i słuchawkach, tyłem przy monitorach |
+| `atelier` | turkusowe tło fotograficzne, softbox, kamera z lampką REC, sztaluga z obrazem, plakat, klaps | artystka w berecie i koszulce w paski (paleta przy pracy) |
+| `workshop` | tablica z narzędziami, stół z imadłem i ramieniem robota, skrzynie (liczba = kolejka kart), beczka | mechanik w kasku i ogrodniczkach, tyłem przy stole |
+| `office` | domyślny pokój dla nowych agentów: biurko, monitor, szafka, zegar | postać w krawacie |
 
-Stan agenta zmienia pokój: światło (włączone przy pracy), animacje rekwizytów (monitory, lampa, ramię robota,
-nagrywanie), pozę figurki (pisanie, uniesiona kartka przy ocenie, alarm przy blokadzie, „z z z”, gdy wolny).
-Animacje wyłączają się przy `prefers-reduced-motion`.
+Stan agenta zmienia pokój: światło (pokój przygasa, gdy agent jest wolny), pozę (praca, trzymana karta
+przy ocenie, uniesiona ręka i „!” przy blokadzie, „Z z z”, gdy śpi) i rekwizyty (monitory, lampa, ramię
+robota, nagrywanie, hologram na pulpicie szefa). Animacje są skokowe jak w grach (kilka klatek) i
+wyłączają się przy `prefers-reduced-motion`. Na wąskim ekranie wieżę przesuwa się w bok palcem.
 
-**Nowy pokój:** dodaj klucz w `ROOMS`/`FIGS` i komponent rekwizytów w `hq/web/src/20-art.js`, wpisz go do
-`HQ_ROOMS` w `scripts/fleetlib.py` (walidator pilnuje zgodności) i ustaw `hq_room` agenta.
+**Nowy pokój:** dodaj klucz w `ROOMS` i funkcję wnętrza (`ROOM_DRAW`) w `hq/web/src/20-art.js`, wygląd
+postaci w `LOOKS`, wpisz klucz do `HQ_ROOMS` w `scripts/fleetlib.py` (walidator pilnuje zgodności)
+i ustaw `hq_room` agenta.
 
 ## 5. Rozwiązywanie problemów
 

@@ -1,10 +1,13 @@
-// Budynek: mostek TARS-a na piętrze, pokoje agentów na parterze (kolejni agenci dokładają pokoje).
+// Wieża TARS: scena pixel-art (20-art.js) + warstwa HTML nad pokojami (kliknięcie, szyld, dymek).
+// Mostek szefa na górze, pokoje załogi po dwa na piętro wokół szybu windy, maszynownia w piwnicy.
 
 const ICON = {
   search: "⌕", page: "▤", terminal: "›_", file: "▤", write: "✎", browser: "◍", eye: "◉", image: "▦",
   video: "▶", audio: "♪", book: "❏", memory: "◈", check: "✓", question: "?", team: "⇄", card: "▭",
   done: "✔", block: "■", review: "⚖", clock: "◷", tool: "⚙",
 };
+
+const pct = (v, total) => `${(100 * v) / total}%`;
 
 function Bubble({ agent }) {
   const st = agent.status;
@@ -23,11 +26,13 @@ function Bubble({ agent }) {
     return null;
   }
   const r = ROOMS[agent.room] || ROOMS.office;
-  const [fx] = r.fig;
+  const [fx, fy] = r.fig;
   const icon = st === "working" && agent.tool ? ICON[agent.tool.icon] || ICON.tool : st === "blocked" ? "!" : st === "review" ? "?" : "⚖";
-  // dymek wisi na ścianie nad figurką (nie zasłania szyldu), strzałka wskazuje głowę
-  return html`<div class=${cx("thq-bubble", tone && `is-${tone}`, (r.bubble === "left" || fx > 55) && "is-left")}
-      style=${{ left: `${fx}%` }} title=${detail ? `${verb}: ${detail}` : verb}>
+  // dymek nad głową postaci; strzałka wskazuje głowę
+  const side = r.bubble === "side";
+  const pos = side ? { left: `calc(${fx}% + 34px)`, top: `${fy}%` } : { left: `${fx}%`, bottom: `calc(${100 - fy}% + 6px)` };
+  return html`<div class=${cx("thq-bubble", tone && `is-${tone}`, side ? "is-side" : (r.bubble === "left" || fx > 60) && "is-left")}
+      style=${pos} title=${detail ? `${verb}: ${detail}` : verb}>
     <span class="thq-bubble-icon" aria-hidden="true">${icon}</span>
     <span class="thq-bubble-body"><span class="thq-bubble-verb">${verb}</span>${detail && html`<span class="thq-bubble-detail">${detail}</span>`}</span>
   </div>`;
@@ -47,57 +52,43 @@ function RoomSign({ agent }) {
   </div>`;
 }
 
-function Room({ agent, board, selected, onSelect }) {
+function Room({ agent, box, lay, selected, onSelect }) {
   const wide = agent.room === "bridge";
   const onKey = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(agent.name); } };
-  return html`<div role="button" tabIndex="0" class=${cx("thq-room", wide && "is-wide", selected && "is-selected", `is-${agent.status}`)}
+  const style = { left: pct(box.x, lay.W), top: pct(box.y, lay.H), width: pct(box.w, lay.W), height: pct(box.h, lay.H) };
+  return html`<div role="button" tabIndex="0" style=${style}
+      class=${cx("thq-room", wide && "is-wide", selected && "is-selected", `is-${agent.status}`)}
       onClick=${() => onSelect(agent.name)} onKeyDown=${onKey} aria-pressed=${selected}
       aria-label=${`${agent.label || agent.title}, ${(STATUS[agent.status] || STATUS.idle).label}. Otwórz szczegóły.`}>
     <${RoomSign} agent=${agent}/>
-    <div class="thq-room-stage">
-      <${RoomArt} agent=${agent} board=${board}/>
-      <${Bubble} agent=${agent}/>
-    </div>
+    <${Bubble} agent=${agent}/>
   </div>`;
 }
 
-function Roof({ side }) {
-  if (side === "left") {
-    return html`<div class="thq-roof thq-roof-left" aria-hidden="true"><svg viewBox="0 0 400 300">
-      <rect x="10" y="236" width="380" height="30" rx="3" fill="#8DA05A"/>
-      ${Array.from({ length: 14 }).map((_, i) => html`<rect key=${i} x=${20 + i * 27} y="231" width="16" height="7" rx="2" fill="#8DA05A"/>`)}
-      <rect x="120" y="150" width="14" height="86" fill="#7A5230"/>
-      <circle cx="127" cy="120" r="42" fill="#3E9B57"/><circle cx="98" cy="146" r="28" fill="#358A4B"/><circle cx="158" cy="142" r="30" fill="#46A862"/>
-      <rect x="220" y="206" width="100" height="10" rx="3" fill="#B5764A"/><rect x="228" y="216" width="8" height="20" fill="#8A5A33"/><rect x="304" y="216" width="8" height="20" fill="#8A5A33"/>
-      <rect x="220" y="180" width="100" height="8" rx="3" fill="#B5764A"/>
-    </svg></div>`;
-  }
-  return html`<div class="thq-roof thq-roof-right" aria-hidden="true"><svg viewBox="0 0 400 300">
-    <rect x="10" y="236" width="380" height="30" rx="3" fill="#7C8896"/>
-    ${Array.from({ length: 14 }).map((_, i) => html`<rect key=${i} x=${20 + i * 27} y="231" width="16" height="7" rx="2" fill="#7C8896"/>`)}
-    <path d="M200 236 L200 70" stroke="#5A6574" stroke-width="6"/>
-    <path d="M186 236 L200 150 L214 236" stroke="#5A6574" stroke-width="4" fill="none"/>
-    <circle class="thq-beacon" cx="200" cy="64" r="8" fill="#FF3B30"/>
-    <g transform="translate(300 180) rotate(-25)"><path d="M-40 0 Q0 40 40 0 Z" fill="#DDE3EA"/><path d="M0 18 L0 -18" stroke="#5A6574" stroke-width="3"/><circle cx="0" cy="-20" r="4" fill="#5A6574"/></g>
-    <rect x="280" y="206" width="40" height="30" fill="#5A6574"/>
-    <g transform="translate(80 150)"><rect x="0" y="0" width="4" height="86" fill="#5A6574"/>
-      <path class="thq-flag" d="M4 2 L60 2 L52 16 L60 30 L4 30 Z" fill="#D6281E"/>
-      <text x="12" y="21" font-size="12" font-weight="800" fill="#FFFFFF" font-family="sans-serif">TARS</text></g>
-  </svg></div>`;
-}
-
-function Building({ agents, board, selected, onSelect }) {
+function Building({ agents, board, selected, onSelect, online = true }) {
   const boss = agents.find((a) => a.room === "bridge") || agents[0];
   const crew = agents.filter((a) => a !== boss);
-  return html`<div class="thq-building">
-    <div class="thq-floor thq-floor-top">
-      <${Roof} side="left"/>
-      ${boss && html`<${Room} agent=${boss} board=${board} selected=${selected === boss.name} onSelect=${onSelect}/>`}
-      <${Roof} side="right"/>
+  const lay = towerLayout(crew.length);
+  const moving = agents.some((a) => isBusy(a.status));
+  const slots = crew.map((a, i) => ({ agent: a, box: lay.rooms[i] }));
+  const spare = lay.rooms.slice(crew.length);
+  const ref = useRef(null);
+  // na wąskim ekranie scena przewija się w bok: na start pokazujemy środek (mostek szefa)
+  useEffect(() => {
+    const sc = ref.current && ref.current.parentElement;
+    if (sc && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) / 2;
+  }, []);
+  return html`<div class="thq-building thq-tower" ref=${ref}>
+    <svg class="thq-tower-art" viewBox=${`0 0 ${lay.W} ${lay.H}`} aria-hidden="true">
+      <${TowerBackdrop} floors=${lay.floors}/>
+      <${TowerMachines} floors=${lay.floors} moving=${moving} online=${online}/>
+      ${boss && html`<${PixRoom} box=${lay.bridge} agent=${boss} board=${board} crew=${crew}/>`}
+      ${slots.map(({ agent, box }) => html`<${PixRoom} key=${agent.name} box=${box} agent=${agent} board=${board}/>`)}
+      ${spare.map((box, i) => html`<${StorageRoom} key=${`spare-${i}`} box=${box}/>`)}
+    </svg>
+    <div class="thq-tower-hits">
+      ${boss && html`<${Room} agent=${boss} box=${lay.bridge} lay=${lay} selected=${selected === boss.name} onSelect=${onSelect}/>`}
+      ${slots.map(({ agent, box }) => html`<${Room} key=${agent.name} agent=${agent} box=${box} lay=${lay} selected=${selected === agent.name} onSelect=${onSelect}/>`)}
     </div>
-    <div class="thq-floor thq-floor-ground" style=${{ "--thq-cols": Math.min(Math.max(crew.length, 1), 4) }}>
-      ${crew.map((a) => html`<${Room} key=${a.name} agent=${a} board=${board} selected=${selected === a.name} onSelect=${onSelect}/>`)}
-    </div>
-    <div class="thq-baseplate" aria-hidden="true"></div>
   </div>`;
 }
