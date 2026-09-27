@@ -44,16 +44,18 @@
       await rawFetch(`${API_ROOT}/update`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }),
       });
-      if (action === "update") st = { ...st, state: "updating", log: "Czekam na pomocnika aktualizacji…" };
+      if (action === "update") st = { ...st, pending: true, log: "Czekam na pomocnika aktualizacji…" };
     } catch (e) { err = e.message; }
     busy = false; render();
     setTimeout(load, 2500);
   }
 
+  const justUpdated = () => st && st.state === "done" && (st.finished_at || 0) > pageLoaded;
+
   function label() {
     if (!st) return null;
-    if (st.state === "updating") return ["⟳ Aktualizuję…", "is-busy"];
-    if (st.state === "done" && (st.finished_at || 0) > pageLoaded) return ["✓ Zaktualizowano · odśwież", "is-done"];
+    if (st.state === "updating" || (st.pending && st.state !== "done")) return ["⟳ Aktualizuję…", "is-busy"];
+    if (justUpdated()) return ["✓ Odśwież stronę", "is-done"];
     if (st.state === "failed") return ["✗ Aktualizacja nieudana", "is-bad"];
     if (st.online && st.behind > 0) return [`⬆ Aktualizacja (${st.behind})`, ""];
     return null;
@@ -69,7 +71,14 @@
     const head = el("header", "thq-upd-head");
     head.append(el("h2", null, "Aktualizacja TARS"), btn("×", "thq-upd-x", () => { open = false; render(); }));
     panel.append(head);
-    if (st.state === "updating") {
+    if (justUpdated()) {
+      panel.append(el("p", null, `Zaktualizowano do ${st.current}. Odśwież stronę, żeby wczytać nową wersję panelu.`));
+      const done = el("div", "thq-upd-actions");
+      done.append(btn("Odśwież stronę", "thq-upd-go", () => location.reload()));
+      panel.append(done);
+      return;
+    }
+    if (st.state === "updating" || st.pending) {
       panel.append(el("p", null, "Pobieram i wdrażam nową wersję. Panel na chwilę się rozłączy; przebudowa obrazu trwa do kilku minut."));
     } else if (st.state === "failed") {
       panel.append(el("p", null, "Aktualizacja się nie udała. Ostatnie linie logu poniżej; wersja sprzed aktualizacji dalej działa."));
@@ -86,7 +95,7 @@
     if (st.log && (st.state === "updating" || st.state === "failed")) panel.append(el("pre", "thq-upd-log", st.log));
     if (err) panel.append(el("p", "thq-upd-err", err));
     const actions = el("div", "thq-upd-actions");
-    if (st.state !== "updating") {
+    if (st.state !== "updating" && !st.pending) {
       actions.append(btn(st.state === "failed" ? "Spróbuj ponownie" : "Aktualizuj teraz", "thq-upd-go", () => send("update"), busy));
       actions.append(btn("Sprawdź ponownie", "thq-upd-ghost", () => send("check"), busy));
     }
@@ -104,7 +113,7 @@
   mount();
   load();
   (function poll() {
-    const busyNow = st && st.state === "updating";
+    const busyNow = st && (st.state === "updating" || st.pending);
     setTimeout(() => { load().finally(poll); }, busyNow || open ? 3000 : 60000);
   })();
 })();

@@ -102,8 +102,12 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--compose", help="katalog compose (.env, tars.env); domyślnie jak w deploy.sh")
     ap.add_argument("--build", help="katalog build; domyślnie jak w deploy.sh")
     ap.add_argument("--mode", default="vps", choices=["vps", "local"])
+    ap.add_argument("--repo", help="repo do aktualizacji (domyślnie to, z którego uruchomiono skrypt)")
     ap.add_argument("--once", action="store_true", help="jedno sprawdzenie i wyjście (test)")
     args = ap.parse_args(argv)
+    global ROOT
+    if args.repo:
+        ROOT = Path(args.repo).resolve()
     state: dict = {"mode": args.mode, "state": "idle", "updater_pid": os.getpid()}
     next_check = 0.0
     while True:
