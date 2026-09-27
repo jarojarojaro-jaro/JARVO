@@ -271,6 +271,12 @@ sprawdzenie albo aktualizację tej samej gałęzi. Na VPS działa jako usługa `
 (`sudo systemctl status tars-updater`, log: `journalctl -u tars-updater`); lokalnie uruchamia go
 `scripts/local-up.sh` (log: `~/tars-local/updater.log`). Gdy nie działa, pozycja w menu się nie pojawia.
 
+### Wyniki agentów w przeglądarce
+Flota działa w kontenerze, więc serwer uruchomiony przez agenta (`localhost:8000`, `npm run dev`) jest dla
+przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w TARS HQ albo link, który agent robi poleceniem
+`python3 /opt/tars/repo/scripts/tars_link.py <plik albo katalog>` (serwer podglądu na porcie 9120, ten sam
+`TARS_BIND_IP` co dashboard; link ważny 7 dni). Pliki wysłane w czacie HQ leżą w `/opt/data/tars/inbox/<data>/`.
+
 ## 10. Rozwiązywanie problemów
 
 | Objaw | Przyczyna i naprawa |

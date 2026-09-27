@@ -21,7 +21,8 @@ function App() {
 
   useEffect(() => { (api.fleet ? api.fleet() : Promise.resolve({ agents: [] })).then((f) => setFleet(f.agents || [])).catch(() => {}); }, []);
 
-  const agents = (state && state.agents) || fleet.map((a) => ({ ...a, status: "idle", counts: {} }));
+  const agents = ((state && state.agents) || fleet.map((a) => ({ ...a, status: "idle", counts: {} }))).map(localAgent);
+  const fleetL = fleet.map(localAgent);
   const boss = agents.find((a) => a.kind === "orchestrator") || agents[0];
   const chatTarget = target || (boss && boss.name);
   const header = usePageHeader();
@@ -64,13 +65,13 @@ function App() {
       <div class="thq-left">
         <div class="thq-scene">
           <${Building} agents=${agents} board=${(state && state.board) || {}} selected=${selected} onSelect=${select} online=${!error}/>
-          <p class="thq-hint">Kliknij pokój, żeby zobaczyć, nad czym pracuje agent. Na telefonie przesuń wieżę palcem.</p>
+          <p class="thq-hint">${L("Kliknij pokój, żeby zobaczyć, nad czym pracuje agent. Na telefonie przesuń wieżę palcem.", "Click a room to see what the agent is working on. On a phone, swipe the tower.")}</p>
         </div>
         <${ChatDock} agents=${agents} target=${chatTarget} setTarget=${setTarget} open=${dockOpen} setOpen=${setDockOpen}
           pending=${pending} onPendingDone=${() => setPending(null)}/>
       </div>
       ${selected
-        ? html`<${AgentPanel} key=${selected} name=${selected} agents=${agents} fleet=${fleet} tab=${tab} setTab=${setTab}
+        ? html`<${AgentPanel} key=${selected} name=${selected} agents=${agents} fleet=${fleetL} tab=${tab} setTab=${setTab}
             onClose=${() => setSelected(null)} onOpenTask=${setTaskId} onOpenFile=${setFile} pending=${pending} onPendingDone=${() => setPending(null)}/>`
         : html`<${Center} state=${state} agents=${agents} onAnswer=${answer} onOpenTask=${setTaskId} onOpenFile=${setFile} focus=${focus}/>`}
     </main>

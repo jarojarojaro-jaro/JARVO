@@ -462,7 +462,7 @@ function roomStorage(L) {
     const rnd = rng(sx);
     [[13, 22], [25, 34], [37, 46], [49, 57]].forEach(([t, b]) => { for (let x = sx + 2; x < sx + 40; x += 9) if (rnd() < 0.8) { const bh = Math.min(8, b - t); g.r(x, b - bh, 8, bh, "#B07E45"); g.r(x + 3, b - bh, 2, bh, "#D4A870"); } });
   });
-  g.text(52, 60, "MAGAZYN", "#8A93A0");
+  g.text(52, 60, txt("MAGAZYN", "STORAGE"), "#8A93A0");
 }
 
 function roomBridge(L, a, board, crew, box) {
@@ -484,7 +484,7 @@ function roomBridge(L, a, board, crew, box) {
   // ekran floty: kolumny tablicy kanban (kolejka, w toku, ocena, blokady)
   const frame = (x, y, w, h) => { g.r(x, y, w, h, "#3A4452"); g.r(x + 1, y + 1, w - 2, h - 2, "#0E131B"); };
   frame(65, 9, 62, 42);
-  g.text(68, 12, "TABLICA FLOTY", "#8FA3B8");
+  g.text(68, 12, txt("TABLICA FLOTY", "FLEET BOARD"), "#8FA3B8");
   [["ready", "#9CC3FF"], ["running", "#7CF0B4"], ["review", "#FFD36E"], ["blocked", "#FF8A7A"]].forEach(([key, color], i) => {
     const x0 = 68 + i * 14, n = (board && board[key]) || 0;
     g.r(x0, 19, 12, 1, color);
@@ -494,7 +494,7 @@ function roomBridge(L, a, board, crew, box) {
   });
   // panel załogi: lampka statusu każdego agenta
   frame(159, 9, 66, 42);
-  g.text(162, 12, "ZALOGA", "#8FA3B8");
+  g.text(162, 12, txt("ZALOGA", "CREW"), "#8FA3B8");
   crew.slice(0, 5).forEach((c, i) => {
     const color = STATUS_PX[c.status] || STATUS_PX.idle;
     (c.status === "blocked" ? L.get("crew-alarm", "thq-px-blink") : g).r(162, 20 + i * 6, 3, 3, color);

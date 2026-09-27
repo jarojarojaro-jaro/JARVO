@@ -64,13 +64,23 @@ if [[ "$(stat -c %u "$L/build")" != "10000" || "$(stat -c %u "$L/data")" != "100
 fi
 
 # pierwsza instalacja raz; później przebudowa obrazu tylko, gdy zmieniło się to, z czego się go buduje
-# (Dockerfile, pakiety, skrypty w obrazie). Sama zmiana docker-compose.yml (np. nowy port) odtwarza kontener bez budowy.
+# (Dockerfile, pakiety, skrypty w obrazie, branding i tłumaczenie dashboardu; ta ostatnia warstwa buduje się
+# w kilka sekund). Sama zmiana docker-compose.yml (np. nowy port) odtwarza kontener bez budowy.
 FLAGS=(--no-pull)
-BUILT="$(cat "$L/compose/.infra-tree" 2>/dev/null || true)"
+BUILT="$(cat "$L/compose/.image-src" 2>/dev/null || true)"   # commit, z którego zbudowano obraz (deploy.sh)
+TREE="$(cat "$L/compose/.infra-tree" 2>/dev/null || true)"   # starsze instalacje: drzewo infra/ z budowy
+infra_changed() {
+  if [[ -n "$BUILT" ]]; then ! git -C "$ROOT" diff --quiet "$BUILT" HEAD -- infra/Dockerfile infra/node infra/python infra/bin 2>/dev/null
+  elif [[ -n "$TREE" ]]; then ! git -C "$ROOT" diff --quiet "$TREE" HEAD:infra -- Dockerfile node python bin 2>/dev/null
+  else true; fi
+}
+brand_changed() { [[ -z "$BUILT" ]] || ! git -C "$ROOT" diff --quiet "$BUILT" HEAD -- branding 2>/dev/null; }
 if [[ ! -f "$L/.installed" ]]; then
   FLAGS+=(--first-run)
-elif [[ -z "$BUILT" ]] || ! git -C "$ROOT" diff --quiet "$BUILT" HEAD:infra -- Dockerfile node python bin 2>/dev/null; then
-  FLAGS+=(--rebuild)
+elif infra_changed; then
+  FLAGS+=(--rebuild --pull-base)
+elif brand_changed; then
+  FLAGS+=(--rebuild)                # tylko branding/tłumaczenie: ta sama wersja Hermesa, kilka sekund
 fi
 TARS_COMPOSE_DIR="$L/compose" TARS_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"
 touch "$L/.installed"

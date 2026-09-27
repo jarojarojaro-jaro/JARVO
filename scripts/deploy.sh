@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Wdrożenie floty TARS na VPS (idempotentne). Uruchamiaj z /srv/tars/repo jako użytkownik z grupy docker.
 #
-#   bash scripts/deploy.sh [--first-run] [--no-pull] [--rebuild] [--resume-cron] [--monitoring]
+#   bash scripts/deploy.sh [--first-run] [--no-pull] [--rebuild] [--pull-base] [--resume-cron] [--monitoring]
+#
+# --rebuild przebudowuje obraz na tej samej wersji Hermesa; --pull-base (i --first-run) pobiera też najnowszy
+# obraz bazowy Hermesa. Zmiana infra/ w git pull robi jedno i drugie, zmiana branding/ tylko przebudowę.
 #
 # Kroki: git pull → docker compose build/up → walidacja repo → build dystrybucji (w kontenerze)
 #        → instalacja/aktualizacja profili (w kontenerze) → healthchecki → podsumowanie.
@@ -10,12 +13,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_DIR="${TARS_COMPOSE_DIR:-/srv/tars/compose}"
 COMPOSE=(docker compose -f "$ROOT/infra/docker-compose.yml" --env-file "$COMPOSE_DIR/.env")
-PULL=1; REBUILD=0; FIRST=0; RESUME_CRON=0; PROFILES=()
+PULL=1; REBUILD=0; PULLBASE=0; FIRST=0; RESUME_CRON=0; PROFILES=()
 for arg in "$@"; do
   case "$arg" in
-    --first-run) FIRST=1; REBUILD=1 ;;
+    --first-run) FIRST=1; REBUILD=1; PULLBASE=1 ;;
     --no-pull) PULL=0 ;;
     --rebuild) REBUILD=1 ;;
+    --pull-base) PULLBASE=1 ;;
     --resume-cron) RESUME_CRON=1 ;;
     --monitoring) PROFILES+=(--profile monitoring) ;;
     *) echo "Nieznana opcja: $arg"; exit 2 ;;
@@ -35,16 +39,20 @@ if [[ $PULL -eq 1 ]]; then
   before="$(git rev-parse HEAD)"
   git pull --ff-only
   after="$(git rev-parse HEAD)"
-  if [[ "$before" != "$after" ]] && git diff --name-only "$before" "$after" | grep -qE '^infra/(Dockerfile|node/|python/|bin/)'; then
-    REBUILD=1
+  if [[ "$before" != "$after" ]]; then
+    changed="$(git diff --name-only "$before" "$after")"
+    if grep -qE '^infra/(Dockerfile|node/|python/|bin/)' <<<"$changed"; then REBUILD=1; PULLBASE=1
+    elif grep -qE '^branding/' <<<"$changed"; then REBUILD=1; fi   # ostatnia warstwa obrazu: sekundy
   fi
 fi
 
 if [[ $REBUILD -eq 1 ]]; then
   log "Budowa obrazu tars-hermes (narzędzia agentów)"
-  "${COMPOSE[@]}" build --pull hermes
+  BUILD_ARGS=(); [[ $PULLBASE -eq 1 ]] && BUILD_ARGS+=(--pull)
+  "${COMPOSE[@]}" build "${BUILD_ARGS[@]}" hermes
   # z której wersji infra/ zbudowano obraz (local-up przebudowuje tylko, gdy się zmieniła)
   git -C "$ROOT" rev-parse HEAD:infra > "$COMPOSE_DIR/.infra-tree" 2>/dev/null || true
+  git -C "$ROOT" rev-parse HEAD > "$COMPOSE_DIR/.image-src" 2>/dev/null || true
   # poprzedni obraz tars-hermes (~4,4 GB) zostaje bez nazwy, a cache budowania rośnie z każdą wersją:
   # sprzątamy, żeby dysk VPS nie puchł (cache z ostatnich 7 dni zostaje dla szybkich przebudów)
   docker image prune -f >/dev/null || true

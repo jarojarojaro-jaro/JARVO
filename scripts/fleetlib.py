@@ -102,6 +102,7 @@ class Agent:
     hq_room: str = "office"
     hq_label: str = ""
     hq_short: str = ""
+    en: dict = field(default_factory=dict)   # angielskie title / hq_label / description (HQ po angielsku)
 
     @property
     def dir(self) -> Path:
@@ -185,6 +186,7 @@ def load_fleet(path: Path | None = None) -> Fleet:
                 hq_room=entry.get("hq_room", "office"),
                 hq_label=entry.get("hq_label", "") or entry.get("title", ""),
                 hq_short=entry.get("hq_short", "") or entry["name"].removeprefix("tars-").capitalize(),
+                en={k: " ".join(str(v).split()) for k, v in (entry.get("en") or {}).items() if v},
             )
         )
     return Fleet(raw=raw, agents=agents)

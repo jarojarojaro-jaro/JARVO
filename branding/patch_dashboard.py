@@ -12,6 +12,7 @@ nie wywraca budowy, tylko wypisuje, czego nie znalazła (wyjątek: tytuł karty,
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import shutil
 import sys
@@ -72,6 +73,51 @@ def bust_cache(assets_dir: Path, index: Path) -> int:
     return len(rename)
 
 
+# Scalanie tłumaczenia z angielskim (jak defineLocale w dashboardzie): brakujący klucz = tekst angielski.
+MERGE_JS = ("((a,b)=>{const m=(x,y)=>{if(!x||typeof x!='object'||Array.isArray(x)||!y||typeof y!='object'"
+            "||Array.isArray(y))return y??x;const r={...x};for(const[k,v]of Object.entries(y)){if(v!==void 0)"
+            "r[k]=m(r[k],v)}return r};return m(a,b)})")
+
+
+def add_polish(assets: list[Path], index: Path, pl_json: Path) -> int:
+    """Język polski w dashboardzie: tłumaczenie z branding/i18n/pl.json dopisane do mapy języków,
+    „Polski” w przełączniku i polski jako język domyślny (dopóki ktoś nie wybierze innego)."""
+    if not pl_json.is_file():
+        print("  · polski: brak pl.json")
+        return 0
+    data = json.dumps(json.loads(pl_json.read_text(encoding="utf-8")), ensure_ascii=False, separators=(",", ":"))
+    done = 0
+    for f in assets:
+        text = f.read_text(encoding="utf-8")
+        if "hermes-locale" not in text or "Afrikaans" not in text:
+            continue
+        if ",pl:" in text and "Polski" in text:
+            print("  · polski: już jest")
+            return 0
+        new, k1 = re.subn(r"([\w$]+)=\{en:([\w$]+),zh:",
+                          lambda m: f"{m.group(1)}={{en:{m.group(2)},pl:{MERGE_JS}({m.group(2)},{data}),zh:", text, count=1)
+        new, k2 = re.subn(r"=\{af:`Afrikaans`,", "={af:`Afrikaans`,pl:`Polski`,", new, count=1)
+        new, k3 = re.subn(r"(localStorage\.getItem\([\w$]+\);if\([\w$]+&&[\w$]+\([\w$]+\)\)return [\w$]+\}catch\{\}return)`en`",
+                          r"\1`pl`", new, count=1)
+        if not (k1 and k2):
+            print(f"  · polski: nie rozpoznano układu pliku języków (mapa {k1}, nazwy {k2})")
+            return 0
+        f.write_text(new, encoding="utf-8")
+        CHANGED.add(f)
+        done = 1
+        print(f"  ✓ polski: tłumaczenie, przełącznik, domyślny ({'tak' if k3 else 'nie znaleziono'})")
+        break
+    if done:
+        sub_all([index], r'<html lang="en"', '<html lang="pl"', "język strony")
+        # pozycje menu bez klucza tłumaczenia (Files, MCP, Channels…) i zakładki pluginów dostają klucz
+        # app.nav.<klucz>; bez tłumaczenia zostaje oryginalna etykieta
+        sub_all(assets, r"path:`/(files|mcp|channels|webhooks|pairing|system)`,label:",
+                r"path:`/\1`,labelKey:`\1`,label:", "menu: klucze tłumaczeń")
+        sub_all(assets, r"\{path:([\w$]+)\.tab\.path,label:\1\.label,",
+                r"{path:\1.tab.path,labelKey:`plugin_`+\1.name,label:\1.label,", "menu: zakładki pluginów")
+    return done
+
+
 def main(argv: list[str]) -> int:
     brand = Path(argv[0])
     for d in (WEB, HERMES / "web" / "public"):
@@ -93,14 +139,16 @@ def main(argv: list[str]) -> int:
             r'\1[...e.map(e=>e.path),"/base"]\2', "BASE w głównym menu")
     sub_all(assets, r"brand:`Hermes Agent`,brandShort:`HA`", "brand:`TARS`,brandShort:`T`", "nazwa marki (i18n)")
     sub_all(assets, r"label:`Hermes Teal", "label:`TARS Teal", "etykiety motywów")
+    add_polish(assets, index[0], brand / "i18n" / "pl.json")
     themes = HERMES / "hermes_cli" / "web_server_dashboard.py"
     if themes.is_file():
         sub_all([themes], r'"label": "Hermes Teal', '"label": "TARS Teal', "etykiety motywów (serwer)")
         # motywy użytkownika przekazują kolory terminala czatu (dashboard je obsługuje, serwer je gubił)
-        sub_all([themes], r'(\n(\s+)"layoutVariant": layout_variant,\n)',
-                r'\1\2"terminalBackground": data.get("terminalBackground") if _nonempty_str(data.get("terminalBackground")) else None,\n'
-                r'\2"terminalForeground": data.get("terminalForeground") if _nonempty_str(data.get("terminalForeground")) else None,\n',
-                "kolory terminala w motywach")
+        if '"terminalBackground": data.get' not in themes.read_text(encoding="utf-8"):
+            sub_all([themes], r'(\n(\s+)"layoutVariant": layout_variant,\n)',
+                    r'\1\2"terminalBackground": data.get("terminalBackground") if _nonempty_str(data.get("terminalBackground")) else None,\n'
+                    r'\2"terminalForeground": data.get("terminalForeground") if _nonempty_str(data.get("terminalForeground")) else None,\n',
+                    "kolory terminala w motywach")
     login = HERMES / "hermes_cli" / "dashboard_auth" / "login_page.py"
     if login.is_file():
         sub_all([login], r"the Hermes Agent dashboard", "TARS HQ", "strona logowania (opis)")

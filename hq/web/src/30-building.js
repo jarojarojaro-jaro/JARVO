@@ -13,15 +13,15 @@ function Bubble({ agent }) {
   const st = agent.status;
   let tone = "", verb = "", detail = "";
   if (st === "working" && agent.tool) {
-    verb = agent.tool.verb; detail = agent.tool.detail || "";
+    verb = L(agent.tool.verb, agent.tool.verb_en || agent.tool.verb); detail = agent.tool.detail || "";
   } else if (st === "working") {
-    verb = agent.quiet ? "cisza…" : "myśli…";
+    verb = agent.quiet ? L("cisza…", "quiet…") : L("myśli…", "thinking…");
   } else if (st === "judging") {
-    verb = "ocenia"; detail = agent.headline;
+    verb = L("ocenia", "reviewing"); detail = agent.headline;
   } else if (st === "blocked") {
-    tone = "bad"; verb = "pytanie"; detail = agent.reason || "potrzebna decyzja";
+    tone = "bad"; verb = L("pytanie", "question"); detail = agent.reason || L("potrzebna decyzja", "decision needed");
   } else if (st === "review") {
-    tone = "warn"; verb = "czeka na ocenę";
+    tone = "warn"; verb = L("czeka na ocenę", "awaiting review");
   } else {
     return null;
   }
@@ -46,8 +46,8 @@ function RoomSign({ agent }) {
     <span class="thq-sign-name" title=${agent.label || agent.title}>${agent.short || agent.label || agent.title}</span>
     <span class=${cx("thq-pill", `is-${s.tone}`)} title=${s.label}><span class="thq-pill-text">${s.label}</span></span>
     ${(c.ready > 0 || c.done_today > 0) && html`<span class="thq-sign-meta">
-      ${c.ready > 0 && html`<span title="Karty w kolejce">▭ ${c.ready}</span>`}
-      ${c.done_today > 0 && html`<span title="Zrobione dziś">✔ ${c.done_today}</span>`}
+      ${c.ready > 0 && html`<span title=${L("Karty w kolejce", "Cards in queue")}>▭ ${c.ready}</span>`}
+      ${c.done_today > 0 && html`<span title=${L("Zrobione dziś", "Done today")}>✔ ${c.done_today}</span>`}
     </span>`}
   </div>`;
 }
@@ -59,7 +59,7 @@ function Room({ agent, box, lay, selected, onSelect }) {
   return html`<div role="button" tabIndex="0" style=${style}
       class=${cx("thq-room", wide && "is-wide", selected && "is-selected", `is-${agent.status}`)}
       onClick=${() => onSelect(agent.name)} onKeyDown=${onKey} aria-pressed=${selected}
-      aria-label=${`${agent.label || agent.title}, ${(STATUS[agent.status] || STATUS.idle).label}. Otwórz szczegóły.`}>
+      aria-label=${`${agent.label || agent.title}, ${(STATUS[agent.status] || STATUS.idle).label}. ${L("Otwórz szczegóły.", "Open details.")}`}>
     <${RoomSign} agent=${agent}/>
     <${Bubble} agent=${agent}/>
   </div>`;

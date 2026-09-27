@@ -16,7 +16,7 @@
   });
   const panel = document.createElement("section");
   panel.className = "thq-upd-panel";
-  panel.setAttribute("aria-label", "Aktualizacja TARS");
+  panel.setAttribute("aria-label", L("Aktualizacja TARS", "TARS update"));
   panel.hidden = true;
   document.body.appendChild(panel);
 
@@ -44,7 +44,7 @@
       await rawFetch(`${API_ROOT}/update`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }),
       });
-      if (action === "update") st = { ...st, pending: true, log: "Czekam na pomocnika aktualizacji…" };
+      if (action === "update") st = { ...st, pending: true, log: L("Czekam na pomocnika aktualizacji…", "Waiting for the update helper…") };
     } catch (e) { err = e.message; }
     busy = false; render();
     setTimeout(load, 2500);
@@ -54,10 +54,10 @@
 
   function label() {
     if (!st) return null;
-    if (st.state === "updating" || (st.pending && st.state !== "done")) return ["⟳ Aktualizuję…", "is-busy"];
-    if (justUpdated()) return ["✓ Odśwież stronę", "is-done"];
-    if (st.state === "failed") return ["✗ Aktualizacja nieudana", "is-bad"];
-    if (st.online && st.behind > 0) return [`⬆ Aktualizacja (${st.behind})`, ""];
+    if (st.state === "updating" || (st.pending && st.state !== "done")) return [L("⟳ Aktualizuję…", "⟳ Updating…"), "is-busy"];
+    if (justUpdated()) return [L("✓ Odśwież stronę", "✓ Reload page"), "is-done"];
+    if (st.state === "failed") return [L("✗ Aktualizacja nieudana", "✗ Update failed"), "is-bad"];
+    if (st.online && st.behind > 0) return [`⬆ ${L("Aktualizacja", "Update")} (${st.behind})`, ""];
     return null;
   }
 
@@ -70,23 +70,23 @@
     if (panel.hidden) return;
     panel.replaceChildren();
     const head = el("header", "thq-upd-head");
-    head.append(el("h2", null, "Aktualizacja TARS"), btn("×", "thq-upd-x", () => { open = false; render(); }));
+    head.append(el("h2", null, L("Aktualizacja TARS", "TARS update")), btn("×", "thq-upd-x", () => { open = false; render(); }));
     panel.append(head);
     if (justUpdated()) {
       // nowa wersja panelu jest już na serwerze: wczytujemy ją sami
       if (!window.__tarsReloading) { window.__tarsReloading = true; setTimeout(() => location.reload(), 3000); }
-      panel.append(el("p", null, `Zaktualizowano do ${st.current}. Za chwilę strona odświeży się sama.`));
+      panel.append(el("p", null, L(`Zaktualizowano do ${st.current}. Za chwilę strona odświeży się sama.`, `Updated to ${st.current}. The page will reload itself in a moment.`)));
       const done = el("div", "thq-upd-actions");
-      done.append(btn("Odśwież stronę", "thq-upd-go", () => location.reload()));
+      done.append(btn(L("Odśwież stronę", "Reload page"), "thq-upd-go", () => location.reload()));
       panel.append(done);
       return;
     }
     if (st.state === "updating" || st.pending) {
-      panel.append(el("p", null, "Pobieram i wdrażam nową wersję. Panel na chwilę się rozłączy; przebudowa obrazu trwa do kilku minut."));
+      panel.append(el("p", null, L("Pobieram i wdrażam nową wersję. Panel na chwilę się rozłączy; przebudowa obrazu trwa do kilku minut.", "Downloading and deploying the new version. The panel will disconnect briefly; an image rebuild takes up to a few minutes.")));
     } else if (st.state === "failed") {
-      panel.append(el("p", null, "Aktualizacja się nie udała. Ostatnie linie logu poniżej; wersja sprzed aktualizacji dalej działa."));
+      panel.append(el("p", null, L("Aktualizacja się nie udała. Ostatnie linie logu poniżej; wersja sprzed aktualizacji dalej działa.", "The update failed. Last log lines below; the previous version keeps running.")));
     } else {
-      panel.append(el("p", null, `Gałąź ${st.branch}: ${st.current} → ${st.latest}. Nowe zmiany:`));
+      panel.append(el("p", null, L(`Gałąź ${st.branch}: ${st.current} → ${st.latest}. Nowe zmiany:`, `Branch ${st.branch}: ${st.current} → ${st.latest}. New changes:`)));
       const ul = el("ul", "thq-upd-list");
       for (const c of st.commits || []) {
         const li = el("li");
@@ -99,8 +99,8 @@
     if (err) panel.append(el("p", "thq-upd-err", err));
     const actions = el("div", "thq-upd-actions");
     if (st.state !== "updating" && !st.pending) {
-      actions.append(btn(st.state === "failed" ? "Spróbuj ponownie" : "Aktualizuj teraz", "thq-upd-go", () => send("update"), busy));
-      actions.append(btn("Sprawdź ponownie", "thq-upd-ghost", () => send("check"), busy));
+      actions.append(btn(st.state === "failed" ? L("Spróbuj ponownie", "Try again") : L("Aktualizuj teraz", "Update now"), "thq-upd-go", () => send("update"), busy));
+      actions.append(btn(L("Sprawdź ponownie", "Check again"), "thq-upd-ghost", () => send("check"), busy));
     }
     panel.append(actions);
     const log = panel.querySelector(".thq-upd-log");

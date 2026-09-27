@@ -81,7 +81,7 @@ def icons_css(text: str) -> str:
     out = []
     for href, rows in icons.items():
         url = "url(\"data:image/svg+xml," + icon_svg(rows).replace("<", "%3C").replace(">", "%3E") + "\")"
-        sel = "aside nav a" if href == "default" else f'aside nav a[href$="{href}"]'
+        sel = "aside.fixed nav a" if href == "default" else f'aside.fixed nav a[href$="{href}"]'
         out.append(f"{sel} {{ --fos-ic: {url}; }}")
     return "\n".join(out) + "\n"
 

@@ -25,26 +25,26 @@ aside.fixed > div:first-child span.font-bold::after {
 }
 /* menu: wszystkie pozycje (też pluginy) dzielą wysokość po równo, bez przewijania i ucinania.
    Ikonki pikselowe (branding/fosfor/icons.txt) dokleja scripts/install_themes.py jako --fos-ic. */
-aside nav { display: flex; flex-direction: column; padding: 6px 0 !important; }
-aside nav ul, aside nav > div { display: contents; }
-aside nav li { flex: 1 1 0; min-height: 19px; max-height: 44px; display: flex; }
-aside nav > div > span {
+aside.fixed nav { display: flex; flex-direction: column; padding: 6px 0 !important; }
+aside.fixed nav ul, aside.fixed nav > div { display: contents; }
+aside.fixed nav li { flex: 1 1 0; min-height: 19px; max-height: 44px; display: flex; }
+aside.fixed nav > div > span {
   flex: none; margin-top: 4px; padding: 4px 20px 2px !important; font-size: 10px !important;
   border-top: 1px solid var(--fos-lo);
 }
-aside nav a {
+aside.fixed nav a {
   flex: 1; color: var(--fos) !important; font-family: var(--theme-font-display) !important; font-size: 21px !important; line-height: 1 !important;
   letter-spacing: .03em !important; padding: 0 8px 0 10px !important; margin: 0 6px; gap: 11px !important;
 }
-aside nav a svg { display: none; }
-aside nav a::before {
+aside.fixed nav a svg { display: none; }
+aside.fixed nav a::before {
   content: ""; flex: none; width: 20px; height: 20px; background: currentColor;
   -webkit-mask: var(--fos-ic) center / 20px 20px no-repeat; mask: var(--fos-ic) center / 20px 20px no-repeat;
   filter: drop-shadow(0 0 3px var(--fos-glow));
 }
-aside nav a[aria-current="page"] { background: var(--fos); color: var(--fos-bg) !important; text-shadow: none; }
-aside nav a[aria-current="page"]::before { filter: none; }
-aside nav a[aria-current="page"] > span.absolute { display: none; }
+aside.fixed nav a[aria-current="page"] { background: var(--fos); color: var(--fos-bg) !important; text-shadow: none; }
+aside.fixed nav a[aria-current="page"]::before { filter: none; }
+aside.fixed nav a[aria-current="page"] > span.absolute { display: none; }
 
 /* górny pasek */
 header h1 { font-family: var(--theme-font-display) !important; font-weight: 400 !important; font-size: 30px !important; letter-spacing: .12em !important; }

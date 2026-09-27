@@ -22,6 +22,8 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Panel agenta: Karty | kanban | karty agenta według stanu (7 dni), klik otwiera kartę z historią i komentarzami |
 | Okno karty | kanban + katalog roboczy karty | na wierzchu **cel** (inny kolor), kontekst, **wynik** (pliki z `WYJŚCIA` oznaczone ★) i raport wykonawcy; pełne zlecenie (wejścia, DoD, granice), komentarze i historia zwinięte |
 | Panel agenta: Wyniki | katalogi robocze | pliki z `out/`: miniatury grafik, podgląd tekstu, PDF, wideo |
+| Czat: zdjęcia i pliki | czat HQ + `/opt/data/tars/inbox/` | 📎, wklejanie Ctrl+V (zrzut ekranu) i przeciąganie. Plik trafia do `inbox/<data>/`, agent dostaje jego ścieżkę (linia `📎 …`), zdjęcie także jako obraz (model bez widzenia dostaje opis od Hermesa) |
+| Czat: pliki od agenta | odpowiedź agenta | linia `MEDIA:<ścieżka>` i obrazy `data:image` jako miniatury, ścieżki `/opt/data/tars/…` i adresy http(s) klikalne; obraz ma „Kopiuj obraz” (np. do Telegrama) |
 | Akcje pliku wynikowego | plugin + pomocnik hosta | **▶ Odpal** (strona HTML w nowej karcie, `:9120`), **Pokaż w folderze** (Eksplorator Windows w lokalnej instalacji WSL; gdzie indziej: **Kopiuj ścieżkę**), **Pobierz**, podgląd/kod |
 | Panel agenta: Czat | API gatewaya | rozmowa bezpośrednia z agentem (sesja HQ, osobna od Telegrama) |
 | Panel agenta: O agencie | fleet.yaml, SOUL, skille | opis, model, autonomia, parametry osobowości, workflowy |
@@ -137,7 +139,19 @@ Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zost
   dopisz linię w `branding/fosfor/palettes.yaml` i wdroż. Wybór zrobiony w dashboardzie przetrwa wdrożenia.
 - Kolory terminala czatu idą z motywu (łatka w `branding/patch_dashboard.py`), skórka TUI jest w błękicie.
 
-## 6. Rozwiązywanie problemów
+## 6. Język: polski i angielski
+
+Dashboard ma pełny polski (tłumaczenie `branding/i18n/pl.json`, ~750 tekstów i całe menu) i jest domyślnie po
+polsku. Język zmienia przełącznik w lewym dolnym rogu (**POLSKI** / **EN** / …). TARS HQ idzie za nim: po polsku
+albo po angielsku (każdy inny język = angielskie HQ); nazwy pokoi, role i opisy agentów po angielsku są w
+`fleet.yaml` (`en:`). Tłumaczenie wstrzykuje `branding/patch_dashboard.py` przy budowie obrazu (brakujący klucz =
+tekst angielski), więc zmiana `branding/` przebudowuje tylko ostatnią warstwę obrazu (sekundy, ta sama wersja
+Hermesa). Kilka stron Hermesa ma część etykiet wpisanych na sztywno po angielsku (np. liczniki na stronie Sesje):
+tych Hermes nie tłumaczy w żadnym języku.
+
+Agenci rozmawiają po polsku niezależnie od języka panelu (SOUL).
+
+## 7. Rozwiązywanie problemów
 
 | Objaw | Przyczyna i naprawa |
 |---|---|
@@ -146,6 +160,7 @@ Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zost
 | czat: „Gateway odrzucił klucz” | klucz w `.env` profilu zmieniony bez restartu gatewaya: `hermes gateway restart` |
 | czat: „No LLM provider configured” | profil nie ma `OPENROUTER_API_KEY` w `/srv/tars/secrets/<agent>.env` |
 | pokój „Pracuje”, ale dymek „cisza…” | pracownik nie wysłał sygnału od 3 min; szczegóły w panelu, patrol zgłosi problem sam |
+| agent podaje `localhost:8000` albo inny port z kontenera | taki adres nie działa w Twojej przeglądarce. Agenci mają to w zasadach; link do wyniku daje `python3 /opt/tars/repo/scripts/tars_link.py <plik>` (serwer podglądu :9120, 7 dni) |
 | „▶ Odpal” otwiera pustą kartę / „nie można połączyć” | port 9120 nieopublikowany: kontener sprzed tej wersji, `bash scripts/local-up.sh` (lokalnie) albo `deploy.sh` go odtworzy |
 | brak „Pokaż w folderze”, jest „Kopiuj ścieżkę” | pomocnik hosta nie działa albo to nie WSL: `bash scripts/local-up.sh` (uruchamia `scripts/updater.py`) |
 | `/api/plugins/tars-hq/health` | pokazuje, czy każdy profil ma klucz i czy gateway odpowiada na `/p/<agent>` |

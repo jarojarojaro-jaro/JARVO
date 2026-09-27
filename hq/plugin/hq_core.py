@@ -181,12 +181,30 @@ TOOL_LABELS = {
 }
 
 
+# te same czasowniki po angielsku (HQ po angielsku, gdy dashboard ma inny język niż polski)
+TOOL_VERBS_EN = {
+    "web_search": "searching", "web_extract": "reading page", "web_crawl": "browsing site", "terminal": "terminal",
+    "execute_code": "running Python", "read_file": "reading", "write_file": "writing", "patch": "editing",
+    "search_files": "searching files", "browser_navigate": "opening", "browser_snapshot": "viewing page",
+    "browser_click": "clicking", "browser_type": "typing", "browser_vision": "looking at page",
+    "vision_analyze": "looking at image", "image_generate": "generating image", "video_generate": "generating video",
+    "text_to_speech": "recording voice", "skill_view": "reading skill", "skills_list": "browsing skills",
+    "memory": "saving to memory", "session_search": "searching history", "todo": "planning steps", "clarify": "asking",
+    "delegate_task": "delegating subtask", "kanban_create": "creating card", "kanban_comment": "commenting on card",
+    "kanban_complete": "closing card", "kanban_block": "blocking card", "kanban_request_review": "sending for review",
+    "kanban_request_changes": "requesting changes", "kanban_list": "checking the board", "kanban_show": "reading card",
+    "cronjob": "setting a routine",
+}
+
+
 def tool_label(name: str | None, args: Any = None) -> dict:
     """Czytelny opis wywołania narzędzia: ikona, czasownik i krótki szczegół z argumentów."""
     name = name or "?"
     icon, verb = TOOL_LABELS.get(name, ("tool", name.replace("_", " ")))
+    verb_en = TOOL_VERBS_EN.get(name, name.replace("_", " "))
     if name.startswith("kanban_") and name not in TOOL_LABELS:
         icon, verb = "card", "kanban: " + name[7:].replace("_", " ")
+        verb_en = verb
     if name.startswith("browser_") and name not in TOOL_LABELS:
         icon = "browser"
     args = _payload(args) if not isinstance(args, dict) else args
@@ -198,7 +216,7 @@ def tool_label(name: str | None, args: Any = None) -> dict:
             break
     if len(detail) > 140:
         detail = detail[:137] + "…"
-    return {"tool": name, "icon": icon, "verb": verb, "detail": detail}
+    return {"tool": name, "icon": icon, "verb": verb, "verb_en": verb_en, "detail": detail}
 
 
 def activity_from_messages(messages: Iterable[dict], limit: int = ACTIVITY_LIMIT) -> list[dict]:
@@ -313,6 +331,14 @@ EVENT_TEXT = {
     "timed_out": "przekroczony czas", "gave_up": "porzucona po błędach", "stale": "brak sygnału od pracownika",
     "reclaimed": "przejęta ponownie", "edited": "edycja karty", "scheduled": "zaplanowana",
 }
+EVENT_TEXT_EN = {
+    "created": "new card", "promoted": "ready to work", "promoted_manual": "ready to work",
+    "claimed": "takes the card", "spawned": "starts working", "completed": "finished the card",
+    "blocked": "blocked", "unblocked": "unblocked", "review_requested": "sends for review",
+    "changes_requested": "sent back for changes", "commented": "comment", "archived": "archived",
+    "timed_out": "timed out", "gave_up": "gave up after errors", "stale": "no signal from worker",
+    "reclaimed": "taken again", "edited": "card edited", "scheduled": "scheduled",
+}
 FEED_KINDS = {"created", "promoted", "spawned", "completed", "blocked", "unblocked", "review_requested",
               "changes_requested", "timed_out", "gave_up", "stale"}
 TONE = {"completed": "good", "blocked": "bad", "gave_up": "bad", "timed_out": "bad", "stale": "warn",
@@ -400,7 +426,7 @@ def build_state(fleet: list[dict], board: dict, index_md: str, now: float,
             ev = _last_event(events, st["task_id"], "blocked")
             st["reason"] = (ev or {}).get("payload", {}).get("reason")
         agents.append({
-            **{k: a.get(k) for k in ("name", "title", "emoji", "kind", "room", "label", "short", "model_tier", "autonomy_max")},
+            **{k: a.get(k) for k in ("name", "title", "emoji", "kind", "room", "label", "short", "model_tier", "autonomy_max", "en")},
             **st,
             "counts": {"running": len(cards["running"]), "ready": len(cards["ready"]), "review": len(cards["review"]),
                        "blocked": len(cards["blocked"]), "judging": len(cards["judging"]),
@@ -424,7 +450,7 @@ def build_state(fleet: list[dict], board: dict, index_md: str, now: float,
             err = str(gp.get("error") or "").strip().splitlines()
             decisions.append({"task_id": t["id"], "title": t.get("title"), "assignee": t.get("assignee"),
                               "kind": "failed", "failures": gp.get("failures"),
-                              "reason": (err[-1] if err else "pracownik kończył się błędem")[:300],
+                              "reason": (err[-1] if err else "")[:300],
                               "since": gave.get("created_at") or t.get("created_at")})
             continue
         if t.get("block_kind") in (None, "", "needs_input"):
@@ -452,7 +478,7 @@ def build_state(fleet: list[dict], board: dict, index_md: str, now: float,
         who = t.get("worker") if e["kind"] == "spawned" and t.get("worker") else t.get("assignee")
         feed.append({"ts": e["created_at"], "kind": e["kind"], "tone": TONE.get(e["kind"], "neutral"),
                      "agent": who, "task_id": e["task_id"], "title": t.get("title") or e["task_id"],
-                     "text": EVENT_TEXT.get(e["kind"], e["kind"])})
+                     "text": EVENT_TEXT.get(e["kind"], e["kind"]), "text_en": EVENT_TEXT_EN.get(e["kind"], e["kind"])})
         if len(feed) >= FEED_LIMIT:
             break
 

@@ -31,11 +31,12 @@ function usePageHeader() {
 function HeadStats({ state, error }) {
   const b = (state && state.board) || {};
   const stale = !state || !usePoll.lastOk || (Date.now() / 1000 - usePoll.lastOk > 20);
-  const chips = [["W toku", b.running || 0, "work", "▶"], ["Ocena", b.review || 0, "warn", "⚖"], ["Blokady", b.blocked || 0, "bad", "■"],
-    ["Kolejka", b.ready || 0, "info", "▭"], ["Zrobione dziś", b.done_today || 0, "good", "✔"]];
+  const chips = [[L("W toku", "In progress"), b.running || 0, "work", "▶"], [L("Ocena", "Review"), b.review || 0, "warn", "⚖"],
+    [L("Blokady", "Blocked"), b.blocked || 0, "bad", "■"], [L("Kolejka", "Queue"), b.ready || 0, "info", "▭"],
+    [L("Zrobione dziś", "Done today"), b.done_today || 0, "good", "✔"]];
   return html`<div class="thq-headbar">
-    <span class=${cx("thq-live", stale && "is-stale")} title=${error || ""}>${stale ? (error ? "brak połączenia" : "łączę…") : `na żywo · ${clock(state.ts)}`}</span>
-    <ul class="thq-stats" aria-label="Stan tablicy">
+    <span class=${cx("thq-live", stale && "is-stale")} title=${error || ""}>${stale ? (error ? L("brak połączenia", "disconnected") : L("łączę…", "connecting…")) : `${L("na żywo", "live")} · ${clock(state.ts)}`}</span>
+    <ul class="thq-stats" aria-label=${L("Stan tablicy", "Board status")}>
       ${chips.map(([label, n, tone, icon]) => html`<li key=${label} class=${cx("thq-stat", n > 0 && `is-${tone}`)} title=${`${label}: ${n}`}>
         <i aria-hidden="true">${icon}</i><strong>${n}</strong><span>${label}</span></li>`)}
     </ul>
@@ -45,7 +46,7 @@ function HeadStats({ state, error }) {
 function HeadDecisions({ count, onClick }) {
   return html`<div class="thq-headbar thq-headbar-end">
     <button type="button" class=${cx("thq-decisions-btn", count > 0 && "has-items")} onClick=${onClick}>
-      Decyzje <span class="thq-badge">${count}</span>
+      ${L("Decyzje", "Decisions")} <span class="thq-badge">${count}</span>
     </button>
   </div>`;
 }
@@ -56,23 +57,23 @@ function Hud({ state, error, onDecisions, now }) {
   // świeżość liczona zegarem przeglądarki (odporne na różnicę zegarów serwera i klienta)
   const stale = !state || !usePoll.lastOk || (Date.now() / 1000 - usePoll.lastOk > 20);
   const chips = [
-    ["W toku", b.running || 0, "work"],
-    ["Ocena", b.review || 0, "warn"],
-    ["Blokady", b.blocked || 0, "bad"],
-    ["Kolejka", b.ready || 0, "info"],
-    ["Zrobione dziś", b.done_today || 0, "good"],
+    [L("W toku", "In progress"), b.running || 0, "work"],
+    [L("Ocena", "Review"), b.review || 0, "warn"],
+    [L("Blokady", "Blocked"), b.blocked || 0, "bad"],
+    [L("Kolejka", "Queue"), b.ready || 0, "info"],
+    [L("Zrobione dziś", "Done today"), b.done_today || 0, "good"],
   ];
   return html`<header class="thq-hud">
     <div class="thq-brand">
       <span class="thq-brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-      <div><h1>TARS HQ</h1><p class="thq-muted">${stale ? (error ? `Brak połączenia: ${error}` : "Łączę z flotą…") : `Na żywo · ${clock(state.ts)}`}</p></div>
+      <div><h1>TARS HQ</h1><p class="thq-muted">${stale ? (error ? `${L("Brak połączenia", "Disconnected")}: ${error}` : L("Łączę z flotą…", "Connecting to the fleet…")) : `${L("Na żywo", "Live")} · ${clock(state.ts)}`}</p></div>
     </div>
-    <ul class="thq-stats" aria-label="Stan tablicy">
+    <ul class="thq-stats" aria-label=${L("Stan tablicy", "Board status")}>
       ${chips.map(([label, n, tone]) => html`<li key=${label} class=${cx("thq-stat", n > 0 && `is-${tone}`)}>
         <strong>${n}</strong><span>${label}</span></li>`)}
     </ul>
     <button type="button" class=${cx("thq-decisions-btn", d.length > 0 && "has-items")} onClick=${onDecisions}>
-      Decyzje <span class="thq-badge">${d.length}</span>
+      ${L("Decyzje", "Decisions")} <span class="thq-badge">${d.length}</span>
     </button>
   </header>`;
 }
@@ -82,16 +83,16 @@ function FailedCard({ item, agents, onAnswer }) {
   const a = agents.find((x) => x.name === item.assignee);
   const retry = async () => {
     setState("…");
-    try { await api.retry(item.task_id); setState("ok"); } catch (e) { setState(`Błąd: ${e.message}`); }
+    try { await api.retry(item.task_id); setState("ok"); } catch (e) { setState(`${L("Błąd", "Error")}: ${e.message}`); }
   };
   return html`<li class="thq-decision is-failed">
-    <p class="thq-decision-q">Karta porzucona po błędach${item.failures ? ` (${item.failures}×)` : ""}.</p>
+    <p class="thq-decision-q">${L("Karta porzucona po błędach", "Card abandoned after errors")}${item.failures ? ` (${item.failures}×)` : ""}.</p>
     <p class="thq-muted">${a ? `${a.emoji} ${a.short || a.name}` : item.assignee} · ${item.title} · ${ago(item.since)}</p>
-    <p class="thq-decision-err">${item.reason}</p>
-    ${state === "ok" ? html`<p class="thq-ok">Karta wraca do kolejki: pracownik spróbuje ponownie.</p>`
+    <p class="thq-decision-err">${item.reason || L("pracownik kończył się błędem", "the worker kept failing")}</p>
+    ${state === "ok" ? html`<p class="thq-ok">${L("Karta wraca do kolejki: pracownik spróbuje ponownie.", "The card is back in the queue: a worker will try again.")}</p>`
       : html`<div class="thq-decision-form">
-        <button type="button" class="thq-send" onClick=${retry} disabled=${state === "…"}>Ponów kartę</button>
-        <button type="button" class="thq-ghost" onClick=${() => onAnswer(item, "karta padła po błędach, sprawdź przyczynę i zdecyduj, co dalej")}>Przekaż TARS-owi</button>
+        <button type="button" class="thq-send" onClick=${retry} disabled=${state === "…"}>${L("Ponów kartę", "Retry card")}</button>
+        <button type="button" class="thq-ghost" onClick=${() => onAnswer(item, "karta padła po błędach, sprawdź przyczynę i zdecyduj, co dalej")}>${L("Przekaż TARS-owi", "Hand to TARS")}</button>
       </div>`}
     ${state && state !== "ok" && state !== "…" ? html`<p class="thq-error">${state}</p>` : null}
   </li>`;
@@ -109,12 +110,12 @@ function Decision({ item, agents, onAnswer }) {
     setSent(true);
   };
   return html`<li class="thq-decision">
-    <p class="thq-decision-q">${item.reason || "Agent czeka na Twoją decyzję."}</p>
+    <p class="thq-decision-q">${item.reason || L("Agent czeka na Twoją decyzję.", "The agent is waiting for your decision.")}</p>
     <p class="thq-muted">${a ? `${a.emoji} ${a.short || a.name}` : item.assignee} · ${item.title} · ${ago(item.since)}</p>
-    ${sent ? html`<p class="thq-ok">Przekazane TARS-owi. On odblokuje kartę i da znać agentowi.</p>`
+    ${sent ? html`<p class="thq-ok">${L("Przekazane TARS-owi. On odblokuje kartę i da znać agentowi.", "Passed to TARS. He will unblock the card and tell the agent.")}</p>`
       : html`<form class="thq-decision-form" onSubmit=${submit}>
-        <label class="thq-sr" for=${`thq-dec-${item.task_id}`}>Odpowiedź</label>
-        <input id=${`thq-dec-${item.task_id}`} value=${text} onInput=${(e) => setText(e.target.value)} placeholder="Twoja odpowiedź"/>
+        <label class="thq-sr" for=${`thq-dec-${item.task_id}`}>${L("Odpowiedź", "Answer")}</label>
+        <input id=${`thq-dec-${item.task_id}`} value=${text} onInput=${(e) => setText(e.target.value)} placeholder=${L("Twoja odpowiedź", "Your answer")}/>
         <button type="submit" class="thq-send" disabled=${!text.trim()}>Odpowiedz</button>
       </form>`}
   </li>`;
@@ -122,12 +123,12 @@ function Decision({ item, agents, onAnswer }) {
 
 function MissionOutputs({ files, onOpenFile }) {
   if (!files || !files.length) return null;
-  return html`<ul class="thq-mout" aria-label="Wyniki misji">
+  return html`<ul class="thq-mout" aria-label=${L("Wyniki misji", "Mission results")}>
     ${files.map((f) => html`<li key=${f.path}>
       <button type="button" class="thq-link" onClick=${() => onOpenFile && onOpenFile(f)} title=${f.rel}>
         ${f.in_out ? "★ " : ""}${f.rel}</button>
-      ${f.kind === "html" && html`<button type="button" class="thq-act-btn is-run" title="Otwórz stronę w nowej karcie"
-        onClick=${() => openSite(f.path).catch((e) => alert(e.message))}>▶ Odpal</button>`}</li>`)}
+      ${f.kind === "html" && html`<button type="button" class="thq-act-btn is-run" title=${L("Otwórz stronę w nowej karcie", "Open the page in a new tab")}
+        onClick=${() => openSite(f.path).catch((e) => alert(e.message))}>▶ ${L("Odpal", "Run")}</button>`}</li>`)}
   </ul>`;
 }
 
@@ -136,14 +137,14 @@ function MissionRow({ m, agents, onOpenTask, onOpenFile }) {
   return html`<li class="thq-mission">
     <div class="thq-mission-head"><strong>${m.title}</strong><span class="thq-muted">${m.id}</span></div>
     <div class="thq-progress" role="progressbar" aria-valuenow=${pct} aria-valuemin="0" aria-valuemax="100"
-      aria-label=${`Postęp: ${m.done} z ${m.total} kart`}><span style=${{ width: `${pct}%` }}></span></div>
+      aria-label=${L(`Postęp: ${m.done} z ${m.total} kart`, `Progress: ${m.done} of ${m.total} cards`)}><span style=${{ width: `${pct}%` }}></span></div>
     <div class="thq-mission-cards">
       ${m.cards.map((c) => {
         const a = agents.find((x) => x.name === c.assignee);
         return html`<button key=${c.id} type="button" class=${cx("thq-mcard", `is-card-${c.status}`)} onClick=${() => onOpenTask(c.id)}
           title=${`${c.title} · ${CARD_STATUS[c.status] || c.status}`}>${a ? a.emoji : "▭"}</button>`;
       })}
-      <span class="thq-muted">${m.done}/${m.total} kart${m.total && m.done === m.total ? " · gotowe" : ""}</span>
+      <span class="thq-muted">${m.done}/${m.total} ${L("kart", "cards")}${m.total && m.done === m.total ? L(" · gotowe", " · done") : ""}</span>
     </div>
     <${MissionOutputs} files=${m.outputs} onOpenFile=${onOpenFile}/>
   </li>`;
@@ -155,26 +156,26 @@ function Center({ state, agents, onAnswer, onOpenTask, onOpenFile, focus }) {
   const feed = (state && state.feed) || [];
   const decRef = useRef(null);
   useEffect(() => { if (focus === "decisions" && decRef.current) decRef.current.scrollIntoView({ behavior: "smooth", block: "start" }); }, [focus]);
-  return html`<aside class="thq-panel thq-center" aria-label="Centrala">
+  return html`<aside class="thq-panel thq-center" aria-label=${L("Centrala", "Control room")}>
     <section ref=${decRef}>
-      <h2 class="thq-h2">Decyzje <span class="thq-count">${d.length}</span></h2>
-      ${d.length === 0 ? html`<p class="thq-muted">Nic nie czeka na Ciebie. Agenci pytają tylko o to, czego nie da się rozstrzygnąć bez Ciebie.</p>`
+      <h2 class="thq-h2">${L("Decyzje", "Decisions")} <span class="thq-count">${d.length}</span></h2>
+      ${d.length === 0 ? html`<p class="thq-muted">${L("Nic nie czeka na Ciebie. Agenci pytają tylko o to, czego nie da się rozstrzygnąć bez Ciebie.", "Nothing is waiting for you. Agents only ask about what cannot be settled without you.")}</p>`
         : html`<ul class="thq-list">${d.map((it) => html`<${Decision} key=${it.task_id} item=${it} agents=${agents} onAnswer=${onAnswer}/>`)}</ul>`}
     </section>
     <section>
-      <h2 class="thq-h2">Misje <span class="thq-count">${missions.length}</span></h2>
-      ${missions.length === 0 ? html`<p class="thq-muted">Brak aktywnych misji. Napisz do TARS-a, czego potrzebujesz.</p>`
+      <h2 class="thq-h2">${L("Misje", "Missions")} <span class="thq-count">${missions.length}</span></h2>
+      ${missions.length === 0 ? html`<p class="thq-muted">${L("Brak aktywnych misji. Napisz do TARS-a, czego potrzebujesz.", "No active missions. Tell TARS what you need.")}</p>`
         : html`<ul class="thq-list">${missions.map((m) => html`<${MissionRow} key=${m.id} m=${m} agents=${agents} onOpenTask=${onOpenTask} onOpenFile=${onOpenFile}/>`)}</ul>`}
     </section>
     <section>
-      <h2 class="thq-h2">Na bieżąco</h2>
-      ${feed.length === 0 ? html`<p class="thq-muted">Tablica jest spokojna.</p>`
+      <h2 class="thq-h2">${L("Na bieżąco", "Activity")}</h2>
+      ${feed.length === 0 ? html`<p class="thq-muted">${L("Tablica jest spokojna.", "The board is quiet.")}</p>`
         : html`<ol class="thq-feed">${feed.slice(0, 18).map((e, i) => {
           const a = agents.find((x) => x.name === e.agent);
           return html`<li key=${i} class=${cx(`is-${e.tone}`)}>
             <span class="thq-muted thq-feed-time">${clock(e.ts)}</span>
             <span>${a ? html`<span aria-hidden="true">${a.emoji}</span> ` : null}<button type="button" class="thq-link" onClick=${() => onOpenTask(e.task_id)}>${e.title}</button>
-              <span class="thq-muted"> ${e.text}</span></span>
+              <span class="thq-muted"> ${L(e.text, e.text_en || e.text)}</span></span>
           </li>`;
         })}</ol>`}
     </section>

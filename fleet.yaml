@@ -59,6 +59,11 @@ agents:
     hq_room: bridge    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
     hq_label: "Mostek dowodzenia"
     hq_short: "TARS"
+    en:
+      title: "Main Judge"
+      hq_label: "Command bridge"
+      description: >-
+        The fleet's Main Judge. Takes requests, opens missions, splits them into kanban cards for the specialists, reviews results against the Definition of Done and reports. Does no domain work itself.
     status: active
 
   - name: tars-sherlock
@@ -77,6 +82,11 @@ agents:
     hq_room: study    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
     hq_label: "Gabinet śledczy"
     hq_short: "Sherlock"
+    en:
+      title: "Research detective"
+      hq_label: "Investigation office"
+      description: >-
+        Multi-source research and fact-checking: splits a question into threads, checks primary sources, cross-confirms claims and delivers a report with citations and confidence levels. Market, competitor, product and keyword research, monitoring.
     status: active
 
   - name: tars-web
@@ -94,6 +104,11 @@ agents:
     hq_room: devlab    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
     hq_label: "Pracownia webowa"
     hq_short: "Web"
+    en:
+      title: "Web Senior Dev"
+      hq_label: "Web studio"
+      description: >-
+        Websites end to end: new sites and product landing pages, improving existing ones, technical SEO, favicons and meta, image optimisation, responsiveness, performance (Core Web Vitals), accessibility, deployment. Learns the brand from the existing site.
     status: active
 
   - name: tars-studio
@@ -111,6 +126,11 @@ agents:
     hq_room: atelier    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
     hq_label: "Atelier kreatywne"
     hq_short: "Studio"
+    en:
+      title: "Marketing & creative"
+      hq_label: "Creative atelier"
+      description: >-
+        Promo graphics, social media posts, videos from code and AI-generated, copy, campaigns and publishing calendars, all on brand. Prepares packages; never publishes without approval.
     status: active
 
   - name: tars-reka
@@ -128,6 +148,11 @@ agents:
     hq_room: workshop    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
     hq_label: "Warsztat"
     hq_short: "Ręka"
+    en:
+      title: "Right hand"
+      hq_label: "Workshop"
+      description: >-
+        Hands-on generalist: quick tasks, documents and conversions, prototypes, organisation, assembling the specialists' results into the final mission package. Knows every agent's skills (read-only), without their depth or memory.
     status: active
 
 shared:

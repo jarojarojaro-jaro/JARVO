@@ -22,29 +22,36 @@ const isPL = () => {
   return !chosen || String(HQ_LANG || chosen).toLowerCase().startsWith("pl");
 };
 const L = (pl, en) => (isPL() ? pl : en);
+const txt = L;   // dla funkcji rysujących wieżę (tam `L` to warstwy sceny)
 
-const STATUS = {
-  working: { label: "Pracuje", tone: "work" },
-  judging: { label: "Ocenia", tone: "work" },
-  blocked: { label: "Czeka na decyzję", tone: "bad" },
-  review: { label: "Czeka na ocenę", tone: "warn" },
-  queued: { label: "Ma kolejkę", tone: "info" },
-  idle: { label: "Wolny", tone: "idle" },
-  offline: { label: "Poza siecią", tone: "idle" },
-};
+// Agent w bieżącym języku: po angielsku nazwa pokoju, rola, opis i cechy z fleet.yaml (pole `en`).
+const localAgent = (a) => (!a || isPL() || !a.en ? a : { ...a, ...a.en });
 
-const CARD_STATUS = {
-  triage: "triage", todo: "w planie", ready: "gotowa", scheduled: "zaplanowana", running: "w toku",
-  review: "ocena", blocked: "blokada", done: "zrobione", archived: "archiwum",
-};
+// Słownik z tekstami w obu językach: obj.klucz zwraca tekst w bieżącym języku.
+const bilingual = (pairs) => Object.defineProperties({}, Object.fromEntries(
+  Object.entries(pairs).map(([k, [pl, en]]) => [k, { get: () => L(pl, en), enumerable: true }])));
+
+const STATUS_TEXT = bilingual({
+  working: ["Pracuje", "Working"], judging: ["Ocenia", "Reviewing"], blocked: ["Czeka na decyzję", "Needs a decision"],
+  review: ["Czeka na ocenę", "Awaiting review"], queued: ["Ma kolejkę", "Has a queue"], idle: ["Wolny", "Idle"],
+  offline: ["Poza siecią", "Offline"],
+});
+const STATUS_TONE = { working: "work", judging: "work", blocked: "bad", review: "warn", queued: "info", idle: "idle", offline: "idle" };
+const STATUS = Object.fromEntries(Object.keys(STATUS_TONE).map((k) => [k, { tone: STATUS_TONE[k], get label() { return STATUS_TEXT[k]; } }]));
+
+const CARD_STATUS = bilingual({
+  triage: ["do rozpisania", "triage"], todo: ["w planie", "planned"], ready: ["gotowa", "ready"], scheduled: ["zaplanowana", "scheduled"],
+  running: ["w toku", "in progress"], review: ["ocena", "review"], blocked: ["blokada", "blocked"], done: ["zrobione", "done"],
+  archived: ["archiwum", "archived"],
+});
 
 function ago(ts, now) {
   if (!ts) return "";
   const s = Math.max(0, Math.round((now || Date.now() / 1000) - ts));
-  if (s < 45) return "teraz";
-  if (s < 3600) return `${Math.round(s / 60)} min temu`;
-  if (s < 86400) return `${Math.round(s / 3600)} h temu`;
-  return `${Math.round(s / 86400)} d temu`;
+  if (s < 45) return L("teraz", "now");
+  if (s < 3600) return L(`${Math.round(s / 60)} min temu`, `${Math.round(s / 60)} min ago`);
+  if (s < 86400) return L(`${Math.round(s / 3600)} h temu`, `${Math.round(s / 3600)} h ago`);
+  return L(`${Math.round(s / 86400)} d temu`, `${Math.round(s / 86400)} d ago`);
 }
 
 function duration(ts, now) {
@@ -58,7 +65,7 @@ function duration(ts, now) {
 function clock(ts) {
   if (!ts) return "";
   const d = new Date(ts * 1000);
-  return d.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(L("pl-PL", "en-GB"), { hour: "2-digit", minute: "2-digit" });
 }
 
 function bytes(n) {
@@ -108,7 +115,7 @@ function PathLink({ path }) {
   const tail = path.slice(clean.length);
   if (!open) return html`<code>${path}</code>`;
   return html`<span><button type="button" class="thq-pathlink" onClick=${() => open(fileFromPath(clean))}
-    title="Otwórz podgląd">${clean.replace(/^\/opt\/data\/tars\//, "")}</button>${tail}</span>`;
+    title=${L("Otwórz podgląd", "Open preview")}>${clean.replace(/^\/opt\/data\/tars\//, "")}</button>${tail}</span>`;
 }
 
 // Minimalny, bezpieczny markdown dla odpowiedzi agentów: akapity, listy, **pogrubienie**, `kod`, linki,

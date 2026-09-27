@@ -51,6 +51,11 @@ def personality(soul: str) -> list[list]:
     return [[name.strip().capitalize(), int(val)] for name, val in re.findall(r"([^\W\d_]+)\s+(\d{1,3})%", first)]
 
 
+# nazwy parametrów osobowości z SOUL.md po angielsku (HQ w wersji angielskiej)
+TRAITS_EN = {"Szczerość": "Honesty", "Humor": "Humor", "Zwięzłość": "Brevity", "Ciekawość": "Curiosity",
+             "Ostrożność": "Caution", "Kreatywność": "Creativity", "Dokładność": "Precision", "Empatia": "Empathy"}
+
+
 def fleet_json(fleet: fl.Fleet | None = None) -> dict:
     fleet = fleet or fl.load_fleet()
     lock = fl.load_lock()
@@ -65,6 +70,9 @@ def fleet_json(fleet: fl.Fleet | None = None) -> dict:
             "skills": sorted(fl.skill_names(a.dir / "skills").keys()),
             "vendored": len((lock.get("agents") or {}).get(a.name) or []),
             "personality": personality(soul),
+            "en": {"title": a.en.get("title") or a.title, "label": a.en.get("hq_label") or a.hq_label or a.title,
+                   "description": a.en.get("description") or a.description,
+                   "personality": [[TRAITS_EN.get(k, k), v] for k, v in personality(soul)]},
         })
     return {"orchestrator": fleet.orchestrator, "agents": agents}
 
