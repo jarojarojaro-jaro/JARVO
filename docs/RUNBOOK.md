@@ -260,6 +260,16 @@ sudo bash /srv/tars/repo/scripts/bootstrap-vps.sh --lock-ssh
 Zasada: **na serwerze nic nie edytujemy ręcznie** (poza plikami env). Zmiana = commit w repo + `deploy.sh`.
 Wyjątek to skille tworzone przez agentów: zbiera je `harvest-skills.sh`.
 
+### Aktualizacje z panelu
+
+Gdy na GitHubie jest nowsza wersja, w menu bocznym dashboardu pojawia się **„⬆ Aktualizacja (n)”**:
+klik pokazuje listę zmian, **„Aktualizuj teraz”** robi `git pull` i wdrożenie (z przebudową obrazu, gdy
+trzeba), a na koniec pojawia się **„✓ Odśwież stronę”**. Robi to pomocnik na hoście
+(`scripts/updater.py`), bo kontener celowo nie ma dostępu do Dockera: panel może tylko poprosić o
+sprawdzenie albo aktualizację tej samej gałęzi. Na VPS działa jako usługa `tars-updater`
+(`sudo systemctl status tars-updater`, log: `journalctl -u tars-updater`); lokalnie uruchamia go
+`scripts/local-up.sh` (log: `~/tars-local/updater.log`). Gdy nie działa, pozycja w menu się nie pojawia.
+
 ## 10. Rozwiązywanie problemów
 
 | Objaw | Przyczyna i naprawa |

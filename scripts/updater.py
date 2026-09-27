@@ -117,7 +117,9 @@ def main(argv: list[str]) -> int:
                 state = update(args, state)
                 next_check = time.time() + CHECK_EVERY
             elif req == "check" or time.time() >= next_check:
-                state = {**check(state), "state": "idle" if state.get("state") != "failed" else "failed"}
+                # „done”/„failed” zostają do następnej aktualizacji (panel pokazuje „odśwież” albo błąd)
+                keep = state.get("state") if state.get("state") in ("done", "failed") else "idle"
+                state = {**check(state), "state": keep}
                 put_state(state)
                 next_check = time.time() + CHECK_EVERY
         except Exception as exc:  # brak sieci, kontener w trakcie restartu… spróbujemy za chwilę
