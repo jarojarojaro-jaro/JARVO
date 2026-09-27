@@ -394,3 +394,44 @@ async def health():
                     entry["api"] = f"błąd: {exc.__class__.__name__}"
             report["agents"][a["name"]] = entry
     return report
+
+
+# ----------------------------------------------------------------------------- aktualizacje
+# Stan pisze pomocnik aktualizacji na hoście (scripts/updater.py). Dashboard może tylko poprosić
+# o sprawdzenie albo aktualizację tej samej gałęzi (plik update-request); poleceń nie wykonuje.
+UPDATE_FILE = core.TARS_DIR / "state" / "update.json"
+UPDATE_REQUEST = core.TARS_DIR / "state" / "update-request"
+UPDATER_STALE = 20 * 60  # pomocnik sprawdza co 10 min; dłuższa cisza = nie działa
+
+
+def _update_state() -> dict:
+    try:
+        state = json.loads(UPDATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"online": False, "state": "unknown", "behind": 0}
+    last = max(state.get("checked_at") or 0, state.get("started_at") or 0, state.get("finished_at") or 0)
+    state["online"] = state.get("state") == "updating" or time.time() - last < UPDATER_STALE
+    state["pending"] = UPDATE_REQUEST.exists()
+    return state
+
+
+@router.get("/update")
+async def update_status():
+    return _update_state()
+
+
+@router.post("/update")
+async def update_request(request: Request):
+    body = await request.json()
+    action = body.get("action")
+    if action not in ("check", "update"):
+        raise HTTPException(400, "action: check albo update")
+    state = _update_state()
+    if not state.get("online"):
+        raise HTTPException(503, "Pomocnik aktualizacji nie działa. Lokalnie: bash scripts/local-up.sh, "
+                                 "na serwerze: sudo systemctl start tars-updater.")
+    if state.get("state") == "updating":
+        raise HTTPException(409, "Aktualizacja już trwa.")
+    UPDATE_REQUEST.parent.mkdir(parents=True, exist_ok=True)
+    UPDATE_REQUEST.write_text(action, encoding="utf-8")
+    return JSONResponse({"ok": True, "action": action}, status_code=202)

@@ -12,7 +12,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 L="${TARS_LOCAL:-$HOME/tars-local}"
 COMPOSE=(docker compose -f "$ROOT/infra/docker-compose.yml" --env-file "$L/compose/.env")
 
-if [[ "${1:-}" == "down" ]]; then "${COMPOSE[@]}" down; exit 0; fi
+if [[ "${1:-}" == "down" ]]; then
+  [[ -f "$L/updater.pid" ]] && kill "$(cat "$L/updater.pid")" 2>/dev/null || true
+  "${COMPOSE[@]}" down; exit 0
+fi
 docker info >/dev/null 2>&1 || { echo "Docker nie działa (uruchom Docker Desktop, włącz integrację WSL)."; exit 1; }
 
 if [[ ! -f "$L/compose/.env" ]]; then
@@ -61,6 +64,12 @@ if [[ "$(stat -c %u "$L/build")" != "10000" || "$(stat -c %u "$L/data")" != "100
 fi
 
 TARS_COMPOSE_DIR="$L/compose" TARS_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" --first-run --no-pull
+
+# pomocnik aktualizacji: przycisk „Aktualizuj” w dashboardzie (git pull + deploy na prośbę z panelu)
+if [[ -f "$L/updater.pid" ]] && kill -0 "$(cat "$L/updater.pid")" 2>/dev/null; then kill "$(cat "$L/updater.pid")" || true; fi
+nohup setsid python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$L/build" \
+  >> "$L/updater.log" 2>&1 < /dev/null &
+echo $! > "$L/updater.pid"
 
 PASS="$(grep '^DASHBOARD_PASSWORD=' "$L/compose/.env" | cut -d= -f2)"
 cat <<EOF

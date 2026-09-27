@@ -128,12 +128,32 @@ if [[ -d /srv/tars/repo ]]; then
   chmod 640 /srv/tars/secrets/*.env
 fi
 
+log "Pomocnik aktualizacji (przycisk „Aktualizuj” w dashboardzie)"
+cat > /etc/systemd/system/tars-updater.service <<UNIT
+[Unit]
+Description=TARS: pomocnik aktualizacji (git pull + deploy na prośbę z dashboardu)
+After=docker.service network-online.target
+Wants=docker.service
+
+[Service]
+User=$USER_NAME
+WorkingDirectory=/srv/tars/repo
+ExecStart=/usr/bin/python3 /srv/tars/repo/scripts/updater.py --mode vps
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable tars-updater >/dev/null 2>&1 || true
+
 cat <<EOF
 
 ✅ Bootstrap zakończony. Dalej (jako $USER_NAME):
   1. sudo tailscale up                         # zaloguj serwer do swojej sieci Tailscale
   2. uzupełnij: /srv/tars/secrets/*.env, /srv/tars/compose/tars.env, /srv/tars/compose/.env (TARS_BIND_IP = tailscale ip -4)
-  3. cd /srv/tars/repo && bash scripts/deploy.sh --first-run
+  3. cd /srv/tars/repo && bash scripts/deploy.sh --first-run && sudo systemctl start tars-updater
   4. po sprawdzeniu, że SSH przez Tailscale działa: sudo bash scripts/bootstrap-vps.sh --lock-ssh
 Pełna instrukcja: docs/RUNBOOK.md
 EOF
