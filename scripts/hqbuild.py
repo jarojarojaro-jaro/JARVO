@@ -79,6 +79,8 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     (dash / "dist" / "index.js").write_text(bundle_js(), encoding="utf-8")
     shutil.copy2(HQ / "web" / "style.css", dash / "dist" / "style.css")
     shutil.copy2(HQ / "web" / "vendor" / "LICENSE-htm", dash / "dist" / "LICENSE-htm")
+    # czcionki motywu Fosfor (VT323, IBM Plex Mono; OFL): serwowane lokalnie, bez Google Fonts
+    shutil.copytree(HQ / "web" / "fonts", dash / "dist" / "fonts")
     fl.write_json(dash / "fleet.json", fleet_json(fleet))
     return dash
 

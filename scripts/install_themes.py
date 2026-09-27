@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Instaluje motywy „Fosfor” dashboardu (branding/fosfor/) w <HERMES_HOME>/dashboard-themes/.
+
+    python install_themes.py <repo> <hermes_home>
+
+Każda pozycja z palettes.yaml staje się jednym motywem Hermesa (YAML: paleta, czcionki, customCSS).
+Wszystkie odcienie liczą się z jednego koloru. Gdy dashboard ma jeszcze motyw domyślny Hermesa,
+ustawia `dashboard.theme` na `default` z palettes.yaml; wybór zrobiony w dashboardzie zostaje.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import yaml
+
+FONT_URL = "/dashboard-plugins/tars-hq/dist/fonts/fosfor.css"
+HERMES_DEFAULT_THEMES = {"", "default", None}
+
+
+def rgb(hex_color: str) -> tuple[int, int, int]:
+    h = hex_color.strip().lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    if len(h) != 6:
+        raise ValueError(f"zły kolor: {hex_color!r} (oczekiwany #rrggbb)")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))  # type: ignore[return-value]
+
+
+def shade(c: tuple[int, int, int], k: float) -> str:
+    return "#" + "".join(f"{round(v * k):02x}" for v in c)
+
+
+def tokens(color: str) -> dict[str, str]:
+    c = rgb(color)
+    return {
+        "fos": shade(c, 1.0), "fos-mid": shade(c, 0.82), "fos-lo": shade(c, 0.45),
+        "fos-bg": shade(c, 0.05), "fos-bg2": shade(c, 0.08),
+        "fos-glow": f"rgba({c[0]}, {c[1]}, {c[2]}, 0.45)",
+    }
+
+
+def theme(entry: dict, css: str) -> dict:
+    t = tokens(entry["color"])
+    root = ":root { " + " ".join(f"--{k}: {v};" for k, v in t.items()) + " }\n"
+    return {
+        "name": entry["name"],
+        "label": entry.get("label") or entry["name"],
+        "description": "TARS: terminal CRT, jeden kolor fosforu",
+        "palette": {
+            "background": t["fos-bg"],
+            "midground": t["fos"],
+            "foreground": {"hex": t["fos"], "alpha": 0.0},
+            "warmGlow": t["fos-glow"],
+            "noiseOpacity": 0,
+        },
+        "typography": {
+            "fontSans": '"IBM Plex Mono", ui-monospace, monospace',
+            "fontMono": '"IBM Plex Mono", ui-monospace, monospace',
+            "fontDisplay": 'VT323, "IBM Plex Mono", monospace',
+            "fontUrl": FONT_URL,
+            "baseSize": "14px",
+            "letterSpacing": "0.01em",
+        },
+        "layout": {"radius": "0", "density": "comfortable"},
+        "colorOverrides": {
+            "card": t["fos-bg2"], "popover": t["fos-bg2"], "border": t["fos-lo"], "input": t["fos-lo"],
+            "ring": t["fos"], "primary": t["fos"], "primaryForeground": t["fos-bg"],
+            "mutedForeground": t["fos-mid"], "accent": t["fos-lo"], "accentForeground": t["fos"],
+        },
+        "terminalBackground": t["fos-bg"],
+        "terminalForeground": t["fos"],
+        "customCSS": root + css,
+    }
+
+
+def set_default_theme(config: Path, name: str) -> bool:
+    if not config.exists():
+        return False
+    try:
+        from ruamel.yaml import YAML
+        y = YAML()
+        y.preserve_quotes = True
+        data = y.load(config.read_text(encoding="utf-8")) or {}
+        dump = lambda d: y.dump(d, config.open("w", encoding="utf-8"))  # noqa: E731
+    except ImportError:  # pragma: no cover
+        data = yaml.safe_load(config.read_text(encoding="utf-8")) or {}
+        dump = lambda d: config.write_text(yaml.safe_dump(d, allow_unicode=True, sort_keys=False), encoding="utf-8")  # noqa: E731
+    dash = data.get("dashboard")
+    if not isinstance(dash, dict):
+        dash = {}
+        data["dashboard"] = dash
+    if dash.get("theme") not in HERMES_DEFAULT_THEMES:
+        return False
+    dash["theme"] = name
+    dump(data)
+    return True
+
+
+def main(argv: list[str]) -> int:
+    repo, home = Path(argv[0]), Path(argv[1])
+    src = repo / "branding" / "fosfor"
+    spec = yaml.safe_load((src / "palettes.yaml").read_text(encoding="utf-8"))
+    css = (src / "theme.css").read_text(encoding="utf-8")
+    out = home / "dashboard-themes"
+    out.mkdir(parents=True, exist_ok=True)
+    for entry in spec["themes"]:
+        body = yaml.safe_dump(theme(entry, css), allow_unicode=True, sort_keys=False, width=1000)
+        (out / f"{entry['name']}.yaml").write_text(body, encoding="utf-8")
+    changed = set_default_theme(home / "config.yaml", spec["default"])
+    print(f"motywy Fosfor: {len(spec['themes'])}" + (f", domyślny: {spec['default']}" if changed else ""))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

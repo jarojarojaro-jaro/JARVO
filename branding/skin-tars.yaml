@@ -1,28 +1,28 @@
 # Skórka terminala Hermesa z brandingiem TARS (display.skin: tars).
 # Kopiowana przez install-fleet.sh do <HERMES_HOME>/skins/ hosta i każdego profilu.
 name: tars
-description: "TARS — stal i bursztyn"
+description: "TARS — fosfor, błękit"
 colors:
-  banner_border: "#7E8896"
-  banner_title: "#E4E9EF"
-  banner_accent: "#F2C14E"
-  banner_dim: "#6E7886"
-  banner_text: "#D5DBE2"
-  ui_accent: "#F2C14E"
-  ui_label: "#A4AEBA"
-  prompt: "#E4E9EF"
-  input_rule: "#7E8896"
-  response_border: "#A4AEBA"
-  status_bar_bg: "#14181E"
-  status_bar_text: "#A4AEBA"
-  status_bar_strong: "#F2C14E"
-  status_bar_dim: "#6E7886"
-  session_label: "#A4AEBA"
-  session_border: "#4A525E"
-  completion_menu_bg: "#14181E"
-  completion_menu_current_bg: "#2A313B"
-  selection_bg: "#2A313B"
-  voice_status_bg: "#14181E"
+  banner_border: "#3E5D6C"
+  banner_title: "#D4EEFB"
+  banner_accent: "#89CFF0"
+  banner_dim: "#4F7A8E"
+  banner_text: "#B9E0F3"
+  ui_accent: "#89CFF0"
+  ui_label: "#70AAC5"
+  prompt: "#D4EEFB"
+  input_rule: "#3E5D6C"
+  response_border: "#70AAC5"
+  status_bar_bg: "#070A0C"
+  status_bar_text: "#70AAC5"
+  status_bar_strong: "#89CFF0"
+  status_bar_dim: "#4F7A8E"
+  session_label: "#70AAC5"
+  session_border: "#2C4450"
+  completion_menu_bg: "#070A0C"
+  completion_menu_current_bg: "#16242B"
+  selection_bg: "#16242B"
+  voice_status_bg: "#070A0C"
 light_colors:
   banner_title: "#1F252D"
   banner_accent: "#B7861A"
@@ -47,5 +47,5 @@ branding:
   help_header: "▮ Komendy"
 tool_prefix: "│"
 banner_logo: |
-  [bold #E4E9EF]▐█▌ ▐█▌ ▐█▌ ▐█▌[/]   [bold #F2C14E]T A R S[/]
-  [#A4AEBA]▐█▌ ▐█▌ ▐█▌ ▐█▌[/]   [#6E7886]flota agentów[/]
+  [bold #D4EEFB]▐█▌ ▐█▌ ▐█▌ ▐█▌[/]   [bold #89CFF0]T A R S[/]
+  [#70AAC5]▐█▌ ▐█▌ ▐█▌ ▐█▌[/]   [#4F7A8E]flota agentów[/]

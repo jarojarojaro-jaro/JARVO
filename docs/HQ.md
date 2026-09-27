@@ -116,7 +116,18 @@ wyłączają się przy `prefers-reduced-motion`. Na wąskim ekranie wieżę prze
 postaci w `LOOKS`, wpisz klucz do `HQ_ROOMS` w `scripts/fleetlib.py` (walidator pilnuje zgodności)
 i ustaw `hq_room` agenta.
 
-## 5. Rozwiązywanie problemów
+## 5. Motyw „Fosfor” (wygląd całego dashboardu)
+
+Cały dashboard (menu, górny pasek, czat, TARS HQ) wygląda jak terminal CRT z 1982: czcionki VT323 i IBM Plex
+Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zostaje w swoich kolorach.
+
+- **Jeden kolor → cały wygląd.** `scripts/install_themes.py` liczy z niego odcienie, tło, ramki i poświatę,
+  a z `branding/fosfor/theme.css` składa motywy Hermesa w `<HERMES_HOME>/dashboard-themes/`.
+- **Zmiana koloru:** przełącznik motywów w lewym dolnym rogu (błękit, bursztyn, zieleń, biel). Własny kolor:
+  dopisz linię w `branding/fosfor/palettes.yaml` i wdroż. Wybór zrobiony w dashboardzie przetrwa wdrożenia.
+- Kolory terminala czatu idą z motywu (łatka w `branding/patch_dashboard.py`), skórka TUI jest w błękicie.
+
+## 6. Rozwiązywanie problemów
 
 | Objaw | Przyczyna i naprawa |
 |---|---|

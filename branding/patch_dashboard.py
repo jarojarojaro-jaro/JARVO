@@ -96,6 +96,11 @@ def main(argv: list[str]) -> int:
     themes = HERMES / "hermes_cli" / "web_server_dashboard.py"
     if themes.is_file():
         sub_all([themes], r'"label": "Hermes Teal', '"label": "TARS Teal', "etykiety motywów (serwer)")
+        # motywy użytkownika przekazują kolory terminala czatu (dashboard je obsługuje, serwer je gubił)
+        sub_all([themes], r'(\n(\s+)"layoutVariant": layout_variant,\n)',
+                r'\1\2"terminalBackground": data.get("terminalBackground") if _nonempty_str(data.get("terminalBackground")) else None,\n'
+                r'\2"terminalForeground": data.get("terminalForeground") if _nonempty_str(data.get("terminalForeground")) else None,\n',
+                "kolory terminala w motywach")
     login = HERMES / "hermes_cli" / "dashboard_auth" / "login_page.py"
     if login.is_file():
         sub_all([login], r"the Hermes Agent dashboard", "TARS HQ", "strona logowania (opis)")

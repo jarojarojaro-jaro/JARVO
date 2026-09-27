@@ -98,6 +98,11 @@ if [[ -f "$REPO/branding/skin-tars.yaml" ]]; then
   done
 fi
 
+# 3e. motywy dashboardu „Fosfor” (jeden kolor → cały wygląd; lista w branding/fosfor/palettes.yaml)
+if [[ -f "$REPO/branding/fosfor/palettes.yaml" ]]; then
+  $PY "$REPO/scripts/install_themes.py" "$REPO" "$DATA"
+fi
+
 # 4. tablica kanban
 if [[ $FIRST -eq 1 || ! -f "$DATA/kanban.db" ]]; then
   log "Tablica kanban"
