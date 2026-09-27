@@ -136,6 +136,21 @@ zadziała; `install-fleet.sh` wypisze ostrzeżenie.
 
 ---
 
+### Klucze dostawców i logowanie (OAuth)
+
+Każdy agent floty to osobny profil Hermesa z własnym `.env`, a Hermes celowo ich nie miesza (izolacja kluczy
+przy multipleksowaniu). Żeby nie wpisywać klucza pięć razy:
+
+- **Klucze API** (CommandCode, OpenRouter, OpenCode, Exa…) dodawaj w dashboardzie **Keys przy profilu
+  „default”**. TARS HQ w ciągu kilku sekund kopiuje je do wszystkich agentów (`scripts/share_keys.py`, blok
+  „klucze wspólne” na końcu `.env` agenta). Dzielone są tylko klucze dostawców i narzędzi; tokeny
+  komunikatorów (Telegram, Discord…) zostają tam, gdzie je wpisano.
+- **Inny klucz dla jednego agenta:** wybierz go w lewym górnym rogu i ustaw klucz w Keys. Ma pierwszeństwo
+  przed wspólnym i synchronizacja go nie nadpisze.
+- **Logowanie OAuth** (ChatGPT/Codex, Nous Portal, Copilot…): zaloguj się raz, przy profilu „default”.
+  Agenci korzystają z niego sami (Hermes czyta główny `auth.json` jako zapas dla profili).
+  Nie loguj się na to samo konto osobno w agentach.
+
 ## 5. Pierwsze wdrożenie
 
 ```bash

@@ -8,8 +8,8 @@ body { text-shadow: 0 0 6px var(--fos-glow); }
 /* linie skanowania i winieta nad całym ekranem */
 body::after {
   content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
-  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, .2) 2px 3px);
-  box-shadow: inset 0 0 180px rgba(0, 0, 0, .65);
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, .12) 2px 3px);
+  box-shadow: inset 0 0 120px rgba(0, 0, 0, .35);
 }
 
 /* ramki: fosfor zamiast półprzezroczystych linii */
@@ -33,7 +33,7 @@ aside nav > div > span {
   border-top: 1px solid var(--fos-lo);
 }
 aside nav a {
-  flex: 1; font-family: var(--theme-font-display) !important; font-size: 21px !important; line-height: 1 !important;
+  flex: 1; color: var(--fos) !important; font-family: var(--theme-font-display) !important; font-size: 21px !important; line-height: 1 !important;
   letter-spacing: .03em !important; padding: 0 8px 0 10px !important; margin: 0 6px; gap: 11px !important;
 }
 aside nav a svg { display: none; }

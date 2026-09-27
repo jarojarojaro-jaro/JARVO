@@ -103,6 +103,9 @@ if [[ -f "$REPO/branding/fosfor/palettes.yaml" ]]; then
   $PY "$REPO/scripts/install_themes.py" "$REPO" "$DATA"
 fi
 
+# 3f. wspólne klucze: klucze dostawców/narzędzi z głównego .env do każdego agenta (na żywo pilnuje ich TARS HQ)
+$PY "$REPO/scripts/share_keys.py" "$DATA"
+
 # 4. tablica kanban
 if [[ $FIRST -eq 1 || ! -f "$DATA/kanban.db" ]]; then
   log "Tablica kanban"

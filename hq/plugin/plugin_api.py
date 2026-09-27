@@ -34,6 +34,26 @@ def _load_core():
 core = _load_core()
 router = APIRouter()
 
+
+def _start_key_sharing() -> None:
+    """Wspólne klucze floty na żywo: klucz dostawcy dodany w dashboardzie (profil „default”) trafia
+    do wszystkich agentów bez restartu. Szczegóły i zasady: share_keys.py obok."""
+    path = _HERE / "share_keys.py"
+    if not path.exists() or os.environ.get("TARS_SHARE_KEYS", "1") == "0":
+        return
+    import threading
+
+    spec = importlib.util.spec_from_file_location("tars_share_keys", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    threading.Thread(target=mod.watch, args=(core.HOME,), name="tars-share-keys", daemon=True).start()
+
+
+try:
+    _start_key_sharing()
+except Exception as _exc:  # plugin działa dalej, klucze zsynchronizuje najbliższe wdrożenie
+    print(f"tars-hq: wspólne klucze nieaktywne: {_exc}", file=sys.stderr)
+
 HOME = core.HOME
 FLEET_FILE = _HERE / "fleet.json"
 SESSIONS_FILE = core.TARS_DIR / "state" / "hq-sessions.json"
