@@ -576,7 +576,8 @@ function towerLayout(crewCount, W = TW) {
   const groundY = baseY - 6;
   const base = { x: 58, y: baseY, w: 284, h: 40 };
   const w = Math.max(TW, Math.round(W));
-  return { W: w, ox: Math.round((w - TW) / 2), H: baseY + 52, floors, roofY, bridge, crewY0, rooms, baseY, groundY, base,
+  // viewH: kadr widoczny (do linii ulicy, bez ziemi i piwnicy); H: pełna scena do rysowania
+  return { W: w, ox: Math.round((w - TW) / 2), H: baseY + 52, viewH: groundY + 4, floors, roofY, bridge, crewY0, rooms, baseY, groundY, base,
     shaft: { x: 188, y: crewY0, w: 24, h: baseY + 40 - crewY0 } };
 }
 

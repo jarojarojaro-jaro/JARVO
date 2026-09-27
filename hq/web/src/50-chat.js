@@ -17,12 +17,27 @@ function toolChip(name, preview) {
   return { tool: name, icon, verb, detail, status: "running" };
 }
 
-function ToolChips({ tools }) {
-  if (!tools || !tools.length) return null;
-  return html`<div class="thq-chips">${tools.map((t, i) => html`<span key=${i} class=${cx("thq-chip", t.status && `is-${t.status}`)}
-      title=${t.detail || t.tool}>
+function ToolChip({ t }) {
+  return html`<span class=${cx("thq-chip", t.status && `is-${t.status}`)} title=${t.detail || t.tool}>
     <span aria-hidden="true">${ICON[t.icon] || ICON.tool}</span> ${t.verb}${t.detail ? html`<em>${t.detail}</em>` : null}
-  </span>`)}</div>`;
+  </span>`;
+}
+
+// Kroki agenta zwinięte do jednej linii (ostatni krok widać, reszta po kliknięciu): odpowiedź jest ważniejsza.
+function ToolChips({ tools }) {
+  const [open, setOpen] = useState(false);
+  if (!tools || !tools.length) return null;
+  if (tools.length <= 2 || open) {
+    return html`<div class="thq-chips">
+      ${tools.map((t, i) => html`<${ToolChip} key=${i} t=${t}/>`)}
+      ${open ? html`<button type="button" class="thq-chips-toggle" onClick=${() => setOpen(false)}>zwiń</button>` : null}
+    </div>`;
+  }
+  const last = tools[tools.length - 1];
+  return html`<div class="thq-chips">
+    <button type="button" class="thq-chips-toggle" onClick=${() => setOpen(true)} aria-expanded="false">▸ ${tools.length} kroków</button>
+    <${ToolChip} t=${last}/>
+  </div>`;
 }
 
 function ChatView({ agent, agents, pending, onPendingDone, compact }) {

@@ -81,6 +81,8 @@
 @media (max-width: 900px) { .thq-live { display: none; } }
 
 /* ----------------------------------------------------------------- layout */
+/* lewa kolumna: wieża + rozmowa pod nią; prawa: panel (Centrala / agent) na całą wysokość */
+.thq-left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .thq-main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 14px; align-items: start; }
 @media (min-width: 1280px) { .thq-main { grid-template-columns: minmax(0, 2.1fr) minmax(340px, 1fr); } }
 .thq-scene {
@@ -424,3 +426,7 @@
 @media (max-width: 1023px) { .thq-upd-panel { left: 12px; right: 12px; width: auto; bottom: 12px; } }
 
 .thq-decision-err { margin: 4px 0 8px; font: 0.8rem/1.4 var(--thq-mono); color: var(--thq-bad, #c0392b); overflow-wrap: anywhere; }
+.thq-chips-toggle { border: 1px dashed var(--thq-line); background: none; color: var(--thq-muted); font: 0.75rem/1.6 var(--thq-mono); padding: 0 8px; cursor: pointer; border-radius: 999px; }
+.thq-chips-toggle:hover { color: var(--thq-ink); }
+.thq-mout { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font: 0.8rem/1.4 var(--thq-mono); }
+.thq-mout .thq-link { text-align: left; overflow-wrap: anywhere; }

@@ -56,17 +56,19 @@ function App() {
   return html`<div class=${cx("thq-root", selected && "has-selection")}>
     ${!header && html`<${Hud} state=${state} error=${error} now=${now} onDecisions=${openDecisions}/>`}
     <main class="thq-main">
-      <div class="thq-scene">
-        <${Building} agents=${agents} board=${(state && state.board) || {}} selected=${selected} onSelect=${select} online=${!error}/>
-        <p class="thq-hint">Kliknij pokój, żeby zobaczyć, nad czym pracuje agent. Na telefonie przesuń wieżę palcem.</p>
+      <div class="thq-left">
+        <div class="thq-scene">
+          <${Building} agents=${agents} board=${(state && state.board) || {}} selected=${selected} onSelect=${select} online=${!error}/>
+          <p class="thq-hint">Kliknij pokój, żeby zobaczyć, nad czym pracuje agent. Na telefonie przesuń wieżę palcem.</p>
+        </div>
+        <${ChatDock} agents=${agents} target=${chatTarget} setTarget=${setTarget} open=${dockOpen} setOpen=${setDockOpen}
+          pending=${pending} onPendingDone=${() => setPending(null)}/>
       </div>
       ${selected
         ? html`<${AgentPanel} key=${selected} name=${selected} agents=${agents} fleet=${fleet} tab=${tab} setTab=${setTab}
             onClose=${() => setSelected(null)} onOpenTask=${setTaskId} onOpenFile=${setFile} pending=${pending} onPendingDone=${() => setPending(null)}/>`
-        : html`<${Center} state=${state} agents=${agents} onAnswer=${answer} onOpenTask=${setTaskId} focus=${focus}/>`}
+        : html`<${Center} state=${state} agents=${agents} onAnswer=${answer} onOpenTask=${setTaskId} onOpenFile=${setFile} focus=${focus}/>`}
     </main>
-    <${ChatDock} agents=${agents} target=${chatTarget} setTarget=${setTarget} open=${dockOpen} setOpen=${setDockOpen}
-      pending=${pending} onPendingDone=${() => setPending(null)}/>
     ${taskId && html`<${TaskModal} taskId=${taskId} agents=${agents} onClose=${() => setTaskId(null)}/>`}
     ${file && html`<${FilePreview} file=${file} onClose=${() => setFile(null)}/>`}
   </div>`;

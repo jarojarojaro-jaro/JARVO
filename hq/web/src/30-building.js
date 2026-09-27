@@ -55,7 +55,7 @@ function RoomSign({ agent }) {
 function Room({ agent, box, lay, selected, onSelect }) {
   const wide = agent.room === "bridge";
   const onKey = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(agent.name); } };
-  const style = { left: pct(box.x, lay.W), top: pct(box.y, lay.H), width: pct(box.w, lay.W), height: pct(box.h, lay.H) };
+  const style = { left: pct(box.x, lay.W), top: pct(box.y, lay.viewH), width: pct(box.w, lay.W), height: pct(box.h, lay.viewH) };
   return html`<div role="button" tabIndex="0" style=${style}
       class=${cx("thq-room", wide && "is-wide", selected && "is-selected", `is-${agent.status}`)}
       onClick=${() => onSelect(agent.name)} onKeyDown=${onKey} aria-pressed=${selected}
@@ -81,7 +81,7 @@ function useSceneWidth(ref, floors) {
     const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return undefined;
     const scene = el.parentElement;
-    const H = towerLayout(floors * 2).H;
+    const H = towerLayout(floors * 2).viewH;
     const calc = () => {
       if (window.innerWidth <= 720) { setW(TW); return; }
       const sp = scrollParent(el);
@@ -123,7 +123,7 @@ function Building({ agents, board, selected, onSelect, online = true }) {
     if (sc && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) / 2;
   }, []);
   return html`<div class="thq-building thq-tower" ref=${ref}>
-    <svg class="thq-tower-art" viewBox=${`0 0 ${lay.W} ${lay.H}`} aria-hidden="true">
+    <svg class="thq-tower-art" viewBox=${`0 0 ${lay.W} ${lay.viewH}`} aria-hidden="true">
       <${TowerBackdrop} floors=${floors} W=${lay.W}/>
       <${TowerMachines} floors=${floors} W=${lay.W} moving=${moving} online=${online}/>
       ${boss && html`<${PixRoom} box=${bridge} agent=${boss} board=${board} crew=${crew}/>`}

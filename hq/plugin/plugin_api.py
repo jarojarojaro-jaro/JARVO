@@ -123,7 +123,15 @@ async def state():
     for t in running[:12]:
         activity[t["id"]] = await asyncio.to_thread(
             _cached, f"tool:{t['id']}", 2.0, lambda t=t: _current_tool(t))
-    return core.build_state(_fleet(), board, _index_md(), now, activity)
+    st = core.build_state(_fleet(), board, _index_md(), now, activity)
+    # wyniki misji: pliki z katalogu misji (najpierw out/), żeby efekt pracy był widać od razu w Centrali
+    missions_dir = core.MISSIONS_INDEX.parent
+    for m in st.get("missions", []):
+        if m.get("done"):
+            m["outputs"] = await asyncio.to_thread(
+                _cached, f"mout:{m['id']}", 10.0,
+                lambda m=m: core.list_outputs([missions_dir / m["id"]], core.Roots(), limit=8))
+    return st
 
 
 @router.get("/fleet")

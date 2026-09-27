@@ -120,7 +120,16 @@ function Decision({ item, agents, onAnswer }) {
   </li>`;
 }
 
-function MissionRow({ m, agents, onOpenTask }) {
+function MissionOutputs({ files, onOpenFile }) {
+  if (!files || !files.length) return null;
+  return html`<ul class="thq-mout" aria-label="Wyniki misji">
+    ${files.map((f) => html`<li key=${f.path}>
+      <button type="button" class="thq-link" onClick=${() => onOpenFile && onOpenFile(f)} title=${f.rel}>
+        ${f.in_out ? "★ " : ""}${f.rel}</button></li>`)}
+  </ul>`;
+}
+
+function MissionRow({ m, agents, onOpenTask, onOpenFile }) {
   const pct = m.total ? Math.round((100 * m.done) / m.total) : 0;
   return html`<li class="thq-mission">
     <div class="thq-mission-head"><strong>${m.title}</strong><span class="thq-muted">${m.id}</span></div>
@@ -132,12 +141,13 @@ function MissionRow({ m, agents, onOpenTask }) {
         return html`<button key=${c.id} type="button" class=${cx("thq-mcard", `is-card-${c.status}`)} onClick=${() => onOpenTask(c.id)}
           title=${`${c.title} · ${CARD_STATUS[c.status] || c.status}`}>${a ? a.emoji : "▭"}</button>`;
       })}
-      <span class="thq-muted">${m.done}/${m.total} kart</span>
+      <span class="thq-muted">${m.done}/${m.total} kart${m.total && m.done === m.total ? " · gotowe" : ""}</span>
     </div>
+    <${MissionOutputs} files=${m.outputs} onOpenFile=${onOpenFile}/>
   </li>`;
 }
 
-function Center({ state, agents, onAnswer, onOpenTask, focus }) {
+function Center({ state, agents, onAnswer, onOpenTask, onOpenFile, focus }) {
   const d = (state && state.decisions) || [];
   const missions = (state && state.missions) || [];
   const feed = (state && state.feed) || [];
@@ -152,7 +162,7 @@ function Center({ state, agents, onAnswer, onOpenTask, focus }) {
     <section>
       <h2 class="thq-h2">Misje <span class="thq-count">${missions.length}</span></h2>
       ${missions.length === 0 ? html`<p class="thq-muted">Brak aktywnych misji. Napisz do TARS-a, czego potrzebujesz.</p>`
-        : html`<ul class="thq-list">${missions.map((m) => html`<${MissionRow} key=${m.id} m=${m} agents=${agents} onOpenTask=${onOpenTask}/>`)}</ul>`}
+        : html`<ul class="thq-list">${missions.map((m) => html`<${MissionRow} key=${m.id} m=${m} agents=${agents} onOpenTask=${onOpenTask} onOpenFile=${onOpenFile}/>`)}</ul>`}
     </section>
     <section>
       <h2 class="thq-h2">Na bieżąco</h2>
