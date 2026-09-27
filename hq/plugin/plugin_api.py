@@ -401,7 +401,7 @@ async def health():
 # o sprawdzenie albo aktualizację tej samej gałęzi (plik update-request); poleceń nie wykonuje.
 UPDATE_FILE = core.TARS_DIR / "state" / "update.json"
 UPDATE_REQUEST = core.TARS_DIR / "state" / "update-request"
-UPDATER_STALE = 20 * 60  # pomocnik sprawdza co 10 min; dłuższa cisza = nie działa
+UPDATER_STALE = 5 * 60  # pomocnik sprawdza co minutę; dłuższa cisza = nie działa
 
 
 def _update_state() -> dict:

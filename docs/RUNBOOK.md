@@ -264,7 +264,8 @@ Wyjątek to skille tworzone przez agentów: zbiera je `harvest-skills.sh`.
 
 Gdy na GitHubie jest nowsza wersja, w menu bocznym dashboardu pojawia się **„⬆ Aktualizacja (n)”**:
 klik pokazuje listę zmian, **„Aktualizuj teraz”** robi `git pull` i wdrożenie (z przebudową obrazu, gdy
-trzeba), a na koniec pojawia się **„✓ Odśwież stronę”**. Robi to pomocnik na hoście
+trzeba), a na koniec strona sama się odświeża. Pomocnik sprawdza GitHuba co minutę; z `TARS_AUTO_UPDATE=1`
+(lokalnie: `TARS_AUTO_UPDATE=1 bash scripts/local-up.sh`) instaluje nowe wersje sam, bez klikania. Robi to pomocnik na hoście
 (`scripts/updater.py`), bo kontener celowo nie ma dostępu do Dockera: panel może tylko poprosić o
 sprawdzenie albo aktualizację tej samej gałęzi. Na VPS działa jako usługa `tars-updater`
 (`sudo systemctl status tars-updater`, log: `journalctl -u tars-updater`); lokalnie uruchamia go

@@ -67,7 +67,7 @@ TARS_COMPOSE_DIR="$L/compose" TARS_BUILD="$L/build" bash "$ROOT/scripts/deploy.s
 
 # pomocnik aktualizacji: przycisk „Aktualizuj” w dashboardzie (git pull + deploy na prośbę z panelu)
 if [[ -f "$L/updater.pid" ]] && kill -0 "$(cat "$L/updater.pid")" 2>/dev/null; then kill "$(cat "$L/updater.pid")" || true; fi
-nohup setsid python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$L/build" \
+TARS_AUTO_UPDATE="${TARS_AUTO_UPDATE:-0}" nohup setsid python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$L/build" \
   >> "$L/updater.log" 2>&1 < /dev/null &
 echo $! > "$L/updater.pid"
 

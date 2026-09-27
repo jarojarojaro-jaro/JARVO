@@ -4,7 +4,7 @@
     python3 scripts/updater.py [--compose DIR] [--build DIR] [--once]
 
 Działa na HOŚCIE (VPS albo WSL), obok kontenera, jako użytkownik z dostępem do dockera i do repo:
-- co TARS_UPDATE_CHECK sekund (domyślnie 600) robi `git fetch` gałęzi repo i zapisuje stan dla
+- co TARS_UPDATE_CHECK sekund (domyślnie 60) robi `git fetch` gałęzi repo i zapisuje stan dla
   dashboardu (ile commitów brakuje i jakie) do <HERMES_HOME>/tars/state/update.json w kontenerze,
 - co kilka sekund sprawdza, czy dashboard poprosił o aktualizację (plik update-request); wtedy uruchamia
   scripts/deploy.sh (git pull + budowa obrazu, gdy trzeba + instalacja floty) i raportuje postęp.
@@ -25,7 +25,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONTAINER = os.environ.get("TARS_CONTAINER", "tars-hermes")
 STATE_DIR = "/opt/data/tars/state"
-CHECK_EVERY = int(os.environ.get("TARS_UPDATE_CHECK", "600"))
+CHECK_EVERY = int(os.environ.get("TARS_UPDATE_CHECK", "60"))
+# TARS_AUTO_UPDATE=1: nowa wersja instaluje się sama, bez klikania w dashboardzie
+AUTO_UPDATE = os.environ.get("TARS_AUTO_UPDATE", "0") == "1"
 POLL_EVERY = 5
 LOG_TAIL = 40
 
@@ -108,11 +110,13 @@ def main(argv: list[str]) -> int:
     global ROOT
     if args.repo:
         ROOT = Path(args.repo).resolve()
-    state: dict = {"mode": args.mode, "state": "idle", "updater_pid": os.getpid()}
+    state: dict = {"mode": args.mode, "state": "idle", "updater_pid": os.getpid(), "auto": AUTO_UPDATE}
     next_check = 0.0
     while True:
         try:
             req = take_request()
+            if req is None and AUTO_UPDATE and state.get("behind", 0) > 0 and state.get("state") != "failed":
+                req = "update"
             if req == "update":
                 state = update(args, state)
                 next_check = time.time() + CHECK_EVERY

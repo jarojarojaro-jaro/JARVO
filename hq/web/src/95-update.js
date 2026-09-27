@@ -62,6 +62,7 @@
   }
 
   function render() {
+    if (justUpdated() && !window.__tarsReloading) { window.__tarsReloading = true; setTimeout(() => location.reload(), 3000); }
     const l = label();
     item.hidden = !l;
     if (l) { item.textContent = l[0]; item.className = `thq-upd ${l[1]}`.trim(); }
@@ -72,7 +73,9 @@
     head.append(el("h2", null, "Aktualizacja TARS"), btn("×", "thq-upd-x", () => { open = false; render(); }));
     panel.append(head);
     if (justUpdated()) {
-      panel.append(el("p", null, `Zaktualizowano do ${st.current}. Odśwież stronę, żeby wczytać nową wersję panelu.`));
+      // nowa wersja panelu jest już na serwerze: wczytujemy ją sami
+      if (!window.__tarsReloading) { window.__tarsReloading = true; setTimeout(() => location.reload(), 3000); }
+      panel.append(el("p", null, `Zaktualizowano do ${st.current}. Za chwilę strona odświeży się sama.`));
       const done = el("div", "thq-upd-actions");
       done.append(btn("Odśwież stronę", "thq-upd-go", () => location.reload()));
       panel.append(done);
@@ -114,6 +117,6 @@
   load();
   (function poll() {
     const busyNow = st && (st.state === "updating" || st.pending);
-    setTimeout(() => { load().finally(poll); }, busyNow || open ? 3000 : 60000);
+    setTimeout(() => { load().finally(poll); }, busyNow || open ? 3000 : 20000);
   })();
 })();
