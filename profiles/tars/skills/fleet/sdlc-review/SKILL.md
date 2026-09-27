@@ -13,7 +13,7 @@ metadata:
   tars:
     agent: tars
     autonomy: A0
-    reviewed: 2026-09-26
+    reviewed: "2026-09-26"
 environments:
   - kanban
 ---

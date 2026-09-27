@@ -11,7 +11,7 @@ metadata:
   tars:
     agent: tars-reka
     autonomy: A1
-    reviewed: 2026-09-26
+    reviewed: "2026-09-26"
 ---
 
 # Złożenie pakietu misji

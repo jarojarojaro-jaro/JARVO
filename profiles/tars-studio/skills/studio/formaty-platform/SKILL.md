@@ -11,7 +11,7 @@ metadata:
   tars:
     agent: tars-studio
     autonomy: A0
-    reviewed: 2026-09-26
+    reviewed: "2026-09-26"
 ---
 
 # Formaty platform

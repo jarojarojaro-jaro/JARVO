@@ -11,7 +11,7 @@ metadata:
   tars:
     agent: tars-web
     autonomy: A2
-    reviewed: 2026-09-26
+    reviewed: "2026-09-26"
 ---
 
 # Podgląd i wdrożenie

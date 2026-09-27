@@ -9,6 +9,7 @@ Kod wyjścia 1 przy błędach; ostrzeżenia nie blokują.
 
 from __future__ import annotations
 
+import json
 import datetime as dt
 import re
 import shutil
@@ -129,6 +130,10 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         except Exception as exc:
             r.err(f"{a.name}/{rel}: frontmatter nie parsuje się: {exc}")
             continue
+        try:  # Hermes serializuje frontmatter do JSON: niecytowana data (2026-09-26) = skill „nieznany”
+            json.dumps(fm)
+        except TypeError as exc:
+            r.err(f"{a.name}/{rel}: frontmatter nie jest zgodny z JSON ({exc}); daty w cudzysłowie")
         name = str(fm.get("name", ""))
         if name != skill_md.parent.name:
             r.err(f"{a.name}/{rel}: name={name!r} ≠ nazwa katalogu")

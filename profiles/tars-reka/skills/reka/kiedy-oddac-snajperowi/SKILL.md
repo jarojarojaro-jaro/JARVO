@@ -10,7 +10,7 @@ metadata:
   tars:
     agent: tars-reka
     autonomy: A0
-    reviewed: 2026-09-26
+    reviewed: "2026-09-26"
 ---
 
 # Kiedy oddać snajperowi
