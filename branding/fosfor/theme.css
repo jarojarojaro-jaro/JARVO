@@ -23,11 +23,14 @@ aside.fixed > div:first-child span.font-bold {
 aside.fixed > div:first-child span.font-bold::after {
   content: "▌"; font-size: .9em; margin-left: 4px; animation: fos-blink 1.06s steps(1) infinite;
 }
-aside nav ul { counter-reset: fos-nav; }
+/* jedna numeracja dla całego menu (też pluginy), wszystko mieści się bez przewijania */
+aside nav { counter-reset: fos-nav; padding-top: 4px !important; padding-bottom: 4px !important; }
+aside nav > div { padding-bottom: 0 !important; }
+aside nav > div > span { padding-top: 4px !important; padding-bottom: 2px !important; font-size: 10px !important; }
 aside nav li { counter-increment: fos-nav; }
 aside nav a {
-  font-family: var(--theme-font-display) !important; font-size: 21px !important; letter-spacing: .06em !important;
-  padding-top: 1px !important; padding-bottom: 1px !important; margin: 0 8px; gap: 10px !important;
+  font-family: var(--theme-font-display) !important; font-size: 21px !important; line-height: 25px !important; letter-spacing: .06em !important;
+  padding-top: 0 !important; padding-bottom: 0 !important; margin: 0 8px; gap: 10px !important;
 }
 aside nav a svg { display: none; }
 aside nav a::before { content: counter(fos-nav, decimal-leading-zero); color: var(--fos-mid); }
