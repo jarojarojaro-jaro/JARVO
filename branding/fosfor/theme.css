@@ -73,3 +73,8 @@ input, textarea, select { background-color: var(--fos-bg) !important; }
 .thq-root *, .thq-headbar * { animation: none !important; }
 /* wieża: własne kolory, bez poświaty i linii skanowania */
 .thq-tower, .thq-building { position: relative; z-index: 10000; text-shadow: none; }
+
+/* sekcja System w menu: tylko status gatewaya i przycisk restartu */
+aside.fixed > div.shrink-0 > span.text-text-tertiary { display: none; }
+aside.fixed > div.shrink-0 a p:nth-child(2) { display: none; }
+aside.fixed > div.shrink-0 a { padding-top: 8px !important; padding-bottom: 4px !important; }
