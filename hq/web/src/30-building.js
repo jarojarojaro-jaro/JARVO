@@ -65,14 +65,58 @@ function Room({ agent, box, lay, selected, onSelect }) {
   </div>`;
 }
 
+// najbliższy przewijany przodek (w dashboardzie przewija się <main> Hermesa, w demo okno)
+function scrollParent(el) {
+  for (let n = el && el.parentElement; n; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY;
+    if ((oy === "auto" || oy === "scroll") && n.scrollHeight > n.clientHeight) return n;
+  }
+  return null;
+}
+
+// Szerokość sceny (w pikselach logicznych) tak, żeby cała wieża zmieściła się na ekranie nad czatem.
+function useSceneWidth(ref, floors) {
+  const [W, setW] = useState(TW);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const scene = el.parentElement;
+    const H = towerLayout(floors * 2).H;
+    const calc = () => {
+      if (window.innerWidth <= 720) { setW(TW); return; }
+      const sp = scrollParent(el);
+      const top = el.getBoundingClientRect().top + (sp ? sp.scrollTop : window.scrollY);
+      const dock = document.querySelector(".thq-root .thq-dock");
+      const hint = scene && scene.querySelector(".thq-hint");
+      const avail = window.innerHeight - top - (dock ? dock.offsetHeight : 0) - (hint ? hint.offsetHeight : 0) - 18;
+      const cw = scene ? scene.clientWidth : el.clientWidth;
+      if (avail < 260 || !cw) { setW(TW); return; }
+      const w = Math.min(Math.max(TW, (H * cw) / avail), TW * 2.6);
+      setW(Math.round(w / 8) * 8);
+    };
+    calc();
+    const ro = new ResizeObserver(() => calc());
+    if (scene) ro.observe(scene);
+    const dock = document.querySelector(".thq-root .thq-dock");
+    if (dock) ro.observe(dock);
+    window.addEventListener("resize", calc);
+    return () => { ro.disconnect(); window.removeEventListener("resize", calc); };
+  }, [floors]);
+  return W;
+}
+
 function Building({ agents, board, selected, onSelect, online = true }) {
   const boss = agents.find((a) => a.room === "bridge") || agents[0];
   const crew = agents.filter((a) => a !== boss);
-  const lay = towerLayout(crew.length);
-  const moving = agents.some((a) => isBusy(a.status));
-  const slots = crew.map((a, i) => ({ agent: a, box: lay.rooms[i] }));
-  const spare = lay.rooms.slice(crew.length);
+  const floors = Math.max(1, Math.ceil(crew.length / 2));
   const ref = useRef(null);
+  const W = useSceneWidth(ref, floors);
+  const lay = towerLayout(crew.length, W);
+  const at = (b) => ({ ...b, x: b.x + lay.ox });
+  const moving = agents.some((a) => isBusy(a.status));
+  const slots = crew.map((a, i) => ({ agent: a, box: at(lay.rooms[i]) }));
+  const spare = lay.rooms.slice(crew.length).map(at);
+  const bridge = at(lay.bridge);
   // na wąskim ekranie scena przewija się w bok: na start pokazujemy środek (mostek szefa)
   useEffect(() => {
     const sc = ref.current && ref.current.parentElement;
@@ -80,14 +124,14 @@ function Building({ agents, board, selected, onSelect, online = true }) {
   }, []);
   return html`<div class="thq-building thq-tower" ref=${ref}>
     <svg class="thq-tower-art" viewBox=${`0 0 ${lay.W} ${lay.H}`} aria-hidden="true">
-      <${TowerBackdrop} floors=${lay.floors}/>
-      <${TowerMachines} floors=${lay.floors} moving=${moving} online=${online}/>
-      ${boss && html`<${PixRoom} box=${lay.bridge} agent=${boss} board=${board} crew=${crew}/>`}
+      <${TowerBackdrop} floors=${floors} W=${lay.W}/>
+      <${TowerMachines} floors=${floors} W=${lay.W} moving=${moving} online=${online}/>
+      ${boss && html`<${PixRoom} box=${bridge} agent=${boss} board=${board} crew=${crew}/>`}
       ${slots.map(({ agent, box }) => html`<${PixRoom} key=${agent.name} box=${box} agent=${agent} board=${board}/>`)}
       ${spare.map((box, i) => html`<${StorageRoom} key=${`spare-${i}`} box=${box}/>`)}
     </svg>
     <div class="thq-tower-hits">
-      ${boss && html`<${Room} agent=${boss} box=${lay.bridge} lay=${lay} selected=${selected === boss.name} onSelect=${onSelect}/>`}
+      ${boss && html`<${Room} agent=${boss} box=${bridge} lay=${lay} selected=${selected === boss.name} onSelect=${onSelect}/>`}
       ${slots.map(({ agent, box }) => html`<${Room} key=${agent.name} agent=${agent} box=${box} lay=${lay} selected=${selected === agent.name} onSelect=${onSelect}/>`)}
     </div>
   </div>`;

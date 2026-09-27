@@ -78,6 +78,11 @@ pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartu
 
 ## 4. Wieża TARS (wygląd)
 
+Tytuł „TARS HQ”, stan połączenia, liczniki tablicy (w toku, ocena, blokady, kolejka, zrobione dziś) i
+przycisk „Decyzje” siedzą w górnym pasku dashboardu Hermesa (kontekst strony wczytany z modułu dashboardu);
+gdy go nie ma (np. tryb demo), HQ pokazuje własny pasek nad wieżą. Scena dopasowuje się do wysokości
+okna: cała wieża mieści się nad czatem, a nadmiar szerokości wypełnia miasto po bokach.
+
 Scena to **przekrój bazy-wieżowca w pixel arcie**, nocą, jak model z klocków przecięty na pół: płaskie
 cięcie konstrukcji, a pokoje mają głębię (tylna ściana, podłoga w perspektywie, meble). Rysunek powstaje
 w kodzie (`hq/web/src/20-art.js`) na siatce 400 pikseli logicznych i skaluje się w SVG bez rozmycia.

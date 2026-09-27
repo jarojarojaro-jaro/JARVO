@@ -2,7 +2,7 @@
    Kolory powierzchni biorą tokeny motywu dashboardu (--color-*), z własnymi wartościami zapasowymi. */
 @import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&family=Pixelify+Sans:wght@400;500;600;700&display=swap");
 
-.thq-root {
+.thq-root, .thq-headbar {
   /* Motyw dashboardu Hermesa: tekst to --color-card-foreground (--color-foreground bywa pusty). */
   --thq-surface: var(--color-card, #FFFFFF);
   --thq-surface-2: var(--color-muted, #F3F5F8);
@@ -24,7 +24,8 @@
   --thq-ui: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   --thq-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --thq-pixel: "Pixelify Sans", "JetBrains Mono", ui-monospace, monospace;
-
+}
+.thq-root {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -63,6 +64,21 @@
 .thq-decisions-btn { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--thq-line); background: var(--thq-surface); font-weight: 700; }
 .thq-decisions-btn.has-items { background: var(--thq-accent); border-color: var(--thq-accent); color: var(--thq-accent-ink); }
 .thq-badge { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: rgba(0,0,0,.14); font: 700 0.8rem var(--thq-mono); }
+
+/* pasek w nagłówku dashboardu Hermesa (obok tytułu „TARS HQ” i po prawej) */
+.thq-headbar { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--thq-ink); font: 13px/1.2 var(--thq-ui); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.thq-headbar-end { justify-content: flex-end; width: 100%; }
+.thq-headbar .thq-stats { flex-wrap: nowrap; gap: 4px; }
+.thq-headbar .thq-stat { padding: 3px 8px; font-size: 0.78rem; gap: 5px; }
+.thq-headbar .thq-stat strong { font-size: 0.86rem; }
+.thq-headbar .thq-decisions-btn { padding: 4px 12px; font-size: 0.85rem; }
+.thq-headbar .thq-badge { min-width: 20px; height: 20px; font-size: 0.74rem; }
+.thq-live { display: inline-flex; align-items: center; gap: 6px; font: 600 0.74rem var(--thq-mono); color: var(--thq-muted); text-transform: uppercase; letter-spacing: .04em; }
+.thq-live::before { content: ""; width: 7px; height: 7px; background: var(--thq-work); animation: thq-pulse 1.6s ease-in-out infinite; }
+.thq-live.is-stale::before { background: var(--thq-idle); animation: none; }
+.thq-headbar .thq-stat i { font-style: normal; font-size: 0.72rem; opacity: .75; }
+@media (max-width: 1260px) { .thq-headbar .thq-stat span { display: none; } .thq-headbar .thq-stat { padding: 3px 7px; } }
+@media (max-width: 900px) { .thq-live { display: none; } }
 
 /* ----------------------------------------------------------------- layout */
 .thq-main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 14px; align-items: start; }
@@ -130,6 +146,23 @@
 @container (max-width: 200px) { .thq-bubble-detail { display: none; } .thq-bubble { padding: 3px 6px; } }
 @container (max-width: 240px) { .thq-sign .thq-pill-text { display: none; } .thq-sign .thq-pill { width: 10px; height: 10px; padding: 0; }
   .thq-sign .thq-pill.is-work::before { width: 10px; height: 10px; } .thq-sign .thq-pill:not(.is-work) { background: currentColor; } }
+
+/* rozmiar podpisów i dymków rośnie i maleje razem z pokojem (cqw = % szerokości pokoju);
+   mostek jest ~2,2× szerszy od pokoju załogi, więc ma mniejsze mnożniki */
+.thq-room .thq-sign { font-size: clamp(8px, 3.8cqw, 12px); padding: 0.2em 0.55em 0.2em 0.4em; gap: 0.4em; }
+.thq-room .thq-sign-name { font-size: clamp(8.5px, 4.6cqw, 13.5px); }
+.thq-room .thq-sign-emoji { font-size: clamp(8px, 3.6cqw, 13px); }
+.thq-room .thq-sign .thq-pill { font-size: clamp(7.5px, 3.6cqw, 11px); }
+.thq-room .thq-sign-meta { font-size: clamp(7.5px, 3.1cqw, 11px); }
+.thq-room .thq-bubble { font-size: clamp(8px, 3.9cqw, 11.5px); padding: 0.3em 0.6em; }
+.thq-room .thq-bubble-verb { font-size: clamp(8.5px, 4.1cqw, 12px); }
+.thq-room.is-wide .thq-sign { font-size: clamp(8px, 1.5cqw, 12px); }
+.thq-room.is-wide .thq-sign-name { font-size: clamp(8.5px, 2.1cqw, 13.5px); }
+.thq-room.is-wide .thq-sign-emoji { font-size: clamp(8px, 1.65cqw, 13px); }
+.thq-room.is-wide .thq-sign .thq-pill { font-size: clamp(7.5px, 1.45cqw, 11px); }
+.thq-room.is-wide .thq-bubble { font-size: clamp(8px, 1.8cqw, 11.5px); }
+.thq-room.is-wide .thq-bubble-verb { font-size: clamp(8.5px, 1.9cqw, 12px); }
+@container (max-width: 230px) { .thq-bubble-detail { display: none; } }
 
 /* ------------------------------------------------------ animacje pikseli (skokowe, jak w grach) */
 .thq-px-light { opacity: 0; transition: opacity .6s steps(3); } .thq-px-light.is-on { opacity: 1; }
@@ -285,7 +318,7 @@
 .thq-target { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--thq-line); background: var(--thq-surface); font-size: 0.86rem; font-weight: 700; white-space: nowrap; }
 .thq-target.is-active { background: var(--thq-ink); border-color: var(--thq-ink); color: var(--thq-surface); }
 .thq-chat { display: flex; flex-direction: column; }
-.thq-chat-list { max-height: 34vh; min-height: 120px; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.thq-chat-list { max-height: 26vh; min-height: 110px; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .thq-chat.is-compact .thq-chat-list { max-height: none; min-height: 260px; }
 .thq-chat-empty p { margin: 0 0 4px; }
 .thq-msg { display: flex; gap: 8px; max-width: 88%; }

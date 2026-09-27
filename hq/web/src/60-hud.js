@@ -1,5 +1,55 @@
 // Pasek stanu floty i Centrala (decyzje, misje, zdarzenia), widoczna, gdy nie wybrano pokoju.
 
+// Górny pasek dashboardu Hermesa ma kontekst strony (tytuł, elementy obok tytułu, prawa strona).
+// SDK go nie udostępnia, ale moduł jest wczytany przez dashboard (modulepreload), więc import po tym samym
+// adresie zwraca ten sam obiekt kontekstu. Brak modułu = HQ pokazuje własny pasek jak dawniej.
+let PAGE_HEADER_CTX = null;
+const pageHeaderReady = (async () => {
+  try {
+    const link = document.querySelector('link[rel="modulepreload"][href*="page-header-context"]');
+    if (!link) return null;
+    const mod = await import(link.href);
+    PAGE_HEADER_CTX = Object.values(mod).find((v) => v && typeof v === "object" && v.Provider && v.Consumer) || null;
+  } catch (e) {
+    PAGE_HEADER_CTX = null;
+  }
+  return PAGE_HEADER_CTX;
+})();
+const NO_HEADER_CTX = React.createContext(null);
+
+function usePageHeader() {
+  const [ctx, setCtx] = useState(() => PAGE_HEADER_CTX);
+  useEffect(() => {
+    let alive = true;
+    if (!ctx) pageHeaderReady.then((c) => { if (alive && c) setCtx(() => c); });
+    return () => { alive = false; };
+  }, []);
+  const api = React.useContext(ctx || NO_HEADER_CTX);
+  return api && typeof api.setTitle === "function" ? api : null;
+}
+
+function HeadStats({ state, error }) {
+  const b = (state && state.board) || {};
+  const stale = !state || !usePoll.lastOk || (Date.now() / 1000 - usePoll.lastOk > 20);
+  const chips = [["W toku", b.running || 0, "work", "▶"], ["Ocena", b.review || 0, "warn", "⚖"], ["Blokady", b.blocked || 0, "bad", "■"],
+    ["Kolejka", b.ready || 0, "info", "▭"], ["Zrobione dziś", b.done_today || 0, "good", "✔"]];
+  return html`<div class="thq-headbar">
+    <span class=${cx("thq-live", stale && "is-stale")} title=${error || ""}>${stale ? (error ? "brak połączenia" : "łączę…") : `na żywo · ${clock(state.ts)}`}</span>
+    <ul class="thq-stats" aria-label="Stan tablicy">
+      ${chips.map(([label, n, tone, icon]) => html`<li key=${label} class=${cx("thq-stat", n > 0 && `is-${tone}`)} title=${`${label}: ${n}`}>
+        <i aria-hidden="true">${icon}</i><strong>${n}</strong><span>${label}</span></li>`)}
+    </ul>
+  </div>`;
+}
+
+function HeadDecisions({ count, onClick }) {
+  return html`<div class="thq-headbar thq-headbar-end">
+    <button type="button" class=${cx("thq-decisions-btn", count > 0 && "has-items")} onClick=${onClick}>
+      Decyzje <span class="thq-badge">${count}</span>
+    </button>
+  </div>`;
+}
+
 function Hud({ state, error, onDecisions, now }) {
   const b = (state && state.board) || {};
   const d = (state && state.decisions) || [];

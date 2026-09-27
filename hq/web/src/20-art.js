@@ -561,7 +561,9 @@ function StorageRoom({ box }) {
 // ------------------------------------------------------------------ wieża, miasto, maszynownia
 
 const TW = 400;
-function towerLayout(crewCount) {
+// Układ wieży we własnych współrzędnych (400 px); W ≥ 400 to szerokość sceny: nadmiar wypełnia miasto,
+// a wieża stoi na środku (ox = przesunięcie). Dzięki temu scena mieści się na ekranie bez pustych pasów.
+function towerLayout(crewCount, W = TW) {
   const floors = Math.max(1, Math.ceil(crewCount / 2));
   const roofY = 40, bridge = { x: 58, y: 46, w: 284, h: 84 };
   const crewY0 = bridge.y + bridge.h + 6;
@@ -573,21 +575,24 @@ function towerLayout(crewCount) {
   const baseY = crewY0 + floors * 76;
   const groundY = baseY - 6;
   const base = { x: 58, y: baseY, w: 284, h: 40 };
-  return { W: TW, H: baseY + 52, floors, roofY, bridge, crewY0, rooms, baseY, groundY, base, shaft: { x: 188, y: crewY0, w: 24, h: baseY + 40 - crewY0 } };
+  const w = Math.max(TW, Math.round(W));
+  return { W: w, ox: Math.round((w - TW) / 2), H: baseY + 52, floors, roofY, bridge, crewY0, rooms, baseY, groundY, base,
+    shaft: { x: 188, y: crewY0, w: 24, h: baseY + 40 - crewY0 } };
 }
 
 function drawSky(L, lay) {
   const g = L.get("sky");
   const bands = ["#070A18", "#0A0F22", "#0D142D", "#111A39", "#152046"];
   const bh = Math.ceil(lay.groundY / bands.length);
-  bands.forEach((c, i) => g.r(0, i * bh, TW, bh, c));
-  for (let i = 1; i < bands.length; i++) for (let row = 0; row < 2; row++) for (let x = row; x < TW; x += 2) g.p(x, i * bh - 1 - row, row ? bands[i - 1] : bands[i]);
+  const W = lay.W, mx = lay.ox + 370;
+  bands.forEach((c, i) => g.r(0, i * bh, W, bh, c));
+  for (let i = 1; i < bands.length; i++) for (let row = 0; row < 2; row++) for (let x = row; x < W; x += 2) g.p(x, i * bh - 1 - row, row ? bands[i - 1] : bands[i]);
   const rnd = rng(42), tw = [L.get("tw1", "thq-px-tw"), L.get("tw2", "thq-px-tw thq-px-tw2"), L.get("tw3", "thq-px-tw thq-px-tw3")];
-  for (let i = 0; i < 70; i++) {
-    const x = Math.floor(rnd() * TW), y = Math.floor(rnd() * (lay.groundY - 60));
+  for (let i = 0; i < Math.round(70 * W / TW); i++) {
+    const x = Math.floor(rnd() * W), y = Math.floor(rnd() * (lay.groundY - 60));
     (i % 4 === 0 ? tw[i % 3] : g).p(x, y, rnd() < 0.3 ? "#FFFFFF" : "#8C9BC4");
   }
-  g.circle(370, 21, 8, "#E9D8A6"); g.circle(374, 18, 6, bands[0]); g.p(367, 24, "#CDBB86"); g.p(365, 20, "#CDBB86");
+  g.circle(mx, 21, 8, "#E9D8A6"); g.circle(mx + 4, 18, 6, bands[0]); g.p(mx - 3, 24, "#CDBB86"); g.p(mx - 5, 20, "#CDBB86");
 }
 
 function drawCity(L, lay) {
@@ -607,21 +612,25 @@ function drawCity(L, lay) {
       x += w + (rnd() < 0.3 ? 1 : 0);
     }
   };
-  block(0, 58, far, "#10162B", 90, lay.groundY - 40, 0.18);
-  block(342, TW, far, "#10162B", 90, lay.groundY - 40, 0.18);
-  block(0, 50, near, "#0A0E1C", 30, 140, 0.28);
-  block(350, TW, near, "#0A0E1C", 30, 140, 0.28);
+  const ox = lay.ox, W = lay.W;
+  block(0, ox + 58, far, "#10162B", 90, lay.groundY - 40, 0.18);
+  block(ox + 342, W, far, "#10162B", 90, lay.groundY - 40, 0.18);
+  block(0, ox + 50, near, "#0A0E1C", 30, 140, 0.28);
+  block(ox + 350, W, near, "#0A0E1C", 30, 140, 0.28);
 }
 
 function drawGround(L, lay) {
-  const g = L.get("ground"), gy = lay.groundY;
-  g.r(0, gy, TW, lay.H - gy, "#241A14");
+  const g = L.get("ground"), gy = lay.groundY, W = lay.W;
+  g.r(0, gy, W, lay.H - gy, "#241A14");
   const rnd = rng(5);
-  for (let i = 0; i < 120; i++) g.p(Math.floor(rnd() * TW), gy + 6 + Math.floor(rnd() * (lay.H - gy - 6)), rnd() < 0.5 ? "#33261D" : "#1B130E");
-  for (let i = 0; i < 10; i++) { const x = Math.floor(rnd() * TW), y = gy + 14 + Math.floor(rnd() * (lay.H - gy - 20)); g.r(x, y, 3, 2, "#4A4038"); }
-  g.r(0, gy, TW, 2, "#3A3F4A"); g.r(0, gy + 2, TW, 3, "#15181E");
-  for (let x = 4; x < TW; x += 14) g.r(x, gy + 3, 6, 1, "#C9A24C");
-  [[18], [382]].forEach(([x]) => {
+  for (let i = 0; i < Math.round(120 * W / TW); i++) g.p(Math.floor(rnd() * W), gy + 6 + Math.floor(rnd() * (lay.H - gy - 6)), rnd() < 0.5 ? "#33261D" : "#1B130E");
+  for (let i = 0; i < Math.round(10 * W / TW); i++) { const x = Math.floor(rnd() * W), y = gy + 14 + Math.floor(rnd() * (lay.H - gy - 20)); g.r(x, y, 3, 2, "#4A4038"); }
+  g.r(0, gy, W, 2, "#3A3F4A"); g.r(0, gy + 2, W, 3, "#15181E");
+  for (let x = 4; x < W; x += 14) g.r(x, gy + 3, 6, 1, "#C9A24C");
+  const lamps = [];
+  for (let x = lay.ox + 18; x > 0; x -= 90) lamps.push([x]);
+  for (let x = lay.ox + 382; x < W; x += 90) lamps.push([x]);
+  lamps.forEach(([x]) => {
     g.r(x, gy - 24, 1, 24, "#3A4350"); g.r(x - 2, gy - 25, 5, 2, "#F5E6A8");
     for (let j = 0; j < 22; j++) g.r(x - 2 - Math.round(j * 0.4), gy - 23 + j, 5 + Math.round(j * 0.8), 1, "rgba(245,230,168,.05)");
   });
@@ -695,16 +704,18 @@ function drawBasement(L, lay, online) {
 }
 
 // Statyczne tło (niebo, miasto, grunt, kadłub, dach): rysowane raz dla danej liczby pięter
-const TowerBackdrop = React.memo(function TowerBackdrop({ floors }) {
-  const lay = towerLayout(floors * 2);
+const TowerBackdrop = React.memo(function TowerBackdrop({ floors, W }) {
+  const lay = towerLayout(floors * 2, W);
   const L = new Layers();
-  drawSky(L, lay); drawCity(L, lay); drawGround(L, lay); drawHull(L, lay);
-  return html`<g>${L.render()}</g>`;
+  drawSky(L, lay); drawCity(L, lay); drawGround(L, lay);
+  const T = new Layers(lay.ox, 0);
+  drawHull(T, lay);
+  return html`<g>${L.render()}${T.render()}</g>`;
 });
 
-function TowerMachines({ floors, moving, online }) {
-  const lay = towerLayout(floors * 2);
-  const L = new Layers();
+function TowerMachines({ floors, W, moving, online }) {
+  const lay = towerLayout(floors * 2, W);
+  const L = new Layers(lay.ox, 0);
   drawShaft(L, lay, moving);
   drawBasement(L, lay, online);
   return html`<g>${L.render()}</g>`;

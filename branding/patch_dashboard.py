@@ -11,6 +11,7 @@ nie wywraca budowy, tylko wypisuje, czego nie znalazła (wyjątek: tytuł karty,
 
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 import sys
@@ -20,6 +21,9 @@ HERMES = Path("/opt/hermes")
 WEB = HERMES / "hermes_cli" / "web_dist"
 
 
+CHANGED: set[Path] = set()
+
+
 def sub_all(files, pattern: str, repl: str, label: str, flags=0) -> int:
     n = 0
     for f in files:
@@ -27,9 +31,45 @@ def sub_all(files, pattern: str, repl: str, label: str, flags=0) -> int:
         new, k = re.subn(pattern, repl, text, flags=flags)
         if k:
             f.write_text(new, encoding="utf-8")
+            CHANGED.add(f)
             n += k
     print(f"  {'✓' if n else '·'} {label}: {n}")
     return n
+
+
+def bust_cache(assets_dir: Path, index: Path) -> int:
+    """Nowe nazwy dla zmienionych plików JS (i wszystkich, które je importują).
+
+    Dashboard serwuje /assets/* z `Cache-Control: immutable` na rok, a nazwa pliku to hash treści
+    z builda Hermesa. Po podmianie treści przeglądarka trzymałaby starą wersję, więc zmieniony plik
+    dostaje przyrostek zależny od treści, a zmiana nazwy przechodzi w górę po importach aż do
+    index.html (który nie jest cache'owany na stałe).
+    """
+    files = sorted(assets_dir.glob("*.js"))
+    changed = {f for f in CHANGED if f.parent == assets_dir}
+    if not changed:
+        return 0
+    digest = hashlib.sha1(b"".join(f.read_bytes() for f in sorted(changed))).hexdigest()[:6]
+    texts = {f: f.read_text(encoding="utf-8") for f in files}
+    names = {f.name for f in changed}
+    grew = True
+    while grew:  # domknięcie: kto importuje zmieniony plik, sam się zmienia
+        grew = False
+        for f in files:
+            if f.name not in names and any(n in texts[f] for n in names):
+                names.add(f.name); grew = True
+    rename = {n: n[:-3] + f"-t{digest}.js" for n in names}
+    pattern = re.compile("|".join(re.escape(n) for n in sorted(rename, key=len, reverse=True)))
+    for f in files:
+        new = pattern.sub(lambda m: rename[m.group(0)], texts[f])
+        target = assets_dir / rename.get(f.name, f.name)
+        target.write_text(new, encoding="utf-8")
+        if target != f:
+            f.unlink()
+    html = index.read_text(encoding="utf-8")
+    index.write_text(pattern.sub(lambda m: rename[m.group(0)], html), encoding="utf-8")
+    print(f"  ✓ nowe nazwy plików (bez starej wersji w cache przeglądarki): {len(rename)}")
+    return len(rename)
 
 
 def main(argv: list[str]) -> int:
@@ -57,6 +97,7 @@ def main(argv: list[str]) -> int:
     if login.is_file():
         sub_all([login], r"the Hermes Agent dashboard", "TARS HQ", "strona logowania (opis)")
         sub_all([login], r" — Hermes Agent<", " — TARS<", "strona logowania (tytuł)")
+    bust_cache(WEB / "assets", WEB / "index.html")
     return 0
 
 

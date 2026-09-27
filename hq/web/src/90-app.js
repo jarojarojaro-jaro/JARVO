@@ -6,7 +6,8 @@ function App() {
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState("now");
   const [target, setTarget] = useState(null);
-  const [dockOpen, setDockOpen] = useState(() => (typeof window === "undefined" ? true : window.innerWidth > 720));
+  // czat rozwinięty na start tylko na wysokim ekranie: wieża ma się mieścić bez przewijania
+  const [dockOpen, setDockOpen] = useState(() => (typeof window === "undefined" ? true : window.innerWidth > 720 && window.innerHeight >= 1000));
   const [pending, setPending] = useState(null);
   const [taskId, setTaskId] = useState(null);
   const [file, setFile] = useState(null);   // okna renderujemy tu, nad całym HQ (panel i dock mają własne warstwy)
@@ -18,6 +19,18 @@ function App() {
   const agents = (state && state.agents) || fleet.map((a) => ({ ...a, status: "idle", counts: {} }));
   const boss = agents.find((a) => a.kind === "orchestrator") || agents[0];
   const chatTarget = target || (boss && boss.name);
+  const header = usePageHeader();
+  const openDecisions = () => { setSelected(null); setFocus("decisions"); setTimeout(() => setFocus(null), 600); };
+  const nDecisions = ((state && state.decisions) || []).length;
+
+  // tytuł, liczniki i przycisk decyzji w górnym pasku dashboardu (zamiast osobnego nagłówka HQ)
+  useEffect(() => {
+    if (!header) return;
+    header.setTitle("TARS HQ");
+    header.setAfterTitle(html`<${HeadStats} state=${state} error=${error}/>`);
+    header.setEnd(html`<${HeadDecisions} count=${nDecisions} onClick=${openDecisions}/>`);
+  }, [header, state, error, nDecisions]);
+  useEffect(() => () => { if (header) { header.setTitle(null); header.setAfterTitle(null); header.setEnd(null); } }, [header]);
 
   const select = (name) => {
     setSelected((cur) => (cur === name ? null : name));
@@ -41,7 +54,7 @@ function App() {
   }
 
   return html`<div class=${cx("thq-root", selected && "has-selection")}>
-    <${Hud} state=${state} error=${error} now=${now} onDecisions=${() => { setSelected(null); setFocus("decisions"); setTimeout(() => setFocus(null), 600); }}/>
+    ${!header && html`<${Hud} state=${state} error=${error} now=${now} onDecisions=${openDecisions}/>`}
     <main class="thq-main">
       <div class="thq-scene">
         <${Building} agents=${agents} board=${(state && state.board) || {}} selected=${selected} onSelect=${select} online=${!error}/>
