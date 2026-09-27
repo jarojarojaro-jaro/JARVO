@@ -78,3 +78,6 @@ input, textarea, select { background-color: var(--fos-bg) !important; }
 aside.fixed > div.shrink-0 > span.text-text-tertiary { display: none; }
 aside.fixed > div.shrink-0 a p:nth-child(2) { display: none; }
 aside.fixed > div.shrink-0 a { padding-top: 8px !important; padding-bottom: 4px !important; }
+
+/* wiersze list (np. Keys): po najechaniu podświetla się cały pasek, jak w Config */
+div[class*="hover:text-foreground"]:hover { background: color-mix(in srgb, var(--fos) 12%, transparent); color: var(--fos) !important; }
