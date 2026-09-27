@@ -31,6 +31,10 @@ if [[ ! -f "$L/compose/.env" ]]; then
   sudo chgrp -R 10000 "$L/secrets" && sudo chmod 2750 "$L/secrets" && sudo chmod 640 "$L"/secrets/*.env
   chmod 600 "$L/compose/.env"
 fi
+# kontener pracuje jako uid 10000 (użytkownik hermes): build i dane muszą być jego
+if [[ "$(stat -c %u "$L/build")" != "10000" || "$(stat -c %u "$L/data")" != "10000" ]]; then
+  sudo chown -R 10000:10000 "$L/build" "$L/data"
+fi
 
 TARS_COMPOSE_DIR="$L/compose" TARS_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" --first-run --no-pull
 
