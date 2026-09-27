@@ -362,3 +362,16 @@ def test_outputs_prune_heavy_dirs(tmp_path):
         (nm / f"f{i}.js").write_text("", encoding="utf-8")
     files = core.list_outputs([ws], core.Roots(tars_dir=tars))
     assert [f["name"] for f in files] == ["a.png"]
+
+
+def test_gave_up_card_is_a_failed_decision(home):
+    import json, sqlite3
+    conn = sqlite3.connect(home / "kanban.db")
+    conn.execute("UPDATE tasks SET status = 'blocked', block_kind = NULL WHERE id = 't_a2'")
+    conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?,?,?,?)",
+                 ("t_a2", "gave_up", json.dumps({"failures": 2, "error": "Traceback…\nError: Unknown skill(s): x"}), NOW - 5))
+    conn.commit(); conn.close()
+    st = core.build_state(FLEET, core.read_board(home / "kanban.db", NOW), INDEX, NOW)
+    failed = [d for d in st["decisions"] if d.get("kind") == "failed"]
+    assert [d["task_id"] for d in failed] == ["t_a2"]
+    assert failed[0]["reason"] == "Error: Unknown skill(s): x" and failed[0]["failures"] == 2

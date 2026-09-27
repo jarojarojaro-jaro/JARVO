@@ -79,7 +79,9 @@ input, textarea, select { background-color: var(--fos-bg) !important; }
 /* nic nie miga poza kursorem przy logo */
 .thq-root *, .thq-headbar * { animation: none !important; }
 /* wieża: własne kolory, bez poświaty i linii skanowania */
-.thq-tower, .thq-building { position: relative; z-index: 10000; text-shadow: none; }
+.thq-tower, .thq-building { text-shadow: none; }
+/* okna (karta, podgląd pliku) ponad liniami skanowania i wszystkim innym */
+.thq-modal-back { z-index: 10001 !important; }
 
 /* sekcja System w menu: tylko status gatewaya i przycisk restartu */
 aside.fixed > div.shrink-0 > span.text-text-tertiary { display: none; }
@@ -88,3 +90,6 @@ aside.fixed > div.shrink-0 a { padding-top: 8px !important; padding-bottom: 4px 
 
 /* wiersze list (np. Keys): po najechaniu podświetla się cały pasek, jak w Config */
 div[class*="hover:text-foreground"]:hover { background: color-mix(in srgb, var(--fos) 12%, transparent); color: var(--fos) !important; }
+.thq-modal { border-radius: 0 !important; border: 2px solid var(--fos-mid); background: var(--fos-bg2) !important;
+  color: var(--fos) !important; font-family: var(--theme-font-sans) !important; box-shadow: 0 0 40px rgba(0, 0, 0, .8) !important; }
+.thq-modal-head h3 { font-family: var(--theme-font-display) !important; font-weight: 400 !important; font-size: 26px !important; letter-spacing: .06em; }

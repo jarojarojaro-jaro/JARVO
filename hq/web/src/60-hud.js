@@ -77,9 +77,30 @@ function Hud({ state, error, onDecisions, now }) {
   </header>`;
 }
 
+function FailedCard({ item, agents, onAnswer }) {
+  const [state, setState] = useState("");
+  const a = agents.find((x) => x.name === item.assignee);
+  const retry = async () => {
+    setState("…");
+    try { await api.retry(item.task_id); setState("ok"); } catch (e) { setState(`Błąd: ${e.message}`); }
+  };
+  return html`<li class="thq-decision is-failed">
+    <p class="thq-decision-q">Karta porzucona po błędach${item.failures ? ` (${item.failures}×)` : ""}.</p>
+    <p class="thq-muted">${a ? `${a.emoji} ${a.short || a.name}` : item.assignee} · ${item.title} · ${ago(item.since)}</p>
+    <p class="thq-decision-err">${item.reason}</p>
+    ${state === "ok" ? html`<p class="thq-ok">Karta wraca do kolejki: pracownik spróbuje ponownie.</p>`
+      : html`<div class="thq-decision-form">
+        <button type="button" class="thq-send" onClick=${retry} disabled=${state === "…"}>Ponów kartę</button>
+        <button type="button" class="thq-ghost" onClick=${() => onAnswer(item, "karta padła po błędach, sprawdź przyczynę i zdecyduj, co dalej")}>Przekaż TARS-owi</button>
+      </div>`}
+    ${state && state !== "ok" && state !== "…" ? html`<p class="thq-error">${state}</p>` : null}
+  </li>`;
+}
+
 function Decision({ item, agents, onAnswer }) {
   const [text, setText] = useState("");
   const [sent, setSent] = useState(false);
+  if (item.kind === "failed") return html`<${FailedCard} item=${item} agents=${agents} onAnswer=${onAnswer}/>`;
   const a = agents.find((x) => x.name === item.assignee);
   const submit = (e) => {
     e.preventDefault();

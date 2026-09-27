@@ -285,8 +285,10 @@ async def chat_history(name: str, limit: int = 60):
     base, key = _api_target(name)
     async with httpx.AsyncClient(timeout=15) as client:
         try:
+            # 500 = maksimum gatewaya: jedna tura z narzędziami to kilkadziesiąt wpisów, a w dymkach
+            # pokazujemy tylko wypowiedzi (ostatnie `limit`), więc bierzemy z zapasem
             r = await client.get(f"{base}/api/sessions/{sid}/messages",
-                                 params={"limit": min(limit, 200), "order": "latest"},
+                                 params={"limit": 500, "order": "latest"},
                                  headers={"Authorization": f"Bearer {key}"})
         except httpx.HTTPError as exc:
             return JSONResponse({"session_id": sid, "messages": [], "error": f"Gateway niedostępny: {exc}"}, 503)
@@ -294,7 +296,7 @@ async def chat_history(name: str, limit: int = 60):
         return {"session_id": None, "messages": []}
     if r.status_code >= 300:
         return JSONResponse({"session_id": sid, "messages": [], "error": _api_error(r, name)}, 502)
-    return {"session_id": sid, "messages": chat_messages(r.json().get("data", []))}
+    return {"session_id": sid, "messages": chat_messages(r.json().get("data", []))[-max(1, min(limit, 200)):]}
 
 
 def chat_messages(raw: list[dict]) -> list[dict]:
@@ -378,6 +380,20 @@ async def chat_reset(name: str):
 
 
 # ------------------------------------------------------------------------ diagnoza
+
+@router.post("/task/{task_id}/retry")
+async def task_retry(task_id: str):
+    """Ponowienie karty porzuconej po błędach (hermes kanban unblock → dispatcher uruchomi ją znowu)."""
+    if not task_id.replace("_", "").isalnum():
+        raise HTTPException(400, "Zły identyfikator karty")
+    hermes = os.environ.get("TARS_HERMES_BIN") or "/opt/hermes/.venv/bin/hermes"
+    proc = await asyncio.create_subprocess_exec(hermes, "kanban", "unblock", task_id,
+                                                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+    out, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
+    if proc.returncode != 0:
+        raise HTTPException(500, f"Nie udało się ponowić karty: {out.decode(errors='replace')[-300:]}")
+    return {"ok": True}
+
 
 @router.get("/health")
 async def health():

@@ -78,7 +78,8 @@ cel: jeden pakiet w `@@MISSIONS_DIR@@/<MISJA>/zlozenie/out/` (INDEX.md z opisem 
 
 ## Po utworzeniu kart
 1. Zapisz plan w `MISSION.md` (tabela kart: id, agent, zależy od, status) i dopisz misję do `INDEX.md` (skill `mission-ledger`).
-2. Odpowiedz użytkownikowi jednym zdaniem: kto co robi, kiedy wynik.
+2. Odpowiedz użytkownikowi jednym zdaniem: kto co robi, kiedy wynik. **Zakończ turę**: nie czekaj
+   (`sleep`), nie odpytuj tablicy w pętli; zdarzenia z tablicy obudzą Cię same.
 
 ## Zdarzenia z tablicy (budzą Cię automatycznie)
 

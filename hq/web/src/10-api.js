@@ -62,6 +62,7 @@ const liveApi = {
   task: (id) => SDK.fetchJSON(`${API_ROOT}/task/${encodeURIComponent(id)}`),
   history: (name) => SDK.fetchJSON(`${API_ROOT}/chat/${encodeURIComponent(name)}/history`),
   reset: (name) => SDK.fetchJSON(`${API_ROOT}/chat/${encodeURIComponent(name)}/reset`, { method: "POST" }),
+  retry: (id) => SDK.fetchJSON(`${API_ROOT}/task/${encodeURIComponent(id)}/retry`, { method: "POST" }),
   async fileBlob(path) {
     const res = await rawFetch(`${API_ROOT}/file?path=${encodeURIComponent(path)}`);
     return res.blob();

@@ -414,8 +414,21 @@ def build_state(fleet: list[dict], board: dict, index_md: str, now: float,
 
     decisions = []
     for t in tasks:
-        if t.get("status") == "blocked" and (t.get("block_kind") in (None, "", "needs_input")):
-            ev = _last_event(events, t["id"], "blocked") or {}
+        if t.get("status") != "blocked":
+            continue
+        # karta porzucona po błędach (pracownik padał): pokazujemy przyczynę i „Ponów”, nie pytanie
+        gave = _last_event(events, t["id"], "gave_up")
+        blk = _last_event(events, t["id"], "blocked")
+        if gave and (not blk or (gave.get("created_at") or 0) >= (blk.get("created_at") or 0)):
+            gp = gave.get("payload", {})
+            err = str(gp.get("error") or "").strip().splitlines()
+            decisions.append({"task_id": t["id"], "title": t.get("title"), "assignee": t.get("assignee"),
+                              "kind": "failed", "failures": gp.get("failures"),
+                              "reason": (err[-1] if err else "pracownik kończył się błędem")[:300],
+                              "since": gave.get("created_at") or t.get("created_at")})
+            continue
+        if t.get("block_kind") in (None, "", "needs_input"):
+            ev = blk or {}
             p = ev.get("payload", {})
             if p.get("kind") not in (None, "needs_input"):
                 continue

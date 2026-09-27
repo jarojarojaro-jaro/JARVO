@@ -341,6 +341,7 @@
     task: async (id) => task(id),
     history: async (name) => ({ session_id: "demo", messages: chatOf(name).slice() }),
     reset: async (name) => { S.chats[name] = []; return { ok: true }; },
+    retry: async () => ({ ok: true }),
     fileBlob,
     send,
   };
