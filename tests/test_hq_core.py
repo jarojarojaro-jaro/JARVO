@@ -276,7 +276,7 @@ def test_hq_plugin_build(tmp_path):
     assert names[0] == fleet["orchestrator"] == "tars"
     tars = fleet["agents"][0]
     assert tars["room"] == "bridge" and tars["short"] == "TARS" and ["Szczerość", 90] in tars["personality"]
-    assert all(a["model"].count("/") == 1 for a in fleet["agents"])
+    assert all(a["model"] for a in fleet["agents"])
 
 
 def test_hq_demo_build(tmp_path):

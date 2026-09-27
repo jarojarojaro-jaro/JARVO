@@ -5,7 +5,7 @@ model:
   default: "@@MODEL@@"
 
 agent:
-  reasoning_effort: medium
+  reasoning_effort: low
   max_turns: 250
 
 timezone: "@@TIMEZONE@@"

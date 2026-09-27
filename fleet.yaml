@@ -21,12 +21,16 @@ reviewer: tars            # recenzent kart: snajperzy wołają kanban_request_re
 # nadpisać przez TARS_MODEL_FRONTIER / TARS_MODEL_STRONG / TARS_MODEL_FAST.
 # scripts/check-models.py sprawdza przed wdrożeniem, czy identyfikatory istnieją u dostawcy.
 models:
-  provider: openrouter
-  tiers:                                    # zestaw openrouter (zweryfikowany 2026-09-26)
-    frontier: anthropic/claude-opus-5.5     # TARS: orkiestracja i ocena
-    strong: anthropic/claude-sonnet-5       # snajperzy i prawa ręka
-    fast: anthropic/claude-haiku-4.5        # subagenci, zadania pomocnicze, rutyny
+  provider: openai-codex                    # OpenAI przez logowanie ChatGPT (OAuth, Models → Login)
+  tiers:                                    # jeden model, głębia myślenia per agent (reasoning_effort w config.yaml)
+    frontier: gpt-6-luna                    # TARS: effort high
+    strong: gpt-6-luna                      # specjaliści: effort low
+    fast: gpt-6-luna                        # subagenci i rutyny
   presets:                                  # nazwa zestawu = dostawca Hermesa (zweryfikowane 2026-09-27)
+    openrouter:                             # OpenRouter (klucz OPENROUTER_API_KEY)
+      frontier: anthropic/claude-opus-5.5
+      strong: anthropic/claude-sonnet-5
+      fast: anthropic/claude-haiku-4.5
     commandcode:                            # CommandCode, modele z podstawowych planów (DeepSeek, Kimi)
       frontier: deepseek/deepseek-v4-pro
       strong: moonshotai/Kimi-K2.6
@@ -37,6 +41,7 @@ models:
       fast: claude-haiku-4-5-20251001
   # model zapasowy, gdy główny odmówi (np. „model poza planem”); klucz: nazwa zestawu
   fallback:
+    openai-codex: {provider: commandcode, model: deepseek/deepseek-v4-pro}
     commandcode-anthropic: {provider: commandcode, model: deepseek/deepseek-v4-pro}
     commandcode: {provider: commandcode, model: deepseek/deepseek-v4-flash}
   media:

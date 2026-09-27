@@ -12,10 +12,10 @@ sys.path.insert(0, str(REPO / "scripts"))
 import fleetlib as fl  # noqa: E402
 
 
-def test_default_is_openrouter():
+def test_default_is_openai_codex():
     f = fl.load_fleet()
     f.apply_model_overrides({})
-    assert f.provider == "openrouter" and f.model_for("frontier").startswith("anthropic/")
+    assert f.provider == "openai-codex" and f.model_for("frontier") == "gpt-6-luna"
 
 
 def test_preset_and_single_model_override():
