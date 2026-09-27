@@ -36,7 +36,7 @@ except ImportError:  # pragma: no cover - lokalnie
         p.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
 REPLACE = ["platform_toolsets", "timezone"]
-MERGE = ["gateway", "kanban", "approvals", "memory", "stt"]
+MERGE = ["gateway", "kanban", "approvals", "memory", "stt", "display"]
 ONLY_IF_MISSING = ["model"]
 
 

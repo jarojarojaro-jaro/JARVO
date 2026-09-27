@@ -72,3 +72,7 @@ security:
 
 kanban:
   auto_subscribe_on_create: true
+
+# Branding terminala: skórka TARS (branding/skin-tars.yaml)
+display:
+  skin: tars

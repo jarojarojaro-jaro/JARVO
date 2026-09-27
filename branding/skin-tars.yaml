@@ -1,0 +1,51 @@
+# Skórka terminala Hermesa z brandingiem TARS (display.skin: tars).
+# Kopiowana przez install-fleet.sh do <HERMES_HOME>/skins/ hosta i każdego profilu.
+name: tars
+description: "TARS — stal i bursztyn"
+colors:
+  banner_border: "#7E8896"
+  banner_title: "#E4E9EF"
+  banner_accent: "#F2C14E"
+  banner_dim: "#6E7886"
+  banner_text: "#D5DBE2"
+  ui_accent: "#F2C14E"
+  ui_label: "#A4AEBA"
+  prompt: "#E4E9EF"
+  input_rule: "#7E8896"
+  response_border: "#A4AEBA"
+  status_bar_bg: "#14181E"
+  status_bar_text: "#A4AEBA"
+  status_bar_strong: "#F2C14E"
+  status_bar_dim: "#6E7886"
+  session_label: "#A4AEBA"
+  session_border: "#4A525E"
+  completion_menu_bg: "#14181E"
+  completion_menu_current_bg: "#2A313B"
+  selection_bg: "#2A313B"
+  voice_status_bg: "#14181E"
+light_colors:
+  banner_title: "#1F252D"
+  banner_accent: "#B7861A"
+  banner_text: "#2F3640"
+  ui_accent: "#B7861A"
+  ui_label: "#5A6370"
+  prompt: "#1F252D"
+  response_border: "#5A6370"
+  status_bar_bg: "#EEF1F4"
+  status_bar_text: "#4A525E"
+  status_bar_strong: "#B7861A"
+  completion_menu_bg: "#EEF1F4"
+  completion_menu_current_bg: "#D8DEE5"
+  selection_bg: "#D8DEE5"
+  voice_status_bg: "#EEF1F4"
+branding:
+  agent_name: "TARS"
+  welcome: "TARS online. Szczerość 90%, humor 75%. Napisz zadanie albo /help."
+  goodbye: "TARS: rozłączam się. ▮▮▮▮"
+  response_label: " ▮ TARS "
+  prompt_symbol: "▮"
+  help_header: "▮ Komendy"
+tool_prefix: "│"
+banner_logo: |
+  [bold #E4E9EF]▐█▌ ▐█▌ ▐█▌ ▐█▌[/]   [bold #F2C14E]T A R S[/]
+  [#A4AEBA]▐█▌ ▐█▌ ▐█▌ ▐█▌[/]   [#6E7886]flota agentów[/]

@@ -90,6 +90,14 @@ if [[ -d "$BUILD/plugins/tars-hq" ]]; then
   HQ_CHANGED=1
 fi
 
+# 3d. branding terminala: skórka "tars" dla hosta i każdego profilu (display.skin w config.yaml)
+if [[ -f "$REPO/branding/skin-tars.yaml" ]]; then
+  for home in "$DATA" "$DATA"/profiles/*/; do
+    [[ -d "$home" ]] || continue
+    mkdir -p "$home/skins" && cp "$REPO/branding/skin-tars.yaml" "$home/skins/tars.yaml"
+  done
+fi
+
 # 4. tablica kanban
 if [[ $FIRST -eq 1 || ! -f "$DATA/kanban.db" ]]; then
   log "Tablica kanban"

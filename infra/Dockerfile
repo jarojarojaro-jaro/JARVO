@@ -60,6 +60,11 @@ RUN set -e; p=""; \
     fi; \
     [ -n "$p" ] || { echo "Nie znaleziono Chromium w obrazie Hermesa" >&2; exit 1; }; \
     ln -sf "$p" /usr/local/bin/chromium && echo "chromium -> $p"
+
+# --- branding TARS w dashboardzie Hermesa (MIT; licencja i autorzy: docs/SOURCES.md):
+#     favicon, tytuł karty i nazwa w menu. Kod Hermesa bez zmian, tylko statyczne zasoby.
+COPY branding/ /tmp/tars-brand/
+RUN python3 /tmp/tars-brand/patch_dashboard.py /tmp/tars-brand && rm -rf /tmp/tars-brand
 # 2) Lightpanda: silnik agent-browsera dla browser_* (≈ 25–30 MB RAM na sesję zamiast ~300 MB Chromium);
 #    Hermes sam przełącza na Chromium przy zrzutach ekranu i stronach, których Lightpanda nie obsłuży.
 COPY --from=lightpanda-strip /tmp/lightpanda /usr/local/bin/lightpanda

@@ -45,3 +45,7 @@ memory:
 platform_toolsets:
   cli: [kanban, file, terminal, skills]
   telegram: [clarify]
+
+# Branding terminala: skórka TARS (branding/skin-tars.yaml)
+display:
+  skin: tars
