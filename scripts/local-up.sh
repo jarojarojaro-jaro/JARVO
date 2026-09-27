@@ -42,7 +42,7 @@ PASS="$(grep '^DASHBOARD_PASSWORD=' "$L/compose/.env" | cut -d= -f2)"
 cat <<EOF
 
 ✅ Flota działa.
-   TARS HQ:  http://localhost:9119   login: tars   hasło: $PASS
+   TARS HQ:  http://localhost:9119/base   login: tars   hasło: $PASS
    czat:     docker exec -it -u hermes tars-hermes hermes -p tars chat
    RAM:      docker stats
    stop:     bash scripts/local-up.sh down

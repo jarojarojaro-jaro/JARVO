@@ -264,7 +264,7 @@ def test_hq_plugin_build(tmp_path):
     for rel in ("manifest.json", "plugin_api.py", "hq_core.py", "fleet.json", "dist/index.js", "dist/style.css", "dist/LICENSE-htm"):
         assert (dash / rel).exists(), rel
     manifest = json.loads((dash / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["name"] == "tars-hq" and manifest["api"] == "plugin_api.py" and manifest["tab"]["override"] == "/"
+    assert manifest["name"] == "tars-hq" and manifest["api"] == "plugin_api.py" and manifest["tab"]["path"] == "/base" and manifest["tab"]["position"] == "before:chat"
     js = (dash / "dist" / "index.js").read_text(encoding="utf-8")
     for src in sorted((Path(hqbuild.HQ) / "web" / "src").glob("*.js")):
         assert f"// ---- {src.name}" in js

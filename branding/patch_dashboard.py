@@ -85,9 +85,12 @@ def main(argv: list[str]) -> int:
         print("Nie znaleziono <title> w index.html", file=sys.stderr)
         return 1
     sub_all(index, r'<link rel="icon"[^>]*>', '<link rel="icon" href="/favicon.ico" />', "favicon")
-    # logo w menu: dwie linie tekstu "Hermes" / "Agent"
+    # logo w menu: dwie linie "Hermes" / "Agent" → jedno słowo "TARS"
     sub_all(assets, r"children:\[`Hermes`,(\(0,[\w$]+\.jsx\)\(`br`,\{\}\)),`Agent`\]",
-            r"children:[`TARS`,\1,`HQ`]", "logo w menu")
+            r"children:[`TARS`]", "logo w menu")
+    # zakładka BASE (plugin TARS HQ) w głównym menu nad CHAT, nie w sekcji „Plugins” na dole
+    sub_all(assets, r"(function [\w$]+\(e,t\)\{let n=[\w$]+\(e,t\),r=new Set\()e\.map\(e=>e\.path\)(\))",
+            r'\1[...e.map(e=>e.path),"/base"]\2', "BASE w głównym menu")
     sub_all(assets, r"brand:`Hermes Agent`,brandShort:`HA`", "brand:`TARS`,brandShort:`T`", "nazwa marki (i18n)")
     sub_all(assets, r"label:`Hermes Teal", "label:`TARS Teal", "etykiety motywów")
     themes = HERMES / "hermes_cli" / "web_server_dashboard.py"

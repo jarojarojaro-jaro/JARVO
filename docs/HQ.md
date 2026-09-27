@@ -1,6 +1,6 @@
 # TARS HQ: kwatera floty (GUI)
 
-TARS HQ to strona główna dashboardu Hermesa (`http://<ip-tailscale>:9119`, logowanie jak do dashboardu).
+TARS HQ to zakładka **BASE** w menu dashboardu Hermesa, nad CHAT (`http://<ip-tailscale>:9119/base`, logowanie jak do dashboardu).
 Pokazuje flotę jako budynek z klocków. Na piętrze jest mostek TARS-a, na parterze pokoje snajperów. Każdy
 agent ma swój pokój, swoją minifigurkę i dymek z tym, co robi w tej chwili. Kliknięcie pokoju otwiera panel
 z podglądem pracy na żywo, kartami, wynikami i czatem. Na dole jest rozmowa: domyślnie z TARS-em, jednym
@@ -52,7 +52,7 @@ Pliki w repo:
 
 | Ścieżka | Rola |
 |---|---|
-| `hq/plugin/manifest.json` | manifest pluginu dashboardu (zakładka zastępuje stronę główną) |
+| `hq/plugin/manifest.json` | manifest pluginu dashboardu (zakładka BASE w menu, przed CHAT) |
 | `hq/plugin/plugin_api.py` | trasy FastAPI, proxy czatu do gatewaya |
 | `hq/plugin/hq_core.py` | logika stanu (bez FastAPI, testowana w `tests/test_hq_core.py`) |
 | `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, czat, HUD, aplikacja |
@@ -120,7 +120,7 @@ i ustaw `hq_room` agenta.
 
 | Objaw | Przyczyna i naprawa |
 |---|---|
-| strona główna dashboardu nie pokazuje HQ | plugin nie jest włączony albo dashboard nie wstał po instalacji: `docker exec -u hermes tars-hermes /command/s6-svc -r /run/service/dashboard` |
+| brak zakładki BASE w menu | plugin nie jest włączony albo dashboard nie wstał po instalacji: `docker exec -u hermes tars-hermes /command/s6-svc -r /run/service/dashboard` |
 | czat: „Profil … nie ma API_SERVER_KEY” | uruchom deploy ponownie (instalator generuje klucze) |
 | czat: „Gateway odrzucił klucz” | klucz w `.env` profilu zmieniony bez restartu gatewaya: `hermes gateway restart` |
 | czat: „No LLM provider configured” | profil nie ma `OPENROUTER_API_KEY` w `/srv/tars/secrets/<agent>.env` |
