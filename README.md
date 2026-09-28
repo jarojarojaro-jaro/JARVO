@@ -10,7 +10,8 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 | 🛰️ `tars` | Main Judge: przyjmuje zlecenia, planuje misje, rozdziela karty, ocenia, raportuje, patroluje |
 | 🔎 `tars-sherlock` | detektyw researchu: wiele źródeł, weryfikacja faktów, raporty z cytatami |
 | 🌐 `tars-web` | Web Senior Dev: brand z URL, audyty, strony i landingi, SEO, favicony, obrazy |
-| 🎬 `tars-studio` | marketing i kreacja: grafiki social, filmy z kodu, obrazy/wideo AI (OpenRouter), copy PL |
+| 🎬 `tars-studio` | marketing i kreacja: grafiki social, obrazy AI (OpenRouter), copy PL, kampanie |
+| 🎥 `tars-wideo` | wideograf: krótkie filmy z tematu (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, klipy z nagrań |
 | 🦾 `tars-reka` | prawa ręka: generalista ze wszystkimi skillami, składa pakiety misji, dokumenty, prototypy |
 
 ## TARS HQ

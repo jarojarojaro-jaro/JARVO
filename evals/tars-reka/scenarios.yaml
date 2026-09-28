@@ -64,7 +64,7 @@ scenarios:
     input: "Zrób kampanię wizerunkową na Instagram z filmami."
     expect:
       should:
-        - "wskazuje tars-studio"
+        - "wskazuje tars-studio (kampania) i tars-wideo (filmy)"
 
   - id: reka-honest-gaps
     type: protocol

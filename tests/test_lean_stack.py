@@ -191,7 +191,7 @@ def test_node_tools_drop_heavy_packages_and_share_chromium():
 # ------------------------------------------------------------------ konfiguracja
 
 def test_profiles_use_lightpanda_and_local_stt():
-    for agent in ["tars", "tars-sherlock", "tars-web", "tars-studio", "tars-reka"]:
+    for agent in ["tars", "tars-sherlock", "tars-web", "tars-studio", "tars-wideo", "tars-reka"]:
         cfg = yaml.safe_load((REPO / "profiles" / agent / "config.yaml").read_text(encoding="utf-8"))
         assert cfg["browser"]["engine"] == "lightpanda", agent
         assert cfg["browser"]["backend"] == "off", agent      # string, nie bool (YAML 1.1: off → False)

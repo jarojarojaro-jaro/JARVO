@@ -15,12 +15,13 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 | Darmowe konto Docker Hub | `docker login` na serwerze | anonimowe pobieranie obrazów ma limit, który na współdzielonych IP VPS-ów łatwo wyczerpać |
 | Klucz SSH (ed25519) | logowanie na serwer | hasła będą wyłączone |
 | Konto [Tailscale](https://tailscale.com) (darmowe) | prywatny dostęp do serwera i paneli | nic nie wystawiamy publicznie |
-| Konto [OpenRouter](https://openrouter.ai) z kredytami | modele, obrazy, wideo | **6 kluczy**: host + 5 agentów, każdy z limitem kredytów |
+| Konto [OpenRouter](https://openrouter.ai) z kredytami | modele, obrazy, wideo | **7 kluczy**: host + 6 agentów, każdy z limitem kredytów |
+| Klucz [Pexels](https://www.pexels.com/api/) albo [Pixabay](https://pixabay.com/api/docs/) (darmowy) | ujęcia stock dla Wideografa | `PEXELS_API_KEY` / `PIXABAY_API_KEY` w Keys (profil główny) |
 | Konto Telegram | główny kanał | bot + supergrupa „TARS HQ” z tematami |
 | Miejsce na backup (Backblaze B2, S3 albo SFTP) | nocne kopie restic | poza serwerem |
 
 Limity kluczy OpenRouter na start (miesięcznie, do korekty po 2 tygodniach): `tars` 30 $, `tars-sherlock` 20 $,
-`tars-web` 20 $, `tars-studio` 30 $ (obrazy/wideo), `tars-reka` 15 $, host 5 $. Klucz z limitem to bezpiecznik:
+`tars-web` 20 $, `tars-studio` 20 $ (obrazy), `tars-wideo` 30 $ (wideo AI), `tars-reka` 15 $, host 5 $. Klucz z limitem to bezpiecznik:
 zapętlony agent nie wyczyści konta.
 
 Przed wdrożeniem sprawdź, czy modele z `fleet.yaml` nadal istnieją (lokalnie albo na serwerze):
@@ -116,6 +117,7 @@ TELEGRAM_TOPIC_SHERLOCK=2
 TELEGRAM_TOPIC_WEB=3
 TELEGRAM_TOPIC_STUDIO=4
 TELEGRAM_TOPIC_REKA=5
+TELEGRAM_TOPIC_WIDEO=6
 ```
 
 **`/srv/tars/secrets/host.env`** (gateway):
@@ -127,7 +129,7 @@ TELEGRAM_REQUIRE_MENTION=false
 OPENROUTER_API_KEY=sk-or-v1-…     # klucz "host" (niski limit)
 ```
 
-**`/srv/tars/secrets/<agent>.env`** dla `tars`, `tars-sherlock`, `tars-web`, `tars-studio`, `tars-reka`:
+**`/srv/tars/secrets/<agent>.env`** dla `tars`, `tars-sherlock`, `tars-web`, `tars-studio`, `tars-wideo`, `tars-reka`:
 ```ini
 OPENROUTER_API_KEY=sk-or-v1-…     # osobny klucz na agenta
 ```

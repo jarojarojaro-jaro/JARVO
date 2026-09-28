@@ -106,13 +106,24 @@ agents:
     - {source: marketingskills, path: skills/content-strategy, dest: marketing/content-strategy}
     - {source: marketingskills, path: skills/launch, dest: marketing/launch}
     - {source: marketingskills, path: skills/image, dest: marketing/image}
-    - {source: marketingskills, path: skills/video, dest: marketing/video}
     - {source: marketingskills, path: skills/ad-creative, dest: marketing/ad-creative}
     - {source: marketingskills, path: skills/ads, dest: marketing/ads}
     - {source: marketingskills, path: skills/marketing-psychology, dest: marketing/marketing-psychology}
     - {source: marketingskills, path: skills/product-marketing, dest: marketing/product-marketing}
     - {source: marketingskills, path: skills/marketing-ideas, dest: marketing/marketing-ideas}
     - {source: marketingskills, path: skills/emails, dest: marketing/emails}
+    - {source: anthropic-skills, path: skills/canvas-design, dest: design/canvas-design}
+    - {source: anthropic-skills, path: skills/theme-factory, dest: design/theme-factory}
+    - {source: hermes, path: skills/creative/baoyu-infographic, dest: creative/baoyu-infographic}
+    - {source: hermes, path: skills/creative/humanizer, dest: creative/humanizer}
+    - {source: hermes, path: optional-skills/creative/social-media-content-calendar, dest: creative/social-media-content-calendar}
+    - {source: hermes, path: optional-skills/creative/creative-ideation, dest: creative/creative-ideation}
+    - {source: hermes, path: optional-skills/creative/meme-generation, dest: creative/meme-generation}
+    - {source: hermes, path: optional-skills/creative/excalidraw, dest: creative/excalidraw}
+    - {source: hermes, path: optional-skills/creative/concept-diagrams, dest: creative/concept-diagrams}
+
+  tars-wideo:
+    - {source: marketingskills, path: skills/video, dest: marketing/video}
     - {source: hyperframes, path: skills/hyperframes, dest: video/hyperframes}
     - {source: hyperframes, path: skills/hyperframes-core, dest: video/hyperframes-core}
     - {source: hyperframes, path: skills/hyperframes-animation, dest: video/hyperframes-animation}
@@ -125,16 +136,8 @@ agents:
     - {source: hyperframes, path: skills/motion-graphics, dest: video/motion-graphics}
     - {source: hyperframes, path: skills/embedded-captions, dest: video/embedded-captions}
     - {source: hyperframes, path: skills/slideshow, dest: video/slideshow}
-    - {source: anthropic-skills, path: skills/canvas-design, dest: design/canvas-design}
-    - {source: anthropic-skills, path: skills/theme-factory, dest: design/theme-factory}
     - {source: hermes, path: skills/creative/manim-video, dest: creative/manim-video}
-    - {source: hermes, path: skills/creative/baoyu-infographic, dest: creative/baoyu-infographic}
-    - {source: hermes, path: skills/creative/humanizer, dest: creative/humanizer}
-    - {source: hermes, path: optional-skills/creative/social-media-content-calendar, dest: creative/social-media-content-calendar}
-    - {source: hermes, path: optional-skills/creative/creative-ideation, dest: creative/creative-ideation}
-    - {source: hermes, path: optional-skills/creative/meme-generation, dest: creative/meme-generation}
-    - {source: hermes, path: optional-skills/creative/excalidraw, dest: creative/excalidraw}
-    - {source: hermes, path: optional-skills/creative/concept-diagrams, dest: creative/concept-diagrams}
+    - {source: hermes, path: optional-skills/creative/ai-presenter-video, dest: creative/ai-presenter-video}
 
   tars-reka:
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}

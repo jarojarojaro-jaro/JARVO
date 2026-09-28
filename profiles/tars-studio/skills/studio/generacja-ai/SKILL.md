@@ -1,23 +1,23 @@
 ---
 name: generacja-ai
-description: "Obrazy i wideo z AI (OpenRouter): prompt, spójność, koszt."
-version: 1.0.0
+description: "Obrazy z AI (OpenRouter): prompt, spójność serii, koszt."
+version: 1.1.0
 author: TARS
 license: MIT
 metadata:
   hermes:
-    tags: [ai, image-generation, video-generation, openrouter]
-    related_skills: [image, video, grafika-social, film-z-kodu]
+    tags: [ai, image-generation, openrouter]
+    related_skills: [image, grafika-social]
   tars:
     agent: tars-studio
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
-# Generacja AI (obrazy i wideo)
+# Generacja AI (obrazy)
 
-Narzędzia: `image_generate`, `video_generate` (wtyczki Hermesa, dostawca OpenRouter: obraz → domyślny łańcuch
-jakościowy wtyczki; wideo → katalog modeli pobierany na żywo). Parametry i aktualne możliwości modelu widać w schemacie narzędzia.
+Narzędzie: `image_generate` (wtyczka Hermesa, dostawca OpenRouter, domyślny łańcuch jakościowy wtyczki).
+Parametry i aktualne możliwości modelu widać w schemacie narzędzia. Wideo z AI robi `tars-wideo` (skill `wideo-ai`).
 
 ## Kiedy AI, a kiedy kod
 - **AI:** zdjęcia produktowe w scenach, ilustracje, tła, klimat, b-roll, warianty koncepcji.
@@ -37,7 +37,7 @@ paleta: głęboki granat i złoto (#0d1b3e, #c9a227), spokojny, premium, 4:5, be
 - ta sama proporcja i kadrowanie w serii.
 
 ## Budżet i jakość
-- najpierw 2–4 szkice → wybór → finał; limit generacji z karty (domyślnie: 12 obrazów, 3 filmy),
+- najpierw 2–4 szkice → wybór → finał; limit generacji z karty (domyślnie: 12 obrazów),
 - każdą generację zapisuj z promptem i modelem w `out/grafiki/generacje.jsonl`,
 - sprawdź wynik (vision): artefakty, dłonie, twarze, czytelność produktu. Wadliwe odrzucasz, nie „poprawiasz tekstem”.
 

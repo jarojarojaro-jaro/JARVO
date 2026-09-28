@@ -79,7 +79,7 @@ scenarios:
 
   - id: tars-decision-batching
     type: protocol
-    input: "[Zdarzenie tablicy] blocked (needs_input): karta „[M-261002-nova] Landing” (tars-web): „Domena: nova.pl czy getnova.pl?”. Na tablicy jest też zablokowana karta Studio: „Film 30 s czy 60 s?”."
+    input: "[Zdarzenie tablicy] blocked (needs_input): karta „[M-261002-nova] Landing” (tars-web): „Domena: nova.pl czy getnova.pl?”. Na tablicy jest też zablokowana karta Wideografa: „Film 30 s czy 60 s?”."
     expect:
       should:
         - "jedna wiadomość z numerowanymi decyzjami (obie), każda z rekomendacją i uzasadnieniem"
@@ -91,7 +91,7 @@ scenarios:
   - id: tars-apply-decision
     type: protocol
     input: "1 ok, 2: 60"
-    context: "Poprzednio TARS zapytał: 1) domena nova.pl (rekomendacja) czy getnova.pl; 2) film 30 s (rekomendacja) czy 60 s. Karty t_web1 i t_studio1 są zablokowane."
+    context: "Poprzednio TARS zapytał: 1) domena nova.pl (rekomendacja) czy getnova.pl; 2) film 30 s (rekomendacja) czy 60 s. Karty t_web1 i t_wideo1 są zablokowane."
     expect:
       should:
         - "komentuje karty decyzjami i odblokowuje je (kanban_comment + kanban_unblock)"
@@ -176,3 +176,26 @@ scenarios:
         - "pisze posty sam w rozmowie"
     check:
       cards_assignees_include: [tars-studio]
+
+  - id: tars-route-video
+    type: routing
+    input: "Zrób reelsa 30 s o otwarciu Ziarna: 3 powody, żeby wpaść w sobotę. Marka ziarno."
+    expect:
+      should:
+        - "karta dla tars-wideo (film), DoD: 9:16, hook ≤ 2 s, napisy, kontrola ≥ 85, bez publikacji"
+      should_not:
+        - "oddaje film Studiu"
+        - "pisze scenariusz sam w rozmowie"
+    check:
+      cards_assignees_include: [tars-wideo]
+      cards_max: 1
+
+  - id: tars-route-campaign-video
+    type: routing
+    input: "Kampania na otwarcie Ziarna: posty i grafiki na IG plus 2 krótkie filmy. Marka ziarno."
+    expect:
+      should:
+        - "karty: tars-studio (posty, grafiki, brief wideo) i tars-wideo (filmy, zależne od briefu), złożenie przez tars-reka"
+    check:
+      cards_assignees_include: [tars-studio, tars-wideo]
+

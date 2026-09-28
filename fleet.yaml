@@ -61,7 +61,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: general       # wątek ogólny grupy „TARS HQ” + Twój DM
-    hq_room: bridge    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_room: bridge    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Mostek dowodzenia"
     hq_short: "TARS"
     en:
@@ -84,7 +84,7 @@ agents:
     autonomy_max: A1
     telegram_topic: sherlock
     pin_skills: [metoda-sherlocka]
-    hq_room: study    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_room: study    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Gabinet śledczy"
     hq_short: "Sherlock"
     en:
@@ -106,7 +106,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: web
-    hq_room: devlab    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_room: devlab    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Pracownia webowa"
     hq_short: "Web"
     en:
@@ -121,21 +121,45 @@ agents:
     title: "Marketing i kreacja"
     emoji: "🎬"
     description: >-
-      Grafiki promocyjne, posty na social media, filmy z kodu i generowane przez AI, copy,
-      kampanie i kalendarze publikacji, zgodnie z brand kitem. Przygotowuje pakiety,
-      nie publikuje bez zgody.
+      Grafiki promocyjne, posty na social media, copy, kampanie i kalendarze publikacji,
+      zgodnie z brand kitem. Filmy zamawia u Wideografa. Przygotowuje pakiety, nie publikuje
+      bez zgody.
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: studio
-    hq_room: atelier    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_room: atelier    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Atelier kreatywne"
     hq_short: "Studio"
     en:
       title: "Marketing & creative"
       hq_label: "Creative atelier"
       description: >-
-        Promo graphics, social media posts, videos from code and AI-generated, copy, campaigns and publishing calendars, all on brand. Prepares packages; never publishes without approval.
+        Promo graphics, social media posts, copy, campaigns and publishing calendars, all on brand. Orders videos from the Videographer. Prepares packages; never publishes without approval.
+    status: active
+
+  - name: tars-wideo
+    kind: specialist
+    title: "Wideograf"
+    emoji: "🎥"
+    description: >-
+      Wideo od A do Z: krótkie filmy na TikTok, Reels i Shorts z tematu (scenariusz, ujęcia stock,
+      AI albo własne, polski lektor, napisy karaoke, muzyka, montaż), warianty do testów A/B, montaż
+      nagrań użytkownika, klipy z długich nagrań, filmy z kodu (HyperFrames, Manim), wideo z AI,
+      napisy PL, formaty platform, kontrola jakości. Przygotowuje pliki, nie publikuje bez zgody.
+    model_tier: strong
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: wideo
+    pin_skills: [krotki-film]
+    hq_room: filmstudio    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_label: "Studio filmowe"
+    hq_short: "Wideograf"
+    en:
+      title: "Videographer"
+      hq_label: "Film studio"
+      description: >-
+        Video end to end: short films for TikTok, Reels and Shorts from a topic (script, stock, AI or own footage, Polish voice-over, karaoke captions, music, editing), A/B variants, editing the user's recordings, clips from long recordings, videos from code (HyperFrames, Manim), AI video, Polish captions, platform formats, quality control. Prepares files; never publishes without approval.
     status: active
 
   - name: tars-reka
@@ -150,7 +174,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: reka
-    hq_room: workshop    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|workshop|office
+    hq_room: workshop    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Warsztat"
     hq_short: "Ręka"
     en:

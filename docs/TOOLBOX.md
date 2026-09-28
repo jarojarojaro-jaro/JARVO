@@ -90,15 +90,7 @@ Crawl4AI (był sidecarem: drugi Chromium, ~3 GB obrazu i do 3 GB RAM; trafilatur
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
-| HyperFrames (skill [H] `hyperframes`) | wideo z HTML + GSAP → MP4/WebM | (skill Hermesa) | n/d | CLI (`npx`) |
-| [Remotion](https://github.com/remotion-dev/remotion) | wideo w React: szablony filmów produktowych | **Remotion License** ⚠️ | 2026-09 | per projekt |
-| [Motion Canvas](https://github.com/motion-canvas/motion-canvas) | animacje i explainery z kodu | MIT | 2026-07 | per projekt |
-| [Revideo](https://github.com/redotvideo/revideo) | fork Motion Canvas do renderingu programowego | MIT | 2026-07 | per projekt |
-| [Manim CE](https://github.com/ManimCommunity/manim) | animacje edukacyjne i matematyczne (skill [H] `manim-video`) | MIT | 2026-09 | CLI |
-| FFmpeg | montaż, konwersje, napisy, formaty platform | LGPL/GPL | n/d | CLI |
-| [auto-editor](https://github.com/WyattBlue/auto-editor) | automatyczne wycinanie ciszy z nagrań (dodatek `media`) | Unlicense | 2026-09 | CLI |
-| [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) | transkrypcja i napisy na CPU (int8, 25 języków z polskim), też wiadomości głosowe Hermesa | CC-BY-4.0 (model) / MIT | 2026-07 | `tars-stt` |
-| [Kokoro](https://github.com/hexgrad/kokoro) | lektor TTS offline (alternatywnie TTS przez API Hermesa) | Apache-2.0 | 2025-08 | skrypt |
+| FFmpeg | ffprobe dla `check_media.py` (wymiary, waga plików) | LGPL/GPL | n/d | CLI |
 | [Satori](https://github.com/vercel/satori) + [resvg](https://github.com/linebender/resvg) | grafiki z HTML/JSX → SVG → PNG (posty, OG images, banery) | MPL-2.0 / Apache-2.0 | 2026-09 | skrypt |
 | [rembg](https://github.com/danielgatis/rembg) | usuwanie tła ze zdjęć produktów (CPU; dodatek `rembg`) | MIT | 2026-09 | CLI |
 | [sharp](https://github.com/lovell/sharp) | przycinanie i eksport w wymiarach platform | Apache-2.0 | 2026-09 | skrypt |
@@ -106,16 +98,40 @@ Crawl4AI (był sidecarem: drugi Chromium, ~3 GB obrazu i do 3 GB RAM; trafilatur
 | [Penpot](https://github.com/penpot/penpot) | otwarte narzędzie do projektowania (opcjonalnie, ciężkie) | MPL-2.0 | 2026-09 | sidecar (opcja) |
 
 Z Hermesa:
-- **generowanie AI:** `plugins/image_gen/openrouter` i `plugins/video_gen/openrouter`, czyli jeden klucz
-  OpenRouter do obrazów i wideo (inni dostawcy: fal, xai, deepinfra; w katalogu też MiniMax, DashScope),
-- **[H] skille:** `hyperframes`, `manim-video`, `baoyu-infographic`, `social-media-content-calendar`,
-  `ai-presenter-video`, `kanban-video-orchestrator`, `creative-ideation`, `humanizer`,
-  `meme-generation`, `xurl`, `excalidraw`, `concept-diagrams`, `p5js`,
+- **generowanie AI:** `plugins/image_gen/openrouter` (jeden klucz OpenRouter do obrazów),
+- **[H] skille:** `baoyu-infographic`, `social-media-content-calendar`, `creative-ideation`, `humanizer`,
+  `meme-generation`, `excalidraw`, `concept-diagrams`,
 - **MCP:** `canva`, `figma`, `cloudinary`, `gamma`,
 - **plugin:** `adspirer` (kampanie reklamowe Google/Meta/TikTok/LinkedIn), wyłącznie na poziomie A2, czyli za Twoją zgodą.
 
+Wideo: sekcja [`tars-wideo`](#tars-wideo-wideograf).
+
+---
+
+## `tars-wideo`: Wideograf
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| FFmpeg (libass, libx264, fontconfig) | cały montaż: normalizacja scen, przejścia, napisy ASS, muzyka z duckingiem, loudnorm, kontrola | LGPL/GPL | n/d | `film.py`, `montaz.py`, `qa_wideo.py` |
+| [edge-tts](https://github.com/rany2/edge-tts) 7.2.7 | lektor PL za darmo, bez klucza (Marek, Zofia), z czasem słów do napisów karaoke | LGPL-3.0 | 2026-08 | leniwa instalacja Hermesa (`tts.edge`) |
+| [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) | transkrypcja z czasem słów: napisy do nagrań, wybór fragmentów, test wymowy lektora | CC-BY-4.0 (model) / MIT | 2026-07 | `tars-stt` |
+| [Pexels API](https://www.pexels.com/api/) | darmowe ujęcia i zdjęcia stock (klucz `PEXELS_API_KEY`) | Pexels License | n/d | `stock.py` |
+| [Pixabay API](https://pixabay.com/api/docs/) | darmowe ujęcia i zdjęcia stock (klucz `PIXABAY_API_KEY`), cache 24 h | Pixabay Content License | n/d | `stock.py` |
+| HyperFrames (skill [H] `hyperframes`) | wideo z HTML + GSAP → MP4/WebM | Apache-2.0 | 2026-09 | CLI (`npx`) |
+| [Manim CE](https://github.com/ManimCommunity/manim) | animacje edukacyjne i matematyczne (skill [H] `manim-video`, dodatek `manim`) | MIT | 2026-09 | CLI |
+| [auto-editor](https://github.com/WyattBlue/auto-editor) | wycinanie ciszy (dodatek `media`; bez niego `montaz.py cisza`) | Unlicense | 2026-09 | CLI |
+| [Remotion](https://github.com/remotion-dev/remotion) | wideo w React (per projekt) | **Remotion License** ⚠️ | 2026-09 | per projekt |
+| [Motion Canvas](https://github.com/motion-canvas/motion-canvas) / [Revideo](https://github.com/redotvideo/revideo) | animacje i render programowy (per projekt) | MIT | 2026-07 | per projekt |
+
+Z Hermesa: `plugins/video_gen/openrouter` i `plugins/image_gen/openrouter` (ujęcia AI, jeden klucz OpenRouter),
+narzędzie `text_to_speech` (Edge, głos pl-PL-MarekNeural w `config.yaml`), skille [H] `manim-video`, `ai-presenter-video`.
+
+Rozważone i odrzucone: [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) (MIT) jako cała aplikacja:
+Streamlit, MoviePy, Redis i drugi silnik transkrypcji (~340 MB repo, dużo RAM) dublowałyby to, co flota już ma.
+Wzięty pomysł pipeline'u, implementacja własna na FFmpeg. Automatyczna publikacja na platformy: tylko A2.
+
 ⚠️ **Remotion:** darmowy dla osób prywatnych i firm do 3 pracowników; większa firma potrzebuje
-płatnej licencji. Jeśli działasz jako większa firma, domyślnie używamy HyperFrames / Motion Canvas / Revideo (MIT).
+płatnej licencji. Domyślnie HyperFrames / Motion Canvas / Revideo.
 
 Odrzucone: ComfyUI self-host (GPL-3.0, wymaga GPU; generowanie idzie przez API),
 `rhasspy/piper` (projekt przeniesiony do `OHF-Voice/piper1-gpl` na GPL-3.0; Kokoro wystarcza).

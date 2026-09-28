@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.1.0
+version: 2.2.0
 author: "TARS (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -39,7 +39,7 @@ to, co ma dowód (krok 4a).
 
 ### 2. Rubryka agenta
 Przeczytaj `references/rubric-<agent>.md` dla profilu wykonawcy (pole implementera w historii karty,
-najczęściej `tars-sherlock`, `tars-web`, `tars-studio`, `tars-reka`). Rubryka mówi, co jest
+najczęściej `tars-sherlock`, `tars-web`, `tars-studio`, `tars-wideo`, `tars-reka`). Rubryka mówi, co jest
 **blokujące**, a co jest tylko uwagą.
 
 ### 3. Runda i soczewka
@@ -68,9 +68,16 @@ Obowiązki bazowe z kroku 4 obowiązują w każdej rundzie. Soczewka mówi, od c
 - czy odpowiedź na pytanie z CEL jest jasna, z poziomem pewności.
 
 **tars-studio (kreacja):**
-- wymiary i formaty plików (`python3 -c` z PIL albo `ffprobe`), długość filmów, rozmiar plików,
+- wymiary i formaty plików (`python3 -c` z PIL albo `ffprobe`), rozmiar plików,
 - teksty: limity znaków platform, brak „AI-izmów”, zgodność z tonem marki, brak obietnic, których nie da się udowodnić,
 - obejrzyj grafiki (narzędzie vision): czytelność, kontrast, logo, bezpieczne marginesy.
+
+**tars-wideo (filmy):**
+- `python3 /opt/tars/repo/profiles/tars-wideo/scripts/qa_wideo.py <film.mp4> --platforma <z karty> --lektor --arkusz /tmp/qa.jpg`:
+  zero błędów, liczby zgodne z `dod_check` wykonawcy (sek, LUFS, rozdzielczość),
+- obejrzyj arkusz (vision): hook w klatkach 0–1,5 s, napisy i logo poza czerwonymi strefami UI, ujęcia pasują do tekstu,
+- `kontrola.json` wykonawcy ≥ 85 i czy jego „różnice” są prawdziwe; `.srt` bez błędów w nazwach i liczbach,
+- źródła i licencje ujęć/muzyki w `film.json` i RAPORT; generacje AI w limicie karty.
 
 **tars-reka (złożenie/dokumenty):**
 - kompletność pakietu wobec kart-rodziców, działające ścieżki, spójny INDEX.md, nic nie zgubione i nic nie przeinaczone.

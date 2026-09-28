@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [marketing, social, formats, specs]
-    related_skills: [grafika-social, film-z-kodu, copy-pl]
+    related_skills: [grafika-social, copy-pl]
   tars:
     agent: tars-studio
     autonomy: A0
@@ -28,4 +28,4 @@ sprawdź aktualną dokumentację platformy i zaktualizuj tabelę w repo).
 - Projektuj w natywnej rozdzielczości (1080 px szerokości dla social), eksport PNG dla grafik z tekstem, JPEG/WebP dla zdjęć.
 - Tekst na grafikach: min. ~40 px przy 1080 px szerokości; kontrast WCAG AA.
 - 9:16: kluczowa treść w środkowym obszarze ~1080×1420 (margines ~250 px góra i dół na UI).
-- Wideo: H.264 + AAC, 30 fps, napisy wypalone dla platform, gdzie większość ogląda bez dźwięku.
+- Wideo: robi `tars-wideo` (skill `formaty-wideo`); tabela niżej służy do briefu i kontroli okładek.

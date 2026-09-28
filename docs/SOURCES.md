@@ -35,7 +35,7 @@ nasze adaptacje żyją w skillach własnych floty.
 | [addyosmani/web-quality-skills](https://github.com/addyosmani/web-quality-skills) | `afa8da9` | MIT | Web |
 | [AgriciDaniel/claude-seo](https://github.com/AgriciDaniel/claude-seo) | `e77e783` | MIT | Web (skille + skrypty w obrazie) |
 | [anthropics/skills](https://github.com/anthropics/skills) | `3337550` | Apache-2.0 (tylko skille z licencją Apache w katalogu) | Web, Studio, Ręka |
-| [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) | `8798e40` | Apache-2.0 | Studio (wideo z HTML) |
+| [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) | `8798e40` | Apache-2.0 | Wideograf (wideo z HTML) |
 
 Build odrzuca skill z `anthropics/skills`, jeśli w jego katalogu nie ma licencji Apache-2.0: część
 skilli w tym repo ma inne, zastrzeżone warunki i nie wolno ich kopiować.
@@ -47,6 +47,7 @@ Autorstwo zaznaczamy w polu `author` skilla.
 
 | Projekt | Licencja | Gdzie w TARS |
 |---|---|---|
+| [harry0703/MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) (commit `8e259e9`, © 2024 Harry) | MIT | pomysł pipeline'u krótkiego filmu (temat → scenariusz → ujęcia → lektor → napisy → muzyka → montaż, warianty); kod własny: `profiles/tars-wideo/scripts/film.py` |
 | [kunchenguid/firstmate](https://github.com/kunchenguid/firstmate) | MIT | model Main Judge: jeden rozmówca, załoga, eskalacja tylko decyzji, stan na dysku ([BOSS.md](BOSS.md)) |
 | [langchain-ai/open_deep_research](https://github.com/langchain-ai/open_deep_research) | MIT | `metoda-sherlocka`, `raport-sledztwa`: plan → równoległe wątki → synteza, zasady cytowania |
 | [dzhng/deep-research](https://github.com/dzhng/deep-research) | MIT | `metoda-sherlocka`: szerokość/głębokość, iteracyjne pytania uzupełniające |

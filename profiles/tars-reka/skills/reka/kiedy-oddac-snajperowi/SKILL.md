@@ -1,7 +1,7 @@
 ---
 name: kiedy-oddac-snajperowi
 description: "Granice ręki: kiedy zadanie należy do specjalisty."
-version: 1.0.0
+version: 1.1.0
 author: TARS
 license: MIT
 metadata:
@@ -10,7 +10,7 @@ metadata:
   tars:
     agent: tars-reka
     autonomy: A0
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
 # Kiedy oddać snajperowi
@@ -22,7 +22,8 @@ albo mówisz to w rozmowie), gdy liczy się **jakość specjalisty**:
 |---|---|
 | decyzja zależy od prawdziwości faktów, potrzebne źródła i weryfikacja | `tars-sherlock` |
 | strona ma trafić do ludzi (produkcja), SEO, wydajność, dostępność | `tars-web` |
-| treść/grafika/wideo ma reprezentować markę publicznie | `tars-studio` |
+| treść/grafika ma reprezentować markę publicznie | `tars-studio` |
+| film: montaż, lektor, napisy, klipy, wideo na platformy | `tars-wideo` |
 | kilka etapów, kilku agentów, decyzje po drodze | TARS (misja) |
 
 Szybkie wersje robisz sam: „sprawdź na szybko, czy X istnieje”, „zmniejsz ten obrazek”, „przerób tekst na punkty”.

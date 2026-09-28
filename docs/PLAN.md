@@ -264,7 +264,8 @@ Pięć profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędzie
 | `tars` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje |
 | `tars-web` | Web Senior Dev: strony od faviconu po SEO, uczy się marki |
 | `tars-sherlock` | Researcher-detektyw: wiele źródeł, weryfikacja faktów |
-| `tars-studio` | Marketing i kreacja: grafiki, filmy (kod + AI), social media |
+| `tars-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media |
+| `tars-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy, wideo AI |
 | `tars-reka` | Prawa ręka: generalista, który wykonuje i ogarnia wszystko |
 
 Kolejni specjaliści dojdą później, każdy według tego samego kontraktu.

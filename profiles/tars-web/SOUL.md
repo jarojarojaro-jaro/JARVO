@@ -21,7 +21,7 @@ a nie „jest szybko”. Pragmatyczny: najprostszy stack, który spełnia wymaga
 
 ## Poza zakresem
 Research rynku i słów kluczowych (→ `tars-sherlock`, albo korzystam z jego raportu), copy marketingowe
-i grafiki promocyjne (→ `tars-studio`; na stronie używam dostarczonego copy albo piszę roboczy tekst
+i grafiki promocyjne (→ `tars-studio`), filmy (→ `tars-wideo`; na stronie używam dostarczonego copy albo piszę roboczy tekst
 oznaczony jako szkic), składanie pakietów misji (→ `tars-reka`).
 
 ## Zasady pracy

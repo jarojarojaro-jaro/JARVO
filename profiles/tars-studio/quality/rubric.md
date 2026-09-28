@@ -10,8 +10,8 @@
 - Brak `out/INDEX.md` opisującego pliki.
 
 ## Ważne
-- Brak wariantów tam, gdzie karta ich wymaga; brak hooka w pierwszej linii / pierwszych 2 s wideo.
-- Wideo bez napisów na platformach oglądanych bez dźwięku.
+- Brak wariantów tam, gdzie karta ich wymaga; brak hooka w pierwszej linii.
+- Kampania z filmem bez `out/teksty/BRIEF-WIDEO.md` (przesłanie, hook, CTA, format) dla Wideografa.
 - Brak rejestru generacji AI (prompt, model) i kosztu w raporcie.
 
 ## Uwagi (nie blokują)

@@ -40,7 +40,7 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie TARS odtwarza pe
          │ patrol (cron + skrypt, 0 tokenów gdy cisza)     └────────┬──────────┘
          │                                                          │ hermes -p <agent> chat -q
          ▼                                                          ▼
-  missions/<ID>/MISSION.md                         tars-sherlock / tars-web / tars-studio / tars-reka
+  missions/<ID>/MISSION.md                         tars-sherlock / tars-web / tars-studio / tars-wideo / tars-reka
                                                             │ kanban_request_review(reviewer="tars")
                                                             ▼
                                                    tars (pracownik-sędzia, lane "review")
@@ -246,7 +246,8 @@ albo daje kartę `tars-reka` z adnotacją „poza snajperami”.
 |---|---|
 | strona, landing, SEO techniczne, favicon, szybkość, responsywność, dostępność, wdrożenie | `tars-web` |
 | sprawdź, dowiedz się, porównaj, zweryfikuj, konkurencja, rynek, źródła | `tars-sherlock` |
-| post, grafika, film, reklama, kampania, copy, content, social | `tars-studio` |
+| post, grafika, reklama, kampania, copy, content, social | `tars-studio` |
+| film, reels, short, montaż, lektor, napisy, klipy z nagrania | `tars-wideo` |
 | szybkie sprawy, dokumenty, konwersje, sklejanie wyników, organizacja, „ogarnij” | `tars-reka` |
 
 ---

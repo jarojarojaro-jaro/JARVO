@@ -1,0 +1,18 @@
+agent: tars-wideo
+
+tools:
+  - {name: ffmpeg, source: https://ffmpeg.org, license: LGPL/GPL, version: image, install: {method: image, spec: "w obrazie Hermesa (libass, libx264, fontconfig)"}, integration: cli, used_by_skills: [krotki-film, montaz-nagran, napisy, klipy-z-dlugiego, lektor-i-dzwiek, kontrola-wideo, dobor-ujec], healthcheck: "ffmpeg -version", autonomy: A1}
+  - {name: edge-tts, source: https://github.com/rany2/edge-tts, license: LGPL-3.0, version: "7.2.7 (leniwa instalacja Hermesa)", install: {method: pip-venv, spec: "edge-tts==7.2.7 w HERMES_LAZY_INSTALL_TARGET"}, integration: skill-script, used_by_skills: [krotki-film, lektor-i-dzwiek, warianty-ab], healthcheck: "cd /opt/hermes && /opt/hermes/.venv/bin/python -c \"from tools.lazy_deps import ensure; ensure('tts.edge', prompt=False); import edge_tts\"", autonomy: A1, notes: "Lektor PL za darmo, bez klucza (pl-PL-MarekNeural, pl-PL-ZofiaNeural), z czasem słów do napisów. Healthcheck doinstalowuje pakiet instalatorem Hermesa (jak narzędzie text_to_speech); film.py robi to samo przy braku."}
+  - {name: parakeet-stt, source: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3, license: "CC-BY-4.0 (model), MIT (onnx-asr)", version: see-infra, install: {method: pip-venv, spec: "onnx-asr[cpu,hub] + /opt/tars/bin/tars-stt"}, integration: skill-script, used_by_skills: [napisy, klipy-z-dlugiego, montaz-nagran], healthcheck: "/opt/tars/venv/bin/python -c 'import onnx_asr'", autonomy: A1, notes: "Transkrypcja z czasem słów (napisy, wybór fragmentów). Model ~0,65 GB przy 1. użyciu; RAM ~1,2 GB tylko w trakcie."}
+  - {name: pexels-api, source: https://www.pexels.com/api/, license: "Pexels License (darmowe użycie komercyjne)", version: v1, install: {method: api, spec: "PEXELS_API_KEY"}, integration: skill-script, used_by_skills: [material-stock, krotki-film], healthcheck: "test -n \"$PEXELS_API_KEY\" || test -n \"$PIXABAY_API_KEY\"", autonomy: A1, optional: true, notes: "Darmowy klucz; limit 200 zapytań/h. Wyniki i pliki w cache /opt/data/tars/cache/wideo."}
+  - {name: pixabay-api, source: https://pixabay.com/api/docs/, license: "Pixabay Content License", version: v1, install: {method: api, spec: "PIXABAY_API_KEY"}, integration: skill-script, used_by_skills: [material-stock, krotki-film], healthcheck: "test -n \"$PIXABAY_API_KEY\" || test -n \"$PEXELS_API_KEY\"", autonomy: A1, optional: true, notes: "Darmowy klucz; wyniki zapytań cache'owane 24 h (wymóg API)."}
+  - {name: hyperframes, source: https://github.com/heygen-com/hyperframes, license: Apache-2.0, version: npx-pinned-by-skill, install: {method: npm, spec: "hyperframes (npx)"}, integration: cli, used_by_skills: [film-z-kodu, hyperframes, product-launch-video], healthcheck: "npx --yes hyperframes --version", autonomy: A1}
+  - {name: manim, optional: true, source: https://github.com/ManimCommunity/manim, license: MIT, version: image, install: {method: uv-tool, spec: manim}, integration: cli, used_by_skills: [manim-video], healthcheck: "manim --version", autonomy: A1, notes: "Wymaga cairo/pango (apt) i LaTeX dla wzorów; tylko z TARS_EXTRAS=\"manim\"."}
+  - {name: auto-editor, optional: true, source: https://github.com/WyattBlue/auto-editor, license: Unlicense, version: see-infra, install: {method: uv-tool, spec: auto-editor}, integration: cli, used_by_skills: [montaz-nagran], healthcheck: "auto-editor --version", autonomy: A1, notes: "tylko z TARS_EXTRAS=\"media\"; bez niego: montaz.py cisza (silencedetect)."}
+
+sidecars: []
+
+hermes_skills: [manim-video, ai-presenter-video]
+hermes_plugins: []
+mcp_servers: []
+env_requires: [OPENROUTER_API_KEY]

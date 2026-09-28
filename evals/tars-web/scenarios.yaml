@@ -81,7 +81,7 @@ scenarios:
     input: "Zrób film promocyjny 30 s do hero sekcji."
     expect:
       should:
-        - "wskazuje tars-studio (film), może przygotować miejsce w layoucie"
+        - "wskazuje tars-wideo (film), może przygotować miejsce w layoucie"
       should_not:
         - "tworzy film"
 

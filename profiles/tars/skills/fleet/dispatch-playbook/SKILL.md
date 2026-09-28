@@ -1,7 +1,7 @@
 ---
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
-version: 1.0.0
+version: 1.1.0
 author: TARS
 license: MIT
 metadata:
@@ -12,7 +12,7 @@ metadata:
   tars:
     agent: tars
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
 # Dispatch: jak rozdać pracę
@@ -69,9 +69,10 @@ kanban_create(
 | Wzorzec | Karty |
 |---|---|
 | **Research → decyzja** | sherlock (raport) → TARS relacjonuje, pyta o decyzję |
-| **Landing produktu** | sherlock (rynek + słowa kluczowe) → web (landing) ∥ studio (grafiki + posty) → reka (złożenie pakietu) |
+| **Landing produktu** | sherlock (rynek + słowa kluczowe) → web (landing) ∥ studio (grafiki + posty) ∥ wideo (film, opcjonalnie) → reka (złożenie) |
 | **Audyt + naprawa strony** | web (audyt) → [decyzja użytkownika, co naprawiać] → web (poprawki) |
-| **Kampania** | sherlock (grupa docelowa, konkurencja) → studio (pakiet kampanii) → reka (złożenie + kalendarz) |
+| **Kampania** | sherlock (grupa docelowa, konkurencja) → studio (pakiet + brief wideo) → wideo (filmy) → reka (złożenie + kalendarz) |
+| **Film** | [sherlock (fakty), gdy film podaje liczby] → wideo (film, warianty, montaż, klipy) |
 | **Nowa marka / brand kit** | web (brand z URL) → studio (weryfikacja tonu i wizualiów) |
 
 **Karta „złożenie”** (dla misji z ≥2 agentami): `assignee="tars-reka"`, `parents` = wszystkie karty merytoryczne,

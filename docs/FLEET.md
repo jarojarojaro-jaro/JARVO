@@ -7,14 +7,15 @@ Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prom
 knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
 każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
 
-**Stan: wszystkie pięć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
+**Stan: wszystkie sześć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
 | `tars` | [SOUL](../profiles/tars/SOUL.md) | [10 w `skills/fleet/`](../profiles/tars/skills/fleet) + generowany `roster` | — | patrol, brief, przegląd, raport floty | [12](../evals/tars/scenarios.yaml) |
 | `tars-sherlock` | [SOUL](../profiles/tars-sherlock/SOUL.md) | [6 w `skills/sherlock/`](../profiles/tars-sherlock/skills/sherlock) | 15 (Hermes, marketingskills) | search_fanout, extract, sources | [11](../evals/tars-sherlock/scenarios.yaml) |
 | `tars-web` | [SOUL](../profiles/tars-web/SOUL.md) | [7 w `skills/web/`](../profiles/tars-web/skills/web) | 30 (web-quality, claude-seo, marketingskills, Anthropic, Hermes) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract | [11](../evals/tars-web/scenarios.yaml) |
-| `tars-studio` | [SOUL](../profiles/tars-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/tars-studio/skills/studio) | 35 (marketingskills, HyperFrames, Anthropic, Hermes) | render_html, check_media, subtitles | [11](../evals/tars-studio/scenarios.yaml) |
+| `tars-studio` | [SOUL](../profiles/tars-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/tars-studio/skills/studio) | 21 (marketingskills, Anthropic, Hermes) | render_html, check_media | [11](../evals/tars-studio/scenarios.yaml) |
+| `tars-wideo` | [SOUL](../profiles/tars-wideo/SOUL.md) | [13 w `skills/wideo/`](../profiles/tars-wideo/skills/wideo) | 15 (HyperFrames, marketingskills, Hermes) | film, stock, kadry, montaz, napisy, qa_wideo | [12](../evals/tars-wideo/scenarios.yaml) |
 | `tars-reka` | [SOUL](../profiles/tars-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/tars-reka/skills/reka) | skill-creator + skille wszystkich snajperów (`external_dirs`) + katalog Hermesa | pack, to_pdf | [11](../evals/tars-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -28,7 +29,8 @@ Legenda przy skillach:
 | `tars` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator | A1 (tworzy karty, ocenia) |
 | `tars-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
 | `tars-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A0/A1 (czyta, pisze raporty) |
-| `tars-studio` | Marketing i kreacja: grafiki, wideo, social media | snajper | A1 (tworzy; publikacja i reklamy = A2) |
+| `tars-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja i reklamy = A2) |
+| `tars-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
 | `tars-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
 ---
@@ -65,7 +67,8 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 |---|---|
 | Strona, landing, SEO, wydajność, favicony, responsywność | `tars-web` |
 | „Dowiedz się”, „sprawdź”, porównaj, zweryfikuj | `tars-sherlock` |
-| Post, grafika, film, kampania, content | `tars-studio` |
+| Post, grafika, kampania, copy, content | `tars-studio` |
+| Film, reels, short, montaż, napisy, lektor, klipy | `tars-wideo` |
 | Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `tars-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
 
@@ -155,8 +158,8 @@ sprzeczności wypisane, daty źródeł podane, jasna odpowiedź na pierwotne pyt
 
 ## `tars-studio`: Marketing i kreacja
 
-**Misja:** graphic designer, twórca i marketer w jednym. Robi posty, grafiki promocyjne i filmy
-(z kodu i przez AI), wie, gdzie co publikować, w jakim formacie i dlaczego.
+**Misja:** graphic designer i marketer w jednym. Robi posty, grafiki promocyjne, copy i kampanie,
+wie, gdzie co publikować, w jakim formacie i dlaczego. Filmy robi `tars-wideo` (Studio pisze do nich brief).
 
 **Zakres wiedzy (knowledge packi):**
 - formaty i wymiary dla każdej platformy (IG, TikTok, YT, LinkedIn, X, FB),
@@ -165,24 +168,48 @@ sprzeczności wypisane, daty źródeł podane, jasna odpowiedź na pierwotne pyt
 - strategia: grupy docelowe, pozycjonowanie, kampanie produktowe.
 
 **Warsztat:**
-- **wideo z kodu:** HyperFrames (HTML → MP4) [H], Manim [H], do rozważenia Remotion
-  (uwaga na licencję dla firm) i Motion Canvas/Revideo, montaż przez FFmpeg,
 - **grafiki z kodu:** szablony HTML/CSS renderowane do PNG, infografiki,
-- **AI:** wtyczki Hermesa `image_gen` i `video_gen` z providerem **OpenRouter** (są w kodzie Hermesa),
+- **AI:** wtyczka Hermesa `image_gen` z providerem **OpenRouter**,
 - **publikacja:** Postiz (self-host) jako kolejka, a post wychodzi dopiero po Twojej akceptacji.
 Pełna lista: [TOOLBOX.md](TOOLBOX.md#tars-studio-marketing-i-kreacja).
 
 **Skille:**
-- [H] `hyperframes`, `manim-video`, `baoyu-infographic`, `social-media-content-calendar`,
-  `ai-presenter-video`, `kanban-video-orchestrator`, `creative-ideation`, `humanizer`, `meme-generation`, `xurl`
-- [T] `formaty-platform` (specyfikacje i szablony), [T] `grafika-promo` (szablony HTML do PNG w brand kicie),
-  [T] `film-produktowy` (scenariusz → storyboard → render), [T] `kampania-launch` (pakiet: posty + grafiki + film + kalendarz),
-  [T] `brand-z-url` (wspólny format brand kitu z `tars-web`)
+- [H] `baoyu-infographic`, `social-media-content-calendar`, `creative-ideation`, `humanizer`, `meme-generation`,
+  `excalidraw`, `concept-diagrams`
+- [T] `formaty-platform` (specyfikacje i szablony), [T] `grafika-social` (szablony HTML do PNG w brand kicie),
+  [T] `pakiet-kampanii` (posty + grafiki + brief wideo + kalendarz), [T] `generacja-ai` (obrazy), [T] `copy-pl`, [T] `publikacja`
 
 **Rubryka sędziego (DoD):** właściwe formaty i wymiary dla platformy, zgodność z brand kitem,
-tekst bez „AI-izmów”, pliki gotowe do publikacji, a przy filmie: render bez błędów i kontrola długości.
+tekst bez „AI-izmów”, pliki gotowe do publikacji, przy kampanii z filmem: brief dla Wideografa.
 
 **Zasada:** **nie publikuje sam.** Przygotowuje pakiet do publikacji, a publikacja wymaga Twojej zgody.
+
+---
+
+## `tars-wideo`: Wideograf
+
+**Misja:** filmy, które ktoś obejrzy do końca: od tematu albo surowego nagrania do gotowego pliku na TikTok, Reels,
+Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwięk, napisy, montaż).
+
+**Tryby pracy:**
+- **krótki film z tematu** (pomysł z [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo), własna implementacja):
+  scenariusz → ujęcia (stock Pexels/Pixabay, AI, pliki, plansze) → polski lektor Edge TTS (darmowy, z czasem słów)
+  → napisy karaoke → muzyka ściszana pod głos → montaż FFmpeg w 9:16/16:9/1:1/4:5, z planu `plan.json` (`film.py`),
+- **warianty A/B** z jednego planu (hook, głos, tempo, długość), wspólne sceny z cache,
+- **montaż nagrań** użytkownika: cięcie, usuwanie ciszy, kadr 9:16 z poziomego, głośność −14 LUFS, napisy,
+- **klipy z długich nagrań** (podcast, webinar): transkrypcja Parakeet z czasem słów → wybór fragmentów → klipy z napisami,
+- **filmy z kodu** (HyperFrames, Manim) i **ujęcia z AI** (`video_generate`, obraz → wideo, rejestr kosztów).
+
+**Jakość:** `qa_wideo.py` (kodeki, format, długość, LUFS, czarne i zamrożone klatki, arkusz ze strefami UI 9:16)
++ `kontrola-wideo` (ocena 0–100 w 10 osiach, PASS od 85, najwyżej 2 rundy poprawek). Każde ujęcie oglądane (vision),
+źródła i licencje w `film.json`.
+
+**Skille:** [T] `krotki-film`, `scenariusz`, `material-stock`, `dobor-ujec`, `warianty-ab`, `montaz-nagran`,
+`klipy-z-dlugiego`, `napisy`, `lektor-i-dzwiek`, `film-z-kodu`, `wideo-ai`, `formaty-wideo`, `kontrola-wideo`;
+[H] `hyperframes` (12 skilli rodziny), `manim-video`, `ai-presenter-video`, marketingskills `video`.
+Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#tars-wideo-wideograf).
+
+**Zasada:** **nie publikuje sam** i nie kupuje materiałów; bez deepfake'ów i klonowania głosów realnych osób.
 
 ---
 

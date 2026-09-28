@@ -23,18 +23,16 @@ web:
 image_gen:
   provider: openrouter          # domyślny łańcuch modeli wtyczki (jakość → fallback)
 
-video_gen:
-  provider: openrouter          # katalog modeli pobierany na żywo z OpenRouter
 
 platform_toolsets:
-  cli: [terminal, file, web, browser, vision, image_gen, video_gen, tts, delegation, memory, skills, todo, session_search]
-  telegram: [terminal, file, web, browser, vision, image_gen, video_gen, tts, delegation, memory, skills, todo, session_search, clarify]
+  cli: [terminal, file, web, browser, vision, image_gen, tts, delegation, memory, skills, todo, session_search]
+  telegram: [terminal, file, web, browser, vision, image_gen, tts, delegation, memory, skills, todo, session_search, clarify]
   cron: [terminal, file, web, memory, skills]
 
 terminal:
   backend: local
   cwd: "@@WORKSPACES_DIR@@/tars-studio"
-  timeout: 900                  # rendering wideo trwa
+  timeout: 600                  # render grafik w wielu rozmiarach
 
 # Przeglądarka: wbudowane narzędzia browser_* przez agent-browser z silnikiem Lightpanda (~30 MB RAM
 # na sesję zamiast ~300 MB Chromium). Zrzuty ekranu i strony, których Lightpanda nie obsłuży,

@@ -27,7 +27,7 @@ PROTOCOL_MARKER = "<!-- TARS:PROTOCOL -->"
 ROSTER_MARKER = "<!-- TARS:ROSTER -->"
 AGENT_KINDS = {"orchestrator", "specialist", "generalist"}
 AUTONOMY_LEVELS = {"A0", "A1", "A2", "A3"}
-HQ_ROOMS = {"bridge", "study", "devlab", "atelier", "workshop", "office"}   # pokoje w TARS HQ (hq/web/src/20-art.js)
+HQ_ROOMS = {"bridge", "study", "devlab", "atelier", "filmstudio", "workshop", "office"}   # pokoje w TARS HQ (hq/web/src/20-art.js)
 # Hermes ucina opis skilla w indeksie promptu do 60 znaków (agent/skill_utils.py).
 SKILL_PROMPT_DESC_LIMIT = 60
 # Budżet main promptu (SOUL.md) w przybliżonych tokenach (~3.5 znaku/token dla PL/EN).

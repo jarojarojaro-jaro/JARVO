@@ -1,11 +1,7 @@
 agent: tars-studio
 
 tools:
-  - {name: hyperframes, source: https://github.com/heygen-com/hyperframes, license: Apache-2.0, version: npx-pinned-by-skill, install: {method: npm, spec: "hyperframes (npx)"}, integration: cli, used_by_skills: [film-z-kodu, hyperframes, product-launch-video], healthcheck: "npx --yes hyperframes --version", autonomy: A1}
-  - {name: manim, optional: true, source: https://github.com/ManimCommunity/manim, license: MIT, version: image, install: {method: uv-tool, spec: manim}, integration: cli, used_by_skills: [manim-video], healthcheck: "manim --version", autonomy: A1, notes: "Wymaga cairo/pango (apt) i LaTeX dla wzorów; tylko z TARS_EXTRAS=\"manim\"."}
-  - {name: ffmpeg, source: https://ffmpeg.org, license: LGPL/GPL, version: image, install: {method: image, spec: "w obrazie Hermesa"}, integration: cli, used_by_skills: [film-z-kodu], healthcheck: "ffmpeg -version", autonomy: A1}
-  - {name: parakeet-stt, source: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3, license: "CC-BY-4.0 (model), MIT (onnx-asr)", version: see-infra, install: {method: pip-venv, spec: "onnx-asr[cpu,hub] + /opt/tars/bin/tars-stt"}, integration: skill-script, used_by_skills: [film-z-kodu], healthcheck: "/opt/tars/venv/bin/python -c 'import onnx_asr'", autonomy: A1, notes: "Parakeet TDT 0.6B v3 int8 (25 języków, w tym polski). Model ~0,65 GB pobierany przy 1. użyciu do /opt/data/tars/models; RAM tylko w trakcie (~1,2 GB)."}
-  - {name: auto-editor, optional: true, source: https://github.com/WyattBlue/auto-editor, license: Unlicense, version: see-infra, install: {method: uv-tool, spec: auto-editor}, integration: cli, used_by_skills: [film-z-kodu], healthcheck: "auto-editor --version", autonomy: A1, notes: "tylko z TARS_EXTRAS=\"media\"; bez niego cięcie ciszy: ffmpeg silenceremove."}
+  - {name: ffmpeg, source: https://ffmpeg.org, license: LGPL/GPL, version: image, install: {method: image, spec: "w obrazie Hermesa"}, integration: cli, used_by_skills: [formaty-platform], healthcheck: "ffmpeg -version", autonomy: A1, notes: "ffprobe dla check_media.py (wymiary, waga); wideo robi tars-wideo."}
   - {name: rembg, optional: true, source: https://github.com/danielgatis/rembg, license: MIT, version: see-infra, install: {method: pip-venv, spec: "rembg[cli]"}, integration: cli, used_by_skills: [grafika-social], healthcheck: "/opt/tars/venv/bin/rembg --help", autonomy: A1, notes: "tylko z TARS_EXTRAS=\"rembg\" (~0,5 GB); bez niego: obraz z przezroczystym tłem z generatora albo prośba o PNG."}
   - {name: playwright-core, source: https://github.com/microsoft/playwright, license: Apache-2.0, version: see-infra, install: {method: npm, spec: playwright-core}, integration: skill-script, used_by_skills: [grafika-social], healthcheck: "node -e \"require('playwright-core')\"", autonomy: A1}
   - {name: sharp, source: https://github.com/lovell/sharp, license: Apache-2.0, version: see-infra, install: {method: npm, spec: sharp}, integration: cli, used_by_skills: [grafika-social], healthcheck: "node -e \"require('sharp')\"", autonomy: A1}
@@ -18,7 +14,7 @@ sidecars:
     optional: true           # sidecar dochodzi, gdy Studio zacznie publikować
     healthcheck: "curl -fsS \"$POSTIZ_URL\" >/dev/null"
 
-hermes_skills: [manim-video, baoyu-infographic, humanizer, social-media-content-calendar, creative-ideation, meme-generation, excalidraw, concept-diagrams]
+hermes_skills: [baoyu-infographic, humanizer, social-media-content-calendar, creative-ideation, meme-generation, excalidraw, concept-diagrams]
 hermes_plugins: []
 mcp_servers: []            # opcjonalnie: canva, figma, cloudinary (po konfiguracji kont)
 env_requires: [OPENROUTER_API_KEY]

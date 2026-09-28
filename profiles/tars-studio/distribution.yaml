@@ -1,11 +1,11 @@
 name: tars-studio
-version: 0.1.0
-description: "Studio: copy, grafiki, filmy z kodu i AI, kampanie social; publikacja tylko za zgodą."
+version: 0.2.0
+description: "Studio: copy, grafiki, obrazy AI, kampanie social (filmy: Wideograf); publikacja tylko za zgodą."
 author: "TARS fleet"
 license: MIT
 env_requires:
   - name: OPENROUTER_API_KEY
-    description: "Klucz OpenRouter dla Studio (modele + generacja obrazów i wideo; osobny klucz z limitem)"
+    description: "Klucz OpenRouter dla Studio (modele + generacja obrazów; osobny klucz z limitem)"
     required: true
   - name: POSTIZ_API_KEY
     description: "Opcjonalnie: kolejka publikacji Postiz (tylko po zgodzie użytkownika)"

@@ -1,17 +1,17 @@
 ---
 name: pakiet-kampanii
-description: "Kampania: koncepcja, posty, grafiki, wideo, kalendarz."
-version: 1.0.0
+description: "Kampania: koncepcja, posty, grafiki, brief wideo, kalendarz."
+version: 1.1.0
 author: TARS
 license: MIT
 metadata:
   hermes:
     tags: [marketing, campaign, launch, content-calendar]
-    related_skills: [launch, content-strategy, social, social-media-content-calendar, grafika-social, film-z-kodu, copy-pl]
+    related_skills: [launch, content-strategy, social, social-media-content-calendar, grafika-social, copy-pl]
   tars:
     agent: tars-studio
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
 # Pakiet kampanii
@@ -21,8 +21,10 @@ metadata:
    (odbiorcy, konkurencja, głos klienta), jeśli jest.
 2. **Koncepcja** (`out/KONCEPCJA.md`, zasady z `launch` i `content-strategy`): cel kampanii (miara), odbiorca, jedna
    główna obietnica, 3 filary treści, kanały, oś czasu. 2 warianty koncepcji z rekomendacją, jeśli karta tego nie przesądza.
-3. **Treści:** posty (`copy-pl`, `social`), grafiki (`grafika-social`), wideo (`film-z-kodu`), opcjonalnie e-mail (`emails`)
+3. **Treści:** posty (`copy-pl`, `social`), grafiki (`grafika-social`), opcjonalnie e-mail (`emails`)
    i reklamy (`ad-creative`), zgodnie z listą z karty.
+   **Filmy** robi `tars-wideo`: piszę `out/teksty/BRIEF-WIDEO.md` (na film: platforma i format, długość, przesłanie,
+   hook, CTA, ton, materiały z kitu, data w kalendarzu) i w `summary` oddania proszę TARS-a o kartę dla Wideografa.
 4. **Kalendarz** (`social-media-content-calendar`): `out/kalendarz.csv` (data, godzina, platforma, typ, plik, tekst, CTA, status=szkic).
 5. **Kontrola:** `check_media.py out/ --auto`, limity tekstów, spójność wizualna (obejrzyj całość obok siebie).
 6. **INDEX i RAPORT:** `out/INDEX.md` (każdy plik: do czego i gdzie), `out/RAPORT.md` (koncepcja w 5 zdaniach, samokontrola DoD,

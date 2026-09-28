@@ -116,6 +116,7 @@ const ROOMS = {
   bridge:   { fig: [50, 22], bubble: "side", wall: "#232B36", wall2: "#2C3643", side: "#1A2029", ceil: "#141A22", floor: "#1C232D", floor2: "#212935", trim: "#0F141B", wallType: "panels", floorType: "grid" },
   study:    { fig: [68, 50], wall: "#1F4D3A", wall2: "#255A44", side: "#183F30", ceil: "#133325", floor: "#6B4426", floor2: "#5E3B20", trim: "#3E2614", wallType: "stripes", floorType: "planks" },
   devlab:   { fig: [63, 44], bubble: "left", wall: "#1F4F9E", wall2: "#1A4488", side: "#183E7C", ceil: "#143670", floor: "#C9D1DA", floor2: "#BCC5CF", trim: "#10306A", wallType: "panels", floorType: "checker" },
+  filmstudio: { fig: [60, 46], bubble: "left", wall: "#2E2A3A", wall2: "#262233", side: "#231F30", ceil: "#1C1927", floor: "#4A3B32", floor2: "#42342C", trim: "#16131E", wallType: "foam", floorType: "planks" },
   atelier:  { fig: [55, 48], wall: "#C2507A", wall2: "#AD4469", side: "#9C3D61", ceil: "#8A3556", floor: "#D9BF8F", floor2: "#CDB07E", trim: "#7E2E4E", wallType: "bricks", floorType: "planks" },
   workshop: { fig: [35, 46], wall: "#C96A22", wall2: "#B25B18", side: "#A9571B", ceil: "#944C16", floor: "#8F979F", floor2: "#838B93", trim: "#6E3A10", wallType: "ribs", floorType: "concrete" },
   office:   { fig: [54, 44], bubble: "left", wall: "#6F7D8E", wall2: "#667486", side: "#5E6B7C", ceil: "#546070", floor: "#4B5A6C", floor2: "#44526A", trim: "#3A4556", wallType: "panels", floorType: "checker" },
@@ -128,6 +129,7 @@ const LOOKS = {
   study:    { coat: "#6B4A2E", coat2: "#523820", pants: "#3B2F25", shoes: "#241A12", hair: "#4A3020", hat: "deerstalker", hatC: "#A07C4C", hatC2: "#7A5C36", outfit: "scarf", accent: "#C9A26B" },
   devlab:   { coat: "#27406A", coat2: "#1B2E4E", pants: "#2B2F36", shoes: "#EDEFF2", hair: "#3A2418", hairStyle: "messy", outfit: "hoodie", phones: "#1FB6A6" },
   atelier:  { coat: "#F4F4F2", coat2: "#D8D8D2", pants: "#3B3F8C", shoes: "#1E1E24", hair: "#6B3A1E", hat: "beret", hatC: "#B0306A", hatC2: "#8C2455", outfit: "stripes", accent: "#1E1E24" },
+  filmstudio: { coat: "#2B2B33", coat2: "#1E1E24", pants: "#3E4A5C", shoes: "#1A1A1F", hair: "#2A1C14", hat: "cap", hatC: "#D62D20", hatC2: "#A51F16", outfit: "vest", vest: "#8C7A55", vest2: "#6E5F40" },
   workshop: { coat: "#D9661F", coat2: "#B85414", pants: "#2F5D9E", shoes: "#3A2A1A", hair: "#3A2A1A", hat: "hardhat", hatC: "#F2B01E", hatC2: "#C98E0E", outfit: "overalls" },
   office:   { coat: "#5A6472", coat2: "#454E5A", pants: "#2E3440", shoes: "#15171C", hair: "#6B4226", hairStyle: "short", outfit: "tie", tie: "#2C6ED5", shirt: "#F1F3F5" },
 };
@@ -164,6 +166,11 @@ function figHat(g, x, hy, k, facing) {
   } else if (k.hat === "beret") {
     g.r(x - 5, hy - 2, 11, 2, k.hatC); g.r(x - 4, hy - 3, 8, 1, k.hatC); g.p(x + 5, hy - 1, k.hatC2);
     g.p(x, hy - 4, k.hatC2); g.r(x - 5, hy, 10, 1, k.hatC2);
+  } else if (k.hat === "cap") {   // daszkiem do tyłu: z przodu widać pasek regulacji
+    g.r(x - 4, hy - 3, 8, 3, k.hatC); g.r(x - 5, hy - 1, 10, 2, k.hatC); g.r(x - 2, hy - 3, 3, 1, shade(k.hatC, 0.3));
+    if (facing === "back") g.r(x - 3, hy + 1, 7, 1, k.hatC2);
+    else { g.r(x - 1, hy, 3, 1, k.hatC2); g.p(x, hy - 4, k.hatC2); }
+    g.r(x - 5, hy + 1, 1, 3, k.hair); g.r(x + 4, hy + 1, 1, 3, k.hair);
   } else if (k.hat === "hardhat") {
     g.r(x - 4, hy - 3, 8, 3, k.hatC); g.r(x - 5, hy - 1, 10, 1, k.hatC); g.r(x - 6, hy, 12, 1, k.hatC2);
     g.r(x - 3, hy - 3, 2, 1, shade(k.hatC, 0.4)); g.r(x - 1, hy - 3, 2, 3, k.hatC2);
@@ -183,6 +190,7 @@ function figOutfit(g, x, y, k, facing) {
     if (o === "stripes") [16, 14, 12, 10].forEach((d) => g.r(x - 5, y - d, 10, 1, k.accent));
     if (o === "overalls") { g.r(x - 3, y - 17, 1, 5, k.pants); g.r(x + 2, y - 17, 1, 5, k.pants); g.r(x - 5, y - 12, 10, 4, k.pants); }
     if (o === "tie") g.r(x - 2, y - 17, 4, 1, k.shirt);
+    if (o === "vest") { g.r(x - 5, y - 17, 10, 9, k.vest); g.r(x - 5, y - 17, 10, 1, k.vest2); }
     return;
   }
   if (o === "suit") {
@@ -203,10 +211,13 @@ function figOutfit(g, x, y, k, facing) {
     g.p(x - 3, y - 14, "#F2B01E"); g.p(x + 2, y - 14, "#F2B01E"); g.r(x - 1, y - 12, 2, 2, shade(k.pants, -0.25));
   } else if (o === "tie") {
     g.r(x - 1, y - 17, 2, 1, k.shirt); g.r(x - 1, y - 16, 2, 5, k.tie);
+  } else if (o === "vest") {
+    g.r(x - 5, y - 17, 3, 9, k.vest); g.r(x + 2, y - 17, 3, 9, k.vest);
+    g.r(x - 5, y - 13, 2, 2, k.vest2); g.r(x + 3, y - 13, 2, 2, k.vest2); g.p(x - 4, y - 16, k.vest2); g.p(x + 3, y - 16, k.vest2);
   }
 }
 
-// Postać-minifigurka (27 px). (x, y) = środek stóp. pose: rest | type | raise | hold | hammer; item: magnifier | palette | clipboard | wrench
+// Postać-minifigurka (27 px). (x, y) = środek stóp. pose: rest | type | raise | hold | hammer; item: magnifier | palette | clipboard | camera | clipper
 function drawFigure(L, id, x, y, look, o = {}) {
   const k = LOOKS[look] || LOOKS.office;
   const facing = o.facing || "front";
@@ -265,6 +276,13 @@ function drawFigure(L, id, x, y, look, o = {}) {
     } else if (it === "palette") {
       armR.r(x + 3, y - 12, 7, 3, "#D9B887").p(x + 4, y - 12, "#E63946").p(x + 6, y - 12, "#2A9D8F").p(x + 8, y - 11, "#F4A261").p(x + 5, y - 10, "#264653");
       armL.r(x - 8, y - 13, 1, 4, "#8A5A33").p(x - 8, y - 14, "#E63946");
+    } else if (it === "camera") {
+      armR.r(x + 3, y - 18, 8, 5, "#23272E").r(x + 11, y - 17, 2, 3, "#3A404A").p(x + 12, y - 16, "#6D8BB0").r(x + 5, y - 20, 4, 2, "#23272E");
+      L.get(`${id}-rec`, o.busy ? "thq-px-rec is-on" : "thq-px-rec").p(x + 4, y - 17, "#FF3B30");
+    } else if (it === "clipper") {
+      armR.r(x + 3, y - 15, 8, 6, "#15171C").r(x + 3, y - 17, 8, 2, "#EDEFF2");
+      for (let i = 0; i < 8; i += 2) armR.p(x + 3 + i, y - 17, "#15171C").p(x + 4 + i, y - 16, "#15171C");
+      armR.r(x + 4, y - 13, 5, 1, "#8A94A3");
     } else if (it === "clipboard") {
       armR.r(x + 3, y - 15, 6, 7, "#8A5A33").r(x + 4, y - 14, 4, 5, "#FFFFFF").r(x + 4, y - 13, 3, 1, "#8A94A3").r(x + 4, y - 11, 3, 1, "#8A94A3").r(x + 5, y - 16, 2, 1, "#C9A24C");
     }
@@ -317,6 +335,7 @@ function drawShell(g, w, h, t, geo) {
   g.r(bx, by, bw, bh, t.wall);
   if (t.wallType === "stripes") for (let x = bx + 2; x < bx + bw; x += 4) g.r(x, by, 1, bh, t.wall2);
   else if (t.wallType === "bricks") for (let yy = by; yy < by + bh; yy += 4) { g.r(bx, yy, bw, 1, t.wall2); for (let x = bx + ((yy / 4) % 2 ? 0 : 4); x < bx + bw; x += 8) g.r(x, yy, 1, 4, t.wall2); }
+  else if (t.wallType === "foam") for (let yy = by + 1; yy < by + bh - 3; yy += 4) for (let x = bx + ((yy >> 2) % 2 ? 0 : 2); x < bx + bw - 1; x += 4) { g.r(x, yy, 2, 2, t.wall2); g.p(x, yy, shade(t.wall, 0.08)); }
   else if (t.wallType === "ribs") for (let x = bx + 1; x < bx + bw; x += 4) { g.r(x, by, 1, bh, shade(t.wall, 0.12)); g.r(x + 1, by, 1, bh, t.wall2); }
   else for (let x = bx + 15; x < bx + bw; x += 16) { g.r(x, by, 1, bh, t.wall2); for (let yy = by + 3; yy < by + bh; yy += 12) { g.p(x - 2, yy, t.wall2); g.p(x + 2, yy, t.wall2); } }
   g.r(bx, by, bw, 1, shade(t.wall, -0.3));
@@ -454,6 +473,48 @@ function roomOffice(L, a) {
   const c = L.get("chair"); c.r(64, 46, 13, 9, "#2D3440"); c.r(69, 55, 3, 4, "#555E6B"); c.r(64, 59, 13, 1, "#555E6B");
 }
 
+// Studio filmowe (Wideograf): zielone tło z softboxem, kamera na statywie z lampką REC, stół montażowy
+// z osią czasu (głowica przesuwa się, gdy agent pracuje), klaps i szpula na ścianie.
+function roomFilmstudio(L, a) {
+  const g = L.get("props"), st = a.status, on = isBusy(st);
+  // green screen z łagodnym przejściem na podłogę
+  g.r(14, 7, 40, 2, "#6E747D"); g.r(15, 9, 38, 49, "#2FA84F");
+  for (let x = 20; x < 53; x += 7) g.r(x, 9, 1, 49, "#2A9647");
+  g.r(15, 58, 38, 3, "#34B056"); g.r(14, 61, 40, 3, "#37B85A");
+  // softbox na statywie (świeci na tło, gdy trwa praca)
+  g.r(8, 34, 1, 30, "#3A3F48"); g.line(8, 58, 4, 64, "#3A3F48"); g.line(8, 58, 12, 64, "#3A3F48");
+  g.r(2, 22, 14, 12, "#2A2F37"); g.r(3, 23, 12, 10, "#EDF1F5"); g.r(3, 23, 12, 1, "#FFFFFF");
+  const glow = L.get("soft-glow", cx("thq-px-glow", on && "is-on"));
+  for (let j = 0; j < 24; j++) glow.r(15 + j, 24 + Math.round(j * 0.2), 1, 10 + Math.round(j * 0.9), "rgba(255,248,220,.10)");
+  // szpula filmu i lampka REC na ścianie
+  g.circle(104, 14, 5, "#8A93A0"); g.circle(104, 14, 1, "#2E2A3A");
+  [[-3, -2], [3, -2], [0, 3]].forEach(([dx, dy]) => g.r(104 + dx - 1, 14 + dy - 1, 2, 2, "#2E2A3A"));
+  g.r(62, 11, 17, 8, "#3A1E1E"); g.r(63, 12, 15, 6, "#1A0E0E");
+  L.get("rec-sign", cx("thq-px-neon", on && "is-on")).text(65, 13, "REC", "#FF4D3D");
+  // kamera na statywie, obiektyw w stronę tła
+  g.line(66, 47, 60, 64, "#3A3F48"); g.line(66, 47, 72, 64, "#3A3F48"); g.r(66, 47, 1, 17, "#4A515C");
+  g.r(60, 39, 13, 8, "#23272E"); g.r(60, 39, 13, 1, "#3A404A"); g.r(55, 41, 5, 4, "#3A404A"); g.r(54, 42, 1, 2, "#6D8BB0");
+  g.r(63, 37, 6, 2, "#23272E"); g.r(73, 40, 3, 3, "#2A2F37");
+  L.get("rec", cx("thq-px-rec", on && "is-on")).r(71, 40, 1, 1, "#FF3B30");
+  // stół montażowy: monitor z podglądem 9:16 i osią czasu (wideo, audio, napisy)
+  g.r(84, 45, 36, 2, "#3A3F48"); g.r(84, 45, 36, 1, "#5A616C"); g.r(86, 47, 2, 12, "#2A2F37"); g.r(116, 47, 2, 12, "#2A2F37");
+  g.r(87, 25, 30, 18, "#1D232C"); g.r(88, 26, 28, 15, "#0B0F15"); g.r(101, 43, 2, 2, "#2A313B");
+  g.r(90, 27, 5, 8, "#E76F51"); g.r(90, 31, 5, 4, "#264653"); g.r(96, 28, 18, 1, "#3A4452"); g.r(96, 30, 12, 1, "#3A4452");
+  [[90, 5, "#5AA9FF"], [96, 7, "#7CF0B4"], [104, 6, "#5AA9FF"], [111, 4, "#7CF0B4"]].forEach(([x, w, c]) => g.r(x, 36, w, 1, c));
+  [[90, 21, "#FFC53D"]].forEach(([x, w, c]) => { for (let i = 0; i < w; i += 2) g.r(x + i, 38 - (i % 4 ? 1 : 0), 1, 1 + (i % 4 ? 1 : 0), c); });
+  [[92, 3], [98, 4], [106, 3], [111, 3]].forEach(([x, w]) => g.r(x, 40, w, 1, "#FF8A7A"));
+  const ph1 = L.get("playhead1", on ? "thq-px-f1" : "", { "--thq-d": "0.9s" }), ph2 = on ? L.get("playhead2", "thq-px-f2", { "--thq-d": "0.9s" }) : null;
+  ph1.r(99, 35, 1, 6, "#FFFFFF");
+  if (ph2) ph2.r(106, 35, 1, 6, "#FFFFFF");
+  // klaps na stole
+  g.r(104, 41, 10, 4, "#15171C"); g.r(104, 39, 10, 2, "#EDEFF2");
+  for (let i = 0; i < 10; i += 3) g.r(104 + i, 39, 1, 2, "#15171C");
+  g.r(105, 42, 6, 1, "#8A94A3");
+  // wideograf między kamerą a stołem
+  const lookup = { working: { pose: "hold", item: "camera" }, judging: { pose: "hold", item: "camera" }, review: { pose: "hold", item: "clipper" }, blocked: { pose: "raise", alert: true, worried: true } };
+  drawFigure(L, "fig", 79, 64, "filmstudio", { busy: on, sleep: st === "idle", ...(lookup[st] || {}) });
+}
+
 function roomStorage(L) {
   const g = L.get("props");
   [[14, 12], [70, 12]].forEach(([sx]) => {
@@ -531,7 +592,7 @@ function roomBridge(L, a, board, crew, box) {
   holo.circle(120, 44, 3, "rgba(120,240,255,.45)");
 }
 
-const ROOM_DRAW = { study: roomStudy, devlab: roomDevlab, atelier: roomAtelier, workshop: roomWorkshop, office: roomOffice };
+const ROOM_DRAW = { study: roomStudy, devlab: roomDevlab, atelier: roomAtelier, filmstudio: roomFilmstudio, workshop: roomWorkshop, office: roomOffice };
 
 function PixRoom({ box, agent, board, crew }) {
   const kind = agent.room === "bridge" ? "bridge" : ROOM_DRAW[agent.room] ? agent.room : "office";

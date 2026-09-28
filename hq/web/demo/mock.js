@@ -56,9 +56,12 @@
       ["vision_analyze", "out/ig-1080x1350.png"], ["kanban_request_review", "3 grafiki IG + 2 stories"],
     ],
     film: [
-      ["skill_view", "film-z-kodu"], ["write_file", "video/kompozycja.html (5 scen, hook 0–2 s)"],
-      ["terminal", "npx hyperframes render video/ --size 1080x1920 --fps 30"], ["terminal", "python3 subtitles.py out/reel.mp4 --lang pl"],
-      ["terminal", "python3 check_media.py out/reel.mp4 --spec ig-reel"], ["kanban_request_review", "Reel 20 s z napisami PL"],
+      ["skill_view", "krotki-film"], ["write_file", "out/wideo/SCENARIUSZ.md (5 scen, hook 1,4 s)"],
+      ["terminal", "python3 stock.py szukaj \"barista latte art\" --format 9:16 --arkusz out/wideo/kandydaci-s2.jpg"],
+      ["vision_analyze", "out/wideo/kandydaci-s2.jpg"], ["write_file", "out/wideo/src/plan.json"],
+      ["terminal", "python3 film.py render out/wideo/src/plan.json --szkic"], ["terminal", "python3 film.py render out/wideo/src/plan.json"],
+      ["terminal", "python3 qa_wideo.py out/wideo/otwarcie/otwarcie-9x16.mp4 --platforma ig-reel --lektor --arkusz qa.jpg"],
+      ["vision_analyze", "out/wideo/otwarcie/qa.jpg"], ["kanban_request_review", "Reel 20 s: lektor, napisy karaoke, −14 LUFS, ocena 91"],
     ],
     pack: [
       ["terminal", "python3 pack.py missions/M-260926-ziarno --out zlozenie/out"], ["write_file", "zlozenie/out/INDEX.md"],
@@ -79,7 +82,7 @@
         t_c03: card("t_c03", "Landing page Ziarno (Astro, PL)", "tars-web", "running", { started_at: t - 200, script: "landing", step: 2 }),
         t_c04: card("t_c04", "Grafiki IG na otwarcie (post 4:5 i story 9:16)", "tars-studio", "blocked",
           { block_kind: "needs_input", reason: "Która data otwarcia na grafikach: 12 czy 19 października?", blocked_at: t - 900 }),
-        t_c05: card("t_c05", "Film 20 s na Reels z napisami PL", "tars-studio", "ready", { parents: ["t_c04"] }),
+        t_c05: card("t_c05", "Film 20 s na Reels z napisami PL", "tars-wideo", "running", { started_at: t - 150, script: "film", step: 4 }),
         t_c06: card("t_c06", "Złożenie pakietu misji", "tars-reka", "todo", {}),
         t_c07: card("t_c07", "Porównanie hostingu dla strony Ziarno", "tars-reka", "review", { worker: "tars", script: "judge_hosting", step: 1, started_at: t - 60 }),
         t_c08: card("t_c08", "Cennik PDF dla kawiarni", "tars-reka", "done", { completed_at: t - 5000 }),
@@ -237,6 +240,7 @@
     "tars-studio": [["ig-1080x1350.png", "image", "#D96B3C"], ["story-1080x1920.png", "image", "#2F6552"], ["kalendarz.csv", "text"]],
     "tars-sherlock": [["RAPORT.md", "text"], ["zrodla.jsonl", "text"]],
     "tars-reka": [["porownanie-hostingu.md", "text"], ["cennik.pdf", "pdf"]],
+    "tars-wideo": [["otwarcie-9x16-miniatura.jpg", "image", "#3B2416"], ["SCENARIUSZ.md", "text"], ["film.json", "text"]],
   };
 
   function outputs(name) {
@@ -277,7 +281,7 @@ a.btn{display:inline-block;padding:12px 22px;background:#6B3E26;color:#F3E6D3;te
     const c = S.cards[id];
     if (!c) throw new Error("Nie ma takiej karty");
     const web = c.assignee === "tars-web";
-    const outName = web ? "index.html" : c.assignee === "tars-studio" ? "post-otwarcie-4x5.png" : "raport.md";
+    const outName = web ? "index.html" : { "tars-studio": "post-otwarcie-4x5.png", "tars-wideo": "otwarcie-9x16-miniatura.jpg" }[c.assignee] || "raport.md";
     const body = `CEL: ${c.title}.
 KONTEKST: „Ziarno” — specialty coffee w Krakowie, otwarcie 19.10.2026. Ton ciepły, rzemieślniczy, bez korpomowy.
 WEJŚCIA: brand kit /opt/data/tars/knowledge/brands/ziarno/brand.md; wyniki Sherlocka w ../sherlock/out/.
@@ -288,7 +292,7 @@ DoD:
 WYJŚCIA: out/${outName}
 GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać innych plików.`;
     const done = c.status === "done";
-    const kind = web ? "html" : outName.endsWith(".png") ? "image" : "text";
+    const kind = web ? "html" : /\.(png|jpg)$/.test(outName) ? "image" : "text";
     const outputs = done ? [{ path: `/opt/data/tars/missions/M-demo/${c.assignee}/out/${outName}`, name: outName, rel: `out/${outName}`,
       kind, size: 14200, mtime: (c.completed_at || now()) - 30, in_out: true, main: true, color: "#6B3E26" }] : [];
     return { ...brief(c), body, brief: parseBrief(body), expected: [`out/${outName}`], outputs,
@@ -310,7 +314,7 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
     const hit = all.find(([n]) => n === name);
     if (hit && hit[1] === "image") return svgFor(name, hit[2]);
     if (name.endsWith(".html")) return new Blob([SAMPLE_SITE], { type: "text/plain" });
-    if (name.endsWith(".png")) return svgFor(name, "#6B3E26");
+    if (/\.(png|jpg)$/.test(name)) return svgFor(name, "#6B3E26");
     return new Blob([`# ${name}\n\nPrzykładowa zawartość w trybie demo.\n\n- Konkurencja: 11 kawiarni specialty w promieniu 1,5 km\n- Mediana ceny flat white: 17 zł\n- Luka: brak śniadań wegańskich przed 8:00\n`], { type: "text/plain" });
   }
 
@@ -341,6 +345,7 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
       "tars-web": [[["read_file", "knowledge/brands/ziarno/BRAND.md"]], "Mogę to zrobić w ramach landingu Ziarno. Budżety jakości zostają: LCP poniżej 2,5 s, CLS poniżej 0,1, Lighthouse 90+. Wdrożenie na produkcję tylko po Twojej zgodzie."],
       "tars-studio": [[["skill_view", "formaty-platform"]], "Zrobię to w formatach 4:5 i 9:16, w kolorach z brand kitu Ziarno. Publikacja dopiero po Twojej akceptacji. Pierwsza wersja:\n\nMEDIA:/opt/data/tars/workspaces/tars-studio/out/ig-1080x1350.png\nMEDIA:/opt/data/tars/workspaces/tars-studio/out/kalendarz.csv\n\nPodgląd na żywo: http://localhost:9120/demo/index.html, pliki w `/opt/data/tars/workspaces/tars-studio/out/ig-1080x1350.png`."],
       "tars-reka": [[["terminal", "python3 -c '…'"]], "Zrobione, wynik w out/. Jeśli to część misji, TARS dopnie to do pakietu końcowego."],
+      "tars-wideo": [[["skill_view", "krotki-film"]], "Zrobię to jako reels 9:16: hook do 2 s, polski lektor, napisy karaoke i muzyka pod głosem. Najpierw szkic do oceny rytmu, potem finał i kontrola jakości. Nic nie publikuję bez Twojej zgody."],
     };
     const [tools, text] = byAgent[name] || [[], "Jasne."];
     return { tools, text };
