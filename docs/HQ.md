@@ -106,6 +106,13 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 - **Każda przeglądarka:** gdy przeglądarka nie odtwarza kodeka filmu (np. Chromium bez H.264, ProRes), edytor sam
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
+- **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `napisy`, `usun`, `sprawdz`,
+  `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
+  a napisy rysuje ta sama funkcja (`hq/web/src/44-napisy.js`) w przeglądarce bez okna, więc plik od agenta wygląda
+  jak eksport z edytora. Edytor co 3 s sprawdza, czy projekt zmienił się z zewnątrz: bez Twoich niezapisanych zmian
+  wczytuje wersję agenta sam (jako zwykły krok, ↶ ją cofa), a przy kolizji pyta: „Wczytaj jego wersję” albo
+  „Zostaw moją”. Zapis nigdy nie nadpisuje po cichu cudzej zmiany (serwer odrzuca go jako nieaktualny).
 - **Telefon (do 860 px):** układ jak w CapCut: podgląd na górze, pod nim czas, odtwarzanie i cofnij/ponów, oś czasu
   przewijana palcem pod stałym wskaźnikiem na środku (dwa palce: przybliżenie), a na dole pasek **Edytuj · Audio ·
   Tekst · Napisy · Format**. Narzędzie otwiera panel od dołu; dotknięcie klipu, napisu albo muzyki na osi otwiera

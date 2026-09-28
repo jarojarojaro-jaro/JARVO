@@ -695,3 +695,6 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-codec.is-info { display: flex; align-items: center; gap: 8px; }
 .thq-ed-spin.is-small { width: 14px; height: 14px; border-width: 2px; flex: none; }
 .thq-ed.is-mobile .thq-ed-nav button { font-size: 0.66rem; }
+.thq-ed-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 14px; background: #3A2A06; color: #FFE3A3; border-bottom: 1px solid #6B4E0E; font-size: 0.86rem; }
+.thq-ed-banner span { flex: 1; min-width: 200px; }
+.thq-ed-banner.is-ok { background: #0F2E1C; color: #A7F3C4; border-color: #1E5A36; }

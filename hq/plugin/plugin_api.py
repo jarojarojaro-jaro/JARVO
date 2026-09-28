@@ -253,6 +253,7 @@ async def edit_info(path: str):
         media = [_media_entry(x) for x in sib]
         proj = None
         pp = ed.project_path(p)
+        mtime = pp.stat().st_mtime if pp.is_file() else 0.0
         if pp.is_file():
             try:
                 proj = json.loads(pp.read_text(encoding="utf-8"))
@@ -260,7 +261,7 @@ async def edit_info(path: str):
                 proj = None
         subs = sorted((str(x) for x in p.parent.glob("*.srt") if x.is_file()), key=lambda x: x.lower())[:30]
         return {"file": _media_entry(p), "media": media, "project": proj, "ffmpeg": bool(t["ffmpeg"]),
-                "stt": bool(t["stt"]), "subs": subs}
+                "stt": bool(t["stt"]), "subs": subs, "project_mtime": mtime}
 
     return await asyncio.to_thread(gather)
 
@@ -285,10 +286,30 @@ async def edit_save(request: Request):
     if not isinstance(proj, dict) or len(raw) > 2_000_000:
         raise HTTPException(400, "Projekt musi być obiektem JSON do 2 MB")
     target = ed.project_path(p)
+    # projekt zmieniony w międzyczasie przez kogoś innego (Wideograf: projekt.py) nie jest nadpisywany po cichu
+    base = body.get("base")
+    if base is not None and not body.get("force") and target.is_file() and target.stat().st_mtime > float(base) + 1e-3:
+        raise HTTPException(409, "Projekt zmienił się poza edytorem")
     tmp = target.with_name(f".{target.name}.part")
     tmp.write_text(raw, encoding="utf-8")
     tmp.replace(target)
-    return {"ok": True, "path": str(target), "ts": time.time()}
+    return {"ok": True, "path": str(target), "ts": time.time(), "mtime": target.stat().st_mtime}
+
+
+@router.get("/edit/stamp")
+async def edit_stamp(path: str):
+    """Kiedy i kto ostatnio zmienił projekt (edytor pyta co kilka sekund: zmiany agenta wczytuje sam)."""
+    p = _media_path(path)
+    if p is None:
+        raise HTTPException(404, "Film poza katalogami floty")
+    pp = ed.project_path(p)
+    if not pp.is_file():
+        return {"mtime": 0.0}
+    try:
+        who = (json.loads(pp.read_text(encoding="utf-8")).get("zmienil") or {}).get("kto")
+    except (OSError, ValueError):
+        who = None
+    return {"mtime": pp.stat().st_mtime, "kto": who}
 
 
 @router.get("/edit/srt")
@@ -504,17 +525,17 @@ async def edit_export(request: Request):
     try:
         proj = ed.normalize(body.get("project") or {}, _media_path)
         pngs = body.get("texts") or []
-        if len(pngs) != len(proj["texts"]):
+        if len(pngs) != len((body.get("project") or {}).get("texts") or []):
             raise ed.ProjectError("Liczba obrazów napisów nie zgadza się z projektem.")
     except ed.ProjectError as exc:
         raise HTTPException(400, str(exc))
     tmpdir = core.JARVO_DIR / "state" / "edytor" / uuid.uuid4().hex[:12]
     tmpdir.mkdir(parents=True, exist_ok=True)
     try:
-        files = []
-        for k, url in enumerate(pngs):
+        files = []   # tylko napisy, które przeszły walidację, w kolejności proj["texts"]
+        for k, x in enumerate(proj["texts"]):
             dest = tmpdir / f"napis-{k}.png"
-            _data_png(url, dest)
+            _data_png(pngs[x["i"]], dest)
             files.append(dest)
         has_audio = {}
         for c in proj["clips"]:

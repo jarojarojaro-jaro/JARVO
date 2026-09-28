@@ -102,12 +102,12 @@ def normalize(project: dict, resolve) -> dict:
     if total > MAX_DURATION:
         raise ProjectError("Film dłuższy niż 3 godziny.")
 
-    texts = []
-    for t in (project.get("texts") or [])[:MAX_TEXTS]:
+    texts = []   # "i" = numer napisu w projekcie: po nim dobieramy jego obraz PNG
+    for i, t in enumerate((project.get("texts") or [])[:MAX_TEXTS]):
         s = _num((t or {}).get("start"), 0, total, 0)
         e = _num(t.get("end"), 0, total, s)
         if e - s >= MIN_CLIP:
-            texts.append({"start": s, "end": e})
+            texts.append({"start": s, "end": e, "i": i})
 
     audio = []
     for m in (project.get("audio") or [])[:MAX_AUDIO]:

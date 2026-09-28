@@ -78,7 +78,14 @@ const liveApi = {
   },
   editInfo: (path) => SDK.fetchJSON(`${API_ROOT}/edit/info?path=${encodeURIComponent(path)}`),
   editMedia: (path) => SDK.fetchJSON(`${API_ROOT}/edit/media?path=${encodeURIComponent(path)}`),
-  editSave: (path, project) => SDK.fetchJSON(`${API_ROOT}/edit/save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, project }) }),
+  async editSave(path, project, base, force) {
+    const res = await fetch(`${basePath()}${API_ROOT}/edit/save`, { method: "POST", credentials: "include",
+      headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ path, project, base, force: !!force }) });
+    if (res.status === 409) { const e = new Error("conflict"); e.conflict = true; throw e; }
+    if (!res.ok) { let m = `HTTP ${res.status}`; try { m = (await res.json()).detail || m; } catch (_) { /* nie-JSON */ } throw new Error(m); }
+    return res.json();
+  },
+  editStamp: (path) => SDK.fetchJSON(`${API_ROOT}/edit/stamp?path=${encodeURIComponent(path)}`),
   async editExport(path, project, texts) {
     const res = await rawFetch(`${API_ROOT}/edit/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, project, texts }) });
     return res.json();

@@ -382,6 +382,10 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
     dest = out_root / agent.name
     shutil.copytree(src, dest, ignore=COPY_IGNORE)
     tokens = base_tokens(fleet, agent, runtime_build_dir, env)
+    # Wideograf: silnik edytora HQ obok projekt.py (render agenta = ten sam co „Eksportuj” w edytorze)
+    if (dest / "scripts" / "projekt.py").exists():
+        shutil.copy2(fl.REPO_ROOT / "hq" / "plugin" / "edytor.py", dest / "scripts" / "edytor.py")
+        shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "src" / "44-napisy.js", dest / "scripts" / "edytor_napisy.js")
 
     # SOUL.md
     soul_path = dest / "SOUL.md"

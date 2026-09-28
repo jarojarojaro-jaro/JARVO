@@ -45,7 +45,7 @@ def test_normalize_limits_and_defaults(tmp_path):
     assert a["speed"] == 4 and a["volume"] == 2          # przycięte do dozwolonych zakresów
     assert img["kind"] == "image" and img["speed"] == 1.0
     assert p["duration"] == pytest.approx(2 / 4 + 2)
-    assert p["texts"] == [{"start": 0.5, "end": p["duration"]}]   # za krótki napis odpada
+    assert p["texts"] == [{"start": 0.5, "end": p["duration"], "i": 0}]   # za krótki napis odpada (i = numer w projekcie)
     assert p["audio"][0]["out"] == pytest.approx(p["duration"] - 1)   # muzyka nie wychodzi poza film
 
 

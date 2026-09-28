@@ -10,10 +10,7 @@ const ED_FORMATS = [
   ["1:1", "1:1 · kwadrat", "1:1 · square"], ["4:5", "4:5 · post", "4:5 · post"],
 ];
 const ED_SIZES = { "16:9": [1920, 1080], "9:16": [1080, 1920], "1:1": [1080, 1080], "4:5": [1080, 1350] };
-const ED_FONTS = [
-  ["system-ui, 'Segoe UI', Roboto, sans-serif", "Bezszeryfowy"], ["'Bricolage Grotesque', system-ui, sans-serif", "Display"],
-  ["Georgia, 'Times New Roman', serif", "Szeryfowy"], ["'JetBrains Mono', ui-monospace, monospace", "Mono"],
-];
+
 const ED_STYLES = [["shadow", "Cień", "Shadow"], ["box", "Tło", "Box"], ["outline", "Obrys", "Outline"], ["plain", "Zwykły", "Plain"]];
 const ED_MIN = 0.1;
 const ED_COLORS = ["#FFFFFF", "#000000", "#FFD60A", "#FF453A", "#32D74B", "#0A84FF", "#BF5AF2", "#FF9F0A"];
@@ -91,64 +88,6 @@ function layoutClips(clips) {
 }
 const projTotal = (p) => p.clips.reduce((a, c) => a + clipDur(c), 0);
 
-// ------------------------------------------------------------------ napisy: jedna funkcja rysująca
-function textFont(t, H, W) {
-  const px = Math.max(6, (t.size || 64) * Math.min(W, H) / 1080);
-  return { px, font: `${t.bold === false ? 500 : 800} ${px}px ${t.font || ED_FONTS[0][0]}` };
-}
-function wrapLines(ctx, text, maxW) {
-  const out = [];
-  for (const para of String(text || "").split("\n")) {
-    let line = "";
-    for (const word of para.split(/\s+/).filter(Boolean)) {
-      const test = line ? `${line} ${word}` : word;
-      if (line && ctx.measureText(test).width > maxW) { out.push(line); line = word; } else line = test;
-    }
-    out.push(line);
-  }
-  return out;
-}
-// Prostokąt napisu na kanwie W×H (do trafiania myszą i rysowania).
-function textBox(ctx, t, W, H) {
-  const { px, font } = textFont(t, H, W);
-  ctx.font = font;
-  const lines = wrapLines(ctx, t.text, (t.maxw || 0.86) * W);
-  const lh = px * 1.18;
-  const w = Math.max(...lines.map((l) => ctx.measureText(l).width), px * 0.5);
-  const h = lines.length * lh;
-  const cx = (t.x ?? 0.5) * W, cy = (t.y ?? 0.8) * H;
-  const pad = t.style === "box" ? px * 0.35 : px * 0.1;
-  return { px, font, lines, lh, w, h, cx, cy, x0: cx - w / 2 - pad, y0: cy - h / 2 - pad, x1: cx + w / 2 + pad, y1: cy + h / 2 + pad };
-}
-function drawText(ctx, t, W, H) {
-  const b = textBox(ctx, t, W, H);
-  ctx.save();
-  ctx.font = b.font;
-  ctx.textBaseline = "middle";
-  const align = t.align || "center";
-  ctx.textAlign = align;
-  const ax = align === "left" ? b.cx - b.w / 2 : align === "right" ? b.cx + b.w / 2 : b.cx;
-  if (t.style === "box") {
-    const r = b.px * 0.22;
-    ctx.fillStyle = t.bg || "rgba(0,0,0,0.72)";
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, r); else ctx.rect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
-    ctx.fill();
-  }
-  b.lines.forEach((line, i) => {
-    const y = b.cy - b.h / 2 + b.lh * (i + 0.5);
-    if (t.style === "outline") {
-      ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, b.px * 0.14); ctx.strokeStyle = t.bg || "#000";
-      ctx.strokeText(line, ax, y);
-    }
-    if (t.style === "shadow") { ctx.shadowColor = "rgba(0,0,0,0.65)"; ctx.shadowBlur = b.px * 0.18; ctx.shadowOffsetY = b.px * 0.05; }
-    ctx.fillStyle = t.color || "#fff";
-    ctx.fillText(line, ax, y);
-    ctx.shadowColor = "transparent";
-  });
-  ctx.restore();
-  return b;
-}
 async function textPng(t, W, H) {
   try { await document.fonts.load(textFont(t, H, W).font); } catch (_) { /* czcionka systemowa */ }
   const c = document.createElement("canvas");
@@ -452,6 +391,16 @@ function VideoEditor({ path, onClose }) {
     if (!api.editInfo) { setErr(L("Edytor działa w zainstalowanym Jarvo.", "The editor runs in an installed Jarvo.")); return undefined; }
     api.editInfo(path).then(async (d) => {
       if (!alive) return;
+      const proj = await prepare(d);
+      baseRef.current = d.project_mtime || 0;
+      H.reset(proj);
+      setInfo(d);
+    }).catch((e) => alive && setErr(e.message || String(e)));
+    return () => { alive = false; };
+  }, [path]);
+
+  // projekt z serwera → gotowy do edycji (id elementów, brakujące pliki odrzucone)
+  async function prepare(d) {
       addMeta([d.file, ...d.media]);
       let proj = d.project && Array.isArray(d.project.clips) && d.project.clips.length ? d.project : initialProject(d.file);
       // pliki z zapisanego projektu, których nie ma w katalogu: dopytujemy, brakujące odrzucamy
@@ -464,11 +413,40 @@ function VideoEditor({ path, onClose }) {
         clips: proj.clips.filter((c) => ok.has(c.src)).map((c) => ({ ...c, id: c.id || edId("c") })),
         audio: (proj.audio || []).filter((c) => ok.has(c.src)).map((c) => ({ ...c, id: c.id || edId("a") })) };
       if (!proj.clips.length) proj = initialProject(d.file);
-      H.reset(proj);
-      setInfo(d);
-    }).catch((e) => alive && setErr(e.message || String(e)));
-    return () => { alive = false; };
-  }, [path]);
+      return proj;
+  }
+  // zmiany z zewnątrz (Wideograf przez projekt.py): wczytujemy jako zwykły krok, więc ↶ cofa zmiany agenta
+  const baseRef = useRef(0);
+  const dirtyRef = useRef(false);
+  const [conflict, setConflict] = useState(null);
+  const [toast, setToast] = useState("");
+  async function reloadProject(who) {
+    const d = await api.editInfo(path);
+    const proj = await prepare(d);
+    baseRef.current = d.project_mtime || 0;
+    dirtyRef.current = false;
+    speechTried.current = new Set();
+    H.apply(() => proj);
+    setInfo(d);
+    setConflict(null);
+    setToast(who === "jarvo-wideo" ? L("Wideograf zmienił projekt: wczytano jego wersję (↶ cofa).", "The video agent changed the project: loaded (undo reverts).")
+      : L("Wczytano nowszą wersję projektu.", "Loaded the newer project version."));
+    setTimeout(() => setToast(""), 6000);
+  }
+  useEffect(() => {
+    if (!info || !api.editStamp) return undefined;
+    let alive = true;
+    const id = setInterval(async () => {
+      if (conflict) return;
+      try {
+        const st = await api.editStamp(path);
+        if (!alive || !(st.mtime > baseRef.current + 1e-3)) return;
+        if (dirtyRef.current) setConflict({ kto: st.kto, mtime: st.mtime });
+        else await reloadProject(st.kto);
+      } catch (_) { /* sieć: następnym razem */ }
+    }, 3000);
+    return () => { alive = false; clearInterval(id); };
+  }, [info, conflict]);
 
   // miniatury dla każdego źródła na osi
   useEffect(() => {
@@ -527,12 +505,32 @@ function VideoEditor({ path, onClose }) {
   // autozapis projektu obok filmu
   useEffect(() => {
     if (!p || !info) return undefined;
+    if (conflict) return undefined;
+    dirtyRef.current = true;
     setSaved(L("zmiany…", "changes…"));
     const id = setTimeout(() => {
-      api.editSave(path, p).then(() => setSaved(L("zapisano", "saved"))).catch((e) => setSaved(L(`nie zapisano: ${e.message}`, `not saved: ${e.message}`)));
+      api.editSave(path, p, baseRef.current).then((r) => {
+        if (r && r.mtime) baseRef.current = r.mtime;
+        dirtyRef.current = false;
+        setSaved(L("zapisano", "saved"));
+      }).catch((e) => {
+        if (e.conflict) {
+          setSaved("");
+          api.editStamp(path).then((st) => setConflict({ kto: st.kto, mtime: st.mtime })).catch(() => setConflict({}));
+          return;
+        }
+        setSaved(L(`nie zapisano: ${e.message}`, `not saved: ${e.message}`));
+      });
     }, 1200);
     return () => clearTimeout(id);
-  }, [p]);
+  }, [p, conflict]);
+  async function keepMine() {
+    const r = await api.editSave(path, projRef.current, baseRef.current, true);
+    if (r && r.mtime) baseRef.current = r.mtime;
+    dirtyRef.current = false;
+    setConflict(null);
+    setSaved(L("zapisano", "saved"));
+  }
 
   const total = p ? projTotal(p) : 0;
   const segs = p ? layoutClips(p.clips) : [];
@@ -1195,6 +1193,12 @@ function VideoEditor({ path, onClose }) {
     </div>
     ${mobile && html`<div class="thq-ed-center"><i></i></div>`}
   </div>`;
+  const banner = conflict ? html`<div class="thq-ed-banner" role="alert">
+      <span>${conflict.kto === "jarvo-wideo" ? L("Wideograf zmienił ten projekt, a Ty masz niezapisane zmiany.", "The video agent changed this project while you have unsaved changes.")
+        : L("Projekt zmienił się poza edytorem.", "The project changed outside the editor.")}</span>
+      <button type="button" class="thq-ed-btn is-main" onClick=${() => reloadProject(conflict.kto)}>${L("Wczytaj jego wersję", "Load theirs")}</button>
+      <button type="button" class="thq-ed-btn" onClick=${keepMine}>${L("Zostaw moją", "Keep mine")}</button></div>`
+    : toast ? html`<div class="thq-ed-banner is-ok" role="status"><span>✓ ${toast}</span></div>` : null;
   const askBox = ask && html`<${AskAgent} ask=${ask} setAsk=${setAsk} path=${path} project=${p} time=${tRef.current} sel=${sel && selItem ? { ...sel, item: selItem } : null} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
   const exportBox = job && html`<${ExportBox} job=${job} onClose=${() => setJob(null)} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
   const exportBtn = html`<button type="button" class="thq-ed-btn is-main" disabled=${running || !info.ffmpeg} onClick=${doExport}
@@ -1230,7 +1234,7 @@ function VideoEditor({ path, onClose }) {
         <button type="button" class="thq-ed-ico" onClick=${() => setAsk(ask ? null : { text: "", reply: "", busy: false })} aria-label=${L("Poproś agenta", "Ask the agent")}>${ED_ICON.spark}</button>
         ${exportBtn}
       </header>
-      ${askBox}
+      ${askBox}${banner}
       <section class="thq-ed-stage-wrap">${stage}</section>
       <div class="thq-ed-transport">
         <span class="thq-ed-time"><span ref=${timeRef}>${fmtT(t, true)}</span> / ${fmtT(total, true)}</span>
@@ -1275,7 +1279,7 @@ function VideoEditor({ path, onClose }) {
       <button type="button" class="thq-ed-btn" onClick=${() => setAsk(ask ? null : { text: "", reply: "", busy: false })}>✦ ${L("Poproś agenta", "Ask the agent")}</button>
       ${exportBtn}
     </header>
-    ${askBox}
+    ${askBox}${banner}
     <div class="thq-ed-body">
       <aside class="thq-ed-side">
         <div class="thq-ed-tabs">
@@ -1349,8 +1353,9 @@ function AskAgent({ ask, setAsk, path, project, time, sel, onOpen }) {
     const projFile = path.replace(/\.[^./]+$/, ".edycja.json");
     const where = sel ? (sel.type === "text" ? `napis „${sel.item.text}” (${fmtT(sel.item.start, true)}–${fmtT(sel.item.end, true)})`
       : sel.type === "clip" ? `klip ${sel.item.src.split("/").pop()} (${fmtT(sel.item.in, true)}–${fmtT(sel.item.out, true)} źródła)` : `muzyka ${sel.item.src.split("/").pop()}`) : "nic";
-    const msg = [`Edycja filmu w edytorze HQ: \`${path}\``, `Projekt montażu (JSON, oś czasu): \`${projFile}\` · kursor ${fmtT(time, true)} · zaznaczone: ${where}.`,
-      `Prośba: ${text}`, "Nową wersję zapisz obok oryginału i podaj ścieżkę w linii MEDIA:."].join("\n");
+    const msg = [`Edycja filmu w edytorze HQ: \`${path}\``, `Projekt montażu: \`${projFile}\` · kursor ${fmtT(time, true)} · zaznaczone: ${where}.`,
+      `Prośba: ${text}`,
+      "Pracuj na tym projekcie: `python3 $HERMES_HOME/scripts/projekt.py pokaz <film>`, zmiany przez `projekt.py dodaj-audio / dodaj-tekst / dodaj-klip / napisy / usun`, na końcu `projekt.py render <film>` i linia MEDIA:. Nie cofaj moich cięć; edytor sam wczyta Twoje zmiany."].join("\n");
     setAsk((a) => ({ ...a, busy: true, reply: "", error: null }));
     try {
       await api.editSave(path, project).catch(() => {});
