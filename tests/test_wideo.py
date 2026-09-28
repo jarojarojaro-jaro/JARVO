@@ -193,3 +193,20 @@ def test_stock_parses_pexels_and_pixabay(monkeypatch):
     assert items[0]["autor"] == "Ala" and items[1]["podglad"] == "https://p/9.jpg"
     assert stock.pick_file(items[0], "9:16")["url"] == "https://v/7-hd.mp4"
     assert "Pexels" in stock.LICENSES["pexels"] and "Pixabay" in stock.LICENSES["pixabay"]
+
+
+def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
+    nz = load_script("profiles/tars-wideo/scripts/narzedzia.py")
+    import yaml
+    lock = yaml.safe_load((REPO / "vendor/skills.lock.yaml").read_text(encoding="utf-8"))
+    assert lock["sources"]["lemo-opuscar"]["rev"] == nz.LEMO_REV            # biblioteka = ten sam commit co skill
+    dests = {e["dest"] for e in lock["agents"]["tars-wideo"]}
+    assert {"video/motion-broll", "video/lemo-opuscar", "video/anidoodle"} <= dests
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
+    shell = tmp_path / "chromium_headless_shell-1243" / "chrome-headless-shell-linux64" / "chrome-headless-shell"
+    shell.parent.mkdir(parents=True)
+    shell.write_text("")
+    assert nz.env_for("lemo")["PLAYWRIGHT_CHROME"] == str(shell)
+    assert nz.env_for("motion")["NODE_PATH"].endswith("node/node_modules")
+    monkeypatch.setenv("TARS_EXTRAS", "media lemo")
+    assert nz.full_extras()

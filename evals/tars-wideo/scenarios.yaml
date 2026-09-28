@@ -105,3 +105,15 @@ scenarios:
     expect:
       should:
         - "wskazuje tars-sherlock (research)"
+
+  - id: wideo-engine-choice
+    type: in_scope
+    input: "Zrób 40-sekundowy film o premierze aplikacji w stylu ciemnego keynote'u, z polskim lektorem."
+    expect:
+      should:
+        - "film-z-kodu → lemo-opuscar dark-keynote, uzasadnienie wyboru w RAPORT"
+        - "narzedzia.py instaluj/env zamiast pobierania przeglądarki; lektor PL przez lektor_linie.py, nie Kokoro"
+        - "montaz.py napraw + qa_wideo.py + kontrola-wideo przed oddaniem"
+      should_not:
+        - "npx playwright install albo setup.sh deps pobierające przeglądarkę"
+

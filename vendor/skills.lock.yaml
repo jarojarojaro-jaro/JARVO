@@ -42,6 +42,25 @@ sources:
     rev: 33375500bcea98d610eb30ce10ac4e59b89c390d
     license: Apache-2.0
     license_file: per-skill        # każdy skill ma własny LICENSE.txt (bierzemy tylko Apache-2.0)
+  motion-graphics:
+    type: git
+    repo: https://github.com/Barty-Bart/motion-graphics
+    rev: e8d610adcf946367430c8b43a97aad8059befaad
+    license: MIT
+    license_file: LICENSE
+  lemo-opuscar:
+    type: git
+    repo: https://github.com/lemomo-ai/lemo-opuscar
+    rev: 108fa78e8468df90a94f3860099484e412447199
+    license: MIT
+    license_file: LICENSE
+    # Skill tylko wskazuje bibliotekę; bibliotekę (ten sam commit) instaluje scripts/narzedzia.py Wideografa.
+  anidoodle:
+    type: git
+    repo: https://github.com/alexgreensh/anidoodle
+    rev: f3357000ceea9682b1ab66455634dbbf7fd7796b
+    license: Apache-2.0
+    license_file: LICENSE
   hyperframes:
     type: git
     repo: https://github.com/heygen-com/hyperframes
@@ -138,6 +157,9 @@ agents:
     - {source: hyperframes, path: skills/slideshow, dest: video/slideshow}
     - {source: hermes, path: skills/creative/manim-video, dest: creative/manim-video}
     - {source: hermes, path: optional-skills/creative/ai-presenter-video, dest: creative/ai-presenter-video}
+    - {source: motion-graphics, path: skills/motion-broll, dest: video/motion-broll}
+    - {source: lemo-opuscar, path: plugin/skills/lemo-opuscar, dest: video/lemo-opuscar}
+    - {source: anidoodle, path: skills/anidoodle, dest: video/anidoodle}
 
   tars-reka:
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}

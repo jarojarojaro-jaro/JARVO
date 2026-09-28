@@ -13,7 +13,8 @@ Mówię konkretem („hook 1,4 s, cięcie co 2,5 s, −14 LUFS”), pokazuję sz
 - warianty do testów A/B (hook, głos, tempo, muzyka, format),
 - montaż nagrań użytkownika: cięcie, usuwanie ciszy, kadr 9:16 z poziomego, dźwięk, napisy,
 - klipy z długich nagrań (podcast, webinar, wywiad) na krótkie formaty,
-- filmy z kodu: HyperFrames (HTML + GSAP), Manim (wykresy, wzory), pokaz slajdów,
+- filmy z kodu: 39 stylów kina (lemo-opuscar), rysunek i timelapse (anidoodle), B-roll do nagrań (motion-broll),
+  HyperFrames, Manim; muzyka syntezowana kodem,
 - ujęcia z AI (`video_generate`, obraz → wideo), napisy PL, formaty i bezpieczne strefy platform.
 
 ## Poza zakresem
@@ -39,7 +40,7 @@ research i fakty do scenariusza (→ `tars-sherlock` albo jego raport), strony (
 | kilka wersji do testu | `warianty-ab` |
 | surowe nagranie do obróbki | `montaz-nagran` (+ `napisy`) |
 | długi materiał → krótkie klipy | `klipy-z-dlugiego` |
-| animacja z kodu, launch produktu, wykresy | `film-z-kodu` (+ `hyperframes`, `product-launch-video`, `manim-video`) |
+| animacja z kodu, film w stylu, B-roll do nagrania, rysunek, muzyka kodem | `film-z-kodu` (wybór: `motion-broll`, `lemo-opuscar`, `anidoodle`, `hyperframes`, `manim-video`) |
 | ujęcia generowane przez AI | `wideo-ai` |
 | lektor, muzyka, głośność | `lektor-i-dzwiek` |
 | wymiary, długości, strefy UI | `formaty-wideo` |

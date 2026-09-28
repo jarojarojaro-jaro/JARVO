@@ -1,13 +1,13 @@
 ---
 name: film-z-kodu
-description: "Film z kodu: HyperFrames, Manim; scenariusz, render, QA."
-version: 2.0.0
+description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
+version: 3.0.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
-    tags: [video, hyperframes, manim, motion-graphics, code]
-    related_skills: [hyperframes, product-launch-video, faceless-explainer, motion-graphics, slideshow, manim-video, scenariusz, napisy, kontrola-wideo]
+    tags: [video, hyperframes, manim, motion-graphics, animation, code]
+    related_skills: [motion-broll, lemo-opuscar, anidoodle, hyperframes, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
   tars:
     agent: tars-wideo
     autonomy: A1
@@ -16,35 +16,53 @@ metadata:
 
 # Film z kodu
 
-Animacje, typografia w ruchu, interfejs produktu, wykresy i wzory: renderowane z kodu, więc tekst i liczby są ostre
-i poprawne. Film z ujęć, lektora i napisów bez animacji → `krotki-film`.
+Animacje, typografia w ruchu, UI, wykresy, rysunek: każda klatka rysowana kodem, ffmpeg składa wideo. Tekst i liczby
+są ostre i poprawne, nic nie jest „z AI”. Film z ujęć stock, lektora i napisów bez animacji → `krotki-film`.
+Instalacja, środowisko i polski lektor dla silników zewnętrznych: `references/narzedzia.md` (przeczytaj przed
+pierwszym użyciem motion-broll, lemo-opuscar albo anidoodle).
 
 ## Wybór silnika
-| Potrzeba | Silnik |
-|---|---|
-| promo produktu, launch, reels z animowanym tekstem | **HyperFrames** (`hyperframes`, `product-launch-video`, `motion-graphics`) |
-| explainer bez nagrań (tekst → wideo) | HyperFrames `faceless-explainer` |
-| pokaz zdjęć/slajdów z przejściami | HyperFrames `slideshow` |
-| matematyka, algorytmy, wykresy w ruchu | **Manim** (`manim-video`; dodatek obrazu `manim`, sprawdź `command -v manim`) |
-| animacja + prawdziwe ujęcia | render z kodu jako `plik` sceny w planie `krotki-film` |
+| Chcę… | Silnik (skill) | Czas pracy |
+|---|---|---|
+| animowane wstawki (B-roll) do **nagrania użytkownika**, zgrane ze słowami; przebitka albo przezroczysty panel | **motion-broll** | 20–60 min |
+| **cały krótki film** 30–75 s w jednym z 39 stylów kina (keynote, screencast, akwarela, anime, 3D, pixel RPG…) | **lemo-opuscar** | 30–60 min, dużo tokenów |
+| premiera produktu / keynote tech (ciemny ekran, UI, wielka liczba) | **lemo-opuscar** `dark-keynote`, `living-screencast` | 30–60 min |
+| **ręcznie rysowana** ilustracja, timelapse rysowania, film rysunkowy, logo rysujące się samo | **anidoodle** | 15–60 min |
+| animacja na stronę (hero, maskotka za kursorem, GIF, naklejka), plik HTML offline | **anidoodle** (`emit.mjs`) → `tars-web` osadza | 15–40 min |
+| muzyka **syntezowana kodem** do dowolnego filmu (bez licencji, bez pobierania) | **anidoodle** `music` → plik do `muzyka` w `film.py` | 10–20 min |
+| promo z animowanym tekstem, szybki launch, slajdy | **HyperFrames** (`hyperframes`, `product-launch-video`, `slideshow`) | 10–30 min |
+| matematyka, algorytmy, wykresy w ruchu | **Manim** (`manim-video`, dodatek `manim`) | 15–40 min |
 
-HyperFrames `media-use` (muzyka, lektor, stock) wymaga zalogowanego CLI HeyGen. Bez niego: lektor
-`film.py lektor` (Edge TTS, z czasem słów), ujęcia `material-stock`, napisy `napisy`.
+Zasada kosztu: lemo-opuscar i pełne filmy anidoodle tylko, gdy karta prosi o styl, „premium” albo film markowy.
+Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnienia w RAPORT.md.
+
+## Wspólne prawa (wszystkie silniki)
+1. **Klatka = czysta funkcja czasu** (`render(t)`, `draw(ctx, frame)`): bez `Math.random` bez ziarna, bez `Date.now()`,
+   bez stanu między klatkami. Każdą klatkę da się wyrenderować osobno i równolegle.
+2. **Hak od klatki 0** (coś już się dzieje), kamera w ruchu, co takt/sekundę jakaś zmiana, puenta na końcu.
+   Krótko: 20–30 s wygrywa z 60 s „ładnymi”.
+3. **Kamera w wektorach, nie w bitmapie**: lemo `camera().apply(g)`, anidoodle `g.push(x, y, s)`, motion-broll `cam` w `SH`.
+4. **Prawda w treści:** żadnych zmyślonych liczb, cytatów, wyników; względne słupki albo etykiety z transkrypcji.
+5. **Czytelność w ruchu:** tekst jadący w złą stronę czyta się na odwrót. Sprawdź kierunek na pasku klatek.
+6. **Przed oddaniem:** arkusz stopklatek co 1–1,5 s + paski klatek co 0,1–0,2 s na kluczowych akcjach (vision),
+   bramka narzędzia (anidoodle `gate.mjs`), potem `qa_wideo.py` i `kontrola-wideo` (≥ 85).
+7. **Prawa:** tylko assety CC0 / CC BY / OFL; żadnych cudzych marek i postaci; licencje w RAPORT.md.
 
 ## Kroki
-1. **Brief i format** (`formaty-wideo`): platforma, długość, cel, jedno przesłanie, CTA, brand kit.
-2. **Scenariusz** (`scenariusz`) → `out/wideo/SCENARIUSZ.md`; **storyboard**: tabela scen (czas, obraz, tekst na ekranie,
-   animacja, dźwięk). Jedna myśl na scenę.
-3. **Lektor najpierw** (gdy jest): `python3 $HERMES_HOME/scripts/film.py lektor "<tekst>" -o out/wideo/src/lektor.mp3`
-   → czasy słów w `.slowa.json`: animacje ustawiam pod te czasy (zamiast zgadywać).
-4. **Budowa:** kompozycja HyperFrames/Manim zgodnie ze skillem silnika; kolory i fonty z brand kitu; źródła w `out/wideo/src/`.
-5. **Render:** najpierw podgląd w niskiej jakości, potem MP4 H.264/AAC, 30 fps, docelowa rozdzielczość.
-6. **Dźwięk i napisy:** podłożenie lektora/muzyki (`lektor-i-dzwiek`), napisy `napisy.py <film> --slowa out/wideo/src/lektor.slowa.json --wypal`
-   (gdy tekst nie jest już animowany na ekranie).
-7. **Kontrola** (`kontrola-wideo`): pierwsza klatka jako miniatura, czytelność na telefonie, strefy UI.
+1. **Brief i format** (`formaty-wideo`): platforma, długość, cel, jedno przesłanie, CTA, brand kit; wybór silnika z tabeli.
+2. **Scenariusz** (`scenariusz`): hook, beat sheet sekunda po sekundzie; lektor PL najpierw (`film.py lektor` →
+   czasy słów), animacje pod te czasy.
+3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle>` (raz; dalej z cache),
+   `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`.
+4. **Look:** jedna–trzy klatki stylu renderowane prawdziwym kodem → obejrzyj (vision), popraw, dopiero potem całość.
+   Akceptacja użytkownika tylko przy dużych zleceniach (karta mówi) – inaczej decydujesz sam.
+5. **Budowa i render** wg SKILL.md wybranego silnika (i w lemo: `$LIB/AGENTS.md`, `DIRECTOR.md`, `TECHNIQUE.md`, `STYLE.md`).
+6. **Dźwięk:** lektor PL (Edge TTS), muzyka (anidoodle albo biblioteka), miks −14 LUFS (`montaz.py glosnosc` albo lemo `mux.sh`).
+7. **Napisy:** `napisy.py <film> --slowa out/wideo/src/lektor.slowa.json --wypal` (gdy tekst nie jest częścią animacji).
+8. **Kontrola** (`kontrola-wideo`), oddanie: link `tars_link.py`, miniatura, źródła projektu w `out/wideo/src/`.
 
 ## Definition of Done
-- [ ] format i długość zgodne z platformą, plik odtwarzalny (`qa_wideo.py` bez błędów),
-- [ ] hook w pierwszych 2 s, CTA na końcu, zgodność z marką,
-- [ ] tekst na ekranie bez błędów, animacje zsynchronizowane z lektorem,
-- [ ] scenariusz i źródła kompozycji w `out/wideo/src/`, `kontrola.json` ≥ 85.
+- [ ] silnik dobrany do celu i uzasadniony; bramka narzędzia (gdy jest) zaliczona,
+- [ ] hak w pierwszych 2 s, zmiana co sekundę, puenta; tekst czytelny w ruchu,
+- [ ] zero zmyślonych liczb; assety z licencją w RAPORT.md,
+- [ ] `qa_wideo.py` bez błędów, `kontrola.json` ≥ 85, źródła projektu w `out/wideo/src/`.

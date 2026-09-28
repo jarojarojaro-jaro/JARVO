@@ -6,6 +6,7 @@
     python3 montaz.py cisza nagranie.mp4 -o bez-ciszy.mp4 [--prog -35] [--min 0.5] [--zapas 0.12]
     python3 montaz.py glosnosc film.mp4 -o film-14lufs.mp4 [--lufs -14]
     python3 montaz.py transkrypcja nagranie.mp4 [-o out/wideo/transkrypcja] [--co 20]
+    python3 montaz.py napraw film.mp4 -o film-ok.mp4       # yuv420p/zakres TV/faststart po silnikach zewnętrznych
 
 Czas: sekundy (75.5) albo m:ss(.x) / h:mm:ss. Każde cięcie jest przekodowane (dokładne co do klatki).
 kadr --x: środek kadru w poziomie (0 = lewa krawędź, 0.5 = środek, 1 = prawa); rozmyte = całe ujęcie
@@ -138,6 +139,15 @@ def loudness(src: Path, out: Path, target: float) -> tuple[Path, dict]:
     return out, {"przed_lufs": float(meas["input_i"]), "cel_lufs": target}
 
 
+def fix(src: Path, out: Path) -> Path:
+    """Film z zewnętrznego silnika → standard platform: yuv420p w zakresie TV, H.264, AAC, faststart (dźwięk bez zmian)."""
+    audio = ["-c:a", "aac", "-b:a", "192k"] if has_audio(src) else []
+    out.parent.mkdir(parents=True, exist_ok=True)
+    wl.run(["ffmpeg", "-y", "-i", str(src), "-vf", wl.TV_RANGE, "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+            *wl.ENC_LIMITS, *audio, "-movflags", "+faststart", str(out)])
+    return out
+
+
 def transcript(src: Path, outbase: Path, every: float) -> dict:
     words = wl.transcribe_words(src)
     outbase.parent.mkdir(parents=True, exist_ok=True)
@@ -179,6 +189,9 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("plik")
     g.add_argument("-o", required=True)
     g.add_argument("--lufs", type=float, default=-14.0)
+    n = sub.add_parser("napraw", help="yuv420p (zakres TV), H.264, AAC, faststart: dla filmów z lemo/anidoodle/HyperFrames")
+    n.add_argument("plik")
+    n.add_argument("-o", required=True)
     t = sub.add_parser("transkrypcja")
     t.add_argument("plik")
     t.add_argument("-o", default=None, help="baza nazwy wyników (domyślnie obok nagrania)")
@@ -201,6 +214,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.cmd == "glosnosc":
             out, stats = loudness(src, Path(args.o), args.lufs)
             print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
+        elif args.cmd == "napraw":
+            out = fix(src, Path(args.o))
+            print(json.dumps({"plik": str(out)}, ensure_ascii=False))
         else:
             base = Path(args.o) if args.o else src.with_suffix("")
             print(json.dumps(transcript(src, base, args.co), ensure_ascii=False))
