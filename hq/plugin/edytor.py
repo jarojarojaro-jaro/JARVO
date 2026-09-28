@@ -201,7 +201,7 @@ def probe(path: Path, ffprobe: str = "ffprobe") -> dict:
     """Czas, wymiary i obecność dźwięku (ffprobe). Obraz: wymiary, bez czasu."""
     try:
         r = subprocess.run([ffprobe, "-v", "error", "-show_entries",
-                            "format=duration:stream=codec_type,width,height,r_frame_rate:stream_tags=rotate",
+                            "format=duration:stream=codec_type,codec_name,width,height,r_frame_rate:stream_tags=rotate",
                             "-of", "json", str(path)], capture_output=True, text=True, timeout=20)
         data = json.loads(r.stdout or "{}")
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
@@ -218,7 +218,7 @@ def probe(path: Path, ffprobe: str = "ffprobe") -> dict:
     dur = (data.get("format") or {}).get("duration")
     return {"ok": True, "duration": float(dur) if dur not in (None, "N/A") else None, "w": w, "h": h, "fps": fps,
             "audio": any(s.get("codec_type") == "audio" for s in streams),
-            "video": bool(v) and media_kind(path) != "audio"}
+            "video": bool(v) and media_kind(path) != "audio", "vcodec": v.get("codec_name")}
 
 
 def export_name(video: Path) -> Path:
@@ -267,6 +267,15 @@ def parse_srt(text: str, limit: int = 5000) -> list[dict]:
     return out
 
 
+def _srt_ts(t: float) -> str:
+    ms = int(round(t * 1000))
+    return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
+
+
+def to_srt(lines: list[dict]) -> str:
+    return "".join(f"{i}\n{_srt_ts(x['start'])} --> {_srt_ts(x['end'])}\n{x['text']}\n\n" for i, x in enumerate(lines, 1))
+
+
 def auto_srt_path(src: Path) -> Path:
     """Napisy z mowy zapisujemy obok źródła: następnym razem wczytują się od razu (i widzi je agent)."""
     return src.with_name(f"{src.stem}.auto.srt")
@@ -281,3 +290,79 @@ def stt_bin() -> str | None:
 
 def tools() -> dict:
     return {"ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe"), "stt": stt_bin()}
+
+
+# ----------------------------------------------------------------------------- mowa: pauzy, wtrącenia, napisy
+SILENCE_DB = -35       # próg ciszy (dB); pauza krótsza niż SILENCE_MIN nie jest zaznaczana
+SILENCE_MIN = 0.35
+_FILLER = re.compile(r"^(y+|e+|ee+m*|m+|h?m+|ym+|em+|uh+m*|um+|eh+m*|ah+|yhm+|mhm+)$")
+
+
+def is_filler(word: str) -> bool:
+    """Wtrącenia typu „yyy”, „eee”, „mmm”, „hmm” (bez interpunkcji i wielkości liter)."""
+    w = re.sub(r"[^\w]", "", word.lower())
+    return bool(w) and bool(_FILLER.match(w))
+
+
+def parse_silences(log: str, duration: float | None = None) -> list[list[float]]:
+    """Wynik filtra silencedetect → [[start, end], …]; cisza do końca pliku kończy się na `duration`."""
+    out, start = [], None
+    for line in log.splitlines():
+        m = re.search(r"silence_start: (-?[\d.]+)", line)
+        if m:
+            start = max(0.0, float(m.group(1)))
+            continue
+        m = re.search(r"silence_end: ([\d.]+)", line)
+        if m and start is not None:
+            out.append([round(start, 3), round(float(m.group(1)), 3)])
+            start = None
+    if start is not None and duration:
+        out.append([round(start, 3), round(duration, 3)])
+    return [x for x in out if x[1] - x[0] > 0.05]
+
+
+def lines_from_words(words: list, max_chars: int = 32, max_gap: float = 0.6, max_dur: float = 3.5) -> list[dict]:
+    """Słowa [[start, end, tekst]] → linie napisów zgrane ze słowami (nowa linia po pauzie,
+    końcu zdania, za długim tekście albo czasie). Wtrąceń nie pokazujemy w napisach."""
+    lines, cur = [], []
+    def flush():
+        if cur:
+            lines.append({"start": cur[0][0], "end": cur[-1][1], "text": " ".join(w[2] for w in cur)})
+            cur.clear()
+    for w in words:
+        a, b, t = float(w[0]), float(w[1]), str(w[2])
+        if is_filler(t):
+            continue
+        if cur and (a - cur[-1][1] > max_gap or len(" ".join(x[2] for x in cur)) + 1 + len(t) > max_chars
+                    or b - cur[0][0] > max_dur):
+            flush()
+        cur.append((a, b, t))
+        if t.endswith((".", "!", "?", "…")):
+            flush()
+    flush()
+    return lines
+
+
+def speech_path(src: Path) -> Path:
+    return src.with_name(f"{src.stem}.mowa.json")
+
+
+def speech_data(words: list, silences: list, duration: float | None) -> dict:
+    return {"v": 1, "duration": duration, "words": words, "silences": silences,
+            "fillers": [i for i, w in enumerate(words) if is_filler(str(w[2]))],
+            "lines": lines_from_words(words)}
+
+
+def proxy_key(src: Path) -> str:
+    import hashlib
+    st = src.stat()
+    return hashlib.sha1(f"{src}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:20]
+
+
+def proxy_command(src: Path, out: Path, ffmpeg: str = "ffmpeg") -> list[str]:
+    """Kopia do podglądu, którą odtworzy każda przeglądarka: WebM VP9 do 540 p, klatka kluczowa co 0,5 s
+    (szybkie przewijanie), szybkie kodowanie. Eksport i tak bierze oryginał."""
+    return [ffmpeg, "-nostdin", "-hide_banner", "-y", "-loglevel", "error", "-i", str(src),
+            "-vf", "scale=-2:'min(540,ih)':flags=bilinear,format=yuv420p", "-c:v", "libvpx-vp9", "-deadline", "realtime",
+            "-cpu-used", "8", "-row-mt", "1", "-b:v", "1200k", "-g", "15", "-c:a", "libopus", "-b:a", "96k", "-ac", "2",
+            "-f", "webm", str(out)]

@@ -679,3 +679,19 @@ button.thq-out-name:hover { text-decoration: underline; }
 @media (max-width: 860px) {
   .thq-ed.is-mobile .thq-ed-act { min-width: 60px; }
 }
+
+/* edytor: mowa, pauzy, wtrącenia */
+.thq-ed-track.is-speech { height: 30px; border-radius: 6px; background: repeating-linear-gradient(90deg, transparent 0 6px, rgba(255,255,255,.03) 6px 7px); }
+.thq-ed-bar-say { position: absolute; top: 5px; height: 20px; overflow: hidden; border-radius: 4px; background: #3A4150; pointer-events: none; }
+.thq-ed-bar-say span { display: block; padding: 0 6px; font-size: 0.68rem; line-height: 20px; color: #C9D1DC; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thq-ed-mark { position: absolute; top: 2px; height: 26px; padding: 0 3px; border: 2px solid transparent; border-radius: 4px; cursor: pointer; z-index: 2;
+  font: 800 0.62rem/22px var(--thq-mono, monospace); color: #1B1300; overflow: hidden; white-space: nowrap; }
+.thq-ed-mark.is-pause { background: repeating-linear-gradient(135deg, rgba(255,69,58,.55) 0 5px, rgba(255,69,58,.3) 5px 10px); }
+.thq-ed-mark.is-filler { background: #FF9F0A; }
+.thq-ed-mark:hover, .thq-ed-mark.is-sel { border-color: #fff; }
+.thq-ed-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; }
+.thq-ed-stats i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: -1px; }
+.thq-ed-stats i.is-pause { background: #FF453A; } .thq-ed-stats i.is-filler { background: #FF9F0A; }
+.thq-ed-codec.is-info { display: flex; align-items: center; gap: 8px; }
+.thq-ed-spin.is-small { width: 14px; height: 14px; border-width: 2px; flex: none; }
+.thq-ed.is-mobile .thq-ed-nav button { font-size: 0.66rem; }

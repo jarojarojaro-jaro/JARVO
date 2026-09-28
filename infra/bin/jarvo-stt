@@ -3,6 +3,7 @@
 
     jarvo-stt <audio|wideo> [--output-dir DIR]          → DIR/<nazwa>.txt   (tryb Hermesa, local_command)
     jarvo-stt <audio|wideo> --srt out.srt [--max-chars 32] → napisy z czasami (subtitles.py)
+    jarvo-stt <audio|wideo> --json slowa.json            → słowa z czasem (edytor filmów HQ)
     jarvo-stt --prefetch                                 → pobierz model z góry (~0,65 GB)
 
 Hermes woła go jako komendę STT (HERMES_LOCAL_STT_COMMAND w docker-compose.yml):
@@ -69,6 +70,18 @@ def words(seg) -> list[tuple[float, float, str]]:
     return [(a, b, w) for a, b, w in out if w]
 
 
+def spoken(seg) -> list[tuple[float, float, str]]:
+    """Słowa z szacowanym końcem: Parakeet podaje tylko początki tokenów, a koniec = początek następnego
+    słowa zjadałby pauzy w środku zdania. Koniec to min(następne słowo, początek + długość wymowy)."""
+    ws = words(seg)
+    out = []
+    for i, (a, b, w) in enumerate(ws):
+        est = a + min(1.2, 0.12 + 0.075 * len(w))
+        nxt = ws[i + 1][0] if i + 1 < len(ws) else seg.end
+        out.append((round(a, 3), round(max(a + 0.05, min(nxt, est, b)), 3), w))
+    return out
+
+
 def srt_time(t: float) -> str:
     ms = int(round(t * 1000))
     h, ms = divmod(ms, 3_600_000)
@@ -96,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("input", nargs="?")
     ap.add_argument("--output-dir", help="zapisz transkrypcję jako <katalog>/<nazwa>.txt (tryb Hermesa)")
     ap.add_argument("--srt", help="zapisz napisy SRT do tego pliku")
+    ap.add_argument("--json", help="zapisz słowa z czasem jako JSON: {\"words\": [[start, end, słowo], …]}")
     ap.add_argument("--max-chars", type=int, default=32, help="maks. znaków w linii napisu")
     ap.add_argument("--language", default="", help="ignorowane: Parakeet v3 sam rozpoznaje język")
     ap.add_argument("--model", default="", help="ignorowane (zgodność z szablonem Hermesa)")
@@ -124,10 +138,15 @@ def main(argv: list[str] | None = None) -> int:
         Path(args.srt).write_text("".join(f"{i}\n{srt_time(a)} --> {srt_time(b)}\n{t}\n\n"
                                           for i, (a, b, t) in enumerate(lines, 1)), encoding="utf-8")
         print(f"SRT: {args.srt} ({len(lines)} linii)")
+    if args.json:
+        import json
+        ws = [list(w) for s in segments for w in spoken(s)]
+        Path(args.json).write_text(json.dumps({"words": ws}, ensure_ascii=False), encoding="utf-8")
+        print(f"JSON: {args.json} ({len(ws)} słów)")
     if args.output_dir:
         out = Path(args.output_dir) / (src.stem + ".txt")
         out.write_text(text + "\n", encoding="utf-8")
-    if not args.srt and not args.output_dir:
+    if not args.srt and not args.output_dir and not args.json:
         print(text)
     return 0
 

@@ -138,3 +138,39 @@ def test_stt_bin_from_env(tmp_path, monkeypatch):
     assert ed.stt_bin() == str(fake)
     monkeypatch.setenv("JARVO_STT_BIN", str(tmp_path / "brak"))
     assert ed.stt_bin() is None
+
+
+def test_fillers():
+    assert all(ed.is_filler(w) for w in ("yyy", "Yyy,", "eee", "mmm", "hmm", "ehm", "uhm"))
+    assert not any(ed.is_filler(w) for w in ("ale", "tak", "my", "e-mail", "mama"))
+
+
+def test_parse_silences_with_trailing_silence():
+    log = ("[silencedetect @ 0x1] silence_start: 2.001\n[silencedetect @ 0x1] silence_end: 3.5 | silence_duration: 1.49\n"
+           "[silencedetect @ 0x1] silence_start: -0.01\n[silencedetect @ 0x1] silence_end: 0.02 | silence_duration: 0.03\n"
+           "[silencedetect @ 0x1] silence_start: 9.0\n")
+    assert ed.parse_silences(log, 10.0) == [[2.001, 3.5], [9.0, 10.0]]   # zbyt krótka cisza odpada
+
+
+def test_lines_from_words_break_on_pause_and_sentence_skip_fillers():
+    words = [[0, 0.3, "Cześć,"], [0.3, 0.5, "yyy"], [0.6, 0.9, "tu"], [0.9, 1.2, "Jarvo."], [1.3, 1.5, "Dalej"], [2.5, 2.9, "idziemy"]]
+    assert [x["text"] for x in ed.lines_from_words(words)] == ["Cześć, tu Jarvo.", "Dalej", "idziemy"]
+    data = ed.speech_data(words, [[1.5, 2.5]], 3.0)
+    assert data["fillers"] == [1] and data["silences"] == [[1.5, 2.5]]
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_real_proxy_and_silences(tmp_path):
+    src = tmp_path / "a.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=25:d=4",
+                    "-f", "lavfi", "-i", "sine=d=4,volume='if(between(t,1,2.5),0,1)':eval=frame", "-shortest",
+                    "-pix_fmt", "yuv420p", str(src)], check=True)
+    out = tmp_path / "p.webm"
+    r = subprocess.run(ed.proxy_command(src, out), capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    info = ed.probe(out)
+    assert info["vcodec"] == "vp9" and info["h"] == 360
+    log = subprocess.run(["ffmpeg", "-nostdin", "-i", str(src), "-vn", "-af", f"silencedetect=noise={ed.SILENCE_DB}dB:d={ed.SILENCE_MIN}",
+                          "-f", "null", "-"], capture_output=True, text=True).stderr
+    (a, b), = ed.parse_silences(log, 4.0)
+    assert a == pytest.approx(1.0, abs=0.05) and b == pytest.approx(2.5, abs=0.05)

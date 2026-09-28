@@ -48,6 +48,15 @@ def test_stt_srt_lines_respect_max_chars_and_segments():
     assert lines[1][0] == pytest.approx(1.2) and lines[2][0] == pytest.approx(5.1)   # linie nie przeskakują segmentów
 
 
+def test_stt_spoken_words_keep_pauses_inside_segment():
+    stt = load_stt()
+    # "Dzień" o 10.0, potem 1,5 s ciszy i "dobry" o 11.5: koniec "Dzień" nie może sięgać 11.5
+    s = seg(10.0, 12.5, [" Dzie", "ń", " dob", "ry"], [0.0, 0.2, 1.5, 1.7])
+    (a0, b0, w0), (a1, b1, w1) = stt.spoken(s)
+    assert (w0, w1) == ("Dzień", "dobry") and a0 == 10.0 and a1 == 11.5
+    assert b0 < 10.8 and b1 <= 12.5
+
+
 def test_stt_segment_without_tokens_and_time_format():
     stt = load_stt()
     s = SimpleNamespace(start=1.0, end=2.5, text=" Tak. ", tokens=None, timestamps=None)

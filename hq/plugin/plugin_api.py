@@ -234,7 +234,7 @@ def _media_path(raw: str) -> Path | None:
 def _media_entry(p: Path) -> dict:
     info = ed.probe(p)
     return {"path": str(p), "name": p.name, "kind": ed.media_kind(p), "size": p.stat().st_size,
-            "mtime": p.stat().st_mtime, **{k: info.get(k) for k in ("duration", "w", "h", "fps", "audio")}}
+            "mtime": p.stat().st_mtime, **{k: info.get(k) for k in ("duration", "w", "h", "fps", "audio", "vcodec")}}
 
 
 @router.get("/edit/info")
@@ -300,58 +300,145 @@ async def edit_srt(path: str):
     return {"captions": ed.parse_srt(p.read_text(encoding="utf-8", errors="replace"))}
 
 
-async def _run_captions(job: dict, stt: str, src: Path, target: Path) -> None:
-    part = target.with_name(f".{target.name}.part")
+async def _proc(*args: str, timeout: float = 3600) -> tuple[int, str]:
+    proc = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     try:
-        proc = await asyncio.create_subprocess_exec(stt, str(src), "--srt", str(part), "--max-chars", "32",
-                                                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        job["proc"] = proc
-        try:
-            _out, err = await asyncio.wait_for(proc.communicate(), timeout=3600)
-        except asyncio.TimeoutError:
-            proc.kill()
-            raise RuntimeError("Rozpoznawanie mowy trwało ponad godzinę")
-        if job.get("state") == "cancelled":
-            return
-        if proc.returncode != 0 or not part.is_file():
-            msg = err.decode("utf-8", "replace").strip().splitlines()
-            raise RuntimeError(msg[-1][:400] if msg else f"jarvo-stt zakończył się kodem {proc.returncode}")
-        part.replace(target)
-        job.update(state="done", progress=1.0, out=str(target),
-                   captions=ed.parse_srt(target.read_text(encoding="utf-8", errors="replace")))
+        _out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        raise RuntimeError("Przekroczony czas")
+    return proc.returncode, err.decode("utf-8", "replace")
+
+
+async def _run_speech(job: dict, src: Path) -> None:
+    """Pauzy (ffmpeg silencedetect, dokładne) + słowa (jarvo-stt, jeśli jest) → <źródło>.mowa.json obok pliku."""
+    t = ed.tools()
+    tmp = core.JARVO_DIR / "state" / "edytor" / f"mowa-{job['id']}.json"
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        info = await asyncio.to_thread(ed.probe, src)
+        code, log = await _proc(t["ffmpeg"], "-nostdin", "-hide_banner", "-i", str(src), "-vn",
+                                "-af", f"silencedetect=noise={ed.SILENCE_DB}dB:d={ed.SILENCE_MIN}", "-f", "null", "-", timeout=900)
+        if code != 0:
+            raise RuntimeError((log.strip().splitlines() or ["ffmpeg: błąd"])[-1][:300])
+        silences = ed.parse_silences(log, info.get("duration"))
+        job["progress"] = 0.2
+        words = []
+        if t["stt"]:
+            code, err = await _proc(t["stt"], str(src), "--json", str(tmp))
+            if code != 0 or not tmp.is_file():
+                raise RuntimeError((err.strip().splitlines() or [f"jarvo-stt: kod {code}"])[-1][:300])
+            words = json.loads(tmp.read_text(encoding="utf-8")).get("words") or []
+        data = ed.speech_data(words, silences, info.get("duration"))
+        ed.speech_path(src).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        if data["lines"]:   # napisy także jako .srt: widzi je agent i inne narzędzia
+            ed.auto_srt_path(src).write_text(ed.to_srt(data["lines"]), encoding="utf-8")
+        job.update(state="done", progress=1.0, speech=data)
     except Exception as exc:
         job.update(state="error", error=str(exc)[:400])
     finally:
-        job.pop("proc", None)
         job["ended"] = time.time()
-        part.unlink(missing_ok=True)
+        tmp.unlink(missing_ok=True)
 
 
-@router.post("/edit/captions")
-async def edit_captions(request: Request):
-    """Napisy z mowy (Parakeet, jarvo-stt) dla źródła klipu. Gotowe wcześniej: od razu z pliku .auto.srt."""
+def _read_speech(src: Path) -> dict | None:
+    p = ed.speech_path(src)
+    try:
+        return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else None
+    except (OSError, ValueError):
+        return None
+
+
+@router.get("/edit/speech")
+async def edit_speech_get(src: str):
+    """Zapisana wcześniej analiza mowy źródła (albo 404, gdy jeszcze jej nie było)."""
+    p = _media_path(src)
+    data = _read_speech(p) if p else None
+    if data is None:
+        raise HTTPException(404, "Brak analizy mowy dla tego pliku")
+    return data
+
+
+@router.post("/edit/speech")
+async def edit_speech(request: Request):
+    """Analiza mowy: pauzy z ffmpeg i słowa z Parakeeta (w tle, wynik przez /edit/job)."""
     import uuid
 
     body = await request.json()
     src = _media_path(str(body.get("src") or ""))
     if src is None or ed.media_kind(src) not in ("video", "audio"):
         raise HTTPException(404, "Źródło poza katalogami floty albo bez dźwięku")
-    target = ed.auto_srt_path(src)
     jid = uuid.uuid4().hex[:12]
-    if target.is_file() and not body.get("force"):
-        job = {"id": jid, "kind": "captions", "state": "done", "progress": 1.0, "out": str(target), "ended": time.time(),
-               "captions": ed.parse_srt(target.read_text(encoding="utf-8", errors="replace"))}
-        _edit.jobs[jid] = job
-        return _job_view(job)
-    stt = ed.tools()["stt"]
-    if not stt:
-        raise HTTPException(503, "Brak rozpoznawania mowy (jarvo-stt) w kontenerze")
-    if any(j.get("state") == "running" and j.get("kind") == "captions" for j in _edit.jobs.values()):
-        raise HTTPException(409, "Trwa już rozpoznawanie mowy: poczekaj, aż się skończy")
-    job = {"id": jid, "kind": "captions", "state": "running", "progress": 0.0, "started": time.time()}
+    cached = None if body.get("force") else _read_speech(src)
+    if cached is not None:
+        job = {"id": jid, "kind": "speech", "state": "done", "progress": 1.0, "speech": cached, "ended": time.time()}
+    else:
+        if not ed.tools()["ffmpeg"]:
+            raise HTTPException(503, "Brak ffmpeg w kontenerze")
+        if any(j.get("state") == "running" and j.get("kind") == "speech" for j in _edit.jobs.values()):
+            raise HTTPException(409, "Trwa już analiza mowy: poczekaj, aż się skończy")
+        job = {"id": jid, "kind": "speech", "state": "running", "progress": 0.0, "started": time.time()}
+        job["task"] = asyncio.create_task(_run_speech(job, src))
     _edit.jobs[jid] = job
-    job["task"] = asyncio.create_task(_run_captions(job, stt, src, target))
     return _job_view(job)
+
+
+# kopia podglądowa (WebM VP9) dla filmów, których kodeka przeglądarka nie odtwarza (np. Chromium bez H.264)
+def _proxy_file(src: Path) -> Path:
+    return core.JARVO_DIR / "state" / "edytor" / "proxy" / f"{ed.proxy_key(src)}.webm"
+
+
+async def _run_proxy(job: dict, src: Path, out: Path) -> None:
+    part = out.with_name(f".{out.stem}.part.webm")
+    try:
+        code, err = await _proc(*ed.proxy_command(src, part, ffmpeg=ed.tools()["ffmpeg"]), timeout=3600)
+        if code != 0 or not part.is_file():
+            raise RuntimeError((err.strip().splitlines() or [f"ffmpeg: kod {code}"])[-1][:300])
+        part.replace(out)
+        job.update(state="done", progress=1.0)
+    except Exception as exc:
+        job.update(state="error", error=str(exc)[:400])
+    finally:
+        job["ended"] = time.time()
+        part.unlink(missing_ok=True)
+
+
+@router.post("/edit/proxy")
+async def edit_proxy(request: Request):
+    import uuid
+
+    body = await request.json()
+    src = _media_path(str(body.get("src") or ""))
+    if src is None or ed.media_kind(src) != "video":
+        raise HTTPException(404, "Film poza katalogami floty")
+    running = next((j for j in _edit.jobs.values()
+                    if j.get("kind") == "proxy" and j.get("src") == str(src) and j.get("state") == "running"), None)
+    if running:
+        return _job_view(running)
+    out = _proxy_file(src)
+    jid = uuid.uuid4().hex[:12]
+    if out.is_file():
+        job = {"id": jid, "kind": "proxy", "src": str(src), "state": "done", "progress": 1.0, "ended": time.time()}
+    else:
+        if not ed.tools()["ffmpeg"]:
+            raise HTTPException(503, "Brak ffmpeg w kontenerze")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        for old in out.parent.glob("*.webm"):     # stare kopie (ponad 7 dni) sprzątamy przy okazji
+            if time.time() - old.stat().st_mtime > 7 * 86400:
+                old.unlink(missing_ok=True)
+        job = {"id": jid, "kind": "proxy", "src": str(src), "state": "running", "progress": 0.0, "started": time.time()}
+        job["task"] = asyncio.create_task(_run_proxy(job, src, out))
+    _edit.jobs[jid] = job
+    return _job_view(job)
+
+
+@router.get("/edit/proxy-file")
+async def edit_proxy_file(src: str):
+    p = _media_path(src)
+    out = _proxy_file(p) if p else None
+    if out is None or not out.is_file():
+        raise HTTPException(404, "Kopia podglądowa jeszcze nie gotowa")
+    return FileResponse(out, media_type="video/webm", headers={"Cache-Control": "private, max-age=3600"})
 
 
 def _data_png(url: str, dest: Path) -> None:

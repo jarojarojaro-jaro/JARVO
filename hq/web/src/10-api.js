@@ -84,7 +84,13 @@ const liveApi = {
     return res.json();
   },
   editSrt: (path) => SDK.fetchJSON(`${API_ROOT}/edit/srt?path=${encodeURIComponent(path)}`),
-  editCaptions: (src, force) => SDK.fetchJSON(`${API_ROOT}/edit/captions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src, force: !!force }) }),
+  editSpeechGet: (src) => SDK.fetchJSON(`${API_ROOT}/edit/speech?src=${encodeURIComponent(src)}`),
+  editSpeech: (src, force) => SDK.fetchJSON(`${API_ROOT}/edit/speech`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src, force: !!force }) }),
+  editProxy: (src) => SDK.fetchJSON(`${API_ROOT}/edit/proxy`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src }) }),
+  async proxyBlob(src) {
+    const res = await rawFetch(`${API_ROOT}/edit/proxy-file?src=${encodeURIComponent(src)}`);
+    return res.blob();
+  },
   editJob: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}`),
   editCancel: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   async *send(name, message, extra) {

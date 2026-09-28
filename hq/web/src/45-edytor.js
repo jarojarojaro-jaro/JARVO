@@ -20,6 +20,23 @@ const ED_COLORS = ["#FFFFFF", "#000000", "#FFD60A", "#FF453A", "#32D74B", "#0A84
 const ED_CAP = { x: 0.5, y: 0.84, size: 58, color: "#FFFFFF", bg: "#000000", style: "outline", bold: true, align: "center", maxw: 0.84,
   font: "'Bricolage Grotesque', system-ui, sans-serif" };
 const plNapisy = (n) => (n === 1 ? "napis" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "napisy" : "napisów");
+const ED_FILLER = /^(y+|e+|ee+m*|m+|h?m+|ym+|em+|uh+m*|um+|eh+m*|ah+|yhm+|mhm+)$/;
+const isFiller = (w) => { const x = String(w).toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""); return !!x && ED_FILLER.test(x); };
+// Słowa (czas osi) → linie napisów: nowa linia po pauzie, końcu zdania, za długim tekście albo czasie (jak edytor.py).
+function groupLines(ws, maxChars = 32, maxGap = 0.6, maxDur = 3.5) {
+  const out = [];
+  let cur = [];
+  const flush = () => { if (cur.length) out.push({ start: cur[0].t0, end: cur[cur.length - 1].t1, text: cur.map((w) => w.text).join(" ") }); cur = []; };
+  for (const w of ws) {
+    if (isFiller(w.text)) continue;
+    const last = cur[cur.length - 1];
+    if (last && (w.t0 - last.t1 > maxGap + 1e-6 || cur.map((x) => x.text).join(" ").length + 1 + w.text.length > maxChars || w.t1 - cur[0].t0 > maxDur)) flush();
+    cur.push(w);
+    if (/[.!?…]$/.test(w.text)) flush();
+  }
+  flush();
+  return out;
+}
 const edSleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const svgI = (body) => html`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 const ED_ICON = {
@@ -41,6 +58,7 @@ const ED_ICON = {
   crop: svgI(html`<path d="M6 2v16h16M2 6h16v16"/>`),
   copy: svgI(html`<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>`),
   trash: svgI(html`<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>`),
+  speech: svgI(html`<path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/>`),
   upload: svgI(html`<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>`),
 };
 function useMedia(q) {
@@ -141,9 +159,28 @@ async function textPng(t, W, H) {
 
 // ------------------------------------------------------------------ media: adresy blob i miniatury
 const edUrls = new Map();       // src → Promise<blob url>
+// Kodeki: czego przeglądarka nie odtworzy (np. H.264 w Chromium, ProRes wszędzie), to gra z kopii WebM z serwera.
+const CODEC_TYPE = { h264: 'video/mp4; codecs="avc1.42E01E"', hevc: 'video/mp4; codecs="hvc1.1.6.L93.B0"', vp9: 'video/webm; codecs="vp9"',
+  vp8: 'video/webm; codecs="vp8"', av1: 'video/mp4; codecs="av01.0.05M.08"' };
+function canPlayVideo(m) {
+  if (!m || m.kind !== "video" || !m.vcodec) return true;
+  const type = CODEC_TYPE[m.vcodec];
+  try { return !!type && document.createElement("video").canPlayType(type) !== ""; } catch (_) { return true; }
+}
+const edProxyNeed = new Set();
+const edProxy = { busy: 0, onChange: null };
+async function proxyUrl(src) {
+  edProxy.busy++; edProxy.onChange && edProxy.onChange(edProxy.busy);
+  try {
+    let j = await api.editProxy(src);
+    while (j.state === "running") { await edSleep(800); j = await api.editJob(j.id); }
+    if (j.state !== "done") throw new Error(j.error || "proxy");
+    return URL.createObjectURL(await api.proxyBlob(src));
+  } finally { edProxy.busy--; edProxy.onChange && edProxy.onChange(edProxy.busy); }
+}
 function mediaUrl(src) {
   if (!edUrls.has(src)) {
-    const p = api.fileBlob(src).then((b) => URL.createObjectURL(b));
+    const p = edProxyNeed.has(src) && api.editProxy ? proxyUrl(src) : api.fileBlob(src).then((b) => URL.createObjectURL(b));
     p.catch(() => edUrls.delete(src));
     edUrls.set(src, p);
   }
@@ -152,6 +189,7 @@ function mediaUrl(src) {
 function releaseMedia() {
   for (const p of edUrls.values()) p.then((u) => URL.revokeObjectURL(u)).catch(() => {});
   edUrls.clear();
+  edProxyNeed.clear();
 }
 // Pasek miniatur źródła: jedna kanwa, N klatek (kolejno, jeden dekoder naraz).
 const THUMB_H = 64;
@@ -396,7 +434,19 @@ function VideoEditor({ path, onClose }) {
   useEffect(() => { MODAL_STACK.push(me.current); return () => { const i = MODAL_STACK.indexOf(me.current); if (i >= 0) MODAL_STACK.splice(i, 1); }; }, []);
   useEffect(() => () => releaseMedia(), []);
 
-  const addMeta = useCallback((list) => setMeta((m) => { const n = { ...m }; for (const x of list) n[x.path] = x; return n; }), []);
+  const addMeta = useCallback((list) => {
+    for (const x of list) if (x && !canPlayVideo(x)) edProxyNeed.add(x.path);   // zanim ktokolwiek poprosi o adres
+    setMeta((m) => { const n = { ...m }; for (const x of list) n[x.path] = x; return n; });
+  }, []);
+  const [proxying, setProxying] = useState(0);
+  useEffect(() => { edProxy.onChange = setProxying; return () => { edProxy.onChange = null; }; }, []);
+  // mowa: analiza per źródło (czas źródła), pauzy i wtrącenia jako znaczniki na osi
+  const [speech, setSpeech] = useState({});
+  const [speechJob, setSpeechJob] = useState(null);
+  const [minPause, setMinPause] = useState(0.6);
+  const [cutNote, setCutNote] = useState("");
+  const [ignored, setIgnored] = useState(() => new Set());
+  const speechTried = useRef(new Set());
   useEffect(() => {
     let alive = true;
     if (!api.editInfo) { setErr(L("Edytor działa w zainstalowanym Jarvo.", "The editor runs in an installed Jarvo.")); return undefined; }
@@ -525,6 +575,13 @@ function VideoEditor({ path, onClose }) {
   }
   function remove() {
     if (!sel || !p) return;
+    if (sel.type === "mark") {
+      const m = speechMarks().find((x) => x.key === sel.id);
+      if (m) cutTimeline([[m.t0, m.t1]]);
+      setSel(null);
+      if (mobileRef.current) setTool("speech");
+      return;
+    }
     if (sel.type === "clip" && p.clips.length <= 1) return;
     const key = sel.type === "clip" ? "clips" : sel.type === "text" ? "texts" : "audio";
     H.apply((P) => ({ ...P, [key]: P[key].filter((x) => x.id !== sel.id) }));
@@ -764,7 +821,8 @@ function VideoEditor({ path, onClose }) {
   const pick = (e, type, id) => {
     e.stopPropagation();
     setSel({ type, id });
-    if (mobileRef.current) setTool(type === "clip" ? "edit" : type);
+    if (mobileRef.current) setTool(type === "clip" ? "edit" : type);   // "mark" → panel znacznika
+    else setSide("inspect");
   };
 
   // ---------------------------------------------------------------- napisy
@@ -787,21 +845,17 @@ function VideoEditor({ path, onClose }) {
       ...list.map((k) => ({ ...ED_CAP, ...look, id: edId("t"), cap: true, start: k.start, end: k.end, text: k.text }))] }));
   }
   async function autoCaptions(force) {
-    if (capJob && capJob.state === "running") return;
+    let sp = speech;
     const srcs = [...new Set(p.clips.filter((c) => c.kind === "video").map((c) => c.src))];
-    setCapJob({ state: "running" });
-    try {
-      let all = [];
-      for (const src of srcs) {
-        let j = await api.editCaptions(src, force);
-        while (j.state === "running") { await edSleep(1500); j = await api.editJob(j.id); }
-        if (j.state !== "done") throw new Error(j.error || L("Rozpoznawanie mowy nie wyszło.", "Speech recognition failed."));
-        all = all.concat(mapCaptions(j.captions || [], src));
-      }
-      if (!all.length) throw new Error(L("Nie znalazłem mowy w klipach na osi.", "No speech found in the timeline clips."));
-      setCaptions(all);
-      setCapJob({ state: "done", n: all.length });
-    } catch (e) { setCapJob({ state: "error", error: e.message || String(e) }); }
+    if (force || srcs.some((x) => !sp[x] || !(sp[x].words || []).length)) {
+      const got = await analyzeSpeech(force);
+      if (!got) return;
+      sp = { ...sp, ...got };
+    }
+    const all = groupLines(timelineWords(sp));
+    if (!all.length) { setCapJob({ state: "error", error: L("Nie znalazłem mowy w klipach na osi.", "No speech found in the timeline clips.") }); return; }
+    setCaptions(all);
+    setCapJob({ state: "done", n: all.length });
   }
   async function srtCaptions(file) {
     try {
@@ -813,6 +867,109 @@ function VideoEditor({ path, onClose }) {
       setCaptions(list);
       setCapJob({ state: "done", n: list.length });
     } catch (e) { setCapJob({ state: "error", error: e.message || String(e) }); }
+  }
+  // przeglądarka nie odtworzyła pliku mimo deklaracji kodeka: przechodzimy na kopię podglądową
+  function codecFallback() {
+    const srcs = [...new Set(projRef.current.clips.filter((c) => c.kind === "video").map((c) => c.src))].filter((x) => !edProxyNeed.has(x));
+    if (!srcs.length || !api.editProxy) { setCodecErr(true); return; }
+    for (const x of srcs) {
+      edProxyNeed.add(x);
+      const u = edUrls.get(x);
+      edUrls.delete(x);
+      if (u) u.then((v) => URL.revokeObjectURL(v)).catch(() => {});
+    }
+    setStrips((st) => { const n = { ...st }; for (const x of srcs) delete n[x]; return n; });
+    player.remount();
+    setTimeout(() => player.seek(tRef.current), 0);
+  }
+
+  // ---------------------------------------------------------------- mowa: pauzy, wtrącenia, wycinanie
+  const PAD = 0.12;   // tyle ciszy zostawiamy po obu stronach cięcia (oddech, naturalny rytm)
+  function speechMarks() {
+    const out = [];
+    for (const s of layoutClips(projRef.current ? projRef.current.clips : [])) {
+      const d = speech[s.c.src];
+      if (!d) continue;
+      const toT = (x) => s.start + (x - s.c.in) / s.c.speed;
+      for (const [a, b] of d.silences || []) {
+        if (b - a < minPause) continue;
+        const a2 = Math.max(a <= s.c.in + 0.01 ? s.c.in : a + PAD, s.c.in), b2 = Math.min(b >= s.c.out - 0.01 ? s.c.out : b - PAD, s.c.out);
+        if (b2 - a2 < 0.1) continue;
+        const key = `p:${s.c.src}:${a}`;
+        if (!ignored.has(key)) out.push({ key, kind: "pause", t0: toT(a2), t1: toT(b2) });
+      }
+      for (const i of d.fillers || []) {
+        const w = d.words[i];
+        const a2 = Math.max(w[0] - 0.03, s.c.in), b2 = Math.min(w[1] + 0.03, s.c.out);
+        if (b2 - a2 < 0.05) continue;
+        const key = `f:${s.c.src}:${w[0]}`;
+        if (!ignored.has(key)) out.push({ key, kind: "filler", t0: toT(a2), t1: toT(b2), label: w[2] });
+      }
+    }
+    return out.sort((x, y) => x.t0 - y.t0);
+  }
+  // słowa ze wszystkich klipów w czasie osi (słowo należy do klipu, w którym jest jego środek)
+  function timelineWords(sp) {
+    const out = [];
+    for (const s of layoutClips(projRef.current ? projRef.current.clips : [])) {
+      const d = (sp || speech)[s.c.src];
+      if (!d) continue;
+      for (const [a, b, w] of d.words || []) {
+        const mid = (a + b) / 2;
+        if (mid < s.c.in || mid >= s.c.out) continue;
+        const a2 = Math.max(a, s.c.in), b2 = Math.min(b, s.c.out);
+        out.push({ t0: s.start + (a2 - s.c.in) / s.c.speed, t1: s.start + (b2 - s.c.in) / s.c.speed, text: w });
+      }
+    }
+    return out;
+  }
+  function speechBars() {
+    return groupLines(timelineWords()).map((k) => ({ t0: k.start, t1: k.end, text: k.text }));
+  }
+  // wycięcie przedziałów osi: klipy dzielą się jak przy zwykłym cięciu, napisy i muzyka przesuwają się w lewo
+  function cutTimeline(ranges) {
+    const rs = ranges.filter((r) => r[1] - r[0] > 0.02).sort((x, y) => x[0] - y[0])
+      .reduce((acc, r) => { const l = acc[acc.length - 1]; if (l && r[0] <= l[1]) l[1] = Math.max(l[1], r[1]); else acc.push([...r]); return acc; }, []);
+    if (!rs.length) return 0;
+    const clips = [];
+    for (const s of layoutClips(projRef.current.clips)) {
+      let pieces = [[s.start, s.end]];
+      for (const [a, b] of rs) pieces = pieces.flatMap(([x, y]) => (b <= x || a >= y ? [[x, y]] : [[x, Math.min(a, y)], [Math.max(b, x), y]]).filter(([u, v]) => v - u >= 0.04));
+      pieces.forEach(([x, y], k) => clips.push({ ...s.c, id: k ? edId("c") : s.c.id, in: s.c.in + (x - s.start) * s.c.speed, out: s.c.in + (y - s.start) * s.c.speed }));
+    }
+    if (!clips.length) return 0;
+    const shift = (t) => { let d = 0; for (const [a, b] of rs) { if (t >= b) d += b - a; else if (t > a) d += t - a; } return t - d; };
+    H.apply((P) => ({ ...P, clips,
+      texts: P.texts.map((x) => ({ ...x, start: shift(x.start), end: shift(x.end) })).filter((x) => x.end - x.start >= 0.05),
+      audio: P.audio.map((m) => ({ ...m, start: shift(m.start) })) }));
+    return rs.reduce((a, [x, y]) => a + y - x, 0);
+  }
+  const loadSpeech = (src, data) => setSpeech((sp) => ({ ...sp, [src]: data }));
+  useEffect(() => {
+    if (!p || !api.editSpeechGet) return;
+    for (const c of p.clips) {
+      if (c.kind !== "video" || speechTried.current.has(c.src)) continue;
+      speechTried.current.add(c.src);
+      api.editSpeechGet(c.src).then((d) => loadSpeech(c.src, d)).catch(() => {});
+    }
+  }, [p && p.clips]);
+  async function analyzeSpeech(force) {
+    if (speechJob && speechJob.state === "running") return false;
+    const srcs = [...new Set(p.clips.filter((c) => c.kind === "video").map((c) => c.src))];
+    setSpeechJob({ state: "running" });
+    try {
+      const got = {};
+      for (const src of srcs) {
+        let j = await api.editSpeech(src, force);
+        while (j.state === "running") { await edSleep(1200); j = await api.editJob(j.id); }
+        if (j.state !== "done") throw new Error(j.error || L("Analiza mowy nie wyszła.", "Speech analysis failed."));
+        got[src] = j.speech;
+      }
+      setSpeech((sp) => ({ ...sp, ...got }));
+      setIgnored(new Set());
+      setSpeechJob({ state: "done" });
+      return got;
+    } catch (e) { setSpeechJob({ state: "error", error: e.message || String(e) }); return false; }
   }
   const setCapLook = (patch, lv) => (lv ? H.live : H.apply)((P) => ({ ...P, texts: P.texts.map((x) => (x.cap ? { ...x, ...patch } : x)) }));
 
@@ -839,6 +996,11 @@ function VideoEditor({ path, onClose }) {
   const running = job && (job.state === "running" || job.state === "prep");
   const caps = p.texts.filter((x) => x.cap);
   const allMuted = p.clips.filter((c) => c.kind !== "image").every((c) => c.muted);
+  const hasSpeech = p.clips.some((c) => speech[c.src]);
+  const speechBusy = !!(speechJob && speechJob.state === "running");
+  const marks = hasSpeech ? speechMarks() : [];
+  const bars = hasSpeech ? speechBars() : [];
+  const markSel = sel && sel.type === "mark" ? marks.find((m) => m.key === sel.id) : null;
 
   // ---- panele narzędzi (te same na komputerze i telefonie)
   const seg = (items, cur, set) => html`<div class="thq-ed-seg">${items.map(([k2, label]) => html`<button type="button" key=${k2} class=${cx(cur === k2 && "is-on")} onClick=${() => set(k2)}>${label}</button>`)}</div>`;
@@ -902,13 +1064,14 @@ function VideoEditor({ path, onClose }) {
   </div>`;
 
   const captionTools = () => html`<div class="thq-ed-form">
-    ${info.stt ? html`<button type="button" class="thq-ed-btn is-main is-wide" disabled=${capJob && capJob.state === "running"} onClick=${() => autoCaptions(false)}>
-        ${ED_ICON.spark} ${capJob && capJob.state === "running" ? L("Rozpoznaję mowę…", "Recognising speech…") : caps.length ? L("Rozpoznaj napisy jeszcze raz", "Recognise captions again") : L("Automatyczne napisy z mowy", "Auto captions from speech")}</button>
+    ${info.stt ? html`<button type="button" class="thq-ed-btn is-main is-wide" disabled=${speechBusy} onClick=${() => autoCaptions(false)}>
+        ${ED_ICON.spark} ${speechBusy ? L("Rozpoznaję mowę…", "Recognising speech…") : caps.length ? L("Wstaw napisy ze słów jeszcze raz", "Insert captions from words again") : L("Automatyczne napisy (zgrane ze słowami)", "Auto captions (synced to words)")}</button>
         <p class="thq-ed-note">${L("Rozpoznawanie działa na serwerze (Parakeet, bez internetu). Pierwszy raz trwa dłużej: pobiera się model.", "Recognition runs on the server (Parakeet, offline). The first run downloads the model.")}</p>`
       : html`<p class="thq-ed-note">${L("Rozpoznawanie mowy jest niedostępne w tej instalacji. Możesz wczytać gotowy plik .srt.", "Speech recognition is not available here. You can load a .srt file.")}</p>`}
     ${(info.subs || []).length > 0 && html`<p class="thq-ed-note">${L("Z pliku napisów:", "From a subtitle file:")}</p>
       <ul class="thq-ed-list">${info.subs.map((f) => html`<li key=${f}><button type="button" onClick=${() => srtCaptions(f)}><span class="thq-ed-mk is-text">CC</span><span class="thq-ed-mn">${f.split("/").pop()}</span><span class="thq-ed-plus">+</span></button></li>`)}</ul>`}
     ${capJob && capJob.state === "error" && html`<p class="thq-ed-bad">${capJob.error}</p>`}
+    ${speechJob && speechJob.state === "error" && html`<p class="thq-ed-bad">${speechJob.error}</p>`}
     ${capJob && capJob.state === "done" && html`<p class="thq-ed-ok">✓ ${L(`Dodano ${capJob.n} ${plNapisy(capJob.n)}`, `Added ${capJob.n} captions`)}</p>`}
     ${caps.length > 0 && html`
       <label>${L("Styl napisów", "Caption style")}${seg(ED_STYLES.map(([k2, pl, en]) => [k2, L(pl, en)]), caps[0].style, (v) => setCapLook({ style: v }))}</label>
@@ -917,6 +1080,42 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Rozmiar", "Size")} · ${Math.round(caps[0].size)}<input type="range" min="24" max="140" value=${caps[0].size} onInput=${(e) => setCapLook({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
       <p class="thq-ed-note">${L(`${caps.length} ${plNapisy(caps.length)}. Pojedynczy napis poprawisz, dotykając go na osi czasu.`, `${caps.length} captions. Tap one on the timeline to fix its text.`)}</p>
       <div class="thq-ed-acts">${act("trash", L("Usuń napisy", "Remove captions"), () => H.apply((P) => ({ ...P, texts: P.texts.filter((x) => !x.cap) })), { bad: true })}</div>`}
+  </div>`;
+
+  const speechTools = () => {
+    const pauses = marks.filter((m) => m.kind === "pause"), fillers = marks.filter((m) => m.kind === "filler");
+    const sum = (xs) => xs.reduce((a, m) => a + m.t1 - m.t0, 0);
+    const cutAll = (xs) => { const d = cutTimeline(xs.map((m) => [m.t0, m.t1])); setSel(null); setCutNote(d ? L(`Wycięto ${d.toFixed(1)} s. Ctrl+Z / ↶ cofa.`, `Cut ${d.toFixed(1)} s. Undo brings it back.`) : ""); };
+    return html`<div class="thq-ed-form">
+      ${!hasSpeech ? html`<p class="thq-ed-note">${L("Wykryję, co i kiedy jest mówione, gdzie są pauzy i wtrącenia („yyy”, „eee”), i zaznaczę to na osi czasu. Każdy fragment wytniesz jednym dotknięciem albo wszystkie naraz.",
+          "I will detect what is said and when, where the pauses and fillers are, and mark them on the timeline. Cut one with a tap or all at once.")}</p>
+        <button type="button" class="thq-ed-btn is-main is-wide" disabled=${speechBusy} onClick=${() => analyzeSpeech(false)}>${ED_ICON.speech} ${speechBusy ? L("Analizuję mowę…", "Analysing speech…") : L("Wykryj mowę i pauzy", "Detect speech and pauses")}</button>
+        ${!info.stt && html`<p class="thq-ed-note">${L("Bez rozpoznawania mowy w tej instalacji wykryję same pauzy (cisza w dźwięku).", "Without speech recognition here I can detect pauses only (silence).")}</p>`}`
+      : html`
+        <div class="thq-ed-stats">
+          <span><i class="is-pause"></i>${L("Pauzy", "Pauses")} <b>${pauses.length}</b> · ${sum(pauses).toFixed(1)} s</span>
+          <span><i class="is-filler"></i>${L("Wtrącenia", "Fillers")} <b>${fillers.length}</b></span>
+        </div>
+        <label>${L("Pauza dłuższa niż", "Pause longer than")} · ${minPause.toFixed(1)} s<input type="range" min="0.3" max="2" step="0.1" value=${minPause} onInput=${(e) => setMinPause(+e.target.value)}/></label>
+        <div class="thq-ed-acts">
+          ${act("split", L(`Wytnij pauzy (${pauses.length})`, `Cut pauses (${pauses.length})`), () => cutAll(pauses), { disabled: !pauses.length })}
+          ${act("trash", L(`Wytnij „yyy” (${fillers.length})`, `Cut fillers (${fillers.length})`), () => cutAll(fillers), { disabled: !fillers.length })}
+          ${act("check", L("Wytnij wszystko", "Cut all"), () => cutAll(marks), { disabled: !marks.length })}
+        </div>
+        ${cutNote && html`<p class="thq-ed-ok">✓ ${cutNote}</p>`}
+        <p class="thq-ed-note">${L("Na osi: czerwone = pauzy, pomarańczowe = wtrącenia, szare paski = wypowiedzi. Dotknij znacznika, żeby go wyciąć albo zostawić.",
+          "On the timeline: red = pauses, orange = fillers, grey bars = speech. Tap a mark to cut or keep it.")}</p>
+        <button type="button" class="thq-ed-btn is-wide" disabled=${speechBusy} onClick=${() => analyzeSpeech(true)}>${speechBusy ? L("Analizuję…", "Analysing…") : L("Wykryj ponownie", "Detect again")}</button>`}
+      ${speechJob && speechJob.state === "error" && html`<p class="thq-ed-bad">${speechJob.error}</p>`}
+    </div>`;
+  };
+  const markTools = (m) => html`<div class="thq-ed-form">
+    <p class="thq-ed-sub">${m.kind === "pause" ? L("Pauza", "Pause") : L(`Wtrącenie „${m.label}”`, `Filler “${m.label}”`)} · ${fmtT(m.t0, true)} – ${fmtT(m.t1, true)} (${(m.t1 - m.t0).toFixed(2)} s)</p>
+    <div class="thq-ed-acts">
+      ${act("split", L("Wytnij", "Cut"), remove)}
+      ${act("check", L("Zostaw", "Keep"), () => { setIgnored((g) => new Set([...g, m.key])); setSel(null); if (mobile) setTool("speech"); })}
+      ${act("speech", L("Odsłuchaj", "Listen"), () => { player.seek(Math.max(0, m.t0 - 1)); setTimeout(() => player.play(), 50); })}
+    </div>
   </div>`;
 
   const formatTools = () => html`<div class="thq-ed-form">
@@ -933,8 +1132,9 @@ function VideoEditor({ path, onClose }) {
   // ---- wspólne elementy: scena, oś czasu
   const stage = html`<div class="thq-ed-fit" ref=${wrapRef}>
     <div class="thq-ed-stage" ref=${stageRef} style=${stageSize}>
-      <video ref=${player.vids[0]} class="thq-ed-v" playsinline preload="auto" onError=${() => setCodecErr(true)}></video>
-      <video ref=${player.vids[1]} class="thq-ed-v" playsinline preload="auto" onError=${() => setCodecErr(true)}></video>
+      <video ref=${player.vids[0]} class="thq-ed-v" playsinline preload="auto" onError=${codecFallback}></video>
+      <video ref=${player.vids[1]} class="thq-ed-v" playsinline preload="auto" onError=${codecFallback}></video>
+      ${proxying > 0 && html`<p class="thq-ed-codec is-info"><span class="thq-ed-spin is-small"></span> ${L("Przygotowuję podgląd dla tej przeglądarki (kopia WebM na serwerze, raz)…", "Preparing a preview this browser can play (one-time WebM copy)…")}</p>`}
       <img ref=${player.imgRef} class="thq-ed-v" alt=""/>
       <canvas ref=${overlayRef} class="thq-ed-overlay" onPointerDown=${stagePointer}></canvas>
       ${codecErr && html`<p class="thq-ed-codec">${L("Ta przeglądarka nie odtwarza kodeka tego filmu (np. Chromium bez H.264). Montaż i eksport działają; do podglądu użyj Chrome, Edge albo Safari.",
@@ -976,6 +1176,12 @@ function VideoEditor({ path, onClose }) {
       ? html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("audio"); }}>+ ${L("Dodaj audio", "Add audio")}</button>`
       : html`<span class="thq-ed-hint">${L("Muzyka: dodaj plik audio z panelu Media", "Music: add an audio file from the Media panel")}</span>`)}
   </div>`;
+  const speechTrack = hasSpeech && html`<div class="thq-ed-track is-speech" onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
+    ${bars.map((b, i) => html`<div key=${`b${i}`} class="thq-ed-bar-say" style=${{ left: `${b.t0 * pps}px`, width: `${Math.max(2, (b.t1 - b.t0) * pps)}px` }} title=${b.text}><span>${b.text}</span></div>`)}
+    ${marks.map((m) => html`<button type="button" key=${m.key} class=${cx("thq-ed-mark", `is-${m.kind}`, sel && sel.id === m.key && "is-sel")}
+      style=${{ left: `${m.t0 * pps}px`, width: `${Math.max(6, (m.t1 - m.t0) * pps)}px` }} title=${m.kind === "pause" ? L("Pauza: kliknij, żeby wyciąć", "Pause: click to cut") : `„${m.label}”`}
+      onPointerDown=${(e) => e.stopPropagation()} onClick=${(e) => pick(e, "mark", m.key)}>${m.kind === "filler" ? m.label : ""}</button>`)}
+  </div>`;
   const timeline = html`<div class="thq-ed-tlwrap">
     <div class="thq-ed-tl" ref=${tlRef} onScroll=${onTlScroll} ...${mobile ? tlTouch : {}}
       onWheel=${(e) => { if (e.ctrlKey) { e.preventDefault(); setPps((x) => clamp(x * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 4, 400)); } }}>
@@ -983,7 +1189,7 @@ function VideoEditor({ path, onClose }) {
         <div class="thq-ed-ruler" onPointerDown=${rulerDown}>
           ${ticks.map((s) => html`<span key=${s} style=${{ left: `${s * pps}px` }}>${step < 1 ? `${fmtT(s)}${(s % 1 ? ".5" : "")}` : fmtT(s)}</span>`)}
         </div>
-        ${mobile ? [videoTrack, audioTrack, textTrack] : [textTrack, videoTrack, audioTrack]}
+        ${mobile ? [videoTrack, speechTrack, audioTrack, textTrack] : [textTrack, videoTrack, speechTrack, audioTrack]}
         ${!mobile && html`<div class="thq-ed-head" ref=${headRef} style=${{ left: `${pad}px`, transform: `translateX(${t * pps}px)` }}><i></i></div>`}
       </div>
     </div>
@@ -996,7 +1202,7 @@ function VideoEditor({ path, onClose }) {
 
   // ---- telefon: układ jak w CapCut
   if (mobile) {
-    const TOOLS = [["edit", L("Edytuj", "Edit")], ["audio", L("Audio", "Audio")], ["text", L("Tekst", "Text")], ["captions", L("Napisy", "Captions")], ["format", L("Format", "Format")]];
+    const TOOLS = [["edit", L("Edytuj", "Edit")], ["audio", L("Audio", "Audio")], ["text", L("Tekst", "Text")], ["captions", L("Napisy", "Captions")], ["speech", L("Mowa", "Speech")], ["format", L("Format", "Format")]];
     const openTool = (k2) => {
       if (tool === k2) { setTool(null); return; }
       if (k2 === "edit" && !(sel && sel.type === "clip")) {
@@ -1012,6 +1218,8 @@ function VideoEditor({ path, onClose }) {
     else if (tool === "text" && selItem && sel.type === "text") { sheet = textTools(selItem); title = selItem.cap ? L("Napis", "Caption") : L("Tekst", "Text"); }
     else if (tool === "audio") { sheet = selItem && sel.type === "audio" ? audioTools(selItem) : audioAdd(); title = L("Audio", "Audio"); }
     else if (tool === "captions") { sheet = captionTools(); title = L("Napisy", "Captions"); }
+    else if (tool === "speech") { sheet = speechTools(); title = L("Mowa, pauzy i wtrącenia", "Speech, pauses and fillers"); }
+    else if (tool === "mark" && markSel) { sheet = markTools(markSel); title = L("Znacznik", "Mark"); }
     else if (tool === "format") { sheet = formatTools(); title = L("Format", "Format"); }
     else if (tool === "media") { sheet = html`<div class="thq-ed-form">${mediaList(["video", "image"])}${uploadBtn("video/*,image/png,image/jpeg,image/webp")}</div>`; title = L("Dodaj klip", "Add clip"); }
     return html`<div class=${cx("thq-ed is-mobile", sheet && "has-sheet")} role="dialog" aria-modal="true" aria-label=${L("Edytor filmu", "Video editor")}>
@@ -1044,6 +1252,7 @@ function VideoEditor({ path, onClose }) {
 
   // ---- komputer
   const inspector = () => {
+    if (markSel) return markTools(markSel);
     if (!selItem) {
       return html`<div>${formatTools()}
         <div class="thq-ed-form"><p class="thq-ed-note">${L("Kliknij klip, napis albo muzykę na osi, żeby je ustawić.", "Click a clip, text or music on the timeline to adjust it.")}</p>
@@ -1072,6 +1281,7 @@ function VideoEditor({ path, onClose }) {
         <div class="thq-ed-tabs">
           <button type="button" class=${cx(side === "media" && "is-on")} onClick=${() => setSide("media")}>${L("Media", "Media")}</button>
           <button type="button" class=${cx(side === "captions" && "is-on")} onClick=${() => setSide("captions")}>${L("Napisy", "Captions")}</button>
+          <button type="button" class=${cx(side === "speech" && "is-on")} onClick=${() => setSide("speech")}>${L("Mowa", "Speech")}</button>
           <button type="button" class=${cx(side === "inspect" && "is-on")} onClick=${() => setSide("inspect")}>${L("Ustawienia", "Settings")}</button>
         </div>
         ${side === "media" ? html`<div class="thq-ed-media">
@@ -1081,7 +1291,7 @@ function VideoEditor({ path, onClose }) {
           ${mediaList(["video", "image", "audio"])}
           ${act(allMuted ? "mute" : "volume", allMuted ? L("Włącz dźwięk filmu", "Unmute video") : L("Wycisz dźwięk filmu", "Mute video audio"),
             () => H.apply((P) => ({ ...P, clips: P.clips.map((c) => ({ ...c, muted: !allMuted })) })), { on: allMuted })}
-        </div>` : side === "captions" ? captionTools() : inspector()}
+        </div>` : side === "captions" ? captionTools() : side === "speech" ? speechTools() : inspector()}
       </aside>
       <section class="thq-ed-stage-wrap">
         ${stage}

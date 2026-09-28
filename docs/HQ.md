@@ -94,12 +94,22 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   się obok źródła jako `<nazwa>.auto.srt`, więc drugi raz wczytuje się od razu. Można też wczytać gotowy `.srt`
   z katalogu filmu. Styl, położenie, kolor i rozmiar zmieniają się dla wszystkich napisów naraz; pojedynczy napis
   poprawiasz na osi czasu.
+- **Mowa, pauzy i wtrącenia:** zakładka „Mowa” (na telefonie w dolnym pasku). **Wykryj mowę i pauzy** robi dwie rzeczy
+  na serwerze: `silencedetect` w ffmpeg wyznacza dokładnie ciszę, a `jarvo-stt --json` podaje czas każdego słowa.
+  Na osi pojawia się ścieżka mowy: szare paski z wypowiedziami, **czerwone** znaczniki pauz (dłuższych niż suwak,
+  domyślnie 0,6 s) i **pomarańczowe** „yyy”/„eee”. Znacznik klikasz: Wytnij, Zostaw albo Odsłuchaj; albo wycinasz
+  wszystkie naraz. Cięcia to zwykłe cięcia klipów (zostaje 0,12 s oddechu), napisy i muzyka przesuwają się razem
+  z nimi, całość cofa się jednym Ctrl+Z. Wynik analizy leży obok źródła jako `<nazwa>.mowa.json` (i `.auto.srt`):
+  następnym razem wczytuje się sam, widzi go też Wideograf. Bez `jarvo-stt` działa samo wykrywanie pauz.
+- **Napisy zgrane ze słowami:** linie układane są ze słów już po cięciach (nowa linia po pauzie, końcu zdania albo
+  32 znakach), bez wtrąceń.
+- **Każda przeglądarka:** gdy przeglądarka nie odtwarza kodeka filmu (np. Chromium bez H.264, ProRes), edytor sam
+  prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
+  plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
 - **Telefon (do 860 px):** układ jak w CapCut: podgląd na górze, pod nim czas, odtwarzanie i cofnij/ponów, oś czasu
   przewijana palcem pod stałym wskaźnikiem na środku (dwa palce: przybliżenie), a na dole pasek **Edytuj · Audio ·
   Tekst · Napisy · Format**. Narzędzie otwiera panel od dołu; dotknięcie klipu, napisu albo muzyki na osi otwiera
   jego ustawienia, uchwyty do przycinania pojawiają się na zaznaczonym elemencie.
-- **Kodeki podglądu:** Chrome, Edge i Safari odtwarzają H.264. Chromium bez kodeków pokaże komunikat; montaż
-  i eksport działają dalej.
 - Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg).
 
 ## 3. Bezpieczeństwo
