@@ -238,6 +238,19 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 ### Faza ∞
 Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
 
+**Pomysły do zbadania (zapisane, żeby nie uciekły):**
+- **Cua** ([trycua/cua](https://github.com/trycua/cua), MIT): „ręce” agenta do programów okienkowych. Cua Driver
+  (MCP `cua-driver mcp`, Linux/Windows/macOS) klika przez drzewo dostępności; rozszerzenie **Cua Perception**
+  (opcjonalne) czyta piksele, gdy drzewa nie ma (kanwy, gry, zdalne pulpity): zrzut → oznaczone regiony
+  (OmniParser + PP-OCR, na CPU, bez sieci), klik wskazuje ID regionu związane z konkretnym zrzutem
+  (`capture_id`, wygasa po 60 s, bez klikania w gołe współrzędne), więc poradzą sobie modele bez „celowania”.
+  Uwaga: OmniParser w Perception jest na **AGPL-3.0** (tylko użytek prywatny, bez udostępniania innym).
+  Kandydat: Ręka z własnym pulpitem XFCE w kontenerze uruchamianym na żądanie (zmierzyć RAM na VPS 8 GB),
+  sterowanie Twoim Windowsem tylko za zgodą (A2). Chmura Cua Fleets jest płatna: pomijamy.
+- **Edytor filmów, dalsze kroki** (inspiracja: diffusionstudio/editor, MPL-2.0, nie forkujemy): Wideograf renderuje
+  `*.edycja.json` tym samym silnikiem co HQ; napisy z mowy (Parakeet) i wycinanie „yyy”/ciszy jako cięcia;
+  przejścia i animacje napisów przez ffmpeg.
+
 ---
 
 ## 7. Decyzje do podjęcia (z rekomendacjami)
