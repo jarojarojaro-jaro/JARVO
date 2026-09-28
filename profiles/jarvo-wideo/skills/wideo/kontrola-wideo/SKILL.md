@@ -25,6 +25,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 ## Kroki
 1. **Technika:** `python3 $HERMES_HOME/scripts/qa_wideo.py <film.mp4> --platforma <tiktok|ig-reel|…> --lektor
    --arkusz out/wideo/<film>/qa.jpg --json`.
+   Sprawdza też pojedyncze „mrugnięcia” (jedna klatka inna niż obie sąsiednie): obejrzyj te chwile i popraw scenę.
    Błąd (`bledy`) = poprawka przed oceną; typowe: głośność → `montaz.py glosnosc`, format → ponowny render,
    czarny początek → pierwsza scena z obrazem.
    - ✅ Punkt kontrolny: `ok: true`.

@@ -46,6 +46,13 @@ powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. D
 - Głośność pod lektorem 0,10–0,18 (plan: `glosnosc`); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.
 - Nigdy: muzyka z list przebojów, „znalezione na YouTube”, muzyka z cudzych filmów.
+- Rytm: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3` (BPM, takty, drop): cięcia na taktach, najmocniejsza
+  scena na dropie; sprawdź uchem przy swobodnym tempie.
+
+## Efekty dźwiękowe
+- Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania (syntetyczne brzmią tanio): biblioteka marki,
+  `@@KNOWLEDGE_DIR@@/wideo/sfx/`, Mixkit i Pixabay (darmowe komercyjnie, bez podpisu; źródło i licencja w RAPORT).
+- Każdy efekt dokładnie na swojej klatce (wg osi animacji), cicho pod lektorem (−18…−12 dB względem głosu).
 
 ## Głośność nagrań
 `montaz.py glosnosc <plik> -o <wynik> --lufs -14` (dwa przejścia loudnorm). Pomiar: `qa_wideo.py <plik>` → `lufs`, `true_peak`.

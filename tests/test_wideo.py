@@ -446,3 +446,44 @@ def test_inspiracje_cache_used_when_offline(tmp_path, monkeypatch):
     cached = wl.cache_dir("inspiracje") / f"videos-{insp.REV[:12]}.json"
     cached.write_text(json.dumps([{"slug": "x"}]))
     assert insp.load() == [{"slug": "x"}]
+
+
+# ------------------------------------------------------------------ rytm muzyki i mrugnięcia klatek
+def _wscript(name):
+    import importlib.util as iu
+    sys.path.insert(0, str(REPO / "profiles" / "jarvo-wideo" / "scripts"))
+    spec = iu.spec_from_file_location(name, REPO / "profiles" / "jarvo-wideo" / "scripts" / f"{name}.py")
+    mod = iu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
+def test_rytm_finds_tempo_grid_and_drop(tmp_path):
+    rytm = _wscript("rytm")
+    p = 0.46875   # 128 BPM, pierwszy bit 0.2 s, głośniej od 7.7 s (drop), mocny bit co takt
+    expr = (f"if(gte(t,0.2), sin(2*PI*55*t)*exp(-25*mod(t-0.2,{p}))*if(eq(mod(floor((t-0.2)/{p}),4),0),1,0.55)"
+            f"*if(lt(t,7.7),0.25,1), 0)")
+    wav = tmp_path / "beat.wav"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"aevalsrc='{expr}':s=44100:d=16", str(wav)], check=True)
+    r = rytm.analyze(wav)
+    assert r["bpm"] == pytest.approx(128, abs=0.5)
+    assert r["pierwszy_bit"] == pytest.approx(0.2, abs=0.03)
+    assert r["drop"] == pytest.approx(7.7, abs=0.05)
+    assert r["takty"][1] - r["takty"][0] == pytest.approx(4 * p, abs=0.02)
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
+def test_qa_single_frame_pop_but_not_cut_or_pan(tmp_path):
+    qa = _wscript("qa_wideo")
+    pop = tmp_path / "pop.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=0x223344:s=320x180:r=30:d=2",
+                    "-f", "lavfi", "-i", "color=white:s=320x180:r=30:d=0.0333", "-f", "lavfi", "-i", "color=c=0x223344:s=320x180:r=30:d=1",
+                    "-f", "lavfi", "-i", "color=c=orange:s=320x180:r=30:d=1",
+                    "-filter_complex", "[0][1][2][3]concat=n=4:v=1:a=0,format=yuv420p", str(pop)], check=True)
+    frames, fps = qa.gray_frames(pop)
+    assert qa.single_frame_pops(frames, fps) == [pytest.approx(2.0, abs=0.04)]     # błysk tak, cięcie na pomarańcz nie
+    pan = tmp_path / "pan.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=2",
+                    "-vf", "scroll=h=0.05,format=yuv420p", str(pan)], check=True)
+    assert qa.single_frame_pops(*qa.gray_frames(pan)) == []                          # szybka panorama to nie błąd

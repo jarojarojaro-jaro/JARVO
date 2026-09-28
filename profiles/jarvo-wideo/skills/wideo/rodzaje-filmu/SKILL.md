@@ -40,12 +40,18 @@ opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprz
 
 ## Kroki
 1. Rodzaj z indeksu → jego plik. Własna animacja HTML (Canvas, SVG, Three.js, GSAP) → też `references/kontrakt-html.md`.
-2. **Brief** `out/wideo/src/BRIEF.md` wg szablonu z pliku rodzaju: wejścia, kierunek, reguły, oś czasu, wynik.
-   Brak wejścia: karta → brand kit → rozsądna domyślna nazwana w RAPORT; pytasz tylko o to, bez czego film będzie zły.
+   **Film-wzór** („zrób coś takiego”): `kadry.py wzor wzor.mp4` (klatki co 0,5 s, cięcia, rytm) → rozpisz go na bity
+   (przejścia, kamera, kolory, fonty) i przenieś tę strukturę na produkt; treści, logo i assetów wzoru nie bierzesz.
+2. **Brief** `out/wideo/src/BRIEF.md` w 6 częściach: **wejścia** (pliki, dane, marka), **kierunek** (styl w 3 zdaniach +
+   czego nie ma być), **struktura** (mapa bitów: sekunda → scena → ruch → dźwięk), **budowa** (silnik, format, fps),
+   **pułapki**, **start** (pierwszy krok). Szablon pól z pliku rodzaju. Brak wejścia: karta → brand kit → rozsądna
+   domyślna nazwana w RAPORT; pytasz tylko o to, bez czego film będzie zły.
+   Muzyka: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3` → BPM, takty, drop; cięcia i zmiany na taktach.
 3. Inspiracje tylko, gdy brief nie ma pomysłu na formę:
    `python3 $HERMES_HOME/scripts/inspiracje.py <rodzaj> --ile 3` (prompty twórców filmów Opus 5.5, pobierane w locie).
    Bierzesz strukturę i chwyty, nie tekst; zainspirowało → autor i link w RAPORT.
-4. Scenariusz i lektor (`scenariusz`), silnik z pliku rodzaju (komendy: `film-z-kodu`), arkusz klatek przed całością.
+4. Scenariusz i lektor (`scenariusz`), silnik z pliku rodzaju (komendy: `film-z-kodu`). **Mapa bitów + 4 kadry
+   kluczowe** (arkusz) do oceny, zanim wyrenderujesz całość; potem 2–3 rundy uwag „jak reżyser”, nie od zera.
 5. Kontrola z pliku rodzaju, `qa_wideo.py`, `kontrola-wideo` (≥ 85).
 
 ## Zasady wspólne

@@ -112,7 +112,7 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
-| FFmpeg (libass, libx264, fontconfig) | cały montaż: normalizacja scen, przejścia, napisy ASS, muzyka z duckingiem, loudnorm, kontrola | LGPL/GPL | n/d | `film.py`, `montaz.py`, `qa_wideo.py` |
+| FFmpeg (libass, libx264, fontconfig) | cały montaż: normalizacja scen, przejścia, napisy ASS, muzyka z duckingiem, loudnorm, kontrola | LGPL/GPL | n/d | `film.py`, `montaz.py`, `qa_wideo.py`, `rytm.py`, `kadry.py` |
 | [edge-tts](https://github.com/rany2/edge-tts) 7.2.7 | lektor PL za darmo, bez klucza (Marek, Zofia), z czasem słów do napisów karaoke | LGPL-3.0 | 2026-08 | leniwa instalacja Hermesa (`tts.edge`) |
 | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) | transkrypcja z czasem słów: napisy do nagrań, wybór fragmentów, test wymowy lektora | CC-BY-4.0 (model) / MIT | 2026-07 | `jarvo-stt` |
 | [Pexels API](https://www.pexels.com/api/) | darmowe ujęcia i zdjęcia stock (klucz `PEXELS_API_KEY`) | Pexels License | n/d | `stock.py` |

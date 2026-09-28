@@ -33,6 +33,12 @@ Nie to: jak działa zjawisko → `explainer.md`; samo logo → `logo-intro.md`; 
 - Sprężyny z małym przerzutem (nie gumowe); krótki blur przy zmianie treści; kamera przybliża, żeby stan wypełniał kadr.
 - Akcent (kolor marki) przenosi element, a nie przejście z czerni; kursor prowadzi oko.
 - Pętla: ostatnia klatka = pierwsza (reklamy w feedzie grają w kółko).
+- **Wygląda drogo, gdy:** nic nie zanika, tylko zmienia kształt; każda scena rośnie z poprzedniej (bez cięć);
+  coś dzieje się na każdym bicie; mały sprężysty „odbój”, gdy element ląduje; kamera robi jeden ruch naraz;
+  **prawdziwy dźwięk** na każdym kliknięciu i świście (biblioteka marki; Mixkit albo Pixabay: darmowe komercyjnie,
+  licencja w RAPORT; syntetyczne `sfx.py` tylko w szkicu, brzmią tanio).
+- **Styl domyślny** (gdy marka nie mówi inaczej): 2D, ciepła biel tła, czarny UI, jeden kolor akcentu, jeden czysty
+  font (Geist albo Inter); bez 3D, ciemnego motywu, poświat, cząsteczek i przenikań. Keynote Apple, nie trailer gry.
 - Prawdziwe ekrany: screenshoty od klienta, z karty albo zrobione przez `jarvo-web`; dane w UI z produktu, nie „Lorem”.
 
 ## Brief (`out/wideo/src/BRIEF.md`)

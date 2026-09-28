@@ -4,7 +4,8 @@
     python3 qa_wideo.py film.mp4 [--platforma tiktok] [--format 9:16] [--lektor] [--arkusz out/wideo/qa.jpg] [--json]
 
 Sprawdza: kontener i kodeki (H.264 + AAC, yuv420p, faststart), rozdzielczość i proporcje, fps, długość wobec
-platformy, głośność (LUFS zintegrowane i true peak), czarne klatki, zamrożony obraz, cisze w dźwięku.
+platformy, głośność (LUFS zintegrowane i true peak), czarne klatki, zamrożony obraz, cisze w dźwięku,
+pojedyncze „mrugnięcia” (jedna klatka inna niż obie sąsiednie: błąd renderu, zgubiony stan, zła klatka przejścia).
 --arkusz: klatki z początku (hook), środka i końca z zaznaczonymi strefami interfejsu platformy (9:16):
 na nich widać, czy napisy, tekst i logo nie wchodzą pod przyciski i opis.
 Kod wyjścia 1 = jest błąd blokujący. Tabela platform zgodna z skills/wideo/formaty-wideo/references/specs.md.
@@ -122,6 +123,38 @@ def sheet(path: Path, dur: float, w: int, h: int, out: Path, marks: bool) -> Pat
     return out
 
 
+POP_W, POP_H = 48, 27     # klatki do wykrywania mrugnięć: małe i w skali szarości (szybko, bez numpy)
+
+
+def gray_frames(path: Path, max_frames: int = 36000) -> tuple[list[bytes], float]:
+    """Małe klatki w skali szarości (ffmpeg dekoduje, Python liczy: bez numpy) i fps."""
+    info = wl.probe(path)
+    fps = (info["video"] or {}).get("fps") or 30
+    size = POP_W * POP_H
+    raw = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", str(path), "-frames:v", str(max_frames),
+                          "-vf", f"scale={POP_W}:{POP_H}:flags=area,format=gray", "-f", "rawvideo", "-"],
+                         capture_output=True, check=False).stdout
+    return [raw[i:i + size] for i in range(0, len(raw) - size + 1, size)], fps
+
+
+def _diff(a: bytes, b: bytes) -> float:
+    return sum(abs(x - y) for x, y in zip(a, b)) / len(a)
+
+
+def single_frame_pops(frames: list[bytes], fps: float = 30, min_jump: float = 14.0, ratio: float = 3.0) -> list[float]:
+    """Klatka i to „mrugnięcie”, gdy mocno różni się od obu sąsiadek, a sąsiadki są do siebie podobne
+    (d(i-1, i+1) co najmniej `ratio` razy mniejsze). Cięcie sceny (jeden skok) i szybki ruch kamery (sąsiadki też
+    się różnią) nie są liczone. Zwraca czasy klatek w sekundach."""
+    out, prev = [], None
+    for i in range(1, len(frames) - 1):
+        d_in = prev if prev is not None else _diff(frames[i - 1], frames[i])
+        d_out = _diff(frames[i], frames[i + 1])
+        prev = d_out
+        if min(d_in, d_out) >= min_jump and _diff(frames[i - 1], frames[i + 1]) * ratio <= min(d_in, d_out):
+            out.append(round(i / fps, 3))
+    return out
+
+
 def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkusz: Path | None) -> dict:
     errors, warns = [], []
     info = wl.probe(path)
@@ -169,6 +202,12 @@ def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkus
             warns.append(f"czarne klatki {s:.1f}–{e:.1f} s")
     for s, e in an["zamrozone"]:
         warns.append(f"zamrożony obraz od {s:.1f} s{f' do {e:.1f} s' if e else ''} (statyczna scena > 2 s nuży)")
+    frames, fps = gray_frames(path)
+    pops = single_frame_pops(frames, fps=fps)
+    if pops:
+        shown = ", ".join(f"{t:.2f}" for t in pops[:8]) + (" …" if len(pops) > 8 else "")
+        (errors if len(pops) > 3 else warns).append(
+            f"pojedyncze klatki inne niż sąsiednie ({len(pops)}×, s: {shown}): obejrzyj `html_wideo.py klatki --czasy` wokół tych chwil")
     if voiced:
         for s, e in an["cisze"]:
             if (e or dur) - s >= 2.0:

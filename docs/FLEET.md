@@ -200,7 +200,7 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 - **klipy z długich nagrań** (podcast, webinar): transkrypcja Parakeet z czasem słów → wybór fragmentów → klipy z napisami,
 - **filmy z kodu** (HyperFrames, Manim) i **ujęcia z AI** (`video_generate`, obraz → wideo, rejestr kosztów).
 
-**Jakość:** `qa_wideo.py` (kodeki, format, długość, LUFS, czarne i zamrożone klatki, arkusz ze strefami UI 9:16)
+**Jakość:** `qa_wideo.py` (kodeki, format, długość, LUFS, czarne i zamrożone klatki, pojedyncze „mrugnięcia” klatek, arkusz ze strefami UI 9:16). **Rytm i wzór:** `rytm.py` (BPM, takty, drop pod cięcia), `kadry.py wzor` (film-wzór → klatki co 0,5 s, cięcia, rytm → mapa bitów)
 + `kontrola-wideo` (ocena 0–100 w 10 osiach, PASS od 85, najwyżej 2 rundy poprawek). Każde ujęcie oglądane (vision),
 źródła i licencje w `film.json`.
 
