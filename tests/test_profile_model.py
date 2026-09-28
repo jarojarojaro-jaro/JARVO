@@ -54,4 +54,4 @@ def test_panel_choice_recalibrates_soul(tmp_path):
     step(tmp_path, "restore")
     new = (tmp_path / "SOUL.md").read_text(encoding="utf-8")
     assert "(anthropic/claude-sonnet-5)" in new and "gpt-6-luna" not in new
-    assert "<!-- TARS:CALIBRATION wykonawca -->" in new and new.endswith("## Język\n")
+    assert "<!-- Jarvo:CALIBRATION wykonawca -->" in new and new.endswith("## Język\n")

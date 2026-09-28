@@ -1,4 +1,4 @@
-# RUNBOOK: stawiamy TARS-a na VPS
+# RUNBOOK: stawiamy Jarva na VPS
 
 Instrukcja krok po kroku: od pustego serwera do floty odpowiadającej na Telegramie, plus codzienna
 obsługa. Architektura i uzasadnienia są w [VPS.md](VPS.md) i [BOSS.md](BOSS.md), tu są same kroki.
@@ -17,7 +17,7 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 | Konto [Tailscale](https://tailscale.com) (darmowe) | prywatny dostęp do serwera i paneli | nic nie wystawiamy publicznie |
 | Konto [OpenRouter](https://openrouter.ai) z kredytami | modele, obrazy, wideo | **7 kluczy**: host + 6 agentów, każdy z limitem kredytów |
 | Klucz [Pexels](https://www.pexels.com/api/) albo [Pixabay](https://pixabay.com/api/docs/) (darmowy) | ujęcia stock dla Wideografa | `PEXELS_API_KEY` / `PIXABAY_API_KEY` w Keys (profil główny) |
-| Konto Telegram | główny kanał | bot + supergrupa „TARS HQ” z tematami |
+| Konto Telegram | główny kanał | bot + supergrupa „Jarvo HQ” z tematami |
 | Miejsce na backup (Backblaze B2, S3 albo SFTP) | nocne kopie restic | poza serwerem |
 
 Limity kluczy OpenRouter na start (miesięcznie, do korekty po 2 tygodniach): `tars` 30 $, `tars-sherlock` 20 $,
@@ -74,14 +74,14 @@ Zainstaluj Tailscale też na laptopie i telefonie. Od teraz łącz się przez `s
 
 ---
 
-## 3. Telegram: bot i „TARS HQ”
+## 3. Telegram: bot i „Jarvo HQ”
 
-1. **Bot:** w [@BotFather](https://t.me/BotFather) → `/newbot` → nazwa (np. „TARS”) → zapisz **token**.
+1. **Bot:** w [@BotFather](https://t.me/BotFather) → `/newbot` → nazwa (np. „Jarvo”) → zapisz **token**.
 2. **Prywatność:** `/setprivacy` → wybierz bota → **Disable**. Bez tego bot w grupie widzi tylko komendy i @wzmianki.
 3. **Twoje ID:** napisz do [@userinfobot](https://t.me/userinfobot) → liczba `Id` = `TELEGRAM_OWNER_ID`.
-4. **Supergrupa:** nowa grupa „TARS HQ” → Ustawienia → **Tematy (Topics): włącz**. Dodaj bota
+4. **Supergrupa:** nowa grupa „Jarvo HQ” → Ustawienia → **Tematy (Topics): włącz**. Dodaj bota
    (**po** zmianie prywatności; jeśli był dodany wcześniej: usuń i dodaj ponownie) i nadaj mu admina.
-5. **Tematy:** utwórz `Sherlock`, `Web`, `Studio`, `Ręka`. Wątek „General” należy do TARS-a.
+5. **Tematy:** utwórz `Sherlock`, `Web`, `Studio`, `Ręka`. Wątek „General” należy do Jarva.
 6. **ID grupy i wątków** (zanim uruchomisz flotę, bo gateway przejmie odbieranie wiadomości):
    napisz po jednej wiadomości w każdym temacie, potem:
    ```bash
@@ -153,7 +153,7 @@ Każdy agent floty to osobny profil Hermesa z własnym `.env`, a Hermes celowo i
 przy multipleksowaniu). Żeby nie wpisywać klucza pięć razy:
 
 - **Klucze API** (CommandCode, OpenRouter, OpenCode, Exa…) dodawaj w dashboardzie **Keys przy profilu
-  „default”**. TARS HQ w ciągu kilku sekund kopiuje je do wszystkich agentów (`scripts/share_keys.py`, blok
+  „default”**. Jarvo HQ w ciągu kilku sekund kopiuje je do wszystkich agentów (`scripts/share_keys.py`, blok
   „klucze wspólne” na końcu `.env` agenta). Dzielone są tylko klucze dostawców i narzędzi; tokeny
   komunikatorów (Telegram, Discord…) zostają tam, gdzie je wpisano.
 - **Inny klucz dla jednego agenta:** wybierz go w lewym górnym rogu i ustaw klucz w Keys. Ma pierwszeństwo
@@ -190,22 +190,22 @@ bash scripts/pin-images.sh      # zapisuje digesty w /srv/tars/compose/.env (rep
 
 ## 6. Test dymny (smoke test)
 
-1. **DM z botem:** „Cześć, kim jesteś i kogo masz w zespole?” → odpowiada TARS, wymienia 4 snajperów.
+1. **DM z botem:** „Cześć, kim jesteś i kogo masz w zespole?” → odpowiada Jarvo, wymienia 4 snajperów.
 2. **Temat Sherlock:** „Jaka jest aktualna stawka VAT na usługi IT w Polsce? Podaj źródło.” → odpowiada Sherlock.
-3. **Misja przez TARS-a (DM):** „Sprawdź 3 konkurentów kawiarni specialty w Krakowie i przygotuj szkic landing page’a.”
-   TARS powinien potwierdzić zlecenie efektami, a na tablicy pojawić się karty:
+3. **Misja przez Jarva (DM):** „Sprawdź 3 konkurentów kawiarni specialty w Krakowie i przygotuj szkic landing page’a.”
+   Jarvo powinien potwierdzić zlecenie efektami, a na tablicy pojawić się karty:
    ```bash
    docker exec -u hermes tars-hermes hermes kanban list
    ```
-   Po kilku–kilkunastu minutach: recenzja TARS-a (status `review` → `done` albo prośba o poprawki) i raport w DM.
-4. **TARS HQ:** `http://<ip-tailscale>:9119`, login `tars` + `DASHBOARD_PASSWORD` z `compose/.env`.
+   Po kilku–kilkunastu minutach: recenzja Jarva (status `review` → `done` albo prośba o poprawki) i raport w DM.
+4. **Jarvo HQ:** `http://<ip-tailscale>:9119`, login `tars` + `DASHBOARD_PASSWORD` z `compose/.env`.
    Strona główna to budynek floty: pokoje agentów z podglądem pracy, decyzje, misje i czat ([HQ.md](HQ.md)).
    Pozostałe zakładki dashboardu Hermesa (sesje, cron, logi, konfiguracja) zostają w menu.
    Kontrola: `/api/plugins/tars-hq/health` po zalogowaniu pokazuje klucze API profili i dostępność gatewaya.
 
 ## 7. Włączenie rutyn i onboarding
 
-Rutyny TARS-a (patrol co 30 min, poranny brief, przegląd tygodnia, świeżość wiedzy) instalują się wstrzymane.
+Rutyny Jarva (patrol co 30 min, poranny brief, przegląd tygodnia, świeżość wiedzy) instalują się wstrzymane.
 Po udanym teście Telegrama:
 
 ```bash
@@ -213,7 +213,7 @@ bash scripts/deploy.sh --no-pull --resume-cron
 docker exec -u hermes tars-hermes hermes -p tars cron list
 ```
 
-Potem napisz do TARS-a: **„Zróbmy onboarding.”** Wywiad (15–20 min) wypełnia `knowledge/user/USER.md` i pamięć
+Potem napisz do Jarva: **„Zróbmy onboarding.”** Wywiad (15–20 min) wypełnia `knowledge/user/USER.md` i pamięć
 o Tobie, z której korzystają wszyscy agenci. Brand kity dodajesz poleceniem: „Naucz się marki z https://…”.
 
 ## 8. Backupy, monitoring, zamknięcie SSH
@@ -275,7 +275,7 @@ sprawdzenie albo aktualizację tej samej gałęzi. Na VPS działa jako usługa `
 
 ### Wyniki agentów w przeglądarce
 Flota działa w kontenerze, więc serwer uruchomiony przez agenta (`localhost:8000`, `npm run dev`) jest dla
-przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w TARS HQ albo link, który agent robi poleceniem
+przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w Jarvo HQ albo link, który agent robi poleceniem
 `python3 /opt/tars/repo/scripts/tars_link.py <plik albo katalog>` (serwer podglądu na porcie 9120, ten sam
 `TARS_BIND_IP` co dashboard; link ważny 7 dni). Pliki wysłane w czacie HQ leżą w `/opt/data/tars/inbox/<data>/`.
 
@@ -284,9 +284,9 @@ przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w TARS HQ albo link, k
 | Objaw | Przyczyna i naprawa |
 |---|---|
 | bot milczy w grupie, w DM odpowiada | prywatność bota włączona albo bot dodany przed jej wyłączeniem → `/setprivacy` Disable, usuń i dodaj bota |
-| w temacie odpowiada TARS zamiast snajpera | złe `TELEGRAM_TOPIC_*` → popraw `tars.env`, `deploy.sh --no-pull`; build wypisuje `!` przy brakach |
+| w temacie odpowiada Jarvo zamiast snajpera | złe `TELEGRAM_TOPIC_*` → popraw `tars.env`, `deploy.sh --no-pull`; build wypisuje `!` przy brakach |
 | karty wiszą w `ready` | nie działa dispatcher: `hermes gateway status`; patrol zgłosi to sam po 20 min |
-| karta w `blocked` `capability` | brak narzędzia albo klucza: TARS pyta w kolejce decyzji; dopisz klucz do `secrets/<agent>.env`, `deploy.sh --no-pull` |
+| karta w `blocked` `capability` | brak narzędzia albo klucza: Jarvo pyta w kolejce decyzji; dopisz klucz do `secrets/<agent>.env`, `deploy.sh --no-pull` |
 | agent odpowiada błędem 401/402 | zły klucz OpenRouter albo wyczerpany limit kredytów tego klucza |
 | `✗` w healthchecku narzędzia | `docker exec -u hermes tars-hermes bash -lc '<komenda z toolbox.yaml>'` i przebudowa obrazu, jeśli brakuje pakietu |
 | walidacja przy deployu nie przechodzi | deploy zatrzymuje się przed zmianą floty; popraw błąd w repo (lokalnie `make validate`) |

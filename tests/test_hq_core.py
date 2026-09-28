@@ -1,4 +1,4 @@
-"""TARS HQ: logika stanu floty na prawdziwych bazach SQLite w schemacie Hermesa."""
+"""Jarvo HQ: logika stanu floty na prawdziwych bazach SQLite w schemacie Hermesa."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ NOW = 1_800_000_000.0
 MIN = 60
 
 FLEET = [
-    {"name": "tars", "kind": "orchestrator", "title": "Main Judge", "emoji": "🛰️", "room": "bridge", "short": "TARS"},
+    {"name": "tars", "kind": "orchestrator", "title": "Main Judge", "emoji": "🛰️", "room": "bridge", "short": "Jarvo"},
     {"name": "tars-sherlock", "kind": "specialist", "title": "Detektyw", "emoji": "🔎", "room": "study", "short": "Sherlock"},
     {"name": "tars-web", "kind": "specialist", "title": "Web", "emoji": "🌐", "room": "devlab", "short": "Web"},
     {"name": "tars-studio", "kind": "specialist", "title": "Studio", "emoji": "🎬", "room": "atelier", "short": "Studio"},
@@ -133,7 +133,7 @@ def test_build_state_statuses(home):
     st = core.build_state(FLEET, board, INDEX, NOW, {"t_a1": tool})
     by = {a["name"]: a for a in st["agents"]}
     assert by["tars-sherlock"]["status"] == "working" and by["tars-sherlock"]["tool"] == tool
-    assert by["tars"]["status"] == "working"                     # TARS właśnie ocenia t_a2 (run profilu tars)
+    assert by["tars"]["status"] == "working"                     # Jarvo właśnie ocenia t_a2 (run profilu tars)
     assert by["tars-web"]["status"] == "blocked"                # blokada ma pierwszeństwo przed oceną
     assert by["tars-studio"]["status"] == "blocked" and "12 czy 19" in by["tars-studio"]["reason"]
     assert by["tars-reka"]["status"] == "queued" and by["tars-reka"]["counts"]["done_today"] == 1
@@ -275,7 +275,7 @@ def test_hq_plugin_build(tmp_path):
     names = [a["name"] for a in fleet["agents"]]
     assert names[0] == fleet["orchestrator"] == "tars"
     tars = fleet["agents"][0]
-    assert tars["room"] == "bridge" and tars["short"] == "TARS" and ["Szczerość", 90] in tars["personality"]
+    assert tars["room"] == "bridge" and tars["short"] == "Jarvo" and ["Szczerość", 90] in tars["personality"]
     assert all(a["model"] for a in fleet["agents"])
 
 
@@ -283,7 +283,7 @@ def test_hq_demo_build(tmp_path):
     import hqbuild
     out = hqbuild.build_demo(tmp_path / "demo")
     html = (out / "index.html").read_text(encoding="utf-8")
-    assert html.startswith('<meta charset="utf-8">') and "<title>TARS HQ</title>" in html[:400]
+    assert html.startswith('<meta charset="utf-8">') and "<title>Jarvo HQ</title>" in html[:400]
     assert "<html" not in html and "<body" not in html            # szkielet dodaje platforma artefaktów
     assert (out / "fleet.js").read_text(encoding="utf-8").startswith("window.TARS_HQ_FLEET = ")
 
@@ -326,7 +326,7 @@ def test_plugin_api_helpers(tmp_path, monkeypatch):
 def test_judge_reads_own_session_not_implementers(home):
     board = core.read_board(home / "kanban.db", NOW)
     t = next(x for x in board["tasks"] if x["id"] == "t_a2")      # tars-web, ocenia tars
-    assert core.worker_session(t) == (None, NOW - 60)              # szukamy sesji TARS-a od startu jego runu
+    assert core.worker_session(t) == (None, NOW - 60)              # szukamy sesji Jarva od startu jego runu
     sher = next(x for x in board["tasks"] if x["id"] == "t_a1")
     assert core.worker_session(sher)[0] == "sess-sher"
 

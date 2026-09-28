@@ -2,7 +2,7 @@
 name: grafika-social
 description: "Grafiki social/OG z kodu HTML→PNG w brand kicie, warianty."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

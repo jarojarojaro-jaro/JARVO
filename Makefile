@@ -1,4 +1,4 @@
-# Skróty do pracy z repo floty TARS (lokalnie albo na VPS).
+# Skróty do pracy z repo floty Jarvo (lokalnie albo na VPS).
 PY ?= python3
 HERMES_SRC ?=
 
@@ -10,7 +10,7 @@ help:
 	@echo "make build HERMES_SRC=… build dystrybucji do build/ (wymaga drzewa Hermesa)"
 	@echo "make models             czy modele z fleet.yaml istnieją na OpenRouter"
 	@echo "make pins               czy piny npm spełniają zasady obrazu Hermesa (wiek ≥ 14 dni, engines)"
-	@echo "make hq-demo            TARS HQ w trybie demo (symulowana flota) do build/hq-demo"
+	@echo "make hq-demo            Jarvo HQ w trybie demo (symulowana flota) do build/hq-demo"
 	@echo "make deploy             wdrożenie na VPS (scripts/deploy.sh)"
 	@echo "make harvest            raport skilli zmienionych przez agentów na VPS"
 	@echo "make new-agent NAME=tars-x TITLE='…'   szkielet nowego agenta"

@@ -2,7 +2,7 @@
 name: raport-sledztwa
 description: "Format raportu: odpowiedź, dowody, pewność, luki, źródła."
 version: 1.0.0
-author: "TARS (zasady cytowania inspirowane open_deep_research, MIT)"
+author: "Jarvo (zasady cytowania inspirowane open_deep_research, MIT)"
 license: MIT
 metadata:
   hermes:
@@ -28,6 +28,6 @@ Plik: `out/RAPORT.md`. Szablon: `references/RAPORT.template.md`.
 7. **Rekomendacja** (jeśli karta prosi o decyzję) oddzielona od faktów.
 8. Długość: tyle, ile trzeba. Streszczenie ≤ 10 zdań; szczegóły w sekcjach.
 
-## Dla TARS-a
-TARS relacjonuje wyniki użytkownikowi, więc pierwszy akapit i sekcja „Rekomendacja” muszą być
+## Dla Jarva
+Jarvo relacjonuje wyniki użytkownikowi, więc pierwszy akapit i sekcja „Rekomendacja” muszą być
 zrozumiałe bez reszty raportu.

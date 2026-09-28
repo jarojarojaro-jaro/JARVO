@@ -1,9 +1,9 @@
-# TARS HQ: kwatera floty (GUI)
+# Jarvo HQ: kwatera floty (GUI)
 
-TARS HQ to zakładka **BASE** w menu dashboardu Hermesa, nad CHAT (`http://<ip-tailscale>:9119/base`, logowanie jak do dashboardu).
-Pokazuje flotę jako budynek z klocków. Na piętrze jest mostek TARS-a, na parterze pokoje snajperów. Każdy
+Jarvo HQ to zakładka **BASE** w menu dashboardu Hermesa, nad CHAT (`http://<ip-tailscale>:9119/base`, logowanie jak do dashboardu).
+Pokazuje flotę jako budynek z klocków. Na piętrze jest mostek Jarva, na parterze pokoje snajperów. Każdy
 agent ma swój pokój, swoją minifigurkę i dymek z tym, co robi w tej chwili. Kliknięcie pokoju otwiera panel
-z podglądem pracy na żywo, kartami, wynikami i czatem. Na dole jest rozmowa: domyślnie z TARS-em, jednym
+z podglądem pracy na żywo, kartami, wynikami i czatem. Na dole jest rozmowa: domyślnie z Jarvem, jednym
 kliknięciem z dowolnym agentem.
 
 Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo build/hq-demo`, potem otwórz
@@ -17,7 +17,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 |---|---|---|
 | Pasek stanu | kanban | karty w toku, w ocenie, zablokowane, w kolejce, zrobione dziś; liczba decyzji |
 | Pokój agenta | kanban + sesja pracownika | stan (pracuje, ocenia, czeka na ocenę, czeka na decyzję, ma kolejkę, wolny) jako animacja i znacznik; dymek z bieżącym narzędziem („szuka: …”, „pisze: out/RAPORT.md”) |
-| Mostek TARS-a | kanban | ekran „Tablica floty” z prawdziwymi licznikami kolumn; TARS-monolit ocenia, gdy w torze review jest karta |
+| Mostek Jarva | kanban | ekran „Tablica floty” z prawdziwymi licznikami kolumn; Jarvo-monolit ocenia, gdy w torze review jest karta |
 | Panel agenta: Teraz | sesja pracownika w `state.db` profilu | karta, nad którą pracuje, czas, sygnał życia i oś kroków na żywo (narzędzia, wypowiedzi, błędy) |
 | Panel agenta: Karty | kanban | karty agenta według stanu (7 dni), klik otwiera kartę z historią i komentarzami |
 | Okno karty | kanban + katalog roboczy karty | na wierzchu **cel** (inny kolor), kontekst, **wynik** (pliki z `WYJŚCIA` oznaczone ★) i raport wykonawcy; pełne zlecenie (wejścia, DoD, granice), komentarze i historia zwinięte |
@@ -27,11 +27,11 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Akcje pliku wynikowego | plugin + pomocnik hosta | **▶ Odpal** (strona HTML w nowej karcie, `:9120`), **Pokaż w folderze** (Eksplorator Windows w lokalnej instalacji WSL; gdzie indziej: **Kopiuj ścieżkę**), **Pobierz**, podgląd/kod |
 | Panel agenta: Czat | API gatewaya | rozmowa bezpośrednia z agentem (sesja HQ, osobna od Telegrama) |
 | Panel agenta: O agencie | fleet.yaml, SOUL, skille | opis, model, autonomia, parametry osobowości, workflowy |
-| Centrala: Decyzje | kanban (`blocked` + `needs_input`) | pytania agentów; odpowiedź idzie do TARS-a, który odblokowuje kartę i zapisuje decyzję |
+| Centrala: Decyzje | kanban (`blocked` + `needs_input`) | pytania agentów; odpowiedź idzie do Jarva, który odblokowuje kartę i zapisuje decyzję |
 | Centrala: Misje | `missions/INDEX.md` + kanban | postęp misji (kostki kart w kolorach stanu) |
 | Centrala: Na bieżąco | zdarzenia kanbana | kto zaczął, oddał do oceny, skończył, utknął |
 
-Decyzje świadomie idą przez TARS-a, a nie bezpośrednio do karty: szef zapisuje je w dzienniku misji i pilnuje
+Decyzje świadomie idą przez Jarva, a nie bezpośrednio do karty: szef zapisuje je w dzienniku misji i pilnuje
 reszty (skill `decision-queue` zna format wiadomości z HQ).
 
 ## 2. Architektura
@@ -88,9 +88,9 @@ pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartu
 - Odczyt kanbana i transkrypcji w trybie SQLite `mode=ro`. HQ niczego nie zapisuje poza mapą sesji czatu
   (`/opt/data/tars/state/hq-sessions.json`); zmiany na tablicy robią agenci przez swoje narzędzia.
 
-## 4. Wieża TARS (wygląd)
+## 4. Wieża Jarvo (wygląd)
 
-Tytuł „TARS HQ”, stan połączenia, liczniki tablicy (w toku, ocena, blokady, kolejka, zrobione dziś) i
+Tytuł „Jarvo HQ”, stan połączenia, liczniki tablicy (w toku, ocena, blokady, kolejka, zrobione dziś) i
 przycisk „Decyzje” siedzą w górnym pasku dashboardu Hermesa (kontekst strony wczytany z modułu dashboardu);
 gdy go nie ma (np. tryb demo), HQ pokazuje własny pasek nad wieżą. Scena dopasowuje się do wysokości
 okna: cała wieża mieści się nad czatem, a nadmiar szerokości wypełnia miasto po bokach.
@@ -99,10 +99,10 @@ Scena to **przekrój bazy-wieżowca w pixel arcie**, nocą, jak model z klocków
 cięcie konstrukcji, a pokoje mają głębię (tylna ściana, podłoga w perspektywie, meble). Rysunek powstaje
 w kodzie (`hq/web/src/20-art.js`) na siatce 400 pikseli logicznych i skaluje się w SVG bez rozmycia.
 
-- **Dach:** neon „TARS”, antena z migającym światłem, talerz, zbiornik na wodę.
-- **Mostek dowodzenia** (`bridge`): **TARS jako szef w garniturze** (postać 2× większa od załogi) za
+- **Dach:** neon „Jarvo”, antena z migającym światłem, talerz, zbiornik na wodę.
+- **Mostek dowodzenia** (`bridge`): **Jarvo jako szef w garniturze** (postać 2× większa od załogi) za
   pulpitem dowodzenia, fotel dyrektorski, okno na miasto, ekran „Tablica floty” (liczniki kanbana na żywo),
-  panel „Załoga” z lampką statusu każdego agenta, robot-monolit TARS (pracuje, gdy flota pracuje).
+  panel „Załoga” z lampką statusu każdego agenta, robot-monolit Jarvo (pracuje, gdy flota pracuje).
 - **Piętra załogi:** po dwa pokoje na piętro wokół szybu windy; winda jeździ, gdy ktoś pracuje. Przy
   nieparzystej liczbie agentów wolne miejsce zajmuje magazyn. Nowi agenci dokładają piętra.
 - **Maszynownia** (piwnica pod ulicą): szafy serwerowe i rdzeń zasilania; zielony „GATEWAY ONLINE”,
@@ -112,7 +112,7 @@ Pokój przypisuje `hq_room` w `fleet.yaml`, a krótką nazwę na szyldzie `hq_sh
 
 | `hq_room` | Wystrój | Postać |
 |---|---|---|
-| `bridge` | jak wyżej | szef TARS: czarny garnitur, biała koszula, czerwony krawat |
+| `bridge` | jak wyżej | szef Jarvo: czarny garnitur, biała koszula, czerwony krawat |
 | `study` | regał z książkami, tablica dowodów z czerwonymi nitkami, zegar, globus, biurko z lampą bankierską | detektyw w kaszkiecie i szaliku (lupa przy pracy) |
 | `devlab` | szafa serwerowa z diodami, tablica z makietą, neon `</>`, dwa monitory z kodem, kubek z parą | programista w bluzie i słuchawkach, tyłem przy monitorach |
 | `atelier` | turkusowe tło fotograficzne, softbox, kamera z lampką REC, sztaluga z obrazem, plakat, klaps | artystka w berecie i koszulce w paski (paleta przy pracy) |
@@ -130,7 +130,7 @@ i ustaw `hq_room` agenta.
 
 ## 5. Motyw „Fosfor” (wygląd całego dashboardu)
 
-Cały dashboard (menu, górny pasek, czat, TARS HQ) wygląda jak terminal CRT z 1982: czcionki VT323 i IBM Plex
+Cały dashboard (menu, górny pasek, czat, Jarvo HQ) wygląda jak terminal CRT z 1982: czcionki VT323 i IBM Plex
 Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zostaje w swoich kolorach.
 
 - **Jeden kolor → cały wygląd.** `scripts/install_themes.py` liczy z niego odcienie, tło, ramki i poświatę,
@@ -142,7 +142,7 @@ Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zost
 ## 6. Język: polski i angielski
 
 Dashboard ma pełny polski (tłumaczenie `branding/i18n/pl.json`, ~750 tekstów i całe menu) i jest domyślnie po
-polsku. Język zmienia przełącznik w lewym dolnym rogu (**POLSKI** / **EN** / …). TARS HQ idzie za nim: po polsku
+polsku. Język zmienia przełącznik w lewym dolnym rogu (**POLSKI** / **EN** / …). Jarvo HQ idzie za nim: po polsku
 albo po angielsku (każdy inny język = angielskie HQ); nazwy pokoi, role i opisy agentów po angielsku są w
 `fleet.yaml` (`en:`). Tłumaczenie wstrzykuje `branding/patch_dashboard.py` przy budowie obrazu (brakujący klucz =
 tekst angielski), więc zmiana `branding/` przebudowuje tylko ostatnią warstwę obrazu (sekundy, ta sama wersja

@@ -79,6 +79,6 @@ approvals:
 security:
   protected_instruction_files: true
 
-# Branding terminala: skórka TARS (branding/skin-tars.yaml)
+# Branding terminala: skórka Jarvo (branding/skin-tars.yaml)
 display:
   skin: tars

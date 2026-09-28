@@ -1,4 +1,4 @@
-// Grafika HQ: „Wieża TARS” w pixel arcie. Przekrój bazy jak model z klocków: płaskie cięcie,
+// Grafika HQ: „Wieża Jarvo” w pixel arcie. Przekrój bazy jak model z klocków: płaskie cięcie,
 // a pokoje mają głębię (perspektywa jednego punktu). Wszystko rysowane w siatce pikseli logicznych
 // (scena 400 px szerokości) i skalowane w SVG z crispEdges, więc piksele zostają ostre w każdym rozmiarze.
 // Rysunek łączy prostokąty tego samego koloru w jedną ścieżkę (mało węzłów DOM, szybki rerender).
@@ -14,7 +14,7 @@ const PX_FONT = {
   M: ["#.#", "###", "###", "#.#", "#.#"], N: ["##.", "#.#", "#.#", "#.#", "#.#"], O: [".#.", "#.#", "#.#", "#.#", ".#."],
   P: ["##.", "#.#", "##.", "#..", "#.."], Q: [".#.", "#.#", "#.#", "##.", ".##"], R: ["##.", "#.#", "##.", "#.#", "#.#"],
   S: [".##", "#..", ".#.", "..#", "##."], T: ["###", ".#.", ".#.", ".#.", ".#."], U: ["#.#", "#.#", "#.#", "#.#", "###"],
-  V: ["#.#", "#.#", "#.#", "#.#", ".#."], W: ["#.#", "#.#", "###", "###", "#.#"], X: ["#.#", "#.#", ".#.", "#.#", "#.#"],
+  V: ["#.#", "#.#", "#.#", ".#.", ".#."], W: ["#.#", "#.#", "###", "###", "#.#"], X: ["#.#", "#.#", ".#.", "#.#", "#.#"],
   Y: ["#.#", "#.#", ".#.", ".#.", ".#."], Z: ["###", "..#", ".#.", "#..", "###"],
   0: ["###", "#.#", "#.#", "#.#", "###"], 1: [".#.", "##.", ".#.", ".#.", "###"], 2: ["##.", "..#", ".#.", "#..", "###"],
   3: ["##.", "..#", ".#.", "..#", "##."], 4: ["#.#", "#.#", "###", "..#", "..#"], 5: ["###", "#..", "##.", "..#", "##."],
@@ -296,7 +296,7 @@ function drawFigure(L, id, x, y, look, o = {}) {
   if (o.alert) L.get(`${id}-alert`, "thq-px-blink").text(x - 1, hy - 9, "!", "#FF4D3D").r(x - 2, hy - 10, 5, 1, "#FF4D3D");
 }
 
-// TARS: robot-monolit (cztery płyty i pasek wyświetlacza); pracuje, gdy flota pracuje
+// Jarvo: robot-monolit (cztery płyty i pasek wyświetlacza); pracuje, gdy flota pracuje
 function drawRobot(L, x, y, state) {
   const g = L.get("robot");
   g.r(x - 14, y, 30, 1, "rgba(0,0,0,.35)");
@@ -569,9 +569,9 @@ function roomBridge(L, a, board, crew, box) {
   g.r(26, 68, 8, 8, "#5A3A22"); g.r(26, 68, 8, 1, "#7A5232"); g.r(24, 56, 4, 12, "#2F8F4E"); g.r(28, 52, 3, 16, "#3AA85C"); g.r(32, 58, 4, 10, "#2F8F4E"); g.r(30, 54, 2, 2, "#4CC070");
   g.r(264, 28, 1, 46, "#8A93A0"); g.r(262, 74, 5, 2, "#5A6574");
   const fl1 = L.get("flag1", "thq-px-f1", { "--thq-d": "1.6s" }), fl2 = L.get("flag2", "thq-px-f2", { "--thq-d": "1.6s" });
-  fl1.r(265, 28, 12, 9, "#C62828").text(269, 30, "T", "#FFFFFF");
-  fl2.r(265, 29, 12, 8, "#C62828").r(276, 28, 1, 1, "#C62828").r(265, 36, 11, 1, "#A11F1F").text(269, 30, "T", "#FFFFFF");
-  // szef TARS: dwa razy większy od załogi, za pulpitem; robot-monolit jako ochrona
+  fl1.r(265, 28, 12, 9, "#C62828").text(269, 30, "J", "#FFFFFF");
+  fl2.r(265, 29, 12, 8, "#C62828").r(276, 28, 1, 1, "#C62828").r(265, 36, 11, 1, "#A11F1F").text(269, 30, "J", "#FFFFFF");
+  // szef Jarvo: dwa razy większy od załogi, za pulpitem; robot-monolit jako ochrona
   const standing = st === "working" || st === "judging" || st === "blocked";
   const pose = st === "judging" ? { pose: "hold", item: "clipboard" } : st === "blocked" ? { pose: "raise", alert: true, worried: true } : standing ? { pose: "type" } : {};
   const BL = new Layers();
@@ -713,7 +713,7 @@ function drawHull(L, lay) {
   slab(lay.bridge.y + lay.bridge.h, 6, 1);
   for (let i = 0; i < lay.floors; i++) slab(lay.crewY0 + i * 76 + 70, 6, 2 + i);
   slab(lay.base.y + lay.base.h, 6, 9);
-  // dach: płyta, klocki na attyce, antena, talerz, zbiornik, neon TARS
+  // dach: płyta, klocki na attyce, antena, talerz, zbiornik, neon Jarvo
   const roof = L.get("roof");
   roof.r(50, 40, 300, 6, "#5D6573"); roof.r(50, 40, 300, 1, "#8A93A0"); roof.r(50, 45, 300, 1, "#3F4652");
   for (let x = 52; x < 346; x += 6) { roof.r(x, 38, 4, 2, "#6B7482"); roof.p(x, 38, "#9AA4B0"); }
@@ -725,9 +725,9 @@ function drawHull(L, lay) {
   roof.r(116, 18, 20, 14, "#8A5A33"); roof.r(116, 21, 20, 1, "#6E4628"); roof.r(116, 28, 20, 1, "#6E4628"); roof.r(118, 16, 16, 2, "#6E4628"); roof.r(121, 14, 10, 2, "#6E4628");
   roof.r(119, 32, 1, 6, "#4A515C"); roof.r(132, 32, 1, 6, "#4A515C");
   roof.r(248, 30, 20, 8, "#9AA4B0"); roof.r(248, 30, 20, 1, "#C2CAD3"); for (let x = 251; x < 266; x += 3) roof.r(x, 32, 1, 5, "#6E7884");
-  roof.r(176, 30, 2, 8, "#4A515C"); roof.r(222, 30, 2, 8, "#4A515C"); roof.r(172, 12, 56, 20, "#141922"); roof.r(172, 12, 56, 1, "#2B3441");
+  roof.r(172, 30, 2, 8, "#4A515C"); roof.r(226, 30, 2, 8, "#4A515C"); roof.r(165, 12, 70, 20, "#141922"); roof.r(165, 12, 70, 1, "#2B3441");
   const neon = L.get("neon-sign", "thq-px-sign");
-  neon.text(177, 15, "TARS", "rgba(242,193,78,.35)", 3); neon.text(178, 15, "TARS", "#F2C14E", 3);
+  neon.text(171, 15, "JARVO", "rgba(242,193,78,.35)", 3); neon.text(172, 15, "JARVO", "#F2C14E", 3);
 }
 
 function drawShaft(L, lay, moving) {

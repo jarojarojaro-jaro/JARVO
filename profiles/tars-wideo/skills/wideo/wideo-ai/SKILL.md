@@ -2,7 +2,7 @@
 name: wideo-ai
 description: "Ujęcia z AI: obraz→wideo, prompt ruchu, spójność, koszt."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

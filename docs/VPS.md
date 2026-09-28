@@ -1,4 +1,4 @@
-# TARS na VPS: infrastruktura
+# Jarvo na VPS: infrastruktura
 
 Cel: jedna maszyna, na której cała flota działa 24/7. Jest bezpieczna, ma backupy,
 monitoring i przewidywalne wdrożenia. Opiera się na oficjalnym obrazie Docker Hermesa
@@ -143,7 +143,7 @@ Rekomendacje:
 | Usługa | Po co | Licencja | Stan |
 |---|---|---|---|
 | `tars-hermes` | agent, gateway, wszystkie profile, dashboard (hasło) | MIT | ✅ w compose |
-| `searxng` (+ `valkey`) | darmowa metawyszukiwarka (JSON) dla Sherlocka i TARS-a | AGPL-3.0 | ✅ w compose |
+| `searxng` (+ `valkey`) | darmowa metawyszukiwarka (JSON) dla Sherlocka i Jarva | AGPL-3.0 | ✅ w compose |
 | ~~`crawl4ai`~~ | zastąpiony: trafilatura + Lightpanda w obrazie (bez stałego kontenera) | | ❌ usunięty (RAM) |
 | ~~`gotenberg`~~ | zastąpiony: `to_pdf.py` (pandoc + Chromium, LibreOffice jako dodatek) | | ❌ usunięty (RAM) |
 | `uptime-kuma` | healthchecki i alerty | MIT | ✅ profil `monitoring` |
@@ -205,7 +205,7 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 - **Beszel:** zasoby serwera, alert przy dysku > 80% i RAM > 90%,
 - **Uptime Kuma:** healthchecki sidecarów + „heartbeat” z crona Hermesa (brak sygnału = alert),
 - **Hermes:** `hermes doctor`, `hermes logs --follow`, `/usage`, `/insights`,
-- **koszty:** limity na kluczach OpenRouter + tygodniowy raport kosztów per agent od TARS-a,
+- **koszty:** limity na kluczach OpenRouter + tygodniowy raport kosztów per agent od Jarva,
 - **Langfuse (faza 6):** każdy przebieg agenta, koszt, czas, oceny sędziego i regresje jakości.
 
 ---
@@ -240,7 +240,7 @@ tablicy ani Telegrama. Osobny bot testowy dojdzie, gdy będziemy testować routi
 
 | Kanał | Jak |
 |---|---|
-| Telegram | grupa „TARS HQ” z wątkami per agent (routing `profile_routes`), plus DM z TARS-em |
+| Telegram | grupa „Jarvo HQ” z wątkami per agent (routing `profile_routes`), plus DM z Jarvem |
 | Terminal | SSH przez Tailscale → `docker exec -it tars-hermes hermes -p tars-web chat` (alias `tars-web`) |
 | Desktop | aplikacja Hermes Desktop połączona ze zdalnym backendem przez Tailscale: Bot Mode, czat grupowy floty |
 | Dashboard | panel web Hermesa (profile, skille, cron, kanban) tylko przez Tailscale |

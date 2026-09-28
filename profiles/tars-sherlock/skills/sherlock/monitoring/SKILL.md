@@ -2,7 +2,7 @@
 name: monitoring
 description: "Monitoring tematu/konkurencji: rutyna, tylko nowości."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:
@@ -16,13 +16,13 @@ metadata:
 
 # Monitoring
 
-Dla zleceń „pilnuj X”, „daj znać, gdy konkurencja…”. Monitoring to rutyna cron (dostarczanie przez TARS-a).
+Dla zleceń „pilnuj X”, „daj znać, gdy konkurencja…”. Monitoring to rutyna cron (dostarczanie przez Jarva).
 
 ## Konfiguracja (jednorazowo, w karcie zlecenia)
 1. Zdefiniuj **obiekt** (firma, produkt, temat, fraza), **źródła** (RSS, strony, wyszukiwania z filtrem czasu)
    i **próg istotności** (co jest warte wiadomości: np. zmiana ceny, nowy produkt, artykuł w mediach tier A/B).
 2. Zapisz definicję w `@@WORKSPACES_DIR@@/tars-sherlock/monitoring/<slug>.md`.
-3. Zaproponuj harmonogram (domyślnie codziennie rano albo co tydzień). TARS tworzy rutynę po akceptacji użytkownika.
+3. Zaproponuj harmonogram (domyślnie codziennie rano albo co tydzień). Jarvo tworzy rutynę po akceptacji użytkownika.
 
 ## Każde uruchomienie
 1. Pobierz nowe elementy od ostatniego uruchomienia (`rss-feeds`, `blogwatcher`, `competitor-news-monitor`, wyszukiwanie `--time day|week`).

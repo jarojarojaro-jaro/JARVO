@@ -2,7 +2,7 @@
 name: weryfikacja-faktow
 description: "Fact-check: twierdzenie → źródła pierwotne → werdykt."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

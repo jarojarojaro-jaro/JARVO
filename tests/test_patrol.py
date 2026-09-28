@@ -1,4 +1,4 @@
-"""Patrol TARS-a: wykrywanie anomalii na tablicy, deduplikacja alertów i tryb cichy (zero tokenów)."""
+"""Patrol Jarva: wykrywanie anomalii na tablicy, deduplikacja alertów i tryb cichy (zero tokenów)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ patrol = load_script("profiles/tars/scripts/patrol.py")
 NOW = 1_800_000_000.0
 MIN = 60
 
-INDEX = """# Misje TARS
+INDEX = """# Misje Jarvo
 
 ## Aktywne
 | ID | Tytuł | Status | Karty |

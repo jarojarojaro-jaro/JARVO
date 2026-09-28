@@ -1,4 +1,4 @@
-// TARS HQ: wspólne podstawy. Pliki src/*.js są sklejane (w kolejności nazw) w jedno IIFE
+// Jarvo HQ: wspólne podstawy. Pliki src/*.js są sklejane (w kolejności nazw) w jedno IIFE
 // przez scripts/build.py, więc stałe z tego pliku są widoczne w następnych.
 
 const SDK = window.__HERMES_PLUGIN_SDK__;

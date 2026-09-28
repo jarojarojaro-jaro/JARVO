@@ -483,7 +483,7 @@ def transcribe_words(media: Path) -> list[Word]:
     if not os.path.exists(stt):
         stt = shutil.which("tars-stt") or ""
     if not stt:
-        raise SystemExit("Brak tars-stt (obraz TARS: /opt/tars/bin/tars-stt).")
+        raise SystemExit("Brak tars-stt (obraz Jarvo: /opt/tars/bin/tars-stt).")
     tmp = cache_dir("transkrypcje") / f"{digest('stt-v1', file_key(media))}.srt"
     if not tmp.exists():
         part = tmp.with_suffix(".part.srt")

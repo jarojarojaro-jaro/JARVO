@@ -2,7 +2,7 @@
 """Zbiera dane do porannego briefu (--mode daily) i przeglądu tygodnia (--mode weekly).
 
 Skrypt przed turą crona: wypisuje zwięzły kontekst (bez modelu), a ostatnia linia to JSON
-dla schedulera. Brief budzi TARS-a zawsze, gdy jest cokolwiek do powiedzenia; pusty dzień → cisza.
+dla schedulera. Brief budzi Jarva zawsze, gdy jest cokolwiek do powiedzenia; pusty dzień → cisza.
 
 Tryb testowy: --fixture plik.json z {"tasks": [...], "shows": {id: show_json}, "index": "..."}.
 """

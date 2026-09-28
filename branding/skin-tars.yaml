@@ -1,7 +1,7 @@
-# Skórka terminala Hermesa z brandingiem TARS (display.skin: tars).
+# Skórka terminala Hermesa z brandingiem Jarvo (display.skin: tars).
 # Kopiowana przez install-fleet.sh do <HERMES_HOME>/skins/ hosta i każdego profilu.
 name: tars
-description: "TARS — fosfor, błękit"
+description: "Jarvo — fosfor, błękit"
 colors:
   banner_border: "#3E5D6C"
   banner_title: "#D4EEFB"
@@ -39,10 +39,10 @@ light_colors:
   selection_bg: "#D8DEE5"
   voice_status_bg: "#EEF1F4"
 branding:
-  agent_name: "TARS"
-  welcome: "TARS online. Szczerość 90%, humor 75%. Napisz zadanie albo /help."
-  goodbye: "TARS: rozłączam się. ▮▮▮▮"
-  response_label: " ▮ TARS "
+  agent_name: "Jarvo"
+  welcome: "Jarvo online. Szczerość 90%, humor 75%. Napisz zadanie albo /help."
+  goodbye: "Jarvo: rozłączam się. ▮▮▮▮"
+  response_label: " ▮ Jarvo "
   prompt_symbol: "▮"
   help_header: "▮ Komendy"
 tool_prefix: "│"

@@ -11,7 +11,7 @@ Filmy od tematu albo surowego nagrania do gotowego pliku na platformę. Spec: [d
 | `config.yaml` | model strong; `video_gen`/`image_gen` przez OpenRouter; lektor Edge TTS pl-PL; publikacja/wgrywanie/zakupy → eskalacja |
 | `quality/rubric.md` | rubryka sędziego |
 
-Klucze: `PEXELS_API_KEY` albo `PIXABAY_API_KEY` (darmowe) w dashboardzie Keys, profil główny: TARS rozdaje je agentom.
+Klucze: `PEXELS_API_KEY` albo `PIXABAY_API_KEY` (darmowe) w dashboardzie Keys, profil główny: Jarvo rozdaje je agentom.
 Bez klucza Wideograf pracuje na plikach użytkownika, generacjach AI i planszach.
 Muzyka „losowa”: utwory z prawem użycia w `/opt/data/tars/knowledge/wideo/muzyka/` (albo `brands/<marka>/muzyka/`).
 

@@ -2,7 +2,7 @@
 name: wywiad
 description: "Mglisty, duży cel: jedno pytanie naraz, max 6, potem brief."
 version: 1.0.0
-author: "TARS (protokół rund na bazie oh-my-hermes deep-interview, MIT)"
+author: "Jarvo (protokół rund na bazie oh-my-hermes deep-interview, MIT)"
 license: MIT
 metadata:
   hermes:

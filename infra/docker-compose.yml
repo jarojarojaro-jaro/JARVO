@@ -1,4 +1,4 @@
-# Flota TARS na VPS. Uruchamiane przez scripts/deploy.sh z katalogu /srv/tars/repo:
+# Flota Jarvo na VPS. Uruchamiane przez scripts/deploy.sh z katalogu /srv/tars/repo:
 #   docker compose -f infra/docker-compose.yml --env-file /srv/tars/compose/.env up -d
 #
 # Budżet: VPS 8 GB RAM (4 vCPU). Limity niżej sumują się do ~5,5 GB (+0,4 GB z profilem monitoring);
@@ -47,7 +47,7 @@ services:
       - ${TARS_SECRETS:-/srv/tars/secrets}:/opt/tars/secrets:ro
     ports:
       - "${TARS_BIND_IP:-127.0.0.1}:9119:9119"     # dashboard + Hermes Desktop (Remote Gateway)
-      - "${TARS_BIND_IP:-127.0.0.1}:9120:9120"     # TARS HQ „Odpal”: podgląd stron agentów (link z tokenem)
+      - "${TARS_BIND_IP:-127.0.0.1}:9120:9120"     # Jarvo HQ „Odpal”: podgląd stron agentów (link z tokenem)
     depends_on:
       searxng: {condition: service_started}
     shm_size: "512mb"                                # jedna Chromium naraz (Lighthouse, PDF, zrzuty)

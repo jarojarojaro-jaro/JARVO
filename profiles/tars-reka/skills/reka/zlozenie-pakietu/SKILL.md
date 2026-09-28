@@ -2,7 +2,7 @@
 name: zlozenie-pakietu
 description: "Złożenie misji: zbierz wyniki kart w jeden pakiet z INDEX."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runner evals floty TARS. Uruchamiaj WYŁĄCZNIE w środowisku staging (bez dispatchera kanbana),
+"""Runner evals floty Jarvo. Uruchamiaj WYŁĄCZNIE w środowisku staging (bez dispatchera kanbana),
 bo scenariusze routingu tworzą karty.
 
     python3 scripts/run-evals.py [--agent tars] [--id tars-route-landing] [--judge-model anthropic/claude-sonnet-5]

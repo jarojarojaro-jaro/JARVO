@@ -1,7 +1,7 @@
 name: tars-web
 version: 0.1.0
 description: "Web Senior Dev: strony i landingi, SEO techniczne, wydajność, dostępność, favicony, obrazy, brand kit, wdrożenia."
-author: "TARS fleet"
+author: "Jarvo fleet"
 license: MIT
 env_requires:
   - name: OPENROUTER_API_KEY

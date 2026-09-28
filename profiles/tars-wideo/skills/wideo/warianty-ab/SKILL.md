@@ -2,7 +2,7 @@
 name: warianty-ab
 description: "Warianty filmu do testów A/B: hook, głos, tempo, muzyka."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

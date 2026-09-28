@@ -192,10 +192,10 @@ function ChatView({ agent, agents, pending, onPendingDone, compact }) {
       ${!loading && messages.length === 0 && html`<div class="thq-chat-empty">
         <p><strong>${agent && agent.emoji} ${who}</strong></p>
         <p class="thq-muted">${agent && agent.kind === "orchestrator"
-          ? L("Napisz, co chcesz osiągnąć. TARS rozpisze misję i przydzieli pracę. Zdjęcia i pliki wklejasz Ctrl+V albo przeciągasz tutaj.",
-              "Say what you want to achieve. TARS will plan the mission and assign the work. Paste photos and files with Ctrl+V or drop them here.")
-          : L("Rozmowa bezpośrednia. Większe zlecenia lepiej dawać przez TARS-a: on pilnuje całości.",
-              "Direct conversation. Bigger jobs are better sent through TARS: he keeps track of the whole.")}</p>
+          ? L("Napisz, co chcesz osiągnąć. Jarvo rozpisze misję i przydzieli pracę. Zdjęcia i pliki wklejasz Ctrl+V albo przeciągasz tutaj.",
+              "Say what you want to achieve. Jarvo will plan the mission and assign the work. Paste photos and files with Ctrl+V or drop them here.")
+          : L("Rozmowa bezpośrednia. Większe zlecenia lepiej dawać przez Jarva: on pilnuje całości.",
+              "Direct conversation. Bigger jobs are better sent through Jarvo: he keeps track of the whole.")}</p>
       </div>`}
       ${messages.map((m, i) => html`<div key=${i} class=${cx("thq-msg", `is-${m.role}`, m.live && "is-live")}>
         ${m.role === "assistant" && html`<span class="thq-msg-who" aria-hidden="true">${agent && agent.emoji}</span>`}

@@ -2,7 +2,7 @@
 name: dokumenty
 description: "Dokumenty: konwersje MD/DOCX/PDF/HTML, OCR, operacje na PDF."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

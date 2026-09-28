@@ -39,7 +39,7 @@ def chromium() -> str:
                  shutil.which("google-chrome")):
         if cand and os.path.exists(cand):
             return cand
-    raise SystemExit("Brak Chromium (obraz TARS: /usr/local/bin/chromium, CHROME_PATH).")
+    raise SystemExit("Brak Chromium (obraz Jarvo: /usr/local/bin/chromium, CHROME_PATH).")
 
 
 def soffice() -> str | None:

@@ -1,4 +1,4 @@
-# Narzędzia Pythona floty TARS → /opt/tars/venv (Python 3.12 przez uv, osobno od środowiska Hermesa).
+# Narzędzia Pythona floty Jarvo → /opt/tars/venv (Python 3.12 przez uv, osobno od środowiska Hermesa).
 # Wersje przypięte (≥ 14 dni od wydania, jak kwarantanna npm w obrazie); aktualizacja = PR + `make pins`.
 trafilatura==2.2.0
 yt-dlp==2026.8.19

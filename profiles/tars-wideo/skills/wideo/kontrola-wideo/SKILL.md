@@ -2,7 +2,7 @@
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

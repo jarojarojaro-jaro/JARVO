@@ -1,5 +1,5 @@
 #!/opt/tars/venv/bin/python
-"""Rozpoznawanie mowy floty TARS: NVIDIA Parakeet TDT 0.6B v3 (int8, ONNX) przez onnx-asr, na CPU.
+"""Rozpoznawanie mowy floty Jarvo: NVIDIA Parakeet TDT 0.6B v3 (int8, ONNX) przez onnx-asr, na CPU.
 
     tars-stt <audio|wideo> [--output-dir DIR]          → DIR/<nazwa>.txt   (tryb Hermesa, local_command)
     tars-stt <audio|wideo> --srt out.srt [--max-chars 32] → napisy z czasami (subtitles.py)

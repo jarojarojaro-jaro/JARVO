@@ -2,7 +2,7 @@
 name: film-z-kodu
 description: "Film z kodu: HyperFrames, Manim; scenariusz, render, QA."
 version: 2.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

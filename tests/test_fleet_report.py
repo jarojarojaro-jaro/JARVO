@@ -22,7 +22,7 @@ def data():
         {"id": "t_6", "title": "Archiwum", "status": "archived", "assignee": "tars-web"},
     ]
     shows = {
-        # recenzja jest przypisana do TARS-a, ale jakość liczymy wykonawcy (payload.implementer)
+        # recenzja jest przypisana do Jarva, ale jakość liczymy wykonawcy (payload.implementer)
         "t_1": {"events": [{"kind": "review_requested", "payload": {"implementer": "tars-web"}}]},
         "t_2": {"events": [
             {"kind": "review_requested", "payload": {"implementer": "tars-sherlock"}},

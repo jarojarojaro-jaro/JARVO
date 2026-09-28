@@ -2,7 +2,7 @@
 name: bramka-jakosci
 description: "Przed oddaniem strony: rubryka designu 0–100 i testy wrogie."
 version: 1.0.0
-author: "TARS (rubryka i werdykt na bazie oh-my-hermes, MIT)"
+author: "Jarvo (rubryka i werdykt na bazie oh-my-hermes, MIT)"
 license: MIT
 metadata:
   hermes:

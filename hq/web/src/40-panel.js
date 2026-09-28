@@ -230,12 +230,12 @@ function NowTab({ data, agents, onOpenTask }) {
       <span class="thq-eyebrow">${L("Zablokowane", "Blocked")}</span><strong>${blocked.title}</strong>
       <span class="thq-muted">${a.reason ? `${L("Pytanie", "Question")}: ${a.reason}` : L("Czeka na decyzję albo brakujący dostęp.", "Waiting for a decision or missing access.")}</span></button>`}
     ${review && html`<button type="button" class="thq-now-card is-warn" onClick=${() => onOpenTask(review.id)}>
-      <span class="thq-eyebrow">${L("Czeka na ocenę TARS-a", "Waiting for TARS to review")}</span><strong>${review.title}</strong></button>`}
+      <span class="thq-eyebrow">${L("Czeka na ocenę Jarva", "Waiting for Jarvo to review")}</span><strong>${review.title}</strong></button>`}
     ${data.cards.judging.length > 0 && html`<div><h4 class="thq-h4">Do oceny (${data.cards.judging.length})</h4>
       ${data.cards.judging.map((c) => html`<${CardRow} key=${c.id} card=${c} agents=${agents} onOpen=${onOpenTask}/>`)}</div>`}
     ${!blocked && !review && data.cards.judging.length === 0 && html`<div class="thq-idle">
       <p><strong>${data.cards.ready.length ? `${L("W kolejce", "Queued")}: ${data.cards.ready.length}` : L("Wolne biurko.", "Free desk.")}</strong></p>
-      <p class="thq-muted">${data.cards.ready.length ? L("Dispatcher przydzieli następną kartę w ciągu minuty.", "The dispatcher assigns the next card within a minute.") : L("Nie ma teraz zadań. Zlecenia daje TARS albo Ty w czacie.", "No tasks right now. Work comes from TARS or from you in the chat.")}</p>
+      <p class="thq-muted">${data.cards.ready.length ? L("Dispatcher przydzieli następną kartę w ciągu minuty.", "The dispatcher assigns the next card within a minute.") : L("Nie ma teraz zadań. Zlecenia daje Jarvo albo Ty w czacie.", "No tasks right now. Work comes from Jarvo or from you in the chat.")}</p>
     </div>`}
     ${data.cards.done.length > 0 && html`<div><h4 class="thq-h4">Ostatnio zrobione</h4>
       ${data.cards.done.slice(0, 5).map((c) => html`<${CardRow} key=${c.id} card=${c} agents=${agents} onOpen=${onOpenTask}/>`)}</div>`}
@@ -268,7 +268,7 @@ function AboutTab({ data, fleetInfo }) {
     <dl class="thq-facts">
       <div><dt>Model</dt><dd>${info.model || a.model_tier}</dd></div>
       <div><dt>${L("Maks. autonomia", "Max autonomy")}</dt><dd>${a.autonomy_max} <span class="thq-muted">${L("(publikacje, wdrożenia i płatności tylko za Twoją zgodą)", "(publishing, deployments and payments only with your approval)")}</span></dd></div>
-      ${info.telegram_topic && html`<div><dt>Telegram</dt><dd>${info.telegram_topic === "general" ? L("DM i wątek General w TARS HQ", "DM and the General topic in TARS HQ") : L(`wątek „${info.telegram_topic}” w TARS HQ`, `the “${info.telegram_topic}” topic in TARS HQ`)}</dd></div>`}
+      ${info.telegram_topic && html`<div><dt>Telegram</dt><dd>${info.telegram_topic === "general" ? L("DM i wątek General w Jarvo HQ", "DM and the General topic in Jarvo HQ") : L(`wątek „${info.telegram_topic}” w Jarvo HQ`, `the “${info.telegram_topic}” topic in Jarvo HQ`)}</dd></div>`}
       <div><dt>${L("7 dni", "7 days")}</dt><dd>${s.done_7d || 0} ${L("zamkniętych kart", "cards closed")}${pct != null ? L(`, ${pct}% przyjętych za pierwszym razem`, `, ${pct}% accepted first time`) : ""}</dd></div>
     </dl>
     ${info.personality && html`<div class="thq-dials">${info.personality.map(([k, v]) => html`<div key=${k} class="thq-dial">

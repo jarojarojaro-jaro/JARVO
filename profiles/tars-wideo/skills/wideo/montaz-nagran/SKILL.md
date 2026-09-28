@@ -2,7 +2,7 @@
 name: montaz-nagran
 description: "Montaż nagrań: cięcie, cisza, kadr 9:16, dźwięk, napisy."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

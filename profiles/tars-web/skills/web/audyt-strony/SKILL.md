@@ -2,7 +2,7 @@
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
 version: 1.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

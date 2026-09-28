@@ -92,7 +92,7 @@ def theme(entry: dict, css: str) -> dict:
     return {
         "name": entry["name"],
         "label": entry.get("label") or entry["name"],
-        "description": "TARS: terminal CRT, jeden kolor fosforu",
+        "description": "Jarvo: terminal CRT, jeden kolor fosforu",
         "palette": {
             "background": t["fos-bg"],
             "midground": t["fos"],

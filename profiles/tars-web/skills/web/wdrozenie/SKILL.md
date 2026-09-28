@@ -2,7 +2,7 @@
 name: wdrozenie
 description: "Podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą)."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

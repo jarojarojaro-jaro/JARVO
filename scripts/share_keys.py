@@ -30,8 +30,8 @@ import time
 from pathlib import Path
 
 LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
-BEGIN = "# >>> TARS: klucze wspólne z głównego .env (zarządzane automatycznie, nie edytuj tego bloku)"
-END = "# <<< TARS: klucze wspólne"
+BEGIN = "# >>> Jarvo: klucze wspólne z głównego .env (zarządzane automatycznie, nie edytuj tego bloku)"
+END = "# <<< Jarvo: klucze wspólne"
 STATE = ".tars-shared-keys.json"
 # gdy katalogu Hermesa nie da się zaimportować: klucze dostawców/narzędzi po nazwie
 FALLBACK_SUFFIXES = ("_API_KEY", "_API_TOKEN", "_BASE_URL", "_API_URL", "_ACCESS_KEY", "_SECRET_KEY")

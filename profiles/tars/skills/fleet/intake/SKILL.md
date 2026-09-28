@@ -2,7 +2,7 @@
 name: intake
 description: "Każda nowa wiadomość: sklasyfikuj i wybierz ścieżkę."
 version: 1.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

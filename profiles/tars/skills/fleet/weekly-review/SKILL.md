@@ -2,7 +2,7 @@
 name: weekly-review
 description: "Przegląd tygodnia: jakość floty, wnioski, propozycje."
 version: 1.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

@@ -2,7 +2,7 @@
 name: daily-brief
 description: "Poranny brief: co w toku, co gotowe, jakie decyzje."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

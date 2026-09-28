@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Walidacja repo floty TARS. Uruchamiana lokalnie (`make validate`), w testach i przy każdym deployu.
+"""Walidacja repo floty Jarvo. Uruchamiana lokalnie (`make validate`), w testach i przy każdym deployu.
 
 Sprawdza: fleet.yaml ↔ profile, kompletność profilu (anatomia z docs/PROFILE-SPEC.md), budżet SOUL,
 frontmatter i opisy skilli (≤ 60 znaków, bo tyle widzi model w indeksie), plik blokady skilli,
@@ -315,7 +315,7 @@ def check_secrets(r: Report) -> None:
 
 
 def check_hq(r: Report) -> None:
-    """TARS HQ (plugin dashboardu): pliki, manifest, zgodność pokoi z grafiką, licencja htm."""
+    """Jarvo HQ (plugin dashboardu): pliki, manifest, zgodność pokoi z grafiką, licencja htm."""
     import json
     hq = fl.REPO_ROOT / "hq"
     if not hq.exists():

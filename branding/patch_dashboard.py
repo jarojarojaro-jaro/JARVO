@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Branding TARS w statycznych zasobach dashboardu Hermesa (uruchamiane przy budowie obrazu).
+"""Branding Jarvo w statycznych zasobach dashboardu Hermesa (uruchamiane przy budowie obrazu).
 
     python3 patch_dashboard.py <katalog-z-favicon>
 
@@ -126,23 +126,23 @@ def main(argv: list[str]) -> int:
                 shutil.copy(brand / name, d / name)
     assets = sorted((WEB / "assets").glob("*.js"))
     index = [WEB / "index.html"]
-    print("Branding TARS w dashboardzie:")
-    if not sub_all(index, r"<title>[^<]*</title>", "<title>TARS</title>", "tytuł karty"):
+    print("Branding Jarvo w dashboardzie:")
+    if not sub_all(index, r"<title>[^<]*</title>", "<title>Jarvo</title>", "tytuł karty"):
         print("Nie znaleziono <title> w index.html", file=sys.stderr)
         return 1
     sub_all(index, r'<link rel="icon"[^>]*>', '<link rel="icon" href="/favicon.ico" />', "favicon")
-    # logo w menu: dwie linie "Hermes" / "Agent" → jedno słowo "TARS"
+    # logo w menu: dwie linie "Hermes" / "Agent" → jedno słowo "Jarvo"
     sub_all(assets, r"children:\[`Hermes`,(\(0,[\w$]+\.jsx\)\(`br`,\{\}\)),`Agent`\]",
-            r"children:[`TARS`]", "logo w menu")
-    # zakładka BASE (plugin TARS HQ) w głównym menu nad CHAT, nie w sekcji „Plugins” na dole
+            r"children:[`Jarvo`]", "logo w menu")
+    # zakładka BASE (plugin Jarvo HQ) w głównym menu nad CHAT, nie w sekcji „Plugins” na dole
     sub_all(assets, r"(function [\w$]+\(e,t\)\{let n=[\w$]+\(e,t\),r=new Set\()e\.map\(e=>e\.path\)(\))",
             r'\1[...e.map(e=>e.path),"/base"]\2', "BASE w głównym menu")
-    sub_all(assets, r"brand:`Hermes Agent`,brandShort:`HA`", "brand:`TARS`,brandShort:`T`", "nazwa marki (i18n)")
-    sub_all(assets, r"label:`Hermes Teal", "label:`TARS Teal", "etykiety motywów")
+    sub_all(assets, r"brand:`Hermes Agent`,brandShort:`HA`", "brand:`Jarvo`,brandShort:`T`", "nazwa marki (i18n)")
+    sub_all(assets, r"label:`Hermes Teal", "label:`Jarvo Teal", "etykiety motywów")
     add_polish(assets, index[0], brand / "i18n" / "pl.json")
     themes = HERMES / "hermes_cli" / "web_server_dashboard.py"
     if themes.is_file():
-        sub_all([themes], r'"label": "Hermes Teal', '"label": "TARS Teal', "etykiety motywów (serwer)")
+        sub_all([themes], r'"label": "Hermes Teal', '"label": "Jarvo Teal', "etykiety motywów (serwer)")
         # motywy użytkownika przekazują kolory terminala czatu (dashboard je obsługuje, serwer je gubił)
         if '"terminalBackground": data.get' not in themes.read_text(encoding="utf-8"):
             sub_all([themes], r'(\n(\s+)"layoutVariant": layout_variant,\n)',
@@ -151,8 +151,8 @@ def main(argv: list[str]) -> int:
                     "kolory terminala w motywach")
     login = HERMES / "hermes_cli" / "dashboard_auth" / "login_page.py"
     if login.is_file():
-        sub_all([login], r"the Hermes Agent dashboard", "TARS HQ", "strona logowania (opis)")
-        sub_all([login], r" — Hermes Agent<", " — TARS<", "strona logowania (tytuł)")
+        sub_all([login], r"the Hermes Agent dashboard", "Jarvo HQ", "strona logowania (opis)")
+        sub_all([login], r" — Hermes Agent<", " — Jarvo<", "strona logowania (tytuł)")
     bust_cache(WEB / "assets", WEB / "index.html")
     return 0
 

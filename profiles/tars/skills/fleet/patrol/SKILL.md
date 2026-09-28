@@ -2,7 +2,7 @@
 name: patrol
 description: "Patrol floty: reaguj na anomalie tablicy i misji."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

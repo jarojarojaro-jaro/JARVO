@@ -1,7 +1,7 @@
 name: tars-wideo
 version: 0.1.0
 description: "Wideograf: krótkie filmy, montaż, napisy PL, lektor, warianty A/B, klipy; publikacja tylko za zgodą."
-author: "TARS fleet"
+author: "Jarvo fleet"
 license: MIT
 env_requires:
   - name: OPENROUTER_API_KEY

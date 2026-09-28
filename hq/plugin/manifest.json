@@ -1,7 +1,7 @@
 {
   "name": "tars-hq",
   "label": "Base",
-  "description": "Kwatera floty TARS: pokoje agentów z podglądem pracy na żywo, misje, decyzje i czat z szefem albo dowolnym agentem.",
+  "description": "Kwatera floty Jarvo: pokoje agentów z podglądem pracy na żywo, misje, decyzje i czat z szefem albo dowolnym agentem.",
   "icon": "Shield",
   "version": "0.1.0",
   "tab": {

@@ -2,7 +2,7 @@
 name: research-seo
 description: "SEO research: frazy PL, intencje, SERP, strony konkurencji."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

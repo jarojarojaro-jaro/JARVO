@@ -2,7 +2,7 @@
 name: formaty-platform
 description: "Wymiary, długości i limity znaków platform social i web."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

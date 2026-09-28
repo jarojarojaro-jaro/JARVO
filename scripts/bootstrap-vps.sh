@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Jednorazowe przygotowanie świeżego VPS (Ubuntu 24.04+/Debian 12+, x86_64) pod flotę TARS.
+# Jednorazowe przygotowanie świeżego VPS (Ubuntu 24.04+/Debian 12+, x86_64) pod flotę Jarvo.
 #
 #   curl -fsSL https://raw.githubusercontent.com/<ty>/TARS/<gałąź>/scripts/bootstrap-vps.sh -o bootstrap-vps.sh
 #   sudo bash bootstrap-vps.sh --user tars --repo https://github.com/<ty>/TARS.git [--branch main] [--ssh-key "ssh-ed25519 ..."]
@@ -131,7 +131,7 @@ fi
 log "Pomocnik aktualizacji (przycisk „Aktualizuj” w dashboardzie)"
 cat > /etc/systemd/system/tars-updater.service <<UNIT
 [Unit]
-Description=TARS: pomocnik aktualizacji (git pull + deploy na prośbę z dashboardu)
+Description=Jarvo: pomocnik aktualizacji (git pull + deploy na prośbę z dashboardu)
 After=docker.service network-online.target
 Wants=docker.service
 

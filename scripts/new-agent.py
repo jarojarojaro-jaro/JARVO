@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     cfg = (dest / "config.yaml").read_text(encoding="utf-8").replace("tars-sherlock", args.name)
     (dest / "config.yaml").write_text(cfg, encoding="utf-8")
     (dest / "distribution.yaml").write_text(
-        f"name: {args.name}\nversion: 0.0.1\ndescription: \"{args.title}\"\nauthor: \"TARS fleet\"\nlicense: MIT\n"
+        f"name: {args.name}\nversion: 0.0.1\ndescription: \"{args.title}\"\nauthor: \"Jarvo fleet\"\nlicense: MIT\n"
         "env_requires:\n  - name: OPENROUTER_API_KEY\n    description: \"Osobny klucz OpenRouter z limitem\"\n    required: true\n",
         encoding="utf-8")
     shutil.copy2(T / "toolbox.template.yaml", dest / "toolbox.yaml")
@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     (dest / "quality" / "rubric.md").write_text(f"# Rubryka: {args.name}\n\n## Blokujące\n- TODO\n\n## Ważne\n- TODO\n\n## Uwagi (nie blokują)\n- TODO\n", encoding="utf-8")
     (dest / "README.md").write_text(f"# {args.name}: {args.title}\n\nTODO: opis profilu.\n", encoding="utf-8")
     (dest / "CHANGELOG.md").write_text(f"# Changelog: {args.name}\n\n## 0.0.1\n- Szkielet.\n", encoding="utf-8")
-    (dest / ".no-bundled-skills").write_text("TARS sniper profile: only its own and vendored skills.\n", encoding="utf-8")
+    (dest / ".no-bundled-skills").write_text("Jarvo sniper profile: only its own and vendored skills.\n", encoding="utf-8")
 
     ev = fl.REPO_ROOT / "evals" / args.name
     ev.mkdir(parents=True, exist_ok=True)

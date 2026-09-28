@@ -2,7 +2,7 @@
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
 version: 2.2.0
-author: "TARS (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
+author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
@@ -18,7 +18,7 @@ environments:
   - kanban
 ---
 
-# Sędzia TARS (tor review)
+# Sędzia Jarvo (tor review)
 
 Ta wersja **zastępuje** wbudowany `sdlc-review` w profilu `tars`. Dispatcher ładuje ją automatycznie,
 gdy agent odda kartę przez `kanban_request_review(reviewer="tars")`.

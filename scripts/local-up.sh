@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lokalny test floty TARS (Linux / WSL2 z Dockerem). Jedno polecenie:
+# Lokalny test floty Jarvo (Linux / WSL2 z Dockerem). Jedno polecenie:
 #
 #   bash scripts/local-up.sh            # przygotuj ~/tars-local (raz) i uruchom flotę
 #   bash scripts/local-up.sh down       # zatrzymaj
@@ -95,7 +95,7 @@ PASS="$(grep '^DASHBOARD_PASSWORD=' "$L/compose/.env" | cut -d= -f2)"
 cat <<EOF
 
 ✅ Flota działa.
-   TARS HQ:  http://localhost:9119/base   login: tars   hasło: $PASS
+   Jarvo HQ:  http://localhost:9119/base   login: tars   hasło: $PASS
    czat:     docker exec -it -u hermes tars-hermes hermes -p tars chat
    RAM:      docker stats
    stop:     bash scripts/local-up.sh down

@@ -3,7 +3,7 @@
 `scripts/build.py` dokleja do SOUL każdego agenta jeden blok stąd, wybrany po modelu agenta
 (`fleet.yaml` → poziom modelu → identyfikator bez prefiksu dostawcy): `gpt-*` → `gpt.md`, `claude-*` →
 `claude.md`, `deepseek*` → `deepseek.md`, `kimi*` → `kimi.md`, reszta → `generic.md`.
-Z pliku trafia sekcja `### Wszyscy` i sekcja roli: `### Orkiestrator` (TARS) albo `### Wykonawca`.
+Z pliku trafia sekcja `### Wszyscy` i sekcja roli: `### Orkiestrator` (Jarvo) albo `### Wykonawca`.
 
 Zasady pisania (za oh-my-hermes, `MODEL_OPTI.md`, MIT):
 - blok przeciwdziała **znanej słabości rodziny**, a nie opisuje dobre praktyki ogólnie,

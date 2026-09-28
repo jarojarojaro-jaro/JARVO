@@ -2,7 +2,7 @@
 name: napisy
 description: "Napisy PL: z lektora albo transkrypcji, korekta, wypalenie."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

@@ -2,7 +2,7 @@
 name: material-stock
 description: "Darmowe ujęcia i zdjęcia stock (Pexels, Pixabay) z licencją."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:
@@ -24,7 +24,7 @@ Darmowe ujęcia wideo i zdjęcia do scen: `$HERMES_HOME/scripts/stock.py`. Klucz
 - Tło pod tekst, b-roll do nagrania użytkownika, zdjęcia do scen z ruchem kamery.
 
 ## Kiedy NIE używać
-- Konkretny produkt, lokal, osoba z marki: stock pokaże „podobny”, nie ten. Prośba o zdjęcia/nagrania (przez TARS-a) albo AI z referencją.
+- Konkretny produkt, lokal, osoba z marki: stock pokaże „podobny”, nie ten. Prośba o zdjęcia/nagrania (przez Jarva) albo AI z referencją.
 - Brak klucza: `film.py sprawdz` zgłosi błąd; wtedy pliki użytkownika, `wideo-ai` albo plansze (`kolor`).
 
 ## Kroki

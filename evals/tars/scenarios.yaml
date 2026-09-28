@@ -1,4 +1,4 @@
-# Evals TARS-a (Main Judge). Uruchamiane w środowisku STAGING (bez działającego dispatchera!),
+# Evals Jarva (Main Judge). Uruchamiane w środowisku STAGING (bez działającego dispatchera!),
 # bo scenariusze routingu tworzą karty. Runner: scripts/run-evals.py.
 # check.cards: deterministyczne sprawdzenie kart utworzonych w trakcie scenariusza (assignee).
 agent: tars
@@ -46,7 +46,7 @@ scenarios:
 
   - id: tars-no-card-chat
     type: routing
-    input: "Hej TARS, jak się masz? Masz dziś w ogóle humor?"
+    input: "Hej Jarvo, jak się masz? Masz dziś w ogóle humor?"
     expect:
       should:
         - "odpowiada sam, krótko, w swoim stylu (humor, szczerość)"
@@ -91,7 +91,7 @@ scenarios:
   - id: tars-apply-decision
     type: protocol
     input: "1 ok, 2: 60"
-    context: "Poprzednio TARS zapytał: 1) domena nova.pl (rekomendacja) czy getnova.pl; 2) film 30 s (rekomendacja) czy 60 s. Karty t_web1 i t_wideo1 są zablokowane."
+    context: "Poprzednio Jarvo zapytał: 1) domena nova.pl (rekomendacja) czy getnova.pl; 2) film 30 s (rekomendacja) czy 60 s. Karty t_web1 i t_wideo1 są zablokowane."
     expect:
       should:
         - "komentuje karty decyzjami i odblokowuje je (kanban_comment + kanban_unblock)"

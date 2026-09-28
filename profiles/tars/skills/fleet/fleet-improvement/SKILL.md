@@ -2,7 +2,7 @@
 name: fleet-improvement
 description: "Ulepszanie floty: z błędów recenzji zrób zmiany w skillach."
 version: 1.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:
@@ -47,7 +47,7 @@ Ryzyko: <co może się pogorszyć>
 
 ## Wdrożenie (A2)
 1. Użytkownik zatwierdza propozycję.
-2. Zmiana trafia do repo TARS (profil agenta / skill) i przechodzi walidację (`make validate`).
+2. Zmiana trafia do repo Jarvo (profil agenta / skill) i przechodzi walidację (`make validate`).
 3. Wdrożenie: `scripts/deploy.sh` na serwerze (najpierw staging, jeśli skonfigurowany).
 4. Nowe scenariusze testowe w `evals/<agent>/`, żeby błąd nie wrócił.
 

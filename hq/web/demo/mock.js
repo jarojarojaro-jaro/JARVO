@@ -1,4 +1,4 @@
-// TARS HQ, tryb demo: symulacja floty w przeglądarce (misja „Ziarno”: otwarcie kawiarni).
+// Jarvo HQ, tryb demo: symulacja floty w przeglądarce (misja „Ziarno”: otwarcie kawiarni).
 // Implementuje ten sam interfejs co prawdziwe API pluginu (window.TARS_HQ_MOCK), bez serwera.
 (function () {
   "use strict";
@@ -117,7 +117,7 @@
     Object.assign(c, { status: worker ? "review" : "running", script, step: 0, started_at: now(), worker: worker || null });
     S.activity[id] = [{ ts: now(), kind: "brief", text: `Karta ${id}: ${c.title}.` }];
     c.events.push({ kind: "spawned", created_at: now() });
-    pushFeed(id, "spawned", worker ? "TARS ocenia" : "zaczyna pracę", "neutral");
+    pushFeed(id, "spawned", worker ? "Jarvo ocenia" : "zaczyna pracę", "neutral");
   }
 
   function finishStep(c) {
@@ -341,10 +341,10 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
         } };
     }
     const byAgent = {
-      "tars-sherlock": [[["web_search", msg.slice(0, 50)]], "Sprawdziłem wstępnie. Mam 3 źródła pierwotne, ale zanim dam liczby, potwierdzę je krzyżowo. Jeśli to ma być pełne śledztwo, zleć je przez TARS-a, wtedy dostaniesz raport z cytatami."],
+      "tars-sherlock": [[["web_search", msg.slice(0, 50)]], "Sprawdziłem wstępnie. Mam 3 źródła pierwotne, ale zanim dam liczby, potwierdzę je krzyżowo. Jeśli to ma być pełne śledztwo, zleć je przez Jarva, wtedy dostaniesz raport z cytatami."],
       "tars-web": [[["read_file", "knowledge/brands/ziarno/BRAND.md"]], "Mogę to zrobić w ramach landingu Ziarno. Budżety jakości zostają: LCP poniżej 2,5 s, CLS poniżej 0,1, Lighthouse 90+. Wdrożenie na produkcję tylko po Twojej zgodzie."],
       "tars-studio": [[["skill_view", "formaty-platform"]], "Zrobię to w formatach 4:5 i 9:16, w kolorach z brand kitu Ziarno. Publikacja dopiero po Twojej akceptacji. Pierwsza wersja:\n\nMEDIA:/opt/data/tars/workspaces/tars-studio/out/ig-1080x1350.png\nMEDIA:/opt/data/tars/workspaces/tars-studio/out/kalendarz.csv\n\nPodgląd na żywo: http://localhost:9120/demo/index.html, pliki w `/opt/data/tars/workspaces/tars-studio/out/ig-1080x1350.png`."],
-      "tars-reka": [[["terminal", "python3 -c '…'"]], "Zrobione, wynik w out/. Jeśli to część misji, TARS dopnie to do pakietu końcowego."],
+      "tars-reka": [[["terminal", "python3 -c '…'"]], "Zrobione, wynik w out/. Jeśli to część misji, Jarvo dopnie to do pakietu końcowego."],
       "tars-wideo": [[["skill_view", "krotki-film"]], "Zrobię to jako reels 9:16: hook do 2 s, polski lektor, napisy karaoke i muzyka pod głosem. Najpierw szkic do oceny rytmu, potem finał i kontrola jakości. Nic nie publikuję bez Twojej zgody."],
     };
     const [tools, text] = byAgent[name] || [[], "Jasne."];

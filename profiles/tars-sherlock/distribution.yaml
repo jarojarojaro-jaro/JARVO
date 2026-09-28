@@ -1,7 +1,7 @@
 name: tars-sherlock
 version: 0.1.0
 description: "Sherlock: wieloźródłowy research i weryfikacja faktów z cytatami i poziomem pewności."
-author: "TARS fleet"
+author: "Jarvo fleet"
 license: MIT
 env_requires:
   - name: OPENROUTER_API_KEY

@@ -10,11 +10,11 @@ Wynik: build/
 
 Kroki dla każdego aktywnego agenta z fleet.yaml:
   1. kopia profiles/<agent>/ (bez plików roboczych),
-  2. SOUL.md: wstawienie wspólnego protokołu (i skrótu floty dla TARS-a),
+  2. SOUL.md: wstawienie wspólnego protokołu (i skrótu floty dla Jarva),
   3. profile.yaml z opisem z fleet.yaml (routing kanbana, roster),
   4. config.yaml: podstawienie tokenów @@...@@ (modele, katalogi, strefa czasowa),
   5. skille zewnętrzne z vendor/skills.lock.yaml (+ licencje, + DESCRIPTION.md kategorii),
-  6. dla TARS-a: skill `roster` i rubryki sędziego generowane z fleet.yaml i quality/rubric.md,
+  6. dla Jarva: skill `roster` i rubryki sędziego generowane z fleet.yaml i quality/rubric.md,
   7. cron/jobs.yaml → cron/jobs.json (przez API crona Hermesa, stałe ID zadań).
 """
 
@@ -39,7 +39,7 @@ COPY_IGNORE = shutil.ignore_patterns(
 
 CATEGORY_DESCRIPTIONS = {
     # kategorie własne
-    "fleet": "Dowodzenie flotą TARS: przyjmowanie zleceń, misje, karty, ocena, decyzje, patrol, raporty.",
+    "fleet": "Dowodzenie flotą Jarvo: przyjmowanie zleceń, misje, karty, ocena, decyzje, patrol, raporty.",
     "sherlock": "Metoda śledcza: wieloźródłowy research, weryfikacja faktów, raporty z cytatami.",
     "web": "Workflowy Web Senior Deva: brand z URL, audyty, nowe strony, landingi, favicony, obrazy, wdrożenia.",
     "studio": "Workflowy Studio: pakiety kampanii, grafiki social, filmy z kodu, generacja AI, formaty, copy PL, publikacja.",
@@ -207,7 +207,7 @@ def write_category_descriptions(skills_root: Path) -> None:
             desc_file.write_text(f"---\ndescription: {json.dumps(desc, ensure_ascii=False)}\n---\n", encoding="utf-8")
 
 
-# ---------------------------------------------------------------- generated (TARS)
+# ---------------------------------------------------------------- generated (Jarvo)
 
 def render_roster_skill(fleet: fl.Fleet) -> str:
     lines = [
@@ -215,7 +215,7 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
         "name: roster",
         'description: "Kto jest we flocie: agenci, zakresy, skille do kart."',
         "version: 1.0.0",
-        "author: TARS (generowane z fleet.yaml)",
+        "author: Jarvo (generowane z fleet.yaml)",
         "license: MIT",
         "metadata:",
         "  tars:",
@@ -341,7 +341,7 @@ def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str]) -> list[str]:
     if owner:
         routes.append({"name": "owner-dm", "platform": "telegram", "chat_id": owner, "profile": fleet.orchestrator})
     else:
-        notes.append("Brak TELEGRAM_OWNER_ID: DM z botem nie zostanie skierowany do TARS-a.")
+        notes.append("Brak TELEGRAM_OWNER_ID: DM z botem nie zostanie skierowany do Jarva.")
     if hq:
         for a in fleet.active():
             topic = a.telegram_topic
@@ -355,9 +355,9 @@ def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str]) -> list[str]:
                 routes.append({"name": f"hq-{a.name}", "platform": "telegram", "chat_id": hq,
                                "thread_id": thread, "profile": a.name})
             else:
-                notes.append(f"Brak TELEGRAM_TOPIC_{topic.upper()}: wątek {a.name} w TARS HQ nie ma trasy.")
+                notes.append(f"Brak TELEGRAM_TOPIC_{topic.upper()}: wątek {a.name} w Jarvo HQ nie ma trasy.")
     else:
-        notes.append("Brak TELEGRAM_HQ_CHAT_ID: grupa „TARS HQ” nie ma tras (działa tylko DM).")
+        notes.append("Brak TELEGRAM_HQ_CHAT_ID: grupa „Jarvo HQ” nie ma tras (działa tylko DM).")
     config.setdefault("gateway", {})["profile_routes"] = routes
     config["timezone"] = fleet.raw.get("shared", {}).get("timezone", "Europe/Warsaw")
     # host (gateway, zadania pomocnicze kanbana) używa dostawcy floty i jej najszybszego modelu
@@ -411,7 +411,7 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
     for md in (dest / "skills").rglob("*.md"):
         md.write_text(render_tokens(md.read_text(encoding="utf-8"), tokens), encoding="utf-8")
 
-    # TARS: roster + rubryki
+    # Jarvo: roster + rubryki
     if agent.name == fleet.orchestrator:
         roster = dest / "skills" / "fleet" / "roster" / "SKILL.md"
         roster.parent.mkdir(parents=True, exist_ok=True)
@@ -479,9 +479,9 @@ def main(argv: list[str] | None = None) -> int:
         summary.append({"agent": agent.name, "skills": n_skills, "cron_jobs": n_jobs})
         print(f"✓ {agent.name}: {n_skills} skilli, {n_jobs} rutyn cron")
 
-    import hqbuild  # TARS HQ: plugin dashboardu (pokoje agentów, czat, decyzje)
+    import hqbuild  # Jarvo HQ: plugin dashboardu (pokoje agentów, czat, decyzje)
     hq_dir = hqbuild.build_plugin(out / "plugins" / "tars-hq", fleet)
-    print(f"✓ TARS HQ: {hq_dir.relative_to(out)}")
+    print(f"✓ Jarvo HQ: {hq_dir.relative_to(out)}")
 
     notes = build_host(fleet, out / "host", env)
     for note in notes:

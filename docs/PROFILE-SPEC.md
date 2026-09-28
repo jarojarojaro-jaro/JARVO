@@ -1,4 +1,4 @@
-# Anatomia agenta TARS (kontrakt profilu v1)
+# Anatomia agenta Jarvo (kontrakt profilu v1)
 
 Ten dokument mówi, **z czego składa się każdy agent** we flocie i kiedy agent jest „gotowy”.
 Dotyczy wszystkich profili z [`fleet.yaml`](../fleet.yaml). Szablony są w [`shared/templates/`](../shared/templates/).
@@ -46,9 +46,9 @@ Obowiązkowe sekcje (szablon: `shared/templates/SOUL.template.md`):
 | Sekcja | Zawartość |
 |---|---|
 | Misja | Jedno zdanie: po co istnieję |
-| Osobowość | Ton, styl, parametry TARS (np. szczerość 90%, humor 60%) |
+| Osobowość | Ton, styl, parametry Jarvo (np. szczerość 90%, humor 60%) |
 | Zakres | Co robię (lista kompetencji) |
-| Poza zakresem | Czego nie robię i komu to oddaję (zawsze przez TARS-a) |
+| Poza zakresem | Czego nie robię i komu to oddaję (zawsze przez Jarva) |
 | Zasady pracy | 5–10 zasad specyficznych dla dziedziny („najpierw pomiar, potem optymalizacja”) |
 | Mapa workflowów | Która sytuacja → który skill (routing wewnętrzny) |
 | Standard jakości | Moja Definition of Done w skrócie |
@@ -93,7 +93,7 @@ Zasady:
 - **źródło i data** przy każdym pakiecie (`source:`, `reviewed:`), bo wiedza webowa i marketingowa się starzeje,
 - **checklisty zamiast esejów:** model lepiej wykonuje listy kontrolne niż ogólne porady,
 - **przykłady wzorcowe** (golden examples): dobry raport, dobra karta, dobra strona,
-- **przegląd świeżości** co kwartał (rutyna cron przypomina TARS-owi).
+- **przegląd świeżości** co kwartał (rutyna cron przypomina Jarvowi).
 
 ---
 
@@ -139,9 +139,9 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 | Warstwa | Gdzie | Kto pisze |
 |---|---|---|
 | Pamięć własna agenta | `memories/MEMORY.md` profilu | agent (np. „ta strona używa Tailwind”) |
-| Wiedza o Tobie | MVP: `knowledge/user/USER.md` (onboarding) + pamięć użytkownika TARS-a; później wspólny provider (np. Honcho) | TARS (onboarding), agenci czytają |
+| Wiedza o Tobie | MVP: `knowledge/user/USER.md` (onboarding) + pamięć użytkownika Jarva; później wspólny provider (np. Honcho) | Jarvo (onboarding), agenci czytają |
 | Brand kity | `knowledge/brands/<marka>/` | `tars-web` / `tars-studio` |
-| Historia zleceń | kanban (`kanban.db`) | TARS i agenci |
+| Historia zleceń | kanban (`kanban.db`) | Jarvo i agenci |
 
 ---
 
@@ -164,7 +164,7 @@ Poziomy autonomii (każda akcja agenta ma przypisany poziom):
 | **A3** | nigdy | płatności, usuwanie cudzych danych, działania na kontach bez zgody |
 
 Mechanizmy techniczne:
-- **toolsety:** każdy profil ma włączone tylko potrzebne toolsety (np. TARS nie ma terminala),
+- **toolsety:** każdy profil ma włączone tylko potrzebne toolsety (np. Jarvo nie ma terminala),
 - **sandbox:** komendy snajperów wykonują się w kontenerze (`terminal.backend: docker`), do potwierdzenia w fazie 0,
 - **zatwierdzanie komend:** Hermes pyta o ryzykowne komendy, więc nie wyłączamy tego,
 - **workspace:** każdy agent ma własny katalog roboczy (`terminal.cwd`), a wyniki oddaje przez kanban (załączniki).
@@ -174,7 +174,7 @@ Mechanizmy techniczne:
 ## 10. Jakość
 
 - **Definition of Done agenta:** lista warunków, które musi spełnić każdy wynik (w SOUL i w rubryce sędziego),
-- **rubryka sędziego:** jak TARS ocenia wynik tego agenta (skill `judge-rubryki` u TARS-a, generowany z `quality/rubric.md` agenta),
+- **rubryka sędziego:** jak Jarvo ocenia wynik tego agenta (skill `judge-rubryki` u Jarva, generowany z `quality/rubric.md` agenta),
 - **evals:** `evals/<agent>/*.yaml` (szablon: `shared/templates/eval.template.yaml`), czyli scenariusze
   „zlecenie → oczekiwane zachowanie → kryteria”, uruchamiane przy każdej zmianie SOUL lub skilli,
 - **ślady i koszty:** Langfuse (wtyczka Hermesa) zbiera przebiegi, koszty i oceny sędziego,
@@ -182,7 +182,7 @@ Mechanizmy techniczne:
 
 ---
 
-## Kontrakt zlecenia (wspólny protokół TARS ↔ agenci)
+## Kontrakt zlecenia (wspólny protokół Jarvo ↔ agenci)
 
 To jedyny element wspólny dla wszystkich agentów. To protokół, a nie wiedza dziedzinowa.
 Źródło jest jedno (`shared/protocol/`), a generator wkleja go do każdego profilu.
@@ -190,21 +190,21 @@ To jedyny element wspólny dla wszystkich agentów. To protokół, a nie wiedza 
 Zaraz za protokołem generator dokleja **kalibrację pod model agenta** (`shared/calibration/<rodzina>.md`:
 `gpt`, `claude`, `deepseek`, `kimi`, `generic`): 2–3 zdania na znaną słabość rodziny, osobno dla orkiestratora
 i wykonawców (np. GPT-6: deleguj, nie dopytuj o to, co ustalisz sam, pisz krótko). Blok ma znaczniki
-`<!-- TARS:CALIBRATION … -->`; gdy w panelu wybierzesz agentowi inny model, `install-fleet.sh` podmienia go przy
+`<!-- Jarvo:CALIBRATION … -->`; gdy w panelu wybierzesz agentowi inny model, `install-fleet.sh` podmienia go przy
 następnym wdrożeniu. Zmiana `TARS_MODEL_PROVIDER` przebudowuje kalibrację sama. Walidator liczy najdłuższy blok
 do budżetu SOUL i pilnuje limitu 3 reguł na sekcję.
 
-**Karta zlecenia (TARS → agent):**
+**Karta zlecenia (Jarvo → agent):**
 ```
 CEL:            co ma powstać (1–2 zdania)
-KONTEKST:       wszystko, czego agent potrzebuje (agent nie zna Twojej rozmowy z TARS-em!)
+KONTEKST:       wszystko, czego agent potrzebuje (agent nie zna Twojej rozmowy z Jarvem!)
 WEJŚCIA:        pliki, linki, brand kit, wyniki poprzednich kart
 DoD:            mierzalne warunki akceptacji
 WYJŚCIA:        jakie pliki i gdzie, w jakim formacie
 GRANICE:        poziom autonomii, budżet (czas/koszt), czego nie ruszać
 ```
 
-**Wynik (agent → TARS):**
+**Wynik (agent → Jarvo):**
 ```
 PODSUMOWANIE:   co zrobiono (3–5 zdań)
 ARTEFAKTY:      lista plików/linków
@@ -213,7 +213,7 @@ RYZYKA I LUKI:  czego nie zrobiono, co niepewne
 DECYZJE:        co wymaga decyzji człowieka
 ```
 
-Agent oddaje wynik do statusu `review`. TARS ocenia: `complete` albo `request_changes`
+Agent oddaje wynik do statusu `review`. Jarvo ocenia: `complete` albo `request_changes`
 z konkretnymi uwagami. Po 3 odrzuceniach eskaluje do Ciebie zamiast kręcić się w kółko.
 
 ---
@@ -249,8 +249,8 @@ profiles/tars-web/
 │       └── …
 ├── scripts/                 # automaty wołane jako $HERMES_HOME/scripts/<plik>
 ├── quality/
-│   └── rubric.md            # rubryka dla sędziego (kopiowana do sdlc-review TARS-a)
-├── cron/jobs.yaml           # rutyny (tylko TARS); build → cron/jobs.json ze stałymi ID
+│   └── rubric.md            # rubryka dla sędziego (kopiowana do sdlc-review Jarva)
+├── cron/jobs.yaml           # rutyny (tylko Jarvo); build → cron/jobs.json ze stałymi ID
 ├── README.md
 └── CHANGELOG.md
 evals/tars-web/scenarios.yaml   # scenariusze testowe (poza dystrybucją)

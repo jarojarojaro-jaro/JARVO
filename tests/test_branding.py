@@ -11,7 +11,7 @@ def test_bust_cache_renames_changed_files_and_importers(tmp_path):
     pd = load_script("branding/patch_dashboard.py")
     assets = tmp_path / "assets"
     assets.mkdir()
-    (assets / "i18n-AAAA11.js").write_text("export const brand = `TARS`;", encoding="utf-8")
+    (assets / "i18n-AAAA11.js").write_text("export const brand = `Jarvo`;", encoding="utf-8")
     (assets / "page-BBBB22.js").write_text('import{b}from"./i18n-AAAA11.js";export default 1;', encoding="utf-8")
     (assets / "vendor-CCCC33.js").write_text("export const v = 1;", encoding="utf-8")
     (assets / "index-DDDD44.js").write_text('import"./page-BBBB22.js";const m=["assets/vendor-CCCC33.js"];', encoding="utf-8")
@@ -34,7 +34,7 @@ def test_bust_cache_renames_changed_files_and_importers(tmp_path):
 
 def test_skin_and_profiles_use_tars_branding():
     skin = yaml.safe_load((REPO / "branding" / "skin-tars.yaml").read_text(encoding="utf-8"))
-    assert skin["name"] == "tars" and skin["branding"]["agent_name"] == "TARS"
+    assert skin["name"] == "tars" and skin["branding"]["agent_name"] == "Jarvo"
     for name in ["_host", "tars", "tars-sherlock", "tars-web", "tars-studio", "tars-reka"]:
         cfg = yaml.safe_load((REPO / "profiles" / name / "config.yaml").read_text(encoding="utf-8"))
         assert cfg["display"]["skin"] == "tars", name

@@ -2,7 +2,7 @@
 name: szybki-fakt
 description: "Jedno pytanie o bieżący fakt: jedna runda szukania, cytat."
 version: 1.0.0
-author: "TARS (na bazie oh-my-hermes web-research, MIT)"
+author: "Jarvo (na bazie oh-my-hermes web-research, MIT)"
 license: MIT
 metadata:
   hermes:

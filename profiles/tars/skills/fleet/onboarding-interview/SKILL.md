@@ -2,7 +2,7 @@
 name: onboarding-interview
 description: "Wywiad startowy: poznaj użytkownika, zapisz jego profil."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:
@@ -30,7 +30,7 @@ Maksymalnie 3 pytania w jednej wiadomości, w 3–4 rundach. Każdą rundę zacz
 ## Zapis
 - Plik wspólny: `@@KNOWLEDGE_DIR@@/user/USER.md` (szablon: `references/USER.template.md`).
   Czytają go wszyscy agenci, więc piszesz **tylko to, co przydatne w pracy**, bez danych wrażliwych (hasła, numery dokumentów, zdrowie).
-- Pamięć TARS-a: najważniejsze preferencje komunikacji i stałe zasady (krótko).
+- Pamięć Jarva: najważniejsze preferencje komunikacji i stałe zasady (krótko).
 - Marki z adresami stron → zaproponuj misję „brand kit” (`dispatch-playbook`, wzorzec 5).
 
 ## Na koniec

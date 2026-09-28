@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nocny backup floty TARS (restic → zewnętrzne repozytorium S3/B2/SFTP). Uruchamiaj z crona hosta:
+# Nocny backup floty Jarvo (restic → zewnętrzne repozytorium S3/B2/SFTP). Uruchamiaj z crona hosta:
 #   15 3 * * * /srv/tars/repo/scripts/backup.sh >> /srv/tars/backups/backup.log 2>&1
 #
 # Wymaga /srv/tars/restic.env (root, chmod 600; celowo poza /srv/tars/secrets, który widzą agenci):

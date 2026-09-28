@@ -16,7 +16,7 @@
   });
   const panel = document.createElement("section");
   panel.className = "thq-upd-panel";
-  panel.setAttribute("aria-label", L("Aktualizacja TARS", "TARS update"));
+  panel.setAttribute("aria-label", L("Aktualizacja Jarvo", "Jarvo update"));
   panel.hidden = true;
   document.body.appendChild(panel);
 
@@ -70,7 +70,7 @@
     if (panel.hidden) return;
     panel.replaceChildren();
     const head = el("header", "thq-upd-head");
-    head.append(el("h2", null, L("Aktualizacja TARS", "TARS update")), btn("×", "thq-upd-x", () => { open = false; render(); }));
+    head.append(el("h2", null, L("Aktualizacja Jarvo", "Jarvo update")), btn("×", "thq-upd-x", () => { open = false; render(); }));
     panel.append(head);
     if (justUpdated()) {
       // nowa wersja panelu jest już na serwerze: wczytujemy ją sami

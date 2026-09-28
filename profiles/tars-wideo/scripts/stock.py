@@ -6,7 +6,7 @@
     python3 stock.py pobierz pexels:123456 [--format 9:16] [--typ wideo|zdjecie] [--do out/wideo/src]
 
 Klucze (darmowe): PEXELS_API_KEY (pexels.com/api), PIXABAY_API_KEY (pixabay.com/api/docs). Wystarczy jeden;
-dodaj w dashboardzie Keys (profil główny), TARS rozda go agentom. Zapytanie może być po polsku (locale pl-PL),
+dodaj w dashboardzie Keys (profil główny), Jarvo rozda go agentom. Zapytanie może być po polsku (locale pl-PL),
 ale angielskie zwykle daje więcej trafień. Pobrane pliki lądują we wspólnym cache (drugi raz: bez pobierania),
 a obok pliku `.json` z autorem, adresem strony i licencją (do RAPORT.md i opisu posta).
 """
@@ -26,7 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wideo_lib as wl  # noqa: E402
 
-UA = "TARS-Wideograf/1.0 (+https://github.com/)"
+UA = "Jarvo-Wideograf/1.0 (+https://github.com/)"
 LICENSES = {
     "pexels": "Licencja Pexels: darmowe użycie komercyjne, bez wymogu podpisu (mile widziany); nie sprzedawać bez zmian, "
               "nie sugerować poparcia osób z kadru. https://www.pexels.com/license/",

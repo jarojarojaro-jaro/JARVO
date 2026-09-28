@@ -2,7 +2,7 @@
 name: klipy-z-dlugiego
 description: "Klipy z długiego nagrania: transkrypcja, wybór, cięcie."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

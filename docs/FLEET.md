@@ -1,4 +1,4 @@
-# Flota TARS: specyfikacja agentów v1
+# Flota Jarvo: specyfikacja agentów v1
 
 Pierwsza flota: **Main Judge + 4 agentów**. Każdy agent to osobny profil Hermesa
 (osobna dystrybucja w `profiles/<nazwa>/`). Rejestr maszynowy jest w [`fleet.yaml`](../fleet.yaml).
@@ -39,7 +39,7 @@ Legenda przy skillach:
 
 Snajperzy nie dzielą się skillami, ale wszyscy znają **Ciebie**:
 - **profil użytkownika**: kim jesteś, czym się zajmujesz, preferencje (MVP: `knowledge/user/USER.md`
-  z wywiadu onboardingowego TARS-a; później wspólny provider pamięci, np. Honcho),
+  z wywiadu onboardingowego Jarva; później wspólny provider pamięci, np. Honcho),
 - **brand kity** w `knowledge/brands/<marka>/`: logo, kolory, fonty, ton komunikacji, `DESIGN.md`.
   Brand kit tworzy `tars-web` albo `tars-studio` („naucz się mojej marki z tej strony”),
   a korzystają z niego obaj. Marka to wiedza o Tobie, nie o dziedzinie, dlatego jest wspólna.
@@ -218,12 +218,12 @@ Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#tars-wideo-wideograf).
 **Misja:** zapierdala i pomaga na każdy możliwy sposób. Ogarnia, rozkminia, proponuje,
 robi szybkie rzeczy od ręki, skleja wyniki snajperów i łata dziury, gdzie nie ma specjalisty.
 
-**Czym różni się od TARS-a:** TARS *zarządza i ocenia*, a prawa ręka *wykonuje*.
-TARS nie robi pracy, a ręka robi wszystko.
+**Czym różni się od Jarva:** Jarvo *zarządza i ocenia*, a prawa ręka *wykonuje*.
+Jarvo nie robi pracy, a ręka robi wszystko.
 
 **Czym różni się od snajperów:** ma **dostęp do skilli wszystkich** agentów (tylko do odczytu)
 i pełny katalog Hermesa, ale nie ma ich pamięci ani głębi. Do szybkich i przekrojowych
-zadań jest idealna. Gdy zadanie wymaga jakości snajpera, sama proponuje oddanie go przez TARS-a.
+zadań jest idealna. Gdy zadanie wymaga jakości snajpera, sama proponuje oddanie go przez Jarva.
 
 **Typowe zadania:** szybka odpowiedź lub obliczenie, poprawka tekstu, porządki w plikach,
 prototyp na szybko, zebranie wyników kilku snajperów w jeden dokument, maile, notatki,
@@ -246,4 +246,4 @@ agentowi edytować skille w external_dirs, jeśli ma prawa zapisu) oraz [T] `kie
 
 Pierwszy wspólny test floty: **„wypuść landing nowego produktu”**. Sherlock robi research
 i słowa kluczowe, web buduje stronę, studio przygotowuje grafiki i posty, ręka składa
-wszystko w pakiet, a TARS ocenia każdy etap.
+wszystko w pakiet, a Jarvo ocenia każdy etap.

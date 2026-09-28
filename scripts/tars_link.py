@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Link do obejrzenia wyniku w przeglądarce użytkownika (serwer podglądu TARS HQ, port 9120).
+"""Link do obejrzenia wyniku w przeglądarce użytkownika (serwer podglądu Jarvo HQ, port 9120).
 
     python3 /opt/tars/repo/scripts/tars_link.py <plik albo katalog> [...]
 

@@ -2,7 +2,7 @@
 name: brand-z-url
 description: "Brand kit z istniejącej strony: logo, kolory, fonty, ton."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

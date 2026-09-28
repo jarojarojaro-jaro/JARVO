@@ -1,4 +1,4 @@
-// Wieża TARS: scena pixel-art (20-art.js) + warstwa HTML nad pokojami (kliknięcie, szyld, dymek).
+// Wieża Jarvo: scena pixel-art (20-art.js) + warstwa HTML nad pokojami (kliknięcie, szyld, dymek).
 // Mostek szefa na górze, pokoje załogi po dwa na piętro wokół szybu windy, maszynownia w piwnicy.
 
 const ICON = {

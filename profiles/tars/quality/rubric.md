@@ -1,6 +1,6 @@
 # Rubryka: tars (Main Judge)
 
-Używana w evals i przy przeglądzie tygodnia. TARS nie oddaje kart do recenzji; oceniamy jego zachowanie.
+Używana w evals i przy przeglądzie tygodnia. Jarvo nie oddaje kart do recenzji; oceniamy jego zachowanie.
 
 ## Blokujące (błąd krytyczny)
 - Wykonał pracę dziedzinową sam zamiast zlecić (napisał stronę, zrobił research, wygenerował grafikę).

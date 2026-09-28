@@ -1,9 +1,9 @@
-# Rejestr floty TARS: jedno źródło prawdy o tym, kto istnieje i jak jest spięty.
+# Rejestr floty Jarvo: jedno źródło prawdy o tym, kto istnieje i jak jest spięty.
 #
 # scripts/build.py czyta ten plik i generuje:
 #   - profile.yaml każdego agenta (opis → routing kanbana),
-#   - skill `roster` TARS-a (kto istnieje, co umie, jakie skille przypinać do kart),
-#   - rubryki sędziego (skill `sdlc-review` TARS-a) z profiles/<agent>/quality/rubric.md,
+#   - skill `roster` Jarva (kto istnieje, co umie, jakie skille przypinać do kart),
+#   - rubryki sędziego (skill `sdlc-review` Jarva) z profiles/<agent>/quality/rubric.md,
 #   - model w config.yaml (z poziomu `model_tier`),
 #   - config hosta (trasy Telegrama `gateway.profile_routes`).
 #
@@ -23,7 +23,7 @@ reviewer: tars            # recenzent kart: snajperzy wołają kanban_request_re
 models:
   provider: openai-codex                    # OpenAI przez logowanie ChatGPT (OAuth, Models → Login)
   tiers:                                    # jeden model, głębia myślenia per agent (reasoning_effort w config.yaml)
-    frontier: gpt-6-luna                    # TARS: effort high
+    frontier: gpt-6-luna                    # Jarvo: effort high
     strong: gpt-6-luna                      # specjaliści: effort low
     fast: gpt-6-luna                        # subagenci i rutyny
   presets:                                  # nazwa zestawu = dostawca Hermesa (zweryfikowane 2026-09-27)
@@ -60,10 +60,10 @@ agents:
     model_tier: frontier
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: general       # wątek ogólny grupy „TARS HQ” + Twój DM
-    hq_room: bridge    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    telegram_topic: general       # wątek ogólny grupy „Jarvo HQ” + Twój DM
+    hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Mostek dowodzenia"
-    hq_short: "TARS"
+    hq_short: "Jarvo"
     en:
       title: "Main Judge"
       hq_label: "Command bridge"
@@ -84,7 +84,7 @@ agents:
     autonomy_max: A1
     telegram_topic: sherlock
     pin_skills: [metoda-sherlocka]
-    hq_room: study    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Gabinet śledczy"
     hq_short: "Sherlock"
     en:
@@ -106,7 +106,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: web
-    hq_room: devlab    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Pracownia webowa"
     hq_short: "Web"
     en:
@@ -128,7 +128,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: studio
-    hq_room: atelier    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Atelier kreatywne"
     hq_short: "Studio"
     en:
@@ -152,7 +152,7 @@ agents:
     autonomy_max: A1
     telegram_topic: wideo
     pin_skills: [krotki-film]
-    hq_room: filmstudio    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Studio filmowe"
     hq_short: "Wideograf"
     en:
@@ -174,7 +174,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: reka
-    hq_room: workshop    # pokój w TARS HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
     hq_label: "Warsztat"
     hq_short: "Ręka"
     en:

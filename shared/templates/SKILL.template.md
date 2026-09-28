@@ -2,7 +2,7 @@
 name: "{{nazwa-workflowu}}"
 description: "{{Kiedy użyć, w jednym zdaniu. Od tego zależy, czy model wybierze ten skill.}}"
 version: 0.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:
@@ -20,7 +20,7 @@ metadata:
 - {{sytuacja}}
 
 ## Kiedy NIE używać
-- {{sytuacja}} → zamiast tego `{{inny-skill}}` albo oddaj TARS-owi.
+- {{sytuacja}} → zamiast tego `{{inny-skill}}` albo oddaj Jarvowi.
 
 ## Wejścia
 | Wejście | Wymagane | Jeśli brak |

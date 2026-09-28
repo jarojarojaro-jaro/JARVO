@@ -1,4 +1,4 @@
-# Rutyny TARS-a. scripts/build.py zamienia ten plik na cron/jobs.json przez API crona Hermesa.
+# Rutyny Jarva. scripts/build.py zamienia ten plik na cron/jobs.json przez API crona Hermesa.
 # `id` musi być stały (aktualizacje dystrybucji scalają zadania po id). Harmonogramy w strefie
 # z config.yaml (timezone). Z dystrybucji zadania instalują się WSTRZYMANE: włącz je świadomie
 # (`hermes -p tars cron resume <id>`) po sprawdzeniu, że Telegram działa (scripts/install-fleet.sh --resume-cron).

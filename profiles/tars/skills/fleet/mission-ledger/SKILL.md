@@ -2,7 +2,7 @@
 name: mission-ledger
 description: "Dziennik misji: MISSION.md, INDEX.md, raport końcowy."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:
@@ -16,7 +16,7 @@ metadata:
 
 # Dziennik misji
 
-Dziennik to **pamięć zewnętrzna TARS-a**. Tablica kanban pamięta pracę; dziennik pamięta,
+Dziennik to **pamięć zewnętrzna Jarva**. Tablica kanban pamięta pracę; dziennik pamięta,
 *po co* ta praca jest, co postanowiliście i co obiecałeś użytkownikowi.
 
 ## Pliki

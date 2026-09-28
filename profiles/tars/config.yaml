@@ -1,4 +1,4 @@
-# TARS: Main Judge. Tokeny @@...@@ podstawia scripts/build.py z fleet.yaml.
+# Jarvo: Main Judge. Tokeny @@...@@ podstawia scripts/build.py z fleet.yaml.
 model:
   provider: "@@PROVIDER@@"
   default: "@@MODEL@@"
@@ -17,7 +17,7 @@ memory:
   nudge_interval: 8
 
 skills:
-  creation_nudge_interval: 0      # TARS nie tworzy skilli sam; ulepszenia idą przez fleet-improvement → repo
+  creation_nudge_interval: 0      # Jarvo nie tworzy skilli sam; ulepszenia idą przez fleet-improvement → repo
 
 web:
   search_backend: searxng         # SEARXNG_URL ustawia docker-compose (własny SearXNG)
@@ -73,6 +73,6 @@ security:
 kanban:
   auto_subscribe_on_create: true
 
-# Branding terminala: skórka TARS (branding/skin-tars.yaml)
+# Branding terminala: skórka Jarvo (branding/skin-tars.yaml)
 display:
   skin: tars

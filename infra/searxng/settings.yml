@@ -1,8 +1,8 @@
-# SearXNG dla floty TARS: wewnętrzna metawyszukiwarka (dostęp tylko z sieci tars-net).
+# SearXNG dla floty Jarvo: wewnętrzna metawyszukiwarka (dostęp tylko z sieci tars-net).
 use_default_settings: true
 
 general:
-  instance_name: "TARS Search"
+  instance_name: "Jarvo Search"
   debug: false
 
 server:

@@ -2,7 +2,7 @@
 name: pakiet-kampanii
 description: "Kampania: koncepcja, posty, grafiki, brief wideo, kalendarz."
 version: 1.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:
@@ -24,7 +24,7 @@ metadata:
 3. **Treści:** posty (`copy-pl`, `social`), grafiki (`grafika-social`), opcjonalnie e-mail (`emails`)
    i reklamy (`ad-creative`), zgodnie z listą z karty.
    **Filmy** robi `tars-wideo`: piszę `out/teksty/BRIEF-WIDEO.md` (na film: platforma i format, długość, przesłanie,
-   hook, CTA, ton, materiały z kitu, data w kalendarzu) i w `summary` oddania proszę TARS-a o kartę dla Wideografa.
+   hook, CTA, ton, materiały z kitu, data w kalendarzu) i w `summary` oddania proszę Jarva o kartę dla Wideografa.
 4. **Kalendarz** (`social-media-content-calendar`): `out/kalendarz.csv` (data, godzina, platforma, typ, plik, tekst, CTA, status=szkic).
 5. **Kontrola:** `check_media.py out/ --auto`, limity tekstów, spójność wizualna (obejrzyj całość obok siebie).
 6. **INDEX i RAPORT:** `out/INDEX.md` (każdy plik: do czego i gdzie), `out/RAPORT.md` (koncepcja w 5 zdaniach, samokontrola DoD,

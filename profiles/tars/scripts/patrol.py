@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Patrol floty TARS: sprawdza tablicę kanban i dziennik misji BEZ modelu.
+"""Patrol floty Jarvo: sprawdza tablicę kanban i dziennik misji BEZ modelu.
 
 Uruchamiany przez cron Hermesa (skrypt przed turą agenta). Wypisuje czytelny raport anomalii,
 a w ostatniej linii JSON dla schedulera:
     {"wakeAgent": false}                      → cisza, zero tokenów
-    {"wakeAgent": true, "context": {...}}     → TARS dostaje raport i działa (skill `patrol`)
+    {"wakeAgent": true, "context": {...}}     → Jarvo dostaje raport i działa (skill `patrol`)
 
-Ta sama anomalia nie budzi TARS-a częściej niż co TARS_PATROL_REALERT_HOURS (domyślnie 12 h).
+Ta sama anomalia nie budzi Jarva częściej niż co TARS_PATROL_REALERT_HOURS (domyślnie 12 h).
 
 Tryb testowy: --fixture plik.json (tasks/events/diagnostics/index) zamiast wywołań `hermes`.
 """

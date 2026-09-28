@@ -2,7 +2,7 @@
 name: formaty-wideo
 description: "Formaty wideo platform: wymiary, długość, strefy UI."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

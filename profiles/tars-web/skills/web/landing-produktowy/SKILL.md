@@ -2,7 +2,7 @@
 name: landing-produktowy
 description: "Landing produktu pod SEO i konwersję, z danymi z researchu."
 version: 1.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

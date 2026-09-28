@@ -1,4 +1,4 @@
-"""TARS HQ: logika stanu floty dla GUI (bez FastAPI i bez importów Hermesa, więc da się ją testować).
+"""Jarvo HQ: logika stanu floty dla GUI (bez FastAPI i bez importów Hermesa, więc da się ją testować).
 
 Źródła danych (wszystko tylko do odczytu):
   - tablica kanban: $HERMES_HOME/kanban.db (SQLite, tryb ro),
@@ -6,7 +6,7 @@
   - dziennik misji: /opt/data/tars/missions/INDEX.md,
   - wyniki: katalogi robocze kart (tasks.workspace_path) i /opt/data/tars/workspaces/<agent>/.
 
-Zapisów tu nie ma. Rozmowy idą przez API gatewaya (plugin_api.py), decyzje przez TARS-a.
+Zapisów tu nie ma. Rozmowy idą przez API gatewaya (plugin_api.py), decyzje przez Jarva.
 """
 
 from __future__ import annotations
@@ -303,7 +303,7 @@ _ROW = re.compile(r"^\|\s*(?P<id>[MZ]-[^|]+?)\s*\|(?P<rest>.*)\|\s*$")
 
 
 def parse_missions(index_md: str) -> list[dict]:
-    """Wiersze sekcji „## Aktywne” dziennika misji (ten sam format co patrol TARS-a)."""
+    """Wiersze sekcji „## Aktywne” dziennika misji (ten sam format co patrol Jarva)."""
     rows, section = [], None
     for line in index_md.splitlines():
         if line.startswith("## "):
@@ -358,10 +358,10 @@ def agent_cards(name: str, tasks: list[dict], orchestrator: str) -> dict[str, li
         if st == "running" and (t.get("worker") or t.get("assignee")) == name:
             out["running"].append(t)
         elif st in ("running", "review") and t.get("worker") == name and not mine:
-            # cudza karta, którą ten profil właśnie wykonuje (np. TARS jako sędzia w torze review)
+            # cudza karta, którą ten profil właśnie wykonuje (np. Jarvo jako sędzia w torze review)
             out["running"].append(t)
         elif st == "running" and mine and t.get("worker") and t["worker"] != name:
-            # karta agenta, którą w tej chwili wykonuje inny profil (np. TARS ją ocenia)
+            # karta agenta, którą w tej chwili wykonuje inny profil (np. Jarvo ją ocenia)
             out["review"].append(t)
         elif mine and st in ("ready", "todo", "scheduled"):
             out["ready"].append(t)
@@ -398,7 +398,7 @@ def derive_status(name: str, cards: dict[str, list[dict]], now: float) -> dict:
 
 def worker_session(t: dict) -> tuple[str | None, float | None]:
     """(session_id, od kiedy) sesji tego, kto teraz pracuje nad kartą. session_id karty należy do
-    wykonawcy; gdy kartę trzyma inny profil (np. TARS-sędzia), szukamy jego sesji po starcie runu."""
+    wykonawcy; gdy kartę trzyma inny profil (np. Jarvo-sędzia), szukamy jego sesji po starcie runu."""
     if t.get("worker") and t["worker"] != t.get("assignee"):
         return None, t.get("run_started_at") or t.get("started_at")
     return t.get("session_id"), t.get("run_started_at") or t.get("started_at")
@@ -635,7 +635,7 @@ def compose_message(text: str, attachments: list[str]) -> str:
 
 
 # ------------------------------------------------------------------------- zlecenie karty
-# Format zlecenia z dispatch-playbook TARS-a: CEL / KONTEKST / WEJŚCIA / DoD / WYJŚCIA / GRANICE.
+# Format zlecenia z dispatch-playbook Jarva: CEL / KONTEKST / WEJŚCIA / DoD / WYJŚCIA / GRANICE.
 BRIEF_KEYS = {"cel": "cel", "kontekst": "kontekst", "wejścia": "wejscia", "wejscia": "wejscia",
               "dod": "dod", "wyjścia": "wyjscia", "wyjscia": "wyjscia", "granice": "granice"}
 _BRIEF_LINE = re.compile(r"^\s*(?:[-*#>]+\s*)?\**\s*(" + "|".join(BRIEF_KEYS) + r")\s*\**\s*:\**\s*(.*)$", re.I)

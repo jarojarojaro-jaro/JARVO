@@ -2,7 +2,7 @@
 name: krotki-film
 description: "Krótki film z tematu: plan, ujęcia, lektor, napisy, montaż."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

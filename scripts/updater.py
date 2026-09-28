@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pomocnik hosta TARS: przycisk „Aktualizuj” i „Pokaż w folderze” w dashboardzie bez dawania kontenerowi
+"""Pomocnik hosta Jarvo: przycisk „Aktualizuj” i „Pokaż w folderze” w dashboardzie bez dawania kontenerowi
 dostępu do Dockera ani do hosta.
 
     python3 scripts/updater.py [--compose DIR] [--build DIR] [--once]

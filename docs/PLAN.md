@@ -1,8 +1,8 @@
-# TARS — plan budowy (od 0 do ∞)
+# Jarvo — plan budowy (od 0 do ∞)
 
 > Prywatny, „wszechwiedzący” asystent AI zbudowany na **Hermes Agent** (Nous Research).
 > Jeden agent na zewnątrz, w środku **flota wyspecjalizowanych profili**. Z każdym można
-> rozmawiać osobno, a TARS je koordynuje. Wszystko jest skonfigurowane z góry, więc nie
+> rozmawiać osobno, a Jarvo je koordynuje. Wszystko jest skonfigurowane z góry, więc nie
 > zaczynasz od pustej kartki.
 
 Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa do postawienia na VPS**
@@ -17,7 +17,7 @@ Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa 
 | [PROFILE-SPEC.md](PROFILE-SPEC.md) | anatomia agenta: 10 warstw, kontrakt zlecenia, Definition of Ready |
 | [TOOLBOX.md](TOOLBOX.md) | zweryfikowane narzędzia open-source per agent + polityka licencji |
 | [BOSS.md](BOSS.md) | mechanika Main Judge'a: misje, kolejka decyzji, patrol, sędziowanie, eskalacje |
-| [HQ.md](HQ.md) | TARS HQ: GUI floty (pokoje agentów, praca na żywo, czat) |
+| [HQ.md](HQ.md) | Jarvo HQ: GUI floty (pokoje agentów, praca na żywo, czat) |
 | [VPS.md](VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring, wdrożenia |
 | [RUNBOOK.md](RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [SOURCES.md](SOURCES.md) | źródła, atrybucje i licencje |
@@ -36,18 +36,18 @@ Naszą pracą jest ich *wypełnienie i spięcie*, a nie przepisywanie rdzenia:
 | Rozmowy z każdym osobno | Aliasy CLI (`tars-fin chat`), **Bot Mode** w aplikacji desktopowej (lista botów, czaty grupowe, boty piszące do siebie), Telegram/Discord/Slack |
 | Jednego bota na Telegramie, który rozdziela rozmowy | **Gateway z multipleksacją** + `gateway.profile_routes` (routing po czacie lub wątku do profilu) |
 | Swarmu, czyli współpracy specjalistów | **Kanban**: trwała tablica zadań współdzielona przez profile, z orkiestratorem routującym po opisie profilu; do szybkich podzadań `delegate_task` |
-| Wspólnej wiedzy o użytkowniku | MVP: plik `knowledge/user/USER.md` z wywiadu onboardingowego + pamięć użytkownika TARS-a (kontekst trafia do kart). Później **Honcho**: wspólny „user peer”, osobny „AI peer” na profil |
+| Wspólnej wiedzy o użytkowniku | MVP: plik `knowledge/user/USER.md` z wywiadu onboardingowego + pamięć użytkownika Jarva (kontekst trafia do kart). Później **Honcho**: wspólny „user peer”, osobny „AI peer” na profil |
 | Izolacji specjalistów („snajperów”) | `hermes profile create --no-skills`: profil bez domyślnego katalogu skilli, dostaje tylko to, co mu damy |
 | Oceny wyników przez szefa | Statusy kanbana `review` / `kanban_request_changes` / `kanban_complete`: praca wraca do orkiestratora do akceptacji |
 | Automatyzacji | Wbudowany **cron** z dostarczaniem na dowolną platformę |
 
 Filozofia Hermesa pasuje do nas idealnie: *„rdzeń jest wąski, możliwości żyją na
 krawędziach”* (skille, pluginy, MCP, profile). Dzięki temu aktualizacje Hermesa nie
-rozwalą nam TARS-a.
+rozwalą nam Jarva.
 
 **Uczciwe zastrzeżenie:** „wszechwiedzący” w praktyce znaczy: dobra wiedza domenowa
 w skillach, dostęp do sieci i Twoich danych przez narzędzia oraz pamięć, która rośnie
-z czasem. Model sam z siebie nie wie wszystkiego. Z każdym tygodniem używania TARS
+z czasem. Model sam z siebie nie wie wszystkiego. Z każdym tygodniem używania Jarvo
 wie jednak coraz więcej o Tobie.
 
 ---
@@ -62,24 +62,24 @@ Zasady:
 1. **Specjalista = snajper.** Jedna dziedzina, własne skille, własna wiedza, własna pamięć.
    Zero wspólnego katalogu skilli: profile tworzone z `--no-skills`, a toolsety
    ograniczone do tego, czego dziedzina potrzebuje. Czego nie umie, tego nie robi. Oddaje zadanie szefowi.
-2. **TARS = Main Judge (orkiestrator).** Sam nie wykonuje pracy dziedzinowej. Robi cztery rzeczy:
+2. **Jarvo = Main Judge (orkiestrator).** Sam nie wykonuje pracy dziedzinowej. Robi cztery rzeczy:
    - **intake:** rozumie, czego chcesz, dopytuje tylko o prawdziwe decyzje,
    - **dispatch:** rozbija cel na karty kanbana i przypisuje je właściwym snajperom,
-   - **judge:** każdy wynik wraca w statusie `review`, a TARS go ocenia według kryteriów
+   - **judge:** każdy wynik wraca w statusie `review`, a Jarvo go ocenia według kryteriów
      z karty: akceptuje (`complete`) albo odsyła do poprawki (`request_changes`),
    - **raport:** oddaje Ci jeden, sprawdzony wynik.
 3. **Bezpośredni kontakt zostaje.** Z każdym snajperem możesz pogadać osobno, ale praca
    wieloetapowa zawsze idzie przez szefa.
 4. **Jedyna rzecz wspólna:** wiedza o *Tobie* (kim jesteś, preferencje). Każdy snajper
    dostaje ją do kontekstu, ale nie wie nic o dziedzinach innych snajperów.
-5. **Nadzór bez palenia tokenów:** dispatcher kanbana i heartbeaty pilnują floty, a TARS
+5. **Nadzór bez palenia tokenów:** dispatcher kanbana i heartbeaty pilnują floty, a Jarvo
    budzi się tylko, gdy coś wymaga oceny albo Twojej decyzji.
 
 ## 3. Architektura docelowa
 
 ```
                          ┌──────────────────────────────┐
-   Ty ── CLI / Desktop ──►│  TARS (profil „tars”)        │  ← dyspozytor + osobowość
+   Ty ── CLI / Desktop ──►│  Jarvo (profil „tars”)        │  ← dyspozytor + osobowość
        ── Telegram ──────►│  frontier model, toolset     │     odpowiada sam albo
                           │  kanban (orkiestrator)       │     zleca specjalistom
                           └──────────────┬───────────────┘
@@ -95,7 +95,7 @@ Zasady:
                (alias CLI, Bot Chat w desktopie, własny temat na Telegramie)
 
   Wspólne warstwy (dla wszystkich profili):
-   • pamięć o Tobie    → MVP: USER.md + pamięć TARS-a; później Honcho (wspólny user peer)
+   • pamięć o Tobie    → MVP: USER.md + pamięć Jarva; później Honcho (wspólny user peer)
    • (brak wspólnych skilli: każdy snajper ma wyłącznie swoje)
    • tablica zadań     → ~/.hermes/kanban.db (współdzielona przez profile)
 ```
@@ -104,17 +104,17 @@ Zasady:
 
 1. **Rozmowa bezpośrednia:** piszesz do konkretnego specjalisty (`tars-fin chat`,
    jego Bot Chat, jego temat na Telegramie). Specjalista ma swoją pamięć i swoje skille.
-2. **Przez TARS-a:** piszesz do TARS-a, a on decyduje:
+2. **Przez Jarva:** piszesz do Jarva, a on decyduje:
    - odpowiada sam (proste rzeczy, small talk, szybkie fakty),
    - `delegate_task`: krótkie, jednorazowe podzadanie (anonimowy subagent, wynik wraca do rozmowy),
    - `kanban_create` z `assignee: tars-xyz`: prawdziwe zlecenie *nazwanemu specjaliście*,
      z jego pamięcią i skillami. Jest trwałe, przeżywa restart i można je śledzić.
-3. **Rój:** TARS rozbija większy cel na karty kanbana dla kilku specjalistów
+3. **Rój:** Jarvo rozbija większy cel na karty kanbana dla kilku specjalistów
    z zależnościami (np. research → analiza → tekst), a na końcu składa wynik.
 
 > Ważne: `delegate_task` **nie** uruchamia profilu specjalisty, tylko świeżego
 > subagenta. Jeśli liczy się wiedza i pamięć specjalisty, trzeba użyć kanbana.
-> To rozróżnienie musi znać SOUL TARS-a.
+> To rozróżnienie musi znać SOUL Jarva.
 
 ---
 
@@ -144,17 +144,17 @@ evals/tars-fin/*.yaml   # scenariusze testowe: pytanie → oczekiwane zachowanie
 ```
 
 **Szablon SOUL.md dla specjalisty** (sekcje obowiązkowe):
-1. *Kim jestem*: rola w jednym zdaniu, osobowość w stylu TARS (humor/szczerość w %).
+1. *Kim jestem*: rola w jednym zdaniu, osobowość w stylu Jarvo (humor/szczerość w %).
 2. *Mój zakres*: co robię. *Poza zakresem*: czego nie robię i komu to oddaję.
 3. *Jak pracuję*: domyślne procedury i które skille wołam w jakiej sytuacji.
 4. *Zasady bezpieczeństwa*: np. finanse bez wykonywania przelewów, zdrowie z zastrzeżeniem,
    że to nie porada medyczna.
-5. *Protokół przekazania*: gdy zadanie wykracza poza dziedzinę, oddaje je TARS-owi (`kanban_block` z powodem), nigdy nie improwizuje.
+5. *Protokół przekazania*: gdy zadanie wykracza poza dziedzinę, oddaje je Jarvowi (`kanban_block` z powodem), nigdy nie improwizuje.
 6. *Język*: domyślnie polski.
 
 **Rejestr floty:** `fleet.yaml` to jedno źródło prawdy o tym, kto istnieje: nazwa, opis
 (do routingu kanbana), tier modelu, kanał/temat na Telegramie, status. Skrypty generują
-z niego trasy `profile_routes`, opisy profili i **skill „roster” dla TARS-a** (żeby
+z niego trasy `profile_routes`, opisy profili i **skill „roster” dla Jarva** (żeby
 dyspozytor zawsze wiedział, jacy specjaliści istnieją). Dzięki temu dodanie specjalisty
 to jeden wpis i jeden katalog, bez ręcznej edycji w pięciu miejscach.
 
@@ -188,12 +188,12 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Model sandboxu: agenci wykonują komendy w kontenerze Hermesa, bez gniazda Dockera.
 - ✅ `hermes profile install` z lokalnego katalogu i `hermes profile update --force-config`.
 - ✅ Izolacja snajpera: `.no-bundled-skills`, profil widzi wyłącznie swoje skille.
-- 🟡 Pętla judge: snajper → `review` → TARS `request_changes` → poprawka → `complete` (tor review skonfigurowany).
-- 🟡 Kanban między profilami: karta od TARS-a, wykonanie przez snajpera, wynik wraca.
+- 🟡 Pętla judge: snajper → `review` → Jarvo `request_changes` → poprawka → `complete` (tor review skonfigurowany).
+- 🟡 Kanban między profilami: karta od Jarva, wykonanie przez snajpera, wynik wraca.
 - 🟡 Telegram: jeden bot, supergrupa z tematami, `profile_routes` z `thread_id` (config generowany i testowany).
 - ✅ Decyzje spisane w sekcji 7 (zamiast osobnych ADR-ów).
 
-### Faza 1: MVP: TARS + Sherlock
+### Faza 1: MVP: Jarvo + Sherlock
 - ✅ Szkielet repo, `fleet.yaml`, szablony, generator (`scripts/build.py`).
 - ✅ Profil `tars`: SOUL, roster generowany z floty, protokół zlecania, 10 skilli dowodzenia ([BOSS.md](BOSS.md)).
 - ✅ `tars-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
@@ -202,14 +202,14 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
-- 🟡 Telegram: „TARS HQ”, temat na specjalistę, General dla TARS-a.
-- ✅ TARS HQ: GUI floty w dashboardzie Hermesa (pokoje agentów, praca na żywo, decyzje, misje, czat), test na prawdziwym Hermesie ([HQ.md](HQ.md)).
+- 🟡 Telegram: „Jarvo HQ”, temat na specjalistę, General dla Jarva.
+- ✅ Jarvo HQ: GUI floty w dashboardzie Hermesa (pokoje agentów, praca na żywo, decyzje, misje, czat), test na prawdziwym Hermesie ([HQ.md](HQ.md)).
 - ⬜ Desktop: Bot Mode (lista botów, awatary, czat grupowy floty).
 - ⬜ (opcjonalnie) głos: transkrypcja notatek głosowych, TTS.
 
 ### Faza 3: Pamięć i onboarding
 - ✅ Skill `onboarding-interview`: wywiad startowy → `knowledge/user/USER.md`.
-- ✅ MVP pamięci o Tobie: USER.md + pamięć użytkownika TARS-a, kontekst przekazywany w kartach.
+- ✅ MVP pamięci o Tobie: USER.md + pamięć użytkownika Jarva, kontekst przekazywany w kartach.
 - ⬜ Wspólny provider pamięci (Honcho self-host) po sprawdzeniu MVP w praktyce.
 - ⬜ Zasady prywatności: co gdzie leży, co nigdy nie opuszcza serwera.
 
@@ -217,7 +217,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ `tars-web`, `tars-studio`, `tars-reka` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
-- ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, TARS ocenia).
+- ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
 - ⬜ Kolejni specjaliści (`make new-agent`), np. finanse, zdrowie, dom.
 
 ### Faza 5: Automatyzacje i rój
@@ -232,7 +232,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 
 ### Faza 7: Pętla samodoskonalenia
 - ✅ `harvest-skills.sh`: skille utworzone lub zmienione przez agentów → przegląd → repo.
-- ✅ `fleet-improvement` TARS-a: wnioski z przeglądu tygodnia jako propozycje zmian.
+- ✅ `fleet-improvement` Jarva: wnioski z przeglądu tygodnia jako propozycje zmian.
 - ⬜ Wersjonowanie floty (tagi), changelog wydań.
 
 ### Faza ∞
@@ -245,9 +245,9 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
 | # | Decyzja | Rekomendacja | Dlaczego |
 |---|---|---|---|
 | D1 | Lista specjalistów | ✅ Ustalone: flota v1 (sekcja 8) | |
-| D2 | Modele | ✅ OpenRouter (modele, obrazy, wideo); poziomy w `fleet.yaml`: frontier dla TARS-a, strong dla snajperów, fast do delegacji | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
+| D2 | Modele | ✅ OpenRouter (modele, obrazy, wideo); poziomy w `fleet.yaml`: frontier dla Jarva, strong dla snajperów, fast do delegacji | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
 | D3 | Gdzie działa | ✅ Ustalone: VPS (x86_64, UE), Docker, szczegóły w [VPS.md](VPS.md) | |
-| D4 | Główny kanał | ✅ Telegram (DM + grupa „TARS HQ” z tematami) + CLI; desktop jako dodatek | Najtańszy start, działa z telefonu |
+| D4 | Główny kanał | ✅ Telegram (DM + grupa „Jarvo HQ” z tematami) + CLI; desktop jako dodatek | Najtańszy start, działa z telefonu |
 | D5 | Wspólna pamięć | ✅ MVP: wbudowana pamięć + USER.md z onboardingu; Honcho (self-host) w fazie 3, gdy MVP okaże się za mały | Mniej ruchomych części na start; Honcho nadal pasuje do modelu „wspólny użytkownik, osobni agenci” |
 | D6 | Nazewnictwo profili | Prefiks `tars-` (`tars-web`, `tars-sherlock`…) | Profile stają się komendami w shellu, a prefiks unika kolizji |
 | D7 | Język | Polski domyślnie, skille technicznie po angielsku tam, gdzie pomaga modelowi | Naturalna rozmowa i precyzyjne instrukcje |

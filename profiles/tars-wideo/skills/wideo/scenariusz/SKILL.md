@@ -2,7 +2,7 @@
 name: scenariusz
 description: "Scenariusz krótkiego wideo: hook, rytm, tekst lektora."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:
@@ -25,7 +25,7 @@ Film krótki wygrywa w pierwszych 2 sekundach i przegrywa na każdej zbędnej. W
 
 ## Kiedy NIE używać
 - Użytkownik dał gotowy tekst: tylko przycięcie do limitu słów i podział na sceny.
-- Fakty, liczby, porównania bez źródła: najpierw dane od `tars-sherlock` (przez TARS-a) albo z karty.
+- Fakty, liczby, porównania bez źródła: najpierw dane od `tars-sherlock` (przez Jarva) albo z karty.
 
 ## Wejścia
 | Wejście | Wymagane | Jeśli brak |

@@ -2,7 +2,7 @@
 name: nowa-strona
 description: "Nowa strona od briefu do podglądu (Astro, mobile-first)."
 version: 1.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

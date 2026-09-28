@@ -2,7 +2,7 @@
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
 version: 1.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:
@@ -68,7 +68,7 @@ kanban_create(
 
 | Wzorzec | Karty |
 |---|---|
-| **Research → decyzja** | sherlock (raport) → TARS relacjonuje, pyta o decyzję |
+| **Research → decyzja** | sherlock (raport) → Jarvo relacjonuje, pyta o decyzję |
 | **Landing produktu** | sherlock (rynek + słowa kluczowe) → web (landing) ∥ studio (grafiki + posty) ∥ wideo (film, opcjonalnie) → reka (złożenie) |
 | **Audyt + naprawa strony** | web (audyt) → [decyzja użytkownika, co naprawiać] → web (poprawki) |
 | **Kampania** | sherlock (grupa docelowa, konkurencja) → studio (pakiet + brief wideo) → wideo (filmy) → reka (złożenie + kalendarz) |

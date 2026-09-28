@@ -2,7 +2,7 @@
 name: dobor-ujec
 description: "Wybór ujęć okiem: arkusz klatek, ocena, odrzuty."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

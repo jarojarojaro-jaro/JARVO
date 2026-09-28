@@ -1,4 +1,4 @@
-"""Wspólne narzędzia testów floty TARS: import skryptów po ścieżce i kopia repo do modyfikacji."""
+"""Wspólne narzędzia testów floty Jarvo: import skryptów po ścieżce i kopia repo do modyfikacji."""
 
 from __future__ import annotations
 

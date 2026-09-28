@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build TARS HQ (pluginu dashboardu Hermesa) i jego wersji demo.
+"""Build Jarvo HQ (pluginu dashboardu Hermesa) i jego wersji demo.
 
     python3 scripts/hqbuild.py --out build/plugins/tars-hq     # plugin (wołane też przez scripts/build.py)
     python3 scripts/hqbuild.py --demo build/hq-demo            # samodzielne demo z symulacją floty
@@ -27,7 +27,7 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py")
 def bundle_js() -> str:
     htm = (HQ / "web" / "vendor" / "htm.umd.js").read_text(encoding="utf-8").strip()
     parts = [
-        "/* TARS HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/. */",
+        "/* Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/. */",
         "/* htm 3.1.1 (c) Jason Miller, Apache-2.0: https://github.com/developit/htm */",
         "(function () {",
         "var htm = (function () { var module = { exports: {} }; var exports = module.exports;",
@@ -116,9 +116,9 @@ def main(argv: list[str] | None = None) -> int:
     if not args.out and not args.demo:
         ap.error("podaj --out albo --demo")
     if args.out:
-        print(f"✓ plugin TARS HQ: {build_plugin(Path(args.out))}")
+        print(f"✓ plugin Jarvo HQ: {build_plugin(Path(args.out))}")
     if args.demo:
-        print(f"✓ demo TARS HQ: {build_demo(Path(args.demo)) / 'index.html'}")
+        print(f"✓ demo Jarvo HQ: {build_demo(Path(args.demo)) / 'index.html'}")
     return 0
 
 

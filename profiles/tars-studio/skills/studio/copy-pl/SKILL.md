@@ -2,7 +2,7 @@
 name: copy-pl
 description: "Copy po polsku: hook, korzyść, CTA, bez AI-izmów i kalek."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

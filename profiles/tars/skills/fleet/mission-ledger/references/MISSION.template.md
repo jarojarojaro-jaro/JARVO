@@ -1,6 +1,6 @@
 # <ID>: <tytuł>
 status: planowanie | w toku | czeka na decyzję | zakończona | anulowana
-utworzona: <RRRR-MM-DD HH:MM> · kanał: <telegram DM / TARS HQ / cli>
+utworzona: <RRRR-MM-DD HH:MM> · kanał: <telegram DM / Jarvo HQ / cli>
 
 ## Intencja (dosłownie)
 > <wiadomość użytkownika, bez przeróbek>
@@ -14,7 +14,7 @@ utworzona: <RRRR-MM-DD HH:MM> · kanał: <telegram DM / TARS HQ / cli>
 ## Decyzje
 | # | Decyzja | Kto | Kiedy |
 |---|---|---|---|
-| 1 | <np. nazwa produktu: „Nova”> | TARS (domyślna) / użytkownik | <data> |
+| 1 | <np. nazwa produktu: „Nova”> | Jarvo (domyślna) / użytkownik | <data> |
 
 ## Plan (karty)
 | Karta | Agent | Rola | Zależy od | Status | Wynik |

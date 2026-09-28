@@ -1,7 +1,7 @@
 {
   "name": "tars-node-tools",
   "private": true,
-  "description": "Narzędzia Node floty TARS (instalowane w obrazie do /opt/tars/node). Wersje przypięte; aktualizacja = PR + `make pins` (obraz Hermesa odrzuca wersje młodsze niż 14 dni: npm min-release-age). playwright-core musi odpowiadać Chromium z obrazu Hermesa (Dockerfile to sprawdza).",
+  "description": "Narzędzia Node floty Jarvo (instalowane w obrazie do /opt/tars/node). Wersje przypięte; aktualizacja = PR + `make pins` (obraz Hermesa odrzuca wersje młodsze niż 14 dni: npm min-release-age). playwright-core musi odpowiadać Chromium z obrazu Hermesa (Dockerfile to sprawdza).",
   "license": "MIT",
   "dependencies": {
     "agent-browser": "0.37.1",

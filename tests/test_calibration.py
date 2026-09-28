@@ -36,6 +36,6 @@ def test_every_family_has_both_roles():
 def test_recalibrate_keeps_role_and_rest():
     soul = "A\n" + fl.calibration_section("gpt-6-luna", True) + "\nB"
     new = fl.recalibrate_soul(soul, "deepseek/deepseek-v4-pro")
-    assert new.startswith("A\n<!-- TARS:CALIBRATION orkiestrator -->") and new.endswith("\nB")
+    assert new.startswith("A\n<!-- Jarvo:CALIBRATION orkiestrator -->") and new.endswith("\nB")
     assert "dokładne dopasowanie tekstu" in new and "(gpt-6-luna)" not in new
     assert fl.recalibrate_soul("bez znaczników", "x") is None

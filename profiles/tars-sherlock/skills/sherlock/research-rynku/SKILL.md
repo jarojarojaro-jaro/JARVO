@@ -2,7 +2,7 @@
 name: research-rynku
 description: "Rynek: gracze, oferty, ceny, komunikacja, opinie klientów."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

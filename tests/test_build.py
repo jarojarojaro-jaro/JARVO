@@ -80,10 +80,10 @@ def test_soul_gets_model_calibration(built):
     for a in fleet.active():
         soul = (out / a.name / "SOUL.md").read_text(encoding="utf-8")
         role = "orkiestrator" if a.name == fleet.orchestrator else "wykonawca"
-        assert f"<!-- TARS:CALIBRATION {role} -->" in soul, a.name
+        assert f"<!-- Jarvo:CALIBRATION {role} -->" in soul, a.name
         assert f"## Jak pracuję na tym modelu ({fleet.model_for(a.model_tier)})" in soul, a.name
         # blok stoi za protokołem, przed sekcjami po znaczniku
-        assert soul.index("## Kontrakt zlecenia floty") < soul.index("<!-- TARS:CALIBRATION")
+        assert soul.index("## Kontrakt zlecenia floty") < soul.index("<!-- Jarvo:CALIBRATION")
 
 
 def test_orchestrator_roster_and_rubrics(built):

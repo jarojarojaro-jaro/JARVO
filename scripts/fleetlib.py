@@ -1,4 +1,4 @@
-"""Wspólne funkcje narzędzi floty TARS (build, validate, deploy, evals).
+"""Wspólne funkcje narzędzi floty Jarvo (build, validate, deploy, evals).
 
 Tylko biblioteka standardowa + YAML. Działa z PyYAML albo z ruamel.yaml (który jest
 w środowisku Hermesa), więc skrypty można uruchamiać zarówno lokalnie, jak i w kontenerze.
@@ -23,11 +23,11 @@ CALIBRATION_DIR = SHARED_DIR / "calibration"
 # prefiks identyfikatora modelu (bez dostawcy) → plik kalibracji w shared/calibration/
 MODEL_FAMILIES = (("gpt-", "gpt"), ("chatgpt", "gpt"), ("o3", "gpt"), ("o4", "gpt"), ("claude", "claude"),
                   ("deepseek", "deepseek"), ("kimi", "kimi"))
-PROTOCOL_MARKER = "<!-- TARS:PROTOCOL -->"
-ROSTER_MARKER = "<!-- TARS:ROSTER -->"
+PROTOCOL_MARKER = "<!-- Jarvo:PROTOCOL -->"
+ROSTER_MARKER = "<!-- Jarvo:ROSTER -->"
 AGENT_KINDS = {"orchestrator", "specialist", "generalist"}
 AUTONOMY_LEVELS = {"A0", "A1", "A2", "A3"}
-HQ_ROOMS = {"bridge", "study", "devlab", "atelier", "filmstudio", "workshop", "office"}   # pokoje w TARS HQ (hq/web/src/20-art.js)
+HQ_ROOMS = {"bridge", "study", "devlab", "atelier", "filmstudio", "workshop", "office"}   # pokoje w Jarvo HQ (hq/web/src/20-art.js)
 # Hermes ucina opis skilla w indeksie promptu do 60 znaków (agent/skill_utils.py).
 SKILL_PROMPT_DESC_LIMIT = 60
 # Budżet main promptu (SOUL.md) w przybliżonych tokenach (~3.5 znaku/token dla PL/EN).
@@ -242,15 +242,15 @@ def model_family(model_id: str | None) -> str:
     return "generic"
 
 
-CALIBRATION_RE = re.compile(r"<!-- TARS:CALIBRATION (orkiestrator|wykonawca) -->.*?<!-- /TARS:CALIBRATION -->", re.S)
+CALIBRATION_RE = re.compile(r"<!-- Jarvo:CALIBRATION (orkiestrator|wykonawca) -->.*?<!-- /TARS:CALIBRATION -->", re.S)
 
 
 def calibration_section(model_id: str | None, orchestrator: bool, root: Path | None = None) -> str:
     """Blok kalibracji w znacznikach: install-fleet (profile_model.py) podmienia go, gdy w panelu wybrano inny model."""
     role = "orkiestrator" if orchestrator else "wykonawca"
     body = calibration_block(model_id, orchestrator, root)
-    return f"<!-- TARS:CALIBRATION {role} -->\n{body}\n<!-- /TARS:CALIBRATION -->" if body else \
-        f"<!-- TARS:CALIBRATION {role} -->\n<!-- /TARS:CALIBRATION -->"
+    return f"<!-- Jarvo:CALIBRATION {role} -->\n{body}\n<!-- /TARS:CALIBRATION -->" if body else \
+        f"<!-- Jarvo:CALIBRATION {role} -->\n<!-- /TARS:CALIBRATION -->"
 
 
 def recalibrate_soul(soul: str, model_id: str | None, root: Path | None = None) -> str | None:

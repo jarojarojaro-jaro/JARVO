@@ -2,7 +2,7 @@
 name: favicon-i-meta
 description: "Komplet faviconów, manifest, meta, OG i JSON-LD z logo."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

@@ -1,6 +1,6 @@
 # Profil hosta (default, /opt/data): gateway, multipleks profili, dispatcher kanbana, trasy.
 # Z Tobą nie rozmawia. Trasy gateway.profile_routes dopisuje scripts/build.py z fleet.yaml
-# i zmiennych TELEGRAM_* (DM właściciela → tars, wątki grupy "TARS HQ" → agenci).
+# i zmiennych TELEGRAM_* (DM właściciela → tars, wątki grupy "Jarvo HQ" → agenci).
 
 model:                      # nadpisywane przez scripts/build.py: dostawca floty i model `fast`
   provider: openrouter
@@ -46,6 +46,6 @@ platform_toolsets:
   cli: [kanban, file, terminal, skills]
   telegram: [clarify]
 
-# Branding terminala: skórka TARS (branding/skin-tars.yaml)
+# Branding terminala: skórka Jarvo (branding/skin-tars.yaml)
 display:
   skin: tars

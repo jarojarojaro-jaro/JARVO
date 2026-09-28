@@ -1,4 +1,4 @@
-/* TARS HQ: style pluginu dashboardu Hermesa. Wszystko w przestrzeni .thq-* (bez wpływu na dashboard).
+/* Jarvo HQ: style pluginu dashboardu Hermesa. Wszystko w przestrzeni .thq-* (bez wpływu na dashboard).
    Kolory powierzchni biorą tokeny motywu dashboardu (--color-*), z własnymi wartościami zapasowymi. */
 @import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&family=Pixelify+Sans:wght@400;500;600;700&display=swap");
 
@@ -66,7 +66,7 @@
 .thq-decisions-btn.has-items { background: var(--thq-accent); border-color: var(--thq-accent); color: var(--thq-accent-ink); }
 .thq-badge { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: rgba(0,0,0,.14); font: 700 0.8rem var(--thq-mono); }
 
-/* pasek w nagłówku dashboardu Hermesa (obok tytułu „TARS HQ” i po prawej) */
+/* pasek w nagłówku dashboardu Hermesa (obok tytułu „Jarvo HQ” i po prawej) */
 .thq-headbar { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--thq-ink); font: 13px/1.2 var(--thq-ui); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .thq-headbar-end { justify-content: flex-end; width: 100%; }
 .thq-headbar .thq-stats { flex-wrap: nowrap; gap: 4px; }

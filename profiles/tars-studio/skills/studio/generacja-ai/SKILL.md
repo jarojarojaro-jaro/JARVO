@@ -2,7 +2,7 @@
 name: generacja-ai
 description: "Obrazy z AI (OpenRouter): prompt, spójność serii, koszt."
 version: 1.1.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

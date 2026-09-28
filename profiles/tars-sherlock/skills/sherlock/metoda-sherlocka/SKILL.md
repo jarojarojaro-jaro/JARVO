@@ -2,7 +2,7 @@
 name: metoda-sherlocka
 description: "Śledztwo: plan, wątki, źródła pierwotne, weryfikacja."
 version: 1.1.0
-author: "TARS (metodologia inspirowana: langchain-ai/open_deep_research MIT, dzhng/deep-research MIT, STORM MIT)"
+author: "Jarvo (metodologia inspirowana: langchain-ai/open_deep_research MIT, dzhng/deep-research MIT, STORM MIT)"
 license: MIT
 metadata:
   hermes:

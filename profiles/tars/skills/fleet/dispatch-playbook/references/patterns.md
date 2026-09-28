@@ -4,7 +4,7 @@ Każdy wzorzec to punkt wyjścia. Dopasuj go do intencji, nie odwrotnie.
 
 ## 1. Research → decyzja
 - `tars-sherlock` / `research`: raport z odpowiedzią na pytanie użytkownika, poziomem pewności i rekomendacją.
-- Po akceptacji: TARS relacjonuje wnioski (nie wkleja całego raportu), podaje ścieżkę do raportu i pyta o decyzję, jeśli taka wynika.
+- Po akceptacji: Jarvo relacjonuje wnioski (nie wkleja całego raportu), podaje ścieżkę do raportu i pyta o decyzję, jeśli taka wynika.
 
 ## 2. Landing produktu (pełny launch)
 1. `tars-sherlock` / `rynek`: grupa docelowa, 3–5 konkurentów (propozycje wartości, ceny, komunikacja), słowa kluczowe PL z intencją.
@@ -16,7 +16,7 @@ Decyzje przed rozdaniem: nazwa produktu, język, domena/ścieżka, CTA (np. zapi
 
 ## 3. Audyt + naprawa strony
 1. `tars-web` / `audyt`: raport priorytetów (P0–P3) z dowodami (Lighthouse, axe, linki, SEO).
-2. TARS → decyzja użytkownika: które priorytety naprawiać (domyślnie P0 + P1).
+2. Jarvo → decyzja użytkownika: które priorytety naprawiać (domyślnie P0 + P1).
 3. `tars-web` / `poprawki`: zmiany na kopii/gałęzi + raport przed/po. Wdrożenie = osobna decyzja (A2).
 
 ## 4. Kampania / content
@@ -29,7 +29,7 @@ Publikacja = decyzja użytkownika (A2), potem Studio ustawia kolejkę.
 ## 5. Brand kit z istniejącej strony
 1. `tars-web` / `brand`: `brand-z-url` → `@@KNOWLEDGE_DIR@@/brands/<slug>/`.
 2. `tars-studio` / `brand-review` (parents: brand): weryfikacja tonu komunikacji i elementów wizualnych, uzupełnienie `product-marketing.md`.
-3. TARS → użytkownik: akceptacja brand kitu (ustawia `approved_by_owner: true`).
+3. Jarvo → użytkownik: akceptacja brand kitu (ustawia `approved_by_owner: true`).
 
 ## 6. Film (pojedynczy albo seria)
 1. opcjonalnie `tars-sherlock` / `fakty`: dane i źródła, gdy film podaje liczby, porównania albo twierdzenia.

@@ -3,7 +3,7 @@
 
     python3 extract.py <url> [--max-chars 20000] [--json]
 
-Trafilatura jest instalowana w obrazie TARS (infra/Dockerfile). Bez niej skrypt robi prosty
+Trafilatura jest instalowana w obrazie Jarvo (infra/Dockerfile). Bez niej skrypt robi prosty
 fallback (HTML → tekst), a w wyniku ustawia "degraded": true.
 """
 

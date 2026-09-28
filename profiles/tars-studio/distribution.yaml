@@ -1,7 +1,7 @@
 name: tars-studio
 version: 0.2.0
 description: "Studio: copy, grafiki, obrazy AI, kampanie social (filmy: Wideograf); publikacja tylko za zgodą."
-author: "TARS fleet"
+author: "Jarvo fleet"
 license: MIT
 env_requires:
   - name: OPENROUTER_API_KEY

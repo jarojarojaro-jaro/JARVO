@@ -1,5 +1,5 @@
 /* Fosfor: wygląd CRT dla całego dashboardu. Zmienne --fos-* wstawia scripts/install_themes.py
-   (liczone z jednego koloru). Wieża TARS HQ zostaje w swoich kolorach. */
+   (liczone z jednego koloru). Wieża Jarvo HQ zostaje w swoich kolorach. */
 @keyframes fos-blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
 
 html, body, #root > div { background: var(--fos-bg) !important; }
@@ -58,7 +58,7 @@ input, textarea, select { background-color: var(--fos-bg) !important; }
 /* terminal czatu w podwójnej ramce */
 .hermes-chat-xterm-host { outline: 3px double var(--fos-mid); outline-offset: 6px; }
 
-/* ---- TARS HQ (plugin) ---- */
+/* ---- Jarvo HQ (plugin) ---- */
 .thq-root, .thq-modal-back { --thq-accent: var(--fos); --thq-accent-ink: var(--fos-bg); --thq-goal: var(--fos-alt); }
 .thq-headbar, .thq-root { font-family: var(--theme-font-sans); }
 .thq-stat, .thq-panel, .thq-dock, .thq-target, .thq-decision, .thq-mission, .thq-chip {

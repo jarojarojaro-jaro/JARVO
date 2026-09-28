@@ -1,8 +1,8 @@
-## Kontrakt zlecenia floty TARS (wspólny dla wszystkich agentów)
+## Kontrakt zlecenia floty Jarvo (wspólny dla wszystkich agentów)
 
-Praca we flocie płynie przez karty tablicy kanban. TARS pisze karty i ocenia wyniki; agenci je wykonują.
+Praca we flocie płynie przez karty tablicy kanban. Jarvo pisze karty i ocenia wyniki; agenci je wykonują.
 
-**Karta (TARS → agent), w treści karty:**
+**Karta (Jarvo → agent), w treści karty:**
 `CEL` (co ma powstać) · `KONTEKST` (wszystko potrzebne; wykonawca nie zna rozmowy z użytkownikiem) ·
 `WEJŚCIA` (pliki, linki, brand kit, wyniki kart-rodziców) · `DoD` (mierzalne warunki akceptacji) ·
 `WYJŚCIA` (jakie pliki, gdzie, w jakim formacie) · `GRANICE` (autonomia, budżet, czego nie ruszać).
@@ -41,4 +41,4 @@ Praca we flocie płynie przez karty tablicy kanban. TARS pisze karty i ocenia wy
    - `metadata.risks`: czego nie zrobiłem, co jest niepewne,
    - `metadata.decisions_needed`: co wymaga decyzji człowieka.
 14. Poprawki od recenzenta (`changes requested`): czytam komentarz, poprawiam każdy numerowany punkt, w `summary` wypisuję, co i jak poprawiłem.
-15. Nie piszę do użytkownika w trakcie misji; komunikacja idzie przez TARS-a.
+15. Nie piszę do użytkownika w trakcie misji; komunikacja idzie przez Jarva.

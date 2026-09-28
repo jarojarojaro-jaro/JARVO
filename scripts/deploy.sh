@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wdrożenie floty TARS na VPS (idempotentne). Uruchamiaj z /srv/tars/repo jako użytkownik z grupy docker.
+# Wdrożenie floty Jarvo na VPS (idempotentne). Uruchamiaj z /srv/tars/repo jako użytkownik z grupy docker.
 #
 #   bash scripts/deploy.sh [--first-run] [--no-pull] [--rebuild] [--pull-base] [--resume-cron] [--monitoring]
 #
@@ -91,4 +91,4 @@ docker exec -u hermes tars-hermes hermes profile list || true
 docker exec -u hermes tars-hermes hermes -p tars cron list || true
 echo
 echo "✅ Wdrożenie zakończone. Commit: $(git rev-parse --short HEAD)"
-[[ $RESUME_CRON -eq 0 ]] && echo "ℹ Rutyny TARS-a są wstrzymane. Po teście Telegrama: bash scripts/deploy.sh --no-pull --resume-cron"
+[[ $RESUME_CRON -eq 0 ]] && echo "ℹ Rutyny Jarva są wstrzymane. Po teście Telegrama: bash scripts/deploy.sh --no-pull --resume-cron"

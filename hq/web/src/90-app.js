@@ -1,4 +1,4 @@
-// Aplikacja TARS HQ: budynek + panel (agent albo Centrala) + dock czatu.
+// Aplikacja Jarvo HQ: budynek + panel (agent albo Centrala) + dock czatu.
 
 const useHostI18n = (SDK && SDK.useI18n) || (() => null);
 
@@ -32,7 +32,7 @@ function App() {
   // tytuł, liczniki i przycisk decyzji w górnym pasku dashboardu (zamiast osobnego nagłówka HQ)
   useEffect(() => {
     if (!header) return;
-    header.setTitle("TARS HQ");
+    header.setTitle("Jarvo HQ");
     header.setAfterTitle(html`<${HeadStats} state=${state} error=${error}/>`);
     header.setEnd(html`<${HeadDecisions} count=${nDecisions} onClick=${openDecisions}/>`);
   }, [header, state, error, nDecisions]);

@@ -1,4 +1,4 @@
-# Obraz floty TARS: oficjalny Hermes + narzędzia agentów (toolbox.yaml wszystkich profili).
+# Obraz floty Jarvo: oficjalny Hermes + narzędzia agentów (toolbox.yaml wszystkich profili).
 #
 #   docker build -f infra/Dockerfile -t tars-hermes:local \
 #     --build-arg HERMES_IMAGE=nousresearch/hermes-agent:<wersja|digest> \
@@ -127,7 +127,7 @@ RUN set -e; git init -q /opt/tars/vendor/claude-seo && cd /opt/tars/vendor/claud
 ENV CLAUDE_PLUGIN_ROOT=/opt/tars/vendor/claude-seo
 ENV CLAUDE_SEO_PYTHON=/opt/tars/venvs/claude-seo/bin/python
 
-# --- branding TARS w dashboardzie Hermesa (MIT; licencja i autorzy: docs/SOURCES.md):
+# --- branding Jarvo w dashboardzie Hermesa (MIT; licencja i autorzy: docs/SOURCES.md):
 #     favicon, tytuł karty i nazwa w menu. Kod Hermesa bez zmian, tylko statyczne zasoby.
 COPY branding/ /tmp/tars-brand/
 RUN python3 /tmp/tars-brand/patch_dashboard.py /tmp/tars-brand && rm -rf /tmp/tars-brand
@@ -143,5 +143,5 @@ ENV TARS_KNOWLEDGE_DIR=/opt/data/tars/knowledge \
     HERMES_WRITE_SAFE_ROOT=/opt/data
 
 LABEL org.opencontainers.image.title="tars-hermes" \
-      org.opencontainers.image.description="Hermes Agent + narzędzia floty TARS"
+      org.opencontainers.image.description="Hermes Agent + narzędzia floty Jarvo"
 # Entrypoint i CMD dziedziczone z obrazu Hermesa (s6-overlay).

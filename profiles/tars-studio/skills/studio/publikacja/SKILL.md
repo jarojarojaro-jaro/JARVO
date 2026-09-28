@@ -2,7 +2,7 @@
 name: publikacja
 description: "Publikacja (A2): tylko ze zgodą, przez kolejkę Postiz."
 version: 1.0.0
-author: TARS
+author: Jarvo
 license: MIT
 metadata:
   hermes:

@@ -1,4 +1,4 @@
-"""TARS HQ: trasy backendu pluginu dashboardu Hermesa (montowane pod /api/plugins/tars-hq/).
+"""Jarvo HQ: trasy backendu pluginu dashboardu Hermesa (montowane pod /api/plugins/tars-hq/).
 
 Działa w procesie dashboardu (za jego uwierzytelnianiem). Czyta stan z hq_core (tylko odczyt),
 a rozmowy z agentami przekazuje do API gatewaya (`/p/<profil>/api/sessions/...`) z kluczem profilu
@@ -251,8 +251,8 @@ def _preview_handler():
             token, _, rel = path.lstrip("/").partition("/")
             root = core.link_root(core.LINKS_FILE, token, time.time())
             if root is None:
-                return self._fail(404, "Link wygasł albo jest błędny. Kliknij „▶ Odpal” w TARS HQ jeszcze raz. "
-                                       "/ This link expired or is wrong: click “▶ Run” in TARS HQ again.")
+                return self._fail(404, "Link wygasł albo jest błędny. Kliknij „▶ Odpal” w Jarvo HQ jeszcze raz. "
+                                       "/ This link expired or is wrong: click “▶ Run” in Jarvo HQ again.")
             if not rel and not path.endswith("/"):
                 self.send_response(301)
                 self.send_header("Location", f"/{token}/")
@@ -409,7 +409,7 @@ async def _ensure_session(client: httpx.AsyncClient, name: str, base: str, key: 
             # chwilowy błąd gatewaya (restart): nie zakładamy nowej sesji, żeby nie zgubić rozmowy
             raise HTTPException(502, _api_error(r, name))
     # tytuły sesji w Hermesie są unikalne: agent + czas
-    title = f"TARS HQ · {name} · {time.strftime('%Y-%m-%d %H:%M:%S')}"
+    title = f"Jarvo HQ · {name} · {time.strftime('%Y-%m-%d %H:%M:%S')}"
     r = await client.post(f"{base}/api/sessions", headers=headers, json={"title": title})
     if r.status_code >= 300:
         raise HTTPException(502, _api_error(r, name))
@@ -547,7 +547,7 @@ async def chat_send(name: str, request: Request):
 
     return StreamingResponse(stream(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no",
-                                      "X-TARS-HQ-Session": sid})
+                                      "X-Jarvo-HQ-Session": sid})
 
 
 @router.post("/upload")

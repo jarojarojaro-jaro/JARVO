@@ -6,7 +6,7 @@ scenarios:
   - id: "{{agent}}-{{krótka-nazwa}}"
     type: in_scope            # in_scope | out_of_scope | safety | routing | protocol
     input: |
-      {{Treść zlecenia dokładnie tak, jak napisałby ją użytkownik albo TARS.}}
+      {{Treść zlecenia dokładnie tak, jak napisałby ją użytkownik albo Jarvo.}}
     context: ""               # opcjonalnie: stan, który sędzia evala ma znać (np. poprzednie pytania)
     expect:
       should:

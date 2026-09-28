@@ -3,7 +3,7 @@
 # Wołane przez scripts/deploy.sh:  docker exec -u hermes tars-hermes bash /opt/tars/repo/scripts/install-fleet.sh
 #
 #   --first-run     dodatkowo: inicjalizacja tablicy kanban i szablonów wiedzy
-#   --resume-cron   wznawia rutyny TARS-a (po sprawdzeniu, że Telegram działa)
+#   --resume-cron   wznawia rutyny Jarva (po sprawdzeniu, że Telegram działa)
 #   --no-restart    bez restartu gatewaya (staging evals: dane izolowane, gateway nie działa)
 set -euo pipefail
 
@@ -71,7 +71,7 @@ for a in $AGENTS; do
 done
 
 # 3b. klucze API profili: multipleksowany gateway obsługuje /p/<profil>/ tylko z własnym API_SERVER_KEY
-#     profilu (z niego korzysta TARS HQ do rozmów z agentami). Generujemy brakujące, istniejących nie ruszamy.
+#     profilu (z niego korzysta Jarvo HQ do rozmów z agentami). Generujemy brakujące, istniejących nie ruszamy.
 for a in $AGENTS; do
   envf="$DATA/profiles/$a/.env"
   if ! grep -qE '^API_SERVER_KEY=.{16,}' "$envf" 2>/dev/null; then
@@ -82,9 +82,9 @@ for a in $AGENTS; do
   fi
 done
 
-# 3c. TARS HQ: plugin dashboardu (strona główna dashboardu na :9119)
+# 3c. Jarvo HQ: plugin dashboardu (strona główna dashboardu na :9119)
 if [[ -d "$BUILD/plugins/tars-hq" ]]; then
-  log "TARS HQ (plugin dashboardu)"
+  log "Jarvo HQ (plugin dashboardu)"
   mkdir -p "$DATA/plugins"
   rm -rf "$DATA/plugins/tars-hq.new" && cp -r "$BUILD/plugins/tars-hq" "$DATA/plugins/tars-hq.new"
   rm -rf "$DATA/plugins/tars-hq" && mv "$DATA/plugins/tars-hq.new" "$DATA/plugins/tars-hq"
@@ -106,7 +106,7 @@ if [[ -f "$REPO/branding/fosfor/palettes.yaml" ]]; then
   $PY "$REPO/scripts/install_themes.py" "$REPO" "$DATA"
 fi
 
-# 3f. wspólne klucze: klucze dostawców/narzędzi z głównego .env do każdego agenta (na żywo pilnuje ich TARS HQ)
+# 3f. wspólne klucze: klucze dostawców/narzędzi z głównego .env do każdego agenta (na żywo pilnuje ich Jarvo HQ)
 $PY "$REPO/scripts/share_keys.py" "$DATA"
 
 # 4. tablica kanban
@@ -117,7 +117,7 @@ fi
 
 # 5. rutyny
 if [[ $RESUME -eq 1 ]]; then
-  log "Wznawiam rutyny TARS-a"
+  log "Wznawiam rutyny Jarva"
   for job in tars-patrol tars-daily-brief tars-weekly-review tars-knowledge-freshness; do
     hermes -p tars cron resume "$job" || echo "  ! nie udało się wznowić $job"
   done
@@ -127,9 +127,9 @@ fi
 if [[ $RESTART -eq 1 ]]; then
   log "Restart gatewaya"
   hermes gateway restart || echo "  ! restart gatewaya nieudany: sprawdź 'hermes gateway status'"
-  # dashboard montuje backend pluginów przy starcie procesu: po zmianie TARS HQ restartujemy tylko jego
+  # dashboard montuje backend pluginów przy starcie procesu: po zmianie Jarvo HQ restartujemy tylko jego
   if [[ "${HQ_CHANGED:-0}" -eq 1 && -d /run/service/dashboard ]]; then
-    /command/s6-svc -r /run/service/dashboard 2>/dev/null && echo "  ↻ dashboard (TARS HQ)" || echo "  ! restart dashboardu nieudany"
+    /command/s6-svc -r /run/service/dashboard 2>/dev/null && echo "  ↻ dashboard (Jarvo HQ)" || echo "  ! restart dashboardu nieudany"
   fi
 fi
 echo "✅ Flota zainstalowana: $AGENTS"

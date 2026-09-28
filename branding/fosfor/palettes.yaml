@@ -1,4 +1,4 @@
-# Motyw „Fosfor” dashboardu TARS: terminal CRT z 1982. Cały wygląd liczy się z JEDNEGO koloru.
+# Motyw „Fosfor” dashboardu Jarvo: terminal CRT z 1982. Cały wygląd liczy się z JEDNEGO koloru.
 # Każda pozycja to osobny motyw w przełączniku motywów (lewy dolny róg dashboardu).
 # Własny kolor: dopisz linię i wdroż (bash scripts/deploy.sh --no-pull). `default` = motyw na start.
 # `accent` (opcjonalnie): drugi kolor do wyróżnień, np. celu karty; domyślnie bursztyn (dla ciepłych: błękit).
