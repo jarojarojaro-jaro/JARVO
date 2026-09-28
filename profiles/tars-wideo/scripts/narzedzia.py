@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Narzędzia „wideo z kodu” (motion-broll, lemo-opuscar, anidoodle): sprawdzenie i instalacja raz, we wspólnym katalogu.
+"""Narzędzia „wideo z kodu” (motion-broll, lemo-opuscar, anidoodle, Remotion + video-shotcraft, puppeteer): sprawdzenie i instalacja raz, we wspólnym katalogu.
 
     python3 narzedzia.py sprawdz                 # co jest gotowe, czego brak (JSON)
-    python3 narzedzia.py instaluj [motion|lemo|anidoodle|wszystko]
+    python3 narzedzia.py instaluj [motion|lemo|anidoodle|remotion|shotcraft|wszystko]
     python3 narzedzia.py env <narzedzie>         # zmienne środowiska do wklejenia: eval "$(python3 narzedzia.py env motion)"
 
 Zasady (VPS 8 GB, bez dubli):
@@ -30,6 +30,12 @@ LEMO = ROOT / "lemo-opuscar"
 PW_VERSION = "1.63.0"                 # = chromium_headless_shell z obrazu Hermesa
 LEMO_REPO = "https://github.com/lemomo-ai/lemo-opuscar.git"
 LEMO_REV = "108fa78e8468df90a94f3860099484e412447199"   # vendor/skills.lock.yaml → lemo-opuscar
+SHOTCRAFT = ROOT / "video-shotcraft"
+SHOTCRAFT_REPO = "https://github.com/Vincentwei1021/video-shotcraft.git"
+SHOTCRAFT_REV = "e2d8928c57ef84701f9b0119ca4a1c28a62050c1"   # vendor/skills.lock.yaml → video-shotcraft
+REMOTION_VERSION = "4.0.484"          # = szablon video-shotcraft; wspólny cache npm dla projektów Remotion
+REMOTION_PKGS = [f"remotion@{REMOTION_VERSION}", f"@remotion/cli@{REMOTION_VERSION}", "react@19.2.7", "react-dom@19.2.7"]
+PUPPETEER_CORE = "puppeteer-core@24.22.0"   # bang-motion snap/export, pixel2motion: bez pobierania przeglądarki
 PY_BASE = ["numpy", "pillow"]
 PY_LEMO = ["scipy", "soundfile", "soxr", "librosa"]
 PY_LEMO_FULL = ["kokoro-onnx", "faster-whisper"]
@@ -119,6 +125,25 @@ def install_lemo() -> None:
             run(["sh", "tools/fetch.sh", what], cwd=LEMO)
 
 
+def install_remotion() -> None:
+    # Remotion ma własną przeglądarkę do pobrania; my podajemy tę z obrazu (--browser-executable, env niżej)
+    ensure_node([*REMOTION_PKGS, PUPPETEER_CORE])
+
+
+def install_shotcraft() -> None:
+    install_remotion()
+    if not (SHOTCRAFT / "SKILL.md").exists():
+        SHOTCRAFT.parent.mkdir(parents=True, exist_ok=True)
+        run(["git", "clone", "--quiet", "--filter=blob:none", "--sparse", "--no-checkout", SHOTCRAFT_REPO, str(SHOTCRAFT)])
+        run(["git", "-C", str(SHOTCRAFT), "sparse-checkout", "set", "--no-cone", "/*", "!/gallery/"])
+        run(["git", "-C", str(SHOTCRAFT), "checkout", "--quiet", SHOTCRAFT_REV])
+    tpl = SHOTCRAFT / "template"
+    if not (tpl / "node_modules" / ".tars-ok").exists():
+        run(["npm", "ci", "--no-audit", "--no-fund", "--silent"], cwd=tpl,
+            env={"PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1", "PUPPETEER_SKIP_DOWNLOAD": "1"})
+        (tpl / "node_modules" / ".tars-ok").touch()
+
+
 def install_anidoodle() -> None:
     # projekt anidoodle ma własne package.json (scaffold); tu tylko rozgrzewamy cache npm, żeby `npm install` w projekcie
     # szło bez sieci, i sprawdzamy, że przeglądarka z obrazu pasuje do playwright-core z projektu
@@ -138,6 +163,9 @@ def status() -> dict:
         "lemo_glos_kokoro": (LEMO / "core" / "tts" / "kokoro-v1.0.onnx").exists(),
         "lemo_sample": (LEMO / "core" / "audio" / "instruments").is_dir() and any((LEMO / "core" / "audio" / "instruments").iterdir()),
         "anidoodle": (NODE / "node_modules" / "esbuild").exists(),
+        "remotion": (NODE / "node_modules" / "@remotion" / "cli").exists(),
+        "puppeteer": (NODE / "node_modules" / "puppeteer-core").exists(),
+        "shotcraft": (SHOTCRAFT / "template" / "node_modules" / ".tars-ok").exists(),
         "pelne_lemo": full_extras(),
     }
 
@@ -151,7 +179,15 @@ def env_for(tool: str) -> dict:
         return {**base, "LEMO_OPUSCAR_HOME": str(LEMO), "LIB": str(LEMO), **({"PLAYWRIGHT_CHROME": shell} if shell else {})}
     if tool == "anidoodle":
         return {**base, "npm_config_prefer_offline": "true", "npm_config_omit": "optional"}
-    raise SystemExit(f"nieznane narzędzie: {tool} (motion | lemo | anidoodle)")
+    if tool in ("remotion", "shotcraft", "puppeteer"):
+        shell = headless_shell() or ""
+        env = {**base, "NODE_PATH": str(NODE / "node_modules"), "PUPPETEER_SKIP_DOWNLOAD": "1",
+               "REMOTION_BROWSER_EXECUTABLE": shell, "PUPPETEER_EXECUTABLE_PATH": shell, "CHROME_BIN": shell,
+               "npm_config_prefer_offline": "true"}
+        if tool == "shotcraft":
+            env["SHOTCRAFT"] = str(SHOTCRAFT)
+        return env
+    raise SystemExit(f"nieznane narzędzie: {tool} (motion | lemo | anidoodle | remotion | shotcraft | puppeteer)")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -170,9 +206,10 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "instaluj":
         what = args[1] if len(args) > 1 else "wszystko"
         steps = {"motion": [install_motion], "lemo": [install_lemo], "anidoodle": [install_anidoodle],
-                 "wszystko": [install_motion, install_anidoodle, install_lemo]}.get(what)
+                 "remotion": [install_remotion], "puppeteer": [install_remotion], "shotcraft": [install_shotcraft],
+                 "wszystko": [install_motion, install_anidoodle, install_lemo, install_shotcraft]}.get(what)
         if not steps:
-            raise SystemExit("instaluj: motion | lemo | anidoodle | wszystko")
+            raise SystemExit("instaluj: motion | lemo | anidoodle | remotion | shotcraft | wszystko")
         if not headless_shell():
             print(f"! brak chromium_headless_shell w {browsers_path()}: narzędzia pobiorą własną przeglądarkę", file=sys.stderr)
         for step in steps:

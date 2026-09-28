@@ -62,6 +62,35 @@ node tools/emit.mjs intro --out out/intro.html                        # cały fi
   (głośność, zakres, jasność) i w RAPORT daj 8-sekundową próbkę do odsłuchu. Plik audio z renderu → `muzyka.plik` w `film.py`.
 - `gate.mjs` szuka `out/<film>.mp4`; renderujesz pod inną nazwą → skopiuj.
 
+## Remotion (skille remotion-*, iart: typografia, wykresy, belki)
+```bash
+python3 $HERMES_HOME/scripts/narzedzia.py instaluj remotion; eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env remotion)"
+npx create-video@latest --blank out/wideo/src/rem && cd out/wideo/src/rem   # albo szablon z remotion-create
+npm install --prefer-offline                                                 # PUPPETEER/PLAYWRIGHT: bez pobierania
+npx remotion still src/index.ts <Kompozycja> out/look.png --frame=0 --browser-executable="$REMOTION_BROWSER_EXECUTABLE"
+npx remotion render src/index.ts <Kompozycja> out/film.mp4 --concurrency=2 --browser-executable="$REMOTION_BROWSER_EXECUTABLE"
+```
+- **Zawsze** `--browser-executable` (przeglądarka z obrazu); bez niej Remotion pobiera własną (~100 MB).
+- `--concurrency=2` na VPS 8 GB. Zasady klatki: `useCurrentFrame()` + `interpolate`/`spring`, zero `Math.random` (`random(seed)`).
+- Licencja Remotion: osoba / firma do 3 osób za darmo; większa firma → licencja firmowa. Zapisz w RAPORT.md.
+
+## video-shotcraft (kinowy film produktu, Remotion)
+```bash
+python3 $HERMES_HOME/scripts/narzedzia.py instaluj shotcraft; eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env shotcraft)"
+cat $SHOTCRAFT/SKILL.md                     # przepisy ujęć: $SHOTCRAFT/references, dema: $SHOTCRAFT/demos
+cp -r $SHOTCRAFT/template out/wideo/src/promo && cd out/wideo/src/promo && npm ci --prefer-offline
+npx remotion render src/index.ts AiflPromo out/promo.mp4 --concurrency=2 --browser-executable="$REMOTION_BROWSER_EXECUTABLE"
+```
+- SKILL.md jest po chińsku (+ opis EN): czytasz, piszesz RAPORT po polsku. Opcjonalny Runway pomijamy (płatny).
+- Screenshoty strony klienta: `assets/scripts/capture-template.mjs` (puppeteer z `env shotcraft`) albo `tars-web`.
+- Dźwięki z `assets/audio/` wolno używać (ATTRIBUTION.md), źródło do RAPORT.md. Workbench (port 5198) nie jest potrzebny.
+
+## bang-motion, pixel2motion, Lottie
+- `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env puppeteer)"` przed `scripts/snap.mjs` / `export-frames.mjs`
+  (bang-motion) i skryptami Phase 2–3 pixel2motion (`CHROME_BIN` ustawione). SKILL.md bang-motion jest po indonezyjsku.
+- pixel2motion: Python z `venv` narzędzi (`env motion` → `PYTHON`), wynik: SVG + HTML + GIF/MP4 do intro/outro.
+- `text-to-lottie`: plik `.json` Lottie; podgląd/MP4 przez stronę z lottie-web w przeglądarce z obrazu. Na stronę → `tars-web`.
+
 ## Łączenie
 - obraz z lemo/anidoodle + lektor PL + napisy: `napisy.py <film> --slowa <words>` albo `film.py` z `plik` w scenach,
 - klipy motion-broll w nagraniu: `composite.py` (podgląd) albo `montaz.py`, potem `napisy` i `glosnosc`,

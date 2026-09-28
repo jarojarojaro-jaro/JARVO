@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, script, hook, storytelling, retention]
-    related_skills: [krotki-film, warianty-ab, video, formaty-wideo]
+    related_skills: [krotki-film, warianty-ab, video, formaty-wideo, sw-premise-theme, sw-scene-craft, sw-dialogue, sw-character-conflict]
   tars:
     agent: tars-wideo
     autonomy: A1
@@ -34,6 +34,11 @@ Film krótki wygrywa w pierwszych 2 sekundach i przegrywa na każdej zbędnej. W
 | odbiorca i platforma | tak | 9:16, odbiorca z brand kitu |
 | długość | nie | 20–40 s |
 | CTA | nie | „zapisz/obserwuj” albo cel z karty |
+
+## Warsztat (gdy film ma fabułę, postać albo dialog)
+Wiedza z `screenwriting/` (McKee, Egri): premisa i jedno przesłanie → `sw-premise-theme`; scena jako zwrot wartości
+→ `sw-scene-craft`; dialog, podtekst → `sw-dialogue`; bohater i przeciwnik → `sw-character-conflict`. W krótkiej
+formie bierz tylko zasady (hak = zwrot wartości, jedna scena = jedna zmiana), nie pełny proces pisania serialu.
 
 ## Kroki
 1. **Jedno zdanie przesłania** („Widz ma wyjść z przekonaniem, że…”). Nie da się → temat za szeroki, zawęź.

@@ -1,13 +1,13 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.0.0
+version: 3.1.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [video, hyperframes, manim, motion-graphics, animation, code]
-    related_skills: [motion-broll, lemo-opuscar, anidoodle, hyperframes, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
+    related_skills: [motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
   tars:
     agent: tars-wideo
     autonomy: A1
@@ -19,7 +19,7 @@ metadata:
 Animacje, typografia w ruchu, UI, wykresy, rysunek: każda klatka rysowana kodem, ffmpeg składa wideo. Tekst i liczby
 są ostre i poprawne, nic nie jest „z AI”. Film z ujęć stock, lektora i napisów bez animacji → `krotki-film`.
 Instalacja, środowisko i polski lektor dla silników zewnętrznych: `references/narzedzia.md` (przeczytaj przed
-pierwszym użyciem motion-broll, lemo-opuscar albo anidoodle).
+pierwszym użyciem silnika spoza HyperFrames/Manim).
 
 ## Wybór silnika
 | Chcę… | Silnik (skill) | Czas pracy |
@@ -32,6 +32,18 @@ pierwszym użyciem motion-broll, lemo-opuscar albo anidoodle).
 | muzyka **syntezowana kodem** do dowolnego filmu (bez licencji, bez pobierania) | **anidoodle** `music` → plik do `muzyka` w `film.py` | 10–20 min |
 | promo z animowanym tekstem, szybki launch, slajdy | **HyperFrames** (`hyperframes`, `product-launch-video`, `slideshow`) | 10–30 min |
 | matematyka, algorytmy, wykresy w ruchu | **Manim** (`manim-video`, dodatek `manim`) | 15–40 min |
+| **kinowy film produktu** ze strony/aplikacji (prawdziwe screenshoty, ruchy kamery 2.5D, cięcia na bit, dźwięk) | **video-shotcraft** (`$SHOTCRAFT/SKILL.md`, Remotion) | 40–90 min |
+| film w **React/Remotion** (klient chce Remotion, komponenty, parametryzowane serie) | **Remotion** (`remotion-best-practices` → `remotion-create`, `remotion-render`) | 20–60 min |
+| **animowana typografia** (słowo po słowie, cytat, manifest) | `kinetic-typography` (Remotion) | 15–30 min |
+| **animowany wykres / infografika** z prawdziwych danych | `chart-animation`, `animated-infographic` (Remotion) | 15–40 min |
+| belka z nazwiskiem, odliczanie (dodatki do nagrań) | `lower-thirds`, `countdown-video` (Remotion) | 10–20 min |
+| opener, promo, plansza, explainer **z wyglądem z marki** (brief stylu wymagany) | **bang-motion** (HTML, eksport puppeteer) | 20–45 min |
+| **logo z obrazka → animacja SVG** (intro/outro marki) | **pixel2motion** | 15–30 min |
+| lekka animacja **Lottie** na stronę/aplikację (ikona, loader, ilustracja) | `text-to-lottie` → `tars-web` osadza | 10–20 min |
+
+Bez dubli: typografia i promo z tekstem najpierw HyperFrames; Remotion (i iart) gdy klient chce Remotion albo
+potrzebny wykres/typografia z gotowego przepisu. Napisy zawsze `napisy` (nie `remotion-captions`), chyba że film
+jest w Remotion. Licencja Remotion: darmowa dla osoby i firmy do 3 osób; większa firma → licencja firmowa (zapisz w RAPORT.md).
 
 Zasada kosztu: lemo-opuscar i pełne filmy anidoodle tylko, gdy karta prosi o styl, „premium” albo film markowy.
 Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnienia w RAPORT.md.
@@ -52,7 +64,7 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 1. **Brief i format** (`formaty-wideo`): platforma, długość, cel, jedno przesłanie, CTA, brand kit; wybór silnika z tabeli.
 2. **Scenariusz** (`scenariusz`): hook, beat sheet sekunda po sekundzie; lektor PL najpierw (`film.py lektor` →
    czasy słów), animacje pod te czasy.
-3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle>` (raz; dalej z cache),
+3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle|remotion|shotcraft>` (raz; dalej z cache),
    `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`.
 4. **Look:** jedna–trzy klatki stylu renderowane prawdziwym kodem → obejrzyj (vision), popraw, dopiero potem całość.
    Akceptacja użytkownika tylko przy dużych zleceniach (karta mówi) – inaczej decydujesz sam.

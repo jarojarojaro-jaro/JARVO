@@ -208,5 +208,11 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     shell.write_text("")
     assert nz.env_for("lemo")["PLAYWRIGHT_CHROME"] == str(shell)
     assert nz.env_for("motion")["NODE_PATH"].endswith("node/node_modules")
+    assert lock["sources"]["video-shotcraft"]["rev"] == nz.SHOTCRAFT_REV
+    assert {"video/remotion-render", "video/bang-motion", "video/pixel2motion", "video/text-to-lottie",
+            "video/kinetic-typography", "screenwriting/sw-scene-craft"} <= dests
+    rem = nz.env_for("shotcraft")
+    assert rem["REMOTION_BROWSER_EXECUTABLE"] == rem["PUPPETEER_EXECUTABLE_PATH"] == str(shell)
+    assert rem["SHOTCRAFT"].endswith("video-shotcraft")
     monkeypatch.setenv("TARS_EXTRAS", "media lemo")
     assert nz.full_extras()

@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fleetlib as fl  # noqa: E402
 
 COPY_IGNORE = shutil.ignore_patterns(
-    "__pycache__", "*.pyc", ".DS_Store", "node_modules", ".env", "*.env", "jobs.yaml"
+    "__pycache__", "*.pyc", ".DS_Store", "node_modules", ".git", ".github", ".env", "*.env", "jobs.yaml"
 )
 
 CATEGORY_DESCRIPTIONS = {
@@ -52,7 +52,8 @@ CATEGORY_DESCRIPTIONS = {
     "marketing": "Marketing (marketingskills, MIT): copy, social, content, launch, reklamy, psychologia, e-maile, CRO.",
     "design": "Design (Anthropic skills Apache-2.0 + Hermes MIT): frontend, systemy designu, grafika, motywy, testy UI.",
     "deploy": "Publikacja stron (Hermes, MIT): wersjonowane wdrożenia i tymczasowe podglądy. Produkcja tylko za zgodą.",
-    "video": "Wideo z HTML (HyperFrames, Apache-2.0): kompozycje, animacje, launch video, explainery, napisy, slideshow.",
+    "video": "Wideo z kodu: HyperFrames, Remotion (+ iart: typografia, wykresy, belki), motion-broll, lemo-opuscar, anidoodle, bang-motion, pixel2motion (logo), Lottie.",
+    "screenwriting": "Warsztat scenarzysty (screenwriting-skills, MIT): premisa, scena, dialog, konflikt; do skilla scenariusz.",
     "creative": "Kreacja (Hermes, MIT): Manim, infografiki, humanizer, kalendarz social, ideacja, memy, diagramy.",
     "meta": "Meta-skille: tworzenie i ulepszanie skilli (Anthropic skill-creator, Apache-2.0).",
 }
@@ -167,6 +168,8 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
                 raise SystemExit(f"[{agent}] {entry['path']}: brak licencji Apache-2.0, nie kopiujemy")
         elif spec.get("license_file"):
             shutil.copy2(src_root / spec["license_file"], dest / "LICENSE-UPSTREAM")
+        elif spec.get("notice") and spec["type"] == "git":
+            (dest / "LICENSE-UPSTREAM").write_text(spec["notice"] + "\n", encoding="utf-8")
         elif spec["type"] == "hermes-tree":
             hermes_license = src_root / "LICENSE"
             if hermes_license.exists():

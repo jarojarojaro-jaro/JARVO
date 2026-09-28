@@ -121,6 +121,12 @@ Wideo: sekcja [`tars-wideo`](#tars-wideo-wideograf).
 | [motion-broll](https://github.com/Barty-Bart/motion-graphics) | animowany B-roll do nagrania, zgrany ze słowami; panele ProRes 4444 z alfą | MIT | 2026-09 | skill + `narzedzia.py` |
 | [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | cały film w 39 stylach (keynote, akwarela, anime, 3D…); lektor PL przez `lektor_linie.py` | MIT | 2026-09 | skill + biblioteka (`narzedzia.py`; sample i Kokoro: `TARS_EXTRAS=lemo`) |
 | [anidoodle](https://github.com/alexgreensh/anidoodle) | rysunek kodem w 31 stylach, timelapse, HTML offline, muzyka syntezowana | Apache-2.0 | 2026-09 | skill + `narzedzia.py` |
+| [Remotion skills](https://github.com/remotion-dev/skills) + iart | wideo w React: create, render, napisy; typografia, wykresy, belki, odliczanie | Remotion License / MIT | 2026-09 | skille + `narzedzia.py instaluj remotion` |
+| [video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) | kinowe filmy produktu: 152 przepisy ujęć, szablon | Apache-2.0 | 2026-09 | `narzedzia.py instaluj shotcraft` |
+| [bang-motion](https://github.com/bangtutorial/bang-motion) | openery, promo, explainery z wyglądem z marki | MIT | 2026-09 | skill |
+| [pixel2motion](https://github.com/nolangz/pixel2motion) | logo z obrazka → animacja SVG / GIF / MP4 | MIT | 2026-09 | skill |
+| [lottie](https://github.com/diffusionstudio/lottie) | animacje Lottie na strony i aplikacje | MIT | 2026-09 | skill (Wideograf + Web) |
+| [screenwriting-skills](https://github.com/jtydhr88/screenwriting-skills) | premisa, scena, dialog, konflikt (do `scenariusz`) | MIT | 2026-09 | skille |
 | [Manim CE](https://github.com/ManimCommunity/manim) | animacje edukacyjne i matematyczne (skill [H] `manim-video`, dodatek `manim`) | MIT | 2026-09 | CLI |
 | [auto-editor](https://github.com/WyattBlue/auto-editor) | wycinanie ciszy (dodatek `media`; bez niego `montaz.py cisza`) | Unlicense | 2026-09 | CLI |
 | [Remotion](https://github.com/remotion-dev/remotion) | wideo w React (per projekt) | **Remotion License** ⚠️ | 2026-09 | per projekt |

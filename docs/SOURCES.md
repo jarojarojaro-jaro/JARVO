@@ -38,6 +38,13 @@ nasze adaptacje żyją w skillach własnych floty.
 | [Barty-Bart/motion-graphics](https://github.com/Barty-Bart/motion-graphics) (skill motion-broll) | `e8d610a` | MIT | Wideograf (B-roll zgrany ze słowami) |
 | [lemomo-ai/lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | `108fa78` | MIT (assety CC0 / CC BY / OFL) | Wideograf (39 stylów filmu; biblioteka instalowana przez `narzedzia.py`) |
 | [alexgreensh/anidoodle](https://github.com/alexgreensh/anidoodle) | `f335700` | Apache-2.0 | Wideograf (rysunek kodem, muzyka syntezowana) |
+| [remotion-dev/skills](https://github.com/remotion-dev/skills) | `cf49eff` | Remotion License (darmowa dla osoby / firmy do 3 osób) | Wideograf (8 skilli remotion-*) |
+| [Vincentwei1021/video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) | `e2d8928` | Apache-2.0 | Wideograf (kinowe filmy produktu; instaluje narzedzia.py) |
+| [diffusionstudio/lottie](https://github.com/diffusionstudio/lottie) | `3c72912` | MIT | Wideograf, Web (text-to-lottie) |
+| [nolangz/pixel2motion](https://github.com/nolangz/pixel2motion) | `e9faedb` | MIT | Wideograf (logo → animacja SVG) |
+| [bangtutorial/bang-motion](https://github.com/bangtutorial/bang-motion) | `c1aa65e` | MIT | Wideograf (motion graphics z marki) |
+| [iart-ai/*-skills](https://github.com/iart-ai/motion-skills) (kinetic-typography `fccc94b`, data-animation `8ce2709`, tiktok-video `2a77533`) | jw. | MIT | Wideograf (typografia, wykresy, belki, odliczanie) |
+| [jtydhr88/screenwriting-skills](https://github.com/jtydhr88/screenwriting-skills) | `357d134` | MIT | Wideograf (5 skilli warsztatu do `scenariusz`) |
 | [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) | `8798e40` | Apache-2.0 | Wideograf (wideo z HTML) |
 
 Build odrzuca skill z `anthropics/skills`, jeśli w jego katalogu nie ma licencji Apache-2.0: część

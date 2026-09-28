@@ -67,6 +67,63 @@ sources:
     rev: 8798e40da8d56b2f0f3be0b74198d0cbbec1dc06
     license: Apache-2.0
     license_file: LICENSE
+  remotion-skills:
+    type: git
+    repo: https://github.com/remotion-dev/skills
+    rev: cf49eff5d4463b33966b6618c83f7295797dd028
+    license: Remotion-License
+    # Lustro packages/skills z monorepo Remotion (bez własnego pliku LICENSE). Remotion: darmowy dla osób
+    # prywatnych i firm do 3 osób; większa firma kupuje licencję firmową (remotion.pro/license).
+    notice: "Remotion Agent Skills, Copyright (c) Remotion AG. Remotion License: https://remotion.dev/license"
+  video-shotcraft:
+    type: git
+    repo: https://github.com/Vincentwei1021/video-shotcraft
+    rev: e2d8928c57ef84701f9b0119ca4a1c28a62050c1
+    license: Apache-2.0
+    license_file: LICENSE
+    # ~100 MB (szablon, dema, audio): nie kopiujemy do profilu; ten sam commit instaluje scripts/narzedzia.py Wideografa.
+  lottie:
+    type: git
+    repo: https://github.com/diffusionstudio/lottie
+    rev: 3c72912fad543897f90045ed4d355813837927fc
+    license: MIT
+    license_file: LICENSE
+  pixel2motion:
+    type: git
+    repo: https://github.com/nolangz/pixel2motion
+    rev: e9faedb28930df0da2acf17da00c80730a78cfe8
+    license: MIT
+    license_file: LICENSE
+  bang-motion:
+    type: git
+    repo: https://github.com/bangtutorial/bang-motion
+    rev: c1aa65e921c970d858705fcb4a53a8294d1a4131
+    license: MIT
+    license_file: LICENSE
+  iart-kinetic-typography:
+    type: git
+    repo: https://github.com/iart-ai/kinetic-typography-skills
+    rev: fccc94bd325d824235ee9e715e65abde57b6513a
+    license: MIT
+    license_file: LICENSE
+  iart-data-animation:
+    type: git
+    repo: https://github.com/iart-ai/data-animation-skills
+    rev: 8ce2709c3992490251e8a991535b1945f01c6865
+    license: MIT
+    license_file: LICENSE
+  iart-tiktok-video:
+    type: git
+    repo: https://github.com/iart-ai/tiktok-video-skills
+    rev: 2a775336b5a638cbf8a61dbd785f9a1b649be016
+    license: MIT
+    license_file: LICENSE
+  screenwriting-skills:
+    type: git
+    repo: https://github.com/jtydhr88/screenwriting-skills
+    rev: 357d1348ccaa1ab75f2f51ef7c90a7f00a686c76
+    license: MIT
+    license_file: LICENSE
 
 agents:
   tars-sherlock:
@@ -87,6 +144,7 @@ agents:
     - {source: marketingskills, path: skills/customer-research, dest: market/customer-research}
 
   tars-web:
+    - {source: lottie, path: skills/text-to-lottie, dest: video/text-to-lottie}
     - {source: web-quality-skills, path: skills/web-quality-audit, dest: web-quality/web-quality-audit}
     - {source: web-quality-skills, path: skills/core-web-vitals, dest: web-quality/core-web-vitals}
     - {source: web-quality-skills, path: skills/performance, dest: web-quality/performance}
@@ -160,6 +218,27 @@ agents:
     - {source: motion-graphics, path: skills/motion-broll, dest: video/motion-broll}
     - {source: lemo-opuscar, path: plugin/skills/lemo-opuscar, dest: video/lemo-opuscar}
     - {source: anidoodle, path: skills/anidoodle, dest: video/anidoodle}
+    - {source: remotion-skills, path: skills/remotion-best-practices, dest: video/remotion-best-practices}
+    - {source: remotion-skills, path: skills/remotion-create, dest: video/remotion-create}
+    - {source: remotion-skills, path: skills/remotion-render, dest: video/remotion-render}
+    - {source: remotion-skills, path: skills/remotion-captions, dest: video/remotion-captions}
+    - {source: remotion-skills, path: skills/remotion-multimedia, dest: video/remotion-multimedia}
+    - {source: remotion-skills, path: skills/remotion-markup, dest: video/remotion-markup}
+    - {source: remotion-skills, path: skills/remotion-interactivity, dest: video/remotion-interactivity}
+    - {source: remotion-skills, path: skills/remotion-studio, dest: video/remotion-studio}
+    - {source: lottie, path: skills/text-to-lottie, dest: video/text-to-lottie}
+    - {source: pixel2motion, path: ., dest: video/pixel2motion}
+    - {source: bang-motion, path: ., dest: video/bang-motion}
+    - {source: iart-kinetic-typography, path: skills/kinetic-typography, dest: video/kinetic-typography}
+    - {source: iart-data-animation, path: skills/chart-animation, dest: video/chart-animation}
+    - {source: iart-data-animation, path: skills/animated-infographic, dest: video/animated-infographic}
+    - {source: iart-tiktok-video, path: skills/lower-thirds, dest: video/lower-thirds}
+    - {source: iart-tiktok-video, path: skills/countdown-video, dest: video/countdown-video}
+    - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-workflow, dest: screenwriting/sw-workflow}
+    - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-premise-theme, dest: screenwriting/sw-premise-theme}
+    - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-scene-craft, dest: screenwriting/sw-scene-craft}
+    - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-dialogue, dest: screenwriting/sw-dialogue}
+    - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-character-conflict, dest: screenwriting/sw-character-conflict}
 
   tars-reka:
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}
