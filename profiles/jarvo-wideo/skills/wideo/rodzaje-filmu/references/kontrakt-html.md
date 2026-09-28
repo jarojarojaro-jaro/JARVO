@@ -51,6 +51,31 @@ jeśli coś ładujesz asynchronicznie przy seek, zwróć prawdziwy `Promise`).
 Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, MorphSVG, MotionPath: darmowe),
 `gsap-performance`; o Three.js: skille `threejs-*` (po temacie). Krzywe i czasy ruchu UI: `animate`.
 
+## Techniki (ruch jak ze studia)
+- **Sprężyny w zamkniętej postaci:** `spring(t) = 1 − e^(−ζωt)·(cos ωdt + ζω/ωd·sin ωdt)` od chwili zmiany; brak stanu.
+  Wartość z wieloma celami = **suma sprężyn, jedna na zmianę** (`Σ (cel_i − cel_i−1)·spring(t − t_i)`): dalej czysta funkcja `t`.
+- **Kamera = jedna transformacja kontenera**, klucze `[t, zoom, x, y]` z easingiem, zoom interpolowany w skali log
+  (`exp(lerp(log z0, log z1))`), jeden ruch na scenę, nigdy zoom w przód i w tył pod rząd; kursor skaluje się z kamerą.
+- **Wspólny element przy przekazaniu:** zalew niesie kopię słów bańki, przycisk niesie swoją etykietę w stronę.
+  **Zalew** (kolor wylewa się z obiektu) musi przykryć najdalszy róg (promień > przekątna od środka) i trwać 0,3–0,35 s;
+  krócej = błysk, połowa ekranu zmienia się w jednej klatce.
+- **Rozciąganie:** dwie krawędzie wskaźnika (zakładki, przełącznika) na różnych sprężynach: przód wyprzedza tył.
+- **Przeciąganie:** gdy kursor trzyma, wartość = funkcja jego pozycji; po puszczeniu sprężyna od miejsca, gdzie była.
+- **Tekst:** wyrasta spod linii maski; tekst podmieniany w zmieniającym kształt pojemniku ma własną maskę i własne
+  wejście/wyjście (inaczej nachodzi); pisanie w stałych liniach, kamera nie goni zawijającego się kursora.
+- **Pętla:** ostatnia klatka = pierwsza, łącznie z pozycją i prędkością kursora (inaczej zacina się na przejściu).
+
+## Pułapki renderu
+- `will-change` na czymś, co skaluje kamera → rozmyty tekst; nie używaj. `z-index` na każdej warstwie.
+- Dziecko z `visibility: visible` prześwituje przez ukrytego rodzica: używaj `inherit`.
+- Wszystkie zmienne zadeklarowane przed pierwszym `__seek` (render woła go od razu).
+- Wideo w stronie: przekoduj all-intra (`ffmpeg -i in.mp4 -g 1 -an klip.mp4`), wczytaj jako blob URL (serwer renderu
+  nie przewija zakresami), w `__seek` ustaw `currentTime` i zwróć `Promise` czekający na `seeked`.
+- `backdrop-filter: url()` źle czyta mapy przesunięć w Chromium: „szkło” = klon sceny pod elementem + filtr SVG.
+- Szybki ruch: `--subklatki 8` (4 zostawia duchy) i trochę wolniej; potem klatka po klatce przez szybkie chwile
+  i `qa_wideo.py` (wykrywa pojedyncze „mrugnięcia”).
+- Dźwięk: prawdziwy efekt na każde zdarzenie, położony wg szczytu (`rytm.py efekt.wav --szczyt`), całość −14 LUFS.
+
 ## Render
 ```bash
 H=$HERMES_HOME/scripts/html_wideo.py

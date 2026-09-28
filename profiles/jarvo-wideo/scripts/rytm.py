@@ -3,6 +3,7 @@
 
     python3 rytm.py muzyka.mp3 [--json out/wideo/src/rytm.json] [--od 0 --do 60]
     python3 rytm.py film-wzor.mp4                 # też z dźwięku filmu (np. wzór do rozpisania na bity)
+    python3 rytm.py klik.wav whoosh.wav --szczyt  # gdzie efekt ma szczyt: kładziesz go tak, by szczyt trafił w zdarzenie
 
 Wynik: BPM, pierwszy bit (faza), czasy bitów, początki taktów (co 4 bity), drop (najmocniejsze wejście po
 spokojniejszym fragmencie) i propozycja cięć: co takt, a na dropie najmocniejsza scena. Liczy na obwiedni
@@ -143,6 +144,14 @@ def drop(env: list[float], bars: list[float]) -> float | None:
     return best_t if best >= 1.25 else None
 
 
+def peak(path: Path) -> dict:
+    """Szczyt efektu (najgłośniejsze 10 ms) i jego początek (pierwsze przekroczenie 20% szczytu)."""
+    env = envelope(path) if path.stat().st_size else []
+    top = max(range(len(env)), key=lambda i: env[i])
+    start = next(i for i, v in enumerate(env) if v >= 0.2 * env[top])
+    return {"plik": str(path), "szczyt": round(top / ENV_SR, 3), "poczatek": round(start / ENV_SR, 3), "dlugosc": round(len(env) / ENV_SR, 3)}
+
+
 def analyze(path: Path, start: float = 0.0, end: float | None = None) -> dict:
     env = envelope(path, start, end)
     on = onsets(env)
@@ -164,11 +173,21 @@ def analyze(path: Path, start: float = 0.0, end: float | None = None) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("plik")
+    ap.add_argument("plik", nargs="+")
+    ap.add_argument("--szczyt", action="store_true", help="efekty dźwiękowe: czas szczytu (przesunięcie przy układaniu)")
     ap.add_argument("--od", type=float, default=0.0)
     ap.add_argument("--do", type=float)
     ap.add_argument("--json", help="zapisz wynik do pliku JSON")
     a = ap.parse_args(argv)
+    if a.szczyt:
+        res = [peak(Path(f)) for f in a.plik]
+        for r in res:
+            print(f"{Path(r['plik']).name}: szczyt {r['szczyt']:.3f} s (początek {r['poczatek']:.3f} s, długość {r['dlugosc']:.2f} s)"
+                  f" → start efektu = chwila zdarzenia − {r['szczyt']:.3f} s")
+        if a.json:
+            Path(a.json).write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+        return 0
+    a.plik = a.plik[0]
     r = analyze(Path(a.plik), a.od, a.do)
     if a.json:
         Path(a.json).parent.mkdir(parents=True, exist_ok=True)

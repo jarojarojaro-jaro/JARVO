@@ -487,3 +487,12 @@ def test_qa_single_frame_pop_but_not_cut_or_pan(tmp_path):
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=2",
                     "-vf", "scroll=h=0.05,format=yuv420p", str(pan)], check=True)
     assert qa.single_frame_pops(*qa.gray_frames(pan)) == []                          # szybka panorama to nie błąd
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
+def test_rytm_sfx_peak(tmp_path):
+    rytm = _wscript("rytm")
+    wav = tmp_path / "klik.wav"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                    "aevalsrc='if(gte(t,0.15),sin(2*PI*900*t)*exp(-40*(t-0.15)),0)':s=44100:d=0.6", str(wav)], check=True)
+    assert rytm.peak(wav)["szczyt"] == pytest.approx(0.15, abs=0.02)
