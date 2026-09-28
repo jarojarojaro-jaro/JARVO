@@ -247,6 +247,19 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
   Uwaga: OmniParser w Perception jest na **AGPL-3.0** (tylko użytek prywatny, bez udostępniania innym).
   Kandydat: Ręka z własnym pulpitem XFCE w kontenerze uruchamianym na żądanie (zmierzyć RAM na VPS 8 GB),
   sterowanie Twoim Windowsem tylko za zgodą (A2). Chmura Cua Fleets jest płatna: pomijamy.
+- **„Drugi mózg” (analiza 8 repo, 2026-09-28):** Jarvo działa na Hermesie, który już ma pamięć, `session_search`,
+  kanban z zależnościami i dostawców pamięci (w tym mem0), więc bierzemy tylko to, czego brak.
+  - **Teraz:** `DeusData/codebase-memory-mcp` (MIT): graf kodu jako serwer MCP, jedna binarka, bez klucza API i bez
+    tokenów, dane w `~/.cache/codebase-memory-mcp/` (SQLite); Hermes wspierany natywnie (skill + `pre_llm_call`).
+    Dla Weba (kod stron) i Ręki; watcher w tle wyłączyć (`watcher_enabled false`), indeks na żądanie.
+  - **Faza bazy wiedzy (Obsidian, osobno):** `AgriciDaniel/claude-obsidian` (MIT, skille Agent Skills → działają
+    w Hermesie; skarbiec = zwykłe pliki Markdown ze źródłami) jako rdzeń; wyszukiwanie: `tobi/qmd` (MIT, BM25 bez
+    modeli lekkie; tryb semantyczny = 3 modele GGUF ~2 GB, na VPS 8 GB ostrożnie); do porównania `garrytan/gbrain`
+    (MIT, Hermes przez MCP, tryb bez klucza na PGLite, ale Bun + demon wzbogacania i płatne embeddingi) i
+    `Graphify-Labs/graphify` (Apache-2.0: graf kodu lokalnie, dokumenty/PDF/wideo przez model = tokeny).
+  - **Pomijamy:** `thedotmack/claude-mem` (Apache-2.0; wtyczka Claude Code z workerem w tle, dubluje pamięć
+    i `session_search` Hermesa), `mem0ai/mem0` (Apache-2.0; Hermes ma go jako dostawcę, ale to chmura z kluczem,
+    a wtyczka przeglądarki nas nie dotyczy), `gastownhall/beads` (MIT; tracker na Dolt, dubluje kanban Hermesa).
 - **Edytor filmów, dalsze kroki** (inspiracja: diffusionstudio/editor, MPL-2.0, nie forkujemy): Wideograf renderuje
   `*.edycja.json` tym samym silnikiem co HQ; napisy z mowy (Parakeet) i wycinanie „yyy”/ciszy jako cięcia;
   przejścia i animacje napisów przez ffmpeg.
