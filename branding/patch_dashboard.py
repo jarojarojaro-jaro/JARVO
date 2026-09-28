@@ -118,6 +118,45 @@ def add_polish(assets: list[Path], index: Path, pl_json: Path) -> int:
     return done
 
 
+SESSION_CARD = ("flex min-w-0 max-w-full flex-col gap-2 border border-border p-3 sm:flex-row sm:items-center "
+                "sm:justify-between")
+SESSION_LABELS = {"Total": "statTotal", "Active in store": "statActive", "Archived": "statArchived",
+                  "Messages": "statMessages", "Sources": "statSources", "Import sessions": "importSessions"}
+
+
+def patch_sessions(assets: list[Path]) -> int:
+    """Strona Sesje: otwiera się na Historii (tam: otwórz, wznów w czacie, zmień nazwę, usuń, zaznacz wiele),
+    karty „Ostatnie sesje” w Przeglądzie są klikalne (otwierają rozmowę w czacie), a etykiety wpisane
+    w kod po angielsku biorą tłumaczenie (klucze sessions.* w pl.json; brak klucza = angielski)."""
+    files = [f for f in assets if "Active in store" in f.read_text(encoding="utf-8")]
+    if not files:
+        print("  · sesje: nie znaleziono strony sesji")
+        return 0
+    n = sub_all(files, r"useState\)\(`overview`\)(,\[[\w$]+,[\w$]+\]=\(0,[\w$]+\.useState\)\(`chats`\))",
+                r"useState)(`list`)\1", "sesje: domyślnie Historia")
+    n += sub_all(files,
+                 r"children:([\w$]+)\.status\.recentSessions(.{0,400}?)children:([\w$]+)\.map\(([\w$]+)=>"
+                 r"\(0,([\w$]+)\.jsxs\)\(`div`,\{className:`" + re.escape(SESSION_CARD) + "`",
+                 lambda m: (f"children:{m.group(1)}.status.recentSessions{m.group(2)}children:{m.group(3)}.map("
+                            f"{m.group(4)}=>(0,{m.group(5)}.jsxs)(`div`,{{role:`button`,tabIndex:0,"
+                            f"title:{m.group(1)}.sessions.resumeInChat,"
+                            f"onClick:()=>location.assign(`/chat?resume=${{encodeURIComponent({m.group(4)}.id)}}`),"
+                            f"onKeyDown:k=>{{k.key===`Enter`&&location.assign(`/chat?resume=${{encodeURIComponent({m.group(4)}.id)}}`)}},"
+                            f"className:`cursor-pointer transition-colors hover:bg-muted/40 {SESSION_CARD}`"),
+                 "sesje: klikalne karty ostatnich sesji", flags=re.S)
+    for f in files:
+        text = f.read_text(encoding="utf-8")
+        m = re.search(r"label:([\w$]+)\.sessions\.overview", text)
+        if not m:
+            continue
+        t = m.group(1)
+        for en, key in SESSION_LABELS.items():
+            n += sub_all([f], rf"children:`{re.escape(en)}`", f"children:{t}.sessions.{key}??`{en}`", f"sesje: „{en}”")
+        n += sub_all([f], r"\?`Any chat source`:", f"?({t}.sessions.anyChatSource??`Any chat source`):",
+                     "sesje: „Any chat source”")
+    return n
+
+
 def main(argv: list[str]) -> int:
     brand = Path(argv[0])
     for d in (WEB, HERMES / "web" / "public"):
@@ -137,9 +176,10 @@ def main(argv: list[str]) -> int:
     # zakładka BASE (plugin Jarvo HQ) w głównym menu nad CHAT, nie w sekcji „Plugins” na dole
     sub_all(assets, r"(function [\w$]+\(e,t\)\{let n=[\w$]+\(e,t\),r=new Set\()e\.map\(e=>e\.path\)(\))",
             r'\1[...e.map(e=>e.path),"/base"]\2', "BASE w głównym menu")
-    sub_all(assets, r"brand:`Hermes Agent`,brandShort:`HA`", "brand:`Jarvo`,brandShort:`T`", "nazwa marki (i18n)")
+    sub_all(assets, r"brand:`Hermes Agent`,brandShort:`HA`", "brand:`Jarvo`,brandShort:`J`", "nazwa marki (i18n)")
     sub_all(assets, r"label:`Hermes Teal", "label:`Jarvo Teal", "etykiety motywów")
     add_polish(assets, index[0], brand / "i18n" / "pl.json")
+    patch_sessions(assets)
     themes = HERMES / "hermes_cli" / "web_server_dashboard.py"
     if themes.is_file():
         sub_all([themes], r'"label": "Hermes Teal', '"label": "Jarvo Teal', "etykiety motywów (serwer)")
