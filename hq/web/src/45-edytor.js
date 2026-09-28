@@ -539,6 +539,13 @@ function VideoEditor({ path, onClose }) {
     }, 1200);
     return () => clearTimeout(id);
   }, [p, conflict]);
+  // zapis „teraz” (np. przed prośbą do agenta) tą samą drogą co autozapis: edytor zna wersję, którą sam zapisał
+  async function saveNow() {
+    const r = await api.editSave(path, projRef.current, baseRef.current);
+    if (r && r.mtime) baseRef.current = r.mtime;
+    dirtyRef.current = false;
+    setSaved(L("zapisano", "saved"));
+  }
   async function keepMine() {
     const r = await api.editSave(path, projRef.current, baseRef.current, true);
     if (r && r.mtime) baseRef.current = r.mtime;
@@ -1214,7 +1221,7 @@ function VideoEditor({ path, onClose }) {
       <button type="button" class="thq-ed-btn is-main" onClick=${() => reloadProject(conflict.kto)}>${L("Wczytaj jego wersję", "Load theirs")}</button>
       <button type="button" class="thq-ed-btn" onClick=${keepMine}>${L("Zostaw moją", "Keep mine")}</button></div>`
     : toast ? html`<div class="thq-ed-banner is-ok" role="status"><span>✓ ${toast}</span></div>` : null;
-  const askBox = ask && html`<${AskAgent} ask=${ask} setAsk=${setAsk} path=${path} project=${p} time=${tRef.current} sel=${sel && selItem ? { ...sel, item: selItem } : null} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
+  const askBox = ask && html`<${AskAgent} ask=${ask} setAsk=${setAsk} path=${path} saveNow=${saveNow} time=${tRef.current} sel=${sel && selItem ? { ...sel, item: selItem } : null} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
   const exportBox = job && html`<${ExportBox} job=${job} onClose=${() => setJob(null)} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
   const exportBtn = html`<button type="button" class="thq-ed-btn is-main" disabled=${running || !info.ffmpeg} onClick=${doExport}
     title=${info.ffmpeg ? L("Zapisz nową wersję filmu (oryginał zostaje)", "Save a new version (the original stays)") : L("Brak ffmpeg w kontenerze", "ffmpeg is missing in the container")}>${mobile ? L("Eksport", "Export") : `⤓ ${L("Eksportuj", "Export")}`}</button>`;
@@ -1361,7 +1368,7 @@ function ExportBox({ job, onClose, onOpen }) {
 }
 
 // Prośba do Wideografa z kontekstem montażu: agent widzi film, projekt i miejsce na osi.
-function AskAgent({ ask, setAsk, path, project, time, sel, onOpen }) {
+function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen }) {
   const send = async () => {
     const text = ask.text.trim();
     if (!text || ask.busy) return;
@@ -1373,7 +1380,7 @@ function AskAgent({ ask, setAsk, path, project, time, sel, onOpen }) {
       "Pracuj na tym projekcie: `python3 $HERMES_HOME/scripts/projekt.py pokaz <film>`, zmiany przez `projekt.py dodaj-audio / dodaj-tekst / dodaj-klip / napisy / usun`, na końcu `projekt.py render <film>` i linia MEDIA:. Nie cofaj moich cięć; edytor sam wczyta Twoje zmiany."].join("\n");
     setAsk((a) => ({ ...a, busy: true, reply: "", error: null }));
     try {
-      await api.editSave(path, project).catch(() => {});
+      await saveNow().catch(() => {});
       for await (const { event, data } of api.send(ED_AGENT, msg)) {
         if (event === "assistant.delta") setAsk((a) => a && { ...a, reply: (a.reply || "") + (data.delta || "") });
         else if (event === "assistant.completed" && typeof data.content === "string") setAsk((a) => a && { ...a, reply: data.content });
