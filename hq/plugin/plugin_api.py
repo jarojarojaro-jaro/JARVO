@@ -864,6 +864,9 @@ def chat_messages(raw: list[dict]) -> list[dict]:
     return out
 
 
+_chat_runs: set = set()
+
+
 @router.post("/chat/{name}/send")
 async def chat_send(name: str, request: Request):
     _agent(name)
@@ -899,7 +902,12 @@ async def chat_send(name: str, request: Request):
         await client.aclose()
         raise
 
-    async def stream():
+    # Odbiór od gatewaya w tle, niezależnie od przeglądarki: zamknięta karta, odświeżenie albo zerwane Wi-Fi nie
+    # przerywają pracy agenta (zerwany strumień = przerwany run). Wynik zostaje w sesji i w historii czatu HQ.
+    queue: asyncio.Queue = asyncio.Queue()
+    listening = {"on": True}
+
+    async def pump():
         try:
             async with client.stream(
                     "POST", f"{base}/api/sessions/{sid}/chat/stream",
@@ -908,14 +916,31 @@ async def chat_send(name: str, request: Request):
                 if r.status_code >= 300:
                     await r.aread()
                     err = {"message": _api_error(r, name)}
-                    yield f"event: error\ndata: {json.dumps(err, ensure_ascii=False)}\n\n".encode()
+                    queue.put_nowait(f"event: error\ndata: {json.dumps(err, ensure_ascii=False)}\n\n".encode())
                     return
                 async for chunk in r.aiter_raw():
-                    yield chunk
+                    if listening["on"]:
+                        queue.put_nowait(chunk)
         except httpx.HTTPError as exc:
-            yield f"event: error\ndata: {json.dumps({'message': f'Gateway: {exc}'})}\n\n".encode()
+            if listening["on"]:
+                queue.put_nowait(f"event: error\ndata: {json.dumps({'message': f'Gateway: {exc}'})}\n\n".encode())
         finally:
+            queue.put_nowait(None)
             await client.aclose()
+
+    task = asyncio.create_task(pump())
+    _chat_runs.add(task)                       # silna referencja: zadanie żyje do końca runu
+    task.add_done_callback(_chat_runs.discard)
+
+    async def stream():
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    return
+                yield item
+        finally:
+            listening["on"] = False            # przeglądarka odeszła: pump dalej opróżnia strumień do końca
 
     return StreamingResponse(stream(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no",
