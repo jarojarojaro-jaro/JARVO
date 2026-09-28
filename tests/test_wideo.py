@@ -108,6 +108,41 @@ def test_check_plan_errors_and_warnings(tmp_path, monkeypatch):
     assert any("emoji" in w for w in rep["ostrzezenia"])
 
 
+def test_check_plan_rejects_unknown_clip_end(tmp_path):
+    plan = plan_base(tmp_path)
+    plan["sceny"][0]["ujecie"] = {"kolor": "#101820", "koniec": "zamroz"}
+    rep = film.check_plan(plan, tmp_path)
+    assert not rep["ok"] and any("ujecie.koniec" in e for e in rep["bledy"])
+    plan["sceny"][0]["ujecie"]["koniec"] = "stop"
+    assert film.check_plan(plan, tmp_path)["ok"]
+
+
+@needs_ffmpeg
+def test_short_code_clip_holds_last_frame_or_loops(tmp_path, monkeypatch):
+    """Animacja z kodu krótsza od sceny: `koniec: stop` trzyma ostatnią klatkę, domyślnie (stock) pętla; obie mają długość sceny."""
+    monkeypatch.setenv("TARS_WIDEO_CACHE", str(tmp_path / "cache"))
+    clip = tmp_path / "anim.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=30:d=1",
+                    "-pix_fmt", "yuv420p", str(clip)], check=True)
+    src = {"typ": "wideo", "plik": clip}
+    stop = film.render_scene(src, {"plik": str(clip), "koniec": "stop"}, 360, 640, 2.0, True)
+    loop = film.render_scene(src, {"plik": str(clip)}, 360, 640, 2.0, True)
+    assert stop != loop                                                    # różne klucze cache
+    for out in (stop, loop):
+        assert abs(wl.duration(out) - 2.0) < 0.1
+
+    def frame_at(path, t):
+        return subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", str(t), "-i", str(path), "-frames:v", "1",
+                               "-vf", "scale=16:16", "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+                              capture_output=True, check=True).stdout
+
+    def diff(a, b):
+        return sum(abs(x - y) for x, y in zip(a, b)) / len(a)
+
+    assert diff(frame_at(stop, 1.5), frame_at(stop, 1.9)) < 2              # stop: ta sama (ostatnia) klatka
+    assert diff(frame_at(loop, 1.5), frame_at(loop, 1.9)) > 2              # pętla: animacja trwa dalej
+
+
 # ------------------------------------------------------------------ stock i montaż
 
 def test_stock_ranking_and_file_choice():
@@ -209,10 +244,115 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     assert nz.env_for("lemo")["PLAYWRIGHT_CHROME"] == str(shell)
     assert nz.env_for("motion")["NODE_PATH"].endswith("node/node_modules")
     assert lock["sources"]["video-shotcraft"]["rev"] == nz.SHOTCRAFT_REV
-    assert {"video/remotion-render", "video/bang-motion", "video/pixel2motion", "video/text-to-lottie",
+    assert lock["sources"]["lottie"]["rev"] == nz.LOTTIE_REV                # player = ten sam commit co skill
+    assert {"video/remotion-best-practices", "video/bang-motion", "video/pixel2motion", "video/text-to-lottie",
             "video/kinetic-typography", "screenwriting/sw-scene-craft"} <= dests
+    # router Remotion zawiera resztę skilli Remotion: osobne kopie byłyby dublami
+    assert not [d for d in dests if d.startswith("video/remotion-") and d != "video/remotion-best-practices"]
+    monkeypatch.setattr(nz, "CHROME_WRAPPER", tmp_path / "bin" / "chrome-no-sandbox")   # jeszcze bez nakładki
     rem = nz.env_for("shotcraft")
     assert rem["REMOTION_BROWSER_EXECUTABLE"] == rem["PUPPETEER_EXECUTABLE_PATH"] == str(shell)
     assert rem["SHOTCRAFT"].endswith("video-shotcraft")
+    assert nz.env_for("html")["CHROME_BIN"] == str(shell)
+    # z nakładką (--no-sandbox dla puppeteer i CHROME_BIN); Remotion i playwright dostają przeglądarkę wprost
+    wrapper = nz.ensure_chrome_wrapper()
+    assert wrapper.stat().st_mode & 0o111 and "--no-sandbox" in wrapper.read_text(encoding="utf-8")
+    html = nz.env_for("html")
+    assert html["PUPPETEER_EXECUTABLE_PATH"] == html["CHROME_BIN"] == str(wrapper) and html["TARS_CHROME_REAL"] == str(shell)
+    assert nz.env_for("remotion")["REMOTION_BROWSER_EXECUTABLE"] == str(shell)
+    assert nz.env_for("lottie")["LOTTIE_PLAYER"].endswith("lottie-player")
+    with pytest.raises(SystemExit):
+        nz.env_for("puppeteer-core")
     monkeypatch.setenv("TARS_EXTRAS", "media lemo")
     assert nz.full_extras()
+
+
+def test_code_tools_helpers(monkeypatch, tmp_path):
+    nz = load_script("profiles/tars-wideo/scripts/narzedzia.py")
+    # starszy układ przeglądarki (chrome-linux/headless_shell) i wybór najnowszego buildu po numerze, nie alfabetycznie
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
+    assert nz.headless_shell() is None
+    old = tmp_path / "chromium_headless_shell-999" / "chrome-linux" / "headless_shell"
+    new = tmp_path / "chromium_headless_shell-1200" / "chrome-headless-shell-linux64" / "chrome-headless-shell"
+    for p in (old, new):
+        p.parent.mkdir(parents=True)
+        p.write_text("")
+    assert nz.headless_shell() == str(new)
+    new.unlink()
+    assert nz.headless_shell() == str(old)
+    assert nz.npm_name("@remotion/cli@4.0.484") == "@remotion/cli"
+    assert nz.npm_name("remotion@4.0.484") == "remotion" and nz.npm_name("esbuild") == "esbuild"
+    assert nz.npm_name("puppeteer@24") == "puppeteer"
+    assert nz.py_module("playwright==1.63.0") == "playwright" and nz.py_module("pillow") == "PIL"
+    assert nz.py_module("faster-whisper") == "faster_whisper"
+    monkeypatch.setattr(nz, "NODE", tmp_path / "node")
+    link = nz.link(tmp_path / "projekt")
+    assert link.is_symlink() and link.resolve() == (tmp_path / "node" / "node_modules").resolve()
+    assert nz.link(tmp_path / "projekt") == link                           # drugi raz bez błędu
+
+
+# ------------------------------------------------------------------ html_wideo (animacja HTML / Lottie → wideo)
+
+hw = load_script("profiles/tars-wideo/scripts/html_wideo.py")
+
+
+def test_html_presets_and_flags_override():
+    o = hw.resolve_opts("pixel2motion")
+    assert (o["param"], o["jednostka"], o["selektor"]) == ("t", "ms", "#logo-root")
+    o = hw.resolve_opts("iart", jednostka="ms", selektor=None)
+    assert o["jednostka"] == "ms" and o["gotowe"] == "window.__ready === true" and o["selektor"] is None
+    assert hw.resolve_opts("bang")["seek"].startswith("async (t)")
+    assert hw.resolve_opts(None)["param"] == "t"
+    with pytest.raises(SystemExit):
+        hw.resolve_opts("nie-ma")
+
+
+def test_html_time_values_and_urls(tmp_path):
+    assert hw.time_value(1.5, "s", 30) == "1.5" and hw.time_value(0, "s", 30) == "0"
+    assert hw.time_value(1.2345, "ms", 30) == "1234" and hw.time_value(2, "klatka", 25) == "50"
+    assert hw.frame_times(1, 4) == [0, .25, .5, .75] and hw.frame_times(0, 30) == [0]
+    assert hw.parse_times("0, 1.5;3") == [0, 1.5, 3] and hw.parse_size("1080x1920") == (1080, 1920)
+    page = tmp_path / "anim.html"
+    page.write_text("<p>x</p>")
+    url = hw.page_url(str(page), {"t": "1.5", "clean": 1})
+    assert url.startswith("file://") and url.endswith("anim.html?t=1.5&clean=1")
+    assert hw.page_url("http://127.0.0.1:3030/p/scene-1?frame=2", {"frame": 5}) == "http://127.0.0.1:3030/p/scene-1?frame=5"
+    with pytest.raises(SystemExit):
+        hw.page_url(str(tmp_path / "brak.html"), {})
+
+
+def test_html_encode_commands(tmp_path):
+    mp4 = hw.encode_cmd("f%05d.png", 30, tmp_path / "a.mp4", False)
+    assert "libx264" in mp4 and "+faststart" in mp4 and any("out_range=tv" in x for x in mp4)
+    mov = hw.encode_cmd("f%05d.png", 24, tmp_path / "a.mov", True)
+    assert "prores_ks" in mov and "yuva444p10le" in mov and "4444" in mov
+    assert "yuva420p" in hw.encode_cmd("f%05d.png", 30, tmp_path / "a.webm", True)
+    with pytest.raises(SystemExit):
+        hw.encode_cmd("f%05d.png", 30, tmp_path / "a.mp4", True)            # MP4 nie ma alfy
+    with pytest.raises(SystemExit):
+        hw.encode_cmd("f%05d.png", 30, tmp_path / "a.avi", False)
+
+
+def test_lottie_contract_check():
+    ok = {"v": "5.12.0", "fr": 30, "ip": 0, "op": 90, "w": 512, "h": 512, "layers": [{"ty": 4}]}
+    assert hw.lottie_check(ok) == []
+    assert "brak pola 'op'" in hw.lottie_check({k: v for k, v in ok.items() if k != "op"})
+    assert hw.lottie_check({**ok, "op": 0}) == ["op ≤ ip (animacja bez klatek)"]
+    assert hw.lottie_check({**ok, "layers": []}) == ["pusta lista layers"]
+
+
+@needs_ffmpeg
+def test_html_sheet_and_encode_from_frames(tmp_path):
+    PIL = pytest.importorskip("PIL.Image")
+    frames = []
+    for i in range(6):
+        p = tmp_path / f"f{i:05d}.png"
+        PIL.new("RGBA", (64, 36), (40 * i, 80, 160, 255 if i % 2 else 0)).save(p)
+        frames.append(p)
+    sheet = hw.sheet(frames, [f"t={i}" for i in range(6)], tmp_path / "arkusz.jpg", width=600)
+    assert PIL.open(sheet).size[0] == 600
+    out = hw.encode(tmp_path, 6, tmp_path / "film.mp4", False)
+    info = wl.probe(out)
+    assert info["video"]["codec"] == "h264" and info["video"]["pix_fmt"] == "yuv420p" and abs(info["duration"] - 1) < .2
+    mov = hw.encode(tmp_path, 6, tmp_path / "film.mov", True)
+    assert wl.probe(mov)["video"]["pix_fmt"].startswith("yuva")

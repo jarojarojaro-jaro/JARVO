@@ -157,6 +157,8 @@ def check_plan(plan: dict, plan_dir: Path) -> dict:
                 wl.hex_to_ass(uj["kolor"])
             except SystemExit as exc:
                 errors.append(f"scena {i}: {exc}")
+        if uj.get("koniec", "petla") not in ("petla", "stop"):
+            errors.append(f"scena {i}: `ujecie.koniec` = petla | stop (stop: animacja z kodu zatrzymuje się na ostatniej klatce)")
         need_stock |= kinds[:1] in (["stock"], ["stock_id"])
     if need_stock and not (os.environ.get("PEXELS_API_KEY") or os.environ.get("PIXABAY_API_KEY")):
         errors.append("sceny ze `stock`, a brak PEXELS_API_KEY / PIXABAY_API_KEY (darmowe; dashboard → Keys). "
@@ -246,7 +248,9 @@ def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -
            "-pix_fmt", "yuv420p", "-g", str(wl.FPS * 2), *wl.ENC_LIMITS, "-an"]
     mode = uj.get("dopasuj", "przytnij")
     key_src = wl.file_key(src["plik"]) if src.get("plik") else [src.get("kolor")]
-    key = wl.digest("scena-v1", key_src, w, h, round(dur, 3), uj.get("od", 0), uj.get("ruch"), mode, draft)
+    end = uj.get("koniec", "petla")
+    key = wl.digest("scena-v1", key_src, w, h, round(dur, 3), uj.get("od", 0), uj.get("ruch"), mode, draft,
+                    *([end] if end != "petla" else []))
     out = wl.cache_dir("sceny") / f"{key}.mp4"
     if out.exists() and out.stat().st_size > 0:
         return out
@@ -273,9 +277,12 @@ def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -
     else:
         start = float(uj.get("od", 0) or 0)
         src_dur = wl.duration(src["plik"])
-        loop = ["-stream_loop", "-1"] if src_dur - start < dur - 0.05 else []
+        short = src_dur - start < dur - 0.05
+        # krótszy klip: stock zapętlamy; animacja z kodu (koniec: stop) trzyma ostatnią klatkę do końca sceny
+        loop = ["-stream_loop", "-1"] if short and end != "stop" else []
+        hold = f"tpad=stop_mode=clone:stop_duration={dur:.3f}," if short and end == "stop" else ""
         fit = fit_filter(w, h, mode)
-        chain = f"{fit},fps={wl.FPS},{wl.TV_RANGE},setsar=1"
+        chain = f"{hold}{fit},fps={wl.FPS},{wl.TV_RANGE},setsar=1"
         if mode == "rozmyte":
             args = ["-filter_complex", f"[0:v]{chain}[v]", "-map", "[v]"]
         else:

@@ -1,7 +1,7 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.1.0
+version: 3.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -33,17 +33,19 @@ pierwszym użyciem silnika spoza HyperFrames/Manim).
 | promo z animowanym tekstem, szybki launch, slajdy | **HyperFrames** (`hyperframes`, `product-launch-video`, `slideshow`) | 10–30 min |
 | matematyka, algorytmy, wykresy w ruchu | **Manim** (`manim-video`, dodatek `manim`) | 15–40 min |
 | **kinowy film produktu** ze strony/aplikacji (prawdziwe screenshoty, ruchy kamery 2.5D, cięcia na bit, dźwięk) | **video-shotcraft** (`$SHOTCRAFT/SKILL.md`, Remotion) | 40–90 min |
-| film w **React/Remotion** (klient chce Remotion, komponenty, parametryzowane serie) | **Remotion** (`remotion-best-practices` → `remotion-create`, `remotion-render`) | 20–60 min |
-| **animowana typografia** (słowo po słowie, cytat, manifest) | `kinetic-typography` (Remotion) | 15–30 min |
+| film w **React/Remotion** (klient chce Remotion, komponenty, parametryzowane serie) | **Remotion** (`remotion-best-practices`: router do create, markup, render, maps…) | 20–60 min |
 | **animowany wykres / infografika** z prawdziwych danych | `chart-animation`, `animated-infographic` (Remotion) | 15–40 min |
 | belka z nazwiskiem, odliczanie (dodatki do nagrań) | `lower-thirds`, `countdown-video` (Remotion) | 10–20 min |
-| opener, promo, plansza, explainer **z wyglądem z marki** (brief stylu wymagany) | **bang-motion** (HTML, eksport puppeteer) | 20–45 min |
-| **logo z obrazka → animacja SVG** (intro/outro marki) | **pixel2motion** | 15–30 min |
-| lekka animacja **Lottie** na stronę/aplikację (ikona, loader, ilustracja) | `text-to-lottie` → `tars-web` osadza | 10–20 min |
+| **animowana typografia** (słowo po słowie, cytat, manifest, tytuł) | `kinetic-typography` (HTML + `html_wideo.py --preset iart`) | 15–30 min |
+| opener, promo, plansza, explainer **z wyglądem z marki** (brief stylu wymagany) | **bang-motion** (HTML + `html_wideo.py --preset bang`) | 20–45 min |
+| **logo z obrazka → animacja SVG** (intro/outro marki) | **pixel2motion** (HTML/SVG + `html_wideo.py --preset pixel2motion`) | 15–30 min |
+| animacja **Lottie** (ikona, loader, belka, logo) na stronę/aplikację albo do filmu | `text-to-lottie` (player Skottie) → JSON dla `tars-web`, MP4/MOV: `html_wideo.py lottie` | 10–20 min |
 
 Bez dubli: typografia i promo z tekstem najpierw HyperFrames; Remotion (i iart) gdy klient chce Remotion albo
-potrzebny wykres/typografia z gotowego przepisu. Napisy zawsze `napisy` (nie `remotion-captions`), chyba że film
-jest w Remotion. Licencja Remotion: darmowa dla osoby i firmy do 3 osób; większa firma → licencja firmowa (zapisz w RAPORT.md).
+potrzebny wykres/typografia z gotowego przepisu. Napisy zawsze `napisy` (nie captions z Remotion), chyba że film
+jest w Remotion. Każda animacja HTML (iart, bang-motion, pixel2motion, własna z uprzężą `?t=`) → klatki, arkusz
+i MP4/MOV przez `$HERMES_HOME/scripts/html_wideo.py`. Licencja Remotion: darmowa dla osoby i firmy do 3 osób;
+większa firma → licencja firmowa (zapisz w RAPORT.md).
 
 Zasada kosztu: lemo-opuscar i pełne filmy anidoodle tylko, gdy karta prosi o styl, „premium” albo film markowy.
 Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnienia w RAPORT.md.
@@ -56,16 +58,19 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 3. **Kamera w wektorach, nie w bitmapie**: lemo `camera().apply(g)`, anidoodle `g.push(x, y, s)`, motion-broll `cam` w `SH`.
 4. **Prawda w treści:** żadnych zmyślonych liczb, cytatów, wyników; względne słupki albo etykiety z transkrypcji.
 5. **Czytelność w ruchu:** tekst jadący w złą stronę czyta się na odwrót. Sprawdź kierunek na pasku klatek.
-6. **Przed oddaniem:** arkusz stopklatek co 1–1,5 s + paski klatek co 0,1–0,2 s na kluczowych akcjach (vision),
-   bramka narzędzia (anidoodle `gate.mjs`), potem `qa_wideo.py` i `kontrola-wideo` (≥ 85).
+6. **Przed oddaniem:** arkusz stopklatek co 1–1,5 s + paski klatek co 0,1–0,2 s na kluczowych akcjach (vision;
+   HTML i Lottie: `html_wideo.py klatki … --arkusz`), bramka narzędzia (anidoodle `gate.mjs`), film po silniku
+   zewnętrznym przez `montaz.py napraw`, potem `qa_wideo.py` i `kontrola-wideo` (≥ 85).
 7. **Prawa:** tylko assety CC0 / CC BY / OFL; żadnych cudzych marek i postaci; licencje w RAPORT.md.
 
 ## Kroki
 1. **Brief i format** (`formaty-wideo`): platforma, długość, cel, jedno przesłanie, CTA, brand kit; wybór silnika z tabeli.
 2. **Scenariusz** (`scenariusz`): hook, beat sheet sekunda po sekundzie; lektor PL najpierw (`film.py lektor` →
    czasy słów), animacje pod te czasy.
-3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle|remotion|shotcraft>` (raz; dalej z cache),
-   `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`.
+3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie>`
+   (raz; dalej z cache), `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`.
+   Skill silnika każe coś doinstalować, pobrać przeglądarkę (`npx playwright install`, `npm i puppeteer`) albo
+   zaktualizować skille (`remotion-upgrade`, `npx skills add`)? Nie rób tego: `references/narzedzia.md` mówi, czym to zastąpić.
 4. **Look:** jedna–trzy klatki stylu renderowane prawdziwym kodem → obejrzyj (vision), popraw, dopiero potem całość.
    Akceptacja użytkownika tylko przy dużych zleceniach (karta mówi) – inaczej decydujesz sam.
 5. **Budowa i render** wg SKILL.md wybranego silnika (i w lemo: `$LIB/AGENTS.md`, `DIRECTOR.md`, `TECHNIQUE.md`, `STYLE.md`).

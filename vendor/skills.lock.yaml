@@ -81,7 +81,8 @@ sources:
     rev: e2d8928c57ef84701f9b0119ca4a1c28a62050c1
     license: Apache-2.0
     license_file: LICENSE
-    # ~100 MB (szablon, dema, audio): nie kopiujemy do profilu; ten sam commit instaluje scripts/narzedzia.py Wideografa.
+    # Repo ~100 MB (szablon, dema, audio; z node_modules szablonu ~410 MB): nie kopiujemy do profilu; ten sam commit
+    # instaluje na żądanie scripts/narzedzia.py Wideografa (`instaluj shotcraft`).
   lottie:
     type: git
     repo: https://github.com/diffusionstudio/lottie
@@ -218,14 +219,9 @@ agents:
     - {source: motion-graphics, path: skills/motion-broll, dest: video/motion-broll}
     - {source: lemo-opuscar, path: plugin/skills/lemo-opuscar, dest: video/lemo-opuscar}
     - {source: anidoodle, path: skills/anidoodle, dest: video/anidoodle}
+    # Router Remotion: zawiera wszystkie skille Remotion jako remotion-*/REFERENCE.md (create, markup, render,
+    # captions, multimedia, maps, studio…), więc osobne skille remotion-* byłyby dublami.
     - {source: remotion-skills, path: skills/remotion-best-practices, dest: video/remotion-best-practices}
-    - {source: remotion-skills, path: skills/remotion-create, dest: video/remotion-create}
-    - {source: remotion-skills, path: skills/remotion-render, dest: video/remotion-render}
-    - {source: remotion-skills, path: skills/remotion-captions, dest: video/remotion-captions}
-    - {source: remotion-skills, path: skills/remotion-multimedia, dest: video/remotion-multimedia}
-    - {source: remotion-skills, path: skills/remotion-markup, dest: video/remotion-markup}
-    - {source: remotion-skills, path: skills/remotion-interactivity, dest: video/remotion-interactivity}
-    - {source: remotion-skills, path: skills/remotion-studio, dest: video/remotion-studio}
     - {source: lottie, path: skills/text-to-lottie, dest: video/text-to-lottie}
     - {source: pixel2motion, path: ., dest: video/pixel2motion}
     - {source: bang-motion, path: ., dest: video/bang-motion}

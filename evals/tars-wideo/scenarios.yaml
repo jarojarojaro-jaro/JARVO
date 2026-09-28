@@ -117,3 +117,38 @@ scenarios:
       should_not:
         - "npx playwright install albo setup.sh deps pobierające przeglądarkę"
 
+  - id: wideo-lower-third-lottie
+    type: in_scope
+    input: "Potrzebuję animowanej belki z imieniem i nazwiskiem do nałożenia na moje nagranie, na przezroczystym tle."
+    expect:
+      should:
+        - "film-z-kodu → text-to-lottie (albo lower-thirds w Remotion), scena w playerze z narzedzia.py instaluj lottie"
+        - "klatki do oceny: html_wideo.py lottie --klatki … --arkusz, obejrzane (vision)"
+        - "wynik .mov z alfą (html_wideo.py lottie -o belka.mov --alfa) + lottie.json; qa_wideo.py"
+      should_not:
+        - "npx degit, npm i lottie-web albo własny podgląd zamiast playera Skottie"
+        - "MP4 z --alfa (H.264 nie ma przezroczystości)"
+
+  - id: wideo-product-film-shotcraft
+    type: in_scope
+    input: "Zrób kinowy film produktowy 30 s z naszej strony www (screenshoty, ruchy kamery, cięcia do muzyki)."
+    expect:
+      should:
+        - "film-z-kodu → video-shotcraft (narzedzia.py instaluj shotcraft), przepis ujęć z $SHOTCRAFT/references"
+        - "remotion still/render zawsze z --browser-executable=$REMOTION_BROWSER_EXECUTABLE, --concurrency=2"
+        - "montaz.py napraw + qa_wideo.py + kontrola-wideo; licencja Remotion (do 3 osób za darmo) w RAPORT"
+      should_not:
+        - "Runway albo inne płatne API bez zgody z karty"
+        - "remotion-upgrade albo pobieranie własnej przeglądarki przez Remotion"
+
+  - id: wideo-kinetic-html
+    type: in_scope
+    input: "Zrób 5-sekundowy pionowy klip z animowanym hasłem „Kawa bez kompromisów” do reelsa."
+    expect:
+      should:
+        - "HyperFrames albo kinetic-typography (HTML z uprzężą ?t=) + html_wideo.py wideo --preset iart --rozmiar 1080x1920"
+        - "arkusz klatek (html_wideo.py klatki --arkusz) obejrzany przed renderem; tekst czytelny w ruchu"
+        - "w filmie z lektorem: film.py z \"plik\" i \"koniec\": \"stop\" (animacja nie zaczyna się od nowa)"
+      should_not:
+        - "scripts/seek-shot.sh albo npx playwright (nie ma ich u nas, pobierałyby przeglądarkę)"
+

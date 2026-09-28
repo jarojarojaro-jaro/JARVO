@@ -40,7 +40,7 @@
 | `sceny[].glos` | inny głos tylko w tej scenie (dialog) | głos planu |
 | `sceny[].tekst_ekranowy` | duży napis u góry na czas sceny (hook, liczba, CTA) | brak |
 | `sceny[].ujecie` | dokładnie jedno: `stock` (zapytanie), `stock_id` (`pexels:ID` / `pixabay:ID`), `plik` (wideo albo zdjęcie), `kolor` (#RRGGBB) | wymagane |
-| `ujecie` (opcje) | `typ: "zdjecie"` (stock zdjęć), `od` (start w pliku, s), `ruch` dla zdjęć: `zoom` · `oddal` · `panorama` · `brak`, `dopasuj`: `przytnij` · `rozmyte` (całe ujęcie na rozmytym tle) | `zoom`, `przytnij` |
+| `ujecie` (opcje) | `typ: "zdjecie"` (stock zdjęć), `od` (start w pliku, s), `ruch` dla zdjęć: `zoom` · `oddal` · `panorama` · `brak`, `dopasuj`: `przytnij` · `rozmyte` (całe ujęcie na rozmytym tle), `koniec` (klip krótszy od sceny): `petla` · `stop` (ostatnia klatka do końca sceny; animacje z `film-z-kodu`) | `zoom`, `przytnij`, `petla` |
 | `warianty[]` | `{nazwa, …nadpisania planu}`; `sceny` jako `{"1": {...}}` (numer sceny od 1) albo pełna lista | brak |
 
 ## Zasady

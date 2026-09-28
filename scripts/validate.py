@@ -250,6 +250,24 @@ def check_cron(a: fl.Agent, own_skills: set[str], vendored: set[str], r: Report)
                 r.err(f"{a.name}/cron/{jid}: skill {s!r} nie istnieje w profilu")
 
 
+def check_related(a: fl.Agent, known: set[str], r: Report) -> None:
+    """metadata.hermes.related_skills własnych skilli wskazują skille, które są w profilu (własne + z locka).
+
+    Profil z .no-bundled-skills nie ma skilli wbudowanych Hermesa, więc brak = błąd; w pozostałych ostrzeżenie
+    (odwołanie może dotyczyć skilla wbudowanego)."""
+    strict = (a.dir / ".no-bundled-skills").exists()
+    for skill_md in fl.iter_skill_files(a.dir / "skills"):
+        try:
+            fm, _ = fl.read_skill(skill_md)
+        except Exception:
+            continue    # błąd frontmattera zgłasza check_profile
+        related = ((fm.get("metadata") or {}).get("hermes") or {}).get("related_skills") or []
+        for name in related:
+            if str(name) not in known:
+                msg = f"{a.name}/{skill_md.parent.name}: related_skills {name!r} nie istnieje w profilu"
+                r.err(msg) if strict else r.warn(msg)
+
+
 def check_evals(fleet: fl.Fleet, r: Report) -> None:
     for a in fleet.active():
         path = fl.REPO_ROOT / "evals" / a.name / "scenarios.yaml"
@@ -356,6 +374,7 @@ def run() -> Report:
         vendored = {Path(e["dest"]).name for e in (lock.get("agents", {}).get(a.name) or [])}
         extra = {"roster"} if a.name == fleet.orchestrator else set()
         check_cron(a, own[a.name] | extra, vendored, r)
+        check_related(a, own[a.name] | extra | vendored, r)
     check_evals(fleet, r)
     check_calibration(r)
     check_hq(r)
