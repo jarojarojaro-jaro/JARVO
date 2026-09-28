@@ -253,11 +253,11 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
     tokenów, dane w `~/.cache/codebase-memory-mcp/` (SQLite); Hermes wspierany natywnie (skill + `pre_llm_call`).
     Dla Weba (kod stron) i Ręki; watcher w tle wyłączyć (`watcher_enabled false`), indeks na żądanie.
   - **Faza bazy wiedzy (Obsidian, osobno):** `AgriciDaniel/claude-obsidian` (MIT, skille Agent Skills → działają
-    w Hermesie; skarbiec = zwykłe pliki Markdown ze źródłami) jako rdzeń; wyszukiwanie: `tobi/qmd` (MIT, BM25 bez
-    modeli lekkie; tryb semantyczny = 3 modele GGUF ~2 GB, na VPS 8 GB ostrożnie); do porównania `garrytan/gbrain`
-    (MIT, Hermes przez MCP, tryb bez klucza na PGLite, ale Bun + demon wzbogacania i płatne embeddingi) i
-    `Graphify-Labs/graphify` (Apache-2.0: graf kodu lokalnie, dokumenty/PDF/wideo przez model = tokeny).
-  - **Pomijamy:** `thedotmack/claude-mem` (Apache-2.0; wtyczka Claude Code z workerem w tle, dubluje pamięć
+    w Hermesie; skarbiec = zwykłe pliki Markdown ze źródłami) jako rdzeń; do porównania `Graphify-Labs/graphify`
+    (Apache-2.0: graf kodu lokalnie, dokumenty/PDF/wideo przez model = tokeny).
+  - **Pomijamy:** `tobi/qmd` (MIT; tryb semantyczny pobiera 3 modele GGUF ~2 GB: za ciężko na VPS 8 GB),
+    `garrytan/gbrain` (MIT; Bun, własny serwer, demon wzbogacania i płatne embeddingi: za ciężko),
+    `thedotmack/claude-mem` (Apache-2.0; wtyczka Claude Code z workerem w tle, dubluje pamięć
     i `session_search` Hermesa), `mem0ai/mem0` (Apache-2.0; Hermes ma go jako dostawcę, ale to chmura z kluczem,
     a wtyczka przeglądarki nas nie dotyczy), `gastownhall/beads` (MIT; tracker na Dolt, dubluje kanban Hermesa).
 - **Edytor filmów, dalsze kroki** (inspiracja: diffusionstudio/editor, MPL-2.0, nie forkujemy): Wideograf renderuje
