@@ -239,6 +239,10 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
 
 **Pomysły do zbadania (zapisane, żeby nie uciekły):**
+- **Onboarding po instalacji (plan użytkownika, do zrobienia):** przewodnik krok po kroku dla nietechnicznej osoby:
+  co robi każdy agent, jak z nim rozmawiać, przykładowe pierwsze prośby, podstawowe pytania o firmę i markę na start.
+  W nim świadome pobranie cięższych rzeczy (np. model mowy Parakeet ~0,65 GB) z paskiem postępu, zamiast
+  niespodzianki przy pierwszym użyciu.
 - **Cua** ([trycua/cua](https://github.com/trycua/cua), MIT): „ręce” agenta do programów okienkowych. Cua Driver
   (MCP `cua-driver mcp`, Linux/Windows/macOS) klika przez drzewo dostępności; rozszerzenie **Cua Perception**
   (opcjonalne) czyta piksele, gdy drzewa nie ma (kanwy, gry, zdalne pulpity): zrzut → oznaczone regiony
