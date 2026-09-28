@@ -89,6 +89,15 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat → nakładki → miks z limiterem), H.264 + AAC,
   `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
   i dopiero gotowy dostaje nazwę `film-edycja[-N].mp4`: nic nie jest nadpisywane.
+- **Napisy:** zakładka „Napisy” (na telefonie przycisk w dolnym pasku) rozpoznaje mowę klipów na serwerze
+  (`jarvo-stt`, Parakeet, bez internetu) i wstawia napisy na ścieżkę tekstu, zgrane z cięciami i tempem. Wynik zapisuje
+  się obok źródła jako `<nazwa>.auto.srt`, więc drugi raz wczytuje się od razu. Można też wczytać gotowy `.srt`
+  z katalogu filmu. Styl, położenie, kolor i rozmiar zmieniają się dla wszystkich napisów naraz; pojedynczy napis
+  poprawiasz na osi czasu.
+- **Telefon (do 860 px):** układ jak w CapCut: podgląd na górze, pod nim czas, odtwarzanie i cofnij/ponów, oś czasu
+  przewijana palcem pod stałym wskaźnikiem na środku (dwa palce: przybliżenie), a na dole pasek **Edytuj · Audio ·
+  Tekst · Napisy · Format**. Narzędzie otwiera panel od dołu; dotknięcie klipu, napisu albo muzyki na osi otwiera
+  jego ustawienia, uchwyty do przycinania pojawiają się na zaznaczonym elemencie.
 - **Kodeki podglądu:** Chrome, Edge i Safari odtwarzają H.264. Chromium bez kodeków pokaże komunikat; montaż
   i eksport działają dalej.
 - Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg).

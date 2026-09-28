@@ -83,6 +83,8 @@ const liveApi = {
     const res = await rawFetch(`${API_ROOT}/edit/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, project, texts }) });
     return res.json();
   },
+  editSrt: (path) => SDK.fetchJSON(`${API_ROOT}/edit/srt?path=${encodeURIComponent(path)}`),
+  editCaptions: (src, force) => SDK.fetchJSON(`${API_ROOT}/edit/captions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src, force: !!force }) }),
   editJob: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}`),
   editCancel: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   async *send(name, message, extra) {

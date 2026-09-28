@@ -16,6 +16,45 @@ const ED_FONTS = [
 ];
 const ED_STYLES = [["shadow", "Cień", "Shadow"], ["box", "Tło", "Box"], ["outline", "Obrys", "Outline"], ["plain", "Zwykły", "Plain"]];
 const ED_MIN = 0.1;
+const ED_COLORS = ["#FFFFFF", "#000000", "#FFD60A", "#FF453A", "#32D74B", "#0A84FF", "#BF5AF2", "#FF9F0A"];
+const ED_CAP = { x: 0.5, y: 0.84, size: 58, color: "#FFFFFF", bg: "#000000", style: "outline", bold: true, align: "center", maxw: 0.84,
+  font: "'Bricolage Grotesque', system-ui, sans-serif" };
+const plNapisy = (n) => (n === 1 ? "napis" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "napisy" : "napisów");
+const edSleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const svgI = (body) => html`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const ED_ICON = {
+  edit: svgI(html`<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/>`),
+  audio: svgI(html`<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>`),
+  text: svgI(html`<path d="M4 7V4h16v3M9 20h6M12 4v16"/>`),
+  captions: svgI(html`<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M13 15h4M7 11h10"/>`),
+  format: svgI(html`<rect x="7" y="3" width="10" height="18" rx="1.5"/><path d="M3 8v8M21 8v8"/>`),
+  close: svgI(html`<path d="M6 6l12 12M18 6 6 18"/>`),
+  undo: svgI(html`<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>`),
+  redo: svgI(html`<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>`),
+  plus: svgI(html`<path d="M12 5v14M5 12h14"/>`),
+  check: svgI(html`<path d="M5 12l5 5 9-10"/>`),
+  spark: svgI(html`<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>`),
+  split: svgI(html`<path d="M12 3v18M8 7l-4 5 4 5M16 7l4 5-4 5"/>`),
+  speed: svgI(html`<path d="M12 14l4-4"/><path d="M3.3 17a9 9 0 1 1 17.4 0"/>`),
+  volume: svgI(html`<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>`),
+  mute: svgI(html`<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6M22 9l-6 6"/>`),
+  crop: svgI(html`<path d="M6 2v16h16M2 6h16v16"/>`),
+  copy: svgI(html`<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>`),
+  trash: svgI(html`<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>`),
+  upload: svgI(html`<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>`),
+};
+function useMedia(q) {
+  const get = () => typeof window !== "undefined" && window.matchMedia && window.matchMedia(q).matches;
+  const [m, setM] = useState(get);
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia(q);
+    const on = () => setM(mq.matches);
+    mq.addEventListener ? mq.addEventListener("change", on) : mq.addListener(on);
+    return () => (mq.removeEventListener ? mq.removeEventListener("change", on) : mq.removeListener(on));
+  }, [q]);
+  return m;
+}
 
 let edSeq = 0;
 const edId = (p) => `${p}${Date.now().toString(36)}${(edSeq++).toString(36)}`;
@@ -282,6 +321,7 @@ function usePlayer(proj, meta, onTick) {
   async function seek(t) {
     const S = st.current;
     S.t = clamp(t, 0, Math.max(0, total() - 0.001));
+    onTick(S.t, false);            // kursor i czas od razu, klatka dociąga się w tle
     const [i, s] = findSeg(S.t);
     if (s) await enter(i, s.c.in + (S.t - s.start) * (s.c.speed || 1), S.playing);
     syncAudio(S.t, S.playing);
@@ -298,8 +338,10 @@ function usePlayer(proj, meta, onTick) {
     S.raf = requestAnimationFrame(frame);
   }
   const toggle = () => (st.current.playing ? stop() : play());
+  // nowe elementy <video> (np. przełączenie układu telefon/komputer): zapomnij stare źródła
+  const remount = () => { st.current.loaded = [null, null]; st.current.idx = -1; };
   useEffect(() => () => { cancelAnimationFrame(st.current.raf); }, []);
-  return { vids, imgRef, audios, st, playing, play, stop, toggle, seek };
+  return { vids, imgRef, audios, st, playing, play, stop, toggle, seek, remount };
 }
 
 // ------------------------------------------------------------------ edytor
@@ -328,6 +370,15 @@ function VideoEditor({ path, onClose }) {
   const [ask, setAsk] = useState(null);
   const [side, setSide] = useState("media");
   const [codecErr, setCodecErr] = useState(false);
+  const mobile = useMedia("(max-width: 860px)");
+  const [tool, setTool] = useState(null);      // telefon: otwarty panel narzędzia
+  const [capJob, setCapJob] = useState(null);
+  const [tlW, setTlW] = useState(800);
+  const mobileRef = useRef(mobile);
+  mobileRef.current = mobile;
+  const autoScroll = useRef(-1);
+  const scrollRaf = useRef(0);
+  const pinch = useRef(null);
   const wrapRef = useRef(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -336,7 +387,7 @@ function VideoEditor({ path, onClose }) {
     const ro = new ResizeObserver(([e]) => setBox({ w: e.contentRect.width, h: e.contentRect.height }));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [!!info]);
+  }, [!!info, mobile]);
   const stageRef = useRef(null), overlayRef = useRef(null), tlRef = useRef(null), headRef = useRef(null), timeRef = useRef(null);
   const tRef = useRef(0);
   const me = useRef({});
@@ -382,6 +433,12 @@ function VideoEditor({ path, onClose }) {
   const onTick = useCallback((time, commitState) => {
     tRef.current = time;
     if (headRef.current) headRef.current.style.transform = `translateX(${time * ppsRef.current}px)`;
+    const tl = tlRef.current;
+    if (mobileRef.current && tl) {
+      // telefon: oś przesuwa się pod wskaźnikiem na środku (jak w CapCut)
+      const x = time * ppsRef.current;
+      if (Math.abs(tl.scrollLeft - x) > 1) { autoScroll.current = x; tl.scrollLeft = x; autoScroll.current = tl.scrollLeft; }
+    }
     if (timeRef.current) timeRef.current.textContent = fmtT(time, true);
     drawOverlay();
     if (commitState) setT(time);
@@ -615,6 +672,7 @@ function VideoEditor({ path, onClose }) {
   }
   const [dragIdx, setDragIdx] = useState(null);
   function clipDown(e, s, i, edge) {
+    if (e.pointerType === "touch" && !edge) return;   // palcem: dotknięcie zaznacza (onClick), przesunięcie przewija oś
     setSel({ type: "clip", id: s.c.id });
     const c0 = { ...s.c };
     const srcDur = c0.kind === "image" ? 600 : ((meta[c0.src] || {}).duration || c0.out);
@@ -639,6 +697,7 @@ function VideoEditor({ path, onClose }) {
     }
   }
   function textDown(e, x, edge) {
+    if (e.pointerType === "touch" && !edge) return;
     setSel({ type: "text", id: x.id });
     const a = x.start, b = x.end;
     drag(e, (d) => {
@@ -648,6 +707,7 @@ function VideoEditor({ path, onClose }) {
     });
   }
   function audioDown(e, m, edge) {
+    if (e.pointerType === "touch" && !edge) return;
     setSel({ type: "audio", id: m.id });
     const m0 = { ...m };
     const srcDur = (meta[m.src] || {}).duration || m.out;
@@ -658,16 +718,103 @@ function VideoEditor({ path, onClose }) {
     });
   }
   function rulerDown(e) {
+    if (mobileRef.current) return;
     const r = tlRef.current.getBoundingClientRect();
-    const at = (ev) => clamp((ev.clientX - r.left + tlRef.current.scrollLeft - 12) / pps, 0, total);
+    const at = (ev) => clamp((ev.clientX - r.left + tlRef.current.scrollLeft - pad) / pps, 0, total);
     player.seek(at(e));
     const move = (ev) => player.seek(at(ev));
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   }
-  const fitZoom = () => { const w = (tlRef.current && tlRef.current.clientWidth) || 800; setPps(clamp((w - 60) / Math.max(1, total), 4, 400)); };
-  useEffect(() => { if (info) setTimeout(fitZoom, 0); }, [info]);
+  const fitZoom = () => {
+    const w = (tlRef.current && tlRef.current.clientWidth) || 800;
+    setPps(mobileRef.current ? clamp(w / 6, 20, 400) : clamp((w - 60) / Math.max(1, total), 4, 400));
+  };
+  useEffect(() => { if (info) setTimeout(fitZoom, 0); }, [info, mobile]);
+  useEffect(() => {
+    const el = tlRef.current;
+    if (!el || !window.ResizeObserver) return undefined;
+    const ro = new ResizeObserver(([e]) => setTlW(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [!!info, mobile]);
+  const pad = mobile ? Math.round(tlW / 2) : 12;
+  const firstLayout = useRef(true);
+  useEffect(() => {
+    if (firstLayout.current) { firstLayout.current = false; return; }
+    player.stop(); player.remount();
+    setTimeout(() => player.seek(tRef.current), 0);
+  }, [mobile]);
+  function onTlScroll() {
+    const tl = tlRef.current;
+    if (!mobileRef.current || !tl || Math.abs(tl.scrollLeft - autoScroll.current) <= 2) return;
+    autoScroll.current = -1;
+    if (player.st.current.playing) player.stop();
+    cancelAnimationFrame(scrollRaf.current);
+    scrollRaf.current = requestAnimationFrame(() => player.seek(tl.scrollLeft / ppsRef.current));
+  }
+  const dist = (e) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  const tlTouch = {
+    onTouchStart: (e) => { if (e.touches.length === 2) pinch.current = { d: dist(e), pps }; },
+    onTouchMove: (e) => { if (pinch.current && e.touches.length === 2) setPps(clamp(pinch.current.pps * dist(e) / pinch.current.d, 4, 400)); },
+    onTouchEnd: () => { pinch.current = null; },
+  };
+  // dotknięcie elementu osi: zaznaczenie i (na telefonie) jego narzędzia
+  const pick = (e, type, id) => {
+    e.stopPropagation();
+    setSel({ type, id });
+    if (mobileRef.current) setTool(type === "clip" ? "edit" : type);
+  };
+
+  // ---------------------------------------------------------------- napisy
+  function mapCaptions(caps, src) {
+    const out = [];
+    for (const s of layoutClips(projRef.current.clips)) {
+      if (s.c.src !== src) continue;
+      for (const k of caps) {
+        const a = Math.max(k.start, s.c.in), b = Math.min(k.end, s.c.out);
+        if (b - a < 0.05) continue;
+        out.push({ start: s.start + (a - s.c.in) / s.c.speed, end: s.start + (b - s.c.in) / s.c.speed, text: k.text });
+      }
+    }
+    return out;
+  }
+  function setCaptions(list) {
+    const old = projRef.current.texts.find((x) => x.cap);
+    const look = old ? { x: old.x, y: old.y, size: old.size, color: old.color, bg: old.bg, style: old.style, font: old.font, bold: old.bold, maxw: old.maxw } : {};
+    H.apply((P) => ({ ...P, texts: [...P.texts.filter((x) => !x.cap),
+      ...list.map((k) => ({ ...ED_CAP, ...look, id: edId("t"), cap: true, start: k.start, end: k.end, text: k.text }))] }));
+  }
+  async function autoCaptions(force) {
+    if (capJob && capJob.state === "running") return;
+    const srcs = [...new Set(p.clips.filter((c) => c.kind === "video").map((c) => c.src))];
+    setCapJob({ state: "running" });
+    try {
+      let all = [];
+      for (const src of srcs) {
+        let j = await api.editCaptions(src, force);
+        while (j.state === "running") { await edSleep(1500); j = await api.editJob(j.id); }
+        if (j.state !== "done") throw new Error(j.error || L("Rozpoznawanie mowy nie wyszło.", "Speech recognition failed."));
+        all = all.concat(mapCaptions(j.captions || [], src));
+      }
+      if (!all.length) throw new Error(L("Nie znalazłem mowy w klipach na osi.", "No speech found in the timeline clips."));
+      setCaptions(all);
+      setCapJob({ state: "done", n: all.length });
+    } catch (e) { setCapJob({ state: "error", error: e.message || String(e) }); }
+  }
+  async function srtCaptions(file) {
+    try {
+      const r = await api.editSrt(file);
+      let list = mapCaptions(r.captions || [], path);
+      // napisy do gotowego filmu, którego nie ma już na osi: czasy wprost
+      if (!list.length) list = (r.captions || []).filter((k) => k.start < total).map((k) => ({ ...k, end: Math.min(k.end, total) }));
+      if (!list.length) throw new Error(L("Plik nie ma napisów w czasie tego filmu.", "The file has no captions within this film."));
+      setCaptions(list);
+      setCapJob({ state: "done", n: list.length });
+    } catch (e) { setCapJob({ state: "error", error: e.message || String(e) }); }
+  }
+  const setCapLook = (patch, lv) => (lv ? H.live : H.apply)((P) => ({ ...P, texts: P.texts.map((x) => (x.cap ? { ...x, ...patch } : x)) }));
 
   // ---------------------------------------------------------------- widok
   if (err) return html`<div class="thq-ed"><div class="thq-ed-msg"><p>${err}</p><button type="button" class="thq-ed-btn" onClick=${onClose}>${L("Zamknij", "Close")}</button></div></div>`;
@@ -684,78 +831,230 @@ function VideoEditor({ path, onClose }) {
     lanes[li] = x.end; textLane[x.id] = li;
   }
   const nLanes = Math.max(1, lanes.length);
-  const width = Math.max(total, 1) * pps + 120;
+  const width = Math.max(total, 1) * pps + pad * 2 + (mobile ? 0 : 120);
   const step = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300].find((s) => s * pps >= 70) || 600;
   const ticks = [];
   for (let s = 0; s <= total + step; s += step) ticks.push(s);
   const media = info.media || [];
   const running = job && (job.state === "running" || job.state === "prep");
+  const caps = p.texts.filter((x) => x.cap);
+  const allMuted = p.clips.filter((c) => c.kind !== "image").every((c) => c.muted);
 
+  // ---- panele narzędzi (te same na komputerze i telefonie)
+  const seg = (items, cur, set) => html`<div class="thq-ed-seg">${items.map(([k2, label]) => html`<button type="button" key=${k2} class=${cx(cur === k2 && "is-on")} onClick=${() => set(k2)}>${label}</button>`)}</div>`;
+  const swatches = (cur, set) => html`<div class="thq-ed-sw">${ED_COLORS.map((c) => html`<button type="button" key=${c} class=${cx(String(cur).toLowerCase() === c.toLowerCase() && "is-on")}
+    style=${{ background: c }} onClick=${() => set(c)} aria-label=${c}></button>`)}<label class="thq-ed-sw-more" title=${L("Inny kolor", "Other color")}>+<input type="color" value=${cur || "#ffffff"} onInput=${(e) => set(e.target.value, true)} onChange=${H.commit}/></label></div>`;
+  const act = (icon, label, fn, opts = {}) => html`<button type="button" class=${cx("thq-ed-act", opts.bad && "is-bad", opts.on && "is-on")} disabled=${opts.disabled} onClick=${fn}>${ED_ICON[icon]}<span>${label}</span></button>`;
+  const mediaList = (kinds) => html`<ul class="thq-ed-list">${media.filter((m) => kinds.includes(m.kind)).map((m) => html`<li key=${m.path}><button type="button" onClick=${() => { addMedia(m); if (mobile) setTool(m.kind === "audio" ? "audio" : "edit"); }} title=${L("Dodaj do osi czasu", "Add to the timeline")}>
+    <span class=${cx("thq-ed-mk", `is-${m.kind}`)}>${m.kind === "audio" ? "♪" : m.kind === "image" ? "▣" : "▶"}</span>
+    <span class="thq-ed-mn">${m.name}</span><span class="thq-ed-md">${m.duration ? fmtT(m.duration) : ""}</span><span class="thq-ed-plus">+</span></button></li>`)}</ul>`;
+  const uploadBtn = (accept) => html`<label class="thq-ed-btn is-wide thq-ed-upload">${ED_ICON.upload} ${L("Dodaj z urządzenia", "Add from device")}
+    <input type="file" multiple accept=${accept} onChange=${(e) => { uploadMedia(Array.from(e.target.files || [])); e.target.value = ""; }}/></label>`;
+
+  const clipTools = (c) => html`<div class="thq-ed-form">
+    <div class="thq-ed-acts">
+      ${act("split", L("Tnij", "Split"), split)}
+      ${act("copy", L("Duplikuj", "Duplicate"), duplicate)}
+      ${c.kind !== "image" && act(c.muted ? "mute" : "volume", c.muted ? L("Włącz dźwięk", "Unmute") : L("Wycisz", "Mute"), () => upd("clip", c.id, { muted: !c.muted }))}
+      ${act("crop", c.fit === "cover" ? L("Wypełnij", "Fill") : L("Dopasuj", "Fit"), () => upd("clip", c.id, { fit: c.fit === "cover" ? "contain" : "cover" }), { on: c.fit === "cover" })}
+      ${act("trash", L("Usuń", "Delete"), remove, { bad: true, disabled: p.clips.length <= 1 })}
+    </div>
+    ${c.kind !== "image" && html`<label>${L("Tempo", "Speed")} · ${c.speed}×${seg(ED_SPEEDS.map((s) => [s, `${s}×`]), c.speed, (v) => upd("clip", c.id, { speed: v }))}</label>`}
+    ${c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}%
+      <input type="range" min="0" max="2" step="0.05" value=${c.volume} onInput=${(e) => upd("clip", c.id, { volume: +e.target.value, muted: false }, true)} onChange=${H.commit}/></label>`}
+    ${c.kind === "image" && html`<label>${L("Czas planszy", "Still duration")} · ${(c.out - c.in).toFixed(1)} s
+      <input type="range" min="0.5" max="15" step="0.5" value=${c.out - c.in} onInput=${(e) => upd("clip", c.id, { out: c.in + +e.target.value }, true)} onChange=${H.commit}/></label>`}
+    <p class="thq-ed-note">${(meta[c.src] || {}).name || c.src.split("/").pop()}${c.kind !== "image" ? ` · ${fmtT(c.in, true)} – ${fmtT(c.out, true)}` : ""}</p>
+  </div>`;
+
+  const textTools = (x) => {
+    const u = (patch, lv) => upd("text", x.id, patch, lv);
+    return html`<div class="thq-ed-form">
+      <textarea rows="2" value=${x.text} placeholder=${L("Wpisz tekst", "Type text")} onInput=${(e) => u({ text: e.target.value }, true)} onBlur=${H.commit}></textarea>
+      <label>${L("Styl", "Style")}${seg(ED_STYLES.map(([k2, pl, en]) => [k2, L(pl, en)]), x.style, (v) => u({ style: v }))}</label>
+      <label>${L("Kolor", "Color")}${swatches(x.color, (v, lv) => u({ color: v }, lv))}</label>
+      ${(x.style === "box" || x.style === "outline") && html`<label>${x.style === "box" ? L("Tło", "Box") : L("Obrys", "Outline")}${swatches(x.bg || "#000000", (v, lv) => u({ bg: v }, lv))}</label>`}
+      <label>${L("Rozmiar", "Size")} · ${Math.round(x.size)}<input type="range" min="16" max="220" value=${x.size} onInput=${(e) => u({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
+      <label>${L("Krój", "Font")}${seg(ED_FONTS.map(([f, n]) => [f, n]), x.font, (v) => u({ font: v }))}</label>
+      <div class="thq-ed-row">
+        ${seg([["left", "⯇"], ["center", "≡"], ["right", "⯈"]], x.align, (v) => u({ align: v }))}
+        <label class="thq-ed-check"><input type="checkbox" checked=${x.bold !== false} onChange=${(e) => u({ bold: e.target.checked })}/> ${L("Gruby", "Bold")}</label>
+      </div>
+      ${!mobile && html`<label>${L("Szerokość", "Width")} · ${Math.round((x.maxw || 0.86) * 100)}%<input type="range" min="0.2" max="1" step="0.01" value=${x.maxw || 0.86} onInput=${(e) => u({ maxw: +e.target.value }, true)} onChange=${H.commit}/></label>`}
+      <p class="thq-ed-note">${fmtT(x.start, true)} – ${fmtT(x.end, true)} · ${L("przeciągnij napis na podglądzie, żeby go przesunąć", "drag the text on the preview to move it")}</p>
+      <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>
+    </div>`;
+  };
+
+  const audioTools = (m) => html`<div class="thq-ed-form">
+    <p class="thq-ed-sub">♪ ${(meta[m.src] || {}).name || m.src.split("/").pop()}</p>
+    <label>${L("Głośność", "Volume")} · ${Math.round(m.volume * 100)}%<input type="range" min="0" max="2" step="0.05" value=${m.volume} onInput=${(e) => upd("audio", m.id, { volume: +e.target.value }, true)} onChange=${H.commit}/></label>
+    <p class="thq-ed-note">${L("Od", "From")} ${fmtT(m.start, true)} · ${L("długość", "length")} ${fmtT(audioDur(m), true)}</p>
+    <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>
+  </div>`;
+
+  const audioAdd = () => html`<div class="thq-ed-form">
+    <div class="thq-ed-acts">${act(allMuted ? "mute" : "volume", allMuted ? L("Włącz dźwięk filmu", "Unmute video") : L("Wycisz dźwięk filmu", "Mute video audio"),
+      () => H.apply((P) => ({ ...P, clips: P.clips.map((c) => ({ ...c, muted: !allMuted })) })), { on: allMuted })}</div>
+    <p class="thq-ed-note">${L("Muzyka i dźwięki z katalogu filmu:", "Music and sounds from the film's folder:")}</p>
+    ${media.some((m) => m.kind === "audio") ? mediaList(["audio"]) : html`<p class="thq-ed-note">${L("Brak plików audio w katalogu.", "No audio files in the folder.")}</p>`}
+    ${uploadBtn("audio/*")}
+  </div>`;
+
+  const captionTools = () => html`<div class="thq-ed-form">
+    ${info.stt ? html`<button type="button" class="thq-ed-btn is-main is-wide" disabled=${capJob && capJob.state === "running"} onClick=${() => autoCaptions(false)}>
+        ${ED_ICON.spark} ${capJob && capJob.state === "running" ? L("Rozpoznaję mowę…", "Recognising speech…") : caps.length ? L("Rozpoznaj napisy jeszcze raz", "Recognise captions again") : L("Automatyczne napisy z mowy", "Auto captions from speech")}</button>
+        <p class="thq-ed-note">${L("Rozpoznawanie działa na serwerze (Parakeet, bez internetu). Pierwszy raz trwa dłużej: pobiera się model.", "Recognition runs on the server (Parakeet, offline). The first run downloads the model.")}</p>`
+      : html`<p class="thq-ed-note">${L("Rozpoznawanie mowy jest niedostępne w tej instalacji. Możesz wczytać gotowy plik .srt.", "Speech recognition is not available here. You can load a .srt file.")}</p>`}
+    ${(info.subs || []).length > 0 && html`<p class="thq-ed-note">${L("Z pliku napisów:", "From a subtitle file:")}</p>
+      <ul class="thq-ed-list">${info.subs.map((f) => html`<li key=${f}><button type="button" onClick=${() => srtCaptions(f)}><span class="thq-ed-mk is-text">CC</span><span class="thq-ed-mn">${f.split("/").pop()}</span><span class="thq-ed-plus">+</span></button></li>`)}</ul>`}
+    ${capJob && capJob.state === "error" && html`<p class="thq-ed-bad">${capJob.error}</p>`}
+    ${capJob && capJob.state === "done" && html`<p class="thq-ed-ok">✓ ${L(`Dodano ${capJob.n} ${plNapisy(capJob.n)}`, `Added ${capJob.n} captions`)}</p>`}
+    ${caps.length > 0 && html`
+      <label>${L("Styl napisów", "Caption style")}${seg(ED_STYLES.map(([k2, pl, en]) => [k2, L(pl, en)]), caps[0].style, (v) => setCapLook({ style: v }))}</label>
+      <label>${L("Położenie", "Position")}${seg([[0.16, L("Góra", "Top")], [0.5, L("Środek", "Middle")], [0.84, L("Dół", "Bottom")]], [0.16, 0.5, 0.84].find((y) => Math.abs(y - caps[0].y) < 0.02), (v) => setCapLook({ y: v }))}</label>
+      <label>${L("Kolor", "Color")}${swatches(caps[0].color, (v, lv) => setCapLook({ color: v }, lv))}</label>
+      <label>${L("Rozmiar", "Size")} · ${Math.round(caps[0].size)}<input type="range" min="24" max="140" value=${caps[0].size} onInput=${(e) => setCapLook({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
+      <p class="thq-ed-note">${L(`${caps.length} ${plNapisy(caps.length)}. Pojedynczy napis poprawisz, dotykając go na osi czasu.`, `${caps.length} captions. Tap one on the timeline to fix its text.`)}</p>
+      <div class="thq-ed-acts">${act("trash", L("Usuń napisy", "Remove captions"), () => H.apply((P) => ({ ...P, texts: P.texts.filter((x) => !x.cap) })), { bad: true })}</div>`}
+  </div>`;
+
+  const formatTools = () => html`<div class="thq-ed-form">
+    <div class="thq-ed-ratios">${ED_FORMATS.map(([k2, pl, en]) => {
+      const [w, h] = k2 === "orig" ? [(meta[path] || {}).w || 16, (meta[path] || {}).h || 9] : ED_SIZES[k2];
+      const r = w / h, bw = r >= 1 ? 30 : Math.round(30 * r), bh = r >= 1 ? Math.round(30 / r) : 30;
+      return html`<button type="button" key=${k2} class=${cx((p.format || "orig") === k2 && "is-on")} onClick=${() => setCanvas(k2)}>
+        <i style=${{ width: `${bw}px`, height: `${bh}px` }}></i><span>${k2 === "orig" ? L("Oryginał", "Original") : k2}</span><small>${L(pl, en).split("· ")[1] || ""}</small></button>`;
+    })}</div>
+    <label>${L("Klatki na sekundę", "Frame rate")}${seg([24, 25, 30, 50, 60].map((f) => [f, String(f)]), p.canvas.fps, (v) => H.apply((P) => ({ ...P, canvas: { ...P.canvas, fps: v } })))}</label>
+    <p class="thq-ed-note">${CW}×${CH} · ${fmtT(total, true)}</p>
+  </div>`;
+
+  // ---- wspólne elementy: scena, oś czasu
+  const stage = html`<div class="thq-ed-fit" ref=${wrapRef}>
+    <div class="thq-ed-stage" ref=${stageRef} style=${stageSize}>
+      <video ref=${player.vids[0]} class="thq-ed-v" playsinline preload="auto" onError=${() => setCodecErr(true)}></video>
+      <video ref=${player.vids[1]} class="thq-ed-v" playsinline preload="auto" onError=${() => setCodecErr(true)}></video>
+      <img ref=${player.imgRef} class="thq-ed-v" alt=""/>
+      <canvas ref=${overlayRef} class="thq-ed-overlay" onPointerDown=${stagePointer}></canvas>
+      ${codecErr && html`<p class="thq-ed-codec">${L("Ta przeglądarka nie odtwarza kodeka tego filmu (np. Chromium bez H.264). Montaż i eksport działają; do podglądu użyj Chrome, Edge albo Safari.",
+        "This browser cannot decode the video codec (e.g. Chromium without H.264). Editing and export still work; use Chrome, Edge or Safari to preview.")}</p>`}
+    </div></div>
+    ${p.audio.map((m) => html`<${EdAudio} key=${m.id} m=${m} audios=${player.audios}/>`)}`;
+
+  const textTrack = html`<div class="thq-ed-track is-text" style=${{ height: `${(p.texts.length ? nLanes : 1) * 26 + 6}px` }} onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
+    ${p.texts.map((x) => html`<div key=${x.id} class=${cx("thq-ed-item is-text", x.cap && "is-cap", sel && sel.id === x.id && "is-sel")}
+      style=${{ left: `${x.start * pps}px`, width: `${Math.max(6, (x.end - x.start) * pps)}px`, top: `${3 + textLane[x.id] * 26}px` }}
+      onPointerDown=${(e) => textDown(e, x)} onClick=${(e) => pick(e, "text", x.id)}>
+      <i class="thq-ed-h is-l" onPointerDown=${(e) => textDown(e, x, "l")}></i><span>${x.cap ? "CC" : "T"} ${x.text}</span><i class="thq-ed-h is-r" onPointerDown=${(e) => textDown(e, x, "r")}></i></div>`)}
+    ${mobile && !p.texts.length && html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text"); }}>+ ${L("Dodaj tekst", "Add text")}</button>`}
+  </div>`;
+  const videoTrack = html`<div class="thq-ed-track is-video" onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
+    ${segs.map((s, i) => {
+      const strip = strips[s.c.src];
+      const wpx = (s.end - s.start) * pps;
+      let bg = {};
+      if (strip && strip.url) {
+        bg = s.c.kind === "image" ? { backgroundImage: `url(${strip.url})`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" }
+          : { backgroundImage: `url(${strip.url})`, backgroundSize: `${strip.dur / s.c.speed * pps}px 100%`, backgroundPosition: `${-s.c.in / s.c.speed * pps}px 0` };
+      }
+      return html`<div key=${s.c.id} class=${cx("thq-ed-item is-clip", sel && sel.id === s.c.id && "is-sel", dragIdx === i && "is-drag")}
+        style=${{ left: `${s.start * pps}px`, width: `${Math.max(4, wpx)}px`, ...bg }} onPointerDown=${(e) => clipDown(e, s, i)} onClick=${(e) => pick(e, "clip", s.c.id)}>
+        <i class="thq-ed-h is-l" onPointerDown=${(e) => clipDown(e, s, i, "l")}></i>
+        <span class="thq-ed-cl">${s.c.speed !== 1 ? `${s.c.speed}× · ` : ""}${s.c.muted ? "🔇 " : ""}${fmtT(s.end - s.start, true)}</span>
+        <i class="thq-ed-h is-r" onPointerDown=${(e) => clipDown(e, s, i, "r")}></i></div>`;
+    })}
+    ${mobile && html`<button type="button" class="thq-ed-addclip" style=${{ left: `${total * pps + 8}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("media"); }}
+      aria-label=${L("Dodaj klip", "Add clip")}>${ED_ICON.plus}</button>`}
+  </div>`;
+  const audioTrack = html`<div class="thq-ed-track is-audio" onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
+    ${p.audio.map((m) => html`<div key=${m.id} class=${cx("thq-ed-item is-audio", sel && sel.id === m.id && "is-sel")}
+      style=${{ left: `${m.start * pps}px`, width: `${Math.max(6, audioDur(m) * pps)}px` }} onPointerDown=${(e) => audioDown(e, m)} onClick=${(e) => pick(e, "audio", m.id)}>
+      <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>♪ ${(meta[m.src] || {}).name || ""} · ${Math.round(m.volume * 100)}%</span>
+      <i class="thq-ed-h is-r" onPointerDown=${(e) => audioDown(e, m, "r")}></i></div>`)}
+    ${!p.audio.length && (mobile
+      ? html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("audio"); }}>+ ${L("Dodaj audio", "Add audio")}</button>`
+      : html`<span class="thq-ed-hint">${L("Muzyka: dodaj plik audio z panelu Media", "Music: add an audio file from the Media panel")}</span>`)}
+  </div>`;
+  const timeline = html`<div class="thq-ed-tlwrap">
+    <div class="thq-ed-tl" ref=${tlRef} onScroll=${onTlScroll} ...${mobile ? tlTouch : {}}
+      onWheel=${(e) => { if (e.ctrlKey) { e.preventDefault(); setPps((x) => clamp(x * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 4, 400)); } }}>
+      <div class="thq-ed-tl-in" style=${{ width: `${width}px`, padding: `0 ${pad}px 10px` }}>
+        <div class="thq-ed-ruler" onPointerDown=${rulerDown}>
+          ${ticks.map((s) => html`<span key=${s} style=${{ left: `${s * pps}px` }}>${step < 1 ? `${fmtT(s)}${(s % 1 ? ".5" : "")}` : fmtT(s)}</span>`)}
+        </div>
+        ${mobile ? [videoTrack, audioTrack, textTrack] : [textTrack, videoTrack, audioTrack]}
+        ${!mobile && html`<div class="thq-ed-head" ref=${headRef} style=${{ left: `${pad}px`, transform: `translateX(${t * pps}px)` }}><i></i></div>`}
+      </div>
+    </div>
+    ${mobile && html`<div class="thq-ed-center"><i></i></div>`}
+  </div>`;
+  const askBox = ask && html`<${AskAgent} ask=${ask} setAsk=${setAsk} path=${path} project=${p} time=${tRef.current} sel=${sel && selItem ? { ...sel, item: selItem } : null} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
+  const exportBox = job && html`<${ExportBox} job=${job} onClose=${() => setJob(null)} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
+  const exportBtn = html`<button type="button" class="thq-ed-btn is-main" disabled=${running || !info.ffmpeg} onClick=${doExport}
+    title=${info.ffmpeg ? L("Zapisz nową wersję filmu (oryginał zostaje)", "Save a new version (the original stays)") : L("Brak ffmpeg w kontenerze", "ffmpeg is missing in the container")}>${mobile ? L("Eksport", "Export") : `⤓ ${L("Eksportuj", "Export")}`}</button>`;
+
+  // ---- telefon: układ jak w CapCut
+  if (mobile) {
+    const TOOLS = [["edit", L("Edytuj", "Edit")], ["audio", L("Audio", "Audio")], ["text", L("Tekst", "Text")], ["captions", L("Napisy", "Captions")], ["format", L("Format", "Format")]];
+    const openTool = (k2) => {
+      if (tool === k2) { setTool(null); return; }
+      if (k2 === "edit" && !(sel && sel.type === "clip")) {
+        const s = segs.find((x) => t >= x.start && t < x.end) || segs[segs.length - 1];
+        if (s) setSel({ type: "clip", id: s.c.id });
+      }
+      if (k2 === "text" && !(sel && sel.type === "text")) { addText(); }
+      if (k2 === "audio" && !(sel && sel.type === "audio")) setSel(null);
+      setTool(k2);
+    };
+    let sheet = null, title = "";
+    if (tool === "edit" && selItem && sel.type === "clip") { sheet = clipTools(selItem); title = L("Klip", "Clip"); }
+    else if (tool === "text" && selItem && sel.type === "text") { sheet = textTools(selItem); title = selItem.cap ? L("Napis", "Caption") : L("Tekst", "Text"); }
+    else if (tool === "audio") { sheet = selItem && sel.type === "audio" ? audioTools(selItem) : audioAdd(); title = L("Audio", "Audio"); }
+    else if (tool === "captions") { sheet = captionTools(); title = L("Napisy", "Captions"); }
+    else if (tool === "format") { sheet = formatTools(); title = L("Format", "Format"); }
+    else if (tool === "media") { sheet = html`<div class="thq-ed-form">${mediaList(["video", "image"])}${uploadBtn("video/*,image/png,image/jpeg,image/webp")}</div>`; title = L("Dodaj klip", "Add clip"); }
+    return html`<div class=${cx("thq-ed is-mobile", sheet && "has-sheet")} role="dialog" aria-modal="true" aria-label=${L("Edytor filmu", "Video editor")}>
+      <header class="thq-ed-top">
+        <button type="button" class="thq-ed-ico" onClick=${() => { player.stop(); onClose(); }} aria-label=${L("Zamknij edytor", "Close the editor")}>${ED_ICON.close}</button>
+        <span class="thq-ed-saved">${saved}</span>
+        <span class="thq-ed-grow"></span>
+        <button type="button" class="thq-ed-ico" onClick=${() => setAsk(ask ? null : { text: "", reply: "", busy: false })} aria-label=${L("Poproś agenta", "Ask the agent")}>${ED_ICON.spark}</button>
+        ${exportBtn}
+      </header>
+      ${askBox}
+      <section class="thq-ed-stage-wrap">${stage}</section>
+      <div class="thq-ed-transport">
+        <span class="thq-ed-time"><span ref=${timeRef}>${fmtT(t, true)}</span> / ${fmtT(total, true)}</span>
+        <button type="button" class="thq-ed-play" onClick=${player.toggle} aria-label=${player.playing ? L("Pauza", "Pause") : L("Odtwórz", "Play")}>${player.playing ? "❚❚" : "▶"}</button>
+        <span class="thq-ed-undo">
+          <button type="button" class="thq-ed-ico" disabled=${!H.canUndo} onClick=${H.undo} aria-label=${L("Cofnij", "Undo")}>${ED_ICON.undo}</button>
+          <button type="button" class="thq-ed-ico" disabled=${!H.canRedo} onClick=${H.redo} aria-label=${L("Ponów", "Redo")}>${ED_ICON.redo}</button>
+        </span>
+      </div>
+      ${timeline}
+      ${sheet && html`<div class="thq-ed-sheet">
+        <header><strong>${title}</strong><button type="button" class="thq-ed-ico" onClick=${() => { setTool(null); if (tool !== "captions" && tool !== "format") setSel(null); }} aria-label=${L("Gotowe", "Done")}>${ED_ICON.check}</button></header>
+        ${sheet}
+      </div>`}
+      <nav class="thq-ed-nav">${TOOLS.map(([k2, label]) => html`<button type="button" key=${k2} class=${cx(tool === k2 && "is-on")} onClick=${() => openTool(k2)}>${ED_ICON[k2]}<span>${label}</span></button>`)}</nav>
+      ${exportBox}
+    </div>`;
+  }
+
+  // ---- komputer
   const inspector = () => {
     if (!selItem) {
-      return html`<div class="thq-ed-form">
-        <label>${L("Format", "Format")}<select value=${p.format || "orig"} onChange=${(e) => setCanvas(e.target.value)}>
-          ${ED_FORMATS.map(([k, pl, en]) => html`<option key=${k} value=${k}>${L(pl, en)}</option>`)}</select></label>
-        <label>${L("Klatki na sekundę", "Frame rate")}<select value=${p.canvas.fps} onChange=${(e) => H.apply((P) => ({ ...P, canvas: { ...P.canvas, fps: +e.target.value } }))}>
-          ${[24, 25, 30, 50, 60].map((f) => html`<option key=${f} value=${f}>${f} fps</option>`)}</select></label>
-        <p class="thq-ed-note">${CW}×${CH} · ${fmtT(total, true)}</p>
-        <p class="thq-ed-note">${L("Kliknij klip, napis albo muzykę na osi, żeby je ustawić.", "Click a clip, text or music on the timeline to adjust it.")}</p>
+      return html`<div>${formatTools()}
+        <div class="thq-ed-form"><p class="thq-ed-note">${L("Kliknij klip, napis albo muzykę na osi, żeby je ustawić.", "Click a clip, text or music on the timeline to adjust it.")}</p>
         <div class="thq-ed-keys">
           <p><kbd>Spacja</kbd> ${L("odtwórz", "play")}</p><p><kbd>S</kbd> ${L("tnij", "split")}</p><p><kbd>T</kbd> ${L("napis", "text")}</p>
           <p><kbd>Del</kbd> ${L("usuń", "delete")}</p><p><kbd>Ctrl Z</kbd> ${L("cofnij", "undo")}</p><p><kbd>Ctrl D</kbd> ${L("duplikuj", "duplicate")}</p>
           <p><kbd>← →</kbd> ${L("klatka", "frame")}</p>
-        </div>
-      </div>`;
+        </div></div></div>`;
     }
-    if (sel.type === "clip") {
-      const c = selItem;
-      return html`<div class="thq-ed-form">
-        <p class="thq-ed-sub">${(meta[c.src] || {}).name || c.src.split("/").pop()}</p>
-        ${c.kind !== "image" && html`<label>${L("Tempo", "Speed")}<select value=${c.speed} onChange=${(e) => upd("clip", c.id, { speed: +e.target.value })}>
-          ${ED_SPEEDS.map((s) => html`<option key=${s} value=${s}>${s}×</option>`)}</select></label>`}
-        ${c.kind === "image" && html`<label>${L("Czas (s)", "Duration (s)")}<input type="number" min="0.2" max="600" step="0.1" value=${(+c.out - c.in).toFixed(1)}
-          onChange=${(e) => upd("clip", c.id, { out: c.in + clamp(+e.target.value || 3, 0.2, 600) })}/></label>`}
-        ${c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}%
-          <input type="range" min="0" max="2" step="0.05" value=${c.volume} onInput=${(e) => upd("clip", c.id, { volume: +e.target.value, muted: false }, true)} onChange=${H.commit}/></label>`}
-        ${c.kind !== "image" && html`<label class="thq-ed-check"><input type="checkbox" checked=${!!c.muted} onChange=${(e) => upd("clip", c.id, { muted: e.target.checked })}/> ${L("Wycisz klip", "Mute clip")}</label>`}
-        <label>${L("Kadr", "Framing")}<select value=${c.fit} onChange=${(e) => upd("clip", c.id, { fit: e.target.value })}>
-          <option value="contain">${L("Dopasuj (czarne pasy)", "Fit (letterbox)")}</option><option value="cover">${L("Wypełnij (przytnij)", "Fill (crop)")}</option></select></label>
-        ${c.kind !== "image" && html`<p class="thq-ed-note">${L("Fragment źródła", "Source range")}: ${fmtT(c.in, true)} – ${fmtT(c.out, true)}</p>`}
-        <div class="thq-ed-row"><button type="button" class="thq-ed-btn" onClick=${split}>✂ ${L("Tnij", "Split")}</button>
-          <button type="button" class="thq-ed-btn" onClick=${duplicate}>⧉ ${L("Duplikuj", "Duplicate")}</button>
-          <button type="button" class="thq-ed-btn is-bad" disabled=${p.clips.length <= 1} onClick=${remove}>🗑 ${L("Usuń", "Delete")}</button></div>
-      </div>`;
-    }
-    if (sel.type === "text") {
-      const x = selItem;
-      const u = (patch, lv) => upd("text", x.id, patch, lv);
-      return html`<div class="thq-ed-form">
-        <label>${L("Tekst", "Text")}<textarea rows="3" value=${x.text} onInput=${(e) => u({ text: e.target.value }, true)} onBlur=${H.commit}></textarea></label>
-        <label>${L("Styl", "Style")}<div class="thq-ed-seg">${ED_STYLES.map(([k, pl, en]) => html`<button type="button" key=${k} class=${cx(x.style === k && "is-on")} onClick=${() => u({ style: k })}>${L(pl, en)}</button>`)}</div></label>
-        <label>${L("Krój", "Font")}<select value=${x.font} onChange=${(e) => u({ font: e.target.value })}>${ED_FONTS.map(([f, n]) => html`<option key=${f} value=${f}>${n}</option>`)}</select></label>
-        <label>${L("Rozmiar", "Size")} · ${Math.round(x.size)}<input type="range" min="16" max="220" value=${x.size} onInput=${(e) => u({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
-        <div class="thq-ed-row">
-          <label class="thq-ed-color">${L("Kolor", "Color")}<input type="color" value=${x.color} onInput=${(e) => u({ color: e.target.value }, true)} onChange=${H.commit}/></label>
-          ${(x.style === "box" || x.style === "outline") && html`<label class="thq-ed-color">${x.style === "box" ? L("Tło", "Box") : L("Obrys", "Outline")}<input type="color" value=${x.bg || "#000000"} onInput=${(e) => u({ bg: e.target.value }, true)} onChange=${H.commit}/></label>`}
-          <label class="thq-ed-check"><input type="checkbox" checked=${x.bold !== false} onChange=${(e) => u({ bold: e.target.checked })}/> ${L("Gruby", "Bold")}</label>
-        </div>
-        <label>${L("Wyrównanie", "Align")}<div class="thq-ed-seg">${[["left", "⯇"], ["center", "≡"], ["right", "⯈"]].map(([k, s]) => html`<button type="button" key=${k} class=${cx(x.align === k && "is-on")} onClick=${() => u({ align: k })}>${s}</button>`)}</div></label>
-        <label>${L("Szerokość", "Width")} · ${Math.round((x.maxw || 0.86) * 100)}%<input type="range" min="0.2" max="1" step="0.01" value=${x.maxw || 0.86} onInput=${(e) => u({ maxw: +e.target.value }, true)} onChange=${H.commit}/></label>
-        <p class="thq-ed-note">${fmtT(x.start, true)} – ${fmtT(x.end, true)} · ${L("przeciągnij napis na podglądzie, żeby go przesunąć", "drag the text on the preview to move it")}</p>
-        <div class="thq-ed-row"><button type="button" class="thq-ed-btn" onClick=${duplicate}>⧉ ${L("Duplikuj", "Duplicate")}</button>
-          <button type="button" class="thq-ed-btn is-bad" onClick=${remove}>🗑 ${L("Usuń", "Delete")}</button></div>
-      </div>`;
-    }
-    const m = selItem;
-    return html`<div class="thq-ed-form">
-      <p class="thq-ed-sub">♪ ${(meta[m.src] || {}).name || m.src.split("/").pop()}</p>
-      <label>${L("Głośność", "Volume")} · ${Math.round(m.volume * 100)}%<input type="range" min="0" max="2" step="0.05" value=${m.volume} onInput=${(e) => upd("audio", m.id, { volume: +e.target.value }, true)} onChange=${H.commit}/></label>
-      <p class="thq-ed-note">${L("Start w filmie", "Starts at")}: ${fmtT(m.start, true)} · ${L("długość", "length")} ${fmtT(audioDur(m), true)}</p>
-      <div class="thq-ed-row"><button type="button" class="thq-ed-btn" onClick=${split}>✂ ${L("Tnij", "Split")}</button>
-        <button type="button" class="thq-ed-btn is-bad" onClick=${remove}>🗑 ${L("Usuń", "Delete")}</button></div>
-    </div>`;
+    return sel.type === "clip" ? clipTools(selItem) : sel.type === "text" ? textTools(selItem) : audioTools(selItem);
   };
-
   return html`<div class="thq-ed" role="dialog" aria-modal="true" aria-label=${L("Edytor filmu", "Video editor")}>
     <header class="thq-ed-top">
       <button type="button" class="thq-ed-btn is-ghost" onClick=${() => { player.stop(); onClose(); }} title=${L("Zamknij edytor (projekt jest zapisany)", "Close the editor (the project is saved)")}>← ${L("Wróć", "Back")}</button>
@@ -765,37 +1064,27 @@ function VideoEditor({ path, onClose }) {
       <button type="button" class="thq-ed-btn is-ghost" disabled=${!H.canUndo} onClick=${H.undo} title="Ctrl+Z">↶</button>
       <button type="button" class="thq-ed-btn is-ghost" disabled=${!H.canRedo} onClick=${H.redo} title="Ctrl+Shift+Z">↷</button>
       <button type="button" class="thq-ed-btn" onClick=${() => setAsk(ask ? null : { text: "", reply: "", busy: false })}>✦ ${L("Poproś agenta", "Ask the agent")}</button>
-      <button type="button" class="thq-ed-btn is-main" disabled=${running || !info.ffmpeg} onClick=${doExport}
-        title=${info.ffmpeg ? L("Zapisz nową wersję filmu (oryginał zostaje)", "Save a new version (the original stays)") : L("Brak ffmpeg w kontenerze", "ffmpeg is missing in the container")}>⤓ ${L("Eksportuj", "Export")}</button>
+      ${exportBtn}
     </header>
-    ${ask && html`<${AskAgent} ask=${ask} setAsk=${setAsk} path=${path} project=${p} time=${tRef.current} sel=${sel && selItem ? { ...sel, item: selItem } : null} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`}
+    ${askBox}
     <div class="thq-ed-body">
       <aside class="thq-ed-side">
         <div class="thq-ed-tabs">
           <button type="button" class=${cx(side === "media" && "is-on")} onClick=${() => setSide("media")}>${L("Media", "Media")}</button>
+          <button type="button" class=${cx(side === "captions" && "is-on")} onClick=${() => setSide("captions")}>${L("Napisy", "Captions")}</button>
           <button type="button" class=${cx(side === "inspect" && "is-on")} onClick=${() => setSide("inspect")}>${L("Ustawienia", "Settings")}</button>
         </div>
         ${side === "media" ? html`<div class="thq-ed-media">
           <button type="button" class="thq-ed-btn is-wide" onClick=${addText}>T ${L("Dodaj napis", "Add text")}</button>
-          <label class="thq-ed-btn is-wide thq-ed-upload">⇪ ${L("Dodaj z dysku", "Add from disk")}
-            <input type="file" multiple accept="video/*,audio/*,image/png,image/jpeg,image/webp" onChange=${(e) => { uploadMedia(Array.from(e.target.files || [])); e.target.value = ""; }}/></label>
+          ${uploadBtn("video/*,audio/*,image/png,image/jpeg,image/webp")}
           <p class="thq-ed-note">${L("Z katalogu filmu", "From the film's folder")}</p>
-          <ul>${media.map((m) => html`<li key=${m.path}><button type="button" onClick=${() => addMedia(m)} title=${L("Dodaj do osi czasu", "Add to the timeline")}>
-            <span class=${cx("thq-ed-mk", `is-${m.kind}`)}>${m.kind === "audio" ? "♪" : m.kind === "image" ? "▣" : "▶"}</span>
-            <span class="thq-ed-mn">${m.name}</span><span class="thq-ed-md">${m.duration ? fmtT(m.duration) : ""}</span><span class="thq-ed-plus">+</span></button></li>`)}</ul>
-        </div>` : inspector()}
+          ${mediaList(["video", "image", "audio"])}
+          ${act(allMuted ? "mute" : "volume", allMuted ? L("Włącz dźwięk filmu", "Unmute video") : L("Wycisz dźwięk filmu", "Mute video audio"),
+            () => H.apply((P) => ({ ...P, clips: P.clips.map((c) => ({ ...c, muted: !allMuted })) })), { on: allMuted })}
+        </div>` : side === "captions" ? captionTools() : inspector()}
       </aside>
       <section class="thq-ed-stage-wrap">
-        <div class="thq-ed-fit" ref=${wrapRef}>
-        <div class="thq-ed-stage" ref=${stageRef} style=${stageSize}>
-          <video ref=${player.vids[0]} class="thq-ed-v" playsinline preload="auto" onError=${() => setCodecErr(true)}></video>
-          <video ref=${player.vids[1]} class="thq-ed-v" playsinline preload="auto" onError=${() => setCodecErr(true)}></video>
-          ${codecErr && html`<p class="thq-ed-codec">${L("Ta przeglądarka nie odtwarza kodeka tego filmu (np. Chromium bez H.264). Montaż i eksport działają; do podglądu użyj Chrome, Edge albo Safari.",
-            "This browser cannot decode the video codec (e.g. Chromium without H.264). Editing and export still work; use Chrome, Edge or Safari to preview.")}</p>`}
-          <img ref=${player.imgRef} class="thq-ed-v" alt=""/>
-          <canvas ref=${overlayRef} class="thq-ed-overlay" onPointerDown=${stagePointer}></canvas>
-        </div></div>
-        ${p.audio.map((m) => html`<${EdAudio} key=${m.id} m=${m} audios=${player.audios}/>`)}
+        ${stage}
         <div class="thq-ed-transport">
           <button type="button" class="thq-ed-play" onClick=${player.toggle} aria-label=${player.playing ? L("Pauza", "Pause") : L("Odtwórz", "Play")}>${player.playing ? "❚❚" : "▶"}</button>
           <span class="thq-ed-time"><span ref=${timeRef}>${fmtT(t, true)}</span> / ${fmtT(total, true)}</span>
@@ -812,44 +1101,8 @@ function VideoEditor({ path, onClose }) {
       <button type="button" class="thq-ed-btn is-ghost" onClick=${fitZoom}>${L("Całość", "Fit")}</button>
       <button type="button" class="thq-ed-btn is-ghost" onClick=${() => setPps((x) => clamp(x * 1.4, 4, 400))} aria-label=${L("Przybliż", "Zoom in")}>+</button>
     </div>
-    <div class="thq-ed-tl" ref=${tlRef} onWheel=${(e) => { if (e.ctrlKey) { e.preventDefault(); setPps((x) => clamp(x * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 4, 400)); } }}>
-      <div class="thq-ed-tl-in" style=${{ width: `${width}px` }}>
-        <div class="thq-ed-ruler" onPointerDown=${rulerDown}>
-          ${ticks.map((s) => html`<span key=${s} style=${{ left: `${s * pps}px` }}>${step < 1 ? `${fmtT(s)}${(s % 1 ? ".5" : "")}` : fmtT(s)}</span>`)}
-        </div>
-        <div class="thq-ed-track is-text" style=${{ height: `${nLanes * 26 + 6}px` }} onPointerDown=${rulerDown}>
-          ${p.texts.map((x) => html`<div key=${x.id} class=${cx("thq-ed-item is-text", sel && sel.id === x.id && "is-sel")}
-            style=${{ left: `${x.start * pps}px`, width: `${Math.max(6, (x.end - x.start) * pps)}px`, top: `${3 + textLane[x.id] * 26}px` }}
-            onPointerDown=${(e) => textDown(e, x)}>
-            <i class="thq-ed-h is-l" onPointerDown=${(e) => textDown(e, x, "l")}></i><span>T ${x.text}</span><i class="thq-ed-h is-r" onPointerDown=${(e) => textDown(e, x, "r")}></i></div>`)}
-        </div>
-        <div class="thq-ed-track is-video" onPointerDown=${rulerDown}>
-          ${segs.map((s, i) => {
-            const strip = strips[s.c.src];
-            const wpx = (s.end - s.start) * pps;
-            let bg = {};
-            if (strip && strip.url) {
-              bg = s.c.kind === "image" ? { backgroundImage: `url(${strip.url})`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" }
-                : { backgroundImage: `url(${strip.url})`, backgroundSize: `${strip.dur / s.c.speed * pps}px 100%`, backgroundPosition: `${-s.c.in / s.c.speed * pps}px 0` };
-            }
-            return html`<div key=${s.c.id} class=${cx("thq-ed-item is-clip", sel && sel.id === s.c.id && "is-sel", dragIdx === i && "is-drag")}
-              style=${{ left: `${s.start * pps}px`, width: `${Math.max(4, wpx)}px`, ...bg }} onPointerDown=${(e) => clipDown(e, s, i)}>
-              <i class="thq-ed-h is-l" onPointerDown=${(e) => clipDown(e, s, i, "l")}></i>
-              <span class="thq-ed-cl">${s.c.speed !== 1 ? `${s.c.speed}× · ` : ""}${s.c.muted ? "🔇 " : ""}${fmtT(s.end - s.start, true)}</span>
-              <i class="thq-ed-h is-r" onPointerDown=${(e) => clipDown(e, s, i, "r")}></i></div>`;
-          })}
-        </div>
-        <div class="thq-ed-track is-audio" onPointerDown=${rulerDown}>
-          ${p.audio.map((m) => html`<div key=${m.id} class=${cx("thq-ed-item is-audio", sel && sel.id === m.id && "is-sel")}
-            style=${{ left: `${m.start * pps}px`, width: `${Math.max(6, audioDur(m) * pps)}px` }} onPointerDown=${(e) => audioDown(e, m)}>
-            <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>♪ ${(meta[m.src] || {}).name || ""} · ${Math.round(m.volume * 100)}%</span>
-            <i class="thq-ed-h is-r" onPointerDown=${(e) => audioDown(e, m, "r")}></i></div>`)}
-          ${!p.audio.length && html`<span class="thq-ed-hint">${L("Muzyka: dodaj plik audio z panelu Media", "Music: add an audio file from the Media panel")}</span>`}
-        </div>
-        <div class="thq-ed-head" ref=${headRef} style=${{ transform: `translateX(${t * pps}px)` }}><i></i></div>
-      </div>
-    </div>
-    ${job && html`<${ExportBox} job=${job} onClose=${() => setJob(null)} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`}
+    ${timeline}
+    ${exportBox}
   </div>`;
 }
 

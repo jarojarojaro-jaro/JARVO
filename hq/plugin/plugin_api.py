@@ -258,7 +258,9 @@ async def edit_info(path: str):
                 proj = json.loads(pp.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 proj = None
-        return {"file": _media_entry(p), "media": media, "project": proj, "ffmpeg": bool(t["ffmpeg"])}
+        subs = sorted((str(x) for x in p.parent.glob("*.srt") if x.is_file()), key=lambda x: x.lower())[:30]
+        return {"file": _media_entry(p), "media": media, "project": proj, "ffmpeg": bool(t["ffmpeg"]),
+                "stt": bool(t["stt"]), "subs": subs}
 
     return await asyncio.to_thread(gather)
 
@@ -287,6 +289,69 @@ async def edit_save(request: Request):
     tmp.write_text(raw, encoding="utf-8")
     tmp.replace(target)
     return {"ok": True, "path": str(target), "ts": time.time()}
+
+
+@router.get("/edit/srt")
+async def edit_srt(path: str):
+    """Plik napisów z katalogu floty → lista {start, end, text} (czas źródła)."""
+    p = core.safe_path(path, ROOTS)
+    if p is None or p.suffix.lower() != ".srt" or p.stat().st_size > 5 * 2**20:
+        raise HTTPException(404, "Napisy poza katalogami floty albo to nie plik .srt")
+    return {"captions": ed.parse_srt(p.read_text(encoding="utf-8", errors="replace"))}
+
+
+async def _run_captions(job: dict, stt: str, src: Path, target: Path) -> None:
+    part = target.with_name(f".{target.name}.part")
+    try:
+        proc = await asyncio.create_subprocess_exec(stt, str(src), "--srt", str(part), "--max-chars", "32",
+                                                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        job["proc"] = proc
+        try:
+            _out, err = await asyncio.wait_for(proc.communicate(), timeout=3600)
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise RuntimeError("Rozpoznawanie mowy trwało ponad godzinę")
+        if job.get("state") == "cancelled":
+            return
+        if proc.returncode != 0 or not part.is_file():
+            msg = err.decode("utf-8", "replace").strip().splitlines()
+            raise RuntimeError(msg[-1][:400] if msg else f"jarvo-stt zakończył się kodem {proc.returncode}")
+        part.replace(target)
+        job.update(state="done", progress=1.0, out=str(target),
+                   captions=ed.parse_srt(target.read_text(encoding="utf-8", errors="replace")))
+    except Exception as exc:
+        job.update(state="error", error=str(exc)[:400])
+    finally:
+        job.pop("proc", None)
+        job["ended"] = time.time()
+        part.unlink(missing_ok=True)
+
+
+@router.post("/edit/captions")
+async def edit_captions(request: Request):
+    """Napisy z mowy (Parakeet, jarvo-stt) dla źródła klipu. Gotowe wcześniej: od razu z pliku .auto.srt."""
+    import uuid
+
+    body = await request.json()
+    src = _media_path(str(body.get("src") or ""))
+    if src is None or ed.media_kind(src) not in ("video", "audio"):
+        raise HTTPException(404, "Źródło poza katalogami floty albo bez dźwięku")
+    target = ed.auto_srt_path(src)
+    jid = uuid.uuid4().hex[:12]
+    if target.is_file() and not body.get("force"):
+        job = {"id": jid, "kind": "captions", "state": "done", "progress": 1.0, "out": str(target), "ended": time.time(),
+               "captions": ed.parse_srt(target.read_text(encoding="utf-8", errors="replace"))}
+        _edit.jobs[jid] = job
+        return _job_view(job)
+    stt = ed.tools()["stt"]
+    if not stt:
+        raise HTTPException(503, "Brak rozpoznawania mowy (jarvo-stt) w kontenerze")
+    if any(j.get("state") == "running" and j.get("kind") == "captions" for j in _edit.jobs.values()):
+        raise HTTPException(409, "Trwa już rozpoznawanie mowy: poczekaj, aż się skończy")
+    job = {"id": jid, "kind": "captions", "state": "running", "progress": 0.0, "started": time.time()}
+    _edit.jobs[jid] = job
+    job["task"] = asyncio.create_task(_run_captions(job, stt, src, target))
+    return _job_view(job)
 
 
 def _data_png(url: str, dest: Path) -> None:
@@ -347,7 +412,7 @@ async def edit_export(request: Request):
     t = ed.tools()
     if not (t["ffmpeg"] and t["ffprobe"]):
         raise HTTPException(503, "Brak ffmpeg w kontenerze")
-    if any(j.get("state") == "running" for j in _edit.jobs.values()):
+    if any(j.get("state") == "running" and j.get("kind", "export") == "export" for j in _edit.jobs.values()):
         raise HTTPException(409, "Trwa inny eksport: poczekaj, aż się skończy")
     try:
         proj = ed.normalize(body.get("project") or {}, _media_path)

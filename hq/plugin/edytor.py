@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -240,5 +241,43 @@ def parse_progress(chunk: str) -> float | None:
     return val
 
 
+_SRT_TIME = re.compile(r"(\d+):(\d{2}):(\d{2})[,.](\d{1,3})")
+
+
+def _srt_sec(m: re.Match) -> float:
+    h, mi, se, ms = m.groups()
+    return int(h) * 3600 + int(mi) * 60 + int(se) + int(ms.ljust(3, "0")) / 1000
+
+
+def parse_srt(text: str, limit: int = 5000) -> list[dict]:
+    """Napisy SRT → [{start, end, text}] (bloki bez czasu pomijamy, tagi <i> itp. usuwamy)."""
+    out = []
+    for block in re.split(r"\n\s*\n", text.replace("\r", "").replace("\ufeff", "").strip()):
+        lines = [x for x in block.split("\n") if x.strip()]
+        for i, line in enumerate(lines):
+            if "-->" in line:
+                a, _, b = line.partition("-->")
+                ma, mb = _SRT_TIME.search(a), _SRT_TIME.search(b)
+                body = re.sub(r"<[^>]+>", "", "\n".join(lines[i + 1:])).strip()
+                if ma and mb and body and _srt_sec(mb) > _srt_sec(ma):
+                    out.append({"start": _srt_sec(ma), "end": _srt_sec(mb), "text": body})
+                break
+        if len(out) >= limit:
+            break
+    return out
+
+
+def auto_srt_path(src: Path) -> Path:
+    """Napisy z mowy zapisujemy obok źródła: następnym razem wczytują się od razu (i widzi je agent)."""
+    return src.with_name(f"{src.stem}.auto.srt")
+
+
+def stt_bin() -> str | None:
+    env = os.environ.get("JARVO_STT_BIN")
+    if env:
+        return env if Path(env).exists() else None
+    return shutil.which("jarvo-stt") or ("/opt/jarvo/bin/jarvo-stt" if Path("/opt/jarvo/bin/jarvo-stt").exists() else None)
+
+
 def tools() -> dict:
-    return {"ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe")}
+    return {"ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe"), "stt": stt_bin()}

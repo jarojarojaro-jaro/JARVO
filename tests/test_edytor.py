@@ -119,3 +119,22 @@ def test_real_export(tmp_path):
     info = ed.probe(out)
     assert (info["w"], info["h"], info["audio"]) == (360, 640, True)
     assert info["duration"] == pytest.approx(2.0, abs=0.1)
+
+
+def test_parse_srt():
+    srt = "﻿1\r\n00:00:01,000 --> 00:00:02,500\r\n<i>Cześć</i> wszystkim\r\n\r\n2\n00:00:03.5 --> 00:00:03,000\nzły czas\n\n3\n00:01:00,000 --> 00:01:02,000\nDwie\nlinie\n"
+    assert ed.parse_srt(srt) == [{"start": 1.0, "end": 2.5, "text": "Cześć wszystkim"},
+                                 {"start": 60.0, "end": 62.0, "text": "Dwie\nlinie"}]
+
+
+def test_auto_srt_next_to_source(tmp_path):
+    assert ed.auto_srt_path(tmp_path / "film.mp4") == tmp_path / "film.auto.srt"
+
+
+def test_stt_bin_from_env(tmp_path, monkeypatch):
+    fake = tmp_path / "stt"
+    fake.write_text("#!/bin/sh\n")
+    monkeypatch.setenv("JARVO_STT_BIN", str(fake))
+    assert ed.stt_bin() == str(fake)
+    monkeypatch.setenv("JARVO_STT_BIN", str(tmp_path / "brak"))
+    assert ed.stt_bin() is None
