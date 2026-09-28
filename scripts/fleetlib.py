@@ -142,7 +142,7 @@ class Fleet:
 
     def apply_model_overrides(self, env: dict[str, str]) -> None:
         """Wybór dostawcy bez edycji repo: JARVO_MODEL_PROVIDER=<zestaw z models.presets> i opcjonalnie
-        JARVO_MODEL_FRONTIER / _STRONG / _FAST (np. z compose/jarvo.env)."""
+        JARVO_MODEL_FRONTIER / _STRONG / _FAST / _FALLBACK (np. z compose/jarvo.env)."""
         models = self.raw["models"]
         chosen = (env.get("JARVO_MODEL_PROVIDER") or "").strip()
         if chosen and chosen != models["provider"]:
@@ -156,6 +156,16 @@ class Fleet:
             value = (env.get(f"JARVO_MODEL_{tier.upper()}") or "").strip()
             if value:
                 models["tiers"][tier] = value
+        # model zapasowy: JARVO_MODEL_FALLBACK=<model u tego samego dostawcy> albo „off” (bez zapasowego)
+        fb = (env.get("JARVO_MODEL_FALLBACK") or "").strip()
+        if fb:
+            table = models.setdefault("fallback", {}) or {}
+            models["fallback"] = table
+            if fb.lower() == "off":
+                table.pop(models["provider"], None)
+            else:
+                prov = (table.get(models["provider"]) or {}).get("provider") or models["provider"]
+                table[models["provider"]] = {"provider": prov, "model": fb}
 
     def agent(self, name: str) -> Agent:
         for a in self.agents:

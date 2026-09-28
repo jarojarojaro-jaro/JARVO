@@ -26,6 +26,18 @@ def test_preset_and_single_model_override():
     assert f.model_for("fast") == "zai-org/GLM-5.3"
 
 
+def test_fallback_override_and_off():
+    f = fl.load_fleet()
+    g = "z-ai/glm-5.3-flash"
+    f.apply_model_overrides({"JARVO_MODEL_PROVIDER": "commandcode", "JARVO_MODEL_FRONTIER": g, "JARVO_MODEL_STRONG": g,
+                             "JARVO_MODEL_FAST": g, "JARVO_MODEL_FALLBACK": g})
+    assert {f.model_for(t) for t in ("frontier", "strong", "fast")} == {g}
+    assert f.fallback == {"provider": "commandcode", "model": g}      # tylko GLM, także zapasowy
+    f = fl.load_fleet()
+    f.apply_model_overrides({"JARVO_MODEL_PROVIDER": "commandcode", "JARVO_MODEL_FALLBACK": "off"})
+    assert f.fallback is None
+
+
 def test_unknown_provider_is_an_error():
     f = fl.load_fleet()
     with pytest.raises(ValueError, match="models.presets"):
