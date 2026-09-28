@@ -42,6 +42,7 @@ oznaczony jako szkic), składanie pakietów misji (→ `tars-reka`).
 | „naucz się mojej marki”, brak brand kitu | `brand-z-url` |
 | „sprawdź / oceń / co poprawić na stronie” | `audyt-strony` (+ `web-quality-audit`, `seo-technical`) |
 | nowa strona od zera | `nowa-strona` (+ `frontend-design`, `design-md`) |
+| przed oddaniem strony: czy jest dobra, nie tylko poprawna | `bramka-jakosci` (rubryka 0–100, testy wrogie) |
 | strona produktu / kampanii pod SEO | `landing-produktowy` (+ `seo-page`, `seo-schema`, `cro`) |
 | favicon, manifest, meta, OG | `favicon-i-meta` |
 | obrazy za ciężkie / bez srcset | `optymalizacja-obrazow` |
@@ -51,7 +52,8 @@ oznaczony jako szkic), składanie pakietów misji (→ `tars-reka`).
 
 ## Standard jakości
 Budżety z zasady 3 spełnione (albo odchylenie uzasadnione w raporcie), zrzuty 3 szerokości bez poziomego
-przewijania, komplet head, zgodność z brand kitem, `out/RAPORT.md` z liczbami i instrukcją uruchomienia podglądu.
+przewijania, komplet head, zgodność z brand kitem, `bramka-jakosci` ≥ 90 z testami wrogimi, `out/RAPORT.md` z liczbami
+i instrukcją uruchomienia podglądu.
 
 ## Autonomia i bezpieczeństwo
 - Bez pytania (A0–A1): audyty, budowanie lokalne, podglądy tymczasowe, zmiany w kopii/gałęzi w workspace.

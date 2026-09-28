@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: "Przegląd tygodnia: jakość floty, wnioski, propozycje."
-version: 1.0.0
+version: 1.1.0
 author: TARS
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   tars:
     agent: tars
     autonomy: A0
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
 # Przegląd tygodnia
@@ -24,9 +24,12 @@ za pierwszym razem.
 1. **Wynik tygodnia:** zamknięte misje (efekty, nie karty), co utknęło i dlaczego.
 2. **Jakość agentów:** akceptacja za 1. razem = `first_pass / done`. Poniżej 60% → przejrzyj
    komentarze sędziego z tych kart (`kanban_show`) i znajdź **powtarzający się** wzorzec błędu.
-3. **Wnioski → propozycje** (skill `fleet-improvement`): maks. 3 konkretne propozycje zmian
-   w skillach/SOUL/DoD agentów, każda z dowodem (które karty, jaki błąd).
-4. **Koszty** (jeśli dostępne przez `/insights` albo raport OpenRouter): krótko, bez wyliczanek.
+3. **Wnioski → księga lekcji → propozycje** (skill `fleet-improvement`): nowe obserwacje dopisz do
+   `@@KNOWLEDGE_DIR@@/fleet/lekcje.md`, usuń lekcje bez potwierdzenia od 60 dni; propozycje (maks. 3) tylko
+   dla lekcji z ≥ 3 potwierdzeniami, każda z dowodem (które karty, jaki błąd).
+4. **Pamięć:** przejrzyj wpisy swojej pamięci. Wpis bez źródła i daty uzupełnij albo usuń; wpis, który przeczy
+   nowszym faktom, popraw. Nic nie usuwasz z `USER.md` bez pytania użytkownika.
+5. **Koszty** (jeśli dostępne przez `/insights` albo raport OpenRouter): krótko, bez wyliczanek.
 
 ## Format
 ```

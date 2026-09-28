@@ -19,6 +19,10 @@ SHARED_DIR = REPO_ROOT / "shared"
 VENDOR_LOCK = REPO_ROOT / "vendor" / "skills.lock.yaml"
 FLEET_FILE = REPO_ROOT / "fleet.yaml"
 
+CALIBRATION_DIR = SHARED_DIR / "calibration"
+# prefiks identyfikatora modelu (bez dostawcy) → plik kalibracji w shared/calibration/
+MODEL_FAMILIES = (("gpt-", "gpt"), ("chatgpt", "gpt"), ("o3", "gpt"), ("o4", "gpt"), ("claude", "claude"),
+                  ("deepseek", "deepseek"), ("kimi", "kimi"))
 PROTOCOL_MARKER = "<!-- TARS:PROTOCOL -->"
 ROSTER_MARKER = "<!-- TARS:ROSTER -->"
 AGENT_KINDS = {"orchestrator", "specialist", "generalist"}
@@ -225,3 +229,51 @@ def approx_tokens(text: str) -> int:
 def write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+# ------------------------------------------------------------------ kalibracja pod rodzinę modelu
+
+def model_family(model_id: str | None) -> str:
+    """Rodzina modelu z identyfikatora (`openrouter/anthropic/claude-opus-5.5` → `claude`); nieznana → `generic`."""
+    name = str(model_id or "").strip().lower().rsplit("/", 1)[-1]
+    for prefix, family in MODEL_FAMILIES:
+        if name.startswith(prefix):
+            return family
+    return "generic"
+
+
+CALIBRATION_RE = re.compile(r"<!-- TARS:CALIBRATION (orkiestrator|wykonawca) -->.*?<!-- /TARS:CALIBRATION -->", re.S)
+
+
+def calibration_section(model_id: str | None, orchestrator: bool, root: Path | None = None) -> str:
+    """Blok kalibracji w znacznikach: install-fleet (profile_model.py) podmienia go, gdy w panelu wybrano inny model."""
+    role = "orkiestrator" if orchestrator else "wykonawca"
+    body = calibration_block(model_id, orchestrator, root)
+    return f"<!-- TARS:CALIBRATION {role} -->\n{body}\n<!-- /TARS:CALIBRATION -->" if body else \
+        f"<!-- TARS:CALIBRATION {role} -->\n<!-- /TARS:CALIBRATION -->"
+
+
+def recalibrate_soul(soul: str, model_id: str | None, root: Path | None = None) -> str | None:
+    """SOUL z blokiem kalibracji dla innego modelu (ta sama rola); None, gdy SOUL nie ma znaczników."""
+    m = CALIBRATION_RE.search(soul)
+    if not m:
+        return None
+    return soul[:m.start()] + calibration_section(model_id, m.group(1) == "orkiestrator", root) + soul[m.end():]
+
+
+def calibration_block(model_id: str | None, orchestrator: bool, root: Path | None = None) -> str:
+    """Sekcja SOUL z kalibracją: część „Wszyscy” + część roli z shared/calibration/<rodzina>.md."""
+    family = model_family(model_id)
+    path = (root or CALIBRATION_DIR) / f"{family}.md"
+    if not path.exists():
+        return ""
+    text = re.sub(r"<!--.*?-->", "", path.read_text(encoding="utf-8"), flags=re.S)
+    sections: dict[str, str] = {}
+    for part in re.split(r"^### ", text, flags=re.M)[1:]:
+        head, _, body = part.partition("\n")
+        sections[head.strip().lower()] = body.strip()
+    role = "orkiestrator" if orchestrator else "wykonawca"
+    body = "\n".join(b for b in (sections.get("wszyscy"), sections.get(role)) if b)
+    if not body:
+        return ""
+    return f"## Jak pracuję na tym modelu ({model_id})\n{body}"

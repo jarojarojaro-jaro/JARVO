@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.0.0
+version: 2.1.0
 author: "TARS (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -13,7 +13,7 @@ metadata:
   tars:
     agent: tars
     autonomy: A0
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 environments:
   - kanban
 ---
@@ -34,7 +34,8 @@ jeden werdykt. Nie przejmujesz pracy wykonawcy i **nigdy nie edytujesz jego plik
 - ostatnie przekazanie: `summary`, `metadata.artifacts`, `metadata.dod_check`, `metadata.risks`,
 - komentarze i decyzje, uwagi z poprzednich rund recenzji.
 
-Przekazanie to **twierdzenie do sprawdzenia**, nie dowód.
+Przekazanie to **twierdzenie do sprawdzenia**, nie dowód. Wykonawca zgłasza, że zrobione; sprawdzone jest dopiero
+to, co ma dowód (krok 4a).
 
 ### 2. Rubryka agenta
 Przeczytaj `references/rubric-<agent>.md` dla profilu wykonawcy (pole implementera w historii karty,
@@ -74,11 +75,25 @@ Obowiązki bazowe z kroku 4 obowiązują w każdej rundzie. Soczewka mówi, od c
 **tars-reka (złożenie/dokumenty):**
 - kompletność pakietu wobec kart-rodziców, działające ścieżki, spójny INDEX.md, nic nie zgubione i nic nie przeinaczone.
 
+### 4a. Dowód dla każdego punktu DoD
+
+Każdy punkt DoD dostaje jeden z trzech stanów:
+
+| Stan | Kiedy |
+|---|---|
+| **Sprawdzone przeze mnie** | sam uruchomiłem kontrolę albo obejrzałem artefakt; znam narzędzie i wynik |
+| **Dowód wykonawcy** | wykonawca podał, czym sprawdził i co wyszło (narzędzie, polecenie, liczba); wynik jest do odtworzenia. Kluczowe punkty sprawdzam wyrywkowo sam |
+| **Bez dowodu** | pusto, „działa”, „OK”, „zgodnie z planem”, `niesprawdzony`, albo liczba, której nie da się odtworzyć |
+
+Punkt **bez dowodu** nie przechodzi: sprawdzam go sam, a jeśli się nie da, idzie do poprawek jako „dostarcz dowód:
+<czym sprawdzić>”. Wyjątek: punkt, którego nie da się sprawdzić przed decyzją użytkownika (np. wymaga wdrożenia A2),
+akceptuję z zastrzeżeniem w `caveats` i `decisions_needed`.
+
 ### 5. Werdykt (dokładnie jeden)
 
 | Werdykt | Kiedy | Akcja |
 |---|---|---|
-| **Akceptacja** | wszystkie punkty DoD spełnione i poparte dowodem; brak blokujących z rubryki | `kanban_complete` |
+| **Akceptacja** | każdy punkt DoD spełniony i w stanie „sprawdzone przeze mnie” albo „dowód wykonawcy”; brak blokujących z rubryki | `kanban_complete` |
 | **Poprawki** | konkretne, naprawialne braki | `kanban_comment` z numerowaną listą, potem `kanban_request_changes` |
 | **Eskalacja** | potrzebna decyzja człowieka / zewnętrzny warunek **albo** to już 3. odrzucenie | `kanban_block(reason="escalation: …")` |
 
@@ -108,7 +123,7 @@ Eskalacja po 3 rundach: `kanban_block(reason="escalation: 3 rundy poprawek bez s
 
 ## Checklista przed werdyktem
 - [ ] przeczytany `kanban_show` bieżącej karty,
-- [ ] każdy punkt DoD zmapowany na dowód,
+- [ ] każdy punkt DoD ma stan z kroku 4a, żaden nie zostaje „bez dowodu”,
 - [ ] obejrzany faktyczny artefakt (nie tylko podsumowanie),
 - [ ] wykonane sprawdzenia z kroku 4 (albo zapisany powód, czemu się nie dało),
 - [ ] przy re-review sprawdzone poprzednie uwagi,

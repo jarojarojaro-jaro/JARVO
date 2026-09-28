@@ -99,9 +99,12 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
             r.err(f"{a.name}: SOUL.md bez sekcji {h!r}")
     if a.name == fleet.orchestrator and fl.ROSTER_MARKER not in soul:
         r.err(f"{a.name}: SOUL.md orkiestratora bez {fl.ROSTER_MARKER}")
-    tokens = fl.approx_tokens(soul.replace(fl.PROTOCOL_MARKER, protocol))
+    # budżet z najdłuższą kalibracją, jaką agent może dostać (zmiana dostawcy albo modelu w panelu)
+    orch = a.name == fleet.orchestrator
+    calib = max((fl.calibration_section(f"{fam}-x", orch) for fam in CALIBRATION_FAMILIES), key=len)
+    tokens = fl.approx_tokens(soul.replace(fl.PROTOCOL_MARKER, f"{protocol}\n\n{calib}"))
     if tokens > fl.SOUL_TOKEN_BUDGET:
-        r.err(f"{a.name}: SOUL ~{tokens} tokenów > budżet {fl.SOUL_TOKEN_BUDGET}")
+        r.err(f"{a.name}: SOUL ~{tokens} tokenów (z protokołem i kalibracją) > budżet {fl.SOUL_TOKEN_BUDGET}")
 
     cfg_text = (d / "config.yaml").read_text(encoding="utf-8") if (d / "config.yaml").exists() else ""
     try:
@@ -169,6 +172,32 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         if not (d / "scripts" / ref).exists():
             r.err(f"{a.name}: odwołanie do nieistniejącego skryptu scripts/{ref}")
     return names
+
+
+CALIBRATION_FAMILIES = ("gpt", "claude", "deepseek", "kimi", "generic")
+CALIBRATION_MAX_RULES = 3   # reguł na sekcję: każda nowa wypiera inną (shared/calibration/README.md)
+
+
+def check_calibration(r: Report) -> None:
+    """shared/calibration/<rodzina>.md: sekcje Wszyscy / Orkiestrator / Wykonawca, najwyżej 3 reguły w każdej."""
+    import re as _re
+
+    for fam in CALIBRATION_FAMILIES:
+        path = fl.CALIBRATION_DIR / f"{fam}.md"
+        if not path.exists():
+            r.err(f"calibration: brak {path.relative_to(fl.REPO_ROOT)}")
+            continue
+        text = _re.sub(r"<!--.*?-->", "", path.read_text(encoding="utf-8"), flags=_re.S)
+        parts = {p.partition("\n")[0].strip(): p.partition("\n")[2] for p in _re.split(r"^### ", text, flags=_re.M)[1:]}
+        for sec in ("Wszyscy", "Orkiestrator", "Wykonawca"):
+            if sec not in parts:
+                r.err(f"calibration/{fam}.md: brak sekcji ### {sec}")
+                continue
+            rules = [ln for ln in parts[sec].splitlines() if ln.lstrip().startswith("- ")]
+            if not rules:
+                r.err(f"calibration/{fam}.md: sekcja {sec} bez reguł")
+            elif len(rules) > CALIBRATION_MAX_RULES:
+                r.err(f"calibration/{fam}.md: sekcja {sec} ma {len(rules)} reguł (max {CALIBRATION_MAX_RULES})")
 
 
 def check_lock(fleet: fl.Fleet, own: dict[str, set[str]], r: Report) -> None:
@@ -328,6 +357,7 @@ def run() -> Report:
         extra = {"roster"} if a.name == fleet.orchestrator else set()
         check_cron(a, own[a.name] | extra, vendored, r)
     check_evals(fleet, r)
+    check_calibration(r)
     check_hq(r)
     check_scripts(r)
     check_secrets(r)

@@ -139,3 +139,40 @@ scenarios:
         - "czyta INDEX.md i tablicę, raportuje w stylu efektów (co, kto, kiedy), bez żargonu"
       should_not:
         - "wymyśla stan, którego nie sprawdził"
+
+  - id: tars-interview-vague
+    type: routing
+    input: "Zrób mi marketing."
+    expect:
+      should:
+        - "uruchamia wywiad: jedno pytanie w wiadomości, poprzedzone „Pytanie 1/6”"
+        - "pod pytaniem 2–4 gotowe odpowiedzi (jedna oznaczona jako polecana) i opcja „Inne”"
+        - "pyta o to, co najbardziej zmienia plan (efekt albo granice), a nie o szczegóły wykonania"
+      should_not:
+        - "zadaje kilka pytań naraz albo listę pytań"
+        - "zakłada karty przed ustaleniem efektu"
+    check:
+      cards_max: 0
+
+  - id: tars-no-interview-clear
+    type: routing
+    input: "Zrób landing dla kawiarni Ziarno z brand kitem ziarno, otwarcie 19.10.2026, rezerwacje przez e-mail."
+    expect:
+      should:
+        - "bez wywiadu i bez pytań: od razu karta dla tars-web z CEL, KONTEKST, DoD, WYJŚCIA, GRANICE"
+        - "potwierdza start jednym-dwoma zdaniami"
+      should_not:
+        - "zadaje pytania, na które odpowiada wiadomość albo brand kit"
+    check:
+      cards_assignees_include: [tars-web]
+
+  - id: tars-delegates-not-does
+    type: routing
+    input: "Napisz mi szybko 3 posty na Instagram o otwarciu Ziarna, marka ziarno."
+    expect:
+      should:
+        - "karta dla tars-studio (praca dziedzinowa), nawet jeśli zadanie wydaje się krótkie"
+      should_not:
+        - "pisze posty sam w rozmowie"
+    check:
+      cards_assignees_include: [tars-studio]

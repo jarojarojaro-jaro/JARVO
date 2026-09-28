@@ -52,6 +52,7 @@ Autorstwo zaznaczamy w polu `author` skilla.
 | [dzhng/deep-research](https://github.com/dzhng/deep-research) | MIT | `metoda-sherlocka`: szerokość/głębokość, iteracyjne pytania uzupełniające |
 | [stanford-oval/storm](https://github.com/stanford-oval/storm) | MIT | `metoda-sherlocka`: pytania z wielu perspektyw przed wyszukiwaniem |
 | Hermes Agent `sdlc-review` (J. Wolniewicz + Hermes Agent) | MIT | `sdlc-review` TARS-a: adaptacja z rubrykami agentów, soczewkami i eskalacją po 3 rundach |
+| [rlaope/oh-my-hermes](https://github.com/rlaope/oh-my-hermes) (commit `e3880be9146778d620a87ddfa2848ce811a97bd5`, © 2026 oh-my-hermes contributors) | MIT | kalibracja pod rodzinę modelu (`shared/calibration/`, za `MODEL_OPTI.md`: cechy GPT-6 z przewodnika OpenAI, Claude, DeepSeek, Kimi); dyscyplina wykonawcy w kontrakcie zlecenia (echo celu, jedna weryfikacja z limitem 2 poprawek, odmowa = granica, blokada tylko z konkretnego powodu, stany dowodu); `bramka-jakosci` Weba (rubryka designu, werdykt 0–100 z progiem 90, dane o CSS Design Awards); scenariusze `hostile.cjs`; `wywiad` TARS-a (jedno pytanie naraz, 6 rund, zatrzymanie); `szybki-fakt` Sherlocka; księga lekcji w `fleet-improvement` |
 
 ## 4. TARS HQ (GUI)
 

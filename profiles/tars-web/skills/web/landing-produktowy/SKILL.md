@@ -1,7 +1,7 @@
 ---
 name: landing-produktowy
 description: "Landing produktu pod SEO i konwersję, z danymi z researchu."
-version: 1.0.0
+version: 1.1.0
 author: TARS
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   tars:
     agent: tars-web
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
 # Landing produktowy
@@ -41,4 +41,4 @@ Wariant `nowa-strona` nastawiony na **jedną frazę główną i jedną konwersj�
 Jedno główne CTA powtórzone 2–3 razy, formularz minimalny, brak rozpraszaczy (menu uproszczone), zaufanie przy CTA.
 
 ## DoD
-DoD z `nowa-strona` + fraza główna w title/H1/URL/description, schema przechodzi walidację (JSON-LD poprawny składniowo, typy zgodne z treścią).
+DoD z `nowa-strona` (w tym `bramka-jakosci` ≥ 90) + fraza główna w title/H1/URL/description, schema przechodzi walidację (JSON-LD poprawny składniowo, typy zgodne z treścią).

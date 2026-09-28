@@ -45,6 +45,23 @@ def model_of(cfg) -> dict | None:
     return {k: m[k] for k in ("provider", "default") if k in m} if isinstance(m, dict) else None
 
 
+def recalibrate(prof: Path, model_id: str | None) -> None:
+    """SOUL profilu dostaje kalibrację pod model wybrany w panelu (shared/calibration/, jak w buildzie)."""
+    soul_path = prof / "SOUL.md"
+    if not model_id or not soul_path.exists():
+        return
+    try:  # kalibracja to dodatek: jej błąd nie może zatrzymać instalacji profilu
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import fleetlib  # noqa: E402  (tylko tutaj: snapshot nie potrzebuje)
+
+        new = fleetlib.recalibrate_soul(soul_path.read_text(encoding="utf-8"), model_id)
+        if new is not None:
+            soul_path.write_text(new, encoding="utf-8")
+            print(f"  kalibracja SOUL pod {model_id}: {fleetlib.model_family(model_id)}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ! kalibracja SOUL pominięta: {exc}")
+
+
 def main(argv: list[str]) -> int:
     action, prof = argv[0], Path(argv[1])
     cfg_path = prof / "config.yaml"
@@ -68,6 +85,7 @@ def main(argv: list[str]) -> int:
             cfg["model"][k] = v
         dump(cfg, cfg_path)
         print(f"  model wybrany w panelu zostaje: {before.get('provider')} / {before.get('default')}")
+        recalibrate(prof, before.get("default"))
     if fleet_model is not None:
         (prof / MARK).write_text(json.dumps(fleet_model), encoding="utf-8")
     (prof / SNAP).unlink(missing_ok=True)

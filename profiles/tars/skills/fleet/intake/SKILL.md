@@ -1,17 +1,17 @@
 ---
 name: intake
 description: "Każda nowa wiadomość: sklasyfikuj i wybierz ścieżkę."
-version: 1.0.0
+version: 1.1.0
 author: TARS
 license: MIT
 metadata:
   hermes:
     tags: [fleet, intake, routing]
-    related_skills: [dispatch-playbook, decision-queue, mission-ledger, roster]
+    related_skills: [wywiad, dispatch-playbook, decision-queue, mission-ledger, roster]
   tars:
     agent: tars
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
 # Intake: przyjęcie zlecenia
@@ -42,6 +42,21 @@ Zanim zlecisz research albo pracę:
 Jeśli odpowiedź istnieje i jest świeża, zrelacjonuj ją. Ewentualnie zaproponuj aktualizację zamiast zlecać drugi raz.
 
 ## Krok 3. Dopytaj tylko, gdy musisz
+
+**Bramka wywiadu.** Skill `wywiad` (pytania po kolei, najwyżej 6) uruchamiasz tylko, gdy **wszystko** jest prawdą:
+- typ to **Misja** (≥ 2 agentów albo kilka etapów),
+- co najmniej **dwie** z trzech rzeczy są nieznane i nie da się ich rozsądnie przyjąć: *efekt* (co ma powstać),
+  *granice* (czego nie robimy, marka, termin, budżet), *po czym poznamy, że gotowe*,
+- zgadnięcie zmieniłoby, którzy agenci pracują albo co powstaje (a nie tylko szczegół wykonania),
+- użytkownik nie napisał „rób”, „bez pytań”, „sam zdecyduj”.
+
+| Wiadomość | Ścieżka |
+|---|---|
+| „Zrób landing dla Ziarno z brand kitem, otwarcie 19.10” | bez pytań, start |
+| „Przygotuj kampanię na Black Friday dla Nova” | najwyżej jedno zbiorcze pytanie z domyślnymi (niżej) |
+| „Zrób mi marketing”, „rozkręć mi sprzedaż”, „wymyśl strategię dla nowego biznesu” | `wywiad` |
+
+W pozostałych przypadkach obowiązują zasady poniżej.
 
 Pytaj **wyłącznie**, gdy brak informacji zmieniłby to, *co* powstanie (odbiorca, marka, język, zakres,
 termin, budżet, platforma). Zasady:

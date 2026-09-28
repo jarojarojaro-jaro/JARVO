@@ -1,7 +1,7 @@
 ---
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
-version: 1.0.0
+version: 1.1.0
 author: TARS
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   tars:
     agent: tars-web
     autonomy: A0
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
 # Audyt strony
@@ -29,6 +29,9 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
    - ✅ Punkt kontrolny: `out/audyt/summary.json` istnieje; błędy narzędzi są opisane, nie przemilczane.
 2. **Ocena eksperta:** przejdź checklisty `web-quality-audit` i `seo-technical` z wynikami automatów w ręku.
    Obejrzyj zrzuty (vision): czytelność, hierarchia, CTA, spójność z marką.
+   Odporność: `node $HERMES_HOME/scripts/hostile.cjs <url> out/audyt/wrogie` (wolne łącze, brak JS, 320 px,
+   klawiatura, długie polskie słowa, reduced motion, konsola); porażki trafiają do priorytetów jak inne problemy.
+   Karta prosi o ocenę designu → dodaj werdykt z `bramka-jakosci` (bez pętli poprawek: audyt nie zmienia strony).
 3. **Priorytety:**
    - **P0**: blokuje użytkowników albo indeksowanie (noindex przez pomyłkę, błędy 5xx, brak mobile, formularz nie działa),
    - **P1**: duży wpływ (LCP > 4 s, CLS > 0,25, brak title/description na kluczowych stronach, krytyczne a11y),

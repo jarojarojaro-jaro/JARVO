@@ -187,6 +187,13 @@ Mechanizmy techniczne:
 To jedyny element wspólny dla wszystkich agentów. To protokół, a nie wiedza dziedzinowa.
 Źródło jest jedno (`shared/protocol/`), a generator wkleja go do każdego profilu.
 
+Zaraz za protokołem generator dokleja **kalibrację pod model agenta** (`shared/calibration/<rodzina>.md`:
+`gpt`, `claude`, `deepseek`, `kimi`, `generic`): 2–3 zdania na znaną słabość rodziny, osobno dla orkiestratora
+i wykonawców (np. GPT-6: deleguj, nie dopytuj o to, co ustalisz sam, pisz krótko). Blok ma znaczniki
+`<!-- TARS:CALIBRATION … -->`; gdy w panelu wybierzesz agentowi inny model, `install-fleet.sh` podmienia go przy
+następnym wdrożeniu. Zmiana `TARS_MODEL_PROVIDER` przebudowuje kalibrację sama. Walidator liczy najdłuższy blok
+do budżetu SOUL i pilnuje limitu 3 reguł na sekcję.
+
 **Karta zlecenia (TARS → agent):**
 ```
 CEL:            co ma powstać (1–2 zdania)

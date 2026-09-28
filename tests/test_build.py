@@ -74,6 +74,18 @@ def test_soul_gets_protocol_with_reviewer(built):
         assert f'kanban_request_review(reviewer="{fleet.reviewer}"' in soul, a.name
 
 
+def test_soul_gets_model_calibration(built):
+    """Kalibracja pod rodzinę modelu agenta (shared/calibration/): orkiestrator i wykonawcy mają swoje sekcje."""
+    fleet, out = built
+    for a in fleet.active():
+        soul = (out / a.name / "SOUL.md").read_text(encoding="utf-8")
+        role = "orkiestrator" if a.name == fleet.orchestrator else "wykonawca"
+        assert f"<!-- TARS:CALIBRATION {role} -->" in soul, a.name
+        assert f"## Jak pracuję na tym modelu ({fleet.model_for(a.model_tier)})" in soul, a.name
+        # blok stoi za protokołem, przed sekcjami po znaczniku
+        assert soul.index("## Kontrakt zlecenia floty") < soul.index("<!-- TARS:CALIBRATION")
+
+
 def test_orchestrator_roster_and_rubrics(built):
     fleet, out = built
     tars = out / fleet.orchestrator

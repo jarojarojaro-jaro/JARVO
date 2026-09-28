@@ -1,22 +1,23 @@
 ---
 name: metoda-sherlocka
 description: "Śledztwo: plan, wątki, źródła pierwotne, weryfikacja."
-version: 1.0.0
+version: 1.1.0
 author: "TARS (metodologia inspirowana: langchain-ai/open_deep_research MIT, dzhng/deep-research MIT, STORM MIT)"
 license: MIT
 metadata:
   hermes:
     tags: [research, investigation, verification, citations]
-    related_skills: [weryfikacja-faktow, raport-sledztwa, research-rynku, research-seo, grounded-citations, searxng-search]
+    related_skills: [szybki-fakt, weryfikacja-faktow, raport-sledztwa, research-rynku, research-seo, grounded-citations, searxng-search]
   tars:
     agent: tars-sherlock
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
 # Metoda Sherlocka
 
 Domyślny workflow każdego śledztwa. Wynik: `out/RAPORT.md` + `out/zrodla.jsonl`.
+Karta pyta o jeden bieżący fakt (limit, cena, data, przepis) bez porównań → `szybki-fakt`, nie ta metoda.
 
 ## Faza 0. Brief śledztwa (≤ 5 min)
 Zapisz w `notes/brief.md`:

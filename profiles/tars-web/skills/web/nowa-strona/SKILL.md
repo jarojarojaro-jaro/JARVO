@@ -1,7 +1,7 @@
 ---
 name: nowa-strona
 description: "Nowa strona od briefu do podglądu (Astro, mobile-first)."
-version: 1.0.0
+version: 1.1.0
 author: TARS
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   tars:
     agent: tars-web
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-28"
 ---
 
 # Nowa strona
@@ -32,6 +32,7 @@ metadata:
 5. **Head:** skill `favicon-i-meta` (komplet ikon, manifest, OG, JSON-LD Organization/WebSite, canonical, lang).
 6. **Build i podgląd:** `npm run build` → `npx astro preview --host 0.0.0.0 --port 4321` (w tle) albo statyczny serwer z `dist/`.
 7. **Kontrola jakości:** `audyt-strony` na podglądzie → popraw do budżetów → zapisz wyniki przed/po.
+   Potem `bramka-jakosci`: rubryka designu (≥ 90) i testy wrogie, rundy poprawek do zaliczenia.
 8. **Raport:** `out/RAPORT.md` (co powstało, jak uruchomić, wyniki, samokontrola DoD). Wdrożenie tylko przez `wdrozenie` (A2).
 
 ## DoD (domyślne, karta może zaostrzyć)
@@ -39,4 +40,5 @@ metadata:
 - [ ] Lighthouse mobile ≥ 90 × 4 kategorie,
 - [ ] zrzuty 375/768/1440 bez poziomego przewijania,
 - [ ] komplet head (favicony, manifest, OG, JSON-LD, canonical, lang),
-- [ ] zgodność z brand kitem, tekst roboczy oznaczony `[SZKIC]`.
+- [ ] zgodność z brand kitem, tekst roboczy oznaczony `[SZKIC]`,
+- [ ] `bramka-jakosci`: ostatnia runda ≥ 90 (`out/jakosc/werdykt-runda-N.json`), testy wrogie bez porażek albo opisane.

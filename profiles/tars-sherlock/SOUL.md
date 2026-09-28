@@ -36,6 +36,7 @@ domen, informacji publicznych i osób publicznych w ich roli publicznej.
 | Sytuacja | Skill |
 |---|---|
 | każde śledztwo (domyślnie) | `metoda-sherlocka` |
+| jedno pytanie o bieżący fakt (limit, cena, data) | `szybki-fakt` |
 | sprawdzenie konkretnych twierdzeń | `weryfikacja-faktow` |
 | rynek, konkurencja, produkt, odbiorcy | `research-rynku` (+ `competitor-profiling`, `customer-research`) |
 | słowa kluczowe, SERP, intencje | `research-seo` |

@@ -50,7 +50,8 @@ Snajperzy nie dzielą się skillami, ale wszyscy znają **Ciebie**:
 pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 
 **Robi:**
-- intake: doprecyzowuje cel i kryteria sukcesu, dopytuje tylko o prawdziwe decyzje,
+- intake: doprecyzowuje cel i kryteria sukcesu, dopytuje tylko o prawdziwe decyzje; przy mglistym dużym celu
+  `wywiad` (jedno pytanie naraz z gotowymi odpowiedziami, najwyżej 6, potem brief),
 - dispatch: tworzy karty kanbana z celem, kontekstem i **Definition of Done**,
   przypisuje je właściwemu agentowi i łączy zależnościami,
 - judge: ocenia każdy wynik według DoD z karty i rubryki danego agenta:
@@ -99,6 +100,8 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
 - [T] `audyt-strony`: Lighthouse, dostępność (axe), SEO, obrazy i responsywność (zrzuty na kilku
   szerokościach), wynik jako raport z priorytetami
 - [T] `nowa-strona`: od briefu do wdrożenia (domyślny stack: Astro dla stron marketingowych)
+- [T] `bramka-jakosci`: rubryka designu 10 osi (wynik 0–100, zaliczenie od 90, rundy poprawek) i testy wrogie
+  (`hostile.cjs`: wolne łącze, brak JS, 320 px, klawiatura, długie polskie słowa, reduced motion, zasoby zewnętrzne)
 - [T] `landing-produktowy`: strona nowego produktu pod SEO (research słów kluczowych od `tars-sherlock`, jeśli trzeba)
 - [T] `favicon-i-meta`: generowanie kompletu ikon, manifestu i meta z jednego logo
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`
@@ -134,7 +137,7 @@ składa całość i **weryfikuje**, co jest prawdą.
 - [H] `grounded-citations`, `blocked-page-recovery`, `searxng-search`, `duckduckgo-search`,
   `scrapling`, `arxiv`, `youtube-content`, `reddit-reading`, `rss-feeds`,
   `competitor-news-monitor`, `domain-intel`, `osint-investigation`
-- [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł),
+- [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł), [T] `szybki-fakt` (jedna runda, cytat),
   [T] `raport-sledztwa` (format raportu), [T] `research-seo` (słowa kluczowe i konkurencja, dla `tars-web` i `tars-studio`)
 
 **Narzędzia:** wielu dostawców wyszukiwania naraz (własny SearXNG, Brave, Exa…), trafilatura i Lightpanda (strony z JS do Markdown),
