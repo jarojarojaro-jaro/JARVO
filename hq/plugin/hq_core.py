@@ -36,6 +36,7 @@ PREVIEW_ROOTS = ("workspaces", "missions", "knowledge", "inbox")   # inbox: plik
 KIND_BY_EXT = {
     **{e: "image" for e in (".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".svg")},
     **{e: "video" for e in (".mp4", ".webm", ".mov")},
+    **{e: "audio" for e in (".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus")},
     ".pdf": "pdf", ".md": "text", ".txt": "text", ".csv": "text", ".json": "text", ".srt": "text",
     ".html": "html", ".htm": "html", ".zip": "archive", ".docx": "doc", ".xlsx": "doc", ".pptx": "doc",
 }

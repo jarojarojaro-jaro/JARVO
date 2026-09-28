@@ -36,7 +36,10 @@ function FileActions({ file, onPreview, compact }) {
     try { await fn(); if (okText) say(okText); } catch (err) { say(err.message || String(err), true); }
   };
   const copy = run(() => copyText(hostPathOf(file.path, host)), L("Ścieżka skopiowana", "Path copied"));
+  const edit = React.useContext(EditCtx);
   return html`<span class=${cx("thq-file-acts", compact && "is-compact")}>
+    ${file.kind === "video" && edit && html`<button type="button" class="thq-act-btn is-run" onClick=${(e) => { e.stopPropagation(); edit(file); }}
+      title=${L("Otwórz w edytorze: tnij, napisy, muzyka, tempo, eksport", "Open in the editor: cut, text, music, speed, export")}>✎ ${L("Edytuj", "Edit")}</button>`}
     ${file.kind === "html" && html`<button type="button" class="thq-act-btn is-run" onClick=${run(() => openSite(file.path))}
       title=${L("Otwórz stronę w nowej karcie przeglądarki", "Open the page in a new browser tab")}>▶ ${L("Odpal", "Run")}</button>`}
     ${onPreview && html`<button type="button" class="thq-act-btn" onClick=${(e) => { e.stopPropagation(); onPreview(file); }}
@@ -160,7 +163,7 @@ const EVENT_PL = bilingual({
 });
 
 function FilePreview({ file, onClose }) {
-  const url = useBlobUrl(["image", "video", "pdf"].includes(file.kind) ? file.path : null);
+  const url = useBlobUrl(["image", "video", "pdf", "audio"].includes(file.kind) ? file.path : null);
   const [text, setText] = useState(null);
   useEffect(() => {
     if (file.kind !== "text" && file.kind !== "html") return;
@@ -170,6 +173,7 @@ function FilePreview({ file, onClose }) {
     <div class="thq-preview-bar"><p class="thq-muted thq-path">${file.path}${file.size != null ? ` · ${bytes(file.size)}` : ""}</p><${FileActions} file=${file}/></div>
     ${file.kind === "image" && (url ? html`<img class="thq-preview-img" src=${url} alt=${file.name}/>` : html`<p class="thq-muted">${L("Wczytuję…", "Loading…")}</p>`)}
     ${file.kind === "video" && url && html`<video class="thq-preview-img" src=${url} controls></video>`}
+    ${file.kind === "audio" && url && html`<audio class="thq-preview-audio" src=${url} controls></audio>`}
     ${file.kind === "pdf" && url && html`<iframe class="thq-preview-pdf" src=${url} title=${file.name}></iframe>`}
     ${(file.kind === "text" || file.kind === "html") && html`<pre class="thq-preview-text">${text == null ? L("Wczytuję…", "Loading…") : text}</pre>`}
     ${["archive", "doc", "other"].includes(file.kind) && html`<p>${L("Tego typu pliku nie da się podejrzeć w przeglądarce. Pobierz go albo otwórz folder przyciskami wyżej.", "This file type cannot be previewed in the browser. Download it or open its folder with the buttons above.")}</p>`}
@@ -178,7 +182,7 @@ function FilePreview({ file, onClose }) {
 
 function Thumb({ file, onOpen }) {
   const url = useBlobUrl(file.kind === "image" ? file.path : null);
-  const label = { image: "Obraz", video: "Wideo", pdf: "PDF", text: "Tekst", html: "HTML", archive: "Paczka", doc: "Dokument", other: "Plik" }[file.kind];
+  const label = { image: "Obraz", video: "Wideo", audio: "Dźwięk", pdf: "PDF", text: "Tekst", html: "HTML", archive: "Paczka", doc: "Dokument", other: "Plik" }[file.kind];
   return html`<button type="button" class="thq-file" onClick=${() => onOpen(file)} title=${file.rel}>
     <span class=${cx("thq-file-thumb", `is-${file.kind}`)}>${url ? html`<img src=${url} alt=""/>` : html`<span>${label}</span>`}</span>
     <span class="thq-file-name">${file.name}</span>

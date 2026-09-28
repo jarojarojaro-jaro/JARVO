@@ -76,6 +76,15 @@ const liveApi = {
     const res = await rawFetch(`${API_ROOT}/file?path=${encodeURIComponent(path)}`);
     return res.blob();
   },
+  editInfo: (path) => SDK.fetchJSON(`${API_ROOT}/edit/info?path=${encodeURIComponent(path)}`),
+  editMedia: (path) => SDK.fetchJSON(`${API_ROOT}/edit/media?path=${encodeURIComponent(path)}`),
+  editSave: (path, project) => SDK.fetchJSON(`${API_ROOT}/edit/save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, project }) }),
+  async editExport(path, project, texts) {
+    const res = await rawFetch(`${API_ROOT}/edit/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, project, texts }) });
+    return res.json();
+  },
+  editJob: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}`),
+  editCancel: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   async *send(name, message, extra) {
     const res = await rawFetch(`${API_ROOT}/chat/${encodeURIComponent(name)}/send`, {
       method: "POST",

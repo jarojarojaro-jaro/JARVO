@@ -99,7 +99,7 @@ function usePoll(fn, ms, deps) {
 // Rodzaj pliku po rozszerzeniu (jak KIND_BY_EXT w hq_core.py).
 const KIND_BY_EXT = {
   png: "image", jpg: "image", jpeg: "image", webp: "image", avif: "image", gif: "image", svg: "image",
-  mp4: "video", webm: "video", mov: "video", pdf: "pdf", md: "text", txt: "text", csv: "text", json: "text", srt: "text",
+  mp4: "video", webm: "video", mov: "video", mp3: "audio", wav: "audio", m4a: "audio", aac: "audio", ogg: "audio", flac: "audio", opus: "audio", pdf: "pdf", md: "text", txt: "text", csv: "text", json: "text", srt: "text",
   html: "html", htm: "html", zip: "archive", docx: "doc", xlsx: "doc", pptx: "doc",
 };
 const kindOf = (path) => KIND_BY_EXT[String(path).split(".").pop().toLowerCase()] || "other";

@@ -25,6 +25,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Czat: zdjęcia i pliki | czat HQ + `/opt/data/jarvo/inbox/` | 📎, wklejanie Ctrl+V (zrzut ekranu) i przeciąganie. Plik trafia do `inbox/<data>/`, agent dostaje jego ścieżkę (linia `📎 …`), zdjęcie także jako obraz (model bez widzenia dostaje opis od Hermesa) |
 | Czat: pliki od agenta | odpowiedź agenta | linia `MEDIA:<ścieżka>` i obrazy `data:image` jako miniatury, ścieżki `/opt/data/jarvo/…` i adresy http(s) klikalne; obraz ma „Kopiuj obraz” (np. do Telegrama) |
 | Akcje pliku wynikowego | plugin + pomocnik hosta | **▶ Odpal** (strona HTML w nowej karcie, `:9120`), **Pokaż w folderze** (Eksplorator Windows w lokalnej instalacji WSL; gdzie indziej: **Kopiuj ścieżkę**), **Pobierz**, podgląd/kod |
+| **✎ Edytuj** (każdy film) | edytor w HQ + ffmpeg w kontenerze | montaż w stylu CapCut: oś czasu z miniaturami, cięcie (S), przycinanie krawędzi, przestawianie klipów, tempo 0,25–4×, głośność i wyciszenie, zdjęcia jako plansze, napisy (styl, krój, kolor, przeciąganie na podglądzie), muzyka z katalogu albo z dysku, format 16:9 / 9:16 / 1:1 / 4:5, cofnij/ponów, skróty klawiszowe. **Eksportuj** zapisuje nową wersję obok oryginału (`film-edycja.mp4`, oryginał zostaje), **Poproś agenta** wysyła Wideografowi prośbę z projektem montażu. Szczegóły: sekcja 2a |
 | Panel agenta: Czat | API gatewaya | rozmowa bezpośrednia z agentem (sesja HQ, osobna od Telegrama) |
 | Panel agenta: O agencie | fleet.yaml, SOUL, skille | opis, model, autonomia, parametry osobowości, workflowy |
 | Centrala: Decyzje | kanban (`blocked` + `needs_input`) | pytania agentów; odpowiedź idzie do Jarva, który odblokowuje kartę i zapisuje decyzję |
@@ -61,6 +62,7 @@ Pliki w repo:
 | `hq/plugin/manifest.json` | manifest pluginu dashboardu (zakładka BASE w menu, przed CHAT) |
 | `hq/plugin/plugin_api.py` | trasy FastAPI, proxy czatu do gatewaya |
 | `hq/plugin/hq_core.py` | logika stanu (bez FastAPI, testowana w `tests/test_hq_core.py`) |
+| `hq/plugin/edytor.py` | edytor filmów: walidacja projektu, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`) |
 | `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, czat, HUD, aplikacja |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność) |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |
@@ -70,6 +72,26 @@ Pliki w repo:
 Wdrożenie jest częścią zwykłego `deploy.sh`: `build.py` buduje plugin do `build/plugins/jarvo-hq`,
 `install-fleet.sh` kopiuje go do `/opt/data/plugins/jarvo-hq`, włącza (Hermes wymaga jawnego włączenia
 pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartuje sam dashboard (s6).
+
+## 2a. Edytor filmów
+
+Bez bibliotek i bez nowych usług: edytor to jeden plik `hq/web/src/45-edytor.js` (~54 KB nieskompresowany, ok. 17 KB po gzip) w tym samym
+pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
+
+- **Podgląd** gra w przeglądarce z plików pobranych raz (blob), bez serwera w pętli. Dwa elementy `<video>` na zmianę:
+  następny klip czeka przewinięty na swój początek, więc przejścia są płynne. Miniatury osi czasu robi przeglądarka
+  (jedna kanwa na źródło).
+- **Napisy** rysuje jedna funkcja na kanwie: w podglądzie i przy eksporcie (PNG na napis nakładany przez ffmpeg),
+  więc plik wygląda jak podgląd, łącznie z krojem.
+- **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
+  `volume`, `muted`, `fit`), napisy i muzyka. Po ponownym otwarciu edycja jest tam, gdzie była.
+- **Eksport** (`POST /edit/export`): serwer sprawdza projekt (ścieżki tylko z katalogów floty, limity długości
+  i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat → nakładki → miks z limiterem), H.264 + AAC,
+  `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
+  i dopiero gotowy dostaje nazwę `film-edycja[-N].mp4`: nic nie jest nadpisywane.
+- **Kodeki podglądu:** Chrome, Edge i Safari odtwarzają H.264. Chromium bez kodeków pokaże komunikat; montaż
+  i eksport działają dalej.
+- Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg).
 
 ## 3. Bezpieczeństwo
 
@@ -86,7 +108,10 @@ pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartu
 - **Pokaż w folderze**: dashboard zapisuje tylko prośbę ze ścieżką (`state/reveal-request`); `scripts/updater.py`
   na hoście sprawdza ją ponownie (tylko `jarvo/{workspaces,missions,knowledge}`) i woła `explorer.exe /select,…`.
 - Odczyt kanbana i transkrypcji w trybie SQLite `mode=ro`. HQ niczego nie zapisuje poza mapą sesji czatu
-  (`/opt/data/jarvo/state/hq-sessions.json`); zmiany na tablicy robią agenci przez swoje narzędzia.
+  (`/opt/data/jarvo/state/hq-sessions.json`) i edytorem filmów (projekt `*.edycja.json` i nowe wersje filmu obok
+  oryginału, pliki tymczasowe w `state/edytor/`); zmiany na tablicy robią agenci przez swoje narzędzia.
+- Edytor: każda ścieżka z projektu przechodzi przez to samo sprawdzenie co podgląd plików; ffmpeg dostaje argumenty
+  listą (bez powłoki), napisy tylko jako poprawne PNG do 12 MB.
 
 ## 4. Wieża Jarvo (wygląd)
 

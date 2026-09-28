@@ -12,6 +12,7 @@ import importlib.util
 import json
 import os
 import sys
+import shutil
 import time
 from pathlib import Path
 
@@ -206,6 +207,204 @@ async def file(path: str, download: bool = False):
     return FileResponse(p, media_type=media, headers=headers,
                         filename=p.name if download else None,
                         content_disposition_type="attachment" if download else "inline")
+
+
+# ------------------------------------------------------------------ edytor filmów
+# Montaż robi przeglądarka (podgląd, oś czasu), a tu tylko: opis plików, zapis projektu obok filmu
+# i eksport jednym przebiegiem ffmpeg w tle (jedno zadanie naraz, postęp z `-progress`).
+def _load_editor():
+    spec = importlib.util.spec_from_file_location("jarvo_hq_edytor", _HERE / "edytor.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["jarvo_hq_edytor"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+ed = _load_editor()
+_edit = sys.modules.setdefault("jarvo_hq_edit_state", type(sys)("jarvo_hq_edit_state"))
+if not hasattr(_edit, "jobs"):
+    _edit.jobs = {}
+
+
+def _media_path(raw: str) -> Path | None:
+    p = core.safe_path(raw, ROOTS)
+    return p if p is not None and ed.media_kind(p) else None
+
+
+def _media_entry(p: Path) -> dict:
+    info = ed.probe(p)
+    return {"path": str(p), "name": p.name, "kind": ed.media_kind(p), "size": p.stat().st_size,
+            "mtime": p.stat().st_mtime, **{k: info.get(k) for k in ("duration", "w", "h", "fps", "audio")}}
+
+
+@router.get("/edit/info")
+async def edit_info(path: str):
+    """Film do edycji: jego parametry, zapisany projekt (jeśli jest) i media z tego samego katalogu."""
+    p = _media_path(path)
+    if p is None or ed.media_kind(p) != "video":
+        raise HTTPException(404, "Film poza katalogami floty albo nie istnieje")
+    t = ed.tools()
+    if not t["ffprobe"]:
+        raise HTTPException(503, "Brak ffprobe w kontenerze: edytor potrzebuje ffmpeg")
+
+    def gather():
+        sib = sorted((x for x in p.parent.iterdir() if x.is_file() and ed.media_kind(x) and not x.name.startswith(".")),
+                     key=lambda x: -x.stat().st_mtime)[:60]
+        media = [_media_entry(x) for x in sib]
+        proj = None
+        pp = ed.project_path(p)
+        if pp.is_file():
+            try:
+                proj = json.loads(pp.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                proj = None
+        return {"file": _media_entry(p), "media": media, "project": proj, "ffmpeg": bool(t["ffmpeg"])}
+
+    return await asyncio.to_thread(gather)
+
+
+@router.get("/edit/media")
+async def edit_media(path: str):
+    """Opis jednego pliku (np. muzyka wysłana z dysku przez czat)."""
+    p = _media_path(path)
+    if p is None:
+        raise HTTPException(404, "Plik poza katalogami floty albo to nie wideo, obraz ani dźwięk")
+    return await asyncio.to_thread(_media_entry, p)
+
+
+@router.post("/edit/save")
+async def edit_save(request: Request):
+    body = await request.json()
+    p = _media_path(str(body.get("path") or ""))
+    if p is None or ed.media_kind(p) != "video":
+        raise HTTPException(404, "Film poza katalogami floty")
+    proj = body.get("project")
+    raw = json.dumps(proj, ensure_ascii=False, indent=1)
+    if not isinstance(proj, dict) or len(raw) > 2_000_000:
+        raise HTTPException(400, "Projekt musi być obiektem JSON do 2 MB")
+    target = ed.project_path(p)
+    tmp = target.with_name(f".{target.name}.part")
+    tmp.write_text(raw, encoding="utf-8")
+    tmp.replace(target)
+    return {"ok": True, "path": str(target), "ts": time.time()}
+
+
+def _data_png(url: str, dest: Path) -> None:
+    import base64
+    head, _, data = str(url).partition(",")
+    if head != "data:image/png;base64" or not data:
+        raise ed.ProjectError("Napis musi być obrazem PNG (data URL).")
+    raw = base64.b64decode(data, validate=True)
+    if len(raw) > 12 * 2**20 or not raw.startswith(b"\x89PNG"):
+        raise ed.ProjectError("Obraz napisu jest uszkodzony albo za duży.")
+    dest.write_bytes(raw)
+
+
+async def _run_export(job: dict, cmd: list[str], total: float, tmpdir: Path, out: Path) -> None:
+    part = out.with_name(f".{out.stem}.part.mp4")
+    cmd = cmd[:-1] + [str(part)]
+    try:
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        job["proc"] = proc
+        err_task = asyncio.create_task(proc.stderr.read())
+        buf = ""
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            buf += line.decode("utf-8", "replace")
+            if buf.endswith("progress=continue\n") or buf.endswith("progress=end\n"):
+                sec = ed.parse_progress(buf)
+                if sec is not None and total > 0:
+                    job["progress"] = min(0.999, sec / total)
+                buf = ""
+        code = await proc.wait()
+        err = (await err_task).decode("utf-8", "replace").strip()
+        if job.get("state") == "cancelled":
+            return
+        if code != 0 or not part.is_file():
+            job.update(state="error", error=(err.splitlines() or [f"ffmpeg zakończył się kodem {code}"])[-1][:400])
+            return
+        part.replace(out)
+        job.update(state="done", progress=1.0, out=str(out), size=out.stat().st_size)
+    except Exception as exc:  # zadanie ma skończyć się stanem, nie wiszącym „w toku”
+        job.update(state="error", error=str(exc)[:400])
+    finally:
+        job.pop("proc", None)
+        job["ended"] = time.time()
+        part.unlink(missing_ok=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@router.post("/edit/export")
+async def edit_export(request: Request):
+    import uuid
+
+    body = await request.json()
+    p = _media_path(str(body.get("path") or ""))
+    if p is None or ed.media_kind(p) != "video":
+        raise HTTPException(404, "Film poza katalogami floty")
+    t = ed.tools()
+    if not (t["ffmpeg"] and t["ffprobe"]):
+        raise HTTPException(503, "Brak ffmpeg w kontenerze")
+    if any(j.get("state") == "running" for j in _edit.jobs.values()):
+        raise HTTPException(409, "Trwa inny eksport: poczekaj, aż się skończy")
+    try:
+        proj = ed.normalize(body.get("project") or {}, _media_path)
+        pngs = body.get("texts") or []
+        if len(pngs) != len(proj["texts"]):
+            raise ed.ProjectError("Liczba obrazów napisów nie zgadza się z projektem.")
+    except ed.ProjectError as exc:
+        raise HTTPException(400, str(exc))
+    tmpdir = core.JARVO_DIR / "state" / "edytor" / uuid.uuid4().hex[:12]
+    tmpdir.mkdir(parents=True, exist_ok=True)
+    try:
+        files = []
+        for k, url in enumerate(pngs):
+            dest = tmpdir / f"napis-{k}.png"
+            _data_png(url, dest)
+            files.append(dest)
+        has_audio = {}
+        for c in proj["clips"]:
+            if c["kind"] == "video" and str(c["src"]) not in has_audio:
+                has_audio[str(c["src"])] = (await asyncio.to_thread(ed.probe, c["src"])).get("audio", False)
+        out = ed.export_name(p)
+        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"])
+    except (ed.ProjectError, ValueError) as exc:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        raise HTTPException(400, str(exc))
+    for jid in [k for k, j in _edit.jobs.items() if j.get("ended") and time.time() - j["ended"] > 3600]:
+        _edit.jobs.pop(jid, None)
+    jid = uuid.uuid4().hex[:12]
+    job = {"id": jid, "state": "running", "progress": 0.0, "started": time.time(), "duration": proj["duration"], "target": str(out)}
+    _edit.jobs[jid] = job
+    job["task"] = asyncio.create_task(_run_export(job, cmd, proj["duration"], tmpdir, out))
+    return _job_view(job)
+
+
+def _job_view(job: dict) -> dict:
+    return {k: v for k, v in job.items() if k not in ("proc", "task")}
+
+
+@router.get("/edit/job/{jid}")
+async def edit_job(jid: str):
+    job = _edit.jobs.get(jid)
+    if not job:
+        raise HTTPException(404, "Nie ma takiego eksportu")
+    return _job_view(job)
+
+
+@router.post("/edit/job/{jid}/cancel")
+async def edit_cancel(jid: str):
+    job = _edit.jobs.get(jid)
+    if not job:
+        raise HTTPException(404, "Nie ma takiego eksportu")
+    if job.get("state") == "running":
+        job["state"] = "cancelled"
+        proc = job.get("proc")
+        if proc and proc.returncode is None:
+            proc.kill()
+    return _job_view(job)
 
 
 # ------------------------------------------------------------------ „Odpal”: podgląd stron na :9120

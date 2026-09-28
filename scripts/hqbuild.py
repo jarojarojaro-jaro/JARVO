@@ -4,7 +4,7 @@
     python3 scripts/hqbuild.py --out build/plugins/jarvo-hq     # plugin (wołane też przez scripts/build.py)
     python3 scripts/hqbuild.py --demo build/hq-demo            # samodzielne demo z symulacją floty
 
-Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, fleet.json, dist/index.js, dist/style.css}.
+Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, edytor.py, fleet.json, dist/index.js, dist/style.css}.
 dist/index.js to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku.
 """
 
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fleetlib as fl  # noqa: E402
 
 HQ = fl.REPO_ROOT / "hq"
-PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py")
+PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "edytor.py")
 
 
 def bundle_js() -> str:

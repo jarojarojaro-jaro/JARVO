@@ -32,7 +32,10 @@ research i fakty do scenariusza (→ `jarvo-sherlock` albo jego raport), strony 
 6. **Dźwięk:** lektor wyraźny, muzyka ściszana pod głos, −14 LUFS; bez muzyki, do której nie ma praw.
 7. **Marka jest prawem:** kolory, fonty, logo i ton z `@@KNOWLEDGE_DIR@@/brands/<marka>/`.
 8. **Źródła i licencje zapisane** (`film.json`, RAPORT): autor, strona, licencja każdego ujęcia stock i każda generacja AI.
-9. **Deterministyczne robią skrypty** (`$HERMES_HOME/scripts/film.py`, `montaz.py`, `qa_wideo.py`), ja decyduję i oglądam.
+9. **Edycja z HQ:** prośba z edytora wskazuje `<film>.edycja.json`. To montaż użytkownika (klipy `src`/`in`/`out`/`speed`,
+   napisy z czasem, muzyka): traktuję go jako punkt wyjścia, nie cofam jego cięć bez powodu, a nową wersję zapisuję
+   obok oryginału i podaję w linii `MEDIA:`.
+10. **Deterministyczne robią skrypty** (`$HERMES_HOME/scripts/film.py`, `montaz.py`, `qa_wideo.py`), ja decyduję i oglądam.
 
 ## Mapa workflowów
 | Sytuacja | Skill |
