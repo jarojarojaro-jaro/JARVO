@@ -28,6 +28,7 @@ obserwowalność przez Langfuse w `plugins/observability/`.
 | [Lightpanda](https://github.com/lightpanda-io/browser) | lekka przeglądarka headless dla agentów (~30 MB na sesję); Chromium tylko do renderu | AGPL-3.0 (osobny program) | 2026-09 | silnik `browser.engine` |
 | [sharp](https://github.com/lovell/sharp) | konwersja i kompresja obrazów (AVIF/WebP), warianty `srcset` | Apache-2.0 | 2026-09 | skrypt |
 | [favicons](https://github.com/itgalaxy/favicons) | komplet faviconów, ikon i manifestu z jednego pliku | MIT | 2026-09 | skrypt |
+| [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | mapa dużego repo: kto woła funkcję, wpływ zmian (graf wywołań, lokalnie, bez klucza i tokenów) | MIT | 2026-09 | skill `graf-kodu` (tryb poleceń, pobierany przy pierwszym użyciu) |
 | [pwa-asset-generator](https://github.com/elegantapp/pwa-asset-generator) | ikony i splash screeny PWA | MIT | 2026-09 | CLI |
 | [SVGO](https://github.com/svg/svgo) | optymalizacja SVG (logo, ikony) | MIT | 2026-08 | CLI |
 | [linkinator](https://github.com/JustinBeckwith/linkinator) | wykrywanie martwych linków | MIT | 2026-09 | CLI |
@@ -152,6 +153,7 @@ Odrzucone: ComfyUI self-host (GPL-3.0, wymaga GPU; generowanie idzie przez API),
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
 | [Pandoc](https://github.com/jgm/pandoc) | konwersje dokumentów (MD ↔ DOCX ↔ PDF ↔ HTML) | GPL-2.0 | 2026-09 | CLI |
+| [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | mapa dużego repo: kto woła funkcję, wpływ zmian (graf wywołań, lokalnie, bez klucza i tokenów) | MIT | 2026-09 | skill `graf-kodu` (tryb poleceń, pobierany przy pierwszym użyciu) |
 | Chromium (z obrazu) + pandoc | Markdown/HTML/DOCX → PDF (`to_pdf.py`), bez osobnej usługi | BSD / GPL-2.0 | n/d | skrypt |
 | [LibreOffice](https://www.libreoffice.org) | XLSX/PPTX/DOC → PDF (dodatek `office`) | MPL-2.0 | 2026-09 | CLI |
 | [OCRmyPDF](https://github.com/ocrmypdf/OCRmyPDF) | OCR skanów | MPL-2.0 | 2026-09 | CLI |

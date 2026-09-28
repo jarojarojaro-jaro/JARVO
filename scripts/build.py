@@ -43,6 +43,7 @@ CATEGORY_DESCRIPTIONS = {
     "sherlock": "Metoda śledcza: wieloźródłowy research, weryfikacja faktów, raporty z cytatami.",
     "web": "Workflowy Web Senior Deva: brand z URL, audyty, nowe strony, landingi, favicony, obrazy, wdrożenia.",
     "studio": "Workflowy Studio: pakiety kampanii, grafiki social, filmy z kodu, generacja AI, formaty, copy PL, publikacja.",
+    "kod": "Praca na istniejącym kodzie: mapa repo (graf wywołań), wpływ zmian przed refaktorem.",
     "reka": "Workflowy prawej ręki: składanie pakietów misji, dokumenty i konwersje, szybkie prototypy, granice.",
     # kategorie skilli zewnętrznych
     "research": "Narzędzia researchu z Hermesa (MIT): wyszukiwarki, cytowanie, arXiv, YouTube, Reddit, RSS, OSINT firm.",
@@ -127,7 +128,9 @@ class SourceResolver:
         if name in self._resolved:
             return self._resolved[name]
         spec = self.sources[name]
-        if spec["type"] == "hermes-tree":
+        if spec["type"] == "repo-tree":            # skille własne Jarvo wspólne dla kilku agentów (shared/skills)
+            path = fl.REPO_ROOT
+        elif spec["type"] == "hermes-tree":
             if not self.hermes_src:
                 raise SystemExit("Źródło 'hermes' wymaga --hermes-src (np. /opt/hermes w kontenerze).")
             path = self.hermes_src
@@ -171,7 +174,7 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
                 raise SystemExit(f"[{agent}] {entry['path']}: brak licencji Apache-2.0, nie kopiujemy")
         elif spec.get("license_file"):
             shutil.copy2(src_root / spec["license_file"], dest / "LICENSE-UPSTREAM")
-        elif spec.get("notice") and spec["type"] == "git":
+        elif spec.get("notice") and spec["type"] in ("git", "repo-tree"):
             (dest / "LICENSE-UPSTREAM").write_text(spec["notice"] + "\n", encoding="utf-8")
         elif spec["type"] == "hermes-tree":
             hermes_license = src_root / "LICENSE"
@@ -184,7 +187,8 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
                 break
         rev = spec.get("rev") or _hermes_rev(src_root)
         fl.write_json(dest / ".vendored.json", {
-            "source": source, "repo": spec.get("repo", "hermes-agent (image tree)"),
+            "source": source,
+            "repo": spec.get("repo") or ("jarvo (to repo)" if spec["type"] == "repo-tree" else "hermes-agent (image tree)"),
             "rev": rev, "path": entry["path"], "license": spec["license"],
         })
         report.append({"agent": agent, "dest": entry["dest"], "source": source, "rev": rev})

@@ -12,6 +12,10 @@
 version: 1
 
 sources:
+  jarvo:
+    type: repo-tree          # skille własne floty wspólne dla kilku agentów: shared/skills w tym repo
+    license: MIT
+    notice: "Jarvo. Silnik graf-kodu: codebase-memory-mcp (c) DeusData, MIT, pobierany przy pierwszym użyciu."
   hermes:
     type: hermes-tree
     license: MIT
@@ -172,6 +176,7 @@ agents:
     - {source: marketingskills, path: skills/customer-research, dest: market/customer-research}
 
   jarvo-web:
+    - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
     - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}
     - {source: gsap-skills, path: skills/gsap-scrolltrigger, dest: gsap/gsap-scrolltrigger}
@@ -311,4 +316,5 @@ agents:
     - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-character-conflict, dest: screenwriting/sw-character-conflict}
 
   jarvo-reka:
+    - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}

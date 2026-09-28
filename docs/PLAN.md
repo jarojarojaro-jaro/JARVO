@@ -249,9 +249,11 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
   sterowanie Twoim Windowsem tylko za zgodą (A2). Chmura Cua Fleets jest płatna: pomijamy.
 - **„Drugi mózg” (analiza 8 repo, 2026-09-28):** Jarvo działa na Hermesie, który już ma pamięć, `session_search`,
   kanban z zależnościami i dostawców pamięci (w tym mem0), więc bierzemy tylko to, czego brak.
-  - **Teraz:** `DeusData/codebase-memory-mcp` (MIT): graf kodu jako serwer MCP, jedna binarka, bez klucza API i bez
-    tokenów, dane w `~/.cache/codebase-memory-mcp/` (SQLite); Hermes wspierany natywnie (skill + `pre_llm_call`).
-    Dla Weba (kod stron) i Ręki; watcher w tle wyłączyć (`watcher_enabled false`), indeks na żądanie.
+  - **Wdrożone:** `DeusData/codebase-memory-mcp` 0.11.0 (MIT) jako skill `kod/graf-kodu` u Weba i Ręki, w trybie
+    poleceń (nie MCP: opisy 17 narzędzi nie jadą w każdym zapytaniu), pobierany przy pierwszym użyciu z SHA-256
+    (program 300 MB, więc nie w obrazie), bez obserwatora i UI. Test na repo Jarvo: indeks ~7 s, pytanie ~5 s;
+    trafność dobra przy zwykłych importach, błędy przy tych samych nazwach w różnych modułach i importach
+    dynamicznych, stąd zasada „graf = wskazówka, potwierdź w pliku”.
   - **Faza bazy wiedzy (Obsidian, osobno):** `AgriciDaniel/claude-obsidian` (MIT, skille Agent Skills → działają
     w Hermesie; skarbiec = zwykłe pliki Markdown ze źródłami) jako rdzeń; do porównania `Graphify-Labs/graphify`
     (Apache-2.0: graf kodu lokalnie, dokumenty/PDF/wideo przez model = tokeny).

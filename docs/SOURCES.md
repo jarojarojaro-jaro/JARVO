@@ -55,6 +55,12 @@ nasze adaptacje żyją w skillach własnych floty.
 Build odrzuca skill z `anthropics/skills`, jeśli w jego katalogu nie ma licencji Apache-2.0: część
 skilli w tym repo ma inne, zastrzeżone warunki i nie wolno ich kopiować.
 
+Programy pobierane przez skille przy pierwszym użyciu (nie w repo ani w obrazie), w przypiętej wersji z sumą SHA-256:
+
+| Projekt | Wersja | Licencja | Dla kogo |
+|---|---|---|---|
+| [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | 0.11.0 (`linux-*-portable`) | MIT (licencje zależności: `THIRD_PARTY_NOTICES.md` obok programu) | Web, Ręka: skill `graf-kodu` (tryb poleceń, bez MCP i bez procesu w tle) |
+
 ## 3. Metodologie i prompty (inspiracja, własny tekst)
 
 Te projekty nie są kopiowane. Przeczytaliśmy je i napisaliśmy własne skille po polsku według ich metod.
