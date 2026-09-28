@@ -10,7 +10,7 @@ Zasady (VPS 8 GB, bez dubli):
   playwright przypięta do tej przeglądarki (PW_VERSION),
 - pakiety npm i Python raz do /opt/data/tars/narzedzia (przeżywają restart), a nie w każdym projekcie,
 - biblioteka lemo-opuscar przypięta do commita z vendor/skills.lock.yaml (bez samoczynnych aktualizacji);
-  ciężkie assety (głos Kokoro ~340 MB, sample ~1,35 GB) tylko z TARS_EXTRAS zawierającym „lemo”.
+  HDRI do stylów 3D (~12 MB) zawsze; ciężkie assety (głos Kokoro ~340 MB, sample ~1,35 GB) tylko z TARS_EXTRAS „lemo”.
 """
 
 from __future__ import annotations
@@ -111,6 +111,9 @@ def install_lemo() -> None:
         run(["uv", "pip", "install", "--quiet", "--python", str(lemo_venv / "bin" / "python"), *pkgs] if shutil.which("uv")
             else [str(lemo_venv / "bin" / "python"), "-m", "pip", "install", "--quiet", *pkgs])
         (lemo_venv / ".lemo-ok").touch()
+    # HDRI (Poly Haven, CC0, ~12 MB): światło i odbicia w stylach 3D (brick-toy, paper-popup, paper-lantern…) – zawsze
+    if not (LEMO / "core" / "assets" / "polyhaven").is_dir() or not any((LEMO / "core" / "assets" / "polyhaven").glob("*.hdr")):
+        run(["sh", "tools/fetch.sh", "hdri"], cwd=LEMO)
     if full_extras():
         for what in ("voice", "instruments"):
             run(["sh", "tools/fetch.sh", what], cwd=LEMO)
@@ -131,6 +134,7 @@ def status() -> dict:
         "venv": (VENV / "bin" / "python").exists(),
         "motion": (NODE / "node_modules" / "playwright").exists() and (VENV / "bin" / "python").exists(),
         "lemo": (LEMO / "node_modules" / ".lemo-ok").exists() and (LEMO / ".venv" / ".lemo-ok").exists(),
+        "lemo_hdri": any((LEMO / "core" / "assets" / "polyhaven").glob("*.hdr")) if (LEMO / "core" / "assets" / "polyhaven").is_dir() else False,
         "lemo_glos_kokoro": (LEMO / "core" / "tts" / "kokoro-v1.0.onnx").exists(),
         "lemo_sample": (LEMO / "core" / "audio" / "instruments").is_dir() and any((LEMO / "core" / "audio" / "instruments").iterdir()),
         "anidoodle": (NODE / "node_modules" / "esbuild").exists(),
