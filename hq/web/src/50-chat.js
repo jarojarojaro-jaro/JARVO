@@ -46,7 +46,7 @@ function ToolChips({ tools }) {
 
 const MAX_ATTACH = 8;
 
-// Załączniki w polu wiadomości: wysyłane od razu do tars/inbox, zdjęcia dodatkowo jako obraz dla modelu.
+// Załączniki w polu wiadomości: wysyłane od razu do jarvo/inbox, zdjęcia dodatkowo jako obraz dla modelu.
 function useAttachments() {
   const [items, setItems] = useState([]);
   const add = useCallback((files) => {

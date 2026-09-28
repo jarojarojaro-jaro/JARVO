@@ -104,12 +104,12 @@ def skill(root, rel, frontmatter_extra="", vendored=False):
 
 def test_prune_removes_only_managed_skills_missing_from_build(tmp_path):
     build, profile = tmp_path / "build", tmp_path / "profile"
-    skill(build, "web/audyt-strony", "metadata:\n  tars:\n    agent: tars-web\n")
-    skill(profile, "web/audyt-strony", "metadata:\n  tars:\n    agent: tars-web\n")
-    old_own = skill(profile, "web/stary-workflow", "metadata:\n  tars:\n    agent: tars-web\n")
+    skill(build, "web/audyt-strony", "metadata:\n  jarvo:\n    agent: jarvo-web\n")
+    skill(profile, "web/audyt-strony", "metadata:\n  jarvo:\n    agent: jarvo-web\n")
+    old_own = skill(profile, "web/stary-workflow", "metadata:\n  jarvo:\n    agent: jarvo-web\n")
     old_vendor = skill(profile, "marketing/competitors", vendored=True)
     agent_made = skill(profile, "moje/wlasny-skill")
-    hidden = skill(profile, ".archive/cos", "metadata:\n  tars:\n    agent: tars-web\n")
+    hidden = skill(profile, ".archive/cos", "metadata:\n  jarvo:\n    agent: jarvo-web\n")
 
     prune_skills.main([str(build), str(profile), "--dry-run"])
     assert old_own.exists() and old_vendor.exists()

@@ -1,0 +1,71 @@
+# jarvo-sherlock: researcher-detektyw. Tokeny @@...@@ podstawia scripts/build.py.
+model:
+  provider: "@@PROVIDER@@"
+  default: "@@MODEL@@"
+
+agent:
+  reasoning_effort: low
+  max_turns: 250
+
+timezone: "@@TIMEZONE@@"
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  nudge_interval: 12
+
+skills:
+  creation_nudge_interval: 20
+
+web:
+  search_backend: searxng        # SEARXNG_URL ustawia docker-compose (własny SearXNG)
+
+platform_toolsets:
+  cli: [web, browser, file, terminal, delegation, memory, skills, todo, vision, session_search]
+  telegram: [web, browser, file, terminal, delegation, memory, skills, todo, vision, session_search, clarify]
+  cron: [web, file, terminal, memory, skills]
+
+terminal:
+  backend: local
+  cwd: "@@WORKSPACES_DIR@@/jarvo-sherlock"
+  timeout: 300
+
+# Przeglądarka: wbudowane narzędzia browser_* przez agent-browser z silnikiem Lightpanda (~30 MB RAM
+# na sesję zamiast ~300 MB Chromium). Zrzuty ekranu i strony, których Lightpanda nie obsłuży,
+# Hermes sam przełącza na Chromium z obrazu.
+browser:
+  backend: "off"                  # bez trybu Browser Use (uvx browser-use pobierany w locie)
+  engine: lightpanda
+  inactivity_timeout: 120
+
+# Wiadomości głosowe: Parakeet (jarvo-stt) uruchamiany na czas transkrypcji (HERMES_LOCAL_STT_COMMAND).
+stt:
+  provider: local_command
+  language: pl
+
+delegation:
+  model: "@@DELEGATION_MODEL@@"
+  provider: "@@PROVIDER@@"
+  max_concurrent_children: 3      # wątki; każdy może otworzyć przeglądarkę
+  max_iterations: 120
+
+approvals:
+  mode: smart
+  timeout: 300
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+  smart_policy: >-
+    Always ESCALATE: logging into accounts, submitting forms on third-party sites, purchases,
+    contacting people, downloading executables and running them.
+  deny:
+    - "rm -rf /*"
+    - "* | sh"
+    - "* | bash"
+
+security:
+  protected_instruction_files: true
+
+# Branding terminala: skórka Jarvo (branding/skin-jarvo.yaml)
+display:
+  skin: jarvo

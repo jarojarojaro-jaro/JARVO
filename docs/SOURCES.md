@@ -12,7 +12,7 @@ są opisane osobno w [TOOLBOX.md](TOOLBOX.md), razem z polityką licencji.
 
 Hermesa nie forkujemy: używamy oficjalnego obrazu i rozszerzamy go na krawędziach (profile, skille, narzędzia).
 
-Komponenty obrazu `tars-hermes` o znaczeniu licencyjnym (pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md)):
+Komponenty obrazu `jarvo-hermes` o znaczeniu licencyjnym (pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md)):
 
 | Projekt | Rola | Licencja |
 |---|---|---|
@@ -58,7 +58,7 @@ Autorstwo zaznaczamy w polu `author` skilla.
 
 | Projekt | Licencja | Gdzie w Jarvo |
 |---|---|---|
-| [harry0703/MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) (commit `8e259e9`, © 2024 Harry) | MIT | pomysł pipeline'u krótkiego filmu (temat → scenariusz → ujęcia → lektor → napisy → muzyka → montaż, warianty); kod własny: `profiles/tars-wideo/scripts/film.py` |
+| [harry0703/MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) (commit `8e259e9`, © 2024 Harry) | MIT | pomysł pipeline'u krótkiego filmu (temat → scenariusz → ujęcia → lektor → napisy → muzyka → montaż, warianty); kod własny: `profiles/jarvo-wideo/scripts/film.py` |
 | [kunchenguid/firstmate](https://github.com/kunchenguid/firstmate) | MIT | model Main Judge: jeden rozmówca, załoga, eskalacja tylko decyzji, stan na dysku ([BOSS.md](BOSS.md)) |
 | [langchain-ai/open_deep_research](https://github.com/langchain-ai/open_deep_research) | MIT | `metoda-sherlocka`, `raport-sledztwa`: plan → równoległe wątki → synteza, zasady cytowania |
 | [dzhng/deep-research](https://github.com/dzhng/deep-research) | MIT | `metoda-sherlocka`: szerokość/głębokość, iteracyjne pytania uzupełniające |

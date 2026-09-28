@@ -1,0 +1,136 @@
+#!/opt/jarvo/venv/bin/python
+"""Rozpoznawanie mowy floty Jarvo: NVIDIA Parakeet TDT 0.6B v3 (int8, ONNX) przez onnx-asr, na CPU.
+
+    jarvo-stt <audio|wideo> [--output-dir DIR]          → DIR/<nazwa>.txt   (tryb Hermesa, local_command)
+    jarvo-stt <audio|wideo> --srt out.srt [--max-chars 32] → napisy z czasami (subtitles.py)
+    jarvo-stt --prefetch                                 → pobierz model z góry (~0,65 GB)
+
+Hermes woła go jako komendę STT (HERMES_LOCAL_STT_COMMAND w docker-compose.yml):
+proces startuje na czas jednej transkrypcji i znika, więc w spoczynku nie zajmuje RAM-u
+(w trakcie ok. 1,1–1,3 GB). Blokada pliku pilnuje, żeby naraz działała jedna transkrypcja.
+Parakeet v3 sam rozpoznaje język (25 języków europejskich, w tym polski), --language jest ignorowane.
+Model pobiera się przy pierwszym użyciu do $JARVO_MODELS_DIR (domyślnie /opt/data/jarvo/models).
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+MODEL = os.environ.get("JARVO_STT_MODEL", "nemo-parakeet-tdt-0.6b-v3")
+QUANT = os.environ.get("JARVO_STT_QUANT", "int8") or None
+MODELS_DIR = Path(os.environ.get("JARVO_MODELS_DIR", "/opt/data/jarvo/models"))
+THREADS = int(os.environ.get("JARVO_STT_THREADS", "2"))
+LOCK = Path(os.environ.get("JARVO_STT_LOCK", "/tmp/jarvo-stt.lock"))
+MAX_SPEECH_S = 20  # VAD tnie mowę na kawałki ≤ 20 s: pamięć nie rośnie z długością nagrania
+
+
+def to_wav(src: Path, tmp: Path) -> Path:
+    """Dowolne audio/wideo → WAV 16 kHz mono PCM (format, który czyta onnx-asr)."""
+    out = tmp / "audio.wav"
+    subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", str(src), "-vn",
+                    "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(out)], check=True)
+    return out
+
+
+def load():
+    os.environ.setdefault("HF_HOME", str(MODELS_DIR / "huggingface"))
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    import onnx_asr  # type: ignore
+    import onnxruntime as ort  # type: ignore
+
+    so = ort.SessionOptions()
+    so.intra_op_num_threads = THREADS
+    so.inter_op_num_threads = 1
+    model = onnx_asr.load_model(MODEL, quantization=QUANT, sess_options=so)
+    vad = onnx_asr.load_vad("silero", sess_options=so)
+    return model.with_vad(vad, max_speech_duration_s=MAX_SPEECH_S).with_timestamps()
+
+
+def words(seg) -> list[tuple[float, float, str]]:
+    """Tokeny segmentu → słowa z czasem bezwzględnym (tokeny z wiodącą spacją zaczynają słowo)."""
+    toks = list(getattr(seg, "tokens", None) or [])
+    stamps = list(getattr(seg, "timestamps", None) or [])
+    if not toks or len(toks) != len(stamps):
+        return [(seg.start, seg.end, seg.text.strip())] if seg.text.strip() else []
+    out: list[list] = []
+    for tok, ts in zip(toks, stamps):
+        if not out or tok.startswith(" "):
+            out.append([seg.start + ts, seg.end, tok.strip()])
+        else:
+            out[-1][2] += tok
+    for i in range(len(out) - 1):
+        out[i][1] = out[i + 1][0]
+    return [(a, b, w) for a, b, w in out if w]
+
+
+def srt_time(t: float) -> str:
+    ms = int(round(t * 1000))
+    h, ms = divmod(ms, 3_600_000)
+    m, ms = divmod(ms, 60_000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def srt_lines(segments, max_chars: int) -> list[tuple[float, float, str]]:
+    lines = []
+    for seg in segments:
+        chunk: list[tuple[float, float, str]] = []
+        for w in words(seg):
+            if chunk and len(" ".join(x[2] for x in chunk + [w])) > max_chars:
+                lines.append((chunk[0][0], chunk[-1][1], " ".join(x[2] for x in chunk)))
+                chunk = []
+            chunk.append(w)
+        if chunk:
+            lines.append((chunk[0][0], chunk[-1][1], " ".join(x[2] for x in chunk)))
+    return lines
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("input", nargs="?")
+    ap.add_argument("--output-dir", help="zapisz transkrypcję jako <katalog>/<nazwa>.txt (tryb Hermesa)")
+    ap.add_argument("--srt", help="zapisz napisy SRT do tego pliku")
+    ap.add_argument("--max-chars", type=int, default=32, help="maks. znaków w linii napisu")
+    ap.add_argument("--language", default="", help="ignorowane: Parakeet v3 sam rozpoznaje język")
+    ap.add_argument("--model", default="", help="ignorowane (zgodność z szablonem Hermesa)")
+    ap.add_argument("--prefetch", action="store_true", help="tylko pobierz model i zakończ")
+    args = ap.parse_args(argv)
+
+    if args.prefetch:
+        load()
+        print(f"Model {MODEL} ({QUANT or 'fp32'}) gotowy w {MODELS_DIR}")
+        return 0
+    if not args.input:
+        ap.error("podaj plik audio lub wideo")
+    src = Path(args.input)
+    if not src.is_file():
+        print(f"Brak pliku: {src}", file=sys.stderr)
+        return 2
+
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(LOCK, "a") as lock, tempfile.TemporaryDirectory(prefix="jarvo-stt-") as tmp:
+        fcntl.flock(lock, fcntl.LOCK_EX)  # jedna transkrypcja naraz (RAM)
+        segments = list(load().recognize(str(to_wav(src, Path(tmp)))))
+
+    text = " ".join(s.text.strip() for s in segments if s.text.strip())
+    if args.srt:
+        lines = srt_lines(segments, args.max_chars)
+        Path(args.srt).write_text("".join(f"{i}\n{srt_time(a)} --> {srt_time(b)}\n{t}\n\n"
+                                          for i, (a, b, t) in enumerate(lines, 1)), encoding="utf-8")
+        print(f"SRT: {args.srt} ({len(lines)} linii)")
+    if args.output_dir:
+        out = Path(args.output_dir) / (src.stem + ".txt")
+        out.write_text(text + "\n", encoding="utf-8")
+    if not args.srt and not args.output_dir:
+        print(text)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

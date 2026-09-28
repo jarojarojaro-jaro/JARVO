@@ -1,4 +1,4 @@
-"""Jarvo HQ: trasy backendu pluginu dashboardu Hermesa (montowane pod /api/plugins/tars-hq/).
+"""Jarvo HQ: trasy backendu pluginu dashboardu Hermesa (montowane pod /api/plugins/jarvo-hq/).
 
 Działa w procesie dashboardu (za jego uwierzytelnianiem). Czyta stan z hq_core (tylko odczyt),
 a rozmowy z agentami przekazuje do API gatewaya (`/p/<profil>/api/sessions/...`) z kluczem profilu
@@ -24,9 +24,9 @@ _HERE = Path(__file__).resolve().parent
 
 def _load_core():
     # plik obok, pod unikalną nazwą (dashboard ładuje pluginy po ścieżce, bez pakietu)
-    spec = importlib.util.spec_from_file_location("tars_hq_core", _HERE / "hq_core.py")
+    spec = importlib.util.spec_from_file_location("jarvo_hq_core", _HERE / "hq_core.py")
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["tars_hq_core"] = mod
+    sys.modules["jarvo_hq_core"] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -39,25 +39,25 @@ def _start_key_sharing() -> None:
     """Wspólne klucze floty na żywo: klucz dostawcy dodany w dashboardzie (profil „default”) trafia
     do wszystkich agentów bez restartu. Szczegóły i zasady: share_keys.py obok."""
     path = _HERE / "share_keys.py"
-    if not path.exists() or os.environ.get("TARS_SHARE_KEYS", "1") == "0":
+    if not path.exists() or os.environ.get("JARVO_SHARE_KEYS", "1") == "0":
         return
     import threading
 
-    spec = importlib.util.spec_from_file_location("tars_share_keys", path)
+    spec = importlib.util.spec_from_file_location("jarvo_share_keys", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    threading.Thread(target=mod.watch, args=(core.HOME,), name="tars-share-keys", daemon=True).start()
+    threading.Thread(target=mod.watch, args=(core.HOME,), name="jarvo-share-keys", daemon=True).start()
 
 
 try:
     _start_key_sharing()
 except Exception as _exc:  # plugin działa dalej, klucze zsynchronizuje najbliższe wdrożenie
-    print(f"tars-hq: wspólne klucze nieaktywne: {_exc}", file=sys.stderr)
+    print(f"jarvo-hq: wspólne klucze nieaktywne: {_exc}", file=sys.stderr)
 
 HOME = core.HOME
 FLEET_FILE = _HERE / "fleet.json"
-SESSIONS_FILE = core.TARS_DIR / "state" / "hq-sessions.json"
-API_BASE = os.environ.get("TARS_HQ_API_BASE") or f"http://127.0.0.1:{os.environ.get('API_SERVER_PORT', '8642')}"
+SESSIONS_FILE = core.JARVO_DIR / "state" / "hq-sessions.json"
+API_BASE = os.environ.get("JARVO_HQ_API_BASE") or f"http://127.0.0.1:{os.environ.get('API_SERVER_PORT', '8642')}"
 ROOTS = core.Roots()
 _cache: dict[str, tuple[float, object]] = {}
 
@@ -145,7 +145,7 @@ async def agent(name: str):
     now = time.time()
     board = await asyncio.to_thread(_board, now)
     tasks, events = board["tasks"], board["events"]
-    orchestrator = next((x["name"] for x in _fleet() if x.get("kind") == "orchestrator"), "tars")
+    orchestrator = next((x["name"] for x in _fleet() if x.get("kind") == "orchestrator"), "jarvo")
     cards = core.agent_cards(name, tasks, orchestrator)
     status = core.derive_status(name, cards, now)
 
@@ -161,7 +161,7 @@ async def agent(name: str):
     for t in cards["running"] + cards["review"] + cards["blocked"] + cards["done"][:8]:
         if t.get("workspace_path"):
             dirs.append(Path(t["workspace_path"]))
-    dirs.append(core.TARS_DIR / "workspaces" / name)
+    dirs.append(core.JARVO_DIR / "workspaces" / name)
     outputs = await asyncio.to_thread(core.list_outputs, dirs, ROOTS)
 
     def brief(lst, n=20):
@@ -210,16 +210,16 @@ async def file(path: str, download: bool = False):
 
 # ------------------------------------------------------------------ „Odpal”: podgląd stron na :9120
 # Strona zrobiona przez agenta otwiera się w nowej karcie z osobnego portu, pod adresem z losowym
-# tokenem (wydaje go zalogowany dashboard albo agent przez scripts/tars_link.py; wspólny plik linków). Nagłówek CSP sandbox daje jej nieprzezroczyste
+# tokenem (wydaje go zalogowany dashboard albo agent przez scripts/jarvo_link.py; wspólny plik linków). Nagłówek CSP sandbox daje jej nieprzezroczyste
 # pochodzenie: skrypty strony działają, ale nie widzą sesji dashboardu i nie wyślą do niego ciasteczek.
-PREVIEW_PORT = int(os.environ.get("TARS_PREVIEW_PORT", "9120"))
-# adres, pod którym przeglądarka widzi serwer podglądu (compose: IP z TARS_BIND_IP); agenci biorą go
+PREVIEW_PORT = int(os.environ.get("JARVO_PREVIEW_PORT", "9120"))
+# adres, pod którym przeglądarka widzi serwer podglądu (compose: IP z JARVO_BIND_IP); agenci biorą go
 # z env albo z pliku state/preview.json, który zapisujemy przy starcie
-PREVIEW_URL = os.environ.get("TARS_PREVIEW_URL") or f"http://localhost:{PREVIEW_PORT}"
+PREVIEW_URL = os.environ.get("JARVO_PREVIEW_URL") or f"http://localhost:{PREVIEW_PORT}"
 PREVIEW_CSP = ("sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads "
                "allow-popups-to-escape-sandbox")
 # stan wspólny dla ponownych importów pluginu (dashboard może przeładować pluginy w tym samym procesie)
-_preview = sys.modules.setdefault("tars_hq_preview_state", type(sys)("tars_hq_preview_state"))
+_preview = sys.modules.setdefault("jarvo_hq_preview_state", type(sys)("jarvo_hq_preview_state"))
 if not hasattr(_preview, "error"):
     _preview.error = None
 
@@ -230,7 +230,7 @@ def _preview_handler():
     from urllib.parse import unquote, urlsplit
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "tars-preview"
+        server_version = "jarvo-preview"
         sys_version = ""
 
         def log_message(self, *a):  # bez logów każdego żądania
@@ -298,9 +298,9 @@ def _start_preview() -> None:
         return
     srv.daemon_threads = True
     _preview.server = srv
-    threading.Thread(target=srv.serve_forever, name="tars-preview", daemon=True).start()
+    threading.Thread(target=srv.serve_forever, name="jarvo-preview", daemon=True).start()
     try:
-        info = core.TARS_DIR / "state" / "preview.json"
+        info = core.JARVO_DIR / "state" / "preview.json"
         info.parent.mkdir(parents=True, exist_ok=True)
         info.write_text(json.dumps({"url": PREVIEW_URL, "port": PREVIEW_PORT}), encoding="utf-8")
     except OSError:
@@ -331,7 +331,7 @@ async def site(request: Request):
 # ------------------------------------------------------ „Pokaż w folderze”: Eksplorator Windows (WSL)
 # Folder otwiera pomocnik na hoście (scripts/updater.py), bo tylko on ma explorer.exe. Dashboard
 # zostawia prośbę z samą ścieżką pliku; pomocnik sprawdza ją jeszcze raz po swojej stronie.
-REVEAL_REQUEST = core.TARS_DIR / "state" / "reveal-request"
+REVEAL_REQUEST = core.JARVO_DIR / "state" / "reveal-request"
 
 
 @router.post("/reveal")
@@ -552,10 +552,10 @@ async def chat_send(name: str, request: Request):
 
 @router.post("/upload")
 async def upload(request: Request):
-    """Plik z czatu HQ (wklejony, przeciągnięty, z 📎) → /opt/data/tars/inbox/<data>/<nazwa>."""
+    """Plik z czatu HQ (wklejony, przeciągnięty, z 📎) → /opt/data/jarvo/inbox/<data>/<nazwa>."""
     from urllib.parse import unquote
 
-    inbox = core.TARS_DIR / "inbox"
+    inbox = core.JARVO_DIR / "inbox"
     target = core.upload_target(inbox, unquote(request.headers.get("X-File-Name", "")), time.time())
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_name(f".{target.name}.part")
@@ -591,7 +591,7 @@ async def task_retry(task_id: str):
     """Ponowienie karty porzuconej po błędach (hermes kanban unblock → dispatcher uruchomi ją znowu)."""
     if not task_id.replace("_", "").isalnum():
         raise HTTPException(400, "Zły identyfikator karty")
-    hermes = os.environ.get("TARS_HERMES_BIN") or "/opt/hermes/.venv/bin/hermes"
+    hermes = os.environ.get("JARVO_HERMES_BIN") or "/opt/hermes/.venv/bin/hermes"
     proc = await asyncio.create_subprocess_exec(hermes, "kanban", "unblock", task_id,
                                                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
     out, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
@@ -620,8 +620,8 @@ async def health():
 # ----------------------------------------------------------------------------- aktualizacje
 # Stan pisze pomocnik aktualizacji na hoście (scripts/updater.py). Dashboard może tylko poprosić
 # o sprawdzenie albo aktualizację tej samej gałęzi (plik update-request); poleceń nie wykonuje.
-UPDATE_FILE = core.TARS_DIR / "state" / "update.json"
-UPDATE_REQUEST = core.TARS_DIR / "state" / "update-request"
+UPDATE_FILE = core.JARVO_DIR / "state" / "update.json"
+UPDATE_REQUEST = core.JARVO_DIR / "state" / "update-request"
 UPDATER_STALE = 5 * 60  # pomocnik sprawdza co minutę; dłuższa cisza = nie działa
 
 
@@ -650,7 +650,7 @@ async def update_request(request: Request):
     state = _update_state()
     if not state.get("online"):
         raise HTTPException(503, "Pomocnik aktualizacji nie działa. Lokalnie: bash scripts/local-up.sh, "
-                                 "na serwerze: sudo systemctl start tars-updater.")
+                                 "na serwerze: sudo systemctl start jarvo-updater.")
     if state.get("state") == "updating":
         raise HTTPException(409, "Aktualizacja już trwa.")
     UPDATE_REQUEST.parent.mkdir(parents=True, exist_ok=True)

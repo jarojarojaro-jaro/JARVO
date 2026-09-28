@@ -15,17 +15,17 @@ wiele profili, a każdy gateway jest pilnowany i restartowany osobno.
         ┌──────────────┴──────────────────────────────────────────────┐
         │ VPS (Ubuntu LTS, Docker)                                     │
         │                                                              │
-        │  ┌───────────────────────────────┐    sieć wewnętrzna tars-net│
-        │  │ tars-hermes (nasz obraz)      │◄──────────┐                │
+        │  ┌───────────────────────────────┐    sieć wewnętrzna jarvo-net│
+        │  │ jarvo-hermes (nasz obraz)      │◄──────────┐                │
         │  │  FROM nousresearch/hermes-agent│           │                │
         │  │  + toolbox (lighthouse, sharp, │      ┌────┴───┐            │
         │  │    pandoc, ocr, parakeet, …)  │      │searxng │            │
         │  │  przeglądarki: Lightpanda +   │      │+valkey │            │
         │  │    1× Chromium (render/PDF)   │      └────────┘            │
         │  │  s6: gateway (multipleks)     │                            │
-        │  │  profile: tars, tars-web,     │                            │
-        │  │  tars-sherlock, tars-studio,  │                            │
-        │  │  tars-reka                    │                            │
+        │  │  profile: jarvo, jarvo-web,     │                            │
+        │  │  jarvo-sherlock, jarvo-studio,  │                            │
+        │  │  jarvo-reka                    │                            │
         │  └──────────────┬────────────────┘   później: honcho, postiz  │
         │        /opt/data (wolumen)           monitoring (opcja):      │
         │                                      uptime-kuma, beszel      │
@@ -60,7 +60,7 @@ rendering kodu (FFmpeg, HyperFrames), przeglądarki, transkrypcję i usługi.
 
 | | Zmierzone (Docker, Hermes 0.21.5) |
 |---|---|
-| obraz `tars-hermes` | **4,4 GB** (z tego 2,7 GB to sam obraz Hermesa) + SearXNG 0,26 GB + Valkey 0,04 GB |
+| obraz `jarvo-hermes` | **4,4 GB** (z tego 2,7 GB to sam obraz Hermesa) + SearXNG 0,26 GB + Valkey 0,04 GB |
 | dysk na start | ok. **6 GB**: obrazy + model mowy 0,65 GB (pobierany przy pierwszej wiadomości głosowej) |
 | RAM w spoczynku | **ok. 0,7 GB**: gateway 350 MB, dashboard 185 MB, SearXNG 130 MB, Valkey 6 MB |
 
@@ -80,15 +80,15 @@ RAM narzędzi zmierzony w kontenerze (szczyt, proces żyje tylko na czas zadania
 Lighthouse 0,35 + transkrypcja 1,0 ≈ **3,5 GB**. Sufity w compose: Hermes 5 GB, SearXNG 384 MB, Valkey 96 MB.
 Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników z RAM hosta),
 `max_in_progress_per_profile: 2`, `delegation.max_concurrent_children` 2–3, jedna transkrypcja naraz
-(blokada w `tars-stt`), swap 4 GB (`bootstrap-vps.sh`, swappiness 10).
+(blokada w `jarvo-stt`), swap 4 GB (`bootstrap-vps.sh`, swappiness 10).
 
 | Etap | CPU | RAM | Dysk | Co działa |
 |---|---|---|---|---|
 | Flota v1 (cała) | 4 vCPU | **8 GB** | 80 GB NVMe | 6 agentów, SearXNG, Lighthouse, PDF, transkrypcja, render wideo (FFmpeg, chwilowo 0,5–0,65 GB); monitoring (+0,2 GB) |
-| + dodatki obrazu | 4 vCPU | 8 GB | 80 GB | `TARS_EXTRAS` (niżej): zwiększa dysk, nie RAM w spoczynku |
+| + dodatki obrazu | 4 vCPU | 8 GB | 80 GB | `JARVO_EXTRAS` (niżej): zwiększa dysk, nie RAM w spoczynku |
 | + Langfuse / Honcho | 8 vCPU | 16 GB | 160 GB+ | self-hostowane ślady i pamięć (ClickHouse i Postgres są pamięciożerne) |
 
-**Dodatki obrazu** (`TARS_EXTRAS` w `compose/.env`, potem `deploy.sh --rebuild`), domyślnie wyłączone:
+**Dodatki obrazu** (`JARVO_EXTRAS` w `compose/.env`, potem `deploy.sh --rebuild`), domyślnie wyłączone:
 
 | Dodatek | Co daje | Dysk |
 |---|---|---|
@@ -122,15 +122,15 @@ Rekomendacje:
 ## 3. Układ katalogów na VPS
 
 ```
-/srv/tars/
-├── repo/                 # klon tego repo → /opt/tars/repo (tylko do odczytu w kontenerze)
-├── compose/              # .env compose (obrazy, sekrety usług, TARS_BIND_IP) + tars.env (ID Telegrama)
-├── secrets/              # host.env i <agent>.env (klucze) → /opt/tars/secrets (ro), grupa 10000, 2750/640
+/srv/jarvo/
+├── repo/                 # klon tego repo → /opt/jarvo/repo (tylko do odczytu w kontenerze)
+├── compose/              # .env compose (obrazy, sekrety usług, JARVO_BIND_IP) + jarvo.env (ID Telegrama)
+├── secrets/              # host.env i <agent>.env (klucze) → /opt/jarvo/secrets (ro), grupa 10000, 2750/640
 ├── restic.env            # dane dostępowe backupu (root, 600), poza kontenerem
-├── build/                # wynik scripts/build.py → /opt/tars/build (ro): dystrybucje profili, config hosta
+├── build/                # wynik scripts/build.py → /opt/jarvo/build (ro): dystrybucje profili, config hosta
 ├── data/
 │   ├── hermes/           # → /opt/data: profile, pamięć, sesje, kanban.db, cron
-│   │   └── tars/         # missions/ (dziennik misji), workspaces/<agent>/, knowledge/ (brand kity, USER.md), state/
+│   │   └── jarvo/         # missions/ (dziennik misji), workspaces/<agent>/, knowledge/ (brand kity, USER.md), state/
 │   ├── valkey/  uptime-kuma/  beszel/
 ├── staging/              # izolowane dane do evals (scripts/evals-staging.sh)
 └── backups/              # staging kopii SQLite, logi backupu i testu odtworzenia
@@ -142,7 +142,7 @@ Rekomendacje:
 
 | Usługa | Po co | Licencja | Stan |
 |---|---|---|---|
-| `tars-hermes` | agent, gateway, wszystkie profile, dashboard (hasło) | MIT | ✅ w compose |
+| `jarvo-hermes` | agent, gateway, wszystkie profile, dashboard (hasło) | MIT | ✅ w compose |
 | `searxng` (+ `valkey`) | darmowa metawyszukiwarka (JSON) dla Sherlocka i Jarva | AGPL-3.0 | ✅ w compose |
 | ~~`crawl4ai`~~ | zastąpiony: trafilatura + Lightpanda w obrazie (bez stałego kontenera) | | ❌ usunięty (RAM) |
 | ~~`gotenberg`~~ | zastąpiony: `to_pdf.py` (pandoc + Chromium, LibreOffice jako dodatek) | | ❌ usunięty (RAM) |
@@ -162,7 +162,7 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 
 **System:**
 - Ubuntu LTS, `unattended-upgrades`, strefa czasowa Europe/Warsaw,
-- użytkownik `tars` bez roota, logowanie SSH tylko kluczem, `PermitRootLogin no`,
+- użytkownik `jarvo` bez roota, logowanie SSH tylko kluczem, `PermitRootLogin no`,
 - po postawieniu Tailscale: SSH tylko w sieci Tailscale, a publiczny port 22 zamknięty,
 - firewall (UFW): domyślnie blokada ruchu przychodzącego; 80/443 otwarte tylko, gdy działa Caddy,
 - fail2ban na SSH (bootstrap); CrowdSec, jeśli kiedyś wystawimy Caddy.
@@ -183,7 +183,7 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 - backupy szyfrowane (restic szyfruje domyślnie), a hasło do repozytorium backupu trzymasz poza VPS,
 - **granica zaufania:** wszyscy agenci działają w jednym kontenerze jako ten sam użytkownik (`hermes`),
   więc agent z terminalem technicznie może przeczytać klucze innych agentów. Łagodzą to limity na kluczach,
-  zgody na ryzykowne komendy i to, że dane dostępowe backupu (`/srv/tars/restic.env`) oraz `compose/.env`
+  zgody na ryzykowne komendy i to, że dane dostępowe backupu (`/srv/jarvo/restic.env`) oraz `compose/.env`
   w ogóle nie trafiają do kontenera. Pełna izolacja kluczy wymagałaby osobnych kontenerów per agent.
 
 ---
@@ -217,7 +217,7 @@ laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: s
 ```
 
 `scripts/deploy.sh` (idempotentny; szczegóły w [RUNBOOK.md](RUNBOOK.md)):
-1. `git pull --ff-only` w `/srv/tars/repo`,
+1. `git pull --ff-only` w `/srv/jarvo/repo`,
 2. przebudowa obrazu, gdy zmienił się `infra/Dockerfile`, `infra/node/` albo `infra/python/` (albo `--rebuild`),
 3. `docker compose up -d`,
 4. walidacja repo w kontenerze (`scripts/validate.py`); błąd zatrzymuje wdrożenie przed zmianą floty,
@@ -228,7 +228,7 @@ laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: s
 7. healthchecki narzędzi z `toolbox.yaml`.
 
 **Staging:** `scripts/evals-staging.sh` uruchamia jednorazowy kontener z tym samym obrazem i buildem, ale na
-osobnym katalogu danych (`/srv/tars/staging`) i bez gatewaya, więc scenariusze evals nie ruszają produkcyjnej
+osobnym katalogu danych (`/srv/jarvo/staging`) i bez gatewaya, więc scenariusze evals nie ruszają produkcyjnej
 tablicy ani Telegrama. Osobny bot testowy dojdzie, gdy będziemy testować routing Telegrama przed zmianą tras.
 
 **Wersje:** Hermes przypięty do wersji albo digestu obrazu. Aktualizacja Hermesa to świadoma decyzja
@@ -241,7 +241,7 @@ tablicy ani Telegrama. Osobny bot testowy dojdzie, gdy będziemy testować routi
 | Kanał | Jak |
 |---|---|
 | Telegram | grupa „Jarvo HQ” z wątkami per agent (routing `profile_routes`), plus DM z Jarvem |
-| Terminal | SSH przez Tailscale → `docker exec -it tars-hermes hermes -p tars-web chat` (alias `tars-web`) |
+| Terminal | SSH przez Tailscale → `docker exec -it jarvo-hermes hermes -p jarvo-web chat` (alias `jarvo-web`) |
 | Desktop | aplikacja Hermes Desktop połączona ze zdalnym backendem przez Tailscale: Bot Mode, czat grupowy floty |
 | Dashboard | panel web Hermesa (profile, skille, cron, kanban) tylko przez Tailscale |
 

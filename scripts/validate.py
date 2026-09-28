@@ -148,18 +148,18 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
             r.err(f"{a.name}/{rel}: brak description")
         elif len(desc) > fl.SKILL_PROMPT_DESC_LIMIT:
             r.err(f"{a.name}/{rel}: description {len(desc)} > {fl.SKILL_PROMPT_DESC_LIMIT} znaków (Hermes ucina w indeksie)")
-        tars = ((fm.get("metadata") or {}).get("tars") or {})
-        if tars.get("agent") != a.name:
-            r.err(f"{a.name}/{rel}: metadata.tars.agent={tars.get('agent')!r}")
-        if tars.get("autonomy") not in fl.AUTONOMY_LEVELS:
-            r.err(f"{a.name}/{rel}: metadata.tars.autonomy niepoprawne")
-        reviewed = str(tars.get("reviewed", ""))
+        jarvo = ((fm.get("metadata") or {}).get("jarvo") or {})
+        if jarvo.get("agent") != a.name:
+            r.err(f"{a.name}/{rel}: metadata.jarvo.agent={jarvo.get('agent')!r}")
+        if jarvo.get("autonomy") not in fl.AUTONOMY_LEVELS:
+            r.err(f"{a.name}/{rel}: metadata.jarvo.autonomy niepoprawne")
+        reviewed = str(jarvo.get("reviewed", ""))
         try:
             age = (dt.date.today() - dt.date.fromisoformat(reviewed)).days
             if age > 180:
                 r.warn(f"{a.name}/{rel}: reviewed {reviewed} (> 180 dni)")
         except ValueError:
-            r.err(f"{a.name}/{rel}: metadata.tars.reviewed musi być RRRR-MM-DD")
+            r.err(f"{a.name}/{rel}: metadata.jarvo.reviewed musi być RRRR-MM-DD")
         if len(body.split()) < 80:
             r.warn(f"{a.name}/{rel}: bardzo krótki skill ({len(body.split())} słów)")
         for ref in re.findall(r"`(references/[^`\s]+)`", body):
@@ -236,7 +236,7 @@ def check_cron(a: fl.Agent, own_skills: set[str], vendored: set[str], r: Report)
     ids = set()
     for job in spec.get("jobs", []) or []:
         jid = job.get("id", "")
-        if not jid.startswith(a.name + "-") and not jid.startswith(a.name.replace("tars-", "") + "-"):
+        if not jid.startswith(a.name + "-") and not jid.startswith(a.name.replace("jarvo-", "") + "-"):
             r.err(f"{a.name}/cron: id {jid!r} musi zaczynać się od nazwy agenta")
         if jid in ids:
             r.err(f"{a.name}/cron: zduplikowane id {jid}")

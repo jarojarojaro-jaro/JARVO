@@ -1,7 +1,7 @@
 # Manifest narzędzi agenta. Instalator VPS czyta te pliki i buduje obraz / sidecary.
 # Każda wersja przypięta. Healthcheck musi przejść na VPS, zanim agent dostanie status active.
 
-agent: tars-xyz
+agent: jarvo-xyz
 
 tools:
   - name: example-cli

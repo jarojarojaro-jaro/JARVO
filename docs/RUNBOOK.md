@@ -11,7 +11,7 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 
 | Co | Po co | Uwagi |
 |---|---|---|
-| VPS x86_64, Ubuntu 24.04 (albo Debian 12), region UE | wszystko działa tutaj | cała flota: **4 vCPU / 8 GB / 80 GB** (obraz `tars-hermes` 4,4 GB, na start ok. 6 GB dysku; RAM w spoczynku ok. 0,7 GB, w szczycie ok. 3,5 GB; szczegóły: [VPS.md §2](VPS.md#2-rozmiar-serwera)) |
+| VPS x86_64, Ubuntu 24.04 (albo Debian 12), region UE | wszystko działa tutaj | cała flota: **4 vCPU / 8 GB / 80 GB** (obraz `jarvo-hermes` 4,4 GB, na start ok. 6 GB dysku; RAM w spoczynku ok. 0,7 GB, w szczycie ok. 3,5 GB; szczegóły: [VPS.md §2](VPS.md#2-rozmiar-serwera)) |
 | Darmowe konto Docker Hub | `docker login` na serwerze | anonimowe pobieranie obrazów ma limit, który na współdzielonych IP VPS-ów łatwo wyczerpać |
 | Klucz SSH (ed25519) | logowanie na serwer | hasła będą wyłączone |
 | Konto [Tailscale](https://tailscale.com) (darmowe) | prywatny dostęp do serwera i paneli | nic nie wystawiamy publicznie |
@@ -20,8 +20,8 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 | Konto Telegram | główny kanał | bot + supergrupa „Jarvo HQ” z tematami |
 | Miejsce na backup (Backblaze B2, S3 albo SFTP) | nocne kopie restic | poza serwerem |
 
-Limity kluczy OpenRouter na start (miesięcznie, do korekty po 2 tygodniach): `tars` 30 $, `tars-sherlock` 20 $,
-`tars-web` 20 $, `tars-studio` 20 $ (obrazy), `tars-wideo` 30 $ (wideo AI), `tars-reka` 15 $, host 5 $. Klucz z limitem to bezpiecznik:
+Limity kluczy OpenRouter na start (miesięcznie, do korekty po 2 tygodniach): `jarvo` 30 $, `jarvo-sherlock` 20 $,
+`jarvo-web` 20 $, `jarvo-studio` 20 $ (obrazy), `jarvo-wideo` 30 $ (wideo AI), `jarvo-reka` 15 $, host 5 $. Klucz z limitem to bezpiecznik:
 zapętlony agent nie wyczyści konta.
 
 Przed wdrożeniem sprawdź, czy modele z `fleet.yaml` nadal istnieją (lokalnie albo na serwerze):
@@ -36,30 +36,30 @@ python3 scripts/check-models.py
 
 ```bash
 ssh root@<IP-VPS>
-curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/TARS/<gałąź>/scripts/bootstrap-vps.sh -o bootstrap-vps.sh
-bash bootstrap-vps.sh --user tars --ssh-key "ssh-ed25519 AAAA… ty@laptop"
+curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/<gałąź>/scripts/bootstrap-vps.sh -o bootstrap-vps.sh
+bash bootstrap-vps.sh --user jarvo --ssh-key "ssh-ed25519 AAAA… ty@laptop"
 ```
 
-Skrypt: aktualizacje i automatyczne łatki, użytkownik `tars` (sudo, docker), SSH tylko z kluczy i bez roota,
-UFW (tylko SSH), fail2ban, Docker + compose, Tailscale (bez logowania), katalogi `/srv/tars/*`.
+Skrypt: aktualizacje i automatyczne łatki, użytkownik `jarvo` (sudo, docker), SSH tylko z kluczy i bez roota,
+UFW (tylko SSH), fail2ban, Docker + compose, Tailscale (bez logowania), katalogi `/srv/jarvo/*`.
 
 **Repo prywatne:** najpierw klucz tylko do odczytu (deploy key), potem klon i drugi przebieg bootstrapu
 (jest idempotentny, a za drugim razem skopiuje szablony konfiguracji):
 
 ```bash
-ssh tars@<IP-VPS>
-ssh-keygen -t ed25519 -f ~/.ssh/tars_deploy -N "" && cat ~/.ssh/tars_deploy.pub
+ssh jarvo@<IP-VPS>
+ssh-keygen -t ed25519 -f ~/.ssh/jarvo_deploy -N "" && cat ~/.ssh/jarvo_deploy.pub
 #   → GitHub: repo → Settings → Deploy keys → Add (bez "Allow write access")
 cat >> ~/.ssh/config <<'EOF'
 Host github.com
-  IdentityFile ~/.ssh/tars_deploy
+  IdentityFile ~/.ssh/jarvo_deploy
   IdentitiesOnly yes
 EOF
-git clone --branch <gałąź> git@github.com:jarojarojaro-jaro/TARS.git /srv/tars/repo
-sudo bash /srv/tars/repo/scripts/bootstrap-vps.sh --user tars
+git clone --branch <gałąź> git@github.com:jarojarojaro-jaro/JARVO.git /srv/jarvo/repo
+sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --user jarvo
 ```
 
-(Repo publiczne: wystarczy od razu `--repo https://github.com/jarojarojaro-jaro/TARS.git --branch <gałąź>`.)
+(Repo publiczne: wystarczy od razu `--repo https://github.com/jarojarojaro-jaro/JARVO.git --branch <gałąź>`.)
 
 `<gałąź>`: `main` po scaleniu, do tego czasu gałąź robocza (`claude/epic-allen-qfjd0s`).
 
@@ -67,10 +67,10 @@ sudo bash /srv/tars/repo/scripts/bootstrap-vps.sh --user tars
 
 ```bash
 sudo tailscale up            # otwórz link i zaloguj serwer do swojej sieci
-tailscale ip -4              # np. 100.101.102.103 → to będzie TARS_BIND_IP
+tailscale ip -4              # np. 100.101.102.103 → to będzie JARVO_BIND_IP
 ```
 
-Zainstaluj Tailscale też na laptopie i telefonie. Od teraz łącz się przez `ssh tars@<ip-tailscale>`.
+Zainstaluj Tailscale też na laptopie i telefonie. Od teraz łącz się przez `ssh jarvo@<ip-tailscale>`.
 
 ---
 
@@ -99,17 +99,17 @@ mają tryb 640 i grupę `10000` (użytkownik `hermes` w kontenerze), bo instalat
 Nowe pliki w tym katalogu dziedziczą grupę (setgid), a przy ręcznym kopiowaniu użyj
 `sudo chgrp 10000 plik && chmod 640 plik`.
 
-**`/srv/tars/compose/.env`** (docker compose):
+**`/srv/jarvo/compose/.env`** (docker compose):
 ```ini
-TARS_BIND_IP=100.101.102.103      # IP Tailscale: dashboard i panele tylko w Twojej sieci
+JARVO_BIND_IP=100.101.102.103      # IP Tailscale: dashboard i panele tylko w Twojej sieci
 SEARXNG_SECRET=…                  # wygenerowany przez bootstrap, zostaw
-DASHBOARD_PASSWORD=…              # hasło do dashboardu (użytkownik: tars), wygenerowane przez bootstrap
+DASHBOARD_PASSWORD=…              # hasło do dashboardu (użytkownik: jarvo), wygenerowane przez bootstrap
 HERMES_MEM_LIMIT=5g               # sufit RAM kontenera Hermesa (VPS 8 GB); przy 16 GB można 10g
 HERMES_CPUS=4
-TARS_EXTRAS=                      # opcjonalnie: rembg media office docling manim (więcej dysku, nie RAM)
+JARVO_EXTRAS=                      # opcjonalnie: rembg media office docling manim (więcej dysku, nie RAM)
 ```
 
-**`/srv/tars/compose/tars.env`** (ID Telegrama, nie sekrety):
+**`/srv/jarvo/compose/jarvo.env`** (ID Telegrama, nie sekrety):
 ```ini
 TELEGRAM_OWNER_ID=123456789
 TELEGRAM_HQ_CHAT_ID=-1001234567890
@@ -120,7 +120,7 @@ TELEGRAM_TOPIC_REKA=5
 TELEGRAM_TOPIC_WIDEO=6
 ```
 
-**`/srv/tars/secrets/host.env`** (gateway):
+**`/srv/jarvo/secrets/host.env`** (gateway):
 ```ini
 TELEGRAM_BOT_TOKEN=…
 TELEGRAM_ALLOWED_USERS=123456789
@@ -129,7 +129,7 @@ TELEGRAM_REQUIRE_MENTION=false
 OPENROUTER_API_KEY=sk-or-v1-…     # klucz "host" (niski limit)
 ```
 
-**`/srv/tars/secrets/<agent>.env`** dla `tars`, `tars-sherlock`, `tars-web`, `tars-studio`, `tars-wideo`, `tars-reka`:
+**`/srv/jarvo/secrets/<agent>.env`** dla `jarvo`, `jarvo-sherlock`, `jarvo-web`, `jarvo-studio`, `jarvo-wideo`, `jarvo-reka`:
 ```ini
 OPENROUTER_API_KEY=sk-or-v1-…     # osobny klucz na agenta
 ```
@@ -140,10 +140,10 @@ zadziała; `install-fleet.sh` wypisze ostrzeżenie.
 
 ### Dostawca modeli (OpenRouter, CommandCode…)
 
-Domyślnie agenci używają OpenRoutera. Inny dostawca dla całej floty: w `compose/tars.env` ustaw
-`TARS_MODEL_PROVIDER` na nazwę zestawu z `fleet.yaml` → `models.presets` (`commandcode-anthropic`:
+Domyślnie agenci używają OpenRoutera. Inny dostawca dla całej floty: w `compose/jarvo.env` ustaw
+`JARVO_MODEL_PROVIDER` na nazwę zestawu z `fleet.yaml` → `models.presets` (`commandcode-anthropic`:
 Claude przez CommandCode, `commandcode`: DeepSeek/Kimi przez CommandCode) i wdroż. Lokalnie jednym
-poleceniem: `TARS_MODEL_PROVIDER=commandcode bash scripts/local-up.sh`. Host (zadania pomocnicze
+poleceniem: `JARVO_MODEL_PROVIDER=commandcode bash scripts/local-up.sh`. Host (zadania pomocnicze
 kanbana) dostaje najszybszy model zestawu, chyba że wybrano mu model ręcznie przez `/model`.
 `make models` sprawdza, czy modele wybranego zestawu istnieją u dostawcy.
 
@@ -165,7 +165,7 @@ przy multipleksowaniu). Żeby nie wpisywać klucza pięć razy:
 ## 5. Pierwsze wdrożenie
 
 ```bash
-cd /srv/tars/repo
+cd /srv/jarvo/repo
 bash scripts/deploy.sh --first-run
 ```
 
@@ -173,10 +173,10 @@ Co się dzieje (i co powinieneś zobaczyć):
 
 | Krok | Oczekiwany wynik |
 |---|---|
-| budowa obrazu `tars-hermes:local` | kilkanaście minut za pierwszym razem |
+| budowa obrazu `jarvo-hermes:local` | kilkanaście minut za pierwszym razem |
 | start usług | `hermes`, `searxng`, `valkey` w stanie `running` |
 | walidacja repo | `Walidacja: 0 błędów` |
-| build dystrybucji | `✓ tars: … skilli, 4 rutyn cron`, `✓ tars-sherlock: …` itd.; brak linii `!` o Telegramie |
+| build dystrybucji | `✓ jarvo: … skilli, 4 rutyn cron`, `✓ jarvo-sherlock: …` itd.; brak linii `!` o Telegramie |
 | instalacja floty | `Instalacja profilu …` ×5, `✅ Flota zainstalowana` |
 | healthchecki | `✓` przy narzędziach, `○` przy opcjonalnych (docling, manim, postiz); każdy `✗` sprawdź w sekcji 10 |
 
@@ -185,7 +185,7 @@ Przed pierwszym wdrożeniem zaloguj się do Docker Hub (`docker login`), żeby n
 Po udanym wdrożeniu przypnij obrazy do digestów (powtarzalne wdrożenia):
 
 ```bash
-bash scripts/pin-images.sh      # zapisuje digesty w /srv/tars/compose/.env (repo bez zmian)
+bash scripts/pin-images.sh      # zapisuje digesty w /srv/jarvo/compose/.env (repo bez zmian)
 ```
 
 ## 6. Test dymny (smoke test)
@@ -195,13 +195,13 @@ bash scripts/pin-images.sh      # zapisuje digesty w /srv/tars/compose/.env (rep
 3. **Misja przez Jarva (DM):** „Sprawdź 3 konkurentów kawiarni specialty w Krakowie i przygotuj szkic landing page’a.”
    Jarvo powinien potwierdzić zlecenie efektami, a na tablicy pojawić się karty:
    ```bash
-   docker exec -u hermes tars-hermes hermes kanban list
+   docker exec -u hermes jarvo-hermes hermes kanban list
    ```
    Po kilku–kilkunastu minutach: recenzja Jarva (status `review` → `done` albo prośba o poprawki) i raport w DM.
-4. **Jarvo HQ:** `http://<ip-tailscale>:9119`, login `tars` + `DASHBOARD_PASSWORD` z `compose/.env`.
+4. **Jarvo HQ:** `http://<ip-tailscale>:9119`, login `jarvo` + `DASHBOARD_PASSWORD` z `compose/.env`.
    Strona główna to budynek floty: pokoje agentów z podglądem pracy, decyzje, misje i czat ([HQ.md](HQ.md)).
    Pozostałe zakładki dashboardu Hermesa (sesje, cron, logi, konfiguracja) zostają w menu.
-   Kontrola: `/api/plugins/tars-hq/health` po zalogowaniu pokazuje klucze API profili i dostępność gatewaya.
+   Kontrola: `/api/plugins/jarvo-hq/health` po zalogowaniu pokazuje klucze API profili i dostępność gatewaya.
 
 ## 7. Włączenie rutyn i onboarding
 
@@ -210,7 +210,7 @@ Po udanym teście Telegrama:
 
 ```bash
 bash scripts/deploy.sh --no-pull --resume-cron
-docker exec -u hermes tars-hermes hermes -p tars cron list
+docker exec -u hermes jarvo-hermes hermes -p jarvo cron list
 ```
 
 Potem napisz do Jarva: **„Zróbmy onboarding.”** Wywiad (15–20 min) wypełnia `knowledge/user/USER.md` i pamięć
@@ -218,28 +218,28 @@ o Tobie, z której korzystają wszyscy agenci. Brand kity dodajesz poleceniem: �
 
 ## 8. Backupy, monitoring, zamknięcie SSH
 
-**Backup (restic):** dane dostępowe trzymamy w `/srv/tars/restic.env` (root, 600), celowo **poza**
-`/srv/tars/secrets`, bo ten katalog jest widoczny w kontenerze agentów.
+**Backup (restic):** dane dostępowe trzymamy w `/srv/jarvo/restic.env` (root, 600), celowo **poza**
+`/srv/jarvo/secrets`, bo ten katalog jest widoczny w kontenerze agentów.
 ```bash
-sudo install -m 600 /dev/null /srv/tars/restic.env
-sudo nano /srv/tars/restic.env
-#   RESTIC_REPOSITORY=b2:tars-backup:/vps
+sudo install -m 600 /dev/null /srv/jarvo/restic.env
+sudo nano /srv/jarvo/restic.env
+#   RESTIC_REPOSITORY=b2:jarvo-backup:/vps
 #   RESTIC_PASSWORD=…            # zapisz TAKŻE poza serwerem (menedżer haseł)
 #   B2_ACCOUNT_ID=…
 #   B2_ACCOUNT_KEY=…
-sudo bash /srv/tars/repo/scripts/backup.sh          # pierwszy przebieg ręcznie
+sudo bash /srv/jarvo/repo/scripts/backup.sh          # pierwszy przebieg ręcznie
 sudo crontab -e
-# 15 3 * * * /srv/tars/repo/scripts/backup.sh >> /srv/tars/backups/backup.log 2>&1
-# 40 4 1 * * /srv/tars/repo/scripts/restore-test.sh >> /srv/tars/backups/restore-test.log 2>&1
+# 15 3 * * * /srv/jarvo/repo/scripts/backup.sh >> /srv/jarvo/backups/backup.log 2>&1
+# 40 4 1 * * /srv/jarvo/repo/scripts/restore-test.sh >> /srv/jarvo/backups/restore-test.log 2>&1
 ```
 
 **Monitoring (opcjonalnie):** `bash scripts/deploy.sh --no-pull --monitoring`, potem Uptime Kuma
 `http://<ip-tailscale>:3001` (monitory: dashboard 9119, SearXNG) i Beszel `http://<ip-tailscale>:8090`
 (klucz agenta z panelu → `BESZEL_AGENT_KEY` w `compose/.env` → ponownie `--monitoring`).
 
-**SSH tylko przez Tailscale** (gdy `ssh tars@<ip-tailscale>` działa):
+**SSH tylko przez Tailscale** (gdy `ssh jarvo@<ip-tailscale>` działa):
 ```bash
-sudo bash /srv/tars/repo/scripts/bootstrap-vps.sh --lock-ssh
+sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh
 ```
 
 ---
@@ -251,11 +251,11 @@ sudo bash /srv/tars/repo/scripts/bootstrap-vps.sh --lock-ssh
 | wdrożenie zmian z repo | `bash scripts/deploy.sh` (pull → walidacja → build → aktualizacja profili → restart gatewaya) |
 | przebudowa obrazu (nowe narzędzia) | `bash scripts/deploy.sh --rebuild` (automatycznie, gdy zmienił się `infra/Dockerfile`, `infra/node/`, `infra/python/`) |
 | aktualizacja Hermesa | zmień `HERMES_IMAGE` w `compose/.env` → `deploy.sh --rebuild` → `pin-images.sh` |
-| evals (staging, izolowane dane) | `bash scripts/evals-staging.sh --agent tars` (koszt: klucze agentów + sędzia) |
+| evals (staging, izolowane dane) | `bash scripts/evals-staging.sh --agent jarvo` (koszt: klucze agentów + sędzia) |
 | skille, które agenci zmienili sami | `bash scripts/harvest-skills.sh > harvest.md`, przegląd, przeniesienie do repo |
-| nowy agent | lokalnie `make new-agent NAME=tars-x TITLE="…"`, uzupełnienie, `make validate`, status `active`, deploy |
-| stan floty | `docker exec -u hermes tars-hermes hermes kanban stats`, `… hermes gateway status` |
-| logi | `docker logs -f tars-hermes`, `/srv/tars/data/hermes/logs/` |
+| nowy agent | lokalnie `make new-agent NAME=jarvo-x TITLE="…"`, uzupełnienie, `make validate`, status `active`, deploy |
+| stan floty | `docker exec -u hermes jarvo-hermes hermes kanban stats`, `… hermes gateway status` |
+| logi | `docker logs -f jarvo-hermes`, `/srv/jarvo/data/hermes/logs/` |
 | wycofanie zmiany | `git checkout <tag-albo-commit> && bash scripts/deploy.sh --no-pull` |
 | koszty | OpenRouter → Activity (per klucz = per agent), dashboard Hermesa |
 
@@ -266,33 +266,33 @@ Wyjątek to skille tworzone przez agentów: zbiera je `harvest-skills.sh`.
 
 Gdy na GitHubie jest nowsza wersja, w menu bocznym dashboardu pojawia się **„⬆ Aktualizacja (n)”**:
 klik pokazuje listę zmian, **„Aktualizuj teraz”** robi `git pull` i wdrożenie (z przebudową obrazu, gdy
-trzeba), a na koniec strona sama się odświeża. Pomocnik sprawdza GitHuba co minutę; z `TARS_AUTO_UPDATE=1`
-(lokalnie: `TARS_AUTO_UPDATE=1 bash scripts/local-up.sh`) instaluje nowe wersje sam, bez klikania. Robi to pomocnik na hoście
+trzeba), a na koniec strona sama się odświeża. Pomocnik sprawdza GitHuba co minutę; z `JARVO_AUTO_UPDATE=1`
+(lokalnie: `JARVO_AUTO_UPDATE=1 bash scripts/local-up.sh`) instaluje nowe wersje sam, bez klikania. Robi to pomocnik na hoście
 (`scripts/updater.py`), bo kontener celowo nie ma dostępu do Dockera: panel może tylko poprosić o
-sprawdzenie albo aktualizację tej samej gałęzi. Na VPS działa jako usługa `tars-updater`
-(`sudo systemctl status tars-updater`, log: `journalctl -u tars-updater`); lokalnie uruchamia go
-`scripts/local-up.sh` (log: `~/tars-local/updater.log`). Gdy nie działa, pozycja w menu się nie pojawia.
+sprawdzenie albo aktualizację tej samej gałęzi. Na VPS działa jako usługa `jarvo-updater`
+(`sudo systemctl status jarvo-updater`, log: `journalctl -u jarvo-updater`); lokalnie uruchamia go
+`scripts/local-up.sh` (log: `~/jarvo-local/updater.log`). Gdy nie działa, pozycja w menu się nie pojawia.
 
 ### Wyniki agentów w przeglądarce
 Flota działa w kontenerze, więc serwer uruchomiony przez agenta (`localhost:8000`, `npm run dev`) jest dla
 przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w Jarvo HQ albo link, który agent robi poleceniem
-`python3 /opt/tars/repo/scripts/tars_link.py <plik albo katalog>` (serwer podglądu na porcie 9120, ten sam
-`TARS_BIND_IP` co dashboard; link ważny 7 dni). Pliki wysłane w czacie HQ leżą w `/opt/data/tars/inbox/<data>/`.
+`python3 /opt/jarvo/repo/scripts/jarvo_link.py <plik albo katalog>` (serwer podglądu na porcie 9120, ten sam
+`JARVO_BIND_IP` co dashboard; link ważny 7 dni). Pliki wysłane w czacie HQ leżą w `/opt/data/jarvo/inbox/<data>/`.
 
 ## 10. Rozwiązywanie problemów
 
 | Objaw | Przyczyna i naprawa |
 |---|---|
 | bot milczy w grupie, w DM odpowiada | prywatność bota włączona albo bot dodany przed jej wyłączeniem → `/setprivacy` Disable, usuń i dodaj bota |
-| w temacie odpowiada Jarvo zamiast snajpera | złe `TELEGRAM_TOPIC_*` → popraw `tars.env`, `deploy.sh --no-pull`; build wypisuje `!` przy brakach |
+| w temacie odpowiada Jarvo zamiast snajpera | złe `TELEGRAM_TOPIC_*` → popraw `jarvo.env`, `deploy.sh --no-pull`; build wypisuje `!` przy brakach |
 | karty wiszą w `ready` | nie działa dispatcher: `hermes gateway status`; patrol zgłosi to sam po 20 min |
 | karta w `blocked` `capability` | brak narzędzia albo klucza: Jarvo pyta w kolejce decyzji; dopisz klucz do `secrets/<agent>.env`, `deploy.sh --no-pull` |
 | agent odpowiada błędem 401/402 | zły klucz OpenRouter albo wyczerpany limit kredytów tego klucza |
-| `✗` w healthchecku narzędzia | `docker exec -u hermes tars-hermes bash -lc '<komenda z toolbox.yaml>'` i przebudowa obrazu, jeśli brakuje pakietu |
+| `✗` w healthchecku narzędzia | `docker exec -u hermes jarvo-hermes bash -lc '<komenda z toolbox.yaml>'` i przebudowa obrazu, jeśli brakuje pakietu |
 | walidacja przy deployu nie przechodzi | deploy zatrzymuje się przed zmianą floty; popraw błąd w repo (lokalnie `make validate`) |
-| `install-fleet.sh`: „nieczytelny” przy sekretach | złe uprawnienia `secrets/` → `sudo chgrp -R 10000 /srv/tars/secrets && sudo chmod 2750 /srv/tars/secrets && sudo chmod 640 /srv/tars/secrets/*.env` |
+| `install-fleet.sh`: „nieczytelny” przy sekretach | złe uprawnienia `secrets/` → `sudo chgrp -R 10000 /srv/jarvo/secrets && sudo chmod 2750 /srv/jarvo/secrets && sudo chmod 640 /srv/jarvo/secrets/*.env` |
 | `toomanyrequests: You have reached your unauthenticated pull rate limit` | limit Docker Hub → `docker login` (darmowe konto) i ponów `deploy.sh` |
-| brak miejsca na dysku | `docker system prune`, stare rendery w `/srv/tars/data/hermes/tars/workspaces/*/` |
+| brak miejsca na dysku | `docker system prune`, stare rendery w `/srv/jarvo/data/hermes/jarvo/workspaces/*/` |
 | mało RAM-u, OOM w `docker logs` / `dmesg` | `docker stats`; zmniejsz `kanban.max_in_progress` w `profiles/_host/config.yaml` (domyślnie 3) i `deploy.sh --no-pull`; sprawdź swap (`swapon --show`) |
-| pierwsza wiadomość głosowa długo się przetwarza | pobiera się model Parakeet (0,65 GB) do `/srv/tars/data/hermes/tars/models`; raz. Z góry: `docker exec -u hermes tars-hermes tars-stt --prefetch` |
+| pierwsza wiadomość głosowa długo się przetwarza | pobiera się model Parakeet (0,65 GB) do `/srv/jarvo/data/hermes/jarvo/models`; raz. Z góry: `docker exec -u hermes jarvo-hermes jarvo-stt --prefetch` |
 | przeglądarka agenta nie widzi strony (pusta treść) | Lightpanda nie obsługuje wszystkiego; Hermes sam przełącza na Chromium przy zrzutach i błędach. Gdy strona uparcie nie działa: `browser.engine: chrome` w `profiles/<agent>/config.yaml` |

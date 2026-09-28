@@ -1,8 +1,8 @@
 // Jarvo HQ, tryb demo: symulacja floty w przeglądarce (misja „Ziarno”: otwarcie kawiarni).
-// Implementuje ten sam interfejs co prawdziwe API pluginu (window.TARS_HQ_MOCK), bez serwera.
+// Implementuje ten sam interfejs co prawdziwe API pluginu (window.JARVO_HQ_MOCK), bez serwera.
 (function () {
   "use strict";
-  const FLEET = (window.TARS_HQ_FLEET && window.TARS_HQ_FLEET.agents) || [];
+  const FLEET = (window.JARVO_HQ_FLEET && window.JARVO_HQ_FLEET.agents) || [];
   const now = () => Date.now() / 1000;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -38,15 +38,15 @@
       ["write_file", "out/RAPORT.md (Lighthouse 98/100/100/100)"], ["kanban_request_review", "Landing gotowy, LCP 1,2 s, CLS 0"],
     ],
     judge_hosting: [
-      ["read_file", "references/rubric-tars-reka.md"], ["read_file", "out/porownanie-hostingu.md"],
+      ["read_file", "references/rubric-jarvo-reka.md"], ["read_file", "out/porownanie-hostingu.md"],
       ["terminal", "python3 -c 'sprawdza ceny w 3 źródłach'"], ["kanban_complete", "Zatwierdzone: Netlify Free wystarcza"],
     ],
     judge_research: [
-      ["read_file", "references/rubric-tars-sherlock.md"], ["read_file", "out/RAPORT.md"], ["web_extract", "losowa próba 3 źródeł"],
+      ["read_file", "references/rubric-jarvo-sherlock.md"], ["read_file", "out/RAPORT.md"], ["web_extract", "losowa próba 3 źródeł"],
       ["kanban_complete", "Zatwierdzone: źródła A/B, pewność wysoka"],
     ],
     judge_landing: [
-      ["read_file", "references/rubric-tars-web.md"], ["browser_navigate", "http://localhost:4321/"], ["read_file", "out/audyt/summary.json"],
+      ["read_file", "references/rubric-jarvo-web.md"], ["browser_navigate", "http://localhost:4321/"], ["read_file", "out/audyt/summary.json"],
       ["kanban_complete", "Zatwierdzone: budżety jakości spełnione"],
     ],
     graphics: [
@@ -77,15 +77,15 @@
     S = {
       t0: t,
       cards: {
-        t_c01: card("t_c01", "Brand kit z ziarno-kawa.pl", "tars-web", "done", { completed_at: t - 2400, started_at: t - 3300 }),
-        t_c02: card("t_c02", "Research: kawiarnie specialty w Krakowie", "tars-sherlock", "running", { started_at: t - 400, script: "research", step: 3 }),
-        t_c03: card("t_c03", "Landing page Ziarno (Astro, PL)", "tars-web", "running", { started_at: t - 200, script: "landing", step: 2 }),
-        t_c04: card("t_c04", "Grafiki IG na otwarcie (post 4:5 i story 9:16)", "tars-studio", "blocked",
+        t_c01: card("t_c01", "Brand kit z ziarno-kawa.pl", "jarvo-web", "done", { completed_at: t - 2400, started_at: t - 3300 }),
+        t_c02: card("t_c02", "Research: kawiarnie specialty w Krakowie", "jarvo-sherlock", "running", { started_at: t - 400, script: "research", step: 3 }),
+        t_c03: card("t_c03", "Landing page Ziarno (Astro, PL)", "jarvo-web", "running", { started_at: t - 200, script: "landing", step: 2 }),
+        t_c04: card("t_c04", "Grafiki IG na otwarcie (post 4:5 i story 9:16)", "jarvo-studio", "blocked",
           { block_kind: "needs_input", reason: "Która data otwarcia na grafikach: 12 czy 19 października?", blocked_at: t - 900 }),
-        t_c05: card("t_c05", "Film 20 s na Reels z napisami PL", "tars-wideo", "running", { started_at: t - 150, script: "film", step: 4 }),
-        t_c06: card("t_c06", "Złożenie pakietu misji", "tars-reka", "todo", {}),
-        t_c07: card("t_c07", "Porównanie hostingu dla strony Ziarno", "tars-reka", "review", { worker: "tars", script: "judge_hosting", step: 1, started_at: t - 60 }),
-        t_c08: card("t_c08", "Cennik PDF dla kawiarni", "tars-reka", "done", { completed_at: t - 5000 }),
+        t_c05: card("t_c05", "Film 20 s na Reels z napisami PL", "jarvo-wideo", "running", { started_at: t - 150, script: "film", step: 4 }),
+        t_c06: card("t_c06", "Złożenie pakietu misji", "jarvo-reka", "todo", {}),
+        t_c07: card("t_c07", "Porównanie hostingu dla strony Ziarno", "jarvo-reka", "review", { worker: "jarvo", script: "judge_hosting", step: 1, started_at: t - 60 }),
+        t_c08: card("t_c08", "Cennik PDF dla kawiarni", "jarvo-reka", "done", { completed_at: t - 5000 }),
       },
       activity: {},
       feed: [],
@@ -136,7 +136,7 @@
       c.events.push({ kind: "review_requested", created_at: now(), payload: { summary: detail } });
       pushFeed(c.id, "review_requested", "oddaje do oceny", "info");
       const judge = { t_c02: "judge_research", t_c03: "judge_landing" }[c.id];
-      if (judge) setTimeout(() => S.cards[c.id].status === "review" && start(c.id, judge, "tars"), 6000);
+      if (judge) setTimeout(() => S.cards[c.id].status === "review" && start(c.id, judge, "jarvo"), 6000);
       if (c.id === "t_c04" || c.id === "t_c05") setTimeout(() => S.cards[c.id].status === "review" && complete(c.id), 7000);
       if (c.id === "t_c06") setTimeout(() => S.cards[c.id].status === "review" && complete(c.id), 7000);
     } else if (tool === "kanban_complete") {
@@ -177,7 +177,7 @@
   setInterval(tick, 1600);
 
   // ------------------------------------------------------------------ widoki
-  const orchestrator = (FLEET.find((a) => a.kind === "orchestrator") || { name: "tars" }).name;
+  const orchestrator = (FLEET.find((a) => a.kind === "orchestrator") || { name: "jarvo" }).name;
 
   function cardsOf(name) {
     const out = { running: [], ready: [], review: [], blocked: [], triage: [], done: [], judging: [] };
@@ -236,15 +236,15 @@
   }
 
   const OUTPUTS = {
-    "tars-web": [["ziarno-hero-375.png", "image", "#6B3E26"], ["ziarno-hero-1440.png", "image", "#8C5B35"], ["RAPORT.md", "text"], ["summary.json", "text"]],
-    "tars-studio": [["ig-1080x1350.png", "image", "#D96B3C"], ["story-1080x1920.png", "image", "#2F6552"], ["kalendarz.csv", "text"]],
-    "tars-sherlock": [["RAPORT.md", "text"], ["zrodla.jsonl", "text"]],
-    "tars-reka": [["porownanie-hostingu.md", "text"], ["cennik.pdf", "pdf"]],
-    "tars-wideo": [["otwarcie-9x16-miniatura.jpg", "image", "#3B2416"], ["SCENARIUSZ.md", "text"], ["film.json", "text"]],
+    "jarvo-web": [["ziarno-hero-375.png", "image", "#6B3E26"], ["ziarno-hero-1440.png", "image", "#8C5B35"], ["RAPORT.md", "text"], ["summary.json", "text"]],
+    "jarvo-studio": [["ig-1080x1350.png", "image", "#D96B3C"], ["story-1080x1920.png", "image", "#2F6552"], ["kalendarz.csv", "text"]],
+    "jarvo-sherlock": [["RAPORT.md", "text"], ["zrodla.jsonl", "text"]],
+    "jarvo-reka": [["porownanie-hostingu.md", "text"], ["cennik.pdf", "pdf"]],
+    "jarvo-wideo": [["otwarcie-9x16-miniatura.jpg", "image", "#3B2416"], ["SCENARIUSZ.md", "text"], ["film.json", "text"]],
   };
 
   function outputs(name) {
-    return (OUTPUTS[name] || []).map(([n, kind, color], i) => ({ path: `/opt/data/tars/workspaces/${name}/out/${n}`, name: n, rel: `out/${n}`,
+    return (OUTPUTS[name] || []).map(([n, kind, color], i) => ({ path: `/opt/data/jarvo/workspaces/${name}/out/${n}`, name: n, rel: `out/${n}`,
       kind, size: 18000 + i * 7311, mtime: now() - 600 * (i + 1), in_out: true, color }));
   }
 
@@ -280,11 +280,11 @@ a.btn{display:inline-block;padding:12px 22px;background:#6B3E26;color:#F3E6D3;te
   function task(id) {
     const c = S.cards[id];
     if (!c) throw new Error("Nie ma takiej karty");
-    const web = c.assignee === "tars-web";
-    const outName = web ? "index.html" : { "tars-studio": "post-otwarcie-4x5.png", "tars-wideo": "otwarcie-9x16-miniatura.jpg" }[c.assignee] || "raport.md";
+    const web = c.assignee === "jarvo-web";
+    const outName = web ? "index.html" : { "jarvo-studio": "post-otwarcie-4x5.png", "jarvo-wideo": "otwarcie-9x16-miniatura.jpg" }[c.assignee] || "raport.md";
     const body = `CEL: ${c.title}.
 KONTEKST: „Ziarno” — specialty coffee w Krakowie, otwarcie 19.10.2026. Ton ciepły, rzemieślniczy, bez korpomowy.
-WEJŚCIA: brand kit /opt/data/tars/knowledge/brands/ziarno/brand.md; wyniki Sherlocka w ../sherlock/out/.
+WEJŚCIA: brand kit /opt/data/jarvo/knowledge/brands/ziarno/brand.md; wyniki Sherlocka w ../sherlock/out/.
 DoD:
 - wynik w out/ zgodny z brand kitem Ziarno (paleta, ton, hasło),
 - responsywny, bez błędów w konsoli,
@@ -293,7 +293,7 @@ WYJŚCIA: out/${outName}
 GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać innych plików.`;
     const done = c.status === "done";
     const kind = web ? "html" : /\.(png|jpg)$/.test(outName) ? "image" : "text";
-    const outputs = done ? [{ path: `/opt/data/tars/missions/M-demo/${c.assignee}/out/${outName}`, name: outName, rel: `out/${outName}`,
+    const outputs = done ? [{ path: `/opt/data/jarvo/missions/M-demo/${c.assignee}/out/${outName}`, name: outName, rel: `out/${outName}`,
       kind, size: 14200, mtime: (c.completed_at || now()) - 30, in_out: true, main: true, color: "#6B3E26" }] : [];
     return { ...brief(c), body, brief: parseBrief(body), expected: [`out/${outName}`], outputs,
       events: c.events.slice(), comments: c.comments || [],
@@ -335,17 +335,17 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
         text: `Zrozumiałem cel. Założyłem dwie karty: **Sherlock** robi research, **Studio** przygotuje grafikę po jego wynikach. Kryteria gotowości są w kartach. Odezwę się, gdy będzie wynik albo decyzja dla Ciebie.`,
         after: () => {
           const t = now(), n = Object.keys(S.cards).length;
-          S.cards[`t_n${n}`] = { id: `t_n${n}`, title: `Research: ${topic}`, assignee: "tars-sherlock", status: "ready", created_at: t, events: [{ kind: "created", created_at: t }] };
-          S.cards[`t_n${n + 1}`] = { id: `t_n${n + 1}`, title: `Grafika: ${topic}`, assignee: "tars-studio", status: "todo", created_at: t, events: [{ kind: "created", created_at: t }] };
+          S.cards[`t_n${n}`] = { id: `t_n${n}`, title: `Research: ${topic}`, assignee: "jarvo-sherlock", status: "ready", created_at: t, events: [{ kind: "created", created_at: t }] };
+          S.cards[`t_n${n + 1}`] = { id: `t_n${n + 1}`, title: `Grafika: ${topic}`, assignee: "jarvo-studio", status: "todo", created_at: t, events: [{ kind: "created", created_at: t }] };
           pushFeed(`t_n${n}`, "created", "nowa karta", "neutral");
         } };
     }
     const byAgent = {
-      "tars-sherlock": [[["web_search", msg.slice(0, 50)]], "Sprawdziłem wstępnie. Mam 3 źródła pierwotne, ale zanim dam liczby, potwierdzę je krzyżowo. Jeśli to ma być pełne śledztwo, zleć je przez Jarva, wtedy dostaniesz raport z cytatami."],
-      "tars-web": [[["read_file", "knowledge/brands/ziarno/BRAND.md"]], "Mogę to zrobić w ramach landingu Ziarno. Budżety jakości zostają: LCP poniżej 2,5 s, CLS poniżej 0,1, Lighthouse 90+. Wdrożenie na produkcję tylko po Twojej zgodzie."],
-      "tars-studio": [[["skill_view", "formaty-platform"]], "Zrobię to w formatach 4:5 i 9:16, w kolorach z brand kitu Ziarno. Publikacja dopiero po Twojej akceptacji. Pierwsza wersja:\n\nMEDIA:/opt/data/tars/workspaces/tars-studio/out/ig-1080x1350.png\nMEDIA:/opt/data/tars/workspaces/tars-studio/out/kalendarz.csv\n\nPodgląd na żywo: http://localhost:9120/demo/index.html, pliki w `/opt/data/tars/workspaces/tars-studio/out/ig-1080x1350.png`."],
-      "tars-reka": [[["terminal", "python3 -c '…'"]], "Zrobione, wynik w out/. Jeśli to część misji, Jarvo dopnie to do pakietu końcowego."],
-      "tars-wideo": [[["skill_view", "krotki-film"]], "Zrobię to jako reels 9:16: hook do 2 s, polski lektor, napisy karaoke i muzyka pod głosem. Najpierw szkic do oceny rytmu, potem finał i kontrola jakości. Nic nie publikuję bez Twojej zgody."],
+      "jarvo-sherlock": [[["web_search", msg.slice(0, 50)]], "Sprawdziłem wstępnie. Mam 3 źródła pierwotne, ale zanim dam liczby, potwierdzę je krzyżowo. Jeśli to ma być pełne śledztwo, zleć je przez Jarva, wtedy dostaniesz raport z cytatami."],
+      "jarvo-web": [[["read_file", "knowledge/brands/ziarno/BRAND.md"]], "Mogę to zrobić w ramach landingu Ziarno. Budżety jakości zostają: LCP poniżej 2,5 s, CLS poniżej 0,1, Lighthouse 90+. Wdrożenie na produkcję tylko po Twojej zgodzie."],
+      "jarvo-studio": [[["skill_view", "formaty-platform"]], "Zrobię to w formatach 4:5 i 9:16, w kolorach z brand kitu Ziarno. Publikacja dopiero po Twojej akceptacji. Pierwsza wersja:\n\nMEDIA:/opt/data/jarvo/workspaces/jarvo-studio/out/ig-1080x1350.png\nMEDIA:/opt/data/jarvo/workspaces/jarvo-studio/out/kalendarz.csv\n\nPodgląd na żywo: http://localhost:9120/demo/index.html, pliki w `/opt/data/jarvo/workspaces/jarvo-studio/out/ig-1080x1350.png`."],
+      "jarvo-reka": [[["terminal", "python3 -c '…'"]], "Zrobione, wynik w out/. Jeśli to część misji, Jarvo dopnie to do pakietu końcowego."],
+      "jarvo-wideo": [[["skill_view", "krotki-film"]], "Zrobię to jako reels 9:16: hook do 2 s, polski lektor, napisy karaoke i muzyka pod głosem. Najpierw szkic do oceny rytmu, potem finał i kontrola jakości. Nic nie publikuję bez Twojej zgody."],
     };
     const [tools, text] = byAgent[name] || [[], "Jasne."];
     return { tools, text };
@@ -377,7 +377,7 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
     yield { event: "run.completed", data: {} };
   }
 
-  window.TARS_HQ_MOCK = {
+  window.JARVO_HQ_MOCK = {
     state: async () => state(),
     fleet: async () => ({ agents: FLEET }),
     agent: async (name) => agent(name),
@@ -385,10 +385,10 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
     history: async (name) => ({ session_id: "demo", messages: chatOf(name).slice() }),
     reset: async (name) => { S.chats[name] = []; return { ok: true }; },
     retry: async () => ({ ok: true }),
-    upload: async (file) => ({ path: `/opt/data/tars/inbox/demo/${file.name}`, name: file.name, rel: file.name, size: file.size, kind: /^image\//.test(file.type) ? "image" : "other" }),
+    upload: async (file) => ({ path: `/opt/data/jarvo/inbox/demo/${file.name}`, name: file.name, rel: file.name, size: file.size, kind: /^image\//.test(file.type) ? "image" : "other" }),
     site: async () => ({ url: URL.createObjectURL(new Blob([SAMPLE_SITE], { type: "text/html" })) }),
     reveal: async () => { throw new Error("W trybie demo nie ma hosta: folder otwiera się w lokalnej instalacji."); },
-    host: async () => ({ explorer: false, preview: true, data_win: "\\\\wsl.localhost\\Ubuntu\\home\\ty\\tars-local\\data\\hermes" }),
+    host: async () => ({ explorer: false, preview: true, data_win: "\\\\wsl.localhost\\Ubuntu\\home\\ty\\jarvo-local\\data\\hermes" }),
     fileBlob,
     send,
   };

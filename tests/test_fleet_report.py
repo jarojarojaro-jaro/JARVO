@@ -6,7 +6,7 @@ import json
 
 from conftest import load_script
 
-report = load_script("profiles/tars/scripts/fleet_report.py")
+report = load_script("profiles/jarvo/scripts/fleet_report.py")
 
 NOW = 1_800_000_000.0
 H = 3600
@@ -14,20 +14,20 @@ H = 3600
 
 def data():
     tasks = [
-        {"id": "t_1", "title": "Audyt", "status": "done", "assignee": "tars-web", "completed_at": NOW - 2 * H},
-        {"id": "t_2", "title": "Research", "status": "done", "assignee": "tars-sherlock", "completed_at": NOW - 5 * H},
-        {"id": "t_3", "title": "Stare", "status": "done", "assignee": "tars-web", "completed_at": NOW - 50 * H},
-        {"id": "t_4", "title": "Czeka", "status": "blocked", "assignee": "tars-studio"},
-        {"id": "t_5", "title": "W toku", "status": "running", "assignee": "tars-web"},
-        {"id": "t_6", "title": "Archiwum", "status": "archived", "assignee": "tars-web"},
+        {"id": "t_1", "title": "Audyt", "status": "done", "assignee": "jarvo-web", "completed_at": NOW - 2 * H},
+        {"id": "t_2", "title": "Research", "status": "done", "assignee": "jarvo-sherlock", "completed_at": NOW - 5 * H},
+        {"id": "t_3", "title": "Stare", "status": "done", "assignee": "jarvo-web", "completed_at": NOW - 50 * H},
+        {"id": "t_4", "title": "Czeka", "status": "blocked", "assignee": "jarvo-studio"},
+        {"id": "t_5", "title": "W toku", "status": "running", "assignee": "jarvo-web"},
+        {"id": "t_6", "title": "Archiwum", "status": "archived", "assignee": "jarvo-web"},
     ]
     shows = {
         # recenzja jest przypisana do Jarva, ale jakość liczymy wykonawcy (payload.implementer)
-        "t_1": {"events": [{"kind": "review_requested", "payload": {"implementer": "tars-web"}}]},
+        "t_1": {"events": [{"kind": "review_requested", "payload": {"implementer": "jarvo-web"}}]},
         "t_2": {"events": [
-            {"kind": "review_requested", "payload": {"implementer": "tars-sherlock"}},
+            {"kind": "review_requested", "payload": {"implementer": "jarvo-sherlock"}},
             {"kind": "changes_requested", "payload": {}},
-            {"kind": "review_requested", "payload": {"implementer": "tars-sherlock"}},
+            {"kind": "review_requested", "payload": {"implementer": "jarvo-sherlock"}},
         ]},
         "t_4": {"events": [{"kind": "blocked", "payload": {"kind": "needs_input", "reason": "Jaki budżet?"}}]},
     }
@@ -38,7 +38,7 @@ def data():
 def test_summarize_daily_window():
     s = report.summarize(data(), NOW, report.DAY)
     assert [t["id"] for t in s["finished"]] == ["t_1", "t_2"]
-    assert s["blocked"] == [{"id": "t_4", "title": "Czeka", "assignee": "tars-studio", "status": "blocked",
+    assert s["blocked"] == [{"id": "t_4", "title": "Czeka", "assignee": "jarvo-studio", "status": "blocked",
                              "reason": "Jaki budżet?"}]
     assert [t["id"] for t in s["in_flight"]] == ["t_5"]
     assert "archived" not in s["counts"]
@@ -47,8 +47,8 @@ def test_summarize_daily_window():
 
 def test_quality_per_implementer():
     q = report.summarize(data(), NOW, report.DAY)["quality"]
-    assert q["tars-web"] == {"done": 1, "changes_requested": 0, "first_pass": 1, "reviews": 1}
-    assert q["tars-sherlock"] == {"done": 1, "changes_requested": 1, "first_pass": 0, "reviews": 2}
+    assert q["jarvo-web"] == {"done": 1, "changes_requested": 0, "first_pass": 1, "reviews": 1}
+    assert q["jarvo-sherlock"] == {"done": 1, "changes_requested": 1, "first_pass": 0, "reviews": 2}
 
 
 def test_weekly_window_includes_older():

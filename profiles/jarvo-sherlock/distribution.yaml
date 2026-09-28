@@ -1,0 +1,9 @@
+name: jarvo-sherlock
+version: 0.1.0
+description: "Sherlock: wieloźródłowy research i weryfikacja faktów z cytatami i poziomem pewności."
+author: "Jarvo fleet"
+license: MIT
+env_requires:
+  - name: OPENROUTER_API_KEY
+    description: "Klucz OpenRouter dla Sherlocka (osobny klucz z limitem kredytów)"
+    required: true

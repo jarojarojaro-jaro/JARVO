@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build Jarvo HQ (pluginu dashboardu Hermesa) i jego wersji demo.
 
-    python3 scripts/hqbuild.py --out build/plugins/tars-hq     # plugin (wołane też przez scripts/build.py)
+    python3 scripts/hqbuild.py --out build/plugins/jarvo-hq     # plugin (wołane też przez scripts/build.py)
     python3 scripts/hqbuild.py --demo build/hq-demo            # samodzielne demo z symulacją floty
 
 Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, fleet.json, dist/index.js, dist/style.css}.
@@ -103,14 +103,14 @@ def build_demo(out: Path) -> Path:
     shutil.copy2(HQ / "web" / "style.css", out / "style.css")
     shutil.copy2(HQ / "web" / "demo" / "mock.js", out / "mock.js")
     shutil.copy2(HQ / "web" / "demo" / "index.html", out / "index.html")
-    (out / "fleet.js").write_text("window.TARS_HQ_FLEET = " + json.dumps(fleet_json(), ensure_ascii=False, indent=1) + ";\n",
+    (out / "fleet.js").write_text("window.JARVO_HQ_FLEET = " + json.dumps(fleet_json(), ensure_ascii=False, indent=1) + ";\n",
                                   encoding="utf-8")
     return out
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", help="katalog pluginu (np. build/plugins/tars-hq)")
+    ap.add_argument("--out", help="katalog pluginu (np. build/plugins/jarvo-hq)")
     ap.add_argument("--demo", help="katalog demo (np. build/hq-demo)")
     args = ap.parse_args(argv)
     if not args.out and not args.demo:

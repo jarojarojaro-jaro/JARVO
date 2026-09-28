@@ -13,7 +13,7 @@ help:
 	@echo "make hq-demo            Jarvo HQ w trybie demo (symulowana flota) do build/hq-demo"
 	@echo "make deploy             wdrożenie na VPS (scripts/deploy.sh)"
 	@echo "make harvest            raport skilli zmienionych przez agentów na VPS"
-	@echo "make new-agent NAME=tars-x TITLE='…'   szkielet nowego agenta"
+	@echo "make new-agent NAME=jarvo-x TITLE='…'   szkielet nowego agenta"
 
 validate:
 	$(PY) scripts/validate.py

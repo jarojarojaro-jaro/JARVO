@@ -3,7 +3,7 @@
 
     python prune_skills.py <build/profiles/x/skills> <profil/skills> [--dry-run]
 
-Skill jest „zarządzany”, gdy ma `.vendored.json` (skill zewnętrzny) albo `metadata.tars` we frontmatterze
+Skill jest „zarządzany”, gdy ma `.vendored.json` (skill zewnętrzny) albo `metadata.jarvo` we frontmatterze
 (skill własny floty). Skille utworzone przez agenta (bez tych znaczników) i skille wbudowane Hermesa
 nie są ruszane. Aktualizacja dystrybucji Hermesa scala katalogi, ale nie kasuje usuniętych skilli,
 a ten skrypt domyka tę lukę.
@@ -21,7 +21,7 @@ def managed(skill_dir: Path) -> bool:
         return True
     text = (skill_dir / "SKILL.md").read_text(encoding="utf-8", errors="ignore")
     head = text.split("\n---", 2)[0] if text.startswith("---") else ""
-    return "\n  tars:" in head or "\ntars:" in head
+    return any(k in head for k in ("\n  jarvo:", "\njarvo:", "\n  tars:", "\ntars:"))  # tars: instalacje sprzed zmiany nazwy
 
 
 def main(argv: list[str]) -> int:

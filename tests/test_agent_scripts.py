@@ -10,10 +10,10 @@ import pytest
 
 from conftest import REPO, load_script
 
-seo = load_script("profiles/tars-web/scripts/seo_check.py")
-sources = load_script("profiles/tars-sherlock/scripts/sources.py")
-pack = load_script("profiles/tars-reka/scripts/pack.py")
-media = load_script("profiles/tars-studio/scripts/check_media.py")
+seo = load_script("profiles/jarvo-web/scripts/seo_check.py")
+sources = load_script("profiles/jarvo-sherlock/scripts/sources.py")
+pack = load_script("profiles/jarvo-reka/scripts/pack.py")
+media = load_script("profiles/jarvo-studio/scripts/check_media.py")
 
 GOOD_HTML = """<!doctype html>
 <html lang="pl"><head>
@@ -117,7 +117,7 @@ def test_pack_collects_outputs_and_reports_gaps(tmp_path, capsys):
 # ------------------------------------------------------------------ check_media
 
 def test_media_specs_in_sync_with_skill_reference():
-    specs_md = (REPO / "profiles/tars-studio/skills/studio/formaty-platform/references/specs.md").read_text(encoding="utf-8")
+    specs_md = (REPO / "profiles/jarvo-studio/skills/studio/formaty-platform/references/specs.md").read_text(encoding="utf-8")
     documented = dict(re.findall(r"^\| `([a-z0-9-]+)` \|[^|]*\| (\d+×\d+)", specs_md, flags=re.M))
     assert set(documented) == set(media.SPECS)
     for key, (w, h, _) in media.SPECS.items():

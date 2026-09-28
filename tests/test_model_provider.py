@@ -1,4 +1,4 @@
-"""Wybór dostawcy modeli floty: zestawy z fleet.yaml, nadpisania z tars.env, model hosta."""
+"""Wybór dostawcy modeli floty: zestawy z fleet.yaml, nadpisania z jarvo.env, model hosta."""
 
 import subprocess
 import sys
@@ -20,7 +20,7 @@ def test_default_is_openai_codex():
 
 def test_preset_and_single_model_override():
     f = fl.load_fleet()
-    f.apply_model_overrides({"TARS_MODEL_PROVIDER": "commandcode", "TARS_MODEL_FAST": "zai-org/GLM-5.3"})
+    f.apply_model_overrides({"JARVO_MODEL_PROVIDER": "commandcode", "JARVO_MODEL_FAST": "zai-org/GLM-5.3"})
     assert f.provider == "commandcode"
     assert f.model_for("frontier") == "deepseek/deepseek-v4-pro"
     assert f.model_for("fast") == "zai-org/GLM-5.3"
@@ -29,7 +29,7 @@ def test_preset_and_single_model_override():
 def test_unknown_provider_is_an_error():
     f = fl.load_fleet()
     with pytest.raises(ValueError, match="models.presets"):
-        f.apply_model_overrides({"TARS_MODEL_PROVIDER": "nie-ma-takiego"})
+        f.apply_model_overrides({"JARVO_MODEL_PROVIDER": "nie-ma-takiego"})
 
 
 def run_merge(tmp_path, fleet_model, target_model, force=False):

@@ -1,0 +1,9 @@
+name: jarvo
+version: 0.1.0
+description: "Jarvo Main Judge: przyjmuje zlecenia, prowadzi misje, rozdziela pracę na kanbanie, ocenia i raportuje."
+author: "Jarvo fleet"
+license: MIT
+env_requires:
+  - name: OPENROUTER_API_KEY
+    description: "Klucz OpenRouter dla Jarva (osobny klucz z limitem kredytów)"
+    required: true

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Buduje gotowe dystrybucje profili Hermesa z tego repo.
 
-    python scripts/build.py --hermes-src /opt/hermes [--env-file /srv/tars/compose/tars.env]
+    python scripts/build.py --hermes-src /opt/hermes [--env-file /srv/jarvo/compose/jarvo.env]
 
 Wynik: build/
   profiles/<agent>/   dystrybucja gotowa do `hermes profile install` / `update`
@@ -72,7 +72,7 @@ def read_env_file(path: Path | None) -> dict[str, str]:
             env[key.strip()] = value.strip().strip('"').strip("'")
     # zmienne środowiska procesu mają pierwszeństwo
     for key, value in os.environ.items():
-        if key.startswith(("TARS_", "TELEGRAM_")):
+        if key.startswith(("JARVO_", "TELEGRAM_")):
             env[key] = value
     return env
 
@@ -96,14 +96,14 @@ def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: d
         "MODEL_STRONG": fleet.model_for("strong"),
         "MODEL_FAST": fleet.model_for("fast"),
         "TIMEZONE": shared.get("timezone", "Europe/Warsaw"),
-        "MISSIONS_DIR": shared.get("missions_dir", "/opt/data/tars/missions"),
-        "WORKSPACES_DIR": shared.get("workspaces_dir", "/opt/data/tars/workspaces"),
-        "KNOWLEDGE_DIR": "/opt/data/tars/knowledge",
+        "MISSIONS_DIR": shared.get("missions_dir", "/opt/data/jarvo/missions"),
+        "WORKSPACES_DIR": shared.get("workspaces_dir", "/opt/data/jarvo/workspaces"),
+        "KNOWLEDGE_DIR": "/opt/data/jarvo/knowledge",
         "BUILD_DIR": runtime_build_dir,
         "AGENT": agent.name,
         "REVIEWER": fleet.reviewer,
         "ORCHESTRATOR": fleet.orchestrator,
-        # cel dostarczania rutyn: DM właściciela (trasa DM → tars), albo lokalnie gdy brak
+        # cel dostarczania rutyn: DM właściciela (trasa DM → jarvo), albo lokalnie gdy brak
         "OWNER_DELIVER": f"telegram:{owner}" if owner else "local",
     }
 
@@ -221,7 +221,7 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
         "author: Jarvo (generowane z fleet.yaml)",
         "license: MIT",
         "metadata:",
-        "  tars:",
+        "  jarvo:",
         f"    agent: {fleet.orchestrator}",
         "    generated: true",
         "---",
@@ -292,10 +292,10 @@ def build_cron(agent_dir: Path, out_dir: Path, tokens: dict[str, str], hermes_sr
         raise SystemExit("Budowa crona wymaga --hermes-src (API crona Hermesa waliduje harmonogramy).")
     code = _CRON_SNIPPET
     payload = json.dumps(jobs, ensure_ascii=False)
-    with tempfile.TemporaryDirectory(prefix="tars_cron_") as tmp:
-        env = dict(os.environ, HERMES_HOME=tmp, TARS_CRON_JOBS=payload, TARS_CRON_OUT=str(out_dir / "cron" / "jobs.json"))
+    with tempfile.TemporaryDirectory(prefix="jarvo_cron_") as tmp:
+        env = dict(os.environ, HERMES_HOME=tmp, JARVO_CRON_JOBS=payload, JARVO_CRON_OUT=str(out_dir / "cron" / "jobs.json"))
         env["PYTHONPATH"] = os.pathsep.join([str(hermes_src), env.get("PYTHONPATH", "")])
-        python = os.environ.get("TARS_HERMES_PYTHON") or sys.executable
+        python = os.environ.get("JARVO_HERMES_PYTHON") or sys.executable
         res = subprocess.run([python, "-c", code], env=env, capture_output=True, text=True)
         if res.returncode != 0:
             raise SystemExit(f"Budowa crona dla {agent_dir.name} nie powiodła się:\n{res.stdout}\n{res.stderr}")
@@ -307,7 +307,7 @@ import json, os, shutil
 from pathlib import Path
 from cron import jobs as cj
 
-specs = json.loads(os.environ["TARS_CRON_JOBS"])
+specs = json.loads(os.environ["JARVO_CRON_JOBS"])
 home = Path(os.environ["HERMES_HOME"])
 with cj.use_cron_store(home):
     for s in specs:
@@ -325,7 +325,7 @@ with cj.use_cron_store(home):
                 rec["id"] = stable
         cj.save_jobs(records, replace=True)
 store = home / "cron" / "jobs.json"
-out = Path(os.environ["TARS_CRON_OUT"])
+out = Path(os.environ["JARVO_CRON_OUT"])
 out.parent.mkdir(parents=True, exist_ok=True)
 shutil.copy2(store, out)
 """
@@ -440,13 +440,13 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", default=str(fl.REPO_ROOT / "build"))
-    ap.add_argument("--hermes-src", default=os.environ.get("TARS_HERMES_SRC"),
+    ap.add_argument("--hermes-src", default=os.environ.get("JARVO_HERMES_SRC"),
                     help="drzewo Hermesa (skille 'hermes' + API crona), w kontenerze: /opt/hermes")
     ap.add_argument("--cache", default=None, help="cache klonów źródeł skilli (domyślnie <out>/.cache)")
     ap.add_argument("--local-src", action="append", default=[],
                     help="nazwa=ścieżka: użyj lokalnego klonu źródła (musi być na commicie z locka)")
     ap.add_argument("--env-file", default=None, help="plik z TELEGRAM_OWNER_ID, TELEGRAM_HQ_CHAT_ID, TELEGRAM_TOPIC_*")
-    ap.add_argument("--runtime-build-dir", default="/opt/tars/build",
+    ap.add_argument("--runtime-build-dir", default="/opt/jarvo/build",
                     help="ścieżka, pod którą build będzie widoczny w kontenerze (external_dirs prawej ręki)")
     ap.add_argument("--agent", action="append", default=[], help="buduj tylko wskazanych agentów")
     args = ap.parse_args(argv)
@@ -483,7 +483,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"✓ {agent.name}: {n_skills} skilli, {n_jobs} rutyn cron")
 
     import hqbuild  # Jarvo HQ: plugin dashboardu (pokoje agentów, czat, decyzje)
-    hq_dir = hqbuild.build_plugin(out / "plugins" / "tars-hq", fleet)
+    hq_dir = hqbuild.build_plugin(out / "plugins" / "jarvo-hq", fleet)
     print(f"✓ Jarvo HQ: {hq_dir.relative_to(out)}")
 
     notes = build_host(fleet, out / "host", env)
@@ -498,7 +498,7 @@ def main(argv: list[str] | None = None) -> int:
         "built_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "repo_rev": repo_rev,
         "agents": summary,
-        "plugins": ["tars-hq"],
+        "plugins": ["jarvo-hq"],
         "vendored": report,
         "notes": notes,
     })

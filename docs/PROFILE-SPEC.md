@@ -140,7 +140,7 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 |---|---|---|
 | Pamięć własna agenta | `memories/MEMORY.md` profilu | agent (np. „ta strona używa Tailwind”) |
 | Wiedza o Tobie | MVP: `knowledge/user/USER.md` (onboarding) + pamięć użytkownika Jarva; później wspólny provider (np. Honcho) | Jarvo (onboarding), agenci czytają |
-| Brand kity | `knowledge/brands/<marka>/` | `tars-web` / `tars-studio` |
+| Brand kity | `knowledge/brands/<marka>/` | `jarvo-web` / `jarvo-studio` |
 | Historia zleceń | kanban (`kanban.db`) | Jarvo i agenci |
 
 ---
@@ -191,7 +191,7 @@ Zaraz za protokołem generator dokleja **kalibrację pod model agenta** (`shared
 `gpt`, `claude`, `deepseek`, `kimi`, `generic`): 2–3 zdania na znaną słabość rodziny, osobno dla orkiestratora
 i wykonawców (np. GPT-6: deleguj, nie dopytuj o to, co ustalisz sam, pisz krótko). Blok ma znaczniki
 `<!-- Jarvo:CALIBRATION … -->`; gdy w panelu wybierzesz agentowi inny model, `install-fleet.sh` podmienia go przy
-następnym wdrożeniu. Zmiana `TARS_MODEL_PROVIDER` przebudowuje kalibrację sama. Walidator liczy najdłuższy blok
+następnym wdrożeniu. Zmiana `JARVO_MODEL_PROVIDER` przebudowuje kalibrację sama. Walidator liczy najdłuższy blok
 do budżetu SOUL i pilnuje limitu 3 reguł na sekcję.
 
 **Karta zlecenia (Jarvo → agent):**
@@ -235,7 +235,7 @@ Agent wchodzi do floty (`status: active` w `fleet.yaml`) dopiero, gdy:
 ## Struktura katalogu agenta (tak jest zbudowane repo)
 
 ```
-profiles/tars-web/
+profiles/jarvo-web/
 ├── distribution.yaml        # manifest dystrybucji Hermesa
 ├── SOUL.md                  # main prompt
 ├── config.yaml              # model (@@MODEL@@ z fleet.yaml), toolsety per platforma, zgody, mcp_servers
@@ -244,7 +244,7 @@ profiles/tars-web/
 ├── skills/
 │   └── web/                 # kategoria (DESCRIPTION.md generuje build)
 │       ├── audyt-strony/
-│       │   ├── SKILL.md     # opis ≤ 60 znaków, metadata.tars: agent, autonomy, reviewed
+│       │   ├── SKILL.md     # opis ≤ 60 znaków, metadata.jarvo: agent, autonomy, reviewed
 │       │   └── references/  # knowledge pack workflowu
 │       └── …
 ├── scripts/                 # automaty wołane jako $HERMES_HOME/scripts/<plik>
@@ -253,6 +253,6 @@ profiles/tars-web/
 ├── cron/jobs.yaml           # rutyny (tylko Jarvo); build → cron/jobs.json ze stałymi ID
 ├── README.md
 └── CHANGELOG.md
-evals/tars-web/scenarios.yaml   # scenariusze testowe (poza dystrybucją)
+evals/jarvo-web/scenarios.yaml   # scenariusze testowe (poza dystrybucją)
 vendor/skills.lock.yaml         # skille zewnętrzne tego agenta (dokładane przy buildzie)
 ```

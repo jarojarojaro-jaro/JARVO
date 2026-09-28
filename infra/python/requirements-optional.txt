@@ -1,4 +1,4 @@
-# Dodatki opcjonalne: build-arg TARS_EXTRAS (compose/.env), np. TARS_EXTRAS="rembg media".
+# Dodatki opcjonalne: build-arg JARVO_EXTRAS (compose/.env), np. JARVO_EXTRAS="rembg media".
 #   rembg   → rembg (wycinanie tła; numba/scipy/scikit-image, ~0,5 GB; model u2net ~170 MB przy 1. użyciu)
 #   media   → auto-editor (automatyczne cięcie ciszy w nagraniach, ~0,2 GB)
 #   docling → docling (PDF/DOCX→Markdown z modelami ML, ~1–2 GB)

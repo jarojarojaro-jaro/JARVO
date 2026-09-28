@@ -141,19 +141,19 @@ class Fleet:
         return dict(fb) if isinstance(fb, dict) and fb.get("provider") and fb.get("model") else None
 
     def apply_model_overrides(self, env: dict[str, str]) -> None:
-        """Wybór dostawcy bez edycji repo: TARS_MODEL_PROVIDER=<zestaw z models.presets> i opcjonalnie
-        TARS_MODEL_FRONTIER / _STRONG / _FAST (np. z compose/tars.env)."""
+        """Wybór dostawcy bez edycji repo: JARVO_MODEL_PROVIDER=<zestaw z models.presets> i opcjonalnie
+        JARVO_MODEL_FRONTIER / _STRONG / _FAST (np. z compose/jarvo.env)."""
         models = self.raw["models"]
-        chosen = (env.get("TARS_MODEL_PROVIDER") or "").strip()
+        chosen = (env.get("JARVO_MODEL_PROVIDER") or "").strip()
         if chosen and chosen != models["provider"]:
             presets = models.get("presets") or {}
             if chosen not in presets:
-                raise ValueError(f"TARS_MODEL_PROVIDER={chosen}: brak zestawu w fleet.yaml (models.presets: "
+                raise ValueError(f"JARVO_MODEL_PROVIDER={chosen}: brak zestawu w fleet.yaml (models.presets: "
                                  f"{', '.join(sorted(presets)) or 'pusto'})")
             models["provider"] = chosen
             models["tiers"] = dict(presets[chosen])
         for tier in list(models["tiers"]):
-            value = (env.get(f"TARS_MODEL_{tier.upper()}") or "").strip()
+            value = (env.get(f"JARVO_MODEL_{tier.upper()}") or "").strip()
             if value:
                 models["tiers"][tier] = value
 
@@ -189,7 +189,7 @@ def load_fleet(path: Path | None = None) -> Fleet:
                 pin_skills=list(entry.get("pin_skills", []) or []),
                 hq_room=entry.get("hq_room", "office"),
                 hq_label=entry.get("hq_label", "") or entry.get("title", ""),
-                hq_short=entry.get("hq_short", "") or entry["name"].removeprefix("tars-").capitalize(),
+                hq_short=entry.get("hq_short", "") or entry["name"].removeprefix("jarvo-").capitalize(),
                 en={k: " ".join(str(v).split()) for k, v in (entry.get("en") or {}).items() if v},
             )
         )
@@ -242,15 +242,15 @@ def model_family(model_id: str | None) -> str:
     return "generic"
 
 
-CALIBRATION_RE = re.compile(r"<!-- Jarvo:CALIBRATION (orkiestrator|wykonawca) -->.*?<!-- /TARS:CALIBRATION -->", re.S)
+CALIBRATION_RE = re.compile(r"<!-- Jarvo:CALIBRATION (orkiestrator|wykonawca) -->.*?<!-- /JARVO:CALIBRATION -->", re.S)
 
 
 def calibration_section(model_id: str | None, orchestrator: bool, root: Path | None = None) -> str:
     """Blok kalibracji w znacznikach: install-fleet (profile_model.py) podmienia go, gdy w panelu wybrano inny model."""
     role = "orkiestrator" if orchestrator else "wykonawca"
     body = calibration_block(model_id, orchestrator, root)
-    return f"<!-- Jarvo:CALIBRATION {role} -->\n{body}\n<!-- /TARS:CALIBRATION -->" if body else \
-        f"<!-- Jarvo:CALIBRATION {role} -->\n<!-- /TARS:CALIBRATION -->"
+    return f"<!-- Jarvo:CALIBRATION {role} -->\n{body}\n<!-- /JARVO:CALIBRATION -->" if body else \
+        f"<!-- Jarvo:CALIBRATION {role} -->\n<!-- /JARVO:CALIBRATION -->"
 
 
 def recalibrate_soul(soul: str, model_id: str | None, root: Path | None = None) -> str | None:

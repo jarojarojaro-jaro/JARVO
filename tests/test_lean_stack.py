@@ -1,4 +1,4 @@
-"""Lekki stos pod VPS 8 GB: tars-stt (napisy), to_pdf (bez Gotenberga), budżet RAM compose, higiena obrazu."""
+"""Lekki stos pod VPS 8 GB: jarvo-stt (napisy), to_pdf (bez Gotenberga), budżet RAM compose, higiena obrazu."""
 
 from __future__ import annotations
 
@@ -18,15 +18,15 @@ from conftest import REPO, load_script
 
 
 def load_stt():
-    loader = importlib.machinery.SourceFileLoader("tars_stt", str(REPO / "infra" / "bin" / "tars-stt"))
-    spec = importlib.util.spec_from_loader("tars_stt", loader)
+    loader = importlib.machinery.SourceFileLoader("jarvo_stt", str(REPO / "infra" / "bin" / "jarvo-stt"))
+    spec = importlib.util.spec_from_loader("jarvo_stt", loader)
     module = importlib.util.module_from_spec(spec)
-    sys.modules["tars_stt"] = module
+    sys.modules["jarvo_stt"] = module
     loader.exec_module(module)
     return module
 
 
-# ------------------------------------------------------------------ tars-stt
+# ------------------------------------------------------------------ jarvo-stt
 
 def seg(start, end, tokens, stamps):
     return SimpleNamespace(start=start, end=end, text="".join(tokens).strip(), tokens=tokens, timestamps=stamps)
@@ -60,8 +60,8 @@ def test_stt_command_template_matches_image_env(tmp_path, monkeypatch):
     m = re.search(r'HERMES_LOCAL_STT_COMMAND="([^"]+)"', docker)
     assert m, "obraz musi ustawiać HERMES_LOCAL_STT_COMMAND"
     tpl = m.group(1)
-    assert tpl.startswith("/opt/tars/bin/tars-stt ") and "{input_path}" in tpl and "{output_dir}" in tpl
-    # szablon po podstawieniu przez Hermesa musi przejść przez argparse tars-stt (brak pliku → kod 2, bez modelu)
+    assert tpl.startswith("/opt/jarvo/bin/jarvo-stt ") and "{input_path}" in tpl and "{output_dir}" in tpl
+    # szablon po podstawieniu przez Hermesa musi przejść przez argparse jarvo-stt (brak pliku → kod 2, bez modelu)
     stt = load_stt()
     monkeypatch.setattr(stt, "load", lambda: pytest.fail("model nie powinien się ładować"))
     argv = tpl.format(input_path=str(tmp_path / "brak.ogg"), output_dir=str(tmp_path), language="pl",
@@ -73,7 +73,7 @@ def test_stt_command_template_matches_image_env(tmp_path, monkeypatch):
 
 @pytest.fixture
 def to_pdf(monkeypatch):
-    mod = load_script("profiles/tars-reka/scripts/to_pdf.py")
+    mod = load_script("profiles/jarvo-reka/scripts/to_pdf.py")
     calls: list[list[str]] = []
 
     def fake_run(cmd, **kw):
@@ -122,7 +122,7 @@ def test_to_pdf_spreadsheet_without_libreoffice_explains_extra(to_pdf, tmp_path,
     monkeypatch.setattr(mod, "soffice", lambda: None)
     src = tmp_path / "budzet.xlsx"
     src.write_bytes(b"PK")
-    with pytest.raises(SystemExit, match="TARS_EXTRAS=\"office\""):
+    with pytest.raises(SystemExit, match="JARVO_EXTRAS=\"office\""):
         mod.main([str(src), str(tmp_path / "b.pdf")])
 
 
@@ -151,7 +151,7 @@ def test_compose_fits_8gb_vps_and_has_no_heavy_sidecars():
 
 def test_env_example_matches_compose_defaults():
     example = (REPO / "infra" / "env" / "compose.env.example").read_text(encoding="utf-8")
-    assert "HERMES_MEM_LIMIT=5g" in example and "TARS_EXTRAS=" in example
+    assert "HERMES_MEM_LIMIT=5g" in example and "JARVO_EXTRAS=" in example
     assert "CRAWL4AI" not in example and "GOTENBERG" not in example and "INSTALL_DOCLING" not in example
 
 
@@ -191,7 +191,7 @@ def test_node_tools_drop_heavy_packages_and_share_chromium():
 # ------------------------------------------------------------------ konfiguracja
 
 def test_profiles_use_lightpanda_and_local_stt():
-    for agent in ["tars", "tars-sherlock", "tars-web", "tars-studio", "tars-wideo", "tars-reka"]:
+    for agent in ["jarvo", "jarvo-sherlock", "jarvo-web", "jarvo-studio", "jarvo-wideo", "jarvo-reka"]:
         cfg = yaml.safe_load((REPO / "profiles" / agent / "config.yaml").read_text(encoding="utf-8"))
         assert cfg["browser"]["engine"] == "lightpanda", agent
         assert cfg["browser"]["backend"] == "off", agent      # string, nie bool (YAML 1.1: off → False)

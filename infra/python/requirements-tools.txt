@@ -1,7 +1,7 @@
-# Narzędzia Pythona floty Jarvo → /opt/tars/venv (Python 3.12 przez uv, osobno od środowiska Hermesa).
+# Narzędzia Pythona floty Jarvo → /opt/jarvo/venv (Python 3.12 przez uv, osobno od środowiska Hermesa).
 # Wersje przypięte (≥ 14 dni od wydania, jak kwarantanna npm w obrazie); aktualizacja = PR + `make pins`.
 trafilatura==2.2.0
 yt-dlp==2026.8.19
-# rozpoznawanie mowy: Parakeet TDT 0.6B v3 (int8, ONNX) przez /opt/tars/bin/tars-stt
+# rozpoznawanie mowy: Parakeet TDT 0.6B v3 (int8, ONNX) przez /opt/jarvo/bin/jarvo-stt
 onnx-asr[cpu,hub]==0.12.0
 onnxruntime==1.29.0

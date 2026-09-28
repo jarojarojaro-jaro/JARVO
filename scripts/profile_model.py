@@ -6,8 +6,8 @@
 
 `hermes profile update --force-config` nadpisuje config.yaml profilu tym z buildu floty. Blok `model`
 wracamy do wersji sprzed aktualizacji, jeśli ktoś go zmienił (strona Models / `/model` przy wybranym
-agencie), czyli gdy różni się od tego, co flota ustawiła poprzednio (.tars-fleet-model.json). Model
-nietknięty przez człowieka idzie za flotą (np. po zmianie TARS_MODEL_PROVIDER).
+agencie), czyli gdy różni się od tego, co flota ustawiła poprzednio (.jarvo-fleet-model.json). Model
+nietknięty przez człowieka idzie za flotą (np. po zmianie JARVO_MODEL_PROVIDER).
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ except ImportError:  # pragma: no cover
     def dump(data, p: Path):
         p.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
-SNAP, MARK = ".tars-model-before.json", ".tars-fleet-model.json"
+SNAP, MARK = ".jarvo-model-before.json", ".jarvo-fleet-model.json"
 
 
 def model_of(cfg) -> dict | None:

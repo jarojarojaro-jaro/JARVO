@@ -14,9 +14,9 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 
 def load_script(rel: str, name: str | None = None):
-    """Importuje skrypt (np. profiles/tars/scripts/patrol.py) jako moduł, bez uruchamiania main()."""
+    """Importuje skrypt (np. profiles/jarvo/scripts/patrol.py) jako moduł, bez uruchamiania main()."""
     path = REPO / rel
-    mod_name = name or "tars_test_" + rel.replace("/", "_").replace("-", "_").removesuffix(".py")
+    mod_name = name or "jarvo_test_" + rel.replace("/", "_").replace("-", "_").removesuffix(".py")
     spec = importlib.util.spec_from_file_location(mod_name, path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[mod_name] = module

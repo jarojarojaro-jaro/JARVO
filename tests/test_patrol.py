@@ -6,7 +6,7 @@ import json
 
 from conftest import load_script
 
-patrol = load_script("profiles/tars/scripts/patrol.py")
+patrol = load_script("profiles/jarvo/scripts/patrol.py")
 
 NOW = 1_800_000_000.0
 MIN = 60
@@ -27,21 +27,21 @@ INDEX = """# Misje Jarvo
 
 def board(**overrides):
     tasks = [
-        {"id": "t_aa01", "title": "Research rynku", "status": "blocked", "assignee": "tars-sherlock",
+        {"id": "t_aa01", "title": "Research rynku", "status": "blocked", "assignee": "jarvo-sherlock",
          "created_at": NOW - 90 * MIN},
-        {"id": "t_aa02", "title": "Landing", "status": "ready", "assignee": "tars-web", "created_at": NOW - 45 * MIN},
-        {"id": "t_bb01", "title": "Stary raport", "status": "done", "assignee": "tars-reka", "created_at": NOW - 900 * MIN},
-        {"id": "t_cc01", "title": "Szybka odpowiedź", "status": "review", "assignee": "tars-reka",
+        {"id": "t_aa02", "title": "Landing", "status": "ready", "assignee": "jarvo-web", "created_at": NOW - 45 * MIN},
+        {"id": "t_bb01", "title": "Stary raport", "status": "done", "assignee": "jarvo-reka", "created_at": NOW - 900 * MIN},
+        {"id": "t_cc01", "title": "Szybka odpowiedź", "status": "review", "assignee": "jarvo-reka",
          "created_at": NOW - 200 * MIN},
-        {"id": "t_ee01", "title": "Pętla", "status": "triage", "assignee": "tars-studio", "created_at": NOW - 5 * MIN},
-        {"id": "t_ff01", "title": "Długi render", "status": "running", "assignee": "tars-studio",
+        {"id": "t_ee01", "title": "Pętla", "status": "triage", "assignee": "jarvo-studio", "created_at": NOW - 5 * MIN},
+        {"id": "t_ff01", "title": "Długi render", "status": "running", "assignee": "jarvo-studio",
          "started_at": NOW - 300 * MIN, "created_at": NOW - 310 * MIN},
-        {"id": "t_gg01", "title": "Świeża karta", "status": "ready", "assignee": "tars-web", "created_at": NOW - 2 * MIN},
+        {"id": "t_gg01", "title": "Świeża karta", "status": "ready", "assignee": "jarvo-web", "created_at": NOW - 2 * MIN},
     ]
     events = {
         "t_aa01": [{"kind": "blocked", "created_at": NOW - 30 * MIN,
                     "payload": {"kind": "needs_input", "reason": "Który rynek: PL czy UE?"}}],
-        "t_cc01": [{"kind": "review_requested", "created_at": NOW - 100 * MIN, "payload": {"implementer": "tars-reka"}}],
+        "t_cc01": [{"kind": "review_requested", "created_at": NOW - 100 * MIN, "payload": {"implementer": "jarvo-reka"}}],
     }
     data = {"tasks": tasks, "events": events, "diagnostics": [], "index": INDEX}
     data.update(overrides)

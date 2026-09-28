@@ -1,18 +1,18 @@
-# Flota Jarvo na VPS. Uruchamiane przez scripts/deploy.sh z katalogu /srv/tars/repo:
-#   docker compose -f infra/docker-compose.yml --env-file /srv/tars/compose/.env up -d
+# Flota Jarvo na VPS. Uruchamiane przez scripts/deploy.sh z katalogu /srv/jarvo/repo:
+#   docker compose -f infra/docker-compose.yml --env-file /srv/jarvo/compose/.env up -d
 #
 # Budżet: VPS 8 GB RAM (4 vCPU). Limity niżej sumują się do ~5,5 GB (+0,4 GB z profilem monitoring);
 # reszta zostaje dla systemu i cache dysku. Limity to sufity, nie rezerwacje: w spoczynku flota bierze ~1 GB.
 #
 # Porty: nic nie jest publikowane publicznie. Dashboard/Desktop (9119), podgląd stron HQ (9120) i panele monitoringu
-# wiążemy do TARS_BIND_IP (domyślnie 127.0.0.1; ustaw IP Tailscale, żeby sięgać z laptopa/telefonu).
+# wiążemy do JARVO_BIND_IP (domyślnie 127.0.0.1; ustaw IP Tailscale, żeby sięgać z laptopa/telefonu).
 # Telegram działa bez portów (long polling).
 #
 # Profile compose:
 #   (domyślny)  hermes + searxng + valkey
 #   monitoring  uptime-kuma + beszel (hub + agent)
 
-name: tars
+name: jarvo
 
 x-restart: &restart
   restart: unless-stopped
@@ -25,29 +25,29 @@ services:
       dockerfile: infra/Dockerfile
       args:
         HERMES_IMAGE: ${HERMES_IMAGE:-nousresearch/hermes-agent:latest}
-        TARS_EXTRAS: ${TARS_EXTRAS:-}
-    image: tars-hermes:local
-    container_name: tars-hermes
+        JARVO_EXTRAS: ${JARVO_EXTRAS:-}
+    image: jarvo-hermes:local
+    container_name: jarvo-hermes
     command: gateway run
     environment:
       HERMES_DASHBOARD: "1"
       # Dashboard na adresie innym niż loopback wymaga uwierzytelniania (inaczej Hermes go nie uruchomi).
-      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: ${DASHBOARD_USER:-tars}
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: ${DASHBOARD_USER:-jarvo}
       HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: ${DASHBOARD_PASSWORD:?ustaw DASHBOARD_PASSWORD w compose/.env}
       HERMES_DASHBOARD_BASIC_AUTH_SECRET: ${DASHBOARD_SESSION_SECRET:-}
       TZ: ${TZ:-Europe/Warsaw}
       HERMES_TIMEZONE: ${TZ:-Europe/Warsaw}
       SEARXNG_URL: http://searxng:8080
-      # adres serwera podglądu („▶ Odpal”, linki agentów z scripts/tars_link.py) widziany z przeglądarki
-      TARS_PREVIEW_URL: http://${TARS_BIND_IP:-127.0.0.1}:9120
+      # adres serwera podglądu („▶ Odpal”, linki agentów z scripts/jarvo_link.py) widziany z przeglądarki
+      JARVO_PREVIEW_URL: http://${JARVO_BIND_IP:-127.0.0.1}:9120
     volumes:
-      - ${TARS_DATA:-/srv/tars/data}/hermes:/opt/data
-      - ${TARS_REPO:-/srv/tars/repo}:/opt/tars/repo:ro
-      - ${TARS_BUILD:-/srv/tars/build}:/opt/tars/build:ro
-      - ${TARS_SECRETS:-/srv/tars/secrets}:/opt/tars/secrets:ro
+      - ${JARVO_DATA:-/srv/jarvo/data}/hermes:/opt/data
+      - ${JARVO_REPO:-/srv/jarvo/repo}:/opt/jarvo/repo:ro
+      - ${JARVO_BUILD:-/srv/jarvo/build}:/opt/jarvo/build:ro
+      - ${JARVO_SECRETS:-/srv/jarvo/secrets}:/opt/jarvo/secrets:ro
     ports:
-      - "${TARS_BIND_IP:-127.0.0.1}:9119:9119"     # dashboard + Hermes Desktop (Remote Gateway)
-      - "${TARS_BIND_IP:-127.0.0.1}:9120:9120"     # Jarvo HQ „Odpal”: podgląd stron agentów (link z tokenem)
+      - "${JARVO_BIND_IP:-127.0.0.1}:9119:9119"     # dashboard + Hermes Desktop (Remote Gateway)
+      - "${JARVO_BIND_IP:-127.0.0.1}:9120:9120"     # Jarvo HQ „Odpal”: podgląd stron agentów (link z tokenem)
     depends_on:
       searxng: {condition: service_started}
     shm_size: "512mb"                                # jedna Chromium naraz (Lighthouse, PDF, zrzuty)
@@ -57,12 +57,12 @@ services:
           # gateway + dashboard + ≤ 3 pracowników kanbana + przeglądarka + chwilowo STT (~1,2 GB)
           memory: ${HERMES_MEM_LIMIT:-5g}
           cpus: "${HERMES_CPUS:-4}"
-    networks: [tars-net]
+    networks: [jarvo-net]
 
   searxng:
     <<: *restart
     image: ${IMAGE_SEARXNG:-searxng/searxng:latest}
-    container_name: tars-searxng
+    container_name: jarvo-searxng
     environment:
       SEARXNG_BASE_URL: http://searxng:8080/
       GRANIAN_HOST: 0.0.0.0        # domyślne "::" wywraca serwer na hostach bez IPv6
@@ -76,53 +76,53 @@ services:
     deploy:
       resources:
         limits: {memory: 384m}
-    networks: [tars-net]
+    networks: [jarvo-net]
 
   valkey:
     <<: *restart
     image: ${IMAGE_VALKEY:-valkey/valkey:8-alpine}
-    container_name: tars-valkey
+    container_name: jarvo-valkey
     command: valkey-server --save 30 1 --loglevel warning --maxmemory 48mb --maxmemory-policy allkeys-lru
     volumes:
-      - ${TARS_DATA:-/srv/tars/data}/valkey:/data
+      - ${JARVO_DATA:-/srv/jarvo/data}/valkey:/data
     deploy:
       resources:
         limits: {memory: 96m}
-    networks: [tars-net]
+    networks: [jarvo-net]
 
   uptime-kuma:
     <<: *restart
     profiles: [monitoring]
     image: ${IMAGE_UPTIME_KUMA:-louislam/uptime-kuma:2}
-    container_name: tars-uptime-kuma
+    container_name: jarvo-uptime-kuma
     volumes:
-      - ${TARS_DATA:-/srv/tars/data}/uptime-kuma:/app/data
+      - ${JARVO_DATA:-/srv/jarvo/data}/uptime-kuma:/app/data
     ports:
-      - "${TARS_BIND_IP:-127.0.0.1}:3001:3001"
+      - "${JARVO_BIND_IP:-127.0.0.1}:3001:3001"
     deploy:
       resources:
         limits: {memory: 256m}
-    networks: [tars-net]
+    networks: [jarvo-net]
 
   beszel:
     <<: *restart
     profiles: [monitoring]
     image: ${IMAGE_BESZEL:-henrygd/beszel:latest}
-    container_name: tars-beszel
+    container_name: jarvo-beszel
     volumes:
-      - ${TARS_DATA:-/srv/tars/data}/beszel:/beszel_data
+      - ${JARVO_DATA:-/srv/jarvo/data}/beszel:/beszel_data
     ports:
-      - "${TARS_BIND_IP:-127.0.0.1}:8090:8090"
+      - "${JARVO_BIND_IP:-127.0.0.1}:8090:8090"
     deploy:
       resources:
         limits: {memory: 128m}
-    networks: [tars-net]
+    networks: [jarvo-net]
 
   beszel-agent:
     <<: *restart
     profiles: [monitoring]
     image: ${IMAGE_BESZEL_AGENT:-henrygd/beszel-agent:latest}
-    container_name: tars-beszel-agent
+    container_name: jarvo-beszel-agent
     network_mode: host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -134,5 +134,5 @@ services:
         limits: {memory: 64m}
 
 networks:
-  tars-net:
+  jarvo-net:
     driver: bridge

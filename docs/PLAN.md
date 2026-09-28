@@ -33,7 +33,7 @@ Naszą pracą jest ich *wypełnienie i spięcie*, a nie przepisywanie rdzenia:
 |---|---|
 | Wielu specjalistów w jednym systemie | **Profile**: każdy ma własny `SOUL.md`, skille, pamięć, model, crony, MCP i klucze |
 | Gotowca zamiast pustej kartki | **Profile distributions**: cały agent jako repo git, instalowany przez `hermes profile install`, aktualizowany przez `hermes profile update` |
-| Rozmowy z każdym osobno | Aliasy CLI (`tars-fin chat`), **Bot Mode** w aplikacji desktopowej (lista botów, czaty grupowe, boty piszące do siebie), Telegram/Discord/Slack |
+| Rozmowy z każdym osobno | Aliasy CLI (`jarvo-fin chat`), **Bot Mode** w aplikacji desktopowej (lista botów, czaty grupowe, boty piszące do siebie), Telegram/Discord/Slack |
 | Jednego bota na Telegramie, który rozdziela rozmowy | **Gateway z multipleksacją** + `gateway.profile_routes` (routing po czacie lub wątku do profilu) |
 | Swarmu, czyli współpracy specjalistów | **Kanban**: trwała tablica zadań współdzielona przez profile, z orkiestratorem routującym po opisie profilu; do szybkich podzadań `delegate_task` |
 | Wspólnej wiedzy o użytkowniku | MVP: plik `knowledge/user/USER.md` z wywiadu onboardingowego + pamięć użytkownika Jarva (kontekst trafia do kart). Później **Honcho**: wspólny „user peer”, osobny „AI peer” na profil |
@@ -79,14 +79,14 @@ Zasady:
 
 ```
                          ┌──────────────────────────────┐
-   Ty ── CLI / Desktop ──►│  Jarvo (profil „tars”)        │  ← dyspozytor + osobowość
+   Ty ── CLI / Desktop ──►│  Jarvo (profil „jarvo”)        │  ← dyspozytor + osobowość
        ── Telegram ──────►│  frontier model, toolset     │     odpowiada sam albo
                           │  kanban (orkiestrator)       │     zleca specjalistom
                           └──────────────┬───────────────┘
                                          │ kanban_create / delegate_task
           ┌───────────────┬──────────────┼──────────────┬───────────────┐
           ▼               ▼              ▼              ▼               ▼
-     tars-sherlock    tars-web      tars-studio    tars-reka       tars-… (kolejni)
+     jarvo-sherlock    jarvo-web      jarvo-studio    jarvo-reka       jarvo-… (kolejni)
      (research)       (strony)      (kreacja)      (prawa ręka)
      SOUL + skille    SOUL + skille SOUL + skille  SOUL + skille
      własna pamięć    własna pamięć …
@@ -102,12 +102,12 @@ Zasady:
 
 ### Trzy tryby pracy
 
-1. **Rozmowa bezpośrednia:** piszesz do konkretnego specjalisty (`tars-fin chat`,
+1. **Rozmowa bezpośrednia:** piszesz do konkretnego specjalisty (`jarvo-fin chat`,
    jego Bot Chat, jego temat na Telegramie). Specjalista ma swoją pamięć i swoje skille.
 2. **Przez Jarva:** piszesz do Jarva, a on decyduje:
    - odpowiada sam (proste rzeczy, small talk, szybkie fakty),
    - `delegate_task`: krótkie, jednorazowe podzadanie (anonimowy subagent, wynik wraca do rozmowy),
-   - `kanban_create` z `assignee: tars-xyz`: prawdziwe zlecenie *nazwanemu specjaliście*,
+   - `kanban_create` z `assignee: jarvo-xyz`: prawdziwe zlecenie *nazwanemu specjaliście*,
      z jego pamięcią i skillami. Jest trwałe, przeżywa restart i można je śledzić.
 3. **Rój:** Jarvo rozbija większy cel na karty kanbana dla kilku specjalistów
    z zależnościami (np. research → analiza → tekst), a na końcu składa wynik.
@@ -126,7 +126,7 @@ Zasady:
 Każdy specjalista to katalog w `profiles/<nazwa>/`, będący **Hermes profile distribution**:
 
 ```
-profiles/tars-fin/
+profiles/jarvo-fin/
 ├── distribution.yaml   # nazwa, wersja, opis, wymagane zmienne env
 ├── SOUL.md             # tożsamość, zakres, czego NIE robi, kiedy oddaje zadanie, ton
 ├── config.yaml         # model, toolsety, terminal.cwd, zgody, mcp_servers (integracje MCP)
@@ -140,7 +140,7 @@ profiles/tars-fin/
 Plus nasze dodatki (nie są częścią dystrybucji, służą do jakości):
 
 ```
-evals/tars-fin/*.yaml   # scenariusze testowe: pytanie → oczekiwane zachowanie
+evals/jarvo-fin/*.yaml   # scenariusze testowe: pytanie → oczekiwane zachowanie
 ```
 
 **Szablon SOUL.md dla specjalisty** (sekcje obowiązkowe):
@@ -195,8 +195,8 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 
 ### Faza 1: MVP: Jarvo + Sherlock
 - ✅ Szkielet repo, `fleet.yaml`, szablony, generator (`scripts/build.py`).
-- ✅ Profil `tars`: SOUL, roster generowany z floty, protokół zlecania, 10 skilli dowodzenia ([BOSS.md](BOSS.md)).
-- ✅ `tars-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
+- ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 10 skilli dowodzenia ([BOSS.md](BOSS.md)).
+- ✅ `jarvo-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
 - ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
 - ✅ Walidator + testy (`make validate`, `make test`, CI) + 56 scenariuszy evals.
 
@@ -214,7 +214,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ⬜ Zasady prywatności: co gdzie leży, co nigdy nie opuszcza serwera.
 
 ### Faza 4: Reszta floty v1, potem kolejni specjaliści
-- ✅ `tars-web`, `tars-studio`, `tars-reka` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
+- ✅ `jarvo-web`, `jarvo-studio`, `jarvo-reka` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
@@ -249,7 +249,7 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
 | D3 | Gdzie działa | ✅ Ustalone: VPS (x86_64, UE), Docker, szczegóły w [VPS.md](VPS.md) | |
 | D4 | Główny kanał | ✅ Telegram (DM + grupa „Jarvo HQ” z tematami) + CLI; desktop jako dodatek | Najtańszy start, działa z telefonu |
 | D5 | Wspólna pamięć | ✅ MVP: wbudowana pamięć + USER.md z onboardingu; Honcho (self-host) w fazie 3, gdy MVP okaże się za mały | Mniej ruchomych części na start; Honcho nadal pasuje do modelu „wspólny użytkownik, osobni agenci” |
-| D6 | Nazewnictwo profili | Prefiks `tars-` (`tars-web`, `tars-sherlock`…) | Profile stają się komendami w shellu, a prefiks unika kolizji |
+| D6 | Nazewnictwo profili | Prefiks `jarvo-` (`jarvo-web`, `jarvo-sherlock`…) | Profile stają się komendami w shellu, a prefiks unika kolizji |
 | D7 | Język | Polski domyślnie, skille technicznie po angielsku tam, gdzie pomaga modelowi | Naturalna rozmowa i precyzyjne instrukcje |
 
 ---
@@ -261,12 +261,12 @@ Pięć profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędzie
 
 | Profil | Rola |
 |---|---|
-| `tars` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje |
-| `tars-web` | Web Senior Dev: strony od faviconu po SEO, uczy się marki |
-| `tars-sherlock` | Researcher-detektyw: wiele źródeł, weryfikacja faktów |
-| `tars-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media |
-| `tars-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy, wideo AI |
-| `tars-reka` | Prawa ręka: generalista, który wykonuje i ogarnia wszystko |
+| `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje |
+| `jarvo-web` | Web Senior Dev: strony od faviconu po SEO, uczy się marki |
+| `jarvo-sherlock` | Researcher-detektyw: wiele źródeł, weryfikacja faktów |
+| `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media |
+| `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy, wideo AI |
+| `jarvo-reka` | Prawa ręka: generalista, który wykonuje i ogarnia wszystko |
 
 Kolejni specjaliści dojdą później, każdy według tego samego kontraktu.
 

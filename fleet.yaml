@@ -12,13 +12,13 @@
 
 version: 2
 
-orchestrator: tars
-reviewer: tars            # recenzent kart: snajperzy wołają kanban_request_review(reviewer=<to>)
+orchestrator: jarvo
+reviewer: jarvo            # recenzent kart: snajperzy wołają kanban_request_review(reviewer=<to>)
 
 # Dostawca modeli i modele na poziomach. Domyślnie OpenRouter; inny dostawca bez edycji repo:
-# w compose/tars.env ustaw TARS_MODEL_PROVIDER=<nazwa zestawu z `presets`> (klucz dostawcy dodaj
+# w compose/jarvo.env ustaw JARVO_MODEL_PROVIDER=<nazwa zestawu z `presets`> (klucz dostawcy dodaj
 # w dashboardzie Keys przy profilu „default”: trafi do wszystkich agentów). Pojedynczy model można
-# nadpisać przez TARS_MODEL_FRONTIER / TARS_MODEL_STRONG / TARS_MODEL_FAST.
+# nadpisać przez JARVO_MODEL_FRONTIER / JARVO_MODEL_STRONG / JARVO_MODEL_FAST.
 # scripts/check-models.py sprawdza przed wdrożeniem, czy identyfikatory istnieją u dostawcy.
 models:
   provider: openai-codex                    # OpenAI przez logowanie ChatGPT (OAuth, Models → Login)
@@ -49,7 +49,7 @@ models:
     video: openrouter                       # video_gen.provider (domyślny model wtyczki)
 
 agents:
-  - name: tars
+  - name: jarvo
     kind: orchestrator
     title: "Main Judge"
     emoji: "🛰️"
@@ -71,7 +71,7 @@ agents:
         The fleet's Main Judge. Takes requests, opens missions, splits them into kanban cards for the specialists, reviews results against the Definition of Done and reports. Does no domain work itself.
     status: active
 
-  - name: tars-sherlock
+  - name: jarvo-sherlock
     kind: specialist
     title: "Researcher-detektyw"
     emoji: "🔎"
@@ -94,7 +94,7 @@ agents:
         Multi-source research and fact-checking: splits a question into threads, checks primary sources, cross-confirms claims and delivers a report with citations and confidence levels. Market, competitor, product and keyword research, monitoring.
     status: active
 
-  - name: tars-web
+  - name: jarvo-web
     kind: specialist
     title: "Web Senior Dev"
     emoji: "🌐"
@@ -116,7 +116,7 @@ agents:
         Websites end to end: new sites and product landing pages, improving existing ones, technical SEO, favicons and meta, image optimisation, responsiveness, performance (Core Web Vitals), accessibility, deployment. Learns the brand from the existing site.
     status: active
 
-  - name: tars-studio
+  - name: jarvo-studio
     kind: specialist
     title: "Marketing i kreacja"
     emoji: "🎬"
@@ -138,7 +138,7 @@ agents:
         Promo graphics, social media posts, copy, campaigns and publishing calendars, all on brand. Orders videos from the Videographer. Prepares packages; never publishes without approval.
     status: active
 
-  - name: tars-wideo
+  - name: jarvo-wideo
     kind: specialist
     title: "Wideograf"
     emoji: "🎥"
@@ -162,7 +162,7 @@ agents:
         Video end to end: short films for TikTok, Reels and Shorts from a topic (script, stock, AI or own footage, Polish voice-over, karaoke captions, music, editing), A/B variants, editing the user's recordings, clips from long recordings, videos from code (HyperFrames, Manim), AI video, Polish captions, platform formats, quality control. Prepares files; never publishes without approval.
     status: active
 
-  - name: tars-reka
+  - name: jarvo-reka
     kind: generalist
     title: "Prawa ręka"
     emoji: "🦾"
@@ -186,10 +186,10 @@ agents:
 
 shared:
   user_memory: builtin          # MVP: pamięć wbudowana + wspólny profil użytkownika; faza 3: honcho
-  user_profile: knowledge/user/USER.md      # na VPS: /opt/data/tars/knowledge/user/USER.md
-  brand_kits: knowledge/brands              # na VPS: /opt/data/tars/knowledge/brands/
-  missions_dir: /opt/data/tars/missions
-  workspaces_dir: /opt/data/tars/workspaces
+  user_profile: knowledge/user/USER.md      # na VPS: /opt/data/jarvo/knowledge/user/USER.md
+  brand_kits: knowledge/brands              # na VPS: /opt/data/jarvo/knowledge/brands/
+  missions_dir: /opt/data/jarvo/missions
+  workspaces_dir: /opt/data/jarvo/workspaces
   protocol: shared/protocol/kontrakt-zlecenia.md
   timezone: Europe/Warsaw
 

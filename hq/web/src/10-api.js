@@ -1,4 +1,4 @@
-// Klient API pluginu. W trybie demo (window.TARS_HQ_MOCK) te same wywołania obsługuje symulator.
+// Klient API pluginu. W trybie demo (window.JARVO_HQ_MOCK) te same wywołania obsługuje symulator.
 
 const API_ROOT = `/api/plugins/${PLUGIN}`;
 
@@ -86,7 +86,7 @@ const liveApi = {
   },
 };
 
-const api = window.TARS_HQ_MOCK || liveApi;
+const api = window.JARVO_HQ_MOCK || liveApi;
 
 // Obiekt URL dla podglądu pliku (pobierany z autoryzacją, więc działa w każdym trybie logowania).
 function useBlobUrl(path) {

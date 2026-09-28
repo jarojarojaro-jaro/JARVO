@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wdrożenie floty Jarvo na VPS (idempotentne). Uruchamiaj z /srv/tars/repo jako użytkownik z grupy docker.
+# Wdrożenie floty Jarvo na VPS (idempotentne). Uruchamiaj z /srv/jarvo/repo jako użytkownik z grupy docker.
 #
 #   bash scripts/deploy.sh [--first-run] [--no-pull] [--rebuild] [--pull-base] [--resume-cron] [--monitoring]
 #
@@ -11,7 +11,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_DIR="${TARS_COMPOSE_DIR:-/srv/tars/compose}"
+# stary pomocnik aktualizacji (sprzed zmiany nazwy) podaje TARS_*: przyjmujemy i migrujemy
+COMPOSE_DIR="${JARVO_COMPOSE_DIR:-${TARS_COMPOSE_DIR:-/srv/jarvo/compose}}"
+JARVO_BUILD="${JARVO_BUILD:-${TARS_BUILD:-}}"
+# migracja instalacji TARS → Jarvo (katalogi, env, stare kontenery); idempotentna
+eval "$(python3 "$(dirname "${BASH_SOURCE[0]}")/migrate_jarvo.py" host --compose "$COMPOSE_DIR" ${JARVO_BUILD:+--build "$JARVO_BUILD"})"
+COMPOSE_DIR="$JARVO_COMPOSE_DIR"; [[ -n "$JARVO_BUILD" ]] || unset JARVO_BUILD
 COMPOSE=(docker compose -f "$ROOT/infra/docker-compose.yml" --env-file "$COMPOSE_DIR/.env")
 PULL=1; REBUILD=0; PULLBASE=0; FIRST=0; RESUME_CRON=0; PROFILES=()
 for arg in "$@"; do
@@ -47,13 +52,13 @@ if [[ $PULL -eq 1 ]]; then
 fi
 
 if [[ $REBUILD -eq 1 ]]; then
-  log "Budowa obrazu tars-hermes (narzędzia agentów)"
+  log "Budowa obrazu jarvo-hermes (narzędzia agentów)"
   BUILD_ARGS=(); [[ $PULLBASE -eq 1 ]] && BUILD_ARGS+=(--pull)
   "${COMPOSE[@]}" build "${BUILD_ARGS[@]}" hermes
   # z której wersji infra/ zbudowano obraz (local-up przebudowuje tylko, gdy się zmieniła)
   git -C "$ROOT" rev-parse HEAD:infra > "$COMPOSE_DIR/.infra-tree" 2>/dev/null || true
   git -C "$ROOT" rev-parse HEAD > "$COMPOSE_DIR/.image-src" 2>/dev/null || true
-  # poprzedni obraz tars-hermes (~4,4 GB) zostaje bez nazwy, a cache budowania rośnie z każdą wersją:
+  # poprzedni obraz jarvo-hermes (~4,4 GB) zostaje bez nazwy, a cache budowania rośnie z każdą wersją:
   # sprzątamy, żeby dysk VPS nie puchł (cache z ostatnich 7 dni zostaje dla szybkich przebudów)
   docker image prune -f >/dev/null || true
   docker builder prune -f --filter until=168h >/dev/null || true
@@ -66,29 +71,29 @@ PY=/opt/hermes/.venv/bin/python
 # Jednorazowe kroki bez init-a s6 (--entrypoint ""): na wspólnym wolumenie danych init wznowiłby
 # drugi gateway i dashboard. Od razu jako użytkownik hermes (uid 10000), repo tylko do odczytu.
 ONEOFF=(run --rm --no-deps -T --entrypoint "" -u 10000:10000 -e HOME=/tmp
-        -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/opt/tars/repo)
+        -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/opt/jarvo/repo)
 log "Walidacja repo"
-"${COMPOSE[@]}" "${ONEOFF[@]}" hermes "$PY" /opt/tars/repo/scripts/validate.py
+"${COMPOSE[@]}" "${ONEOFF[@]}" hermes "$PY" /opt/jarvo/repo/scripts/validate.py
 
 log "Build dystrybucji profili"
 "${COMPOSE[@]}" "${ONEOFF[@]}" \
-  -v "${TARS_BUILD:-/srv/tars/build}:/out" -v "$COMPOSE_DIR:/opt/tars/compose:ro" \
-  -e TARS_HERMES_PYTHON="$PY" \
-  hermes "$PY" /opt/tars/repo/scripts/build.py --hermes-src /opt/hermes --out /out \
-  --env-file /opt/tars/compose/tars.env --runtime-build-dir /opt/tars/build
+  -v "${JARVO_BUILD:-/srv/jarvo/build}:/out" -v "$COMPOSE_DIR:/opt/jarvo/compose:ro" \
+  -e JARVO_HERMES_PYTHON="$PY" \
+  hermes "$PY" /opt/jarvo/repo/scripts/build.py --hermes-src /opt/hermes --out /out \
+  --env-file /opt/jarvo/compose/jarvo.env --runtime-build-dir /opt/jarvo/build
 
 log "Instalacja/aktualizacja floty w kontenerze"
 EXTRA=()
 [[ $RESUME_CRON -eq 1 ]] && EXTRA+=(--resume-cron)
 [[ $FIRST -eq 1 ]] && EXTRA+=(--first-run)
-docker exec -u hermes tars-hermes bash /opt/tars/repo/scripts/install-fleet.sh "${EXTRA[@]}"
+docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/install-fleet.sh "${EXTRA[@]}"
 
 log "Healthchecki narzędzi"
-docker exec -u hermes tars-hermes bash /opt/tars/repo/scripts/healthcheck.sh || echo "(są ostrzeżenia, patrz wyżej)"
+docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/healthcheck.sh || echo "(są ostrzeżenia, patrz wyżej)"
 
 log "Stan"
-docker exec -u hermes tars-hermes hermes profile list || true
-docker exec -u hermes tars-hermes hermes -p tars cron list || true
+docker exec -u hermes jarvo-hermes hermes profile list || true
+docker exec -u hermes jarvo-hermes hermes -p jarvo cron list || true
 echo
 echo "✅ Wdrożenie zakończone. Commit: $(git rev-parse --short HEAD)"
 [[ $RESUME_CRON -eq 0 ]] && echo "ℹ Rutyny Jarva są wstrzymane. Po teście Telegrama: bash scripts/deploy.sh --no-pull --resume-cron"

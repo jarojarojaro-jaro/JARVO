@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Szkielet nowego agenta floty z szablonów (shared/templates) + wpis w fleet.yaml (status: planned).
 
-    python3 scripts/new-agent.py --name tars-fin --title "Finanse" [--kind specialist] [--tier strong]
+    python3 scripts/new-agent.py --name jarvo-fin --title "Finanse" [--kind specialist] [--tier strong]
 
 Tworzy profiles/<name>/ (SOUL, config, distribution, toolbox, rubric, README, CHANGELOG, pierwszy skill)
 i evals/<name>/scenarios.yaml. Agent wchodzi do floty dopiero po spełnieniu Definition of Ready
@@ -29,12 +29,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--kind", default="specialist", choices=sorted(fl.AGENT_KINDS))
     ap.add_argument("--tier", default="strong")
     args = ap.parse_args(argv)
-    if not re.fullmatch(r"tars-[a-z0-9-]+", args.name):
-        raise SystemExit("Nazwa musi mieć postać tars-<slug> (małe litery, cyfry, myślniki).")
+    if not re.fullmatch(r"jarvo-[a-z0-9-]+", args.name):
+        raise SystemExit("Nazwa musi mieć postać jarvo-<slug> (małe litery, cyfry, myślniki).")
     dest = fl.PROFILES_DIR / args.name
     if dest.exists():
         raise SystemExit(f"{dest} już istnieje.")
-    slug = args.name.removeprefix("tars-")
+    slug = args.name.removeprefix("jarvo-")
     (dest / "skills" / slug / f"{slug}-workflow").mkdir(parents=True)
     for d in ["scripts", "cron", "quality"]:
         (dest / d).mkdir()
@@ -45,18 +45,18 @@ def main(argv: list[str] | None = None) -> int:
     (dest / "SOUL.md").write_text(soul, encoding="utf-8")
 
     skill = (T / "SKILL.template.md").read_text(encoding="utf-8")
-    skill = skill.replace("{{nazwa-workflowu}}", f"{slug}-workflow").replace("{{tars-xyz}}", args.name)
+    skill = skill.replace("{{nazwa-workflowu}}", f"{slug}-workflow").replace("{{jarvo-xyz}}", args.name)
     (dest / "skills" / slug / f"{slug}-workflow" / "SKILL.md").write_text(skill, encoding="utf-8")
 
-    shutil.copy2(fl.PROFILES_DIR / "tars-sherlock" / "config.yaml", dest / "config.yaml")
-    cfg = (dest / "config.yaml").read_text(encoding="utf-8").replace("tars-sherlock", args.name)
+    shutil.copy2(fl.PROFILES_DIR / "jarvo-sherlock" / "config.yaml", dest / "config.yaml")
+    cfg = (dest / "config.yaml").read_text(encoding="utf-8").replace("jarvo-sherlock", args.name)
     (dest / "config.yaml").write_text(cfg, encoding="utf-8")
     (dest / "distribution.yaml").write_text(
         f"name: {args.name}\nversion: 0.0.1\ndescription: \"{args.title}\"\nauthor: \"Jarvo fleet\"\nlicense: MIT\n"
         "env_requires:\n  - name: OPENROUTER_API_KEY\n    description: \"Osobny klucz OpenRouter z limitem\"\n    required: true\n",
         encoding="utf-8")
     shutil.copy2(T / "toolbox.template.yaml", dest / "toolbox.yaml")
-    (dest / "toolbox.yaml").write_text((dest / "toolbox.yaml").read_text().replace("tars-xyz", args.name), encoding="utf-8")
+    (dest / "toolbox.yaml").write_text((dest / "toolbox.yaml").read_text().replace("jarvo-xyz", args.name), encoding="utf-8")
     (dest / "quality" / "rubric.md").write_text(f"# Rubryka: {args.name}\n\n## Blokujące\n- TODO\n\n## Ważne\n- TODO\n\n## Uwagi (nie blokują)\n- TODO\n", encoding="utf-8")
     (dest / "README.md").write_text(f"# {args.name}: {args.title}\n\nTODO: opis profilu.\n", encoding="utf-8")
     (dest / "CHANGELOG.md").write_text(f"# Changelog: {args.name}\n\n## 0.0.1\n- Szkielet.\n", encoding="utf-8")

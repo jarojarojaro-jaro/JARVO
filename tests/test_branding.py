@@ -32,12 +32,12 @@ def test_bust_cache_renames_changed_files_and_importers(tmp_path):
     assert "vendor-CCCC33.js" in (assets / new_index).read_text(encoding="utf-8")
 
 
-def test_skin_and_profiles_use_tars_branding():
-    skin = yaml.safe_load((REPO / "branding" / "skin-tars.yaml").read_text(encoding="utf-8"))
-    assert skin["name"] == "tars" and skin["branding"]["agent_name"] == "Jarvo"
-    for name in ["_host", "tars", "tars-sherlock", "tars-web", "tars-studio", "tars-reka"]:
+def test_skin_and_profiles_use_jarvo_branding():
+    skin = yaml.safe_load((REPO / "branding" / "skin-jarvo.yaml").read_text(encoding="utf-8"))
+    assert skin["name"] == "jarvo" and skin["branding"]["agent_name"] == "Jarvo"
+    for name in ["_host", "jarvo", "jarvo-sherlock", "jarvo-web", "jarvo-studio", "jarvo-reka"]:
         cfg = yaml.safe_load((REPO / "profiles" / name / "config.yaml").read_text(encoding="utf-8"))
-        assert cfg["display"]["skin"] == "tars", name
+        assert cfg["display"]["skin"] == "jarvo", name
     ico = (REPO / "branding" / "favicon.ico").read_bytes()
     assert ico[:4] == b"\x00\x00\x01\x00"                # prawdziwy plik ICO, nie SVG pod złą nazwą
 
@@ -85,6 +85,6 @@ def test_polish_translation_covers_dashboard_sections():
     pl = json.loads((REPO / "branding" / "i18n" / "pl.json").read_text(encoding="utf-8"))
     for section in ("common", "app", "status", "sessions", "cron", "config", "env", "kanban", "achievements"):
         assert section in pl
-    assert pl["app"]["nav"]["plugin_tars-hq"] == "Baza"
+    assert pl["app"]["nav"]["plugin_jarvo-hq"] == "Baza"
     # placeholdery zostają jak w oryginale
     assert "{count}" in pl["sessions"]["selectedCount"] and "{what}" in pl["common"]["loadFailed"]

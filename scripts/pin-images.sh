@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Przypina obrazy usług i Hermesa do digestów (powtarzalne wdrożenia). Uruchom po udanym pierwszym wdrożeniu,
-# a potem przy świadomej aktualizacji. Nadpisuje zmienne IMAGE_* i HERMES_IMAGE w /srv/tars/compose/.env.
+# a potem przy świadomej aktualizacji. Nadpisuje zmienne IMAGE_* i HERMES_IMAGE w /srv/jarvo/compose/.env.
 set -euo pipefail
-ENV_FILE="${1:-/srv/tars/compose/.env}"
+ENV_FILE="${1:-/srv/jarvo/compose/.env}"
 [[ -f "$ENV_FILE" ]] || { echo "Brak $ENV_FILE"; exit 1; }
 
 pin() {  # pin <ZMIENNA> <obraz:tag>

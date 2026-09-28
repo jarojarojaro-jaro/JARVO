@@ -2,7 +2,7 @@
 // Stan i samą aktualizację robi pomocnik na hoście (scripts/updater.py); tu tylko pokazujemy i prosimy.
 
 (function updateWidget() {
-  if (typeof document === "undefined" || window.TARS_HQ_MOCK) return;
+  if (typeof document === "undefined" || window.JARVO_HQ_MOCK) return;
   const pageLoaded = Date.now() / 1000;
   let st = null, open = false, busy = false, err = "";
 
@@ -62,7 +62,7 @@
   }
 
   function render() {
-    if (justUpdated() && !window.__tarsReloading) { window.__tarsReloading = true; setTimeout(() => location.reload(), 3000); }
+    if (justUpdated() && !window.__jarvoReloading) { window.__jarvoReloading = true; setTimeout(() => location.reload(), 3000); }
     const l = label();
     item.hidden = !l;
     if (l) { item.textContent = l[0]; item.className = `thq-upd ${l[1]}`.trim(); }
@@ -74,7 +74,7 @@
     panel.append(head);
     if (justUpdated()) {
       // nowa wersja panelu jest już na serwerze: wczytujemy ją sami
-      if (!window.__tarsReloading) { window.__tarsReloading = true; setTimeout(() => location.reload(), 3000); }
+      if (!window.__jarvoReloading) { window.__jarvoReloading = true; setTimeout(() => location.reload(), 3000); }
       panel.append(el("p", null, L(`Zaktualizowano do ${st.current}. Za chwilę strona odświeży się sama.`, `Updated to ${st.current}. The page will reload itself in a moment.`)));
       const done = el("div", "thq-upd-actions");
       done.append(btn(L("Odśwież stronę", "Reload page"), "thq-upd-go", () => location.reload()));

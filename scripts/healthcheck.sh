@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Healthchecki narzędzi i usług z toolbox.yaml wszystkich agentów (w kontenerze tars-hermes).
-#   docker exec -u hermes tars-hermes bash /opt/tars/repo/scripts/healthcheck.sh
+# Healthchecki narzędzi i usług z toolbox.yaml wszystkich agentów (w kontenerze jarvo-hermes).
+#   docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/healthcheck.sh
 set -uo pipefail
-REPO=/opt/tars/repo
+REPO=/opt/jarvo/repo
 PY=/opt/hermes/.venv/bin/python
 fails=0
 

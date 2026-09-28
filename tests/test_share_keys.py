@@ -9,7 +9,7 @@ sk = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sk)
 
 
-def home(tmp_path, root_env: str, agents=("tars", "tars-web")):
+def home(tmp_path, root_env: str, agents=("jarvo", "jarvo-web")):
     (tmp_path / ".env").write_text(root_env, encoding="utf-8")
     for a in agents:
         d = tmp_path / "profiles" / a
@@ -26,7 +26,7 @@ def env(h, agent):
 def test_provider_keys_shared_messaging_not(tmp_path):
     h = home(tmp_path, "COMMANDCODE_API_KEY=cc-1\nOPENROUTER_API_KEY=or-1\nTELEGRAM_BOT_TOKEN=123:x\nAPI_SERVER_KEY=root\n")
     sk.sync(h)
-    e = env(h, "tars")
+    e = env(h, "jarvo")
     assert e["COMMANDCODE_API_KEY"][1] == "cc-1"
     assert e["OPENROUTER_API_KEY"][1] == "or-1"          # pusta wartość agenta = brak klucza
     assert "TELEGRAM_BOT_TOKEN" not in e
@@ -35,17 +35,17 @@ def test_provider_keys_shared_messaging_not(tmp_path):
 
 def test_agent_value_wins_and_edit_in_block_is_kept(tmp_path):
     h = home(tmp_path, "COMMANDCODE_API_KEY=cc-1\n")
-    p = h / "profiles" / "tars-web" / ".env"
+    p = h / "profiles" / "jarvo-web" / ".env"
     p.write_text(p.read_text() + "FIREWORKS_API_KEY=own\n", encoding="utf-8")
     (h / ".env").write_text("COMMANDCODE_API_KEY=cc-1\nFIREWORKS_API_KEY=root\n", encoding="utf-8")
     sk.sync(h)
-    assert env(h, "tars-web")["FIREWORKS_API_KEY"][1] == "own"
+    assert env(h, "jarvo-web")["FIREWORKS_API_KEY"][1] == "own"
     # zmiana w bloku (np. dashboard przy wybranym agencie) → zostaje ustawieniem agenta
     p.write_text(p.read_text().replace("COMMANDCODE_API_KEY=cc-1", "COMMANDCODE_API_KEY=cc-web"), encoding="utf-8")
     (h / ".env").write_text("COMMANDCODE_API_KEY=cc-2\nFIREWORKS_API_KEY=root\n", encoding="utf-8")
     sk.sync(h)
-    assert env(h, "tars-web")["COMMANDCODE_API_KEY"][1] == "cc-web"
-    assert env(h, "tars")["COMMANDCODE_API_KEY"][1] == "cc-2"
+    assert env(h, "jarvo-web")["COMMANDCODE_API_KEY"][1] == "cc-web"
+    assert env(h, "jarvo")["COMMANDCODE_API_KEY"][1] == "cc-2"
 
 
 def test_removed_key_disappears_and_sync_is_idempotent(tmp_path):
@@ -53,7 +53,7 @@ def test_removed_key_disappears_and_sync_is_idempotent(tmp_path):
     sk.sync(h)
     (h / ".env").write_text("", encoding="utf-8")
     sk.sync(h)
-    text = (h / "profiles" / "tars" / ".env").read_text(encoding="utf-8")
+    text = (h / "profiles" / "jarvo" / ".env").read_text(encoding="utf-8")
     assert "COMMANDCODE_API_KEY" not in text and sk.BEGIN not in text
     sk.sync(h)
-    assert (h / "profiles" / "tars" / ".env").read_text(encoding="utf-8") == text
+    assert (h / "profiles" / "jarvo" / ".env").read_text(encoding="utf-8") == text

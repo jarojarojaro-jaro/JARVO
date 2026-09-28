@@ -1,4 +1,4 @@
-"""Wideograf (tars-wideo): biblioteka napisów i lektora, plan filmu, stock, montaż, kontrola i render end-to-end."""
+"""Wideograf (jarvo-wideo): biblioteka napisów i lektora, plan filmu, stock, montaż, kontrola i render end-to-end."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ import pytest
 
 from conftest import REPO, load_script
 
-wl = load_script("profiles/tars-wideo/scripts/wideo_lib.py", "wideo_lib")
-film = load_script("profiles/tars-wideo/scripts/film.py")
-stock = load_script("profiles/tars-wideo/scripts/stock.py", "stock")
-montaz = load_script("profiles/tars-wideo/scripts/montaz.py")
-qa = load_script("profiles/tars-wideo/scripts/qa_wideo.py")
+wl = load_script("profiles/jarvo-wideo/scripts/wideo_lib.py", "wideo_lib")
+film = load_script("profiles/jarvo-wideo/scripts/film.py")
+stock = load_script("profiles/jarvo-wideo/scripts/stock.py", "stock")
+montaz = load_script("profiles/jarvo-wideo/scripts/montaz.py")
+qa = load_script("profiles/jarvo-wideo/scripts/qa_wideo.py")
 
 needs_ffmpeg = pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak FFmpeg")
 W = wl.Word
@@ -121,7 +121,7 @@ def test_check_plan_rejects_unknown_clip_end(tmp_path):
 @needs_ffmpeg
 def test_short_code_clip_holds_last_frame_or_loops(tmp_path, monkeypatch):
     """Animacja z kodu krótsza od sceny: `koniec: stop` trzyma ostatnią klatkę, domyślnie (stock) pętla; obie mają długość sceny."""
-    monkeypatch.setenv("TARS_WIDEO_CACHE", str(tmp_path / "cache"))
+    monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "cache"))
     clip = tmp_path / "anim.mp4"
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=30:d=1",
                     "-pix_fmt", "yuv420p", str(clip)], check=True)
@@ -172,7 +172,7 @@ def test_montaz_time_parsing():
 
 
 def test_platform_specs_in_sync_with_skill_reference():
-    md = (REPO / "profiles/tars-wideo/skills/wideo/formaty-wideo/references/specs.md").read_text(encoding="utf-8")
+    md = (REPO / "profiles/jarvo-wideo/skills/wideo/formaty-wideo/references/specs.md").read_text(encoding="utf-8")
     rows = re.findall(r"^\| `([a-z0-9-]+)` \|[^|]*\| (\d+:\d+) \| (\d+)×(\d+) \| (\d+) s \| (\d+)–(\d+) s", md, flags=re.M)
     documented = {k: (fmt, int(mx), (int(lo), int(hi))) for k, fmt, _w, _h, mx, lo, hi in rows}
     assert documented == qa.PLATFORMS
@@ -184,7 +184,7 @@ def test_platform_specs_in_sync_with_skill_reference():
 
 @needs_ffmpeg
 def test_render_draft_end_to_end_passes_qa(tmp_path, monkeypatch):
-    monkeypatch.setenv("TARS_WIDEO_CACHE", str(tmp_path / "cache"))
+    monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "cache"))
     monkeypatch.chdir(tmp_path)
     subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=640x480", "-frames:v", "1",
                     str(tmp_path / "zdjecie.jpg")], check=True)
@@ -232,11 +232,11 @@ def test_stock_parses_pexels_and_pixabay(monkeypatch):
 
 
 def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
-    nz = load_script("profiles/tars-wideo/scripts/narzedzia.py")
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
     import yaml
     lock = yaml.safe_load((REPO / "vendor/skills.lock.yaml").read_text(encoding="utf-8"))
     assert lock["sources"]["lemo-opuscar"]["rev"] == nz.LEMO_REV            # biblioteka = ten sam commit co skill
-    dests = {e["dest"] for e in lock["agents"]["tars-wideo"]}
+    dests = {e["dest"] for e in lock["agents"]["jarvo-wideo"]}
     assert {"video/motion-broll", "video/lemo-opuscar", "video/anidoodle"} <= dests
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
     shell = tmp_path / "chromium_headless_shell-1243" / "chrome-headless-shell-linux64" / "chrome-headless-shell"
@@ -259,17 +259,17 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     wrapper = nz.ensure_chrome_wrapper()
     assert wrapper.stat().st_mode & 0o111 and "--no-sandbox" in wrapper.read_text(encoding="utf-8")
     html = nz.env_for("html")
-    assert html["PUPPETEER_EXECUTABLE_PATH"] == html["CHROME_BIN"] == str(wrapper) and html["TARS_CHROME_REAL"] == str(shell)
+    assert html["PUPPETEER_EXECUTABLE_PATH"] == html["CHROME_BIN"] == str(wrapper) and html["JARVO_CHROME_REAL"] == str(shell)
     assert nz.env_for("remotion")["REMOTION_BROWSER_EXECUTABLE"] == str(shell)
     assert nz.env_for("lottie")["LOTTIE_PLAYER"].endswith("lottie-player")
     with pytest.raises(SystemExit):
         nz.env_for("puppeteer-core")
-    monkeypatch.setenv("TARS_EXTRAS", "media lemo")
+    monkeypatch.setenv("JARVO_EXTRAS", "media lemo")
     assert nz.full_extras()
 
 
 def test_code_tools_helpers(monkeypatch, tmp_path):
-    nz = load_script("profiles/tars-wideo/scripts/narzedzia.py")
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
     # starszy układ przeglądarki (chrome-linux/headless_shell) i wybór najnowszego buildu po numerze, nie alfabetycznie
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
     assert nz.headless_shell() is None
@@ -294,7 +294,7 @@ def test_code_tools_helpers(monkeypatch, tmp_path):
 
 # ------------------------------------------------------------------ html_wideo (animacja HTML / Lottie → wideo)
 
-hw = load_script("profiles/tars-wideo/scripts/html_wideo.py")
+hw = load_script("profiles/jarvo-wideo/scripts/html_wideo.py")
 
 
 def test_html_presets_and_flags_override():
@@ -359,8 +359,8 @@ def test_html_sheet_and_encode_from_frames(tmp_path):
     assert wl.probe(mov)["video"]["pix_fmt"].startswith("yuva")
 
 
-def test_html_tars_preset_query_merge_and_subframes():
-    o = hw.resolve_opts("tars", query={"lang": "pl"})
+def test_html_jarvo_preset_query_merge_and_subframes():
+    o = hw.resolve_opts("jarvo", query={"lang": "pl"})
     assert o["serwer"] and o["query"] == {"render": "1", "lang": "pl"}      # --query dokłada, render=1 zostaje
     assert "instanceof Promise" in o["seek"]                               # oś GSAP (thenable) nie blokuje
     assert hw.resolve_opts("iart")["query"] == {} and not hw.resolve_opts("iart")["serwer"]
@@ -394,9 +394,9 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
 
 # ------------------------------------------------------------------ rodzaje filmu i inspiracje
 
-RODZAJE_DIR = REPO / "profiles/tars-wideo/skills/wideo/rodzaje-filmu"
+RODZAJE_DIR = REPO / "profiles/jarvo-wideo/skills/wideo/rodzaje-filmu"
 SEKCJE = ["## Wynik", "## Silnik", "## Struktura", "## Rzemiosło", "## Brief", "## Pułapki", "## Kontrola", "## Inspiracje"]
-insp = load_script("profiles/tars-wideo/scripts/inspiracje.py")
+insp = load_script("profiles/jarvo-wideo/scripts/inspiracje.py")
 
 
 def test_rodzaje_index_matches_files_and_stays_lean():
@@ -439,7 +439,7 @@ def test_inspiracje_pick_filters_dedupes_and_excludes():
 
 
 def test_inspiracje_cache_used_when_offline(tmp_path, monkeypatch):
-    monkeypatch.setenv("TARS_WIDEO_CACHE", str(tmp_path / "cache"))
+    monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "cache"))
     monkeypatch.setattr(insp, "URL", "http://127.0.0.1:9/brak.json")       # sieć niedostępna
     with pytest.raises(SystemExit):
         insp.load()                                                        # bez cache: jasny komunikat, nie traceback

@@ -11,12 +11,12 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
-| `tars` | [SOUL](../profiles/tars/SOUL.md) | [10 w `skills/fleet/`](../profiles/tars/skills/fleet) + generowany `roster` | — | patrol, brief, przegląd, raport floty | [12](../evals/tars/scenarios.yaml) |
-| `tars-sherlock` | [SOUL](../profiles/tars-sherlock/SOUL.md) | [6 w `skills/sherlock/`](../profiles/tars-sherlock/skills/sherlock) | 15 (Hermes, marketingskills) | search_fanout, extract, sources | [11](../evals/tars-sherlock/scenarios.yaml) |
-| `tars-web` | [SOUL](../profiles/tars-web/SOUL.md) | [7 w `skills/web/`](../profiles/tars-web/skills/web) | 30 (web-quality, claude-seo, marketingskills, Anthropic, Hermes) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract | [11](../evals/tars-web/scenarios.yaml) |
-| `tars-studio` | [SOUL](../profiles/tars-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/tars-studio/skills/studio) | 21 (marketingskills, Anthropic, Hermes) | render_html, check_media | [11](../evals/tars-studio/scenarios.yaml) |
-| `tars-wideo` | [SOUL](../profiles/tars-wideo/SOUL.md) | [13 w `skills/wideo/`](../profiles/tars-wideo/skills/wideo) | 15 (HyperFrames, marketingskills, Hermes) | film, stock, kadry, montaz, napisy, qa_wideo | [12](../evals/tars-wideo/scenarios.yaml) |
-| `tars-reka` | [SOUL](../profiles/tars-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/tars-reka/skills/reka) | skill-creator + skille wszystkich snajperów (`external_dirs`) + katalog Hermesa | pack, to_pdf | [11](../evals/tars-reka/scenarios.yaml) |
+| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [10 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | — | patrol, brief, przegląd, raport floty | [12](../evals/jarvo/scenarios.yaml) |
+| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [6 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 15 (Hermes, marketingskills) | search_fanout, extract, sources | [11](../evals/jarvo-sherlock/scenarios.yaml) |
+| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [7 w `skills/web/`](../profiles/jarvo-web/skills/web) | 30 (web-quality, claude-seo, marketingskills, Anthropic, Hermes) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract | [11](../evals/jarvo-web/scenarios.yaml) |
+| `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 21 (marketingskills, Anthropic, Hermes) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
+| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [13 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 15 (HyperFrames, marketingskills, Hermes) | film, stock, kadry, montaz, napisy, qa_wideo | [12](../evals/jarvo-wideo/scenarios.yaml) |
+| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | skill-creator + skille wszystkich snajperów (`external_dirs`) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
 
@@ -26,12 +26,12 @@ Legenda przy skillach:
 
 | Profil | Rola | Typ | Maks. autonomia bez zgody |
 |---|---|---|---|
-| `tars` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator | A1 (tworzy karty, ocenia) |
-| `tars-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
-| `tars-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A0/A1 (czyta, pisze raporty) |
-| `tars-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja i reklamy = A2) |
-| `tars-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
-| `tars-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
+| `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator | A1 (tworzy karty, ocenia) |
+| `jarvo-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
+| `jarvo-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A0/A1 (czyta, pisze raporty) |
+| `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja i reklamy = A2) |
+| `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
+| `jarvo-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
 ---
 
@@ -41,12 +41,12 @@ Snajperzy nie dzielą się skillami, ale wszyscy znają **Ciebie**:
 - **profil użytkownika**: kim jesteś, czym się zajmujesz, preferencje (MVP: `knowledge/user/USER.md`
   z wywiadu onboardingowego Jarva; później wspólny provider pamięci, np. Honcho),
 - **brand kity** w `knowledge/brands/<marka>/`: logo, kolory, fonty, ton komunikacji, `DESIGN.md`.
-  Brand kit tworzy `tars-web` albo `tars-studio` („naucz się mojej marki z tej strony”),
+  Brand kit tworzy `jarvo-web` albo `jarvo-studio` („naucz się mojej marki z tej strony”),
   a korzystają z niego obaj. Marka to wiedza o Tobie, nie o dziedzinie, dlatego jest wspólna.
 
 ---
 
-## `tars`: Main Judge
+## `jarvo`: Main Judge
 
 **Misja:** jedyny punkt kontaktu do większych zadań. Rozumie, czego chcesz, rozdziela
 pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
@@ -65,11 +65,11 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 **Zasady routingu:**
 | Zlecenie | Do kogo |
 |---|---|
-| Strona, landing, SEO, wydajność, favicony, responsywność | `tars-web` |
-| „Dowiedz się”, „sprawdź”, porównaj, zweryfikuj | `tars-sherlock` |
-| Post, grafika, kampania, copy, content | `tars-studio` |
-| Film, reels, short, montaż, napisy, lektor, klipy | `tars-wideo` |
-| Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `tars-reka` |
+| Strona, landing, SEO, wydajność, favicony, responsywność | `jarvo-web` |
+| „Dowiedz się”, „sprawdź”, porównaj, zweryfikuj | `jarvo-sherlock` |
+| Post, grafika, kampania, copy, content | `jarvo-studio` |
+| Film, reels, short, montaż, napisy, lektor, klipy | `jarvo-wideo` |
+| Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
 
 **Skille:** [T] `judge-rubryki` (kryteria oceny dla każdego agenta), [T] `dispatch-playbook`
@@ -80,7 +80,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 
 ---
 
-## `tars-web`: Web Senior Dev
+## `jarvo-web`: Web Senior Dev
 
 **Misja:** wie o stronach wszystko. Robi nowe strony, ulepsza i usprawnia stare, uczy
 się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
@@ -105,13 +105,13 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
 - [T] `nowa-strona`: od briefu do wdrożenia (domyślny stack: Astro dla stron marketingowych)
 - [T] `bramka-jakosci`: rubryka designu 10 osi (wynik 0–100, zaliczenie od 90, rundy poprawek) i testy wrogie
   (`hostile.cjs`: wolne łącze, brak JS, 320 px, klawiatura, długie polskie słowa, reduced motion, zasoby zewnętrzne)
-- [T] `landing-produktowy`: strona nowego produktu pod SEO (research słów kluczowych od `tars-sherlock`, jeśli trzeba)
+- [T] `landing-produktowy`: strona nowego produktu pod SEO (research słów kluczowych od `jarvo-sherlock`, jeśli trzeba)
 - [T] `favicon-i-meta`: generowanie kompletu ikon, manifestu i meta z jednego logo
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`
 
 **Narzędzia:** terminal, pliki, przeglądarka (Lightpanda, Chromium do zrzutów), Node.js, a do tego Lighthouse, axe-core,
 Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate i MCP
-`context7`/`netlify`/`cloudflare`. Pełna lista: [TOOLBOX.md](TOOLBOX.md#tars-web-web-senior-dev).
+`context7`/`netlify`/`cloudflare`. Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-web-web-senior-dev).
 
 **Rubryka sędziego (DoD):** strona buduje się bez błędów, Lighthouse ≥ 90 we wszystkich
 kategoriach (albo uzasadnienie), komplet faviconów i meta, poprawne zrzuty mobile i desktop,
@@ -121,7 +121,7 @@ zgodność z brand kitem.
 
 ---
 
-## `tars-sherlock`: Researcher-detektyw
+## `jarvo-sherlock`: Researcher-detektyw
 
 **Misja:** znajdzie wszystko i wszystkiego się dowie. Sprawdza wiele wątków i wiele źródeł,
 składa całość i **weryfikuje**, co jest prawdą.
@@ -141,11 +141,11 @@ składa całość i **weryfikuje**, co jest prawdą.
   `scrapling`, `arxiv`, `youtube-content`, `reddit-reading`, `rss-feeds`,
   `competitor-news-monitor`, `domain-intel`, `osint-investigation`
 - [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł), [T] `szybki-fakt` (jedna runda, cytat),
-  [T] `raport-sledztwa` (format raportu), [T] `research-seo` (słowa kluczowe i konkurencja, dla `tars-web` i `tars-studio`)
+  [T] `raport-sledztwa` (format raportu), [T] `research-seo` (słowa kluczowe i konkurencja, dla `jarvo-web` i `jarvo-studio`)
 
 **Narzędzia:** wielu dostawców wyszukiwania naraz (własny SearXNG, Brave, Exa…), trafilatura i Lightpanda (strony z JS do Markdown),
 Docling (PDF-y, dodatek obrazu), yt-dlp (transkrypcje), OpenAlex (nauka), ArchiveBox (archiwum dowodów),
-delegowanie wątków. Pełna lista: [TOOLBOX.md](TOOLBOX.md#tars-sherlock-researcher-detektyw).
+delegowanie wątków. Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-sherlock-researcher-detektyw).
 
 **Rubryka sędziego (DoD):** każde kluczowe twierdzenie ma źródło, podany poziom pewności,
 sprzeczności wypisane, daty źródeł podane, jasna odpowiedź na pierwotne pytanie.
@@ -156,10 +156,10 @@ sprzeczności wypisane, daty źródeł podane, jasna odpowiedź na pierwotne pyt
 
 ---
 
-## `tars-studio`: Marketing i kreacja
+## `jarvo-studio`: Marketing i kreacja
 
 **Misja:** graphic designer i marketer w jednym. Robi posty, grafiki promocyjne, copy i kampanie,
-wie, gdzie co publikować, w jakim formacie i dlaczego. Filmy robi `tars-wideo` (Studio pisze do nich brief).
+wie, gdzie co publikować, w jakim formacie i dlaczego. Filmy robi `jarvo-wideo` (Studio pisze do nich brief).
 
 **Zakres wiedzy (knowledge packi):**
 - formaty i wymiary dla każdej platformy (IG, TikTok, YT, LinkedIn, X, FB),
@@ -171,7 +171,7 @@ wie, gdzie co publikować, w jakim formacie i dlaczego. Filmy robi `tars-wideo` 
 - **grafiki z kodu:** szablony HTML/CSS renderowane do PNG, infografiki,
 - **AI:** wtyczka Hermesa `image_gen` z providerem **OpenRouter**,
 - **publikacja:** Postiz (self-host) jako kolejka, a post wychodzi dopiero po Twojej akceptacji.
-Pełna lista: [TOOLBOX.md](TOOLBOX.md#tars-studio-marketing-i-kreacja).
+Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-studio-marketing-i-kreacja).
 
 **Skille:**
 - [H] `baoyu-infographic`, `social-media-content-calendar`, `creative-ideation`, `humanizer`, `meme-generation`,
@@ -186,7 +186,7 @@ tekst bez „AI-izmów”, pliki gotowe do publikacji, przy kampanii z filmem: b
 
 ---
 
-## `tars-wideo`: Wideograf
+## `jarvo-wideo`: Wideograf
 
 **Misja:** filmy, które ktoś obejrzy do końca: od tematu albo surowego nagrania do gotowego pliku na TikTok, Reels,
 Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwięk, napisy, montaż).
@@ -207,13 +207,13 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 **Skille:** [T] `krotki-film`, `scenariusz`, `material-stock`, `dobor-ujec`, `warianty-ab`, `montaz-nagran`,
 `klipy-z-dlugiego`, `napisy`, `lektor-i-dzwiek`, `film-z-kodu`, `wideo-ai`, `formaty-wideo`, `kontrola-wideo`;
 [H] `hyperframes` (12 skilli rodziny), `manim-video`, `ai-presenter-video`, marketingskills `video`.
-Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#tars-wideo-wideograf).
+Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#jarvo-wideo-wideograf).
 
 **Zasada:** **nie publikuje sam** i nie kupuje materiałów; bez deepfake'ów i klonowania głosów realnych osób.
 
 ---
 
-## `tars-reka`: Prawa ręka
+## `jarvo-reka`: Prawa ręka
 
 **Misja:** zapierdala i pomaga na każdy możliwy sposób. Ogarnia, rozkminia, proponuje,
 robi szybkie rzeczy od ręki, skleja wyniki snajperów i łata dziury, gdzie nie ma specjalisty.
@@ -239,10 +239,10 @@ agentowi edytować skille w external_dirs, jeśli ma prawa zapisu) oraz [T] `kie
 
 ## Kolejność budowy (propozycja)
 
-1. `tars` + `tars-sherlock`: najprostsze narzędzia, dobre do przetestowania pętli sędziego.
-2. `tars-web`: najwięcej wiedzy do spisania, najbardziej mierzalne wyniki (Lighthouse).
-3. `tars-studio`: wymaga najwięcej narzędzi i kluczy API (OpenRouter, FFmpeg, renderery).
-4. `tars-reka`: na końcu, bo korzysta ze skilli pozostałych.
+1. `jarvo` + `jarvo-sherlock`: najprostsze narzędzia, dobre do przetestowania pętli sędziego.
+2. `jarvo-web`: najwięcej wiedzy do spisania, najbardziej mierzalne wyniki (Lighthouse).
+3. `jarvo-studio`: wymaga najwięcej narzędzi i kluczy API (OpenRouter, FFmpeg, renderery).
+4. `jarvo-reka`: na końcu, bo korzysta ze skilli pozostałych.
 
 Pierwszy wspólny test floty: **„wypuść landing nowego produktu”**. Sherlock robi research
 i słowa kluczowe, web buduje stronę, studio przygotowuje grafiki i posty, ręka składa

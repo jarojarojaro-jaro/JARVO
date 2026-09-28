@@ -20,8 +20,8 @@ stanu „w rozmowie”, tylko w trzech trwałych miejscach:
 | Co | Gdzie | Kto pisze |
 |---|---|---|
 | **Praca** (zadania, statusy, przekazania, oceny) | tablica kanban Hermesa (`kanban.db`) | Jarvo, agenci, dispatcher |
-| **Misje** (Twoja intencja, decyzje, plan, raport końcowy) | `/opt/data/tars/missions/<ID>/MISSION.md` + `INDEX.md` | Jarvo |
-| **Wiedza o Tobie i zasady stałe** | pamięć profilu `tars` (`MEMORY.md`, `USER.md`) + profil użytkownika | Jarvo |
+| **Misje** (Twoja intencja, decyzje, plan, raport końcowy) | `/opt/data/jarvo/missions/<ID>/MISSION.md` + `INDEX.md` | Jarvo |
+| **Wiedza o Tobie i zasady stałe** | pamięć profilu `jarvo` (`MEMORY.md`, `USER.md`) + profil użytkownika | Jarvo |
 
 Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza pełny obraz z dysku.
 
@@ -34,30 +34,30 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
         │
         ▼
   ┌──────────────┐  kanban_create (karty z kontraktem)   ┌───────────────────┐
-  │ tars (czat)  │ ─────────────────────────────────────► │  dispatcher (gw)   │
+  │ jarvo (czat)  │ ─────────────────────────────────────► │  dispatcher (gw)   │
   │  Boss        │ ◄── notify+wake: completed / blocked / │  co 60 s spawnuje  │
   └──────┬───────┘     review_requested / gave_up         │  pracowników       │
          │ patrol (cron + skrypt, 0 tokenów gdy cisza)     └────────┬──────────┘
          │                                                          │ hermes -p <agent> chat -q
          ▼                                                          ▼
-  missions/<ID>/MISSION.md                         tars-sherlock / tars-web / tars-studio / tars-wideo / tars-reka
-                                                            │ kanban_request_review(reviewer="tars")
+  missions/<ID>/MISSION.md                         jarvo-sherlock / jarvo-web / jarvo-studio / jarvo-wideo / jarvo-reka
+                                                            │ kanban_request_review(reviewer="jarvo")
                                                             ▼
-                                                   tars (pracownik-sędzia, lane "review")
+                                                   jarvo (pracownik-sędzia, lane "review")
                                                    skill sdlc-review (nasza wersja z rubrykami)
                                                    → kanban_complete  albo  kanban_request_changes
 ```
 
-- **`tars` w czacie (Boss):** przyjmuje zlecenie, zakłada misję, tworzy karty, odbiera
+- **`jarvo` w czacie (Boss):** przyjmuje zlecenie, zakłada misję, tworzy karty, odbiera
   zdarzenia, prowadzi kolejkę decyzji, raportuje. Na platformach czatu **nie ma terminala**
   (toolsety: kanban, memory, file, web, session_search, clarify, todo, skills, cronjob).
-- **`tars` jako pracownik-sędzia:** kiedy snajper odda kartę do recenzji, dispatcher uruchamia
-  profil `tars` w torze „review” z wymuszonym skillem `sdlc-review`. Nasza wersja tego skilla
-  (w profilu `tars`) zastępuje wbudowaną i zawiera rubryki każdego agenta. Pracownik ma
+- **`jarvo` jako pracownik-sędzia:** kiedy snajper odda kartę do recenzji, dispatcher uruchamia
+  profil `jarvo` w torze „review” z wymuszonym skillem `sdlc-review`. Nasza wersja tego skilla
+  (w profilu `jarvo`) zastępuje wbudowaną i zawiera rubryki każdego agenta. Pracownik ma
   platformę CLI, a więc terminal, przeglądarkę i pliki, żeby **samemu zweryfikować** wynik
   (uruchomić Lighthouse, otworzyć źródła, sprawdzić wymiary grafik). Nigdy nie edytuje wyniku.
 - **Snajperzy:** dostają kartę, pracują w swoim katalogu misji, na końcu wołają
-  `kanban_request_review(reviewer="tars")` z samokontrolą wobec DoD.
+  `kanban_request_review(reviewer="jarvo")` z samokontrolą wobec DoD.
 - **Host (`default`):** profil techniczny. Trzyma token bota, uruchamia gateway (multipleks
   wszystkich profili), dispatcher kanbana i trasy `profile_routes`. Nie rozmawia z Tobą.
 
@@ -94,8 +94,8 @@ Dla misji Jarvo (skill `dispatch-playbook`):
    bo agenci nie widzą kart rodzeństwa,
 4. tworzy karty (`kanban_create`) z kontraktem zlecenia, przypiętymi skillami (`skills`),
    zależnościami (`parents`), `idempotency_key = <ID>-<rola>`, `workspace_kind: dir`
-   i `workspace_path: /opt/data/tars/missions/<ID>/<rola>`,
-5. dla misji wieloagentowych dodaje kartę **„Złożenie”** dla `tars-reka` z `parents` =
+   i `workspace_path: /opt/data/jarvo/missions/<ID>/<rola>`,
+5. dla misji wieloagentowych dodaje kartę **„Złożenie”** dla `jarvo-reka` z `parents` =
    wszystkie karty merytoryczne, która składa pakiet końcowy,
 6. dopisuje misję do `missions/INDEX.md` i odpowiada Ci jednym zdaniem: co ruszyło, kto nad czym pracuje i kiedy spodziewać się wyniku.
 
@@ -106,11 +106,11 @@ Snajper pracuje według swojego SOUL i skilli. Protokół (wspólny, wklejany do
 - przy długiej pracy wysyła `kanban_heartbeat`,
 - brakuje mu informacji → `kanban_block(kind="needs_input", reason=…)` z konkretnym pytaniem,
 - zadanie poza zakresem → `kanban_block(kind="capability", reason=…)` z sugestią, kto powinien je dostać,
-- koniec → `kanban_request_review(reviewer="tars", summary=…, metadata={artifacts, dod_check, …})`.
+- koniec → `kanban_request_review(reviewer="jarvo", summary=…, metadata={artifacts, dod_check, …})`.
 
 ### 3.4 Ocena (Judge)
 
-Pracownik-sędzia `tars` (skill `sdlc-review`, wersja Jarvo):
+Pracownik-sędzia `jarvo` (skill `sdlc-review`, wersja Jarvo):
 1. czyta kartę, DoD i przekazanie (`kanban_show`),
 2. ładuje **rubrykę agenta** (`references/rubric-<agent>.md`),
 3. zmienia perspektywę w kolejnych rundach: **1: artefakt** (czyta wynik „na zimno”),
@@ -240,22 +240,22 @@ utworzona: <data> · kanał: <telegram DM / HQ / cli>
 
 Generowany z `fleet.yaml` do skilla `roster` Jarva. Zasada: **najwęższy agent, który
 w pełni pokrywa zadanie**. Jeśli nikt nie pokrywa, Jarvo proponuje nową specjalizację
-albo daje kartę `tars-reka` z adnotacją „poza snajperami”.
+albo daje kartę `jarvo-reka` z adnotacją „poza snajperami”.
 
 | Sygnał w zleceniu | Agent |
 |---|---|
-| strona, landing, SEO techniczne, favicon, szybkość, responsywność, dostępność, wdrożenie | `tars-web` |
-| sprawdź, dowiedz się, porównaj, zweryfikuj, konkurencja, rynek, źródła | `tars-sherlock` |
-| post, grafika, reklama, kampania, copy, content, social | `tars-studio` |
-| film, reels, short, montaż, lektor, napisy, klipy z nagrania | `tars-wideo` |
-| szybkie sprawy, dokumenty, konwersje, sklejanie wyników, organizacja, „ogarnij” | `tars-reka` |
+| strona, landing, SEO techniczne, favicon, szybkość, responsywność, dostępność, wdrożenie | `jarvo-web` |
+| sprawdź, dowiedz się, porównaj, zweryfikuj, konkurencja, rynek, źródła | `jarvo-sherlock` |
+| post, grafika, reklama, kampania, copy, content, social | `jarvo-studio` |
+| film, reels, short, montaż, lektor, napisy, klipy z nagrania | `jarvo-wideo` |
+| szybkie sprawy, dokumenty, konwersje, sklejanie wyników, organizacja, „ogarnij” | `jarvo-reka` |
 
 ---
 
 ## 10. Co jest weryfikowane w fazie 0
 
-- [ ] snajper → `kanban_request_review(reviewer="tars")` → pracownik `tars` z naszym `sdlc-review` → werdykt,
-- [ ] `request_changes` wraca do tego samego snajpera, a re-review trafia znowu do `tars`,
-- [ ] czat `tars` na Telegramie dostaje wake po zdarzeniach i potrafi odpowiedzieć `[SILENT]`,
+- [ ] snajper → `kanban_request_review(reviewer="jarvo")` → pracownik `jarvo` z naszym `sdlc-review` → werdykt,
+- [ ] `request_changes` wraca do tego samego snajpera, a re-review trafia znowu do `jarvo`,
+- [ ] czat `jarvo` na Telegramie dostaje wake po zdarzeniach i potrafi odpowiedzieć `[SILENT]`,
 - [ ] patrol: skrypt bez anomalii nie budzi modelu; z anomalią budzi i dostarcza wiadomość,
 - [ ] `workspace_kind: dir` w katalogu misji zachowuje pliki po akceptacji.

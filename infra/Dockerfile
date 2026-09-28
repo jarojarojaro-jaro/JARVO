@@ -1,14 +1,14 @@
 # Obraz floty Jarvo: oficjalny Hermes + narzędzia agentów (toolbox.yaml wszystkich profili).
 #
-#   docker build -f infra/Dockerfile -t tars-hermes:local \
+#   docker build -f infra/Dockerfile -t jarvo-hermes:local \
 #     --build-arg HERMES_IMAGE=nousresearch/hermes-agent:<wersja|digest> \
-#     [--build-arg TARS_EXTRAS="rembg media docling manim office"] .
+#     [--build-arg JARVO_EXTRAS="rembg media docling manim office"] .
 #
 # Zasady: entrypoint Hermesa bez zmian (s6 jako PID 1, zrzucenie uprawnień do użytkownika hermes),
-# dane w /opt/data (wolumen), repo i build montowane tylko do odczytu (/opt/tars/repo, /opt/tars/build).
+# dane w /opt/data (wolumen), repo i build montowane tylko do odczytu (/opt/jarvo/repo, /opt/jarvo/build).
 # Obraz celuje w VPS 8 GB RAM: jedna Chromium (ta z obrazu Hermesa) do renderowania i audytów,
 # Lightpanda do codziennego przeglądania, rozpoznawanie mowy uruchamiane na żądanie, bez cache
-# instalatorów w warstwach. Ciężkie, rzadko używane narzędzia są opcjonalne (TARS_EXTRAS).
+# instalatorów w warstwach. Ciężkie, rzadko używane narzędzia są opcjonalne (JARVO_EXTRAS).
 ARG HERMES_IMAGE=nousresearch/hermes-agent:latest
 # Lightpanda (AGPL-3.0, niezmodyfikowana binarka): przeglądarka headless dla narzędzi browser_* agentów.
 # Wersja przypięta digestem; wydanie ≥ 14 dni (ta sama kwarantanna co npm/PyPI).
@@ -27,7 +27,7 @@ FROM ${HERMES_IMAGE}
 # Dodatki (spacje lub przecinki): rembg (wycinanie tła, ~0,5 GB), media (auto-editor, ~0,2 GB),
 # docling (PDF→Markdown z modelami ML, ~1–2 GB), manim (animacje matematyczne + LaTeX, ~1 GB),
 # office (LibreOffice do XLSX/PPTX→PDF, ~0,5 GB).
-ARG TARS_EXTRAS=""
+ARG JARVO_EXTRAS=""
 ARG CLAUDE_SEO_REV=e77e783e38eeb738424eb72117abbd2dacdd88af
 
 USER root
@@ -35,7 +35,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     UV_NO_CACHE=1
 
 # --- pakiety systemowe: dokumenty, OCR, metadane, fonty (polskie znaki), narzędzia PDF
-RUN set -e; extras=" $(echo "$TARS_EXTRAS" | tr ',' ' ') "; \
+RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
     pkgs="pandoc qpdf ocrmypdf tesseract-ocr tesseract-ocr-pol tesseract-ocr-eng \
           libimage-exiftool-perl jq sqlite3 \
           fonts-dejavu fonts-noto-core fonts-noto-color-emoji fonts-inter"; \
@@ -72,8 +72,8 @@ ENV CHROME_PATH=/usr/local/bin/chromium \
 
 # --- narzędzia Node (wersje przypięte w infra/node/package.json; playwright-core dembrandta ujednolicony
 #     przez "overrides" z wersją, której Chromium jest już w obrazie → bez dociągania drugiej przeglądarki)
-COPY infra/node/package.json /opt/tars/node/package.json
-RUN set -e; cd /opt/tars/node && \
+COPY infra/node/package.json /opt/jarvo/node/package.json
+RUN set -e; cd /opt/jarvo/node && \
     npm install --omit=dev --no-audit --no-fund && \
     # dembrandt: model ML tylko dla eksperymentalnej flagi --ai (nie używamy) → bez onnxruntime-node (~0,5 GB)
     rm -rf node_modules/onnxruntime-node node_modules/onnxruntime-common && \
@@ -82,66 +82,66 @@ RUN set -e; cd /opt/tars/node && \
     find node_modules/agent-browser/bin -name 'agent-browser-*' ! -name "agent-browser-$ab" -delete && \
     # na PATH natywna binarka zamiast nakładki w Node (jak robi postinstall przy instalacji globalnej)
     ln -sf ../agent-browser/bin/agent-browser-$ab node_modules/.bin/agent-browser && \
-    ln -sf /opt/tars/node/node_modules/agent-browser/bin/agent-browser-$ab /usr/local/bin/agent-browser && \
+    ln -sf /opt/jarvo/node/node_modules/agent-browser/bin/agent-browser-$ab /usr/local/bin/agent-browser && \
     agent-browser --version && \
     # jedna Chromium dla wszystkich: playwright-core musi trafić w rewizję przeglądarki z obrazu Hermesa
     node -e "require('playwright-core').chromium.launch().then(b => b.close()).then(() => console.log('playwright-core → Chromium OK'))" && \
     npm cache clean --force && rm -rf /root/.npm/_cacache
-ENV NODE_PATH=/opt/tars/node/node_modules
-ENV PATH="/opt/tars/bin:/opt/tars/node/node_modules/.bin:${PATH}:/opt/tars/venv/bin"
+ENV NODE_PATH=/opt/jarvo/node/node_modules
+ENV PATH="/opt/jarvo/bin:/opt/jarvo/node/node_modules/.bin:${PATH}:/opt/jarvo/venv/bin"
 
 # --- narzędzia Pythona (osobny venv na Pythonie 3.12, żeby nie ruszać środowiska Hermesa).
 # Interpreter pobrany przez uv musi leżeć poza /root, inaczej venv nie działa dla użytkownika hermes.
-ENV UV_PYTHON_INSTALL_DIR=/opt/tars/uv-python
-COPY infra/python/ /opt/tars/python/
-RUN set -e; extras=" $(echo "$TARS_EXTRAS" | tr ',' ' ') "; \
-    uv venv /opt/tars/venv --python 3.12 && \
-    VIRTUAL_ENV=/opt/tars/venv uv pip install -r /opt/tars/python/requirements-tools.txt && \
+ENV UV_PYTHON_INSTALL_DIR=/opt/jarvo/uv-python
+COPY infra/python/ /opt/jarvo/python/
+RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
+    uv venv /opt/jarvo/venv --python 3.12 && \
+    VIRTUAL_ENV=/opt/jarvo/venv uv pip install -r /opt/jarvo/python/requirements-tools.txt && \
     for x in rembg media docling manim; do \
       case "$extras" in *" $x "*) \
         pkg="$(case $x in media) echo auto-editor;; *) echo $x;; esac)"; \
-        spec="$(grep -E "^${pkg}(\[[^]]*\])?==" /opt/tars/python/requirements-optional.txt)"; \
+        spec="$(grep -E "^${pkg}(\[[^]]*\])?==" /opt/jarvo/python/requirements-optional.txt)"; \
         [ -n "$spec" ] || { echo "Brak pinu dla dodatku $x" >&2; exit 1; }; \
-        VIRTUAL_ENV=/opt/tars/venv uv pip install "$spec";; \
+        VIRTUAL_ENV=/opt/jarvo/venv uv pip install "$spec";; \
       esac; \
     done && \
     # auto-editor ściąga swoją binarkę przy pierwszym uruchomieniu do site-packages (w runtime tylko do odczytu)
-    if [ -x /opt/tars/venv/bin/auto-editor ]; then /opt/tars/venv/bin/auto-editor --version; fi
+    if [ -x /opt/jarvo/venv/bin/auto-editor ]; then /opt/jarvo/venv/bin/auto-editor --version; fi
 
-# --- skrypty floty w obrazie (tars-stt: rozpoznawanie mowy Parakeet dla Hermesa i napisów)
-COPY --chmod=0755 infra/bin/ /opt/tars/bin/
-# Wiadomości głosowe: Hermes woła tars-stt jako lokalną komendę STT (stt.provider: local_command).
-# Proces żyje tylko na czas transkrypcji; model (~0,65 GB) pobiera się raz do /opt/data/tars/models.
-ENV HERMES_LOCAL_STT_COMMAND="/opt/tars/bin/tars-stt {input_path} --output-dir {output_dir} --language {language}" \
-    TARS_MODELS_DIR=/opt/data/tars/models
+# --- skrypty floty w obrazie (jarvo-stt: rozpoznawanie mowy Parakeet dla Hermesa i napisów)
+COPY --chmod=0755 infra/bin/ /opt/jarvo/bin/
+# Wiadomości głosowe: Hermes woła jarvo-stt jako lokalną komendę STT (stt.provider: local_command).
+# Proces żyje tylko na czas transkrypcji; model (~0,65 GB) pobiera się raz do /opt/data/jarvo/models.
+ENV HERMES_LOCAL_STT_COMMAND="/opt/jarvo/bin/jarvo-stt {input_path} --output-dir {output_dir} --language {language}" \
+    JARVO_MODELS_DIR=/opt/data/jarvo/models
 
 # --- claude-seo: runtime skryptów dla skilli SEO (ten sam commit co w vendor/skills.lock.yaml).
 # Playwright przypięty do wersji, której Chromium jest w obrazie (requirements-claude-seo.txt).
-RUN set -e; git init -q /opt/tars/vendor/claude-seo && cd /opt/tars/vendor/claude-seo && \
+RUN set -e; git init -q /opt/jarvo/vendor/claude-seo && cd /opt/jarvo/vendor/claude-seo && \
     git remote add origin https://github.com/AgriciDaniel/claude-seo && \
     git fetch -q --depth 1 origin "$CLAUDE_SEO_REV" && git checkout -q FETCH_HEAD && rm -rf .git && \
-    uv venv /opt/tars/venvs/claude-seo --python 3.12 && \
-    VIRTUAL_ENV=/opt/tars/venvs/claude-seo uv pip install -r requirements.txt \
-      -c /opt/tars/python/requirements-claude-seo.txt && \
-    /opt/tars/venvs/claude-seo/bin/python -c "from playwright.sync_api import sync_playwright as s; p = s().start(); p.chromium.launch().close(); p.stop(); print('claude-seo playwright → Chromium OK')"
-ENV CLAUDE_PLUGIN_ROOT=/opt/tars/vendor/claude-seo
-ENV CLAUDE_SEO_PYTHON=/opt/tars/venvs/claude-seo/bin/python
+    uv venv /opt/jarvo/venvs/claude-seo --python 3.12 && \
+    VIRTUAL_ENV=/opt/jarvo/venvs/claude-seo uv pip install -r requirements.txt \
+      -c /opt/jarvo/python/requirements-claude-seo.txt && \
+    /opt/jarvo/venvs/claude-seo/bin/python -c "from playwright.sync_api import sync_playwright as s; p = s().start(); p.chromium.launch().close(); p.stop(); print('claude-seo playwright → Chromium OK')"
+ENV CLAUDE_PLUGIN_ROOT=/opt/jarvo/vendor/claude-seo
+ENV CLAUDE_SEO_PYTHON=/opt/jarvo/venvs/claude-seo/bin/python
 
 # --- branding Jarvo w dashboardzie Hermesa (MIT; licencja i autorzy: docs/SOURCES.md):
 #     favicon, tytuł karty i nazwa w menu. Kod Hermesa bez zmian, tylko statyczne zasoby.
-COPY branding/ /tmp/tars-brand/
-RUN python3 /tmp/tars-brand/patch_dashboard.py /tmp/tars-brand && rm -rf /tmp/tars-brand
+COPY branding/ /tmp/jarvo-brand/
+RUN python3 /tmp/jarvo-brand/patch_dashboard.py /tmp/jarvo-brand && rm -rf /tmp/jarvo-brand
 
 # --- katalogi punktów montowania (zawartość z wolumenów). Bez `chmod -R`: przepisałby cały
-#     /opt/tars do nowej warstwy (+2,7 GB); instalatory i tak zostawiają pliki czytelne dla wszystkich.
-RUN mkdir -p /opt/tars/repo /opt/tars/build /opt/tars/secrets && \
-    chmod a+rx /opt/tars /opt/tars/repo /opt/tars/build /opt/tars/bin
+#     /opt/jarvo do nowej warstwy (+2,7 GB); instalatory i tak zostawiają pliki czytelne dla wszystkich.
+RUN mkdir -p /opt/jarvo/repo /opt/jarvo/build /opt/jarvo/secrets && \
+    chmod a+rx /opt/jarvo /opt/jarvo/repo /opt/jarvo/build /opt/jarvo/bin
 
-ENV TARS_KNOWLEDGE_DIR=/opt/data/tars/knowledge \
-    TARS_MISSIONS_DIR=/opt/data/tars/missions \
-    TARS_HERMES_SRC=/opt/hermes \
+ENV JARVO_KNOWLEDGE_DIR=/opt/data/jarvo/knowledge \
+    JARVO_MISSIONS_DIR=/opt/data/jarvo/missions \
+    JARVO_HERMES_SRC=/opt/hermes \
     HERMES_WRITE_SAFE_ROOT=/opt/data
 
-LABEL org.opencontainers.image.title="tars-hermes" \
+LABEL org.opencontainers.image.title="jarvo-hermes" \
       org.opencontainers.image.description="Hermes Agent + narzędzia floty Jarvo"
 # Entrypoint i CMD dziedziczone z obrazu Hermesa (s6-overlay).

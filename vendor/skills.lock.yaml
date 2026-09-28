@@ -35,7 +35,7 @@ sources:
     license: MIT
     license_file: LICENSE
     # Skille wołają "${CLAUDE_PLUGIN_ROOT}/scripts/claude-seo"; obraz Dockera instaluje
-    # ten sam commit do /opt/tars/vendor/claude-seo i ustawia CLAUDE_PLUGIN_ROOT.
+    # ten sam commit do /opt/jarvo/vendor/claude-seo i ustawia CLAUDE_PLUGIN_ROOT.
   anthropic-skills:
     type: git
     repo: https://github.com/anthropics/skills
@@ -127,7 +127,7 @@ sources:
     license_file: LICENSE
 
 agents:
-  tars-sherlock:
+  jarvo-sherlock:
     - {source: hermes, path: skills/research/grounded-citations, dest: research/grounded-citations}
     - {source: hermes, path: skills/web/blocked-page-recovery, dest: research/blocked-page-recovery}
     - {source: hermes, path: optional-skills/research/searxng-search, dest: research/searxng-search}
@@ -144,7 +144,7 @@ agents:
     - {source: marketingskills, path: skills/competitor-profiling, dest: market/competitor-profiling}
     - {source: marketingskills, path: skills/customer-research, dest: market/customer-research}
 
-  tars-web:
+  jarvo-web:
     - {source: lottie, path: skills/text-to-lottie, dest: video/text-to-lottie}
     - {source: web-quality-skills, path: skills/web-quality-audit, dest: web-quality/web-quality-audit}
     - {source: web-quality-skills, path: skills/core-web-vitals, dest: web-quality/core-web-vitals}
@@ -177,7 +177,7 @@ agents:
     - {source: hermes, path: optional-skills/web-development/publish-site, dest: deploy/publish-site}
     - {source: hermes, path: optional-skills/web-development/cloudflare-temporary-deploy, dest: deploy/cloudflare-temporary-deploy}
 
-  tars-studio:
+  jarvo-studio:
     - {source: marketingskills, path: skills/copywriting, dest: marketing/copywriting}
     - {source: marketingskills, path: skills/copy-editing, dest: marketing/copy-editing}
     - {source: marketingskills, path: skills/social, dest: marketing/social}
@@ -200,7 +200,7 @@ agents:
     - {source: hermes, path: optional-skills/creative/excalidraw, dest: creative/excalidraw}
     - {source: hermes, path: optional-skills/creative/concept-diagrams, dest: creative/concept-diagrams}
 
-  tars-wideo:
+  jarvo-wideo:
     - {source: marketingskills, path: skills/video, dest: marketing/video}
     - {source: hyperframes, path: skills/hyperframes, dest: video/hyperframes}
     - {source: hyperframes, path: skills/hyperframes-core, dest: video/hyperframes-core}
@@ -236,5 +236,5 @@ agents:
     - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-dialogue, dest: screenwriting/sw-dialogue}
     - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-character-conflict, dest: screenwriting/sw-character-conflict}
 
-  tars-reka:
+  jarvo-reka:
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}

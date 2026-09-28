@@ -2,7 +2,7 @@
 """Sprawdza, czy modele z fleet.yaml istnieją u dostawcy (publiczne listy modeli, bez klucza).
 
     python3 scripts/check-models.py [--json]
-    TARS_MODEL_PROVIDER=commandcode python3 scripts/check-models.py   # inny zestaw z models.presets
+    JARVO_MODEL_PROVIDER=commandcode python3 scripts/check-models.py   # inny zestaw z models.presets
 
 Kod wyjścia 1, gdy któregoś modelu nie ma (np. wycofany): zmień poziom w fleet.yaml przed wdrożeniem.
 """
@@ -33,7 +33,7 @@ def main(argv: list[str]) -> int:
     if not url:
         print(f"· {fleet.provider}: brak publicznej listy modeli, pomijam sprawdzanie")
         return 0
-    req = urllib.request.Request(url, headers={"User-Agent": "tars-check-models/1.0", "Accept": "application/json"})
+    req = urllib.request.Request(url, headers={"User-Agent": "jarvo-check-models/1.0", "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 (stałe adresy)
         models = {m["id"]: m for m in json.load(resp)["data"]}
     report, missing = [], 0

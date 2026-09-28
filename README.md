@@ -7,12 +7,12 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 
 | Agent | Rola |
 |---|---|
-| 🛰️ `tars` | Main Judge: przyjmuje zlecenia, planuje misje, rozdziela karty, ocenia, raportuje, patroluje |
-| 🔎 `tars-sherlock` | detektyw researchu: wiele źródeł, weryfikacja faktów, raporty z cytatami |
-| 🌐 `tars-web` | Web Senior Dev: brand z URL, audyty, strony i landingi, SEO, favicony, obrazy |
-| 🎬 `tars-studio` | marketing i kreacja: grafiki social, obrazy AI (OpenRouter), copy PL, kampanie |
-| 🎥 `tars-wideo` | wideograf: krótkie filmy z tematu (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, klipy z nagrań |
-| 🦾 `tars-reka` | prawa ręka: generalista ze wszystkimi skillami, składa pakiety misji, dokumenty, prototypy |
+| 🛰️ `jarvo` | Main Judge: przyjmuje zlecenia, planuje misje, rozdziela karty, ocenia, raportuje, patroluje |
+| 🔎 `jarvo-sherlock` | detektyw researchu: wiele źródeł, weryfikacja faktów, raporty z cytatami |
+| 🌐 `jarvo-web` | Web Senior Dev: brand z URL, audyty, strony i landingi, SEO, favicony, obrazy |
+| 🎬 `jarvo-studio` | marketing i kreacja: grafiki social, obrazy AI (OpenRouter), copy PL, kampanie |
+| 🎥 `jarvo-wideo` | wideograf: krótkie filmy z tematu (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, klipy z nagrań |
+| 🦾 `jarvo-reka` | prawa ręka: generalista ze wszystkimi skillami, składa pakiety misji, dokumenty, prototypy |
 
 ## Jarvo HQ
 
@@ -44,7 +44,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`evals/<agent>/`](evals) | scenariusze testowe zachowań (routing, protokół, bezpieczeństwo, poza zakresem) |
 | [`scripts/`](scripts) | build dystrybucji, walidator, deploy, instalacja floty, backupy, evals, narzędzia |
 | [`hq/`](hq) | Jarvo HQ: plugin dashboardu (backend, frontend, demo) |
-| [`infra/`](infra) | obraz `tars-hermes` (Hermes + narzędzia), docker compose z sidecarami, szablony env |
+| [`infra/`](infra) | obraz `jarvo-hermes` (Hermes + narzędzia), docker compose z sidecarami, szablony env |
 | [`knowledge/`](knowledge) | szablony wiedzy (brand kit) kopiowane na serwer |
 | [`tests/`](tests) | testy pytest |
 | [`docs/`](docs) | dokumentacja (niżej) |
@@ -67,10 +67,10 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 
 ```
 Ty (Telegram DM / "Jarvo HQ")
- └─ gateway Hermesa (multipleks profili) ─┬─ DM, wątek General → tars (Main Judge)
+ └─ gateway Hermesa (multipleks profili) ─┬─ DM, wątek General → jarvo (Main Judge)
                                           └─ wątki Sherlock / Web / Studio / Ręka → snajper
-tars: intake → MISSION.md → karty kanban (CEL, DoD, GRANICE) → snajperzy pracują w swoich katalogach
-    → kanban_request_review → tars sędziuje (rubryka agenta) → poprawki albo akceptacja → raport efektów
+jarvo: intake → MISSION.md → karty kanban (CEL, DoD, GRANICE) → snajperzy pracują w swoich katalogach
+    → kanban_request_review → jarvo sędziuje (rubryka agenta) → poprawki albo akceptacja → raport efektów
 patrol co 30 min (skrypt bez modelu; budzi Jarva tylko przy anomaliach), brief rano, przegląd tygodnia
 ```
 

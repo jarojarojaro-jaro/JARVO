@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # Lokalny test floty Jarvo (Linux / WSL2 z Dockerem). Jedno polecenie:
 #
-#   bash scripts/local-up.sh            # przygotuj ~/tars-local (raz) i uruchom flotę
+#   bash scripts/local-up.sh            # przygotuj ~/jarvo-local (raz) i uruchom flotę
 #   bash scripts/local-up.sh down       # zatrzymaj
 #
 # Przy pierwszym uruchomieniu pyta o dostawcę modeli (OpenRouter albo CommandCode) i jego klucz
 # (Enter = bez klucza: GUI i narzędzia działają, agenci nie odpowiadają; klucz dodasz potem w Keys).
-# Zmiana dostawcy później:  TARS_MODEL_PROVIDER=commandcode bash scripts/local-up.sh
+# Zmiana dostawcy później:  JARVO_MODEL_PROVIDER=commandcode bash scripts/local-up.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-L="${TARS_LOCAL:-$HOME/tars-local}"
+L="${JARVO_LOCAL:-$HOME/jarvo-local}"
+# instalacja sprzed zmiany nazwy (~/tars-local): przeniesienie, env, stare kontenery w dół
+OLD_L="${TARS_LOCAL:-$HOME/tars-local}"
+if [[ -d "$OLD_L/compose" && ! -e "$L" && "$(basename "$OLD_L")" == "tars-local" && "$(basename "$L")" == "jarvo-local" ]]; then
+  python3 "$ROOT/scripts/migrate_jarvo.py" host --compose "$OLD_L/compose" >/dev/null
+fi
 COMPOSE=(docker compose -f "$ROOT/infra/docker-compose.yml" --env-file "$L/compose/.env")
 
 if [[ "${1:-}" == "down" ]]; then
@@ -33,13 +38,13 @@ if [[ ! -f "$L/compose/.env" ]]; then
   esac
   read -rsp "Klucz $KEYVAR (Enter = pomiń): " KEY; echo
   PASS="$(openssl rand -hex 12)"
-  sed -e "s#^TARS_DATA=.*#TARS_DATA=$L/data#" -e "s#^TARS_REPO=.*#TARS_REPO=$ROOT#" \
-      -e "s#^TARS_BUILD=.*#TARS_BUILD=$L/build#" -e "s#^TARS_SECRETS=.*#TARS_SECRETS=$L/secrets#" \
+  sed -e "s#^JARVO_DATA=.*#JARVO_DATA=$L/data#" -e "s#^JARVO_REPO=.*#JARVO_REPO=$ROOT#" \
+      -e "s#^JARVO_BUILD=.*#JARVO_BUILD=$L/build#" -e "s#^JARVO_SECRETS=.*#JARVO_SECRETS=$L/secrets#" \
       -e "s#^SEARXNG_SECRET=.*#SEARXNG_SECRET=$(openssl rand -hex 32)#" \
       -e "s#^DASHBOARD_PASSWORD=.*#DASHBOARD_PASSWORD=$PASS#" \
       -e "s#^DASHBOARD_SESSION_SECRET=.*#DASHBOARD_SESSION_SECRET=$(openssl rand -hex 32)#" \
       "$ROOT/infra/env/compose.env.example" > "$L/compose/.env"
-  sed "s#^TARS_MODEL_PROVIDER=.*#TARS_MODEL_PROVIDER=$PROVIDER#" "$ROOT/infra/env/tars.env.example" > "$L/compose/tars.env"
+  sed "s#^JARVO_MODEL_PROVIDER=.*#JARVO_MODEL_PROVIDER=$PROVIDER#" "$ROOT/infra/env/jarvo.env.example" > "$L/compose/jarvo.env"
   for f in "$ROOT"/infra/env/secrets/*.env.example; do
     if [[ $KEYVAR == OPENROUTER_API_KEY ]]; then
       sed "s#^OPENROUTER_API_KEY=.*#OPENROUTER_API_KEY=$KEY#" "$f" > "$L/secrets/$(basename "${f%.example}")"
@@ -52,11 +57,11 @@ if [[ ! -f "$L/compose/.env" ]]; then
   sudo chgrp -R 10000 "$L/secrets" && sudo chmod 2750 "$L/secrets" && sudo chmod 640 "$L"/secrets/*.env
   chmod 600 "$L/compose/.env"
 fi
-# zmiana dostawcy w istniejącej instalacji: TARS_MODEL_PROVIDER=... bash scripts/local-up.sh
-if [[ -n "${TARS_MODEL_PROVIDER+x}" ]]; then
-  grep -q '^TARS_MODEL_PROVIDER=' "$L/compose/tars.env" || echo "TARS_MODEL_PROVIDER=" >> "$L/compose/tars.env"
-  sed -i "s#^TARS_MODEL_PROVIDER=.*#TARS_MODEL_PROVIDER=$TARS_MODEL_PROVIDER#" "$L/compose/tars.env"
-  echo "▶ Dostawca modeli: ${TARS_MODEL_PROVIDER:-openrouter}"
+# zmiana dostawcy w istniejącej instalacji: JARVO_MODEL_PROVIDER=... bash scripts/local-up.sh
+if [[ -n "${JARVO_MODEL_PROVIDER+x}" ]]; then
+  grep -q '^JARVO_MODEL_PROVIDER=' "$L/compose/jarvo.env" || echo "JARVO_MODEL_PROVIDER=" >> "$L/compose/jarvo.env"
+  sed -i "s#^JARVO_MODEL_PROVIDER=.*#JARVO_MODEL_PROVIDER=$JARVO_MODEL_PROVIDER#" "$L/compose/jarvo.env"
+  echo "▶ Dostawca modeli: ${JARVO_MODEL_PROVIDER:-openrouter}"
 fi
 # kontener pracuje jako uid 10000 (użytkownik hermes): build i dane muszą być jego
 if [[ "$(stat -c %u "$L/build")" != "10000" || "$(stat -c %u "$L/data")" != "10000" ]]; then
@@ -82,12 +87,12 @@ elif infra_changed; then
 elif brand_changed; then
   FLAGS+=(--rebuild)                # tylko branding/tłumaczenie: ta sama wersja Hermesa, kilka sekund
 fi
-TARS_COMPOSE_DIR="$L/compose" TARS_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"
+JARVO_COMPOSE_DIR="$L/compose" JARVO_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"
 touch "$L/.installed"
 
 # pomocnik aktualizacji: przycisk „Aktualizuj” w dashboardzie (git pull + deploy na prośbę z panelu)
 if [[ -f "$L/updater.pid" ]] && kill -0 "$(cat "$L/updater.pid")" 2>/dev/null; then kill "$(cat "$L/updater.pid")" || true; fi
-TARS_AUTO_UPDATE="${TARS_AUTO_UPDATE:-0}" nohup setsid python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$L/build" \
+JARVO_AUTO_UPDATE="${JARVO_AUTO_UPDATE:-0}" nohup setsid python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$L/build" \
   >> "$L/updater.log" 2>&1 < /dev/null &
 echo $! > "$L/updater.pid"
 
@@ -95,8 +100,8 @@ PASS="$(grep '^DASHBOARD_PASSWORD=' "$L/compose/.env" | cut -d= -f2)"
 cat <<EOF
 
 ✅ Flota działa.
-   Jarvo HQ:  http://localhost:9119/base   login: tars   hasło: $PASS
-   czat:     docker exec -it -u hermes tars-hermes hermes -p tars chat
+   Jarvo HQ:  http://localhost:9119/base   login: jarvo   hasło: $PASS
+   czat:     docker exec -it -u hermes jarvo-hermes hermes -p jarvo chat
    RAM:      docker stats
    stop:     bash scripts/local-up.sh down
 EOF

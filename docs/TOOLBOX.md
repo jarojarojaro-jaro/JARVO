@@ -17,7 +17,7 @@ obserwowalność przez Langfuse w `plugins/observability/`.
 
 ---
 
-## `tars-web`: Web Senior Dev
+## `jarvo-web`: Web Senior Dev
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
@@ -51,7 +51,7 @@ własną przeglądarkę i ~0,3 GB; całą witrynę audytujemy `audit.sh` po kole
 
 ---
 
-## `tars-sherlock`: Researcher-detektyw
+## `jarvo-sherlock`: Researcher-detektyw
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
@@ -86,7 +86,7 @@ Crawl4AI (był sidecarem: drugi Chromium, ~3 GB obrazu i do 3 GB RAM; trafilatur
 
 ---
 
-## `tars-studio`: Marketing i kreacja
+## `jarvo-studio`: Marketing i kreacja
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
@@ -104,22 +104,22 @@ Z Hermesa:
 - **MCP:** `canva`, `figma`, `cloudinary`, `gamma`,
 - **plugin:** `adspirer` (kampanie reklamowe Google/Meta/TikTok/LinkedIn), wyłącznie na poziomie A2, czyli za Twoją zgodą.
 
-Wideo: sekcja [`tars-wideo`](#tars-wideo-wideograf).
+Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 
 ---
 
-## `tars-wideo`: Wideograf
+## `jarvo-wideo`: Wideograf
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
 | FFmpeg (libass, libx264, fontconfig) | cały montaż: normalizacja scen, przejścia, napisy ASS, muzyka z duckingiem, loudnorm, kontrola | LGPL/GPL | n/d | `film.py`, `montaz.py`, `qa_wideo.py` |
 | [edge-tts](https://github.com/rany2/edge-tts) 7.2.7 | lektor PL za darmo, bez klucza (Marek, Zofia), z czasem słów do napisów karaoke | LGPL-3.0 | 2026-08 | leniwa instalacja Hermesa (`tts.edge`) |
-| [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) | transkrypcja z czasem słów: napisy do nagrań, wybór fragmentów, test wymowy lektora | CC-BY-4.0 (model) / MIT | 2026-07 | `tars-stt` |
+| [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) | transkrypcja z czasem słów: napisy do nagrań, wybór fragmentów, test wymowy lektora | CC-BY-4.0 (model) / MIT | 2026-07 | `jarvo-stt` |
 | [Pexels API](https://www.pexels.com/api/) | darmowe ujęcia i zdjęcia stock (klucz `PEXELS_API_KEY`) | Pexels License | n/d | `stock.py` |
 | [Pixabay API](https://pixabay.com/api/docs/) | darmowe ujęcia i zdjęcia stock (klucz `PIXABAY_API_KEY`), cache 24 h | Pixabay Content License | n/d | `stock.py` |
 | HyperFrames (skill [H] `hyperframes`) | wideo z HTML + GSAP → MP4/WebM | Apache-2.0 | 2026-09 | CLI (`npx`) |
 | [motion-broll](https://github.com/Barty-Bart/motion-graphics) | animowany B-roll do nagrania, zgrany ze słowami; panele ProRes 4444 z alfą | MIT | 2026-09 | skill + `narzedzia.py` |
-| [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | cały film w 39 stylach (keynote, akwarela, anime, 3D…); lektor PL przez `lektor_linie.py` | MIT | 2026-09 | skill + biblioteka (`narzedzia.py`; sample i Kokoro: `TARS_EXTRAS=lemo`) |
+| [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | cały film w 39 stylach (keynote, akwarela, anime, 3D…); lektor PL przez `lektor_linie.py` | MIT | 2026-09 | skill + biblioteka (`narzedzia.py`; sample i Kokoro: `JARVO_EXTRAS=lemo`) |
 | [anidoodle](https://github.com/alexgreensh/anidoodle) | rysunek kodem w 31 stylach, timelapse, HTML offline, muzyka syntezowana | Apache-2.0 | 2026-09 | skill + `narzedzia.py` |
 | [Remotion skills](https://github.com/remotion-dev/skills) + iart | wideo w React: create, render, napisy; typografia, wykresy, belki, odliczanie | Remotion License / MIT | 2026-09 | skille + `narzedzia.py instaluj remotion` |
 | [video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) | kinowe filmy produktu: 152 przepisy ujęć, szablon | Apache-2.0 | 2026-09 | `narzedzia.py instaluj shotcraft` |
@@ -147,7 +147,7 @@ Odrzucone: ComfyUI self-host (GPL-3.0, wymaga GPU; generowanie idzie przez API),
 
 ---
 
-## `tars-reka`: Prawa ręka
+## `jarvo-reka`: Prawa ręka
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
@@ -164,7 +164,7 @@ MCP według Twoich narzędzi (np. `notion`, `todoist`, `calendly`, `airtable`), 
 
 ---
 
-## `tars`: Main Judge
+## `jarvo`: Main Judge
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
@@ -207,7 +207,7 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 
 ---
 
-## Stan instalacji (co naprawdę jest w obrazie `tars-hermes`)
+## Stan instalacji (co naprawdę jest w obrazie `jarvo-hermes`)
 
 Źródło prawdy: [`infra/Dockerfile`](../infra/Dockerfile), [`infra/node/package.json`](../infra/node/package.json),
 [`infra/python/requirements-tools.txt`](../infra/python/requirements-tools.txt), sidecary w
@@ -218,24 +218,24 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 | obraz Hermesa | `/opt/hermes` | Python 3.14 Hermesa (nie ruszamy), Node, `uv`, ffmpeg/ffprobe, Chromium |
 | pakiety systemowe | apt | pandoc, qpdf, ocrmypdf + tesseract (pol, eng), exiftool, jq, sqlite3, fonty z polskimi znakami |
 | przeglądarki | `/usr/local/bin/lightpanda`, `/usr/local/bin/chromium` (`CHROME_PATH`) | Lightpanda dla `browser_*` agentów (agent-browser); jedna Chromium z obrazu Hermesa dla zrzutów, PDF, Lighthouse, Playwright i dembrandta |
-| narzędzia Node | `/opt/tars/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt |
-| narzędzia Pythona | venv `/opt/tars/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet); dodatki `TARS_EXTRAS`: rembg, auto-editor, docling, manim |
-| claude-seo | `/opt/tars/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
-| sidecary | sieć `tars-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
+| narzędzia Node | `/opt/jarvo/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt |
+| narzędzia Pythona | venv `/opt/jarvo/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet); dodatki `JARVO_EXTRAS`: rembg, auto-editor, docling, manim |
+| claude-seo | `/opt/jarvo/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
+| sidecary | sieć `jarvo-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
 
 Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmianą):
 - globalny npmrc obrazu ma `min-release-age = 14` i `engine-strict`: przypinamy wersje npm starsze niż 14 dni
   i zgodne z Node obrazu; tę samą zasadę stosujemy do pinów Pythona,
-- interpreter Pythona dla venv pobiera `uv` do `/opt/tars/uv-python` (nie do `/root`, niedostępnego dla `hermes`),
+- interpreter Pythona dla venv pobiera `uv` do `/opt/jarvo/uv-python` (nie do `/root`, niedostępnego dla `hermes`),
 - jedna Chromium: `playwright-core` (także dembrandta, przez `overrides`) i Playwright claude-seo są przypięte do wersji,
   której przeglądarka jest w obrazie Hermesa; Dockerfile uruchamia ją testowo i zatrzyma build przy niezgodności,
 - `AGENT_BROWSER_EXECUTABLE_PATH` celowo nieustawione: agent-browser użyłby go też dla silnika lightpanda,
 - bez cache instalatorów w warstwach (`UV_NO_CACHE`, `npm cache clean`) i bez `chmod -R` (kopiuje całe drzewo do nowej warstwy),
 - auto-editor (dodatek `media`) pobiera swoją binarkę przy budowie obrazu (w runtime katalog pakietów jest tylko do odczytu),
-- rozpoznawanie mowy: `/opt/tars/bin/tars-stt` (Hermes: `HERMES_LOCAL_STT_COMMAND`, `stt.provider: local_command`).
+- rozpoznawanie mowy: `/opt/jarvo/bin/jarvo-stt` (Hermes: `HERMES_LOCAL_STT_COMMAND`, `stt.provider: local_command`).
 
 Skrypty `.cjs` ładują moduły przez `NODE_PATH`, a ESM-owe pakiety (np. `favicons`) przez `importGlobal()`.
-Skrypty Pythona, które potrzebują bibliotek z venv narzędzi, same przełączają się na `/opt/tars/venv`.
+Skrypty Pythona, które potrzebują bibliotek z venv narzędzi, same przełączają się na `/opt/jarvo/venv`.
 
 **MCP:** serwery MCP dopisujemy w `config.yaml` profilu, w sekcji `mcp_servers` (Hermes nie czyta
 `mcp.json` z profilu). Zasada bez zmian: tylko te serwery, których agent naprawdę używa, bo każde

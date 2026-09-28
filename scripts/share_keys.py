@@ -6,7 +6,7 @@
 
 Dlaczego: przy wielu profilach Hermes celowo izoluje klucze (każdy profil czyta tylko swój .env, bez
 podglądania głównego). Klucz dodany w dashboardzie przy profilu „default” widzi więc tylko profil główny,
-a agenci (tars, tars-sherlock, …) nie. Ten skrypt dopisuje je na końcu .env każdego agenta w bloku
+a agenci (jarvo, jarvo-sherlock, …) nie. Ten skrypt dopisuje je na końcu .env każdego agenta w bloku
 zarządzanym automatycznie.
 
 Zasady:
@@ -32,7 +32,7 @@ from pathlib import Path
 LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
 BEGIN = "# >>> Jarvo: klucze wspólne z głównego .env (zarządzane automatycznie, nie edytuj tego bloku)"
 END = "# <<< Jarvo: klucze wspólne"
-STATE = ".tars-shared-keys.json"
+STATE = ".jarvo-shared-keys.json"
 # gdy katalogu Hermesa nie da się zaimportować: klucze dostawców/narzędzi po nazwie
 FALLBACK_SUFFIXES = ("_API_KEY", "_API_TOKEN", "_BASE_URL", "_API_URL", "_ACCESS_KEY", "_SECRET_KEY")
 NEVER_SHARED = {"API_SERVER_KEY", "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD", "SUDO_PASSWORD"}
@@ -107,7 +107,7 @@ def sync_profile(env_path: Path, shared: dict[str, tuple[str, str]], last: dict[
     if block:
         new += "\n" + BEGIN + "\n" + "\n".join(block) + "\n" + END + "\n"
     if new != text:
-        tmp = env_path.with_name(env_path.name + ".tars-tmp")
+        tmp = env_path.with_name(env_path.name + ".jarvo-tmp")
         tmp.write_text(new, encoding="utf-8")
         os.chmod(tmp, 0o600)
         tmp.replace(env_path)

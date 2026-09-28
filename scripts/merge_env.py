@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scala sekrety z /opt/tars/secrets/<x>.env do docelowego .env profilu.
+"""Scala sekrety z /opt/jarvo/secrets/<x>.env do docelowego .env profilu.
 
     python merge_env.py <źródło.env> <cel.env>
 

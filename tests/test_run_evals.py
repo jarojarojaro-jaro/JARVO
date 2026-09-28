@@ -9,10 +9,10 @@ evals = load_script("scripts/run-evals.py")
 
 
 def test_deterministic_checks():
-    scn = {"check": {"cards_assignees_include": ["tars-web", "tars-studio"], "cards_max": 2}}
-    cards = [{"assignee": "tars-web"}, {"assignee": "tars-sherlock"}, {"assignee": "tars-web"}]
+    scn = {"check": {"cards_assignees_include": ["jarvo-web", "jarvo-studio"], "cards_max": 2}}
+    cards = [{"assignee": "jarvo-web"}, {"assignee": "jarvo-sherlock"}, {"assignee": "jarvo-web"}]
     fails = evals.deterministic(scn, "ok", cards)
-    assert "brak karty dla tars-studio" in fails
+    assert "brak karty dla jarvo-studio" in fails
     assert "utworzono 3 kart > 2" in fails
     assert evals.deterministic({"check": {"response_equals": "[SILENT]"}}, " [SILENT]\n", []) == []
     assert evals.deterministic({"check": {"response_equals": "[SILENT]"}}, "Jasne!", [])
@@ -27,7 +27,7 @@ def test_checks_reference_real_agents():
 
 
 def test_dry_run_lists_all(capsys, monkeypatch):
-    monkeypatch.setenv("TARS_EVAL_ALLOW_PROD", "1")
+    monkeypatch.setenv("JARVO_EVAL_ALLOW_PROD", "1")
     assert evals.main(["--dry-run"]) == 0
     out = capsys.readouterr().out
     total = sum(len(fl.load_yaml(p)["scenarios"]) for p in (REPO / "evals").glob("*/scenarios.yaml"))

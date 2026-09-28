@@ -5,15 +5,15 @@ dostępu do Dockera ani do hosta.
     python3 scripts/updater.py [--compose DIR] [--build DIR] [--once]
 
 Działa na HOŚCIE (VPS albo WSL), obok kontenera, jako użytkownik z dostępem do dockera i do repo:
-- co TARS_UPDATE_CHECK sekund (domyślnie 60) robi `git fetch` gałęzi repo i zapisuje stan dla
-  dashboardu (ile commitów brakuje i jakie) do <HERMES_HOME>/tars/state/update.json w kontenerze,
+- co JARVO_UPDATE_CHECK sekund (domyślnie 60) robi `git fetch` gałęzi repo i zapisuje stan dla
+  dashboardu (ile commitów brakuje i jakie) do <HERMES_HOME>/jarvo/state/update.json w kontenerze,
 - co kilka sekund sprawdza, czy dashboard poprosił o aktualizację (plik update-request); wtedy uruchamia
   scripts/deploy.sh (git pull + budowa obrazu, gdy trzeba + instalacja floty) i raportuje postęp.
 - lokalnie w WSL otwiera Eksplorator Windows na pliku wynikowym (plik reveal-request z samą ścieżką;
   pomocnik przelicza ją na ścieżkę hosta i sprawdza, że leży w katalogach wyników floty).
 Dashboard nigdy nie wykonuje poleceń: może tylko poprosić o `check` albo `update` tej samej gałęzi
 albo o pokazanie pliku wyników w Eksploratorze.
-Uruchamiany przez scripts/local-up.sh (lokalnie) albo usługę systemd tars-updater (VPS, bootstrap-vps.sh).
+Uruchamiany przez scripts/local-up.sh (lokalnie) albo usługę systemd jarvo-updater (VPS, bootstrap-vps.sh).
 """
 
 from __future__ import annotations
@@ -28,16 +28,16 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTAINER = os.environ.get("TARS_CONTAINER", "tars-hermes")
-STATE_DIR = "/opt/data/tars/state"
-CHECK_EVERY = int(os.environ.get("TARS_UPDATE_CHECK", "60"))
-# TARS_AUTO_UPDATE=1: nowa wersja instaluje się sama, bez klikania w dashboardzie
-AUTO_UPDATE = os.environ.get("TARS_AUTO_UPDATE", "0") == "1"
+CONTAINER = os.environ.get("JARVO_CONTAINER", "jarvo-hermes")
+STATE_DIR = "/opt/data/jarvo/state"
+CHECK_EVERY = int(os.environ.get("JARVO_UPDATE_CHECK", "60"))
+# JARVO_AUTO_UPDATE=1: nowa wersja instaluje się sama, bez klikania w dashboardzie
+AUTO_UPDATE = os.environ.get("JARVO_AUTO_UPDATE", "0") == "1"
 POLL_EVERY = 2   # prośby z dashboardu (folder ma się otworzyć od razu)
 LOG_TAIL = 40
 DATA_IN = "/opt/data"
 # tylko wyniki floty (jak podgląd plików w HQ): nigdy klucze, profile ani konfiguracja
-REVEAL_ROOTS = ("tars/workspaces", "tars/missions", "tars/knowledge", "tars/inbox")
+REVEAL_ROOTS = ("jarvo/workspaces", "jarvo/missions", "jarvo/knowledge", "jarvo/inbox")
 
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
@@ -135,9 +135,9 @@ def update(args, state: dict) -> dict:
     put_state({**state, "state": "updating", "started_at": time.time(), "log": ""})
     env = dict(os.environ)
     if args.compose:
-        env["TARS_COMPOSE_DIR"] = args.compose
+        env["JARVO_COMPOSE_DIR"] = args.compose
     if args.build:
-        env["TARS_BUILD"] = args.build
+        env["JARVO_BUILD"] = args.build
     lines: list[str] = []
     proc = subprocess.Popen(["bash", str(ROOT / "scripts" / "deploy.sh")], cwd=ROOT, env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -160,7 +160,7 @@ def update(args, state: dict) -> dict:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--compose", help="katalog compose (.env, tars.env); domyślnie jak w deploy.sh")
+    ap.add_argument("--compose", help="katalog compose (.env, jarvo.env); domyślnie jak w deploy.sh")
     ap.add_argument("--build", help="katalog build; domyślnie jak w deploy.sh")
     ap.add_argument("--mode", default="vps", choices=["vps", "local"])
     ap.add_argument("--repo", help="repo do aktualizacji (domyślnie to, z którego uruchomiono skrypt)")
@@ -171,7 +171,7 @@ def main(argv: list[str]) -> int:
         ROOT = Path(args.repo).resolve()
     state: dict = {"mode": args.mode, "state": "idle", "updater_pid": os.getpid(), "auto": AUTO_UPDATE}
     try:  # po samorestarcie (niżej): stan „done” zostaje, żeby dashboard sam się odświeżył
-        state.update(json.loads(os.environ.pop("TARS_UPDATER_STATE", "") or "{}"), updater_pid=os.getpid())
+        state.update(json.loads(os.environ.pop("JARVO_UPDATER_STATE", "") or os.environ.pop("TARS_UPDATER_STATE", "") or "{}"), updater_pid=os.getpid())
     except ValueError:
         pass
     me = Path(__file__).resolve()
@@ -191,7 +191,7 @@ def main(argv: list[str]) -> int:
                 next_check = time.time() + CHECK_EVERY
                 if state.get("state") == "done" and me.read_bytes() != my_code:
                     # aktualizacja zmieniła też tego pomocnika: wczytujemy nową wersję (ten sam PID)
-                    os.environ["TARS_UPDATER_STATE"] = json.dumps(state, ensure_ascii=False)
+                    os.environ["JARVO_UPDATER_STATE"] = json.dumps(state, ensure_ascii=False)
                     os.execv(sys.executable, [sys.executable, str(me), *argv])
             elif req == "check" or time.time() >= next_check:
                 # „done”/„failed” zostają do następnej aktualizacji (panel pokazuje „odśwież” albo błąd)

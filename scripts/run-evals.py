@@ -2,7 +2,7 @@
 """Runner evals floty Jarvo. Uruchamiaj WYŁĄCZNIE w środowisku staging (bez dispatchera kanbana),
 bo scenariusze routingu tworzą karty.
 
-    python3 scripts/run-evals.py [--agent tars] [--id tars-route-landing] [--judge-model anthropic/claude-sonnet-5]
+    python3 scripts/run-evals.py [--agent jarvo] [--id jarvo-route-landing] [--judge-model anthropic/claude-sonnet-5]
                                  [--dry-run] [--out evals/results]
 
 Dla każdego scenariusza:
@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fleetlib as fl  # noqa: E402
 
-HERMES = os.environ.get("TARS_HERMES_BIN", "hermes")
+HERMES = os.environ.get("JARVO_HERMES_BIN", "hermes")
 JUDGE_PROMPT = """Jesteś sędzią testów agenta AI. Oceń, czy transkrypcja spełnia oczekiwania.
 Zwróć WYŁĄCZNIE JSON: {"pass": true|false, "score": 0..1, "failed": ["…"], "notes": "…"}.
 Każdy punkt "should" musi być spełniony, żaden punkt "should_not" nie może wystąpić.
@@ -122,9 +122,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default=str(fl.REPO_ROOT / "evals" / "results"))
     args = ap.parse_args(argv)
 
-    if os.environ.get("TARS_EVAL_ALLOW_PROD") != "1" and Path("/opt/data/gateway.pid").exists():
+    if os.environ.get("JARVO_EVAL_ALLOW_PROD") != "1" and Path("/opt/data/gateway.pid").exists():
         print("Wygląda na produkcję (działa gateway z dispatcherem). Uruchamiaj evals na stagingu "
-              "albo ustaw TARS_EVAL_ALLOW_PROD=1, jeśli wiesz, co robisz.")
+              "albo ustaw JARVO_EVAL_ALLOW_PROD=1, jeśli wiesz, co robisz.")
         return 2
     fleet = fl.load_fleet()
     model = args.judge_model or fleet.model_for("strong")

@@ -3,8 +3,8 @@
 Źródła danych (wszystko tylko do odczytu):
   - tablica kanban: $HERMES_HOME/kanban.db (SQLite, tryb ro),
   - transkrypcje pracowników: $HERMES_HOME/profiles/<agent>/state.db (SQLite, tryb ro),
-  - dziennik misji: /opt/data/tars/missions/INDEX.md,
-  - wyniki: katalogi robocze kart (tasks.workspace_path) i /opt/data/tars/workspaces/<agent>/.
+  - dziennik misji: /opt/data/jarvo/missions/INDEX.md,
+  - wyniki: katalogi robocze kart (tasks.workspace_path) i /opt/data/jarvo/workspaces/<agent>/.
 
 Zapisów tu nie ma. Rozmowy idą przez API gatewaya (plugin_api.py), decyzje przez Jarva.
 """
@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Any, Iterable
 
 HOME = Path(os.environ.get("HERMES_HOME", "/opt/data"))
-TARS_DIR = Path(os.environ.get("TARS_DATA_DIR", str(HOME / "tars")))
-MISSIONS_INDEX = Path(os.environ.get("TARS_MISSIONS_DIR", str(TARS_DIR / "missions"))) / "INDEX.md"
+JARVO_DIR = Path(os.environ.get("JARVO_DATA_DIR", str(HOME / "jarvo")))
+MISSIONS_INDEX = Path(os.environ.get("JARVO_MISSIONS_DIR", str(JARVO_DIR / "missions"))) / "INDEX.md"
 
 OPEN = {"triage", "todo", "ready", "running", "blocked", "review", "scheduled"}
 HEARTBEAT_STALE_S = 180          # pracownik bez sygnału dłużej niż 3 min = „cisza”
@@ -277,7 +277,7 @@ def read_session_messages(state_db: Path, session_id: str | None, since: float |
             scols = _columns(conn, "sessions")
             if "started_at" in scols:
                 # tylko sesje pracowników: bez rozmów (API/HQ, Telegram) i rutyn crona
-                src = " AND COALESCE(source, '') NOT IN ('api_server', 'tars-hq', 'telegram', 'cron')" \
+                src = " AND COALESCE(source, '') NOT IN ('api_server', 'jarvo-hq', 'telegram', 'cron')" \
                     if "source" in scols else ""
                 row = conn.execute(f"SELECT id FROM sessions WHERE started_at >= ?{src} ORDER BY started_at DESC LIMIT 1",
                                    (since - 5,)).fetchone()
@@ -412,7 +412,7 @@ def card_brief(t: dict) -> dict:
 def build_state(fleet: list[dict], board: dict, index_md: str, now: float,
                 activity_by_task: dict[str, dict] | None = None) -> dict:
     tasks, events = board.get("tasks", []), board.get("events", [])
-    orchestrator = next((a["name"] for a in fleet if a.get("kind") == "orchestrator"), "tars")
+    orchestrator = next((a["name"] for a in fleet if a.get("kind") == "orchestrator"), "jarvo")
     by_id = {t["id"]: t for t in tasks}
     day_ago = now - 86400
     agents = []
@@ -490,10 +490,10 @@ def build_state(fleet: list[dict], board: dict, index_md: str, now: float,
 
 @dataclass
 class Roots:
-    tars_dir: Path = TARS_DIR
+    jarvo_dir: Path = JARVO_DIR
 
     def allowed(self) -> list[Path]:
-        return [(self.tars_dir / r).resolve() for r in PREVIEW_ROOTS]
+        return [(self.jarvo_dir / r).resolve() for r in PREVIEW_ROOTS]
 
 
 def safe_path(raw: str, roots: Roots) -> Path | None:
@@ -703,8 +703,8 @@ def site_root(file: Path, roots: Roots) -> Path:
     return file.parent
 
 
-# Linki podglądu wspólne dla dashboardu („▶ Odpal”) i agentów (scripts/tars_link.py): token → katalog strony.
-LINKS_FILE = TARS_DIR / "state" / "preview-links.json"
+# Linki podglądu wspólne dla dashboardu („▶ Odpal”) i agentów (scripts/jarvo_link.py): token → katalog strony.
+LINKS_FILE = JARVO_DIR / "state" / "preview-links.json"
 LINK_TTL = 7 * 86400
 LINKS_MAX = 500
 

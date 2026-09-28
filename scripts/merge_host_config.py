@@ -72,7 +72,7 @@ def main(argv: list[str]) -> int:
         deep_merge(target["platforms"]["telegram"], fleet["platforms"]["telegram"])
     # model hosta: z floty, gdy go brak, przy --force-model albo gdy nadal jest tym, co flota ustawiła
     # ostatnio (zmiana dostawcy floty go aktualizuje; model wybrany ręcznie przez /model zostaje)
-    marker = target_path.parent / ".tars-host-model.json"
+    marker = target_path.parent / ".jarvo-host-model.json"
     try:
         last = json.loads(marker.read_text(encoding="utf-8"))
     except Exception:

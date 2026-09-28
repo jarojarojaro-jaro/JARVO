@@ -1,7 +1,7 @@
 # Brand kit: {{Nazwa marki}}
 
 <!-- Szablon. Prawdziwe brand kity żyją na VPS w data/knowledge/brands/<marka>/ (poza git),
-     tworzone przez workflow `brand-z-url` (tars-web / tars-studio). Korzystają z nich obaj agenci. -->
+     tworzone przez workflow `brand-z-url` (jarvo-web / jarvo-studio). Korzystają z nich obaj agenci. -->
 
 source: {{URL strony, z której wyciągnięto brand}}
 extracted: {{RRRR-MM-DD}}

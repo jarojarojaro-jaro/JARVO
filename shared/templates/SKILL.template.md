@@ -8,8 +8,8 @@ metadata:
   hermes:
     tags: ["{{dziedzina}}", "{{typ}}"]
     related_skills: ["{{inny-skill}}"]
-  tars:
-    agent: "{{tars-xyz}}"
+  jarvo:
+    agent: "{{jarvo-xyz}}"
     autonomy: A1            # najwyższy poziom autonomii, jakiego wymaga ten workflow
     reviewed: "{{RRRR-MM-DD}}"
 ---

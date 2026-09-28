@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Nocny backup floty Jarvo (restic → zewnętrzne repozytorium S3/B2/SFTP). Uruchamiaj z crona hosta:
-#   15 3 * * * /srv/tars/repo/scripts/backup.sh >> /srv/tars/backups/backup.log 2>&1
+#   15 3 * * * /srv/jarvo/repo/scripts/backup.sh >> /srv/jarvo/backups/backup.log 2>&1
 #
-# Wymaga /srv/tars/restic.env (root, chmod 600; celowo poza /srv/tars/secrets, który widzą agenci):
-#   RESTIC_REPOSITORY=s3:https://…/tars-backup   (albo b2:…, sftp:…)
+# Wymaga /srv/jarvo/restic.env (root, chmod 600; celowo poza /srv/jarvo/secrets, który widzą agenci):
+#   RESTIC_REPOSITORY=s3:https://…/jarvo-backup   (albo b2:…, sftp:…)
 #   RESTIC_PASSWORD=…                            (przechowuj też POZA serwerem!)
 #   AWS_ACCESS_KEY_ID=… / AWS_SECRET_ACCESS_KEY=…  (albo B2_ACCOUNT_ID / B2_ACCOUNT_KEY)
 set -euo pipefail
-RESTIC_ENV="${TARS_RESTIC_ENV:-/srv/tars/restic.env}"   # root, 0600, POZA /srv/tars/secrets (kontener go nie widzi)
+RESTIC_ENV="${JARVO_RESTIC_ENV:-/srv/jarvo/restic.env}"   # root, 0600, POZA /srv/jarvo/secrets (kontener go nie widzi)
 set -a; source "$RESTIC_ENV"; set +a
 
-DATA=/srv/tars/data
-STAGE=/srv/tars/backups/stage
+DATA=/srv/jarvo/data
+STAGE=/srv/jarvo/backups/stage
 mkdir -p "$STAGE"
 rm -rf "${STAGE:?}"/*
 
@@ -26,12 +26,12 @@ done
 echo "▶ restic backup"
 restic snapshots >/dev/null 2>&1 || restic init
 restic backup \
-  --tag tars \
+  --tag jarvo \
   --exclude "$DATA/hermes/**/*.db" --exclude "$DATA/hermes/**/*.db-wal" --exclude "$DATA/hermes/**/*.db-shm" \
   --exclude "$DATA/hermes/**/cache" --exclude "$DATA/hermes/**/*_cache" --exclude "$DATA/hermes/**/node_modules" \
-  --exclude "$DATA/hermes/tars/workspaces/**/node_modules" --exclude "$DATA/hermes/**/browser_screenshots" \
-  "$DATA/hermes" "$STAGE" /srv/tars/compose /srv/tars/secrets
+  --exclude "$DATA/hermes/jarvo/workspaces/**/node_modules" --exclude "$DATA/hermes/**/browser_screenshots" \
+  "$DATA/hermes" "$STAGE" /srv/jarvo/compose /srv/jarvo/secrets
 
 echo "▶ retencja"
-restic forget --tag tars --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
+restic forget --tag jarvo --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
 echo "✅ $(date -Is) backup OK"

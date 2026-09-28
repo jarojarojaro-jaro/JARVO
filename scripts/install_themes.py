@@ -15,7 +15,7 @@ from pathlib import Path
 
 import yaml
 
-FONT_URL = "/dashboard-plugins/tars-hq/dist/fonts/fosfor.css"
+FONT_URL = "/dashboard-plugins/jarvo-hq/dist/fonts/fosfor.css"
 HERMES_DEFAULT_THEMES = {"", "default", None}
 
 

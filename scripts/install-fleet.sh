@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Instalacja/aktualizacja floty WEWNĄTRZ kontenera tars-hermes (jako użytkownik hermes).
-# Wołane przez scripts/deploy.sh:  docker exec -u hermes tars-hermes bash /opt/tars/repo/scripts/install-fleet.sh
+# Instalacja/aktualizacja floty WEWNĄTRZ kontenera jarvo-hermes (jako użytkownik hermes).
+# Wołane przez scripts/deploy.sh:  docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/install-fleet.sh
 #
 #   --first-run     dodatkowo: inicjalizacja tablicy kanban i szablonów wiedzy
 #   --resume-cron   wznawia rutyny Jarva (po sprawdzeniu, że Telegram działa)
 #   --no-restart    bez restartu gatewaya (staging evals: dane izolowane, gateway nie działa)
 set -euo pipefail
 
-BUILD=/opt/tars/build
-SECRETS=/opt/tars/secrets
-REPO=/opt/tars/repo
+BUILD=/opt/jarvo/build
+SECRETS=/opt/jarvo/secrets
+REPO=/opt/jarvo/repo
 DATA=/opt/data
 PY=/opt/hermes/.venv/bin/python
 FIRST=0; RESUME=0; RESTART=1
@@ -21,21 +21,23 @@ log() { printf '▶ %s\n' "$*"; }
 [[ -f "$BUILD/BUILD.json" ]] || { echo "Brak $BUILD/BUILD.json: najpierw scripts/build.py"; exit 1; }
 if [[ -d "$SECRETS" ]] && ! ls "$SECRETS" >/dev/null 2>&1; then
   echo "✗ $SECRETS jest nieczytelny dla użytkownika $(id -un) (uid $(id -u)). Na hoście:"
-  echo "  sudo chgrp -R 10000 /srv/tars/secrets && sudo chmod 2750 /srv/tars/secrets && sudo chmod 640 /srv/tars/secrets/*.env"
+  echo "  sudo chgrp -R 10000 /srv/jarvo/secrets && sudo chmod 2750 /srv/jarvo/secrets && sudo chmod 640 /srv/jarvo/secrets/*.env"
   exit 1
 fi
 for f in "$SECRETS"/*.env; do
   [[ -e "$f" && ! -r "$f" ]] && { echo "✗ $f nieczytelny (uprawnienia): sudo chgrp 10000 $f && sudo chmod 640 $f"; exit 1; }
 done
+# migracja danych i profili sprzed zmiany nazwy (TARS → Jarvo): sesje i pamięć przechodzą z profilem
+$PY "$REPO/scripts/migrate_jarvo.py" container --data "$DATA" || echo "  ! migracja Jarvo z ostrzeżeniami (patrz wyżej)"
 AGENTS=$($PY -c "import json;print(' '.join(a['agent'] for a in json.load(open('$BUILD/BUILD.json'))['agents']))")
 
 # 1. katalogi floty i szablony wiedzy
 log "Katalogi floty"
-mkdir -p "$DATA/tars/missions" "$DATA/tars/state" "$DATA/tars/knowledge/brands" "$DATA/tars/knowledge/user"
-for a in $AGENTS; do mkdir -p "$DATA/tars/workspaces/$a"; done
-[[ -f "$DATA/tars/missions/INDEX.md" ]] || cp "$BUILD/profiles/tars/skills/fleet/mission-ledger/references/INDEX.template.md" "$DATA/tars/missions/INDEX.md"
-rm -rf "$DATA/tars/knowledge/brands/_szablon" && cp -r "$REPO/knowledge/brands/_szablon" "$DATA/tars/knowledge/brands/_szablon"
-[[ -f "$DATA/tars/knowledge/user/USER.md" ]] || cp "$BUILD/profiles/tars/skills/fleet/onboarding-interview/references/USER.template.md" "$DATA/tars/knowledge/user/USER.md"
+mkdir -p "$DATA/jarvo/missions" "$DATA/jarvo/state" "$DATA/jarvo/knowledge/brands" "$DATA/jarvo/knowledge/user"
+for a in $AGENTS; do mkdir -p "$DATA/jarvo/workspaces/$a"; done
+[[ -f "$DATA/jarvo/missions/INDEX.md" ]] || cp "$BUILD/profiles/jarvo/skills/fleet/mission-ledger/references/INDEX.template.md" "$DATA/jarvo/missions/INDEX.md"
+rm -rf "$DATA/jarvo/knowledge/brands/_szablon" && cp -r "$REPO/knowledge/brands/_szablon" "$DATA/jarvo/knowledge/brands/_szablon"
+[[ -f "$DATA/jarvo/knowledge/user/USER.md" ]] || cp "$BUILD/profiles/jarvo/skills/fleet/onboarding-interview/references/USER.template.md" "$DATA/jarvo/knowledge/user/USER.md"
 
 # 2. profil hosta: config (scalanie kluczy floty), SOUL, sekrety
 log "Profil hosta"
@@ -83,21 +85,21 @@ for a in $AGENTS; do
 done
 
 # 3c. Jarvo HQ: plugin dashboardu (strona główna dashboardu na :9119)
-if [[ -d "$BUILD/plugins/tars-hq" ]]; then
+if [[ -d "$BUILD/plugins/jarvo-hq" ]]; then
   log "Jarvo HQ (plugin dashboardu)"
   mkdir -p "$DATA/plugins"
-  rm -rf "$DATA/plugins/tars-hq.new" && cp -r "$BUILD/plugins/tars-hq" "$DATA/plugins/tars-hq.new"
-  rm -rf "$DATA/plugins/tars-hq" && mv "$DATA/plugins/tars-hq.new" "$DATA/plugins/tars-hq"
+  rm -rf "$DATA/plugins/jarvo-hq.new" && cp -r "$BUILD/plugins/jarvo-hq" "$DATA/plugins/jarvo-hq.new"
+  rm -rf "$DATA/plugins/jarvo-hq" && mv "$DATA/plugins/jarvo-hq.new" "$DATA/plugins/jarvo-hq"
   # pluginy użytkownika muszą być jawnie włączone (zabezpieczenie Hermesa)
-  hermes plugins enable tars-hq >/dev/null 2>&1 || $PY "$REPO/scripts/enable_plugin.py" "$DATA/config.yaml" tars-hq
+  hermes plugins enable jarvo-hq >/dev/null 2>&1 || $PY "$REPO/scripts/enable_plugin.py" "$DATA/config.yaml" jarvo-hq
   HQ_CHANGED=1
 fi
 
-# 3d. branding terminala: skórka "tars" dla hosta i każdego profilu (display.skin w config.yaml)
-if [[ -f "$REPO/branding/skin-tars.yaml" ]]; then
+# 3d. branding terminala: skórka "jarvo" dla hosta i każdego profilu (display.skin w config.yaml)
+if [[ -f "$REPO/branding/skin-jarvo.yaml" ]]; then
   for home in "$DATA" "$DATA"/profiles/*/; do
     [[ -d "$home" ]] || continue
-    mkdir -p "$home/skins" && cp "$REPO/branding/skin-tars.yaml" "$home/skins/tars.yaml"
+    mkdir -p "$home/skins" && cp "$REPO/branding/skin-jarvo.yaml" "$home/skins/jarvo.yaml"
   done
 fi
 
@@ -118,8 +120,8 @@ fi
 # 5. rutyny
 if [[ $RESUME -eq 1 ]]; then
   log "Wznawiam rutyny Jarva"
-  for job in tars-patrol tars-daily-brief tars-weekly-review tars-knowledge-freshness; do
-    hermes -p tars cron resume "$job" || echo "  ! nie udało się wznowić $job"
+  for job in jarvo-patrol jarvo-daily-brief jarvo-weekly-review jarvo-knowledge-freshness; do
+    hermes -p jarvo cron resume "$job" || echo "  ! nie udało się wznowić $job"
   done
 fi
 

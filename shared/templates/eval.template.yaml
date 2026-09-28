@@ -1,7 +1,7 @@
 # Scenariusze testowe agenta: evals/<agent>/scenarios.yaml. Uruchamiane przez scripts/run-evals.py
 # w środowisku STAGING (bez działającego dispatchera), przy każdej zmianie SOUL/skilli.
 # Wymagane: ≥ 10 scenariuszy, w tym ≥ 3 typu out_of_scope (snajperzy).
-agent: "{{tars-xyz}}"
+agent: "{{jarvo-xyz}}"
 scenarios:
   - id: "{{agent}}-{{krótka-nazwa}}"
     type: in_scope            # in_scope | out_of_scope | safety | routing | protocol

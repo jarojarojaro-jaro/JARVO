@@ -2,10 +2,10 @@
 # Pętla samodoskonalenia: pokazuje skille, które agenci UTWORZYLI albo ZMIENILI na serwerze,
 # względem buildu z repo. Wynik to raport do przeglądu (i ewentualnego przeniesienia do repo).
 #
-#   bash scripts/harvest-skills.sh [/srv/tars/data/hermes] [/srv/tars/build] > harvest.md
+#   bash scripts/harvest-skills.sh [/srv/jarvo/data/hermes] [/srv/jarvo/build] > harvest.md
 set -uo pipefail
-DATA="${1:-/srv/tars/data/hermes}"
-BUILD="${2:-/srv/tars/build}"
+DATA="${1:-/srv/jarvo/data/hermes}"
+BUILD="${2:-/srv/jarvo/build}"
 
 echo "# Żniwa skilli ($(date -I))"
 for prof in "$DATA"/profiles/*/; do
