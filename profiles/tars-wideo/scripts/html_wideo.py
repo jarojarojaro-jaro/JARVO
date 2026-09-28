@@ -10,9 +10,13 @@ Każda klatka to stan animacji w chwili t (uprząż czasu strony, nie zegar ści
 i powtarzalne niezależnie od szybkości maszyny. Uprząż: parametr w URL (--param t --jednostka s|ms|klatka;
 strona czyta go przy wczytaniu i pauzuje) albo funkcja seek w JS (--seek "t => tl.seek(t)", bez przeładowań).
 Presety (flagi je nadpisują):
+  tars          nasz kontrakt (rodzaje-filmu/references/kontrakt-html.md): window.__seek(t), window.__ready,
+                rozmiar z window.__W/__H, strona z lokalnego serwera: biblioteki z /_lib/ (three, gsap), bez CDN
   iart          ?t=<s>, gotowe: window.__ready        (kinetic-typography, chart-animation, lower-thirds…)
   pixel2motion  ?t=<ms>, gotowe: window.__p2mReady, kadr #logo-root
   bang          window.OPENER.seek(t), ?clean=1, rozmiar z OPENER.W/H (bang-motion; zamiast snap/export-frames.mjs)
+--subklatki N (wideo): motion blur, każda klatka to średnia N chwil między klatkami (N× dłużej).
+--serwer: strona z http://127.0.0.1 (fetch plików obok, moduły ES, /_lib/ = wspólne node_modules narzędzi).
 lottie: renderer Skottie z oficjalnego playera (canvaskit-wasm, `narzedzia.py instaluj lottie`), ten sam co w playerze.
 Wyjście: .mp4 (H.264, yuv420p, zakres TV, faststart), .mov (ProRes; z --alfa 4444 z przezroczystością),
 .webm (VP9; z --alfa przezroczyste), .gif. Wymaga: playwright w Pythonie (`narzedzia.py instaluj html`), ffmpeg.
@@ -31,7 +35,7 @@ import sys
 import tempfile
 import threading
 from pathlib import Path
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -46,6 +50,11 @@ BANG_SEEK = """async (t) => {
   O.seek(t);
 }"""
 PRESETS: dict[str, dict] = {
+    # ?render=1: strona nie odpala pętli podglądu (rAF z zegarem nadpisałby klatkę między seek a zrzutem)
+    # seek nie zwraca wyniku __seek: oś GSAP to obiekt „thenable” (await czekałby na koniec zatrzymanej osi)
+    "tars": {"seek": "async (t) => { const r = window.__seek(t); if (r instanceof Promise) await r; }",
+             "gotowe": "window.__ready === true", "serwer": True,
+             "query": {"render": "1"}, "rozmiar_js": "[window.__W || 1920, window.__H || 1080]"},
     "iart": {"param": "t", "jednostka": "s", "gotowe": "window.__ready === true"},
     "pixel2motion": {"param": "t", "jednostka": "ms", "gotowe": "window.__p2mReady === true", "selektor": "#logo-root"},
     "bang": {"seek": BANG_SEEK, "query": {"clean": "1"},
@@ -53,7 +62,7 @@ PRESETS: dict[str, dict] = {
              "rozmiar_js": "[window.OPENER.W || 1920, window.OPENER.H || 1080]"},
 }
 DEFAULTS = {"param": "t", "jednostka": "s", "gotowe": None, "seek": None, "selektor": None, "query": {},
-            "rozmiar_js": None}
+            "rozmiar_js": None, "serwer": False}
 BROWSER_ARGS = ["--enable-webgl", "--ignore-gpu-blocklist", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
                 "--autoplay-policy=no-user-gesture-required", "--allow-file-access-from-files"]
 RAF2 = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
@@ -99,12 +108,19 @@ def frame_times(duration: float, fps: float) -> list[float]:
     return [i / fps for i in range(max(1, int(round(duration * fps))))]
 
 
+def subframe_times(times: list[float], fps: float, n: int) -> list[float]:
+    """N chwil w obrębie każdej klatki (0, 1/n, … czasu klatki) do uśrednienia w motion blur."""
+    return [t + k / (fps * n) for t in times for k in range(n)]
+
+
 def resolve_opts(preset: str | None, **flags) -> dict:
     """Preset + jawne flagi (None = nie podano) → komplet opcji."""
     if preset and preset not in PRESETS:
         raise SystemExit(f"nieznany preset {preset!r} ({' | '.join(PRESETS)})")
     opts = {**DEFAULTS, **(PRESETS.get(preset or "", {}))}
+    query = {**opts["query"], **(flags.pop("query", None) or {})}     # --query dokłada, nie kasuje presetu
     opts.update({k: v for k, v in flags.items() if v is not None})
+    opts["query"] = query
     return opts
 
 
@@ -182,6 +198,26 @@ def capture(src: str, times: list[float], names: list[str], out_dir: Path, o: di
         page.evaluate(FONTS)
         page.evaluate(RAF2)
 
+    httpd = None
+    if o["serwer"] and "://" not in src:          # strona z lokalnego serwera: fetch, moduły ES, /_lib/
+        page_file = Path(src).resolve()
+        if not page_file.exists():
+            raise SystemExit(f"brak pliku: {src}")
+        httpd = serve(page_file.parent, lib=True)
+        src = f"http://127.0.0.1:{httpd.server_address[1]}/{quote(page_file.name)}"
+    try:
+        _run_capture(sync_playwright, src, times, names, out_dir, o, fps, size, size_explicit, scale, alfa, wait_ms,
+                     frames, errors, settle)
+    finally:
+        if httpd:
+            httpd.shutdown()
+    for e in dict.fromkeys(errors):
+        print(f"  ! błąd JS na stronie: {e[:300]}", file=sys.stderr)
+    return frames
+
+
+def _run_capture(sync_playwright, src, times, names, out_dir, o, fps, size, size_explicit, scale, alfa, wait_ms,
+                 frames, errors, settle) -> None:
     with sync_playwright() as p:
         browser = launch(p)
         page = _page(browser, size, scale, errors)
@@ -206,9 +242,6 @@ def capture(src: str, times: list[float], names: list[str], out_dir: Path, o: di
             target.screenshot(path=str(path), omit_background=alfa)
             frames.append(path)
         browser.close()
-    for e in dict.fromkeys(errors):
-        print(f"  ! błąd JS na stronie: {e[:300]}", file=sys.stderr)
-    return frames
 
 
 def sheet(frames: list[Path], labels: list[str], out: Path, width: int = 1600) -> Path:
@@ -237,6 +270,20 @@ def sheet(frames: list[Path], labels: list[str], out: Path, width: int = 1600) -
         draw.text((x + 6, y + 5), label, fill="#ffffff")
     out.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(out, quality=88)
+    return out
+
+
+def blend(paths: list[Path], out: Path, alfa: bool) -> Path:
+    """Średnia podklatek (motion blur jak migawka 360°)."""
+    import numpy as np
+    from PIL import Image
+
+    acc = None
+    for p in paths:
+        a = np.asarray(Image.open(p).convert("RGBA"), dtype=np.float32)
+        acc = a if acc is None else acc + a
+    img = Image.fromarray(np.clip(acc / len(paths) + 0.5, 0, 255).astype("uint8"), "RGBA")
+    (img if alfa else img.convert("RGB")).save(out)
     return out
 
 
@@ -280,15 +327,25 @@ LOTTIE_PAGE = """<!doctype html>
 
 
 class _Quiet(http.server.SimpleHTTPRequestHandler):
-    extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map,
-                      ".wasm": "application/wasm", ".js": "text/javascript", ".json": "application/json"}
+    extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, ".wasm": "application/wasm",
+                      ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json"}
+    lib_root: Path | None = None      # /_lib/… → wspólne node_modules narzędzi (three, gsap)
+
+    def translate_path(self, path: str) -> str:
+        clean = unquote(urlsplit(path).path)
+        if self.lib_root is not None and clean.startswith("/_lib/"):
+            root = self.lib_root.resolve()
+            target = (root / clean[len("/_lib/"):]).resolve()
+            return str(target) if root in target.parents else str(root / "__poza_lib__")
+        return super().translate_path(path)
 
     def log_message(self, *args) -> None:  # noqa: D401 - cisza w logach
         pass
 
 
-def serve(root: Path) -> http.server.ThreadingHTTPServer:
-    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(root)))
+def serve(root: Path, lib: bool = False) -> http.server.ThreadingHTTPServer:
+    handler = type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules"}) if lib else _Quiet
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(handler, directory=str(root)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd
 
@@ -356,7 +413,7 @@ def lottie_render(src: Path, frames_sel: list[float] | None, fps_out: float | No
 def _html_opts(a) -> dict:
     query = dict(parse_qsl(a.query)) if a.query else None
     return resolve_opts(a.preset, param=a.param, jednostka=a.jednostka, gotowe=a.gotowe, seek=a.seek,
-                        selektor=a.selektor, query=query)
+                        selektor=a.selektor, query=query, serwer=True if a.serwer else None)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -377,6 +434,7 @@ def main(argv: list[str] | None = None) -> int:
         s.add_argument("--alfa", action="store_true", help="przezroczyste tło (.mov / .webm / PNG)")
         s.add_argument("--fps", type=float, default=30.0)
         s.add_argument("--czekaj", type=int, default=0, help="dodatkowe ms po ustawieniu czasu (animacje CSS z opóźnieniem)")
+        s.add_argument("--serwer", action="store_true", help="strona z lokalnego serwera (fetch, moduły ES, /_lib/)")
         if name == "klatki":
             s.add_argument("--czasy", required=True, help="sekundy po przecinku, np. 0,1.5,3")
             s.add_argument("--out", default="out/wideo/klatki")
@@ -386,6 +444,7 @@ def main(argv: list[str] | None = None) -> int:
             s.add_argument("-o", "--wyjscie", required=True, help="film .mp4 | .mov | .webm | .gif")
             s.add_argument("--arkusz", help="dodatkowo arkusz ~12 klatek z filmu")
             s.add_argument("--zostaw-klatki", action="store_true")
+            s.add_argument("--subklatki", type=int, default=1, help="motion blur: średnia N chwil na klatkę (2–8)")
     lo = sub.add_parser("lottie")
     lo.add_argument("plik", help="lottie.json (assety i fonty obok, jak w playerze)")
     lo.add_argument("-o", "--wyjscie", help="film .mp4 | .mov | .webm | .gif")
@@ -433,10 +492,17 @@ def main(argv: list[str] | None = None) -> int:
 
     times = frame_times(a.dlugosc, a.fps)
     work = Path(tempfile.mkdtemp(prefix="tars-html-klatki-"))
-    frames = capture(a.zrodlo, times, [f"f{i:05d}.png" for i in range(len(times))], work, o, a.fps, size,
-                     bool(a.rozmiar), a.skala, a.alfa, a.czekaj)
+    n = max(1, a.subklatki)
+    if n == 1:
+        frames = capture(a.zrodlo, times, [f"f{i:05d}.png" for i in range(len(times))], work, o, a.fps, size,
+                         bool(a.rozmiar), a.skala, a.alfa, a.czekaj)
+    else:
+        sub_times = subframe_times(times, a.fps, n)
+        subs = capture(a.zrodlo, sub_times, [f"s{i:06d}.png" for i in range(len(sub_times))], work / "sub", o, a.fps,
+                       size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj)
+        frames = [blend(subs[i * n:(i + 1) * n], work / f"f{i:05d}.png", a.alfa) for i in range(len(times))]
     out = encode(work, a.fps, Path(a.wyjscie), a.alfa)
-    result = {"film": str(out), "klatek": len(frames), "fps": a.fps}
+    result = {"film": str(out), "klatek": len(frames), "fps": a.fps, **({"subklatki": n} if n > 1 else {})}
     if a.arkusz:
         step = max(1, len(frames) // 12)
         result["arkusz"] = str(sheet(frames[::step], [f"t={t:.2f}s" for t in times[::step]], Path(a.arkusz)))

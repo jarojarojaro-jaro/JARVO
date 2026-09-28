@@ -52,6 +52,9 @@ REMOTION_PKGS = [f"remotion@{REMOTION_VERSION}", f"@remotion/cli@{REMOTION_VERSI
 # skrypty z repo (bang-motion snap/export-frames, shotcraft capture-template) importują `puppeteer`; bez pobierania
 # przeglądarki (PUPPETEER_SKIP_DOWNLOAD), uruchamiany na tej z obrazu (PUPPETEER_EXECUTABLE_PATH)
 PUPPETEER = "puppeteer@24.43.1"
+# biblioteki własnych animacji HTML (kontrakt `tars`): html_wideo.py serwuje je pod /_lib/, bez CDN
+# (three: MIT; gsap: „Standard no-charge license”, darmowa także komercyjnie)
+HTML_LIBS = ["three@0.186.1", "gsap@3.15.0"]
 PY_BASE = ["numpy", "pillow"]
 PY_HTML = [f"playwright=={PW_VERSION}"]
 PY_LEMO = ["scipy", "soundfile", "soxr", "librosa"]
@@ -182,7 +185,7 @@ def ensure_chrome_wrapper() -> Path:
 def install_html() -> None:
     ensure_chrome_wrapper()
     ensure_venv(PY_BASE + PY_HTML)
-    ensure_node([PUPPETEER])
+    ensure_node([PUPPETEER, *HTML_LIBS])
 
 
 def install_lemo() -> None:
@@ -255,6 +258,7 @@ def status() -> dict:
         "venv": (VENV / "bin" / "python").exists(),
         "motion": (NODE / "node_modules" / "playwright").exists() and (VENV / "bin" / "python").exists(),
         "html": venv_has("playwright") and venv_has("PIL"),
+        "html_biblioteki": all(npm_installed(p, NODE / "node_modules") for p in HTML_LIBS),
         "lemo": (LEMO / "node_modules" / ".lemo-ok").exists() and (LEMO / ".venv" / ".lemo-ok").exists(),
         "lemo_hdri": hdri.is_dir() and any(hdri.glob("*.hdr")),
         "lemo_glos_kokoro": (LEMO / "core" / "tts" / "kokoro-v1.0.onnx").exists(),

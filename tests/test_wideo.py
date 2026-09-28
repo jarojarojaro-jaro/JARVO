@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -356,3 +357,92 @@ def test_html_sheet_and_encode_from_frames(tmp_path):
     assert info["video"]["codec"] == "h264" and info["video"]["pix_fmt"] == "yuv420p" and abs(info["duration"] - 1) < .2
     mov = hw.encode(tmp_path, 6, tmp_path / "film.mov", True)
     assert wl.probe(mov)["video"]["pix_fmt"].startswith("yuva")
+
+
+def test_html_tars_preset_query_merge_and_subframes():
+    o = hw.resolve_opts("tars", query={"lang": "pl"})
+    assert o["serwer"] and o["query"] == {"render": "1", "lang": "pl"}      # --query dokłada, render=1 zostaje
+    assert "instanceof Promise" in o["seek"]                               # oś GSAP (thenable) nie blokuje
+    assert hw.resolve_opts("iart")["query"] == {} and not hw.resolve_opts("iart")["serwer"]
+    assert hw.subframe_times([0, 1 / 30], 30, 2) == [0, 1 / 60, 1 / 30, 1 / 30 + 1 / 60]
+
+
+def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
+    import urllib.error
+    import urllib.request
+    nz_mod = sys.modules["narzedzia"]                                     # ten sam moduł, którego używa html_wideo
+    monkeypatch.setattr(nz_mod, "NODE", tmp_path / "node")
+    lib = tmp_path / "node" / "node_modules" / "three" / "build"
+    lib.mkdir(parents=True)
+    (lib / "three.module.js").write_text("export const ok = 1;")
+    (tmp_path / "sekret.txt").write_text("nie")
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "index.html").write_text("<p>ok</p>")
+    httpd = hw.serve(site, lib=True)
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/index.html") as r:
+            assert b"ok" in r.read()
+        with urllib.request.urlopen(base + "/_lib/three/build/three.module.js") as r:
+            assert r.headers["Content-Type"].startswith("text/javascript") and b"ok" in r.read()
+        with pytest.raises(urllib.error.HTTPError):
+            urllib.request.urlopen(base + "/_lib/../../sekret.txt")
+    finally:
+        httpd.shutdown()
+
+
+# ------------------------------------------------------------------ rodzaje filmu i inspiracje
+
+RODZAJE_DIR = REPO / "profiles/tars-wideo/skills/wideo/rodzaje-filmu"
+SEKCJE = ["## Wynik", "## Silnik", "## Struktura", "## Rzemiosło", "## Brief", "## Pułapki", "## Kontrola", "## Inspiracje"]
+insp = load_script("profiles/tars-wideo/scripts/inspiracje.py")
+
+
+def test_rodzaje_index_matches_files_and_stays_lean():
+    """Indeks = pliki; każdy plik rodzaju ma te same sekcje, jest krótki (bez rozrostu) i ma swój klucz inspiracji."""
+    index = (RODZAJE_DIR / "SKILL.md").read_text(encoding="utf-8")
+    linked = set(re.findall(r"`references/([a-z0-9-]+)\.md`", index))
+    files = {p.stem for p in (RODZAJE_DIR / "references").glob("*.md")}
+    assert linked == files
+    types = files - {"kontrakt-html"}
+    assert types == set(insp.RODZAJE)                                     # każdy rodzaj ma inspiracje i odwrotnie
+    for name in sorted(types):
+        text = (RODZAJE_DIR / "references" / f"{name}.md").read_text(encoding="utf-8")
+        heads = [ln.split(" (")[0] for ln in text.splitlines() if ln.startswith("## ")]
+        assert heads == SEKCJE, name
+        assert len(text.splitlines()) <= 70, f"{name}: plik rodzaju ma być krótki"
+        assert f"inspiracje.py {name}" in text, name
+    assert len(index.splitlines()) <= 70
+
+
+def test_inspiracje_pick_filters_dedupes_and_excludes():
+    base = {"prompt_partial": False, "tech_tags": ["canvas"], "author": "a", "post_url": "u"}
+    long = " — scene one, scene two, rules and timeline." * 12
+    items = [
+        {**base, "slug": "exp", "category": "explainer", "prompt": "Explain how photons travel." + long},
+        {**base, "slug": "exp-kopia", "category": "explainer", "prompt": "Explain how photons travel." + long},
+        {**base, "slug": "czesciowy", "category": "explainer", "prompt": "Explain it." + long, "prompt_partial": True},
+        {**base, "slug": "promo", "category": "motion", "prompt": "Product launch video for our app." + long},
+        {**base, "slug": "czysty-ruch", "category": "motion", "prompt": "Abstract loop of circles." + long},
+        {**base, "slug": "gra", "category": "motion", "prompt": "Playable game." + long, "tech_tags": ["threejs"]},
+    ]
+    assert [x["slug"] for x in insp.pick(items, "explainer", ile=5)] == ["exp"]   # bez kopii i częściowych
+    assert [x["slug"] for x in insp.pick(items, "promo-produktu", ile=5)] == ["promo"]
+    mg = [x["slug"] for x in insp.pick(items, "motion-graphics", ile=5)]
+    assert "czysty-ruch" in mg and "promo" not in mg                       # promo ma swój rodzaj
+    assert [x["slug"] for x in insp.pick(items, "interaktywne", tag="threejs")] == ["gra"]
+    with pytest.raises(SystemExit):
+        insp.pick(items, "reklama")
+    shown = insp.show(items[0], limit=40)
+    assert "@a" in shown and "--pelny exp" in shown
+
+
+def test_inspiracje_cache_used_when_offline(tmp_path, monkeypatch):
+    monkeypatch.setenv("TARS_WIDEO_CACHE", str(tmp_path / "cache"))
+    monkeypatch.setattr(insp, "URL", "http://127.0.0.1:9/brak.json")       # sieć niedostępna
+    with pytest.raises(SystemExit):
+        insp.load()                                                        # bez cache: jasny komunikat, nie traceback
+    cached = wl.cache_dir("inspiracje") / f"videos-{insp.REV[:12]}.json"
+    cached.write_text(json.dumps([{"slug": "x"}]))
+    assert insp.load() == [{"slug": "x"}]

@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, hyperframes, manim, motion-graphics, animation, code]
-    related_skills: [motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
+    related_skills: [rodzaje-filmu, motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
   tars:
     agent: tars-wideo
     autonomy: A1
@@ -22,8 +22,11 @@ Instalacja, środowisko i polski lektor dla silników zewnętrznych: `references
 pierwszym użyciem silnika spoza HyperFrames/Manim).
 
 ## Wybór silnika
+Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlaczego. Ta tabela to pełna lista silników.
+
 | Chcę… | Silnik (skill) | Czas pracy |
 |---|---|---|
+| **własna animacja** w Canvas, SVG, Three.js, GSAP (dowolny pomysł, pełna kontrola) | HTML wg `rodzaje-filmu/references/kontrakt-html.md` + `html_wideo.py --preset tars` | 20–60 min |
 | animowane wstawki (B-roll) do **nagrania użytkownika**, zgrane ze słowami; przebitka albo przezroczysty panel | **motion-broll** | 20–60 min |
 | **cały krótki film** 30–75 s w jednym z 39 stylów kina (keynote, screencast, akwarela, anime, 3D, pixel RPG…) | **lemo-opuscar** | 30–60 min, dużo tokenów |
 | premiera produktu / keynote tech (ciemny ekran, UI, wielka liczba) | **lemo-opuscar** `dark-keynote`, `living-screencast` | 30–60 min |
@@ -64,7 +67,8 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 7. **Prawa:** tylko assety CC0 / CC BY / OFL; żadnych cudzych marek i postaci; licencje w RAPORT.md.
 
 ## Kroki
-1. **Brief i format** (`formaty-wideo`): platforma, długość, cel, jedno przesłanie, CTA, brand kit; wybór silnika z tabeli.
+1. **Rodzaj, brief i format** (`rodzaje-filmu`, `formaty-wideo`): plik rodzaju → `out/wideo/src/BRIEF.md`
+   (platforma, długość, cel, jedno przesłanie, CTA, brand kit); silnik z pliku rodzaju albo z tabeli.
 2. **Scenariusz** (`scenariusz`): hook, beat sheet sekunda po sekundzie; lektor PL najpierw (`film.py lektor` →
    czasy słów), animacje pod te czasy.
 3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie>`

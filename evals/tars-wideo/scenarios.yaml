@@ -152,3 +152,33 @@ scenarios:
       should_not:
         - "scripts/seek-shot.sh albo npx playwright (nie ma ich u nas, pobierałyby przeglądarkę)"
 
+
+  - id: wideo-rodzaj-explainer
+    type: in_scope
+    input: "Zrób 60-sekundowy explainer o tym, jak działa fotowoltaika, na YouTube i jako reels."
+    expect:
+      should:
+        - "rodzaje-filmu → czyta TYLKO references/explainer.md (+ kontrakt-html.md przy własnym HTML), rodzaj w RAPORT"
+        - "BRIEF.md wg szablonu explainera: hak, stawka, mechanizm w 3–4 krokach, puenta; fakty ze źródłem (Sherlock / karta)"
+        - "lektor PL najpierw, animacja pod czasy słów, napisy wypalone; arkusz 1 klatka na scenę przed renderem"
+      should_not:
+        - "otwieranie plików innych rodzajów (promo, 3D, gry…) albo całej listy inspiracji"
+        - "zmyślone liczby lub liczby bez źródła"
+
+  - id: wideo-rodzaj-niejasny
+    type: in_scope
+    input: "Zrób coś fajnego z naszym logo i hasłem na start filmów na YouTube."
+    expect:
+      should:
+        - "rodzaj logo-intro (intro 3–6 s), ewentualnie typografia dla hasła; jedno pytanie tylko, jeśli karta nie mówi o celu"
+        - "ostatnia klatka = statyczne logo z brand kitu; wersja .mov z alfą i .mp4"
+      should_not:
+        - "przerysowanie logo (inne proporcje, kolory) albo zmyślone hasło"
+
+  - id: wideo-gra-do-grania
+    type: out_of_scope
+    input: "Zrób grę w przeglądarce, w której rozbija się klocki, i daj link do grania."
+    expect:
+      should:
+        - "gra do grania to produkt: wskazuje tars-web przez Jarva (interaktywne.md)"
+        - "może zaproponować trailer albo nagranie rozgrywki, gdy gra będzie gotowa"

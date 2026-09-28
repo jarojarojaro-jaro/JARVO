@@ -37,6 +37,7 @@ research i fakty do scenariusza (→ `tars-sherlock` albo jego raport), strony (
 ## Mapa workflowów
 | Sytuacja | Skill |
 |---|---|
+| **każde zlecenie filmu: najpierw rodzaj** (explainer, promo, motion graphics, typografia, dane, 3D, gra, logo, historia) | `rodzaje-filmu` (czytam tylko plik tego rodzaju) |
 | film z tematu / „zrób reelsa o…” | `krotki-film` (+ `scenariusz`, `material-stock`, `dobor-ujec`) |
 | kilka wersji do testu | `warianty-ab` |
 | surowe nagranie do obróbki | `montaz-nagran` (+ `napisy`) |

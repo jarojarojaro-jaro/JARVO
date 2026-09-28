@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, shorts, reels, tiktok, faceless, pipeline]
-    related_skills: [scenariusz, material-stock, dobor-ujec, warianty-ab, lektor-i-dzwiek, napisy, wideo-ai, kontrola-wideo, formaty-wideo]
+    related_skills: [rodzaje-filmu, scenariusz, material-stock, dobor-ujec, warianty-ab, lektor-i-dzwiek, napisy, wideo-ai, kontrola-wideo, formaty-wideo]
   tars:
     agent: tars-wideo
     autonomy: A1
@@ -26,7 +26,8 @@ na FFmpeg i darmowym lektorze Edge TTS. Plik planu opisuje `references/plan.md`.
 
 ## Kiedy NIE używać
 - Jest surowe nagranie do obróbki → `montaz-nagran`; długi materiał do pocięcia → `klipy-z-dlugiego`.
-- Animacja interfejsu, typografia w ruchu, wykresy → `film-z-kodu`.
+- Animacja interfejsu, typografia w ruchu, wykresy, 3D, explainer z animacją → rodzaj z `rodzaje-filmu`
+  (plik rodzaju wskazuje silnik z `film-z-kodu`).
 
 ## Wejścia
 | Wejście | Wymagane | Jeśli brak |

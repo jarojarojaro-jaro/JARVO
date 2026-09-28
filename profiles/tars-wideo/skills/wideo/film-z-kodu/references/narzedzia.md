@@ -97,7 +97,7 @@ npx remotion render src/index.ts AiflPromo out/promo.mp4 --concurrency=2 --brows
 - Dema z `@remotion/motion-blur`: `npm i @remotion/motion-blur@4.0.484 --prefer-offline` w projekcie.
 - Dźwięki z `assets/audio/` wolno używać (ATTRIBUTION.md), źródło do RAPORT.md. Workbench (port 5198) nie jest potrzebny.
 
-## Animacja HTML → wideo: `html_wideo.py` (iart kinetic-typography, bang-motion, pixel2motion)
+## Animacja HTML → wideo: `html_wideo.py` (nasza animacja, iart kinetic-typography, bang-motion, pixel2motion)
 ```bash
 python3 $HERMES_HOME/scripts/narzedzia.py instaluj html        # raz: playwright (Python) = wersja przeglądarki z obrazu
 H=$HERMES_HOME/scripts/html_wideo.py
@@ -106,6 +106,8 @@ python3 $H wideo  out/wideo/src/typo/type.html --preset iart --rozmiar 1080x1920
 python3 $H wideo  out/wideo/src/logo/logo_motion.html --preset pixel2motion --skala 2 --dlugosc 2.4 --alfa -o out/wideo/logo.mov
 python3 $H wideo  out/wideo/src/opener/index.html --preset bang --dlugosc 12 -o out/wideo/opener.mp4
 ```
+- **Nasza animacja** (Canvas, SVG, Three.js, GSAP): kontrakt `rodzaje-filmu/references/kontrakt-html.md`,
+  `--preset tars` (serwer lokalny, biblioteki z `/_lib/`, `?render=1`), `--subklatki 4` = motion blur.
 - Strona musi mieć uprząż czasu: iart `?t=<s>` + `window.__ready`, pixel2motion `?t=<ms>` + `window.__p2mReady`,
   bang-motion `window.OPENER.seek(t)`. Własna animacja: `--param/--jednostka` albo `--seek "t => tl.seek(t)"`.
 - `.mov --alfa` (ProRes 4444) do nakładania na nagranie; `.mp4` do publikacji. Potem `qa_wideo.py`, lektor i napisy jak zawsze.
