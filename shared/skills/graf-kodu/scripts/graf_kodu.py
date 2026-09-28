@@ -129,12 +129,18 @@ def ensure(repo: Path, refresh: bool = False) -> str:
 
 def trace(repo: Path, fn: str, direction: str, depth: int) -> str:
     name = ensure(repo)
-    out = run(["cli", "trace_path", "--project", name, "--function-name", fn, "--direction", direction,
-               "--depth", str(depth)]).stdout
+    r = run(["cli", "trace_path", "--project", name, "--function-name", fn, "--direction", direction,
+             "--depth", str(depth)], quiet=True)
+    out = (r.stdout or "").strip() or (r.stderr or "").strip()
     try:
         d = json.loads(out)
     except ValueError:
+        if r.returncode != 0:
+            raise SystemExit(f"graf kodu: {out[-800:]}")
         return out
+    if d.get("error") == "function not found":
+        return (f"Nie ma funkcji „{fn}” w mapie. Znajdź pełną nazwę: graf_kodu.py szukaj {repo} '.*{fn}.*' "
+                "(albo mapa jest nieaktualna: graf_kodu.py indeks).")
     if d.get("status") == "ambiguous":   # kilka funkcji o tej nazwie: pokaż pełne nazwy do wyboru
         opts = [s.get("qualified_name") for s in d.get("suggestions") or []]
         return "Kilka funkcji o tej nazwie, podaj pełną nazwę:\n" + "\n".join(f"  {o}" for o in opts)

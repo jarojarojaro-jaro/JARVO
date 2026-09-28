@@ -43,7 +43,7 @@ def test_ambiguous_name_lists_qualified_names(monkeypatch, tmp_path):
     monkeypatch.setattr(gk, "ensure", lambda repo, refresh=False: "proj")
     out = json.dumps({"status": "ambiguous", "suggestions": [{"qualified_name": "proj.a.normalize"},
                                                              {"qualified_name": "proj.b.normalize"}]})
-    monkeypatch.setattr(gk, "run", lambda args, quiet=False: type("R", (), {"stdout": out})())
+    monkeypatch.setattr(gk, "run", lambda args, quiet=False: type("R", (), {"stdout": out, "stderr": "", "returncode": 0})())
     text = gk.trace(tmp_path, "normalize", "inbound", 2)
     assert "proj.a.normalize" in text and "proj.b.normalize" in text and "pełną nazwę" in text
 
@@ -58,3 +58,11 @@ def test_live_callers_of_known_function(monkeypatch):
     monkeypatch.setenv("JARVO_GRAF_KODU", os.environ["JARVO_TEST_GRAF_KODU"])
     out = gk.trace(ROOT, "home-user-TARS.profiles.jarvo-wideo.scripts.wideo_lib.probe", "inbound", 1)
     assert "qa_wideo" in out and "kadry" in out
+
+
+def test_unknown_function_gives_hint(monkeypatch, tmp_path):
+    monkeypatch.setattr(gk, "ensure", lambda repo, refresh=False: "proj")
+    out = json.dumps({"error": "function not found", "function_name": "nieMa"})
+    monkeypatch.setattr(gk, "run", lambda args, quiet=False: type("R", (), {"stdout": "", "stderr": out, "returncode": 1})())
+    text = gk.trace(tmp_path, "nieMa", "inbound", 2)
+    assert "szukaj" in text and "nieMa" in text and "{" not in text

@@ -105,15 +105,32 @@ def py() -> str:
     return str(VENV / "bin" / "python")
 
 
+def py_name(spec: str) -> str:
+    """Nazwa paczki ze specyfikacji pip („playwright==1.63.0” → playwright)."""
+    return re.split(r"[=<>!~\[]", spec, maxsplit=1)[0].strip()
+
+
 def py_module(spec: str) -> str:
     """Nazwa modułu do importu dla specyfikacji pip („playwright==1.63.0” → playwright, „pillow” → PIL)."""
-    name = re.split(r"[=<>!~\[]", spec, maxsplit=1)[0].strip()
+    name = py_name(spec)
     return PY_MODULES.get(name, name.replace("-", "_"))
+
+
+def uv_exempt(pkgs: list[str]) -> list[str]:
+    """Obraz Hermesa ma w uv kwarantannę nowych wydań (exclude-newer: 14 dni). Paczki przypięte co do wersji
+    (==X.Y.Z) zwalniamy z niej, jak robi to sam Hermes dla swoich pinów: dokładny pin nie „pływa”, więc kwarantanna
+    nic nie chroni, a potrafi zablokować instalację (np. playwright wydany tydzień przed zmianą Chromium w obrazie).
+    Paczki bez pinu (numpy, pillow) zostają pod kwarantanną."""
+    out = []
+    for spec in pkgs:
+        if "==" in spec:
+            out += ["--exclude-newer-package", f"{py_name(spec)}=false"]
+    return out
 
 
 def pip_install(python: str, pkgs: list[str]) -> None:
     if shutil.which("uv"):
-        run(["uv", "pip", "install", "--quiet", "--python", python, *pkgs])
+        run(["uv", "pip", "install", "--quiet", "--python", python, *uv_exempt(pkgs), *pkgs])
     else:
         run([python, "-m", "pip", "install", "--quiet", *pkgs])
 

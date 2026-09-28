@@ -496,3 +496,10 @@ def test_rytm_sfx_peak(tmp_path):
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
                     "aevalsrc='if(gte(t,0.15),sin(2*PI*900*t)*exp(-40*(t-0.15)),0)':s=44100:d=0.6", str(wav)], check=True)
     assert rytm.peak(wav)["szczyt"] == pytest.approx(0.15, abs=0.02)
+
+
+def test_narzedzia_exempts_exact_pins_from_uv_quarantine():
+    """Obraz Hermesa ma exclude-newer 14 dni: dokładne piny (playwright==X) muszą być zwolnione, reszta nie."""
+    nz = _wscript("narzedzia")
+    assert nz.uv_exempt(["numpy", "playwright==1.63.0", "imageio"]) == ["--exclude-newer-package", "playwright=false"]
+    assert nz.py_module("playwright==1.63.0") == "playwright" and nz.py_module("pillow") == "PIL"
