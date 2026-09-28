@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [web, astro, build, frontend]
-    related_skills: [frontend-design, design-md, popular-web-designs, favicon-i-meta, optymalizacja-obrazow, audyt-strony, wdrozenie]
+    related_skills: [frontend-design, design-md, popular-web-designs, favicon-i-meta, optymalizacja-obrazow, audyt-strony, wdrozenie, animate, gsap-core, gsap-scrolltrigger, threejs-fundamentals]
   jarvo:
     agent: jarvo-web
     autonomy: A1

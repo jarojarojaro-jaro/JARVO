@@ -54,9 +54,9 @@ REMOTION_PKGS = [f"remotion@{REMOTION_VERSION}", f"@remotion/cli@{REMOTION_VERSI
 PUPPETEER = "puppeteer@24.43.1"
 # biblioteki własnych animacji HTML (kontrakt `jarvo`): html_wideo.py serwuje je pod /_lib/, bez CDN
 # (three: MIT; gsap: „Standard no-charge license”, darmowa także komercyjnie)
-HTML_LIBS = ["three@0.186.1", "gsap@3.15.0"]
+HTML_LIBS = ["three@0.186.1", "gsap@3.15.0", "p5@2.3.4"]   # p5: algorithmic-art
 PY_BASE = ["numpy", "pillow"]
-PY_HTML = [f"playwright=={PW_VERSION}"]
+PY_HTML = [f"playwright=={PW_VERSION}", "imageio"]   # imageio: slack-gif-creator (GIF przez Pillow)
 PY_LEMO = ["scipy", "soundfile", "soxr", "librosa"]
 PY_LEMO_FULL = ["kokoro-onnx", "faster-whisper"]
 PY_MODULES = {"pillow": "PIL", "kokoro-onnx": "kokoro_onnx", "faster-whisper": "faster_whisper"}

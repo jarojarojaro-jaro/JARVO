@@ -48,6 +48,9 @@ potem `renderer.render(scene, camera)`. Bez `clock.getDelta()`.
 `window.__seek = (t) => { tl.seek(t, false); }` (w klamrach: `__seek` nie zwraca osi, bo oś GSAP jest „thenable”;
 jeśli coś ładujesz asynchronicznie przy seek, zwróć prawdziwy `Promise`).
 
+Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, MorphSVG, MotionPath: darmowe),
+`gsap-performance`; o Three.js: skille `threejs-*` (po temacie). Krzywe i czasy ruchu UI: `animate`.
+
 ## Render
 ```bash
 H=$HERMES_HOME/scripts/html_wideo.py

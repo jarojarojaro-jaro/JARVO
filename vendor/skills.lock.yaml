@@ -126,6 +126,33 @@ sources:
     license: MIT
     license_file: LICENSE
 
+  gsap-skills:
+    type: git
+    repo: https://github.com/greensock/gsap-skills
+    rev: aed9cfd3277740755f6bfc1155c7aa645403b760
+    license: MIT
+    license_file: LICENSE
+  threejs-skills:
+    type: git
+    repo: https://github.com/CloudAI-X/threejs-skills
+    rev: b1c623076c661fc9b03dac19292e825a5d106823
+    license: MIT
+    # bez pliku LICENSE; licencja MIT zadeklarowana w README repo
+    notice: "threejs-skills, Copyright (c) CloudAI-X. MIT License (README: https://github.com/CloudAI-X/threejs-skills)"
+  emil-skills:
+    type: git
+    repo: https://github.com/emilkowalski/skills
+    rev: d16ebe60d09a5ba2afcb7054ede9d0a10c9f6128
+    license: MIT
+    license_file: LICENSE
+  impeccable:
+    type: git
+    repo: https://github.com/pbakaus/impeccable
+    rev: 114ea1d3838fca73b253af45f873b9c4f5f213c8
+    license: Apache-2.0
+    license_file: LICENSE
+    # silnik detektora (program, wersja z scripts/VERSION) pobiera raz install-fleet.sh do IMPECCABLE_HOME
+
 agents:
   jarvo-sherlock:
     - {source: hermes, path: skills/research/grounded-citations, dest: research/grounded-citations}
@@ -145,6 +172,30 @@ agents:
     - {source: marketingskills, path: skills/customer-research, dest: market/customer-research}
 
   jarvo-web:
+    - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
+    - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}
+    - {source: gsap-skills, path: skills/gsap-scrolltrigger, dest: gsap/gsap-scrolltrigger}
+    - {source: gsap-skills, path: skills/gsap-plugins, dest: gsap/gsap-plugins}
+    - {source: gsap-skills, path: skills/gsap-utils, dest: gsap/gsap-utils}
+    - {source: gsap-skills, path: skills/gsap-performance, dest: gsap/gsap-performance}
+    - {source: gsap-skills, path: skills/gsap-react, dest: gsap/gsap-react}
+    - {source: gsap-skills, path: skills/gsap-frameworks, dest: gsap/gsap-frameworks}
+    - {source: threejs-skills, path: skills/threejs-fundamentals, dest: threejs/threejs-fundamentals}
+    - {source: threejs-skills, path: skills/threejs-geometry, dest: threejs/threejs-geometry}
+    - {source: threejs-skills, path: skills/threejs-materials, dest: threejs/threejs-materials}
+    - {source: threejs-skills, path: skills/threejs-lighting, dest: threejs/threejs-lighting}
+    - {source: threejs-skills, path: skills/threejs-textures, dest: threejs/threejs-textures}
+    - {source: threejs-skills, path: skills/threejs-animation, dest: threejs/threejs-animation}
+    - {source: threejs-skills, path: skills/threejs-shaders, dest: threejs/threejs-shaders}
+    - {source: threejs-skills, path: skills/threejs-postprocessing, dest: threejs/threejs-postprocessing}
+    - {source: threejs-skills, path: skills/threejs-loaders, dest: threejs/threejs-loaders}
+    - {source: threejs-skills, path: skills/threejs-interaction, dest: threejs/threejs-interaction}
+    - {source: emil-skills, path: skills/animate, dest: motion/animate}
+    - {source: emil-skills, path: skills/review-animations, dest: motion/review-animations}
+    - {source: emil-skills, path: skills/improve-animations, dest: motion/improve-animations}
+    - {source: emil-skills, path: skills/find-animation-opportunities, dest: motion/find-animation-opportunities}
+    - {source: emil-skills, path: skills/animation-vocabulary, dest: motion/animation-vocabulary}
+    - {source: impeccable, path: .hermes/skills/impeccable, dest: design/impeccable}
     - {source: lottie, path: skills/text-to-lottie, dest: video/text-to-lottie}
     - {source: web-quality-skills, path: skills/web-quality-audit, dest: web-quality/web-quality-audit}
     - {source: web-quality-skills, path: skills/core-web-vitals, dest: web-quality/core-web-vitals}
@@ -172,12 +223,13 @@ agents:
     - {source: hermes, path: skills/creative/popular-web-designs, dest: design/popular-web-designs}
     - {source: hermes, path: skills/creative/design-md, dest: design/design-md}
     - {source: hermes, path: skills/creative/claude-design, dest: design/claude-design}
-    - {source: hermes, path: optional-skills/creative/impeccable, dest: design/impeccable}
     - {source: hermes, path: optional-skills/web-development/scrollcraft, dest: design/scrollcraft}
     - {source: hermes, path: optional-skills/web-development/publish-site, dest: deploy/publish-site}
     - {source: hermes, path: optional-skills/web-development/cloudflare-temporary-deploy, dest: deploy/cloudflare-temporary-deploy}
 
   jarvo-studio:
+    - {source: anthropic-skills, path: skills/algorithmic-art, dest: design/algorithmic-art}
+    - {source: impeccable, path: .hermes/skills/impeccable, dest: design/impeccable}
     - {source: marketingskills, path: skills/copywriting, dest: marketing/copywriting}
     - {source: marketingskills, path: skills/copy-editing, dest: marketing/copy-editing}
     - {source: marketingskills, path: skills/social, dest: marketing/social}
@@ -201,6 +253,28 @@ agents:
     - {source: hermes, path: optional-skills/creative/concept-diagrams, dest: creative/concept-diagrams}
 
   jarvo-wideo:
+    - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
+    - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}
+    - {source: gsap-skills, path: skills/gsap-scrolltrigger, dest: gsap/gsap-scrolltrigger}
+    - {source: gsap-skills, path: skills/gsap-plugins, dest: gsap/gsap-plugins}
+    - {source: gsap-skills, path: skills/gsap-utils, dest: gsap/gsap-utils}
+    - {source: gsap-skills, path: skills/gsap-performance, dest: gsap/gsap-performance}
+    - {source: gsap-skills, path: skills/gsap-react, dest: gsap/gsap-react}
+    - {source: gsap-skills, path: skills/gsap-frameworks, dest: gsap/gsap-frameworks}
+    - {source: threejs-skills, path: skills/threejs-fundamentals, dest: threejs/threejs-fundamentals}
+    - {source: threejs-skills, path: skills/threejs-geometry, dest: threejs/threejs-geometry}
+    - {source: threejs-skills, path: skills/threejs-materials, dest: threejs/threejs-materials}
+    - {source: threejs-skills, path: skills/threejs-lighting, dest: threejs/threejs-lighting}
+    - {source: threejs-skills, path: skills/threejs-textures, dest: threejs/threejs-textures}
+    - {source: threejs-skills, path: skills/threejs-animation, dest: threejs/threejs-animation}
+    - {source: threejs-skills, path: skills/threejs-shaders, dest: threejs/threejs-shaders}
+    - {source: threejs-skills, path: skills/threejs-postprocessing, dest: threejs/threejs-postprocessing}
+    - {source: threejs-skills, path: skills/threejs-loaders, dest: threejs/threejs-loaders}
+    - {source: threejs-skills, path: skills/threejs-interaction, dest: threejs/threejs-interaction}
+    - {source: emil-skills, path: skills/animate, dest: motion/animate}
+    - {source: emil-skills, path: skills/review-animations, dest: motion/review-animations}
+    - {source: emil-skills, path: skills/animation-vocabulary, dest: motion/animation-vocabulary}
+    - {source: anthropic-skills, path: skills/slack-gif-creator, dest: video/slack-gif-creator}
     - {source: marketingskills, path: skills/video, dest: marketing/video}
     - {source: hyperframes, path: skills/hyperframes, dest: video/hyperframes}
     - {source: hyperframes, path: skills/hyperframes-core, dest: video/hyperframes-core}

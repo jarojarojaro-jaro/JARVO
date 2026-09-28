@@ -22,6 +22,7 @@ Nie to: cały opener z treścią → `motion-graphics.md`; reklama produktu → 
 - **Belka 6 s:** 0–0,6 wejście (tło, potem imię, potem funkcja), 0,6–5,4 trwanie bez ruchu, 5,4–6 wyjście odwrotne.
 
 ## Rzemiosło
+- GIF do Slacka / README (limity rozmiaru, pętla): `slack-gif-creator`.
 - Logo jest prawem: proporcje, kolory, pola ochronne i kształty z brand kitu; animacja nie zmienia znaku.
 - Jeden gest (rysowanie konturu, złożenie z części, odsłonięcie maską), nie pięć efektów.
 - Ostatnia klatka = statyczne logo piksel w piksel (kontrakt klatki końcowej, porównaj z plikiem logo).

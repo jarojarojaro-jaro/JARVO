@@ -84,6 +84,18 @@ for a in $AGENTS; do
   fi
 done
 
+# 3b2. impeccable (detektor „znaków AI” w projektach): program w wersji z VERSION skilla, raz, do trwałego katalogu
+IMP_HOME="$DATA/jarvo/narzedzia/impeccable"
+for a in $AGENTS; do
+  imp="$DATA/profiles/$a/skills/design/impeccable/scripts/impeccable"
+  [[ -f "$imp" ]] || continue
+  envf="$DATA/profiles/$a/.env"
+  grep -q '^IMPECCABLE_HOME=' "$envf" 2>/dev/null || echo "IMPECCABLE_HOME=$IMP_HOME" >> "$envf"
+  mkdir -p "$IMP_HOME"
+  IMPECCABLE_HOME="$IMP_HOME" sh "$imp" --version >/dev/null 2>&1 && echo "  ✓ impeccable ($a)" \
+    || echo "  ! impeccable: nie pobrano programu (sieć?); pobierze się przy pierwszym użyciu"
+done
+
 # 3c. Jarvo HQ: plugin dashboardu (strona główna dashboardu na :9119)
 if [[ -d "$BUILD/plugins/jarvo-hq" ]]; then
   log "Jarvo HQ (plugin dashboardu)"

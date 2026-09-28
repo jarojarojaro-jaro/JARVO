@@ -26,6 +26,7 @@ Nie to: jak działa zjawisko → `explainer.md`; samo logo → `logo-intro.md`; 
 | 27–30 | **Logo + CTA** (adres, „pobierz”), ostatnia klatka czytelna jako miniatura |
 
 ## Rzemiosło
+- Decyzje ruchu (krzywa, czas, właściwość) wg `animate`; gotowe ujęcia sprawdź wg `review-animations`.
 - Siatka BPM: co takt coś się dzieje; ważne zmiany na mocnych bitach, drop = najmocniejsza funkcja.
 - „Jedna forma, bez cięć”: kolejne stany UI to ten sam element zmieniający rozmiar, promień i kolor; treść wchodzi
   po rozpoczęciu przemiany i znika przed następną (tekst nigdy się nie nakłada).

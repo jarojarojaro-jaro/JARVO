@@ -23,6 +23,8 @@ Nie to: płaska grafika z parallaxą → `motion-graphics.md`; gra do grania →
 | 13–15 | **Kadr końcowy** jak plakat (miniatura), miejsce na tekst albo logo |
 
 ## Rzemiosło
+- Wiedza Three.js po temacie (wczytaj tylko potrzebny): `threejs-lighting`, `threejs-materials`, `threejs-shaders`,
+  `threejs-animation`, `threejs-postprocessing`, `threejs-geometry`.
 - Wszystko z `t`: pozycje, kamera, uniformy shaderów; losowość z ziarnem; fizyka z krokiem stałym od `t = 0`.
 - Kamera po krzywej (`CatmullRomCurve3`) z easingiem prędkości, bez szarpnięć; ogniskowa stała w ujęciu.
 - Światło: klucz + kontra (rim) + wypełnienie albo HDRI; mgła dla głębi; tonemapping ACES, sRGB na wyjściu.

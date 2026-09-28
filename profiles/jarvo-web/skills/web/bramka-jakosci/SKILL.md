@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [web, design, quality, visual-qa, accessibility]
-    related_skills: [nowa-strona, landing-produktowy, audyt-strony, frontend-design, design-md, impeccable]
+    related_skills: [nowa-strona, landing-produktowy, audyt-strony, frontend-design, design-md, impeccable, review-animations]
   jarvo:
     agent: jarvo-web
     autonomy: A1
@@ -37,6 +37,9 @@ u seniora product designu (klasa Linear / Stripe / Supabase). **Technicznie czys
    (wolne łącze, brak JS, 320 px, sama klawiatura, długie polskie słowa, reduced motion, konsola).
    `offline` (zasoby z innych serwerów) liczy się, gdy DoD mówi „offline”, „jeden plik” albo „bez zależności
    zewnętrznych”. Scenariusz z `not_run` to brak pomiaru, nie zaliczenie.
+   **Znaki AI (bez modelu):** `sh $HERMES_HOME/skills/design/impeccable/scripts/impeccable detect <katalog|url> --json`
+   → `out/jakosc/impeccable.json` (fioletowe gradienty, sprężynujący easing, oklepane fonty…); każde trafienie to
+   różnica w werdykcie albo świadomy wyjątek z uzasadnieniem. Animacje strony: przegląd wg `review-animations`.
 4. **Ocena rubryką.** Przejdź 10 osi z `references/rubryka.md`. Każda oś: zaliczona albo różnica z dowodem
    (który zrzut, co widać) i **najmniejszą zmianą**, która ją naprawi.
 5. **Werdykt** w formacie z `references/werdykt.md`: liczba 0–100, `PASS` / `REVISE` / `BLOCK`, lista różnic.
