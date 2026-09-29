@@ -97,7 +97,11 @@
       if (id !== talking) return;
       let s = plain.slice(0, i);
       for (const t of tags) s = s.replace(t, `<b>${t}</b>`);
-      hello.innerHTML = s + '<span class="caret"></span>';
+      hello.replaceChildren(...s.split(/(<b>.*?<\/b>)/).filter(Boolean).map((part) => {
+        const m = part.match(/^<b>(.*)<\/b>$/);
+        if (!m) return document.createTextNode(part);
+        const el = document.createElement("b"); el.textContent = m[1]; return el;
+      }), Object.assign(document.createElement("span"), { className: "caret" }));
       await sleep(plain[i - 1] === "\n" ? 220 : 32 + Math.random() * 30);
     }
   }
@@ -188,7 +192,12 @@
     }));
     $(".inst-for", box).textContent = os === "windows" ? (tab === "WSL" ? "WSL · UBUNTU" : "WINDOWS 10 · 11") : "MACOS · LINUX";
     $("#cmd").textContent = o.tabs[tab];
-    $("#steps").innerHTML = o.steps.map((s) => `<li>${s}</li>`).join("");
+    // kroki to nasze stałe teksty z linkami: parsujemy je poza dokumentem (DOMParser nie wykonuje skryptów)
+    $("#steps").replaceChildren(...o.steps.map((s) => {
+      const li = document.createElement("li");
+      li.append(...new DOMParser().parseFromString(s, "text/html").body.childNodes);
+      return li;
+    }));
     const c = $("#copy"); c.textContent = "COPY"; c.classList.remove("ok");
   }
   for (const b of dlg.querySelectorAll("[data-os]")) {

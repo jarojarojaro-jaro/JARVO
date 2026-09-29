@@ -1,0 +1,12 @@
+# JARVO
+
+> JARVO is a self-hosted AI team ("your digital right hand") that turns an idea into a finished result: research, websites, videos, paid ads and documents.
+
+JARVO runs on your own computer or server (Docker). A lead agent plans the work and hands it to specialists: a research detective, a web developer, a marketing and creative studio, a videographer, an ads specialist and a generalist right hand. Every result is reviewed against a definition of done before it reaches you.
+
+## Main pages
+- [Home](https://jarvo.pl/): what JARVO is and how to install it (one command for macOS, Linux and Windows)
+
+## Optional
+- [Documentation](https://github.com/jarojarojaro-jaro/JARVO/tree/main/docs): architecture, agents, deployment
+- [Source code](https://github.com/jarojarojaro-jaro/JARVO)

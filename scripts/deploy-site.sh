@@ -13,7 +13,7 @@ USER_="${JARVO_FTP_USER:-jarvo@jarvo.pl}"
 DIR="${JARVO_FTP_DIR:-/}"
 [[ -n "${JARVO_FTP_PASS:-}" ]] || { read -rsp "Hasło FTP dla $USER_: " JARVO_FTP_PASS; echo; }
 
-FILES=(index.html style.css app.js)
+FILES=(index.html style.css app.js .htaccess robots.txt sitemap.xml llms.txt site.webmanifest favicon.ico)
 while IFS= read -r f; do FILES+=("${f#"$ROOT/site/"}"); done < <(find "$ROOT/site/assets" -type f ! -name '*.json')
 
 # FTPS (szyfrowane logowanie); serwer bez FTPS: JARVO_FTP_PLAIN=1

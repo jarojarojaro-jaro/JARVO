@@ -1,0 +1,3 @@
+{"name": "JARVO", "short_name": "JARVO", "start_url": "/", "display": "standalone",
+ "background_color": "#0E121A", "theme_color": "#0E121A",
+ "icons": [{"src": "assets/icon-180.png", "sizes": "180x180", "type": "image/png"}, {"src": "assets/favicon.svg", "sizes": "any", "type": "image/svg+xml"}]}

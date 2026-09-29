@@ -51,3 +51,16 @@ def test_local_up_is_portable_to_macos():
             if not l.lstrip().startswith("#") and not l.startswith(("owner()", "sedi()"))]
     s = "\n".join(code)
     assert "stat -c" not in s and "sed -i" not in s and "nohup setsid" not in s
+
+
+def test_seo_and_security_files_are_deployed():
+    site = Path(__file__).resolve().parents[1] / "site"
+    deploy = (site.parent / "scripts" / "deploy-site.sh").read_text(encoding="utf-8")
+    for f in [".htaccess", "robots.txt", "sitemap.xml", "llms.txt", "site.webmanifest", "favicon.ico"]:
+        assert (site / f).exists() and f in deploy, f
+    ht = (site / ".htaccess").read_text(encoding="utf-8")
+    for h in ["Strict-Transport-Security", "Content-Security-Policy", "frame-ancestors 'none'", "X-Content-Type-Options"]:
+        assert h in ht, h
+    html = (site / "index.html").read_text(encoding="utf-8")
+    assert 'rel="canonical"' in html and "application/ld+json" in html
+    assert all(" width=" in tag for tag in __import__("re").findall(r"<img [^>]*>", html))

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JARVO — From idea to reality.</title>
-<meta name="description" content="JARVO — your digital right hand. From idea to reality.">
+<meta name="description" content="JARVO is your digital right hand: an AI team that researches, builds websites, makes videos and writes docs. From idea to reality.">
 <meta name="theme-color" content="#0E121A">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://jarvo.pl/">
@@ -19,7 +19,21 @@
 <meta name="twitter:title" content="JARVO — From idea to reality.">
 <meta name="twitter:description" content="Your digital right hand.">
 <meta name="twitter:image" content="https://jarvo.pl/assets/og.png">
+<link rel="canonical" href="https://jarvo.pl/">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="manifest" href="site.webmanifest">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@graph": [
+  {"@type": "Organization", "@id": "https://jarvo.pl/#org", "name": "JARVO", "url": "https://jarvo.pl/",
+   "logo": "https://jarvo.pl/assets/icon-180.png", "sameAs": ["https://github.com/jarojarojaro-jaro/JARVO"]},
+  {"@type": "WebSite", "@id": "https://jarvo.pl/#site", "name": "JARVO", "url": "https://jarvo.pl/", "publisher": {"@id": "https://jarvo.pl/#org"}},
+  {"@type": "SoftwareApplication", "name": "JARVO", "applicationCategory": "BusinessApplication",
+   "operatingSystem": "macOS, Linux, Windows", "description": "A self-hosted AI team: research, websites, videos, ads and docs.",
+   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "publisher": {"@id": "https://jarvo.pl/#org"}}
+]}
+</script>
 <link rel="preload" href="assets/scene.png" as="image">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -28,7 +42,7 @@
   <main class="stage" id="top">
     <!-- nagłówek -->
     <header class="nav">
-      <a class="nav-logo" href="#top" aria-label="JARVO"><img src="assets/logo.svg" alt="JARVO"></a>
+      <a class="nav-logo" href="#top" aria-label="JARVO"><img src="assets/logo.svg" width="1030" height="260" alt="JARVO"></a>
       <span class="nav-sep" aria-hidden="true"></span>
       <nav class="nav-links" aria-label="Main">
         <a href="https://github.com/jarojarojaro-jaro/JARVO/tree/main/docs">Docs</a>
@@ -39,7 +53,7 @@
 
     <!-- hero -->
     <p class="kicker"><span class="kicker-dot" aria-hidden="true"></span>READY TO BUILD</p>
-    <h1 class="title"><img src="assets/title.svg" alt="FROM IDEA TO REALITY."></h1>
+    <h1 class="title"><img src="assets/title.svg" width="715" height="220" alt="FROM IDEA TO REALITY."></h1>
     <p class="sub">Your digital right hand.</p>
     <div class="cta">
       <button class="btn-start" type="button" data-install>Start building <i class="arrow" aria-hidden="true"></i></button>
@@ -48,26 +62,26 @@
     <!-- telefon: sam robot z karty postaci i dymek z rozmową (na desktopie ukryty) -->
     <div class="bot">
       <div class="bubble" aria-live="polite"><p id="hello"></p></div>
-      <div class="bot-fig is-front" id="bot" role="button" tabindex="0" aria-label="Say hi to JARVO"><img class="pose on" src="assets/robot-front.png" alt="JARVO"><img class="bot-eyes" id="bot-eyes" src="assets/robot-eyes.png" alt=""></div>
+      <div class="bot-fig is-front" id="bot" role="button" tabindex="0" aria-label="Say hi to JARVO"><img class="pose on" src="assets/robot-front.png" width="223" height="364" alt="JARVO"><img class="bot-eyes" id="bot-eyes" src="assets/robot-eyes.png" width="223" height="364" alt=""></div>
     </div>
 
     <!-- ilustracja: tło + ruchome warstwy (site/tools/art.mjs) -->
     <div class="scene" aria-hidden="true"><div class="scene-inner">
-      <img class="scene-base" src="assets/scene.png" alt="">
+      <img class="scene-base" src="assets/scene.png" width="735" height="570" alt="">
       <div class="px" id="particles"></div>
       <div class="glow g-check"></div>
       <div class="glow g-antenna"></div>
       <div class="glow g-laptop"></div>
       <div class="energy" data-spr="cable"></div>
       <div class="leds" data-spr="leds"></div>
-      <div class="par" data-depth="6"><div class="panel float-a" data-spr="panels-l"><img src="assets/panels-l.png" alt=""><i class="data"></i><i class="sheen"></i></div></div>
-      <div class="par" data-depth="9"><div class="panel float-b" data-spr="panels-r"><img src="assets/panels-r.png" alt=""><i class="data"></i><i class="sheen"></i></div></div>
+      <div class="par" data-depth="6"><div class="panel float-a" data-spr="panels-l"><img src="assets/panels-l.png" width="151" height="277" alt=""><i class="data"></i><i class="sheen"></i></div></div>
+      <div class="par" data-depth="9"><div class="panel float-b" data-spr="panels-r"><img src="assets/panels-r.png" width="202" height="259" alt=""><i class="data"></i><i class="sheen"></i></div></div>
       <div class="eyes" id="eyes">
-        <img class="spr eye" data-spr="eye-l" src="assets/eye-l.png" alt="">
-        <img class="spr eye" data-spr="eye-r" src="assets/eye-r.png" alt="">
+        <img class="spr eye" data-spr="eye-l" src="assets/eye-l.png" width="23" height="52" alt="">
+        <img class="spr eye" data-spr="eye-r" src="assets/eye-r.png" width="37" height="52" alt="">
       </div>
-      <img class="spr hand hand-l" data-spr="hand-l" src="assets/hand-l.png" alt="">
-      <img class="spr hand hand-r" data-spr="hand-r" src="assets/hand-r.png" alt="">
+      <img class="spr hand hand-l" data-spr="hand-l" src="assets/hand-l.png" width="68" height="42" alt="">
+      <img class="spr hand hand-r" data-spr="hand-r" src="assets/hand-r.png" width="50" height="53" alt="">
       <div class="steam"><i></i><i></i><i></i></div>
     </div></div>
 
