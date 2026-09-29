@@ -40,6 +40,8 @@ u seniora product designu (klasa Linear / Stripe / Supabase). **Technicznie czys
    **Znaki AI (bez modelu):** `sh $HERMES_HOME/skills/design/impeccable/scripts/impeccable detect <katalog|url> --json`
    → `out/jakosc/impeccable.json` (fioletowe gradienty, sprężynujący easing, oklepane fonty…); każde trafienie to
    różnica w werdykcie albo świadomy wyjątek z uzasadnieniem. Animacje strony: przegląd wg `review-animations`.
+3a. **Bezpieczeństwo.** `python3 $HERMES_HOME/scripts/security_check.py url <url>` zawsze; strona z backendem,
+   logowaniem albo formularzem: cały skill `bezpieczenstwo-aplikacji`. KRYTYCZNE lub WYSOKIE = **BLOCK**, niezależnie od wyniku rubryki.
 4. **Ocena rubryką.** Przejdź 10 osi z `references/rubryka.md`. Każda oś: zaliczona albo różnica z dowodem
    (który zrzut, co widać) i **najmniejszą zmianą**, która ją naprawi.
 5. **Werdykt** w formacie z `references/werdykt.md`: liczba 0–100, `PASS` / `REVISE` / `BLOCK`, lista różnic.

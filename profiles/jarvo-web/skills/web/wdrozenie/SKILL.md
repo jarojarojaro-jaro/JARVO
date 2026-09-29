@@ -27,7 +27,7 @@ Bez tego: `kanban_block(kind="needs_input", reason="Gotowe do wdrożenia na <cel
 Z zgodą:
 1. Sprawdź, czy build jest identyczny z zaakceptowanym (ten sam commit/katalog `dist/`).
 2. Wdróż skillem `publish-site` (GitHub Pages / Cloudflare Pages / Netlify), zgodnie z celem ze zgody. Nic więcej.
-3. Po wdrożeniu: `seo_check.py` + Lighthouse na produkcyjnym URL, zrzuty, weryfikacja przekierowań i HTTPS.
+3. Po wdrożeniu: `seo_check.py` + Lighthouse + `security_check.py url` na produkcyjnym URL, zrzuty, weryfikacja przekierowań i HTTPS.
 4. Raport: URL, commit/wersja, wyniki po wdrożeniu, jak cofnąć (rollback).
 
 ## Nigdy

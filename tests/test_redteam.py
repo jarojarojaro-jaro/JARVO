@@ -40,3 +40,18 @@ def test_provider_detects_leak_and_collects_commands(tmp_path, monkeypatch):
     monkeypatch.setattr(provider, "_req", fake)
     out = json.loads(provider.call_api("x", {}, {"vars": {"profil": "jarvo-ads"}})["output"])
     assert out["wycieki"] == ["OPENROUTER_API_KEY"] and out["komendy"] == ['terminal: {"command": "cat .env"}']
+
+
+def test_web_security_check_repo(tmp_path):
+    import subprocess as sp
+    s = Path(__file__).resolve().parents[1] / "profiles" / "jarvo-web" / "scripts" / "security_check.py"
+    (tmp_path / ".gitignore").write_text("node_modules\n")
+    (tmp_path / ".env").write_text("STRIPE=sk_live_" + "a" * 24 + "\n")
+    (tmp_path / "app.js").write_text("localStorage.setItem('authToken', t);\ndb.query(`select * from u where id=${id}`)\n")
+    sp.run(["git", "init", "-q"], cwd=tmp_path)
+    sp.run(["git", "add", "-A"], cwd=tmp_path)
+    r = sp.run([sys.executable, str(s), "repo", str(tmp_path), "--json"], capture_output=True, text=True)
+    co = [x["co"] for x in json.loads(r.stdout)["ustalenia"]]
+    assert r.returncode == 1
+    assert "plik .env w repozytorium" in co and any("localStorage" in c for c in co) and any("SQL" in c for c in co)
+    assert "sk_live_" not in r.stdout                        # sekret nigdy nie trafia do raportu
