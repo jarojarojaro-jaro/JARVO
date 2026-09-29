@@ -441,11 +441,17 @@ def test_inspiracje_pick_filters_dedupes_and_excludes():
 def test_inspiracje_cache_used_when_offline(tmp_path, monkeypatch):
     monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "cache"))
     monkeypatch.setattr(insp, "URL", "http://127.0.0.1:9/brak.json")       # sieć niedostępna
+    monkeypatch.setattr(insp, "AIM_URL", "http://127.0.0.1:9/brak2.json")
     with pytest.raises(SystemExit):
         insp.load()                                                        # bez cache: jasny komunikat, nie traceback
     cached = wl.cache_dir("inspiracje") / f"videos-{insp.REV[:12]}.json"
     cached.write_text(json.dumps([{"slug": "x"}]))
-    assert insp.load() == [{"slug": "x"}]
+    assert [it["slug"] for it in insp.load()] == ["x"]                     # drugie źródło bez cache: pominięte
+    aim = wl.cache_dir("inspiracje") / f"aim-{insp.AIM_REV[:12]}.json"
+    aim.write_text(json.dumps({"cases": [{"id": "1", "category": "产品宣传", "author": {"handle": "a"},
+                                          "prompt": {"status": "original", "text": "launch film"}, "source": {"url": "u"}}]}))
+    got = insp.load()
+    assert [it["slug"] for it in got] == ["x", "aim-1"] and got[1]["category"] == "product" and not got[1]["prompt_partial"]
 
 
 # ------------------------------------------------------------------ rytm muzyki i mrugnięcia klatek

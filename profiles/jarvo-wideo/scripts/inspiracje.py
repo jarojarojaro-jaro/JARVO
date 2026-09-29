@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Inspiracje do rodzaju filmu: prompty twórców filmów Opus 5.5 (yihui-dev/awesome-opus5-5-videos).
+"""Inspiracje do rodzaju filmu: prompty twórców filmów Opus 5.5 (yihui-dev/awesome-opus5-5-videos
+i guanmo-ai/awesome-ai-motion, MIT) oraz opisane drogi produkcji (athemeroy/awesome-opus-5-5-videos, CC-BY 4.0).
 
     python3 inspiracje.py explainer [--ile 3] [--tag threejs] [--szukaj whiteboard]
     python3 inspiracje.py --pelny <slug>          # cały prompt jednego wpisu
     python3 inspiracje.py --rodzaje               # nasze rodzaje → kategorie i słowa listy
+    python3 inspiracje.py --drogi [--ile 3]       # jak naprawdę powstały filmy: droga produkcji + przykłady z dowodem
 
 Lista nie ma licencji (prompty należą do autorów), więc NIE trzymamy jej w repo: pobieramy w locie z przypiętego
 commita (cache 30 dni) i czytamy jak publiczną stronę. Bierz strukturę i chwyty, nie tekst; zainspirowało → autor
@@ -28,6 +30,14 @@ REPO = "https://github.com/yihui-dev/awesome-opus5-5-videos"
 REV = "6cdcea6c01a8bb6af836746017983cff32f465cb"
 URL = f"https://raw.githubusercontent.com/yihui-dev/awesome-opus5-5-videos/{REV}/data/videos.json"
 CACHE_DAYS = 30
+AIM_REPO = "https://github.com/guanmo-ai/awesome-ai-motion"         # MIT
+AIM_REV = "dff7a79b9da34dc1553634cabcae22a583ab02fc"
+AIM_URL = f"https://raw.githubusercontent.com/guanmo-ai/awesome-ai-motion/{AIM_REV}/data/cases.json"
+ATH_REPO = "https://github.com/athemeroy/awesome-opus-5-5-videos"   # CC-BY 4.0: przy użyciu podaj autora i link
+ATH_REV = "f0728e6fd1e5ec496815c1c7ba115bc70e3a31f9"
+ATH_URL = f"https://raw.githubusercontent.com/athemeroy/awesome-opus-5-5-videos/{ATH_REV}/data/cases.csv"
+AIM_KAT = {"叙事短片": "stories", "产品宣传": "product", "知识讲解": "explainer", "短动效": "motion",
+           "3D 与交互": "3d", "音乐与歌词": "music", "像素与角色": "characters"}
 
 # nasz rodzaj (rodzaje-filmu) → kategorie listy i wzorce w prompcie (regex, całe słowa; trafienia = trafność).
 # motion-graphics: kategoria „motion” bez promptów, które pasują do rodzajów węższych (tam są lepiej opisane).
@@ -49,7 +59,7 @@ WZORCE: dict[str, list[str]] = {
 }
 RODZAJE: dict[str, dict] = {
     "explainer": {"kategorie": ["explainer"], "wzorce": WZORCE["explainer"]},
-    "promo-produktu": {"kategorie": [], "wzorce": WZORCE["promo-produktu"]},
+    "promo-produktu": {"kategorie": ["product"], "wzorce": WZORCE["promo-produktu"]},
     "motion-graphics": {"kategorie": ["motion"], "wzorce": [],
                         "bez": [w for k in ("promo-produktu", "typografia", "dane", "logo-intro", "fabula")
                                 for w in WZORCE[k]]},
@@ -58,24 +68,67 @@ RODZAJE: dict[str, dict] = {
     "scena-3d": {"kategorie": ["3d"], "wzorce": WZORCE["scena-3d"]},
     "interaktywne": {"kategorie": ["interactive"], "wzorce": WZORCE["interaktywne"]},
     "logo-intro": {"kategorie": [], "wzorce": WZORCE["logo-intro"]},
-    "fabula": {"kategorie": [], "wzorce": WZORCE["fabula"]},
+    "fabula": {"kategorie": ["stories", "characters"], "wzorce": WZORCE["fabula"]},
 }
 
 
-def load(refresh: bool = False) -> list[dict]:
-    path = wl.cache_dir("inspiracje") / f"videos-{REV[:12]}.json"
+def fetch(url: str, name: str, refresh: bool, check=json.loads) -> str | None:
+    """Pobiera plik z przypiętego commita do cache (30 dni); bez sieci używa starego cache albo zwraca None."""
+    path = wl.cache_dir("inspiracje") / name
     fresh = path.exists() and time.time() - path.stat().st_mtime < CACHE_DAYS * 86400
     if refresh or not fresh:
         try:
-            req = urllib.request.Request(URL, headers={"User-Agent": "jarvo-wideo/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "jarvo-wideo/1.0"})
             with urllib.request.urlopen(req, timeout=30) as r:
                 data = r.read()
-            json.loads(data)
+            check(data.decode("utf-8"))
             path.write_bytes(data)
         except (urllib.error.URLError, TimeoutError, ValueError) as exc:
             if not path.exists():
-                raise SystemExit(f"nie pobrałem listy inspiracji ({exc}); pracuj bez nich, to tylko dodatek")
-    return json.loads(path.read_text(encoding="utf-8"))
+                print(f"(pominięte źródło {name}: {exc})", file=sys.stderr)
+                return None
+    return path.read_text(encoding="utf-8")
+
+
+def from_aim(raw: str) -> list[dict]:
+    """awesome-ai-motion → format listy yihui (slug, author, category, prompt, tech_tags, post_url)."""
+    out = []
+    for c in json.loads(raw).get("cases", []):
+        pr = c.get("prompt") or {}
+        out.append({"slug": f"aim-{c['id']}", "author": (c.get("author") or {}).get("handle", "?"),
+                    "category": AIM_KAT.get(c.get("category"), "other"), "prompt": pr.get("text") or "",
+                    "prompt_partial": pr.get("status") != "original", "post_url": (c.get("source") or {}).get("url", ""),
+                    "tech_tags": [], "opis": " ".join(filter(None, [c.get("titleEn"), c.get("summaryEn")])),
+                    "zrodlo": AIM_REPO})
+    return out
+
+
+def load(refresh: bool = False) -> list[dict]:
+    raw = fetch(URL, f"videos-{REV[:12]}.json", refresh)
+    items = [dict(it, zrodlo=REPO) for it in json.loads(raw)] if raw else []
+    aim = fetch(AIM_URL, f"aim-{AIM_REV[:12]}.json", refresh)
+    items += from_aim(aim) if aim else []
+    if not items:
+        raise SystemExit("nie pobrałem list inspiracji; pracuj bez nich, to tylko dodatek")
+    return items
+
+
+def drogi(refresh: bool, ile: int) -> str:
+    """Opisane przypadki (athemeroy, CC-BY 4.0): jaka droga produkcji naprawdę stoi za filmem."""
+    import csv, io
+    raw = fetch(ATH_URL, f"athemeroy-{ATH_REV[:12]}.csv", refresh, check=lambda t: t.index("source_url"))
+    if not raw:
+        return "brak danych o drogach produkcji (sieć); to tylko dodatek"
+    rows = list(csv.DictReader(io.StringIO(raw)))
+    by: dict[str, list[dict]] = {}
+    for r in rows:
+        by.setdefault(r.get("primary_path") or "?", []).append(r)
+    out = [f"# Drogi produkcji: {len(rows)} opisanych filmów · źródło: {ATH_REPO} (CC-BY 4.0, autor: athemeroy)\n"]
+    for path, rs in sorted(by.items(), key=lambda kv: -len(kv[1])):
+        out.append(f"## {path} ({len(rs)})")
+        for r in rs[:ile]:
+            out.append(f"- {r.get('label')} · {r.get('source_url')}\n  {(r.get('creator_disclosure') or '')[:300]}")
+    return "\n".join(out)
 
 
 def score(item: dict) -> float:
@@ -91,7 +144,7 @@ def score(item: dict) -> float:
 
 def relevance(item: dict, rule: dict) -> int:
     """0 = nie pasuje; kategoria listy = 3 pkt, każdy trafiony wzorzec = 1 pkt; wzorzec z „bez” wyklucza."""
-    text = ((item.get("prompt") or "") + " " + " ".join(item.get("tech_tags") or [])).lower()
+    text = " ".join([item.get("prompt") or "", item.get("opis") or "", *(item.get("tech_tags") or [])]).lower()
     if any(re.search(p, text) for p in rule.get("bez", [])):
         return 0
     return 3 * (item.get("category") in rule["kategorie"]) + sum(bool(re.search(p, text)) for p in rule["wzorce"])
@@ -124,7 +177,7 @@ def show(it: dict, limit: int | None = 1500) -> str:
     body = prompt[:limit] + (f"\n[… {len(prompt) - limit} zn. więcej: --pelny {it['slug']}]" if cut else "")
     tags = ", ".join(it.get("tech_tags") or [])
     return (f"## {it['slug']}  ·  @{it.get('author', '?')}  ·  {it.get('category')}  ·  {tags}\n"
-            f"post: {it.get('post_url', '')}\n\n{body}\n")
+            f"post: {it.get('post_url', '')} · lista: {it.get('zrodlo', REPO)}\n\n{body}\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -135,10 +188,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--szukaj", help="fraza w prompcie (po angielsku), np. whiteboard, \"one shape\"")
     ap.add_argument("--pelny", metavar="SLUG", help="pokaż cały prompt jednego wpisu")
     ap.add_argument("--rodzaje", action="store_true")
+    ap.add_argument("--drogi", action="store_true", help="drogi produkcji z przykładami (co naprawdę zrobił model)")
     ap.add_argument("--odswiez", action="store_true", help="pobierz listę ponownie")
     a = ap.parse_args(argv)
     if a.rodzaje:
         print(json.dumps(RODZAJE, ensure_ascii=False, indent=1))
+        return 0
+    if a.drogi:
+        print(drogi(a.odswiez, a.ile))
         return 0
     items = load(a.odswiez)
     if a.pelny:
@@ -150,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
     if not a.rodzaj:
         ap.error("podaj rodzaj albo --pelny <slug>")
     found = pick(items, a.rodzaj, a.tag, a.szukaj, a.ile)
-    print(f"# Inspiracje: {a.rodzaj} ({len(found)}); źródło: {REPO} @ {REV[:7]}\n"
+    print(f"# Inspiracje: {a.rodzaj} ({len(found)}); listy: {REPO} @ {REV[:7]}, {AIM_REPO} @ {AIM_REV[:7]}\n"
           "Weź strukturę i chwyty (sekcje, reguły, oś czasu), nie tekst. Użyte → autor i link w RAPORT.\n")
     for it in found:
         print(show(it))

@@ -39,6 +39,8 @@ nasze adaptacje żyją w skillach własnych floty.
 | [lemomo-ai/lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | `108fa78` | MIT (assety CC0 / CC BY / OFL) | Wideograf (39 stylów filmu; biblioteka instalowana przez `narzedzia.py`) |
 | [alexgreensh/anidoodle](https://github.com/alexgreensh/anidoodle) | `f335700` | Apache-2.0 | Wideograf (rysunek kodem, muzyka syntezowana) |
 | [buildwithhanif/claude-animation-skill](https://github.com/buildwithhanif/claude-animation-skill) | `4ddb8c8` | MIT | Wideograf (animacja w Node canvas, postaci, efekty, dźwięk syntezowany z osi czasu) |
+| [guanmo-ai/awesome-ai-motion](https://github.com/guanmo-ai/awesome-ai-motion) | `dff7a79` | MIT | Wideograf (inspiracje: 355 filmów, 62 prompty autorów; pobierane w locie) |
+| [athemeroy/awesome-opus-5-5-videos](https://github.com/athemeroy/awesome-opus-5-5-videos) | `f0728e6` | CC-BY 4.0 (autor: athemeroy) | Wideograf (`inspiracje.py --drogi`: 168 opisanych dróg produkcji; pobierane w locie, z atrybucją) |
 | [remotion-dev/skills](https://github.com/remotion-dev/skills) | `cf49eff` | Remotion License (darmowa dla osoby / firmy do 3 osób) | Wideograf (router `remotion-best-practices` ze wszystkimi `remotion-*/REFERENCE.md`) |
 | [Vincentwei1021/video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) | `e2d8928` | Apache-2.0 | Wideograf (kinowe filmy produktu; instaluje narzedzia.py) |
 | [diffusionstudio/lottie](https://github.com/diffusionstudio/lottie) | `3c72912` | MIT | Wideograf, Web (text-to-lottie) |
