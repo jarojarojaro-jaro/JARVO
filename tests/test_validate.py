@@ -47,6 +47,19 @@ def test_orchestrator_terminal_on_telegram(repo_copy):
     assert errors_matching(validate.run(), r"nie powinien mieć terminala na Telegramie")
 
 
+
+def test_hq_chat_platform_must_be_configured(repo_copy):
+    import re as _re
+    cfg = repo_copy / "profiles/jarvo-web/config.yaml"
+    cfg.write_text(_re.sub(r"^  api_server: .*\n", "", cfg.read_text(encoding="utf-8"), flags=_re.M), encoding="utf-8")
+    jarvo = repo_copy / "profiles/jarvo/config.yaml"
+    jarvo.write_text(jarvo.read_text(encoding="utf-8").replace("api_server: [kanban,", "api_server: [terminal,"),
+                     encoding="utf-8")
+    report = validate.run()
+    assert errors_matching(report, r"jarvo-web: config.yaml bez platform_toolsets.api_server")
+    assert errors_matching(report, r"jarvo: orkiestrator bez toolsetu kanban na czacie HQ")
+    assert errors_matching(report, r"jarvo: orkiestrator nie powinien mieć terminala na czacie HQ")
+
 def test_unattended_approvals_must_deny(repo_copy):
     cfg = repo_copy / "profiles/jarvo-studio/config.yaml"
     cfg.write_text(cfg.read_text(encoding="utf-8").replace("cron_mode: deny", "cron_mode: approve"), encoding="utf-8")

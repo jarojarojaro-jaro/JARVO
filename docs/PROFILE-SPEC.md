@@ -172,7 +172,8 @@ Poziomy autonomii (każda akcja agenta ma przypisany poziom):
 
 Mechanizmy techniczne:
 - **toolsety:** każdy profil ma włączone tylko potrzebne toolsety, osobno na platformę (np. Jarvo nie ma terminala
-  na Telegramie; ma go tylko pracownik-sędzia na CLI),
+  na Telegramie ani w czacie HQ; ma go tylko pracownik-sędzia na CLI); czat HQ to platforma `api_server`,
+  ustawiana jawnie jak Telegram (bez `clarify`), inaczej Hermes dałby jej domyślny zestaw (walidator tego pilnuje),
 - **sandbox:** `terminal.backend: local` wewnątrz kontenera `jarvo-hermes` (repo i build zamontowane `:ro`),
 - **zatwierdzanie komend:** Hermes pyta o ryzykowne komendy, więc nie wyłączamy tego; pracownicy bez człowieka
   (`cron_mode`, `single_query_mode`, `unattended_mode`) mają `deny`,

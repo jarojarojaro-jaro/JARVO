@@ -83,7 +83,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 `onboarding-interview`, `fleet-improvement`, [T] `roster` (generowany z `fleet.yaml`: kto istnieje i co umie).
 
 **Toolsety:** na Telegramie `kanban`, `memory`, `file`, `web`, `session_search`, `clarify`, `todo`, `skills`, `cronjob`,
-bez terminala. Pracownik-sędzia (CLI) ma dodatkowo `terminal`, `browser` i `vision` do weryfikacji wyników.
+bez terminala; w czacie HQ (`api_server`) to samo bez `clarify`. Pracownik-sędzia (CLI) ma dodatkowo `terminal`, `browser` i `vision` do weryfikacji wyników.
 Pracy dziedzinowej nie wykonuje (zasada SOUL, nie brak narzędzi).
 
 ---

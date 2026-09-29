@@ -36,6 +36,7 @@ tts:
 platform_toolsets:
   cli: [terminal, file, web, browser, vision, image_gen, video_gen, tts, delegation, memory, skills, todo, session_search]
   telegram: [terminal, file, web, browser, vision, image_gen, video_gen, tts, delegation, memory, skills, todo, session_search, clarify]
+  api_server: [terminal, file, web, browser, vision, image_gen, video_gen, tts, delegation, memory, skills, todo, session_search]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
   cron: [terminal, file, web, memory, skills]
 
 terminal:

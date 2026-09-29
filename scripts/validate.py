@@ -116,10 +116,16 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         r.err(f"{a.name}: config.yaml model.default musi być tokenem @@MODEL@@ (modele zarządza fleet.yaml)")
     if "cli" not in (cfg.get("platform_toolsets") or {}):
         r.err(f"{a.name}: config.yaml bez platform_toolsets.cli (pracownicy kanbana używają cli)")
-    if a.name == fleet.orchestrator and "kanban" not in (cfg.get("platform_toolsets") or {}).get("telegram", []):
-        r.err(f"{a.name}: orkiestrator bez toolsetu kanban na Telegramie")
-    if a.name == fleet.orchestrator and "terminal" in (cfg.get("platform_toolsets") or {}).get("telegram", []):
-        r.err(f"{a.name}: orkiestrator nie powinien mieć terminala na Telegramie (nie wykonuje pracy)")
+    toolsets = cfg.get("platform_toolsets") or {}
+    # czat Jarvo HQ idzie przez platformę api_server: bez wpisu Hermes daje jej domyślny zestaw (u orkiestratora
+    # terminal bez kanbana), więc każdy profil ma ją jawnie, tak jak Telegram
+    if "telegram" in toolsets and "api_server" not in toolsets:
+        r.err(f"{a.name}: config.yaml bez platform_toolsets.api_server (czat HQ dostałby domyślne narzędzia Hermesa)")
+    for plat, label in (("telegram", "Telegramie"), ("api_server", "czacie HQ (api_server)")):
+        if a.name == fleet.orchestrator and plat in toolsets and "kanban" not in toolsets[plat]:
+            r.err(f"{a.name}: orkiestrator bez toolsetu kanban na {label}")
+        if a.name == fleet.orchestrator and "terminal" in (toolsets.get(plat) or []):
+            r.err(f"{a.name}: orkiestrator nie powinien mieć terminala na {label} (nie wykonuje pracy)")
     appr = cfg.get("approvals") or {}
     for key in ("cron_mode", "single_query_mode", "unattended_mode"):
         if appr.get(key) != "deny":
