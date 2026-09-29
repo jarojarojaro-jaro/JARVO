@@ -75,6 +75,8 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 10. **HyperFrames: check przed renderem.** Po każdej zmianie kompozycji `npx hyperframes check` (lint + walidacja
    w przeglądarce, `--snapshots` na klatki) i render dopiero przy czystym wyniku: według HeyGen mediana 1 render zamiast 2
    i ~połowa kosztu tokenów. Promo z marki: `hyperframes capture <URL>` (skill `product-launch-video`) albo `assety.py`.
+11. **Za wolno?** `krytyka.py puls` pokazuje, gdzie film zwalnia; poprawiasz na osi czasu przez `retime.py`
+   (`references/retime.md`), nie cięciem MP4.
 9. **Pętla krytyki przed oddaniem:** `kontrola-wideo` krok 4a (7 osi 1–10, 3 najgorsze problemy, aż wszystko ≥ 8).
 
 ## Kroki

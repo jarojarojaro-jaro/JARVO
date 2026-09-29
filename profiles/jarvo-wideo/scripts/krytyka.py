@@ -4,6 +4,7 @@
     python3 krytyka.py telefon film.mp4 [-o out/wideo/<film>/telefon.jpg]      # 1 kl./s w 360 px szer., siatka 5×N
     python3 krytyka.py pasek film.mp4 --t 4.2 [--klatek 12] [-o pasek.jpg]    # kolejne klatki wokół szybkiej akcji
     python3 krytyka.py martwe film.mp4 [--prog 2.5]                           # odcinki bez zmiany obrazu (martwy takt)
+    python3 krytyka.py puls film.mp4 [--prog 3] [--min 1.5]                   # gdzie film ZWALNIA (mało nowego), pod retime.py
     python3 krytyka.py petla film.mp4 [-o petla.mp4]                          # szew pętli: ostatnia vs pierwsza klatka
     python3 krytyka.py determinizm anim.html --czasy 1.3,4.2 [--preset jarvo]  # ta sama klatka 2× = ten sam obraz
     python3 krytyka.py ocena kontrola.json                                    # czy runda spełnia pętlę (7 osi ≥ 8)
@@ -97,6 +98,26 @@ def martwe(film: Path, prog: float, fps: float = 5.0) -> dict:
     return {"martwe": odc, "prog_s": prog, "ok": not odc}
 
 
+def puls(film: Path, prog: float = 3.0, min_s: float = 1.5, fps: float = 5.0) -> dict:
+    """Tempo informacji: martwe() łapie tylko zamrożony obraz, a tło z ruchem (cząsteczki, ziarno) nie jest „martwe”,
+    choć nic nowego się nie dzieje. Tu liczy się średnia zmiana obrazu na sekundę; odcinki poniżej `prog` dłuższe
+    niż `min_s` to miejsca do zagęszczenia (retime.py: bliżej kotwice, szybszy lektor)."""
+    d = roznice(film, fps)
+    n = int(len(d) / fps)
+    sek = [sum(d[int(i * fps):int((i + 1) * fps)]) / max(1, len(d[int(i * fps):int((i + 1) * fps)])) for i in range(n)]
+    wolne, start = [], None
+    for i, v in enumerate(sek + [99.0]):
+        if v < prog:
+            start = i if start is None else start
+        elif start is not None:
+            if i - start >= min_s:
+                wolne.append({"od": start, "do": i, "sek": i - start, "srednio": round(sum(sek[start:i]) / (i - start), 2)})
+            start = None
+    suma = sum(w["sek"] for w in wolne)
+    return {"dlugosc_s": n, "wolne": wolne, "wolne_s": suma, "udzial_wolnych": round(suma / max(1, n), 2),
+            "ok": suma / max(1, n) <= 0.25, "prog": prog, "min_s": min_s}
+
+
 def petla(film: Path, out: Path | None) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         a, b = Path(tmp) / "a.gray", Path(tmp) / "b.gray"
@@ -147,6 +168,8 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("pasek"); s.add_argument("film"); s.add_argument("--t", type=float, required=True)
     s.add_argument("--klatek", type=int, default=12); s.add_argument("-o")
     s = sub.add_parser("martwe"); s.add_argument("film"); s.add_argument("--prog", type=float, default=2.5)
+    s = sub.add_parser("puls"); s.add_argument("film"); s.add_argument("--prog", type=float, default=3.0)
+    s.add_argument("--min", type=float, default=1.5)
     s = sub.add_parser("petla"); s.add_argument("film"); s.add_argument("-o")
     s = sub.add_parser("determinizm"); s.add_argument("zrodlo"); s.add_argument("--czasy", required=True)
     s.add_argument("--preset", default="jarvo")
@@ -161,6 +184,8 @@ def main(argv: list[str] | None = None) -> int:
         f = Path(a.film); r = pasek(f, a.t, a.klatek, Path(a.o or f.with_name(f"{f.stem}-pasek-{a.t:g}.jpg")))
     elif a.cmd == "martwe":
         r = martwe(Path(a.film), a.prog)
+    elif a.cmd == "puls":
+        r = puls(Path(a.film), a.prog, a.min)
     elif a.cmd == "petla":
         r = petla(Path(a.film), Path(a.o) if a.o else None)
     elif a.cmd == "determinizm":
