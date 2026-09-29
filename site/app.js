@@ -14,14 +14,15 @@
   const scene = $(".scene");
   function fit() {
     const w = document.documentElement.clientWidth;
-    const s = Math.min(w, 1760) / 1536 * 0.9;          // 90%: więcej oddechu wokół niż w makiecie
+    // cała plansza zawsze na jednym ekranie (szerokość i wysokość), z odrobiną oddechu
+    const s = Math.min(Math.min(w, 1760) / 1536 * 0.9, innerHeight / 1024 * 0.96);
     root.style.setProperty("--s", s);
     if (mobile.matches) root.style.setProperty("--ss", scene.clientWidth / 735);
     const st = $(".stage");
     st.style.marginLeft = mobile.matches ? "" : `${(w - 1536 * s) / 2}px`;
     // wysoki ekran: plansza na środku w pionie
     st.style.marginTop = mobile.matches ? "" : `${Math.max(0, (innerHeight - 1024 * s) / 2)}px`;
-    $(".page").style.height = mobile.matches ? "" : `${Math.max(innerHeight, 1024 * s)}px`;
+
   }
   addEventListener("resize", fit); mobile.addEventListener("change", fit); fit();
 
@@ -55,13 +56,16 @@
   if (!reduced) addEventListener("pointermove", (e) => { mx = e.clientX; my = e.clientY; if (!raf) raf = requestAnimationFrame(look); }, { passive: true });
 
   function blink() {
-    if (!reduced) { eyes.classList.remove("blink"); void eyes.offsetWidth; eyes.classList.add("blink"); }
+    if (!reduced) for (const e of [eyes, $("#bot-eyes")]) { e.classList.remove("blink"); void e.offsetWidth; e.classList.add("blink"); }
     setTimeout(blink, 2200 + Math.random() * 3800 + (Math.random() < 0.2 ? -1800 : 0));
   }
   setTimeout(blink, 1600);
 
   // ---------------------------------------------------------------- terminal: ktoś pisze, Jarvo odpowiada
-  const ask = $("#ask"), reply = $("#reply"), cursor = $("#cursor"), sceneInner = $(".scene-inner");
+  // ta sama rozmowa w terminalu (desktop) i w dymku robota (telefon)
+  const each = (sel, t) => { for (const el of document.querySelectorAll(sel)) el.textContent = t; };
+  const ask = { set textContent(t) { each("[data-ask]", t); } }, reply = { set textContent(t) { each("[data-reply]", t); } };
+  const askEl = $("#ask"), replyEl = $("#reply"), cursor = $("#cursor"), sceneInner = $(".scene-inner");
   const talks = [
     ["yo, let's take over the world", "Already on it, boss. Phase one starts Monday."],
     ["build me a landing page by lunch", "Lunch? It's live. Go eat."],
@@ -71,21 +75,20 @@
   ];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let busy = false;
-  const at = (el) => { el.parentNode.appendChild(cursor); };
-  async function type(el, text, min, spread) {
-    busy = true; at(el); cursor.classList.add("is-typing");
+  async function type(el, text, min, spread, host) {
+    busy = true; host.parentNode.appendChild(cursor); cursor.classList.add("is-typing");
     for (let i = 1; i <= text.length; i++) { el.textContent = text.slice(0, i); await sleep(min + Math.random() * spread); }
     cursor.classList.remove("is-typing"); busy = false;
   }
   async function loop() {
-    const who = $(".t-who");
+    const whos = document.querySelectorAll(".t-who");
     for (;;) for (const [q, a] of talks) {
-      ask.textContent = ""; reply.textContent = ""; who.style.visibility = "hidden";
+      ask.textContent = ""; reply.textContent = ""; for (const w of whos) w.style.visibility = "hidden";
       await sleep(500);
-      await type(ask, q, 45, 70);                 // człowiek pisze wolniej, z wahaniem
+      await type(ask, q, 45, 70, askEl);                 // człowiek pisze wolniej, z wahaniem
       await sleep(650);
-      who.style.visibility = "";
-      await type(reply, a, 16, 22);               // Jarvo odpowiada szybko
+      for (const w of whos) w.style.visibility = "";
+      await type(reply, a, 16, 22, replyEl);               // Jarvo odpowiada szybko
       await sleep(3200);
     }
   }

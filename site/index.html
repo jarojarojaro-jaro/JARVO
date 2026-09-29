@@ -32,6 +32,13 @@
       <button class="btn-start" type="button" data-install>Start building <i class="arrow" aria-hidden="true"></i></button>
     </div>
 
+    <!-- telefon: sam robot z karty postaci i dymek z rozmową (na desktopie ukryty) -->
+    <div class="bot" aria-hidden="true">
+      <div class="bubble"><p class="b-ask"><span class="t-gt">&gt;</span><span data-ask>yo, let's take over the world</span></p>
+        <p class="b-reply"><span class="t-who">jarvo</span><span data-reply>Already on it, boss. Phase one starts Monday.</span></p></div>
+      <div class="bot-fig"><img src="assets/robot.png" alt=""><img class="bot-eyes" id="bot-eyes" src="assets/robot-eyes.png" alt=""></div>
+    </div>
+
     <!-- ilustracja: tło + ruchome warstwy (site/tools/art.mjs) -->
     <div class="scene" aria-hidden="true"><div class="scene-inner">
       <img class="scene-base" src="assets/scene.png" alt="">
@@ -60,8 +67,8 @@
         <button class="term-max" type="button" data-install aria-label="Install JARVO"></button>
       </div>
       <div class="term-body">
-        <p class="t-prompt"><span class="t-gt">&gt;</span><span id="ask">yo, let's take over the world</span></p>
-        <p class="t-line"><span class="t-who">jarvo</span><span id="reply">Already on it, boss. Phase one starts Monday.</span></p>
+        <p class="t-prompt"><span class="t-gt">&gt;</span><span id="ask" data-ask>yo, let's take over the world</span></p>
+        <p class="t-line"><span class="t-who">jarvo</span><span id="reply" data-reply>Already on it, boss. Phase one starts Monday.</span></p>
         <span class="t-cursor" id="cursor" aria-hidden="true"></span>
         <span class="t-dots d-tl"></span><span class="t-dots d-tr"></span><span class="t-dots d-bl"></span><span class="t-dots d-br"></span>
       </div>
