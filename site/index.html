@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVO — From idea to reality.</title>
+<meta name="description" content="JARVO: your AI team. From idea to reality.">
+<meta name="theme-color" content="#0E121A">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/scene.png" as="image">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <main class="stage" id="top">
+    <!-- nagłówek -->
+    <header class="nav">
+      <a class="nav-logo" href="#top" aria-label="JARVO"><img src="assets/logo.svg" alt="JARVO"></a>
+      <span class="nav-sep" aria-hidden="true"></span>
+      <nav class="nav-links" aria-label="Main">
+        <a href="https://github.com/jarojarojaro-jaro/JARVO#readme">Product</a>
+        <a href="https://github.com/jarojarojaro-jaro/JARVO/tree/main/docs">Docs</a>
+        <a href="https://github.com/jarojarojaro-jaro/JARVO/commits/main">Changelog</a>
+      </nav>
+      <a class="btn-open" href="http://localhost:9119/base">Open JARVO <i class="arrow" aria-hidden="true"></i></a>
+      <span class="nav-corner c-tr" aria-hidden="true"></span><span class="nav-corner c-br" aria-hidden="true"></span>
+    </header>
+
+    <!-- hero -->
+    <p class="kicker"><span class="kicker-dot" aria-hidden="true"></span>READY TO BUILD</p>
+    <h1 class="title"><img src="assets/title.svg" alt="FROM IDEA TO REALITY."></h1>
+    <p class="sub">Your AI coding partner.</p>
+    <div class="cta">
+      <button class="btn-start" type="button" data-install>Start building <i class="arrow" aria-hidden="true"></i></button>
+      <a class="btn-explore" href="#workflow">Explore the workflow <i class="arrow" aria-hidden="true"></i></a>
+    </div>
+
+    <!-- ilustracja: tło + ruchome warstwy (site/tools/art.mjs) -->
+    <div class="scene" aria-hidden="true"><div class="scene-inner">
+      <img class="scene-base" src="assets/scene.png" alt="">
+      <div class="px" id="particles"></div>
+      <div class="glow g-check"></div>
+      <div class="glow g-antenna"></div>
+      <div class="glow g-laptop"></div>
+      <div class="par" data-depth="6"><img class="spr float-a" data-spr="panels-l" src="assets/panels-l.png" alt=""></div>
+      <div class="par" data-depth="9"><img class="spr float-b" data-spr="panels-r" src="assets/panels-r.png" alt=""></div>
+      <div class="eyes" id="eyes">
+        <img class="spr eye" data-spr="eye-l" src="assets/eye-l.png" alt="">
+        <img class="spr eye" data-spr="eye-r" src="assets/eye-r.png" alt="">
+      </div>
+      <img class="spr hand hand-l" data-spr="hand-l" src="assets/hand-l.png" alt="">
+      <img class="spr hand hand-r" data-spr="hand-r" src="assets/hand-r.png" alt="">
+      <div class="steam"><i></i><i></i><i></i></div>
+    </div></div>
+
+    <!-- terminal -->
+    <section class="term" aria-label="JARVO terminal">
+      <div class="term-bar">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="term-ver">JARVO v0.1.0</span>
+        <button class="term-max" type="button" data-install aria-label="Install JARVO"></button>
+      </div>
+      <div class="term-body">
+        <p class="t-prompt"><span class="t-gt">&gt;</span> jarvo</p>
+        <p class="t-line"><span id="typed">What are we building today?</span><span class="t-cursor" aria-hidden="true"></span></p>
+        <span class="t-dots d-tl"></span><span class="t-dots d-tr"></span><span class="t-dots d-bl"></span><span class="t-dots d-br"></span>
+      </div>
+    </section>
+
+    <!-- workflow -->
+    <section class="flow" id="workflow" aria-label="Workflow">
+      <article class="step">
+        <span class="step-n">01</span><h2>PLAN</h2>
+        <svg class="step-ic red" viewBox="0 0 42 52" aria-hidden="true"><path d="M4 4h22l12 12v32H4z M26 4v12h12" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"/><path d="M12 26h18M12 33h18M12 40h12" stroke="currentColor" stroke-width="4"/></svg>
+        <p>Turn ideas into a clear<br> plan with JARVO.</p>
+      </article>
+      <article class="step">
+        <span class="step-n">02</span><h2>BUILD</h2>
+        <svg class="step-ic lime" viewBox="0 0 64 48" aria-hidden="true"><path d="M18 8 4 24l14 16M46 8l14 16-14 16M37 2 27 46" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="square"/></svg>
+        <p>Generate, iterate, and<br> integrate with confidence.</p>
+      </article>
+      <article class="step">
+        <span class="step-n">03</span><h2>REVIEW</h2>
+        <svg class="step-ic red" viewBox="0 0 60 36" aria-hidden="true"><path d="M3 18C11 6 20 3 30 3s19 3 27 15c-8 12-17 15-27 15S11 30 3 18z" fill="none" stroke="currentColor" stroke-width="4.5"/><circle cx="30" cy="18" r="7.5" fill="currentColor"/></svg>
+        <p>Inspect, refine, and<br> ship with peace of mind.</p>
+      </article>
+    </section>
+  </main>
+</div>
+
+<!-- instalacja: system → polecenie -->
+<dialog class="inst" id="install" aria-labelledby="inst-h">
+  <form method="dialog" class="inst-x-form"><button class="inst-x" aria-label="Close">×</button></form>
+  <p class="inst-kicker"><span class="kicker-dot"></span>INSTALL</p>
+  <h2 id="inst-h">Which system are you on?</h2>
+  <div class="inst-os" role="radiogroup" aria-label="System">
+    <button type="button" role="radio" data-os="macos"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.5 2-3.6 2.1-3.7-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.1 2.5-1.8 3.1-.5 7.6 1.3 10.1.8 1.2 1.8 2.6 3.1 2.5 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.4-4.2zM14 5.2c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.6 2.8-1.4z"/></svg>macOS</button>
+    <button type="button" role="radio" data-os="linux"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2c-2.2 0-3.6 1.8-3.6 4.4 0 1.3.3 2.2-.4 3.4-.9 1.4-2.8 3.6-2.8 6.4 0 .7.1 1.3.4 1.8-.6.4-1.9.6-1.9 1.6 0 1.2 1.9.9 3.1 1.6.8.5 1.6.8 2.4.5.6-.2.9-.6 1-1h3.5c.1.4.4.8 1 1 .8.3 1.6 0 2.4-.5 1.2-.7 3.1-.4 3.1-1.6 0-1-1.3-1.2-1.9-1.6.3-.5.4-1.1.4-1.8 0-2.8-1.9-5-2.8-6.4-.7-1.2-.4-2.1-.4-3.4C15.6 3.8 14.2 2 12 2zm-1.5 3.6c.4 0 .7.5.7 1.1s-.3 1.1-.7 1.1-.7-.5-.7-1.1.3-1.1.7-1.1zm3 0c.4 0 .7.5.7 1.1s-.3 1.1-.7 1.1-.7-.5-.7-1.1.3-1.1.7-1.1zM12 8.6c.9 0 2 .6 2 1.1s-1.1 1.1-2 1.1-2-.6-2-1.1 1.1-1.1 2-1.1z"/></svg>Linux</button>
+    <button type="button" role="radio" data-os="windows"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.5 10.4 4.5v7H3zm0 13 7.4 1v-7H3zm8.3 1.1L21 21v-8.5h-9.7zm0-15.2v7.1H21V3z"/></svg>Windows</button>
+  </div>
+  <div class="inst-cmd" id="inst-cmd" hidden>
+    <div class="inst-tabs"><div class="tabs" role="tablist"></div><span class="inst-for"></span></div>
+    <div class="cmd"><span class="cmd-dollar">$</span><code id="cmd"></code><button type="button" class="cmd-copy" id="copy">COPY</button></div>
+    <ol class="inst-steps" id="steps"></ol>
+  </div>
+</dialog>
+
+<script src="app.js" defer></script>
+</body>
+</html>
