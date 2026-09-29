@@ -156,6 +156,9 @@ def test_compose_fits_8gb_vps_and_has_no_heavy_sidecars():
     assert total <= 6 * 1024**3, f"domyślne usługi mogą zająć {total / 1024**3:.1f} GB (budżet 6 GB na VPS 8 GB)"
     env = " ".join(str(v) for v in services["hermes"]["environment"].values())
     assert "CRAWL4AI" not in env and "GOTENBERG" not in env
+    # dodatki muszą być widoczne także w działającym kontenerze (narzedzia.py sprawdza „lemo” w czasie pracy)
+    assert services["hermes"]["environment"].get("JARVO_EXTRAS") == "${JARVO_EXTRAS:-}"
+    assert services["hermes"]["build"]["args"].get("JARVO_EXTRAS") == "${JARVO_EXTRAS:-}"
 
 
 def test_env_example_matches_compose_defaults():

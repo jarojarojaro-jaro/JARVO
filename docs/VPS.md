@@ -99,6 +99,7 @@ Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników 
 | `office` | LibreOffice: XLSX/PPTX/DOC → PDF | ~0,5 GB |
 | `docling` | PDF/DOCX → Markdown z modelami ML (tabele, układ) | ~1–2 GB |
 | `manim` | animacje matematyczne (+ LaTeX) | ~1 GB |
+| `lemo` | Wideograf: sample instrumentów i głos Kokoro (EN/ZH) dla lemo-opuscar; bez przebudowy obrazu: `narzedzia.py instaluj lemo` w działającym kontenerze | ~1,7 GB w `/opt/data` |
 
 Co zmieniliśmy względem pierwszej wersji (9,5 GB obrazu, sidecary 5 GB, limit 10 GB RAM):
 - **Gotenberg** (LibreOffice + Chromium w osobnym kontenerze, 1,7 GB) → `to_pdf.py`: pandoc + Chromium z obrazu;
