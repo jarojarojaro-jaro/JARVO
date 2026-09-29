@@ -40,6 +40,8 @@ services:
       SEARXNG_URL: http://searxng:8080
       # adres serwera podglądu („▶ Odpal”, linki agentów z scripts/jarvo_link.py) widziany z przeglądarki
       JARVO_PREVIEW_URL: http://${JARVO_BIND_IP:-127.0.0.1}:9120
+      # dodatki także w działającym kontenerze: „lemo” (sample, głos Kokoro) instaluje narzedzia.py w czasie pracy
+      JARVO_EXTRAS: ${JARVO_EXTRAS:-}
     volumes:
       - ${JARVO_DATA:-/srv/jarvo/data}/hermes:/opt/data
       - ${JARVO_REPO:-/srv/jarvo/repo}:/opt/jarvo/repo:ro

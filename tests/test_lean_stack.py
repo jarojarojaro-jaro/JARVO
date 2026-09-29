@@ -156,12 +156,23 @@ def test_compose_fits_8gb_vps_and_has_no_heavy_sidecars():
     assert total <= 6 * 1024**3, f"domyślne usługi mogą zająć {total / 1024**3:.1f} GB (budżet 6 GB na VPS 8 GB)"
     env = " ".join(str(v) for v in services["hermes"]["environment"].values())
     assert "CRAWL4AI" not in env and "GOTENBERG" not in env
+    # dodatki muszą być widoczne także w działającym kontenerze (narzedzia.py sprawdza „lemo” w czasie pracy)
+    assert services["hermes"]["environment"].get("JARVO_EXTRAS") == "${JARVO_EXTRAS:-}"
+    assert services["hermes"]["build"]["args"].get("JARVO_EXTRAS") == "${JARVO_EXTRAS:-}"
 
 
 def test_env_example_matches_compose_defaults():
     example = (REPO / "infra" / "env" / "compose.env.example").read_text(encoding="utf-8")
     assert "HERMES_MEM_LIMIT=5g" in example and "JARVO_EXTRAS=" in example
     assert "CRAWL4AI" not in example and "GOTENBERG" not in example and "INSTALL_DOCLING" not in example
+
+
+def test_every_agent_has_secrets_template():
+    """bootstrap-vps.sh i local-up.sh zakładają secrets/<agent>.env tylko z szablonów: bez szablonu agent zostaje bez pliku."""
+    import fleetlib as fl
+    templates = {p.name.removesuffix(".env.example") for p in (REPO / "infra/env/secrets").glob("*.env.example")}
+    missing = {a.name for a in fl.load_fleet().active()} - templates
+    assert not missing, f"brak infra/env/secrets/<agent>.env.example dla: {sorted(missing)}"
 
 
 # ------------------------------------------------------------------ obraz

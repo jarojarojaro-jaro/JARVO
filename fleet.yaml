@@ -15,7 +15,7 @@ version: 2
 orchestrator: jarvo
 reviewer: jarvo            # recenzent kart: snajperzy wołają kanban_request_review(reviewer=<to>)
 
-# Dostawca modeli i modele na poziomach. Domyślnie OpenRouter; inny dostawca bez edycji repo:
+# Dostawca modeli i modele na poziomach. Domyślnie openai-codex (logowanie ChatGPT); inny dostawca bez edycji repo:
 # w compose/jarvo.env ustaw JARVO_MODEL_PROVIDER=<nazwa zestawu z `presets`> (klucz dostawcy dodaj
 # w dashboardzie Keys przy profilu „default”: trafi do wszystkich agentów). Pojedynczy model można
 # nadpisać przez JARVO_MODEL_FRONTIER / JARVO_MODEL_STRONG / JARVO_MODEL_FAST.
@@ -78,7 +78,8 @@ agents:
     description: >-
       Wieloźródłowy research i weryfikacja faktów: rozbija pytanie na wątki, sprawdza źródła
       pierwotne, potwierdza twierdzenia krzyżowo i oddaje raport z cytatami i poziomem pewności.
-      Research rynku, konkurencji, produktów, słów kluczowych, monitoring.
+      Research rynku, konkurencji, produktów, słów kluczowych, monitoring. Transkrypcja filmu z linku
+      albo pliku (YouTube, TikTok, Instagram): tekst tego, co mówią.
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1

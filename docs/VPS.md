@@ -3,7 +3,7 @@
 Cel: jedna maszyna, na której cała flota działa 24/7. Jest bezpieczna, ma backupy,
 monitoring i przewidywalne wdrożenia. Opiera się na oficjalnym obrazie Docker Hermesa
 (`nousresearch/hermes-agent`), który ma wbudowany supervisor s6: jeden kontener obsługuje
-wiele profili, a każdy gateway jest pilnowany i restartowany osobno.
+wszystkie profile przez jeden multipleksowany gateway, a s6 pilnuje i restartuje gateway i dashboard.
 
 ---
 
@@ -23,9 +23,10 @@ wiele profili, a każdy gateway jest pilnowany i restartowany osobno.
         │  │  przeglądarki: Lightpanda +   │      │+valkey │            │
         │  │    1× Chromium (render/PDF)   │      └────────┘            │
         │  │  s6: gateway (multipleks)     │                            │
-        │  │  profile: jarvo, jarvo-web,     │                            │
-        │  │  jarvo-sherlock, jarvo-studio,  │                            │
-        │  │  jarvo-reka                    │                            │
+        │  │  profile: jarvo, jarvo-web,   │                            │
+        │  │  jarvo-sherlock, jarvo-studio,│                            │
+        │  │  jarvo-wideo, jarvo-ads,      │                            │
+        │  │  jarvo-reka                   │                            │
         │  └──────────────┬────────────────┘   później: honcho, postiz  │
         │        /opt/data (wolumen)           monitoring (opcja):      │
         │                                      uptime-kuma, beszel      │
@@ -37,9 +38,10 @@ wiele profili, a każdy gateway jest pilnowany i restartowany osobno.
 
 Kluczowe decyzje:
 - **Jeden kontener Hermesa, wiele profili.** Tak rekomenduje dokumentacja Hermesa: wspólny cache,
-  jeden katalog do backupu, s6 restartuje każdy gateway osobno.
+  jeden katalog do backupu, jeden gateway (`gateway.multiplex_profiles`) pod nadzorem s6.
 - **Nasz obraz pochodny:** `FROM nousresearch/hermes-agent:<wersja>` + narzędzia z `toolbox.yaml`
-  wszystkich agentów. Budowany przez `infra/Dockerfile`, przypięty do konkretnej wersji Hermesa.
+  wszystkich agentów. Budowany przez `infra/Dockerfile` z `HERMES_IMAGE` z `compose/.env` (domyślnie
+  `:latest`; po pierwszym wdrożeniu `scripts/pin-images.sh` przypina go do digestu).
 - **Sidecar tylko wtedy, gdy musi być usługą** (SearXNG). Ekstrakcja stron i PDF działają w obrazie
   na żądanie (trafilatura, Lightpanda, pandoc + Chromium): proces żyje tylko na czas zadania, więc
   w spoczynku nie zajmuje RAM-u. Tak cała flota mieści się na VPS z 8 GB.
@@ -56,7 +58,7 @@ Kluczowe decyzje:
 Bez GPU. Generowanie obrazów i wideo AI idzie przez API (OpenRouter), a lokalnie liczymy tylko
 rendering kodu (FFmpeg, HyperFrames), przeglądarki, transkrypcję i usługi.
 
-**Cel: VPS 4 vCPU / 8 GB RAM / 80 GB NVMe dla całej floty (6 agentów).**
+**Cel: VPS 4 vCPU / 8 GB RAM / 80 GB NVMe dla całej floty (7 agentów).**
 
 | | Zmierzone (Docker, Hermes 0.21.5) |
 |---|---|
@@ -71,20 +73,20 @@ RAM narzędzi zmierzony w kontenerze (szczyt, proces żyje tylko na czas zadania
 | przeglądanie przez Lightpandę (agent-browser, strona z ciężkim JS) | ~35 MB | 0,4 s |
 | to samo w Chromium (zrzuty ekranu, trudne strony) | ~100–250 MB | 0,9 s |
 | Lighthouse, 1 strona mobile | ~340 MB | 11 s |
-| transkrypcja Parakeet (36 s wideo → tekst/SRT, 2 wątki CPU) | ~1,0 GB | 10–12 s |
+| transkrypcja Parakeet (36 s wideo → tekst/SRT, 2 wątki CPU) | ~1,1–1,3 GB | 10–12 s |
 | dembrandt (tokeny marki ze strony) | ~170 MB | 9 s |
 | Markdown → PDF (pandoc + Chromium) | ~70 MB | 0,4 s |
 | pracownik kanbana (proces Hermesa z agentem) | ~250–350 MB (szac.) | cały czas trwania karty |
 
 **Budżet 8 GB (najgorszy realny przypadek naraz):** spoczynek 0,7 + 3 pracowników 1,0 + przeglądarki 0,4 +
-Lighthouse 0,35 + transkrypcja 1,0 ≈ **3,5 GB**. Sufity w compose: Hermes 5 GB, SearXNG 384 MB, Valkey 96 MB.
+Lighthouse 0,35 + transkrypcja 1,2 ≈ **3,7 GB**. Sufity w compose: Hermes 5 GB, SearXNG 384 MB, Valkey 96 MB.
 Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników z RAM hosta),
 `max_in_progress_per_profile: 2`, `delegation.max_concurrent_children` 2–3, jedna transkrypcja naraz
 (blokada w `jarvo-stt`), swap 4 GB (`bootstrap-vps.sh`, swappiness 10).
 
 | Etap | CPU | RAM | Dysk | Co działa |
 |---|---|---|---|---|
-| Flota v1 (cała) | 4 vCPU | **8 GB** | 80 GB NVMe | 6 agentów, SearXNG, Lighthouse, PDF, transkrypcja, render wideo (FFmpeg, chwilowo 0,5–0,65 GB); monitoring (+0,2 GB) |
+| Flota v1 (cała) | 4 vCPU | **8 GB** | 80 GB NVMe | 7 agentów, SearXNG, Lighthouse, PDF, transkrypcja, render wideo (FFmpeg, chwilowo 0,5–0,65 GB); monitoring (+0,2 GB) |
 | + dodatki obrazu | 4 vCPU | 8 GB | 80 GB | `JARVO_EXTRAS` (niżej): zwiększa dysk, nie RAM w spoczynku |
 | + Langfuse / Honcho | 8 vCPU | 16 GB | 160 GB+ | self-hostowane ślady i pamięć (ClickHouse i Postgres są pamięciożerne) |
 
@@ -97,6 +99,7 @@ Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników 
 | `office` | LibreOffice: XLSX/PPTX/DOC → PDF | ~0,5 GB |
 | `docling` | PDF/DOCX → Markdown z modelami ML (tabele, układ) | ~1–2 GB |
 | `manim` | animacje matematyczne (+ LaTeX) | ~1 GB |
+| `lemo` | Wideograf: sample instrumentów i głos Kokoro (EN/ZH) dla lemo-opuscar; bez przebudowy obrazu: `narzedzia.py instaluj lemo` w działającym kontenerze | ~1,7 GB w `/opt/data` |
 
 Co zmieniliśmy względem pierwszej wersji (9,5 GB obrazu, sidecary 5 GB, limit 10 GB RAM):
 - **Gotenberg** (LibreOffice + Chromium w osobnym kontenerze, 1,7 GB) → `to_pdf.py`: pandoc + Chromium z obrazu;
@@ -124,7 +127,7 @@ Rekomendacje:
 ```
 /srv/jarvo/
 ├── repo/                 # klon tego repo → /opt/jarvo/repo (tylko do odczytu w kontenerze)
-├── compose/              # .env compose (obrazy, sekrety usług, JARVO_BIND_IP) + jarvo.env (ID Telegrama)
+├── compose/              # .env compose (obrazy, sekrety usług, JARVO_BIND_IP) + jarvo.env (ID Telegrama, dostawca modeli)
 ├── secrets/              # host.env i <agent>.env (klucze) → /opt/jarvo/secrets (ro), grupa 10000, 2750/640
 ├── restic.env            # dane dostępowe backupu (root, 600), poza kontenerem
 ├── build/                # wynik scripts/build.py → /opt/jarvo/build (ro): dystrybucje profili, config hosta
@@ -178,13 +181,15 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 
 **Sekrety:**
 - tylko w `.env` profili (uprawnienia `0600`), nigdy w git,
-- **osobny klucz OpenRouter dla każdego agenta z limitem kredytów.** Widać koszt per agent,
-  a wyciek jednego klucza ma ograniczony zasięg,
+- **osobny klucz OpenRouter dla każdego agenta z limitem kredytów** (obrazy i wideo AI, a przy zestawie
+  `openrouter` także modele). Widać koszt per agent, a wyciek jednego klucza ma ograniczony zasięg.
+  Agent bez własnego klucza dostaje klucz hosta (`scripts/share_keys.py`, blok „klucze wspólne”),
 - backupy szyfrowane (restic szyfruje domyślnie), a hasło do repozytorium backupu trzymasz poza VPS,
 - **granica zaufania:** wszyscy agenci działają w jednym kontenerze jako ten sam użytkownik (`hermes`),
   więc agent z terminalem technicznie może przeczytać klucze innych agentów. Łagodzą to limity na kluczach,
-  zgody na ryzykowne komendy i to, że dane dostępowe backupu (`/srv/jarvo/restic.env`) oraz `compose/.env`
-  w ogóle nie trafiają do kontenera. Pełna izolacja kluczy wymagałaby osobnych kontenerów per agent.
+  zgody na ryzykowne komendy i to, że dane dostępowe backupu (`/srv/jarvo/restic.env`) w ogóle nie trafiają
+  do kontenera, a `compose/.env` nie jest w nim montowany (trafiają z niego tylko login, hasło i sekret sesji
+  dashboardu jako zmienne `HERMES_DASHBOARD_BASIC_AUTH_*`). Pełna izolacja kluczy wymagałaby osobnych kontenerów per agent.
 
 ---
 
@@ -203,9 +208,10 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 ## 7. Monitoring i koszty
 
 - **Beszel:** zasoby serwera, alert przy dysku > 80% i RAM > 90%,
-- **Uptime Kuma:** healthchecki sidecarów + „heartbeat” z crona Hermesa (brak sygnału = alert),
+- **Uptime Kuma:** monitory dashboardu (9119) i SearXNG; „heartbeat” z crona Hermesa (brak sygnału = alert) jeszcze nie jest zbudowany,
 - **Hermes:** `hermes doctor`, `hermes logs --follow`, `/usage`, `/insights`,
-- **koszty:** limity na kluczach OpenRouter + tygodniowy raport kosztów per agent od Jarva,
+- **koszty:** plan ChatGPT (domyślne modele `openai-codex`), limity na kluczach OpenRouter (obrazy, wideo, zestaw
+  `openrouter`) + tygodniowy raport kosztów per agent od Jarva,
 - **Langfuse (faza 6):** każdy przebieg agenta, koszt, czas, oceny sędziego i regresje jakości.
 
 ---
@@ -218,7 +224,8 @@ laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: s
 
 `scripts/deploy.sh` (idempotentny; szczegóły w [RUNBOOK.md](RUNBOOK.md)):
 1. `git pull --ff-only` w `/srv/jarvo/repo`,
-2. przebudowa obrazu, gdy zmienił się `infra/Dockerfile`, `infra/node/` albo `infra/python/` (albo `--rebuild`),
+2. przebudowa obrazu, gdy zmienił się `infra/Dockerfile`, `infra/node/`, `infra/python/` albo `infra/bin/` (wtedy też
+   z pobraniem nowego obrazu bazowego) lub `branding/` (albo `--rebuild`),
 3. `docker compose up -d`,
 4. walidacja repo w kontenerze (`scripts/validate.py`); błąd zatrzymuje wdrożenie przed zmianą floty,
 5. build dystrybucji (`scripts/build.py`): SOUL z protokołem, tokeny modeli, roster, rubryki, skille zewnętrzne, cron,
@@ -231,8 +238,10 @@ laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: s
 osobnym katalogu danych (`/srv/jarvo/staging`) i bez gatewaya, więc scenariusze evals nie ruszają produkcyjnej
 tablicy ani Telegrama. Osobny bot testowy dojdzie, gdy będziemy testować routing Telegrama przed zmianą tras.
 
-**Wersje:** Hermes przypięty do wersji albo digestu obrazu. Aktualizacja Hermesa to świadoma decyzja
-(np. raz w miesiącu): najpierw staging, potem produkcja. Rollback: poprzedni tag repo i poprzedni obraz.
+**Wersje:** Hermes przypięty do digestu obrazu (`HERMES_IMAGE` w `compose/.env`, zapisuje go `scripts/pin-images.sh`;
+bez tego `:latest`). Aktualizacja Hermesa to świadoma decyzja (np. raz w miesiącu): najpierw staging, potem produkcja.
+Rollback: poprzedni tag repo + `deploy.sh --no-pull --rebuild` na przypiętym `HERMES_IMAGE` (poprzedni obraz
+`jarvo-hermes` przebudowa usuwa).
 
 ---
 
@@ -241,7 +250,7 @@ tablicy ani Telegrama. Osobny bot testowy dojdzie, gdy będziemy testować routi
 | Kanał | Jak |
 |---|---|
 | Telegram | grupa „Jarvo HQ” z wątkami per agent (routing `profile_routes`), plus DM z Jarvem |
-| Terminal | SSH przez Tailscale → `docker exec -it jarvo-hermes hermes -p jarvo-web chat` (alias `jarvo-web`) |
+| Terminal | SSH przez Tailscale → `docker exec -it -u hermes jarvo-hermes hermes -p jarvo-web chat` (alias `jarvo-web`) |
 | Desktop | aplikacja Hermes Desktop połączona ze zdalnym backendem przez Tailscale: Bot Mode, czat grupowy floty |
 | Dashboard | panel web Hermesa (profile, skille, cron, kanban) tylko przez Tailscale |
 

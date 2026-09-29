@@ -21,6 +21,8 @@ skills:
     - "@@BUILD_DIR@@/profiles/jarvo-sherlock/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-web/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-studio/skills"
+    - "@@BUILD_DIR@@/profiles/jarvo-wideo/skills"
+    - "@@BUILD_DIR@@/profiles/jarvo-ads/skills"
 
 web:
   search_backend: searxng
@@ -28,6 +30,7 @@ web:
 platform_toolsets:
   cli: [terminal, file, web, browser, vision, code_execution, delegation, memory, skills, todo, session_search]
   telegram: [terminal, file, web, browser, vision, code_execution, delegation, memory, skills, todo, session_search, clarify]
+  api_server: [terminal, file, web, browser, vision, code_execution, delegation, memory, skills, todo, session_search]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
   cron: [terminal, file, web, memory, skills]
 
 terminal:

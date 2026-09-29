@@ -3,7 +3,8 @@
 
 Sprawdza: fleet.yaml ↔ profile, kompletność profilu (anatomia z docs/PROFILE-SPEC.md), budżet SOUL,
 frontmatter i opisy skilli (≤ 60 znaków, bo tyle widzi model w indeksie), plik blokady skilli,
-definicje crona, evals, składnię skryptów i przypadkowe sekrety w repo.
+definicje crona, evals, składnię skryptów, przypadkowe sekrety w repo i zgodność dokumentacji z kodem
+(linki i kotwice w *.md, pełna lista floty w dokumentach przeglądowych, liczby skilli i evals w tabelach).
 Kod wyjścia 1 przy błędach; ostrzeżenia nie blokują.
 """
 
@@ -33,6 +34,11 @@ SECRET_PATTERNS = [
     (re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"), "klucz prywatny"),
 ]
 SKIP_DIRS = {".git", "build", "node_modules", "__pycache__", ".pytest_cache"}
+# dokumenty z pełną listą floty: każdy aktywny agent musi w nich wystąpić jako `nazwa`
+DOCS_WITH_FLEET = ["README.md", "docs/FLEET.md", "docs/JARVO-CALOSC.md", "docs/BOSS.md", "docs/TOOLBOX.md"]
+# kolumny tabel w dokumentach, których liczba w wierszu agenta musi zgadzać się z repo
+DOC_COUNT_COLUMNS = {"skille": "skille", "workflowy własne": "skille", "evals": "evals"}
+MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 
 
 class Report:
@@ -116,10 +122,22 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         r.err(f"{a.name}: config.yaml model.default musi być tokenem @@MODEL@@ (modele zarządza fleet.yaml)")
     if "cli" not in (cfg.get("platform_toolsets") or {}):
         r.err(f"{a.name}: config.yaml bez platform_toolsets.cli (pracownicy kanbana używają cli)")
-    if a.name == fleet.orchestrator and "kanban" not in (cfg.get("platform_toolsets") or {}).get("telegram", []):
-        r.err(f"{a.name}: orkiestrator bez toolsetu kanban na Telegramie")
-    if a.name == fleet.orchestrator and "terminal" in (cfg.get("platform_toolsets") or {}).get("telegram", []):
-        r.err(f"{a.name}: orkiestrator nie powinien mieć terminala na Telegramie (nie wykonuje pracy)")
+    toolsets = cfg.get("platform_toolsets") or {}
+    # czat Jarvo HQ idzie przez platformę api_server: bez wpisu Hermes daje jej domyślny zestaw (u orkiestratora
+    # terminal bez kanbana), więc każdy profil ma ją jawnie, tak jak Telegram
+    if "telegram" in toolsets and "api_server" not in toolsets:
+        r.err(f"{a.name}: config.yaml bez platform_toolsets.api_server (czat HQ dostałby domyślne narzędzia Hermesa)")
+    for plat, label in (("telegram", "Telegramie"), ("api_server", "czacie HQ (api_server)")):
+        if a.name == fleet.orchestrator and plat in toolsets and "kanban" not in toolsets[plat]:
+            r.err(f"{a.name}: orkiestrator bez toolsetu kanban na {label}")
+        if a.name == fleet.orchestrator and "terminal" in (toolsets.get(plat) or []):
+            r.err(f"{a.name}: orkiestrator nie powinien mieć terminala na {label} (nie wykonuje pracy)")
+    if a.kind == "generalist":
+        # prawa ręka czyta skille wszystkich snajperów (tylko do odczytu); nowy snajper musi tu trafić
+        dirs = " ".join((cfg.get("skills") or {}).get("external_dirs") or [])
+        for s in fleet.active():
+            if s.kind == "specialist" and f"/profiles/{s.name}/skills" not in dirs:
+                r.err(f"{a.name}: skills.external_dirs bez skilli {s.name} (generalista czyta skille wszystkich snajperów)")
     appr = cfg.get("approvals") or {}
     for key in ("cron_mode", "single_query_mode", "unattended_mode"):
         if appr.get(key) != "deny":
@@ -360,6 +378,75 @@ def check_hq(r: Report) -> None:
             r.err(f"hq: pokoje w 20-art.js {sorted(js_rooms)} ≠ fleetlib.HQ_ROOMS {sorted(fl.HQ_ROOMS)}")
 
 
+def md_slug(heading: str) -> str:
+    """Kotwica nagłówka tak, jak liczy ją GitHub: małe litery, bez interpunkcji, spacje → '-'."""
+    return re.sub(r"[^\w\- ]", "", heading.strip().lower()).replace(" ", "-")
+
+
+def md_without_code(text: str) -> str:
+    return re.sub(r"^```.*?^```", "", text, flags=re.S | re.M)
+
+
+def md_tables(text: str):
+    """Tabele Markdown jako listy wierszy (komórki bez `|` i spacji na brzegach)."""
+    rows: list[list[str]] = []
+    for line in text.splitlines() + [""]:
+        if line.startswith("|"):
+            rows.append([c.strip() for c in line.strip().strip("|").split("|")])
+        elif rows:
+            yield rows
+            rows = []
+
+
+def check_docs(fleet: fl.Fleet, r: Report) -> None:
+    """Dokumentacja zgodna z kodem: linki i kotwice istnieją, listy floty są pełne, liczby w tabelach się zgadzają."""
+    root = fl.REPO_ROOT
+    docs = [p for p in sorted(root.rglob("*.md")) if SKIP_DIRS.isdisjoint(p.relative_to(root).parts)]
+    anchors: dict[Path, set[str]] = {}
+    for doc in docs:
+        text = md_without_code(doc.read_text(encoding="utf-8"))
+        for url in MD_LINK.findall(text):
+            if re.match(r"[a-z][a-z0-9+.-]*:", url):
+                continue
+            path, _, anchor = url.partition("#")
+            target = (doc.parent / path).resolve() if path else doc
+            rel = doc.relative_to(root)
+            if not target.exists():
+                r.err(f"{rel}: link do nieistniejącego {url}")
+            elif anchor and target.suffix == ".md":
+                if target not in anchors:
+                    body = md_without_code(target.read_text(encoding="utf-8"))
+                    anchors[target] = {md_slug(h) for h in re.findall(r"^#{1,6}\s+(.+)$", body, re.M)}
+                if anchor not in anchors[target]:
+                    r.err(f"{rel}: kotwica #{anchor} nie istnieje w {path or rel.name}")
+    for rel in DOCS_WITH_FLEET:
+        path = root / rel
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for a in fleet.active():
+            if f"`{a.name}`" not in text:
+                r.err(f"{rel}: brak agenta `{a.name}` (dokument opisuje całą flotę)")
+    counts = {}
+    for a in fleet.active():
+        scen = fl.load_yaml(root / "evals" / a.name / "scenarios.yaml") if (root / "evals" / a.name).exists() else {}
+        counts[a.name] = {"skille": len(list((a.dir / "skills").rglob("SKILL.md"))),
+                          "evals": len((scen or {}).get("scenarios") or [])}
+    for doc in docs:
+        for table in md_tables(md_without_code(doc.read_text(encoding="utf-8"))):
+            cols = {i: DOC_COUNT_COLUMNS[h.lower()] for i, h in enumerate(table[0]) if h.lower() in DOC_COUNT_COLUMNS}
+            for row in table[2:] if cols else []:
+                agent = re.search(r"`(jarvo[a-z0-9-]*)`", row[0])
+                if not agent or agent.group(1) not in counts:
+                    continue
+                for i, kind in cols.items():
+                    num = re.search(r"\d+", row[i]) if i < len(row) else None
+                    real = counts[agent.group(1)][kind]
+                    if num and int(num.group()) != real:
+                        r.err(f"{doc.relative_to(root)}: {agent.group(1)} ma {real} ({kind}), "
+                              f"a tabela podaje {num.group()}")
+
+
 def run() -> Report:
     r = Report()
     fleet = fl.load_fleet()
@@ -378,6 +465,7 @@ def run() -> Report:
     check_evals(fleet, r)
     check_calibration(r)
     check_hq(r)
+    check_docs(fleet, r)
     check_scripts(r)
     check_secrets(r)
     return r

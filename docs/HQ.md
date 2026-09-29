@@ -1,7 +1,7 @@
 # Jarvo HQ: kwatera floty (GUI)
 
 Jarvo HQ to zakładka **BASE** w menu dashboardu Hermesa, nad CHAT (`http://<ip-tailscale>:9119/base`, logowanie jak do dashboardu).
-Pokazuje flotę jako budynek z klocków. Na piętrze jest mostek Jarva, na parterze pokoje snajperów. Każdy
+Pokazuje flotę jako budynek z klocków. Na górze jest mostek Jarva, pod nim piętra z pokojami snajperów (po dwa na piętro). Każdy
 agent ma swój pokój, swoją minifigurkę i dymek z tym, co robi w tej chwili. Kliknięcie pokoju otwiera panel
 z podglądem pracy na żywo, kartami, wynikami i czatem. Na dole jest rozmowa: domyślnie z Jarvem, jednym
 kliknięciem z dowolnym agentem.
@@ -28,27 +28,35 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | **✎ Edytuj** (każdy film) | edytor w HQ + ffmpeg w kontenerze | montaż w stylu CapCut: oś czasu z miniaturami, cięcie (S), przycinanie krawędzi, przestawianie klipów, tempo 0,25–4×, głośność i wyciszenie, zdjęcia jako plansze, napisy (styl, krój, kolor, przeciąganie na podglądzie), muzyka z katalogu albo z dysku, format 16:9 / 9:16 / 1:1 / 4:5, cofnij/ponów, skróty klawiszowe. **Eksportuj** zapisuje nową wersję obok oryginału (`film-edycja.mp4`, oryginał zostaje), **Poproś agenta** wysyła Wideografowi prośbę z projektem montażu. Szczegóły: sekcja 2a |
 | Panel agenta: Czat | API gatewaya | rozmowa bezpośrednia z agentem (sesja HQ, osobna od Telegrama) |
 | Panel agenta: O agencie | fleet.yaml, SOUL, skille | opis, model, autonomia, parametry osobowości, workflowy |
-| Centrala: Decyzje | kanban (`blocked` + `needs_input`) | pytania agentów; odpowiedź idzie do Jarva, który odblokowuje kartę i zapisuje decyzję |
+| Centrala: Decyzje | kanban (`blocked` + `needs_input`, karty porzucone po błędach) | pytania agentów; odpowiedź idzie do Jarva, który odblokowuje kartę i zapisuje decyzję. Karta porzucona po błędach ma **Ponów kartę** (wraca do kolejki) albo **Przekaż Jarvowi** |
 | Centrala: Misje | `missions/INDEX.md` + kanban | postęp misji (kostki kart w kolorach stanu) |
 | Centrala: Na bieżąco | zdarzenia kanbana | kto zaczął, oddał do oceny, skończył, utknął |
 
 Decyzje świadomie idą przez Jarva, a nie bezpośrednio do karty: szef zapisuje je w dzienniku misji i pilnuje
-reszty (skill `decision-queue` zna format wiadomości z HQ).
+reszty (skill `decision-queue` zna format wiadomości z HQ). Wyjątek: „Ponów kartę” odblokowuje kartę porzuconą
+po błędach bezpośrednio (`hermes kanban unblock`), bo tu nie ma czego rozstrzygać.
 
 ## 2. Architektura
 
 ```
 przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
-   └─ zakładka „/” = plugin jarvo-hq (React z SDK dashboardu + htm, bez kroku budowania po stronie serwera)
+   └─ zakładka „/base” = plugin jarvo-hq (React z SDK dashboardu + htm, bez kroku budowania po stronie serwera)
         ├─ GET  /api/plugins/jarvo-hq/state        co 3 s: agenci, tablica, decyzje, misje, zdarzenia
+        ├─ GET  /api/plugins/jarvo-hq/fleet        opis floty (fleet.json)
         ├─ GET  /api/plugins/jarvo-hq/agent/<a>    co 2,5 s przy otwartym panelu: karty, oś kroków, wyniki
         ├─ GET  /api/plugins/jarvo-hq/task/<id>    karta z historią i komentarzami
+        ├─ POST /api/plugins/jarvo-hq/task/<id>/retry  „Ponów kartę” porzuconą po błędach (hermes kanban unblock)
         ├─ GET  /api/plugins/jarvo-hq/file?path=   podgląd pliku z katalogów floty
         ├─ POST /api/plugins/jarvo-hq/site        link „Odpal” (token) ─► :9120 serwer podglądu stron w pluginie
         ├─ POST /api/plugins/jarvo-hq/reveal      prośba „Pokaż w folderze” ─► pomocnik hosta (explorer.exe)
+        ├─ GET  /api/plugins/jarvo-hq/host        czy działa „Pokaż w folderze” (WSL), ścieżki hosta, port podglądu
         ├─ GET  /api/plugins/jarvo-hq/chat/<a>/history
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/send ─► gateway :8642 /p/<agent>/api/sessions/<id>/chat/stream (SSE)
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/reset
+        ├─ POST /api/plugins/jarvo-hq/upload      plik z czatu (📎, Ctrl+V, przeciągnięcie) ─► /opt/data/jarvo/inbox/<data>/
+        ├─ GET/POST /api/plugins/jarvo-hq/edit/…  edytor filmów: info, media, save, stamp, srt, speech, proxy,
+        │                                          proxy-file, export, job/<id>[/cancel] (sekcja 2a)
+        ├─ GET/POST /api/plugins/jarvo-hq/update  stan i prośba o sprawdzenie/aktualizację (pomocnik hosta scripts/updater.py)
         └─ GET  /api/plugins/jarvo-hq/health       klucze API profili i dostępność gatewaya
 backend pluginu (plugin_api.py, w procesie dashboardu)
    ├─ hq_core.py: odczyt kanban.db i state.db profili w trybie tylko do odczytu, wyliczenie stanu
@@ -63,11 +71,13 @@ Pliki w repo:
 | `hq/plugin/plugin_api.py` | trasy FastAPI, proxy czatu do gatewaya |
 | `hq/plugin/hq_core.py` | logika stanu (bez FastAPI, testowana w `tests/test_hq_core.py`) |
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`) |
-| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, czat, HUD, aplikacja |
+| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy i edytor filmów, czat, HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność) |
+| `hq/web/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css` |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |
 | `hq/web/demo/` | strona demo i symulator floty |
 | `scripts/hqbuild.py` | build pluginu (sklejenie JS, `fleet.json` z fleet.yaml i SOUL) i demo |
+| `scripts/share_keys.py` (kopiowany do pluginu) | wspólne klucze floty na żywo: klucz dostawcy z głównego `.env` trafia do `.env` agentów |
 
 Wdrożenie jest częścią zwykłego `deploy.sh`: `build.py` buduje plugin do `build/plugins/jarvo-hq`,
 `install-fleet.sh` kopiuje go do `/opt/data/plugins/jarvo-hq`, włącza (Hermes wymaga jawnego włączenia
@@ -75,7 +85,7 @@ pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartu
 
 ## 2a. Edytor filmów
 
-Bez bibliotek i bez nowych usług: edytor to jeden plik `hq/web/src/45-edytor.js` (~54 KB nieskompresowany, ok. 17 KB po gzip) w tym samym
+Bez bibliotek i bez nowych usług: edytor to jeden plik `hq/web/src/45-edytor.js` (~88 KB nieskompresowany, ok. 26 KB po gzip) w tym samym
 pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 
 - **Podgląd** gra w przeglądarce z plików pobranych raz (blob), bez serwera w pętli. Dwa elementy `<video>` na zmianę:
@@ -124,18 +134,24 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 - Wszystkie trasy pluginu są za logowaniem dashboardu (bez sesji: `401 unauthenticated`).
 - Dashboard nasłuchuje tylko na IP Tailscale (`JARVO_BIND_IP`), hasło generuje bootstrap.
 - Klucze API profili zostają na serwerze. Backend pluginu czyta je z `.env` profilu przy każdym wywołaniu.
-- Podgląd plików tylko z `/opt/data/jarvo/{workspaces,missions,knowledge}`, po rozwiązaniu symlinków.
+- Podgląd plików tylko z `/opt/data/jarvo/{workspaces,missions,knowledge,inbox}` (inbox: pliki wysłane w czacie HQ),
+  po rozwiązaniu symlinków.
   Pliki wysyłane z nagłówkiem `Content-Security-Policy: sandbox` i `nosniff`, HTML jako zwykły tekst:
   strona wygenerowana przez agenta nie wykona skryptu w sesji dashboardu.
 - **▶ Odpal**: strona agenta idzie z osobnego portu 9120 (ten sam `JARVO_BIND_IP`), tylko pod adresem z losowym
-  tokenem, który wydaje zalogowany dashboard (ważny 12 h, znika przy restarcie). Nagłówek `CSP: sandbox` bez
+  tokenem, który wydaje zalogowany dashboard albo agent (`scripts/jarvo_link.py`; wspólny plik
+  `state/preview-links.json`, ważny 7 dni, przetrwa restart). Nagłówek `CSP: sandbox` bez
   `allow-same-origin` daje stronie nieprzezroczyste pochodzenie: jej skrypty działają, ale nie czytają ciasteczek
   i nie wyślą ich do dashboardu. Nowa karta nie ma `window.opener`. Pliki ukryte, `..` i symlinki na zewnątrz: 404.
 - **Pokaż w folderze**: dashboard zapisuje tylko prośbę ze ścieżką (`state/reveal-request`); `scripts/updater.py`
-  na hoście sprawdza ją ponownie (tylko `jarvo/{workspaces,missions,knowledge}`) i woła `explorer.exe /select,…`.
-- Odczyt kanbana i transkrypcji w trybie SQLite `mode=ro`. HQ niczego nie zapisuje poza mapą sesji czatu
-  (`/opt/data/jarvo/state/hq-sessions.json`) i edytorem filmów (projekt `*.edycja.json` i nowe wersje filmu obok
-  oryginału, pliki tymczasowe w `state/edytor/`); zmiany na tablicy robią agenci przez swoje narzędzia.
+  na hoście sprawdza ją ponownie (tylko `jarvo/{workspaces,missions,knowledge,inbox}`) i woła `explorer.exe /select,…`.
+- Odczyt kanbana i transkrypcji w trybie SQLite `mode=ro`. HQ zapisuje tylko: mapę sesji czatu
+  (`/opt/data/jarvo/state/hq-sessions.json`), pliki z czatu (`inbox/<data>/`), linki podglądu
+  (`state/preview-links.json`, `state/preview.json`), prośby do pomocnika hosta (`state/reveal-request`,
+  `state/update-request`), pliki edytora filmów (projekt `*.edycja.json`, analiza `*.mowa.json` i `*.auto.srt`,
+  nowe wersje filmu obok oryginału, pliki tymczasowe w `state/edytor/`) i blok wspólnych kluczy w `.env` agentów
+  (`share_keys.py`). Na tablicy HQ może tylko ponowić kartę porzuconą po błędach (`hermes kanban unblock`);
+  resztę zmian robią agenci przez swoje narzędzia.
 - Edytor: każda ścieżka z projektu przechodzi przez to samo sprawdzenie co podgląd plików; ffmpeg dostaje argumenty
   listą (bez powłoki), napisy tylko jako poprawne PNG do 12 MB.
 
@@ -167,8 +183,9 @@ Pokój przypisuje `hq_room` w `fleet.yaml`, a krótką nazwę na szyldzie `hq_sh
 | `study` | regał z książkami, tablica dowodów z czerwonymi nitkami, zegar, globus, biurko z lampą bankierską | detektyw w kaszkiecie i szaliku (lupa przy pracy) |
 | `devlab` | szafa serwerowa z diodami, tablica z makietą, neon `</>`, dwa monitory z kodem, kubek z parą | programista w bluzie i słuchawkach, tyłem przy monitorach |
 | `atelier` | turkusowe tło fotograficzne, softbox, kamera z lampką REC, sztaluga z obrazem, plakat, klaps | artystka w berecie i koszulce w paski (paleta przy pracy) |
+| `filmstudio` | zielone tło z softboxem, kamera na statywie z lampką REC, stół montażowy z monitorem 9:16 i osią czasu (głowica jedzie przy pracy), klaps, szpula i napis REC na ścianie | wideograf w czerwonej czapce z daszkiem i kamizelce (kamera przy pracy) |
 | `workshop` | tablica z narzędziami, stół z imadłem i ramieniem robota, skrzynie (liczba = kolejka kart), beczka | mechanik w kasku i ogrodniczkach, tyłem przy stole |
-| `office` | domyślny pokój dla nowych agentów: biurko, monitor, szafka, zegar | postać w krawacie |
+| `office` | Sala operacyjna (Ads), też pokój domyślny dla nowych agentów: ściana ekranów z wynikami kampanii (słupki wariantów, linia wydatków pod czerwoną linią koperty, tablica ROAS), biurko z dwoma monitorami, czerwony STOP, roślinka | postać w koszuli i niebieskim krawacie, tyłem przy monitorach |
 
 Stan agenta zmienia pokój: światło (pokój przygasa, gdy agent jest wolny), pozę (praca, trzymana karta
 przy ocenie, uniesiona ręka i „!” przy blokadzie, „Z z z”, gdy śpi) i rekwizyty (monitory, lampa, ramię
@@ -185,10 +202,13 @@ Cały dashboard (menu, górny pasek, czat, Jarvo HQ) wygląda jak terminal CRT z
 Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zostaje w swoich kolorach.
 
 - **Jeden kolor → cały wygląd.** `scripts/install_themes.py` liczy z niego odcienie, tło, ramki i poświatę,
-  a z `branding/fosfor/theme.css` składa motywy Hermesa w `<HERMES_HOME>/dashboard-themes/`.
-- **Zmiana koloru:** przełącznik motywów w lewym dolnym rogu (błękit, bursztyn, zieleń, biel). Własny kolor:
-  dopisz linię w `branding/fosfor/palettes.yaml` i wdroż. Wybór zrobiony w dashboardzie przetrwa wdrożenia.
-- Kolory terminala czatu idą z motywu (łatka w `branding/patch_dashboard.py`), skórka TUI jest w błękicie.
+  a z `branding/fosfor/theme.css` składa motywy Hermesa w `<HERMES_HOME>/dashboard-themes/`. Motyw dwukolorowy
+  podaje dodatkowo `frame`, `fill`, `bg`, `muted`, `line` (i opcjonalnie `accent`).
+- **Zmiana koloru:** przełącznik motywów w lewym dolnym rogu: domyślny **Jarvo · biało-czerwony** (dwukolorowy)
+  oraz Fosfor: błękit, bursztyn, zieleń, biel. Własny kolor: dopisz linię w `branding/fosfor/palettes.yaml`
+  i wdroż. Wybór zrobiony w dashboardzie przetrwa wdrożenia.
+- Kolory terminala czatu idą z motywu (łatka w `branding/patch_dashboard.py`), skórka TUI jest biało-czerwona
+  (`branding/skin-jarvo.yaml`).
 
 ## 6. Język: polski i angielski
 
@@ -197,8 +217,8 @@ polsku. Język zmienia przełącznik w lewym dolnym rogu (**POLSKI** / **EN** / 
 albo po angielsku (każdy inny język = angielskie HQ); nazwy pokoi, role i opisy agentów po angielsku są w
 `fleet.yaml` (`en:`). Tłumaczenie wstrzykuje `branding/patch_dashboard.py` przy budowie obrazu (brakujący klucz =
 tekst angielski), więc zmiana `branding/` przebudowuje tylko ostatnią warstwę obrazu (sekundy, ta sama wersja
-Hermesa). Kilka stron Hermesa ma część etykiet wpisanych na sztywno po angielsku (np. liczniki na stronie Sesje):
-tych Hermes nie tłumaczy w żadnym języku.
+Hermesa). Etykiety wpisane w kod po angielsku na stronie Sesje (liczniki, „Import sessions”) tłumaczy łatka
+(`patch_sessions`, klucze `sessions.*` w `pl.json`); inne takie etykiety Hermesa zostają po angielsku.
 
 Agenci rozmawiają po polsku niezależnie od języka panelu (SOUL).
 

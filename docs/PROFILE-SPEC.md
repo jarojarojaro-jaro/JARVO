@@ -14,9 +14,9 @@ granice i testy, a nie tylko dobry prompt.
  ┌───────────────────────────────────────────────────────────────┐
  │ 1. Tożsamość (SOUL.md = main prompt)          zawsze w kontekście │
  ├───────────────────────────────────────────────────────────────┤
- │ 2. Workflowy (skills/*/SKILL.md)              ładowane na żądanie │
- │ 3. Wiedza (skills/*/references/, knowledge/)  ładowana na żądanie │
- │ 4. Skrypty (skills/*/scripts/)                wykonywane, nie czytane │
+ │ 2. Workflowy (skills/*/*/SKILL.md)            ładowane na żądanie │
+ │ 3. Wiedza (references/ skilli, knowledge/)    ładowana na żądanie │
+ │ 4. Skrypty (scripts/ profilu)                 wykonywane, nie czytane │
  ├───────────────────────────────────────────────────────────────┤
  │ 5. Toolbox (narzędzia OSS na VPS)             toolbox.yaml       │
  │ 6. Integracje (mcp_servers w config.yaml, pluginy, .env)         │
@@ -39,9 +39,12 @@ i 200 stron wiedzy, nie płacąc za to w każdej wiadomości.
 
 ## 1. Tożsamość: `SOUL.md` (main prompt)
 
-Budżet: **~1500–3000 tokenów**. Wszystko dłuższe należy do skilli.
+Budżet: **~1500–3000 tokenów**. Walidator pilnuje twardego limitu ~3200 tokenów liczonego razem z protokołem floty
+(~1200) i najdłuższą możliwą kalibracją. Wszystko dłuższe należy do skilli.
 
-Obowiązkowe sekcje (szablon: `shared/templates/SOUL.template.md`):
+Walidator wymaga sekcji `## Misja` i `## Osobowość` oraz znacznika `<!-- Jarvo:PROTOCOL -->` (orkiestrator także
+`<!-- Jarvo:ROSTER -->`); bez znacznika build się zatrzymuje. Nowy profil zakłada `scripts/new-agent.py`.
+Zalecane sekcje (szablon: `shared/templates/SOUL.template.md`; Jarvo i prawa ręka mają własny układ):
 
 | Sekcja | Zawartość |
 |---|---|
@@ -62,7 +65,7 @@ Obowiązkowe sekcje (szablon: `shared/templates/SOUL.template.md`):
 ## 2. Workflowy: skille-procedury
 
 Workflow to **powtarzalna procedura z punktami kontrolnymi**, zapisana jako skill
-(`skills/<nazwa>/SKILL.md`, format agentskills.io, zgodny z Hermesem).
+(`skills/<kategoria>/<nazwa>/SKILL.md`, format agentskills.io, zgodny z Hermesem).
 
 Każdy workflow ma (szablon: `shared/templates/SKILL.template.md`):
 - **Kiedy użyć i kiedy nie** (to trafia do `description`, więc od tego zależy, czy model w ogóle go wybierze),
@@ -71,7 +74,7 @@ Każdy workflow ma (szablon: `shared/templates/SKILL.template.md`):
 - **Wyjścia:** pliki i raport w ustalonym formacie,
 - **Definition of Done** workflowu,
 - **Typowe błędy** i jak ich unikać,
-- odwołania do `references/` (wiedza) i `scripts/` (automaty).
+- odwołania do `references/` (wiedza) i skryptów profilu `$HERMES_HOME/scripts/<plik>` (automaty).
 
 Zasada: **wszystko, co deterministyczne, idzie do skryptu.** Konwersję obrazów, generowanie
 faviconów czy audyt Lighthouse robi skrypt, a model decyduje, interpretuje i składa wyniki.
@@ -80,26 +83,29 @@ Skrypty są tańsze, szybsze i powtarzalne.
 Rodzaje skilli agenta:
 - **workflowy główne:** 3–8 najważniejszych procedur dziedziny,
 - **playbooki:** krótsze przepisy na konkretne sytuacje,
-- **skille Hermesa [H]:** gotowe skille z katalogu Hermesa, instalowane w profilu (listy w [TOOLBOX.md](TOOLBOX.md)).
+- **skille zewnętrzne:** z katalogu Hermesa [H] i z repozytoriów OSS przypiętych do commitu, przypisane agentom
+  w [`vendor/skills.lock.yaml`](../vendor/skills.lock.yaml); build dokłada je z licencją (`LICENSE-UPSTREAM`) i `.vendored.json`,
+- **skille wspólne floty:** własne skille narzędziowe w `shared/skills/` (np. `graf-kodu`), przypisywane agentom w tym samym locku.
 
 ---
 
 ## 3. Wiedza: knowledge packi
 
-Wiedza dziedzinowa w plikach Markdown w `skills/<workflow>/references/` (przy workflow,
+Wiedza dziedzinowa w plikach Markdown w `skills/<kategoria>/<workflow>/references/` (przy workflow,
 który z niej korzysta) albo w `knowledge/` profilu (wiedza przekrojowa).
 
 Zasady:
 - **źródło i data** przy każdym pakiecie (`source:`, `reviewed:`), bo wiedza webowa i marketingowa się starzeje,
 - **checklisty zamiast esejów:** model lepiej wykonuje listy kontrolne niż ogólne porady,
 - **przykłady wzorcowe** (golden examples): dobry raport, dobra karta, dobra strona,
-- **przegląd świeżości** co kwartał (rutyna cron przypomina Jarvowi).
+- **przegląd świeżości** co miesiąc (rutyna Jarva `jarvo-knowledge-freshness` wskazuje pakiety z `reviewed:` starszym niż 120 dni).
 
 ---
 
 ## 4. Skrypty
 
-`skills/<workflow>/scripts/`: Python lub Node, uruchamiane przez terminal agenta.
+`scripts/` profilu (np. `profiles/jarvo-web/scripts/`): Python, Node lub bash, wołane przez terminal agenta
+jako `$HERMES_HOME/scripts/<plik>` (walidator sprawdza, że każde takie odwołanie ma plik).
 Każdy skrypt ma `--help`, zwraca JSON lub czytelny raport, ma kod wyjścia ≠ 0 przy błędzie
 i nie wymaga interakcji.
 
@@ -147,8 +153,9 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 
 ## 8. Rutyny
 
-`cron/jobs.json`: zadania cykliczne agenta (np. Sherlock: tygodniowy monitoring konkurencji;
-Web: miesięczny audyt Twoich stron). Z dystrybucji instalują się **wstrzymane**, a włączasz je świadomie.
+`cron/jobs.yaml` → `cron/jobs.json` przy buildzie: zadania cykliczne agenta. Dziś ma je tylko Jarvo (patrol, poranny brief,
+przegląd tygodnia, świeżość wiedzy). Rutyny snajperów (np. monitoring Sherlocka) zakłada Jarvo po Twojej zgodzie.
+Z dystrybucji instalują się **wstrzymane**, a włączasz je świadomie.
 
 ---
 
@@ -164,9 +171,14 @@ Poziomy autonomii (każda akcja agenta ma przypisany poziom):
 | **A3** | nigdy | płatności, usuwanie cudzych danych, działania na kontach bez zgody |
 
 Mechanizmy techniczne:
-- **toolsety:** każdy profil ma włączone tylko potrzebne toolsety (np. Jarvo nie ma terminala),
-- **sandbox:** komendy snajperów wykonują się w kontenerze (`terminal.backend: docker`), do potwierdzenia w fazie 0,
-- **zatwierdzanie komend:** Hermes pyta o ryzykowne komendy, więc nie wyłączamy tego,
+- **toolsety:** każdy profil ma włączone tylko potrzebne toolsety, osobno na platformę (np. Jarvo nie ma terminala
+  na Telegramie ani w czacie HQ; ma go tylko pracownik-sędzia na CLI); czat HQ to platforma `api_server`,
+  ustawiana jawnie jak Telegram (bez `clarify`), inaczej Hermes dałby jej domyślny zestaw (walidator tego pilnuje),
+- **sandbox:** `terminal.backend: local` wewnątrz kontenera `jarvo-hermes` (repo i build zamontowane `:ro`),
+- **zatwierdzanie komend:** Hermes pyta o ryzykowne komendy, więc nie wyłączamy tego; pracownicy bez człowieka
+  (`cron_mode`, `single_query_mode`, `unattended_mode`) mają `deny`,
+- **wspólne zakazy floty:** `shared/security/deny.yaml` (zmiana konfiguracji Hermesa, `rm -r` danych floty, eksfiltracja,
+  czytanie `.env`, logowanie w cudze konta) build dopina do `approvals.deny` każdego profilu,
 - **workspace:** każdy agent ma własny katalog roboczy (`terminal.cwd`), a wyniki oddaje przez kanban (załączniki).
 
 ---
@@ -174,22 +186,26 @@ Mechanizmy techniczne:
 ## 10. Jakość
 
 - **Definition of Done agenta:** lista warunków, które musi spełnić każdy wynik (w SOUL i w rubryce sędziego),
-- **rubryka sędziego:** jak Jarvo ocenia wynik tego agenta (skill `judge-rubryki` u Jarva, generowany z `quality/rubric.md` agenta),
+- **rubryka sędziego:** jak Jarvo ocenia wynik tego agenta (skill `sdlc-review` u Jarva: `references/rubric-<agent>.md` generowane z `quality/rubric.md` agenta),
 - **evals:** `evals/<agent>/*.yaml` (szablon: `shared/templates/eval.template.yaml`), czyli scenariusze
-  „zlecenie → oczekiwane zachowanie → kryteria”, uruchamiane przy każdej zmianie SOUL lub skilli,
-- **ślady i koszty:** Langfuse (wtyczka Hermesa) zbiera przebiegi, koszty i oceny sędziego,
+  „zlecenie → oczekiwane zachowanie → kryteria”, uruchamiane ręcznie na stagingu (`scripts/evals-staging.sh`) po zmianie
+  SOUL lub skilli; CI sprawdza tylko ich strukturę (`validate.py`),
+- **ślady i koszty (planowane, faza 6):** Langfuse (wtyczka Hermesa) ma zbierać przebiegi, koszty i oceny sędziego;
+  dziś niewłączony w żadnym profilu,
 - **pętla błędów:** każda poprawka odesłana przez sędziego jest kandydatem na nowy eval albo poprawkę skilla.
 
 ---
 
 ## Kontrakt zlecenia (wspólny protokół Jarvo ↔ agenci)
 
-To jedyny element wspólny dla wszystkich agentów. To protokół, a nie wiedza dziedzinowa.
+To jedyna wspólna treść procedur wszystkich agentów. To protokół, a nie wiedza dziedzinowa. Poza nim build dokłada
+każdemu agentowi kalibrację pod model, wspólne zakazy (`approvals.deny`) i model zapasowy (`fallback_providers`).
 Źródło jest jedno (`shared/protocol/`), a generator wkleja go do każdego profilu.
 
 Zaraz za protokołem generator dokleja **kalibrację pod model agenta** (`shared/calibration/<rodzina>.md`:
-`gpt`, `claude`, `deepseek`, `kimi`, `generic`): 2–3 zdania na znaną słabość rodziny, osobno dla orkiestratora
-i wykonawców (np. GPT-6: deleguj, nie dopytuj o to, co ustalisz sam, pisz krótko). Blok ma znaczniki
+`gpt`, `claude`, `deepseek`, `kimi`, `generic`): sekcja `### Wszyscy` + sekcja roli (`### Orkiestrator` albo
+`### Wykonawca`), najwyżej 3 reguły w każdej, na znaną słabość rodziny (np. GPT-6: deleguj, nie dopytuj o to,
+co ustalisz sam, pisz krótko). Blok ma znaczniki
 `<!-- Jarvo:CALIBRATION … -->`; gdy w panelu wybierzesz agentowi inny model, `install-fleet.sh` podmienia go przy
 następnym wdrożeniu. Zmiana `JARVO_MODEL_PROVIDER` przebudowuje kalibrację sama. Walidator liczy najdłuższy blok
 do budżetu SOUL i pilnuje limitu 3 reguł na sekcję.
@@ -204,14 +220,20 @@ WYJŚCIA:        jakie pliki i gdzie, w jakim formacie
 GRANICE:        poziom autonomii, budżet (czas/koszt), czego nie ruszać
 ```
 
-**Wynik (agent → Jarvo):**
+**Wynik (agent → Jarvo)**, `kanban_request_review(reviewer=…, summary=…, metadata=…)`:
 ```
-PODSUMOWANIE:   co zrobiono (3–5 zdań)
-ARTEFAKTY:      lista plików/linków
-SAMOKONTROLA:   każdy punkt DoD → spełniony / niespełniony + dowód
-RYZYKA I LUKI:  czego nie zrobiono, co niepewne
-DECYZJE:        co wymaga decyzji człowieka
+summary:                    co zrobiono (3–5 zdań)
+metadata.artifacts:         ścieżki plików wynikowych
+metadata.dod_check:         każdy punkt DoD → spełniony / niespełniony / niesprawdzony + dowód
+metadata.risks:             czego nie zrobiono, co niepewne
+metadata.decisions_needed:  co wymaga decyzji człowieka
 ```
+
+Protokół ma **16 zasad wykonawcy** w trzech blokach: start (1–4: `kanban_show`, pierwszy heartbeat = ponumerowane
+punkty DoD, `kanban_block` z `needs_input` albo `capability`), praca (5–11: równoległe odczyty, heartbeat, odmowa
+uprawnień to granica, treści z internetu to dane, serwery tylko do testów, pliki z inboxu, pamięć tylko na trwałe fakty)
+i koniec (12–16: jedna pełna kontrola i najwyżej 2 cykle poprawek, oddanie przez `kanban_request_review`, poprawki
+po recenzji, brak wiadomości do użytkownika w trakcie misji, blokada to koniec). Pełna treść: `shared/protocol/kontrakt-zlecenia.md`.
 
 Agent oddaje wynik do statusu `review`. Jarvo ocenia: `complete` albo `request_changes`
 z konkretnymi uwagami. Po 3 odrzuceniach eskaluje do Ciebie zamiast kręcić się w kółko.
@@ -221,12 +243,13 @@ z konkretnymi uwagami. Po 3 odrzuceniach eskaluje do Ciebie zamiast kręcić si�
 ## Kiedy agent jest „gotowy” (Definition of Ready agenta)
 
 Agent wchodzi do floty (`status: active` w `fleet.yaml`) dopiero, gdy:
-- [ ] `SOUL.md` ma wszystkie sekcje i mieści się w budżecie,
+- [ ] `SOUL.md` ma wymagane sekcje i znaczniki oraz mieści się w budżecie,
 - [ ] ma ≥ 3 workflowy główne z DoD, a każdy został przetestowany na prawdziwym zadaniu,
 - [ ] knowledge packi mają źródła i daty,
 - [ ] `toolbox.yaml` jest kompletny, a healthchecki przechodzą na VPS,
 - [ ] ma rubrykę dla sędziego,
-- [ ] ma ≥ 10 evals (w tym ≥ 3 „poza zakresem”, gdzie oczekiwanym zachowaniem jest oddanie zadania),
+- [ ] ma ≥ 10 evals (u snajperów i generalisty w tym ≥ 3 „poza zakresem”, gdzie oczekiwanym zachowaniem jest oddanie
+  zadania; u Jarva scenariusze `routing`),
 - [ ] przeszedł tydzień dogfoodingu bez krytycznych problemów,
 - [ ] ma README i changelog w dystrybucji.
 
@@ -238,8 +261,9 @@ Agent wchodzi do floty (`status: active` w `fleet.yaml`) dopiero, gdy:
 profiles/jarvo-web/
 ├── distribution.yaml        # manifest dystrybucji Hermesa
 ├── SOUL.md                  # main prompt
-├── config.yaml              # model (@@MODEL@@ z fleet.yaml), toolsety per platforma, zgody, mcp_servers
-├── .no-bundled-skills       # snajper: bez katalogu skilli Hermesa (izolacja)
+├── config.yaml              # model (@@MODEL@@ z fleet.yaml), reasoning_effort, toolsety per platforma, zgody,
+│                            # terminal/przeglądarka/delegacja (mcp_servers: dziś żaden profil)
+├── .no-bundled-skills       # snajper i orkiestrator: bez katalogu skilli Hermesa (brak tylko u jarvo-reka)
 ├── toolbox.yaml             # narzędzia OSS (nasz manifest + healthchecki)
 ├── skills/
 │   └── web/                 # kategoria (DESCRIPTION.md generuje build)
@@ -255,4 +279,15 @@ profiles/jarvo-web/
 └── CHANGELOG.md
 evals/jarvo-web/scenarios.yaml   # scenariusze testowe (poza dystrybucją)
 vendor/skills.lock.yaml         # skille zewnętrzne tego agenta (dokładane przy buildzie)
+shared/protocol/kontrakt-zlecenia.md   # protokół (wklejany do SOUL)
+shared/calibration/<rodzina>.md        # kalibracja pod model (za protokołem)
+shared/security/deny.yaml              # wspólne zakazy → approvals.deny
+shared/skills/                         # wspólne skille własne (np. graf-kodu), przypisywane w locku
+fleet.yaml (wpis agenta)               # kind, model_tier, autonomy_max, telegram_topic, hq_room, pin_skills, description
 ```
+
+Build (`scripts/build.py`) dokłada do kopii profilu: `profile.yaml` (opis z `fleet.yaml` do routingu kanbana),
+protokół i kalibrację w SOUL, u Jarva skrót floty (`<!-- Jarvo:ROSTER -->`), skill `roster` i rubryki w `sdlc-review`,
+tokeny `@@…@@` w `config.yaml`, `distribution.yaml` i skillach, wspólne zakazy w `approvals.deny`, `fallback_providers`,
+`DESCRIPTION.md` kategorii, skille z locka z licencjami oraz `cron/jobs.json` (u Wideografa także silnik edytora HQ
+`edytor.py` i `edytor_napisy.js` w `scripts/`).

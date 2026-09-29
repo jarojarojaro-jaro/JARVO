@@ -1,7 +1,7 @@
 # Jarvo — całość od A do Z
 
 > Jeden opis wszystkiego. Do wklejenia na start nowej sesji, żeby mieć pełny kontekst
-> bez czytania całego repo. Repo: `jarojarojaro-jaro/JARVO`, lokalnie `/home/user/TARS`.
+> bez czytania całego repo. Repo: `jarojarojaro-jaro/JARVO`, w piaskownicy Claude Code `/home/user/JARVO`.
 > Gałąź robocza: `claude/epic-allen-qfjd0s`. Język pracy: polski.
 
 ---
@@ -24,8 +24,8 @@ za zgodą człowieka.
 Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 
 - **Snajper = specjalista.** Jedna dziedzina, własne skille, własna wiedza, własna pamięć.
-  Profile tworzone z `--no-skills` — dostają tylko to, co im damy. Czego nie umie, tego nie robi:
-  oddaje zadanie szefowi.
+  Dystrybucja snajpera ma znacznik `.no-bundled-skills` (bez katalogu skilli Hermesa) — dostaje tylko to,
+  co mu damy (wyjątek: generalista `jarvo-reka`). Czego nie umie, tego nie robi: oddaje zadanie szefowi.
 - **Jarvo = Main Judge (orkiestrator).** Sam nie robi pracy dziedzinowej. Robi cztery rzeczy:
   1. **intake** — rozumie, czego chcesz, dopytuje tylko o prawdziwe decyzje,
   2. **dispatch** — rozbija cel na karty kanbana i przypisuje snajperom,
@@ -34,7 +34,8 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
   4. **raport** — oddaje Ci jeden, sprawdzony wynik.
 - **Bezpośredni kontakt zostaje** — z każdym snajperem pogadasz osobno, ale praca wieloetapowa
   zawsze idzie przez szefa.
-- **Jedyna rzecz wspólna:** wiedza o Tobie (USER.md). Reszta jest odizolowana per agent.
+- **Wspólne:** wiedza o Tobie (USER.md) i brand kity (`knowledge/brands`). Pamięć i skille są per agent
+  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki; Ręka czyta skille wszystkich).
 - **Nadzór bez palenia tokenów:** dispatcher kanbana i patrol (skrypt bez modelu) pilnują floty
   i budzą Jarva tylko przy anomaliach albo gdy trzeba Twojej decyzji.
 
@@ -51,7 +52,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | Agent | Rola | Pokój HQ | Temat Telegram | Skille |
 |---|---|---|---|---|
 | 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol | Mostek dowodzenia (`bridge`) | general | 11 |
-| 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami | Gabinet śledczy (`study`) | sherlock | 7 |
+| 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami, transkrypcja filmu z linku | Gabinet śledczy (`study`) | sherlock | 7 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi, SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | Pracownia webowa (`devlab`) | web | 9 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, copy PL, kampanie, kalendarze | Atelier kreatywne (`atelier`) | studio | 6 |
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, filmy z kodu, maskotka | Studio filmowe (`filmstudio`) | wideo | 14 |
@@ -64,7 +65,7 @@ A/B, A/B/C), audytuje konta, optymalizuje i raportuje. Wyniki liczy **statystyk�
 (P(best)). 10 skilli: `plan-kampanii`, `plan-testu`, `start-kampanii`, `podlacz-konto`, `audyt-konta`,
 `optymalizacja`, `raport-reklam`, `wnioski-marki`, `sledzenie-konwersji`, `zgodnosc-reklam`.
 Skrypty: `ads.py` (klient Skarbca, exit 3 gdy nie podłączony), `planer.py`, `eksperyment.py`, `eksport.py`.
-**Stan: wpięty technicznie, BEZ kluczy.** Sejf na tokeny (Skarbiec) do zrobienia — patrz §7.
+**Stan: wpięty technicznie, BEZ kluczy.** Sejf na tokeny (Skarbiec) do zrobienia — patrz §10.
 
 ### 2b. jarvo-wideo — szczegóły
 Pętla krytyki: film oceniany na **7 osiach** (hook, telefon, ruch, różnorodność, kompozycja, marka,
@@ -105,20 +106,24 @@ Cała flota mieści się na **1 VPS: 4 vCPU / 8 GB RAM / 80 GB**. Obraz ~4,4 GB,
 **Obraz `jarvo-hermes`** = Hermes Agent + dobrane narzędzia. **Sidecary (docker compose):**
 - `hermes` — silnik agentów,
 - `searxng` — własna metawyszukiwarka (70+ silników, bez kluczy), AGPL,
-- `valkey` — cache/kolejki,
-- `uptime-kuma` — monitoring dostępności,
-- `beszel` + `beszel-agent` — monitoring zasobów,
+- `valkey` — magazyn SearXNG (cache, limiter),
+- `uptime-kuma` — monitoring dostępności (opcjonalnie: profil compose `monitoring`, `deploy.sh --monitoring`),
+- `beszel` + `beszel-agent` — monitoring zasobów (jw.),
 - `jarvo-net` — sieć.
 
-**Narzędzia w obrazie:** Lightpanda (lekka przeglądarka headless ~30 MB/sesję) + jeden Chromium
-tylko do renderu, Parakeet (STT), Edge TTS (lektor), FFmpeg, playwright/Chromium (pre-instalowany
-w piaskownicy pod `/opt/pw-browsers`). Odchudzone: usunięto Gotenberg i Crawl4AI.
+**Narzędzia w obrazie:** Lightpanda (lekka przeglądarka headless ~30 MB/sesję) + jedna Chromium z obrazu
+Hermesa (`/usr/local/bin/chromium`: render, PDF, zrzuty, Lighthouse), Parakeet przez `jarvo-stt` (onnx-asr;
+model ~0,65 GB pobierany przy pierwszym użyciu), FFmpeg (z obrazu Hermesa). Edge TTS (lektor) doinstalowuje
+Hermes przy pierwszym użyciu. Odchudzone: usunięto Gotenberg i Crawl4AI. (W piaskownicy Claude Code osobno:
+Playwright/Chromium w `/opt/pw-browsers`, poza obrazem.)
 
 **Modele:** domyślnie provider `openai-codex` (jeden model `gpt-6-luna`, głębia myślenia per agent
 przez `reasoning_effort`). Presety alternatywne: `openrouter` (Claude Opus 5.5 / Sonnet 5 / Haiku 4.5),
 `commandcode` (DeepSeek/Kimi), `commandcode-anthropic`. Fallback, gdy główny model odmówi.
 Model zmienia się przez `JARVO_MODEL_PROVIDER` w `compose/jarvo.env`, bez edycji repo.
-**Modele testowe lokalnie: GLM 5.3 flash.**
+**Modele testowe lokalnie: GLM 5.3 flash** — nie jest zestawem w `fleet.yaml`; ustawiany w `compose/jarvo.env`
+przez `JARVO_MODEL_PROVIDER` + `JARVO_MODEL_FRONTIER/STRONG/FAST` (i `JARVO_MODEL_FALLBACK`), np. `commandcode`
++ `z-ai/glm-5.3-flash` (tak jak w `tests/test_model_provider.py`).
 
 ---
 
@@ -155,7 +160,7 @@ Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo bui
 Statyczna strona wgrywana na FTP. Ma: `.htaccess` (HSTS, CSP `frame-ancestors 'none'`, XFO DENY,
 nosniff, Referrer/Permissions-Policy, redirecty HTTPS i non-www, 404 dla dotfiles), `robots.txt`,
 `sitemap.xml`, `llms.txt`, `site.webmanifest`, favicon; `index.html` z canonical, JSON-LD, opisem
-132 znaki, width/height na obrazach; `app.js` bez innerHTML (DOM/DOMParser).
+130 znaków, width/height na obrazach; `app.js` bez innerHTML (DOM/DOMParser).
 Wdrożenie: `bash scripts/deploy-site.sh`. **Zostało po stronie użytkownika:** wgrać na FTP i sprawdzić
 nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-security|x-frame"`.
 
@@ -170,17 +175,19 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `profiles/_host/` | profil hosta: gateway z multipleksacją, trasy Telegrama, dispatcher kanbana |
 | `shared/protocol/` | kontrakt zlecenia (16 zasad) wstrzykiwany do każdego SOUL |
 | `shared/security/deny.yaml` | reguły blokad dla całej floty |
-| `shared/skills/` | skille wspólne (np. `graf-kodu`) |
+| `shared/skills/` | skille wspólne (`graf-kodu`; `transkrypcja-filmu`: link do filmu → tekst mowy) |
 | `shared/calibration/` | kalibracja SOUL pod rodzinę modelu przy buildzie |
+| `shared/templates/` | szablony SOUL, skilla, evals i toolboxa (`make new-agent`) |
 | `security/redteam/` | promptfoo: prowider, config, scenariusze ataków |
 | `vendor/skills.lock.yaml` | skille zewnętrzne przypięte do commitów (licencje w docs/SOURCES.md) |
-| `evals/<agent>/` | scenariusze testów zachowań (routing, protokół, bezpieczeństwo) |
+| `evals/<agent>/` | scenariusze testów zachowań (w zakresie, poza zakresem, routing, protokół, bezpieczeństwo) |
 | `scripts/` | build, walidator, deploy, instalacja floty, backupy, evals, migracja, narzędzia |
 | `hq/` | Jarvo HQ (backend, frontend, demo) |
 | `infra/` | obraz jarvo-hermes, docker-compose z sidecarami, szablony env |
-| `knowledge/` | szablony wiedzy (brand kit, USER.md) |
+| `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
 | `branding/` | skórka Jarvo (banner, logo) |
 | `site/` | landing jarvo.pl |
+| `install.sh`, `install.ps1` | instalator jednym poleceniem (macOS/Linux/WSL2, Windows): repo do `~/jarvo` + `scripts/local-up.sh` |
 | `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`) |
 | `tests/`, `docs/` | testy pytest, dokumentacja |
 
@@ -194,6 +201,9 @@ SOURCES (licencje).
 ## 9. Zasady pracy (z CLAUDE.md)
 
 - **Każda aktualizacja = osobny commit i od razu push** (gałąź robocza, remote `origin`).
+- **Dokumentacja zawsze zgodna z kodem:** zmiana w kodzie aktualizuje w tym samym commicie każdy dokument, który ją
+  opisuje (README, `docs/*.md` z tym plikiem włącznie, README i CHANGELOG profilu): nazwy, liczby, ścieżki, komendy, statusy.
+  `validate.py` pilnuje linków i kotwic, pełnej listy floty w dokumentach przeglądowych i liczb skilli/evals w tabelach.
 - Przed commitem: `python3 -m pytest -q` i `python3 scripts/validate.py` bez błędów.
   Na czystym kontenerze najpierw `make dev-deps` (pytest + pyyaml z `requirements-dev.txt`).
 - **Po każdym dodaniu test w działającym kontenerze**, nie tylko pytest: deploy
@@ -201,12 +211,12 @@ SOURCES (licencje).
   nowa funkcja uruchomiona w `jarvo-hermes` jako użytkownik `hermes`
   (`PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:$PATH`), a GUI przez zalogowany dashboard.
   Wszystko ma się spinać: build → instalacja → healthchecki → realne użycie.
-- **Piaskownica Claude Code:** `dockerd` uruchamiany ręcznie; obraz budujemy
-  `docker build --network host --build-arg HERMES_IMAGE=hermes-ca:test --build-arg HTTPS_PROXY=…
-  -t jarvo-hermes:local -f infra/Dockerfile .`, a `deploy.sh` bez `--rebuild`.
-- Instalacja lokalna użytkownika: `~/TARS`. Build lokalny w scratchpadzie sesji: `jarvo-local`
-  (compose dir + build dir). Deploy: `JARVO_COMPOSE_DIR=<scratch>/jarvo-local/compose
-  JARVO_BUILD=<scratch>/jarvo-local/build bash scripts/deploy.sh --no-pull`.
+- **Piaskownica Claude Code:** `JARVO_LOCAL=<scratchpad>/jarvo-local bash scripts/sandbox-up.sh` robi wszystko:
+  `dockerd`, obraz `hermes-ca:test` (Hermes + certyfikat proxy), `jarvo-hermes:local` przez
+  `docker build --network host` (compose nie widzi proxy), instalację w `jarvo-local` i
+  `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` lub `branding/` albo z `--rebuild`.
+- Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (repo do `~/jarvo`) → `bash scripts/local-up.sh`
+  → `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`; stare `~/tars-local` przenoszone samo).
 
 ---
 
@@ -220,8 +230,10 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
 1. **Skarbiec (zadanie #50):** kontener z tokenem Meta/Google, polityka w kodzie, koperty (spend cap
    zatwierdzany kodem out-of-band, model nigdy nie widzi kodu), szkice PAUSED, STOP zawsze dozwolony,
    Graph API v25. Do zrobienia, gdy będą klucze.
-2. **Reguła: agenci nie zapamiętują danych logowania z czatu** (po red teamie Wideograf zapisał login
-   w pamięci — hasła nie było, ale warto uszczelnić).
+2. **Reguła: agenci nie zapisują danych logowania z czatu w pamięci (`memory`).** Po red teamie Wideograf
+   zapisał login w pamięci (hasła tam nie było). Hasła i logowanie w cudze konta już blokują reguła 16
+   kontraktu i `deny.yaml` (`agent-browser … auth`, `--password`, strony logowania: w red teamie hasło z czatu
+   trafiło do `agent-browser`, a login do YouTube Studio). Brakuje jeszcze wprost zakazu zapisywania loginów w pamięci.
 3. **PageIndex (MIT, rozważane):** vectorless RAG do czytania długich dokumentów przez lokalny model
    (litellm → Hermes/GLM). Nie jako osobny agent — jako współdzielona umiejętność „czytania długich
    dokumentów”. Do decyzji: zakres (który agent najpierw) + model do indeksowania.

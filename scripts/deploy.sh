@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Wdrożenie floty Jarvo na VPS (idempotentne). Uruchamiaj z /srv/jarvo/repo jako użytkownik z grupy docker.
 #
-#   bash scripts/deploy.sh [--first-run] [--no-pull] [--rebuild] [--pull-base] [--resume-cron] [--monitoring]
+#   bash scripts/deploy.sh [--first-run] [--no-pull] [--rebuild] [--pull-base] [--no-build] [--resume-cron] [--monitoring]
 #
 # --rebuild przebudowuje obraz na tej samej wersji Hermesa; --pull-base (i --first-run) pobiera też najnowszy
 # obraz bazowy Hermesa. Zmiana infra/ w git pull robi jedno i drugie, zmiana branding/ tylko przebudowę.
+# --no-build nigdy nie buduje obrazu (także przy --first-run): jarvo-hermes:local zbudowano wcześniej
+# (piaskownica Claude Code, scripts/sandbox-up.sh, gdzie budowanie przez compose nie widzi proxy).
 #
 # Kroki: git pull → docker compose build/up → walidacja repo → build dystrybucji (w kontenerze)
 #        → instalacja/aktualizacja profili (w kontenerze) → healthchecki → podsumowanie.
@@ -18,13 +20,14 @@ JARVO_BUILD="${JARVO_BUILD:-${TARS_BUILD:-}}"
 eval "$(python3 "$(dirname "${BASH_SOURCE[0]}")/migrate_jarvo.py" host --compose "$COMPOSE_DIR" ${JARVO_BUILD:+--build "$JARVO_BUILD"})"
 COMPOSE_DIR="$JARVO_COMPOSE_DIR"; [[ -n "$JARVO_BUILD" ]] || unset JARVO_BUILD
 COMPOSE=(docker compose -f "$ROOT/infra/docker-compose.yml" --env-file "$COMPOSE_DIR/.env")
-PULL=1; REBUILD=0; PULLBASE=0; FIRST=0; RESUME_CRON=0; PROFILES=()
+PULL=1; REBUILD=0; PULLBASE=0; NOBUILD=0; FIRST=0; RESUME_CRON=0; PROFILES=()
 for arg in "$@"; do
   case "$arg" in
     --first-run) FIRST=1; REBUILD=1; PULLBASE=1 ;;
     --no-pull) PULL=0 ;;
     --rebuild) REBUILD=1 ;;
     --pull-base) PULLBASE=1 ;;
+    --no-build) NOBUILD=1 ;;
     --resume-cron) RESUME_CRON=1 ;;
     --monitoring) PROFILES+=(--profile monitoring) ;;
     *) echo "Nieznana opcja: $arg"; exit 2 ;;
@@ -51,6 +54,10 @@ if [[ $PULL -eq 1 ]]; then
   fi
 fi
 
+if [[ $NOBUILD -eq 1 ]]; then
+  REBUILD=0
+  docker image inspect jarvo-hermes:local >/dev/null 2>&1 || fail "Brak obrazu jarvo-hermes:local (--no-build wymaga gotowego obrazu)."
+fi
 if [[ $REBUILD -eq 1 ]]; then
   log "Budowa obrazu jarvo-hermes (narzędzia agentów)"
   BUILD_ARGS=(); [[ $PULLBASE -eq 1 ]] && BUILD_ARGS+=(--pull)

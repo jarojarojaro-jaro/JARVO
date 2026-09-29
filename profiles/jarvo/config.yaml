@@ -25,6 +25,7 @@ web:
 # Czat (Telegram): bez terminala. Pracownik-sędzia (tor review, platforma cli): pełna weryfikacja.
 platform_toolsets:
   telegram: [kanban, memory, file, web, session_search, clarify, todo, skills, cronjob]
+  api_server: [kanban, memory, file, web, session_search, todo, skills, cronjob]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
   cli: [kanban, memory, file, terminal, web, browser, vision, session_search, todo, skills, cronjob]
   cron: [kanban, memory, file, skills, session_search]
 

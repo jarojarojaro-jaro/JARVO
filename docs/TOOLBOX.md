@@ -57,10 +57,9 @@ własną przeglądarkę i ~0,3 GB; całą witrynę audytujemy `audit.sh` po kole
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
 | [SearXNG](https://github.com/searxng/searxng) | własna metawyszukiwarka (70+ silników), bez kluczy i limitów | AGPL-3.0 | 2026-09 | sidecar + dostawca `searxng` |
-| [trafilatura](https://github.com/adbar/trafilatura) | czysta treść artykułów (`extract.py`) | Apache-2.0 | 2026-09 | skrypt |
+| [trafilatura](https://github.com/adbar/trafilatura) | czysta treść artykułów, metadane, daty publikacji (`extract.py`) | Apache-2.0 | 2026-09 | skrypt |
 | [Lightpanda](https://github.com/lightpanda-io/browser) | strony z JS do Markdown bez Chromium: `lightpanda fetch --dump markdown <url>`; silnik `browser_*` | AGPL-3.0 (osobny program) | 2026-09 | CLI + Hermes |
 | [Scrapling](https://github.com/D4Vinci/Scrapling) | odporny scraping (skill [H] `scrapling`) | BSD-3 | 2026-09 | CLI |
-| [trafilatura](https://github.com/adbar/trafilatura) | czysty tekst artykułów, metadane, daty publikacji | Apache-2.0 | 2026-09 | skrypt |
 | [Docling](https://github.com/docling-project/docling) | PDF-y, raporty, tabele → Markdown | MIT | 2026-09 | skrypt |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | napisy i transkrypcje z wideo jako źródła | Unlicense | 2026-09 | CLI |
 | [ExifTool](https://github.com/exiftool/exiftool) | metadane zdjęć i plików (weryfikacja pochodzenia) | GPL-3.0 | 2026-05 | CLI |
@@ -120,7 +119,7 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 | [Pixabay API](https://pixabay.com/api/docs/) | darmowe ujęcia i zdjęcia stock (klucz `PIXABAY_API_KEY`), cache 24 h | Pixabay Content License | n/d | `stock.py` |
 | HyperFrames (skill [H] `hyperframes`) | wideo z HTML + GSAP → MP4/WebM | Apache-2.0 | 2026-09 | CLI (`npx`) |
 | [motion-broll](https://github.com/Barty-Bart/motion-graphics) | animowany B-roll do nagrania, zgrany ze słowami; panele ProRes 4444 z alfą | MIT | 2026-09 | skill + `narzedzia.py` |
-| [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | cały film w 39 stylach (keynote, akwarela, anime, 3D…); lektor PL przez `lektor_linie.py` | MIT | 2026-09 | skill + biblioteka (`narzedzia.py`; sample i Kokoro: `JARVO_EXTRAS=lemo`) |
+| [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | cały film w 39 stylach (keynote, akwarela, anime, 3D…); lektor PL przez `lektor_linie.py` | MIT | 2026-09 | skill + biblioteka (`narzedzia.py`; sample i Kokoro tylko z `JARVO_EXTRAS=lemo` w `compose/.env`, bez przebudowy obrazu: compose przekazuje zmienną do kontenera) |
 | [anidoodle](https://github.com/alexgreensh/anidoodle) | rysunek kodem w 31 stylach, timelapse, HTML offline, muzyka syntezowana | Apache-2.0 | 2026-09 | skill + `narzedzia.py` |
 | [Remotion skills](https://github.com/remotion-dev/skills) + iart | wideo w React: create, render, napisy; typografia, wykresy, belki, odliczanie | Remotion License / MIT | 2026-09 | skille + `narzedzia.py instaluj remotion` |
 | [video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) | kinowe filmy produktu: 152 przepisy ujęć, szablon | Apache-2.0 | 2026-09 | `narzedzia.py instaluj shotcraft` |
@@ -144,7 +143,19 @@ Wzięty pomysł pipeline'u, implementacja własna na FFmpeg. Automatyczna publik
 płatnej licencji. Domyślnie HyperFrames / Motion Canvas / Revideo.
 
 Odrzucone: ComfyUI self-host (GPL-3.0, wymaga GPU; generowanie idzie przez API),
-`rhasspy/piper` (projekt przeniesiony do `OHF-Voice/piper1-gpl` na GPL-3.0; Kokoro wystarcza).
+`rhasspy/piper` (projekt przeniesiony do `OHF-Voice/piper1-gpl` na GPL-3.0; lektor PL robi Edge TTS, a Kokoro, tylko EN/ZH, jest częścią lemo-opuscar).
+
+---
+
+## `jarvo-ads`: Specjalista Ads
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| Skarbiec (`jarvo-skarbiec`, własny) | tokeny Meta/Google, polityka budżetu, koperty i kody zgody; agent nie ma tokenów | MIT | n/d | sidecar (**w planie, jeszcze nie zbudowany**: brak usługi w `infra/docker-compose.yml`) |
+| `ads.py` | jedyne wejście do kont reklamowych przez Skarbiec; bez niego kod wyjścia 3 | własny kod | n/d | skrypt |
+| `eksport.py`, `planer.py`, `eksperyment.py` | eksporty CSV z Ads Managera / Google Ads, planowanie budżetu testu, werdykt testu A/B/C | własny kod | n/d | skrypt |
+
+Bez Skarbca agent pracuje na eksportach CSV. Wydatki tylko na poziomie A2, w kopercie zatwierdzonej kodem ([ADS.md](ADS.md)).
 
 ---
 
@@ -172,7 +183,7 @@ MCP według Twoich narzędzi (np. `notion`, `todoist`, `calendly`, `airtable`), 
 |---|---|---|---|---|
 | Kanban Hermesa | tablica zleceń, statusy `review` / `request_changes` | MIT (Hermes) | n/d | toolset `kanban` |
 | [Langfuse](https://github.com/langfuse/langfuse) | ślady przebiegów, koszty per agent, oceny sędziego | MIT (core) | 2026-09 | plugin `langfuse` + sidecar |
-| [promptfoo](https://github.com/promptfoo/promptfoo) | evals floty (scenariusze z `evals/`) w CI i przed wdrożeniem | MIT | 2026-09 | CLI (dev/CI) |
+| [promptfoo](https://github.com/promptfoo/promptfoo) | red team floty (`scripts/redteam.sh`, ataki z `security/redteam/`); evals z `evals/` robi `scripts/run-evals.py` | MIT | 2026-09 | CLI w kontenerze (0.123.1, instalowany przy pierwszym użyciu) |
 | [DeepEval](https://github.com/confident-ai/deepeval) | alternatywa dla promptfoo (metryki LLM-sędziego) | Apache-2.0 | 2026-09 | do oceny |
 
 Z katalogu wtyczek Hermesa do oceny w fazie 6: `afterforge` (zamienia porażki agentów
@@ -217,7 +228,7 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 
 | Warstwa | Gdzie | Co |
 |---|---|---|
-| obraz Hermesa | `/opt/hermes` | Python 3.14 Hermesa (nie ruszamy), Node, `uv`, ffmpeg/ffprobe, Chromium |
+| obraz Hermesa | `/opt/hermes` | Python 3.13 Hermesa (Debian 13; nie ruszamy), Node, `uv`, ffmpeg/ffprobe, Chromium |
 | pakiety systemowe | apt | pandoc, qpdf, ocrmypdf + tesseract (pol, eng), exiftool, jq, sqlite3, fonty z polskimi znakami |
 | przeglądarki | `/usr/local/bin/lightpanda`, `/usr/local/bin/chromium` (`CHROME_PATH`) | Lightpanda dla `browser_*` agentów (agent-browser); jedna Chromium z obrazu Hermesa dla zrzutów, PDF, Lighthouse, Playwright i dembrandta |
 | narzędzia Node | `/opt/jarvo/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt |

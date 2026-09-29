@@ -23,6 +23,7 @@ web:
 platform_toolsets:
   cli: [web, browser, file, terminal, delegation, memory, skills, todo, vision, session_search]
   telegram: [web, browser, file, terminal, delegation, memory, skills, todo, vision, session_search, clarify]
+  api_server: [web, browser, file, terminal, delegation, memory, skills, todo, vision, session_search]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
   cron: [web, file, terminal, memory, skills]
 
 terminal:

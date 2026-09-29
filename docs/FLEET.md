@@ -1,6 +1,6 @@
 # Flota Jarvo: specyfikacja agentów v1
 
-Pierwsza flota: **Main Judge + 4 agentów**. Każdy agent to osobny profil Hermesa
+Flota: **Main Judge + 6 agentów**. Każdy agent to osobny profil Hermesa
 (osobna dystrybucja w `profiles/<nazwa>/`). Rejestr maszynowy jest w [`fleet.yaml`](../fleet.yaml).
 
 Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prompt, workflowy,
@@ -11,25 +11,26 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
-| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [10 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | — | patrol, brief, przegląd, raport floty | [12](../evals/jarvo/scenarios.yaml) |
-| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [6 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 15 (Hermes, marketingskills) | search_fanout, extract, sources | [11](../evals/jarvo-sherlock/scenarios.yaml) |
-| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [7 w `skills/web/`](../profiles/jarvo-web/skills/web) | 30 (web-quality, claude-seo, marketingskills, Anthropic, Hermes) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract | [11](../evals/jarvo-web/scenarios.yaml) |
-| `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 21 (marketingskills, Anthropic, Hermes) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
-| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [13 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 15 (HyperFrames, marketingskills, Hermes) | film, stock, kadry, montaz, napisy, qa_wideo | [12](../evals/jarvo-wideo/scenarios.yaml) |
+| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [11 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 0 | patrol, brief, przegląd, raport floty | [18](../evals/jarvo/scenarios.yaml) |
+| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [7 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 16 (Hermes, marketingskills, wspólny `transkrypcja-filmu`) | search_fanout, extract, sources | [12](../evals/jarvo-sherlock/scenarios.yaml) |
+| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [9 w `skills/web/`](../profiles/jarvo-web/skills/web) | 55 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [12](../evals/jarvo-web/scenarios.yaml) |
+| `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 23 (marketingskills, Anthropic, Hermes, impeccable) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
+| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [14 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 56 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólny `transkrypcja-filmu` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie (+ wideo_lib) | [19](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 5 (marketingskills) | ads, planer, eksperyment, eksport | [12](../evals/jarvo-ads/scenarios.yaml) |
-| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | skill-creator + skille wszystkich snajperów (`external_dirs`) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
+| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 3 (skill-creator, `graf-kodu`, `transkrypcja-filmu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
 
 Legenda przy skillach:
 - **[H]**: skill, który już istnieje w Hermesie (`skills/` albo `optional-skills/`) i tylko go instalujemy w profilu,
-- **[T]**: skill, który piszemy sami w tym repo.
+- **[T]**: skill, który piszemy sami w tym repo,
+- **[Z]**: skill zewnętrzny z innego repo OSS, przypięty do commitu w [`vendor/skills.lock.yaml`](../vendor/skills.lock.yaml).
 
 | Profil | Rola | Typ | Maks. autonomia bez zgody |
 |---|---|---|---|
 | `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator | A1 (tworzy karty, ocenia) |
 | `jarvo-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
-| `jarvo-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A0/A1 (czyta, pisze raporty) |
+| `jarvo-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A1 (czyta, pisze raporty) |
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja = A2) |
 | `jarvo-ads` | Specjalista Ads: Meta Ads i Google Ads, kampanie, testy, raporty | snajper | A1 (szkice PAUSED; wydatek = A2 z kodem Skarbca) |
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
@@ -39,7 +40,8 @@ Legenda przy skillach:
 
 ## Warstwa wspólna: wiedza o Tobie i Twoich markach
 
-Snajperzy nie dzielą się skillami, ale wszyscy znają **Ciebie**:
+Snajperzy nie dzielą pamięci ani workflowów dziedzinowych (wspólne są tylko narzędziowe skille z `shared/skills/`,
+np. `graf-kodu`, i te same skille zewnętrzne z locka), ale wszyscy znają **Ciebie**:
 - **profil użytkownika**: kim jesteś, czym się zajmujesz, preferencje (MVP: `knowledge/user/USER.md`
   z wywiadu onboardingowego Jarva; później wspólny provider pamięci, np. Honcho),
 - **brand kity** w `knowledge/brands/<marka>/`: logo, kolory, fonty, ton komunikacji, `DESIGN.md`.
@@ -75,11 +77,14 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
 
-**Skille:** [T] `judge-rubryki` (kryteria oceny dla każdego agenta), [T] `dispatch-playbook`
-(jak pisać karty z DoD, typowe przepływy), [T] `roster` (generowany z `fleet.yaml`: kto istnieje i co umie),
-[T] `raport-dla-szefa` (format raportu końcowego).
+**Skille:** [T] `intake`, `wywiad`, `dispatch-playbook` (jak pisać karty z DoD, typowe przepływy),
+`mission-ledger` (dziennik misji i raport końcowy), `decision-queue`, `sdlc-review` (sędzia; rubryki agentów
+`references/rubric-<agent>.md` generowane z ich `quality/rubric.md`), `patrol`, `daily-brief`, `weekly-review`,
+`onboarding-interview`, `fleet-improvement`, [T] `roster` (generowany z `fleet.yaml`: kto istnieje i co umie).
 
-**Toolsety:** `kanban` (orkiestrator), `memory`. Bez terminala i bez edycji plików projektów.
+**Toolsety:** na Telegramie `kanban`, `memory`, `file`, `web`, `session_search`, `clarify`, `todo`, `skills`, `cronjob`,
+bez terminala; w czacie HQ (`api_server`) to samo bez `clarify`. Pracownik-sędzia (CLI) ma dodatkowo `terminal`, `browser` i `vision` do weryfikacji wyników.
+Pracy dziedzinowej nie wykonuje (zasada SOUL, nie brak narzędzi).
 
 ---
 
@@ -100,7 +105,9 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
 - **Wdrożenie:** GitHub/Cloudflare/Netlify Pages, domeny, analityka.
 
 **Skille:**
-- [H] `claude-design`, `popular-web-designs`, `design-md`, `impeccable`, `auteur`, `scrollcraft`, `publish-site`
+- [H] `claude-design`, `popular-web-designs`, `design-md`, `scrollcraft`, `publish-site`, `cloudflare-temporary-deploy`
+- [Z] `impeccable`, web-quality-skills (5), claude-seo (13), marketingskills (3), Anthropic (2), GSAP (8), Three.js (10),
+  motion Emila Kowalskiego (5), `text-to-lottie`, wspólny `graf-kodu` (`shared/skills/`)
 - [T] `brand-z-url`: podajesz stronę, a agent crawluje ją i wyciąga logo, kolory, fonty,
   ton i komponenty do `knowledge/brands/<marka>/` (z `DESIGN.md`)
 - [T] `audyt-strony`: Lighthouse, dostępność (axe), SEO, obrazy i responsywność (zrzuty na kilku
@@ -111,10 +118,12 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
 - [T] `landing-produktowy`: strona nowego produktu pod SEO (research słów kluczowych od `jarvo-sherlock`, jeśli trzeba)
 - [T] `favicon-i-meta`: generowanie kompletu ikon, manifestu i meta z jednego logo
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`
+- [T] `wdrozenie`: podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą)
+- [T] `bezpieczenstwo-aplikacji`: skan i przegląd bezpieczeństwa kodu i strony (`security_check.py`)
 
 **Narzędzia:** terminal, pliki, przeglądarka (Lightpanda, Chromium do zrzutów), Node.js, a do tego Lighthouse, axe-core,
-Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate i MCP
-`context7`/`netlify`/`cloudflare`. Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-web-web-senior-dev).
+Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate; MCP `context7`
+zaplanowany (jeszcze niewłączony w `config.yaml`). Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-web-web-senior-dev).
 
 **Rubryka sędziego (DoD):** strona buduje się bez błędów, Lighthouse ≥ 90 we wszystkich
 kategoriach (albo uzasadnienie), komplet faviconów i meta, poprawne zrzuty mobile i desktop,
@@ -142,13 +151,17 @@ składa całość i **weryfikuje**, co jest prawdą.
 **Skille:**
 - [H] `grounded-citations`, `blocked-page-recovery`, `searxng-search`, `duckduckgo-search`,
   `scrapling`, `arxiv`, `youtube-content`, `reddit-reading`, `rss-feeds`,
-  `competitor-news-monitor`, `domain-intel`, `osint-investigation`
+  `blogwatcher`, `competitor-news-monitor`, `domain-intel`, `osint-investigation`
+- [Z] marketingskills `competitor-profiling`, `customer-research`; wspólny `transkrypcja-filmu` (`shared/skills/`):
+  link albo plik filmu → tekst mowy (napisy platformy albo Parakeet), bez analizy obrazu
 - [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł), [T] `szybki-fakt` (jedna runda, cytat),
-  [T] `raport-sledztwa` (format raportu), [T] `research-seo` (słowa kluczowe i konkurencja, dla `jarvo-web` i `jarvo-studio`)
+  [T] `raport-sledztwa` (format raportu), [T] `research-seo` (słowa kluczowe i konkurencja, dla `jarvo-web` i `jarvo-studio`),
+  [T] `research-rynku` (gracze, oferty, ceny, opinie), [T] `monitoring` (rutyna cron zakładana przez Jarva)
 
 **Narzędzia:** wielu dostawców wyszukiwania naraz (własny SearXNG, Brave, Exa…), trafilatura i Lightpanda (strony z JS do Markdown),
-Docling (PDF-y, dodatek obrazu), yt-dlp (transkrypcje), OpenAlex (nauka), ArchiveBox (archiwum dowodów),
-delegowanie wątków. Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-sherlock-researcher-detektyw).
+Docling (PDF-y, dodatek obrazu), yt-dlp (transkrypcje), OpenAlex (nauka, wtyczka opcjonalna), archiwum dowodów lokalnie
+(`sources.py --archive`; ArchiveBox jako opcjonalny sidecar w planach), delegowanie wątków.
+Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-sherlock-researcher-detektyw).
 
 **Rubryka sędziego (DoD):** każde kluczowe twierdzenie ma źródło, podany poziom pewności,
 sprzeczności wypisane, daty źródeł podane, jasna odpowiedź na pierwotne pytanie.
@@ -179,6 +192,8 @@ Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-studio-marketing-i-kreacja).
 **Skille:**
 - [H] `baoyu-infographic`, `social-media-content-calendar`, `creative-ideation`, `humanizer`, `meme-generation`,
   `excalidraw`, `concept-diagrams`
+- [Z] marketingskills (12: copywriting, social, launch, ads, ad-creative…), Anthropic (3: `algorithmic-art`,
+  `canvas-design`, `theme-factory`), `impeccable`
 - [T] `formaty-platform` (specyfikacje i szablony), [T] `grafika-social` (szablony HTML do PNG w brand kicie),
   [T] `pakiet-kampanii` (posty + grafiki + brief wideo + kalendarz), [T] `generacja-ai` (obrazy), [T] `copy-pl`, [T] `publikacja`
 
@@ -207,9 +222,11 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 + `kontrola-wideo` (ocena 0–100 w 10 osiach, PASS od 85, najwyżej 2 rundy poprawek). Każde ujęcie oglądane (vision),
 źródła i licencje w `film.json`.
 
-**Skille:** [T] `krotki-film`, `scenariusz`, `material-stock`, `dobor-ujec`, `warianty-ab`, `montaz-nagran`,
+**Skille:** [T] `rodzaje-filmu`, `krotki-film`, `scenariusz`, `material-stock`, `dobor-ujec`, `warianty-ab`, `montaz-nagran`,
 `klipy-z-dlugiego`, `napisy`, `lektor-i-dzwiek`, `film-z-kodu`, `wideo-ai`, `formaty-wideo`, `kontrola-wideo`;
-[H] `hyperframes` (12 skilli rodziny), `manim-video`, `ai-presenter-video`, marketingskills `video`.
+[H] `manim-video`, `ai-presenter-video`; [Z] `hyperframes` (12 skilli rodziny), marketingskills `video`, GSAP (8),
+Three.js (10), screenwriting (5), iart (5), motion (3), Remotion, motion-broll, lemo-opuscar, anidoodle, claude-animation,
+bang-motion, pixel2motion, `text-to-lottie`, `slack-gif-creator`, wspólny `transkrypcja-filmu` (razem 56).
 Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#jarvo-wideo-wideograf).
 
 **Zasada:** **nie publikuje sam** i nie kupuje materiałów; bez deepfake'ów i klonowania głosów realnych osób.
@@ -224,17 +241,17 @@ robi szybkie rzeczy od ręki, skleja wyniki snajperów i łata dziury, gdzie nie
 **Czym różni się od Jarva:** Jarvo *zarządza i ocenia*, a prawa ręka *wykonuje*.
 Jarvo nie robi pracy, a ręka robi wszystko.
 
-**Czym różni się od snajperów:** ma **dostęp do skilli wszystkich** agentów (tylko do odczytu)
-i pełny katalog Hermesa, ale nie ma ich pamięci ani głębi. Do szybkich i przekrojowych
-zadań jest idealna. Gdy zadanie wymaga jakości snajpera, sama proponuje oddanie go przez Jarva.
+**Czym różni się od snajperów:** ma **dostęp do skilli wszystkich snajperów** (tylko do odczytu; walidator
+pilnuje, żeby nowy snajper też tu trafił) i pełny katalog Hermesa, ale nie ma ich pamięci ani głębi.
+Do szybkich i przekrojowych zadań jest idealna. Gdy zadanie wymaga jakości snajpera, sama proponuje oddanie go przez Jarva.
 
 **Typowe zadania:** szybka odpowiedź lub obliczenie, poprawka tekstu, porządki w plikach,
 prototyp na szybko, zebranie wyników kilku snajperów w jeden dokument, maile, notatki,
 plan dnia, „znajdź sposób, żeby…”.
 
-**Skille:** pełny katalog [H] plus skille snajperów przez `skills.external_dirs`
-(w fazie 0 trzeba potwierdzić, że ręka **nie może ich modyfikować**, bo Hermes pozwala
-agentowi edytować skille w external_dirs, jeśli ma prawa zapisu) oraz [T] `kiedy-oddac-snajperowi`.
+**Skille:** pełny katalog [H], skille wszystkich snajperów przez `skills.external_dirs` (build zamontowany
+w kontenerze tylko do odczytu, `:ro`, więc ręka nie może ich modyfikować), [Z] `skill-creator`, `graf-kodu`, `transkrypcja-filmu`
+oraz [T] `zlozenie-pakietu`, `dokumenty`, `szybki-prototyp`, `kiedy-oddac-snajperowi`.
 
 **Rubryka sędziego (DoD):** zadanie wykonane, wynik sprawdzony przez nią samą, jasno powiedziane, czego nie zrobiła.
 
@@ -249,12 +266,14 @@ i kodami zgody, więc agent nie może wydać złotówki bez Ciebie. Pełny proje
 
 ---
 
-## Kolejność budowy (propozycja)
+## Kolejność budowy (historycznie, faza 1)
 
 1. `jarvo` + `jarvo-sherlock`: najprostsze narzędzia, dobre do przetestowania pętli sędziego.
 2. `jarvo-web`: najwięcej wiedzy do spisania, najbardziej mierzalne wyniki (Lighthouse).
 3. `jarvo-studio`: wymaga najwięcej narzędzi i kluczy API (OpenRouter, FFmpeg, renderery).
 4. `jarvo-reka`: na końcu, bo korzysta ze skilli pozostałych.
+5. `jarvo-wideo`: wydzielony później ze Studia (wideo to osobny warsztat).
+6. `jarvo-ads`: dołączony bez kluczy; Skarbiec (sejf tokenów) jeszcze do zbudowania ([ADS.md](ADS.md)).
 
 Pierwszy wspólny test floty: **„wypuść landing nowego produktu”**. Sherlock robi research
 i słowa kluczowe, web buduje stronę, studio przygotowuje grafiki i posty, ręka składa

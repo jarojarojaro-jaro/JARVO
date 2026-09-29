@@ -133,3 +133,58 @@ def test_version_range_check():
     assert ok(">=18 <20", "26.5.1") is False
     assert ok("<4.0 >=3.11", "3.12.0") is True
     assert ok(">=3.13", "3.12.0") is False
+
+
+# ------------------------------------------------------------------ deploy.sh --no-build, sandbox-up.sh
+
+def _fake_docker(tmp_path, image_exists: bool):
+    """Atrapa `docker`: zapisuje wywołania; `image inspect` zwraca 0 albo 1 (czy obraz jest)."""
+    import os
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    log = tmp_path / "docker.log"
+    (bindir / "docker").write_text(
+        "#!/usr/bin/env bash\n"
+        f'echo "$*" >> "{log}"\n'
+        f'if [[ "$1 $2" == "image inspect" ]]; then exit {0 if image_exists else 1}; fi\n'
+        "exit 0\n", encoding="utf-8")
+    (bindir / "docker").chmod(0o755)
+    compose = tmp_path / "compose"
+    compose.mkdir()
+    (compose / ".env").write_text("SEARXNG_SECRET=x\nDASHBOARD_PASSWORD=y\n", encoding="utf-8")
+    env = {**os.environ, "PATH": f"{bindir}:{os.environ['PATH']}", "JARVO_COMPOSE_DIR": str(compose),
+           "JARVO_BUILD": str(tmp_path / "build")}
+    return env, log
+
+
+def _deploy(env, *flags):
+    import subprocess
+    return subprocess.run(["bash", str(fl.REPO_ROOT / "scripts/deploy.sh"), *flags], env=env,
+                          capture_output=True, text=True, timeout=60)
+
+
+def test_deploy_no_build_never_builds_even_on_first_run(tmp_path):
+    env, log = _fake_docker(tmp_path, image_exists=True)
+    res = _deploy(env, "--no-pull", "--no-build", "--first-run")
+    assert res.returncode == 0, res.stdout + res.stderr
+    calls = log.read_text(encoding="utf-8")
+    assert " up -d" in calls and " build " not in calls and "Budowa obrazu" not in res.stdout
+
+
+def test_deploy_no_build_requires_existing_image(tmp_path):
+    env, log = _fake_docker(tmp_path, image_exists=False)
+    res = _deploy(env, "--no-pull", "--no-build")
+    assert res.returncode == 1
+    assert "Brak obrazu jarvo-hermes:local" in res.stdout
+    assert " up -d" not in log.read_text(encoding="utf-8")
+
+
+def test_sandbox_up_refuses_outside_sandbox(tmp_path):
+    import os
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if k.upper() != "HTTPS_PROXY"}
+    env["JARVO_LOCAL"] = str(tmp_path / "local")
+    res = subprocess.run(["bash", str(fl.REPO_ROOT / "scripts/sandbox-up.sh")], env=env,
+                         capture_output=True, text=True, timeout=30)
+    assert res.returncode == 1 and "to nie piaskownica" in res.stdout
+    assert not (tmp_path / "local").exists()

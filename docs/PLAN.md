@@ -22,6 +22,7 @@ Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa 
 | [VPS.md](VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring, wdrożenia |
 | [RUNBOOK.md](RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [SOURCES.md](SOURCES.md) | źródła, atrybucje i licencje |
+| [JARVO-CALOSC.md](JARVO-CALOSC.md) | całość od A do Z w jednym pliku (kontekst na start sesji) |
 
 ---
 
@@ -61,8 +62,8 @@ do Ciebie tylko prawdziwe decyzje. Stan żyje na dysku, więc wszystko przeżywa
 
 Zasady:
 1. **Specjalista = snajper.** Jedna dziedzina, własne skille, własna wiedza, własna pamięć.
-   Zero wspólnego katalogu skilli: profile tworzone z `--no-skills`, a toolsety
-   ograniczone do tego, czego dziedzina potrzebuje. Czego nie umie, tego nie robi. Oddaje zadanie szefowi.
+   Bez katalogu skilli Hermesa: dystrybucja snajpera ma znacznik `.no-bundled-skills` (wyjątek: generalista
+   `jarvo-reka`), a toolsety ograniczone do tego, czego dziedzina potrzebuje. Czego nie umie, tego nie robi. Oddaje zadanie szefowi.
 2. **Jarvo = Main Judge (orkiestrator).** Sam nie wykonuje pracy dziedzinowej. Robi cztery rzeczy:
    - **intake:** rozumie, czego chcesz, dopytuje tylko o prawdziwe decyzje,
    - **dispatch:** rozbija cel na karty kanbana i przypisuje je właściwym snajperom,
@@ -85,20 +86,21 @@ Zasady:
                           │  kanban (orkiestrator)       │     zleca specjalistom
                           └──────────────┬───────────────┘
                                          │ kanban_create / delegate_task
-          ┌───────────────┬──────────────┼──────────────┬───────────────┐
-          ▼               ▼              ▼              ▼               ▼
-     jarvo-sherlock    jarvo-web      jarvo-studio    jarvo-reka       jarvo-… (kolejni)
-     (research)       (strony)      (kreacja)      (prawa ręka)
-     SOUL + skille    SOUL + skille SOUL + skille  SOUL + skille
-     własna pamięć    własna pamięć …
-          ▲               ▲              ▲              ▲
-          └───────────────┴── rozmowa bezpośrednia ─────┘
+        ┌─────────────┬─────────────┬────┴────────┬─────────────┬─────────────┐
+        ▼             ▼             ▼             ▼             ▼             ▼
+ jarvo-sherlock   jarvo-web   jarvo-studio   jarvo-wideo    jarvo-ads    jarvo-reka
+   (research)     (strony)      (kreacja)      (wideo)      (reklamy)   (prawa ręka)
+  SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille
+  własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć
+        ▲             ▲             ▲             ▲             ▲             ▲
+        └─────────────┴───────── rozmowa bezpośrednia ──────────┴─────────────┘
                (alias CLI, Bot Chat w desktopie, własny temat na Telegramie)
 
   Wspólne warstwy (dla wszystkich profili):
    • pamięć o Tobie    → MVP: USER.md + pamięć Jarva; później Honcho (wspólny user peer)
-   • (brak wspólnych skilli: każdy snajper ma wyłącznie swoje)
-   • tablica zadań     → ~/.hermes/kanban.db (współdzielona przez profile)
+   • skille wspólne    → tylko wybrane, z repo (`shared/skills/`, np. `graf-kodu` u Weba i Ręki);
+                         poza tym każdy snajper ma wyłącznie swoje
+   • tablica zadań     → /opt/data/kanban.db (HERMES_HOME hosta, współdzielona przez profile)
 ```
 
 ### Trzy tryby pracy
@@ -169,8 +171,8 @@ Aktualna mapa jest w [README](../README.md#mapa-repo). Najważniejsze przepływy
 fleet.yaml + profiles/<agent>/ + shared/protocol/ + vendor/skills.lock.yaml
    └─ scripts/build.py ──► build/profiles/<agent>/   (dystrybucje Hermesa: SOUL z protokołem, tokeny,
                           build/host/config.yaml       roster, rubryki, skille zewnętrzne, cron z ID)
-scripts/deploy.sh (VPS) ──► validate → build → install-fleet.sh (hermes profile install/update,
-                            sekrety, prune skilli, kanban) → healthcheck → restart gatewaya
+scripts/deploy.sh (VPS) ──► git pull → obraz/usługi → validate → build → install-fleet.sh (hermes profile
+                            install/update, sekrety, prune skilli, kanban, restart gatewaya) → healthcheck
 ```
 
 ---
@@ -183,7 +185,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 ### Faza 0: Fundament i spike techniczny
 - 🟡 Postawić VPS według [RUNBOOK.md](RUNBOOK.md) (skrypty gotowe: `bootstrap-vps.sh`, `deploy.sh`).
 - ✅ Obraz pochodny Hermesa (`infra/Dockerfile`) z narzędziami MVP, zbudowany na opublikowanym obrazie Hermesa 0.21.5.
-- ✅ Test end-to-end w Dockerze: prawdziwy `deploy.sh` (walidacja, build, instalacja i aktualizacja 5 profili,
+- ✅ Test end-to-end w Dockerze: prawdziwy `deploy.sh` (walidacja, build, instalacja i aktualizacja 5 profili (wtedy; dziś flota ma 7),
   healthchecki), audyt strony z Lighthouse/axe, rendery grafik, PDF (pandoc + Chromium), SearXNG, patrol na prawdziwej
   tablicy i cron z bramką skryptu (`wakeAgent=false` → zero tokenów). Bez modeli LLM i bez Telegrama.
 - ✅ Model sandboxu: agenci wykonują komendy w kontenerze Hermesa, bez gniazda Dockera.
@@ -196,17 +198,17 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 
 ### Faza 1: MVP: Jarvo + Sherlock
 - ✅ Szkielet repo, `fleet.yaml`, szablony, generator (`scripts/build.py`).
-- ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 10 skilli dowodzenia ([BOSS.md](BOSS.md)).
+- ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 11 skilli dowodzenia ([BOSS.md](BOSS.md)).
 - ✅ `jarvo-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
 - ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
-- ✅ Walidator + testy (`make validate`, `make test`, CI) + 56 scenariuszy evals.
+- ✅ Walidator + testy (`make validate`, `make test`, CI) + 95 scenariuszy evals.
 
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
 - 🟡 Telegram: „Jarvo HQ”, temat na specjalistę, General dla Jarva.
 - ✅ Jarvo HQ: GUI floty w dashboardzie Hermesa (pokoje agentów, praca na żywo, decyzje, misje, czat), test na prawdziwym Hermesie ([HQ.md](HQ.md)).
 - ⬜ Desktop: Bot Mode (lista botów, awatary, czat grupowy floty).
-- ⬜ (opcjonalnie) głos: transkrypcja notatek głosowych, TTS.
+- 🟡 Głos: notatki głosowe z Telegrama → Parakeet (`jarvo-stt`, `stt.provider: local_command`), lektor Edge TTS u Wideografa.
 
 ### Faza 3: Pamięć i onboarding
 - ✅ Skill `onboarding-interview`: wywiad startowy → `knowledge/user/USER.md`.
@@ -216,6 +218,10 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 
 ### Faza 4: Reszta floty v1, potem kolejni specjaliści
 - ✅ `jarvo-web`, `jarvo-studio`, `jarvo-reka` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
+- ✅ `jarvo-wideo` (Wideograf): 14 skilli, pętla krytyki (7 osi), maskotka, 19 scenariuszy evals.
+- 🟡 `jarvo-ads` (reklamy Meta i Google): SOUL, 10 skilli, skrypty, rubryka, 12 scenariuszy evals; bez kluczy ([ADS.md](ADS.md)).
+- ⬜ Clipmaker Wideografa: długie nagranie → edytowalne rolki (kadr z focusem, napisy karaoke, `klipy.py`) ([KLIPY.md](KLIPY.md)).
+- ⬜ Skarbiec: sejf tokenów reklamowych, koperty zatwierdzane kodem, STOP ([ADS.md](ADS.md)).
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
@@ -227,8 +233,10 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 
 ### Faza 6: Jakość, koszty, bezpieczeństwo
 - ✅ Evals na stagingu (`scripts/evals-staging.sh`), sędzia LLM + sprawdzenia deterministyczne.
-- ✅ Koszty: poziomy modeli w `fleet.yaml`, osobny klucz OpenRouter z limitem na agenta.
+- ✅ Koszty: poziomy modeli w `fleet.yaml` i `reasoning_effort` per agent; przy presecie `openrouter` osobny klucz z limitem na agenta.
 - ✅ Bezpieczeństwo: zgody (A2 tylko z człowiekiem, praca bez nadzoru = odmowa), sekrety tylko w `.env`, Tailscale.
+- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 12 ataków) i wspólne zakazy floty
+  (`shared/security/deny.yaml`).
 - ⬜ Przegląd kosztów po 2 tygodniach, korekta poziomów modeli.
 
 ### Faza 7: Pętla samodoskonalenia
@@ -267,9 +275,9 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
     `thedotmack/claude-mem` (Apache-2.0; wtyczka Claude Code z workerem w tle, dubluje pamięć
     i `session_search` Hermesa), `mem0ai/mem0` (Apache-2.0; Hermes ma go jako dostawcę, ale to chmura z kluczem,
     a wtyczka przeglądarki nas nie dotyczy), `gastownhall/beads` (MIT; tracker na Dolt, dubluje kanban Hermesa).
-- **Edytor filmów, dalsze kroki** (inspiracja: diffusionstudio/editor, MPL-2.0, nie forkujemy): Wideograf renderuje
-  `*.edycja.json` tym samym silnikiem co HQ; napisy z mowy (Parakeet) i wycinanie „yyy”/ciszy jako cięcia;
-  przejścia i animacje napisów przez ffmpeg.
+- **Edytor filmów** (inspiracja: diffusionstudio/editor, MPL-2.0, nie forkujemy). **Wdrożone** ([HQ.md §2a](HQ.md#2a-edytor-filmów)):
+  Wideograf renderuje `*.edycja.json` tym samym silnikiem co HQ (`projekt.py render`), napisy z mowy (Parakeet),
+  znaczniki ciszy i „yyy” do wycięcia. **Dalsze kroki:** przejścia i animacje napisów przez ffmpeg.
 
 ---
 
@@ -278,7 +286,7 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
 | # | Decyzja | Rekomendacja | Dlaczego |
 |---|---|---|---|
 | D1 | Lista specjalistów | ✅ Ustalone: flota v1 (sekcja 8) | |
-| D2 | Modele | ✅ OpenRouter (modele, obrazy, wideo); poziomy w `fleet.yaml`: frontier dla Jarva, strong dla snajperów, fast do delegacji | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
+| D2 | Modele | ✅ Domyślnie `openai-codex` (`gpt-6-luna` na wszystkich poziomach, głębia przez `reasoning_effort`: high dla Jarva, low dla reszty); presety `openrouter` / `commandcode` / `commandcode-anthropic` przez `JARVO_MODEL_PROVIDER`; obrazy i wideo przez OpenRouter | Orkiestracja wymaga osądu, a wykonanie jasno opisanych zadań nie |
 | D3 | Gdzie działa | ✅ Ustalone: VPS (x86_64, UE), Docker, szczegóły w [VPS.md](VPS.md) | |
 | D4 | Główny kanał | ✅ Telegram (DM + grupa „Jarvo HQ” z tematami) + CLI; desktop jako dodatek | Najtańszy start, działa z telefonu |
 | D5 | Wspólna pamięć | ✅ MVP: wbudowana pamięć + USER.md z onboardingu; Honcho (self-host) w fazie 3, gdy MVP okaże się za mały | Mniej ruchomych części na start; Honcho nadal pasuje do modelu „wspólny użytkownik, osobni agenci” |
@@ -289,7 +297,7 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
 
 ## 8. Flota v1
 
-Pięć profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędziego) jest w
+Siedem profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędziego) jest w
 [FLEET.md](FLEET.md), a rejestr maszynowy w [`fleet.yaml`](../fleet.yaml).
 
 | Profil | Rola |
@@ -299,6 +307,7 @@ Pięć profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędzie
 | `jarvo-sherlock` | Researcher-detektyw: wiele źródeł, weryfikacja faktów |
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media |
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy, wideo AI |
+| `jarvo-ads` | Specjalista Ads: Meta i Google Ads, kampanie, testy A/B/C, raporty; wydaje tylko w kopercie z kodem |
 | `jarvo-reka` | Prawa ręka: generalista, który wykonuje i ogarnia wszystko |
 
 Kolejni specjaliści dojdą później, każdy według tego samego kontraktu.

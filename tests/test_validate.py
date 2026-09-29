@@ -47,6 +47,19 @@ def test_orchestrator_terminal_on_telegram(repo_copy):
     assert errors_matching(validate.run(), r"nie powinien mieć terminala na Telegramie")
 
 
+
+def test_hq_chat_platform_must_be_configured(repo_copy):
+    import re as _re
+    cfg = repo_copy / "profiles/jarvo-web/config.yaml"
+    cfg.write_text(_re.sub(r"^  api_server: .*\n", "", cfg.read_text(encoding="utf-8"), flags=_re.M), encoding="utf-8")
+    jarvo = repo_copy / "profiles/jarvo/config.yaml"
+    jarvo.write_text(jarvo.read_text(encoding="utf-8").replace("api_server: [kanban,", "api_server: [terminal,"),
+                     encoding="utf-8")
+    report = validate.run()
+    assert errors_matching(report, r"jarvo-web: config.yaml bez platform_toolsets.api_server")
+    assert errors_matching(report, r"jarvo: orkiestrator bez toolsetu kanban na czacie HQ")
+    assert errors_matching(report, r"jarvo: orkiestrator nie powinien mieć terminala na czacie HQ")
+
 def test_unattended_approvals_must_deny(repo_copy):
     cfg = repo_copy / "profiles/jarvo-studio/config.yaml"
     cfg.write_text(cfg.read_text(encoding="utf-8").replace("cron_mode: deny", "cron_mode: approve"), encoding="utf-8")
@@ -92,3 +105,31 @@ def test_cron_script_must_exist(repo_copy):
 def test_profile_without_fleet_entry(repo_copy):
     (repo_copy / "profiles/jarvo-nieznany").mkdir()
     assert errors_matching(validate.run(), r"profiles/jarvo-nieznany: brak wpisu w fleet.yaml")
+
+
+def test_docs_count_must_match_repo(repo_copy):
+    import shutil
+    shutil.rmtree(repo_copy / "profiles/jarvo-studio/skills/studio/copy-pl")
+    assert errors_matching(validate.run(), r"docs/FLEET.md: jarvo-studio ma 5 \(skille\), a tabela podaje 6")
+
+
+def test_docs_must_list_whole_fleet(repo_copy):
+    readme = repo_copy / "README.md"
+    readme.write_text(readme.read_text(encoding="utf-8").replace("`jarvo-reka`", "jarvo-reka"), encoding="utf-8")
+    assert errors_matching(validate.run(), r"README.md: brak agenta `jarvo-reka`")
+
+
+def test_docs_broken_link_and_anchor(repo_copy):
+    (repo_copy / "docs/NOWY.md").write_text("[a](PLAN.md#nie-ma-takiej) [b](BRAK.md) [c](PLAN.md#6-roadmapa)\n",
+                                            encoding="utf-8")
+    report = validate.run()
+    assert errors_matching(report, r"docs/NOWY.md: kotwica #nie-ma-takiej nie istnieje w PLAN.md")
+    assert errors_matching(report, r"docs/NOWY.md: link do nieistniejącego BRAK.md")
+    assert not errors_matching(report, r"6-roadmapa")
+
+
+def test_generalist_must_see_every_specialist(repo_copy):
+    cfg = repo_copy / "profiles/jarvo-reka/config.yaml"
+    cfg.write_text(cfg.read_text(encoding="utf-8").replace('    - "@@BUILD_DIR@@/profiles/jarvo-ads/skills"\n', ""),
+                   encoding="utf-8")
+    assert errors_matching(validate.run(), r"jarvo-reka: skills.external_dirs bez skilli jarvo-ads")

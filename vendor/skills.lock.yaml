@@ -166,6 +166,7 @@ sources:
 
 agents:
   jarvo-sherlock:
+    - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
     - {source: hermes, path: skills/research/grounded-citations, dest: research/grounded-citations}
     - {source: hermes, path: skills/web/blocked-page-recovery, dest: research/blocked-page-recovery}
     - {source: hermes, path: optional-skills/research/searxng-search, dest: research/searxng-search}
@@ -265,6 +266,7 @@ agents:
     - {source: hermes, path: optional-skills/creative/concept-diagrams, dest: creative/concept-diagrams}
 
   jarvo-wideo:
+    - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
     - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
     - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}
     - {source: gsap-skills, path: skills/gsap-scrolltrigger, dest: gsap/gsap-scrolltrigger}
@@ -330,5 +332,6 @@ agents:
     - {source: marketingskills, path: skills/analytics, dest: marketing/analytics}
     - {source: marketingskills, path: skills/ad-creative, dest: marketing/ad-creative}
   jarvo-reka:
+    - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}

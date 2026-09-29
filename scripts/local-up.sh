@@ -4,7 +4,8 @@
 #   bash scripts/local-up.sh            # przygotuj ~/jarvo-local (raz) i uruchom flotę
 #   bash scripts/local-up.sh down       # zatrzymaj
 #
-# Przy pierwszym uruchomieniu pyta o dostawcę modeli (OpenRouter albo CommandCode) i jego klucz
+# Przy pierwszym uruchomieniu pyta o dostawcę modeli (OpenRouter, CommandCode albo OpenAI przez logowanie ChatGPT)
+# i jego klucz
 # (Enter = bez klucza: GUI i narzędzia działają, agenci nie odpowiadają; klucz dodasz potem w Keys).
 # Zmiana dostawcy później:  JARVO_MODEL_PROVIDER=commandcode bash scripts/local-up.sh
 set -euo pipefail
@@ -33,13 +34,15 @@ if [[ ! -f "$L/compose/.env" ]]; then
   echo "  1) OpenRouter"
   echo "  2) CommandCode: modele Claude"
   echo "  3) CommandCode: modele otwarte (DeepSeek, Kimi)"
+  echo "  4) OpenAI: logowanie ChatGPT (bez klucza; zaloguj się w dashboardzie: Models → Login)"
   read -rp "Wybór [1]: " CHOICE
   case "${CHOICE:-1}" in
     2) PROVIDER=commandcode-anthropic; KEYVAR=COMMANDCODE_API_KEY ;;
     3) PROVIDER=commandcode; KEYVAR=COMMANDCODE_API_KEY ;;
-    *) PROVIDER=; KEYVAR=OPENROUTER_API_KEY ;;
+    4) PROVIDER=; KEYVAR= ;;                      # puste = domyślny dostawca z fleet.yaml (openai-codex)
+    *) PROVIDER=openrouter; KEYVAR=OPENROUTER_API_KEY ;;
   esac
-  read -rsp "Klucz $KEYVAR (Enter = pomiń): " KEY; echo
+  KEY=; [[ -n $KEYVAR ]] && { read -rsp "Klucz $KEYVAR (Enter = pomiń): " KEY; echo; }
   PASS="$(openssl rand -hex 12)"
   sed -e "s#^JARVO_DATA=.*#JARVO_DATA=$L/data#" -e "s#^JARVO_REPO=.*#JARVO_REPO=$ROOT#" \
       -e "s#^JARVO_BUILD=.*#JARVO_BUILD=$L/build#" -e "s#^JARVO_SECRETS=.*#JARVO_SECRETS=$L/secrets#" \
@@ -64,7 +67,7 @@ fi
 if [[ -n "${JARVO_MODEL_PROVIDER+x}" ]]; then
   grep -q '^JARVO_MODEL_PROVIDER=' "$L/compose/jarvo.env" || echo "JARVO_MODEL_PROVIDER=" >> "$L/compose/jarvo.env"
   sedi "s#^JARVO_MODEL_PROVIDER=.*#JARVO_MODEL_PROVIDER=$JARVO_MODEL_PROVIDER#" "$L/compose/jarvo.env"
-  echo "▶ Dostawca modeli: ${JARVO_MODEL_PROVIDER:-openrouter}"
+  echo "▶ Dostawca modeli: ${JARVO_MODEL_PROVIDER:-openai-codex (domyślny z fleet.yaml)}"
 fi
 # kontener pracuje jako uid 10000 (użytkownik hermes): build i dane muszą być jego
 if [[ "$(owner "$L/build")" != "10000" || "$(owner "$L/data")" != "10000" ]]; then

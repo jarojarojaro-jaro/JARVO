@@ -1,5 +1,8 @@
 # Changelog: jarvo-studio
 
+## Niewydane
+- Czat Jarvo HQ (`platform_toolsets.api_server`) ustawiony jawnie: te same narzędzia co na Telegramie (bez `clarify`). Wcześniej Hermes dawał tu swój domyślny zestaw narzędzi.
+
 ## 0.2.0 (2026-09-28)
 - Wideo przeniesione do nowego agenta `jarvo-wideo` (Wideograf): film-z-kodu, napisy, HyperFrames, Manim, wideo z AI.
   Studio pisze brief filmu w pakiecie kampanii (`out/teksty/BRIEF-WIDEO.md`); `generacja-ai` tylko obrazy.

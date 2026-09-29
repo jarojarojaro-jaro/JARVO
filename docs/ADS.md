@@ -1,6 +1,7 @@
 # Jarvo Ads: specjalista Ads Managera (projekt)
 
-> Stan: **projekt v1 (2026-09-29), decyzje podjęte (sekcja 14), start budowy.**
+> Stan: **agent zbudowany (faza 2, 2026-09-29); Skarbiec (faza 1) jeszcze nie istnieje.** Decyzje z sekcji 14 podjęte.
+> Bez Skarbca `ads.py` kończy się kodem 3, a agent pracuje na eksportach CSV (`eksport.py`). Co jest, a co w planie: sekcja 12.
 > Platformy: **Meta Ads i Google Ads.** Fakty o platformach sprawdzone 2026-09-29 (źródła w sekcji 15).
 
 Nowy specjalista floty: **`jarvo-ads`**, czyli ktoś, kto na co dzień siedzi w Ads Managerze i Google Ads.
@@ -64,7 +65,7 @@ Do tego karty kanbana wykonują się bez człowieka (tryb `unattended`).
 
 **Wniosek: prompt i zgody Hermesa nie mogą być jedyną ochroną przed wydaniem Twoich pieniędzy.**
 
-Dlatego token Meta **nie trafia do kontenera Hermesa w ogóle**. Trzyma go osobny, mały kontener:
+Dlatego tokeny Meta i Google **nie trafiają do kontenera Hermesa w ogóle**. Trzyma je osobny, mały kontener:
 **Skarbiec** (`jarvo-skarbiec`). Agent rozmawia z nim przez wąskie API, a każda reguła o pieniądzach
 jest w kodzie Skarbca, nie w prompcie.
 
@@ -73,9 +74,9 @@ jest w kodzie Skarbca, nie w prompcie.
  ┌──────────────────────────────┐   HTTP   ┌────────────────────────────────────────┐
  │ jarvo-ads (agent)            │─────────►│ polityka (skarbiec.yaml, tylko odczyt) │
  │   └ ads.py (CLI, bez tokenu) │jarvo-net │ dziennik każdej akcji (SQLite)         │
- │ HQ: panel Reklamy,           │─────────►│ zgody: jednorazowe kody przez Telegram │
- │     przycisk STOP            │          │ strażnik co 1 h: wydatki, anomalie     │
- └──────────────────────────────┘          │ token Meta (tylko tu)                  │
+ │ HQ: panel Reklamy,           │─────────►│ zgody: kody jednorazowe (komunikator)  │
+ │     przycisk STOP (w planie) │          │ strażnik co 1 h: wydatki, anomalie     │
+ └──────────────────────────────┘          │ tokeny Meta i Google (tylko tu)        │
                                            └────────────────────┬───────────────────┘
                                                                 │ Graph API v25 (HTTPS)
                                                                 ▼
@@ -84,6 +85,9 @@ jest w kodzie Skarbca, nie w prompcie.
 
 Skarbiec to mały serwis w Pythonie z biblioteki standardowej: bez frameworka, kilkadziesiąt MB RAM, ten sam wzorzec co sidecar
 SearXNG. Pliki kreacji czyta z `/opt/data/jarvo` zamontowanego tylko do odczytu.
+
+**Stan:** Skarbca jeszcze nie ma (brak usługi w `infra/docker-compose.yml`). Istnieje klient `ads.py`, który bez
+Skarbca kończy się kodem 3 („Skarbiec niepodłączony”), a agent pracuje na eksportach CSV (`eksport.py`).
 
 ### Obrona w głąb: pięć warstw
 
@@ -131,9 +135,13 @@ każdego przesunięcia 20 zł. Poza kopertę wyjść nie może, bo Skarbiec licz
 
 ## 4. Zgoda: jak to wygląda na telefonie
 
-1. Agent zgłasza kopertę do Skarbca (`ads.py koperta zglos plan.json`). Skarbiec sprawdza politykę i zapisuje
+Stan: po stronie agenta gotowe (`ads.py koperta …`, skill `start-kampanii`); wysyłkę i sprawdzanie kodów robi Skarbiec,
+którego jeszcze nie ma.
+
+1. Agent zgłasza kopertę do Skarbca (`ads.py koperta zglos out/koperta.json`). Skarbiec sprawdza politykę i zapisuje
    kopertę ze stanem `czeka`.
-2. **Skarbiec sam** (nie model) wysyła Ci na Telegram podsumowanie z danych koperty i 6-cyfrowy kod:
+2. **Skarbiec sam** (nie model) wysyła Ci przez podłączony komunikator (Telegram, Discord albo Slack; bez komunikatora
+   tylko w panelu Skarbca) podsumowanie z danych koperty i 6-cyfrowy kod:
    ```
    🔐 Skarbiec: prośba o zgodę na wydatek
    Test „5 filmów launchowych” · konto JARVO (act_123)
@@ -141,7 +149,7 @@ każdego przesunięcia 20 zł. Poza kopertę wyjść nie może, bo Skarbiec licz
    5 reklam (link do podglądu z Mety)
    Kod: 482 917 (ważny 30 min, tylko dla tej koperty)
    ```
-3. Wpisujesz kod w rozmowie z Jarvem albo w panelu Reklamy w HQ. Agent przekazuje go do Skarbca, a ten startuje kampanię.
+3. Wpisujesz kod w rozmowie z Jarvem albo w panelu Reklamy w HQ (panel w planie, faza 4). Agent przekazuje go do Skarbca, a ten startuje kampanię.
 
 Dlaczego tak:
 - **model nie zna kodu**, dopóki go nie wpiszesz. Skarbiec trzyma tylko jego skrót (hash), więc agent nie może „zatwierdzić
@@ -150,8 +158,9 @@ Dlaczego tak:
   Model nie może pokazać Ci „100 zł”, a puścić 1000,
 - kod jest jednorazowy, przypięty do jednej koperty i wygasa po 30 min.
 
-Na STOP nie trzeba kodu: „stop reklamy” do Jarva, czerwony przycisk w HQ albo `ads.py stop` pauzuje wszystko,
-co Skarbiec prowadzi.
+Na STOP nie trzeba kodu: `ads.py stop` pauzuje wszystko, co Skarbiec prowadzi (działa, gdy Skarbiec jest podłączony).
+W planie (faza 4): czerwony przycisk w HQ i „stop reklamy” do Jarva. Dziś Jarvo traktuje „stop” jak anulowanie misji
+(archiwizuje karty), a nie jak STOP reklam.
 
 ---
 
@@ -194,7 +203,8 @@ tańszą metrykę albo dłuższy czas.
   - **zwycięzca:** P(najlepszy) ≥ 95% i oczekiwana strata < 2%,
   - **przegrany** (wyłączany w kopercie): P(najlepszy) < 5% po minimum albo wydatek 2× docelowego CPA bez konwersji,
   - koniec czasu bez rozstrzygnięcia: raport mówi **„remis”** i podaje, ile budżetu brakowało.
-- Jedna zmienna na test. Nazwa reklamy koduje atrybuty (`T03_hook-pytanie_9x16_lektor-m_v2`), więc wnioski da się
+- Najlepiej jedna zmienna na test. Gdy warianty różnią się wszystkim (`wiele_zmiennych: true`), raport mówi tylko,
+  który pakiet wygrał, a nie dlaczego. Nazwa reklamy koduje atrybuty (`T03_hook-pytanie_9x16_lektor-m_v2`), więc wnioski da się
   zbierać przekrojowo przez wiele testów („hooki-pytania vs hooki-liczby”).
 
 ### 5.4 Zmęczenie kreacji
@@ -206,11 +216,12 @@ Według praktyków po zmianie algorytmu Andromeda kreacje męczą się w 2–3 t
 
 ## 6. Workflowy agenta (skille)
 
-Własne [T]:
+Własne [T] (wszystkie są w `profiles/jarvo-ads/skills/ads/`, 10 skilli):
 
 | Skill | Co robi | Poziom |
 |---|---|---|
-| `podlacz-konto` | przeprowadza Cię przez Business Managera, aplikację, użytkownika systemowego i token; token wklejasz do Skarbca (nie do agenta); `ads.py doctor` sprawdza uprawnienia, walutę, strefę czasu, piksel, limit konta | A0 |
+| `plan-kampanii` | cel biznesowy → typ kampanii (Meta/Google), struktura, odbiorcy/słowa kluczowe, budżet, harmonogram, prognoza z `planer.py`, konwencja nazw | A1 |
+| `podlacz-konto` | przeprowadza Cię przez Business Managera, aplikację, użytkownika systemowego i token, a w Google Ads przez MCC, token deweloperski i OAuth; tokeny wklejasz do Skarbca (nie do agenta); `ads.py doctor` sprawdza uprawnienia, walutę, strefę czasu, piksel, limit konta | A0 |
 | `audyt-konta` | stan konta: struktura, marnotrawstwo, piksel/CAPI, zmęczone kreacje, szybkie wygrane | A0 |
 | `plan-testu` | hipoteza, zmienna, warianty, metryka z drabiny, planer mocy, koperta, **brief kreacji** dla Studia/Wideografa | A1 |
 | `start-kampanii` | budowa na koncie w PAUSED, podglądy reklam, zgłoszenie koperty, start po kodzie | A1 → A2 |
@@ -225,17 +236,24 @@ Zewnętrzne (MIT, [coreyhaines31/marketingskills](https://github.com/coreyhaines
 `ad-creative` (tylko do pisania briefów, kreacje robi Studio).
 
 Skrypty (deterministyczne, `--help`, JSON, kod wyjścia ≠ 0 przy błędzie):
-- `ads.py`: jedyne wejście do Skarbca (`doctor`, `konto`, `kreacja wgraj`, `kampania szkic`, `koperta zglos|zatwierdz|stan`,
-  `wariant pauza|budzet`, `stop`, `statystyki`),
+- `ads.py`: jedyne wejście do Skarbca (`doctor`, `konta`, `kampanie`, `statystyki`, `szkic` (kreacje w pliku szkicu),
+  `koperta zglos|zatwierdz|stan`, `pauza`, `budzet`, `stop`, `dziennik`); kod wyjścia 0 ok, 1 odmowa Skarbca,
+  2 złe wejście, 3 Skarbiec niepodłączony,
 - `eksperyment.py`: P(najlepszy), strata, reguły stopu, werdykt,
 - `planer.py`: moc testu, czas i koszt do rozstrzygnięcia, rekomendacja liczby wariantów,
-- `raport.py`: wykresy (HTML → PNG przez Chromium z obrazu) i raport Markdown.
+- `eksport.py`: eksport CSV z Ads Managera / Google Ads (nagłówki PL i EN) → tabela (wydatek, CTR, CPC, CPA, hook rate),
+  `--json` jako wejście dla `eksperyment.py`, `--grupuj kampania|zestaw|reklama`; działa bez Skarbca.
+
+Wykresy do raportów agent robi sam według skilla `raport-reklam` (HTML → PNG przez Chromium z obrazu), bez osobnego skryptu.
 
 ---
 
 ## 7. Rutyny
 
 Instalują się **wstrzymane**, jak wszystkie rutyny floty ([BOSS.md §4](BOSS.md#4-pilnowanie-nic-nie-ginie)).
+
+**Stan: jeszcze niezbudowane.** Strażnik powstanie razem ze Skarbcem. Rutyny agenta wymagają `profiles/jarvo-ads/cron/jobs.yaml`
+(dziś go nie ma) i dopisania ich id do `scripts/install-fleet.sh --resume-cron` (dziś wznawia tylko rutyny Jarva).
 
 | Rutyna | Kiedy | Model? |
 |---|---|---|
@@ -247,20 +265,22 @@ Instalują się **wstrzymane**, jak wszystkie rutyny floty ([BOSS.md §4](BOSS.m
 
 ## 8. Współpraca z flotą
 
-| Kto | Zmiana |
-|---|---|
-| **Jarvo** | routing: „reklama płatna”, „budżet”, „Meta Ads”, „wyniki kampanii”, „test A/B reklam” → `jarvo-ads`. Misja „wypromuj X” = ads (plan) → studio + wideo (kreacje) → ads (start, po kodzie) |
-| **Studio** | przestaje być właścicielem reklam płatnych; robi kreacje reklam według briefu z `plan-testu` (formaty, warianty, jedna zmienna). Skille `ads` i `ad-creative` zostają u niego do copy |
-| **Wideograf** | skill `warianty-ab` dostaje wejście z briefu (hook, tempo, lektor); nazwy plików według konwencji atrybutów |
-| **Web** | piksel, Conversions API, UTM i baner zgód na stronach docelowych (karta od ads) |
-| **Sherlock** | benchmarki branży, reklamy konkurencji (Biblioteka reklam Meta) na potrzeby planu |
+| Kto | Zmiana | Stan |
+|---|---|---|
+| **Jarvo** | routing: „reklama płatna”, „budżet”, „Meta Ads”, „wyniki kampanii”, „test A/B reklam” → `jarvo-ads`. Misja „wypromuj X” = ads (plan) → studio + wideo (kreacje) → ads (start, po kodzie) | routing ✅ (skill `roster` z `fleet.yaml`); wzorzec misji ⬜ (brak w `dispatch-playbook`, wzorzec „Kampania” nie ma ads) |
+| **Studio** | przestaje być właścicielem reklam płatnych; robi kreacje reklam według briefu z `plan-testu` (formaty, warianty, jedna zmienna). Skille `ads` i `ad-creative` zostają u niego do copy | ✅ (SOUL Studia) |
+| **Wideograf** | skill `warianty-ab` dostaje wejście z briefu (hook, tempo, lektor); nazwy plików według konwencji atrybutów | ⬜ (`warianty-ab` bez briefu od ads, pliki `<film>-<wariant>-<format>.mp4`) |
+| **Web** | piksel, Conversions API, UTM i baner zgód na stronach docelowych (karta od ads) | ⬜ (brak workflowu w profilu Web) |
+| **Sherlock** | benchmarki branży, reklamy konkurencji (Biblioteka reklam Meta) na potrzeby planu | bez zmian w profilu: zwykłe zlecenie researchu |
 
-Sędzia (Jarvo) dostaje rubrykę `jarvo-ads`: plan ma hipotezę i jedną zmienną, planer mocy uruchomiony, koperta zgodna z kartą,
+Sędzia (Jarvo) dostaje rubrykę `jarvo-ads` (jest: `profiles/jarvo-ads/quality/rubric.md`): plan ma hipotezę i jedną zmienną, planer mocy uruchomiony, koperta zgodna z kartą,
 raport z P(najlepszy) i uczciwym „remisem”, wnioski zapisane z dowodem, zero akcji A2 bez identyfikatora zgody w dzienniku.
 
 ---
 
 ## 9. Dane i raporty
+
+Stan: dziennik, migawki i uzgadnianie to część Skarbca (w planie). Agent ma już klienta `ads.py dziennik`.
 
 - **Dziennik Skarbca** (SQLite, tylko dopisywanie): każda akcja zapisująca z polami kto (agent / strażnik / HQ), co, stan przed
   i po, identyfikator zgody. To odpowiedź na pytanie „kto to włączył?”.
@@ -283,8 +303,9 @@ Dalej proponuję: test CTR D vs B, 300 zł, 5 dni. Odpowiedz „ok”, a przyśl
 
 ## 10. HQ
 
-- Pokój `office` (dziś wolny) → **„Sala operacyjna”**: ekrany z wykresami, figurka Ads.
-- Panel **Reklamy**: koperty (pasek wydane / zatwierdzone), testy z paskami P(najlepszy) dla wariantów, oczekujące zgody
+- Pokój `office` to **„Sala operacyjna”** (jest): ściana ekranów (słupki wariantów, wydatki pod linią koperty, ROAS),
+  figurka Ads, czerwony STOP jako dekoracja.
+- Panel **Reklamy** (w planie, faza 4; dziś go nie ma): koperty (pasek wydane / zatwierdzone), testy z paskami P(najlepszy) dla wariantów, oczekujące zgody
   z polem na kod, dziennik akcji i **czerwony STOP** (bez kodu, bo tylko zmniejsza wydatki).
 
 ---
@@ -313,14 +334,16 @@ na atrapie API (fake Graph), tak jak testy HQ.
 
 Każdy krok: osobny commit, push, pytest + `validate.py` i test w działającym kontenerze (zasady z `CLAUDE.md`).
 
-| Faza | Co | Test „na żywo” |
-|---|---|---|
-| **1. Skarbiec** | kontener, polityka, dziennik, koperty, kody przez Telegram, STOP, strażnik, adapter Meta, atrapa Graph API, `ads.py` | atrapa + **konto sandbox Meta** (0 zł) |
-| **2. Agent** | profil `jarvo-ads` (SOUL, 9 skilli, skrypty statystyki i planera), rubryka, ≥ 10 evals (w tym „odpal bez pytania”, injection w komentarzu pod reklamą, „zmień metodę płatności”), routing Jarva, figurka w HQ | karta od Jarva → plan → szkic w sandboxie → kod → start |
-| **3. Pierwszy prawdziwy test** | **5 filmów launchowych jako test A/B/C/D/E** na jarvo.pl, mała koperta (Twoja decyzja) | prawdziwe konto, raport końcowy |
-| **4. Pętla wiedzy i HQ** | panel Reklamy, raport tygodniowy z wykresami, wnioski marki czytane przez Studio i Wideografa | drugi test na briefie z wniosków |
-| **5. Google Ads** | adapter w Skarbcu, test na koncie testowym Google | |
-| **6. TikTok** | po weryfikacji aplikacji | |
+Stan: ✅ zrobione w kodzie · 🟡 zakodowane, czeka na test na żywo · ⬜ do zrobienia.
+
+| Faza | Co | Test „na żywo” | Stan |
+|---|---|---|---|
+| **1. Skarbiec** | kontener, polityka, dziennik, koperty, kody przez komunikator, STOP, strażnik, adapter Meta, atrapa Graph API, `ads.py` | atrapa + **konto sandbox Meta** (0 zł) | ⬜ Skarbca brak; jest tylko klient `ads.py` (bez Skarbca kod 3) |
+| **2. Agent** | profil `jarvo-ads` (SOUL, 10 skilli, skrypty planera, statystyki i eksportu CSV), rubryka, ≥ 10 evals (w tym „odpal bez pytania”, injection w komentarzu pod reklamą, „zmień metodę płatności”), routing Jarva, figurka w HQ | karta od Jarva → plan → szkic w sandboxie → kod → start | 🟡 w kodzie gotowe (12 evals); test na żywo czeka na Skarbiec |
+| **3. Pierwszy prawdziwy test** | **5 filmów launchowych jako test A/B/C/D/E** na jarvo.pl, mała koperta (Twoja decyzja) | prawdziwe konto, raport końcowy | ⬜ |
+| **4. Pętla wiedzy i HQ** | panel Reklamy, raport tygodniowy z wykresami, wnioski marki czytane przez Studio i Wideografa | drugi test na briefie z wniosków | ⬜ panel, rutyny i czytanie wniosków przez Studio/Wideografa; ✅ Sala operacyjna w HQ, zapis `WNIOSKI.md` przez `wnioski-marki` |
+| **5. Google Ads** | adapter w Skarbcu, test na koncie testowym Google | | ⬜ adapter; po stronie agenta Google już jest (`plan-kampanii`, `podlacz-konto`, CSV w `eksport.py`) |
+| **6. TikTok** | po weryfikacji aplikacji | | ⬜ |
 
 ---
 
@@ -335,16 +358,16 @@ Każdy krok: osobny commit, push, pytest + `validate.py` i test w działającym 
 
 ---
 
-## 14. Decyzje do podjęcia
+## 14. Decyzje (podjęte 2026-09-29)
 
-| # | Pytanie | Rekomendacja |
+| # | Pytanie | Decyzja |
 |---|---|---|
 | 1 | Czy w zatwierdzonej kopercie agent może sam wyłączać przegranych i przesuwać budżet między wariantami? | **Tak.** Bez tego testy A/B/C/D wymagają Twojego kliknięcia co kilka godzin |
-| 2 | Kanał kodu zgody | **Telegram**, a w HQ pole na kod (jak 2FA w banku) |
+| 2 | Kanał kodu zgody | **podłączony komunikator** (Telegram, Discord albo Slack), a w HQ pole na kod (jak 2FA w banku); bez komunikatora kody tylko w panelu Skarbca |
 | 3 | Twardy sufit miesięczny w polityce Skarbca (zmiana tylko w pliku na serwerze, nie przez agenta) | **1000 zł/mies.** na start |
 | 4 | Czy Studio oddaje reklamy płatne w całości nowemu agentowi? | **Tak:** Studio robi kreacje, Ads je puszcza i mierzy |
 | 5 | Kolejność platform po Mecie | **Google, potem TikTok** (wniosek do TikToka złożyć już teraz, bo trwa tygodniami) |
-| 6 | Nazwa | `jarvo-ads` · „Media buyer” · pokój „Sala operacyjna” · Skarbiec jako strażnik |
+| 6 | Nazwa | `jarvo-ads` · „Specjalista Ads” · pokój „Sala operacyjna” · Skarbiec jako strażnik |
 
 ---
 

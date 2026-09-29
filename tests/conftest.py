@@ -34,7 +34,7 @@ def repo_copy(tmp_path, monkeypatch):
 
     dst = tmp_path / "repo"
     dst.mkdir()
-    for rel in ["fleet.yaml", "profiles", "shared", "vendor", "evals", "knowledge"]:
+    for rel in ["fleet.yaml", "profiles", "shared", "vendor", "evals", "knowledge", "docs", "README.md"]:
         src = REPO / rel
         if src.is_dir():
             shutil.copytree(src, dst / rel, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
