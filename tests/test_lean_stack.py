@@ -164,6 +164,14 @@ def test_env_example_matches_compose_defaults():
     assert "CRAWL4AI" not in example and "GOTENBERG" not in example and "INSTALL_DOCLING" not in example
 
 
+def test_every_agent_has_secrets_template():
+    """bootstrap-vps.sh i local-up.sh zakładają secrets/<agent>.env tylko z szablonów: bez szablonu agent zostaje bez pliku."""
+    import fleetlib as fl
+    templates = {p.name.removesuffix(".env.example") for p in (REPO / "infra/env/secrets").glob("*.env.example")}
+    missing = {a.name for a in fl.load_fleet().active()} - templates
+    assert not missing, f"brak infra/env/secrets/<agent>.env.example dla: {sorted(missing)}"
+
+
 # ------------------------------------------------------------------ obraz
 
 def test_dockerfile_hygiene():
