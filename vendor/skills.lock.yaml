@@ -315,6 +315,12 @@ agents:
     - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-dialogue, dest: screenwriting/sw-dialogue}
     - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-character-conflict, dest: screenwriting/sw-character-conflict}
 
+  jarvo-ads:
+    - {source: marketingskills, path: skills/ads, dest: marketing/ads}
+    - {source: marketingskills, path: skills/ab-testing, dest: marketing/ab-testing}
+    - {source: marketingskills, path: skills/attribution, dest: marketing/attribution}
+    - {source: marketingskills, path: skills/analytics, dest: marketing/analytics}
+    - {source: marketingskills, path: skills/ad-creative, dest: marketing/ad-creative}
   jarvo-reka:
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}

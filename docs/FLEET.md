@@ -7,7 +7,7 @@ Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prom
 knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
 każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
 
-**Stan: wszystkie sześć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
+**Stan: wszystkie siedem profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
@@ -16,6 +16,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [7 w `skills/web/`](../profiles/jarvo-web/skills/web) | 30 (web-quality, claude-seo, marketingskills, Anthropic, Hermes) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract | [11](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 21 (marketingskills, Anthropic, Hermes) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [13 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 15 (HyperFrames, marketingskills, Hermes) | film, stock, kadry, montaz, napisy, qa_wideo | [12](../evals/jarvo-wideo/scenarios.yaml) |
+| `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 5 (marketingskills) | ads, planer, eksperyment, eksport | [12](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | skill-creator + skille wszystkich snajperów (`external_dirs`) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -29,7 +30,8 @@ Legenda przy skillach:
 | `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator | A1 (tworzy karty, ocenia) |
 | `jarvo-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
 | `jarvo-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A0/A1 (czyta, pisze raporty) |
-| `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja i reklamy = A2) |
+| `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja = A2) |
+| `jarvo-ads` | Specjalista Ads: Meta Ads i Google Ads, kampanie, testy, raporty | snajper | A1 (szkice PAUSED; wydatek = A2 z kodem Skarbca) |
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
 | `jarvo-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
@@ -67,7 +69,8 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 |---|---|
 | Strona, landing, SEO, wydajność, favicony, responsywność | `jarvo-web` |
 | „Dowiedz się”, „sprawdź”, porównaj, zweryfikuj | `jarvo-sherlock` |
-| Post, grafika, kampania, copy, content | `jarvo-studio` |
+| Post, grafika, kreacja reklamy, copy, content | `jarvo-studio` |
+| Reklama płatna, Meta Ads, Google Ads, budżet, wyniki kampanii | `jarvo-ads` |
 | Film, reels, short, montaż, napisy, lektor, klipy | `jarvo-wideo` |
 | Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
@@ -237,9 +240,10 @@ agentowi edytować skille w external_dirs, jeśli ma prawa zapisu) oraz [T] `kie
 
 ---
 
-## `jarvo-ads`: Media buyer (planowany)
+## `jarvo-ads`: Specjalista Ads
 
-Płatne reklamy od planu testu po raport: testy A/B/C/D, optymalizacja w zatwierdzonej kopercie budżetu,
+Meta Ads i Google Ads od planu kampanii po raport: stawianie kampanii, codzienna kontrola konta, testy A/B/C,
+optymalizacja w zatwierdzonej kopercie budżetu,
 wnioski dla Studia i Wideografa. Pieniędzy pilnuje **Skarbiec**, osobny kontener z tokenem Meta, polityką
 i kodami zgody, więc agent nie może wydać złotówki bez Ciebie. Pełny projekt: [ADS.md](ADS.md).
 

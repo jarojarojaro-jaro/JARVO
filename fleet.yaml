@@ -162,6 +162,30 @@ agents:
         Video end to end: short films for TikTok, Reels and Shorts from a topic (script, stock, AI or own footage, Polish voice-over, karaoke captions, music, editing), A/B variants, editing the user's recordings, clips from long recordings, videos from code (HyperFrames, Manim), AI video, Polish captions, platform formats, quality control. Prepares files; never publishes without approval.
     status: active
 
+  - name: jarvo-ads
+    kind: specialist
+    title: "Specjalista Ads"
+    emoji: "📈"
+    description: >-
+      Płatne reklamy Meta Ads (Facebook, Instagram) i Google Ads od A do Z: planowanie kampanii,
+      struktura, odbiorcy, słowa kluczowe, budżety, stawianie kampanii, codzienna kontrola konta,
+      optymalizacja, testy A/B/C, raporty wyników i wnioski dla kreacji. Wydaje pieniądze tylko
+      w kopercie zatwierdzonej kodem przez użytkownika.
+    model_tier: strong
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: ads
+    pin_skills: [plan-kampanii]
+    hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_label: "Sala operacyjna"
+    hq_short: "Ads"
+    en:
+      title: "Ads specialist"
+      hq_label: "Operations room"
+      description: >-
+        Paid ads on Meta Ads (Facebook, Instagram) and Google Ads end to end: campaign planning, structure, audiences, keywords, budgets, launching campaigns, daily account checks, optimisation, A/B/C tests, performance reports and learnings for creatives. Spends money only within a budget envelope the user approves with a code.
+    status: active
+
   - name: jarvo-reka
     kind: generalist
     title: "Prawa ręka"

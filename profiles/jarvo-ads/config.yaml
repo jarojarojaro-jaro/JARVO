@@ -1,0 +1,66 @@
+# jarvo-ads: specjalista płatnych reklam (Meta Ads, Google Ads). Tokeny @@...@@ podstawia scripts/build.py.
+# Klucze do kont reklamowych NIE są w tym profilu: trzyma je Skarbiec (osobny kontener, docs/ADS.md).
+model:
+  provider: "@@PROVIDER@@"
+  default: "@@MODEL@@"
+
+agent:
+  reasoning_effort: low
+  max_turns: 250
+
+timezone: "@@TIMEZONE@@"
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  nudge_interval: 12
+
+skills:
+  creation_nudge_interval: 20
+
+web:
+  search_backend: searxng
+
+platform_toolsets:
+  cli: [terminal, file, web, browser, vision, delegation, memory, skills, todo, session_search]
+  telegram: [terminal, file, web, browser, vision, delegation, memory, skills, todo, session_search, clarify]
+  cron: [terminal, file, memory, skills]
+
+terminal:
+  backend: local
+  cwd: "@@WORKSPACES_DIR@@/jarvo-ads"
+  timeout: 300
+
+browser:
+  backend: "off"
+  engine: lightpanda
+  inactivity_timeout: 120
+
+stt:
+  provider: local_command
+  language: pl
+
+delegation:
+  model: "@@DELEGATION_MODEL@@"
+  provider: "@@PROVIDER@@"
+  max_concurrent_children: 2
+
+approvals:
+  mode: smart
+  timeout: 300
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+  smart_policy: >-
+    Always ESCALATE: any direct HTTP call to graph.facebook.com, googleads.googleapis.com or other ad platform APIs,
+    reading or printing tokens and secrets, changing payment methods or account spending limits.
+  deny:
+    - "rm -rf /*"
+    - "* | sh"
+    - "* | bash"
+
+security:
+  protected_instruction_files: true
+
+display:
+  skin: jarvo

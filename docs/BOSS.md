@@ -246,7 +246,8 @@ albo daje kartę `jarvo-reka` z adnotacją „poza snajperami”.
 |---|---|
 | strona, landing, SEO techniczne, favicon, szybkość, responsywność, dostępność, wdrożenie | `jarvo-web` |
 | sprawdź, dowiedz się, porównaj, zweryfikuj, konkurencja, rynek, źródła | `jarvo-sherlock` |
-| post, grafika, reklama, kampania, copy, content, social | `jarvo-studio` |
+| post, grafika, kreacja reklamy, copy, content, social | `jarvo-studio` |
+| reklama płatna, Meta Ads, Google Ads, budżet reklamowy, kampania płatna, wyniki reklam, test reklam | `jarvo-ads` |
 | film, reels, short, montaż, lektor, napisy, klipy z nagrania | `jarvo-wideo` |
 | szybkie sprawy, dokumenty, konwersje, sklejanie wyników, organizacja, „ogarnij” | `jarvo-reka` |
 

@@ -113,7 +113,7 @@ fi
 if [[ -f "$REPO/branding/skin-jarvo.yaml" ]]; then
   for home in "$DATA" "$DATA"/profiles/*/; do
     [[ -d "$home" ]] || continue
-    mkdir -p "$home/skins" && cp "$REPO/branding/skin-jarvo.yaml" "$home/skins/jarvo.yaml"
+    mkdir -p "$home/skins" && cp -f "$REPO/branding/skin-jarvo.yaml" "$home/skins/jarvo.yaml"
   done
 fi
 

@@ -119,7 +119,7 @@ const ROOMS = {
   filmstudio: { fig: [60, 46], bubble: "left", wall: "#2E2A3A", wall2: "#262233", side: "#231F30", ceil: "#1C1927", floor: "#4A3B32", floor2: "#42342C", trim: "#16131E", wallType: "foam", floorType: "planks" },
   atelier:  { fig: [55, 48], wall: "#C2507A", wall2: "#AD4469", side: "#9C3D61", ceil: "#8A3556", floor: "#D9BF8F", floor2: "#CDB07E", trim: "#7E2E4E", wallType: "bricks", floorType: "planks" },
   workshop: { fig: [35, 46], wall: "#C96A22", wall2: "#B25B18", side: "#A9571B", ceil: "#944C16", floor: "#8F979F", floor2: "#838B93", trim: "#6E3A10", wallType: "ribs", floorType: "concrete" },
-  office:   { fig: [54, 44], bubble: "left", wall: "#6F7D8E", wall2: "#667486", side: "#5E6B7C", ceil: "#546070", floor: "#4B5A6C", floor2: "#44526A", trim: "#3A4556", wallType: "panels", floorType: "checker" },
+  office:   { fig: [54, 44], bubble: "left", wall: "#26303F", wall2: "#212A38", side: "#1C2430", ceil: "#171E28", floor: "#333C4A", floor2: "#2D3542", trim: "#12171F", wallType: "panels", floorType: "grid" },
 };
 const STORAGE = { wall: "#3A414C", wall2: "#343B45", side: "#2E343D", ceil: "#272C34", floor: "#5A6068", floor2: "#535960", trim: "#22272E", wallType: "panels", floorType: "concrete" };
 
@@ -460,14 +460,31 @@ function roomWorkshop(L, a, queue) {
   drawFigure(L, "fig", 46, 62, "workshop", { facing: "back", busy: on, sleep: st === "idle", ...(lookup[st] || {}) });
 }
 
+// Sala operacyjna (Ads): ściana ekranów z wynikami kampanii (słupki wariantów, linia wydatków, pasek ROAS),
+// biurko z dwoma monitorami i czerwony STOP. Gdy agent pracuje, monitory na biurku żyją.
 function roomOffice(L, a) {
   const g = L.get("props"), st = a.status, on = isBusy(st);
-  g.circle(30, 20, 5, "#E9EDF2"); g.r(30, 16, 1, 4, INK); g.r(30, 20, 3, 1, INK);
-  g.r(14, 30, 16, 28, "#8A94A3"); for (let i = 0; i < 3; i++) { g.r(15, 32 + i * 9, 14, 7, "#9AA4B0"); g.r(20, 35 + i * 9, 4, 1, "#5A6472"); }
+  // duży ekran: słupki wariantów A–D (zwycięzca limonkowy, przegrany czerwony)
+  g.r(10, 9, 44, 26, "#1D232C"); g.r(11, 10, 42, 24, "#0B0F15"); g.r(13, 12, 14, 1, "#3A4452");
+  [[14, 9, "#5A6472"], [22, 14, "#5A6472"], [30, 19, "#B8FF3D"], [38, 7, "#D4213D"]].forEach(([x, h, c]) => g.r(x, 31 - h, 5, h, c));
+  g.r(12, 31, 40, 1, "#3A4452");
+  // drugi ekran: wydatki rosną pod czerwoną linią koperty
+  g.r(58, 9, 34, 18, "#1D232C"); g.r(59, 10, 32, 16, "#0B0F15"); g.r(60, 13, 30, 1, "#D4213D");
+  [[60, 23], [65, 21], [70, 22], [75, 19], [80, 18], [85, 16], [89, 15]].reduce((p, q) => (p && g.line(p[0], p[1], q[0], q[1], "#F2F1E8"), q), null);
+  // tablica wyniku
+  g.r(96, 9, 22, 8, "#1D232C"); g.r(97, 10, 20, 6, "#0B0F15");
+  L.get("ads-ticker", cx("thq-px-neon", on && "is-on")).text(98, 11, "ROAS", "#B8FF3D");
+  // biurko z dwoma monitorami
   g.r(50, 44, 60, 2, "#E9EDF2"); g.r(52, 46, 2, 12, "#AEB7C2"); g.r(106, 46, 2, 12, "#AEB7C2");
-  g.r(62, 30, 20, 14, "#1D232C"); g.r(63, 31, 18, 11, on ? "#2C4A7A" : "#0B0F15");
-  if (on) for (let i = 0; i < 4; i++) g.r(65, 33 + i * 2, 8 + (i * 3) % 7, 1, "#9CC3FF");
-  g.r(92, 38, 6, 6, "#C8693C"); g.r(91, 31, 3, 7, "#2F8F4E"); g.r(95, 29, 3, 9, "#3AA85C");
+  g.r(58, 31, 18, 13, "#1D232C"); g.r(59, 32, 16, 10, on ? "#16324A" : "#0B0F15");
+  g.r(78, 31, 18, 13, "#1D232C"); g.r(79, 32, 16, 10, on ? "#1E2A12" : "#0B0F15");
+  if (on) {
+    for (let i = 0; i < 4; i++) g.r(61, 34 + i * 2, 6 + (i * 5) % 9, 1, "#9CC3FF");
+    [[81, 4], [84, 6], [87, 3], [90, 7]].forEach(([x, h]) => g.r(x, 41 - h, 2, h, "#B8FF3D"));
+  }
+  // czerwony STOP na biurku i roślinka
+  g.r(99, 41, 5, 3, "#3A3F48"); L.get("ads-stop", cx("thq-px-rec", on && "is-on")).r(100, 40, 3, 2, "#FF3B30");
+  g.r(18, 50, 6, 8, "#C8693C"); g.r(17, 42, 3, 8, "#2F8F4E"); g.r(21, 40, 3, 10, "#3AA85C");
   const lookup = { working: { pose: "type" }, judging: { pose: "type" }, blocked: { pose: "raise", alert: true } };
   drawFigure(L, "fig", 70, 60, "office", { facing: "back", legs: false, busy: on, sleep: st === "idle", ...(lookup[st] || {}) });
   const c = L.get("chair"); c.r(64, 46, 13, 9, "#2D3440"); c.r(69, 55, 3, 4, "#555E6B"); c.r(64, 59, 13, 1, "#555E6B");

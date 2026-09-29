@@ -1,0 +1,14 @@
+agent: jarvo-ads
+
+tools:
+  - name: skarbiec
+    source: services/skarbiec (to repo)
+    license: MIT
+    version: "repo"
+    install: {method: image, spec: "osobny kontener jarvo-skarbiec (infra/docker-compose.yml)"}
+    integration: sidecar
+    used_by_skills: [podlacz-konto, start-kampanii, optymalizacja, audyt-konta, raport-reklam]
+    healthcheck: "python3 $HERMES_HOME/scripts/ads.py doctor --quiet"
+    autonomy: A2
+    optional: true
+    notes: "Trzyma tokeny Meta/Google, politykę budżetu, koperty i kody zgody. Bez niego agent działa na eksportach CSV."

@@ -1,0 +1,10 @@
+name: jarvo-ads
+version: 0.1.0
+description: "Ads: specjalista Meta Ads i Google Ads: plany, kampanie, kontrola konta, testy, raporty."
+author: "Jarvo fleet"
+license: MIT
+env_requires:
+  - name: OPENROUTER_API_KEY
+    description: "Klucz modelu dla Ads (osobny klucz z limitem kredytów)"
+    required: false
+agent: jarvo-ads
