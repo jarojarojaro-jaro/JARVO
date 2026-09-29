@@ -1,7 +1,7 @@
 # Clipmaker Wideografa: długie nagranie → edytowalne rolki (projekt)
 
-> Stan: **projekt v1 (2026-09-30), do akceptacji.** Właściciel: `jarvo-wideo`. Nic z tego jeszcze nie jest w kodzie,
-> poza elementami opisanymi w „Co już jest”.
+> Stan: **zaakceptowany (2026-09-30), w budowie** (§6: krok 1 gotowy). Właściciel: `jarvo-wideo`.
+> Format: **9:16 domyślnie** (Reels, Shorts, TikTok), 16:9 na życzenie (`format` w `plan.json`, całość albo rolka).
 
 Ktoś wrzuca długi materiał (podcast, webinar, live, vlog, 5–120 min). Wideograf go transkrybuje, rozumie, w którym
 momencie co jest powiedziane, wybiera najlepsze fragmenty według jednego „master promptu” i robi z nich krótkie
@@ -64,7 +64,7 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 
 | Element | Domyślnie | W projekcie |
 |---|---|---|
-| format | 1080×1920, 30 fps | `canvas` |
+| format | 1080×1920, 30 fps (9:16); na życzenie 1920×1080 (16:9) | `canvas`; `format` w planie albo rolce |
 | kadr | mówca z poziomego nagrania: przycięcie do pionu z punktem skupienia na twarzy; dwie osoby: segment na osobę | klip `fit: cover` + **nowe** `fx`, `fy` (0–1) i `zoom` (1–2) |
 | rytm | wycięte pauzy > 0,6 s i „yyy” (zostaje 0,12 s oddechu); punch-in (zoom 1,15) na mocnym zdaniu | kolejne klipy z tego samego źródła |
 | napisy | **karaoke**: 2–4 słowa w linii, aktywne słowo w kolorze akcentu, grube, z obrysem, w dolnej 1/3 poza strefą UI platform | **nowy** typ napisu: `words` + `hl` |
@@ -75,7 +75,7 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 
 | # | Część | Co | Gdzie |
 |---|---|---|---|
-| 1 | **Kadr z punktem skupienia** | `fx`, `fy`, `zoom` w klipie: eksport (`crop` ffmpeg), podgląd i suwaki „Kadr” w edytorze, walidacja | `hq/plugin/edytor.py`, `hq/web/src/45-edytor.js`, `projekt.py` |
+| 1 ✅ | **Kadr z punktem skupienia** | `fx`, `fy`, `zoom` w klipie: eksport (`crop` ffmpeg), podgląd i suwaki „Kadr” w edytorze, walidacja | `hq/plugin/edytor.py`, `hq/web/src/45-edytor.js`, `projekt.py` |
 | 2 | **Napisy karaoke** | napis z `words: [[start, end, słowo]]` i `hl` (kolor aktywnego słowa); rysowanie z podświetleniem w `44-napisy.js`; eksport jako **jedna** warstwa (PNG na słowo, sklejone demuxerem concat), więc stała pamięć niezależnie od liczby słów; edycja tekstu linii w edytorze wyłącza karaoke tylko tej linii | `44-napisy.js`, `45-edytor.js`, `edytor.py`, `plugin_api.py`, `projekt.py` |
 | 3 | **klipy.py** | `przygotuj` (mowa.json, sceny, arkusze, transkrypcja.txt), `zbuduj` (plan.json → projekty → render), `sprawdz` (walidacja planu: czasy w źródle, długości, hook) | `profiles/jarvo-wideo/scripts/klipy.py` |
 | 4 | **Skill `clipmaker`** | kroki, master prompt, schemat `plan.json`, styl rolki, DoD, rubryka; zastępuje dzisiejszy `klipy-z-dlugiego` (robi gotowe MP4 z wypalonymi napisami, bez możliwości edycji) | `profiles/jarvo-wideo/skills/wideo/clipmaker/` |
@@ -84,7 +84,7 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 
 `plan.json` (pisze Wideograf, sprawdza `klipy.py sprawdz`):
 ```json
-{"zrodlo": "/opt/data/jarvo/inbox/…/podcast.mp4",
+{"zrodlo": "/opt/data/jarvo/inbox/…/podcast.mp4", "format": "9:16",
  "styl": {"napisy": "karaoke", "hl": "#FFE14D", "tytul": true, "tnij_pauzy": 0.6, "muzyka": null},
  "rolki": [{"slug": "3-bledy-cen", "tytul": "3 błędy w cenach", "opis": "…", "hashtagi": ["#biznes"],
             "segmenty": [{"od": 754.2, "do": 781.9, "fx": 0.42, "fy": 0.35, "zoom": 1.0}],
@@ -104,7 +104,7 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 
 ## 6. Kolejność budowy (każdy krok: commit, testy, test w kontenerze i w zalogowanym edytorze HQ)
 
-1. kadr `fx`/`fy`/`zoom` (eksport + podgląd + suwaki),
+1. ✅ kadr `fx`/`fy`/`zoom` (eksport + podgląd + suwaki, `projekt.py kadr`),
 2. napisy karaoke (rysowanie, edycja, eksport jedną warstwą, `projekt.py render`),
 3. `klipy.py przygotuj` + `zbuduj` + `sprawdz`,
 4. skill `clipmaker` z master promptem, routing, evals, rubryka; `klipy-z-dlugiego` → przekierowanie,

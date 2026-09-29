@@ -4,7 +4,7 @@ Projekt montażu to mały JSON (zapisywany obok filmu jako `<nazwa>.edycja.json`
 
     {"version": 1, "canvas": {"w": 1080, "h": 1920, "fps": 30},
      "clips": [{"src": "/opt/data/jarvo/.../film.mp4", "in": 0.0, "out": 4.2, "speed": 1.0,
-                "volume": 1.0, "muted": false, "fit": "contain"}],
+                "volume": 1.0, "muted": false, "fit": "contain"}],     # "cover" + fx, fy, zoom: kadr z punktem skupienia
      "texts": [{"start": 0.5, "end": 3.0, ...}],          # wygląd rysuje przeglądarka (PNG na klatkę)
      "audio": [{"src": ".../muzyka.mp3", "start": 0.0, "in": 0.0, "out": 30.0, "volume": 0.4}]}
 
@@ -95,7 +95,10 @@ def normalize(project: dict, resolve) -> dict:
         clips.append({"src": path, "kind": kind, "in": a, "out": b,
                       "speed": 1.0 if kind == "image" else _num(c.get("speed"), 0.25, 4, 1),
                       "volume": _num(c.get("volume"), 0, 2, 1), "muted": bool(c.get("muted")),
-                      "fit": "cover" if c.get("fit") == "cover" else "contain"})
+                      "fit": "cover" if c.get("fit") == "cover" else "contain",
+                      # kadr przy „Wypełnij”: punkt skupienia (0–1, 0,5 = środek) i przybliżenie (punch-in)
+                      "fx": _num(c.get("fx"), 0, 1, 0.5), "fy": _num(c.get("fy"), 0, 1, 0.5),
+                      "zoom": _num(c.get("zoom"), 1, 3, 1)})
     if not clips:
         raise ProjectError("Oś czasu jest pusta: dodaj co najmniej jeden klip.")
     total = sum((c["out"] - c["in"]) / c["speed"] for c in clips)
@@ -139,6 +142,15 @@ def _f(x: float) -> str:
     return f"{x:.4f}".rstrip("0").rstrip(".") or "0"
 
 
+def cover_filter(W: int, H: int, c: dict) -> str:
+    """„Wypełnij” z kadrem: obraz skalowany tak, by pokrył kadr powiększony o `zoom`, i wycięty z punktem skupienia
+    (fx, fy). To ten sam kadr co w podglądzie (CSS object-position fx fy + scale(zoom) wokół tego punktu)."""
+    z, fx, fy = c.get("zoom", 1), c.get("fx", 0.5), c.get("fy", 0.5)
+    sw, sh = (_even(W * z), _even(H * z)) if z != 1 else (W, H)
+    return (f"scale={sw}:{sh}:force_original_aspect_ratio=increase,"
+            f"crop={W}:{H}:(iw-{W})*{_f(fx)}:(ih-{H})*{_f(fy)}")
+
+
 def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                   ffmpeg: str = "ffmpeg") -> list[str]:
     """Argumenty ffmpeg dla znormalizowanego projektu. `has_audio[src] -> bool` z ffprobe."""
@@ -155,7 +167,7 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
         else:
             args += ["-ss", _f(c["in"]), "-t", _f(dur_src), "-i", str(c["src"])]
         vi = n; n += 1
-        fit = (f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}" if c["fit"] == "cover"
+        fit = (cover_filter(W, H, c) if c["fit"] == "cover"
                else f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black")
         graph.append(f"[{vi}:v]setpts=(PTS-STARTPTS)/{_f(c['speed'])},fps={F},{fit},setsar=1,format=yuv420p,"
                      f"tpad=stop_mode=clone:stop_duration=1,trim=duration={_f(dur)},setpts=PTS-STARTPTS[v{i}]")

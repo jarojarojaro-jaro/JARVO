@@ -81,3 +81,16 @@ def test_render_same_engine(film, capsys):
     assert pr.main(["render", str(film)]) == 0
     out = film.with_name("film-edycja.mp4")
     assert out.is_file() and f"MEDIA:{out}" in capsys.readouterr().out
+
+
+def test_kadr_sets_focus_and_zoom(film, capsys):
+    """Pion z poziomego: klip „Wypełnij” z punktem skupienia i przybliżeniem; wartości spoza zakresu przycięte."""
+    assert pr.main(["dodaj-klip", str(film), str(film), "--od", "0", "--do", "1", "--wypelnij", "--fx", "0.3"]) == 0
+    c = proj(film)["clips"][-1]
+    assert (c["fit"], c["fx"]) == ("cover", 0.3)
+    assert pr.main(["kadr", str(film), c["id"], "--fy", "0.2", "--zoom", "9"]) == 0
+    c = next(x for x in proj(film)["clips"] if x["id"] == c["id"])
+    assert (c["fx"], c["fy"], c["zoom"]) == (0.3, 0.2, 3.0)
+    assert pr.main(["sprawdz", str(film)]) == 0
+    with pytest.raises(SystemExit, match="nie ma klipu"):
+        pr.main(["kadr", str(film), "brak"])

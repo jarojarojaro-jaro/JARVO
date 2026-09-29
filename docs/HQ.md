@@ -99,6 +99,9 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat → nakładki → miks z limiterem), H.264 + AAC,
   `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
   i dopiero gotowy dostaje nazwę `film-edycja[-N].mp4`: nic nie jest nadpisywane.
+- **Kadr:** klip w trybie „Wypełnij” (np. pion 9:16 z poziomego nagrania) ma w ustawieniach suwaki **Kadr: poziomo**,
+  **Kadr: pionowo** i **Przybliżenie** (1–3×, punch-in). Zapisują się w klipie jako `fx`, `fy`, `zoom`; eksport tnie
+  ten sam fragment (`crop` z punktem skupienia w ffmpeg), który pokazuje podgląd (CSS `object-position` + `scale`).
 - **Napisy:** zakładka „Napisy” (na telefonie przycisk w dolnym pasku) rozpoznaje mowę klipów na serwerze
   (`jarvo-stt`, Parakeet, bez internetu) i wstawia napisy na ścieżkę tekstu, zgrane z cięciami i tempem. Wynik zapisuje
   się obok źródła jako `<nazwa>.auto.srt`, więc drugi raz wczytuje się od razu. Można też wczytać gotowy `.srt`
@@ -117,7 +120,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
-  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `napisy`, `usun`, `sprawdz`,
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `usun`, `sprawdz`,
   `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy rysuje ta sama funkcja (`hq/web/src/44-napisy.js`) w przeglądarce bez okna, więc plik od agenta wygląda
   jak eksport z edytora. Edytor co 3 s sprawdza, czy projekt zmienił się z zewnątrz: bez Twoich niezapisanych zmian

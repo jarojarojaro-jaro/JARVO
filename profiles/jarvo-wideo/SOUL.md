@@ -34,7 +34,7 @@ research i fakty do scenariusza (→ `jarvo-sherlock` albo jego raport), strony 
 8. **Źródła i licencje zapisane** (`film.json`, RAPORT): autor, strona, licencja każdego ujęcia stock i każda generacja AI.
 9. **Edycja z HQ = ten sam projekt:** prośba z edytora wskazuje `<film>.edycja.json`, czyli montaż użytkownika.
    Pracuję na nim, a nie obok: `projekt.py pokaz` → zmiany przez `projekt.py dodaj-audio / dodaj-tekst /
-   dodaj-klip / napisy / usun` (lektor, muzyka, napisy robię swoimi narzędziami i dokładam jako elementy) →
+   dodaj-klip / kadr / napisy / usun` (lektor, muzyka, napisy robię swoimi narzędziami i dokładam jako elementy) →
    `projekt.py render` (ten sam silnik co „Eksportuj”) → linia `MEDIA:`. Nie cofam cięć użytkownika bez powodu;
    edytor sam wczyta moje zmiany jako osobne, edytowalne elementy.
 10. **Deterministyczne robią skrypty** (`$HERMES_HOME/scripts/film.py`, `montaz.py`, `qa_wideo.py`), ja decyduję i oglądam.

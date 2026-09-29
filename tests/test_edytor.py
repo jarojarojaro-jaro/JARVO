@@ -174,3 +174,40 @@ def test_real_proxy_and_silences(tmp_path):
                           "-f", "null", "-"], capture_output=True, text=True).stderr
     (a, b), = ed.parse_silences(log, 4.0)
     assert a == pytest.approx(1.0, abs=0.05) and b == pytest.approx(2.5, abs=0.05)
+
+
+def test_cover_focus_and_zoom_filter(tmp_path):
+    f = _files(tmp_path)
+    base = {"src": str(f["a.mp4"]), "in": 0, "out": 2, "fit": "cover"}
+    p = ed.normalize({"canvas": {"w": 1080, "h": 1920},
+                      "clips": [base, {**base, "fx": 0.2, "fy": 0.9, "zoom": 1.5}, {**base, "fx": 7, "zoom": 0.1}]},
+                     _resolver(tmp_path))
+    c0, c1, c2 = p["clips"]
+    assert (c0["fx"], c0["fy"], c0["zoom"]) == (0.5, 0.5, 1)          # stare projekty: kadr jak dotąd (środek)
+    assert (c2["fx"], c2["zoom"]) == (1, 1)                            # wartości spoza zakresu przycięte
+    assert ed.cover_filter(1080, 1920, c0) == ("scale=1080:1920:force_original_aspect_ratio=increase,"
+                                               "crop=1080:1920:(iw-1080)*0.5:(ih-1920)*0.5")
+    assert ed.cover_filter(1080, 1920, c1) == ("scale=1620:2880:force_original_aspect_ratio=increase,"
+                                               "crop=1080:1920:(iw-1080)*0.2:(ih-1920)*0.9")
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_real_export_focus_picks_side_of_frame(tmp_path):
+    """Poziome źródło: lewa połowa czerwona, prawa niebieska. Pion 9:16 z fx=0 widzi czerwień, z fx=1 błękit."""
+    src = tmp_path / "szer.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=red:s=320x180:d=1",
+                    "-f", "lavfi", "-i", "color=blue:s=320x180:d=1", "-filter_complex",
+                    "[0:v]crop=160:180:0:0[l];[1:v]crop=160:180:0:0[r];[l][r]hstack,format=yuv420p",
+                    str(src)], check=True)
+    colors = {}
+    for fx in (0.0, 1.0):
+        p = ed.normalize({"canvas": {"w": 90, "h": 160, "fps": 25},
+                          "clips": [{"src": str(src), "in": 0, "out": 0.5, "fit": "cover", "fx": fx}]}, _resolver(tmp_path))
+        out = tmp_path / f"o{fx}.mp4"
+        r = subprocess.run(ed.build_command(p, {}, [], out), capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        rgb = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(out), "-frames:v", "1", "-vf", "scale=1:1",
+                              "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
+        colors[fx] = tuple(rgb[:3])
+    assert colors[0.0][0] > 150 and colors[0.0][2] < 90       # czerwony
+    assert colors[1.0][2] > 150 and colors[1.0][0] < 90       # niebieski

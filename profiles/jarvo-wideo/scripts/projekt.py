@@ -9,7 +9,8 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py dodaj-audio <film> <plik> [--start S] [--od S] [--do S] [--glosnosc 0.8] [--wycisz-film]
     projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain]
                                            [--y 0.78] [--rozmiar 72] [--kolor #FFFFFF] [--tlo #000000]
-    projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N]
+    projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--wypelnij --fx X --fy Y --zoom Z]
+    projekt.py kadr <film> <id> [--wypelnij|--dopasuj] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
     projekt.py napisy <film> [--srt plik.srt]      # napisy ze słów (<źródło>.mowa.json) albo z pliku SRT
     projekt.py usun <film> <id>                    # usuń klip / tekst / audio o danym id (z `pokaz`)
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
@@ -180,11 +181,38 @@ def cmd_dodaj_klip(film: Path, a) -> int:
     od = a.od or 0.0
     do = a.do if a.do is not None else (od + dur if kind == "image" else dur)
     c = {"id": new_id("c"), "src": str(src), "kind": kind, "in": od, "out": do, "speed": 1 if kind == "image" else a.tempo,
-         "volume": 1, "muted": False, "fit": "contain"}
+         "volume": 1, "muted": False, "fit": "cover" if a.wypelnij else "contain"}
+    c.update(kadr_z_arg(a))
     pos = len(proj["clips"]) if a.pozycja is None else max(0, min(len(proj["clips"]), a.pozycja))
     proj["clips"].insert(pos, c)
     save(film, proj)
     print(f"Dodano klip [{c['id']}] {src.name} na pozycji {pos} ({(do - od) / c['speed']:.2f} s)")
+    return 0
+
+
+def kadr_z_arg(a) -> dict:
+    """--fx/--fy/--zoom → pola klipu (kadr działa przy „Wypełnij”, czyli fit=cover; edytor.py pilnuje zakresów)."""
+    out = {}
+    for k in ("fx", "fy", "zoom"):
+        v = getattr(a, k, None)
+        if v is not None:
+            lo, hi = (1.0, 3.0) if k == "zoom" else (0.0, 1.0)
+            out[k] = min(hi, max(lo, v))
+    return out
+
+
+def cmd_kadr(film: Path, a) -> int:
+    proj = load(film)
+    c = next((x for x in proj["clips"] if x.get("id") == a.id), None)
+    if c is None:
+        raise SystemExit(f"nie ma klipu o id {a.id} (lista: projekt.py pokaz)")
+    if a.wypelnij or a.dopasuj:
+        c["fit"] = "cover" if a.wypelnij else "contain"
+    c.update(kadr_z_arg(a))
+    if c.get("fit") != "cover" and kadr_z_arg(a):
+        print("uwaga: fx/fy/zoom działają przy --wypelnij (fit=cover)")
+    save(film, proj)
+    print(f"Kadr [{c['id']}]: {c.get('fit')} fx={c.get('fx', 0.5)} fy={c.get('fy', 0.5)} zoom={c.get('zoom', 1)}")
     return 0
 
 
@@ -365,6 +393,17 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--do", type=float)
     sp.add_argument("--tempo", type=float, default=1.0)
     sp.add_argument("--pozycja", type=int, help="miejsce na ścieżce (0 = na początek; domyślnie na koniec)")
+
+    def kadr_args(sp):
+        sp.add_argument("--wypelnij", action="store_true", help="wypełnij kadr (fit=cover), np. pion z poziomego")
+        sp.add_argument("--fx", type=float, help="punkt skupienia poziomo 0–1 (0.5 = środek, twarz mówcy z klatek)")
+        sp.add_argument("--fy", type=float, help="punkt skupienia pionowo 0–1")
+        sp.add_argument("--zoom", type=float, help="przybliżenie 1–3 (punch-in ok. 1.15)")
+    kadr_args(sp)
+    sp = film_cmd("kadr", cmd_kadr, "kadr klipu: wypełnij/dopasuj, punkt skupienia, przybliżenie")
+    sp.add_argument("id")
+    kadr_args(sp)
+    sp.add_argument("--dopasuj", action="store_true", help="cały obraz z pasami (fit=contain)")
     film_cmd("napisy", cmd_napisy, "napisy ze słów albo z SRT").add_argument("--srt")
     film_cmd("usun", cmd_usun, "usuń element po id").add_argument("id")
     film_cmd("sprawdz", cmd_sprawdz, "walidacja projektu")

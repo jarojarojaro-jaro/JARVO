@@ -200,6 +200,16 @@ function usePlayer(proj, meta, onTick) {
     for (let i = 0; i < L.length; i++) if (t < L[i].end - 1e-6) return [i, L[i]];
     return L.length ? [L.length - 1, L[L.length - 1]] : [-1, null];
   };
+  // kadr jak w eksporcie (edytor.py cover_filter): object-position = punkt skupienia, scale(zoom) wokół niego
+  function applyFit(el, c) {
+    const cover = c.fit === "cover";
+    const fx = cover ? clamp(c.fx ?? 0.5, 0, 1) : 0.5, fy = cover ? clamp(c.fy ?? 0.5, 0, 1) : 0.5;
+    const z = cover ? clamp(c.zoom ?? 1, 1, 3) : 1;
+    el.style.objectFit = cover ? "cover" : "contain";
+    el.style.objectPosition = `${fx * 100}% ${fy * 100}%`;
+    el.style.transformOrigin = `${fx * 100}% ${fy * 100}%`;
+    el.style.transform = z !== 1 ? `scale(${z})` : "";
+  }
   async function load(slot, c, local) {
     const v = vids[slot].current;
     if (!v) return;
@@ -210,7 +220,7 @@ function usePlayer(proj, meta, onTick) {
     v.playbackRate = c.speed || 1;
     v.volume = clamp(c.volume ?? 1, 0, 1);
     v.muted = !!c.muted;
-    v.style.objectFit = c.fit === "cover" ? "cover" : "contain";
+    applyFit(v, c);
   }
   function show(kind, slot) {
     vids.forEach((r, i) => r.current && r.current.classList.toggle("is-on", kind === "video" && i === slot));
@@ -247,7 +257,7 @@ function usePlayer(proj, meta, onTick) {
     if (s.c.kind === "image") {
       const url = await mediaUrl(s.c.src);
       if (imgRef.current && imgRef.current.getAttribute("src") !== url) imgRef.current.src = url;
-      if (imgRef.current) imgRef.current.style.objectFit = s.c.fit === "cover" ? "cover" : "contain";
+      if (imgRef.current) applyFit(imgRef.current, s.c);
       show("image");
       vids.forEach((r) => r.current && r.current.pause());
     } else {
@@ -1041,6 +1051,14 @@ function VideoEditor({ path, onClose }) {
       ${act("crop", c.fit === "cover" ? L("Wypełnij", "Fill") : L("Dopasuj", "Fit"), () => upd("clip", c.id, { fit: c.fit === "cover" ? "contain" : "cover" }), { on: c.fit === "cover" })}
       ${act("trash", L("Usuń", "Delete"), remove, { bad: true, disabled: p.clips.length <= 1 })}
     </div>
+    ${c.fit === "cover" && html`<div class="thq-ed-crop">
+      <label>${L("Kadr: poziomo", "Frame: horizontal")} · ${Math.round((c.fx ?? 0.5) * 100)}%
+        <input type="range" min="0" max="1" step="0.01" value=${c.fx ?? 0.5} onInput=${(e) => upd("clip", c.id, { fx: +e.target.value }, true)} onChange=${H.commit}/></label>
+      <label>${L("Kadr: pionowo", "Frame: vertical")} · ${Math.round((c.fy ?? 0.5) * 100)}%
+        <input type="range" min="0" max="1" step="0.01" value=${c.fy ?? 0.5} onInput=${(e) => upd("clip", c.id, { fy: +e.target.value }, true)} onChange=${H.commit}/></label>
+      <label>${L("Przybliżenie", "Zoom")} · ${(c.zoom ?? 1).toFixed(2)}×
+        <input type="range" min="1" max="3" step="0.05" value=${c.zoom ?? 1} onInput=${(e) => upd("clip", c.id, { zoom: +e.target.value }, true)} onChange=${H.commit}/></label>
+    </div>`}
     ${c.kind !== "image" && html`<label>${L("Tempo", "Speed")} · ${c.speed}×${seg(ED_SPEEDS.map((s) => [s, `${s}×`]), c.speed, (v) => upd("clip", c.id, { speed: v }))}</label>`}
     ${c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}%
       <input type="range" min="0" max="2" step="0.05" value=${c.volume} onInput=${(e) => upd("clip", c.id, { volume: +e.target.value, muted: false }, true)} onChange=${H.commit}/></label>`}
