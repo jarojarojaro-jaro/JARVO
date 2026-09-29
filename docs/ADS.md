@@ -1,49 +1,56 @@
-# Jarvo Ads: agent od płatnych reklam (projekt)
+# Jarvo Ads: specjalista Ads Managera (projekt)
 
-> Stan: **projekt v0 (2026-09-29), przed budową.** Decyzje do podjęcia są w sekcji 14.
-> Fakty o platformach sprawdzone 2026-09-29 (źródła w sekcji 15).
+> Stan: **projekt v1 (2026-09-29), decyzje podjęte (sekcja 14), start budowy.**
+> Platformy: **Meta Ads i Google Ads.** Fakty o platformach sprawdzone 2026-09-29 (źródła w sekcji 15).
 
-Nowy specjalista floty: **`jarvo-ads`**, media buyer i analityk w jednym. Bierze kreacje od Studia i Wideografa,
-puszcza je jako płatne reklamy, robi testy A/B/C/D, pilnuje budżetu, raportuje, co działa, a co nie,
-i zapisuje wnioski, żeby następne kreacje były lepsze.
+Nowy specjalista floty: **`jarvo-ads`**, czyli ktoś, kto na co dzień siedzi w Ads Managerze i Google Ads.
+Planuje kampanie, stawia je, pilnuje budżetu, codziennie sprawdza konto, optymalizuje, raportuje, co działa,
+a co nie. Testuje wtedy, gdy test ma sens: jedna reklama, A/B, A/B/C albo więcej wariantów, w których może
+różnić się wszystko naraz.
 
 ---
 
 ## 1. Co dokładnie robi
 
-Pętla, którą zamyka:
+**Codzienna robota specjalisty od reklam:**
+
+| Obszar | Co konkretnie |
+|---|---|
+| **planowanie kampanii** | cel biznesowy → cel kampanii (sprzedaż, leady, ruch, zasięg, instalacje), struktura (kampanie, zestawy/grupy, reklamy), odbiorcy, miejsca emisji, budżety, harmonogram, prognoza wyników i kosztów |
+| **stawianie** | kampanie na Mecie (FB, IG) i w Google (Search, YouTube, Performance Max): odbiorcy, słowa kluczowe, reklamy, UTM, piksel i konwersje. Wszystko najpierw jako **szkic PAUSED** (0 zł) z podglądem |
+| **pilnowanie** | codzienna kontrola konta: tempo wydatków, odrzucone reklamy, faza uczenia, zmęczenie kreacji, częstotliwość, problemy z płatnością, śledzenie konwersji, wyszukiwane hasła w Google (wykluczenia) |
+| **optymalizacja** | wyłączanie słabych reklam, przesuwanie budżetu do lepszych, wymiana zmęczonych kreacji, korekty stawek i odbiorców w zatwierdzonym budżecie |
+| **testy** | jedna reklama, A/B, A/B/C, A/B/C/D…: warianty mogą różnić się wszystkim (film, hook, copy, grupa odbiorców). Agent mówi uczciwie, co da się z takiego testu wyczytać, a co nie (sekcja 5) |
+| **raporty** | krótko, gdy coś się dzieje; tygodniowo z wykresami; na koniec kampanii z wnioskami |
+| **wnioski marki** | co zadziałało i dlaczego, zapisane z dowodami, żeby Studio i Wideograf robili kolejne kreacje lepiej |
+
+Pętla pracy:
 
 ```
-  pomysł / produkt
+  cel („więcej zapisów na jarvo.pl”)
         │
         ▼
-  ① plan testu (jarvo-ads) ── hipoteza, 1 zmienna, warianty A/B/C/D, metryka, budżet, czas
-        │                     + planer mocy: „czy ten budżet w ogóle coś rozstrzygnie?”
-        ▼
-  ② kreacje (jarvo-studio: grafiki, copy · jarvo-wideo: filmy, warianty hooków)
+  ① plan kampanii (jarvo-ads): cel, struktura, odbiorcy, budżet, prognoza, ewentualnie warianty
         │
         ▼
-  ③ szkic na koncie Meta (PAUSED, 0 zł) ── podgląd reklam, link do Ads Managera
+  ② kreacje: brief do Studia (grafiki, copy) i Wideografa (filmy, wersje hooków)
         │
         ▼
-  ④ Twoja zgoda na kopertę budżetu (kod jak w banku)
+  ③ szkic na koncie (PAUSED, 0 zł): podglądy reklam, link do Ads Managera / Google Ads
         │
         ▼
-  ⑤ start → optymalizacja w kopercie (wyłącza przegranych, przesuwa budżet między wariantami)
+  ④ Twoja zgoda na kopertę budżetu (kod przez podłączony komunikator)
+        │
+        ▼
+  ⑤ start → codzienna kontrola i optymalizacja w kopercie
         │     strażnik co godzinę: wydatki, anomalie, odrzucone reklamy
         ▼
-  ⑥ raport: zwycięzca z prawdopodobieństwem, a przy remisie remis
-        │
-        ▼
-  ⑦ biblioteka wniosków marki → brief następnych kreacji (wraca do ②)
+  ⑥ raporty → wnioski marki → następne kreacje i kampanie (wraca do ①)
 ```
 
-Najważniejsze: agent nie ma robić „kampanii”, tylko **system testowania**. Każdy test kończy się wnioskiem
-zapisanym w marce („hook z pytaniem wygrał 3 z 4 testów, hook rate +31%”), a Studio i Wideograf czytają te wnioski
-przed następną kreacją.
-
 **Poza zakresem:** robienie grafik i filmów (Studio, Wideograf), strona i piksel na stronie (Web), research rynku
-(Sherlock), posty organiczne (Studio, kolejka publikacji).
+(Sherlock), posty organiczne (Studio). Płatne reklamy należą w całości do `jarvo-ads`: Studio robi kreacje,
+Ads je puszcza i mierzy.
 
 ---
 

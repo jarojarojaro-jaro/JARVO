@@ -285,6 +285,22 @@ def copy_rubrics(fleet: fl.Fleet, review_skill_refs: Path) -> None:
             shutil.copy2(rubric, review_skill_refs / f"rubric-{a.name}.md")
 
 
+def remove_tree(path: Path) -> None:
+    """Usuwa stary wynik budowy. Resztki innego użytkownika (np. __pycache__ roota po ręcznym uruchomieniu
+    skryptu agenta) nie mogą wywrócić wdrożenia przed instalacją floty: katalog odkładamy na bok
+    (wystarczy prawo zapisu w rodzicu), a przy następnej budowie próbujemy go dosprzątać."""
+    try:
+        shutil.rmtree(path)
+        return
+    except PermissionError:
+        pass
+    trash = path.parent / f".{path.name}.old-{dt.datetime.now():%Y%m%d%H%M%S}"
+    path.rename(trash)
+    print(f"  ! {path} miał pliki innego użytkownika: odłożony do {trash.name} (usuń ręcznie: sudo rm -rf)")
+    for old in path.parent.glob(f".{path.name}.old-*"):
+        shutil.rmtree(old, ignore_errors=True)
+
+
 # ---------------------------------------------------------------------------- cron
 
 def build_cron(agent_dir: Path, out_dir: Path, tokens: dict[str, str], hermes_src: Path | None) -> int:
@@ -478,7 +494,7 @@ def main(argv: list[str] | None = None) -> int:
 
     profiles_out = out / "profiles"
     if profiles_out.exists():
-        shutil.rmtree(profiles_out)
+        remove_tree(profiles_out)
     profiles_out.mkdir(parents=True)
     resolver = SourceResolver(lock, hermes_src, cache, local_src)
 
