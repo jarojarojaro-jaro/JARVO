@@ -497,3 +497,47 @@ def test_preview_links_shared_file(tmp_path):
     assert core.link_root(links, "zly-token", NOW) is None
     t2 = core.link_for(links, site, NOW + core.LINK_TTL * 0.6)           # mniej niż pół terminu → nowy
     assert t2 != t1
+
+
+def test_update_state_stalled_when_helper_silent(tmp_path, monkeypatch):
+    """Pomocnik zniknął w trakcie aktualizacji: panel pokazuje „utknęła”, nie wieczne „aktualizuję”."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    import time
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    api = load_script("hq/plugin/plugin_api.py", "jarvo_hq_plugin_api_upd")
+    upd = tmp_path / "update.json"
+    monkeypatch.setattr(api, "UPDATE_FILE", upd)
+    monkeypatch.setattr(api, "UPDATE_REQUEST", tmp_path / "update-request")
+    now = time.time()
+    upd.write_text(json.dumps({"state": "updating", "started_at": now - 1800, "beat": now - 20}), encoding="utf-8")
+    assert api._update_state()["state"] == "updating"          # znak życia świeży: trwa
+    upd.write_text(json.dumps({"state": "updating", "started_at": now - 1800}), encoding="utf-8")
+    st = api._update_state()
+    assert st["state"] == "stalled" and not st["online"] and st["silent_for"] >= 1800
+    upd.write_text(json.dumps({"state": "idle", "checked_at": now - 3600}), encoding="utf-8")
+    (tmp_path / "update-request").write_text("update", encoding="utf-8")
+    assert api._update_state()["state"] == "stalled"           # prośba czeka na nieobecnego pomocnika
+
+
+def test_updater_heartbeat_and_timeout(tmp_path, monkeypatch):
+    up = load_script("scripts/updater.py", "jarvo_updater_test")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "deploy.sh").write_text("echo start; sleep 30; echo koniec\n")
+    writes = []
+    monkeypatch.setattr(up, "ROOT", tmp_path)
+    monkeypatch.setattr(up, "put_state", lambda s: writes.append(dict(s)) or True)
+    monkeypatch.setattr(up, "check", lambda s: dict(s))
+    monkeypatch.setattr(up, "UPDATE_TIMEOUT", 1)
+    real_event = up.threading.Event
+    class Fast(real_event):
+        def wait(self, timeout=None):
+            return super().wait(min(timeout or 0, 0.3))
+    monkeypatch.setattr(up.threading, "Event", Fast)
+    args = type("A", (), {"compose": None, "build": None})()
+    t0 = __import__("time").time()
+    final = up.update(args, {"state": "idle"})
+    assert __import__("time").time() - t0 < 15                 # zawieszony deploy przerwany
+    assert final["state"] == "failed" and "Przerwano" in final["log"]
+    assert any(w.get("beat") for w in writes)                    # znak życia bez nowych linii logu
+    assert writes[-1]["state"] == "failed"                       # ostatni zapis to wynik, nie „updating”

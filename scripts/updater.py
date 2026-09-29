@@ -22,8 +22,10 @@ import argparse
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -35,6 +37,8 @@ CHECK_EVERY = int(os.environ.get("JARVO_UPDATE_CHECK", "60"))
 AUTO_UPDATE = os.environ.get("JARVO_AUTO_UPDATE", "0") == "1"
 POLL_EVERY = 2   # prośby z dashboardu (folder ma się otworzyć od razu)
 LOG_TAIL = 40
+# zawieszony deploy (np. build bez sieci) nie może blokować panelu w nieskończoność
+UPDATE_TIMEOUT = int(os.environ.get("JARVO_UPDATE_TIMEOUT", str(45 * 60)))
 DATA_IN = "/opt/data"
 # tylko wyniki floty (jak podgląd plików w HQ): nigdy klucze, profile ani konfiguracja
 REVEAL_ROOTS = ("jarvo/workspaces", "jarvo/missions", "jarvo/knowledge", "jarvo/inbox")
@@ -139,15 +143,28 @@ def update(args, state: dict) -> dict:
     if args.build:
         env["JARVO_BUILD"] = args.build
     lines: list[str] = []
+    started = time.time()
     proc = subprocess.Popen(["bash", str(ROOT / "scripts" / "deploy.sh")], cwd=ROOT, env=env,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    last_push = 0.0
-    for line in proc.stdout:  # postęp na żywo (ogon logu), co kilka sekund
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    done = threading.Event()
+
+    def beat() -> None:
+        # znak życia co 15 s także bez nowych linii (długi build); po limicie czasu przerywamy deploy
+        while not done.wait(15):
+            if time.time() - started > UPDATE_TIMEOUT:
+                lines.append(f"Przerwano: aktualizacja trwała ponad {UPDATE_TIMEOUT // 60} min.")
+                os.killpg(proc.pid, signal.SIGTERM)
+                return
+            put_state({**state, "state": "updating", "started_at": started, "beat": time.time(),
+                       "log": "\n".join(lines[-LOG_TAIL:])})
+
+    t = threading.Thread(target=beat, daemon=True)
+    t.start()
+    for line in proc.stdout:  # postęp na żywo (ogon logu)
         lines.append(line.rstrip())
-        if time.time() - last_push > 5:
-            put_state({**state, "state": "updating", "log": "\n".join(lines[-LOG_TAIL:])})
-            last_push = time.time()
     ok = proc.wait() == 0
+    done.set()
+    t.join(timeout=60)   # ostatni znak życia nie może nadpisać wyniku
     # kontener mógł zostać odtworzony: czekamy, aż znów przyjmie zapis stanu
     final = {**check(state), "state": "done" if ok else "failed", "finished_at": time.time(),
              "log": "\n".join(lines[-LOG_TAIL:])}

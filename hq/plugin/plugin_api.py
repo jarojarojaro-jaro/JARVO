@@ -1027,9 +1027,13 @@ def _update_state() -> dict:
         state = json.loads(UPDATE_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {"online": False, "state": "unknown", "behind": 0}
-    last = max(state.get("checked_at") or 0, state.get("started_at") or 0, state.get("finished_at") or 0)
-    state["online"] = state.get("state") == "updating" or time.time() - last < UPDATER_STALE
+    last = max(state.get(k) or 0 for k in ("checked_at", "started_at", "finished_at", "beat"))
+    state["online"] = time.time() - last < UPDATER_STALE
     state["pending"] = UPDATE_REQUEST.exists()
+    state["silent_for"] = int(time.time() - last) if last else None
+    # pomocnik zniknął w trakcie (zamknięty WSL, restart, zawieszony deploy): nie udajemy, że trwa
+    if not state["online"] and (state.get("state") == "updating" or state["pending"]):
+        state["state"] = "stalled"
     return state
 
 

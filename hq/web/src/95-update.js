@@ -57,6 +57,7 @@
     if (st.state === "updating" || (st.pending && st.state !== "done")) return [L("⟳ Aktualizuję…", "⟳ Updating…"), "is-busy"];
     if (justUpdated()) return [L("✓ Odśwież stronę", "✓ Reload page"), "is-done"];
     if (st.state === "failed") return [L("✗ Aktualizacja nieudana", "✗ Update failed"), "is-bad"];
+    if (st.state === "stalled") return [L("⚠ Aktualizacja utknęła", "⚠ Update stalled"), "is-bad"];
     if (st.online && st.behind > 0) return [`⬆ ${L("Aktualizacja", "Update")} (${st.behind})`, ""];
     return null;
   }
@@ -81,8 +82,14 @@
       panel.append(done);
       return;
     }
-    if (st.state === "updating" || st.pending) {
-      panel.append(el("p", null, L("Pobieram i wdrażam nową wersję. Panel na chwilę się rozłączy; przebudowa obrazu trwa do kilku minut.", "Downloading and deploying the new version. The panel will disconnect briefly; an image rebuild takes up to a few minutes.")));
+    if (st.state === "stalled") {
+      const min = Math.round((st.silent_for || 0) / 60);
+      panel.append(el("p", null, L(
+        `Pomocnik aktualizacji nie odzywa się od ${min} min (zamknięty terminal/WSL, restart komputera albo zawieszony build). Wersja sprzed aktualizacji dalej działa. Uruchom go ponownie: lokalnie bash scripts/local-up.sh, na serwerze sudo systemctl restart jarvo-updater, i kliknij „Spróbuj ponownie”.`,
+        `The update helper has been silent for ${min} min (closed terminal/WSL, reboot or a hung build). The previous version keeps running. Restart it: locally bash scripts/local-up.sh, on a server sudo systemctl restart jarvo-updater, then click "Try again".`)));
+    } else if (st.state === "updating" || st.pending) {
+      const since = st.started_at ? Math.max(0, Math.round((Date.now() / 1000 - st.started_at) / 60)) : null;
+      panel.append(el("p", null, L("Pobieram i wdrażam nową wersję. Panel na chwilę się rozłączy; przebudowa obrazu trwa do kilku minut." + (since != null ? ` Trwa ${since} min.` : ""), "Downloading and deploying the new version. The panel will disconnect briefly; an image rebuild takes up to a few minutes." + (since != null ? ` Running for ${since} min.` : ""))));
     } else if (st.state === "failed") {
       panel.append(el("p", null, L("Aktualizacja się nie udała. Ostatnie linie logu poniżej; wersja sprzed aktualizacji dalej działa.", "The update failed. Last log lines below; the previous version keeps running.")));
     } else {
@@ -95,11 +102,11 @@
       }
       panel.append(ul);
     }
-    if (st.log && (st.state === "updating" || st.state === "failed")) panel.append(el("pre", "thq-upd-log", st.log));
+    if (st.log && (st.state === "updating" || st.state === "failed" || st.state === "stalled")) panel.append(el("pre", "thq-upd-log", st.log));
     if (err) panel.append(el("p", "thq-upd-err", err));
     const actions = el("div", "thq-upd-actions");
-    if (st.state !== "updating" && !st.pending) {
-      actions.append(btn(st.state === "failed" ? L("Spróbuj ponownie", "Try again") : L("Aktualizuj teraz", "Update now"), "thq-upd-go", () => send("update"), busy));
+    if (st.state === "stalled" || (st.state !== "updating" && !st.pending)) {
+      actions.append(btn(st.state === "failed" || st.state === "stalled" ? L("Spróbuj ponownie", "Try again") : L("Aktualizuj teraz", "Update now"), "thq-upd-go", () => send("update"), busy));
       actions.append(btn(L("Sprawdź ponownie", "Check again"), "thq-upd-ghost", () => send("check"), busy));
     }
     panel.append(actions);
