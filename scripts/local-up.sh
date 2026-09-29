@@ -15,6 +15,9 @@ OLD_L="${TARS_LOCAL:-$HOME/tars-local}"
 if [[ -d "$OLD_L/compose" && ! -e "$L" && "$(basename "$OLD_L")" == "tars-local" && "$(basename "$L")" == "jarvo-local" ]]; then
   python3 "$ROOT/scripts/migrate_jarvo.py" host --compose "$OLD_L/compose" >/dev/null
 fi
+# macOS (BSD) i Linux (GNU) różnią się stat, sed -i i setsid
+owner() { stat -c %u "$1" 2>/dev/null || stat -f %u "$1"; }
+sedi() { if sed --version >/dev/null 2>&1; then sed -i "$@"; else sed -i '' "$@"; fi; }
 COMPOSE=(docker compose -f "$ROOT/infra/docker-compose.yml" --env-file "$L/compose/.env")
 
 if [[ "${1:-}" == "down" ]]; then
@@ -60,11 +63,11 @@ fi
 # zmiana dostawcy w istniejącej instalacji: JARVO_MODEL_PROVIDER=... bash scripts/local-up.sh
 if [[ -n "${JARVO_MODEL_PROVIDER+x}" ]]; then
   grep -q '^JARVO_MODEL_PROVIDER=' "$L/compose/jarvo.env" || echo "JARVO_MODEL_PROVIDER=" >> "$L/compose/jarvo.env"
-  sed -i "s#^JARVO_MODEL_PROVIDER=.*#JARVO_MODEL_PROVIDER=$JARVO_MODEL_PROVIDER#" "$L/compose/jarvo.env"
+  sedi "s#^JARVO_MODEL_PROVIDER=.*#JARVO_MODEL_PROVIDER=$JARVO_MODEL_PROVIDER#" "$L/compose/jarvo.env"
   echo "▶ Dostawca modeli: ${JARVO_MODEL_PROVIDER:-openrouter}"
 fi
 # kontener pracuje jako uid 10000 (użytkownik hermes): build i dane muszą być jego
-if [[ "$(stat -c %u "$L/build")" != "10000" || "$(stat -c %u "$L/data")" != "10000" ]]; then
+if [[ "$(owner "$L/build")" != "10000" || "$(owner "$L/data")" != "10000" ]]; then
   sudo chown -R 10000:10000 "$L/build" "$L/data"
 fi
 
@@ -92,7 +95,8 @@ touch "$L/.installed"
 
 # pomocnik aktualizacji: przycisk „Aktualizuj” w dashboardzie (git pull + deploy na prośbę z panelu)
 if [[ -f "$L/updater.pid" ]] && kill -0 "$(cat "$L/updater.pid")" 2>/dev/null; then kill "$(cat "$L/updater.pid")" || true; fi
-JARVO_AUTO_UPDATE="${JARVO_AUTO_UPDATE:-0}" nohup setsid python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$L/build" \
+DETACH=(); command -v setsid >/dev/null && DETACH=(setsid)
+JARVO_AUTO_UPDATE="${JARVO_AUTO_UPDATE:-0}" nohup ${DETACH[@]+"${DETACH[@]}"} python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$L/build" \
   >> "$L/updater.log" 2>&1 < /dev/null &
 echo $! > "$L/updater.pid"
 
