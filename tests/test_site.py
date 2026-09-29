@@ -64,3 +64,37 @@ def test_seo_and_security_files_are_deployed():
     html = (site / "index.html").read_text(encoding="utf-8")
     assert 'rel="canonical"' in html and "application/ld+json" in html
     assert all(" width=" in tag for tag in __import__("re").findall(r"<img [^>]*>", html))
+
+
+@pytest.mark.skipif(not shutil.which("bash"), reason="brak basha")
+@pytest.mark.parametrize("choice, provider, key_in", [
+    ("1", "openrouter", "agents"),                 # OpenRouter: klucz do sekretów każdego agenta
+    ("2", "commandcode-anthropic", "host"),        # CommandCode: klucz do host.env (share_keys.py)
+    ("4", "", None),                               # OpenAI (logowanie ChatGPT): bez klucza, domyślny dostawca
+])
+def test_local_up_provider_choice(tmp_path, choice, provider, key_in):
+    """Wybór dostawcy w local-up.sh trafia do compose/jarvo.env zgodnie z fleet.yaml (puste = openai-codex)."""
+    import os
+    root = tmp_path / "repo"
+    (root / "scripts").mkdir(parents=True)
+    shutil.copy(REPO / "scripts" / "local-up.sh", root / "scripts")
+    shutil.copytree(REPO / "infra" / "env", root / "infra" / "env")
+    (root / "scripts" / "deploy.sh").write_text("exit 0\n", encoding="utf-8")
+    (root / "scripts" / "updater.py").write_text("", encoding="utf-8")
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for name, body in {"docker": "exit 0", "sudo": 'exec "$@"', "chown": "exit 0", "chgrp": "exit 0"}.items():
+        (bindir / name).write_text(f"#!/usr/bin/env bash\n{body}\n", encoding="utf-8")
+        (bindir / name).chmod(0o755)
+    local = tmp_path / "jarvo-local"
+    env = {**os.environ, "HOME": str(tmp_path), "JARVO_LOCAL": str(local), "PATH": f"{bindir}:{os.environ['PATH']}"}
+    env.pop("JARVO_MODEL_PROVIDER", None)
+    res = subprocess.run(["bash", str(root / "scripts" / "local-up.sh")], input=f"{choice}\nklucz-testowy\n",
+                         env=env, capture_output=True, text=True, timeout=60)
+    assert res.returncode == 0, res.stdout + res.stderr
+    jarvo_env = (local / "compose" / "jarvo.env").read_text(encoding="utf-8")
+    assert re.search(rf"^JARVO_MODEL_PROVIDER={provider}$", jarvo_env, re.M)
+    agent = (local / "secrets" / "jarvo-web.env").read_text(encoding="utf-8")
+    host = (local / "secrets" / "host.env").read_text(encoding="utf-8")
+    assert ("OPENROUTER_API_KEY=klucz-testowy" in agent) == (key_in == "agents")
+    assert ("klucz-testowy" in host) == (key_in is not None)   # szablon hosta też ma OPENROUTER_API_KEY
