@@ -4,7 +4,7 @@ Statyczna strona (bez buildu, bez CDN): `index.html`, `style.css`, `app.js`, `as
 Podgląd: `python3 -m http.server -d site 8080` → http://localhost:8080.
 
 - **Układ 1:1 z makietą** `JARVO-landing-page-koncepcja.png` (1536×1024): na desktopie plansza skaluje się do
-  szerokości okna, zawsze mieści się na jednym ekranie (szerokość i wysokość). Telefon (≤ 820 px): też jeden ekran, zamiast sceny przy biurku robot z karty postaci (`tools/robot.mjs`: 5 póz bez tła i jasnej obwódki). Wchodzi i macha na powitanie, myśli (THINK), gdy ktoś pisze, odpowiada w dymku, potem pokazuje BUILD/REVIEW/SHIP; tapnięcie = poza i tekst.
+  szerokości okna, zawsze mieści się na jednym ekranie (szerokość i wysokość). Telefon (≤ 820 px): też jeden ekran, zamiast sceny przy biurku robot z karty postaci (`tools/robot.mjs`: poza FRONT bez tła). Stoi spokojnie i mruga, nad nim dymek z powitaniem „Hi, I'm JARVO”; tapnięcie = krótki podskok i kolejny tekst. Czysty kontur (krawędź wycinka zjedzona do konturu, równy obrys w CSS).
 - **Robot się rusza:** oczy idą za kursorem i mrugają, dłonie stukają, gdy terminal pisze, panele pływają
   z paralaksą, antena i ekran laptopa świecą, z kubka leci para, po panelach przewijają się dane, a czerwonymi kablami płynie energia. Przy `prefers-reduced-motion` wszystko stoi.
 - **Warstwy ilustracji** generuje `tools/art.mjs` z grafiki z pakietu marki (tło bez ruchomych elementów

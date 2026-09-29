@@ -62,9 +62,8 @@
   setTimeout(blink, 1600);
 
   // ---------------------------------------------------------------- terminal: ktoś pisze, Jarvo odpowiada
-  let held = 0;   // robot mówi swoje (powitanie, tapnięcie): dymek chwilowo nie pokazuje rozmowy
   // ta sama rozmowa w terminalu (desktop) i w dymku robota (telefon)
-  const each = (sel, t) => { for (const el of document.querySelectorAll(sel)) if (!(held && el.closest(".bubble"))) el.textContent = t; };
+  const each = (sel, t) => { for (const el of document.querySelectorAll(sel)) el.textContent = t; };
   const ask = { set textContent(t) { each("[data-ask]", t); } }, reply = { set textContent(t) { each("[data-reply]", t); } };
   const askEl = $("#ask"), replyEl = $("#reply"), cursor = $("#cursor"), sceneInner = $(".scene-inner");
   const talks = [
@@ -81,49 +80,44 @@
     for (let i = 1; i <= text.length; i++) { el.textContent = text.slice(0, i); await sleep(min + Math.random() * spread); }
     cursor.classList.remove("is-typing"); busy = false;
   }
-  // ---------------------------------------------------------------- robot na telefonie: pozy z karty postaci
-  const bot = $("#bot");
-  const poseAfter = ["ship", "build", "review", "build", "front"];   // czym „odpowiada” ciało po każdej rozmowie
-  function pose(name) {
-    for (const im of bot.querySelectorAll(".pose")) im.classList.toggle("on", im.dataset.pose === name);
-    bot.classList.toggle("is-front", name === "front");
-  }
-  function move(cls) { bot.classList.remove("hop", "wave", "enter"); void bot.offsetWidth; bot.classList.add(cls); }
-  const quips = [
-    ["ship", "Hey! I'm JARVO. Your digital right hand."],
-    ["review", "Poking me won't make it ship faster. Start building will."],
-    ["think", "Thinking… about coffee. And your roadmap."],
-    ["build", "Busy building. Tap Start building and join in."],
-    ["ship", "High five! Well, a high pixel."],
+  // ---------------------------------------------------------------- robot na telefonie: stoi, mruga, wita się w dymku
+  const bot = $("#bot"), bubble = $(".bubble"), hello = $("#hello");
+  const lines = [
+    "Hi, I'm <b>JARVO</b>.\nYour digital right hand.",
+    "Tap <b>Start building</b>\nand let's get to work.",
+    "Research, sites, videos, docs.\nOne team, zero drama.",
+    "Still here. Still ready, boss.",
   ];
-  let qi = 1;
-  async function say(p, text, ms) {
-    held++; pose(p); move(p === "ship" ? "wave" : "hop");
-    for (const w of document.querySelectorAll(".bubble .t-who")) w.style.visibility = "";
-    for (const el of document.querySelectorAll(".bubble [data-ask]")) el.textContent = "";
-    for (const el of document.querySelectorAll(".bubble [data-reply]")) el.textContent = text;
-    await sleep(ms); held--; if (!held) pose("front");
+  let li = 0, talking = 0;
+  async function speak(html) {
+    const id = ++talking;
+    bubble.classList.add("show");
+    const plain = html.replace(/<[^>]+>/g, ""), tags = [...html.matchAll(/<b>(.*?)<\/b>/g)].map((m) => m[1]);
+    for (let i = 1; i <= plain.length; i++) {
+      if (id !== talking) return;
+      let s = plain.slice(0, i);
+      for (const t of tags) s = s.replace(t, `<b>${t}</b>`);
+      hello.innerHTML = s + '<span class="caret"></span>';
+      await sleep(plain[i - 1] === "\n" ? 220 : 32 + Math.random() * 30);
+    }
   }
-  bot.addEventListener("click", () => { const [p, t] = quips[qi++ % quips.length]; say(p, t, 2600); });
+  setTimeout(() => speak(lines[0]), reduced ? 0 : 700);
+  bot.addEventListener("click", () => {
+    bot.classList.remove("hop"); void bot.offsetWidth; bot.classList.add("hop");
+    li = (li + 1) % lines.length; speak(lines[li]);
+  });
   bot.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); bot.click(); } });
 
   async function loop() {
     const whos = document.querySelectorAll(".t-who");
-    if (mobile.matches) { move("enter"); await sleep(500); await say("ship", quips[0][1], 2800); }   // wejście: macha i się przedstawia
-    for (;;) for (const [n, [q, a]] of talks.entries()) {
-      while (held) await sleep(200);
+    for (;;) for (const [q, a] of talks) {
       ask.textContent = ""; reply.textContent = ""; for (const w of whos) w.style.visibility = "hidden";
       await sleep(500);
-      if (!held) pose("think");                   // ktoś pisze: robot myśli
-      await type(ask, q, 45, 70, askEl);
+      await type(ask, q, 45, 70, askEl);          // człowiek pisze wolniej, z wahaniem
       await sleep(650);
       for (const w of whos) w.style.visibility = "";
-      if (!held) { pose("front"); move("hop"); }  // odpowiada
-      await type(reply, a, 16, 22, replyEl);
-      await sleep(900);
-      if (!held) { pose(poseAfter[n % poseAfter.length]); move(poseAfter[n % poseAfter.length] === "ship" ? "wave" : "hop"); }
-      await sleep(2400);
-      if (!held) pose("front");
+      await type(reply, a, 16, 22, replyEl);      // Jarvo odpowiada szybko
+      await sleep(3200);
     }
   }
   if (!reduced) loop();

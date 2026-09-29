@@ -1,4 +1,4 @@
-// Robot na telefon: pozy z karty postaci (03_POSTAC/JARVO-karta-postaci-czerwona.png) bez jasnego tła.
+// Robot na telefon: poza FRONT z karty postaci (03_POSTAC/JARVO-karta-postaci-czerwona.png) bez jasnego tła.
 // Tło znika zalewaniem od krawędzi (biała głowa w konturze zostaje), potem pyłki i cień podłogi,
 // a na końcu jasna „aureola” na krawędzi (piksele pośrednie między konturem a tłem planszy).
 // Z pozy FRONT osobno oczy (do mrugania).
@@ -12,11 +12,7 @@ const [src, out] = process.argv.slice(2);
 if (!src || !out) { console.error("użycie: node robot.mjs <karta-postaci.png> <katalog>"); process.exit(2); }
 // pozy w planszy 1536×1024: prostokąt i punkty tła zamknięte w konturze (np. między nogami)
 const POSES = {
-  front:  { box: [92, 118, 325, 489], holes: [[214, 448]] },
-  think:  { box: [70, 578, 295, 930], holes: [[205, 900], [205, 890], [200, 905]] },
-  build:  { box: [436, 592, 712, 930], holes: [] },
-  review: { box: [800, 582, 1088, 930], holes: [[945, 905], [943, 895], [948, 912]] },
-  ship:   { box: [1186, 566, 1474, 930], holes: [[1330, 900], [1325, 890], [1335, 908]] },
+  front: { box: [92, 118, 325, 489], holes: [[214, 448]] },
 };
 const EYES = [160, 205, 255, 258];   // oczy pozy FRONT (współrzędne planszy)
 
@@ -65,17 +61,24 @@ const res = await p.evaluate(async ({ data, POSES, EYES }) => {
     }
     const main = sizes.indexOf(Math.max(...sizes));
     for (let k = 0; k < W * H; k++) if (d[k * 4 + 3] !== 0 && comp[k] !== main) d[k * 4 + 3] = 0;
-    // aureola: jasne/szare piksele stykające się z przezroczystością (3 przejścia, od zewnątrz do konturu)
-    for (let pass = 0; pass < 3; pass++) {
+    // aureola: z krawędzi zjadamy wszystko, co nie jest ciemnym konturem ani nasyconym kolorem (czerwień, limonka),
+    // aż krawędź to sam kontur (do 8 przejść); potem pojedyncze półprzezroczyste resztki
+    for (let pass = 0; pass < 8; pass++) {
       const kill = [];
       for (let k = 0; k < W * H; k++) {
         const i = k * 4; if (d[i + 3] === 0) continue;
         const x = k % W, y = k / W | 0;
         const edge = x === 0 || y === 0 || x === W - 1 || y === H - 1 || d[i - 1] === 0 || d[i + 7] === 0 ||
                      d[i - W * 4 + 3] === 0 || d[i + W * 4 + 3] === 0;
-        if (edge && lum(i) > 95 && sat(i) < 45) kill.push(i);
+        if (edge && lum(i) > 62 && sat(i) < 90) kill.push(i);
       }
+      if (!kill.length) break;
       for (const i of kill) d[i + 3] = 0;
+    }
+    for (let k = 0; k < W * H; k++) {        // samotne piksele (0–1 sąsiad) to szum krawędzi
+      const i = k * 4; if (!d[i + 3]) continue;
+      const n = (d[i - 1] ? 1 : 0) + (d[i + 7] ? 1 : 0) + (d[i - W * 4 + 3] ? 1 : 0) + (d[i + W * 4 + 3] ? 1 : 0);
+      if (n <= 1) d[i + 3] = 0;
     }
     let mnx = W, mny = H, mxx = 0, mxy = 0;
     for (let k = 0; k < W * H; k++) if (d[k * 4 + 3]) { const x = k % W, y = k / W | 0; mnx = Math.min(mnx, x); mny = Math.min(mny, y); mxx = Math.max(mxx, x); mxy = Math.max(mxy, y); }

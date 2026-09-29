@@ -261,29 +261,27 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .title img { height: auto; }
   .sub { flex: none; font-size: clamp(19px, 5.4vw, 28px); margin-top: 1vh; }
   .bot { display: flex; flex: 1; min-height: 0; flex-direction: column; align-items: center; justify-content: flex-end; padding-top: 1.5vh; }
-  .bubble { flex: none; align-self: stretch; margin: 0 0 1.2vh; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px;
-    background: #0F131B; font: 13px/1.45 var(--mono); position: relative; height: calc(3 * 1.45em + 20px); overflow: hidden; }
-  .bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px; background: #0F131B;
-    border: solid var(--line); border-width: 0 1px 1px 0; transform: translateX(-50%) rotate(45deg); }
-  .bubble p { margin: 0; }
-  .b-ask .t-gt { color: var(--lime); margin-right: 8px; }
-  .b-ask:has([data-ask]:empty) { display: none; }
-  .b-reply .t-who { margin-right: 8px; }
-  .bot-fig { position: relative; flex: 1; min-height: 0; aspect-ratio: 266 / 365; max-width: 100%; cursor: pointer; -webkit-tap-highlight-color: transparent;
-    animation: bob 2.6s ease-in-out infinite; }
-  .bot-fig img { position: absolute; bottom: 0; left: 50%; height: auto; transform: translateX(-50%); image-rendering: pixelated; }
-  .pose { visibility: hidden; }
-  .pose.on { visibility: visible; }
+  /* dymek nad robotem: komiksowy, z ogonkiem w stronę głowy */
+  .bubble { flex: none; position: relative; max-width: 300px; margin: 0 auto 16px; padding: 12px 16px; border: 1.5px solid var(--ink);
+    border-radius: 14px; background: #121722; font: 500 15px/1.45 var(--mono); color: var(--ink); min-height: calc(2 * 1.45em + 24px);
+    box-shadow: 0 0 0 4px rgba(242, 241, 232, .04), 0 10px 30px rgba(0, 0, 0, .35); opacity: 0; transform: translateY(6px) scale(.96);
+    transition: opacity .35s, transform .35s cubic-bezier(.2, 1.4, .4, 1); }
+  .bubble.show { opacity: 1; transform: none; }
+  .bubble::after { content: ""; position: absolute; left: 50%; bottom: -9px; width: 14px; height: 14px; background: #121722;
+    border: solid var(--ink); border-width: 0 1.5px 1.5px 0; transform: translateX(-50%) rotate(45deg); }
+  .bubble p { margin: 0; white-space: pre-line; }
+  .bubble b { color: var(--lime); font-weight: 600; }
+  .bubble .caret { display: inline-block; width: 8px; height: 15px; margin-left: 3px; vertical-align: -2px; background: var(--lime); animation: cur 1.06s steps(1) infinite; }
+  .bot-fig { position: relative; flex: 1; min-height: 0; aspect-ratio: 223 / 364; max-width: 100%; cursor: pointer;
+    -webkit-tap-highlight-color: transparent; animation: enter .8s cubic-bezier(.2, 1.3, .4, 1) both; }
+  .bot-fig img { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  /* równy ciemny kontur (oryginał ma go miejscami za cienki) */
+  .bot-fig .pose { filter: drop-shadow(1.5px 0 0 #07090D) drop-shadow(-1.5px 0 0 #07090D) drop-shadow(0 1.5px 0 #07090D) drop-shadow(0 -1.5px 0 #07090D); }
   .bot-eyes { filter: drop-shadow(0 0 5px rgba(184, 255, 61, .7)); transform-origin: 50% 32%; }
-  .bot-fig:not(.is-front) .bot-eyes { visibility: hidden; }
   .bot-eyes.blink { animation: blink .22s steps(2, jump-none) 1; }
-  .bot-fig.hop { animation: hop .5s cubic-bezier(.3, 1.6, .5, 1) 1, bob 2.6s ease-in-out .5s infinite; }
-  .bot-fig.wave { animation: wave .9s ease-in-out 2, bob 2.6s ease-in-out 1.8s infinite; transform-origin: 50% 100%; }
-  .bot-fig.enter { animation: enter .7s cubic-bezier(.2, 1.4, .4, 1) 1 both; }
-  @keyframes hop { 0% { transform: translateY(0) scaleY(1); } 20% { transform: translateY(2px) scaleY(.94); } 55% { transform: translateY(-18px) scaleY(1.03); } 100% { transform: none; } }
-  @keyframes wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
-  @keyframes enter { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
-  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  .bot-fig.hop { animation: hop .45s cubic-bezier(.3, 1.6, .5, 1) 1; }
+  @keyframes hop { 0% { transform: none; } 25% { transform: translateY(2px) scaleY(.96); } 60% { transform: translateY(-12px); } 100% { transform: none; } }
+  @keyframes enter { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
   .cta { flex: none; margin-top: 1.6vh; order: 9; }
   .btn-start { width: 100%; height: 54px; justify-content: center; padding: 0; font-size: 18px; }
   .inst { padding: 28px 18px 22px; }
