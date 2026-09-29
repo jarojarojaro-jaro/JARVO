@@ -194,7 +194,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .step h2 { position: absolute; top: 20px; margin: 0; font: 600 17.5px var(--mono); letter-spacing: .14em; }
 .step-ic { position: absolute; }
 .step p { position: absolute; margin: 0; font: 16.5px/1.6 var(--mono); letter-spacing: .06em; color: #AEB5C4; }
-.red { color: var(--crimson); } .lime { color: var(--lime); }
+.red { color: var(--crimson); } .lime { color: var(--lime); } .white { color: var(--ink); }
 .step:nth-child(1) .step-n { left: 76px; } .step:nth-child(1) h2 { left: 144px; }
 .step:nth-child(1) .step-ic { left: 79px; top: 66px; width: 38px; height: 50px; }
 .step:nth-child(1) p { left: 153px; top: 68px; width: 280px; }
@@ -267,11 +267,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
     border: solid var(--line); border-width: 0 1px 1px 0; transform: translateX(-50%) rotate(45deg); }
   .bubble p { margin: 0; }
   .b-ask .t-gt { color: var(--lime); margin-right: 8px; }
+  .b-ask:has([data-ask]:empty) { display: none; }
   .b-reply .t-who { margin-right: 8px; }
-  .bot-fig { position: relative; flex: 1; min-height: 0; aspect-ratio: 233 / 371; max-width: 100%; animation: bob 2.6s ease-in-out infinite; }
-  .bot-fig img { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  .bot-fig { position: relative; flex: 1; min-height: 0; aspect-ratio: 266 / 365; max-width: 100%; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    animation: bob 2.6s ease-in-out infinite; }
+  .bot-fig img { position: absolute; bottom: 0; left: 50%; height: auto; transform: translateX(-50%); image-rendering: pixelated; }
+  .pose { visibility: hidden; }
+  .pose.on { visibility: visible; }
   .bot-eyes { filter: drop-shadow(0 0 5px rgba(184, 255, 61, .7)); transform-origin: 50% 32%; }
+  .bot-fig:not(.is-front) .bot-eyes { visibility: hidden; }
   .bot-eyes.blink { animation: blink .22s steps(2, jump-none) 1; }
+  .bot-fig.hop { animation: hop .5s cubic-bezier(.3, 1.6, .5, 1) 1, bob 2.6s ease-in-out .5s infinite; }
+  .bot-fig.wave { animation: wave .9s ease-in-out 2, bob 2.6s ease-in-out 1.8s infinite; transform-origin: 50% 100%; }
+  .bot-fig.enter { animation: enter .7s cubic-bezier(.2, 1.4, .4, 1) 1 both; }
+  @keyframes hop { 0% { transform: translateY(0) scaleY(1); } 20% { transform: translateY(2px) scaleY(.94); } 55% { transform: translateY(-18px) scaleY(1.03); } 100% { transform: none; } }
+  @keyframes wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+  @keyframes enter { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
   .cta { flex: none; margin-top: 1.6vh; order: 9; }
   .btn-start { width: 100%; height: 54px; justify-content: center; padding: 0; font-size: 18px; }

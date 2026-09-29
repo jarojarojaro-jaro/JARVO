@@ -56,14 +56,15 @@
   if (!reduced) addEventListener("pointermove", (e) => { mx = e.clientX; my = e.clientY; if (!raf) raf = requestAnimationFrame(look); }, { passive: true });
 
   function blink() {
-    if (!reduced) for (const e of [eyes, $("#bot-eyes")]) { e.classList.remove("blink"); void e.offsetWidth; e.classList.add("blink"); }
+    if (!reduced) for (const e of [eyes, $("#bot-eyes")].filter(Boolean)) { e.classList.remove("blink"); void e.offsetWidth; e.classList.add("blink"); }
     setTimeout(blink, 2200 + Math.random() * 3800 + (Math.random() < 0.2 ? -1800 : 0));
   }
   setTimeout(blink, 1600);
 
   // ---------------------------------------------------------------- terminal: ktoś pisze, Jarvo odpowiada
+  let held = 0;   // robot mówi swoje (powitanie, tapnięcie): dymek chwilowo nie pokazuje rozmowy
   // ta sama rozmowa w terminalu (desktop) i w dymku robota (telefon)
-  const each = (sel, t) => { for (const el of document.querySelectorAll(sel)) el.textContent = t; };
+  const each = (sel, t) => { for (const el of document.querySelectorAll(sel)) if (!(held && el.closest(".bubble"))) el.textContent = t; };
   const ask = { set textContent(t) { each("[data-ask]", t); } }, reply = { set textContent(t) { each("[data-reply]", t); } };
   const askEl = $("#ask"), replyEl = $("#reply"), cursor = $("#cursor"), sceneInner = $(".scene-inner");
   const talks = [
@@ -80,16 +81,49 @@
     for (let i = 1; i <= text.length; i++) { el.textContent = text.slice(0, i); await sleep(min + Math.random() * spread); }
     cursor.classList.remove("is-typing"); busy = false;
   }
+  // ---------------------------------------------------------------- robot na telefonie: pozy z karty postaci
+  const bot = $("#bot");
+  const poseAfter = ["ship", "build", "review", "build", "front"];   // czym „odpowiada” ciało po każdej rozmowie
+  function pose(name) {
+    for (const im of bot.querySelectorAll(".pose")) im.classList.toggle("on", im.dataset.pose === name);
+    bot.classList.toggle("is-front", name === "front");
+  }
+  function move(cls) { bot.classList.remove("hop", "wave", "enter"); void bot.offsetWidth; bot.classList.add(cls); }
+  const quips = [
+    ["ship", "Hey! I'm JARVO. Your digital right hand."],
+    ["review", "Poking me won't make it ship faster. Start building will."],
+    ["think", "Thinking… about coffee. And your roadmap."],
+    ["build", "Busy building. Tap Start building and join in."],
+    ["ship", "High five! Well, a high pixel."],
+  ];
+  let qi = 1;
+  async function say(p, text, ms) {
+    held++; pose(p); move(p === "ship" ? "wave" : "hop");
+    for (const w of document.querySelectorAll(".bubble .t-who")) w.style.visibility = "";
+    for (const el of document.querySelectorAll(".bubble [data-ask]")) el.textContent = "";
+    for (const el of document.querySelectorAll(".bubble [data-reply]")) el.textContent = text;
+    await sleep(ms); held--; if (!held) pose("front");
+  }
+  bot.addEventListener("click", () => { const [p, t] = quips[qi++ % quips.length]; say(p, t, 2600); });
+  bot.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); bot.click(); } });
+
   async function loop() {
     const whos = document.querySelectorAll(".t-who");
-    for (;;) for (const [q, a] of talks) {
+    if (mobile.matches) { move("enter"); await sleep(500); await say("ship", quips[0][1], 2800); }   // wejście: macha i się przedstawia
+    for (;;) for (const [n, [q, a]] of talks.entries()) {
+      while (held) await sleep(200);
       ask.textContent = ""; reply.textContent = ""; for (const w of whos) w.style.visibility = "hidden";
       await sleep(500);
-      await type(ask, q, 45, 70, askEl);                 // człowiek pisze wolniej, z wahaniem
+      if (!held) pose("think");                   // ktoś pisze: robot myśli
+      await type(ask, q, 45, 70, askEl);
       await sleep(650);
       for (const w of whos) w.style.visibility = "";
-      await type(reply, a, 16, 22, replyEl);               // Jarvo odpowiada szybko
-      await sleep(3200);
+      if (!held) { pose("front"); move("hop"); }  // odpowiada
+      await type(reply, a, 16, 22, replyEl);
+      await sleep(900);
+      if (!held) { pose(poseAfter[n % poseAfter.length]); move(poseAfter[n % poseAfter.length] === "ship" ? "wave" : "hop"); }
+      await sleep(2400);
+      if (!held) pose("front");
     }
   }
   if (!reduced) loop();
