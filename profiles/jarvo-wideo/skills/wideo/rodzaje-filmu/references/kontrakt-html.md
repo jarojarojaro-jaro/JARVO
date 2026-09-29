@@ -86,3 +86,11 @@ python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 -
 - `--subklatki 4` = motion blur (4× dłużej); tylko w finale i przy szybkim ruchu. `--alfa -o x.mov` = przezroczyste tło.
 - WebGL liczy się na CPU (VPS bez GPU): zmierz czas 1 klatki (`klatki --czasy 5`) i oszacuj całość, zanim ruszysz 60 s w 60 fps.
 - Dźwięk (lektor, muzyka, efekty) dokłada `film.py` (`"plik"` + `"koniec": "stop"`) albo `montaz.py`; potem `qa_wideo.py`.
+
+## Trzy formaty z jednej osi czasu
+Jedna scena, jedna oś czasu, **układ liczony z rozmiaru kadru**, a nie stałe piksele: `const L = layout(W, H)`
+na starcie (`W`, `H` z `window.__W/__H`), a każda scena rysuje w jednostkach `L` (np. `L.u = Math.min(W, H) / 100`,
+`L.safe` = bezpieczne marginesy platformy, `L.pion = H > W`). Dla pionu układ się **przestawia** (tekst nad obrazem
+zamiast obok, większa typografia), a nie przycina z poziomu. Render każdego formatu tym samym plikiem:
+`html_wideo.py wideo anim.html --preset jarvo --rozmiar 1080x1920 …`, `--rozmiar 1080x1080`, `--rozmiar 1920x1080`.
+Kontrola: `krytyka.py telefon` dla każdego formatu (tekst czytelny w 360 px).

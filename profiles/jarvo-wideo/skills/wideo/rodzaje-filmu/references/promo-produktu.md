@@ -11,7 +11,7 @@ Nie to: jak działa zjawisko → `explainer.md`; samo logo → `logo-intro.md`; 
 | Materiał | Silnik |
 |---|---|
 | strona albo aplikacja klienta (screenshoty, ruch kamery 2.5D, cięcia na bit, dźwięk) | `video-shotcraft` |
-| UI jako jedna forma, która się przekształca (przycisk → loader → karta…) | własny HTML (`kontrakt-html.md`) |
+| UI jako jedna forma, która się przekształca (przycisk → loader → karta…) | własny HTML (`kontrakt-html.md`) + spec „jeden kształt” (skill `film-z-kodu`, `jeden-ksztalt.md`) |
 | ciemny keynote, wielka liczba, living screencast | `lemo-opuscar` (`dark-keynote`, `living-screencast`) |
 | szybko, tekst + obrazy produktu | HyperFrames `product-launch-video` |
 | produkt fizyczny w 3D | `scena-3d.md` |
@@ -35,11 +35,14 @@ Nie to: jak działa zjawisko → `explainer.md`; samo logo → `logo-intro.md`; 
 - Pętla: ostatnia klatka = pierwsza (reklamy w feedzie grają w kółko).
 - **Wygląda drogo, gdy:** nic nie zanika, tylko zmienia kształt; każda scena rośnie z poprzedniej (bez cięć);
   coś dzieje się na każdym bicie; mały sprężysty „odbój”, gdy element ląduje; kamera robi jeden ruch naraz;
-  **prawdziwy dźwięk** na każdym kliknięciu i świście (biblioteka marki; Mixkit albo Pixabay: darmowe komercyjnie,
-  licencja w RAPORT; syntetyczne `sfx.py` tylko w szkicu, brzmią tanio).
+  **dźwięk na każdym kliknięciu i świście**: syntezowany z osi czasu (`sound.mjs`, skill `lektor-i-dzwiek`: click, pop,
+  whoosh, tick z wariacją `pitch`) albo biblioteka marki / Mixkit / Pixabay (licencja w RAPORT).
 - **Styl domyślny** (gdy marka nie mówi inaczej): 2D, ciepła biel tła, czarny UI, jeden kolor akcentu, jeden czysty
   font (Geist albo Inter); bez 3D, ciemnego motywu, poświat, cząsteczek i przenikań. Keynote Apple, nie trailer gry.
-- Prawdziwe ekrany: screenshoty od klienta, z karty albo zrobione przez `jarvo-web`; dane w UI z produktu, nie „Lorem”.
+- **Prawdziwe ekrany, twardo:** najpierw `python3 $HERMES_HOME/scripts/assety.py <URL> [--podstrony /cennik]` (zrzuty
+  desktop i telefon, logo, paleta z użyciem, fonty → `out/wideo/src/assets/assety.json`); wypisz w RAPORT, co masz i czego
+  brak. Kadrujesz i animujesz wycinki tych zrzutów. **Nigdy nie rysujesz UI produktu z wyobraźni**; aplikacja za
+  logowaniem → zrzuty od klienta. Dane w UI z produktu, nie „Lorem”.
 
 ## Brief (`out/wideo/src/BRIEF.md`)
 ```

@@ -27,6 +27,7 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 | Chcę… | Silnik (skill) | Czas pracy |
 |---|---|---|
 | **własna animacja** w Canvas, SVG, Three.js, GSAP (dowolny pomysł, pełna kontrola) | HTML wg `rodzaje-filmu/references/kontrakt-html.md` + `html_wideo.py --preset jarvo` | 20–60 min |
+| **UI morph**: jeden kontener przechodzi przez 8–12 stanów produktu, kursor klika, zero cięć, pętla | HTML wg spec `references/jeden-ksztalt.md` (zrzuty z `assety.py`) | 30–60 min |
 | animowane wstawki (B-roll) do **nagrania użytkownika**, zgrane ze słowami; przebitka albo przezroczysty panel | **motion-broll** | 20–60 min |
 | **cały krótki film** 30–75 s w jednym z 39 stylów kina (keynote, screencast, akwarela, anime, 3D, pixel RPG…) | **lemo-opuscar** | 30–60 min, dużo tokenów |
 | premiera produktu / keynote tech (ciemny ekran, UI, wielka liczba) | **lemo-opuscar** `dark-keynote`, `living-screencast` | 30–60 min |

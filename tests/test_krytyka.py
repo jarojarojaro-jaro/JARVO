@@ -43,3 +43,10 @@ def test_round_scoring(tmp_path):
     k.write_text(json.dumps({"runda": 2, "osie": {**{o: 9 for o in krytyka.OSIE}, "kompozycja": 6}, "problemy": [{"problem": "bez czasu"}]}))
     r = krytyka.ocena(k)
     assert not r["ok"] and r["ponizej_8"] == {"kompozycja": 6} and r["problemy_bez_czasu"] == 1
+
+
+def test_assety_hex_palette():
+    import assety
+    assert assety.hex_("rgb(212, 33, 61)") == "#D4213D"
+    assert assety.hex_("rgba(0, 0, 0, 0.2)") is None           # półprzezroczyste nakładki nie są kolorem marki
+    assert assety.hex_("transparent") is None
