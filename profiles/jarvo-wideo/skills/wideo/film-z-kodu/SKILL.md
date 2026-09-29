@@ -53,6 +53,8 @@ i MP4/MOV przez `$HERMES_HOME/scripts/html_wideo.py`. Licencja Remotion: darmowa
 większa firma → licencja firmowa (zapisz w RAPORT.md).
 
 Zasada kosztu: lemo-opuscar i pełne filmy anidoodle tylko, gdy karta prosi o styl, „premium” albo film markowy.
+Film dłuższy niż 30 s, flagowy, z postacią albo historią: bramki z `references/produkcja-etapami.md`
+(przewodnik stylu, lista ujęć, stopklatki, animatic 960×540, próbka najtrudniejszych sekund, dziennik krytyki).
 Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnienia w RAPORT.md.
 
 ## Wspólne prawa (wszystkie silniki)
