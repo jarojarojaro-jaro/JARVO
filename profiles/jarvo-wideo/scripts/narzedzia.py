@@ -2,7 +2,7 @@
 """Narzędzia „wideo z kodu”: sprawdzenie i instalacja raz, we wspólnym katalogu.
 
     python3 narzedzia.py sprawdz                 # co jest gotowe, czego brak (JSON)
-    python3 narzedzia.py instaluj [motion|lemo|anidoodle|remotion|shotcraft|html|lottie|wszystko]
+    python3 narzedzia.py instaluj [motion|lemo|anidoodle|animacja|remotion|shotcraft|html|lottie|wszystko]
     python3 narzedzia.py env <narzedzie>         # zmienne środowiska do wklejenia: eval "$(python3 narzedzia.py env motion)"
     python3 narzedzia.py link <katalog>          # <katalog>/node_modules → wspólne (skrypty .mjs nie czytają NODE_PATH)
 
@@ -256,6 +256,17 @@ def install_anidoodle() -> None:
     ensure_node([f"playwright-core@{PW_VERSION}", "esbuild@0.25.12", "typescript@5.9.3"])
 
 
+ANIMACJA_SKILL = Path(os.environ.get("HERMES_HOME", str(Path.home()))) / "skills" / "video" / "claude-animation"
+
+
+def install_animacja() -> None:
+    # claude-animation: Node canvas bez przeglądarki; jedyna zależność @napi-rs/canvas (prebuilt, bez kompilacji).
+    # Importy ESM szukają pakietów obok pliku, więc skill dostaje link node_modules → wspólne node_modules.
+    ensure_node(["@napi-rs/canvas@0.1.80"])
+    if ANIMACJA_SKILL.is_dir():
+        link(ANIMACJA_SKILL)
+
+
 def canvaskit_dir() -> Path:
     return LOTTIE / "node_modules" / "canvaskit-wasm" / "bin" / "full"
 
@@ -281,6 +292,7 @@ def status() -> dict:
         "lemo_glos_kokoro": (LEMO / "core" / "tts" / "kokoro-v1.0.onnx").exists(),
         "lemo_sample": instruments.is_dir() and any(instruments.iterdir()),
         "anidoodle": (NODE / "node_modules" / "esbuild").exists(),
+        "animacja": (NODE / "node_modules" / "@napi-rs" / "canvas").exists(),
         "remotion": (NODE / "node_modules" / "@remotion" / "cli").exists(),
         "puppeteer": (NODE / "node_modules" / "puppeteer").exists(),
         "shotcraft": (SHOTCRAFT / "template" / "node_modules" / ".jarvo-ok").exists(),
@@ -289,7 +301,7 @@ def status() -> dict:
     }
 
 
-TOOLS = ("motion", "lemo", "anidoodle", "remotion", "shotcraft", "html", "lottie")
+TOOLS = ("motion", "lemo", "anidoodle", "animacja", "remotion", "shotcraft", "html", "lottie")
 
 
 def env_for(tool: str) -> dict:
@@ -305,6 +317,11 @@ def env_for(tool: str) -> dict:
         return {**base, "LEMO_OPUSCAR_HOME": str(LEMO), "LIB": str(LEMO), **({"PLAYWRIGHT_CHROME": shell} if shell else {})}
     if tool == "anidoodle":
         return {**base, "npm_config_prefer_offline": "true", "npm_config_omit": "optional"}
+    if tool == "animacja":
+        if ANIMACJA_SKILL.is_dir():
+            link(ANIMACJA_SKILL)
+        return {"NODE_PATH": str(NODE / "node_modules"), "ANIM": str(ANIMACJA_SKILL),
+                "CLAUDE_ANIMATION_LIB": str(ANIMACJA_SKILL / "lib")}
     if tool in ("remotion", "shotcraft"):
         env = {**base, "NODE_PATH": str(NODE / "node_modules"), **real, "CHROME_BIN": chrome, "PUPPETEER_EXECUTABLE_PATH": chrome,
                "REMOTION_BROWSER_EXECUTABLE": shell, "npm_config_prefer_offline": "true"}
@@ -346,10 +363,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "instaluj":
         what = args[1] if len(args) > 1 else "wszystko"
-        steps = {"motion": [install_motion], "lemo": [install_lemo], "anidoodle": [install_anidoodle],
+        steps = {"motion": [install_motion], "lemo": [install_lemo], "anidoodle": [install_anidoodle], "animacja": [install_animacja],
                  "remotion": [install_remotion], "shotcraft": [install_shotcraft], "html": [install_html],
                  "lottie": [install_lottie],
-                 "wszystko": [install_motion, install_html, install_anidoodle, install_lemo, install_shotcraft,
+                 "wszystko": [install_motion, install_html, install_anidoodle, install_animacja, install_lemo, install_shotcraft,
                               install_lottie]}.get(what)
         if not steps:
             raise SystemExit(f"instaluj: {' | '.join(TOOLS)} | wszystko")

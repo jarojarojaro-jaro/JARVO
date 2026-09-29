@@ -52,6 +52,13 @@ powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. D
 ## Efekty dźwiękowe
 - Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania (syntetyczne brzmią tanio): biblioteka marki,
   `@@KNOWLEDGE_DIR@@/wideo/sfx/`, Mixkit i Pixabay (darmowe komercyjnie, bez podpisu; źródło i licencja w RAPORT).
+- **Najpierw syntezuj (zalecane):** efekty z osi czasu obrazu, bez plików i licencji:
+  `node $ANIM/scripts/sound.mjs cues.json film.mp4 final.mp4 --lufs -14 [--bed muzyka.wav --bed-at 2.0]`
+  (`eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env animacja)"`). `cues.json`: `[{"sfx":"click","t":0.94},
+  {"sfx":"whoosh","t":1.08,"dur":0.5}]`; dźwięki: pop, whoosh, whip, tick, thump, crack, sparkle, buzz, scratch,
+  drip, boing, riser, splash, click, step, fall, chime, chirp, burner (+ `vol`, `pan`, `pitch` 0,9–1,3, żeby się nie powtarzały).
+  Czasy: zdarzenia w obrazie (klik, zmiana stanu, cięcie) i bity z `rytm.py`; cue **~0,03 s przed** klatką zdarzenia.
+  Bez ciągłego „skrobania” pod rysowaniem: dźwięk mają kontakty, nie rysowanie.
 - Pobierasz sam: strona kategorii `mixkit.co/free-sound-effects/<słowo>/` (np. click, whoosh, pop, typing) ma linki
   do plików `assets.mixkit.co/…` → `curl -L` do `out/wideo/src/sfx/`; jeden efekt na zdarzenie, nazwa = zdarzenie.
 - Każdy efekt dokładnie na swojej klatce (wg osi animacji): `rytm.py efekty/*.wav --szczyt` mówi, gdzie ma szczyt,

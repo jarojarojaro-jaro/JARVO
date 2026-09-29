@@ -47,6 +47,24 @@ cat "$LIB/AGENTS.md"; sed -n 1,80p "$LIB/styles/README.md"         # potem DIREC
   (**2 workery** na VPS 8 GB: każdy to osobna przeglądarka), miks `sh core/render/mux.sh …` (−14 LUFS).
 - Film to 30–60 min pracy: storyboard tylko, gdy karta prosi. Wynik: `<nazwa>.mp4`, `.srt`, `poster.jpg`, `TREATMENT.md`.
 
+## claude-animation (rysunek w Node canvas, postaci, efekty gry, dźwięk syntezowany)
+Bez przeglądarki i GPU: `@napi-rs/canvas` + ffmpeg, najlżejszy silnik na VPS. Film = `frame(ctx, t)`.
+```bash
+eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env animacja)"     # ANIM = katalog skilla, link node_modules
+mkdir -p out/wideo/src/anim && cp $ANIM/templates/film-template.mjs out/wideo/src/anim/film.mjs
+# film.mjs bierze bibliotekę z CLAUDE_ANIMATION_LIB (ustawia env animacja); przykłady: $ANIM/../../../../examples nie są w profilu
+cd out/wideo/src/anim && node film.mjs sheet 0,2,4,6,8  # arkusz w tych sekundach → vision
+node film.mjs strip 4.2                          # 12 klatek wokół szybkiej akcji
+node film.mjs verify                             # determinizm (klatka w i poza kolejnością identyczna)
+node film.mjs render                             # MP4 (nie nadpisuje dobrego pliku nieudanym)
+node $ANIM/scripts/sound.mjs cues.json film.mp4 final.mp4 --lufs -14   # efekty z osi czasu + miks + loudnorm
+```
+- Najpierw `$ANIM/references/workflow.md` i `templates/beat-sheet.md`; detal powierzchni: `references/detail.md`;
+  pułapki: `references/traps.md`. Rigi: `lib/rigs/chibi.mjs` (człowiek z ruchem ust), `critter.mjs`, `bug.mjs`, `ant.mjs`;
+  efekty akcji: `lib/fx.mjs` (hit-stop, trzęsienie, iskry, napisy komiksowe); styl low-poly: `lib/lowpoly.mjs`.
+- Muzyka kodem: `scripts/music.mjs` (ukulele), `chiptune.mjs` (gra), `ambient.mjs` (tło); licencja MIT, nic do opłacania.
+- Skill jest po angielsku i w przykładach używa indonezyjskich słów kluczowych: pracujesz po polsku, tekst na ekranie PL.
+
 ## anidoodle (rysunek, timelapse, muzyka kodem)
 ```bash
 SK=$HERMES_HOME/skills/video/anidoodle; eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env anidoodle)"

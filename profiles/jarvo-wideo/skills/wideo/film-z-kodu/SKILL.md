@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, hyperframes, manim, motion-graphics, animation, code]
-    related_skills: [rodzaje-filmu, motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
+    related_skills: [rodzaje-filmu, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
@@ -31,6 +31,7 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 | **cały krótki film** 30–75 s w jednym z 39 stylów kina (keynote, screencast, akwarela, anime, 3D, pixel RPG…) | **lemo-opuscar** | 30–60 min, dużo tokenów |
 | premiera produktu / keynote tech (ciemny ekran, UI, wielka liczba) | **lemo-opuscar** `dark-keynote`, `living-screencast` | 30–60 min |
 | **ręcznie rysowana** ilustracja, timelapse rysowania, film rysunkowy, logo rysujące się samo | **anidoodle** | 15–60 min |
+| **postać w akcji** (maskotka, bohater gry, zwierzak z anatomią), efekty jak w grze, low-poly pętla, książeczka; **bez przeglądarki** (najlżejsze na VPS) | **claude-animation** (Node canvas) | 20–60 min |
 | animacja na stronę (hero, maskotka za kursorem, GIF, naklejka), plik HTML offline | **anidoodle** (`emit.mjs`) → `jarvo-web` osadza | 15–40 min |
 | muzyka **syntezowana kodem** do dowolnego filmu (bez licencji, bez pobierania) | **anidoodle** `music` → plik do `muzyka` w `film.py` | 10–20 min |
 | promo z animowanym tekstem, szybki launch, slajdy | **HyperFrames** (`hyperframes`, `product-launch-video`, `slideshow`) | 10–30 min |

@@ -59,6 +59,13 @@ sources:
     license: MIT
     license_file: LICENSE
     # Skill tylko wskazuje bibliotekę; bibliotekę (ten sam commit) instaluje scripts/narzedzia.py Wideografa.
+  claude-animation:
+    type: git
+    repo: https://github.com/buildwithhanif/claude-animation-skill
+    rev: 4ddb8c80fdec96dc9f55d4b9bdee60bde6f0134b
+    license: MIT
+    license_file: LICENSE
+    # Node canvas (@napi-rs/canvas) + ffmpeg, bez przeglądarki; zależność instaluje scripts/narzedzia.py Wideografa.
   anidoodle:
     type: git
     repo: https://github.com/alexgreensh/anidoodle
@@ -298,6 +305,7 @@ agents:
     - {source: motion-graphics, path: skills/motion-broll, dest: video/motion-broll}
     - {source: lemo-opuscar, path: plugin/skills/lemo-opuscar, dest: video/lemo-opuscar}
     - {source: anidoodle, path: skills/anidoodle, dest: video/anidoodle}
+    - {source: claude-animation, path: plugins/claude-animation/skills/claude-animation, dest: video/claude-animation}
     # Router Remotion: zawiera wszystkie skille Remotion jako remotion-*/REFERENCE.md (create, markup, render,
     # captions, multimedia, maps, studio…), więc osobne skille remotion-* byłyby dublami.
     - {source: remotion-skills, path: skills/remotion-best-practices, dest: video/remotion-best-practices}
