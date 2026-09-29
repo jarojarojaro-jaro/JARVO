@@ -56,6 +56,8 @@ for a in $AGENTS; do
   if [[ -d "$DATA/profiles/$a" && -f "$DATA/profiles/$a/distribution.yaml" ]]; then
     log "Aktualizacja profilu $a"
     $PY "$REPO/scripts/profile_model.py" snapshot "$DATA/profiles/$a"
+    # źródło aktualizacji zawsze = bieżący build (po migracji TARS → Jarvo zostawała stara ścieżka /opt/tars/…)
+    sed -i "s#^source:.*#source: $src#" "$DATA/profiles/$a/distribution.yaml"
     hermes profile update "$a" --force-config --yes
     $PY "$REPO/scripts/profile_model.py" restore "$DATA/profiles/$a"
   else
