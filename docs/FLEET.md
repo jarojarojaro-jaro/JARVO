@@ -17,7 +17,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 23 (marketingskills, Anthropic, Hermes, impeccable) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [14 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 55 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie (+ wideo_lib) | [19](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 5 (marketingskills) | ads, planer, eksperyment, eksport | [12](../evals/jarvo-ads/scenarios.yaml) |
-| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 2 (skill-creator, `graf-kodu`) + skille Sherlocka, Web i Studio (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
+| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 2 (skill-creator, `graf-kodu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
 
@@ -240,15 +240,15 @@ robi szybkie rzeczy od ręki, skleja wyniki snajperów i łata dziury, gdzie nie
 **Czym różni się od Jarva:** Jarvo *zarządza i ocenia*, a prawa ręka *wykonuje*.
 Jarvo nie robi pracy, a ręka robi wszystko.
 
-**Czym różni się od snajperów:** ma **dostęp do skilli Sherlocka, Web i Studio** (tylko do odczytu;
-skille Wideografa i Ads jeszcze nie są podpięte) i pełny katalog Hermesa, ale nie ma ich pamięci ani głębi.
+**Czym różni się od snajperów:** ma **dostęp do skilli wszystkich snajperów** (tylko do odczytu; walidator
+pilnuje, żeby nowy snajper też tu trafił) i pełny katalog Hermesa, ale nie ma ich pamięci ani głębi.
 Do szybkich i przekrojowych zadań jest idealna. Gdy zadanie wymaga jakości snajpera, sama proponuje oddanie go przez Jarva.
 
 **Typowe zadania:** szybka odpowiedź lub obliczenie, poprawka tekstu, porządki w plikach,
 prototyp na szybko, zebranie wyników kilku snajperów w jeden dokument, maile, notatki,
 plan dnia, „znajdź sposób, żeby…”.
 
-**Skille:** pełny katalog [H], skille Sherlocka, Web i Studio przez `skills.external_dirs` (build zamontowany
+**Skille:** pełny katalog [H], skille wszystkich snajperów przez `skills.external_dirs` (build zamontowany
 w kontenerze tylko do odczytu, `:ro`, więc ręka nie może ich modyfikować), [Z] `skill-creator`, `graf-kodu`
 oraz [T] `zlozenie-pakietu`, `dokumenty`, `szybki-prototyp`, `kiedy-oddac-snajperowi`.
 

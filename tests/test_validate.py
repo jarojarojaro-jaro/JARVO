@@ -126,3 +126,10 @@ def test_docs_broken_link_and_anchor(repo_copy):
     assert errors_matching(report, r"docs/NOWY.md: kotwica #nie-ma-takiej nie istnieje w PLAN.md")
     assert errors_matching(report, r"docs/NOWY.md: link do nieistniejącego BRAK.md")
     assert not errors_matching(report, r"6-roadmapa")
+
+
+def test_generalist_must_see_every_specialist(repo_copy):
+    cfg = repo_copy / "profiles/jarvo-reka/config.yaml"
+    cfg.write_text(cfg.read_text(encoding="utf-8").replace('    - "@@BUILD_DIR@@/profiles/jarvo-ads/skills"\n', ""),
+                   encoding="utf-8")
+    assert errors_matching(validate.run(), r"jarvo-reka: skills.external_dirs bez skilli jarvo-ads")

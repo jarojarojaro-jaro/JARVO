@@ -132,6 +132,12 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
             r.err(f"{a.name}: orkiestrator bez toolsetu kanban na {label}")
         if a.name == fleet.orchestrator and "terminal" in (toolsets.get(plat) or []):
             r.err(f"{a.name}: orkiestrator nie powinien mieć terminala na {label} (nie wykonuje pracy)")
+    if a.kind == "generalist":
+        # prawa ręka czyta skille wszystkich snajperów (tylko do odczytu); nowy snajper musi tu trafić
+        dirs = " ".join((cfg.get("skills") or {}).get("external_dirs") or [])
+        for s in fleet.active():
+            if s.kind == "specialist" and f"/profiles/{s.name}/skills" not in dirs:
+                r.err(f"{a.name}: skills.external_dirs bez skilli {s.name} (generalista czyta skille wszystkich snajperów)")
     appr = cfg.get("approvals") or {}
     for key in ("cron_mode", "single_query_mode", "unattended_mode"):
         if appr.get(key) != "deny":

@@ -21,6 +21,8 @@ skills:
     - "@@BUILD_DIR@@/profiles/jarvo-sherlock/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-web/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-studio/skills"
+    - "@@BUILD_DIR@@/profiles/jarvo-wideo/skills"
+    - "@@BUILD_DIR@@/profiles/jarvo-ads/skills"
 
 web:
   search_backend: searxng
