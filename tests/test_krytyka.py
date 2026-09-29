@@ -50,3 +50,10 @@ def test_assety_hex_palette():
     assert assety.hex_("rgb(212, 33, 61)") == "#D4213D"
     assert assety.hex_("rgba(0, 0, 0, 0.2)") is None           # półprzezroczyste nakładki nie są kolorem marki
     assert assety.hex_("transparent") is None
+
+
+def test_maskotka_blink_is_deterministic():
+    import maskotka
+    assert maskotka.mrug(0.0) == 1.0
+    t = maskotka.MRUGNIECIA_CO - 0.7 + 0.07          # środek mrugnięcia
+    assert maskotka.mrug(t) < 0.2 and maskotka.mrug(t) == maskotka.mrug(t + maskotka.MRUGNIECIA_CO)
