@@ -83,7 +83,7 @@
   // ---------------------------------------------------------------- robot na telefonie: stoi, mruga, wita się w dymku
   const bot = $("#bot"), bubble = $(".bubble"), hello = $("#hello");
   const lines = [
-    "Hi, I'm <b>JARVO</b>.\nYour digital right hand.",
+    "Hi, I'm <b>JARVO</b>.\nWhat are we building today?",
     "Tap <b>Start building</b>\nand let's get to work.",
     "Research, sites, videos, docs.\nOne team, zero drama.",
     "Still here. Still ready, boss.",
