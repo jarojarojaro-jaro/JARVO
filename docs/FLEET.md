@@ -11,13 +11,13 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
-| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [11 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 0 | patrol, brief, przegląd, raport floty | [17](../evals/jarvo/scenarios.yaml) |
-| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [7 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 15 (Hermes, marketingskills) | search_fanout, extract, sources | [12](../evals/jarvo-sherlock/scenarios.yaml) |
+| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [11 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 0 | patrol, brief, przegląd, raport floty | [18](../evals/jarvo/scenarios.yaml) |
+| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [7 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 16 (Hermes, marketingskills, wspólny `transkrypcja-filmu`) | search_fanout, extract, sources | [12](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [9 w `skills/web/`](../profiles/jarvo-web/skills/web) | 55 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [12](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 23 (marketingskills, Anthropic, Hermes, impeccable) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
-| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [14 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 55 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie (+ wideo_lib) | [19](../evals/jarvo-wideo/scenarios.yaml) |
+| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [14 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 56 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólny `transkrypcja-filmu` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie (+ wideo_lib) | [19](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 5 (marketingskills) | ads, planer, eksperyment, eksport | [12](../evals/jarvo-ads/scenarios.yaml) |
-| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 2 (skill-creator, `graf-kodu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
+| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 3 (skill-creator, `graf-kodu`, `transkrypcja-filmu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
 
@@ -152,7 +152,8 @@ składa całość i **weryfikuje**, co jest prawdą.
 - [H] `grounded-citations`, `blocked-page-recovery`, `searxng-search`, `duckduckgo-search`,
   `scrapling`, `arxiv`, `youtube-content`, `reddit-reading`, `rss-feeds`,
   `blogwatcher`, `competitor-news-monitor`, `domain-intel`, `osint-investigation`
-- [Z] marketingskills `competitor-profiling`, `customer-research`
+- [Z] marketingskills `competitor-profiling`, `customer-research`; wspólny `transkrypcja-filmu` (`shared/skills/`):
+  link albo plik filmu → tekst mowy (napisy platformy albo Parakeet), bez analizy obrazu
 - [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł), [T] `szybki-fakt` (jedna runda, cytat),
   [T] `raport-sledztwa` (format raportu), [T] `research-seo` (słowa kluczowe i konkurencja, dla `jarvo-web` i `jarvo-studio`),
   [T] `research-rynku` (gracze, oferty, ceny, opinie), [T] `monitoring` (rutyna cron zakładana przez Jarva)
@@ -225,7 +226,7 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 `klipy-z-dlugiego`, `napisy`, `lektor-i-dzwiek`, `film-z-kodu`, `wideo-ai`, `formaty-wideo`, `kontrola-wideo`;
 [H] `manim-video`, `ai-presenter-video`; [Z] `hyperframes` (12 skilli rodziny), marketingskills `video`, GSAP (8),
 Three.js (10), screenwriting (5), iart (5), motion (3), Remotion, motion-broll, lemo-opuscar, anidoodle, claude-animation,
-bang-motion, pixel2motion, `text-to-lottie`, `slack-gif-creator` (razem 55).
+bang-motion, pixel2motion, `text-to-lottie`, `slack-gif-creator`, wspólny `transkrypcja-filmu` (razem 56).
 Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#jarvo-wideo-wideograf).
 
 **Zasada:** **nie publikuje sam** i nie kupuje materiałów; bez deepfake'ów i klonowania głosów realnych osób.
@@ -249,7 +250,7 @@ prototyp na szybko, zebranie wyników kilku snajperów w jeden dokument, maile, 
 plan dnia, „znajdź sposób, żeby…”.
 
 **Skille:** pełny katalog [H], skille wszystkich snajperów przez `skills.external_dirs` (build zamontowany
-w kontenerze tylko do odczytu, `:ro`, więc ręka nie może ich modyfikować), [Z] `skill-creator`, `graf-kodu`
+w kontenerze tylko do odczytu, `:ro`, więc ręka nie może ich modyfikować), [Z] `skill-creator`, `graf-kodu`, `transkrypcja-filmu`
 oraz [T] `zlozenie-pakietu`, `dokumenty`, `szybki-prototyp`, `kiedy-oddac-snajperowi`.
 
 **Rubryka sędziego (DoD):** zadanie wykonane, wynik sprawdzony przez nią samą, jasno powiedziane, czego nie zrobiła.

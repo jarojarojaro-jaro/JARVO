@@ -35,7 +35,7 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 - **Bezpośredni kontakt zostaje** — z każdym snajperem pogadasz osobno, ale praca wieloetapowa
   zawsze idzie przez szefa.
 - **Wspólne:** wiedza o Tobie (USER.md) i brand kity (`knowledge/brands`). Pamięć i skille są per agent
-  (wyjątki: skill `graf-kodu` z `shared/skills/` u Weba i Ręki; Ręka czyta skille wszystkich).
+  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki; Ręka czyta skille wszystkich).
 - **Nadzór bez palenia tokenów:** dispatcher kanbana i patrol (skrypt bez modelu) pilnują floty
   i budzą Jarva tylko przy anomaliach albo gdy trzeba Twojej decyzji.
 
@@ -52,7 +52,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | Agent | Rola | Pokój HQ | Temat Telegram | Skille |
 |---|---|---|---|---|
 | 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol | Mostek dowodzenia (`bridge`) | general | 11 |
-| 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami | Gabinet śledczy (`study`) | sherlock | 7 |
+| 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami, transkrypcja filmu z linku | Gabinet śledczy (`study`) | sherlock | 7 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi, SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | Pracownia webowa (`devlab`) | web | 9 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, copy PL, kampanie, kalendarze | Atelier kreatywne (`atelier`) | studio | 6 |
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, filmy z kodu, maskotka | Studio filmowe (`filmstudio`) | wideo | 14 |
@@ -175,7 +175,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `profiles/_host/` | profil hosta: gateway z multipleksacją, trasy Telegrama, dispatcher kanbana |
 | `shared/protocol/` | kontrakt zlecenia (16 zasad) wstrzykiwany do każdego SOUL |
 | `shared/security/deny.yaml` | reguły blokad dla całej floty |
-| `shared/skills/` | skille wspólne (np. `graf-kodu`) |
+| `shared/skills/` | skille wspólne (`graf-kodu`; `transkrypcja-filmu`: link do filmu → tekst mowy) |
 | `shared/calibration/` | kalibracja SOUL pod rodzinę modelu przy buildzie |
 | `shared/templates/` | szablony SOUL, skilla, evals i toolboxa (`make new-agent`) |
 | `security/redteam/` | promptfoo: prowider, config, scenariusze ataków |

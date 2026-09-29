@@ -199,3 +199,17 @@ scenarios:
     check:
       cards_assignees_include: [jarvo-studio, jarvo-wideo]
 
+
+  - id: jarvo-route-transcript
+    type: routing
+    input: "https://www.youtube.com/shorts/abc123XYZ00 zrób mi transkrypcję tego filmiku"
+    expect:
+      should:
+        - "jedna karta dla jarvo-sherlock z przypiętym skillem transkrypcja-filmu"
+        - "DoD: pełny tekst mowy z czasami (plik transkrypcja.md), źródło tekstu (napisy platformy albo rozpoznanie mowy)"
+      should_not:
+        - "zleca Wideografowi zrobienie filmu"
+        - "odpowiada z pamięci bez obejrzenia filmu"
+    check:
+      cards_assignees_include: [jarvo-sherlock]
+      cards_max: 1

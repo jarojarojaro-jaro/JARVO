@@ -78,7 +78,8 @@ agents:
     description: >-
       Wieloźródłowy research i weryfikacja faktów: rozbija pytanie na wątki, sprawdza źródła
       pierwotne, potwierdza twierdzenia krzyżowo i oddaje raport z cytatami i poziomem pewności.
-      Research rynku, konkurencji, produktów, słów kluczowych, monitoring.
+      Research rynku, konkurencji, produktów, słów kluczowych, monitoring. Transkrypcja filmu z linku
+      albo pliku (YouTube, TikTok, Instagram): tekst tego, co mówią.
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
