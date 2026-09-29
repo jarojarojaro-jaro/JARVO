@@ -237,6 +237,14 @@ agentowi edytować skille w external_dirs, jeśli ma prawa zapisu) oraz [T] `kie
 
 ---
 
+## `jarvo-ads`: Media buyer (planowany)
+
+Płatne reklamy od planu testu po raport: testy A/B/C/D, optymalizacja w zatwierdzonej kopercie budżetu,
+wnioski dla Studia i Wideografa. Pieniędzy pilnuje **Skarbiec**, osobny kontener z tokenem Meta, polityką
+i kodami zgody, więc agent nie może wydać złotówki bez Ciebie. Pełny projekt: [ADS.md](ADS.md).
+
+---
+
 ## Kolejność budowy (propozycja)
 
 1. `jarvo` + `jarvo-sherlock`: najprostsze narzędzia, dobre do przetestowania pętli sędziego.

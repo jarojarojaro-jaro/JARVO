@@ -18,6 +18,7 @@ Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa 
 | [TOOLBOX.md](TOOLBOX.md) | zweryfikowane narzędzia open-source per agent + polityka licencji |
 | [BOSS.md](BOSS.md) | mechanika Main Judge'a: misje, kolejka decyzji, patrol, sędziowanie, eskalacje |
 | [HQ.md](HQ.md) | Jarvo HQ: GUI floty (pokoje agentów, praca na żywo, czat) |
+| [ADS.md](ADS.md) | projekt agenta reklam płatnych `jarvo-ads` i Skarbca (strażnik budżetu) |
 | [VPS.md](VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring, wdrożenia |
 | [RUNBOOK.md](RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [SOURCES.md](SOURCES.md) | źródła, atrybucje i licencje |
