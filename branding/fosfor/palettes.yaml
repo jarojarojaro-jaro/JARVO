@@ -1,9 +1,14 @@
 # Motyw „Fosfor” dashboardu Jarvo: terminal CRT z 1982. Cały wygląd liczy się z JEDNEGO koloru.
 # Każda pozycja to osobny motyw w przełączniku motywów (lewy dolny róg dashboardu).
 # Własny kolor: dopisz linię i wdroż (bash scripts/deploy.sh --no-pull). `default` = motyw na start.
+# Dwukolorowy: `frame` (ramki, neon), `fill` (wypełnienia), `bg`, `muted`, `line` (słabe linie).
 # `accent` (opcjonalnie): drugi kolor do wyróżnień, np. celu karty; domyślnie bursztyn (dla ciepłych: błękit).
-default: fosfor
+default: jarvo
 themes:
+  # Jarvo: biel i czerwień jak flaga Polski. Białe napisy, czerwone ramki z neonową poświatą, tło Midnight.
+  - {name: jarvo, label: "Jarvo · biało-czerwony", color: "#F2F1E8", frame: "#D4213D", fill: "#D4213D",
+     bg: "#10131C", muted: "#A3A8B6", line: "#5C1A27", accent: "#FF4D63",
+     description: "Jarvo: biel i czerwień, neonowe ramki"}
   - {name: fosfor,           label: "Fosfor · błękit",   color: "#89cff0"}
   - {name: fosfor-bursztyn,  label: "Fosfor · bursztyn", color: "#ffb000"}
   - {name: fosfor-zielen,    label: "Fosfor · zieleń",   color: "#41ff7a"}

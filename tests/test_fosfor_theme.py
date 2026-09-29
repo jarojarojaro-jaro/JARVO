@@ -30,14 +30,28 @@ def test_install_writes_themes_and_sets_default(tmp_path):
     assert theme["palette"]["midground"] == "#89cff0"
     assert "--fos: #89cff0;" in theme["customCSS"] and len(theme["customCSS"]) < 32 * 1024
     cfg = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
-    assert cfg["dashboard"]["theme"] == "fosfor" and cfg["model"] == "x"
+    assert cfg["dashboard"]["theme"] == "jarvo" and cfg["model"] == "x"
+    jarvo = yaml.safe_load((tmp_path / "dashboard-themes" / "jarvo.yaml").read_text(encoding="utf-8"))
+    assert "--fos-line: #d4213d;" in jarvo["customCSS"] and "--fos: #f2f1e8;" in jarvo["customCSS"]
+    assert jarvo["colorOverrides"]["primary"] == "#d4213d" and jarvo["palette"]["background"] == "#10131c"
 
 
-def test_user_choice_is_kept(tmp_path):
-    (tmp_path / "config.yaml").write_text("dashboard:\n  theme: fosfor-bursztyn\n", encoding="utf-8")
+def test_old_fosfor_switches_once_then_choice_is_kept(tmp_path):
+    cfgp = tmp_path / "config.yaml"
+    cfgp.write_text("dashboard:\n  theme: fosfor-biel\n", encoding="utf-8")
     it.main([str(REPO), str(tmp_path)])
-    cfg = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
-    assert cfg["dashboard"]["theme"] == "fosfor-bursztyn"
+    assert yaml.safe_load(cfgp.read_text(encoding="utf-8"))["dashboard"]["theme"] == "jarvo"
+    cfgp.write_text("dashboard:\n  theme: fosfor-bursztyn\n", encoding="utf-8")   # użytkownik wrócił
+    it.main([str(REPO), str(tmp_path)])
+    assert yaml.safe_load(cfgp.read_text(encoding="utf-8"))["dashboard"]["theme"] == "fosfor-bursztyn"
+
+
+def test_two_color_tokens():
+    t = it.tokens("#F2F1E8", "#FF4D63", frame="#D4213D", fill="#D4213D", bg="#10131C")
+    assert t["fos"] == "#f2f1e8" and t["fos-line"] == "#d4213d" and t["fos-fill-ink"] == "#f2f1e8"
+    assert t["fos-bg"] == "#10131c" and "212, 33, 61" in t["fos-neon"]
+    one = it.tokens("#89cff0")
+    assert one["fos-neon"] == "transparent" and one["fos-fill"] == one["fos"] and one["fos-line"] == one["fos-mid"]
 
 
 def test_fonts_are_bundled():

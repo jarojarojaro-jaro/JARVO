@@ -16,12 +16,13 @@ body::after {
 aside, header, nav, .border-b, .border-t, .border-r, .border { border-color: var(--fos-lo) !important; }
 
 /* menu boczne */
-aside.fixed { background: var(--fos-bg2) !important; border-right-width: 2px !important; }
+aside.fixed { background: var(--fos-bg2) !important; border-right: 2px solid var(--fos-line) !important; box-shadow: 4px 0 18px -8px var(--fos-neon); }
 aside.fixed > div:first-child span.font-bold {
   font-family: var(--theme-font-display); font-weight: 400; font-size: 44px; letter-spacing: 6px; line-height: 1;
 }
 aside.fixed > div:first-child span.font-bold::after {
   content: "▌"; font-size: .9em; margin-left: 4px; animation: fos-blink 1.06s steps(1) infinite;
+  color: var(--fos-fill); text-shadow: 0 0 10px var(--fos-neon);
 }
 /* menu: wszystkie pozycje (też pluginy) dzielą wysokość po równo, bez przewijania i ucinania.
    Ikonki pikselowe (branding/fosfor/icons.txt) dokleja scripts/install_themes.py jako --fos-ic. */
@@ -42,7 +43,8 @@ aside.fixed nav a::before {
   -webkit-mask: var(--fos-ic) center / 20px 20px no-repeat; mask: var(--fos-ic) center / 20px 20px no-repeat;
   filter: drop-shadow(0 0 3px var(--fos-glow));
 }
-aside.fixed nav a[aria-current="page"] { background: var(--fos); color: var(--fos-bg) !important; text-shadow: none; }
+aside.fixed nav a[aria-current="page"] { background: var(--fos-fill); color: var(--fos-fill-ink) !important; text-shadow: none;
+  box-shadow: 0 0 14px var(--fos-neon); }
 aside.fixed nav a[aria-current="page"]::before { filter: none; }
 aside.fixed nav a[aria-current="page"] > span.absolute { display: none; }
 
@@ -53,28 +55,28 @@ header h1 { font-family: var(--theme-font-display) !important; font-weight: 400 
 button, input, select, textarea { border-radius: 0 !important; }
 input, textarea, select { background-color: var(--fos-bg) !important; }
 ::placeholder { color: var(--fos-mid) !important; opacity: .7; }
-::selection { background: var(--fos); color: var(--fos-bg); text-shadow: none; }
+::selection { background: var(--fos-fill); color: var(--fos-fill-ink); text-shadow: none; }
 
 /* terminal czatu w podwójnej ramce */
-.hermes-chat-xterm-host { outline: 3px double var(--fos-mid); outline-offset: 6px; }
+.hermes-chat-xterm-host { outline: 3px double var(--fos-line); outline-offset: 6px; }
 
 /* ---- Jarvo HQ (plugin) ---- */
-.thq-root, .thq-modal-back { --thq-accent: var(--fos); --thq-accent-ink: var(--fos-bg); --thq-goal: var(--fos-alt); }
+.thq-root, .thq-modal-back { --thq-accent: var(--fos-fill); --thq-accent-ink: var(--fos-fill-ink); --thq-goal: var(--fos-alt); }
 .thq-headbar, .thq-root { font-family: var(--theme-font-sans); }
 .thq-stat, .thq-panel, .thq-dock, .thq-target, .thq-decision, .thq-mission, .thq-chip {
-  border-radius: 0 !important; border-color: var(--fos-mid) !important; background: transparent !important;
-  color: var(--fos) !important; box-shadow: none !important;
+  border-radius: 0 !important; border-color: var(--fos-line) !important; background: transparent !important;
+  color: var(--fos) !important; box-shadow: 0 0 10px -2px var(--fos-neon), inset 0 0 10px -4px var(--fos-neon) !important;
 }
-.thq-stat.is-bad { background: var(--fos) !important; color: var(--fos-bg) !important; text-shadow: none; }
-.thq-stat.is-bad * { color: var(--fos-bg) !important; }
+.thq-stat.is-bad { background: var(--fos-fill) !important; color: var(--fos-fill-ink) !important; text-shadow: none; }
+.thq-stat.is-bad * { color: var(--fos-fill-ink) !important; }
 .thq-decisions-btn, .thq-send, .thq-target.is-active {
-  border-radius: 0 !important; background: var(--fos) !important; color: var(--fos-bg) !important;
-  border-color: var(--fos) !important; text-shadow: none; font-family: var(--theme-font-display) !important; font-size: 20px !important;
+  border-radius: 0 !important; background: var(--fos-fill) !important; color: var(--fos-fill-ink) !important;
+  border-color: var(--fos-fill) !important; box-shadow: 0 0 12px var(--fos-neon) !important; text-shadow: none; font-family: var(--theme-font-display) !important; font-size: 20px !important;
 }
 .thq-badge { border-radius: 0 !important; background: var(--fos-bg) !important; color: var(--fos) !important; }
 .thq-h2, .thq-dock-toggle { font-family: var(--theme-font-display) !important; font-weight: 400 !important; font-size: 22px !important; letter-spacing: .08em; }
 .thq-progress { border-radius: 0 !important; background: var(--fos-lo) !important; }
-.thq-progress > span { border-radius: 0 !important; background: var(--fos) !important; }
+.thq-progress > span { border-radius: 0 !important; background: var(--fos-fill) !important; box-shadow: 0 0 8px var(--fos-neon); }
 .thq-muted { color: var(--fos-mid) !important; }
 /* nic nie miga poza kursorem przy logo */
 .thq-root *, .thq-headbar * { animation: none !important; }
@@ -90,18 +92,18 @@ aside.fixed > div.shrink-0 a { padding-top: 8px !important; padding-bottom: 4px 
 
 /* wiersze list (np. Keys): po najechaniu podświetla się cały pasek, jak w Config */
 div[class*="hover:text-foreground"]:hover { background: color-mix(in srgb, var(--fos) 12%, transparent); color: var(--fos) !important; }
-.thq-modal { border-radius: 0 !important; border: 2px solid var(--fos-mid); background: var(--fos-bg2) !important;
-  color: var(--fos) !important; font-family: var(--theme-font-sans) !important; box-shadow: 0 0 40px rgba(0, 0, 0, .8) !important; }
+.thq-modal { border-radius: 0 !important; border: 2px solid var(--fos-line); background: var(--fos-bg2) !important;
+  color: var(--fos) !important; font-family: var(--theme-font-sans) !important; box-shadow: 0 0 40px rgba(0, 0, 0, .8), 0 0 18px var(--fos-neon) !important; }
 .thq-modal-head h3 { font-family: var(--theme-font-display) !important; font-weight: 400 !important; font-size: 26px !important; letter-spacing: .06em; }
 
 /* okno karty: cel w drugim kolorze palety, reszta w fosforze */
 .thq-goal { border-radius: 0 !important; background: color-mix(in srgb, var(--fos-alt) 8%, transparent) !important;
   border-color: var(--fos-alt) !important; color: var(--fos-alt) !important; text-shadow: 0 0 6px color-mix(in srgb, var(--fos-alt) 45%, transparent); }
 .thq-goal-label { font-family: var(--theme-font-display) !important; font-size: 18px !important; font-weight: 400 !important; letter-spacing: .12em !important; }
-.thq-out, .thq-act-btn { border-radius: 0 !important; border-color: var(--fos-mid) !important; background: transparent !important; color: var(--fos) !important; }
-.thq-out.is-main { border-color: var(--fos) !important; border-width: 2px; }
+.thq-out, .thq-act-btn { border-radius: 0 !important; border-color: var(--fos-line) !important; background: transparent !important; color: var(--fos) !important; }
+.thq-out.is-main { border-color: var(--fos-fill) !important; box-shadow: 0 0 10px var(--fos-neon); border-width: 2px; }
 .thq-act-btn:hover { background: color-mix(in srgb, var(--fos) 14%, transparent) !important; }
-.thq-act-btn.is-run { background: var(--fos) !important; color: var(--fos-bg) !important; text-shadow: none; }
+.thq-act-btn.is-run { background: var(--fos-fill) !important; color: var(--fos-fill-ink) !important; text-shadow: none; }
 .thq-more { border-color: var(--fos-lo) !important; }
 .thq-task-meta code { background: none !important; color: var(--fos-mid) !important; }
 .thq-more > summary { font-family: var(--theme-font-display) !important; font-weight: 400 !important; font-size: 19px !important; color: var(--fos-mid) !important; }
@@ -109,6 +111,13 @@ div[class*="hover:text-foreground"]:hover { background: color-mix(in srgb, var(-
 
 /* czat: pliki i zdjęcia w fosforze */
 .thq-pathlink { color: var(--fos) !important; }
-.thq-media-img, .thq-media-file, .thq-attach-item { border-radius: 0 !important; border-color: var(--fos-mid) !important; background: transparent !important; }
+.thq-media-img, .thq-media-file, .thq-attach-item { border-radius: 0 !important; border-color: var(--fos-line) !important; background: transparent !important; }
 .thq-media-img img, .thq-md-img, .thq-attach-item img { border-radius: 0 !important; }
-.thq-chat.is-drop { outline-color: var(--fos) !important; }
+.thq-chat.is-drop { outline-color: var(--fos-fill) !important; }
+
+/* motyw dwukolorowy (biało-czerwony Jarvo): czerwony neon na ramkach, białe napisy.
+   W motywach jednokolorowych --fos-neon = transparent, więc nic się nie zmienia. */
+header { box-shadow: 0 6px 18px -12px var(--fos-neon); }
+aside.fixed nav a:hover:not([aria-current="page"]) { box-shadow: inset 3px 0 0 var(--fos-fill); }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--fos-fill) !important; outline-offset: 2px; }
+.thq-upd-panel { border-color: var(--fos-line) !important; box-shadow: 0 0 18px var(--fos-neon) !important; }

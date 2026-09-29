@@ -35,17 +35,30 @@ def shade(c: tuple[int, int, int], k: float) -> str:
 AMBER, BLUE = "#ffb000", "#89cff0"
 
 
-def tokens(color: str, accent: str | None = None) -> dict[str, str]:
+def tokens(color: str, accent: str | None = None, **extra: str) -> dict[str, str]:
     """Odcienie fosforu z jednego koloru + drugi kolor (--fos-alt) do wyróżnień, np. celu karty.
-    Bez `accent`: bursztyn, a dla ciepłego fosforu (czerwony > niebieski) błękit."""
+    Bez `accent`: bursztyn, a dla ciepłego fosforu (czerwony > niebieski) błękit.
+    Motyw dwukolorowy (np. biało-czerwony Jarvo) podaje dodatkowo `frame` (ramki i poświata neonu),
+    `fill` (wypełnienia: aktywne menu, przyciski), `bg`, `muted` i `line` (słabe linie)."""
     c = rgb(color)
     alt = accent or (BLUE if c[0] > c[2] + 40 else AMBER)
-    return {
-        "fos": shade(c, 1.0), "fos-mid": shade(c, 0.82), "fos-lo": shade(c, 0.45),
-        "fos-bg": shade(c, 0.05), "fos-bg2": shade(c, 0.08),
-        "fos-glow": f"rgba({c[0]}, {c[1]}, {c[2]}, 0.45)",
+    frame = rgb(extra["frame"]) if extra.get("frame") else None
+    bg = extra.get("bg") or shade(c, 0.05)
+    b = rgb(bg)
+    t = {
+        "fos": shade(c, 1.0), "fos-mid": extra.get("muted") or shade(c, 0.82),
+        "fos-lo": extra.get("line") or shade(c, 0.45),
+        "fos-bg": shade(b, 1.0), "fos-bg2": "#" + "".join(f"{min(255, v + 7):02x}" for v in b) if "bg" in extra else shade(c, 0.08),
+        "fos-glow": f"rgba({c[0]}, {c[1]}, {c[2]}, {0.18 if frame else 0.45})",
         "fos-alt": shade(rgb(alt), 1.0),
     }
+    fill = rgb(extra["fill"]) if extra.get("fill") else c
+    t.update({
+        "fos-line": shade(frame, 1.0) if frame else t["fos-mid"],          # ramki paneli i okien
+        "fos-fill": shade(fill, 1.0), "fos-fill-ink": shade(c, 1.0) if extra.get("fill") else t["fos-bg"],
+        "fos-neon": f"rgba({frame[0]}, {frame[1]}, {frame[2]}, 0.55)" if frame else "transparent",
+    })
+    return t
 
 
 def icon_svg(rows: list[str]) -> str:
@@ -87,12 +100,13 @@ def icons_css(text: str) -> str:
 
 
 def theme(entry: dict, css: str) -> dict:
-    t = tokens(entry["color"], entry.get("accent"))
+    t = tokens(entry["color"], entry.get("accent"),
+               **{k: entry[k] for k in ("frame", "fill", "bg", "muted", "line") if entry.get(k)})
     root = ":root { " + " ".join(f"--{k}: {v};" for k, v in t.items()) + " }\n"
     return {
         "name": entry["name"],
         "label": entry.get("label") or entry["name"],
-        "description": "Jarvo: terminal CRT, jeden kolor fosforu",
+        "description": entry.get("description") or "Jarvo: terminal CRT, jeden kolor fosforu",
         "palette": {
             "background": t["fos-bg"],
             "midground": t["fos"],
@@ -111,7 +125,7 @@ def theme(entry: dict, css: str) -> dict:
         "layout": {"radius": "0", "density": "comfortable"},
         "colorOverrides": {
             "card": t["fos-bg2"], "popover": t["fos-bg2"], "border": t["fos-lo"], "input": t["fos-lo"],
-            "ring": t["fos"], "primary": t["fos"], "primaryForeground": t["fos-bg"],
+            "ring": t["fos-line"], "primary": t["fos-fill"], "primaryForeground": t["fos-fill-ink"],
             "mutedForeground": t["fos-mid"], "accent": t["fos-lo"], "accentForeground": t["fos"],
         },
         "terminalBackground": t["fos-bg"],
@@ -120,7 +134,12 @@ def theme(entry: dict, css: str) -> dict:
     }
 
 
-def set_default_theme(config: Path, name: str) -> bool:
+# Jednorazowa zmiana na biało-czerwony motyw marki dla instalacji, które miały jeden ze starych
+# motywów Fosfor (nowy domyślny). Znacznik w katalogu motywów: potem wybór użytkownika jest święty.
+BRAND_SWITCH = ".jarvo-bialo-czerwony"
+
+
+def set_default_theme(config: Path, name: str, switch_from: tuple[str, ...] = ()) -> bool:
     if not config.exists():
         return False
     try:
@@ -136,7 +155,7 @@ def set_default_theme(config: Path, name: str) -> bool:
     if not isinstance(dash, dict):
         dash = {}
         data["dashboard"] = dash
-    if dash.get("theme") not in HERMES_DEFAULT_THEMES:
+    if dash.get("theme") not in HERMES_DEFAULT_THEMES and dash.get("theme") not in switch_from:
         return False
     dash["theme"] = name
     dump(data)
@@ -155,7 +174,10 @@ def main(argv: list[str]) -> int:
     for entry in spec["themes"]:
         body = yaml.safe_dump(theme(entry, css), allow_unicode=True, sort_keys=False, width=1000)
         (out / f"{entry['name']}.yaml").write_text(body, encoding="utf-8")
-    changed = set_default_theme(home / "config.yaml", spec["default"])
+    marker = out / BRAND_SWITCH
+    old = tuple(e["name"] for e in spec["themes"] if e["name"].startswith("fosfor")) if not marker.exists() else ()
+    changed = set_default_theme(home / "config.yaml", spec["default"], old)
+    marker.touch()
     print(f"motywy Fosfor: {len(spec['themes'])}" + (f", domyślny: {spec['default']}" if changed else ""))
     return 0
 

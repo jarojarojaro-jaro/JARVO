@@ -12,7 +12,7 @@
   /* tło sceny wyliczone z motywu: działa w jasnych i ciemnych motywach bez zgadywania */
   --thq-stage: color-mix(in srgb, var(--thq-ink) 8%, var(--thq-surface));
   --thq-stage-2: color-mix(in srgb, var(--thq-ink) 16%, var(--thq-surface));
-  --thq-accent: #D6281E;
+  --thq-accent: #D4213D;
   --thq-accent-ink: #FFFFFF;
   --thq-work: #1E9A61;
   --thq-warn: #C98A00;
@@ -499,7 +499,7 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-preview-audio { display: block; width: 100%; margin: 12px 0; }
 .thq-ed {
   --ed-bg: #101216; --ed-panel: #181B21; --ed-panel-2: #22262E; --ed-line: #2E333C; --ed-ink: #E9ECF1; --ed-muted: #8C95A3;
-  --ed-accent: #3BA9FF; --ed-clip: #2C6ED5; --ed-text: #B0489A; --ed-audio: #1E9A61;
+  --ed-accent: #E8354F; --ed-clip: #2C6ED5; --ed-text: #B0489A; --ed-audio: #1E9A61;
   position: fixed; inset: 0; z-index: 1100; display: flex; flex-direction: column;
   background: var(--ed-bg); color: var(--ed-ink); font: 14px/1.4 var(--thq-ui, system-ui, sans-serif); user-select: none;
   -webkit-user-select: none; overscroll-behavior: contain;
