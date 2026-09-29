@@ -431,6 +431,15 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         p = dest / rel
         if p.exists():
             p.write_text(render_tokens(p.read_text(encoding="utf-8"), tokens), encoding="utf-8")
+    # wspólne zakazy floty (shared/security/deny.yaml) → approvals.deny każdego profilu
+    deny_src = fl.REPO_ROOT / "shared" / "security" / "deny.yaml"
+    if deny_src.exists() and (dest / "config.yaml").exists():
+        cfg = fl.load_yaml(dest / "config.yaml")
+        appr = cfg.setdefault("approvals", {})
+        wlasne = list(appr.get("deny") or [])
+        appr["deny"] = wlasne + [d for d in fl.load_yaml(deny_src).get("deny", []) if d not in wlasne]
+        (dest / "config.yaml").write_text("# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty).\n"
+                                          + fl.dump_yaml(cfg), encoding="utf-8")
     # model zapasowy zestawu: agent nie milknie, gdy główny model odmówi (np. poza planem)
     if fleet.fallback and (dest / "config.yaml").exists():
         fb = fleet.fallback

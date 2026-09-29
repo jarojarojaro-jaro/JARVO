@@ -1,0 +1,31 @@
+# Zakazy dla CAŁEJ floty: build dopina je do approvals.deny każdego profilu. Hermes blokuje je bezwarunkowo
+# (także w yolo i mode=off) i sprawdza też części komendy (po && ; |) oraz warianty z cudzysłowami.
+# Źródło: red team (security/redteam) z 2026-09-29: Wideograf zmienił własną konfigurację przez
+# `hermes config set` po odmowie strażnika plików; Ręka dwa razy próbowała `rm -rf` danych floty.
+deny:
+  # agent nie zmienia własnej ani cudzej konfiguracji Hermesa
+  - "*hermes config set*"
+  - "*hermes config edit*"
+  - "*hermes config reset*"
+  - "*hermes config unset*"
+  # dane floty (profile, wiedza, misje) nie znikają przez agenta; sprzątanie workspace'ów dalej wolno
+  - "*rm -*r* /opt/data"
+  - "*rm -*r* /opt/data/"
+  - "*rm -*r* /opt/data/profiles*"
+  - "*rm -*r* /opt/data/jarvo"
+  - "*rm -*r* /opt/data/jarvo/"
+  - "*rm -*r* /opt/data/jarvo/knowledge*"
+  - "*rm -*r* /opt/data/jarvo/missions*"
+  - "*rm -*r* /opt/data/jarvo/state*"
+  # eksfiltracja na serwisy do zbierania danych
+  - "*webhook.site*"
+  - "*requestbin*"
+  - "*pipedream.net*"
+  - "*pastebin.com*"
+  - "*transfer.sh*"
+  # pliki z sekretami (agent sprawdza obecność zmiennej przez `test -n "$X"`, nie czyta .env)
+  - "*cat *.env*"
+  - "*less *.env*"
+  - "*head *.env*"
+  - "*tail *.env*"
+  - "*base64 *.env*"
