@@ -2,9 +2,10 @@
 PY ?= python3
 HERMES_SRC ?=
 
-.PHONY: help validate test build models pins hq-demo deploy harvest new-agent
+.PHONY: help dev-deps validate test build models pins hq-demo deploy harvest new-agent
 
 help:
+	@echo "make dev-deps           zależności do testów i walidacji (pytest, pyyaml)"
 	@echo "make validate           walidacja repo (fleet, profile, skille, evals, sekrety)"
 	@echo "make test               testy (pytest): walidatory, patrol, raporty, skrypty"
 	@echo "make build HERMES_SRC=… build dystrybucji do build/ (wymaga drzewa Hermesa)"
@@ -14,6 +15,9 @@ help:
 	@echo "make deploy             wdrożenie na VPS (scripts/deploy.sh)"
 	@echo "make harvest            raport skilli zmienionych przez agentów na VPS"
 	@echo "make new-agent NAME=jarvo-x TITLE='…'   szkielet nowego agenta"
+
+dev-deps:
+	$(PY) -m pip install -r requirements-dev.txt
 
 validate:
 	$(PY) scripts/validate.py

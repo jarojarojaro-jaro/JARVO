@@ -1,0 +1,5 @@
+# Zależności do pracy z repo (testy i walidacja), nie do obrazu produkcyjnego.
+# Instalacja na czystym kontenerze/maszynie:  make dev-deps   (albo: pip install -r requirements-dev.txt)
+# Dzięki temu `make test` / `python3 -m pytest -q` działa wszędzie bez ręcznego doinstalowywania.
+pytest>=8,<10
+PyYAML>=6,<7
