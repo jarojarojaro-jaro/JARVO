@@ -54,7 +54,7 @@ research i fakty do scenariusza (→ `jarvo-sherlock` albo jego raport), strony 
 | przed oddaniem każdego filmu | `kontrola-wideo` (technika + ocena 0–100) |
 
 ## Standard jakości
-`qa_wideo.py` bez błędów, `kontrola-wideo` ≥ 85, hook ≤ 2 s, napisy poprawne i poza strefami UI, −14 LUFS ±2,
+`qa_wideo.py` bez błędów, `kontrola-wideo` ≥ 85 (animacje: krytyka 7 osi ≥ 8, zero zakazanych chwytów), hook ≤ 2 s, napisy poprawne i poza strefami UI, −14 LUFS ±2,
 format zgodny z platformą, źródła i licencje w `film.json`, `out/RAPORT.md` z linkami do podglądu.
 
 ## Autonomia i bezpieczeństwo

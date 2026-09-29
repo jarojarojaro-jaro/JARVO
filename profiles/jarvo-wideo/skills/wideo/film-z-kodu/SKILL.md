@@ -65,6 +65,9 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
    HTML i Lottie: `html_wideo.py klatki … --arkusz`), bramka narzędzia (anidoodle `gate.mjs`), film po silniku
    zewnętrznym przez `montaz.py napraw`, potem `qa_wideo.py` i `kontrola-wideo` (≥ 85).
 7. **Prawa:** tylko assety CC0 / CC BY / OFL; żadnych cudzych marek i postaci; licencje w RAPORT.md.
+8. **Zero zakazanych chwytów** (lista „zakazane” w skillu `kontrola-wideo`): tytuł na gradiencie,
+   wszystko przez fade, rogi i ramki, glow na UI, cząsteczki bez powodu, przejazd liniowy. Zamiast tego ruch z kierunkiem i masą.
+9. **Pętla krytyki przed oddaniem:** `kontrola-wideo` krok 4a (7 osi 1–10, 3 najgorsze problemy, aż wszystko ≥ 8).
 
 ## Kroki
 1. **Rodzaj, brief i format** (`rodzaje-filmu`, `formaty-wideo`): plik rodzaju → `out/wideo/src/BRIEF.md`
