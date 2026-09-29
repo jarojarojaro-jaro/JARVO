@@ -60,34 +60,37 @@
   }
   setTimeout(blink, 1600);
 
-  // ---------------------------------------------------------------- terminal: robot pisze, dłonie stukają
-  const typed = $("#typed"), sceneInner = $(".scene-inner");
-  const lines = [
-    "What are we building today?",
-    "a landing page for my bakery, with online orders",
-    "research: the best CRM for a 5-person team",
-    "a 30-second promo video from these photos",
-    "fix the login bug and add tests",
-    "plan my product launch, step by step",
-    "What are we building today?",
+  // ---------------------------------------------------------------- terminal: ktoś pisze, Jarvo odpowiada
+  const ask = $("#ask"), reply = $("#reply"), cursor = $("#cursor"), sceneInner = $(".scene-inner");
+  const talks = [
+    ["yo, let's take over the world", "Love it. I'll draft the plan, you bring the coffee."],
+    ["build me a landing page by lunch", "Done by 11:58. Tests included, zero drama."],
+    ["find the best CRM for a team of 5", "Compared 14. Top 3 with prices on your desk in a minute."],
+    ["make a 30s promo from these photos", "Rendering. Voiceover in Polish or English?"],
+    ["remind me what I promised the client", "Friday demo, new logo, and no more Comic Sans."],
   ];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  async function type(text) {
-    busy = true;
-    for (let i = 1; i <= text.length; i++) { typed.textContent = text.slice(0, i); await sleep(34 + Math.random() * 50); }
-    busy = false;
-  }
-  async function erase() {
-    const t = typed.textContent;
-    for (let i = t.length; i >= 0; i--) { typed.textContent = t.slice(0, i); await sleep(14); }
+  let busy = false;
+  const at = (el) => { el.parentNode.appendChild(cursor); };
+  async function type(el, text, min, spread) {
+    busy = true; at(el); cursor.classList.add("is-typing");
+    for (let i = 1; i <= text.length; i++) { el.textContent = text.slice(0, i); await sleep(min + Math.random() * spread); }
+    cursor.classList.remove("is-typing"); busy = false;
   }
   async function loop() {
-    typed.textContent = "";
-    await sleep(700);
-    for (;;) for (const l of lines) { await type(l); await sleep(l.endsWith("?") ? 2600 : 1500); await erase(); await sleep(300); }
+    const who = $(".t-who");
+    for (;;) for (const [q, a] of talks) {
+      ask.textContent = ""; reply.textContent = ""; who.style.visibility = "hidden";
+      await sleep(500);
+      await type(ask, q, 45, 70);                 // człowiek pisze wolniej, z wahaniem
+      await sleep(650);
+      who.style.visibility = "";
+      await type(reply, a, 16, 22);               // Jarvo odpowiada szybko
+      await sleep(3200);
+    }
   }
+  if (!reduced) loop();
   // robot stuka prawie bez przerwy: serie po 1–3 s, krótkie pauzy; zawsze, gdy terminal pisze
-  let busy = false;
   async function hands() {
     for (;;) {
       sceneInner.classList.add("typing");
