@@ -63,11 +63,11 @@
   // ---------------------------------------------------------------- terminal: ktoś pisze, Jarvo odpowiada
   const ask = $("#ask"), reply = $("#reply"), cursor = $("#cursor"), sceneInner = $(".scene-inner");
   const talks = [
-    ["yo, let's take over the world", "Love it. I'll draft the plan, you bring the coffee."],
-    ["build me a landing page by lunch", "Done by 11:58. Tests included, zero drama."],
-    ["find the best CRM for a team of 5", "Compared 14. Top 3 with prices on your desk in a minute."],
-    ["make a 30s promo from these photos", "Rendering. Voiceover in Polish or English?"],
-    ["remind me what I promised the client", "Friday demo, new logo, and no more Comic Sans."],
+    ["yo, let's take over the world", "Already on it, boss. Phase one starts Monday."],
+    ["build me a landing page by lunch", "Lunch? It's live. Go eat."],
+    ["find the best CRM for a team of 5", "Read 40 reviews so you don't have to. Top 3 on your desk."],
+    ["make a 30s promo from these photos", "Say less. Rendering the hype."],
+    ["remind me what I promised the client", "Friday demo. I remembered, you're welcome."],
   ];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let busy = false;
