@@ -98,7 +98,7 @@ for a in $AGENTS; do
     || echo "  ! impeccable: nie pobrano programu (sieć?); pobierze się przy pierwszym użyciu"
 done
 
-# 3c. Jarvo HQ: plugin dashboardu (strona główna dashboardu na :9119)
+# 3c. Jarvo HQ: plugin dashboardu (zakładka BASE, :9119/base)
 if [[ -d "$BUILD/plugins/jarvo-hq" ]]; then
   log "Jarvo HQ (plugin dashboardu)"
   mkdir -p "$DATA/plugins"
