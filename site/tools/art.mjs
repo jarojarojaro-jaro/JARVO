@@ -25,6 +25,9 @@ const SPRITES = {
   // dłonie w rękawiczkach: tylko jasne piksele (klawiatura zostaje na miejscu)
   "hand-l": { rects: [[1090, 392, 1158, 434]], key: "glove" },
   "hand-r": { rects: [[1136, 378, 1186, 431]], key: "glove" },
+  // maski (tylko kształt, tło zostaje): czerwone kable, którymi płynie energia, i diody na biurku
+  "cable": { rects: [[1160, 432, 1300, 640], [1300, 540, 1335, 625]], key: "red", mask: true },
+  "leds": { rects: [[985, 432, 1058, 472], [880, 452, 928, 478], [1322, 578, 1422, 618]], key: "red", mask: true },
 };
 // śmieci z makiety, których strona nie potrzebuje (przycisk „Open JARVO” i ramka nagłówka nad sceną)
 const ERASE = [[1240, 70, 1505, 119], [770, 104, 790, 120]];
@@ -52,6 +55,7 @@ const result = await p.evaluate(async ({ data, SCENE, SPRITES, ERASE }) => {
   const keys = {
     bg: (i) => !near(i, bg, 7),
     lime: (i) => d[i + 1] > 150 && d[i] > 110 && d[i + 2] < 140 && d[i + 1] > d[i + 2] + 60,
+    red: (i) => d[i] > 150 && d[i + 1] < 90 && d[i + 2] < 110,
     glove: (i) => d[i] > 150 && d[i + 1] > 150 && d[i + 2] > 140 && Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) < 45,
   };
   const inRects = (x, y, rects) => rects.some(([x0, y0, x1, y1]) => x >= x0 && x < x1 && y >= y0 && y < y1);
@@ -77,7 +81,7 @@ const result = await p.evaluate(async ({ data, SCENE, SPRITES, ERASE }) => {
     sprites[name] = { x: x0 - SCENE.x, y: y0 - SCENE.y, w: sc.width, h: sc.height, png: sc.toDataURL("image/png") };
     // w tle: tam, gdzie był element, kolor tła (panele) albo ekranu (oczy, z 1 px zapasu na miękkie krawędzie);
     // dłonie zostają też w tle (pod nimi nie ma czego pokazać)
-    if (s.key === "glove") continue;
+    if (s.key === "glove" || s.mask) continue;
     if (s.key === "bg") {   // panel: całe prostokąty do koloru tła (sprite ma już wszystko, co nie jest tłem)
       for (const [rx0, ry0, rx1, ry1] of s.rects) for (let y = ry0; y < ry1; y++) for (let x = rx0; x < rx1; x++) {
         const i = at(x, y); d[i] = bg[0]; d[i + 1] = bg[1]; d[i + 2] = bg[2];

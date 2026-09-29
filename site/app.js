@@ -1,5 +1,7 @@
 // JARVO landing: skala planszy, żywy robot (oczy za kursorem, mruganie, pisanie), terminal i instalacja.
 (() => {
+  // Kontakt: adres e-mail (mailto:) albo strona; pusto = zgłoszenia na GitHubie.
+  const CONTACT = "";
   // Skąd instalatory. Po podpięciu domeny wystarczy zmienić tę jedną linię (np. https://jarvo.dev).
   const BASE = "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main";
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -7,14 +9,19 @@
   const root = document.documentElement;
 
   // ---------------------------------------------------------------- skala (desktop 1:1 z makietą)
+  if (CONTACT) document.getElementById("contact").href = CONTACT.includes("@") && !CONTACT.startsWith("mailto:") ? `mailto:${CONTACT}` : CONTACT;
   const mobile = matchMedia("(max-width: 820px)");
   const scene = $(".scene");
   function fit() {
     const w = document.documentElement.clientWidth;
-    root.style.setProperty("--s", Math.min(w, 1760) / 1536);
+    const s = Math.min(w, 1760) / 1536 * 0.9;          // 90%: więcej oddechu wokół niż w makiecie
+    root.style.setProperty("--s", s);
     if (mobile.matches) root.style.setProperty("--ss", scene.clientWidth / 735);
-    // szerokie ekrany: plansza wyśrodkowana
-    $(".page").style.marginLeft = w > 1760 ? `${(w - 1760) / 2}px` : "";
+    const st = $(".stage");
+    st.style.marginLeft = mobile.matches ? "" : `${(w - 1536 * s) / 2}px`;
+    // wysoki ekran: plansza na środku w pionie
+    st.style.marginTop = mobile.matches ? "" : `${Math.max(0, (innerHeight - 1024 * s) / 2)}px`;
+    $(".page").style.height = mobile.matches ? "" : `${Math.max(innerHeight, 1024 * s)}px`;
   }
   addEventListener("resize", fit); mobile.addEventListener("change", fit); fit();
 
@@ -60,13 +67,15 @@
     "a landing page for my bakery, with online orders",
     "research: the best CRM for a 5-person team",
     "a 30-second promo video from these photos",
+    "fix the login bug and add tests",
+    "plan my product launch, step by step",
     "What are we building today?",
   ];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function type(text) {
-    sceneInner.classList.add("typing");
-    for (let i = 1; i <= text.length; i++) { typed.textContent = text.slice(0, i); await sleep(38 + Math.random() * 55); }
-    sceneInner.classList.remove("typing");
+    busy = true;
+    for (let i = 1; i <= text.length; i++) { typed.textContent = text.slice(0, i); await sleep(34 + Math.random() * 50); }
+    busy = false;
   }
   async function erase() {
     const t = typed.textContent;
@@ -75,8 +84,18 @@
   async function loop() {
     typed.textContent = "";
     await sleep(700);
-    for (;;) for (const l of lines) { await type(l); await sleep(l.endsWith("?") ? 5200 : 2300); await erase(); await sleep(450); }
+    for (;;) for (const l of lines) { await type(l); await sleep(l.endsWith("?") ? 2600 : 1500); await erase(); await sleep(300); }
   }
+  // robot stuka prawie bez przerwy: serie po 1–3 s, krótkie pauzy; zawsze, gdy terminal pisze
+  let busy = false;
+  async function hands() {
+    for (;;) {
+      sceneInner.classList.add("typing");
+      await sleep(1000 + Math.random() * 2200);
+      if (!busy) { sceneInner.classList.remove("typing"); await sleep(250 + Math.random() * 650); }
+    }
+  }
+  if (!reduced) hands();
   if (!reduced) loop();
 
   // ---------------------------------------------------------------- instalacja: system → polecenie

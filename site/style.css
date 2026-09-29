@@ -46,12 +46,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .nav-corner { position: absolute; right: 0; width: 1px; height: 14px; background: var(--line); }
 .nav-corner.c-tr { top: -1px; } .nav-corner.c-br { bottom: 0; }
 .nav-corner.c-br::after { content: ""; position: absolute; right: 0; bottom: 0; width: 30px; height: 1px; background: var(--line); }
-.nav-logo { position: absolute; left: 32px; top: 5px; }
-.nav-logo img { display: block; height: 75px; width: auto; }
-.nav-sep { position: absolute; left: 359px; top: 21px; width: 1px; height: 45px; background: var(--line); }
-.nav-links { position: absolute; left: 402px; top: 30px; display: flex; gap: 0; font-size: 19px; }
-.nav-links a { color: #E9E8DF; margin-right: 54px; transition: color .2s; }
-.nav-links a:nth-child(2) { margin-right: 55px; }
+.nav-logo { position: absolute; left: 32px; top: 15px; }
+.nav-logo img { display: block; height: 56px; width: auto; }
+.nav-sep { position: absolute; left: 292px; top: 24px; width: 1px; height: 45px; background: var(--line); }
+.nav-links { position: absolute; left: 330px; top: 33px; display: flex; gap: 0; font-size: 16.5px; }
+.nav-links a { color: #E9E8DF; margin-right: 44px; transition: color .2s; }
 .nav-links a:hover { color: var(--lime); }
 .btn-open { position: absolute; left: 1222px; top: 16px; width: 220px; height: 53px; border: 1.5px solid var(--ink); border-radius: 6px;
   display: flex; align-items: center; gap: 20px; padding-left: 30px; font-size: 19px; transition: background .2s, color .2s; }
@@ -69,7 +68,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn-start { width: 277px; background: var(--lime); color: #10131C; border: 0; font-size: 22.5px; font-weight: 500; padding-left: 38px; gap: 24px; }
 .btn-start:hover { box-shadow: 0 0 0 3px rgba(184, 255, 61, .25), 0 0 34px rgba(184, 255, 61, .35); transform: translateY(-1px); }
 .btn-start:active { transform: translateY(1px); }
-.btn-explore { width: 309px; border: 1.5px solid #C9CAD0; font-size: 19.5px; padding-left: 31px; gap: 24px; }
+.btn-explore { width: 210px; border: 1.5px solid #C9CAD0; font-size: 19.5px; padding-left: 31px; gap: 24px; }
 .btn-explore .arrow { color: var(--lime); }
 .btn-explore:hover { border-color: var(--ink); background: rgba(242, 241, 232, .05); }
 
@@ -87,13 +86,43 @@ button { font: inherit; color: inherit; cursor: pointer; }
 [data-spr="eye-r"] { left: 348px; top: 157px; width: 37px; height: 52px; }
 [data-spr="hand-l"] { left: 320px; top: 322px; width: 68px; height: 42px; }
 [data-spr="hand-r"] { left: 366px; top: 308px; width: 50px; height: 53px; }
+/* panele: dane przewijają się po ekranach, co kilka sekund przebiega po nich błysk */
+.panel { position: absolute; }
+.panel img { display: block; width: 100%; height: 100%; }
+.panel i { position: absolute; inset: 0; mix-blend-mode: screen; pointer-events: none;
+  -webkit-mask: var(--m) 0 0 / 100% 100% no-repeat; mask: var(--m) 0 0 / 100% 100% no-repeat; }
+[data-spr="panels-l"] { --m: url(assets/panels-l.png); }
+[data-spr="panels-r"] { --m: url(assets/panels-r.png); }
+.panel .data { opacity: .55; background: repeating-linear-gradient(to bottom, transparent 0 7px, rgba(184, 255, 61, .22) 7px 9px, transparent 9px 16px,
+  rgba(212, 33, 61, .28) 16px 18px, transparent 18px 26px); background-size: 100% 52px; animation: data 2.2s linear infinite; }
+.float-b .data { animation-duration: 2.9s; animation-direction: reverse; }
+@keyframes data { to { background-position: 0 52px; } }
+.panel .sheen { background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .5) 48%, rgba(255, 255, 255, .08) 53%, transparent 60%) 0 0 / 300% 100%;
+  animation: sheen 4.8s ease-in-out infinite; }
+.float-b .sheen { animation-delay: -2.2s; }
+@keyframes sheen { 0%, 55% { background-position: 150% 0; } 100% { background-position: -60% 0; } }
+
+/* energia płynie czerwonymi kablami, diody na biurku oddychają */
+[data-spr="cable"] { left: 390px; top: 362px; width: 175px; height: 208px; }
+[data-spr="leds"] { left: 110px; top: 362px; width: 542px; height: 186px; }
+.energy, .leds { pointer-events: none; }
+.energy { -webkit-mask: url(assets/cable.png) 0 0 / 100% 100%; mask: url(assets/cable.png) 0 0 / 100% 100%;
+  background: linear-gradient(100deg, rgba(255, 70, 100, .35) 0 38%, #ff5a74 44%, #fff8e0 50%, #ff5a74 56%, rgba(255, 70, 100, .35) 62% 100%) 0 0 / 64px 100%;
+  animation: flow .8s linear infinite; filter: brightness(1.25) drop-shadow(0 0 3px #ff3355) drop-shadow(0 0 10px rgba(255, 51, 85, .85)); }
+@keyframes flow { to { background-position: 64px 0; } }
+.leds { -webkit-mask: url(assets/leds.png) 0 0 / 100% 100%; mask: url(assets/leds.png) 0 0 / 100% 100%; background: #ff5870;
+  mix-blend-mode: screen; animation: led 1.9s ease-in-out infinite; filter: drop-shadow(0 0 6px #ff2d4d); }
+@keyframes led { 0%, 100% { opacity: .1; } 50% { opacity: .85; } }
+.eyes .eye { animation: eyeglow 3s ease-in-out infinite; }
+@keyframes eyeglow { 50% { filter: drop-shadow(0 0 7px rgba(184, 255, 61, .95)); } }
+
 .float-a { animation: float 6.5s ease-in-out infinite; }
 .float-b { animation: float 7.5s ease-in-out -2.5s infinite; }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 
 .eyes { left: 0; top: 0; width: 735px; height: 570px; transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
 .eyes .eye { position: absolute; transform-origin: 50% 50%; filter: drop-shadow(0 0 4px rgba(184, 255, 61, .55)); }
-.eyes.blink .eye { animation: blink .22s steps(2, jump-none) 1; }
+.eyes.blink .eye { animation: blink .22s steps(2, jump-none) 1, eyeglow 3s ease-in-out infinite; }
 @keyframes blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.1); } }
 
 .hand { transition: transform .06s; }
