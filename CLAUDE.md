@@ -6,6 +6,8 @@
   każdy dokument, który ją opisuje: `README.md`, `docs/*.md` (także `docs/JARVO-CALOSC.md`), README i CHANGELOG profilu.
   Nazwy, liczby (skille, skrypty, evals, ataki red teamu), ścieżki, komendy, flagi i statusy w roadmapie mają odpowiadać repo.
   Przed commitem szukamy w dokumentach starych nazw i liczb (`grep -rn`); dokument niezgodny z kodem to błąd jak każdy inny.
+  `scripts/validate.py` sprawdza to, co da się automatycznie: linki i kotwice w `*.md`, obecność każdego agenta
+  w dokumentach przeglądowych i liczby w kolumnach „Skille” / „Workflowy własne” / „Evals” tabel.
 - Przed commitem: `python3 -m pytest -q` i `python3 scripts/validate.py` bez błędów.
   Na czystym kontenerze/maszynie najpierw `make dev-deps` (pytest, pyyaml z `requirements-dev.txt`) —
   nie doinstalowujemy narzędzi ręcznie, wszystko jest przypięte w repo.

@@ -203,6 +203,7 @@ SOURCES (licencje).
 - **Każda aktualizacja = osobny commit i od razu push** (gałąź robocza, remote `origin`).
 - **Dokumentacja zawsze zgodna z kodem:** zmiana w kodzie aktualizuje w tym samym commicie każdy dokument, który ją
   opisuje (README, `docs/*.md` z tym plikiem włącznie, README i CHANGELOG profilu): nazwy, liczby, ścieżki, komendy, statusy.
+  `validate.py` pilnuje linków i kotwic, pełnej listy floty w dokumentach przeglądowych i liczb skilli/evals w tabelach.
 - Przed commitem: `python3 -m pytest -q` i `python3 scripts/validate.py` bez błędów.
   Na czystym kontenerze najpierw `make dev-deps` (pytest + pyyaml z `requirements-dev.txt`).
 - **Po każdym dodaniu test w działającym kontenerze**, nie tylko pytest: deploy

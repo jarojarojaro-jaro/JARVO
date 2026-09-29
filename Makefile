@@ -6,7 +6,7 @@ HERMES_SRC ?=
 
 help:
 	@echo "make dev-deps           zależności do testów i walidacji (pytest, pyyaml)"
-	@echo "make validate           walidacja repo (fleet, profile, skille, evals, sekrety)"
+	@echo "make validate           walidacja repo (fleet, profile, skille, evals, sekrety, docs)"
 	@echo "make test               testy (pytest): walidatory, patrol, raporty, skrypty"
 	@echo "make build HERMES_SRC=… build dystrybucji do build/ (wymaga drzewa Hermesa)"
 	@echo "make models             czy modele z fleet.yaml istnieją na OpenRouter"

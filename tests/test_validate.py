@@ -105,3 +105,24 @@ def test_cron_script_must_exist(repo_copy):
 def test_profile_without_fleet_entry(repo_copy):
     (repo_copy / "profiles/jarvo-nieznany").mkdir()
     assert errors_matching(validate.run(), r"profiles/jarvo-nieznany: brak wpisu w fleet.yaml")
+
+
+def test_docs_count_must_match_repo(repo_copy):
+    import shutil
+    shutil.rmtree(repo_copy / "profiles/jarvo-studio/skills/studio/copy-pl")
+    assert errors_matching(validate.run(), r"docs/FLEET.md: jarvo-studio ma 5 \(skille\), a tabela podaje 6")
+
+
+def test_docs_must_list_whole_fleet(repo_copy):
+    readme = repo_copy / "README.md"
+    readme.write_text(readme.read_text(encoding="utf-8").replace("`jarvo-reka`", "jarvo-reka"), encoding="utf-8")
+    assert errors_matching(validate.run(), r"README.md: brak agenta `jarvo-reka`")
+
+
+def test_docs_broken_link_and_anchor(repo_copy):
+    (repo_copy / "docs/NOWY.md").write_text("[a](PLAN.md#nie-ma-takiej) [b](BRAK.md) [c](PLAN.md#6-roadmapa)\n",
+                                            encoding="utf-8")
+    report = validate.run()
+    assert errors_matching(report, r"docs/NOWY.md: kotwica #nie-ma-takiej nie istnieje w PLAN.md")
+    assert errors_matching(report, r"docs/NOWY.md: link do nieistniejącego BRAK.md")
+    assert not errors_matching(report, r"6-roadmapa")

@@ -36,7 +36,7 @@ Praca z repo:
 
 ```bash
 make dev-deps        # zależności testów i walidacji (pytest, pyyaml z requirements-dev.txt)
-make validate        # walidacja repo: fleet ↔ profile, skille, evals, sekrety
+make validate        # walidacja repo: fleet ↔ profile, skille, evals, sekrety, dokumentacja ↔ kod
 make test            # testy (pytest): walidator, patrol, raporty, build, skrypty agentów
 make models          # czy modele z fleet.yaml istnieją u wybranego dostawcy (openai-codex: brak listy, pomija)
 ```
