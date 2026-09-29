@@ -29,3 +29,9 @@ deny:
   - "*head *.env*"
   - "*tail *.env*"
   - "*base64 *.env*"
+  # logowanie na konta i hasła z czatu: tylko przez sejf Hermesa (browser_vault) po decyzji człowieka,
+  # nigdy przez CLI przeglądarki z hasłem w komendzie (red team: Wideograf zapisał hasło z czatu przez agent-browser)
+  - "*agent-browser*auth *"
+  - "*--password*"
+  - "*password-stdin*"
+  - "*accounts.google.com*"
