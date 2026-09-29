@@ -30,6 +30,15 @@ def test_dead_beat_detected(tmp_path):
 
 
 @needs_ff
+def test_puls_flags_slow_stretches(tmp_path):
+    still = _film(tmp_path / "s.mp4", "color=c=red", 8)
+    r = krytyka.puls(still, 3.0, 1.5)
+    assert not r["ok"] and r["wolne"] and r["wolne_s"] >= 6
+    moving = _film(tmp_path / "m.mp4", "testsrc2", 8)
+    assert krytyka.puls(moving, 3.0, 1.5)["ok"]
+
+
+@needs_ff
 def test_loop_seam(tmp_path):
     assert krytyka.petla(_film(tmp_path / "c.mp4", "color=c=blue"), None)["ok"]
     assert not krytyka.petla(_film(tmp_path / "t.mp4", "testsrc2"), None)["ok"]
