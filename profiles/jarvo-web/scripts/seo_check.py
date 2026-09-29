@@ -5,7 +5,7 @@
 
 Sekcje: head (title, description, canonical, lang, viewport, robots), icons (favicon, apple-touch,
 manifest), og (Open Graph/Twitter), jsonld (typy i poprawność składni), content (H1, nagłówki,
-obrazy bez alt/wymiarów), crawl (robots.txt, sitemap.xml, hreflang). Każda sekcja: errors/warnings/info.
+obrazy bez alt/wymiarów, linki wewnętrzne, czyste adresy), crawl (robots.txt, sitemap.xml, llms.txt, hreflang). Każda sekcja: errors/warnings/info.
 Kod wyjścia 1, gdy są błędy.
 """
 
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -29,6 +30,7 @@ class PageParser(HTMLParser):
         self.links: list[dict] = []
         self.scripts_ld: list[str] = []
         self.imgs: list[dict] = []
+        self.anchors: list[str] = []
         self.headings: list[tuple[str, str]] = []
         self.html_attrs: dict = {}
         self.title = ""
@@ -52,6 +54,8 @@ class PageParser(HTMLParser):
             self._in_ld, self._ld_buf = True, []
         elif tag == "img":
             self.imgs.append(a)
+        elif tag == "a" and a.get("href"):
+            self.anchors.append(a["href"])
         elif tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
             self._heading, self._heading_buf = tag, []
 
@@ -170,11 +174,30 @@ def check(html: str, url: str | None) -> dict:
     if no_dims:
         r["content"]["warnings"].append(f"{len(no_dims)} obrazów bez width/height (CLS), np. {no_dims[:3]}")
 
+    # linki wewnętrzne i czyste adresy (slugi): małe litery, myślniki, bez spacji, _ i identyfikatorów w parametrach
+    host = urllib.parse.urlsplit(url).netloc if url and url.startswith("http") else ""
+    wewn = []
+    for href in p.anchors:
+        sp = urllib.parse.urlsplit(href)
+        if sp.scheme in ("mailto", "tel", "javascript") or href.startswith("#"):
+            continue
+        if not sp.netloc or sp.netloc == host:
+            wewn.append(sp)
+    if len(p.headings) > 2 and len(wewn) < 3:
+        r["content"]["warnings"].append(f"tylko {len(wewn)} linków wewnętrznych (zalecane ≥ 3 do powiązanych podstron)")
+    brudne = sorted({sp.path + ("?" + sp.query if sp.query else "") for sp in wewn
+                     if re.search(r"[A-Z_ ]|%20|\.(php|aspx?)$|/\d{4,}(/|$)", sp.path)
+                     or re.search(r"(^|&)(id|p|page_id|cat)=\d", sp.query)})
+    if brudne:
+        r["content"]["warnings"].append(f"nieczyste adresy ({len(brudne)}), np. {brudne[:3]}: małe litery, myślniki, słowa zamiast ID")
+
     if url and url.startswith("http"):
         origin = "{0.scheme}://{0.netloc}".format(urllib.parse.urlsplit(url))
         status, robots_txt = fetch(origin + "/robots.txt")
         if status != 200:
             r["crawl"]["warnings"].append(f"robots.txt: HTTP {status}")
+        elif re.search(r"(?im)^user-agent:\s*\*\s*(?:\n(?!user-agent).*)*?\n\s*disallow:\s*/\s*$", robots_txt):
+            r["crawl"]["errors"].append("robots.txt blokuje całą stronę (User-agent: * / Disallow: /)")
         elif "sitemap:" not in robots_txt.lower():
             r["crawl"]["info"].append("robots.txt bez wpisu Sitemap:")
         status, _ = fetch(origin + "/sitemap.xml")
@@ -182,6 +205,9 @@ def check(html: str, url: str | None) -> dict:
             status_idx, _ = fetch(origin + "/sitemap-index.xml")
             if status_idx != 200:
                 r["crawl"]["warnings"].append(f"brak sitemap.xml (HTTP {status})")
+        status, llms = fetch(origin + "/llms.txt")
+        if status != 200 or not llms.lstrip().startswith("#"):
+            r["crawl"]["info"].append("brak /llms.txt (mapa strony dla wyszukiwarek AI: ChatGPT, Perplexity, Claude)")
     hreflang = [l for l in p.links if l.get("rel", "").lower() == "alternate" and l.get("hreflang")]
     if hreflang:
         r["crawl"]["info"].append(f"hreflang: {[l['hreflang'] for l in hreflang]}")

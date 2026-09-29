@@ -40,5 +40,8 @@ metadata:
 - [ ] Lighthouse mobile ≥ 90 × 4 kategorie,
 - [ ] zrzuty 375/768/1440 bez poziomego przewijania,
 - [ ] komplet head (favicony, manifest, OG, JSON-LD, canonical, lang),
+- [ ] widoczność: `robots.txt` (bez `Disallow: /`), `sitemap.xml`, `llms.txt`, czyste adresy, ≥ 3 linki wewnętrzne
+  (`seo_check.py` bez błędów; lista: skill `audyt-strony`, `widocznosc.md`),
+- [ ] bezpieczeństwo: `security_check.py url` bez KRYTYCZNYCH i WYSOKICH; aplikacja z backendem: skill `bezpieczenstwo-aplikacji`,
 - [ ] zgodność z brand kitem, tekst roboczy oznaczony `[SZKIC]`,
 - [ ] `bramka-jakosci`: ostatnia runda ≥ 90 (`out/jakosc/werdykt-runda-N.json`), testy wrogie bez porażek albo opisane.

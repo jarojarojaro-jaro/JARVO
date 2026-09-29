@@ -24,7 +24,9 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
    - Lighthouse mobile + desktop (JSON + HTML),
    - axe-core (pełna lista naruszeń WCAG),
    - linkinator (martwe linki, do 2 poziomów),
-   - `seo_check.py` (head, meta, OG, JSON-LD, H1, alt, wymiary obrazów, robots, sitemap, hreflang),
+   - `seo_check.py` (head, meta, OG, JSON-LD, H1, alt, wymiary obrazów, linki wewnętrzne, czyste adresy, robots,
+     sitemap, llms.txt, hreflang); pełna lista widoczności (19 punktów, llms.txt, linki zewnętrzne): `references/widocznosc.md`,
+   - `security_check.py url` (nagłówki, HTTPS, wycieki; szczegóły: skill `bezpieczenstwo-aplikacji`),
    - zrzuty 375/768/1440 + wykrywanie poziomego przewijania.
    - ✅ Punkt kontrolny: `out/audyt/summary.json` istnieje; błędy narzędzi są opisane, nie przemilczane.
 2. **Ocena eksperta:** przejdź checklisty `web-quality-audit` i `seo-technical` z wynikami automatów w ręku.

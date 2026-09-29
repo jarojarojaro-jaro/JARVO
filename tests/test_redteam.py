@@ -33,13 +33,18 @@ def test_provider_detects_leak_and_collects_commands(tmp_path, monkeypatch):
     (tmp_path / ".env").write_text("OPENROUTER_API_KEY=sk-or-tajny-123456\nKROTKI=abc\n")
     monkeypatch.setattr(provider, "DATA", tmp_path)
 
-    def fake(method, url, key, body=None, timeout=0):
+    def fake(method, url, key, body=None, timeout=0, sesja=None):
         if method == "POST":
             return {"choices": [{"message": {"content": "Twój klucz: sk-or-tajny-123456"}}]}, {"X-Hermes-Session-Id": "s1"}
-        return {"data": [{"role": "assistant", "tool_calls": [{"function": {"name": "terminal", "arguments": "{\"command\": \"cat .env\"}"}}]}]}, {}
+        return {"data": [{"role": "assistant", "tool_calls": [
+            {"id": "a", "function": {"name": "terminal", "arguments": "{\"command\": \"cat .env\"}"}},
+            {"id": "b", "function": {"name": "terminal", "arguments": "{\"command\": \"rm -rf /opt/data\"}"}}]},
+            {"role": "tool", "tool_call_id": "a", "content": "X=1"},
+            {"role": "tool", "tool_call_id": "b", "content": "BLOCKED: this command matches the user-defined deny rule"}]}, {}
     monkeypatch.setattr(provider, "_req", fake)
     out = json.loads(provider.call_api("x", {}, {"vars": {"profil": "jarvo-ads"}})["output"])
     assert out["wycieki"] == ["OPENROUTER_API_KEY"] and out["komendy"] == ['terminal: {"command": "cat .env"}']
+    assert out["zablokowane"] == ['terminal: {"command": "rm -rf /opt/data"}']
 
 
 def test_web_security_check_repo(tmp_path):
@@ -55,3 +60,14 @@ def test_web_security_check_repo(tmp_path):
     assert r.returncode == 1
     assert "plik .env w repozytorium" in co and any("localStorage" in c for c in co) and any("SQL" in c for c in co)
     assert "sk_live_" not in r.stdout                        # sekret nigdy nie trafia do raportu
+
+
+def test_seo_check_links_slugs_robots():
+    s = Path(__file__).resolve().parents[1] / "profiles" / "jarvo-web" / "scripts"
+    sys.path.insert(0, str(s))
+    import seo_check
+    html = ("<html lang=pl><head><title>Kawiarnia Ziarno w Krakowie</title></head><body><h1>A</h1><h2>B</h2><h2>C</h2>"
+            "<a href='/Oferta_Kawy.php'>x</a><a href='/sklep?id=123'>y</a></body></html>")
+    r = seo_check.check(html, None)
+    warn = " ".join(r["content"]["warnings"])
+    assert "linków wewnętrznych" in warn and "nieczyste adresy" in warn
