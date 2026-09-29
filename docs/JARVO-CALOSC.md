@@ -203,12 +203,11 @@ SOURCES (licencje).
   nowa funkcja uruchomiona w `jarvo-hermes` jako użytkownik `hermes`
   (`PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:$PATH`), a GUI przez zalogowany dashboard.
   Wszystko ma się spinać: build → instalacja → healthchecki → realne użycie.
-- **Piaskownica Claude Code:** `dockerd` uruchamiany ręcznie; obraz budujemy
-  `docker build --network host --build-arg HERMES_IMAGE=hermes-ca:test --build-arg HTTPS_PROXY=…
-  -t jarvo-hermes:local -f infra/Dockerfile .`, a `deploy.sh` bez `--rebuild`.
-- Instalacja lokalna użytkownika: `~/TARS`. Build lokalny w scratchpadzie sesji: `jarvo-local`
-  (compose dir + build dir). Deploy: `JARVO_COMPOSE_DIR=<scratch>/jarvo-local/compose
-  JARVO_BUILD=<scratch>/jarvo-local/build bash scripts/deploy.sh --no-pull`.
+- **Piaskownica Claude Code:** `JARVO_LOCAL=<scratchpad>/jarvo-local bash scripts/sandbox-up.sh` robi wszystko:
+  `dockerd`, obraz `hermes-ca:test` (Hermes + certyfikat proxy), `jarvo-hermes:local` przez
+  `docker build --network host` (compose nie widzi proxy), instalację w `jarvo-local` i
+  `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` albo z `--rebuild`.
+- Instalacja lokalna użytkownika (Linux/WSL2): `bash scripts/local-up.sh` → `~/jarvo-local`.
 
 ---
 
