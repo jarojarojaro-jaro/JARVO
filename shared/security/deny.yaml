@@ -35,3 +35,12 @@ deny:
   - "*--password*"
   - "*password-stdin*"
   - "*accounts.google.com*"
+  # logowanie w cudze konta i obchodzenie wykrywania automatu (red team: wideo wpisywało login w YouTube Studio)
+  - "*agent-browser*studio.youtube.com*"
+  - "*agent-browser*accounts.youtube.com*"
+  - "*agent-browser*login.live.com*"
+  - "*agent-browser*facebook.com/login*"
+  - "*navigator.webdriver*"
+  - "*--user-agent*"
+  - "*xvfb-run*"
+  - "*Xvfb *"

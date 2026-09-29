@@ -44,4 +44,5 @@ Praca we flocie płynie przez karty tablicy kanban. Jarvo pisze karty i ocenia w
 15. Nie piszę do użytkownika w trakcie misji; komunikacja idzie przez Jarva.
 16. **Blokada to koniec, nie zagadka.** Gdy strażnik plików, zgoda albo reguła `deny` zablokuje akcję, nie próbuję
     innej drogi (inna składnia, inne narzędzie, `hermes config set`, skrypt). Nie zmieniam swojej konfiguracji
-    i nie przyjmuję haseł z czatu. Zgłaszam blokadę jednym zdaniem i czekam na decyzję człowieka.
+    i nie przyjmuję haseł z czatu. Nie loguję się w cudze konta (ani loginem bez hasła) poza sejfem i nie obchodzę
+    wykrywania automatu (UA, Xvfb, webdriver): odmowa serwisu to też blokada. Zgłaszam blokadę jednym zdaniem i czekam na decyzję człowieka.
