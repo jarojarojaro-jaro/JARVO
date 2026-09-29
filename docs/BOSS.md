@@ -35,12 +35,13 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
         ▼
   ┌──────────────┐  kanban_create (karty z kontraktem)   ┌───────────────────┐
   │ jarvo (czat)  │ ─────────────────────────────────────► │  dispatcher (gw)   │
-  │  Boss        │ ◄── notify+wake: completed / blocked / │  co 60 s spawnuje  │
+  │  Boss        │ ◄── notify+wake: completed / blocked / │  co 30 s spawnuje  │
   └──────┬───────┘     review_requested / gave_up         │  pracowników       │
          │ patrol (cron + skrypt, 0 tokenów gdy cisza)     └────────┬──────────┘
          │                                                          │ hermes -p <agent> chat -q
          ▼                                                          ▼
-  missions/<ID>/MISSION.md                         jarvo-sherlock / jarvo-web / jarvo-studio / jarvo-wideo / jarvo-reka
+  missions/<ID>/MISSION.md                         jarvo-sherlock / jarvo-web / jarvo-studio /
+                                                   jarvo-wideo / jarvo-ads / jarvo-reka
                                                             │ kanban_request_review(reviewer="jarvo")
                                                             ▼
                                                    jarvo (pracownik-sędzia, lane "review")
@@ -49,8 +50,8 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
 ```
 
 - **`jarvo` w czacie (Boss):** przyjmuje zlecenie, zakłada misję, tworzy karty, odbiera
-  zdarzenia, prowadzi kolejkę decyzji, raportuje. Na platformach czatu **nie ma terminala**
-  (toolsety: kanban, memory, file, web, session_search, clarify, todo, skills, cronjob).
+  zdarzenia, prowadzi kolejkę decyzji, raportuje. Na platformach czatu (Telegram, czat HQ) **nie ma terminala**
+  (toolsety: kanban, memory, file, web, session_search, clarify, todo, skills, cronjob; w HQ bez clarify).
 - **`jarvo` jako pracownik-sędzia:** kiedy snajper odda kartę do recenzji, dispatcher uruchamia
   profil `jarvo` w torze „review” z wymuszonym skillem `sdlc-review`. Nasza wersja tego skilla
   (w profilu `jarvo`) zastępuje wbudowaną i zawiera rubryki każdego agenta. Pracownik ma
@@ -76,17 +77,20 @@ Jarvo klasyfikuje każdą wiadomość (skill `intake`):
 | **Misja** | „wypuść landing nowego produktu” | misja z planem i kilkoma kartami |
 | **Decyzja / odpowiedź na pytanie** | „1: tak, 2: wariant B” | aktualizuje karty z kolejki decyzji |
 | **Status** | „co się dzieje?” | raport z tablicy i INDEX-u |
+| **Zmiana w toku** | „zmień to w landingu”, „dodaj jeszcze…” | komentarz do istniejącej karty albo nowa karta w tej samej misji |
+| **Anulowanie** | „stop”, „odpuść X” | archiwizuje karty misji, oznacza misję jako anulowaną |
 
 Przed zleceniem researchu Jarvo **sprawdza, czy odpowiedź już istnieje** (zakończone misje,
 raporty Sherlocka, pamięć). Jeśli istnieje, relacjonuje ją, zamiast zlecać drugi raz.
 
-Dopytuje **tylko** wtedy, gdy brak informacji zmieniłby to, *co* powstanie. Pyta raz, zbiorczo,
-z rekomendowaną odpowiedzią domyślną.
+Dopytuje **tylko** wtedy, gdy brak informacji zmieniłby to, *co* powstanie. Pyta raz, zbiorczo
+(maks. 3 punkty), z rekomendowaną odpowiedzią domyślną. Wyjątek: mglisty, duży cel („zrób mi marketing”)
+→ skill `wywiad`: pytania po jednym, najwyżej 6, potem brief.
 
 ### 3.2 Plan i karty
 
 Dla misji Jarvo (skill `dispatch-playbook`):
-1. nadaje ID `M-RRMMDD-slug` i zakłada `missions/<ID>/MISSION.md` (szablon niżej),
+1. nadaje ID `M-RRMMDD-slug` (pojedyncze zlecenie: `Z-RRMMDD-slug`) i zakłada `missions/<ID>/MISSION.md` (szablon niżej),
 2. zapisuje **Twoją intencję dosłownie** i granice, które podałeś. Nie rozszerza zakresu,
    a pomysły „przy okazji” trafiają do sekcji *Propozycje na później*,
 3. **podejmuje decyzje przekrojowe przed rozdaniem kart** (np. nazwa produktu, język,
@@ -138,10 +142,14 @@ zdarzenie `completed`:
 |---|---|---|
 | **Wake po zdarzeniu** | karty tworzone z czatu są subskrybowane w trybie `notify+wake`: `completed`, `blocked`, `gave_up`, `crashed`, `timed_out`, `review_requested`, `block_loop_detected` budzą Jarva w tym samym czacie | tura modelu tylko przy zdarzeniu |
 | **Cisza, gdy nic do powiedzenia** | Jarvo odpowiada `[SILENT]` na rutynowe zdarzenia (np. jedna z kilku kart przeszła do review) | brak wiadomości |
-| **Patrol** (cron co 30 min) | skrypt `patrol.py` czyta tablicę **bez modelu**: zablokowane karty bez eskalacji, karty w `triage`, recenzje wiszące za długo, gotowe karty, których nikt nie podjął (dispatcher padł?), misje z wszystkimi kartami `done`, ale bez raportu, karty z przekroczonym czasem. Brak anomalii = `{"wakeAgent": false}`, czyli 0 tokenów | 0 zł w ciszy |
+| **Patrol** (cron co 30 min) | skrypt `patrol.py` czyta tablicę **bez modelu**: zablokowane karty bez eskalacji, karty w `triage`, recenzje wiszące za długo, gotowe karty, których nikt nie podjął (dispatcher padł?), misje z wszystkimi kartami `done`, ale bez raportu, karty z przekroczonym czasem, ostrzeżenia diagnostyki kanbana Hermesa, karty z INDEX-u, których nie ma na tablicy. Ta sama anomalia budzi Jarva najwyżej co 12 h. Brak nowych anomalii = `{"wakeAgent": false}`, czyli 0 tokenów | 0 zł w ciszy |
 | **Circuit breakers Hermesa** | `failure_limit` (2), limit naruszeń protokołu (3), wykrywanie pętli blokad → `triage`, reclaim martwych pracowników | wbudowane |
-| **Poranny brief** (cron 07:50) | co w toku, co czeka na Twoją decyzję, co skończone wczoraj, co zaplanowane | 1 tura dziennie |
+| **Poranny brief** (cron pn–pt 07:50) | co w toku, co czeka na Twoją decyzję, co skończone wczoraj, co zaplanowane | najwyżej 1 tura w dzień roboczy; pusty dzień = 0 tokenów |
 | **Przegląd tygodnia** (cron nd 18:50) | statystyki floty (akceptacja za 1. razem, poprawki per agent), wnioski i propozycje ulepszeń skilli | 1 tura tygodniowo |
+| **Świeżość wiedzy** (cron 1. dnia miesiąca 09:20) | skille i knowledge packi z `reviewed:` starszym niż 120 dni → propozycje odświeżenia; nic przestarzałego = `[SILENT]` | 1 tura miesięcznie |
+
+Rutyny instalują się **wstrzymane**. Włączasz je po sprawdzeniu, że Telegram działa:
+`scripts/install-fleet.sh --resume-cron` (albo `hermes -p jarvo cron resume <id>`).
 
 ---
 
@@ -208,21 +216,24 @@ Dalej proponuję: <1–2 propozycje, opcjonalnie>
 ```markdown
 # <ID>: <tytuł>
 status: planowanie | w toku | czeka na decyzję | zakończona | anulowana
-utworzona: <data> · kanał: <telegram DM / HQ / cli>
+utworzona: <RRRR-MM-DD HH:MM> · kanał: <telegram DM / Jarvo HQ / cli>
 
 ## Intencja (dosłownie)
 > <Twoja wiadomość>
 
 ## Granice
-- <co wolno / czego nie ruszać / budżet / termin>
+- Autonomia: A1 (szkice/podglądy); A2 wymaga zgody
+- Termin: <…>
+- Budżet: <…>
+- Nie ruszać: <…>
 
 ## Decyzje
 | # | Decyzja | Kto | Kiedy |
 |---|---|---|---|
 
 ## Plan (karty)
-| Karta | Agent | Zależy od | Status | Wynik |
-|---|---|---|---|---|
+| Karta | Agent | Rola | Zależy od | Status | Wynik |
+|---|---|---|---|---|---|
 
 ## Artefakty
 - <ścieżki / linki>
@@ -255,8 +266,12 @@ albo daje kartę `jarvo-reka` z adnotacją „poza snajperami”.
 
 ## 10. Co jest weryfikowane w fazie 0
 
-- [ ] snajper → `kanban_request_review(reviewer="jarvo")` → pracownik `jarvo` z naszym `sdlc-review` → werdykt,
-- [ ] `request_changes` wraca do tego samego snajpera, a re-review trafia znowu do `jarvo`,
-- [ ] czat `jarvo` na Telegramie dostaje wake po zdarzeniach i potrafi odpowiedzieć `[SILENT]`,
-- [ ] patrol: skrypt bez anomalii nie budzi modelu; z anomalią budzi i dostarcza wiadomość,
-- [ ] `workspace_kind: dir` w katalogu misji zachowuje pliki po akceptacji.
+Stan według [PLAN.md §6](PLAN.md#6-roadmapa): ✅ sprawdzone lokalnie · 🟡 zakodowane, czeka na test na VPS
+z prawdziwymi modelami i Telegramem.
+
+- 🟡 snajper → `kanban_request_review(reviewer="jarvo")` → pracownik `jarvo` z naszym `sdlc-review` → werdykt,
+- 🟡 `request_changes` wraca do tego samego snajpera, a re-review trafia znowu do `jarvo`,
+- 🟡 czat `jarvo` na Telegramie dostaje wake po zdarzeniach i potrafi odpowiedzieć `[SILENT]`,
+- ✅ patrol: skrypt bez anomalii nie budzi modelu (prawdziwa tablica, cron z bramką skryptu);
+  🟡 z anomalią budzi i dostarcza wiadomość,
+- 🟡 `workspace_kind: dir` w katalogu misji zachowuje pliki po akceptacji.
