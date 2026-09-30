@@ -1,0 +1,14 @@
+{
+  "name": "jarvo-wiedza",
+  "label": "Wiedza",
+  "description": "Skarbiec wiedzy floty Jarvo: graf notatek, drzewo, szukanie, orzeczenia, skrzynka szkiców, lint i dziennik.",
+  "icon": "BookOpen",
+  "version": "0.1.0",
+  "tab": {
+    "path": "/wiedza",
+    "position": "before:chat"
+  },
+  "entry": "dist/index.js",
+  "css": "dist/style.css",
+  "api": "plugin_api.py"
+}

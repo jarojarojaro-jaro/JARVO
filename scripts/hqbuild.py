@@ -24,10 +24,12 @@ HQ = fl.REPO_ROOT / "hq"
 PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "edytor.py")
 
 
-def bundle_js() -> str:
+def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.") -> str:
+    """Jedno IIFE z htm i plikami src/*.js (w kolejności nazw); ten sam pakowacz służy zakładce „Wiedza” (wiedza/web/src)."""
+    src_dir = src_dir or HQ / "web" / "src"
     htm = (HQ / "web" / "vendor" / "htm.umd.js").read_text(encoding="utf-8").strip()
     parts = [
-        "/* Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/. */",
+        f"/* {naglowek} */",
         "/* htm 3.1.1 (c) Jason Miller, Apache-2.0: https://github.com/developit/htm */",
         "(function () {",
         "var htm = (function () { var module = { exports: {} }; var exports = module.exports;",
@@ -35,7 +37,7 @@ def bundle_js() -> str:
         "return module.exports; })();",
         '"use strict";',
     ]
-    for src in sorted((HQ / "web" / "src").glob("*.js")):
+    for src in sorted(src_dir.glob("*.js")):
         parts.append(f"\n// ---- {src.name}\n" + src.read_text(encoding="utf-8"))
     parts.append("})();")
     return "\n".join(parts) + "\n"

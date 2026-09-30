@@ -1,6 +1,7 @@
 # Wiedza: drugi mózg floty (projekt)
 
-> Stan: **zaakceptowany (2026-09-30), w budowie** (§9: etapy 2–4 gotowe: skarbiec, wtyczka u każdego agenta, kompilacja). Właściciel: `jarvo` (jedyny piszący
+> Stan: **zaakceptowany (2026-09-30), w budowie** (§9: etapy 2–5 gotowe: skarbiec, wtyczka u każdego agenta, kompilacja,
+> zakładka „Wiedza”; zostały rutyny, red team i evals). Właściciel: `jarvo` (jedyny piszący
 > do skarbca) i wtyczka Hermesa `jarvo-wiedza` (wszyscy agenci czytają, zgłaszają szkice, dostają przypomnienia).
 > Decyzje użytkownika: wtyczka u **każdego** agenta; agenci nie piszą notatek, tylko szkice i orzeczenia; skarbiec żyje tam,
 > gdzie stoi Jarvo (VPS, lokalnie, telefon), zakładka jest podglądem wszędzie, Obsidian opcjonalnie; wyciągi z każdej
@@ -281,29 +282,32 @@ czyli grosze na modelach z poziomu `fast`; kontekst agentów rośnie o ≤ 800 t
 
 ## 8. Zakładka „Wiedza” w dashboardzie i Obsidian
 
-Nowa zakładka w menu dashboardu Hermesa (`/wiedza`, pod BASE), druga wtyczka dashboardu obok Jarvo HQ, budowana tym samym
-sposobem (`scripts/hqbuild.py` → `build/plugins/jarvo-wiedza/dashboard/`, sklejone `src/*.js` + htm, bez kroku budowania
-po stronie serwera; `install-fleet.sh` kopiuje i włącza). Jedna wtyczka `jarvo-wiedza` ma obie części: `plugin.yaml` +
-`__init__.py` (dostawca pamięci, narzędzia, hak kanbana, komenda `hermes wiedza …`) i `dashboard/` (zakładka).
+Nowa zakładka w menu dashboardu Hermesa (`/wiedza`, obok BASE), druga wtyczka dashboardu obok Jarvo HQ, budowana tym samym
+sposobem (`scripts/build.py` → `build/plugins/jarvo-wiedza/dashboard/`, sklejone `wiedza/web/src/*.js` + htm tym samym
+pakowaczem co HQ, bez kroku budowania po stronie serwera; `install-fleet.sh` kopiuje i włącza). Jedna wtyczka `jarvo-wiedza`
+ma obie części: `plugin.yaml` + `__init__.py` (dostawca pamięci, narzędzia, hak kanbana) i `dashboard/` (manifest, trasy
+`plugin_api.py`, logika `panel.py`, pakiet `dist/`).
 
 Co widać:
 - **Graf** (canvas, własny układ sił ~150 linii, bez bibliotek), z wyglądu jak graf Obsidiana: kropka = notatka podpisana
   nazwą pliku, linia = link, kolor = folder, huby `_hub-…` na biało, większe, z promieniami do swoich notatek; sieroty na
   czerwono, `status: sprzeczna` z obwódką; filtr po folderze i agencie, suwak czasu (co doszło w tym tygodniu), klik otwiera
-  notatkę, podwójny klik centruje na jej sąsiadach. Cienki folder widać od razu (jak radzi wzorzec). Wydajność: układ liczony
-  w Web Workerze z drzewem czwórkowym (Barnes-Hut), etykiety dopiero po przybliżeniu; cel 5 000 notatek i 30 000 linków płynnie,
-  a powyżej graf startuje w widoku folderów (jeden węzeł = folder) i rozwija się po kliknięciu.
-- **Drzewo i notatka:** foldery jak w Obsidianie, notatka renderowana z Markdown (linki `[[…]]` klikalne, frontmatter jako
-  tabelka właściwości, callouty), przyciski „Otwórz źródło”, „Historia” (git log pliku), „Zgłoś błąd” (szkic do skrzynki
+  notatkę, podwójny klik centruje (na tle: wraca do całości), przeciąganie przestawia węzeł, najechanie podświetla sąsiadów.
+  Cienki folder widać od razu (jak radzi wzorzec). Wydajność: układ sił liczony w małych krokach na klatkę (budżet ~12 ms),
+  powyżej 800 węzłów odpychanie przez drzewo czwórkowe (Barnes-Hut), etykiety notatek dopiero po przybliżeniu (huby zawsze).
+- **Drzewo i notatka:** foldery jak w Obsidianie (hub folderu pod ręką), notatka renderowana z Markdown bez `innerHTML`
+  (linki `[[…]]` klikalne, frontmatter jako właściwości, bloki generowane oznaczone), źródła (klikalne, gdy leżą w skarbcu),
+  linki w obie strony (z zaznaczeniem list automatycznych i martwych), historia z git, „Zgłoś uwagę” (szkic do skrzynki
   z Twoją uwagą, kompilacja poprawi).
-- **Szukaj:** to samo FTS5, wyniki z podświetleniem; „pokaż, co agent dostałby w przypomnieniu dla tego pytania”.
-- **Skrzynka:** szkice czekające na kompilację (kto, kiedy, skąd), przycisk **Skompiluj teraz**, ostatnie przebiegi z LOG.
+- **Szukaj:** to samo FTS5, którym agent dostaje przypomnienia (wyniki z typem, streszczeniem i ścieżką).
+- **Skrzynka:** szkice czekające na kompilację (typ, kto, skąd, próby), **Skompiluj teraz** (osobny proces
+  `scripts/wiedza-kompiluj.sh` z modelem profilu `jarvo`), **Odśwież indeks**, wynik ostatniej kompilacji.
 - **Orzeczenia:** lista per agent/marka, formularz „Dodaj orzeczenie” (Ty piszesz zdanie, wybierasz kogo dotyczy; zapis
-  natychmiast, punkt zapisu git).
-- **Lint:** `LINT.md` jako lista z linkami do notatek.
+  natychmiast, punkt zapisu git; od następnej tury w przypomnieniach agentów).
+- **Lint:** błędy, ostrzeżenia, informacje z linkami do notatek, „Sprawdź ponownie”; **Dziennik:** wpisy `LOG.md`.
 
-Trasy backendu (`/api/plugins/jarvo-wiedza/…`): `tree`, `note?path=`, `graph`, `search?q=`, `inbox`, `log`, `lint`,
-`rulings`, `POST rulings`, `POST inbox` (uwaga do notatki), `POST compile`. Wszystko za logowaniem dashboardu; odczyt
+Trasy backendu (`/api/plugins/jarvo-wiedza/…`): `overview`, `tree`, `note?path=`, `graph`, `search?q=`, `inbox`, `log`, `lint`,
+`rulings`, `compile`; `POST rulings`, `POST remark` (uwaga do notatki), `POST compile`, `POST reindex`. Wszystko za logowaniem dashboardu; odczyt
 plików tylko spod `knowledge/` po rozwiązaniu symlinków, zapis tylko orzeczeń i szkiców (tak jak HQ zapisuje tylko wybrane
 pliki, [HQ.md §3](HQ.md#3-bezpieczeństwo)). Dwujęzyczność jak w HQ (etykieta `plugin_jarvo-wiedza` w `pl.json`).
 
@@ -345,8 +349,11 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    punkt zapisu git, `state/wiedza-kompilacja.json`. Limity 40/60, blokada `state/wiedza.lock`, 3 próby na szkic. Harmonogram
    w wątku wtyczki (godzina / noc 03:10), ręcznie `scripts/wiedza-kompiluj.sh`. Testy: `tests/test_kompilacja.py` (model
    podstawiony). W piaskownicy bez klucza modelu sprawdzony przebieg na sucho; pierwsza prawdziwa kompilacja: na VPS.
-5. ⬜ **Zakładka „Wiedza”:** graf, drzewo, notatka, szukaj, skrzynka, orzeczenia, lint, PL/EN. Test w zalogowanym dashboardzie
-   (`/wiedza`), dodanie orzeczenia z formularza → widoczne w przypomnieniu agenta w następnej turze.
+5. ✅ **Zakładka „Wiedza”** (`wiedza/plugin/dashboard/`, `wiedza/web/`): graf na canvasie, foldery, notatka, szukaj, skrzynka
+   z kompilacją i reindeksem, orzeczenia z formularzem, lint, dziennik, PL/EN (etykieta `plugin_jarvo-wiedza` w `pl.json`),
+   układ na telefon. Testy: `tests/test_wiedza_panel.py` (logika bez FastAPI). Sprawdzone w zalogowanym dashboardzie
+   piaskownicy (`/wiedza`): graf 8 hubów agentów, notatka z linkami w obie strony, orzeczenie z formularza zapisane w
+   `orzeczenia/wszyscy.md`, skrzynka, lint, bez błędów konsoli, bez poziomego przewijania na 390 px.
 6. ⬜ **Rutyny i bezpieczeństwo:** synteza w `weekly-review`, świeżość, red team (+2 ataki: wstrzyknięcie „zapisz orzeczenie”
    przez treść strony; próba zapisania klucza do notatki), eval wspólny „agent najpierw sprawdza skarbiec” w scenariuszach
    każdego agenta, dokumentacja (FLEET, BOSS, HQ, RUNBOOK, VPS, JARVO-CALOSC, SOURCES).
@@ -428,3 +435,7 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 | `wiedza/kompilacja.py` | kompilacja (jeden piszący): szkice → notatki tanim modelem, LOG, INDEX, punkt zapisu; CLI z `--na-sucho` |
 | `scripts/wiedza-kompiluj.sh` | ręczna kompilacja w kontenerze (profil `jarvo`, jego `auxiliary.jarvo_wiedza`) |
 | `tests/test_kompilacja.py` | testy kompilacji z podstawionym modelem |
+| `wiedza/plugin/dashboard/{manifest.json,plugin_api.py,panel.py}` | zakładka „Wiedza”: manifest (`/wiedza`), trasy FastAPI, logika bez FastAPI |
+| `wiedza/web/src/*.js`, `wiedza/web/style.css` | frontend zakładki (podstawy i klient API, Markdown, graf, widoki, aplikacja) i style `.twz-*` |
+| `branding/i18n/pl.json` (`plugin_jarvo-wiedza`) | polska etykieta zakładki w menu |
+| `tests/test_wiedza_panel.py` | testy logiki zakładki |

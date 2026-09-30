@@ -1,6 +1,8 @@
 # Jarvo HQ: kwatera floty (GUI)
 
 Jarvo HQ to zakładka **BASE** w menu dashboardu Hermesa, nad CHAT (`http://<ip-tailscale>:9119/base`, logowanie jak do dashboardu).
+Obok niej jest zakładka **WIEDZA** (`/wiedza`): skarbiec wiedzy floty z grafem notatek, orzeczeniami i skrzynką szkiców
+(osobna wtyczka `jarvo-wiedza`, opis w [WIEDZA.md §8](WIEDZA.md#8-zakładka-wiedza-w-dashboardzie-i-obsidian)).
 Pokazuje flotę jako budynek z klocków. Na górze jest mostek Jarva, pod nim piętra z pokojami snajperów (po dwa na piętro). Każdy
 agent ma swój pokój, swoją minifigurkę i dymek z tym, co robi w tej chwili. Kliknięcie pokoju otwiera panel
 z podglądem pracy na żywo, kartami, wynikami i czatem. Na dole jest rozmowa: domyślnie z Jarvem, jednym
@@ -236,7 +238,7 @@ Agenci rozmawiają po polsku niezależnie od języka panelu (SOUL).
 
 | Objaw | Przyczyna i naprawa |
 |---|---|
-| brak zakładki BASE w menu | plugin nie jest włączony albo dashboard nie wstał po instalacji: `docker exec -u hermes jarvo-hermes /command/s6-svc -r /run/service/dashboard` |
+| brak zakładki BASE albo WIEDZA w menu | plugin nie jest włączony albo dashboard nie wstał po instalacji: `docker exec -u hermes jarvo-hermes /command/s6-svc -r /run/service/dashboard` |
 | czat: „Profil … nie ma API_SERVER_KEY” | uruchom deploy ponownie (instalator generuje klucze) |
 | czat: „Gateway odrzucił klucz” | klucz w `.env` profilu zmieniony bez restartu gatewaya: `hermes gateway restart` |
 | czat: „No LLM provider configured” | profil nie ma `OPENROUTER_API_KEY` w `/srv/jarvo/secrets/<agent>.env` |

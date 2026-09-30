@@ -110,6 +110,7 @@ if [[ -d "$BUILD/plugins/jarvo-hq" ]]; then
   rm -rf "$DATA/plugins/jarvo-hq" && mv "$DATA/plugins/jarvo-hq.new" "$DATA/plugins/jarvo-hq"
   # pluginy użytkownika muszą być jawnie włączone (zabezpieczenie Hermesa)
   hermes plugins enable jarvo-hq >/dev/null 2>&1 || $PY "$REPO/scripts/enable_plugin.py" "$DATA/config.yaml" jarvo-hq
+  HQ_CHANGED=1
 fi
 
 # 3c'. skarbiec wiedzy: wtyczka jarvo-wiedza (docs/WIEDZA.md). Dostawca pamięci każdego profilu (memory.provider w config.yaml
@@ -123,7 +124,9 @@ if [[ -d "$BUILD/plugins/jarvo-wiedza" ]]; then
     mkdir -p "$DATA/profiles/$a/plugins"
     ln -sfn "$DATA/plugins/jarvo-wiedza" "$DATA/profiles/$a/plugins/jarvo-wiedza"
   done
-  HQ_CHANGED=1
+  # zakładka „Wiedza” w dashboardzie (dashboard/manifest.json): wtyczka włączona w config hosta jak Jarvo HQ
+  hermes plugins enable jarvo-wiedza >/dev/null 2>&1 || $PY "$REPO/scripts/enable_plugin.py" "$DATA/config.yaml" jarvo-wiedza
+  HQ_CHANGED=1                      # restart dashboardu na końcu (montuje backendy wtyczek przy starcie)
 fi
 
 # 3d. branding terminala: skórka "jarvo" dla hosta i każdego profilu (display.skin w config.yaml)

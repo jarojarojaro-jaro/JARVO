@@ -175,3 +175,27 @@ def test_full_orchestrator_build_with_cron(tmp_path, monkeypatch):
     assert all(j.get("deliver") == "telegram:111111111" for j in jobs)
     manifest = json.loads((tmp_path / "out/BUILD.json").read_text(encoding="utf-8"))
     assert manifest["agents"][0]["cron_jobs"] == 4
+
+
+def test_wiedza_plugin_wiring(built, tmp_path):
+    """Skarbiec wiedzy (docs/WIEDZA.md): każdy profil ma dostawcę pamięci jarvo-wiedza, włączoną wtyczkę i tani model
+    zadania pomocniczego; wtyczka z obiema częściami (agent + dashboard) buduje się z repo."""
+    fleet, out = built
+    for agent in fleet.active():
+        cfg = fl.load_yaml(out / agent.name / "config.yaml")
+        assert cfg["memory"]["provider"] == "jarvo-wiedza", agent.name
+        assert "jarvo-wiedza" in cfg["plugins"]["enabled"], agent.name
+        assert cfg["auxiliary"]["jarvo_wiedza"]["model"] == fleet.model_for("fast"), agent.name
+    plugin = build.build_wiedza_plugin(tmp_path / "plugins" / "jarvo-wiedza")
+    for rel in ("plugin.yaml", "__init__.py", "wiedza.py", "kompilacja.py", "dashboard/manifest.json", "dashboard/plugin_api.py",
+                "dashboard/panel.py", "dashboard/dist/index.js", "dashboard/dist/style.css"):
+        assert (plugin / rel).exists(), rel
+    manifest = json.loads((plugin / "dashboard" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["name"] == "jarvo-wiedza" and manifest["tab"]["path"] == "/wiedza"
+    js = (plugin / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8")
+    assert js.count('window.__HERMES_PLUGINS__.register(PLUGIN, App)') == 1
+    assert not re.search(r"\.innerHTML\s*=|dangerouslySetInnerHTML", js)          # treść notatek renderowana elementami, nie HTML-em
+    dane = build.wiedza_fleet(fleet, out)
+    web = next(a for a in dane["agents"] if a["name"] == "jarvo-web")
+    assert web["short"] == "Web" and any(s["name"] == "bezpieczenstwo-aplikacji" and s["description"] for s in web["skills"])
+    assert "security_check.py" in web["scripts"]

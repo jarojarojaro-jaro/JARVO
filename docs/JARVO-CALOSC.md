@@ -147,6 +147,8 @@ Plugin dashboardu Hermesa (`hq/`): budynek z pokojami agentów (pixel art), mini
 Pokoje: bridge, study, devlab, atelier, filmstudio, workshop, office, radar. Sesje klikalne (Historia
 domyślnie). Czat obsługuje zdjęcia i pliki w obie strony. Linki „Odpal” (podgląd) i „Pokaż w folderze”.
 Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
+Obok BASE zakładka **Wiedza** (`/wiedza`, wtyczka `jarvo-wiedza`): graf skarbca wiedzy, foldery i notatki, szukanie, orzeczenia
+z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIEDZA.md)).
 
 ---
 
@@ -257,9 +259,9 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    zapisał login w pamięci (hasła tam nie było). Hasła i logowanie w cudze konta już blokują reguła 16
    kontraktu i `deny.yaml` (`agent-browser … auth`, `--password`, strony logowania: w red teamie hasło z czatu
    trafiło do `agent-browser`, a login do YouTube Studio). Brakuje jeszcze wprost zakazu zapisywania loginów w pamięci.
-3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (zaakceptowany 2026-09-30, etapy 2–4 z 7 gotowe:
-   skarbiec zasiewany przy wdrożeniu, `wiedza.py`, wtyczka `jarvo-wiedza` u każdego agenta, kompilacja `kompilacja.py`;
-   dalej zakładka „Wiedza” i rutyny):** jeden folder
+3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (zaakceptowany 2026-09-30, etapy 2–5 z 7 gotowe:
+   skarbiec zasiewany przy wdrożeniu, `wiedza.py`, wtyczka `jarvo-wiedza` u każdego agenta, kompilacja `kompilacja.py`,
+   zakładka „Wiedza” w dashboardzie; dalej rutyny, red team i evals):** jeden folder
    notatek Markdown z linkami (`knowledge/`), wzorzec LLM Wiki Karpathy'ego; wtyczka Hermesa `jarvo-wiedza` jako dostawca
    pamięci (przypomnienia przed turą, wyciąg po sesji i przed kompresją, 4 narzędzia), kompilacja tanim modelem (jeden
    piszący), orzeczenia z Twoich korekt, lint, punkty zapisu git, zakładka „Wiedza” z grafem w dashboardzie.

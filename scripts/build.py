@@ -286,6 +286,14 @@ def build_wiedza_plugin(out: Path) -> Path:
     shutil.copytree(fl.REPO_ROOT / "wiedza" / "plugin", out, ignore=COPY_IGNORE)
     shutil.copy2(fl.REPO_ROOT / "wiedza" / "wiedza.py", out / "wiedza.py")
     shutil.copy2(fl.REPO_ROOT / "wiedza" / "kompilacja.py", out / "kompilacja.py")
+    # zakładka „Wiedza” w dashboardzie: manifest + trasy + logika już skopiowane z wiedza/plugin/dashboard; tu pakiet JS i style
+    import hqbuild
+    dash = out / "dashboard"
+    (dash / "dist").mkdir(parents=True, exist_ok=True)
+    (dash / "dist" / "index.js").write_text(hqbuild.bundle_js(fl.REPO_ROOT / "wiedza" / "web" / "src",
+                                                             "Jarvo Wiedza: zakładka dashboardu Hermesa. Plik generowany przez scripts/build.py z wiedza/web/src/."), encoding="utf-8")
+    shutil.copy2(fl.REPO_ROOT / "wiedza" / "web" / "style.css", dash / "dist" / "style.css")
+    shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "vendor" / "LICENSE-htm", dash / "dist" / "LICENSE-htm")
     return out
 
 
