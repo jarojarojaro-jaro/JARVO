@@ -30,8 +30,8 @@ i Docker Engine; na macOS potrzebny jest działający Docker Desktop albo OrbSta
 automatyzacji: [docs/INSTALER.md](docs/INSTALER.md)):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash
-# Windows (PowerShell):  irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
+curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/HEAD/install.sh | bash
+# Windows (PowerShell):  irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/HEAD/install.ps1 | iex
 # bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
 # potem:      jarvo status | logs | chat | update | down | uninstall      (jarvo help: wszystkie)
 # z klonu:    bash bin/jarvo up   (stop: bash bin/jarvo down)

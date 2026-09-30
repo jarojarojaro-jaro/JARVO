@@ -91,7 +91,9 @@ R "sed -i 's#http://#https://#g' /etc/apt/sources.list.d/*.sources /etc/apt/sour
 
 log "1/6 install.sh jak z curl | bash (JARVO_SETUP_ONLY=1: pakiety, Docker Engine, grupa docker, repo, polecenie jarvo)"
 # JARVO_FORCE=1: dysk piaskownicy bywa pełny (kopia obrazu zajmuje 6 GB); sprawdzenie sprzętu testuje pytest
-U "cat /mnt/jarvo/install.sh | JARVO_SETUP_ONLY=1 JARVO_FORCE=1 JARVO_REPO=/mnt/jarvo JARVO_BRANCH='$BRANCH' bash"
+U "cat /mnt/jarvo/install.sh | JARVO_SETUP_ONLY=1 JARVO_FORCE=1 JARVO_REPO=/mnt/jarvo bash"
+cloned="$(U "git -C ~/jarvo rev-parse --abbrev-ref HEAD")"
+[[ $cloned == "$BRANCH" ]] || fail "Klon bez JARVO_BRANCH ma być na gałęzi głównej repo ($BRANCH), jest: $cloned"
 U "for t in git curl python3 openssl docker; do command -v \$t >/dev/null || exit 1; done; sudo docker info >/dev/null && test -x /usr/local/bin/jarvo && test -d ~/jarvo/.git" \
   || fail "Po install.sh brakuje narzędzi, Dockera, repo albo polecenia jarvo"
 U "getent group docker | grep -q tester" || fail "tester nie jest w grupie docker"
@@ -112,7 +114,7 @@ U "jarvo autostart on" && fail "autostart on bez systemd powinien się nie udać
 U "jarvo open | grep -q 9119 && jarvo pliki | grep -q jarvo-local/data" || fail "jarvo open/pliki"
 
 log "4/6 ponowne install.sh = aktualizacja (bez pytań, bez budowy)"
-U "cat /mnt/jarvo/install.sh | JARVO_YES=1 JARVO_NO_BUILD=1 JARVO_FORCE=1 JARVO_REPO=/mnt/jarvo JARVO_BRANCH='$BRANCH' bash" | tail -5
+U "cat /mnt/jarvo/install.sh | JARVO_YES=1 JARVO_NO_BUILD=1 JARVO_FORCE=1 JARVO_REPO=/mnt/jarvo bash" | tail -5
 status="$(U "jarvo status")"
 grep -q "jarvo-hermes.*Up" <<<"$status" || fail "Flota nie działa po aktualizacji"
 

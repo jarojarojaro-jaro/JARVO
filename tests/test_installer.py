@@ -89,14 +89,16 @@ def test_dry_run_fresh_ubuntu_installs_tools_and_docker(tmp_path):
     assert "System: linux" in out and "pakiety: apt" in out
     assert "apt-get install -y -q git curl python3 openssl ca-certificates" in out
     assert "get.docker.com" in out and "$ sudo env" in out and " sh /" in out
-    assert "git clone" in out and "bin/jarvo up" in out
+    assert "git clone -q --depth 50 https://github.com/jarojarojaro-jaro/JARVO.git" in out   # bez -b: gałąź główna repo
+    assert "bin/jarvo up" in out
     assert "Koniec próby na sucho" in out
     assert not (tmp_path / "home/jarvo").exists() and not (tmp_path / "home/jarvo-local").exists()
 
 
 def test_dry_run_fedora_and_arch(tmp_path):
-    fedora = _dry(tmp_path / "f", _os_release(tmp_path, "fedora"))
+    fedora = _dry(tmp_path / "f", _os_release(tmp_path, "fedora"), JARVO_BRANCH="wydanie-1")
     assert fedora.returncode == 0, fedora.stdout + fedora.stderr
+    assert "git clone -q --depth 50 -b wydanie-1 " in fedora.stdout
     # dnf, a gdy go nie ma na maszynie testowej: yum (ten sam wiersz poleceń)
     assert ("dnf install -y git curl python3 openssl" in fedora.stdout
             or "yum install -y git curl python3 openssl" in fedora.stdout) and "get.docker.com" in fedora.stdout

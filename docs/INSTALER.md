@@ -59,7 +59,8 @@ macOS    curl -fsSL https://jarvo.pl/install.sh | bash
 Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły użytkownik)
 ```
 
-(`jarvo.pl/install.sh` to przekierowanie na raw GitHub; do czasu domeny działa adres z `README.md`.)
+(`jarvo.pl/install.sh` to przekierowanie na raw GitHub; do czasu domeny działa adres z `README.md`:
+`…/JARVO/HEAD/install.sh`, czyli zawsze gałąź główna repo, bez wpisywania jej nazwy; instalator klonuje tę samą gałąź.)
 
 ### Linux (zrobione, §4a)
 1. Menedżer pakietów (`apt`, `dnf`/`yum`, `pacman`, `zypper`) doinstalowuje `git curl python3 openssl`.
