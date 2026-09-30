@@ -211,8 +211,8 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo) |
 | `site/` | landing jarvo.pl |
-| `install.sh`, `install.ps1` | instalator jednym poleceniem (macOS/Linux/WSL2, Windows): repo do `~/jarvo` + `scripts/local-up.sh`; plan pełnej automatyzacji (Docker, WSL, autostart) w [INSTALER.md](INSTALER.md) |
-| `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`) |
+| `install.sh`, `install.ps1`, `bin/jarvo` | instalator jednym poleceniem (Linux/WSL2: sam instaluje pakiety i Docker Engine; macOS; Windows): repo do `~/jarvo`, polecenie `jarvo` (`up`, `status`, `update`, `uninstall`…); plan reszty (macOS, Windows, obraz z rejestru) w [INSTALER.md](INSTALER.md) |
+| `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`: pytest, pyyaml, shellcheck) |
 | `tests/`, `docs/` | testy pytest, dokumentacja |
 
 **Dokumenty:** PLAN (wizja/architektura/roadmapa), BOSS (mechanika Main Judge'a), FLEET (specyfikacja
@@ -230,7 +230,7 @@ SOURCES (licencje).
   opisuje (README, `docs/*.md` z tym plikiem włącznie, README i CHANGELOG profilu): nazwy, liczby, ścieżki, komendy, statusy.
   `validate.py` pilnuje linków i kotwic, pełnej listy floty w dokumentach przeglądowych i liczb skilli/evals w tabelach.
 - Przed commitem: `python3 -m pytest -q` i `python3 scripts/validate.py` bez błędów.
-  Na czystym kontenerze najpierw `make dev-deps` (pytest + pyyaml z `requirements-dev.txt`).
+  Na czystym kontenerze najpierw `make dev-deps` (pytest, pyyaml i shellcheck z `requirements-dev.txt`).
 - **Po każdym dodaniu test w działającym kontenerze**, nie tylko pytest: deploy
   (`scripts/deploy.sh --no-pull` z `JARVO_COMPOSE_DIR`/`JARVO_BUILD` lokalnej instalacji), potem
   nowa funkcja uruchomiona w `jarvo-hermes` jako użytkownik `hermes`
@@ -240,8 +240,10 @@ SOURCES (licencje).
   `dockerd`, obraz `hermes-ca:test` (Hermes + certyfikat proxy), `jarvo-hermes:local` przez
   `docker build --network host` (compose nie widzi proxy), instalację w `jarvo-local` i
   `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` lub `branding/` albo z `--rebuild`.
-- Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (repo do `~/jarvo`) → `bash scripts/local-up.sh`
-  → `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`; stare `~/tars-local` przenoszone samo).
+- Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (na Linuksie sam doinstalowuje pakiety i Docker
+  Engine; repo do `~/jarvo`) → `jarvo up` (`bin/jarvo` → `scripts/local-up.sh`) → `~/jarvo-local` (`compose/`,
+  `secrets/`, `build/`, `data/`; stare `~/tars-local` przenoszone samo); pomocnik aktualizacji jako usługa
+  `systemd --user` (`jarvo autostart on`). Test od zera w piaskownicy: `scripts/install-test.sh`.
 
 ---
 

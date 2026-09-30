@@ -12,3 +12,6 @@ node_modules/
 !*.env.example
 infra/env/*.env
 infra/env/secrets/*.env
+
+# katalog instalacji floty zapisany przez install.sh (JARVO_LOCAL)
+/.jarvo-local

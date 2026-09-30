@@ -1,0 +1,17 @@
+# Pomocnik aktualizacji Jarvo jako usługa systemd użytkownika. `jarvo autostart on` renderuje ten szablon do
+# ~/.config/systemd/user/jarvo-updater.service (@JARVO@ = ścieżka bin/jarvo, @LOCAL@ = katalog instalacji,
+# @AUTO@ = JARVO_AUTO_UPDATE) i włącza linger, żeby usługa wstawała po restarcie bez logowania.
+# Kontenery floty wstają same (restart: unless-stopped w docker-compose.yml); usługa dba tylko o pomocnika.
+[Unit]
+Description=Jarvo: pomocnik aktualizacji (przycisk „Aktualizuj” w dashboardzie)
+After=network-online.target
+
+[Service]
+Environment=JARVO_LOCAL=@LOCAL@
+Environment=JARVO_AUTO_UPDATE=@AUTO@
+ExecStart=@JARVO@ updater
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

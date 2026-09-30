@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+# Polecenie użytkownika floty Jarvo na własnym komputerze (Linux, WSL2, macOS). Instaluje je install.sh
+# (dowiązanie /usr/local/bin/jarvo → ~/jarvo/bin/jarvo); działa też prosto z klonu: bash bin/jarvo …
+#
+#   jarvo up                  postaw albo uruchom flotę (scripts/local-up.sh; pierwszy raz pyta o dostawcę modeli)
+#   jarvo down                zatrzymaj flotę
+#   jarvo status              kontenery, dashboard, pomocnik aktualizacji, autostart, wersja
+#   jarvo logs [usługa]       logi na żywo (domyślnie hermes; Ctrl+C kończy)
+#   jarvo update              git pull + ponowne postawienie (obraz przebudowany tylko, gdy trzeba)
+#   jarvo chat [profil]       czat z agentem w terminalu (domyślnie jarvo)
+#   jarvo open                otwórz dashboard w przeglądarce
+#   jarvo pliki               otwórz katalog z wynikami agentów
+#   jarvo autostart on|off|status   pomocnik aktualizacji jako usługa systemd użytkownika (Linux, WSL z systemd)
+#   jarvo uninstall [--yes] [--all] usuń flotę (kontenery, obraz, usługę, polecenie); --all także dane, klucze i repo
+#   jarvo version             gałąź, commit i data repo
+#
+# Zmienne: JARVO_LOCAL (katalog instalacji: ~/jarvo-local albo zapisany w ~/jarvo/.jarvo-local), JARVO_YES=1
+# (bez pytań), JARVO_AUTO_UPDATE=1 (pomocnik instaluje nowe wersje sam). Gdy jesteś w grupie docker, ale ta
+# sesja logowania jeszcze o tym nie wie (świeża instalacja), jarvo uruchamia się ponownie przez `sg docker`.
+set -euo pipefail
+
+# macOS ma basha 3.2; skrypty floty potrzebują 4+ (Homebrew)
+if (( BASH_VERSINFO[0] < 4 )); then
+  for b in /opt/homebrew/bin/bash /usr/local/bin/bash; do [[ -x $b ]] && exec "$b" "$0" "$@"; done
+fi
+
+resolve() {   # ścieżka bez dowiązań (readlink -f nie ma na starszym macOS)
+  local p="$1" d
+  while [[ -L $p ]]; do
+    d="$(cd "$(dirname "$p")" && pwd)"; p="$(readlink "$p")"; [[ $p == /* ]] || p="$d/$p"
+  done
+  printf '%s/%s\n' "$(cd "$(dirname "$p")" && pwd)" "$(basename "$p")"
+}
+SELF="$(resolve "${BASH_SOURCE[0]}")"
+ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
+L="${JARVO_LOCAL:-}"
+[[ -n $L ]] || L="$(cat "$ROOT/.jarvo-local" 2>/dev/null || true)"
+[[ -n $L ]] || L="$HOME/jarvo-local"
+export JARVO_LOCAL="$L"
+PORT=9119; URL="http://localhost:$PORT/base"
+UNIT_DIR="$HOME/.config/systemd/user"; UNIT="$UNIT_DIR/jarvo-updater.service"
+ME="$(id -un)"
+SUDO=; [[ $(id -u) -eq 0 ]] || SUDO=sudo
+OS=linux; case "$(uname -s)" in Darwin) OS=macos ;; Linux) grep -qi microsoft /proc/version 2>/dev/null && OS=wsl ;; esac
+ARGS=("$@")
+
+if [[ -t 1 ]]; then R=$'\e[38;2;212;33;61m'; Y=$'\e[33m'; N=$'\e[0m'; else R=; Y=; N=; fi
+say() { printf '%s▌%s %s\n' "$R" "$N" "$*"; }
+warn() { printf '%s!%s %s\n' "$Y" "$N" "$*"; }
+die() { printf '%s✗%s %s\n' "$R" "$N" "$*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+confirm() {   # JARVO_YES=1 odpowiada „tak”; bez terminala „nie”
+  [[ "${JARVO_YES:-0}" == 1 ]] && return 0
+  local a; read -rp "$1 [t/N] " a < /dev/tty 2>/dev/null || return 1
+  [[ $a == [tTyY]* ]]
+}
+compose() { docker compose -f "$ROOT/infra/docker-compose.yml" --env-file "$L/compose/.env" "$@"; }
+installed() { [[ -f "$L/compose/.env" ]]; }
+
+# Docker gotowy? Członek grupy docker, którego sesja logowania jeszcze o tym nie wie (świeża instalacja,
+# usługa systemd uruchomiona przed usermod), dostaje grupę przez sg i uruchamia to samo polecenie od nowa.
+ensure_docker() {   # ensure_docker [soft]: soft zwraca 1 zamiast kończyć
+  docker info >/dev/null 2>&1 && return 0
+  if [[ $OS != macos && -n $SUDO ]] && have sg && have getent \
+     && getent group docker 2>/dev/null | cut -d: -f4 | tr ',' '\n' | grep -qx "$ME" \
+     && ! id -nG | tr ' ' '\n' | grep -qx docker; then
+    exec sg docker -c "$(printf '%q ' "$SELF" ${ARGS[@]+"${ARGS[@]}"})"
+  fi
+  [[ "${1:-}" == soft ]] && return 1
+  if [[ -S /var/run/docker.sock && ! -w /var/run/docker.sock ]]; then
+    die "Brak dostępu do Dockera: sudo usermod -aG docker $ME, potem zaloguj się ponownie."
+  fi
+  case "$OS" in
+    macos) die "Docker nie działa: uruchom Docker Desktop (albo OrbStack)." ;;
+    wsl) die "Docker nie działa: sudo service docker start (albo uruchom Docker Desktop z integracją WSL)." ;;
+    *) die "Docker nie działa: sudo systemctl start docker." ;;
+  esac
+}
+
+updater_pid_alive() { local p; p="$(cat "$L/updater.pid" 2>/dev/null || true)"; [[ -n $p ]] && kill -0 "$p" 2>/dev/null; }
+unit_usable() { [[ $OS != macos && -d /run/systemd/system ]] && systemctl --user show-environment >/dev/null 2>&1; }
+unit_enabled() { [[ -f $UNIT ]] && systemctl --user is-enabled jarvo-updater.service >/dev/null 2>&1; }
+unit_text() {
+  sed -e "s#@JARVO@#$SELF#g" -e "s#@LOCAL@#$L#g" -e "s#@AUTO@#${JARVO_AUTO_UPDATE:-0}#g" \
+      "$ROOT/infra/autostart/jarvo-updater.service" | grep -v '^#'
+}
+open_path() {   # przeglądarka albo menedżer plików; bez pulpitu zwraca 1 (ścieżka jest już wypisana)
+  local what="$1"
+  case "$OS" in
+    macos) open "$what" ;;
+    wsl) if have wslview; then wslview "$what" >/dev/null 2>&1
+         elif [[ $what == http* ]]; then cmd.exe /c start "" "$what" >/dev/null 2>&1
+         else explorer.exe "$(wslpath -w "$what")" >/dev/null 2>&1 || true; fi ;;
+    *) [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && have xdg-open && xdg-open "$what" >/dev/null 2>&1 ;;
+  esac
+}
+
+cmd_up() { ensure_docker; bash "$ROOT/scripts/local-up.sh"; }
+cmd_down() { installed || die "Flota nie jest zainstalowana (jarvo up)."; ensure_docker; bash "$ROOT/scripts/local-up.sh" down; }
+cmd_logs() { installed || die "Flota nie jest zainstalowana (jarvo up)."; ensure_docker; compose logs -f --tail=200 "${1:-hermes}"; }
+cmd_chat() { ensure_docker; docker exec -it -u hermes jarvo-hermes hermes -p "${1:-jarvo}" chat; }
+cmd_update() {
+  say "git pull ($ROOT)"
+  git -C "$ROOT" pull --ff-only || die "Aktualizacja repo nie powiodła się (lokalne zmiany? git -C $ROOT status)."
+  cmd_up
+}
+cmd_version() {
+  git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "? (brak repo git w $ROOT)"; return; }
+  printf '%s %s\n' "$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)" "$(git -C "$ROOT" log -1 --format='%h (%cs)')"
+}
+cmd_open() { echo "$URL"; open_path "$URL" || true; }
+cmd_pliki() {
+  local d="$L/data/hermes/jarvo"
+  [[ -d $d ]] || die "Brak $d: flota jeszcze nie działała (jarvo up)."
+  echo "$d"; open_path "$d" || true
+}
+cmd_updater() {   # pierwszy plan; tak uruchamia go usługa systemd
+  ensure_docker
+  exec python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$L/build"
+}
+cmd_status() {
+  installed || die "Flota nie jest zainstalowana (jarvo up)."
+  ensure_docker
+  compose ps
+  echo
+  echo "dashboard:             $URL   (login jarvo, hasło: DASHBOARD_PASSWORD w $L/compose/.env)"
+  if unit_enabled; then echo "pomocnik aktualizacji: usługa systemd ($(systemctl --user is-active jarvo-updater.service 2>/dev/null || echo '?'))"
+  elif updater_pid_alive; then echo "pomocnik aktualizacji: w tle (pid $(cat "$L/updater.pid"), do wylogowania)"
+  else echo "pomocnik aktualizacji: nie działa (jarvo up go uruchomi)"; fi
+  cmd_autostart status
+  echo "wersja:                $(cmd_version)"
+}
+cmd_autostart() {
+  case "${1:-status}" in
+    on)
+      unit_usable || die "Brak usług systemd użytkownika (macOS, WSL bez systemd, kontener): pomocnik aktualizacji startuje przy jarvo up i działa do wylogowania."
+      mkdir -p "$UNIT_DIR"; unit_text > "$UNIT"
+      if updater_pid_alive; then kill "$(cat "$L/updater.pid")" 2>/dev/null || true; fi   # proces w tle ustępuje usłudze
+      rm -f "$L/updater.pid"
+      systemctl --user daemon-reload
+      systemctl --user enable --now jarvo-updater.service >/dev/null 2>&1 \
+        || die "Nie udało się włączyć usługi (systemctl --user status jarvo-updater)."
+      # usługa ma wstawać po restarcie także bez zalogowanego użytkownika
+      loginctl enable-linger "$ME" 2>/dev/null || $SUDO loginctl enable-linger "$ME" 2>/dev/null \
+        || warn "loginctl enable-linger $ME nie zadziałało: usługa wstanie dopiero po zalogowaniu."
+      say "Autostart włączony: usługa jarvo-updater (systemctl --user status jarvo-updater)" ;;
+    off)
+      if [[ -f $UNIT ]]; then
+        systemctl --user disable --now jarvo-updater.service >/dev/null 2>&1 || true
+        rm -f "$UNIT"; systemctl --user daemon-reload >/dev/null 2>&1 || true
+      fi
+      say "Autostart wyłączony" ;;
+    status)
+      if unit_enabled; then echo "autostart:             włączony (usługa $(systemctl --user is-active jarvo-updater.service 2>/dev/null || echo '?'))"
+      else echo "autostart:             wyłączony"; fi ;;
+    print) unit_text ;;
+    *) die "jarvo autostart on|off|status" ;;
+  esac
+}
+cmd_uninstall() {
+  local all=0 a link
+  for a in "$@"; do
+    case "$a" in --yes|-y) export JARVO_YES=1 ;; --all) all=1 ;; *) die "jarvo uninstall [--yes] [--all]" ;; esac
+  done
+  confirm "Usunąć flotę Jarvo (kontenery, obraz, usługę aktualizacji, polecenie jarvo)?" || { echo "Anulowano."; return 0; }
+  if installed && ensure_docker soft; then
+    compose down --remove-orphans >/dev/null 2>&1 || true
+    docker image rm -f jarvo-hermes:local >/dev/null 2>&1 || true
+  else
+    warn "Docker nie działa: kontenerów i obrazu nie usuwam (docker compose down; docker image rm jarvo-hermes:local)."
+  fi
+  cmd_autostart off >/dev/null 2>&1 || true
+  if updater_pid_alive; then kill "$(cat "$L/updater.pid")" 2>/dev/null || true; fi
+  for link in /usr/local/bin/jarvo "$HOME/.local/bin/jarvo"; do
+    if [[ -L $link && "$(resolve "$link")" == "$SELF" ]]; then rm -f "$link" 2>/dev/null || $SUDO rm -f "$link"; fi
+  done
+  say "Flota usunięta."
+  # dane, klucze i repo: tylko na wyraźne życzenie (--all albo odpowiedź „tak”; samo --yes ich nie rusza)
+  local ask; if [[ $all == 1 ]]; then ask=yes; elif [[ "${JARVO_YES:-0}" == 1 ]]; then ask=no; else ask=pytaj; fi
+  if [[ $ask == yes ]] || { [[ $ask == pytaj ]] && confirm "Usunąć też dane, klucze i konfigurację ($L)?"; }; then
+    [[ -n $L && $L != / && -d $L ]] && $SUDO rm -rf "$L" && say "Usunięto $L"
+  else echo "Dane zostają: $L"; fi
+  if [[ $ask == yes ]] || { [[ $ask == pytaj ]] && confirm "Usunąć repo ($ROOT)?"; }; then
+    [[ -n $ROOT && $ROOT != / && -d "$ROOT/.git" ]] && rm -rf "$ROOT" && say "Usunięto $ROOT"
+  else echo "Repo zostaje: $ROOT"; fi
+  return 0
+}
+usage() { grep -E '^#   jarvo ' "$SELF" | sed 's/^#   //'; }
+
+cmd="${1:-help}"; shift || true
+case "$cmd" in
+  up|start) cmd_up ;;
+  down|stop) cmd_down ;;
+  status) cmd_status ;;
+  logs) cmd_logs "$@" ;;
+  update) cmd_update ;;
+  chat) cmd_chat "$@" ;;
+  open) cmd_open ;;
+  pliki|files) cmd_pliki ;;
+  autostart) cmd_autostart "$@" ;;
+  uninstall) cmd_uninstall "$@" ;;
+  version) cmd_version ;;
+  updater) cmd_updater ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

@@ -24,19 +24,23 @@ Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
 
 ## Szybki start
 
-Instalacja lokalna jednym poleceniem (macOS, Linux, WSL2; repo do `~/jarvo`, flota w `~/jarvo-local`,
-potem http://localhost:9119/base):
+Instalacja lokalna jednym poleceniem (Linux, WSL2, macOS; repo do `~/jarvo`, flota w `~/jarvo-local`,
+potem http://localhost:9119/base). Na Linuksie i w WSL instalator sam doinstalowuje brakujące programy
+i Docker Engine; na macOS potrzebny jest działający Docker Desktop albo OrbStack (plan pełnej
+automatyzacji: [docs/INSTALER.md](docs/INSTALER.md)):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash
 # Windows (PowerShell):  irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
-# z istniejącego klonu:  bash scripts/local-up.sh   (stop: bash scripts/local-up.sh down)
+# bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
+# potem:      jarvo status | logs | chat | update | down | uninstall      (jarvo help: wszystkie)
+# z klonu:    bash bin/jarvo up   (stop: bash bin/jarvo down)
 ```
 
 Praca z repo:
 
 ```bash
-make dev-deps        # zależności testów i walidacji (pytest, pyyaml z requirements-dev.txt)
+make dev-deps        # zależności testów i walidacji (pytest, pyyaml, shellcheck z requirements-dev.txt)
 make validate        # walidacja repo: fleet ↔ profile, skille, evals, sekrety, dokumentacja ↔ kod
 make test            # testy (pytest): walidator, patrol, raporty, build, skrypty agentów
 make models          # czy modele z fleet.yaml istnieją u wybranego dostawcy (openai-codex: brak listy, pomija)
@@ -70,7 +74,8 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`knowledge/`](knowledge) | szablon brand kitu kopiowany na serwer |
 | [`branding/`](branding) | skórka Jarvo: terminal, favicon, motyw i tłumaczenie dashboardu |
 | [`site/`](site) | landing jarvo.pl (`scripts/deploy-site.sh`) |
-| [`install.sh`](install.sh), [`install.ps1`](install.ps1) | instalator jednym poleceniem (macOS/Linux/WSL2, Windows) |
+| [`install.sh`](install.sh), [`install.ps1`](install.ps1) | instalator jednym poleceniem (Linux/WSL2 z instalacją Dockera, macOS, Windows) |
+| [`bin/jarvo`](bin/jarvo) | polecenie użytkownika po instalacji: `up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall` |
 | [`requirements-dev.txt`](requirements-dev.txt) | zależności testów i walidacji (`make dev-deps`) |
 | [`tests/`](tests) | testy pytest |
 | [`wiedza/`](wiedza) | skarbiec wiedzy floty (drugi mózg): `wiedza.py` i `SCHEMA.md`, projekt w [docs/WIEDZA.md](docs/WIEDZA.md) |

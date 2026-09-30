@@ -3,3 +3,4 @@
 # Dzięki temu `make test` / `python3 -m pytest -q` działa wszędzie bez ręcznego doinstalowywania.
 pytest>=8,<10
 PyYAML>=6,<7
+shellcheck-py>=0.10,<0.12   # lint skryptów bash (install.sh, bin/jarvo, scripts/*.sh) w tests/test_installer.py

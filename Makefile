@@ -5,7 +5,7 @@ HERMES_SRC ?=
 .PHONY: help dev-deps validate test build models pins hq-demo deploy harvest new-agent
 
 help:
-	@echo "make dev-deps           zależności do testów i walidacji (pytest, pyyaml)"
+	@echo "make dev-deps           zależności do testów i walidacji (pytest, pyyaml, shellcheck)"
 	@echo "make validate           walidacja repo (fleet, profile, skille, evals, sekrety, docs)"
 	@echo "make test               testy (pytest): walidatory, patrol, raporty, skrypty"
 	@echo "make build HERMES_SRC=… build dystrybucji do build/ (wymaga drzewa Hermesa)"

@@ -249,7 +249,8 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ `harvest-skills.sh`: skille utworzone lub zmienione przez agentów → przegląd → repo.
 - ✅ `fleet-improvement` Jarva: wnioski z przeglądu tygodnia jako propozycje zmian.
 - ⬜ Wersjonowanie floty (tagi), changelog wydań.
-- ⬜ Instalator jednym poleceniem na Linuksie, macOS i Windowsie (Docker, WSL i autostart instalowane same): plan w [INSTALER.md](INSTALER.md).
+- 🟡 Instalator jednym poleceniem na Linuksie, macOS i Windowsie (Docker, WSL i autostart instalowane same): plan w [INSTALER.md](INSTALER.md);
+  etap 1 (Linux: pakiety, Docker Engine, polecenie `jarvo`, autostart, `uninstall`, test od zera w kontenerze) ✅ 2026-09-30.
 
 ### Faza ∞
 Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
