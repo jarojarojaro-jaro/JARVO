@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-09-30"
 ---
 
 # Dispatch: jak rozdać pracę
@@ -62,7 +62,8 @@ kanban_create(
 - `<MISJA>` = ID misji (`M-RRMMDD-slug`) albo `Z-RRMMDD-slug` dla pojedynczego zlecenia.
 - `<rola>` = krótki slug zadania, np. `research`, `landing`, `grafiki`, `zlozenie`.
 - Katalog workspace musi istnieć: utwórz go przez narzędzie plików (np. zapisując `README.md` z celem karty).
-- `goal_mode=True` tylko dla kart otwartych („iteruj, aż…”). Wtedy DoD musi być bardzo konkretne.
+- `goal_mode=True` tylko dla kart otwartych („iteruj, aż…”). Wtedy DoD musi być bardzo konkretne i w GRANICE nazwać,
+  czego nie wolno ruszyć, żeby je zaliczyć (testy, progi, skrypty kontroli): pętla „aż przejdzie” kusi osłabieniem kontroli.
 
 ## Wzorce misji (szczegóły: `references/patterns.md`)
 

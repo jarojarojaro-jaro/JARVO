@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Kontrakt zlecenia (wspólny): nie osłabiam kontroli, żeby zaliczyć DoD (za ECC loop-design-check); poprawki po recenzji z pytaniem przy niejasnym punkcie i sprzeciwem z dowodem przy błędnym (za superpowers receiving-code-review); reguła 17: zgoda A2 przypięta do odcisku wersji plików (`scripts/odcisk.py`, za ECC operator-approval-loop).
 - Wspólny skill `hooki` (`shared/skills/`, za marketing-os `hooks.md`, MIT): trzy warstwy hooka bez powtórzeń, 18 taktyk, korpus słów klientów, rozbieg, lejek diagnozy. Podpięty w `scenariusz`, `warianty-ab` i master prompcie `clipmaker` (pole `taktyka` w planie; `klipy.py sprawdz` ostrzega, gdy tytuł-hook powtarza pierwsze zdanie mowy).
 - Master prompt clipmakera: zasady cięć (nie w środku słowa, zapas 30–200 ms, napisy zawsze na wierzchu).
 - Skill `clipmaker` (master prompt: typy momentów, 6 osi oceny, uczciwość; schemat `plan.json`) zastępuje `klipy-z-dlugiego`: rolki są projektami edytora HQ, nie wypalonymi MP4.

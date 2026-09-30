@@ -11,17 +11,21 @@ metadata:
   jarvo:
     agent: jarvo-studio
     autonomy: A2
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-30"
 ---
 
 # Publikacja
 
-**A2: tylko z wyraźną zgodą użytkownika**, zapisaną w karcie albo komentarzu (data + zakres, np.
-„Decyzja użytkownika 2026-10-03: publikuj posty 1–5 z kalendarza na LinkedIn i IG”).
-Brak zgody → `kanban_block(kind="needs_input", reason="Pakiet gotowy. Publikować? <co, gdzie, kiedy>")`.
+**A2: tylko z wyraźną zgodą użytkownika**, zapisaną w karcie albo komentarzu (data + zakres + wersja, np.
+„Decyzja użytkownika 2026-10-03: publikuj posty 1–5 z kalendarza na LinkedIn i IG, wersja 3f9c0a1b2d4e”).
+Brak zgody → odcisk paczki (`python3 /opt/jarvo/repo/scripts/odcisk.py out/do-publikacji out/kalendarz.csv`) i
+`kanban_block(kind="needs_input", reason="Pakiet gotowy (wersja <odcisk>). Publikować? <co, gdzie, kiedy>")`.
 
 ## Ze zgodą
-1. Zakres zgody = zakres działania. Nic ponad to (inne platformy, inne daty = nowa zgoda).
+0. `odcisk.py <te same ścieżki> --sprawdz <odcisk ze zgody>`: kod 1 = tekst albo grafika zmieniły się po zgodzie →
+   nie publikujesz, prosisz o nową zgodę na nową wersję.
+1. Zakres zgody = zakres działania. Nic ponad to (inne platformy, inne daty = nowa zgoda). Jedno zaplanowanie na
+   zgodę: błąd albo brak potwierdzenia z Postiz → sprawdź w Postiz, co powstało, zanim spróbujesz ponownie.
 2. Kolejka **Postiz** (self-host na serwerze, `POSTIZ_URL` + `POSTIZ_API_KEY`): utwórz wpisy z kalendarza jako
    zaplanowane, z plikami z `out/`. Jeśli Postiz nie jest skonfigurowany: przygotuj paczkę do ręcznej publikacji
    (`out/do-publikacji/` + instrukcja) i powiedz to w raporcie.

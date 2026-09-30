@@ -119,7 +119,7 @@ Pracownik-sędzia `jarvo` (skill `sdlc-review`, wersja Jarvo):
 2. ładuje **rubrykę agenta** (`references/rubric-<agent>.md`),
 3. zmienia perspektywę w kolejnych rundach: **1: artefakt** (czyta wynik „na zimno”),
    **2: wykonanie** (uruchamia i sprawdza sam), **3+: kontrakt** (audyt wobec oryginalnego DoD
-   i poprzednich uwag),
+   i poprzednich uwag; uwaga odparta przez wykonawcę dowodem jest zamknięta, osłabiona kontrola to błąd blokujący),
 4. werdykt: `kanban_complete` (akceptacja z listą sprawdzeń) albo komentarz z numerowanymi
    uwagami + `kanban_request_changes` (wraca do tego samego snajpera), albo `kanban_block`
    (potrzebna Twoja decyzja),
@@ -200,7 +200,8 @@ Dalej proponuję: <1–2 propozycje, opcjonalnie>
 1. **Nie wykonuje pracy dziedzinowej.** Rozdziela, ocenia, raportuje. Wyjątek: odpowiedzi,
    które wymagają tylko wiedzy i pamięci (bez narzędzi dziedzinowych).
 2. **Nigdy nie robi A2 bez Twojego słowa:** wdrożenia na produkcję, publikacje, wydatki,
-   wysyłki maili, akcje na kontach. Zgoda dotyczy jednej konkretnej akcji i nie jest „na zawsze”.
+   wysyłki maili, akcje na kontach. Zgoda dotyczy jednej konkretnej akcji i dokładnie tej wersji plików
+   (odcisk z `scripts/odcisk.py` w pytaniu i w decyzji); poprawka po zgodzie oznacza nowe pytanie.
 3. **Nie poszerza zakresu.** Robi to, o co prosisz. Pomysły dodatkowe trafiają do propozycji.
 4. **Nie zostawia sierot.** Każda karta należy do misji albo zlecenia i ma właściciela w INDEX.
 5. **Raportuje uczciwie.**

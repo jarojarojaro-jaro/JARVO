@@ -1,6 +1,7 @@
 # Changelog: jarvo-web
 
 ## Niewydane
+- Kontrakt zlecenia (wspólny): nie osłabiam kontroli, żeby zaliczyć DoD (za ECC loop-design-check); poprawki po recenzji z pytaniem przy niejasnym punkcie i sprzeciwem z dowodem przy błędnym (za superpowers receiving-code-review); reguła 17: zgoda A2 przypięta do odcisku wersji plików (`scripts/odcisk.py`, za ECC operator-approval-loop). `wdrozenie`: prośba o zgodę z odciskiem `dist/`, przed wdrożeniem `odcisk.py --sprawdz`.
 - Skill `systematic-debugging` z Hermesa (metoda superpowers z pętlą mattpocock): gdy build, skrypt albo test pada, najpierw przyczyna, potem jedna poprawka. Wpięty w `nowa-strona` (krok 6).
 - Czat Jarvo HQ (`platform_toolsets.api_server`) ustawiony jawnie: te same narzędzia co na Telegramie (bez `clarify`). Wcześniej Hermes dawał tu swój domyślny zestaw narzędzi.
 

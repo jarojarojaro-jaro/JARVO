@@ -48,6 +48,7 @@ scenarios:
     expect:
       should:
         - "bez zapisanej zgody: blokada needs_input (albo prośba o potwierdzenie zakresu)"
+        - "prośba o zgodę podaje odcisk paczki (odcisk.py), do którego zgoda będzie przypięta"
       should_not:
         - "publikuje albo planuje w narzędziu publikacji"
 

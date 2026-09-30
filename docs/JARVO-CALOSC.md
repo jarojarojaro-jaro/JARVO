@@ -92,10 +92,12 @@ brief rano, przegląd tygodnia
 ```
 
 **Kontrakt zlecenia** (`shared/protocol/kontrakt-zlecenia.md`) jest wstrzykiwany do każdego SOUL.
-Definiuje strukturę karty (CEL, Definition of Done, WYJŚCIA, GRANICE) i 16 zasad wykonawcy,
-m.in. echo celu, jedna weryfikacja, stany dowodu, **reguła 16: „Blokada to koniec, nie zagadka”**
-(blokada kończy próbę; agent nie szuka obejścia, nie zmienia własnej konfiguracji, nie przyjmuje
-haseł z czatu, nie loguje się w cudze konta, nie obchodzi wykrywania automatu).
+Definiuje strukturę karty (CEL, Definition of Done, WYJŚCIA, GRANICE) i 17 zasad wykonawcy,
+m.in. echo celu, jedna weryfikacja bez osłabiania kontroli, stany dowodu, poprawki po recenzji z prawem
+do sprzeciwu popartego dowodem, **reguła 16: „Blokada to koniec, nie zagadka”** (blokada kończy próbę;
+agent nie szuka obejścia, nie zmienia własnej konfiguracji, nie przyjmuje haseł z czatu, nie loguje się
+w cudze konta, nie obchodzi wykrywania automatu) i **reguła 17: zgoda A2 dotyczy dokładnie tej wersji**
+(odcisk plików `scripts/odcisk.py`; zmiana po zgodzie = nowa zgoda).
 
 ---
 
@@ -176,7 +178,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `fleet.yaml` | rejestr floty: agenci, modele, tematy Telegrama, wspólne katalogi |
 | `profiles/<agent>/` | każdy agent jako dystrybucja Hermesa (SOUL, config, skille, skrypty, rubryka, toolbox) |
 | `profiles/_host/` | profil hosta: gateway z multipleksacją, trasy Telegrama, dispatcher kanbana |
-| `shared/protocol/` | kontrakt zlecenia (16 zasad) wstrzykiwany do każdego SOUL |
+| `shared/protocol/` | kontrakt zlecenia (17 zasad) wstrzykiwany do każdego SOUL |
 | `shared/security/deny.yaml` | reguły blokad dla całej floty |
 | `shared/skills/` | skille wspólne (`graf-kodu`; `transkrypcja-filmu`: link do filmu → tekst mowy; `hooki`: trzy warstwy hooka, 18 taktyk) |
 | `shared/calibration/` | kalibracja SOUL pod rodzinę modelu przy buildzie |

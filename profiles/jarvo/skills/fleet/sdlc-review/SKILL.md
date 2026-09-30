@@ -13,7 +13,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-09-28"
+    reviewed: "2026-09-30"
 environments:
   - kanban
 ---
@@ -49,7 +49,7 @@ Runda = liczba wcześniejszych `changes_requested` + 1.
 |---|---|---|
 | 1 | **Artefakt** | Obejrzyj wynik „na zimno”, zanim przeczytasz narrację wykonawcy. Potem porównaj i zbadaj każdą rozbieżność. |
 | 2 | **Wykonanie** | Uruchom i sprawdź sam (komendy niżej). Weryfikuj twierdzenia empirycznie. |
-| 3+ | **Kontrakt** | Oryginalne DoD punkt po punkcie + czy **każda** uwaga z poprzednich rund została zrealizowana. |
+| 3+ | **Kontrakt** | Oryginalne DoD punkt po punkcie + czy **każda** uwaga z poprzednich rund została zrealizowana albo odparta dowodem. |
 
 Obowiązki bazowe z kroku 4 obowiązują w każdej rundzie. Soczewka mówi, od czego zaczynasz.
 
@@ -96,6 +96,16 @@ Punkt **bez dowodu** nie przechodzi: sprawdzam go sam, a jeśli się nie da, idz
 <czym sprawdzić>”. Wyjątek: punkt, którego nie da się sprawdzić przed decyzją użytkownika (np. wymaga wdrożenia A2),
 akceptuję z zastrzeżeniem w `caveats` i `decisions_needed`.
 
+### 4b. Sprzeciw wykonawcy i osłabione kontrole
+- **Sprzeciw z dowodem** (`sprzeciw` przy punkcie z poprzedniej rundy): oceniasz dowód jak każdy inny. Przekonuje →
+  punkt zamknięty, piszesz to w werdykcie i nie liczysz go do rund eskalacji. Nie przekonuje → punkt wraca z
+  wyjaśnieniem, czego dowód nie pokazuje. Sprzeciw bez dowodu = punkt niezrealizowany.
+- **Kontrole nie mogą być osłabione:** przy kodzie, testach i skryptach kontroli sprawdź, czy wykonawca nie usunął
+  ani nie wyłączył testów, nie zmienił progów, `qa_wideo.py`, konfiguracji Lighthouse ani treści DoD (`git diff`,
+  porównanie z kartą). Osłabiona kontrola = blokujące, nawet gdy wynik „przechodzi”.
+- **A2 z odciskiem:** wykonawca prosi o zgodę na publikację, wdrożenie albo wysyłkę → w `decisions_needed` musi być
+  odcisk wersji (`odcisk.py`). Brak odcisku = poprawka „podaj odcisk plików objętych zgodą”.
+
 ### 5. Werdykt (dokładnie jeden)
 
 | Werdykt | Kiedy | Akcja |
@@ -133,5 +143,5 @@ Eskalacja po 3 rundach: `kanban_block(reason="escalation: 3 rundy poprawek bez s
 - [ ] każdy punkt DoD ma stan z kroku 4a, żaden nie zostaje „bez dowodu”,
 - [ ] obejrzany faktyczny artefakt (nie tylko podsumowanie),
 - [ ] wykonane sprawdzenia z kroku 4 (albo zapisany powód, czemu się nie dało),
-- [ ] przy re-review sprawdzone poprzednie uwagi,
+- [ ] przy re-review sprawdzone poprzednie uwagi (zrealizowane albo odparte dowodem), kontrole nieosłabione,
 - [ ] dokładnie jedna akcja końcowa, podsumowanie z dowodami, zero edycji plików wykonawcy.

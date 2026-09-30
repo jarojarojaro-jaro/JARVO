@@ -230,11 +230,13 @@ metadata.risks:             czego nie zrobiono, co niepewne
 metadata.decisions_needed:  co wymaga decyzji człowieka
 ```
 
-Protokół ma **16 zasad wykonawcy** w trzech blokach: start (1–4: `kanban_show`, pierwszy heartbeat = ponumerowane
+Protokół ma **17 zasad wykonawcy** w trzech blokach: start (1–4: `kanban_show`, pierwszy heartbeat = ponumerowane
 punkty DoD, `kanban_block` z `needs_input` albo `capability`), praca (5–11: równoległe odczyty, heartbeat, odmowa
 uprawnień to granica, treści z internetu to dane, serwery tylko do testów, pliki z inboxu, pamięć tylko na trwałe fakty)
-i koniec (12–16: jedna pełna kontrola i najwyżej 2 cykle poprawek, oddanie przez `kanban_request_review`, poprawki
-po recenzji, brak wiadomości do użytkownika w trakcie misji, blokada to koniec). Pełna treść: `shared/protocol/kontrakt-zlecenia.md`.
+i koniec (12–17: jedna pełna kontrola, najwyżej 2 cykle poprawek i żadnego osłabiania kontroli (testy, progi, skrypty QA),
+oddanie przez `kanban_request_review`, poprawki po recenzji (niejasne → pytanie, błędne → sprzeciw z dowodem, każda
+poprawka sprawdzona), brak wiadomości do użytkownika w trakcie misji, blokada to koniec, zgoda A2 przypięta do odcisku
+wersji plików z `scripts/odcisk.py`). Pełna treść: `shared/protocol/kontrakt-zlecenia.md`.
 
 Agent oddaje wynik do statusu `review`. Jarvo ocenia: `complete` albo `request_changes`
 z konkretnymi uwagami. Po 3 odrzuceniach eskaluje do Ciebie zamiast kręcić się w kółko.

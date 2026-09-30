@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A2
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-30"
 ---
 
 # Podgląd i wdrożenie
@@ -22,10 +22,11 @@ metadata:
 
 ## Wdrożenie produkcyjne (A2)
 Warunek: w karcie albo w komentarzu jest **wyraźna zgoda użytkownika** z datą (np. „Decyzja użytkownika 2026-10-02: wdrożyć na nova.pl”).
-Bez tego: `kanban_block(kind="needs_input", reason="Gotowe do wdrożenia na <cel>. Potrzebna zgoda użytkownika.")`.
+Bez tego: `kanban_block(kind="needs_input", reason="Gotowe do wdrożenia na <cel> (wersja <odcisk dist/>). Potrzebna zgoda użytkownika.")`.
 
 Z zgodą:
-1. Sprawdź, czy build jest identyczny z zaakceptowanym (ten sam commit/katalog `dist/`).
+1. Sprawdź, czy build jest identyczny z zaakceptowanym: `python3 /opt/jarvo/repo/scripts/odcisk.py out/site/dist --sprawdz <odcisk ze zgody>`
+   (kod 1 = `dist/` zmienił się po zgodzie → nowa zgoda).
 2. Wdróż skillem `publish-site` (GitHub Pages / Cloudflare Pages / Netlify), zgodnie z celem ze zgody. Nic więcej.
 3. Po wdrożeniu: `seo_check.py` + Lighthouse + `security_check.py url` na produkcyjnym URL, zrzuty, weryfikacja przekierowań i HTTPS.
 4. Raport: URL, commit/wersja, wyniki po wdrożeniu, jak cofnąć (rollback).
