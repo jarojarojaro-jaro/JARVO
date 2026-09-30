@@ -285,6 +285,7 @@ def build_wiedza_plugin(out: Path) -> Path:
         remove_tree(out)
     shutil.copytree(fl.REPO_ROOT / "wiedza" / "plugin", out, ignore=COPY_IGNORE)
     shutil.copy2(fl.REPO_ROOT / "wiedza" / "wiedza.py", out / "wiedza.py")
+    shutil.copy2(fl.REPO_ROOT / "wiedza" / "kompilacja.py", out / "kompilacja.py")
     return out
 
 

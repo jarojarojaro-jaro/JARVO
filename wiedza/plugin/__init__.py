@@ -40,6 +40,8 @@ MAX_ZNAKOW_ROZMOWY = 24_000
 MAX_PRZYPOMNIENIA = 2_200
 MAX_ORZECZEN = 20
 LIMIT_NOTATEK = 5
+KOMPILACJA_CO_S = 3600                # kompilacja najwyżej raz na godzinę, gdy są szkice; do tego co noc (KOMPILACJA_NOC)
+KOMPILACJA_NOC = (3, 10)              # godzina, minuta: nocny przebieg (strefa kontenera)
 TYPY_SZKICU = ["fakt", "decyzja", "lekcja", "podmiot", "pojecie", "projekt"]
 
 WYCIAG_SYSTEM = (
@@ -55,19 +57,27 @@ WYCIAG_SYSTEM = (
 
 # ------------------------------------------------------------------------------------------------ pomocnicze
 
-def _lib():
-    """wiedza.py obok wtyczki (kopiowany przy buildzie) albo katalog wyżej (repo); jedna nazwa modułu dla wszystkich."""
-    mod = sys.modules.get("jarvo_wiedza_lib")
+def _modul(nazwa: str, plik: str):
+    """Moduł skarbca obok wtyczki (kopiowany przy buildzie) albo katalog wyżej (repo); jedna nazwa modułu dla wszystkich profili."""
+    mod = sys.modules.get(nazwa)
     if mod is not None:
         return mod
-    for kandydat in (_HERE / "wiedza.py", _HERE.parent / "wiedza.py"):
+    for kandydat in (_HERE / plik, _HERE.parent / plik):
         if kandydat.exists():
-            spec = importlib.util.spec_from_file_location("jarvo_wiedza_lib", kandydat)
+            spec = importlib.util.spec_from_file_location(nazwa, kandydat)
             mod = importlib.util.module_from_spec(spec)
-            sys.modules["jarvo_wiedza_lib"] = mod
+            sys.modules[nazwa] = mod
             spec.loader.exec_module(mod)
             return mod
-    raise ImportError("jarvo-wiedza: brak wiedza.py obok wtyczki")
+    raise ImportError(f"jarvo-wiedza: brak {plik} obok wtyczki")
+
+
+def _lib():
+    return _modul("jarvo_wiedza_lib", "wiedza.py")
+
+
+def _kompilacja():
+    return _modul("jarvo_wiedza_kompilacja", "kompilacja.py")
 
 
 def _korzen(hermes_home: str) -> Path:
@@ -111,6 +121,10 @@ def wywolaj_model(system: str, user: str, max_tokens: int = 1200) -> str:
     resp = call_llm(task=ZADANIE_AUX, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
                     max_tokens=max_tokens, temperature=0.2)
     return _tresc_odpowiedzi(resp)
+
+
+def model_kompilacji(system: str, user: str) -> str:
+    return wywolaj_model(system, user, max_tokens=2000)
 
 
 def _zapis_rozmowy(messages: List[Dict[str, Any]], od_tury: int = 0) -> tuple[str, int]:
@@ -444,8 +458,14 @@ class SkarbiecProvider(MemoryProvider):
         return f"Ustalenia z tej części rozmowy zapisano w skarbcu wiedzy: {n['zrodlo']}\n{n['wyciag'][:1500]}"
 
     def _petla_ciszy(self) -> None:
-        """Sesja bez nowej tury przez CISZA_S i z ≥ MIN_TUR nowymi turami → wyciąg (człowiek nie musi pisać /new)."""
+        """Co minutę: sesja bez nowej tury przez CISZA_S i z ≥ MIN_TUR nowymi turami → wyciąg (człowiek nie musi pisać /new);
+        do tego kompilacja skrzynki, gdy pora (raz na godzinę przy szkicach albo nocny przebieg). Blokada w state/ pilnuje,
+        żeby z ośmiu profili gatewaya kompilował jeden."""
         while not self._stop.wait(60):
+            try:
+                self._moze_kompilowac() and self.kompiluj("harmonogram")
+            except Exception as e:
+                logger.debug("jarvo-wiedza: harmonogram kompilacji: %s", e)
             try:
                 teraz = time.time()
                 with self._lock:
@@ -461,6 +481,39 @@ class SkarbiecProvider(MemoryProvider):
                             self._bufor[sid]["wyciagnieto"] = len(b["tury"]) if n else self._bufor[sid]["wyciagnieto"]
             except Exception as e:
                 logger.debug("jarvo-wiedza: pętla ciszy: %s", e)
+
+    # ---- kompilacja (jeden piszący)
+    def _ostatnia_kompilacja(self) -> float:
+        try:
+            return float(json.loads((self._stan / "wiedza-kompilacja.json").read_text(encoding="utf-8")).get("ostatnia") or 0)
+        except (OSError, ValueError, TypeError):
+            return 0.0
+
+    def _moze_kompilowac(self) -> bool:
+        if self._kontekst != "primary" or not self._skarbiec or not (self._skarbiec / "skrzynka").is_dir():
+            return False
+        if not any((self._skarbiec / "skrzynka").glob("*.md")):
+            return False
+        teraz = time.time()
+        ostatnia = self._ostatnia_kompilacja()
+        if teraz - ostatnia >= KOMPILACJA_CO_S:
+            return True
+        lt = time.localtime(teraz)
+        noc = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, KOMPILACJA_NOC[0], KOMPILACJA_NOC[1], 0, 0, 0, -1))
+        return noc <= teraz < noc + 600 and ostatnia < noc
+
+    def kompiluj(self, powod: str = "ręcznie") -> Dict[str, Any]:
+        """Przebieg kompilacji skrzynki tanim modelem (wiedza/kompilacja.py); zwraca raport."""
+        sk = self._sk()
+        if sk is None:
+            return {"error": "brak skarbca"}
+        K = _kompilacja().Kompilacja
+        raport = K(sk, self.model_kompilacji if hasattr(self, "model_kompilacji") else model_kompilacji).uruchom()
+        if raport.get("szkice") and not raport.get("zablokowana"):
+            logger.info("jarvo-wiedza: kompilacja (%s): %s szkiców → %s nowych, %s aktualizacji, %s sprzecznych, %s odrzuconych, %s błędów",
+                        powod, raport["szkice"], raport["nowe"], raport["aktualizacje"], raport["sprzeczne"], raport["odrzucone"], raport["bledy"])
+            self._cache = ("", 0.0, "")
+        return raport
 
     def _wyciag(self, messages: List[Dict[str, Any]], sid: str, *, od_tury: int, powod: str) -> Optional[Dict[str, Any]]:
         sk = self._sk()

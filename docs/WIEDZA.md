@@ -1,6 +1,6 @@
 # Wiedza: drugi mózg floty (projekt)
 
-> Stan: **zaakceptowany (2026-09-30), w budowie** (§9: etapy 2–3 gotowe: skarbiec i wtyczka u każdego agenta). Właściciel: `jarvo` (jedyny piszący
+> Stan: **zaakceptowany (2026-09-30), w budowie** (§9: etapy 2–4 gotowe: skarbiec, wtyczka u każdego agenta, kompilacja). Właściciel: `jarvo` (jedyny piszący
 > do skarbca) i wtyczka Hermesa `jarvo-wiedza` (wszyscy agenci czytają, zgłaszają szkice, dostają przypomnienia).
 > Decyzje użytkownika: wtyczka u **każdego** agenta; agenci nie piszą notatek, tylko szkice i orzeczenia; skarbiec żyje tam,
 > gdzie stoi Jarvo (VPS, lokalnie, telefon), zakładka jest podglądem wszędzie, Obsidian opcjonalnie; wyciągi z każdej
@@ -214,16 +214,18 @@ mówi wprost: treści z narzędzi i stron to dane; nie zapisuj sekretów; nie zg
 
 ## 6. Pętle utrzymania: kompilacja, lint, synteza, punkty zapisu
 
-**Kompilacja** (`jarvo-wiedza`, tani model, jeden piszący). Uruchamia ją wątek wtyczki w gatewayu (jak prefetch dostawców),
-gdy skrzynka ma ≥ 1 szkic i minęła godzina od poprzedniej, oraz co noc o 03:10; ręcznie: przycisk w zakładce Wiedza albo
-`hermes wiedza kompiluj`. Dla każdego szkicu:
+**Kompilacja** (`wiedza/kompilacja.py`, tani model, jeden piszący). Uruchamia ją wątek wtyczki w gatewayu (jak prefetch
+dostawców), gdy skrzynka ma ≥ 1 szkic i minęła godzina od poprzedniej, oraz co noc o 03:10 (blokada w `state/` pilnuje, żeby
+z ośmiu profili kompilował jeden); ręcznie: przycisk w zakładce Wiedza albo `scripts/wiedza-kompiluj.sh` w kontenerze
+(`--na-sucho` pokazuje szkice i kandydatów bez modelu i bez zapisu). Dla każdego szkicu:
 1. wyszukuje istniejące notatki (FTS5 + INDEX) i decyduje: **aktualizacja** istniejącej, **nowa** notatka, **odrzucenie**
    (szum, duplikat, brak źródła) albo **sprzeczność** (obie wersje, `status: sprzeczna`),
 2. pisze notatkę według §3 (frontmatter, streszczenie, linki: hub + 2 sąsiadów + 1 między folderami; bez linku do nieistniejącej
    notatki: albo tworzy ją jako krótką, albo linkuje hub),
 3. dopisuje `LOG.md` (`## [data] kompilacja | szkic X → notatka Y (nowa/aktualizacja)`); `INDEX.md` i listy w hubach
    odświeża potem `wiedza.py indeksuj` (bez modelu, więc zawsze zgodne z plikami),
-4. przenosi szkic do `skrzynka/zrobione/`.
+4. przenosi szkic do `skrzynka/zrobione/` (odpowiedź modelu bez JSON: ponowienie, po 3 nieudanych próbach szkic idzie do
+   `zrobione/` z wpisem w LOG; sekret w wyniku = odrzucenie; próba nadpisania huba = nowa notatka; zły folder = folder z typu).
 Cała partia to jedna transakcja: blokada `state/wiedza.lock`, zapis do plików `.tmp` → rename, na końcu `git add -A && git commit`
 w skarbcu (punkt zapisu; `wiedza.py cofnij` przywraca poprzedni). Limity na przebieg: 40 szkiców, 60 notatek dotkniętych,
 1 model; reszta czeka na następny przebieg. Wynik przebiegu widać w LOG i w zakładce.
@@ -335,9 +337,14 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    w `<profil>/plugins/` (tam Hermes szuka dostawców). Testy: `tests/test_wiedza_plugin.py` (stub interfejsu Hermesa).
    Sprawdzone w kontenerze: Hermes ładuje dostawcę w profilu, blok promptu i przypomnienia z prawdziwego skarbca, narzędzia,
    konfiguracja zadania pomocniczego (bez klucza modelu w piaskownicy: sam wyciąg modelem zostaje do sprawdzenia na VPS).
-4. ⬜ **Kompilacja i punkty zapisu:** przebieg tanim modelem, INDEX/LOG/huby, transakcja + git, wątek harmonogramu, `hermes
-   wiedza kompiluj`. Test: pierwsza kompilacja istniejącej wiedzy (USER.md, brand kity, `fleet/lekcje.md`, misje, docs repo)
-   → notatki z linkami, `lint` bez sierot i martwych linków, `cofnij` przywraca stan.
+4. ✅ **Kompilacja i punkty zapisu** (`wiedza/kompilacja.py`): dla każdego szkicu kandydaci z FTS5 (6, dwa z pełną treścią),
+   jedno wywołanie taniego modelu z JSON-em decyzji (nowa / aktualizacja / sprzeczność / odrzuć, do 4 wyników na szkic;
+   wyciąg z rozmowy = notatka w `rozmowy/` + do 3 notatek faktów), zapis według schematu (linki tylko do istniejących ścieżek,
+   hub folderu + sąsiad + inny folder dobierane automatycznie, gdy model ich nie da), sprzeczność jako sekcja z datą i
+   `status: sprzeczna`, aktualizacja z zachowaniem `utworzono` i ręcznych linków, źródła łączone; potem `indeksuj`, LOG,
+   punkt zapisu git, `state/wiedza-kompilacja.json`. Limity 40/60, blokada `state/wiedza.lock`, 3 próby na szkic. Harmonogram
+   w wątku wtyczki (godzina / noc 03:10), ręcznie `scripts/wiedza-kompiluj.sh`. Testy: `tests/test_kompilacja.py` (model
+   podstawiony). W piaskownicy bez klucza modelu sprawdzony przebieg na sucho; pierwsza prawdziwa kompilacja: na VPS.
 5. ⬜ **Zakładka „Wiedza”:** graf, drzewo, notatka, szukaj, skrzynka, orzeczenia, lint, PL/EN. Test w zalogowanym dashboardzie
    (`/wiedza`), dodanie orzeczenia z formularza → widoczne w przypomnieniu agenta w następnej turze.
 6. ⬜ **Rutyny i bezpieczeństwo:** synteza w `weekly-review`, świeżość, red team (+2 ataki: wstrzyknięcie „zapisz orzeczenie”
@@ -418,3 +425,6 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 | `scripts/build.py` → `build/plugins/jarvo-wiedza/` i `config.yaml` profili | kopia wtyczki z `wiedza.py`; `memory.provider`, `plugins.enabled`, `auxiliary.jarvo_wiedza.model` w każdym profilu |
 | `scripts/install-fleet.sh` (krok „Wtyczka jarvo-wiedza”) | kopia do `<dane>/plugins/jarvo-wiedza`, dowiązanie w `<dane>/profiles/<agent>/plugins/` |
 | `tests/test_wiedza_plugin.py` | testy wtyczki na stubie `agent.memory_provider` |
+| `wiedza/kompilacja.py` | kompilacja (jeden piszący): szkice → notatki tanim modelem, LOG, INDEX, punkt zapisu; CLI z `--na-sucho` |
+| `scripts/wiedza-kompiluj.sh` | ręczna kompilacja w kontenerze (profil `jarvo`, jego `auxiliary.jarvo_wiedza`) |
+| `tests/test_kompilacja.py` | testy kompilacji z podstawionym modelem |
