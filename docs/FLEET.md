@@ -195,7 +195,7 @@ Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-studio-marketing-i-kreacja).
 - [Z] marketingskills (12: copywriting, social, launch, ads, ad-creative…), Anthropic (3: `algorithmic-art`,
   `canvas-design`, `theme-factory`), `impeccable`; wspólny `hooki` (`shared/skills/`: trzy warstwy hooka, 18 taktyk)
 - [T] `formaty-platform` (specyfikacje i szablony), [T] `grafika-social` (szablony HTML do PNG w brand kicie),
-  [T] `pakiet-kampanii` (posty + grafiki + brief wideo + kalendarz), [T] `generacja-ai` (obrazy), [T] `copy-pl`, [T] `publikacja`
+  [T] `pakiet-kampanii` (posty + grafiki + brief wideo + kalendarz), [T] `generacja-ai` (obrazy), [T] `copy-pl` (+ sito AI-izmów), [T] `publikacja`
 
 **Rubryka sędziego (DoD):** właściwe formaty i wymiary dla platformy, zgodność z brand kitem,
 tekst bez „AI-izmów”, pliki gotowe do publikacji, przy kampanii z filmem: brief dla Wideografa.

@@ -28,7 +28,10 @@ Metody bierzesz z nich, a te zasady dopasowują wynik do polskiego odbiorcy.
 - **Czasowniki w stronie czynnej**, krótkie zdania, polska interpunkcja („”, –, bez spacji przed dwukropkiem).
 - **Zakazane kalki i AI-izmy:** „w dzisiejszym dynamicznym świecie”, „odkryj moc”, „przenieś na wyższy poziom”,
   „nie tylko… ale także” w każdym akapicie, „game changer”, nadmiar emoji, „Czy wiesz, że…?” jako otwarcie.
-  Po napisaniu przejdź tekst skillem `humanizer`.
+  Pełne sito: [`references/sito.md`](references/sito.md): 13 wzorców struktury i znaczenia (odruchowe trójki,
+  zdania równej długości, identyczne akapity, uspokajające zakończenie, „najlepszy w branży” bez odniesienia,
+  asekuracja, korzyść bez mechanizmu…), tabela słów do skreślenia, test na głos i wyjątek dla formalnych marek.
+  Po napisaniu przejdź tekst sitem, potem skillem `humanizer`.
 - **Liczby i fakty tylko z dowodem** (brand kit, raport Sherlocka). Brak dowodu → przeformułuj bez liczby.
 - Hashtagi: 3–5 trafnych (IG), 0–3 (LinkedIn), po polsku, jeśli odbiorca polski.
 
@@ -41,4 +44,5 @@ mówią co innego. Są słowa klientów (recenzje, komentarze, raport Sherlocka)
   3 różne taktyki hooka, reszta tekstu wspólna.
 
 ## Kontrola
-Limity znaków (`formaty-platform`), literówki, zgodność z tonem marki, zero obietnic bez pokrycia.
+Limity znaków (`formaty-platform`), literówki, zgodność z tonem marki, zero obietnic bez pokrycia,
+sito przeczytane punkt po punkcie i tekst przeczytany na głos.

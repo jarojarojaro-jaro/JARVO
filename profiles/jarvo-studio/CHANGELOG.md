@@ -1,6 +1,7 @@
 # Changelog: jarvo-studio
 
 ## Niewydane
+- `copy-pl`: sito AI-izmów `references/sito.md` (za marketing-os `slop-patterns.md`, MIT, po polsku): 13 wzorców struktury i znaczenia, tabela słów do skreślenia, test na głos, wyjątek dla formalnych marek.
 - Wspólny skill `hooki` (`shared/skills/`, za marketing-os `hooks.md`, MIT): trzy warstwy hooka bez powtórzeń, 18 taktyk, korpus słów klientów, rozbieg, lejek diagnozy. `copy-pl`: hook z taktyką, warianty reklamy = różne taktyki.
 - Czat Jarvo HQ (`platform_toolsets.api_server`) ustawiony jawnie: te same narzędzia co na Telegramie (bez `clarify`). Wcześniej Hermes dawał tu swój domyślny zestaw narzędzi.
 
