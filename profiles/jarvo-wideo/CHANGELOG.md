@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Master prompt clipmakera: zasady cięć (nie w środku słowa, zapas 30–200 ms, napisy zawsze na wierzchu).
 - Skill `clipmaker` (master prompt: typy momentów, 6 osi oceny, uczciwość; schemat `plan.json`) zastępuje `klipy-z-dlugiego`: rolki są projektami edytora HQ, nie wypalonymi MP4.
 - `klipy.py` (clipmaker): długie nagranie → `przygotuj` (mowa, cięcia ujęć, arkusze, transkrypcja), `sprawdz` (plan.json), `zbuduj` (projekty edytora + MP4 + KLIPY.md).
 - Napisy karaoke w projekcie montażu: `projekt.py napisy --karaoke [kolor]`, podświetlenie słowa w edytorze HQ i w renderze.

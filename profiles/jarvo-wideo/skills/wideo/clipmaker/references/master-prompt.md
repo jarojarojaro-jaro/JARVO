@@ -28,6 +28,16 @@ wybierasz kandydatów, żeby rolki pokryły różne wątki, a nie pięć razy te
   obejrzenia jeszcze raz albo do komentarza.
 - **Długość:** 20–60 s; domyślnie 25–45 s. Krócej, gdy myśl jest skończona; dłużej tylko przy historii, która trzyma.
 
+### Cięcia (rzemiosło)
+- **Nigdy w środku słowa.** `od` i `do` segmentu stawiasz w przerwie między słowami (czasy słów są w `nagranie.mowa.json`);
+  `klipy.py sprawdz` ostrzega „tnie słowo”.
+- **Zapas na krawędziach 30–200 ms:** czasy słów z rozpoznawania mowy pływają o kilkadziesiąt milisekund, więc cięcie
+  tuż przy słowie ucina jego początek albo końcówkę. Skrypt sam zostawia ~80 ms przed pierwszym słowem, ~250 ms po
+  ostatnim i ~120 ms oddechu po wyciętej pauzie; ręcznie przesuwasz krawędź, gdy słychać ucięcie (szybkie tempo: bliżej
+  30 ms, spokojna rozmowa: bliżej 200 ms).
+- **Napisy zawsze na wierzchu:** nic (plansza, logo, grafika, tytuł) nie może ich zasłaniać. Tytuł-hook stoi u góry,
+  napisy w dolnej części; dodatkowy element kładziesz poza pasem napisów albo w czasie, gdy napisów nie ma.
+
 ## 4. Ocena (1–10 na każdej osi)
 | Oś | 9–10 | 7–8 | ≤ 6 |
 |---|---|---|---|
