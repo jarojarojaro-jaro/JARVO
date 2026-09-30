@@ -13,13 +13,15 @@
 #      przebudowa tylko przy braku obrazu, --rebuild albo zmianie infra/ od ostatniej budowy,
 #   4. instalacja w $JARVO_LOCAL (compose/.env, jarvo.env, sekrety bez kluczy: GUI i narzędzia działają,
 #      agenci odpowiedzą po dodaniu klucza w dashboardzie Keys),
-#   5. scripts/deploy.sh --no-pull --no-build (pierwszy raz z --first-run): walidacja, build dystrybucji,
+#   5. certyfikat proxy w magazynie NSS hermesa ($JARVO_LOCAL/data/hermes/.pki/nssdb): Chromium (Lighthouse, axe,
+#      zrzuty, Playwright) nie czyta magazynu systemowego i bez tego każda strona z internetu kończy się
+#      ERR_CERT_AUTHORITY_INVALID; odtwarzany tylko po zmianie certyfikatu,
+#   6. scripts/deploy.sh --no-pull --no-build (pierwszy raz z --first-run): walidacja, build dystrybucji,
 #      instalacja profili, healthchecki.
 #
 # Tylko do piaskownicy. Na VPS: scripts/deploy.sh, na własnym komputerze: scripts/local-up.sh.
-# Uwaga: Python 3.13 w obrazie ma ścisłą weryfikację X.509 i odrzuca certyfikat proxy piaskownicy
-# („CA cert does not include key usage extension”), więc skrypty Pythona w kontenerze nie pobiorą nic
-# z internetu. Nie wyłączamy weryfikacji TLS: curl, apt, uv i npm w budowie działają.
+# Weryfikacji TLS nigdzie nie wyłączamy: curl, apt, uv, npm i Python w kontenerze ufają certyfikatowi proxy
+# z magazynu systemowego (krok 2), Chromium z magazynu NSS (krok 5).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 L="${JARVO_LOCAL:-$HOME/jarvo-local}"
@@ -99,6 +101,22 @@ if [[ ! -f "$L/compose/.env" ]]; then
   chgrp -R 10000 "$L/secrets" && chmod 2750 "$L/secrets" && chmod 640 "$L"/secrets/*.env
   chmod 600 "$L/compose/.env"
 fi
+
+NSS="$L/data/hermes/.pki/nssdb"                 # $HOME hermesa w kontenerze to /opt/data
+CA_SHA="$(sha256sum "$CA" | cut -c1-64)"
+if [[ "$(cat "$NSS/.ca-sha" 2>/dev/null)" != "$CA_SHA" ]]; then
+  log "certyfikat proxy dla Chromium (NSS)"
+  command -v certutil >/dev/null || apt-get install -y -q libnss3-tools >/dev/null \
+    || { apt-get update -q >/dev/null && apt-get install -y -q libnss3-tools >/dev/null; }
+  rm -rf "$NSS" && mkdir -p "$NSS"
+  certutil -N -d "sql:$NSS" --empty-password
+  tmp="$(mktemp -d)"
+  csplit -s -z -f "$tmp/ca-" "$CA" '/-----BEGIN CERTIFICATE-----/' '{*}'
+  i=0
+  for c in "$tmp"/ca-*; do i=$((i + 1)); certutil -A -d "sql:$NSS" -t "C,," -n "piaskownica-$i" -i "$c"; done
+  rm -rf "$tmp"
+  echo "$CA_SHA" > "$NSS/.ca-sha"
+fi
 chown -R 10000:10000 "$L/build" "$L/data"      # kontener pracuje jako hermes (uid 10000)
 
 FLAGS=(--no-pull --no-build)
@@ -111,7 +129,7 @@ cat <<EOF
 
 ✅ Flota działa w piaskownicy.
    Jarvo HQ:   http://localhost:9119/base   login: jarvo   hasło: $PASS
-   komenda:    docker exec -u hermes -e PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:\$PATH jarvo-hermes <polecenie>
+   komenda:    docker exec -u hermes jarvo-hermes <polecenie>   (PATH obrazu ma już Hermesa i narzędzia; bez bash -l)
    ponownie:   JARVO_LOCAL=$L bash scripts/sandbox-up.sh   (przebudowa obrazu tylko po zmianie infra/)
    stop:       JARVO_LOCAL=$L bash scripts/sandbox-up.sh down
 EOF
