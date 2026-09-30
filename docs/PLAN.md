@@ -19,6 +19,7 @@ Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa 
 | [BOSS.md](BOSS.md) | mechanika Main Judge'a: misje, kolejka decyzji, patrol, sędziowanie, eskalacje |
 | [HQ.md](HQ.md) | Jarvo HQ: GUI floty (pokoje agentów, praca na żywo, czat) |
 | [ADS.md](ADS.md) | projekt agenta reklam płatnych `jarvo-ads` i Skarbca (strażnik budżetu) |
+| [LEADY.md](LEADY.md) | projekt Łowcy leadów: sygnały zakupowe z oficjalnych źródeł → lista firm z „dlaczego teraz” |
 | [VPS.md](VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring, wdrożenia |
 | [RUNBOOK.md](RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [SOURCES.md](SOURCES.md) | źródła, atrybucje i licencje |
@@ -222,6 +223,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - 🟡 `jarvo-ads` (reklamy Meta i Google): SOUL, 10 skilli, skrypty, rubryka, 12 scenariuszy evals; bez kluczy ([ADS.md](ADS.md)).
 - ⬜ Clipmaker Wideografa: długie nagranie → edytowalne rolki (kadr z focusem, napisy karaoke, `klipy.py`) ([KLIPY.md](KLIPY.md)).
 - ⬜ Skarbiec: sejf tokenów reklamowych, koperty zatwierdzane kodem, STOP ([ADS.md](ADS.md)).
+- 🟡 Łowca leadów `jarvo-lowca`: sygnały z KRS, przetargów, stron firm → lista firm z „dlaczego teraz” i opublikowanym kontaktem ([LEADY.md](LEADY.md)).
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
