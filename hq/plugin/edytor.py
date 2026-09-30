@@ -32,6 +32,7 @@ MEDIA_EXT = VIDEO_EXT | IMAGE_EXT | AUDIO_EXT
 MAX_CLIPS = 200
 MAX_TEXTS = 60
 MAX_AUDIO = 12
+MAX_WORDS = 40           # słów w jednym napisie karaoke (linia napisu ma ich 2–8)
 MAX_DURATION = 3 * 3600.0
 MIN_CLIP = 0.04          # jedna klatka przy 25 fps
 FPS_ALLOWED = (24, 25, 30, 50, 60)
@@ -110,7 +111,11 @@ def normalize(project: dict, resolve) -> dict:
         s = _num((t or {}).get("start"), 0, total, 0)
         e = _num(t.get("end"), 0, total, s)
         if e - s >= MIN_CLIP:
-            texts.append({"start": s, "end": e, "i": i})
+            x = {"start": s, "end": e, "i": i}
+            kara = karaoke_windows(t, s, e)
+            if kara:
+                x["kara"] = kara
+            texts.append(x)
 
     audio = []
     for m in (project.get("audio") or [])[:MAX_AUDIO]:
@@ -124,6 +129,71 @@ def normalize(project: dict, resolve) -> dict:
         if b - a >= MIN_CLIP:
             audio.append({"src": path, "in": a, "out": b, "start": start, "volume": _num(m.get("volume"), 0, 2, 1)})
     return {"canvas": canvas, "clips": clips, "texts": texts, "audio": audio, "duration": total}
+
+
+def karaoke_words(t: dict) -> list[str] | None:
+    """Słowa napisu karaoke albo None (ta sama reguła co karaokeWords w 44-napisy.js): jest kolor `hl`, lista `words`
+    i tyle samo słów w tekście (poprawiona literówka zostaje karaoke, inna liczba słów już nie)."""
+    words, toks = t.get("words"), str(t.get("text") or "").split()
+    if not t.get("hl") or not isinstance(words, list) or not words or len(words) != len(toks) or len(words) > MAX_WORDS:
+        return None
+    return toks
+
+
+def karaoke_windows(t: dict, s: float, e: float) -> list[tuple[float, float, int]] | None:
+    """Okna czasu osi, w których aktywne jest słowo j (czasy słów liczone od początku napisu).
+    Przed pierwszym słowem aktywne jest pierwsze, ostatnie trwa do końca napisu: okna pokrywają cały napis."""
+    if karaoke_words(t) is None:
+        return None
+    starts, top = [], 0.0
+    for w in t["words"]:
+        rel = _num(w[0] if isinstance(w, (list, tuple)) and w else 0, 0, MAX_DURATION, 0)
+        top = max(top, rel)                                    # czasy rosną (jak w karaokeIndex)
+        starts.append(min(e, s + top))
+    out = []
+    for j in range(len(starts)):
+        a = s if j == 0 else starts[j]
+        b = e if j == len(starts) - 1 else starts[j + 1]
+        if b - a >= 0.001:
+            out.append((a, b, j))
+    return out or None
+
+
+def blank_png(path: Path, w: int, h: int) -> Path:
+    """Przezroczysty PNG w×h (tło warstwy karaoke między napisami), bez zależności."""
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    raw = (b"\x00" + b"\x00" * (4 * w)) * h
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+                     + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
+    return path
+
+
+def karaoke_concat(p: dict, pngs: dict[int, list[Path]], blank: Path, dest: Path) -> Path | None:
+    """Wszystkie napisy karaoke jako JEDNA warstwa: lista demuxera concat (PNG aktywnego słowa + czas, przerwy
+    = przezroczysty PNG). ffmpeg dekoduje naraz jeden obraz, więc pamięć nie rośnie z liczbą słów."""
+    events = sorted((a, b, pngs[x["i"]][j]) for x in p["texts"] if x.get("kara") for a, b, j in x["kara"])
+    if not events:
+        return None
+    lines, t = ["ffconcat version 1.0"], 0.0
+
+    def add(path: Path, dur: float) -> None:
+        if dur >= 0.001:
+            lines.extend([f"file '{path}'", f"duration {dur:.3f}"])
+    for a, b, png in events:
+        if b <= t:
+            continue                       # nakładające się napisy karaoke: wygrywa wcześniejszy
+        a = max(a, t)
+        add(blank, a - t)
+        add(png, b - a)
+        t = b
+    add(blank, max(0.0, p["duration"] - t))
+    lines.append(f"file '{blank}'")        # demuxer concat potrzebuje ostatniego pliku jeszcze raz
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return dest
 
 
 def _atempo(speed: float) -> str:
@@ -152,7 +222,7 @@ def cover_filter(W: int, H: int, c: dict) -> str:
 
 
 def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
-                  ffmpeg: str = "ffmpeg") -> list[str]:
+                  ffmpeg: str = "ffmpeg", karaoke: Path | None = None) -> list[str]:
     """Argumenty ffmpeg dla znormalizowanego projektu. `has_audio[src] -> bool` z ffprobe."""
     W, H, F = p["canvas"]["w"], p["canvas"]["h"], p["canvas"]["fps"]
     args = [ffmpeg, "-nostdin", "-hide_banner", "-y", "-loglevel", "error", "-progress", "pipe:1", "-nostats"]
@@ -183,10 +253,21 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
 
     vlast = "vc"
     for k, (t, png) in enumerate(zip(p["texts"], text_pngs)):
+        if t.get("kara") and karaoke:
+            continue                        # ten napis jest w warstwie karaoke niżej
         args += ["-i", str(png)]
         ti = n; n += 1
         graph.append(f"[{vlast}][{ti}:v]overlay=0:0:format=auto:enable='between(t,{_f(t['start'])},{_f(t['end'])})'[vt{k}]")
         vlast = f"vt{k}"
+
+    if karaoke:
+        # -reinit_filter 0: obrazy mogą mieć różny format pikseli (RGB/RGBA); bez tego ffmpeg przebudowuje graf
+        # w trakcie i nakładka gubi warstwę (sprawdzone testem na kolorach)
+        args += ["-reinit_filter", "0", "-f", "concat", "-safe", "0", "-i", str(karaoke)]
+        ki = n; n += 1
+        graph.append(f"[{ki}:v]fps={F},format=rgba[kl]")
+        graph.append(f"[{vlast}][kl]overlay=0:0:format=auto:eof_action=pass[vk]")
+        vlast = "vk"
 
     alast = "ac"
     if p["audio"]:
@@ -338,8 +419,9 @@ def lines_from_words(words: list, max_chars: int = 32, max_gap: float = 0.6, max
     końcu zdania, za długim tekście albo czasie). Wtrąceń nie pokazujemy w napisach."""
     lines, cur = [], []
     def flush():
-        if cur:
-            lines.append({"start": cur[0][0], "end": cur[-1][1], "text": " ".join(w[2] for w in cur)})
+        if cur:   # words: czasy słów od początku linii (napisy karaoke, jak groupLines w edytorze)
+            lines.append({"start": cur[0][0], "end": cur[-1][1], "text": " ".join(w[2] for w in cur),
+                          "words": [[round(w[0] - cur[0][0], 3), round(w[1] - cur[0][0], 3), w[2]] for w in cur]})
             cur.clear()
     for w in words:
         a, b, t = float(w[0]), float(w[1]), str(w[2])

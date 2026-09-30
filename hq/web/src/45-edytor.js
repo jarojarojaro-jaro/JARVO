@@ -16,6 +16,7 @@ const ED_MIN = 0.1;
 const ED_COLORS = ["#FFFFFF", "#000000", "#FFD60A", "#FF453A", "#32D74B", "#0A84FF", "#BF5AF2", "#FF9F0A"];
 const ED_CAP = { x: 0.5, y: 0.84, size: 58, color: "#FFFFFF", bg: "#000000", style: "outline", bold: true, align: "center", maxw: 0.84,
   font: "'Bricolage Grotesque', system-ui, sans-serif" };
+const ED_HL = "#FFE14D";   // domyślny kolor aktywnego słowa (karaoke)
 const plNapisy = (n) => (n === 1 ? "napis" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "napisy" : "napisów");
 const ED_FILLER = /^(y+|e+|ee+m*|m+|h?m+|ym+|em+|uh+m*|um+|eh+m*|ah+|yhm+|mhm+)$/;
 const isFiller = (w) => { const x = String(w).toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""); return !!x && ED_FILLER.test(x); };
@@ -23,7 +24,11 @@ const isFiller = (w) => { const x = String(w).toLowerCase().replace(/[^\p{L}\p{N
 function groupLines(ws, maxChars = 32, maxGap = 0.6, maxDur = 3.5) {
   const out = [];
   let cur = [];
-  const flush = () => { if (cur.length) out.push({ start: cur[0].t0, end: cur[cur.length - 1].t1, text: cur.map((w) => w.text).join(" ") }); cur = []; };
+  const flush = () => {
+    if (cur.length) out.push({ start: cur[0].t0, end: cur[cur.length - 1].t1, text: cur.map((w) => w.text).join(" "),
+      words: cur.map((w) => [+(w.t0 - cur[0].t0).toFixed(3), +(w.t1 - cur[0].t0).toFixed(3), w.text]) });
+    cur = [];
+  };
   for (const w of ws) {
     if (isFiller(w.text)) continue;
     const last = cur[cur.length - 1];
@@ -88,11 +93,11 @@ function layoutClips(clips) {
 }
 const projTotal = (p) => p.clips.reduce((a, c) => a + clipDur(c), 0);
 
-async function textPng(t, W, H) {
+async function textPng(t, W, H, hi = -1) {
   try { await document.fonts.load(textFont(t, H, W).font); } catch (_) { /* czcionka systemowa */ }
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
-  drawText(c.getContext("2d"), t, W, H);
+  drawText(c.getContext("2d"), t, W, H, hi);
   return c.toDataURL("image/png");
 }
 
@@ -514,7 +519,7 @@ function VideoEditor({ path, onClose }) {
     const now = tRef.current;
     for (const x of P.texts) {
       if (now < x.start || now >= x.end) continue;
-      const b = drawText(g, x, w, h);
+      const b = drawText(g, x, w, h, karaokeIndex(x, now));
       const s = selRef.current;
       if (s && s.type === "text" && s.id === x.id) {
         g.save(); g.strokeStyle = "#3BA9FF"; g.lineWidth = Math.max(2, w / 480); g.setLineDash([w / 90, w / 140]);
@@ -668,9 +673,13 @@ function VideoEditor({ path, onClose }) {
     try {
       const { w, h } = p.canvas;
       const texts = p.texts.filter((x) => x.end - x.start >= 0.04 && x.start < total && String(x.text || "").trim());
-      const pngs = [];
-      for (const x of texts) pngs.push(await textPng(x, w, h));
-      const r = await api.editExport(path, { ...p, texts }, pngs);
+      const pngs = [], karaoke = {};
+      for (const [i, x] of texts.entries()) {
+        pngs.push(await textPng(x, w, h));
+        const ws = karaokeWords(x);
+        if (ws) { karaoke[i] = []; for (let k = 0; k < ws.length; k++) karaoke[i].push(await textPng(x, w, h, k)); }
+      }
+      const r = await api.editExport(path, { ...p, texts }, pngs, karaoke);
       setJob(r);
     } catch (e) { setJob({ state: "error", error: e.message || String(e) }); }
   }
@@ -788,7 +797,10 @@ function VideoEditor({ path, onClose }) {
     setSel({ type: "text", id: x.id });
     const a = x.start, b = x.end;
     drag(e, (d) => {
-      if (edge === "l") upd("text", x.id, { start: clamp(snap(a + d, [a]), 0, b - ED_MIN) }, true);
+      if (edge === "l") {
+        const ns = clamp(snap(a + d, [a]), 0, b - ED_MIN);
+        upd("text", x.id, { start: ns, ...(x.words ? { words: x.words.map((w) => [+(w[0] - (ns - a)).toFixed(3), +(w[1] - (ns - a)).toFixed(3), w[2]]) } : {}) }, true);
+      }
       else if (edge === "r") upd("text", x.id, { end: clamp(snap(b + d, [b]), a + ED_MIN, total) }, true);
       else { const len = b - a; const s = clamp(snap(a + d, [a, b]), 0, Math.max(0, total - len)); upd("text", x.id, { start: s, end: s + len }, true); }
     });
@@ -870,9 +882,9 @@ function VideoEditor({ path, onClose }) {
   }
   function setCaptions(list) {
     const old = projRef.current.texts.find((x) => x.cap);
-    const look = old ? { x: old.x, y: old.y, size: old.size, color: old.color, bg: old.bg, style: old.style, font: old.font, bold: old.bold, maxw: old.maxw } : {};
+    const look = old ? { x: old.x, y: old.y, size: old.size, color: old.color, bg: old.bg, style: old.style, font: old.font, bold: old.bold, maxw: old.maxw, hl: old.hl || "" } : {};
     H.apply((P) => ({ ...P, texts: [...P.texts.filter((x) => !x.cap),
-      ...list.map((k) => ({ ...ED_CAP, ...look, id: edId("t"), cap: true, start: k.start, end: k.end, text: k.text }))] }));
+      ...list.map((k) => ({ ...ED_CAP, ...look, id: edId("t"), cap: true, start: k.start, end: k.end, text: k.text, ...(k.words ? { words: k.words } : {}) }))] }));
   }
   async function autoCaptions(force) {
     let sp = speech;
@@ -1115,6 +1127,10 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Styl napisów", "Caption style")}${seg(ED_STYLES.map(([k2, pl, en]) => [k2, L(pl, en)]), caps[0].style, (v) => setCapLook({ style: v }))}</label>
       <label>${L("Położenie", "Position")}${seg([[0.16, L("Góra", "Top")], [0.5, L("Środek", "Middle")], [0.84, L("Dół", "Bottom")]], [0.16, 0.5, 0.84].find((y) => Math.abs(y - caps[0].y) < 0.02), (v) => setCapLook({ y: v }))}</label>
       <label>${L("Kolor", "Color")}${swatches(caps[0].color, (v, lv) => setCapLook({ color: v }, lv))}</label>
+      ${caps.some((x) => (x.words || []).length) ? html`<label class="thq-ed-check"><input type="checkbox" checked=${!!caps[0].hl}
+          onChange=${(e) => setCapLook({ hl: e.target.checked ? (caps[0].hlLast || ED_HL) : "", hlLast: caps[0].hl || caps[0].hlLast })}/> ${L("Karaoke: aktywne słowo w kolorze", "Karaoke: highlight the spoken word")}</label>
+        ${caps[0].hl && html`<label>${L("Kolor aktywnego słowa", "Active word color")}${swatches(caps[0].hl, (v, lv) => setCapLook({ hl: v }, lv))}</label>`}`
+        : html`<p class="thq-ed-note">${L("Karaoke działa z napisami ze słów (automatyczne napisy), nie z pliku .srt.", "Karaoke works with word-synced auto captions, not .srt files.")}</p>`}
       <label>${L("Rozmiar", "Size")} · ${Math.round(caps[0].size)}<input type="range" min="24" max="140" value=${caps[0].size} onInput=${(e) => setCapLook({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
       <p class="thq-ed-note">${L(`${caps.length} ${plNapisy(caps.length)}. Pojedynczy napis poprawisz, dotykając go na osi czasu.`, `${caps.length} captions. Tap one on the timeline to fix its text.`)}</p>
       <div class="thq-ed-acts">${act("trash", L("Usuń napisy", "Remove captions"), () => H.apply((P) => ({ ...P, texts: P.texts.filter((x) => !x.cap) })), { bad: true })}</div>`}

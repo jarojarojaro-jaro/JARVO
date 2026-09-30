@@ -116,6 +116,11 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   następnym razem wczytuje się sam, widzi go też Wideograf. Bez `jarvo-stt` działa samo wykrywanie pauz.
 - **Napisy zgrane ze słowami:** linie układane są ze słów już po cięciach (nowa linia po pauzie, końcu zdania albo
   32 znakach), bez wtrąceń.
+- **Karaoke:** napisy ze słów (automatyczne, nie z pliku `.srt`) pamiętają czas każdego słowa (`words`, liczony od
+  początku napisu, więc przesunięty napis zabiera go ze sobą). Pole **Karaoke** w zakładce „Napisy” podświetla słowo
+  wypowiadane w danej chwili wybranym kolorem (`hl`, domyślnie żółty). Poprawka literówki (ta sama liczba słów) zostawia
+  karaoke, inna liczba słów wyłącza je tylko w tej linii. Eksport: obraz PNG na każde słowo, a wszystkie napisy karaoke
+  idą do ffmpeg jako **jedna** warstwa (demuxer `concat`), więc pamięć nie rośnie z długością filmu.
 - **Każda przeglądarka:** gdy przeglądarka nie odtwarza kodeka filmu (np. Chromium bez H.264, ProRes), edytor sam
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.

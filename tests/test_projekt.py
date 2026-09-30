@@ -94,3 +94,25 @@ def test_kadr_sets_focus_and_zoom(film, capsys):
     assert pr.main(["sprawdz", str(film)]) == 0
     with pytest.raises(SystemExit, match="nie ma klipu"):
         pr.main(["kadr", str(film), "brak"])
+
+
+def test_captions_karaoke_keep_word_times(film):
+    """--karaoke: napisy ze słów dostają czasy słów (od początku linii) i kolor aktywnego słowa."""
+    ed.speech_path(film).write_text(json.dumps(ed.speech_data(
+        [[0.1, 0.5, "Raz"], [0.6, 0.9, "dwa."], [2.2, 2.6, "Trzy"], [2.7, 3.0, "cztery."]], [], 4.0)), encoding="utf-8")
+    assert pr.main(["napisy", str(film), "--karaoke"]) == 0
+    caps = [x for x in proj(film)["texts"] if x.get("cap")]
+    assert caps[0]["hl"] == pr.KARAOKE_HL and caps[0]["words"] == [[0.0, 0.4, "Raz"], [0.5, 0.8, "dwa."]]
+    p = ed.normalize(proj(film), pr.resolve)
+    assert [len(x.get("kara") or []) for x in p["texts"]] == [2, 2]
+    assert pr.main(["napisy", str(film), "--karaoke", "#00FF00"]) == 0
+    assert all(x["hl"] == "#00FF00" for x in proj(film)["texts"] if x.get("cap"))
+
+
+@pytest.mark.skipif(not _has_playwright(), reason="render napisów potrzebuje playwright (narzedzia.py instaluj html)")
+def test_render_karaoke(film, capsys):
+    ed.speech_path(film).write_text(json.dumps(ed.speech_data(
+        [[0.1, 0.5, "Raz"], [0.6, 0.9, "dwa."], [2.2, 2.6, "Trzy"], [2.7, 3.0, "cztery."]], [], 4.0)), encoding="utf-8")
+    pr.main(["napisy", str(film), "--karaoke"])
+    assert pr.main(["render", str(film), "--out", str(film.with_name("kar.mp4"))]) == 0
+    assert ed.probe(film.with_name("kar.mp4"))["duration"] == pytest.approx(4.0, abs=0.15)

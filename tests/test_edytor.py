@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -211,3 +212,87 @@ def test_real_export_focus_picks_side_of_frame(tmp_path):
         colors[fx] = tuple(rgb[:3])
     assert colors[0.0][0] > 150 and colors[0.0][2] < 90       # czerwony
     assert colors[1.0][2] > 150 and colors[1.0][0] < 90       # niebieski
+
+
+# ------------------------------------------------------------------ napisy karaoke
+
+KAR = {"start": 10.0, "end": 12.0, "text": "Trzy błędy w cenach", "hl": "#FFE14D",
+       "words": [[0, 0.4, "Trzy"], [0.5, 0.9, "błędy"], [1.0, 1.1, "w"], [1.2, 1.9, "cenach"]]}
+
+
+def test_karaoke_rule_matches_editor():
+    assert ed.karaoke_words(KAR) == ["Trzy", "błędy", "w", "cenach"]
+    assert ed.karaoke_words({**KAR, "text": "Trzy błędy w cenach!"}) == ["Trzy", "błędy", "w", "cenach!"]   # literówka
+    assert ed.karaoke_words({**KAR, "text": "Dwa błędy"}) is None          # inna liczba słów: zwykły napis
+    assert ed.karaoke_words({**KAR, "hl": ""}) is None                    # karaoke wyłączone
+
+
+def test_karaoke_windows_cover_the_caption():
+    w = ed.karaoke_windows(KAR, 10.0, 12.0)
+    assert w == [(10.0, 10.5, 0), (10.5, 11.0, 1), (11.0, 11.2, 2), (11.2, 12.0, 3)]
+    # czasy spoza napisu przycięte, malejące traktowane jak rosnące
+    odd = {**KAR, "words": [[0, 1, "a"], [5, 6, "b"], [0.2, 0.3, "c"], [9, 9, "d"]], "text": "a b c d"}
+    assert ed.karaoke_windows(odd, 10.0, 12.0) == [(10.0, 12.0, 0)]
+
+
+def test_karaoke_layer_and_command(tmp_path):
+    f = _files(tmp_path)
+    p = ed.normalize({"canvas": {"w": 1080, "h": 1920},
+                      "clips": [{"src": str(f["a.mp4"]), "in": 0, "out": 20}],
+                      "texts": [{"start": 1, "end": 3, "text": "tytuł"}, KAR]}, _resolver(tmp_path))
+    assert "kara" not in p["texts"][0] and len(p["texts"][1]["kara"]) == 4
+    words = {1: [tmp_path / f"w{j}.png" for j in range(4)]}
+    blank = ed.blank_png(tmp_path / "pusty.png", 8, 4)
+    assert blank.read_bytes().startswith(b"\x89PNG\r\n\x1a\n") and b"IHDR" in blank.read_bytes()
+    lst = ed.karaoke_concat(p, words, blank, tmp_path / "k.ffconcat").read_text(encoding="utf-8").splitlines()
+    assert lst[0] == "ffconcat version 1.0"
+    assert lst[1:5] == [f"file '{blank}'", "duration 10.000", f"file '{words[1][0]}'", "duration 0.500"]
+    assert lst[-3:] == [f"file '{blank}'", "duration 8.000", f"file '{blank}'"]   # przerwa do końca + powtórka
+    cmd = ed.build_command(p, {}, [tmp_path / "t0.png", tmp_path / "t1.png"], tmp_path / "o.mp4",
+                           karaoke=tmp_path / "k.ffconcat")
+    graph = cmd[cmd.index("-filter_complex") + 1]
+    assert str(tmp_path / "t0.png") in cmd and str(tmp_path / "t1.png") not in cmd   # karaoke nie jako zwykły napis
+    assert "concat" in cmd and "eof_action=pass" in graph
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_real_export_karaoke_layer(tmp_path):
+    """Dwa słowa = dwa obrazy (czerwony, niebieski). W czasie słowa 1 kadr jest czerwony, słowa 2 niebieski,
+    po napisie widać film (zielony): warstwa idzie jednym wejściem ffmpeg."""
+    run = lambda *a: subprocess.run(["ffmpeg", "-loglevel", "error", "-y", *a], check=True)
+    run("-f", "lavfi", "-i", "color=green:s=64x64:r=25:d=3", "-pix_fmt", "yuv420p", str(tmp_path / "g.mp4"))
+    for name, col in (("r", "red"), ("b", "blue")):
+        run("-f", "lavfi", "-i", f"color={col}:s=64x64", "-frames:v", "1", str(tmp_path / f"{name}.png"))
+    t = {"start": 0.0, "end": 2.0, "text": "raz dwa", "hl": "#ff0", "words": [[0, 0.9, "raz"], [1.0, 1.9, "dwa"]]}
+    p = ed.normalize({"canvas": {"w": 64, "h": 64, "fps": 25}, "clips": [{"src": str(tmp_path / "g.mp4"), "in": 0, "out": 3}],
+                      "texts": [t]}, _resolver(tmp_path))
+    layer = ed.karaoke_concat(p, {0: [tmp_path / "r.png", tmp_path / "b.png"]},
+                              ed.blank_png(tmp_path / "pusty.png", 64, 64), tmp_path / "k.ffconcat")
+    out = tmp_path / "o.mp4"
+    r = subprocess.run(ed.build_command(p, {}, [tmp_path / "r.png"], out, karaoke=layer), capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+
+    def rgb(ts):
+        return tuple(subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", str(ts), "-i", str(out), "-frames:v", "1",
+                                     "-vf", "scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                                    capture_output=True, check=True).stdout[:3])
+    red, blue, green = rgb(0.5), rgb(1.5), rgb(2.5)
+    assert red[0] > 150 and red[2] < 90
+    assert blue[2] > 150 and blue[0] < 90
+    assert green[1] > 90 and green[0] < 90 and green[2] < 90
+
+
+def test_karaoke_js_rule_same_as_python(tmp_path):
+    """karaokeWords / karaokeIndex z 44-napisy.js dają te same słowa i okna co edytor.py."""
+    if not shutil.which("node"):
+        pytest.skip("brak node")
+    js = (Path(__file__).resolve().parents[1] / "hq" / "web" / "src" / "44-napisy.js").read_text(encoding="utf-8")
+    prog = js + f"""
+const t = {json.dumps(KAR)};
+console.log(JSON.stringify({{w: karaokeWords(t).map((x) => x[2]),
+  idx: [9.9, 10.2, 10.5, 10.95, 11.15, 11.5, 13].map((s) => karaokeIndex(t, s)),
+  off: karaokeWords({{...t, text: "Dwa błędy"}}), plain: karaokeIndex({{...t, hl: ""}}, 11)}}));"""
+    out = json.loads(subprocess.run(["node", "-e", prog], capture_output=True, text=True, check=True).stdout)
+    assert out["w"] == ed.karaoke_words(KAR)
+    assert out["idx"] == [0, 0, 1, 1, 2, 3, 3]
+    assert out["off"] is None and out["plain"] == -1

@@ -35,7 +35,25 @@ function textBox(ctx, t, W, H) {
   const pad = t.style === "box" ? px * 0.35 : px * 0.1;
   return { px, font, lines, lh, w, h, cx, cy, x0: cx - w / 2 - pad, y0: cy - h / 2 - pad, x1: cx + w / 2 + pad, y1: cy + h / 2 + pad };
 }
-function drawText(ctx, t, W, H) {
+// Karaoke: napis ma `words` = [[od, do, słowo]] w sekundach OD POCZĄTKU napisu (przesunięcie napisu na osi
+// zabiera czasy ze sobą) i `hl` = kolor aktywnego słowa. Poprawiony tekst z tą samą liczbą słów zachowuje czasy
+// (literówka), inna liczba słów wyłącza karaoke tej linii. Ta sama reguła jest w edytor.py (eksport).
+function karaokeWords(t) {
+  if (!t || !t.hl || !Array.isArray(t.words) || !t.words.length) return null;
+  const toks = String(t.text || "").split(/\s+/).filter(Boolean);
+  if (toks.length !== t.words.length) return null;
+  return t.words.map((w, i) => [Math.max(0, +w[0] || 0), Math.max(0, +w[1] || 0), toks[i]]);
+}
+// Numer aktywnego słowa w chwili `now` (czas osi): ostatnie, które już się zaczęło; przed pierwszym = 0.
+function karaokeIndex(t, now) {
+  const ws = karaokeWords(t);
+  if (!ws) return -1;
+  const rel = now - (t.start || 0);
+  let k = 0;
+  for (let i = 0; i < ws.length; i++) if (ws[i][0] <= rel + 1e-6) k = i;
+  return k;
+}
+function drawText(ctx, t, W, H, hi = -1) {
   const b = textBox(ctx, t, W, H);
   ctx.save();
   ctx.font = b.font;
@@ -50,8 +68,28 @@ function drawText(ctx, t, W, H) {
     if (ctx.roundRect) ctx.roundRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, r); else ctx.rect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
     ctx.fill();
   }
+  const kw = hi >= 0 ? karaokeWords(t) : null;
+  let wi = 0;   // numer słowa w całym napisie (linie z wrapLines zachowują kolejność słów)
   b.lines.forEach((line, i) => {
     const y = b.cy - b.h / 2 + b.lh * (i + 0.5);
+    if (kw) {   // słowo po słowie: aktywne w kolorze `hl`, reszta w kolorze napisu
+      const lw = ctx.measureText(line).width;
+      let x = align === "left" ? ax : align === "right" ? ax - lw : ax - lw / 2;
+      ctx.textAlign = "left";
+      for (const word of line.split(" ").filter(Boolean)) {
+        if (t.style === "outline") {
+          ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, b.px * 0.14); ctx.strokeStyle = t.bg || "#000";
+          ctx.strokeText(word, x, y);
+        }
+        if (t.style === "shadow") { ctx.shadowColor = "rgba(0,0,0,0.65)"; ctx.shadowBlur = b.px * 0.18; ctx.shadowOffsetY = b.px * 0.05; }
+        ctx.fillStyle = wi === hi ? t.hl : (t.color || "#fff");
+        ctx.fillText(word, x, y);
+        ctx.shadowColor = "transparent";
+        x += ctx.measureText(word + " ").width;
+        wi++;
+      }
+      return;
+    }
     if (t.style === "outline") {
       ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, b.px * 0.14); ctx.strokeStyle = t.bg || "#000";
       ctx.strokeText(line, ax, y);

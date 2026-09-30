@@ -527,22 +527,38 @@ async def edit_export(request: Request):
         pngs = body.get("texts") or []
         if len(pngs) != len((body.get("project") or {}).get("texts") or []):
             raise ed.ProjectError("Liczba obrazów napisów nie zgadza się z projektem.")
+        kpngs = body.get("karaoke") or {}
+        raw_texts = (body.get("project") or {}).get("texts") or []
+        for x in proj["texts"]:
+            if x.get("kara") and len(kpngs.get(str(x["i"])) or []) != len(raw_texts[x["i"]].get("words") or []):
+                raise ed.ProjectError("Napisy karaoke: liczba obrazów słów nie zgadza się z projektem.")
     except ed.ProjectError as exc:
         raise HTTPException(400, str(exc))
     tmpdir = core.JARVO_DIR / "state" / "edytor" / uuid.uuid4().hex[:12]
     tmpdir.mkdir(parents=True, exist_ok=True)
     try:
         files = []   # tylko napisy, które przeszły walidację, w kolejności proj["texts"]
+        kara: dict[int, list] = {}
         for k, x in enumerate(proj["texts"]):
             dest = tmpdir / f"napis-{k}.png"
             _data_png(pngs[x["i"]], dest)
             files.append(dest)
+            if x.get("kara"):     # karaoke: obraz na każde słowo (aktywne w kolorze), sklejone w jedną warstwę
+                kara[x["i"]] = []
+                for j, data in enumerate(kpngs[str(x["i"])]):
+                    kd = tmpdir / f"napis-{k}-slowo-{j}.png"
+                    _data_png(data, kd)
+                    kara[x["i"]].append(kd)
+        layer = None
+        if kara:
+            cv = proj["canvas"]
+            layer = ed.karaoke_concat(proj, kara, ed.blank_png(tmpdir / "pusty.png", cv["w"], cv["h"]), tmpdir / "karaoke.ffconcat")
         has_audio = {}
         for c in proj["clips"]:
             if c["kind"] == "video" and str(c["src"]) not in has_audio:
                 has_audio[str(c["src"])] = (await asyncio.to_thread(ed.probe, c["src"])).get("audio", False)
         out = ed.export_name(p)
-        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"])
+        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"], karaoke=layer)
     except (ed.ProjectError, ValueError) as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(400, str(exc))

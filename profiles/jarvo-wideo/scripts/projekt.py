@@ -11,7 +11,7 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
                                            [--y 0.78] [--rozmiar 72] [--kolor #FFFFFF] [--tlo #000000]
     projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--wypelnij --fx X --fy Y --zoom Z]
     projekt.py kadr <film> <id> [--wypelnij|--dopasuj] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
-    projekt.py napisy <film> [--srt plik.srt]      # napisy ze słów (<źródło>.mowa.json) albo z pliku SRT
+    projekt.py napisy <film> [--srt plik.srt] [--karaoke [#FFE14D]]   # napisy ze słów (<źródło>.mowa.json) albo SRT
     projekt.py usun <film> <id>                    # usuń klip / tekst / audio o danym id (z `pokaz`)
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
     projekt.py render <film> [--out plik.mp4]      # nowa wersja obok oryginału, na końcu linia MEDIA:
@@ -48,6 +48,7 @@ TEXT_DEFAULT = {"x": 0.5, "y": 0.78, "size": 72, "color": "#FFFFFF", "bg": "#000
 CAP_DEFAULT = {**TEXT_DEFAULT, "y": 0.84, "size": 58, "style": "outline", "maxw": 0.84,
                "font": "'Bricolage Grotesque', system-ui, sans-serif"}
 FPS = (24, 25, 30, 50, 60)
+KARAOKE_HL = "#FFE14D"   # kolor aktywnego słowa (jak ED_HL w edytorze)
 
 
 def new_id(prefix: str) -> str:
@@ -246,9 +247,12 @@ def cmd_napisy(film: Path, a) -> int:
         lines = ed.lines_from_words(words)
     t = total(proj)
     old = next((x for x in proj.get("texts") or [] if x.get("cap")), None)
-    look = {k: old[k] for k in ("x", "y", "size", "color", "bg", "style", "font", "bold", "maxw") if old and k in old}
+    look = {k: old[k] for k in ("x", "y", "size", "color", "bg", "style", "font", "bold", "maxw", "hl") if old and k in old}
+    if a.karaoke is not None:
+        look["hl"] = a.karaoke or KARAOKE_HL
     proj["texts"] = [x for x in proj.get("texts") or [] if not x.get("cap")] + [
-        {**CAP_DEFAULT, **look, "id": new_id("t"), "cap": True, "start": k["start"], "end": min(k["end"], t), "text": k["text"]}
+        {**CAP_DEFAULT, **look, "id": new_id("t"), "cap": True, "start": k["start"], "end": min(k["end"], t), "text": k["text"],
+         **({"words": k["words"]} if k.get("words") else {})}
         for k in lines if k["start"] < t]
     save(film, proj)
     print(f"Napisy: {sum(1 for x in proj['texts'] if x.get('cap'))} linii")
@@ -297,10 +301,13 @@ def ensure_playwright() -> None:
     raise SystemExit("napisy renderuje przeglądarka: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html")
 
 
-def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path) -> list[Path]:
-    """Każdy napis → PNG W×H, rysowany TĄ SAMĄ funkcją co w edytorze (44-napisy.js) w przeglądarce bez okna."""
+def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path,
+              hi: list[int] | None = None) -> list[Path]:
+    """Każdy napis → PNG W×H, rysowany TĄ SAMĄ funkcją co w edytorze (44-napisy.js) w przeglądarce bez okna.
+    `hi[k]` ≥ 0: napis karaoke z aktywnym słowem o tym numerze (jeden obraz na słowo)."""
     if not texts:
         return []
+    hi = hi or [-1] * len(texts)
     if NAPISY_JS is None:
         raise SystemExit("brak edytor_napisy.js obok skryptu (przebuduj profil)")
     ensure_playwright()
@@ -321,14 +328,14 @@ def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path) -> list[Path]:
             pass
         page.add_script_tag(content=NAPISY_JS.read_text(encoding="utf-8"))
         for i, t in enumerate(texts):
-            data = page.evaluate("""async ([t, W, H]) => {
+            data = page.evaluate("""async ([t, W, H, hi]) => {
                 try { await document.fonts.load(textFont(t, H, W).font); } catch (_) {}
                 const c = document.createElement("canvas"); c.width = W; c.height = H;
-                drawText(c.getContext("2d"), t, W, H);
+                drawText(c.getContext("2d"), t, W, H, hi);
                 return c.toDataURL("image/png");
-            }""", [t, W, H])
+            }""", [t, W, H, hi[i]])
             import base64
-            dest = out_dir / f"napis-{i}.png"
+            dest = out_dir / f"napis-{i}{'' if hi[i] < 0 else f'-slowo-{hi[i]}'}.png"
             dest.write_bytes(base64.b64decode(data.split(",", 1)[1]))
             paths.append(dest)
         browser.close()
@@ -346,8 +353,15 @@ def cmd_render(film: Path, a) -> int:
     out = Path(a.out) if a.out else ed.export_name(film)
     has_audio = {str(c["src"]): ed.probe(c["src"]).get("audio", False) for c in p["clips"] if c["kind"] == "video"}
     with tempfile.TemporaryDirectory(prefix="projekt-") as tmp:
-        pngs = text_pngs(kept, p["canvas"]["w"], p["canvas"]["h"], Path(tmp))
-        cmd = ed.build_command(p, has_audio, pngs, out)
+        W, H = p["canvas"]["w"], p["canvas"]["h"]
+        # jedno uruchomienie przeglądarki: zwykłe obrazy napisów, potem obraz na każde słowo napisów karaoke
+        jobs = [(t, -1) for t in kept] + [(texts[x["i"]], j) for x in p["texts"] if x.get("kara")
+                                          for j in range(len(texts[x["i"]]["words"]))]
+        allp = text_pngs([t for t, _ in jobs], W, H, Path(tmp), [j for _, j in jobs])
+        pngs, rest = allp[:len(kept)], iter(allp[len(kept):])
+        kara = {x["i"]: [next(rest) for _ in texts[x["i"]]["words"]] for x in p["texts"] if x.get("kara")}
+        layer = ed.karaoke_concat(p, kara, ed.blank_png(Path(tmp) / "pusty.png", W, H), Path(tmp) / "karaoke.ffconcat") if kara else None
+        cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer)
         t0 = time.time()
         r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
@@ -404,7 +418,10 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("id")
     kadr_args(sp)
     sp.add_argument("--dopasuj", action="store_true", help="cały obraz z pasami (fit=contain)")
-    film_cmd("napisy", cmd_napisy, "napisy ze słów albo z SRT").add_argument("--srt")
+    sp = film_cmd("napisy", cmd_napisy, "napisy ze słów albo z SRT")
+    sp.add_argument("--srt")
+    sp.add_argument("--karaoke", nargs="?", const="", metavar="KOLOR",
+                    help="aktywne słowo w kolorze (domyślnie żółty); tylko napisy ze słów, nie z SRT")
     film_cmd("usun", cmd_usun, "usuń element po id").add_argument("id")
     film_cmd("sprawdz", cmd_sprawdz, "walidacja projektu")
     film_cmd("render", cmd_render, "złóż film (jak „Eksportuj”)").add_argument("--out")
