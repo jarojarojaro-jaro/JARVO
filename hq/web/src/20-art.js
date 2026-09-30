@@ -120,6 +120,7 @@ const ROOMS = {
   atelier:  { fig: [55, 48], wall: "#C2507A", wall2: "#AD4469", side: "#9C3D61", ceil: "#8A3556", floor: "#D9BF8F", floor2: "#CDB07E", trim: "#7E2E4E", wallType: "bricks", floorType: "planks" },
   workshop: { fig: [35, 46], wall: "#C96A22", wall2: "#B25B18", side: "#A9571B", ceil: "#944C16", floor: "#8F979F", floor2: "#838B93", trim: "#6E3A10", wallType: "ribs", floorType: "concrete" },
   office:   { fig: [54, 44], bubble: "left", wall: "#26303F", wall2: "#212A38", side: "#1C2430", ceil: "#171E28", floor: "#333C4A", floor2: "#2D3542", trim: "#12171F", wallType: "panels", floorType: "grid" },
+  radar:    { fig: [60, 44], bubble: "left", wall: "#1B2E2C", wall2: "#203634", side: "#162624", ceil: "#11201E", floor: "#2E3D3B", floor2: "#283634", trim: "#0D1816", wallType: "panels", floorType: "grid" },
 };
 const STORAGE = { wall: "#3A414C", wall2: "#343B45", side: "#2E343D", ceil: "#272C34", floor: "#5A6068", floor2: "#535960", trim: "#22272E", wallType: "panels", floorType: "concrete" };
 
@@ -132,6 +133,7 @@ const LOOKS = {
   filmstudio: { coat: "#2B2B33", coat2: "#1E1E24", pants: "#3E4A5C", shoes: "#1A1A1F", hair: "#2A1C14", hat: "cap", hatC: "#D62D20", hatC2: "#A51F16", outfit: "vest", vest: "#8C7A55", vest2: "#6E5F40" },
   workshop: { coat: "#D9661F", coat2: "#B85414", pants: "#2F5D9E", shoes: "#3A2A1A", hair: "#3A2A1A", hat: "hardhat", hatC: "#F2B01E", hatC2: "#C98E0E", outfit: "overalls" },
   office:   { coat: "#5A6472", coat2: "#454E5A", pants: "#2E3440", shoes: "#15171C", hair: "#6B4226", hairStyle: "short", outfit: "tie", tie: "#2C6ED5", shirt: "#F1F3F5" },
+  radar:    { coat: "#4B5B34", coat2: "#3A4728", pants: "#2E3440", shoes: "#15171C", hair: "#5A3A22", hat: "cap", hatC: "#F26B1D", hatC2: "#C9540F", outfit: "vest", vest: "#F26B1D", vest2: "#C9540F", phones: "#1FB6A6" },
 };
 
 const STATUS_PX = { working: "#3DDC84", judging: "#3DDC84", blocked: "#FF4D3D", review: "#FFC53D", queued: "#5AA9FF", idle: "#56606E", offline: "#3A414C" };
@@ -490,6 +492,45 @@ function roomOffice(L, a) {
   const c = L.get("chair"); c.r(64, 46, 13, 9, "#2D3440"); c.r(69, 55, 3, 4, "#555E6B"); c.r(64, 59, 13, 1, "#555E6B");
 }
 
+// Radar sprzedaży (Łowca leadów): ekran radaru (wiązka i migające cele, gdy agent pracuje), mapa Polski
+// z pinezkami firm, neon LEADY, biurko z listą leadów i stosem kart (kolejka).
+function roomRadar(L, a, queue) {
+  const g = L.get("props"), st = a.status, on = isBusy(st);
+  // radar: ramka, pierścienie, krzyż
+  g.circle(26, 25, 15, "#1D232C"); g.circle(26, 25, 13, "#0B2A18");
+  g.circle(26, 25, 12, "#06140C"); g.circle(26, 25, 8, "#0B2A18"); g.circle(26, 25, 7, "#06140C"); g.circle(26, 25, 3, "#0B2A18"); g.circle(26, 25, 2, "#06140C");
+  g.r(14, 25, 25, 1, "#12402A"); g.r(26, 13, 1, 25, "#12402A");
+  const sweep = L.get("radar-sweep", cx("thq-px-holo", on && "is-on"));
+  sweep.line(26, 25, 35, 16, "#7CF0B4"); sweep.line(26, 25, 36, 18, "rgba(124,240,180,.45)"); sweep.line(26, 25, 34, 15, "rgba(124,240,180,.35)");
+  L.get("radar-blip1", on ? "thq-px-led1" : "thq-px-off").r(31, 19, 2, 2, "#B8FF3D");
+  L.get("radar-blip2", on ? "thq-px-led2" : "thq-px-off").r(19, 30, 2, 2, "#B8FF3D").r(30, 32, 1, 1, "#7CF0B4");
+  // mapa Polski na tablicy + pinezki firm
+  g.r(46, 9, 40, 28, "#1D232C"); g.r(47, 10, 38, 26, "#0E1A1C");
+  const kraj = [[55, 12, 20], [52, 13, 27], [50, 14, 31], [49, 16, 33], [49, 18, 34], [50, 20, 33], [50, 22, 32], [51, 24, 30], [52, 26, 28], [53, 28, 25], [55, 30, 20], [58, 32, 13]];
+  kraj.forEach(([x, y, w]) => g.r(x, y, w, 2, "#2C4A46"));
+  g.r(57, 12, 6, 1, "#3E6A64"); g.r(70, 12, 3, 1, "#3E6A64");
+  const piny = L.get("pins", cx("thq-px-neon", on && "is-on"));
+  [[58, 17], [67, 21], [74, 15], [62, 27], [76, 25], [70, 30]].forEach(([x, y]) => { piny.r(x, y, 2, 2, "#FF3B30"); piny.p(x, y + 2, "#8A1F18"); });
+  // neon LEADY
+  g.r(92, 9, 26, 8, "#1D232C"); g.r(93, 10, 24, 6, "#0B0F15");
+  L.get("lowca-ticker", cx("thq-px-neon", on && "is-on")).text(95, 11, "LEADY", "#F26B1D");
+  // biurko: monitor z listą leadów, drugi z oceną, stos kart
+  g.r(50, 44, 62, 2, "#E9EDF2"); g.r(52, 46, 2, 12, "#AEB7C2"); g.r(108, 46, 2, 12, "#AEB7C2");
+  g.r(58, 31, 18, 13, "#1D232C"); g.r(59, 32, 16, 10, on ? "#10262A" : "#0B0F15");
+  g.r(80, 31, 18, 13, "#1D232C"); g.r(81, 32, 16, 10, on ? "#2A1A0E" : "#0B0F15");
+  if (on) {
+    for (let i = 0; i < 4; i++) { g.r(61, 34 + i * 2, 2, 1, "#B8FF3D"); g.r(64, 34 + i * 2, 5 + (i * 3) % 6, 1, "#9CC3FF"); }
+    [[83, 7], [86, 5], [89, 4], [92, 2]].forEach(([x, h]) => g.r(x, 41 - h, 2, h, "#F26B1D"));
+  }
+  for (let i = 0; i < Math.min(queue, 6); i++) g.r(100, 43 - i, 8, 1, i % 2 ? "#F4EEDC" : "#FFFFFF");
+  // telefon i roślinka
+  g.r(38, 50, 6, 8, "#C8693C"); g.r(37, 42, 3, 8, "#2F8F4E"); g.r(41, 40, 3, 10, "#3AA85C");
+  g.r(12, 58, 18, 2, "#3A3F48"); g.r(14, 55, 6, 3, "#1D232C"); g.r(15, 54, 4, 1, "#F26B1D");
+  const lookup = { working: { pose: "type" }, judging: { pose: "type" }, review: { pose: "hold", item: "clipboard" }, blocked: { pose: "raise", alert: true, worried: true } };
+  drawFigure(L, "fig", 72, 60, "radar", { facing: "back", legs: false, busy: on, sleep: st === "idle", ...(lookup[st] || {}) });
+  const c = L.get("chair"); c.r(66, 46, 13, 9, "#2D3440"); c.r(71, 55, 3, 4, "#555E6B"); c.r(66, 59, 13, 1, "#555E6B");
+}
+
 // Studio filmowe (Wideograf): zielone tło z softboxem, kamera na statywie z lampką REC, stół montażowy
 // z osią czasu (głowica przesuwa się, gdy agent pracuje), klaps i szpula na ścianie.
 function roomFilmstudio(L, a) {
@@ -609,7 +650,7 @@ function roomBridge(L, a, board, crew, box) {
   holo.circle(120, 44, 3, "rgba(120,240,255,.45)");
 }
 
-const ROOM_DRAW = { study: roomStudy, devlab: roomDevlab, atelier: roomAtelier, filmstudio: roomFilmstudio, workshop: roomWorkshop, office: roomOffice };
+const ROOM_DRAW = { study: roomStudy, devlab: roomDevlab, atelier: roomAtelier, filmstudio: roomFilmstudio, workshop: roomWorkshop, office: roomOffice, radar: roomRadar };
 
 function PixRoom({ box, agent, board, crew }) {
   const kind = agent.room === "bridge" ? "bridge" : ROOM_DRAW[agent.room] ? agent.room : "office";

@@ -90,6 +90,8 @@ out/leady/<projekt>/
 ## 6. Etapy
 
 1. ✅ Plan (ten dokument).
-2. ⬜ Skrypty `krs.py`, `przetargi.py`, `strona.py`, `leady.py` z testami (sieć tylko w teście w kontenerze).
+2. ✅ Skrypty `krs.py`, `przetargi.py`, `strona.py`, `leady.py` (+ `lowca_lib.py`) z testami offline; sprawdzone
+   na żywych źródłach w kontenerze. e-Zamówienia odcina za kilka ciężkich zapytań z rzędu (strona „Dostęp
+   zablokowany”): pauza 4 s na zapytanie, pełny dzień dzielony na województwa, blokada = stop. Pokój „Radar” w HQ.
 3. ⬜ Profil `jarvo-lowca`: SOUL, 6 skilli, rubryka, evals, pokój „Radar” w HQ, dokumentacja floty.
 4. ⬜ Pierwszy prawdziwy przebieg na ofercie użytkownika i poprawki wag.

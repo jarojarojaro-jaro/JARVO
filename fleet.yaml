@@ -61,7 +61,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: general       # wątek ogólny grupy „Jarvo HQ” + Twój DM
-    hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
     hq_label: "Mostek dowodzenia"
     hq_short: "Jarvo"
     en:
@@ -85,7 +85,7 @@ agents:
     autonomy_max: A1
     telegram_topic: sherlock
     pin_skills: [metoda-sherlocka]
-    hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
     hq_label: "Gabinet śledczy"
     hq_short: "Sherlock"
     en:
@@ -107,7 +107,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: web
-    hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
     hq_label: "Pracownia webowa"
     hq_short: "Web"
     en:
@@ -129,7 +129,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: studio
-    hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
     hq_label: "Atelier kreatywne"
     hq_short: "Studio"
     en:
@@ -153,7 +153,7 @@ agents:
     autonomy_max: A1
     telegram_topic: wideo
     pin_skills: [krotki-film]
-    hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
     hq_label: "Studio filmowe"
     hq_short: "Wideograf"
     en:
@@ -177,7 +177,7 @@ agents:
     autonomy_max: A1
     telegram_topic: ads
     pin_skills: [plan-kampanii]
-    hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
     hq_label: "Sala operacyjna"
     hq_short: "Ads"
     en:
@@ -186,6 +186,30 @@ agents:
       description: >-
         Paid ads on Meta Ads (Facebook, Instagram) and Google Ads end to end: campaign planning, structure, audiences, keywords, budgets, launching campaigns, daily account checks, optimisation, A/B/C tests, performance reports and learnings for creatives. Spends money only within a budget envelope the user approves with a code.
     status: active
+
+  - name: jarvo-lowca
+    kind: specialist
+    title: "Łowca leadów"
+    emoji: "🎯"
+    description: >-
+      Szukanie klientów (leadów B2B) po sygnałach zakupowych z oficjalnych źródeł: nowe firmy w KRS,
+      przetargi (e-Zamówienia, TED) i ich zwycięzcy, oferty pracy, technologia i zmiany na stronach firm,
+      newsy. Profil idealnego klienta, kwalifikacja, ranking firm z „dlaczego teraz”, kontakt opublikowany
+      przez firmę (ze źródłem), monitoring nowych leadów. Niczego nie wysyła.
+    model_tier: strong
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: lowca
+    pin_skills: [profil-klienta]
+    hq_room: radar    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
+    hq_label: "Radar sprzedaży"
+    hq_short: "Łowca"
+    en:
+      title: "Lead hunter"
+      hq_label: "Sales radar"
+      description: >-
+        Finds B2B leads from buying signals in official sources: new companies in the KRS register, public tenders (e-Zamówienia, TED) and their winners, job ads, technology and changes on company websites, news. Ideal customer profile, qualification, a ranked list of companies with "why now", contacts the company published itself (with the source), monitoring for new leads. Never sends anything.
+    status: planned
 
   - name: jarvo-reka
     kind: generalist
@@ -199,7 +223,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: reka
-    hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office
+    hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
     hq_label: "Warsztat"
     hq_short: "Ręka"
     en:
