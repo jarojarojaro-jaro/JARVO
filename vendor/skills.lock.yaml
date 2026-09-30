@@ -185,6 +185,7 @@ agents:
 
   jarvo-web:
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
+    - {source: hermes, path: skills/software-development/systematic-debugging, dest: kod/systematic-debugging}
     - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
     - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}
     - {source: gsap-skills, path: skills/gsap-scrolltrigger, dest: gsap/gsap-scrolltrigger}

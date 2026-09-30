@@ -7,11 +7,11 @@ license: MIT
 metadata:
   hermes:
     tags: [web, astro, build, frontend]
-    related_skills: [frontend-design, design-md, popular-web-designs, favicon-i-meta, optymalizacja-obrazow, audyt-strony, wdrozenie, animate, gsap-core, gsap-scrolltrigger, threejs-fundamentals]
+    related_skills: [systematic-debugging, frontend-design, design-md, popular-web-designs, favicon-i-meta, optymalizacja-obrazow, audyt-strony, wdrozenie, animate, gsap-core, gsap-scrolltrigger, threejs-fundamentals]
   jarvo:
     agent: jarvo-web
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-09-30"
 ---
 
 # Nowa strona
@@ -31,6 +31,8 @@ metadata:
    formularze z etykietami, widoczny fokus, `prefers-reduced-motion`.
 5. **Head:** skill `favicon-i-meta` (komplet ikon, manifest, OG, JSON-LD Organization/WebSite, canonical, lang).
 6. **Build i podgląd:** `npm run build` → `npx astro preview --host 0.0.0.0 --port 4321` (w tle) albo statyczny serwer z `dist/`.
+   Build, skrypt albo test pada → `systematic-debugging`: najpierw przyczyna (odtworzenie, jedna hipoteza naraz),
+   potem jedna poprawka; bez zgadywania kolejnych zmian.
 7. **Kontrola jakości:** `audyt-strony` na podglądzie → popraw do budżetów → zapisz wyniki przed/po.
    Potem `bramka-jakosci`: rubryka designu (≥ 90) i testy wrogie, rundy poprawek do zaliczenia.
 8. **Raport:** `out/RAPORT.md` (co powstało, jak uruchomić, wyniki, samokontrola DoD). Wdrożenie tylko przez `wdrozenie` (A2).
