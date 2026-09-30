@@ -611,13 +611,13 @@ function roomBridge(L, a, board, crew, box) {
     for (let j = 0; j < Math.min(n, 5); j++) g.r(x0, 28 + j * 4, 12, 3, color);
     if (n > 5) g.r(x0 + 5, 48, 3, 1, color);
   });
-  // panel załogi: lampka statusu każdego agenta
-  frame(159, 9, 66, 42);
-  g.text(162, 12, txt("ZALOGA", "CREW"), "#8FA3B8");
-  crew.slice(0, 5).forEach((c, i) => {
+  // panel załogi: lampka statusu każdego agenta (7 wierszy; wyżej niż tablica floty, bo pod spodem stoi pulpit)
+  frame(159, 4, 66, 52);
+  g.text(162, 6, txt("ZALOGA", "CREW"), "#8FA3B8");
+  crew.slice(0, 7).forEach((c, i) => {
     const color = STATUS_PX[c.status] || STATUS_PX.idle;
-    (c.status === "blocked" ? L.get("crew-alarm", "thq-px-blink") : g).r(162, 20 + i * 6, 3, 3, color);
-    g.text(168, 19 + i * 6, String(c.short || c.name).slice(0, 13), c.status === "idle" ? "#6E7A8A" : "#C9D3DE");
+    (c.status === "blocked" ? L.get("crew-alarm", "thq-px-blink") : g).r(162, 14 + i * 6, 3, 3, color);
+    g.text(168, 13 + i * 6, String(c.short || c.name).slice(0, 13), c.status === "idle" ? "#6E7A8A" : "#C9D3DE");
   });
   // czerwony dywan i fotel szefa
   for (let yy = 70; yy < 84; yy++) { const ins = Math.round((83 - yy) * 0.35); g.r(124 + ins, yy, 36 - 2 * ins, 1, "#7A1C22"); g.p(124 + ins, yy, "#C9A24C"); g.p(159 - ins, yy, "#C9A24C"); }
