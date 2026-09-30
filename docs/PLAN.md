@@ -221,7 +221,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ `jarvo-web`, `jarvo-studio`, `jarvo-reka` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
 - ✅ `jarvo-wideo` (Wideograf): 15 skilli, pętla krytyki (7 osi), maskotka, clipmaker (rolki z długich nagrań), demo strony (nagranie z kursorem i napisami kroków), 22 scenariusze evals.
 - 🟡 `jarvo-ads` (reklamy Meta i Google): SOUL, 10 skilli, skrypty, rubryka, 12 scenariuszy evals; bez kluczy ([ADS.md](ADS.md)).
-- ⬜ Clipmaker Wideografa: długie nagranie → edytowalne rolki (kadr z focusem, napisy karaoke, `klipy.py`) ([KLIPY.md](KLIPY.md)).
+- 🟡 Clipmaker Wideografa: długie nagranie → edytowalne rolki (kadr z focusem, napisy karaoke, `klipy.py`); kroki 1–4 gotowe, krok 5: test na prawdziwym nagraniu ([KLIPY.md](KLIPY.md)).
 - ⬜ Skarbiec: sejf tokenów reklamowych, koperty zatwierdzane kodem, STOP ([ADS.md](ADS.md)).
 - 🟡 Łowca leadów `jarvo-lowca`: sygnały z KRS, przetargów, stron firm → lista firm z „dlaczego teraz” i opublikowanym kontaktem ([LEADY.md](LEADY.md)).
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
