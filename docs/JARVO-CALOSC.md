@@ -204,6 +204,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `hq/` | Jarvo HQ (backend, frontend, demo) |
 | `infra/` | obraz jarvo-hermes, docker-compose z sidecarami, szablony env |
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
+| `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo) |
 | `site/` | landing jarvo.pl |
 | `install.sh`, `install.ps1` | instalator jednym poleceniem (macOS/Linux/WSL2, Windows): repo do `~/jarvo` + `scripts/local-up.sh` |
@@ -254,7 +255,8 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    zapisał login w pamięci (hasła tam nie było). Hasła i logowanie w cudze konta już blokują reguła 16
    kontraktu i `deny.yaml` (`agent-browser … auth`, `--password`, strony logowania: w red teamie hasło z czatu
    trafiło do `agent-browser`, a login do YouTube Studio). Brakuje jeszcze wprost zakazu zapisywania loginów w pamięci.
-3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (2026-09-30, do akceptacji):** jeden folder
+3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (zaakceptowany 2026-09-30, etap 2 z 7 gotowy:
+   skarbiec zasiewany przy wdrożeniu, `wiedza.py`):** jeden folder
    notatek Markdown z linkami (`knowledge/`), wzorzec LLM Wiki Karpathy'ego; wtyczka Hermesa `jarvo-wiedza` jako dostawca
    pamięci (przypomnienia przed turą, wyciąg po sesji i przed kompresją, 4 narzędzia), kompilacja tanim modelem (jeden
    piszący), orzeczenia z Twoich korekt, lint, punkty zapisu git, zakładka „Wiedza” z grafem w dashboardzie.

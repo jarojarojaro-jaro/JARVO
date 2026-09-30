@@ -39,6 +39,10 @@ for a in $AGENTS; do mkdir -p "$DATA/jarvo/workspaces/$a"; done
 rm -rf "$DATA/jarvo/knowledge/brands/_szablon" && cp -r "$REPO/knowledge/brands/_szablon" "$DATA/jarvo/knowledge/brands/_szablon"
 [[ -f "$DATA/jarvo/knowledge/user/USER.md" ]] || cp "$BUILD/profiles/jarvo/skills/fleet/onboarding-interview/references/USER.template.md" "$DATA/jarvo/knowledge/user/USER.md"
 
+# 1b. skarbiec wiedzy (docs/WIEDZA.md): huby agentów z buildu, SCHEMA, INDEX, docs repo jako źródła; 0 tokenów, git na punkty zapisu
+log "Skarbiec wiedzy"
+$PY "$REPO/wiedza/wiedza.py" --skarbiec "$DATA/jarvo/knowledge" --stan "$DATA/jarvo/state" zasiej --fleet "$BUILD/wiedza/fleet.json" --docs "$REPO/docs"
+
 # 2. profil hosta: config (scalanie kluczy floty), SOUL, sekrety
 log "Profil hosta"
 # pierwsza instalacja: obraz zasiał config.yaml przykładowym modelem → wymuszamy model floty

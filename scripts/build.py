@@ -275,6 +275,29 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
     return "\n".join(lines) + "\n"
 
 
+def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
+    """fleet.json dla skarbca wiedzy: hub każdego agenta (wiedza/wiedza.py zasiej) dostaje rolę, skille własne z opisami,
+    nazwy skilli zewnętrznych (z dystrybucji po buildzie) i skrypty."""
+    agents = []
+    for a in fleet.active():
+        wlasne = fl.skill_names(a.dir / "skills")
+        skills = []
+        for name, path in sorted(wlasne.items()):
+            fm, _ = fl.read_skill(path)
+            skills.append({"name": name, "description": " ".join(str(fm.get("description", "")).split())})
+        # skille zewnętrzne po nazwach katalogów (ich frontmatter bywa niestandardowy: nie parsujemy YAML-a cudzych skilli)
+        katalog = profiles_out / a.name / "skills"
+        wszystkie = {p.parent.name for p in fl.iter_skill_files(katalog)} if katalog.is_dir() else set()
+        zewnetrzne = sorted(wszystkie - {p.parent.name for p in wlasne.values()})
+        skrypty = sorted(p.name for p in (a.dir / "scripts").glob("*")
+                         if p.is_file() and not p.name.startswith("_") and not p.name.endswith("_lib.py")) if (a.dir / "scripts").is_dir() else []
+        agents.append({"name": a.name, "short": a.hq_short or a.title, "title": a.title, "emoji": a.emoji, "kind": a.kind,
+                       "description": a.description, "room": a.hq_room, "label": a.hq_label or a.title,
+                       "telegram_topic": a.telegram_topic, "autonomy_max": a.autonomy_max, "skills": skills,
+                       "external_skills": zewnetrzne, "scripts": skrypty})
+    return {"orchestrator": fleet.orchestrator, "agents": agents}
+
+
 def render_roster_summary(fleet: fl.Fleet) -> str:
     rows = ["| Agent | Rola |", "|---|---|"]
     for a in fleet.active():
@@ -539,6 +562,10 @@ def main(argv: list[str] | None = None) -> int:
     import hqbuild  # Jarvo HQ: plugin dashboardu (pokoje agentów, czat, decyzje)
     hq_dir = hqbuild.build_plugin(out / "plugins" / "jarvo-hq", fleet)
     print(f"✓ Jarvo HQ: {hq_dir.relative_to(out)}")
+
+    # skarbiec wiedzy (docs/WIEDZA.md): huby agentów zasiewa install-fleet.sh z tego pliku (wiedza/wiedza.py zasiej)
+    fl.write_json(out / "wiedza" / "fleet.json", wiedza_fleet(fleet, profiles_out))
+    print("✓ skarbiec wiedzy: wiedza/fleet.json")
 
     notes = build_host(fleet, out / "host", env)
     for note in notes:

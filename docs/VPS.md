@@ -133,7 +133,7 @@ Rekomendacje:
 ├── build/                # wynik scripts/build.py → /opt/jarvo/build (ro): dystrybucje profili, config hosta
 ├── data/
 │   ├── hermes/           # → /opt/data: profile, pamięć, sesje, kanban.db, cron
-│   │   └── jarvo/         # missions/ (dziennik misji), workspaces/<agent>/, knowledge/ (brand kity, USER.md), state/
+│   │   └── jarvo/         # missions/ (dziennik misji), workspaces/<agent>/, knowledge/ (skarbiec wiedzy: notatki, brand kity, USER.md), state/
 │   ├── valkey/  uptime-kuma/  beszel/
 ├── staging/              # izolowane dane do evals (scripts/evals-staging.sh)
 └── backups/              # staging kopii SQLite, logi backupu i testu odtworzenia

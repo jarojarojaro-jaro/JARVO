@@ -1,7 +1,10 @@
 # Wiedza: drugi mózg floty (projekt)
 
-> Stan: **projekt do akceptacji (2026-09-30), nic jeszcze nie wdrożone** (§9). Właściciel: `jarvo` (jedyny piszący
+> Stan: **zaakceptowany (2026-09-30), w budowie** (§9: etap 2 gotowy). Właściciel: `jarvo` (jedyny piszący
 > do skarbca) i wtyczka Hermesa `jarvo-wiedza` (wszyscy agenci czytają, zgłaszają szkice, dostają przypomnienia).
+> Decyzje użytkownika: wtyczka u **każdego** agenta; agenci nie piszą notatek, tylko szkice i orzeczenia; skarbiec żyje tam,
+> gdzie stoi Jarvo (VPS, lokalnie, telefon), zakładka jest podglądem wszędzie, Obsidian opcjonalnie; wyciągi z każdej
+> rozmowy i karty z rozsądnymi progami (nie przepalać, ale nie oszczędzać na wiedzy).
 > Wzorzec: **LLM Wiki** Andreja Karpathy'ego (skarbiec zwykłych plików Markdown, który utrzymuje model, a człowiek
 > ogląda i koryguje), oglądany jak w Obsidianie (graf notatek połączonych linkami), wpięty w Hermesa jako
 > **dostawca pamięci** (`memory.provider`), więc działa w czacie, na Telegramie, w kartach kanbana i w cronie.
@@ -26,7 +29,7 @@ zaokrąglone”, to zdanie zostaje orzeczeniem marki i wraca w każdej następne
 
 ## 1. Zasady skarbca (schemat)
 
-To jest „CLAUDE.md skarbca” w rozumieniu Karpathy'ego: krótki plik `SCHEMA.md` w repo (`shared/wiedza/SCHEMA.md`), kopiowany
+To jest „CLAUDE.md skarbca” w rozumieniu Karpathy'ego: krótki plik `SCHEMA.md` w repo (`wiedza/SCHEMA.md`), kopiowany
 do skarbca przy wdrożeniu i czytany przez kompilację i przez agentów, gdy piszą szkic.
 
 1. **Źródła zostają nietknięte.** `zrodla/` to historia tylko do odczytu (raporty, transkrypcje, artykuły, eksporty rozmów).
@@ -54,7 +57,8 @@ do skarbca przy wdrożeniu i czytany przez kompilację i przez agentów, gdy pis
     lista leadów zostaje w projekcie Łowcy, do skarbca idą profil klienta i lekcje.
 12. **Po polsku, krótko, konkretnie.** Notatki i orzeczenia w trybie oznajmującym, sprawdzalne, bez esejów.
     **Nazwa pliku = tytuł, jak się go mówi:** małe litery, spacje i polskie znaki dozwolone, bez innych znaków niż przecinek,
-    myślnik, kropka i dwukropek, do 70 znaków (`bramka jakości blokuje przy krytyczne.md`). W grafie (Obsidian i zakładka)
+    myślnik, kropka i nawiasy, do 70 znaków (`bramka jakości blokuje przy krytyczne.md`; Obsidian i Windows odrzucają
+    `* " \ / < > : | ? # ^ [ ]`). W grafie (Obsidian i zakładka)
     etykietą węzła jest właśnie nazwa pliku, więc ma być czytelna bez otwierania. Nazwy folderów zostają ASCII bez spacji
     (`pojecia/`, `podmioty/`), bo są w kodzie i w ścieżkach narzędzi. **Hub każdego folderu to plik `_hub-<nazwa>.md`**
     (podkreślenie sortuje go na górze, nazwa jest unikalna w całym skarbcu, więc w grafie widać od razu, który to hub).
@@ -105,7 +109,8 @@ Poza skarbcem: indeks wyszukiwarki `state/wiedza.db` (SQLite FTS5, odtwarzalny z
 | `zrodla/` | haki wtyczki (rozmowy, karty), Ty (pliki), wdrożenie (docs repo) | koniec sesji, zamknięcie karty, „zapisz to w wiedzy”, deploy |
 | `skrzynka/` | każdy agent (`wiedza_zapisz`), haki (koniec sesji, kompresja, karta, pamięć) | na bieżąco, bez modelu albo z tanim modelem |
 | `orzeczenia/` | agent na Twoje słowo (`wiedza_orzeczenie`), formularz w HQ | gdy poprawiasz agenta |
-| notatki, `INDEX.md`, `LOG.md`, huby | **tylko kompilacja** (`jarvo-wiedza`, tani model) i `zasiej` (0 tokenów) | noc / próg szkiców / ręcznie |
+| notatki, `LOG.md`, ręczne części hubów | **tylko kompilacja** (`jarvo-wiedza`, tani model) i `zasiej` (0 tokenów) | noc / próg szkiców / ręcznie |
+| `INDEX.md`, listy notatek w hubach (bloki `Jarvo:GEN`), indeks FTS5 | `wiedza.py indeksuj` (0 tokenów, deterministycznie z plików) | po każdej kompilacji, zasiewie, na żądanie |
 | `LINT.md` | lint (0 tokenów) | co tydzień i przed kompilacją |
 
 ---
@@ -216,7 +221,8 @@ gdy skrzynka ma ≥ 1 szkic i minęła godzina od poprzedniej, oraz co noc o 03:
    (szum, duplikat, brak źródła) albo **sprzeczność** (obie wersje, `status: sprzeczna`),
 2. pisze notatkę według §3 (frontmatter, streszczenie, linki: hub + 2 sąsiadów + 1 między folderami; bez linku do nieistniejącej
    notatki: albo tworzy ją jako krótką, albo linkuje hub),
-3. aktualizuje hub folderu i `INDEX.md`, dopisuje `LOG.md` (`## [data] kompilacja | szkic X → notatka Y (nowa/aktualizacja)`),
+3. dopisuje `LOG.md` (`## [data] kompilacja | szkic X → notatka Y (nowa/aktualizacja)`); `INDEX.md` i listy w hubach
+   odświeża potem `wiedza.py indeksuj` (bez modelu, więc zawsze zgodne z plikami),
 4. przenosi szkic do `skrzynka/zrobione/`.
 Cała partia to jedna transakcja: blokada `state/wiedza.lock`, zapis do plików `.tmp` → rename, na końcu `git add -A && git commit`
 w skarbcu (punkt zapisu; `wiedza.py cofnij` przywraca poprzedni). Limity na przebieg: 40 szkiców, 60 notatek dotkniętych,
@@ -310,12 +316,14 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
 
 ## 9. Etapy (każdy z testem w kontenerze, status w tym dokumencie)
 
-1. ⬜ **Plan** (ten dokument) → Twoja akceptacja decyzji z §10.
-2. ⬜ **Skarbiec i skrypt** `wiedza/wiedza.py` (w repo, kopiowany do wtyczki i dostępny jako `/opt/jarvo/repo/wiedza/wiedza.py`):
-   `zasiej` (huby z `fleet.yaml`, SCHEMA, INDEX, LOG, docs repo do `zrodla/jarvo-repo/`, git init), `indeksuj`, `szukaj`,
-   `czytaj`, `zapisz` (szkic), `orzeczenie`, `lint`, `cofnij`; `shared/wiedza/SCHEMA.md`; testy pytest (frontmatter, linki,
-   FTS po polsku z ogonkami i bez, lint na przygotowanym skarbcu, jeden piszący pod blokadą). Test w kontenerze: po deployu
-   są huby 8 agentów, `szukaj "bramka jakości"` znajduje notatkę Weba, `lint` = 0 błędów.
+1. ✅ **Plan** (ten dokument), decyzje z §10 zaakceptowane 2026-09-30.
+2. ✅ **Skarbiec i skrypt** `wiedza/wiedza.py` (bez zależności poza biblioteką standardową; w kontenerze
+   `python3 /opt/jarvo/repo/wiedza/wiedza.py`): `zasiej` (katalogi, `SCHEMA.md`, huby folderów i agentów z `build/wiedza/fleet.json`,
+   orzeczenia, `fleet/lekcje.md`, docs repo do `zrodla/jarvo-repo/`, git init i punkt zapisu), `indeksuj` (FTS5 w `state/wiedza.db`,
+   `INDEX.md`, listy w hubach), `szukaj`, `czytaj`, `zapisz`, `orzeczenie`, `lint`, `graf`, `cofnij`, `status`; `wiedza/SCHEMA.md`;
+   `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami, zewnętrzne z locka, skrypty), `install-fleet.sh`
+   zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane). Testy: `tests/test_wiedza.py`.
+   Sprawdzone w kontenerze: huby 8 agentów, wyszukiwanie po polsku bez ogonków, lint bez błędów, punkty zapisu git.
 3. ⬜ **Wtyczka `jarvo-wiedza`, część agenta:** dostawca pamięci (blok, przypomnienia, 4 narzędzia, lustro pamięci, wyciąg
    przy końcu sesji i przed kompresją tanim modelem), hak `kanban_task_completed`, `build.py` ustawia `memory.provider:
    jarvo-wiedza` w każdym profilu i model `fast` dla `ctx.llm`, `install-fleet.sh` włącza wtyczkę. Test: rozmowa z Webem w HQ
@@ -340,22 +348,20 @@ korzystała; zakładka jest ostatnia, bo pokazuje to, co już działa.
 
 | # | Decyzja | Rekomendacja | Dlaczego |
 |---|---|---|---|
-| W1 | Gdzie leży skarbiec | istniejący `knowledge/` floty (`/opt/data/jarvo/knowledge`) | już w backupie, w podglądzie HQ i w skillach (`brands/`, `user/`, `fleet/`); jeden folder = jeden vault Obsidiana |
-| W2 | Jak agenci są wpięci | wtyczka Hermesa jako **dostawca pamięci** (`memory.provider: jarvo-wiedza`), nie sam skill | przypomnienie przed turą i wyciąg po sesji bez decyzji modelu „czy zajrzeć”; działa w kanbanie i cronie; jeden kod dla 8 profili |
-| W3 | Kto pisze notatki | **jeden piszący**: kompilacja tanim modelem; agenci tylko szkice i orzeczenia | brak konfliktów, jedna transakcja z cofaniem, spójny format, tańsze niż pisanie notatek drogim modelem w trakcie pracy |
+| W1 ✅ | Gdzie leży skarbiec | istniejący `knowledge/` floty (`/opt/data/jarvo/knowledge`) | już w backupie, w podglądzie HQ i w skillach (`brands/`, `user/`, `fleet/`); jeden folder = jeden vault Obsidiana |
+| W2 ✅ | Jak agenci są wpięci | wtyczka Hermesa jako **dostawca pamięci** (`memory.provider: jarvo-wiedza`) u każdego z 8 agentów, nie sam skill | przypomnienie przed turą i wyciąg po sesji bez decyzji modelu „czy zajrzeć”; działa w kanbanie i cronie; jeden kod dla 8 profili |
+| W3 ✅ | Kto pisze notatki | **jeden piszący**: kompilacja tanim modelem; agenci tylko szkice i orzeczenia | brak konfliktów, jedna transakcja z cofaniem, spójny format, tańsze niż pisanie notatek drogim modelem w trakcie pracy |
 | W4 | Wyszukiwanie | FTS5 + krok po linkach; osadzenia ONNX dopiero, gdy FTS zawodzi | zero nowych usług, działa dziś w obrazie; wzorzec i doświadczenie innych mówią „najpierw struktura, wektory potem” |
 | W5 | Modele | wyciągi i kompilacja: poziom `fast` (dziś ten sam `gpt-6-luna`, `reasoning_effort` low); synteza tygodnia: Jarvo | rutyna na tanim, osąd na drogim; koszty w §7 |
 | W6 | GUI | własna zakładka „Wiedza” z grafem na canvasie (bez bibliotek); `hermes-memory-wiki` opcjonalnie obok | ma pokazywać notatki, orzeczenia i skrzynkę, których wtyczka Nous nie zna; graf ~150 linii, jak wieża HQ |
-| W7 | Obsidian | okno na ten sam folder (lokalnie bezpośrednio, VPS przez `rsync`/zakładkę), bez synchronizacji chmurowej | jeden system zapisu; Obsidian nie jest wymagany, żeby całość działała |
+| W7 ✅ | Obsidian | skarbiec żyje tam, gdzie stoi Jarvo (VPS, lokalnie, telefon); zakładka „Wiedza” jest podglądem wszędzie, Obsidian to opcjonalne okno na ten sam folder, bez synchronizacji chmurowej | jeden system zapisu; Obsidian nie jest wymagany, żeby całość działała |
 | W8 | Nazwy | foldery i klucze po polsku; `brands/`, `user/`, `fleet/` zostają | reszta repo i agentów jest po polsku; zmiana istniejących ścieżek ruszyłaby 5 skilli bez korzyści |
 | W9 | `claude-obsidian` | **nie** jako rdzeń (zmiana wobec [PLAN.md §6](PLAN.md#6-roadmapa)); bierzemy pomysły (jeden piszący, transakcje, rejestr źródeł) | 15 skilli + własny rdzeń w Pythonie z własnymi ścieżkami i trybami pracy, dubluje pamięć, cron i skille Hermesa; nasza wtyczka to ~1/5 tej ilości kodu i siedzi w hakach Hermesa |
 | W10 | Czego nie zapisujemy | sekrety, loginy, hasła (lint + deny), listy leadów (zostają w projekcie Łowcy), surowe transkrypcje rozmów w całości (tylko wyciąg) | bezpieczeństwo i RODO; skarbiec ma być czytelny, nie kompletny |
 
-**Pytania, które zmieniają budowę** (reszta ma domyślne odpowiedzi wyżej):
-1. Zgoda na W2 (wtyczka jako dostawca pamięci u wszystkich 8 agentów) i W3 (agenci nie piszą notatek bezpośrednio)?
-2. Używasz Obsidiana na swoim komputerze (instalacja lokalna) czy patrzysz tylko przez zakładkę na VPS? Zmienia to tylko etap 7.
-3. Budżet na wyciągi i kompilację: domyślnie każda rozmowa ≥ 4 tur i każda karta. Jeśli wolisz oszczędniej: tylko karty
-   i rozmowy oznaczone („zapamiętaj to”).
+**Odpowiedzi użytkownika (2026-09-30):** W2 i W3 tak (każdy agent ma wtyczkę); Obsidian bez jednej reguły (Jarvo stoi
+w różnych miejscach), więc zakładka jest głównym podglądem; budżet domyślny (każda rozmowa ≥ 4 tur i każda karta),
+„nie przepalać, ale jak trzeba, to trzeba”.
 
 ---
 
@@ -392,3 +398,13 @@ korzystała; zakładka jest ostatnia, bo pokazuje to, co już działa.
 | `intfloat/multilingual-e5-small` (etap 7) | osadzenia wielojęzyczne na CPU przez ONNX Runtime | MIT |
 
 Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w którym dana rzecz trafi do repo.
+
+## 13. Pliki w repo
+
+| Ścieżka | Rola |
+|---|---|
+| `wiedza/wiedza.py` | narzędzie skarbca (zasiew, indeks, szukanie, szkice, orzeczenia, lint, graf, punkty zapisu); importowane przez wtyczkę |
+| `wiedza/SCHEMA.md` | zasady skarbca kopiowane do `knowledge/SCHEMA.md` |
+| `scripts/build.py` → `build/wiedza/fleet.json` | dane do hubów agentów (rola, skille z opisami, skille zewnętrzne, skrypty) |
+| `scripts/install-fleet.sh` (krok „Skarbiec wiedzy”) | `zasiej` przy każdym wdrożeniu |
+| `tests/test_wiedza.py` | testy skarbca |

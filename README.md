@@ -73,6 +73,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`install.sh`](install.sh), [`install.ps1`](install.ps1) | instalator jednym poleceniem (macOS/Linux/WSL2, Windows) |
 | [`requirements-dev.txt`](requirements-dev.txt) | zależności testów i walidacji (`make dev-deps`) |
 | [`tests/`](tests) | testy pytest |
+| [`wiedza/`](wiedza) | skarbiec wiedzy floty (drugi mózg): `wiedza.py` i `SCHEMA.md`, projekt w [docs/WIEDZA.md](docs/WIEDZA.md) |
 | [`docs/`](docs) | dokumentacja (niżej) |
 
 ## Dokumentacja
