@@ -1,7 +1,7 @@
 ---
 name: nowa-strona
 description: "Nowa strona od briefu do podglądu (Astro, mobile-first)."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -27,6 +27,8 @@ metadata:
    cd site && npm install
    ```
    Tokeny marki jako CSS custom properties (`src/styles/tokens.css`). Bez ciężkich frameworków UI, jeśli niepotrzebne.
+   Zanim powstanie pierwszy commit: `.gitignore` z `.env*` i `!.env.example`, sekrety tylko w `.env`, w repo `.env.example`
+   z pustymi wartościami. Nowa zależność: najpierw sprawdź w rejestrze, że istnieje i jest znana (nie ufaj nazwie od modelu).
 4. **Budowa sekcji:** semantyczny HTML, mobile-first, `<picture>` z AVIF/WebP (`optymalizacja-obrazow`),
    formularze z etykietami, widoczny fokus, `prefers-reduced-motion`.
 5. **Head:** skill `favicon-i-meta` (komplet ikon, manifest, OG, JSON-LD Organization/WebSite, canonical, lang).

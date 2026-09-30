@@ -1,24 +1,43 @@
 #!/usr/bin/env python3
 """Automatyczne sprawdzenia bezpieczeństwa strony/aplikacji (część mechaniczna skilla bezpieczenstwo-aplikacji).
 
-    python3 security_check.py repo <katalog projektu> [--json]     # kod: sekrety, .env w gicie, zależności, wzorce ryzyka
-    python3 security_check.py url https://strona.pl [--json]        # działająca strona: nagłówki, ciasteczka, CORS, wycieki
+    python3 security_check.py repo <katalog projektu> [--offline] [--json]   # kod: sekrety, .env w gicie, zależności, wzorce ryzyka
+    python3 security_check.py url https://strona.pl [--json]                 # działająca strona: nagłówki, ciasteczka, CORS,
+                                                                             # wycieki, klucze w JS wysyłanym do przeglądarki
+    python3 security_check.py atak http://localhost:4321 [próby…] [--json]    # nieniszczące próby na działającej aplikacji
+
+`atak` (tylko nasz podgląd albo aplikacja użytkownika za jego zgodą: `--zgoda-wlasciciela`), próby wybierasz flagami:
+    --chronione /api/orders /admin       trasy, które bez sesji muszą odmówić (401/403/przekierowanie na logowanie)
+    --sesja-a "Cookie: sid=…" --sesja-b "Authorization: Bearer …" --zasob-a /api/orders/17
+                                         konto B nie może czytać zasobu konta A (IDOR); nagłówki kont testowych
+    --logowanie /api/login               12 szybkich prób nieistniejącym kontem: oczekiwane 429 (limit prób)
+    --limit /api/search                  12 szybkich żądań GET: oczekiwane 429 (endpointu AI z prawdziwym modelem nie testuj)
+    --upload /api/upload[:pole]          plik HTML udający obrazek (z sesją A): oczekiwana odmowa 4xx
+    --wyloguj /api/logout                na końcu: po wylogowaniu sesja A nie może działać (wymaga --zasob-a)
 
 To nie zastępuje przeglądu kodu (model czyta przepływ danych: skill, references/przeglad-kodu.md), tylko łapie
 to, co da się wykryć maszynowo i bez fałszywych alarmów. Każde ustalenie ma wagę: KRYTYCZNE / WYSOKIE / ŚREDNIE / NISKIE.
-Kod wyjścia: 0 = brak KRYTYCZNYCH i WYSOKICH, 1 = są, 2 = złe wejście. Bez sieci poza badaną stroną; bez zależności.
+Kod wyjścia: 0 = brak KRYTYCZNYCH i WYSOKICH, 1 = są, 2 = złe wejście albo brak zgody. Sieć: badana strona, a w `repo`
+rejestry npm i PyPI (czy zależności istnieją, wiek, pobrania; `--offline` pomija). Bez zależności poza biblioteką standardową.
 """
 from __future__ import annotations
 
 import argparse
+import base64
+import datetime as dt
+import ipaddress
 import json
 import re
+import secrets
 import shutil
 import ssl
 import subprocess
 import sys
+import tomllib
 import urllib.error
+import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 WAGI = ["KRYTYCZNE", "WYSOKIE", "ŚREDNIE", "NISKIE"]
@@ -95,6 +114,25 @@ WYCIEKI = [("/.env", "KRYTYCZNE"), ("/.git/HEAD", "KRYTYCZNE"), ("/.git/config",
            ("/server-status", "ŚREDNIE"), ("/phpinfo.php", "WYSOKIE"), ("/.vscode/settings.json", "NISKIE"),
            ("/wp-config.php.bak", "KRYTYCZNE"), ("/config.json", "ŚREDNIE"), ("/backup.zip", "WYSOKIE")]
 
+# Popularne pakiety: zależność o nazwie różnej o 1 znak i mało pobierana to kandydat na podszycie (typosquatting)
+# albo nazwa zmyślona przez model i zarejestrowana przez kogoś innego (slopsquatting).
+POPULARNE_NPM = """react react-dom next vue nuxt svelte astro vite webpack typescript express fastify koa axios lodash
+underscore moment dayjs date-fns zod yup joi prisma mongoose sequelize knex pg mysql2 redis ioredis jsonwebtoken bcrypt
+bcryptjs argon2 passport helmet cors dotenv uuid nanoid chalk commander yargs inquirer debug winston pino morgan
+body-parser cookie-parser multer sharp jimp puppeteer playwright cheerio jsdom marked dompurify tailwindcss postcss
+autoprefixer eslint prettier jest vitest mocha chai sinon supertest nodemon rimraf glob minimist semver ws socket.io
+graphql apollo-server stripe openai @anthropic-ai/sdk @supabase/supabase-js firebase aws-sdk @aws-sdk/client-s3
+nodemailer resend twilio bullmq cron node-fetch got superagent qs formidable busboy rxjs immer zustand redux
+@reduxjs/toolkit react-router react-router-dom @tanstack/react-query swr clsx classnames framer-motion three
+chart.js d3 leaflet mapbox-gl sass less styled-components @emotion/react""".split()
+POPULARNE_PYPI = """requests urllib3 httpx aiohttp flask django fastapi starlette uvicorn gunicorn pydantic sqlalchemy
+alembic psycopg2 psycopg2-binary psycopg asyncpg pymysql redis celery boto3 botocore numpy pandas scipy matplotlib
+pillow opencv-python scikit-learn torch tensorflow transformers openai anthropic langchain tiktoken beautifulsoup4
+lxml selenium playwright pytest black ruff mypy flake8 click typer rich pyyaml python-dotenv jinja2 werkzeug
+cryptography pyjwt bcrypt argon2-cffi passlib stripe twilio sentry-sdk python-multipart markdown bleach""".split()
+UWAGI: list[str] = []          # czego nie dało się ocenić (brak sieci, limit rejestru): nigdy „czysto”
+SPRAWDZONE: list[str] = []     # próby `atak`, które przeszły (dowód do listy kontrolnej)
+
 
 def u(waga, co, gdzie, poprawka):
     return {"waga": waga, "co": co, "gdzie": gdzie, "poprawka": poprawka}
@@ -161,20 +199,187 @@ def repo(root: Path) -> list[dict]:
     return wyn
 
 
-def pobierz(url: str, method="GET", headers=None, timeout=15):
-    req = urllib.request.Request(url, method=method, headers={"User-Agent": "jarvo-web-security/1.0", **(headers or {})})
-    ctx = ssl.create_default_context()
+def odleglosc1(a: str, b: str) -> bool:
+    """Czy nazwy różnią się dokładnie jedną edycją (wstawienie, usunięcie, zamiana, przestawienie sąsiadów)."""
+    if a == b or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        rozne = [i for i in range(len(a)) if a[i] != b[i]]
+        return len(rozne) == 1 or (len(rozne) == 2 and rozne[1] == rozne[0] + 1 and a[rozne[0]] == b[rozne[1]] and a[rozne[1]] == b[rozne[0]])
+    krotsza, dluzsza = sorted((a, b), key=len)
+    return any(dluzsza[:i] + dluzsza[i + 1:] == krotsza for i in range(len(dluzsza)))
+
+
+def manifesty(root: Path) -> list[tuple[str, str, str]]:
+    """(ekosystem, nazwa, plik) dla zależności bezpośrednich: package.json, requirements*.txt, pyproject.toml."""
+    out = []
+    pj = root / "package.json"
+    if pj.is_file():
+        try:
+            d = json.loads(pj.read_text(encoding="utf-8"))
+        except ValueError:
+            d = {}
+        for sekcja in ("dependencies", "devDependencies", "optionalDependencies"):
+            for nazwa, spec in (d.get(sekcja) or {}).items():
+                if not re.match(r"(file|link|workspace|git\+|github:|https?:|npm:)", str(spec)):
+                    out.append(("npm", nazwa, "package.json"))
+    for req in sorted(root.glob("requirements*.txt")):
+        for linia in req.read_text(encoding="utf-8", errors="ignore").splitlines():
+            m = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", linia)
+            if m and not linia.lstrip().startswith(("#", "-")):
+                out.append(("pypi", m.group(1), req.name))
+    pp = root / "pyproject.toml"
+    if pp.is_file():
+        try:
+            d = tomllib.loads(pp.read_text(encoding="utf-8"))
+        except (tomllib.TOMLDecodeError, UnicodeDecodeError):
+            d = {}
+        proj = d.get("project") or {}
+        for spec in (proj.get("dependencies") or []) + [x for g in (proj.get("optional-dependencies") or {}).values() for x in g]:
+            m = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", spec)
+            if m:
+                out.append(("pypi", m.group(1), "pyproject.toml"))
+    return list(dict.fromkeys(out))
+
+
+def _json_z(url: str, timeout=10):
+    """(kod, dane) z rejestru; kod 0 = brak odpowiedzi (sieć)."""
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
-            return r.status, {k.lower(): v for k, v in r.headers.items()}, r.headers.get_all("Set-Cookie") or [], r.read(3000)
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "jarvo-web-security/1.0",
+                                                                          "Accept": "application/json"}), timeout=timeout) as r:
+            return r.status, json.loads(r.read(8_000_000) or b"null")
     except urllib.error.HTTPError as e:
-        return e.code, {k.lower(): v for k, v in e.headers.items()}, e.headers.get_all("Set-Cookie") or [], e.read(3000)
+        return e.code, None
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return 0, None
+
+
+def pakiet(eko: str, nazwa: str) -> dict:
+    """Istnieje? Od kiedy? Ile pobrań tygodniowo? (None = nieznane)."""
+    if eko == "npm":
+        kod, dl = _json_z(f"https://api.npmjs.org/downloads/point/last-week/{urllib.parse.quote(nazwa, safe='@')}")
+        pobrania = (dl or {}).get("downloads") if kod == 200 else None
+        if pobrania is not None and pobrania >= 10_000:
+            return {"istnieje": True, "pobrania": pobrania, "utworzony": None}
+        kod, doc = _json_z(f"https://registry.npmjs.org/{urllib.parse.quote(nazwa, safe='@')}")
+        if kod == 404:
+            return {"istnieje": False}
+        if kod != 200:
+            return {"istnieje": None}
+        return {"istnieje": True, "pobrania": pobrania, "utworzony": ((doc or {}).get("time") or {}).get("created")}
+    kod, doc = _json_z(f"https://pypi.org/pypi/{urllib.parse.quote(nazwa)}/json")
+    if kod == 404:
+        return {"istnieje": False}
+    if kod != 200:
+        return {"istnieje": None}
+    daty = [f.get("upload_time_iso_8601") for pliki_ in ((doc or {}).get("releases") or {}).values() for f in pliki_]
+    kod2, st = _json_z(f"https://pypistats.org/api/packages/{nazwa.lower()}/recent")
+    return {"istnieje": True, "utworzony": min((d for d in daty if d), default=None),
+            "pobrania": ((st or {}).get("data") or {}).get("last_week") if kod2 == 200 else None}
+
+
+def zaleznosci(root: Path, dzis: dt.date | None = None) -> list[dict]:
+    """Czy zależności z manifestów istnieją w rejestrze, nie są świeże i mało używane, nie udają popularnych nazw."""
+    lista = manifesty(root)[:200]
+    if not lista:
+        return []
+    dzis = dzis or dt.date.today()
+    with ThreadPoolExecutor(6) as ex:
+        dane = list(ex.map(lambda x: pakiet(x[0], x[1]), lista))
+    wyn = []
+    for (eko, nazwa, plik), d in zip(lista, dane):
+        if d.get("istnieje") is None:
+            UWAGI.append(f"{eko} {nazwa}: rejestr nie odpowiedział, nie oceniono")
+            continue
+        if d["istnieje"] is False:
+            wyn.append(u("WYSOKIE", f"zależność {nazwa} nie istnieje w rejestrze {eko} (nazwa zmyślona?)", plik,
+                         "usuń albo znajdź prawdziwy pakiet; nazwę sprawdza człowiek w rejestrze, zanim ktoś ją zarejestruje"))
+            continue
+        pobrania, wiek = d.get("pobrania"), None
+        if d.get("utworzony"):
+            try:
+                wiek = (dzis - dt.date.fromisoformat(d["utworzony"][:10])).days
+            except ValueError:
+                pass
+        malo = pobrania is not None and pobrania < 1000
+        popularne = POPULARNE_NPM if eko == "npm" else POPULARNE_PYPI
+        podobny = next((p for p in popularne if odleglosc1(nazwa.lower(), p)), None)
+        if podobny and (pobrania is None or pobrania < 10_000):
+            wyn.append(u("WYSOKIE", f"zależność {nazwa} różni się jedną literą od popularnego {podobny} "
+                         f"({pobrania if pobrania is not None else '?'} pobrań/tydz.)", plik,
+                         f"literówka albo podszycie: użyj {podobny}, chyba że {nazwa} to świadomy wybór z opisem"))
+        elif wiek is not None and wiek < 90 and (malo or pobrania is None):
+            wyn.append(u("ŚREDNIE", f"zależność {nazwa} jest nowa ({wiek} dni) i mało używana "
+                         f"({pobrania if pobrania is not None else '?'} pobrań/tydz.)", plik,
+                         "sprawdź repozytorium, autora i skrypty instalacyjne; w razie wątpliwości zamień na znany pakiet"))
+    return wyn
+
+
+class BezPrzekierowan(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **kw):
+        return None
+
+
+def pobierz(url: str, method="GET", headers=None, timeout=15, limit=3000, dane: bytes | None = None, przekierowania=True):
+    req = urllib.request.Request(url, data=dane, method=method, headers={"User-Agent": "jarvo-web-security/1.0", **(headers or {})})
+    ctx = ssl.create_default_context()
+    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx),
+                                         *([] if przekierowania else [BezPrzekierowan()]))
+    try:
+        with opener.open(req, timeout=timeout) as r:
+            return r.status, {k.lower(): v for k, v in r.headers.items()}, r.headers.get_all("Set-Cookie") or [], r.read(limit)
+    except urllib.error.HTTPError as e:
+        return e.code, {k.lower(): v for k, v in e.headers.items()}, e.headers.get_all("Set-Cookie") or [], e.read(limit)
+
+
+def rola_jwt(token: str) -> str | None:
+    """Rola z JWT Supabase (anon jest publiczny z założenia, service_role nigdy)."""
+    try:
+        cz = token.split(".")[1]
+        return json.loads(base64.urlsafe_b64decode(cz + "=" * (-len(cz) % 4))).get("role")
+    except (IndexError, ValueError):
+        return None
+
+
+def sekrety_w_js(tekst: str, gdzie: str) -> list[dict]:
+    wyn = []
+    for nazwa, wz in SEKRETY[:8]:
+        for m in re.finditer(wz, tekst):
+            s = m.group(0)
+            if re.search(r"(?i)(example|placeholder|your|xxx|dummy)", s):
+                continue
+            if nazwa.startswith("klucz Supabase") and rola_jwt(s) not in ("service_role", "supabase_admin"):
+                continue                                   # klucz anon: publiczny z założenia, chroni go RLS
+            if nazwa == "klucz Google API":
+                wyn.append(u("ŚREDNIE", "klucz Google API w JS strony", gdzie,
+                             "klucze Maps/Firebase bywają publiczne: ogranicz je (referrer, lista API) w konsoli Google"))
+            else:
+                wyn.append(u("KRYTYCZNE", f"{nazwa} w JS wysyłanym do przeglądarki", gdzie,
+                             "klucz tylko na serwerze (trasa API/proxy); UNIEWAŻNIJ klucz u dostawcy"))
+            break
+    return wyn
+
+
+def skrypty_strony(base: str, html: str) -> list[str]:
+    """Adresy skryptów tej samej domeny z <script src> i <link rel=modulepreload> (maks. 20)."""
+    host = urllib.parse.urlsplit(base).netloc
+    adresy = re.findall(r"<script[^>]+src=[\"']([^\"']+)", html, re.I)
+    adresy += re.findall(r"<link[^>]+rel=[\"']modulepreload[\"'][^>]*href=[\"']([^\"']+)", html, re.I)
+    pelne = [urllib.parse.urljoin(base + "/", a) for a in adresy]
+    return list(dict.fromkeys(a for a in pelne if urllib.parse.urlsplit(a).netloc == host))[:20]
 
 
 def strona(url: str) -> list[dict]:
     wyn = []
     base = url.rstrip("/")
-    st, h, cookies, body = pobierz(base)
+    st, h, cookies, body = pobierz(base, limit=3_000_000)
+    html = body.decode("utf-8", "replace")
+    wyn += sekrety_w_js(html, base)                              # skrypty wbudowane w HTML
+    for js in skrypty_strony(base, html):
+        s, _, _, b = pobierz(js, limit=8_000_000)
+        if s == 200:
+            wyn += sekrety_w_js(b.decode("utf-8", "replace"), js)
+    body = body[:3000]
     if base.startswith("http://"):
         wyn.append(u("WYSOKIE", "strona bez HTTPS", base, "certyfikat (Let's Encrypt) i przekierowanie 301 na https"))
     for nag, waga, po_co in NAGLOWKI:
@@ -204,24 +409,170 @@ def strona(url: str) -> list[dict]:
     return wyn
 
 
+def lokalny(url: str) -> bool:
+    """Nasz podgląd: localhost, *.localhost/.local/.test albo adres prywatny."""
+    host = urllib.parse.urlsplit(url).hostname or ""
+    if host == "localhost" or host.endswith((".localhost", ".local", ".test", ".internal")):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+        return ip.is_private or ip.is_loopback
+    except ValueError:
+        return False
+
+
+def naglowek(linia: str | None) -> dict:
+    """„Cookie: sid=…” → {"Cookie": "sid=…"}; puste → {}."""
+    if not linia:
+        return {}
+    k, _, v = linia.partition(":")
+    return {k.strip(): v.strip()}
+
+
+def _odmowa(status: int, h: dict) -> bool:
+    return status in (401, 403, 404) or (status in (301, 302, 303, 307, 308) and re.search(r"(?i)log|sign|auth", h.get("location", "")))
+
+
+def atak(base: str, a) -> list[dict]:
+    """Nieniszczące próby na działającej aplikacji. Każda próba to kilka żądań; nic nie jest kasowane ani kupowane."""
+    base, wyn = base.rstrip("/"), []
+    sa, sb = naglowek(a.sesja_a), naglowek(a.sesja_b)
+    url = lambda sciezka: base + "/" + sciezka.lstrip("/")          # tylko ścieżki: zostajemy na badanym hoście
+    _, _, _, wzor404 = pobierz(url(f"jarvo-nie-istnieje-{secrets.token_hex(4)}"), limit=20000, przekierowania=False)
+
+    for sciezka in a.chronione or []:                                 # 1. trasy bez sesji
+        s, h, _, b = pobierz(url(sciezka), limit=20000, przekierowania=False)
+        if _odmowa(s, h):
+            SPRAWDZONE.append(f"{sciezka} bez sesji: {s} (odmowa)")
+        elif s == 200 and b == wzor404:
+            UWAGI.append(f"{sciezka} bez sesji: 200 jak dla nieistniejącej strony (SPA); sprawdź trasę API, nie widok")
+        elif s < 300:
+            wyn.append(u("WYSOKIE", f"{sciezka} odpowiada bez logowania ({s})", url(sciezka),
+                         "sprawdzenie sesji i roli w handlerze/middleware serwera, nie tylko ukrycie w UI"))
+        else:
+            UWAGI.append(f"{sciezka} bez sesji: {s}, nie oceniono")
+
+    for sciezka in a.zasob_a or []:                                   # 2. cudzy zasób (IDOR)
+        s_a, _, _, b_a = pobierz(url(sciezka), headers=sa, limit=200000, przekierowania=False)
+        if s_a != 200:
+            UWAGI.append(f"{sciezka}: konto A dostało {s_a}, a powinno widzieć własny zasób; próba IDOR pominięta")
+            continue
+        s_b, h_b, _, b_b = pobierz(url(sciezka), headers=sb, limit=200000, przekierowania=False)
+        if s_b == 200 and b_b == b_a:
+            wyn.append(u("WYSOKIE", f"konto B czyta zasób konta A ({sciezka})", url(sciezka),
+                         "zapytanie z właścicielem z sesji: where id = $1 and user_id = $2; RLS w bazie"))
+        elif _odmowa(s_b, h_b) or s_b == 200:
+            SPRAWDZONE.append(f"{sciezka} sesją konta B: {s_b}" + (" (inna treść niż u A)" if s_b == 200 else " (odmowa)"))
+        s0, h0, _, _ = pobierz(url(sciezka), limit=2000, przekierowania=False)
+        if s0 < 300 and not _odmowa(s0, h0):
+            wyn.append(u("WYSOKIE", f"zasób konta A dostępny bez logowania ({sciezka})", url(sciezka), "sprawdzenie sesji na serwerze"))
+
+    def seria(sciezka: str, metoda: str, cialo: bytes | None, naglowki: dict) -> list[int]:
+        kody = []
+        for _ in range(12):
+            s, _, _, _ = pobierz(url(sciezka), method=metoda, headers=naglowki, dane=cialo, limit=500, przekierowania=False)
+            kody.append(s)
+            if s == 429:
+                break
+        return kody
+
+    if a.logowanie:                                                   # 3. limit prób logowania
+        cialo = json.dumps({"email": f"jarvo-test-{secrets.token_hex(3)}@example.invalid",
+                            "password": secrets.token_urlsafe(12)}).encode()
+        kody = seria(a.logowanie, "POST", cialo, {"Content-Type": "application/json"})
+        if set(kody) <= {404, 405}:
+            UWAGI.append(f"{a.logowanie}: trasa nie istnieje albo nie przyjmuje POST ({kody[0]}), nie oceniono")
+        elif 429 in kody:
+            SPRAWDZONE.append(f"{a.logowanie}: limit prób działa (429 po {len(kody)} próbach)")
+        else:
+            wyn.append(u("WYSOKIE", f"logowanie bez limitu prób: 12 prób, kody {sorted(set(kody))}", url(a.logowanie),
+                         "limit na IP i konto (np. 5/min) z 429 i Retry-After; blokada po serii błędów"))
+    for sciezka in a.limit or []:                                     # 4. limit żądań na trasie
+        kody = seria(sciezka, "GET", None, sa)
+        if set(kody) <= {404, 405}:
+            UWAGI.append(f"{sciezka}: trasa nie istnieje ({kody[0]}), nie oceniono")
+        elif 429 in kody:
+            SPRAWDZONE.append(f"{sciezka}: limit żądań działa (429 po {len(kody)})")
+        else:
+            wyn.append(u("ŚREDNIE", f"{sciezka} bez limitu żądań: 12 żądań, kody {sorted(set(kody))}", url(sciezka),
+                         "limit na użytkownika i IP; przy endpointach AI także limit długości wejścia i max_tokens"))
+
+    if a.upload:                                                      # 5. plik HTML udający obrazek
+        sciezka, _, pole = a.upload.partition(":")
+        granica = "jarvo" + secrets.token_hex(8)
+        tresc = b"<html><body><script>alert(document.domain)</script></body></html>"
+        cialo = (f"--{granica}\r\nContent-Disposition: form-data; name=\"{pole or 'file'}\"; filename=\"obrazek.jpg\"\r\n"
+                 f"Content-Type: image/jpeg\r\n\r\n").encode() + tresc + f"\r\n--{granica}--\r\n".encode()
+        s, _, _, b = pobierz(url(sciezka), method="POST", dane=cialo, limit=20000, przekierowania=False,
+                             headers={**sa, "Content-Type": f"multipart/form-data; boundary={granica}"})
+        if 400 <= s < 500:
+            SPRAWDZONE.append(f"{sciezka}: HTML jako obrazek odrzucony ({s})")
+        elif 200 <= s < 300:
+            gdzie = re.search(rb"[\w./-]+\.jpg", b)
+            waga, co = "WYSOKIE", "upload przyjął plik HTML udający obrazek"
+            if gdzie:
+                s2, h2, _, _ = pobierz(url(gdzie.group(0).decode()), limit=500)
+                if s2 == 200 and "html" in h2.get("content-type", ""):
+                    waga, co = "KRYTYCZNE", "upload przyjął HTML i serwuje go jako stronę (XSS z pliku)"
+            wyn.append(u(waga, co, url(sciezka), "typ po zawartości (magic bytes), lista typów, losowa nazwa, osobna domena/"
+                         "bucket z Content-Disposition: attachment i nosniff"))
+        else:
+            UWAGI.append(f"{sciezka}: upload odpowiedział {s}, nie oceniono")
+
+    if a.wyloguj:                                                     # 6. sesja po wylogowaniu (na końcu)
+        if not (a.zasob_a and sa):
+            UWAGI.append("--wyloguj wymaga --sesja-a i --zasob-a; pominięte")
+        else:
+            pobierz(url(a.wyloguj), method="POST", headers=sa, dane=b"", limit=500, przekierowania=False)
+            s, h, _, _ = pobierz(url(a.zasob_a[0]), headers=sa, limit=500, przekierowania=False)
+            if _odmowa(s, h):
+                SPRAWDZONE.append(f"po wylogowaniu stara sesja nie działa ({s})")
+            elif s == 200:
+                wyn.append(u("ŚREDNIE", "stara sesja działa po wylogowaniu", url(a.wyloguj),
+                             "unieważnienie sesji na serwerze (lista odwołanych albo krótki JWT + odświeżanie z rotacją)"))
+    return wyn
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("tryb", choices=["repo", "url"])
+    ap.add_argument("tryb", choices=["repo", "url", "atak"])
     ap.add_argument("cel")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--offline", action="store_true", help="repo: bez pytania rejestrów npm/PyPI o zależności")
+    ap.add_argument("--zgoda-wlasciciela", action="store_true", help="atak na adres spoza podglądu: właściciel się zgodził")
+    ap.add_argument("--chronione", nargs="+")
+    ap.add_argument("--sesja-a")
+    ap.add_argument("--sesja-b")
+    ap.add_argument("--zasob-a", nargs="+")
+    ap.add_argument("--logowanie")
+    ap.add_argument("--limit", nargs="+")
+    ap.add_argument("--upload")
+    ap.add_argument("--wyloguj")
     a = ap.parse_args(argv)
     if a.tryb == "repo" and not Path(a.cel).is_dir():
         print("✗ brak katalogu", file=sys.stderr)
         return 2
-    wyn = repo(Path(a.cel)) if a.tryb == "repo" else strona(a.cel)
+    if a.tryb == "atak" and not (lokalny(a.cel) or a.zgoda_wlasciciela):
+        print("✗ atak tylko na naszym podglądzie (localhost, adres prywatny) albo z --zgoda-wlasciciela "
+              "po zgodzie właściciela aplikacji", file=sys.stderr)
+        return 2
+    if a.tryb == "repo":
+        wyn = repo(Path(a.cel)) + ([] if a.offline else zaleznosci(Path(a.cel)))
+    else:
+        wyn = strona(a.cel) if a.tryb == "url" else atak(a.cel, a)
     wyn.sort(key=lambda x: WAGI.index(x["waga"]))
     licz = {w: sum(x["waga"] == w for x in wyn) for w in WAGI}
     if a.json:
-        print(json.dumps({"cel": a.cel, "tryb": a.tryb, "podsumowanie": licz, "ustalenia": wyn}, ensure_ascii=False, indent=2))
+        print(json.dumps({"cel": a.cel, "tryb": a.tryb, "podsumowanie": licz, "ustalenia": wyn, "sprawdzone": SPRAWDZONE,
+                          "nie_ocenione": UWAGI}, ensure_ascii=False, indent=2))
     else:
         print(f"{a.cel}: " + ", ".join(f"{k} {v}" for k, v in licz.items()))
         for x in wyn:
             print(f"  [{x['waga']}] {x['co']} · {x['gdzie']}\n      → {x['poprawka']}")
+        for s in SPRAWDZONE:
+            print(f"  ✓ {s}")
+        for s in UWAGI:
+            print(f"  ? {s}")
     return 1 if licz["KRYTYCZNE"] or licz["WYSOKIE"] else 0
 
 

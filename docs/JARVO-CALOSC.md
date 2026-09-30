@@ -161,8 +161,10 @@ Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo bui
 - **Skan skilli z cudzych repo** (`scripts/skan_skilli.py`, przy każdym buildzie): skaner Hermesa + wzorce
   getsentry `skill-scanner` i ECC (wstrzyknięcia, `curl|sh`, sekrety, ukryte znaki, hooki, `postinstall`).
   High/critical bez przejrzanego wyjątku (`vendor/skan-wyjatki.yaml`, przypięty do commitu) zatrzymuje wdrożenie.
-- **Bezpieczeństwo aplikacji (jarvo-web):** skill `bezpieczenstwo-aplikacji` (18 punktów), skaner
-  repo/URL (`security_check.py`, także niebezpieczne ustawienia domyślne), audyt zależności (`supply-chain-risk-auditor`,
+- **Bezpieczeństwo aplikacji (jarvo-web):** skill `bezpieczenstwo-aplikacji` (26 punktów, w tym funkcje AI, sesje,
+  CSRF, kopie zapasowe), skaner repo/URL (`security_check.py`: niebezpieczne ustawienia domyślne, zależności nieistniejące
+  albo podszyte, klucze w JS strony), nieniszczące próby na podglądzie (`security_check.py atak`: trasy bez sesji, IDOR
+  na dwóch kontach, limit logowania, upload, wylogowanie), audyt zależności (`supply-chain-risk-auditor`,
   Trail of Bits), przegląd kodu wg OWASP (`security-review`, getsentry); bramka jakości BLOKUJE oddanie strony przy
   KRYTYCZNE/WYSOKIE.
 - Zasady stałe: nigdy nie commitujemy sekretów; hasło FTP tylko w scratchpadzie

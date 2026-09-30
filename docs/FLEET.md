@@ -13,7 +13,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 |---|---|---|---|---|---|
 | `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [11 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 1 (`writing-for-agents`, mattpocock) | patrol, brief, przegląd, raport floty | [19](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [7 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 16 (Hermes, marketingskills, wspólny `transkrypcja-filmu`) | search_fanout, extract, sources | [12](../evals/jarvo-sherlock/scenarios.yaml) |
-| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [9 w `skills/web/`](../profiles/jarvo-web/skills/web) | 58 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [14](../evals/jarvo-web/scenarios.yaml) |
+| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [9 w `skills/web/`](../profiles/jarvo-web/skills/web) | 58 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [15](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 24 (marketingskills, Anthropic, Hermes, impeccable, wspólny `hooki`) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [15 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 57 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy (+ wideo_lib) | [22](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [12](../evals/jarvo-ads/scenarios.yaml) |
@@ -125,7 +125,8 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
 - [T] `favicon-i-meta`: generowanie kompletu ikon, manifestu i meta z jednego logo
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`
 - [T] `wdrozenie`: podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą)
-- [T] `bezpieczenstwo-aplikacji`: skan i przegląd bezpieczeństwa kodu i strony (`security_check.py`)
+- [T] `bezpieczenstwo-aplikacji`: skan kodu, strony i zależności, próby na podglądzie (`security_check.py repo|url|atak`),
+  lista 26 punktów (w tym funkcje AI, sesje, CSRF, kopie zapasowe), przegląd kodu
 
 **Narzędzia:** terminal, pliki, przeglądarka (Lightpanda, Chromium do zrzutów), Node.js, a do tego Lighthouse, axe-core,
 Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate; MCP `context7`
