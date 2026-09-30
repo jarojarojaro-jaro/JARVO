@@ -52,8 +52,12 @@ do skarbca przy wdrożeniu i czytany przez kompilację i przez agentów, gdy pis
 11. **Bez sekretów i bez cudzych danych ponad potrzebę.** Klucze, hasła, loginy, tokeny nigdy (lint skanuje wzorce jak
     `security_check.py`). Dane osób trzecich tylko takie, jakie Łowca i Sherlock już dziś mogą zapisać (publiczne, ze źródłem);
     lista leadów zostaje w projekcie Łowcy, do skarbca idą profil klienta i lekcje.
-12. **Po polsku, krótko, konkretnie.** Notatki i orzeczenia w trybie oznajmującym, sprawdzalne, bez esejów. Nazwy plików:
-    małe litery, myślniki, bez polskich znaków (`bramka-jakosci-blokuje.md`), tytuł w pliku z polskimi znakami.
+12. **Po polsku, krótko, konkretnie.** Notatki i orzeczenia w trybie oznajmującym, sprawdzalne, bez esejów.
+    **Nazwa pliku = tytuł, jak się go mówi:** małe litery, spacje i polskie znaki dozwolone, bez innych znaków niż przecinek,
+    myślnik, kropka i dwukropek, do 70 znaków (`bramka jakości blokuje przy krytyczne.md`). W grafie (Obsidian i zakładka)
+    etykietą węzła jest właśnie nazwa pliku, więc ma być czytelna bez otwierania. Nazwy folderów zostają ASCII bez spacji
+    (`pojecia/`, `podmioty/`), bo są w kodzie i w ścieżkach narzędzi. **Hub każdego folderu to plik `_hub-<nazwa>.md`**
+    (podkreślenie sortuje go na górze, nazwa jest unikalna w całym skarbcu, więc w grafie widać od razu, który to hub).
 
 ---
 
@@ -70,7 +74,7 @@ knowledge/                       # = skarbiec (vault Obsidiana): same pliki Mark
 ├── INDEX.md                     # katalog: każda notatka jedną linią (link · streszczenie · typ · data); pisze kompilacja
 ├── LOG.md                       # dziennik tylko-dopisywany: `## [2026-09-30] kompilacja | 4 szkice → 3 notatki, 1 aktualizacja`
 ├── LINT.md                      # ostatni raport lintu (§6): martwe linki, sieroty, sprzeczności, brak źródła, przeterminowane
-├── hub.md                       # strona główna: linki do hubów folderów, liczby, ostatnie zmiany
+├── _hub-skarbiec.md             # strona główna: linki do hubów folderów, liczby, ostatnie zmiany
 ├── zrodla/                      # SUROWE, tylko do odczytu: nigdy edytowane, nigdy usuwane
 │   ├── rozmowy/                 #   eksporty rozmów (wyciąg z sesji zapisany przy jej końcu, patrz §5)
 │   ├── karty/                   #   raporty z kart (kopia out/RAPORT.md, KLIPY.md, LEADY.md… po zamknięciu karty)
@@ -78,17 +82,17 @@ knowledge/                       # = skarbiec (vault Obsidiana): same pliki Mark
 │   └── jarvo-repo/              #   docs/*.md tego repo (kopiowane przy wdrożeniu): jak działa sama flota
 ├── skrzynka/                    # SZKICE czekające na kompilację: jeden plik = jeden szkic (kto, kiedy, skąd, treść)
 │   └── zrobione/                #   szkice po kompilacji (30 dni, potem kasowane; źródła są w zrodla/)
-├── agenci/                      # hub „Agenci” + katalog na agenta
-│   └── jarvo-web/hub.md         #   hub agenta (część generowana z fleet.yaml + część pisana ręcznie/kompilacją)
-│       ├── lekcje-…             #   czego się nauczył (z księgi lekcji i recenzji sędziego)
-│       └── narzedzia-…          #   notatki o skryptach, limitach, kruczkach („Lightpanda nie renderuje three.js”)
-├── projekty/                    # hub + notatka na misję/projekt (strona X, kampania Y, klipy Z): stan, decyzje, wyniki (linki)
-├── marki → brands/              # brand kity (bez zmian) + hub „Marki”; orzeczenia marki w orzeczenia/marki/<marka>.md
-├── ty → user/                   # USER.md (bez zmian) + notatki „firma”, „oferta”, „klienci”, „głos marki” (hub „Ty”)
-├── podmioty/                    # firmy, ludzie (tylko publiczne role), narzędzia, konkurenci, dostawcy: jedna notatka na rzecz
-├── pojecia/                     # metody, wzorce, definicje, lekcje ogólne („bramka jakości”, „test A/B/C bayesowski”)
-├── orzeczenia/                  # `wszyscy.md`, `<agent>.md`, `marki/<marka>.md`: jedna datowana linia na korektę
-├── rozmowy/                     # hub + skompilowane ustalenia: `2026-09-30-jarvo-web-landing-x.md` (decyzje, fakty, pliki)
+├── agenci/_hub-agenci.md        # hub „Agenci” + katalog na agenta
+│   └── jarvo-web/_hub-web.md    #   hub agenta (część generowana z fleet.yaml + część pisana ręcznie/kompilacją)
+│       ├── zrzuty mobile zawsze przed oddaniem.md     # czego się nauczył (z księgi lekcji i recenzji sędziego)
+│       └── lightpanda nie renderuje three.js.md       # notatki o skryptach, limitach, kruczkach
+├── projekty/_hub-projekty.md    # hub + notatka na misję/projekt (strona X, kampania Y, klipy Z): stan, decyzje, wyniki (linki)
+├── brands/_hub-marki.md         # brand kity (bez zmian) + hub „Marki”; orzeczenia marki w orzeczenia/marki/<marka>.md
+├── user/_hub-ty.md              # USER.md (bez zmian) + notatki „firma”, „oferta”, „klienci”, „głos marki” (hub „Ty”)
+├── podmioty/_hub-podmioty.md    # firmy, ludzie (tylko publiczne role), narzędzia, konkurenci, dostawcy: jedna notatka na rzecz
+├── pojecia/_hub-pojecia.md      # metody, wzorce, definicje, lekcje ogólne („bramka jakości”, „test A/B/C bayesowski”)
+├── orzeczenia/_hub-orzeczenia.md # `wszyscy.md`, `<agent>.md`, `marki/<marka>.md`: jedna datowana linia na korektę
+├── rozmowy/_hub-rozmowy.md      # skompilowane ustalenia: `2026-09-30 web: landing marki x.md` (decyzje, fakty, pliki)
 ├── fleet/lekcje.md              # istniejąca księga lekcji (bez zmian); linkowana z hubów agentów
 └── .obsidian/  .git/            # opcjonalnie: ustawienia Obsidiana użytkownika; punkty zapisu git (§6). Wtyczka je ignoruje.
 ```
@@ -126,9 +130,9 @@ Zauważone przy audycie M&W (2026-09-30): `screenshots.py` w Lightpandzie oddał
 poprawny. Lightpanda zostaje do szybkich odczytów DOM i linków (30 MB RAM na sesję), Chromium do wszystkiego, co widać.
 
 ## Powiązane
-- hub: [[agenci/jarvo-web/hub|Web]]
-- [[agenci/jarvo-web/narzedzia-screenshots|screenshots.py]] · [[pojecia/audyt-strony|audyt strony]]
-- [[projekty/mw-showcase-audyt|M&W: audyt 2026-09-30]]
+- hub: [[agenci/jarvo-web/_hub-web|Web]]
+- [[agenci/jarvo-web/lighthouse tylko w chromium|Lighthouse tylko w Chromium]] · [[pojecia/audyt strony|audyt strony]]
+- [[projekty/mw showcase: audyt 2026-09-30|M&W: audyt 2026-09-30]]
 ```
 
 Reguły formatu (sprawdza lint): frontmatter z czterema kluczami obowiązkowymi (`typ`, `utworzono`, `zmieniono`, `status`) i
@@ -275,9 +279,12 @@ po stronie serwera; `install-fleet.sh` kopiuje i włącza). Jedna wtyczka `jarvo
 `__init__.py` (dostawca pamięci, narzędzia, hak kanbana, komenda `hermes wiedza …`) i `dashboard/` (zakładka).
 
 Co widać:
-- **Graf** (canvas, własny układ sił ~150 linii, bez bibliotek): kropka = notatka, linia = link, kolor = folder, huby na biało
-  i większe, sieroty na czerwono, `status: sprzeczna` z obwódką; filtr po folderze i agencie, suwak czasu (co doszło w tym
-  tygodniu), klik otwiera notatkę, podwójny klik centruje na jej sąsiadach. Cienki folder widać od razu (jak radzi wzorzec).
+- **Graf** (canvas, własny układ sił ~150 linii, bez bibliotek), z wyglądu jak graf Obsidiana: kropka = notatka podpisana
+  nazwą pliku, linia = link, kolor = folder, huby `_hub-…` na biało, większe, z promieniami do swoich notatek; sieroty na
+  czerwono, `status: sprzeczna` z obwódką; filtr po folderze i agencie, suwak czasu (co doszło w tym tygodniu), klik otwiera
+  notatkę, podwójny klik centruje na jej sąsiadach. Cienki folder widać od razu (jak radzi wzorzec). Wydajność: układ liczony
+  w Web Workerze z drzewem czwórkowym (Barnes-Hut), etykiety dopiero po przybliżeniu; cel 5 000 notatek i 30 000 linków płynnie,
+  a powyżej graf startuje w widoku folderów (jeden węzeł = folder) i rozwija się po kliknięciu.
 - **Drzewo i notatka:** foldery jak w Obsidianie, notatka renderowana z Markdown (linki `[[…]]` klikalne, frontmatter jako
   tabelka właściwości, callouty), przyciski „Otwórz źródło”, „Historia” (git log pliku), „Zgłoś błąd” (szkic do skrzynki
   z Twoją uwagą, kompilacja poprawi).
