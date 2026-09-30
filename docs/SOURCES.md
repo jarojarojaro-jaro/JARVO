@@ -119,7 +119,7 @@ Autorstwo zaznaczamy w polu `author` skilla albo `source` pliku w `references/`.
 | [htm](https://github.com/developit/htm) 3.1.1 | składnia podobna do JSX bez kompilacji (`hq/web/vendor/`, z licencją) | Apache-2.0 |
 | React | dostarczany przez SDK dashboardu Hermesa; w trybie demo 18.3.1 z cdnjs | MIT |
 | Bricolage Grotesque, Atkinson Hyperlegible, JetBrains Mono, Pixelify Sans | kroje (Google Fonts) | OFL-1.1 |
-| VT323 (Peter Hull), IBM Plex Mono (IBM) | kroje motywu Fosfor, dołączone w `hq/web/fonts/` | OFL-1.1 |
+| VT323 (Peter Hull), IBM Plex Mono (IBM) | kroje motywu Fosfor, dołączone w `branding/fonts/` | OFL-1.1 |
 
 Pixel art wieży, pokoi i postaci jest rysowany kodem w tym repo (`hq/web/src/20-art.js`); inspiracja
 przekrojami modeli z klocków, bez użycia znaków towarowych ani zasobów producentów zabawek i gier.

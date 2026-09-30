@@ -88,3 +88,66 @@ def test_polish_translation_covers_dashboard_sections():
     assert pl["app"]["nav"]["plugin_jarvo-hq"] == "Baza"
     # placeholdery zostają jak w oryginale
     assert "{count}" in pl["sessions"]["selectedCount"] and "{what}" in pl["common"]["loadFailed"]
+
+
+LOGIN_FIXTURE = """\
+_LOGIN_HTML_TEMPLATE = \"\"\"\\
+<!doctype html>
+<html lang="en">
+<head><title>Sign in — Jarvo</title>
+<style>
+  :root {{ --midground: #ffac02; }}
+</style></head>
+<body><main>
+  <div class="brand">Nous<span class="dot"></span>Research</div>
+  <div class="card"><h1>Sign in</h1>
+    <p class="subtitle">Choose a sign-in method to continue to Jarvo HQ.</p>
+{provider_buttons}
+  </div>
+  <footer><span class="sep"></span>Public bind &middot; Auth required<span class="sep"></span></footer>
+</main>{password_script}</body></html>
+\"\"\"
+
+_EMPTY_HTML = \"\"\"\\
+<html lang="en"><head><title>Sign-in unavailable — Jarvo</title>
+<style>
+  :root { --midground: #ffac02; }
+</style></head><body><h1>Sign-in unavailable</h1></body></html>
+\"\"\"
+
+
+def _password_form(plabel):
+    return (
+        f'        <div class="form-title">Sign in with {plabel}</div>\\n'
+        f'          <span class="field-label">Username</span>\\n'
+        f'          <span class="field-label">Password</span>\\n'
+        f'        <button class="provider-btn" type="submit">Sign in</button>\\n'
+    )
+"""
+
+
+def test_login_page_gets_jarvo_brand_polish_and_fonts(tmp_path):
+    pd = load_script("branding/patch_dashboard.py")
+    hermes = tmp_path / "hermes"
+    login = hermes / "hermes_cli" / "dashboard_auth" / "login_page.py"
+    login.parent.mkdir(parents=True)
+    (hermes / "hermes_cli" / "web_dist").mkdir()
+    login.write_text(LOGIN_FIXTURE, encoding="utf-8")
+    pd.HERMES, pd.WEB = hermes, hermes / "hermes_cli" / "web_dist"
+    pd.patch_login(login, REPO / "branding")
+    pd.patch_login(login, REPO / "branding")                      # drugi raz nic nie dokleja
+    text = login.read_text(encoding="utf-8")
+    assert text.count("---- Jarvo: biel i czerwień") == 2         # szablon logowania i strona „brak metod”
+    for word in ("Nous", "Sign in", "Public bind", "Username", ">Password<", 'lang="en"'):
+        assert word not in text, word
+    for word in ("Zaloguj się", "Zaloguj</button>", "Dostęp tylko po zalogowaniu", "Użytkownik", "Hasło",
+                 "Logowanie niedostępne", '<span class="tagline">from idea to reality.</span>'):
+        assert word in text, word
+    assert "/fonts/VT323-400-latin.woff2" in text
+    assert (pd.WEB / "fonts" / "VT323-400-latin.woff2").is_file()
+    # szablon Hermesa to str.format: po łatce musi się formatować, a strona „brak metod” zostaje zwykłym CSS
+    ns: dict = {}
+    exec(compile(text, "login_page.py", "exec"), ns)
+    html = ns["_LOGIN_HTML_TEMPLATE"].format(provider_buttons=ns["_password_form"]("Jarvo"), password_script="")
+    assert "--midground: #D4213D;" in html and '<svg class="logo"' in html and "{{" not in html
+    assert "--midground: #D4213D;" in ns["_EMPTY_HTML"] and "{{" not in ns["_EMPTY_HTML"]

@@ -234,6 +234,8 @@ bash scripts/deploy.sh --no-pull --resume-cron
 docker exec -u hermes jarvo-hermes hermes -p jarvo cron list
 ```
 
+Na własnym komputerze (instalator, polecenie `jarvo`): `JARVO_RESUME_CRON=1 jarvo up`.
+
 Potem napisz do Jarva: **„Zróbmy onboarding.”** Wywiad (15–20 min) wypełnia `knowledge/user/USER.md` i pamięć
 o Tobie, z której korzystają wszyscy agenci. Brand kity dodajesz poleceniem: „Naucz się marki z https://…”.
 

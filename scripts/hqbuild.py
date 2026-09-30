@@ -89,8 +89,9 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     (dash / "dist" / "index.js").write_text(bundle_js(), encoding="utf-8")
     shutil.copy2(HQ / "web" / "style.css", dash / "dist" / "style.css")
     shutil.copy2(HQ / "web" / "vendor" / "LICENSE-htm", dash / "dist" / "LICENSE-htm")
-    # czcionki motywu Fosfor (VT323, IBM Plex Mono; OFL): serwowane lokalnie, bez Google Fonts
-    shutil.copytree(HQ / "web" / "fonts", dash / "dist" / "fonts")
+    # czcionki motywu Fosfor (VT323, IBM Plex Mono; OFL): serwowane lokalnie, bez Google Fonts;
+    # te same pliki trafiają na stronę logowania (branding/patch_dashboard.py)
+    shutil.copytree(fl.REPO_ROOT / "branding" / "fonts", dash / "dist" / "fonts")
     # wspólne klucze floty: plugin pilnuje ich na bieżąco (skrypt jest też uruchamiany przy wdrożeniu)
     shutil.copy2(fl.REPO_ROOT / "scripts" / "share_keys.py", dash / "share_keys.py")
     fl.write_json(dash / "fleet.json", fleet_json(fleet))

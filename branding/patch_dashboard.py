@@ -157,6 +157,113 @@ def patch_sessions(assets: list[Path]) -> int:
     return n
 
 
+# Strona logowania: marka Jarvo (logo, biel i czerwień, fonty VT323 / IBM Plex Mono jak w motywie Fosfor, linie CRT)
+# i polskie napisy. Hermes buduje ją z szablonu str.format (w CSS podwójne klamry), więc CSS doklejamy osobno
+# do szablonu logowania (klamry podwojone) i do strony „brak metod logowania” (klamry pojedyncze).
+LOGIN_TEXTS = [
+    (r'<html lang="en">', '<html lang="pl">', "język"),
+    (r"<title>Sign in — Jarvo</title>", "<title>Logowanie — Jarvo</title>", "tytuł karty"),
+    (r"<h1>Sign in</h1>", "<h1>Zaloguj się</h1>", "nagłówek"),
+    (r"Choose a sign-in method to continue to Jarvo HQ\.", "Wejście do Jarvo HQ: Twojej floty agentów.", "opis"),
+    (r"Public bind &middot; Auth required", "Dostęp tylko po zalogowaniu", "stopka"),
+    (r"f'Sign in with \{", "f'Zaloguj przez {", "przycisk dostawcy"),
+    (r"Sign in with \{plabel\}", "Nazwa użytkownika i hasło", "tytuł formularza"),
+    (r'<span class="field-label">Username</span>', '<span class="field-label">Użytkownik</span>', "pole użytkownika"),
+    (r'<span class="field-label">Password</span>', '<span class="field-label">Hasło</span>', "pole hasła"),
+    (r'type="submit">Sign in</button>', 'type="submit">Zaloguj</button>', "przycisk"),
+    (r"'Invalid username or password\.'", "'Zły użytkownik albo hasło.'", "błąd hasła"),
+    (r"'Network error\. Please try again\.'", "'Błąd sieci. Spróbuj ponownie.'", "błąd sieci"),
+    (r"<title>Sign-in unavailable — Jarvo</title>", "<title>Logowanie niedostępne — Jarvo</title>", "tytuł (brak metod)"),
+    (r"<h1>Sign-in unavailable</h1>", "<h1>Logowanie niedostępne</h1>", "nagłówek (brak metod)"),
+]
+LOGIN_CSS = """
+  /* ---- Jarvo: biel i czerwień, fonty i linie CRT motywu Fosfor (branding/patch_dashboard.py) ---- */
+@@FONTS@@
+  :root {
+    --background-base: #10131C;
+    --background: #10131C;
+    --midground: #D4213D;
+    --foreground: #F2F1E8;
+    --jarvo-red-hi: #FF4D63;
+    --hairline: color-mix(in srgb, #D4213D 30%, transparent);
+    --hairline-strong: color-mix(in srgb, #D4213D 55%, transparent);
+  }
+  html, body { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+  body {
+    background-image:
+      radial-gradient(ellipse at top, color-mix(in srgb, #D4213D 14%, transparent) 0%, transparent 60%),
+      repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, .18) 2px 3px);
+    background-size: auto, auto;
+  }
+  .brand {
+    display: flex; flex-direction: column; align-items: center; gap: .55rem;
+    font-family: VT323, 'IBM Plex Mono', monospace; font-weight: 400; font-size: 2.9rem; line-height: 1;
+    letter-spacing: .38em; text-indent: .38em; color: var(--foreground); text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(212, 33, 61, .55);
+  }
+  .brand .logo { width: 76px; height: 76px; margin-bottom: .35rem; filter: drop-shadow(0 0 16px rgba(212, 33, 61, .5)); }
+  .brand .tagline { font-size: 1.05rem; letter-spacing: .28em; text-indent: .28em; text-transform: none; color: var(--jarvo-red-hi); }
+  .card {
+    background: #151A26; border: 2px solid var(--midground);
+    box-shadow: 0 0 24px -6px rgba(212, 33, 61, .6), inset 0 0 0 1px rgba(242, 241, 232, .04), 0 24px 60px -20px rgba(0, 0, 0, .7);
+  }
+  h1 { font-family: VT323, 'IBM Plex Mono', monospace; font-weight: 400; font-size: 2.5rem; letter-spacing: .06em; text-transform: none; line-height: 1.1; }
+  h1::after { content: "▌"; color: var(--midground); margin-left: .12em; animation: jarvo-blink 1.06s steps(1) infinite; }
+  @keyframes jarvo-blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+  .subtitle { font-size: .9rem; }
+  .form-title, .field-label { font-family: 'IBM Plex Mono', monospace; letter-spacing: .14em; }
+  .field-input { font-family: 'IBM Plex Mono', monospace; background: #0B0E15; }
+  .field-input:focus-visible { border-color: var(--midground); box-shadow: 0 0 0 1px var(--midground), 0 0 12px rgba(212, 33, 61, .45); }
+  .provider-btn {
+    background: var(--midground); color: var(--foreground); font-family: VT323, 'IBM Plex Mono', monospace; font-weight: 400;
+    font-size: 1.55rem; letter-spacing: .22em; line-height: 1; padding: .8rem 1rem;
+    box-shadow: 0 0 16px -2px rgba(212, 33, 61, .7), inset 1px 1px 0 rgba(255, 255, 255, .25), inset -1px -1px 0 rgba(0, 0, 0, .4);
+  }
+  .provider-btn:hover { filter: none; background: var(--jarvo-red-hi); }
+  .provider-btn:active { filter: none; background: var(--foreground); color: var(--background-base); }
+  .provider-btn:focus-visible { outline-color: var(--foreground); }
+  .form-error { color: var(--jarvo-red-hi); }
+  footer { font-family: 'IBM Plex Mono', monospace; color: color-mix(in srgb, var(--foreground) 50%, transparent); }
+  ::selection { background: var(--midground); color: var(--foreground); }
+  @media (prefers-reduced-motion: reduce) { h1::after { animation: none; } }
+"""
+
+
+def login_fonts_css(brand: Path) -> str:
+    """@font-face z fosfor.css, z adresami /fonts/… (publiczne; pliki pluginu HQ są za logowaniem)."""
+    css = (brand / "fonts" / "fosfor.css").read_text(encoding="utf-8")
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return re.sub(r"url\(([\w.-]+\.woff2)\)", r"url('/fonts/\1')", css).strip()
+
+
+def patch_login(login: Path, brand: Path) -> None:
+    for d in (WEB / "fonts", HERMES / "web" / "public" / "fonts"):
+        if d.parent.is_dir():
+            d.mkdir(exist_ok=True)
+            for f in (brand / "fonts").glob("*.woff2"):
+                shutil.copy(f, d / f.name)
+    for pat, repl, label in LOGIN_TEXTS:
+        sub_all([login], pat, repl, f"logowanie: {label}")
+    svg = (brand / "favicon.svg").read_text(encoding="utf-8")
+    svg = svg[svg.index("<svg"):].replace("<svg ", '<svg class="logo" aria-hidden="true" ', 1)
+    svg = re.sub(r"<title.*?</desc>", "", svg, flags=re.S)
+    assert "{" not in svg and "}" not in svg, "logo SVG nie może mieć klamer (szablon str.format)"
+    sub_all([login], r'<div class="brand">Nous<span class="dot"></span>Research</div>',
+            lambda m: f'<div class="brand">{svg}<span>Jarvo</span><span class="tagline">from idea to reality.</span></div>',
+            "logowanie: marka i logo")
+    css = LOGIN_CSS.replace("@@FONTS@@", login_fonts_css(brand))
+    text = login.read_text(encoding="utf-8")
+    if "---- Jarvo: biel i czerwień" in text:
+        print("  · logowanie: kolory i fonty (już są)")
+        return
+    head, sep, tail = text.partition("_EMPTY_HTML = ")
+    doubled = css.replace("{", "{{").replace("}", "}}")
+    head = head.replace("</style>", doubled + "</style>", 1)
+    tail = tail.replace("</style>", css + "</style>", 1)
+    login.write_text(head + sep + tail, encoding="utf-8")
+    print("  ✓ logowanie: kolory i fonty: 2")
+
+
 def main(argv: list[str]) -> int:
     brand = Path(argv[0])
     for d in (WEB, HERMES / "web" / "public"):
@@ -178,6 +285,8 @@ def main(argv: list[str]) -> int:
             r'\1[...e.map(e=>e.path),"/base"]\2', "BASE w głównym menu")
     sub_all(assets, r"brand:`Hermes Agent`,brandShort:`HA`", "brand:`Jarvo`,brandShort:`J`", "nazwa marki (i18n)")
     sub_all(assets, r"label:`Hermes Teal", "label:`Jarvo Teal", "etykiety motywów")
+    # stopka menu: marka Jarvo i silnik (Hermes Agent, MIT) zamiast nazwy firmy Nous Research (wszystkie języki)
+    sub_all(assets, r"footer:\{org:`Nous Research`\}", "footer:{org:`Jarvo · Hermes Agent`}", "stopka menu")
     add_polish(assets, index[0], brand / "i18n" / "pl.json")
     patch_sessions(assets)
     themes = HERMES / "hermes_cli" / "web_server_dashboard.py"
@@ -193,6 +302,7 @@ def main(argv: list[str]) -> int:
     if login.is_file():
         sub_all([login], r"the Hermes Agent dashboard", "Jarvo HQ", "strona logowania (opis)")
         sub_all([login], r" — Hermes Agent<", " — Jarvo<", "strona logowania (tytuł)")
+        patch_login(login, brand)
     bust_cache(WEB / "assets", WEB / "index.html")
     return 0
 

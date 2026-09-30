@@ -137,7 +137,7 @@ Zbudowane 2026-09-30 (pliki w §1):
   `JARVO_REPO`, `JARVO_BRANCH`.
 - `bin/jarvo` (lista poleceń w §1); `uninstall` usuwa kontenery, obraz, usługę i polecenie, o dane, klucze
   i repo pyta osobno (`--all` usuwa też je; samo `--yes` ich nie rusza).
-- `scripts/local-up.sh`: dostawca i klucz z env, `--prepare`, `JARVO_NO_BUILD=1`, bez `sudo` u roota,
+- `scripts/local-up.sh`: dostawca i klucz z env, `--prepare`, `JARVO_NO_BUILD=1`, `JARVO_RESUME_CRON=1` (rutyny Jarva), bez `sudo` u roota,
   restart usługi `jarvo-updater` zamiast procesu w tle, gdy usługa jest włączona.
 - macOS bez regresji: te same sprawdzenia co wcześniej (git, Docker, bash 4+), `bin/jarvo` sam przechodzi
   na basha z Homebrew.

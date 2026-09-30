@@ -12,6 +12,7 @@
 # (same domyślne: OpenRouter bez klucza). Klucz nigdy nie jest wypisywany.
 # Zmiana dostawcy później:  JARVO_MODEL_PROVIDER=commandcode bash scripts/local-up.sh
 # JARVO_NO_BUILD=1: obraz jarvo-hermes:local jest już gotowy (docker load, rejestr): nigdy nie buduj.
+# JARVO_RESUME_CRON=1: włącz rutyny Jarva (patrol, brief, przegląd tygodnia), domyślnie wstrzymane.
 # JARVO_LOCAL: katalog instalacji (domyślnie ~/jarvo-local).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -123,7 +124,8 @@ elif infra_changed; then
 elif brand_changed; then
   FLAGS+=(--rebuild)                # tylko branding/tłumaczenie: ta sama wersja Hermesa, kilka sekund
 fi
-JARVO_COMPOSE_DIR="$L/compose" JARVO_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"
+[[ "${JARVO_RESUME_CRON:-0}" == 1 ]] && FLAGS+=(--resume-cron)   # rutyny Jarva (domyślnie wstrzymane)
+JARVO_LOCAL_INSTALL=1 JARVO_COMPOSE_DIR="$L/compose" JARVO_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"
 touch "$L/.installed"
 
 # pomocnik aktualizacji: przycisk „Aktualizuj” w dashboardzie (git pull + deploy na prośbę z panelu).

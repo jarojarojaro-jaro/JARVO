@@ -103,4 +103,11 @@ docker exec -u hermes jarvo-hermes hermes profile list || true
 docker exec -u hermes jarvo-hermes hermes -p jarvo cron list || true
 echo
 echo "✅ Wdrożenie zakończone. Commit: $(git rev-parse --short HEAD)"
-[[ $RESUME_CRON -eq 0 ]] && echo "ℹ Rutyny Jarva są wstrzymane. Po teście Telegrama: bash scripts/deploy.sh --no-pull --resume-cron"
+if [[ $RESUME_CRON -eq 0 ]]; then
+  # lokalnie (local-up.sh ustawia JARVO_LOCAL_INSTALL=1) wznawia się przez polecenie jarvo, na VPS przez deploy.sh
+  if [[ "${JARVO_LOCAL_INSTALL:-0}" == 1 ]]; then
+    echo "ℹ Rutyny Jarva (patrol, brief, przegląd tygodnia) są wstrzymane. Włączenie: JARVO_RESUME_CRON=1 jarvo up"
+  else
+    echo "ℹ Rutyny Jarva są wstrzymane. Po teście Telegrama: bash scripts/deploy.sh --no-pull --resume-cron"
+  fi
+fi

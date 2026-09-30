@@ -55,8 +55,8 @@ def test_two_color_tokens():
 
 
 def test_fonts_are_bundled():
-    css = (REPO / "hq" / "web" / "fonts" / "fosfor.css").read_text(encoding="utf-8")
+    css = (REPO / "branding" / "fonts" / "fosfor.css").read_text(encoding="utf-8")
     for name in ("VT323", "IBM Plex Mono"):
         assert name in css
     for ref in [l.split("url(")[1].split(")")[0] for l in css.splitlines() if "url(" in l]:
-        assert (REPO / "hq" / "web" / "fonts" / ref).is_file()
+        assert (REPO / "branding" / "fonts" / ref).is_file()

@@ -56,4 +56,4 @@ try {
   if ($Granted) { wsl.exe -u root -e rm -f $Drop $DropTmp }
 }
 if ($Code -ne 0) { Die "Instalacja się nie udała (log powyżej; pełny: ~/jarvo-local/install.log w WSL)." }
-Start-Process "http://localhost:9119/base"
+# dashboard otwiera już install.sh (jarvo open w WSL): tu nie otwieramy drugiej karty

@@ -75,7 +75,7 @@ Pliki w repo:
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`) |
 | `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy i edytor filmów, czat, HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność) |
-| `hq/web/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css` |
+| `branding/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css`; te same pliki na stronie logowania |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |
 | `hq/web/demo/` | strona demo i symulator floty |
 | `scripts/hqbuild.py` | build pluginu (sklejenie JS, `fleet.json` z fleet.yaml i SOUL) i demo |
@@ -221,6 +221,9 @@ Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zost
   i wdroż. Wybór zrobiony w dashboardzie przetrwa wdrożenia.
 - Kolory terminala czatu idą z motywu (łatka w `branding/patch_dashboard.py`), skórka TUI jest biało-czerwona
   (`branding/skin-jarvo.yaml`).
+- **Strona logowania** (`/login`, przed dashboardem) ma markę Jarvo: logo, biel i czerwień, VT323 / IBM Plex Mono,
+  linie CRT i polskie napisy (łatka `patch_login` w `branding/patch_dashboard.py`). Fonty kopiuje do publicznego
+  `/fonts/` dashboardu, bo pliki pluginu HQ są za logowaniem. Stopka menu: „Jarvo · Hermes Agent”.
 
 ## 6. Język: polski i angielski
 
