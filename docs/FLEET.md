@@ -48,7 +48,11 @@ narzędziowe jak `graf-kodu` i metodyczne jak `hooki`, oraz te same skille zewn�
   z wywiadu onboardingowego Jarva; później wspólny provider pamięci, np. Honcho),
 - **brand kity** w `knowledge/brands/<marka>/`: logo, kolory, fonty, ton komunikacji, `DESIGN.md`.
   Brand kit tworzy `jarvo-web` albo `jarvo-studio` („naucz się mojej marki z tej strony”),
-  a korzystają z niego obaj. Marka to wiedza o Tobie, nie o dziedzinie, dlatego jest wspólna.
+  a korzystają z niego obaj. Marka to wiedza o Tobie, nie o dziedzinie, dlatego jest wspólna,
+- **skarbiec wiedzy** (`knowledge/`, projekt: [WIEDZA.md](WIEDZA.md)): notatki z linkami o Tobie, markach, projektach,
+  agentach i narzędziach, orzeczenia z Twoich korekt, wyciągi z rozmów i kart. Wtyczka `jarvo-wiedza` (dostawca pamięci
+  Hermesa u każdego agenta) daje przypomnienia przed turą i narzędzia `wiedza_szukaj`, `wiedza_czytaj`, `wiedza_zapisz`,
+  `wiedza_orzeczenie`; agenci zgłaszają szkice, notatki pisze kompilacja.
 
 ---
 

@@ -15,7 +15,7 @@ granice i testy, a nie tylko dobry prompt.
  │ 1. Tożsamość (SOUL.md = main prompt)          zawsze w kontekście │
  ├───────────────────────────────────────────────────────────────┤
  │ 2. Workflowy (skills/*/*/SKILL.md)            ładowane na żądanie │
- │ 3. Wiedza (references/ skilli, knowledge/)    ładowana na żądanie │
+ │ 3. Wiedza (references/ skilli, skarbiec)      ładowana na żądanie │
  │ 4. Skrypty (scripts/ profilu)                 wykonywane, nie czytane │
  ├───────────────────────────────────────────────────────────────┤
  │ 5. Toolbox (narzędzia OSS na VPS)             toolbox.yaml       │
@@ -93,7 +93,9 @@ Rodzaje skilli agenta:
 ## 3. Wiedza: knowledge packi
 
 Wiedza dziedzinowa w plikach Markdown w `skills/<kategoria>/<workflow>/references/` (przy workflow,
-który z niej korzysta) albo w `knowledge/` profilu (wiedza przekrojowa).
+który z niej korzysta). Wiedza przekrojowa i zdobywana w pracy (o użytkowniku, markach, projektach, lekcje, orzeczenia)
+żyje w skarbcu wiedzy floty (`knowledge/`, [WIEDZA.md](WIEDZA.md)): agent dostaje z niego przypomnienia przed turą
+i narzędzia `wiedza_*` przez wtyczkę `jarvo-wiedza`.
 
 Zasady:
 - **źródło i data** przy każdym pakiecie (`source:`, `reviewed:`), bo wiedza webowa i marketingowa się starzeje,

@@ -110,6 +110,19 @@ if [[ -d "$BUILD/plugins/jarvo-hq" ]]; then
   rm -rf "$DATA/plugins/jarvo-hq" && mv "$DATA/plugins/jarvo-hq.new" "$DATA/plugins/jarvo-hq"
   # pluginy użytkownika muszą być jawnie włączone (zabezpieczenie Hermesa)
   hermes plugins enable jarvo-hq >/dev/null 2>&1 || $PY "$REPO/scripts/enable_plugin.py" "$DATA/config.yaml" jarvo-hq
+fi
+
+# 3c'. skarbiec wiedzy: wtyczka jarvo-wiedza (docs/WIEDZA.md). Dostawca pamięci każdego profilu (memory.provider w config.yaml
+# profilu z buildu); Hermes szuka dostawców w <HERMES_HOME profilu>/plugins/, więc jedna kopia + dowiązanie w każdym profilu.
+if [[ -d "$BUILD/plugins/jarvo-wiedza" ]]; then
+  log "Wtyczka jarvo-wiedza (skarbiec wiedzy)"
+  mkdir -p "$DATA/plugins"
+  rm -rf "$DATA/plugins/jarvo-wiedza.new" && cp -r "$BUILD/plugins/jarvo-wiedza" "$DATA/plugins/jarvo-wiedza.new"
+  rm -rf "$DATA/plugins/jarvo-wiedza" && mv "$DATA/plugins/jarvo-wiedza.new" "$DATA/plugins/jarvo-wiedza"
+  for a in $AGENTS; do
+    mkdir -p "$DATA/profiles/$a/plugins"
+    ln -sfn "$DATA/plugins/jarvo-wiedza" "$DATA/profiles/$a/plugins/jarvo-wiedza"
+  done
   HQ_CHANGED=1
 fi
 

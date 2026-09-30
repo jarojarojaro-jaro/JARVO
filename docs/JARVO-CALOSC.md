@@ -34,7 +34,9 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
   4. **raport** — oddaje Ci jeden, sprawdzony wynik.
 - **Bezpośredni kontakt zostaje** — z każdym snajperem pogadasz osobno, ale praca wieloetapowa
   zawsze idzie przez szefa.
-- **Wspólne:** wiedza o Tobie (USER.md) i brand kity (`knowledge/brands`). Pamięć i skille są per agent
+- **Wspólne:** wiedza o Tobie (USER.md), brand kity (`knowledge/brands`) i **skarbiec wiedzy** (`knowledge/`, [WIEDZA.md](WIEDZA.md):
+  notatki z linkami, orzeczenia z Twoich korekt, wyciągi z rozmów i kart; wtyczka `jarvo-wiedza` daje każdemu agentowi
+  przypomnienia przed turą i narzędzia `wiedza_*`). Pamięć i skille są per agent
   (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads; Ręka czyta skille wszystkich).
 - **Nadzór bez palenia tokenów:** dispatcher kanbana i patrol (skrypt bez modelu) pilnują floty
   i budzą Jarva tylko przy anomaliach albo gdy trzeba Twojej decyzji.
@@ -255,8 +257,8 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    zapisał login w pamięci (hasła tam nie było). Hasła i logowanie w cudze konta już blokują reguła 16
    kontraktu i `deny.yaml` (`agent-browser … auth`, `--password`, strony logowania: w red teamie hasło z czatu
    trafiło do `agent-browser`, a login do YouTube Studio). Brakuje jeszcze wprost zakazu zapisywania loginów w pamięci.
-3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (zaakceptowany 2026-09-30, etap 2 z 7 gotowy:
-   skarbiec zasiewany przy wdrożeniu, `wiedza.py`):** jeden folder
+3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (zaakceptowany 2026-09-30, etapy 2–3 z 7 gotowe:
+   skarbiec zasiewany przy wdrożeniu, `wiedza.py`, wtyczka `jarvo-wiedza` u każdego agenta; dalej kompilacja, zakładka, rutyny):** jeden folder
    notatek Markdown z linkami (`knowledge/`), wzorzec LLM Wiki Karpathy'ego; wtyczka Hermesa `jarvo-wiedza` jako dostawca
    pamięci (przypomnienia przed turą, wyciąg po sesji i przed kompresją, 4 narzędzia), kompilacja tanim modelem (jeden
    piszący), orzeczenia z Twoich korekt, lint, punkty zapisu git, zakładka „Wiedza” z grafem w dashboardzie.

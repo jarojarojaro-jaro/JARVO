@@ -1,0 +1,4 @@
+name: jarvo-wiedza
+version: 0.1.0
+description: "Skarbiec wiedzy floty Jarvo: dostawca pamięci (przypomnienia, orzeczenia, szkice, wyciągi z rozmów) i hak kanbana."
+provides_hooks: [kanban_task_completed]

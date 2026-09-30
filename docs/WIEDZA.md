@@ -1,6 +1,6 @@
 # Wiedza: drugi mózg floty (projekt)
 
-> Stan: **zaakceptowany (2026-09-30), w budowie** (§9: etap 2 gotowy). Właściciel: `jarvo` (jedyny piszący
+> Stan: **zaakceptowany (2026-09-30), w budowie** (§9: etapy 2–3 gotowe: skarbiec i wtyczka u każdego agenta). Właściciel: `jarvo` (jedyny piszący
 > do skarbca) i wtyczka Hermesa `jarvo-wiedza` (wszyscy agenci czytają, zgłaszają szkice, dostają przypomnienia).
 > Decyzje użytkownika: wtyczka u **każdego** agenta; agenci nie piszą notatek, tylko szkice i orzeczenia; skarbiec żyje tam,
 > gdzie stoi Jarvo (VPS, lokalnie, telefon), zakładka jest podglądem wszędzie, Obsidian opcjonalnie; wyciągi z każdej
@@ -167,7 +167,7 @@ ale wszystkie instancje wskazują ten sam skarbiec. Wzorzec kodu: wbudowany loka
 | `system_prompt_block()` | stały blok ≤ 12 linii: „Masz skarbiec wiedzy: `wiedza_szukaj`, `wiedza_czytaj`, `wiedza_zapisz`, `wiedza_orzeczenie`. Zanim odpowiesz na coś o użytkowniku, markach, projektach, narzędziach albo własnej dziedzinie, sprawdź skarbiec. Korekta od użytkownika = orzeczenie (po potwierdzeniu jednym zdaniem). Nie wpisuj sekretów.” | ~120 tokenów w każdym zapytaniu |
 | `prefetch(query)` / `queue_prefetch` | przed turą: wyszukiwanie po wiadomości użytkownika (+ tytuł bieżącej karty) w FTS5, rozszerzone o 1 krok po linkach z hubów; zwraca ≤ 5 notatek jako `ścieżka · streszczenie` oraz **zawsze** orzeczenia agenta (i marki, gdy rozpoznana) | ≤ ~400 tokenów, w tle (Hermes woła `queue_prefetch` po turze, `prefetch` konsumuje cache) |
 | `get_tool_schemas()` / `handle_tool_call()` | 4 narzędzia: `wiedza_szukaj(zapytanie, folder?, agent?, limit)`, `wiedza_czytaj(sciezka)` (cała notatka, pay-per-read), `wiedza_zapisz(typ, tytul, tresc, zrodlo, linki?)` (szkic do `skrzynka/`), `wiedza_orzeczenie(kogo, tresc)` (linia w `orzeczenia/`, tylko po słowach użytkownika) | ~250 tokenów schematów; wywołania na żądanie |
-| `on_session_end(messages)` | wyciąg z sesji tanim modelem (`ctx.llm`, model poziomu `fast`), gdy sesja miała ≥ 4 tury i kontekst `primary`: decyzje, fakty, korekty, pytania otwarte, pliki → `zrodla/rozmowy/<data>-<agent>-<sesja>.md` (surowy wyciąg) + szkic w `skrzynka/` | 1 tanie wywołanie na sesję |
+| `on_session_end(messages)` | wyciąg z sesji tanim modelem (zadanie pomocnicze `auxiliary.jarvo_wiedza`, model poziomu `fast`), gdy sesja miała ≥ 4 nowe tury użytkownika i kontekst `primary`: decyzje, fakty, korekty, pytania otwarte, pliki → `zrodla/rozmowy/<data>-<agent>-<sesja>.md` (surowy wyciąg) + szkic w `skrzynka/`; to samo po 30 min ciszy w sesji (wątek wtyczki), zawsze tylko dla tur jeszcze niewyciągniętych | 1 tanie wywołanie na sesję |
 | `on_pre_compress(messages)` | to samo dla części rozmowy, która zaraz zniknie w kompresji: nic nie ginie między „turą 40” a streszczeniem | 1 tanie wywołanie na kompresję |
 | `on_memory_write(action, target, content)` | lustro wpisów `memory` (MEMORY.md/USER.md) do `skrzynka/pamiec-<agent>.md`: pamięć zostaje mała (3000 znaków), skarbiec pamięta wszystko z datą i źródłem | 0 tokenów |
 | `on_delegation(task, result)` | wynik `delegate_task` jako szkic (kiedy Jarvo zlecał subagentom „przeczytaj 50 notatek i streść”) | 0 tokenów |
@@ -324,11 +324,17 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami, zewnętrzne z locka, skrypty), `install-fleet.sh`
    zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane). Testy: `tests/test_wiedza.py`.
    Sprawdzone w kontenerze: huby 8 agentów, wyszukiwanie po polsku bez ogonków, lint bez błędów, punkty zapisu git.
-3. ⬜ **Wtyczka `jarvo-wiedza`, część agenta:** dostawca pamięci (blok, przypomnienia, 4 narzędzia, lustro pamięci, wyciąg
-   przy końcu sesji i przed kompresją tanim modelem), hak `kanban_task_completed`, `build.py` ustawia `memory.provider:
-   jarvo-wiedza` w każdym profilu i model `fast` dla `ctx.llm`, `install-fleet.sh` włącza wtyczkę. Test: rozmowa z Webem w HQ
-   → po `/new` w `zrodla/rozmowy/` jest wyciąg, w skrzynce szkic; nowa rozmowa dostaje przypomnienie (widać w transkrypcji
-   sesji); karta zamknięta przez Jarva → szkic karty; `deny.yaml` nadal blokuje czytanie `.env`.
+3. ✅ **Wtyczka `jarvo-wiedza`, część agenta** (`wiedza/plugin/`): dostawca pamięci Hermesa (`memory.provider: jarvo-wiedza`
+   w `config.yaml` każdego profilu z buildu): stały blok w prompcie, przypomnienia przed turą (≤ 5 notatek z FTS5 + orzeczenia
+   agenta, wszystkich i marki, ≤ 2 200 znaków, pomijane dla powitań i komend), 4 narzędzia (`wiedza_szukaj`, `wiedza_czytaj`,
+   `wiedza_zapisz`, `wiedza_orzeczenie` ze strażnikiem: cytat musi pasować do bieżącej wiadomości użytkownika), lustro wpisów
+   `memory` do `skrzynka/pamiec-<agent>.md`, wyciąg z rozmowy tanim modelem (zadanie pomocnicze `auxiliary.jarvo_wiedza`,
+   model poziomu `fast`) na koniec sesji, przed kompresją i po 30 min ciszy, tylko od 4 tur użytkownika i tylko nowe tury;
+   hak `kanban_task_completed` (raporty `out/*.md` zamkniętej karty do `zrodla/karty/`, szkic karty). Subagent i cron: tylko
+   odczyt. `build.py` kopiuje wtyczkę do `build/plugins/jarvo-wiedza/`, `install-fleet.sh` do `<dane>/plugins/` z dowiązaniem
+   w `<profil>/plugins/` (tam Hermes szuka dostawców). Testy: `tests/test_wiedza_plugin.py` (stub interfejsu Hermesa).
+   Sprawdzone w kontenerze: Hermes ładuje dostawcę w profilu, blok promptu i przypomnienia z prawdziwego skarbca, narzędzia,
+   konfiguracja zadania pomocniczego (bez klucza modelu w piaskownicy: sam wyciąg modelem zostaje do sprawdzenia na VPS).
 4. ⬜ **Kompilacja i punkty zapisu:** przebieg tanim modelem, INDEX/LOG/huby, transakcja + git, wątek harmonogramu, `hermes
    wiedza kompiluj`. Test: pierwsza kompilacja istniejącej wiedzy (USER.md, brand kity, `fleet/lekcje.md`, misje, docs repo)
    → notatki z linkami, `lint` bez sierot i martwych linków, `cofnij` przywraca stan.
@@ -408,3 +414,7 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 | `scripts/build.py` → `build/wiedza/fleet.json` | dane do hubów agentów (rola, skille z opisami, skille zewnętrzne, skrypty) |
 | `scripts/install-fleet.sh` (krok „Skarbiec wiedzy”) | `zasiej` przy każdym wdrożeniu |
 | `tests/test_wiedza.py` | testy skarbca |
+| `wiedza/plugin/plugin.yaml`, `wiedza/plugin/__init__.py` | wtyczka `jarvo-wiedza`: dostawca pamięci (`SkarbiecProvider`), hak kanbana (`karta_zamknieta`), zadanie pomocnicze `jarvo_wiedza` |
+| `scripts/build.py` → `build/plugins/jarvo-wiedza/` i `config.yaml` profili | kopia wtyczki z `wiedza.py`; `memory.provider`, `plugins.enabled`, `auxiliary.jarvo_wiedza.model` w każdym profilu |
+| `scripts/install-fleet.sh` (krok „Wtyczka jarvo-wiedza”) | kopia do `<dane>/plugins/jarvo-wiedza`, dowiązanie w `<dane>/profiles/<agent>/plugins/` |
+| `tests/test_wiedza_plugin.py` | testy wtyczki na stubie `agent.memory_provider` |

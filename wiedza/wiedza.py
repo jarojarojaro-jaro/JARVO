@@ -65,7 +65,9 @@ LINK_RE = re.compile(r"\[\[([^\]\|#]+)(#[^\]\|]*)?(?:\|([^\]]*))?\]\]")
 ZAKAZANE_W_NAZWIE = set('*"\\/<>:|?#^[]')            # Obsidian i Windows nie przyjmą takiej nazwy
 DATA_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 STOPSLOWA = {"i", "a", "w", "z", "na", "do", "to", "że", "ze", "się", "sie", "nie", "jak", "co", "czy", "dla", "od", "po",
-             "przez", "jest", "są", "sa", "the", "and", "or", "of", "for", "mi", "mnie", "ten", "ta", "te", "ale", "oraz", "o"}
+             "przez", "jest", "są", "sa", "the", "and", "or", "of", "for", "mi", "mnie", "ten", "ta", "te", "ale", "oraz", "o",
+             "kto", "we", "gdzie", "kiedy", "czym", "który", "która", "które", "ktory", "ktora", "ktore", "jaki", "jaka", "jakie",
+             "ma", "mam", "masz", "być", "byc", "był", "była", "było", "będzie", "bedzie", "ich", "jego", "jej", "nam", "nas", "moja", "mój", "moje"}
 SEKRETY = [
     ("klucz Stripe", re.compile(r"\bsk_(live|test)_[A-Za-z0-9]{8,}")),
     ("klucz OpenAI/Anthropic", re.compile(r"\bsk-(ant-)?[A-Za-z0-9_-]{20,}")),
@@ -222,7 +224,7 @@ class Skarbiec:
         out = []
         for p in self.root.rglob("*.md"):
             r = p.relative_to(self.root)
-            if any(part.startswith(".") for part in r.parts):
+            if any(part.startswith(".") or part == "_szablon" for part in r.parts):   # katalogi z kropką i szablony (brands/_szablon)
                 continue
             if len(r.parts) == 1 and r.name in PLIKI_SPECJALNE:
                 continue

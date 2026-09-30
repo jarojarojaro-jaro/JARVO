@@ -275,6 +275,19 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
     return "\n".join(lines) + "\n"
 
 
+WIEDZA_PLUGIN = "jarvo-wiedza"
+
+
+def build_wiedza_plugin(out: Path) -> Path:
+    """Wtyczka skarbca (wiedza/plugin + wiedza.py obok): install-fleet.sh kopiuje ją do <dane>/plugins/ i dowiązuje
+    w każdym profilu (dostawcy pamięci są szukani w <HERMES_HOME profilu>/plugins/)."""
+    if out.exists():
+        remove_tree(out)
+    shutil.copytree(fl.REPO_ROOT / "wiedza" / "plugin", out, ignore=COPY_IGNORE)
+    shutil.copy2(fl.REPO_ROOT / "wiedza" / "wiedza.py", out / "wiedza.py")
+    return out
+
+
 def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
     """fleet.json dla skarbca wiedzy: hub każdego agenta (wiedza/wiedza.py zasiej) dostaje rolę, skille własne z opisami,
     nazwy skilli zewnętrznych (z dystrybucji po buildzie) i skrypty."""
@@ -462,14 +475,22 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         p = dest / rel
         if p.exists():
             p.write_text(render_tokens(p.read_text(encoding="utf-8"), tokens), encoding="utf-8")
-    # wspólne zakazy floty (shared/security/deny.yaml) → approvals.deny każdego profilu
+    # wspólne zakazy floty (shared/security/deny.yaml) → approvals.deny każdego profilu;
+    # skarbiec wiedzy (docs/WIEDZA.md): dostawca pamięci jarvo-wiedza u każdego agenta, wtyczka włączona,
+    # zadanie pomocnicze jarvo_wiedza (wyciągi z rozmów, kompilacja) na modelu poziomu fast
     deny_src = fl.REPO_ROOT / "shared" / "security" / "deny.yaml"
-    if deny_src.exists() and (dest / "config.yaml").exists():
+    if (dest / "config.yaml").exists():
         cfg = fl.load_yaml(dest / "config.yaml")
-        appr = cfg.setdefault("approvals", {})
-        wlasne = list(appr.get("deny") or [])
-        appr["deny"] = wlasne + [d for d in fl.load_yaml(deny_src).get("deny", []) if d not in wlasne]
-        (dest / "config.yaml").write_text("# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty).\n"
+        if deny_src.exists():
+            appr = cfg.setdefault("approvals", {})
+            wlasne = list(appr.get("deny") or [])
+            appr["deny"] = wlasne + [d for d in fl.load_yaml(deny_src).get("deny", []) if d not in wlasne]
+        cfg.setdefault("memory", {})["provider"] = WIEDZA_PLUGIN
+        wtyczki = cfg.setdefault("plugins", {})
+        wlaczone = list(wtyczki.get("enabled") or [])
+        wtyczki["enabled"] = wlaczone + ([WIEDZA_PLUGIN] if WIEDZA_PLUGIN not in wlaczone else [])
+        cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("fast")}
+        (dest / "config.yaml").write_text("# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy).\n"
                                           + fl.dump_yaml(cfg), encoding="utf-8")
     # model zapasowy zestawu: agent nie milknie, gdy główny model odmówi (np. poza planem)
     if fleet.fallback and (dest / "config.yaml").exists():
@@ -565,7 +586,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # skarbiec wiedzy (docs/WIEDZA.md): huby agentów zasiewa install-fleet.sh z tego pliku (wiedza/wiedza.py zasiej)
     fl.write_json(out / "wiedza" / "fleet.json", wiedza_fleet(fleet, profiles_out))
-    print("✓ skarbiec wiedzy: wiedza/fleet.json")
+    build_wiedza_plugin(out / "plugins" / WIEDZA_PLUGIN)
+    print(f"✓ skarbiec wiedzy: wiedza/fleet.json, plugins/{WIEDZA_PLUGIN}")
 
     notes = build_host(fleet, out / "host", env)
     for note in notes:
@@ -579,7 +601,7 @@ def main(argv: list[str] | None = None) -> int:
         "built_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "repo_rev": repo_rev,
         "agents": summary,
-        "plugins": ["jarvo-hq"],
+        "plugins": ["jarvo-hq", WIEDZA_PLUGIN],
         "vendored": report,
         "skan_skilli": skan,
         "notes": notes,
