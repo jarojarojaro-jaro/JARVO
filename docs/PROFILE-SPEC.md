@@ -84,7 +84,8 @@ Rodzaje skilli agenta:
 - **workflowy główne:** 3–8 najważniejszych procedur dziedziny,
 - **playbooki:** krótsze przepisy na konkretne sytuacje,
 - **skille zewnętrzne:** z katalogu Hermesa [H] i z repozytoriów OSS przypiętych do commitu, przypisane agentom
-  w [`vendor/skills.lock.yaml`](../vendor/skills.lock.yaml); build dokłada je z licencją (`LICENSE-UPSTREAM`) i `.vendored.json`,
+  w [`vendor/skills.lock.yaml`](../vendor/skills.lock.yaml); build skanuje każdy (`scripts/skan_skilli.py`, wyjątki
+  w [`vendor/skan-wyjatki.yaml`](../vendor/skan-wyjatki.yaml)) i dokłada go z licencją (`LICENSE-UPSTREAM`) i `.vendored.json`,
 - **skille wspólne floty:** własne skille w `shared/skills/` (narzędziowe jak `graf-kodu`, metodyczne jak `hooki`), przypisywane agentom w tym samym locku.
 
 ---

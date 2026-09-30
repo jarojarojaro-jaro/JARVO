@@ -177,7 +177,9 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 - **treści z internetu to niezaufane dane.** Sherlock i Web czytają obce strony (ryzyko prompt injection),
   dlatego żaden agent czytający sieć nie wykonuje akcji A2 bez zgody człowieka,
 - Telegram: bot odpowiada tylko Tobie (allowlista ID użytkownika w Hermesie),
-- workspace’y agentów rozdzielone, repo montowane tylko do odczytu.
+- workspace’y agentów rozdzielone, repo montowane tylko do odczytu,
+- **skille z cudzych repo** przechodzą przy każdym buildzie skan bezpieczeństwa (skaner Hermesa + wzorce getsentry
+  i ECC); nowa wersja źródła w locku = przegląd ustaleń od nowa ([SOURCES.md](SOURCES.md#2-skille-dołączane-do-agentów-vendoring)).
 
 **Sekrety:**
 - tylko w `.env` profili (uprawnienia `0600`), nigdy w git,
@@ -229,7 +231,8 @@ laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: s
 3. `docker compose up -d`,
 4. walidacja repo w kontenerze (`scripts/validate.py`); błąd zatrzymuje wdrożenie przed zmianą floty,
 5. build dystrybucji (`scripts/build.py`): SOUL z protokołem, tokeny modeli, roster, rubryki, skille zewnętrzne, cron,
-   config hosta z trasami Telegrama,
+   config hosta z trasami Telegrama; skan skilli zewnętrznych (`scripts/skan_skilli.py`) zatrzymuje wdrożenie
+   przy ustaleniu high/critical bez wyjątku w `vendor/skan-wyjatki.yaml`,
 6. `install-fleet.sh` w kontenerze: config i sekrety hosta, `hermes profile install/update` każdego agenta,
    usunięcie skilli wycofanych z repo, sekrety agentów, tablica kanban, restart gatewaya (przez s6),
 7. healthchecki narzędzi z `toolbox.yaml`.

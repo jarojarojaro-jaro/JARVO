@@ -13,7 +13,9 @@ Kroki dla każdego aktywnego agenta z fleet.yaml:
   2. SOUL.md: wstawienie wspólnego protokołu (i skrótu floty dla Jarva),
   3. profile.yaml z opisem z fleet.yaml (routing kanbana, roster),
   4. config.yaml: podstawienie tokenów @@...@@ (modele, katalogi, strefa czasowa),
-  5. skille zewnętrzne z vendor/skills.lock.yaml (+ licencje, + DESCRIPTION.md kategorii),
+  5. skille zewnętrzne z vendor/skills.lock.yaml (+ licencje, + DESCRIPTION.md kategorii); każdy przechodzi
+     skan bezpieczeństwa (scripts/skan_skilli.py): high/critical bez wyjątku z vendor/skan-wyjatki.yaml
+     zatrzymuje build,
   6. dla Jarva: skill `roster` i rubryki sędziego generowane z fleet.yaml i quality/rubric.md,
   7. cron/jobs.yaml → cron/jobs.json (przez API crona Hermesa, stałe ID zadań).
 """
@@ -32,6 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fleetlib as fl  # noqa: E402
+import skan_skilli  # noqa: E402
 
 COPY_IGNORE = shutil.ignore_patterns(
     "__pycache__", "*.pyc", ".DS_Store", "node_modules", ".git", ".github", ".env", "*.env", "jobs.yaml"
@@ -155,7 +158,8 @@ def _git(args: list[str], cwd: Path | None = None) -> str:
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
 
 
-def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceResolver, report: list) -> None:
+def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceResolver, report: list,
+                  straznik: skan_skilli.Straznik | None = None) -> None:
     for entry in lock.get("agents", {}).get(agent, []) or []:
         source = entry["source"]
         spec = lock["sources"][source]
@@ -167,6 +171,9 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
         if dest.exists():
             raise SystemExit(f"[{agent}] kolizja: {entry['dest']} już istnieje (skill własny o tej nazwie?)")
         shutil.copytree(src, dest, ignore=COPY_IGNORE)
+        rev = spec.get("rev") or _hermes_rev(src_root)
+        if straznik is not None:        # skan przed dopisaniem naszych plików (licencja, .vendored.json)
+            straznik.sprawdz(dest, agent, source, spec["type"], rev, entry["path"])
         # licencja
         if spec.get("license_file") == "per-skill":
             lic = next((p for p in dest.iterdir() if p.name.lower().startswith("license")), None)
@@ -185,7 +192,6 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
             if notice.is_file():
                 shutil.copy2(notice, dest / "NOTICE-UPSTREAM")
                 break
-        rev = spec.get("rev") or _hermes_rev(src_root)
         fl.write_json(dest / ".vendored.json", {
             "source": source,
             "repo": spec.get("repo") or ("jarvo (to repo)" if spec["type"] == "repo-tree" else "hermes-agent (image tree)"),
@@ -397,7 +403,8 @@ def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str]) -> list[str]:
 
 # ---------------------------------------------------------------------------- main
 
-def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_dir, env, hermes_src, report):
+def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_dir, env, hermes_src, report,
+                straznik=None):
     src = agent.dir
     dest = out_root / agent.name
     shutil.copytree(src, dest, ignore=COPY_IGNORE)
@@ -458,7 +465,7 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         copy_rubrics(fleet, dest / "skills" / "fleet" / "sdlc-review" / "references")
 
     # skille zewnętrzne
-    vendor_skills(agent.name, dest / "skills", lock, resolver, report)
+    vendor_skills(agent.name, dest / "skills", lock, resolver, report, straznik)
     if (dest / "skills").exists():
         write_category_descriptions(dest / "skills")
 
@@ -509,14 +516,24 @@ def main(argv: list[str] | None = None) -> int:
 
     report: list[dict] = []
     summary = []
+    straznik = skan_skilli.Straznik(hermes_src, cache / "skan")
     for agent in fleet.active():
         if args.agent and agent.name not in args.agent:
             continue
         n_jobs = build_agent(fleet, agent, profiles_out, lock, resolver, protocol,
-                             args.runtime_build_dir, env, hermes_src, report)
+                             args.runtime_build_dir, env, hermes_src, report, straznik)
         n_skills = len(list(fl.iter_skill_files(profiles_out / agent.name / "skills")))
         summary.append({"agent": agent.name, "skills": n_skills, "cron_jobs": n_jobs})
         print(f"✓ {agent.name}: {n_skills} skilli, {n_jobs} rutyn cron")
+
+    blad = straznik.blad()
+    if blad:
+        raise SystemExit(blad)
+    skan = straznik.raport()
+    print(f"✓ skan skilli: {skan['skilli']} skilli, {skan['ustalen']} ustaleń ({skan['wyjatkow_uzytych']} znanych "
+          f"wyjątków, {skan['ostrzezen']} ostrzeżeń)" + ("" if skan["hermes_guard"] else ", bez skanera Hermesa"))
+    for w in straznik.nieuzyte():
+        print(f"! wyjątek skanu niczego nie przykrył (usuń albo popraw rev): {w}")
 
     import hqbuild  # Jarvo HQ: plugin dashboardu (pokoje agentów, czat, decyzje)
     hq_dir = hqbuild.build_plugin(out / "plugins" / "jarvo-hq", fleet)
@@ -536,6 +553,7 @@ def main(argv: list[str] | None = None) -> int:
         "agents": summary,
         "plugins": ["jarvo-hq"],
         "vendored": report,
+        "skan_skilli": skan,
         "notes": notes,
     })
     print(f"Build gotowy: {out}")

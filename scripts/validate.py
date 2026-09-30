@@ -246,6 +246,32 @@ def check_lock(fleet: fl.Fleet, own: dict[str, set[str]], r: Report) -> None:
             vnames.add(vname)
 
 
+def check_skan_wyjatki(r: Report) -> None:
+    """vendor/skan-wyjatki.yaml: każdy wyjątek skanu wskazuje skill z locka, ma przypięty rev i powód."""
+    path = fl.REPO_ROOT / "vendor" / "skan-wyjatki.yaml"
+    if not path.exists():
+        return
+    lock = fl.load_lock()
+    sources = lock.get("sources", {})
+    entries = {(e.get("source"), e.get("path")) for es in (lock.get("agents") or {}).values() for e in es or []}
+    for i, w in enumerate((fl.load_yaml(path) or {}).get("wyjatki") or [], 1):
+        tag = f"skan-wyjatki #{i} ({w.get('zrodlo')}:{w.get('skill')})"
+        for pole in ("zrodlo", "rev", "skill", "regula", "powod"):
+            if not w.get(pole):
+                r.err(f"{tag}: brak pola {pole}")
+        spec = sources.get(w.get("zrodlo"))
+        if spec is None:
+            r.err(f"{tag}: nieznane źródło")
+            continue
+        if (w.get("zrodlo"), w.get("skill")) not in entries:
+            r.err(f"{tag}: tego skilla nie ma w locku")
+        rev = str(w.get("rev") or "")
+        if rev == "*" and spec.get("type") != "repo-tree":
+            r.err(f"{tag}: rev „*” tylko dla skilli z tego repo; cudze przypinamy do commitu")
+        if spec.get("type") == "git" and rev != "*" and not str(spec.get("rev", "")).startswith(rev):
+            r.warn(f"{tag}: rev {rev} ≠ lock {str(spec.get('rev'))[:7]}: wyjątek nie działa, przejrzyj ustalenie na nowo")
+
+
 def check_cron(a: fl.Agent, own_skills: set[str], vendored: set[str], r: Report) -> None:
     src = a.dir / "cron" / "jobs.yaml"
     if not src.exists():
@@ -457,6 +483,7 @@ def run() -> Report:
     for a in fleet.active():
         own[a.name] = check_profile(fleet, a, protocol, r)
     check_lock(fleet, own, r)
+    check_skan_wyjatki(r)
     for a in fleet.active():
         vendored = {Path(e["dest"]).name for e in (lock.get("agents", {}).get(a.name) or [])}
         extra = {"roster"} if a.name == fleet.orchestrator else set()

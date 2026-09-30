@@ -29,6 +29,19 @@ Każdy skopiowany skill dostaje `LICENSE-UPSTREAM` (albo licencję z własnego k
 (jeśli źródło go ma) i `.vendored.json` (repo, commit, ścieżka, licencja). Treści skilli nie zmieniamy;
 nasze adaptacje żyją w skillach własnych floty.
 
+Przed wejściem do profilu każdy skill przechodzi **skan bezpieczeństwa** (`scripts/skan_skilli.py`):
+- skaner Hermesa `tools/skills_guard.py` z obrazu;
+- kontrole strukturalne za [getsentry/skills](https://github.com/getsentry/skills) `skill-scanner` (Apache-2.0):
+  hooki w nagłówku, `!`polecenie``, pliki testów, skrypty `postinstall`, tekst w metadanych PNG, nagłówek YAML;
+- wzorce za [affaan-m/ECC](https://github.com/affaan-m/ECC) `build-pi-core.js` (MIT): `curl|sh`, `npx -y`,
+  sekrety, ukryte znaki Unicode.
+
+Ustalenie high/critical zatrzymuje build, chyba że ktoś je przeczytał i dopisał jako fałszywy alarm do
+[`vendor/skan-wyjatki.yaml`](../vendor/skan-wyjatki.yaml) (z powodem). Wyjątek jest przypięty do commitu źródła,
+więc po zmianie `rev` w locku nowa wersja cudzego skilla przechodzi przegląd od nowa. Skille z obrazu Hermesa
+tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata przed dodaniem do locka:
+`python3 scripts/skan_skilli.py <katalog> --hermes-src /opt/hermes`.
+
 | Źródło | Commit | Licencja | Dla kogo |
 |---|---|---|---|
 | [Hermes Agent](https://github.com/NousResearch/hermes-agent): skille z drzewa obrazu | wersja obrazu | MIT | Sherlock, Web, Studio, Wideograf (manim-video, ai-presenter-video) |

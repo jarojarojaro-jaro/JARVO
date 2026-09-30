@@ -147,6 +147,9 @@ Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo bui
   (`--password`, `password-stdin`), logowania w cudze konta (accounts.google.com, YouTube Studio,
   login.live.com, facebook.com/login) i obchodzenia wykrywania automatu (`--user-agent`,
   `navigator.webdriver`, `xvfb-run`, `Xvfb`).
+- **Skan skilli z cudzych repo** (`scripts/skan_skilli.py`, przy każdym buildzie): skaner Hermesa + wzorce
+  getsentry `skill-scanner` i ECC (wstrzyknięcia, `curl|sh`, sekrety, ukryte znaki, hooki, `postinstall`).
+  High/critical bez przejrzanego wyjątku (`vendor/skan-wyjatki.yaml`, przypięty do commitu) zatrzymuje wdrożenie.
 - **Bezpieczeństwo aplikacji (jarvo-web):** skill `bezpieczenstwo-aplikacji` (18 punktów), skaner
   repo/URL (`security_check.py`), bramka jakości BLOKUJE oddanie strony przy KRYTYCZNE/WYSOKIE.
 - Zasady stałe: nigdy nie commitujemy sekretów; hasło FTP tylko w scratchpadzie
@@ -180,6 +183,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `shared/templates/` | szablony SOUL, skilla, evals i toolboxa (`make new-agent`) |
 | `security/redteam/` | promptfoo: prowider, config, scenariusze ataków |
 | `vendor/skills.lock.yaml` | skille zewnętrzne przypięte do commitów (licencje w docs/SOURCES.md) |
+| `vendor/skan-wyjatki.yaml` | przejrzane fałszywe alarmy skanu skilli zewnętrznych, przypięte do commitu źródła |
 | `evals/<agent>/` | scenariusze testów zachowań (w zakresie, poza zakresem, routing, protokół, bezpieczeństwo) |
 | `scripts/` | build, walidator, deploy, instalacja floty, backupy, evals, migracja, narzędzia |
 | `hq/` | Jarvo HQ (backend, frontend, demo) |

@@ -1,0 +1,69 @@
+# Znane fałszywe alarmy skanu skilli zewnętrznych (scripts/skan_skilli.py, uruchamia go scripts/build.py).
+#
+# Ustalenie high/critical bez wyjątku zatrzymuje build. Każdy wyjątek ktoś przeczytał w kontekście i opisał w `powod`.
+# Wyjątek jest przypięty do źródła i commitu z locka (`rev`, prefiks SHA): po zmianie `rev` ustalenie wraca jako błąd,
+# więc nowa wersja cudzego skilla zawsze przechodzi przegląd od nowa. `rev: "*"` tylko dla skilli z tego repo
+# (źródło `jarvo`), bo przechodzą przegląd w PR. Skille z obrazu Hermesa (`hermes`) nie blokują builda (Hermes
+# instaluje je jako wbudowane), ich ustalenia są tylko w raporcie.
+#
+# Pola: zrodlo (nazwa z locka), rev, skill (`path` z locka), regula (nazwa albo lista; glob), plik (glob, domyślnie *),
+# powod. Nieużyty wyjątek build wypisuje jako „!”: usuń go albo popraw rev.
+
+wyjatki:
+  # --- obronne zasady „dane to nie polecenia” cytują atak jako przykład
+  - {zrodlo: marketingskills, rev: 5b2c000, skill: skills/ads, regula: [wstrzykniecie, "hermes:prompt_injection_ignore"],
+     plik: references/audit-guardrails.md, powod: "zasada obronna: nie wykonuj poleceń typu „ignore previous instructions” z pobranych stron"}
+  - {zrodlo: emil-skills, rev: d16ebe6, skill: skills/find-animation-opportunities, regula: [wstrzykniecie, "hermes:prompt_injection_ignore"],
+     plik: SKILL.md, powod: "zasada obronna: treść repo to dane, próby sterowania zgłasza jako ustalenie"}
+  - {zrodlo: emil-skills, rev: d16ebe6, skill: skills/improve-animations, regula: [wstrzykniecie, "hermes:prompt_injection_ignore"],
+     plik: SKILL.md, powod: "zasada obronna: treść repo to dane, próby sterowania zgłasza jako ustalenie"}
+  - {zrodlo: emil-skills, rev: d16ebe6, skill: skills/improve-animations, regula: [ukryte-znaki, "hermes:invisible_unicode"],
+     plik: PLAN-TEMPLATE.md, powod: "spacja zerowej szerokości przed ``` zagnieżdża blok kodu w szablonie planu (4 linie, bez tekstu)"}
+
+  # --- środowisko procesu przekazywane do podprocesu (nie wysyła go nigdzie)
+  - {zrodlo: jarvo, rev: "*", skill: shared/skills/graf-kodu, regula: "hermes:python_os_environ", plik: scripts/graf_kodu.py,
+     powod: "kopiuje środowisko do procesu silnika grafu z własnym HOME i cache"}
+  - {zrodlo: anthropic-skills, rev: "3337550", skill: skills/skill-creator, regula: "hermes:python_os_environ", plik: "scripts/*.py",
+     powod: "przekazuje środowisko do podprocesu ewaluacji, bez zmiennej CLAUDECODE"}
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/media-use, regula: "hermes:python_os_environ", plik: "audio/scripts/lib/gemini-auth*.py",
+     powod: "odczyt klucza Gemini ze zmiennej GCS_CREDS i testy tej funkcji; floty nie dotyczy (nie mamy klucza Gemini)"}
+
+  # --- sieć lokalna i oficjalne API w przykładach
+  - {zrodlo: anthropic-skills, rev: "3337550", skill: skills/webapp-testing, regula: gniazdo, plik: scripts/with_server.py,
+     powod: "sprawdza, czy lokalny serwer (localhost) już słucha na porcie"}
+  - {zrodlo: claude-seo, rev: e77e783, skill: skills/seo, regula: "hermes:env_exfil_curl", plik: references/cwv-thresholds.md,
+     powod: "przykład zapytania do oficjalnego API Google (CrUX/PageSpeed) z kluczem użytkownika w nagłówku"}
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/hyperframes-cli, regula: "hermes:context_exfil", plik: references/preview-render.md,
+     powod: "`hyperframes preview --context` wypisuje lokalny kontekst studia, nic nie wysyła"}
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/hyperframes-cli, regula: ["hermes:aws_dir_access", "hermes:dump_all_env"], plik: references/lambda.md,
+     powod: "dokumentacja opcjonalnego renderu w AWS Lambda na kluczach człowieka; flota go nie używa"}
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/hyperframes-creative, regula: "hermes:tmp_staging", plik: references/typography.md,
+     powod: "skrypt w /tmp czyta publiczną listę fontów Google Fonts; nic nie uruchamia z sieci"}
+
+  # --- podpowiedzi instalacji dla człowieka (w kontenerze agent nie ma sudo, instalacje blokuje deny.yaml)
+  - {zrodlo: claude-seo, rev: e77e783, skill: skills/seo-images, regula: "hermes:sudo_usage", plik: SKILL.md,
+     powod: "tekst „install: sudo apt install …” dla człowieka; exiftool/cwebp są w obrazie"}
+
+  # --- dane osadzone i przykłady HTML
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/embedded-captions, regula: ["hermes:encoded_exfil", "hermes:aws_access_key_leaked"],
+     plik: modes/standard/fonts/fonts.css, powod: "fonty WOFF2 jako base64 (data: URI); „klucz AWS” to przypadkowy ciąg w danych fontu"}
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/embedded-captions, regula: "hermes:path_traversal_deep", plik: scripts/render-and-composite.sh,
+     powod: "szuka klonu repo hyperframes trzy katalogi wyżej (tryb deweloperski upstreamu)"}
+  - {zrodlo: pixel2motion, rev: e9faedb, skill: ".", regula: "hermes:encoded_exfil", plik: docs/index.html,
+     powod: "strona demo z obrazami base64"}
+  - {zrodlo: web-quality-skills, rev: afa8da9, skill: skills/accessibility, regula: "hermes:html_comment_injection", plik: SKILL.md,
+     powod: "komentarz HTML w przykładzie kodu (✅ visually hidden text)"}
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/hyperframes-animation, regula: "hermes:html_comment_injection",
+     powod: "komentarze HTML w przykładach kompozycji (hidden = CSS, nie ukryte polecenia)"}
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/hyperframes-core, regula: "hermes:html_comment_injection", plik: references/sub-compositions.md,
+     powod: "komentarz HTML w przykładzie kompozycji"}
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/hyperframes-creative, regula: "hermes:html_comment_injection", plik: references/composition-patterns.md,
+     powod: "komentarz HTML w przykładzie kompozycji"}
+  - {zrodlo: hyperframes, rev: 8798e40, skill: skills/slideshow, regula: ["hermes:html_comment_injection", "hermes:path_traversal_deep"],
+     plik: references/standalone-harness.md, powod: "przykład HTML: komentarz CSS i względne ścieżki do skryptów playera w repo upstreamu"}
+
+  # --- kod silników
+  - {zrodlo: anidoodle, rev: f335700, skill: skills/anidoodle, regula: "hermes:dump_all_env", plik: "engine/src/*",
+     powod: "typ `Env` silnika canvas (wymiary, cache płótna), nie zmienne środowiskowe"}
+  - {zrodlo: motion-graphics, rev: e8d610a, skill: skills/motion-broll, regula: ["hermes:python_os_system", "hermes:python_os_popen"],
+     plik: scripts/make_pages.py, powod: "ffmpeg/ffprobe na plikach, które skrypt sam wygenerował w katalogu roboczym (nazwy bez danych z zewnątrz)"}

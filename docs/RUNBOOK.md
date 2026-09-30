@@ -189,7 +189,7 @@ Co się dzieje (i co powinieneś zobaczyć):
 | budowa obrazu `jarvo-hermes:local` | kilkanaście minut za pierwszym razem |
 | start usług | `hermes`, `searxng`, `valkey` w stanie `running` |
 | walidacja repo | `Walidacja: 0 błędów` |
-| build dystrybucji | `✓ jarvo: … skilli, 4 rutyn cron`, `✓ jarvo-sherlock: …` itd.; brak linii `!` o Telegramie |
+| build dystrybucji | `✓ jarvo: … skilli, 4 rutyn cron`, `✓ jarvo-sherlock: …` itd., `✓ skan skilli: … (… znanych wyjątków, … ostrzeżeń)`; brak linii `!` o Telegramie i o wyjątkach skanu |
 | instalacja floty | `Instalacja profilu …` ×7, `✅ Flota zainstalowana` |
 | healthchecki | `✓` przy narzędziach, `○` przy opcjonalnych (dodatki `JARVO_EXTRAS`, narzędzia Wideografa z `narzedzia.py`, klucze Pexels/Pixabay, postiz, skarbiec); każdy `✗` sprawdź w sekcji 10 |
 
@@ -310,6 +310,7 @@ przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w Jarvo HQ albo link, 
 | karta w `blocked` `capability` | brak narzędzia albo klucza: Jarvo pyta w kolejce decyzji; dopisz klucz do `secrets/<agent>.env`, `deploy.sh --no-pull` |
 | agent odpowiada błędem 401/402 | `openai-codex`: wygasłe logowanie ChatGPT → ponów Models → Login przy profilu „default”; zestaw `openrouter`: zły klucz OpenRouter albo wyczerpany limit kredytów tego klucza |
 | `✗` w healthchecku narzędzia | `docker exec -u hermes jarvo-hermes bash -c '<komenda z toolbox.yaml>'` (nie `bash -lc`: powłoka logowania zeruje `PATH` obrazu) i przebudowa obrazu, jeśli brakuje pakietu |
+| build: „Skan skilli: N ustaleń high/critical bez wyjątku” | nowa wersja źródła w locku albo nowy skill ma podejrzany fragment. Przeczytaj każde ustalenie w kontekście (`python3 scripts/skan_skilli.py <katalog skilla>`): fałszywy alarm → wpis w `vendor/skan-wyjatki.yaml` z powodem i rev; prawdziwy problem → nie bierzemy tej wersji (cofnij `rev`) |
 | walidacja przy deployu nie przechodzi | deploy zatrzymuje się przed zmianą floty; popraw błąd w repo (lokalnie `make validate`) |
 | `install-fleet.sh`: „nieczytelny” przy sekretach | złe uprawnienia `secrets/` → `sudo chgrp -R 10000 /srv/jarvo/secrets && sudo chmod 2750 /srv/jarvo/secrets && sudo chmod 640 /srv/jarvo/secrets/*.env` |
 | `toomanyrequests: You have reached your unauthenticated pull rate limit` | limit Docker Hub → `docker login` (darmowe konto) i ponów `deploy.sh` |
