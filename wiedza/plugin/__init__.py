@@ -359,8 +359,8 @@ class SkarbiecProvider(MemoryProvider):
                 n = sk.wczytaj(str(args.get("sciezka") or ""))
                 return json.dumps({"sciezka": n.sciezka, "tytul": n.tytul, "frontmatter": n.fm, "tresc": n.tresc[:12000]}, ensure_ascii=False)
             if tool_name == "wiedza_zapisz":
-                if self._kontekst != "primary":
-                    return json.dumps({"error": "szkice zgłasza tylko główna sesja (nie subagent ani cron)"}, ensure_ascii=False)
+                if self._kontekst not in ("primary", "cron"):
+                    return json.dumps({"error": "szkice zgłasza główna sesja albo rutyna, nie subagent"}, ensure_ascii=False)
                 rel = _lib().zapisz_szkic(sk, str(args.get("typ") or "fakt"), str(args.get("tytul") or ""), str(args.get("tresc") or ""),
                                           str(args.get("zrodlo") or ""), self._agent, list(args.get("tagi") or []), skad=f"sesja {self._session_id}")
                 return json.dumps({"szkic": rel, "info": "szkic czeka na kompilację; nie jest jeszcze notatką"}, ensure_ascii=False)
@@ -404,7 +404,7 @@ class SkarbiecProvider(MemoryProvider):
 
     # ---- zbieranie: lustro pamięci, tury, wyciągi
     def on_memory_write(self, action: str, target: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
-        if action not in ("add", "replace") or not content or self._kontekst != "primary":
+        if action not in ("add", "replace") or not content or self._kontekst not in ("primary", "cron"):
             return
         sk = self._sk()
         if sk is None:

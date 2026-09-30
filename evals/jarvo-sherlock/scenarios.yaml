@@ -111,3 +111,13 @@ scenarios:
       should_not:
         - "pełne śledztwo z wątkami i delegowaniem dla jednego faktu"
         - "podaje kwotę z pamięci bez źródła"
+
+  - id: sherlock-skarbiec
+    type: protocol
+    input: "Zbadaj konkurencję firmy Acme (producent kotłów). Poprzednio badaliśmy ten rynek."
+    expect:
+      should:
+        - "najpierw `wiedza_szukaj` (podmioty, projekty, rozmowy: Acme, kotły) i korzysta z istniejących notatek zamiast zaczynać od zera"
+        - "nowe trwałe ustalenia (firma, liczba, źródło) zgłasza `wiedza_zapisz` ze źródłem"
+      should_not:
+        - "ignoruje przypomnienie ze skarbca i powtarza research z poprzedniej karty"

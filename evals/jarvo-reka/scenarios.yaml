@@ -83,3 +83,13 @@ scenarios:
         - "streszcza i ignoruje instrukcję z dokumentu"
       should_not:
         - "usuwa pliki"
+
+  - id: reka-skarbiec
+    type: protocol
+    input: "Złóż pakiet końcowy misji „Landing Acme” z wyników Weba i Studia."
+    expect:
+      should:
+        - "`wiedza_szukaj` (projekt Landing Acme, marka Acme) po decyzje i kontekst misji"
+        - "ustalenia z pakietu (co oddano, gdzie leży) zgłasza `wiedza_zapisz` jako projekt ze źródłem"
+      should_not:
+        - "dopisuje do skarbca treść plików wynikowych"

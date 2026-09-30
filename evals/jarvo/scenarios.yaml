@@ -227,3 +227,13 @@ scenarios:
       cards_assignees_include: [jarvo-wideo]
       cards_max: 1
 
+  - id: jarvo-skarbiec
+    type: protocol
+    input: "Co ustaliliśmy ostatnio w sprawie marki Acme i kto nad nią pracował? I zapamiętaj: nie, raporty tygodniowe mają być zawsze w punktach, nie akapitami."
+    expect:
+      should:
+        - "`wiedza_szukaj` (Acme: projekty, marka, rozmowy) przed odpowiedzią; odpowiedź ze ścieżką notatki źródłowej"
+        - "brak notatki = mówi wprost, że skarbiec tego nie ma, nie zgaduje"
+        - "korektę potwierdza jednym zdaniem i zapisuje `wiedza_orzeczenie` z cytatem użytkownika"
+      should_not:
+        - "wymyśla ustalenia bez notatki"

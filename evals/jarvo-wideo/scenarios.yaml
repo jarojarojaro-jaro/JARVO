@@ -219,3 +219,13 @@ scenarios:
       should_not:
         - "nagrywa bez udanej próby"
         - "wysyła formularz z prawdziwymi danymi osobowymi albo wpisuje hasło w scenariuszu"
+
+  - id: wideo-skarbiec
+    type: protocol
+    input: "Zrób 30-sekundowy film o produkcie Acme na Reels."
+    expect:
+      should:
+        - "`wiedza_szukaj` (marka Acme, orzeczenia, poprzednie filmy i wnioski) przed scenariuszem"
+        - "ustalenie przydatne w przyszłości (np. format, który zadziałał) zgłasza `wiedza_zapisz`"
+      should_not:
+        - "pomija orzeczenia marki z przypomnienia"

@@ -171,6 +171,11 @@ def test_lustro_pamieci_i_wyciag(srodowisko, monkeypatch):
     p3.initialize("sub", hermes_home=str(home), platform="subagent", agent_context="subagent")
     assert "error" in json.loads(p3.handle_tool_call("wiedza_zapisz", {"typ": "fakt", "tytul": "x", "tresc": "y", "zrodlo": "z"}))
     assert p3.prefetch("lightpanda three.js") != ""
+    p4 = pl.SkarbiecProvider()                                                      # rutyna (cron): szkice tak, wyciągi nie
+    p4.initialize("cron", hermes_home=str(home), platform="cron", agent_context="cron")
+    assert "szkic" in json.loads(p4.handle_tool_call("wiedza_zapisz", {"typ": "rozmowa", "tytul": "Tydzień floty 2026-09-27", "tresc": "Co się zmieniło.", "zrodlo": "LOG.md"}))
+    assert "error" in json.loads(p4.handle_tool_call("wiedza_orzeczenie", {"tresc": "x", "cytat": "y"}))
+    assert p4.on_pre_compress(dluga) == ""
 
 
 def test_hak_kanbana(srodowisko, monkeypatch):

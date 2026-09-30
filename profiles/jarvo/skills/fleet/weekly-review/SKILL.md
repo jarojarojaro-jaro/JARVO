@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: "Przegląd tygodnia: jakość floty, wnioski, propozycje."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-09-28"
+    reviewed: "2026-09-30"
 ---
 
 # Przegląd tygodnia
@@ -30,12 +30,19 @@ za pierwszym razem.
 4. **Pamięć:** przejrzyj wpisy swojej pamięci. Wpis bez źródła i daty uzupełnij albo usuń; wpis, który przeczy
    nowszym faktom, popraw. Nic nie usuwasz z `USER.md` bez pytania użytkownika.
 5. **Koszty** (jeśli dostępne przez `/insights` albo raport OpenRouter): krótko, bez wyliczanek.
+6. **Skarbiec wiedzy (synteza tygodnia, jedyna praca drogiego modelu w skarbcu):** przeczytaj wpisy z ostatnich 7 dni
+   w `@@KNOWLEDGE_DIR@@/LOG.md` i raport `@@KNOWLEDGE_DIR@@/LINT.md`. Zgłoś szkic `wiedza_zapisz(typ="rozmowa",
+   tytul="Tydzień floty RRRR-MM-DD", zrodlo="LOG.md i LINT.md skarbca")` z trzema sekcjami: **co się zmieniło** (nowe
+   i zaktualizowane notatki, po jednym zdaniu), **co dryfuje** (sprzeczności, przeterminowane, sieroty z lintu), **co warto
+   zbadać** (pytania, na które skarbiec nie ma notatki). Orzeczenia i lekcje z ≥ 3 potwierdzeniami zgłoś w propozycjach
+   `fleet-improvement` jako kandydatów do SOUL albo skilla (repo jest źródłem prawdy). Brak wpisów w LOG z 7 dni → pomiń.
 
 ## Format
 ```
 📊 Tydzień floty
 Zrobione: <2–4 linie>
 Jakość: sherlock 5/6 za 1. razem, web 3/5 (powtarza się: brak zrzutów mobile), studio 4/4
+Skarbiec: +7 notatek, 1 sprzeczność do rozstrzygnięcia (link w zakładce Wiedza)
 Proponuję ulepszyć:
 1. <agent>: <zmiana> (<dowód>)
 Decyzja: wdrożyć propozycje 1–2? (zmiany trafią do repo i na serwer po Twoim „ok”)

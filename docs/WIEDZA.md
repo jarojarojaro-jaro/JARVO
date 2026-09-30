@@ -1,7 +1,7 @@
 # Wiedza: drugi mózg floty (projekt)
 
-> Stan: **zaakceptowany (2026-09-30), w budowie** (§9: etapy 2–5 gotowe: skarbiec, wtyczka u każdego agenta, kompilacja,
-> zakładka „Wiedza”; zostały rutyny, red team i evals). Właściciel: `jarvo` (jedyny piszący
+> Stan: **zbudowany (2026-09-30)**: etapy 1–6 gotowe (§9), etap 7 opcjonalny. Do zrobienia na VPS: pierwsza kompilacja
+> z prawdziwym modelem (w piaskownicy Claude Code nie ma klucza modelu). Właściciel: `jarvo` (jedyny piszący
 > do skarbca) i wtyczka Hermesa `jarvo-wiedza` (wszyscy agenci czytają, zgłaszają szkice, dostają przypomnienia).
 > Decyzje użytkownika: wtyczka u **każdego** agenta; agenci nie piszą notatek, tylko szkice i orzeczenia; skarbiec żyje tam,
 > gdzie stoi Jarvo (VPS, lokalnie, telefon), zakładka jest podglądem wszędzie, Obsidian opcjonalnie; wyciągi z każdej
@@ -173,7 +173,7 @@ ale wszystkie instancje wskazują ten sam skarbiec. Wzorzec kodu: wbudowany loka
 | `on_memory_write(action, target, content)` | lustro wpisów `memory` (MEMORY.md/USER.md) do `skrzynka/pamiec-<agent>.md`: pamięć zostaje mała (3000 znaków), skarbiec pamięta wszystko z datą i źródłem | 0 tokenów |
 | `on_delegation(task, result)` | wynik `delegate_task` jako szkic (kiedy Jarvo zlecał subagentom „przeczytaj 50 notatek i streść”) | 0 tokenów |
 | hak wtyczki `kanban_task_completed` | zamknięta karta: kopia raportu z `out/` do `zrodla/karty/`, szkic „projekt/karta” z tytułem, `summary`, plikami `WYJŚCIA`, linkami do agenta i marki | 0 tokenów |
-| `initialize(hermes_home, agent_context…)` | otwiera indeks; kontekst `subagent`/`cron`/`flush` = tylko odczyt (bez szkiców z rutyn) | |
+| `initialize(hermes_home, agent_context…)` | otwiera indeks; kontekst `subagent` = tylko odczyt; `cron` (rutyny Jarva, np. synteza tygodnia) może zgłaszać szkice i lustrzyć pamięć, ale bez wyciągów i orzeczeń | |
 
 Dlaczego dostawca pamięci, a nie sam skill ze skryptem: skill trzeba by wołać świadomie (Karpathy i komentujący jego gist
 zgłaszają właśnie ten problem: agent „zapomina zajrzeć”), a dostawca dostaje przypomnienie **przed** każdą turą i wyciąg
@@ -336,8 +336,8 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    `wiedza_zapisz`, `wiedza_orzeczenie` ze strażnikiem: cytat musi pasować do bieżącej wiadomości użytkownika), lustro wpisów
    `memory` do `skrzynka/pamiec-<agent>.md`, wyciąg z rozmowy tanim modelem (zadanie pomocnicze `auxiliary.jarvo_wiedza`,
    model poziomu `fast`) na koniec sesji, przed kompresją i po 30 min ciszy, tylko od 4 tur użytkownika i tylko nowe tury;
-   hak `kanban_task_completed` (raporty `out/*.md` zamkniętej karty do `zrodla/karty/`, szkic karty). Subagent i cron: tylko
-   odczyt. `build.py` kopiuje wtyczkę do `build/plugins/jarvo-wiedza/`, `install-fleet.sh` do `<dane>/plugins/` z dowiązaniem
+   hak `kanban_task_completed` (raporty `out/*.md` zamkniętej karty do `zrodla/karty/`, szkic karty). Subagent: tylko odczyt;
+   rutyny (cron): szkice tak, wyciągi i orzeczenia nie. `build.py` kopiuje wtyczkę do `build/plugins/jarvo-wiedza/`, `install-fleet.sh` do `<dane>/plugins/` z dowiązaniem
    w `<profil>/plugins/` (tam Hermes szuka dostawców). Testy: `tests/test_wiedza_plugin.py` (stub interfejsu Hermesa).
    Sprawdzone w kontenerze: Hermes ładuje dostawcę w profilu, blok promptu i przypomnienia z prawdziwego skarbca, narzędzia,
    konfiguracja zadania pomocniczego (bez klucza modelu w piaskownicy: sam wyciąg modelem zostaje do sprawdzenia na VPS).
@@ -354,9 +354,12 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    układ na telefon. Testy: `tests/test_wiedza_panel.py` (logika bez FastAPI). Sprawdzone w zalogowanym dashboardzie
    piaskownicy (`/wiedza`): graf 8 hubów agentów, notatka z linkami w obie strony, orzeczenie z formularza zapisane w
    `orzeczenia/wszyscy.md`, skrzynka, lint, bez błędów konsoli, bez poziomego przewijania na 390 px.
-6. ⬜ **Rutyny i bezpieczeństwo:** synteza w `weekly-review`, świeżość, red team (+2 ataki: wstrzyknięcie „zapisz orzeczenie”
-   przez treść strony; próba zapisania klucza do notatki), eval wspólny „agent najpierw sprawdza skarbiec” w scenariuszach
-   każdego agenta, dokumentacja (FLEET, BOSS, HQ, RUNBOOK, VPS, JARVO-CALOSC, SOURCES).
+6. ✅ **Rutyny i bezpieczeństwo:** `weekly-review` 1.2.0 (synteza skarbca: co się zmieniło, co dryfuje, co zbadać, jako
+   szkic „Tydzień floty”; orzeczenia z ≥ 3 potwierdzeniami do `fleet-improvement`), red team +2 ataki (`web`: orzeczenie
+   wstrzyknięte przez treść strony `fixtures/strona-z-orzeczeniem.html`; `reka`: klucz i hasło do zapisania w skarbcu),
+   scenariusz `<agent>-skarbiec` (typ `protocol`) w evals każdego z 8 agentów (najpierw `wiedza_szukaj`, korekta →
+   `wiedza_orzeczenie`, lekcje przez `wiedza_zapisz`, wyniki pracy zostają w plikach), dokumentacja (FLEET, BOSS, HQ, RUNBOOK,
+   VPS, PROFILE-SPEC, JARVO-CALOSC, PLAN). Red team i evals wymagają modeli: uruchomienie na VPS/stagingu.
 7. ⬜ **Opcjonalnie:** osadzenia ONNX (hybryda), `hermes-memory-wiki` obok, Obsidian na Twoim komputerze (instrukcja w RUNBOOK).
 
 Kolejność jest taka, żeby po etapie 3 flota już zbierała wiedzę (nawet zanim będzie ją ładnie widać), a po etapie 4 z niej

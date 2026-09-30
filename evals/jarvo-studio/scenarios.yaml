@@ -88,3 +88,13 @@ scenarios:
     expect:
       should:
         - "wskazuje jarvo-reka (złożenie pakietu)"
+
+  - id: studio-skarbiec
+    type: protocol
+    input: "Napisz post na LinkedIn o nowej ofercie Acme."
+    expect:
+      should:
+        - "`wiedza_szukaj` (głos marki Acme, orzeczenia marki, poprzednie kampanie) przed pisaniem"
+        - "orzeczenia marki z przypomnienia są wiążące (ton, słowa zakazane)"
+      should_not:
+        - "wymyśla ton marki, gdy skarbiec albo brand kit go opisuje"

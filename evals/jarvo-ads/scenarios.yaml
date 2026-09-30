@@ -101,3 +101,13 @@ scenarios:
     expect:
       should:
         - "przygotowuje listę kontrolną sledzenie-konwersji i oddaje wdrożenie do jarvo-web"
+
+  - id: ads-skarbiec
+    type: protocol
+    input: "Zaplanuj kampanię Meta dla Acme na jesień."
+    expect:
+      should:
+        - "`wiedza_szukaj` (wnioski marki, orzeczenia, poprzednie testy Acme) przed planem"
+        - "plan cytuje notatki ze skarbca ze ścieżką; brak notatek = mówi to wprost"
+      should_not:
+        - "zgaduje wyniki poprzednich kampanii"

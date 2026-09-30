@@ -218,7 +218,8 @@ sudo systemctl start jarvo-updater
    docker exec -u hermes jarvo-hermes hermes kanban list
    ```
    Po kilku–kilkunastu minutach: recenzja Jarva (status `review` → `done` albo prośba o poprawki) i raport w DM.
-4. **Jarvo HQ:** `http://<ip-tailscale>:9119/base` (zakładka **BASE** nad CHAT), login `jarvo` + `DASHBOARD_PASSWORD`
+4. **Jarvo HQ:** `http://<ip-tailscale>:9119/base` (zakładka **BASE** nad CHAT; obok **WIEDZA** z grafem skarbca: po wdrożeniu
+   widać huby 8 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
    z `compose/.env`. To budynek floty: pokoje agentów z podglądem pracy, decyzje, misje i czat ([HQ.md](HQ.md)).
    Pozostałe zakładki dashboardu Hermesa (sesje, cron, logi, konfiguracja) zostają w menu.
    Kontrola: `/api/plugins/jarvo-hq/health` po zalogowaniu pokazuje klucze API profili i dostępność gatewaya.
@@ -274,6 +275,7 @@ sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh
 | evals (staging, izolowane dane) | `bash scripts/evals-staging.sh --agent jarvo` (koszt: klucze agentów + sędzia) |
 | red team (ataki promptfoo, tylko środowisko testowe) | `bash scripts/redteam.sh` albo `bash scripts/redteam.sh --filtr ads` (koszt: tokeny modeli) |
 | skille, które agenci zmienili sami | `bash scripts/harvest-skills.sh > harvest.md`, przegląd, przeniesienie do repo |
+| skarbiec wiedzy (drugi mózg floty) | zakładka **Wiedza** (`:9119/wiedza`): graf, notatki, orzeczenia (Twoje korekty), skrzynka szkiców; ręczna kompilacja `docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/wiedza-kompiluj.sh` (`--na-sucho` = podgląd); szczegóły [WIEDZA.md](WIEDZA.md) |
 | nowy agent | lokalnie `make new-agent NAME=jarvo-x TITLE="…"`, uzupełnienie, `make validate`, status `active`, deploy |
 | stan floty | `docker exec -u hermes jarvo-hermes hermes kanban stats`, `… hermes gateway status` |
 | logi | `docker logs -f jarvo-hermes`, `/srv/jarvo/data/hermes/logs/` |

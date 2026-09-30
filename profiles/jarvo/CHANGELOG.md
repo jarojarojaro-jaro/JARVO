@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- `weekly-review` 1.2.0: synteza skarbca wiedzy (co się zmieniło, co dryfuje, co zbadać) jako szkic `Tydzień floty` przez `wiedza_zapisz`; orzeczenia z ≥ 3 potwierdzeniami trafiają do propozycji `fleet-improvement`. Każdy agent ma wtyczkę `jarvo-wiedza` (przypomnienia ze skarbca, narzędzia `wiedza_*`), projekt w `docs/WIEDZA.md`.
 - Nowy agent `jarvo-lowca` (Łowca leadów) w rosterze. `dispatch-playbook`: wzorzec „Leady → pierwsza wiadomość” (Łowca → decyzja użytkownika → szkic w Studiu; wysyłka to A2).
 - Skill `writing-for-agents` (mattpocock/skills, MIT): warsztat pisania dokumentów dla agentów (wskaźniki kontekstu, hierarchia informacji, kryteria ukończenia). `fleet-improvement`: zanim zaproponujesz zmianę w SOUL albo skillu, `writing-for-agents` (gdzie umieścić, opis jako wskaźnik, kryterium ukończenia).
 - Kontrakt zlecenia (wspólny): nie osłabiam kontroli, żeby zaliczyć DoD (za ECC loop-design-check); poprawki po recenzji z pytaniem przy niejasnym punkcie i sprzeciwem z dowodem przy błędnym (za superpowers receiving-code-review); reguła 17: zgoda A2 przypięta do odcisku wersji plików (`scripts/odcisk.py`, za ECC operator-approval-loop). Sędzia (`sdlc-review` 4b): sprzeciw z dowodem zamyka punkt, osłabiona kontrola blokuje, prośba o A2 bez odcisku wraca do poprawki. `decision-queue`: pytanie i decyzja A2 z odciskiem. `dispatch-playbook`: karta `goal_mode` nazywa, czego nie wolno ruszyć.

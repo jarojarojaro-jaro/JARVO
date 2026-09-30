@@ -94,6 +94,6 @@ out/leady/<projekt>/
 2. ✅ Skrypty `krs.py`, `przetargi.py`, `strona.py`, `leady.py` (+ `lowca_lib.py`) z testami offline; sprawdzone
    na żywych źródłach w kontenerze. e-Zamówienia odcina za kilka ciężkich zapytań z rzędu (strona „Dostęp
    zablokowany”): pauza 4 s na zapytanie, pełny dzień dzielony na województwa, blokada = stop. Pokój „Radar” w HQ.
-3. ✅ Profil `jarvo-lowca`: SOUL, 6 skilli, rubryka, 12 scenariuszy evals, dokumentacja floty; wzorzec misji „Leady”
+3. ✅ Profil `jarvo-lowca`: SOUL, 6 skilli, rubryka, 13 scenariuszy evals, dokumentacja floty; wzorzec misji „Leady”
    u Jarva, temat `Łowca` na Telegramie (`TELEGRAM_TOPIC_LOWCA`).
 4. ⬜ Pierwszy prawdziwy przebieg na ofercie użytkownika i poprawki wag.

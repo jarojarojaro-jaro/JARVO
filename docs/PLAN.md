@@ -203,7 +203,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 11 skilli dowodzenia ([BOSS.md](BOSS.md)).
 - ✅ `jarvo-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
 - ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
-- ✅ Walidator + testy (`make validate`, `make test`, CI) + 101 scenariuszy evals.
+- ✅ Walidator + testy (`make validate`, `make test`, CI) + 122 scenariuszy evals.
 
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
@@ -215,18 +215,19 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 ### Faza 3: Pamięć i onboarding
 - ✅ Skill `onboarding-interview`: wywiad startowy → `knowledge/user/USER.md`.
 - ✅ MVP pamięci o Tobie: USER.md + pamięć użytkownika Jarva, kontekst przekazywany w kartach.
-- ⬜ **Skarbiec wiedzy (drugi mózg floty):** projekt w [WIEDZA.md](WIEDZA.md) (2026-09-30, do akceptacji): wzorzec LLM Wiki,
-  wtyczka `jarvo-wiedza` jako dostawca pamięci u wszystkich agentów, kompilacja tanim modelem, zakładka „Wiedza” z grafem.
+- 🟡 **Skarbiec wiedzy (drugi mózg floty):** zbudowany według [WIEDZA.md](WIEDZA.md) (2026-09-30): wzorzec LLM Wiki,
+  wtyczka `jarvo-wiedza` jako dostawca pamięci u wszystkich agentów, kompilacja tanim modelem, zakładka „Wiedza” z grafem,
+  synteza tygodnia, red team, evals; czeka na pierwszą kompilację z prawdziwym modelem na VPS.
 - ⬜ Wspólny provider pamięci (Honcho self-host) tylko jeśli skarbiec wiedzy okaże się za mały na wiedzę o Tobie.
 - ⬜ Zasady prywatności: co gdzie leży, co nigdy nie opuszcza serwera.
 
 ### Faza 4: Reszta floty v1, potem kolejni specjaliści
 - ✅ `jarvo-web`, `jarvo-studio`, `jarvo-reka` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
-- ✅ `jarvo-wideo` (Wideograf): 15 skilli, pętla krytyki (7 osi), maskotka, clipmaker (rolki z długich nagrań), demo strony (nagranie z kursorem i napisami kroków), 22 scenariusze evals.
-- 🟡 `jarvo-ads` (reklamy Meta i Google): SOUL, 10 skilli, skrypty, rubryka, 12 scenariuszy evals; bez kluczy ([ADS.md](ADS.md)).
+- ✅ `jarvo-wideo` (Wideograf): 15 skilli, pętla krytyki (7 osi), maskotka, clipmaker (rolki z długich nagrań), demo strony (nagranie z kursorem i napisami kroków), 23 scenariusze evals.
+- 🟡 `jarvo-ads` (reklamy Meta i Google): SOUL, 10 skilli, skrypty, rubryka, 13 scenariuszy evals; bez kluczy ([ADS.md](ADS.md)).
 - 🟡 Clipmaker Wideografa: długie nagranie → edytowalne rolki (kadr z focusem, napisy karaoke, `klipy.py`); kroki 1–4 gotowe, krok 5: test na prawdziwym nagraniu ([KLIPY.md](KLIPY.md)).
 - ⬜ Skarbiec: sejf tokenów reklamowych, koperty zatwierdzane kodem, STOP ([ADS.md](ADS.md)).
-- 🟡 Łowca leadów `jarvo-lowca`: SOUL, 6 skilli, skrypty (KRS, BZP, TED, strony firm), rubryka, 12 scenariuszy evals; sygnały → lista firm z „dlaczego teraz” i opublikowanym kontaktem; brak pierwszego przebiegu na prawdziwej ofercie ([LEADY.md](LEADY.md)).
+- 🟡 Łowca leadów `jarvo-lowca`: SOUL, 6 skilli, skrypty (KRS, BZP, TED, strony firm), rubryka, 13 scenariuszy evals; sygnały → lista firm z „dlaczego teraz” i opublikowanym kontaktem; brak pierwszego przebiegu na prawdziwej ofercie ([LEADY.md](LEADY.md)).
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
@@ -240,7 +241,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Evals na stagingu (`scripts/evals-staging.sh`), sędzia LLM + sprawdzenia deterministyczne.
 - ✅ Koszty: poziomy modeli w `fleet.yaml` i `reasoning_effort` per agent; przy presecie `openrouter` osobny klucz z limitem na agenta.
 - ✅ Bezpieczeństwo: zgody (A2 tylko z człowiekiem, praca bez nadzoru = odmowa), sekrety tylko w `.env`, Tailscale.
-- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 14 ataków) i wspólne zakazy floty
+- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 16 ataków) i wspólne zakazy floty
   (`shared/security/deny.yaml`).
 - ⬜ Przegląd kosztów po 2 tygodniach, korekta poziomów modeli.
 
@@ -272,7 +273,7 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
     (program 300 MB, więc nie w obrazie), bez obserwatora i UI. Test na repo Jarvo: indeks ~7 s, pytanie ~5 s;
     trafność dobra przy zwykłych importach, błędy przy tych samych nazwach w różnych modułach i importach
     dynamicznych, stąd zasada „graf = wskazówka, potwierdź w pliku”.
-  - **Skarbiec wiedzy (drugi mózg): projekt rozpisany w [WIEDZA.md](WIEDZA.md)** (2026-09-30): wzorzec LLM Wiki
+  - **Skarbiec wiedzy (drugi mózg): zbudowany według [WIEDZA.md](WIEDZA.md)** (2026-09-30): wzorzec LLM Wiki
     Karpathy'ego, wtyczka Hermesa `jarvo-wiedza` jako dostawca pamięci, zakładka „Wiedza” z grafem. `AgriciDaniel/claude-obsidian`
     (MIT) **nie** jako rdzeń (WIEDZA.md, decyzja W9: 15 skilli i własny rdzeń dublują Hermesa), bierzemy z niego pomysły;
     `Graphify-Labs/graphify` (Apache-2.0) bez zastosowania: graf kodu mamy w `graf-kodu`.

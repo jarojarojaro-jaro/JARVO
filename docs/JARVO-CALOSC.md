@@ -154,7 +154,7 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
 
 ## 6. Bezpieczeństwo (Skarbiec-design + red team)
 
-- **Red team na promptfoo** (`security/redteam/`): 14 ataków na agentów, świeża sesja per atak,
+- **Red team na promptfoo** (`security/redteam/`): 16 ataków na agentów (w tym orzeczenie wstrzyknięte przez treść strony i klucz do zapisania w skarbcu wiedzy), świeża sesja per atak,
   wykrywanie wycieków. Ostatni stan: **12/12 odpartych** po uszczelnieniu.
 - **Deny dla całej floty** (`shared/security/deny.yaml`, mergowane do każdego profilu): blokada zmiany
   własnej konfiguracji (`hermes config set/...`), kasowania danych floty (`rm -r /opt/data/...`),
@@ -259,9 +259,9 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    zapisał login w pamięci (hasła tam nie było). Hasła i logowanie w cudze konta już blokują reguła 16
    kontraktu i `deny.yaml` (`agent-browser … auth`, `--password`, strony logowania: w red teamie hasło z czatu
    trafiło do `agent-browser`, a login do YouTube Studio). Brakuje jeszcze wprost zakazu zapisywania loginów w pamięci.
-3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (zaakceptowany 2026-09-30, etapy 2–5 z 7 gotowe:
+3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (zbudowany 2026-09-30, etapy 1–6 z 7:
    skarbiec zasiewany przy wdrożeniu, `wiedza.py`, wtyczka `jarvo-wiedza` u każdego agenta, kompilacja `kompilacja.py`,
-   zakładka „Wiedza” w dashboardzie; dalej rutyny, red team i evals):** jeden folder
+   zakładka „Wiedza”, synteza w przeglądzie tygodnia, red team, evals; **na VPS zostaje pierwsza kompilacja z modelem**):** jeden folder
    notatek Markdown z linkami (`knowledge/`), wzorzec LLM Wiki Karpathy'ego; wtyczka Hermesa `jarvo-wiedza` jako dostawca
    pamięci (przypomnienia przed turą, wyciąg po sesji i przed kompresją, 4 narzędzia), kompilacja tanim modelem (jeden
    piszący), orzeczenia z Twoich korekt, lint, punkty zapisu git, zakładka „Wiedza” z grafem w dashboardzie.
