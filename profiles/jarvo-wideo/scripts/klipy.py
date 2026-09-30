@@ -1,0 +1,431 @@
+#!/usr/bin/env python3
+"""Clipmaker: długie nagranie → krótkie rolki (9:16 domyślnie, 16:9 na życzenie) jako projekty edytora HQ + MP4.
+
+    klipy.py przygotuj <nagranie> [-o out/wideo/klipy] [--od-nowa]
+    klipy.py sprawdz <plan.json>
+    klipy.py zbuduj <plan.json> [-o out/wideo/klipy] [--bez-renderu] [--tylko SLUG]
+
+przygotuj (0 tokenów): mowa (Parakeet: słowa z czasem, pauzy, wtrącenia) do <nagranie>.mowa.json — tego samego
+pliku używa zakładka „Mowa” w edytorze HQ; cięcia ujęć; arkusze klatek z czasem (do vision_analyze: gdzie jest
+mówca); transkrypcja.txt ze zdaniami i czasami (to czytasz według master promptu) i analiza.json.
+
+sprawdz: plan.json przed budową (czasy w źródle, długości, hook, kadr, oceny). Błędy = kod 1, uwagi nie blokują.
+
+zbuduj: każda rolka → <out>/klip-N-<slug>.edycja.json (projekt edytora: segmenty ze źródła, wycięte pauzy
+i wtrącenia, kadr z punktem skupienia, punch-in na cięciach, napisy karaoke ze słów, tytuł-hook) i render tym samym
+silnikiem co „Eksportuj” → <out>/klip-N-<slug>.mp4, na końcu KLIPY.md. Człowiek otwiera rolkę w HQ („✎ Edytuj”)
+i poprawia wszystko; eksport z edytora robi nową wersję obok.
+
+plan.json: patrz skill clipmaker (references/plan.md). Czas w sekundach ŹRÓDŁA.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import projekt as pr  # noqa: E402  (silnik edytora: pr.ed)
+
+ed = pr.ed
+FORMATY = {"9:16": (1080, 1920), "16:9": (1920, 1080)}
+FPS = 30
+ODDECH = 0.12            # tyle ciszy zostaje po wycięciu pauzy (jak w edytorze)
+PRZED, PO = 0.08, 0.25   # zapas przed pierwszym i po ostatnim słowie segmentu
+PUNCH = 1.12             # przybliżenie co drugiego ujęcia po cięciu (ukrywa skok obrazu)
+HL = pr.KARAOKE_HL
+ZLE_STARTY = ("no i", "i ", "a ", "tak jak mówiłem", "wracając do", "jak mówiłem", "więc", "no więc", "no to",
+              "ale ", "bo ", "czyli", "and ", "so ", "but ", "like i said", "anyway")
+STYL = {"napisy": "karaoke", "hl": HL, "tytul": True, "tytul_s": 3.0, "tnij_pauzy": 0.6, "bez_wtracen": True,
+        "punch": True, "muzyka": None, "muzyka_glosnosc": 0.12}
+
+
+def mmss(s: float) -> str:
+    s = max(0.0, s)
+    return f"{int(s // 60):02d}:{s % 60:04.1f}"
+
+
+# ---------------------------------------------------------------- przygotuj
+
+def analiza_mowy(src: Path, od_nowa: bool) -> dict:
+    """<nagranie>.mowa.json jak w edytorze HQ: pauzy (silencedetect) + słowa (jarvo-stt --json)."""
+    sp = ed.speech_path(src)
+    if sp.is_file() and not od_nowa:
+        d = json.loads(sp.read_text(encoding="utf-8"))
+        if d.get("words"):
+            return d
+    info = ed.probe(src)
+    r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(src), "-vn", "-af",
+                        f"silencedetect=noise={ed.SILENCE_DB}dB:d={ed.SILENCE_MIN}", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    if r.returncode:
+        raise SystemExit(f"ffmpeg nie przeanalizował dźwięku: {r.stderr.strip()[-300:]}")
+    silences = ed.parse_silences(r.stderr, info.get("duration"))
+    stt = ed.stt_bin()
+    if not stt:
+        raise SystemExit("brak jarvo-stt (rozpoznawanie mowy): bez słów nie wybierzesz fragmentów")
+    with tempfile.TemporaryDirectory() as t:
+        out = Path(t) / "slowa.json"
+        r = subprocess.run([stt, str(src), "--json", str(out)], capture_output=True, text=True)
+        if r.returncode or not out.is_file():
+            raise SystemExit(f"jarvo-stt: {r.stderr.strip()[-300:]}")
+        words = json.loads(out.read_text(encoding="utf-8")).get("words") or []
+    d = ed.speech_data(words, silences, info.get("duration"))
+    sp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    if d["lines"]:
+        ed.auto_srt_path(src).write_text(ed.to_srt(d["lines"]), encoding="utf-8")
+    return d
+
+
+def sceny(src: Path, prog: float = 0.35) -> list[float]:
+    """Cięcia ujęć (zmniejszony obraz: szybko także dla godzinnego nagrania)."""
+    r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(src), "-an", "-vf",
+                        f"scale=320:-2,select='gt(scene,{prog})',showinfo", "-f", "null", "-"], capture_output=True, text=True)
+    return [round(float(t), 2) for t in re.findall(r"pts_time:([\d.]+)", r.stderr)]
+
+
+def arkusze(src: Path, dur: float, out: Path, na_arkusz: int = 24, kolumny: int = 6) -> list[dict]:
+    """Klatki co `co` s (najwyżej ~72 na całe nagranie) z czasem w rogu: gdzie mówca, ile osób, plansze."""
+    co = max(5.0, dur / 72)
+    n = max(1, int(dur / co))
+    out.mkdir(parents=True, exist_ok=True)
+    wynik = []
+    for k, first in enumerate(range(0, n, na_arkusz)):
+        cnt = min(na_arkusz, n - first)
+        dest = out / f"arkusz-{k + 1}.jpg"
+        t0 = first * co
+        base = f"fps=1/{co:.3f},scale=320:-2"
+        label = (f",drawtext=text='%{{pts\\:hms\\:{t0:.3f}}}':x=4:y=4:fontsize=16:fontcolor=white:"
+                 "box=1:boxcolor=black@0.7:boxborderw=3")
+        tile = f",tile={kolumny}x{(cnt + kolumny - 1) // kolumny}:padding=4:color=0x0B0D12"
+        cmd = ["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-ss", f"{t0:.3f}", "-t", f"{cnt * co:.3f}", "-i", str(src)]
+        r = subprocess.run(cmd + ["-vf", base + label + tile, "-frames:v", "1", "-q:v", "3", str(dest)], capture_output=True)
+        if r.returncode:   # bez fontu do drawtext: arkusz bez czasu (kolejność × co od t0)
+            subprocess.run(cmd + ["-vf", base + tile, "-frames:v", "1", "-q:v", "3", str(dest)], check=True, capture_output=True)
+        wynik.append({"plik": str(dest), "od": round(t0, 1), "do": round(t0 + cnt * co, 1), "co_s": round(co, 1)})
+    return wynik
+
+
+def zdania(words: list, max_gap: float = 1.0, max_dur: float = 25.0) -> list[dict]:
+    """Słowa → zdania z czasem źródła (do czytania i wyboru fragmentów). Wtrącenia zostają, oznaczone „(yyy)”."""
+    out, cur = [], []
+
+    def flush():
+        if cur:
+            out.append({"od": cur[0][0], "do": cur[-1][1], "tekst": " ".join(w[2] for w in cur)})
+            cur.clear()
+    for w in words:
+        a, b, t = float(w[0]), float(w[1]), str(w[2])
+        if cur and (a - cur[-1][1] > max_gap or b - cur[0][0] > max_dur):
+            flush()
+        cur.append((a, b, "(yyy)" if ed.is_filler(t) else t))
+        if t.endswith((".", "!", "?", "…")):
+            flush()
+    flush()
+    return out
+
+
+def cmd_przygotuj(a) -> int:
+    src = Path(a.nagranie).resolve()
+    if not src.is_file():
+        raise SystemExit(f"nie ma pliku: {src}")
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
+    info = ed.probe(src)
+    dur = info.get("duration") or 0.0
+    print(f"▶ mowa (Parakeet, ~1–2 min na 10 min nagrania): {src.name}, {mmss(dur)}", flush=True)
+    d = analiza_mowy(src, a.od_nowa)
+    print("▶ cięcia ujęć i arkusze klatek", flush=True)
+    cuts = sceny(src)
+    sheets = arkusze(src, dur, out / "klatki") if info.get("video") else []
+    zd = zdania(d["words"])
+    pauzy = [s for s in d.get("silences") or [] if s[1] - s[0] >= 1.5]
+    lines = [f"# Transkrypcja: {src.name} · {mmss(dur)} · {len(d['words'])} słów · {len(cuts)} cięć ujęć",
+             "# [od–do w ŹRÓDLE] zdanie; (yyy) = wtrącenie; (pauza N s) = cisza ≥ 1,5 s", ""]
+    pi = 0
+    for z in zd:
+        while pi < len(pauzy) and pauzy[pi][0] < z["od"]:
+            lines.append(f"      (pauza {pauzy[pi][1] - pauzy[pi][0]:.1f} s)")
+            pi += 1
+        lines.append(f"[{mmss(z['od'])}–{mmss(z['do'])}] {z['tekst']}")
+    (out / "transkrypcja.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    res = {"zrodlo": str(src), "sek": round(dur, 2), "w": info.get("w"), "h": info.get("h"), "fps": info.get("fps"),
+           "slowa": len(d["words"]), "zdania": len(zd), "ciecia_ujec": cuts, "arkusze": sheets,
+           "mowa": str(ed.speech_path(src)), "transkrypcja": str(out / "transkrypcja.txt")}
+    (out / "analiza.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"✓ {out / 'transkrypcja.txt'} ({len(zd)} zdań) · {len(sheets)} arkuszy klatek · {out / 'analiza.json'}")
+    print("Dalej: master prompt (skill clipmaker) → plan.json → klipy.py sprawdz → klipy.py zbuduj")
+    return 0
+
+
+# ---------------------------------------------------------------- plan: odczyt i sprawdzenie
+
+def wczytaj_plan_dict(plan: dict) -> dict:
+    """Plan z domyślnym stylem rolki (to, czego plan nie podaje, bierzemy z STYL)."""
+    return {**plan, "styl": {**STYL, **(plan.get("styl") or {})}}
+
+
+def wczytaj_plan(path: Path) -> dict:
+    try:
+        plan = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"plan.json nie czyta się: {exc}")
+    return wczytaj_plan_dict(plan)
+
+
+def slowa_zrodla(src: Path) -> list:
+    sp = ed.speech_path(src)
+    if not sp.is_file():
+        raise SystemExit(f"brak {sp.name}: najpierw klipy.py przygotuj {src}")
+    return json.loads(sp.read_text(encoding="utf-8")).get("words") or []
+
+
+def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
+    bledy, uwagi = [], []
+    src = Path(str(plan.get("zrodlo") or ""))
+    if not src.is_file():
+        return [f"nie ma źródła: {src}"], [], {}
+    info = ed.probe(src)
+    dur = info.get("duration") or 0.0
+    words = slowa_zrodla(src)
+    rolki = plan.get("rolki") or []
+    if not 1 <= len(rolki) <= 12:
+        bledy.append(f"rolek: {len(rolki)} (dozwolone 1–12)")
+    slugi = set()
+    for n, r in enumerate(rolki, 1):
+        tag = f"rolka {n} ({r.get('slug')})"
+        slug = str(r.get("slug") or "")
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,39}", slug):
+            bledy.append(f"{tag}: slug tylko a-z, 0-9 i „-”, do 40 znaków")
+        if slug in slugi:
+            bledy.append(f"{tag}: slug się powtarza")
+        slugi.add(slug)
+        fmt = r.get("format") or plan.get("format") or "9:16"
+        if fmt not in FORMATY:
+            bledy.append(f"{tag}: format {fmt!r} (dozwolone: {', '.join(FORMATY)})")
+        segs = r.get("segmenty") or []
+        if not 1 <= len(segs) <= 3:
+            bledy.append(f"{tag}: segmentów {len(segs)} (dozwolone 1–3)")
+        suma, prev = 0.0, -1.0
+        for s in segs:
+            od, do = float(s.get("od", -1)), float(s.get("do", -1))
+            if not 0 <= od < do <= dur + 0.05:
+                bledy.append(f"{tag}: segment {od}–{do} poza nagraniem (0–{dur:.1f} s) albo od ≥ do")
+                continue
+            if od < prev:
+                uwagi.append(f"{tag}: segmenty nie idą po kolei w źródle: upewnij się, że sens się nie zmienia")
+            prev = do
+            suma += do - od
+            for k in ("fx", "fy"):
+                if k in s and not 0 <= float(s[k]) <= 1:
+                    bledy.append(f"{tag}: {k}={s[k]} (0–1)")
+            if "zoom" in s and not 1 <= float(s["zoom"]) <= 3:
+                bledy.append(f"{tag}: zoom={s['zoom']} (1–3)")
+            for t, gdzie in ((od, "początek"), (do, "koniec")):
+                w = next((w for w in words if w[0] + 0.05 < t < w[1] - 0.05), None)
+                if w:
+                    uwagi.append(f"{tag}: {gdzie} {t:.2f} s tnie słowo „{w[2]}” ({w[0]:.2f}–{w[1]:.2f})")
+        if segs and not bledy:
+            if not 8 <= suma <= 90:
+                bledy.append(f"{tag}: długość {suma:.1f} s (dozwolone 8–90, najlepiej 20–60)")
+            elif not 20 <= suma <= 60:
+                uwagi.append(f"{tag}: długość {suma:.1f} s poza 20–60 s")
+            s0 = segs[0]
+            start = " ".join(str(w[2]) for w in words if float(s0["od"]) - 0.05 <= w[0] < float(s0["do"]))[:40].lower()
+            if start.startswith(ZLE_STARTY):
+                uwagi.append(f"{tag}: zaczyna się od „{start[:20]}…”: hook powinien być pierwszym zdaniem")
+        tytul = str(r.get("tytul") or "")
+        if len(tytul) > 60:
+            bledy.append(f"{tag}: tytuł ma {len(tytul)} znaków (do 60)")
+        elif len(tytul.split()) > 7:
+            uwagi.append(f"{tag}: tytuł ma {len(tytul.split())} słów (na ekran najlepiej ≤ 6)")
+        oc = r.get("oceny") or {}
+        if oc:
+            sr = sum(float(v) for v in oc.values()) / len(oc)
+            if sr < 7 or float(oc.get("hook", 10)) < 7:
+                uwagi.append(f"{tag}: oceny poniżej progu (średnia {sr:.1f}, hook {oc.get('hook')}): master prompt mówi ≥ 7")
+    return bledy, uwagi, {"src": src, "dur": dur, "words": words, "info": info}
+
+
+def cmd_sprawdz(a) -> int:
+    bledy, uwagi, _ = sprawdz_plan(wczytaj_plan(Path(a.plan)))
+    for u in uwagi:
+        print(f"  ⚠ {u}")
+    for b in bledy:
+        print(f"  ✗ {b}")
+    print(f"Plan: {len(bledy)} błędów, {len(uwagi)} uwag")
+    return 1 if bledy else 0
+
+
+# ---------------------------------------------------------------- zbuduj
+
+def fragmenty(od: float, do: float, words: list, prog: float | None, bez_wtracen: bool) -> list[tuple[float, float]]:
+    """Segment źródła → kawałki bez pauz dłuższych niż `prog` (zostaje oddech) i bez „yyy”. Czasy źródła."""
+    ws = [w for w in words if od <= (w[0] + w[1]) / 2 < do and not (bez_wtracen and ed.is_filler(str(w[2])))]
+    if not prog or not ws:
+        return [(od, do)]
+    out = [[max(od, ws[0][0] - PRZED), ws[0][1]]]
+    for w in ws[1:]:
+        if w[0] - out[-1][1] > prog:
+            out[-1][1] = min(do, out[-1][1] + ODDECH / 2)
+            out.append([max(od, w[0] - ODDECH / 2), w[1]])
+        else:
+            out[-1][1] = w[1]
+    out[-1][1] = min(do, out[-1][1] + PO)
+    # bardzo krótkie kawałki doklejamy do sąsiada (migotanie obrazu)
+    merged: list[list[float]] = []
+    for a, b in out:
+        if merged and (b - a < 0.35 or a - merged[-1][1] < 0.05):
+            merged[-1][1] = b
+        else:
+            merged.append([a, b])
+    return [(round(a, 3), round(b, 3)) for a, b in merged]
+
+
+def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict) -> dict:
+    st = plan["styl"]
+    fmt = r.get("format") or plan.get("format") or "9:16"
+    W, H = FORMATY[fmt]
+    pion = fmt == "9:16"
+    # poziome źródło w pionowym kadrze (i odwrotnie) → wypełnij z punktem skupienia; ten sam kształt → też cover
+    clips, k = [], 0
+    for s in r["segmenty"]:
+        for a, b in fragmenty(float(s["od"]), float(s["do"]), words, st.get("tnij_pauzy"), st.get("bez_wtracen", True)):
+            zoom = float(s.get("zoom", 1.0))
+            if st.get("punch") and k % 2 == 1:
+                zoom = min(3.0, zoom * PUNCH)
+            clips.append({"id": pr.new_id("c"), "src": str(src), "kind": "video", "in": a, "out": b, "speed": 1,
+                          "volume": 1, "muted": False, "fit": "cover", "fx": float(s.get("fx", 0.5)),
+                          "fy": float(s.get("fy", 0.4 if pion else 0.5)), "zoom": round(zoom, 3)})
+            k += 1
+    proj = {"version": 1, "format": fmt, "canvas": {"w": W, "h": H, "fps": FPS}, "clips": clips, "texts": [], "audio": [],
+            "clipmaker": {"slug": r["slug"], "segmenty": r["segmenty"], "zrodlo": str(src)}}
+    total = pr.total(proj)
+    # napisy karaoke: krótkie linie (2–4 słowa w pionie), nad strefą przycisków platform
+    look = {**pr.CAP_DEFAULT, "size": 76 if pion else 60, "y": 0.70 if pion else 0.86, "maxw": 0.86 if pion else 0.8,
+            "style": "outline", "bold": True}
+    if st.get("napisy") == "karaoke":
+        look["hl"] = st.get("hl") or HL
+    if st.get("napisy"):
+        lines = ed.lines_from_words(pr.timeline_words(proj), max_chars=18 if pion else 30, max_gap=0.5, max_dur=2.6)
+        for ln in lines:
+            if ln["start"] >= total:
+                continue
+            proj["texts"].append({**look, "id": pr.new_id("t"), "cap": True, "start": ln["start"],
+                                  "end": min(ln["end"], total), "text": ln["text"],
+                                  **({"words": ln["words"]} if look.get("hl") and ln.get("words") else {})})
+    if st.get("tytul") and r.get("tytul"):
+        proj["texts"].append({**pr.TEXT_DEFAULT, "id": pr.new_id("t"), "start": 0.0, "end": min(float(st.get("tytul_s") or 3), total),
+                              "text": str(r["tytul"]), "style": "box", "color": "#111111", "bg": st.get("hl") or HL,
+                              "y": 0.14 if pion else 0.12, "size": 78 if pion else 64, "maxw": 0.84,
+                              "font": "'Bricolage Grotesque', system-ui, sans-serif"})
+    if st.get("muzyka"):
+        m = Path(str(st["muzyka"]))
+        if m.is_file():
+            md = ed.probe(m).get("duration") or total
+            proj["audio"].append({"id": pr.new_id("a"), "src": str(m.resolve()), "start": 0.0, "in": 0.0,
+                                  "out": min(md, total), "volume": float(st.get("muzyka_glosnosc") or 0.12)})
+    return proj
+
+
+def ensure_render_env() -> None:
+    """Render napisów potrzebuje playwright (jak projekt.py render): w razie potrzeby uruchom się w venv narzędzi."""
+    try:
+        import playwright.sync_api  # noqa: F401
+        return
+    except ImportError:
+        pass
+    import narzedzia as nz
+    venv_py = Path(nz.py())
+    if venv_py.exists() and Path(sys.prefix).resolve() != nz.VENV.resolve() and not os.environ.get("JARVO_KLIPY_REEXEC"):
+        os.environ["JARVO_KLIPY_REEXEC"] = "1"
+        os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
+    raise SystemExit("render napisów potrzebuje przeglądarki: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html "
+                     "(albo zbuduj z --bez-renderu i wyrenderuj w edytorze HQ)")
+
+
+def cmd_zbuduj(a) -> int:
+    plan = wczytaj_plan(Path(a.plan))
+    bledy, uwagi, ctx = sprawdz_plan(plan)
+    for u in uwagi:
+        print(f"  ⚠ {u}")
+    if bledy:
+        for b in bledy:
+            print(f"  ✗ {b}")
+        raise SystemExit("plan ma błędy (klipy.py sprawdz): popraw plan.json")
+    if not a.bez_renderu:
+        ensure_render_env()
+    out = Path(a.out).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    wyniki = []
+    for n, r in enumerate(plan["rolki"], 1):
+        if a.tylko and r["slug"] != a.tylko:
+            continue
+        film = out / f"klip-{n}-{r['slug']}.mp4"
+        proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"])
+        ed.normalize(proj, pr.resolve)                     # ta sama walidacja co eksport z edytora
+        pr.save(film, proj)
+        dl = pr.total(proj)
+        print(f"▶ rolka {n}: {film.name} · {len(proj['clips'])} ujęć · {dl:.1f} s · {sum(1 for t in proj['texts'] if t.get('cap'))} napisów", flush=True)
+        if not a.bez_renderu:
+            if pr.cmd_render(film, argparse.Namespace(out=str(film))) != 0:
+                raise SystemExit(f"render {film.name} nie wyszedł")
+        wyniki.append({"n": n, "r": r, "film": film, "dl": dl, "ujecia": len(proj["clips"])})
+    pisz_klipy_md(plan, wyniki, out, ctx)
+    print(f"✓ {out / 'KLIPY.md'}")
+    return 0
+
+
+def pisz_klipy_md(plan: dict, wyniki: list[dict], out: Path, ctx: dict) -> None:
+    src = ctx["src"]
+    lines = [f"# Rolki z nagrania {src.name}", "",
+             f"Źródło: `{src}` ({mmss(ctx['dur'])}). Każdą rolkę otwierasz w HQ („✎ Edytuj”): cięcia, kadr, napisy i tytuł "
+             "są edytowalne, eksport robi nową wersję obok.", "",
+             "| # | Rolka | Długość | Fragmenty źródła | Ocena | Plik |", "|---|---|---|---|---|---|"]
+    for w in wyniki:
+        r, oc = w["r"], w["r"].get("oceny") or {}
+        sr = f"{sum(float(v) for v in oc.values()) / len(oc):.1f}" if oc else "–"
+        segs = ", ".join(f"{mmss(float(s['od']))}–{mmss(float(s['do']))}" for s in r["segmenty"])
+        lines.append(f"| {w['n']} | {r.get('tytul') or r['slug']} | {w['dl']:.0f} s | {segs} | {sr} | `{w['film'].name}` |")
+    for w in wyniki:
+        r = w["r"]
+        lines += ["", f"## {w['n']}. {r.get('tytul') or r['slug']}", "",
+                  f"- plik: `{w['film'].name}` (projekt: `{ed.project_path(w['film']).name}`), {w['ujecia']} ujęć, {w['dl']:.1f} s",
+                  f"- dlaczego: {r.get('dlaczego') or '–'}",
+                  f"- opis: {r.get('opis') or '–'}",
+                  f"- hashtagi: {' '.join(r.get('hashtagi') or []) or '–'}"]
+        if r.get("oceny"):
+            lines.append("- oceny: " + ", ".join(f"{k} {v}" for k, v in r["oceny"].items()))
+    (out / "KLIPY.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("przygotuj", help="mowa, cięcia ujęć, arkusze klatek, transkrypcja.txt")
+    p.add_argument("nagranie")
+    p.add_argument("-o", "--out", default="out/wideo/klipy")
+    p.add_argument("--od-nowa", action="store_true", help="rozpoznaj mowę jeszcze raz (zamiast wziąć .mowa.json)")
+    p.set_defaults(fn=cmd_przygotuj)
+    p = sub.add_parser("sprawdz", help="walidacja plan.json")
+    p.add_argument("plan")
+    p.set_defaults(fn=cmd_sprawdz)
+    p = sub.add_parser("zbuduj", help="plan.json → projekty edytora + MP4 + KLIPY.md")
+    p.add_argument("plan")
+    p.add_argument("-o", "--out", default="out/wideo/klipy")
+    p.add_argument("--bez-renderu", action="store_true", help="tylko projekty (render później: projekt.py render albo edytor HQ)")
+    p.add_argument("--tylko", help="zbuduj tylko rolkę o tym slugu (poprawka jednej rolki)")
+    p.set_defaults(fn=cmd_zbuduj)
+    a = ap.parse_args(argv)
+    return a.fn(a)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

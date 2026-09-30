@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- `klipy.py` (clipmaker): długie nagranie → `przygotuj` (mowa, cięcia ujęć, arkusze, transkrypcja), `sprawdz` (plan.json), `zbuduj` (projekty edytora + MP4 + KLIPY.md).
 - Napisy karaoke w projekcie montażu: `projekt.py napisy --karaoke [kolor]`, podświetlenie słowa w edytorze HQ i w renderze.
 - Kadr klipu w projekcie montażu: punkt skupienia i przybliżenie (`fx`, `fy`, `zoom`; `projekt.py kadr`, suwaki w edytorze HQ).
 - Wspólny skill `transkrypcja-filmu`: link (YouTube, TikTok, Instagram…) albo plik → tekst tego, co mówią (napisy platformy albo Parakeet).

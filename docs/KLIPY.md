@@ -1,6 +1,6 @@
 # Clipmaker Wideografa: długie nagranie → edytowalne rolki (projekt)
 
-> Stan: **zaakceptowany (2026-09-30), w budowie** (§6: kroki 1–2 gotowe). Właściciel: `jarvo-wideo`.
+> Stan: **zaakceptowany (2026-09-30), w budowie** (§6: kroki 1–3 gotowe). Właściciel: `jarvo-wideo`.
 > Format: **9:16 domyślnie** (Reels, Shorts, TikTok), 16:9 na życzenie (`format` w `plan.json`, całość albo rolka).
 
 Ktoś wrzuca długi materiał (podcast, webinar, live, vlog, 5–120 min). Wideograf go transkrybuje, rozumie, w którym
@@ -77,7 +77,7 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 |---|---|---|---|
 | 1 ✅ | **Kadr z punktem skupienia** | `fx`, `fy`, `zoom` w klipie: eksport (`crop` ffmpeg), podgląd i suwaki „Kadr” w edytorze, walidacja | `hq/plugin/edytor.py`, `hq/web/src/45-edytor.js`, `projekt.py` |
 | 2 ✅ | **Napisy karaoke** | napis z `words: [[start, end, słowo]]` i `hl` (kolor aktywnego słowa); rysowanie z podświetleniem w `44-napisy.js`; eksport jako **jedna** warstwa (PNG na słowo, sklejone demuxerem concat), więc stała pamięć niezależnie od liczby słów; poprawka tekstu z tą samą liczbą słów (literówka) zachowuje karaoke, inna liczba słów wyłącza je tylko w tej linii | `44-napisy.js`, `45-edytor.js`, `edytor.py`, `plugin_api.py`, `projekt.py` |
-| 3 | **klipy.py** | `przygotuj` (mowa.json, sceny, arkusze, transkrypcja.txt), `zbuduj` (plan.json → projekty → render), `sprawdz` (walidacja planu: czasy w źródle, długości, hook) | `profiles/jarvo-wideo/scripts/klipy.py` |
+| 3 ✅ | **klipy.py** | `przygotuj` (mowa.json, sceny, arkusze, transkrypcja.txt), `zbuduj` (plan.json → projekty → render), `sprawdz` (walidacja planu: czasy w źródle, długości, hook) | `profiles/jarvo-wideo/scripts/klipy.py` |
 | 4 | **Skill `clipmaker`** | kroki, master prompt, schemat `plan.json`, styl rolki, DoD, rubryka; zastępuje dzisiejszy `klipy-z-dlugiego` (robi gotowe MP4 z wypalonymi napisami, bez możliwości edycji) | `profiles/jarvo-wideo/skills/wideo/clipmaker/` |
 | 5 | **Routing i evals** | „zrób rolki/shorty z tego nagrania” → Wideograf ze skillem `clipmaker`; scenariusze: wybór, wyrwanie z kontekstu, film bez praw | `evals/`, rubryka Wideografa |
 | 6 | **Dokumentacja** | HQ.md §2a (kadr, karaoke), FLEET, README profilu, JARVO-CALOSC | |
@@ -106,6 +106,6 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 
 1. ✅ kadr `fx`/`fy`/`zoom` (eksport + podgląd + suwaki, `projekt.py kadr`),
 2. ✅ napisy karaoke (rysowanie, edycja, eksport jedną warstwą, `projekt.py napisy --karaoke` i `render`),
-3. `klipy.py przygotuj` + `zbuduj` + `sprawdz`,
+3. ✅ `klipy.py przygotuj` + `zbuduj` + `sprawdz`,
 4. skill `clipmaker` z master promptem, routing, evals, rubryka; `klipy-z-dlugiego` → przekierowanie,
 5. próba na prawdziwym nagraniu: 10–20 min → 3–5 rolek, otwarcie i poprawka rolki w edytorze, eksport.
