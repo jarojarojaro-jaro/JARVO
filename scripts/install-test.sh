@@ -6,7 +6,7 @@
 #   bash scripts/install-test.sh [ubuntu:24.04|debian:12] [--keep]
 #
 # Sprawdza po kolei: pakiety (git, curl, python3, openssl) i Docker Engine z get.docker.com, grupa docker i sg,
-# klon repo z /mnt/jarvo (kopia bieżącego drzewa roboczego, więc także zmian sprzed commita), `jarvo up` bez pytań (JARVO_YES=1, JARVO_NO_BUILD=1), dashboard
+# klon repo z /mnt/jarvo (kopia bieżącego drzewa roboczego jako gałąź main, więc także zmian sprzed commita), `jarvo up` bez pytań (JARVO_YES=1, JARVO_NO_BUILD=1), dashboard
 # odpowiada, ponowne install.sh = aktualizacja, jarvo status / down / uninstall --yes.
 # Tylko piaskownica (HTTPS_PROXY i CA jak w sandbox-up.sh); na zwykłym komputerze: bash install.sh.
 set -euo pipefail   # uwaga: na hoście żadnych potoków „| grep -q” (pipefail + SIGPIPE), wyniki do zmiennej
@@ -60,7 +60,7 @@ SRC="$L/install-test/repo"
 log "Repo testowe z drzewa roboczego ($BRANCH): $SRC"
 rm -rf "$SRC"; mkdir -p "$SRC"
 git -C "$ROOT" ls-files -co --exclude-standard -z | tar -C "$ROOT" --null -T - -cf - | tar -C "$SRC" -xf -
-git -C "$SRC" init -q -b "$BRANCH"
+git -C "$SRC" init -q -b main                 # instalator domyślnie klonuje main
 git -C "$SRC" -c user.name=test -c user.email=test@example.invalid add -A
 git -C "$SRC" -c user.name=test -c user.email=test@example.invalid commit -q -m "drzewo robocze do testu instalatora"
 
@@ -93,7 +93,7 @@ log "1/6 install.sh jak z curl | bash (JARVO_SETUP_ONLY=1: pakiety, Docker Engin
 # JARVO_FORCE=1: dysk piaskownicy bywa pełny (kopia obrazu zajmuje 6 GB); sprawdzenie sprzętu testuje pytest
 U "cat /mnt/jarvo/install.sh | JARVO_SETUP_ONLY=1 JARVO_FORCE=1 JARVO_REPO=/mnt/jarvo bash"
 cloned="$(U "git -C ~/jarvo rev-parse --abbrev-ref HEAD")"
-[[ $cloned == "$BRANCH" ]] || fail "Klon bez JARVO_BRANCH ma być na gałęzi głównej repo ($BRANCH), jest: $cloned"
+[[ $cloned == main ]] || fail "Klon bez JARVO_BRANCH ma być na gałęzi main, jest: $cloned"
 U "for t in git curl python3 openssl docker; do command -v \$t >/dev/null || exit 1; done; sudo docker info >/dev/null && test -x /usr/local/bin/jarvo && test -d ~/jarvo/.git" \
   || fail "Po install.sh brakuje narzędzi, Dockera, repo albo polecenia jarvo"
 U "getent group docker | grep -q tester" || fail "tester nie jest w grupie docker"

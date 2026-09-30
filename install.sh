@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Instalator Jarvo: Linux, WSL2, macOS. Jedno polecenie ze strony:
 #
-#   curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/HEAD/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash
 #
 # Linux i WSL: sprawdza sprzęt (procesor, RAM, dysk), doinstalowuje brakujące programy (git, curl, python3,
 # openssl) menedżerem pakietów dystrybucji (apt, dnf/yum, pacman, zypper), instaluje Docker Engine
@@ -14,7 +14,7 @@
 #
 # Zmienne (wszystkie opcjonalne):
 #   JARVO_DIR, JARVO_LOCAL       katalog repo (~/jarvo) i instalacji floty (~/jarvo-local)
-#   JARVO_REPO, JARVO_BRANCH     adres git i gałąź (domyślnie gałąź główna repo)
+#   JARVO_REPO, JARVO_BRANCH     adres git i gałąź (main)
 #   JARVO_PROVIDER, JARVO_KEY    dostawca modeli (openrouter, commandcode-anthropic, commandcode, openai-codex)
 #                                i klucz; z JARVO_YES=1 instalator o nic nie pyta (bez klucza: GUI działa,
 #                                klucz dodasz w dashboardzie)
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 REPO="${JARVO_REPO:-https://github.com/jarojarojaro-jaro/JARVO.git}"
-BRANCH="${JARVO_BRANCH:-}"          # pusta = gałąź główna repo (klon bez -b, aktualizacja bieżącej)
+BRANCH="${JARVO_BRANCH:-main}"      # pusta = gałąź główna repo (klon bez -b, aktualizacja bieżącej)
 DIR="${JARVO_DIR:-$HOME/jarvo}"
 L="${JARVO_LOCAL:-$HOME/jarvo-local}"
 DRY="${JARVO_DRY_RUN:-0}"

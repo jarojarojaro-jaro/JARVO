@@ -1,11 +1,11 @@
 # Instalator Jarvo dla Windowsa (PowerShell). Jedno polecenie ze strony:
 #
-#   irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/HEAD/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
 #
 # Jarvo działa w Dockerze przez WSL2. Skrypt sprawdza WSL i Docker Desktop, a potem uruchamia
 # ten sam instalator co na Linuksie (install.sh) wewnątrz domyślnej dystrybucji WSL.
 $ErrorActionPreference = "Stop"
-$Base = if ($env:JARVO_INSTALL_BASE) { $env:JARVO_INSTALL_BASE } else { "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/HEAD" }
+$Base = if ($env:JARVO_INSTALL_BASE) { $env:JARVO_INSTALL_BASE } else { "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main" }
 
 function Say($t) { Write-Host "▌ " -ForegroundColor Red -NoNewline; Write-Host $t }
 function Die($t) { Write-Host "✗ $t" -ForegroundColor Red; exit 1 }

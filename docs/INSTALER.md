@@ -60,7 +60,7 @@ Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły
 ```
 
 (`jarvo.pl/install.sh` to przekierowanie na raw GitHub; do czasu domeny działa adres z `README.md`:
-`…/JARVO/HEAD/install.sh`, czyli zawsze gałąź główna repo, bez wpisywania jej nazwy; instalator klonuje tę samą gałąź.)
+`…/JARVO/main/install.sh`; instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną.)
 
 ### Linux (zrobione, §4a)
 1. Menedżer pakietów (`apt`, `dnf`/`yum`, `pacman`, `zypper`) doinstalowuje `git curl python3 openssl`.

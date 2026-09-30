@@ -89,7 +89,7 @@ def test_dry_run_fresh_ubuntu_installs_tools_and_docker(tmp_path):
     assert "System: linux" in out and "pakiety: apt" in out
     assert "apt-get install -y -q git curl python3 openssl ca-certificates" in out
     assert "get.docker.com" in out and "$ sudo env" in out and " sh /" in out
-    assert "git clone -q --depth 50 https://github.com/jarojarojaro-jaro/JARVO.git" in out   # bez -b: gałąź główna repo
+    assert "git clone -q --depth 50 -b main https://github.com/jarojarojaro-jaro/JARVO.git" in out
     assert "bin/jarvo up" in out
     assert "Koniec próby na sucho" in out
     assert not (tmp_path / "home/jarvo").exists() and not (tmp_path / "home/jarvo-local").exists()
