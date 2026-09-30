@@ -166,7 +166,7 @@ ale wszystkie instancje wskazują ten sam skarbiec. Wzorzec kodu: wbudowany loka
 | Hak Hermesa | Co robi `jarvo-wiedza` | Koszt |
 |---|---|---|
 | `system_prompt_block()` | stały blok ≤ 12 linii: „Masz skarbiec wiedzy: `wiedza_szukaj`, `wiedza_czytaj`, `wiedza_zapisz`, `wiedza_orzeczenie`. Zanim odpowiesz na coś o użytkowniku, markach, projektach, narzędziach albo własnej dziedzinie, sprawdź skarbiec. Korekta od użytkownika = orzeczenie (po potwierdzeniu jednym zdaniem). Nie wpisuj sekretów.” | ~120 tokenów w każdym zapytaniu |
-| `prefetch(query)` / `queue_prefetch` | przed turą: wyszukiwanie po wiadomości użytkownika (+ tytuł bieżącej karty) w FTS5, rozszerzone o 1 krok po linkach z hubów; zwraca ≤ 5 notatek jako `ścieżka · streszczenie` oraz **zawsze** orzeczenia agenta (i marki, gdy rozpoznana) | ≤ ~400 tokenów, w tle (Hermes woła `queue_prefetch` po turze, `prefetch` konsumuje cache) |
+| `prefetch(query)` / `queue_prefetch` | przed turą: wyszukiwanie po wiadomości użytkownika (+ tytuł bieżącej karty) w FTS5, rozszerzone o 1 krok po linkach z hubów; zwraca ≤ 5 notatek jako `ścieżka · streszczenie` oraz **zawsze** orzeczenia agenta (i marki, gdy rozpoznana). Każde przypomnienie zapisuje jedną linią w `state/wiedza-przypomnienia.jsonl` (agent, sesja, pytanie, notatki, liczba orzeczeń), do wglądu w zakładce Wiedza → Dziennik → „Co dostali agenci” | ≤ ~400 tokenów, w tle (Hermes woła `queue_prefetch` po turze, `prefetch` konsumuje cache) |
 | `get_tool_schemas()` / `handle_tool_call()` | 4 narzędzia: `wiedza_szukaj(zapytanie, folder?, agent?, limit)`, `wiedza_czytaj(sciezka)` (cała notatka, pay-per-read), `wiedza_zapisz(typ, tytul, tresc, zrodlo, linki?)` (szkic do `skrzynka/`), `wiedza_orzeczenie(kogo, tresc)` (linia w `orzeczenia/`, tylko po słowach użytkownika) | ~250 tokenów schematów; wywołania na żądanie |
 | `on_session_end(messages)` | wyciąg z sesji tanim modelem (zadanie pomocnicze `auxiliary.jarvo_wiedza`, model poziomu `fast`), gdy sesja miała ≥ 4 nowe tury użytkownika i kontekst `primary`: decyzje, fakty, korekty, pytania otwarte, pliki → `zrodla/rozmowy/<data>-<agent>-<sesja>.md` (surowy wyciąg) + szkic w `skrzynka/`; to samo po 30 min ciszy w sesji (wątek wtyczki), zawsze tylko dla tur jeszcze niewyciągniętych | 1 tanie wywołanie na sesję |
 | `on_pre_compress(messages)` | to samo dla części rozmowy, która zaraz zniknie w kompresji: nic nie ginie między „turą 40” a streszczeniem | 1 tanie wywołanie na kompresję |
@@ -304,9 +304,10 @@ Co widać:
   `scripts/wiedza-kompiluj.sh` z modelem profilu `jarvo`), **Odśwież indeks**, wynik ostatniej kompilacji.
 - **Orzeczenia:** lista per agent/marka, formularz „Dodaj orzeczenie” (Ty piszesz zdanie, wybierasz kogo dotyczy; zapis
   natychmiast, punkt zapisu git; od następnej tury w przypomnieniach agentów).
-- **Lint:** błędy, ostrzeżenia, informacje z linkami do notatek, „Sprawdź ponownie”; **Dziennik:** wpisy `LOG.md`.
+- **Lint:** błędy, ostrzeżenia, informacje z linkami do notatek, „Sprawdź ponownie”; **Dziennik:** wpisy `LOG.md` (zmiany
+  skarbca) i „Co dostali agenci” (przypomnienia wstrzyknięte przed turą, z `state/wiedza-przypomnienia.jsonl`).
 
-Trasy backendu (`/api/plugins/jarvo-wiedza/…`): `overview`, `tree`, `note?path=`, `graph`, `search?q=`, `inbox`, `log`, `lint`,
+Trasy backendu (`/api/plugins/jarvo-wiedza/…`): `overview`, `tree`, `note?path=`, `graph`, `search?q=`, `inbox`, `log`, `recall`, `lint`,
 `rulings`, `compile`; `POST rulings`, `POST remark` (uwaga do notatki), `POST compile`, `POST reindex`. Wszystko za logowaniem dashboardu; odczyt
 plików tylko spod `knowledge/` po rozwiązaniu symlinków, zapis tylko orzeczeń i szkiców (tak jak HQ zapisuje tylko wybrane
 pliki, [HQ.md §3](HQ.md#3-bezpieczeństwo)). Dwujęzyczność jak w HQ (etykieta `plugin_jarvo-wiedza` w `pl.json`).
@@ -346,7 +347,7 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    wyciąg z rozmowy = notatka w `rozmowy/` + do 3 notatek faktów), zapis według schematu (linki tylko do istniejących ścieżek,
    hub folderu + sąsiad + inny folder dobierane automatycznie, gdy model ich nie da), sprzeczność jako sekcja z datą i
    `status: sprzeczna`, aktualizacja z zachowaniem `utworzono` i ręcznych linków, źródła łączone; potem `indeksuj`, LOG,
-   punkt zapisu git, `state/wiedza-kompilacja.json`. Limity 40/60, blokada `state/wiedza.lock`, 3 próby na szkic. Harmonogram
+   punkt zapisu git, `state/wiedza-kompilacja.json`, sprzątanie `skrzynka/zrobione/` po 30 dniach. Limity 40/60, blokada `state/wiedza.lock`, 3 próby na szkic. Harmonogram
    w wątku wtyczki (godzina / noc 03:10), ręcznie `scripts/wiedza-kompiluj.sh`. Testy: `tests/test_kompilacja.py` (model
    podstawiony). W piaskownicy bez klucza modelu sprawdzony przebieg na sucho; pierwsza prawdziwa kompilacja: na VPS.
 5. ✅ **Zakładka „Wiedza”** (`wiedza/plugin/dashboard/`, `wiedza/web/`): graf na canvasie, foldery, notatka, szukaj, skrzynka

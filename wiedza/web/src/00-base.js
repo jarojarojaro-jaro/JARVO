@@ -87,6 +87,7 @@ const api = {
   search: (q, folder) => SDK.fetchJSON(`${API_ROOT}/search?q=${encodeURIComponent(q)}${folder ? `&folder=${encodeURIComponent(folder)}` : ""}`),
   inbox: () => SDK.fetchJSON(`${API_ROOT}/inbox`),
   log: () => SDK.fetchJSON(`${API_ROOT}/log?n=60`),
+  recall: () => SDK.fetchJSON(`${API_ROOT}/recall?n=80`),
   lint: (refresh) => SDK.fetchJSON(`${API_ROOT}/lint${refresh ? "?refresh=1" : ""}`),
   rulings: () => SDK.fetchJSON(`${API_ROOT}/rulings`),
   addRuling: (kogo, tresc) => post("/rulings", { kogo, tresc, zrodlo: "człowiek, zakładka Wiedza" }),

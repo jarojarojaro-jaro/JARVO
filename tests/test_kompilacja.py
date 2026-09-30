@@ -168,3 +168,18 @@ def test_cli_na_sucho(sk, capsys):
     assert out.startswith("na sucho: szkice: 1") and "kandydaci:" in out
     assert k._json_z_odpowiedzi('```json\n{"decyzja": "odrzuc", "powod": "x"}\n```') == {"wyniki": [{"decyzja": "odrzuc", "powod": "x"}]}
     assert k._json_z_odpowiedzi("Oto wynik: {\"wyniki\": []} dziękuję") == {"wyniki": []} and k._json_z_odpowiedzi("nic") is None
+
+
+def test_sprzatanie_zrobione_po_30_dniach(sk):
+    import os, time
+    kat = sk.root / "skrzynka" / "zrobione"
+    kat.mkdir(parents=True, exist_ok=True)
+    stary, nowy = kat / "stary.md", kat / "nowy.md"
+    stary.write_text("x", encoding="utf-8")
+    nowy.write_text("y", encoding="utf-8")
+    dawno = time.time() - 40 * 86400
+    os.utime(stary, (dawno, dawno))
+    szkic(sk, "fakt", "Coś", "Treść.")
+    odp = {"wyniki": [{"decyzja": "odrzuc", "powod": "test"}]}
+    r = k.Kompilacja(sk, model_z([odp])).uruchom()
+    assert r["sprzatniete"] == 1 and not stary.exists() and nowy.exists()

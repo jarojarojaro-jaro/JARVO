@@ -89,6 +89,9 @@ def test_lint_cache_rulings_remark_inbox_log(panel, monkeypatch):
     assert log[0]["rodzaj"] == "orzeczenie" and log[-1]["rodzaj"] == "zasiew" and log[0]["data"] == "2026-09-30"
     r = panel.reindex()
     assert r["pliki"] >= 15 and r["index"] >= 15
+    assert panel.recall_log() == []
+    (panel.sk.stan / "wiedza-przypomnienia.jsonl").write_text('{"agent": "jarvo-web", "notatki": ["pojecia/audyt strony"]}\nzepsuta linia\n{"agent": "jarvo"}\n', encoding="utf-8")
+    assert [w["agent"] for w in panel.recall_log()] == ["jarvo", "jarvo-web"]
 
 
 def test_compile_process(panel, tmp_path):

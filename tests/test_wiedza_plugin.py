@@ -88,6 +88,10 @@ def test_blok_promptu_i_przypomnienie(srodowisko):
     assert "Przyciski zaokrąglone" not in r                                       # orzeczenia marki tylko przy trafieniu w markę
     r2 = p.prefetch("jakie kolory ma marka Acme?")
     assert "brands/acme/BRAND" in r2 and "[acme] Przyciski zaokrąglone" in r2
+    dziennik = (root / "jarvo" / "state" / "wiedza-przypomnienia.jsonl").read_text(encoding="utf-8").splitlines()
+    wpis = json.loads(dziennik[-1])
+    assert wpis["agent"] == "jarvo-web" and wpis["zapytanie"] == "jakie kolory ma marka Acme?" and "brands/acme/BRAND" in wpis["notatki"]
+    assert wpis["orzeczen"] >= 3 and wpis["sesja"] == "sesja-123" and wpis["znakow"] == len(r2)
     assert len(r2) <= pl.MAX_PRZYPOMNIENIA
     assert p.prefetch("o niczym konkretnym xyzzy") .startswith("## Orzeczenia")   # bez trafień zostają orzeczenia
 

@@ -87,6 +87,11 @@ async def log(n: int = 40):
     return {"wpisy": await _w(PANEL.log, max(1, min(n, 200)))}
 
 
+@router.get("/recall")
+async def recall(n: int = 60):
+    return {"wpisy": await _w(PANEL.recall_log, n)}
+
+
 @router.get("/lint")
 async def lint(refresh: int = 0):
     return await _w(PANEL.lint, bool(refresh))

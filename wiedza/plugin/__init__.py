@@ -40,6 +40,8 @@ MAX_ZNAKOW_ROZMOWY = 24_000
 MAX_PRZYPOMNIENIA = 2_200
 MAX_ORZECZEN = 20
 LIMIT_NOTATEK = 5
+DZIENNIK_PRZYPOMNIEN = "wiedza-przypomnienia.jsonl"   # w state/: co agent dostał ze skarbca przed turą (do sprawdzenia w zakładce i w pliku)
+DZIENNIK_MAX_B = 5_000_000
 KOMPILACJA_CO_S = 3600                # kompilacja najwyżej raz na godzinę, gdy są szkice; do tego co noc (KOMPILACJA_NOC)
 KOMPILACJA_NOC = (3, 10)              # godzina, minuta: nocny przebieg (strefa kontenera)
 TYPY_SZKICU = ["fakt", "decyzja", "lekcja", "podmiot", "pojecie", "projekt"]
@@ -284,7 +286,29 @@ class SkarbiecProvider(MemoryProvider):
             logger.debug("jarvo-wiedza: przypomnienie nieudane: %s", e)
             wynik = ""
         self._cache = (query, time.time(), wynik)
+        if wynik:
+            self._zapisz_przypomnienie(query, wynik, session_id or self._session_id)
         return wynik
+
+    def _zapisz_przypomnienie(self, query: str, wynik: str, sid: str) -> None:
+        """Jedna linia JSON na przypomnienie: kto, kiedy, w jakiej sesji, na jakie pytanie, które notatki i ile orzeczeń."""
+        if not self._stan:
+            return
+        try:
+            notatki = re.findall(r"^- `([^`]+)`", wynik, re.M)
+            orzeczen = sum(1 for l in wynik.splitlines() if l.startswith("- ") and " · [" in l)
+            wpis = {"ts": round(time.time(), 1), "data": time.strftime("%Y-%m-%d %H:%M:%S"), "agent": self._agent, "sesja": (sid or "")[:12],
+                    "platforma": self._platforma, "zapytanie": " ".join(query.split())[:120], "notatki": notatki, "orzeczen": orzeczen, "znakow": len(wynik)}
+            plik = self._stan / DZIENNIK_PRZYPOMNIEN
+            self._stan.mkdir(parents=True, exist_ok=True)
+            with self._lock:
+                if plik.exists() and plik.stat().st_size > DZIENNIK_MAX_B:
+                    linie = plik.read_text(encoding="utf-8", errors="replace").splitlines()[-2000:]
+                    plik.write_text("\n".join(linie) + "\n", encoding="utf-8")
+                with plik.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(wpis, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.debug("jarvo-wiedza: dziennik przypomnień: %s", e)
 
     def _przypomnienie(self, sk, query: str) -> str:
         lib = _lib()

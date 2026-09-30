@@ -52,7 +52,7 @@ function App() {
           ${view === "rulings" && html`<${Rulings} onOpen=${open} onChanged=${changed}/>`}
           ${view === "inbox" && html`<${Inbox} onChanged=${changed}/>`}
           ${view === "lint" && html`<${LintView} onOpen=${open}/>`}
-          ${view === "log" && html`<${LogView}/>`}
+          ${view === "log" && html`<${LogView} onOpen=${open}/>`}
         </div>
       </nav>
       <section class="twz-center">

@@ -183,11 +183,23 @@ function LintView({ onOpen }) {
   </div>`;
 }
 
-function LogView() {
+function LogView({ onOpen }) {
   const [data, err] = usePoll(() => api.log(), 15000, []);
+  const [recall, recallErr] = usePoll(() => api.recall(), 15000, []);
+  const [which, setWhich] = useState("log");
   if (err) return html`<p class="twz-error">${err}</p>`;
-  if (!data) return html`<p class="twz-muted">${L("Wczytuję…", "Loading…")}</p>`;
-  return html`<ul class="twz-log">${data.wpisy.map((w, i) => html`<li key=${i}><span class="twz-tag">${w.rodzaj}</span><strong>${w.data}</strong> ${w.tresc}
-    ${w.szczegoly.length > 0 && html`<ul>${w.szczegoly.slice(0, 12).map((s, j) => html`<li key=${j}>${s}</li>`)}${w.szczegoly.length > 12 && html`<li class="twz-muted">…</li>`}</ul>`}</li>`)}
-    ${!data.wpisy.length && html`<li class="twz-muted">${L("pusty dziennik", "empty log")}</li>`}</ul>`;
+  return html`<div>
+    <div class="twz-toolbar">
+      <button type="button" class=${cx("twz-tab", which === "log" && "is-active")} onClick=${() => setWhich("log")}>${L("Zmiany skarbca", "Vault changes")}</button>
+      <button type="button" class=${cx("twz-tab", which === "recall" && "is-active")} onClick=${() => setWhich("recall")}>${L("Co dostali agenci", "What agents received")}</button>
+    </div>
+    ${which === "log" && (!data ? html`<p class="twz-muted">${L("Wczytuję…", "Loading…")}</p>` : html`<ul class="twz-log">${data.wpisy.map((w, i) => html`<li key=${i}><span class="twz-tag">${w.rodzaj}</span><strong>${w.data}</strong> ${w.tresc}
+      ${w.szczegoly.length > 0 && html`<ul>${w.szczegoly.slice(0, 12).map((s, j) => html`<li key=${j}>${inline(s, onOpen, `log-${i}-${j}`)}</li>`)}${w.szczegoly.length > 12 && html`<li class="twz-muted">…</li>`}</ul>`}</li>`)}
+      ${!data.wpisy.length && html`<li class="twz-muted">${L("pusty dziennik", "empty log")}</li>`}</ul>`)}
+    ${which === "recall" && (recallErr ? html`<p class="twz-error">${recallErr}</p>` : !recall ? html`<p class="twz-muted">${L("Wczytuję…", "Loading…")}</p>` : html`<ul class="twz-log">
+      <li class="twz-muted twz-empty">${L("Każda linia = przypomnienie wstrzyknięte agentowi przed turą (plik state/wiedza-przypomnienia.jsonl).", "Each line = a recall injected into an agent's turn (file state/wiedza-przypomnienia.jsonl).")}</li>
+      ${recall.wpisy.map((w, i) => html`<li key=${i}><span class="twz-tag">${w.agent}</span><strong>${w.data}</strong> ${L("pytanie", "query")}: „${w.zapytanie}” · ${w.orzeczen} ${L("orzeczeń", "rulings")} · ${w.znakow} ${L("znaków", "chars")}
+        ${(w.notatki || []).length > 0 && html`<ul>${w.notatki.map((n, j) => html`<li key=${j}><button type="button" class="twz-wikilink" onClick=${() => onOpen(n)}>${n}</button></li>`)}</ul>`}</li>`)}
+      ${!recall.wpisy.length && html`<li class="twz-muted">${L("jeszcze żadnych przypomnień", "no recalls yet")}</li>`}</ul>`)}
+  </div>`;
 }

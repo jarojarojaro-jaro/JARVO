@@ -42,6 +42,7 @@ LIMIT_SZKICOW = 40
 LIMIT_NOTATEK = 60
 LIMIT_PROB = 3                      # nieudane wywołania modelu na szkic, potem szkic ląduje w zrobione/ z wpisem w LOG
 BLOKADA_STARA_S = 2 * 3600
+ZROBIONE_DNI = 30                   # szkice po kompilacji zostają tyle dni (źródła są w zrodla/, decyzje w LOG.md)
 KANDYDATOW = 6
 PELNA_TRESC_KANDYDATOW = 2
 MAX_LINKOW = 8
@@ -321,6 +322,21 @@ class Kompilacja:
         cel.parent.mkdir(parents=True, exist_ok=True)
         os.replace(p, cel)
 
+    def sprzatnij_zrobione(self) -> int:
+        """Szkice po kompilacji starsze niż ZROBIONE_DNI znikają (ich treść jest w notatkach i LOG.md, źródła w zrodla/)."""
+        kat = self.sk.root / "skrzynka" / "zrobione"
+        if not kat.is_dir():
+            return 0
+        n = 0
+        for f in kat.glob("*.md"):
+            if time.time() - f.stat().st_mtime > ZROBIONE_DNI * 86400:
+                try:
+                    f.unlink()
+                    n += 1
+                except OSError:
+                    pass
+        return n
+
     def _oznacz_probe(self, p: Path, szkic: dict) -> None:
         fm = dict(szkic["fm"])
         fm["proby"] = szkic["proby"] + 1
@@ -377,6 +393,7 @@ class Kompilacja:
                 ix.odswiez()                     # kolejne szkice widzą nowe notatki
             self.raport["pominiete"] += max(0, len(szkice) - self.limit_szkicow)
             if not self.na_sucho:
+                self.raport["sprzatniete"] = self.sprzatnij_zrobione()
                 ix.odswiez()
                 lib.zbuduj_index(self.sk, ix)
                 lib.odswiez_listy_hubow(self.sk, ix)

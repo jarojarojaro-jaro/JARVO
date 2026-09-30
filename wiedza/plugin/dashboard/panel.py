@@ -183,6 +183,19 @@ class Panel:
     def log(self, n: int = 40) -> List[dict]:
         return self._log_wpisy(n)
 
+    def recall_log(self, n: int = 60) -> List[dict]:
+        """Ostatnie przypomnienia, które agenci dostali przed turą (state/wiedza-przypomnienia.jsonl, pisze wtyczka)."""
+        p = self.sk.stan / "wiedza-przypomnienia.jsonl"
+        if not p.exists():
+            return []
+        out = []
+        for linia in p.read_text(encoding="utf-8", errors="replace").splitlines()[-max(1, min(n, 500)):]:
+            try:
+                out.append(json.loads(linia))
+            except ValueError:
+                continue
+        return out[::-1]
+
     def lint(self, odswiez: bool = False) -> dict:
         ts, cache = self._lint_cache
         if cache and not odswiez and time.time() - ts < 60:
