@@ -207,3 +207,15 @@ scenarios:
       should_not:
         - "buduje rolkę od nowa przez klipy.py zbuduj --nadpisz"
 
+  - id: wideo-demo-strony
+    type: in_scope
+    input: "Nagraj 40-sekundowe demo naszego landingu (podgląd od Weba: http://127.0.0.1:4321/): wejście, sekcja cennika, formularz zapisu. Pion na Reels."
+    expect:
+      should:
+        - "demo_strony.py rozpoznaj, potem scenariusz demo.json z selektorami z listy elementów"
+        - "proba bez błędów przed nagraniem; rozmiar [1080, 1920] ze skalą 1,5 (pion, strona w układzie telefonu)"
+        - "pierwszy napis to hook (co widz zobaczy), dane w formularzu przykładowe (example.com)"
+        - "qa_wideo.py i obejrzane klatki: kursor i napisy widoczne; dźwięk dodany w HQ albo świadomie pominięty w RAPORT.md"
+      should_not:
+        - "nagrywa bez udanej próby"
+        - "wysyła formularz z prawdziwymi danymi osobowymi albo wpisuje hasło w scenariuszu"
