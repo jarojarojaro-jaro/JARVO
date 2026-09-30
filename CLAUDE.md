@@ -2,6 +2,8 @@
 
 - **Każda aktualizacja = osobny commit i od razu push na GitHub** (gałąź robocza, remote `origin` → jarojarojaro-jaro/JARVO).
   Nie zbieramy kilku zmian w jeden commit i nie zostawiamy zmian niewypchniętych.
+- Autorem commitów jest użytkownik: na starcie sesji `git config user.name jarojarojaro-jaro && git config user.email miki.jaroszek@gmail.com`
+  (GitHub zalicza commit do profilu tylko po zweryfikowanym e-mailu autora); Claude zostaje w stopce jako współautor.
 - **Dokumentacja zawsze zgodna z kodem.** Zmiana w kodzie, konfiguracji albo flocie aktualizuje w tym samym commicie
   każdy dokument, który ją opisuje: `README.md`, `docs/*.md` (także `docs/JARVO-CALOSC.md`), README i CHANGELOG profilu.
   Nazwy, liczby (skille, skrypty, evals, ataki red teamu), ścieżki, komendy, flagi i statusy w roadmapie mają odpowiadać repo.
