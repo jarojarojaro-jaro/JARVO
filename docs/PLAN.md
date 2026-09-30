@@ -201,7 +201,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 11 skilli dowodzenia ([BOSS.md](BOSS.md)).
 - ✅ `jarvo-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
 - ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
-- ✅ Walidator + testy (`make validate`, `make test`, CI) + 95 scenariuszy evals.
+- ✅ Walidator + testy (`make validate`, `make test`, CI) + 98 scenariuszy evals.
 
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
@@ -218,7 +218,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 
 ### Faza 4: Reszta floty v1, potem kolejni specjaliści
 - ✅ `jarvo-web`, `jarvo-studio`, `jarvo-reka` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
-- ✅ `jarvo-wideo` (Wideograf): 14 skilli, pętla krytyki (7 osi), maskotka, 19 scenariuszy evals.
+- ✅ `jarvo-wideo` (Wideograf): 14 skilli, pętla krytyki (7 osi), maskotka, clipmaker (rolki z długich nagrań), 21 scenariuszy evals.
 - 🟡 `jarvo-ads` (reklamy Meta i Google): SOUL, 10 skilli, skrypty, rubryka, 12 scenariuszy evals; bez kluczy ([ADS.md](ADS.md)).
 - ⬜ Clipmaker Wideografa: długie nagranie → edytowalne rolki (kadr z focusem, napisy karaoke, `klipy.py`) ([KLIPY.md](KLIPY.md)).
 - ⬜ Skarbiec: sejf tokenów reklamowych, koperty zatwierdzane kodem, STOP ([ADS.md](ADS.md)).

@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, editing, ffmpeg, reframe, silence, audio]
-    related_skills: [napisy, lektor-i-dzwiek, klipy-z-dlugiego, dobor-ujec, kontrola-wideo, formaty-wideo]
+    related_skills: [napisy, lektor-i-dzwiek, clipmaker, dobor-ujec, kontrola-wideo, formaty-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
@@ -28,7 +28,7 @@ a nowe na nie nachodzą. Własny film w innym formacie: `film.py render --format
 zostaw jego napisy albo zapytaj o wersję „czystą”.
 
 ## Kiedy NIE używać
-- Nagranie dłuższe niż ~5 min, z którego mają powstać krótkie klipy → `klipy-z-dlugiego`.
+- Nagranie dłuższe niż ~3 min, z którego mają powstać krótkie rolki → `clipmaker`.
 - Brak nagrania, jest tylko temat → `krotki-film`.
 
 ## Kroki

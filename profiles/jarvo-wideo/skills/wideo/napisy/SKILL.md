@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, captions, subtitles, srt, ass, karaoke]
-    related_skills: [krotki-film, montaz-nagran, klipy-z-dlugiego, embedded-captions, formaty-wideo]
+    related_skills: [krotki-film, montaz-nagran, clipmaker, embedded-captions, formaty-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1

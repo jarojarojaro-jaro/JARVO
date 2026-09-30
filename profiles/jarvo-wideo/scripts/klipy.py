@@ -3,7 +3,7 @@
 
     klipy.py przygotuj <nagranie> [-o out/wideo/klipy] [--od-nowa]
     klipy.py sprawdz <plan.json>
-    klipy.py zbuduj <plan.json> [-o out/wideo/klipy] [--bez-renderu] [--tylko SLUG]
+    klipy.py zbuduj <plan.json> [-o out/wideo/klipy] [--bez-renderu] [--tylko SLUG] [--nadpisz]
 
 przygotuj (0 tokenów): mowa (Parakeet: słowa z czasem, pauzy, wtrącenia) do <nagranie>.mowa.json — tego samego
 pliku używa zakładka „Mowa” w edytorze HQ; cięcia ujęć; arkusze klatek z czasem (do vision_analyze: gdzie jest
@@ -196,6 +196,8 @@ def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
     dur = info.get("duration") or 0.0
     words = slowa_zrodla(src)
     rolki = plan.get("rolki") or []
+    if (plan.get("styl") or {}).get("napisy") not in ("karaoke", "zwykle", None):
+        bledy.append("styl.napisy: karaoke, zwykle albo null")
     if not 1 <= len(rolki) <= 12:
         bledy.append(f"rolek: {len(rolki)} (dozwolone 1–12)")
     slugi = set()
@@ -335,6 +337,25 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict) -> di
     return proj
 
 
+def podpis(proj: dict) -> str:
+    """Odcisk treści projektu (klipy, napisy, audio, kadr): po nim poznajemy, czy ktoś edytował rolkę w HQ."""
+    import hashlib
+    tresc = {k: proj.get(k) for k in ("canvas", "clips", "texts", "audio")}
+    return hashlib.sha1(json.dumps(tresc, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
+
+
+def edytowana_recznie(film: Path) -> bool:
+    """Projekt rolki zmieniony po zbudowaniu (albo bez podpisu): ponowne zbuduj nie może go po cichu nadpisać."""
+    pp = ed.project_path(film)
+    if not pp.is_file():
+        return False
+    try:
+        proj = json.loads(pp.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    return (proj.get("clipmaker") or {}).get("podpis") != podpis(proj)
+
+
 def ensure_render_env() -> None:
     """Render napisów potrzebuje playwright (jak projekt.py render): w razie potrzeby uruchom się w venv narzędzi."""
     try:
@@ -369,8 +390,12 @@ def cmd_zbuduj(a) -> int:
         if a.tylko and r["slug"] != a.tylko:
             continue
         film = out / f"klip-{n}-{r['slug']}.mp4"
+        if edytowana_recznie(film) and not a.nadpisz:
+            raise SystemExit(f"{film.name}: projekt zmieniono po zbudowaniu (np. w edytorze HQ). Poprawiaj go przez "
+                             "projekt.py (kadr, usun, napisy…) albo zbuduj z --nadpisz, jeśli te zmiany mają zniknąć")
         proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"])
         ed.normalize(proj, pr.resolve)                     # ta sama walidacja co eksport z edytora
+        proj["clipmaker"]["podpis"] = podpis(proj)
         pr.save(film, proj)
         dl = pr.total(proj)
         print(f"▶ rolka {n}: {film.name} · {len(proj['clips'])} ujęć · {dl:.1f} s · {sum(1 for t in proj['texts'] if t.get('cap'))} napisów", flush=True)
@@ -422,6 +447,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("-o", "--out", default="out/wideo/klipy")
     p.add_argument("--bez-renderu", action="store_true", help="tylko projekty (render później: projekt.py render albo edytor HQ)")
     p.add_argument("--tylko", help="zbuduj tylko rolkę o tym slugu (poprawka jednej rolki)")
+    p.add_argument("--nadpisz", action="store_true", help="nadpisz rolkę zmienioną w edytorze HQ (zmiany człowieka znikną)")
     p.set_defaults(fn=cmd_zbuduj)
     a = ap.parse_args(argv)
     return a.fn(a)

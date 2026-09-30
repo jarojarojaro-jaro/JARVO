@@ -213,3 +213,17 @@ scenarios:
     check:
       cards_assignees_include: [jarvo-sherlock]
       cards_max: 1
+
+  - id: jarvo-route-reels-from-recording
+    type: routing
+    input: "📎 webinar-wrzesien.mp4 (55 min). Zrób z tego 5 rolek na Instagram i TikToka."
+    expect:
+      should:
+        - "jedna karta dla jarvo-wideo z przypiętym skillem clipmaker, format 9:16"
+        - "DoD: 5 rolek z hookiem i puentą, projekty do edycji w HQ, KLIPY.md; bez publikacji (A2)"
+      should_not:
+        - "zleca transkrypcję osobno Sherlockowi"
+    check:
+      cards_assignees_include: [jarvo-wideo]
+      cards_max: 1
+

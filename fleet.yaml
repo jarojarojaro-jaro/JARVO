@@ -146,7 +146,7 @@ agents:
     description: >-
       Wideo od A do Z: krótkie filmy na TikTok, Reels i Shorts z tematu (scenariusz, ujęcia stock,
       AI albo własne, polski lektor, napisy karaoke, muzyka, montaż), warianty do testów A/B, montaż
-      nagrań użytkownika, klipy z długich nagrań, filmy z kodu (HyperFrames, Manim), wideo z AI,
+      nagrań użytkownika, rolki z długich nagrań (clipmaker: edytowalne w HQ, napisy karaoke), filmy z kodu (HyperFrames, Manim), wideo z AI,
       napisy PL, formaty platform, kontrola jakości. Przygotowuje pliki, nie publikuje bez zgody.
     model_tier: strong
     delegation_tier: fast
@@ -160,7 +160,7 @@ agents:
       title: "Videographer"
       hq_label: "Film studio"
       description: >-
-        Video end to end: short films for TikTok, Reels and Shorts from a topic (script, stock, AI or own footage, Polish voice-over, karaoke captions, music, editing), A/B variants, editing the user's recordings, clips from long recordings, videos from code (HyperFrames, Manim), AI video, Polish captions, platform formats, quality control. Prepares files; never publishes without approval.
+        Video end to end: short films for TikTok, Reels and Shorts from a topic (script, stock, AI or own footage, Polish voice-over, karaoke captions, music, editing), A/B variants, editing the user's recordings, reels from long recordings (clipmaker: editable in HQ, karaoke captions), videos from code (HyperFrames, Manim), AI video, Polish captions, platform formats, quality control. Prepares files; never publishes without approval.
     status: active
 
   - name: jarvo-ads

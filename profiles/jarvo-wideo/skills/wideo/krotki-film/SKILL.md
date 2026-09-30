@@ -25,7 +25,7 @@ na FFmpeg i darmowym lektorze Edge TTS. Plik planu opisuje `references/plan.md`.
 - Seria filmów z jednego szablonu (ten sam plan, inne teksty).
 
 ## Kiedy NIE używać
-- Jest surowe nagranie do obróbki → `montaz-nagran`; długi materiał do pocięcia → `klipy-z-dlugiego`.
+- Jest surowe nagranie do obróbki → `montaz-nagran`; długi materiał do pocięcia na rolki → `clipmaker`.
 - Animacja interfejsu, typografia w ruchu, wykresy, 3D, explainer z animacją → rodzaj z `rodzaje-filmu`
   (plik rodzaju wskazuje silnik z `film-z-kodu`).
 

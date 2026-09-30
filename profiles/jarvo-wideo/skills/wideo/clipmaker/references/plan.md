@@ -1,0 +1,49 @@
+# plan.json: schemat
+
+Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, czyli minuty × 60 + sekundy).
+`klipy.py sprawdz` pilnuje pól i zakresów; czego plan nie poda, bierze wartość domyślną.
+
+```json
+{
+  "zrodlo": "/opt/data/jarvo/inbox/2026-09-30/podcast.mp4",
+  "format": "9:16",
+  "styl": {
+    "napisy": "karaoke",
+    "hl": "#FFE14D",
+    "tytul": true,
+    "tytul_s": 3.0,
+    "tnij_pauzy": 0.6,
+    "bez_wtracen": true,
+    "punch": true,
+    "muzyka": null,
+    "muzyka_glosnosc": 0.12
+  },
+  "rolki": [
+    {
+      "slug": "3-bledy-w-cenach",
+      "tytul": "3 błędy w cenach",
+      "segmenty": [{"od": 754.2, "do": 781.9, "fx": 0.42, "fy": 0.38, "zoom": 1.0}],
+      "oceny": {"hook": 8, "samodzielnosc": 9, "wartosc": 8, "emocja": 7, "puenta": 8, "udostepnienie": 7},
+      "dlaczego": "konkretna lista z liczbami, zamyka się puentą",
+      "opis": "Trzy błędy, przez które zarabiasz mniej niż konkurencja.",
+      "hashtagi": ["#biznes", "#ceny", "#sprzedaż"]
+    }
+  ]
+}
+```
+
+| Pole | Co | Domyślnie |
+|---|---|---|
+| `format` | `9:16` (1080×1920) albo `16:9` (1920×1080); także w rolce, gdy jedna ma być inna | `9:16` |
+| `styl.napisy` | `karaoke` (aktywne słowo w kolorze `hl`), `zwykle` (bez podświetlenia) albo `null` (bez napisów) | `karaoke` |
+| `styl.tytul`, `tytul_s` | tytuł-hook z rolki na górze przez pierwsze sekundy | `true`, 3 s |
+| `styl.tnij_pauzy` | wycina pauzy dłuższe niż tyle sekund (zostaje oddech 0,12 s); `null` = bez cięcia | 0,6 |
+| `styl.bez_wtracen` | wycina „yyy”, „eee”, „mmm” | `true` |
+| `styl.punch` | co drugie ujęcie po cięciu przybliżone ×1,12 (ukrywa skok obrazu) | `true` |
+| `styl.muzyka` | plik muzyki pod mową (licencja w KLIPY.md), głośność `muzyka_glosnosc` | brak |
+| `rolki[].slug` | a-z, 0-9, „-”, do 40 znaków; nazwa pliku `klip-N-<slug>.mp4` | — |
+| `rolki[].segmenty` | 1–3 fragmenty źródła: `od`, `do`, kadr `fx`/`fy` (0–1, punkt skupienia), `zoom` (1–3) | fx 0,5, fy 0,4 (pion) |
+| `rolki[].oceny` | 6 osi z master promptu | — |
+
+Poprawka po zbudowaniu: zmień plan i `klipy.py zbuduj plan.json --tylko <slug>`. Rolka zmieniona już w edytorze HQ
+→ `projekt.py` na jej projekcie (zbuduj nie nadpisze pracy człowieka bez `--nadpisz`).

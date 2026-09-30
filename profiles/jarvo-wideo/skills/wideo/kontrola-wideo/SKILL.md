@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, qa, quality-gate, rubric, loudness, safe-zones]
-    related_skills: [krotki-film, montaz-nagran, klipy-z-dlugiego, napisy, formaty-wideo, dobor-ujec]
+    related_skills: [krotki-film, montaz-nagran, clipmaker, napisy, formaty-wideo, dobor-ujec]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1

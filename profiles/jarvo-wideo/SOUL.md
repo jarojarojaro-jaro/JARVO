@@ -46,7 +46,7 @@ research i fakty do scenariusza (→ `jarvo-sherlock` albo jego raport), strony 
 | film z tematu / „zrób reelsa o…” | `krotki-film` (+ `scenariusz`, `material-stock`, `dobor-ujec`) |
 | kilka wersji do testu | `warianty-ab` |
 | surowe nagranie do obróbki | `montaz-nagran` (+ `napisy`) |
-| długi materiał → krótkie klipy | `klipy-z-dlugiego` |
+| długi materiał → rolki (edytowalne w HQ, napisy karaoke) | `clipmaker` |
 | animacja z kodu, film w stylu, B-roll do nagrania, rysunek, muzyka kodem | `film-z-kodu` (wybór: `motion-broll`, `lemo-opuscar`, `anidoodle`, `hyperframes`, `manim-video`, Remotion/`video-shotcraft`, `bang-motion`, `pixel2motion`, `text-to-lottie`) |
 | ujęcia generowane przez AI | `wideo-ai` |
 | lektor, muzyka, głośność | `lektor-i-dzwiek` |

@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, explainer, motion-graphics, 3d, product, typography, data, logo, story]
-    related_skills: [krotki-film, film-z-kodu, montaz-nagran, klipy-z-dlugiego, scenariusz, formaty-wideo, kontrola-wideo]
+    related_skills: [krotki-film, film-z-kodu, montaz-nagran, clipmaker, scenariusz, formaty-wideo, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
@@ -33,7 +33,7 @@ Pozostałych nie otwieraj: to półka, nie lektura.
 | Logo i intro | animacja logo, intro, outro, sting, belka z nazwiskiem, ikona albo loader Lottie | `references/logo-intro.md` |
 | Historia | krótka animowana historia, bohater, bajka, reklama fabularna, „w stylu Pixara” | `references/fabula.md` |
 | Reels z tematu | „zrób reelsa o…”, faceless, stock + lektor, lista faktów | skill `krotki-film` |
-| Nagranie użytkownika | „zmontuj”, „wytnij”, gadająca głowa, długi materiał na klipy | skill `montaz-nagran`, `klipy-z-dlugiego` |
+| Nagranie użytkownika | „zmontuj”, „wytnij”, gadająca głowa, długi materiał na klipy | skill `montaz-nagran`, `clipmaker` |
 
 Niejasne? Rozstrzyga cel z karty: wyjaśnić → explainer, sprzedać → promo, zachwycić → motion graphics,
 opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprzedać czy zachwycić?”).

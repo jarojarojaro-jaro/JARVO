@@ -19,3 +19,10 @@
 
 ## Uwagi (nie blokują)
 - Preferencje estetyczne w granicach brand kitu (krój napisów, kolor akcentu, przejścia).
+
+## Rolki z długiego nagrania (clipmaker)
+- Blokujące: rolka zmienia sens wypowiedzi (wycięte zaprzeczenie, cudzy pogląd jako teza, sklejone wątki);
+  brak KANDYDACI.md z ocenami albo plan.json; `klipy.py sprawdz` z błędami; rolka bez projektu `.edycja.json`
+  (człowiek nie może jej poprawić w HQ); twarz mówcy poza kadrem.
+- Ważne: hook później niż w 3 s, rolka urwana w pół zdania, dwie rolki o tym samym temacie, oceny < 7 bez wyjaśnienia,
+  nazwy własne i liczby w napisach niepoprawione, rolka zmieniona przez człowieka nadpisana przez `zbuduj`.

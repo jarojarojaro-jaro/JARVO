@@ -114,3 +114,19 @@ def test_real_prepare_without_speech_model(tmp_path, monkeypatch):
     a = json.loads((out / "analiza.json").read_text(encoding="utf-8"))
     assert a["slowa"] == 2 and a["arkusze"] and Path(a["arkusze"][0]["plik"]).is_file()
     assert "[00:00.5–00:01.0] Cześć." in (out / "transkrypcja.txt").read_text(encoding="utf-8")
+
+
+def test_rebuild_does_not_overwrite_user_edit(nagranie, tmp_path):
+    pl = tmp_path / "plan.json"
+    pl.write_text(json.dumps(plan(nagranie)), encoding="utf-8")
+    out = tmp_path / "klipy"
+    assert K.main(["zbuduj", str(pl), "-o", str(out), "--bez-renderu"]) == 0
+    assert K.main(["zbuduj", str(pl), "-o", str(out), "--bez-renderu"]) == 0       # bez zmian człowieka: wolno
+    pp = out / "klip-1-trzy-bledy.edycja.json"
+    proj = json.loads(pp.read_text(encoding="utf-8"))
+    proj["texts"][0]["text"] = "Poprawione w HQ"                                        # człowiek edytował rolkę
+    pp.write_text(json.dumps(proj), encoding="utf-8")
+    with pytest.raises(SystemExit, match="zmieniono po zbudowaniu"):
+        K.main(["zbuduj", str(pl), "-o", str(out), "--bez-renderu"])
+    assert "Poprawione w HQ" in pp.read_text(encoding="utf-8")
+    assert K.main(["zbuduj", str(pl), "-o", str(out), "--bez-renderu", "--nadpisz"]) == 0
