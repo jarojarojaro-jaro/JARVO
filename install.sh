@@ -24,8 +24,8 @@
 #   JARVO_DRY_RUN=1              tylko pokaż, co by zrobił (nic nie instaluje)
 #
 # Cały skrypt siedzi w funkcji main, więc bash wykonuje go dopiero po pobraniu w całości: ucięty transfer
-# nic nie uruchomi. Pytania czyta z terminala (/dev/tty), nie z potoku curl | bash. Klucze nigdy nie trafiają
-# do logu (~/jarvo-local/install.log).
+# nic nie uruchomi. Hasło sudo i pytania czyta z terminala (/dev/tty), nie z potoku curl | bash; sudo pyta
+# o hasło raz, na początku. Klucze nigdy nie trafiają do logu (~/jarvo-local/install.log).
 set -euo pipefail
 
 REPO="${JARVO_REPO:-https://github.com/jarojarojaro-jaro/JARVO.git}"
@@ -62,6 +62,13 @@ proxy_setup() {
 penv() { as_root env ${PROXY_ENV[@]+"${PROXY_ENV[@]}"} "$@"; }
 
 OS=; ARCH=; PKG=; SUDO=; NEWBASH=; NEED_GROUP=0
+
+sudo_check() {   # hasło administratora raz, na początku; kolejne sudo (pakiety, Docker, chown danych floty) idą z pamięci
+  [[ -n $SUDO ]] || return 0
+  if [[ $DRY != 1 ]] && $SUDO -n true 2>/dev/null; then return 0; fi   # uprawnienia już zapamiętane (albo NOPASSWD)
+  say "Potrzebne hasło administratora (sudo), zwykle tylko raz:"
+  run $SUDO -v || die "sudo nie przyjęło hasła albo $(id -un) nie ma uprawnień sudo."
+}
 
 detect_os() {
   case "$(uname -s)" in
@@ -232,6 +239,12 @@ docker_check() {
     say "Docker: $(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok)"
     return
   fi
+  # Docker już działa jako Ty (Docker Desktop z integracją WSL, wcześniejsza instalacja): nic do roboty, zero sudo
+  if have docker && docker info >/dev/null 2>&1; then
+    docker compose version >/dev/null 2>&1 || compose_install
+    say "Docker: $(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok)"
+    return
+  fi
   if ! have docker; then
     docker_install
     [[ $DRY == 1 ]] && return
@@ -253,8 +266,8 @@ docker_check() {
 port_check() {
   [[ $DRY == 1 ]] && return 0
   # własny kontener na tym porcie to nie konflikt (ponowna instalacja = aktualizacja)
-  if [[ -n $SUDO ]]; then $SUDO docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx jarvo-hermes && return 0
-  else docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx jarvo-hermes && return 0; fi
+  if docker info >/dev/null 2>&1; then docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx jarvo-hermes && return 0
+  elif [[ -n $SUDO ]]; then $SUDO docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx jarvo-hermes && return 0; fi
   if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then
     die "Port $PORT jest zajęty przez inny program. Zwolnij go (ss -ltnp | grep $PORT) i uruchom polecenie ponownie."
   fi
@@ -312,10 +325,13 @@ fleet_up() {
 main() {
   printf '\n%s  ██████  %sJ A R V O%s\n%s  ██████  %sfrom idea to reality.%s\n\n' "$W" "$W" "$N" "$R" "$D" "$N"
   [[ $DRY == 1 ]] && warn "Na sucho (JARVO_DRY_RUN=1): tylko pokazuję, co bym zrobił."
+  # curl | bash: stdin to potok z pobranym skryptem; hasło sudo i pytania czytamy z terminala
+  if [[ ! -t 0 ]] && { : < /dev/tty; } 2>/dev/null; then exec < /dev/tty; fi
   detect_os
   proxy_setup
   [[ $OS == macos ]] || detect_pkg
   hw_check
+  sudo_check
   if [[ $DRY != 1 ]]; then
     # log całej instalacji (bez kluczy: local-up.sh czyta je bez echa)
     mkdir -p "$L"
@@ -334,4 +350,4 @@ main() {
   sleep 0.2   # tee ma zdążyć wypisać ostatnie linie
 }
 
-main "$@"
+main "$@"; exit   # exit od razu: po przepięciu stdin na terminal bash nie może czytać z niego poleceń

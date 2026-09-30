@@ -130,7 +130,9 @@ Zbudowane 2026-09-30 (pliki w §1):
   `service`, w ostateczności `dockerd` w tle; WSL bez systemd dostaje `iptables-legacy`), grupa `docker`,
   wolny port 9119, klon albo aktualizacja repo (`fetch` + `checkout` + `merge --ff-only`; lokalne zmiany
   zatrzymują), `/usr/local/bin/jarvo` (albo `~/.local/bin`), log `~/jarvo-local/install.log` bez kluczy,
-  proxy z środowiska przekazywane pod `sudo`. Zmienne: `JARVO_PROVIDER`, `JARVO_KEY`, `JARVO_YES=1`,
+  proxy z środowiska przekazywane pod `sudo`; wejście przepięte na terminal (`curl | bash` daje potok, więc hasło
+  `sudo` i odpowiedzi muszą iść z `/dev/tty`), hasło `sudo` raz na początku (`sudo -v`), Docker działający już
+  jako użytkownik (Docker Desktop w WSL) nie wymaga ani `sudo`, ani grupy. Zmienne: `JARVO_PROVIDER`, `JARVO_KEY`, `JARVO_YES=1`,
   `JARVO_SETUP_ONLY=1`, `JARVO_NO_AUTOSTART=1`, `JARVO_FORCE=1`, `JARVO_DRY_RUN=1`, `JARVO_DIR`, `JARVO_LOCAL`,
   `JARVO_REPO`, `JARVO_BRANCH`.
 - `bin/jarvo` (lista poleceń w §1); `uninstall` usuwa kontenery, obraz, usługę i polecenie, o dane, klucze

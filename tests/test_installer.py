@@ -70,7 +70,7 @@ def test_scripts_parse():
     for s in SCRIPTS:
         assert subprocess.run(["bash", "-n", str(s)], capture_output=True).returncode == 0, s
     text = INSTALL.read_text(encoding="utf-8").rstrip().splitlines()
-    assert text[-1] == 'main "$@"', "install.sh: całość w main (curl | bash wykonuje dopiero po pobraniu)"
+    assert text[-1].startswith('main "$@"; exit'), "install.sh: całość w main, exit zaraz po nim (stdin przepięte na terminal)"
     assert (ROOT / "infra/autostart/jarvo-updater.service").exists()
 
 
@@ -89,6 +89,7 @@ def test_dry_run_fresh_ubuntu_installs_tools_and_docker(tmp_path):
     assert "System: linux" in out and "pakiety: apt" in out
     assert "apt-get install -y -q git curl python3 openssl ca-certificates" in out
     assert "get.docker.com" in out and "$ sudo env" in out and " sh /" in out
+    assert "$ sudo -v" in out and out.index("$ sudo -v") < out.index("apt-get")   # hasło raz, przed pierwszym sudo
     assert "git clone -q --depth 50 -b main https://github.com/jarojarojaro-jaro/JARVO.git" in out
     assert "bin/jarvo up" in out
     assert "Koniec próby na sucho" in out
@@ -123,7 +124,7 @@ def test_dry_run_with_docker_present_skips_install(tmp_path):
                PATH=str(bin_dir) + ":" + str(_bare_path(tmp_path / "p", hide=("git", "curl", "python3", "openssl"))))
     assert res.returncode == 0, res.stdout + res.stderr
     assert "get.docker.com" not in res.stdout and "Docker: 29.0" in res.stdout
-    assert "usermod -aG docker tester" in res.stdout     # udawany użytkownik nie jest w grupie docker
+    assert "usermod" not in res.stdout and "groupadd" not in res.stdout   # Docker działa jako użytkownik: bez grupy i sudo do Dockera
 
 
 def test_low_ram_refuses_unless_forced(tmp_path):
