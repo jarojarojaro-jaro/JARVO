@@ -7,17 +7,17 @@ license: MIT
 metadata:
   hermes:
     tags: [video, script, hook, storytelling, retention]
-    related_skills: [krotki-film, warianty-ab, video, formaty-wideo, sw-premise-theme, sw-scene-craft, sw-dialogue, sw-character-conflict]
+    related_skills: [hooki, krotki-film, warianty-ab, video, formaty-wideo, sw-premise-theme, sw-scene-craft, sw-dialogue, sw-character-conflict]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-09-30"
 ---
 
 # Scenariusz krótkiego wideo
 
-Film krótki wygrywa w pierwszych 2 sekundach i przegrywa na każdej zbędnej. Wzorce hooków i struktur:
-`references/hooki.md`.
+Film krótki wygrywa w pierwszych 2 sekundach i przegrywa na każdej zbędnej. Wzorce hooków i struktur z polskimi
+przykładami: `references/hooki.md`; metoda (trzy warstwy, 18 taktyk, korpus słów klientów): skill `hooki`.
 
 ## Kiedy użyć
 - Przed każdym filmem z lektorem albo tekstem na ekranie (`krotki-film`, `film-z-kodu`, `warianty-ab`).
@@ -43,10 +43,13 @@ formie bierz tylko zasady (hak = zwrot wartości, jedna scena = jedna zmiana), n
 ## Kroki
 1. **Jedno zdanie przesłania** („Widz ma wyjść z przekonaniem, że…”). Nie da się → temat za szeroki, zawęź.
 2. **Budżet słów:** długość × 2,5 słowa/s (lektor Edge +0%); 30 s ≈ 70 słów. Hook ≤ 12 słów, scena ≤ 22.
-3. **Hook (0–2 s):** wzorzec z `references/hooki.md`; konkret, liczba, konflikt albo obietnica; bez „Cześć, dziś…”.
-   Tekst ekranowy hooka ≤ 5 słów, zrozumiały bez dźwięku.
+3. **Hook (0–2 s):** wzorzec z `references/hooki.md`, taktyka ze skilla `hooki`; konkret, liczba, konflikt albo
+   obietnica; bez „Cześć, dziś…”. Wypisz **trzy warstwy**: obraz pierwszej sekundy, zdanie lektora, tekst ekranowy
+   (≤ 5 słów, zrozumiały bez dźwięku). Tekst ekranowy nie powtarza lektora: dokłada stawkę albo wywołuje odbiorcę.
+   Są słowa klientów (recenzje, komentarze w karcie, raport Sherlocka)? Hook z ich dosłownego zdania.
 4. **Struktura** dobrana do celu (lista, mit→fakt, problem→rozwiązanie, przed→po, historia); 4–8 scen, jedna myśl na scenę,
-   każda scena kończy się powodem, żeby oglądać dalej.
+   każda scena kończy się powodem, żeby oglądać dalej. Sceny 2–3 (do ~15 s) rozwijają przesłankę hooka, nie zaczynają
+   listy funkcji.
 5. **Obraz do każdej sceny:** co widać (konkretny obiekt i kadr, nie „coś o kawie”), zapytanie stock po angielsku.
 6. **CTA** jedno, na końcu (i opcjonalnie wpleciony w połowie przy > 40 s).
 7. **Czytanie na głos:** zdania krótkie, bez nawiasów, skrótów i cyfr rzymskich; liczby tak, jak mają być czytane
@@ -57,7 +60,7 @@ formie bierz tylko zasady (hak = zwrot wartości, jedna scena = jedna zmiana), n
   zapytanie stock, czas szacowany), CTA, źródła faktów.
 
 ## Definition of Done
-- [ ] jedno przesłanie; hook ≤ 12 słów i ≤ 2,5 s czytania,
+- [ ] jedno przesłanie; hook ≤ 12 słów i ≤ 2,5 s czytania, trzy warstwy hooka bez powtórzeń,
 - [ ] suma słów w budżecie długości; żadna scena > 22 słów,
 - [ ] każda scena ma konkretny obraz; liczby i fakty mają źródło,
 - [ ] tekst naturalny po polsku (bez kalk i „AI-izmów”), CTA na końcu.

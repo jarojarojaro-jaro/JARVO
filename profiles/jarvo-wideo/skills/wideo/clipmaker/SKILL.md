@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, repurpose, clips, podcast, webinar, shorts, reels, tiktok]
-    related_skills: [napisy, montaz-nagran, kontrola-wideo, formaty-wideo, scenariusz]
+    related_skills: [hooki, napisy, montaz-nagran, kontrola-wideo, formaty-wideo, scenariusz]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
@@ -40,8 +40,9 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
    Nagranie 60 min to ~6–12 min rozpoznawania mowy: wyślij `kanban_heartbeat` przed startem.
 2. **Przeczytaj** `out/wideo/klipy/transkrypcja.txt` w całości (długie: po kawałku, ale całe) i
    [`references/master-prompt.md`](references/master-prompt.md). Tam jest, co jest dobrą rolką i jak oceniać.
-3. **Kandydaci** → `out/wideo/klipy/KANDYDACI.md`: 2–3× więcej niż rolek, każdy z czasem w źródle, hookiem,
-   puentą, ocenami 6 osi i jednym zdaniem „dlaczego” (albo „dlaczego odpada”).
+3. **Kandydaci** → `out/wideo/klipy/KANDYDACI.md`: 2–3× więcej niż rolek, każdy z czasem w źródle, hookiem
+   w trzech warstwach (zdanie, tytuł na ekran, pierwsza klatka) i taktyką (skill `hooki`), puentą, ocenami 6 osi
+   i jednym zdaniem „dlaczego” (albo „dlaczego odpada”).
 4. **Kadr:** obejrzyj arkusze `out/wideo/klipy/klatki/arkusz-*.jpg` (`vision_analyze`): gdzie jest twarz mówcy
    (fx, fy 0–1), ile osób, czy są plansze. Dwie osoby i zmiana ujęcia w środku rolki → dwa segmenty, każdy
    ze swoim fx (cięcia ujęć są w `analiza.json`).
@@ -69,6 +70,7 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
 
 ## Definition of Done
 - [ ] każda rolka: hook w pierwszych 1–3 s, jedna myśl zrozumiała bez reszty nagrania, puenta na końcu, 20–60 s,
+- [ ] tytuł-hook nie powtarza zdania mówionego; rolki mają ≥ 3 różne taktyki hooka (gdy rolek ≥ 3),
 - [ ] oceny w KANDYDACI.md (średnia ≥ 7, hook ≥ 7), rolki o różnych tematach, czasy w źródle w KLIPY.md,
 - [ ] `klipy.py sprawdz` bez błędów, `qa_wideo.py` bez błędów dla każdej rolki, twarz mówcy w kadrze,
 - [ ] napisy poprawione (nazwy własne, liczby), projekty otwierają się w edytorze HQ.

@@ -7,11 +7,11 @@ license: MIT
 metadata:
   hermes:
     tags: [ads, testing, experiment]
-    related_skills: [ab-testing, plan-kampanii, optymalizacja]
+    related_skills: [ab-testing, hooki, plan-kampanii, optymalizacja]
   jarvo:
     agent: jarvo-ads
     autonomy: A1
-    reviewed: "2026-09-29"
+    reviewed: "2026-09-30"
 ---
 
 # Plan testu
@@ -28,7 +28,8 @@ albo wszystkim (wtedy wiemy tylko, KTÓRY pakiet wygrał). Oba są w porządku, 
 1. **Pytanie testu** jednym zdaniem: „Który z 5 filmów launchowych zatrzymuje najwięcej osób?”.
    Zaznacz: jedna zmienna czy wiele (`wiele_zmiennych: true` w danych dla `eksperyment.py`).
 2. **Metryka z drabiny** (od najtańszej): hook rate (wideo, 3 s / wyświetlenia) → CTR → CVR → CPA.
-   Wybierz najdroższą metrykę, którą budżet rozstrzygnie.
+   Wybierz najdroższą metrykę, którą budżet rozstrzygnie. Metryka pasuje do zmienianej warstwy (lejek w `hooki`):
+   test hooka → hook rate, test rozbiegu → hold rate (15 s / 3 s); słaby CVR naprawia strona, nie nowe hooki.
 3. **Moc:** `$HERMES_HOME/scripts/planer.py test --metryka … --warianty … --budzet-dzienny … --dni … (--bazowa | --cpa)`.
    Kod 1 = niewykonalny: zastosuj rekomendację (mniej wariantów, tańsza metryka, dłużej) i przelicz. Nie planuj testu,
    który z góry nic nie rozstrzygnie.
@@ -40,7 +41,10 @@ albo wszystkim (wtedy wiemy tylko, KTÓRY pakiet wygrał). Oba są w porządku, 
 5. **Reguły stopu** (domyślne): min. 4 dni (lepiej 7) i wolumen z planera; zwycięzca P ≥ 95% i strata < 2%;
    wyłączenie przy P < 5% po minimum albo 2× cel CPA bez wyniku; koniec czasu bez rozstrzygnięcia = remis.
 6. **Brief kreacji**, jeśli wariantów brak: dla każdego wariantu co ma się różnić, format, długość, hook, CTA
-   (karta do Studia/Wideografa przez Jarva). Nazwy plików wg konwencji z `plan-kampanii`.
+   (karta do Studia/Wideografa przez Jarva). Nazwy plików wg konwencji z `plan-kampanii`. Hook **napisany, nie opisany**,
+   w trzech warstwach (obraz / zdanie / tekst na ekranie), z taktyką i źródłem w korpusie (najlepsze reklamy konta,
+   recenzje, komentarze): skill `hooki`. Test hooków: różne taktyki, ten sam rozbieg; nowe kąty najpierw jako tanie
+   grafiki (drabina wierności).
 
 ## Wyjścia
 Sekcja „Test” w `out/PLAN.md`: pytanie, warianty (tabela), jedna/wiele zmiennych, metryka i dlaczego, wynik planera

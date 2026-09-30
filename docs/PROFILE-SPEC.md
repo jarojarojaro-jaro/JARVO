@@ -85,7 +85,7 @@ Rodzaje skilli agenta:
 - **playbooki:** krótsze przepisy na konkretne sytuacje,
 - **skille zewnętrzne:** z katalogu Hermesa [H] i z repozytoriów OSS przypiętych do commitu, przypisane agentom
   w [`vendor/skills.lock.yaml`](../vendor/skills.lock.yaml); build dokłada je z licencją (`LICENSE-UPSTREAM`) i `.vendored.json`,
-- **skille wspólne floty:** własne skille narzędziowe w `shared/skills/` (np. `graf-kodu`), przypisywane agentom w tym samym locku.
+- **skille wspólne floty:** własne skille w `shared/skills/` (narzędziowe jak `graf-kodu`, metodyczne jak `hooki`), przypisywane agentom w tym samym locku.
 
 ---
 

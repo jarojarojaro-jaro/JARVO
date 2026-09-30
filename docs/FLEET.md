@@ -14,9 +14,9 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [11 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 0 | patrol, brief, przegląd, raport floty | [19](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [7 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 16 (Hermes, marketingskills, wspólny `transkrypcja-filmu`) | search_fanout, extract, sources | [12](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [9 w `skills/web/`](../profiles/jarvo-web/skills/web) | 55 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [12](../evals/jarvo-web/scenarios.yaml) |
-| `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 23 (marketingskills, Anthropic, Hermes, impeccable) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
-| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [14 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 56 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólny `transkrypcja-filmu` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy (+ wideo_lib) | [21](../evals/jarvo-wideo/scenarios.yaml) |
-| `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 5 (marketingskills) | ads, planer, eksperyment, eksport | [12](../evals/jarvo-ads/scenarios.yaml) |
+| `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 24 (marketingskills, Anthropic, Hermes, impeccable, wspólny `hooki`) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
+| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [14 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 57 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy (+ wideo_lib) | [21](../evals/jarvo-wideo/scenarios.yaml) |
+| `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [12](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 3 (skill-creator, `graf-kodu`, `transkrypcja-filmu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -40,8 +40,8 @@ Legenda przy skillach:
 
 ## Warstwa wspólna: wiedza o Tobie i Twoich markach
 
-Snajperzy nie dzielą pamięci ani workflowów dziedzinowych (wspólne są tylko narzędziowe skille z `shared/skills/`,
-np. `graf-kodu`, i te same skille zewnętrzne z locka), ale wszyscy znają **Ciebie**:
+Snajperzy nie dzielą pamięci ani workflowów dziedzinowych (wspólne są tylko skille z `shared/skills/`:
+narzędziowe jak `graf-kodu` i metodyczne jak `hooki`, oraz te same skille zewnętrzne z locka), ale wszyscy znają **Ciebie**:
 - **profil użytkownika**: kim jesteś, czym się zajmujesz, preferencje (MVP: `knowledge/user/USER.md`
   z wywiadu onboardingowego Jarva; później wspólny provider pamięci, np. Honcho),
 - **brand kity** w `knowledge/brands/<marka>/`: logo, kolory, fonty, ton komunikacji, `DESIGN.md`.
@@ -193,7 +193,7 @@ Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-studio-marketing-i-kreacja).
 - [H] `baoyu-infographic`, `social-media-content-calendar`, `creative-ideation`, `humanizer`, `meme-generation`,
   `excalidraw`, `concept-diagrams`
 - [Z] marketingskills (12: copywriting, social, launch, ads, ad-creative…), Anthropic (3: `algorithmic-art`,
-  `canvas-design`, `theme-factory`), `impeccable`
+  `canvas-design`, `theme-factory`), `impeccable`; wspólny `hooki` (`shared/skills/`: trzy warstwy hooka, 18 taktyk)
 - [T] `formaty-platform` (specyfikacje i szablony), [T] `grafika-social` (szablony HTML do PNG w brand kicie),
   [T] `pakiet-kampanii` (posty + grafiki + brief wideo + kalendarz), [T] `generacja-ai` (obrazy), [T] `copy-pl`, [T] `publikacja`
 
@@ -226,7 +226,7 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 `clipmaker`, `napisy`, `lektor-i-dzwiek`, `film-z-kodu`, `wideo-ai`, `formaty-wideo`, `kontrola-wideo`;
 [H] `manim-video`, `ai-presenter-video`; [Z] `hyperframes` (12 skilli rodziny), marketingskills `video`, GSAP (8),
 Three.js (10), screenwriting (5), iart (5), motion (3), Remotion, motion-broll, lemo-opuscar, anidoodle, claude-animation,
-bang-motion, pixel2motion, `text-to-lottie`, `slack-gif-creator`, wspólny `transkrypcja-filmu` (razem 56).
+bang-motion, pixel2motion, `text-to-lottie`, `slack-gif-creator`, wspólne `transkrypcja-filmu` i `hooki` (razem 57).
 Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#jarvo-wideo-wideograf).
 
 **Zasada:** **nie publikuje sam** i nie kupuje materiałów; bez deepfake'ów i klonowania głosów realnych osób.

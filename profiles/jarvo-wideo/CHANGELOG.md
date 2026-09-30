@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Wspólny skill `hooki` (`shared/skills/`, za marketing-os `hooks.md`, MIT): trzy warstwy hooka bez powtórzeń, 18 taktyk, korpus słów klientów, rozbieg, lejek diagnozy. Podpięty w `scenariusz`, `warianty-ab` i master prompcie `clipmaker` (pole `taktyka` w planie; `klipy.py sprawdz` ostrzega, gdy tytuł-hook powtarza pierwsze zdanie mowy).
 - Master prompt clipmakera: zasady cięć (nie w środku słowa, zapas 30–200 ms, napisy zawsze na wierzchu).
 - Skill `clipmaker` (master prompt: typy momentów, 6 osi oceny, uczciwość; schemat `plan.json`) zastępuje `klipy-z-dlugiego`: rolki są projektami edytora HQ, nie wypalonymi MP4.
 - `klipy.py` (clipmaker): długie nagranie → `przygotuj` (mowa, cięcia ujęć, arkusze, transkrypcja), `sprawdz` (plan.json), `zbuduj` (projekty edytora + MP4 + KLIPY.md).

@@ -7,11 +7,11 @@ license: MIT
 metadata:
   hermes:
     tags: [copywriting, polish, social, marketing]
-    related_skills: [copywriting, copy-editing, social, humanizer, marketing-psychology]
+    related_skills: [hooki, copywriting, copy-editing, social, humanizer, marketing-psychology]
   jarvo:
     agent: jarvo-studio
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-09-30"
 ---
 
 # Copy po polsku
@@ -33,9 +33,12 @@ Metody bierzesz z nich, a te zasady dopasowują wynik do polskiego odbiorcy.
 - Hashtagi: 3–5 trafnych (IG), 0–3 (LinkedIn), po polsku, jeśli odbiorca polski.
 
 ## Struktury
+Hook każdej struktury to jedna z 18 taktyk skilla `hooki`; w grafice i wideo trzy warstwy (obraz, nagłówek, dopisek)
+mówią co innego. Są słowa klientów (recenzje, komentarze, raport Sherlocka)? Hook z ich dosłownego zdania.
 - **Post LinkedIn:** hook (≤ 210 znaków, przed „więcej”) → historia/problem → wniosek → pytanie lub CTA.
 - **Post IG:** hook w pierwszej linii → 3–5 krótkich akapitów → CTA → hashtagi.
-- **Reklama:** nagłówek (korzyść), tekst (dowód + oferta), CTA (czasownik), 3 warianty do testu A/B.
+- **Reklama:** nagłówek (korzyść), tekst (dowód + oferta), CTA (czasownik), 3 warianty do testu A/B:
+  3 różne taktyki hooka, reszta tekstu wspólna.
 
 ## Kontrola
 Limity znaków (`formaty-platform`), literówki, zgodność z tonem marki, zero obietnic bez pokrycia.

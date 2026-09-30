@@ -21,7 +21,8 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
   "rolki": [
     {
       "slug": "3-bledy-w-cenach",
-      "tytul": "3 błędy w cenach",
+      "tytul": "Tracisz marżę?",
+      "taktyka": "liczba na start",
       "segmenty": [{"od": 754.2, "do": 781.9, "fx": 0.42, "fy": 0.38, "zoom": 1.0}],
       "oceny": {"hook": 8, "samodzielnosc": 9, "wartosc": 8, "emocja": 7, "puenta": 8, "udostepnienie": 7},
       "dlaczego": "konkretna lista z liczbami, zamyka się puentą",
@@ -43,6 +44,8 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
 | `styl.muzyka` | plik muzyki pod mową (licencja w KLIPY.md), głośność `muzyka_glosnosc` | brak |
 | `rolki[].slug` | a-z, 0-9, „-”, do 40 znaków; nazwa pliku `klip-N-<slug>.mp4` | — |
 | `rolki[].segmenty` | 1–3 fragmenty źródła: `od`, `do`, kadr `fx`/`fy` (0–1, punkt skupienia), `zoom` (1–3) | fx 0,5, fy 0,4 (pion) |
+| `rolki[].tytul` | tytuł-hook na ekranie, ≤ 6 słów; nie powtarza pierwszego zdania mowy (`sprawdz` ostrzega) | — |
+| `rolki[].taktyka` | taktyka hooka ze skilla `hooki` (np. „pod prąd”, „historia od środka”); trafia do KLIPY.md | — |
 | `rolki[].oceny` | 6 osi z master promptu | — |
 
 Poprawka po zbudowaniu: zmień plan i `klipy.py zbuduj plan.json --tylko <slug>`. Rolka zmieniona już w edytorze HQ

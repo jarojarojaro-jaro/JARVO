@@ -7,11 +7,11 @@ license: MIT
 metadata:
   hermes:
     tags: [ads, audit]
-    related_skills: [ads, optymalizacja, sledzenie-konwersji]
+    related_skills: [ads, hooki, optymalizacja, sledzenie-konwersji]
   jarvo:
     agent: jarvo-ads
     autonomy: A0
-    reviewed: "2026-09-29"
+    reviewed: "2026-09-30"
 ---
 
 # Audyt konta
@@ -27,6 +27,7 @@ Odpowiedź na „zobacz, co się dzieje na moim koncie” albo pierwszy krok po 
 3. **Marnotrawstwo:** reklamy z wydatkiem ≥ 2× cel CPA bez wyniku, Google: wyszukiwane hasła bez związku, miejsca
    emisji/aplikacje z samymi kliknięciami, nakładające się grupy odbiorców.
 4. **Kreacje:** częstotliwość, spadek CTR w czasie (zmęczenie), liczba aktywnych kreacji na zestaw, formaty (brak 9:16?).
+   Słaba reklama → lejek diagnozy ze skilla `hooki` (hook rate → hold rate → CTR → CVR), naprawiasz pierwszy zepsuty etap.
 5. **Budżet i tempo:** wydatek vs plan, ograniczenia budżetem przy dobrym CPA (szansa na skalowanie).
 6. **Zgodność:** odrzucone reklamy, ostrzeżenia konta, kategorie specjalne.
 Każdy punkt: **stan → dowód (liczba, okres) → wpływ w zł → rekomendacja**. Szacunki nazywaj szacunkami.

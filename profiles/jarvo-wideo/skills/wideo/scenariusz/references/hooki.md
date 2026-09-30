@@ -11,6 +11,9 @@
 | Bezpośrednio do widza | „Jeśli pijesz kawę po 15:00, obejrzyj to.” | segmentacja odbiorców |
 | Przed → po | „Ta sama kawa, dwa młynki. Różnica?” | porównania, produkt |
 
+Wzorce to 7 z 18 taktyk skilla `hooki` (liczba na start, pod prąd, historia od środka, pytanie, efekt, wywołanie,
+kontrast); pełna tabela, trzy warstwy i lejek diagnozy są tam.
+
 Zasady: konkret zamiast przymiotnika; bez „cześć”, „w dzisiejszym filmie”, „mam dla was”; tekst ekranowy hooka ≤ 5 słów;
 obraz hooka ma ruch albo kontrast (nie plansza z logo).
 

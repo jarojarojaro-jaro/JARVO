@@ -187,6 +187,17 @@ def slowa_zrodla(src: Path) -> list:
     return json.loads(sp.read_text(encoding="utf-8")).get("words") or []
 
 
+def _tokeny(tekst: str) -> set[str]:
+    return {w for w in re.findall(r"\w+", tekst.lower()) if len(w) > 2}
+
+
+def powtarza_mowe(tytul: str, words: list, od: float, okno: float = 4.0) -> bool:
+    """Tytuł-hook, który mówi to samo co pierwsze sekundy mowy, marnuje warstwę tekstu (≥ 60% słów wspólnych)."""
+    tt = _tokeny(tytul)
+    mowa = _tokeny(" ".join(str(w[2]) for w in words if od - 0.05 <= w[0] < od + okno))
+    return len(tt) >= 2 and len(tt & mowa) / len(tt) >= 0.6
+
+
 def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
     bledy, uwagi = [], []
     src = Path(str(plan.get("zrodlo") or ""))
@@ -244,6 +255,9 @@ def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
             if start.startswith(ZLE_STARTY):
                 uwagi.append(f"{tag}: zaczyna się od „{start[:20]}…”: hook powinien być pierwszym zdaniem")
         tytul = str(r.get("tytul") or "")
+        if segs and not bledy and tytul and powtarza_mowe(tytul, words, float(segs[0]["od"])):
+            uwagi.append(f"{tag}: tytuł powtarza pierwsze zdanie mówione: tekst na ekranie ma dokładać stawkę "
+                         "albo wywołać odbiorcę (skill hooki)")
         if len(tytul) > 60:
             bledy.append(f"{tag}: tytuł ma {len(tytul)} znaków (do 60)")
         elif len(tytul.split()) > 7:
@@ -423,7 +437,7 @@ def pisz_klipy_md(plan: dict, wyniki: list[dict], out: Path, ctx: dict) -> None:
         r = w["r"]
         lines += ["", f"## {w['n']}. {r.get('tytul') or r['slug']}", "",
                   f"- plik: `{w['film'].name}` (projekt: `{ed.project_path(w['film']).name}`), {w['ujecia']} ujęć, {w['dl']:.1f} s",
-                  f"- dlaczego: {r.get('dlaczego') or '–'}",
+                  f"- hook: {r.get('taktyka') or '–'} (taktyka), dlaczego: {r.get('dlaczego') or '–'}",
                   f"- opis: {r.get('opis') or '–'}",
                   f"- hashtagi: {' '.join(r.get('hashtagi') or []) or '–'}"]
         if r.get("oceny"):

@@ -57,6 +57,11 @@ def test_plan_check_errors_and_warnings(nagranie):
     tnie = plan(nagranie, segmenty=[{"od": 1.5, "do": 12.0}])
     _, uwagi, _ = K.sprawdz_plan(K.wczytaj_plan_dict(tnie))
     assert any("tnie słowo „błędy”" in u for u in uwagi)
+    echo = plan(nagranie, tytul="Trzy błędy w cenach")                  # tytuł = pierwsze zdanie mówione
+    _, uwagi, _ = K.sprawdz_plan(K.wczytaj_plan_dict(echo))
+    assert any("tytuł powtarza pierwsze zdanie" in u for u in uwagi)
+    _, uwagi, _ = K.sprawdz_plan(K.wczytaj_plan_dict(plan(nagranie, tytul="Tracisz marżę?")))
+    assert not any("tytuł powtarza" in u for u in uwagi)
 
 
 def test_project_is_editable_reel(nagranie):
@@ -79,13 +84,13 @@ def test_project_is_editable_reel(nagranie):
 
 def test_build_writes_projects_and_klipy_md(nagranie, tmp_path, capsys):
     pl = tmp_path / "plan.json"
-    pl.write_text(json.dumps(plan(nagranie, opis="Opis", hashtagi=["#ceny"])), encoding="utf-8")
+    pl.write_text(json.dumps(plan(nagranie, opis="Opis", hashtagi=["#ceny"], taktyka="liczba na start")), encoding="utf-8")
     out = tmp_path / "klipy"
     assert K.main(["zbuduj", str(pl), "-o", str(out), "--bez-renderu"]) == 0
     proj = json.loads((out / "klip-1-trzy-bledy.edycja.json").read_text(encoding="utf-8"))
     assert proj["zmienil"]["kto"] == "jarvo-wideo" and proj["clipmaker"]["slug"] == "trzy-bledy"
     md = (out / "KLIPY.md").read_text(encoding="utf-8")
-    assert "3 błędy w cenach" in md and "00:00.9–00:12.0" in md and "#ceny" in md
+    assert "3 błędy w cenach" in md and "00:00.9–00:12.0" in md and "#ceny" in md and "liczba na start" in md
     bad = tmp_path / "zly.json"
     bad.write_text(json.dumps(plan(nagranie, segmenty=[{"od": 5, "do": 4}])), encoding="utf-8")
     with pytest.raises(SystemExit, match="plan ma błędy"):

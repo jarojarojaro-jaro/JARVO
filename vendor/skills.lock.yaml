@@ -241,6 +241,7 @@ agents:
     - {source: hermes, path: optional-skills/web-development/cloudflare-temporary-deploy, dest: deploy/cloudflare-temporary-deploy}
 
   jarvo-studio:
+    - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: anthropic-skills, path: skills/algorithmic-art, dest: design/algorithmic-art}
     - {source: impeccable, path: .hermes/skills/impeccable, dest: design/impeccable}
     - {source: marketingskills, path: skills/copywriting, dest: marketing/copywriting}
@@ -266,6 +267,7 @@ agents:
     - {source: hermes, path: optional-skills/creative/concept-diagrams, dest: creative/concept-diagrams}
 
   jarvo-wideo:
+    - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
     - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
     - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}
@@ -326,6 +328,7 @@ agents:
     - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-character-conflict, dest: screenwriting/sw-character-conflict}
 
   jarvo-ads:
+    - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: marketingskills, path: skills/ads, dest: marketing/ads}
     - {source: marketingskills, path: skills/ab-testing, dest: marketing/ab-testing}
     - {source: marketingskills, path: skills/attribution, dest: marketing/attribution}

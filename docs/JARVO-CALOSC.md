@@ -35,7 +35,7 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 - **Bezpośredni kontakt zostaje** — z każdym snajperem pogadasz osobno, ale praca wieloetapowa
   zawsze idzie przez szefa.
 - **Wspólne:** wiedza o Tobie (USER.md) i brand kity (`knowledge/brands`). Pamięć i skille są per agent
-  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki; Ręka czyta skille wszystkich).
+  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads; Ręka czyta skille wszystkich).
 - **Nadzór bez palenia tokenów:** dispatcher kanbana i patrol (skrypt bez modelu) pilnują floty
   i budzą Jarva tylko przy anomaliach albo gdy trzeba Twojej decyzji.
 
@@ -175,7 +175,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `profiles/_host/` | profil hosta: gateway z multipleksacją, trasy Telegrama, dispatcher kanbana |
 | `shared/protocol/` | kontrakt zlecenia (16 zasad) wstrzykiwany do każdego SOUL |
 | `shared/security/deny.yaml` | reguły blokad dla całej floty |
-| `shared/skills/` | skille wspólne (`graf-kodu`; `transkrypcja-filmu`: link do filmu → tekst mowy) |
+| `shared/skills/` | skille wspólne (`graf-kodu`; `transkrypcja-filmu`: link do filmu → tekst mowy; `hooki`: trzy warstwy hooka, 18 taktyk) |
 | `shared/calibration/` | kalibracja SOUL pod rodzinę modelu przy buildzie |
 | `shared/templates/` | szablony SOUL, skilla, evals i toolboxa (`make new-agent`) |
 | `security/redteam/` | promptfoo: prowider, config, scenariusze ataków |

@@ -56,7 +56,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`profiles/_host/`](profiles/_host) | profil hosta: gateway z multipleksacją, trasy Telegrama, dispatcher kanbana |
 | [`shared/protocol/`](shared/protocol) | kontrakt zlecenia wstrzykiwany do każdego SOUL (karta: CEL, DoD, WYJŚCIA, GRANICE…) |
 | [`shared/security/deny.yaml`](shared/security/deny.yaml) | zakazy dla całej floty, dopinane do `approvals.deny` każdego profilu |
-| [`shared/skills/`](shared/skills) | skille własne wspólne dla kilku agentów (`graf-kodu` u Weba i Ręki, `transkrypcja-filmu` (tekst mowy z linku do filmu) u Sherlocka, Wideografa i Ręki) |
+| [`shared/skills/`](shared/skills) | skille własne wspólne dla kilku agentów (`graf-kodu` u Weba i Ręki, `transkrypcja-filmu` (tekst mowy z linku do filmu) u Sherlocka, Wideografa i Ręki, `hooki` (trzy warstwy hooka, 18 taktyk) u Studia, Wideografa i Ads) |
 | [`shared/calibration/`](shared/calibration) | kalibracja SOUL pod rodzinę modelu (przy buildzie) |
 | [`shared/templates/`](shared/templates) | szablony SOUL, skilla, evals i toolboxa (`make new-agent`) |
 | [`vendor/skills.lock.yaml`](vendor/skills.lock.yaml) | skille zewnętrzne przypięte do commitów (licencje w [docs/SOURCES.md](docs/SOURCES.md)) |

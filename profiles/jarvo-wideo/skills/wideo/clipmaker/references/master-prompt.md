@@ -16,14 +16,27 @@ wybierasz kandydatów, żeby rolki pokryły różne wątki, a nie pięć razy te
 | porażka i lekcja | przyznanie się do błędu, co z tego wyszło | „Straciłem pierwszy biznes przez jedną decyzję.” |
 | konkretna rada | krok, narzędzie, ustawienie, liczba do zapamiętania | „Ustaw to jedno pole, zanim wyślesz ofertę.” |
 | emocja | śmiech, wzruszenie, złość, zaskoczenie w głosie (wykrzyknienia, powtórzenia) | reakcja rozmówcy w pierwszej sekundzie |
+
+Typy mapują się na taktyki skilla `hooki`: teza pod prąd → pod prąd / wspólny wróg, liczba → liczba na start,
+historia → historia od środka, porażka → historia od środka / strata, rada → efekt / demonstracja,
+emocja → świadek, riposta → pytanie / domyślna odpowiedź. Wypowiedź z konkretnym doświadczeniem mówcy
+(„przejrzałem 400 kont”) → autorytet.
 | riposta / wymiana | szybka wymiana zdań, pytanie i celna odpowiedź | pytanie prowadzącego jako hook |
 
 ## 3. Budowa dobrej rolki
 - **Hook (0–3 s):** pierwsze zdanie otwiera pętlę ciekawości albo stawia tezę. Bez wstępów („no więc”, „jak już
   mówiłem”, „wracając do…”), bez zaimków bez odniesienia na starcie („on wtedy…”, „to jest…”).
+  Hook rolki ma **trzy warstwy** (skill `hooki`) i każda mówi co innego:
+  - **zdanie mówione** = pierwsze zdanie fragmentu (wybierasz, nie piszesz),
+  - **obraz** = pierwsza klatka: twarz w emocji, gest, rzecz pokazywana w ręku; nie mówca w pół mrugnięcia,
+  - **tytuł-hook** na ekranie **nie powtarza** zdania mówionego: dokłada stawkę, wywołuje odbiorcę albo nazywa
+    konflikt (mówca: „Trzy błędy w cenach…” → tytuł „Tracisz marżę?”, nie „3 błędy w cenach”).
+    `klipy.py sprawdz` ostrzega, gdy tytuł powtarza pierwsze sekundy mowy.
+  Każdemu kandydatowi nadajesz **taktykę** z tabeli 18 taktyk (`taktyka` w planie); wśród wybranych rolek ≥ 3 różne.
   Najlepsze zdanie jest w środku fragmentu? Wolno zacząć od niego (segment 1 = to zdanie, segment 2 = rozwinięcie),
   **jeśli sens się nie zmienia** i oba segmenty są z tego samego wątku.
-- **Środek:** konkret (liczba, przykład, obraz), jedna myśl. Dygresje wycinasz segmentami (do 3 segmentów).
+- **Środek:** konkret (liczba, przykład, obraz), jedna myśl. Pierwsze ~15 s rozwija przesłankę hooka
+  (widz zatrzymany na „przestałem wysyłać raporty” zostaje dla „dlaczego”), a nie skacze do innego wątku. Dygresje wycinasz segmentami (do 3 segmentów).
 - **Koniec:** puenta, wniosek albo zdanie domykające; nigdy urwane w pół zdania. Świetnie, gdy koniec zachęca do
   obejrzenia jeszcze raz albo do komentarza.
 - **Długość:** 20–60 s; domyślnie 25–45 s. Krócej, gdy myśl jest skończona; dłużej tylko przy historii, która trzyma.
@@ -65,5 +78,6 @@ Do rolki trafia kandydat ze **średnią ≥ 7 i hookiem ≥ 7**. Za mało takich
 - **Kadr:** twarz mówcy w górnej połowie kadru pionowego (fy ~0,35–0,45), oczy mniej więcej na 1/3 wysokości.
 
 ## 7. Zapis
-`KANDYDACI.md`: mapa tematów + tabela kandydatów (od–do, typ, hook, oceny, dlaczego / dlaczego odpada).
+`KANDYDACI.md`: mapa tematów + tabela kandydatów (od–do, typ, taktyka, hook: zdanie + tytuł + pierwsza klatka,
+oceny, dlaczego / dlaczego odpada).
 `plan.json`: wybrane rolki (schemat: `plan.md`). Potem `klipy.py sprawdz`.
