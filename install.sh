@@ -67,7 +67,10 @@ sudo_check() {   # hasło administratora raz, na początku; kolejne sudo (pakiet
   [[ -n $SUDO ]] || return 0
   if [[ $DRY != 1 ]] && $SUDO -n true 2>/dev/null; then return 0; fi   # uprawnienia już zapamiętane (albo NOPASSWD)
   say "Potrzebne hasło administratora (sudo), zwykle tylko raz:"
-  run $SUDO -v || die "sudo nie przyjęło hasła albo $(id -un) nie ma uprawnień sudo."
+  if ! run $SUDO -v; then
+    [[ $OS == wsl ]] && die "sudo nie przyjęło hasła. W WSL to hasło użytkownika Linuksa $(id -un) ustawione przy pierwszym uruchomieniu Ubuntu, nie hasło ani PIN Windowsa. Nie pamiętasz? W PowerShellu: wsl -u root passwd $(id -un)   (albo uruchom instalator z PowerShella: irm …/install.ps1 | iex, wtedy hasło nie jest potrzebne)."
+    die "sudo nie przyjęło hasła albo $(id -un) nie ma uprawnień sudo."
+  fi
 }
 
 detect_os() {

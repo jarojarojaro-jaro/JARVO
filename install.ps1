@@ -3,7 +3,8 @@
 #   irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
 #
 # Jarvo działa w Dockerze przez WSL2. Skrypt sprawdza WSL i Docker Desktop, a potem uruchamia
-# ten sam instalator co na Linuksie (install.sh) wewnątrz domyślnej dystrybucji WSL.
+# ten sam instalator co na Linuksie (install.sh) wewnątrz domyślnej dystrybucji WSL. Hasła Linuksa nie trzeba:
+# na czas instalacji użytkownik WSL dostaje sudo bez hasła (przez wsl -u root), zabierane zaraz po niej.
 $ErrorActionPreference = "Stop"
 $Base = if ($env:JARVO_INSTALL_BASE) { $env:JARVO_INSTALL_BASE } else { "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main" }
 
@@ -34,8 +35,25 @@ if ($LASTEXITCODE -ne 0) {
   Die "Docker nie odpowiada w WSL. Uruchom Docker Desktop i włącz Settings → Resources → WSL integration dla swojej dystrybucji."
 }
 
-# 3. Ten sam instalator co na Linuksie, w WSL (pytania o dostawcę modeli pojawią się tutaj)
+# 3. Ten sam instalator co na Linuksie, w WSL (pytania o dostawcę modeli pojawią się tutaj).
+# Hasło Linuksa w WSL to NIE hasło Windowsa i ludzie go nie pamiętają. Windows i tak wchodzi do WSL jako root
+# bez hasła (wsl -u root), więc na czas instalacji dajemy użytkownikowi sudo bez hasła i zabieramy je na końcu.
+$User = ((wsl.exe -e sh -c "id -un") | Out-String).Trim()
+$Drop = "/etc/sudoers.d/zz-jarvo-install"
+$DropTmp = "/etc/sudoers.d/.zz-jarvo-install.tmp"
+$Granted = $false
+if ($User -and $User -ne "root") {
+  wsl.exe -u root -e sh -c "printf '%s ALL=(ALL) NOPASSWD: ALL\n' '$User' > $DropTmp && chmod 440 $DropTmp && visudo -cf $DropTmp >/dev/null && mv $DropTmp $Drop"
+  if ($LASTEXITCODE -eq 0) { $Granted = $true }
+  else { Say "Nie udało się dać tymczasowych uprawnień: instalator zapyta o hasło Linuksa w WSL (nie Windowsa)." }
+}
 Say "Uruchamiam instalator w WSL…"
-wsl.exe -e bash -lc "curl -fsSL '$Base/install.sh' | bash"
-if ($LASTEXITCODE -ne 0) { Die "Instalacja się nie udała (log powyżej)." }
+$Code = 1
+try {
+  wsl.exe -e bash -lc "curl -fsSL '$Base/install.sh' | bash"
+  $Code = $LASTEXITCODE
+} finally {
+  if ($Granted) { wsl.exe -u root -e rm -f $Drop $DropTmp }
+}
+if ($Code -ne 0) { Die "Instalacja się nie udała (log powyżej; pełny: ~/jarvo-local/install.log w WSL)." }
 Start-Process "http://localhost:9119/base"
