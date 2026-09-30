@@ -1,0 +1,36 @@
+agent: jarvo-lowca
+
+tools:
+  - name: krs-api
+    source: https://api-krs.ms.gov.pl (Ministerstwo Sprawiedliwości)
+    license: dane publiczne (rejestr jawny)
+    version: "api"
+    install: {method: none, spec: "HTTP, bez klucza"}
+    integration: skill-script
+    used_by_skills: [sygnaly, kontakt-firmy, monitoring-leadow]
+    healthcheck: "python3 -c \"import urllib.request; urllib.request.urlopen('https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/0000019193?rejestr=P&format=json', timeout=20)\""
+    autonomy: A0
+    optional: true
+    notes: "krs.py: odpisy i dzienny biuletyn wpisów. Nazwiska zarządu API maskuje."
+  - name: e-zamowienia-bzp
+    source: https://ezamowienia.gov.pl/mo-board/api/v1/notice (Urząd Zamówień Publicznych)
+    license: dane publiczne
+    version: "api v1"
+    install: {method: none, spec: "HTTP, bez klucza"}
+    integration: skill-script
+    used_by_skills: [sygnaly, monitoring-leadow]
+    healthcheck: "python3 /opt/jarvo/repo/profiles/jarvo-lowca/scripts/przetargi.py sprawdz bzp"
+    autonomy: A0
+    optional: true
+    notes: "przetargi.py bzp: ogłoszenia i wyniki ze zwycięzcą. Odcina za serię ciężkich zapytań: pauza 4 s, dzień dzielony na województwa."
+  - name: ted-api
+    source: https://api.ted.europa.eu/v3 (Urząd Publikacji UE)
+    license: dane publiczne (reuse EU)
+    version: "v3"
+    install: {method: none, spec: "HTTP, bez klucza"}
+    integration: skill-script
+    used_by_skills: [sygnaly, monitoring-leadow]
+    healthcheck: "python3 /opt/jarvo/repo/profiles/jarvo-lowca/scripts/przetargi.py sprawdz ted"
+    autonomy: A0
+    optional: true
+    notes: "przetargi.py ted: ogłoszenia unijne z CPV."

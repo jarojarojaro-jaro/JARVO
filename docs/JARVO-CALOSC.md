@@ -44,7 +44,7 @@ Poziomy autonomii: **A0** odczyt · **A1** szkice we własnym workspace · **A2*
 
 ---
 
-## 2. Flota agentów (7 profili)
+## 2. Flota agentów (8 profili)
 
 Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady), `config.yaml`
 (model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja.
@@ -57,9 +57,17 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, copy PL, kampanie, kalendarze | Atelier kreatywne (`atelier`) | studio | 6 |
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, filmy z kodu, maskotka | Studio filmowe (`filmstudio`) | wideo | 15 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem | Sala operacyjna (`office`) | ads | 10 |
+| 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 6 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | Warsztat (`workshop`) | reka | 4 |
 
-### 2a. jarvo-ads — szczegóły (najnowszy)
+### 2a. jarvo-lowca — szczegóły (najnowszy)
+Łowca leadów B2B z oficjalnych, darmowych źródeł: KRS (API MS: biuletyn dnia i odpisy; nazwiska zarządu maskowane),
+e-Zamówienia BZP (ogłoszenia i wyniki ze zwycięzcą), TED, strony firm (`robots.txt`, uczciwy UA), wyszukiwarka.
+Ocena: dopasowanie do `ICP.yaml` → świeżość → siła; kontakt tylko opublikowany przez firmę albo rejestr, ze źródłem;
+przypomnienie o zgodzie na informację handlową (UŚUDE, PKE) i RODO w każdej liście. Skrypty: `krs.py`, `przetargi.py`,
+`strona.py`, `leady.py`. Projekt: [LEADY.md](LEADY.md).
+
+### 2a'. jarvo-ads — szczegóły
 Specjalista Ads Managera dla **Meta (FB/IG) i Google**. Planuje kampanie, robi testy (jedna reklama,
 A/B, A/B/C), audytuje konta, optymalizuje i raportuje. Wyniki liczy **statystyką bayesowską**
 (P(best)). 10 skilli: `plan-kampanii`, `plan-testu`, `start-kampanii`, `podlacz-konto`, `audyt-konta`,
@@ -134,7 +142,7 @@ przez `JARVO_MODEL_PROVIDER` + `JARVO_MODEL_FRONTIER/STRONG/FAST` (i `JARVO_MODE
 
 Plugin dashboardu Hermesa (`hq/`): budynek z pokojami agentów (pixel art), minifigurki, dymki
 „co każdy robi teraz”, podgląd pracy na żywo, wyniki, decyzje i czat z Jarvem albo dowolnym agentem.
-Pokoje: bridge, study, devlab, atelier, filmstudio, workshop, office. Sesje klikalne (Historia
+Pokoje: bridge, study, devlab, atelier, filmstudio, workshop, office, radar. Sesje klikalne (Historia
 domyślnie). Czat obsługuje zdjęcia i pliki w obie strony. Linki „Odpal” (podgląd) i „Pokaż w folderze”.
 Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
 
@@ -142,7 +150,7 @@ Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo bui
 
 ## 6. Bezpieczeństwo (Skarbiec-design + red team)
 
-- **Red team na promptfoo** (`security/redteam/`): 12 ataków na agentów, świeża sesja per atak,
+- **Red team na promptfoo** (`security/redteam/`): 14 ataków na agentów, świeża sesja per atak,
   wykrywanie wycieków. Ostatni stan: **12/12 odpartych** po uszczelnieniu.
 - **Deny dla całej floty** (`shared/security/deny.yaml`, mergowane do każdego profilu): blokada zmiany
   własnej konfiguracji (`hermes config set/...`), kasowania danych floty (`rm -r /opt/data/...`),

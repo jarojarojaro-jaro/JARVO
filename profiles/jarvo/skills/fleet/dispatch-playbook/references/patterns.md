@@ -37,6 +37,13 @@ Publikacja = decyzja użytkownika (A2), potem Studio ustawia kolejkę.
 Nagranie użytkownika (📎) albo długi materiał: jedna karta `jarvo-wideo` (montaż / klipy), bez researchu.
 Decyzje przed rozdaniem tylko, gdy zmieniają wynik: platforma/format, długość, głos (M/K), muzyka marki.
 
-## 7. Szybkie zadanie (pojedyncze)
+## 7. Leady → pierwsza wiadomość
+1. `jarvo-lowca` / `leady`: ICP (oferta, kogo szukamy, region) → sygnały z KRS, przetargów, stron firm → ranking z
+   „dlaczego teraz” i kontaktem, który firma sama opublikowała (`LEADY.md`, `leady.csv`).
+2. Jarvo → decyzja użytkownika: do których firm pisać (domyślnie top 10).
+3. opcjonalnie `jarvo-studio` / `wiadomosci` (parents: leady): szkic pierwszej wiadomości na firmę (`copy-pl`), z „dlaczego teraz”.
+Wysyłka = decyzja człowieka (A2); agent niczego nie wysyła. Monitoring (rutyna) tylko za zgodą użytkownika.
+
+## 8. Szybkie zadanie (pojedyncze)
 Jedna karta dla właściwego agenta, bez MISSION.md (tylko wpis w INDEX.md z ID `Z-…`).
 Przykłady: „zrób favicon z tego logo”, „sprawdź, czy ta informacja jest prawdziwa”, „przerób ten PDF na DOCX”.

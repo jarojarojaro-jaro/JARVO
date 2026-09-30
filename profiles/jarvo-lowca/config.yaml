@@ -1,0 +1,66 @@
+# jarvo-lowca: łowca leadów (sygnały zakupowe z oficjalnych źródeł). Tokeny @@...@@ podstawia scripts/build.py.
+model:
+  provider: "@@PROVIDER@@"
+  default: "@@MODEL@@"
+
+agent:
+  reasoning_effort: low
+  max_turns: 250
+
+timezone: "@@TIMEZONE@@"
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  nudge_interval: 12
+
+skills:
+  creation_nudge_interval: 20
+
+web:
+  search_backend: searxng
+
+platform_toolsets:
+  cli: [terminal, file, web, browser, delegation, memory, skills, todo, session_search]
+  telegram: [terminal, file, web, browser, delegation, memory, skills, todo, session_search, clarify]
+  api_server: [terminal, file, web, browser, delegation, memory, skills, todo, session_search]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
+  cron: [terminal, file, memory, skills]
+
+terminal:
+  backend: local
+  cwd: "@@WORKSPACES_DIR@@/jarvo-lowca"
+  timeout: 600
+
+browser:
+  backend: "off"
+  engine: lightpanda
+  inactivity_timeout: 120
+
+stt:
+  provider: local_command
+  language: pl
+
+delegation:
+  model: "@@DELEGATION_MODEL@@"
+  provider: "@@PROVIDER@@"
+  max_concurrent_children: 2
+
+approvals:
+  mode: smart
+  timeout: 300
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+  smart_policy: >-
+    Always ESCALATE: sending e-mails or messages, logging into any website, buying or downloading contact databases,
+    scraping LinkedIn or other sites behind a login, bypassing robots.txt, rate limits or bot protection.
+  deny:
+    - "rm -rf /*"
+    - "* | sh"
+    - "* | bash"
+
+security:
+  protected_instruction_files: true
+
+display:
+  skin: jarvo

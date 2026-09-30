@@ -1,6 +1,6 @@
 # Łowca leadów: sygnały zakupowe → lista firm z „dlaczego teraz” (projekt)
 
-> Stan: **zaakceptowany (2026-09-30), w budowie** (§6). Właściciel: `jarvo-lowca` („Łowca”).
+> Stan: **zaakceptowany (2026-09-30), agent aktywny; czeka na pierwszy przebieg** (§6). Właściciel: `jarvo-lowca` („Łowca”).
 > Decyzje użytkownika: osobny agent; **źródła oficjalne i darmowe** (płatne API tylko na własnych kluczach); kontakt =
 > dane, które firma **sama opublikowała** (strona, rejestr), zawsze ze źródłem; agent niczego nie wysyła.
 
@@ -73,7 +73,8 @@ Nazwiska członków zarządu API KRS maskuje (`D***`), więc osoba kontaktowa po
 ## 4. Ocena
 
 Najpierw **dopasowanie** (brak dopasowania = brak wiersza), potem **świeżość** (sygnał sprzed tygodnia bije sygnał
-sprzed kwartału), potem **siła** (dwa niezależne sygnały na jednej firmie biją jeden). Wagi i okna czasowe są w
+sprzed kwartału), potem **siła** (dwa niezależne sygnały na jednej firmie biją jeden); przy remisie wyżej firma z
+opublikowanym kontaktem. Wagi i okna czasowe są w
 `ICP.yaml`, więc wynik da się odtworzyć i poprawić. Każdy wiersz ma powód w słowach użytkownika.
 
 ## 5. Pliki
@@ -93,5 +94,6 @@ out/leady/<projekt>/
 2. ✅ Skrypty `krs.py`, `przetargi.py`, `strona.py`, `leady.py` (+ `lowca_lib.py`) z testami offline; sprawdzone
    na żywych źródłach w kontenerze. e-Zamówienia odcina za kilka ciężkich zapytań z rzędu (strona „Dostęp
    zablokowany”): pauza 4 s na zapytanie, pełny dzień dzielony na województwa, blokada = stop. Pokój „Radar” w HQ.
-3. ⬜ Profil `jarvo-lowca`: SOUL, 6 skilli, rubryka, evals, pokój „Radar” w HQ, dokumentacja floty.
+3. ✅ Profil `jarvo-lowca`: SOUL, 6 skilli, rubryka, 12 scenariuszy evals, dokumentacja floty; wzorzec misji „Leady”
+   u Jarva, temat `Łowca` na Telegramie (`TELEGRAM_TOPIC_LOWCA`).
 4. ⬜ Pierwszy prawdziwy przebieg na ofercie użytkownika i poprawki wag.

@@ -209,7 +209,7 @@ agents:
       hq_label: "Sales radar"
       description: >-
         Finds B2B leads from buying signals in official sources: new companies in the KRS register, public tenders (e-Zamówienia, TED) and their winners, job ads, technology and changes on company websites, news. Ideal customer profile, qualification, a ranked list of companies with "why now", contacts the company published itself (with the source), monitoring for new leads. Never sends anything.
-    status: planned
+    status: active
 
   - name: jarvo-reka
     kind: generalist

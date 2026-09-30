@@ -7,7 +7,8 @@
     leady.py ocen <projekt> [--top 30] [--monitoring]     # leady.csv + LEADY.md; --monitoring: tylko nowe względem baza.json
 
 <projekt> = katalog z ICP.yaml (np. out/leady/nova-www). Ocena: najpierw dopasowanie do ICP (brak = brak wiersza),
-potem świeżość (waga sygnału maleje liniowo do zera w oknie dni), potem siła (dwa różne typy sygnałów > jeden).
+potem świeżość (waga sygnału maleje liniowo do zera w oknie dni), potem siła (dwa różne typy sygnałów > jeden);
+przy remisie wyżej firma z opublikowanym kontaktem.
 Kontakty tylko opublikowane przez firmę albo rejestr, każdy ze źródłem; skrypt niczego nie wysyła.
 """
 
@@ -70,21 +71,28 @@ def klucz(firma: dict) -> str:
 
 
 def cmd_dodaj(projekt: Path, pliki: list[str]) -> int:
+    """Scala sygnały w `sygnaly.jsonl` projektu. Surowe wiersze zapisane wprost do tego pliku (`-o …/sygnaly.jsonl`)
+    też są przyjmowane: dostają klucz firmy i przechodzą deduplikację, jak z osobnego pliku."""
     cel = projekt / "sygnaly.jsonl"
-    znane = {(s["_klucz"], s["typ"], s.get("zrodlo")) for s in ll.czytaj_jsonl(str(cel))}
-    nowe = []
-    for plik in pliki:
+    wiersze, znane, nowe = [], set(), 0
+    zrodla = [str(cel)] + [p for p in pliki if Path(p).resolve() != cel.resolve()]
+    for i, plik in enumerate(zrodla):
         for s in ll.czytaj_jsonl(plik):
             if not s.get("typ") or not s.get("firma"):
                 print(f"! pominięty wiersz bez typu albo firmy w {plik}", file=sys.stderr)
                 continue
-            s["_klucz"] = klucz(s["firma"])
+            surowy = "_klucz" not in s
+            s["_klucz"] = s.get("_klucz") or klucz(s["firma"])
             k = (s["_klucz"], s["typ"], s.get("zrodlo"))
             if k not in znane:
                 znane.add(k)
-                nowe.append(s)
-    ll.zapisz_jsonl(nowe, str(cel))
-    print(f"✓ {cel}: +{len(nowe)} sygnałów")
+                wiersze.append(s)
+                nowe += i > 0 or surowy
+    projekt.mkdir(parents=True, exist_ok=True)
+    tmp = cel.with_suffix(".jsonl.tmp")
+    tmp.write_text("".join(json.dumps(w, ensure_ascii=False) + "\n" for w in wiersze), encoding="utf-8")
+    tmp.replace(cel)
+    print(f"✓ {cel}: +{nowe} sygnałów (razem {len(wiersze)})")
     return 0
 
 
@@ -180,7 +188,7 @@ def ocen_firmy(sygnaly: list[dict], kontakty: dict, powody: dict, icp: dict, dzi
             "email": e.get("email"), "email_rodzaj": e.get("rodzaj"), "email_zrodlo": e.get("zrodlo"),
             "telefon": ((kt.get("telefony") or [{}])[0]).get("numer"), "formularz": kt.get("formularz"),
         })
-    out.sort(key=lambda r: (-r["ocena"], r["nazwa"] or ""))
+    out.sort(key=lambda r: (-r["ocena"], not (r["email"] or r["telefon"] or r["formularz"]), r["nazwa"] or ""))   # remis: z kontaktem wyżej
     return out
 
 

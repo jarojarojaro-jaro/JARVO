@@ -1,13 +1,13 @@
 # Flota Jarvo: specyfikacja agentów v1
 
-Flota: **Main Judge + 6 agentów**. Każdy agent to osobny profil Hermesa
+Flota: **Main Judge + 7 agentów**. Każdy agent to osobny profil Hermesa
 (osobna dystrybucja w `profiles/<nazwa>/`). Rejestr maszynowy jest w [`fleet.yaml`](../fleet.yaml).
 
 Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prompt, workflowy,
 knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
 każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
 
-**Stan: wszystkie siedem profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
+**Stan: wszystkie osiem profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
@@ -17,6 +17,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 24 (marketingskills, Anthropic, Hermes, impeccable, wspólny `hooki`) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [15 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 57 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy (+ wideo_lib) | [22](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [12](../evals/jarvo-ads/scenarios.yaml) |
+| `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [6 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 0 | krs, przetargi, strona, leady | [12](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 4 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [11](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -34,6 +35,7 @@ Legenda przy skillach:
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja = A2) |
 | `jarvo-ads` | Specjalista Ads: Meta Ads i Google Ads, kampanie, testy, raporty | snajper | A1 (szkice PAUSED; wydatek = A2 z kodem Skarbca) |
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
+| `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
 | `jarvo-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
 ---
@@ -74,6 +76,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Post, grafika, kreacja reklamy, copy, content | `jarvo-studio` |
 | Reklama płatna, Meta Ads, Google Ads, budżet, wyniki kampanii | `jarvo-ads` |
 | Film, reels, short, montaż, napisy, lektor, klipy | `jarvo-wideo` |
+| Leady, nowi klienci, „komu sprzedać”, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
 
@@ -266,6 +269,19 @@ Meta Ads i Google Ads od planu kampanii po raport: stawianie kampanii, codzienna
 optymalizacja w zatwierdzonej kopercie budżetu,
 wnioski dla Studia i Wideografa. Pieniędzy pilnuje **Skarbiec**, osobny kontener z tokenem Meta, polityką
 i kodami zgody, więc agent nie może wydać złotówki bez Ciebie. Pełny projekt: [ADS.md](ADS.md).
+
+---
+
+## `jarvo-lowca`: Łowca leadów
+
+Szuka firm, dla których teraz jest dobry moment na rozmowę: nowe spółki w KRS (PKD i region z profilu klienta),
+przetargi w BZP i TED (zamawiający kupuje to, co sprzedajesz; zwycięzca potrzebuje wykonawców), oferty pracy,
+technologia i zmiany na stronach firm, newsy. Oddaje ranking z „dlaczego teraz”, źródłem sygnału i kontaktem, który
+firma sama opublikowała; monitoring pokazuje tylko nowe firmy. Tylko źródła oficjalne i publiczne, bez LinkedIna
+i baz kupionych, niczego nie wysyła. Pełny projekt: [LEADY.md](LEADY.md).
+
+**Skille:** [T] `profil-klienta`, `sygnaly` (+ tabela źródeł i przepisów), `kwalifikacja`, `kontakt-firmy`,
+`lista-leadow`, `monitoring-leadow`. Skrypty: `krs.py`, `przetargi.py`, `strona.py`, `leady.py`.
 
 ---
 

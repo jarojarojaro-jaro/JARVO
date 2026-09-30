@@ -3,6 +3,7 @@
 
     przetargi.py bzp --od 2026-09-22 [--do 2026-09-29] [--cpv 72,48] [--woj PL14,ŚLĄSKIE] [--wyniki] [--szukaj "strona www"] [-o sygnaly.jsonl]
     przetargi.py ted --od 2026-09-01 [--do …] [--cpv 72] [--kraj POL] [-o sygnaly.jsonl]
+    przetargi.py sprawdz bzp|ted                            # healthcheck: jedno małe zapytanie, kod 3 = blokada
 
 BZP `--wyniki`: ogłoszenia o udzieleniu zamówienia, a firmą-sygnałem jest **zwycięzca** (NIP, miasto): właśnie dostał
 pracę do wykonania, więc potrzebuje podwykonawców, sprzętu, ludzi. Bez `--wyniki`: ogłoszenia o zamówieniu, a
@@ -132,6 +133,22 @@ def ted(od: str, do: str, cpv: list[str], kraj: str) -> list[dict]:
     return out
 
 
+def sprawdz(zrodlo: str) -> str:
+    """Jedno najmniejsze zapytanie bez pamięci (healthcheck): czy źródło odpowiada danymi, a nie stroną blokady."""
+    if zrodlo == "bzp":
+        wczoraj = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        lista = ll.json_z(f"{BZP}?NoticeType=ContractNotice&PublicationDateFrom={wczoraj}&PublicationDateTo={wczoraj}"
+                          "&PageSize=1&OrganizationProvince=PL14", pamiec_h=0, timeout=30)
+        if not isinstance(lista, list):
+            raise ConnectionError("BZP: odpowiedź bez listy ogłoszeń")
+        return f"BZP odpowiada ({len(lista)} ogłoszenie z {wczoraj})"
+    kod, tresc = ll.http(TED, metoda="POST", dane={"query": "buyer-country=POL", "limit": 1, "fields": ["publication-number"]},
+                         pamiec_h=0, timeout=30)
+    if kod != 200 or "notices" not in tresc[:200]:
+        raise ConnectionError(f"TED {kod}: {tresc[:200]}")
+    return "TED odpowiada"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -148,7 +165,19 @@ def main(argv: list[str] | None = None) -> int:
             s.add_argument("--szukaj", help="fraza w przedmiocie albo treści ogłoszenia")
         else:
             s.add_argument("--kraj", default="POL")
+    s = sub.add_parser("sprawdz", help="healthcheck: jedno małe zapytanie do źródła")
+    s.add_argument("zrodlo", choices=("bzp", "ted"))
     a = ap.parse_args(argv)
+    if a.cmd == "sprawdz":
+        try:
+            print(f"✓ {sprawdz(a.zrodlo)}")
+            return 0
+        except ll.Blokada as e:
+            print(f"✗ blokada: {e}", file=sys.stderr)
+            return 3
+        except ConnectionError as e:
+            print(f"✗ {e}", file=sys.stderr)
+            return 1
     cpv = [c.strip() for c in (a.cpv or "").split(",") if c.strip()]
     try:
         if a.cmd == "bzp":

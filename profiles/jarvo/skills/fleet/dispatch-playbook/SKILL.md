@@ -75,6 +75,7 @@ kanban_create(
 | **Kampania** | sherlock (grupa docelowa, konkurencja) → studio (pakiet + brief wideo) → wideo (filmy) → reka (złożenie + kalendarz) |
 | **Film** | [sherlock (fakty), gdy film podaje liczby] → wideo (film, warianty, montaż, klipy) |
 | **Nowa marka / brand kit** | web (brand z URL) → studio (weryfikacja tonu i wizualiów) |
+| **Leady** | lowca (ICP → sygnały → ranking z kontaktem) → [decyzja użytkownika, do kogo] → studio (szkic wiadomości, opcjonalnie) |
 
 **Karta „złożenie”** (dla misji z ≥2 agentami): `assignee="jarvo-reka"`, `parents` = wszystkie karty merytoryczne,
 cel: jeden pakiet w `@@MISSIONS_DIR@@/<MISJA>/zlozenie/out/` (INDEX.md z opisem i ścieżkami, bez przerabiania treści).

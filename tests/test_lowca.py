@@ -96,6 +96,21 @@ def test_tenders(monkeypatch):
     assert len(zapytania) == 1 + len(ll.WOJ)                                     # pełny dzień dzielony na województwa
 
 
+
+def test_tender_healthcheck(monkeypatch, capsys):
+    monkeypatch.setattr(ll, "json_z", lambda url, **kw: [] if kw.get("pamiec_h") == 0 and "PageSize=1" in url else None)
+    assert przetargi.main(["sprawdz", "bzp"]) == 0 and "BZP odpowiada" in capsys.readouterr().out
+    monkeypatch.setattr(ll, "http", lambda url, **kw: (200, '{"notices": [], "totalNoticeCount": 0}'))
+    assert przetargi.main(["sprawdz", "ted"]) == 0
+
+    def blokada(url, **kw):
+        raise ll.Blokada("ezamowienia.gov.pl odmówił (200)")
+    monkeypatch.setattr(ll, "json_z", blokada)
+    assert przetargi.main(["sprawdz", "bzp"]) == 3                              # blokada = czerwony healthcheck
+    monkeypatch.setattr(ll, "http", lambda url, **kw: (500, "błąd"))
+    assert przetargi.main(["sprawdz", "ted"]) == 1
+
+
 HTML = {
     "https://firma.pl/robots.txt": "User-agent: *\nDisallow: /panel\n",
     "https://firma.pl": """<html><head><title>Firma – strony</title><meta name="description" content="Opis">
@@ -161,6 +176,10 @@ def test_leads_scoring_dedupe_and_monitoring(tmp_path):
     plik.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in (s1, s2, fund, slask, s1)), encoding="utf-8")
     assert leady.cmd_dodaj(p, [str(plik)]) == 0
     assert len(ll.czytaj_jsonl(str(p / "sygnaly.jsonl"))) == 4                   # duplikat s1 odrzucony
+    ll.zapisz_jsonl([s2, {**s2, "zrodlo": "https://firma.pl/praca"}], str(p / "sygnaly.jsonl"))   # surowe wprost do bazy
+    assert leady.cmd_dodaj(p, [str(p / "sygnaly.jsonl")]) == 0
+    baza = ll.czytaj_jsonl(str(p / "sygnaly.jsonl"))
+    assert len(baza) == 5 and all(s.get("_klucz") for s in baza)               # duplikat s2 odrzucony, nowy z kluczem
     leady.cmd_ocen(p, top=10, monitoring=True, dzis=dt.date(2026, 9, 30))
     rows = list(csv.DictReader((p / "leady.csv").open(encoding="utf-8")))
     assert [r["klucz"] for r in rows] == ["nip:9522290390"]                      # fundacja wykluczona, śląskie poza ICP

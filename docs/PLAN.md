@@ -87,14 +87,14 @@ Zasady:
                           │  kanban (orkiestrator)       │     zleca specjalistom
                           └──────────────┬───────────────┘
                                          │ kanban_create / delegate_task
-        ┌─────────────┬─────────────┬────┴────────┬─────────────┬─────────────┐
-        ▼             ▼             ▼             ▼             ▼             ▼
- jarvo-sherlock   jarvo-web   jarvo-studio   jarvo-wideo    jarvo-ads    jarvo-reka
-   (research)     (strony)      (kreacja)      (wideo)      (reklamy)   (prawa ręka)
-  SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille
-  własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć
-        ▲             ▲             ▲             ▲             ▲             ▲
-        └─────────────┴───────── rozmowa bezpośrednia ──────────┴─────────────┘
+        ┌─────────────┬─────────────┬────┴────────┬─────────────┬─────────────┬─────────────┐
+        ▼             ▼             ▼             ▼             ▼             ▼             ▼
+ jarvo-sherlock   jarvo-web   jarvo-studio   jarvo-wideo    jarvo-ads   jarvo-lowca    jarvo-reka
+   (research)     (strony)      (kreacja)      (wideo)      (reklamy)     (leady)    (prawa ręka)
+  SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille
+  własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć
+        ▲             ▲             ▲             ▲             ▲             ▲             ▲
+        └─────────────┴───────────────── rozmowa bezpośrednia ──────────────┴─────────────┘
                (alias CLI, Bot Chat w desktopie, własny temat na Telegramie)
 
   Wspólne warstwy (dla wszystkich profili):
@@ -223,7 +223,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - 🟡 `jarvo-ads` (reklamy Meta i Google): SOUL, 10 skilli, skrypty, rubryka, 12 scenariuszy evals; bez kluczy ([ADS.md](ADS.md)).
 - 🟡 Clipmaker Wideografa: długie nagranie → edytowalne rolki (kadr z focusem, napisy karaoke, `klipy.py`); kroki 1–4 gotowe, krok 5: test na prawdziwym nagraniu ([KLIPY.md](KLIPY.md)).
 - ⬜ Skarbiec: sejf tokenów reklamowych, koperty zatwierdzane kodem, STOP ([ADS.md](ADS.md)).
-- 🟡 Łowca leadów `jarvo-lowca`: sygnały z KRS, przetargów, stron firm → lista firm z „dlaczego teraz” i opublikowanym kontaktem ([LEADY.md](LEADY.md)).
+- 🟡 Łowca leadów `jarvo-lowca`: SOUL, 6 skilli, skrypty (KRS, BZP, TED, strony firm), rubryka, 12 scenariuszy evals; sygnały → lista firm z „dlaczego teraz” i opublikowanym kontaktem; brak pierwszego przebiegu na prawdziwej ofercie ([LEADY.md](LEADY.md)).
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
@@ -237,7 +237,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Evals na stagingu (`scripts/evals-staging.sh`), sędzia LLM + sprawdzenia deterministyczne.
 - ✅ Koszty: poziomy modeli w `fleet.yaml` i `reasoning_effort` per agent; przy presecie `openrouter` osobny klucz z limitem na agenta.
 - ✅ Bezpieczeństwo: zgody (A2 tylko z człowiekiem, praca bez nadzoru = odmowa), sekrety tylko w `.env`, Tailscale.
-- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 12 ataków) i wspólne zakazy floty
+- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 14 ataków) i wspólne zakazy floty
   (`shared/security/deny.yaml`).
 - ⬜ Przegląd kosztów po 2 tygodniach, korekta poziomów modeli.
 
@@ -299,7 +299,7 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
 
 ## 8. Flota v1
 
-Siedem profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędziego) jest w
+Osiem profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędziego) jest w
 [FLEET.md](FLEET.md), a rejestr maszynowy w [`fleet.yaml`](../fleet.yaml).
 
 | Profil | Rola |
@@ -310,6 +310,7 @@ Siedem profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędzie
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media |
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy, wideo AI |
 | `jarvo-ads` | Specjalista Ads: Meta i Google Ads, kampanie, testy A/B/C, raporty; wydaje tylko w kopercie z kodem |
+| `jarvo-lowca` | Łowca leadów: sygnały zakupowe z oficjalnych źródeł → ranking firm z „dlaczego teraz” i kontaktem; niczego nie wysyła |
 | `jarvo-reka` | Prawa ręka: generalista, który wykonuje i ogarnia wszystko |
 
 Kolejni specjaliści dojdą później, każdy według tego samego kontraktu.
