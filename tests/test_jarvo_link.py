@@ -34,3 +34,19 @@ def test_link_for_page_and_refusal(tmp_path, monkeypatch, capsys):
     assert tl.core.link_root(tl.core.LINKS_FILE, token, 0) == (out.parents[1]).resolve()
     assert tl.main([str(tmp_path / "secret.env")]) == 1
     assert "poza" in capsys.readouterr().err
+
+
+def test_link_works_from_agent_profile_home(tmp_path, monkeypatch, capsys):
+    """Dispatcher uruchamia wykonawcę z HERMES_HOME=<root>/profiles/<agent>; dane floty i tak są w <root>/jarvo."""
+    monkeypatch.delenv("JARVO_DATA_DIR", raising=False)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-wideo"))
+    monkeypatch.setenv("JARVO_PREVIEW_URL", "http://100.64.0.7:9120")
+    spec = importlib.util.spec_from_file_location("jarvo_link_profil", REPO / "scripts" / "jarvo_link.py")
+    tl = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tl)
+    assert tl.core.JARVO_DIR == tmp_path / "jarvo"
+    film = tmp_path / "jarvo" / "workspaces" / "jarvo-wideo" / "karta" / "out" / "demo.mp4"
+    film.parent.mkdir(parents=True)
+    film.write_bytes(b"\0")
+    assert tl.main([str(film)]) == 0 and capsys.readouterr().out.strip().endswith("/demo.mp4")
+

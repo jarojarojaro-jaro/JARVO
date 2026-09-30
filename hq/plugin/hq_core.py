@@ -20,7 +20,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-HOME = Path(os.environ.get("HERMES_HOME", "/opt/data"))
+def _hermes_root(home: str) -> Path:
+    """Korzeń danych Hermesa. Wykonawca karty działa z HERMES_HOME profilu (`<root>/profiles/<agent>`), a dane floty
+    leżą w `<root>/jarvo`: bez tego jarvo_link.py uruchomiony przez agenta szukałby ich w katalogu profilu."""
+    h = Path(home)
+    return h.parent.parent if h.parent.name == "profiles" else h
+
+
+HOME = _hermes_root(os.environ.get("HERMES_HOME", "/opt/data"))
 JARVO_DIR = Path(os.environ.get("JARVO_DATA_DIR", str(HOME / "jarvo")))
 MISSIONS_INDEX = Path(os.environ.get("JARVO_MISSIONS_DIR", str(JARVO_DIR / "missions"))) / "INDEX.md"
 

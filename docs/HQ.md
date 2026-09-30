@@ -148,7 +148,8 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   strona wygenerowana przez agenta nie wykona skryptu w sesji dashboardu.
 - **▶ Odpal**: strona agenta idzie z osobnego portu 9120 (ten sam `JARVO_BIND_IP`), tylko pod adresem z losowym
   tokenem, który wydaje zalogowany dashboard albo agent (`scripts/jarvo_link.py`; wspólny plik
-  `state/preview-links.json`, ważny 7 dni, przetrwa restart). Nagłówek `CSP: sandbox` bez
+  `state/preview-links.json`, ważny 7 dni, przetrwa restart). Wykonawca karty działa z `HERMES_HOME` swojego profilu
+  (`/opt/data/profiles/<agent>`), więc `hq_core` wylicza z niego korzeń danych (`/opt/data/jarvo`). Nagłówek `CSP: sandbox` bez
   `allow-same-origin` daje stronie nieprzezroczyste pochodzenie: jej skrypty działają, ale nie czytają ciasteczek
   i nie wyślą ich do dashboardu. Nowa karta nie ma `window.opener`. Pliki ukryte, `..` i symlinki na zewnątrz: 404.
 - **Pokaż w folderze**: dashboard zapisuje tylko prośbę ze ścieżką (`state/reveal-request`); `scripts/updater.py`
