@@ -20,6 +20,7 @@ Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa 
 | [HQ.md](HQ.md) | Jarvo HQ: GUI floty (pokoje agentów, praca na żywo, czat) |
 | [ADS.md](ADS.md) | projekt agenta reklam płatnych `jarvo-ads` i Skarbca (strażnik budżetu) |
 | [LEADY.md](LEADY.md) | projekt Łowcy leadów: sygnały zakupowe z oficjalnych źródeł → lista firm z „dlaczego teraz” |
+| [WIEDZA.md](WIEDZA.md) | projekt skarbca wiedzy (drugi mózg floty): LLM Wiki w plikach Markdown, wtyczka `jarvo-wiedza`, zakładka „Wiedza” z grafem |
 | [VPS.md](VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring, wdrożenia |
 | [RUNBOOK.md](RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [SOURCES.md](SOURCES.md) | źródła, atrybucje i licencje |
@@ -214,7 +215,9 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 ### Faza 3: Pamięć i onboarding
 - ✅ Skill `onboarding-interview`: wywiad startowy → `knowledge/user/USER.md`.
 - ✅ MVP pamięci o Tobie: USER.md + pamięć użytkownika Jarva, kontekst przekazywany w kartach.
-- ⬜ Wspólny provider pamięci (Honcho self-host) po sprawdzeniu MVP w praktyce.
+- ⬜ **Skarbiec wiedzy (drugi mózg floty):** projekt w [WIEDZA.md](WIEDZA.md) (2026-09-30, do akceptacji): wzorzec LLM Wiki,
+  wtyczka `jarvo-wiedza` jako dostawca pamięci u wszystkich agentów, kompilacja tanim modelem, zakładka „Wiedza” z grafem.
+- ⬜ Wspólny provider pamięci (Honcho self-host) tylko jeśli skarbiec wiedzy okaże się za mały na wiedzę o Tobie.
 - ⬜ Zasady prywatności: co gdzie leży, co nigdy nie opuszcza serwera.
 
 ### Faza 4: Reszta floty v1, potem kolejni specjaliści
@@ -269,9 +272,10 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
     (program 300 MB, więc nie w obrazie), bez obserwatora i UI. Test na repo Jarvo: indeks ~7 s, pytanie ~5 s;
     trafność dobra przy zwykłych importach, błędy przy tych samych nazwach w różnych modułach i importach
     dynamicznych, stąd zasada „graf = wskazówka, potwierdź w pliku”.
-  - **Faza bazy wiedzy (Obsidian, osobno):** `AgriciDaniel/claude-obsidian` (MIT, skille Agent Skills → działają
-    w Hermesie; skarbiec = zwykłe pliki Markdown ze źródłami) jako rdzeń; do porównania `Graphify-Labs/graphify`
-    (Apache-2.0: graf kodu lokalnie, dokumenty/PDF/wideo przez model = tokeny).
+  - **Skarbiec wiedzy (drugi mózg): projekt rozpisany w [WIEDZA.md](WIEDZA.md)** (2026-09-30): wzorzec LLM Wiki
+    Karpathy'ego, wtyczka Hermesa `jarvo-wiedza` jako dostawca pamięci, zakładka „Wiedza” z grafem. `AgriciDaniel/claude-obsidian`
+    (MIT) **nie** jako rdzeń (WIEDZA.md, decyzja W9: 15 skilli i własny rdzeń dublują Hermesa), bierzemy z niego pomysły;
+    `Graphify-Labs/graphify` (Apache-2.0) bez zastosowania: graf kodu mamy w `graf-kodu`.
   - **Pomijamy:** `tobi/qmd` (MIT; tryb semantyczny pobiera 3 modele GGUF ~2 GB: za ciężko na VPS 8 GB),
     `garrytan/gbrain` (MIT; Bun, własny serwer, demon wzbogacania i płatne embeddingi: za ciężko),
     `thedotmack/claude-mem` (Apache-2.0; wtyczka Claude Code z workerem w tle, dubluje pamięć

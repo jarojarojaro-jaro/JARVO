@@ -212,7 +212,8 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 
 **Dokumenty:** PLAN (wizja/architektura/roadmapa), BOSS (mechanika Main Judge'a), FLEET (specyfikacja
 agentów), PROFILE-SPEC (anatomia agenta: 10 warstw), TOOLBOX (narzędzia open-source), VPS (infra),
-HQ (dashboard), ADS (projekt agenta reklam + Skarbiec), RUNBOOK (wdrożenie krok po kroku),
+HQ (dashboard), ADS (projekt agenta reklam + Skarbiec), LEADY (Łowca leadów), KLIPY (clipmaker),
+WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku),
 SOURCES (licencje).
 
 ---
@@ -253,7 +254,11 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    zapisał login w pamięci (hasła tam nie było). Hasła i logowanie w cudze konta już blokują reguła 16
    kontraktu i `deny.yaml` (`agent-browser … auth`, `--password`, strony logowania: w red teamie hasło z czatu
    trafiło do `agent-browser`, a login do YouTube Studio). Brakuje jeszcze wprost zakazu zapisywania loginów w pamięci.
-3. **PageIndex (MIT, rozważane):** vectorless RAG do czytania długich dokumentów przez lokalny model
+3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (2026-09-30, do akceptacji):** jeden folder
+   notatek Markdown z linkami (`knowledge/`), wzorzec LLM Wiki Karpathy'ego; wtyczka Hermesa `jarvo-wiedza` jako dostawca
+   pamięci (przypomnienia przed turą, wyciąg po sesji i przed kompresją, 4 narzędzia), kompilacja tanim modelem (jeden
+   piszący), orzeczenia z Twoich korekt, lint, punkty zapisu git, zakładka „Wiedza” z grafem w dashboardzie.
+4. **PageIndex (MIT, rozważane):** vectorless RAG do czytania długich dokumentów przez lokalny model
    (litellm → Hermes/GLM). Nie jako osobny agent — jako współdzielona umiejętność „czytania długich
    dokumentów”. Do decyzji: zakres (który agent najpierw) + model do indeksowania.
 
