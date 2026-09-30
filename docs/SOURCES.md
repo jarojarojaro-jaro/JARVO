@@ -64,6 +64,7 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [CloudAI-X/threejs-skills](https://github.com/CloudAI-X/threejs-skills) | `b1c6230` | MIT (deklarowana w README, bez pliku; autorstwo w `notice`) | Wideograf, Web (10 skilli Three.js) |
 | [emilkowalski/skills](https://github.com/emilkowalski/skills) | `d16ebe6` | MIT | Wideograf, Web (rzemiosło animacji UI) |
 | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `114ea1d` | Apache-2.0 | Web, Studio (detektor anty-wzorców, silnik pobierany do `narzedzia/impeccable`) |
+| [mattpocock/skills](https://github.com/mattpocock/skills) | `d81f3a1` | MIT | Jarvo, Ręka (`writing-for-agents`: pisanie SOUL i skilli) |
 | [getsentry/skills](https://github.com/getsentry/skills) `security-review` (na bazie [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/)) | `d18b7aa` | CC-BY-SA-4.0 (licencja skilla; reszta repo Apache-2.0) | Web (przegląd kodu wg OWASP: JS/Next, Python, Docker) |
 | [trailofbits/skills](https://github.com/trailofbits/skills) `supply-chain-risk-auditor` | `82fe822` | CC-BY-SA-4.0 (całe repo, także skrypty) | Web (ryzyko zależności: OSV, porzucone repo, wydawcy npm, skrypty instalacyjne) |
 | [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) | `8798e40` | Apache-2.0 | Wideograf (wideo z HTML) |

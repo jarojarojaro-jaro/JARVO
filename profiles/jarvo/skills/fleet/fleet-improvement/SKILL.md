@@ -7,11 +7,11 @@ license: MIT
 metadata:
   hermes:
     tags: [fleet, improvement, retro, skills]
-    related_skills: [weekly-review, sdlc-review]
+    related_skills: [writing-for-agents, weekly-review, sdlc-review]
   jarvo:
     agent: jarvo
     autonomy: A2
-    reviewed: "2026-09-28"
+    reviewed: "2026-09-30"
 ---
 
 # Ulepszanie floty
@@ -36,6 +36,8 @@ Pojedynczy błąd to jeszcze nie reguła. Każdą obserwację zapisujesz w `@@KN
   pieniędzy lub akcji A2). Mniej = lekcja czeka w księdze.
 - Lekcja bez nowego potwierdzenia przez 60 dni wypada z księgi (przegląd tygodnia).
 - Treść reguły: tryb rozkazujący, sprawdzalna, z jednym zdaniem „czego nie obejmuje”.
+- Zanim napiszesz zmianę w SOUL albo skillu: `writing-for-agents` (gdzie ją umieścić: krok, reguła, osobny plik za
+  wskaźnikiem; opis skilla jako wskaźnik, który ma zadziałać; kryterium ukończenia kroku).
 
 ## Format propozycji
 ```

@@ -6,6 +6,6 @@ Generalista wykonawczy. Spec: [docs/FLEET.md](../../docs/FLEET.md#jarvo-reka-pra
 |---|---|
 | `SOUL.md` | main prompt: wykonuje wszystko szybko, sprawdza, mówi, kiedy oddać specjaliście |
 | `skills/reka/` | 4: zlozenie-pakietu, dokumenty, szybki-prototyp, kiedy-oddac-snajperowi |
-| skille | 3 z locka (`skill-creator`, `graf-kodu`, `transkrypcja-filmu`) + pełny katalog Hermesa (dosiewany przy starcie) + skille wszystkich snajperów tylko do odczytu (`skills.external_dirs` → build `:ro`) |
+| skille | 4 z locka (`skill-creator`, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`) + pełny katalog Hermesa (dosiewany przy starcie) + skille wszystkich snajperów tylko do odczytu (`skills.external_dirs` → build `:ro`) |
 | `scripts/` | `pack.py` (pakiet misji + manifest + zip), `to_pdf.py` (pandoc + Chromium, LibreOffice opcjonalnie) |
 | `quality/rubric.md` | rubryka sędziego |
