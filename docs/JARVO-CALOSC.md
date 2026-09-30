@@ -211,14 +211,14 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo) |
 | `site/` | landing jarvo.pl |
-| `install.sh`, `install.ps1` | instalator jednym poleceniem (macOS/Linux/WSL2, Windows): repo do `~/jarvo` + `scripts/local-up.sh` |
+| `install.sh`, `install.ps1` | instalator jednym poleceniem (macOS/Linux/WSL2, Windows): repo do `~/jarvo` + `scripts/local-up.sh`; plan pełnej automatyzacji (Docker, WSL, autostart) w [INSTALER.md](INSTALER.md) |
 | `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`) |
 | `tests/`, `docs/` | testy pytest, dokumentacja |
 
 **Dokumenty:** PLAN (wizja/architektura/roadmapa), BOSS (mechanika Main Judge'a), FLEET (specyfikacja
 agentów), PROFILE-SPEC (anatomia agenta: 10 warstw), TOOLBOX (narzędzia open-source), VPS (infra),
 HQ (dashboard), ADS (projekt agenta reklam + Skarbiec), LEADY (Łowca leadów), KLIPY (clipmaker),
-WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku),
+WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku), INSTALER (plan instalatora jednym poleceniem na trzy systemy),
 SOURCES (licencje).
 
 ---
