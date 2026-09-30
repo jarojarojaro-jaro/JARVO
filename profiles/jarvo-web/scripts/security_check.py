@@ -51,6 +51,39 @@ RYZYKA = [  # (waga, opis, wzorzec, poprawka) — tylko wzorce o niskim odsetku 
     ("ŚREDNIE", "tryb debug na stałe", r"(?i)(DEBUG\s*=\s*True|app\.debug\s*=\s*true|debug:\s*true)", "debug tylko z env i nigdy na produkcji"),
     ("NISKIE", "haszowanie hasła słabym algorytmem", r"(?i)(md5|sha1)\s*\(.*pass", "argon2id albo bcrypt (koszt ≥ 12)"),
 ]
+# Niebezpieczne ustawienia domyślne (metoda za Trail of Bits `insecure-defaults`, reguły własne): liczy się, czy aplikacja
+# DZIAŁA z tą wartością, gdy brakuje konfiguracji. `env.get(X, 'dev')` działa ze znanym sekretem, `env[X]` się wywraca.
+# Pomijamy pliki testów (fixtures z sekretem testowym to nie ustalenie).
+_WRAZLIWE = r"[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|PASS|TOKEN|API_KEY|PRIVATE_KEY|SIGNING_KEY|JWT)[A-Z0-9_]*"
+DOMYSLNE = [  # (waga, opis, wzorzec, poprawka)
+    ("WYSOKIE", "sekret z wartością zapasową w kodzie (aplikacja ruszy ze znanym kluczem)",
+     r"(?:environ\.get|getenv|ENV\.fetch)\(\s*['\"]" + _WRAZLIWE + r"['\"]\s*,\s*['\"][^'\"]+['\"]"
+     r"|process\.env\." + _WRAZLIWE + r"\s*(?:\|\||\?\?)\s*['\"`][^'\"`]+['\"`]",
+     "bez wartości zapasowej: brak zmiennej = błąd przy starcie (os.environ['X'] / throw)"),
+    ("WYSOKIE", "zabezpieczenie wyłączone, gdy brak konfiguracji (fail-open)",
+     r"(?i)(?:environ\.get|getenv|process\.env)\W+(?:REQUIRE_AUTH|AUTH_ENABLED|ENABLE_AUTH|CSRF\w*|VERIFY_\w+|SSL_VERIFY)"
+     r"['\"]?\s*(?:,|\|\||\?\?)\s*['\"](?:false|0|no|off)['\"]",
+     "domyślnie włączone; wyłączenie tylko jawną zmienną w środowisku deweloperskim"),
+    ("WYSOKIE", "weryfikacja certyfikatu TLS wyłączona",
+     r"verify\s*=\s*False|rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['\"]?0",
+     "zostaw weryfikację; własny CA przez verify=<ścieżka do CA> / ca: [...]"),
+    ("WYSOKIE", "JWT bez weryfikacji podpisu",
+     r"(?i)algorithms\s*=\s*\[?\s*['\"]none['\"]|verify_signature['\"]?\s*:\s*False|jwt\.decode\([^)]*verify\s*=\s*False",
+     "stały algorytm (HS256/RS256) i weryfikacja podpisu zawsze"),
+    ("WYSOKIE", "domyślne hasło w kodzie",
+     r"(?i)(?:password|passwd|pass|haslo)\w*['\"]?\s*[:=]\s*['\"](?:admin|password|changeme|root|secret|qwerty|123456)\w{0,4}['\"]",
+     "hasło tylko ze zmiennej środowiskowej; żadnego konta z hasłem domyślnym"),
+    ("ŚREDNIE", "szczegóły błędu (stos, komunikat bazy) w odpowiedzi do klienta",
+     r"(?:jsonify|res\.(?:send|json)|Response)\([^\n]*(?:traceback\.format_exc|\.stack\b)",
+     "pełny błąd do logów, klientowi ogólny komunikat"),
+    ("ŚREDNIE", "introspekcja GraphQL włączona na stałe", r"introspection\s*:\s*true",
+     "introspection: process.env.NODE_ENV !== 'production'"),
+    ("ŚREDNIE", "uprawnienia plików dla wszystkich (0o666/0o777, public-read)",
+     r"0o?7[67]7\b|0o?666\b|chmod\s+(?:-R\s+)?777|['\"]public-read(?:-write)?['\"]",
+     "najmniejsze potrzebne uprawnienia; publiczny odczyt tylko dla zasobów, które mają być publiczne"),
+]
+PLIK_TESTOW = re.compile(r"(^|/)(tests?|__tests__|spec|fixtures?)/|(^|/)test_[^/]*$|[._](test|spec)\.[a-z]+$")
+
 NAGLOWKI = [  # (nagłówek, waga gdy brak, po co)
     ("strict-transport-security", "ŚREDNIE", "HSTS: wymusza HTTPS (max-age ≥ 15552000; includeSubDomains)"),
     ("content-security-policy", "ŚREDNIE", "CSP: ogranicza skrypty (XSS); minimum default-src 'self', frame-ancestors 'none'"),
@@ -105,7 +138,8 @@ def repo(root: Path) -> list[dict]:
                 wyn.append(u("KRYTYCZNE", f"{nazwa} w kodzie", f"{rel}:{line}", "przenieś do zmiennych serwera; UNIEWAŻNIJ klucz"))
                 break
         if p.suffix in KOD:
-            for waga, opis, wz, fix in RYZYKA:
+            reguly = RYZYKA + ([] if PLIK_TESTOW.search(rel) else DOMYSLNE)
+            for waga, opis, wz, fix in reguly:
                 m = re.search(wz, txt)
                 if m:
                     wyn.append(u(waga, opis, f"{rel}:{txt.count(chr(10), 0, m.start()) + 1}", fix))

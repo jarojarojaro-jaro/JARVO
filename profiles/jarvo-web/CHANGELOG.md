@@ -1,6 +1,7 @@
 # Changelog: jarvo-web
 
 ## Niewydane
+- Bezpieczeństwo aplikacji: skille `security-review` (getsentry, OWASP: JS/Next, Python, Docker, tabela „czego nie zgłaszać”) i `supply-chain-risk-auditor` (Trail of Bits: OSV, porzucone repo, wydawcy npm, skrypty instalacyjne), oba CC BY-SA bez zmian; `bezpieczenstwo-aplikacji` krok 1b (zależności) i 4 (przegląd per technologia). `security_check.py repo`: niebezpieczne ustawienia domyślne (metoda Trail of Bits `insecure-defaults`, reguły własne; pliki testów pominięte).
 - Kontrakt zlecenia (wspólny): nie osłabiam kontroli, żeby zaliczyć DoD (za ECC loop-design-check); poprawki po recenzji z pytaniem przy niejasnym punkcie i sprzeciwem z dowodem przy błędnym (za superpowers receiving-code-review); reguła 17: zgoda A2 przypięta do odcisku wersji plików (`scripts/odcisk.py`, za ECC operator-approval-loop). `wdrozenie`: prośba o zgodę z odciskiem `dist/`, przed wdrożeniem `odcisk.py --sprawdz`.
 - Skill `systematic-debugging` z Hermesa (metoda superpowers z pętlą mattpocock): gdy build, skrypt albo test pada, najpierw przyczyna, potem jedna poprawka. Wpięty w `nowa-strona` (krok 6).
 - Czat Jarvo HQ (`platform_toolsets.api_server`) ustawiony jawnie: te same narzędzia co na Telegramie (bez `clarify`). Wcześniej Hermes dawał tu swój domyślny zestaw narzędzi.

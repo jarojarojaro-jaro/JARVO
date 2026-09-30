@@ -62,6 +62,22 @@ def test_web_security_check_repo(tmp_path):
     assert "sk_live_" not in r.stdout                        # sekret nigdy nie trafia do raportu
 
 
+def test_web_security_check_insecure_defaults(tmp_path):
+    """Niebezpieczne ustawienia domyślne (metoda Trail of Bits insecure-defaults): kod produkcyjny tak, testy nie."""
+    import subprocess as sp
+    s = Path(__file__).resolve().parents[1] / "profiles" / "jarvo-web" / "scripts" / "security_check.py"
+    (tmp_path / "config.py").write_text("import os\nSECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')\n"
+                                        "PORT = os.environ.get('PORT', '8080')\n")
+    (tmp_path / "api.js").write_text("const agent = new https.Agent({ rejectUnauthorized: false });\n")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_auth.py").write_text("import os\nK = os.environ.get('SECRET_KEY', 'test-secret')\n")
+    r = sp.run([sys.executable, str(s), "repo", str(tmp_path), "--json"], capture_output=True, text=True)
+    wyn = json.loads(r.stdout)["ustalenia"]
+    gdzie = {x["gdzie"].split(":")[0] for x in wyn if "zapasową" in x["co"]}
+    assert r.returncode == 1 and gdzie == {"config.py"}                  # PORT z domyślną wartością to nie sekret
+    assert any("TLS" in x["co"] and x["gdzie"].startswith("api.js") for x in wyn)
+
+
 def test_seo_check_links_slugs_robots():
     s = Path(__file__).resolve().parents[1] / "profiles" / "jarvo-web" / "scripts"
     sys.path.insert(0, str(s))

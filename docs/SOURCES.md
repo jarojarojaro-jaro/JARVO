@@ -64,6 +64,8 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [CloudAI-X/threejs-skills](https://github.com/CloudAI-X/threejs-skills) | `b1c6230` | MIT (deklarowana w README, bez pliku; autorstwo w `notice`) | Wideograf, Web (10 skilli Three.js) |
 | [emilkowalski/skills](https://github.com/emilkowalski/skills) | `d16ebe6` | MIT | Wideograf, Web (rzemiosło animacji UI) |
 | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `114ea1d` | Apache-2.0 | Web, Studio (detektor anty-wzorców, silnik pobierany do `narzedzia/impeccable`) |
+| [getsentry/skills](https://github.com/getsentry/skills) `security-review` (na bazie [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/)) | `d18b7aa` | CC-BY-SA-4.0 (licencja skilla; reszta repo Apache-2.0) | Web (przegląd kodu wg OWASP: JS/Next, Python, Docker) |
+| [trailofbits/skills](https://github.com/trailofbits/skills) `supply-chain-risk-auditor` | `82fe822` | CC-BY-SA-4.0 (całe repo, także skrypty) | Web (ryzyko zależności: OSV, porzucone repo, wydawcy npm, skrypty instalacyjne) |
 | [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) | `8798e40` | Apache-2.0 | Wideograf (wideo z HTML) |
 
 Build odrzuca skill z `anthropics/skills`, jeśli w jego katalogu nie ma licencji Apache-2.0: część
@@ -104,6 +106,7 @@ Autorstwo zaznaczamy w polu `author` skilla albo `source` pliku w `references/`.
 | [obra/superpowers](https://github.com/obra/superpowers) (commit `8ca22db`, © Jesse Vincent) | MIT | kontrakt zlecenia pkt 14 (poprawki po recenzji: pytanie przy niejasnym punkcie, sprzeciw z dowodem, każda poprawka sprawdzona) za `receiving-code-review`; `sdlc-review` 4b |
 | [affaan-m/ECC](https://github.com/affaan-m/ECC) (commit `c70874f`, © 2026 Affaan Mustafa) | MIT | kontrakt pkt 12 (nie osłabiam kontroli) za `loop-design-check` i `config-protection`; pkt 17 i `scripts/odcisk.py` (zgoda A2 przypięta do wersji, jedno wykonanie na zgodę) za `operator-approval-loop`; wzorce skanu skilli (`scripts/skan_skilli.py`) za `build-pi-core.js` |
 | [getsentry/skills](https://github.com/getsentry/skills) (commit `d18b7aa`, `skill-scanner`) | Apache-2.0 | kontrole strukturalne i wzorce skanu skilli w `scripts/skan_skilli.py` |
+| [trailofbits/skills](https://github.com/trailofbits/skills) (commit `82fe822`, `insecure-defaults`) | CC-BY-SA-4.0 | tylko metoda („czy aplikacja działa z tą wartością, gdy brak konfiguracji”): reguły i opisy własne w `security_check.py` (sekret z wartością zapasową, fail-open, TLS, JWT, domyślne hasła, stos błędu, introspekcja, uprawnienia) |
 | [Yuzzyuk/marketing-os](https://github.com/Yuzzyuk/marketing-os) (commit `bb67dff`, © 2026 Marketing OS contributors) | MIT | `hooks.md` → wspólny skill `hooki` (trzy warstwy, 18 taktyk, korpus, rozbieg, lejek diagnozy, drabina wierności); `slop-patterns.md` → `copy-pl/references/sito.md`; oba po polsku |
 | JohnHeibel/ClaudeAnimationBase (+ briefy @donaldjewkes) | MIT | wzorzec bramek etapów w `film-z-kodu/references/produkcja-etapami.md` |
 
@@ -132,6 +135,7 @@ przekrojami modeli z klocków, bez użycia znaków towarowych ani zasobów produ
 | MIT | zachowujemy informację o prawach autorskich i licencję (`LICENSE-UPSTREAM` przy każdym skillu) |
 | Apache-2.0 | licencja przy skillu, `NOTICE` źródła (jeśli istnieje), treść bez zmian (zmiany oznaczylibyśmy w pliku) |
 | AGPL-3.0 (SearXNG, Lightpanda, opcjonalnie Postiz) | programy uruchamiamy bez modyfikacji (Lightpanda: binarka z oficjalnego obrazu, tylko usunięte symbole debugowania), tylko prywatnie; zmieniona wersja udostępniana przez sieć innym wymagałaby publikacji źródeł |
+| CC-BY-SA-4.0 (getsentry `security-review`, Trail of Bits) | dołączamy **bez zmian**, z atrybucją i licencją przy skillu; tłumaczenie albo przeróbka byłaby adaptacją i musiałaby zostać na CC BY-SA, dlatego metodę Trail of Bits `insecure-defaults` przepisaliśmy własnymi regułami (`security_check.py`), bez kopiowania tekstu. Znaki towarowe (logo Trail of Bits, Sentry) nie są objęte licencją |
 | CC-BY-4.0 (model Parakeet) | uznanie autorstwa (NVIDIA) w tym pliku; model pobierany z Hugging Face, nie redystrybuujemy go |
 
 Aktualizacja źródła = zmiana `rev` w locku (pełny SHA), build, przegląd różnic w skillach, evals, commit.

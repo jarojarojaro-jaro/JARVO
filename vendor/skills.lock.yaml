@@ -20,6 +20,18 @@ sources:
     type: hermes-tree
     license: MIT
     notice: "Copyright (c) Nous Research. Hermes Agent, MIT License."
+  getsentry-security:
+    type: git                # osobne źródło: ten skill ma własną licencję (OWASP, CC BY-SA), reszta repo Apache-2.0
+    repo: https://github.com/getsentry/skills
+    rev: d18b7aa8ba878354e5c348310230e652f7690f9c
+    license: CC-BY-SA-4.0
+    notice: "getsentry/skills security-review (Sentry), materiał na bazie OWASP Cheat Sheet Series (https://cheatsheetseries.owasp.org/), CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/. Dołączony bez zmian; licencja w pliku LICENSE skilla."
+  trailofbits:
+    type: git
+    repo: https://github.com/trailofbits/skills
+    rev: 82fe8226252622fa807643bdca1710901198553a
+    license: CC-BY-SA-4.0     # całe repo, także skrypty; dołączamy bez zmian (adaptacja = CC BY-SA)
+    license_file: LICENSE
   marketingskills:
     type: git
     repo: https://github.com/coreyhaines31/marketingskills
@@ -186,6 +198,8 @@ agents:
   jarvo-web:
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: hermes, path: skills/software-development/systematic-debugging, dest: kod/systematic-debugging}
+    - {source: getsentry-security, path: skills/security-review, dest: bezpieczenstwo/security-review}
+    - {source: trailofbits, path: plugins/supply-chain-risk-auditor/skills/supply-chain-risk-auditor, dest: bezpieczenstwo/supply-chain-risk-auditor}
     - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
     - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}
     - {source: gsap-skills, path: skills/gsap-scrolltrigger, dest: gsap/gsap-scrolltrigger}

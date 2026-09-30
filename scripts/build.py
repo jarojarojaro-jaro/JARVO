@@ -46,6 +46,7 @@ CATEGORY_DESCRIPTIONS = {
     "sherlock": "Metoda śledcza: wieloźródłowy research, weryfikacja faktów, raporty z cytatami.",
     "web": "Workflowy Web Senior Deva: brand z URL, audyty, nowe strony, landingi, favicony, obrazy, wdrożenia.",
     "studio": "Workflowy Studio: pakiety kampanii, grafiki social, filmy z kodu, generacja AI, formaty, copy PL, publikacja.",
+    "bezpieczenstwo": "Bezpieczeństwo aplikacji (CC BY-SA, bez zmian): przegląd kodu wg OWASP (getsentry), ryzyko zależności (Trail of Bits).",
     "kod": "Praca na kodzie: mapa repo (graf wywołań), wpływ zmian przed refaktorem, debugowanie od przyczyny.",
     "reka": "Workflowy prawej ręki: składanie pakietów misji, dokumenty i konwersje, szybkie prototypy, granice.",
     # kategorie skilli zewnętrznych

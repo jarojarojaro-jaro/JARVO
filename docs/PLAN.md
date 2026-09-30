@@ -201,7 +201,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 11 skilli dowodzenia ([BOSS.md](BOSS.md)).
 - ✅ `jarvo-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
 - ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
-- ✅ Walidator + testy (`make validate`, `make test`, CI) + 99 scenariuszy evals.
+- ✅ Walidator + testy (`make validate`, `make test`, CI) + 100 scenariuszy evals.
 
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).

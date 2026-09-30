@@ -67,3 +67,9 @@ wyjatki:
      powod: "typ `Env` silnika canvas (wymiary, cache płótna), nie zmienne środowiskowe"}
   - {zrodlo: motion-graphics, rev: e8d610a, skill: skills/motion-broll, regula: ["hermes:python_os_system", "hermes:python_os_popen"],
      plik: scripts/make_pages.py, powod: "ffmpeg/ffprobe na plikach, które skrypt sam wygenerował w katalogu roboczym (nazwy bez danych z zewnątrz)"}
+
+  # --- skille bezpieczeństwa: przykłady ataków w dokumentacji (tylko pliki .md, bez skryptów)
+  - {zrodlo: getsentry-security, rev: d18b7aa, skill: skills/security-review, regula: "*", plik: "*.md",
+     powod: "przewodnik OWASP: przykłady podatnego kodu i ataków oznaczone jako FLAG/Attack (os.system(user_input), ../../../etc/passwd, curl|bash w preinstall, „Ignore all previous instructions” jako atak na LLM); „klucz AWS” to przykładowy klucz z dokumentacji AWS (z końcówką EXAMPLE); skill nie ma skryptów"}
+  - {zrodlo: trailofbits, rev: 82fe822, skill: plugins/supply-chain-risk-auditor/skills/supply-chain-risk-auditor,
+     regula: "hermes:python_os_environ", plik: scripts/test_collect.py, powod: "test uruchamia collect.py w podprocesie ze środowiskiem + PYTHONPATH"}

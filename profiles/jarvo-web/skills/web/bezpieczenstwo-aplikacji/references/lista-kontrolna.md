@@ -1,6 +1,6 @@
 ---
 source: "OWASP Top 10 (2021) i ASVS 4.0; checklista „vibe-coded app security” (film, wrzesień 2026); MDN Security headers"
-reviewed: "2026-09-29"
+reviewed: "2026-09-30"
 ---
 # Lista kontrolna (18 + nagłówki)
 
@@ -23,5 +23,5 @@ reviewed: "2026-09-29"
 | 15 | Limit żądań | logowanie, rejestracja, reset hasła, API | np. 5 prób/min/IP na logowanie; 429 z `Retry-After` |
 | 16 | CORS zaostrzony | `security_check.py url` | lista domen; nigdy `*` z ciasteczkami |
 | 17 | Debug wyłączony na produkcji | `security_check.py url`, konfiguracja | własne strony błędów, zero śladów stosu |
-| 18 | Zależności aktualne | `npm audit --omit=dev` | 0 critical/high; Dependabot/Renovate włączone |
+| 18 | Zależności aktualne i zaufane | `npm audit --omit=dev` + `supply-chain-risk-auditor` (krok 1b) | 0 critical/high; porzucone pakiety i skrypty instalacyjne opisane; Dependabot/Renovate włączone |
 | N | Nagłówki | `security_check.py url` | HTTPS + HSTS, CSP (`frame-ancestors 'none'`), nosniff, Referrer-Policy, Permissions-Policy |

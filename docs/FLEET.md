@@ -13,7 +13,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 |---|---|---|---|---|---|
 | `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [11 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 0 | patrol, brief, przegląd, raport floty | [19](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [7 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 16 (Hermes, marketingskills, wspólny `transkrypcja-filmu`) | search_fanout, extract, sources | [12](../evals/jarvo-sherlock/scenarios.yaml) |
-| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [9 w `skills/web/`](../profiles/jarvo-web/skills/web) | 56 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [13](../evals/jarvo-web/scenarios.yaml) |
+| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [9 w `skills/web/`](../profiles/jarvo-web/skills/web) | 58 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [14](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 24 (marketingskills, Anthropic, Hermes, impeccable, wspólny `hooki`) | render_html, check_media | [11](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [14 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 57 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy (+ wideo_lib) | [21](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [12](../evals/jarvo-ads/scenarios.yaml) |
@@ -108,7 +108,8 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
 - [H] `claude-design`, `popular-web-designs`, `design-md`, `scrollcraft`, `publish-site`, `cloudflare-temporary-deploy`,
   `systematic-debugging` (przyczyna błędu builda albo skryptu, zanim poprawka)
 - [Z] `impeccable`, web-quality-skills (5), claude-seo (13), marketingskills (3), Anthropic (2), GSAP (8), Three.js (10),
-  motion Emila Kowalskiego (5), `text-to-lottie`, wspólny `graf-kodu` (`shared/skills/`)
+  motion Emila Kowalskiego (5), `text-to-lottie`, wspólny `graf-kodu` (`shared/skills/`), getsentry `security-review`
+  (przegląd kodu wg OWASP), Trail of Bits `supply-chain-risk-auditor` (ryzyko zależności)
 - [T] `brand-z-url`: podajesz stronę, a agent crawluje ją i wyciąga logo, kolory, fonty,
   ton i komponenty do `knowledge/brands/<marka>/` (z `DESIGN.md`)
 - [T] `audyt-strony`: Lighthouse, dostępność (axe), SEO, obrazy i responsywność (zrzuty na kilku
