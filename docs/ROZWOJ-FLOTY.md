@@ -1,7 +1,7 @@
 # Rozwój floty: plan dopracowania agentów i nowi specjaliści
 
-Stan: **plan do analizy (research 2026-10-01).** Wdrożone: naprawy z §3 punkty 1, 3 i 4. Nowi agenci: na razie żadni
-(dwie rundy propozycji odłożone, §6); reszta czeka na decyzje. Wersje bibliotek, limity API i daty
+Stan: **plan do analizy (research 2026-10-01).** Wdrożone: naprawy z §3 punkty 1, 3 i 4. Nowi agenci: dwie rundy
+propozycji odłożone (§6); osobno projekt Twórcy aplikacji w [MOBILE.md](MOBILE.md). Reszta czeka na decyzje. Wersje bibliotek, limity API i daty
 przepisów sprawdzono 2026-10-01; przed wdrożeniem każdego punktu sprawdzamy je jeszcze raz. Uwagi prawne to
 wskazówki do projektu, nie porada prawna.
 
