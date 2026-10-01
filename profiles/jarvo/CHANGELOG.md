@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- `dispatch-playbook`: wzorzec „Kampania / content” z opcjonalnym krokiem `jarvo-ads` (plan kampanii płatnej; start tylko przez Skarbiec z kodem zgody). Roster pomija skille, którym brakuje usługi (`metadata.jarvo.wymaga`). Walidator wymaga, żeby każdy specjalista był we wzorcach misji.
 - `weekly-review` 1.2.0: synteza skarbca wiedzy (co się zmieniło, co dryfuje, co zbadać) jako szkic `Tydzień floty` przez `wiedza_zapisz`; orzeczenia z ≥ 3 potwierdzeniami trafiają do propozycji `fleet-improvement`. Każdy agent ma wtyczkę `jarvo-wiedza` (przypomnienia ze skarbca, narzędzia `wiedza_*`), projekt w `docs/WIEDZA.md`.
 - Nowy agent `jarvo-lowca` (Łowca leadów) w rosterze. `dispatch-playbook`: wzorzec „Leady → pierwsza wiadomość” (Łowca → decyzja użytkownika → szkic w Studiu; wysyłka to A2).
 - Skill `writing-for-agents` (mattpocock/skills, MIT): warsztat pisania dokumentów dla agentów (wskaźniki kontekstu, hierarchia informacji, kryteria ukończenia). `fleet-improvement`: zanim zaproponujesz zmianę w SOUL albo skillu, `writing-for-agents` (gdzie umieścić, opis jako wskaźnik, kryterium ukończenia).
