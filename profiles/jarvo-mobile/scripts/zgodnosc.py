@@ -34,19 +34,22 @@ UPRAWNIENIA: dict[str, dict] = {
     "aparat": {"modul": "expo-camera", "wtyczka": "expo-camera", "prop": "cameraPermission",
                "ios": "NSCameraUsageDescription", "extra": {"recordAudioAndroid": False}},
     "zdjecia": {"modul": "expo-image-picker", "wtyczka": "expo-image-picker", "prop": "photosPermission",
-                "ios": "NSPhotoLibraryUsageDescription", "extra": {"microphonePermission": False}},
+                "ios": "NSPhotoLibraryUsageDescription", "extra": {}},
     "lokalizacja": {"modul": "expo-location", "wtyczka": "expo-location", "prop": "locationWhenInUsePermission",
-                    "ios": "NSLocationWhenInUseUsageDescription", "extra": {}},
+                    "ios": "NSLocationWhenInUseUsageDescription",
+                    "extra": {"locationAlwaysAndWhenInUsePermission": False, "locationAlwaysPermission": False,
+                              "motionUsagePermission": False}},
     "lokalizacja-w-tle": {"modul": "expo-location", "wtyczka": "expo-location",
                           "prop": "locationAlwaysAndWhenInUsePermission",
                           "ios": "NSLocationAlwaysAndWhenInUseUsageDescription",
-                          "extra": {"isAndroidBackgroundLocationEnabled": True},
+                          "extra": {"isAndroidBackgroundLocationEnabled": True, "isIosBackgroundLocationEnabled": True,
+                                    "locationAlwaysPermission": False, "motionUsagePermission": False},
                           "odblokuj": ["android.permission.ACCESS_BACKGROUND_LOCATION"]},
     "powiadomienia": {"modul": "expo-notifications", "wtyczka": "expo-notifications", "prop": None, "ios": None, "extra": {}},
     "kontakty": {"modul": "expo-contacts", "wtyczka": "expo-contacts", "prop": "contactsPermission",
                  "ios": "NSContactsUsageDescription", "extra": {}},
     "kalendarz": {"modul": "expo-calendar", "wtyczka": "expo-calendar", "prop": "calendarPermission",
-                  "ios": "NSCalendarsFullAccessUsageDescription", "extra": {}},
+                  "ios": "NSCalendarsFullAccessUsageDescription", "extra": {"remindersPermission": False}},
     "mikrofon": {"modul": "expo-audio", "wtyczka": "expo-audio", "prop": "microphonePermission",
                  "ios": "NSMicrophoneUsageDescription", "extra": {}, "odblokuj": ["android.permission.RECORD_AUDIO"]},
     "biometria": {"modul": "expo-local-authentication", "wtyczka": "expo-local-authentication", "prop": "faceIDPermission",
@@ -54,6 +57,14 @@ UPRAWNIENIA: dict[str, dict] = {
     "sledzenie": {"modul": "expo-tracking-transparency", "wtyczka": "expo-tracking-transparency",
                   "prop": "userTrackingPermission", "ios": "NSUserTrackingUsageDescription", "extra": {},
                   "odblokuj": ["com.google.android.gms.permission.AD_ID"]},
+}
+# Wtyczki Expo dopisują do Info.plist angielskie ogólniki („Allow $(PRODUCT_NAME) to access your microphone”) dla
+# każdego klucza, którego nie ustawimy; `false` klucz usuwa (applyPermissions w @expo/config-plugins). Tu: klucze innych
+# uprawnień obsługiwane przez tę samą wtyczkę → powód z profilu, gdy jest w nim to uprawnienie, inaczej false.
+KLUCZE_OBCE: dict[str, dict[str, str]] = {
+    "expo-camera": {"microphonePermission": "mikrofon"},
+    "expo-image-picker": {"cameraPermission": "aparat", "microphonePermission": "mikrofon"},
+    "expo-location": {"locationWhenInUsePermission": "lokalizacja"},
 }
 # blokowane zawsze, chyba że uprawnienie z profilu je odblokuje (Google Play: deklaracje i odrzucenia za zbędne uprawnienia)
 ZAWSZE_BLOKUJ = ["android.permission.RECORD_AUDIO", "android.permission.SYSTEM_ALERT_WINDOW",
@@ -174,11 +185,24 @@ def ocen(p: dict) -> dict:
         props = wtyczki.setdefault(d["wtyczka"], {})
         if d["prop"]:
             props[d["prop"]] = powod
-        props.update(d["extra"])
+        for k, v in d["extra"].items():           # `false` z innego uprawnienia nie kasuje ustawionego powodu
+            if not props.get(k):
+                props[k] = v
         odblokuj.update(d.get("odblokuj", []))
         wym(f"uprawnienie-{u}", f"uprawnienie {u}: prośba w momencie użycia, z wyjaśnieniem; odmowa nie blokuje aplikacji",
             "Apple 5.1.1, 5.1.2(i); Google Play: uprawnienia", f"`{d['modul']}` + polski opis w `uprawnienia_ios` i `locales/pl.json`")
+    for wt, klucze in KLUCZE_OBCE.items():
+        if wt not in wtyczki:
+            continue
+        for prop, u in klucze.items():
+            if prop in wtyczki[wt] and wtyczki[wt][prop]:
+                continue                                  # ustawione przez własne uprawnienie tej wtyczki
+            wtyczki[wt][prop] = powody.get(u) if u in uprawnienia and powody.get(u) else False
     if "lokalizacja-w-tle" in uprawnienia:
+        # Apple wymaga obu kluczy: „w użyciu” i „zawsze”; bez osobnego powodu ten sam tekst
+        wtyczki["expo-location"]["locationWhenInUsePermission"] = (powody.get("lokalizacja")
+                                                                  or powody.get("lokalizacja-w-tle", ""))
+        info_plist.setdefault("NSLocationWhenInUseUsageDescription", wtyczki["expo-location"]["locationWhenInUsePermission"])
         ostrz.append("lokalizacja w tle: deklaracja w Play Console z filmem, mocne uzasadnienie dla Apple; zwykle wystarcza lokalizacja w użyciu")
     if "kontakty" in uprawnienia:
         ostrz.append("kontakty: Google Play od 2026 woli selektor kontaktów zamiast READ_CONTACTS; uzasadnij pełny dostęp")

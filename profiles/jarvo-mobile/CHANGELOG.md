@@ -1,6 +1,10 @@
 # Changelog: jarvo-mobile
 
 ## Niewydane
+- Poprawka profilu zgodności: wtyczki Expo (aparat, zdjęcia, lokalizacja, kalendarz) nie dopisują już angielskich
+  ogólników do Info.plist („Allow $(PRODUCT_NAME) to access your microphone”, Apple 5.1.1). Każdy klucz obsługiwanej
+  wtyczki dostaje powód z profilu albo `false`. Lokalizacja w tle ma oba klucze wymagane przez Apple. Wykryte
+  introspekcją konfiguracji przy pracy nad listą kontrolną sklepów.
 - Etap 3 (bramka): skill `bramka-aplikacji` (rubryka 10 osi, werdykt PASS / REVISE / BLOCK, najwyżej 3 rundy),
   `wrogie.cjs` (mały ekran, tryb ciemny z axe, brak sieci, długie słowa, ograniczony ruch, nieznana trasa, konsola),
   `urzadzenie.py` (Android przez adb: duża czcionka, mały ekran, ciemny, offline, odebrane uprawnienia, wstecz, śmierć

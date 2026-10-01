@@ -42,8 +42,34 @@ def test_uprawnienie_bez_powodu_albo_ogolnikowe_to_blad():
     assert not w["bledy"]
     kz = w["konfiguracja"]
     assert kz["uprawnienia_ios"] == {"NSCameraUsageDescription": POWOD}
-    assert ["expo-camera", {"cameraPermission": POWOD, "recordAudioAndroid": False}] in kz["wtyczki"]
+    assert ["expo-camera", {"cameraPermission": POWOD, "recordAudioAndroid": False, "microphonePermission": False}] in kz["wtyczki"]
     assert "expo-notifications" in kz["wtyczki"]
+
+
+def test_wtyczki_bez_angielskich_ogolnikow():
+    """Wtyczki Expo dopisują „Allow $(PRODUCT_NAME) to access your microphone” dla kluczy, których nie ustawimy;
+    profil ustawia każdy klucz obsługiwanej wtyczki: powód albo false (klucz znika z Info.plist)."""
+    def wt(w):
+        return {n: pr for n, pr in (x if isinstance(x, list) else [x, {}] for x in w["konfiguracja"]["wtyczki"])}
+    w = wt(zg.ocen({"uprawnienia": ["aparat"], "powody": {"aparat": POWOD}}))
+    assert w["expo-camera"] == {"cameraPermission": POWOD, "recordAudioAndroid": False, "microphonePermission": False}
+    w = wt(zg.ocen({"uprawnienia": ["zdjecia"], "powody": {"zdjecia": POWOD}}))
+    assert w["expo-image-picker"] == {"photosPermission": POWOD, "cameraPermission": False, "microphonePermission": False}
+    w = wt(zg.ocen({"uprawnienia": ["zdjecia", "aparat", "mikrofon"],
+                    "powody": {"zdjecia": POWOD, "aparat": POWOD + " A", "mikrofon": POWOD + " M"}}))
+    assert w["expo-image-picker"]["cameraPermission"] == POWOD + " A" and w["expo-camera"]["microphonePermission"] == POWOD + " M"
+    w = wt(zg.ocen({"uprawnienia": ["lokalizacja"], "powody": {"lokalizacja": POWOD}}))
+    assert w["expo-location"] == {"locationWhenInUsePermission": POWOD, "locationAlwaysAndWhenInUsePermission": False,
+                                  "locationAlwaysPermission": False, "motionUsagePermission": False}
+    for kolejnosc in (["lokalizacja", "lokalizacja-w-tle"], ["lokalizacja-w-tle", "lokalizacja"]):
+        o = zg.ocen({"uprawnienia": kolejnosc, "powody": {"lokalizacja": POWOD, "lokalizacja-w-tle": POWOD + " T"}})
+        loc = wt(o)["expo-location"]
+        assert loc["locationWhenInUsePermission"] == POWOD and loc["locationAlwaysAndWhenInUsePermission"] == POWOD + " T"
+        assert loc["isIosBackgroundLocationEnabled"] is True
+    o = zg.ocen({"uprawnienia": ["lokalizacja-w-tle"], "powody": {"lokalizacja-w-tle": POWOD}})
+    assert wt(o)["expo-location"]["locationWhenInUsePermission"] == POWOD          # Apple wymaga obu kluczy
+    assert o["konfiguracja"]["uprawnienia_ios"]["NSLocationWhenInUseUsageDescription"] == POWOD
+    assert wt(zg.ocen({"uprawnienia": ["kalendarz"], "powody": {"kalendarz": POWOD}}))["expo-calendar"]["remindersPermission"] is False
 
 
 def test_blokady_androida_odblokowane_tylko_przez_profil():
