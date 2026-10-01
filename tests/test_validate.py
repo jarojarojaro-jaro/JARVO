@@ -133,3 +133,38 @@ def test_generalist_must_see_every_specialist(repo_copy):
     cfg.write_text(cfg.read_text(encoding="utf-8").replace('    - "@@BUILD_DIR@@/profiles/jarvo-ads/skills"\n', ""),
                    encoding="utf-8")
     assert errors_matching(validate.run(), r"jarvo-reka: skills.external_dirs bez skilli jarvo-ads")
+
+
+# ---------------------------------------------------------------- routing: nowy agent nie może być „niewidzialny”
+
+def test_specialist_without_handoff_line(repo_copy):
+    fy = repo_copy / "fleet.yaml"
+    tekst = fy.read_text(encoding="utf-8")
+    linia = next(l for l in tekst.splitlines() if l.strip().startswith("oddaj_gdy: \"szukanie klientów"))
+    fy.write_text(tekst.replace(linia + "\n", ""), encoding="utf-8")
+    assert errors_matching(validate.run(), r"jarvo-lowca: brak `oddaj_gdy`")
+
+
+def test_generalist_handoff_table_must_be_generated(repo_copy):
+    sk = repo_copy / "profiles/jarvo-reka/skills/reka/kiedy-oddac-snajperowi/SKILL.md"
+    sk.write_text(sk.read_text(encoding="utf-8").replace(fl.ODDAJ_MARKER, "| Sygnał | Agent |\n|---|---|\n| strona | `jarvo-web` |"),
+                  encoding="utf-8")
+    assert errors_matching(validate.run(), r"jarvo-reka: żaden skill nie ma znacznika")
+
+
+def test_specialist_missing_from_dispatch_patterns(repo_copy):
+    p = repo_copy / "profiles/jarvo" / validate.PATTERNS_FILE
+    p.write_text(p.read_text(encoding="utf-8").replace("`jarvo-ads`", "Ads"), encoding="utf-8")
+    assert errors_matching(validate.run(), r"jarvo-ads: nie występuje w żadnym wzorcu misji")
+
+
+def test_service_command_needs_requirement(repo_copy):
+    sk = repo_copy / "profiles/jarvo-ads/skills/ads/start-kampanii/SKILL.md"
+    sk.write_text("\n".join(l for l in sk.read_text(encoding="utf-8").splitlines() if "wymaga:" not in l) + "\n", encoding="utf-8")
+    assert errors_matching(validate.run(), r"jarvo-ads/start-kampanii: używa poleceń usługi 'skarbiec'")
+
+
+def test_unknown_required_service(repo_copy):
+    sk = repo_copy / "profiles/jarvo-ads/skills/ads/start-kampanii/SKILL.md"
+    sk.write_text(sk.read_text(encoding="utf-8").replace("wymaga: [skarbiec]", "wymaga: [skarbiec, skarbonka]"), encoding="utf-8")
+    assert errors_matching(validate.run(), r"wymaga nieznanej usługi 'skarbonka'")

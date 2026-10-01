@@ -1,7 +1,7 @@
 ---
 name: optymalizacja
 description: "Codzienna kontrola konta i optymalizacja w kopercie."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo"
 license: MIT
 metadata:
@@ -10,8 +10,9 @@ metadata:
     related_skills: [raport-reklam, plan-testu, start-kampanii]
   jarvo:
     agent: jarvo-ads
+    wymaga: [skarbiec]           # bez usługi Skarbiec skill nie trafia do profilu (scripts/build.py)
     autonomy: A2
-    reviewed: "2026-09-29"
+    reviewed: "2026-10-01"
 ---
 
 # Optymalizacja

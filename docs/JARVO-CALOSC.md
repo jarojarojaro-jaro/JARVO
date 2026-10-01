@@ -34,6 +34,10 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
   4. **raport** — oddaje Ci jeden, sprawdzony wynik.
 - **Bezpośredni kontakt zostaje** — z każdym snajperem pogadasz osobno, ale praca wieloetapowa
   zawsze idzie przez szefa.
+- **Nowy agent nie może być „niewidzialny”.** Każdy specjalista ma w `fleet.yaml` pole `oddaj_gdy`, z którego build
+  generuje tabelę „komu oddać” u Ręki, i występuje we wzorcach misji Jarva; walidator nie przepuści go bez tego.
+- **Bez martwych ścieżek.** Skill, który potrzebuje usługi (np. Skarbca), deklaruje `metadata.jarvo.wymaga`; dopóki usługi
+  nie ma w `infra/docker-compose.yml`, nie trafia do profilu, a SOUL agenta mówi, czego dziś nie zrobi.
 - **Wspólne:** wiedza o Tobie (USER.md), brand kity (`knowledge/brands`) i **skarbiec wiedzy** (`knowledge/`, [WIEDZA.md](WIEDZA.md):
   notatki z linkami, orzeczenia z Twoich korekt, wyciągi z rozmów i kart; wtyczka `jarvo-wiedza` daje każdemu agentowi
   przypomnienia przed turą i narzędzia `wiedza_*`). Pamięć i skille są per agent
@@ -218,7 +222,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 **Dokumenty:** PLAN (wizja/architektura/roadmapa), BOSS (mechanika Main Judge'a), FLEET (specyfikacja
 agentów), PROFILE-SPEC (anatomia agenta: 10 warstw), TOOLBOX (narzędzia open-source), VPS (infra),
 HQ (dashboard), ADS (projekt agenta reklam + Skarbiec), LEADY (Łowca leadów), KLIPY (clipmaker),
-WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku), INSTALER (plan instalatora jednym poleceniem na trzy systemy), ROZWOJ-FLOTY (plan dopracowania agentów i nowi specjaliści),
+WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku), INSTALER (plan instalatora jednym poleceniem na trzy systemy), ROZWOJ-FLOTY (plan dopracowania agentów),
 SOURCES (licencje).
 
 ---

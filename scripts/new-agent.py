@@ -67,14 +67,19 @@ def main(argv: list[str] | None = None) -> int:
     (ev / "scenarios.yaml").write_text(f"agent: {args.name}\nscenarios: []\n", encoding="utf-8")
 
     fleet_text = fl.FLEET_FILE.read_text(encoding="utf-8")
+    oddaj = ("    oddaj_gdy: \"TODO: kiedy Ręka ma oddać zadanie temu agentowi (tabela generowana)\"\n"
+             if args.kind == "specialist" else "")
     entry = (f"\n  - name: {args.name}\n    kind: {args.kind}\n    title: \"{args.title}\"\n    emoji: \"\"\n"
              f"    description: >-\n      TODO: jedno-dwa zdania o zakresie (routing kanbana).\n"
+             f"{oddaj}"
              f"    model_tier: {args.tier}\n    delegation_tier: fast\n    autonomy_max: A1\n"
              f"    telegram_topic: {slug}\n    status: planned\n")
     fleet_text = fleet_text.replace("\nshared:", entry + "\nshared:", 1)
     fl.FLEET_FILE.write_text(fleet_text, encoding="utf-8")
     print(f"✓ Szkielet: {dest}\n✓ evals/{args.name}/scenarios.yaml\n✓ wpis w fleet.yaml (status: planned)")
-    print("Dalej: uzupełnij SOUL, skille, rubrykę, evals; `make validate`; status → active (Definition of Ready).")
+    print("Dalej: uzupełnij SOUL, skille, rubrykę, evals, `oddaj_gdy` w fleet.yaml i wzorzec misji Jarva "
+          "(profiles/jarvo/skills/fleet/dispatch-playbook/references/patterns.md); `make validate`; status → active "
+          "(Definition of Ready). Walidator nie przepuści aktywnego specjalisty bez `oddaj_gdy` i wzorca misji.")
     return 0
 
 

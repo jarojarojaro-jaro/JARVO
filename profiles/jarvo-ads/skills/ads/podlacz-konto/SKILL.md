@@ -1,7 +1,7 @@
 ---
 name: podlacz-konto
 description: "Podłączenie Meta Ads i Google Ads do Skarbca krok po kroku."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo"
 license: MIT
 metadata:
@@ -10,8 +10,9 @@ metadata:
     related_skills: [start-kampanii, audyt-konta]
   jarvo:
     agent: jarvo-ads
+    wymaga: [skarbiec]           # bez usługi Skarbiec skill nie trafia do profilu (scripts/build.py)
     autonomy: A0
-    reviewed: "2026-09-29"
+    reviewed: "2026-10-01"
 ---
 
 # Podłączenie konta

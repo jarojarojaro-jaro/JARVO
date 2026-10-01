@@ -93,6 +93,7 @@ agents:
       hq_label: "Investigation office"
       description: >-
         Multi-source research and fact-checking: splits a question into threads, checks primary sources, cross-confirms claims and delivers a report with citations and confidence levels. Market, competitor, product and keyword research, monitoring.
+    oddaj_gdy: "decyzja zależy od prawdziwości faktów: potrzebne źródła, weryfikacja, research rynku, konkurencji albo SEO"
     status: active
 
   - name: jarvo-web
@@ -115,6 +116,7 @@ agents:
       hq_label: "Web studio"
       description: >-
         Websites end to end: new sites and product landing pages, improving existing ones, technical SEO, favicons and meta, image optimisation, responsiveness, performance (Core Web Vitals), accessibility, deployment. Learns the brand from the existing site.
+    oddaj_gdy: "strona ma trafić do ludzi (produkcja): budowa, audyt, SEO, wydajność, dostępność, bezpieczeństwo, wdrożenie"
     status: active
 
   - name: jarvo-studio
@@ -137,6 +139,7 @@ agents:
       hq_label: "Creative atelier"
       description: >-
         Promo graphics, social media posts, copy, campaigns and publishing calendars, all on brand. Orders videos from the Videographer. Prepares packages; never publishes without approval.
+    oddaj_gdy: "treść albo grafika ma reprezentować markę publicznie: copy, grafiki social, kampania, kalendarz postów"
     status: active
 
   - name: jarvo-wideo
@@ -161,6 +164,7 @@ agents:
       hq_label: "Film studio"
       description: >-
         Video end to end: short films for TikTok, Reels and Shorts from a topic (script, stock, AI or own footage, Polish voice-over, karaoke captions, music, editing), A/B variants, editing the user's recordings, reels from long recordings (clipmaker: editable in HQ, karaoke captions), videos from code (HyperFrames, Manim), AI video, Polish captions, platform formats, quality control. Prepares files; never publishes without approval.
+    oddaj_gdy: "film: montaż, lektor, napisy, klipy z długiego nagrania, wideo na platformy, demo strony"
     status: active
 
   - name: jarvo-ads
@@ -185,6 +189,7 @@ agents:
       hq_label: "Operations room"
       description: >-
         Paid ads on Meta Ads (Facebook, Instagram) and Google Ads end to end: campaign planning, structure, audiences, keywords, budgets, launching campaigns, daily account checks, optimisation, A/B/C tests, performance reports and learnings for creatives. Spends money only within a budget envelope the user approves with a code.
+    oddaj_gdy: "płatne reklamy Meta albo Google: plan kampanii z budżetem, test kreacji, audyt konta, raport z eksportu"
     status: active
 
   - name: jarvo-lowca
@@ -209,6 +214,7 @@ agents:
       hq_label: "Sales radar"
       description: >-
         Finds B2B leads from buying signals in official sources: new companies in the KRS register, public tenders (e-Zamówienia, TED) and their winners, job ads, technology and changes on company websites, news. Ideal customer profile, qualification, a ranked list of companies with "why now", contacts the company published itself (with the source), monitoring for new leads. Never sends anything.
+    oddaj_gdy: "szukanie klientów B2B: profil idealnego klienta, firmy z sygnałem zakupowym (KRS, przetargi, rekrutacje), lista leadów"
     status: active
 
   - name: jarvo-reka
@@ -244,5 +250,9 @@ shared:
 
 infra:
   host: vps
+  # usługi z projektów, których compose jeszcze nie uruchamia; skill z `metadata.jarvo.wymaga: [usługa]` trafia do profilu
+  # dopiero, gdy usługa jest w infra/docker-compose.yml (do tego czasu agent mówi wprost, czego brakuje)
+  uslugi_planowane:
+    skarbiec: "strażnik budżetu reklam, docs/ADS.md faza 1"
   hermes_image: nousresearch/hermes-agent:latest   # przypnij do wersji/digestu przy pierwszym wdrożeniu
   channels: [telegram, cli, desktop]

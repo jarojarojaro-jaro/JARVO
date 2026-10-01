@@ -263,7 +263,7 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
     for a in fleet.active():
         if a.name == fleet.orchestrator:
             continue
-        own = sorted(fl.skill_names(a.dir / "skills").keys())
+        own = sorted(fl.available_skills(a.dir / "skills")[0].keys())
         vendored = sorted(Path(e["dest"]).name for e in lock.get("agents", {}).get(a.name, []) or [])
         lines.append(f"### `{a.name}`")
         lines.append(f"- workflowy własne: {', '.join(f'`{n}`' for n in own) or '—'}")
@@ -302,7 +302,7 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
     nazwy skilli zewnętrznych (z dystrybucji po buildzie) i skrypty."""
     agents = []
     for a in fleet.active():
-        wlasne = fl.skill_names(a.dir / "skills")
+        wlasne = fl.available_skills(a.dir / "skills")[0]
         skills = []
         for name, path in sorted(wlasne.items()):
             fm, _ = fl.read_skill(path)
@@ -318,6 +318,30 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
                        "telegram_topic": a.telegram_topic, "autonomy_max": a.autonomy_max, "skills": skills,
                        "external_skills": zewnetrzne, "scripts": skrypty})
     return {"orchestrator": fleet.orchestrator, "agents": agents}
+
+
+def render_handoff_table(fleet: fl.Fleet, agent: fl.Agent) -> str:
+    """Tabela „komu oddać” z fleet.yaml (pole `oddaj_gdy`): każdy aktywny specjalista poza samym agentem.
+    Nowy agent we fleet.yaml trafia tu sam; walidator pilnuje, żeby każdy specjalista miał `oddaj_gdy`."""
+    rows = ["| Sygnał | Właściwy agent |", "|---|---|"]
+    for a in fleet.active():
+        if a.name in (agent.name, fleet.orchestrator) or a.kind != "specialist":
+            continue
+        rows.append(f"| {a.oddaj_gdy or a.description} | `{a.name}` ({a.emoji} {a.title}) |")
+    rows.append(f"| kilka etapów, kilku agentów, decyzje po drodze | `{fleet.orchestrator}` (misja) |")
+    return "\n".join(rows)
+
+
+def render_missing_section(pominiete: dict[str, list[str]], fleet: fl.Fleet) -> str:
+    """Sekcja SOUL: workflowy pominięte w tej instalacji, bo brakuje usług, których wymagają (`metadata.jarvo.wymaga`)."""
+    planowane = (fleet.raw.get("infra") or {}).get("uslugi_planowane") or {}
+    rows = ["## Czego w tej instalacji nie zrobisz (generowane przez build)", "",
+            "Te workflowy wymagają usług, których ta instalacja nie uruchamia, więc nie ma ich w Twoim profilu. Gdy ktoś",
+            "o nie poprosi, powiedz wprost, czego brakuje, i zaproponuj to, co działa. Nie udawaj, że je wykonałeś.", "",
+            "| Workflow | Brakuje usługi |", "|---|---|"]
+    for name, brak in sorted(pominiete.items()):
+        rows.append(f"| `{name}` | " + ", ".join(f"{u} ({planowane[u]})" if u in planowane else u for u in brak) + " |")
+    return "\n".join(rows) + "\n"
 
 
 def render_roster_summary(fleet: fl.Fleet) -> str:
@@ -455,6 +479,12 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
     dest = out_root / agent.name
     shutil.copytree(src, dest, ignore=COPY_IGNORE)
     tokens = base_tokens(fleet, agent, runtime_build_dir, env)
+    # workflowy, którym brakuje usługi (`metadata.jarvo.wymaga`), nie trafiają do profilu: agent nie ma martwych ścieżek
+    _, pominiete = fl.available_skills(src / "skills")
+    for name in pominiete:
+        sciezka = fl.skill_names(dest / "skills").get(name)
+        if sciezka:
+            remove_tree(sciezka.parent)
     # Wideograf: silnik edytora HQ obok projekt.py (render agenta = ten sam co „Eksportuj” w edytorze)
     if (dest / "scripts" / "projekt.py").exists():
         shutil.copy2(fl.REPO_ROOT / "hq" / "plugin" / "edytor.py", dest / "scripts" / "edytor.py")
@@ -470,6 +500,8 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
     soul = soul.replace(fl.PROTOCOL_MARKER, f"{protocol.strip()}\n\n{calibration}")
     if agent.name == fleet.orchestrator:
         soul = soul.replace(fl.ROSTER_MARKER, render_roster_summary(fleet))
+    if pominiete:
+        soul = soul.rstrip() + "\n\n" + render_missing_section(pominiete, fleet)
     soul_path.write_text(render_tokens(soul, tokens), encoding="utf-8")
 
     # profile.yaml
@@ -507,9 +539,12 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         with (dest / "config.yaml").open("a", encoding="utf-8") as f:
             f.write(f'\nfallback_providers:\n  - provider: "{fb["provider"]}"\n    model: "{fb["model"]}"\n')
 
-    # skille własne → tokeny w SKILL.md i references
+    # skille własne → tokeny w SKILL.md i references; tabela „komu oddać” z fleet.yaml
     for md in (dest / "skills").rglob("*.md"):
-        md.write_text(render_tokens(md.read_text(encoding="utf-8"), tokens), encoding="utf-8")
+        tekst = md.read_text(encoding="utf-8")
+        if fl.ODDAJ_MARKER in tekst:
+            tekst = tekst.replace(fl.ODDAJ_MARKER, render_handoff_table(fleet, agent))
+        md.write_text(render_tokens(tekst, tokens), encoding="utf-8")
 
     # Jarvo: roster + rubryki
     if agent.name == fleet.orchestrator:

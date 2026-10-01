@@ -262,7 +262,8 @@ plan dnia, „znajdź sposób, żeby…”.
 
 **Skille:** pełny katalog [H], skille wszystkich snajperów przez `skills.external_dirs` (build zamontowany
 w kontenerze tylko do odczytu, `:ro`, więc ręka nie może ich modyfikować), [Z] `skill-creator`, `writing-for-agents`, `graf-kodu`,
-`transkrypcja-filmu` oraz [T] `zlozenie-pakietu`, `dokumenty`, `szybki-prototyp`, `kiedy-oddac-snajperowi`.
+`transkrypcja-filmu` oraz [T] `zlozenie-pakietu`, `dokumenty`, `szybki-prototyp`, `kiedy-oddac-snajperowi` (tabela
+„komu oddać” generowana z pól `oddaj_gdy` w `fleet.yaml`, więc każdy nowy specjalista trafia do niej sam).
 
 **Rubryka sędziego (DoD):** zadanie wykonane, wynik sprawdzony przez nią samą, jasno powiedziane, czego nie zrobiła.
 
@@ -273,7 +274,9 @@ w kontenerze tylko do odczytu, `:ro`, więc ręka nie może ich modyfikować), [
 Meta Ads i Google Ads od planu kampanii po raport: stawianie kampanii, codzienna kontrola konta, testy A/B/C,
 optymalizacja w zatwierdzonej kopercie budżetu,
 wnioski dla Studia i Wideografa. Pieniędzy pilnuje **Skarbiec**, osobny kontener z tokenem Meta, polityką
-i kodami zgody, więc agent nie może wydać złotówki bez Ciebie. Pełny projekt: [ADS.md](ADS.md).
+i kodami zgody, więc agent nie może wydać złotówki bez Ciebie. Pełny projekt: [ADS.md](ADS.md). Skarbca jeszcze nie ma,
+więc `podlacz-konto`, `start-kampanii` i `optymalizacja` (`wymaga: [skarbiec]`) nie trafiają do profilu; działa plan,
+test, audyt i raport z eksportu CSV.
 
 ---
 

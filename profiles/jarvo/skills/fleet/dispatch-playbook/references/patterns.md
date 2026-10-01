@@ -23,7 +23,10 @@ Decyzje przed rozdaniem: nazwa produktu, język, domena/ścieżka, CTA (np. zapi
 1. `jarvo-sherlock` / `odbiorcy`: kim są odbiorcy, gdzie są, co działa u konkurencji.
 2. `jarvo-studio` / `kampania` (parents: odbiorcy): pakiet (posty, grafiki, kalendarz) + `BRIEF-WIDEO.md`, gdy kampania ma filmy.
 3. `jarvo-wideo` / `filmy` (parents: kampania): filmy z briefu Studia (formaty, warianty A/B, napisy).
-4. `jarvo-reka` / `zlozenie`: pakiet + kalendarz w jednym dokumencie.
+4. opcjonalnie, gdy kampania ma budżet reklamowy: `jarvo-ads` / `reklamy` (parents: kampania, filmy): plan kampanii
+   płatnej (budżet, grupy odbiorców, test kreacji, prognoza) i wnioski dla Studia; start kampanii tylko przez Skarbiec
+   z kodem zgody (A2), a bez Skarbca: plan i kreacje do ręcznego wgrania.
+5. `jarvo-reka` / `zlozenie`: pakiet + kalendarz w jednym dokumencie.
 Publikacja = decyzja użytkownika (A2), potem Studio ustawia kolejkę.
 
 ## 5. Brand kit z istniejącej strony

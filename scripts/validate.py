@@ -473,11 +473,55 @@ def check_docs(fleet: fl.Fleet, r: Report) -> None:
                               f"a tabela podaje {num.group()}")
 
 
+# polecenia, które działają tylko z daną usługą: skill, który ich używa, musi to zadeklarować (`metadata.jarvo.wymaga`)
+SERVICE_COMMANDS = {"skarbiec": r"ads\.py (?:szkic|koperta|pauza|budzet|stop)\b"}
+PATTERNS_FILE = "skills/fleet/dispatch-playbook/references/patterns.md"
+
+
+def check_routing(fleet: fl.Fleet, r: Report) -> None:
+    """Nowy agent nie może zostać „niewidzialny”: każdy specjalista ma `oddaj_gdy` (generowana tabela Ręki), generalista
+    kieruje przez tę tabelę, a Jarvo ma każdego specjalistę we wzorcach misji."""
+    aktywni = fleet.active()
+    for a in aktywni:
+        if a.kind == "specialist" and (not a.oddaj_gdy or a.oddaj_gdy.startswith("TODO")):
+            r.err(f"{a.name}: brak `oddaj_gdy` w fleet.yaml (kiedy generalista ma oddać mu zadanie; tabela jest generowana)")
+    for a in aktywni:
+        if a.kind != "generalist":
+            continue
+        if not any(fl.ODDAJ_MARKER in p.read_text(encoding="utf-8") for p in (a.dir / "skills").rglob("*.md")):
+            r.err(f"{a.name}: żaden skill nie ma znacznika {fl.ODDAJ_MARKER} (tabela „komu oddać” musi być generowana "
+                  f"z fleet.yaml, nie pisana ręcznie)")
+    orch = next((a for a in aktywni if a.name == fleet.orchestrator), None)
+    wzorce = orch.dir / PATTERNS_FILE if orch else None
+    if wzorce and wzorce.is_file():
+        tekst = wzorce.read_text(encoding="utf-8")
+        for a in aktywni:
+            if a.kind == "specialist" and f"`{a.name}`" not in tekst:
+                r.err(f"{a.name}: nie występuje w żadnym wzorcu misji Jarva ({PATTERNS_FILE})")
+
+
+def check_services(fleet: fl.Fleet, r: Report) -> None:
+    """`metadata.jarvo.wymaga` tylko ze znanych usług; polecenia zależne od usługi tylko w skillach, które ją deklarują."""
+    znane = fl.compose_services() | set(((fleet.raw.get("infra") or {}).get("uslugi_planowane") or {}).keys())
+    for a in fleet.active():
+        for name, path in fl.skill_names(a.dir / "skills").items():
+            fm, body = fl.read_skill(path)
+            wymaga = fl.skill_requires(fm)
+            for u in wymaga:
+                if u not in znane:
+                    r.err(f"{a.name}/{name}: wymaga nieznanej usługi {u!r} (ani w docker-compose, ani w infra.uslugi_planowane)")
+            for usluga, wzor in SERVICE_COMMANDS.items():
+                if re.search(wzor, body) and usluga not in wymaga:
+                    r.err(f"{a.name}/{name}: używa poleceń usługi {usluga!r}, ale nie deklaruje `wymaga: [{usluga}]`")
+
+
 def run() -> Report:
     r = Report()
     fleet = fl.load_fleet()
     protocol = (fl.REPO_ROOT / fleet.raw["shared"]["protocol"]).read_text(encoding="utf-8")
     check_fleet(fleet, r)
+    check_routing(fleet, r)
+    check_services(fleet, r)
     own: dict[str, set[str]] = {}
     lock = fl.load_lock()
     for a in fleet.active():

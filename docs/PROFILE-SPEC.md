@@ -88,6 +88,12 @@ Rodzaje skilli agenta:
   w [`vendor/skan-wyjatki.yaml`](../vendor/skan-wyjatki.yaml)) i dokłada go z licencją (`LICENSE-UPSTREAM`) i `.vendored.json`,
 - **skille wspólne floty:** własne skille w `shared/skills/` (narzędziowe jak `graf-kodu`, metodyczne jak `hooki`), przypisywane agentom w tym samym locku.
 
+**Skill zależny od usługi** deklaruje ją w `metadata.jarvo.wymaga` (np. `wymaga: [skarbiec]`). Build wstawia go do profilu
+dopiero, gdy usługa jest w `infra/docker-compose.yml`; do tego czasu skill nie trafia do profilu ani do rosteru Jarva,
+a SOUL agenta dostaje wygenerowaną sekcję „Czego w tej instalacji nie zrobisz”. Planowane usługi są w `fleet.yaml`
+(`infra.uslugi_planowane`), a walidator odrzuca nieznaną usługę i skill, który woła polecenia usługi bez tej deklaracji.
+Agent nie ma więc martwych ścieżek: albo skill działa, albo agent mówi wprost, czego brakuje.
+
 ---
 
 ## 3. Wiedza: knowledge packi
@@ -256,7 +262,9 @@ Agent wchodzi do floty (`status: active` w `fleet.yaml`) dopiero, gdy:
 - [ ] ma ≥ 10 evals (u snajperów i generalisty w tym ≥ 3 „poza zakresem”, gdzie oczekiwanym zachowaniem jest oddanie
   zadania; u Jarva scenariusze `routing`),
 - [ ] przeszedł tydzień dogfoodingu bez krytycznych problemów,
-- [ ] ma README i changelog w dystrybucji.
+- [ ] ma README i changelog w dystrybucji,
+- [ ] specjalista ma w `fleet.yaml` pole `oddaj_gdy` (z niego build generuje tabelę „komu oddać” u Ręki)
+  i występuje we wzorcach misji Jarva (`dispatch-playbook/references/patterns.md`); bez tego walidator go nie przepuści.
 
 ---
 
@@ -273,7 +281,7 @@ profiles/jarvo-web/
 ├── skills/
 │   └── web/                 # kategoria (DESCRIPTION.md generuje build)
 │       ├── audyt-strony/
-│       │   ├── SKILL.md     # opis ≤ 60 znaków, metadata.jarvo: agent, autonomy, reviewed
+│       │   ├── SKILL.md     # opis ≤ 60 znaków, metadata.jarvo: agent, autonomy, reviewed (opcjonalnie wymaga)
 │       │   └── references/  # knowledge pack workflowu
 │       └── …
 ├── scripts/                 # automaty wołane jako $HERMES_HOME/scripts/<plik>
@@ -288,11 +296,13 @@ shared/protocol/kontrakt-zlecenia.md   # protokół (wklejany do SOUL)
 shared/calibration/<rodzina>.md        # kalibracja pod model (za protokołem)
 shared/security/deny.yaml              # wspólne zakazy → approvals.deny
 shared/skills/                         # wspólne skille własne (np. graf-kodu), przypisywane w locku
-fleet.yaml (wpis agenta)               # kind, model_tier, autonomy_max, telegram_topic, hq_room, pin_skills, description
+fleet.yaml (wpis agenta)               # kind, model_tier, autonomy_max, telegram_topic, hq_room, pin_skills, description, oddaj_gdy
 ```
 
 Build (`scripts/build.py`) dokłada do kopii profilu: `profile.yaml` (opis z `fleet.yaml` do routingu kanbana),
 protokół i kalibrację w SOUL, u Jarva skrót floty (`<!-- Jarvo:ROSTER -->`), skill `roster` i rubryki w `sdlc-review`,
+tabelę „komu oddać” z pól `oddaj_gdy` wszędzie, gdzie skill ma `<!-- Jarvo:ODDAJ -->` (u Ręki), pomija skille, którym
+brakuje usługi z `metadata.jarvo.wymaga` (i dopisuje je do SOUL jako niedostępne),
 tokeny `@@…@@` w `config.yaml`, `distribution.yaml` i skillach, wspólne zakazy w `approvals.deny`, `fallback_providers`,
 `DESCRIPTION.md` kategorii, skille z locka z licencjami oraz `cron/jobs.json` (u Wideografa także silnik edytora HQ
 `edytor.py` i `edytor_napisy.js` w `scripts/`).

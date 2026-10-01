@@ -1,6 +1,10 @@
 # Jarvo Ads: specjalista Ads Managera (projekt)
 
 > Stan: **agent zbudowany (faza 2, 2026-09-29); Skarbiec (faza 1) jeszcze nie istnieje.** Decyzje z sekcji 14 podjęte.
+> Do czasu Skarbca skille `podlacz-konto`, `start-kampanii` i `optymalizacja` (`metadata.jarvo.wymaga: [skarbiec]`) nie
+> trafiają do profilu, a SOUL agenta ma wygenerowaną listę tego, czego nie zrobi. Działają: plan kampanii, plan testu,
+> audyt konta, raport i wnioski z eksportu CSV (`eksport.py`), zgodność reklam. Usługa wraca sama, gdy pojawi się
+> w `infra/docker-compose.yml`.
 > Bez Skarbca `ads.py` kończy się kodem 3, a agent pracuje na eksportach CSV (`eksport.py`). Co jest, a co w planie: sekcja 12.
 > Platformy: **Meta Ads i Google Ads.** Fakty o platformach sprawdzone 2026-09-29 (źródła w sekcji 15).
 

@@ -199,3 +199,36 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     web = next(a for a in dane["agents"] if a["name"] == "jarvo-web")
     assert web["short"] == "Web" and any(s["name"] == "bezpieczenstwo-aplikacji" and s["description"] for s in web["skills"])
     assert "security_check.py" in web["scripts"]
+
+
+def test_generalist_handoff_table_covers_every_specialist(built):
+    fleet, out = built
+    tekst = (out / "jarvo-reka/skills/reka/kiedy-oddac-snajperowi/SKILL.md").read_text(encoding="utf-8")
+    assert fl.ODDAJ_MARKER not in tekst
+    for a in fleet.active():
+        if a.kind == "specialist":
+            assert f"`{a.name}`" in tekst and a.oddaj_gdy in tekst, a.name
+    assert "`jarvo-reka`" not in tekst and f"`{fleet.orchestrator}` (misja)" in tekst
+
+
+def test_skills_without_required_service_are_left_out(built):
+    fleet, out = built
+    ads = out / "jarvo-ads"
+    zbudowane = set(fl.skill_names(ads / "skills"))
+    if "skarbiec" in fl.compose_services():          # gdy Skarbiec trafi do compose, skille wracają same
+        assert {"start-kampanii", "optymalizacja", "podlacz-konto"} <= zbudowane
+        return
+    assert not {"start-kampanii", "optymalizacja", "podlacz-konto"} & zbudowane
+    assert {"plan-kampanii", "audyt-konta", "raport-reklam"} <= zbudowane            # ścieżki z eksportem CSV zostają
+    soul = (ads / "SOUL.md").read_text(encoding="utf-8")
+    assert "Czego w tej instalacji nie zrobisz" in soul and "`start-kampanii`" in soul and "skarbiec (" in soul
+    roster = (out / "jarvo/skills/fleet/roster/SKILL.md").read_text(encoding="utf-8")
+    assert "`start-kampanii`" not in roster and "`plan-kampanii`" in roster
+    assert "Czego w tej instalacji" not in (out / "jarvo-web/SOUL.md").read_text(encoding="utf-8")
+
+
+def test_required_service_present_keeps_skills(tmp_path, monkeypatch):
+    monkeypatch.setattr(fl, "compose_services", lambda path=None: {"hermes", "skarbiec"})
+    a = next(x for x in fl.load_fleet().active() if x.name == "jarvo-ads")
+    ok, pominiete = fl.available_skills(a.dir / "skills")
+    assert not pominiete and "start-kampanii" in ok

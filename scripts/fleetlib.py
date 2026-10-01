@@ -25,6 +25,9 @@ MODEL_FAMILIES = (("gpt-", "gpt"), ("chatgpt", "gpt"), ("o3", "gpt"), ("o4", "gp
                   ("deepseek", "deepseek"), ("kimi", "kimi"))
 PROTOCOL_MARKER = "<!-- Jarvo:PROTOCOL -->"
 ROSTER_MARKER = "<!-- Jarvo:ROSTER -->"
+# tabela „komu oddać” generowana z fleet.yaml (pole `oddaj_gdy` każdego specjalisty): Ręka i każdy, kto routuje
+ODDAJ_MARKER = "<!-- Jarvo:ODDAJ -->"
+COMPOSE_FILE = Path(__file__).resolve().parent.parent / "infra" / "docker-compose.yml"
 AGENT_KINDS = {"orchestrator", "specialist", "generalist"}
 AUTONOMY_LEVELS = {"A0", "A1", "A2", "A3"}
 HQ_ROOMS = {"bridge", "study", "devlab", "atelier", "filmstudio", "workshop", "office", "radar"}   # pokoje w Jarvo HQ (hq/web/src/20-art.js)
@@ -107,6 +110,7 @@ class Agent:
     hq_label: str = ""
     hq_short: str = ""
     en: dict = field(default_factory=dict)   # angielskie title / hq_label / description (HQ po angielsku)
+    oddaj_gdy: str = ""                       # kiedy generalista (Ręka) ma oddać zadanie temu agentowi; tabela generowana
 
     @property
     def dir(self) -> Path:
@@ -201,6 +205,7 @@ def load_fleet(path: Path | None = None) -> Fleet:
                 hq_label=entry.get("hq_label", "") or entry.get("title", ""),
                 hq_short=entry.get("hq_short", "") or entry["name"].removeprefix("jarvo-").capitalize(),
                 en={k: " ".join(str(v).split()) for k, v in (entry.get("en") or {}).items() if v},
+                oddaj_gdy=" ".join(str(entry.get("oddaj_gdy", "") or "").split()),
             )
         )
     return Fleet(raw=raw, agents=agents)
@@ -221,6 +226,32 @@ def iter_skill_files(root: Path):
         if any(part.startswith(".") for part in rel.parts):
             continue
         yield path
+
+
+def compose_services(path: Path | None = None) -> set[str]:
+    """Usługi zdefiniowane w infra/docker-compose.yml: to, co instalacja naprawdę uruchamia."""
+    data = load_yaml(path or COMPOSE_FILE) or {}
+    return set((data.get("services") or {}).keys())
+
+
+def skill_requires(fm: dict) -> list[str]:
+    """Usługi, bez których skill nie działa (`metadata.jarvo.wymaga`). Brak usługi = skill nie trafia do profilu."""
+    jarvo = ((fm.get("metadata") or {}).get("jarvo") or {})
+    return [str(x) for x in (jarvo.get("wymaga") or [])]
+
+
+def available_skills(root: Path, services: set[str] | None = None) -> tuple[dict[str, Path], dict[str, list[str]]]:
+    """Skille, których wymagania są spełnione, oraz pominięte → brakujące usługi."""
+    services = compose_services() if services is None else services
+    ok, pominiete = {}, {}
+    for name, path in skill_names(root).items():
+        fm, _ = read_skill(path)
+        brak = [s for s in skill_requires(fm) if s not in services]
+        if brak:
+            pominiete[name] = brak
+        else:
+            ok[name] = path
+    return ok, pominiete
 
 
 def skill_names(root: Path) -> dict[str, Path]:

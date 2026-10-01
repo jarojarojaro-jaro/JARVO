@@ -1,6 +1,6 @@
 # Rozwój floty: plan dopracowania agentów i nowi specjaliści
 
-Stan: **plan do analizy (research 2026-10-01), nic nie jest wdrożone.** Wersje bibliotek, limity API i daty
+Stan: **plan do analizy (research 2026-10-01).** Wdrożone: naprawy z §3 punkty 1, 3 i 4; reszta czeka na decyzje. Wersje bibliotek, limity API i daty
 przepisów sprawdzono 2026-10-01; przed wdrożeniem każdego punktu sprawdzamy je jeszcze raz. Uwagi prawne to
 wskazówki do projektu, nie porada prawna.
 
@@ -26,7 +26,7 @@ Z tego wynikają cztery reguły tego planu:
 | `jarvo-web` | 9 | 9 (~1 400 linii) | 58 | wysoka | wzorzec: sprawdzenia od początku do końca w kodzie |
 | `jarvo-wideo` | 15 | 17 + biblioteka (~5 600 linii) + edytor | 57 | wysoka | pełna linia produkcyjna |
 | `jarvo-lowca` | 6 | 4 + biblioteka (~1 100 linii) | 0 | średnio-wysoka | prawdziwe dane, ale błąd w ocenie leadów i nigdy nie uruchomiony na prawdziwej ofercie |
-| `jarvo-ads` | 10 | 4 (~550 linii) | 6 | nisko-średnia | dobra matematyka testów, ale Skarbiec nie istnieje, więc połowa skilli to martwe ścieżki |
+| `jarvo-ads` | 10 | 4 (~550 linii) | 6 | nisko-średnia | dobra matematyka testów; Skarbiec nie istnieje, więc 3 skille nie działały wcale, a 4 tylko na eksporcie CSV |
 | `jarvo-sherlock` | 7 | 3 (~290 linii) | 16 | nisko-średnia | weryfikacja źródeł tylko w prompcie; dziś blisko zwykłego „deep research” |
 | `jarvo-studio` | 6 | 2 (~160 linii) + 1 szablon | 24 | nisko-średnia | renderuje i mierzy wymiary, ale tekstu, układu i publikacji kod nie sprawdza |
 | `jarvo-reka` | 4 | 2 (~190 linii) | 4 + wszystkie skille floty | niska | generalista bez dostępu do Twojej poczty, kalendarza i dokumentów |
@@ -44,9 +44,13 @@ Te punkty nie wymagają decyzji, tylko poprawki:
    i telefonem do każdego abonenta, także firmy i adresu ogólnego typu `biuro@`. Najcenniejsze są więc
    leady, które same proszą o oferty (przetargi, zapytania ofertowe), bo odpowiedź na nie nie jest
    niezamówiona.
-3. **Ręka kieruje zadania po nieaktualnej tabeli:** `kiedy-oddac-snajperowi` nie zna Ads ani Łowcy.
-4. **Ads opisuje nieistniejące rzeczy:** `podlacz-konto` odsyła do „HQ → Reklamy” i `compose/skarbiec.env`,
-   a `ads.py` zawsze kończy się kodem 3. [ADS.md](ADS.md) podaje Graph API v25, a od 29.07.2026 jest v26.
+3. ✅ **Ręka kierowała zadania po ręcznej, nieaktualnej tabeli** (naprawione 2026-10-01). Tabelę „komu oddać” generuje
+   teraz build z pola `oddaj_gdy` każdego specjalisty w `fleet.yaml`. Walidator nie przepuści aktywnego specjalisty bez
+   tego pola ani bez miejsca we wzorcach misji Jarva, a `make new-agent` od razu dopisuje pole do uzupełnienia.
+4. ✅ **Ads miał martwe ścieżki** (naprawione 2026-10-01): `podlacz-konto`, `start-kampanii` i `optymalizacja` wołały
+   Skarbiec, którego nie ma. Mają teraz `metadata.jarvo.wymaga: [skarbiec]`, więc do czasu Skarbca nie trafiają do profilu,
+   a SOUL agenta dostaje wygenerowaną listę tego, czego nie zrobi. Walidator odrzuca skill wołający polecenia Skarbca bez
+   tej deklaracji. Zostaje: [ADS.md](ADS.md) podaje Graph API v25, a od 29.07.2026 jest v26.
 5. **Sherlock:** wtyczka OpenAlex od lutego 2026 wymaga klucza (`OPENALEX_API_KEY`), a `sources.py --archive`
    zapisuje sam HTML, choć opis obiecuje też tekst.
 6. **Studio i dokumentacja:** [TOOLBOX.md](TOOLBOX.md) wymienia Satori i resvg, a renderuje Playwright.
@@ -133,8 +137,9 @@ spotkań zamienione w zadania.
 | 7 | Przegląd umowy po polsku | lista ryzyk: kary umowne, limit odpowiedzialności, pola eksploatacji przy przeniesieniu praw, umowa powierzenia (art. 28 RODO), termin płatności B2B; na bazie `review-contract` z [knowledge-work-plugins](https://github.com/anthropics/knowledge-work-plugins) (Apache-2.0) | S–M |
 | 8 | Twój głos w szkicach | `executive-voice` i `executive-playbook` z [SortedEA/skills](https://github.com/SortedEA/skills) (MIT) | S |
 | 9 | Zadania | Todoist (oficjalne zdalne MCP) albo Notion, jeśli ich używasz; inaczej `TASKS.md` w skarbcu bez nowej usługi | S |
-| 10 | e-Doręczenia | przekazywanie maila z powiadomieniem na Telegram: od dziś (1.10.2026) każda firma z CEIDG musi mieć adres, a nieodebrana przesyłka po 14 dniach uznaje się za doręczoną | S |
-| 11 | `pack.py` v2 i naprawa tabeli kierowania (§3) | paczka czyta artefakty z kart kanbana, sprawdza linki w `INDEX.md` i wyłapuje niezgodności między kartami (nazwy, ceny, adresy) | S |
+| 10 | „Czy mogę to zapłacić?” | NIP i rachunek na białej liście VAT przed przelewem (powyżej 15 tys. zł rachunek spoza listy to brak kosztu i solidarna odpowiedzialność za VAT), kurs NBP do faktur zagranicznych; wspólny moduł z §4 | S |
+| 10b | e-Doręczenia | przekazywanie maila z powiadomieniem na Telegram: od dziś (1.10.2026) każda firma z CEIDG musi mieć adres, a nieodebrana przesyłka po 14 dniach uznaje się za doręczoną | S |
+| 11 | `pack.py` v2 (tabela kierowania już naprawiona, §3) | paczka czyta artefakty z kart kanbana, sprawdza linki w `INDEX.md` i wyłapuje niezgodności między kartami (nazwy, ceny, adresy) | S |
 
 **Bezpieczeństwo poczty (reguła dwóch).** Czytanie maili łączy prywatne dane, obce treści i kanały
 wyjścia. Dlatego triage działa jako zadanie crona bez przeglądarki, sieci i terminala, a jedyne wyjścia to
@@ -185,102 +190,41 @@ na CPU, kolejne paczki angielskich skilli marketingowych.
 ### 5.6 Web i Wideograf
 
 Bez zmian w tym planie: są wzorcem. Web dostaje tylko zlecenia od nowych agentów (poprawki z audytów
-Inspektora i Ads).
+audytu zgodności (§6) i Ads).
 
-## 6. Nowi specjaliści (propozycja)
+## 6. Nowi specjaliści: decyzja
 
-Każdy działa skryptami uruchamianymi na żądanie, bez usług działających cały czas.
+**Decyzja 2026-10-01: na razie żadnego nowego agenta.** Proponowani Rachmistrz (finanse), Handlowiec (oferty i lejek)
+i Opiekun opinii zostali odrzuceni jako wymyśleni na siłę. Dwa drobne pomysły z nich zostają jako skille Ręki:
+sprawdzenie białej listy przed przelewem (5.3 #10) i terminy podatkowe (5.3 #3).
 
-### 6.1 `jarvo-inspektor`: Inspektor zgodności (najwyżej w kolejce)
-
-Darmowy, poparty dowodami audyt prawny dowolnej strony: prawny odpowiednik technicznego audytu Weba.
-- **Raport cookies:** co ładuje się przed zgodą, po „odrzuć” i po „akceptuj”, z HAR-em i zrzutami jako
-  dowodem; czy „Odrzuć wszystkie” jest równie łatwe jak „Akceptuj”. Miarą jest poradnik UODO dla e-handlu
-  (marzec 2025); art. 399 PKE przewiduje kary do 3% przychodu.
+**Audyt zgodności trafia do Weba jako skill, nie osobny agent.** Web ma już Playwright, axe i nagłówki bezpieczeństwa,
+więc dokładamy mu prawną część tego samego audytu:
+- **Raport cookies:** co ładuje się przed zgodą, po „odrzuć” i po „akceptuj”, z HAR-em i zrzutami jako dowodem; czy
+  „Odrzuć wszystkie” jest równie łatwe jak „Akceptuj”. Miarą jest poradnik UODO dla e-handlu (marzec 2025); art. 399 PKE
+  przewiduje kary do 3% przychodu.
 - **Szkic polityki prywatności i cookies** z faktycznie znalezionych narzędzi (GA4, Pixel), oznaczony
   „do weryfikacji przez prawnika”.
 - **Formularze:** zaznaczone domyślnie zgody, osobna zgoda na każdy kanał (art. 398 PKE).
-- **Sklep:** najniższa cena z 30 dni i opis weryfikacji opinii (Omnibus), dane producenta (GPSR od
-  13.12.2024), martwy link do platformy ODR (zamkniętej 20.07.2025).
-- **Dostępność (EAA):** drzewo decyzji, czy ustawa w ogóle dotyczy firmy (mikroprzedsiębiorcy usługowi są
-  zwolnieni), szkic deklaracji dostępności; test axe robi Web.
-- **Narzędzia:** własny skrypt Playwright, [Open Cookie Database](https://github.com/jkwakman/Open-Cookie-Database)
-  (Apache-2.0), opcjonalnie [gdpr-cookie-scanner](https://github.com/Slashgear/gdpr-cookie-scanner) (MIT).
-- **Granice:** to nie porada prawna; czyta tylko publiczne strony, niczego nie poprawia sam (poprawki idą
-  do Weba), audytów cudzych stron nie publikuje i nikogo nie zgłasza do UODO.
-- **Wartość dla Ciebie:** nieudany audyt to gotowy pretekst do rozmowy o Twoich usługach.
-- **Nakład:** S–M, bez kluczy i kont.
-
-### 6.2 `jarvo-rachmistrz`: Rachmistrz (finanse i zaplecze biura)
-
-- **Skrzynka KSeF tylko do odczytu:** faktury zakupowe jako XML FA(3), rejestr CSV/XLSX, wykrywanie
-  duplikatów, terminy płatności. Od 1.02.2026 wszyscy odbierają faktury w KSeF, od 1.04.2026 wystawiają;
-  mikrofirmy do 10 tys. zł miesięcznie mają czas do 1.01.2027, a kary są od 2027.
-- **„Czy mogę to zapłacić?”:** NIP i rachunek na białej liście przed przelewem; powyżej 15 tys. zł na
-  rachunek spoza listy nie ma kosztu podatkowego i jest solidarna odpowiedzialność za VAT.
-- **Przepływy pieniędzy z wyciągu** MT940 albo CSV, dopasowane do faktur, lista subskrypcji, prognoza na
-  13 tygodni. Bankowych API brak (GoCardless zamknął rejestrację), więc import pliku.
-- **Kalendarz podatkowy** jako ICS i przypomnienia; kurs NBP do faktur Meta i Google (import usług).
-- **Narzędzia:** [ksef-client](https://github.com/smekcio/ksef-client-python) albo [ksef2](https://github.com/stacking-hq/ksef2)
-  (MIT, przed 1.0, więc przypięta wersja), środowisko testowe KSeF do evals, [mt-940](https://github.com/WoLpH/mt940)
-  (BSD-3), NBP, `holidays`.
-- **Granice:** token KSeF z samym `InvoiceRead`; wystawienie faktury w produkcji to A2 z kodem (faktury nie
-  da się usunąć, tylko skorygować); brak dostępu do zapisu w banku i płatności; numery rachunków
-  maskowane w tym, co widzi model; decyzje podatkowe należą do księgowej.
-- **Dlaczego osobny agent, a nie skill Ręki:** token KSeF i dane bankowe mają żyć tylko w jednym profilu.
-  Ręka bierze z Rachmistrza gotowe podsumowanie do porannego briefu.
-- **Nakład:** M–L.
-
-### 6.3 `jarvo-handlowiec`: Handlowiec (od zapytania do podpisanej umowy)
-
-- **Zapytanie mailowe → oferta PDF w Twojej marce** (zakres, terminy, cena, warunki); dane klienta
-  z NIP przez wspólny moduł rejestrów; `to_pdf.py` już jest.
-- **Lejek sprzedaży** w SQLite albo CSV; codziennie lista ofert bez odpowiedzi od ponad 5 dni ze szkicami
-  przypomnień.
-- **Umowa z szablonu** (usługi, NDA, dzieło) z listą ryzyk: pola eksploatacji (art. 41 prawa autorskiego),
-  kary umowne, terminy płatności.
-- **Przekazanie do Rachmistrza** po wygranej: szkic faktury.
-- **Granice:** niczego nie wysyła (A2); przypomnienia tylko w wątkach, które zaczął klient (art. 398 PKE);
-  ceny, rabaty i podpisy decydujesz Ty.
-- **Szew z innymi:** Łowca kończy na kontakcie, Handlowiec zaczyna od pierwszej odpowiedzi; Ręka tylko
-  szkicuje maile, bez stanu lejka.
-- **Nakład:** M.
-
-### 6.4 `jarvo-opiekun`: Opiekun opinii (opcjonalny)
-
-- **Odpowiedzi na opinie Google** w tonie marki; przy negatywnych zalecenie, jak zareagować.
-- **Zestaw do zbierania opinii:** plakat z QR i link do formularza Google, bez filtrowania niezadowolonych.
-- **Spójność nazwy, adresu i telefonu** w Google, Facebooku i polskich katalogach.
-- **FAQ z opinii i strony** dla Weba (strona FAQ z JSON-LD).
-- **Dane:** eksport z Google Takeout; odpowiedzi przez Business Profile API (wymaga zatwierdzenia,
-  profilu zweryfikowanego od 60 dni i strony).
-- **Granice:** każda odpowiedź to A2; żadnych opinii kupionych ani zachęcanych nagrodą (Omnibus, UOKiK);
-  żadnych danych osobowych ani zdrowotnych w odpowiedziach.
-- **Nakład:** S–M; największe ryzyko to uzyskanie dostępu do API. Może zacząć jako skill Studio.
-
-### Odrzuceni kandydaci
-
-- **Social media / community manager:** dubluje Studio, a czytanie cudzych komentarzy wymaga przeglądu
-  aplikacji Meta. Lepiej skill `triage-komentarzy` (tylko szkice) w Studio.
-- **Czatbot na stronę / obsługa klienta:** publiczny punkt wejścia zaprasza do wstrzykiwania poleceń,
-  a Chatwoot potrzebuje 4 GB RAM. Przeżywa tylko część z opiniami i FAQ (Opiekun).
-- **Analityk danych:** wykresy z CSV robi każdy czat; cenne dane mają już Rachmistrz (finanse) i Ads
-  (reklamy), a Search Console może dostać Web jako skill.
-- **Pisarz blogowy SEO:** pokrywają go Sherlock `research-seo`, Studio `copy-pl` i Web `landing-produktowy`.
-- **Osobny recenzent umów:** za wąski; dzielą go Inspektor (regulaminy stron) i Handlowiec (umowy z klientami).
+- **Sklep:** najniższa cena z 30 dni i opis weryfikacji opinii (Omnibus), dane producenta (GPSR od 13.12.2024), martwy
+  link do platformy ODR (zamkniętej 20.07.2025).
+- **Dostępność (EAA):** czy ustawa w ogóle dotyczy firmy (mikroprzedsiębiorcy usługowi są zwolnieni) i szkic deklaracji.
+- **Narzędzia:** własny skrypt Playwright w `scripts/` Weba, [Open Cookie Database](https://github.com/jkwakman/Open-Cookie-Database)
+  (Apache-2.0) do klasyfikacji cookies.
+- **Granice:** to nie porada prawna; czyta tylko publiczne strony, audytów cudzych stron nie publikuje.
+- **Wartość:** to samo co reszta audytu Weba: darmowy, sprawdzalny wynik, który otwiera rozmowę o usługach.
+- **Nakład:** S–M. Część śledzenia (Pixel, Consent Mode) liczy wspólnie z audytem gotowości Ads (5.2 #1), żeby nie
+  pisać tego dwa razy.
 
 ## 7. Kolejność
 
 | Etap | Zakres | Nakład | Klucze i konta |
 |---|---|---|---|
-| A. Naprawy i fundament | §3 (punkt 1 zrobiony), `rejestry_pl.py` (§4) | 2–3 dni | brak |
+| A. Naprawy i fundament | §3 (punkty 1, 3 i 4 zrobione), `rejestry_pl.py` (§4) | 1–2 dni | brak |
 | B. Sygnatury bez kont | Ads: audyt gotowości (5.2 #1–3); Łowca: karta leada (5.1 #2–8, potem #9 na Twojej ofercie); Sherlock: raport z dowodami (5.4 #1–5); Studio: pakiet startowy (5.5 #1–5) | ok. 2 tygodnie | darmowe: archive.org, OpenAlex, GUS BIR, PageSpeed |
-| C. Inspektor | 6.1 | 3–5 dni | brak |
+| C. Web: audyt zgodności | §6 | 3–5 dni | brak |
 | D. Ręka z Twoimi kontami | 5.3 #1–11 | ok. tydzień | poczta, kalendarz (Twoja zgoda na każde) |
-| E. Rachmistrz | 6.2, najpierw środowisko testowe KSeF | 1–2 tygodnie | token KSeF `InvoiceRead` |
-| F. Handlowiec | 6.3 | ok. tydzień | brak nowych |
-| G. Konta reklamowe | Skarbiec faza 1, MCP tylko do odczytu (5.2 #6–7) | ok. tydzień | Meta `ads_read`, Google rola „tylko odczyt” |
-| H. Opiekun (jeśli tak) | 6.4 | 3–5 dni | dostęp do Business Profile API |
+| E. Konta reklamowe | Skarbiec faza 1, MCP tylko do odczytu (5.2 #6–7) | ok. tydzień | Meta `ads_read`, Google rola „tylko odczyt” |
 
 Każdy etap kończy się tak jak dotąd: testy, evals, red team dla nowych wejść z sieci, wdrożenie i próba
 w działającym kontenerze, dokumentacja.
@@ -292,10 +236,8 @@ w działającym kontenerze, dokumentacja.
 | R1 | Kolejność etapów z §7 | **Tak, jak w tabeli:** najpierw naprawy i rzeczy bez kont, potem Twoje konta |
 | R2 | Jakiej poczty i kalendarza używasz (Gmail/Google, Microsoft 365, inna)? | od tego zależy wybór serwera MCP w 5.3 |
 | R3 | Zadania: Todoist, Notion czy plik w skarbcu? | **plik w skarbcu**, jeśli nie używasz żadnej z tych aplikacji |
-| R4 | Finanse jako osobny agent (Rachmistrz) czy skille Ręki? | **osobny agent:** token KSeF i dane bankowe tylko w jednym profilu |
 | R5 | Postiz | **poza VPS** (Postiz Cloud albo mały osobny serwer) albo eksport ICS/CSV |
 | R6 | LanguageTool i changedetection.io | **dopiero po pomiarze RAM** na VPS |
-| R7 | Opiekun opinii | **na razie skill Studio**, osobny agent, gdy będzie dostęp do API |
 | R8 | Baza Konkurencyjności przez nieopisane API strony | **tak, ostrożnie:** małe tempo, a gdy przestanie działać, eksport listy projektów |
 
 ## 9. Źródła
