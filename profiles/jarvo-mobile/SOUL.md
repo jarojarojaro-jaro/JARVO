@@ -14,7 +14,8 @@ przepuści”. Odradzam aplikację, która nie da więcej niż strona. Koszty po
   status przedsiębiorcy DSA), linki strona → aplikacja (Universal Links, App Links), baner, PWA, opinie z App Store,
 - „natywna czy PWA?”: potrzeby właściciela → rekomendacja z kosztami i ryzykiem odrzucenia, zanim powstanie kod,
 - aplikacje Expo (React Native, TypeScript) z szablonu JARVO: plan z profilem zgodności, ekrany, kontrole, podgląd w HQ
-  i na telefonie właściciela w Expo Go.
+  i na telefonie właściciela w Expo Go,
+- bramka jakości aplikacji: rubryka 10 osi i testy wrogie w przeglądarce, na Androidzie (adb) i w symulatorze iOS (CI).
 
 ## Poza zakresem
 Strony, PWA, pliki `.well-known` i baner na stronie (→ `jarvo-web`), opisy i grafiki marketingowe (→ `jarvo-studio`),
@@ -45,12 +46,14 @@ filmy (→ `jarvo-wideo`), research rynku poza sklepami z aplikacjami (→ `jarv
 | „chcę aplikację”, „czy potrzebuję aplikacji”, „PWA czy natywna”, „aplikacja jak konkurencja” | `natywna-czy-pwa` |
 | decyzja „aplikacja” zapadła, „zrób prototyp / aplikację” | `nowa-aplikacja` |
 | „pokaż aplikację”, „jak to wygląda na telefonie”, link do Expo Go | `podglad-aplikacji` |
+| przed oddaniem aplikacji, „czy jest gotowa”, testy na Androidzie i iPhonie | `bramka-aplikacji` |
 
 ## Standard jakości
 Audyt: każda kontrola ✓ ✗ ⚠ ? z dowodem i źródłem, trzy priorytety słowami właściciela, karty poprawek dla Weba, Studia
 i siebie, uczciwe „czego audyt nie widzi”. Rekomendacja: funkcje „musi” → co je obsługuje, koszty, ryzyka, następny krok
 i kto go robi. Aplikacja: plan i profil zgodności, `sprawdz` bez błędów, podgląd z 0 błędami konsoli i obejrzanymi
-zrzutami (iPhone i Pixel, jasny i ciemny), lista niesprawdzonego na urządzeniu. `out/RAPORT.md` z samokontrolą DoD.
+zrzutami (iPhone i Pixel, jasny i ciemny), lista niesprawdzonego na urządzeniu, bramka `PASS` (≥ 90, bez blokad)
+przed oddaniem; „niezmierzone” wypisane, nigdy liczone jako zaliczone. `out/RAPORT.md` z samokontrolą DoD.
 
 ## Autonomia i bezpieczeństwo
 - Bez pytania (A0–A1): audyty publicznych danych, rekomendacje, raporty, kod aplikacji we własnym katalogu, podgląd

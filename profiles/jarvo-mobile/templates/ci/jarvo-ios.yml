@@ -1,0 +1,82 @@
+# Jarvo: testy i zrzuty aplikacji w symulatorze iOS (warstwa 3 bramki aplikacji i zrzuty do App Store).
+# Wkłada go `ios_ci.py przygotuj`; uruchamia `ios_ci.py uruchom` (workflow_dispatch), wyniki pobiera jako artefakt.
+#   tryb expo-go: aplikacja w Expo Go w symulatorze (bez builda natywnego; symulator nie wymaga logowania w Expo Go)
+#   tryb build:   build Release dla symulatora (zrzuty do sklepu bez interfejsu Expo Go; wymaga modułów zgodnych z prebuild)
+# Runner macos-26: Xcode 26.x, symulatory iPhone 17 Pro Max (6,9″ → 1320×2868) i iPad Pro 13″.
+name: jarvo-ios
+on:
+  workflow_dispatch:
+    inputs:
+      tryb: {description: "expo-go albo build", required: false, default: "expo-go"}
+      trasy: {description: "trasy aplikacji oddzielone spacją", required: false, default: "/ /wiecej /kontakt /prywatnosc"}
+      urzadzenie: {description: "nazwa symulatora", required: false, default: "iPhone 17 Pro Max"}
+permissions:
+  contents: read
+jobs:
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: {node-version: "22", cache: npm}
+      - run: npm ci
+      - name: Symulator
+        run: |
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys;n=sys.argv[1];d=json.load(sys.stdin)['devices'];print(next(x['udid'] for r in sorted(d, reverse=True) if 'iOS' in r for x in d[r] if x['name']==n))" "${{ inputs.urzadzenie }}")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          mkdir -p out/ios
+          xcrun simctl list devices "$UDID" > out/ios/urzadzenie.txt
+      - name: Aplikacja (Expo Go)
+        if: inputs.tryb != 'build'
+        run: |
+          set -euo pipefail
+          npx expo start --ios --localhost > out/ios/metro.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://localhost:8081/status | grep -q running && break; sleep 2; done
+          sleep 45
+          echo "exp://127.0.0.1:8081/--" > out/ios/baza.txt
+      - name: Aplikacja (build Release dla symulatora)
+        if: inputs.tryb == 'build'
+        run: |
+          set -euo pipefail
+          npx expo prebuild -p ios --clean
+          SCHEME=$(basename ios/*.xcworkspace .xcworkspace)
+          xcodebuild -workspace "ios/$SCHEME.xcworkspace" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator \
+            -destination "id=$UDID" -derivedDataPath build CODE_SIGNING_ALLOWED=NO > out/ios/xcodebuild.log 2>&1 || (tail -80 out/ios/xcodebuild.log; exit 1)
+          APP=$(find build/Build/Products -name "*.app" -maxdepth 3 | head -1)
+          xcrun simctl install "$UDID" "$APP"
+          SCHEME_URL=$(node -e "const c=require('./jarvo.app.json');console.log(c.scheme)")
+          BUNDLE=$(node -e "const c=require('./jarvo.app.json');console.log(c.bundle_ios)")
+          xcrun simctl launch "$UDID" "$BUNDLE"
+          sleep 15
+          echo "${SCHEME_URL}:/" > out/ios/baza.txt
+      - name: Zrzuty i testy wrogie
+        run: |
+          set -uo pipefail
+          BAZA=$(cat out/ios/baza.txt)
+          zrzuty() {   # $1 = prefiks pliku
+            for T in ${{ inputs.trasy }}; do
+              N=$(echo "$T" | sed 's#^/##; s#[^A-Za-z0-9_-]#_#g'); N=${N:-start}
+              xcrun simctl openurl "$UDID" "${BAZA}/${T#/}"
+              sleep 6
+              xcrun simctl io "$UDID" screenshot --type=png "out/ios/$1-$N.png"
+            done
+          }
+          xcrun simctl ui "$UDID" appearance light; zrzuty jasny
+          xcrun simctl ui "$UDID" appearance dark; zrzuty ciemny
+          xcrun simctl ui "$UDID" appearance light
+          xcrun simctl ui "$UDID" content_size accessibility-extra-extra-extra-large; zrzuty duza-czcionka
+          xcrun simctl ui "$UDID" content_size large
+          xcrun simctl spawn "$UDID" log show --last 15m --style compact --predicate 'eventMessage CONTAINS[c] "error" OR eventMessage CONTAINS[c] "exception"' \
+            2>/dev/null | grep -Ei "ReactNativeJS|RCTFatal|Unhandled|Exception" | tail -60 > out/ios/bledy.txt || true
+          ls -1 out/ios > out/ios/pliki.txt
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with: {name: jarvo-ios, path: out/ios, retention-days: 7}

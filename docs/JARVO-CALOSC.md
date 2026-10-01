@@ -64,7 +64,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, filmy z kodu, maskotka | Studio filmowe (`filmstudio`) | wideo | 15 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem | Sala operacyjna (`office`) | ads | 10 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 6 |
-| 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 4 |
+| 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI); konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 5 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | Warsztat (`workshop`) | reka | 4 |
 
 ### 2a. jarvo-mobile — szczegóły (najnowszy)
@@ -75,8 +75,10 @@ ze strony App Store, Google Play: aktualizacja, docelowe API, oceny, Data safety
 w CDN Apple i Digital Asset Links API; baner, odznaki, PWA, polityka prywatności; opinie z App Store z tematami skarg;
 aplikacje partnerów oddzielone od aplikacji firmy). Etap 2: `nowa-aplikacja` i `podglad-aplikacji` (szablon
 `templates/expo-jarvo` z Expo SDK 57 i elementami zgodności, `zgodnosc.py`, `aplikacja.py nowa/ustaw/sprawdz/podglad/
-expo-go`, ikony z logo albo inicjałów, zrzuty iPhone 17 Pro Max i Pixel w obu motywach z kontrolami). Kolejne etapy:
-bramka aplikacji na urządzeniu, lista kontrolna sklepów, wydanie.
+expo-go`, ikony z logo albo inicjałów, zrzuty iPhone 17 Pro Max i Pixel w obu motywach z kontrolami). Etap 3:
+`bramka-aplikacji` (rubryka 10 osi, werdykt PASS / REVISE / BLOCK, testy wrogie: `wrogie.cjs` w przeglądarce,
+`urzadzenie.py` na Androidzie przez adb, `ios_ci.py` w symulatorze iOS na GitHub Actions). Kolejne etapy: lista
+kontrolna sklepów, wydanie.
 
 ### 2a''. jarvo-lowca — szczegóły
 Łowca leadów B2B z oficjalnych, darmowych źródeł: KRS (API MS: biuletyn dnia i odpisy; nazwiska zarządu maskowane),

@@ -86,6 +86,28 @@ tools:
     healthcheck: "node -e \"require('playwright-core')\""
     autonomy: A0
     notes: "zrzuty.cjs: iPhone 17 Pro Max (1320×2868) i Pixel 9, jasny i ciemny; kontrole konsoli, przewijania, celów dotyku i axe-core."
+  - name: adb
+    source: https://developer.android.com/tools/adb (pakiet Debiana adb)
+    license: Apache-2.0
+    version: see-infra
+    install: {method: apt, spec: adb}
+    integration: skill-script
+    used_by_skills: [bramka-aplikacji]
+    healthcheck: "adb version"
+    autonomy: A1
+    optional: true
+    notes: "urzadzenie.py: usługa floty android (Redroid) w sieci jarvo-net albo telefon / emulator właściciela; port adb nigdy publicznie."
+  - name: github-actions-macos
+    source: https://github.com/actions/runner-images (macos-26)
+    license: usługa GitHub (minuty macOS)
+    version: "macos-26 (Xcode 26.x)"
+    install: {method: none, spec: "workflow templates/ci/jarvo-ios.yml w repo aplikacji właściciela"}
+    integration: skill-script
+    used_by_skills: [bramka-aplikacji]
+    healthcheck: "python3 -c \"import urllib.request; urllib.request.urlopen('https://api.github.com/zen', timeout=20)\""
+    autonomy: A1
+    optional: true
+    notes: "ios_ci.py: wypchnięcie na gałąź jarvo/ci, workflow_dispatch, artefakt ze zrzutami i logami; GITHUB_TOKEN fine-grained właściciela."
 
 sidecars: []
 hermes_skills: []

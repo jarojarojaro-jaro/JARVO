@@ -18,7 +18,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [15 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 57 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy (+ wideo_lib) | [23](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [13](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [6 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 0 | krs, przetargi, strona, leady | [13](../evals/jarvo-lowca/scenarios.yaml) |
-| `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [4 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 0 | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty (+ mobile_lib, szablon `expo-jarvo`) | [18](../evals/jarvo-mobile/scenarios.yaml) |
+| `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [5 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 0 | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [21](../evals/jarvo-mobile/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 4 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [12](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -313,8 +313,10 @@ robota jego organizacji). Konta Apple, Google i Expo zawsze właściciela. Pełn
 jakości na urządzeniu, lista kontrolna sklepów, wydanie): [MOBILE.md](MOBILE.md).
 
 **Skille:** [T] `audyt-mobilny` (+ kryteria kontroli), `natywna-czy-pwa` (+ macierz decyzji), `nowa-aplikacja`
-(+ szablon planu, zasady ekranów), `podglad-aplikacji` (+ konfiguracja Expo Go). Skrypty: `audyt_mobilny.py`,
-`decyzja.py`, `zgodnosc.py`, `aplikacja.py`, `ikony.cjs`, `zrzuty.cjs`; szablon `templates/expo-jarvo/`.
+(+ szablon planu, zasady ekranów), `podglad-aplikacji` (+ konfiguracja Expo Go), `bramka-aplikacji` (+ rubryka 10 osi,
+werdykt, testy wrogie w przeglądarce, na Androidzie przez adb i w symulatorze iOS w GitHub Actions). Skrypty:
+`audyt_mobilny.py`, `decyzja.py`, `zgodnosc.py`, `aplikacja.py`, `ikony.cjs`, `zrzuty.cjs`, `wrogie.cjs`,
+`urzadzenie.py`, `ios_ci.py`, `bramka.py`; szablony `templates/expo-jarvo/` i `templates/ci/jarvo-ios.yml`.
 
 ---
 

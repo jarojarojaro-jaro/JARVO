@@ -327,7 +327,7 @@ a `eas metadata:lint` (tylko App Store, w becie) ma dwie reguły i liczy słowa 
 | **A** | **Konto i tożsamość** | | |
 | 1 | wysyła właściciel ze swoich kont Apple i Google; agent jako członek zespołu; nigdy jedno konto dla wielu firm | ręcznie | Apple 4.2.6, 5.6.2 |
 | 2 | status przedsiębiorcy DSA zweryfikowany w App Store Connect | ręcznie | [wymagania](https://developer.apple.com/news/upcoming-requirements/) |
-| 3 | branża regulowana (zdrowie, finanse) → wysyła podmiot prawny, dokumenty w załączniku | pół | Apple 5.6.2 |
+| 3 🟡 | `bramka-aplikacji`: rubryka 10 osi, werdykt (`bramka.py`), testy wrogie w przeglądarce (`wrogie.cjs`), na Androidzie przez adb (`urzadzenie.py`) i w symulatorze iOS na GitHub Actions (`ios_ci.py`, `templates/ci/jarvo-ios.yml`); usługa Android (Redroid) + ws-scrcpy w dashboardzie | bramka i warstwa web gotowe: w kontenerze szablon 7/7 testów wrogich, celowo zepsuta aplikacja 4 błędy (przewijanie, axe w trybie ciemnym, brak paska offline, długie słowa), werdykt rundy 1 = REVISE 87 (start z tekstem zastępczym, ikona z inicjałami); Android i iOS przetestowane na atrapach (13 testów); usługa Android w budowie, test na serwerze Ubuntu i Windows 11 (piaskownica nie ma KVM ani bindera) | GitHub albo Codemagic |
 | **B** | **Build i konfiguracja** | | |
 | 4 | `ios.bundleIdentifier` i `android.package` ustawione, w odwrotnej notacji domeny, nie `com.example` (identyfikatora nie da się zmienić po pierwszym wgraniu) | auto | App Store Connect |
 | 5 | numer wersji i builda wyższy niż ostatnio wgrany (`eas build:version:get`) | auto | EAS |
