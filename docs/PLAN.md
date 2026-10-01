@@ -231,7 +231,8 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
-- ⬜ Kolejni specjaliści (`make new-agent`), np. finanse, zdrowie, dom.
+- ⬜ Dopracowanie słabszych agentów (Łowca, Ads, Ręka, Sherlock, Studio) i kolejni specjaliści (Inspektor zgodności,
+  Rachmistrz, Handlowiec, Opiekun opinii): plan do analizy w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md). Dalej np. zdrowie, dom.
 
 ### Faza 5: Automatyzacje i rój
 - ✅ Rutyny: patrol co 30 min (bez modelu, gdy spokój), poranny brief, przegląd tygodnia, świeżość wiedzy.
