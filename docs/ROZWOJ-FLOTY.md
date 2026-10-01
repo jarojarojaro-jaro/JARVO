@@ -1,7 +1,7 @@
 # Rozwój floty: plan dopracowania agentów i nowi specjaliści
 
-Stan: **plan do analizy (research 2026-10-01, druga runda propozycji agentów w §6).** Wdrożone: naprawy z §3 punkty
-1, 3 i 4; reszta czeka na decyzje. Wersje bibliotek, limity API i daty
+Stan: **plan do analizy (research 2026-10-01).** Wdrożone: naprawy z §3 punkty 1, 3 i 4. Nowi agenci: na razie żadni
+(dwie rundy propozycji odłożone, §6); reszta czeka na decyzje. Wersje bibliotek, limity API i daty
 przepisów sprawdzono 2026-10-01; przed wdrożeniem każdego punktu sprawdzamy je jeszcze raz. Uwagi prawne to
 wskazówki do projektu, nie porada prawna.
 
@@ -216,85 +216,18 @@ Agent u 8 tys. klientów, agent Meta w WhatsApp i Instagramie: 10 mln rozmów ty
 mają autonomiczni handlowcy wysyłający maile sami (70–80% rezygnacji po 3 miesiącach u 11x). Paczki z 12 „pracownikami”
 (Sintra, Marblism) zbierają recenzje „ogólnikowe i wymagające codziennej poprawki”.
 
-### 6.2 Propozycja: trzech agentów
+### 6.2 Decyzja: odłożone
 
-**`jarvo-informatyk`: Informatyk (najmocniejszy, przydaje się każdej firmie).** Firma jednoosobowa nie ma działu IT,
-a oszustwa na fakturach i phishing to dziś największe ryzyko finansowe małej firmy.
-- **Darmowy audyt domeny i poczty** (jak u Weba: sprawdzalny w sekundę): data wygaśnięcia domeny i DNSSEC z RDAP,
-  SPF (z limitem 10 zapytań), DKIM, DMARC, MTA-STS, certyfikat HTTPS; gotowe rekordy DNS do wklejenia
-  ([checkdmarc](https://github.com/domainaware/checkdmarc), Apache-2.0, zna nowy standard DMARC z maja 2026).
-- **„Kto wysyła maile jako Ty”:** raporty DMARC z osobnej skrzynki ([parsedmarc](https://pypi.org/project/parsedmarc/),
-  Apache-2.0) pokazują zapomniane narzędzia i podszywanie się; bezpieczna ścieżka od `p=none` do `reject`.
-- **Domeny-sobowtóry:** permutacje Twojej domeny ([dnstwist](https://github.com/elceef/dnstwist)) sprawdzone z listą
-  ostrzeżeń [CERT Polska](https://hole.cert.pl/domains/v2/domains.txt): na tym stoi oszustwo „zmiana numeru konta”.
-- **„Czy ten mail to oszustwo?”:** przesyłasz podejrzany mail jako załącznik `.eml`, agent czyta nagłówki, wiek domeny,
-  linki z listą CERT (nie otwierając ich) i daje werdykt; przy fakturze sprawdza rachunek na białej liście VAT.
-- **Konta i hasła:** MFA i administratorzy w Google Workspace albo Microsoft 365 tylko do odczytu; wycieki haseł przez
-  bezpłatne [moje.cert.pl](https://moje.cert.pl/) (opcjonalnie płatne HIBP).
-- **Raport w poniedziałek na Telegramie** z alertami 60, 30 i 7 dni przed wygaśnięciem domeny i certyfikatu.
-- **Dlaczego osobny agent:** stały monitoring i tokeny administratora (tylko do odczytu) w jednym, izolowanym profilu;
-  Web zostaje przy stronie (nagłówki, HTTPS), a nie przy domenie, poczcie i kontach.
-- **Granice:** niczego nie zmienia w DNS ani kontach (gotowe rekordy, zmiana to A2); nie otwiera linków z podejrzanych maili.
-- **Nakład:** M.
+**2026-10-01: druga runda też odłożona; na razie żadnych nowych agentów.** Rozważani byli:
+- **Informatyk:** audyt domeny i poczty (SPF, DKIM, DMARC), domeny-sobowtóry z listą CERT, ocena podejrzanych maili.
+- **Recepcja:** wiadomości od klientów z wielu kanałów, szkic odpowiedzi i zatwierdzenie na Telegramie. Research
+  kanałów (co da się podłączyć: poczta, Allegro, SMS, Instagram tak; Messenger i WhatsApp po konfiguracji Meta;
+  czat Google, LinkedIn, TikTok w UE nie) jest w historii repo, commit `487626e`.
+- **Menedżer sklepu:** jakość sprzedaży na Allegro, parametry ofert i GPSR, marża, Merchant Center.
 
-**`jarvo-recepcja`: Recepcja (wiadomości od klientów).** Najlepiej udokumentowana rola na rynku, a jednoosobowa firma
-traci na niej najwięcej czasu i klientów (odpowiedź po godzinach, po 24 h na Allegro).
-- **Jedna kolejka wiadomości od klientów:** poczta firmowa, Messenger i Instagram (Graph API dla własnej strony),
-  wiadomości Allegro; dla każdej szkic odpowiedzi z wiedzy firmy (cennik, FAQ, regulamin, godziny ze skarbca i strony).
-- **Zatwierdzanie jednym przyciskiem na Telegramie:** „wyślij”, „popraw”, „odpowiem sam”. Nic nie wychodzi bez Ciebie (A2).
-- **Pilnowanie czasu odpowiedzi:** alert, gdy wiadomość czeka za długo (np. limit 24 h Allegro); prośby o termin wpisane
-  jako propozycje do kalendarza; przypomnienia o wizycie do zatwierdzenia.
-- **Pytania bez odpowiedzi w wiedzy firmy** trafiają do Ciebie i, po Twojej odpowiedzi, jako szkic do skarbca, więc
-  z czasem recepcja wie więcej.
-- **Dlaczego osobny agent, a nie Ręka:** czyta niezaufane wiadomości od obcych ludzi, więc musi mieć minimum narzędzi
-  (bez terminala, przeglądarki i plików; tylko wiedza firmy do odczytu i szkic). Ręka pracuje na Twoich sprawach
-  z pełnym zestawem narzędzi; połączenie obu w jednym profilu to podręcznikowe ryzyko wstrzyknięcia poleceń.
-- **Później, tylko jeśli zechcesz:** automatyczne odpowiedzi na wąskie, powtarzalne pytania (godziny, dojazd, status
-  przesyłki) według reguł, które sam zatwierdzisz.
-- **Nakład:** M (najwięcej pracy to podłączenie kanałów).
+Dane z §6.1 zostają jako punkt odniesienia, gdy wrócimy do tematu.
 
-**Recepcja: jak podłączyć kanały (sprawdzone w dokumentacji 2026-10-01).**
-
-| Kanał | Da się? | Co musi zrobić właściciel | Jak czytamy |
-|---|---|---|---|
-| Poczta (IMAP, Gmail, Microsoft 365) | tak | hasło aplikacji albo własna aplikacja Google/Microsoft; Microsoft pozwala na „czytaj i twórz szkice” bez prawa wysyłki (`Mail.ReadWrite` bez `Mail.Send`) | odpytywanie, bez publicznego adresu |
-| Allegro | tak | własna aplikacja w panelu deweloperskim Allegro, logowanie kodem z urządzenia | odpytywanie (`/messaging/threads`, dyskusje `/sale/issues`) |
-| Instagram (konto firmowe) | tak, po konfiguracji | własna aplikacja Meta, logowanie Instagramem; dla własnego konta wystarcza Standard Access | odpytywanie (`/me/conversations`) |
-| Messenger (strona na Facebooku) | prawdopodobnie, po konfiguracji | własna aplikacja Meta; dokumentacja Meta jest sprzeczna co do przeglądu aplikacji, więc liczymy się z weryfikacją firmy | odpytywanie (`/{page-id}/conversations`) |
-| WhatsApp Business | tak, ale trudniej | aplikacja Meta, numer wypięty z aplikacji WhatsApp (wspólny numer z aplikacją tylko przez partnera Meta); wiadomości poza 24 h tylko szablonami (płatne) | tylko webhook: potrzebny tunel (Cloudflare Tunnel albo Tailscale Funnel) |
-| SMS | tak | numer u SerwerSMS, SMSAPI albo Twilio (od ok. 99 zł miesięcznie za numer dedykowany w SMSAPI) | SerwerSMS: odpytywanie; SMSAPI: webhook |
-| OLX | tak, po akceptacji | aplikacja w Partner API OLX (OLX ją sprawdza) | odpytywanie |
-| Formularz na stronie | tak | formularz wysyła maila na osobną skrzynkę | przez pocztę |
-| Telegram (klienci piszą do bota) | tak | bot w BotFather | odpytywanie |
-| Czat Google w profilu firmy | **nie** | Google wyłączył czat 31.07.2024 | — |
-| LinkedIn (strona firmy), TikTok (w UE) | **nie** | brak API dla wiadomości firmowych | — |
-| Booksy | **tylko partnerzy** | API tylko po umowie z Booksy | — |
-
-**Jak to działa:** każdy kanał ma mały łącznik (skrypt), który co minutę pobiera nowe wiadomości do jednej kolejki
-(SQLite). Webhook, tunel i jeden publiczny adres są potrzebne tylko dla WhatsAppa. Recepcja czyta kolejkę i pisze
-szkic z wiedzy firmy. Ty dostajesz na Telegramie wiadomość klienta i szkic i odpowiadasz „wyślij”, „popraw: …” albo
-„sam odpowiem”. Wysyła **osobny skrypt bez modelu**, dokładnie zatwierdzony tekst, i przed wysyłką sprawdza okno
-kanału (24 h w Meta, szablon w WhatsAppie). Model nie ma narzędzia do wysyłki, więc wstrzyknięte polecenie w wiadomości
-klienta nie może niczego wysłać; to ten sam wzorzec co Skarbiec w Ads.
-
-**Kolejność kanałów:** 1. poczta, Allegro, formularz, SMS (bez publicznego adresu); 2. Instagram; 3. Messenger
-i WhatsApp po weryfikacji firmy w Meta. Gotowa skrzynka wielokanałowa (Chatwoot, MIT) ma sens tylko dla firm z kilkoma
-osobami do obsługi: kosztuje ok. 4 GB RAM i nie upraszcza konfiguracji Meta.
-
-**`jarvo-sklep`: Menedżer sklepu (tylko dla firm sprzedających online, włączany opcjonalnie).**
-- **Jakość sprzedaży na Allegro** (`/sale/quality`): wynik z historią 30 dni, co spadło i które zamówienia lub
-  dyskusje za tym stoją.
-- **Brakujące parametry ofert**, także te obowiązkowe w ciągu 3 miesięcy, i **braki GPSR** (producent, informacje
-  o bezpieczeństwie; bez nich oferty nie da się edytować): gotowe poprawki do zatwierdzenia.
-- **Marża na produkcie** po prowizji, opłatach Smart! i kosztach reklam; problemy w Google Merchant Center
-  (nowe Merchant API, stare Content API wyłączone 18.08.2026) z poprawką na produkt.
-- **Szkice odpowiedzi w dyskusjach i zwrotach** z terminami (wiadomości ogólne idą przez Recepcję).
-- **Ceny konkurencji:** tylko legalnie, przez reguły cenowe Allegro; wyszukiwanie ofert konkurencji w API jest dla
-  nowych aplikacji zamknięte, a regulamin API przewiduje 50 tys. zł kary umownej za naruszenie, więc żadnego scrapowania.
-- **Granice:** faza 1 tylko odczyt; każda zmiana oferty, ceny i wiadomość to A2. Własna aplikacja Allegro właściciela.
-- **Nakład:** M–L. Sens ma tylko u kogoś, kto sprzedaje online; u reszty agent jest wyłączony.
-
-### 6.3 Skille zamiast agentów
+### 6.3 Pomysły na skille (odłożone razem z agentami, do decyzji przy rozwoju istniejących agentów)
 
 Część bólów jest prawdziwa, ale nie uzasadnia osobnego profilu:
 
@@ -338,10 +271,8 @@ więc dokładamy mu prawną część tego samego audytu:
 | A. Naprawy i fundament | §3 (punkty 1, 3 i 4 zrobione), `rejestry_pl.py` (§4) | 1–2 dni | brak |
 | B. Sygnatury bez kont | Ads: audyt gotowości (5.2 #1–3); Łowca: karta leada (5.1 #2–8, potem #9 na Twojej ofercie); Sherlock: raport z dowodami (5.4 #1–5); Studio: pakiet startowy (5.5 #1–5) | ok. 2 tygodnie | darmowe: archive.org, OpenAlex, GUS BIR, PageSpeed |
 | C. Web: audyt zgodności | §6.4 | 3–5 dni | brak |
-| D. Informatyk | §6.2 (jeśli zatwierdzisz) | ok. tydzień | opcjonalnie: odczyt kont Google/Microsoft, klucz Spamhaus DQS |
-| E. Recepcja | §6.2 (jeśli zatwierdzisz) | 1–2 tygodnie | skrzynka firmowa, strona na Facebooku/Instagramie, Allegro |
-| F. Ręka z Twoimi kontami | 5.3 #1–11 i skille z §6.3 | ok. tydzień | poczta, kalendarz, program do faktur (Twoja zgoda na każde) |
-| G. Konta reklamowe | Skarbiec faza 1, MCP tylko do odczytu (5.2 #6–7) | ok. tydzień | Meta `ads_read`, Google rola „tylko odczyt” |
+| D. Ręka z Twoimi kontami | 5.3 #1–11 | ok. tydzień | poczta, kalendarz (Twoja zgoda na każde) |
+| E. Konta reklamowe | Skarbiec faza 1, MCP tylko do odczytu (5.2 #6–7) | ok. tydzień | Meta `ads_read`, Google rola „tylko odczyt” |
 
 Każdy etap kończy się tak jak dotąd: testy, evals, red team dla nowych wejść z sieci, wdrożenie i próba
 w działającym kontenerze, dokumentacja.
@@ -356,9 +287,6 @@ w działającym kontenerze, dokumentacja.
 | R5 | Postiz | **poza VPS** (Postiz Cloud albo mały osobny serwer) albo eksport ICS/CSV |
 | R6 | LanguageTool i changedetection.io | **dopiero po pomiarze RAM** na VPS |
 | R8 | Baza Konkurencyjności przez nieopisane API strony | **tak, ostrożnie:** małe tempo, a gdy przestanie działać, eksport listy projektów |
-| R9 | Których nowych agentów z §6.2 budujemy? | **Informatyk i Recepcja**; Sklep tylko, jeśli Ty albo pierwsi użytkownicy sprzedajecie online |
-| R10 | Kanały Recepcji na start | **poczta firmowa i Messenger/Instagram**, Allegro razem ze Sklepem |
-| R11 | Skille z §6.3 | **wszystkie**, w etapach Ręki, Łowcy, Jarva, Studia i Weba |
 
 ## 9. Źródła
 

@@ -233,8 +233,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
 - 🟡 Dopracowanie słabszych agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności (cookies, zgody, Omnibus)
   jako skill Weba: plan w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md); naprawy z §3 (ocena leadów, tabela Ręki, martwe ścieżki Ads)
-  zrobione 2026-10-01. Nowi specjaliści (druga runda, oparta na danych o bólach małych firm): Informatyk, Recepcja
-  i opcjonalny Menedżer sklepu, do decyzji w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md) §6.
+  zrobione 2026-10-01. Nowi specjaliści: na razie żadni (dwie rundy propozycji odłożone, [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md) §6).
 
 ### Faza 5: Automatyzacje i rój
 - ✅ Rutyny: patrol co 30 min (bez modelu, gdy spokój), poranny brief, przegląd tygodnia, świeżość wiedzy.
