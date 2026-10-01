@@ -70,6 +70,7 @@ const liveApi = {
     return res.json();
   },
   site: (path) => SDK.fetchJSON(`${API_ROOT}/site`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
+  android: () => SDK.fetchJSON(`${API_ROOT}/android`, { method: "POST" }),
   reveal: (path) => SDK.fetchJSON(`${API_ROOT}/reveal`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
   host: () => SDK.fetchJSON(`${API_ROOT}/host`),
   async fileBlob(path) {
@@ -146,10 +147,19 @@ function useHost() {
 // „Odpal”: strona w nowej karcie z serwera podglądu (osobny port, link z tokenem). Kartę otwieramy od razu
 // (blokada wyskakujących okien), odcinamy jej dostęp do dashboardu (opener) i dopiero potem ładujemy adres.
 async function openSite(path) {
+  return openTokenLink(() => api.site(path));
+}
+
+// Ekran telefonu testowego (Redroid przez ws-scrcpy): to samo, link z proxy na osobnym porcie.
+function openAndroidScreen() {
+  return openTokenLink(() => api.android());
+}
+
+async function openTokenLink(get) {
   const w = window.open("", "_blank");
   if (w) { w.opener = null; w.document.title = "Uruchamiam…"; }
   try {
-    const r = await api.site(path);
+    const r = await get();
     const url = r.url || `${location.protocol}//${location.hostname}:${r.port}${r.path}`;
     if (w) w.location.href = url; else window.open(url, "_blank", "noopener");
   } catch (e) {

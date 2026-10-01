@@ -31,6 +31,8 @@ wszystkie profile przez jeden multipleksowany gateway, a s6 pilnuje i restartuje
         │  └──────────────┬────────────────┘   później: honcho, postiz  │
         │        /opt/data (wolumen)           monitoring (opcja):      │
         │                                      uptime-kuma, beszel      │
+        │                                      android (opcja): telefon │
+        │                                      testowy + ekran ws-scrcpy│
         │  Tailscale ◄── Ty: SSH, dashboard Hermesa, desktop app       │
         └──────────────────────────────────────────────────────────────┘
                        │
@@ -89,6 +91,7 @@ Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników 
 |---|---|---|---|---|
 | Flota v1 (cała) | 4 vCPU | **8 GB** | 80 GB NVMe | 9 agentów, SearXNG, Lighthouse, PDF, transkrypcja, render wideo (FFmpeg, chwilowo 0,5–0,65 GB); monitoring (+0,2 GB) |
 | + dodatki obrazu | 4 vCPU | 8 GB | 80 GB | `JARVO_EXTRAS` (niżej): zwiększa dysk, nie RAM w spoczynku |
+| + telefon testowy (Twórca aplikacji) | 4 vCPU | 8 GB | +3 GB | Redroid do 2 GB + ekran 0,25 GB, włączany na czas testów (`jarvo android on`, moduł `binder_linux`); serwer z KVM: emulator Google do 4 GB, wtedy wygodniej 12–16 GB |
 | + Langfuse / Honcho | 8 vCPU | 16 GB | 160 GB+ | self-hostowane ślady i pamięć (ClickHouse i Postgres są pamięciożerne) |
 
 **Dodatki obrazu** (`JARVO_EXTRAS` w `compose/.env`, potem `deploy.sh --rebuild`), domyślnie wyłączone:
@@ -152,6 +155,7 @@ Rekomendacje:
 | ~~`gotenberg`~~ | zastąpiony: `to_pdf.py` (pandoc + Chromium, LibreOffice jako dodatek) | | ❌ usunięty (RAM) |
 | `uptime-kuma` | healthchecki i alerty | MIT | ✅ profil `monitoring` |
 | `beszel` (+ agent) | CPU/RAM/dysk, alerty | MIT | ✅ profil `monitoring` |
+| `android` (Redroid) / `android-emulator` (emulator Google, KVM) + `android-ekran` (ws-scrcpy) | telefon testowy Twórcy aplikacji: adb w sieci floty, ekran w HQ przez proxy `:9122` z tokenem | Apache-2.0 / MIT / MIT | ✅ profile `android` i `android-kvm` (`jarvo android on`) |
 | `honcho` (+ postgres/pgvector) | wspólna pamięć o Tobie | AGPL-3.0 | ⬜ faza 3, jeśli MVP pamięci nie wystarczy |
 | `postiz` (+ postgres, redis) | kolejka publikacji social media po Twojej akceptacji | AGPL-3.0 | ⬜ gdy Studio zacznie publikować |
 | `langfuse` | ślady, koszty, oceny sędziego | MIT (core) | ⬜ faza 6 |

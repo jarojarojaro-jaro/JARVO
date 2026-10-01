@@ -96,7 +96,7 @@ tools:
     healthcheck: "adb version"
     autonomy: A1
     optional: true
-    notes: "urzadzenie.py: usługa floty android (Redroid) w sieci jarvo-net albo telefon / emulator właściciela; port adb nigdy publicznie."
+    notes: "urzadzenie.py: telefon testowy floty (jarvo android on: emulator Google przy KVM albo Redroid) w sieci jarvo-net albo telefon / emulator właściciela; port adb nigdy publicznie. Ekran dla właściciela: jarvo_link.py --android."
   - name: github-actions-macos
     source: https://github.com/actions/runner-images (macos-26)
     license: usługa GitHub (minuty macOS)

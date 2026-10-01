@@ -98,33 +98,45 @@ telefon właściciela przez Expo Go albo TestFlight i wynajęty na minuty Mac w 
 
 | Gdzie stoi flota | Urządzenie do testów | Uwagi |
 |---|---|---|
-| **Serwer Ubuntu z KVM** (`ls /dev/kvm`) | **emulator Androida (AVD) w Dockerze**, obraz x86_64 `google_apis`, API 34–36, budowany skryptami [google/android-emulator-container-scripts](https://github.com/google/android-emulator-container-scripts) (Apache-2.0) | oficjalny emulator Google, pełna zgodność z Expo; 3–4 GB RAM, 2–4 rdzenie |
-| **Windows 11 (WSL2)** | ten sam emulator w Docker Engine **wewnątrz** dystrybucji WSL (zagnieżdżona wirtualizacja jest domyślnie włączona, [wsl-config](https://learn.microsoft.com/en-us/windows/wsl/wsl-config)) | Docker Desktop na Windows nie daje kontenerom KVM; Redroid w WSL wymaga własnego jądra, więc odpada |
+| **Serwer Ubuntu z KVM** (`ls /dev/kvm`) | **oficjalny emulator Androida (AVD) w Dockerze**: obraz [docker-android](https://github.com/HQarroum/docker-android) `api-33` (MIT, x86_64 `google_apis`, gotowy na Docker Hub, aktualizowany 05.2026); nowsze API przez jego `API_LEVEL` przy własnym budowaniu | emulator Google z usługami Google, pełna zgodność z Expo; 3–4 GB RAM, 2–4 rdzenie. [budtmo/docker-android](https://github.com/budtmo/docker-android) odrzucony: licencja wymaga zgody na zbieranie danych |
+| **Windows 11 (WSL2)** | ten sam emulator w Docker Engine **wewnątrz** dystrybucji WSL (zagnieżdżona wirtualizacja jest domyślnie włączona, [wsl-config](https://learn.microsoft.com/en-us/windows/wsl/wsl-config)) | Docker Desktop może nie przekazać kontenerom KVM, dlatego `jarvo android on` sprawdza to próbnym kontenerem zamiast zgadywać; Redroid w WSL wymaga własnego jądra, więc odpada |
 | **Serwer Ubuntu bez KVM, VPS 8 GB** | **[Redroid](https://github.com/remote-android/redroid-doc)** (Android 14 w kontenerze, bez wirtualizacji), moduł jądra `binder_linux` z pakietu `linux-modules-extra` | ok. 1,5–2 GB RAM; obraz `14.0.0` (15 i 16 mają znany błąd bindera); kontener `--privileged`; grafika programowa (ok. 15 kl./s); **bez usług Google** |
 | VPS bez możliwości ładowania modułów (OpenVZ, LXC) | brak urządzenia lokalnie | telefon właściciela + chmura (§5.4) |
 
-**Nasza piaskownica:** brak `/dev/kvm` i `CONFIG_ANDROID_BINDER_IPC is not set`, więc żadnego Androida tu nie uruchomimy.
-Testy etapu 3 (§16) robimy na serwerze Ubuntu albo komputerze z Windows 11.
+**Włączenie jednym poleceniem:** `jarvo android on` wybiera wariant sam: `/dev/kvm` dostępne dla Dockera → emulator
+(profil compose `android-kvm`), inaczej binder w jądrze → Redroid (profil `android`; brakujący moduł `binder_linux`
+ładuje, w razie potrzeby doinstalowuje `linux-modules-extra`, i zapisuje go w `modules-load.d`), inaczej wyjaśnia, czemu
+się nie da (macOS, WSL bez KVM albo z Docker Desktop, VPS na OpenVZ/LXC) i odsyła do prawdziwego telefonu. Wybór
+ręczny: `--emulator` / `--redroid`. O emulatorze decyduje próba, a nie samo `/dev/kvm` na hoście: krótki kontener
+z obrazu floty z `--device /dev/kvm` musi zobaczyć urządzenie (Docker Desktop bywa bez niego). Profil trafia do `COMPOSE_PROFILES` w `compose/.env`, więc `jarvo up`, `update`
+i `deploy.sh` go pamiętają; `jarvo android off` zwalnia RAM, `jarvo android status` pokazuje jądro, wariant i Androida.
+Oba warianty mają w sieci floty tę samą nazwę `jarvo-android:5555`, więc agent i ekran nie wiedzą, który działa.
 
-**Android w dashboardzie.** [ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) (MIT) pokazuje ekran urządzenia w przeglądarce
-i przyjmuje kliknięcia; działa z emulatorem i z Redroidem. Sam nie ma żadnej autoryzacji, więc stoi wyłącznie za
-zalogowanym proxy dashboardu (z WebSocketami), tak jak podgląd HQ. Port adb (5555) nigdy nie jest publikowany na zewnątrz,
-urządzenie żyje w sieci wewnętrznej floty.
+**Nasza piaskownica:** brak `/dev/kvm` i `CONFIG_ANDROID_BINDER_IPC is not set`, więc żadnego Androida tu nie uruchomimy.
+Sam telefon testujemy na serwerze Ubuntu albo komputerze z Windows 11; w piaskownicy sprawdzamy resztę łańcucha
+(obraz ekranu, proxy z tokenem, `adb` w obrazie floty, komunikaty `jarvo android`).
+
+**Android w dashboardzie.** [ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) (MIT, przypięty commit, obraz
+`infra/android/Dockerfile.ws-scrcpy`) pokazuje ekran urządzenia w przeglądarce i przyjmuje kliknięcia; działa z emulatorem
+i z Redroidem. Sam nie ma żadnej autoryzacji, więc działa tylko w sieci floty, a właściciel wchodzi przez proxy w pluginie
+HQ na porcie 9122: link z tokenem (12 h) z przycisku **📱 Ekran telefonu** w panelu Twórcy aplikacji albo od agenta
+(`scripts/jarvo_link.py --android`), token zamieniany na ciasteczko `HttpOnly`, każde żądanie i WebSocket sprawdzane
+(szczegóły: [HQ.md](HQ.md)). Port adb (5555) nigdy nie jest publikowany na zewnątrz, urządzenie żyje w sieci wewnętrznej floty.
 
 **Automatyzacja.** `adb` w kontenerze agenta (instalacja, zrzuty `screencap`, logi `logcat`), przepływy
 [Maestro](https://github.com/mobile-dev-inc/Maestro) 2.11 (Apache-2.0, Java 17, wbudowany serwer MCP; rozmawia tylko z adb na
 `localhost:5037`, więc serwer adb działa w kontenerze agenta i łączy się z urządzeniem przez `adb connect`).
-Szkic dla Redroida:
+Usługi są w `infra/docker-compose.yml` (profile `android` i `android-kvm`); ręcznie wygląda to tak:
 
 ```bash
-# host, raz
+# host, raz (robi to jarvo android on)
 sudo apt install -y linux-modules-extra-$(uname -r)
-echo 'options binder_linux devices=binder,hwbinder,vndbinder' | sudo tee /etc/modprobe.d/redroid.conf
-echo binder_linux | sudo tee /etc/modules-load.d/redroid.conf
+echo 'options binder_linux devices=binder,hwbinder,vndbinder' | sudo tee /etc/modprobe.d/jarvo-android.conf
+echo binder_linux | sudo tee /etc/modules-load.d/jarvo-android.conf
 sudo modprobe binder_linux devices=binder,hwbinder,vndbinder
-# urządzenie tylko w sieci floty, port 5555 nie wychodzi na zewnątrz
-docker run -d --name jarvo-android --privileged --network jarvo-net --memory 2g --cpus 2 \
-  -v jarvo-android-data:/data redroid/redroid:14.0.0_64only-latest \
+# urządzenie tylko w sieci floty, port 5555 nie wychodzi na zewnątrz (compose: usługa android)
+docker run -d --name jarvo-android --privileged --network jarvo_jarvo-net --memory 2g --cpus 2 \
+  -v /srv/jarvo/data/android:/data redroid/redroid:14.0.0_64only-latest \
   androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest \
   androidboot.redroid_width=1080 androidboot.redroid_height=2340 androidboot.redroid_dpi=420
 # w kontenerze agenta
@@ -502,9 +514,9 @@ zewnętrznych skilli od HIG i Material; reguły sklepów w `sklep_check.py` i `r
 ok. 200 MB), `bundletool`. Opcjonalnie dodatek `JARVO_EXTRAS=android` (JDK 17, Android SDK i NDK do lokalnych buildów;
 3–5 GB dysku, pomiar RAM przed włączeniem domyślnie). Projekty w katalogu roboczym agenta, wspólna pamięć podręczna npm.
 
-**Urządzenie z Androidem** jako opcjonalna usługa floty, wybierana przez instalator według tego, co ma maszyna:
+**Urządzenie z Androidem** jako opcjonalna usługa floty, wybierana przez `jarvo android on` według tego, co ma maszyna:
 `/dev/kvm` → emulator Google, moduł `binder_linux` → Redroid, nic z tego → bez urządzenia (telefon właściciela i chmura).
-Do tego ws-scrcpy za proxy dashboardu. Domyślnie wyłączone, startuje na czas testów.
+Do tego ws-scrcpy za proxy HQ (`:9122`, link z tokenem). Domyślnie wyłączone, startuje na czas testów.
 
 **iOS:** szablon workflowu GitHub Actions (`macos-26`, Maestro, zrzuty) wkładany do repo aplikacji właściciela;
 alternatywnie konfiguracja Codemagic.
@@ -522,7 +534,7 @@ alternatywnie konfiguracja Codemagic.
 |---|---|---|---|
 | 1 ✅ | `audyt-mobilny` + `natywna-czy-pwa`, skrypty `audyt_mobilny.py` i `decyzja.py` z testami, profil agenta (SOUL, rubryka, 14 evals, `oddaj_gdy`, wzorce misji 8 i 9), pokój w HQ, 2 ataki red teamu | audyt 5 prawdziwych firm (Allegro, Żabka, McDonald's, Cukiernia Sowa, Da Grasso): m.in. brak plików linków na zabka.pl i mcdonalds.pl, baner McDonald's wskazujący nieistniejącą aplikację, aplikacja iOS Da Grasso bez języka polskiego, pliki linków Da Grasso tylko na www; aplikacje partnerów (Pyszne, Uber Eats, Glovo) oddzielone | brak |
 | 2 ✅ | `nowa-aplikacja` + `podglad-aplikacji`: szablon `templates/expo-jarvo` (Expo SDK 57) z elementami zgodności, `zgodnosc.py`, `aplikacja.py` (nowa, ustaw, sprawdz, eksport, podglad, expo-go), `ikony.cjs`, `zrzuty.cjs`, 27 testów | w kontenerze: aplikacja z profilu „logowanie e-mail + Google, aparat, powiadomienia” w 81 s, `sprawdz` 6/6 (typy, lint, wersje SDK, expo-doctor, zasady JARVO) w 11 s, podgląd w HQ i 20 zrzutów iPhone 17 Pro Max i Pixel w obu motywach bez błędów; poprawione po teście: brakujący `expo-font` (wykrył expo-doctor), podpisy zakładek ucięte w wersji webowej, link HQ do katalogu zamiast `index.html`. Expo Go na prawdziwym telefonie czeka na organizację Expo właściciela | Expo (podgląd na telefonie) |
-| 3 🟡 | `bramka-aplikacji`: rubryka 10 osi, werdykt (`bramka.py`), testy wrogie w przeglądarce (`wrogie.cjs`), na Androidzie przez adb (`urzadzenie.py`) i w symulatorze iOS na GitHub Actions (`ios_ci.py`, `templates/ci/jarvo-ios.yml`); usługa Android (Redroid) + ws-scrcpy w dashboardzie | bramka i warstwa web gotowe: w kontenerze szablon 7/7 testów wrogich, celowo zepsuta aplikacja 4 błędy (przewijanie, axe w trybie ciemnym, brak paska offline, długie słowa), werdykt rundy 1 = REVISE 87 (start z tekstem zastępczym, ikona z inicjałami); Android i iOS przetestowane na atrapach (13 testów); usługa Android w budowie, test na serwerze Ubuntu i Windows 11 (piaskownica nie ma KVM ani bindera) | GitHub albo Codemagic |
+| 3 🟡 | `bramka-aplikacji`: rubryka 10 osi, werdykt (`bramka.py`), testy wrogie w przeglądarce (`wrogie.cjs`), na Androidzie przez adb (`urzadzenie.py`) i w symulatorze iOS na GitHub Actions (`ios_ci.py`, `templates/ci/jarvo-ios.yml`); telefon testowy (emulator Google albo Redroid) + ws-scrcpy w HQ | bramka i warstwa web gotowe: w kontenerze szablon 7/7 testów wrogich, celowo zepsuta aplikacja 4 błędy (przewijanie, axe w trybie ciemnym, brak paska offline, długie słowa), werdykt rundy 1 = REVISE 87 (start z tekstem zastępczym, ikona z inicjałami); Android i iOS przetestowane na atrapach (13 testów). Telefon testowy: `jarvo android on|off|status` (emulator przy KVM sprawdzonym próbnym kontenerem, Redroid przy binderze), `adb` w obrazie floty, ekran ws-scrcpy za proxy HQ `:9122` (12 testów, w tym prawdziwe gniazda z WebSocketem); w kontenerze: `adb` 34.0.5, `urzadzenie.py status` = kod 3 z instrukcją, przycisk 📱 w panelu otwiera ws-scrcpy przez proxy (nowa karta bez `opener`, ciasteczko niewidoczne dla JS, WebSocket działa), bez ciasteczka 403, token ekranu na `:9120` 404. Czeka: sam Android na serwerze Ubuntu i w Windows 11 (piaskownica nie ma KVM ani bindera) i pierwszy przebieg iOS w GitHub Actions | GitHub albo Codemagic |
 | 4 | `pakiet-do-sklepow` + `sklep_check.py` (44 punkty z testami na celowo zepsutych aplikacjach) + potok zrzutów | pakiet dla prototypu, zero błędów auto | brak |
 | 5 | `wydanie` + `odrzucenie`: EAS Build i Submit, TestFlight, ścieżki Google, notatki dla recenzenta | pierwsza prawdziwa aplikacja przez recenzję w obu sklepach | Apple 99 $/rok, Google 25 $ |
 | 6 | `aplikacja-ze-strony`, `utrzymanie-aplikacji`, red team (opinie i wiadomości recenzentów jako atak, złośliwa paczka npm, sekret w paczce JS) | strona Weba → aplikacja z powiadomieniami | jak w 5 |
@@ -542,7 +554,7 @@ Współpraca z flotą: **Web** (PWA, pliki `.well-known`, baner, strony polityki
 | M5 | iOS bez Maca | **EAS Build** (15 buildów/mies. za darmo); GitHub Actions jako zapas |
 | M6 | Nazwa | `jarvo-mobile`, „Twórca aplikacji”, pokój „Pracownia aplikacji” |
 | M7 | Kolejność | **Etap 1 najpierw** (audyt bez kont daje wartość od razu), potem 2–4, wydanie na końcu |
-| M8 | Android do testów | **Usługa opcjonalna wybierana przez instalator:** KVM → emulator Google, binder → Redroid (obraz 14), nic → telefon i chmura; podgląd przez ws-scrcpy za logowaniem dashboardu |
+| M8 | Android do testów | **Usługa opcjonalna wybierana przez `jarvo android on`:** KVM → emulator Google, binder → Redroid (obraz 14), nic → telefon i chmura; podgląd przez ws-scrcpy za proxy HQ (`:9122`, link z tokenem wydawany zalogowanemu dashboardowi) |
 | M9 | Testy i zrzuty iOS | **GitHub Actions `macos-26`** w repo aplikacji właściciela (publiczne za darmo), Codemagic dla repo prywatnych; zapis na listę EAS Simulator |
 | M10 | Zgodność ze sklepami | **Od planu, nie na końcu:** profil zgodności w kroku 1, elementy w szablonie, `sklep_check.py` (44 punkty) blokuje wysłanie, każde odrzucenie dopisuje punkt |
 | M11 | Konto Google | **Konto organizacji** (D-U-N-S), bo osobiste wymaga testu 12 osób przez 14 dni; przy osobistym agent planuje test z klientami właściciela |

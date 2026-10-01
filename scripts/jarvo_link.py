@@ -8,6 +8,10 @@ npm run dev, localhost:8000…) jest dla użytkownika NIEOSIĄGALNY. Zamiast teg
 który działa w przeglądarce użytkownika: strona HTML z CSS/JS/obrazkami obok, obraz, PDF, wideo, tekst.
 Katalog = jego index.html. Tylko pliki z /opt/data/jarvo/{workspaces,missions,knowledge,inbox}.
 Link jest ważny 7 dni; ten sam katalog dostaje ten sam link.
+
+    python3 /opt/jarvo/repo/scripts/jarvo_link.py --android
+
+Link do ekranu telefonu testowego z Androidem (proxy Jarvo HQ, port 9122; profil compose „android”), ważny 12 godzin.
 """
 
 from __future__ import annotations
@@ -26,15 +30,20 @@ sys.modules[_spec.name] = core   # dataclass w hq_core potrzebuje modułu w sys.
 _spec.loader.exec_module(core)
 
 
-def base_url() -> str:
+def base_url(env: str = "JARVO_PREVIEW_URL", klucz: str = "url", domyslny: str = "http://localhost:9120") -> str:
     """Adres serwera podglądu, jak widzi go przeglądarka (compose: JARVO_PREVIEW_URL)."""
-    url = os.environ.get("JARVO_PREVIEW_URL")
+    url = os.environ.get(env)
     if not url:
         try:
-            url = json.loads((core.JARVO_DIR / "state" / "preview.json").read_text(encoding="utf-8")).get("url")
+            url = json.loads((core.JARVO_DIR / "state" / "preview.json").read_text(encoding="utf-8")).get(klucz)
         except (OSError, ValueError):
             url = None
-    return (url or "http://localhost:9120").rstrip("/")
+    return (url or domyslny).rstrip("/")
+
+
+def link_android(now: float) -> str:
+    token = core.link_for(core.LINKS_FILE, core.SCREEN_ROOT, now, core.SCREEN_TTL)
+    return f"{base_url('JARVO_ANDROID_SCREEN_URL', 'android_url', 'http://localhost:9122')}/{token}/"
 
 
 def link(raw: str, roots: "core.Roots", now: float) -> str:
@@ -54,6 +63,9 @@ def main(argv: list[str]) -> int:
         print(__doc__.strip())
         return 0 if argv else 2
     roots, now, bad = core.Roots(), time.time(), 0
+    if argv == ["--android"]:
+        print(link_android(now))
+        return 0
     for raw in argv:
         try:
             print(link(raw, roots, now))

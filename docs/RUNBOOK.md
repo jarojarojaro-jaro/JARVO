@@ -261,6 +261,12 @@ sudo crontab -e
 `http://<ip-tailscale>:3001` (monitory: dashboard 9119, SearXNG) i Beszel `http://<ip-tailscale>:8090`
 (klucz agenta z panelu → `BESZEL_AGENT_KEY` w `compose/.env` → ponownie `--monitoring`).
 
+**Telefon testowy Twórcy aplikacji (opcjonalnie):** `JARVO_LOCAL=/srv/jarvo bash bin/jarvo android on` sprawdza jądro
+(`/dev/kvm` → emulator Google, inaczej moduł `binder_linux` → Redroid, w razie potrzeby doinstalowuje
+`linux-modules-extra`), zapisuje `COMPOSE_PROFILES` w `compose/.env` (kolejne `deploy.sh` go pamiętają), startuje
+Androida i ekran, czeka na start systemu i wypisuje link do ekranu (`http://<ip-tailscale>:9122/<token>/`, 12 h; w HQ
+przycisk 📱 w panelu Twórcy aplikacji). Wyłączenie zwalnia RAM: `bin/jarvo android off`; stan: `bin/jarvo android status`.
+
 **SSH tylko przez Tailscale** (gdy `ssh jarvo@<ip-tailscale>` działa):
 ```bash
 sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh

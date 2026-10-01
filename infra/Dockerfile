@@ -34,10 +34,11 @@ USER root
 ENV DEBIAN_FRONTEND=noninteractive \
     UV_NO_CACHE=1
 
-# --- pakiety systemowe: dokumenty, OCR, metadane, fonty (polskie znaki), narzędzia PDF
+# --- pakiety systemowe: dokumenty, OCR, metadane, fonty (polskie znaki), narzędzia PDF;
+#     adb: Twórca aplikacji steruje telefonem testowym (profil compose „android”, ~3 MB)
 RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
     pkgs="pandoc qpdf ocrmypdf tesseract-ocr tesseract-ocr-pol tesseract-ocr-eng \
-          libimage-exiftool-perl jq sqlite3 \
+          libimage-exiftool-perl jq sqlite3 adb \
           fonts-dejavu fonts-noto-core fonts-noto-color-emoji fonts-inter"; \
     case "$extras" in *" manim "*) pkgs="$pkgs libcairo2-dev libpango1.0-dev pkg-config texlive-latex-base texlive-fonts-recommended";; esac; \
     case "$extras" in *" office "*) pkgs="$pkgs libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui";; esac; \

@@ -12,6 +12,7 @@
 #   jarvo pliki               otwórz katalog z wynikami agentów
 #   jarvo autostart on|off|status   pomocnik aktualizacji jako usługa systemd użytkownika (Linux, WSL z systemd)
 #   jarvo uninstall [--yes] [--all] usuń flotę (kontenery, obraz, usługę, polecenie); --all także dane, klucze i repo
+#   jarvo android on|off|status     telefon testowy Twórcy aplikacji (emulator przy KVM, Redroid przy binderze; ekran w HQ)
 #   jarvo version             gałąź, commit i data repo
 #
 # Zmienne: JARVO_LOCAL (katalog instalacji: ~/jarvo-local albo zapisany w ~/jarvo/.jarvo-local), JARVO_YES=1
@@ -185,6 +186,105 @@ cmd_uninstall() {
   else echo "Repo zostaje: $ROOT"; fi
   return 0
 }
+# Telefon testowy Twórcy aplikacji, dwa warianty pod jednym adresem w sieci floty (jarvo-android:5555):
+#   emulator  oficjalny emulator Google (Android 13, z usługami Google), gdy Docker daje kontenerom /dev/kvm
+#             (serwer z KVM, WSL2 z zagnieżdżoną wirtualizacją; sprawdzamy próbnym kontenerem) → profil android-kvm
+#   redroid   Android 14 w kontenerze bez wirtualizacji, gdy jądro ma binder (VPS bez KVM) → profil android
+# Profil zapisujemy w compose/.env (COMPOSE_PROFILES), więc jarvo up / update / deploy go pamiętają.
+binder_ok() { grep -qw binder /proc/filesystems 2>/dev/null || [[ -e /dev/binder ]]; }
+kvm_ok() { [[ -e /dev/kvm ]]; }
+# czy Docker naprawdę przekaże /dev/kvm kontenerowi (Docker Engine w WSL tak, Docker Desktop zależnie od wersji):
+# próbny kontener z obrazu floty, bez pobierania czegokolwiek
+kvm_docker() { docker run --rm --entrypoint "" --device /dev/kvm jarvo-hermes:local test -c /dev/kvm >/dev/null 2>&1; }
+env_profiles() { grep -E '^COMPOSE_PROFILES=' "$L/compose/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'"'" || true; }
+set_profiles() {   # set_profiles <lista po przecinku, może być pusta>
+  local f="$L/compose/.env" tmp
+  tmp="$(mktemp)"; grep -vE '^COMPOSE_PROFILES=' "$f" > "$tmp" || true
+  [[ -n $1 ]] && echo "COMPOSE_PROFILES=$1" >> "$tmp"
+  cat "$tmp" > "$f"; rm -f "$tmp"
+}
+without_android() { tr ',' '\n' <<<"$1" | { grep -vxE 'android|android-kvm' || true; } | paste -sd, -; }
+android_adb() { docker exec -u hermes jarvo-hermes adb "$@"; }
+android_booted() { [[ "$(android_adb -s jarvo-android:5555 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; }
+android_kind() {   # android_kind [--emulator|--redroid] → emulator albo redroid (albo koniec z wyjaśnieniem)
+  local want="${1:-}"
+  [[ -z $want || $want == --emulator || $want == --redroid ]] || die "jarvo android on [--emulator|--redroid]"
+  [[ $OS == macos ]] && die "Telefon testowy działa na Linuksie i w WSL2: Docker na macOS nie daje kontenerom ani KVM, ani sterownika binder. Zamiast niego podłącz prawdziwy telefon: docs/MOBILE.md §5."
+  if [[ $want != --redroid ]] && kvm_ok; then
+    kvm_docker && { echo emulator; return; }
+    [[ $want == --emulator ]] && die "Docker nie przekazuje kontenerom /dev/kvm (Docker Desktop?). Emulator działa z Docker Engine zainstalowanym w samym Linuksie albo WSL (install.sh robi to domyślnie)."
+  fi
+  [[ $want == --emulator ]] && die "Brak /dev/kvm: ta maszyna nie ma wirtualizacji dla emulatora (VPS bez KVM: jarvo android on --redroid)."
+  [[ $OS == wsl ]] && die "W WSL2 telefon testowy to emulator, a on potrzebuje /dev/kvm w kontenerach: zagnieżdżona wirtualizacja (domyślna w Windows 11; .wslconfig nestedVirtualization=true) i Docker, który ją przekazuje. Bez tego zostaje prawdziwy telefon: docs/MOBILE.md §5."
+  echo redroid
+}
+android_binder() {
+  binder_ok && return 0
+  say "Ładuję moduł jądra binder_linux (sudo)"
+  if ! $SUDO modprobe binder_linux devices=binder,hwbinder,vndbinder 2>/dev/null; then
+    if have apt-get && confirm "Brak modułu binder_linux. Doinstalować linux-modules-extra-$(uname -r)?"; then
+      $SUDO apt-get install -y "linux-modules-extra-$(uname -r)" >/dev/null \
+        || die "Nie udało się zainstalować linux-modules-extra-$(uname -r)."
+      $SUDO modprobe binder_linux devices=binder,hwbinder,vndbinder \
+        || die "Moduł binder_linux nie wstał (jądro bez CONFIG_ANDROID_BINDER_IPC?)."
+    else
+      die "Brak modułu binder_linux w jądrze $(uname -r) (Ubuntu/Debian: sudo apt install linux-modules-extra-$(uname -r)). VPS na OpenVZ/LXC nie załaduje modułu: podłącz prawdziwy telefon, docs/MOBILE.md §5."
+    fi
+  fi
+  # po restarcie maszyny moduł ładuje się sam
+  echo binder_linux | $SUDO tee /etc/modules-load.d/jarvo-android.conf >/dev/null
+  echo "options binder_linux devices=binder,hwbinder,vndbinder" | $SUDO tee /etc/modprobe.d/jarvo-android.conf >/dev/null
+  binder_ok || die "Moduł załadowany, ale binder nadal niewidoczny (/proc/filesystems, /dev/binder)."
+}
+cmd_android() {
+  installed || die "Flota nie jest zainstalowana (jarvo up)."
+  local prof kind profile service need mem rest
+  prof="$(env_profiles)"
+  case "${1:-status}" in
+    on)
+      ensure_docker
+      kind="$(android_kind "${2:-}")"
+      if [[ $kind == emulator ]]; then profile=android-kvm; service=android-emulator; need=12
+      else android_binder; profile=android; service=android; need=7; fi
+      mem="$(awk '/MemTotal/ {print int($2/1048576)}' /proc/meminfo 2>/dev/null || echo 0)"
+      (( mem >= need )) || warn "Ta maszyna ma ${mem} GB RAM; telefon testowy ($kind) bierze w pracy do $([[ $kind == emulator ]] && echo 4 || echo 2,3) GB."
+      compose stop android android-emulator >/dev/null 2>&1 || true      # zmiana wariantu: zwalniamy nazwę jarvo-android
+      compose rm -f android android-emulator >/dev/null 2>&1 || true
+      rest="$(without_android "$prof")"
+      set_profiles "${rest:+$rest,}$profile"
+      say "Startuję telefon testowy: $kind (pierwszy raz pobranie Androida 1,5–2,7 GB i budowa ekranu, kilka minut)"
+      compose --profile "$profile" up -d "$service" android-ekran
+      say "Czekam, aż Android wstanie (do 4 minut)"
+      for _ in $(seq 1 48); do
+        android_adb connect jarvo-android:5555 >/dev/null 2>&1 || true
+        android_booted && break
+        sleep 5
+      done
+      android_booted || die "Android nie wstał w 4 minuty: jarvo logs $service"
+      say "Telefon testowy działa. Ekran w przeglądarce (link ważny 12 h; w Jarvo HQ także przycisk 📱 w pokoju Aplikacje):"
+      docker exec -u hermes jarvo-hermes python3 /opt/jarvo/repo/scripts/jarvo_link.py --android ;;
+    off)
+      ensure_docker
+      compose stop android android-emulator android-ekran >/dev/null 2>&1 || true
+      compose rm -f android android-emulator android-ekran >/dev/null 2>&1 || true
+      set_profiles "$(without_android "$prof")"
+      say "Telefon testowy wyłączony. Zainstalowane aplikacje zostają w $L/data/android* (jarvo android on wraca do nich)." ;;
+    status)
+      if kvm_ok; then echo "KVM (/dev/kvm):        tak"; else echo "KVM (/dev/kvm):        nie"; fi
+      if binder_ok; then echo "binder w jądrze:       tak"; else echo "binder w jądrze:       nie"; fi
+      case ",$prof," in
+        *,android-kvm,*) echo "telefon testowy:       włączony, emulator (COMPOSE_PROFILES w $L/compose/.env)" ;;
+        *,android,*) echo "telefon testowy:       włączony, Redroid (COMPOSE_PROFILES w $L/compose/.env)" ;;
+        *) echo "telefon testowy:       wyłączony (jarvo android on)" ;;
+      esac
+      if ensure_docker soft && docker ps --format '{{.Names}}' | grep -qx jarvo-android; then
+        android_adb connect jarvo-android:5555 >/dev/null 2>&1 || true
+        if android_booted; then echo "Android:               działa ($(android_adb -s jarvo-android:5555 shell getprop ro.build.version.release 2>/dev/null | tr -d '\r'))"
+        else echo "Android:               startuje albo nie odpowiada (jarvo logs android)"; fi
+      else echo "Android:               nie działa"; fi ;;
+    *) die "jarvo android on [--emulator|--redroid] | off | status" ;;
+  esac
+}
 usage() { grep -E '^#   jarvo ' "$SELF" | sed 's/^#   //'; }
 
 cmd="${1:-help}"; shift || true
@@ -199,6 +299,7 @@ case "$cmd" in
   pliki|files) cmd_pliki ;;
   autostart) cmd_autostart "$@" ;;
   uninstall) cmd_uninstall "$@" ;;
+  android) cmd_android "$@" ;;
   version) cmd_version ;;
   updater) cmd_updater ;;
   help|-h|--help) usage ;;

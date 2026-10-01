@@ -1,0 +1,24 @@
+# Ekran telefonu testowego w przeglądarce: ws-scrcpy (MIT, NetrisTV) przypięty do commitu.
+# Nie ma żadnej autoryzacji, więc działa tylko w sieci floty (jarvo-net, bez portów); właściciel ogląda go przez
+# proxy Jarvo HQ (port 9122, link z tokenem wydawany zalogowanemu dashboardowi).
+ARG NODE_IMAGE=node:22-bookworm-slim
+FROM ${NODE_IMAGE} AS build
+ARG WS_SCRCPY_REV=cd6cea6ebde17af6685c2b325183fc24bef9d52b
+RUN apt-get -o Acquire::Retries=3 update && apt-get install -y --no-install-recommends git ca-certificates python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+RUN git init -q . && git remote add origin https://github.com/NetrisTV/ws-scrcpy.git \
+    && git fetch -q --depth 1 origin "$WS_SCRCPY_REV" && git checkout -q FETCH_HEAD
+RUN npm install --no-audit --no-fund --ignore-scripts && npm run dist \
+    && cd dist && npm install --omit=dev --no-audit --no-fund --ignore-scripts && npm rebuild node-pty
+
+FROM ${NODE_IMAGE}
+RUN apt-get -o Acquire::Retries=3 update && apt-get install -y --no-install-recommends adb tini \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /src/dist /app
+COPY ekran-start.sh /usr/local/bin/ekran-start.sh
+WORKDIR /app
+ENV JARVO_ANDROID_ADB=jarvo-android:5555
+EXPOSE 8000
+USER node
+ENTRYPOINT ["/usr/bin/tini", "--", "sh", "/usr/local/bin/ekran-start.sh"]

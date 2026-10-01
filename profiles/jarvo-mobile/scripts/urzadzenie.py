@@ -67,7 +67,7 @@ class Adb:
         stan = subprocess.run([self.adb, "-s", self.serial, "get-state"], capture_output=True, text=True, timeout=20)
         if stan.stdout.strip() != "device":
             raise BrakUrzadzenia(f"urządzenie {self.serial} niedostępne ({(stan.stderr or stan.stdout).strip()[:200]}); "
-                                 "właściciel włącza je poleceniem `jarvo android on` (wymaga KVM albo modułu binder_linux)")
+                                 "właściciel włącza je poleceniem `jarvo android on` (emulator przy KVM albo Redroid przy binderze, docs/MOBILE.md §5)")
 
 
 def status(adb: Adb) -> dict:

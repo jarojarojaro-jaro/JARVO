@@ -715,6 +715,9 @@ def site_root(file: Path, roots: Roots) -> Path:
 LINKS_FILE = JARVO_DIR / "state" / "preview-links.json"
 LINK_TTL = 7 * 86400
 LINKS_MAX = 500
+# ten sam plik trzyma też linki do ekranu telefonu testowego (proxy :9122); znacznik zamiast katalogu, krótszy termin
+SCREEN_ROOT = Path("@android-ekran")
+SCREEN_TTL = 12 * 3600
 
 
 def links_load(path: Path) -> dict:

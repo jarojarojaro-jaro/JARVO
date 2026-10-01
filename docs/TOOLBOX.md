@@ -185,6 +185,9 @@ Wszystkie źródła bez kluczy. Odmowa źródła (403/429, strona antybotowa) = 
 | [expo-doctor](https://github.com/expo/expo/tree/main/packages/expo-doctor) 1.21.1 | konfiguracja i zależności projektu (`aplikacja.py sprawdz`) | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
 | [eas-cli](https://github.com/expo/eas-cli) 24.7.0 | projekt w organizacji właściciela i EAS Update do podglądu w Expo Go (`aplikacja.py expo-go`, token robota `EXPO_TOKEN`) | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
 | [adb](https://developer.android.com/tools/adb) (pakiet Debiana) | Android przez adb: instalacja, zrzuty, logi, testy wrogie (`urzadzenie.py`) | Apache-2.0 | 2026-09 | obraz floty |
+| [Redroid](https://github.com/remote-android/redroid-doc) 14.0.0 | telefon testowy na serwerze bez KVM (Android 14 w kontenerze, moduł `binder_linux`) | Apache-2.0 | 2026-10 | usługa `android` (`jarvo android on`) |
+| [docker-android](https://github.com/HQarroum/docker-android) `api-33` | telefon testowy przy KVM: oficjalny emulator Google z usługami Google | MIT | 2026-10 | usługa `android-emulator` (`jarvo android on`) |
+| [ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) (commit `cd6cea6`) | ekran telefonu testowego w przeglądarce (podgląd, klikanie), za proxy HQ `:9122` z tokenem | MIT | 2026-10 | usługa `android-ekran` (`infra/android/`) |
 | [GitHub Actions `macos-26`](https://github.com/actions/runner-images) | symulator iOS: zrzuty jasny / ciemny / duża czcionka, logi (`ios_ci.py`, `templates/ci/jarvo-ios.yml`) | usługa GitHub | 2026-09 | workflow w repo aplikacji właściciela |
 | `zgodnosc.py`, `ikony.cjs` (sharp), `zrzuty.cjs` (playwright-core, axe-core) | profil zgodności → wymagania sklepów; ikony bez alfy, adaptacyjne i ekran startowy; zrzuty iPhone 17 Pro Max i Pixel w obu motywach z kontrolami | własny kod | n/d | skrypt |
 

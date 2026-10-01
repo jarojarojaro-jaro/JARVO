@@ -71,6 +71,17 @@ if [[ $REBUILD -eq 1 ]]; then
   docker builder prune -f --filter until=168h >/dev/null || true
 fi
 
+# telefon testowy włączony (COMPOSE_PROFILES w compose/.env): obraz ekranu (ws-scrcpy) budujemy na nowo, gdy zmieniło
+# się infra/android/ od ostatniej budowy (lokalnie i na VPS, niezależnie od git pull w tym przebiegu)
+if [[ $NOBUILD -eq 0 ]] && "${COMPOSE[@]}" config --services 2>/dev/null | grep -qx android-ekran; then
+  screen_tree="$(git -C "$ROOT" rev-parse HEAD:infra/android 2>/dev/null || echo brak)"
+  if [[ "$(cat "$COMPOSE_DIR/.screen-tree" 2>/dev/null)" != "$screen_tree" ]] \
+     || ! docker image inspect jarvo-ws-scrcpy:local >/dev/null 2>&1; then
+    log "Budowa obrazu ekranu telefonu testowego (ws-scrcpy)"
+    "${COMPOSE[@]}" build android-ekran && echo "$screen_tree" > "$COMPOSE_DIR/.screen-tree"
+  fi
+fi
+
 log "Start usług"
 "${COMPOSE[@]}" "${PROFILES[@]}" up -d
 

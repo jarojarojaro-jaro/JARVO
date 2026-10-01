@@ -18,10 +18,16 @@ reviewed: 2026-10-01
 | awarie | konsola, błędy strony | bufor `crash`, ReactNativeJS | logi symulatora |
 
 ## Urządzenie z Androidem
-- Usługa floty `android` (Redroid: Android 14 w kontenerze, bez wirtualizacji, moduł `binder_linux`) włączana przez
-  właściciela poleceniem `jarvo android on`; agent łączy się przez adb w sieci floty (`JARVO_ANDROID_ADB`).
+- Telefon testowy floty włącza właściciel: `jarvo android on`. Przy KVM to oficjalny emulator Google (Android 13
+  z usługami Google), bez KVM Redroid (Android 14 w kontenerze, moduł `binder_linux`). Oba pod tym samym adresem w sieci
+  floty: agent łączy się przez adb (`JARVO_ANDROID_ADB`, domyślnie `jarvo-android:5555`).
+- `urzadzenie.py status` z kodem 3 = telefon wyłączony: poproś właściciela o `jarvo android on` (albo zostaw warstwę
+  Androida jako „niezmierzoną”), nie udawaj wyniku.
+- Właściciel może patrzeć na ekran i klikać razem z Tobą: link `python3 /opt/jarvo/repo/scripts/jarvo_link.py --android`
+  (12 h) albo przycisk 📱 w Twoim panelu w HQ. Dawaj go, gdy prosisz o ręczny test albo pokazujesz przepływ.
 - Albo telefon właściciela z debugowaniem USB podłączony do komputera z flotą (adb), albo emulator Android Studio.
-- Redroid nie ma usług Google: powiadomień FCM, logowania Google i Map nie sprawdzi (→ telefon właściciela).
+- Redroid nie ma usług Google: powiadomień FCM, logowania Google i Map nie sprawdzi (→ emulator przy KVM albo telefon
+  właściciela).
 
 ## iOS w GitHub Actions (raz, właściciel)
 1. Repo na GitHubie dla kodu aplikacji (publiczne = minuty macOS za darmo; prywatne = płatne ponad limit).

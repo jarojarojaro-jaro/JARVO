@@ -4,13 +4,17 @@
 # Budżet: VPS 8 GB RAM (4 vCPU). Limity niżej sumują się do ~5,5 GB (+0,4 GB z profilem monitoring);
 # reszta zostaje dla systemu i cache dysku. Limity to sufity, nie rezerwacje: w spoczynku flota bierze ~1 GB.
 #
-# Porty: nic nie jest publikowane publicznie. Dashboard/Desktop (9119), podgląd stron HQ (9120) i panele monitoringu
-# wiążemy do JARVO_BIND_IP (domyślnie 127.0.0.1; ustaw IP Tailscale, żeby sięgać z laptopa/telefonu).
+# Porty: nic nie jest publikowane publicznie. Dashboard/Desktop (9119), podgląd stron HQ (9120), ekran telefonu
+# testowego (9122, proxy z tokenem) i panele monitoringu wiążemy do JARVO_BIND_IP (domyślnie 127.0.0.1; ustaw IP Tailscale, żeby sięgać z laptopa/telefonu).
 # Telegram działa bez portów (long polling).
 #
 # Profile compose:
 #   (domyślny)  hermes + searxng + valkey
 #   monitoring  uptime-kuma + beszel (hub + agent)
+#   android     telefon testowy Twórcy aplikacji na serwerze bez KVM: Redroid (Android 14 w kontenerze, moduł binder
+#               w jądrze hosta) + ws-scrcpy (ekran w przeglądarce); ~2,3 GB RAM w pracy
+#   android-kvm to samo z oficjalnym emulatorem Androida 13 (z usługami Google) tam, gdzie jest /dev/kvm (serwer
+#               z KVM, WSL2 z Docker Engine); ~4 GB RAM. Oba włącza `jarvo android on` (wybiera sam), adres ten sam.
 
 name: jarvo
 
@@ -40,6 +44,10 @@ services:
       SEARXNG_URL: http://searxng:8080
       # adres serwera podglądu („▶ Odpal”, linki agentów z scripts/jarvo_link.py) widziany z przeglądarki
       JARVO_PREVIEW_URL: http://${JARVO_BIND_IP:-127.0.0.1}:9120
+      # telefon testowy (profil android): adb dla Twórcy aplikacji i proxy ekranu ws-scrcpy za linkiem z tokenem
+      JARVO_ANDROID_ADB: jarvo-android:5555
+      JARVO_ANDROID_SCREEN_UPSTREAM: jarvo-android-ekran:8000
+      JARVO_ANDROID_SCREEN_URL: http://${JARVO_BIND_IP:-127.0.0.1}:9122
       # dodatki także w działającym kontenerze: „lemo” (sample, głos Kokoro) instaluje narzedzia.py w czasie pracy
       JARVO_EXTRAS: ${JARVO_EXTRAS:-}
     volumes:
@@ -50,6 +58,7 @@ services:
     ports:
       - "${JARVO_BIND_IP:-127.0.0.1}:9119:9119"     # dashboard + Hermes Desktop (Remote Gateway)
       - "${JARVO_BIND_IP:-127.0.0.1}:9120:9120"     # Jarvo HQ „Odpal”: podgląd stron agentów (link z tokenem)
+      - "${JARVO_BIND_IP:-127.0.0.1}:9122:9122"     # ekran telefonu testowego (proxy ws-scrcpy, link z tokenem)
     depends_on:
       searxng: {condition: service_started}
     shm_size: "512mb"                                # jedna Chromium naraz (Lighthouse, PDF, zrzuty)
@@ -134,6 +143,65 @@ services:
     deploy:
       resources:
         limits: {memory: 64m}
+
+  # Telefon testowy: Android 14 w kontenerze (Redroid, Apache-2.0). Bez portów: adb tylko w sieci floty
+  # (jarvo-android:5555). privileged, bo Android montuje własne systemy plików i potrzebuje urządzeń binder hosta.
+  android:
+    <<: *restart
+    profiles: [android]
+    image: ${IMAGE_REDROID:-redroid/redroid:14.0.0_64only-latest}
+    container_name: jarvo-android
+    privileged: true
+    command:
+      - androidboot.redroid_width=1080
+      - androidboot.redroid_height=2340
+      - androidboot.redroid_dpi=420
+      - androidboot.redroid_gpu_mode=guest
+      - androidboot.use_memfd=1
+    volumes:
+      - ${JARVO_DATA:-/srv/jarvo/data}/android:/data
+    deploy:
+      resources:
+        limits:
+          memory: ${ANDROID_MEM_LIMIT:-2g}
+          cpus: "${ANDROID_CPUS:-2}"
+    networks: [jarvo-net]
+
+  # Ten sam telefon testowy jako oficjalny emulator Google (AVD API 33 google_apis, obraz docker-android, MIT) dla maszyn
+  # z KVM. Ta sama nazwa w sieci floty (jarvo-android:5555), więc agent i ekran nie wiedzą, który wariant działa.
+  android-emulator:
+    <<: *restart
+    profiles: [android-kvm]
+    image: ${IMAGE_ANDROID_EMULATOR:-halimqarroum/docker-android:api-33}
+    container_name: jarvo-android
+    devices: [/dev/kvm]
+    environment:
+      MEMORY: ${ANDROID_EMU_MEMORY:-3072}
+      CORES: ${ANDROID_CPUS:-2}
+      SKIP_AUTH: "true"
+    volumes:
+      - ${JARVO_DATA:-/srv/jarvo/data}/android-emulator:/data
+    deploy:
+      resources:
+        limits:
+          memory: ${ANDROID_EMU_MEM_LIMIT:-4g}
+          cpus: "${ANDROID_CPUS:-2}"
+    networks: [jarvo-net]
+
+  # Ekran telefonu w przeglądarce (ws-scrcpy, MIT, przypięty commit). Bez logowania, więc bez portów: właściciel
+  # wchodzi przez proxy w jarvo-hermes (:9122) z linku z tokenem.
+  android-ekran:
+    <<: *restart
+    profiles: [android, android-kvm]
+    build:
+      context: ./android
+      dockerfile: Dockerfile.ws-scrcpy
+    image: jarvo-ws-scrcpy:local
+    container_name: jarvo-android-ekran
+    deploy:
+      resources:
+        limits: {memory: 256m}
+    networks: [jarvo-net]
 
 networks:
   jarvo-net:

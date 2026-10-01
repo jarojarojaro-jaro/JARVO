@@ -283,6 +283,21 @@ function AboutTab({ data, fleetInfo }) {
   </div>`;
 }
 
+// Twórca aplikacji: ekran telefonu testowego (profil compose „android”), gdy działa.
+function PhoneScreen() {
+  const host = useHost();
+  const [note, setNote] = useState(null);
+  if (!host.android) return null;
+  const open = async () => {
+    try { await openAndroidScreen(); } catch (err) { setNote(err.message || String(err)); setTimeout(() => setNote(null), 6000); }
+  };
+  return html`<div class="thq-file-acts">
+    <button type="button" class="thq-act-btn is-run" onClick=${open}
+      title=${L("Ekran telefonu testowego z Androidem w nowej karcie (link ważny 12 godzin)", "The Android test phone screen in a new tab (link valid for 12 hours)")}>📱 ${L("Ekran telefonu", "Phone screen")}</button>
+    ${note && html`<span class="thq-act-note is-bad" role="status">${note}</span>`}
+  </div>`;
+}
+
 function AgentPanel({ name, agents, fleet, onClose, onOpenTask, onOpenFile, pending, onPendingDone, tab, setTab }) {
   const [data, err] = usePoll(() => api.agent(name), 2500, [name]);
   const listed = agents.find((a) => a.name === name);
@@ -301,6 +316,7 @@ function AgentPanel({ name, agents, fleet, onClose, onOpenTask, onOpenFile, pend
         ${k === "cards" && data && html`<span class="thq-count">${Object.values(data.cards).reduce((n, l) => n + l.length, 0)}</span>`}
       </button>`)}</nav>
     <div class="thq-panel-body">
+      ${name === "jarvo-mobile" && tab === "now" && html`<${PhoneScreen}/>`}
       ${err && !data && html`<p class="thq-error">${err}</p>`}
       ${!data && !err && html`<p class="thq-muted">${L("Wczytuję…", "Loading…")}</p>`}
       ${data && tab === "now" && html`<${NowTab} data=${data} agents=${agents} onOpenTask=${onOpenTask}/>`}

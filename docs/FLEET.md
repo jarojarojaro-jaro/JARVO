@@ -309,7 +309,9 @@ wymagane przez sklepy (prywatność, kontakt, usuwanie konta, stany ekranów, br
 (`zgodnosc.py`: logowanie, płatności, treści, AI, uprawnienia z polskim powodem → wymagania z numerami wytycznych),
 paleta z koloru marki z kontrastem WCAG AA, ikony, kontrole (typy, lint, wersje SDK, expo-doctor, zasady JARVO),
 podgląd w HQ ze zrzutami iPhone i Pixel w obu motywach oraz w Expo Go na telefonie właściciela (EAS Update, token
-robota jego organizacji). Konta Apple, Google i Expo zawsze właściciela. Pełny projekt i kolejne etapy (bramka
+robota jego organizacji). Testuje na telefonie testowym floty (`jarvo android on`: emulator Google przy KVM albo
+Redroid; ekran dla właściciela w HQ, przycisk 📱) i w symulatorze iOS w GitHub Actions. Konta Apple, Google i Expo
+zawsze właściciela. Pełny projekt i kolejne etapy (bramka
 jakości na urządzeniu, lista kontrolna sklepów, wydanie): [MOBILE.md](MOBILE.md).
 
 **Skille:** [T] `audyt-mobilny` (+ kryteria kontroli), `natywna-czy-pwa` (+ macierz decyzji), `nowa-aplikacja`

@@ -29,6 +29,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Akcje pliku wynikowego | plugin + pomocnik hosta | **▶ Odpal** (strona HTML w nowej karcie, `:9120`), **Pokaż w folderze** (Eksplorator Windows w lokalnej instalacji WSL; gdzie indziej: **Kopiuj ścieżkę**), **Pobierz**, podgląd/kod |
 | **✎ Edytuj** (każdy film) | edytor w HQ + ffmpeg w kontenerze | montaż w stylu CapCut: oś czasu z miniaturami, cięcie (S), przycinanie krawędzi, przestawianie klipów, tempo 0,25–4×, głośność i wyciszenie, zdjęcia jako plansze, napisy (styl, krój, kolor, przeciąganie na podglądzie), muzyka z katalogu albo z dysku, format 16:9 / 9:16 / 1:1 / 4:5, cofnij/ponów, skróty klawiszowe. **Eksportuj** zapisuje nową wersję obok oryginału (`film-edycja.mp4`, oryginał zostaje), **Poproś agenta** wysyła Wideografowi prośbę z projektem montażu. Szczegóły: sekcja 2a |
 | Panel agenta: Czat | API gatewaya | rozmowa bezpośrednia z agentem (sesja HQ, osobna od Telegrama) |
+| **📱 Ekran telefonu** (panel Twórcy aplikacji) | telefon testowy floty (`jarvo android on`) + proxy `:9122` | ekran Androida w nowej karcie (ws-scrcpy: podgląd na żywo, klikanie, pisanie), link z tokenem ważny 12 h; przycisk widać tylko, gdy telefon działa |
 | Panel agenta: O agencie | fleet.yaml, SOUL, skille | opis, model, autonomia, parametry osobowości, workflowy |
 | Centrala: Decyzje | kanban (`blocked` + `needs_input`, karty porzucone po błędach) | pytania agentów; odpowiedź idzie do Jarva, który odblokowuje kartę i zapisuje decyzję. Karta porzucona po błędach ma **Ponów kartę** (wraca do kolejki) albo **Przekaż Jarvowi** |
 | Centrala: Misje | `missions/INDEX.md` + kanban | postęp misji (kostki kart w kolorach stanu) |
@@ -51,7 +52,10 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ GET  /api/plugins/jarvo-hq/file?path=   podgląd pliku z katalogów floty
         ├─ POST /api/plugins/jarvo-hq/site        link „Odpal” (token) ─► :9120 serwer podglądu stron w pluginie
         ├─ POST /api/plugins/jarvo-hq/reveal      prośba „Pokaż w folderze” ─► pomocnik hosta (explorer.exe)
-        ├─ GET  /api/plugins/jarvo-hq/host        czy działa „Pokaż w folderze” (WSL), ścieżki hosta, port podglądu
+        ├─ POST /api/plugins/jarvo-hq/android     link „📱 Ekran telefonu” (token) ─► :9122 proxy ekranu w pluginie
+        │                                          ─► jarvo-android-ekran:8000 (ws-scrcpy, HTTP i WebSocket)
+        ├─ GET  /api/plugins/jarvo-hq/host        czy działa „Pokaż w folderze” (WSL), ścieżki hosta, port podglądu,
+        │                                          czy działa telefon testowy
         ├─ GET  /api/plugins/jarvo-hq/chat/<a>/history
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/send ─► gateway :8642 /p/<agent>/api/sessions/<id>/chat/stream (SSE)
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/reset
@@ -154,6 +158,13 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   (`/opt/data/profiles/<agent>`), więc `hq_core` wylicza z niego korzeń danych (`/opt/data/jarvo`). Nagłówek `CSP: sandbox` bez
   `allow-same-origin` daje stronie nieprzezroczyste pochodzenie: jej skrypty działają, ale nie czytają ciasteczek
   i nie wyślą ich do dashboardu. Nowa karta nie ma `window.opener`. Pliki ukryte, `..` i symlinki na zewnątrz: 404.
+- **📱 Ekran telefonu**: ws-scrcpy nie ma logowania, więc działa tylko w sieci floty (bez portów); jedyne wejście to
+  proxy w pluginie na porcie 9122 (ten sam `JARVO_BIND_IP`). Link `/<token>/` wydaje zalogowany dashboard albo agent
+  (`scripts/jarvo_link.py --android`; ten sam plik linków, znacznik `@android-ekran`, ważny 12 h). Wejście z tokenem
+  zamienia go na ciasteczko `HttpOnly` (`SameSite=Lax`) i przekierowuje na `/`; każde żądanie bez ważnego ciasteczka
+  dostaje 403. Zwykłe żądania idą do ws-scrcpy z `Connection: close`, więc każde następne przechodzi kontrolę od nowa;
+  WebSocket po kontroli to czysty strumień. Ciasteczka przeglądarki (także dashboardu, bo ciasteczka nie znają portów)
+  nie idą dalej. Token ekranu nie otwiera niczego na `:9120` i odwrotnie.
 - **Pokaż w folderze**: dashboard zapisuje tylko prośbę ze ścieżką (`state/reveal-request`); `scripts/updater.py`
   na hoście sprawdza ją ponownie (tylko `jarvo/{workspaces,missions,knowledge,inbox}`) i woła `explorer.exe /select,…`.
 - Odczyt kanbana i transkrypcji w trybie SQLite `mode=ro`. HQ zapisuje tylko: mapę sesji czatu
@@ -249,5 +260,7 @@ Agenci rozmawiają po polsku niezależnie od języka panelu (SOUL).
 | pokój „Pracuje”, ale dymek „cisza…” | pracownik nie wysłał sygnału od 3 min; szczegóły w panelu, patrol zgłosi problem sam |
 | agent podaje `localhost:8000` albo inny port z kontenera | taki adres nie działa w Twojej przeglądarce. Agenci mają to w zasadach; link do wyniku daje `python3 /opt/jarvo/repo/scripts/jarvo_link.py <plik>` (serwer podglądu :9120, 7 dni) |
 | „▶ Odpal” otwiera pustą kartę / „nie można połączyć” | port 9120 nieopublikowany: kontener sprzed tej wersji, `bash scripts/local-up.sh` (lokalnie) albo `deploy.sh` go odtworzy |
+| brak przycisku „📱 Ekran telefonu” | telefon testowy wyłączony: `jarvo android status`, włączenie `jarvo android on` (docs/MOBILE.md §5) |
+| ekran telefonu: „Telefon testowy jest wyłączony” (503) | kontener `jarvo-android-ekran` nie działa: `jarvo android on`; pusta lista urządzeń w ws-scrcpy = Android jeszcze startuje (do 4 min) |
 | brak „Pokaż w folderze”, jest „Kopiuj ścieżkę” | pomocnik hosta nie działa albo to nie WSL: `bash scripts/local-up.sh` (uruchamia `scripts/updater.py`) |
 | `/api/plugins/jarvo-hq/health` | pokazuje, czy każdy profil ma klucz i czy gateway odpowiada na `/p/<agent>` |

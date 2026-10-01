@@ -6,6 +6,9 @@
   `urzadzenie.py` (Android przez adb: duża czcionka, mały ekran, ciemny, offline, odebrane uprawnienia, wstecz, śmierć
   procesu, świeża instalacja, awarie z logów, przywracanie ustawień), `ios_ci.py` + `templates/ci/jarvo-ios.yml`
   (symulator iOS w GitHub Actions), `bramka.py` (werdykt z punktami i „niezmierzonymi”).
+- Telefon testowy floty: `jarvo android on|off|status` (emulator Google przy KVM sprawdzonym próbnym kontenerem, Redroid
+  przy binderze), `adb` w obrazie floty, ekran ws-scrcpy w HQ (przycisk 📱 w panelu, proxy `:9122` z tokenem) i link dla
+  właściciela `jarvo_link.py --android`.
 - Etap 2: szablon aplikacji `templates/expo-jarvo` (Expo SDK 57, expo-router, elementy zgodności ze sklepami od
   pierwszego dnia: Więcej, Kontakt, Prywatność, Usuń konto przy kontach, stany ekranów, pasek braku sieci, granica
   błędów, `usesNonExemptEncryption`, blokady uprawnień Androida, EAS). Skille `nowa-aplikacja` (plan, profil zgodności,

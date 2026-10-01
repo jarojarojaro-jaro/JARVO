@@ -77,8 +77,9 @@ aplikacje partnerów oddzielone od aplikacji firmy). Etap 2: `nowa-aplikacja` i 
 `templates/expo-jarvo` z Expo SDK 57 i elementami zgodności, `zgodnosc.py`, `aplikacja.py nowa/ustaw/sprawdz/podglad/
 expo-go`, ikony z logo albo inicjałów, zrzuty iPhone 17 Pro Max i Pixel w obu motywach z kontrolami). Etap 3:
 `bramka-aplikacji` (rubryka 10 osi, werdykt PASS / REVISE / BLOCK, testy wrogie: `wrogie.cjs` w przeglądarce,
-`urzadzenie.py` na Androidzie przez adb, `ios_ci.py` w symulatorze iOS na GitHub Actions). Kolejne etapy: lista
-kontrolna sklepów, wydanie.
+`urzadzenie.py` na Androidzie przez adb, `ios_ci.py` w symulatorze iOS na GitHub Actions) i telefon testowy floty
+(`jarvo android on`: emulator Google przy KVM albo Redroid przy binderze, ekran w HQ przez proxy `:9122` z tokenem).
+Kolejne etapy: lista kontrolna sklepów, wydanie.
 
 ### 2a''. jarvo-lowca — szczegóły
 Łowca leadów B2B z oficjalnych, darmowych źródeł: KRS (API MS: biuletyn dnia i odpisy; nazwiska zarządu maskowane),

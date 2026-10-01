@@ -638,7 +638,7 @@ def _preview_handler():
             path = unquote(urlsplit(self.path).path)
             token, _, rel = path.lstrip("/").partition("/")
             root = core.link_root(core.LINKS_FILE, token, time.time())
-            if root is None:
+            if root is None or root == core.SCREEN_ROOT:
                 return self._fail(404, "Link wygasł albo jest błędny. Kliknij „▶ Odpal” w Jarvo HQ jeszcze raz. "
                                        "/ This link expired or is wrong: click “▶ Run” in Jarvo HQ again.")
             if not rel and not path.endswith("/"):
@@ -690,7 +690,8 @@ def _start_preview() -> None:
     try:
         info = core.JARVO_DIR / "state" / "preview.json"
         info.parent.mkdir(parents=True, exist_ok=True)
-        info.write_text(json.dumps({"url": PREVIEW_URL, "port": PREVIEW_PORT}), encoding="utf-8")
+        info.write_text(json.dumps({"url": PREVIEW_URL, "port": PREVIEW_PORT,
+                                    "android_url": os.environ.get("JARVO_ANDROID_SCREEN_URL")}), encoding="utf-8")
     except OSError:
         pass
 
@@ -714,6 +715,184 @@ async def site(request: Request):
     token = await asyncio.to_thread(core.link_for, core.LINKS_FILE, root, time.time())
     rel = p.relative_to(root).as_posix()
     return {"port": PREVIEW_PORT, "path": f"/{token}/{rel}"}
+
+
+# ------------------------------------------- ekran telefonu testowego (Redroid + ws-scrcpy) na :9122
+# ws-scrcpy nie ma logowania, więc siedzi tylko w sieci floty; tu jest jedyne wejście do niego. Link z tokenem
+# (wspólny plik linków, ważny 12 h) wydaje zalogowany dashboard albo agent (scripts/jarvo_link.py --android).
+# Wejście na /<token>/ zamienia token na ciasteczko HttpOnly i przekierowuje na /, bo ws-scrcpy ładuje pliki
+# i otwiera WebSockety od korzenia. Każde żądanie bez ważnego ciasteczka dostaje 403. Zwykłe żądania idą
+# z `Connection: close`, więc każde kolejne przechodzi kontrolę od nowa; WebSocket po kontroli to czysty strumień.
+# Ciasteczka przeglądarki (także dashboardu z :9119, bo ciasteczka nie znają portów) nie idą dalej do ws-scrcpy.
+SCREEN_PORT = int(os.environ.get("JARVO_ANDROID_SCREEN_PORT", "9122"))
+SCREEN_UPSTREAM = os.environ.get("JARVO_ANDROID_SCREEN_UPSTREAM", "jarvo-android-ekran:8000")
+SCREEN_URL = os.environ.get("JARVO_ANDROID_SCREEN_URL") or f"http://localhost:{SCREEN_PORT}"
+SCREEN_ROOT = core.SCREEN_ROOT
+SCREEN_COOKIE = f"jarvo_ekran_{SCREEN_PORT}"
+_screen = sys.modules.setdefault("jarvo_hq_screen_state", type(sys)("jarvo_hq_screen_state"))
+if not hasattr(_screen, "error"):
+    _screen.error = None
+
+
+def _screen_upstream() -> tuple[str, int]:
+    host, _, port = SCREEN_UPSTREAM.rpartition(":")
+    return host or SCREEN_UPSTREAM, int(port or 8000)
+
+
+def _screen_page(code: int, title: str, text: str, extra: list[str] | None = None) -> bytes:
+    reason = {302: "Found", 400: "Bad Request", 403: "Forbidden", 503: "Service Unavailable"}.get(code, "Error")
+    body = (f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>{title}</title>"
+            "<body style='font:16px/1.5 system-ui;max-width:34rem;margin:3rem auto;padding:0 1rem'>"
+            f"<h1 style='font-size:1.3rem'>{title}</h1><p>{text}</p>").encode()
+    head = [f"HTTP/1.1 {code} {reason}", "Content-Type: text/html; charset=utf-8", f"Content-Length: {len(body)}",
+            "Cache-Control: no-store", "Referrer-Policy: no-referrer", "Connection: close", *(extra or [])]
+    return ("\r\n".join(head) + "\r\n\r\n").encode("latin-1") + body
+
+
+def screen_request(head: bytes, now: float) -> tuple[str, bytes]:
+    """Decyzja dla nagłówka żądania (bez ciała): ("odpowiedz", bajty odpowiedzi) albo ("przekaz", nagłówek dla
+    ws-scrcpy). Czysta funkcja, testowana bez gniazd."""
+    from urllib.parse import unquote, urlsplit
+
+    try:
+        lines = head.decode("latin-1").split("\r\n")
+        method, target, version = lines[0].split(" ", 2)
+    except ValueError:
+        return "odpowiedz", _screen_page(400, "Złe żądanie", "Nie rozumiem tego żądania.")
+    headers = [(k.strip(), v.strip()) for k, _, v in (ln.partition(":") for ln in lines[1:] if ln)]
+    path = unquote(urlsplit(target).path)
+    first = path.lstrip("/").partition("/")[0]
+    if first and core.link_root(core.LINKS_FILE, first, now) == SCREEN_ROOT:
+        left = int(float(core.links_load(core.LINKS_FILE)[first]["exp"]) - now)
+        return "odpowiedz", _screen_page(302, "Ekran telefonu", "Przekierowuję…", [
+            "Location: /", f"Set-Cookie: {SCREEN_COOKIE}={first}; Path=/; Max-Age={left}; HttpOnly; SameSite=Lax"])
+    cookies = {}
+    for k, v in headers:
+        if k.lower() == "cookie":
+            for part in v.split(";"):
+                n, _, val = part.strip().partition("=")
+                cookies[n] = val
+    tok = cookies.get(SCREEN_COOKIE, "")
+    if not tok or core.link_root(core.LINKS_FILE, tok, now) != SCREEN_ROOT:
+        return "odpowiedz", _screen_page(403, "Ekran telefonu testowego",
+                                         "Ten adres otwiera się z linku: Jarvo HQ → pokój Aplikacje → „📱 Ekran telefonu” "
+                                         "albo link od Twórcy aplikacji. Link jest ważny 12 godzin.")
+    upgrade = any(k.lower() == "upgrade" and v.lower() == "websocket" for k, v in headers)
+    host, port = _screen_upstream()
+    out = [f"{method} {target} {version}"]
+    for k, v in headers:
+        kl = k.lower()
+        if kl in ("cookie", "host") or (kl in ("connection", "keep-alive") and not upgrade):
+            continue
+        out.append(f"{k}: {v}")
+    out.insert(1, f"Host: {host}:{port}")
+    if not upgrade:
+        out.append("Connection: close")
+    return "przekaz", ("\r\n".join(out) + "\r\n\r\n").encode("latin-1")
+
+
+def _screen_handler():
+    import selectors
+    import socket
+    import socketserver
+
+    def pipe(a, b) -> None:
+        sel = selectors.DefaultSelector()
+        sel.register(a, selectors.EVENT_READ, b)
+        sel.register(b, selectors.EVENT_READ, a)
+        try:
+            while True:
+                events = sel.select(timeout=3600)      # godzina ciszy = porzucona karta
+                if not events:
+                    return
+                for key, _ in events:
+                    data = key.fileobj.recv(65536)
+                    if not data:
+                        return
+                    key.data.sendall(data)
+        except OSError:
+            return
+        finally:
+            sel.close()
+
+    class Handler(socketserver.BaseRequestHandler):
+        def handle(self):
+            c = self.request
+            c.settimeout(30)
+            buf = b""
+            try:
+                while b"\r\n\r\n" not in buf:
+                    chunk = c.recv(16384)
+                    if not chunk:
+                        return
+                    buf += chunk
+                    if len(buf) > 65536:
+                        return c.sendall(_screen_page(400, "Złe żądanie", "Za długi nagłówek."))
+                head, _, rest = buf.partition(b"\r\n\r\n")
+                kind, data = screen_request(head, time.time())
+                if kind == "odpowiedz":
+                    return c.sendall(data)
+                try:
+                    up = socket.create_connection(_screen_upstream(), timeout=5)
+                except OSError:
+                    return c.sendall(_screen_page(503, "Telefon testowy jest wyłączony",
+                                                  "Włącz go na serwerze poleceniem <code>jarvo android on</code> "
+                                                  "(wymaga modułu binder w jądrze Linuksa, zob. docs/MOBILE.md §5)."))
+                with up:
+                    up.sendall(data + rest)
+                    c.settimeout(None)
+                    up.settimeout(None)
+                    pipe(c, up)
+            except OSError:
+                return
+
+    return Handler
+
+
+def _start_screen() -> None:
+    if getattr(_screen, "server", None) or SCREEN_PORT == 0:
+        return
+    import socketserver
+    import threading
+
+    class Server(socketserver.ThreadingTCPServer):
+        allow_reuse_address = True
+        daemon_threads = True
+
+    try:
+        srv = Server(("0.0.0.0", SCREEN_PORT), _screen_handler())
+    except OSError as exc:
+        _screen.error = f"port {SCREEN_PORT} zajęty ({exc.strerror})"
+        return
+    _screen.server = srv
+    threading.Thread(target=srv.serve_forever, name="jarvo-android-screen", daemon=True).start()
+
+
+try:
+    _start_screen()
+except Exception as _exc:
+    _screen.error = str(_exc)
+
+
+def _screen_online() -> bool:
+    import socket
+
+    try:
+        socket.create_connection(_screen_upstream(), timeout=1.5).close()
+        return True
+    except OSError:
+        return False
+
+
+@router.post("/android")
+async def android_screen():
+    """Link do ekranu telefonu testowego: {port, path}; przeglądarka składa host jak przy „Odpal”."""
+    if not getattr(_screen, "server", None):
+        raise HTTPException(503, f"Proxy ekranu telefonu nie działa: {_screen.error or 'serwer nie wystartował'}")
+    if not await asyncio.to_thread(_screen_online):
+        raise HTTPException(503, "Telefon testowy jest wyłączony. Włącz go na serwerze: jarvo android on.")
+    token = await asyncio.to_thread(core.link_for, core.LINKS_FILE, SCREEN_ROOT, time.time(), core.SCREEN_TTL)
+    return {"port": SCREEN_PORT, "path": f"/{token}/"}
 
 
 # ------------------------------------------------------ „Pokaż w folderze”: Eksplorator Windows (WSL)
@@ -741,12 +920,14 @@ async def reveal(request: Request):
 
 @router.get("/host")
 async def host_info():
-    """Co umie host: otwieranie folderów (WSL), ścieżka danych po stronie Windows, port podglądu."""
+    """Co umie host: otwieranie folderów (WSL), ścieżka danych po stronie Windows, port podglądu,
+    telefon testowy (włączony profil android i działające proxy ekranu)."""
     st = _update_state()
     h = st.get("host") or {}
+    android = bool(getattr(_screen, "server", None)) and await asyncio.to_thread(_screen_online)
     return {"explorer": bool(st.get("online") and h.get("explorer")), "data_win": h.get("data_win"),
             "data_host": h.get("data_host"), "preview": bool(getattr(_preview, "server", None)),
-            "preview_port": PREVIEW_PORT}
+            "preview_port": PREVIEW_PORT, "android": android}
 
 
 # --------------------------------------------------------------------------- czat
