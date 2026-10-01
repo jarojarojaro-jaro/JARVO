@@ -1,6 +1,7 @@
 # Rozwój floty: plan dopracowania agentów i nowi specjaliści
 
-Stan: **plan do analizy (research 2026-10-01).** Wdrożone: naprawy z §3 punkty 1, 3 i 4; reszta czeka na decyzje. Wersje bibliotek, limity API i daty
+Stan: **plan do analizy (research 2026-10-01, druga runda propozycji agentów w §6).** Wdrożone: naprawy z §3 punkty
+1, 3 i 4; reszta czeka na decyzje. Wersje bibliotek, limity API i daty
 przepisów sprawdzono 2026-10-01; przed wdrożeniem każdego punktu sprawdzamy je jeszcze raz. Uwagi prawne to
 wskazówki do projektu, nie porada prawna.
 
@@ -192,13 +193,99 @@ na CPU, kolejne paczki angielskich skilli marketingowych.
 Bez zmian w tym planie: są wzorcem. Web dostaje tylko zlecenia od nowych agentów (poprawki z audytów
 audytu zgodności (§6) i Ads).
 
-## 6. Nowi specjaliści: decyzja
+## 6. Nowi specjaliści
 
-**Decyzja 2026-10-01: na razie żadnego nowego agenta.** Proponowani Rachmistrz (finanse), Handlowiec (oferty i lejek)
-i Opiekun opinii zostali odrzuceni jako wymyśleni na siłę. Dwa drobne pomysły z nich zostają jako skille Ręki:
-sprawdzenie białej listy przed przelewem (5.3 #10) i terminy podatkowe (5.3 #3).
+Pierwsza runda propozycji (Rachmistrz, Handlowiec, Opiekun opinii, Inspektor) została odrzucona jako wymyślona na siłę.
+Druga runda (research 2026-10-01) zaczyna od drugiej strony: **na co właściciele małych firm naprawdę tracą czas
+i pieniądze** oraz **jakich „cyfrowych pracowników” ludzie faktycznie używają**, a nie jakie role da się wymyślić.
 
-**Audyt zgodności trafia do Weba jako skill, nie osobny agent.** Web ma już Playwright, axe i nagłówki bezpieczeństwa,
+### 6.1 Dowody: gdzie boli
+
+| Ból | Dane | Źródło |
+|---|---|---|
+| Oszustwa i phishing | 260 783 incydenty w 2025 (+152%), 97% to oszustwa; OLX i Allegro najczęściej podszywane | [CERT Polska 2025](https://www.nask.pl/aktualnosci/prawie-2-tys-zgloszen-kazdego-dnia-raport-cert-polska-za-2025-rok) |
+| Fałszywe faktury | 32,8% firm MŚP dostało fałszywą fakturę albo fakturę ze zmienionym numerem konta | [BIK, raport antyfraudowy 2025](https://media.bik.pl/informacje-prasowe/860954/raport-antyfraudowy-bik-2025-rosnie-liczba-cyberatakow-na-firmy-i-instytucje) |
+| Zaległe płatności | 84% firm ma klientów płacących po terminie, 30% czeka ponad 60 dni | [BIK, IV kw. 2025](https://media.bik.pl/informacje-prasowe/863321/84-firm-w-polsce-doswiadcza-opoznien-w-platnosciach-czas-odwrocic-ten-trend) |
+| Faktury i KSeF | 74% firm miało problemy z KSeF w pierwszym miesiącu | [Grant Thornton, marzec 2026](https://grantthornton.pl/en/article/entrepreneurs-opinions-one-month-after-the-entry-into-force-of-ksef-report/) |
+| Wiadomości od klientów | Allegro liczy odsetek odpowiedzi w 24 h do jakości sprzedaży (widoczność ofert); co czwarta rezerwacja w Booksy po zamknięciu salonu | [Allegro](https://adsup.pl/allegro-aktualnosci-dla-sprzedajacych/zmiany-w-jakosci-sprzedazy-od-1-pazdziernika-2025/), [Booksy](https://trends-pl.booksy.com/) |
+| Biurokracja | 44% mikro i małych firm wskazuje ją jako barierę (+10 pkt) | [ZPP Busometr, I poł. 2026](https://zpp.net.pl/pesymizm-bierze-gore-najnowszy-busometr-zpp-ujawnia-trudna-rzeczywistosc-mikro-i-malego-biznesu/) |
+
+Co ludzie naprawdę używają (twarde liczby mają tylko duże firmy): **obsługa wiadomości od klientów** (HubSpot Customer
+Agent u 8 tys. klientów, agent Meta w WhatsApp i Instagramie: 10 mln rozmów tygodniowo) i **asystent właściciela**
+(poczta, kalendarz, notatki; Lindy w 2026 zamienił cały zespół „AI pracowników” na jednego asystenta). Najgorsze dane
+mają autonomiczni handlowcy wysyłający maile sami (70–80% rezygnacji po 3 miesiącach u 11x). Paczki z 12 „pracownikami”
+(Sintra, Marblism) zbierają recenzje „ogólnikowe i wymagające codziennej poprawki”.
+
+### 6.2 Propozycja: trzech agentów
+
+**`jarvo-informatyk`: Informatyk (najmocniejszy, przydaje się każdej firmie).** Firma jednoosobowa nie ma działu IT,
+a oszustwa na fakturach i phishing to dziś największe ryzyko finansowe małej firmy.
+- **Darmowy audyt domeny i poczty** (jak u Weba: sprawdzalny w sekundę): data wygaśnięcia domeny i DNSSEC z RDAP,
+  SPF (z limitem 10 zapytań), DKIM, DMARC, MTA-STS, certyfikat HTTPS; gotowe rekordy DNS do wklejenia
+  ([checkdmarc](https://github.com/domainaware/checkdmarc), Apache-2.0, zna nowy standard DMARC z maja 2026).
+- **„Kto wysyła maile jako Ty”:** raporty DMARC z osobnej skrzynki ([parsedmarc](https://pypi.org/project/parsedmarc/),
+  Apache-2.0) pokazują zapomniane narzędzia i podszywanie się; bezpieczna ścieżka od `p=none` do `reject`.
+- **Domeny-sobowtóry:** permutacje Twojej domeny ([dnstwist](https://github.com/elceef/dnstwist)) sprawdzone z listą
+  ostrzeżeń [CERT Polska](https://hole.cert.pl/domains/v2/domains.txt): na tym stoi oszustwo „zmiana numeru konta”.
+- **„Czy ten mail to oszustwo?”:** przesyłasz podejrzany mail jako załącznik `.eml`, agent czyta nagłówki, wiek domeny,
+  linki z listą CERT (nie otwierając ich) i daje werdykt; przy fakturze sprawdza rachunek na białej liście VAT.
+- **Konta i hasła:** MFA i administratorzy w Google Workspace albo Microsoft 365 tylko do odczytu; wycieki haseł przez
+  bezpłatne [moje.cert.pl](https://moje.cert.pl/) (opcjonalnie płatne HIBP).
+- **Raport w poniedziałek na Telegramie** z alertami 60, 30 i 7 dni przed wygaśnięciem domeny i certyfikatu.
+- **Dlaczego osobny agent:** stały monitoring i tokeny administratora (tylko do odczytu) w jednym, izolowanym profilu;
+  Web zostaje przy stronie (nagłówki, HTTPS), a nie przy domenie, poczcie i kontach.
+- **Granice:** niczego nie zmienia w DNS ani kontach (gotowe rekordy, zmiana to A2); nie otwiera linków z podejrzanych maili.
+- **Nakład:** M.
+
+**`jarvo-recepcja`: Recepcja (wiadomości od klientów).** Najlepiej udokumentowana rola na rynku, a jednoosobowa firma
+traci na niej najwięcej czasu i klientów (odpowiedź po godzinach, po 24 h na Allegro).
+- **Jedna kolejka wiadomości od klientów:** poczta firmowa, Messenger i Instagram (Graph API dla własnej strony),
+  wiadomości Allegro; dla każdej szkic odpowiedzi z wiedzy firmy (cennik, FAQ, regulamin, godziny ze skarbca i strony).
+- **Zatwierdzanie jednym przyciskiem na Telegramie:** „wyślij”, „popraw”, „odpowiem sam”. Nic nie wychodzi bez Ciebie (A2).
+- **Pilnowanie czasu odpowiedzi:** alert, gdy wiadomość czeka za długo (np. limit 24 h Allegro); prośby o termin wpisane
+  jako propozycje do kalendarza; przypomnienia o wizycie do zatwierdzenia.
+- **Pytania bez odpowiedzi w wiedzy firmy** trafiają do Ciebie i, po Twojej odpowiedzi, jako szkic do skarbca, więc
+  z czasem recepcja wie więcej.
+- **Dlaczego osobny agent, a nie Ręka:** czyta niezaufane wiadomości od obcych ludzi, więc musi mieć minimum narzędzi
+  (bez terminala, przeglądarki i plików; tylko wiedza firmy do odczytu i szkic). Ręka pracuje na Twoich sprawach
+  z pełnym zestawem narzędzi; połączenie obu w jednym profilu to podręcznikowe ryzyko wstrzyknięcia poleceń.
+- **Później, tylko jeśli zechcesz:** automatyczne odpowiedzi na wąskie, powtarzalne pytania (godziny, dojazd, status
+  przesyłki) według reguł, które sam zatwierdzisz.
+- **Nakład:** M (najwięcej pracy to podłączenie kanałów).
+
+**`jarvo-sklep`: Menedżer sklepu (tylko dla firm sprzedających online, włączany opcjonalnie).**
+- **Jakość sprzedaży na Allegro** (`/sale/quality`): wynik z historią 30 dni, co spadło i które zamówienia lub
+  dyskusje za tym stoją.
+- **Brakujące parametry ofert**, także te obowiązkowe w ciągu 3 miesięcy, i **braki GPSR** (producent, informacje
+  o bezpieczeństwie; bez nich oferty nie da się edytować): gotowe poprawki do zatwierdzenia.
+- **Marża na produkcie** po prowizji, opłatach Smart! i kosztach reklam; problemy w Google Merchant Center
+  (nowe Merchant API, stare Content API wyłączone 18.08.2026) z poprawką na produkt.
+- **Szkice odpowiedzi w dyskusjach i zwrotach** z terminami (wiadomości ogólne idą przez Recepcję).
+- **Ceny konkurencji:** tylko legalnie, przez reguły cenowe Allegro; wyszukiwanie ofert konkurencji w API jest dla
+  nowych aplikacji zamknięte, a regulamin API przewiduje 50 tys. zł kary umownej za naruszenie, więc żadnego scrapowania.
+- **Granice:** faza 1 tylko odczyt; każda zmiana oferty, ceny i wiadomość to A2. Własna aplikacja Allegro właściciela.
+- **Nakład:** M–L. Sens ma tylko u kogoś, kto sprzedaje online; u reszty agent jest wyłączony.
+
+### 6.3 Skille zamiast agentów
+
+Część bólów jest prawdziwa, ale nie uzasadnia osobnego profilu:
+
+| Ból | Gdzie | Co dokładnie |
+|---|---|---|
+| Zaległe płatności (84% firm) | Ręka, skill `naleznosci` | przeterminowane faktury z programu do faktur (Fakturownia, inFakt, wFirma, iFirma mają API), szkice przypomnień, odsetki ustawowe i 40 euro rekompensaty; wysyłka A2 |
+| Dotacje | Łowca, miesięczny skill | miesięczne zestawienia naborów (XLSX z funduszeeuropejskie.gov.pl) dopasowane do profilu firmy; ile zostało limitu de minimis z [SUDOP](https://sudop.uokik.gov.pl/search/aidBeneficiary) po NIP; szkolenia z Bazy Usług Rozwojowych |
+| Tygodniowy raport biznesowy | Jarvo, rozbudowa `weekly-review` | GA4 (oficjalne MCP tylko do odczytu), Search Console, sprzedaż; „co się zmieniło i dlaczego” z dziennikiem floty |
+| Newsletter | Studio | szkic newslettera z treści tygodnia jako kampania-szkic w GetResponse, MailerLite albo FreshMail; nigdy nie wysyła |
+| Lokalne SEO | Web | spójność nazwy, adresu i telefonu, dane strukturalne LocalBusiness |
+| Rekrutacja | Ręka | ogłoszenie zgodne z jawnością wynagrodzeń (Kodeks pracy od 24.12.2025) i klauzula RODO; bez oceniania CV (AI Act: wysokie ryzyko) |
+
+Odrzucone także w drugiej rundzie: autonomiczny handlowiec wysyłający maile (najgorsze dane rynkowe, a Łowca celowo
+niczego nie wysyła), telefoniczna recepcja (recenzje „robotyczna”; test CallBay zostaje osobnym tematem), optymalizator
+cen usług (brak danych), osobny agent dotacji (dla firmy usługowej większość miesięcy to „nic dla Ciebie”).
+
+### 6.4 Audyt zgodności jako skill Weba (decyzja z pierwszej rundy)
+
+ Web ma już Playwright, axe i nagłówki bezpieczeństwa,
 więc dokładamy mu prawną część tego samego audytu:
 - **Raport cookies:** co ładuje się przed zgodą, po „odrzuć” i po „akceptuj”, z HAR-em i zrzutami jako dowodem; czy
   „Odrzuć wszystkie” jest równie łatwe jak „Akceptuj”. Miarą jest poradnik UODO dla e-handlu (marzec 2025); art. 399 PKE
@@ -222,9 +309,11 @@ więc dokładamy mu prawną część tego samego audytu:
 |---|---|---|---|
 | A. Naprawy i fundament | §3 (punkty 1, 3 i 4 zrobione), `rejestry_pl.py` (§4) | 1–2 dni | brak |
 | B. Sygnatury bez kont | Ads: audyt gotowości (5.2 #1–3); Łowca: karta leada (5.1 #2–8, potem #9 na Twojej ofercie); Sherlock: raport z dowodami (5.4 #1–5); Studio: pakiet startowy (5.5 #1–5) | ok. 2 tygodnie | darmowe: archive.org, OpenAlex, GUS BIR, PageSpeed |
-| C. Web: audyt zgodności | §6 | 3–5 dni | brak |
-| D. Ręka z Twoimi kontami | 5.3 #1–11 | ok. tydzień | poczta, kalendarz (Twoja zgoda na każde) |
-| E. Konta reklamowe | Skarbiec faza 1, MCP tylko do odczytu (5.2 #6–7) | ok. tydzień | Meta `ads_read`, Google rola „tylko odczyt” |
+| C. Web: audyt zgodności | §6.4 | 3–5 dni | brak |
+| D. Informatyk | §6.2 (jeśli zatwierdzisz) | ok. tydzień | opcjonalnie: odczyt kont Google/Microsoft, klucz Spamhaus DQS |
+| E. Recepcja | §6.2 (jeśli zatwierdzisz) | 1–2 tygodnie | skrzynka firmowa, strona na Facebooku/Instagramie, Allegro |
+| F. Ręka z Twoimi kontami | 5.3 #1–11 i skille z §6.3 | ok. tydzień | poczta, kalendarz, program do faktur (Twoja zgoda na każde) |
+| G. Konta reklamowe | Skarbiec faza 1, MCP tylko do odczytu (5.2 #6–7) | ok. tydzień | Meta `ads_read`, Google rola „tylko odczyt” |
 
 Każdy etap kończy się tak jak dotąd: testy, evals, red team dla nowych wejść z sieci, wdrożenie i próba
 w działającym kontenerze, dokumentacja.
@@ -239,6 +328,9 @@ w działającym kontenerze, dokumentacja.
 | R5 | Postiz | **poza VPS** (Postiz Cloud albo mały osobny serwer) albo eksport ICS/CSV |
 | R6 | LanguageTool i changedetection.io | **dopiero po pomiarze RAM** na VPS |
 | R8 | Baza Konkurencyjności przez nieopisane API strony | **tak, ostrożnie:** małe tempo, a gdy przestanie działać, eksport listy projektów |
+| R9 | Których nowych agentów z §6.2 budujemy? | **Informatyk i Recepcja**; Sklep tylko, jeśli Ty albo pierwsi użytkownicy sprzedajecie online |
+| R10 | Kanały Recepcji na start | **poczta firmowa i Messenger/Instagram**, Allegro razem ze Sklepem |
+| R11 | Skille z §6.3 | **wszystkie**, w etapach Ręki, Łowcy, Jarva, Studia i Weba |
 
 ## 9. Źródła
 
