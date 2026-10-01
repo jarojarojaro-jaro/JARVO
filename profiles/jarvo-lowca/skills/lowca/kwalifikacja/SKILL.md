@@ -1,7 +1,7 @@
 ---
 name: kwalifikacja
 description: "Kwalifikacja: odsiew szumu, dopasowanie, świeżość, siła."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo (metoda za superdesigndev/treg lead-signals, Apache-2.0)"
 license: MIT
 metadata:
@@ -19,7 +19,8 @@ metadata:
 Lista sygnałów to nie lista leadów: zwykle **odpada ponad połowa**. Kolejność oceny: najpierw **dopasowanie** (brak
 dopasowania = brak wiersza), potem **świeżość** (sygnał sprzed tygodnia bije sygnał sprzed kwartału), potem **siła**
 (dwa niezależne sygnały na jednej firmie biją jeden); przy remisie wyżej firma z opublikowanym kontaktem. Liczy to `leady.py ocen` według `ICP.yaml`; Ty sprawdzasz,
-czy liczby mają sens.
+czy liczby mają sens. Dopasowanie liczy tylko kryteria, które dane sygnału pozwalają sprawdzić; reszta jest w kolumnie
+`niesprawdzone` (np. `cpv, slowa` przy nowej spółce z KRS): przy czołówce dopilnuj ich sam, zanim lead trafi dalej.
 
 ## Kroki
 1. `python3 $HERMES_HOME/scripts/leady.py ocen <projekt> --top 30` → `leady.csv`, `LEADY.md`.

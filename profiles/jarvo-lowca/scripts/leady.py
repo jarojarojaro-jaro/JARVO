@@ -6,7 +6,8 @@
     leady.py powod <projekt> <klucz> "dlaczego teraz"     # powód słowami użytkownika zamiast opisu sygnału
     leady.py ocen <projekt> [--top 30] [--monitoring]     # leady.csv + LEADY.md; --monitoring: tylko nowe względem baza.json
 
-<projekt> = katalog z ICP.yaml (np. out/leady/nova-www). Ocena: najpierw dopasowanie do ICP (brak = brak wiersza),
+<projekt> = katalog z ICP.yaml (np. out/leady/nova-www). Ocena: najpierw dopasowanie do ICP (brak = brak wiersza;
+liczone tylko z kryteriów, które dane sygnału pozwalają sprawdzić, reszta w kolumnie `niesprawdzone`),
 potem świeżość (waga sygnału maleje liniowo do zera w oknie dni), potem siła (dwa różne typy sygnałów > jeden);
 przy remisie wyżej firma z opublikowanym kontaktem.
 Kontakty tylko opublikowane przez firmę albo rejestr, każdy ze źródłem; skrypt niczego nie wysyła.
@@ -34,7 +35,7 @@ PRZYPOMNIENIE = ("Zanim ktokolwiek napisze do tych firm: informacja handlowa mai
                  "co do zasady wymaga jej wcześniejszej zgody (UŚUDE, Prawo komunikacji elektronicznej), także w B2B; adres "
                  "opublikowany na stronie to nie zgoda. Przed kampanią: podstawa prawna, lista wypisanych, informacja o źródle "
                  "danych (RODO art. 14). Lista jest do Twojej decyzji; nic nie zostało wysłane.")
-POLA = ["klucz", "nazwa", "nip", "krs", "woj", "miejscowosc", "www", "ocena", "dopasowanie", "sygnaly", "dlaczego_teraz",
+POLA = ["klucz", "nazwa", "nip", "krs", "woj", "miejscowosc", "www", "ocena", "dopasowanie", "niesprawdzone", "sygnaly", "dlaczego_teraz",
         "zrodla", "email", "email_rodzaj", "email_zrodlo", "telefon", "formularz", "nowy", "pierwszy_raz"]
 
 
@@ -120,27 +121,71 @@ def cmd_powod(projekt: Path, k: str, tekst: str) -> int:
     return 0
 
 
-def dopasowanie(firma: dict, sygnaly: list[dict], icp: dict) -> float | None:
-    """0–1 (część kryteriów ICP, które firma spełnia); None = wykluczona."""
+SLOWO_RE = re.compile(r"[0-9a-ząćęłńóśźż]+")
+
+
+def _rdzen(slowo: str) -> str:
+    """Prymitywny rdzeń polskiego słowa: bez końcówki fleksyjnej („strona” → „stron”, „internetowy” → „internetow”)."""
+    if len(slowo) >= 7:
+        return slowo[:-2]
+    if len(slowo) >= 5:
+        return slowo[:-1]
+    return slowo
+
+
+def zawiera(tekst: str, fraza: str) -> bool:
+    """Czy tekst zawiera frazę z dokładnością do odmiany: każde słowo frazy jako początek jakiegoś słowa tekstu
+    („strona” znajduje „strony”, „stronę”, „stronie”; „sklep internetowy” znajduje „sklepu internetowego”)."""
+    slowa = SLOWO_RE.findall(tekst.lower())
+    return all(any(w.startswith(_rdzen(f)) for w in slowa) for f in SLOWO_RE.findall(fraza.lower()))
+
+
+def ocena_icp(firma: dict, sygnaly: list[dict], icp: dict) -> tuple[float, list[str]] | None:
+    """Dopasowanie do ICP: (część SPRAWDZALNYCH kryteriów, które firma spełnia, lista niesprawdzonych); None = wykluczona.
+
+    Kryterium liczy się tylko wtedy, gdy sygnały mają dane, którymi da się je sprawdzić: PKD ma firma z KRS, CPV ma
+    przetarg, województwo ma firma z adresem, a słowa opisują potrzebę (przedmiot przetargu, rekrutacja, news, strona;
+    opis wpisu w KRS to tylko branża). Brak danych to „nie wiadomo”, nie „nie pasuje”: nowa spółka z KRS nie traci
+    punktów za brak CPV, a przetarg za brak PKD. Gdy żadnego kryterium nie da się sprawdzić, dopasowanie = 0,5
+    (przechodzi przy domyślnym progu 0,5, odpada przy progu 1,0)."""
     d = icp["dopasowanie"]
     tekst = " ".join([firma.get("nazwa") or ""] + [s.get("opis") or "" for s in sygnaly] +
                      [(s.get("szczegoly") or {}).get("przedmiot") or "" for s in sygnaly]).lower()
     forma = " ".join(str((s.get("szczegoly") or {}).get("forma") or "") for s in sygnaly).upper()
-    if any(w.lower() in tekst for w in d.get("wyklucz_slowa") or []) or any(f.upper() in forma for f in d.get("wyklucz_formy") or []):
+    if any(zawiera(tekst, w) for w in d.get("wyklucz_slowa") or []) or any(f.upper() in forma for f in d.get("wyklucz_formy") or []):
         return None
-    kryteria = []
+    wyniki: list[bool] = []
+    niesprawdzone: list[str] = []
+
+    def kryterium(nazwa: str, sprawdzalne: bool, spelnione: bool) -> None:
+        if spelnione:                       # dopasowanie zawsze się liczy, nawet przy niepełnych danych
+            wyniki.append(True)
+        elif sprawdzalne:
+            wyniki.append(False)
+        else:
+            niesprawdzone.append(nazwa)
+
     if d.get("pkd"):
-        kody = [firma.get("pkd") or ""]
-        kryteria.append(any(k.replace(".", "").startswith(str(p).replace(".", "")) for k in kody for p in d["pkd"]))
+        kody = [k for k in [firma.get("pkd")] + list(firma.get("pkd_inne") or []) if k]
+        kryterium("pkd", bool(kody), any(str(k).replace(".", "").startswith(str(p).replace(".", "")) for k in kody for p in d["pkd"]))
     if d.get("woj"):
         woj = [ll.WOJ.get(str(w).upper(), str(w).upper()) for w in d["woj"]]
-        kryteria.append((firma.get("woj") or "").upper() in woj)
+        kryterium("woj", bool(firma.get("woj")), (firma.get("woj") or "").upper() in woj)
     if d.get("cpv"):
         cpv = [c for s in sygnaly for c in ((s.get("szczegoly") or {}).get("cpv") or [])]
-        kryteria.append(any(str(c).startswith(str(p)) for c in cpv for p in d["cpv"]))
+        kryterium("cpv", bool(cpv), any(str(c).startswith(str(p)) for c in cpv for p in d["cpv"]))
     if d.get("slowa"):
-        kryteria.append(any(w.lower() in tekst for w in d["slowa"]))
-    return sum(kryteria) / len(kryteria) if kryteria else 1.0
+        opisuje_potrzebe = any(not str(s.get("typ") or "").startswith("krs-") for s in sygnaly)
+        kryterium("slowa", opisuje_potrzebe, any(zawiera(tekst, w) for w in d["slowa"]))
+    if wyniki:
+        return sum(wyniki) / len(wyniki), niesprawdzone
+    return (0.5 if niesprawdzone else 1.0), niesprawdzone
+
+
+def dopasowanie(firma: dict, sygnaly: list[dict], icp: dict) -> float | None:
+    """0–1 (część sprawdzalnych kryteriów ICP, które firma spełnia); None = wykluczona. Szczegóły: ocena_icp."""
+    wynik = ocena_icp(firma, sygnaly, icp)
+    return None if wynik is None else wynik[0]
 
 
 def swiezosc(s: dict, icp: dict, dzis: dt.date) -> float:
@@ -162,9 +207,10 @@ def ocen_firmy(sygnaly: list[dict], kontakty: dict, powody: dict, icp: dict, dzi
         firma = {}
         for s in ss:                                             # najpełniejsze dane firmy z wszystkich sygnałów
             firma.update({a: b for a, b in (s.get("firma") or {}).items() if b})
-        fit = dopasowanie(firma, ss, icp)
-        if fit is None or fit < prog:
+        wynik = ocena_icp(firma, ss, icp)
+        if wynik is None or wynik[0] < prog:
             continue
+        fit, niesprawdzone = wynik
         per_typ: dict[str, float] = {}
         for s in ss:
             per_typ[s["typ"]] = max(per_typ.get(s["typ"], 0.0), swiezosc(s, icp, dzis))
@@ -181,7 +227,7 @@ def ocen_firmy(sygnaly: list[dict], kontakty: dict, powody: dict, icp: dict, dzi
         out.append({
             "klucz": k, "nazwa": firma.get("nazwa"), "nip": firma.get("nip"), "krs": firma.get("krs"), "woj": firma.get("woj"),
             "miejscowosc": firma.get("miejscowosc"), "www": firma.get("www") or (kt.get("domena") and f"https://{kt['domena']}"),
-            "ocena": ocena, "dopasowanie": round(fit, 2),
+            "ocena": ocena, "dopasowanie": round(fit, 2), "niesprawdzone": ", ".join(niesprawdzone),
             "sygnaly": "; ".join(f"{s['typ']}@{str(s.get('data'))[:10]}" for s in sorted(ss, key=lambda s: str(s.get("data")), reverse=True)),
             "dlaczego_teraz": powody.get(k) or najlepszy.get("opis") or najlepszy["typ"],
             "zrodla": " ".join(dict.fromkeys(s.get("zrodlo") for s in ss if s.get("zrodlo"))),

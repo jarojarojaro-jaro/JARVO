@@ -194,3 +194,71 @@ def test_leads_scoring_dedupe_and_monitoring(tmp_path):
     assert "szuka marketingowca" in (p / "leady.csv").read_text(encoding="utf-8")
     leady.cmd_ocen(p, top=10, monitoring=False, dzis=dt.date(2026, 12, 30))       # wszystko poza oknem świeżości
     assert list(csv.DictReader((p / "leady.csv").open(encoding="utf-8"))) == []
+
+
+def _icp_z_dokumentacji() -> dict:
+    """Przykładowy ICP ze skilla profil-klienta (ten, który agent kopiuje), przepuszczony przez wczytaj_icp."""
+    import re as _re
+    import tempfile
+
+    skill = (Path(__file__).resolve().parent.parent / "profiles/jarvo-lowca/skills/lowca/profil-klienta/SKILL.md")
+    yaml_txt = _re.search(r"```yaml\n(.*?)```", skill.read_text(encoding="utf-8"), _re.S).group(1)
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "ICP.yaml").write_text(yaml_txt, encoding="utf-8")
+        return leady.wczytaj_icp(Path(d))
+
+
+def test_keywords_match_polish_inflection():
+    assert leady.zawiera("Wykonanie strony internetowej gminy", "strona")
+    assert leady.zawiera("budowa sklepu internetowego dla muzeum", "sklep internetowy")
+    assert leady.zawiera("spółka w likwidacji", "likwidacji") and leady.zawiera("otwarcie likwidacja", "likwidacji")
+    assert not leady.zawiera("remont drogi gminnej", "strona")
+    assert not leady.zawiera("sklep z obuwiem", "sklep internetowy")            # oba słowa frazy muszą wystąpić
+
+
+def test_icp_counts_only_checkable_criteria():
+    """Regresja: kryterium, którego sygnał nie dotyczy (CPV przy KRS, PKD przy przetargu), nie może obniżać oceny."""
+    icp = _icp_z_dokumentacji()
+    assert icp["dopasowanie"]["prog"] == 1.0 and icp["dopasowanie"]["cpv"] and icp["dopasowanie"]["slowa"]
+    firma_it = {**krs.normalizuj(ODPIS["odpis"], "P"), "pkd": "62.01.Z", "pkd_inne": [], "woj": "MAZOWIECKIE"}
+    s_krs = krs.sygnal(firma_it, "2026-09-29")
+    # nowa spółka IT z Mazowsza: PKD i województwo pasują, CPV i słowa nie dotyczą wpisu w KRS
+    assert leady.ocena_icp(firma_it, [s_krs], icp) == (1.0, ["cpv", "slowa"])
+    # przetarg na stronę od mazowieckiego zamawiającego: województwo, CPV i słowa pasują, PKD nie dotyczy
+    przetarg = przetargi.bzp_sygnaly({"objectId": "x1", "publicationDate": "2026-09-28", "orderObject": "Wykonanie strony internetowej gminy",
+                                      "cpvCode": "72413000-8 (Usługi w zakresie projektowania stron WWW)",
+                                      "organizationName": "Gmina Test", "organizationNationalId": "5250000251",
+                                      "organizationProvince": "PL14"}, wyniki=False)[0]
+    assert przetarg["szczegoly"]["cpv"] == ["72413000"]
+    assert leady.ocena_icp(przetarg["firma"], [przetarg], icp) == (1.0, ["pkd"])
+    # to, co sprawdzalne i niezgodne, nadal odpada: zła branża w KRS, zły CPV w przetargu
+    fryzjer = {**firma_it, "pkd": "96.21.Z"}
+    assert leady.ocena_icp(fryzjer, [krs.sygnal(fryzjer, "2026-09-29")], icp)[0] == 0.5
+    zly_cpv = {**przetarg, "szczegoly": {**przetarg["szczegoly"], "cpv": ["45000000"]}}
+    assert leady.ocena_icp(zly_cpv["firma"], [zly_cpv], icp)[0] < 1.0
+    # nic do sprawdzenia: neutralne 0,5 (odpada przy progu 1,0), z listą niesprawdzonych
+    assert leady.ocena_icp({"nazwa": "X"}, [{"typ": "krs-wpis", "opis": ""}], icp) == (0.5, ["pkd", "woj", "cpv", "slowa"])
+    # wykluczenia działają jak wcześniej
+    assert leady.ocena_icp(firma_it, [{**s_krs, "opis": "spółka w likwidacji"}], icp) is None
+
+
+def test_icp_example_end_to_end_keeps_best_leads(tmp_path):
+    """Pełny przebieg `ocen` z przykładowym ICP: idealna nowa spółka i pasujący przetarg trafiają na listę."""
+    p = tmp_path / "leady"
+    p.mkdir()
+    skill = Path(__file__).resolve().parent.parent / "profiles/jarvo-lowca/skills/lowca/profil-klienta/SKILL.md"
+    import re as _re
+    (p / "ICP.yaml").write_text(_re.search(r"```yaml\n(.*?)```", skill.read_text(encoding="utf-8"), _re.S).group(1), encoding="utf-8")
+    firma_it = {**krs.normalizuj(ODPIS["odpis"], "P"), "pkd": "62.01.Z", "pkd_inne": [], "woj": "MAZOWIECKIE"}
+    przetarg = przetargi.bzp_sygnaly({"objectId": "x1", "publicationDate": "2026-09-28", "orderObject": "Sklep internetowy dla muzeum",
+                                      "cpvCode": "72212224-5", "organizationName": "Muzeum Test", "organizationNationalId": "5250000251",
+                                      "organizationProvince": "PL14"}, wyniki=False)[0]
+    plik = tmp_path / "s.jsonl"
+    plik.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in (krs.sygnal(firma_it, "2026-09-29"), przetarg)),
+                    encoding="utf-8")
+    leady.cmd_dodaj(p, [str(plik)])
+    leady.cmd_ocen(p, top=10, monitoring=False, dzis=dt.date(2026, 9, 30))
+    rows = {r["klucz"]: r for r in csv.DictReader((p / "leady.csv").open(encoding="utf-8"))}
+    assert set(rows) == {"nip:9522290390", "nip:5250000251"}
+    assert rows["nip:9522290390"]["dopasowanie"] == "1.0" and rows["nip:9522290390"]["niesprawdzone"] == "cpv, slowa"
+    assert rows["nip:5250000251"]["niesprawdzone"] == "pkd"

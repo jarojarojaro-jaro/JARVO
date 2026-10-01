@@ -35,10 +35,10 @@ Z tego wynikają cztery reguły tego planu:
 
 Te punkty nie wymagają decyzji, tylko poprawki:
 
-1. **Łowca odrzuca dobre leady.** `leady.dopasowanie()` liczy kryterium ICP jako niespełnione, gdy sygnał
-   go w ogóle nie dotyczy (CPV jest tylko w przetargach, PKD tylko w KRS). Przy przykładowym profilu
-   z `profil-klienta` idealna nowa spółka IT dostaje 0,5 przy progu 1,0 i odpada; pasujący przetarg tak samo.
-   Poprawka: kryteria liczone tylko dla pól, które sygnał ma, plus test na przykładowym profilu.
+1. ✅ **Łowca odrzucał dobre leady** (naprawione 2026-10-01). Kryterium ICP, którego sygnał nie dotyczy (CPV przy
+   KRS, PKD przy przetargu), liczyło się jako niespełnione, a słowa kluczowe porównywały się dosłownie („strona”
+   nie znajdowała „strony”). Przy przykładowym profilu z progiem 1,0 odpadały idealna nowa spółka IT i pasujący
+   przetarg. Teraz liczą się tylko kryteria sprawdzalne (reszta w kolumnie `niesprawdzone`), słowa po rdzeniu.
 2. **Łowca: prawo komunikacji elektronicznej jest opisane za słabo.** [LEADY.md](LEADY.md) §3 mówi o zgodzie
    „do konkretnej osoby”. Od 10.11.2024 art. 398 PKE wymaga uprzedniej zgody na marketing e-mailem
    i telefonem do każdego abonenta, także firmy i adresu ogólnego typu `biuro@`. Najcenniejsze są więc
@@ -82,7 +82,7 @@ Raz w tygodniu: przegląd nowych sygnałów, zbliżających się terminów przet
 
 | # | Co | Po co | Nakład |
 |---|---|---|---|
-| 1 | Poprawka oceny ICP i test (§3) | bez niej najlepsze leady odpadają | S |
+| 1 | ✅ Poprawka oceny ICP i test (§3) | bez niej najlepsze leady odpadały | zrobione |
 | 2 | [Baza Konkurencyjności](https://bazakonkurencyjnosci.funduszeeuropejskie.gov.pl/) + [lista projektów UE 2021–27](https://funduszeeuropejskie.gov.pl/raporty-i-analizy/lista-projektow-realizowanych-z-funduszy-europejskich-w-polsce-w-latach-2021-2027/) | firmy z dotacją muszą tu publikować zapytania ofertowe: budżet jest, a odpowiedź jest legalna | M (API nieopisane, trzeba je rozpoznać) |
 | 3 | Porównanie odpisu pełnego KRS | co dokładnie się zmieniło: kapitał, nowe PKD, oddziały, przeprowadzka, brak złożonego sprawozdania | S |
 | 4 | Nowe firmy z REGON BIR (także jednoosobowe) | świeże podmioty codziennie; dane minimalne, tylko po filtrze ICP (kara UODO dla Bisnode, art. 14) | S–M |
@@ -273,7 +273,7 @@ Darmowy, poparty dowodami audyt prawny dowolnej strony: prawny odpowiednik techn
 
 | Etap | Zakres | Nakład | Klucze i konta |
 |---|---|---|---|
-| A. Naprawy i fundament | §3 w całości, `rejestry_pl.py` (§4) | 2–3 dni | brak |
+| A. Naprawy i fundament | §3 (punkt 1 zrobiony), `rejestry_pl.py` (§4) | 2–3 dni | brak |
 | B. Sygnatury bez kont | Ads: audyt gotowości (5.2 #1–3); Łowca: karta leada (5.1 #2–8, potem #9 na Twojej ofercie); Sherlock: raport z dowodami (5.4 #1–5); Studio: pakiet startowy (5.5 #1–5) | ok. 2 tygodnie | darmowe: archive.org, OpenAlex, GUS BIR, PageSpeed |
 | C. Inspektor | 6.1 | 3–5 dni | brak |
 | D. Ręka z Twoimi kontami | 5.3 #1–11 | ok. tydzień | poczta, kalendarz (Twoja zgoda na każde) |

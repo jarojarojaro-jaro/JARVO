@@ -1,7 +1,7 @@
 ---
 name: profil-klienta
 description: "ICP: kogo szukamy, gdzie, jaki ból i jakie sygnały."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -28,7 +28,10 @@ to przypadkowe firmy. Wynik: `ICP.yaml` (czyta go `leady.py`) i `ICP.md` (dla cz
 3. **Po czym poznamy „teraz”:** sygnały z tabeli źródeł w skillu `sygnaly`, z wagą 0–3 i oknem świeżości
    w dniach. Przetargi: prefiksy CPV (np. `72` usługi IT, `79341` reklama, `45` roboty budowlane).
 4. **Wykluczenia:** formy (`FUNDACJA`, `STOWARZYSZENIE`), słowa (`likwidacji`, konkurenci użytkownika), własni klienci.
-5. **Próg dopasowania** (`prog`, domyślnie 0,5): część kryteriów, które firma musi spełnić. 1,0 = wszystkie.
+5. **Próg dopasowania** (`prog`, domyślnie 0,5): część kryteriów, które firma musi spełnić. 1,0 = wszystkie
+   **sprawdzalne**: kryterium, którego sygnał nie dotyczy (CPV przy wpisie w KRS, PKD przy przetargu), nie obniża
+   oceny, tylko trafia do kolumny `niesprawdzone` w `leady.csv`. Gdy nie da się sprawdzić żadnego, dopasowanie = 0,5.
+   Słowa porównujemy po rdzeniu: „strona” znajduje „strony” i „stronie”, fraza wymaga wszystkich swoich słów.
 
 ## `ICP.yaml`
 ```yaml
@@ -38,7 +41,7 @@ dopasowanie:
   pkd: ["62", "70", "73"]          # prefiksy PKD (bez kropek też działa)
   woj: [MAZOWIECKIE]               # nazwy albo kody PL14
   cpv: ["72", "79341"]             # tylko przy przetargach
-  slowa: ["strona", "sklep internetowy"]   # w opisie sygnału albo przedmiocie przetargu
+  slowa: ["strona", "sklep internetowy"]   # w przedmiocie przetargu albo opisie sygnału (nie w samym wpisie KRS); po rdzeniu
   wyklucz_slowa: ["likwidacji"]
   wyklucz_formy: [FUNDACJA, STOWARZYSZENIE]
   prog: 1.0

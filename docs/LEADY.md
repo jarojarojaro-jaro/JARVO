@@ -72,7 +72,9 @@ Nazwiska członków zarządu API KRS maskuje (`D***`), więc osoba kontaktowa po
 
 ## 4. Ocena
 
-Najpierw **dopasowanie** (brak dopasowania = brak wiersza), potem **świeżość** (sygnał sprzed tygodnia bije sygnał
+Najpierw **dopasowanie** (brak dopasowania = brak wiersza; liczone tylko z kryteriów ICP, które dane sygnału pozwalają
+sprawdzić, np. CPV tylko przy przetargach, PKD tylko przy firmach z KRS; reszta w kolumnie `niesprawdzone`; słowa po
+rdzeniu, więc „strona” znajduje „strony”), potem **świeżość** (sygnał sprzed tygodnia bije sygnał
 sprzed kwartału), potem **siła** (dwa niezależne sygnały na jednej firmie biją jeden); przy remisie wyżej firma z
 opublikowanym kontaktem. Wagi i okna czasowe są w
 `ICP.yaml`, więc wynik da się odtworzyć i poprawić. Każdy wiersz ma powód w słowach użytkownika.
