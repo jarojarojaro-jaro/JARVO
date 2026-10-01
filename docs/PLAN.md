@@ -231,8 +231,9 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
-- ⬜ **Twórca aplikacji** `jarvo-mobile` (aplikacje mobilne w Expo, darmowy audyt mobilny, prototyp na telefonie, pakiet
-  do sklepów): projekt do akceptacji w [MOBILE.md](MOBILE.md).
+- ⬜ **Twórca aplikacji** `jarvo-mobile` (aplikacje mobilne w Expo od pomysłu do sklepu: darmowy audyt mobilny, prototyp
+  na telefonie, testy na Androidzie i w symulatorze iOS, bramka aplikacji, 44-punktowa lista kontrolna sklepów, zrzuty,
+  obsługa odrzuceń): projekt do akceptacji w [MOBILE.md](MOBILE.md).
 - 🟡 Dopracowanie słabszych agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności (cookies, zgody, Omnibus)
   jako skill Weba: plan w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md); naprawy z §3 (ocena leadów, tabela Ręki, martwe ścieżki Ads)
   zrobione 2026-10-01. Nowi specjaliści: na razie żadni (dwie rundy propozycji odłożone, [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md) §6).

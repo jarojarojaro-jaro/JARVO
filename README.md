@@ -99,7 +99,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [RUNBOOK.md](docs/RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [INSTALER.md](docs/INSTALER.md) | plan instalatora jednym poleceniem na Linuksie, macOS i Windowsie: diagnoza, etapy, ocena trudności |
 | [ROZWOJ-FLOTY.md](docs/ROZWOJ-FLOTY.md) | plan dopracowania agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności jako skill Weba |
-| [MOBILE.md](docs/MOBILE.md) | projekt Twórcy aplikacji `jarvo-mobile`: darmowy audyt mobilny, prototyp Expo na telefonie, pakiet do sklepów; do akceptacji |
+| [MOBILE.md](docs/MOBILE.md) | projekt Twórcy aplikacji `jarvo-mobile`: pełny proces od pomysłu do sklepu (darmowy audyt mobilny, prototyp Expo na telefonie, Android w dashboardzie i iOS w chmurze, bramka aplikacji, lista kontrolna sklepów, zrzuty, odrzucenia); do akceptacji |
 | [SOURCES.md](docs/SOURCES.md) | źródła, atrybucje i licencje |
 | [JARVO-CALOSC.md](docs/JARVO-CALOSC.md) | całość od A do Z w jednym pliku (kontekst na start sesji) |
 
