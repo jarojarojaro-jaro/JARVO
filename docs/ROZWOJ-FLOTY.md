@@ -253,6 +253,34 @@ traci na niej najwięcej czasu i klientów (odpowiedź po godzinach, po 24 h na 
   przesyłki) według reguł, które sam zatwierdzisz.
 - **Nakład:** M (najwięcej pracy to podłączenie kanałów).
 
+**Recepcja: jak podłączyć kanały (sprawdzone w dokumentacji 2026-10-01).**
+
+| Kanał | Da się? | Co musi zrobić właściciel | Jak czytamy |
+|---|---|---|---|
+| Poczta (IMAP, Gmail, Microsoft 365) | tak | hasło aplikacji albo własna aplikacja Google/Microsoft; Microsoft pozwala na „czytaj i twórz szkice” bez prawa wysyłki (`Mail.ReadWrite` bez `Mail.Send`) | odpytywanie, bez publicznego adresu |
+| Allegro | tak | własna aplikacja w panelu deweloperskim Allegro, logowanie kodem z urządzenia | odpytywanie (`/messaging/threads`, dyskusje `/sale/issues`) |
+| Instagram (konto firmowe) | tak, po konfiguracji | własna aplikacja Meta, logowanie Instagramem; dla własnego konta wystarcza Standard Access | odpytywanie (`/me/conversations`) |
+| Messenger (strona na Facebooku) | prawdopodobnie, po konfiguracji | własna aplikacja Meta; dokumentacja Meta jest sprzeczna co do przeglądu aplikacji, więc liczymy się z weryfikacją firmy | odpytywanie (`/{page-id}/conversations`) |
+| WhatsApp Business | tak, ale trudniej | aplikacja Meta, numer wypięty z aplikacji WhatsApp (wspólny numer z aplikacją tylko przez partnera Meta); wiadomości poza 24 h tylko szablonami (płatne) | tylko webhook: potrzebny tunel (Cloudflare Tunnel albo Tailscale Funnel) |
+| SMS | tak | numer u SerwerSMS, SMSAPI albo Twilio (od ok. 99 zł miesięcznie za numer dedykowany w SMSAPI) | SerwerSMS: odpytywanie; SMSAPI: webhook |
+| OLX | tak, po akceptacji | aplikacja w Partner API OLX (OLX ją sprawdza) | odpytywanie |
+| Formularz na stronie | tak | formularz wysyła maila na osobną skrzynkę | przez pocztę |
+| Telegram (klienci piszą do bota) | tak | bot w BotFather | odpytywanie |
+| Czat Google w profilu firmy | **nie** | Google wyłączył czat 31.07.2024 | — |
+| LinkedIn (strona firmy), TikTok (w UE) | **nie** | brak API dla wiadomości firmowych | — |
+| Booksy | **tylko partnerzy** | API tylko po umowie z Booksy | — |
+
+**Jak to działa:** każdy kanał ma mały łącznik (skrypt), który co minutę pobiera nowe wiadomości do jednej kolejki
+(SQLite). Webhook, tunel i jeden publiczny adres są potrzebne tylko dla WhatsAppa. Recepcja czyta kolejkę i pisze
+szkic z wiedzy firmy. Ty dostajesz na Telegramie wiadomość klienta i szkic i odpowiadasz „wyślij”, „popraw: …” albo
+„sam odpowiem”. Wysyła **osobny skrypt bez modelu**, dokładnie zatwierdzony tekst, i przed wysyłką sprawdza okno
+kanału (24 h w Meta, szablon w WhatsAppie). Model nie ma narzędzia do wysyłki, więc wstrzyknięte polecenie w wiadomości
+klienta nie może niczego wysłać; to ten sam wzorzec co Skarbiec w Ads.
+
+**Kolejność kanałów:** 1. poczta, Allegro, formularz, SMS (bez publicznego adresu); 2. Instagram; 3. Messenger
+i WhatsApp po weryfikacji firmy w Meta. Gotowa skrzynka wielokanałowa (Chatwoot, MIT) ma sens tylko dla firm z kilkoma
+osobami do obsługi: kosztuje ok. 4 GB RAM i nie upraszcza konfiguracji Meta.
+
 **`jarvo-sklep`: Menedżer sklepu (tylko dla firm sprzedających online, włączany opcjonalnie).**
 - **Jakość sprzedaży na Allegro** (`/sale/quality`): wynik z historią 30 dni, co spadło i które zamówienia lub
   dyskusje za tym stoją.
