@@ -1,0 +1,42 @@
+agent: jarvo-mobile
+
+tools:
+  - name: itunes-search-api
+    source: https://performance-partners.apple.com/search-api (Apple)
+    license: dane publiczne (API bez klucza)
+    version: "api"
+    install: {method: none, spec: "HTTP, bez klucza; ~20 zapytań/min"}
+    integration: skill-script
+    used_by_skills: [audyt-mobilny]
+    healthcheck: "python3 /opt/jarvo/repo/profiles/jarvo-mobile/scripts/audyt_mobilny.py sprawdz"
+    autonomy: A0
+    optional: true
+    notes: "audyt_mobilny.py: lookup po ID i bundleId, wyszukiwanie, kanał RSS opinii; pauza 4 s między zapytaniami (także między procesami)."
+  - name: google-play-details
+    source: https://play.google.com/store/apps/details (Google)
+    license: strona publiczna (robots.txt dopuszcza /store/apps/details)
+    version: "html"
+    install: {method: none, spec: "HTTP"}
+    integration: skill-script
+    used_by_skills: [audyt-mobilny]
+    healthcheck: "python3 -c \"import urllib.request; urllib.request.urlopen('https://play.google.com/store/apps/details?id=pl.allegro&hl=pl', timeout=20)\""
+    autonomy: A0
+    optional: true
+    notes: "Tylko strona szczegółów (ocena, aktualizacja, Data safety). Wyszukiwarki i opinii Google Play nie pobieramy (robots.txt, regulamin)."
+  - name: digital-asset-links-api
+    source: https://developers.google.com/digital-asset-links (Google)
+    license: API publiczne bez klucza
+    version: "v1"
+    install: {method: none, spec: "HTTP"}
+    integration: skill-script
+    used_by_skills: [audyt-mobilny]
+    healthcheck: "python3 -c \"import urllib.request; urllib.request.urlopen('https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://allegro.pl&relation=delegate_permission/common.handle_all_urls', timeout=20)\""
+    autonomy: A0
+    optional: true
+    notes: "Potwierdzenie App Links; kopia AASA z CDN Apple (app-site-association.cdn-apple.com) bez klucza."
+
+sidecars: []
+hermes_skills: []
+hermes_plugins: []
+mcp_servers: []
+env_requires: [OPENROUTER_API_KEY]

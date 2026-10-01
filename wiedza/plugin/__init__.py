@@ -484,7 +484,7 @@ class SkarbiecProvider(MemoryProvider):
     def _petla_ciszy(self) -> None:
         """Co minutę: sesja bez nowej tury przez CISZA_S i z ≥ MIN_TUR nowymi turami → wyciąg (człowiek nie musi pisać /new);
         do tego kompilacja skrzynki, gdy pora (raz na godzinę przy szkicach albo nocny przebieg). Blokada w state/ pilnuje,
-        żeby z ośmiu profili gatewaya kompilował jeden."""
+        żeby z dziewięciu profili gatewaya kompilował jeden."""
         while not self._stop.wait(60):
             try:
                 self._moze_kompilowac() and self.kompiluj("harmonogram")

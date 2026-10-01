@@ -198,6 +198,7 @@ Pokój przypisuje `hq_room` w `fleet.yaml`, a krótką nazwę na szyldzie `hq_sh
 | `workshop` | tablica z narzędziami, stół z imadłem i ramieniem robota, skrzynie (liczba = kolejka kart), beczka | mechanik w kasku i ogrodniczkach, tyłem przy stole |
 | `office` | Sala operacyjna (Ads), też pokój domyślny dla nowych agentów: ściana ekranów z wynikami kampanii (słupki wariantów, linia wydatków pod czerwoną linią koperty, tablica ROAS), biurko z dwoma monitorami, czerwony STOP, roślinka | postać w koszuli i niebieskim krawacie, tyłem przy monitorach |
 | `radar` | Radar sprzedaży (Łowca leadów): ekran radaru z pierścieniami (wiązka i migające cele przy pracy), mapa Polski z pinezkami firm, neon LEADY, biurko z listą leadów i słupkami oceny, stos kart (kolejka), telefon, roślinka | łowca w pomarańczowej czapce i kamizelce, ze słuchawkami, tyłem przy monitorach |
+| `apps` | Pracownia aplikacji (Twórca aplikacji): tablica z makietami trzech ekranów (przy pracy ekrany się zmieniają), neon APP z pięcioma gwiazdkami ocen, regał z telefonami testowymi (lampki ładowania), biurko z monitorem z kodem, telefon na statywie z kodem QR do podglądu (zielona linia skanu przy pracy), stos kart (kolejka), roślinka | twórca w fioletowej bluzie i słuchawkach, tyłem przy biurku |
 
 Stan agenta zmienia pokój: światło (pokój przygasa, gdy agent jest wolny), pozę (praca, trzymana karta
 przy ocenie, uniesiona ręka i „!” przy blokadzie, „Z z z”, gdy śpi) i rekwizyty (monitory, lampa, ramię

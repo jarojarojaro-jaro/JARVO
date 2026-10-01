@@ -1,6 +1,7 @@
 # Changelog: jarvo-reka
 
 ## Niewydane
+- Czyta też skille Twórcy aplikacji (`jarvo-mobile`) w `skills.external_dirs`.
 - `kiedy-oddac-snajperowi` 1.2.0: tabela „komu oddać” generowana z pól `oddaj_gdy` w `fleet.yaml` (wcześniej ręczna, bez Ads i Łowcy), więc każdy nowy specjalista trafia do niej sam; plus jak przekazać zadanie, żeby specjalista nie zaczynał od zera.
 - Czyta też skille Łowcy leadów (`jarvo-lowca`) w `skills.external_dirs`.
 - Skill `writing-for-agents` (mattpocock/skills, MIT): warsztat pisania dokumentów dla agentów (wskaźniki kontekstu, hierarchia informacji, kryteria ukończenia). Mapa workflowów: nowy skill = `skill-creator` + `writing-for-agents`.

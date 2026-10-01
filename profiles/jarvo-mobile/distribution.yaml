@@ -1,0 +1,9 @@
+name: jarvo-mobile
+version: 0.1.0
+description: "Twórca aplikacji: audyt mobilny, „natywna czy PWA” z kosztami, aplikacje Expo do App Store i Google Play."
+author: "Jarvo fleet"
+license: MIT
+env_requires:
+  - name: OPENROUTER_API_KEY
+    description: "Klucz modelu dla Twórcy aplikacji (osobny klucz z limitem kredytów)"
+    required: false

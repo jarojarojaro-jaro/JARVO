@@ -172,6 +172,20 @@ Wszystkie źródła bez kluczy. Odmowa źródła (403/429, strona antybotowa) = 
 
 ---
 
+## `jarvo-mobile`: Twórca aplikacji
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| [iTunes Search API](https://performance-partners.apple.com/search-api) | aplikacje w polskim App Store (lookup po ID i bundleId, wyszukiwanie z `lang=pl_pl`), kanał RSS opinii; ~20 zapytań/min, więc pauza 4 s także między procesami | dane publiczne | n/d | `audyt_mobilny.py`, healthcheck `audyt_mobilny.py sprawdz` |
+| strona aplikacji w [App Store](https://apps.apple.com) | status przedsiębiorcy DSA, etykiety prywatności, link do polityki | strona publiczna | n/d | `audyt_mobilny.py` |
+| strona szczegółów [Google Play](https://play.google.com/store/apps) | ocena, liczba ocen, ostatnia aktualizacja, pobrania, Data safety (tylko `/store/apps/details`, które robots.txt dopuszcza) | strona publiczna | n/d | `audyt_mobilny.py` |
+| [Digital Asset Links API](https://developers.google.com/digital-asset-links) i CDN Apple (`app-site-association.cdn-apple.com`) | potwierdzenie App Links i kopii pliku Universal Links | API publiczne | n/d | `audyt_mobilny.py` |
+| `decyzja.py`, `mobile_lib.py` | natywna czy PWA (19 funkcji, 5 rozwiązań, koszty); grzeczne HTTP z robots.txt, pauzą i pamięcią odpowiedzi | własny kod | n/d | skrypt |
+
+Wszystkie źródła bez kluczy. Odmowa źródła = blokada, bez obchodzenia; opinii z Google Play nie pobieramy ([MOBILE.md](MOBILE.md)).
+
+---
+
 ## `jarvo-reka`: Prawa ręka
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |

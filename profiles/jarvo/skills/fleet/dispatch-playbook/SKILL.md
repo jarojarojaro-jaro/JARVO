@@ -76,6 +76,8 @@ kanban_create(
 | **Film** | [sherlock (fakty), gdy film podaje liczby] → wideo (film, warianty, montaż, klipy) |
 | **Nowa marka / brand kit** | web (brand z URL) → studio (weryfikacja tonu i wizualiów) |
 | **Leady** | lowca (ICP → sygnały → ranking z kontaktem) → [decyzja użytkownika, do kogo] → studio (szkic wiadomości, opcjonalnie) |
+| **Aplikacja mobilna** | mobile (natywna czy PWA, koszty) → [decyzja użytkownika] → web (strona, PWA) albo mobile (Wallet, aplikacja) |
+| **Audyt mobilny** | mobile (audyt: sklepy, linki, PWA, opinie) → [decyzja użytkownika] → web ∥ studio (poprawki) |
 
 **Karta „złożenie”** (dla misji z ≥2 agentami): `assignee="jarvo-reka"`, `parents` = wszystkie karty merytoryczne,
 cel: jeden pakiet w `@@MISSIONS_DIR@@/<MISJA>/zlozenie/out/` (INDEX.md z opisem i ścieżkami, bez przerabiania treści).

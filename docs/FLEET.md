@@ -7,7 +7,7 @@ Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prom
 knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
 każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
 
-**Stan: wszystkie osiem profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
+**Stan: wszystkie dziewięć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
@@ -18,6 +18,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [15 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 57 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy (+ wideo_lib) | [23](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [13](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [6 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 0 | krs, przetargi, strona, leady | [13](../evals/jarvo-lowca/scenarios.yaml) |
+| `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [2 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 0 | audyt_mobilny, decyzja (+ mobile_lib) | [14](../evals/jarvo-mobile/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 4 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [12](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -36,6 +37,7 @@ Legenda przy skillach:
 | `jarvo-ads` | Specjalista Ads: Meta Ads i Google Ads, kampanie, testy, raporty | snajper | A1 (szkice PAUSED; wydatek = A2 z kodem Skarbca) |
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
 | `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
+| `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A1 (audyty i rekomendacje; konta sklepów i wysyłka = A2) |
 | `jarvo-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
 ---
@@ -81,6 +83,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Reklama płatna, Meta Ads, Google Ads, budżet, wyniki kampanii | `jarvo-ads` |
 | Film, reels, short, montaż, napisy, lektor, klipy | `jarvo-wideo` |
 | Leady, nowi klienci, „komu sprzedać”, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
+| Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play | `jarvo-mobile` |
 | Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
 
@@ -293,6 +296,22 @@ i baz kupionych, niczego nie wysyła. Pełny projekt: [LEADY.md](LEADY.md).
 
 ---
 
+## `jarvo-mobile`: Twórca aplikacji
+
+Mówi uczciwie, czy firmie potrzebna aplikacja: potrzeby właściciela (`potrzeby.yaml`) → strona, PWA, karta w Wallet,
+gotowa platforma albo aplikacja w App Store i Google Play, z kosztami licencji, ryzykiem odrzucenia (Apple 4.2) i
+następnym krokiem. Robi darmowy audyt mobilny dowolnej firmy z danych publicznych: aplikacje w sklepach (świeżość,
+docelowe API Androida, oceny, polska karta, etykiety prywatności, Data safety, status przedsiębiorcy DSA), opinie
+z App Store z tematami skarg, linki strona → aplikacja (`apple-app-site-association` z kopią w CDN Apple,
+`assetlinks.json`), baner, odznaki, PWA; aplikacje partnerów (Pyszne, Uber Eats) oddziela od aplikacji firmy.
+Konta Apple, Google i Expo zawsze właściciela. Pełny projekt i kolejne etapy (aplikacje Expo, podgląd na telefonie,
+bramka jakości, lista kontrolna sklepów, wydanie): [MOBILE.md](MOBILE.md).
+
+**Skille:** [T] `audyt-mobilny` (+ kryteria kontroli), `natywna-czy-pwa` (+ macierz decyzji). Skrypty:
+`audyt_mobilny.py`, `decyzja.py`.
+
+---
+
 ## Kolejność budowy (historycznie, faza 1)
 
 1. `jarvo` + `jarvo-sherlock`: najprostsze narzędzia, dobre do przetestowania pętli sędziego.
@@ -301,6 +320,7 @@ i baz kupionych, niczego nie wysyła. Pełny projekt: [LEADY.md](LEADY.md).
 4. `jarvo-reka`: na końcu, bo korzysta ze skilli pozostałych.
 5. `jarvo-wideo`: wydzielony później ze Studia (wideo to osobny warsztat).
 6. `jarvo-ads`: dołączony bez kluczy; Skarbiec (sejf tokenów) jeszcze do zbudowania ([ADS.md](ADS.md)).
+7. `jarvo-lowca` i `jarvo-mobile`: specjaliści z własnymi skryptami do źródeł publicznych ([LEADY.md](LEADY.md), [MOBILE.md](MOBILE.md)).
 
 Pierwszy wspólny test floty: **„wypuść landing nowego produktu”**. Sherlock robi research
 i słowa kluczowe, web buduje stronę, studio przygotowuje grafiki i posty, ręka składa

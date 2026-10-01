@@ -61,7 +61,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: general       # wątek ogólny grupy „Jarvo HQ” + Twój DM
-    hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
+    hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
     hq_label: "Mostek dowodzenia"
     hq_short: "Jarvo"
     en:
@@ -85,7 +85,7 @@ agents:
     autonomy_max: A1
     telegram_topic: sherlock
     pin_skills: [metoda-sherlocka]
-    hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
+    hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
     hq_label: "Gabinet śledczy"
     hq_short: "Sherlock"
     en:
@@ -108,7 +108,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: web
-    hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
+    hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
     hq_label: "Pracownia webowa"
     hq_short: "Web"
     en:
@@ -131,7 +131,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: studio
-    hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
+    hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
     hq_label: "Atelier kreatywne"
     hq_short: "Studio"
     en:
@@ -156,7 +156,7 @@ agents:
     autonomy_max: A1
     telegram_topic: wideo
     pin_skills: [krotki-film]
-    hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
+    hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
     hq_label: "Studio filmowe"
     hq_short: "Wideograf"
     en:
@@ -181,7 +181,7 @@ agents:
     autonomy_max: A1
     telegram_topic: ads
     pin_skills: [plan-kampanii]
-    hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
+    hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
     hq_label: "Sala operacyjna"
     hq_short: "Ads"
     en:
@@ -206,7 +206,7 @@ agents:
     autonomy_max: A1
     telegram_topic: lowca
     pin_skills: [profil-klienta]
-    hq_room: radar    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
+    hq_room: radar    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
     hq_label: "Radar sprzedaży"
     hq_short: "Łowca"
     en:
@@ -215,6 +215,31 @@ agents:
       description: >-
         Finds B2B leads from buying signals in official sources: new companies in the KRS register, public tenders (e-Zamówienia, TED) and their winners, job ads, technology and changes on company websites, news. Ideal customer profile, qualification, a ranked list of companies with "why now", contacts the company published itself (with the source), monitoring for new leads. Never sends anything.
     oddaj_gdy: "szukanie klientów B2B: profil idealnego klienta, firmy z sygnałem zakupowym (KRS, przetargi, rekrutacje), lista leadów"
+    status: active
+
+  - name: jarvo-mobile
+    kind: specialist
+    title: "Twórca aplikacji"
+    emoji: "📱"
+    description: >-
+      Aplikacje mobilne dla małych firm: uczciwa decyzja „natywna czy PWA” z kosztami i ryzykiem odrzucenia w sklepie
+      (strona, PWA, karta w Wallet, gotowa platforma albo aplikacja w App Store i Google Play) oraz darmowy audyt mobilny
+      dowolnej firmy: aplikacje w sklepach (świeżość, oceny, polska karta, prywatność, status przedsiębiorcy DSA), opinie
+      z App Store, linki strona → aplikacja (Universal Links, App Links), baner i PWA. Tylko dane publiczne; konta zawsze właściciela.
+    model_tier: strong
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: mobile
+    pin_skills: [natywna-czy-pwa]
+    hq_room: apps    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_label: "Pracownia aplikacji"
+    hq_short: "Aplikacje"
+    en:
+      title: "App maker"
+      hq_label: "App lab"
+      description: >-
+        Mobile apps for small businesses: an honest "native or PWA" decision with costs and app-store rejection risk (website, PWA, Wallet pass, an existing platform or an App Store and Google Play app) and a free mobile audit of any company: apps in the stores (freshness, ratings, Polish listing, privacy, EU trader status), App Store reviews, website-to-app links (Universal Links, App Links), smart banner and PWA. Public data only; accounts always belong to the owner.
+    oddaj_gdy: "aplikacja mobilna: czy firmie potrzebna (natywna, PWA, Wallet), audyt aplikacji w App Store i Google Play, linki strona → aplikacja"
     status: active
 
   - name: jarvo-reka
@@ -229,7 +254,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: reka
-    hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar
+    hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
     hq_label: "Warsztat"
     hq_short: "Ręka"
     en:

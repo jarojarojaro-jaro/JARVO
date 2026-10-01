@@ -50,7 +50,7 @@ Poziomy autonomii: **A0** odczyt · **A1** szkice we własnym workspace · **A2*
 
 ---
 
-## 2. Flota agentów (8 profili)
+## 2. Flota agentów (9 profili)
 
 Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady), `config.yaml`
 (model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja.
@@ -64,9 +64,19 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, filmy z kodu, maskotka | Studio filmowe (`filmstudio`) | wideo | 15 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem | Sala operacyjna (`office`) | ads | 10 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 6 |
+| 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie); konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 2 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | Warsztat (`workshop`) | reka | 4 |
 
-### 2a. jarvo-lowca — szczegóły (najnowszy)
+### 2a. jarvo-mobile — szczegóły (najnowszy)
+Twórca aplikacji, etap 1 z [MOBILE.md](MOBILE.md): `natywna-czy-pwa` (`decyzja.py`: potrzeby → strona, PWA, karta
+w Wallet, platforma albo aplikacja w sklepach; 19 funkcji, koszty licencji, ryzyko odrzucenia 4.2, opcje „blisko”)
+i `audyt-mobilny` (`audyt_mobilny.py`: iTunes API z polską kartą, status przedsiębiorcy DSA i etykiety prywatności
+ze strony App Store, Google Play: aktualizacja, docelowe API, oceny, Data safety; Universal Links i App Links z kopią
+w CDN Apple i Digital Asset Links API; baner, odznaki, PWA, polityka prywatności; opinie z App Store z tematami skarg;
+aplikacje partnerów oddzielone od aplikacji firmy). Tylko dane publiczne. Kolejne etapy: aplikacje Expo, podgląd na
+telefonie, bramka aplikacji, lista kontrolna sklepów, wydanie.
+
+### 2a''. jarvo-lowca — szczegóły
 Łowca leadów B2B z oficjalnych, darmowych źródeł: KRS (API MS: biuletyn dnia i odpisy; nazwiska zarządu maskowane),
 e-Zamówienia BZP (ogłoszenia i wyniki ze zwycięzcą), TED, strony firm (`robots.txt`, uczciwy UA), wyszukiwarka.
 Ocena: dopasowanie do `ICP.yaml` → świeżość → siła; kontakt tylko opublikowany przez firmę albo rejestr, ze źródłem;
@@ -158,7 +168,7 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
 
 ## 6. Bezpieczeństwo (Skarbiec-design + red team)
 
-- **Red team na promptfoo** (`security/redteam/`): 16 ataków na agentów (w tym orzeczenie wstrzyknięte przez treść strony i klucz do zapisania w skarbcu wiedzy), świeża sesja per atak,
+- **Red team na promptfoo** (`security/redteam/`): 18 ataków na agentów (w tym orzeczenie wstrzyknięte przez treść strony i klucz do zapisania w skarbcu wiedzy), świeża sesja per atak,
   wykrywanie wycieków. Ostatni stan: **12/12 odpartych** po uszczelnieniu.
 - **Deny dla całej floty** (`shared/security/deny.yaml`, mergowane do każdego profilu): blokada zmiany
   własnej konfiguracji (`hermes config set/...`), kasowania danych floty (`rm -r /opt/data/...`),

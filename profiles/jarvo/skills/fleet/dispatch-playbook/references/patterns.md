@@ -47,6 +47,20 @@ Decyzje przed rozdaniem tylko, gdy zmieniają wynik: platforma/format, długoś�
 3. opcjonalnie `jarvo-studio` / `wiadomosci` (parents: leady): szkic pierwszej wiadomości na firmę (`copy-pl`), z „dlaczego teraz”.
 Wysyłka = decyzja człowieka (A2); agent niczego nie wysyła. Monitoring (rutyna) tylko za zgodą użytkownika.
 
-## 8. Szybkie zadanie (pojedyncze)
+## 8. Aplikacja mobilna („chcę aplikację”)
+1. `jarvo-mobile` / `decyzja`: `natywna-czy-pwa`: potrzeby (`potrzeby.yaml`) → rekomendacja (strona, PWA, karta w Wallet,
+   platforma albo aplikacja w sklepach) z kosztami, ryzykiem odrzucenia (Apple 4.2) i następnym krokiem.
+2. Jarvo → decyzja użytkownika: które rozwiązanie (przy opcjach „blisko” pokaż obie).
+3. Dalej według decyzji: strona albo PWA → `jarvo-web` (parents: decyzja); karta w Wallet albo aplikacja → `jarvo-mobile`.
+Bez kroku 1 nikt nie zaczyna aplikacji. Konta Apple, Google i Expo są zawsze właściciela; wysyłka do sklepów = A2.
+
+## 9. Audyt mobilny → poprawki
+1. `jarvo-mobile` / `audyt`: `audyt-mobilny` (aplikacje w sklepach, linki strona → aplikacja, PWA, opinie z App Store)
+   → trzy priorytety i propozycje kart.
+2. Jarvo → decyzja użytkownika, co poprawiać; karty z propozycji: `jarvo-web` (pliki `.well-known`, baner, odznaki,
+   manifest, strony prywatności i usuwania konta), `jarvo-studio` (opis, „Co nowego”), właściciel (konsole sklepów).
+Jako pierwszy kontakt z firmą z listy Łowcy: audyt to wartość bez dostępu do kont; wysyłka do firmy = A2.
+
+## 10. Szybkie zadanie (pojedyncze)
 Jedna karta dla właściwego agenta, bez MISSION.md (tylko wpis w INDEX.md z ID `Z-…`).
 Przykłady: „zrób favicon z tego logo”, „sprawdź, czy ta informacja jest prawdziwa”, „przerób ten PDF na DOCX”.

@@ -41,7 +41,8 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
          │                                                          │ hermes -p <agent> chat -q
          ▼                                                          ▼
   missions/<ID>/MISSION.md                         jarvo-sherlock / jarvo-web / jarvo-studio /
-                                                   jarvo-wideo / jarvo-ads / jarvo-lowca / jarvo-reka
+                                                   jarvo-wideo / jarvo-ads / jarvo-lowca /
+                                                   jarvo-mobile / jarvo-reka
                                                             │ kanban_request_review(reviewer="jarvo")
                                                             ▼
                                                    jarvo (pracownik-sędzia, lane "review")
@@ -262,6 +263,7 @@ albo daje kartę `jarvo-reka` z adnotacją „poza snajperami”.
 | reklama płatna, Meta Ads, Google Ads, budżet reklamowy, kampania płatna, wyniki reklam, test reklam | `jarvo-ads` |
 | film, reels, short, montaż, lektor, napisy, klipy z nagrania | `jarvo-wideo` |
 | leady, nowi klienci, komu sprzedać, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
+| aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, App Store, Google Play, audyt aplikacji | `jarvo-mobile` |
 | szybkie sprawy, dokumenty, konwersje, sklejanie wyników, organizacja, „ogarnij” | `jarvo-reka` |
 
 ---
