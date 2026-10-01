@@ -225,7 +225,8 @@ agents:
       Aplikacje mobilne dla małych firm: uczciwa decyzja „natywna czy PWA” z kosztami i ryzykiem odrzucenia w sklepie
       (strona, PWA, karta w Wallet, gotowa platforma albo aplikacja w App Store i Google Play) oraz darmowy audyt mobilny
       dowolnej firmy: aplikacje w sklepach (świeżość, oceny, polska karta, prywatność, status przedsiębiorcy DSA), opinie
-      z App Store, linki strona → aplikacja (Universal Links, App Links), baner i PWA. Tylko dane publiczne; konta zawsze właściciela.
+      z App Store, linki strona → aplikacja (Universal Links, App Links), baner i PWA. Aplikacje Expo (React Native) z szablonu
+      ze zgodnością ze sklepami od planu: prototyp, kontrole, podgląd w HQ i na telefonie w Expo Go. Konta zawsze właściciela.
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
@@ -238,8 +239,8 @@ agents:
       title: "App maker"
       hq_label: "App lab"
       description: >-
-        Mobile apps for small businesses: an honest "native or PWA" decision with costs and app-store rejection risk (website, PWA, Wallet pass, an existing platform or an App Store and Google Play app) and a free mobile audit of any company: apps in the stores (freshness, ratings, Polish listing, privacy, EU trader status), App Store reviews, website-to-app links (Universal Links, App Links), smart banner and PWA. Public data only; accounts always belong to the owner.
-    oddaj_gdy: "aplikacja mobilna: czy firmie potrzebna (natywna, PWA, Wallet), audyt aplikacji w App Store i Google Play, linki strona → aplikacja"
+        Mobile apps for small businesses: an honest "native or PWA" decision with costs and app-store rejection risk (website, PWA, Wallet pass, an existing platform or an App Store and Google Play app) and a free mobile audit of any company: apps in the stores (freshness, ratings, Polish listing, privacy, EU trader status), App Store reviews, website-to-app links (Universal Links, App Links), smart banner and PWA. Expo (React Native) apps from a template with store compliance built in from the plan: prototype, checks, preview in HQ and on the owner's phone in Expo Go. Accounts always belong to the owner.
+    oddaj_gdy: "aplikacja mobilna: czy firmie potrzebna (natywna, PWA, Wallet), prototyp i budowa aplikacji, podgląd na telefonie, audyt aplikacji w App Store i Google Play"
     status: active
 
   - name: jarvo-reka

@@ -181,6 +181,10 @@ Wszystkie źródła bez kluczy. Odmowa źródła (403/429, strona antybotowa) = 
 | strona szczegółów [Google Play](https://play.google.com/store/apps) | ocena, liczba ocen, ostatnia aktualizacja, pobrania, Data safety (tylko `/store/apps/details`, które robots.txt dopuszcza) | strona publiczna | n/d | `audyt_mobilny.py` |
 | [Digital Asset Links API](https://developers.google.com/digital-asset-links) i CDN Apple (`app-site-association.cdn-apple.com`) | potwierdzenie App Links i kopii pliku Universal Links | API publiczne | n/d | `audyt_mobilny.py` |
 | `decyzja.py`, `mobile_lib.py` | natywna czy PWA (19 funkcji, 5 rozwiązań, koszty); grzeczne HTTP z robots.txt, pauzą i pamięcią odpowiedzi | własny kod | n/d | skrypt |
+| [Expo SDK 57](https://github.com/expo/expo) (szablon `templates/expo-jarvo`) | aplikacje React Native z expo-router; `aplikacja.py nowa/ustaw/sprawdz/eksport/podglad` | MIT | 2026-09 | per projekt (npm, `npx expo install`) |
+| [expo-doctor](https://github.com/expo/expo/tree/main/packages/expo-doctor) 1.21.1 | konfiguracja i zależności projektu (`aplikacja.py sprawdz`) | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
+| [eas-cli](https://github.com/expo/eas-cli) 24.7.0 | projekt w organizacji właściciela i EAS Update do podglądu w Expo Go (`aplikacja.py expo-go`, token robota `EXPO_TOKEN`) | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
+| `zgodnosc.py`, `ikony.cjs` (sharp), `zrzuty.cjs` (playwright-core, axe-core) | profil zgodności → wymagania sklepów; ikony bez alfy, adaptacyjne i ekran startowy; zrzuty iPhone 17 Pro Max i Pixel w obu motywach z kontrolami | własny kod | n/d | skrypt |
 
 Wszystkie źródła bez kluczy. Odmowa źródła = blokada, bez obchodzenia; opinii z Google Play nie pobieramy ([MOBILE.md](MOBILE.md)).
 

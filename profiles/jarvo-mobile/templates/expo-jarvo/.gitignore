@@ -1,0 +1,26 @@
+# zależności i pliki generowane
+node_modules/
+.expo/
+dist/
+dist-web/
+web-build/
+expo-env.d.ts
+# Continuous Native Generation: katalogi natywne powstają z app.config.ts (nie edytujemy ich ręcznie)
+/ios
+/android
+# klucze i podpisy nigdy w repo
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+google-services*.json
+GoogleService-Info*.plist
+.env*
+!.env.example
+# logi
+npm-debug.*
+*.log
+.DS_Store

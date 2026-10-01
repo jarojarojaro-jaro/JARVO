@@ -233,8 +233,9 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
 - 🟡 **Twórca aplikacji** `jarvo-mobile` (aplikacje mobilne w Expo od pomysłu do sklepu: darmowy audyt mobilny, prototyp
   na telefonie, testy na Androidzie i w symulatorze iOS, bramka aplikacji, 44-punktowa lista kontrolna sklepów, zrzuty,
-  obsługa odrzuceń): projekt zaakceptowany 2026-10-01, etap 1 gotowy (agent we flocie: `audyt-mobilny`,
-  `natywna-czy-pwa`, 14 scenariuszy evals, pokój „Pracownia aplikacji”), etapy 2–6 w budowie ([MOBILE.md](MOBILE.md)).
+  obsługa odrzuceń): projekt zaakceptowany 2026-10-01, etapy 1–2 gotowe (agent we flocie: `audyt-mobilny`,
+  `natywna-czy-pwa`, `nowa-aplikacja`, `podglad-aplikacji`, szablon Expo SDK 57, 18 scenariuszy evals, pokój „Pracownia
+  aplikacji”), etapy 3–6 w budowie ([MOBILE.md](MOBILE.md)).
 - 🟡 Dopracowanie słabszych agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności (cookies, zgody, Omnibus)
   jako skill Weba: plan w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md); naprawy z §3 (ocena leadów, tabela Ręki, martwe ścieżki Ads)
   zrobione 2026-10-01. Nowi specjaliści: na razie żadni (dwie rundy propozycji odłożone, [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md) §6).

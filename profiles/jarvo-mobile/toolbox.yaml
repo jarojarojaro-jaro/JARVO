@@ -34,6 +34,58 @@ tools:
     autonomy: A0
     optional: true
     notes: "Potwierdzenie App Links; kopia AASA z CDN Apple (app-site-association.cdn-apple.com) bez klucza."
+  - name: expo-sdk
+    source: https://github.com/expo/expo
+    license: MIT
+    version: "SDK 57 (expo ~57.0.26, react-native 0.86.3)"
+    install: {method: npm, spec: "per projekt z szablonu templates/expo-jarvo (npm install + npx expo install)"}
+    integration: skill-script
+    used_by_skills: [nowa-aplikacja, podglad-aplikacji]
+    healthcheck: "node --version && npm --version"
+    autonomy: A1
+    notes: "aplikacja.py nowa/ustaw/sprawdz/eksport/podglad; Node z obrazu Hermesa (≥ 22.13 wymagane przez SDK 57)."
+  - name: expo-doctor
+    source: https://github.com/expo/expo/tree/main/packages/expo-doctor
+    license: MIT
+    version: "1.21.1"
+    install: {method: npx, spec: "npx --yes expo-doctor@1.21.1 (pobierany przy pierwszym użyciu)"}
+    integration: skill-script
+    used_by_skills: [nowa-aplikacja]
+    healthcheck: "npm --version"
+    autonomy: A0
+    optional: true
+    notes: "aplikacja.py sprawdz: konfiguracja, zależności, React Native Directory (wymaga sieci; --bez-sieci pomija)."
+  - name: eas-cli
+    source: https://github.com/expo/eas-cli
+    license: MIT
+    version: "24.7.0"
+    install: {method: npx, spec: "npx --yes eas-cli@24.7.0 (pobierany przy pierwszym użyciu)"}
+    integration: skill-script
+    used_by_skills: [podglad-aplikacji]
+    healthcheck: "npm --version"
+    autonomy: A1
+    optional: true
+    notes: "aplikacja.py expo-go: eas init (projekt w organizacji właściciela) i eas update na gałąź podglądu; token robota EXPO_TOKEN w .env profilu. Build i wysyłka do sklepów: A2."
+  - name: sharp
+    source: https://github.com/lovell/sharp
+    license: Apache-2.0
+    version: see-infra
+    install: {method: npm, spec: sharp}
+    integration: skill-script
+    used_by_skills: [nowa-aplikacja]
+    healthcheck: "node -e \"require('sharp')\""
+    autonomy: A1
+    notes: "ikony.cjs: ikona App Store bez kanału alfa, ikona adaptacyjna Androida (pierwszy plan, tło, monochromatyczna), ekran startowy, favicon."
+  - name: playwright-core
+    source: https://github.com/microsoft/playwright
+    license: Apache-2.0
+    version: see-infra
+    install: {method: npm, spec: playwright-core}
+    integration: skill-script
+    used_by_skills: [podglad-aplikacji, nowa-aplikacja]
+    healthcheck: "node -e \"require('playwright-core')\""
+    autonomy: A0
+    notes: "zrzuty.cjs: iPhone 17 Pro Max (1320×2868) i Pixel 9, jasny i ciemny; kontrole konsoli, przewijania, celów dotyku i axe-core."
 
 sidecars: []
 hermes_skills: []

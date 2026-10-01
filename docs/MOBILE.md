@@ -1,7 +1,8 @@
 # Twórca aplikacji: specjalista od aplikacji mobilnych
 
 > Stan: **zaakceptowany 2026-10-01, w budowie.** Właściciel: `jarvo-mobile` („Twórca aplikacji”), we flocie od etapu 1
-> (`audyt-mobilny`, `natywna-czy-pwa`, `audyt_mobilny.py`, `decyzja.py`, pokój „Pracownia aplikacji” w HQ); postęp etapów w §16.
+> (audyt mobilny, „natywna czy PWA”, pokój „Pracownia aplikacji” w HQ); etap 2 gotowy (szablon aplikacji, budowa,
+> podgląd w HQ i w Expo Go); postęp etapów w §16.
 > Decyzje M1–M11 w §17 przyjęte z rekomendacjami. Wersje, ceny i reguły sklepów sprawdzone 2026-10-01; przed każdym etapem
 > sprawdzamy je jeszcze raz, bo sklepy zmieniają je co kilka miesięcy. Rzeczy, których nie udało się potwierdzić
 > w źródłach pierwotnych, są oznaczone „(niepotwierdzone)”.
@@ -520,7 +521,7 @@ alternatywnie konfiguracja Codemagic.
 | Etap | Zakres | Test | Konta |
 |---|---|---|---|
 | 1 ✅ | `audyt-mobilny` + `natywna-czy-pwa`, skrypty `audyt_mobilny.py` i `decyzja.py` z testami, profil agenta (SOUL, rubryka, 14 evals, `oddaj_gdy`, wzorce misji 8 i 9), pokój w HQ, 2 ataki red teamu | audyt 5 prawdziwych firm (Allegro, Żabka, McDonald's, Cukiernia Sowa, Da Grasso): m.in. brak plików linków na zabka.pl i mcdonalds.pl, baner McDonald's wskazujący nieistniejącą aplikację, aplikacja iOS Da Grasso bez języka polskiego, pliki linków Da Grasso tylko na www; aplikacje partnerów (Pyszne, Uber Eats, Glovo) oddzielone | brak |
-| 2 | `nowa-aplikacja` + `podglad-aplikacji`: szablon JARVO z elementami zgodności, profil zgodności, pętla „pokaż i sprawdź”, podgląd w HQ, link do Expo Go | prototyp z briefu na iPhonie i Androidzie właściciela | Expo |
+| 2 ✅ | `nowa-aplikacja` + `podglad-aplikacji`: szablon `templates/expo-jarvo` (Expo SDK 57) z elementami zgodności, `zgodnosc.py`, `aplikacja.py` (nowa, ustaw, sprawdz, eksport, podglad, expo-go), `ikony.cjs`, `zrzuty.cjs`, 27 testów | w kontenerze: aplikacja z profilu „logowanie e-mail + Google, aparat, powiadomienia” w 81 s, `sprawdz` 6/6 (typy, lint, wersje SDK, expo-doctor, zasady JARVO) w 11 s, podgląd w HQ i 20 zrzutów iPhone 17 Pro Max i Pixel w obu motywach bez błędów; poprawione po teście: brakujący `expo-font` (wykrył expo-doctor), podpisy zakładek ucięte w wersji webowej, link HQ do katalogu zamiast `index.html`. Expo Go na prawdziwym telefonie czeka na organizację Expo właściciela | Expo (podgląd na telefonie) |
 | 3 | `bramka-aplikacji`: urządzenie Android (emulator albo Redroid) + ws-scrcpy w dashboardzie, Maestro, testy wrogie; workflow iOS w GitHub Actions | bramka na prototypie z etapu 2, na serwerze Ubuntu i na Windows 11 (piaskownica nie ma KVM ani bindera) | GitHub albo Codemagic |
 | 4 | `pakiet-do-sklepow` + `sklep_check.py` (44 punkty z testami na celowo zepsutych aplikacjach) + potok zrzutów | pakiet dla prototypu, zero błędów auto | brak |
 | 5 | `wydanie` + `odrzucenie`: EAS Build i Submit, TestFlight, ścieżki Google, notatki dla recenzenta | pierwsza prawdziwa aplikacja przez recenzję w obu sklepach | Apple 99 $/rok, Google 25 $ |

@@ -1,5 +1,12 @@
 # Changelog: jarvo-mobile
 
+## Niewydane
+- Etap 2: szablon aplikacji `templates/expo-jarvo` (Expo SDK 57, expo-router, elementy zgodności ze sklepami od
+  pierwszego dnia: Więcej, Kontakt, Prywatność, Usuń konto przy kontach, stany ekranów, pasek braku sieci, granica
+  błędów, `usesNonExemptEncryption`, blokady uprawnień Androida, EAS). Skille `nowa-aplikacja` (plan, profil zgodności,
+  konfiguracja, ekrany, pętla kontroli) i `podglad-aplikacji` (link w HQ, zrzuty, Expo Go przez EAS Update i token
+  robota organizacji właściciela). Skrypty `zgodnosc.py`, `aplikacja.py`, `ikony.cjs`, `zrzuty.cjs`.
+
 ## 0.1.0 (2026-10-01)
 - Pierwsza wersja (etap 1 z docs/MOBILE.md): darmowy audyt mobilny (`audyt_mobilny.py`: iTunes API z polską kartą,
   strona aplikacji w App Store (status przedsiębiorcy DSA, etykiety prywatności), strona szczegółów Google Play

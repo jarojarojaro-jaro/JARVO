@@ -1,0 +1,38 @@
+{
+  "nazwa": "Moja Firma",
+  "slug": "moja-firma",
+  "scheme": "mojafirma",
+  "wersja": "1.0.0",
+  "bundle_ios": "pl.mojafirma.app",
+  "pakiet_android": "pl.mojafirma.app",
+  "wlasciciel_expo": "",
+  "expo_project_id": "",
+  "tablet": false,
+  "opis": "Krótki opis, co klient załatwi w aplikacji.",
+  "firma": {
+    "nazwa": "Moja Firma sp. z o.o.",
+    "adres": "ul. Przykładowa 1, 00-001 Warszawa",
+    "email": "kontakt@mojafirma.pl",
+    "telefon": "+48 600 000 000",
+    "strona": "https://mojafirma.pl",
+    "prywatnosc_url": "https://mojafirma.pl/polityka-prywatnosci",
+    "usuwanie_konta_url": ""
+  },
+  "funkcje": {
+    "konta": false,
+    "tresci_uzytkownikow": false,
+    "ai": false
+  },
+  "kolory": {
+    "glowny": "#2F5BEA",
+    "tlo_ikony": "#2F5BEA"
+  },
+  "uprawnienia_ios": {},
+  "wtyczki": [],
+  "zablokowane_uprawnienia_android": [
+    "android.permission.RECORD_AUDIO",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.WRITE_EXTERNAL_STORAGE"
+  ]
+}
