@@ -375,7 +375,7 @@ korzystała; zakładka jest ostatnia, bo pokazuje to, co już działa.
 | # | Decyzja | Rekomendacja | Dlaczego |
 |---|---|---|---|
 | W1 ✅ | Gdzie leży skarbiec | istniejący `knowledge/` floty (`/opt/data/jarvo/knowledge`) | już w backupie, w podglądzie HQ i w skillach (`brands/`, `user/`, `fleet/`); jeden folder = jeden vault Obsidiana |
-| W2 ✅ | Jak agenci są wpięci | wtyczka Hermesa jako **dostawca pamięci** (`memory.provider: jarvo-wiedza`) u każdego z 9 agentów, nie sam skill | przypomnienie przed turą i wyciąg po sesji bez decyzji modelu „czy zajrzeć”; działa w kanbanie i cronie; jeden kod dla 8 profili |
+| W2 ✅ | Jak agenci są wpięci | wtyczka Hermesa jako **dostawca pamięci** (`memory.provider: jarvo-wiedza`) u każdego z 9 agentów, nie sam skill | przypomnienie przed turą i wyciąg po sesji bez decyzji modelu „czy zajrzeć”; działa w kanbanie i cronie; jeden kod dla 9 profili |
 | W3 ✅ | Kto pisze notatki | **jeden piszący**: kompilacja tanim modelem; agenci tylko szkice i orzeczenia | brak konfliktów, jedna transakcja z cofaniem, spójny format, tańsze niż pisanie notatek drogim modelem w trakcie pracy |
 | W4 | Wyszukiwanie | FTS5 + krok po linkach; osadzenia ONNX dopiero, gdy FTS zawodzi | zero nowych usług, działa dziś w obrazie; wzorzec i doświadczenie innych mówią „najpierw struktura, wektory potem” |
 | W5 | Modele | wyciągi i kompilacja: poziom `fast` (dziś ten sam `gpt-6-luna`, `reasoning_effort` low); synteza tygodnia: Jarvo | rutyna na tanim, osąd na drogim; koszty w §7 |
