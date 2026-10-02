@@ -18,6 +18,7 @@ export default function Start() {
         <Tekst kolor={k.naGlownym}>{APLIKACJA.opis}</Tekst>
       </View>
       <Tekst wariant="naglowek">Co możesz zrobić</Tekst>
+      {/* JARVO-TODO: funkcje z planu zamiast tego tekstu (sklep_check.py blokuje wysłanie z tym znacznikiem). */}
       <Tekst drugi>Tu pojawią się główne funkcje aplikacji z planu.</Tekst>
       <Przycisk tytul="Skontaktuj się z nami" wariant="drugi" onPress={() => router.push('/kontakt')} />
     </Ekran>

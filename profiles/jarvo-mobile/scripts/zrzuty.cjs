@@ -4,7 +4,8 @@
  *
  *   node zrzuty.cjs <url-bazowy> <outdir> [--trasy /,/wiecej] [--urzadzenia iphone,pixel] [--motywy jasny,ciemny]
  *
- * Profile: iPhone 17 Pro Max (440×956 @3 = 1320×2868, rozmiar zrzutów App Store 6,9″) i Pixel (412×915 @2,625).
+ * Profile: iPhone 17 Pro Max (440×956 @3 = 1320×2868, rozmiar zrzutów App Store 6,9″), Pixel (412×915 @2,625)
+ * i na żądanie iPad Pro 13″ (1032×1376 @2 = 2064×2752).
  * Kontrole: błędy konsoli i strony, poziome przewijanie, cele dotyku mniejsze niż 44 px (przyciski, linki, zakładki),
  * axe-core (kontrast, etykiety, role). Wynik: <outdir>/<urządzenie>-<motyw>/<trasa>.png i <outdir>/zrzuty.json.
  * To wersja webowa (react-native-web): kontrole natywne (czcionka systemowa, przycisk wstecz, uprawnienia) robi bramka
@@ -19,6 +20,9 @@ const URZADZENIA = {
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1' },
   pixel: { nazwa: 'Pixel 9', viewport: { width: 412, height: 915 }, deviceScaleFactor: 2.625,
     userAgent: 'Mozilla/5.0 (Linux; Android 16; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36' },
+  // tylko na żądanie (aplikacje z tabletem): 13″, rozmiar zrzutów iPada w App Store
+  ipad: { nazwa: 'iPad Pro 13', viewport: { width: 1032, height: 1376 }, deviceScaleFactor: 2,
+    userAgent: 'Mozilla/5.0 (iPad; CPU OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1' },
 };
 
 function arg(name, def) {

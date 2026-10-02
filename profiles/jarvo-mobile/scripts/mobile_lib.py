@@ -244,3 +244,35 @@ def md_komorka(tekst: object) -> str:
 
 def podsumowanie() -> str:
     return f"zapytań {LICZNIK['zapytania']}, z pamięci {LICZNIK['z_pamieci']}, błędów {LICZNIK['bledy']}"
+
+
+def obraz(sciezka: str | Path) -> dict:
+    """Nagłówek obrazu bez bibliotek: {typ, szer, wys, alfa, bajty}. PNG: typ koloru 4/6 albo blok tRNS = alfa;
+    JPEG: wymiary z markera SOF, alfy nie ma. Inny plik: {typ: None}."""
+    p = Path(sciezka)
+    dane = p.read_bytes()
+    info = {"typ": None, "szer": 0, "wys": 0, "alfa": False, "bajty": len(dane)}
+    if dane[:8] == b"\x89PNG\r\n\x1a\n":
+        info.update(typ="png", szer=int.from_bytes(dane[16:20], "big"), wys=int.from_bytes(dane[20:24], "big"))
+        kolor, i = dane[25], 8
+        alfa = kolor in (4, 6)
+        while i + 8 <= len(dane) and not alfa:
+            n, nazwa = int.from_bytes(dane[i:i + 4], "big"), dane[i + 4:i + 8]
+            if nazwa == b"tRNS":
+                alfa = True
+            if nazwa in (b"IDAT", b"IEND"):
+                break
+            i += 12 + n
+        info["alfa"] = alfa
+    elif dane[:2] == b"\xff\xd8":
+        info["typ"], i = "jpeg", 2
+        while i + 9 < len(dane):
+            if dane[i] != 0xFF:
+                i += 1
+                continue
+            znacznik, n = dane[i + 1], int.from_bytes(dane[i + 2:i + 4], "big")
+            if znacznik in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                info.update(wys=int.from_bytes(dane[i + 5:i + 7], "big"), szer=int.from_bytes(dane[i + 7:i + 9], "big"))
+                break
+            i += 2 + n
+    return info

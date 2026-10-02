@@ -1,8 +1,9 @@
 # Twórca aplikacji: specjalista od aplikacji mobilnych
 
 > Stan: **zaakceptowany 2026-10-01, w budowie.** Właściciel: `jarvo-mobile` („Twórca aplikacji”), we flocie od etapu 1
-> (audyt mobilny, „natywna czy PWA”, pokój „Pracownia aplikacji” w HQ); etap 2 gotowy (szablon aplikacji, budowa,
-> podgląd w HQ i w Expo Go); postęp etapów w §16.
+> (audyt mobilny, „natywna czy PWA”, pokój „Pracownia aplikacji” w HQ); gotowe etapy 2 (szablon, budowa, podgląd w HQ
+> i w Expo Go) i 4 (pakiet do sklepów z listą 44 punktów), etap 3 (bramka, telefon testowy, iOS w CI) czeka na test
+> na urządzeniach; postęp w §16.
 > Decyzje M1–M11 w §17 przyjęte z rekomendacjami. Wersje, ceny i reguły sklepów sprawdzone 2026-10-01; przed każdym etapem
 > sprawdzamy je jeszcze raz, bo sklepy zmieniają je co kilka miesięcy. Rzeczy, których nie udało się potwierdzić
 > w źródłach pierwotnych, są oznaczone „(niepotwierdzone)”.
@@ -321,11 +322,24 @@ aplikacji adres, telefon i e-mail; przy firmie zarejestrowanej w domu warto mie�
 
 ## 8. Lista kontrolna przed wysłaniem (`sklep_check.py`)
 
-Skrypt czyta to, co sklepy faktycznie dostaną: konfigurację po rozwiązaniu wtyczek (`npx expo config --type introspect
---json` daje Info.plist i AndroidManifest bez prebuilda), zbudowane pliki (AAB przez `bundletool dump`, IPA rozpakowane:
-`Info.plist`, `PrivacyInfo.xcprivacy`), paczkę JS, metadane (`store.config.json` z EAS Metadata, karta Google w `out/sklep/`),
-obrazy (nagłówek PNG: typ koloru 6 oznacza kanał alfa) i adresy (`curl -L` musi dać 2xx). Wynik: `out/sklep/check.json`
-i raport ✓/✗/? z numerem wytycznej przy każdym punkcie.
+Skrypt czyta to, co sklepy faktycznie dostaną:
+- **konfigurację po rozwiązaniu wtyczek**: `npx expo config --type introspect` daje Info.plist i uprawnienia Androida
+  bez prebuilda. `--type public` daje to, co ustawiła sama aplikacja; usuwa `ios.config`, więc szyfrowanie czytamy
+  z introspekcji;
+- **zbudowane pliki**, gdy są (`--aab`, `--ipa`, `--apk` albo najnowsze w `out/build/`):
+  - AAB: manifest bez Javy i bundletool, dekodowany z protobuf aapt2 (sprawdzone na prawdziwym AAB);
+  - biblioteki `.so`: wyrównanie z nagłówków ELF (`p_align` segmentów `PT_LOAD`; w APK także przesunięcie w zipie);
+  - IPA: `Info.plist` i `PrivacyInfo.xcprivacy`;
+  - paczkę JS;
+- **metadane**: `store.config.json` (EAS Metadata, App Store) i karta Google w układzie fastlane supply
+  (`out/sklep/google/pl-PL/`);
+- **obrazy**: nagłówek PNG, gdzie typ koloru 4 lub 6 albo blok `tRNS` oznacza kanał alfa. Teksty na zrzutach iOS
+  czyta OCR (tesseract);
+- **adresy firmy**: publiczne HTTPS, 2xx po przekierowaniach.
+
+Wynik to `out/sklep/check.json` i `CHECK.md`: przy każdym punkcie ✓ / ✗ / ? / ☐ z dowodem, poprawką i numerem
+wytycznej. Ludzie potwierdzają punkty przez `sklep_check.py potwierdz` (`out/sklep/potwierdzenia.json`).
+Wysłanie jest możliwe dopiero, gdy wszystkie 44 punkty są ✓.
 
 Tryby: **auto** = skrypt rozstrzyga sam, każdy błąd blokuje wysłanie; **pół** = skrypt zbiera dowody, agent ocenia,
 człowiek potwierdza; **ręcznie** = punkt listy dla właściciela w konsoli sklepu (A2).
@@ -342,15 +356,15 @@ a `eas metadata:lint` (tylko App Store, w becie) ma dwie reguły i liczy słowa 
 | 3 | branża regulowana (zdrowie, finanse) → wysyła podmiot prawny, dokumenty w załączniku | pół | Apple 5.6.2 |
 | **B** | **Build i konfiguracja** | | |
 | 4 | `ios.bundleIdentifier` i `android.package` ustawione, w odwrotnej notacji domeny, nie `com.example` (identyfikatora nie da się zmienić po pierwszym wgraniu) | auto | App Store Connect |
-| 5 | numer wersji i builda wyższy niż ostatnio wgrany (`eas build:version:get`) | auto | EAS |
+| 5 | wersja wyższa niż w App Store (iTunes API), numery buildów rosną same (EAS: `appVersionSource: remote`, `autoIncrement`) | auto | EAS |
 | 6 | Xcode ≥ 26, iOS od 16.4; `targetSdkVersion` w AAB ≥ 36 | auto | Apple, Google (docelowe API) |
-| 7 | wszystkie biblioteki `.so` wyrównane do 16 KB | auto | Google (16 KB) |
+| 7 | biblioteki `.so` 64-bitowe wyrównane do 16 KB | auto | Google (16 KB) |
 | 8 | build nie w trybie debug; bez ruchu bez TLS i `NSAllowsArbitraryLoads`; w paczce JS brak `localhost`, adresów sieci lokalnej, ngrok, serwerów testowych | auto | Apple 2.1 |
 | 9 | ustawione `ios.config.usesNonExemptEncryption` (eksport szyfrowania) | auto | konfiguracja Expo |
 | 10 | `expo-doctor` i `expo install --check` bez błędów | auto | Expo |
 | **C** | **Uprawnienia i prywatność** | | |
 | 11 | każdy użyty moduł z uprawnieniem (aparat, lokalizacja, zdjęcia, kontakty, powiadomienia, kalendarz, mikrofon, biometria, śledzenie) ma opis w Info.plist | auto | Apple 5.1.1(ii) |
-| 12 | opisy uprawnień po polsku (`locales/pl.json`), ≥ 40 znaków, z nazwą funkcji, żaden z czarnej listy ogólników („potrzebuje dostępu”, domyślne teksty wtyczek) | auto | Apple 5.1.1, App Review |
+| 12 | opisy uprawnień po polsku (Info.plist z regionem `pl` albo `locales/pl.json`), ≥ 40 znaków, z nazwą funkcji, żaden z czarnej listy ogólników („potrzebuje dostępu”, domyślne teksty wtyczek) | auto | Apple 5.1.1, App Review |
 | 13 | brak zbędnych uprawnień: Info.plist i manifest porównane z importami w kodzie | auto | Apple 5.1.1(iii), Google |
 | 14 | uprawnienia wymagające deklaracji w Google (lokalizacja w tle, `READ_MEDIA_*`, `READ_CONTACTS`, `QUERY_ALL_PACKAGES`, dokładne alarmy, usługi pierwszoplanowe, `AD_ID`) oznaczone do formularza | pół | Google (uprawnienia) |
 | 15 | `UIBackgroundModes` tylko z trybami używanymi w kodzie | auto | Apple 2.5.4 |
@@ -364,7 +378,7 @@ a `eas metadata:lint` (tylko App Store, w becie) ma dwie reguły i liczy słowa 
 | 22 | jest zakładanie konta → „Usuń konto” w aplikacji i działający adres usuwania w sieci | auto | Apple 5.1.1(v), Google |
 | 23 | jest logowanie Google lub Facebook → na iOS widać Zaloguj się przez Apple | auto | Apple 4.8 |
 | 24 | katalog i informacje dostępne bez logowania | pół | Apple 5.1.1(v) |
-| 25 | konto demo w `store.config.json` i w Google: po angielsku, bez kodu SMS i 2FA; skrypt loguje się nim do backendu | auto | Apple 2.1, Google (logowanie) |
+| 25 | konto demo w `store.config.json` (hasło w `JARVO_DEMO_HASLO`, nie w repo) i w Google: bez kodu SMS i 2FA; skrypt loguje się nim do backendu, gdy aplikacja podaje `backend.demo_login` | auto | Apple 2.1, Google (logowanie) |
 | **E** | **Treść i funkcje** | | |
 | 26 | brak lorem ipsum, TODO, FIXME, „Wkrótce”, example.com i pustych ekranów | auto | Apple 2.1 |
 | 27 | wszystkie linki w aplikacji i metadanych działają; `apple-app-site-association` i `assetlinks.json` pasują do aplikacji | auto | Apple 2.1 |
@@ -386,25 +400,34 @@ a `eas metadata:lint` (tylko App Store, w becie) ma dwie reguły i liczy słowa 
 | 41 | skan zakazanych słów we wszystkich metadanych: Android/Google Play (na karcie iOS), „beta”, „#1”, „najlepsza”, „darmowa”, rabaty, emoji, WIELKIE LITERY | auto | Apple 2.3.10, Google (metadane) |
 | 42 | karta i nazwa aplikacji w wersji pl-PL | auto | — |
 | 43 | kwestionariusz wieku Apple (nowy od 31.01.2026); Google: klasyfikacja IARC, grupa docelowa, reklamy, funkcje finansowe, Data safety | ręcznie | Apple, Google (kontrole przed recenzją) |
-| 44 | notatki dla recenzenta po angielsku: funkcje, ścieżka testu, uzasadnienie płatności, informacja o aktualizacjach bez recenzji | ręcznie | Apple 2.3.1(a) |
+| 44 | notatki dla recenzenta po angielsku (≤ 4000 bajtów, kroki ścieżki testu; skrypt sprawdza język i kroki, człowiek treść): funkcje, ścieżka testu, uzasadnienie płatności, informacja o aktualizacjach bez recenzji | pół | Apple 2.3.1(a) |
 
 Lista nie jest zamknięta: każde odrzucenie dopisuje punkt (§10).
 
 ## 9. Zrzuty do sklepów
 
 Najczęstszy błąd małych aplikacji to zrzuty z samym logowaniem albo ekranem startowym (2.3.3). Potok:
-1. **Scenariusz** w `out/sklep/zrzuty.yaml`: 5–8 kadrów, każdy to jedna korzyść dla klienta z nagłówkiem po polsku
-   (copy od Studia), kolejność jak w karcie.
+1. **Scenariusz** w `out/sklep/zrzuty.yaml` (szkic robi `pakiet.py szkic` z tras aplikacji): 2–8 kadrów (Google
+   wymaga co najmniej 2), każdy to jedna korzyść dla klienta z nagłówkiem po polsku (copy od Studia), kolejność jak
+   w karcie.
 2. **Dane demo:** realistyczna polska treść z seeda (bez danych prawdziwych klientów), te same na obu platformach.
-3. **Przechwycenie z prawdziwej aplikacji** (wersja produkcyjna, nie Expo Go, bo jego menu widać na ekranie):
+3. **Przechwycenie z prawdziwej aplikacji** (`pakiet.py zrzuty --zrodlo android|ios`; wersja produkcyjna, nie Expo Go,
+   bo jego menu widać na ekranie). Źródło `web` (eksport z podglądu, Playwright w profilach iPhone 17 Pro Max, Pixel,
+   iPad 13″, z dorysowanym paskiem 9:41) służy tylko do szkicu karty; lista kontrolna oznacza je „?”:
    - iOS: symulator iPhone 17 Pro Max (6,9″, 1320×2868) i iPad Pro 13″ (2064×2752, gdy jest tablet) w GitHub Actions
      albo Codemagic; czysty pasek stanu `xcrun simctl status_bar booted override --time 9:41 --batteryState charged
-     --batteryLevel 100 --cellularBars 4`; przepływ Maestro przechodzi kadry i robi zrzuty.
-   - Android: emulator albo Redroid 1080×2340 (albo telefon właściciela), pasek stanu w trybie demo
-     (`settings put global sysui_demo_allowed 1` i polecenia `com.android.systemui.demo`).
-4. **Kompozycja:** szablony HTML w repo (nagłówek, kolory brand kitu, opcjonalnie ramka urządzenia) renderowane przez
-   Playwright w dokładnych wymiarach, zapis bez kanału alfa (JPEG albo PNG RGB). Do tego grafika promocyjna Google
-   1024×500 i ikona 512×512.
+     --batteryLevel 100 --cellularBars 4`; artefakt `ios_ci.py` (`jasny-<trasa>.png`).
+   - Android: telefon testowy floty (emulator albo Redroid, 1080×2340) albo telefon właściciela przez adb, pasek stanu
+     w trybie demo (`settings put global sysui_demo_allowed 1` i polecenia `com.android.systemui.demo`: 9:41, pełna
+     bateria, bez powiadomień), trasy otwierane przez `schemat://trasa`.
+4. **Kompozycja** (`kadry.cjs`): HTML z `pakiet.py` (gradient z koloru marki, nagłówek bez polskich „sierotek”
+   i z równym łamaniem, ekran w ramce w całości, bez uciętego paska zakładek) renderowany przez Playwright
+   w dokładnych wymiarach i zapisany jako PNG bez kanału alfa (sharp `removeAlpha`). Wymiary:
+   - iPhone 6,9″: 1320×2868;
+   - iPad 13″: 2064×2752;
+   - Google telefon: 1080×1920.
+
+   Do tego (`pakiet.py grafiki`) grafika promocyjna Google 1024×500 i ikona 512×512.
 5. **Kontrola:** punkty 34–38 listy (§8): wymiary, alfa, liczba, „aplikacja w użyciu”, obce platformy.
 6. **Film podglądowy** (opcjonalnie): Wideograf skleja 15–30 s z nagrania przepływu (skill `demo-strony`), Apple wymaga
    nagrania z aplikacji, bez kadrów spoza niej.
@@ -535,7 +558,7 @@ alternatywnie konfiguracja Codemagic.
 | 1 ✅ | `audyt-mobilny` + `natywna-czy-pwa`, skrypty `audyt_mobilny.py` i `decyzja.py` z testami, profil agenta (SOUL, rubryka, 14 evals, `oddaj_gdy`, wzorce misji 8 i 9), pokój w HQ, 2 ataki red teamu | audyt 5 prawdziwych firm (Allegro, Żabka, McDonald's, Cukiernia Sowa, Da Grasso): m.in. brak plików linków na zabka.pl i mcdonalds.pl, baner McDonald's wskazujący nieistniejącą aplikację, aplikacja iOS Da Grasso bez języka polskiego, pliki linków Da Grasso tylko na www; aplikacje partnerów (Pyszne, Uber Eats, Glovo) oddzielone | brak |
 | 2 ✅ | `nowa-aplikacja` + `podglad-aplikacji`: szablon `templates/expo-jarvo` (Expo SDK 57) z elementami zgodności, `zgodnosc.py`, `aplikacja.py` (nowa, ustaw, sprawdz, eksport, podglad, expo-go), `ikony.cjs`, `zrzuty.cjs`, 27 testów | w kontenerze: aplikacja z profilu „logowanie e-mail + Google, aparat, powiadomienia” w 81 s, `sprawdz` 6/6 (typy, lint, wersje SDK, expo-doctor, zasady JARVO) w 11 s, podgląd w HQ i 20 zrzutów iPhone 17 Pro Max i Pixel w obu motywach bez błędów; poprawione po teście: brakujący `expo-font` (wykrył expo-doctor), podpisy zakładek ucięte w wersji webowej, link HQ do katalogu zamiast `index.html`. Expo Go na prawdziwym telefonie czeka na organizację Expo właściciela | Expo (podgląd na telefonie) |
 | 3 🟡 | `bramka-aplikacji`: rubryka 10 osi, werdykt (`bramka.py`), testy wrogie w przeglądarce (`wrogie.cjs`), na Androidzie przez adb (`urzadzenie.py`) i w symulatorze iOS na GitHub Actions (`ios_ci.py`, `templates/ci/jarvo-ios.yml`); telefon testowy (emulator Google albo Redroid) + ws-scrcpy w HQ | bramka i warstwa web gotowe: w kontenerze szablon 7/7 testów wrogich, celowo zepsuta aplikacja 4 błędy (przewijanie, axe w trybie ciemnym, brak paska offline, długie słowa), werdykt rundy 1 = REVISE 87 (start z tekstem zastępczym, ikona z inicjałami); Android i iOS przetestowane na atrapach (13 testów). Telefon testowy: `jarvo android on|off|status` (emulator przy KVM sprawdzonym próbnym kontenerem, Redroid przy binderze), `adb` w obrazie floty, ekran ws-scrcpy za proxy HQ `:9122` (12 testów, w tym prawdziwe gniazda z WebSocketem); w kontenerze: `adb` 34.0.5, `urzadzenie.py status` = kod 3 z instrukcją, przycisk 📱 w panelu otwiera ws-scrcpy przez proxy (nowa karta bez `opener`, ciasteczko niewidoczne dla JS, WebSocket działa), bez ciasteczka 403, token ekranu na `:9120` 404. Czeka: sam Android na serwerze Ubuntu i w Windows 11 (piaskownica nie ma KVM ani bindera) i pierwszy przebieg iOS w GitHub Actions | GitHub albo Codemagic |
-| 4 | `pakiet-do-sklepow` + `sklep_check.py` (44 punkty z testami na celowo zepsutych aplikacjach) + potok zrzutów | pakiet dla prototypu, zero błędów auto | brak |
+| 4 ✅ | `pakiet-do-sklepow` + `sklep_check.py` (44 punkty z testami na celowo zepsutych aplikacjach) + potok zrzutów (`pakiet.py`, `kadry.cjs`) | 36 testów (celowo zepsute aplikacje w każdej grupie A–G, AAB z manifestem protobuf i bibliotekami ELF, IPA, obrazy z alfą, adresy, metadane w bajtach); aplikacja wzorcowa bez błędów auto. W kontenerze: lista na prawdziwej aplikacji w 5 s; pierwsze uruchomienie znalazło angielski opis mikrofonu dopisywany przez wtyczkę aparatu (poprawka w `zgodnosc.py`), tekst zastępczy na ekranie startowym szablonu (teraz JARVO-TODO) i kopię aplikacji w innym katalogu (4.3); pakiet prototypu „Salon Ola” (karta, grafiki, zrzuty 1320×2868 i 1080×1920 bez alfy, galeria w podglądzie HQ) przechodzi punkty 34–42, a blokują go tylko rzeczy, których fikcyjna firma mieć nie może: strona z polityką, kontakt i usuwanie konta pod prawdziwą domeną, backend usuwania konta. Zrzuty z buildu (android / ios) czekają na telefon testowy i pierwszy build | brak |
 | 5 | `wydanie` + `odrzucenie`: EAS Build i Submit, TestFlight, ścieżki Google, notatki dla recenzenta | pierwsza prawdziwa aplikacja przez recenzję w obu sklepach | Apple 99 $/rok, Google 25 $ |
 | 6 | `aplikacja-ze-strony`, `utrzymanie-aplikacji`, red team (opinie i wiadomości recenzentów jako atak, złośliwa paczka npm, sekret w paczce JS) | strona Weba → aplikacja z powiadomieniami | jak w 5 |
 

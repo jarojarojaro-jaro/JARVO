@@ -1,6 +1,16 @@
 # Changelog: jarvo-mobile
 
 ## Niewydane
+- Etap 4 (pakiet do sklepów): skill `pakiet-do-sklepow`.
+  - `sklep_check.py`: 44 punkty z MOBILE.md §8 (auto / pół / ręcznie), z dowodem, poprawką i podstawą przy każdym.
+    Czyta konfigurację po wtyczkach (`expo config --type introspect`) i manifest AAB (protobuf aapt2).
+    Sprawdza wyrównanie `.so` do 16 KB z nagłówków ELF, Info.plist i PrivacyInfo z IPA, paczkę JS, obrazy bez alfy
+    i adresy firmy, a teksty zrzutów iOS przez OCR. Ludzie potwierdzają punkty przez `potwierdz`.
+  - `pakiet.py`: szkic `store.config.json` (EAS Metadata) i karty Google (układ fastlane) ze znacznikami JARVO-TODO,
+    grafiki Google oraz zrzuty ze scenariusza (źródło web / android / ios).
+  - `kadry.cjs`: kompozycja HTML w dokładnych wymiarach, PNG bez alfy, nagłówki bez polskich sierotek.
+  - Profil iPad 13″ w `zrzuty.cjs`.
+  - Ekran startowy szablonu ma JARVO-TODO, więc nie trafi do sklepu z tekstem zastępczym.
 - Poprawka profilu zgodności: wtyczki Expo (aparat, zdjęcia, lokalizacja, kalendarz) nie dopisują już angielskich
   ogólników do Info.plist („Allow $(PRODUCT_NAME) to access your microphone”, Apple 5.1.1). Każdy klucz obsługiwanej
   wtyczki dostaje powód z profilu albo `false`. Lokalizacja w tle ma oba klucze wymagane przez Apple. Wykryte

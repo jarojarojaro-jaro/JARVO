@@ -72,17 +72,17 @@ tools:
     version: see-infra
     install: {method: npm, spec: sharp}
     integration: skill-script
-    used_by_skills: [nowa-aplikacja]
+    used_by_skills: [nowa-aplikacja, pakiet-do-sklepow]
     healthcheck: "node -e \"require('sharp')\""
     autonomy: A1
-    notes: "ikony.cjs: ikona App Store bez kanału alfa, ikona adaptacyjna Androida (pierwszy plan, tło, monochromatyczna), ekran startowy, favicon."
+    notes: "ikony.cjs: ikona App Store bez kanału alfa, ikona adaptacyjna Androida (pierwszy plan, tło, monochromatyczna), ekran startowy, favicon. kadry.cjs: zrzuty do sklepów i grafiki Google zapisane bez alfy."
   - name: playwright-core
     source: https://github.com/microsoft/playwright
     license: Apache-2.0
     version: see-infra
     install: {method: npm, spec: playwright-core}
     integration: skill-script
-    used_by_skills: [podglad-aplikacji, nowa-aplikacja]
+    used_by_skills: [podglad-aplikacji, nowa-aplikacja, pakiet-do-sklepow]
     healthcheck: "node -e \"require('playwright-core')\""
     autonomy: A0
     notes: "zrzuty.cjs: iPhone 17 Pro Max (1320×2868) i Pixel 9, jasny i ciemny; kontrole konsoli, przewijania, celów dotyku i axe-core."
@@ -108,6 +108,27 @@ tools:
     autonomy: A1
     optional: true
     notes: "ios_ci.py: wypchnięcie na gałąź jarvo/ci, workflow_dispatch, artefakt ze zrzutami i logami; GITHUB_TOKEN fine-grained właściciela."
+
+  - name: tesseract
+    source: https://github.com/tesseract-ocr/tesseract
+    license: Apache-2.0
+    version: see-infra
+    install: {method: apt, spec: "tesseract-ocr tesseract-ocr-pol (obraz floty)"}
+    integration: skill-script
+    used_by_skills: [pakiet-do-sklepow]
+    healthcheck: "tesseract --version"
+    autonomy: A1
+    notes: "sklep_check.py punkt 37: tekst na zrzutach iOS bez nazw innych platform (Apple 2.3.10)."
+  - name: eas-metadata-fastlane-layout
+    source: https://docs.expo.dev/eas/metadata/ (store.config.json), https://docs.fastlane.tools/actions/supply/ (układ karty Google)
+    license: formaty plików (MIT)
+    version: "configVersion 0"
+    install: {method: none, spec: "pliki w repo aplikacji: store.config.json, out/sklep/google/pl-PL/"}
+    integration: skill-script
+    used_by_skills: [pakiet-do-sklepow]
+    healthcheck: "true"
+    autonomy: A1
+    notes: "pakiet.py szkic tworzy pliki, sklep_check.py je czyta; wysyłka metadanych (eas metadata:push) dopiero w etapie 5, A2."
 
 sidecars: []
 hermes_skills: []
