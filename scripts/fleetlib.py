@@ -24,6 +24,7 @@ CALIBRATION_DIR = SHARED_DIR / "calibration"
 MODEL_FAMILIES = (("gpt-", "gpt"), ("chatgpt", "gpt"), ("o3", "gpt"), ("o4", "gpt"), ("claude", "claude"),
                   ("deepseek", "deepseek"), ("kimi", "kimi"))
 PROTOCOL_MARKER = "<!-- Jarvo:PROTOCOL -->"
+SWIEZOSC_DNI = 120        # skill sprawdzony dawniej = do przejrzenia (walidator, rutyna profiles/jarvo/scripts/swiezosc.py)
 ROSTER_MARKER = "<!-- Jarvo:ROSTER -->"
 # tabela „komu oddać” generowana z fleet.yaml (pole `oddaj_gdy` każdego specjalisty): Ręka i każdy, kto routuje
 ODDAJ_MARKER = "<!-- Jarvo:ODDAJ -->"

@@ -2,12 +2,15 @@
 # `id` musi być stały (aktualizacje dystrybucji scalają zadania po id). Harmonogramy w strefie
 # z config.yaml (timezone). Z dystrybucji zadania instalują się WSTRZYMANE: włącz je świadomie
 # (`hermes -p jarvo cron resume <id>`) po sprawdzeniu, że Telegram działa (scripts/install-fleet.sh --resume-cron).
+# Głęboko myśli tylko przegląd tygodnia (wnioski, lekcje). Patrol i brief: płytkie myślenie, bo skrypt już zebrał dane;
+# model zostaje modelem Jarva (przypięty tu nie poszedłby za zmianą modelu w panelu). Świeżość wiedzy bez modelu (no_agent).
 
 jobs:
   - id: jarvo-patrol
     name: "Patrol floty"
     schedule: "every 30m"
     script: patrol.py
+    reasoning_effort: low
     skills: [patrol]
     enabled_toolsets: [kanban, file, memory, skills]
     deliver: "@@OWNER_DELIVER@@"
@@ -20,6 +23,7 @@ jobs:
     name: "Poranny brief"
     schedule: "50 7 * * 1-5"
     script: brief_daily.py
+    reasoning_effort: low
     skills: [daily-brief, decision-queue]
     enabled_toolsets: [kanban, file, memory, skills]
     deliver: "@@OWNER_DELIVER@@"
@@ -41,10 +45,7 @@ jobs:
   - id: jarvo-knowledge-freshness
     name: "Świeżość wiedzy"
     schedule: "20 9 1 * *"
-    skills: [fleet-improvement]
-    enabled_toolsets: [file, skills]
+    # daty `reviewed:` skilli liczy skrypt (0 tokenów); puste wyjście = cisza
+    script: swiezosc.py
+    no_agent: true
     deliver: "@@OWNER_DELIVER@@"
-    prompt: >-
-      Raz w miesiącu: sprawdź daty `reviewed:` we frontmatterze skilli i knowledge packów agentów
-      w @@BUILD_DIR@@/profiles/*/skills (tylko skille z metadata.jarvo). Wypisz te starsze niż 120 dni
-      jako propozycje odświeżenia (format z `fleet-improvement`). Nic przestarzałego → [SILENT].

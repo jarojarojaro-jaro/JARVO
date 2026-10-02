@@ -174,8 +174,8 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         reviewed = str(jarvo.get("reviewed", ""))
         try:
             age = (dt.date.today() - dt.date.fromisoformat(reviewed)).days
-            if age > 180:
-                r.warn(f"{a.name}/{rel}: reviewed {reviewed} (> 180 dni)")
+            if age > fl.SWIEZOSC_DNI:
+                r.warn(f"{a.name}/{rel}: reviewed {reviewed} (> {fl.SWIEZOSC_DNI} dni)")
         except ValueError:
             r.err(f"{a.name}/{rel}: metadata.jarvo.reviewed musi być RRRR-MM-DD")
         if len(body.split()) < 80:
