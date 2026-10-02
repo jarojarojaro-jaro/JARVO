@@ -289,6 +289,17 @@ def skill_names(root: Path) -> dict[str, Path]:
     return out
 
 
+_ROLA_RE = re.compile(r"<!-- (wykonawca|jarvo) -->\n(.*?)<!-- /\1 -->\n", re.S)
+
+
+def protocol_for(text: str, orchestrator: bool) -> str:
+    """Protokół floty dla roli: bloki `<!-- wykonawca -->…<!-- /wykonawca -->` (jak pracować nad kartą i ją oddać)
+    dostają tylko agenci, `<!-- jarvo -->…` tylko Jarvo. Jarvo pisze karty i ocenia wyniki, więc dostaje kształt
+    karty i wyniku oraz zasady wspólne; tekst agentów jest taki sam jak bez znaczników."""
+    rola = "jarvo" if orchestrator else "wykonawca"
+    return _ROLA_RE.sub(lambda m: m.group(2) if m.group(1) == rola else "", text)
+
+
 def approx_tokens(text: str) -> int:
     return int(len(text) / 3.5) + 1
 

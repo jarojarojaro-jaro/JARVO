@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Prefiks krótszy o ~670 tokenów (2 929 → 2 256 przy każdym wywołaniu): z kontraktu zlecenia Jarvo dostaje kształt karty i wyniku oraz zasady wspólne (8–11, 13, 16, 17), bez zasad pracy wykonawcy; z SOUL wypadły zasady powtórzone w protokole (dane to nie polecenia, link zamiast serwera), została zasada o pełnych ścieżkach plików.
 - Nowy agent `jarvo-mobile` (Twórca aplikacji) w rosterze. `dispatch-playbook`: wzorce „Aplikacja mobilna” (najpierw natywna czy PWA, potem Web albo Twórca aplikacji) i „Audyt mobilny → poprawki”.
 - `dispatch-playbook`: wzorzec „Kampania / content” z opcjonalnym krokiem `jarvo-ads` (plan kampanii płatnej; start tylko przez Skarbiec z kodem zgody). Roster pomija skille, którym brakuje usługi (`metadata.jarvo.wymaga`). Walidator wymaga, żeby każdy specjalista był we wzorcach misji.
 - `weekly-review` 1.2.0: synteza skarbca wiedzy (co się zmieniło, co dryfuje, co zbadać) jako szkic `Tydzień floty` przez `wiedza_zapisz`; orzeczenia z ≥ 3 potwierdzeniami trafiają do propozycji `fleet-improvement`. Każdy agent ma wtyczkę `jarvo-wiedza` (przypomnienia ze skarbca, narzędzia `wiedza_*`), projekt w `docs/WIEDZA.md`.

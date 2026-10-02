@@ -497,7 +497,7 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         raise SystemExit(f"[{agent.name}] SOUL.md nie ma znacznika {fl.PROTOCOL_MARKER}")
     # kalibracja pod rodzinę modelu agenta (shared/calibration/, za oh-my-hermes): tuż po protokole floty
     calibration = fl.calibration_section(fleet.model_for(agent.model_tier), agent.name == fleet.orchestrator)
-    soul = soul.replace(fl.PROTOCOL_MARKER, f"{protocol.strip()}\n\n{calibration}")
+    soul = soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, agent.name == fleet.orchestrator).strip()}\n\n{calibration}")
     if agent.name == fleet.orchestrator:
         soul = soul.replace(fl.ROSTER_MARKER, render_roster_summary(fleet))
     if pominiete:

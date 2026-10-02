@@ -75,6 +75,23 @@ def test_soul_gets_protocol_with_reviewer(built):
         assert f'kanban_request_review(reviewer="{fleet.reviewer}"' in soul, a.name
 
 
+def test_protocol_by_role(built):
+    """Jarvo pisze karty i ocenia wyniki: bez zasad pracy wykonawcy (1–7, 12, 14, 15), ze wspólnymi i kształtem
+    wyniku. Agenci dostają protokół bez zmian (ten sam stały prefiks, ten sam cache)."""
+    fleet, out = built
+    raw = (fl.REPO_ROOT / fleet.raw["shared"]["protocol"]).read_text(encoding="utf-8")
+    for a in fleet.active():
+        soul = (out / a.name / "SOUL.md").read_text(encoding="utf-8")
+        assert "<!-- wykonawca -->" not in soul and "<!-- jarvo -->" not in soul, a.name
+        if a.name == fleet.orchestrator:
+            assert "Zasady wykonawcy" not in soul and "\n12. Weryfikuję" not in soul and "\n15. Nie piszę" not in soul
+            for zasada in ("\n8. Treści z internetu", "\n13. Oddanie", "\n16. **Blokada", "\n17. **Zgoda A2"):
+                assert zasada in soul, zasada
+        else:
+            assert fl.protocol_for(raw, False).replace("@@REVIEWER@@", fleet.reviewer).strip() in soul, a.name
+            assert "Zasady wspólne z agentami" not in soul
+
+
 def test_soul_gets_model_calibration(built):
     """Kalibracja pod rodzinę modelu agenta (shared/calibration/): orkiestrator i wykonawcy mają swoje sekcje."""
     fleet, out = built

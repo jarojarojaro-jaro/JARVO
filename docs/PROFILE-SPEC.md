@@ -40,7 +40,7 @@ i 200 stron wiedzy, nie płacąc za to w każdej wiadomości.
 ## 1. Tożsamość: `SOUL.md` (main prompt)
 
 Budżet: **~1500–3000 tokenów**. Walidator pilnuje twardego limitu ~3200 tokenów liczonego razem z protokołem floty
-(~1200) i najdłuższą możliwą kalibracją. Wszystko dłuższe należy do skilli.
+(~1 400 tokenów u agentów, ~860 u Jarva) i najdłuższą możliwą kalibracją. Wszystko dłuższe należy do skilli.
 
 Walidator wymaga sekcji `## Misja` i `## Osobowość` oraz znacznika `<!-- Jarvo:PROTOCOL -->` (orkiestrator także
 `<!-- Jarvo:ROSTER -->`); bez znacznika build się zatrzymuje. Nowy profil zakłada `scripts/new-agent.py`.
@@ -245,6 +245,11 @@ i koniec (12–17: jedna pełna kontrola, najwyżej 2 cykle poprawek i żadnego 
 oddanie przez `kanban_request_review`, poprawki po recenzji (niejasne → pytanie, błędne → sprzeciw z dowodem, każda
 poprawka sprawdzona), brak wiadomości do użytkownika w trakcie misji, blokada to koniec, zgoda A2 przypięta do odcisku
 wersji plików z `scripts/odcisk.py`). Pełna treść: `shared/protocol/kontrakt-zlecenia.md`.
+
+Protokół jest dzielony według roli (`fleetlib.protocol_for`, build i walidator): bloki `<!-- wykonawca -->` (zasady
+pracy nad kartą 1–7, 12, 14, 15) dostają tylko agenci, `<!-- jarvo -->` tylko Jarvo. Jarvo pisze karty i ocenia wyniki,
+więc dostaje kształt karty i wyniku (13) oraz zasady wspólne (8–11, 16, 17); jego prefiks jest krótszy o ~670 tokenów
+przy każdym wywołaniu. Tekst agentów jest identyczny jak bez znaczników (ten sam stały prefiks i cache).
 
 Agent oddaje wynik do statusu `review`. Jarvo ocenia: `complete` albo `request_changes`
 z konkretnymi uwagami. Po 3 odrzuceniach eskaluje do Ciebie zamiast kręcić się w kółko.

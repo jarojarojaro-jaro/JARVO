@@ -134,7 +134,8 @@ patrol co 30 min (skrypt bez modelu; budzi Jarva tylko przy anomaliach)
 brief rano, przegląd tygodnia
 ```
 
-**Kontrakt zlecenia** (`shared/protocol/kontrakt-zlecenia.md`) jest wstrzykiwany do każdego SOUL.
+**Kontrakt zlecenia** (`shared/protocol/kontrakt-zlecenia.md`) jest wstrzykiwany do każdego SOUL (Jarvo dostaje
+tylko kształt karty i wyniku oraz zasady wspólne, bez zasad pracy wykonawcy: ~670 tokenów mniej na wywołanie).
 Definiuje strukturę karty (CEL, Definition of Done, WYJŚCIA, GRANICE) i 17 zasad wykonawcy,
 m.in. echo celu, jedna weryfikacja bez osłabiania kontroli, stany dowodu, poprawki po recenzji z prawem
 do sprzeciwu popartego dowodem, **reguła 16: „Blokada to koniec, nie zagadka”** (blokada kończy próbę;

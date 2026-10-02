@@ -108,7 +108,7 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
     # budżet z najdłuższą kalibracją, jaką agent może dostać (zmiana dostawcy albo modelu w panelu)
     orch = a.name == fleet.orchestrator
     calib = max((fl.calibration_section(f"{fam}-x", orch) for fam in CALIBRATION_FAMILIES), key=len)
-    tokens = fl.approx_tokens(soul.replace(fl.PROTOCOL_MARKER, f"{protocol}\n\n{calib}"))
+    tokens = fl.approx_tokens(soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, orch)}\n\n{calib}"))
     if tokens > fl.SOUL_TOKEN_BUDGET:
         r.err(f"{a.name}: SOUL ~{tokens} tokenów (z protokołem i kalibracją) > budżet {fl.SOUL_TOKEN_BUDGET}")
 
