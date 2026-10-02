@@ -23,7 +23,6 @@ wrócić do `natywna-czy-pwa`. Kod: 0 = OK, 1 = strona nie odpowiada, 3 = robots
 from __future__ import annotations
 
 import argparse
-import html as htmlmod
 import json
 import re
 import sys
@@ -81,7 +80,6 @@ DOMYSLNE_KOLORY = {"#337AB7", "#286090", "#23527C", "#5BC0DE", "#5CB85C", "#F0AD
                    "#0000EE", "#551A8B", "#3498DB", "#2196F3", "#4CAF50", "#F44336", "#FF5722", "#9C27B0", "#3F51B5"}
 PRIORYTET_LINKOW = re.compile(r"kontakt|contact|o-nas|about|oferta|menu|cennik|karta|lokal|salon|sklepy|cukierni|restauracj|"
                               r"punkty|godzin|zamow|zamów|rezerw|umow|umów|uslug|usług|produkt", re.I)
-KOLOR_CSS = re.compile(r"(?:--(?:primary|brand|main|accent|color-primary)[\w-]*|background(?:-color)?)\s*:\s*(#[0-9a-fA-F]{6})\b")
 
 
 class Strona(HTMLParser):

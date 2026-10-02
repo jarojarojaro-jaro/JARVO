@@ -129,18 +129,7 @@ def zbierz(url: str, out: Path, podstrony: list[str]) -> dict:
 
 
 def ensure_playwright() -> None:
-    """Jak w html_wideo.py, ale skok do venv narzędzi uruchamia ten skrypt (nie html_wideo.py)."""
-    import os
-    try:
-        import playwright.sync_api  # noqa: F401
-        return
-    except ImportError:
-        pass
-    venv_py = Path(nz.py())
-    if venv_py.exists() and Path(sys.prefix).resolve() != nz.VENV.resolve() and not os.environ.get("JARVO_HTML_REEXEC"):
-        os.environ["JARVO_HTML_REEXEC"] = "1"
-        os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
-    raise SystemExit("brak playwright w Pythonie: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html")
+    nz.wymagaj_playwright(__file__, "JARVO_HTML_REEXEC")
 
 
 def main(argv: list[str] | None = None) -> int:

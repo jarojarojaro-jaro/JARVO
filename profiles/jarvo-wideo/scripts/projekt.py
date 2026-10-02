@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -316,17 +315,8 @@ def cmd_sprawdz(film: Path, a) -> int:
 # ---------------------------------------------------------------- render (ten sam silnik co „Eksportuj”)
 
 def ensure_playwright() -> None:
-    try:
-        import playwright.sync_api  # noqa: F401
-        return
-    except ImportError:
-        pass
     import narzedzia as nz
-    venv_py = Path(nz.py())
-    if venv_py.exists() and Path(sys.prefix).resolve() != nz.VENV.resolve() and not os.environ.get("JARVO_PROJEKT_REEXEC"):
-        os.environ["JARVO_PROJEKT_REEXEC"] = "1"
-        os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
-    raise SystemExit("napisy renderuje przeglądarka: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html")
+    nz.wymagaj_playwright(__file__, "JARVO_PROJEKT_REEXEC", "napisy renderuje przeglądarka")
 
 
 def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path,

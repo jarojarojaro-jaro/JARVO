@@ -42,7 +42,7 @@ sys.path.insert(0, str(TU))
 
 import mobile_lib as ml  # noqa: E402
 
-EAS = "eas-cli@24.7.0"
+EAS = ml.EAS_CLI
 PUNKTY_BUILDU = {6, 7, 8, 13, 14, 16}          # przed buildem mogą być „?”: sprawdzi je lista na AAB i IPA
 ROZSZERZENIA = {"ANDROID": "aab", "IOS": "ipa"}
 
@@ -55,17 +55,10 @@ class BrakKonta(Exception):
     pass
 
 
-def _json(p: Path) -> dict:
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-
-
 def _app(kat: Path) -> dict:
     if not (kat / "jarvo.app.json").exists():
         raise Blad(f"{kat}: brak jarvo.app.json (to nie aplikacja z szablonu JARVO)")
-    return _json(kat / "jarvo.app.json")
+    return ml.czytaj_json(kat / "jarvo.app.json")
 
 
 def _wyd(kat: Path) -> Path:
@@ -79,7 +72,7 @@ def _wyd(kat: Path) -> Path:
 def werdykt_bramki(kat: Path) -> dict:
     pliki = sorted((kat / "out" / "jakosc").glob("werdykt-runda-*.json"),
                    key=lambda p: int(re.search(r"(\d+)", p.stem.rsplit("-", 1)[-1]).group(1)))
-    return _json(pliki[-1]) if pliki else {}
+    return ml.czytaj_json(pliki[-1]) if pliki else {}
 
 
 def jarvo_todo(kat: Path) -> list[str]:
@@ -101,7 +94,7 @@ def bramki(kat: Path, etap: str) -> list[str]:
     w = werdykt_bramki(kat)
     if w.get("werdykt") != "PASS":
         braki.append(f"bramka aplikacji: {w.get('werdykt', 'brak werdyktu')} {w.get('wynik', '')} (wymagany PASS: skill bramka-aplikacji)")
-    check = _json(kat / "out" / "sklep" / "check.json")
+    check = ml.czytaj_json(kat / "out" / "sklep" / "check.json")
     if not check:
         braki.append("brak listy kontrolnej (sklep_check.py <app>)")
     else:
@@ -129,7 +122,7 @@ def zapisz_zgode(kat: Path, krok: str, zgoda: str, szczegoly: dict) -> dict:
     if len(zgoda) < 10:
         raise Blad("A2: potrzebne dosłowne słowa zgody właściciela (--zgoda \"…\", co najmniej 10 znaków)")
     p = _wyd(kat) / "zgody.json"
-    dane = _json(p) or {"zgody": []}
+    dane = ml.czytaj_json(p) or {"zgody": []}
     wpis = {"krok": krok, "zgoda": zgoda, "kiedy": dt.datetime.now().isoformat(timespec="seconds"), **szczegoly}
     dane["zgody"].append(wpis)
     ml.zapisz(p, json.dumps(dane, ensure_ascii=False, indent=2))
@@ -167,7 +160,7 @@ def build(kat: Path, platforma: str, zgoda: str) -> dict:
     buildy = [{"id": b["id"], "platforma": b.get("platform"), "status": b.get("status"), "wersja": app.get("wersja"),
                "utworzono": dt.datetime.now().isoformat(timespec="seconds")} for b in lista]
     p = _wyd(kat) / "buildy.json"
-    dane = _json(p) or {"buildy": []}
+    dane = ml.czytaj_json(p) or {"buildy": []}
     dane["buildy"] = buildy + dane["buildy"]
     ml.zapisz(p, json.dumps(dane, ensure_ascii=False, indent=2))
     return {"buildy": buildy, "dalej": "`wydanie.py status <app> --czekaj 40` (iOS 15–30 min, Android 10–20 min w kolejce darmowej)"}
@@ -183,7 +176,7 @@ def _pobierz(url: str, cel: Path) -> Path:
 
 
 def status(kat: Path, czekaj_min: int = 0) -> dict:
-    dane = _json(kat / "out" / "wydanie" / "buildy.json")
+    dane = ml.czytaj_json(kat / "out" / "wydanie" / "buildy.json")
     if not dane.get("buildy"):
         raise Blad("brak buildów (wydanie.py build)")
     koniec = time.time() + czekaj_min * 60
@@ -221,12 +214,12 @@ def status(kat: Path, czekaj_min: int = 0) -> dict:
             args += [f"--{Path(b['plik']).suffix.lstrip('.')}", str(kat / b["plik"])]
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             wynik["lista_kod"] = sklep_check.main(args)
-        wynik["lista"] = _json(kat / "out" / "sklep" / "check.json").get("podsumowanie", "?")
+        wynik["lista"] = ml.czytaj_json(kat / "out" / "sklep" / "check.json").get("podsumowanie", "?")
     return wynik
 
 
 def _ostatni(kat: Path, platforma: str) -> dict | None:
-    for b in _json(kat / "out" / "wydanie" / "buildy.json").get("buildy", []):
+    for b in ml.czytaj_json(kat / "out" / "wydanie" / "buildy.json").get("buildy", []):
         if str(b.get("platforma")).upper() == platforma.upper() and b.get("status") == "FINISHED" and b.get("plik"):
             return b
     return None
@@ -278,7 +271,7 @@ def karta(kat: Path, zgoda: str) -> dict:
     todo = jarvo_todo(kat)
     if todo:
         raise Blad(f"JARVO-TODO w metadanych albo kodzie: {', '.join(todo[:5])}")
-    check = _json(kat / "out" / "sklep" / "check.json")
+    check = ml.czytaj_json(kat / "out" / "sklep" / "check.json")
     zle = [x["nr"] for x in check.get("wyniki", []) if x["stan"] == "blad" and x["grupa"] in ("D", "F", "G") and x["tryb"] == "auto"]
     if not check or zle:
         raise Blad(f"lista kontrolna: karta ma błędy w punktach {zle or 'brak listy'} (sklep_check.py)")
@@ -337,7 +330,7 @@ Wysyła właściciel ze swoich kont (Apple 4.2.6). Agent przygotował build, kar
 
 def recenzja(kat: Path) -> dict:
     app = _app(kat)
-    check = _json(kat / "out" / "sklep" / "check.json")
+    check = ml.czytaj_json(kat / "out" / "sklep" / "check.json")
     ios_b, and_b = _ostatni(kat, "ios"), _ostatni(kat, "android")
     lista = check.get("podsumowanie", "brak listy kontrolnej") if check else "brak listy kontrolnej"
     reczne = [f"- ☐ {x['nr']}. {x['tytul']}: {x['dowod']}" for x in check.get("wyniki", []) if x["stan"] in ("recznie", "?")]

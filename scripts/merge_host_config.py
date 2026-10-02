@@ -16,25 +16,10 @@ import json
 import sys
 from pathlib import Path
 
-try:
-    from ruamel.yaml import YAML  # środowisko Hermesa
-    _yaml = YAML()
-    _yaml.preserve_quotes = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from fleetlib import rt_yaml  # noqa: E402
 
-    def load(p: Path):
-        return _yaml.load(p.read_text(encoding="utf-8")) if p.exists() else None
-
-    def dump(data, p: Path):
-        with p.open("w", encoding="utf-8") as f:
-            _yaml.dump(data, f)
-except ImportError:  # pragma: no cover - lokalnie
-    import yaml  # type: ignore
-
-    def load(p: Path):
-        return yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else None
-
-    def dump(data, p: Path):
-        p.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+load, dump = rt_yaml()
 
 REPLACE = ["platform_toolsets", "timezone"]
 MERGE = ["gateway", "kanban", "approvals", "memory", "stt", "display"]

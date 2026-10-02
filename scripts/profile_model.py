@@ -16,26 +16,10 @@ import json
 import sys
 from pathlib import Path
 
-try:
-    from ruamel.yaml import YAML
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from fleetlib import rt_yaml  # noqa: E402
 
-    _y = YAML()
-    _y.preserve_quotes = True
-
-    def load(p: Path):
-        return _y.load(p.read_text(encoding="utf-8")) if p.exists() else None
-
-    def dump(data, p: Path):
-        with p.open("w", encoding="utf-8") as f:
-            _y.dump(data, f)
-except ImportError:  # pragma: no cover
-    import yaml  # type: ignore
-
-    def load(p: Path):
-        return yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else None
-
-    def dump(data, p: Path):
-        p.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+load, dump = rt_yaml()
 
 SNAP, MARK = ".jarvo-model-before.json", ".jarvo-fleet-model.json"
 
@@ -51,8 +35,7 @@ def recalibrate(prof: Path, model_id: str | None) -> None:
     if not model_id or not soul_path.exists():
         return
     try:  # kalibracja to dodatek: jej błąd nie może zatrzymać instalacji profilu
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import fleetlib  # noqa: E402  (tylko tutaj: snapshot nie potrzebuje)
+        import fleetlib
 
         new = fleetlib.recalibrate_soul(soul_path.read_text(encoding="utf-8"), model_id)
         if new is not None:

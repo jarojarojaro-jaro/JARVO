@@ -29,9 +29,6 @@ READY_STALE_MIN = int(os.environ.get("JARVO_PATROL_READY_STALE_MIN", "20"))
 REVIEW_STALE_MIN = int(os.environ.get("JARVO_PATROL_REVIEW_STALE_MIN", "60"))
 RUNNING_STALE_MIN = int(os.environ.get("JARVO_PATROL_RUNNING_STALE_MIN", "240"))
 REALERT_HOURS = float(os.environ.get("JARVO_PATROL_REALERT_HOURS", "12"))
-TRIAGE_ALWAYS = True
-
-OPEN_STATUSES = {"triage", "todo", "ready", "running", "blocked", "review", "scheduled"}
 
 
 # ------------------------------------------------------------------ data access

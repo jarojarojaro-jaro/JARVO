@@ -72,20 +72,13 @@ def nazwa_paczki(spec: str) -> str:
     return (spec[:i] if i > 0 else spec).lower()
 
 
-def _json(p: Path) -> dict:
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-
-
 def zaufane(kat: Path | None = None) -> set[str]:
     """Lista Expo SDK z node_modules aplikacji (gdy jest), zależności szablonu JARVO i moduły profilu zgodności."""
-    pkg = _json(SZABLON / "package.json")
+    pkg = ml.czytaj_json(SZABLON / "package.json")
     z = set(pkg.get("dependencies") or {}) | set(pkg.get("devDependencies") or {})
     z |= {m["modul"] for m in zgodnosc.UPRAWNIENIA.values() if m.get("modul")} | {"expo-apple-authentication"}
     if kat is not None:
-        z |= set(_json(kat / "node_modules" / "expo" / "bundledNativeModules.json"))
+        z |= set(ml.czytaj_json(kat / "node_modules" / "expo" / "bundledNativeModules.json"))
     return z
 
 
@@ -180,7 +173,7 @@ def ocen(nazwa: str, kat: Path | None = None, siec: bool = True, dzis: dt.date |
 
 
 def zaleznosci(kat: Path, siec: bool = True) -> list[dict]:
-    pkg = _json(kat / "package.json")
+    pkg = ml.czytaj_json(kat / "package.json")
     nazwy = list(dict.fromkeys([*(pkg.get("dependencies") or {}), *(pkg.get("devDependencies") or {})]))
     return [ocen(n, kat, siec) for n in nazwy]
 

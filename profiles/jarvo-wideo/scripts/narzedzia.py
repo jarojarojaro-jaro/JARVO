@@ -105,6 +105,21 @@ def py() -> str:
     return str(VENV / "bin" / "python")
 
 
+def wymagaj_playwright(skrypt: str, flaga: str, komunikat: str = "brak playwright w Pythonie", dopisek: str = "") -> None:
+    """Playwright jest w venv narzędzi: bez niego skrypt raz uruchamia się od nowa tamtym Pythonem (`flaga` w env
+    blokuje pętlę), a gdy i tam go nie ma, kończy się poleceniem instalacji."""
+    try:
+        import playwright.sync_api  # noqa: F401
+        return
+    except ImportError:
+        pass
+    venv_py = Path(py())
+    if venv_py.exists() and Path(sys.prefix).resolve() != VENV.resolve() and not os.environ.get(flaga):
+        os.environ[flaga] = "1"
+        os.execv(str(venv_py), [str(venv_py), str(Path(skrypt).resolve()), *sys.argv[1:]])
+    raise SystemExit(f"{komunikat}: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html{dopisek}")
+
+
 def py_name(spec: str) -> str:
     """Nazwa paczki ze specyfikacji pip („playwright==1.63.0” → playwright)."""
     return re.split(r"[=<>!~\[]", spec, maxsplit=1)[0].strip()

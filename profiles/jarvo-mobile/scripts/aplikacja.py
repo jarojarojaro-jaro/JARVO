@@ -34,12 +34,13 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mobile_lib as ml  # noqa: E402
 import paczki  # noqa: E402
 import zgodnosc  # noqa: E402
 
 TU = Path(__file__).resolve().parent
 SZABLON = TU.parent / "templates" / "expo-jarvo"
-EAS = os.environ.get("JARVO_EAS_CLI", "eas-cli@24.7.0")                 # ≥ 14 dni od wydania (kwarantanna npm)
+EAS = ml.EAS_CLI
 DOCTOR = os.environ.get("JARVO_EXPO_DOCTOR", "expo-doctor@1.21.1")
 BUNDLE_RE = re.compile(r"^[a-z][a-z0-9]*(\.[a-z][a-z0-9_]*){1,}$")
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
@@ -144,9 +145,7 @@ def kolory_ts(p: dict) -> str:
 
 # ------------------------------------------------------------------ konfiguracja
 
-def wczytaj_yaml(sciezka: str | Path) -> dict:
-    import yaml
-    return yaml.safe_load(Path(sciezka).read_text(encoding="utf-8")) or {}
+wczytaj_yaml = zgodnosc.wczytaj           # aplikacja.yaml czytana tak samo jak zgodnosc.yaml (pakiet.py, testy)
 
 
 def sprawdz_konfiguracje(a: dict, konta: bool) -> list[str]:

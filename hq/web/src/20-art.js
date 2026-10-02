@@ -25,7 +25,6 @@ const PX_FONT = {
   ":": ["...", ".#.", "...", ".#.", "..."],
 };
 const PX_FOLD = { "Ą": "A", "Ć": "C", "Ę": "E", "Ł": "L", "Ń": "N", "Ó": "O", "Ś": "S", "Ź": "Z", "Ż": "Z" };
-const pxTextW = (str, s = 1) => Math.max(0, String(str).length * 4 * s - s);
 
 class Pix {
   // Prostokąty tego samego koloru łączymy w jedną ścieżkę, ale tylko gdy nic narysowane później

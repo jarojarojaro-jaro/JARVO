@@ -26,7 +26,6 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-import math
 import re
 import statistics
 from pathlib import Path

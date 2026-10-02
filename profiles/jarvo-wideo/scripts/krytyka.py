@@ -26,15 +26,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wideo_lib as wl  # noqa: E402
 
 OSIE = ["hook", "telefon", "ruch", "roznorodnosc", "kompozycja", "marka", "dzwiek"]
-OSIE_OPIS = {
-    "hook": "haczyk w pierwszych 2 s",
-    "telefon": "czytelność w 360 px szerokości",
-    "ruch": "jakość ruchu: sprężyny, wyhamowanie, zero martwych klatek",
-    "roznorodnosc": "nowa rzecz co 2–4 s",
-    "kompozycja": "kadr, hierarchia, oddech; zero zakazanych chwytów",
-    "marka": "kolory, fonty, logo, ton z kitu",
-    "dzwiek": "dźwięk na bitach i zdarzeniach, −14 LUFS",
-}
 
 
 def ff(args: list[str]) -> subprocess.CompletedProcess:

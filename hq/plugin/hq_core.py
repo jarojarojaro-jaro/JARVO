@@ -831,6 +831,3 @@ def agent_stats(name: str, tasks: list[dict], events: list[dict], now: float) ->
     return {"done_7d": len(done), "first_pass_7d": first_pass,
             "changes_7d": sum(1 for t in done if t["id"] in changes)}
 
-
-def now_ts() -> float:
-    return time.time()

@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -372,18 +371,9 @@ def edytowana_recznie(film: Path) -> bool:
 
 def ensure_render_env() -> None:
     """Render napisów potrzebuje playwright (jak projekt.py render): w razie potrzeby uruchom się w venv narzędzi."""
-    try:
-        import playwright.sync_api  # noqa: F401
-        return
-    except ImportError:
-        pass
     import narzedzia as nz
-    venv_py = Path(nz.py())
-    if venv_py.exists() and Path(sys.prefix).resolve() != nz.VENV.resolve() and not os.environ.get("JARVO_KLIPY_REEXEC"):
-        os.environ["JARVO_KLIPY_REEXEC"] = "1"
-        os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
-    raise SystemExit("render napisów potrzebuje przeglądarki: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html "
-                     "(albo zbuduj z --bez-renderu i wyrenderuj w edytorze HQ)")
+    nz.wymagaj_playwright(__file__, "JARVO_KLIPY_REEXEC", "render napisów potrzebuje przeglądarki",
+                          " (albo zbuduj z --bez-renderu i wyrenderuj w edytorze HQ)")
 
 
 def cmd_zbuduj(a) -> int:

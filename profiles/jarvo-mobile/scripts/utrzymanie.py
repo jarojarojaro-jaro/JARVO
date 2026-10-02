@@ -48,7 +48,7 @@ def _wersja_pakietu(kat: Path, nazwa: str) -> str:
     p = kat / "node_modules" / nazwa / "package.json"
     if p.exists():
         return json.loads(p.read_text(encoding="utf-8")).get("version", "")
-    pkg = wydanie._json(kat / "package.json")
+    pkg = ml.czytaj_json(kat / "package.json")
     return re.sub(r"^[~^]", "", (pkg.get("dependencies") or {}).get(nazwa, ""))
 
 
@@ -151,7 +151,7 @@ def stan(kat: Path, siec: bool = True) -> dict:
                 wynik["app_store"] = None
         except (ConnectionError, ml.Blokada) as e:
             wynik["app_store"] = {"blad": str(e)}
-    buildy = [b for b in wydanie._json(kat / "out" / "wydanie" / "buildy.json").get("buildy", []) if b.get("status") == "FINISHED"]
+    buildy = [b for b in ml.czytaj_json(kat / "out" / "wydanie" / "buildy.json").get("buildy", []) if b.get("status") == "FINISHED"]
     wynik["buildy"] = [{k: b.get(k) for k in ("platforma", "wersja", "numer", "runtime")} for b in buildy[:4]]
     wynik["kalendarz"] = kalendarz(kat, 1, wynik.get("sdk_npm") if isinstance(wynik.get("sdk_npm"), dict) else None)["terminy"][:5]
     l = [f"# Stan aplikacji: {app.get('nazwa')} {app.get('wersja')}", "",
@@ -188,7 +188,7 @@ def aktualizacja(kat: Path, wiadomosc: str, zgoda: str, kanal: str = "production
         braki.append("brak expo_project_id w jarvo.app.json (bez updates.url build nie pyta o aktualizacje)")
     if not os.environ.get("EXPO_TOKEN"):
         braki.append("brak EXPO_TOKEN (token robota organizacji Expo właściciela)")
-    buildy = [b for b in wydanie._json(kat / "out" / "wydanie" / "buildy.json").get("buildy", [])
+    buildy = [b for b in ml.czytaj_json(kat / "out" / "wydanie" / "buildy.json").get("buildy", [])
               if b.get("status") == "FINISHED" and b.get("runtime")]
     if not buildy:
         braki.append("brak buildu sklepowego z runtime w out/wydanie/buildy.json: aktualizacja nie miałaby do czego trafić")

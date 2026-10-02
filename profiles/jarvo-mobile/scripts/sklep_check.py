@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import io
 import json
 import os
 import plistlib
@@ -101,7 +100,6 @@ assert len(PUNKTY) == 44 and [p[0] for p in PUNKTY] == list(range(1, 45))
 GRUPY = {"A": "Konto i tożsamość", "B": "Build i konfiguracja", "C": "Uprawnienia i prywatność", "D": "Konta i logowanie",
          "E": "Treść i funkcje", "F": "Grafiki", "G": "Metadane", "N": "Wyuczone z odrzuceń"}
 ZNAKI = {"ok": "✓", "blad": "✗", "?": "?", "recznie": "☐"}
-EAS = "eas-cli@24.7.0"
 
 # wartości z szablonu expo-jarvo, które nie mogą trafić do sklepu
 SZABLON = {"pl.mojafirma.app", "Moja Firma", "Moja Firma sp. z o.o.", "ul. Przykładowa 1, 00-001 Warszawa",
@@ -329,13 +327,6 @@ def czytaj_build(p: Path) -> Build:
 
 # ------------------------------------------------------------------ kontekst aplikacji
 
-def _json(p: Path) -> dict:
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-
-
 def konfiguracja(kat: Path) -> dict:
     """{public, introspect, zrodlo}: konfiguracja Expo po wtyczkach; bez node_modules odtworzona z jarvo.app.json."""
     if (kat / "node_modules" / "expo").exists():
@@ -347,7 +338,7 @@ def konfiguracja(kat: Path) -> dict:
                 raise RuntimeError(f"expo config --type {typ}: {(r.stdout + r.stderr).strip()[-600:]}")
             out[typ] = json.loads(r.stdout[r.stdout.find("{"):])
         return {**out, "zrodlo": "expo config"}
-    app = _json(kat / "jarvo.app.json")
+    app = ml.czytaj_json(kat / "jarvo.app.json")
     cfg = {"name": app.get("nazwa"), "version": app.get("wersja"), "runtimeVersion": {"policy": "fingerprint"},
            "ios": {"bundleIdentifier": app.get("bundle_ios"), "supportsTablet": app.get("tablet"),
                    "config": {"usesNonExemptEncryption": False},
@@ -367,14 +358,14 @@ class Kontekst:
 
     def __post_init__(self):
         k = self.kat
-        self.app = _json(k / "jarvo.app.json")
-        self.pkg = _json(k / "package.json")
+        self.app = ml.czytaj_json(k / "jarvo.app.json")
+        self.pkg = ml.czytaj_json(k / "package.json")
         self.deps = set(self.pkg.get("dependencies") or {}) | set(self.pkg.get("devDependencies") or {})
         self.src = {p.relative_to(k).as_posix(): p.read_text(encoding="utf-8", errors="replace")
                     for p in sorted((k / "src").rglob("*")) if p.suffix in (".ts", ".tsx", ".js", ".jsx") and p.is_file()} \
             if (k / "src").exists() else {}
         self.importy = {m for t in self.src.values() for m in re.findall(r"""(?:from|import|require\()\s*['"]([@\w./-]+)['"]""", t)}
-        self.store = _json(k / "store.config.json")
+        self.store = ml.czytaj_json(k / "store.config.json")
         apple = self.store.get("apple") or {}
         self.apple_info = (apple.get("info") or {})
         self.apple_pl = self.apple_info.get("pl-PL") or {}
@@ -383,7 +374,7 @@ class Kontekst:
         g = self.sklep / "google" / "pl-PL"
         self.google = {n: (g / n).read_text(encoding="utf-8").strip() for n in LIMITY_GOOGLE if (g / n).exists()}
         self.google_dir = g
-        self.potw = _json(self.sklep / "potwierdzenia.json")
+        self.potw = ml.czytaj_json(self.sklep / "potwierdzenia.json")
         self.funkcje = self.app.get("funkcje") or {}
         self.firma = self.app.get("firma") or {}
 
@@ -499,7 +490,7 @@ def p4(ctx):
 
 def p5(ctx):
     wersja = ctx.public.get("version") or ctx.app.get("wersja") or ""
-    eas = _json(ctx.kat / "eas.json")
+    eas = ml.czytaj_json(ctx.kat / "eas.json")
     zrodlo = (eas.get("cli") or {}).get("appVersionSource")
     auto = ((eas.get("build") or {}).get("production") or {}).get("autoIncrement")
     dowody, zle = [f"wersja {wersja}"], []
@@ -643,7 +634,7 @@ def p9(ctx):
 
 
 def p10(ctx, sprawdz: dict | None = None):
-    spr = sprawdz if sprawdz is not None else _json(ctx.kat / "out" / "jakosc" / "sprawdz.json")
+    spr = sprawdz if sprawdz is not None else ml.czytaj_json(ctx.kat / "out" / "jakosc" / "sprawdz.json")
     kontrole = {k["id"]: k for k in spr.get("kontrole", [])}
     if not kontrole:
         return Wynik(10, "?", "brak wyników `aplikacja.py sprawdz` (out/jakosc/sprawdz.json)", "uruchom `aplikacja.py sprawdz <app>`")
@@ -675,7 +666,7 @@ def p11(ctx):
 
 
 def p12(ctx):
-    lokalne = _json(ctx.kat / "locales" / "pl.json")
+    lokalne = ml.czytaj_json(ctx.kat / "locales" / "pl.json")
     zle = []
     for k, v in sorted(ctx.plist.items()):
         if not k.endswith("UsageDescription"):
@@ -1029,7 +1020,7 @@ def _odcisk(kat: Path) -> set[str]:
             s = (m[0] or m[1]).strip()
             if s and not s.startswith(("@", "./", "../", "http")):
                 teksty.add(_u(s))
-    app = _json(kat / "jarvo.app.json")
+    app = ml.czytaj_json(kat / "jarvo.app.json")
     teksty.add(_u(str(app.get("opis") or "")))
     teksty.update(f"ekran:{p.stem}" for p in (kat / "src" / "app").rglob("*.tsx")) if (kat / "src" / "app").exists() else None
     return teksty
@@ -1088,7 +1079,7 @@ def p31(ctx):
 def p32(ctx):
     rv = ctx.public.get("runtimeVersion") or {}
     polityka = rv.get("policy") if isinstance(rv, dict) else f"stała {rv}"
-    eas = _json(ctx.kat / "eas.json")
+    eas = ml.czytaj_json(ctx.kat / "eas.json")
     kanal = ((eas.get("build") or {}).get("production") or {}).get("channel")
     if polityka != "fingerprint":
         return Wynik(32, "blad", f"runtimeVersion: {polityka} (aktualizacja JS może trafić do builda z innym kodem natywnym)",
@@ -1190,7 +1181,7 @@ def _ocr(p: Path) -> str:
 
 
 def p37(ctx):
-    meta = _json(ctx.sklep / "zrzuty.json")
+    meta = ml.czytaj_json(ctx.sklep / "zrzuty.json")
     zle, dowody = [], []
     ios = [p for n in ZRZUTY_APPLE for p in _obrazy(ctx.sklep / "apple" / "pl-PL" / n)]
     for p in ios:
@@ -1429,7 +1420,7 @@ def potwierdz(kat: Path, nr: int, kto: str, uwaga: str) -> dict:
     if len(uwaga.strip()) < 10:
         raise SystemExit("uwaga: co sprawdzono i gdzie (co najmniej 10 znaków)")
     p = kat / "out" / "sklep" / "potwierdzenia.json"
-    dane = _json(p)
+    dane = ml.czytaj_json(p)
     dane[str(nr)] = {"kto": kto, "kiedy": dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "uwaga": uwaga.strip()}
     ml.zapisz(p, json.dumps(dane, ensure_ascii=False, indent=2))
     return dane[str(nr)]

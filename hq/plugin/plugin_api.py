@@ -23,16 +23,16 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 _HERE = Path(__file__).resolve().parent
 
 
-def _load_core():
+def _load(name: str, file: str):
     # plik obok, pod unikalną nazwą (dashboard ładuje pluginy po ścieżce, bez pakietu)
-    spec = importlib.util.spec_from_file_location("jarvo_hq_core", _HERE / "hq_core.py")
+    spec = importlib.util.spec_from_file_location(name, _HERE / file)
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["jarvo_hq_core"] = mod
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 
 
-core = _load_core()
+core = _load("jarvo_hq_core", "hq_core.py")
 router = APIRouter()
 
 
@@ -218,26 +218,8 @@ async def file(path: str, download: bool = False):
 # ------------------------------------------------------------------ edytor filmów
 # Montaż robi przeglądarka (podgląd, oś czasu), a tu tylko: opis plików, zapis projektu obok filmu
 # i eksport jednym przebiegiem ffmpeg w tle (jedno zadanie naraz, postęp z `-progress`).
-def _load_editor():
-    spec = importlib.util.spec_from_file_location("jarvo_hq_edytor", _HERE / "edytor.py")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["jarvo_hq_edytor"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-ed = _load_editor()
-
-
-def _load_anim():
-    spec = importlib.util.spec_from_file_location("jarvo_hq_animacja", _HERE / "animacja.py")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["jarvo_hq_animacja"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-anim = _load_anim()
+ed = _load("jarvo_hq_edytor", "edytor.py")
+anim = _load("jarvo_hq_animacja", "animacja.py")
 _edit = sys.modules.setdefault("jarvo_hq_edit_state", type(sys)("jarvo_hq_edit_state"))
 if not hasattr(_edit, "jobs"):
     _edit.jobs = {}
@@ -828,7 +810,6 @@ async def anim_params(request: Request):
 # Ciasteczka przeglądarki (także dashboardu z :9119, bo ciasteczka nie znają portów) nie idą dalej do ws-scrcpy.
 SCREEN_PORT = int(os.environ.get("JARVO_ANDROID_SCREEN_PORT", "9122"))
 SCREEN_UPSTREAM = os.environ.get("JARVO_ANDROID_SCREEN_UPSTREAM", "jarvo-android-ekran:8000")
-SCREEN_URL = os.environ.get("JARVO_ANDROID_SCREEN_URL") or f"http://localhost:{SCREEN_PORT}"
 SCREEN_ROOT = core.SCREEN_ROOT
 SCREEN_COOKIE = f"jarvo_ekran_{SCREEN_PORT}"
 _screen = sys.modules.setdefault("jarvo_hq_screen_state", type(sys)("jarvo_hq_screen_state"))

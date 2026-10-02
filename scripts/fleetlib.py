@@ -50,6 +50,32 @@ def _yaml_backend():
         return "ruamel", YAML(typ="safe", pure=True)
 
 
+def rt_yaml():
+    """(load, dump) dla plików konfiguracji Hermesa: ruamel zachowuje komentarze i cudzysłowy (środowisko Hermesa),
+    bez niego PyYAML. load(ścieżka) zwraca None dla brakującego pliku."""
+    try:
+        from ruamel.yaml import YAML  # type: ignore
+    except ImportError:  # pragma: no cover - lokalnie bez ruamel
+        import yaml  # type: ignore
+
+        def load(p: Path):
+            return yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else None
+
+        def dump(data, p: Path) -> None:
+            p.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        return load, dump
+    y = YAML()
+    y.preserve_quotes = True
+
+    def load(p: Path):
+        return y.load(p.read_text(encoding="utf-8")) if p.exists() else None
+
+    def dump(data, p: Path) -> None:
+        with p.open("w", encoding="utf-8") as f:
+            y.dump(data, f)
+    return load, dump
+
+
 def load_yaml(path: Path | str) -> Any:
     text = Path(path).read_text(encoding="utf-8")
     return loads_yaml(text)

@@ -17,7 +17,9 @@ const ED_COLORS = ["#FFFFFF", "#000000", "#FFD60A", "#FF453A", "#32D74B", "#0A84
 const ED_CAP = { x: 0.5, y: 0.84, size: 58, color: "#FFFFFF", bg: "#000000", style: "outline", bold: true, align: "center", maxw: 0.84,
   font: "'Bricolage Grotesque', system-ui, sans-serif" };
 const ED_HL = "#FFE14D";   // domyślny kolor aktywnego słowa (karaoke)
-const plNapisy = (n) => (n === 1 ? "napis" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "napisy" : "napisów");
+// polska forma liczebnika: plForma(3, ["uwaga", "uwagi", "uwag"]) → "uwagi"
+const plForma = (n, [jeden, kilka, wiele]) => (n === 1 ? jeden : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? kilka : wiele);
+const NAPISY = ["napis", "napisy", "napisów"];
 const ED_FILLER = /^(y+|e+|ee+m*|m+|h?m+|ym+|em+|uh+m*|um+|eh+m*|ah+|yhm+|mhm+)$/;
 const isFiller = (w) => { const x = String(w).toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""); return !!x && ED_FILLER.test(x); };
 // Słowa (czas osi) → linie napisów: nowa linia po pauzie, końcu zdania, za długim tekście albo czasie (jak edytor.py).
@@ -1263,7 +1265,7 @@ function VideoEditor({ path, onClose }) {
       <ul class="thq-ed-list">${info.subs.map((f) => html`<li key=${f}><button type="button" onClick=${() => srtCaptions(f)}><span class="thq-ed-mk is-text">${ED_ICON.captions}</span><span class="thq-ed-mn">${f.split("/").pop()}</span><span class="thq-ed-plus">+</span></button></li>`)}</ul>`}
     ${capJob && capJob.state === "error" && html`<p class="thq-ed-bad">${capJob.error}</p>`}
     ${speechJob && speechJob.state === "error" && html`<p class="thq-ed-bad">${speechJob.error}</p>`}
-    ${capJob && capJob.state === "done" && html`<p class="thq-ed-ok">✓ ${L(`Dodano ${capJob.n} ${plNapisy(capJob.n)}`, `Added ${capJob.n} captions`)}</p>`}
+    ${capJob && capJob.state === "done" && html`<p class="thq-ed-ok">✓ ${L(`Dodano ${capJob.n} ${plForma(capJob.n, NAPISY)}`, `Added ${capJob.n} captions`)}</p>`}
     ${caps.length > 0 && html`
       <label>${L("Styl napisów", "Caption style")}${seg(ED_STYLES.map(([k2, pl, en]) => [k2, L(pl, en)]), caps[0].style, (v) => setCapLook({ style: v }))}</label>
       <label>${L("Położenie", "Position")}${seg([[0.16, L("Góra", "Top")], [0.5, L("Środek", "Middle")], [0.84, L("Dół", "Bottom")]], [0.16, 0.5, 0.84].find((y) => Math.abs(y - caps[0].y) < 0.02), (v) => setCapLook({ y: v }))}</label>
@@ -1273,7 +1275,7 @@ function VideoEditor({ path, onClose }) {
         ${caps[0].hl && html`<label>${L("Kolor aktywnego słowa", "Active word color")}${swatches(caps[0].hl, (v, lv) => setCapLook({ hl: v }, lv))}</label>`}`
         : html`<p class="thq-ed-note">${L("Karaoke działa z napisami ze słów (automatyczne napisy), nie z pliku .srt.", "Karaoke works with word-synced auto captions, not .srt files.")}</p>`}
       <label>${L("Rozmiar", "Size")} · ${Math.round(caps[0].size)}<input type="range" min="24" max="140" value=${caps[0].size} onInput=${(e) => setCapLook({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
-      <p class="thq-ed-note">${L(`${caps.length} ${plNapisy(caps.length)}. Pojedynczy napis poprawisz, dotykając go na osi czasu.`, `${caps.length} captions. Tap one on the timeline to fix its text.`)}</p>
+      <p class="thq-ed-note">${L(`${caps.length} ${plForma(caps.length, NAPISY)}. Pojedynczy napis poprawisz, dotykając go na osi czasu.`, `${caps.length} captions. Tap one on the timeline to fix its text.`)}</p>
       <div class="thq-ed-acts">${act("trash", L("Usuń napisy", "Remove captions"), () => H.apply((P) => ({ ...P, texts: P.texts.filter((x) => !x.cap) })), { bad: true })}</div>`}
   </div>`;
 
@@ -1572,7 +1574,6 @@ function NoteThumb({ path, url }) {
   const src = url || disk;
   return src ? html`<img src=${src} alt=${L("Kadr uwagi", "Note frame")}/>` : html`<span class="thq-ed-note-pic" title=${path}>${ED_ICON.camera}</span>`;
 }
-const plUwag = (n) => (n === 1 ? "uwaga" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "uwagi" : "uwag");
 function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen, notes, addNote, removeNote, noteHi, onSeek, startShot, urls }) {
   const open = openNotes(notes);
   const where = sel ? (sel.type === "text" ? `napis „${sel.item.text}” (${fmtT(sel.item.start, true)}–${fmtT(sel.item.end, true)})`
@@ -1624,7 +1625,7 @@ function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen, notes, addNot
         title=${L("Zapisz jako uwagę w tym miejscu osi (wyślesz kilka naraz)", "Save as a note at this moment (send several at once)")}>${ED_ICON.pin}${L("Uwaga w", "Note at")} ${edClock(time)}</button>
       <span class="thq-ed-grow"></span>
       <button type="button" class="thq-ed-btn is-main" disabled=${!canSend} onClick=${send}>${ask.busy ? "…"
-        : open.length ? L(`Wyślij (${open.length} ${plUwag(open.length)})`, `Send (${open.length} note${open.length === 1 ? "" : "s"})`) : L("Wyślij", "Send")}</button>
+        : open.length ? L(`Wyślij (${open.length} ${plForma(open.length, ["uwaga", "uwagi", "uwag"])})`, `Send (${open.length} note${open.length === 1 ? "" : "s"})`) : L("Wyślij", "Send")}</button>
     </div>
     ${(ask.reply || ask.busy) && html`<div class="thq-ed-reply"><${Markdown} text=${ask.reply || L("Wideograf pracuje…", "Working…")}/></div>`}
     ${ask.error && html`<p class="thq-ed-bad">${ask.error}</p>`}

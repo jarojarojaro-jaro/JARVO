@@ -197,16 +197,7 @@ def os_z_krokow(zdarzenia: list[dict], koniec: float) -> list[tuple[float, float
 # ------------------------------------------------------------------ przeglądarka
 
 def ensure_playwright() -> None:
-    try:
-        import playwright.sync_api  # noqa: F401
-        return
-    except ImportError:
-        pass
-    venv_py = Path(nz.py())
-    if venv_py.exists() and Path(sys.prefix).resolve() != nz.VENV.resolve() and not os.environ.get("JARVO_DEMO_REEXEC"):
-        os.environ["JARVO_DEMO_REEXEC"] = "1"
-        os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
-    raise SystemExit("brak playwright w Pythonie: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html")
+    nz.wymagaj_playwright(__file__, "JARVO_DEMO_REEXEC")
 
 
 def przegladarka(p):

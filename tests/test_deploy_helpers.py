@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import stat
 
+import enable_plugin
 import fleetlib as fl
 import merge_env
 import merge_host_config
@@ -188,3 +189,17 @@ def test_sandbox_up_refuses_outside_sandbox(tmp_path):
                          capture_output=True, text=True, timeout=30)
     assert res.returncode == 1 and "to nie piaskownica" in res.stdout
     assert not (tmp_path / "local").exists()
+
+
+# ------------------------------------------------------------------ enable_plugin
+
+def test_enable_plugin_keeps_comments_and_removes_from_disabled(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("# konfiguracja hosta\nplugins:\n  enabled: [inny]\n  disabled: [jarvo-hq, stary]\nmodel: x  # zostaje\n",
+                   encoding="utf-8")
+    assert enable_plugin.main([str(cfg), "jarvo-hq"]) == 0
+    assert enable_plugin.main([str(cfg), "jarvo-hq"]) == 0                     # drugi raz bez duplikatu
+    data = fl.load_yaml(cfg)
+    assert data["plugins"]["enabled"] == ["inny", "jarvo-hq"] and data["plugins"]["disabled"] == ["stary"]
+    load, _dump = fl.rt_yaml()
+    assert load(tmp_path / "brak.yaml") is None and data["model"] == "x"
