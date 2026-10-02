@@ -173,9 +173,9 @@ agents:
     emoji: "📈"
     description: >-
       Płatne reklamy Meta Ads (Facebook, Instagram) i Google Ads od A do Z: planowanie kampanii,
-      struktura, odbiorcy, słowa kluczowe, budżety, stawianie kampanii, codzienna kontrola konta,
-      optymalizacja, testy A/B/C, raporty wyników i wnioski dla kreacji. Wydaje pieniądze tylko
-      w kopercie zatwierdzonej kodem przez użytkownika.
+      struktura, odbiorcy, słowa kluczowe, budżety, testy A/B/C, raporty wyników i wnioski dla kreacji;
+      stawianie kampanii, codzienna kontrola konta i optymalizacja przez Skarbiec, gdy jest zainstalowany.
+      Wydaje pieniądze tylko w kopercie zatwierdzonej kodem przez użytkownika.
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1

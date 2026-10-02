@@ -332,18 +332,6 @@ def render_handoff_table(fleet: fl.Fleet, agent: fl.Agent) -> str:
     return "\n".join(rows)
 
 
-def render_missing_section(pominiete: dict[str, list[str]], fleet: fl.Fleet) -> str:
-    """Sekcja SOUL: workflowy pominięte w tej instalacji, bo brakuje usług, których wymagają (`metadata.jarvo.wymaga`)."""
-    planowane = (fleet.raw.get("infra") or {}).get("uslugi_planowane") or {}
-    rows = ["## Czego w tej instalacji nie zrobisz (generowane przez build)", "",
-            "Te workflowy wymagają usług, których ta instalacja nie uruchamia, więc nie ma ich w Twoim profilu. Gdy ktoś",
-            "o nie poprosi, powiedz wprost, czego brakuje, i zaproponuj to, co działa. Nie udawaj, że je wykonałeś.", "",
-            "| Workflow | Brakuje usługi |", "|---|---|"]
-    for name, brak in sorted(pominiete.items()):
-        rows.append(f"| `{name}` | " + ", ".join(f"{u} ({planowane[u]})" if u in planowane else u for u in brak) + " |")
-    return "\n".join(rows) + "\n"
-
-
 def render_roster_summary(fleet: fl.Fleet) -> str:
     rows = ["| Agent | Rola |", "|---|---|"]
     for a in fleet.active():
@@ -501,7 +489,7 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
     if agent.name == fleet.orchestrator:
         soul = soul.replace(fl.ROSTER_MARKER, render_roster_summary(fleet))
     if pominiete:
-        soul = soul.rstrip() + "\n\n" + render_missing_section(pominiete, fleet)
+        soul = soul.rstrip() + "\n\n" + fl.missing_section(pominiete, fleet)
     soul_path.write_text(render_tokens(soul, tokens), encoding="utf-8")
 
     # profile.yaml

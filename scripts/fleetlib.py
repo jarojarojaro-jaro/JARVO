@@ -281,6 +281,19 @@ def available_skills(root: Path, services: set[str] | None = None) -> tuple[dict
     return ok, pominiete
 
 
+def missing_section(pominiete: dict[str, list[str]], fleet: "Fleet") -> str:
+    """Sekcja SOUL dopisywana przez build: workflowy pominięte w tej instalacji, bo brakuje usług, których wymagają
+    (`metadata.jarvo.wymaga`). Walidator liczy ją do budżetu SOUL, bo agent dostaje ją przy każdym wywołaniu."""
+    planowane = (fleet.raw.get("infra") or {}).get("uslugi_planowane") or {}
+    rows = ["## Czego w tej instalacji nie zrobisz (generowane przez build)", "",
+            "Te workflowy wymagają usług, których ta instalacja nie uruchamia, więc nie ma ich w Twoim profilu. Gdy ktoś",
+            "o nie poprosi, powiedz wprost, czego brakuje, i zaproponuj to, co działa. Nie udawaj, że je wykonałeś.", "",
+            "| Workflow | Brakuje usługi |", "|---|---|"]
+    for name, brak in sorted(pominiete.items()):
+        rows.append(f"| `{name}` | " + ", ".join(f"{u} ({planowane[u]})" if u in planowane else u for u in brak) + " |")
+    return "\n".join(rows) + "\n"
+
+
 def skill_names(root: Path) -> dict[str, Path]:
     out: dict[str, Path] = {}
     for path in iter_skill_files(root):
