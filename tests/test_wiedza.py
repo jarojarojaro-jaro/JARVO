@@ -102,6 +102,37 @@ def test_szukaj_po_polsku_bez_ogonkow_i_krok_po_linkach(skarbiec):
     ix.zamknij()
 
 
+def test_linki_w_pamieci_jak_z_dysku_i_bez_przeliczania_bez_zmian(skarbiec):
+    """Rozwiązywanie z `mapa()` daje to samo co sprawdzanie dysku; odświeżenie bez zmian nie przelicza linków."""
+    sk = skarbiec
+    notatka(sk, "pojecia/audyt strony", "Audyt strony", "Audyt to Lighthouse.", typ="pojecie", linki=["pojecia/_hub-pojecia"])
+    sk.zapisz_plik("SCHEMA", "# Schemat\n")
+    zbior, znane = sk.mapa()
+    for cel in ("audyt strony", "pojecia/audyt strony", "/pojecia/audyt strony", "nie ma takiej", "pojecia/nie ma",
+                "SCHEMA", "pojecia/audyt strony.md", "pojecia/../pojecia/audyt strony", "brands/_szablon/x", ".git/HEAD"):
+        assert sk.rozwiaz(cel, znane, zbior) == sk.rozwiaz(cel), cel
+    ix = w.Indeks(sk)
+    ix.odswiez()
+    ix.db.execute("UPDATE linki SET etykieta = 'znacznik'")                    # bez zmian w skarbcu: tabela linków zostaje
+    ix.odswiez()
+    assert {r[0] for r in ix.db.execute("SELECT etykieta FROM linki")} == {"znacznik"}
+    notatka(sk, "pojecia/nowe", "Nowe", "Nowa notatka.", typ="pojecie", linki=["audyt strony"])
+    assert ix.odswiez()["nowe"] == 1
+    linki = {(r["z"], r["do_"], r["rozwiazany"]) for r in ix.linki()}
+    assert ("pojecia/nowe", "pojecia/audyt strony", 1) in linki and "znacznik" not in {r["etykieta"] for r in ix.linki()}
+    notatka(sk, "pojecia/do schematu", "Do schematu", "Link do schematu.", typ="pojecie", linki=["SCHEMA"])
+    ix.odswiez()
+    assert ("pojecia/do schematu", "SCHEMA", 1) in {(r["z"], r["do_"], r["rozwiazany"]) for r in ix.linki()}
+    (sk.root / "SCHEMA.md").unlink()                                           # zniknął tylko plik specjalny: linki od nowa
+    assert ix.odswiez()["zmienione"] == 0
+    assert ("pojecia/do schematu", "SCHEMA", 0) in {(r["z"], r["do_"], r["rozwiazany"]) for r in ix.linki()}
+    for pelny in (False, True):                                                # FTS bez zdublowanych wierszy
+        notatka(sk, "pojecia/nowe", "Nowe", f"Zmiana {pelny}.", typ="pojecie")
+        ix.odswiez(pelny=pelny)
+        assert ix.db.execute("SELECT count(*) FROM fts").fetchone()[0] == len(sk.pliki())
+    ix.zamknij()
+
+
 def test_lint_czysty_i_bledy(skarbiec):
     sk = skarbiec
     ix = w.Indeks(sk)

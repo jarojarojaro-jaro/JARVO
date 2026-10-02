@@ -204,8 +204,9 @@ class Kompilacja:
 
         for c in stare:
             dodaj(c)
+        zbior, znane = self.sk.mapa()
         for c in wynik.get("linki") or []:
-            dodaj(self.sk.rozwiaz(str(c)))
+            dodaj(self.sk.rozwiaz(str(c), znane, zbior))
         hub = None
         if folder == "agenci" and katalog.count("/") == 1:
             hub = next((h for h in (self.sk.rel(p) for p in (self.sk.root / katalog).glob("_hub-*.md"))), None)
@@ -282,7 +283,8 @@ class Kompilacja:
         if szkic["zrodlo"] not in zrodla:
             zrodla.append(szkic["zrodlo"])
         fm["zrodlo"] = "; ".join(zrodla)[:300]
-        stare_linki = [self.sk.rozwiaz(c) or c for c, _e, auto in stara.linki if not auto]
+        zbior, znane = self.sk.mapa()
+        stare_linki = [self.sk.rozwiaz(c, znane, zbior) or c for c, _e, auto in stara.linki if not auto]
         if decyzja == "aktualizacja":
             fm["typ"] = typ if typ != "rozmowa" or stara.typ == "rozmowa" else stara.typ
             fm["status"] = "aktualna"

@@ -130,8 +130,9 @@ class Panel:
         finally:
             ix.zamknij()
         wy = []
+        zbior, znane = self.sk.mapa()
         for cel, etykieta, auto in n.linki:
-            r = self.sk.rozwiaz(cel)
+            r = self.sk.rozwiaz(cel, znane, zbior)
             wy.append({"cel": r or cel, "etykieta": etykieta, "istnieje": r is not None, "auto": auto, "tytul": tytuly.get(r or "", "")})
         zrodlo = str(n.fm.get("zrodlo") or "")
         zrodla = [{"tekst": z.strip(), "sciezka": z.strip() if self.sk.istnieje(z.strip()) else None} for z in zrodlo.split(";") if z.strip()]

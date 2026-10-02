@@ -254,7 +254,9 @@ ostrzegają zarówno Karpathy, jak i second-brain-os); Obsidian otwiera folder b
 
 **Teraz: FTS5 + linki, bez wektorów.** Indeks SQLite (`state/wiedza.db`): tabela FTS5 `unicode61 remove_diacritics 2`
 („wydajność” = „wydajnosc”), kolumny tytuł (waga 3), streszczenie (2), treść (1), tagi, folder, agent; zapytanie z prefiksami
-(`landing*`) i BM25. Indeks przyrostowy po `mtime` pliku, pełna przebudowa < 5 s przy 5 000 notatek. Wynik rozszerzany o 1 krok po
+(`landing*`) i BM25. Indeks przyrostowy po `mtime` i rozmiarze pliku, linki przeliczane tylko po zmianie w skarbcu, a cele linków
+rozwiązywane w pamięci (jedno przejście po dysku). Zmierzone przy 5 000 notatek: pełna przebudowa ~1,6 s, odświeżenie bez zmian
+(dokładane do każdej tury agenta) ~0,3 s; lint przy 1 500 notatkach ~0,7 s. Wynik rozszerzany o 1 krok po
 linkach z hubów (notatka o marce X pociąga orzeczenia marki X). Karpathy: przy ~100 źródłach i setkach stron wystarczy INDEX
 i wyszukiwarka tekstowa; second-brain-os: „no vector database until you need one”. Hermes szuka tak samo w sesjach (FTS5).
 

@@ -200,6 +200,13 @@ class Notatka:
         return str(self.fm.get("typ") or ("hub" if self.hub else ""))
 
 
+def _zwykly_cel(cel: str) -> bool:
+    """Cel linku, który na pewno jest albo nie jest w `Skarbiec.pliki()` (bez sprawdzania dysku)."""
+    czesci = cel.split("/")
+    return (not cel.endswith(".md") and "\\" not in cel and cel + ".md" not in PLIKI_SPECJALNE
+            and all(c and c not in (".", "..") and not c.startswith(".") and c != "_szablon" for c in czesci))
+
+
 class Skarbiec:
     def __init__(self, root: str | Path, stan: str | Path | None = None):
         self.root = Path(root).resolve()
@@ -274,18 +281,26 @@ class Skarbiec:
             out.append((cel, (m.group(3) or cel).strip(), auto))
         return out
 
-    def rozwiaz(self, cel: str, znane: dict[str, str] | None = None) -> str | None:
-        """Cel linku → ścieżka notatki: pełna ścieżka albo (jak w Obsidianie) sama nazwa pliku, gdy jednoznaczna."""
+    def mapa(self) -> tuple[set[str], dict[str, str]]:
+        """Jedno przejście po dysku na wiele linków: zbiór ścieżek notatek i nazwa pliku → pierwsza ścieżka."""
+        pliki = self.pliki()
+        znane: dict[str, str] = {}
+        for rel in pliki:
+            znane.setdefault(rel.rsplit("/", 1)[-1], rel)
+        return set(pliki), znane
+
+    def rozwiaz(self, cel: str, znane: dict[str, str] | None = None, zbior: set[str] | None = None) -> str | None:
+        """Cel linku → ścieżka notatki: pełna ścieżka albo (jak w Obsidianie) sama nazwa pliku, gdy jednoznaczna.
+
+        Z `zbior` (z `mapa()`) zwykła ścieżka rozstrzyga się w pamięci; dysk tylko dla nietypowych celów
+        (pliki specjalne, `.md` na końcu, katalogi z kropką, `..`)."""
         cel = cel.strip().lstrip("/")
-        if self.istnieje(cel):
+        if zbior is not None and cel in zbior:
             return cel
-        if znane is None:
-            znane = {}
-            for rel in self.pliki():
-                znane.setdefault(rel.rsplit("/", 1)[-1], rel)
-                znane.setdefault(rel.rsplit("/", 1)[-1] + "#n", "1")
+        if (zbior is None or not _zwykly_cel(cel)) and self.istnieje(cel):
+            return cel
         if "/" not in cel:
-            return znane.get(cel)
+            return (znane if znane is not None else self.mapa()[1]).get(cel)
         return None
 
     # ---- pisanie
@@ -360,18 +375,24 @@ class Indeks:
                 tokenize='unicode61 remove_diacritics 2');
             CREATE TABLE IF NOT EXISTS linki(z TEXT, do_ TEXT, etykieta TEXT, auto INTEGER, rozwiazany INTEGER);
             CREATE INDEX IF NOT EXISTS linki_do ON linki(do_);
+            CREATE TABLE IF NOT EXISTS meta(klucz TEXT PRIMARY KEY, wartosc TEXT);
         """)
 
     def zamknij(self) -> None:
         self.db.close()
 
     def odswiez(self, pelny: bool = False) -> dict:
-        """Indeks przyrostowy po mtime i rozmiarze; linki przeliczane w całości (tanie)."""
+        """Indeks przyrostowy po mtime i rozmiarze. Linki przeliczane w całości, ale tylko gdy coś się zmieniło
+        (notatka, lista plików specjalnych) albo przy `pelny`; bez zmian odświeżenie to sam przegląd katalogów."""
         pliki = self.sk.pliki()
+        zbior = set(pliki)
+        specjalne = ",".join(sorted(n for n in PLIKI_SPECJALNE if (self.sk.root / n).is_file()))
         stare = {r["sciezka"]: (r["mtime"], r["rozmiar"]) for r in self.db.execute("SELECT sciezka, mtime, rozmiar FROM pliki")}
         nowe = zmienione = 0
         notatki: dict[str, Notatka] = {}
         with self.db:
+            if pelny:                                    # DELETE po kolumnie UNINDEXED skanuje całe FTS: przy przebudowie raz
+                self.db.execute("DELETE FROM fts")
             for rel in pliki:
                 p = self.sk.plik(rel)
                 st = p.stat()
@@ -381,27 +402,31 @@ class Indeks:
                 notatki[rel] = n
                 nowe += rel not in stare
                 zmienione += rel in stare
-                self.db.execute("DELETE FROM fts WHERE sciezka = ?", (rel,))
+                if rel in stare and not pelny:           # nowa notatka nie ma wiersza w FTS (pliki i fts w jednej transakcji)
+                    self.db.execute("DELETE FROM fts WHERE sciezka = ?", (rel,))
                 self.db.execute("INSERT INTO fts(sciezka, tytul, streszczenie, tresc, tagi) VALUES (?,?,?,?,?)",
                                 (rel, n.tytul, n.streszczenie, LISTA_RE.sub("", n.tresc), " ".join(n.fm.get("tagi") or []) if isinstance(n.fm.get("tagi"), list) else str(n.fm.get("tagi") or "")))
                 self.db.execute("INSERT OR REPLACE INTO pliki VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                 (rel, n.mtime, n.rozmiar, n.tytul, n.streszczenie, n.typ, str(n.fm.get("status") or ""),
                                  str(n.fm.get("agent") or ""), n.folder, str(n.fm.get("zmieniono") or ""),
                                  str(n.fm.get("wazne_do") or ""), int(n.hub), n.slowa))
-            usuniete = [s for s in stare if s not in set(pliki)]
+            usuniete = [s for s in stare if s not in zbior]
             for s in usuniete:
                 self.db.execute("DELETE FROM fts WHERE sciezka = ?", (s,))
                 self.db.execute("DELETE FROM pliki WHERE sciezka = ?", (s,))
-            # linki: całość od nowa (potrzebne do lintu, grafu i rozszerzania wyników)
-            znane: dict[str, str] = {}
-            for rel in pliki:
-                znane.setdefault(rel.rsplit("/", 1)[-1], rel)
-            self.db.execute("DELETE FROM linki")
-            for rel in pliki:
-                n = notatki.get(rel) or self.sk.wczytaj(rel)
-                for cel, etykieta, auto in n.linki:
-                    cel_r = self.sk.rozwiaz(cel, znane)
-                    self.db.execute("INSERT INTO linki VALUES (?,?,?,?,?)", (rel, cel_r or cel, etykieta, int(auto), int(cel_r is not None)))
+            # linki: całość od nowa (potrzebne do lintu, grafu i rozszerzania wyników), gdy cokolwiek się zmieniło
+            stan_linkow = self.db.execute("SELECT wartosc FROM meta WHERE klucz = 'linki'").fetchone()
+            if pelny or nowe or zmienione or usuniete or stan_linkow is None or stan_linkow[0] != specjalne:
+                znane: dict[str, str] = {}
+                for rel in pliki:
+                    znane.setdefault(rel.rsplit("/", 1)[-1], rel)
+                self.db.execute("DELETE FROM linki")
+                for rel in pliki:
+                    n = notatki.get(rel) or self.sk.wczytaj(rel)
+                    for cel, etykieta, auto in n.linki:
+                        cel_r = self.sk.rozwiaz(cel, znane, zbior)
+                        self.db.execute("INSERT INTO linki VALUES (?,?,?,?,?)", (rel, cel_r or cel, etykieta, int(auto), int(cel_r is not None)))
+                self.db.execute("INSERT OR REPLACE INTO meta VALUES ('linki', ?)", (specjalne,))
         return {"pliki": len(pliki), "nowe": nowe, "zmienione": zmienione, "usuniete": len(usuniete)}
 
     @staticmethod
@@ -675,6 +700,7 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
     """Zdrowie skarbca bez modelu. Błędy = do naprawy przez kompilację/człowieka; ostrzeżenia = warto; informacje = wiedzieć."""
     ix.odswiez()
     bledy, ostrz, info = [], [], []
+    zbior, znane = sk.mapa()
     notatki = {r["sciezka"]: r for r in ix.notatki()}
     linki = ix.linki()
     we_reczne: dict[str, int] = {}
@@ -726,7 +752,7 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
                 ostrz.append(f"bez streszczenia (pierwszy akapit po tytule): [[{rel}]]")
         if not r["hub"] and not wlasny_format and n.typ not in BEZ_ZRODLA and rel != "fleet/lekcje":
             reczne = [(c, a) for c, _e, a in n.linki if not a]
-            cele = [sk.rozwiaz(c) for c, _a in reczne]
+            cele = [sk.rozwiaz(c, znane, zbior) for c, _a in reczne]
             hub_folderu = f"{n.folder}/{HUBY.get(n.folder, ('', ''))[0]}" if n.folder in HUBY else ""
             if hub_folderu and hub_folderu not in cele and not any(c and c.startswith(n.folder + "/") and c.rsplit("/", 1)[-1].startswith("_hub-") for c in cele):
                 ostrz.append(f"bez linku do huba folderu: [[{rel}]]")
