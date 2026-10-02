@@ -15,8 +15,11 @@ import os
 import subprocess
 import sys
 import time
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import liczby  # noqa: E402  (ta sama definicja jakości co w Jarvo HQ)
 
 MISSIONS_DIR = Path(os.environ.get("JARVO_MISSIONS_DIR", "/opt/data/jarvo/missions"))
 DAY = 86400
@@ -50,22 +53,7 @@ def summarize(data: dict, now: float, window_s: int) -> dict:
     blocked = [t for t in tasks if t.get("status") == "blocked"]
     in_flight = [t for t in tasks if t.get("status") in {"ready", "running", "review", "todo", "triage"}]
 
-    per_agent = defaultdict(lambda: {"done": 0, "changes_requested": 0, "first_pass": 0, "reviews": 0})
-    for t in finished:
-        evs = (shows.get(t["id"]) or {}).get("events", [])
-        implementer = None
-        for e in evs:
-            if e.get("kind") == "review_requested":
-                implementer = (e.get("payload") or {}).get("implementer") or implementer
-        implementer = implementer or t.get("assignee") or "?"
-        n_changes = sum(1 for e in evs if e.get("kind") == "changes_requested")
-        n_reviews = sum(1 for e in evs if e.get("kind") == "review_requested")
-        stats = per_agent[implementer]
-        stats["done"] += 1
-        stats["changes_requested"] += n_changes
-        stats["reviews"] += n_reviews
-        if n_reviews and n_changes == 0:
-            stats["first_pass"] += 1
+    quality = liczby.jakosc(finished, {t["id"]: (shows.get(t["id"]) or {}).get("events", []) for t in finished})
 
     def brief(t):
         return {"id": t["id"], "title": t.get("title"), "assignee": t.get("assignee"), "status": t.get("status")}
@@ -82,7 +70,7 @@ def summarize(data: dict, now: float, window_s: int) -> dict:
         "finished": [brief(t) for t in finished],
         "blocked": blocked_info,
         "in_flight": [brief(t) for t in in_flight],
-        "quality": dict(per_agent),
+        "quality": quality,
         "active_missions": [ln for ln in data.get("index", "").splitlines() if ln.startswith("| M-") or ln.startswith("| Z-")][:20],
     }
 
@@ -103,6 +91,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     summary = summarize(data, now, window)
+    if args.mode == "weekly" and not args.fixture:
+        # sześć liczb z tablicy i sesji (0 tokenów): eskalacje, awarie, cisza i tokeny obok jakości
+        summary["liczby"] = liczby.policz(liczby.dane_domyslne(), now, 7)
     empty = not (summary["finished"] or summary["blocked"] or summary["in_flight"])
     if args.mode == "daily" and empty:
         print(json.dumps({"wakeAgent": False}))

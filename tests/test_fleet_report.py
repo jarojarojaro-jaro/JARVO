@@ -47,8 +47,8 @@ def test_summarize_daily_window():
 
 def test_quality_per_implementer():
     q = report.summarize(data(), NOW, report.DAY)["quality"]
-    assert q["jarvo-web"] == {"done": 1, "changes_requested": 0, "first_pass": 1, "reviews": 1}
-    assert q["jarvo-sherlock"] == {"done": 1, "changes_requested": 1, "first_pass": 0, "reviews": 2}
+    assert q["jarvo-web"] == {"done": 1, "changes_requested": 0, "first_pass": 1, "reviews": 1, "with_changes": 0}
+    assert q["jarvo-sherlock"] == {"done": 1, "changes_requested": 1, "first_pass": 0, "reviews": 2, "with_changes": 1}
 
 
 def test_weekly_window_includes_older():

@@ -11,10 +11,12 @@ Zapisów tu nie ma. Rozmowy idą przez API gatewaya (plugin_api.py), decyzje prz
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
 import sqlite3
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -139,7 +141,10 @@ def read_board(db_path: Path, now: float, window_s: int = 7 * 86400, extra_ids: 
                         events.append(row)
         for e in events:
             e["payload"] = _payload(e.get("payload"))
-        return {"tasks": tasks, "events": events, "ok": True}
+        # jakość agentów (za 1. razem, poprawki): wszystkie recenzje kart zakończonych w oknie, także sprzed okna
+        done = [t["id"] for t in tasks if t.get("status") == "done" and (t.get("completed_at") or 0) >= since]
+        quality = _liczby().zdarzenia_jakosci(conn, done) if done else {}
+        return {"tasks": tasks, "events": events, "quality_events": quality, "ok": True}
     finally:
         conn.close()
 
@@ -821,13 +826,23 @@ def site_file(root: Path, rel: str, roots: Roots) -> Path | None:
     return p if safe_path(str(p), roots) else None
 
 
-def agent_stats(name: str, tasks: list[dict], events: list[dict], now: float) -> dict:
-    """Jakość z ostatnich 7 dni: karty zamknięte, przyjęte za pierwszym razem, poprawki."""
+def _liczby():
+    """profiles/jarvo/scripts/liczby.py: jedna definicja jakości dla HQ i przeglądu tygodnia (kopia w pluginie)."""
+    if "jarvo_hq_liczby" not in sys.modules:
+        here = Path(__file__).resolve().parent
+        cand = next(c for c in (here / "liczby.py", here.parents[1] / "profiles" / "jarvo" / "scripts" / "liczby.py")
+                    if c.is_file())
+        spec = importlib.util.spec_from_file_location("jarvo_hq_liczby", cand)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["jarvo_hq_liczby"] = mod
+        spec.loader.exec_module(mod)
+    return sys.modules["jarvo_hq_liczby"]
+
+
+def agent_stats(name: str, board: dict, now: float) -> dict:
+    """Jakość z ostatnich 7 dni: karty zamknięte, przyjęte za pierwszym razem, z poprawkami (liczby.jakosc)."""
     week = now - 7 * 86400
-    done = [t for t in tasks if t.get("assignee") == name and t.get("status") == "done"
-            and (t.get("completed_at") or 0) >= week]
-    changes = {e["task_id"] for e in events if e["kind"] == "changes_requested"}
-    first_pass = sum(1 for t in done if t["id"] not in changes)
-    return {"done_7d": len(done), "first_pass_7d": first_pass,
-            "changes_7d": sum(1 for t in done if t["id"] in changes)}
+    done = [t for t in board.get("tasks", []) if t.get("status") == "done" and (t.get("completed_at") or 0) >= week]
+    s = _liczby().jakosc(done, board.get("quality_events") or {}).get(name) or {}
+    return {"done_7d": s.get("done", 0), "first_pass_7d": s.get("first_pass", 0), "changes_7d": s.get("with_changes", 0)}
 

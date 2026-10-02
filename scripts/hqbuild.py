@@ -98,6 +98,8 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     shutil.copy2(fl.REPO_ROOT / "scripts" / "share_keys.py", dash / "share_keys.py")
     # pomiar animacji Wideografa: HQ pokazuje raport i sprawdza jego aktualność tym samym kodem
     shutil.copy2(fl.REPO_ROOT / "profiles" / "jarvo-wideo" / "scripts" / "pomiar.py", dash / "pomiar.py")
+    # liczby floty: HQ liczy jakość agentów tą samą funkcją co przegląd tygodnia Jarva
+    shutil.copy2(fl.REPO_ROOT / "profiles" / "jarvo" / "scripts" / "liczby.py", dash / "liczby.py")
     fl.write_json(dash / "fleet.json", fleet_json(fleet))
     return dash
 

@@ -234,7 +234,7 @@ def test_safe_path_and_outputs(tmp_path):
 
 def test_agent_stats(home):
     board = core.read_board(home / "kanban.db", NOW)
-    s = core.agent_stats("jarvo-reka", board["tasks"], board["events"], NOW)
+    s = core.agent_stats("jarvo-reka", board, NOW)
     assert s == {"done_7d": 1, "first_pass_7d": 0, "changes_7d": 1}
 
 

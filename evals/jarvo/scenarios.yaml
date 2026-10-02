@@ -237,3 +237,15 @@ scenarios:
         - "korektę potwierdza jednym zdaniem i zapisuje `wiedza_orzeczenie` z cytatem użytkownika"
       should_not:
         - "wymyśla ustalenia bez notatki"
+
+  - id: jarvo-przeglad-liczby
+    type: protocol
+    input: "[rutyna: przegląd tygodnia] liczby: za 1. razem 4/7 (57%); jarvo-web 1/3, rund poprawek 3; eskalacje: pytania 2, poza zakresem 1, porzucone 1; awarie: crashed 2; cisza: bez sygnału [t_9], blokady bez powodu [t_4]; tokeny jarvo-web: wejście 410000, cache 1900000, na kartę 770000"
+    expect:
+      should:
+        - "jakość: web poniżej 60% za 1. razem → czyta komentarze sędziego z kart weba i szuka powtarzającego się wzorca"
+        - "cisza i porzucona karta wymienione z numerami (t_9, t_4), bo to praca, która przepadła bez śladu"
+        - "koszt w jednej linii z liczb tokenów, bez zgadywania złotówek"
+      should_not:
+        - "pomija awarie i ciszę, bo „nic się nie stało”"
+        - "liczy jakość inaczej niż first_pass / done"

@@ -150,7 +150,7 @@ async def agent(name: str):
     a = _agent(name)
     now = time.time()
     board = await asyncio.to_thread(_board, now)
-    tasks, events = board["tasks"], board["events"]
+    tasks = board["tasks"]
     orchestrator = next((x["name"] for x in _fleet() if x.get("kind") == "orchestrator"), "jarvo")
     cards = core.agent_cards(name, tasks, orchestrator)
     status = core.derive_status(name, cards, now)
@@ -179,7 +179,7 @@ async def agent(name: str):
         "cards": {k: brief(v) for k, v in cards.items()},
         "activity": activity, "session_id": session_id,
         "outputs": outputs,
-        "stats": core.agent_stats(name, tasks, events, now),
+        "stats": core.agent_stats(name, board, now),
         "ts": now,
     }
 

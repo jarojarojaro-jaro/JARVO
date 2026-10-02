@@ -18,7 +18,8 @@ metadata:
 
 Rutyna cron (niedziela wieczorem). Skrypt `fleet_report.py --mode weekly` dał Ci dane z 7 dni,
 w tym `quality`: dla każdego agenta liczba zakończonych kart, recenzji, poprawek i akceptacji
-za pierwszym razem.
+za pierwszym razem, oraz `liczby` (`liczby.py`, bez modelu): eskalacje (pytania, poza zakresem, porzucone),
+awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i tokeny każdego agenta.
 
 ## Co przygotować
 1. **Wynik tygodnia:** zamknięte misje (efekty, nie karty), co utknęło i dlaczego.
@@ -29,7 +30,8 @@ za pierwszym razem.
    dla lekcji z ≥ 3 potwierdzeniami, każda z dowodem (które karty, jaki błąd).
 4. **Pamięć:** przejrzyj wpisy swojej pamięci. Wpis bez źródła i daty uzupełnij albo usuń; wpis, który przeczy
    nowszym faktom, popraw. Nic nie usuwasz z `USER.md` bez pytania użytkownika.
-5. **Koszty** (jeśli dostępne przez `/insights` albo raport OpenRouter): krótko, bez wyliczanek.
+5. **Koszty:** tokeny z `liczby.tokeny` (i `tokeny_na_karte`) w jednej linii; cisza i awarie wymień z numerami kart,
+   bo to praca, która przepadła bez śladu.
 6. **Skarbiec wiedzy (synteza tygodnia, jedyna praca drogiego modelu w skarbcu):** przeczytaj wpisy z ostatnich 7 dni
    w `@@KNOWLEDGE_DIR@@/LOG.md` i raport `@@KNOWLEDGE_DIR@@/LINT.md`. Zgłoś szkic `wiedza_zapisz(typ="rozmowa",
    tytul="Tydzień floty RRRR-MM-DD", zrodlo="LOG.md i LINT.md skarbca")` z trzema sekcjami: **co się zmieniło** (nowe
