@@ -245,6 +245,20 @@ function filmstrip(src, meta) {
 // Fala dźwięku źródła audio (jak w CapCut): szczyty co 1/60 s na przezroczystej kanwie; klip na osi przesuwa ją
 // tak jak pasek miniatur. Dekodowanie od razu w 8 kHz (mało pamięci); bardzo długie pliki zostają bez fali.
 const WAVE_H = 48, WAVE_PPS = 60;
+// Fala w decybelach (jak w OpenCut): wysokość = poziom szczytu w dBFS od −48 (cisza) do 0, bez wyrównania do
+// najgłośniejszego miejsca, więc cichy plik wygląda cicho, a ciche fragmenty są widoczne.
+const waveH = (peak) => clamp((20 * Math.log10(Math.max(peak, 1e-6)) + 48) / 48, 0, 1);
+// Linia głośności na klipie: położenie 0–1 (dół = cisza, góra = +6 dB, 0 dB na 5/6 wysokości); głośność w projekcie
+// zostaje liniowa (0–2), jak w eksporcie ffmpeg `volume=`.
+const ED_DB = [-30, 20 * Math.log10(2)];   // góra = głośność 2 (+6 dB), maks. projektu
+const volDb = (v) => (v > 0 ? 20 * Math.log10(v) : -Infinity);
+const volPos = (v) => clamp((volDb(v) - ED_DB[0]) / (ED_DB[1] - ED_DB[0]), 0, 1);
+function posVol(pos) {
+  if (pos <= 0.02) return 0;
+  const db = ED_DB[0] + pos * (ED_DB[1] - ED_DB[0]);
+  return Math.abs(db) < 0.75 ? 1 : +Math.min(2, 10 ** (db / 20)).toFixed(3);   // przyciąga do 0 dB
+}
+const fmtDb = (v) => (v > 0 ? `${volDb(v) >= 0.05 ? "+" : ""}${volDb(v).toFixed(1)} dB`.replace("-", "−") : "−∞ dB");
 async function decodeSmall(buf) {
   const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   for (const rate of [8000, 44100]) {
@@ -262,18 +276,17 @@ function waveform(src, meta) {
     const n = clamp(Math.ceil(a.duration * WAVE_PPS), 1, 12000), per = Math.max(1, Math.floor(a.length / n));
     const chans = Array.from({ length: Math.min(2, a.numberOfChannels) }, (_, i) => a.getChannelData(i));
     const peaks = new Float32Array(n);
-    let top = 1e-4;
     for (let i = 0; i < n; i++) {
       let m = 0;
       for (const ch of chans) for (let j = i * per, e = Math.min(ch.length, j + per); j < e; j++) { const v = Math.abs(ch[j]); if (v > m) m = v; }
-      peaks[i] = m; if (m > top) top = m;
+      peaks[i] = m;
     }
     const c = document.createElement("canvas");
     c.width = n; c.height = WAVE_H;
     const g = c.getContext("2d");
     g.fillStyle = "rgba(255,255,255,0.62)";
     for (let i = 0; i < n; i++) {
-      const h = Math.max(1, Math.sqrt(peaks[i] / top) * (WAVE_H - 4));
+      const h = Math.max(1, waveH(peaks[i]) * (WAVE_H - 4));
       g.fillRect(i, (WAVE_H - h) / 2, 1, h);
     }
     return new Promise((ok) => c.toBlob((b) => ok({ url: b ? URL.createObjectURL(b) : null, dur: a.duration }), "image/png"));
@@ -1091,6 +1104,24 @@ function VideoEditor({ path, onClose }) {
       else upd("audio", m.id, { start: clamp(snap(m0.start + d, [m0.start]), 0, total) }, true);
     });
   }
+  // linia głośności klipu albo audio: przeciąganie w pionie (palcem dopiero na zaznaczonym elemencie)
+  function volDown(e, type, item) {
+    if (e.pointerType === "touch" && !(sel && sel.id === item.id)) return;
+    e.stopPropagation(); e.preventDefault();
+    setSel({ type, id: item.id });
+    const hgt = e.currentTarget.parentElement.getBoundingClientRect().height || 1;
+    const y0 = e.clientY, p0 = volPos(item.muted ? 0 : item.volume ?? 1);
+    const move = (ev) => {
+      const v = posVol(clamp(p0 + (y0 - ev.clientY) / hgt, 0, 1));
+      upd(type, item.id, type === "clip" ? { volume: v, muted: false } : { volume: v }, true);
+    };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); H.commit(); };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+  const volLine = (type, item) => { const k = volPos(item.muted ? 0 : item.volume ?? 1); return html`<b class=${cx("thq-ed-vol", item.muted && "is-mute")} style=${{ bottom: `calc(${k * 100}% - ${k * 2}px)` }}
+    title=${`${L("Głośność", "Volume")} ${fmtDb(item.muted ? 0 : item.volume ?? 1)} · ${L("przeciągnij w górę albo w dół", "drag up or down")}`}
+    onPointerDown=${(e) => volDown(e, type, item)} onClick=${(e) => e.stopPropagation()}></b>`; };
   function rulerDown(e) {
     if (mobileRef.current) return;
     const r = tlRef.current.getBoundingClientRect();
@@ -1351,7 +1382,7 @@ function VideoEditor({ path, onClose }) {
         <input type="range" min="1" max="3" step="0.05" value=${c.zoom ?? 1} onInput=${(e) => upd("clip", c.id, { zoom: +e.target.value }, true)} onChange=${H.commit}/></label>
     </div>`}
     ${c.kind !== "image" && html`<label>${L("Tempo", "Speed")} · ${c.speed}×${seg(ED_SPEEDS.map((s) => [s, `${s}×`]), c.speed, (v) => clipPatch(c.id, { speed: v }))}</label>`}
-    ${c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}%
+    ${c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}% (${fmtDb(c.muted ? 0 : c.volume)})
       <input type="range" min="0" max="2" step="0.05" value=${c.volume} onInput=${(e) => upd("clip", c.id, { volume: +e.target.value, muted: false }, true)} onChange=${H.commit}/></label>`}
     ${c.kind === "image" && html`<label>${L("Czas planszy", "Still duration")} · ${(c.out - c.in).toFixed(1)} s
       <input type="range" min="0.5" max="15" step="0.5" value=${c.out - c.in} onInput=${(e) => clipPatch(c.id, { out: c.in + +e.target.value }, true)} onChange=${H.commit}/></label>`}
@@ -1380,7 +1411,7 @@ function VideoEditor({ path, onClose }) {
 
   const audioTools = (m) => html`<div class="thq-ed-form">
     <p class="thq-ed-sub thq-ed-subi">${ED_ICON.audio}<span>${(meta[m.src] || {}).name || m.src.split("/").pop()}</span></p>
-    <label>${L("Głośność", "Volume")} · ${Math.round(m.volume * 100)}%<input type="range" min="0" max="2" step="0.05" value=${m.volume} onInput=${(e) => upd("audio", m.id, { volume: +e.target.value }, true)} onChange=${H.commit}/></label>
+    <label>${L("Głośność", "Volume")} · ${Math.round(m.volume * 100)}% (${fmtDb(m.volume)})<input type="range" min="0" max="2" step="0.05" value=${m.volume} onInput=${(e) => upd("audio", m.id, { volume: +e.target.value }, true)} onChange=${H.commit}/></label>
     <p class="thq-ed-note">${L("Od", "From")} ${fmtT(m.start, true)} · ${L("długość", "length")} ${fmtT(audioDur(m), true)}</p>
     <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>
   </div>`;
@@ -1516,7 +1547,8 @@ function VideoEditor({ path, onClose }) {
       return html`<div key=${s.c.id} class=${cx("thq-ed-item is-clip", sel && sel.id === s.c.id && "is-sel", dragIdx === i && "is-drag")}
         style=${{ left: `${s.start * pps}px`, width: `${Math.max(4, wpx)}px`, ...bg }} onPointerDown=${(e) => clipDown(e, s, i)} onClick=${(e) => pick(e, "clip", s.c.id)}>
         <i class="thq-ed-h is-l" onPointerDown=${(e) => clipDown(e, s, i, "l")}></i>
-        <span class="thq-ed-cl">${s.c.muted && ED_ICON.mute}${s.c.speed !== 1 ? `${s.c.speed}× · ` : ""}${fmtT(s.end - s.start, true)}</span>
+        <span class="thq-ed-cl">${s.c.muted && ED_ICON.mute}${s.c.speed !== 1 ? `${s.c.speed}× · ` : ""}${!s.c.muted && Math.abs((s.c.volume ?? 1) - 1) > 0.01 ? `${fmtDb(s.c.volume)} · ` : ""}${fmtT(s.end - s.start, true)}</span>
+        ${s.c.kind !== "image" && volLine("clip", s.c)}
         <i class="thq-ed-h is-r" onPointerDown=${(e) => clipDown(e, s, i, "r")}></i></div>`;
     })}
     ${mobile && html`<button type="button" class="thq-ed-addclip" style=${{ left: `${total * pps + 8}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("media"); }}
@@ -1529,7 +1561,7 @@ function VideoEditor({ path, onClose }) {
       const wave = w && w.url ? { backgroundImage: `url(${w.url})`, backgroundSize: `${w.dur * pps}px 100%`, backgroundPosition: `${-m.in * pps}px 0`, backgroundRepeat: "no-repeat" } : {};
       return html`<div key=${m.id} class=${cx("thq-ed-item is-audio", sel && sel.id === m.id && "is-sel")}
       style=${{ left: `${m.start * pps}px`, width: `${Math.max(6, audioDur(m) * pps)}px`, ...wave }} onPointerDown=${(e) => audioDown(e, m)} onClick=${(e) => pick(e, "audio", m.id)}>
-      <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>${(meta[m.src] || {}).name || ""}${Math.abs(m.volume - 1) > 0.01 ? ` · ${Math.round(m.volume * 100)}%` : ""}</span>
+      <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>${(meta[m.src] || {}).name || ""}${Math.abs(m.volume - 1) > 0.01 ? ` · ${fmtDb(m.volume)}` : ""}</span>${volLine("audio", m)}
       <i class="thq-ed-h is-r" onPointerDown=${(e) => audioDown(e, m, "r")}></i></div>`;
     })}
     ${!p.audio.length && (mobile

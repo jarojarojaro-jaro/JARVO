@@ -98,7 +98,7 @@ pluginu (albo wtyczki `jarvo-wiedza`) się zmieniła: wdrożenie bez zmian w HQ 
 
 ## 2a. Edytor filmów
 
-Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~117 KB nieskompresowany, ok. 36 KB po gzip, plus `46-uwagi.js`) w tym samym
+Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~119 KB nieskompresowany, ok. 36 KB po gzip, plus `46-uwagi.js`) w tym samym
 pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 
 - **Oś magnetyczna (jak w CapCut):** każda zmiana klipów (usunięcie, wstawienie, przycięcie krawędzi, tempo, długość
@@ -116,7 +116,12 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   na wysokości 0,68 i z szerokością 74% (nad opisem, obok przycisków), tak samo u Wideografa (`projekt.py dodaj-tekst` i `napisy`). Test: `tests/test_edytor_strefy.py`.
 - **Podgląd** gra w przeglądarce z plików pobranych raz (blob), bez serwera w pętli. Dwa elementy `<video>` na zmianę:
   następny klip czeka przewinięty na swój początek, więc przejścia są płynne. Miniatury osi czasu robi przeglądarka
-  (jedna kanwa na źródło), a muzyka na osi ma falę dźwięku (szczyty liczone raz na plik, dekodowanie w 8 kHz).
+  (jedna kanwa na źródło), a muzyka na osi ma falę dźwięku w skali dB (szczyty liczone raz na plik, dekodowanie
+  w 8 kHz; −48 dBFS = cisza, bez wyrównania do najgłośniejszego miejsca, więc cichy fragment wygląda cicho).
+- **Linia głośności (pomysł z OpenCut):** żółta linia na klipie wideo i na muzyce; przeciągnięcie w górę albo w dół
+  zmienia głośność (góra +6 dB, 0 dB na 5/6 wysokości, przyciąga do 0 dB, sam dół = cisza), cały gest to jeden krok
+  cofania. Na telefonie linię przeciąga się po zaznaczeniu klipu. W projekcie głośność zostaje liniowa (0–2), jak
+  w eksporcie (`volume=`); etykieta na osi i panel pokazują ją w dB. Test: `tests/test_edytor_glosnosc.py`.
 - **Wygląd jak w CapCut:** grafitowe tło, jeden akcent (cyjan: **Eksportuj**, aktywne narzędzie, zaznaczenie), krój
   systemowy (SF Pro na iPhonie i Macu, Segoe UI na Windows, Roboto na Androidzie) z Inter jako zapasem
   (`hq/web/fonts/`, OFL), ikony SVG jednym stylem linii zamiast emoji, czas `00:05.20`. Na osi: miniatury klipu w

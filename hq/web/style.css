@@ -731,6 +731,11 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-item.is-audio { top: 0; height: 34px; align-items: flex-start; background-color: var(--ed-audio); color: #fff; }
 .thq-ed-item.is-audio span { flex: 0 1 auto; margin: 3px 0 0 6px; padding: 0 6px; border-radius: 4px; background: rgba(8,40,45,.55); font-size: 10.5px; line-height: 16px; }
 .thq-ed-h { position: absolute; top: 0; bottom: 0; width: 10px; z-index: 1; cursor: ew-resize; background: transparent; transition: background .12s; }
+/* linia głośności: żółta kreska z pasem chwytu ±6 px; przy wyciszeniu przerywana przy dole */
+.thq-ed-vol { position: absolute; left: 10px; right: 10px; height: 0; border-top: 1.5px solid #FFD60A; box-shadow: 0 1px 0 rgba(0,0,0,.55), 0 -1px 0 rgba(0,0,0,.35); cursor: ns-resize; }
+.thq-ed-vol::before { content: ""; position: absolute; left: 0; right: 0; top: -7px; height: 12px; }
+.thq-ed-vol.is-mute { border-top-style: dashed; opacity: .7; }
+.thq-ed.is-mobile .thq-ed-item:not(.is-sel) .thq-ed-vol { pointer-events: none; }
 .thq-ed-h.is-l { left: 0; border-radius: 6px 0 0 6px; } .thq-ed-h.is-r { right: 0; border-radius: 0 6px 6px 0; }
 .thq-ed-item.is-sel .thq-ed-h, .thq-ed-item:hover .thq-ed-h { background: #fff; }
 .thq-ed-h::after { content: ""; position: absolute; top: 34%; bottom: 34%; left: 4px; width: 2px; border-radius: 1px; background: #2B2B30; }
