@@ -45,4 +45,8 @@ def repo_copy(tmp_path, monkeypatch):
     monkeypatch.setattr(fl, "SHARED_DIR", dst / "shared")
     monkeypatch.setattr(fl, "VENDOR_LOCK", dst / "vendor" / "skills.lock.yaml")
     monkeypatch.setattr(fl, "FLEET_FILE", dst / "fleet.yaml")
+    # składnię skryptów (53 procesy bash -n / node --check) sprawdza test_repo_is_valid na prawdziwym repo;
+    # testy na kopii zmieniają konfigurację floty, nie skrypty
+    import validate
+    monkeypatch.setattr(validate, "check_scripts", lambda r: None)
     return dst

@@ -4,6 +4,7 @@ i szkic pakietu. Bez sieci (adresy podmienione), bez node_modules (konfiguracja 
 
 from __future__ import annotations
 
+import functools
 import io
 import json
 import plistlib
@@ -32,14 +33,20 @@ POLITYKA = ("<html><body><h1>Polityka prywatności Salon Ola</h1><p>Administrato
 
 # ------------------------------------------------------------------ pliki testowe
 
-def png(p: Path, w: int, h: int, alfa: bool = False) -> Path:
-    p.parent.mkdir(parents=True, exist_ok=True)
+@functools.lru_cache(maxsize=None)
+def _png_bajty(w: int, h: int, alfa: bool) -> bytes:
+    """Jednolity PNG danego rozmiaru; liczony raz na rozmiar (zrzuty 1320×2868 to ~11 MB surowych pikseli)."""
     kanaly = 4 if alfa else 3
     surowe = b"".join(b"\x00" + b"\x80" * (w * kanaly) for _ in range(h))
     def blok(t, d):
         return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
-    p.write_bytes(b"\x89PNG\r\n\x1a\n" + blok(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6 if alfa else 2, 0, 0, 0))
-                  + blok(b"IDAT", zlib.compress(surowe, 9)) + blok(b"IEND", b""))
+    return (b"\x89PNG\r\n\x1a\n" + blok(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6 if alfa else 2, 0, 0, 0))
+            + blok(b"IDAT", zlib.compress(surowe, 9)) + blok(b"IEND", b""))
+
+
+def png(p: Path, w: int, h: int, alfa: bool = False) -> Path:
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(_png_bajty(w, h, alfa))
     return p
 
 
