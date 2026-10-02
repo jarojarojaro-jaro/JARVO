@@ -111,7 +111,8 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   platformę albo **Wył.** wybierasz w **Format** (zapamiętane w tej przeglądarce). Tekst, który w nie wchodzi, ma
   czerwoną ramkę, a panel tekstu i napisów mówi, pod co wchodzi. Strefy nie trafiają do eksportu ani do kadru dla
   agenta. Liczby (ułamki kadru 1080×1920, przegląd 2026): TikTok 130/484/44/140 px (góra/dół/lewo/prawo), Shorts
-  180/390/60/120 px, Reels według zalecenia Meta 14% / 35% / 6%. Nowy tekst i napisy w kadrze pionowym startują
+  180/390/60/120 px, Reels według zalecenia Meta 14% / 35% / 6%; te same liczby ma kontrola Wideografa
+  (`wideo_lib.STREFY_UI`: arkusz `qa_wideo.py`, `pomiar.py`). Nowy tekst i napisy w kadrze pionowym startują
   na wysokości 0,68 i z szerokością 74% (nad opisem, obok przycisków), tak samo u Wideografa (`projekt.py dodaj-tekst` i `napisy`). Test: `tests/test_edytor_strefy.py`.
 - **Podgląd** gra w przeglądarce z plików pobranych raz (blob), bez serwera w pętli. Dwa elementy `<video>` na zmianę:
   następny klip czeka przewinięty na swój początek, więc przejścia są płynne. Miniatury osi czasu robi przeglądarka

@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-10-02"
 ---
 
 # Formaty wideo platform
@@ -30,9 +30,11 @@ Tabela platform: `references/specs.md` (zgodna z `qa_wideo.py --platforma`).
 - Plik < 250 MB dla krótkich formatów (zwykle 5–30 MB).
 
 ## Strefy interfejsu 9:16 (TikTok, Reels, Shorts)
-- góra ~10%: zakładki i status; dół ~20%: opis, nazwa konta, dźwięk; prawy pasek (od ~45% do ~80% wysokości,
-  ostatnie ~14% szerokości): przyciski. Ważny tekst i logo w środkowym obszarze.
-- `qa_wideo.py --arkusz` zaznacza te strefy na czerwono; napisy `film.py` i `napisy.py` omijają je domyślnie.
+- TikTok: góra ~7% (zakładki), dół ~25% (opis, nazwa konta, dźwięk), prawo ~13% (przyciski), lewo ~4%.
+  Shorts: góra ~9%, dół ~20%, prawo ~11%. Reels (zalecenie Meta): góra 14%, dół 35%, boki 6%.
+  Ważny tekst i logo w środkowym obszarze. Liczby: `wideo_lib.STREFY_UI` (te same pokazuje edytor HQ).
+- `qa_wideo.py --arkusz` zaznacza na czerwono strefy `--platforma` (bez niej TikTok), `pomiar.py` zgłasza tekst pod nimi;
+  napisy `film.py` i `napisy.py` omijają je domyślnie, tekst z `projekt.py` startuje na 0,68 wysokości.
 
 ## Wiele platform z jednego materiału
 - Kręcone/generowane pod 9:16 → 1:1 i 4:5 przez przycięcie góry i dołu (tekst w środku kadru!).

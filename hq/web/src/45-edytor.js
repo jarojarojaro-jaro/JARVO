@@ -12,7 +12,7 @@ const ED_FORMATS = [
 const ED_SIZES = { "16:9": [1920, 1080], "9:16": [1080, 1920], "1:1": [1080, 1080], "4:5": [1080, 1350] };
 // Strefy interfejsu w kadrze pionowym (ułamki kadru 1080×1920, przegląd 2026): góra = zakładki i nazwa konta,
 // dół = opis, konto i dźwięk, boki = przyciski (serce, komentarze, udostępnij) i margines. Tylko podgląd, bez eksportu.
-// TikTok 130/484/44/140 px, Shorts 180/390/60/120 px, Reels: zalecenie Meta 14% / 35% / 6%.
+// TikTok 130/484/44/140 px, Shorts 180/390/60/120 px, Reels: zalecenie Meta 14% / 35% / 6%. Te same liczby: wideo_lib.STREFY_UI.
 const ED_STREFY = {
   tiktok: { name: "TikTok", t: 0.068, b: 0.252, l: 0.041, r: 0.13 },
   reels: { name: "Reels", t: 0.14, b: 0.35, l: 0.06, r: 0.06 },
@@ -20,10 +20,10 @@ const ED_STREFY = {
 };
 const ED_STREFY_OPIS = { top: ["góra: zakładki, nazwa konta", "top: tabs, account name"], bottom: ["dół: opis, konto, dźwięk", "bottom: caption, account, sound"],
   left: ["lewy margines", "left margin"], right: ["prawo: przyciski", "right: buttons"] };
-// Prostokąty stref platformy `pf` na kanwie W×H; poza kadrem pionowym brak stref.
+// Prostokąty stref platformy `pf` na kanwie W×H; tylko kadr pionowy jak 9:16 (4:5 i poziomy: brak stref).
 function strefyUI(W, H, pf) {
   const z = ED_STREFY[pf];
-  if (!z || H <= W) return [];
+  if (!z || W / H > 0.65) return [];
   const t = z.t * H, b = H - z.b * H;
   return [{ k: "top", x0: 0, y0: 0, x1: W, y1: t }, { k: "bottom", x0: 0, y0: b, x1: W, y1: H },
     { k: "left", x0: 0, y0: t, x1: z.l * W, y1: b }, { k: "right", x0: W - z.r * W, y0: t, x1: W, y1: b }];
@@ -688,7 +688,7 @@ function VideoEditor({ path, onClose }) {
   const measure = useRef(null);
   function strefyTekstu(x) {
     const { w, h } = projRef.current.canvas;
-    if (!ED_STREFY[strefa] || h <= w) return [];
+    if (!strefyUI(w, h, strefa).length) return [];
     if (!measure.current) measure.current = document.createElement("canvas").getContext("2d");
     return strefyKolizja(textBox(measure.current, x, w, h), w, h, strefa);
   }
@@ -1424,7 +1424,7 @@ function VideoEditor({ path, onClose }) {
       return html`<button type="button" key=${k2} class=${cx((p.format || "orig") === k2 && "is-on")} onClick=${() => setCanvas(k2)}>
         <i style=${{ width: `${bw}px`, height: `${bh}px` }}></i><span>${k2 === "orig" ? L("Oryginał", "Original") : k2}</span><small>${L(pl, en).split("· ")[1] || ""}</small></button>`;
     })}</div>
-    ${p.canvas.h > p.canvas.w && html`<label>${L("Strefy platformy · tylko podgląd", "Platform safe zones · preview only")}${seg([["off", L("Wył.", "Off")],
+    ${strefyUI(CW, CH, "tiktok").length > 0 && html`<label>${L("Strefy platformy · tylko podgląd", "Platform safe zones · preview only")}${seg([["off", L("Wył.", "Off")],
       ...Object.entries(ED_STREFY).map(([k2, z]) => [k2, z.name])], ED_STREFY[strefa] ? strefa : "off", pickStrefa)}</label>`}
     <label>${L("Klatki na sekundę", "Frame rate")}${seg([24, 25, 30, 50, 60].map((f) => [f, String(f)]), p.canvas.fps, (v) => H.apply((P) => ({ ...P, canvas: { ...P.canvas, fps: v } })))}</label>
     <p class="thq-ed-note">${CW}×${CH} · ${fmtT(total, true)}</p>

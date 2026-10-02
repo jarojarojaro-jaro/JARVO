@@ -6,7 +6,7 @@
 Sprawdza: kontener i kodeki (H.264 + AAC, yuv420p, faststart), rozdzielczość i proporcje, fps, długość wobec
 platformy, głośność (LUFS zintegrowane i true peak), czarne klatki, zamrożony obraz, cisze w dźwięku,
 pojedyncze „mrugnięcia” (jedna klatka inna niż obie sąsiednie: błąd renderu, zgubiony stan, zła klatka przejścia).
---arkusz: klatki z początku (hook), środka i końca z zaznaczonymi strefami interfejsu platformy (9:16):
+--arkusz: klatki z początku (hook), środka i końca z zaznaczonymi strefami interfejsu platformy (9:16, bez --platforma TikTok):
 na nich widać, czy napisy, tekst i logo nie wchodzą pod przyciski i opis.
 Kod wyjścia 1 = jest błąd blokujący. Tabela platform zgodna z skills/wideo/formaty-wideo/references/specs.md.
 """
@@ -87,14 +87,12 @@ def analyze(path: Path, has_audio: bool) -> dict:
     return out
 
 
-def zones(w: int, h: int) -> list[tuple[int, int, int, int]]:
-    """Strefy zasłaniane przez interfejs 9:16 (TikTok/Reels/Shorts): góra, dół z opisem, prawy pasek przycisków."""
-    if h <= w:
-        return []
-    return [(0, 0, w, int(h * 0.10)), (0, int(h * 0.80), w, h - int(h * 0.80)), (int(w * 0.86), int(h * 0.45), w - int(w * 0.86), int(h * 0.35))]
+def zones(w: int, h: int, platform: str | None = None) -> list[tuple[int, int, int, int]]:
+    """Strefy zasłaniane przez interfejs 9:16 platformy (wideo_lib.strefy_ui, bez platformy TikTok) jako (x, y, szer., wys.)."""
+    return [(int(x0), int(y0), int(x1 - x0), int(y1 - y0)) for _n, (x0, y0, x1, y1) in wl.strefy_ui(w, h, platform)]
 
 
-def sheet(path: Path, dur: float, w: int, h: int, out: Path, marks: bool) -> Path:
+def sheet(path: Path, dur: float, w: int, h: int, out: Path, marks: bool, platform: str | None = None) -> Path:
     times = sorted({0.0, 0.5, 1.5, dur * 0.25, dur * 0.5, dur * 0.75, max(0.0, dur - 0.5)})
     times = [t for t in times if t < dur]
     cw = 270 if h > w else 480
@@ -103,7 +101,7 @@ def sheet(path: Path, dur: float, w: int, h: int, out: Path, marks: bool) -> Pat
     if marks:
         sx, sy = cw / w, ch / h
         draw = "".join(f",drawbox=x={int(x * sx)}:y={int(y * sy)}:w={int(bw * sx)}:h={int(bh * sy)}:color=red@0.28:t=fill"
-                       for x, y, bw, bh in zones(w, h))
+                       for x, y, bw, bh in zones(w, h, platform))
     with tempfile.TemporaryDirectory(prefix="jarvo-qa-") as tmp:
         for i, t in enumerate(times):
             label = f"{t:.1f}s"
@@ -217,7 +215,7 @@ def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkus
                        "wideo": v["codec"], "audio": a and a["codec"], "mb": round(info["size"] / 1048576, 2),
                        "lufs": an["lufs"], "true_peak": an["true_peak"]}}
     if arkusz:
-        res["arkusz"] = str(sheet(path, dur, v["width"], v["height"], arkusz, marks=True))
+        res["arkusz"] = str(sheet(path, dur, v["width"], v["height"], arkusz, marks=True, platform=platform))
     return res
 
 

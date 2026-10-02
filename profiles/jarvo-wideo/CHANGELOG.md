@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Strefy interfejsu 9:16 z jednej tabeli `wideo_lib.STREFY_UI` (TikTok, Reels, Shorts; te same liczby co w edytorze HQ): arkusz `qa_wideo.py` zaznacza strefy wybranej `--platforma` (bez niej TikTok), `pomiar.py` liczy tekst pod strefą od jego widocznej części; napisy ASS (`film.py`, `napisy.py`) mają dolny margines 26% zamiast 24%, nad opisem TikToka. Kadr 4:5 nie ma już stref 9:16.
 - Kadr pionowy: `projekt.py dodaj-tekst` i `napisy` stawiają tekst domyślnie na wysokości 0,68 i szerokości 74% (`PION`: nad opisem TikToka i Shorts, obok kolumny przycisków; `--y` dalej wygrywa), tak jak edytor HQ, który pokazuje teraz strefy interfejsu TikTok/Reels/Shorts na podglądzie. `klipy.py` bierze tę samą wartość.
 - `projekt.py usun` (klip) i `dodaj-klip --pozycja` przesuwają resztę osi jak edytor HQ (oś magnetyczna, `edytor.remap_times`): napisy, uwagi i audio za usuniętym albo wstawionym klipem już się nie rozjeżdżają.
 - Limit płatnej generacji AI na kartę pilnuje strażnik wtyczki `jarvo-wiedza` (`video_generate` 3, `image_generate` 12; ponad limit zgoda człowieka), a nie tylko tekst skilla.

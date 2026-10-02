@@ -376,10 +376,28 @@ class SubStyle:
         return cls(**known)
 
 
+# Strefy interfejsu w kadrze 9:16: (góra, dół, lewo, prawo) jako ułamki kadru, przegląd 2026: TikTok 130/484/44/140 px,
+# Shorts 180/390/60/120 px na 1080×1920, Reels wg zalecenia Meta 14% / 35% / 6%. Te same liczby: ED_STREFY w edytorze HQ.
+STREFY_UI = {"tiktok": (0.068, 0.252, 0.041, 0.13), "reels": (0.14, 0.35, 0.06, 0.06), "shorts": (0.094, 0.203, 0.056, 0.111)}
+# nazwy platform skryptów (qa_wideo --platforma, pomiar) → zestaw stref; bez platformy albo inna: TikTok (jak w edytorze)
+STREFY_PLATFORMY = {"ig-reel": "reels", "fb-reel": "reels", "ig-story": "reels", "yt-short": "shorts", "yt-shorts": "shorts"}
+
+
+def strefy_ui(w: int, h: int, platforma: str | None = None) -> list[tuple[str, tuple[float, float, float, float]]]:
+    """Prostokąty (nazwa, (x0, y0, x1, y1)) zasłaniane przez interfejs platformy; tylko kadr pionowy jak 9:16 (nie 4:5)."""
+    if w / h > 0.65:
+        return []
+    p = STREFY_PLATFORMY.get(platforma or "", platforma or "")
+    t, b, l, r = STREFY_UI.get(p, STREFY_UI["tiktok"])
+    y0, y1 = h * t, h * (1 - b)
+    return [("góra (zakładki, nazwa konta)", (0, 0, w, y0)), ("dół (opis, konto, dźwięk)", (0, y1, w, h)),
+            ("lewy margines", (0, y0, w * l, y1)), ("prawy pasek przycisków", (w * (1 - r), y0, w, y1))]
+
+
 def safe_margins(w: int, h: int) -> dict:
-    """Marginesy napisów poza strefami interfejsu platform (9:16: dół ~25% i prawy pasek przycisków)."""
+    """Marginesy napisów poza strefami interfejsu platform (9:16: nad opisem TikToka, szerszy margines przycisków)."""
     if h > w:   # prawy margines szerszy: pasek przycisków (serce, komentarze, udostępnij)
-        return {"dol": even(h * 0.24), "srodek": 0, "gora": even(h * 0.14), "l": even(w * 0.08), "r": even(w * 0.16)}
+        return {"dol": even(h * 0.26), "srodek": 0, "gora": even(h * 0.14), "l": even(w * 0.08), "r": even(w * 0.16)}
     return {"dol": even(h * 0.08), "srodek": 0, "gora": even(h * 0.08), "l": even(w * 0.06), "r": even(w * 0.06)}
 
 

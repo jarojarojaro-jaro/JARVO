@@ -6,7 +6,7 @@ z przeglądarki teksty (widoczna część, granice glifów, krycie, kolor, rozmi
 
     tekst_poza_kadrem     tekst w pełni widoczny wychodzi poza kadr (≥ 0,25 s)                     błąd
     czas_czytania         tekst widoczny krócej, niż trzeba na przeczytanie (pl: 0,4 s + 3 słowa/s)  błąd / ostrzeżenie
-    strefa_platformy      tekst pod interfejsem platformy (9:16: dół 24%, góra 14%, prawy pasek 16%) błąd przy --platforma
+    strefa_platformy      tekst pod interfejsem platformy (9:16: wideo_lib.STREFY_UI, bez platformy TikTok)  błąd przy --platforma
     kontrast              tekst a tło za nim poniżej WCAG (4,5:1; duży tekst 3:1)                  błąd
     czcionka_zastepcza    krój z CSS niedostępny: render pokaże inny niż projekt                   błąd
     czarna_przerwa        czarna klatka między scenami (nie na początku i końcu)                   błąd
@@ -28,11 +28,14 @@ import io
 import json
 import re
 import statistics
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import wideo_lib as wl  # noqa: E402
 
 STATYKA_PROG = 0.06             # największa zmiana piksela (miniatura 96 px) poniżej = obraz stoi
 CZERN_PROG = 0.035              # średnia jasność poniżej = czarna klatka
-PLATFORMY_PION = {"tiktok", "ig-reel", "reels", "ig-story", "yt-shorts", "shorts", "fb-reel"}
 GENERYCZNE = {"serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-serif", "ui-sans-serif",
               "ui-monospace", "ui-rounded", "emoji", "math", "fangsong", "inherit", "initial", "-apple-system",
               "blinkmacsystemfont"}
@@ -142,10 +145,11 @@ def nalozony(fg, bg) -> tuple[float, float, float]:
 
 
 def strefy(W: int, H: int, platforma: str | None) -> list[tuple[str, tuple[float, float, float, float]]]:
-    """Strefy interfejsu platformy (jak safe_margins w wideo_lib i arkusz qa_wideo): (nazwa, (x0, y0, x1, y1))."""
-    if H > W or (platforma or "") in PLATFORMY_PION:
-        return [("dół (opis, przyciski)", (0, H * 0.76, W, H)), ("góra (nazwa konta)", (0, 0, W, H * 0.14)),
-                ("prawy pasek przycisków", (W * 0.84, H * 0.40, W, H))]
+    """Strefy interfejsu platformy w kadrze 9:16 (wideo_lib.strefy_ui: te same co arkusz qa_wideo i edytor HQ),
+    w innym kadrze marginesy: (nazwa, (x0, y0, x1, y1))."""
+    pion = wl.strefy_ui(W, H, platforma)
+    if pion:
+        return pion
     return [("margines kadru", (0, 0, W, H * 0.08)), ("margines kadru", (0, H * 0.92, W, H)),
             ("margines kadru", (0, 0, W * 0.06, H)), ("margines kadru", (W * 0.94, 0, W, H))]
 
@@ -193,9 +197,9 @@ def analiza(probki: list[dict], dlugosc: float, hz: float, platforma: str | None
             out.append(_ustalenie("tekst_poza_kadrem", "blad", f"„{krotki}” wychodzi poza kadr przez {len(poza) * dt:.1f} s",
                                   "zmniejsz tekst, złam linię albo przesuń go do środka", poza[0][0], poza[-1][0] + dt, tekst=pelny))
         # strefy platformy
-        for nazwa, z in zony:
-            pod = [(t, x) for t, x in ciag if x["a"] >= 0.6 and
-                   _przeciecie((x["x0"], x["y0"], x["x1"], x["y1"]), z) > 0.15 * max(1.0, (x["x1"] - x["x0"]) * (x["y1"] - x["y0"]))]
+        for nazwa, z in zony:                  # ≥ 15% widocznej (w kadrze) części tekstu pod strefą
+            pod = [(t, x) for t, x in ciag if x["a"] >= 0.6 and _przeciecie((x["x0"], x["y0"], x["x1"], x["y1"]), z)
+                   > 0.15 * max(1.0, _przeciecie((x["x0"], x["y0"], x["x1"], x["y1"]), (0, 0, W, H)))]
             if len(pod) * dt >= 0.3:
                 out.append(_ustalenie("strefa_platformy", "blad" if twarde_strefy else "ostrz",
                                       f"„{krotki}” w strefie: {nazwa} ({len(pod) * dt:.1f} s)",

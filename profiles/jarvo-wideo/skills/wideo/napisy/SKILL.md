@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-10-02"
 ---
 
 # Napisy PL
@@ -30,7 +30,7 @@ Większość krótkich filmów oglądana jest bez dźwięku, więc napisy są cz
 | `zwykle` | do 2 linii zdania | LinkedIn, YouTube 16:9, treści eksperckie |
 | SRT „miękkie” | plik `.srt` wgrywany na platformę | YouTube, LinkedIn, FB (dostępność, SEO) |
 
-Pozycja domyślna: dół poza strefą opisu i przycisków (9:16: 24% od dołu, szerszy margines z prawej).
+Pozycja domyślna: dół poza strefą opisu i przycisków (9:16: 26% od dołu, nad opisem TikToka; szerszy margines z prawej).
 Tekst ekranowy (hook) jest u góry i nie koliduje z napisami.
 
 ## Kroki
