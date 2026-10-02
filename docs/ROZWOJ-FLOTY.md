@@ -29,7 +29,7 @@ Z tego wynikają cztery reguły tego planu:
 | `jarvo-lowca` | 6 | 4 + biblioteka (~1 100 linii) | 0 | średnio-wysoka | prawdziwe dane, ale błąd w ocenie leadów i nigdy nie uruchomiony na prawdziwej ofercie |
 | `jarvo-ads` | 10 | 4 (~550 linii) | 6 | nisko-średnia | dobra matematyka testów; Skarbiec nie istnieje, więc 3 skille nie działały wcale, a 4 tylko na eksporcie CSV |
 | `jarvo-sherlock` | 7 | 3 (~290 linii) | 16 | nisko-średnia | weryfikacja źródeł tylko w prompcie; dziś blisko zwykłego „deep research” |
-| `jarvo-studio` | 6 | 2 (~160 linii) + 1 szablon | 24 | nisko-średnia | renderuje i mierzy wymiary, ale tekstu, układu i publikacji kod nie sprawdza |
+| `jarvo-studio` | 6 | 2 (~160 linii) + 1 szablon | 23 | nisko-średnia | renderuje i mierzy wymiary, ale tekstu, układu i publikacji kod nie sprawdza |
 | `jarvo-mobile` | 10 | 18 + biblioteka (~7 300 linii) + szablon Expo | 20 | wysoka | od decyzji „natywna czy PWA” po sklep; podgląd w Expo Go czeka na organizację Expo właściciela |
 | `jarvo-reka` | 4 | 2 (~190 linii) | 4 + wszystkie skille floty | niska | generalista bez dostępu do Twojej poczty, kalendarza i dokumentów |
 
