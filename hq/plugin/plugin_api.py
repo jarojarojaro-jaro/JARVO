@@ -221,6 +221,17 @@ def _load_editor():
 
 
 ed = _load_editor()
+
+
+def _load_anim():
+    spec = importlib.util.spec_from_file_location("jarvo_hq_animacja", _HERE / "animacja.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["jarvo_hq_animacja"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+anim = _load_anim()
 _edit = sys.modules.setdefault("jarvo_hq_edit_state", type(sys)("jarvo_hq_edit_state"))
 if not hasattr(_edit, "jobs"):
     _edit.jobs = {}
@@ -634,8 +645,31 @@ def _preview_handler():
             self.end_headers()
             self.wfile.write(data)
 
+        def _static(self, data: bytes, ctype: str, body: bool):
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            if body:
+                self.wfile.write(data)
+
         def _serve(self, body: bool):
-            path = unquote(urlsplit(self.path).path)
+            parts = urlsplit(self.path)
+            path = unquote(parts.path)
+            # mostek podglądu animacji (HQ ↔ strona przez postMessage) i wspólne biblioteki animacji (three, gsap)
+            if path == "/_jarvo/most.js":
+                return self._static(anim.MOST_JS.encode(), "text/javascript; charset=utf-8", body)
+            if path.startswith("/_lib/"):
+                lib = core.lib_file(path[len("/_lib/"):])
+                if lib is None:
+                    return self._fail(404, "Nie ma takiej biblioteki.")
+                ctype = mimetypes.guess_type(lib.name)[0] or "application/octet-stream"
+                if lib.suffix in (".js", ".mjs"):
+                    ctype = "text/javascript; charset=utf-8"
+                return self._static(lib.read_bytes(), ctype, body)
             token, _, rel = path.lstrip("/").partition("/")
             root = core.link_root(core.LINKS_FILE, token, time.time())
             if root is None or root == core.SCREEN_ROOT:
@@ -651,10 +685,12 @@ def _preview_handler():
             ctype = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
             if ctype.startswith("text/") or ctype in ("application/javascript", "application/json", "image/svg+xml"):
                 ctype += "; charset=utf-8"
-            data = p.read_bytes() if body else b""
+            data = p.read_bytes()
+            if "jarvo-podglad=1" in parts.query and p.suffix.lower() in (".html", ".htm"):
+                data = anim.wstrzyknij_most(data)          # tylko podgląd animacji w HQ, nie „▶ Odpal”
             self.send_response(200)
             self.send_header("Content-Type", ctype)
-            self.send_header("Content-Length", str(p.stat().st_size))
+            self.send_header("Content-Length", str(len(data)))
             self.send_header("Content-Security-Policy", PREVIEW_CSP)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
@@ -715,6 +751,42 @@ async def site(request: Request):
     token = await asyncio.to_thread(core.link_for, core.LINKS_FILE, root, time.time())
     rel = p.relative_to(root).as_posix()
     return {"port": PREVIEW_PORT, "path": f"/{token}/{rel}"}
+
+
+# ------------------------------------------- animacja HTML: podgląd na żywo i parametry (animacja.py)
+@router.get("/anim/check")
+async def anim_check(path: str):
+    """Czy plik HTML to animacja z kontraktem (przycisk „◐ Animacja” przy plikach z linków w czacie)."""
+    p = core.safe_path(path, ROOTS)
+    return {"anim": bool(p) and await asyncio.to_thread(anim.to_animacja, p)}
+
+
+@router.get("/anim/info")
+async def anim_info(path: str):
+    """Link podglądu (mostek przez postMessage, bez pętli podglądu strony), parametry ze schematu i stan pomiaru."""
+    p = core.safe_path(path, ROOTS)
+    if p is None or not anim.to_animacja(p):
+        raise HTTPException(404, "To nie animacja z kontraktem __seek (kontrakt-html.md) albo plik poza katalogami floty")
+    if not getattr(_preview, "server", None):
+        raise HTTPException(503, f"Podgląd stron nie działa: {_preview.error or 'serwer nie wystartował'}")
+    root = p.parent
+    token = await asyncio.to_thread(core.link_for, core.LINKS_FILE, root, time.time())
+    return {"plik": str(p), "podglad": {"port": PREVIEW_PORT, "path": f"/{token}/{p.name}?render=1&jarvo-podglad=1"},
+            "parametry": await asyncio.to_thread(anim.wczytaj, p), "pomiar": await asyncio.to_thread(anim.pomiar, p)}
+
+
+@router.post("/anim/params")
+async def anim_params(request: Request):
+    """Nowe wartości parametrów → parametry.json obok strony (tylko pola ze schematu, typy sprawdzone)."""
+    body = await request.json()
+    p = core.safe_path(str(body.get("path") or ""), ROOTS)
+    if p is None or not (p.parent / anim.PARAMETRY).is_file():
+        raise HTTPException(404, "Brak parametry.json obok animacji")
+    try:
+        pola = await asyncio.to_thread(anim.zapisz, p, body.get("wartosci"))
+    except anim.ParamError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "pola": pola, "pomiar": await asyncio.to_thread(anim.pomiar, p)}
 
 
 # ------------------------------------------- ekran telefonu testowego (Redroid + ws-scrcpy) na :9122

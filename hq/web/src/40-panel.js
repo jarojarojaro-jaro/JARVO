@@ -37,7 +37,17 @@ function FileActions({ file, onPreview, compact }) {
   };
   const copy = run(() => copyText(hostPathOf(file.path, host)), L("Ścieżka skopiowana", "Path copied"));
   const edit = React.useContext(EditCtx);
+  const animate = React.useContext(AnimCtx);
+  const [isAnim, setIsAnim] = useState(file.anim);
+  useEffect(() => {   // plik z linku w czacie nie ma flagi z listy wyników: pytamy serwer raz
+    if (file.kind !== "html" || file.anim !== undefined || !api.animCheck) return undefined;
+    let alive = true;
+    api.animCheck(file.path).then((r) => alive && setIsAnim(!!(r && r.anim))).catch(() => {});
+    return () => { alive = false; };
+  }, [file.path]);
   return html`<span class=${cx("thq-file-acts", compact && "is-compact")}>
+    ${file.kind === "html" && isAnim && animate && html`<button type="button" class="thq-act-btn is-run" onClick=${(e) => { e.stopPropagation(); animate(file); }}
+      title=${L("Podgląd na żywo: przewijanie, parametry (kolory, teksty, tempo), pomiar", "Live preview: scrubbing, parameters (colors, texts, timing), measurement")}>◐ ${L("Animacja", "Animation")}</button>`}
     ${file.kind === "video" && edit && html`<button type="button" class="thq-act-btn is-run" onClick=${(e) => { e.stopPropagation(); edit(file); }}
       title=${L("Otwórz w edytorze: tnij, napisy, muzyka, tempo, eksport", "Open in the editor: cut, text, music, speed, export")}>✎ ${L("Edytuj", "Edit")}</button>`}
     ${file.kind === "html" && html`<button type="button" class="thq-act-btn is-run" onClick=${run(() => openSite(file.path))}

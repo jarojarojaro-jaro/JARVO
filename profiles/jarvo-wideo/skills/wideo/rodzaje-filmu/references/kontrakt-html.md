@@ -3,7 +3,7 @@
 Jeden plik `out/wideo/src/<nazwa>/index.html` (+ assety obok). Ta sama strona służy do podglądu (odtwarza się
 w pętli) i do renderu klatka po klatce: `html_wideo.py --preset jarvo` woła `window.__seek(t)` dla każdej klatki.
 
-## Pięć twardych reguł
+## Twarde reguły
 1. `window.__seek(t)` rysuje **cały** stan w chwili `t` (sekundy) i nic nie zwraca (albo `Promise`, gdy czeka). Nic poza `t`: zero `Date.now`,
    `performance.now`, `setTimeout`, `Math.random` bez ziarna (`mulberry32(seed)`), zero stanu z poprzedniej klatki
    (fizyka i cząstki liczone od `t = 0` albo z krokiem stałym od zera do `t`).
@@ -17,6 +17,31 @@ w pętli) i do renderu klatka po klatce: `html_wideo.py --preset jarvo` woła `w
    `{tekst, x, y, w, h, kolor, rozmiar, krycie, widoczny?, id?}` (prostokąt w pikselach kadru, `widoczny` = odsłonięta
    część przy pisaniu). Tekst w DOM (HTML, SVG) `pomiar` czyta sam; bez `__teksty` tekst z `fillText` jest dla niego
    niewidoczny (zostają tylko kontrole obrazu).
+7. **Parametry do strojenia** (HQ: przycisk **◐ Animacja**, podgląd na żywo z suwakami): to, co właściciel może chcieć
+   zmienić bez Ciebie (kolory, teksty, tempo, krzywe wejścia, włącz/wyłącz element), trzymasz w `parametry.json` obok
+   strony i czytasz przy starcie do `window.__params`; każda klatka bierze wartości z tego obiektu (nie kopiuj ich do
+   stałych), więc HQ zmienia je na żywo, a render czyta ten sam plik. Typy: `liczba` (`min`, `max`, `krok`), `kolor`
+   (`#RRGGBB`), `tekst`, `przelacznik`, `wybor` (`opcje`), `krzywa` (`[x1, y1, x2, y2]` jak cubic-bezier). Najwyżej
+   kilkanaście pól, nazwy po polsku dla właściciela; po zmianie parametrów pomiar trzeba powtórzyć. Wartości zapisane
+   przez właściciela w HQ to jego decyzje: zmieniasz je tylko na jego prośbę, a nowe pole dopisujesz z obecną wartością.
+
+## Parametry (reguła 7)
+```json
+{"pola": [
+  {"klucz": "tlo", "typ": "kolor", "etykieta": "Tło", "wartosc": "#0B1220"},
+  {"klucz": "tytul", "typ": "tekst", "etykieta": "Tytuł", "wartosc": "Kawa z palarni Jarvo"},
+  {"klucz": "tempo", "typ": "liczba", "etykieta": "Tempo", "min": 0.5, "max": 2, "krok": 0.05, "wartosc": 1},
+  {"klucz": "wejscie", "typ": "krzywa", "etykieta": "Wejście tytułu", "wartosc": [0.16, 1, 0.3, 1]},
+  {"klucz": "logo", "typ": "przelacznik", "etykieta": "Logo na końcu", "wartosc": true}]}
+```
+```js
+const P = window.__params = {};                         // HQ podmienia wartości na żywo i woła __seek(t)
+try { for (const f of (await (await fetch('parametry.json')).json()).pola) P[f.klucz] = f.wartosc; } catch (e) {}
+// krzywa z parametru: bezier(...P.wejscie)(postęp 0–1) → 0–1 (cubic-bezier jak w CSS)
+const bezier = (x1, y1, x2, y2) => (x) => { let a = 0, b = 1, t = x;
+  for (let i = 0; i < 24; i++) { t = (a + b) / 2; const u = 1 - t, bx = 3*u*u*t*x1 + 3*u*t*t*x2 + t*t*t; if (bx < x) a = t; else b = t; }
+  const u = 1 - t; return 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t; };
+```
 
 ## Szkielet (Canvas 2D; Three.js i GSAP niżej)
 ```html

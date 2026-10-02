@@ -149,7 +149,7 @@ def test_odcisk_wyjatki_i_aktualnosc(tmp_path):
               "werdykt": {"ok": True, "bledy": 0}}
     assert pm.aktualnosc(anim, raport) == []
     assert any("niepełny" in p for p in pm.aktualnosc(anim, {**raport, "pokrycie": {"pelne": False, "tryb": "szybki", "hz": 4}}))
-    assert any("błędów" in p for p in pm.aktualnosc(anim, {**raport, "werdykt": {"ok": False, "bledy": 2}}))
+    assert any("błędy bez wyjątku: 2" in p for p in pm.aktualnosc(anim, {**raport, "werdykt": {"ok": False, "bledy": 2}}))
     anim.write_text("<p>2</p>", encoding="utf-8")
     assert any("zmieniły się" in p for p in pm.aktualnosc(anim, raport))
 

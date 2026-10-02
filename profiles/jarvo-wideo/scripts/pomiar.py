@@ -345,7 +345,7 @@ def aktualnosc(anim: Path, raport: dict) -> list[str]:
     if not pok.get("pelne"):
         powody.append(f"pomiar niepełny (tryb {pok.get('tryb', '?')}, {pok.get('hz', '?')} próbek/s): do oddania --tryb pelny")
     if not (raport.get("werdykt") or {}).get("ok"):
-        powody.append(f"{(raport.get('werdykt') or {}).get('bledy', '?')} błędów bez wyjątku: popraw albo opisz świadomy wyjątek")
+        powody.append(f"błędy bez wyjątku: {(raport.get('werdykt') or {}).get('bledy', '?')} (popraw albo opisz świadomy wyjątek)")
     return powody
 
 

@@ -113,6 +113,9 @@ dźwięk), każda min. 8/10, plus lista zakazanych klisz. Prawdziwe assety marki
 Syntetyczne SFX, biblioteka inspiracji, produkcja etapami, formaty platform z jednego timeline.
 Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo strony (`demo_strony.py`, metoda ECC
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.
+Animacja z kodu ma twardy pomiar przed oddaniem (`html_wideo.py pomiar`: czas czytania, kadr i strefy UI platformy,
+kontrast, czarne przerwy, martwe odcinki, rytm; „gotowe” tylko z pełnym i aktualnym raportem) i parametry
+(`parametry.json`), które właściciel stroi na żywo w HQ.
 
 ---
 
@@ -175,7 +178,8 @@ Plugin dashboardu Hermesa (`hq/`): budynek z pokojami agentów (pixel art), mini
 „co każdy robi teraz”, podgląd pracy na żywo, wyniki, decyzje i czat z Jarvem albo dowolnym agentem.
 Pokoje: bridge, study, devlab, atelier, filmstudio, workshop, office, radar. Sesje klikalne (Historia
 domyślnie). Czat obsługuje zdjęcia i pliki w obie strony. Linki „Odpal” (podgląd) i „Pokaż w folderze”.
-Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
+Edytor filmów w stylu CapCut (uwagi na osi z kadrem dla Wideografa) i podgląd animacji z kodu na żywo z suwakami
+parametrów ([HQ.md §2a–2b](HQ.md#2a-edytor-filmów)). Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
 Obok BASE zakładka **Wiedza** (`/wiedza`, wtyczka `jarvo-wiedza`): graf skarbca wiedzy, foldery i notatki, szukanie, orzeczenia
 z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIEDZA.md)).
 

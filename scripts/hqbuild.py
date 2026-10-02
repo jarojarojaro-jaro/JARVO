@@ -4,7 +4,7 @@
     python3 scripts/hqbuild.py --out build/plugins/jarvo-hq     # plugin (wołane też przez scripts/build.py)
     python3 scripts/hqbuild.py --demo build/hq-demo            # samodzielne demo z symulacją floty
 
-Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, edytor.py, fleet.json, dist/index.js, dist/style.css}.
+Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, edytor.py, animacja.py, pomiar.py, fleet.json, dist/index.js, dist/style.css}.
 dist/index.js to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku.
 """
 
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fleetlib as fl  # noqa: E402
 
 HQ = fl.REPO_ROOT / "hq"
-PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "edytor.py")
+PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "edytor.py", "animacja.py")
 
 
 def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.") -> str:
@@ -94,6 +94,8 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     shutil.copytree(fl.REPO_ROOT / "branding" / "fonts", dash / "dist" / "fonts")
     # wspólne klucze floty: plugin pilnuje ich na bieżąco (skrypt jest też uruchamiany przy wdrożeniu)
     shutil.copy2(fl.REPO_ROOT / "scripts" / "share_keys.py", dash / "share_keys.py")
+    # pomiar animacji Wideografa: HQ pokazuje raport i sprawdza jego aktualność tym samym kodem
+    shutil.copy2(fl.REPO_ROOT / "profiles" / "jarvo-wideo" / "scripts" / "pomiar.py", dash / "pomiar.py")
     fl.write_json(dash / "fleet.json", fleet_json(fleet))
     return dash
 

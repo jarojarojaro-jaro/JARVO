@@ -100,6 +100,14 @@ const liveApi = {
     return res.blob();
   },
   editJob: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}`),
+  animInfo: (path) => SDK.fetchJSON(`${API_ROOT}/anim/info?path=${encodeURIComponent(path)}`),
+  animCheck: (path) => SDK.fetchJSON(`${API_ROOT}/anim/check?path=${encodeURIComponent(path)}`),
+  async animParams(path, wartosci) {
+    const res = await fetch(`${basePath()}${API_ROOT}/anim/params`, { method: "POST", credentials: "include",
+      headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ path, wartosci }) });
+    if (!res.ok) { let m = `HTTP ${res.status}`; try { m = (await res.json()).detail || m; } catch (_) { /* nie-JSON */ } throw new Error(m); }
+    return res.json();
+  },
   editCancel: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   async *send(name, message, extra) {
     const res = await rawFetch(`${API_ROOT}/chat/${encodeURIComponent(name)}/send`, {

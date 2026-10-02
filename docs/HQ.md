@@ -28,6 +28,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Czat: pliki od agenta | odpowiedź agenta | linia `MEDIA:<ścieżka>` i obrazy `data:image` jako miniatury, ścieżki `/opt/data/jarvo/…` i adresy http(s) klikalne; obraz ma „Kopiuj obraz” (np. do Telegrama) |
 | Akcje pliku wynikowego | plugin + pomocnik hosta | **▶ Odpal** (strona HTML w nowej karcie, `:9120`), **Pokaż w folderze** (Eksplorator Windows w lokalnej instalacji WSL; gdzie indziej: **Kopiuj ścieżkę**), **Pobierz**, podgląd/kod |
 | **✎ Edytuj** (każdy film) | edytor w HQ + ffmpeg w kontenerze | montaż w stylu CapCut: oś czasu z miniaturami, cięcie (S), przycinanie krawędzi, przestawianie klipów, tempo 0,25–4×, głośność i wyciszenie, zdjęcia jako plansze, napisy (styl, krój, kolor, przeciąganie na podglądzie), muzyka z katalogu albo z dysku, format 16:9 / 9:16 / 1:1 / 4:5, cofnij/ponów, skróty klawiszowe, uwagi przypięte do osi i kadr z podglądu dla Wideografa. **Eksportuj** zapisuje nową wersję obok oryginału (`film-edycja.mp4`, oryginał zostaje), **Poproś agenta** wysyła Wideografowi prośbę z projektem montażu. Szczegóły: sekcja 2a |
+| **◐ Animacja** (animacja HTML Wideografa) | serwer podglądu `:9120` + `parametry.json` + `pomiar.json` obok strony | animacja z kodu bez renderowania MP4: przewijanie, odtwarzanie, klatka po klatce, suwaki, kolory, teksty, przełączniki i krzywe ruchu z `parametry.json` widoczne od razu, **Zapisz parametry**, lista ustaleń pomiaru (klik przewija do chwili) i **Poproś Wideografa**. Szczegóły: sekcja 2b |
 | Panel agenta: Czat | API gatewaya | rozmowa bezpośrednia z agentem (sesja HQ, osobna od Telegrama) |
 | **📱 Ekran telefonu** (panel Twórcy aplikacji) | telefon testowy floty (`jarvo android on`) + proxy `:9122` | ekran Androida w nowej karcie (ws-scrcpy: podgląd na żywo, klikanie, pisanie), link z tokenem ważny 12 h; przycisk widać tylko, gdy telefon działa |
 | Panel agenta: O agencie | fleet.yaml, SOUL, skille | opis, model, autonomia, parametry osobowości, workflowy |
@@ -62,6 +63,9 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ POST /api/plugins/jarvo-hq/upload      plik z czatu (📎, Ctrl+V, przeciągnięcie) ─► /opt/data/jarvo/inbox/<data>/
         ├─ GET/POST /api/plugins/jarvo-hq/edit/…  edytor filmów: info, media, save, stamp, srt, speech, proxy,
         │                                          proxy-file, export, job/<id>[/cancel] (sekcja 2a)
+        ├─ GET  /api/plugins/jarvo-hq/anim/check  czy plik HTML to animacja z kontraktem (przycisk „◐ Animacja”)
+        ├─ GET  /api/plugins/jarvo-hq/anim/info   link podglądu z mostkiem ─► :9120, parametry, stan pomiaru (sekcja 2b)
+        ├─ POST /api/plugins/jarvo-hq/anim/params nowe wartości ─► parametry.json obok strony
         ├─ GET/POST /api/plugins/jarvo-hq/update  stan i prośba o sprawdzenie/aktualizację (pomocnik hosta scripts/updater.py)
         └─ GET  /api/plugins/jarvo-hq/health       klucze API profili i dostępność gatewaya
 backend pluginu (plugin_api.py, w procesie dashboardu)
@@ -77,7 +81,8 @@ Pliki w repo:
 | `hq/plugin/plugin_api.py` | trasy FastAPI, proxy czatu do gatewaya |
 | `hq/plugin/hq_core.py` | logika stanu (bez FastAPI, testowana w `tests/test_hq_core.py`) |
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`) |
-| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, edytor filmów i jego uwagi z kadrami, czat, HUD, aplikacja, widżet aktualizacji |
+| `hq/plugin/animacja.py` | animacja HTML: schemat i zapis `parametry.json`, stan pomiaru, mostek podglądu (testy: `tests/test_animacja.py`); build dokłada do pluginu `pomiar.py` Wideografa (odcisk i aktualność raportu) |
+| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność) |
 | `branding/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css`; te same pliki na stronie logowania |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |
@@ -152,6 +157,35 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   jego ustawienia, uchwyty do przycinania pojawiają się na zaznaczonym elemencie.
 - Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg).
 
+## 2b. Animacja HTML: podgląd na żywo i parametry
+
+Animację z kodu (kontrakt HTML Wideografa: `window.__seek(t)`, `__ready`, `__W/__H/__DUR`) da się obejrzeć i stroić
+bez renderowania MP4 (pomysł z Remocn Studio, MIT: panel właściwości i podgląd na żywo). Przycisk **◐ Animacja** jest
+przy każdym pliku HTML, który ma obok `parametry.json` albo `__seek` w kodzie (wyniki agenta i linki w czacie).
+
+- **Podgląd** to ta sama strona z serwera `:9120` (link z tokenem na katalog animacji, jak **▶ Odpal**), ale z
+  `?render=1&jarvo-podglad=1`: strona nie gra sama, a serwer dokleja do niej mostek `/_jarvo/most.js`. Strona ma
+  nieprzezroczyste pochodzenie (CSP sandbox), więc HQ rozmawia z nią tylko przez `postMessage`: wysyła czas i wartości
+  parametrów, mostek ustawia je (`window.__setParams(wartości)`, jeśli strona go ma, inaczej `Object.assign(window.__params, …)`),
+  woła `__seek(t)` i odpowiada „klatka gotowa”. Przewijanie łączy żądania (najwyżej jedno w drodze, potem ostatnie
+  czekające), więc suwak nie zatyka strony. Ramka ma natywny rozmiar animacji (`__W×__H`) przeskalowany do okna.
+- **Sterowanie:** ▶/❚❚ i Spacja (pętla), suwak czasu, ←/→ klatka (1/30 s), Shift+←/→ sekunda, pole długości
+  (z raportu pomiaru albo `__DUR` strony), Esc zamyka. Biblioteki z `/_lib/` (three, gsap) serwer `:9120` podaje z tego samego katalogu
+  narzędzi co `html_wideo.py`, więc podgląd wygląda jak render.
+- **Parametry** (kontrakt HTML, reguła 7): `parametry.json` obok strony ma listę `pola` z typami `liczba` (suwak
+  min/max/krok), `kolor` (#RRGGBB), `tekst` (do 400 znaków), `przelacznik`, `wybor` (opcje) i `krzywa`
+  (cubic-bezier z uchwytami do przeciągania i gotowymi krzywymi). Zmiana jest widoczna od razu w bieżącej klatce;
+  zmienione pole ma ↺ z zapisaną wartością. **Zapisz parametry** zapisuje tylko wartości pól ze schematu (typy
+  i zakresy sprawdza serwer, zapis atomowy); kod strony i reszta pliku zostają. Strona bez `window.__params`
+  dostaje ostrzeżenie, że zmiany nie będą widoczne na żywo.
+- **Pomiar:** okno czyta `pomiar.json` (`html_wideo.py pomiar`) i liczy jego aktualność tym samym odciskiem co
+  Wideograf (`pomiar.py` w pluginie). Lista ustaleń (błędy, ostrzeżenia, wyjątki z powodem) przewija do chwili
+  problemu. Zapis parametrów zmienia odcisk, więc raport od razu staje się nieaktualny: „gotowe” wymaga nowego pomiaru.
+- **Poproś Wideografa** wysyła prośbę ze ścieżką strony, kursorem czasu i niezapisanymi zmianami („tempo: 1 → 1.25”)
+  oraz poleceniem pomiaru i renderu. Odpowiedź widać w oknie.
+- Logika serwera: `hq/plugin/animacja.py` (bez FastAPI), frontend: `hq/web/src/47-animacja.js`, testy:
+  `tests/test_animacja.py`.
+
 ## 3. Bezpieczeństwo
 
 - Wszystkie trasy pluginu są za logowaniem dashboardu (bez sesji: `401 unauthenticated`).
@@ -167,6 +201,9 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   (`/opt/data/profiles/<agent>`), więc `hq_core` wylicza z niego korzeń danych (`/opt/data/jarvo`). Nagłówek `CSP: sandbox` bez
   `allow-same-origin` daje stronie nieprzezroczyste pochodzenie: jej skrypty działają, ale nie czytają ciasteczek
   i nie wyślą ich do dashboardu. Nowa karta nie ma `window.opener`. Pliki ukryte, `..` i symlinki na zewnątrz: 404.
+  Bez tokenu serwer podaje tylko mostek `/_jarvo/most.js` i biblioteki `/_lib/…` (otwarte pakiety npm z
+  `narzedzia/node/node_modules`, bez plików ukrytych i symlinków na zewnątrz). Mostek trafia do strony tylko z
+  `?jarvo-podglad=1` (okno **◐ Animacja**) i przyjmuje wiadomości wyłącznie od okna nadrzędnego.
 - **📱 Ekran telefonu**: ws-scrcpy nie ma logowania, więc działa tylko w sieci floty (bez portów); jedyne wejście to
   proxy w pluginie na porcie 9122 (ten sam `JARVO_BIND_IP`). Link `/<token>/` wydaje zalogowany dashboard albo agent
   (`scripts/jarvo_link.py --android`; ten sam plik linków, znacznik `@android-ekran`, ważny 12 h). Wejście z tokenem
@@ -180,7 +217,8 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   (`/opt/data/jarvo/state/hq-sessions.json`), pliki z czatu (`inbox/<data>/`), linki podglądu
   (`state/preview-links.json`, `state/preview.json`), prośby do pomocnika hosta (`state/reveal-request`,
   `state/update-request`), pliki edytora filmów (projekt `*.edycja.json`, analiza `*.mowa.json` i `*.auto.srt`,
-  nowe wersje filmu obok oryginału, pliki tymczasowe w `state/edytor/`) i blok wspólnych kluczy w `.env` agentów
+  nowe wersje filmu obok oryginału, pliki tymczasowe w `state/edytor/`), wartości pól w `parametry.json` animacji
+  (**◐ Animacja**) i blok wspólnych kluczy w `.env` agentów
   (`share_keys.py`). Na tablicy HQ może tylko ponowić kartę porzuconą po błędach (`hermes kanban unblock`);
   resztę zmian robią agenci przez swoje narzędzia.
 - Edytor: każda ścieżka z projektu przechodzi przez to samo sprawdzenie co podgląd plików; ffmpeg dostaje argumenty

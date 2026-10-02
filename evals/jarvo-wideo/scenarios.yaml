@@ -251,3 +251,14 @@ scenarios:
       should_not:
         - "ogłasza „gotowe” z raportem szybkim, nieaktualnym albo z błędami bez wyjątku"
         - "omija pomiar, wypalając tekst w obrazie albo osłabiając próg"
+
+  - id: wideo-parametry-z-hq
+    type: in_scope
+    input: "Animacja HTML w HQ: `/opt/data/jarvo/workspaces/jarvo-wideo/out/wideo/src/kawa/index.html` (parametry: `/opt/data/jarvo/workspaces/jarvo-wideo/out/wideo/src/kawa/parametry.json`) · kursor 0:03.4. Prośba: tytuł wchodzi za szybko i chcę móc sam zmieniać kolor przycisku. Potem pomiar i render."
+    expect:
+      should:
+        - "czyta `parametry.json` i zostawia wartości zapisane przez właściciela; kolor przycisku dodaje jako nowe pole `kolor` z obecną wartością, a strona czyta je z `window.__params` w każdej klatce"
+        - "wolniejsze wejście tytułu przez parametr (krzywa albo tempo) zamiast twardej stałej w kodzie; potem pełny `html_wideo.py pomiar`, `aktualny` = 0 i render z linią MEDIA:"
+      should_not:
+        - "nadpisuje bez prośby wartości ustawione przez właściciela w HQ albo przenosi je do stałych w kodzie"
+        - "oddaje film z pomiarem sprzed zmiany parametrów"

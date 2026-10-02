@@ -83,8 +83,8 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
    ruchów, wzorce kompozycji) i `video-lessons` (fonty zastępcze, drżenie tekstu, szwy przejść, CSS na zegarze ściennym,
    WebGL; najpierw odtwórz usterkę, potem napraw przyczynę). Pisane dla aplikacji Remocn Studio, u nas: „Studio”
    i „pipeline” = nasz proces (`rodzaje-filmu` → `scenariusz` → ten skill → `kontrola-wideo`); `design_check` =
-   `html_wideo.py pomiar` (animacja HTML) + `qa_wideo.py` i `krytyka.py` (MP4); panelu właściwości i schematów (`rules/tunable-text.md`) nie mamy:
-   wartości do strojenia trzymaj w stałych na górze sceny; szablony w `motion-design` to wzorce kompozycji z rejestru
+   `html_wideo.py pomiar` (animacja HTML) + `qa_wideo.py` i `krytyka.py` (MP4); panel właściwości i schematy (`rules/tunable-text.md`) = u nas
+   `parametry.json` + `window.__params` (kontrakt HTML, reguła 7; właściciel stroi je w HQ, **◐ Animacja**); szablony w `motion-design` to wzorce kompozycji z rejestru
    remocn, niczego z niego nie instalujesz. Przykłady w Remotion przenosisz na wybrany silnik (Remotion tylko,
    gdy go wybrałeś: firmy powyżej 3 osób potrzebują licencji Remotion).
 

@@ -19,6 +19,8 @@ function App() {
   const [focus, setFocus] = useState(null);
   const [editing, setEditing] = useState(null);   // ścieżka filmu otwartego w edytorze
   const openEditor = useCallback((f) => { setFile(null); setEditing(f.path); }, []);
+  const [animating, setAnimating] = useState(null);   // ścieżka animacji HTML otwartej w podglądzie na żywo
+  const openAnim = useCallback((f) => { setFile(null); setAnimating(f.path); }, []);
   const now = Date.now() / 1000;
 
   useEffect(() => { (api.fleet ? api.fleet() : Promise.resolve({ agents: [] })).then((f) => setFleet(f.agents || [])).catch(() => {}); }, []);
@@ -61,7 +63,7 @@ function App() {
     </div></div>`;
   }
 
-  return html`<${FileCtx.Provider} value=${setFile}><${EditCtx.Provider} value=${openEditor}><div class=${cx("thq-root", selected && "has-selection")}>
+  return html`<${FileCtx.Provider} value=${setFile}><${EditCtx.Provider} value=${openEditor}><${AnimCtx.Provider} value=${openAnim}><div class=${cx("thq-root", selected && "has-selection")}>
     ${!header && html`<${Hud} state=${state} error=${error} now=${now} onDecisions=${openDecisions}/>`}
     <main class="thq-main">
       <div class="thq-left">
@@ -80,7 +82,8 @@ function App() {
     ${taskId && html`<${TaskModal} taskId=${taskId} agents=${agents} onClose=${() => setTaskId(null)} onOpenFile=${setFile}/>`}
     ${file && html`<${FilePreview} file=${file} onClose=${() => setFile(null)}/>`}
     ${editing && html`<${VideoEditor} key=${editing} path=${editing} onClose=${() => setEditing(null)}/>`}
-  </div></${EditCtx.Provider}></${FileCtx.Provider}>`;
+    ${animating && html`<${AnimStudio} key=${animating} path=${animating} onClose=${() => setAnimating(null)}/>`}
+  </div></${AnimCtx.Provider}></${EditCtx.Provider}></${FileCtx.Provider}>`;
 }
 
 if (window.__HERMES_PLUGINS__ && window.__HERMES_PLUGINS__.register) {

@@ -346,6 +346,25 @@ function initialProject(file) {
   };
 }
 
+// Dashboard trzyma wtyczkę w warstwie z własnym z-index (np. 2), a menu boczne ma wyższy (50): okno „fixed” na cały
+// ekran (edytor, animacja) zostałoby pod menu. Na czas okna podnosimy przodków z z-index nad resztę strony, po
+// zamknięciu przywracamy.
+function useOverDashboard() {
+  useEffect(() => {
+    const raised = [];
+    let el = document.querySelector(".thq-root");
+    while (el && el !== document.body) {
+      const cs = getComputedStyle(el);
+      if (cs.zIndex !== "auto" && cs.position !== "static") {
+        raised.push([el, el.style.zIndex]);
+        el.style.zIndex = "2147483000";
+      }
+      el = el.parentElement;
+    }
+    return () => raised.forEach(([node, prev]) => { node.style.zIndex = prev; });
+  }, []);
+}
+
 function VideoEditor({ path, onClose }) {
   const openFile = React.useContext(FileCtx);
   const [info, setInfo] = useState(null);
@@ -389,21 +408,7 @@ function VideoEditor({ path, onClose }) {
 
   // okno na wierzchu stosu: Escape w podglądzie pod spodem nas nie zamyka
   useEffect(() => { MODAL_STACK.push(me.current); return () => { const i = MODAL_STACK.indexOf(me.current); if (i >= 0) MODAL_STACK.splice(i, 1); }; }, []);
-  // Dashboard trzyma wtyczkę w warstwie z własnym z-index (np. 2), a menu boczne ma wyższy (50): edytor „fixed”
-  // zostałby pod menu. Na czas edytora podnosimy przodków z z-index nad resztę strony, po zamknięciu przywracamy.
-  useEffect(() => {
-    const raised = [];
-    let el = document.querySelector(".thq-root");
-    while (el && el !== document.body) {
-      const cs = getComputedStyle(el);
-      if (cs.zIndex !== "auto" && cs.position !== "static") {
-        raised.push([el, el.style.zIndex]);
-        el.style.zIndex = "2147483000";
-      }
-      el = el.parentElement;
-    }
-    return () => raised.forEach(([node, prev]) => { node.style.zIndex = prev; });
-  }, []);
+  useOverDashboard();
   useEffect(() => () => releaseMedia(), []);
 
   const addMeta = useCallback((list) => {

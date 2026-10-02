@@ -600,8 +600,41 @@ def upload_target(inbox: Path, raw_name: str | None, now: float) -> Path:
 
 def file_entry(p: Path, base: Path | None = None) -> dict:
     st = p.stat()
-    return {"path": str(p), "name": p.name, "rel": str(p.relative_to(base)) if base else p.name, "size": st.st_size,
-            "mtime": st.st_mtime, "kind": KIND_BY_EXT.get(p.suffix.lower(), "other"), "in_out": False}
+    kind = KIND_BY_EXT.get(p.suffix.lower(), "other")
+    e = {"path": str(p), "name": p.name, "rel": str(p.relative_to(base)) if base else p.name, "size": st.st_size,
+         "mtime": st.st_mtime, "kind": kind, "in_out": False}
+    if kind == "html" and is_animation(p):
+        e["anim"] = True
+    return e
+
+
+def is_animation(p: Path) -> bool:
+    """Animacja z kontraktem HTML Wideografa: parametry.json obok albo `__seek` w kodzie (podgląd na żywo w HQ)."""
+    if (p.parent / "parametry.json").is_file():
+        return True
+    try:
+        with p.open("rb") as f:
+            return b"__seek" in f.read(512_000)
+    except OSError:
+        return False
+
+
+# wspólne biblioteki animacji (three, gsap) z katalogu narzędzi Wideografa: ten sam /_lib/ co w html_wideo.py
+LIB_ROOT = Path(os.environ.get("JARVO_NARZEDZIA", str(JARVO_DIR / "narzedzia"))) / "node" / "node_modules"
+
+
+def lib_file(rel: str, root: Path | None = None) -> Path | None:
+    """Plik biblioteki spod node_modules narzędzi (bez ukrytych, bez wyjścia poza katalog, także symlinkiem)."""
+    root = (root or LIB_ROOT)
+    parts = [x for x in rel.split("/") if x]
+    if not parts or any(x.startswith(".") or "\x00" in x or "\\" in x for x in parts):
+        return None
+    try:
+        base = root.resolve(strict=True)
+        p = base.joinpath(*parts).resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    return p if p.is_file() and _within(p, base) else None
 
 
 def message_text(content: Any) -> str:
