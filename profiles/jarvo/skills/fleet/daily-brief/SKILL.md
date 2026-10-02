@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-09-26"
+    reviewed: "2026-10-02"
 ---
 
 # Poranny brief
@@ -32,5 +32,6 @@ Dziś w planie: <rutyny / terminy z misji, jeśli są>
 - Decyzje z kolejki zawsze na górze sekcji „Czeka na Ciebie” (skill `decision-queue`), z rekomendacjami.
 - Liczby tylko, gdy coś znaczą („3 posty gotowe”, nie „2 karty w statusie review”).
 - Bez żargonu tablicy. Bez powtarzania wczorajszego briefu, jeśli nic się nie zmieniło.
+- Prosty polski (skill `prosty-polski`): zdanie do 20 słów, strona czynna, zwykłe słowa, ostrzeżenie: najpierw co zrobić.
 - Jeśli dane pokazują problem (zablokowane > 1 dnia, awarie), zacznij od niego.
 - Skrypt zgłosił błąd → jedna linia: „Nie mogę odczytać tablicy: <błąd>. Sprawdź serwer.”

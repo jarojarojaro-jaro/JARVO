@@ -24,7 +24,7 @@ jobs:
     schedule: "50 7 * * 1-5"
     script: brief_daily.py
     reasoning_effort: low
-    skills: [daily-brief, decision-queue]
+    skills: [daily-brief, decision-queue, prosty-polski]
     enabled_toolsets: [kanban, file, memory, skills]
     deliver: "@@OWNER_DELIVER@@"
     prompt: >-
@@ -35,7 +35,7 @@ jobs:
     name: "Przegląd tygodnia"
     schedule: "50 18 * * 0"
     script: review_weekly.py
-    skills: [weekly-review, fleet-improvement]
+    skills: [weekly-review, fleet-improvement, prosty-polski]
     enabled_toolsets: [kanban, file, memory, skills, session_search]
     deliver: "@@OWNER_DELIVER@@"
     prompt: >-

@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import liczby  # noqa: E402  (ta sama definicja jakości co w Jarvo HQ)
+import prosty  # noqa: E402  (prosty polski: wiadomości Jarva do właściciela)
 
 MISSIONS_DIR = Path(os.environ.get("JARVO_MISSIONS_DIR", "/opt/data/jarvo/missions"))
 DAY = 86400
@@ -94,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.mode == "weekly" and not args.fixture:
         # sześć liczb z tablicy i sesji (0 tokenów): eskalacje, awarie, cisza i tokeny obok jakości
         summary["liczby"] = liczby.policz(liczby.dane_domyslne(), now, 7)
+        summary["prosty_polski"] = prosty.tydzien(liczby.dane_domyslne(), now, 7)
     empty = not (summary["finished"] or summary["blocked"] or summary["in_flight"])
     if args.mode == "daily" and empty:
         print(json.dumps({"wakeAgent": False}))

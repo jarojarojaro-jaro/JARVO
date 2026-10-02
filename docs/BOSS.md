@@ -147,7 +147,7 @@ zdarzenie `completed`:
 | **Patrol** (cron co 30 min) | skrypt `patrol.py` czyta tablicę **bez modelu**: zablokowane karty bez eskalacji, karty w `triage`, recenzje wiszące za długo, gotowe karty, których nikt nie podjął (dispatcher padł?), misje z wszystkimi kartami `done`, ale bez raportu, karty z przekroczonym czasem, ostrzeżenia diagnostyki kanbana Hermesa, karty z INDEX-u, których nie ma na tablicy. Ta sama anomalia budzi Jarva najwyżej co 12 h (wtedy płytkie myślenie: dane zebrał skrypt). Brak nowych anomalii = `{"wakeAgent": false}`, czyli 0 tokenów | 0 zł w ciszy |
 | **Circuit breakers Hermesa** | `failure_limit` (2), limit naruszeń protokołu (3), wykrywanie pętli blokad → `triage`, reclaim martwych pracowników | wbudowane |
 | **Poranny brief** (cron pn–pt 07:50) | co w toku, co czeka na Twoją decyzję, co skończone wczoraj, co zaplanowane | najwyżej 1 tura w dzień roboczy, płytkie myślenie (dane zebrał skrypt); pusty dzień = 0 tokenów |
-| **Przegląd tygodnia** (cron nd 18:50) | statystyki floty (akceptacja za 1. razem, poprawki per agent; eskalacje, awarie pracownika, cisza i tokeny z `liczby.py` bez modelu), wnioski i propozycje ulepszeń skilli, synteza skarbca wiedzy (co się zmieniło, co dryfuje, co zbadać: szkic „Tydzień floty” do skrzynki, [WIEDZA.md](WIEDZA.md)) | 1 tura tygodniowo |
+| **Przegląd tygodnia** (cron nd 18:50) | statystyki floty (akceptacja za 1. razem, poprawki per agent; eskalacje, awarie pracownika, cisza i tokeny z `liczby.py` bez modelu), styl wiadomości do właściciela (prosty polski: ile w normie, co zawodzi; `prosty.py` bez modelu), wnioski i propozycje ulepszeń skilli, synteza skarbca wiedzy (co się zmieniło, co dryfuje, co zbadać: szkic „Tydzień floty” do skrzynki, [WIEDZA.md](WIEDZA.md)) | 1 tura tygodniowo |
 | **Świeżość wiedzy** (cron 1. dnia miesiąca 09:20) | skrypt `swiezosc.py` bez modelu: skille z `reviewed:` starszym niż 120 dni (ten sam próg co ostrzeżenie walidatora) i notatki skarbca po `wazne_do` albo `do-sprawdzenia` → lista do przejrzenia; nic przestarzałego = cisza | 0 tokenów |
 
 Rutyny instalują się **wstrzymane**. Włączasz je po sprawdzeniu, że Telegram działa:
@@ -180,6 +180,10 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
   „Web skończył landing, sprawdzam jakość”.
 - **Ostatnia wiadomość tury stoi sama:** zawiera wynik, konsekwencję, potrzebne decyzje i linki/ścieżki.
 - **Eskalacja** = dowód → konsekwencja → opcje → rekomendacja.
+- **Prosty polski** (skill `prosty-polski`, wzór: ASD-STE100 z dokumentacji lotniczej „w 80%”): zdanie do 20–25 słów,
+  akapit do 6 zdań, jedna czynność w zdaniu, strona czynna, zwykłe słowa zamiast urzędowych (słownik w skillu),
+  ostrzeżenie: najpierw co zrobić, potem ryzyko (⛔ strata pieniędzy, danych, konta; ⚠ gorszy wynik). Te same limity liczy
+  `prosty.py` bez modelu, a przegląd tygodnia pokazuje, ile wiadomości do Ciebie było w normie.
 - **Pisze od razu, gdy:** wynik gotowy do Twojej oceny, wnioski z researchu, prawdziwa blokada
   po wyczerpaniu prób, coś nieodwracalnego/ryzykownego, potrzebny login/klucz, decyzja.
 - **Nie pisze o:** rutynowym postępie, automatycznych ponowieniach, wewnętrznych mechanizmach.

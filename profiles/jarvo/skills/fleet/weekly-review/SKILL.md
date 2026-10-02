@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-09-30"
+    reviewed: "2026-10-02"
 ---
 
 # Przegląd tygodnia
@@ -38,6 +38,9 @@ awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i token
    i zaktualizowane notatki, po jednym zdaniu), **co dryfuje** (sprzeczności, przeterminowane, sieroty z lintu), **co warto
    zbadać** (pytania, na które skarbiec nie ma notatki). Orzeczenia i lekcje z ≥ 3 potwierdzeniami zgłoś w propozycjach
    `fleet-improvement` jako kandydatów do SOUL albo skilla (repo jest źródłem prawdy). Brak wpisów w LOG z 7 dni → pomiń.
+7. **Styl wiadomości:** `prosty_polski` z danych (skill `prosty-polski`, liczy `prosty.py`): ile Twoich wiadomości do
+   właściciela było w normie i co zawodziło najczęściej, w jednej linii. Poniżej 80% w normie → lekcja w księdze
+   (`fleet-improvement`) z dwoma przykładami potknięć. Brak wiadomości → pomiń.
 
 ## Format
 ```
@@ -45,6 +48,7 @@ awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i token
 Zrobione: <2–4 linie>
 Jakość: sherlock 5/6 za 1. razem, web 3/5 (powtarza się: brak zrzutów mobile), studio 4/4
 Skarbiec: +7 notatek, 1 sprzeczność do rozstrzygnięcia (link w zakładce Wiedza)
+Styl: 18/20 wiadomości prostym polskim (najczęściej: za długie zdania)
 Proponuję ulepszyć:
 1. <agent>: <zmiana> (<dowód>)
 Decyzja: wdrożyć propozycje 1–2? (zmiany trafią do repo i na serwer po Twoim „ok”)

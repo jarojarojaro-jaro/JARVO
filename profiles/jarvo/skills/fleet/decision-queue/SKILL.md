@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-09-30"
+    reviewed: "2026-10-02"
 ---
 
 # Kolejka decyzji
@@ -40,7 +40,8 @@ Zasady:
 - nieodwracalne rzeczy (A2) **nigdy** nie przechodzą domyślnie; czekają na wyraźne „tak”,
 - pozycja A2 niesie **odcisk wersji** z prośby wykonawcy (`odcisk.py`, 12 znaków): zgoda dotyczy dokładnie tych plików.
   Wykonawca nie podał odcisku → dopytaj go (komentarz w karcie), zanim zapytasz człowieka,
-- maksymalnie 5 pozycji naraz; resztę zostaw na następną wiadomość albo poranny brief.
+- maksymalnie 5 pozycji naraz; resztę zostaw na następną wiadomość albo poranny brief,
+- prosty polski (skill `prosty-polski`): pytanie i uzasadnienie po jednym krótkim zdaniu, ryzyko A2 jako „⛔ OSTRZEŻENIE”.
 
 ## Wdrożenie odpowiedzi
 Dla każdej odpowiedzi:
