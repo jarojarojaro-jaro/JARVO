@@ -5,6 +5,11 @@ dist/
 dist-web/
 web-build/
 expo-env.d.ts
+# wyniki kontroli i podglądu: powstają od nowa przy każdym `sprawdz`, `podglad` i bramce (historia wydań
+# i odrzuceń w out/wydanie i out/odrzucenia zostaje w repo)
+/out/zrzuty/
+/out/jakosc/
+/out/expo-go/
 # Continuous Native Generation: katalogi natywne powstają z app.config.ts (nie edytujemy ich ręcznie)
 /ios
 /android

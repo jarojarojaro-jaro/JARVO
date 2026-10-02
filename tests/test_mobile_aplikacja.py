@@ -4,6 +4,7 @@ podgląd (serwer zrzutów, link HQ) i Expo Go (parsowanie `eas update --json`). 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import urllib.request
@@ -149,7 +150,8 @@ def test_ustaw_bez_kont_usuwa_ekran_i_trase(aplikacja_tmp):
 def test_modul_przypomnien_wlaczany_profilem(aplikacja_tmp):
     """Powiadomienia w profilu → moduł przypomnień (plik, ekran w Stack, wiersz w „Więcej”); bez nich wszystko znika."""
     ap.ustaw(aplikacja_tmp, APLIKACJA, {"uprawnienia": ["powiadomienia"]})
-    assert (aplikacja_tmp / "src/lib/przypomnienia.ts").exists() and (aplikacja_tmp / "src/app/przypomnienia.tsx").exists()
+    for rel in ("src/lib/przypomnienia.ts", "src/lib/przypomnienia.native.ts", "src/app/przypomnienia.tsx"):
+        assert (aplikacja_tmp / rel).exists(), rel
     uklad = (aplikacja_tmp / "src/app/_layout.tsx").read_text(encoding="utf-8")
     wiecej = (aplikacja_tmp / "src/app/(tabs)/wiecej.tsx").read_text(encoding="utf-8")
     assert uklad.count('name="przypomnienia"') == 1 and wiecej.count("'/przypomnienia'") == 1
@@ -157,11 +159,18 @@ def test_modul_przypomnien_wlaczany_profilem(aplikacja_tmp):
     ap.ustaw(aplikacja_tmp, APLIKACJA, {"uprawnienia": ["powiadomienia"]})              # drugi raz: bez duplikatów
     assert (aplikacja_tmp / "src/app/(tabs)/wiecej.tsx").read_text(encoding="utf-8").count("'/przypomnienia'") == 1
     ap.ustaw(aplikacja_tmp, APLIKACJA, {})
-    assert not (aplikacja_tmp / "src/lib/przypomnienia.ts").exists() and not (aplikacja_tmp / "src/app/przypomnienia.tsx").exists()
+    for rel in ("src/lib/przypomnienia.ts", "src/lib/przypomnienia.native.ts", "src/app/przypomnienia.tsx"):
+        assert not (aplikacja_tmp / rel).exists(), rel
     assert "przypomnienia" not in (aplikacja_tmp / "src/app/_layout.tsx").read_text(encoding="utf-8")
     assert "przypomnienia" not in (aplikacja_tmp / "src/app/(tabs)/wiecej.tsx").read_text(encoding="utf-8")
-    przyp = (ap.MODULY / "powiadomienia" / "src" / "lib" / "przypomnienia.ts").read_text(encoding="utf-8")
-    assert "requestPermissionsAsync" in przyp and "SchedulableTriggerInputTypes.DATE" in przyp
+    lib = ap.MODULY / "powiadomienia" / "src" / "lib"
+    natywne = (lib / "przypomnienia.native.ts").read_text(encoding="utf-8")
+    assert "requestPermissionsAsync" in natywne and "SchedulableTriggerInputTypes.DATE" in natywne
+    # przeglądarka (podgląd w HQ, piaskownica bez localStorage): bez expo-notifications, to samo API
+    web = (lib / "przypomnienia.ts").read_text(encoding="utf-8")
+    assert "expo-notifications" not in web.split("\n\n", 1)[1] and "'niedostepne'" in web
+    eksporty = lambda t: sorted(re.findall(r"export (?:async function|function|const|type) (\w+)", t))
+    assert eksporty(web) == sorted(eksporty(natywne) + ["Zaplanowane"])
 
 
 def test_nowa_nie_zostawia_pol_aplikacji(tmp_path, monkeypatch):

@@ -5,7 +5,7 @@ i jednym zdaniem dla recenzenta Apple (notatki w `store.config.json`, po angiels
 
 | Funkcja | Sygnał na stronie | Jak w szablonie JARVO | Expo Go | Uprawnienie | Dla recenzenta (4.2) |
 |---|---|---|---|---|---|
-| przypomnienia | rezerwacje, wydarzenia | moduł `przypomnienia` (`src/lib/przypomnienia.ts`, ekran `/przypomnienia`): powiadomienie lokalne, bez serwera | tak (lokalne) | powiadomienia | "Local reminders the day before a booked visit, scheduled on device." |
+| przypomnienia | rezerwacje, wydarzenia | moduł `przypomnienia` (`src/lib/przypomnienia.native.ts` + zaślepka webowa `przypomnienia.ts`, ekran `/przypomnienia`): powiadomienie lokalne, bez serwera | tak (lokalne) | powiadomienia | "Local reminders the day before a booked visit, scheduled on device." |
 | kalendarz | rezerwacje, wydarzenia | `expo-calendar`: „Dodaj do kalendarza” przy wizycie / wydarzeniu | tak | kalendarz (powód!) | "Adds bookings to the user's calendar." |
 | karta-qr | lojalnosc | ekran karty z kodem QR (`react-native-qrcode-svg`), pieczątki w pamięci urządzenia albo w backendzie; Wallet później | tak | — | "Digital loyalty card with a scannable QR code used at the counter." |
 | oferta-offline | menu, sklep | `tresci.json` → `src/lib/oferta.ts`, lista z wyszukiwaniem, działa bez sieci | tak | — | "The full menu and price list are available offline." |

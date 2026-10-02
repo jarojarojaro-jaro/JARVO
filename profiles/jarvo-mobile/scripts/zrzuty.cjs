@@ -58,7 +58,10 @@ const nazwaPliku = (trasa) => (trasa === '/' ? 'start' : trasa.replace(/^\//, ''
       for (const motyw of motywy) {
         const d = URZADZENIA[u];
         const ctx = await browser.newContext({ viewport: d.viewport, deviceScaleFactor: d.deviceScaleFactor, isMobile: true,
-          hasTouch: true, userAgent: d.userAgent, locale: 'pl-PL', colorScheme: motyw === 'ciemny' ? 'dark' : 'light' });
+          hasTouch: true, userAgent: d.userAgent, locale: 'pl-PL', colorScheme: motyw === 'ciemny' ? 'dark' : 'light',
+          // „ogranicz ruch”: animacje wejścia (Reanimated, CSS) od razu w stanie końcowym, więc zrzut nie łapie
+          // ekranu w połowie przejścia (blade karty zamiast prawdziwych kolorów)
+          reducedMotion: 'reduce' });
         const katalog = path.join(outdir, `${u}-${motyw}`);
         fs.mkdirSync(katalog, { recursive: true });
         for (const trasa of trasy) {

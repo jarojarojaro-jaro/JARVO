@@ -1,6 +1,12 @@
 # Changelog: jarvo-mobile
 
 ## Niewydane
+- Po testowym przebiegu (aplikacja Jarvo dla właściciela floty, 2.10): `ikony.cjs` rozpoznaje logo-kafelek (własne tło
+  ikony, np. favicon Jarvo) i daje je na całą ikonę zamiast przemalowanego białego kwadratu; logo wielokolorowe nie jest
+  przemalowywane (tylko ostrzeżenie); sylwetka Androida 13+ z grafiki na kafelku. `zrzuty.cjs` z „ogranicz ruch”, więc
+  zrzut nie łapie animacji wejścia w połowie. Moduł przypomnień rozdzielony na `przypomnienia.native.ts` i zaślepkę
+  webową (podgląd w HQ bez błędu localStorage z expo-notifications). Szablon nie wersjonuje `out/zrzuty`, `out/jakosc`,
+  `out/expo-go` (historia wydań i odrzuceń zostaje).
 - Etap 6 (aplikacja ze strony, utrzymanie, łańcuch dostaw): skille `aplikacja-ze-strony` i `utrzymanie-aplikacji`.
   - `ze_strony.py`: strona firmy i do 12 podstron (najpierw kontakt, oferta, lokale; robots.txt, pauzy) → dane firmy,
     opis bez ozdobników, kolor marki (theme-color, manifest, logo SVG, CSS; bez kolorów Bootstrapa i WordPressa), oferta
