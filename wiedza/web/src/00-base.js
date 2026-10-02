@@ -35,7 +35,7 @@ const folderColor = (f) => FOLDER_COLORS[f] || "#9AA6B4";
 const TYPE_NAMES = bilingual({
   hub: ["hub", "hub"], agent: ["agent", "agent"], projekt: ["projekt", "project"], podmiot: ["podmiot", "entity"], pojecie: ["pojęcie", "concept"],
   fakt: ["fakt", "fact"], decyzja: ["decyzja", "decision"], lekcja: ["lekcja", "lesson"], zrodlo: ["źródło", "source"], rozmowa: ["rozmowa", "conversation"],
-  orzeczenia: ["orzeczenia", "rulings"],
+  orzeczenia: ["orzeczenia", "rulings"], skill: ["skill", "skill"],
 });
 const STATUS_NAMES = bilingual({
   aktualna: ["aktualna", "current"], "do-sprawdzenia": ["do sprawdzenia", "to verify"], sprzeczna: ["sprzeczna", "contradictory"],

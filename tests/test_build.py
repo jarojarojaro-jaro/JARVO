@@ -219,6 +219,18 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     # skarbiec idzie za kodem: ostatnie zmiany z CHANGELOG-u profilu i skrypty wspólne repo (lint nieaktualnych notatek)
     assert web["changes_section"] == "Niewydane" and web["changes"] and all(len(z) <= 280 for z in web["changes"])
     assert "odcisk.py" in dane["repo_scripts"] and "build.py" in dane["repo_scripts"]
+    # każdy skill to węzeł grafu wiedzy: plik w repo, powiązania, skrypty; wspólne (shared/skills) osobno od zewnętrznych
+    jarvo = next(a for a in dane["agents"] if a["name"] == "jarvo")
+    weekly = next(s for s in jarvo["skills"] if s["name"] == "weekly-review")
+    assert weekly["path"] == "profiles/jarvo/skills/fleet/weekly-review/SKILL.md" and "fleet-improvement" in weekly["related"]
+    assert {"fleet_report.py", "raport_strona.py"} <= set(weekly["scripts"]) and weekly["sections"]
+    dist = tmp_path / "dist"
+    for rel in ("jarvo-web/skills/wspolne/graf-kodu/SKILL.md", "jarvo-web/skills/obce/gsap/SKILL.md"):
+        (dist / rel).parent.mkdir(parents=True)
+        (dist / rel).write_text("---\nname: x\n---\n", encoding="utf-8")
+    web = next(a for a in build.wiedza_fleet(fleet, dist)["agents"] if a["name"] == "jarvo-web")
+    assert [s["name"] for s in web["shared_skills"]] == ["graf-kodu"] and web["external_skills"] == ["gsap"]
+    assert web["shared_skills"][0]["path"] == "shared/skills/graf-kodu/SKILL.md"
 
 
 def test_generalist_handoff_table_covers_every_specialist(built):

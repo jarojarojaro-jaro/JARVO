@@ -43,6 +43,7 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 | `orzeczenia/` | `wszyscy.md`, `<agent>.md`, `marki/<marka>.md` | `orzeczenia/_hub-orzeczenia` |
 | `rozmowy/` | skompilowane ustalenia z rozmów i kart | `rozmowy/_hub-rozmowy` |
 | `fleet/lekcje.md` | księga lekcji floty (skill `fleet-improvement`) | linkowana z hubów agentów |
+| `fleet/skille/` | jeden węzeł na skill floty (własny i wspólny), generowany przy zasiewie z repo: opis, agenci, powiązane skille, skrypty; nie edytuj, poza domyślnym szukaniem (`folder=fleet`) | linkowane z hubów agentów |
 
 Pliki specjalne w korzeniu: `_hub-skarbiec.md` (strona główna), `INDEX.md` (generowany), `LOG.md` (tylko dopisywanie),
 `LINT.md` (ostatni raport), `SCHEMA.md` (ten plik). Bloki `<!-- Jarvo:GEN … -->` w hubach są generowane: nie edytuj ich ręcznie.
@@ -51,7 +52,7 @@ Pliki specjalne w korzeniu: `_hub-skarbiec.md` (strona główna), `INDEX.md` (ge
 
 ```markdown
 ---
-typ: fakt              # hub | agent | projekt | podmiot | pojecie | fakt | decyzja | lekcja | zrodlo | rozmowa
+typ: fakt              # hub | agent | projekt | podmiot | pojecie | fakt | decyzja | lekcja | zrodlo | rozmowa | skill (tylko zasiew)
 tagi: [web, wydajnosc]
 utworzono: 2026-09-30
 zmieniono: 2026-09-30

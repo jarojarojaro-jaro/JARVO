@@ -99,6 +99,7 @@ knowledge/                       # = skarbiec (vault Obsidiana): same pliki Mark
 ├── orzeczenia/_hub-orzeczenia.md # `wszyscy.md`, `<agent>.md`, `marki/<marka>.md`: jedna datowana linia na korektę
 ├── rozmowy/_hub-rozmowy.md      # skompilowane ustalenia: `2026-09-30 web: landing marki x.md` (decyzje, fakty, pliki)
 ├── fleet/lekcje.md              # istniejąca księga lekcji (bez zmian); linkowana z hubów agentów
+├── fleet/skille/<skill>.md      # węzeł grafu na każdy skill floty (zasiew z repo): opis, agenci, powiązane skille, skrypty
 └── .obsidian/  .git/            # opcjonalnie: ustawienia Obsidiana użytkownika; punkty zapisu git (§6). Wtyczka je ignoruje.
 ```
 
@@ -111,6 +112,7 @@ Poza skarbcem: indeks wyszukiwarki `state/wiedza.db` (SQLite FTS5, odtwarzalny z
 | `skrzynka/` | każdy agent (`wiedza_zapisz`), haki (koniec sesji, kompresja, karta, pamięć) | na bieżąco, bez modelu albo z tanim modelem |
 | `orzeczenia/` | agent na Twoje słowo (`wiedza_orzeczenie`), formularz w HQ | gdy poprawiasz agenta |
 | notatki, `LOG.md`, ręczne części hubów | **tylko kompilacja** (`jarvo-wiedza`, tani model) i `zasiej` (0 tokenów) | noc / próg szkiców / ręcznie |
+| `fleet/skille/` (węzły skilli) | tylko `zasiej` z `build/wiedza/fleet.json` (0 tokenów) | każde wdrożenie |
 | `INDEX.md`, listy notatek w hubach (bloki `Jarvo:GEN`), indeks FTS5 | `wiedza.py indeksuj` (0 tokenów, deterministycznie z plików) | po każdej kompilacji, zasiewie, na żądanie |
 | `LINT.md` | lint (0 tokenów) | co tydzień i przed kompilacją |
 
@@ -335,6 +337,11 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami, zewnętrzne z locka, skrypty), `install-fleet.sh`
    zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane; pogrubiony opis huba agenta idzie
    za opisem z `fleet.yaml`, dopóki człowiek go nie zmienił; lustro `zrodla/jarvo-repo/` traci dokumenty usunięte z repo).
+   **Cała flota w grafie:** każdy skill floty (własny i wspólny z `shared/skills/`) to węzeł `fleet/skille/<skill>`: opis, wersja,
+   data przeglądu, plik w repo, agenci (linki do hubów), powiązane skille (z `related_skills` i nazw w treści skilla), skrypty floty
+   wymienione w skillu i sekcje. Hub agenta linkuje swoje skille, więc graf pokazuje agent → skill → skrypty i skill → skill.
+   Węzeł zmienia się tylko razem ze skillem, a skill usunięty z floty znika. Węzły skilli nie wchodzą do przypomnień ani do
+   domyślnego szukania (agent ma swoje skille w prompcie); `wiedza_szukaj(folder="fleet")` je zwraca, `INDEX.md` liczy je jedną linią.
    **Skarbiec idzie za kodem:** blok `Jarvo:GEN` huba agenta ma też ostatnie zmiany z `CHANGELOG.md` profilu (sekcja
    „Niewydane” albo najnowsza wersja, do 6 punktów), więc agent widzi, co się w nim i w innych zmieniło; `lint` porównuje
    odwołania do skryptów w notatkach o flocie (`agenci/`, `pojecia/`, `fleet/`, `orzeczenia/`) z tym, co jest w repo

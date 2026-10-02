@@ -370,7 +370,7 @@ class SkarbiecProvider(MemoryProvider):
                             "orzeczenia). Zwraca ścieżki i streszczenia; całą notatkę czyta wiedza_czytaj.",
              "parameters": {"type": "object", "properties": {
                  "zapytanie": {"type": "string", "description": "po polsku, kilka słów"},
-                 "folder": {"type": "string", "description": "opcjonalnie: agenci, projekty, brands, user, podmioty, pojecia, orzeczenia, rozmowy"},
+                 "folder": {"type": "string", "description": "opcjonalnie: agenci, projekty, brands, user, podmioty, pojecia, orzeczenia, rozmowy, fleet (lekcje i skille floty)"},
                  "limit": {"type": "integer", "description": "domyślnie 5, najwyżej 12"}},
                  "required": ["zapytanie"]}},
             {"name": "wiedza_czytaj",

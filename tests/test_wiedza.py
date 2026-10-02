@@ -56,7 +56,8 @@ def test_zasiew_huby_orzeczenia_docs_git(skarbiec, tmp_path):
                     "_hub-pojecia.md", "_hub-orzeczenia.md", "_hub-rozmowy.md", "_hub-jarvo.md", "_hub-web.md", "_hub-łowca.md"}
     assert len(huby) == len({h for h in huby})                       # nazwy unikalne w całym skarbcu (etykiety w grafie)
     hub = (sk.root / "agenci/jarvo-web/_hub-web.md").read_text(encoding="utf-8")
-    assert "`nowa-strona`: Nowa strona: od briefu do wdrożenia." in hub and "skille zewnętrzne (2): `gsap`, `seo-audit`" in hub
+    assert "[[fleet/skille/nowa-strona|nowa-strona]]: Nowa strona: od briefu do wdrożenia." in hub
+    assert "skille zewnętrzne (2): `gsap`, `seo-audit`" in hub
     assert "[[orzeczenia/web|Orzeczenia: Web]]" in hub and "<!-- Jarvo:GEN lista -->" in hub
     assert (sk.root / "orzeczenia/łowca.md").exists() and (sk.root / "orzeczenia/wszyscy.md").exists()
     assert (sk.root / "zrodla/jarvo-repo/PLAN.md").exists() and (sk.root / "SCHEMA.md").exists() and (sk.root / "LINT.md").exists()
@@ -78,7 +79,7 @@ def test_ponowny_zasiew_zachowuje_reczna_czesc_i_odswieza_blok(skarbiec, tmp_pat
     (tmp_path / "fleet.json").write_text(json.dumps(fleet, ensure_ascii=False), encoding="utf-8")
     assert w.main(["--skarbiec", str(sk.root), "--stan", str(tmp_path / "state"), "zasiej", "--fleet", str(tmp_path / "fleet.json")]) == 0
     hub = p.read_text(encoding="utf-8")
-    assert "Ręczna uwaga o Webie." in hub and "`seo`: SEO techniczne." in hub and hub.count("<!-- Jarvo:GEN fleet -->") == 1
+    assert "Ręczna uwaga o Webie." in hub and "[[fleet/skille/seo|seo]]: SEO techniczne." in hub and hub.count("<!-- Jarvo:GEN fleet -->") == 1
     (tmp_path / "docs" / "PLAN.md").unlink()                                  # dokument usunięty z repo znika z lustra
     (tmp_path / "docs" / "NOWY.md").write_text("# Nowy\n", encoding="utf-8")
     assert w.main(["--skarbiec", str(sk.root), "--stan", str(tmp_path / "state"), "zasiej", "--docs", str(tmp_path / "docs")]) == 0
@@ -290,3 +291,49 @@ def test_nazwy_i_frontmatter():
     assert w.podziel("bez frontmatteru") == ({}, "bez frontmatteru")
     assert w.zawiera_sekret("hasło: qwerty12") == "hasło w tekście" and w.zawiera_sekret("zwykły tekst o hasłach") is None
     assert w.Indeks.zapytanie("Jak jest z wydajnością strony?") == '"jak"*' if False else '"wydajnością"* OR "strony"*' in w.Indeks.zapytanie("Jak jest z wydajnością strony?")
+
+
+def test_skille_floty_to_wezly_grafu(skarbiec, tmp_path):
+    """Każdy skill floty (własny i wspólny) to notatka-węzeł w `fleet/skille/`: linki do hubów agentów, powiązanych skilli
+    i skryptów; poza domyślnym szukaniem i przypomnieniami (folder="fleet" je zwraca); zmienia się tylko ze skillem."""
+    sk = skarbiec
+    fleet = json.loads((tmp_path / "fleet.json").read_text(encoding="utf-8"))
+    fleet["agents"][0]["skills"] = [
+        {"name": "intake", "description": "Intake: rozumie zlecenie.", "path": "profiles/jarvo/skills/fleet/intake/SKILL.md",
+         "version": "1.1.0", "reviewed": "2026-10-02", "related": ["dispatch-playbook", "wywiad"], "mentions": ["schemat", "liczby"],
+         "scripts": ["patrol.py"], "sections": ["Kroki", "Format"]},
+        {"name": "schemat", "description": "Schemat w rozmowie.", "path": "profiles/jarvo/skills/fleet/schemat/SKILL.md"}]
+    graf_kodu = {"name": "graf-kodu", "description": "Mapa kodu.", "path": "shared/skills/graf-kodu/SKILL.md"}
+    fleet["agents"][1]["shared_skills"] = [graf_kodu]
+    fleet["agents"][2]["shared_skills"] = [graf_kodu]
+    (tmp_path / "fleet.json").write_text(json.dumps(fleet, ensure_ascii=False), encoding="utf-8")
+    r = w.zasiej(sk, fleet, None, None)
+    assert r["skille"] == 3                       # intake (nowe dane), schemat i graf-kodu; nowa-strona bez zmian
+    intake = sk.wczytaj("fleet/skille/intake")
+    assert intake.typ == "skill" and intake.fm["status"] == "generowane" and intake.fm["agent"] == "jarvo"
+    assert intake.fm["zrodlo"] == "profiles/jarvo/skills/fleet/intake/SKILL.md" and intake.streszczenie.startswith("Intake")
+    assert "[[agenci/jarvo/_hub-jarvo|Jarvo]]" in intake.tresc and "[[fleet/skille/schemat|schemat]]" in intake.tresc
+    assert "`dispatch-playbook`" in intake.tresc and "liczby" not in intake.tresc   # wzmianka bez skilla: pomijana
+    assert "skrypty: `patrol.py`" in intake.tresc and "wersja 1.1.0 · przejrzany 2026-10-02" in intake.tresc
+    wspolny = sk.wczytaj("fleet/skille/graf-kodu")
+    assert "agent" not in wspolny.fm and "[[agenci/jarvo-web/_hub-web|Web]], [[agenci/jarvo-lowca/_hub-łowca|Łowca]]" in wspolny.tresc
+    assert "skille wspólne floty (1): [[fleet/skille/graf-kodu|graf-kodu]]" in (sk.root / "agenci/jarvo-web/_hub-web.md").read_text(encoding="utf-8")
+    ix = w.Indeks(sk)
+    try:
+        ix.odswiez()
+        g = ix.graf()
+        assert {"fleet/skille/intake", "fleet/skille/graf-kodu"} <= {n["id"] for n in g["wezly"]}
+        krawedzie = {(l["z"], l["do"]) for l in g["linki"]}
+        assert ("agenci/jarvo/_hub-jarvo", "fleet/skille/intake") in krawedzie
+        assert ("fleet/skille/intake", "fleet/skille/schemat") in krawedzie
+        assert not [x for x in ix.szukaj("intake zlecenie") if x["typ"] == "skill"]           # przypomnienia bez skilli
+        assert [x["sciezka"] for x in ix.szukaj("intake zlecenie", folder="fleet")] == ["fleet/skille/intake"]
+        assert "- skille floty: 4 notatek w `fleet/skille/`" in (w.zbuduj_index(sk, ix) and (sk.root / "INDEX.md").read_text(encoding="utf-8"))
+        raport = w.lint(sk, ix)
+        assert not [x for x in raport["bledy"] + raport["ostrzezenia"] if "fleet/skille" in x]
+    finally:
+        ix.zamknij()
+    assert w.zasiej(sk, fleet, None, None)["skille"] == 0                 # bez zmian w skillach: pliki nietknięte
+    fleet["agents"][0]["skills"] = fleet["agents"][0]["skills"][:1]
+    assert w.zasiej(sk, fleet, None, None)["skille"] == 2                 # intake bez linku do schematu + schemat usunięty
+    assert not sk.istnieje("fleet/skille/schemat") and "fleet/skille/schemat" not in sk.wczytaj("fleet/skille/intake").tresc

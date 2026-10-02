@@ -94,7 +94,8 @@ function buildSim(data, filter) {
   const links = (data.linki || []).map((l) => ({ a: byId.get(l.z), b: byId.get(l.do), auto: l.auto })).filter((l) => l.a && l.b && l.a !== l.b);
   const deg = new Map();
   for (const l of links) { if (!l.auto) deg.set(l.b.id, (deg.get(l.b.id) || 0) + 1); }
-  for (const n of nodes) n.orphan = !n.hub && !(deg.get(n.id) > 0);
+  // sierota = brak linku pisanego ręcznie; węzły skilli robi zasiew (linki z hubów agentów), więc nie są sierotami
+  for (const n of nodes) n.orphan = !n.hub && n.typ !== "skill" && !(deg.get(n.id) > 0);
   return { nodes, links, alpha: 1, byId };
 }
 

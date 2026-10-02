@@ -53,10 +53,11 @@ OPISY_FOLDEROW = {
 POZA_WYSZUKIWANIEM = ("zrodla/", "skrzynka/")          # domyślnie nie wracają w wynikach (surowe i szkice)
 PLIKI_SPECJALNE = {"INDEX.md", "LOG.md", "LINT.md", "SCHEMA.md"}
 BEZ_FRONTMATTERU = ("brands/", "user/", "zrodla/", "skrzynka/")   # własne formaty (brand kit, USER.md, źródła, szkice)
-TYPY = {"hub", "agent", "projekt", "podmiot", "pojecie", "fakt", "decyzja", "lekcja", "zrodlo", "rozmowa", "orzeczenia"}
+TYPY = {"hub", "agent", "projekt", "podmiot", "pojecie", "fakt", "decyzja", "lekcja", "zrodlo", "rozmowa", "orzeczenia", "skill"}
 STATUSY = {"aktualna", "do-sprawdzenia", "sprzeczna", "przestarzala", "generowane"}
 WYMAGANE = ("typ", "utworzono", "zmieniono", "status")
-BEZ_ZRODLA = {"hub", "agent", "orzeczenia"}
+BEZ_ZRODLA = {"hub", "agent", "orzeczenia", "skill"}         # generowane z repo i floty (linki robi zasiew)
+SKILLE = "fleet/skille"                                       # skill floty = węzeł grafu (zasiew z fleet.json)
 # notatki o samej flocie (nie o klientach): ich odwołania do skryptów lint porównuje z repo (state/wiedza-kod.json)
 O_FLOCIE = ("agenci/", "pojecia/", "fleet/", "orzeczenia/")
 SKRYPT_RE = re.compile(r"`(?:[^`\s]*/)?([\w-]+\.(?:py|sh|cjs|mjs))\b[^`]*`")
@@ -451,6 +452,8 @@ class Indeks:
             s = r["sciezka"]
             if not zrodla and s.startswith(POZA_WYSZUKIWANIEM):
                 continue
+            if r["typ"] == "skill" and not folder:            # węzły grafu o flocie: tylko z folder="fleet"
+                continue
             if folder and not s.startswith(folder.rstrip("/") + "/"):
                 continue
             if agent and r["agent"] and r["agent"] != agent:
@@ -511,7 +514,10 @@ def zbuduj_index(sk: Skarbiec, ix: Indeks) -> int:
             linie += [f"## {nazwa} ({len(wiersze)} plików, poza wyszukiwaniem)", ""]
             continue
         linie += [f"## {nazwa}", ""]
-        for r in sorted(wiersze, key=lambda r: (not r["hub"], r["sciezka"])):
+        skille = [r for r in wiersze if r["typ"] == "skill"]
+        if skille:
+            linie.append(f"- skille floty: {len(skille)} notatek w `{SKILLE}/` (węzły grafu; szukanie z `folder=fleet`)")
+        for r in sorted((r for r in wiersze if r["typ"] != "skill"), key=lambda r: (not r["hub"], r["sciezka"])):
             s = (r["streszczenie"] or "").replace("\n", " ")
             s = s[:120].rstrip() + ("…" if len(s) > 120 else "")
             czesci = [f"[[{r['sciezka']}|{r['tytul']}]]"] + ([s] if s else []) + [r["typ"] or "?"] + ([r["zmieniono"]] if r["zmieniono"] else [])
@@ -572,11 +578,57 @@ def hub_agenta(a: dict) -> tuple[str, str]:
     return f"agenci/{a['name']}/_hub-{krotki}", krotki
 
 
+def notatka_skilla(s: dict, agenci: list[tuple[str, str, str]], znane: set[str]) -> str:
+    """Notatka-węzeł skilla floty: opis, kto go ma, powiązane skille i skrypty (linki robi zasiew, nie autor)."""
+    powiazane = [n for n in dict.fromkeys([*s.get("related", []), *s.get("mentions", [])]) if n in znane and n != s["name"]]
+    obce = [n for n in s.get("related", []) if n not in znane]
+    wiersze = ["- agent: " + ", ".join(f"[[{hub}|{nazwa}]]" for hub, nazwa, _a in agenci)]
+    wersja = " · ".join(x for x in (f"wersja {s['version']}" if s.get("version") else "",
+                                    f"przejrzany {s['reviewed']}" if s.get("reviewed") else "") if x)
+    plik = f"plik w repo: `{s['path']}`" if s.get("path") else ""
+    if wersja or plik:
+        wiersze.append("- " + " · ".join(x for x in (wersja, plik) if x))
+    if s.get("scripts"):
+        wiersze.append("- skrypty: " + ", ".join(f"`{x}`" for x in s["scripts"]))
+    if powiazane or obce:
+        wiersze.append("- powiązane skille: " + ", ".join([f"[[{SKILLE}/{n}|{n}]]" for n in powiazane] + [f"`{n}`" for n in obce]))
+    if s.get("sections"):
+        wiersze.append("- sekcje: " + " · ".join(s["sections"]))
+    opis = s.get("description") or "(skill bez opisu)"
+    return (f"# {s['name']}\n\n**{opis}**\n\n"
+            + zastap_blok("", "skill", "## Z repo (SKILL.md i fleet.yaml)\n" + "\n".join(wiersze)).strip() + "\n")
+
+
+def zasiej_skille(sk: Skarbiec, skille: dict[str, tuple[dict, list]]) -> int:
+    """`fleet/skille/<nazwa>.md` dla każdego skilla floty (własnego i wspólnego): węzeł grafu połączony z hubami agentów,
+    powiązanymi skillami i skryptami. Plik zmienia się tylko, gdy zmienił się skill; skill usunięty z floty znika."""
+    katalog = sk.root / SKILLE
+    katalog.mkdir(parents=True, exist_ok=True)
+    zmienione = 0
+    for nazwa, (s, agenci) in sorted(skille.items()):
+        rel = f"{SKILLE}/{nazwa}"
+        tresc = notatka_skilla(s, agenci, set(skille))
+        stare_fm, stara = podziel(sk.plik(rel).read_text(encoding="utf-8")) if sk.istnieje(rel) else ({}, None)
+        if stara is not None and stara.strip() == tresc.strip():
+            continue
+        fm = _hub_frontmatter("skill", s.get("path") or "fleet.yaml", status="generowane", tagi=["skill"],
+                              utworzono=str(stare_fm.get("utworzono") or dzis()))
+        if len(agenci) == 1:
+            fm["agent"] = agenci[0][2]
+        sk.zapisz_plik(rel, sklej(fm, tresc))
+        zmienione += 1
+    for stary in katalog.glob("*.md"):                 # skill usunięty z floty nie zostaje w grafie
+        if stary.stem not in skille:
+            stary.unlink()
+            zmienione += 1
+    return zmienione
+
+
 def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | None) -> dict:
     sk.root.mkdir(parents=True, exist_ok=True)
     for f in FOLDERY:
         (sk.root / f).mkdir(parents=True, exist_ok=True)
-    raport = {"huby": 0, "agenci": 0, "docs": 0, "git": False}
+    raport = {"huby": 0, "agenci": 0, "skille": 0, "docs": 0, "git": False}
     if schema and schema.exists():
         shutil.copy2(schema, sk.root / "SCHEMA.md")
     # huby folderów (część ręczna zostaje: piszemy tylko, gdy pliku nie ma; bloki GEN odświeżane zawsze)
@@ -599,6 +651,7 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
         poprzednie = json.loads((sk.stan / "wiedza-agenci.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         poprzednie = {}
+    skille_floty: dict[str, tuple[dict, list]] = {}
     if fleet:
         for a in fleet.get("agents", []):
             rel, krotki = hub_agenta(a)
@@ -612,10 +665,17 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                         f"- [[fleet/lekcje|Księga lekcji floty]]\n").replace("#  ", "# ")
                 sk.zapisz_plik(rel, sklej(_hub_frontmatter("agent", "fleet.yaml", agent=a["name"]), body))
                 raport["agenci"] += 1
-            skille = "\n".join(f"- `{s['name']}`: {s.get('description', '').strip()}" for s in a.get("skills", [])) or "_brak_"
+            skille = "\n".join(f"- [[{SKILLE}/{s['name']}|{s['name']}]]: {s.get('description', '').strip()}"
+                               for s in a.get("skills", [])) or "_brak_"
             skrypty = ", ".join(f"`{s}`" for s in a.get("scripts", [])) or "_brak_"
             zewn = a.get("external_skills") or []
             zewn_linia = (f"\n- skille zewnętrzne ({len(zewn)}): " + ", ".join(f"`{s}`" for s in zewn)) if zewn else ""
+            wsp = a.get("shared_skills") or []
+            if wsp:
+                zewn_linia = (f"\n- skille wspólne floty ({len(wsp)}): " + ", ".join(f"[[{SKILLE}/{s['name']}|{s['name']}]]" for s in wsp)
+                              + zewn_linia)
+            for s in [*a.get("skills", []), *wsp]:
+                skille_floty.setdefault(s["name"], (s, []))[1].append((rel, a.get("short") or krotki, a["name"]))
             zmiany = "".join(f"\n  - {z}" for z in a.get("changes") or [])
             zmiany_linia = (f"\n- ostatnie zmiany (CHANGELOG profilu, {a.get('changes_section') or 'najnowsze'}):{zmiany}"
                             if zmiany else "")
@@ -638,6 +698,7 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
         # skrypty, które naprawdę są w repo: lint wskazuje notatki floty odwołujące się do nieistniejących
         znane_skrypty = sorted({s for a in fleet.get("agents", []) for s in a.get("scripts", [])} | set(fleet.get("repo_scripts") or []))
         (sk.stan / "wiedza-kod.json").write_text(json.dumps({"skrypty": znane_skrypty}, ensure_ascii=False, indent=1), encoding="utf-8")
+        raport["skille"] = zasiej_skille(sk, skille_floty)
     if not sk.istnieje("orzeczenia/wszyscy"):
         sk.zapisz_plik("orzeczenia/wszyscy", sklej(_hub_frontmatter("orzeczenia", "człowiek"),
                                                    "# Orzeczenia: wszyscy\n\n**Korekty od użytkownika dla całej floty, jedna datowana linia każda.**\n\n"
@@ -660,7 +721,8 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
         (sk.root / "INDEX.md").write_text("# Indeks skarbca\n\n_Pusty do pierwszego `wiedza.py indeksuj`._\n", encoding="utf-8")
     if not (sk.root / "LINT.md").exists():
         (sk.root / "LINT.md").write_text("# Lint skarbca\n\n_Jeszcze nie uruchomiono `wiedza.py lint`._\n", encoding="utf-8")
-    sk.dopisz_log("zasiew", f"huby: {raport['huby']} folderów, {raport['agenci']} agentów; docs repo: {raport['docs']} plików")
+    sk.dopisz_log("zasiew", f"huby: {raport['huby']} folderów, {raport['agenci']} agentów; skille: {raport['skille']} zmienionych; "
+                            f"docs repo: {raport['docs']} plików")
     raport["git"] = sk.git_init() and sk.punkt_zapisu("zasiew skarbca")
     return raport
 
@@ -910,7 +972,8 @@ def main(argv: list[str] | None = None) -> int:
         odswiez_listy_hubow(sk, ix)
         ix.odswiez()
         sk.punkt_zapisu("zasiew skarbca: indeks")
-        print(f"✓ zasiew: {r['huby']} hubów folderów, {r['agenci']} hubów agentów, {r['docs']} docs, indeks {n} notatek, git: {'tak' if r['git'] else 'nie'}")
+        print(f"✓ zasiew: {r['huby']} hubów folderów, {r['agenci']} hubów agentów, {r['skille']} skilli zmienionych, {r['docs']} docs, "
+              f"indeks {n} notatek, git: {'tak' if r['git'] else 'nie'}")
         return 0
     if not sk.root.is_dir():
         print(f"✗ brak skarbca {sk.root} (najpierw `zasiej`)", file=sys.stderr)
