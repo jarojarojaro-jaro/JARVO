@@ -136,6 +136,7 @@ def aplikacja_tmp(tmp_path, monkeypatch):
 def test_ustaw_bez_kont_usuwa_ekran_i_trase(aplikacja_tmp):
     w = ap.ustaw(aplikacja_tmp, {**APLIKACJA, "firma": {**APLIKACJA["firma"], "usuwanie_konta_url": ""}}, {})
     assert not (aplikacja_tmp / "src/app/usun-konto.tsx").exists()
+    assert not (aplikacja_tmp / "src/lib/konto.ts").exists()               # jego JARVO-TODO nie blokuje aplikacji bez kont
     assert 'name="usun-konto"' not in (aplikacja_tmp / "src/app/_layout.tsx").read_text(encoding="utf-8")
     app = json.loads((aplikacja_tmp / "jarvo.app.json").read_text(encoding="utf-8"))
     assert app["bundle_ios"] == "pl.salonola.app" and app["scheme"] == "salonola" and app["funkcje"]["konta"] is False
@@ -145,10 +146,42 @@ def test_ustaw_bez_kont_usuwa_ekran_i_trase(aplikacja_tmp):
     assert json.loads((aplikacja_tmp / "package.json").read_text(encoding="utf-8"))["name"] == "salon-ola"
 
 
+def test_modul_przypomnien_wlaczany_profilem(aplikacja_tmp):
+    """Powiadomienia w profilu → moduł przypomnień (plik, ekran w Stack, wiersz w „Więcej”); bez nich wszystko znika."""
+    ap.ustaw(aplikacja_tmp, APLIKACJA, {"uprawnienia": ["powiadomienia"]})
+    assert (aplikacja_tmp / "src/lib/przypomnienia.ts").exists() and (aplikacja_tmp / "src/app/przypomnienia.tsx").exists()
+    uklad = (aplikacja_tmp / "src/app/_layout.tsx").read_text(encoding="utf-8")
+    wiecej = (aplikacja_tmp / "src/app/(tabs)/wiecej.tsx").read_text(encoding="utf-8")
+    assert uklad.count('name="przypomnienia"') == 1 and wiecej.count("'/przypomnienia'") == 1
+    assert wiecej.index("'/prywatnosc'") < wiecej.index("'/przypomnienia'")
+    ap.ustaw(aplikacja_tmp, APLIKACJA, {"uprawnienia": ["powiadomienia"]})              # drugi raz: bez duplikatów
+    assert (aplikacja_tmp / "src/app/(tabs)/wiecej.tsx").read_text(encoding="utf-8").count("'/przypomnienia'") == 1
+    ap.ustaw(aplikacja_tmp, APLIKACJA, {})
+    assert not (aplikacja_tmp / "src/lib/przypomnienia.ts").exists() and not (aplikacja_tmp / "src/app/przypomnienia.tsx").exists()
+    assert "przypomnienia" not in (aplikacja_tmp / "src/app/_layout.tsx").read_text(encoding="utf-8")
+    assert "przypomnienia" not in (aplikacja_tmp / "src/app/(tabs)/wiecej.tsx").read_text(encoding="utf-8")
+    przyp = (ap.MODULY / "powiadomienia" / "src" / "lib" / "przypomnienia.ts").read_text(encoding="utf-8")
+    assert "requestPermissionsAsync" in przyp and "SchedulableTriggerInputTypes.DATE" in przyp
+
+
+def test_nowa_nie_zostawia_pol_aplikacji(tmp_path, monkeypatch):
+    """Odrzucona konfiguracja (brak e-maila) nie zostawia plików: następna próba nie trafia na „katalog nie jest pusty”."""
+    monkeypatch.setattr(ap, "ikony", lambda *a, **k: None)
+    kat = tmp_path / "app"
+    with pytest.raises(ap.Blad, match="firma.email"):
+        ap.nowa(kat, {**APLIKACJA, "firma": {**APLIKACJA["firma"], "email": ""}}, {}, None, instaluj=False)
+    assert not kat.exists()
+    kat.mkdir()
+    monkeypatch.setattr(ap, "ustaw", lambda *a, **k: (_ for _ in ()).throw(ap.Blad("ikony.cjs: brak sharp")))
+    with pytest.raises(ap.Blad, match="sharp"):
+        ap.nowa(kat, APLIKACJA, {}, None, instaluj=False)
+    assert kat.exists() and not any(kat.iterdir())                   # pusty katalog podany przez agenta zostaje pusty
+
+
 def test_ustaw_z_kontami_przywraca_ekran(aplikacja_tmp):
     ap.ustaw(aplikacja_tmp, {**APLIKACJA, "firma": {**APLIKACJA["firma"], "usuwanie_konta_url": ""}}, {})
     ap.ustaw(aplikacja_tmp, APLIKACJA, {"logowanie": ["email"], "uprawnienia": ["aparat"], "powody": {"aparat": POWOD}})
-    assert (aplikacja_tmp / "src/app/usun-konto.tsx").exists()
+    assert (aplikacja_tmp / "src/app/usun-konto.tsx").exists() and (aplikacja_tmp / "src/lib/konto.ts").exists()
     assert (aplikacja_tmp / "src/app/_layout.tsx").read_text(encoding="utf-8").count('name="usun-konto"') == 1
     pl = json.loads((aplikacja_tmp / "locales/pl.json").read_text(encoding="utf-8"))
     assert pl == {"CFBundleDisplayName": "Salon Ola", "NSCameraUsageDescription": POWOD}

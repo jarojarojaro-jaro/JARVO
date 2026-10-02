@@ -18,7 +18,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [15 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 57 (HyperFrames, GSAP, Three.js, Remotion, iart, screenwriting, marketingskills, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy (+ wideo_lib) | [23](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [13](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [6 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 0 | krs, przetargi, strona, leady | [13](../evals/jarvo-lowca/scenarios.yaml) |
-| `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [8 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 0 | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [28](../evals/jarvo-mobile/scenarios.yaml) |
+| `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 20 (Expo, React Native, ASO; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 4 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [12](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -83,7 +83,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Reklama płatna, Meta Ads, Google Ads, budżet, wyniki kampanii | `jarvo-ads` |
 | Film, reels, short, montaż, napisy, lektor, klipy | `jarvo-wideo` |
 | Leady, nowi klienci, „komu sprzedać”, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
-| Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play | `jarvo-mobile` |
+| Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play, aplikacja z naszej strony, aktualizacja albo poprawka aplikacji w sklepie | `jarvo-mobile` |
 | Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
 
@@ -314,16 +314,21 @@ Redroid; ekran dla właściciela w HQ, przycisk 📱) i w symulatorze iOS w GitH
 (karta pl-PL, grafiki, zrzuty w wymiarach sklepów bez alfy) i przepuszcza go przez `sklep_check.py`: 44 punkty
 z dowodem i numerem wytycznej, błąd automatyczny blokuje wysłanie. Konta Apple, Google i Expo zawsze właściciela.
 Wydanie robi za dosłowną zgodą właściciela (build, TestFlight, testy Google, karta), do recenzji wysyła właściciel;
-odrzucenie zamienia w poprawkę, wyjaśnienie albo odwołanie i w nową kontrolę listy. Pełny projekt: [MOBILE.md](MOBILE.md).
+odrzucenie zamienia w poprawkę, wyjaśnienie albo odwołanie i w nową kontrolę listy. Ze strony firmy robi plan aplikacji
+(dane, oferta, funkcje natywne ponad stronę; mniej niż 3 z mocnym sygnałem = ryzyko Apple 4.2), a po wydaniu pilnuje
+terminów sklepów, opinii i Expo SDK i wypuszcza poprawki JS przez EAS Update tylko za zgodą i tylko do zgodnego buildu.
+Każdą nową paczkę npm sprawdza przed instalacją (literówki, podszycia, nazwy zmyślone). Pełny projekt: [MOBILE.md](MOBILE.md).
 
 **Skille:** [T] `audyt-mobilny` (+ kryteria kontroli), `natywna-czy-pwa` (+ macierz decyzji), `nowa-aplikacja`
 (+ szablon planu, zasady ekranów), `podglad-aplikacji` (+ konfiguracja Expo Go), `bramka-aplikacji` (+ rubryka 10 osi,
 werdykt, testy wrogie w przeglądarce, na Androidzie przez adb i w symulatorze iOS w GitHub Actions),
 `pakiet-do-sklepow` (+ metadane i limity, potok zrzutów, mapa 44 punktów), [A2] `wydanie` (+ konta właściciela),
-[T] `odrzucenie` (+ mapa odrzuceń). Skrypty: `audyt_mobilny.py`, `decyzja.py`, `zgodnosc.py`, `aplikacja.py`,
+[T] `odrzucenie` (+ mapa odrzuceń), `aplikacja-ze-strony` (+ funkcje natywne i opisy dla recenzenta),
+[A2] `utrzymanie-aplikacji` (+ opinie w sklepach); 20 skilli zewnętrznych (Expo, Callstack, Vercel, ASO). Skrypty: `audyt_mobilny.py`, `decyzja.py`, `zgodnosc.py`, `aplikacja.py`,
 `ikony.cjs`, `zrzuty.cjs`, `wrogie.cjs`, `urzadzenie.py`, `ios_ci.py`, `bramka.py`, `sklep_check.py` (44 punkty przed
 wysłaniem i wyuczone z odrzuceń), `pakiet.py` (szkic karty, grafiki, zrzuty), `kadry.cjs`, `wydanie.py` (EAS Build,
-Submit i Metadata za zgodą), `odrzucenie.py` (wytyczne, odpowiedź, nauka); szablony `templates/expo-jarvo/`
+Submit i Metadata za zgodą), `odrzucenie.py` (wytyczne, odpowiedź, nauka), `ze_strony.py` (strona firmy → plan i szkice konfiguracji), `utrzymanie.py`
+(stan, kalendarz terminów, EAS Update za zgodą, plan SDK), `paczki.py` (paczki npm przed instalacją); szablony `templates/expo-jarvo/`
 i `templates/ci/jarvo-ios.yml`.
 
 ---

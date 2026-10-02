@@ -182,6 +182,31 @@ sources:
     license_file: LICENSE
     # silnik detektora (program, wersja z scripts/VERSION) pobiera raz install-fleet.sh do IMPECCABLE_HOME
 
+  expo-skills:
+    type: git                # oficjalne skille Expo; bez expo-skill-feedback, eas-observe (wysyłka danych do Expo)
+    repo: https://github.com/expo/skills
+    rev: c0dadf355d4caa4e1720de372f0f8766df1a8978
+    license: MIT
+    license_file: LICENSE
+  callstack-skills:
+    type: git
+    repo: https://github.com/callstackincubator/agent-skills
+    rev: 61e6e7dfdf3a8ee862254c200d751fcb1fb863dc
+    license: MIT
+    license_file: LICENSE
+  vercel-skills:
+    type: git
+    repo: https://github.com/vercel-labs/agent-skills
+    rev: 063bee94c3f4df8453406c830b0a7df0f2860278
+    license: MIT
+    notice: "vercel-labs/agent-skills, Copyright (c) Vercel. MIT License (README: https://github.com/vercel-labs/agent-skills)"
+  aso-skills:
+    type: git
+    repo: https://github.com/appeeky/aso-skills
+    rev: 8de1ee18d8971723ac49320f01c574b8972ed1a5
+    license: MIT
+    license_file: LICENSE
+
 agents:
   jarvo:
     - {source: mattpocock-skills, path: skills/productivity/writing-for-agents, dest: meta/writing-for-agents}
@@ -362,3 +387,27 @@ agents:
     - {source: mattpocock-skills, path: skills/productivity/writing-for-agents, dest: meta/writing-for-agents}
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}
+
+  jarvo-mobile:
+    # Expo: router, natywny wygląd, animacje, dane, strona → aplikacja, sklepy, aktualizacje, podnoszenie SDK.
+    # Sekcja „Submitting Feedback” każdego skilla (npx submit-expo-feedback) jest zablokowana w approvals.deny profilu.
+    - {source: expo-skills, path: plugins/expo/skills/expo-router, dest: expo/expo-router}
+    - {source: expo-skills, path: plugins/expo/skills/expo-native-ui, dest: expo/expo-native-ui}
+    - {source: expo-skills, path: plugins/expo/skills/expo-ui, dest: expo/expo-ui}
+    - {source: expo-skills, path: plugins/expo/skills/expo-design-system, dest: expo/expo-design-system}
+    - {source: expo-skills, path: plugins/expo/skills/expo-animation, dest: expo/expo-animation}
+    - {source: expo-skills, path: plugins/expo/skills/expo-data-fetching, dest: expo/expo-data-fetching}
+    - {source: expo-skills, path: plugins/expo/skills/expo-web-to-native, dest: expo/expo-web-to-native}
+    - {source: expo-skills, path: plugins/expo/skills/eas-app-stores, dest: expo/eas-app-stores}
+    - {source: expo-skills, path: plugins/expo/skills/eas-update, dest: expo/eas-update}
+    - {source: expo-skills, path: plugins/expo/skills/expo-upgrade, dest: expo/expo-upgrade}
+    - {source: callstack-skills, path: skills/react-native-best-practices, dest: rn/react-native-best-practices}
+    - {source: callstack-skills, path: skills/react-navigation, dest: rn/react-navigation}
+    - {source: callstack-skills, path: skills/upgrading-react-native, dest: rn/upgrading-react-native}
+    - {source: vercel-skills, path: skills/react-native-skills, dest: rn/react-native-skills}
+    - {source: aso-skills, path: skills/metadata-optimization, dest: aso/metadata-optimization}
+    - {source: aso-skills, path: skills/screenshot-optimization, dest: aso/screenshot-optimization}
+    - {source: aso-skills, path: skills/app-rejection-recovery, dest: aso/app-rejection-recovery}
+    - {source: aso-skills, path: skills/android-aso, dest: aso/android-aso}
+    - {source: aso-skills, path: skills/localization, dest: aso/localization}
+    - {source: aso-skills, path: skills/review-management, dest: aso/review-management}

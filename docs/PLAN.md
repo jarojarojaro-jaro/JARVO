@@ -233,9 +233,10 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
 - 🟡 **Twórca aplikacji** `jarvo-mobile` (aplikacje mobilne w Expo od pomysłu do sklepu: darmowy audyt mobilny, prototyp
   na telefonie, testy na Androidzie i w symulatorze iOS, bramka aplikacji, 44-punktowa lista kontrolna sklepów, zrzuty,
-  obsługa odrzuceń): projekt zaakceptowany 2026-10-01, etapy 1–2 gotowe (agent we flocie: `audyt-mobilny`,
-  `natywna-czy-pwa`, `nowa-aplikacja`, `podglad-aplikacji`, szablon Expo SDK 57, 18 scenariuszy evals, pokój „Pracownia
-  aplikacji”), etapy 3–6 w budowie ([MOBILE.md](MOBILE.md)).
+  obsługa odrzuceń, aplikacja ze strony firmy, utrzymanie): projekt zaakceptowany 2026-10-01; etapy 1, 2, 4 i 6 gotowe
+  (10 skilli własnych + 20 zewnętrznych, szablon Expo SDK 57, 34 scenariusze evals, 5 ataków red teamu, pokój „Pracownia
+  aplikacji”); etapy 3 i 5 gotowe w kodzie, czekają na telefon testowy (KVM albo binder), pierwszy przebieg iOS w GitHub
+  Actions i pierwszą aplikację na kontach właściciela ([MOBILE.md](MOBILE.md) §16).
 - 🟡 Dopracowanie słabszych agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności (cookies, zgody, Omnibus)
   jako skill Weba: plan w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md); naprawy z §3 (ocena leadów, tabela Ręki, martwe ścieżki Ads)
   zrobione 2026-10-01. Nowi specjaliści: na razie żadni (dwie rundy propozycji odłożone, [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md) §6).
@@ -248,7 +249,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Evals na stagingu (`scripts/evals-staging.sh`), sędzia LLM + sprawdzenia deterministyczne.
 - ✅ Koszty: poziomy modeli w `fleet.yaml` i `reasoning_effort` per agent; przy presecie `openrouter` osobny klucz z limitem na agenta.
 - ✅ Bezpieczeństwo: zgody (A2 tylko z człowiekiem, praca bez nadzoru = odmowa), sekrety tylko w `.env`, Tailscale.
-- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 18 ataków) i wspólne zakazy floty
+- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 21 ataków) i wspólne zakazy floty
   (`shared/security/deny.yaml`).
 - ⬜ Przegląd kosztów po 2 tygodniach, korekta poziomów modeli.
 

@@ -68,6 +68,10 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [getsentry/skills](https://github.com/getsentry/skills) `security-review` (na bazie [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/)) | `d18b7aa` | CC-BY-SA-4.0 (licencja skilla; reszta repo Apache-2.0) | Web (przegląd kodu wg OWASP: JS/Next, Python, Docker) |
 | [trailofbits/skills](https://github.com/trailofbits/skills) `supply-chain-risk-auditor` | `82fe822` | CC-BY-SA-4.0 (całe repo, także skrypty) | Web (ryzyko zależności: OSV, porzucone repo, wydawcy npm, skrypty instalacyjne) |
 | [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) | `8798e40` | Apache-2.0 | Wideograf (wideo z HTML) |
+| [expo/skills](https://github.com/expo/skills) | `c0dadf3` | MIT | Twórca aplikacji (10 skilli Expo: router, natywny wygląd, animacje, dane, strona → aplikacja, sklepy, EAS Update, podnoszenie SDK; bez skilli wysyłających dane do Expo, `submit-expo-feedback` w `approvals.deny`) |
+| [callstackincubator/agent-skills](https://github.com/callstackincubator/agent-skills) | `61e6e7d` | MIT | Twórca aplikacji (`react-native-best-practices`, `react-navigation`, `upgrading-react-native`) |
+| [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `063bee9` | MIT (w README, autorstwo w `notice`) | Twórca aplikacji (`react-native-skills`) |
+| [appeeky/aso-skills](https://github.com/appeeky/aso-skills) | `8de1ee1` | MIT | Twórca aplikacji (6 skilli ASO: metadane, zrzuty, odrzucenia, Google Play, lokalizacja, opinie) |
 
 Build odrzuca skill z `anthropics/skills`, jeśli w jego katalogu nie ma licencji Apache-2.0: część
 skilli w tym repo ma inne, zastrzeżone warunki i nie wolno ich kopiować.

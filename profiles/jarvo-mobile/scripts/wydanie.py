@@ -196,7 +196,8 @@ def status(kat: Path, czekaj_min: int = 0) -> dict:
             if r.returncode != 0:
                 raise Blad(f"eas build:view {b['id']}: {(r.stdout + r.stderr).strip()[-600:]}")
             v = _json_z_wyjscia(r.stdout)
-            b.update(status=v.get("status"), numer=v.get("appBuildVersion"), blad=(v.get("error") or {}).get("message"))
+            b.update(status=v.get("status"), numer=v.get("appBuildVersion"), runtime=v.get("runtimeVersion"),
+                     blad=(v.get("error") or {}).get("message"))
             url = (v.get("artifacts") or {}).get("applicationArchiveUrl") or (v.get("artifacts") or {}).get("buildUrl")
             if b["status"] == "FINISHED" and url and not b.get("plik"):
                 roz = ROZSZERZENIA.get(str(b.get("platforma")).upper(), "bin")

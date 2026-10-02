@@ -226,7 +226,9 @@ agents:
       (strona, PWA, karta w Wallet, gotowa platforma albo aplikacja w App Store i Google Play) oraz darmowy audyt mobilny
       dowolnej firmy: aplikacje w sklepach (świeżość, oceny, polska karta, prywatność, status przedsiębiorcy DSA), opinie
       z App Store, linki strona → aplikacja (Universal Links, App Links), baner i PWA. Aplikacje Expo (React Native) z szablonu
-      ze zgodnością ze sklepami od planu: prototyp, kontrole, podgląd w HQ i na telefonie w Expo Go. Konta zawsze właściciela.
+      ze zgodnością ze sklepami od planu (także ze strony firmy): prototyp, kontrole, podgląd w HQ i na telefonie w Expo Go,
+      bramka jakości, pakiet do sklepów, wydanie i poprawki przez EAS Update za zgodą, terminy sklepów i opinie po wydaniu.
+      Konta zawsze właściciela.
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1

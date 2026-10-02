@@ -50,8 +50,9 @@ firmy → `kanban_block(kind="needs_input")` z propozycją; identyfikatora aplik
 5. **Ekrany z planu** (zasady: `references/ekrany.md`): komponenty z `src/components/`, kolory z `useKolory()`, na
    każdym ekranie z danymi stany ładowania, pustki i błędu, formularze z typem klawiatury i autouzupełnianiem, prośba
    o uprawnienie w momencie użycia z ekranem wyjaśnienia przed oknem systemowym, nic za logowaniem bez potrzeby.
-   Paczki tylko `npx expo install <paczka>`; w prototypie trzymaj się modułów dostępnych w Expo Go (podgląd na
-   telefonie bez builda). Backend: Supabase z kluczem `anon` (nigdy `service_role` w aplikacji).
+   Nowa paczka: najpierw `python3 $HERMES_HOME/scripts/paczki.py sprawdz <projekt>/app <paczka>` (literówka,
+   podszycie, nazwa zmyślona, świeża albo ze skryptem instalacyjnym = ✗, nie instalujesz), potem tylko
+   `npx expo install <paczka>`; w prototypie trzymaj się modułów dostępnych w Expo Go (podgląd bez builda). Backend: Supabase z kluczem `anon` (nigdy `service_role` w aplikacji).
 6. **Pętla po każdej większej zmianie:**
    - `python3 $HERMES_HOME/scripts/aplikacja.py sprawdz <projekt>/app`: typy, lint, wersje SDK, expo-doctor, zasady
      JARVO (pliki zgodności, uprawnienia ↔ moduły, sekrety). Wszystko ✓; `J-TODO` dozwolone tylko z listą w ryzykach,

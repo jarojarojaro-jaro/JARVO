@@ -34,6 +34,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import paczki  # noqa: E402
 import zgodnosc  # noqa: E402
 
 TU = Path(__file__).resolve().parent
@@ -217,28 +218,70 @@ def ustaw(kat: Path, a: dict, zg: dict, logo: str | None = None) -> dict:
     pkg["name"] = a["slug"]
     (kat / "package.json").write_text(json.dumps(pkg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     _ekran_usuwania(kat, kz["funkcje"]["konta"])
-    ikony(kat, a, logo)
-    return {"paleta": p, "zgodnosc": w}
+    _modul_powiadomien(kat, "expo-notifications" in kz["paczki"])
+    uwagi = ikony(kat, a, logo) or []
+    return {"paleta": p, "zgodnosc": w, "uwagi": uwagi}
 
 
 def _ekran_usuwania(kat: Path, konta: bool) -> None:
-    """Ekran „Usuń konto” jest w aplikacji wtedy i tylko wtedy, gdy aplikacja ma konta."""
+    """Ekran „Usuń konto” (i jego moduł `src/lib/konto.ts` z JARVO-TODO dla backendu) jest w aplikacji wtedy i tylko
+    wtedy, gdy aplikacja ma konta: aplikacji bez kont ten znacznik nie może blokować wydania."""
     ekran = kat / "src" / "app" / "usun-konto.tsx"
+    modul = kat / "src" / "lib" / "konto.ts"
     uklad = kat / "src" / "app" / "_layout.tsx"
     linia = '        <Stack.Screen name="usun-konto" options={{ title: \'Usuń konto\' }} />\n'
     tekst = uklad.read_text(encoding="utf-8")
     if konta:
         if not ekran.exists():
             shutil.copy2(SZABLON / "src" / "app" / "usun-konto.tsx", ekran)
+        if not modul.exists():
+            shutil.copy2(SZABLON / "src" / "lib" / "konto.ts", modul)
         if 'name="usun-konto"' not in tekst:
             tekst = tekst.replace("      </Stack>\n", linia + "      </Stack>\n")
     else:
         ekran.unlink(missing_ok=True)
+        if modul.exists() and not any("@/lib/konto" in p.read_text(encoding="utf-8", errors="replace")
+                                      for p in (kat / "src").rglob("*.ts*") if p != modul):
+            modul.unlink()
         tekst = "".join(l for l in tekst.splitlines(keepends=True) if 'name="usun-konto"' not in l)
     uklad.write_text(tekst, encoding="utf-8")
 
 
-def ikony(kat: Path, a: dict, logo: str | None) -> None:
+MODULY = TU.parent / "templates" / "moduly"
+WIERSZ_PRZYPOMNIEN = ("        <Wiersz tytul=\"Przypomnienia\" opis=\"Wizyty, odbiory, wydarzenia\" ikona=\"notifications-outline\" "
+                      "onPress={() => router.push('/przypomnienia')} />\n")
+
+
+def _modul_powiadomien(kat: Path, wlaczony: bool) -> None:
+    """Moduł przypomnień (powiadomienia lokalne, zgoda w chwili użycia) jest w aplikacji wtedy i tylko wtedy, gdy profil
+    zgodności ma powiadomienia: pliki z templates/moduly/powiadomienia, ekran w Stack i wiersz w „Więcej”."""
+    zrodlo = MODULY / "powiadomienia"
+    pliki = [p.relative_to(zrodlo) for p in zrodlo.rglob("*") if p.is_file()]
+    uklad, wiecej = kat / "src" / "app" / "_layout.tsx", kat / "src" / "app" / "(tabs)" / "wiecej.tsx"
+    linia = "        <Stack.Screen name=\"przypomnienia\" options={{ title: 'Przypomnienia' }} />\n"
+    tu, tw = uklad.read_text(encoding="utf-8"), wiecej.read_text(encoding="utf-8")
+    if wlaczony:
+        for rel in pliki:
+            (kat / rel).parent.mkdir(parents=True, exist_ok=True)
+            if not (kat / rel).exists():
+                shutil.copy2(zrodlo / rel, kat / rel)
+        if 'name="przypomnienia"' not in tu:
+            tu = tu.replace("      </Stack>\n", linia + "      </Stack>\n")
+        if "'/przypomnienia'" not in tw:
+            kotwica = next((l for l in tw.splitlines(keepends=True) if "router.push('/prywatnosc')" in l), None)
+            if kotwica is None:
+                raise Blad("wiecej.tsx bez wiersza „Prywatność”: nie wiem, gdzie dodać „Przypomnienia”")
+            tw = tw.replace(kotwica, kotwica + WIERSZ_PRZYPOMNIEN)
+    else:
+        for rel in pliki:
+            (kat / rel).unlink(missing_ok=True)
+        tu = "".join(l for l in tu.splitlines(keepends=True) if 'name="przypomnienia"' not in l)
+        tw = "".join(l for l in tw.splitlines(keepends=True) if "'/przypomnienia'" not in l)
+    uklad.write_text(tu, encoding="utf-8")
+    wiecej.write_text(tw, encoding="utf-8")
+
+
+def ikony(kat: Path, a: dict, logo: str | None) -> list[str]:
     cmd = ["node", str(TU / "ikony.cjs"), "--out", str(kat / "assets"), "--kolor", a["kolor_glowny"],
            "--litery", inicjaly(a["nazwa"])]
     if logo:
@@ -246,13 +289,34 @@ def ikony(kat: Path, a: dict, logo: str | None) -> None:
     r = _uruchom(cmd, kat, timeout=180)
     if r.returncode != 0:
         raise Blad(f"ikony.cjs: {r.stderr.strip()[-600:]}")
+    try:
+        return json.loads(r.stdout.strip().splitlines()[-1]).get("uwagi") or []
+    except (ValueError, IndexError):
+        return []
 
 
 def nowa(kat: Path, a: dict, zg: dict, logo: str | None, instaluj: bool) -> dict:
     if kat.exists() and any(kat.iterdir()):
         raise Blad(f"{kat} nie jest pusty (do zmian w istniejącej aplikacji: `ustaw`)")
+    # najpierw walidacja (bez plików na dysku), żeby odrzucona konfiguracja nie zostawiała pół-aplikacji
+    w = zgodnosc.ocen(zg)
+    if w["bledy"]:
+        raise Blad("profil zgodności ma błędy: " + "; ".join(w["bledy"]))
+    bledy = sprawdz_konfiguracje(a, w["konfiguracja"]["funkcje"]["konta"])
+    if bledy:
+        raise Blad("konfiguracja aplikacji: " + "; ".join(bledy))
+    istnial = kat.exists()
     shutil.copytree(SZABLON, kat, dirs_exist_ok=True, ignore=shutil.ignore_patterns("node_modules", ".expo", "dist*"))
-    wynik = ustaw(kat, a, zg, logo)
+    try:
+        wynik = ustaw(kat, a, zg, logo)
+    except Exception:
+        # sprzątamy tylko to, co sami założyliśmy przed chwilą (katalog był pusty albo go nie było)
+        if istnial:
+            for x in kat.iterdir():
+                shutil.rmtree(x) if x.is_dir() else x.unlink()
+        else:
+            shutil.rmtree(kat)
+        raise
     if instaluj:
         r = _uruchom(["npm", "install", "--no-audit", "--no-fund", "--loglevel=error"], kat)
         if r.returncode != 0:
@@ -301,6 +365,11 @@ def zasady_jarvo(kat: Path) -> list[dict]:
         for wz, nazwa in SEKRETY:
             if re.search(wz, t):
                 k.append({"id": "J-SEKRET", "ok": False, "opis": f"{p.relative_to(kat)}: {nazwa} w kodzie aplikacji (trafia do paczki)"})
+    wzorce = paczki.zaufane(kat) | set(paczki.POPULARNE)
+    for nazwa in sorted(set(pkg.get("dependencies") or {}) | set(pkg.get("devDependencies") or {})):
+        wzor = paczki.podszycie(nazwa, wzorce)
+        if wzor:
+            k.append({"id": "J-PACZKA", "ok": False, "opis": f"package.json: {nazwa} prawie jak {wzor} (literówka albo podszycie)"})
     todo = [f"{p.relative_to(kat)}:{i + 1}" for p, t in kod.items() for i, l in enumerate(t.splitlines()) if "JARVO-TODO" in l]
     k.append({"id": "J-TODO", "ok": True, "ostrz": bool(todo),
               "opis": f"znaczniki JARVO-TODO: {len(todo)} ({', '.join(todo[:5])}); blokują wydanie, nie podgląd" if todo
@@ -333,6 +402,9 @@ def sprawdz(kat: Path, siec: bool = True) -> dict:
         krok("WERSJE", "wersje paczek zgodne z SDK (expo install --check)", ["npx", "expo", "install", "--check"])
         if siec:
             krok("DOCTOR", "expo-doctor (konfiguracja, zależności, React Native Directory)", ["npx", "--yes", DOCTOR], timeout=300)
+            zle = [w for w in paczki.zaleznosci(kat) if w["wynik"] in ("blad", "?")]
+            wyniki.append({"id": "PACZKI", "ok": not zle, "opis": "paczki npm: rejestr, wiek, pobrania, skrypty instalacyjne (paczki.py)",
+                           "wyjscie": "\n".join(f"{w['paczka']}: {'; '.join(w['powody'])}" for w in zle)})
     wyniki += zasady_jarvo(kat)
     zle = [w for w in wyniki if not w["ok"]]
     return {"katalog": str(kat), "ok": not zle, "kontrole": wyniki,
@@ -557,6 +629,8 @@ def main(argv: list[str] | None = None) -> int:
             (kat / "ZGODNOSC.md").write_text(md, encoding="utf-8")
             print(f"✓ {kat} ({args.cmd}): paleta {json.dumps(w['paleta']['kontrasty'], ensure_ascii=False)}; "
                   f"moduły: {', '.join(w['zgodnosc']['konfiguracja']['paczki']) or 'szablon'}; ZGODNOSC.md")
+            for u in w.get("uwagi") or []:
+                print(f"⚠ ikony: {u}")
             return 0
         if args.cmd == "sprawdz":
             w = sprawdz(kat, not args.bez_sieci)

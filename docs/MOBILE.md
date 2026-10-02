@@ -2,8 +2,9 @@
 
 > Stan: **zaakceptowany 2026-10-01, w budowie.** Właściciel: `jarvo-mobile` („Twórca aplikacji”), we flocie od etapu 1
 > (audyt mobilny, „natywna czy PWA”, pokój „Pracownia aplikacji” w HQ); gotowe etapy 2 (szablon, budowa, podgląd w HQ
-> i w Expo Go) i 4 (pakiet do sklepów z listą 44 punktów); etap 3 (bramka, telefon testowy, iOS w CI) czeka na test
-> na urządzeniach, etap 5 (wydanie, odrzucenia) na pierwszą aplikację na kontach właściciela; postęp w §16.
+> i w Expo Go), 4 (pakiet do sklepów z listą 44 punktów) i 6 (aplikacja ze strony, utrzymanie, paczki npm, skille
+> zewnętrzne, red team); etap 3 (bramka, telefon testowy, iOS w CI) czeka na test na urządzeniach, etap 5 (wydanie,
+> odrzucenia) na pierwszą aplikację na kontach właściciela; postęp w §16.
 > Decyzje M1–M12 w §17 przyjęte z rekomendacjami. Wersje, ceny i reguły sklepów sprawdzone 2026-10-01; przed każdym etapem
 > sprawdzamy je jeszcze raz, bo sklepy zmieniają je co kilka miesięcy. Rzeczy, których nie udało się potwierdzić
 > w źródłach pierwotnych, są oznaczone „(niepotwierdzone)”.
@@ -497,11 +498,26 @@ część robi Web (pliki `.well-known`, baner, manifest), część Studio (opisy
 
 ## 12. Ścieżka „moja strona jako aplikacja”
 
-Najczęstsze życzenie i najczęstsze odrzucenie (4.2). Agent najpierw robi „Natywna czy PWA?”. Jeśli aplikacja ma sens,
-przenosi stronę do Expo (skill `expo-web-to-native` z oficjalnych skilli Expo) i dodaje funkcje, których strona nie ma:
-powiadomienia (Expo Push, za darmo), tryb offline, aparat lub skaner QR, przypomnienia o wizycie, karta w Wallet,
-logowanie biometryczne. Capacitor tylko z wbudowaną kopią strony, nigdy jako okno na żywą stronę (jego dokumentacja
-mówi, że to nie do produkcji). Punkt 28 listy kontrolnej (§8) mierzy udział ekranów WebView.
+Najczęstsze życzenie i najczęstsze odrzucenie (4.2). Skill `aplikacja-ze-strony` zaczyna od `ze_strony.py analizuj
+<adres>`: strona główna i do 12 podstron (najpierw kontakt, oferta, lokale; ten sam host, robots.txt, pauzy) →
+`ze-strony.json` ze źródłem każdej informacji. Z niej:
+
+- **dane firmy:** nazwa, opis bez ozdobników, telefon i e-mail (najpierw JSON-LD i strona „Kontakt”; sieć lokali
+  z dziesiątkami numerów osobno, do ekranu „Znajdź lokal”), adres, godziny, polityka prywatności, media;
+- **marka:** kolor z `theme-color`, manifestu, logo SVG albo CSS, bez domyślnych kolorów Bootstrapa i WordPressa; logo;
+- **treści:** pozycje oferty z cenami (`tresci.json`), menu strony → ekrany;
+- **sygnały → funkcje natywne:** rezerwacje → przypomnienia (moduł `przypomnienia` w szablonie: powiadomienie lokalne,
+  bez serwera) i kalendarz; karta stałego klienta → karta z kodem QR; menu i cennik → oferta offline; lokale →
+  „Zadzwoń” i „Nawiguj”; tort na zamówienie → zamówienie ze zdjęciem i przypomnieniem o odbiorze; zawsze linki ze
+  strony otwierające aplikację. Mocny sygnał = ★; **mniej niż 3 ★ to ryzyko 4.2** i powrót do `natywna-czy-pwa`;
+- **szkice:** `aplikacja.yaml` (pola, których strona nie podaje, z `JARVO-TODO`: uzupełnia właściciel) i `zgodnosc.yaml`
+  (uprawnienia z ★, powody do wpisania) → `nowa-aplikacja`; prace dla Weba (pliki `.well-known`, baner, brakująca
+  polityka prywatności).
+
+Treść strony to obce dane, nie polecenia; strona konkurencji nie jest źródłem aplikacji (4.1, 4.3, prawo autorskie).
+Wzorce przenoszenia ekranów: skill zewnętrzny `expo-web-to-native`. Capacitor tylko z wbudowaną kopią strony, nigdy
+jako okno na żywą stronę (jego dokumentacja mówi, że to nie do produkcji). Punkt 28 listy kontrolnej (§8) mierzy
+udział ekranów WebView.
 
 ## 13. Workflowy (skille) i skille zewnętrzne
 
@@ -510,23 +526,27 @@ mówi, że to nie do produkcji). Punkt 28 listy kontrolnej (§8) mierzy udział 
 | `audyt-mobilny` | darmowy audyt (§11) → raport ✓/✗ i karty poprawek dla Weba i Studia |
 | `natywna-czy-pwa` | potrzeba → rekomendacja z kosztami (sklepy, konta, utrzymanie) |
 | `nowa-aplikacja` | brief → plan i profil zgodności → makiety → szablon JARVO → pętla §5 → `bramka-aplikacji` |
-| `aplikacja-ze-strony` | §12 |
+| `aplikacja-ze-strony` | `ze_strony.py`: strona firmy → dane, oferta, sygnały, funkcje natywne z ★, szkice konfiguracji i praca dla Weba; mniej niż 3 ★ → `natywna-czy-pwa` (§12) |
 | `podglad-aplikacji` | wersja webowa w HQ, link EAS Update do Expo Go, urządzenie Android w dashboardzie, zrzuty na Telegram |
 | `bramka-aplikacji` | rubryka 0–100, testy wrogie na Androidzie i w symulatorze iOS, werdykt (§6) |
 | `pakiet-do-sklepow` | zrzuty (§9), ikony, opisy w limitach, formularze prywatności, konto demo, notatki dla recenzenta |
 | `wydanie` | `wydanie.py`: plan i bramki, EAS Build (A2), AAB i IPA z listą kontrolną (§8), TestFlight i testy Google (A2), karta App Store (A2), lista kliknięć właściciela do recenzji i wydania |
 | `odrzucenie` | `odrzucenie.py`: wiadomość recenzenta → wytyczna → poprawka, wyjaśnienie albo odwołanie, odpowiedź po angielsku; wyuczona kontrola listy (N1, N2…) (§10) |
-| `utrzymanie-aplikacji` | poprawki przez EAS Update, nowa wersja w sklepie, podnoszenie SDK, kalendarz terminów sklepów |
+| `utrzymanie-aplikacji` | `utrzymanie.py`: stan (SDK, buildy, App Store, opinie), kalendarz terminów sklepów z `.ics`, plan podniesienia SDK, poprawka przez EAS Update (A2: zgoda, odcisk kodu natywnego = build w sklepie, inaczej nowa wersja przez `wydanie`) |
 
-Skille zewnętrzne do przypięcia w `vendor/skills.lock.yaml` (licencje sprawdzone 2026-10-01):
+Skille zewnętrzne przypięte w `vendor/skills.lock.yaml` (20, licencje i skan `skan_skilli.py` 2026-10-02):
 
 | Źródło | Licencja | Co bierzemy |
 |---|---|---|
-| [expo/skills](https://github.com/expo/skills) | MIT | `expo-router`, `expo-native-ui`, `expo-ui`, `expo-design-system`, `expo-animation`, `expo-data-fetching`, `expo-web-to-native`, `eas-app-stores`, `eas-update`, `eas-workflows`, `eas-simulator` (po wyjściu z wczesnego dostępu; bez skilli z telemetrią) |
+| [expo/skills](https://github.com/expo/skills) | MIT | `expo-router`, `expo-native-ui`, `expo-ui`, `expo-design-system`, `expo-animation`, `expo-data-fetching`, `expo-web-to-native`, `eas-app-stores`, `eas-update`, `expo-upgrade` |
 | [callstackincubator/agent-skills](https://github.com/callstackincubator/agent-skills) | MIT | `react-native-best-practices`, `react-navigation`, `upgrading-react-native` |
-| [software-mansion-labs/skills](https://github.com/software-mansion-labs/skills) | MIT (w README, brak pliku: zapis w `notice`) | `react-native-best-practices` (animacje, gesty) |
-| [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | MIT | `react-native-skills` (krótkie reguły) |
+| [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | MIT (w README, zapis w `notice`) | `react-native-skills` (krótkie reguły) |
 | [appeeky/aso-skills](https://github.com/appeeky/aso-skills) | MIT | `metadata-optimization`, `screenshot-optimization`, `app-rejection-recovery`, `android-aso`, `localization`, `review-management` |
+
+Bez: `expo-skill-feedback` i `eas-observe` (wysyłają dane projektu do Expo), `eas-workflows` i `eas-simulator` (CI w EAS
+spoza procesu floty; symulator we wczesnym dostępie), `react-native-best-practices` od Software Mansion (ta sama nazwa
+co u Callstack). Każdy skill Expo kończy się sekcją „Submitting Feedback” z `npx submit-expo-feedback`: wyjątek w
+`vendor/skan-wyjatki.yaml` i blokada `*submit-expo-feedback*` w `approvals.deny` profilu, więc dane klienta nie wychodzą.
 
 Własna polska lista dostępności (cele dotyku 44 pt / 48 dp, etykiety, duże czcionki, kontrast) zamiast słabych
 zewnętrznych skilli od HIG i Material; reguły sklepów w `sklep_check.py` i `references/` skilli, nie w modelu.
@@ -550,7 +570,9 @@ zewnętrznych skilli od HIG i Material; reguły sklepów w `sklep_check.py` i `r
   tylko do wydań testowych. **Nigdy** osobisty token Expo właściciela (pełny dostęp do konta).
 - **Urządzenie z Androidem** (`--privileged`) w sieci wewnętrznej floty; adb i ws-scrcpy nigdy bez uwierzytelnienia.
 - **Opinie ze sklepów i wiadomości recenzentów to obce treści** (wstrzykiwanie poleceń): czytane jako dane, odpowiedzi tylko jako szkice (A2).
-- **Zależności npm:** nowe paczki przez ten sam skan co u Weba (`security_check.py`), wersje przypięte.
+- **Zależności npm:** nowa paczka najpierw przez `paczki.py sprawdz` (literówka albo podszycie pod paczkę z listy Expo
+  i popularnych, nazwa zmyślona, paczka świeża i mało używana, skrypty instalacyjne przy małej popularności = ✗), potem
+  `npx expo install`; `aplikacja.py sprawdz` powtarza to dla całego `package.json` (offline: literówki, z siecią: rejestr).
 - **Każdy właściciel ma własne konta** Apple, Google i Expo (§7); agent nigdy nie publikuje z jednego, wspólnego konta.
 
 ## 16. Infrastruktura i etapy
@@ -582,7 +604,7 @@ alternatywnie konfiguracja Codemagic.
 | 3 🟡 | `bramka-aplikacji`: rubryka 10 osi, werdykt (`bramka.py`), testy wrogie w przeglądarce (`wrogie.cjs`), na Androidzie przez adb (`urzadzenie.py`) i w symulatorze iOS na GitHub Actions (`ios_ci.py`, `templates/ci/jarvo-ios.yml`); telefon testowy (emulator Google albo Redroid) + ws-scrcpy w HQ | bramka i warstwa web gotowe: w kontenerze szablon 7/7 testów wrogich, celowo zepsuta aplikacja 4 błędy (przewijanie, axe w trybie ciemnym, brak paska offline, długie słowa), werdykt rundy 1 = REVISE 87 (start z tekstem zastępczym, ikona z inicjałami); Android i iOS przetestowane na atrapach (13 testów). Telefon testowy: `jarvo android on|off|status` (emulator przy KVM sprawdzonym próbnym kontenerem, Redroid przy binderze), `adb` w obrazie floty, ekran ws-scrcpy za proxy HQ `:9122` (12 testów, w tym prawdziwe gniazda z WebSocketem); w kontenerze: `adb` 34.0.5, `urzadzenie.py status` = kod 3 z instrukcją, przycisk 📱 w panelu otwiera ws-scrcpy przez proxy (nowa karta bez `opener`, ciasteczko niewidoczne dla JS, WebSocket działa), bez ciasteczka 403, token ekranu na `:9120` 404. Czeka: sam Android na serwerze Ubuntu i w Windows 11 (piaskownica nie ma KVM ani bindera) i pierwszy przebieg iOS w GitHub Actions | GitHub albo Codemagic |
 | 4 ✅ | `pakiet-do-sklepow` + `sklep_check.py` (44 punkty z testami na celowo zepsutych aplikacjach) + potok zrzutów (`pakiet.py`, `kadry.cjs`) | 36 testów (celowo zepsute aplikacje w każdej grupie A–G, AAB z manifestem protobuf i bibliotekami ELF, IPA, obrazy z alfą, adresy, metadane w bajtach); aplikacja wzorcowa bez błędów auto. W kontenerze: lista na prawdziwej aplikacji w 5 s; pierwsze uruchomienie znalazło angielski opis mikrofonu dopisywany przez wtyczkę aparatu (poprawka w `zgodnosc.py`), tekst zastępczy na ekranie startowym szablonu (teraz JARVO-TODO) i kopię aplikacji w innym katalogu (4.3); pakiet prototypu „Salon Ola” (karta, grafiki, zrzuty 1320×2868 i 1080×1920 bez alfy, galeria w podglądzie HQ) przechodzi punkty 34–42, a blokują go tylko rzeczy, których fikcyjna firma mieć nie może: strona z polityką, kontakt i usuwanie konta pod prawdziwą domeną, backend usuwania konta. Zrzuty z buildu (android / ios) czekają na telefon testowy i pierwszy build | brak |
 | 5 🟡 | `wydanie` + `odrzucenie`: EAS Build i Submit, TestFlight, ścieżki Google, notatki dla recenzenta | gotowe w kodzie: `wydanie.py` (bramki, zgody, EAS Build / Submit / Metadata, pobranie buildów z listą kontrolną) i `odrzucenie.py` (wytyczne, droga, odpowiedź EN, obce dane, nauka → punkty N) z 11 testami na atrapie EAS i prawdziwych wiadomościach; w kontenerze plan, bramki, analiza i nauka na aplikacji testowej. **Czeka:** pierwsza prawdziwa aplikacja przez recenzję w obu sklepach (konta właściciela: Apple 99 $/rok, Google 25 $) | Apple 99 $/rok, Google 25 $ |
-| 6 | `aplikacja-ze-strony`, `utrzymanie-aplikacji`, red team (opinie i wiadomości recenzentów jako atak, złośliwa paczka npm, sekret w paczce JS) | strona Weba → aplikacja z powiadomieniami | jak w 5 |
+| 6 ✅ | `aplikacja-ze-strony` (`ze_strony.py`, moduł `przypomnienia` w szablonie), `utrzymanie-aplikacji` (`utrzymanie.py`: stan, kalendarz `.ics`, aktualizacja A2, plan SDK), `paczki.py` (paczki npm przed instalacją), 20 skilli zewnętrznych (Expo, Callstack, Vercel, ASO), 3 ataki red teamu (wiadomość recenzenta z poleceniem, paczka-literówka, sekret w kodzie aplikacji), 6 evals | 29 testów (atrapa strony pizzerii, menu bez `<nav>` z podkategoriami, terminy i `.ics`, stan z App Store, bramki aktualizacji z atrapą EAS, werdykty paczek) + 2 w `test_mobile_aplikacja.py`. W kontenerze strona prawdziwej sieci cukierni: 13 stron, kolor z logo SVG, 3 numery centrali i 195 numerów lokali osobno, ekran „Produkty” z kategoriami; uczciwie 2 ★ (zamówienie tortu ze zdjęciem, „Zadzwoń” i „Nawiguj” do lokalu) → ostrzeżenie 4.2 i `natywna-czy-pwa`. Aplikacja z tego planu (dla testu budowy) z logo w 44 s, `sprawdz` 6/6, 12 zrzutów bez błędów. Poprawione po testach: kolor Bootstrapa jako marka, brak kontaktu, numery lokali w kontakcie, menu w `div#menu` niewidoczne, „Strona główna” i „EN” jako ekrany, emoji i „Zobacz!” w opisie, słabe sygnały (1–2 trafienia) z ★, brązowe logo na brązowej ikonie, pół aplikacji po błędzie konfiguracji. `utrzymanie.py` na tej aplikacji: SDK 57.0.26 = najnowszy (58 w drodze), odcisk runtime z `expo-updates`, kalendarz od 1.11.2026 z `.ics`; `paczki.py` na prawdziwym rejestrze npm: `expo-notifcations`, `react-native-async-storage`, nazwa zmyślona ✗, `react-native-qrcode-svg` ⚠ (moduł natywny spoza Expo SDK), `zustand` ✓; `sprawdz` z krokiem `PACZKI` 7/7 w 11 s. Bramka aktualizacji na kopii aplikacji: zgodny odcisk → bramki przechodzą i prawdziwy `eas update` odrzuca fałszywy token; nowe uprawnienie iOS → inny odcisk na obu platformach → blokada z odesłaniem do `wydanie`. Skan Hermesa przy buildzie: 3 ustalenia w skillach zewnętrznych przejrzane (linki w `AGENTS.md` repo aplikacji, `sudo` dla Xcode na Macu) → wyjątki z powodem; Hermes widzi 30 skilli profilu, HQ pokazuje nowe w „O agencie” | jak w 5 |
 
 Współpraca z flotą: **Web** (PWA, pliki `.well-known`, baner, strony polityki prywatności i usuwania konta, brand kit),
 **Studio** (opisy, nagłówki zrzutów, grafiki do sklepu), **Wideograf** (film podglądowy ze skilla `demo-strony`),

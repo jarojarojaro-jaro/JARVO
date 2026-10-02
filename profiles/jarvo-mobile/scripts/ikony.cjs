@@ -38,13 +38,38 @@ function svgLitery(litery, kolor, rozmiar) {
    font-size="${fs_}" fill="${kolor}">${esc(litery)}</text></svg>`);
 }
 
-async function znak(logo, litery, kolorLiter, bok) {
-  // logo albo inicjały wpasowane w kwadrat `bok` (przezroczyste tło)
+const kontrast = (a, b) => {
+  const [x, y] = [luminancja(a), luminancja(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+const hex = (r, g, b) => '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
+
+async function sredniKolor(png) {
+  // średni kolor widocznych pikseli (alfa > 50%) znaku na przezroczystym tle
+  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < data.length; i += info.channels) {
+    if (data[i + 3] > 128) { r += data[i]; g += data[i + 1]; b += data[i + 2]; n++; }
+  }
+  return n ? hex(r / n, g / n, b / n) : null;
+}
+
+async function znak(logo, litery, kolorLiter, bok, tloHex) {
+  // logo albo inicjały wpasowane w kwadrat `bok` (przezroczyste tło). Logo w kolorze tła (np. brązowe logo na
+  // brązowej ikonie) znikałoby: przy kontraście < 3:1 przemalowujemy je na kolor czytelny na tle, z tą samą sylwetką.
   if (logo) {
-    return sharp(logo, { density: 600 }).resize(bok, bok, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+    const png = await sharp(logo, { density: 600 }).resize(bok, bok, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+    const sredni = tloHex ? await sredniKolor(png) : null;
+    if (sredni && kontrast(sredni, tloHex) < 3) {
+      UWAGI.push(`logo (${sredni}) zlewa się z tłem ${tloHex}: przemalowane na ${kolorLiter}`);
+      const alfa = await sharp(png).ensureAlpha().extractChannel(3).toBuffer();
+      return sharp({ create: { width: bok, height: bok, channels: 3, background: kolorLiter } }).joinChannel(alfa).png().toBuffer();
+    }
+    return png;
   }
   return sharp(svgLitery(litery, kolorLiter, bok)).png().toBuffer();
 }
+const UWAGI = [];
 
 (async () => {
   const out = arg('--out');
@@ -56,6 +81,12 @@ async function znak(logo, litery, kolorLiter, bok) {
     process.exit(2);
   }
   if (logo && !fs.existsSync(logo)) { console.error(`Brak pliku logo: ${logo}`); process.exit(2); }
+  if (logo) {
+    const m = await sharp(logo, { density: 72 }).metadata();
+    if (m.width && m.height && Math.max(m.width / m.height, m.height / m.width) > 2) {
+      UWAGI.push(`logo poziome (${m.width}×${m.height}): na ikonie będzie drobne; czytelniejszy jest kwadratowy sygnet od marki`);
+    }
+  }
   fs.mkdirSync(out, { recursive: true });
   const N = 1024;
   const tlo = { create: { width: N, height: N, channels: 3, background: kolor } };
@@ -69,10 +100,10 @@ async function znak(logo, litery, kolorLiter, bok) {
   };
 
   // App Store: ikona bez przezroczystości; logo w 66% powierzchni
-  const zIkona = await znak(logo, litery, naTle, Math.round(N * 0.66));
+  const zIkona = await znak(logo, litery, naTle, Math.round(N * 0.66), kolor);
   await zapisz('icon.png', sharp(tlo).composite([{ input: zIkona, gravity: 'center' }]).flatten({ background: kolor }).removeAlpha().png());
   // Android: ikona adaptacyjna (bezpieczne koło ≈ 66% → znak 56%, żeby nic nie ucięło)
-  const zFg = await znak(logo, litery, naTle, Math.round(N * 0.56));
+  const zFg = await znak(logo, litery, naTle, Math.round(N * 0.56), kolor);
   const pusty = { create: { width: N, height: N, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } };
   const fg = await sharp(pusty).composite([{ input: zFg, gravity: 'center' }]).png().toBuffer();
   await zapisz('android-icon-foreground.png', sharp(fg));
@@ -84,5 +115,5 @@ async function znak(logo, litery, kolorLiter, bok) {
   const zSplash = await znak(logo, litery, kolor, Math.round(N * 0.8));
   await zapisz('splash-icon.png', sharp(pusty).composite([{ input: zSplash, gravity: 'center' }]).png());
   await zapisz('favicon.png', sharp(path.join(out, 'icon.png')).resize(48, 48).png());
-  console.log(JSON.stringify({ out, logo: logo || null, litery: logo ? null : litery, pliki: wynik }));
+  console.log(JSON.stringify({ out, logo: logo || null, litery: logo ? null : litery, pliki: wynik, uwagi: [...new Set(UWAGI)] }));
 })().catch((e) => { console.error(e && e.stack ? e.stack : String(e)); process.exit(1); });

@@ -61,11 +61,11 @@ tools:
     version: "24.7.0"
     install: {method: npx, spec: "npx --yes eas-cli@24.7.0 (pobierany przy pierwszym użyciu)"}
     integration: skill-script
-    used_by_skills: [podglad-aplikacji, wydanie]
+    used_by_skills: [podglad-aplikacji, wydanie, utrzymanie-aplikacji]
     healthcheck: "npm --version"
     autonomy: A1
     optional: true
-    notes: "aplikacja.py expo-go: eas init (projekt w organizacji właściciela) i eas update na gałąź podglądu (A1). wydanie.py: eas build (production, --no-wait), build:view, submit (TestFlight, ścieżka wewnętrzna Google jako szkic), metadata:push: A2 z dosłowną zgodą właściciela; token robota EXPO_TOKEN w .env profilu."
+    notes: "aplikacja.py expo-go: eas init (projekt w organizacji właściciela) i eas update na gałąź podglądu (A1). wydanie.py: eas build (production, --no-wait), build:view, submit (TestFlight, ścieżka wewnętrzna Google jako szkic), metadata:push: A2 z dosłowną zgodą właściciela. utrzymanie.py aktualizacja: eas update na kanał production (A2, zgoda, runtime = build w sklepie); token robota EXPO_TOKEN w .env profilu."
   - name: sharp
     source: https://github.com/lovell/sharp
     license: Apache-2.0
@@ -129,6 +129,38 @@ tools:
     healthcheck: "true"
     autonomy: A1
     notes: "pakiet.py szkic tworzy pliki, sklep_check.py je czyta; wysyłka metadanych (eas metadata:push) dopiero w etapie 5, A2."
+  - name: expo-updates-fingerprint
+    source: https://github.com/expo/expo/tree/main/packages/expo-updates
+    license: MIT
+    version: "~57.0.24 (z szablonu)"
+    install: {method: npm, spec: "zależność aplikacji z szablonu templates/expo-jarvo"}
+    integration: skill-script
+    used_by_skills: [utrzymanie-aplikacji]
+    healthcheck: "npm --version"
+    autonomy: A0
+    optional: true
+    notes: "utrzymanie.py: npx expo-updates runtimeversion:resolve --platform ios|android (odcisk kodu natywnego, runtimeVersion policy fingerprint) porównany z runtime buildu w sklepie z out/wydanie/buildy.json."
+  - name: npm-registry
+    source: https://registry.npmjs.org (npm, Inc.)
+    license: API publiczne bez klucza
+    version: "api"
+    install: {method: none, spec: "HTTP: registry.npmjs.org/<paczka>/latest, api.npmjs.org/downloads/point/last-week/<paczka>"}
+    integration: skill-script
+    used_by_skills: [nowa-aplikacja, utrzymanie-aplikacji]
+    healthcheck: "python3 -c \"import urllib.request; urllib.request.urlopen('https://registry.npmjs.org/expo/latest', timeout=20)\""
+    autonomy: A0
+    optional: true
+    notes: "paczki.py: istnienie, wiek, pobrania tygodniowo, skrypty instalacyjne i deprecated przed npx expo install; utrzymanie.py: npm view expo dist-tags (najnowszy SDK). Bez sieci: tylko literówki i podszycia, reszta jako „?”."
+  - name: strona-firmy
+    source: strona właściciela (HTTP)
+    license: treści właściciela; robots.txt respektowany
+    version: "html"
+    install: {method: none, spec: "HTTP przez mobile_lib.pobierz (robots.txt, pauzy, pamięć podręczna)"}
+    integration: skill-script
+    used_by_skills: [aplikacja-ze-strony]
+    healthcheck: "true"
+    autonomy: A0
+    notes: "ze_strony.py: strona główna i do 12 podstron tego samego hosta; JSON-LD, meta, manifest, logo SVG, CSS; treść jako obce dane. Kod 3 = robots.txt zabrania (bez obchodzenia)."
 
 sidecars: []
 hermes_skills: []

@@ -73,3 +73,34 @@ wyjatki:
      powod: "przewodnik OWASP: przykłady podatnego kodu i ataków oznaczone jako FLAG/Attack (os.system(user_input), ../../../etc/passwd, curl|bash w preinstall, „Ignore all previous instructions” jako atak na LLM); „klucz AWS” to przykładowy klucz z dokumentacji AWS (z końcówką EXAMPLE); skill nie ma skryptów"}
   - {zrodlo: trailofbits, rev: 82fe822, skill: plugins/supply-chain-risk-auditor/skills/supply-chain-risk-auditor,
      regula: "hermes:python_os_environ", plik: scripts/test_collect.py, powod: "test uruchamia collect.py w podprocesie ze środowiskiem + PYTHONPATH"}
+
+  # --- skille Expo (Twórca aplikacji): sekcja „Submitting Feedback” wysyła opinię do Expo przez npx; profil jarvo-mobile
+  #     blokuje to polecenie w approvals.deny (`*submit-expo-feedback*`), więc instrukcja zostaje martwa
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-router, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-native-ui, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-ui, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-design-system, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-animation, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-data-fetching, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-web-to-native, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/eas-app-stores, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/eas-update, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-upgrade, regula: pobierz-i-uruchom, plik: SKILL.md,
+     powod: "npx --yes submit-expo-feedback: zablokowane w approvals.deny profilu jarvo-mobile; feedbacku do Expo nie wysyłamy"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/eas-app-stores, regula: pobierz-i-uruchom, plik: references/testflight.md,
+     powod: "opis wersji eas-cli (npx eas-cli@23.2.0); wydanie.py używa przypiętego eas-cli@24.7.0"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-native-ui, regula: polecenie-przy-ladowaniu, plik: SKILL.md,
+     powod: "operator non-null TypeScriptu (`Platform.select(...)!` returns), nie !`polecenie`; inline_shell w Hermesie wyłączony (domyślnie)"}
+  - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-upgrade, regula: "hermes:agent_config_mod", plik: SKILL.md,
+     powod: "AGENTS.md w repo aplikacji (szablon Expo linkuje dokumentację wersji SDK): przy podniesieniu SDK zmieniają się linki, nie konfiguracja agenta Hermes"}
+  - {zrodlo: callstack-skills, rev: 61e6e7d, skill: skills/upgrading-react-native, regula: "hermes:sudo_usage", plik: references/upgrading-react-native.md,
+     powod: "xcode-select i xcodebuild -runFirstLaunch na Macu człowieka; w kontenerze floty nie ma Xcode ani sudo, iOS budują EAS i GitHub Actions"}

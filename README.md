@@ -14,7 +14,7 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 | 🎥 `jarvo-wideo` | wideograf: krótkie filmy z tematu (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, klipy z nagrań |
 | 📈 `jarvo-ads` | specjalista Ads: Meta i Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem |
 | 🎯 `jarvo-lowca` | łowca leadów: sygnały zakupowe z KRS, przetargów i stron firm → ranking firm z „dlaczego teraz” i opublikowanym kontaktem; nic nie wysyła |
-| 📱 `jarvo-mobile` | twórca aplikacji: uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA), aplikacje Expo ze zgodnością ze sklepami od planu, podgląd w HQ i w Expo Go; konta zawsze właściciela |
+| 📱 `jarvo-mobile` | twórca aplikacji: uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA), aplikacje Expo ze zgodnością ze sklepami od planu (także ze strony firmy), podgląd w HQ i w Expo Go, bramka jakości, pakiet do sklepów z listą 44 punktów, wydanie i poprawki OTA za zgodą, kontrola paczek npm; konta zawsze właściciela |
 | 🦾 `jarvo-reka` | prawa ręka: generalista ze wszystkimi skillami, składa pakiety misji, dokumenty, prototypy |
 
 ## Jarvo HQ
@@ -100,7 +100,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [RUNBOOK.md](docs/RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [INSTALER.md](docs/INSTALER.md) | plan instalatora jednym poleceniem na Linuksie, macOS i Windowsie: diagnoza, etapy, ocena trudności |
 | [ROZWOJ-FLOTY.md](docs/ROZWOJ-FLOTY.md) | plan dopracowania agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności jako skill Weba |
-| [MOBILE.md](docs/MOBILE.md) | projekt Twórcy aplikacji `jarvo-mobile`: pełny proces od pomysłu do sklepu (darmowy audyt mobilny, prototyp Expo na telefonie, Android w dashboardzie i iOS w chmurze, bramka aplikacji, lista kontrolna sklepów, zrzuty, odrzucenia); do akceptacji |
+| [MOBILE.md](docs/MOBILE.md) | projekt Twórcy aplikacji `jarvo-mobile`: pełny proces od pomysłu do sklepu (darmowy audyt mobilny, prototyp Expo na telefonie, Android w dashboardzie i iOS w chmurze, bramka aplikacji, lista kontrolna sklepów, zrzuty, odrzucenia, aplikacja ze strony, utrzymanie); etapy i stan w §16 |
 | [SOURCES.md](docs/SOURCES.md) | źródła, atrybucje i licencje |
 | [JARVO-CALOSC.md](docs/JARVO-CALOSC.md) | całość od A do Z w jednym pliku (kontekst na start sesji) |
 

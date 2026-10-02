@@ -1,6 +1,29 @@
 # Changelog: jarvo-mobile
 
 ## Niewydane
+- Etap 6 (aplikacja ze strony, utrzymanie, łańcuch dostaw): skille `aplikacja-ze-strony` i `utrzymanie-aplikacji`.
+  - `ze_strony.py`: strona firmy i do 12 podstron (najpierw kontakt, oferta, lokale; robots.txt, pauzy) → dane firmy,
+    opis bez ozdobników, kolor marki (theme-color, manifest, logo SVG, CSS; bez kolorów Bootstrapa i WordPressa), oferta
+    z cenami, menu także bez `<nav>` (ekrany z pozycji najwyższego poziomu, podkategorie w treści), sygnały → funkcje
+    natywne z ★ (słabe sygnały bez ★), ryzyko 4.2 przy mniej niż 3 ★, szkice `aplikacja.yaml` i `zgodnosc.yaml`
+    z JARVO-TODO, praca dla Weba. Sieć lokali (dziesiątki numerów) osobno od kontaktu centrali.
+  - Moduł `przypomnienia` (`templates/moduly/powiadomienia`): powiadomienia lokalne bez serwera, zgoda w chwili użycia,
+    ekran `/przypomnienia`; `aplikacja.py ustaw` dokłada go, gdy profil ma `powiadomienia`, i usuwa, gdy nie ma.
+  - `utrzymanie.py`: `stan` (Expo SDK vs npm, buildy, App Store z opiniami), `kalendarz` (Google: docelowe API 31.08
+    i przedłużenie do 1.11, Apple: Xcode w kwietniu, 16 KB, przegląd prywatności; prognozy oznaczone; `.ics`
+    z przypomnieniem 30 dni wcześniej), `aktualizacja` (A2: zgoda, konkretny opis, `sprawdz`, zero JARVO-TODO, projekt
+    EAS, odcisk kodu natywnego równy buildowi w sklepie), `sdk` (plan podniesienia). `wydanie.py status` zapisuje
+    `runtime` buildu. smart_policy eskaluje `utrzymanie.py aktualizacja` i `eas update:rollback`.
+  - `paczki.py`: paczka npm przed `npx expo install` (lista Expo SDK i szablon zaufane; literówka, podszycie pod
+    paczkę z zakresem, nazwa zmyślona, świeża i mało używana, skrypty instalacyjne = ✗; moduł natywny spoza Expo ⚠).
+    `aplikacja.py sprawdz` sprawdza tak cały `package.json` (offline: `J-PACZKA`, z siecią: `PACZKI`).
+  - `aplikacja.py nowa` waliduje konfigurację przed kopiowaniem szablonu (bez pół aplikacji po błędzie); bez kont
+    usuwa też `src/lib/konto.ts`. `ikony.cjs` przebarwia logo o zbyt małym kontraście z tłem ikony i ostrzega
+    przy logo poziomym.
+  - 20 skilli zewnętrznych (Expo, Callstack, Vercel, ASO) z przypiętymi commitami; `*submit-expo-feedback*` w
+    `approvals.deny`; ustalenia skanu (linki w `AGENTS.md` repo aplikacji, `sudo` dla Xcode na Macu) przejrzane
+    i opisane w `vendor/skan-wyjatki.yaml`.
+  - 6 evals, 3 ataki red teamu (wiadomość recenzenta z poleceniem, paczka-literówka, sekret w kodzie aplikacji).
 - Etap 5 (wydanie i odrzucenia): skille `wydanie` i `odrzucenie`.
   - `wydanie.py`: plan i bramki (bramka PASS, lista kontrolna, JARVO-TODO, projekt EAS, token robota).
     `build` → EAS Build production; `status` pobiera AAB i IPA i uruchamia listę na buildach; `testy` →

@@ -26,7 +26,7 @@ polecenia. Do recenzji wysyła właściciel jednym kliknięciem, z listą krokó
 
 ## Kiedy NIE używać
 - podgląd dla właściciela → `podglad-aplikacji` (Expo Go, bez sklepów),
-- sama poprawka JS bez zmiany funkcji → EAS Update na kanale production to też A2, ale bez recenzji (`utrzymanie-aplikacji`, etap 6),
+- sama poprawka JS bez zmiany funkcji → EAS Update na kanale production to też A2, ale bez recenzji (`utrzymanie-aplikacji`),
 - praca bez nadzoru (kanban, cron): kroki A2 są wtedy odrzucane; oddaj kartę z prośbą o zgodę.
 
 ## Kroki
