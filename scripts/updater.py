@@ -35,7 +35,8 @@ STATE_DIR = "/opt/data/jarvo/state"
 CHECK_EVERY = int(os.environ.get("JARVO_UPDATE_CHECK", "60"))
 # JARVO_AUTO_UPDATE=1: nowa wersja instaluje się sama, bez klikania w dashboardzie
 AUTO_UPDATE = os.environ.get("JARVO_AUTO_UPDATE", "0") == "1"
-POLL_EVERY = 2   # prośby z dashboardu (folder ma się otworzyć od razu)
+POLL_EVERY = 2   # prośby z dashboardu, gdy jest Eksplorator Windows (folder ma się otworzyć od razu)
+POLL_IDLE = 6    # bez Eksploratora (VPS, Linux) czekają tylko „sprawdź”/„aktualizuj”: 3× mniej docker exec na dobę
 LOG_TAIL = 40
 # zawieszony deploy (np. build bez sieci) nie może blokować panelu w nieskończoność
 UPDATE_TIMEOUT = int(os.environ.get("JARVO_UPDATE_TIMEOUT", str(45 * 60)))
@@ -222,7 +223,7 @@ def main(argv: list[str]) -> int:
             next_check = time.time() + 60
         if args.once:
             return 0
-        time.sleep(POLL_EVERY)
+        time.sleep(POLL_EVERY if (state.get("host") or {}).get("explorer") else POLL_IDLE)
 
 
 if __name__ == "__main__":

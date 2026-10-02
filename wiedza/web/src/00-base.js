@@ -69,7 +69,7 @@ function usePoll(fn, ms, deps) {
     let alive = true, timer = null;
     const run = () => fn().then((d) => { if (alive) { setData(d); setError(null); } })
       .catch((e) => { if (alive) setError(e.message || String(e)); })
-      .finally(() => { if (alive && ms) timer = setTimeout(run, ms); });
+      .finally(() => { if (alive && ms) timer = setTimeout(run, document.hidden ? ms * 4 : ms); });
     run();
     return () => { alive = false; if (timer) clearTimeout(timer); };
   }, [...(deps || []), tick]);

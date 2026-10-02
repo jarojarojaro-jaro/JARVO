@@ -119,11 +119,11 @@
     const sys = document.querySelector("aside.fixed > div.shrink-0.flex.flex-col.border-t");
     if (sys && item.nextElementSibling !== sys) sys.parentElement.insertBefore(item, sys);
   }
-  setInterval(mount, 1500);
+  setInterval(() => { if (!document.hidden) mount(); }, 1500);
   mount();
   load();
   (function poll() {
     const busyNow = st && (st.state === "updating" || st.pending);
-    setTimeout(() => { load().finally(poll); }, busyNow || open ? 3000 : 20000);
+    setTimeout(() => { load().finally(poll); }, busyNow || open ? 3000 : document.hidden ? 80000 : 20000);
   })();
 })();

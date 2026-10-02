@@ -536,7 +536,7 @@ function VideoEditor({ path, onClose }) {
     if (!info || !api.editStamp) return undefined;
     let alive = true;
     const id = setInterval(async () => {
-      if (conflict) return;
+      if (conflict || document.hidden) return;              // ukryta karta: zmiany agenta wczytamy po powrocie
       try {
         const st = await api.editStamp(path);
         if (!alive || !(st.mtime > baseRef.current + 1e-3)) return;

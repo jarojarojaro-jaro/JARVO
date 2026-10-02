@@ -45,9 +45,9 @@ po błędach bezpośrednio (`hermes kanban unblock`), bo tu nie ma czego rozstrz
 ```
 przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
    └─ zakładka „/base” = plugin jarvo-hq (React z SDK dashboardu + htm, bez kroku budowania po stronie serwera)
-        ├─ GET  /api/plugins/jarvo-hq/state        co 3 s: agenci, tablica, decyzje, misje, zdarzenia
+        ├─ GET  /api/plugins/jarvo-hq/state        co 3 s (ukryta karta: co 12 s): agenci, tablica, decyzje, misje, zdarzenia
         ├─ GET  /api/plugins/jarvo-hq/fleet        opis floty (fleet.json)
-        ├─ GET  /api/plugins/jarvo-hq/agent/<a>    co 2,5 s przy otwartym panelu: karty, oś kroków, wyniki
+        ├─ GET  /api/plugins/jarvo-hq/agent/<a>    co 2,5 s przy otwartym panelu: karty, oś kroków, wyniki (pliki co 10 s)
         ├─ GET  /api/plugins/jarvo-hq/task/<id>    karta z historią i komentarzami
         ├─ POST /api/plugins/jarvo-hq/task/<id>/retry  „Ponów kartę” porzuconą po błędach (hermes kanban unblock)
         ├─ GET  /api/plugins/jarvo-hq/file?path=   podgląd pliku z katalogów floty
@@ -147,7 +147,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy rysuje ta sama funkcja (`hq/web/src/44-napisy.js`) w przeglądarce bez okna, więc plik od agenta wygląda
-  jak eksport z edytora. Edytor co 3 s sprawdza, czy projekt zmienił się z zewnątrz: bez Twoich niezapisanych zmian
+  jak eksport z edytora. Edytor co 3 s (gdy karta jest widoczna) sprawdza, czy projekt zmienił się z zewnątrz: bez Twoich niezapisanych zmian
   wczytuje wersję agenta sam (jako zwykły krok, ↶ ją cofa), a przy kolizji pyta: „Wczytaj jego wersję” albo
   „Zostaw moją”. Zapis nigdy nie nadpisuje po cichu cudzej zmiany (serwer odrzuca go jako nieaktualny).
 - **Uwagi na osi i kadr do Wideografa** (pomysł z Remocn Studio, MIT): w panelu „Poproś agenta” **📌 Uwaga w 0:04.2**
@@ -221,6 +221,7 @@ przy każdym pliku HTML, który ma obok `parametry.json` albo `__seek` w kodzie 
   nie idą dalej. Token ekranu nie otwiera niczego na `:9120` i odwrotnie.
 - **Pokaż w folderze**: dashboard zapisuje tylko prośbę ze ścieżką (`state/reveal-request`); `scripts/updater.py`
   na hoście sprawdza ją ponownie (tylko `jarvo/{workspaces,missions,knowledge,inbox}`) i woła `explorer.exe /select,…`.
+  Prośby odbiera co 2 s, gdy jest Eksplorator (WSL); bez niego (VPS, Linux) co 6 s, bo czekają tylko „sprawdź” i „aktualizuj”.
 - Odczyt kanbana i transkrypcji w trybie SQLite `mode=ro`. HQ zapisuje tylko: mapę sesji czatu
   (`/opt/data/jarvo/state/hq-sessions.json`), pliki z czatu (`inbox/<data>/`), linki podglądu
   (`state/preview-links.json`, `state/preview.json`), prośby do pomocnika hosta (`state/reveal-request`,

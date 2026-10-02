@@ -364,6 +364,24 @@ def test_outputs_prune_heavy_dirs(tmp_path):
     assert [f["name"] for f in files] == ["a.png"]
 
 
+def test_outputs_scan_limit_stops_whole_walk(tmp_path, monkeypatch):
+    """Po SCAN_MAX plików przejście kończy się całe: kolejne katalogi nie są już listowane."""
+    jarvo = tmp_path / "jarvo"
+    dirs = []
+    for k in range(3):
+        d = jarvo / "workspaces" / f"a{k}"
+        for j in range(4):
+            (d / f"s{j}").mkdir(parents=True, exist_ok=True)
+            (d / f"s{j}" / "x.txt").write_text("x", encoding="utf-8")
+        dirs.append(d)
+    monkeypatch.setattr(core, "SCAN_MAX", 3)
+    listed = []
+    real_walk = os.walk
+    monkeypatch.setattr(core.os, "walk", lambda d: ((listed.append(r), (r, s, n))[1] for r, s, n in real_walk(d)))
+    files = core.list_outputs(dirs, core.Roots(jarvo_dir=jarvo))
+    assert len(files) == 3 and len(listed) <= 5
+
+
 def test_gave_up_card_is_a_failed_decision(home):
     import json, sqlite3
     conn = sqlite3.connect(home / "kanban.db")

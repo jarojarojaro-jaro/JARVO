@@ -124,11 +124,19 @@ def read_board(db_path: Path, now: float, window_s: int = 7 * 86400, extra_ids: 
         if blocked:
             seen_blocked = {e["task_id"] for e in events if e["kind"] == "blocked"}
             missing = [b for b in blocked if b not in seen_blocked]
-            for tid in missing:
-                row = conn.execute("SELECT task_id, kind, payload, created_at FROM task_events WHERE task_id = ? "
-                                   "AND kind = 'blocked' ORDER BY created_at DESC, id DESC LIMIT 1", (tid,)).fetchone()
-                if row:
-                    events.append(dict(row))
+            if missing:                                # jedno przejście po zdarzeniach zamiast zapytania na kartę
+                latest: dict[str, dict] = {}
+                q = ("SELECT id, task_id, kind, payload, created_at FROM task_events WHERE kind = 'blocked' "
+                     f"AND task_id IN ({','.join('?' * len(missing))})")
+                for r in conn.execute(q, missing):
+                    cur = latest.get(r["task_id"])
+                    if cur is None or (r["created_at"], r["id"]) > (cur["created_at"], cur["id"]):
+                        latest[r["task_id"]] = dict(r)
+                for tid in missing:
+                    if tid in latest:
+                        row = latest[tid]
+                        row.pop("id")
+                        events.append(row)
         for e in events:
             e["payload"] = _payload(e.get("payload"))
         return {"tasks": tasks, "events": events, "ok": True}
@@ -538,7 +546,11 @@ def list_outputs(dirs: Iterable[Path], roots: Roots, limit: int = OUTPUT_LIMIT) 
             continue
         if not d.is_dir() or not any(_within(d, r) for r in allowed):
             continue
+        if scanned > SCAN_MAX:
+            break
         for root, subdirs, names in os.walk(d):
+            if scanned > SCAN_MAX:                    # limit kończy całe przejście, nie tylko bieżący katalog
+                break
             subdirs[:] = [s for s in subdirs if s not in SKIP_DIRS and not s.startswith(".")]
             for n in names:
                 scanned += 1

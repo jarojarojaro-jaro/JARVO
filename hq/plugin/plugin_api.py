@@ -89,16 +89,21 @@ def _state_db(profile: str) -> Path:
 
 
 def _board(now: float) -> dict:
-    # karty misji z INDEX.md czytamy zawsze, także zakończone dawno (postęp misji)
-    mission_ids = [c for m in core.parse_missions(_index_md()) for c in m["cards"]]
-    return _cached("board", 1.5, lambda: core.read_board(HOME / "kanban.db", now, extra_ids=mission_ids))
+    # karty misji z INDEX.md czytamy zawsze, także zakończone dawno (postęp misji); TTL krótszy niż odpytywanie
+    # Centrali (3 s), ale wspólny z panelem agenta (2,5 s), więc oba widoki naraz czytają tablicę raz
+    def read():
+        mission_ids = [c for m in core.parse_missions(_index_md()) for c in m["cards"]]
+        return core.read_board(HOME / "kanban.db", now, extra_ids=mission_ids)
+    return _cached("board", 2.5, read)
 
 
 def _index_md() -> str:
-    try:
-        return core.MISSIONS_INDEX.read_text(encoding="utf-8")
-    except OSError:
-        return ""
+    def read():
+        try:
+            return core.MISSIONS_INDEX.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+    return _cached("index", 2.0, read)
 
 
 def _current_tool(task: dict) -> dict | None:
@@ -163,7 +168,8 @@ async def agent(name: str):
         if t.get("workspace_path"):
             dirs.append(Path(t["workspace_path"]))
     dirs.append(core.JARVO_DIR / "workspaces" / name)
-    outputs = await asyncio.to_thread(core.list_outputs, dirs, ROOTS)
+    # panel odpytuje co 2,5 s, a przejście katalogów roboczych to ~0,1 s: wyniki agenta odświeżane co 10 s (jak misji)
+    outputs = await asyncio.to_thread(_cached, f"aout:{name}", 10.0, lambda: core.list_outputs(dirs, ROOTS))
 
     def brief(lst, n=20):
         return [core.card_brief(t) for t in lst[:n]]
@@ -242,8 +248,22 @@ def _media_path(raw: str) -> Path | None:
     return p if p is not None and ed.media_kind(p) else None
 
 
+_probe_cache: dict[tuple, dict] = {}
+
+
+def _probe(p: Path) -> dict:
+    """ffprobe raz na wersję pliku (ścieżka, mtime, rozmiar): edytor przy otwarciu i przeładowaniu bada do 60 mediów."""
+    st = p.stat()
+    key = (str(p), st.st_mtime_ns, st.st_size)
+    if key not in _probe_cache:
+        if len(_probe_cache) > 512:
+            _probe_cache.clear()
+        _probe_cache[key] = ed.probe(p)
+    return _probe_cache[key]
+
+
 def _media_entry(p: Path) -> dict:
-    info = ed.probe(p)
+    info = _probe(p)
     return {"path": str(p), "name": p.name, "kind": ed.media_kind(p), "size": p.stat().st_size,
             "mtime": p.stat().st_mtime, **{k: info.get(k) for k in ("duration", "w", "h", "fps", "audio", "vcodec")}}
 
@@ -307,6 +327,9 @@ async def edit_save(request: Request):
     return {"ok": True, "path": str(target), "ts": time.time(), "mtime": target.stat().st_mtime}
 
 
+_stamp_cache: dict[str, tuple[float, str | None]] = {}
+
+
 @router.get("/edit/stamp")
 async def edit_stamp(path: str):
     """Kiedy i kto ostatnio zmienił projekt (edytor pyta co kilka sekund: zmiany agenta wczytuje sam)."""
@@ -316,11 +339,18 @@ async def edit_stamp(path: str):
     pp = ed.project_path(p)
     if not pp.is_file():
         return {"mtime": 0.0}
+    mtime = pp.stat().st_mtime
+    hit = _stamp_cache.get(str(pp))
+    if hit and hit[0] == mtime:                  # projekt (do 2 MB) parsowany tylko po zmianie, nie co 3 s
+        return {"mtime": mtime, "kto": hit[1]}
     try:
         who = (json.loads(pp.read_text(encoding="utf-8")).get("zmienil") or {}).get("kto")
     except (OSError, ValueError):
         who = None
-    return {"mtime": pp.stat().st_mtime, "kto": who}
+    if len(_stamp_cache) > 256:
+        _stamp_cache.clear()
+    _stamp_cache[str(pp)] = (mtime, who)
+    return {"mtime": mtime, "kto": who}
 
 
 @router.get("/edit/srt")
