@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Wzorzec „Wyjaśnij mi filmem” (pomysł Karpathy'ego: film tłumaczy szybciej niż tekst): prośba właściciela to jedna karta dla Wideografa, explainer dla właściciela 60–90 s, fakty z WEJŚĆ (skarbiec, raporty, docs), bez publikacji i płatnej generacji AI; Sherlock tylko, gdy tematu nie ma w skarbcu. `intake` kieruje taką prośbę do wzorca, eval `jarvo-route-explain-video`.
 - Prosty polski w wiadomościach do właściciela (wzór ASD-STE100 „w 80%”): skill `prosty-polski` (limity zdań i akapitów, strona czynna, słownik zamienników urzędowych słów, ostrzeżenia ⛔/⚠ według szablonu „najpierw co zrobić”), zasada w SOUL, briefie i kolejce decyzji. `prosty.py` liczy to bez modelu, a przegląd tygodnia dostaje `prosty_polski`: ile wiadomości Jarva do właściciela było w normie i co zawodziło najczęściej.
 - `sdlc-review` 2.3.0: krok 1 to linter kontraktu `kontrakt.py` (0 tokenów: sekcje karty, artefakty, `dod_check` punkt w punkt z dowodem); kontrole dziedzinowe dla `jarvo-ads`, `jarvo-lowca` i `jarvo-mobile` (dotąd sędzia miał je tylko dla pięciu agentów).
 - Rutyny: patrol i poranny brief z płytkim myśleniem (`reasoning_effort: low`; dane zebrał skrypt, model zostaje modelem Jarva), świeżość wiedzy bez modelu (`swiezosc.py`, zadanie `no_agent`: skille z `reviewed` > 120 dni i notatki skarbca po `wazne_do` albo `do-sprawdzenia`). Przegląd tygodnia zostaje na pełnej głębi.

@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-09-30"
+    reviewed: "2026-10-02"
 ---
 
 # Dispatch: jak rozdać pracę
@@ -74,6 +74,7 @@ kanban_create(
 | **Audyt + naprawa strony** | web (audyt) → [decyzja użytkownika, co naprawiać] → web (poprawki) |
 | **Kampania** | sherlock (grupa docelowa, konkurencja) → studio (pakiet + brief wideo) → wideo (filmy) → reka (złożenie + kalendarz) |
 | **Film** | [sherlock (fakty), gdy film podaje liczby] → wideo (film, warianty, montaż, klipy) |
+| **Wyjaśnij mi filmem** | [sherlock (fakty), gdy tematu nie ma w skarbcu ani w misjach] → wideo (explainer dla Ciebie, 60–90 s, bez publikacji) |
 | **Nowa marka / brand kit** | web (brand z URL) → studio (weryfikacja tonu i wizualiów) |
 | **Leady** | lowca (ICP → sygnały → ranking z kontaktem) → [decyzja użytkownika, do kogo] → studio (szkic wiadomości, opcjonalnie) |
 | **Aplikacja mobilna** | mobile (natywna czy PWA, koszty) → [decyzja użytkownika] → web (strona, PWA) albo mobile (Wallet, aplikacja) |

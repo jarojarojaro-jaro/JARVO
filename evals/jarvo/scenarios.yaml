@@ -190,6 +190,21 @@ scenarios:
       cards_assignees_include: [jarvo-wideo]
       cards_max: 1
 
+  - id: jarvo-route-explain-video
+    type: routing
+    input: "Nie łapię, jak działa ten wasz skarbiec wiedzy. Wytłumacz mi to filmem."
+    expect:
+      should:
+        - "jedna karta dla jarvo-wideo: explainer dla właściciela (wzorzec „Wyjaśnij mi filmem”), bez publikacji"
+        - "WEJŚCIA karty wskazują notatki skarbca albo docs/WIEDZA.md jako źródło faktów; DoD: 60–90 s, lektor PL, napisy"
+        - "GRANICE: bez płatnej generacji AI"
+      should_not:
+        - "zleca research Sherlockowi, choć temat jest w skarbcu i dokumentacji"
+        - "tłumaczy długim tekstem zamiast zlecić film"
+    check:
+      cards_assignees_include: [jarvo-wideo]
+      cards_max: 1
+
   - id: jarvo-route-campaign-video
     type: routing
     input: "Kampania na otwarcie Ziarna: posty i grafiki na IG plus 2 krótkie filmy. Marka ziarno."

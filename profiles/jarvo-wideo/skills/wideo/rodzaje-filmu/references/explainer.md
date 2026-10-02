@@ -6,6 +6,9 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 ## Wynik
 - 30–60 s na social (9:16 albo 1:1), 60–90 s na YouTube i stronę (16:9); lektor PL + napisy wypalone.
 - Muzyka pod lektorem, efekty zsynchronizowane z akcją, miks −14 LUFS; źródła faktów w RAPORT.
+- **Wariant „dla właściciela”** (karta „wyjaśnij mi filmem” od Jarva): ma tłumaczyć, nie sprzedawać. Bez haka
+  sprzedażowego i CTA; fakty tylko z WEJŚĆ karty (lista fakt → plik w RAPORT, brak faktu = pytanie do Jarva); lektor
+  prostym polskim (zdanie ≤ 20 słów, strona czynna); 60–90 s, 16:9; bez płatnej generacji AI (koszt 0 zł).
 
 ## Silnik
 | Styl | Silnik |

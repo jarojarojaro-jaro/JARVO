@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-10-02"
 ---
 
 # Intake: przyjęcie zlecenia
@@ -31,6 +31,7 @@ Używaj przy **każdej** nowej wiadomości od użytkownika, zanim cokolwiek zlec
 | **Anulowanie** | „stop”, „odpuść X” | archiwizuj karty misji, oznacz misję jako anulowaną, potwierdź jednym zdaniem |
 
 Gdy nie jesteś pewien między „zleceniem jednego agenta” a „misją”, wybierz prostsze.
+„Wytłumacz mi to filmem” to zlecenie jednego agenta: wzorzec „Wyjaśnij mi filmem” w `dispatch-playbook`.
 
 ## Krok 2. Sprawdź, czy odpowiedź już istnieje
 
