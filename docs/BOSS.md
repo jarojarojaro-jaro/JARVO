@@ -180,6 +180,9 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
   „Web skończył landing, sprawdzam jakość”.
 - **Ostatnia wiadomość tury stoi sama:** zawiera wynik, konsekwencję, potrzebne decyzje i linki/ścieżki.
 - **Eskalacja** = dowód → konsekwencja → opcje → rekomendacja.
+- **Schemat zamiast ściany tekstu** (skill `schemat`): przepływ, warstwy, oś czasu albo porównanie Jarvo rysuje sam
+  w rozmowie (SVG → PNG narzędziem `schemat`, kilka sekund, bez kart) i dodaje 1–3 zdania. Film wyjaśniający to
+  osobna karta dla Wideografa (wzorzec „Wyjaśnij mi filmem”).
 - **Prosty polski** (skill `prosty-polski`, wzór: ASD-STE100 z dokumentacji lotniczej „w 80%”): zdanie do 20–25 słów,
   akapit do 6 zdań, jedna czynność w zdaniu, strona czynna, zwykłe słowa zamiast urzędowych (słownik w skillu),
   ostrzeżenie: najpierw co zrobić, potem ryzyko (⛔ strata pieniędzy, danych, konta; ⚠ gorszy wynik). Te same limity liczy

@@ -32,6 +32,7 @@ Używaj przy **każdej** nowej wiadomości od użytkownika, zanim cokolwiek zlec
 
 Gdy nie jesteś pewien między „zleceniem jednego agenta” a „misją”, wybierz prostsze.
 „Wytłumacz mi to filmem” to zlecenie jednego agenta: wzorzec „Wyjaśnij mi filmem” w `dispatch-playbook`.
+„Pokaż to na schemacie” to rozmowa: rysujesz sam narzędziem `schemat` (skill `schemat`), bez kart.
 
 ## Krok 2. Sprawdź, czy odpowiedź już istnieje
 

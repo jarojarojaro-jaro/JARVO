@@ -9,7 +9,9 @@ profilu ma `memory.provider: jarvo-wiedza`). Co robi:
   - lustro wpisów `memory` (MEMORY.md/USER.md) do skrzynki,
   - wyciąg z rozmowy tanim modelem (zadanie pomocnicze `jarvo_wiedza`, model poziomu fast) na koniec sesji, przed
     kompresją i po 30 minutach ciszy; wynik: zrodla/rozmowy/ (surowy wyciąg) + szkic w skrzynce,
-  - hak `kanban_task_completed`: raporty z out/ zamkniętej karty do zrodla/karty/ i szkic (0 tokenów).
+  - hak `kanban_task_completed`: raporty z out/ zamkniętej karty do zrodla/karty/ i szkic (0 tokenów),
+  - narzędzie `schemat` (schemat.py) tylko dla agentów z SCHEMAT_DLA (Jarvo, rozmowa z właścicielem): SVG → PNG w rozmowie.
+    Hermes ładuje tę wtyczkę jako dostawcę pamięci (wyłączną), więc narzędzia idą przez get_tool_schemas, nie register_tool.
 Agenci nie piszą notatek: notatki, INDEX i huby pisze kompilacja (etap 4) i `wiedza.py`.
 """
 from __future__ import annotations
@@ -32,6 +34,8 @@ from agent.memory_provider import MemoryProvider, is_trivial_prompt, spawn_conte
 
 logger = logging.getLogger(__name__)
 _HERE = Path(__file__).resolve().parent
+# narzędzie `schemat` (SVG → PNG w rozmowie) mają tylko ci agenci: Jarvo rozmawia z właścicielem, wykonawcy robią grafiki sami
+SCHEMAT_DLA = {"jarvo"}
 NAZWA = "jarvo-wiedza"
 ZADANIE_AUX = "jarvo_wiedza"          # auxiliary.jarvo_wiedza.model = poziom fast (scripts/build.py)
 MIN_TUR = 4                           # wyciąg dopiero, gdy użytkownik napisał tyle razy
@@ -80,6 +84,10 @@ def _lib():
 
 def _kompilacja():
     return _modul("jarvo_wiedza_kompilacja", "kompilacja.py")
+
+
+def _schemat():
+    return _modul("jarvo_schemat", "schemat.py")
 
 
 def _korzen(hermes_home: str) -> Path:
@@ -340,6 +348,9 @@ class SkarbiecProvider(MemoryProvider):
 
     # ---- narzędzia
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
+        return self._narzedzia_skarbca() + ([_schemat().SCHEMA] if self._agent in SCHEMAT_DLA else [])
+
+    def _narzedzia_skarbca(self) -> List[Dict[str, Any]]:
         return [
             {"name": "wiedza_szukaj",
              "description": "Szuka w skarbcu wiedzy floty (notatki o użytkowniku, markach, projektach, agentach, narzędziach, "
@@ -373,6 +384,8 @@ class SkarbiecProvider(MemoryProvider):
         ]
 
     def handle_tool_call(self, tool_name: str, args: Dict[str, Any], **kwargs) -> str:
+        if tool_name == "schemat" and self._agent in SCHEMAT_DLA:       # rysunek nie potrzebuje skarbca
+            return _schemat().obsluz(args)
         sk = self._sk()
         if sk is None:
             return json.dumps({"error": "skarbiec wiedzy niedostępny (brak katalogu)"}, ensure_ascii=False)

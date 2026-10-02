@@ -232,3 +232,17 @@ def test_straznik_limit_generacji_na_karte(tmp_path, monkeypatch):
     assert pl.straznik(tool_name="video_generate", args={}) is None                           # licznik na kartę
     stan = json.loads((tmp_path / "state" / "generacje-ai.json").read_text(encoding="utf-8"))
     assert stan == {"t_film": {"video_generate": 2, "image_generate": 1}, "t_inna": {"video_generate": 1}}
+
+
+def test_schemat_tylko_dla_jarva(srodowisko, tmp_path, monkeypatch):
+    """Narzędzie `schemat` (SVG → PNG) dostaje tylko Jarvo; wykonawcy mają same narzędzia skarbca."""
+    root, _home, _sk, p = srodowisko
+    assert "schemat" not in {s["name"] for s in p.get_tool_schemas()}
+    assert "nieznane narzędzie" in p.handle_tool_call("schemat", {"svg": "<svg/>", "tytul": "x"})
+    (root / "profiles" / "jarvo").mkdir(parents=True)
+    j = pl.SkarbiecProvider()
+    j.initialize("sesja-j", hermes_home=str(root / "profiles" / "jarvo"), platform="telegram", agent_context="primary")
+    nazwy = [s["name"] for s in j.get_tool_schemas()]
+    assert nazwy[-1] == "schemat" and len(nazwy) == 5
+    monkeypatch.setenv("JARVO_CHROMIUM", str(tmp_path / "nie-ma"))
+    assert "Nie udało się narysować" in json.loads(j.handle_tool_call("schemat", {"svg": "<svg/>", "tytul": "x"}))["error"]
