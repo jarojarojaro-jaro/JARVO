@@ -67,8 +67,9 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 4. **Prawda w treści:** żadnych zmyślonych liczb, cytatów, wyników; względne słupki albo etykiety z transkrypcji.
 5. **Czytelność w ruchu:** tekst jadący w złą stronę czyta się na odwrót. Sprawdź kierunek na pasku klatek.
 6. **Przed oddaniem:** arkusz stopklatek co 1–1,5 s + paski klatek co 0,1–0,2 s na kluczowych akcjach (vision;
-   HTML i Lottie: `html_wideo.py klatki … --arkusz`), bramka narzędzia (anidoodle `gate.mjs`), film po silniku
-   zewnętrznym przez `montaz.py napraw`, potem `qa_wideo.py` i `kontrola-wideo` (≥ 85).
+   HTML i Lottie: `html_wideo.py klatki … --arkusz`), animacja HTML: `html_wideo.py pomiar` pełny i aktualny bez
+   błędów (`kontrakt-html.md`, tekst z kanwy przez `__teksty`), bramka narzędzia (anidoodle `gate.mjs`), film po
+   silniku zewnętrznym przez `montaz.py napraw`, potem `qa_wideo.py` i `kontrola-wideo` (≥ 85).
 7. **Prawa:** tylko assety CC0 / CC BY / OFL; żadnych cudzych marek i postaci; licencje w RAPORT.md.
 8. **Zero zakazanych chwytów** (lista „zakazane” w skillu `kontrola-wideo`): tytuł na gradiencie,
    wszystko przez fade, rogi i ramki, glow na UI, cząsteczki bez powodu, przejazd liniowy. Zamiast tego ruch z kierunkiem i masą.
@@ -82,7 +83,7 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
    ruchów, wzorce kompozycji) i `video-lessons` (fonty zastępcze, drżenie tekstu, szwy przejść, CSS na zegarze ściennym,
    WebGL; najpierw odtwórz usterkę, potem napraw przyczynę). Pisane dla aplikacji Remocn Studio, u nas: „Studio”
    i „pipeline” = nasz proces (`rodzaje-filmu` → `scenariusz` → ten skill → `kontrola-wideo`); `design_check` =
-   `qa_wideo.py` + `krytyka.py` + arkusz klatek; panelu właściwości i schematów (`rules/tunable-text.md`) nie mamy:
+   `html_wideo.py pomiar` (animacja HTML) + `qa_wideo.py` i `krytyka.py` (MP4); panelu właściwości i schematów (`rules/tunable-text.md`) nie mamy:
    wartości do strojenia trzymaj w stałych na górze sceny; szablony w `motion-design` to wzorce kompozycji z rejestru
    remocn, niczego z niego nie instalujesz. Przykłady w Remotion przenosisz na wybrany silnik (Remotion tylko,
    gdy go wybrałeś: firmy powyżej 3 osób potrzebują licencji Remotion).

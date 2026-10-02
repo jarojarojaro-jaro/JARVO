@@ -29,6 +29,12 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    Błąd (`bledy`) = poprawka przed oceną; typowe: głośność → `montaz.py glosnosc`, format → ponowny render,
    czarny początek → pierwsza scena z obrazem.
    - ✅ Punkt kontrolny: `ok: true`.
+1b. **Animacja HTML (nasz kontrakt, `--preset jarvo`):** `python3 $HERMES_HOME/scripts/html_wideo.py pomiar <strona>
+   --preset jarvo --dlugosc <s> --platforma <…>` mierzy z DOM i klatek: czas czytania, tekst poza kadrem i pod UI
+   platformy, kontrast, kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów (`pomiar.md` obok
+   strony). Ustalenia to fakty, nie opinie: poprawiasz albo zapisujesz świadomy wyjątek z powodem (`--wyjatek`).
+   **„Gotowe” tylko z pełnym i aktualnym raportem** (`html_wideo.py aktualny <strona>` = 0); po każdej zmianie
+   pliku animacji raport jest nieaktualny. Ostrzeżenia (martwy odcinek, rytm) sprawdzasz okiem w kroku 4a.
 2. **Oglądanie:** `vision_analyze` na arkuszu (`qa.jpg`: klatki 0 s, 0,5 s, 1,5 s, ¼, ½, ¾, koniec; czerwone pola =
    strefy UI). Pytania: czy hook jest czytelny w klatce 0–1,5 s? czy napisy/tekst/logo wchodzą w czerwone pola?
    czy ujęcia pasują do tekstu? artefakty, znaki wodne, obcy tekst? Dodatkowo `SCENARIUSZ.md` i `.srt` (błędy w słowach).
@@ -58,13 +64,15 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    z uczciwie nazwanymi brakami. Historia rund (osie + problemy) w `out/wideo/<film>/krytyka.md`.
 5. **Poprawki:** REVISE → popraw plan/pliki wg `roznice`, render, nowa runda (`runda` + 1). Najwyżej 2 rundy poprawek;
    potem oddaję z wynikiem i nazwanymi brakami w `metadata.risks` (bez podbijania wyniku).
-6. **Dowód do oddania karty:** w `dod_check` wynik `qa_wideo.py` (liczby: sek, LUFS, rozdzielczość) i `kontrola.json`.
+6. **Dowód do oddania karty:** w `dod_check` wynik `qa_wideo.py` (liczby: sek, LUFS, rozdzielczość), `kontrola.json`
+   i przy animacji HTML `pomiar.json` (werdykt i odcisk).
 
 ## Wyjścia
 - `out/wideo/<film>/qa.jpg`, `out/wideo/<film>/kontrola.json` (ostatnia runda), historia rund w RAPORT.md.
 
 ## Definition of Done
 - [ ] `qa_wideo.py` bez błędów (JSON w raporcie), arkusz obejrzany,
+- [ ] animacja HTML: `html_wideo.py aktualny` = 0 (pomiar pełny, aktualny, bez błędów; wyjątki z powodem w raporcie),
 - [ ] `kontrola.json` z wynikiem ≥ 85 i PASS albo nazwane braki po 2 rundach,
 - [ ] każda różnica ma najmniejszą poprawkę; wynik nie jest zawyżany,
 - [ ] film z kodu / animacja: `krytyka.py ocena` = 0 (7 osi ≥ 8) albo nazwane braki po 3 rundach, zero chwytów z `zakazane.md` bez uzasadnienia.

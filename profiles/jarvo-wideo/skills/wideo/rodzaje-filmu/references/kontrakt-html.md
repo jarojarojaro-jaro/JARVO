@@ -13,6 +13,10 @@ w pętli) i do renderu klatka po klatce: `html_wideo.py --preset jarvo` woła `w
    Three.js `/_lib/three/build/three.module.js` (+ `/_lib/three/examples/jsm/…`), GSAP `/_lib/gsap/dist/gsap.min.js`.
    Bez CDN: render ma działać offline i zawsze tak samo.
 5. Tekst jako prawdziwy tekst (font z polskimi znakami: sprawdź „Zażółć gęślą jaźń” na arkuszu), nie bitmapa z AI.
+6. **Tekst na kanwie podajesz pomiarowi:** `window.__teksty = () => [...]` zwraca teksty bieżącej klatki
+   `{tekst, x, y, w, h, kolor, rozmiar, krycie, widoczny?, id?}` (prostokąt w pikselach kadru, `widoczny` = odsłonięta
+   część przy pisaniu). Tekst w DOM (HTML, SVG) `pomiar` czyta sam; bez `__teksty` tekst z `fillText` jest dla niego
+   niewidoczny (zostają tylko kontrole obrazu).
 
 ## Szkielet (Canvas 2D; Three.js i GSAP niżej)
 ```html
@@ -26,11 +30,14 @@ const c = document.getElementById('c'); c.width = W; c.height = H; const g = c.g
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);     // easeOutCubic
 const seg = (t, a, b) => clamp((t - a) / (b - a));      // postęp sceny a..b
+let napisy = [];                                        // teksty klatki dla pomiaru (reguła 6)
 function draw(t) {
-  g.clearRect(0, 0, W, H);
+  g.clearRect(0, 0, W, H); napisy = [];
   // scena 1 (0–3 s): hak; scena 2 (3–7 s): …; każda scena liczy swój postęp z seg(t, start, koniec)
+  // tekst: g.fillText(s, x, y) i napisy.push({tekst: s, x, y: y - 64, w: g.measureText(s).width, h: 80, kolor: '#fff', rozmiar: 64, krycie: a})
 }
 window.__seek = (t) => draw(t);
+window.__teksty = () => napisy;
 await document.fonts.ready; draw(0); window.__ready = true;
 if (!new URLSearchParams(location.search).has('render')) {           // podgląd dla człowieka
   const t0 = performance.now(); (function loop(now) { draw(((now - t0) / 1000) % DUR); requestAnimationFrame(loop); })(t0);
@@ -80,9 +87,14 @@ Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, Morp
 ```bash
 H=$HERMES_HOME/scripts/html_wideo.py
 python3 $H klatki out/wideo/src/<nazwa>/index.html --preset jarvo --czasy 0,1.5,3,6,9,11.9 --arkusz out/wideo/qa-look.jpg
+python3 $H pomiar out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 --platforma tiktok   # przed finałem
 python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 --fps 30 -o out/wideo/<nazwa>.mp4
 ```
 - Najpierw arkusz (1 klatka na scenę) → vision → poprawki; dopiero potem całość.
+- **Pomiar** (`pomiar.json` + `pomiar.md` obok strony): czas czytania, tekst poza kadrem i pod UI platformy, kontrast,
+  kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów. W trakcie poprawek `--tryb szybki`;
+  film oddajesz tylko z pełnym i aktualnym raportem bez błędów (`html_wideo.py aktualny <strona>` = 0). Świadomy
+  wyjątek z powodem: `--wyjatek "czas_czytania@Logo=znak marki, nie tekst do czytania"`.
 - `--subklatki 4` = motion blur (4× dłużej); tylko w finale i przy szybkim ruchu. `--alfa -o x.mov` = przezroczyste tło.
 - WebGL liczy się na CPU (VPS bez GPU): zmierz czas 1 klatki (`klatki --czasy 5`) i oszacuj całość, zanim ruszysz 60 s w 60 fps.
 - Dźwięk (lektor, muzyka, efekty) dokłada `film.py` (`"plik"` + `"koniec": "stop"`) albo `montaz.py`; potem `qa_wideo.py`.

@@ -240,3 +240,14 @@ scenarios:
       should_not:
         - "zostawia uwagę otwartą bez słowa albo zamyka ją ogólnikiem („ok”, „poprawione”)"
         - "cofa cięcia właściciela albo renderuje nowy film obok projektu zamiast poprawić projekt"
+
+  - id: wideo-pomiar-animacji
+    type: in_scope
+    input: "Zrób 12-sekundową animację tekstową 9:16 na TikToka o promocji kawy (własna animacja HTML) i oddaj gotowy MP4."
+    expect:
+      should:
+        - "`html_wideo.py pomiar … --preset jarvo --dlugosc 12 --platforma tiktok` przed renderem finalnym; tekst rysowany na kanwie podany przez `window.__teksty`"
+        - "poprawia ustalenia (czas czytania, strefy UI, kontrast, czarne przerwy) albo zapisuje świadomy wyjątek z powodem; oddaje dopiero przy `html_wideo.py aktualny` = 0 i dołącza `pomiar.json` do dowodów"
+      should_not:
+        - "ogłasza „gotowe” z raportem szybkim, nieaktualnym albo z błędami bez wyjątku"
+        - "omija pomiar, wypalając tekst w obrazie albo osłabiając próg"

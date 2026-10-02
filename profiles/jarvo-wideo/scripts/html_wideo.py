@@ -5,6 +5,13 @@
     python3 html_wideo.py wideo  anim.html --dlugosc 6 [--fps 30] -o film.mp4 [--preset …] [--alfa]
     python3 html_wideo.py lottie scena/lottie.json [-o film.mp4|.mov|.webm|.gif] [--alfa] [--tlo "#101010"]
     python3 html_wideo.py lottie scena/lottie.json --klatki 0,45,89 --arkusz arkusz.jpg
+    python3 html_wideo.py pomiar anim.html --dlugosc 6 [--preset jarvo] [--platforma tiktok] [--tryb pelny|szybki]
+                                [--wyjatek "czas_czytania@Logo=znak marki, nie tekst do czytania"] [--json pomiar.json]
+    python3 html_wideo.py aktualny anim.html [--raport pomiar.json]   # 0 = raport pełny, aktualny i bez błędów
+
+pomiar: teksty z DOM i małe klatki w każdej próbce (10/s; szybki 4/s): czas czytania, tekst poza kadrem i pod UI
+platformy, kontrast WCAG, kroje zastępcze, czarne przerwy, martwe odcinki, monotonny rytm, błędy JS i zasobów
+(szczegóły: pomiar.py). Raport z odciskiem plików animacji: po każdej zmianie nieaktualny. Kod 1 = błędy.
 
 Każda klatka to stan animacji w chwili t (uprząż czasu strony, nie zegar ścienny), więc wideo jest płynne
 i powtarzalne niezależnie od szybkości maszyny. Uprząż: parametr w URL (--param t --jednostka s|ms|klatka;
@@ -69,6 +76,7 @@ RAF2 = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame
 FONTS = "() => (document.fonts ? document.fonts.ready.then(() => true) : true)"
 LOTTIE_ASSET_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ttf", ".otf", ".ttc", ".woff", ".woff2"}
 TIMEOUT_MS = 60_000
+HZ_POMIARU = {"pelny": 10.0, "szybki": 4.0}
 
 
 # ---------------------------------------------------------------- czyste funkcje (testowane bez przeglądarki)
@@ -408,6 +416,118 @@ def lottie_render(src: Path, frames_sel: list[float] | None, fps_out: float | No
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ---------------------------------------------------------------- pomiar animacji (DOM + klatki)
+
+def zmierz(src: str, o: dict, dlugosc: float, hz: float, size: tuple[int, int], size_explicit: bool,
+           wait_ms: int) -> dict:
+    """Próbki co 1/hz s: teksty z DOM (pomiar.SONDA_JS) + mała klatka JPEG; na końcu dostępność krojów."""
+    import pomiar as pm
+    from playwright.sync_api import sync_playwright
+
+    errors: list[str] = []
+    failed: list[str] = []
+    httpd = None
+    if o["serwer"] and "://" not in src:
+        page_file = Path(src).resolve()
+        if not page_file.exists():
+            raise SystemExit(f"brak pliku: {src}")
+        httpd = serve(page_file.parent, lib=True)
+        src = f"http://127.0.0.1:{httpd.server_address[1]}/{quote(page_file.name)}"
+    times = [i / hz for i in range(max(1, int(math.floor(dlugosc * hz + 1e-9))))]
+    probki, jpgs, prev, rodziny = [], {}, None, set()
+    try:
+        with sync_playwright() as p:
+            browser = launch(p)
+            page = _page(browser, size, 1.0, errors)
+            page.on("requestfailed", lambda r: failed.append(f"{r.url} ({r.failure})"))
+            page.on("response", lambda r: failed.append(f"{r.url} (HTTP {r.status})") if r.status >= 400 else None)
+
+            def settle() -> None:
+                if o["gotowe"]:
+                    page.wait_for_function(o["gotowe"], timeout=TIMEOUT_MS)
+                page.evaluate(FONTS)
+                page.evaluate(RAF2)
+            if o["seek"]:
+                page.goto(page_url(src, o["query"]), wait_until="load")
+                settle()
+                if o["rozmiar_js"] and not size_explicit:
+                    w, h = page.evaluate(f"() => {o['rozmiar_js']}")
+                    page.set_viewport_size({"width": int(w), "height": int(h)})
+                    page.evaluate(RAF2)
+            for t in times:
+                if o["seek"]:
+                    page.evaluate(o["seek"], t)
+                    page.evaluate(RAF2)
+                else:
+                    page.goto(page_url(src, {**o["query"], o["param"]: time_value(t, o["jednostka"], 30)}), wait_until="load")
+                    settle()
+                if wait_ms:
+                    page.wait_for_timeout(wait_ms)
+                d = page.evaluate(pm.SONDA_JS)
+                jpg = page.screenshot(type="jpeg", quality=60)
+                luma, zmiana, ruch, prev = pm.luma_i_zmiana(jpg, prev)
+                for x in d["teksty"]:
+                    first = x["family"].split(",")[0].strip().strip("'\"")
+                    if first and first.lower() not in pm.GENERYCZNE:
+                        rodziny.add(first)
+                probki.append({"t": round(t, 4), "W": d["W"], "H": d["H"], "teksty": d["teksty"], "luma": round(luma, 4),
+                               "zmiana": None if zmiana is None else round(zmiana, 5),
+                               "ruch": None if ruch is None else round(ruch, 4)})
+                if d["teksty"]:
+                    jpgs[len(probki) - 1] = jpg
+            czcionki = page.evaluate(pm.CZCIONKI_JS, sorted(rodziny))
+            rozmiar = [page.viewport_size["width"], page.viewport_size["height"]]
+            browser.close()
+    finally:
+        if httpd:
+            httpd.shutdown()
+    return {"probki": probki, "jpgs": jpgs, "czcionki": czcionki, "bledy_js": list(dict.fromkeys(errors)),
+            "zasoby": [f for f in dict.fromkeys(failed) if not f.split(" (")[0].endswith("/favicon.ico")], "rozmiar": rozmiar}
+
+
+def raport_pomiaru(anim: Path, wynik: dict, ustawienia: dict, tryb: str, hz: float, wyjatki_: list[dict]) -> dict:
+    import pomiar as pm
+    probki = wynik["probki"]
+    # tło pod każdym tekstem: klatka z połowy chwil, gdy cały tekst jest dobrze widoczny
+    tla, chwile = {}, {}
+    for i, p in enumerate(probki):
+        for x in p["teksty"]:
+            if x["a"] >= 0.6 and len(x["seen"]) >= len(x["full"]) * 0.98 and i in wynik["jpgs"]:
+                chwile.setdefault(x["id"], []).append((i, x))
+    for tid, lista in chwile.items():
+        i, x = lista[len(lista) // 2]
+        bg = pm.tlo_wokol(wynik["jpgs"][i], (x["x0"], x["y0"], x["x1"], x["y1"]))
+        if bg:
+            tla[tid] = (bg, probki[i]["t"])
+    ust = pm.analiza(probki, ustawienia["dlugosc"], hz, ustawienia.get("platforma"), ustawienia.get("jezyk", "pl"), tla)
+    teksty_rodzin: dict[str, list[str]] = {}
+    for p in probki:
+        for x in p["teksty"]:
+            teksty_rodzin.setdefault(x["family"].split(",")[0].strip().strip("'\""), []).append(x["full"])
+    for r in wynik["czcionki"]["brak"] + [b for b in wynik["czcionki"]["bledne"] if b not in wynik["czcionki"]["brak"]]:
+        przyklad = (teksty_rodzin.get(r) or [""])[0][:40]
+        ust.append({"kod": "czcionka_zastepcza", "waga": "blad", "opis": f"krój „{r}” niedostępny (np. „{przyklad}”): render użyje zastępczego",
+                    "poprawka": "dołącz plik kroju obok strony (@font-face, lokalnie) albo użyj kroju z brand kitu", "od": 0.0,
+                    "do": ustawienia["dlugosc"], "tekst": przyklad})
+    for e in wynik["bledy_js"][:5]:
+        ust.append({"kod": "blad_js", "waga": "blad", "opis": f"błąd JavaScript: {e[:160]}", "poprawka": "napraw skrypt animacji",
+                    "od": 0.0, "do": ustawienia["dlugosc"]})
+    for z in wynik["zasoby"][:8]:
+        ust.append({"kod": "zasob", "waga": "blad", "opis": f"nie wczytano: {z[:160]}", "poprawka": "plik lokalnie obok strony, bez CDN",
+                    "od": 0.0, "do": ustawienia["dlugosc"]})
+    pm.zastosuj_wyjatki(ust, wyjatki_)
+    import datetime as _dt
+    return {"plik": str(anim), "kiedy": _dt.datetime.now().isoformat(timespec="seconds"), "ustawienia": ustawienia,
+            "odcisk": pm.odcisk(anim, ustawienia), "rozmiar": wynik["rozmiar"],
+            "pokrycie": {"tryb": tryb, "hz": hz, "probek": len(probki), "od": 0.0, "do": ustawienia["dlugosc"], "pelne": tryb == "pelny"},
+            "teksty": len({x["id"] for p in probki for x in p["teksty"]}), "czcionki_brak": wynik["czcionki"]["brak"],
+            "wyjatki": wyjatki_, "ustalenia": ust, "werdykt": pm.werdykt(ust)}
+
+
+def _raport_path(zrodlo: str, raport: str | None) -> Path:
+    return Path(raport) if raport else Path(zrodlo).resolve().parent / "pomiar.json"
+
+
 # ---------------------------------------------------------------- CLI
 
 def _html_opts(a) -> dict:
@@ -419,7 +539,7 @@ def _html_opts(a) -> dict:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("klatki", "wideo"):
+    for name in ("klatki", "wideo", "pomiar"):
         s = sub.add_parser(name)
         s.add_argument("zrodlo", help="plik .html albo URL (http://127.0.0.1:…)")
         s.add_argument("--preset", choices=sorted(PRESETS))
@@ -435,7 +555,14 @@ def main(argv: list[str] | None = None) -> int:
         s.add_argument("--fps", type=float, default=30.0)
         s.add_argument("--czekaj", type=int, default=0, help="dodatkowe ms po ustawieniu czasu (animacje CSS z opóźnieniem)")
         s.add_argument("--serwer", action="store_true", help="strona z lokalnego serwera (fetch, moduły ES, /_lib/)")
-        if name == "klatki":
+        if name == "pomiar":
+            s.add_argument("--dlugosc", type=float, required=True, help="sekundy (cały film)")
+            s.add_argument("--tryb", choices=sorted(HZ_POMIARU), default="pelny", help="pelny 10 próbek/s (do oddania), szybki 4/s")
+            s.add_argument("--platforma", help="tiktok | ig-reel | yt-shorts | youtube…: strefy UI platformy jako błędy")
+            s.add_argument("--jezyk", default="pl", help="tempo czytania (pl, en)")
+            s.add_argument("--wyjatek", action="append", default=[], help="KOD[@fragment tekstu]=powód (świadomy wyjątek)")
+            s.add_argument("--json", help="raport (domyślnie pomiar.json obok animacji) + pomiar.md")
+        elif name == "klatki":
             s.add_argument("--czasy", required=True, help="sekundy po przecinku, np. 0,1.5,3")
             s.add_argument("--out", default="out/wideo/klatki")
             s.add_argument("--arkusz", help="JPG z klatkami i czasami (do vision_analyze)")
@@ -445,6 +572,9 @@ def main(argv: list[str] | None = None) -> int:
             s.add_argument("--arkusz", help="dodatkowo arkusz ~12 klatek z filmu")
             s.add_argument("--zostaw-klatki", action="store_true")
             s.add_argument("--subklatki", type=int, default=1, help="motion blur: średnia N chwil na klatkę (2–8)")
+    ak = sub.add_parser("aktualny")
+    ak.add_argument("zrodlo", help="plik .html animacji")
+    ak.add_argument("--raport", help="raport pomiaru (domyślnie pomiar.json obok animacji)")
     lo = sub.add_parser("lottie")
     lo.add_argument("plik", help="lottie.json (assety i fonty obok, jak w playerze)")
     lo.add_argument("-o", "--wyjscie", help="film .mp4 | .mov | .webm | .gif")
@@ -456,6 +586,8 @@ def main(argv: list[str] | None = None) -> int:
     lo.add_argument("--tlo", default="#000000", help="tło bez --alfa (CSS), np. #ffffff")
     lo.add_argument("--skala", type=float, default=1.0, help="mnożnik rozdzielczości (w, h z pliku)")
     a = ap.parse_args(argv)
+    if a.cmd == "aktualny":
+        return cmd_aktualny(a)
     ensure_playwright()
 
     if a.cmd == "lottie":
@@ -480,6 +612,8 @@ def main(argv: list[str] | None = None) -> int:
 
     o = _html_opts(a)
     size = parse_size(a.rozmiar) if a.rozmiar else (1920, 1080)
+    if a.cmd == "pomiar":
+        return cmd_pomiar(a, o, size)
     if a.cmd == "klatki":
         times = parse_times(a.czasy)
         names = [f"t{t:08.3f}.png" for t in times]
@@ -511,7 +645,49 @@ def main(argv: list[str] | None = None) -> int:
     else:
         shutil.rmtree(work, ignore_errors=True)
     print(json.dumps(result, ensure_ascii=False))
+    if "://" not in a.zrodlo:
+        import pomiar as pm
+        rp = _raport_path(a.zrodlo, None)
+        powody = pm.aktualnosc(Path(a.zrodlo), json.loads(rp.read_text(encoding="utf-8"))) if rp.is_file() else ["brak raportu"]
+        if powody:
+            print(f"⚠ pomiar animacji przed oddaniem: {'; '.join(powody)} (html_wideo.py pomiar {a.zrodlo} --dlugosc {a.dlugosc:g} …)",
+                  file=sys.stderr)
     return 0
+
+
+def cmd_pomiar(a, o: dict, size: tuple[int, int]) -> int:
+    import pomiar as pm
+    if "://" in a.zrodlo:
+        raise SystemExit("pomiar: podaj plik .html animacji (odcisk liczymy z plików na dysku)")
+    anim = Path(a.zrodlo).resolve()
+    hz = HZ_POMIARU[a.tryb]
+    wyj = pm.wyjatki(a.wyjatek)
+    ustawienia = {"dlugosc": a.dlugosc, "rozmiar": a.rozmiar or None, "preset": a.preset, "query": o["query"],
+                  "platforma": a.platforma, "jezyk": a.jezyk}
+    wynik = zmierz(str(anim), o, a.dlugosc, hz, size, bool(a.rozmiar), a.czekaj)
+    raport = raport_pomiaru(anim, wynik, ustawienia, a.tryb, hz, wyj)
+    out = _raport_path(a.zrodlo, a.json)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(raport, ensure_ascii=False, indent=1), encoding="utf-8")
+    out.with_suffix(".md").write_text(pm.podsumowanie_md(raport), encoding="utf-8")
+    w = raport["werdykt"]
+    print(f"{'✓' if w['ok'] else '✗'} pomiar {anim.name}: błędy {w['bledy']}, ostrzeżenia {w['ostrzezenia']}, wyjątki {w['wyjatki']} "
+          f"· {raport['pokrycie']['probek']} próbek, {raport['teksty']} tekstów → {out}")
+    for u in sorted(raport["ustalenia"], key=lambda u: (u["waga"] != "blad", u["od"]))[:12]:
+        if not u.get("wyjatek"):
+            print(f"  {'✗' if u['waga'] == 'blad' else '⚠'} {u['od']:.1f}–{u['do']:.1f} s {u['kod']}: {u['opis']}")
+    return 0 if w["ok"] else 1
+
+
+def cmd_aktualny(a) -> int:
+    import pomiar as pm
+    rp = _raport_path(a.zrodlo, a.raport)
+    if not rp.is_file():
+        print(f"✗ brak raportu {rp}: html_wideo.py pomiar {a.zrodlo} --dlugosc …")
+        return 1
+    powody = pm.aktualnosc(Path(a.zrodlo).resolve(), json.loads(rp.read_text(encoding="utf-8")))
+    print("✓ raport pomiaru pełny, aktualny i bez błędów" if not powody else "✗ " + "\n✗ ".join(powody))
+    return 0 if not powody else 1
 
 
 if __name__ == "__main__":
