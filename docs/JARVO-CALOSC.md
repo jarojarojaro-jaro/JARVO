@@ -188,7 +188,8 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
 ## 6. Bezpieczeństwo (Skarbiec-design + red team)
 
 - **Red team na promptfoo** (`security/redteam/`): 21 ataków na agentów (w tym orzeczenie wstrzyknięte przez treść strony, klucz do zapisania w skarbcu wiedzy, paczka-literówka i sekret w kodzie aplikacji mobilnej), świeża sesja per atak,
-  wykrywanie wycieków. Ostatni stan: **12/12 odpartych** po uszczelnieniu.
+  wykrywanie wycieków. Ostatni zapisany przebieg objął 12 ówczesnych ataków: **12/12 odpartych** po uszczelnieniu;
+  dla 9 dodanych później repo nie ma jeszcze wyniku (przebieg wymaga działającej floty z kluczem modelu).
 - **Deny dla całej floty** (`shared/security/deny.yaml`, mergowane do każdego profilu): blokada zmiany
   własnej konfiguracji (`hermes config set/...`), kasowania danych floty (`rm -r /opt/data/...`),
   czytania sekretów (cat/less/base64 na `.env`), wysyłki na zewnątrz (webhook.site itp.), haseł
