@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: "Przegląd tygodnia: jakość floty, wnioski, propozycje."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -34,13 +34,16 @@ awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i token
    bo to praca, która przepadła bez śladu.
 6. **Skarbiec wiedzy (synteza tygodnia, jedyna praca drogiego modelu w skarbcu):** przeczytaj wpisy z ostatnich 7 dni
    w `@@KNOWLEDGE_DIR@@/LOG.md` i raport `@@KNOWLEDGE_DIR@@/LINT.md`. Zgłoś szkic `wiedza_zapisz(typ="rozmowa",
-   tytul="Tydzień floty RRRR-MM-DD", zrodlo="LOG.md i LINT.md skarbca")` z trzema sekcjami: **co się zmieniło** (nowe
+   tytul="Tydzień floty RRRR-MM-DD", zrodlo="LOG.md i LINT.md skarbca; strona <strona.plik>")` z trzema sekcjami: **co się zmieniło** (nowe
    i zaktualizowane notatki, po jednym zdaniu), **co dryfuje** (sprzeczności, przeterminowane, sieroty z lintu), **co warto
    zbadać** (pytania, na które skarbiec nie ma notatki). Orzeczenia i lekcje z ≥ 3 potwierdzeniami zgłoś w propozycjach
    `fleet-improvement` jako kandydatów do SOUL albo skilla (repo jest źródłem prawdy). Brak wpisów w LOG z 7 dni → pomiń.
 7. **Styl wiadomości:** `prosty_polski` z danych (skill `prosty-polski`, liczy `prosty.py`): ile Twoich wiadomości do
    właściciela było w normie i co zawodziło najczęściej, w jednej linii. Poniżej 80% w normie → lekcja w księdze
    (`fleet-improvement`) z dwoma przykładami potknięć. Brak wiadomości → pomiń.
+8. **Strona tygodnia:** `strona` z danych (`raport_strona.py`, bez modelu): te same liczby jako strona z kaflami
+   i paskami (jakość i tokeny na agenta, zrobione, stoi, w toku). Wiadomość niesie `strona.link` w ostatniej linii;
+   wniosków nie przepisuj na stronę, zostają w wiadomości. Brak `strona` albo `strona.blad` → bez linii, błąd w jednym zdaniu.
 
 ## Format
 ```
@@ -52,6 +55,7 @@ Styl: 18/20 wiadomości prostym polskim (najczęściej: za długie zdania)
 Proponuję ulepszyć:
 1. <agent>: <zmiana> (<dowód>)
 Decyzja: wdrożyć propozycje 1–2? (zmiany trafią do repo i na serwer po Twoim „ok”)
+Strona tygodnia: <strona.link>
 ```
 
 Brak aktywności w tygodniu → `[SILENT]`.
