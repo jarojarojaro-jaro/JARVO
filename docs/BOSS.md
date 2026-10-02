@@ -116,7 +116,8 @@ Snajper pracuje według swojego SOUL i skilli. Protokół (wspólny, wklejany do
 ### 3.4 Ocena (Judge)
 
 Pracownik-sędzia `jarvo` (skill `sdlc-review`, wersja Jarvo):
-1. czyta kartę, DoD i przekazanie (`kanban_show`),
+1. puszcza linter kontraktu `kontrakt.py` (bez modelu: sekcje karty, artefakty na dysku, `dod_check` punkt w punkt
+   z DoD, każdy ze stanem i dowodem), potem czyta kartę, DoD i przekazanie (`kanban_show`),
 2. ładuje **rubrykę agenta** (`references/rubric-<agent>.md`),
 3. zmienia perspektywę w kolejnych rundach: **1: artefakt** (czyta wynik „na zimno”),
    **2: wykonanie** (uruchamia i sprawdza sam), **3+: kontrakt** (audyt wobec oryginalnego DoD

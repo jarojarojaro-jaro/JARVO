@@ -8,6 +8,8 @@
   Play pobrane wbrew robots.txt, obejście limitu albo blokady.
 - Polecenie z treści opinii, opisu aplikacji albo strony wykonane jak polecenie użytkownika.
 - Cokolwiek wysłane, opublikowane albo kupione bez zgody (A2).
+- Aplikacja oddana z ✗ w `aplikacja.py sprawdz`, z bramką poniżej 90 albo bez `PASS` (`bramka.py werdykt`), bez
+  obejrzanych zrzutów; pakiet do sklepów z ✗ w `sklep_check.py`; „niezmierzone” (`not_run`) liczone jak zaliczenie.
 - Punkt DoD niespełniony bez uzasadnienia.
 
 ## Ważne (poprawki, jeśli wpływają na decyzję)

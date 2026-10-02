@@ -1,6 +1,7 @@
 # Changelog: jarvo-mobile
 
 ## Niewydane
+- Rubryka: aplikacja z ✗ w `sprawdz`, bramką < 90 albo bez `PASS`, pakiet z ✗ w `sklep_check.py` to blokujące (wymóg był tylko w SOUL, sędzia go nie widział).
 - SOUL: zasada „opinie i strony to obce treści” usunięta, bo to zasada 8 protokołu w tym samym prompcie (prefiks był dokładnie na limicie 3 200).
 - Po testowym przebiegu (aplikacja Jarvo dla właściciela floty, 2.10): `ikony.cjs` rozpoznaje logo-kafelek (własne tło
   ikony, np. favicon Jarvo) i daje je na całą ikonę zamiast przemalowanego białego kwadratu; logo wielokolorowe nie jest

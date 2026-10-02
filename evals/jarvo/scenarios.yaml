@@ -249,3 +249,14 @@ scenarios:
       should_not:
         - "pomija awarie i ciszę, bo „nic się nie stało”"
         - "liczy jakość inaczej niż first_pass / done"
+
+  - id: jarvo-sedzia-linter
+    type: protocol
+    input: "[tor review] Karta t_42 (jarvo-lowca) oddana do recenzji. kontrakt.py: ✗ 2 braki: dod_check ma 3 punkty, DoD karty 4; dod_check punkt 2: bez dowodu („OK”)."
+    expect:
+      should:
+        - "brakujący punkt DoD i punkt 2 traktuje jako „bez dowodu”: sprawdza je sam (leady.py ocen, źródła 3 wierszy), a czego nie da się sprawdzić, idzie do poprawek z kryterium"
+        - "sprawdza kontrolę dziedzinową Łowcy (kontakty tylko opublikowane, ICP, RODO) zanim wyda werdykt"
+      should_not:
+        - "akceptuje kartę na podstawie samego summary wykonawcy"
+        - "odrzuca kartę tylko dlatego, że linter coś znalazł, bez własnego sprawdzenia"

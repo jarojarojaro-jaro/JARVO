@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.2.0
+version: 2.3.0
 author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -29,7 +29,10 @@ jeden werdykt. Nie przejmujesz pracy wykonawcy i **nigdy nie edytujesz jego plik
 ## Procedura
 
 ### 1. Orientacja z trwałego zapisu
-`kanban_show()`, a z niego:
+Najpierw linter kontraktu (0 tokenów): `python3 $HERMES_HOME/scripts/kontrakt.py <id karty>`. Sprawdza sekcje karty,
+istnienie artefaktów i `dod_check` (tyle punktów co DoD, każdy ze stanem i dowodem). Braki przekazania to punkty
+„bez dowodu” z kroku 4a; brak sekcji karty to Twój błąd przy jej pisaniu, nie wykonawcy (zapisz w `caveats`).
+Potem `kanban_show()`, a z niego:
 - oryginalny CEL, KONTEKST, **DoD**, WYJŚCIA, GRANICE,
 - ostatnie przekazanie: `summary`, `metadata.artifacts`, `metadata.dod_check`, `metadata.risks`,
 - komentarze i decyzje, uwagi z poprzednich rund recenzji.
@@ -38,9 +41,8 @@ Przekazanie to **twierdzenie do sprawdzenia**, nie dowód. Wykonawca zgłasza, �
 to, co ma dowód (krok 4a).
 
 ### 2. Rubryka agenta
-Przeczytaj `references/rubric-<agent>.md` dla profilu wykonawcy (pole implementera w historii karty,
-najczęściej `jarvo-sherlock`, `jarvo-web`, `jarvo-studio`, `jarvo-wideo`, `jarvo-reka`). Rubryka mówi, co jest
-**blokujące**, a co jest tylko uwagą.
+Przeczytaj `references/rubric-<agent>.md` dla profilu wykonawcy (pole implementera w historii karty: każdy
+z ośmiu agentów floty ma swoją rubrykę i sekcję w kroku 4). Rubryka mówi, co jest **blokujące**, a co jest tylko uwagą.
 
 ### 3. Runda i soczewka
 Runda = liczba wcześniejszych `changes_requested` + 1.
@@ -78,6 +80,26 @@ Obowiązki bazowe z kroku 4 obowiązują w każdej rundzie. Soczewka mówi, od c
 - obejrzyj arkusz (vision): hook w klatkach 0–1,5 s, napisy i logo poza czerwonymi strefami UI, ujęcia pasują do tekstu,
 - `kontrola.json` wykonawcy ≥ 85 i czy jego „różnice” są prawdziwe; `.srt` bez błędów w nazwach i liczbach,
 - źródła i licencje ujęć/muzyki w `film.json` i RAPORT; generacje AI w limicie karty.
+
+**jarvo-ads (reklamy):**
+- odtwórz liczby: `python3 /opt/jarvo/repo/profiles/jarvo-ads/scripts/planer.py` z danymi z `out/PLAN.md` daje tę samą
+  prognozę; werdykt testu z `eksperyment.py` (P(najlepszy) ≥ 95% albo „remis” z kosztem rozstrzygnięcia),
+- każda akcja zapisująca na koncie ma w dzienniku Skarbca identyfikator zgody albo mieści się w kopercie; żadnego
+  wywołania API platformy obok `ads.py`, żadnej prośby o token,
+- liczby raportu z zakresem dat i źródłem; treść reklam wobec zasad platformy (kategorie specjalne, obietnice).
+
+**jarvo-lowca (leady):**
+- `python3 /opt/jarvo/repo/profiles/jarvo-lowca/scripts/leady.py ocen <projekt>` odtwarza ranking z `LEADY.md`;
+  wylosuj 3 wiersze i otwórz źródło sygnału i kontaktu (data, adres),
+- kontakt tylko opublikowany przez firmę albo rejestr (zero zgadniętych e-maili, LinkedIna, baz kupionych), firma
+  pasuje do `ICP.yaml`, pokrycie (sygnały → firmy → z kontaktem) i przypomnienie o zgodach i RODO; nic nie wysłane (A2).
+
+**jarvo-mobile (aplikacje i audyty):**
+- aplikacja: `python3 /opt/jarvo/repo/profiles/jarvo-mobile/scripts/aplikacja.py sprawdz <app>` bez ✗ i
+  `bramka.py werdykt` = `PASS` (≥ 90, bez blokad; `not_run` to brak pomiaru, nie zaliczenie); obejrzyj zrzuty
+  z `out/zrzuty/` (iPhone i Pixel, oba motywy),
+- pakiet do sklepów: `sklep_check.py` bez ✗ auto; audyt: dowód przy każdym wniosku (adres, wersja, data) i numer
+  wytycznej przy zasadach sklepu; nic wysłanego do sklepu ani EAS Update bez zgody z odciskiem (A2).
 
 **jarvo-reka (złożenie/dokumenty):**
 - kompletność pakietu wobec kart-rodziców, działające ścieżki, spójny INDEX.md, nic nie zgubione i nic nie przeinaczone.
