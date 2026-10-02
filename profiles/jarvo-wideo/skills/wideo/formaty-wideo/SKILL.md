@@ -38,7 +38,8 @@ Tabela platform: `references/specs.md` (zgodna z `qa_wideo.py --platforma`).
 
 ## Wiele platform z jednego materiału
 - Kręcone/generowane pod 9:16 → 1:1 i 4:5 przez przycięcie góry i dołu (tekst w środku kadru!).
-- 16:9 → 9:16: `montaz.py kadr --x <środek obiektu>` albo `--tryb rozmyte` (slajdy, ekran, dwie osoby).
+- 16:9 → 9:16: `montaz.py kadr --x <środek obiektu>` albo `--tryb rozmyte` (slajdy, ekran, dwie osoby); w projekcie edytora
+  `projekt.py kadr <id> --wypelnij --fx X` albo `--rozmyte` (nowy klip o innych proporcjach dostaje rozmyte tło sam).
 - `film.py render --format 9:16,16:9`: osobne ujęcia stock dla każdej orientacji (lepsze niż przycinanie).
 
 ## Definition of Done

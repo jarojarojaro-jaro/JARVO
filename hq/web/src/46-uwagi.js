@@ -15,6 +15,16 @@ function fitBox(vw, vh, W, H, c) {
   return { x: ox + ((W - dw) * fx - ox) * z, y: oy + ((H - dh) * fy - oy) * z, w: dw * z, h: dh * z };
 }
 
+// Rozmyte tło (fit "blur"): ujęcie pokrywające kadr, zmniejszone do ~128 px na kanwie `s` (podgląd rozmywa ją
+// w CSS, kadr dla agenta filtrem kanwy). Eksport: edytor.blur_filter, ten sam wygląd co `film.py --tryb rozmyte`.
+function blurBg(s, el, vw, vh, W, H) {
+  const k = 128 / Math.max(W, H), w = Math.max(2, Math.round(W * k)), h = Math.max(2, Math.round(H * k));
+  if (s.width !== w || s.height !== h) { s.width = w; s.height = h; }
+  const r = fitBox(vw, vh, w, h, { fit: "cover" });
+  try { s.getContext("2d").drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { /* klatka jeszcze niegotowa */ }
+  return s;
+}
+
 // Zaznaczenie na podglądzie (dwa punkty w ułamkach 0–1) → prostokąt w pikselach kadru W×H.
 // Kliknięcie albo zaznaczenie mniejsze niż `min` kadru = cały kadr.
 function shotRect(a, b, W, H, min = 0.03) {

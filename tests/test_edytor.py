@@ -214,6 +214,39 @@ def test_real_export_focus_picks_side_of_frame(tmp_path):
     assert colors[1.0][2] > 150 and colors[1.0][0] < 90       # niebieski
 
 
+def test_blur_fit_filter(tmp_path):
+    """„Rozmyte tło”: fit blur przechodzi walidację, w grafie ffmpeg tło i ujęcie mają etykiety z numerem klipu."""
+    f = _files(tmp_path)
+    base = {"src": str(f["a.mp4"]), "in": 0, "out": 2}
+    p = ed.normalize({"canvas": {"w": 1080, "h": 1920}, "clips": [{**base, "fit": "blur"}, {**base, "fit": "x"}]},
+                     _resolver(tmp_path))
+    assert [c["fit"] for c in p["clips"]] == ["blur", "contain"]
+    cmd = ed.build_command(p, {}, [], tmp_path / "o.mp4")
+    graph = cmd[cmd.index("-filter_complex") + 1]
+    assert "fps=30,split[bg0][fg0];[bg0]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:2," in graph
+    assert "[bb0][ff0]overlay=(W-w)/2:(H-h)/2,setsar=1" in graph and "pad=1080:1920" in graph and "[bg1]" not in graph
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_real_export_blur_fills_bars(tmp_path):
+    """Poziomy czerwony klip w pionie 9:16: „Pasy” zostawiają czarny pas u góry, „Rozmyte tło” wypełnia go kolorem ujęcia."""
+    src = tmp_path / "czerwony.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=red:s=320x180:d=1",
+                    "-pix_fmt", "yuv420p", str(src)], check=True)
+    gora = {}
+    for fit in ("contain", "blur"):
+        p = ed.normalize({"canvas": {"w": 90, "h": 160, "fps": 25},
+                          "clips": [{"src": str(src), "in": 0, "out": 0.5, "fit": fit}]}, _resolver(tmp_path))
+        out = tmp_path / f"{fit}.mp4"
+        r = subprocess.run(ed.build_command(p, {}, [], out), capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        rgb = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(out), "-frames:v", "1", "-vf", "crop=2:2:44:8",
+                              "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
+        gora[fit] = tuple(rgb[:3])
+    assert sum(gora["contain"]) < 40                                   # czarny pas
+    assert gora["blur"][0] > 120 and gora["blur"][2] < 90               # rozmyta czerwień
+
+
 # ------------------------------------------------------------------ napisy karaoke
 
 KAR = {"start": 10.0, "end": 12.0, "text": "Trzy błędy w cenach", "hl": "#FFE14D",
@@ -310,11 +343,13 @@ def test_kadr_rysowany_jak_podglad():
     """fitBox = applyFit podglądu (object-fit, object-position, scale): zrzut kadru trafia tam, gdzie widzi go użytkownik."""
     out = _uwagi_js("""console.log(JSON.stringify({
       contain: fitBox(1920, 1080, 1080, 1920, {fit: "contain"}),
+      rozmyte: fitBox(1920, 1080, 1080, 1920, {fit: "blur", zoom: 2}),
       cover: fitBox(1920, 1080, 1080, 1920, {fit: "cover", fx: 0.5, fy: 0.5}),
       lewo: fitBox(1920, 1080, 1080, 1920, {fit: "cover", fx: 0, fy: 0.5}),
       zoom: fitBox(1920, 1080, 1920, 1080, {fit: "cover", fx: 0.25, fy: 0.5, zoom: 2}),
       zly: fitBox(1920, 1080, 1920, 1080, {fit: "cover", fx: 7, zoom: 99})}));""")
     assert out["contain"] == {"x": 0, "y": 656.25, "w": 1080, "h": 607.5}            # pasy u góry i u dołu
+    assert out["rozmyte"] == out["contain"]                                            # ujęcie całe; tło rysuje blurBg
     assert out["cover"]["h"] == 1920 and round(out["cover"]["x"], 3) == round((1080 - 1920 * 1920 / 1080) / 2, 3)
     assert out["lewo"]["x"] == 0                                                       # punkt skupienia: lewa krawędź
     z = out["zoom"]

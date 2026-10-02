@@ -32,6 +32,8 @@ function strefyUI(W, H, pf) {
 const strefyKolizja = (box, W, H, pf) => strefyUI(W, H, pf)
   .filter((s) => box.x0 < s.x1 && box.x1 > s.x0 && box.y0 < s.y1 && box.y1 > s.y0).map((s) => s.k);
 
+// Klip o innych proporcjach niż kadr: czarne pasy, rozmyte tło z tego samego ujęcia albo wypełnienie (przycięcie).
+const ED_FITS = [["contain", "Pasy", "Bars"], ["blur", "Rozmyte tło", "Blurred"], ["cover", "Wypełnij", "Fill"]];
 const ED_STYLES = [["shadow", "Cień", "Shadow"], ["box", "Tło", "Box"], ["outline", "Obrys", "Outline"], ["plain", "Zwykły", "Plain"]];
 const ED_MIN = 0.1;
 const ED_COLORS = ["#FFFFFF", "#000000", "#FFD60A", "#FF453A", "#32D74B", "#0A84FF", "#BF5AF2", "#FF9F0A"];
@@ -83,7 +85,6 @@ const ED_ICON = {
   speed: svgI(html`<path d="M12 14l4-4"/><path d="M3.3 17a9 9 0 1 1 17.4 0"/>`),
   volume: svgI(html`<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>`),
   mute: svgI(html`<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6M22 9l-6 6"/>`),
-  crop: svgI(html`<path d="M6 2v16h16M2 6h16v16"/>`),
   copy: svgI(html`<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>`),
   trash: svgI(html`<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>`),
   speech: svgI(html`<path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/>`),
@@ -642,6 +643,7 @@ function VideoEditor({ path, onClose }) {
     }
     if (timeRef.current) timeRef.current.textContent = edTC(time);
     drawOverlay();
+    drawBlur();
     if (commitState) setT(time);
   }, []);
   const ppsRef = useRef(pps);
@@ -684,6 +686,30 @@ function VideoEditor({ path, onClose }) {
     }
   }
   useEffect(() => { drawOverlay(); }, [p, sel, strefa]);
+  // rozmyte tło bieżącego klipu (fit "blur"): mała kanwa pod wideo, rozmyta i powiększona w CSS
+  const blurRef = useRef(null);
+  function drawBlur() {
+    const c = blurRef.current, P = projRef.current;
+    if (!c || !P) return;
+    let seg = null;
+    if (P.clips.some((x) => x.fit === "blur")) {
+      const now = tRef.current, L2 = layoutClips(P.clips);
+      seg = L2.find((x) => now < x.end - 1e-6) || L2[L2.length - 1];
+    }
+    const on = !!seg && seg.c.fit === "blur";
+    c.classList.toggle("is-on", on);
+    if (!on) return;
+    const el = seg.c.kind === "image" ? player.imgRef.current : player.vids[player.st.current.slot].current;
+    const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
+    if (vw && vh) blurBg(c, el, vw, vh, P.canvas.w, P.canvas.h);
+  }
+  useEffect(() => { drawBlur(); }, [p]);
+  useEffect(() => {      // po przewinięciu i wczytaniu klatki (pauza): tło z nowej klatki
+    const els = [...player.vids.map((r) => r.current), player.imgRef.current].filter(Boolean);
+    const on = () => drawBlur();
+    for (const e of els) for (const ev of ["seeked", "loadeddata", "load"]) e.addEventListener(ev, on);
+    return () => { for (const e of els) for (const ev of ["seeked", "loadeddata", "load"]) e.removeEventListener(ev, on); };
+  }, [!!p]);
   // tekst w strefie platformy: nazwy stref do ostrzeżenia w panelu (pusto = poza strefami albo kadr poziomy)
   const measure = useRef(null);
   function strefyTekstu(x) {
@@ -709,6 +735,11 @@ function VideoEditor({ path, onClose }) {
     const el = seg && seg.c.kind === "image" ? player.imgRef.current : player.vids[player.st.current.slot].current;
     const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
     if (vw && vh) {
+      if (seg.c.fit === "blur") {
+        const s = blurBg(document.createElement("canvas"), el, vw, vh, W, Hh);
+        g.save(); g.filter = `blur(${Math.round(Math.max(W, Hh) / 160)}px) brightness(0.92)`;
+        g.drawImage(s, -W * 0.06, -Hh * 0.06, W * 1.12, Hh * 1.12); g.restore();
+      }
       const r = fitBox(vw, vh, W, Hh, seg.c);
       try { g.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { /* klatka jeszcze niegotowa: zostaje czarne tło */ }
     }
@@ -809,10 +840,14 @@ function VideoEditor({ path, onClose }) {
   // zmiana długości albo kolejności klipów: napisy, uwagi i audio idą za materiałem (remapTimes)
   const clipsChange = (fn, liveMode) => (liveMode ? H.liveFrom : H.apply)((B) => remapTimes(B, { ...B, clips: fn(B.clips) }));
   const clipPatch = (id, patch, liveMode) => clipsChange((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c)), liveMode);
+  // klip o innych proporcjach niż kadr W×H (z metadanych pliku; nieznane = pasuje)
+  const innyKadr = (src, W, H) => { const m = meta[src]; return !!(m && m.w && m.h) && Math.abs(m.w / m.h - W / H) > 0.02 * (W / H); };
   const setCanvas = (format) => H.apply((P) => {
     const f = meta[path] || {};
     const [w, h] = format === "orig" ? [even(f.w || 1920), even(f.h || 1080)] : ED_SIZES[format];
-    return { ...P, format, canvas: { ...P.canvas, w, h } };
+    // klip, który pasował do starego kadru, a do nowego nie: rozmyte tło zamiast czarnych pasów (wybrane Pasy zostają)
+    const clips = P.clips.map((c) => ((c.fit || "contain") === "contain" && !innyKadr(c.src, P.canvas.w, P.canvas.h) && innyKadr(c.src, w, h) ? { ...c, fit: "blur" } : c));
+    return { ...P, format, canvas: { ...P.canvas, w, h }, clips };
   });
   function split() {
     if (!p) return;
@@ -883,7 +918,8 @@ function VideoEditor({ path, onClose }) {
       setSel({ type: "audio", id: x.id });
       return;
     }
-    const c = { id: edId("c"), src: m.path, kind: m.kind, in: 0, out: m.kind === "image" ? 3 : (m.duration || 3), speed: 1, volume: 1, muted: false, fit: "contain" };
+    const c = { id: edId("c"), src: m.path, kind: m.kind, in: 0, out: m.kind === "image" ? 3 : (m.duration || 3), speed: 1, volume: 1, muted: false,
+      fit: innyKadr(m.path, projRef.current.canvas.w, projRef.current.canvas.h) ? "blur" : "contain" };
     clipsChange((cs) => {
       const i = sel && sel.type === "clip" ? cs.findIndex((x) => x.id === sel.id) + 1 : cs.length;
       const arr = cs.slice(); arr.splice(i || cs.length, 0, c);
@@ -1303,9 +1339,9 @@ function VideoEditor({ path, onClose }) {
       ${act("split", L("Tnij", "Split"), split)}
       ${act("copy", L("Duplikuj", "Duplicate"), duplicate)}
       ${c.kind !== "image" && act(c.muted ? "mute" : "volume", c.muted ? L("Włącz dźwięk", "Unmute") : L("Wycisz", "Mute"), () => upd("clip", c.id, { muted: !c.muted }))}
-      ${act("crop", c.fit === "cover" ? L("Wypełnij", "Fill") : L("Dopasuj", "Fit"), () => upd("clip", c.id, { fit: c.fit === "cover" ? "contain" : "cover" }), { on: c.fit === "cover" })}
       ${act("trash", L("Usuń", "Delete"), remove, { bad: true, disabled: p.clips.length <= 1 })}
     </div>
+    <label>${L("Kadr", "Framing")}${seg(ED_FITS.map(([k2, pl, en]) => [k2, L(pl, en)]), c.fit || "contain", (v) => upd("clip", c.id, { fit: v }))}</label>
     ${c.fit === "cover" && html`<div class="thq-ed-crop">
       <label>${L("Kadr: poziomo", "Frame: horizontal")} · ${Math.round((c.fx ?? 0.5) * 100)}%
         <input type="range" min="0" max="1" step="0.01" value=${c.fx ?? 0.5} onInput=${(e) => upd("clip", c.id, { fx: +e.target.value }, true)} onChange=${H.commit}/></label>
@@ -1417,6 +1453,7 @@ function VideoEditor({ path, onClose }) {
     </div>
   </div>`;
 
+  const inne = p.clips.filter((c) => innyKadr(c.src, CW, CH));
   const formatTools = () => html`<div class="thq-ed-form">
     <div class="thq-ed-ratios">${ED_FORMATS.map(([k2, pl, en]) => {
       const [w, h] = k2 === "orig" ? [(meta[path] || {}).w || 16, (meta[path] || {}).h || 9] : ED_SIZES[k2];
@@ -1426,6 +1463,11 @@ function VideoEditor({ path, onClose }) {
     })}</div>
     ${strefyUI(CW, CH, "tiktok").length > 0 && html`<label>${L("Strefy platformy · tylko podgląd", "Platform safe zones · preview only")}${seg([["off", L("Wył.", "Off")],
       ...Object.entries(ED_STREFY).map(([k2, z]) => [k2, z.name])], ED_STREFY[strefa] ? strefa : "off", pickStrefa)}</label>`}
+    ${inne.length > 0 && html`<label>${L(`Klipy o innych proporcjach (${inne.length})`, `Clips with other proportions (${inne.length})`)}${seg(ED_FITS.map(([k2, pl, en]) => [k2, L(pl, en)]),
+      inne.every((c) => (c.fit || "contain") === (inne[0].fit || "contain")) ? inne[0].fit || "contain" : null,
+      (v) => H.apply((P) => ({ ...P, clips: P.clips.map((c) => (innyKadr(c.src, P.canvas.w, P.canvas.h) ? { ...c, fit: v } : c)) })))}</label>
+      <p class="thq-ed-note">${CH > CW ? L("Kadr pionowy. Film ma zostać poziomy? Wybierz 16:9 albo Oryginał powyżej.", "Vertical frame. Want a horizontal film? Pick 16:9 or Original above.")
+        : L("Kadr poziomy. Film na TikToka, Reels albo Shorts? Wybierz 9:16 powyżej.", "Horizontal frame. For TikTok, Reels or Shorts pick 9:16 above.")}</p>`}
     <label>${L("Klatki na sekundę", "Frame rate")}${seg([24, 25, 30, 50, 60].map((f) => [f, String(f)]), p.canvas.fps, (v) => H.apply((P) => ({ ...P, canvas: { ...P.canvas, fps: v } })))}</label>
     <p class="thq-ed-note">${CW}×${CH} · ${fmtT(total, true)}</p>
   </div>`;
@@ -1433,6 +1475,7 @@ function VideoEditor({ path, onClose }) {
   // ---- wspólne elementy: scena, oś czasu
   const stage = html`<div class="thq-ed-fit" ref=${wrapRef}>
     <div class="thq-ed-stage" ref=${stageRef} style=${stageSize}>
+      <canvas ref=${blurRef} class="thq-ed-blur" aria-hidden="true"></canvas>
       <video ref=${player.vids[0]} class="thq-ed-v" playsinline preload="auto" onError=${codecFallback}></video>
       <video ref=${player.vids[1]} class="thq-ed-v" playsinline preload="auto" onError=${codecFallback}></video>
       ${proxying > 0 && html`<p class="thq-ed-codec is-info"><span class="thq-ed-spin is-small"></span> ${L("Przygotowuję podgląd dla tej przeglądarki (kopia WebM na serwerze, raz)…", "Preparing a preview this browser can play (one-time WebM copy)…")}</p>`}

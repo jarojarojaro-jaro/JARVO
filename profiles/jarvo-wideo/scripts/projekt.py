@@ -9,8 +9,8 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py dodaj-audio <film> <plik> [--start S] [--od S] [--do S] [--glosnosc 0.8] [--wycisz-film]
     projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain]
                                            [--y 0.78] [--rozmiar 72] [--kolor #FFFFFF] [--tlo #000000]
-    projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--wypelnij --fx X --fy Y --zoom Z]
-    projekt.py kadr <film> <id> [--wypelnij|--dopasuj] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
+    projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--rozmyte|--dopasuj|--wypelnij --fx X --fy Y --zoom Z]
+    projekt.py kadr <film> <id> [--rozmyte|--dopasuj|--wypelnij] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
     projekt.py napisy <film> [--srt plik.srt] [--karaoke [#FFE14D]]   # napisy ze słów (<źródło>.mowa.json) albo SRT
     projekt.py usun <film> <id>                    # usuń klip / tekst / audio o danym id (z `pokaz`)
     projekt.py uwaga <film> <id> (--zrobione "co zmieniłem" | --odrzuc "dlaczego")   # zamknij uwagę z osi edytora
@@ -208,11 +208,12 @@ def cmd_dodaj_klip(film: Path, a) -> int:
     kind = ed.media_kind(src) if src else None
     if kind not in ("video", "image"):
         raise SystemExit(f"to nie film ani obraz: {a.plik}")
-    dur = 3.0 if kind == "image" else (ed.probe(src).get("duration") or 3.0)
+    info = ed.probe(src)
+    dur = 3.0 if kind == "image" else (info.get("duration") or 3.0)
     od = a.od or 0.0
     do = a.do if a.do is not None else (od + dur if kind == "image" else dur)
     c = {"id": new_id("c"), "src": str(src), "kind": kind, "in": od, "out": do, "speed": 1 if kind == "image" else a.tempo,
-         "volume": 1, "muted": False, "fit": "cover" if a.wypelnij else "contain"}
+         "volume": 1, "muted": False, "fit": fit_z_arg(a, "blur" if inny_kadr(info, proj["canvas"]) else "contain")}
     c.update(kadr_z_arg(a))
     pos = len(proj["clips"]) if a.pozycja is None else max(0, min(len(proj["clips"]), a.pozycja))
     clips = list(proj["clips"])
@@ -220,6 +221,18 @@ def cmd_dodaj_klip(film: Path, a) -> int:
     save(film, ed.remap_times(proj, {**proj, "clips": clips}))   # wstawiony w środek: reszta osi odsuwa się
     print(f"Dodano klip [{c['id']}] {src.name} na pozycji {pos} ({(do - od) / c['speed']:.2f} s)")
     return 0
+
+
+def inny_kadr(info: dict, canvas: dict) -> bool:
+    """Proporcje pliku inne niż kadr projektu (jak innyKadr w edytorze); nieznane wymiary = pasuje."""
+    w, h = info.get("w"), info.get("h")
+    k = canvas["w"] / canvas["h"]
+    return bool(w and h) and abs(w / h - k) > 0.02 * k
+
+
+def fit_z_arg(a, domyslny: str) -> str:
+    """--wypelnij / --rozmyte / --dopasuj → fit klipu; bez flagi `domyslny` (inne proporcje: rozmyte tło, jak w edytorze)."""
+    return "cover" if a.wypelnij else "blur" if a.rozmyte else "contain" if a.dopasuj else domyslny
 
 
 def kadr_z_arg(a) -> dict:
@@ -238,8 +251,7 @@ def cmd_kadr(film: Path, a) -> int:
     c = next((x for x in proj["clips"] if x.get("id") == a.id), None)
     if c is None:
         raise SystemExit(f"nie ma klipu o id {a.id} (lista: projekt.py pokaz)")
-    if a.wypelnij or a.dopasuj:
-        c["fit"] = "cover" if a.wypelnij else "contain"
+    c["fit"] = fit_z_arg(a, c.get("fit") or "contain")
     c.update(kadr_z_arg(a))
     if c.get("fit") != "cover" and kadr_z_arg(a):
         print("uwaga: fx/fy/zoom działają przy --wypelnij (fit=cover)")
@@ -436,7 +448,10 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--pozycja", type=int, help="miejsce na ścieżce (0 = na początek; domyślnie na koniec)")
 
     def kadr_args(sp):
-        sp.add_argument("--wypelnij", action="store_true", help="wypełnij kadr (fit=cover), np. pion z poziomego")
+        g = sp.add_mutually_exclusive_group()
+        g.add_argument("--wypelnij", action="store_true", help="wypełnij kadr (fit=cover), np. pion z poziomego")
+        g.add_argument("--rozmyte", action="store_true", help="całe ujęcie na rozmytym tle z niego samego (fit=blur)")
+        g.add_argument("--dopasuj", action="store_true", help="całe ujęcie z czarnymi pasami (fit=contain)")
         sp.add_argument("--fx", type=float, help="punkt skupienia poziomo 0–1 (0.5 = środek, twarz mówcy z klatek)")
         sp.add_argument("--fy", type=float, help="punkt skupienia pionowo 0–1")
         sp.add_argument("--zoom", type=float, help="przybliżenie 1–3 (punch-in ok. 1.15)")
@@ -444,7 +459,6 @@ def main(argv: list[str] | None = None) -> int:
     sp = film_cmd("kadr", cmd_kadr, "kadr klipu: wypełnij/dopasuj, punkt skupienia, przybliżenie")
     sp.add_argument("id")
     kadr_args(sp)
-    sp.add_argument("--dopasuj", action="store_true", help="cały obraz z pasami (fit=contain)")
     sp = film_cmd("napisy", cmd_napisy, "napisy ze słów albo z SRT")
     sp.add_argument("--srt")
     sp.add_argument("--karaoke", nargs="?", const="", metavar="KOLOR",

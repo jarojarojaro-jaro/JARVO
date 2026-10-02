@@ -98,7 +98,7 @@ pluginu (albo wtyczki `jarvo-wiedza`) się zmieniła: wdrożenie bez zmian w HQ 
 
 ## 2a. Edytor filmów
 
-Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~113 KB nieskompresowany, ok. 34 KB po gzip, plus `46-uwagi.js`) w tym samym
+Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~117 KB nieskompresowany, ok. 36 KB po gzip, plus `46-uwagi.js`) w tym samym
 pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 
 - **Oś magnetyczna (jak w CapCut):** każda zmiana klipów (usunięcie, wstawienie, przycięcie krawędzi, tempo, długość
@@ -132,6 +132,14 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat → nakładki → miks z limiterem), H.264 + AAC,
   `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
   i dopiero gotowy dostaje nazwę `film-edycja[-N].mp4`: nic nie jest nadpisywane.
+- **Klip o innych proporcjach niż kadr** (np. poziome nagranie w pionie 9:16) ma trzy tryby: **Pasy** (całe ujęcie,
+  czarne pasy), **Rozmyte tło** (całe ujęcie na rozmytym, przyciemnionym tle z niego samego; `fit: "blur"`) i
+  **Wypełnij** (przycięcie). Wybór jest w ustawieniach klipu, a w **Format** dla wszystkich takich klipów naraz.
+  Zmiana formatu na inny niż materiał daje klipom domyślnie rozmyte tło (pasy wybrane wcześniej zostają), tak samo nowy
+  klip o innych proporcjach. Film ma zostać poziomy? Format **16:9** albo **Oryginał**: wtedy poziomy klip wypełnia
+  kadr bez tła i pasów, a panel Format mówi to wprost. Podgląd rysuje tło na małej kanwie pod wideo (rozmycie w CSS),
+  eksport tym samym przepisem co `film.py --tryb rozmyte` (`edytor.blur_filter`: `boxblur` + `eq`), Wideograf:
+  `projekt.py dodaj-klip|kadr --rozmyte|--dopasuj|--wypelnij`.
 - **Kadr:** klip w trybie „Wypełnij” (np. pion 9:16 z poziomego nagrania) ma w ustawieniach suwaki **Kadr: poziomo**,
   **Kadr: pionowo** i **Przybliżenie** (1–3×, punch-in). Zapisują się w klipie jako `fx`, `fy`, `zoom`; eksport tnie
   ten sam fragment (`crop` z punktem skupienia w ffmpeg), który pokazuje podgląd (CSS `object-position` + `scale`).

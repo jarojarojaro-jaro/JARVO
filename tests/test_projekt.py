@@ -96,6 +96,22 @@ def test_kadr_sets_focus_and_zoom(film, capsys):
         pr.main(["kadr", str(film), "brak"])
 
 
+def test_rozmyte_tlo_dla_innych_proporcji(film, tmp_path):
+    """Klip o innych proporcjach niż kadr dostaje rozmyte tło (jak w edytorze HQ); flagi wybierają tryb jawnie."""
+    pion = tmp_path / "pion.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=180x320:r=25:d=2",
+                    "-pix_fmt", "yuv420p", str(pion)], check=True)
+    assert pr.main(["dodaj-klip", str(film), str(pion)]) == 0                        # pion do kadru 4:3
+    assert pr.main(["dodaj-klip", str(film), str(film), "--do", "1"]) == 0           # te same proporcje
+    assert pr.main(["dodaj-klip", str(film), str(pion), "--dopasuj"]) == 0
+    cs = proj(film)["clips"]
+    assert [c["fit"] for c in cs[1:]] == ["blur", "contain", "contain"]
+    assert pr.main(["kadr", str(film), cs[3]["id"], "--rozmyte"]) == 0
+    assert proj(film)["clips"][3]["fit"] == "blur" and pr.main(["sprawdz", str(film)]) == 0
+    with pytest.raises(SystemExit):
+        pr.main(["kadr", str(film), cs[3]["id"], "--rozmyte", "--wypelnij"])        # jeden tryb naraz
+
+
 def test_captions_karaoke_keep_word_times(film):
     """--karaoke: napisy ze słów dostają czasy słów (od początku linii) i kolor aktywnego słowa."""
     ed.speech_path(film).write_text(json.dumps(ed.speech_data(

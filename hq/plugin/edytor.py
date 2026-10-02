@@ -4,7 +4,7 @@ Projekt montażu to mały JSON (zapisywany obok filmu jako `<nazwa>.edycja.json`
 
     {"version": 1, "canvas": {"w": 1080, "h": 1920, "fps": 30},
      "clips": [{"src": "/opt/data/jarvo/.../film.mp4", "in": 0.0, "out": 4.2, "speed": 1.0,
-                "volume": 1.0, "muted": false, "fit": "contain"}],     # "cover" + fx, fy, zoom: kadr z punktem skupienia
+                "volume": 1.0, "muted": false, "fit": "contain"}],     # pasy; "blur" = rozmyte tło; "cover" + fx, fy, zoom
      "texts": [{"start": 0.5, "end": 3.0, ...}],          # wygląd rysuje przeglądarka (PNG na klatkę)
      "audio": [{"src": ".../muzyka.mp3", "start": 0.0, "in": 0.0, "out": 30.0, "volume": 0.4}]}
 
@@ -96,7 +96,7 @@ def normalize(project: dict, resolve) -> dict:
         clips.append({"src": path, "kind": kind, "in": a, "out": b,
                       "speed": 1.0 if kind == "image" else _num(c.get("speed"), 0.25, 4, 1),
                       "volume": _num(c.get("volume"), 0, 2, 1), "muted": bool(c.get("muted")),
-                      "fit": "cover" if c.get("fit") == "cover" else "contain",
+                      "fit": c.get("fit") if c.get("fit") in ("cover", "blur") else "contain",
                       # kadr przy „Wypełnij”: punkt skupienia (0–1, 0,5 = środek) i przybliżenie (punch-in)
                       "fx": _num(c.get("fx"), 0, 1, 0.5), "fy": _num(c.get("fy"), 0, 1, 0.5),
                       "zoom": _num(c.get("zoom"), 1, 3, 1)})
@@ -283,6 +283,16 @@ def cover_filter(W: int, H: int, c: dict) -> str:
             f"crop={W}:{H}:(iw-{W})*{_f(fx)}:(ih-{H})*{_f(fy)}")
 
 
+def blur_filter(W: int, H: int, i: int) -> str:
+    """„Rozmyte tło”: całe ujęcie na środku, pod nim to samo ujęcie pokrywające kadr, rozmyte i lekko przyciemnione
+    (jak `film.py --tryb rozmyte`; podgląd: blurBg w przeglądarce). Etykiety z numerem klipu: jeden graf na eksport.
+    Promień rośnie z kadrem (24 px przy 1080), bo boxblur odrzuca promień większy niż ćwierć krótszego boku."""
+    r = max(2, round(min(W, H) * 0.022))
+    return (f"split[bg{i}][fg{i}];[bg{i}]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+            f"boxblur={r}:2,eq=brightness=-0.08[bb{i}];[fg{i}]scale={W}:{H}:force_original_aspect_ratio=decrease[ff{i}];"
+            f"[bb{i}][ff{i}]overlay=(W-w)/2:(H-h)/2")
+
+
 def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                   ffmpeg: str = "ffmpeg", karaoke: Path | None = None) -> list[str]:
     """Argumenty ffmpeg dla znormalizowanego projektu. `has_audio[src] -> bool` z ffprobe."""
@@ -299,7 +309,7 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
         else:
             args += ["-ss", _f(c["in"]), "-t", _f(dur_src), "-i", str(c["src"])]
         vi = n; n += 1
-        fit = (cover_filter(W, H, c) if c["fit"] == "cover"
+        fit = (cover_filter(W, H, c) if c["fit"] == "cover" else blur_filter(W, H, i) if c["fit"] == "blur"
                else f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black")
         graph.append(f"[{vi}:v]setpts=(PTS-STARTPTS)/{_f(c['speed'])},fps={F},{fit},setsar=1,format=yuv420p,"
                      f"tpad=stop_mode=clone:stop_duration=1,trim=duration={_f(dur)},setpts=PTS-STARTPTS[v{i}]")
