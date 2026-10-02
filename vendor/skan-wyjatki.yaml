@@ -102,5 +102,7 @@ wyjatki:
      powod: "operator non-null TypeScriptu (`Platform.select(...)!` returns), nie !`polecenie`; inline_shell w Hermesie wyłączony (domyślnie)"}
   - {zrodlo: expo-skills, rev: c0dadf3, skill: plugins/expo/skills/expo-upgrade, regula: "hermes:agent_config_mod", plik: SKILL.md,
      powod: "AGENTS.md w repo aplikacji (szablon Expo linkuje dokumentację wersji SDK): przy podniesieniu SDK zmieniają się linki, nie konfiguracja agenta Hermes"}
+  - {zrodlo: remocn-studio, rev: 86f64ee, skill: agent/skills/motion-design, regula: "hermes:role_pretend", plik: rules/anti-patterns.md,
+     powod: "rada reżyserska w tabeli objawów: zapowiedź typograficzna nie musi „udawać” interaktywnego demo; nie zmienia tożsamości agenta"}
   - {zrodlo: callstack-skills, rev: 61e6e7d, skill: skills/upgrading-react-native, regula: "hermes:sudo_usage", plik: references/upgrading-react-native.md,
      powod: "xcode-select i xcodebuild -runFirstLaunch na Macu człowieka; w kontenerze floty nie ma Xcode ani sudo, iOS budują EAS i GitHub Actions"}

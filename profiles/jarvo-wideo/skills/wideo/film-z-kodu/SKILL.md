@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, hyperframes, manim, motion-graphics, animation, code]
-    related_skills: [rodzaje-filmu, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
+    related_skills: [rodzaje-filmu, motion-design, video-lessons, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
@@ -78,6 +78,14 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 11. **Za wolno?** `krytyka.py puls` pokazuje, gdzie film zwalnia; poprawiasz na osi czasu przez `retime.py`
    (`references/retime.md`), nie cięciem MP4.
 9. **Pętla krytyki przed oddaniem:** `kontrola-wideo` krok 4a (7 osi 1–10, 3 najgorsze problemy, aż wszystko ≥ 8).
+12. **Reżyseria ruchu i usterki renderu:** `motion-design` (kierunek, inscenizacja, ciągłość, easing, timing, słownik
+   ruchów, wzorce kompozycji) i `video-lessons` (fonty zastępcze, drżenie tekstu, szwy przejść, CSS na zegarze ściennym,
+   WebGL; najpierw odtwórz usterkę, potem napraw przyczynę). Pisane dla aplikacji Remocn Studio, u nas: „Studio”
+   i „pipeline” = nasz proces (`rodzaje-filmu` → `scenariusz` → ten skill → `kontrola-wideo`); `design_check` =
+   `qa_wideo.py` + `krytyka.py` + arkusz klatek; panelu właściwości i schematów (`rules/tunable-text.md`) nie mamy:
+   wartości do strojenia trzymaj w stałych na górze sceny; szablony w `motion-design` to wzorce kompozycji z rejestru
+   remocn, niczego z niego nie instalujesz. Przykłady w Remotion przenosisz na wybrany silnik (Remotion tylko,
+   gdy go wybrałeś: firmy powyżej 3 osób potrzebują licencji Remotion).
 
 ## Kroki
 1. **Rodzaj, brief i format** (`rodzaje-filmu`, `formaty-wideo`): plik rodzaju → `out/wideo/src/BRIEF.md`

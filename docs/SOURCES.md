@@ -71,6 +71,7 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [expo/skills](https://github.com/expo/skills) | `c0dadf3` | MIT | Twórca aplikacji (10 skilli Expo: router, natywny wygląd, animacje, dane, strona → aplikacja, sklepy, EAS Update, podnoszenie SDK; bez skilli wysyłających dane do Expo, `submit-expo-feedback` w `approvals.deny`) |
 | [callstackincubator/agent-skills](https://github.com/callstackincubator/agent-skills) | `61e6e7d` | MIT | Twórca aplikacji (`react-native-best-practices`, `react-navigation`, `upgrading-react-native`) |
 | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `063bee9` | MIT (w README, autorstwo w `notice`) | Twórca aplikacji (`react-native-skills`) |
+| [Remocn/remocn-studio](https://github.com/Remocn/remocn-studio) | `86f64ee` | MIT | Wideograf (`motion-design`: reżyseria ruchu i wzorce kompozycji, `video-lessons`: znane usterki renderu); ich pojęcia (Studio, `design_check`) tłumaczy reguła 12 `film-z-kodu` |
 | [appeeky/aso-skills](https://github.com/appeeky/aso-skills) | `8de1ee1` | MIT | Twórca aplikacji (6 skilli ASO: metadane, zrzuty, odrzucenia, Google Play, lokalizacja, opinie) |
 
 Build odrzuca skill z `anthropics/skills`, jeśli w jego katalogu nie ma licencji Apache-2.0: część

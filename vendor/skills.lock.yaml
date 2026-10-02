@@ -200,6 +200,12 @@ sources:
     rev: 063bee94c3f4df8453406c830b0a7df0f2860278
     license: MIT
     notice: "vercel-labs/agent-skills, Copyright (c) Vercel. MIT License (README: https://github.com/vercel-labs/agent-skills)"
+  remocn-studio:
+    type: git                # Remocn Studio (aplikacja na macOS): tylko jej własne skille ruchu, bez vendorowanych remotion/remocn
+    repo: https://github.com/Remocn/remocn-studio
+    rev: 86f64ee6b2e5b9fa69c81ba2e99151a14c178b33
+    license: MIT
+    license_file: LICENSE
   aso-skills:
     type: git
     repo: https://github.com/appeeky/aso-skills
@@ -374,6 +380,10 @@ agents:
     - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-scene-craft, dest: screenwriting/sw-scene-craft}
     - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-dialogue, dest: screenwriting/sw-dialogue}
     - {source: screenwriting-skills, path: plugins/screenwriting/skills/sw-character-conflict, dest: screenwriting/sw-character-conflict}
+    # Reżyseria ruchu i znane usterki renderu z Remocn Studio; ich „Studio”, „pipeline” i design_check
+    # tłumaczy na nasze narzędzia reguła 12 skilla film-z-kodu.
+    - {source: remocn-studio, path: agent/skills/motion-design, dest: video/motion-design}
+    - {source: remocn-studio, path: agent/skills/video-lessons, dest: video/video-lessons}
 
   jarvo-ads:
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}

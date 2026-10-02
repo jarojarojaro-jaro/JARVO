@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Skille zewnętrzne `motion-design` i `video-lessons` z Remocn Studio (MIT, przypięty commit `86f64ee`): reżyseria ruchu (kierunek, inscenizacja, ciągłość, easing, timing, słownik ruchów) i znane usterki renderu; reguła 12 w `film-z-kodu` tłumaczy ich pojęcia na nasze narzędzia. Skan: jedno ustalenie (rada „nie musi udawać demo” wzięta za zmianę tożsamości) opisane jako wyjątek.
 - Uwagi z osi edytora HQ: `projekt.py pokaz` wypisuje uwagi właściciela (czas osi, tekst, kadr), `projekt.py uwaga <film> <id> --zrobione|--odrzuc` zamyka je z opisem (edytor pokazuje ✓), `render` ostrzega o otwartych. Prośba z edytora niesie kadry z podglądu (obrazy do `vision_analyze`).
 - Skill `demo-strony` i skrypt `demo_strony.py` (metoda za ECC `ui-demo`, MIT): rozpoznanie elementów → próba scenariusza (akcje wykonane, zły selektor = lista widocznych elementów) → nagranie MP4 z płynnym kursorem, pisaniem znak po znaku, pauzami dla człowieka i paskiem napisów kroków (także nad oknem modalnym); SRT i oś kroków do edycji w HQ. Tylko nasz podgląd albo domeny ze scenariusza, hasło konta testowego tylko ze zmiennej środowiskowej.
 - Kontrakt zlecenia (wspólny): nie osłabiam kontroli, żeby zaliczyć DoD (za ECC loop-design-check); poprawki po recenzji z pytaniem przy niejasnym punkcie i sprzeciwem z dowodem przy błędnym (za superpowers receiving-code-review); reguła 17: zgoda A2 przypięta do odcisku wersji plików (`scripts/odcisk.py`, za ECC operator-approval-loop).
