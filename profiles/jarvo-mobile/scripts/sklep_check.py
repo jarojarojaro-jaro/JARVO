@@ -99,7 +99,7 @@ PUNKTY: list[tuple[int, str, str, str, str]] = [
 assert len(PUNKTY) == 44 and [p[0] for p in PUNKTY] == list(range(1, 45))
 
 GRUPY = {"A": "Konto i tożsamość", "B": "Build i konfiguracja", "C": "Uprawnienia i prywatność", "D": "Konta i logowanie",
-         "E": "Treść i funkcje", "F": "Grafiki", "G": "Metadane"}
+         "E": "Treść i funkcje", "F": "Grafiki", "G": "Metadane", "N": "Wyuczone z odrzuceń"}
 ZNAKI = {"ok": "✓", "blad": "✗", "?": "?", "recznie": "☐"}
 EAS = "eas-cli@24.7.0"
 
@@ -927,8 +927,11 @@ def p25(ctx):
     zle = []
     if not r.get("demoUsername"):
         zle.append("brak apple.review.demoUsername w store.config.json")
-    if not (r.get("demoPassword") or os.environ.get("JARVO_DEMO_HASLO")):
-        zle.append("brak hasła demo (store.config.json albo JARVO_DEMO_HASLO w .env profilu przy wysyłce)")
+    if r.get("demoPassword"):
+        zle.append("hasło demo w store.config.json: plik jest w repo aplikacji (bywa publiczne dla darmowego CI iOS); "
+                   "hasło tylko w JARVO_DEMO_HASLO (.env profilu), wstawia je `wydanie.py karta` na czas wysyłki")
+    elif not os.environ.get("JARVO_DEMO_HASLO"):
+        zle.append("brak hasła demo: JARVO_DEMO_HASLO w .env profilu (wpisuje właściciel, nie w czacie)")
     if r.get("demoRequired") is False:
         zle.append("demoRequired=false przy aplikacji z kontami")
     notatki = str(r.get("notes") or "")
@@ -939,7 +942,7 @@ def p25(ctx):
     logowanie = (ctx.app.get("backend") or {}).get("demo_login")
     if logowanie and ctx.siec:
         try:
-            dane = json.dumps({"login": r["demoUsername"], "haslo": r.get("demoPassword") or os.environ.get("JARVO_DEMO_HASLO")}).encode()
+            dane = json.dumps({"login": r["demoUsername"], "haslo": os.environ.get("JARVO_DEMO_HASLO")}).encode()
             import urllib.request
             req = urllib.request.Request(logowanie, data=dane, headers={"Content-Type": "application/json"}, method="POST")
             with urllib.request.urlopen(req, timeout=20) as o:  # noqa: S310 (backend aplikacji właściciela)
@@ -1344,6 +1347,37 @@ def wczytaj_profil(kat: Path, sciezka: str | None) -> dict:
     return {}
 
 
+def bez_komentarzy(kod: str) -> str:
+    """Kod TS/JS bez komentarzy blokowych i liniowych (adresy `https://` zostają)."""
+    kod = re.sub(r"/\*.*?\*/", " ", kod, flags=re.S)
+    return re.sub(r"(?m)(^|[^:\\'\"])//.*$", r"\1", kod)
+
+
+def punkty_wyuczone(ctx: Kontekst) -> list[dict]:
+    """Kontrole dopisane przez `odrzucenie.py naucz` (wzorzec w kodzie i / albo metadanych): błąd blokuje wysłanie."""
+    try:
+        import odrzucenie
+        kontrole = odrzucenie.wyuczone()
+    except Exception as e:  # noqa: BLE001
+        return [{"nr": "N?", "grupa": "N", "tryb": "auto", "tytul": "kontrole wyuczone", "podstawa": "", "stan": "?", "znak": "?",
+                 "dowod": f"nie wczytano _nauka/odrzucenia.yaml: {e}", "poprawka": "popraw plik nauki"}]
+    out = []
+    for k in kontrole:
+        if not k.get("wzorzec"):
+            continue
+        wz = re.compile(k["wzorzec"], re.I)
+        zrodla = {}
+        if k.get("gdzie", "oba") in ("src", "oba"):
+            zrodla.update({n: bez_komentarzy(t) for n, t in ctx.src.items()})     # komentarze nie trafiają do aplikacji
+        if k.get("gdzie", "oba") in ("metadane", "oba"):
+            zrodla.update(ctx.metadane_teksty())
+        trafienia = [f"{n}: {m.group(0)}" for n, t in zrodla.items() for m in [wz.search(t)] if m]
+        out.append({"nr": k["id"], "grupa": "N", "tryb": "auto", "tytul": k["opis"], "podstawa": f"{k['wytyczna']} (odrzucenie {k['data']})",
+                    "stan": "blad" if trafienia else "ok", "znak": "✗" if trafienia else "✓",
+                    "dowod": "; ".join(trafienia[:5]) if trafienia else f"brak /{k['wzorzec']}/", "poprawka": k["poprawka"]})
+    return out
+
+
 def sprawdz(ctx: Kontekst) -> dict:
     wyniki = []
     for nr, grupa, tryb, tytul, podstawa in PUNKTY:
@@ -1359,6 +1393,7 @@ def sprawdz(ctx: Kontekst) -> dict:
             w = Wynik(nr, "ok", f"potwierdził {potw.get('kto')} {potw.get('kiedy', '')}: {potw.get('uwaga', '')} (dowód: {w.dowod})")
         wyniki.append({"nr": nr, "grupa": grupa, "tryb": tryb, "tytul": tytul, "podstawa": podstawa, "stan": w.stan,
                        "znak": ZNAKI[w.stan], "dowod": w.dowod, "poprawka": w.poprawka})
+    wyniki += punkty_wyuczone(ctx)
     licz = {s: sum(1 for w in wyniki if w["stan"] == s) for s in ZNAKI}
     blokujace = [w for w in wyniki if w["stan"] == "blad" and w["tryb"] == "auto"]
     return {"aplikacja": str(ctx.kat), "data": ml.DZIS.isoformat(), "konfiguracja": ctx.cfg.get("zrodlo"),
@@ -1376,6 +1411,8 @@ def raport_md(r: dict) -> str:
     if r["blokujace"]:
         l += [f"**Blokuje wysłanie:** punkty {', '.join(map(str, r['blokujace']))}.", ""]
     for g, nazwa in GRUPY.items():
+        if not any(w["grupa"] == g for w in r["wyniki"]):
+            continue
         l += [f"## {g}. {nazwa}", "", "| # | | Sprawdzenie | Tryb | Dowód | Poprawka | Podstawa |", "|---|---|---|---|---|---|---|"]
         l += [f"| {w['nr']} | {w['znak']} | {ml.md_komorka(w['tytul'])} | {w['tryb']} | {ml.md_komorka(w['dowod'])} | "
               f"{ml.md_komorka(w['poprawka'])} | {ml.md_komorka(w['podstawa'])} |" for w in r["wyniki"] if w["grupa"] == g]

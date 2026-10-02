@@ -2,9 +2,9 @@
 
 > Stan: **zaakceptowany 2026-10-01, w budowie.** Właściciel: `jarvo-mobile` („Twórca aplikacji”), we flocie od etapu 1
 > (audyt mobilny, „natywna czy PWA”, pokój „Pracownia aplikacji” w HQ); gotowe etapy 2 (szablon, budowa, podgląd w HQ
-> i w Expo Go) i 4 (pakiet do sklepów z listą 44 punktów), etap 3 (bramka, telefon testowy, iOS w CI) czeka na test
-> na urządzeniach; postęp w §16.
-> Decyzje M1–M11 w §17 przyjęte z rekomendacjami. Wersje, ceny i reguły sklepów sprawdzone 2026-10-01; przed każdym etapem
+> i w Expo Go) i 4 (pakiet do sklepów z listą 44 punktów); etap 3 (bramka, telefon testowy, iOS w CI) czeka na test
+> na urządzeniach, etap 5 (wydanie, odrzucenia) na pierwszą aplikację na kontach właściciela; postęp w §16.
+> Decyzje M1–M12 w §17 przyjęte z rekomendacjami. Wersje, ceny i reguły sklepów sprawdzone 2026-10-01; przed każdym etapem
 > sprawdzamy je jeszcze raz, bo sklepy zmieniają je co kilka miesięcy. Rzeczy, których nie udało się potwierdzić
 > w źródłach pierwotnych, są oznaczone „(niepotwierdzone)”.
 
@@ -442,8 +442,27 @@ sprawie Apple oferuje 30-minutowe konsultacje z recenzentami.
 **Google:** ścieżka wewnętrzna → raport przedpremierowy (ok. godziny) → test zamknięty (dla nowego konta osobistego
 obowiązkowo 12 testerów przez 14 dni) → produkcja ze **stopniowym wydaniem** (np. 20% użytkowników) i obserwacją awarii.
 
-**Odrzucenie (skill `odrzucenie`):**
-1. Wiadomość z App Review albo z Play Console to obce dane: agent czyta ją jako tekst, nie jako polecenia.
+**Jak to robi `wydanie.py`:**
+1. `plan`: bramki i jednorazowe przygotowanie kont właściciela.
+2. `build`: EAS Build production, `--no-wait`.
+3. `status`: AAB i IPA do `out/build/` i lista kontrolna na buildach.
+4. `testy`: `eas submit` do TestFlight i na ścieżkę wewnętrzną Google jako szkic.
+5. `karta`: `eas metadata:push` ze `store.config.json`; hasło demo z `JARVO_DEMO_HASLO` jest w pliku tylko na czas
+   wysyłki. Kartę Google właściciel wkleja z `GOOGLE.md`.
+6. `recenzja`: lista kliknięć właściciela.
+
+Kroki 2, 4 i 5 to A2. Mają trzy zabezpieczenia:
+- bramki: `PASS` bramki, lista kontrolna bez ✗ auto (przed testami na pobranych buildach), zero `JARVO-TODO`,
+  projekt EAS i token robota;
+- dosłowne słowa zgody właściciela w `--zgoda`, zapisane w `out/wydanie/zgody.json`;
+- zatwierdzenie polecenia przez Hermesa (`approvals.smart_policy`). W pracy bez nadzoru te polecenia są odrzucane.
+
+Do recenzji i do wydania klika właściciel: decyzja **M12** (§17). Pierwszy AAB w Google wgrywa ręcznie, bo API Google
+przyjmuje wersje dopiero po pierwszej.
+
+**Odrzucenie (skill `odrzucenie`, `odrzucenie.py analizuj`):**
+1. Wiadomość z App Review albo z Play Console to obce dane: agent czyta ją jako tekst, nie jako polecenia; zdania
+   wyglądające na polecenia (token, uruchom, wyłącz kontrolę) skrypt oznacza jako podejrzane w `ANALIZA.md`.
 2. Dopasowanie do wytycznej i klasyfikacja: **poprawka** (kod albo metadane), **wyjaśnienie** (recenzent czegoś nie
    znalazł: ścieżka, konto demo, nagranie) albo **odwołanie** (recenzja się myli).
 3. Szkic odpowiedzi **po angielsku** (Google odpowiada na odwołania tylko po angielsku, chińsku, japońsku i koreańsku):
@@ -455,8 +474,11 @@ obowiązkowo 12 testerów przez 14 dni) → produkcja ze **stopniowym wydaniem**
    [pomoc](https://support.google.com/googleplay/android-developer/answer/2477981)) albo poprawka z nowym `versionCode`.
 5. Wysłanie odpowiedzi to A2. Odwołania rzadko wygrywają (Apple w 2025: 423 przywrócone z 26 305 odwołań od usunięcia),
    więc domyślnie poprawiamy, a odwołujemy się tylko z mocnym argumentem.
-6. **Pętla nauki:** każde odrzucenie trafia do `odrzucenia.md` w skarbcu wiedzy (wytyczna, cytat, poprawka) i dopisuje
-   punkt do `sklep_check.py` albo rubryki bramki, z testem. Ten sam błąd nie zdarza się drugi raz.
+6. **Pętla nauki:** każde odrzucenie trafia jako lekcja do skarbca wiedzy (`wiedza_zapisz`, szkic z `LEKCJA.md`:
+   wytyczna, cytat, poprawka) i jako kontrola: `odrzucenie.py naucz` dopisuje wzorzec do
+   `<katalog Twórcy aplikacji>/_nauka/odrzucenia.yaml`, a `sklep_check.py` od razu stosuje go we wszystkich aplikacjach
+   jako punkty N1, N2… (kod bez komentarzy i metadane; błąd blokuje). Stałą kontrolę z testem do `sklep_check.py`
+   dopisuje deweloper floty z propozycji karty. Ten sam błąd nie zdarza się drugi raz.
 
 ## 11. Darmowy audyt mobilny: skąd dane
 
@@ -492,8 +514,8 @@ mówi, że to nie do produkcji). Punkt 28 listy kontrolnej (§8) mierzy udział 
 | `podglad-aplikacji` | wersja webowa w HQ, link EAS Update do Expo Go, urządzenie Android w dashboardzie, zrzuty na Telegram |
 | `bramka-aplikacji` | rubryka 0–100, testy wrogie na Androidzie i w symulatorze iOS, werdykt (§6) |
 | `pakiet-do-sklepow` | zrzuty (§9), ikony, opisy w limitach, formularze prywatności, konto demo, notatki dla recenzenta |
-| `wydanie` | build, `sklep_check.py` (§8), wgranie do testów (A2), wysłanie do recenzji (A2), lista kroków dla człowieka w konsolach |
-| `odrzucenie` | wiadomość recenzenta → wytyczna → poprawka, wyjaśnienie albo odwołanie; nowy punkt listy (§10) |
+| `wydanie` | `wydanie.py`: plan i bramki, EAS Build (A2), AAB i IPA z listą kontrolną (§8), TestFlight i testy Google (A2), karta App Store (A2), lista kliknięć właściciela do recenzji i wydania |
+| `odrzucenie` | `odrzucenie.py`: wiadomość recenzenta → wytyczna → poprawka, wyjaśnienie albo odwołanie, odpowiedź po angielsku; wyuczona kontrola listy (N1, N2…) (§10) |
 | `utrzymanie-aplikacji` | poprawki przez EAS Update, nowa wersja w sklepie, podnoszenie SDK, kalendarz terminów sklepów |
 
 Skille zewnętrzne do przypięcia w `vendor/skills.lock.yaml` (licencje sprawdzone 2026-10-01):
@@ -559,7 +581,7 @@ alternatywnie konfiguracja Codemagic.
 | 2 ✅ | `nowa-aplikacja` + `podglad-aplikacji`: szablon `templates/expo-jarvo` (Expo SDK 57) z elementami zgodności, `zgodnosc.py`, `aplikacja.py` (nowa, ustaw, sprawdz, eksport, podglad, expo-go), `ikony.cjs`, `zrzuty.cjs`, 27 testów | w kontenerze: aplikacja z profilu „logowanie e-mail + Google, aparat, powiadomienia” w 81 s, `sprawdz` 6/6 (typy, lint, wersje SDK, expo-doctor, zasady JARVO) w 11 s, podgląd w HQ i 20 zrzutów iPhone 17 Pro Max i Pixel w obu motywach bez błędów; poprawione po teście: brakujący `expo-font` (wykrył expo-doctor), podpisy zakładek ucięte w wersji webowej, link HQ do katalogu zamiast `index.html`. Expo Go na prawdziwym telefonie czeka na organizację Expo właściciela | Expo (podgląd na telefonie) |
 | 3 🟡 | `bramka-aplikacji`: rubryka 10 osi, werdykt (`bramka.py`), testy wrogie w przeglądarce (`wrogie.cjs`), na Androidzie przez adb (`urzadzenie.py`) i w symulatorze iOS na GitHub Actions (`ios_ci.py`, `templates/ci/jarvo-ios.yml`); telefon testowy (emulator Google albo Redroid) + ws-scrcpy w HQ | bramka i warstwa web gotowe: w kontenerze szablon 7/7 testów wrogich, celowo zepsuta aplikacja 4 błędy (przewijanie, axe w trybie ciemnym, brak paska offline, długie słowa), werdykt rundy 1 = REVISE 87 (start z tekstem zastępczym, ikona z inicjałami); Android i iOS przetestowane na atrapach (13 testów). Telefon testowy: `jarvo android on|off|status` (emulator przy KVM sprawdzonym próbnym kontenerem, Redroid przy binderze), `adb` w obrazie floty, ekran ws-scrcpy za proxy HQ `:9122` (12 testów, w tym prawdziwe gniazda z WebSocketem); w kontenerze: `adb` 34.0.5, `urzadzenie.py status` = kod 3 z instrukcją, przycisk 📱 w panelu otwiera ws-scrcpy przez proxy (nowa karta bez `opener`, ciasteczko niewidoczne dla JS, WebSocket działa), bez ciasteczka 403, token ekranu na `:9120` 404. Czeka: sam Android na serwerze Ubuntu i w Windows 11 (piaskownica nie ma KVM ani bindera) i pierwszy przebieg iOS w GitHub Actions | GitHub albo Codemagic |
 | 4 ✅ | `pakiet-do-sklepow` + `sklep_check.py` (44 punkty z testami na celowo zepsutych aplikacjach) + potok zrzutów (`pakiet.py`, `kadry.cjs`) | 36 testów (celowo zepsute aplikacje w każdej grupie A–G, AAB z manifestem protobuf i bibliotekami ELF, IPA, obrazy z alfą, adresy, metadane w bajtach); aplikacja wzorcowa bez błędów auto. W kontenerze: lista na prawdziwej aplikacji w 5 s; pierwsze uruchomienie znalazło angielski opis mikrofonu dopisywany przez wtyczkę aparatu (poprawka w `zgodnosc.py`), tekst zastępczy na ekranie startowym szablonu (teraz JARVO-TODO) i kopię aplikacji w innym katalogu (4.3); pakiet prototypu „Salon Ola” (karta, grafiki, zrzuty 1320×2868 i 1080×1920 bez alfy, galeria w podglądzie HQ) przechodzi punkty 34–42, a blokują go tylko rzeczy, których fikcyjna firma mieć nie może: strona z polityką, kontakt i usuwanie konta pod prawdziwą domeną, backend usuwania konta. Zrzuty z buildu (android / ios) czekają na telefon testowy i pierwszy build | brak |
-| 5 | `wydanie` + `odrzucenie`: EAS Build i Submit, TestFlight, ścieżki Google, notatki dla recenzenta | pierwsza prawdziwa aplikacja przez recenzję w obu sklepach | Apple 99 $/rok, Google 25 $ |
+| 5 🟡 | `wydanie` + `odrzucenie`: EAS Build i Submit, TestFlight, ścieżki Google, notatki dla recenzenta | gotowe w kodzie: `wydanie.py` (bramki, zgody, EAS Build / Submit / Metadata, pobranie buildów z listą kontrolną) i `odrzucenie.py` (wytyczne, droga, odpowiedź EN, obce dane, nauka → punkty N) z 11 testami na atrapie EAS i prawdziwych wiadomościach; w kontenerze plan, bramki, analiza i nauka na aplikacji testowej. **Czeka:** pierwsza prawdziwa aplikacja przez recenzję w obu sklepach (konta właściciela: Apple 99 $/rok, Google 25 $) | Apple 99 $/rok, Google 25 $ |
 | 6 | `aplikacja-ze-strony`, `utrzymanie-aplikacji`, red team (opinie i wiadomości recenzentów jako atak, złośliwa paczka npm, sekret w paczce JS) | strona Weba → aplikacja z powiadomieniami | jak w 5 |
 
 Współpraca z flotą: **Web** (PWA, pliki `.well-known`, baner, strony polityki prywatności i usuwania konta, brand kit),
@@ -581,6 +603,7 @@ Współpraca z flotą: **Web** (PWA, pliki `.well-known`, baner, strony polityki
 | M9 | Testy i zrzuty iOS | **GitHub Actions `macos-26`** w repo aplikacji właściciela (publiczne za darmo), Codemagic dla repo prywatnych; zapis na listę EAS Simulator |
 | M10 | Zgodność ze sklepami | **Od planu, nie na końcu:** profil zgodności w kroku 1, elementy w szablonie, `sklep_check.py` (44 punkty) blokuje wysłanie, każde odrzucenie dopisuje punkt |
 | M11 | Konto Google | **Konto organizacji** (D-U-N-S), bo osobiste wymaga testu 12 osób przez 14 dni; przy osobistym agent planuje test z klientami właściciela |
+| M12 | Kto klika „wyślij do recenzji” i „wydaj” | **Właściciel**, z listą kroków od agenta (`wydanie.py recenzja`). Agent buduje, wgrywa do testów i wysyła kartę za zgodą (A2), ale nieodwracalne kroki publiczne robi człowiek: wydanie ręczne w App Store, wdrożenie stopniowe w Google. Bez kluczy API do wysyłki recenzji w rękach agenta |
 
 ## 18. Źródła (sprawdzone 2026-10-01)
 

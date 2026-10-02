@@ -61,11 +61,11 @@ tools:
     version: "24.7.0"
     install: {method: npx, spec: "npx --yes eas-cli@24.7.0 (pobierany przy pierwszym użyciu)"}
     integration: skill-script
-    used_by_skills: [podglad-aplikacji]
+    used_by_skills: [podglad-aplikacji, wydanie]
     healthcheck: "npm --version"
     autonomy: A1
     optional: true
-    notes: "aplikacja.py expo-go: eas init (projekt w organizacji właściciela) i eas update na gałąź podglądu; token robota EXPO_TOKEN w .env profilu. Build i wysyłka do sklepów: A2."
+    notes: "aplikacja.py expo-go: eas init (projekt w organizacji właściciela) i eas update na gałąź podglądu (A1). wydanie.py: eas build (production, --no-wait), build:view, submit (TestFlight, ścieżka wewnętrzna Google jako szkic), metadata:push: A2 z dosłowną zgodą właściciela; token robota EXPO_TOKEN w .env profilu."
   - name: sharp
     source: https://github.com/lovell/sharp
     license: Apache-2.0

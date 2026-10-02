@@ -64,7 +64,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, filmy z kodu, maskotka | Studio filmowe (`filmstudio`) | wideo | 15 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem | Sala operacyjna (`office`) | ads | 10 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 6 |
-| 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 6 |
+| 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 8 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | Warsztat (`workshop`) | reka | 4 |
 
 ### 2a. jarvo-mobile — szczegóły (najnowszy)
@@ -81,7 +81,10 @@ expo-go`, ikony z logo albo inicjałów, zrzuty iPhone 17 Pro Max i Pixel w obu 
 (`jarvo android on`: emulator Google przy KVM albo Redroid przy binderze, ekran w HQ przez proxy `:9122` z tokenem).
 Etap 4: `pakiet-do-sklepow` (`sklep_check.py`: 44 punkty z dowodem i numerem wytycznej, czyta konfigurację po wtyczkach,
 AAB, IPA, metadane, obrazy i adresy; `pakiet.py`: szkic karty, grafiki Google, zrzuty w wymiarach sklepów bez alfy
-i galeria w podglądzie HQ). Kolejne etapy: wydanie, odrzucenia.
+i galeria w podglądzie HQ). Etap 5: `wydanie` (`wydanie.py`: plan i bramki, EAS Build, pobranie AAB i IPA z listą
+kontrolną, TestFlight i testy Google, karta App Store; każdy krok A2 z dosłowną zgodą właściciela, do recenzji wysyła
+on) i `odrzucenie` (`odrzucenie.py`: wytyczne z wiadomości recenzenta, poprawka / wyjaśnienie / odwołanie, odpowiedź
+po angielsku, wiadomość jako obce dane, nauka jako nowe punkty listy N1, N2…).
 
 ### 2a''. jarvo-lowca — szczegóły
 Łowca leadów B2B z oficjalnych, darmowych źródeł: KRS (API MS: biuletyn dnia i odpisy; nazwiska zarządu maskowane),

@@ -1,6 +1,19 @@
 # Changelog: jarvo-mobile
 
 ## Niewydane
+- Etap 5 (wydanie i odrzucenia): skille `wydanie` i `odrzucenie`.
+  - `wydanie.py`: plan i bramki (bramka PASS, lista kontrolna, JARVO-TODO, projekt EAS, token robota).
+    `build` → EAS Build production; `status` pobiera AAB i IPA i uruchamia listę na buildach; `testy` →
+    TestFlight i ścieżka wewnętrzna Google (szkic); `karta` → `eas metadata:push`, a hasło demo jest
+    w pliku tylko na czas wysyłki; `recenzja` daje kliknięcia właściciela; `wersja` podnosi numer.
+    Każdy krok A2 zapisuje dosłowne słowa zgody właściciela. Hermes eskaluje polecenia do człowieka
+    (smart_policy obejmuje `wydanie.py build/testy/karta`).
+  - `odrzucenie.py`: wytyczne Apple i zasady Google z wiadomości. Droga: poprawka, wyjaśnienie albo
+    odwołanie. Szkic odpowiedzi po angielsku. Zdania-polecenia w wiadomości są oznaczane jako podejrzane
+    i nic z nich nie jest wykonywane. `naucz` dopisuje kontrolę, którą `sklep_check.py` stosuje jako
+    punkty N1, N2… (bez komentarzy kodu).
+  - `sklep_check.py`: hasło demo w `store.config.json` blokuje, bo repo aplikacji bywa publiczne.
+  - 4 evals.
 - Etap 4 (pakiet do sklepów): skill `pakiet-do-sklepow`.
   - `sklep_check.py`: 44 punkty z MOBILE.md §8 (auto / pół / ręcznie), z dowodem, poprawką i podstawą przy każdym.
     Czyta konfigurację po wtyczkach (`expo config --type introspect`) i manifest AAB (protobuf aapt2).

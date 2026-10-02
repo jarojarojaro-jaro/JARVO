@@ -55,8 +55,9 @@ approvals:
   smart_policy: >-
     Always ESCALATE: anything that touches the owner's Apple, Google Play or Expo accounts (eas submit, eas build
     with auto-submit, eas update to a production channel, fastlane deliver/supply/pilot, altool, App Store Connect
-    or Google Play Developer API calls that change data), submitting for review, releasing or publishing an app,
-    replying to store reviews, buying anything, logging into any website. Never use passwords pasted in chat.
+    or Google Play Developer API calls that change data), the wydanie.py subcommands build, testy and karta (they run
+    EAS Build, EAS Submit and eas metadata:push on the owner's accounts), submitting for review, releasing or publishing
+    an app, replying to store reviews, buying anything, logging into any website. Never use passwords pasted in chat.
   deny:
     - "rm -rf /*"
     - "git push --force*"

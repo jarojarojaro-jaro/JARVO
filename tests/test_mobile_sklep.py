@@ -177,7 +177,7 @@ def app(tmp_path, monkeypatch):
                            "keywords": ["fryzjer", "kosmetyczka", "wizyta", "rezerwacja", "manicure"],
                            "releaseNotes": "Pierwsza wersja aplikacji.", "supportUrl": "https://salonola.pl",
                            "privacyPolicyUrl": "https://salonola.pl/polityka-prywatnosci"}},
-        "review": {"demoUsername": "review@salonola.pl", "demoPassword": "Demo-2026", "demoRequired": True, "notes": NOTATKI}}},
+        "review": {"demoUsername": "review@salonola.pl", "demoRequired": True, "notes": NOTATKI}}},
         ensure_ascii=False), encoding="utf-8")
     g = kat / "out" / "sklep" / "google" / "pl-PL"
     for n, v in (("title.txt", "Salon Ola"), ("short_description.txt", "Umów wizytę i zbieraj pieczątki za usługi."),
@@ -197,6 +197,7 @@ def app(tmp_path, monkeypatch):
     monkeypatch.setattr(sk, "_ocr", lambda p: "Salon Ola Umów wizytę")
     monkeypatch.setattr(ml, "json_z", lambda url, **kw: {"results": []})
     monkeypatch.setenv("JARVO_MOBILE_PRACE", str(tmp_path / "brak"))
+    monkeypatch.setenv("JARVO_DEMO_HASLO", "haslo-z-env-profilu")
     return kat
 
 
@@ -360,11 +361,14 @@ def test_adresy_lokalne_i_bez_https(app, monkeypatch):
 def test_konto_demo_i_notatki(app, monkeypatch):
     _http_ok(monkeypatch)
     s = json.loads((app / "store.config.json").read_text(encoding="utf-8"))
-    s["apple"]["review"].update(demoPassword="", notes="Zaloguj się kontem demo, potem wpisz kod SMS.")
+    s["apple"]["review"].update(notes="Zaloguj się kontem demo, potem wpisz kod SMS.")
     (app / "store.config.json").write_text(json.dumps(s, ensure_ascii=False), encoding="utf-8")
     monkeypatch.delenv("JARVO_DEMO_HASLO", raising=False)
     w = wyniki(app)
-    assert w[25]["stan"] == "blad" and "hasła demo" in w[25]["dowod"] and "SMS" in w[25]["dowod"]
+    assert w[25]["stan"] == "blad" and "brak hasła demo" in w[25]["dowod"] and "SMS" in w[25]["dowod"]
+    s["apple"]["review"]["demoPassword"] = "Salon2026!"
+    (app / "store.config.json").write_text(json.dumps(s, ensure_ascii=False), encoding="utf-8")
+    assert "hasło demo w store.config.json" in wyniki(app)[25]["dowod"]
     assert w[44]["stan"] == "blad" and "nie po angielsku" in w[44]["dowod"]
 
 
