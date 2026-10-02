@@ -216,6 +216,9 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     web = next(a for a in dane["agents"] if a["name"] == "jarvo-web")
     assert web["short"] == "Web" and any(s["name"] == "bezpieczenstwo-aplikacji" and s["description"] for s in web["skills"])
     assert "security_check.py" in web["scripts"]
+    # skarbiec idzie za kodem: ostatnie zmiany z CHANGELOG-u profilu i skrypty wspólne repo (lint nieaktualnych notatek)
+    assert web["changes_section"] == "Niewydane" and web["changes"] and all(len(z) <= 280 for z in web["changes"])
+    assert "odcisk.py" in dane["repo_scripts"] and "build.py" in dane["repo_scripts"]
 
 
 def test_generalist_handoff_table_covers_every_specialist(built):

@@ -105,6 +105,31 @@ def test_opis_agenta_w_hubie_idzie_za_fleet_yaml(skarbiec, tmp_path):
     assert "**Mój opis Weba.**" in hub and "Jeszcze inny opis" not in hub                  # ręczna zmiana zostaje
 
 
+def test_skarbiec_idzie_za_kodem_zmiany_i_nieaktualne_skrypty(skarbiec, tmp_path):
+    """Hub agenta pokazuje ostatnie zmiany z CHANGELOG-u; lint wskazuje notatki floty z odwołaniem do skryptu,
+    którego nie ma już w repo (notatki o klientach nie są sprawdzane)."""
+    sk = skarbiec
+    fleet = json.loads((tmp_path / "fleet.json").read_text(encoding="utf-8"))
+    fleet["agents"][1]["changes_section"] = "Niewydane"
+    fleet["agents"][1]["changes"] = ["Bramka jakości liczona skryptem."]
+    fleet["repo_scripts"] = ["odcisk.py"]
+    (tmp_path / "fleet.json").write_text(json.dumps(fleet, ensure_ascii=False), encoding="utf-8")
+    assert w.main(["--skarbiec", str(sk.root), "--stan", str(tmp_path / "state"), "zasiej", "--fleet", str(tmp_path / "fleet.json")]) == 0
+    hub = (sk.root / "agenci/jarvo-web/_hub-web.md").read_text(encoding="utf-8")
+    assert "- ostatnie zmiany (CHANGELOG profilu, Niewydane):\n  - Bramka jakości liczona skryptem." in hub
+    notatka(sk, "agenci/jarvo-web/audyt skryptem", "Audyt skryptem", "Audyt robi `audit.sh`, a zgody `scripts/odcisk.py --sprawdz`.",
+            linki=["agenci/jarvo-web/_hub-web", "pojecia/_hub-pojecia"])
+    notatka(sk, "agenci/jarvo-web/stary audyt", "Stary audyt", "Audyt robi `$HERMES_HOME/scripts/stary_audyt.py`.",
+            linki=["agenci/jarvo-web/_hub-web", "pojecia/_hub-pojecia"])
+    notatka(sk, "projekty/sklep klienta", "Sklep klienta", "Klient ma `manage.py` w Django.", typ="projekt",
+            linki=["projekty/_hub-projekty", "pojecia/_hub-pojecia"])
+    ix = w.Indeks(sk)
+    raport = w.lint(sk, ix)
+    ix.zamknij()
+    nieaktualne = [o for o in raport["ostrzezenia"] if "nieaktualna wobec repo" in o]
+    assert nieaktualne == ["nieaktualna wobec repo: skryptu `stary_audyt.py` nie ma we flocie: [[agenci/jarvo-web/stary audyt]]"]
+
+
 def test_szukaj_po_polsku_bez_ogonkow_i_krok_po_linkach(skarbiec):
     sk = skarbiec
     notatka(sk, "agenci/jarvo-web/lighthouse tylko w chromium", "Lighthouse tylko w Chromium",

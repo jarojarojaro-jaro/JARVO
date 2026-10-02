@@ -57,10 +57,14 @@ TYPY = {"hub", "agent", "projekt", "podmiot", "pojecie", "fakt", "decyzja", "lek
 STATUSY = {"aktualna", "do-sprawdzenia", "sprzeczna", "przestarzala", "generowane"}
 WYMAGANE = ("typ", "utworzono", "zmieniono", "status")
 BEZ_ZRODLA = {"hub", "agent", "orzeczenia"}
+# notatki o samej flocie (nie o klientach): ich odwołania do skryptów lint porównuje z repo (state/wiedza-kod.json)
+O_FLOCIE = ("agenci/", "pojecia/", "fleet/", "orzeczenia/")
+SKRYPT_RE = re.compile(r"`(?:[^`\s]*/)?([\w-]+\.(?:py|sh|cjs|mjs))\b[^`]*`")
 MAX_SLOW = {"hub": 400, "agent": 600, "projekt": 400}
 DOMYSLNY_MAX_SLOW = 250
 GEN_RE = re.compile(r"<!-- Jarvo:GEN (\w+) -->.*?<!-- /Jarvo:GEN \1 -->", re.S)
-LISTA_RE = re.compile(r"<!-- Jarvo:GEN lista -->.*?<!-- /Jarvo:GEN lista -->", re.S)   # same linki: poza indeksem i liczbą słów
+LISTA_RE = re.compile(r"<!-- Jarvo:GEN lista -->.*?<!-- /Jarvo:GEN lista -->", re.S)   # same linki: poza indeksem
+# limit długości (lint) liczy tylko treść pisaną: bloki GEN (lista notatek, rejestr floty) robi zasiew, nie autor
 LINK_RE = re.compile(r"\[\[([^\]\|#]+)(#[^\]\|]*)?(?:\|([^\]]*))?\]\]")
 ZAKAZANE_W_NAZWIE = set('*"\\/<>:|?#^[]')            # Obsidian i Windows nie przyjmą takiej nazwy
 DATA_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -266,7 +270,7 @@ class Skarbiec:
                     streszczenie = bez_markdown(s)
                     break
         n = Notatka(sciezka=self.rel(p), tytul=tytul, streszczenie=streszczenie[:240], fm=fm, tresc=tresc,
-                    slowa=len(re.findall(r"\w+", LISTA_RE.sub("", tresc))), mtime=p.stat().st_mtime, rozmiar=p.stat().st_size)
+                    slowa=len(re.findall(r"\w+", GEN_RE.sub("", tresc))), mtime=p.stat().st_mtime, rozmiar=p.stat().st_size)
         n.linki = self._linki(tresc)
         return n
 
@@ -612,9 +616,12 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             skrypty = ", ".join(f"`{s}`" for s in a.get("scripts", [])) or "_brak_"
             zewn = a.get("external_skills") or []
             zewn_linia = (f"\n- skille zewnętrzne ({len(zewn)}): " + ", ".join(f"`{s}`" for s in zewn)) if zewn else ""
+            zmiany = "".join(f"\n  - {z}" for z in a.get("changes") or [])
+            zmiany_linia = (f"\n- ostatnie zmiany (CHANGELOG profilu, {a.get('changes_section') or 'najnowsze'}):{zmiany}"
+                            if zmiany else "")
             gen = (f"## Z rejestru floty (fleet.yaml)\n- rola: {a.get('kind', '')} · autonomia: {a.get('autonomy_max', '')} · "
                    f"pokój HQ: {a.get('label', a.get('room', ''))} (`{a.get('room', '')}`) · temat Telegrama: `{a.get('telegram_topic', '')}`\n"
-                   f"- skille ({len(a.get('skills', []))}):\n{skille}{zewn_linia}\n- skrypty: {skrypty}")
+                   f"- skille ({len(a.get('skills', []))}):\n{skille}{zewn_linia}\n- skrypty: {skrypty}{zmiany_linia}")
             pl = sk.plik(rel)
             tekst = pl.read_text(encoding="utf-8")
             m = re.search(r"^(# .+\n\n)\*\*(.+)\*\*$", tekst, re.M)
@@ -628,6 +635,9 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                                           f"## Powiązane\n- hub: [[orzeczenia/_hub-orzeczenia|Orzeczenia]]\n- [[{rel}|{a.get('short') or krotki}]]\n\n## Linie\n"))
         (sk.stan).mkdir(parents=True, exist_ok=True)
         (sk.stan / "wiedza-agenci.json").write_text(json.dumps(agenci_meta, ensure_ascii=False, indent=1), encoding="utf-8")
+        # skrypty, które naprawdę są w repo: lint wskazuje notatki floty odwołujące się do nieistniejących
+        znane_skrypty = sorted({s for a in fleet.get("agents", []) for s in a.get("scripts", [])} | set(fleet.get("repo_scripts") or []))
+        (sk.stan / "wiedza-kod.json").write_text(json.dumps({"skrypty": znane_skrypty}, ensure_ascii=False, indent=1), encoding="utf-8")
     if not sk.istnieje("orzeczenia/wszyscy"):
         sk.zapisz_plik("orzeczenia/wszyscy", sklej(_hub_frontmatter("orzeczenia", "człowiek"),
                                                    "# Orzeczenia: wszyscy\n\n**Korekty od użytkownika dla całej floty, jedna datowana linia każda.**\n\n"
@@ -718,6 +728,10 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
     ix.odswiez()
     bledy, ostrz, info = [], [], []
     zbior, znane = sk.mapa()
+    try:
+        skrypty_repo = set(json.loads((sk.stan / "wiedza-kod.json").read_text(encoding="utf-8"))["skrypty"])
+    except (OSError, ValueError, KeyError):
+        skrypty_repo = None                        # skarbiec bez zasiewu z buildu: nie ma z czym porównać
     notatki = {r["sciezka"]: r for r in ix.notatki()}
     linki = ix.linki()
     we_reczne: dict[str, int] = {}
@@ -739,6 +753,9 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
         sekret = zawiera_sekret(n.tresc)
         if sekret:
             bledy.append(f"sekret w treści ({sekret}): [[{rel}]]")
+        if skrypty_repo is not None and rel.startswith(O_FLOCIE) and not r["hub"]:
+            for nazwa_s in sorted({m.group(1) for m in SKRYPT_RE.finditer(n.tresc)} - skrypty_repo):
+                ostrz.append(f"nieaktualna wobec repo: skryptu `{nazwa_s}` nie ma we flocie: [[{rel}]]")
         wlasny_format = rel.startswith(BEZ_FRONTMATTERU) and not r["hub"]
         if not wlasny_format:
             brak = [k for k in WYMAGANE if not n.fm.get(k)]

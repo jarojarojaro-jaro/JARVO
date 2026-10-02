@@ -334,6 +334,10 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami, zewnętrzne z locka, skrypty), `install-fleet.sh`
    zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane; pogrubiony opis huba agenta idzie
    za opisem z `fleet.yaml`, dopóki człowiek go nie zmienił; lustro `zrodla/jarvo-repo/` traci dokumenty usunięte z repo).
+   **Skarbiec idzie za kodem:** blok `Jarvo:GEN` huba agenta ma też ostatnie zmiany z `CHANGELOG.md` profilu (sekcja
+   „Niewydane” albo najnowsza wersja, do 6 punktów), więc agent widzi, co się w nim i w innych zmieniło; `lint` porównuje
+   odwołania do skryptów w notatkach o flocie (`agenci/`, `pojecia/`, `fleet/`, `orzeczenia/`) z tym, co jest w repo
+   (`state/wiedza-kod.json` z zasiewu), i ostrzega „nieaktualna wobec repo”, a przegląd tygodnia zgłasza to w „co dryfuje”.
    Testy: `tests/test_wiedza.py`.
    Sprawdzone w kontenerze: huby 9 agentów, wyszukiwanie po polsku bez ogonków, lint bez błędów, punkty zapisu git.
 3. ✅ **Wtyczka `jarvo-wiedza`, część agenta** (`wiedza/plugin/`): dostawca pamięci Hermesa (`memory.provider: jarvo-wiedza`
