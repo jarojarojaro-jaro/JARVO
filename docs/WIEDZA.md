@@ -332,7 +332,9 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    orzeczenia, `fleet/lekcje.md`, docs repo do `zrodla/jarvo-repo/`, git init i punkt zapisu), `indeksuj` (FTS5 w `state/wiedza.db`,
    `INDEX.md`, listy w hubach), `szukaj`, `czytaj`, `zapisz`, `orzeczenie`, `lint`, `graf`, `cofnij`, `status`; `wiedza/SCHEMA.md`;
    `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami, zewnętrzne z locka, skrypty), `install-fleet.sh`
-   zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane). Testy: `tests/test_wiedza.py`.
+   zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane; pogrubiony opis huba agenta idzie
+   za opisem z `fleet.yaml`, dopóki człowiek go nie zmienił; lustro `zrodla/jarvo-repo/` traci dokumenty usunięte z repo).
+   Testy: `tests/test_wiedza.py`.
    Sprawdzone w kontenerze: huby 9 agentów, wyszukiwanie po polsku bez ogonków, lint bez błędów, punkty zapisu git.
 3. ✅ **Wtyczka `jarvo-wiedza`, część agenta** (`wiedza/plugin/`): dostawca pamięci Hermesa (`memory.provider: jarvo-wiedza`
    w `config.yaml` każdego profilu z buildu): stały blok w prompcie, przypomnienia przed turą (≤ 5 notatek z FTS5 + orzeczenia

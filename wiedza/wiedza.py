@@ -591,11 +591,17 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
     sk.zapisz_plik(HUBY[""][0], zastap_blok(p.read_text(encoding="utf-8"), "huby", "## Foldery\n" + "\n".join(linie)))
     # agenci z fleet.json
     agenci_meta: dict[str, dict] = {}
+    try:   # opisy z poprzedniego zasiewu: pogrubiony opis huba idzie za fleet.yaml, dopóki człowiek go nie zmienił
+        poprzednie = json.loads((sk.stan / "wiedza-agenci.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        poprzednie = {}
     if fleet:
         for a in fleet.get("agents", []):
             rel, krotki = hub_agenta(a)
             orz = f"orzeczenia/{krotki}"
-            agenci_meta[a["name"]] = {"hub": rel, "orzeczenia": orz, "short": a.get("short") or krotki, "title": a.get("title", "")}
+            opis = " ".join(a.get("description", "").split())
+            agenci_meta[a["name"]] = {"hub": rel, "orzeczenia": orz, "short": a.get("short") or krotki, "title": a.get("title", ""),
+                                      "opis": opis}
             if not sk.istnieje(rel):
                 body = (f"# {a.get('emoji', '')} {a.get('title', a['name'])} ({a['name']})\n\n**{a.get('description', '').strip()}**\n\n"
                         f"## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n- [[{orz}|Orzeczenia: {a.get('short') or krotki}]]\n"
@@ -610,7 +616,12 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                    f"pokój HQ: {a.get('label', a.get('room', ''))} (`{a.get('room', '')}`) · temat Telegrama: `{a.get('telegram_topic', '')}`\n"
                    f"- skille ({len(a.get('skills', []))}):\n{skille}{zewn_linia}\n- skrypty: {skrypty}")
             pl = sk.plik(rel)
-            sk.zapisz_plik(rel, zastap_blok(pl.read_text(encoding="utf-8"), "fleet", gen))
+            tekst = pl.read_text(encoding="utf-8")
+            m = re.search(r"^(# .+\n\n)\*\*(.+)\*\*$", tekst, re.M)
+            stary = (poprzednie.get(a["name"]) or {}).get("opis")
+            if m and opis and m.group(2) != opis and (stary is None or m.group(2) == stary):
+                tekst = tekst[:m.start(2) - 2] + f"**{opis}**" + tekst[m.end(2) + 2:]
+            sk.zapisz_plik(rel, zastap_blok(tekst, "fleet", gen))
             if not sk.istnieje(orz):
                 sk.zapisz_plik(orz, sklej(_hub_frontmatter("orzeczenia", "człowiek", agent=a["name"]),
                                           f"# Orzeczenia: {a.get('short') or krotki}\n\n**Korekty od użytkownika dla `{a['name']}`, jedna datowana linia każda; agent czyta je przed każdą turą.**\n\n"
@@ -626,9 +637,15 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                                              "# Księga lekcji floty\n\n**Obserwacje z recenzji sędziego: jedna linia = jedna sprawdzalna reguła z licznikiem potwierdzeń.**\n\n"
                                              "## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n"))
     if docs and docs.is_dir():
+        lustro = sk.root / "zrodla" / "jarvo-repo"
+        nazwy = set()
         for d in sorted(docs.glob("*.md")):
-            shutil.copy2(d, sk.root / "zrodla" / "jarvo-repo" / d.name)
+            shutil.copy2(d, lustro / d.name)
+            nazwy.add(d.name)
             raport["docs"] += 1
+        for stara in lustro.glob("*.md"):            # dokument usunięty z repo nie zostaje w skarbcu jako „źródło”
+            if stara.name not in nazwy:
+                stara.unlink()
     if not (sk.root / "INDEX.md").exists():
         (sk.root / "INDEX.md").write_text("# Indeks skarbca\n\n_Pusty do pierwszego `wiedza.py indeksuj`._\n", encoding="utf-8")
     if not (sk.root / "LINT.md").exists():

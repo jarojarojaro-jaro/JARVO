@@ -61,7 +61,8 @@ def test_zasiew_huby_orzeczenia_docs_git(skarbiec, tmp_path):
     assert (sk.root / "orzeczenia/łowca.md").exists() and (sk.root / "orzeczenia/wszyscy.md").exists()
     assert (sk.root / "zrodla/jarvo-repo/PLAN.md").exists() and (sk.root / "SCHEMA.md").exists() and (sk.root / "LINT.md").exists()
     meta = json.loads((tmp_path / "state" / "wiedza-agenci.json").read_text(encoding="utf-8"))
-    assert meta["jarvo-lowca"] == {"hub": "agenci/jarvo-lowca/_hub-łowca", "orzeczenia": "orzeczenia/łowca", "short": "Łowca", "title": "Łowca leadów"}
+    assert meta["jarvo-lowca"] == {"hub": "agenci/jarvo-lowca/_hub-łowca", "orzeczenia": "orzeczenia/łowca", "short": "Łowca",
+                                   "title": "Łowca leadów", "opis": "Leady B2B."}
     index = (sk.root / "INDEX.md").read_text(encoding="utf-8")
     assert "[[agenci/jarvo-web/_hub-web|🌐 Web Senior Dev (jarvo-web)]]" in index and "[[user/USER|Użytkownik]]" in index
     assert "## [2026-09-30] zasiew |" in (sk.root / "LOG.md").read_text(encoding="utf-8")
@@ -78,6 +79,30 @@ def test_ponowny_zasiew_zachowuje_reczna_czesc_i_odswieza_blok(skarbiec, tmp_pat
     assert w.main(["--skarbiec", str(sk.root), "--stan", str(tmp_path / "state"), "zasiej", "--fleet", str(tmp_path / "fleet.json")]) == 0
     hub = p.read_text(encoding="utf-8")
     assert "Ręczna uwaga o Webie." in hub and "`seo`: SEO techniczne." in hub and hub.count("<!-- Jarvo:GEN fleet -->") == 1
+    (tmp_path / "docs" / "PLAN.md").unlink()                                  # dokument usunięty z repo znika z lustra
+    (tmp_path / "docs" / "NOWY.md").write_text("# Nowy\n", encoding="utf-8")
+    assert w.main(["--skarbiec", str(sk.root), "--stan", str(tmp_path / "state"), "zasiej", "--docs", str(tmp_path / "docs")]) == 0
+    lustro = {x.name for x in (sk.root / "zrodla" / "jarvo-repo").glob("*.md")}
+    assert "NOWY.md" in lustro and "PLAN.md" not in lustro
+
+
+def test_opis_agenta_w_hubie_idzie_za_fleet_yaml(skarbiec, tmp_path):
+    """Opis agenta (pogrubiony akapit huba) odświeża się z fleet.yaml przy zasiewie, chyba że człowiek go zmienił."""
+    sk = skarbiec
+    zasiew = ["--skarbiec", str(sk.root), "--stan", str(tmp_path / "state"), "zasiej", "--fleet", str(tmp_path / "fleet.json")]
+    fleet = json.loads((tmp_path / "fleet.json").read_text(encoding="utf-8"))
+    fleet["agents"][1]["description"] = "Strony i SEO techniczne, bez researchu rynku."
+    (tmp_path / "fleet.json").write_text(json.dumps(fleet, ensure_ascii=False), encoding="utf-8")
+    assert w.main(zasiew) == 0
+    web = sk.root / "agenci/jarvo-web/_hub-web.md"
+    assert "**Strony i SEO techniczne, bez researchu rynku.**" in web.read_text(encoding="utf-8")
+    web.write_text(web.read_text(encoding="utf-8").replace("**Strony i SEO techniczne, bez researchu rynku.**",
+                                                            "**Mój opis Weba.**"), encoding="utf-8")
+    fleet["agents"][1]["description"] = "Jeszcze inny opis."
+    (tmp_path / "fleet.json").write_text(json.dumps(fleet, ensure_ascii=False), encoding="utf-8")
+    assert w.main(zasiew) == 0
+    hub = web.read_text(encoding="utf-8")
+    assert "**Mój opis Weba.**" in hub and "Jeszcze inny opis" not in hub                  # ręczna zmiana zostaje
 
 
 def test_szukaj_po_polsku_bez_ogonkow_i_krok_po_linkach(skarbiec):

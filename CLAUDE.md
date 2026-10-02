@@ -10,6 +10,12 @@
   Przed commitem szukamy w dokumentach starych nazw i liczb (`grep -rn`); dokument niezgodny z kodem to błąd jak każdy inny.
   `scripts/validate.py` sprawdza to, co da się automatycznie: linki i kotwice w `*.md`, obecność każdego agenta
   w dokumentach przeglądowych i liczby w kolumnach „Skille” / „Workflowy własne” / „Evals” tabel.
+- **Skarbiec wiedzy (knowledge base) też zgodny z kodem.** Agenci czytają skarbiec (`/opt/data/jarvo/knowledge`), więc
+  zmiana w kodzie albo flocie musi do niego dotrzeć. Zasiew przy każdym wdrożeniu (`wiedza.py zasiej`) odświeża sam:
+  lustro `docs/*.md` w `zrodla/jarvo-repo/`, bloki `Jarvo:GEN` hubów agentów (skille, skrypty, skille zewnętrzne)
+  i opis agenta z `fleet.yaml`. Wszystko inne, co opisuje kod (szablony i treści w `knowledge/`, `wiedza/SCHEMA.md`,
+  generatory hubów w `wiedza.py`), zmieniamy w tym samym commicie; po wdrożeniu sprawdzamy w kontenerze, że skarbiec
+  mówi to samo co repo (np. `grep` w `/opt/data/jarvo/knowledge`), a `wiedza.py lint` jest bez błędów.
 - Przed commitem: `python3 -m pytest -q` i `python3 scripts/validate.py` bez błędów.
   Na czystym kontenerze/maszynie najpierw `make dev-deps` (pytest, pyyaml, shellcheck z `requirements-dev.txt`) —
   nie doinstalowujemy narzędzi ręcznie, wszystko jest przypięte w repo.
