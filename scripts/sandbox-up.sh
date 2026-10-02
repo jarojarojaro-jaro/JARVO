@@ -117,7 +117,9 @@ if [[ "$(cat "$NSS/.ca-sha" 2>/dev/null)" != "$CA_SHA" ]]; then
   rm -rf "$tmp"
   echo "$CA_SHA" > "$NSS/.ca-sha"
 fi
-chown -R 10000:10000 "$L/build" "$L/data"      # kontener pracuje jako hermes (uid 10000)
+# kontener pracuje jako hermes (uid 10000); przy działającej flocie pliki -wal/-shm SQLite potrafią zniknąć w trakcie
+# przechodzenia katalogu, więc jedna powtórka (druga porażka to już prawdziwy błąd)
+chown -R 10000:10000 "$L/build" "$L/data" 2>/dev/null || chown -R 10000:10000 "$L/build" "$L/data"
 
 FLAGS=(--no-pull --no-build)
 [[ -f "$L/.installed" ]] || FLAGS+=(--first-run)
