@@ -611,6 +611,7 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-upload { position: relative; overflow: hidden; }
 .thq-ed-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .thq-ed-note { margin: 0; color: var(--ed-muted); font-size: 12px; line-height: 1.5; }
+.thq-ed-note.is-warn { color: var(--ed-warn); }
 .thq-ed-sub { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .thq-ed-subi { display: flex; align-items: center; gap: 8px; margin: 0; }
 .thq-ed-subi svg { width: 16px; height: 16px; color: var(--ed-muted); }

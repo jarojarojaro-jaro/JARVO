@@ -51,8 +51,16 @@ TEXT_DEFAULT = {"x": 0.5, "y": 0.78, "size": 72, "color": "#FFFFFF", "bg": "#000
                 "font": "system-ui, 'Segoe UI', Roboto, sans-serif", "bold": True, "align": "center", "maxw": 0.86}
 CAP_DEFAULT = {**TEXT_DEFAULT, "y": 0.84, "size": 58, "style": "outline", "maxw": 0.84,
                "font": "'Bricolage Grotesque', system-ui, sans-serif"}
+# tekst i napisy w kadrze pionowym: nad opisem TikToka i Shorts, węższe niż kolumna przycisków (ED_PION w edytorze HQ)
+PION = {"y": 0.68, "maxw": 0.74}
 FPS = (24, 25, 30, 50, 60)
 KARAOKE_HL = "#FFE14D"   # kolor aktywnego słowa (jak ED_HL w edytorze)
+
+
+def pion(proj: dict) -> dict:
+    """Położenie i szerokość domyślna w kadrze pionowym (poza strefami platform); w poziomym zostaje z TEXT_DEFAULT / CAP_DEFAULT."""
+    c = proj.get("canvas") or {}
+    return dict(PION) if (c.get("h") or 0) > (c.get("w") or 0) else {}
 
 
 def new_id(prefix: str) -> str:
@@ -182,7 +190,7 @@ def cmd_dodaj_tekst(film: Path, a) -> int:
     if not (0 <= a.start < a.koniec) or a.start >= t:
         raise SystemExit(f"zły czas napisu (film ma {t:.2f} s)")
     base = CAP_DEFAULT if a.napis else TEXT_DEFAULT
-    x = {**base, "id": new_id("t"), "text": a.tekst, "start": a.start, "end": min(a.koniec, t)}
+    x = {**base, **pion(proj), "id": new_id("t"), "text": a.tekst, "start": a.start, "end": min(a.koniec, t)}
     for k, v in (("style", a.styl), ("y", a.y), ("size", a.rozmiar), ("color", a.kolor), ("bg", a.tlo)):
         if v is not None:
             x[k] = v
@@ -274,7 +282,7 @@ def cmd_napisy(film: Path, a) -> int:
     if a.karaoke is not None:
         look["hl"] = a.karaoke or KARAOKE_HL
     proj["texts"] = [x for x in proj.get("texts") or [] if not x.get("cap")] + [
-        {**CAP_DEFAULT, **look, "id": new_id("t"), "cap": True, "start": k["start"], "end": min(k["end"], t), "text": k["text"],
+        {**CAP_DEFAULT, **pion(proj), **look, "id": new_id("t"), "cap": True, "start": k["start"], "end": min(k["end"], t), "text": k["text"],
          **({"words": k["words"]} if k.get("words") else {})}
         for k in lines if k["start"] < t]
     save(film, proj)
@@ -415,7 +423,7 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--start", type=float, required=True)
     sp.add_argument("--koniec", type=float, required=True)
     sp.add_argument("--styl", choices=["shadow", "box", "outline", "plain"])
-    sp.add_argument("--y", type=float, help="położenie w pionie 0–1 (0.84 = dół)")
+    sp.add_argument("--y", type=float, help="położenie w pionie 0–1 (0.84 = dół; w kadrze pionowym domyślnie 0.68, nad opisem)")
     sp.add_argument("--rozmiar", type=float)
     sp.add_argument("--kolor")
     sp.add_argument("--tlo", help="kolor tła (styl box) albo obrysu (outline)")

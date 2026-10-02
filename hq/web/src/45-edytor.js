@@ -10,6 +10,27 @@ const ED_FORMATS = [
   ["1:1", "1:1 · kwadrat", "1:1 · square"], ["4:5", "4:5 · post", "4:5 · post"],
 ];
 const ED_SIZES = { "16:9": [1920, 1080], "9:16": [1080, 1920], "1:1": [1080, 1080], "4:5": [1080, 1350] };
+// Strefy interfejsu w kadrze pionowym (ułamki kadru 1080×1920, przegląd 2026): góra = zakładki i nazwa konta,
+// dół = opis, konto i dźwięk, boki = przyciski (serce, komentarze, udostępnij) i margines. Tylko podgląd, bez eksportu.
+// TikTok 130/484/44/140 px, Shorts 180/390/60/120 px, Reels: zalecenie Meta 14% / 35% / 6%.
+const ED_STREFY = {
+  tiktok: { name: "TikTok", t: 0.068, b: 0.252, l: 0.041, r: 0.13 },
+  reels: { name: "Reels", t: 0.14, b: 0.35, l: 0.06, r: 0.06 },
+  shorts: { name: "Shorts", t: 0.094, b: 0.203, l: 0.056, r: 0.111 },
+};
+const ED_STREFY_OPIS = { top: ["góra: zakładki, nazwa konta", "top: tabs, account name"], bottom: ["dół: opis, konto, dźwięk", "bottom: caption, account, sound"],
+  left: ["lewy margines", "left margin"], right: ["prawo: przyciski", "right: buttons"] };
+// Prostokąty stref platformy `pf` na kanwie W×H; poza kadrem pionowym brak stref.
+function strefyUI(W, H, pf) {
+  const z = ED_STREFY[pf];
+  if (!z || H <= W) return [];
+  const t = z.t * H, b = H - z.b * H;
+  return [{ k: "top", x0: 0, y0: 0, x1: W, y1: t }, { k: "bottom", x0: 0, y0: b, x1: W, y1: H },
+    { k: "left", x0: 0, y0: t, x1: z.l * W, y1: b }, { k: "right", x0: W - z.r * W, y0: t, x1: W, y1: b }];
+}
+// Strefy, w które wchodzi prostokąt napisu (textBox): np. ["bottom", "right"].
+const strefyKolizja = (box, W, H, pf) => strefyUI(W, H, pf)
+  .filter((s) => box.x0 < s.x1 && box.x1 > s.x0 && box.y0 < s.y1 && box.y1 > s.y0).map((s) => s.k);
 
 const ED_STYLES = [["shadow", "Cień", "Shadow"], ["box", "Tło", "Box"], ["outline", "Obrys", "Outline"], ["plain", "Zwykły", "Plain"]];
 const ED_MIN = 0.1;
@@ -17,6 +38,9 @@ const ED_COLORS = ["#FFFFFF", "#000000", "#FFD60A", "#FF453A", "#32D74B", "#0A84
 const ED_CAP = { x: 0.5, y: 0.84, size: 58, color: "#FFFFFF", bg: "#000000", style: "outline", bold: true, align: "center", maxw: 0.84,
   font: "'Bricolage Grotesque', system-ui, sans-serif" };
 const ED_HL = "#FFE14D";   // domyślny kolor aktywnego słowa (karaoke)
+// Tekst i napisy w kadrze pionowym startują nad opisem TikToka i Shorts i węższe niż kolumna przycisków
+// (dwie linie mieszczą się w strefach); to samo projekt.PION u agenta i w klipy.py.
+const ED_PION = { y: 0.68, maxw: 0.74 };
 // polska forma liczebnika: plForma(3, ["uwaga", "uwagi", "uwag"]) → "uwagi"
 const plForma = (n, [jeden, kilka, wiele]) => (n === 1 ? jeden : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? kilka : wiele);
 const NAPISY = ["napis", "napisy", "napisów"];
@@ -480,6 +504,9 @@ function VideoEditor({ path, onClose }) {
   const [ask, setAsk] = useState(null);
   const [shot, setShot] = useState(null);      // zaznaczanie kadru: {a, b} w ułamkach podglądu (null = wyłączone)
   const [noteHi, setNoteHi] = useState(null);  // uwaga podświetlona na osi i w panelu prośby
+  // strefy platformy na podglądzie kadru pionowego: wybór zapamiętany w tej przeglądarce, nie w projekcie
+  const [strefa, setStrefa] = useState(() => { try { return localStorage.getItem("thq-ed-strefy") || "tiktok"; } catch (_) { return "tiktok"; } });
+  const pickStrefa = (v) => { setStrefa(v); try { localStorage.setItem("thq-ed-strefy", v); } catch (_) { /* bez pamięci przeglądarki */ } };
   const shotUrls = useRef(new Map());          // ścieżka kadru → obraz (data URL) z tej sesji edytora
   const [side, setSide] = useState("media");
   const [codecErr, setCodecErr] = useState(false);
@@ -624,6 +651,8 @@ function VideoEditor({ path, onClose }) {
   projRef.current = p;
   const selRef = useRef(sel);
   selRef.current = sel;
+  const strefaRef = useRef(strefa);
+  strefaRef.current = strefa;
 
   function drawOverlay() {
     const c = overlayRef.current, P = projRef.current;
@@ -633,17 +662,37 @@ function VideoEditor({ path, onClose }) {
     const g = c.getContext("2d");
     g.clearRect(0, 0, w, h);
     const now = tRef.current;
+    const pf = strefaRef.current, zs = strefyUI(w, h, pf);
+    if (zs.length) {
+      // strefy interfejsu platformy: tylko na podglądzie (eksport i kadr dla agenta rysują napisy osobno)
+      g.save();
+      g.fillStyle = "rgba(0,0,0,0.38)"; g.strokeStyle = "rgba(255,69,58,0.85)"; g.lineWidth = Math.max(1, w / 540); g.setLineDash([w / 90, w / 140]);
+      for (const z of zs) { g.fillRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0); g.strokeRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0); }
+      const fs = Math.round(w / 26);
+      g.setLineDash([]); g.font = `600 ${fs}px system-ui, sans-serif`; g.fillStyle = "rgba(255,255,255,0.9)"; g.textBaseline = "top";
+      for (const z of zs) if (z.k === "top" || z.k === "bottom") g.fillText(`${ED_STREFY[pf].name} · ${L(...ED_STREFY_OPIS[z.k])}`, w * 0.05, z.k === "top" ? fs * 0.6 : h - fs * 1.8);
+      g.restore();
+    }
     for (const x of P.texts) {
       if (now < x.start || now >= x.end) continue;
       const b = drawText(g, x, w, h, karaokeIndex(x, now));
-      const s = selRef.current;
-      if (s && s.type === "text" && s.id === x.id) {
-        g.save(); g.strokeStyle = "#3BA9FF"; g.lineWidth = Math.max(2, w / 480); g.setLineDash([w / 90, w / 140]);
+      const s = selRef.current, hit = zs.length && strefyKolizja(b, w, h, pf).length;
+      if (hit || (s && s.type === "text" && s.id === x.id)) {
+        g.save(); g.strokeStyle = hit ? "#FF453A" : "#3BA9FF"; g.lineWidth = Math.max(2, w / 480); g.setLineDash([w / 90, w / 140]);
         g.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); g.restore();
       }
     }
   }
-  useEffect(() => { drawOverlay(); }, [p, sel]);
+  useEffect(() => { drawOverlay(); }, [p, sel, strefa]);
+  // tekst w strefie platformy: nazwy stref do ostrzeżenia w panelu (pusto = poza strefami albo kadr poziomy)
+  const measure = useRef(null);
+  function strefyTekstu(x) {
+    const { w, h } = projRef.current.canvas;
+    if (!ED_STREFY[strefa] || h <= w) return [];
+    if (!measure.current) measure.current = document.createElement("canvas").getContext("2d");
+    return strefyKolizja(textBox(measure.current, x, w, h), w, h, strefa);
+  }
+  const strefaUwaga = (hits, kto, rada) => hits.length > 0 && html`<p class="thq-ed-note is-warn">⚠ ${kto} ${L("wchodzi pod interfejs", "sits under the interface of")} ${ED_STREFY[strefa].name} (${[...new Set(hits)].map((k) => L(...ED_STREFY_OPIS[k])).join(", ")}). ${rada}</p>`;
 
   // ---------------------------------------------------------------- kadr do Wideografa i uwagi na osi
   // Kadr składamy jak podgląd: klatka w tym samym kadrze (fitBox = applyFit) i napisy tą samą funkcją drawText.
@@ -821,7 +870,8 @@ function VideoEditor({ path, onClose }) {
   function addText() {
     const start = clamp(tRef.current, 0, Math.max(0, total - 0.5));
     const x = { id: edId("t"), text: L("Twój tekst", "Your text"), start, end: Math.min(total, start + 3), x: 0.5, y: 0.78, size: 72,
-      color: "#FFFFFF", bg: "#000000", style: "shadow", font: ED_FONTS[0][0], bold: true, align: "center", maxw: 0.86 };
+      color: "#FFFFFF", bg: "#000000", style: "shadow", font: ED_FONTS[0][0], bold: true, align: "center", maxw: 0.86,
+      ...(projRef.current.canvas.h > projRef.current.canvas.w ? ED_PION : {}) };
     H.apply((P) => ({ ...P, texts: [...P.texts, x] }));
     setSel({ type: "text", id: x.id });
     setSide("inspect");
@@ -1073,7 +1123,7 @@ function VideoEditor({ path, onClose }) {
     const old = projRef.current.texts.find((x) => x.cap);
     const look = old ? { x: old.x, y: old.y, size: old.size, color: old.color, bg: old.bg, style: old.style, font: old.font, bold: old.bold, maxw: old.maxw, hl: old.hl || "" } : {};
     H.apply((P) => ({ ...P, texts: [...P.texts.filter((x) => !x.cap),
-      ...list.map((k) => ({ ...ED_CAP, ...look, id: edId("t"), cap: true, start: k.start, end: k.end, text: k.text, ...(k.words ? { words: k.words } : {}) }))] }));
+      ...list.map((k) => ({ ...ED_CAP, ...(P.canvas.h > P.canvas.w ? ED_PION : {}), ...look, id: edId("t"), cap: true, start: k.start, end: k.end, text: k.text, ...(k.words ? { words: k.words } : {}) }))] }));
   }
   async function autoCaptions(force) {
     let sp = speech;
@@ -1227,6 +1277,9 @@ function VideoEditor({ path, onClose }) {
   const media = info.media || [];
   const running = job && (job.state === "running" || job.state === "prep");
   const caps = p.texts.filter((x) => x.cap);
+  const capYs = p.canvas.h > p.canvas.w ? [0.2, 0.5, ED_PION.y] : [0.16, 0.5, 0.84];   // góra / środek / dół napisów
+  const capHitList = tool === "captions" || side === "captions" ? caps.map(strefyTekstu).filter((x) => x.length) : [];
+  const capHits = capHitList.flat(), capHitN = capHitList.length;
   const allMuted = p.clips.filter((c) => c.kind !== "image").every((c) => c.muted);
   const hasSpeech = p.clips.some((c) => speech[c.src]);
   const speechBusy = !!(speechJob && speechJob.state === "running");
@@ -1273,6 +1326,7 @@ function VideoEditor({ path, onClose }) {
     const u = (patch, lv) => upd("text", x.id, patch, lv);
     return html`<div class="thq-ed-form">
       <textarea rows="2" value=${x.text} placeholder=${L("Wpisz tekst", "Type text")} onInput=${(e) => u({ text: e.target.value }, true)} onBlur=${H.commit}></textarea>
+      ${strefaUwaga(strefyTekstu(x), x.cap ? L("Napis", "The caption") : L("Tekst", "The text"), L("Przesuń go na podglądzie.", "Move it on the preview."))}
       <label>${L("Styl", "Style")}${seg(ED_STYLES.map(([k2, pl, en]) => [k2, L(pl, en)]), x.style, (v) => u({ style: v }))}</label>
       <label>${L("Kolor", "Color")}${swatches(x.color, (v, lv) => u({ color: v }, lv))}</label>
       ${(x.style === "box" || x.style === "outline") && html`<label>${x.style === "box" ? L("Tło", "Box") : L("Obrys", "Outline")}${swatches(x.bg || "#000000", (v, lv) => u({ bg: v }, lv))}</label>`}
@@ -1315,7 +1369,8 @@ function VideoEditor({ path, onClose }) {
     ${capJob && capJob.state === "done" && html`<p class="thq-ed-ok">✓ ${L(`Dodano ${capJob.n} ${plForma(capJob.n, NAPISY)}`, `Added ${capJob.n} captions`)}</p>`}
     ${caps.length > 0 && html`
       <label>${L("Styl napisów", "Caption style")}${seg(ED_STYLES.map(([k2, pl, en]) => [k2, L(pl, en)]), caps[0].style, (v) => setCapLook({ style: v }))}</label>
-      <label>${L("Położenie", "Position")}${seg([[0.16, L("Góra", "Top")], [0.5, L("Środek", "Middle")], [0.84, L("Dół", "Bottom")]], [0.16, 0.5, 0.84].find((y) => Math.abs(y - caps[0].y) < 0.02), (v) => setCapLook({ y: v }))}</label>
+      <label>${L("Położenie", "Position")}${seg([[capYs[0], L("Góra", "Top")], [0.5, L("Środek", "Middle")], [capYs[2], L("Dół", "Bottom")]], capYs.find((y) => Math.abs(y - caps[0].y) < 0.02), (v) => setCapLook({ y: v }))}</label>
+      ${strefaUwaga(capHits, L(`${capHitN} z ${caps.length} ${plForma(caps.length, NAPISY)}`, `${capHitN} of ${caps.length} captions`), L("Ustaw położenie wyżej albo zmniejsz napisy.", "Move them up or make them smaller."))}
       <label>${L("Kolor", "Color")}${swatches(caps[0].color, (v, lv) => setCapLook({ color: v }, lv))}</label>
       ${caps.some((x) => (x.words || []).length) ? html`<label class="thq-ed-check"><input type="checkbox" checked=${!!caps[0].hl}
           onChange=${(e) => setCapLook({ hl: e.target.checked ? (caps[0].hlLast || ED_HL) : "", hlLast: caps[0].hl || caps[0].hlLast })}/> ${L("Karaoke: aktywne słowo w kolorze", "Karaoke: highlight the spoken word")}</label>
@@ -1369,6 +1424,8 @@ function VideoEditor({ path, onClose }) {
       return html`<button type="button" key=${k2} class=${cx((p.format || "orig") === k2 && "is-on")} onClick=${() => setCanvas(k2)}>
         <i style=${{ width: `${bw}px`, height: `${bh}px` }}></i><span>${k2 === "orig" ? L("Oryginał", "Original") : k2}</span><small>${L(pl, en).split("· ")[1] || ""}</small></button>`;
     })}</div>
+    ${p.canvas.h > p.canvas.w && html`<label>${L("Strefy platformy · tylko podgląd", "Platform safe zones · preview only")}${seg([["off", L("Wył.", "Off")],
+      ...Object.entries(ED_STREFY).map(([k2, z]) => [k2, z.name])], ED_STREFY[strefa] ? strefa : "off", pickStrefa)}</label>`}
     <label>${L("Klatki na sekundę", "Frame rate")}${seg([24, 25, 30, 50, 60].map((f) => [f, String(f)]), p.canvas.fps, (v) => H.apply((P) => ({ ...P, canvas: { ...P.canvas, fps: v } })))}</label>
     <p class="thq-ed-note">${CW}×${CH} · ${fmtT(total, true)}</p>
   </div>`;

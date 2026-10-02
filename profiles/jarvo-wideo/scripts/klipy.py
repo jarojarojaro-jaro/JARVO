@@ -324,7 +324,7 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict) -> di
             "clipmaker": {"slug": r["slug"], "segmenty": r["segmenty"], "zrodlo": str(src)}}
     total = pr.total(proj)
     # napisy karaoke: krótkie linie (2–4 słowa w pionie), nad strefą przycisków platform
-    look = {**pr.CAP_DEFAULT, "size": 76 if pion else 60, "y": 0.70 if pion else 0.86, "maxw": 0.86 if pion else 0.8,
+    look = {**pr.CAP_DEFAULT, "size": 76 if pion else 60, **(pr.PION if pion else {"y": 0.86, "maxw": 0.8}),
             "style": "outline", "bold": True}
     if st.get("napisy") == "karaoke":
         look["hl"] = st.get("hl") or HL

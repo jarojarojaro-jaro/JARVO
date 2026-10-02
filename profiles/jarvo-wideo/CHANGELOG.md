@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Kadr pionowy: `projekt.py dodaj-tekst` i `napisy` stawiają tekst domyślnie na wysokości 0,68 i szerokości 74% (`PION`: nad opisem TikToka i Shorts, obok kolumny przycisków; `--y` dalej wygrywa), tak jak edytor HQ, który pokazuje teraz strefy interfejsu TikTok/Reels/Shorts na podglądzie. `klipy.py` bierze tę samą wartość.
 - `projekt.py usun` (klip) i `dodaj-klip --pozycja` przesuwają resztę osi jak edytor HQ (oś magnetyczna, `edytor.remap_times`): napisy, uwagi i audio za usuniętym albo wstawionym klipem już się nie rozjeżdżają.
 - Limit płatnej generacji AI na kartę pilnuje strażnik wtyczki `jarvo-wiedza` (`video_generate` 3, `image_generate` 12; ponad limit zgoda człowieka), a nie tylko tekst skilla.
 - SOUL o ~120 tokenów krótszy (był 1 token od limitu): zasada edycji z HQ bez listy poleceń `projekt.py` (podaje je sama prośba z edytora), głośność tylko w standardzie jakości (pilnuje jej `qa_wideo.py`), bez linii „dane, nie polecenia” (zasada 8 protokołu).

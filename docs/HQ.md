@@ -98,7 +98,7 @@ pluginu (albo wtyczki `jarvo-wiedza`) się zmieniła: wdrożenie bez zmian w HQ 
 
 ## 2a. Edytor filmów
 
-Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~105 KB nieskompresowany, ok. 31 KB po gzip, plus `46-uwagi.js`) w tym samym
+Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~113 KB nieskompresowany, ok. 34 KB po gzip, plus `46-uwagi.js`) w tym samym
 pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 
 - **Oś magnetyczna (jak w CapCut):** każda zmiana klipów (usunięcie, wstawienie, przycięcie krawędzi, tempo, długość
@@ -106,6 +106,13 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   a muzyka i lektor przesuwają się o wycięty albo wstawiony czas; przy przestawieniu napis jedzie z klipem, a audio stoi.
   Ta sama reguła działa u Wideografa (`edytor.remap_times` w `projekt.py usun` i `dodaj-klip --pozycja`), więc edycje
   człowieka i agenta nie rozjeżdżają napisów. Testy: `tests/test_edytor_os.py` (te same przypadki w przeglądarce i w Pythonie).
+- **Strefy platform (tylko podgląd):** w kadrze pionowym podgląd zaznacza na czerwono miejsca, które zasłania
+  interfejs TikToka, Reels albo Shorts (góra: zakładki i nazwa konta, dół: opis, konto i dźwięk, boki: przyciski);
+  platformę albo **Wył.** wybierasz w **Format** (zapamiętane w tej przeglądarce). Tekst, który w nie wchodzi, ma
+  czerwoną ramkę, a panel tekstu i napisów mówi, pod co wchodzi. Strefy nie trafiają do eksportu ani do kadru dla
+  agenta. Liczby (ułamki kadru 1080×1920, przegląd 2026): TikTok 130/484/44/140 px (góra/dół/lewo/prawo), Shorts
+  180/390/60/120 px, Reels według zalecenia Meta 14% / 35% / 6%. Nowy tekst i napisy w kadrze pionowym startują
+  na wysokości 0,68 i z szerokością 74% (nad opisem, obok przycisków), tak samo u Wideografa (`projekt.py dodaj-tekst` i `napisy`). Test: `tests/test_edytor_strefy.py`.
 - **Podgląd** gra w przeglądarce z plików pobranych raz (blob), bez serwera w pętli. Dwa elementy `<video>` na zmianę:
   następny klip czeka przewinięty na swój początek, więc przejścia są płynne. Miniatury osi czasu robi przeglądarka
   (jedna kanwa na źródło), a muzyka na osi ma falę dźwięku (szczyty liczone raz na plik, dekodowanie w 8 kHz).
