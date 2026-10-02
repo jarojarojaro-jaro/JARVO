@@ -360,6 +360,9 @@ function VideoEditor({ path, onClose }) {
   const [saved, setSaved] = useState("");
   const [job, setJob] = useState(null);
   const [ask, setAsk] = useState(null);
+  const [shot, setShot] = useState(null);      // zaznaczanie kadru: {a, b} w ułamkach podglądu (null = wyłączone)
+  const [noteHi, setNoteHi] = useState(null);  // uwaga podświetlona na osi i w panelu prośby
+  const shotUrls = useRef(new Map());          // ścieżka kadru → obraz (data URL) z tej sesji edytora
   const [side, setSide] = useState("media");
   const [codecErr, setCodecErr] = useState(false);
   const mobile = useMedia("(max-width: 860px)");
@@ -440,6 +443,7 @@ function VideoEditor({ path, onClose }) {
       addMeta(extra.filter(Boolean));
       const ok = new Set([...known, ...extra.filter(Boolean).map((x) => x.path)]);
       proj = { ...proj, texts: (proj.texts || []).map((x) => ({ ...x, id: x.id || edId("t") })),
+        notes: (proj.notes || []).filter((n) => n && Number.isFinite(+n.t)).map((n) => ({ ...n, t: +n.t, id: n.id || edId("n") })),
         clips: proj.clips.filter((c) => ok.has(c.src)).map((c) => ({ ...c, id: c.id || edId("c") })),
         audio: (proj.audio || []).filter((c) => ok.has(c.src)).map((c) => ({ ...c, id: c.id || edId("a") })) };
       if (!proj.clips.length) proj = initialProject(d.file);
@@ -528,6 +532,69 @@ function VideoEditor({ path, onClose }) {
     }
   }
   useEffect(() => { drawOverlay(); }, [p, sel]);
+
+  // ---------------------------------------------------------------- kadr do Wideografa i uwagi na osi
+  // Kadr składamy jak podgląd: klatka w tym samym kadrze (fitBox = applyFit) i napisy tą samą funkcją drawText.
+  async function captureFrame(a, b) {
+    const P = projRef.current;
+    const { w: W, h: Hh } = P.canvas;
+    const c = document.createElement("canvas");
+    c.width = W; c.height = Hh;
+    const g = c.getContext("2d");
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, Hh);
+    const now = tRef.current;
+    const L2 = layoutClips(P.clips);
+    const seg = L2.find((x) => now < x.end - 1e-6) || L2[L2.length - 1];
+    const el = seg && seg.c.kind === "image" ? player.imgRef.current : player.vids[player.st.current.slot].current;
+    const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
+    if (vw && vh) {
+      const r = fitBox(vw, vh, W, Hh, seg.c);
+      try { g.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { /* klatka jeszcze niegotowa: zostaje czarne tło */ }
+    }
+    for (const x of P.texts) if (now >= x.start && now < x.end) drawText(g, x, W, Hh, karaokeIndex(x, now));
+    const r = shotRect(a, b, W, Hh);
+    const [ow, oh] = shotSize(r.w, r.h);
+    const out = document.createElement("canvas");
+    out.width = ow; out.height = oh;
+    out.getContext("2d").drawImage(c, r.x, r.y, r.w, r.h, 0, 0, ow, oh);
+    const url = out.toDataURL("image/jpeg", 0.86);
+    const blob = await new Promise((ok) => out.toBlob(ok, "image/jpeg", 0.86));
+    const name = `kadr-${path.split("/").pop().replace(/\.[^.]+$/, "")}-${edClock(now).replace(/[:.]/g, "")}.jpg`;
+    const up = await api.upload(new File([blob], name, { type: "image/jpeg" }));
+    if (!up || !up.path) throw new Error((up && (up.detail || up.error)) || L("Nie udało się zapisać kadru.", "Could not save the frame."));
+    shotUrls.current.set(up.path, url);
+    return { path: up.path, url, t: now, full: r.full };
+  }
+  const startShot = () => { player.stop(); setShot({}); };
+  function shotDown(e) {
+    e.preventDefault(); e.stopPropagation();
+    const box = e.currentTarget.getBoundingClientRect();
+    const at = (ev) => ({ x: (ev.clientX - box.left) / box.width, y: (ev.clientY - box.top) / box.height });
+    const a = at(e);
+    setShot({ a, b: a });
+    const move = (ev) => setShot((x) => x && { ...x, b: at(ev) });
+    const up = async (ev) => {
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
+      const b = at(ev);
+      setShot({ a, b, busy: true });
+      const base = { text: "", reply: "", busy: false };
+      try {
+        const k = await captureFrame(a, b);
+        setAsk((x) => ({ ...(x || base), shot: k, error: null }));
+      } catch (err) {
+        setAsk((x) => ({ ...(x || base), error: err.message || String(err) }));
+      }
+      setShot(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+  function addNote(text, img) {
+    const n = { id: edId("n"), t: Math.round(tRef.current * 100) / 100, text: String(text || "").trim(), img: img || null, done: false };
+    H.apply((P) => ({ ...P, notes: [...(P.notes || []), n] }));
+    setNoteHi(n.id);
+  }
+  const removeNote = (id) => H.apply((P) => ({ ...P, notes: (P.notes || []).filter((n) => n.id !== id) }));
   useEffect(() => { onTick(tRef.current, false); }, [pps]);
   // po zmianie projektu odtwarzacz pokazuje właściwą klatkę (zatrzymany)
   useEffect(() => { if (p && !player.playing) player.seek(Math.min(tRef.current, Math.max(0, projTotal(p) - 0.001))); }, [p && p.clips]);
@@ -710,7 +777,7 @@ function VideoEditor({ path, onClose }) {
         player.seek(tRef.current + (e.key === "ArrowLeft" ? -step : step));
       } else if (e.key === "Home") player.seek(0);
       else if (e.key === "End") player.seek(total);
-      else if (e.key === "Escape") { if (ask) setAsk(null); else if (sel) setSel(null); }
+      else if (e.key === "Escape") { if (shot) setShot(null); else if (ask) setAsk(null); else if (sel) setSel(null); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -983,7 +1050,8 @@ function VideoEditor({ path, onClose }) {
     const shift = (t) => { let d = 0; for (const [a, b] of rs) { if (t >= b) d += b - a; else if (t > a) d += t - a; } return t - d; };
     H.apply((P) => ({ ...P, clips,
       texts: P.texts.map((x) => ({ ...x, start: shift(x.start), end: shift(x.end) })).filter((x) => x.end - x.start >= 0.05),
-      audio: P.audio.map((m) => ({ ...m, start: shift(m.start) })) }));
+      audio: P.audio.map((m) => ({ ...m, start: shift(m.start) })),
+      notes: (P.notes || []).map((n) => ({ ...n, t: shift(n.t) })) }));
     return rs.reduce((a, [x, y]) => a + y - x, 0);
   }
   const loadSpeech = (src, data) => setSpeech((sp) => ({ ...sp, [src]: data }));
@@ -1191,11 +1259,21 @@ function VideoEditor({ path, onClose }) {
       ${proxying > 0 && html`<p class="thq-ed-codec is-info"><span class="thq-ed-spin is-small"></span> ${L("Przygotowuję podgląd dla tej przeglądarki (kopia WebM na serwerze, raz)…", "Preparing a preview this browser can play (one-time WebM copy)…")}</p>`}
       <img ref=${player.imgRef} class="thq-ed-v" alt=""/>
       <canvas ref=${overlayRef} class="thq-ed-overlay" onPointerDown=${stagePointer}></canvas>
+      ${shot && html`<div class=${cx("thq-ed-shot", shot.a && "is-drag", shot.busy && "is-busy")} onPointerDown=${shot.busy ? null : shotDown}>
+        ${shot.a && html`<i style=${{ left: `${Math.min(shot.a.x, shot.b.x) * 100}%`, top: `${Math.min(shot.a.y, shot.b.y) * 100}%`,
+          width: `${Math.abs(shot.b.x - shot.a.x) * 100}%`, height: `${Math.abs(shot.b.y - shot.a.y) * 100}%` }}></i>`}</div>`}
       ${codecErr && html`<p class="thq-ed-codec">${L("Ta przeglądarka nie odtwarza kodeka tego filmu (np. Chromium bez H.264). Montaż i eksport działają; do podglądu użyj Chrome, Edge albo Safari.",
         "This browser cannot decode the video codec (e.g. Chromium without H.264). Editing and export still work; use Chrome, Edge or Safari to preview.")}</p>`}
     </div></div>
     ${p.audio.map((m) => html`<${EdAudio} key=${m.id} m=${m} audios=${player.audios}/>`)}`;
 
+  const notes = p.notes || [];
+  const noteTrack = notes.length > 0 && html`<div class="thq-ed-track is-notes" onPointerDown=${rulerDown}>
+    ${notes.map((n) => html`<button type="button" key=${n.id} class=${cx("thq-ed-pin", n.done && "is-done", noteHi === n.id && "is-sel")}
+      style=${{ left: `${n.t * pps}px` }} title=${`${edClock(n.t)} · ${n.text || L("kadr", "frame")}${n.done ? ` · ✓ ${n.odp || ""}` : ""}`}
+      aria-label=${`${L("Uwaga", "Note")} ${edClock(n.t)}`} onPointerDown=${(e) => e.stopPropagation()}
+      onClick=${(e) => { e.stopPropagation(); player.seek(n.t); setNoteHi(n.id); if (!ask) setAsk({ text: "", reply: "", busy: false }); }}>${n.done ? "✓" : ""}</button>`)}
+  </div>`;
   const textTrack = html`<div class="thq-ed-track is-text" style=${{ height: `${(p.texts.length ? nLanes : 1) * 26 + 6}px` }} onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
     ${p.texts.map((x) => html`<div key=${x.id} class=${cx("thq-ed-item is-text", x.cap && "is-cap", sel && sel.id === x.id && "is-sel")}
       style=${{ left: `${x.start * pps}px`, width: `${Math.max(6, (x.end - x.start) * pps)}px`, top: `${3 + textLane[x.id] * 26}px` }}
@@ -1243,19 +1321,24 @@ function VideoEditor({ path, onClose }) {
         <div class="thq-ed-ruler" onPointerDown=${rulerDown}>
           ${ticks.map((s) => html`<span key=${s} style=${{ left: `${s * pps}px` }}>${step < 1 ? `${fmtT(s)}${(s % 1 ? ".5" : "")}` : fmtT(s)}</span>`)}
         </div>
-        ${mobile ? [videoTrack, speechTrack, audioTrack, textTrack] : [textTrack, videoTrack, speechTrack, audioTrack]}
+        ${mobile ? [noteTrack, videoTrack, speechTrack, audioTrack, textTrack] : [noteTrack, textTrack, videoTrack, speechTrack, audioTrack]}
         ${!mobile && html`<div class="thq-ed-head" ref=${headRef} style=${{ left: `${pad}px`, transform: `translateX(${t * pps}px)` }}><i></i></div>`}
       </div>
     </div>
     ${mobile && html`<div class="thq-ed-center"><i></i></div>`}
   </div>`;
-  const banner = conflict ? html`<div class="thq-ed-banner" role="alert">
+  const banner = shot ? html`<div class="thq-ed-banner is-shot" role="status">
+      <span>${shot.busy ? L("Zapisuję kadr…", "Saving the frame…") : L("📷 Przeciągnij prostokąt na podglądzie albo kliknij, żeby wziąć cały kadr.", "📷 Drag a box on the preview, or click to take the whole frame.")}</span>
+      <button type="button" class="thq-ed-btn" onClick=${() => setShot(null)}>${L("Anuluj", "Cancel")}</button></div>`
+    : conflict ? html`<div class="thq-ed-banner" role="alert">
       <span>${conflict.kto === "jarvo-wideo" ? L("Wideograf zmienił ten projekt, a Ty masz niezapisane zmiany.", "The video agent changed this project while you have unsaved changes.")
         : L("Projekt zmienił się poza edytorem.", "The project changed outside the editor.")}</span>
       <button type="button" class="thq-ed-btn is-main" onClick=${() => reloadProject(conflict.kto)}>${L("Wczytaj jego wersję", "Load theirs")}</button>
       <button type="button" class="thq-ed-btn" onClick=${keepMine}>${L("Zostaw moją", "Keep mine")}</button></div>`
     : toast ? html`<div class="thq-ed-banner is-ok" role="status"><span>✓ ${toast}</span></div>` : null;
-  const askBox = ask && html`<${AskAgent} ask=${ask} setAsk=${setAsk} path=${path} saveNow=${saveNow} time=${tRef.current} sel=${sel && selItem ? { ...sel, item: selItem } : null} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
+  const askBox = ask && !shot && html`<${AskAgent} ask=${ask} setAsk=${setAsk} path=${path} saveNow=${saveNow} time=${tRef.current} sel=${sel && selItem ? { ...sel, item: selItem } : null}
+    onOpen=${(f) => { onClose(); openFile && openFile(f); }} notes=${notes} addNote=${addNote} removeNote=${removeNote} noteHi=${noteHi}
+    onSeek=${(x) => player.seek(x)} startShot=${startShot} urls=${shotUrls}/>`;
   const exportBox = job && html`<${ExportBox} job=${job} onClose=${() => setJob(null)} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
   const exportBtn = html`<button type="button" class="thq-ed-btn is-main" disabled=${running || !info.ffmpeg} onClick=${doExport}
     title=${info.ffmpeg ? L("Zapisz nową wersję filmu (oryginał zostaje)", "Save a new version (the original stays)") : L("Brak ffmpeg w kontenerze", "ffmpeg is missing in the container")}>${mobile ? L("Eksport", "Export") : `⤓ ${L("Eksportuj", "Export")}`}</button>`;
@@ -1402,35 +1485,64 @@ function ExportBox({ job, onClose, onOpen }) {
 }
 
 // Prośba do Wideografa z kontekstem montażu: agent widzi film, projekt i miejsce na osi.
-function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen }) {
+// Miniatura kadru uwagi: obraz z tej sesji albo plik z inboxu (po ponownym otwarciu edytora).
+function NoteThumb({ path, url }) {
+  const disk = useBlobUrl(url ? null : path);
+  const src = url || disk;
+  return src ? html`<img src=${src} alt=${L("Kadr uwagi", "Note frame")}/>` : html`<span class="thq-ed-note-pic" title=${path}>📷</span>`;
+}
+const plUwag = (n) => (n === 1 ? "uwaga" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "uwagi" : "uwag");
+function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen, notes, addNote, removeNote, noteHi, onSeek, startShot, urls }) {
+  const open = openNotes(notes);
+  const where = sel ? (sel.type === "text" ? `napis „${sel.item.text}” (${fmtT(sel.item.start, true)}–${fmtT(sel.item.end, true)})`
+    : sel.type === "clip" ? `klip ${sel.item.src.split("/").pop()} (${fmtT(sel.item.in, true)}–${fmtT(sel.item.out, true)} źródła)` : `muzyka ${sel.item.src.split("/").pop()}`) : "nic";
+  const text = (ask.text || "").trim();
+  const canSend = !ask.busy && (text || open.length || ask.shot);
   const send = async () => {
-    const text = ask.text.trim();
-    if (!text || ask.busy) return;
-    const projFile = path.replace(/\.[^./]+$/, ".edycja.json");
-    const where = sel ? (sel.type === "text" ? `napis „${sel.item.text}” (${fmtT(sel.item.start, true)}–${fmtT(sel.item.end, true)})`
-      : sel.type === "clip" ? `klip ${sel.item.src.split("/").pop()} (${fmtT(sel.item.in, true)}–${fmtT(sel.item.out, true)} źródła)` : `muzyka ${sel.item.src.split("/").pop()}`) : "nic";
-    const msg = [`Edycja filmu w edytorze HQ: \`${path}\``, `Projekt montażu: \`${projFile}\` · kursor ${fmtT(time, true)} · zaznaczone: ${where}.`,
-      `Prośba: ${text}`,
-      "Pracuj na tym projekcie: `python3 $HERMES_HOME/scripts/projekt.py pokaz <film>`, zmiany przez `projekt.py dodaj-audio / dodaj-tekst / dodaj-klip / napisy / usun`, na końcu `projekt.py render <film>` i linia MEDIA:. Nie cofaj moich cięć; edytor sam wczyta Twoje zmiany."].join("\n");
+    if (!canSend) return;
+    const { message, attachments, images } = askMessage({ path, cursor: time, where, text, shot: ask.shot, notes, urls: (x) => urls.current.get(x) });
     setAsk((a) => ({ ...a, busy: true, reply: "", error: null }));
     try {
       await saveNow().catch(() => {});
-      for await (const { event, data } of api.send(ED_AGENT, msg)) {
+      const extra = attachments.length ? { attachments, images } : undefined;
+      for await (const { event, data } of api.send(ED_AGENT, message, extra)) {
         if (event === "assistant.delta") setAsk((a) => a && { ...a, reply: (a.reply || "") + (data.delta || "") });
         else if (event === "assistant.completed" && typeof data.content === "string") setAsk((a) => a && { ...a, reply: data.content });
         else if (event === "run.failed" || event === "error") setAsk((a) => a && { ...a, error: data.message || data.error || "błąd" });
       }
+      setAsk((a) => a && { ...a, text: "", shot: null });
     } catch (e) { setAsk((a) => a && { ...a, error: e.message || String(e) }); }
     setAsk((a) => a && { ...a, busy: false });
   };
+  const pin = () => {
+    if (!text && !ask.shot) return;
+    addNote(text, ask.shot && ask.shot.path);
+    setAsk((a) => ({ ...a, text: "", shot: null }));
+  };
   const vids = [...new Set(((ask.reply || "").match(/\/opt\/data\/jarvo\/(?:workspaces|missions|knowledge|inbox)\/[^\s`'"<>()]+\.(?:mp4|webm|mov)/g) || []))];
+  const sorted = [...(notes || [])].sort((a, b) => a.t - b.t);
   return html`<div class="thq-ed-ask">
-    <p class="thq-ed-note">${L("Wideograf dostanie film, projekt montażu i miejsce na osi. Np. „dodaj lektora”, „zrób wersję 15 s”, „podmień muzykę na spokojniejszą”.",
-      "The video agent gets the film, the edit project and your timeline position. E.g. “add a voice-over”, “make a 15 s cut”, “calmer music”.")}</p>
-    <div class="thq-ed-row"><textarea rows="2" value=${ask.text} placeholder=${L("Co zmienić?", "What should change?")}
+    <p class="thq-ed-note">${L("Wideograf dostanie film, projekt montażu, miejsce na osi, uwagi i kadry. 📌 przypina prośbę do chwili filmu, 📷 dołącza zaznaczony fragment podglądu.",
+      "The video agent gets the film, the edit project, your timeline position, notes and frames. 📌 pins a request to a moment, 📷 attaches a part of the preview.")}</p>
+    ${sorted.length > 0 && html`<ol class="thq-ed-notes">${sorted.map((n) => html`<li key=${n.id} class=${cx(n.done && "is-done", noteHi === n.id && "is-sel")}>
+      <button type="button" class="thq-ed-note-t" onClick=${() => onSeek(n.t)} title=${L("Przejdź do tego miejsca", "Go to this moment")}>${edClock(n.t)}</button>
+      <span class="thq-ed-note-x">${n.text || L("(kadr)", "(frame)")}${n.done && html`<small>✓ ${n.odp || L("zrobione", "done")}</small>`}</span>
+      ${n.img && html`<${NoteThumb} path=${n.img} url=${urls.current.get(n.img)}/>`}
+      <button type="button" class="thq-ed-note-del" onClick=${() => removeNote(n.id)} aria-label=${L("Usuń uwagę", "Remove note")}>×</button></li>`)}</ol>`}
+    <textarea rows="2" value=${ask.text} placeholder=${L("Co zmienić? Np. „tu za szybko”, „literówka w napisie”, „dodaj lektora”.", "What should change? E.g. “too fast here”, “typo in the caption”, “add a voice-over”.")}
       onInput=${(e) => { const v = e.target.value; setAsk((a) => ({ ...a, text: v })); }}
       onKeyDown=${(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}></textarea>
-      <button type="button" class="thq-ed-btn is-main" disabled=${ask.busy || !ask.text.trim()} onClick=${send}>${ask.busy ? "…" : L("Wyślij", "Send")}</button></div>
+    ${ask.shot && html`<div class="thq-ed-shotprev"><img src=${ask.shot.url} alt=${L("Kadr", "Frame")}/>
+      <span>${L("Kadr", "Frame")} ${edClock(ask.shot.t)}${ask.shot.full ? "" : L(" · fragment", " · crop")}</span>
+      <button type="button" class="thq-ed-note-del" onClick=${() => setAsk((a) => ({ ...a, shot: null }))} aria-label=${L("Usuń kadr", "Remove frame")}>×</button></div>`}
+    <div class="thq-ed-row is-actions">
+      <button type="button" class="thq-ed-btn" onClick=${startShot} disabled=${ask.busy}>📷 ${L("Kadr", "Frame")}</button>
+      <button type="button" class="thq-ed-btn" onClick=${pin} disabled=${ask.busy || (!text && !ask.shot)}
+        title=${L("Zapisz jako uwagę w tym miejscu osi (wyślesz kilka naraz)", "Save as a note at this moment (send several at once)")}>📌 ${L("Uwaga w", "Note at")} ${edClock(time)}</button>
+      <span class="thq-ed-grow"></span>
+      <button type="button" class="thq-ed-btn is-main" disabled=${!canSend} onClick=${send}>${ask.busy ? "…"
+        : open.length ? L(`Wyślij (${open.length} ${plUwag(open.length)})`, `Send (${open.length} note${open.length === 1 ? "" : "s"})`) : L("Wyślij", "Send")}</button>
+    </div>
     ${(ask.reply || ask.busy) && html`<div class="thq-ed-reply"><${Markdown} text=${ask.reply || L("Wideograf pracuje…", "Working…")}/></div>`}
     ${ask.error && html`<p class="thq-ed-bad">${ask.error}</p>`}
     ${vids.map((v) => html`<button key=${v} type="button" class="thq-ed-btn" onClick=${() => onOpen(fileFromPath(v))}>▶ ${v.split("/").pop()}</button>`)}

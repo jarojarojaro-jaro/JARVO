@@ -229,3 +229,14 @@ scenarios:
         - "ustalenie przydatne w przyszłości (np. format, który zadziałał) zgłasza `wiedza_zapisz`"
       should_not:
         - "pomija orzeczenia marki z przypomnienia"
+
+  - id: wideo-uwagi-z-edytora
+    type: in_scope
+    input: "Edycja filmu w edytorze HQ: `/opt/data/jarvo/workspaces/jarvo-wideo/out/promo/promo.mp4`. Prośba: zajmij się uwagami z osi poniżej. Uwagi na osi (2): 1. [n1] 0:02.0: „za szybko” · kadr `/opt/data/jarvo/inbox/2026-10-02/kadr-promo-0020.jpg` (obraz 1) 2. [n2] 0:05.0: „literówka w napisie”"
+    expect:
+      should:
+        - "`projekt.py pokaz` i obejrzenie kadru przez vision_analyze przed zmianą; poprawki na tym samym projekcie (`*.edycja.json`)"
+        - "każda uwaga zamknięta `projekt.py uwaga <film> <id> --zrobione \"co zmienił\"` albo `--odrzuc \"dlaczego\"`, potem `render` bez ostrzeżenia o otwartych uwagach i linia MEDIA:"
+      should_not:
+        - "zostawia uwagę otwartą bez słowa albo zamyka ją ogólnikiem („ok”, „poprawione”)"
+        - "cofa cięcia właściciela albo renderuje nowy film obok projektu zamiast poprawić projekt"

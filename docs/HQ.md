@@ -27,7 +27,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Czat: zdjęcia i pliki | czat HQ + `/opt/data/jarvo/inbox/` | 📎, wklejanie Ctrl+V (zrzut ekranu) i przeciąganie. Plik trafia do `inbox/<data>/`, agent dostaje jego ścieżkę (linia `📎 …`), zdjęcie także jako obraz (model bez widzenia dostaje opis od Hermesa) |
 | Czat: pliki od agenta | odpowiedź agenta | linia `MEDIA:<ścieżka>` i obrazy `data:image` jako miniatury, ścieżki `/opt/data/jarvo/…` i adresy http(s) klikalne; obraz ma „Kopiuj obraz” (np. do Telegrama) |
 | Akcje pliku wynikowego | plugin + pomocnik hosta | **▶ Odpal** (strona HTML w nowej karcie, `:9120`), **Pokaż w folderze** (Eksplorator Windows w lokalnej instalacji WSL; gdzie indziej: **Kopiuj ścieżkę**), **Pobierz**, podgląd/kod |
-| **✎ Edytuj** (każdy film) | edytor w HQ + ffmpeg w kontenerze | montaż w stylu CapCut: oś czasu z miniaturami, cięcie (S), przycinanie krawędzi, przestawianie klipów, tempo 0,25–4×, głośność i wyciszenie, zdjęcia jako plansze, napisy (styl, krój, kolor, przeciąganie na podglądzie), muzyka z katalogu albo z dysku, format 16:9 / 9:16 / 1:1 / 4:5, cofnij/ponów, skróty klawiszowe. **Eksportuj** zapisuje nową wersję obok oryginału (`film-edycja.mp4`, oryginał zostaje), **Poproś agenta** wysyła Wideografowi prośbę z projektem montażu. Szczegóły: sekcja 2a |
+| **✎ Edytuj** (każdy film) | edytor w HQ + ffmpeg w kontenerze | montaż w stylu CapCut: oś czasu z miniaturami, cięcie (S), przycinanie krawędzi, przestawianie klipów, tempo 0,25–4×, głośność i wyciszenie, zdjęcia jako plansze, napisy (styl, krój, kolor, przeciąganie na podglądzie), muzyka z katalogu albo z dysku, format 16:9 / 9:16 / 1:1 / 4:5, cofnij/ponów, skróty klawiszowe, uwagi przypięte do osi i kadr z podglądu dla Wideografa. **Eksportuj** zapisuje nową wersję obok oryginału (`film-edycja.mp4`, oryginał zostaje), **Poproś agenta** wysyła Wideografowi prośbę z projektem montażu. Szczegóły: sekcja 2a |
 | Panel agenta: Czat | API gatewaya | rozmowa bezpośrednia z agentem (sesja HQ, osobna od Telegrama) |
 | **📱 Ekran telefonu** (panel Twórcy aplikacji) | telefon testowy floty (`jarvo android on`) + proxy `:9122` | ekran Androida w nowej karcie (ws-scrcpy: podgląd na żywo, klikanie, pisanie), link z tokenem ważny 12 h; przycisk widać tylko, gdy telefon działa |
 | Panel agenta: O agencie | fleet.yaml, SOUL, skille | opis, model, autonomia, parametry osobowości, workflowy |
@@ -77,7 +77,7 @@ Pliki w repo:
 | `hq/plugin/plugin_api.py` | trasy FastAPI, proxy czatu do gatewaya |
 | `hq/plugin/hq_core.py` | logika stanu (bez FastAPI, testowana w `tests/test_hq_core.py`) |
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`) |
-| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy i edytor filmów, czat, HUD, aplikacja, widżet aktualizacji |
+| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, edytor filmów i jego uwagi z kadrami, czat, HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność) |
 | `branding/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css`; te same pliki na stronie logowania |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |
@@ -91,7 +91,7 @@ pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartu
 
 ## 2a. Edytor filmów
 
-Bez bibliotek i bez nowych usług: edytor to jeden plik `hq/web/src/45-edytor.js` (~88 KB nieskompresowany, ok. 26 KB po gzip) w tym samym
+Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~100 KB nieskompresowany, ok. 30 KB po gzip, plus `46-uwagi.js`) w tym samym
 pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 
 - **Podgląd** gra w przeglądarce z plików pobranych raz (blob), bez serwera w pętli. Dwa elementy `<video>` na zmianę:
@@ -131,12 +131,21 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
-  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `usun`, `sprawdz`,
-  `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `usun`, `uwaga`,
+  `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy rysuje ta sama funkcja (`hq/web/src/44-napisy.js`) w przeglądarce bez okna, więc plik od agenta wygląda
   jak eksport z edytora. Edytor co 3 s sprawdza, czy projekt zmienił się z zewnątrz: bez Twoich niezapisanych zmian
   wczytuje wersję agenta sam (jako zwykły krok, ↶ ją cofa), a przy kolizji pyta: „Wczytaj jego wersję” albo
   „Zostaw moją”. Zapis nigdy nie nadpisuje po cichu cudzej zmiany (serwer odrzuca go jako nieaktualny).
+- **Uwagi na osi i kadr do Wideografa** (pomysł z Remocn Studio, MIT): w panelu „Poproś agenta” **📌 Uwaga w 0:04.2**
+  przypina prośbę do chwili filmu (żółta pinezka na ścieżce „Uwagi” nad osią; klik przewija do tego miejsca), a
+  **📷 Kadr** pozwala zaznaczyć prostokąt na podglądzie (klik = cały kadr). Kadr składa się jak podgląd: klatka w tym
+  samym kadrze (`fitBox` = `applyFit`) i napisy tą samą funkcją `drawText`; JPEG do 1280 px trafia do inboxu, a uwaga
+  albo prośba ma do niego ścieżkę. **Wyślij** wysyła prośbę i wszystkie otwarte uwagi naraz, z czasem osi i kadrami
+  (pierwsze 4 jako obrazy dla modelu, reszta jako ścieżki do `vision_analyze`). Uwagi są w projekcie (`notes`), więc
+  przetrwają zamknięcie edytora i przesuwają się razem z treścią przy wycinaniu pauz. Wideograf zamyka każdą
+  `projekt.py uwaga <film> <id> --zrobione "co zmienił"` albo `--odrzuc "dlaczego"`: pinezka zmienia się w zielone ✓
+  z jego opisem, a `render` ostrzega o otwartych. Logika bez Reacta: `hq/web/src/46-uwagi.js` (testy w node).
 - **Telefon (do 860 px):** układ jak w CapCut: podgląd na górze, pod nim czas, odtwarzanie i cofnij/ponów, oś czasu
   przewijana palcem pod stałym wskaźnikiem na środku (dwa palce: przybliżenie), a na dole pasek **Edytuj · Audio ·
   Tekst · Napisy · Format**. Narzędzie otwiera panel od dołu; dotknięcie klipu, napisu albo muzyki na osi otwiera

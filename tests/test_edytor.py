@@ -296,3 +296,66 @@ console.log(JSON.stringify({{w: karaokeWords(t).map((x) => x[2]),
     assert out["w"] == ed.karaoke_words(KAR)
     assert out["idx"] == [0, 0, 1, 1, 2, 3, 3]
     assert out["off"] is None and out["plain"] == -1
+
+
+def _uwagi_js(prog: str):
+    """Uruchamia 46-uwagi.js (kadr i uwagi edytora, bez Reacta) z programem testowym w node."""
+    if not shutil.which("node"):
+        pytest.skip("brak node")
+    js = (ROOT / "hq" / "web" / "src" / "46-uwagi.js").read_text(encoding="utf-8")
+    return json.loads(subprocess.run(["node", "-e", js + "\n" + prog], capture_output=True, text=True, check=True).stdout)
+
+
+def test_kadr_rysowany_jak_podglad():
+    """fitBox = applyFit podglądu (object-fit, object-position, scale): zrzut kadru trafia tam, gdzie widzi go użytkownik."""
+    out = _uwagi_js("""console.log(JSON.stringify({
+      contain: fitBox(1920, 1080, 1080, 1920, {fit: "contain"}),
+      cover: fitBox(1920, 1080, 1080, 1920, {fit: "cover", fx: 0.5, fy: 0.5}),
+      lewo: fitBox(1920, 1080, 1080, 1920, {fit: "cover", fx: 0, fy: 0.5}),
+      zoom: fitBox(1920, 1080, 1920, 1080, {fit: "cover", fx: 0.25, fy: 0.5, zoom: 2}),
+      zly: fitBox(1920, 1080, 1920, 1080, {fit: "cover", fx: 7, zoom: 99})}));""")
+    assert out["contain"] == {"x": 0, "y": 656.25, "w": 1080, "h": 607.5}            # pasy u góry i u dołu
+    assert out["cover"]["h"] == 1920 and round(out["cover"]["x"], 3) == round((1080 - 1920 * 1920 / 1080) / 2, 3)
+    assert out["lewo"]["x"] == 0                                                       # punkt skupienia: lewa krawędź
+    z = out["zoom"]
+    assert (z["w"], z["h"]) == (3840, 2160) and z["x"] == 1920 * 0.25 * (1 - 2)      # scale(2) wokół (25%, 50%)
+    assert out["zly"]["w"] == 1920 * 3                                                 # wartości spoza zakresu przycięte
+
+
+def test_zaznaczenie_kadru_i_rozmiar():
+    out = _uwagi_js("""console.log(JSON.stringify({
+      klik: shotRect({x: .5, y: .5}, {x: .51, y: .5}, 1080, 1920),
+      prost: shotRect({x: .8, y: .9}, {x: .2, y: .5}, 1080, 1920),
+      poza: shotRect({x: -1, y: -1}, {x: 2, y: .5}, 1000, 1000),
+      maly: shotSize(800, 600), duzy: shotSize(1080, 1920), zegar: [edClock(4.24), edClock(65), edClock(-3)]}));""")
+    assert out["klik"]["full"] and (out["klik"]["w"], out["klik"]["h"]) == (1080, 1920)
+    assert out["prost"] == {"x": 216, "y": 960, "w": 648, "h": 768, "full": False}
+    assert out["poza"] == {"x": 0, "y": 0, "w": 1000, "h": 500, "full": False}
+    assert out["maly"] == [800, 600] and out["duzy"] == [720, 1280]
+    assert out["zegar"] == ["0:04.2", "1:05.0", "0:00.0"]
+
+
+def test_prosba_z_uwagami_i_kadrami():
+    """Prośba do Wideografa: tylko otwarte uwagi w kolejności osi, kadry jako ścieżki, najwyżej 4 obrazy dla modelu."""
+    out = _uwagi_js("""
+const notes = [
+  {id: "n2", t: 9.5, text: "literówka w napisie", img: "/inbox/k2.jpg"},
+  {id: "n1", t: 4.24, text: "  za szybko  ", img: "/inbox/k1.jpg"},
+  {id: "n0", t: 1, text: "zrobione wcześniej", done: true, odp: "ok"},
+  {id: "n3", t: 12, text: "", img: "/inbox/k3.jpg"}, {id: "n4", t: 13, text: "x", img: "/inbox/k4.jpg"},
+  {id: "n5", t: 14, text: "y", img: "/inbox/k5.jpg"}];
+const urls = (p) => p === "/inbox/k5.jpg" ? null : "data:image/jpeg;base64," + p;
+const a = askMessage({path: "/opt/data/jarvo/workspaces/x/film.mp4", cursor: 3.3, where: "nic", text: "", notes, urls,
+  shot: {path: "/inbox/ogolny.jpg"}});
+const b = askMessage({path: "/f/film.mov", cursor: 0, text: "dodaj lektora", notes: [], urls});
+console.log(JSON.stringify({a, b}));""")
+    a, b = out["a"], out["b"]
+    m = a["message"]
+    assert "Projekt montażu: `/opt/data/jarvo/workspaces/x/film.edycja.json` · kursor 0:03.3" in m
+    assert "Prośba: zajmij się uwagami z osi" in m and "Kadr do prośby: `/inbox/ogolny.jpg` (obraz 1)" in m
+    assert m.index("[n1] 0:04.2: „za szybko”") < m.index("[n2] 0:09.5") and "n0" not in m
+    assert "[n3] 0:12.0: „zobacz kadr”" in m and "projekt.py uwaga <film> <id> --zrobione" in m
+    assert a["attachments"] == ["/inbox/ogolny.jpg", "/inbox/k1.jpg", "/inbox/k2.jpg", "/inbox/k3.jpg", "/inbox/k4.jpg", "/inbox/k5.jpg"]
+    assert len(a["images"]) == 4 and "(obraz 4)" in m and "(obraz 5)" not in m   # limit obrazów; reszta jako ścieżki
+    assert b["attachments"] == [] and b["images"] == [] and "Uwagi na osi" not in b["message"] and "uwaga <film>" not in b["message"]
+    assert "Prośba: dodaj lektora" in b["message"] and "film.edycja.json" in b["message"]

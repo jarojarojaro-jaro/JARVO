@@ -13,11 +13,16 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py kadr <film> <id> [--wypelnij|--dopasuj] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
     projekt.py napisy <film> [--srt plik.srt] [--karaoke [#FFE14D]]   # napisy ze słów (<źródło>.mowa.json) albo SRT
     projekt.py usun <film> <id>                    # usuń klip / tekst / audio o danym id (z `pokaz`)
+    projekt.py uwaga <film> <id> (--zrobione "co zmieniłem" | --odrzuc "dlaczego")   # zamknij uwagę z osi edytora
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
     projekt.py render <film> [--out plik.mp4]      # nowa wersja obok oryginału, na końcu linia MEDIA:
 
 Czas S w sekundach osi (po cięciach i zmianach tempa), chyba że opis mówi „źródła” (--od/--do).
 Nic nie nadpisuje oryginału: render zapisuje film-edycja.mp4, film-edycja-2.mp4…
+
+Uwagi (`notes` w projekcie) zostawia właściciel w edytorze HQ: prośba przypięta do chwili osi, często z kadrem
+(obraz w inboxie, oglądasz go przez vision_analyze). Każdą zamykasz `uwaga … --zrobione` albo `--odrzuc` z powodem;
+edytor pokazuje je wtedy jako ✓ z Twoim opisem. `render` ostrzega, gdy zostały otwarte.
 """
 
 from __future__ import annotations
@@ -129,8 +134,31 @@ def cmd_pokaz(film: Path, a) -> int:
     print("Audio:" if proj.get("audio") else "Audio: brak")
     for m in proj.get("audio") or []:
         print(f"  [{m.get('id')}] od {m['start']:6.2f} przez {m['out'] - m['in']:.2f} s  {Path(m['src']).name} · głośność {m.get('volume', 1):.2f}")
+    notes = sorted((n for n in proj.get("notes") or [] if isinstance(n, dict)), key=lambda n: float(n.get("t") or 0))
+    if notes:
+        otwarte = sum(1 for n in notes if not n.get("done"))
+        print(f"Uwagi właściciela ({otwarte} otwartych z {len(notes)}; czas osi):")
+        for n in notes:
+            stan = f"✓ {n.get('odp') or 'zrobione'}" if n.get("done") else "OTWARTA"
+            kadr = f" · kadr {n['img']}" if n.get("img") else ""
+            print(f"  [{n.get('id')}] {float(n.get('t') or 0):6.2f}  {(n.get('text') or '(kadr)')!r}{kadr} · {stan}")
     if a.json:
         print(json.dumps(proj, ensure_ascii=False, indent=1))
+    return 0
+
+
+def cmd_uwaga(film: Path, a) -> int:
+    proj = load(film)
+    note = next((n for n in proj.get("notes") or [] if isinstance(n, dict) and n.get("id") == a.id), None)
+    if note is None:
+        raise SystemExit(f"nie ma uwagi o id {a.id} (lista: projekt.py pokaz)")
+    odp = " ".join((a.zrobione or a.odrzuc or "").split())
+    if len(odp) < 8:
+        raise SystemExit("opisz konkretnie, co zmieniłeś albo dlaczego nie (co najmniej 8 znaków)")
+    note.update(done=True, odp=("" if a.zrobione else "odrzucona: ") + odp, kto="jarvo-wideo", kiedy=time.time())
+    save(film, proj)
+    left = sum(1 for n in proj["notes"] if isinstance(n, dict) and not n.get("done"))
+    print(f"Uwaga {a.id} zamknięta. Otwarte: {left}.")
     return 0
 
 
@@ -369,6 +397,9 @@ def cmd_render(film: Path, a) -> int:
         return 1
     info = ed.probe(out)
     print(f"Gotowe w {time.time() - t0:.1f} s: {out} · {info.get('w')}×{info.get('h')} · {info.get('duration') or 0:.2f} s")
+    otwarte = [n.get("id") for n in proj.get("notes") or [] if isinstance(n, dict) and not n.get("done")]
+    if otwarte:
+        print(f"⚠ otwarte uwagi właściciela: {', '.join(map(str, otwarte))} (zamknij: projekt.py uwaga <film> <id> --zrobione|--odrzuc)")
     print(f"MEDIA:{out}")
     return 0
 
@@ -423,6 +454,11 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--karaoke", nargs="?", const="", metavar="KOLOR",
                     help="aktywne słowo w kolorze (domyślnie żółty); tylko napisy ze słów, nie z SRT")
     film_cmd("usun", cmd_usun, "usuń element po id").add_argument("id")
+    sp = film_cmd("uwaga", cmd_uwaga, "zamknij uwagę z osi edytora")
+    sp.add_argument("id")
+    g = sp.add_mutually_exclusive_group(required=True)
+    g.add_argument("--zrobione", help="co zmieniłeś (zobaczy to właściciel w edytorze)")
+    g.add_argument("--odrzuc", help="dlaczego nie (np. kolizja z inną uwagą, wymaga decyzji)")
     film_cmd("sprawdz", cmd_sprawdz, "walidacja projektu")
     film_cmd("render", cmd_render, "złóż film (jak „Eksportuj”)").add_argument("--out")
     a = ap.parse_args(argv)

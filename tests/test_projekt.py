@@ -116,3 +116,30 @@ def test_render_karaoke(film, capsys):
     pr.main(["napisy", str(film), "--karaoke"])
     assert pr.main(["render", str(film), "--out", str(film.with_name("kar.mp4"))]) == 0
     assert ed.probe(film.with_name("kar.mp4"))["duration"] == pytest.approx(4.0, abs=0.15)
+
+
+def test_uwagi_z_edytora_zamykane_przez_agenta(film, capsys):
+    """Uwagi właściciela z osi edytora: `pokaz` je wypisuje, `uwaga` zamyka z opisem, `render` ostrzega o otwartych."""
+    pr.main(["pokaz", str(film)])
+    p = pr.load(film)
+    p["notes"] = [{"id": "n1", "t": 1.5, "text": "za szybko", "img": "/opt/data/jarvo/inbox/k1.jpg", "done": False},
+                  {"id": "n2", "t": 0.4, "text": "", "img": "/opt/data/jarvo/inbox/k2.jpg", "done": False}]
+    pr.save(film, p)
+    capsys.readouterr()
+    pr.main(["pokaz", str(film)])
+    out = capsys.readouterr().out
+    assert "Uwagi właściciela (2 otwartych z 2" in out and out.index("[n2]") < out.index("[n1]") and "kadr /opt/data/jarvo/inbox/k1.jpg" in out
+    with pytest.raises(SystemExit, match="konkretnie"):
+        pr.main(["uwaga", str(film), "n1", "--zrobione", "ok"])
+    with pytest.raises(SystemExit, match="nie ma uwagi"):
+        pr.main(["uwaga", str(film), "n9", "--zrobione", "zwolnione tempo klipu"])
+    assert pr.main(["uwaga", str(film), "n1", "--zrobione", "tempo klipu 2 z 1.5× na 1×"]) == 0
+    n1 = next(n for n in proj(film)["notes"] if n["id"] == "n1")
+    assert n1["done"] and n1["odp"] == "tempo klipu 2 z 1.5× na 1×" and n1["kto"] == "jarvo-wideo"
+    assert proj(film)["zmienil"]["kto"] == "jarvo-wideo"                       # edytor wczyta zmianę sam
+    assert pr.main(["render", str(film)]) == 0
+    assert "otwarte uwagi właściciela: n2" in capsys.readouterr().out
+    assert pr.main(["uwaga", str(film), "n2", "--odrzuc", "kadr pokazuje zamierzony efekt, pytam właściciela"]) == 0
+    assert next(n for n in proj(film)["notes"] if n["id"] == "n2")["odp"].startswith("odrzucona: ")
+    pr.main(["render", str(film)])
+    assert "otwarte uwagi" not in capsys.readouterr().out

@@ -36,7 +36,8 @@ research i fakty do scenariusza (→ `jarvo-sherlock` albo jego raport), strony 
    Pracuję na nim, a nie obok: `projekt.py pokaz` → zmiany przez `projekt.py dodaj-audio / dodaj-tekst /
    dodaj-klip / kadr / napisy / usun` (lektor, muzyka, napisy robię swoimi narzędziami i dokładam jako elementy) →
    `projekt.py render` (ten sam silnik co „Eksportuj”) → linia `MEDIA:`. Nie cofam cięć użytkownika bez powodu;
-   edytor sam wczyta moje zmiany jako osobne, edytowalne elementy.
+   edytor sam wczyta moje zmiany jako osobne, edytowalne elementy. Uwagi z osi (z kadrem: oglądam go) zamykam każdą:
+   `projekt.py uwaga <film> <id> --zrobione "co"` albo `--odrzuc "dlaczego"`.
 10. **Deterministyczne robią skrypty** (`$HERMES_HOME/scripts/film.py`, `montaz.py`, `qa_wideo.py`), ja decyduję i oglądam.
 
 ## Mapa workflowów
