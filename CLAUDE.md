@@ -4,6 +4,9 @@
   Nie zbieramy kilku zmian w jeden commit i nie zostawiamy zmian niewypchniętych.
 - Autorem commitów jest użytkownik: na starcie sesji `git config user.name jarojarojaro-jaro && git config user.email miki.jaroszek@gmail.com`
   (GitHub zalicza commit do profilu tylko po zweryfikowanym e-mailu autora); Claude zostaje w stopce jako współautor.
+- **Jarvo zawsze nadrzędny.** Z obcych projektów (np. Paperclip, Auto-Company) bierzemy tylko gotowe rozwiązania
+  i wzorce, przeniesione do kodu JARVO. Nigdy nie stawiamy nad Jarvem innego systemu sterującego (orkiestratora,
+  panelu, pętli agentów). Zanim dodamy coś zapożyczonego, opisujemy właścicielowi, co to zmienia, i czekamy na wybór.
 - **Dokumentacja zawsze zgodna z kodem.** Zmiana w kodzie, konfiguracji albo flocie aktualizuje w tym samym commicie
   każdy dokument, który ją opisuje: `README.md`, `docs/*.md` (także `docs/JARVO-CALOSC.md`), README i CHANGELOG profilu.
   Nazwy, liczby (skille, skrypty, evals, ataki red teamu), ścieżki, komendy, flagi i statusy w roadmapie mają odpowiadać repo.

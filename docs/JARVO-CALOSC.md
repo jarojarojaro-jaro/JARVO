@@ -15,7 +15,8 @@ wyniki i oddaje jeden sprawdzony rezultat. Wszystko działa na jednym VPS-ie i n
 
 **Kluczowa zasada:** nie forkujemy Hermesa. Repo jest jedynym źródłem prawdy — na serwerze nic
 nie edytujemy ręcznie. Działania nieodwracalne (publikacja, wdrożenie, płatności, wysyłka) tylko
-za zgodą człowieka.
+za zgodą człowieka. Jarvo jest zawsze nadrzędny: z innych projektów bierzemy tylko gotowe rozwiązania
+i wzorce do kodu JARVO, nigdy system sterujący nad Jarvem.
 
 ---
 
