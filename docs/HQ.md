@@ -93,8 +93,10 @@ Pliki w repo:
 
 Wdrożenie jest częścią zwykłego `deploy.sh`: `build.py` buduje plugin do `build/plugins/jarvo-hq`,
 `install-fleet.sh` kopiuje go do `/opt/data/plugins/jarvo-hq`, włącza (Hermes wymaga jawnego włączenia
-pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartuje sam dashboard (s6), ale tylko gdy treść
-pluginu (albo wtyczki `jarvo-wiedza`) się zmieniła: wdrożenie bez zmian w HQ nie rozłącza otwartego panelu.
+pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartuje sam dashboard (s6). Dashboard czyta
+listę wtyczek tylko przy starcie, więc restart następuje, gdy odcisk treści `jarvo-hq` i `jarvo-wiedza` różni się od
+odcisku z ostatniego restartu (`/opt/data/plugins/.odcisk-panelu`). Dzięki temu wtyczka skopiowana przez przerwaną
+instalację pojawi się przy następnej, a wdrożenie bez zmian nie rozłącza otwartego panelu.
 
 ## 2a. Edytor filmów
 

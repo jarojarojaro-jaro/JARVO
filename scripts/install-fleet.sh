@@ -102,8 +102,7 @@ for a in $AGENTS; do
     || echo "  ! impeccable: nie pobrano programu (sieć?); pobierze się przy pierwszym użyciu"
 done
 
-# Podmiana wtyczki z buildu. Dashboard montuje backendy wtyczek przy starcie, więc restart (HQ_CHANGED) tylko wtedy,
-# gdy treść wtyczki się zmieniła: wdrożenie bez zmian w HQ nie rozłącza otwartego panelu.
+# Podmiana wtyczki z buildu (ta sama treść = stara kopia zostaje). O restarcie dashboardu decyduje odcisk na końcu.
 put_plugin() {
   local src="$BUILD/plugins/$1" dst="$DATA/plugins/$1"
   mkdir -p "$DATA/plugins"
@@ -113,7 +112,13 @@ put_plugin() {
   fi
   rm -rf "$dst.new" && cp -r "$src" "$dst.new"
   rm -rf "$dst" && mv "$dst.new" "$dst"
-  HQ_CHANGED=1
+}
+# Odcisk treści wtyczek panelu (bez __pycache__): porównywany z odciskiem z ostatniego restartu dashboardu.
+odcisk_wtyczek() {
+  local d; local -a dirs=()
+  for d in jarvo-hq jarvo-wiedza; do [[ -d "$DATA/plugins/$d" ]] && dirs+=("$d"); done
+  (( ${#dirs[@]} )) || return 0
+  (cd "$DATA/plugins" && find "${dirs[@]}" -type f ! -path '*/__pycache__/*' -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16)
 }
 
 # 3c. Jarvo HQ: plugin dashboardu (zakładka BASE, :9119/base)
@@ -171,9 +176,16 @@ fi
 if [[ $RESTART -eq 1 ]]; then
   log "Restart gatewaya"
   hermes gateway restart || echo "  ! restart gatewaya nieudany: sprawdź 'hermes gateway status'"
-  # dashboard montuje backend pluginów przy starcie procesu: po zmianie Jarvo HQ restartujemy tylko jego
-  if [[ "${HQ_CHANGED:-0}" -eq 1 && -d /run/service/dashboard ]]; then
-    /command/s6-svc -r /run/service/dashboard 2>/dev/null && echo "  ↻ dashboard (Jarvo HQ)" || echo "  ! restart dashboardu nieudany"
+  # Dashboard czyta listę wtyczek (zakładki Baza, Wiedza) i montuje ich backendy raz, przy starcie procesu. Restart, gdy
+  # wtyczki na dysku różnią się od tych, z którymi był ostatnio restartowany, także gdy poprzednia instalacja skopiowała
+  # wtyczkę i nie dotarła do restartu. Te same wtyczki: bez restartu, otwarty panel się nie rozłącza.
+  ODCISK="$(odcisk_wtyczek)"
+  if [[ -n "$ODCISK" && -d /run/service/dashboard && "$ODCISK" != "$(cat "$DATA/plugins/.odcisk-panelu" 2>/dev/null || true)" ]]; then
+    if /command/s6-svc -r /run/service/dashboard 2>/dev/null; then
+      echo "$ODCISK" > "$DATA/plugins/.odcisk-panelu"; echo "  ↻ dashboard (wtyczki Jarvo HQ i Wiedza)"
+    else
+      echo "  ! restart dashboardu nieudany"
+    fi
   fi
 fi
 echo "✅ Flota zainstalowana: $AGENTS"
