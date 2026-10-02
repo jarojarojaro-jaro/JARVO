@@ -73,7 +73,11 @@ def _modul(nazwa: str, plik: str):
             spec = importlib.util.spec_from_file_location(nazwa, kandydat)
             mod = importlib.util.module_from_spec(spec)
             sys.modules[nazwa] = mod
-            spec.loader.exec_module(mod)
+            try:
+                spec.loader.exec_module(mod)
+            except BaseException:
+                sys.modules.pop(nazwa, None)          # nieudany import nie zostaje w pamięci jako pusty moduł
+                raise
             return mod
     raise ImportError(f"jarvo-wiedza: brak {plik} obok wtyczki")
 
@@ -88,6 +92,15 @@ def _kompilacja():
 
 def _schemat():
     return _modul("jarvo_schemat", "schemat.py")
+
+
+def _schemat_schema() -> List[Dict[str, Any]]:
+    """Schemat narzędzia `schemat`; jego awaria (brak pliku, błąd w kodzie) nie zabiera narzędzi skarbca."""
+    try:
+        return [_schemat().SCHEMA]
+    except Exception as exc:
+        logger.warning("jarvo-wiedza: narzędzie schemat niedostępne: %s", exc)
+        return []
 
 
 def _korzen(hermes_home: str) -> Path:
@@ -348,7 +361,7 @@ class SkarbiecProvider(MemoryProvider):
 
     # ---- narzędzia
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
-        return self._narzedzia_skarbca() + ([_schemat().SCHEMA] if self._agent in SCHEMAT_DLA else [])
+        return self._narzedzia_skarbca() + (_schemat_schema() if self._agent in SCHEMAT_DLA else [])
 
     def _narzedzia_skarbca(self) -> List[Dict[str, Any]]:
         return [
@@ -385,7 +398,10 @@ class SkarbiecProvider(MemoryProvider):
 
     def handle_tool_call(self, tool_name: str, args: Dict[str, Any], **kwargs) -> str:
         if tool_name == "schemat" and self._agent in SCHEMAT_DLA:       # rysunek nie potrzebuje skarbca
-            return _schemat().obsluz(args)
+            try:
+                return _schemat().obsluz(args)
+            except Exception as exc:
+                return json.dumps({"error": f"Narzędzie schemat niedostępne: {exc}"[:300]}, ensure_ascii=False)
         sk = self._sk()
         if sk is None:
             return json.dumps({"error": "skarbiec wiedzy niedostępny (brak katalogu)"}, ensure_ascii=False)

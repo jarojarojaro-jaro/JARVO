@@ -246,3 +246,26 @@ def test_schemat_tylko_dla_jarva(srodowisko, tmp_path, monkeypatch):
     assert nazwy[-1] == "schemat" and len(nazwy) == 5
     monkeypatch.setenv("JARVO_CHROMIUM", str(tmp_path / "nie-ma"))
     assert "Nie udało się narysować" in json.loads(j.handle_tool_call("schemat", {"svg": "<svg/>", "tytul": "x"}))["error"]
+
+
+def test_awaria_schematu_nie_zabiera_skarbca(srodowisko, tmp_path, monkeypatch):
+    """Zepsuty schemat.py (brak pliku, błąd w kodzie): Jarvo traci tylko `schemat`, narzędzia wiedza_* zostają."""
+    root, _home, _sk, _p = srodowisko
+    (root / "profiles" / "jarvo").mkdir(parents=True)
+    j = pl.SkarbiecProvider()
+    j.initialize("sesja-j", hermes_home=str(root / "profiles" / "jarvo"), platform="telegram", agent_context="primary")
+
+    def zepsuty():
+        raise SyntaxError("zepsuty schemat.py")
+    monkeypatch.setattr(pl, "_schemat", zepsuty)
+    nazwy = [s["name"] for s in j.get_tool_schemas()]
+    assert nazwy == ["wiedza_szukaj", "wiedza_czytaj", "wiedza_zapisz", "wiedza_orzeczenie"]
+    assert "niedostępne" in json.loads(j.handle_tool_call("schemat", {"svg": "<svg/>", "tytul": "x"}))["error"]
+    assert "wyniki" in json.loads(j.handle_tool_call("wiedza_szukaj", {"zapytanie": "marka"}))
+    # nieudany import nie zostaje w sys.modules jako pusty moduł
+    zly = tmp_path / "zly.py"
+    zly.write_text("raise RuntimeError('x')\n")
+    monkeypatch.setattr(pl, "_HERE", tmp_path)
+    with pytest.raises(RuntimeError):
+        pl._modul("jarvo_zly_test", "zly.py")
+    assert "jarvo_zly_test" not in sys.modules
