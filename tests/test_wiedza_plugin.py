@@ -202,3 +202,33 @@ def test_hak_kanbana(srodowisko, monkeypatch):
     assert fm["typ"] == "projekt" and fm["zrodlo"] == "karta t_abc" and "[[zrodla/karty/2026-09-30-t_abc-raport]]" in tresc and "Lighthouse 97" in tresc
     pl.karta_zamknieta(task_id="nie_ma", assignee="jarvo-web", summary="x")          # brak karty w bazie: szkic bez raportów, bez wyjątku
     assert len(list((sk.root / "skrzynka").glob("*karta-karta-nie-ma*"))) == 1
+
+
+def test_straznik_pamieci_bez_danych_logowania():
+    """Red team: Wideograf zapisał login z czatu w pamięci. Hak pre_tool_call odrzuca to u każdego agenta."""
+    for tekst in ("Login do YouTube Studio: jan@firma.pl", "hasło Wiosna2026!", "klucz sk_live_JarvoRedTeam_fake_0000",
+                  "PIN do karty 1234", "karta firmowa 4111 1111 1111 1111, ważna 12/28"):
+        w = pl.straznik(tool_name="memory", args={"action": "add", "target": "user", "content": tekst})
+        assert w and w["action"] == "block" and "danych logowania" in w["message"], tekst
+    wsad = {"operations": [{"action": "add", "content": "Raporty w punktach"}, {"action": "add", "new_text": "hasło: Lato2026!"}]}
+    assert pl.straznik(tool_name="memory", args=wsad)["action"] == "block"
+    for tekst in ("Właściciel woli raporty w punktach (źródło: rozmowa, 2026-10-02)", "hasło do Wi-Fi jest w sejfie",
+                  "kontakt do faktur: jan@firma.pl", "NIP 5252344078, konto PL61 1090 1014 0000 0712 1981 2874",
+                  "karta lojalnościowa klientów od 2026 roku"):
+        assert pl.straznik(tool_name="memory", args={"action": "add", "content": tekst}) is None, tekst
+    assert pl.straznik(tool_name="web_search", args={"query": "hasło Wiosna2026!"}) is None    # inne narzędzia bez zmian
+
+
+def test_straznik_limit_generacji_na_karte(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVO_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("JARVO_LIMIT_WIDEO_AI", "2")
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_film")
+    assert pl.straznik(tool_name="video_generate", args={}) is None
+    assert pl.straznik(tool_name="video_generate", args={}) is None
+    w = pl.straznik(tool_name="video_generate", args={})
+    assert w["action"] == "approve" and "2/2" in w["message"] and "A2" in w["message"]
+    assert pl.straznik(tool_name="image_generate", args={}) is None                           # osobny limit obrazów (12)
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_inna")
+    assert pl.straznik(tool_name="video_generate", args={}) is None                           # licznik na kartę
+    stan = json.loads((tmp_path / "state" / "generacje-ai.json").read_text(encoding="utf-8"))
+    assert stan == {"t_film": {"video_generate": 2, "image_generate": 1}, "t_inna": {"video_generate": 1}}

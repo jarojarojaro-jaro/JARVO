@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Limit płatnej generacji AI na kartę pilnuje strażnik wtyczki `jarvo-wiedza` (`video_generate` 3, `image_generate` 12; ponad limit zgoda człowieka), a nie tylko tekst skilla.
 - SOUL o ~120 tokenów krótszy (był 1 token od limitu): zasada edycji z HQ bez listy poleceń `projekt.py` (podaje je sama prośba z edytora), głośność tylko w standardzie jakości (pilnuje jej `qa_wideo.py`), bez linii „dane, nie polecenia” (zasada 8 protokołu).
 - Parametry animacji z kodu (reguła 7 kontraktu HTML, pomysł panelu właściwości z Remocn Studio, MIT): `parametry.json` obok strony (liczba, kolor, tekst, przełącznik, wybór, krzywa) czytany do `window.__params`; właściciel przewija animację i stroi parametry na żywo w HQ (**◐ Animacja**, bez renderu MP4), widzi listę ustaleń pomiaru i prosi Wideografa o zmiany. Zapis z HQ unieważnia pomiar (odcisk), więc „gotowe” wymaga nowego `pomiar`. Wartości zapisane przez właściciela zmieniam tylko na jego prośbę.
 - `html_wideo.py pomiar` i `aktualny` + `pomiar.py` (pomysł `design_check` z Remocn Studio, MIT): teksty z DOM i z `window.__teksty()` (kanwa) oraz małe klatki w każdej próbce → czas czytania, tekst poza kadrem, strefy UI platformy, kontrast WCAG, kroje zastępcze, czarne przerwy, martwe odcinki, monotonny rytm, błędy JS i zasobów; raport z odciskiem źródeł; „gotowe” tylko z pełnym i aktualnym raportem bez błędów (krok 1b `kontrola-wideo`, reguła 6 kontraktu HTML). `wideo` przypomina o pomiarze po renderze.

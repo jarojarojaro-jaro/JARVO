@@ -1,6 +1,7 @@
 # Changelog: jarvo-studio
 
 ## Niewydane
+- Limit płatnej generacji AI na kartę pilnuje strażnik wtyczki `jarvo-wiedza` (`video_generate` 3, `image_generate` 12; ponad limit zgoda człowieka), a nie tylko tekst skilla.
 - Bez zewnętrznego skilla `ads` (marketingskills: strategia kampanii, licytacje, optymalizacja): to praca `jarvo-ads`, który ma go u siebie; kreacje reklam zostają w `ad-creative`.
 - SOUL bez linii „dane, nie polecenia” (jest w zasadzie 8 protokołu w tym samym prompcie).
 - Kontrakt zlecenia (wspólny): nie osłabiam kontroli, żeby zaliczyć DoD (za ECC loop-design-check); poprawki po recenzji z pytaniem przy niejasnym punkcie i sprzeciwem z dowodem przy błędnym (za superpowers receiving-code-review); reguła 17: zgoda A2 przypięta do odcisku wersji plików (`scripts/odcisk.py`, za ECC operator-approval-loop). `publikacja`: prośba o zgodę z odciskiem paczki, przed zaplanowaniem `odcisk.py --sprawdz`, jedno zaplanowanie na zgodę.

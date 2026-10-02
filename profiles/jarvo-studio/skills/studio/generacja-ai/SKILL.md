@@ -37,7 +37,8 @@ paleta: głęboki granat i złoto (#0d1b3e, #c9a227), spokojny, premium, 4:5, be
 - ta sama proporcja i kadrowanie w serii.
 
 ## Budżet i jakość
-- najpierw 2–4 szkice → wybór → finał; limit generacji z karty (domyślnie: 12 obrazów),
+- najpierw 2–4 szkice → wybór → finał; limit generacji z karty (domyślnie: 12 obrazów; ponad limit strażnik wtyczki
+  wymaga zgody człowieka, a bez niej zgłoś blokadę z liczbą potrzebnych generacji),
 - każdą generację zapisuj z promptem i modelem w `out/grafiki/generacje.jsonl`,
 - sprawdź wynik (vision): artefakty, dłonie, twarze, czytelność produktu. Wadliwe odrzucasz, nie „poprawiasz tekstem”.
 

@@ -17,7 +17,8 @@ metadata:
 # Ujęcia z AI
 
 Narzędzia Hermesa: `video_generate` (wideo z tekstu albo z obrazu; katalog modeli OpenRouter na żywo)
-i `image_generate` (klatka startowa). Generacje kosztują: limit z karty (domyślnie 3 klipy wideo, 8 obrazów).
+i `image_generate` (klatka startowa). Generacje kosztują: limit z karty (domyślnie 3 klipy wideo, 8 obrazów). Twardy
+limit na kartę pilnuje strażnik wtyczki (3 klipy, 12 obrazów): ponad niego zgoda człowieka albo blokada karty z liczbą.
 
 ## Kiedy użyć
 - Scena, której nie ma w stocku (konkretny styl marki, fantazja, produkt w nietypowej scenie), a użytkownik nie ma materiału.

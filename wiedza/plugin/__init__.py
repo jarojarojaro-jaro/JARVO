@@ -632,6 +632,86 @@ def _karta_z_bazy(db: Path, task_id: str) -> Dict[str, Any]:
         return {}
 
 
+# ------------------------------------------------------------------------------------------------ strażnik narzędzi
+# Zasady, których approvals (tylko polecenia terminala) nie widzą: pilnuje ich hak pre_tool_call u każdego agenta.
+# 1) pamięć (`memory`) nie przechowuje danych logowania, sekretów ani numerów kart (red team: Wideograf zapisał login
+#    z czatu);
+# 2) płatna generacja AI (`video_generate`, `image_generate`) ma twardy limit na kartę; ponad limit = zgoda człowieka
+#    (A2: wydatek), a bez człowieka (karta, cron) Hermes odmawia, więc agent musi zapytać przez blokadę karty.
+LIMITY_GENERACJI = {"video_generate": ("JARVO_LIMIT_WIDEO_AI", 3), "image_generate": ("JARVO_LIMIT_OBRAZY_AI", 12)}
+_LOGOWANIE_RE = re.compile(r"(?i)\b(has[łl]o|password|passwd|pin)\b(?:\s+[^\s\d!@#$%^&*]{1,12}){0,3}?\s*(?:[:=]|to\b|jest\b)?"
+                           r"\s*\S*[\d!@#$%^&*]\S*")
+_LOGIN_RE = re.compile(r"(?i)\b(login|username|nazwa użytkownika)\b[^\n]{0,40}?\S+@\S+\.\w+")
+_KARTA_RE = re.compile(r"(?i)\b(karta|karty|kartę|card|visa|mastercard)\b")
+_CYFRY_RE = re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)")
+
+
+def _numer_karty(tekst: str) -> bool:
+    """Numer karty płatniczej: słowo „karta” i 13–19 cyfr z poprawną sumą Luhna (NIP, REGON, telefon tego nie mają)."""
+    if not _KARTA_RE.search(tekst):
+        return False
+    for m in _CYFRY_RE.finditer(tekst):
+        cyfry = [int(c) for c in m.group(0) if c.isdigit()]
+        suma = sum(c if i % 2 == 0 else (c * 2 - 9 if c > 4 else c * 2) for i, c in enumerate(reversed(cyfry)))
+        if suma % 10 == 0:
+            return True
+    return False
+_generacje_lock = threading.Lock()
+
+
+def _teksty_pamieci(args: Dict[str, Any]) -> List[str]:
+    ops = args.get("operations") if isinstance(args.get("operations"), list) else [args]
+    return [str(o.get(k) or "") for o in ops if isinstance(o, dict) for k in ("content", "new_text")]
+
+
+def _limit_generacji(tool_name: str, task_id: str, session_id: str) -> Optional[Dict[str, Any]]:
+    zmienna, domyslny = LIMITY_GENERACJI[tool_name]
+    try:
+        limit = int(os.environ.get(zmienna) or domyslny)
+    except ValueError:
+        limit = domyslny
+    klucz = os.environ.get("HERMES_KANBAN_TASK") or task_id or session_id or "bez-karty"
+    _, stan = _sciezki(os.environ.get("HERMES_HOME", "/opt/data"))
+    plik = stan / "generacje-ai.json"
+    with _generacje_lock:
+        try:
+            liczniki = json.loads(plik.read_text(encoding="utf-8")) if plik.exists() else {}
+        except (OSError, ValueError):
+            liczniki = {}
+        n = int((liczniki.get(klucz) or {}).get(tool_name, 0))
+        if n >= limit:
+            return {"action": "approve", "rule_key": f"jarvo-generacje-{tool_name}",
+                    "message": f"Limit płatnej generacji na kartę wyczerpany ({tool_name}: {n}/{limit}). Kolejna to wydatek "
+                               "(A2): potrzebna zgoda człowieka. Bez niej zgłoś blokadę z liczbą generacji, której potrzebujesz."}
+        liczniki.setdefault(klucz, {})[tool_name] = n + 1
+        try:
+            stan.mkdir(parents=True, exist_ok=True)
+            tmp = plik.with_name(plik.name + ".tmp")
+            tmp.write_text(json.dumps(liczniki, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, plik)
+        except OSError as e:
+            logger.debug("jarvo-wiedza: licznik generacji: %s", e)
+    return None
+
+
+def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id: str = "", session_id: str = "",
+             **_kw: Any) -> Optional[Dict[str, Any]]:
+    """Hak pre_tool_call: {"action": "block"|"approve", "message"} albo None (narzędzie idzie dalej)."""
+    args = args if isinstance(args, dict) else {}
+    try:
+        if tool_name == "memory":
+            for tekst in _teksty_pamieci(args):
+                if (_lib().zawiera_sekret(tekst) or _LOGOWANIE_RE.search(tekst) or _LOGIN_RE.search(tekst)
+                        or _numer_karty(tekst)):
+                    return {"action": "block", "message": "Pamięć nie przechowuje danych logowania, haseł, kluczy ani numerów kart "
+                            "(zasada 16 kontraktu). Zapisz fakt bez danych dostępowych, np. „właściciel loguje się sam”."}
+        elif tool_name in LIMITY_GENERACJI:
+            return _limit_generacji(tool_name, task_id, session_id)
+    except Exception as e:                       # strażnik nie może zatrzymać zwykłej pracy własnym błędem
+        logger.debug("jarvo-wiedza: strażnik %s: %s", tool_name, e)
+    return None
+
+
 # ------------------------------------------------------------------------------------------------ rejestracja
 
 def register(ctx) -> None:
@@ -641,6 +721,10 @@ def register(ctx) -> None:
         ctx.register_hook("kanban_task_completed", karta_zamknieta)
     except Exception as e:
         logger.debug("jarvo-wiedza: hak kanbana nie zarejestrowany: %s", e)
+    try:
+        ctx.register_hook("pre_tool_call", straznik)
+    except Exception as e:
+        logger.debug("jarvo-wiedza: strażnik narzędzi nie zarejestrowany: %s", e)
     try:
         ctx.register_auxiliary_task(ZADANIE_AUX, display_name="Skarbiec wiedzy", description="wyciągi z rozmów i kompilacja skarbca (tani model)")
     except Exception as e:

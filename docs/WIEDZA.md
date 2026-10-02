@@ -173,6 +173,7 @@ ale wszystkie instancje wskazują ten sam skarbiec. Wzorzec kodu: wbudowany loka
 | `on_memory_write(action, target, content)` | lustro wpisów `memory` (MEMORY.md/USER.md) do `skrzynka/pamiec-<agent>.md`: pamięć zostaje mała (3000 znaków), skarbiec pamięta wszystko z datą i źródłem | 0 tokenów |
 | `on_delegation(task, result)` | wynik `delegate_task` jako szkic (kiedy Jarvo zlecał subagentom „przeczytaj 50 notatek i streść”) | 0 tokenów |
 | hak wtyczki `kanban_task_completed` | zamknięta karta: kopia raportu z `out/` do `zrodla/karty/`, szkic „projekt/karta” z tytułem, `summary`, plikami `WYJŚCIA`, linkami do agenta i marki | 0 tokenów |
+| hak wtyczki `pre_tool_call` (strażnik narzędzi) | `memory` bez danych logowania, haseł, kluczy i numerów kart (blokada); płatna generacja AI z limitem na kartę: `video_generate` 3, `image_generate` 12 (`JARVO_LIMIT_WIDEO_AI`, `JARVO_LIMIT_OBRAZY_AI`), ponad limit zgoda człowieka (A2), licznik w `state/generacje-ai.json`. Zasady, których approvals (tylko terminal) nie widzą | 0 tokenów |
 | `initialize(hermes_home, agent_context…)` | otwiera indeks; kontekst `subagent` = tylko odczyt; `cron` (rutyny Jarva, np. synteza tygodnia) może zgłaszać szkice i lustrzyć pamięć, ale bez wyciągów i orzeczeń | |
 
 Dlaczego dostawca pamięci, a nie sam skill ze skryptem: skill trzeba by wołać świadomie (Karpathy i komentujący jego gist

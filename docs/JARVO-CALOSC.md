@@ -292,10 +292,10 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
 1. **Skarbiec (zadanie #50):** kontener z tokenem Meta/Google, polityka w kodzie, koperty (spend cap
    zatwierdzany kodem out-of-band, model nigdy nie widzi kodu), szkice PAUSED, STOP zawsze dozwolony,
    Graph API v25. Do zrobienia, gdy będą klucze.
-2. **Reguła: agenci nie zapisują danych logowania z czatu w pamięci (`memory`).** Po red teamie Wideograf
-   zapisał login w pamięci (hasła tam nie było). Hasła i logowanie w cudze konta już blokują reguła 16
-   kontraktu i `deny.yaml` (`agent-browser … auth`, `--password`, strony logowania: w red teamie hasło z czatu
-   trafiło do `agent-browser`, a login do YouTube Studio). Brakuje jeszcze wprost zakazu zapisywania loginów w pamięci.
+2. ✅ **Agenci nie zapisują danych logowania w pamięci (`memory`).** Po red teamie Wideograf zapisał login w pamięci
+   (hasła tam nie było). Hasła i logowanie w cudze konta blokują reguła 16 kontraktu i `deny.yaml`; zapis loginu, hasła,
+   klucza albo numeru karty do `memory` odrzuca teraz strażnik narzędzi wtyczki `jarvo-wiedza` (hak `pre_tool_call`
+   u każdego agenta, [WIEDZA.md](WIEDZA.md) §4). Ten sam hak trzyma limit płatnej generacji AI na kartę.
 3. **Skarbiec wiedzy (drugi mózg floty), projekt w [WIEDZA.md](WIEDZA.md) (zbudowany 2026-09-30, etapy 1–6 z 7:
    skarbiec zasiewany przy wdrożeniu, `wiedza.py`, wtyczka `jarvo-wiedza` u każdego agenta, kompilacja `kompilacja.py`,
    zakładka „Wiedza”, synteza w przeglądzie tygodnia, red team, evals; **na VPS zostaje pierwsza kompilacja z modelem**):** jeden folder
