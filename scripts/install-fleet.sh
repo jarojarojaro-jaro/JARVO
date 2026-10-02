@@ -102,31 +102,39 @@ for a in $AGENTS; do
     || echo "  ! impeccable: nie pobrano programu (sieć?); pobierze się przy pierwszym użyciu"
 done
 
+# Podmiana wtyczki z buildu. Dashboard montuje backendy wtyczek przy starcie, więc restart (HQ_CHANGED) tylko wtedy,
+# gdy treść wtyczki się zmieniła: wdrożenie bez zmian w HQ nie rozłącza otwartego panelu.
+put_plugin() {
+  local src="$BUILD/plugins/$1" dst="$DATA/plugins/$1"
+  mkdir -p "$DATA/plugins"
+  if [[ -d "$dst" ]] && diff -rq -x __pycache__ "$src" "$dst" >/dev/null 2>&1; then
+    echo "  = $1 bez zmian"
+    return
+  fi
+  rm -rf "$dst.new" && cp -r "$src" "$dst.new"
+  rm -rf "$dst" && mv "$dst.new" "$dst"
+  HQ_CHANGED=1
+}
+
 # 3c. Jarvo HQ: plugin dashboardu (zakładka BASE, :9119/base)
 if [[ -d "$BUILD/plugins/jarvo-hq" ]]; then
   log "Jarvo HQ (plugin dashboardu)"
-  mkdir -p "$DATA/plugins"
-  rm -rf "$DATA/plugins/jarvo-hq.new" && cp -r "$BUILD/plugins/jarvo-hq" "$DATA/plugins/jarvo-hq.new"
-  rm -rf "$DATA/plugins/jarvo-hq" && mv "$DATA/plugins/jarvo-hq.new" "$DATA/plugins/jarvo-hq"
+  put_plugin jarvo-hq
   # pluginy użytkownika muszą być jawnie włączone (zabezpieczenie Hermesa)
   hermes plugins enable jarvo-hq >/dev/null 2>&1 || $PY "$REPO/scripts/enable_plugin.py" "$DATA/config.yaml" jarvo-hq
-  HQ_CHANGED=1
 fi
 
 # 3c'. skarbiec wiedzy: wtyczka jarvo-wiedza (docs/WIEDZA.md). Dostawca pamięci każdego profilu (memory.provider w config.yaml
 # profilu z buildu); Hermes szuka dostawców w <HERMES_HOME profilu>/plugins/, więc jedna kopia + dowiązanie w każdym profilu.
 if [[ -d "$BUILD/plugins/jarvo-wiedza" ]]; then
   log "Wtyczka jarvo-wiedza (skarbiec wiedzy)"
-  mkdir -p "$DATA/plugins"
-  rm -rf "$DATA/plugins/jarvo-wiedza.new" && cp -r "$BUILD/plugins/jarvo-wiedza" "$DATA/plugins/jarvo-wiedza.new"
-  rm -rf "$DATA/plugins/jarvo-wiedza" && mv "$DATA/plugins/jarvo-wiedza.new" "$DATA/plugins/jarvo-wiedza"
+  put_plugin jarvo-wiedza             # zmiana = restart dashboardu na końcu (zakładka „Wiedza”)
   for a in $AGENTS; do
     mkdir -p "$DATA/profiles/$a/plugins"
     ln -sfn "$DATA/plugins/jarvo-wiedza" "$DATA/profiles/$a/plugins/jarvo-wiedza"
   done
   # zakładka „Wiedza” w dashboardzie (dashboard/manifest.json): wtyczka włączona w config hosta jak Jarvo HQ
   hermes plugins enable jarvo-wiedza >/dev/null 2>&1 || $PY "$REPO/scripts/enable_plugin.py" "$DATA/config.yaml" jarvo-wiedza
-  HQ_CHANGED=1                      # restart dashboardu na końcu (montuje backendy wtyczek przy starcie)
 fi
 
 # 3d. branding terminala: skórka "jarvo" dla hosta i każdego profilu (display.skin w config.yaml)

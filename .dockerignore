@@ -1,0 +1,5 @@
+# Kontekst budowy obrazu jarvo-hermes (compose: context ..). Dockerfile kopiuje tylko infra/ i branding/;
+# reszta repo (z .git ~27 MB) nie leci do demona przy każdej budowie.
+*
+!infra
+!branding
