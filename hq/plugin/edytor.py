@@ -131,6 +131,68 @@ def normalize(project: dict, resolve) -> dict:
     return {"canvas": canvas, "clips": clips, "texts": texts, "audio": audio, "duration": total}
 
 
+def layout_clips(clips: list[dict]) -> list[tuple[dict, float, float]]:
+    """(klip, początek, koniec) na osi: klipy jeden po drugim, długość (out − in) / tempo."""
+    out, t = [], 0.0
+    for c in clips:
+        d = (float(c.get("out", 0)) - float(c.get("in", 0))) / float(c.get("speed") or 1)
+        out.append((c, t, t + d))
+        t += d
+    return out
+
+
+def remap_times(p0: dict, p1: dict) -> dict:
+    """Oś magnetyczna, ta sama reguła co remapTimes w hq/web/src/45-edytor.js: po zmianie klipów (usunięcie, wstawienie,
+    przycięcie, tempo, przestawienie) napisy i uwagi idą za materiałem, z którego pochodzą (czas źródła klipu), a muzyka
+    i lektor przesuwają się o wycięty albo wstawiony czas. Przy samym przestawieniu napis jedzie w całości z klipem."""
+    l0, l1 = layout_clips(p0.get("clips") or []), layout_clips(p1.get("clips") or [])
+    tot0, tot1 = (l0[-1][2] if l0 else 0.0), (l1[-1][2] if l1 else 0.0)
+    ids0 = {c.get("id") for c in p0.get("clips") or []}
+
+    def klucz(c: dict) -> str:
+        return f"{c.get('id')}|{float(c.get('in', 0))}|{float(c.get('out', 0))}|{float(c.get('speed') or 1)}"
+    reorder = (len(p0.get("clips") or []) == len(p1.get("clips") or [])
+               and sorted(map(klucz, p0.get("clips") or [])) == sorted(map(klucz, p1.get("clips") or [])))
+
+    def mapuj(t: float) -> float:
+        if t >= tot0 - 1e-9:
+            return t + tot1 - tot0
+        i = next((k for k, s in enumerate(l0) if t < s[2]), 0)
+        c0, a0, _ = l0[i]
+        u = float(c0.get("in", 0)) + (t - a0) * float(c0.get("speed") or 1)
+
+        def trafia(s) -> bool:
+            c = s[0]
+            return c.get("src") == c0.get("src") and float(c.get("in", 0)) - 1e-6 <= u <= float(c.get("out", 0)) + 1e-6
+        same = next((s for s in l1 if s[0].get("id") == c0.get("id")), None)
+        s1 = same if same and trafia(same) else next((s for s in l1 if s[0].get("id") not in ids0 and trafia(s)), None)
+        if s1:
+            return s1[1] + (u - float(s1[0].get("in", 0))) / float(s1[0].get("speed") or 1)
+        if same:                                             # wycięty fragment klipu: na jego krawędź
+            return same[1] if u < float(same[0].get("in", 0)) else same[2]
+        for s in l0[i + 1:]:                                 # klip usunięty: tam, gdzie był
+            nast = next((x for x in l1 if x[0].get("id") == s[0].get("id")), None)
+            if nast:
+                return nast[1]
+        return tot1
+
+    texts = []
+    for x in p1.get("texts") or []:
+        a, b = float(x.get("start", 0)), float(x.get("end", 0))
+        if reorder:
+            d = mapuj((a + b) / 2) - (a + b) / 2
+            a, b = a + d, b + d
+        else:
+            a, b = mapuj(a), mapuj(b)
+        if b - a >= 0.05:
+            texts.append({**x, "start": round(a, 3), "end": round(b, 3)})
+    audio = p1.get("audio") or []
+    if not reorder:
+        audio = [{**m, "start": round(mapuj(float(m.get("start", 0))), 3)} for m in audio]
+    notes = [{**n, "t": round(mapuj(float(n.get("t", 0))), 3)} for n in p1.get("notes") or []]
+    return {**p1, "texts": texts, "audio": audio, "notes": notes}
+
+
 def karaoke_words(t: dict) -> list[str] | None:
     """Słowa napisu karaoke albo None (ta sama reguła co karaokeWords w 44-napisy.js): jest kolor `hl`, lista `words`
     i tyle samo słów w tekście (poprawiona literówka zostaje karaoke, inna liczba słów już nie)."""

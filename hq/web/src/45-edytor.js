@@ -113,6 +113,38 @@ function layoutClips(clips) {
   let t = 0;
   return clips.map((c) => { const s = t; t += clipDur(c); return { c, start: s, end: t }; });
 }
+// Oś magnetyczna (jak CapCut): po każdej zmianie klipów (usunięcie, wstawienie, przycięcie, tempo, przestawienie) napisy
+// i uwagi idą za materiałem, z którego pochodzą (czas źródła klipu), a muzyka i lektor przesuwają się o wycięty albo
+// wstawiony czas. Przy samym przestawieniu napis jedzie w całości z klipem, w którym leży, a audio stoi.
+// Ta sama reguła w edytor.py remap_times (zmiany agenta przez projekt.py).
+function remapTimes(P0, P1) {
+  const L0 = layoutClips(P0.clips), L1 = layoutClips(P1.clips);
+  const tot0 = L0.length ? L0[L0.length - 1].end : 0, tot1 = L1.length ? L1[L1.length - 1].end : 0;
+  const ids0 = new Set(P0.clips.map((c) => c.id));
+  const key = (c) => `${c.id}|${c.in}|${c.out}|${c.speed || 1}`;
+  const reorder = P0.clips.length === P1.clips.length && P0.clips.map(key).sort().join() === P1.clips.map(key).sort().join();
+  const map = (t) => {
+    if (t >= tot0 - 1e-9) return t + tot1 - tot0;
+    const i = Math.max(0, L0.findIndex((s) => t < s.end));
+    const s0 = L0[i], sp0 = s0.c.speed || 1;
+    const u = s0.c.in + (t - s0.start) * sp0;
+    const hit = (s) => s.c.src === s0.c.src && u >= s.c.in - 1e-6 && u <= s.c.out + 1e-6;
+    const same = L1.find((s) => s.c.id === s0.c.id);
+    const s1 = (same && hit(same) ? same : null) || L1.find((s) => !ids0.has(s.c.id) && hit(s));
+    if (s1) return s1.start + (u - s1.c.in) / (s1.c.speed || 1);
+    if (same) return u < same.c.in ? same.start : same.end;            // wycięty fragment klipu: na jego krawędź
+    const next = L0.slice(i + 1).map((s) => L1.find((x) => x.c.id === s.c.id)).find(Boolean);
+    return next ? next.start : tot1;                                    // klip usunięty: tam, gdzie był
+  };
+  const r = (x) => +x.toFixed(3);
+  const texts = (P1.texts || []).map((x) => {
+    if (reorder) { const mid = (x.start + x.end) / 2, d = map(mid) - mid; return { ...x, start: r(x.start + d), end: r(x.end + d) }; }
+    return { ...x, start: r(map(x.start)), end: r(map(x.end)) };
+  }).filter((x) => x.end - x.start >= 0.05);
+  return { ...P1, texts,
+    audio: reorder ? P1.audio : (P1.audio || []).map((m) => ({ ...m, start: r(map(m.start)) })),
+    notes: (P1.notes || []).map((n) => ({ ...n, t: r(map(n.t)) })) };
+}
 const projTotal = (p) => p.clips.reduce((a, c) => a + clipDur(c), 0);
 
 async function textPng(t, W, H, hi = -1) {
@@ -238,6 +270,11 @@ function useHistory(initial) {
     if (!base.current) base.current = s.present;
     return { ...s, present: fn(s.present) };
   }), []);
+  // jak live, ale zawsze od stanu sprzed gestu (przeciąganie liczy całą zmianę od początku, np. przesunięcie osi)
+  const liveFrom = useCallback((fn) => setH((s) => {
+    if (!base.current) base.current = s.present;
+    return { ...s, present: fn(base.current) };
+  }), []);
   const commit = useCallback(() => setH((s) => {
     const b = base.current; base.current = null;
     if (!b || b === s.present) return s;
@@ -246,7 +283,7 @@ function useHistory(initial) {
   const undo = useCallback(() => setH((s) => (s.past.length ? { past: s.past.slice(0, -1), present: s.past[s.past.length - 1], future: [s.present, ...s.future] } : s)), []);
   const redo = useCallback(() => setH((s) => (s.future.length ? { past: [...s.past, s.present], present: s.future[0], future: s.future.slice(1) } : s)), []);
   const reset = useCallback((p) => setH({ past: [], present: p, future: [] }), []);
-  return { p: h.present, apply, live, commit, undo, redo, reset, canUndo: h.past.length > 0, canRedo: h.future.length > 0 };
+  return { p: h.present, apply, live, liveFrom, commit, undo, redo, reset, canUndo: h.past.length > 0, canRedo: h.future.length > 0 };
 }
 
 // ------------------------------------------------------------------ odtwarzacz: dwa <video> na zmianę
@@ -720,6 +757,9 @@ function VideoEditor({ path, onClose }) {
     const key = type === "clip" ? "clips" : type === "text" ? "texts" : "audio";
     return { ...P, [key]: P[key].map((x) => (x.id === id ? { ...x, ...(typeof patch === "function" ? patch(x) : patch) } : x)) };
   });
+  // zmiana długości albo kolejności klipów: napisy, uwagi i audio idą za materiałem (remapTimes)
+  const clipsChange = (fn, liveMode) => (liveMode ? H.liveFrom : H.apply)((B) => remapTimes(B, { ...B, clips: fn(B.clips) }));
+  const clipPatch = (id, patch, liveMode) => clipsChange((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c)), liveMode);
   const setCanvas = (format) => H.apply((P) => {
     const f = meta[path] || {};
     const [w, h] = format === "orig" ? [even(f.w || 1920), even(f.h || 1080)] : ED_SIZES[format];
@@ -760,8 +800,11 @@ function VideoEditor({ path, onClose }) {
       return;
     }
     if (sel.type === "clip" && p.clips.length <= 1) return;
-    const key = sel.type === "clip" ? "clips" : sel.type === "text" ? "texts" : "audio";
-    H.apply((P) => ({ ...P, [key]: P[key].filter((x) => x.id !== sel.id) }));
+    if (sel.type === "clip") clipsChange((cs) => cs.filter((x) => x.id !== sel.id));   // reszta osi dosuwa się z napisami
+    else {
+      const key = sel.type === "text" ? "texts" : "audio";
+      H.apply((P) => ({ ...P, [key]: P[key].filter((x) => x.id !== sel.id) }));
+    }
     setSel(null);
   }
   function duplicate() {
@@ -770,7 +813,9 @@ function VideoEditor({ path, onClose }) {
     const copy = { ...selItem, id: edId(sel.type[0]) };
     if (sel.type === "text") { const d = copy.end - copy.start; copy.start = Math.min(copy.end, total - d); copy.end = copy.start + d; }
     if (sel.type === "audio") copy.start = selItem.start + audioDur(selItem);
-    H.apply((P) => { const arr = P[key].slice(); arr.splice(arr.findIndex((x) => x.id === sel.id) + 1, 0, copy); return { ...P, [key]: arr }; });
+    const ins = (arr0) => { const arr = arr0.slice(); arr.splice(arr.findIndex((x) => x.id === sel.id) + 1, 0, copy); return arr; };
+    if (sel.type === "clip") clipsChange(ins);
+    else H.apply((P) => ({ ...P, [key]: ins(P[key]) }));
     setSel({ type: sel.type, id: copy.id });
   }
   function addText() {
@@ -789,10 +834,10 @@ function VideoEditor({ path, onClose }) {
       return;
     }
     const c = { id: edId("c"), src: m.path, kind: m.kind, in: 0, out: m.kind === "image" ? 3 : (m.duration || 3), speed: 1, volume: 1, muted: false, fit: "contain" };
-    H.apply((P) => {
-      const i = sel && sel.type === "clip" ? P.clips.findIndex((x) => x.id === sel.id) + 1 : P.clips.length;
-      const arr = P.clips.slice(); arr.splice(i || P.clips.length, 0, c);
-      return { ...P, clips: arr };
+    clipsChange((cs) => {
+      const i = sel && sel.type === "clip" ? cs.findIndex((x) => x.id === sel.id) + 1 : cs.length;
+      const arr = cs.slice(); arr.splice(i || cs.length, 0, c);
+      return arr;
     });
     setSel({ type: "clip", id: c.id });
   }
@@ -914,10 +959,10 @@ function VideoEditor({ path, onClose }) {
     setSel({ type: "clip", id: s.c.id });
     const c0 = { ...s.c };
     const srcDur = c0.kind === "image" ? 600 : ((meta[c0.src] || {}).duration || c0.out);
-    if (edge === "l") drag(e, (d) => upd("clip", c0.id, { in: clamp(c0.in + d * c0.speed, 0, c0.out - ED_MIN) }, true));
+    if (edge === "l") drag(e, (d) => clipPatch(c0.id, { in: clamp(c0.in + d * c0.speed, 0, c0.out - ED_MIN) }, true));
     else if (edge === "r") drag(e, (d) => {
       const end = snap(s.start + (c0.out - c0.in) / c0.speed + d, [s.end]);
-      upd("clip", c0.id, { out: clamp(c0.in + (end - s.start) * c0.speed, c0.in + ED_MIN, srcDur) }, true);
+      clipPatch(c0.id, { out: clamp(c0.in + (end - s.start) * c0.speed, c0.in + ED_MIN, srcDur) }, true);
     });
     else {
       // przestawianie: klip idzie tam, gdzie jest kursor (środek innego klipu = zamiana miejsc)
@@ -925,12 +970,14 @@ function VideoEditor({ path, onClose }) {
       setDragIdx(i);
       drag(e, (d) => {
         const at = mid + d;
-        const L2 = layoutClips(projRef.current.clips);
-        const cur = L2.findIndex((x) => x.c.id === c0.id);
-        let target = L2.findIndex((x) => at < x.start + (x.end - x.start) / 2);
-        if (target < 0) target = L2.length;
-        if (target > cur) target -= 1;
-        if (target !== cur) H.live((P) => { const arr = P.clips.slice(); const [it] = arr.splice(cur, 1); arr.splice(target, 0, it); return { ...P, clips: arr }; });
+        // od układu sprzed gestu: klip trafia między pozostałe tam, gdzie jest kursor; napisy jadą z klipami
+        clipsChange((cs) => {
+          const rest = cs.filter((x) => x.id !== c0.id);
+          let target = layoutClips(rest).findIndex((x) => at < x.start + (x.end - x.start) / 2);
+          if (target < 0) target = rest.length;
+          rest.splice(target, 0, cs.find((x) => x.id === c0.id));
+          return rest;
+        }, true);
       });
     }
   }
@@ -1214,11 +1261,11 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Przybliżenie", "Zoom")} · ${(c.zoom ?? 1).toFixed(2)}×
         <input type="range" min="1" max="3" step="0.05" value=${c.zoom ?? 1} onInput=${(e) => upd("clip", c.id, { zoom: +e.target.value }, true)} onChange=${H.commit}/></label>
     </div>`}
-    ${c.kind !== "image" && html`<label>${L("Tempo", "Speed")} · ${c.speed}×${seg(ED_SPEEDS.map((s) => [s, `${s}×`]), c.speed, (v) => upd("clip", c.id, { speed: v }))}</label>`}
+    ${c.kind !== "image" && html`<label>${L("Tempo", "Speed")} · ${c.speed}×${seg(ED_SPEEDS.map((s) => [s, `${s}×`]), c.speed, (v) => clipPatch(c.id, { speed: v }))}</label>`}
     ${c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}%
       <input type="range" min="0" max="2" step="0.05" value=${c.volume} onInput=${(e) => upd("clip", c.id, { volume: +e.target.value, muted: false }, true)} onChange=${H.commit}/></label>`}
     ${c.kind === "image" && html`<label>${L("Czas planszy", "Still duration")} · ${(c.out - c.in).toFixed(1)} s
-      <input type="range" min="0.5" max="15" step="0.5" value=${c.out - c.in} onInput=${(e) => upd("clip", c.id, { out: c.in + +e.target.value }, true)} onChange=${H.commit}/></label>`}
+      <input type="range" min="0.5" max="15" step="0.5" value=${c.out - c.in} onInput=${(e) => clipPatch(c.id, { out: c.in + +e.target.value }, true)} onChange=${H.commit}/></label>`}
     <p class="thq-ed-note">${(meta[c.src] || {}).name || c.src.split("/").pop()}${c.kind !== "image" ? ` · ${fmtT(c.in, true)} – ${fmtT(c.out, true)}` : ""}</p>
   </div>`;
 

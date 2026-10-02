@@ -96,12 +96,7 @@ def save(film: Path, proj: dict) -> Path:
 
 
 def layout(clips: list[dict]) -> list[tuple[dict, float, float]]:
-    out, t = [], 0.0
-    for c in clips:
-        d = (c["out"] - c["in"]) / (c.get("speed") or 1)
-        out.append((c, t, t + d))
-        t += d
-    return out
+    return ed.layout_clips(clips)                  # ta sama oś co edytor HQ
 
 
 def total(proj: dict) -> float:
@@ -212,8 +207,9 @@ def cmd_dodaj_klip(film: Path, a) -> int:
          "volume": 1, "muted": False, "fit": "cover" if a.wypelnij else "contain"}
     c.update(kadr_z_arg(a))
     pos = len(proj["clips"]) if a.pozycja is None else max(0, min(len(proj["clips"]), a.pozycja))
-    proj["clips"].insert(pos, c)
-    save(film, proj)
+    clips = list(proj["clips"])
+    clips.insert(pos, c)
+    save(film, ed.remap_times(proj, {**proj, "clips": clips}))   # wstawiony w środek: reszta osi odsuwa się
     print(f"Dodano klip [{c['id']}] {src.name} na pozycji {pos} ({(do - od) / c['speed']:.2f} s)")
     return 0
 
@@ -293,8 +289,10 @@ def cmd_usun(film: Path, a) -> int:
         if any(x.get("id") == a.id for x in items):
             if key == "clips" and len(items) == 1:
                 raise SystemExit("to jedyny klip: projekt musi mieć choć jeden")
-            proj[key] = [x for x in items if x.get("id") != a.id]
-            save(film, proj)
+            nowy = {**proj, key: [x for x in items if x.get("id") != a.id]}
+            if key == "clips":                     # oś magnetyczna: napisy, uwagi i audio za klipem dosuwają się
+                nowy = ed.remap_times(proj, nowy)
+            save(film, nowy)
             print(f"Usunięto {a.id}")
             return 0
     raise SystemExit(f"nie ma elementu {a.id} (sprawdź `pokaz`)")

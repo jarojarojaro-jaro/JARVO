@@ -101,6 +101,11 @@ pluginu (albo wtyczki `jarvo-wiedza`) się zmieniła: wdrożenie bez zmian w HQ 
 Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~105 KB nieskompresowany, ok. 31 KB po gzip, plus `46-uwagi.js`) w tym samym
 pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 
+- **Oś magnetyczna (jak w CapCut):** każda zmiana klipów (usunięcie, wstawienie, przycięcie krawędzi, tempo, długość
+  obrazu, przestawienie) przelicza resztę osi: napisy i uwagi idą za materiałem, z którego pochodzą (czas źródła klipu),
+  a muzyka i lektor przesuwają się o wycięty albo wstawiony czas; przy przestawieniu napis jedzie z klipem, a audio stoi.
+  Ta sama reguła działa u Wideografa (`edytor.remap_times` w `projekt.py usun` i `dodaj-klip --pozycja`), więc edycje
+  człowieka i agenta nie rozjeżdżają napisów. Testy: `tests/test_edytor_os.py` (te same przypadki w przeglądarce i w Pythonie).
 - **Podgląd** gra w przeglądarce z plików pobranych raz (blob), bez serwera w pętli. Dwa elementy `<video>` na zmianę:
   następny klip czeka przewinięty na swój początek, więc przejścia są płynne. Miniatury osi czasu robi przeglądarka
   (jedna kanwa na źródło), a muzyka na osi ma falę dźwięku (szczyty liczone raz na plik, dekodowanie w 8 kHz).
