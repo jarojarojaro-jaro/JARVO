@@ -63,7 +63,7 @@ function AnField({ p, value, saved, onChange }) {
   }
   return html`<div class=${cx("thq-an-field", changed && "is-changed")}>
     <div class="thq-an-label"><span>${p.etykieta}</span>${changed && html`<button type="button" class="thq-an-undo" onClick=${() => set(saved)}
-      title=${L(`Przywróć: ${anShow(saved)}`, `Restore: ${anShow(saved)}`)}>↺</button>`}</div>
+      title=${L(`Przywróć: ${anShow(saved)}`, `Restore: ${anShow(saved)}`)} aria-label=${L("Przywróć", "Restore")}>${ED_ICON.reset}</button>`}</div>
     ${p.opis && html`<p class="thq-ed-note">${p.opis}</p>`}${control}</div>`;
 }
 
@@ -218,11 +218,11 @@ function AnimStudio({ path, onClose }) {
   const dirName = path.split("/").slice(-2, -1)[0] || "";
   return html`<div class="thq-ed thq-an" role="dialog" aria-modal="true" aria-label=${L("Animacja", "Animation")}>
     <header class="thq-ed-top">
-      <button type="button" class="thq-ed-btn is-ghost" onClick=${() => { stop(); onClose(); }}>← ${L("Wróć", "Back")}</button>
+      <button type="button" class="thq-ed-ico" onClick=${() => { stop(); onClose(); }} aria-label=${L("Wróć", "Back")} title=${L("Wróć", "Back")}>${ED_ICON.back}</button>
       <strong class="thq-ed-title" title=${path}>${dirName ? `${dirName}/` : ""}${name}</strong>
       <span class="thq-ed-saved">${zmiany.length ? L(`${zmiany.length} niezapisane`, `${zmiany.length} unsaved`) : pola.length ? L("parametry zapisane", "parameters saved") : ""}</span>
       <span class="thq-ed-grow"></span>
-      ${pola.length > 0 && html`<button type="button" class="thq-ed-btn" disabled=${!zmiany.length} onClick=${() => { setVals(base); valsRef.current = base; seekTo(tRef.current, true); }}>↺ ${L("Cofnij zmiany", "Revert")}</button>
+      ${pola.length > 0 && html`<button type="button" class="thq-ed-btn" disabled=${!zmiany.length} onClick=${() => { setVals(base); valsRef.current = base; seekTo(tRef.current, true); }}>${ED_ICON.reset}${L("Cofnij zmiany", "Revert")}</button>
         <button type="button" class="thq-ed-btn is-main" disabled=${!zmiany.length || busySave} onClick=${save}>${busySave ? "…" : L("Zapisz parametry", "Save parameters")}</button>`}
     </header>
     ${note && html`<div class=${cx("thq-ed-banner", !note.startsWith("✗") && "is-ok")} role="status"><span>${note}</span></div>`}
@@ -237,8 +237,8 @@ function AnimStudio({ path, onClose }) {
         </div>
         ${pageErr && html`<p class="thq-ed-bad">${L("Błąd na stronie:", "Page error:")} ${pageErr}</p>`}
         <div class="thq-an-transport">
-          <button type="button" class="thq-ed-play" onClick=${toggle} disabled=${!ready} aria-label=${playing ? L("Pauza", "Pause") : L("Odtwórz", "Play")}>${playing ? "❚❚" : "▶"}</button>
-          <span class="thq-ed-time">${edClock(t)} / ${edClock(dur)}</span>
+          <button type="button" class="thq-ed-play" onClick=${toggle} disabled=${!ready} aria-label=${playing ? L("Pauza", "Pause") : L("Odtwórz", "Play")}>${playing ? ED_ICON.pause : ED_ICON.play}</button>
+          <span class="thq-ed-time">${edTC(t)}<span class="thq-ed-dur"> / ${edTC(dur)}</span></span>
           <input type="range" class="thq-an-scrub" min="0" max=${dur} step="0.01" value=${t} disabled=${!ready}
             onInput=${(e) => { stop(); seekTo(+e.target.value); }} aria-label=${L("Czas", "Time")}/>
           <label class="thq-an-dur">${L("długość", "length")} <input type="number" min="0.5" max="600" step="0.5" value=${dur}

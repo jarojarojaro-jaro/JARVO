@@ -92,6 +92,8 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     # czcionki motywu Fosfor (VT323, IBM Plex Mono; OFL): serwowane lokalnie, bez Google Fonts;
     # te same pliki trafiają na stronę logowania (branding/patch_dashboard.py)
     shutil.copytree(fl.REPO_ROOT / "branding" / "fonts", dash / "dist" / "fonts")
+    # krój edytora filmów (Inter, OFL): zapas, gdy system nie ma SF Pro / Segoe UI / Roboto
+    shutil.copytree(HQ / "web" / "fonts", dash / "dist" / "fonts", dirs_exist_ok=True)
     # wspólne klucze floty: plugin pilnuje ich na bieżąco (skrypt jest też uruchamiany przy wdrożeniu)
     shutil.copy2(fl.REPO_ROOT / "scripts" / "share_keys.py", dash / "share_keys.py")
     # pomiar animacji Wideografa: HQ pokazuje raport i sprawdza jego aktualność tym samym kodem
@@ -106,6 +108,7 @@ def build_demo(out: Path) -> Path:
     out.mkdir(parents=True)
     (out / "app.js").write_text(bundle_js(), encoding="utf-8")
     shutil.copy2(HQ / "web" / "style.css", out / "style.css")
+    shutil.copytree(HQ / "web" / "fonts", out / "fonts")
     shutil.copy2(HQ / "web" / "demo" / "mock.js", out / "mock.js")
     shutil.copy2(HQ / "web" / "demo" / "index.html", out / "index.html")
     (out / "fleet.js").write_text("window.JARVO_HQ_FLEET = " + json.dumps(fleet_json(), ensure_ascii=False, indent=1) + ";\n",

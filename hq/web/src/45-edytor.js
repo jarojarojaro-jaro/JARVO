@@ -62,7 +62,27 @@ const ED_ICON = {
   trash: svgI(html`<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>`),
   speech: svgI(html`<path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/>`),
   upload: svgI(html`<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>`),
+  back: svgI(html`<path d="m15 18-6-6 6-6"/>`),
+  camera: svgI(html`<path d="M14.5 4h-5L7.5 6.5H4.5A1.5 1.5 0 0 0 3 8v10a1.5 1.5 0 0 0 1.5 1.5h15A1.5 1.5 0 0 0 21 18V8a1.5 1.5 0 0 0-1.5-1.5h-3z"/><circle cx="12" cy="12.5" r="3.5"/>`),
+  pin: svgI(html`<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>`),
+  film: svgI(html`<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>`),
+  image: svgI(html`<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5.2-5.2L5.5 20"/>`),
+  sliders: svgI(html`<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>`),
+  alignL: svgI(html`<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>`),
+  alignC: svgI(html`<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>`),
+  alignR: svgI(html`<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>`),
+  minus: svgI(html`<path d="M5 12h14"/>`),
+  fit: svgI(html`<path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/>`),
+  reset: svgI(html`<path d="M4 4v6h6"/><path d="M4.6 15a8 8 0 1 0 1.8-8.3L4 10"/>`),
+  play: html`<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.5.86l10.2-6.4a1 1 0 0 0 0-1.72L9.5 4.74A1 1 0 0 0 8 5.6z"/></svg>`,
+  pause: html`<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.2"/></svg>`,
 };
+// czas osi jak w CapCut: 00:05.20 (minuty zawsze dwucyfrowe, setne do precyzyjnego montażu)
+function edTC(s, fine = true) {
+  s = Math.max(0, s || 0);
+  const m = Math.floor(s / 60), r = s - m * 60;
+  return `${String(m).padStart(2, "0")}:${fine ? r.toFixed(2).padStart(5, "0") : String(Math.floor(r)).padStart(2, "0")}`;
+}
 function useMedia(q) {
   const get = () => typeof window !== "undefined" && window.matchMedia && window.matchMedia(q).matches;
   const [m, setM] = useState(get);
@@ -159,6 +179,45 @@ function filmstrip(src, meta) {
     }
     v.removeAttribute("src"); v.load();
     return new Promise((ok) => c.toBlob((b) => ok({ url: b ? URL.createObjectURL(b) : null, n, w: tw, dur }), "image/jpeg", 0.72));
+  });
+  thumbQueue = job.catch(() => {});
+  return job;
+}
+// Fala dźwięku źródła audio (jak w CapCut): szczyty co 1/60 s na przezroczystej kanwie; klip na osi przesuwa ją
+// tak jak pasek miniatur. Dekodowanie od razu w 8 kHz (mało pamięci); bardzo długie pliki zostają bez fali.
+const WAVE_H = 48, WAVE_PPS = 60;
+async function decodeSmall(buf) {
+  const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  for (const rate of [8000, 44100]) {
+    try { return await new AC(1, 1, rate).decodeAudioData(buf.slice(0)); } catch (_) { /* inna częstotliwość */ }
+  }
+  return null;
+}
+function waveform(src, meta) {
+  const job = thumbQueue.then(async () => {
+    if (!meta || !(meta.duration > 0) || meta.duration > 1800 || !(window.OfflineAudioContext || window.webkitOfflineAudioContext)) return null;
+    const buf = await (await fetch(await mediaUrl(src))).arrayBuffer();
+    if (buf.byteLength > 150e6) return null;
+    const a = await decodeSmall(buf);
+    if (!a) return null;
+    const n = clamp(Math.ceil(a.duration * WAVE_PPS), 1, 12000), per = Math.max(1, Math.floor(a.length / n));
+    const chans = Array.from({ length: Math.min(2, a.numberOfChannels) }, (_, i) => a.getChannelData(i));
+    const peaks = new Float32Array(n);
+    let top = 1e-4;
+    for (let i = 0; i < n; i++) {
+      let m = 0;
+      for (const ch of chans) for (let j = i * per, e = Math.min(ch.length, j + per); j < e; j++) { const v = Math.abs(ch[j]); if (v > m) m = v; }
+      peaks[i] = m; if (m > top) top = m;
+    }
+    const c = document.createElement("canvas");
+    c.width = n; c.height = WAVE_H;
+    const g = c.getContext("2d");
+    g.fillStyle = "rgba(255,255,255,0.62)";
+    for (let i = 0; i < n; i++) {
+      const h = Math.max(1, Math.sqrt(peaks[i] / top) * (WAVE_H - 4));
+      g.fillRect(i, (WAVE_H - h) / 2, 1, h);
+    }
+    return new Promise((ok) => c.toBlob((b) => ok({ url: b ? URL.createObjectURL(b) : null, dur: a.duration }), "image/png"));
   });
   thumbQueue = job.catch(() => {});
   return job;
@@ -371,6 +430,7 @@ function VideoEditor({ path, onClose }) {
   const [err, setErr] = useState(null);
   const [meta, setMeta] = useState({});
   const [strips, setStrips] = useState({});
+  const [waves, setWaves] = useState({});        // fala dźwięku każdego pliku audio na osi
   const H = useHistory(null);
   const p = H.p;
   const [sel, setSel] = useState(null);        // {type:"clip"|"text"|"audio", id}
@@ -496,6 +556,14 @@ function VideoEditor({ path, onClose }) {
       filmstrip(c.src, meta[c.src]).then((r) => setStrips((s) => ({ ...s, [c.src]: r }))).catch(() => {});
     }
   }, [p && p.clips, meta]);
+  useEffect(() => {
+    if (!p) return;
+    for (const m of p.audio) {
+      if (waves[m.src] !== undefined || !meta[m.src]) continue;
+      setWaves((w) => ({ ...w, [m.src]: null }));
+      waveform(m.src, meta[m.src]).then((r) => setWaves((w) => ({ ...w, [m.src]: r }))).catch(() => {});
+    }
+  }, [p && p.audio, meta]);
 
   const onTick = useCallback((time, commitState) => {
     tRef.current = time;
@@ -506,7 +574,7 @@ function VideoEditor({ path, onClose }) {
       const x = time * ppsRef.current;
       if (Math.abs(tl.scrollLeft - x) > 1) { autoScroll.current = x; tl.scrollLeft = x; autoScroll.current = tl.scrollLeft; }
     }
-    if (timeRef.current) timeRef.current.textContent = fmtT(time, true);
+    if (timeRef.current) timeRef.current.textContent = edTC(time);
     drawOverlay();
     if (commitState) setT(time);
   }, []);
@@ -1123,8 +1191,8 @@ function VideoEditor({ path, onClose }) {
     style=${{ background: c }} onClick=${() => set(c)} aria-label=${c}></button>`)}<label class="thq-ed-sw-more" title=${L("Inny kolor", "Other color")}>+<input type="color" value=${cur || "#ffffff"} onInput=${(e) => set(e.target.value, true)} onChange=${H.commit}/></label></div>`;
   const act = (icon, label, fn, opts = {}) => html`<button type="button" class=${cx("thq-ed-act", opts.bad && "is-bad", opts.on && "is-on")} disabled=${opts.disabled} onClick=${fn}>${ED_ICON[icon]}<span>${label}</span></button>`;
   const mediaList = (kinds) => html`<ul class="thq-ed-list">${media.filter((m) => kinds.includes(m.kind)).map((m) => html`<li key=${m.path}><button type="button" onClick=${() => { addMedia(m); if (mobile) setTool(m.kind === "audio" ? "audio" : "edit"); }} title=${L("Dodaj do osi czasu", "Add to the timeline")}>
-    <span class=${cx("thq-ed-mk", `is-${m.kind}`)}>${m.kind === "audio" ? "♪" : m.kind === "image" ? "▣" : "▶"}</span>
-    <span class="thq-ed-mn">${m.name}</span><span class="thq-ed-md">${m.duration ? fmtT(m.duration) : ""}</span><span class="thq-ed-plus">+</span></button></li>`)}</ul>`;
+    <span class=${cx("thq-ed-mk", `is-${m.kind}`)}>${m.kind === "audio" ? ED_ICON.audio : m.kind === "image" ? ED_ICON.image : ED_ICON.film}</span>
+    <span class="thq-ed-mn">${m.name}</span><span class="thq-ed-md">${m.duration ? edTC(m.duration, false) : ""}</span><span class="thq-ed-plus">${ED_ICON.plus}</span></button></li>`)}</ul>`;
   const uploadBtn = (accept) => html`<label class="thq-ed-btn is-wide thq-ed-upload">${ED_ICON.upload} ${L("Dodaj z urządzenia", "Add from device")}
     <input type="file" multiple accept=${accept} onChange=${(e) => { uploadMedia(Array.from(e.target.files || [])); e.target.value = ""; }}/></label>`;
 
@@ -1162,7 +1230,7 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Rozmiar", "Size")} · ${Math.round(x.size)}<input type="range" min="16" max="220" value=${x.size} onInput=${(e) => u({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
       <label>${L("Krój", "Font")}${seg(ED_FONTS.map(([f, n]) => [f, n]), x.font, (v) => u({ font: v }))}</label>
       <div class="thq-ed-row">
-        ${seg([["left", "⯇"], ["center", "≡"], ["right", "⯈"]], x.align, (v) => u({ align: v }))}
+        ${seg([["left", ED_ICON.alignL], ["center", ED_ICON.alignC], ["right", ED_ICON.alignR]], x.align, (v) => u({ align: v }))}
         <label class="thq-ed-check"><input type="checkbox" checked=${x.bold !== false} onChange=${(e) => u({ bold: e.target.checked })}/> ${L("Gruby", "Bold")}</label>
       </div>
       ${!mobile && html`<label>${L("Szerokość", "Width")} · ${Math.round((x.maxw || 0.86) * 100)}%<input type="range" min="0.2" max="1" step="0.01" value=${x.maxw || 0.86} onInput=${(e) => u({ maxw: +e.target.value }, true)} onChange=${H.commit}/></label>`}
@@ -1172,7 +1240,7 @@ function VideoEditor({ path, onClose }) {
   };
 
   const audioTools = (m) => html`<div class="thq-ed-form">
-    <p class="thq-ed-sub">♪ ${(meta[m.src] || {}).name || m.src.split("/").pop()}</p>
+    <p class="thq-ed-sub thq-ed-subi">${ED_ICON.audio}<span>${(meta[m.src] || {}).name || m.src.split("/").pop()}</span></p>
     <label>${L("Głośność", "Volume")} · ${Math.round(m.volume * 100)}%<input type="range" min="0" max="2" step="0.05" value=${m.volume} onInput=${(e) => upd("audio", m.id, { volume: +e.target.value }, true)} onChange=${H.commit}/></label>
     <p class="thq-ed-note">${L("Od", "From")} ${fmtT(m.start, true)} · ${L("długość", "length")} ${fmtT(audioDur(m), true)}</p>
     <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>
@@ -1192,7 +1260,7 @@ function VideoEditor({ path, onClose }) {
         <p class="thq-ed-note">${L("Rozpoznawanie działa na serwerze (Parakeet, bez internetu). Pierwszy raz trwa dłużej: pobiera się model.", "Recognition runs on the server (Parakeet, offline). The first run downloads the model.")}</p>`
       : html`<p class="thq-ed-note">${L("Rozpoznawanie mowy jest niedostępne w tej instalacji. Możesz wczytać gotowy plik .srt.", "Speech recognition is not available here. You can load a .srt file.")}</p>`}
     ${(info.subs || []).length > 0 && html`<p class="thq-ed-note">${L("Z pliku napisów:", "From a subtitle file:")}</p>
-      <ul class="thq-ed-list">${info.subs.map((f) => html`<li key=${f}><button type="button" onClick=${() => srtCaptions(f)}><span class="thq-ed-mk is-text">CC</span><span class="thq-ed-mn">${f.split("/").pop()}</span><span class="thq-ed-plus">+</span></button></li>`)}</ul>`}
+      <ul class="thq-ed-list">${info.subs.map((f) => html`<li key=${f}><button type="button" onClick=${() => srtCaptions(f)}><span class="thq-ed-mk is-text">${ED_ICON.captions}</span><span class="thq-ed-mn">${f.split("/").pop()}</span><span class="thq-ed-plus">+</span></button></li>`)}</ul>`}
     ${capJob && capJob.state === "error" && html`<p class="thq-ed-bad">${capJob.error}</p>`}
     ${speechJob && speechJob.state === "error" && html`<p class="thq-ed-bad">${speechJob.error}</p>`}
     ${capJob && capJob.state === "done" && html`<p class="thq-ed-ok">✓ ${L(`Dodano ${capJob.n} ${plNapisy(capJob.n)}`, `Added ${capJob.n} captions`)}</p>`}
@@ -1280,11 +1348,12 @@ function VideoEditor({ path, onClose }) {
       onClick=${(e) => { e.stopPropagation(); player.seek(n.t); setNoteHi(n.id); if (!ask) setAsk({ text: "", reply: "", busy: false }); }}>${n.done ? "✓" : ""}</button>`)}
   </div>`;
   const textTrack = html`<div class="thq-ed-track is-text" style=${{ height: `${(p.texts.length ? nLanes : 1) * 26 + 6}px` }} onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
+    ${mobile && html`<button type="button" class="thq-ed-lane" onPointerDown=${(e) => e.stopPropagation()} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text"); }} aria-label=${L("Dodaj tekst", "Add text")}>${ED_ICON.text}</button>`}
     ${p.texts.map((x) => html`<div key=${x.id} class=${cx("thq-ed-item is-text", x.cap && "is-cap", sel && sel.id === x.id && "is-sel")}
       style=${{ left: `${x.start * pps}px`, width: `${Math.max(6, (x.end - x.start) * pps)}px`, top: `${3 + textLane[x.id] * 26}px` }}
       onPointerDown=${(e) => textDown(e, x)} onClick=${(e) => pick(e, "text", x.id)}>
-      <i class="thq-ed-h is-l" onPointerDown=${(e) => textDown(e, x, "l")}></i><span>${x.cap ? "CC" : "T"} ${x.text}</span><i class="thq-ed-h is-r" onPointerDown=${(e) => textDown(e, x, "r")}></i></div>`)}
-    ${mobile && !p.texts.length && html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text"); }}>+ ${L("Dodaj tekst", "Add text")}</button>`}
+      <i class="thq-ed-h is-l" onPointerDown=${(e) => textDown(e, x, "l")}></i><span>${x.text}</span><i class="thq-ed-h is-r" onPointerDown=${(e) => textDown(e, x, "r")}></i></div>`)}
+    ${mobile && !p.texts.length && html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text"); }}>${ED_ICON.plus}${L("Dodaj tekst", "Add text")}</button>`}
   </div>`;
   const videoTrack = html`<div class="thq-ed-track is-video" onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
     ${segs.map((s, i) => {
@@ -1298,19 +1367,24 @@ function VideoEditor({ path, onClose }) {
       return html`<div key=${s.c.id} class=${cx("thq-ed-item is-clip", sel && sel.id === s.c.id && "is-sel", dragIdx === i && "is-drag")}
         style=${{ left: `${s.start * pps}px`, width: `${Math.max(4, wpx)}px`, ...bg }} onPointerDown=${(e) => clipDown(e, s, i)} onClick=${(e) => pick(e, "clip", s.c.id)}>
         <i class="thq-ed-h is-l" onPointerDown=${(e) => clipDown(e, s, i, "l")}></i>
-        <span class="thq-ed-cl">${s.c.speed !== 1 ? `${s.c.speed}× · ` : ""}${s.c.muted ? "🔇 " : ""}${fmtT(s.end - s.start, true)}</span>
+        <span class="thq-ed-cl">${s.c.muted && ED_ICON.mute}${s.c.speed !== 1 ? `${s.c.speed}× · ` : ""}${fmtT(s.end - s.start, true)}</span>
         <i class="thq-ed-h is-r" onPointerDown=${(e) => clipDown(e, s, i, "r")}></i></div>`;
     })}
     ${mobile && html`<button type="button" class="thq-ed-addclip" style=${{ left: `${total * pps + 8}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("media"); }}
       aria-label=${L("Dodaj klip", "Add clip")}>${ED_ICON.plus}</button>`}
   </div>`;
   const audioTrack = html`<div class="thq-ed-track is-audio" onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
-    ${p.audio.map((m) => html`<div key=${m.id} class=${cx("thq-ed-item is-audio", sel && sel.id === m.id && "is-sel")}
-      style=${{ left: `${m.start * pps}px`, width: `${Math.max(6, audioDur(m) * pps)}px` }} onPointerDown=${(e) => audioDown(e, m)} onClick=${(e) => pick(e, "audio", m.id)}>
-      <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>♪ ${(meta[m.src] || {}).name || ""} · ${Math.round(m.volume * 100)}%</span>
-      <i class="thq-ed-h is-r" onPointerDown=${(e) => audioDown(e, m, "r")}></i></div>`)}
+    ${mobile && html`<button type="button" class="thq-ed-lane" onPointerDown=${(e) => e.stopPropagation()} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("audio"); }} aria-label=${L("Audio", "Audio")}>${ED_ICON.audio}</button>`}
+    ${p.audio.map((m) => {
+      const w = waves[m.src];
+      const wave = w && w.url ? { backgroundImage: `url(${w.url})`, backgroundSize: `${w.dur * pps}px 100%`, backgroundPosition: `${-m.in * pps}px 0`, backgroundRepeat: "no-repeat" } : {};
+      return html`<div key=${m.id} class=${cx("thq-ed-item is-audio", sel && sel.id === m.id && "is-sel")}
+      style=${{ left: `${m.start * pps}px`, width: `${Math.max(6, audioDur(m) * pps)}px`, ...wave }} onPointerDown=${(e) => audioDown(e, m)} onClick=${(e) => pick(e, "audio", m.id)}>
+      <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>${(meta[m.src] || {}).name || ""}${Math.abs(m.volume - 1) > 0.01 ? ` · ${Math.round(m.volume * 100)}%` : ""}</span>
+      <i class="thq-ed-h is-r" onPointerDown=${(e) => audioDown(e, m, "r")}></i></div>`;
+    })}
     ${!p.audio.length && (mobile
-      ? html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("audio"); }}>+ ${L("Dodaj audio", "Add audio")}</button>`
+      ? html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("audio"); }}>${ED_ICON.plus}${L("Dodaj audio", "Add audio")}</button>`
       : html`<span class="thq-ed-hint">${L("Muzyka: dodaj plik audio z panelu Media", "Music: add an audio file from the Media panel")}</span>`)}
   </div>`;
   const speechTrack = hasSpeech && html`<div class="thq-ed-track is-speech" onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
@@ -1324,7 +1398,8 @@ function VideoEditor({ path, onClose }) {
       onWheel=${(e) => { if (e.ctrlKey) { e.preventDefault(); setPps((x) => clamp(x * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 4, 400)); } }}>
       <div class="thq-ed-tl-in" style=${{ width: `${width}px`, padding: `0 ${pad}px 10px` }}>
         <div class="thq-ed-ruler" onPointerDown=${rulerDown}>
-          ${ticks.map((s) => html`<span key=${s} style=${{ left: `${s * pps}px` }}>${step < 1 ? `${fmtT(s)}${(s % 1 ? ".5" : "")}` : fmtT(s)}</span>`)}
+          ${ticks.map((s) => html`<span key=${s} style=${{ left: `${s * pps}px` }}>${step < 1 ? `${edTC(s, false)}${(s % 1 ? ".5" : "")}` : edTC(s, false)}</span>`)}
+          ${ticks.map((s) => html`<b key=${`d${s}`} style=${{ left: `${(s + step / 2) * pps}px` }}></b>`)}
         </div>
         ${mobile ? [noteTrack, videoTrack, speechTrack, audioTrack, textTrack] : [noteTrack, textTrack, videoTrack, speechTrack, audioTrack]}
         ${!mobile && html`<div class="thq-ed-head" ref=${headRef} style=${{ left: `${pad}px`, transform: `translateX(${t * pps}px)` }}><i></i></div>`}
@@ -1333,20 +1408,20 @@ function VideoEditor({ path, onClose }) {
     ${mobile && html`<div class="thq-ed-center"><i></i></div>`}
   </div>`;
   const banner = shot ? html`<div class="thq-ed-banner is-shot" role="status">
-      <span>${shot.busy ? L("Zapisuję kadr…", "Saving the frame…") : L("📷 Przeciągnij prostokąt na podglądzie albo kliknij, żeby wziąć cały kadr.", "📷 Drag a box on the preview, or click to take the whole frame.")}</span>
+      <span>${shot.busy ? L("Zapisuję kadr…", "Saving the frame…") : L("Przeciągnij prostokąt na podglądzie albo kliknij, żeby wziąć cały kadr.", "Drag a box on the preview, or click to take the whole frame.")}</span>
       <button type="button" class="thq-ed-btn" onClick=${() => setShot(null)}>${L("Anuluj", "Cancel")}</button></div>`
     : conflict ? html`<div class="thq-ed-banner" role="alert">
       <span>${conflict.kto === "jarvo-wideo" ? L("Wideograf zmienił ten projekt, a Ty masz niezapisane zmiany.", "The video agent changed this project while you have unsaved changes.")
         : L("Projekt zmienił się poza edytorem.", "The project changed outside the editor.")}</span>
       <button type="button" class="thq-ed-btn is-main" onClick=${() => reloadProject(conflict.kto)}>${L("Wczytaj jego wersję", "Load theirs")}</button>
       <button type="button" class="thq-ed-btn" onClick=${keepMine}>${L("Zostaw moją", "Keep mine")}</button></div>`
-    : toast ? html`<div class="thq-ed-banner is-ok" role="status"><span>✓ ${toast}</span></div>` : null;
+    : toast ? html`<div class="thq-ed-banner is-ok" role="status">${ED_ICON.check}<span>${toast}</span></div>` : null;
   const askBox = ask && !shot && html`<${AskAgent} ask=${ask} setAsk=${setAsk} path=${path} saveNow=${saveNow} time=${tRef.current} sel=${sel && selItem ? { ...sel, item: selItem } : null}
     onOpen=${(f) => { onClose(); openFile && openFile(f); }} notes=${notes} addNote=${addNote} removeNote=${removeNote} noteHi=${noteHi}
     onSeek=${(x) => player.seek(x)} startShot=${startShot} urls=${shotUrls}/>`;
   const exportBox = job && html`<${ExportBox} job=${job} onClose=${() => setJob(null)} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
   const exportBtn = html`<button type="button" class="thq-ed-btn is-main" disabled=${running || !info.ffmpeg} onClick=${doExport}
-    title=${info.ffmpeg ? L("Zapisz nową wersję filmu (oryginał zostaje)", "Save a new version (the original stays)") : L("Brak ffmpeg w kontenerze", "ffmpeg is missing in the container")}>${mobile ? L("Eksport", "Export") : `⤓ ${L("Eksportuj", "Export")}`}</button>`;
+    title=${info.ffmpeg ? L("Zapisz nową wersję filmu (oryginał zostaje)", "Save a new version (the original stays)") : L("Brak ffmpeg w kontenerze", "ffmpeg is missing in the container")}>${L("Eksportuj", "Export")}</button>`;
 
   // ---- telefon: układ jak w CapCut
   if (mobile) {
@@ -1375,14 +1450,14 @@ function VideoEditor({ path, onClose }) {
         <button type="button" class="thq-ed-ico" onClick=${() => { player.stop(); onClose(); }} aria-label=${L("Zamknij edytor", "Close the editor")}>${ED_ICON.close}</button>
         <span class="thq-ed-saved">${saved}</span>
         <span class="thq-ed-grow"></span>
-        <button type="button" class="thq-ed-ico" onClick=${() => setAsk(ask ? null : { text: "", reply: "", busy: false })} aria-label=${L("Poproś agenta", "Ask the agent")}>${ED_ICON.spark}</button>
+        <button type="button" class=${cx("thq-ed-pill", ask && "is-on")} onClick=${() => setAsk(ask ? null : { text: "", reply: "", busy: false })} aria-label=${L("Poproś agenta", "Ask the agent")}>${ED_ICON.spark}<span>${L("Agent", "Agent")}</span></button>
         ${exportBtn}
       </header>
       ${askBox}${banner}
       <section class="thq-ed-stage-wrap">${stage}</section>
       <div class="thq-ed-transport">
-        <span class="thq-ed-time"><span ref=${timeRef}>${fmtT(t, true)}</span> / ${fmtT(total, true)}</span>
-        <button type="button" class="thq-ed-play" onClick=${player.toggle} aria-label=${player.playing ? L("Pauza", "Pause") : L("Odtwórz", "Play")}>${player.playing ? "❚❚" : "▶"}</button>
+        <span class="thq-ed-time"><span ref=${timeRef}>${edTC(t)}</span><span class="thq-ed-dur"> / ${edTC(total)}</span></span>
+        <button type="button" class="thq-ed-play" onClick=${player.toggle} aria-label=${player.playing ? L("Pauza", "Pause") : L("Odtwórz", "Play")}>${player.playing ? ED_ICON.pause : ED_ICON.play}</button>
         <span class="thq-ed-undo">
           <button type="button" class="thq-ed-ico" disabled=${!H.canUndo} onClick=${H.undo} aria-label=${L("Cofnij", "Undo")}>${ED_ICON.undo}</button>
           <button type="button" class="thq-ed-ico" disabled=${!H.canRedo} onClick=${H.redo} aria-label=${L("Ponów", "Redo")}>${ED_ICON.redo}</button>
@@ -1414,26 +1489,27 @@ function VideoEditor({ path, onClose }) {
   };
   return html`<div class="thq-ed" role="dialog" aria-modal="true" aria-label=${L("Edytor filmu", "Video editor")}>
     <header class="thq-ed-top">
-      <button type="button" class="thq-ed-btn is-ghost" onClick=${() => { player.stop(); onClose(); }} title=${L("Zamknij edytor (projekt jest zapisany)", "Close the editor (the project is saved)")}>← ${L("Wróć", "Back")}</button>
+      <button type="button" class="thq-ed-ico" onClick=${() => { player.stop(); onClose(); }} title=${L("Zamknij edytor (projekt jest zapisany)", "Close the editor (the project is saved)")} aria-label=${L("Wróć", "Back")}>${ED_ICON.back}</button>
       <strong class="thq-ed-title" title=${path}>${path.split("/").pop()}</strong>
       <span class="thq-ed-saved">${saved}</span>
       <span class="thq-ed-grow"></span>
-      <button type="button" class="thq-ed-btn is-ghost" disabled=${!H.canUndo} onClick=${H.undo} title="Ctrl+Z">↶</button>
-      <button type="button" class="thq-ed-btn is-ghost" disabled=${!H.canRedo} onClick=${H.redo} title="Ctrl+Shift+Z">↷</button>
-      <button type="button" class="thq-ed-btn" onClick=${() => setAsk(ask ? null : { text: "", reply: "", busy: false })}>✦ ${L("Poproś agenta", "Ask the agent")}</button>
+      <button type="button" class="thq-ed-ico" disabled=${!H.canUndo} onClick=${H.undo} title=${`${L("Cofnij", "Undo")} (Ctrl+Z)`} aria-label=${L("Cofnij", "Undo")}>${ED_ICON.undo}</button>
+      <button type="button" class="thq-ed-ico" disabled=${!H.canRedo} onClick=${H.redo} title=${`${L("Ponów", "Redo")} (Ctrl+Shift+Z)`} aria-label=${L("Ponów", "Redo")}>${ED_ICON.redo}</button>
+      <span class="thq-ed-sep"></span>
+      <button type="button" class=${cx("thq-ed-pill", ask && "is-on")} onClick=${() => setAsk(ask ? null : { text: "", reply: "", busy: false })}>${ED_ICON.spark}<span>${L("Poproś agenta", "Ask the agent")}</span></button>
       ${exportBtn}
     </header>
     ${askBox}${banner}
     <div class="thq-ed-body">
       <aside class="thq-ed-side">
         <div class="thq-ed-tabs">
-          <button type="button" class=${cx(side === "media" && "is-on")} onClick=${() => setSide("media")}>${L("Media", "Media")}</button>
-          <button type="button" class=${cx(side === "captions" && "is-on")} onClick=${() => setSide("captions")}>${L("Napisy", "Captions")}</button>
-          <button type="button" class=${cx(side === "speech" && "is-on")} onClick=${() => setSide("speech")}>${L("Mowa", "Speech")}</button>
-          <button type="button" class=${cx(side === "inspect" && "is-on")} onClick=${() => setSide("inspect")}>${L("Ustawienia", "Settings")}</button>
+          <button type="button" class=${cx(side === "media" && "is-on")} onClick=${() => setSide("media")}>${ED_ICON.film}<span>${L("Media", "Media")}</span></button>
+          <button type="button" class=${cx(side === "captions" && "is-on")} onClick=${() => setSide("captions")}>${ED_ICON.captions}<span>${L("Napisy", "Captions")}</span></button>
+          <button type="button" class=${cx(side === "speech" && "is-on")} onClick=${() => setSide("speech")}>${ED_ICON.speech}<span>${L("Mowa", "Speech")}</span></button>
+          <button type="button" class=${cx(side === "inspect" && "is-on")} onClick=${() => setSide("inspect")}>${ED_ICON.sliders}<span>${L("Ustawienia", "Settings")}</span></button>
         </div>
         ${side === "media" ? html`<div class="thq-ed-media">
-          <button type="button" class="thq-ed-btn is-wide" onClick=${addText}>T ${L("Dodaj napis", "Add text")}</button>
+          <button type="button" class="thq-ed-btn is-wide" onClick=${addText}>${ED_ICON.text} ${L("Dodaj napis", "Add text")}</button>
           ${uploadBtn("video/*,audio/*,image/png,image/jpeg,image/webp")}
           <p class="thq-ed-note">${L("Z katalogu filmu", "From the film's folder")}</p>
           ${mediaList(["video", "image", "audio"])}
@@ -1444,20 +1520,20 @@ function VideoEditor({ path, onClose }) {
       <section class="thq-ed-stage-wrap">
         ${stage}
         <div class="thq-ed-transport">
-          <button type="button" class="thq-ed-play" onClick=${player.toggle} aria-label=${player.playing ? L("Pauza", "Pause") : L("Odtwórz", "Play")}>${player.playing ? "❚❚" : "▶"}</button>
-          <span class="thq-ed-time"><span ref=${timeRef}>${fmtT(t, true)}</span> / ${fmtT(total, true)}</span>
+          <button type="button" class="thq-ed-play" onClick=${player.toggle} aria-label=${player.playing ? L("Pauza", "Pause") : L("Odtwórz", "Play")}>${player.playing ? ED_ICON.pause : ED_ICON.play}</button>
+          <span class="thq-ed-time"><span ref=${timeRef}>${edTC(t)}</span><span class="thq-ed-dur"> / ${edTC(total)}</span></span>
         </div>
       </section>
     </div>
     <div class="thq-ed-tools">
-      <button type="button" class="thq-ed-btn is-ghost" onClick=${split} title="S">✂ ${L("Tnij", "Split")}</button>
-      <button type="button" class="thq-ed-btn is-ghost" onClick=${addText} title="T">T ${L("Napis", "Text")}</button>
-      <button type="button" class="thq-ed-btn is-ghost" disabled=${!sel} onClick=${duplicate} title="Ctrl+D">⧉</button>
-      <button type="button" class="thq-ed-btn is-ghost" disabled=${!sel || (sel.type === "clip" && p.clips.length <= 1)} onClick=${remove} title="Delete">🗑</button>
+      <button type="button" class="thq-ed-tool" onClick=${split} title=${`${L("Tnij", "Split")} (S)`}>${ED_ICON.split}<span>${L("Tnij", "Split")}</span></button>
+      <button type="button" class="thq-ed-tool" onClick=${addText} title=${`${L("Napis", "Text")} (T)`}>${ED_ICON.text}<span>${L("Napis", "Text")}</span></button>
+      <button type="button" class="thq-ed-tool" disabled=${!sel} onClick=${duplicate} title=${`${L("Duplikuj", "Duplicate")} (Ctrl+D)`}>${ED_ICON.copy}<span>${L("Duplikuj", "Duplicate")}</span></button>
+      <button type="button" class="thq-ed-tool" disabled=${!sel || (sel.type === "clip" && p.clips.length <= 1)} onClick=${remove} title=${`${L("Usuń", "Delete")} (Del)`}>${ED_ICON.trash}<span>${L("Usuń", "Delete")}</span></button>
       <span class="thq-ed-grow"></span>
-      <button type="button" class="thq-ed-btn is-ghost" onClick=${() => setPps((x) => clamp(x / 1.4, 4, 400))} aria-label=${L("Oddal", "Zoom out")}>−</button>
-      <button type="button" class="thq-ed-btn is-ghost" onClick=${fitZoom}>${L("Całość", "Fit")}</button>
-      <button type="button" class="thq-ed-btn is-ghost" onClick=${() => setPps((x) => clamp(x * 1.4, 4, 400))} aria-label=${L("Przybliż", "Zoom in")}>+</button>
+      <button type="button" class="thq-ed-ico is-sm" onClick=${() => setPps((x) => clamp(x / 1.4, 4, 400))} aria-label=${L("Oddal", "Zoom out")} title=${L("Oddal", "Zoom out")}>${ED_ICON.minus}</button>
+      <button type="button" class="thq-ed-ico is-sm" onClick=${fitZoom} aria-label=${L("Cała oś", "Fit")} title=${L("Cała oś", "Fit")}>${ED_ICON.fit}</button>
+      <button type="button" class="thq-ed-ico is-sm" onClick=${() => setPps((x) => clamp(x * 1.4, 4, 400))} aria-label=${L("Przybliż", "Zoom in")} title=${L("Przybliż", "Zoom in")}>${ED_ICON.plus}</button>
     </div>
     ${timeline}
     ${exportBox}
@@ -1480,7 +1556,7 @@ function ExportBox({ job, onClose, onOpen }) {
     ${!done && !bad && html`<p><strong>${job.state === "prep" ? L("Przygotowuję napisy…", "Preparing texts…") : L(`Eksport ${pct}%`, `Exporting ${pct}%`)}</strong></p>
       <div class="thq-ed-bar"><i style=${{ width: `${pct}%` }}></i></div>
       ${job.id && html`<button type="button" class="thq-ed-btn" onClick=${() => api.editCancel(job.id).catch(() => {})}>${L("Przerwij", "Cancel")}</button>`}`}
-    ${done && html`<p><strong>✓ ${L("Gotowe", "Done")}:</strong> ${file.name} · ${bytes(job.size)}</p>
+    ${done && html`<p class="thq-ed-subi">${ED_ICON.check}<span><strong>${L("Gotowe", "Done")}</strong> · ${file.name} · ${bytes(job.size)}</span></p>
       <div class="thq-ed-row"><button type="button" class="thq-ed-btn is-main" onClick=${() => onOpen(file)}>${L("Obejrzyj", "Watch")}</button>
         <button type="button" class="thq-ed-btn" onClick=${() => downloadFile(file)}>${L("Pobierz", "Download")}</button>
         <button type="button" class="thq-ed-btn is-ghost" onClick=${onClose}>${L("Edytuj dalej", "Keep editing")}</button></div>`}
@@ -1494,7 +1570,7 @@ function ExportBox({ job, onClose, onOpen }) {
 function NoteThumb({ path, url }) {
   const disk = useBlobUrl(url ? null : path);
   const src = url || disk;
-  return src ? html`<img src=${src} alt=${L("Kadr uwagi", "Note frame")}/>` : html`<span class="thq-ed-note-pic" title=${path}>📷</span>`;
+  return src ? html`<img src=${src} alt=${L("Kadr uwagi", "Note frame")}/>` : html`<span class="thq-ed-note-pic" title=${path}>${ED_ICON.camera}</span>`;
 }
 const plUwag = (n) => (n === 1 ? "uwaga" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "uwagi" : "uwag");
 function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen, notes, addNote, removeNote, noteHi, onSeek, startShot, urls }) {
@@ -1527,29 +1603,31 @@ function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen, notes, addNot
   const vids = [...new Set(((ask.reply || "").match(/\/opt\/data\/jarvo\/(?:workspaces|missions|knowledge|inbox)\/[^\s`'"<>()]+\.(?:mp4|webm|mov)/g) || []))];
   const sorted = [...(notes || [])].sort((a, b) => a.t - b.t);
   return html`<div class="thq-ed-ask">
-    <p class="thq-ed-note">${L("Wideograf dostanie film, projekt montażu, miejsce na osi, uwagi i kadry. 📌 przypina prośbę do chwili filmu, 📷 dołącza zaznaczony fragment podglądu.",
-      "The video agent gets the film, the edit project, your timeline position, notes and frames. 📌 pins a request to a moment, 📷 attaches a part of the preview.")}</p>
+    <header class="thq-ed-pop-head"><strong>${ED_ICON.spark}${L("Poproś Wideografa", "Ask the video agent")}</strong>
+      <button type="button" class="thq-ed-ico is-sm" onClick=${() => setAsk(null)} aria-label=${L("Zamknij", "Close")}>${ED_ICON.close}</button></header>
+    <p class="thq-ed-note">${L("Dostanie film, projekt montażu, miejsce na osi, uwagi i kadry. Uwaga przypina prośbę do chwili filmu, kadr dołącza zaznaczony fragment podglądu.",
+      "It gets the film, the edit project, your timeline position, notes and frames. A note pins a request to a moment; a frame attaches part of the preview.")}</p>
     ${sorted.length > 0 && html`<ol class="thq-ed-notes">${sorted.map((n) => html`<li key=${n.id} class=${cx(n.done && "is-done", noteHi === n.id && "is-sel")}>
       <button type="button" class="thq-ed-note-t" onClick=${() => onSeek(n.t)} title=${L("Przejdź do tego miejsca", "Go to this moment")}>${edClock(n.t)}</button>
-      <span class="thq-ed-note-x">${n.text || L("(kadr)", "(frame)")}${n.done && html`<small>✓ ${n.odp || L("zrobione", "done")}</small>`}</span>
+      <span class="thq-ed-note-x">${n.text || L("(kadr)", "(frame)")}${n.done && html`<small>${ED_ICON.check}${n.odp || L("zrobione", "done")}</small>`}</span>
       ${n.img && html`<${NoteThumb} path=${n.img} url=${urls.current.get(n.img)}/>`}
-      <button type="button" class="thq-ed-note-del" onClick=${() => removeNote(n.id)} aria-label=${L("Usuń uwagę", "Remove note")}>×</button></li>`)}</ol>`}
+      <button type="button" class="thq-ed-note-del" onClick=${() => removeNote(n.id)} aria-label=${L("Usuń uwagę", "Remove note")}>${ED_ICON.close}</button></li>`)}</ol>`}
     <textarea rows="2" value=${ask.text} placeholder=${L("Co zmienić? Np. „tu za szybko”, „literówka w napisie”, „dodaj lektora”.", "What should change? E.g. “too fast here”, “typo in the caption”, “add a voice-over”.")}
       onInput=${(e) => { const v = e.target.value; setAsk((a) => ({ ...a, text: v })); }}
       onKeyDown=${(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}></textarea>
     ${ask.shot && html`<div class="thq-ed-shotprev"><img src=${ask.shot.url} alt=${L("Kadr", "Frame")}/>
       <span>${L("Kadr", "Frame")} ${edClock(ask.shot.t)}${ask.shot.full ? "" : L(" · fragment", " · crop")}</span>
-      <button type="button" class="thq-ed-note-del" onClick=${() => setAsk((a) => ({ ...a, shot: null }))} aria-label=${L("Usuń kadr", "Remove frame")}>×</button></div>`}
+      <button type="button" class="thq-ed-note-del" onClick=${() => setAsk((a) => ({ ...a, shot: null }))} aria-label=${L("Usuń kadr", "Remove frame")}>${ED_ICON.close}</button></div>`}
     <div class="thq-ed-row is-actions">
-      <button type="button" class="thq-ed-btn" onClick=${startShot} disabled=${ask.busy}>📷 ${L("Kadr", "Frame")}</button>
+      <button type="button" class="thq-ed-btn" onClick=${startShot} disabled=${ask.busy}>${ED_ICON.camera}${L("Kadr", "Frame")}</button>
       <button type="button" class="thq-ed-btn" onClick=${pin} disabled=${ask.busy || (!text && !ask.shot)}
-        title=${L("Zapisz jako uwagę w tym miejscu osi (wyślesz kilka naraz)", "Save as a note at this moment (send several at once)")}>📌 ${L("Uwaga w", "Note at")} ${edClock(time)}</button>
+        title=${L("Zapisz jako uwagę w tym miejscu osi (wyślesz kilka naraz)", "Save as a note at this moment (send several at once)")}>${ED_ICON.pin}${L("Uwaga w", "Note at")} ${edClock(time)}</button>
       <span class="thq-ed-grow"></span>
       <button type="button" class="thq-ed-btn is-main" disabled=${!canSend} onClick=${send}>${ask.busy ? "…"
         : open.length ? L(`Wyślij (${open.length} ${plUwag(open.length)})`, `Send (${open.length} note${open.length === 1 ? "" : "s"})`) : L("Wyślij", "Send")}</button>
     </div>
     ${(ask.reply || ask.busy) && html`<div class="thq-ed-reply"><${Markdown} text=${ask.reply || L("Wideograf pracuje…", "Working…")}/></div>`}
     ${ask.error && html`<p class="thq-ed-bad">${ask.error}</p>`}
-    ${vids.map((v) => html`<button key=${v} type="button" class="thq-ed-btn" onClick=${() => onOpen(fileFromPath(v))}>▶ ${v.split("/").pop()}</button>`)}
+    ${vids.map((v) => html`<button key=${v} type="button" class="thq-ed-btn" onClick=${() => onOpen(fileFromPath(v))}>${ED_ICON.film}${v.split("/").pop()}</button>`)}
   </div>`;
 }

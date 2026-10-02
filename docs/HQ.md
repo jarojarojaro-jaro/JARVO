@@ -83,7 +83,8 @@ Pliki w repo:
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`) |
 | `hq/plugin/animacja.py` | animacja HTML: schemat i zapis `parametry.json`, stan pomiaru, mostek podglądu (testy: `tests/test_animacja.py`); build dokłada do pluginu `pomiar.py` Wideografa (odcisk i aktualność raportu) |
 | `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, HUD, aplikacja, widżet aktualizacji |
-| `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność) |
+| `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność; edytor i okno animacji z własnymi tokenami) |
+| `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto |
 | `branding/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css`; te same pliki na stronie logowania |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |
 | `hq/web/demo/` | strona demo i symulator floty |
@@ -96,12 +97,19 @@ pluginów użytkownika), generuje brakujące `API_SERVER_KEY` profili i restartu
 
 ## 2a. Edytor filmów
 
-Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~100 KB nieskompresowany, ok. 30 KB po gzip, plus `46-uwagi.js`) w tym samym
+Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~105 KB nieskompresowany, ok. 31 KB po gzip, plus `46-uwagi.js`) w tym samym
 pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 
 - **Podgląd** gra w przeglądarce z plików pobranych raz (blob), bez serwera w pętli. Dwa elementy `<video>` na zmianę:
   następny klip czeka przewinięty na swój początek, więc przejścia są płynne. Miniatury osi czasu robi przeglądarka
-  (jedna kanwa na źródło).
+  (jedna kanwa na źródło), a muzyka na osi ma falę dźwięku (szczyty liczone raz na plik, dekodowanie w 8 kHz).
+- **Wygląd jak w CapCut:** grafitowe tło, jeden akcent (cyjan: **Eksportuj**, aktywne narzędzie, zaznaczenie), krój
+  systemowy (SF Pro na iPhonie i Macu, Segoe UI na Windows, Roboto na Androidzie) z Inter jako zapasem
+  (`hq/web/fonts/`, OFL), ikony SVG jednym stylem linii zamiast emoji, czas `00:05.20`. Na osi: miniatury klipu w
+  zaokrąglonym pasku z białą ramką zaznaczenia, fala dźwięku na morskim tle, tekst pomarańczowy, napisy ciemniejszy
+  pomarańcz, cienki biały wskaźnik. Komunikaty to pływająca „pigułka” pod paskiem, bez przesuwania układu. Edytor
+  i okno **◐ Animacja** nie biorą wyglądu z motywu dashboardu: „tarcza” w `style.css` cofa to, co motyw Fosfor
+  wymusza (`!important` na zaokrągleniach i tle pól, poświata tekstu, wyłączone animacje).
 - **Napisy** rysuje jedna funkcja na kanwie: w podglądzie i przy eksporcie (PNG na napis nakładany przez ffmpeg),
   więc plik wygląda jak podgląd, łącznie z krojem.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
