@@ -16,7 +16,8 @@ rolek, pokrycie nagrania). Błędy = kod 1, uwagi nie blokują.
 zbuduj: każda rolka → <out>/klip-N-<slug>.edycja.json (projekt edytora: segmenty ze źródła z granicą dosuniętą
 ze środka słowa do przerwy obok, wycięte pauzy i wtrącenia, kadr na twarzy mówcy, gdy plan nie podaje fx/fy
 (twarze.py, YuNet: śledzenie z bezwładnością, nowe ujęcie przy zmianie twarzy albo dużym przesunięciu),
-punch-in na cięciach, napisy karaoke ze słów, tytuł-hook) i render tym samym
+punch-in na cięciach, głośność klipów do −14 LUFS z pomiaru źródła, napisy karaoke ze słów, tytuł-hook)
+i render tym samym
 silnikiem co „Eksportuj” → <out>/klip-N-<slug>.mp4, na końcu KLIPY.md. Człowiek otwiera rolkę w HQ („✎ Edytuj”)
 i poprawia wszystko; eksport z edytora robi nową wersję obok.
 
@@ -27,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import subprocess
 import sys
@@ -49,6 +51,7 @@ KADR_Y = 0.38            # środek twarzy na tej wysokości kadru (oczy mniej wi
 ZMIANA = 3               # tyle próbek z rzędu (≈ 1,5 s), zanim kadr przejdzie na inną twarz albo w nowe miejsce
 BONUS = 3.0              # twarz w kadrze liczy się ×3 przy wyborze (za openshorts: kadr nie skacze między twarzami)
 ODEJSCIE = 0.35          # twarz odeszła od ustawienia kadru o tyle szerokości kadru → nowe ustawienie
+LUFS, SZCZYT = -14.0, -1.5   # głośność rolki i najwyższy szczyt (jak montaz.py glosnosc i qa_wideo.py)
 PUNCH = 1.12             # przybliżenie co drugiego ujęcia po cięciu (ukrywa skok obrazu)
 HL = pr.KARAOKE_HL
 ZLE_STARTY = ("no i", "i ", "a ", "tak jak mówiłem", "wracając do", "jak mówiłem", "więc", "no więc", "no to",
@@ -563,6 +566,36 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarz
     return proj
 
 
+def glosnosc_zrodla(src: Path, odcinki: list[tuple[float, float]]) -> tuple[float, float] | None:
+    """Głośność zintegrowana (LUFS) i szczyt prawdziwy (dBFS) kawałków źródła, które trafiają do rolki, razem
+    (ebur128 po aselect: wycięte pauzy i wtrącenia nie liczą się do szczytu; cisza odpada bramką pomiaru).
+    Bez 30 ms na brzegach kawałka: tam eksport wycisza cięcie (ciche cięcia), więc trzask na styku nie gra.
+    Dźwięk idzie przez tę samą zamianę na stereo 48 kHz co eksport edytora (szczyt mono spada tam o 3 dB)."""
+    odcinki = [(a + 0.03, b - 0.03) if b - a > 0.2 else (a, b) for a, b in odcinki]
+    if not odcinki:
+        return None
+    t0, t1 = min(a for a, _ in odcinki), max(b for _, b in odcinki)
+    wybor = "+".join(f"between(t\\,{a - t0:.3f}\\,{b - t0:.3f})" for a, b in odcinki)
+    cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-ss", f"{t0:.3f}", "-t", f"{t1 - t0:.3f}", "-i", str(src),
+           "-vn", "-af", f"aselect={wybor},asetpts=N/SR/TB,aresample=48000,"   # jak eksport: mono → stereo −3 dB
+           "aformat=sample_fmts=fltp:channel_layouts=stereo,ebur128=peak=true", "-f", "null", "-"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError:
+        return None
+    summary = r.stderr[r.stderr.rfind("Summary:"):]
+    i, pk = re.search(r"I:\s+(-?[\d.]+) LUFS", summary), re.search(r"Peak:\s+(-?[\d.]+) dBFS", summary)
+    if r.returncode or not i or float(i.group(1)) < -69:
+        return None
+    return float(i.group(1)), float(pk.group(1)) if pk else 0.0
+
+
+def wzmocnienie(lufs: float, szczyt: float) -> float:
+    """Głośność klipów (0,25–2, jak w edytorze), która daje LUFS bez wyjścia szczytu ponad SZCZYT; ±1 dB zostaje 1."""
+    db = min(LUFS - lufs, SZCZYT - szczyt, 20 * math.log10(2))
+    return 1.0 if abs(db) < 1 else round(min(2.0, max(0.25, 10 ** (db / 20))), 3)
+
+
 def auto_kadr(st: dict, s: dict) -> bool:
     """Kadr z twarzy, gdy plan nie podaje fx ani fy segmentu (i styl go nie wyłącza)."""
     return bool(st.get("kadr_auto", True)) and "fx" not in s and "fy" not in s
@@ -633,12 +666,19 @@ def cmd_zbuduj(a) -> int:
             raise SystemExit(f"{film.name}: projekt zmieniono po zbudowaniu (np. w edytorze HQ). Poprawiaj go przez "
                              "projekt.py (kadr, usun, napisy…) albo zbuduj z --nadpisz, jeśli te zmiany mają zniknąć")
         proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"], twarze)
+        gl = glosnosc_zrodla(ctx["src"], [(c["in"], c["out"]) for c in proj["clips"]]) if ctx["info"].get("audio") else None
+        if gl:
+            v = wzmocnienie(*gl)
+            for c in proj["clips"]:
+                c["volume"] = v
+            proj["clipmaker"]["glosnosc"] = {"lufs": gl[0], "szczyt": gl[1], "volume": v}
         ed.normalize(proj, pr.resolve)                     # ta sama walidacja co eksport z edytora
         proj["clipmaker"]["podpis"] = podpis(proj)
         pr.save(film, proj)
         dl = pr.total(proj)
         print(f"▶ rolka {n}: {film.name} · {len(proj['clips'])} ujęć · {dl:.1f} s · {sum(1 for t in proj['texts'] if t.get('cap'))} napisów"
-              f" · kadr: {', '.join(proj['clipmaker']['kadr'])}", flush=True)
+              f" · kadr: {', '.join(proj['clipmaker']['kadr'])}"
+              + (f" · głośność {gl[0]:.1f} LUFS → ×{proj['clipmaker']['glosnosc']['volume']}" if gl else ""), flush=True)
         if not a.bez_renderu:
             if pr.cmd_render(film, argparse.Namespace(out=str(film))) != 0:
                 raise SystemExit(f"render {film.name} nie wyszedł")

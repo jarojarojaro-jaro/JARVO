@@ -78,7 +78,7 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 | rytm | wycięte pauzy > 0,6 s i „yyy” (zostaje 0,12 s oddechu); punch-in (zoom 1,15) na mocnym zdaniu | kolejne klipy z tego samego źródła |
 | napisy | **karaoke**: 2–4 słowa w linii, aktywne słowo w kolorze akcentu, grube, z obrysem, w dolnej 1/3 poza strefą UI platform | **nowy** typ napisu: `words` + `hl` |
 | hook | tytuł na górze przez pierwsze ~3 s | zwykły napis (`texts`) |
-| dźwięk | głośność −14 LUFS, opcjonalnie cicha muzyka pod mową | `audio` |
+| dźwięk | głośność −14 LUFS: `zbuduj` mierzy fragmenty źródła (ebur128) i ustawia głośność klipów (najwyżej ×2, szczyt ≤ −1,5 dBFS); opcjonalnie cicha muzyka pod mową | `volume` klipów, `audio` |
 
 ## 4. Co trzeba zbudować
 

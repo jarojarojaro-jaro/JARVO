@@ -54,7 +54,8 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
    błędy poprawiasz zawsze; uwagi („tnie słowo” z miejscem, dokąd `zbuduj` dosunie granicę, „zaczyna się od „no i””,
    długość, „rolki dzielą N% materiału”, „wszystkie rolki z jednej połowy”) poprawiasz albo w KANDYDACI.md piszesz,
    dlaczego zostają.
-6. **Zbuduj** (render po kolei, ~0,5–1× długości rolki każda).
+6. **Zbuduj** (render po kolei, ~0,5–1× długości rolki każda). Głośność rolki `zbuduj` ustawia sam z pomiaru źródła
+   (−14 LUFS, głośność klipów najwyżej ×2); bardzo ciche nagranie zostaje poniżej celu i `qa_wideo.py` to pokaże.
 7. **Kontrola każdej rolki:** `python3 $HERMES_HOME/scripts/qa_wideo.py <rolka>.mp4` + 2–3 klatki (`vision_analyze`):
    twarz w kadrze, napisy czytelne i poza strefą UI, tytuł nie zasłania twarzy. Cięcia: `krytyka.py ciecia <rolka>.mp4`
    (projekt leży obok, słowa z analizy mowy nagrania) i każdy obraz cięcia przez `vision_analyze`; słowo przecięte

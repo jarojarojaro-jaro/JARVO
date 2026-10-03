@@ -230,3 +230,23 @@ def test_reel_frames_speaker_face_when_plan_has_no_focus(nagranie):
     assert K.odcinki_twarzy(p, WORDS, info) == [(0.9, 12.0)]
     assert K.odcinki_twarzy(K.wczytaj_plan_dict(plan(nagranie)), WORDS, info) == []          # fx w planie
     assert K.odcinki_twarzy(p, WORDS, {**info, "w": 1080, "h": 1920}) == []                  # pion z pionu
+
+
+def test_gain_to_target_loudness_with_peak_headroom():
+    assert K.wzmocnienie(-14.5, -6.0) == 1.0                     # w granicach ±1 dB: bez zmian
+    assert K.wzmocnienie(-20.0, -10.0) == pytest.approx(10 ** (6 / 20), abs=0.002)
+    assert K.wzmocnienie(-26.0, -12.0) == 2.0                    # najwyżej ×2 (jak suwak w edytorze)
+    assert K.wzmocnienie(-20.0, -4.0) == pytest.approx(10 ** (2.5 / 20), abs=0.002)   # szczyt najwyżej −1,5 dBFS
+    assert K.wzmocnienie(-8.0, -0.5) == pytest.approx(10 ** (-6 / 20), abs=0.002)     # za głośno: ciszej
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
+def test_source_loudness_of_reel_segments(tmp_path):
+    src = tmp_path / "glos.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x180:d=12", "-f", "lavfi",
+                    "-i", "anoisesrc=c=pink:d=12,volume='if(lt(t,6),0.05,0.2)':eval=frame", "-shortest",
+                    "-pix_fmt", "yuv420p", str(src)], check=True)
+    cicha, glosna = K.glosnosc_zrodla(src, [(0.5, 5.5)]), K.glosnosc_zrodla(src, [(6.5, 11.5)])
+    assert glosna[0] - cicha[0] == pytest.approx(12.0, abs=1.0)              # 0,05 → 0,2 = +12 dB
+    oba = K.glosnosc_zrodla(src, [(0.5, 5.5), (6.5, 11.5)])
+    assert cicha[0] < oba[0] < glosna[0] and oba[1] >= glosna[1] - 0.5
