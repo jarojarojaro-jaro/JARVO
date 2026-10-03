@@ -46,6 +46,7 @@ const ED_PION = { y: 0.68, maxw: 0.74 };
 // polska forma liczebnika: plForma(3, ["uwaga", "uwagi", "uwag"]) → "uwagi"
 const plForma = (n, [jeden, kilka, wiele]) => (n === 1 ? jeden : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? kilka : wiele);
 const NAPISY = ["napis", "napisy", "napisów"];
+const BLOKI = ["blok", "bloki", "bloków"];
 const ED_FILLER = /^(y+|e+|ee+m*|m+|h?m+|ym+|em+|uh+m*|um+|eh+m*|ah+|yhm+|mhm+)$/;
 const isFiller = (w) => { const x = String(w).toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""); return !!x && ED_FILLER.test(x); };
 // Słowa (czas osi) → linie napisów: nowa linia po pauzie, końcu zdania, za długim tekście albo czasie (jak edytor.py).
@@ -104,6 +105,18 @@ const ED_ICON = {
   play: html`<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.5.86l10.2-6.4a1 1 0 0 0 0-1.72L9.5 4.74A1 1 0 0 0 8 5.6z"/></svg>`,
   pause: html`<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.2"/></svg>`,
 };
+// typografia (48-typografia.js): nazwy w panelu bloku i słowa; puste = z motywu
+const TYPO_UKLAD_NAZWY = { kolumna: ["Kolumna", "Column"], schodki: ["Schodki", "Steps"], srodek: ["Środek", "Center"], skos: ["Skos", "Slant"],
+  "3d": ["3D", "3D"], za: ["Za osobą", "Behind"], rozrzut: ["Rozrzut", "Scatter"] };
+const TYPO_WEJSCIA_NAZWY = { ciecie: ["Cięcie", "Cut"], pop: ["Pop", "Pop"], kontur: ["Kontur", "Outline"], maska: ["Wysuw", "Reveal"],
+  pisanie: ["Pisanie", "Typing"], zjazd: ["Wjazd", "Slide"] };
+const TYPO_WYJSCIA_NAZWY = { ciecie: ["Cięcie", "Cut"], zanik: ["Zanik", "Fade"], smuga: ["Smuga", "Smear"] };
+const TYPO_STYLE_NAZWY = { wypelnij: ["Pełny", "Fill"], kontur: ["Kontur", "Outline"], "3d": ["3D", "3D"], blask: ["Blask", "Glow"], tlo: ["Tło", "Box"] };
+const TYPO_WAGI_NAZWY = [["Małe", "Small"], ["Zwykłe", "Normal"], ["Ważne", "Strong"], ["Uderzenie", "Hit"]];
+const typoBez = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== null));
+const typoNoweId = (ids, base) => { let k = 1; while (ids.has(`${base}${String.fromCharCode(97 + k)}`)) k++; return `${base}${String.fromCharCode(97 + k)}`; };
+const typoTekst = (b) => b.slowa.map((w) => w.tekst).join(" ");
+
 // czas osi jak w CapCut: 00:05.20 (minuty zawsze dwucyfrowe, setne do precyzyjnego montażu)
 function edTC(s, fine = true) {
   s = Math.max(0, s || 0);
@@ -166,9 +179,26 @@ function remapTimes(P0, P1) {
     if (reorder) { const mid = (x.start + x.end) / 2, d = map(mid) - mid; return { ...x, start: r(x.start + d), end: r(x.end + d) }; }
     return { ...x, start: r(map(x.start)), end: r(map(x.end)) };
   }).filter((x) => x.end - x.start >= 0.05);
+  const typo = typoPrzesun(P1.typo, (b) => {
+    if (!reorder) return typoNaOsi(b, map);
+    const mid = (b.start + b.end) / 2, d = map(mid) - mid;
+    return typoNaOsi(b, (x) => x + d);
+  });
   return { ...P1, texts,
     audio: reorder ? P1.audio : (P1.audio || []).map((m) => ({ ...m, start: r(map(m.start)) })),
-    notes: (P1.notes || []).map((n) => ({ ...n, t: r(map(n.t)) })) };
+    notes: (P1.notes || []).map((n) => ({ ...n, t: r(map(n.t)) })), ...(typo ? { typo } : {}) };
+}
+// Blok typografii po zmianie osi: początek, koniec i każde słowo (czas od początku bloku) przez tę samą funkcję czasu,
+// więc słowo zostaje przy swoim dźwięku; blok z wyciętego fragmentu (krótszy niż 0,05 s) wypada.
+function typoNaOsi(b, f) {
+  const r = (x) => +x.toFixed(3);
+  const s = f(b.start), e = f(b.end);
+  return { ...b, start: r(s), end: r(e), slowa: (b.slowa || []).map((w) => ({ ...w,
+    t: r(Math.max(0, f(b.start + (+w.t || 0)) - s)), k: r(Math.max(0, f(b.start + (+w.k || 0)) - s)) })) };
+}
+function typoPrzesun(typo, fn) {
+  if (!typo || !Array.isArray(typo.bloki)) return typo;
+  return { ...typo, bloki: typo.bloki.map(fn).filter((b) => b.end - b.start >= 0.05) };
 }
 const projTotal = (p) => p.clips.reduce((a, c) => a + clipDur(c), 0);
 
@@ -672,19 +702,32 @@ function VideoEditor({ path, onClose }) {
   const typoFontRef = useRef("");
   // sylwetka osoby (maska.py Wideografa): napis z warstwy „tyl” chowa się za osobą także w podglądzie
   const maskaRef = useRef({ info: null, img: new Map(), oc: null });
-  const typoTyl = !!(p && typoBloki(p).some((b) => b.warstwa === "tyl"));
+  const [maskaV, setMaskaV] = useState(0);     // nowy indeks sylwetek: panel bloku wie, czy osoba zasłoni napis
+  // bloki za osobą (czas): indeks pobieramy po ich zmianie i po wczytaniu projektu (np. Wideograf policzył sylwetki),
+  // a nie przy każdym ruchu suwaka
+  const typoTylKey = p ? typoBloki(p).filter((b) => b.warstwa === "tyl").map((b) => `${b.id}@${b.start}-${b.end}`).join() : "";
   useEffect(() => {
-    if (!typoTyl || !api.editMaska) { maskaRef.current.info = null; return undefined; }
+    if (!typoTylKey || !api.editMaska) { maskaRef.current.info = null; return undefined; }
     let live = true;
     api.editMaska(path).then((d) => {
       if (!live) return;
       const m = maskaRef.current;
       if (!d || !d.klucz || !m.info || m.info.klucz !== d.klucz) m.img.clear();
       m.info = d && d.klucz ? { ...d, set: new Set(d.klatki) } : null;
+      setMaskaV((v) => v + 1);
       drawOverlay();
     }).catch(() => {});
     return () => { live = false; };
-  }, [typoTyl, p && p.typo, path]);
+  }, [typoTylKey, info, path]);
+  // czy sylwetki pokrywają blok za osobą (aktualny klucz osi i ≥ 90% jego klatek)
+  function maskaBloku(b) {
+    const inf = maskaRef.current.info, P = projRef.current;
+    if (!inf || !P || inf.klucz !== maskaKlucz(P)) return false;
+    const F = +inf.fps || P.canvas.fps || 30, a = Math.floor(b.start * F), z = Math.max(a + 1, Math.round(b.end * F));
+    let n = 0;
+    for (let k = a; k < z; k++) if (inf.set.has(k)) n++;
+    return n >= 0.9 * (z - a);
+  }
   const WCZYTUJE = "…";
   function maskaKlatka(k) {          // ImageBitmap sylwetki klatki k albo null (wczytuje w tle i rysuje ponownie)
     const m = maskaRef.current, inf = m.info;
@@ -753,6 +796,13 @@ function VideoEditor({ path, onClose }) {
       typoRysuj(g, P, w, h, now, "tyl");
       osobaNaWierzch(g, P, w, h, now);
       typoRysuj(g, P, w, h, now, "przod");
+      const s = selRef.current, b = s && s.type === "typo" && typoAktywne(P, now).find((x) => x.id === s.id);
+      if (b) {                                       // zaznaczony blok: ramka w jego obrocie
+        const f = typoRamka(g, b, P, w, h);
+        g.save(); g.translate(f.u.cx, f.u.cy); g.rotate(((+b.rot || 0) * Math.PI) / 180);
+        g.strokeStyle = b.warstwa === "tyl" ? "#B78CFF" : "#3BA9FF"; g.lineWidth = Math.max(2, w / 480); g.setLineDash([w / 90, w / 140]);
+        g.strokeRect(f.x0 - f.u.cx, f.y0 - f.u.cy, f.x1 - f.x0, f.y1 - f.y0); g.restore();
+      }
     }
     for (const x of P.texts) {
       if (now < x.start || now >= x.end) continue;
@@ -911,13 +961,52 @@ function VideoEditor({ path, onClose }) {
 
   const total = p ? projTotal(p) : 0;
   const segs = p ? layoutClips(p.clips) : [];
-  const selItem = !p || !sel ? null : (sel.type === "clip" ? p.clips : sel.type === "text" ? p.texts : p.audio).find((x) => x.id === sel.id) || null;
+  const selItem = !p || !sel ? null : (sel.type === "clip" ? p.clips : sel.type === "text" ? p.texts : sel.type === "typo" ? typoBloki(p)
+    : sel.type === "audio" ? p.audio : []).find((x) => x.id === sel.id) || null;
 
   // ---------------------------------------------------------------- operacje
   const upd = (type, id, patch, liveMode) => (liveMode ? H.live : H.apply)((P) => {
     const key = type === "clip" ? "clips" : type === "text" ? "texts" : "audio";
     return { ...P, [key]: P[key].map((x) => (x.id === id ? { ...x, ...(typeof patch === "function" ? patch(x) : patch) } : x)) };
   });
+  // typografia: blok (pola bloku) i słowo (pola słowa); undefined usuwa pole, więc wraca wartość z motywu
+  const typoApply = (fn, lv) => (lv ? H.live : H.apply)((P) => {
+    const T = P.typo || { motyw: "czysty", bloki: [] };
+    return { ...P, typo: { ...T, ...fn({ ...T, bloki: T.bloki || [] }) } };
+  });
+  const typoUpd = (id, patch, lv) => typoApply((T) => ({ bloki: T.bloki.map((b) => (b.id === id ? typoBez({ ...b, ...(typeof patch === "function" ? patch(b) : patch) }) : b)) }), lv);
+  const slowoUpd = (id, j, patch, lv) => typoUpd(id, (b) => ({ slowa: b.slowa.map((w, k) => (k === j ? typoBez({ ...w, ...patch }) : w)) }), lv);
+  const [typoW, setTypoW] = useState(null);      // numer zaznaczonego słowa w bloku (panel słowa)
+  function typoPodziel(b, now) {                  // nowy blok od słowa pod wskaźnikiem (albo od następnego, gdy wskaźnik jest w przerwie)
+    const j = b.slowa.findIndex((w, k) => k > 0 && b.start + Math.max(+w.t || 0, +w.k || 0) > now + 1e-6);
+    if (j <= 0) return false;
+    const d = +b.slowa[j].t || 0, li = Math.round(+b.slowa[j].linia || 0);
+    const nid = typoNoweId(new Set(typoBloki(p).map((x) => x.id)), b.id);
+    typoApply((T) => ({ bloki: T.bloki.flatMap((x) => (x.id !== b.id ? [x] : [
+      { ...x, slowa: x.slowa.slice(0, j), end: +(x.start + d - 0.02).toFixed(3), wyjscie: "ciecie" },
+      { ...x, id: nid, start: +(x.start + d).toFixed(3), slowa: x.slowa.slice(j).map((w) => ({ ...w, t: +((+w.t || 0) - d).toFixed(3),
+        k: +((+w.k || 0) - d).toFixed(3), linia: Math.max(0, Math.round(+w.linia || 0) - li) })) }])) }));
+    setSel({ type: "typo", id: nid });
+    setTypoW(null);
+    return true;
+  }
+  function typoPolacz(b) {                        // z następnym blokiem w jedną frazę (jego słowa w nowych liniach)
+    const nast = typoBloki(p).filter((x) => x.id !== b.id && x.start >= b.start).sort((x, y) => x.start - y.start)[0];
+    if (!nast) return;
+    const d = nast.start - b.start, li = Math.max(...b.slowa.map((w) => Math.round(+w.linia || 0))) + 1;
+    typoApply((T) => ({ bloki: T.bloki.filter((x) => x.id !== nast.id).map((x) => (x.id !== b.id ? x : { ...x, end: Math.max(x.end, nast.end),
+      wyjscie: nast.wyjscie || x.wyjscie, slowa: [...x.slowa, ...nast.slowa.map((w) => ({ ...w, t: +((+w.t || 0) + d).toFixed(3),
+        k: +((+w.k || 0) + d).toFixed(3), linia: Math.round(+w.linia || 0) + li }))] })) }));
+  }
+  function typoDodaj() {                           // własny blok w miejscu wskaźnika: jedno mocne słowo do wpisania
+    const start = clamp(tRef.current, 0, Math.max(0, total - 0.5)), H2 = p.canvas.h > p.canvas.w;
+    const b = { id: typoNoweId(new Set(typoBloki(p).map((x) => x.id)), "w"), start: +start.toFixed(3), end: +Math.min(total, start + 1.5).toFixed(3),
+      uklad: "srodek", x: 0.5, y: H2 ? 0.62 : 0.7, w: H2 ? 0.7 : 0.5, rot: 0, tilt: 0, warstwa: "przod",
+      slowa: [{ t: 0, k: 0.4, tekst: L("TEKST", "TEXT"), waga: 3, linia: 0 }] };
+    typoApply((T) => ({ bloki: [...T.bloki, b].sort((x, y) => x.start - y.start) }));
+    setSel({ type: "typo", id: b.id }); setTypoW(0);
+    if (mobileRef.current) setTool("typo"); else setSide("inspect");
+  }
   // zmiana długości albo kolejności klipów: napisy, uwagi i audio idą za materiałem (remapTimes)
   const clipsChange = (fn, liveMode) => (liveMode ? H.liveFrom : H.apply)((B) => remapTimes(B, { ...B, clips: fn(B.clips) }));
   const clipPatch = (id, patch, liveMode) => clipsChange((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c)), liveMode);
@@ -933,6 +1022,7 @@ function VideoEditor({ path, onClose }) {
   function split() {
     if (!p) return;
     const now = tRef.current;
+    if (sel && sel.type === "typo" && selItem && now >= selItem.start && now <= selItem.end) { typoPodziel(selItem, now); return; }   // w bloku tnie tylko blok
     if (sel && sel.type === "text") {
       const x = p.texts.find((y) => y.id === sel.id);
       if (x && now > x.start + ED_MIN && now < x.end - ED_MIN) {
@@ -965,7 +1055,8 @@ function VideoEditor({ path, onClose }) {
       return;
     }
     if (sel.type === "clip" && p.clips.length <= 1) return;
-    if (sel.type === "clip") clipsChange((cs) => cs.filter((x) => x.id !== sel.id));   // reszta osi dosuwa się z napisami
+    if (sel.type === "typo") typoApply((T) => ({ bloki: T.bloki.filter((x) => x.id !== sel.id) }));
+    else if (sel.type === "clip") clipsChange((cs) => cs.filter((x) => x.id !== sel.id));   // reszta osi dosuwa się z napisami
     else {
       const key = sel.type === "text" ? "texts" : "audio";
       H.apply((P) => ({ ...P, [key]: P[key].filter((x) => x.id !== sel.id) }));
@@ -974,6 +1065,13 @@ function VideoEditor({ path, onClose }) {
   }
   function duplicate() {
     if (!sel || !selItem) return;
+    if (sel.type === "typo") {                    // kopia bloku zaraz po nim (ta sama długość, w filmie)
+      const d = selItem.end - selItem.start, st = Math.min(selItem.end, Math.max(0, total - d));
+      const copy = { ...selItem, id: typoNoweId(new Set(typoBloki(p).map((x) => x.id)), selItem.id), start: +st.toFixed(3), end: +(st + d).toFixed(3) };
+      typoApply((T) => ({ bloki: [...T.bloki, copy].sort((x, y) => x.start - y.start) }));
+      setSel({ type: "typo", id: copy.id });
+      return;
+    }
     const key = sel.type === "clip" ? "clips" : sel.type === "text" ? "texts" : "audio";
     const copy = { ...selItem, id: edId(sel.type[0]) };
     if (sel.type === "text") { const d = copy.end - copy.start; copy.start = Math.min(copy.end, total - d); copy.end = copy.start + d; }
@@ -1108,7 +1206,7 @@ function VideoEditor({ path, onClose }) {
     const hits = p.texts.filter((x) => tRef.current >= x.start && tRef.current < x.end)
       .filter((x) => { const b = textBox(g, x, p.canvas.w, p.canvas.h); return px >= b.x0 && px <= b.x1 && py >= b.y0 && py <= b.y1; });
     const hit = hits[hits.length - 1];
-    if (!hit) { setSel(null); return; }
+    if (!hit) { typoPointer(e, px, py, r); return; }
     setSel({ type: "text", id: hit.id });
     selRef.current = { type: "text", id: hit.id };
     const sx = hit.x ?? 0.5, sy = hit.y ?? 0.8;
@@ -1124,11 +1222,34 @@ function VideoEditor({ path, onClose }) {
     window.addEventListener("pointerup", up);
   }
 
+  // blok typografii pod kursorem (przód nad tyłem): zaznaczenie i przeciąganie kotwicy, przyciąganie do środka
+  function typoPointer(e, px, py, r) {
+    const g = overlayRef.current.getContext("2d"), { w: W, h: Hh } = p.canvas;
+    const akt = typoAktywne(p, tRef.current).sort((a, b) => (a.warstwa === "tyl") - (b.warstwa === "tyl"));
+    const hit = akt.find((b) => { const f = typoRamka(g, b, p, W, Hh); return px >= f.x0 && px <= f.x1 && py >= f.y0 && py <= f.y1; });
+    if (!hit) { setSel(null); return; }
+    if (!(sel && sel.type === "typo" && sel.id === hit.id)) setTypoW(null);
+    setSel({ type: "typo", id: hit.id });
+    selRef.current = { type: "typo", id: hit.id };
+    if (!mobileRef.current) setSide("inspect");
+    const sx = hit.x ?? 0.5, sy = hit.y ?? 0.3;
+    const move = (ev) => {
+      let nx = clamp(sx + (ev.clientX - e.clientX) / r.width, 0, 1), ny = clamp(sy + (ev.clientY - e.clientY) / r.height, 0, 1);
+      if (Math.abs(nx - 0.5) < 0.015) nx = 0.5;
+      if (Math.abs(ny - 0.5) < 0.015) ny = 0.5;
+      typoUpd(hit.id, { x: +nx.toFixed(4), y: +ny.toFixed(4) }, true);
+    };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); H.commit(); };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
   // ---------------------------------------------------------------- oś czasu: przeciąganie
   const snapPts = () => {
     const pts = [0, tRef.current, total];
     for (const s of segs) pts.push(s.start, s.end);
     for (const x of p.texts) pts.push(x.start, x.end);
+    for (const b of typoBloki(p)) pts.push(b.start, b.end);
     for (const m of p.audio) pts.push(m.start, m.start + audioDur(m));
     return pts;
   };
@@ -1186,6 +1307,19 @@ function VideoEditor({ path, onClose }) {
       }
       else if (edge === "r") upd("text", x.id, { end: clamp(snap(b + d, [b]), a + ED_MIN, total) }, true);
       else { const len = b - a; const s = clamp(snap(a + d, [a, b]), 0, Math.max(0, total - len)); upd("text", x.id, { start: s, end: s + len }, true); }
+    });
+  }
+  function typoDown(e, b, edge) {
+    if (e.pointerType === "touch" && !edge) return;
+    if (!(sel && sel.id === b.id)) setTypoW(null);
+    setSel({ type: "typo", id: b.id });
+    const a = b.start, z = b.end, s0 = b.slowa;
+    drag(e, (d) => {
+      if (edge === "l") {                         // początek: słowa zostają przy swoim czasie w filmie
+        const ns = clamp(snap(a + d, [a]), 0, z - ED_MIN), dd = ns - a;
+        typoUpd(b.id, { start: +ns.toFixed(3), slowa: s0.map((w) => ({ ...w, t: +Math.max(0, (+w.t || 0) - dd).toFixed(3), k: +Math.max(0, (+w.k || 0) - dd).toFixed(3) })) }, true);
+      } else if (edge === "r") typoUpd(b.id, { end: +clamp(snap(z + d, [z]), a + ED_MIN, total).toFixed(3) }, true);
+      else { const len = z - a, ns = clamp(snap(a + d, [a, z]), 0, Math.max(0, total - len)); typoUpd(b.id, { start: +ns.toFixed(3), end: +(ns + len).toFixed(3) }, true); }
     });
   }
   function audioDown(e, m, edge) {
@@ -1263,6 +1397,12 @@ function VideoEditor({ path, onClose }) {
   // dotknięcie elementu osi: zaznaczenie i (na telefonie) jego narzędzia
   const pick = (e, type, id) => {
     e.stopPropagation();
+    if (type === "typo") {                          // wskaźnik w bloku (wszystkie słowa już widać), żeby go było widać
+      const b = typoBloki(projRef.current).find((x) => x.id === id), now = tRef.current;
+      const ost = b ? Math.max(...b.slowa.map((w) => +w.t || 0)) : 0;
+      if (b && (now < b.start + ost || now >= b.end)) player.seek(Math.min(b.end - 0.04, b.start + ost + 0.08));
+      if (!(sel && sel.id === id)) setTypoW(null);
+    }
     setSel({ type, id });
     if (mobileRef.current) setTool(type === "clip" ? "edit" : type);   // "mark" → panel znacznika
     else setSide("inspect");
@@ -1385,7 +1525,8 @@ function VideoEditor({ path, onClose }) {
     H.apply((P) => ({ ...P, clips,
       texts: P.texts.map((x) => ({ ...x, start: shift(x.start), end: shift(x.end) })).filter((x) => x.end - x.start >= 0.05),
       audio: P.audio.map((m) => ({ ...m, start: shift(m.start) })),
-      notes: (P.notes || []).map((n) => ({ ...n, t: shift(n.t) })) }));
+      notes: (P.notes || []).map((n) => ({ ...n, t: shift(n.t) })),
+      ...(P.typo ? { typo: typoPrzesun(P.typo, (b) => typoNaOsi(b, shift)) } : {}) }));
     return rs.reduce((a, [x, y]) => a + y - x, 0);
   }
   const loadSpeech = (src, data) => setSpeech((sp) => ({ ...sp, [src]: data }));
@@ -1543,7 +1684,83 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Rozmiar", "Size")} · ${Math.round(caps[0].size)}<input type="range" min="24" max="140" value=${caps[0].size} onInput=${(e) => setCapLook({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
       <p class="thq-ed-note">${L(`${caps.length} ${plForma(caps.length, NAPISY)}. Pojedynczy napis poprawisz, dotykając go na osi czasu.`, `${caps.length} captions. Tap one on the timeline to fix its text.`)}</p>
       <div class="thq-ed-acts">${act("trash", L("Usuń napisy", "Remove captions"), () => H.apply((P) => ({ ...P, texts: P.texts.filter((x) => !x.cap) })), { bad: true })}</div>`}
+    ${typoPlanTools()}
   </div>`;
+
+  // ---- typografia: plan (motyw, akcent) i blok ze słowami (48-typografia.js rysuje, tu tylko dane);
+  // sekcja planu siedzi w formularzu panelu Napisy i bloku, żeby całość przewijała się jednym paskiem
+  const typoPlanTools = () => {
+    const T = p.typo || {}, n = typoBloki(p).length, m = typoMotyw(p);
+    return html`<div class="thq-ed-typo-plan">
+      <p class="thq-ed-sub">${L("Typografia słowo po słowie", "Word-by-word typography")}${n ? ` · ${n} ${L(plForma(n, BLOKI), n === 1 ? "block" : "blocks")}` : ""}</p>
+      ${n ? html`
+        <label>${L("Motyw", "Theme")}${seg(Object.entries(TYPO_MOTYWY).map(([k2, x]) => [k2, L(...x.nazwa)]), TYPO_MOTYWY[T.motyw] ? T.motyw : "czysty", (v) => typoApply(() => ({ motyw: v })))}</label>
+        <label>${L("Akcent: kolor uderzenia", "Accent: hit word color")}${swatches(m.akcent, (v, lv) => typoApply(() => ({ akcent: v }), lv))}</label>
+        ${T.akcent && html`<button type="button" class="thq-ed-btn is-wide" onClick=${() => typoApply(() => ({ akcent: undefined }))}>${ED_ICON.reset} ${L("Akcent z motywu", "Theme accent")}</button>`}
+        <p class="thq-ed-note">${L("Kliknij blok na osi albo na podglądzie, żeby zmienić słowa, układ, głębię i ruch.", "Click a block on the timeline or the preview to change words, layout, depth and motion.")}</p>
+        <div class="thq-ed-acts">
+          ${act("plus", L("Dodaj blok", "Add block"), typoDodaj)}
+          ${act("trash", L("Usuń typografię", "Remove typography"), () => { H.apply(({ typo: _t, ...rest }) => rest); setSel(null); }, { bad: true })}
+        </div>`
+      : html`<p class="thq-ed-note">${L("Napisy jak z montażu: każde słowo w swoim czasie, różne wielkości, kroje, kolory, głębia, skos i 3D, mocne słowo czasem za osobą. Plan układa Wideograf z mowy filmu, a Ty poprawiasz tu każdy blok i słowo.",
+          "Edit-style captions: every word on its beat, different sizes, fonts, colors, depth, slant and 3D, a strong word sometimes behind the person. The video agent plans it from the speech; you fine-tune every block and word here.")}</p>
+        <button type="button" class="thq-ed-btn is-main is-wide" onClick=${() => setAsk({ text: L("Ułóż typografię słowo po słowie do tego filmu.", "Lay out word-by-word typography for this film."), reply: "", busy: false })}>${ED_ICON.spark} ${L("Poproś Wideografa o typografię", "Ask the video agent for typography")}</button>
+        <button type="button" class="thq-ed-btn is-wide" onClick=${typoDodaj}>${ED_ICON.plus} ${L("Dodaj blok ręcznie", "Add a block by hand")}</button>`}
+    </div>`;
+  };
+  const typoTools = (b) => {
+    const m = typoMotyw(p), auto = L("Auto", "Auto");
+    const u = (patch, lv) => typoUpd(b.id, patch, lv);
+    const naj = b.slowa.reduce((a, x, k) => ((+x.waga || 0) > (+b.slowa[a].waga || 0) ? k : a), 0);
+    const j = typoW !== null && typoW < b.slowa.length ? typoW : naj;
+    const w = b.slowa[j], wyg = typoSlowo(w, m, b.uklad);       // wygląd słowa teraz (z motywu albo nadpisany)
+    const su = (patch, lv) => slowoUpd(b.id, j, patch, lv);
+    const tyl = b.warstwa === "tyl", li = Math.round(+w.linia || 0);
+    const suwak = (label, v, min, max, step, fn, fmt) => html`<label>${label} · ${fmt(v)}
+      <input type="range" min=${min} max=${max} step=${step} value=${v} onInput=${(e) => fn(+e.target.value, true)} onChange=${H.commit}/></label>`;
+    return html`<div class="thq-ed-form">
+      <p class="thq-ed-sub">${L("Blok typografii", "Typography block")} · ${fmtT(b.start, true)} – ${fmtT(b.end, true)}</p>
+      <div class="thq-ed-typo-slowa" role="group" aria-label=${L("Słowa bloku", "Block words")}>${b.slowa.map((x, k) => html`<button type="button" key=${k}
+        class=${cx(`is-w${typoClamp(Math.round(+x.waga || 0), 0, 3)}`, k === j && "is-on")} onClick=${() => setTypoW(k)}>${x.tekst}</button>`)}</div>
+      <input class="thq-ed-input" type="text" value=${w.tekst} aria-label=${L("Tekst słowa", "Word text")} onInput=${(e) => su({ tekst: e.target.value }, true)} onBlur=${H.commit}/>
+      <label>${L("Waga słowa", "Word weight")}${seg(TYPO_WAGI_NAZWY.map(([pl, en], k2) => [k2, L(pl, en)]), wyg.waga, (v) => su({ waga: v }))}</label>
+      <label>${L("Kolor", "Color")}${swatches(wyg.kolor, (v, lv) => su({ kolor: v }, lv))}</label>
+      ${w.kolor && html`<button type="button" class="thq-ed-btn is-wide" onClick=${() => su({ kolor: undefined })}>${ED_ICON.reset} ${L("Kolor z motywu (akcent tylko na uderzeniu)", "Theme color (accent only on the hit)")}</button>`}
+      <label>${L("Krój", "Font")}<div class="thq-ed-fonts">${[["", auto], ...Object.entries(TYPO_KROJE).map(([k2, f]) => [k2, f[3]])].map(([k2, n]) => {
+        const f = k2 && TYPO_KROJE[k2];
+        return html`<button type="button" key=${k2 || "auto"} class=${cx((w.kroj || "") === k2 && "is-on")} onClick=${() => su({ kroj: k2 || undefined })}
+          style=${f ? { fontFamily: f[0], fontWeight: f[1], fontStyle: f[2] ? "italic" : "normal" } : {}}>${n}</button>`;
+      })}</div></label>
+      <label>${L("Styl", "Style")}${seg([["", auto], ...TYPO_STYLE.map((k2) => [k2, L(...TYPO_STYLE_NAZWY[k2])])], w.styl || "", (v) => su({ styl: v || undefined }))}</label>
+      <label>${L("Głębia słowa", "Word depth")}${seg([[-1, L("Dalej", "Back")], [0, L("Zwykła", "Normal")], [1, L("Bliżej", "Front")]], wyg.glebia, (v) => su({ glebia: v || undefined }))}</label>
+      <label>${L("Wielkie litery", "Capitals")}${seg([["", auto], ["tak", "AA"], ["nie", "Aa"]], w.wielkie === true ? "tak" : w.wielkie === false ? "nie" : "", (v) => su({ wielkie: v === "tak" ? true : v === "nie" ? false : undefined }))}</label>
+      ${suwak(L("Skala słowa", "Word scale"), +w.skala || 1, 0.3, 3, 0.05, (v, lv) => su({ skala: Math.abs(v - 1) < 0.001 ? undefined : v }, lv), (v) => `${Math.round(v * 100)}%`)}
+      <div class="thq-ed-row"><span class="thq-ed-note">${L("Linia", "Line")} ${li + 1}</span>
+        ${seg([["gora", L("↑ wyżej", "↑ up")], ["dol", L("↓ niżej", "↓ down")]], null, (v) => su({ linia: Math.max(0, li + (v === "dol" ? 1 : -1)) }))}</div>
+
+      <p class="thq-ed-sub">${L("Blok", "Block")}</p>
+      <label>${L("Układ", "Layout")}${seg(TYPO_UKLADY.map((k2) => [k2, L(...TYPO_UKLAD_NAZWY[k2])]), b.uklad, (v) => u(v === "za" ? { uklad: v, warstwa: "tyl", rot: 0, tilt: 0 } : { uklad: v }))}</label>
+      <label>${L("Głębia bloku", "Block depth")}${seg([["przod", L("Przed osobą", "In front")], ["tyl", L("Za osobą", "Behind")]], tyl ? "tyl" : "przod", (v) => u({ warstwa: v }))}</label>
+      ${tyl && !maskaBloku(b) && html`<p class="thq-ed-note is-warn">⚠ ${L("Osoba zasłoni ten napis, gdy Wideograf policzy jej sylwetkę w tym fragmencie. Do tego czasu napis widać w całości.",
+          "The person will cover this text once the video agent computes their silhouette here. Until then the text is fully visible.")}</p>
+        <button type="button" class="thq-ed-btn is-wide" onClick=${() => setAsk({ text: L(`Policz sylwetkę osoby dla bloku typografii „${typoTekst(b)}” (${fmtT(b.start, true)}–${fmtT(b.end, true)}), żeby napis był za osobą.`,
+          `Compute the person's silhouette for the typography block "${typoTekst(b)}" (${fmtT(b.start, true)}–${fmtT(b.end, true)}) so the text sits behind them.`), reply: "", busy: false })}>${ED_ICON.spark} ${L("Poproś Wideografa o sylwetkę", "Ask the video agent for the silhouette")}</button>`}
+      ${suwak(L("Rozmiar", "Size"), +b.rozmiar || 1, 0.3, 3, 0.05, (v, lv) => u({ rozmiar: v }, lv), (v) => `${Math.round(v * 100)}%`)}
+      ${suwak(L("Szerokość", "Width"), +b.w || 0.62, 0.15, 1, 0.01, (v, lv) => u({ w: v }, lv), (v) => `${Math.round(v * 100)}%`)}
+      ${suwak(L("Obrót", "Rotation"), +b.rot || 0, -45, 45, 1, (v, lv) => u({ rot: v }, lv), (v) => `${v}°`)}
+      ${suwak(L("Perspektywa 3D", "3D perspective"), +b.tilt || 0, -45, 45, 1, (v, lv) => u({ tilt: v }, lv), (v) => `${v}°`)}
+      <label>${L("Wejście słów", "Word entrance")}${seg([["", auto], ...Object.keys(TYPO_WEJSCIA).map((k2) => [k2, L(...TYPO_WEJSCIA_NAZWY[k2])])], b.wejscie || "", (v) => u({ wejscie: v || undefined }))}</label>
+      <label>${L("Wyjście bloku", "Block exit")}${seg([["", auto], ...Object.keys(TYPO_WYJSCIA).map((k2) => [k2, L(...TYPO_WYJSCIA_NAZWY[k2])])], b.wyjscie || "", (v) => u({ wyjscie: v || undefined }))}</label>
+      <p class="thq-ed-note">${L("Przeciągnij blok na podglądzie, żeby go przesunąć; na osi zmienisz jego czas. Tnij dzieli blok na słowie pod wskaźnikiem.",
+        "Drag the block on the preview to move it; change its timing on the timeline. Split cuts the block at the word under the playhead.")}</p>
+      <div class="thq-ed-acts">
+        ${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}
+        ${act("plus", L("Połącz z następnym", "Merge with next"), () => typoPolacz(b), { disabled: !typoBloki(p).some((x) => x.id !== b.id && x.start >= b.start) })}
+        ${act("trash", L("Usuń", "Delete"), remove, { bad: true })}
+      </div>
+      ${typoPlanTools()}
+    </div>`;
+  };
 
   const speechTools = () => {
     const pauses = marks.filter((m) => m.kind === "pause"), fillers = marks.filter((m) => m.kind === "filler");
@@ -1632,6 +1849,19 @@ function VideoEditor({ path, onClose }) {
       <i class="thq-ed-h is-l" onPointerDown=${(e) => textDown(e, x, "l")}></i><span>${x.text}</span><i class="thq-ed-h is-r" onPointerDown=${(e) => textDown(e, x, "r")}></i></div>`)}
     ${mobile && !p.texts.length && html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text"); }}>${ED_ICON.plus}${L("Dodaj tekst", "Add text")}</button>`}
   </div>`;
+  const typoLane = {}, tLanes = [];
+  for (const b of typoBloki(p).slice().sort((a, c) => a.start - c.start)) {
+    let li = tLanes.findIndex((end) => end <= b.start + 1e-6);
+    if (li < 0) { li = tLanes.length; tLanes.push(0); }
+    tLanes[li] = b.end; typoLane[b.id] = li;
+  }
+  const typoTrack = tLanes.length > 0 && html`<div class="thq-ed-track is-typo" style=${{ height: `${tLanes.length * 26 + 6}px` }} onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
+    ${typoBloki(p).map((b) => html`<div key=${b.id} class=${cx("thq-ed-item is-typo", b.warstwa === "tyl" && "is-tyl", sel && sel.type === "typo" && sel.id === b.id && "is-sel")}
+      style=${{ left: `${b.start * pps}px`, width: `${Math.max(6, (b.end - b.start) * pps)}px`, top: `${3 + typoLane[b.id] * 26}px` }}
+      title=${`${typoTekst(b)}${b.warstwa === "tyl" ? ` · ${L("za osobą", "behind the person")}` : ""}`}
+      onPointerDown=${(e) => typoDown(e, b)} onClick=${(e) => pick(e, "typo", b.id)}>
+      <i class="thq-ed-h is-l" onPointerDown=${(e) => typoDown(e, b, "l")}></i><span>${b.slowa.map((w, k) => html`<b key=${k} class=${`is-w${typoClamp(Math.round(+w.waga || 0), 0, 3)}`}>${w.tekst} </b>`)}</span><i class="thq-ed-h is-r" onPointerDown=${(e) => typoDown(e, b, "r")}></i></div>`)}
+  </div>`;
   const videoTrack = html`<div class="thq-ed-track is-video" onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
     ${segs.map((s, i) => {
       const strip = strips[s.c.src];
@@ -1679,7 +1909,7 @@ function VideoEditor({ path, onClose }) {
           ${ticks.map((s) => html`<span key=${s} style=${{ left: `${s * pps}px` }}>${step < 1 ? `${edTC(s, false)}${(s % 1 ? ".5" : "")}` : edTC(s, false)}</span>`)}
           ${ticks.map((s) => html`<b key=${`d${s}`} style=${{ left: `${(s + step / 2) * pps}px` }}></b>`)}
         </div>
-        ${mobile ? [noteTrack, videoTrack, speechTrack, audioTrack, textTrack] : [noteTrack, textTrack, videoTrack, speechTrack, audioTrack]}
+        ${mobile ? [noteTrack, videoTrack, speechTrack, audioTrack, textTrack, typoTrack] : [noteTrack, typoTrack, textTrack, videoTrack, speechTrack, audioTrack]}
         ${!mobile && html`<div class="thq-ed-head" ref=${headRef} style=${{ left: `${pad}px`, transform: `translateX(${t * pps}px)` }}><i></i></div>`}
       </div>
     </div>
@@ -1721,6 +1951,7 @@ function VideoEditor({ path, onClose }) {
     else if (tool === "captions") { sheet = captionTools(); title = L("Napisy", "Captions"); }
     else if (tool === "speech") { sheet = speechTools(); title = L("Mowa, pauzy i wtrącenia", "Speech, pauses and fillers"); }
     else if (tool === "mark" && markSel) { sheet = markTools(markSel); title = L("Znacznik", "Mark"); }
+    else if (tool === "typo" && selItem && sel.type === "typo") { sheet = typoTools(selItem); title = L("Typografia", "Typography"); }
     else if (tool === "format") { sheet = formatTools(); title = L("Format", "Format"); }
     else if (tool === "media") { sheet = html`<div class="thq-ed-form">${mediaList(["video", "image"])}${uploadBtn("video/*,image/png,image/jpeg,image/webp")}</div>`; title = L("Dodaj klip", "Add clip"); }
     return html`<div class=${cx("thq-ed is-mobile", sheet && "has-sheet")} role="dialog" aria-modal="true" aria-label=${L("Edytor filmu", "Video editor")}>
@@ -1763,7 +1994,7 @@ function VideoEditor({ path, onClose }) {
           <p><kbd>← →</kbd> ${L("klatka", "frame")}</p>
         </div></div></div>`;
     }
-    return sel.type === "clip" ? clipTools(selItem) : sel.type === "text" ? textTools(selItem) : audioTools(selItem);
+    return sel.type === "clip" ? clipTools(selItem) : sel.type === "text" ? textTools(selItem) : sel.type === "typo" ? typoTools(selItem) : audioTools(selItem);
   };
   return html`<div class="thq-ed" role="dialog" aria-modal="true" aria-label=${L("Edytor filmu", "Video editor")}>
     <header class="thq-ed-top">
@@ -1853,6 +2084,7 @@ function NoteThumb({ path, url }) {
 function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen, notes, addNote, removeNote, noteHi, onSeek, startShot, urls }) {
   const open = openNotes(notes);
   const where = sel ? (sel.type === "text" ? `napis „${sel.item.text}” (${fmtT(sel.item.start, true)}–${fmtT(sel.item.end, true)})`
+    : sel.type === "typo" ? `blok typografii ${sel.item.id} „${typoTekst(sel.item)}” (${fmtT(sel.item.start, true)}–${fmtT(sel.item.end, true)}${sel.item.warstwa === "tyl" ? ", za osobą" : ""})`
     : sel.type === "clip" ? `klip ${sel.item.src.split("/").pop()} (${fmtT(sel.item.in, true)}–${fmtT(sel.item.out, true)} źródła)` : `muzyka ${sel.item.src.split("/").pop()}`) : "nic";
   const text = (ask.text || "").trim();
   const canSend = !ask.busy && (text || open.length || ask.shot);

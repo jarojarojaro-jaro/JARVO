@@ -100,11 +100,12 @@ instalację pojawi się przy następnej, a wdrożenie bez zmian nie rozłącza o
 
 ## 2a. Edytor filmów
 
-Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~119 KB nieskompresowany, ok. 36 KB po gzip, plus `46-uwagi.js`) w tym samym
+Bez bibliotek i bez nowych usług: edytor to plik `hq/web/src/45-edytor.js` (~146 KB nieskompresowany, ok. 44 KB po gzip, plus `46-uwagi.js`) w tym samym
 pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 
 - **Oś magnetyczna (jak w CapCut):** każda zmiana klipów (usunięcie, wstawienie, przycięcie krawędzi, tempo, długość
-  obrazu, przestawienie) przelicza resztę osi: napisy i uwagi idą za materiałem, z którego pochodzą (czas źródła klipu),
+  obrazu, przestawienie) przelicza resztę osi: napisy, uwagi i bloki typografii (z czasami słów) idą za materiałem,
+  z którego pochodzą (czas źródła klipu),
   a muzyka i lektor przesuwają się o wycięty albo wstawiony czas; przy przestawieniu napis jedzie z klipem, a audio stoi.
   Ta sama reguła działa u Wideografa (`edytor.remap_times` w `projekt.py usun` i `dodaj-klip --pozycja`), więc edycje
   człowieka i agenta nie rozjeżdżają napisów. Testy: `tests/test_edytor_os.py` (te same przypadki w przeglądarce i w Pythonie).
@@ -149,6 +150,17 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   (`typoOdcinki`), wysyła je jako WebP (PNG, gdy przeglądarka nie zna WebP) razem z pustą klatką w tym samym formacie
   (demuxer `concat` dekoduje całą listę kodekiem pierwszego pliku, więc serwer odrzuca mieszankę PNG i WebP), a ffmpeg
   nakłada dwie warstwy pod zwykłymi napisami: „za osobą” (`tyl`) i przednią.
+- **Edycja typografii:** pas **Typografia** nad osią (blok przed osobą niebieski, za osobą fioletowy, słowa pogrubione
+  według wagi). Klik w blok na osi albo na podglądzie otwiera panel (na telefonie arkusz): słowa jako żetony
+  (tekst, waga, kolor z powrotem do motywu, krój z siatki albo „Auto” z motywu, styl, głębia, wielkie litery, skala,
+  linia) i blok (układ; „Za osobą” przestawia blok na warstwę `tyl`, rozmiar, szerokość, obrót, perspektywa 3D,
+  wejście słów, wyjście). Blok `tyl` bez policzonej sylwetki ma ostrzeżenie i przycisk prośby do Wideografa.
+  Na podglądzie blok przeciąga się z przyciąganiem do środka kadru; na osi zmienia się jego czas (lewa krawędź
+  zostawia słowa przy ich czasie w filmie). **Tnij** dzieli blok na słowie pod wskaźnikiem, jest też **Połącz
+  z następnym**, **Duplikuj** i **Usuń**; wszystko to jeden krok cofania. Panel **Napisy** ma sekcję typografii:
+  motyw, akcent, nowy blok, usunięcie planu albo prośba do Wideografa o plan. Przycięcie, usunięcie, tempo
+  i przestawienie klipów przesuwają bloki i czasy słów razem z materiałem (`typoNaOsi` w `remapTimes`
+  i `edytor.remap_times`; test: `tests/test_edytor_os.py`).
 - **Napis za osobą** (głębia jak z montażu: osoba przed słowem): Wideograf liczy maską MODNet (`maska.py`) sylwetkę
   osoby klatka po klatce dla bloków warstwy `tyl` i zapisuje ją obok filmu (`<film>.maska/`: PNG z kanałem alfa
   i `indeks.json` z kluczem osi). Podgląd pobiera indeks (`GET /edit/maska`) i rysuje: warstwa `tyl` → osoba z bieżącej

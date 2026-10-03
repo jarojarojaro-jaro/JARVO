@@ -223,8 +223,9 @@ def layout_clips(clips: list[dict]) -> list[tuple[dict, float, float]]:
 
 def remap_times(p0: dict, p1: dict) -> dict:
     """Oś magnetyczna, ta sama reguła co remapTimes w hq/web/src/45-edytor.js: po zmianie klipów (usunięcie, wstawienie,
-    przycięcie, tempo, przestawienie) napisy i uwagi idą za materiałem, z którego pochodzą (czas źródła klipu), a muzyka
-    i lektor przesuwają się o wycięty albo wstawiony czas. Przy samym przestawieniu napis jedzie w całości z klipem."""
+    przycięcie, tempo, przestawienie) napisy, uwagi i bloki typografii (z każdym słowem) idą za materiałem, z którego
+    pochodzą (czas źródła klipu), a muzyka i lektor przesuwają się o wycięty albo wstawiony czas. Przy samym
+    przestawieniu napis i blok jadą w całości z klipem."""
     l0, l1 = layout_clips(p0.get("clips") or []), layout_clips(p1.get("clips") or [])
     tot0, tot1 = (l0[-1][2] if l0 else 0.0), (l1[-1][2] if l1 else 0.0)
     ids0 = {c.get("id") for c in p0.get("clips") or []}
@@ -270,7 +271,25 @@ def remap_times(p0: dict, p1: dict) -> dict:
     if not reorder:
         audio = [{**m, "start": round(mapuj(float(m.get("start", 0))), 3)} for m in audio]
     notes = [{**n, "t": round(mapuj(float(n.get("t", 0))), 3)} for n in p1.get("notes") or []]
-    return {**p1, "texts": texts, "audio": audio, "notes": notes}
+    out = {**p1, "texts": texts, "audio": audio, "notes": notes}
+    typo = p1.get("typo")
+    if isinstance(typo, dict) and isinstance(typo.get("bloki"), list):   # typografia: blok i każde słowo za materiałem
+        bloki = []
+        for b in typo["bloki"]:
+            if not isinstance(b, dict):
+                continue
+            a, e = float(b.get("start", 0)), float(b.get("end", 0))
+            d = mapuj((a + e) / 2) - (a + e) / 2 if reorder else 0.0
+            f = (lambda x, d=d: x + d) if reorder else mapuj
+            s1, e1 = f(a), f(e)
+            if e1 - s1 < 0.05:
+                continue
+            slowa = [{**w, "t": round(max(0.0, f(a + float(w.get("t") or 0)) - s1), 3),
+                      "k": round(max(0.0, f(a + float(w.get("k") or 0)) - s1), 3)}
+                     for w in b.get("slowa") or [] if isinstance(w, dict)]
+            bloki.append({**b, "start": round(s1, 3), "end": round(e1, 3), "slowa": slowa})
+        out["typo"] = {**typo, "bloki": bloki}
+    return out
 
 
 def karaoke_words(t: dict) -> list[str] | None:
