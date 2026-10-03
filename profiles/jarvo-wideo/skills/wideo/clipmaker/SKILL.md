@@ -1,7 +1,7 @@
 ---
 name: clipmaker
 description: "Długie nagranie → edytowalne rolki z napisami karaoke."
-version: 1.5.0
+version: 1.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -61,6 +61,10 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
    (−14 LUFS, głośność klipów najwyżej ×2); bardzo ciche nagranie zostaje poniżej celu i `qa_wideo.py` to pokaże.
    Zbliżenia też sam: ×1,12 na akcencie (słowo wyraźnie głośniej niż zwykle u mówcy i ważne: liczba, wykrzyknik,
    puenta), najwyżej ~3 na minutę i co ≥ 18 s; `zbuduj` wypisuje ich czasy. Za mało albo za dużo → `styl.punch`.
+   **Pierwsza klatka i okładka** też z twarzy: pierwsza klatka w mrugnięciu, rozmyta albo bokiem → `zbuduj` przesuwa
+   początek najwyżej 0,25 s w ciszę przed pierwszym słowem; nie ma dobrej → „⚠ pierwsza klatka” (zmień `od` segmentu).
+   Okładka `klip-N-<slug>-okladka.jpg` to klatka rolki z dużą, ostrą twarzą do kamery z otwartymi oczami, w kadrze
+   rolki, bez napisów (tekst na okładkę to zlecenie dla Studia przez Jarva).
 7. **Kontrola każdej rolki:** `python3 $HERMES_HOME/scripts/qa_wideo.py <rolka>.mp4` + 2–3 klatki (`vision_analyze`):
    twarz w kadrze, napisy czytelne i poza strefą UI, tytuł nie zasłania twarzy. Cięcia: `krytyka.py ciecia <rolka>.mp4`
    (projekt leży obok, słowa z analizy mowy nagrania) i każdy obraz cięcia przez `vision_analyze`; słowo przecięte
@@ -78,7 +82,7 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
   (tekst linii z tą samą liczbą słów zachowuje karaoke) albo prosisz człowieka o listę nazw.
 
 ## Wyjścia
-`out/wideo/klipy/`: `klip-N-<slug>.mp4` + `klip-N-<slug>.edycja.json`, `KLIPY.md`, `KANDYDACI.md`, `plan.json`,
+`out/wideo/klipy/`: `klip-N-<slug>.mp4` + `klip-N-<slug>.edycja.json` + `klip-N-<slug>-okladka.jpg`, `KLIPY.md`, `KANDYDACI.md`, `plan.json`,
 `transkrypcja.txt`, `analiza.json`, `klatki/`. Analiza mowy leży obok nagrania (`<nagranie>.mowa.json`).
 
 ## Definition of Done
@@ -87,4 +91,5 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
 - [ ] każde okno ocenione 0–100 w KANDYDACI.md, oceny rolek (średnia ≥ 7, hook ≥ 7), rolki o różnych tematach
       i puentach, tytuł nazywa konkret tej rolki, czasy w źródle w KLIPY.md,
 - [ ] `klipy.py sprawdz` bez błędów, `qa_wideo.py` i `krytyka.py ciecia` bez błędów dla każdej rolki, twarz mówcy w kadrze,
-- [ ] napisy poprawione (nazwy własne, liczby), projekty otwierają się w edytorze HQ.
+- [ ] napisy poprawione (nazwy własne, liczby), projekty otwierają się w edytorze HQ,
+- [ ] okładka każdej rolki obejrzana (`vision_analyze`), żadna „⚠ pierwsza klatka” nie została bez decyzji.

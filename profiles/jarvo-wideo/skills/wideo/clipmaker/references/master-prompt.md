@@ -36,7 +36,9 @@ emocja → świadek, riposta → pytanie / domyślna odpowiedź. Wypowiedź z ko
   mówiłem”, „wracając do…”), bez zaimków bez odniesienia na starcie („on wtedy…”, „to jest…”).
   Hook rolki ma **trzy warstwy** (skill `hooki`) i każda mówi co innego:
   - **zdanie mówione** = pierwsze zdanie fragmentu (wybierasz, nie piszesz),
-  - **obraz** = pierwsza klatka: twarz w emocji, gest, rzecz pokazywana w ręku; nie mówca w pół mrugnięcia,
+  - **obraz** = pierwsza klatka: twarz w emocji, gest, rzecz pokazywana w ręku; nie mówca w pół mrugnięcia
+    (`zbuduj` sam przesuwa początek o ułamek sekundy z mrugnięcia, rozmycia i twarzy bokiem, a gdy się nie da,
+    ostrzega „⚠ pierwsza klatka”),
   - **tytuł-hook** na ekranie **nie powtarza** zdania mówionego: dokłada stawkę, wywołuje odbiorcę albo nazywa
     konflikt (mówca: „Trzy błędy w cenach…” → tytuł „Tracisz marżę?”, nie „3 błędy w cenach”).
     `klipy.py sprawdz` ostrzega, gdy tytuł powtarza pierwsze sekundy mowy.

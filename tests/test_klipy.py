@@ -337,3 +337,68 @@ def test_reel_cuts_to_whoever_speaks(nagranie):
     assert clips[0]["fx"] < 0.3 and clips[1]["fx"] > 0.7
     bez = K.projekt_rolki(p, p["rolki"][0], nagranie, slowa, {"w": 1920, "h": 1080}, tw, None)
     assert bez["clipmaker"]["kadr"] == ["twarz"] and len({c["fx"] for c in bez["clips"]}) == 1
+
+
+def tw(x, y=0.4, s=0.1, ostr=100.0, oczy=1.0, nos=0.0):
+    """Twarz z punktami (oczy, nos, kąciki ust) i jakością (ostrość, oczy otwarte), jak z twarze.py wykryj."""
+    return [x - s / 2, y - s / 2, x + s / 2, y + s / 2, 0.9, x - 0.3 * s, y - 0.1 * s, x + 0.3 * s, y - 0.1 * s,
+            x + nos * s, y + 0.05 * s, x - 0.2 * s, y + 0.25 * s, x + 0.2 * s, y + 0.25 * s, ostr, oczy]
+
+
+def test_cover_is_big_sharp_frontal_face_with_open_eyes():
+    W, H, sw, sh = 1080, 1920, 1920, 1080
+    c = {"in": 0.0, "out": 10.0, "fx": 0.5, "fy": 0.4, "zoom": 1.0}
+    okno = K.widoczne(c, W, H, sw, sh)
+    assert okno[:4] == pytest.approx((0.3418, 0.0, 0.6582, 1.0), abs=1e-3)
+    assert K.twarz_w_kadrze([tw(0.2, s=0.3), tw(0.5, s=0.08), tw(0.55, s=0.06)], okno)[0] == pytest.approx(0.46)
+    assert K.frontalnosc(tw(0.5)) == 1.0 and K.frontalnosc(tw(0.5, nos=0.3)) == 0.2
+    twarze = {"probki": [[1.0, [tw(0.5, ostr=100)]], [2.0, [tw(0.5, ostr=110)]],
+                         [3.0, [tw(0.5, s=0.12, ostr=20)]],              # większa, ale rozmyta
+                         [4.0, [tw(0.5, s=0.12, ostr=120, oczy=0.5)]],   # największa i najostrzejsza, ale mrugnięcie
+                         [5.0, [tw(0.5, s=0.11, ostr=105)]],             # ← okładka
+                         [6.0, [tw(0.5, s=0.13, ostr=120, nos=0.3)]],    # bokiem
+                         [7.0, [tw(0.2, s=0.2)]]]}                       # twarz poza kadrem
+    probki = K.probki_rolki([c], twarze, W, H, sw, sh)
+    assert probki[-1][3] is None and probki[0][4] == pytest.approx(0.1 * 3413.3 * 0.1 * 1920 / (W * H), rel=1e-3)
+    wz = K.wzorzec(probki)
+    assert wz == {"ostr": 110.0, "oczy": 1.0, "max": 120.0}
+    assert K.okladka(probki, wz)[:3] == (5.0, 5.0, 0)
+    assert [K.slabosc(p[3], wz) for p in probki] == [None, None, "twarz rozmyta", K.MRUGNIECIE, None, "twarz bokiem",
+                                                     "bez twarzy w kadrze"]
+    assert K.okladka([p for p in probki if p[3] is None], wz) is None
+
+
+def test_first_frame_skips_blink_within_silence_before_first_word(nagranie):
+    p = K.wczytaj_plan_dict(plan(nagranie))
+    proj = K.projekt_rolki(p, p["rolki"][0], nagranie, WORDS, {})
+    c0 = proj["clips"][0]
+    assert c0["in"] == 0.92 and K.chwile_poczatku(proj["clips"], WORDS, 0.9) == [0.92, 0.953]
+    dalej = [[1.0, 1.3, "x"], [2.0, 2.4, "Zaczynamy"], [2.5, 2.8, "teraz."]]        # słowo przed rolką kończy się w 1,3 s
+    ch = K.chwile_poczatku([{"in": 1.92, "out": 2.8}], dalej, 1.5)
+    assert ch[0] == pytest.approx(1.753, abs=1e-3) and 1.92 in ch and ch[-1] <= 1.97 and len(ch) == 7
+    wz = {"ostr": 100.0, "oczy": 1.0, "max": 120.0}
+    W, H, sw, sh = 1080, 1920, 1920, 1080
+    c = {**c0, "fx": 0.5}
+    ocena = {"probki": [[1.753, [tw(0.5)]], [1.787, [tw(0.5)]], [1.82, [tw(0.5, oczy=0.4)]], [1.853, [tw(0.5, oczy=0.4)]],
+                        [1.887, [tw(0.5, oczy=0.5)]], [1.92, [tw(0.5, oczy=0.5)]], [1.953, [tw(0.5)]]]}
+    assert K.pierwsza_klatka({**c, "in": 1.92}, ocena, wz, W, H, sw, sh) == (1.953, K.MRUGNIECIE)
+    assert K.pierwsza_klatka({**c, "in": 1.787}, ocena, wz, W, H, sw, sh) == (None, None)       # dobra: bez zmian
+    zle = {"probki": [[t, [tw(0.5, ostr=10)]] for t, _ in ocena["probki"]]}
+    assert K.pierwsza_klatka({**c, "in": 1.92}, zle, wz, W, H, sw, sh) == (None, "twarz rozmyta")
+    assert K.pierwsza_klatka(c, None, wz, W, H, sw, sh) == (None, None)                        # bez modelu
+    po = K.projekt_rolki(p, p["rolki"][0], nagranie, WORDS, {}, start=0.953)
+    assert po["clips"][0]["in"] == 0.953                                                   # pierwsza klatka później
+    assert [(x["in"], x["out"]) for x in po["clips"][1:]] == [(x["in"], x["out"]) for x in proj["clips"][1:]]
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
+def test_cover_file_is_frame_in_clip_framing(tmp_path):
+    src = tmp_path / "zrodlo.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:d=3",
+                    "-pix_fmt", "yuv420p", str(src)], check=True)
+    plik = tmp_path / "klip-1-x-okladka.jpg"
+    assert K.zapisz_okladke(src, {"fx": 0.3, "fy": 0.4, "zoom": 1.12}, 1.5, 1080, 1920, plik)
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0", str(plik)],
+                       capture_output=True, text=True, check=True)
+    assert r.stdout.strip() == "1080,1920"
+    assert not K.zapisz_okladke(tmp_path / "brak.mp4", {}, 1.0, 1080, 1920, tmp_path / "nie.jpg")

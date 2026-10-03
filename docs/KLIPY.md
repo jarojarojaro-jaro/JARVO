@@ -32,7 +32,7 @@ napisy, tytuł, muzykę, a eksport robi nową wersję.
        dla każdej rolki: projekt 1080×1920 (segmenty ze źródła z granicą dosuniętą ze środka słowa do przerwy,
        kadr na twarzy z twarze.py (YuNet) albo z planu, cięcie pauz > 0,6 s i „yyy”,
        napisy karaoke ze słów, tytuł-hook na pierwsze sekundy, opcjonalnie muzyka) → render tym samym silnikiem
-       co „Eksportuj” → klip-N-<slug>.mp4 + klip-N-<slug>.edycja.json
+       co „Eksportuj” → klip-N-<slug>.mp4 + klip-N-<slug>.edycja.json + okładka klip-N-<slug>-okladka.jpg
         │
         ▼
   ④ kontrola: qa_wideo.py + klatki kontrolne (kadr, napisy w strefie bezpiecznej) + obraz każdego cięcia
@@ -78,6 +78,8 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 | rytm | wycięte pauzy > 0,6 s i „yyy” (zostaje 0,12 s oddechu); zbliżenie ×1,12 na akcencie mowy (słowo głośniej niż zwykle u mówcy i ważne treścią, waga słowa z `typografia.py`), najwyżej ~3 na minutę i co ≥ 18 s, 1,3–3,5 s do cięcia albo przerwy | kolejne klipy z tego samego źródła; zbliżenie = klip podzielony w tym samym materiale z `zoom` 1,12 (eksport nie wycisza takiego styku), czasy w `clipmaker.zblizenia` |
 | napisy | **karaoke**: 2–4 słowa w linii, aktywne słowo w kolorze akcentu, grube, z obrysem, w dolnej 1/3 poza strefą UI platform | **nowy** typ napisu: `words` + `hl` |
 | hook | tytuł na górze przez pierwsze ~3 s | zwykły napis (`texts`) |
+| pierwsza klatka | bez mrugnięcia, rozmycia i twarzy bokiem: `twarze.py ocen` ocenia klatki od 0,25 s przed pierwszym słowem, `zbuduj` bierze najpóźniejszą dobrą; żadnej dobrej → „⚠ pierwsza klatka” w logu i KLIPY.md | `in` pierwszego klipu, `clipmaker.pierwsza_klatka` |
+| okładka | `klip-N-<slug>-okladka.jpg`: klatka rolki w jej kadrze, bez napisów; wybór za openshorts (pole twarzy × ostrość) plus twarz do kamery i otwarte oczy (mrugnięcie ×0,3); ostrość = wariancja laplasjanu twarzy, oczy = kontrast okolic oczu do kontrastu twarzy (`twarze.py`, przy każdej próbce `wykryj`) | `clipmaker.okladka` (chwila osi, plik) |
 | dźwięk | głośność −14 LUFS: `zbuduj` mierzy fragmenty źródła (ebur128) i ustawia głośność klipów (najwyżej ×2, szczyt ≤ −1,5 dBFS); opcjonalnie cicha muzyka pod mową | `volume` klipów, `audio` |
 
 ## 4. Co trzeba zbudować

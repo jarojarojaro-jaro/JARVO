@@ -49,3 +49,20 @@ def test_grid_and_segments():
     with pytest.raises(SystemExit):
         T.odcinki_arg("5-3")
     assert T.pamiec_path(Path("/x/podcast.mp4")) == Path("/x/podcast.twarze.json")
+
+
+def test_face_quality_sharpness_and_open_eyes():
+    np = pytest.importorskip("numpy")
+    w, h = 200, 200
+    f = [0.25, 0.25, 0.75, 0.75, 0.9, 0.4, 0.42, 0.6, 0.42, 0.5, 0.5, 0.42, 0.62, 0.58, 0.62]
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    ostra = 128 + 60 * np.sign(np.sin(xx / 2) * np.sin(yy / 2))               # drobna szachownica: dużo krawędzi
+    rozmyta = 128 + 30 * np.sin(xx / 25) * np.sin(yy / 25)                     # łagodne przejścia
+    assert T.jakosc(f, ostra, w, h)[0] > 20 * T.jakosc(f, rozmyta, w, h)[0]
+    skora = 150 + 15 * np.sin(xx / 9) * np.sin(yy / 9)                           # gładka twarz, oczy zamknięte
+    otwarte = skora.copy()
+    for ex in (80, 120):                                                         # białko i źrenica w miejscu oczu
+        otwarte[80:88, ex - 6:ex + 7] = 235
+        otwarte[81:87, ex - 2:ex + 3] = 30
+    assert T.jakosc(f, otwarte, w, h)[1] > 1.5 * T.jakosc(f, skora, w, h)[1]
+    assert T.jakosc([0.0, 0.0, 0.01, 0.01] + f[4:], ostra, w, h) == [0.0, 0.0]  # za mała twarz: bez oceny

@@ -5,10 +5,14 @@ sam, bez zgadywania fx/fy z arkusza klatek.
     twarze.py model                                          # pobierz model raz (230 KB, przypięta suma SHA-256)
     twarze.py wykryj <nagranie> --odcinki 10-35.5,60-80 [--co 0.5]
     twarze.py usta <nagranie> --odcinki 10-35.5 [--co 0.125]  # ruch ust każdej twarzy (kto mówi)
+    twarze.py ocen <nagranie> --chwile 12.30,12.333,12.367     # twarze z jakością w dokładnych chwilach (bez pamięci)
 
-wykryj: JSON {"w", "h", "co", "probki": [[t, [[x0, y0, x1, y1, pewnosc, oczy i usta: 10 liczb], …]], …]} ze
-współrzędnymi 0–1 klatki źródła (po obrocie z telefonu). Próbki leżą na stałej siatce co `co` sekund, więc odcinki
-różnych rolek dzielą wyniki: policzone próbki zostają w <nagranie>.twarze.json obok nagrania.
+wykryj: JSON {"w", "h", "co", "probki": [[t, [[x0, y0, x1, y1, pewnosc, oczy, nos i usta: 10 liczb, ostrosc, oczy_otwarte],
+…]], …]} ze współrzędnymi 0–1 klatki źródła (po obrocie z telefonu). Próbki leżą na stałej siatce co `co` sekund,
+więc odcinki różnych rolek dzielą wyniki: policzone próbki zostają w <nagranie>.twarze.json obok nagrania.
+ostrosc = wariancja laplasjanu w ramce twarzy (rozmycie ruchu i ostrości ją obniża), oczy_otwarte = kontrast okolic
+oczu do kontrastu całej twarzy (zamknięte oko to gładka skóra, więc mniej); klipy.py wybiera z tego okładkę rolki
+(duża, ostra twarz do kamery, za openshorts: thumbnail) i pierwszą klatkę bez mrugnięcia.
 
 usta: to samo gęściej (8 klatek/s) i przy każdej twarzy ruch ust względem poprzedniej klatki: różnica obszaru ust
 i szczęki (według kącików ust) minus połowa różnicy obszaru oczu i nosa (ruch głowy; mówiący też rusza głową, więc nie
@@ -44,6 +48,7 @@ BOK = 640                 # wejście modelu 640×640
 PEWNOSC = 0.7             # twarz, gdy wynik ≥ 0,7 (OpenCV w przykładzie 0,9; niżej łapie też twarz z profilu)
 NMS = 0.3
 CO = 0.5                  # domyślnie dwie próbki na sekundę
+WERSJA = 2                # pamięć <nagranie>.twarze.json: 2 = twarze z ostrością i oczami
 
 
 def katalog_modeli() -> Path:
@@ -146,6 +151,30 @@ class Detektor:
         return out
 
 
+def _szary(rgb: bytes, w: int, h: int):
+    import numpy as np  # noqa: PLC0415
+    return np.frombuffer(rgb, dtype=np.uint8).reshape(h, w, 3).astype(np.float32) @ np.array([0.299, 0.587, 0.114],
+                                                                                             dtype=np.float32)
+
+
+def jakosc(f: list[float], szary, w: int, h: int) -> list[float]:
+    """[ostrość, oczy otwarte] twarzy (0–1, z punktami) w klatce w skali szarości."""
+    H, Wd = szary.shape
+    x0, y0 = max(0, int(f[0] * w)), max(0, int(f[1] * h))
+    x1, y1 = min(Wd, int(math.ceil(f[2] * w))), min(H, int(math.ceil(f[3] * h)))
+    tw = szary[y0:y1, x0:x1]
+    if tw.shape[0] < 5 or tw.shape[1] < 5:
+        return [0.0, 0.0]
+    lap = 4 * tw[1:-1, 1:-1] - tw[:-2, 1:-1] - tw[2:, 1:-1] - tw[1:-1, :-2] - tw[1:-1, 2:]
+    r = max(2, int(0.09 * (x1 - x0)))
+    oczy = []
+    for ex, ey in ((f[5] * w, f[6] * h), (f[7] * w, f[8] * h)):
+        o = szary[max(0, int(ey) - r):int(ey) + r + 1, max(0, int(ex) - r):int(ex) + r + 1]
+        if o.size:
+            oczy.append(float(o.std()))
+    return [round(float(lap.var()), 1), round(sum(oczy) / len(oczy) / (float(tw.std()) + 1.0), 3) if oczy else 0.0]
+
+
 USTA_CO = 0.125           # ruch ust: 8 klatek na sekundę (mowa to 4–8 ruchów ust na sekundę)
 SIATKA = (12, 16)         # obszar ust i obszar odniesienia próbkowane do 12×16 punktów
 
@@ -182,8 +211,7 @@ def ruch_ust(det: Detektor, src: Path, chwile: list[float], w: int, h: int) -> d
         if ost is None or t - ost > 1.5 * USTA_CO:
             poprz = []
         ost = t
-        szary = np.frombuffer(rgb, dtype=np.uint8).reshape(h, w, 3).astype(np.float32) @ np.array([0.299, 0.587, 0.114],
-                                                                                                    dtype=np.float32)
+        szary = _szary(rgb, w, h)
         teraz, wynik = [], []
         for f in det.twarze(rgb, w, h):
             u, o = obszary(f, szary, w, h)
@@ -238,14 +266,16 @@ def wykryj(src: Path, odcinki: list[tuple[float, float]], co: float = CO) -> dic
         pam = json.loads(pp.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         pam = {}
-    if pam.get("model") != MODEL_SHA256[:12] or pam.get("co") != co or pam.get("w") != W or pam.get("h") != H:
-        pam = {"model": MODEL_SHA256[:12], "co": co, "w": W, "h": H, "probki": {}}
+    if (pam.get("model") != MODEL_SHA256[:12] or pam.get("co") != co or pam.get("w") != W or pam.get("h") != H
+            or pam.get("wersja") != WERSJA):
+        pam = {"model": MODEL_SHA256[:12], "wersja": WERSJA, "co": co, "w": W, "h": H, "probki": {}}
     chwile = sorted({t for od, do in odcinki for t in siatka(od, do, co)})
     brak = [t for t in chwile if f"{t:.3f}" not in pam["probki"]]
     if brak:
         det = Detektor()
         for t, rgb in klatki(src, brak, w, h):
-            pam["probki"][f"{t:.3f}"] = det.twarze(rgb, w, h)
+            szary = _szary(rgb, w, h)
+            pam["probki"][f"{t:.3f}"] = [f + jakosc(f, szary, w, h) for f in det.twarze(rgb, w, h)]
         try:
             pp.write_text(json.dumps(pam, ensure_ascii=False), encoding="utf-8")
         except OSError:
@@ -264,8 +294,8 @@ def usta(src: Path, odcinki: list[tuple[float, float]], co: float = USTA_CO) -> 
         pam = json.loads(pp.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         pam = {}
-    if pam.get("model") != MODEL_SHA256[:12] or pam.get("w") != W or pam.get("h") != H:
-        pam = {"model": MODEL_SHA256[:12], "co": CO, "w": W, "h": H, "probki": {}}
+    if pam.get("model") != MODEL_SHA256[:12] or pam.get("w") != W or pam.get("h") != H or pam.get("wersja") != WERSJA:
+        pam = {"model": MODEL_SHA256[:12], "wersja": WERSJA, "co": CO, "w": W, "h": H, "probki": {}}
     if (pam.get("usta") or {}).get("co") != co:
         pam["usta"] = {"co": co, "probki": {}}
     zapis = pam["usta"]["probki"]
@@ -285,6 +315,26 @@ def usta(src: Path, odcinki: list[tuple[float, float]], co: float = USTA_CO) -> 
             pass
     chwile = sorted({t for od, do in odcinki for t in siatka(od, do, co)})
     return {"w": W, "h": H, "co": co, "probki": [[t, zapis[f"{t:.3f}"]] for t in chwile if f"{t:.3f}" in zapis]}
+
+
+def ocen(src: Path, chwile: list[float]) -> dict:
+    """Twarze z jakością w dokładnych chwilach (np. kolejne klatki przed pierwszym słowem rolki), bez pamięci."""
+    v = wl.probe(src).get("video") or {}
+    W, H = int(v.get("width") or 0), int(v.get("height") or 0)
+    if not W or not H:
+        raise SystemExit(f"{src.name}: brak obrazu (twarze tylko z wideo)")
+    w, h = rozmiar(W, H)
+    det, out = Detektor(), []
+    for t in sorted(chwile):           # każda chwila osobno: pierwsza klatka od t, jak w eksporcie klipu od `in` = t
+        r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-ss", f"{t:.3f}", "-i", str(src),
+                            "-vf", f"scale={w}:{h}", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                           capture_output=True, check=True)
+        if len(r.stdout) < w * h * 3:
+            continue
+        rgb = r.stdout[:w * h * 3]
+        szary = _szary(rgb, w, h)
+        out.append([t, [f + jakosc(f, szary, w, h) for f in det.twarze(rgb, w, h)]])
+    return {"w": W, "h": H, "probki": out}
 
 
 def odcinki_arg(s: str) -> list[tuple[float, float]]:
@@ -314,6 +364,11 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--co", type=float, default=USTA_CO, help="odstęp klatek w sekundach (domyślnie 0,125)")
     sp.set_defaults(fn=lambda a: print(json.dumps(usta(Path(a.nagranie).resolve(), odcinki_arg(a.odcinki),
                                                        max(0.04, a.co)))) or 0)
+    sp = sub.add_parser("ocen", help="twarze z ostrością i oczami w dokładnych chwilach (JSON)")
+    sp.add_argument("nagranie")
+    sp.add_argument("--chwile", required=True, help="sekundy źródła po przecinku")
+    sp.set_defaults(fn=lambda a: print(json.dumps(ocen(Path(a.nagranie).resolve(),
+                                                       [float(x) for x in a.chwile.split(",") if x.strip()]))) or 0)
     a = ap.parse_args(argv)
     return a.fn(a)
 

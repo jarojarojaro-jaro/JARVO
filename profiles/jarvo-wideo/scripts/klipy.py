@@ -17,9 +17,10 @@ zbuduj: każda rolka → <out>/klip-N-<slug>.edycja.json (projekt edytora: segme
 ze środka słowa do przerwy obok, wycięte pauzy i wtrącenia, kadr na twarzy mówcy, gdy plan nie podaje fx/fy
 (twarze.py, YuNet: śledzenie z bezwładnością, nowe ujęcie przy zmianie twarzy albo dużym przesunięciu; kilka osób
 w kadrze → kadr na tej, która mówi, z ruchu ust w czasie mowy),
-zbliżenia na akcentach mowy, głośność klipów do −14 LUFS z pomiaru źródła, napisy karaoke ze słów, tytuł-hook)
+zbliżenia na akcentach mowy, pierwsza klatka bez mrugnięcia, głośność klipów do −14 LUFS z pomiaru źródła, napisy karaoke ze słów, tytuł-hook)
 i render tym samym
-silnikiem co „Eksportuj” → <out>/klip-N-<slug>.mp4, na końcu KLIPY.md. Człowiek otwiera rolkę w HQ („✎ Edytuj”)
+silnikiem co „Eksportuj” → <out>/klip-N-<slug>.mp4 i okładka klip-N-<slug>-okladka.jpg (duża, ostra twarz do kamery,
+oczy otwarte), na końcu KLIPY.md. Człowiek otwiera rolkę w HQ („✎ Edytuj”)
 i poprawia wszystko; eksport z edytora robi nową wersję obok.
 
 plan.json: patrz skill clipmaker (references/plan.md). Czas w sekundach ŹRÓDŁA.
@@ -62,6 +63,10 @@ AKCENT_NA_MIN = 3        # i najwyżej ~3 na minutę; częściej to drganie, nie
 AKCENT_Z = 1.0           # akcent: słowo głośniej niż zwykle u mówcy (odchylenia od mediany, jak w typografii)
 AKCENT_WYNIK = 2.5       # i ważne treścią (waga słowa z typografii: liczba, wykrzyknik, długie, koniec zdania)
 TRZYMAJ = (1.3, 3.5)     # zbliżenie trwa tyle i wraca na cięciu albo w przerwie między słowami
+OCZY = 0.75              # oczy otwarte: kontrast okolic oczu ≥ tyle typowego w rolce (mrugnięcie to mniej)
+OSTRA = 0.5              # twarz ostra: wariancja laplasjanu ≥ tyle typowej w rolce
+POCZATEK = 0.25          # pierwsza klatka może wejść najwyżej tyle sekund w ciszę przed pierwszym słowem
+MRUGNIECIE = "oczy zamknięte (mrugnięcie)"
 HL = pr.KARAOKE_HL
 ZLE_STARTY = ("no i", "i ", "a ", "tak jak mówiłem", "wracając do", "jak mówiłem", "więc", "no więc", "no to",
               "ale ", "bo ", "czyli", "and ", "so ", "but ", "like i said", "anyway")
@@ -404,15 +409,17 @@ def fragmenty(od: float, do: float, words: list, prog: float | None, bez_wtracen
 
 # ---------------------------------------------------------------- kadr na twarz (twarze.py)
 
-def twarze_zrodla(src: Path, odcinki: list[tuple[float, float]], polecenie: str = "wykryj") -> dict | None:
+def twarze_zrodla(src: Path, odcinki: list[tuple[float, float]], polecenie: str = "wykryj",
+                  chwile: list[float] | None = None) -> dict | None:
     """twarze.py Pythonem narzędzi (onnxruntime z obrazu); błąd albo brak modelu = None i kadr z planu albo środek
-    (przy `usta`: kadr na największej twarzy zamiast na mówiącym)."""
-    if not odcinki:
+    (przy `usta`: kadr na największej twarzy zamiast na mówiącym; przy `ocen`: pierwsza klatka bez zmian)."""
+    if not odcinki and not chwile:
         return None
     py = "/opt/jarvo/venv/bin/python" if Path("/opt/jarvo/venv/bin/python").exists() else sys.executable
-    arg = ",".join(f"{a:.3f}-{b:.3f}" for a, b in odcinki)
+    arg = (["--chwile", ",".join(f"{t:.3f}" for t in chwile)] if chwile
+           else ["--odcinki", ",".join(f"{a:.3f}-{b:.3f}" for a, b in odcinki)])
     try:
-        r = subprocess.run([py, str(HERE / "twarze.py"), polecenie, str(src), "--odcinki", arg], capture_output=True,
+        r = subprocess.run([py, str(HERE / "twarze.py"), polecenie, str(src), *arg], capture_output=True,
                            text=True, timeout=3600)
         if r.returncode == 0:
             return json.loads(r.stdout)
@@ -708,8 +715,121 @@ def przybliz(clips: list[dict], meta: list, slowa: list[list], chwile: list[floa
     return out
 
 
+def widoczne(c: dict, W: int, H: int, sw: float, sh: float) -> tuple[float, float, float, float, float, float]:
+    """Część źródła (0–1) widoczna w klipie `cover` (jak edytor.cover_filter) i skala źródło → kadr w pikselach."""
+    z = float(c.get("zoom", 1) or 1)
+    k = max(W * z / sw, H * z / sh)
+    iw, ih = sw * k, sh * k
+    x0, y0 = (iw - W) * float(c.get("fx", 0.5)) / iw, (ih - H) * float(c.get("fy", 0.5)) / ih
+    return x0, y0, x0 + W / iw, y0 + H / ih, iw, ih
+
+
+def twarz_w_kadrze(twarze: list, okno: tuple) -> list | None:
+    """Największa twarz, której środek widać w kadrze klipu."""
+    x0, y0, x1, y1 = okno[:4]
+    w = [f for f in twarze if x0 <= (f[0] + f[2]) / 2 <= x1 and y0 <= (f[1] + f[3]) / 2 <= y1]
+    return max(w, key=lambda f: (f[2] - f[0]) * (f[3] - f[1]), default=None)
+
+
+def frontalnosc(f: list) -> float:
+    """1 = twarz do kamery (nos w połowie między oczami), mniej = bokiem; najmniej 0,2."""
+    d = abs(f[7] - f[5])
+    return round(max(0.2, 1 - 2 * abs(f[9] - (f[5] + f[7]) / 2) / d), 3) if d > 1e-6 else 0.2
+
+
+def probki_rolki(clips: list[dict], twarze: dict | None, W: int, H: int, sw: float, sh: float) -> list[tuple]:
+    """Próbki twarzy w klipach rolki: (chwila osi, chwila źródła, nr klipu, twarz w kadrze albo None, pole twarzy
+    jako część kadru)."""
+    out, s = [], 0.0
+    if not sw or not sh:
+        return out
+    for i, c in enumerate(clips):
+        okno = widoczne(c, W, H, sw, sh)
+        for t, tw in (twarze or {}).get("probki") or []:
+            if c["in"] + 0.05 <= t <= c["out"] - 0.05:
+                f = twarz_w_kadrze(tw, okno)
+                pole = (f[2] - f[0]) * okno[4] * (f[3] - f[1]) * okno[5] / (W * H) if f else 0.0
+                out.append((round(s + t - c["in"], 3), t, i, f, round(pole, 4)))
+        s += c["out"] - c["in"]
+    return out
+
+
+def wzorzec(probki: list[tuple]) -> dict:
+    """Typowa ostrość i otwarcie oczu twarzy w rolce (mediana): do nich porównujemy klatki."""
+    f = [p[3] for p in probki if p[3] is not None and len(p[3]) >= 17]
+    return {"ostr": _centyl([x[15] for x in f], 0.5), "oczy": _centyl([x[16] for x in f], 0.5),
+            "max": max((x[15] for x in f), default=0.0)}
+
+
+def slabosc(f: list | None, wz: dict) -> str | None:
+    """Dlaczego klatka nie nadaje się na pierwszą (None = nadaje się)."""
+    if f is None:
+        return "bez twarzy w kadrze"
+    if len(f) >= 17 and wz["ostr"] and f[15] < OSTRA * wz["ostr"]:
+        return "twarz rozmyta"                     # najpierw ostrość: rozmycie gasi też kontrast oczu
+    if len(f) >= 17 and wz["oczy"] and f[16] < OCZY * wz["oczy"]:
+        return MRUGNIECIE
+    if frontalnosc(f) < 0.5:
+        return "twarz bokiem"
+    return None
+
+
+def okladka(probki: list[tuple], wz: dict) -> tuple | None:
+    """Klatka rolki na okładkę (za openshorts thumbnail: pole twarzy × ostrość): duża twarz w kadrze, ostra,
+    do kamery, z otwartymi oczami. Wynik: próbka (chwila osi, chwila źródła, nr klipu, twarz, pole) albo None."""
+    def wynik(p):
+        f = p[3]
+        ostr = 1 + min(1.0, f[15] / wz["max"]) if len(f) >= 17 and wz["max"] else 1.0
+        return p[4] * ostr * frontalnosc(f) * (0.3 if slabosc(f, wz) == MRUGNIECIE else 1.0)
+    return max((p for p in probki if p[3] is not None), key=wynik, default=None)
+
+
+def chwile_poczatku(clips: list[dict], words: list, od: float) -> list[float]:
+    """Chwile źródła do wyboru pierwszej klatki: obecny początek i co klatkę od POCZATEK s przed pierwszym słowem
+    do 0,03 s przed nim, nie przed granicą segmentu i nie przed końcem wcześniejszego słowa."""
+    if not clips:
+        return []
+    c0 = clips[0]
+    w0 = next((float(w[0]) for w in words if (float(w[0]) + float(w[1])) / 2 >= c0["in"]), None)
+    if w0 is None or w0 >= c0["out"]:
+        return [c0["in"]]
+    pe = max((float(w[1]) for w in words if (float(w[0]) + float(w[1])) / 2 < c0["in"]), default=0.0)
+    lo, hi = max(od, pe + 0.02, w0 - POCZATEK, 0.0), w0 - 0.03
+    t0 = c0["in"] if lo <= c0["in"] <= hi else lo          # siatka klatek od obecnego początku (ffmpeg fps = równe kroki)
+    t0 -= int((t0 - lo) * FPS + 1e-6) / FPS
+    out = {round(c0["in"], 3)} | {round(t0 + k / FPS, 3) for k in range(int((hi - t0) * FPS + 1e-6) + 1)}
+    return sorted(out)
+
+
+def pierwsza_klatka(c0: dict, ocena: dict | None, wz: dict, W: int, H: int, sw: float, sh: float
+                    ) -> tuple[float | None, str | None]:
+    """(nowy początek pierwszego klipu albo None, powód): gdy pierwsza klatka jest słaba (mrugnięcie, rozmyta,
+    bokiem, bez twarzy), najpóźniejsza dobra klatka z `twarze.py ocen` przed pierwszym słowem; brak dobrej = powód."""
+    probki = (ocena or {}).get("probki") or []
+    if not probki or not sw or not sh:
+        return None, None
+    okno = widoczne(c0, W, H, sw, sh)
+    oceny = [(t, slabosc(twarz_w_kadrze(tw, okno), wz)) for t, tw in probki]
+    teraz = min(oceny, key=lambda o: abs(o[0] - c0["in"]))
+    if teraz[1] is None:
+        return None, None
+    dobre = [t for t, sl in oceny if sl is None]
+    return (round(max(dobre), 3), teraz[1]) if dobre else (None, teraz[1])
+
+
+def zapisz_okladke(src: Path, c: dict, t: float, W: int, H: int, plik: Path) -> bool:
+    """Klatka źródła w kadrze klipu (ten sam filtr co eksport, bez napisów i tytułu) → JPG W×H."""
+    try:
+        r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t:.3f}", "-i",
+                            str(src), "-vf", ed.cover_filter(W, H, c), "-frames:v", "1", "-q:v", "2", str(plik)],
+                           capture_output=True)
+    except OSError:
+        return False
+    return r.returncode == 0 and plik.is_file()
+
+
 def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarze: dict | None = None,
-                  usta: dict | None = None, glosy: dict | None = None) -> dict:
+                  usta: dict | None = None, glosy: dict | None = None, start: float | None = None) -> dict:
     st = plan["styl"]
     fmt = r.get("format") or plan.get("format") or "9:16"
     W, H = FORMATY[fmt]
@@ -741,6 +861,8 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarz
                 clips.append({"id": pr.new_id("c"), "src": str(src), "kind": "video", "in": a, "out": b, "speed": 1,
                               "volume": 1, "muted": False, "fit": "cover", "fx": fx, "fy": fy, "zoom": round(zoom, 3)})
                 k += 1
+    if start is not None and clips and start < clips[0]["out"] - 0.3:
+        clips[0]["in"] = round(start, 3)          # pierwsza klatka bez mrugnięcia (cmd_zbuduj, twarze.py ocen)
     zbl = []
     if st.get("punch") in (True, "akcenty") and clips:
         slowa = slowa_rolki(clips, words, glosy)
@@ -835,13 +957,20 @@ def auto_kadr(st: dict, s: dict) -> bool:
     return bool(st.get("kadr_auto", True)) and "fx" not in s and "fy" not in s
 
 
-def odcinki_twarzy(plan: dict, words: list, info: dict, tylko: str | None = None) -> list[tuple[float, float]]:
-    """Odcinki źródła, w których trzeba znaleźć twarze: segmenty bez fx/fy, gdy kadr ma inne proporcje niż źródło."""
+def odcinki_twarzy(plan: dict, words: list, info: dict, tylko: str | None = None,
+                   okladki: bool = False) -> list[tuple[float, float]]:
+    """Odcinki źródła, w których trzeba znaleźć twarze: segmenty bez fx/fy, gdy kadr ma inne proporcje niż źródło
+    (kadr na twarz); z `okladki` wszystkie segmenty z obrazem (okładka i pierwsza klatka każdej rolki)."""
     sw, sh = float(info.get("w") or 0), float(info.get("h") or 0)
     out = []
     for r in plan["rolki"]:
         W, H = FORMATY[r.get("format") or plan.get("format") or "9:16"]
-        if (tylko and r["slug"] != tylko) or not info.get("video") or not sw or not sh or abs(W / H - sw / sh) < 0.05:
+        if (tylko and r["slug"] != tylko) or not info.get("video") or not sw or not sh:
+            continue
+        if okladki:
+            out += [granice(float(s["od"]), float(s["do"]), words, info.get("duration")) for s in r["segmenty"]]
+            continue
+        if abs(W / H - sw / sh) < 0.05:
             continue
         out += [granice(float(s["od"]), float(s["do"]), words, info.get("duration"))
                 for s in r["segmenty"] if auto_kadr(plan["styl"], s)]
@@ -886,6 +1015,8 @@ def ensure_render_env() -> None:
 
 
 def cmd_zbuduj(a) -> int:
+    if not a.bez_renderu:
+        ensure_render_env()                        # najpierw: ponowne uruchomienie w venv nie powtarza uwag
     plan = wczytaj_plan(Path(a.plan))
     bledy, uwagi, ctx = sprawdz_plan(plan)
     for u in uwagi:
@@ -894,14 +1025,17 @@ def cmd_zbuduj(a) -> int:
         for b in bledy:
             print(f"  ✗ {b}")
         raise SystemExit("plan ma błędy (klipy.py sprawdz): popraw plan.json")
-    if not a.bez_renderu:
-        ensure_render_env()
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     odc = odcinki_twarzy(plan, ctx["words"], ctx["info"], a.tylko)
-    if odc:
-        print(f"▶ twarze (YuNet): {len(odc)} odcinków, {sum(b - a for a, b in odc):.0f} s źródła", flush=True)
-    twarze = twarze_zrodla(ctx["src"], odc)
+    wsz = odcinki_twarzy(plan, ctx["words"], ctx["info"], a.tylko, okladki=True)
+    if wsz:
+        print(f"▶ twarze (YuNet): {len(wsz)} odcinków, {sum(b - a for a, b in wsz):.0f} s źródła "
+              "(kadr, okładka, pierwsza klatka)", flush=True)
+    wszystkie = twarze_zrodla(ctx["src"], wsz)
+    # kadr na twarz tylko w segmentach z innymi proporcjami niż źródło i bez fx/fy; okładka z każdego segmentu
+    twarze = {**wszystkie, "probki": [p for p in wszystkie.get("probki") or []
+                                      if any(a - 0.01 <= p[0] <= b + 0.01 for a, b in odc)]} if wszystkie and odc else None
     kilka = [(a, b) for a, b in odc if kilka_osob([p for p in (twarze or {}).get("probki") or [] if a - 0.01 <= p[0] <= b + 0.01])]
     if kilka:
         print(f"▶ kto mówi (ruch ust, 8 klatek/s): {len(kilka)} odcinków z kilkoma osobami", flush=True)
@@ -918,6 +1052,23 @@ def cmd_zbuduj(a) -> int:
                                                           for s in r["segmenty"]])
                  if plan["styl"].get("punch") in (True, "akcenty") and ctx["info"].get("audio") else None)
         proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"], twarze, usta, glosy)
+        W, H, sw, sh = proj["canvas"]["w"], proj["canvas"]["h"], float(ctx["info"].get("w") or 0), float(ctx["info"].get("h") or 0)
+        wz = wzorzec(probki_rolki(proj["clips"], wszystkie, W, H, sw, sh))
+        start, slaba = None, None
+        if wszystkie and proj["clips"]:
+            ch = chwile_poczatku(proj["clips"], ctx["words"], proj["clipmaker"]["granice"][0][0])
+            stary = proj["clips"][0]["in"]
+            start, slaba = pierwsza_klatka(proj["clips"][0], twarze_zrodla(ctx["src"], [], "ocen", ch) if ch else None,
+                                           wz, W, H, sw, sh)
+            if start is not None:
+                proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"], twarze, usta, glosy, start)
+                proj["clipmaker"]["pierwsza_klatka"] = {"przesuniecie": round(start - stary, 3), "bylo": slaba}
+            elif slaba:
+                proj["clipmaker"]["pierwsza_klatka"] = {"uwaga": slaba}
+        ok = okladka(probki_rolki(proj["clips"], wszystkie, W, H, sw, sh), wz)
+        plik_okl = film.with_name(film.stem + "-okladka.jpg")
+        if ok and zapisz_okladke(ctx["src"], proj["clips"][ok[2]], ok[1], W, H, plik_okl):
+            proj["clipmaker"]["okladka"] = {"t": ok[0], "plik": plik_okl.name}
         gl = glosnosc_zrodla(ctx["src"], [(c["in"], c["out"]) for c in proj["clips"]]) if ctx["info"].get("audio") else None
         if gl:
             v = wzmocnienie(*gl)
@@ -932,12 +1083,19 @@ def cmd_zbuduj(a) -> int:
               f" · kadr: {', '.join(proj['clipmaker']['kadr'])}"
               + (f" · głośność {gl[0]:.1f} LUFS → ×{proj['clipmaker']['glosnosc']['volume']}" if gl else "")
               + (" · zbliżenia " + ", ".join(f"{a:.1f}–{b:.1f} s" for a, b in proj["clipmaker"]["zblizenia"])
-                 if proj["clipmaker"].get("zblizenia") else ""), flush=True)
+                 if proj["clipmaker"].get("zblizenia") else "")
+              + (f" · okładka {proj['clipmaker']['okladka']['t']:.1f} s" if proj["clipmaker"].get("okladka") else ""), flush=True)
+        pk = proj["clipmaker"].get("pierwsza_klatka") or {}
+        if pk.get("bylo"):
+            print(f"  pierwsza klatka przesunięta o {pk['przesuniecie']:+.2f} s ({pk['bylo']})", flush=True)
+        elif pk.get("uwaga"):
+            print(f"  ⚠ pierwsza klatka: {pk['uwaga']}; przesuń początek segmentu (słowo wcześniej albo później)", flush=True)
         if not a.bez_renderu:
             if pr.cmd_render(film, argparse.Namespace(out=str(film))) != 0:
                 raise SystemExit(f"render {film.name} nie wyszedł")
         wyniki.append({"n": n, "r": r, "film": film, "dl": dl, "ujecia": len(proj["clips"]),
-                       "granice": proj["clipmaker"]["granice"]})
+                       "granice": proj["clipmaker"]["granice"], "okladka": proj["clipmaker"].get("okladka"),
+                       "pierwsza": proj["clipmaker"].get("pierwsza_klatka")})
     pisz_klipy_md(plan, wyniki, out, ctx)
     print(f"✓ {out / 'KLIPY.md'}")
     return 0
@@ -963,6 +1121,14 @@ def pisz_klipy_md(plan: dict, wyniki: list[dict], out: Path, ctx: dict) -> None:
                   f"- hashtagi: {' '.join(r.get('hashtagi') or []) or '–'}"]
         if r.get("oceny"):
             lines.append("- oceny: " + ", ".join(f"{k} {v}" for k, v in r["oceny"].items()))
+        if w.get("okladka"):
+            lines.append(f"- okładka: `{w['okladka']['plik']}` (klatka z {w['okladka']['t']:.1f} s rolki: duża, ostra "
+                         "twarz; na TikToku i w Reels wybierz tę chwilę jako okładkę albo wgraj plik)")
+        pk = w.get("pierwsza") or {}
+        if pk.get("bylo"):
+            lines.append(f"- pierwsza klatka: przesunięta o {pk['przesuniecie']:+.2f} s, bo była: {pk['bylo']}")
+        elif pk.get("uwaga"):
+            lines.append(f"- ⚠ pierwsza klatka: {pk['uwaga']} (przesuń początek segmentu w planie)")
     (out / "KLIPY.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
