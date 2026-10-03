@@ -6,7 +6,8 @@ Projekt to `<film>.edycja.json` obok filmu (zapisuje go edytor HQ). Zmieniasz go
 w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je dalej poprawiać.
 
     projekt.py pokaz <film>                        # co jest na osi (klipy, napisy, audio, długość)
-    projekt.py dodaj-audio <film> <plik> [--start S] [--od S] [--do S] [--glosnosc 0.8] [--wycisz-film]
+    projekt.py dodaj-audio <film> <plik> [--start S] [--od S] [--do S] [--glosnosc 0.8] [--wycisz-film] [--narastanie 1] [--wyciszanie 2]
+    projekt.py dzwiek <film> <id> [--glosnosc 0.3] [--narastanie S] [--wyciszanie S] [--wycisz|--wlacz]   # klip albo audio
     projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain] [--kroj Poppins]
                                            [--y 0.78] [--rozmiar 72] [--kolor #FFFFFF] [--tlo #000000]
     projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--rozmyte|--dopasuj|--wypelnij --fx X --fy Y --zoom Z]
@@ -142,7 +143,7 @@ def cmd_pokaz(film: Path, a) -> int:
     for (c, s, e), tr in zip(layout(proj["clips"]), trs):
         extra = "".join([f" · tempo {c.get('speed', 1)}×" if c.get("speed", 1) != 1 else "", " · wyciszony" if c.get("muted") else "",
                          f" · głośność {c.get('volume', 1):.2f}" if c.get("volume", 1) != 1 else ""])
-        print(f"  [{c.get('id')}] {s:6.2f}–{e:6.2f}  {Path(c['src']).name} (źródło {c['in']:.2f}–{c['out']:.2f}){extra}")
+        print(f"  [{c.get('id')}] {s:6.2f}–{e:6.2f}  {Path(c['src']).name} (źródło {c['in']:.2f}–{c['out']:.2f}){extra}{opis_zaniku(c)}")
         if tr:
             print(f"      ↳ przejście {tr['type']} {tr['d']:.2f} s ({e - tr['d'] / 2:.2f}–{e + tr['d'] / 2:.2f})")
         elif c.get("transition") and c is not proj["clips"][-1]:
@@ -155,7 +156,7 @@ def cmd_pokaz(film: Path, a) -> int:
         print(f"Typografia: {len(typo['bloki'])} bloków, motyw {typo['motyw']} (szczegóły: typografia.py pokaz)")
     print("Audio:" if proj.get("audio") else "Audio: brak")
     for m in proj.get("audio") or []:
-        print(f"  [{m.get('id')}] od {m['start']:6.2f} przez {m['out'] - m['in']:.2f} s  {Path(m['src']).name} · głośność {m.get('volume', 1):.2f}")
+        print(f"  [{m.get('id')}] od {m['start']:6.2f} przez {m['out'] - m['in']:.2f} s  {Path(m['src']).name} · głośność {m.get('volume', 1):.2f}{opis_zaniku(m)}")
     notes = sorted((n for n in proj.get("notes") or [] if isinstance(n, dict)), key=lambda n: float(n.get("t") or 0))
     if notes:
         otwarte = sum(1 for n in notes if not n.get("done"))
@@ -194,13 +195,54 @@ def cmd_dodaj_audio(film: Path, a) -> int:
     if do - od <= 0.05:
         raise SystemExit("pusty fragment audio (sprawdź --od/--do)")
     item = {"id": new_id("a"), "src": str(src), "start": max(0.0, a.start), "in": od, "out": do,
-            "volume": max(0.0, min(2.0, a.glosnosc))}
+            "volume": max(0.0, min(2.0, a.glosnosc)), **zanik_z_arg(a, do - od)}
     proj.setdefault("audio", []).append(item)
     if a.wycisz_film:
         for c in proj["clips"]:
             c["muted"] = True
     save(film, proj)
     print(f"Dodano audio [{item['id']}] {src.name} od {item['start']:.2f} s ({do - od:.2f} s)")
+    return 0
+
+
+def zanik_z_arg(a, d: float, old: dict | None = None) -> dict:
+    """--narastanie / --wyciszanie (s) → fadeIn / fadeOut, do połowy elementu i najwyżej 10 s (edytor.zanik)."""
+    out = {}
+    for arg, key in (("narastanie", "fadeIn"), ("wyciszanie", "fadeOut")):
+        v = getattr(a, arg, None)
+        v = (old or {}).get(key) if v is None else v
+        if v:
+            out[key] = round(max(0.0, min(float(v), ed.ZANIK_MAX, d / 2)), 2)
+    return out
+
+
+def opis_zaniku(x: dict) -> str:
+    return "".join([f" · narastanie {x['fadeIn']:.1f} s" if x.get("fadeIn") else "", f" · wyciszanie {x['fadeOut']:.1f} s" if x.get("fadeOut") else ""])
+
+
+def cmd_dzwiek(film: Path, a) -> int:
+    """Głośność, wyciszenie i zanik klipu (jego dźwięk) albo elementu audio, jak suwaki w edytorze HQ."""
+    proj = load(film)
+    lay = {c.get("id"): e - s for c, s, e in layout(proj["clips"])}
+    x = next((c for c in proj["clips"] if c.get("id") == a.id), None)
+    d = lay.get(a.id, 0.0)
+    if x is None:
+        x = next((m for m in proj.get("audio") or [] if m.get("id") == a.id), None)
+        if x is None:
+            raise SystemExit(f"nie ma klipu ani audio o id {a.id} (lista: projekt.py pokaz)")
+        d = max(0.0, min(x["out"] - x["in"], total(proj) - x.get("start", 0)))   # muzyka ucięta na końcu filmu
+    if a.glosnosc is not None:
+        x["volume"] = round(max(0.0, min(2.0, a.glosnosc)), 3)
+    if a.wycisz or a.wlacz:
+        if "muted" not in x and x not in proj["clips"]:
+            raise SystemExit("--wycisz/--wlacz dotyczy klipu; audio wyciszasz --glosnosc 0")
+        x["muted"] = bool(a.wycisz)
+    for arg, key in (("narastanie", "fadeIn"), ("wyciszanie", "fadeOut")):
+        if getattr(a, arg) == 0:                   # 0 = bez zaniku
+            x.pop(key, None)
+    x.update(zanik_z_arg(a, d, x))
+    save(film, proj)
+    print(f"[{a.id}] głośność {x.get('volume', 1):.2f}{' · wyciszony' if x.get('muted') else ''}{opis_zaniku(x)}")
     return 0
 
 
@@ -707,6 +749,16 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--do", type=float, help="fragment źródła: koniec (s)")
     sp.add_argument("--glosnosc", type=float, default=1.0, help="0–2 (muzyka pod lektorem ok. 0.15–0.3)")
     sp.add_argument("--wycisz-film", action="store_true", help="wycisz oryginalny dźwięk klipów")
+    sp.add_argument("--narastanie", type=float, help="narastanie na początku (s, do 10, najwyżej połowa)")
+    sp.add_argument("--wyciszanie", type=float, help="wyciszanie na końcu (s; muzyka dłuższa niż film cichnie na końcu filmu)")
+    sp = film_cmd("dzwiek", cmd_dzwiek, "głośność i zanik klipu albo audio")
+    sp.add_argument("id", help="klip albo audio (z `pokaz`)")
+    sp.add_argument("--glosnosc", type=float, help="0–2 (1 = bez zmian)")
+    sp.add_argument("--narastanie", type=float, help="s (0 = bez)")
+    sp.add_argument("--wyciszanie", type=float, help="s (0 = bez)")
+    g = sp.add_mutually_exclusive_group()
+    g.add_argument("--wycisz", action="store_true", help="wycisz dźwięk klipu")
+    g.add_argument("--wlacz", action="store_true", help="włącz dźwięk klipu")
     sp = film_cmd("dodaj-tekst", cmd_dodaj_tekst, "tekst albo napis na obrazie")
     sp.add_argument("tekst")
     sp.add_argument("--start", type=float, required=True)

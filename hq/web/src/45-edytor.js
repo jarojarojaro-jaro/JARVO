@@ -154,6 +154,7 @@ function edKadr(w, h) {
 }
 const clipDur = (c) => (c.out - c.in) / (c.speed || 1);
 const audioDur = (m) => m.out - m.in;
+const audioNaOsi = (m, tot) => Math.max(0, Math.min(audioDur(m), tot - m.start));   // eksport ucina muzykę na końcu filmu
 function fmtT(s, fine) {
   s = Math.max(0, s || 0);
   const m = Math.floor(s / 60), r = s - m * 60;
@@ -459,7 +460,9 @@ function usePlayer(proj, meta, onTick) {
       el.style.webkitMaskImage = css.webkitMaskImage || "";
       el.style.filter = css.filter || "";
       const s = S.seg[k], v = vids[k].current;     // dźwięk klipów przenika się jak acrossfade w eksporcie
-      if (s && v && s.c.kind !== "image") v.volume = clamp(s.c.volume ?? 1, 0, 1) * (!styl ? 1 : k === ka ? 1 - W.q : W.q);
+      if (s && v && s.c.kind !== "image") {
+        v.volume = clamp(s.c.volume ?? 1, 0, 1) * (!styl ? 1 : k === ka ? 1 - W.q : W.q) * zanikGain(t - s.start, s.end - s.start, s.c.fadeIn, s.c.fadeOut);
+      }
     }
     box.style.background = styl ? styl.tlo : "";
     const pc = pixRef.current;
@@ -499,7 +502,7 @@ function usePlayer(proj, meta, onTick) {
       if (!a) continue;
       const local = m.in + (t - m.start);
       const inside = t >= m.start && local < m.out;
-      a.volume = clamp(m.volume ?? 1, 0, 1);
+      a.volume = clamp(m.volume ?? 1, 0, 1) * zanikGain(t - m.start, audioNaOsi(m, total()), m.fadeIn, m.fadeOut);
       if (inside && play) {
         if (Math.abs(a.currentTime - local) > 0.25) a.currentTime = local;
         if (a.paused) a.play().catch(() => {});
@@ -1547,6 +1550,11 @@ function VideoEditor({ path, onClose }) {
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   }
+  // zanik na osi: przyciemniony trójkąt nad linią narastania i wyciszania (d = długość elementu na osi)
+  const fadeMarks = (item, d) => {
+    const fi = Math.min(+item.fadeIn || 0, zanikMax(d)), fo = Math.min(+item.fadeOut || 0, zanikMax(d));
+    return html`${fi > 0 && html`<i class="thq-ed-fade is-in" style=${{ width: `${fi * pps}px` }}></i>`}${fo > 0 && html`<i class="thq-ed-fade is-out" style=${{ left: `${(d - fo) * pps}px`, width: `${fo * pps}px` }}></i>`}`;
+  };
   const volLine = (type, item) => { const k = volPos(item.muted ? 0 : item.volume ?? 1); return html`<b class=${cx("thq-ed-vol", item.muted && "is-mute")} style=${{ bottom: `calc(${k * 100}% - ${k * 2}px)` }}
     title=${`${L("Głośność", "Volume")} ${fmtDb(item.muted ? 0 : item.volume ?? 1)} · ${L("przeciągnij w górę albo w dół", "drag up or down")}`}
     onPointerDown=${(e) => volDown(e, type, item)} onClick=${(e) => e.stopPropagation()}></b>`; };
@@ -1842,6 +1850,7 @@ function VideoEditor({ path, onClose }) {
     ${c.kind !== "image" && html`<label>${L("Tempo", "Speed")} · ${c.speed}×${seg(ED_SPEEDS.map((s) => [s, `${s}×`]), c.speed, (v) => clipPatch(c.id, { speed: v }))}</label>`}
     ${c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}% (${fmtDb(c.muted ? 0 : c.volume)})
       <input type="range" min="0" max="2" step="0.05" value=${c.volume} onInput=${(e) => upd("clip", c.id, { volume: +e.target.value, muted: false }, true)} onChange=${H.commit}/></label>`}
+    ${c.kind !== "image" && !c.muted && fadeTools("clip", c, clipDur(c))}
     ${c.kind === "image" && html`<label>${L("Czas planszy", "Still duration")} · ${(c.out - c.in).toFixed(1)} s
       <input type="range" min="0.5" max="15" step="0.5" value=${c.out - c.in} onInput=${(e) => clipPatch(c.id, { out: c.in + +e.target.value }, true)} onChange=${H.commit}/></label>`}
     ${czesci.length > 0 && html`<label>${L("Podziel na równe części", "Split into equal parts")} · ${fmtSek(clipDur(c))}${seg(czesci.map((n) => [n, `${n} × ${fmtSek(clipDur(c) / n)}`]), null, (n) => podziel(c.id, n))}</label>`}
@@ -1900,9 +1909,18 @@ function VideoEditor({ path, onClose }) {
     </div>`;
   };
 
+  // narastanie i wyciszanie (s): suwaki do połowy elementu, najwyżej 10 s (43-dzwiek.js, afade w eksporcie)
+  const fadeTools = (type, item, d) => {
+    const mx = Math.floor(zanikMax(d) * 10) / 10;
+    if (mx < 0.1) return null;
+    const one = (key, pl, en) => html`<label>${L(pl, en)} · ${fmtSek(Math.min(+item[key] || 0, mx))}
+      <input type="range" min="0" max=${mx} step="0.1" value=${Math.min(+item[key] || 0, mx)} onInput=${(e) => upd(type, item.id, { [key]: +e.target.value || undefined }, true)} onChange=${H.commit}/></label>`;
+    return html`<div class="thq-ed-row2">${one("fadeIn", "Narastanie", "Fade in")}${one("fadeOut", "Wyciszanie", "Fade out")}</div>`;
+  };
   const audioTools = (m) => html`<div class="thq-ed-form">
     <p class="thq-ed-sub thq-ed-subi">${ED_ICON.audio}<span>${(meta[m.src] || {}).name || m.src.split("/").pop()}</span></p>
     <label>${L("Głośność", "Volume")} · ${Math.round(m.volume * 100)}% (${fmtDb(m.volume)})<input type="range" min="0" max="2" step="0.05" value=${m.volume} onInput=${(e) => upd("audio", m.id, { volume: +e.target.value }, true)} onChange=${H.commit}/></label>
+    ${fadeTools("audio", m, audioNaOsi(m, total))}
     <p class="thq-ed-note">${L("Od", "From")} ${fmtT(m.start, true)} · ${L("długość", "length")} ${fmtT(audioDur(m), true)}</p>
     <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>
   </div>`;
@@ -2138,7 +2156,7 @@ function VideoEditor({ path, onClose }) {
         style=${{ left: `${s.start * pps}px`, width: `${Math.max(4, wpx)}px`, ...bg }} onPointerDown=${(e) => clipDown(e, s, i)} onClick=${(e) => pick(e, "clip", s.c.id)}>
         <i class="thq-ed-h is-l" onPointerDown=${(e) => clipDown(e, s, i, "l")}></i>
         <span class="thq-ed-cl">${s.c.muted && ED_ICON.mute}${s.c.speed !== 1 ? `${s.c.speed}× · ` : ""}${!s.c.muted && Math.abs((s.c.volume ?? 1) - 1) > 0.01 ? `${fmtDb(s.c.volume)} · ` : ""}${fmtT(s.end - s.start, true)}</span>
-        ${s.c.kind !== "image" && volLine("clip", s.c)}
+        ${s.c.kind !== "image" && volLine("clip", s.c)}${s.c.kind !== "image" && !s.c.muted && fadeMarks(s.c, s.end - s.start)}
         <i class="thq-ed-h is-r" onPointerDown=${(e) => clipDown(e, s, i, "r")}></i></div>`;
     })}
     ${segs.slice(0, -1).map((s, i) => {          // cięcie: okno przejścia (pasek) i przycisk wyboru
@@ -2152,14 +2170,15 @@ function VideoEditor({ path, onClose }) {
     ${mobile && html`<button type="button" class="thq-ed-addclip" style=${{ left: `${total * pps + 8}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("media"); }}
       aria-label=${L("Dodaj klip", "Add clip")}>${ED_ICON.plus}</button>`}
   </div>`;
-  const audioTrack = html`<div class="thq-ed-track is-audio" onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
+  const pasy = pasyAudio(p.audio);
+  const audioTrack = html`<div class="thq-ed-track is-audio" style=${{ height: `${pasy.n * 38 - 4}px` }} onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
     ${mobile && html`<button type="button" class="thq-ed-lane" onPointerDown=${(e) => e.stopPropagation()} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("audio"); }} aria-label=${L("Audio", "Audio")}>${ED_ICON.audio}</button>`}
     ${p.audio.map((m) => {
       const w = waves[m.src];
       const wave = w && w.url ? { backgroundImage: `url(${w.url})`, backgroundSize: `${w.dur * pps}px 100%`, backgroundPosition: `${-m.in * pps}px 0`, backgroundRepeat: "no-repeat" } : {};
       return html`<div key=${m.id} class=${cx("thq-ed-item is-audio", sel && sel.id === m.id && "is-sel")}
-      style=${{ left: `${m.start * pps}px`, width: `${Math.max(6, audioDur(m) * pps)}px`, ...wave }} onPointerDown=${(e) => audioDown(e, m)} onClick=${(e) => pick(e, "audio", m.id)}>
-      <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>${(meta[m.src] || {}).name || ""}${Math.abs(m.volume - 1) > 0.01 ? ` · ${fmtDb(m.volume)}` : ""}</span>${volLine("audio", m)}
+      style=${{ left: `${m.start * pps}px`, top: `${(pasy.pas[m.id] || 0) * 38}px`, width: `${Math.max(6, audioDur(m) * pps)}px`, ...wave }} onPointerDown=${(e) => audioDown(e, m)} onClick=${(e) => pick(e, "audio", m.id)}>
+      <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>${(meta[m.src] || {}).name || ""}${Math.abs(m.volume - 1) > 0.01 ? ` · ${fmtDb(m.volume)}` : ""}</span>${volLine("audio", m)}${fadeMarks(m, audioNaOsi(m, total))}
       <i class="thq-ed-h is-r" onPointerDown=${(e) => audioDown(e, m, "r")}></i></div>`;
     })}
     ${!p.audio.length && (mobile

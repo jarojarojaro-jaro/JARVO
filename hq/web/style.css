@@ -638,6 +638,7 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed input[type=checkbox] { width: 16px; height: 16px; margin: 0; accent-color: var(--ed-accent); }
 .thq-ed-check { flex-direction: row !important; align-items: center; gap: 8px !important; color: var(--ed-ink) !important; font-weight: 400 !important; font-size: 13px !important; }
 .thq-ed-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.thq-ed-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .thq-ed-row textarea { flex: 1; min-width: 0; }
 .thq-ed-row.is-actions { flex-wrap: wrap; align-items: center; }
 .thq-ed-seg { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--ed-bg); overflow-x: auto; scrollbar-width: none; }
@@ -790,8 +791,12 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-styl canvas { display: block; width: 100%; aspect-ratio: 8 / 5; border-radius: 6px; background: #3a3d42; }
 .thq-ed-styl:hover { color: var(--ed-ink); }
 .thq-ed-styl.is-on { background: var(--ed-panel-3); color: var(--ed-ink); box-shadow: 0 1px 2px rgba(0,0,0,.35), inset 0 0 0 2px var(--ed-typo); }
+/* zanik: przyciemniony trójkąt nad linią narastania (od lewego dołu) i wyciszania (do prawego dołu) */
+.thq-ed-fade { position: absolute; top: 0; bottom: 0; left: 0; z-index: 1; pointer-events: none; background: rgba(0,0,0,.45); }
+.thq-ed-fade.is-in { clip-path: polygon(0 0, 100% 0, 0 100%); }
+.thq-ed-fade.is-out { clip-path: polygon(0 0, 100% 0, 100% 100%); }
 .thq-ed-item.is-audio { top: 0; height: 34px; align-items: flex-start; background-color: var(--ed-audio); color: #fff; }
-.thq-ed-item.is-audio span { flex: 0 1 auto; margin: 3px 0 0 6px; padding: 0 6px; border-radius: 4px; background: rgba(8,40,45,.55); font-size: 10.5px; line-height: 16px; }
+.thq-ed-item.is-audio span { position: relative; z-index: 2; flex: 0 1 auto; margin: 3px 0 0 6px; padding: 0 6px; border-radius: 4px; background: rgba(8,40,45,.55); font-size: 10.5px; line-height: 16px; }
 .thq-ed-h { position: absolute; top: 0; bottom: 0; width: 10px; z-index: 1; cursor: ew-resize; background: transparent; transition: background .12s; }
 /* linia głośności: żółta kreska z pasem chwytu ±6 px; przy wyciszeniu przerywana przy dole */
 .thq-ed-vol { position: absolute; left: 10px; right: 10px; height: 0; border-top: 1.5px solid #FFD60A; box-shadow: 0 1px 0 rgba(0,0,0,.55), 0 -1px 0 rgba(0,0,0,.35); cursor: ns-resize; }

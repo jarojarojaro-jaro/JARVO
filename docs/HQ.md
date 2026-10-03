@@ -125,6 +125,12 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   zmienia głośność (góra +6 dB, 0 dB na 5/6 wysokości, przyciąga do 0 dB, sam dół = cisza), cały gest to jeden krok
   cofania. Na telefonie linię przeciąga się po zaznaczeniu klipu. W projekcie głośność zostaje liniowa (0–2), jak
   w eksporcie (`volume=`); etykieta na osi i panel pokazują ją w dB. Test: `tests/test_edytor_glosnosc.py`.
+- **Narastanie i wyciszanie** (jak w CapCut): suwaki w ustawieniach muzyki i klipu (0–10 s, najwyżej połowa
+  elementu), na osi przyciemniony trójkąt na początku i końcu. Liniowo w podglądzie (`zanikGain` w `43-dzwiek.js`)
+  i w eksporcie (`afade curve=tri`), test mierzy głośność w pliku z ffmpeg i porównuje z podglądem
+  (`tests/test_edytor_dzwiek.py`). Muzyka dłuższa niż film cichnie na końcu filmu. Pola `fadeIn`, `fadeOut` w projekcie.
+- **Pasy audio:** muzyka, lektor i efekty grające naraz leżą na osi jeden pod drugim (element trafia na pierwszy
+  wolny pas, `pasyAudio`), do 32 elementów audio w projekcie; eksport miesza wszystkie.
 - **Wygląd jak w CapCut:** grafitowe tło, jeden akcent (cyjan: **Eksportuj**, aktywne narzędzie, zaznaczenie), krój
   systemowy (SF Pro na iPhonie i Macu, Segoe UI na Windows, Roboto na Androidzie) z Inter jako zapasem
   (`hq/web/fonts/`, OFL), ikony SVG jednym stylem linii zamiast emoji, czas `00:05.20`. Na osi: miniatury klipu w
@@ -188,7 +194,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   Klucz osi (klipy, przycięcie, tempo, kadr; `edytor.maska_klucz` = `maskaKlucz` w `48-typografia.js`) pilnuje, żeby
   po zmianie klipów nie użyć starych sylwetek: wtedy napis jest po prostu widoczny w całości.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
-  `volume`, `muted`, `fit`, `transition`), napisy, muzyka i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
+  `volume`, `muted`, `fit`, `transition`, `fadeIn`, `fadeOut`), napisy, muzyka i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
 - **Eksport** (`POST /edit/export`): serwer sprawdza projekt (ścieżki tylko z katalogów floty, limity długości
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat albo xfade przy przejściach → nakładki → miks
   z limiterem), H.264 + AAC,
@@ -253,7 +259,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
-  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `przejscie`, `tnij`, `wytnij`, `usun`, `uwaga`,
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy i typografię rysują te same funkcje (`hq/web/src/44-napisy.js`, `48-typografia.js`) w przeglądarce bez
   okna, więc plik od agenta wygląda jak eksport z edytora. Typografię na tym samym projekcie układa `typografia.py`

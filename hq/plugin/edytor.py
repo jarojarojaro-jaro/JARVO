@@ -5,9 +5,10 @@ Projekt montażu to mały JSON (zapisywany obok filmu jako `<nazwa>.edycja.json`
     {"version": 1, "canvas": {"w": 1080, "h": 1920, "fps": 30},
      "clips": [{"src": "/opt/data/jarvo/.../film.mp4", "in": 0.0, "out": 4.2, "speed": 1.0,
                 "volume": 1.0, "muted": false, "fit": "contain",     # pasy; "blur" = rozmyte tło; "cover" + fx, fy, zoom
+                "fadeIn": 0.0, "fadeOut": 0.0,                      # narastanie i wyciszanie dźwięku (s, opcjonalne)
                 "transition": {"type": "fade", "dur": 0.5}}],      # przejście do następnego klipu (opcjonalne)
      "texts": [{"start": 0.5, "end": 3.0, ...}],          # wygląd rysuje przeglądarka (PNG na klatkę)
-     "audio": [{"src": ".../muzyka.mp3", "start": 0.0, "in": 0.0, "out": 30.0, "volume": 0.4}]}
+     "audio": [{"src": ".../muzyka.mp3", "start": 0.0, "in": 0.0, "out": 30.0, "volume": 0.4, "fadeOut": 2.0}]}
 
 Klipy leżą jeden za drugim (ścieżka główna jak w CapCut), napisy i muzyka mają własny czas.
 Przejście leży na środku cięcia i nie skraca filmu: klip A gra dalej za cięciem, klip B zaczyna przed nim
@@ -58,7 +59,8 @@ PRZEJSCIA = ("fade", "fadeblack", "fadewhite", "blur", "zoomin", "pixelize", "sl
              "slidedown", "coverleft", "coverright", "wipeleft", "wiperight", "smoothleft", "circleopen")
 PRZEJSCIE_D = 0.5        # domyślna długość przejścia (s)
 ROZMYCIE_PRZEJSCIA = 40  # rozmycie przy cięciu: σ = krótszy bok kadru / 40 (27 px przy 1080)
-MAX_AUDIO = 12
+MAX_AUDIO = 32           # muzyka, lektor i efekty (na osi w pasach jeden pod drugim)
+ZANIK_MAX = 10.0         # najdłuższe narastanie albo wyciszanie (s), najwyżej połowa elementu (ZANIK_MAX w 43-dzwiek.js)
 MAX_WORDS = 40           # słów w jednym napisie karaoke (linia napisu ma ich 2–8)
 MAX_DURATION = 3 * 3600.0
 MIN_CLIP = 0.04          # jedna klatka przy 25 fps
@@ -109,6 +111,23 @@ def kadr_eksportu(w: int, h: int) -> tuple[int, int]:
     return _even(math.floor(w * k + 0.5)), _even(math.floor(h * k + 0.5))
 
 
+def zanik(x: dict, d: float) -> tuple[float, float]:
+    """Narastanie i wyciszanie elementu o długości d (s na osi): 0–10 s, najwyżej połowa elementu."""
+    lim = max(0.0, min(ZANIK_MAX, d / 2))
+    return min(_num(x.get("fadeIn"), 0, ZANIK_MAX, 0), lim), min(_num(x.get("fadeOut"), 0, ZANIK_MAX, 0), lim)
+
+
+def afade(fi: float, fo: float, st: float, d: float) -> str:
+    """Zanik liniowy (curve=tri, jak zanikGain w podglądzie) dźwięku, który zaczyna się w st i trwa d; "" bez zaniku.
+    afade daje ciszę przed narastaniem i po wyciszeniu (także w zapasie przejścia), tak samo jak podgląd."""
+    out = []
+    if fi > 0:
+        out.append(f"afade=t=in:st={_f(st)}:d={_f(fi)}:curve=tri")
+    if fo > 0:
+        out.append(f"afade=t=out:st={_f(st + d - fo)}:d={_f(fo)}:curve=tri")
+    return ",".join(out)
+
+
 def normalize(project: dict, resolve) -> dict:
     """Sprawdza i porządkuje projekt. `resolve(src) -> Path | None` pilnuje katalogów floty."""
     if not isinstance(project, dict):
@@ -137,6 +156,9 @@ def normalize(project: dict, resolve) -> dict:
                       # kadr przy „Wypełnij”: punkt skupienia (0–1, 0,5 = środek) i przybliżenie (punch-in)
                       "fx": _num(c.get("fx"), 0, 1, 0.5), "fy": _num(c.get("fy"), 0, 1, 0.5),
                       "zoom": _num(c.get("zoom"), 1, 3, 1)})
+        fi, fo = zanik(c, (b - a) / clips[-1]["speed"])
+        if fi or fo:
+            clips[-1].update(fade_in=fi, fade_out=fo)
         tr = c.get("transition")
         if isinstance(tr, dict) and tr.get("type") in PRZEJSCIA:
             clips[-1]["transition"] = {"type": tr["type"], "dur": _num(tr.get("dur"), 0.1, 3, PRZEJSCIE_D)}
@@ -168,6 +190,9 @@ def normalize(project: dict, resolve) -> dict:
         b = min(b, a + (total - start))          # muzyka nie wychodzi poza film
         if b - a >= MIN_CLIP:
             audio.append({"src": path, "in": a, "out": b, "start": start, "volume": _num(m.get("volume"), 0, 2, 1)})
+            fi, fo = zanik(m, b - a)             # wyciszenie liczone od końca w filmie (muzyka dłuższa niż film)
+            if fi or fo:
+                audio[-1].update(fade_in=fi, fade_out=fo)
     return {"canvas": canvas, "clips": clips, "texts": texts, "audio": audio, "duration": total,
             "przejscia": przejscia_osi(clips, canvas["fps"]), "typo": normalize_typo(project.get("typo"), total)}
 
@@ -604,7 +629,9 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                                          f"volume={_f(c['volume'])}" if c["volume"] != 1 else "") if x)
             graph.append(f"[{vi}:a]{chain},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
                          + (f"adelay={round(brak * 1000)}:all=1," if brak > 1e-4 else "")
-                         + f"apad,atrim=duration={_f(L)},asetpts=PTS-STARTPTS[a{i}]")
+                         + f"apad,atrim=duration={_f(L)},asetpts=PTS-STARTPTS"
+                         + (f",{zan}" if (zan := afade(c.get("fade_in", 0), c.get("fade_out", 0), pre, L - pre - post)) else "")
+                         + f"[a{i}]")
         else:
             graph.append(f"anullsrc=r=48000:cl=stereo,atrim=duration={_f(L)},aformat=sample_fmts=fltp[a{i}]")
         seg_labels.append(f"[v{i}][a{i}]")
@@ -661,8 +688,9 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
             args += ["-ss", _f(m["in"]), "-t", _f(m["out"] - m["in"]), "-i", str(m["src"])]
             mi = n; n += 1
             ms = int(round(m["start"] * 1000))
+            zan = afade(m.get("fade_in", 0), m.get("fade_out", 0), 0, m["out"] - m["in"])
             graph.append(f"[{mi}:a]asetpts=PTS-STARTPTS,volume={_f(m['volume'])},aresample=48000,"
-                         f"aformat=sample_fmts=fltp:channel_layouts=stereo,adelay={ms}|{ms}[m{k}]")
+                         f"aformat=sample_fmts=fltp:channel_layouts=stereo,{zan + ',' if zan else ''}adelay={ms}|{ms}[m{k}]")
             mix.append(f"[m{k}]")
         graph.append(f"{''.join(mix)}amix=inputs={len(mix)}:duration=first:normalize=0,"
                      f"alimiter=limit=0.97[amx]")
