@@ -62,7 +62,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami, transkrypcja filmu z linku | Gabinet śledczy (`study`) | sherlock | 7 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi, SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | Pracownia webowa (`devlab`) | web | 9 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, copy PL, kampanie, kalendarze | Atelier kreatywne (`atelier`) | studio | 6 |
-| 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, filmy z kodu, maskotka | Studio filmowe (`filmstudio`) | wideo | 15 |
+| 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, typografia jak z montażu, filmy z kodu, maskotka | Studio filmowe (`filmstudio`) | wideo | 16 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem | Sala operacyjna (`office`) | ads | 10 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 6 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 10 |
@@ -116,7 +116,10 @@ Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo s
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.
 Animacja z kodu ma twardy pomiar przed oddaniem (`html_wideo.py pomiar`: czas czytania, kadr i strefy UI platformy,
 kontrast, czarne przerwy, martwe odcinki, rytm; „gotowe” tylko z pełnym i aktualnym raportem) i parametry
-(`parametry.json`), które właściciel stroi na żywo w HQ.
+(`parametry.json`), które właściciel stroi na żywo w HQ. Typografia do nagrania z mową (`typografia.py`, skill
+`typografia-edit`): reżyser z reguł układa bloki słów, Wideograf poprawia je znaczeniem (puenta = uderzenie w kolorze
+akcentu, myśl = dalej i kursywą, bez czerwieni domyślnie), mocne słowo staje za osobą (maska MODNet), a plan zostaje
+w projekcie montażu do poprawek w HQ; gotowego planu nie nadpisuje bez wyraźnej prośby.
 
 ---
 

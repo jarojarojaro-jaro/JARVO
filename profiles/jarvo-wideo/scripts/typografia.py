@@ -3,9 +3,10 @@
 skosem i perspektywą 3D, jako plan bloków w projekcie edytora HQ (`<film>.edycja.json`, klucz `typo`).
 
     typografia.py plan <film> [--motyw czysty|kino|ulica|energia|elegancki] [--akcent "#FFD400"]
-                              [--tempo spokojne|normalne|ostre] [--zostaw-napisy] [--ziarno N] [--bez-maski]
+                              [--tempo spokojne|normalne|ostre] [--zostaw-napisy] [--ziarno N] [--bez-maski] [--nowy]
     typografia.py pokaz <film> [--json]          # plan w skrócie: bloki, układy, wagi słów (do poprawek)
     typografia.py popraw <film> zmiany.json       # Twoje poprawki reżyserskie (format niżej)
+    typografia.py sylwetki <film>                 # sylwetki osoby pod bloki „za osobą” (np. ustawione w edytorze)
     typografia.py arkusz <film> [-o out/wideo/typografia.jpg] [--ile 12]   # klatki: film + typografia (vision)
     typografia.py usun <film>                     # usuń plan typografii z projektu
 
@@ -16,6 +17,8 @@ każdego słowa (krzyk = mocne słowo), pauzy, interpunkcja, cięcia ujęć → 
 blok staje obok twarzy, nie na niej, a najwyżej co szósty z jednym mocnym słowem idzie „za osobę” (sylwetki klatek
 w <film>.maska/, eksport i edytor kładą osobę z powrotem nad napisem). Bez modelu albo z --bez-maski: miejsca domyślne.
 Te same dane rysuje edytor HQ (hq/web/src/48-typografia.js), więc człowiek widzi i poprawia wszystko na osi.
+Gotowy plan mógł już poprawić człowiek, więc `plan` go nie nadpisuje: poprawiasz go `popraw`, a od nowa układasz
+tylko na wyraźną prośbę (`--nowy`).
 
 pokaz + popraw = Twoja reżyseria (zasady: skill typografia-edit): znaczenie słowa → forma. zmiany.json:
     {"motyw": "kino", "akcent": "#E5383B",
@@ -619,6 +622,10 @@ def cmd_plan(film: Path, a) -> int:
     proj = pr.load(film)
     cv = proj["canvas"]
     total = pr.total(proj)
+    stary = ed.normalize_typo(proj.get("typo"), total)["bloki"]
+    if stary and not a.nowy:                    # człowiek mógł go poprawić w edytorze HQ
+        raise SystemExit(f"projekt ma już plan typografii ({len(stary)} bloków, może z poprawkami właściciela): "
+                         f"popraw go (typografia.py pokaz {film} → popraw), od nowa tylko na wyraźną prośbę: --nowy")
     slowa, ciecia = slowa_osi(proj)
     if not slowa:
         raise SystemExit("brak mowy w nagraniu: typografia potrzebuje słów (sprawdź dźwięk albo transkrypcję)")
@@ -766,6 +773,18 @@ def cmd_popraw(film: Path, a) -> int:
     return 0
 
 
+def cmd_sylwetki(film: Path, a) -> int:
+    proj = pr.load(film)
+    plan = ed.normalize_typo(proj.get("typo"), pr.total(proj))
+    tyl = sum(1 for b in plan["bloki"] if b["warstwa"] == "tyl")
+    if not tyl:
+        print("Brak bloków za osobą (warstwa „tyl”): nie ma czego liczyć")
+        return 0
+    za = sylwetki(film, plan)
+    print(f"Sylwetki: {za} z {tyl} bloków za osobą" + ("" if za == tyl else " (maska niedostępna: osoba nie zasłoni reszty)"))
+    return 0 if za else 1
+
+
 def cmd_usun(film: Path, a) -> int:
     proj = pr.load(film)
     proj.pop("typo", None)
@@ -814,7 +833,11 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--ziarno", type=int, default=0, help="inny wariant układów (ten sam numer = ten sam plan)")
     sp.add_argument("--zostaw-napisy", action="store_true", help="nie usuwaj zwykłych napisów z projektu")
     sp.add_argument("--bez-maski", action="store_true", help="bez maski osoby (MODNet): miejsca domyślne, bez „za osobą”")
+    sp.add_argument("--nowy", action="store_true", help="ułóż od nowa, choć projekt ma już plan (poprawki człowieka giną)")
     sp.set_defaults(fn=cmd_plan)
+    sp = sub.add_parser("sylwetki", help="sylwetki osoby pod bloki za osobą")
+    sp.add_argument("film")
+    sp.set_defaults(fn=cmd_sylwetki)
     sp = sub.add_parser("pokaz", help="plan w skrócie")
     sp.add_argument("film")
     sp.add_argument("--json", action="store_true")

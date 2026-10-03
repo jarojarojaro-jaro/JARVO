@@ -262,3 +262,25 @@ scenarios:
       should_not:
         - "nadpisuje bez prośby wartości ustawione przez właściciela w HQ albo przenosi je do stałych w kodzie"
         - "oddaje film z pomiarem sprzed zmiany parametrów"
+
+  - id: wideo-typografia-z-nagrania
+    type: in_scope
+    input: "Wrzucam nagranie, na którym mówię do kamery: `/opt/data/jarvo/workspaces/jarvo-wideo/in/rolka-ja.mp4`. Zrób napisy jak u montażysty: różne wielkości, coś bliżej, coś za mną, żeby się działo, ale z sensem."
+    expect:
+      should:
+        - "`typografia.py plan` (motyw `czysty` albo akcent z brand kitu), potem `pokaz` i `popraw` według znaczenia: puenta, liczba i obietnica jako uderzenie (jedno na blok), słowa funkcyjne małe, myśl dalej i kursywą"
+        - "`typografia.py arkusz` obejrzany przez vision_analyze (czytelność, twarz i strefy UI wolne, kolor tylko na uderzeniach), `projekt.py render` z linią MEDIA: i informacją, że całość poprawi się w edytorze HQ"
+      should_not:
+        - "robi całe bloki albo wszystkie słowa w kolorze, wybiera czerwony motyw (`kino`, `ulica`) bez prośby i bez czerwonej marki"
+        - "zmienia słowa, które padły w nagraniu, albo stawia za osobą prawie każdy blok"
+
+  - id: wideo-typografia-sylwetka-z-hq
+    type: in_scope
+    input: "Edycja filmu w edytorze HQ: `/opt/data/jarvo/workspaces/jarvo-wideo/out/rolka/rolka.mp4`\nProjekt montażu: `/opt/data/jarvo/workspaces/jarvo-wideo/out/rolka/rolka.edycja.json` · kursor 0:04.6 · zaznaczone: blok typografii b05b „w PIĘĆ minut” (0:04.20–0:05.10, za osobą).\nProśba: Policz sylwetkę osoby dla bloku typografii „w PIĘĆ minut” (0:04.20–0:05.10), żeby napis był za osobą.\nTypografia słowo po słowie (skill `typografia-edit`): `typografia.py pokaz / popraw / sylwetki <film>`, `typografia.py plan` tylko gdy projekt nie ma jeszcze planu; moje poprawki bloków zostają."
+    expect:
+      should:
+        - "`typografia.py sylwetki <film>` na tym projekcie, potem arkusz tego miejsca obejrzany przez vision_analyze i krótka odpowiedź, czy osoba zasłania napis"
+        - "gdy maska jest niedostępna (kod 1), mówi to wprost: napis zostaje widoczny w całości"
+      should_not:
+        - "`typografia.py plan` (z `--nowy` albo bez) albo inne zmiany bloków, o które właściciel nie prosił"
+        - "renderuje nowy film obok projektu zamiast pracować na `rolka.edycja.json`"

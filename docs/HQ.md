@@ -154,7 +154,8 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   według wagi). Klik w blok na osi albo na podglądzie otwiera panel (na telefonie arkusz): słowa jako żetony
   (tekst, waga, kolor z powrotem do motywu, krój z siatki albo „Auto” z motywu, styl, głębia, wielkie litery, skala,
   linia) i blok (układ; „Za osobą” przestawia blok na warstwę `tyl`, rozmiar, szerokość, obrót, perspektywa 3D,
-  wejście słów, wyjście). Blok `tyl` bez policzonej sylwetki ma ostrzeżenie i przycisk prośby do Wideografa.
+  wejście słów, wyjście). Blok `tyl` bez policzonej sylwetki ma ostrzeżenie i przycisk prośby do Wideografa
+  (`typografia.py sylwetki`; `typografia.py plan` nie nadpisuje planu poprawionego w edytorze bez `--nowy`).
   Na podglądzie blok przeciąga się z przyciąganiem do środka kadru; na osi zmienia się jego czas (lewa krawędź
   zostawia słowa przy ich czasie w filmie). **Tnij** dzieli blok na słowie pod wskaźnikiem, jest też **Połącz
   z następnym**, **Duplikuj** i **Usuń**; wszystko to jeden krok cofania. Panel **Napisy** ma sekcję typografii:

@@ -627,3 +627,44 @@ def test_maska_opis_glowy_bez_reki_i_png_z_alfa(tmp_path):
     assert b[:8] == b"\x89PNG\r\n\x1a\n" and struct.unpack(">II", b[16:24]) == (60, 100) and b[25] == 6   # RGBA
     dane = zlib.decompress(b[b.index(b"IDAT") + 4:b.index(b"IEND") - 8])
     assert len(dane) == 100 * (1 + 60 * 4) and dane[30 * 241 + 1 + 30 * 4 + 3] == 255 and dane[1 + 3] == 0
+
+
+def _projekt_typo(tmp_path: Path, bloki: list[dict]) -> Path:
+    """Film (pusty plik wystarczy: projekt ma klipy) i projekt z planem typografii, jak po poprawkach w edytorze."""
+    src = tmp_path / "film.mp4"
+    src.write_bytes(b"")
+    raw = {"version": 1, "canvas": {"w": 1080, "h": 1920, "fps": 30}, "texts": [], "audio": [],
+           "clips": [{"id": "c1", "src": str(src), "kind": "video", "in": 0, "out": 6, "speed": 1}],
+           "typo": {"motyw": "czysty", "bloki": bloki}}
+    ed.project_path(src).write_text(json.dumps(raw), encoding="utf-8")
+    return src
+
+
+def test_plan_nie_nadpisuje_planu_z_poprawkami(tmp_path, monkeypatch):
+    """Gotowy plan mógł poprawić człowiek w HQ: `plan` odmawia, od nowa tylko z --nowy."""
+    src = _projekt_typo(tmp_path, [blok([("Moje", 1), ("POPRAWKI", 3)])])
+    przed = ed.project_path(src).read_text(encoding="utf-8")
+    with pytest.raises(SystemExit, match="--nowy"):
+        ty.main(["plan", str(src)])
+    assert ed.project_path(src).read_text(encoding="utf-8") == przed
+    monkeypatch.setattr(ty, "slowa_osi", lambda proj: ([], []))
+    with pytest.raises(SystemExit, match="brak mowy"):          # z --nowy przechodzi dalej (tu: film bez mowy)
+        ty.main(["plan", str(src), "--nowy"])
+
+
+def test_sylwetki_tylko_dla_blokow_za_osoba(tmp_path, monkeypatch, capsys):
+    """Blok przestawiony za osobę w edytorze: `sylwetki` liczy maskę tylko dla bloków warstwy „tyl”."""
+    przod = blok([("Zwykły", 1)], start=0.5)
+    tyl = {**blok([("ZA", 3)], start=2.0), "id": "b2", "uklad": "za", "warstwa": "tyl"}
+    src = _projekt_typo(tmp_path, [przod, tyl])
+    wolania = []
+    monkeypatch.setattr(ty, "maska", lambda film, *args: wolania.append(args) or "ok")
+    assert ty.main(["sylwetki", str(src)]) == 0
+    assert len(wolania) == 1 and wolania[0][0] == "klatki" and wolania[0][2] == "2.000"
+    assert "Sylwetki: 1 z 1" in capsys.readouterr().out
+    monkeypatch.setattr(ty, "maska", lambda film, *args: None)   # bez modelu: kod błędu i wyjaśnienie
+    assert ty.main(["sylwetki", str(src)]) == 1
+    assert "maska niedostępna" in capsys.readouterr().out
+    (tmp_path / "bez").mkdir()
+    src2 = _projekt_typo(tmp_path / "bez", [przod])
+    assert ty.main(["sylwetki", str(src2)]) == 0 and "Brak bloków za osobą" in capsys.readouterr().out

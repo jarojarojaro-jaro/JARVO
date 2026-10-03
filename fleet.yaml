@@ -149,7 +149,8 @@ agents:
     description: >-
       Wideo od A do Z: krótkie filmy na TikTok, Reels i Shorts z tematu (scenariusz, ujęcia stock,
       AI albo własne, polski lektor, napisy karaoke, muzyka, montaż), warianty do testów A/B, montaż
-      nagrań użytkownika, rolki z długich nagrań (clipmaker: edytowalne w HQ, napisy karaoke), filmy z kodu (HyperFrames, Manim), wideo z AI,
+      nagrań użytkownika, rolki z długich nagrań (clipmaker: edytowalne w HQ, napisy karaoke), typografia jak z montażu
+      do nagrania z mową (słowo po słowie, głębia, napis za osobą), filmy z kodu (HyperFrames, Manim), wideo z AI,
       napisy PL, formaty platform, kontrola jakości. Przygotowuje pliki, nie publikuje bez zgody.
     model_tier: strong
     delegation_tier: fast

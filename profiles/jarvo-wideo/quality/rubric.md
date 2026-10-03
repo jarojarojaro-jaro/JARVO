@@ -26,3 +26,10 @@
   (człowiek nie może jej poprawić w HQ); twarz mówcy poza kadrem.
 - Ważne: hook później niż w 3 s, rolka urwana w pół zdania, dwie rolki o tym samym temacie, oceny < 7 bez wyjaśnienia,
   nazwy własne i liczby w napisach niepoprawione, rolka zmieniona przez człowieka nadpisana przez `zbuduj`.
+
+## Typografia jak z montażu (`typografia-edit`)
+- Blokujące: słowa na ekranie inne niż w mowie (poza liczebnikiem zapisanym cyfrą); napis na twarzy albo w strefie UI;
+  plan poprawiony przez właściciela w HQ nadpisany (`plan --nowy` bez jego prośby); brak projektu `.edycja.json`.
+- Ważne: kolor na całych blokach albo na zwykłych słowach, czerwony motyw albo czerwień bez powodu w treści czy marce,
+  więcej niż dwa kolory poza bielą, więcej niż jedno uderzenie w bloku, za osobą częściej niż co szósty blok,
+  słowo, które wchodzi przed dźwiękiem albo długo po nim; arkusz nieobejrzany.

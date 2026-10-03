@@ -11,7 +11,7 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 | 🔎 `jarvo-sherlock` | detektyw researchu: wiele źródeł, weryfikacja faktów, raporty z cytatami |
 | 🌐 `jarvo-web` | Web Senior Dev: brand z URL, audyty, strony i landingi, SEO, favicony, obrazy |
 | 🎬 `jarvo-studio` | marketing i kreacja: grafiki social, obrazy AI (OpenRouter), copy PL, kampanie |
-| 🎥 `jarvo-wideo` | wideograf: krótkie filmy z tematu (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, klipy z nagrań |
+| 🎥 `jarvo-wideo` | wideograf: krótkie filmy z tematu (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, klipy z nagrań, typografia jak z montażu |
 | 📈 `jarvo-ads` | specjalista Ads: Meta i Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem |
 | 🎯 `jarvo-lowca` | łowca leadów: sygnały zakupowe z KRS, przetargów i stron firm → ranking firm z „dlaczego teraz” i opublikowanym kontaktem; nic nie wysyła |
 | 📱 `jarvo-mobile` | twórca aplikacji: uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA), aplikacje Expo ze zgodnością ze sklepami od planu (także ze strony firmy), podgląd w HQ i w Expo Go, bramka jakości, pakiet do sklepów z listą 44 punktów, wydanie i poprawki OTA za zgodą, kontrola paczek npm; konta zawsze właściciela |
