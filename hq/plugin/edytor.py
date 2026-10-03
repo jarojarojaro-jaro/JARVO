@@ -64,6 +64,7 @@ ZANIK_MAX = 10.0         # najdłuższe narastanie albo wyciszanie (s), najwyże
 MAX_WORDS = 40           # słów w jednym napisie karaoke (linia napisu ma ich 2–8)
 MAX_DURATION = 3 * 3600.0
 MIN_CLIP = 0.04          # jedna klatka przy 25 fps
+CICHE_CIECIE = 0.025     # mikro-wyciszenie (s) dźwięku na twardym cięciu: cięcie w środku fali daje słyszalny klik
 FPS_ALLOWED = (24, 25, 30, 50, 60)
 
 
@@ -115,6 +116,11 @@ def zanik(x: dict, d: float) -> tuple[float, float]:
     """Narastanie i wyciszanie elementu o długości d (s na osi): 0–10 s, najwyżej połowa elementu."""
     lim = max(0.0, min(ZANIK_MAX, d / 2))
     return min(_num(x.get("fadeIn"), 0, ZANIK_MAX, 0), lim), min(_num(x.get("fadeOut"), 0, ZANIK_MAX, 0), lim)
+
+
+def ciche_ciecie(d: float) -> float:
+    """Mikro-wyciszenie elementu długości d: 25 ms, a w bardzo krótkim elemencie najwyżej jego ćwierć."""
+    return min(CICHE_CIECIE, max(0.0, d) / 4)
 
 
 def afade(fi: float, fo: float, st: float, d: float) -> str:
@@ -630,7 +636,10 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
             graph.append(f"[{vi}:a]{chain},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
                          + (f"adelay={round(brak * 1000)}:all=1," if brak > 1e-4 else "")
                          + f"apad,atrim=duration={_f(L)},asetpts=PTS-STARTPTS"
-                         + (f",{zan}" if (zan := afade(c.get("fade_in", 0), c.get("fade_out", 0), pre, L - pre - post)) else "")
+                         # cięcie bez przejścia i bez zaniku dostaje mikro-wyciszenie (przejście ma acrossfade)
+                         + (f",{zan}" if (zan := afade(c.get("fade_in", 0) or (0 if pre else ciche_ciecie(L - pre - post)),
+                                                       c.get("fade_out", 0) or (0 if post else ciche_ciecie(L - pre - post)),
+                                                       pre, L - pre - post)) else "")
                          + f"[a{i}]")
         else:
             graph.append(f"anullsrc=r=48000:cl=stereo,atrim=duration={_f(L)},aformat=sample_fmts=fltp[a{i}]")
@@ -688,7 +697,10 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
             args += ["-ss", _f(m["in"]), "-t", _f(m["out"] - m["in"]), "-i", str(m["src"])]
             mi = n; n += 1
             ms = int(round(m["start"] * 1000))
-            zan = afade(m.get("fade_in", 0), m.get("fade_out", 0), 0, m["out"] - m["in"])
+            # audio przycięte od środka: mikro-wyciszenie na początku (od początku pliku zostaje atak efektu) i na końcu
+            mik = ciche_ciecie(m["out"] - m["in"])
+            zan = afade(m.get("fade_in", 0) or (mik if m["in"] > 0.001 else 0), m.get("fade_out", 0) or mik,
+                        0, m["out"] - m["in"])
             graph.append(f"[{mi}:a]asetpts=PTS-STARTPTS,volume={_f(m['volume'])},aresample=48000,"
                          f"aformat=sample_fmts=fltp:channel_layouts=stereo,{zan + ',' if zan else ''}adelay={ms}|{ms}[m{k}]")
             mix.append(f"[m{k}]")

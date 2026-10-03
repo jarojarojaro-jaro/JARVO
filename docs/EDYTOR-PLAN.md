@@ -21,7 +21,7 @@ Jarvo zostaje nadrzędny: z cudzych projektów bierzemy tylko wzorce i pliki na 
 |---|---|---|
 | Przejścia między klipami | ✅ | 16 rodzajów, kwadrat na cięciu, animowane miniatury, długość, „Do wszystkich cięć”; nie skraca filmu (środek cięcia, napisy zostają); eksport `xfade` + `acrossfade`; `projekt.py przejscie` |
 | Szybkie cięcie | ✅ | Usuń z lewej (od początku klipu do wskaźnika, Q) i z prawej (od wskaźnika, W), podział klipu na 2–4 równe części (np. 7,5 s → 3 × 2,5 s, środek usunięty jednym ruchem, reszta się dosuwa); `projekt.py tnij` i `wytnij` |
-| Zanik audio | ✅ | Narastanie i wyciszanie na początku i końcu każdego audio i klipu (suwaki, trójkąt na osi, `afade` liniowo jak podgląd); `projekt.py dzwiek` i `dodaj-audio --narastanie/--wyciszanie` |
+| Zanik audio | ✅ | Narastanie i wyciszanie na początku i końcu każdego audio i klipu (suwaki, trójkąt na osi, `afade` liniowo jak podgląd); `projekt.py dzwiek` i `dodaj-audio --narastanie/--wyciszanie`; ciche cięcia: 25 ms wyciszenia na każdym twardym cięciu w eksporcie |
 | Kilka ścieżek audio | ✅ | Muzyka, lektor i efekty grające naraz na osobnych pasach osi (pierwszy wolny pas), do 32 elementów audio |
 | Paski ikon na telefonie | ✅ | Pasek główny, pasek klipu, audio i tekstu jak w CapCut, z „<” powrotu; ikona otwiera jedną sekcję ustawień |
 

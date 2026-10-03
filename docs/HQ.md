@@ -130,6 +130,10 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   elementu), na osi przyciemniony trójkąt na początku i końcu. Liniowo w podglądzie (`zanikGain` w `43-dzwiek.js`)
   i w eksporcie (`afade curve=tri`), test mierzy głośność w pliku z ffmpeg i porównuje z podglądem
   (`tests/test_edytor_dzwiek.py`). Muzyka dłuższa niż film cichnie na końcu filmu. Pola `fadeIn`, `fadeOut` w projekcie.
+- **Ciche cięcia:** eksport wycisza dźwięk klipu na 25 ms przy każdym twardym cięciu (bez przejścia i bez własnego
+  zaniku; `edytor.CICHE_CIECIE`), a audio przycięte od środka na obu końcach (efekt od początku pliku zachowuje atak).
+  Cięcie w środku fali dawało klik, a rolki z clipmakera i cięcia z zakładki „Mowa” mają takich cięć dużo. Test mierzy
+  skok fali na styku dwóch kawałków sinusa (`test_ciecie_bez_kliku`). Pomysł z browser-use/video-use (MIT).
 - **Pasy audio:** muzyka, lektor i efekty grające naraz leżą na osi jeden pod drugim (element trafia na pierwszy
   wolny pas, `pasyAudio`), do 32 elementów audio w projekcie; eksport miesza wszystkie.
 - **Menu Audio** (jak w CapCut; „Dodaj audio” pod osią, na komputerze zakładka „Audio” w panelu, `44-audio.js`):

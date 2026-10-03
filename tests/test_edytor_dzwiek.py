@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import shutil
 import struct
 import subprocess
@@ -60,6 +61,59 @@ def test_normalize_zanik_w_granicach(tmp_path):
     assert "afade=t=in:st=0:d=1:curve=tri,afade=t=out:st=1.5:d=1.5:curve=tri,adelay=3000|3000[m0]" in cmd
     assert len(ed.normalize({"clips": [{"src": str(tmp_path / "a.mp4")}], "audio": [{"src": str(tmp_path / "m.mp3"), "out": 1}] * 40},
                             lambda s: Path(s) if Path(s).is_file() else None)["audio"]) == ed.MAX_AUDIO == 32
+
+
+def test_ciche_ciecia_w_poleceniu(tmp_path):
+    """Twarde cięcie dostaje 25 ms wyciszenia; przejście (acrossfade) i zanik użytkownika zostają bez zmian."""
+    for n in ("a.mp4", "m.mp3"):
+        (tmp_path / n).write_bytes(b"x")
+    a = str(tmp_path / "a.mp4")
+    p = ed.normalize({"clips": [{"src": a, "in": 0, "out": 2}, {"src": a, "in": 3, "out": 5, "transition": {"type": "fade", "dur": 0.5}},
+                                {"src": a, "in": 6, "out": 7, "fadeOut": 0.3}],
+                      "audio": [{"src": str(tmp_path / "m.mp3"), "start": 0, "in": 0, "out": 1},
+                                {"src": str(tmp_path / "m.mp3"), "start": 1, "in": 2.5, "out": 3.5}]},
+                     lambda s: Path(s) if Path(s).is_file() else None)
+    cmd = " ".join(ed.build_command(p, {a: True}, [], tmp_path / "o.mp4"))
+    assert "afade=t=in:st=0:d=0.025:curve=tri,afade=t=out:st=1.975:d=0.025:curve=tri[a0]" in cmd
+    # klip przed przejściem: wyciszenie tylko na wejściu, wyjście robi acrossfade
+    assert "afade=t=in:st=0:d=0.025:curve=tri[a1]" in cmd
+    # klip po przejściu: wejście w acrossfade, wyjście = zanik użytkownika (0,3 s), a nie 25 ms
+    a2 = cmd.split("[a1]")[1].split("[a2]")[0]
+    assert a2.endswith("asetpts=PTS-STARTPTS,afade=t=out:st=" + a2.split("afade=t=out:st=")[1]) and a2.endswith(":d=0.3:curve=tri")
+    assert "afade=t=in" not in a2
+    # efekt od początku pliku zachowuje atak, efekt przycięty od środka dostaje wyciszenie na obu końcach
+    assert "aformat=sample_fmts=fltp:channel_layouts=stereo,afade=t=out:st=0.975:d=0.025:curve=tri,adelay=0|0[m0]" in cmd
+    assert "afade=t=in:st=0:d=0.025:curve=tri,afade=t=out:st=0.975:d=0.025:curve=tri,adelay=1000|1000[m1]" in cmd
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_ciecie_bez_kliku(tmp_path):
+    """Dwa kawałki tej samej fali w różnych fazach (szczyt → zero): bez wyciszenia na styku jest skok fali (klik),
+    z nim fala gaśnie do zera i rośnie od zera. Dźwięk w PCM, żeby kodek nie wygładzał skoku."""
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=black:s=64x64:d=3:r=25",
+                    "-f", "lavfi", "-i", "aevalsrc=0.8*sin(2*PI*440*t):s=48000:c=stereo:d=3", "-shortest",
+                    "-c:a", "pcm_s16le", str(tmp_path / "v.mov")], check=True)
+    src = str(tmp_path / "v.mov")
+    koniec = 440.25 / 440                                # szczyt sinusa; drugi klip zaczyna się w zerze (1,5 s)
+    p = ed.normalize({"canvas": {"w": 64, "h": 64, "fps": 25},
+                      "clips": [{"src": src, "in": 0.2, "out": koniec}, {"src": src, "in": 1.5, "out": 2.4}]},
+                     lambda s: Path(s) if Path(s).is_file() else None)
+
+    def skok(bez_wyciszenia: bool) -> float:
+        out = tmp_path / "o.mov"
+        cmd = ["pcm_s16le" if x == "aac" else x for x in ed.build_command(p, {src: True}, [], out)]
+        if bez_wyciszenia:
+            cmd = [re.sub(r",afade=t=(in|out):st=[0-9.]+:d=0\.025:curve=tri", "", x) for x in cmd]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr[-1500:]
+        raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(out), "-map", "0:a", "-ac", "1", "-f", "f32le", "-"],
+                             capture_output=True, check=True).stdout
+        x = struct.unpack(f"<{len(raw) // 4}f", raw)
+        k = round((koniec - 0.2) * 48000)               # styk klipów na osi
+        return max(abs(x[i + 1] - x[i]) for i in range(k - 400, k + 400))
+
+    assert skok(True) > 0.5                              # bez wyciszenia: fala skacze o ~0,8 na styku = klik
+    assert skok(False) < 0.08                            # z wyciszeniem: najwyżej zwykły krok sinusa 440 Hz (≈ 0,046)
 
 
 def _rms(film: Path, okna: list[tuple[float, float]]) -> list[float]:
