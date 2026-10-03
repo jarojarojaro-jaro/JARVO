@@ -295,5 +295,8 @@ i znika po 15 min bezczynności; z 15 narzędzi serwera w schemacie modelu tylko
 narzędzie bez `readOnlyHint=true`, np. z nowej wersji, czeka na zgodę).
 Nie używamy hostowanego endpointu inspomcp.dev ani `TOGETHER_API_KEY` (bez klucza wyszukiwanie jest leksykalne,
 więc zapytania po angielsku). Serwer pobiera katalog (~2,3 MB) z CDN autorów przy każdym starcie; Hermes przekazuje
-serwerom stdio tylko bezpieczne zmienne środowiska (bez proxy), więc za proxy HTTPS ten pobór nie przejdzie.
+serwerom stdio tylko bezpieczne zmienne środowiska (`PATH`, `HOME`, bez proxy), więc `config.yaml` podaje mu wprost
+`NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt` (CA dodane do systemu, np. proxy z własnym certyfikatem).
+Proxy wymagające `HTTPS_PROXY` dalej blokuje pobór. Healthcheck (`toolbox.yaml`) startuje serwer z takim samym okrojonym
+środowiskiem i robi prawdziwe `search_screens`, więc zielony wynik znaczy, że katalog się pobrał.
 

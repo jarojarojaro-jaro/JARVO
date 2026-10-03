@@ -58,6 +58,9 @@ mcp_servers:
       INSPO_PROFILE: "full"
       INSPO_IMAGES: "thumbs"        # miniatury: Hermes zapisuje je jako pliki (MEDIA:…), Web ogląda je narzędziem vision
       INSPO_MAX_TOKENS: "5000"      # sufit jednej odpowiedzi; wynik narzędzia wraca w każdej kolejnej turze
+      # Hermes przekazuje serwerowi stdio tylko PATH, HOME i kilka zmiennych: bez tego Node nie zna CA dodanych do systemu
+      # (proxy z własnym certyfikatem, piaskownica) i pobieranie katalogu kończy się SELF_SIGNED_CERT_IN_CHAIN
+      NODE_EXTRA_CA_CERTS: "/etc/ssl/certs/ca-certificates.crt"
     lazy: true
     idle_timeout_seconds: 900
     connect_timeout: 60
