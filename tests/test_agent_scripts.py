@@ -1,4 +1,4 @@
-"""Skrypty narzędziowe snajperów: SEO, dziennik źródeł, pakiet misji, kontrola mediów."""
+"""Skrypty narzędziowe snajperów: SEO, rejestr źródeł i cytowania, pakiet misji, kontrola mediów."""
 
 from __future__ import annotations
 
@@ -60,29 +60,142 @@ def test_seo_title_length_warning():
 
 # ----------------------------------------------------------------------- sources
 
-def test_sources_add_dedupe_list_cite(tmp_path, monkeypatch, capsys):
+extract = load_script("profiles/jarvo-sherlock/scripts/extract.py")
+STRONA = "Stopa bezrobocia w marcu 2026 wyniosła **5,1 procent**, podał [GUS](https://stat.gov.pl). Inne zdanie."
+
+
+def rejestr(tmp_path):
+    return json.loads((tmp_path / "out/zrodla.json").read_text(encoding="utf-8"))["sources"]
+
+
+def test_sources_numery_stale_i_ocena(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     sources.main(["add", "https://stat.gov.pl/raport", "--tier", "A", "--type", "dane", "--date", "2026-03-01",
                   "--title", "GUS: raport"])
-    sources.main(["add", "https://blog.example/wpis", "--tier", "C", "--type", "opinia"])
-    sources.main(["add", "https://stat.gov.pl/raport", "--tier", "A", "--type", "pierwotne", "--title", "GUS"])
-    entries = [json.loads(line) for line in (tmp_path / "out/zrodla.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert [e["n"] for e in entries] == [1, 2]
-    assert entries[0]["type"] == "pierwotne" and entries[0]["title"] == "GUS"
-    capsys.readouterr()
+    sources.main(["add", "https://blog.example/wpis", "https://inny.example/a"])
+    sources.main(["add", "https://stat.gov.pl/raport/#tabela", "--tier", "A", "--type", "pierwotne"])
+    e = rejestr(tmp_path)
+    assert [x["id"] for x in e] == [1, 2, 3]                       # ten sam adres (z / i #) = ten sam numer
+    assert e[0]["type"] == "pierwotne" and e[0]["title"] == "GUS: raport" and e[0]["date"] == "2026-03-01"
+    assert capsys.readouterr().out.splitlines()[-1] == "[1] https://stat.gov.pl/raport"
     sources.main(["list", "--min-tier", "B"])
     listed = capsys.readouterr().out
     assert "stat.gov.pl" in listed and "blog.example" not in listed
-    sources.main(["cite"])
+    sources.main(["cite"])                                          # stare polecenie = render
     cited = capsys.readouterr().out.splitlines()
-    assert cited[0].startswith("[1] GUS") and "wiarygodność A" in cited[0]
-    assert cited[1].startswith("[2] https://blog.example/wpis")
-
-
-def test_sources_rejects_bad_tier(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+    assert cited[0] == "## Źródła"
+    assert cited[2].startswith("- [1] https://stat.gov.pl/raport — GUS: raport") and "wiarygodność A, pierwotne" in cited[2]
     with pytest.raises(SystemExit):
-        sources.main(["add", "https://x.example", "--tier", "Z", "--type", "dane"])
+        sources.main(["add", "https://x.example", "--tier", "Z"])
+
+
+def test_sources_ingest_i_wspolny_rejestr(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    wspolny = tmp_path / "misja/zrodla.json"
+    monkeypatch.setenv("JARVO_REJESTR_ZRODEL", str(wspolny))
+    wyniki = {"results": [{"url": "https://a.example/x", "title": "A"}, {"link": "https://b.example", "name": "B"},
+                          {"url": "https://a.example/x/"}]}
+    (tmp_path / "w.json").write_text(json.dumps(wyniki), encoding="utf-8")
+    assert sources.main(["ingest", "w.json"]) == 0
+    assert [s["title"] for s in json.loads(wspolny.read_text(encoding="utf-8"))["sources"]] == ["A", "B"]
+    sources.main(["add", "https://a.example/x", "--title", "Strona A"])
+    assert sources.main(["ingest", "w.json"]) == 0                  # tytuł z wyszukiwarki nie nadpisuje zapisanego
+    assert [s["title"] for s in json.loads(wspolny.read_text(encoding="utf-8"))["sources"]] == ["Strona A", "B"]
+    assert not (tmp_path / "out").exists()
+    inny = tmp_path / "watek/zrodla.json"
+    sources.main(["add", "https://c.example", "--rejestr", str(inny)])           # --rejestr także po poleceniu
+    sources.main([f"--rejestr={inny}", "add", "https://d.example"])
+    assert [x["id"] for x in json.loads(inny.read_text(encoding="utf-8"))["sources"]] == [1, 2]
+
+
+def test_sources_przenosi_stary_dziennik(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "out").mkdir()
+    (tmp_path / "out/zrodla.jsonl").write_text(json.dumps({"n": 1, "url": "https://stat.gov.pl/r", "tier": "A",
+                                                          "type": "dane", "checked_at": "2026-09-01"}) + "\n", encoding="utf-8")
+    sources.main(["add", "https://nowe.example"])
+    e = rejestr(tmp_path)
+    assert [(x["id"], x["url"]) for x in e] == [(1, "https://stat.gov.pl/r"), (2, "https://nowe.example")]
+    assert e[0]["tier"] == "A" and e[0]["accessed"] == "2026-09-01"
+
+
+def test_cytat_tylko_doslowny_z_zapisanego_tekstu(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "s.txt").write_text(STRONA, encoding="utf-8")
+    sources.main(["add", "https://stat.gov.pl/r", "--tekst", "s.txt"])
+    sources.main(["add", "https://blog.example/w"])
+    e = rejestr(tmp_path)[0]
+    assert (tmp_path / "out" / e["tekst"]).read_text(encoding="utf-8") == STRONA and len(e["sha256"]) == 64
+    # odstępy, wielkość liter i znaczniki markdown (pogrubienie, link) nie przeszkadzają
+    assert sources.main(["quote", "1", "--text", "wyniosła 5,1 procent, podał GUS"]) == 0
+    with pytest.raises(SystemExit, match="dosłownie"):
+        sources.main(["quote", "1", "--text", "wyniosła 6 procent, podał GUS"])
+    with pytest.raises(SystemExit, match="za krótki"):
+        sources.main(["quote", "1", "--text", "5,1 procent"])
+    with pytest.raises(SystemExit, match="nie ma zapisanego tekstu"):
+        sources.main(["quote", "2", "--text", "cokolwiek tu jest"])
+    sources.main(["quote", "1", "--text", "WYNIOSŁA 5,1   procent, podał GUS"])            # bez dubla
+    assert len(rejestr(tmp_path)[0]["quotes"]) == 1
+    # link z podświetleniem: krótki cytat w całości, długi jako początek,koniec; przecinek i myślnik zakodowane
+    assert sources.link_podswietlenia("https://a.pl/r", "jest 5,1 procent - dane") == \
+        "https://a.pl/r#:~:text=jest%205%2C1%20procent%20%2D%20dane"
+    assert sources.link_podswietlenia("https://a.pl/r", "Stopa bezrobocia w marcu 2026 była równa 5,1 procent według GUS") == \
+        "https://a.pl/r#:~:text=Stopa%20bezrobocia%20w%20marcu,5%2C1%20procent%20wed%C5%82ug%20GUS"
+
+
+def test_verify_raportu(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "s.txt").write_text(STRONA, encoding="utf-8")
+    sources.main(["add", "https://stat.gov.pl/r", "--tekst", "s.txt", "--tier", "A", "--type", "dane"])
+    sources.main(["add", "https://blog.example/w"])
+    raport = tmp_path / "out/RAPORT.md"
+    raport.write_text("# Raport\n\nBezrobocie w marcu 2026 wyniosło 5,1 procent [1]. Blog twierdzi zupełnie "
+                      "co innego w tej sprawie [2]. To zdanie podaje liczbę [7].\n", encoding="utf-8")
+    assert sources.main(["verify", str(raport)]) == 1
+    err = capsys.readouterr().err
+    assert "spoza rejestru" in err and "[7]" in err and "nie ma bloku" in err
+    assert "bez oceny wiarygodności" in err and "tylko z wyniku wyszukiwania" in err
+
+    raport.write_text("# Raport\n\nBezrobocie w marcu 2026 wyniosło 5,1 procent [1]. Blog twierdzi zupełnie "
+                      "co innego w tej sprawie [niezweryfikowane]. Prognoza na koniec roku jest niepewna.\n",
+                      encoding="utf-8")
+    assert sources.main(["render", "--replace-in", str(raport)]) == 0
+    assert sources.main(["render", "--replace-in", str(raport), "--styl", "dowody"]) == 0   # bez dublowania bloku
+    assert raport.read_text(encoding="utf-8").count("## Źródła") == 1
+    assert sources.main(["verify", str(raport), "--min-coverage", "0.9"]) == 1          # 2 z 3 zdań
+    assert sources.main(["verify", str(raport), "--min-coverage", "0.6"]) == 0
+    assert sources.main(["verify", str(raport), "--dowody"]) == 1                        # brak cytatu-dowodu
+    sources.main(["quote", "1", "--text", "Stopa bezrobocia w marcu 2026 wyniosła 5,1 procent"])
+    sources.main(["render", "--replace-in", str(raport), "--styl", "dowody"])
+    capsys.readouterr()
+    assert sources.main(["verify", str(raport), "--dowody"]) == 0
+    out = capsys.readouterr().out
+    assert "cytowania OK" in out and "1 [niezweryfikowane]" in out
+    assert sources.main(["verify", str(raport), "--strict"]) == 1                        # [2] w rejestrze, nie cytowane
+    tekst = raport.read_text(encoding="utf-8")
+    assert "> „Stopa bezrobocia" in tekst and "#:~:text=" in tekst
+    # ręcznie poprawiony adres w bloku źródeł nie przejdzie
+    raport.write_text(tekst.replace("- [1] https://stat.gov.pl/r", "- [1] https://stat.gov.pl/inny"), encoding="utf-8")
+    assert sources.main(["verify", str(raport)]) == 1
+    # angielskie nagłówek i znacznik też działają (raport po angielsku)
+    raport.write_text("Unemployment reached five point one percent [1].\nGrowth may slow down later [unverified].\n\n"
+                      "Sources:\n[1] https://stat.gov.pl/r\n", encoding="utf-8")
+    assert sources.main(["verify", str(raport), "--min-coverage", "1"]) == 0
+
+
+def test_extract_rejestruje_i_zapisuje_tekst(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(extract, "extract", lambda url: {
+        "url": url, "title": "GUS", "author": None, "date": "2026-03-01", "sitename": "GUS", "text": STRONA,
+        "degraded": False})
+    assert extract.main(["https://stat.gov.pl/r", "--tier", "A", "--type", "dane", "--max-chars", "10"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("[1] w rejestrze źródeł; pełny tekst: out/strony/1.txt")
+    e = rejestr(tmp_path)[0]
+    assert (e["tier"], e["type"], e["date"], e["title"]) == ("A", "dane", "2026-03-01", "GUS")
+    assert (tmp_path / "out/strony/1.txt").read_text(encoding="utf-8") == STRONA    # cały tekst, nie ucięty
+    assert extract.main(["https://inna.example", "--bez-rejestru", "--json", "--max-chars", "10"]) == 0
+    assert len(rejestr(tmp_path)) == 1 and json.loads(capsys.readouterr().out)["truncated"] is True
 
 
 # -------------------------------------------------------------------------- pack

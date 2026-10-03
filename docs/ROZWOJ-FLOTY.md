@@ -28,7 +28,7 @@ Z tego wynikają cztery reguły tego planu:
 | `jarvo-wideo` | 16 | 21 + biblioteka (~7 400 linii) + edytor | 59 | wysoka | pełna linia produkcyjna |
 | `jarvo-lowca` | 6 | 4 + biblioteka (~1 100 linii) | 0 | średnio-wysoka | prawdziwe dane, ale błąd w ocenie leadów i nigdy nie uruchomiony na prawdziwej ofercie |
 | `jarvo-ads` | 10 | 4 (~550 linii) | 6 | nisko-średnia | dobra matematyka testów; Skarbiec nie istnieje, więc 3 skille nie działały wcale, a 4 tylko na eksporcie CSV |
-| `jarvo-sherlock` | 7 | 3 (~290 linii) | 16 | nisko-średnia | weryfikacja źródeł tylko w prompcie; dziś blisko zwykłego „deep research” |
+| `jarvo-sherlock` | 8 | 3 (~900 linii) | 15 | średnia | cytowania sprawdzane w kodzie (rejestr, cytaty-dowody z tekstem strony, `verify` raportu); bez Wayback i źródeł prawa PL |
 | `jarvo-studio` | 6 | 2 (~160 linii) + 1 szablon | 23 | nisko-średnia | renderuje i mierzy wymiary, ale tekstu, układu i publikacji kod nie sprawdza |
 | `jarvo-mobile` | 10 | 18 + biblioteka (~7 300 linii) + szablon Expo | 20 | wysoka | od decyzji „natywna czy PWA” po sklep; podgląd w Expo Go czeka na organizację Expo właściciela |
 | `jarvo-reka` | 4 | 2 (~190 linii) | 4 + wszystkie skille floty | niska | generalista bez dostępu do Twojej poczty, kalendarza i dokumentów |
@@ -53,8 +53,8 @@ Te punkty nie wymagają decyzji, tylko poprawki:
    Skarbiec, którego nie ma. Mają teraz `metadata.jarvo.wymaga: [skarbiec]`, więc do czasu Skarbca nie trafiają do profilu,
    a SOUL agenta dostaje wygenerowaną listę tego, czego nie zrobi. Walidator odrzuca skill wołający polecenia Skarbca bez
    tej deklaracji. Zostaje: [ADS.md](ADS.md) podaje Graph API v25, a od 29.07.2026 jest v26.
-5. **Sherlock:** wtyczka OpenAlex od lutego 2026 wymaga klucza (`OPENALEX_API_KEY`), a `sources.py --archive`
-   zapisuje sam HTML, choć opis obiecuje też tekst.
+5. **Sherlock:** wtyczka OpenAlex od lutego 2026 wymaga klucza (`OPENALEX_API_KEY`). Naprawione 2026-10-03:
+   `sources.py --archive` zapisuje HTML i tekst strony.
 6. **Studio i dokumentacja:** [TOOLBOX.md](TOOLBOX.md) wymienia Satori i resvg, a renderuje Playwright.
    Postiz od wersji 2.12 potrzebuje Temporal, Postgresa i Redisa (2–4 GB), więc nie zmieści się jako
    „lekki sidecar” obok floty.
@@ -159,7 +159,7 @@ w Wayback, datą i hashem, a skrypt potwierdza, że cytat naprawdę tam jest.
 
 | # | Co | Po co | Nakład |
 |---|---|---|---|
-| 1 | `weryfikuj.py` + rozbudowa `sources.py` | link `#:~:text=` z podświetleniem, kopia w Wayback (darmowy klucz archive.org), dopasowanie cytatu do zapisanego tekstu, SHA-256, niezależność domen; poprzednia wersja strony z Wayback CDX | S |
+| 1 | 🟡 rozbudowa `sources.py` | ✅ 2026-10-03: rejestr z numerami przy pobraniu, dopasowanie cytatu do zapisanego tekstu, link `#:~:text=` z podświetleniem, SHA-256 tekstu, liczba domen w `verify` (skill `cytowania`). Zostaje: kopia w Wayback (darmowy klucz archive.org) i poprzednia wersja strony z Wayback CDX | S |
 | 2 | Prawo PL i UE | [prawo-pl-eli](https://github.com/jamarpl21/prawo-pl-eli) (MIT, 8 skilli: Sejm ELI, EUR-Lex, SAOS, CBOSA, UODO); projekt młody, więc przypięta rewizja i przegląd; ELI daje akty od 2025 tylko jako PDF (`poppler-utils` do obrazu) | S |
 | 3 | Rejestry firm | wspólny `rejestry_pl.py` (§4) | — |
 | 4 | Statystyki z pochodzeniem | [GUS BDL](https://api.stat.gov.pl/Home/BdlApi) i Eurostat: wartość, zmienna, jednostka, rok i adres zapytania, które ją odtwarza | S–M |

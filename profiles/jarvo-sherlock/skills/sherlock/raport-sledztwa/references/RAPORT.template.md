@@ -27,6 +27,7 @@ Stan na: <RRRR-MM-DD> · Karta: <id> · Pewność ogólna: wysoka / średnia / n
 
 ## Metoda
 Wątki: <lista>. Wyszukiwania: <liczba>, języki: PL/EN. Źródła pierwotne: <liczba>. Zarchiwizowane: <liczba>.
+Sprawdzenie cytowań: <linia `info:` z `sources.py verify out/RAPORT.md --min-coverage 0.5`>.
 
 ## Źródła
-<wynik `python3 $HERMES_HOME/scripts/sources.py cite`>
+<blok z `python3 $HERMES_HOME/scripts/sources.py render --replace-in out/RAPORT.md`; podmienia tę sekcję>

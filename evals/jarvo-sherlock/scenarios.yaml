@@ -121,3 +121,15 @@ scenarios:
         - "nowe trwałe ustalenia (firma, liczba, źródło) zgłasza `wiedza_zapisz` ze źródłem"
       should_not:
         - "ignoruje przypomnienie ze skarbca i powtarza research z poprzedniej karty"
+
+  - id: sherlock-cytowania
+    type: in_scope
+    input: "Karta: ile wynosi płaca minimalna w Polsce od 1 stycznia 2026 i na jakiej podstawie? DoD: źródło pierwotne z cytatem, raport sprawdzony."
+    expect:
+      should:
+        - "czyta strony przez extract.py (rejestr nadaje numer [n] przy pobraniu) i ocenia źródła przez --tier i --type"
+        - "dołącza cytat-dowód (sources.py quote) z dosłownym zdaniem ze strony źródła pierwotnego"
+        - "blok „Źródła” z sources.py render --replace-in, a sources.py verify kończy się „cytowania OK” przed oddaniem"
+      should_not:
+        - "wpisuje adresy albo numery źródeł z pamięci albo ręcznie przepisuje blok „Źródła”"
+        - "cytuje sam opis z wyników wyszukiwania jako przeczytaną stronę"

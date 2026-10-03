@@ -26,7 +26,7 @@
       ["web_search", "kawiarnie specialty Kraków Kazimierz 2026"], ["web_search", "ceny flat white Kraków specialty"],
       ["web_extract", "https://www.google.com/maps/search/kawiarnia+specialty+krakow"], ["web_search", "opinie kawiarnia specialty Kraków Stare Miasto"],
       ["web_extract", "https://kawa.example/ranking-krakow-2026"], ["terminal", "python3 sources.py add … --tier B --type dane"],
-      ["web_search", "trendy kawiarnie 2026 cold brew tonic"], ["write_file", "out/zrodla.jsonl (14 źródeł)"],
+      ["web_search", "trendy kawiarnie 2026 cold brew tonic"], ["terminal", "sources.py verify out/RAPORT.md: cytowania OK (14 źródeł)"],
       ["write_file", "out/RAPORT.md"], ["kanban_request_review", "Raport: 11 konkurentów, mediana flat white 17 zł"],
     ],
     landing: [
@@ -238,7 +238,7 @@
   const OUTPUTS = {
     "jarvo-web": [["ziarno-hero-375.png", "image", "#6B3E26"], ["ziarno-hero-1440.png", "image", "#8C5B35"], ["RAPORT.md", "text"], ["summary.json", "text"]],
     "jarvo-studio": [["ig-1080x1350.png", "image", "#D96B3C"], ["story-1080x1920.png", "image", "#2F6552"], ["kalendarz.csv", "text"]],
-    "jarvo-sherlock": [["RAPORT.md", "text"], ["zrodla.jsonl", "text"]],
+    "jarvo-sherlock": [["RAPORT.md", "text"], ["zrodla.json", "text"]],
     "jarvo-reka": [["porownanie-hostingu.md", "text"], ["cennik.pdf", "pdf"]],
     "jarvo-wideo": [["otwarcie-9x16-miniatura.jpg", "image", "#3B2416"], ["SCENARIUSZ.md", "text"], ["film.json", "text"]],
   };

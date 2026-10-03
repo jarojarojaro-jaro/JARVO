@@ -1,17 +1,17 @@
 ---
 name: weryfikacja-faktow
 description: "Fact-check: twierdzenie → źródła pierwotne → werdykt."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [research, fact-checking, verification, sources]
-    related_skills: [metoda-sherlocka, grounded-citations, raport-sledztwa]
+    related_skills: [metoda-sherlocka, cytowania, raport-sledztwa]
   jarvo:
     agent: jarvo-sherlock
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-10-03"
 ---
 
 # Weryfikacja faktów
@@ -21,7 +21,7 @@ Dla każdego **kluczowego** twierdzenia (od którego zależy odpowiedź albo dec
 ## Tabela twierdzeń
 Prowadź `notes/twierdzenia.md`:
 
-| # | Twierdzenie (dosłownie) | Źródła [n] | Pierwotne? | Data | Werdykt | Pewność |
+| # | Twierdzenie (dosłownie) | Źródła [n] z rejestru | Pierwotne? | Data | Werdykt | Pewność |
 |---|---|---|---|---|---|---|
 
 Werdykty: **potwierdzone** · **częściowo** (z doprecyzowaniem) · **niepotwierdzone** (brak dowodów) ·
@@ -30,11 +30,14 @@ Werdykty: **potwierdzone** · **częściowo** (z doprecyzowaniem) · **niepotwie
 ## Procedura dla jednego twierdzenia
 1. **Rozbij** na sprawdzalne elementy: kto, co, kiedy, ile, gdzie.
 2. **Źródło pierwotne:** gdzie to pierwszy raz ogłoszono (dokument, rejestr, dane, oficjalny komunikat)?
-   Czytaj oryginał (`extract.py`, PDF → `read_file` albo Docling, jeśli jest; wideo → `youtube-content`).
+   Czytaj oryginał (`extract.py`, który od razu rejestruje źródło; PDF → `read_file` albo Docling, jeśli jest;
+   wideo → `youtube-content`). Tekst przeczytany poza `extract.py` zapisz i dołącz: `sources.py add <url> --tekst plik.txt`.
 3. **Czytanie lateralne:** zamiast wierzyć stronie, sprawdź, co **inni** mówią o niej i o twierdzeniu.
 4. **Drugie niezależne źródło:** niezależne = nie cytuje pierwszego i nie jest przedrukiem.
 5. **Liczby:** przelicz (procenty, sumy, waluty, jednostki). Sprawdź, czy porównywane okresy są porównywalne.
-6. **Cytaty:** znajdź dokładne brzmienie w oryginale, z kontekstem.
+6. **Cytaty:** znajdź dokładne brzmienie w oryginale, z kontekstem, i dołącz je jako dowód:
+   `sources.py quote <n> --text "dokładne słowa"` (odrzuci słowa, których nie ma w zapisanym tekście strony).
+   Raport z weryfikacji przechodzi `verify --dowody`, a blok źródeł ma `--styl dowody`.
 7. **Aktualność:** data źródła vs data zdarzenia; czy od tego czasu coś się zmieniło?
 8. **Zdjęcia/dokumenty:** metadane (`exiftool`), wyszukiwanie obrazem (przeglądarka), archiwum (Wayback) dla zmian na stronach.
 
@@ -47,6 +50,8 @@ Werdykty: **potwierdzone** · **częściowo** (z doprecyzowaniem) · **niepotwie
 | **D** | anonimowe, afiliacyjne rankingi, farmy treści, media społecznościowe bez weryfikacji | tylko jako sygnał |
 
 Konflikt interesów (źródło zarabia na twierdzeniu) obniża tier o jeden poziom.
+Tier i typ zapisujesz w rejestrze: `extract.py <url> --tier A --type pierwotne` albo `sources.py add <url> --tier … --type …`.
+`verify` nie przepuści raportu, który cytuje źródło bez oceny.
 
 ## Pewność
 - **wysoka:** ≥ 2 niezależne źródła A/B, w tym pierwotne; brak wiarygodnych zaprzeczeń,

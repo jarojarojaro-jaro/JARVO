@@ -12,7 +12,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
 | `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [13 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 1 (`writing-for-agents`, mattpocock) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski | [23](../evals/jarvo/scenarios.yaml) |
-| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [7 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 16 (Hermes, marketingskills, wspólny `transkrypcja-filmu`) | search_fanout, extract, sources | [13](../evals/jarvo-sherlock/scenarios.yaml) |
+| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [8 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 15 (Hermes, marketingskills, wspólny `transkrypcja-filmu`) | search_fanout, extract, sources (rejestr cytowań) | [14](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 58 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [17](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 23 (marketingskills, Anthropic, Hermes, impeccable, wspólny `hooki`) | render_html, check_media | [12](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [16 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 59 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, demo_strony, typografia, maska (+ wideo_lib) | [28](../evals/jarvo-wideo/scenarios.yaml) |
@@ -167,18 +167,21 @@ składa całość i **weryfikuje**, co jest prawdą.
 8. Raport: wnioski z poziomem pewności, a każde twierdzenie z cytatem i linkiem.
 
 **Skille:**
-- [H] `grounded-citations`, `blocked-page-recovery`, `searxng-search`, `duckduckgo-search`,
+- [H] `blocked-page-recovery`, `searxng-search`, `duckduckgo-search`,
   `scrapling`, `arxiv`, `youtube-content`, `reddit-reading`, `rss-feeds`,
   `blogwatcher`, `competitor-news-monitor`, `domain-intel`, `osint-investigation`
 - [Z] marketingskills `competitor-profiling`, `customer-research`; wspólny `transkrypcja-filmu` (`shared/skills/`):
   link albo plik filmu → tekst mowy (napisy platformy albo Parakeet), bez analizy obrazu
 - [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł), [T] `szybki-fakt` (jedna runda, cytat),
   [T] `raport-sledztwa` (format raportu), [T] `research-seo` (słowa kluczowe i konkurencja, dla `jarvo-web` i `jarvo-studio`),
-  [T] `research-rynku` (gracze, oferty, ceny, opinie), [T] `monitoring` (rutyna cron zakładana przez Jarva)
+  [T] `research-rynku` (gracze, oferty, ceny, opinie), [T] `monitoring` (rutyna cron zakładana przez Jarva),
+  [T] `cytowania` (numer `[n]` z rejestru przy pobraniu strony, cytaty-dowody sprawdzane z tekstem strony,
+  blok „Źródła” ze skryptu i `verify` raportu przed oddaniem; silnik przeniesiony z Hermesa `grounded-citations`)
 
 **Narzędzia:** wielu dostawców wyszukiwania naraz (własny SearXNG, Brave, Exa…), trafilatura i Lightpanda (strony z JS do Markdown),
-Docling (PDF-y, dodatek obrazu), yt-dlp (transkrypcje), OpenAlex (nauka, wtyczka opcjonalna), archiwum dowodów lokalnie
-(`sources.py --archive`; ArchiveBox jako opcjonalny sidecar w planach), delegowanie wątków.
+Docling (PDF-y, dodatek obrazu), yt-dlp (transkrypcje), OpenAlex (nauka, wtyczka opcjonalna), rejestr źródeł
+z tekstami stron i cytatami-dowodami (`sources.py`, `out/zrodla.json`), archiwum dowodów lokalnie
+(`sources.py --archive`: HTML i tekst; ArchiveBox jako opcjonalny sidecar w planach), delegowanie wątków.
 Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-sherlock-researcher-detektyw).
 
 **Rubryka sędziego (DoD):** każde kluczowe twierdzenie ma źródło, podany poziom pewności,

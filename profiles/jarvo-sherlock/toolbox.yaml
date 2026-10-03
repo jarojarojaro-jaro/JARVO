@@ -66,7 +66,7 @@ sidecars:
     url_env: SEARXNG_URL
     healthcheck: "curl -fsS \"$SEARXNG_URL/search?q=test&format=json\" >/dev/null"
 
-hermes_skills: [grounded-citations, blocked-page-recovery, searxng-search, duckduckgo-search, scrapling, arxiv, youtube-content, reddit-reading, rss-feeds, blogwatcher, competitor-news-monitor, domain-intel, osint-investigation]
+hermes_skills: [blocked-page-recovery, searxng-search, duckduckgo-search, scrapling, arxiv, youtube-content, reddit-reading, rss-feeds, blogwatcher, competitor-news-monitor, domain-intel, osint-investigation]
 hermes_plugins: [openalex]   # opcjonalnie: `hermes -p jarvo-sherlock plugins install <nazwa>`
 mcp_servers: []
 env_requires: [OPENROUTER_API_KEY]

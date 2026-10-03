@@ -71,7 +71,7 @@ Z Hermesa:
   Parallel. **Różne indeksy wyszukiwania dają niezależność źródeł**, co jest fundamentem weryfikacji krzyżowej,
 - **plugins:** `openalex` (literatura naukowa i cytowania), `storm-fusion-research` (panel
   perspektyw z sędzią, pasuje do metody Sherlocka), `web-defuddle` (ekstrakcja lokalna), `source-tray` (lista odwiedzonych źródeł),
-- **[H] skille:** `grounded-citations`, `blocked-page-recovery`, `searxng-search`, `duckduckgo-search`,
+- **[H] skille:** `blocked-page-recovery`, `searxng-search`, `duckduckgo-search`,
   `scrapling`, `arxiv`, `youtube-content`, `reddit-reading`, `rss-feeds`, `blogwatcher`,
   `competitor-news-monitor`, `domain-intel`, `osint-investigation`,
 - **MCP:** `wolfram` (weryfikacja liczb i obliczeń), `deepwiki`, `hugging_face`.

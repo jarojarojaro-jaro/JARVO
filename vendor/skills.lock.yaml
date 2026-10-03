@@ -218,7 +218,6 @@ agents:
     - {source: mattpocock-skills, path: skills/productivity/writing-for-agents, dest: meta/writing-for-agents}
   jarvo-sherlock:
     - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
-    - {source: hermes, path: skills/research/grounded-citations, dest: research/grounded-citations}
     - {source: hermes, path: skills/web/blocked-page-recovery, dest: research/blocked-page-recovery}
     - {source: hermes, path: optional-skills/research/searxng-search, dest: research/searxng-search}
     - {source: hermes, path: optional-skills/research/duckduckgo-search, dest: research/duckduckgo-search}
