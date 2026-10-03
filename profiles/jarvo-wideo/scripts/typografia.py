@@ -2,26 +2,31 @@
 """Typografia jak z montażu: nagranie z mową → napisy słowo po słowie z różną wielkością, krojem, kolorem, głębią,
 skosem i perspektywą 3D, jako plan bloków w projekcie edytora HQ (`<film>.edycja.json`, klucz `typo`).
 
-    typografia.py plan <film> [--motyw czysty|kino|ulica|energia|elegancki] [--akcent "#FFD400"]
+    typografia.py plan <film> [--motyw czysty|kino|ulica|energia|elegancki] [--akcent "#C8102E"] [--paleta A,B]
                               [--tempo spokojne|normalne|ostre] [--zostaw-napisy] [--ziarno N] [--bez-maski] [--nowy]
     typografia.py pokaz <film> [--json]          # plan w skrócie: bloki, układy, wagi słów (do poprawek)
     typografia.py popraw <film> zmiany.json       # Twoje poprawki reżyserskie (format niżej)
     typografia.py sylwetki <film>                 # sylwetki osoby pod bloki „za osobą” (np. ustawione w edytorze)
+    typografia.py paleta <film> [--paleta A,B] [--akcent marka] [--bez-akcentu]   # kolory z kadru na gotowym planie
     typografia.py arkusz <film> [-o out/wideo/typografia.jpg] [--ile 12]   # klatki: film + typografia (vision)
     typografia.py usun <film>                     # usuń plan typografii z projektu
 
 plan (0 tokenów, reżyser z reguł): mowa z <źródło>.mowa.json (Parakeet; brak = analiza jak w edytorze), głośność
 każdego słowa (krzyk = mocne słowo), pauzy, interpunkcja, cięcia ujęć → frazy (bloki po 1–5 słów), waga słowa 0–3
-(0 słowo funkcyjne małe, 3 uderzenie: największe, w akcencie, z efektem motywu), linie bloku, układ bloku
+(0 słowo funkcyjne małe, 3 uderzenie: największe, w kolorze z palety, z efektem motywu), linie bloku, układ bloku
 (kolumna, schodki, srodek, skos, 3d, rozrzut), obrót, wejście słów i wyjście bloku. Maska osoby (maska.py, MODNet):
 blok staje obok twarzy, nie na niej, a najwyżej co szósty z jednym mocnym słowem idzie „za osobę” (sylwetki klatek
 w <film>.maska/, eksport i edytor kładą osobę z powrotem nad napisem). Bez modelu albo z --bez-maski: miejsca domyślne.
+Paleta z kadru: dwa akcenty z kontrastu z materiałem (główna barwa sceny → barwa przeciwna, np. niebieskie niebo
+i morze → ciemna czerwień; bonus za mocny kolor już w kadrze, kara za barwy skóry przy osobie), wariant ciemny albo
+jasny z tła pod blokami, kolory na zmianę po mocnych słowach (uderzenia i co drugi blok bez uderzenia), płytka
+pod słowem, które nie odcina się od tła.
 Te same dane rysuje edytor HQ (hq/web/src/48-typografia.js), więc człowiek widzi i poprawia wszystko na osi.
 Gotowy plan mógł już poprawić człowiek, więc `plan` go nie nadpisuje: poprawiasz go `popraw`, a od nowa układasz
 tylko na wyraźną prośbę (`--nowy`).
 
 pokaz + popraw = Twoja reżyseria (zasady: skill typografia-edit): znaczenie słowa → forma. zmiany.json:
-    {"motyw": "kino", "akcent": "#E5383B",
+    {"motyw": "kino", "paleta": ["#B3122E", "#F2C94C"],   # nowa paleta: słowa w starych kolorach idą za nią
      "bloki": [{"blok": "b03", "uklad": "skos", "rot": -8, "warstwa": "tyl", "x": 0.3, "y": 0.4,
                 "slowa": {"4": {"tekst": "A$$", "kolor": "#2ECC40", "waga": 3, "kroj": "playfairI", "styl": "3d"}}},
                {"polacz": ["b05", "b06"]},          # jedna fraza z dwóch bloków
@@ -542,6 +547,201 @@ def uloz_z_maska(plan: dict, opisy: list[dict], W: int, H: int, total: float, ud
     return ed.normalize_typo(plan, total)
 
 
+# ---------------------------------------------------------------- paleta z kadru
+
+# Rodziny kolorów napisu: barwa (stopnie), wariant ciemny (na jasne tło), jasny (na ciemne) i smak (kara: oliwkowe
+# i pomarańczowe słowo rzadko wygląda dobrze). Paleta filmu to dwie rodziny wybrane z kontrastu z materiałem,
+# nie jeden kolor motywu na wszystko. Kolejność = pierwszeństwo przy remisie (szara scena bez wyraźnej barwy).
+KOLORY = {
+    "czerwony": (355, "#B3122E", "#FF5A5F", 0.0),
+    "złoty": (45, "#A87A12", "#F2C94C", 0.0),
+    "niebieski": (215, "#1D4ED8", "#7CB7FF", 0.0),
+    "turkusowy": (180, "#0E7C86", "#5EEAD4", 0.0),
+    "różowy": (325, "#BE185D", "#FF7AC6", 0.0),
+    "fioletowy": (265, "#6D28D9", "#B79CFF", 0.05),
+    "zielony": (140, "#15803D", "#4ADE80", 0.1),
+    "pomarańczowy": (25, "#C2410C", "#FF8A3D", 0.05),
+    "limonkowy": (80, "#4D7C0F", "#C6F432", 0.3),
+}
+PALETA_ROZNICA = 40      # najmniejsza różnica barw dwóch akcentów (stopnie): inaczej to jeden kolor dwa razy
+PALETA_BOK = 96          # dłuższy bok klatki do analizy koloru (wystarczy na barwy i jasność tła pod blokiem)
+KONTRAST_PLYTA = 1.6     # słabszy kontrast słowa w akcencie z tłem pod blokiem = słowo na płytce (styl „tlo”)
+
+
+def _barwa_d(a: float, b: float) -> float:
+    d = abs(a - b) % 360
+    return min(d, 360 - d)
+
+
+def _hex_rgb(h: str) -> tuple[float, float, float]:
+    n = int(h.lstrip("#"), 16)
+    return ((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255
+
+
+def luminancja(r: float, g: float, b: float) -> float:
+    """Względna luminancja WCAG (0 czerń – 1 biel)."""
+    f = lambda c: c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4  # noqa: E731
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+
+
+def kontrast(l1: float, l2: float) -> float:
+    a, b = max(l1, l2), min(l1, l2)
+    return (a + 0.05) / (b + 0.05)
+
+
+def analiza_kadru(klatki: list[bytes]) -> dict:
+    """Barwy materiału z małych klatek RGB: histogram barw ważony nasyceniem (36 przedziałów po 10°; skóra waży
+    mniej, bo to osoba, nie scena), „echo” = mały, mocno nasycony przedmiot w kadrze (czerwona czapka), udział
+    barw skóry i piasku, jasność i barwność (średnie nasycenie: szare biuro ≈ 0, plaża z morzem ≫ 0)."""
+    import colorsys  # noqa: PLC0415
+    hist, echo, n, jas, chroma, skory = [0.0] * 36, [0.0] * 36, 0, 0.0, 0.0, 0
+    for rgb in klatki:
+        for i in range(0, len(rgb) - 2, 3):
+            r, g, b = rgb[i] / 255, rgb[i + 1] / 255, rgb[i + 2] / 255
+            h, s, v = colorsys.rgb_to_hsv(r, g, b)
+            n += 1
+            jas += luminancja(r, g, b)
+            c = s * v
+            chroma += c
+            if c < 0.12:
+                continue
+            k = int(h * 36) % 36
+            skora = 0.02 <= h <= 0.13 and 0.15 <= s <= 0.7 and v >= 0.3
+            skory += skora
+            hist[k] += c * (0.3 if skora else 1.0)
+            if s >= 0.55 and v >= 0.3 and not skora:
+                echo[k] += 1
+    suma = sum(hist) or 1.0
+    return {"hist": [x / suma for x in hist], "echo": [x / max(1, n) for x in echo],
+            "jasnosc": jas / max(1, n), "barwnosc": chroma / max(1, n), "skora": skory / max(1, n)}
+
+
+def dobierz_palete(an: dict, marka: str | None = None) -> list[str]:
+    """Dwa akcenty filmu z kontrastu z materiałem: barwy dopełniające rozszczepione (główna barwa sceny ±150°:
+    niebieskie niebo i morze → czerwień i złoto, zieleń → fiolet i róż, ciepłe drewno → turkus i niebieski,
+    czerwień → zieleń i niebieski), z bonusem za kolor, który już jest mocnym akcentem
+    w kadrze (czapka Mikołaja), z karą za barwy obecne w scenie i za barwy skóry i piasku, gdy jest ich w kadrze dużo
+    (pomarańczowe i złote słowo ginie przy ciele i na plaży). Drugi akcent co najmniej PALETA_ROZNICA° dalej.
+    Kolor marki (`marka`) jest pierwszy.
+    Wariant (ciemny/jasny) wybiera `pokoloruj` z jasności tła pod blokami; tu wraca wariant ciemny."""
+    hist, echo = an["hist"], an["echo"]
+    gladki = [hist[k - 1] * 0.5 + hist[k] + hist[(k + 1) % 36] * 0.5 for k in range(36)]
+    dom = max(range(36), key=gladki.__getitem__) * 10 + 5
+    barwna = an["barwnosc"] >= 0.08 and max(gladki) >= 0.12        # scena ma wyraźną barwę (nie szare biuro)
+    rozszczep = ((dom + 150) % 360, (dom + 210) % 360)
+    skory = an.get("skora", 0.0)
+
+    def ocena(nazwa: str) -> float:
+        hue, _c, _j, smak = KOLORY[nazwa]
+        konflikt = sum(hist[k] * max(0.0, 1 - _barwa_d(hue, k * 10 + 5) / 45) for k in range(36))
+        dop = 1 - min(_barwa_d(hue, x) for x in rozszczep) / 180 if barwna else 0.5
+        ech = min(1.0, sum(echo[k] for k in range(36) if _barwa_d(hue, k * 10 + 5) <= 20) / 0.004)
+        skora = min(0.35, 3 * skory) if 12 <= hue <= 38 else min(0.15, 1.5 * skory) if 38 < hue <= 50 else 0.0
+        return (1 - konflikt) + 0.8 * dop + 0.35 * ech - skora - smak
+
+    ranking = sorted(KOLORY, key=lambda k: (-ocena(k), list(KOLORY).index(k)))
+    if marka:
+        r, g, b = _hex_rgb(marka)
+        import colorsys  # noqa: PLC0415
+        hm = colorsys.rgb_to_hsv(r, g, b)[0] * 360
+        drugi = next((k for k in ranking if _barwa_d(KOLORY[k][0], hm) >= PALETA_ROZNICA), ranking[0])
+        return [marka.upper(), KOLORY[drugi][1]]
+    pierwszy = ranking[0]
+    drugi = next(k for k in ranking[1:] if _barwa_d(KOLORY[k][0], KOLORY[pierwszy][0]) >= PALETA_ROZNICA)
+    return [KOLORY[pierwszy][1], KOLORY[drugi][1]]
+
+
+def rodzina(kolor: str) -> tuple[str, str] | None:
+    """(ciemny, jasny) wariant rodziny, do której należy kolor palety; kolor spoza KOLORY (marka) = None."""
+    return next(((d, j) for _, d, j, _s in KOLORY.values() if kolor.upper() in (d.upper(), j.upper())), None)
+
+
+def jasnosc_pod(rgb: bytes, w: int, h: int, b: dict, W: int, H: int) -> float:
+    """Średnia luminancja klatki pod ramką bloku (szacunek rozmiar_bloku), czyli tła, na którym stoi napis."""
+    bw, bh = rozmiar_bloku(b, b.get("w", 0.62), W, H)
+    x0, x1 = max(0, int((b["x"] - bw / 2) * w)), min(w, int(math.ceil((b["x"] + bw / 2) * w)))
+    y0, y1 = max(0, int((b["y"] - bh / 2) * h)), min(h, int(math.ceil((b["y"] + bh / 2) * h)))
+    suma, n = 0.0, 0
+    for y in range(y0, max(y0 + 1, y1)):
+        for x in range(x0, max(x0 + 1, x1)):
+            i = (min(y, h - 1) * w + min(x, w - 1)) * 3
+            suma += luminancja(rgb[i] / 255, rgb[i + 1] / 255, rgb[i + 2] / 255)
+            n += 1
+    return suma / max(1, n)
+
+
+def pokoloruj(plan: dict, paleta: list[str], tla: dict[str, float]) -> dict:
+    """Paleta na planie: wariant każdej rodziny (ciemny/jasny) z lepszym kontrastem z tłem pod blokami, a kolory
+    rozpisane na zmianę (A, B, A, B…) po mocnych słowach: uderzenie w każdym bloku, który je ma, i najważniejsze słowo
+    (waga 2) w co drugim bloku bez uderzenia, żeby film nie był biały z trzema kolorowymi słowami. Słowo, które
+    w kolorze nie odcina się od tła pod blokiem, dostaje płytkę w tym kolorze (styl „tlo”). Słowa z kolorem
+    (poprawka człowieka) zostają i nie przesuwają kolejki. tla: id bloku → jasność tła pod nim (0–1)."""
+    plan = json.loads(json.dumps(plan))
+    jasnosci = sorted(tla.values()) or [0.4]
+    mediana = lambda c: sorted(kontrast(luminancja(*_hex_rgb(c)), j) for j in jasnosci)[len(jasnosci) // 2]  # noqa: E731
+    wybrane = [max(rodzina(k), key=mediana) if rodzina(k) else k.upper() for k in paleta]
+    plan["paleta"] = wybrane
+    n = bez = 0
+    for b in plan["bloki"]:
+        cel = [w for w in b["slowa"] if w["waga"] == 3]
+        if not cel:
+            bez += 1
+            cel = [max((w for w in b["slowa"] if w["waga"] == 2), key=lambda w: len(w["tekst"]))] \
+                if bez % 2 == 1 and any(w["waga"] == 2 for w in b["slowa"]) else []
+        for w in cel:
+            if "kolor" in w:
+                continue
+            kolor = wybrane[n % len(wybrane)]
+            n += 1
+            w["kolor"] = kolor
+            tlo = tla.get(b["id"])
+            if tlo is not None and "styl" not in w and b.get("uklad") != "za" \
+                    and kontrast(luminancja(*_hex_rgb(kolor)), tlo) < KONTRAST_PLYTA:
+                w["styl"] = "tlo"
+    return plan
+
+
+def zmien_palete(plan: dict, nowa: list[str]) -> dict:
+    """Nowa paleta i te same miejsca: słowa w kolorze starej pozycji palety dostają kolor nowej (jak w edytorze HQ)."""
+    plan = json.loads(json.dumps(plan))
+    stara = [str(x).upper() for x in plan.get("paleta") or []]
+    mapa = {s: str(n).upper() for s, n in zip(stara, nowa) if s != str(n).upper()}
+    for b in plan["bloki"]:
+        for w in b["slowa"]:
+            if str(w.get("kolor", "")).upper() in mapa:
+                w["kolor"] = mapa[str(w["kolor"]).upper()]
+    plan["paleta"] = [str(x).upper() for x in nowa]
+    return plan
+
+
+def probki_kadru(proj: dict, plan: dict, ile: int = 24) -> tuple[list[bytes], dict[str, float]]:
+    """Małe klatki osi w chwilach bloków (najwyżej `ile`, równo) → (klatki do analizy sceny, jasność tła pod
+    każdym blokiem z najbliższej klatki). Błąd ffmpeg = ([], {}): plan bez palety z kadru."""
+    import maska as mk  # noqa: PLC0415  (klatki osi jak eksport; bez onnxruntime)
+    cv = proj["canvas"]
+    W, H = cv["w"], cv["h"]
+    k = PALETA_BOK / max(W, H)
+    w, h = max(8, round(W * k)), max(8, round(H * k))
+    fps = float(cv["fps"])
+    srodki = {b["id"]: (b["start"] + b["end"]) / 2 for b in plan["bloki"]}
+    chwile = sorted(set(srodki.values()))
+    if len(chwile) > ile:
+        chwile = [chwile[round(i * (len(chwile) - 1) / (ile - 1))] for i in range(ile)]
+    numery = sorted({int(t * fps) for t in chwile})
+    try:
+        klatki = dict(mk.klatki_osi(proj, numery, fps, w, h))
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"uwaga: nie czytam klatek do palety ({exc}); kolory z motywu", file=sys.stderr)
+        return [], {}
+    if not klatki:
+        return [], {}
+    tla = {}
+    for b in plan["bloki"]:
+        nr = min(klatki, key=lambda x: abs(x / fps - srodki[b["id"]]))
+        tla[b["id"]] = round(jasnosc_pod(klatki[nr], w, h, b, W, H), 4)
+    return list(klatki.values()), tla
+
+
 def zbuduj_plan(slowa: list[dict], ciecia: list[float], W: int, H: int, total: float, motyw: str = "czysty",
                 tempo: str = "normalne", ziarno: int = 0, akcent: str | None = None) -> dict:
     """Cały plan typografii (czyste funkcje: testy bez ffmpeg i przeglądarki)."""
@@ -638,13 +838,19 @@ def cmd_plan(film: Path, a) -> int:
             proj["typo"] = plan
             pr.save(film, proj)                 # maska.py klatki liczy klucz osi z zapisanego projektu
             za = sylwetki(film, plan)
+    klatki, tla = probki_kadru(proj, plan)
+    paleta = [x.strip().upper() for x in a.paleta.split(",")] if a.paleta else \
+        dobierz_palete(analiza_kadru(klatki), a.akcent) if klatki else None
+    if paleta:
+        plan = ed.normalize_typo(pokoloruj(plan, paleta, tla), total)
     proj["typo"] = plan
     if not a.zostaw_napisy:
         proj["texts"] = [x for x in proj.get("texts") or [] if not x.get("cap")]
     pr.save(film, proj)
     n_slow = sum(len(b["slowa"]) for b in plan["bloki"])
     print(f"Typografia: {len(plan['bloki'])} bloków, {n_slow} słów, motyw {plan['motyw']} · cięcia: {len(ciecia)}"
-          + ("" if a.bez_maski else f" · za osobą: {za}"))
+          + ("" if a.bez_maski else f" · za osobą: {za}")
+          + (f" · paleta z kadru: {' '.join(plan['paleta'])}" if plan.get("paleta") else " · kolory z motywu"))
     print(f"Dalej: typografia.py pokaz {film} → popraw według znaczenia → typografia.py arkusz {film} → projekt.py render {film}")
     return 0
 
@@ -665,6 +871,7 @@ def cmd_pokaz(film: Path, a) -> int:
         return 0
     cv = proj["canvas"]
     print(f"Typografia: {film.name} · motyw {plan['motyw']}{' · akcent ' + plan['akcent'] if plan.get('akcent') else ''}"
+          f"{' · paleta ' + ' '.join(plan['paleta']) if plan.get('paleta') else ''}"
           f" · {len(plan['bloki'])} bloków · kadr {cv['w']}×{cv['h']}")
     for b in plan["bloki"]:
         lin: dict[int, list[str]] = {}
@@ -674,7 +881,7 @@ def cmd_pokaz(film: Path, a) -> int:
                          " ZA OSOBĄ" if b["warstwa"] == "tyl" else "", f" wyjście {b['wyjscie']}" if b.get("wyjscie") else ""])
         print(f"{b['id']} {b['start']:6.2f}–{b['end']:6.2f} {b['uklad']:8s} x{b['x']:.2f} y{b['y']:.2f} w{b['w']:.2f}{extra}"
               f"  |  {' / '.join(' '.join(v) for _k, v in sorted(lin.items()))}")
-    print("\nWaga: [0] małe słowo funkcyjne, [1] zwykłe, [2] ważne (większe), [3] uderzenie (największe, kolor akcentu,"
+    print("\nWaga: [0] małe słowo funkcyjne, [1] zwykłe, [2] ważne (większe), [3] uderzenie (największe, kolor z palety,"
           " jedno na blok, około co trzeci blok).")
     print("Poprawki według znaczenia (skill typografia-edit): zmiany.json → typografia.py popraw <film> zmiany.json")
     return 0
@@ -691,6 +898,8 @@ def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
     for k in ("motyw", "akcent"):
         if k in zmiany:
             plan[k] = zmiany[k]
+    if isinstance(zmiany.get("paleta"), list):           # nowa paleta: słowa w starych kolorach idą za nią
+        plan = zmien_palete(plan, zmiany["paleta"])
     po_id = {b["id"]: b for b in plan["bloki"]}
     for z in zmiany.get("bloki") or []:
         if "polacz" in z:
@@ -785,6 +994,43 @@ def cmd_sylwetki(film: Path, a) -> int:
     return 0 if za else 1
 
 
+def cmd_paleta(film: Path, a) -> int:
+    """Paleta z kadru na gotowym planie: układ, słowa i poprawki człowieka zostają, zmieniają się kolory uderzeń.
+    Plan z paletą: słowa w starych kolorach palety idą za nową (jak w edytorze); bez palety: uderzenia bez własnego
+    koloru dostają akcenty na zmianę. Akcent planu to kolor marki: zostaje pierwszy, chyba że --bez-akcentu."""
+    proj = pr.load(film)
+    total = pr.total(proj)
+    plan = ed.normalize_typo(proj.get("typo"), total)
+    if not plan["bloki"]:
+        raise SystemExit("brak planu typografii: typografia.py plan <film>")
+    if a.bez_akcentu:
+        plan.pop("akcent", None)
+    marka = a.akcent or plan.get("akcent")
+    if a.akcent:
+        plan["akcent"] = a.akcent
+    klatki, tla = probki_kadru(proj, plan)
+    if a.paleta:
+        paleta = [x.strip().upper() for x in a.paleta.split(",")]
+    elif klatki:
+        paleta = dobierz_palete(analiza_kadru(klatki), marka)
+    else:
+        raise SystemExit("nie czytam klatek filmu: podaj paletę sam (--paleta #RRGGBB,#RRGGBB)")
+    stara = plan.get("paleta")
+    plan = pokoloruj(plan, paleta, tla)         # paleta planu = warianty z tła pod blokami
+    if stara:                                    # słowa w kolorach starej palety idą za nową, miejsce po miejscu
+        plan = zmien_palete({**plan, "paleta": stara}, plan["paleta"])
+    plan = ed.normalize_typo(plan, total)
+    proj["typo"] = plan
+    pr.save(film, proj)
+    kolory = sorted({w["kolor"] for b in plan["bloki"] for w in b["slowa"] if w.get("kolor")})
+    plytki = sum(1 for b in plan["bloki"] for w in b["slowa"] if w.get("styl") == "tlo")
+    print(f"Paleta: {' '.join(plan['paleta'])}{' (z kadru)' if not a.paleta else ''}"
+          + (f" · marka {plan['akcent']}" if plan.get("akcent") else "")
+          + f" · kolory słów: {' '.join(kolory) or 'brak'} · płytki: {plytki}")
+    print(f"Dalej: typografia.py arkusz {film} → oceń kolory na klatkach → projekt.py render {film}")
+    return 0
+
+
 def cmd_usun(film: Path, a) -> int:
     proj = pr.load(film)
     proj.pop("typo", None)
@@ -828,7 +1074,8 @@ def main(argv: list[str] | None = None) -> int:
     sp = sub.add_parser("plan", help="reżyser z reguł: plan typografii w projekcie")
     sp.add_argument("film")
     sp.add_argument("--motyw", choices=MOTYWY, default="czysty")
-    sp.add_argument("--akcent", help="kolor akcentu (np. kolor marki z brand kitu), #RRGGBB")
+    sp.add_argument("--akcent", help="kolor marki z brand kitu, #RRGGBB: pierwszy w palecie, drugi z kadru")
+    sp.add_argument("--paleta", help="paleta zamiast tej z kadru: #RRGGBB,#RRGGBB (np. na prośbę właściciela)")
     sp.add_argument("--tempo", choices=tuple(TEMPO), default="normalne")
     sp.add_argument("--ziarno", type=int, default=0, help="inny wariant układów (ten sam numer = ten sam plan)")
     sp.add_argument("--zostaw-napisy", action="store_true", help="nie usuwaj zwykłych napisów z projektu")
@@ -838,6 +1085,12 @@ def main(argv: list[str] | None = None) -> int:
     sp = sub.add_parser("sylwetki", help="sylwetki osoby pod bloki za osobą")
     sp.add_argument("film")
     sp.set_defaults(fn=cmd_sylwetki)
+    sp = sub.add_parser("paleta", help="kolory z kadru na gotowym planie (układ i poprawki zostają)")
+    sp.add_argument("film")
+    sp.add_argument("--paleta", help="własna paleta zamiast tej z kadru: #RRGGBB,#RRGGBB")
+    sp.add_argument("--akcent", help="kolor marki, #RRGGBB: pierwszy w palecie")
+    sp.add_argument("--bez-akcentu", action="store_true", help="usuń akcent planu (to nie był kolor marki)")
+    sp.set_defaults(fn=cmd_paleta)
     sp = sub.add_parser("pokaz", help="plan w skrócie")
     sp.add_argument("film")
     sp.add_argument("--json", action="store_true")
@@ -860,6 +1113,8 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"nie ma pliku: {film}")
     if getattr(a, "akcent", None) and not re.match(r"^#[0-9A-Fa-f]{6}$", a.akcent):
         raise SystemExit("--akcent: kolor #RRGGBB")
+    if getattr(a, "paleta", None) and not all(re.match(r"^#[0-9A-Fa-f]{6}$", x.strip()) for x in a.paleta.split(",")):
+        raise SystemExit("--paleta: kolory #RRGGBB po przecinku")
     return a.fn(film, a)
 
 

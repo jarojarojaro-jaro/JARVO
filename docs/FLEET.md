@@ -232,7 +232,8 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 - **klipy z długich nagrań** (podcast, webinar): transkrypcja Parakeet z czasem słów → wybór fragmentów → klipy z napisami,
 - **typografia jak z montażu** do nagrania z mową (`typografia.py`, skill `typografia-edit`): słowa w rytmie mowy, różne
   wielkości, kroje, głębia, skos i 3D, mocne słowo za osobą (maska MODNet, `maska.py`); forma wynika ze znaczenia,
-  kolor akcentu tylko na uderzeniu; plan leży w projekcie montażu, więc właściciel poprawia każde słowo w edytorze HQ,
+  kolory z palety kadru (dwa akcenty w kontraście ze sceną, rozpisane na zmianę po mocnych słowach); plan leży
+  w projekcie montażu, więc właściciel poprawia każde słowo w edytorze HQ,
 - **filmy z kodu** (HyperFrames, Manim) i **ujęcia z AI** (`video_generate`, obraz → wideo, rejestr kosztów).
 
 **Jakość:** `qa_wideo.py` (kodeki, format, długość, LUFS, czarne i zamrożone klatki, pojedyncze „mrugnięcia” klatek, arkusz ze strefami UI 9:16). **Rytm i wzór:** `rytm.py` (BPM, takty, drop pod cięcia), `kadry.py wzor` (film-wzór → klatki co 0,5 s, cięcia, rytm → mapa bitów)

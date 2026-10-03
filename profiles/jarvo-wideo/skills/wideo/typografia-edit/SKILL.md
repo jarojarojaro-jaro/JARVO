@@ -30,8 +30,9 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
 ## Kroki
 1. **Plan** (0 tokenów, reżyser z reguł): `python3 $HERMES_HOME/scripts/typografia.py plan <film> [--motyw czysty]
    [--akcent <kolor marki>] [--tempo spokojne|normalne|ostre]`. Projekt powstaje sam z filmu, a zwykłe napisy znikają
-   (zostają z `--zostaw-napisy`). **Gdy plan już jest, nie układam go od nowa:** mógł go poprawić właściciel.
-   `--nowy` tylko na jego wyraźną prośbę.
+   (zostają z `--zostaw-napisy`). Kolory dobiera sam z kadru (sekcja „Kolor”). **Gdy plan już jest, nie układam go
+   od nowa:** mógł go poprawić właściciel. `--nowy` tylko na jego wyraźną prośbę; same kolory zmienia
+   `typografia.py paleta <film>` (układ i poprawki zostają).
 2. **Czytam** `typografia.py pokaz <film>`: każdy blok z czasem, układem i słowami `numer:[waga]tekst`. Numery i `id`
    bloków czytam za każdym razem od nowa (cięcie w HQ robi nowe bloki, np. `b04b`).
 3. **Reżyseruję znaczeniem** (tabela niżej): `zmiany.json` → `typografia.py popraw <film> zmiany.json`. Poprawiam tylko
@@ -47,7 +48,7 @@ Kod 1 = model maski niedostępny (RUNBOOK); wtedy napis jest widoczny w całośc
 ## Znaczenie → forma
 | Co mówi osoba | Forma |
 |---|---|
-| puenta, obietnica, liczba, nazwa produktu | waga 3 (uderzenie): największe, w kolorze akcentu; jedno na blok, mniej więcej co trzeci blok |
+| puenta, obietnica, liczba, nazwa produktu | waga 3 (uderzenie): największe, w kolorze z palety; jedno na blok, mniej więcej co trzeci blok |
 | ważne słowo, ale nie puenta | waga 2 |
 | spójniki, przyimki, zaimki | waga 0 (małe, lekki krój motywu) |
 | przeczenie, które zmienia sens („nie”, „nigdy”, „bez”) | co najmniej waga 2, nigdy 0 |
@@ -65,13 +66,22 @@ Rytm robi zmiana, nie dekoracja: ten sam układ najwyżej dwa razy z rzędu; po 
 Bloki krótsze niż 0,5 s łączę z sąsiednim (`polacz`), długie zdanie dzielę na pauzie (`podziel`).
 
 ## Kolor
-- **Domyślnie motyw `czysty`:** białe słowa i żółty akcent. Akcent tylko na wadze 3, nigdy na całym bloku.
-- **Czerwień nie jest domyślna.** Motywy `kino` i `ulica` (czerwony akcent) tylko na prośbę albo gdy marka jest
-  czerwona. Pojedyncze słowo na czerwono tylko, gdy znaczy stratę, błąd albo zakaz, i najwyżej dwa razy w filmie.
-- Kolor marki: `--akcent` z `@@KNOWLEDGE_DIR@@/brands/<marka>/` (kolory marki są prawem).
-- Najwyżej dwa kolory poza bielą w całym filmie: akcent i jeden kolor znaczenia (np. zielony przy zysku).
-  Trzeci kolor to chaos.
-- Jasne tło (okno, biała ściana) i nieczytelne słowo: styl `tlo` albo inne miejsce bloku, nie ciemniejszy kolor tekstu.
+Kolor bierze się z materiału, nie z motywu. Jeden kolor na wszystkie mocne słowa to błąd (uwaga właściciela).
+- **Paleta z kadru** (`plan` i `paleta` liczą ją same, `pokaz` ją wypisuje): dwa akcenty w kontraście z barwami
+  sceny, czyli barwy dopełniające rozszczepione. Niebieskie niebo i morze → ciemna czerwień i złoto, zieleń → róż
+  i fiolet, ciepłe drewno i skóra → turkus i niebieski, czerwone wnętrze → zieleń i niebieski. Bonus ma kolor, który
+  już mocno świeci w kadrze (czerwona czapka); pomarańczowe i złote słowa przy dużej ilości skóry i piasku przegrywają.
+- **Wariant z tła:** na jasnym tle (niebo, ściana) ciemny wariant, na ciemnym jasny. Słowo, które nie odcina się
+  od tła pod blokiem, dostaje płytkę w swoim kolorze (`tlo`; napis na płytce czarny albo biały z kontrastu).
+- **Rozpisanie:** akcenty na zmianę (A, B, A, B…) po mocnych słowach: uderzenie w każdym bloku, który je ma,
+  i najważniejsze słowo (waga 2) w co drugim bloku bez uderzenia. Reszta biała. Najwyżej dwa akcenty i biel,
+  plus jeden kolor znaczenia, gdy treść go niesie (zielony przy zysku, czerwony przy stracie). Trzeci akcent to chaos.
+- Kolor marki: `--akcent` z `@@KNOWLEDGE_DIR@@/brands/<marka>/` (kolory marki są prawem). Marka idzie pierwsza,
+  drugi akcent i tak dobieram z kadru.
+- Właściciel mówi, jakie kolory chce: `--paleta "#RRGGBB,#RRGGBB"` w `plan` albo `paleta`, albo `"paleta": [...]`
+  w `zmiany.json`. Słowa w starych kolorach palety idą za nową, kolory ustawione ręcznie zostają.
+- Czerwień nie jest domyślna: wolno ją wtedy, gdy kontrastuje z kadrem (scena chłodna: niebo, morze, zieleń) albo
+  jest kolorem marki. Na scenie czerwonej, pomarańczowej i przy dużej ilości skóry nie.
 
 ## Krój, głębia, ruch
 - Krój zostawiam z motywu („Auto”). W bloku najwyżej dwa kroje, w filmie trzy (główny, lekki, kursywa).
@@ -98,7 +108,8 @@ Pola bloku: `uklad`, `x`, `y` (kotwica 0–1), `w`, `rot`, `tilt`, `warstwa` (`p
 ## Kontrola (arkusz, `vision_analyze`)
 - Najmniejsze słowo czytelne na telefonie, polskie znaki i liczby poprawne, tekst zgodny z mową.
 - Żaden napis nie zakrywa twarzy (poza świadomym „za osobą”) ani stref UI platformy (`formaty-wideo`).
-- Kolor tylko na uderzeniach; bez czerwieni bez powodu; najwyżej dwa kolory poza bielą.
+- Kolory z palety kadru, rozpisane na zmianę; żaden akcent nie ginie na tle; nie jeden kolor na wszystko i nie
+  więcej niż dwa akcenty poza bielą (plus kolor znaczenia).
 - Bloki różnią się układem i wielkością, ale każda różnica ma powód w treści.
 
 ## Definition of Done

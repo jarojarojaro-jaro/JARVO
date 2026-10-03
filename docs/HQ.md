@@ -140,11 +140,13 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   (`fontLoad`), więc polskie znaki nie spadają na krój zastępczy; render agenta wstawia te same pliki jako data: URL
   (`edytor.kroje_css`), bez Google Fonts.
 - **Typografia** jak z montażu (słowo po słowie: różne wielkości, kroje, kolory, głębia, skos, perspektywa 3D): plan
-  w projekcie (`typo`: motyw, akcent i bloki z układem, kotwicą, obrotem, perspektywą, warstwą, wejściem i wyjściem;
+  w projekcie (`typo`: motyw, akcent, paleta i bloki z układem, kotwicą, obrotem, perspektywą, warstwą, wejściem i wyjściem;
   słowa z czasem, wagą 0–3, linią, głębią, krojem, kolorem i stylem) rysuje jeden renderer `hq/web/src/48-typografia.js`
   w podglądzie, przy eksporcie i w renderze Wideografa. Pięć motywów (`czysty` domyślny, `kino`, `ulica`, `energia`,
-  `elegancki`); kolor akcentu tylko na uderzeniu (waga 3), a blok wypełnia część swojej szerokości zależnie od
-  najmocniejszego słowa. Plan układa Wideograf (`typografia.py plan`, reżyser z reguł: mowa, głośność słów, pauzy,
+  `elegancki`). Kolory mocnych słów to **paleta z kadru** (`typo.paleta`, dwa akcenty, które `typografia.py` dobiera
+  z kontrastu z barwami sceny, np. niebieskie niebo → ciemna czerwień i złoto); akcentem bez palety jest kolor
+  motywu, a kolor marki (`akcent`) wygrywa z obydwoma. Słowo w stylu `tlo` ma płytkę w swoim kolorze z czarnym albo
+  białym napisem (kontrast). Blok wypełnia część swojej szerokości zależnie od najmocniejszego słowa. Plan układa Wideograf (`typografia.py plan`, reżyser z reguł: mowa, głośność słów, pauzy,
   interpunkcja, cięcia ujęć) i poprawia według znaczenia (`typografia.py popraw`); serwer sprawdza go
   (`edytor.normalize_typo`). Przy eksporcie przeglądarka rysuje klatkę tylko tam, gdzie obraz warstwy się zmienia
   (`typoOdcinki`), wysyła je jako WebP (PNG, gdy przeglądarka nie zna WebP) razem z pustą klatką w tym samym formacie
@@ -159,7 +161,9 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   Na podglądzie blok przeciąga się z przyciąganiem do środka kadru; na osi zmienia się jego czas (lewa krawędź
   zostawia słowa przy ich czasie w filmie). **Tnij** dzieli blok na słowie pod wskaźnikiem, jest też **Połącz
   z następnym**, **Duplikuj** i **Usuń**; wszystko to jeden krok cofania. Panel **Napisy** ma sekcję typografii:
-  motyw, akcent, nowy blok, usunięcie planu albo prośba do Wideografa o plan. Przycięcie, usunięcie, tempo
+  motyw, **paleta z filmu** (zmiana koloru palety przenosi na nowy kolor wszystkie słowa w starym, tak jak
+  `typografia.py popraw` z `"paleta"`), akcent, nowy blok, usunięcie planu albo prośba do Wideografa o plan.
+  Kolory palety stoją też pierwsze przy kolorze słowa. Przycięcie, usunięcie, tempo
   i przestawienie klipów przesuwają bloki i czasy słów razem z materiałem (`typoNaOsi` w `remapTimes`
   i `edytor.remap_times`; test: `tests/test_edytor_os.py`).
 - **Napis za osobą** (głębia jak z montażu: osoba przed słowem): Wideograf liczy maską MODNet (`maska.py`) sylwetkę

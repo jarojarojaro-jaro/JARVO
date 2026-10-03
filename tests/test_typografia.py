@@ -668,3 +668,141 @@ def test_sylwetki_tylko_dla_blokow_za_osoba(tmp_path, monkeypatch, capsys):
     (tmp_path / "bez").mkdir()
     src2 = _projekt_typo(tmp_path / "bez", [przod])
     assert ty.main(["sylwetki", str(src2)]) == 0 and "Brak bloków za osobą" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- paleta z kadru
+
+def klatka(fn, w: int = 54, h: int = 96) -> bytes:
+    """Mała klatka RGB z funkcji (x, y w 0–1) → (r, g, b)."""
+    return bytes(c for y in range(h) for x in range(w) for c in fn(x / w, y / h))
+
+
+def plaza(x, y):           # niebo, morze, piasek (jak nagranie z Mikołajem na plaży)
+    return (74, 144, 217) if y < 0.45 else (40, 170, 200) if y < 0.6 else (225, 205, 170)
+
+
+def mikolaj(x, y):         # ta sama plaża z osobą (skóra) i małą czerwoną czapką
+    if 0.35 < x < 0.65 and 0.12 < y < 0.17:
+        return (200, 20, 30)
+    if 0.35 < x < 0.65 and 0.17 < y < 0.75:
+        return (205, 150, 120)
+    return plaza(x, y)
+
+
+def barwa(hexa: str) -> int:
+    return next(h for h, d, j, _s in ty.KOLORY.values() if hexa.upper() in (d.upper(), j.upper()))
+
+
+@pytest.mark.parametrize("scena, oczekiwane", [
+    (plaza, ["#B3122E", "#A87A12"]),                                   # niebieskie → ciemna czerwień i złoto
+    (mikolaj, ["#B3122E", "#A87A12"]),
+    (lambda x, y: (60, 140, 50) if y < 0.7 else (90, 70, 40), ["#BE185D", "#6D28D9"]),   # zieleń → róż, fiolet
+    (lambda x, y: (190, 30, 40), ["#1D4ED8", "#15803D"]),              # czerwień → niebieski, zieleń
+])
+def test_paleta_z_kontrastu_ze_scena(scena, oczekiwane):
+    assert ty.dobierz_palete(ty.analiza_kadru([klatka(scena)])) == oczekiwane
+
+
+def test_paleta_dwa_rozne_kolory_i_marka_pierwsza():
+    for scena in (plaza, lambda x, y: (128, 128, 125), lambda x, y: (170, 110, 60), lambda x, y: (150, 40, 200)):
+        an = ty.analiza_kadru([klatka(scena)])
+        a, b = ty.dobierz_palete(an)
+        assert ty._barwa_d(barwa(a), barwa(b)) >= ty.PALETA_ROZNICA      # nigdy jeden kolor dwa razy
+        m, d = ty.dobierz_palete(an, "#E30613")
+        assert m == "#E30613" and ty._barwa_d(barwa(d), 357) >= ty.PALETA_ROZNICA
+
+
+def test_paleta_nie_bierze_barwy_sceny_ani_skory():
+    an = ty.analiza_kadru([klatka(mikolaj)])
+    assert an["skora"] > 0.1 and an["barwnosc"] > 0.2
+    for k in ty.dobierz_palete(an):
+        assert ty._barwa_d(barwa(k), 210) >= 90                         # nie niebieski na niebie
+        assert not 12 <= barwa(k) <= 38                                  # nie pomarańczowy przy skórze
+
+
+def plan_z_uderzeniami(n: int) -> dict:
+    return {"motyw": "czysty", "bloki": [
+        {"id": f"b{i}", "start": i * 1.0, "end": i * 1.0 + 0.9, "uklad": "kolumna", "x": 0.5, "y": 0.6, "w": 0.7,
+         "rot": 0, "tilt": 0, "warstwa": "przod",
+         "slowa": [{"t": 0, "k": 0.3, "tekst": "to", "waga": 0, "linia": 0},
+                   {"t": 0.3, "k": 0.6, "tekst": f"MOCNE{i}", "waga": 3, "linia": 1}]} for i in range(n)]}
+
+
+def test_pokoloruj_uderzenia_na_zmiane_i_wariant_z_tla():
+    jasne = ty.pokoloruj(plan_z_uderzeniami(5), ["#B3122E", "#A87A12"], {f"b{i}": 0.55 for i in range(5)})
+    assert jasne["paleta"] == ["#B3122E", "#A87A12"]                    # jasne niebo: warianty ciemne
+    assert [b["slowa"][1]["kolor"] for b in jasne["bloki"]] == ["#B3122E", "#A87A12", "#B3122E", "#A87A12", "#B3122E"]
+    assert all("kolor" not in b["slowa"][0] for b in jasne["bloki"])   # małe słowa zostają białe
+    ciemne = ty.pokoloruj(plan_z_uderzeniami(3), ["#B3122E", "#A87A12"], {f"b{i}": 0.02 for i in range(3)})
+    assert ciemne["paleta"] == ["#FF5A5F", "#F2C94C"]                   # ciemna scena: warianty jasne
+    assert not any(w.get("styl") == "tlo" for b in ciemne["bloki"] for w in b["slowa"])
+
+
+def test_pokoloruj_wazne_slowo_w_co_drugim_bloku_bez_uderzenia():
+    plan = plan_z_uderzeniami(5)
+    for i in (1, 2, 3):                                                # bloki 1–3 bez uderzenia, z ważnym słowem
+        plan["bloki"][i]["slowa"][1]["waga"] = 2
+    plan["bloki"][2]["slowa"].append({"t": 0.6, "k": 0.8, "tekst": "najdłuższe", "waga": 2, "linia": 1})
+    out = ty.pokoloruj(plan, ["#B3122E", "#A87A12"], {})
+    kolory = [[w.get("kolor") for w in b["slowa"]] for b in out["bloki"]]
+    assert kolory == [[None, "#B3122E"], [None, "#A87A12"], [None, None, None], [None, "#B3122E"], [None, "#A87A12"]]
+
+
+def test_pokoloruj_plytka_tylko_przy_slabym_kontrascie_i_nie_rusza_poprawek():
+    plan = plan_z_uderzeniami(3)
+    plan["bloki"][2]["slowa"][1]["kolor"] = "#FFFFFF"                  # poprawka człowieka zostaje
+    out = ty.pokoloruj(plan, ["#B3122E", "#A87A12"], {"b0": 0.12, "b1": 0.6, "b2": 0.6})
+    assert out["bloki"][0]["slowa"][1] == {**plan["bloki"][0]["slowa"][1], "kolor": "#B3122E", "styl": "tlo"}
+    assert "styl" not in out["bloki"][1]["slowa"][1]
+    assert out["bloki"][2]["slowa"][1]["kolor"] == "#FFFFFF"
+
+
+def test_zmien_palete_przenosi_slowa_i_normalize_ja_trzyma():
+    plan = ty.pokoloruj(plan_z_uderzeniami(3), ["#B3122E", "#A87A12"], {})
+    nowy = ty.zmien_palete(plan, ["#1d4ed8", "#A87A12"])
+    assert [b["slowa"][1]["kolor"] for b in nowy["bloki"]] == ["#1D4ED8", "#A87A12", "#1D4ED8"]
+    norm = ed.normalize_typo({**nowy, "paleta": ["#1d4ed8", "zły", "#A87A12", "#111111", "#222222", "#333333"]}, 10)
+    assert norm["paleta"] == ["#1D4ED8", "#A87A12", "#111111", "#222222"]
+    assert "paleta" not in ed.normalize_typo({"paleta": "#B3122E"}, 10)
+    po, _ = ty.zastosuj(nowy, {"paleta": ["#BE185D", "#A87A12"]}, 10)    # popraw: paleta jak w edytorze
+    assert [b["slowa"][1]["kolor"] for b in po["bloki"]] == ["#BE185D", "#A87A12", "#BE185D"]
+
+
+def test_jasnosc_pod_blokiem():
+    W, H = 54, 96
+    rgb = klatka(lambda x, y: (255, 255, 255) if y < 0.5 else (0, 0, 0), W, H)
+    gora = ty.jasnosc_pod(rgb, W, H, {"x": 0.5, "y": 0.2, "w": 0.6, "slowa": [{"tekst": "ab", "linia": 0}]}, 1080, 1920)
+    dol = ty.jasnosc_pod(rgb, W, H, {"x": 0.5, "y": 0.8, "w": 0.6, "slowa": [{"tekst": "ab", "linia": 0}]}, 1080, 1920)
+    assert gora > 0.95 and dol < 0.05
+
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_renderer_akcent_z_palety_i_napis_na_plytce():
+    o = node("console.log(JSON.stringify([typoMotyw({typo: {motyw: 'czysty', paleta: ['#B3122E', '#A87A12']}}).akcent,"
+             " typoMotyw({typo: {motyw: 'czysty', akcent: '#E30613', paleta: ['#B3122E']}}).akcent,"
+             " typoMotyw({typo: {motyw: 'czysty'}}).akcent, typoJasnosc('#B3122E'), typoJasnosc('#F2C94C')]));")
+    assert o[:3] == ["#B3122E", "#E30613", "#FFD400"]                  # marka > paleta z kadru > motyw
+    assert abs(o[3] - ty.luminancja(*ty._hex_rgb("#B3122E"))) < 1e-6   # ta sama luminancja co w Pythonie
+    assert abs(o[4] - ty.luminancja(*ty._hex_rgb("#F2C94C"))) < 1e-6
+    assert "plyta ? (typoJasnosc(plyta) > 0.36" in JS                   # ciemna płytka → biały napis
+
+
+def test_polecenie_paleta_zmienia_kolory_nie_uklad(tmp_path, monkeypatch):
+    film = tmp_path / "f.mp4"
+    film.write_bytes(b"x")
+    plan = ed.normalize_typo({**plan_z_uderzeniami(3), "akcent": "#E7C583"}, 10)
+    plan["bloki"][1]["slowa"][1]["kolor"] = "#FFFFFF"                  # kolor człowieka
+    proj = {"canvas": {"w": 1080, "h": 1920, "fps": 30}, "clips": [], "typo": plan}
+    zapis = {}
+    monkeypatch.setattr(ty.pr, "load", lambda f: json.loads(json.dumps(proj)))
+    monkeypatch.setattr(ty.pr, "total", lambda p: 10.0)
+    monkeypatch.setattr(ty.pr, "save", lambda f, p: zapis.update(p))
+    monkeypatch.setattr(ty, "probki_kadru", lambda p, pl: ([klatka(plaza)], {b["id"]: 0.5 for b in pl["bloki"]}))
+    assert ty.main(["paleta", str(film), "--bez-akcentu"]) == 0
+    po = zapis["typo"]
+    assert "akcent" not in po and po["paleta"] == ["#B3122E", "#A87A12"]
+    assert [b["slowa"][1].get("kolor") for b in po["bloki"]] == ["#B3122E", "#FFFFFF", "#A87A12"]
+    assert [(b["x"], b["y"], b["uklad"]) for b in po["bloki"]] == [(b["x"], b["y"], b["uklad"]) for b in plan["bloki"]]
+    proj["typo"] = po                                                    # druga paleta: słowa idą za nią
+    assert ty.main(["paleta", str(film), "--paleta", "#1D4ED8,#BE185D"]) == 0
+    assert [b["slowa"][1].get("kolor") for b in zapis["typo"]["bloki"]] == ["#1D4ED8", "#FFFFFF", "#BE185D"]

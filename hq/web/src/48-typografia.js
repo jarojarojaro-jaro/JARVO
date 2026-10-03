@@ -3,7 +3,7 @@
 // i render Wideografa (projekt.py w przeglądarce bez okna). Plan bloków układa typografia.py (reżyser), a człowiek
 // poprawia go w edytorze. Czas słowa liczony od początku bloku: przesunięcie bloku zabiera słowa ze sobą.
 //
-// projekt.typo = {motyw, akcent, bloki: [{id, start, end, uklad, x, y, w, rot, tilt, warstwa, wejscie, wyjscie,
+// projekt.typo = {motyw, akcent, paleta, bloki: [{id, start, end, uklad, x, y, w, rot, tilt, warstwa, wejscie, wyjscie,
 //                 rozmiar, slowa: [{t, k, tekst, waga 0–3, linia, glebia −1|0|1, kolor, kroj, styl}]}]}
 
 const TYPO_KROJE = {   // klucz → [rodzina CSS, grubość, kursywa, nazwa]; pliki w fonts/kroje (OFL)
@@ -23,7 +23,8 @@ const TYPO_KROJE = {   // klucz → [rodzina CSS, grubość, kursywa, nazwa]; pl
 };
 // Motyw = zestaw decyzji: kroje (główny, mały do słów funkcyjnych, drugi do słów „z tyłu”), kolory, wejście/wyjście,
 // styl najmocniejszego słowa, tekstura, skala skosu (stopnie; reżyser typografia.py ma tę samą tabelę SKOS).
-// Kolor marki nadpisuje akcent (projekt.typo.akcent).
+// Kolor marki nadpisuje akcent (projekt.typo.akcent), a bez marki akcentem jest pierwszy kolor palety z kadru
+// (projekt.typo.paleta, typografia.py); kolor motywu zostaje tylko, gdy palety nie ma.
 const TYPO_MOTYWY = {
   czysty: { nazwa: ["Czysty", "Clean"], kroj: "bricolage", maly: "bricolageL", drugi: "playfairI", akcent: "#FFD400",
     kolor: "#FFFFFF", wielkie: false, wejscie: "pop", wyjscie: "zanik", hit: "wypelnij", skos: 5, lh: 1.0 },
@@ -48,7 +49,8 @@ const TYPO_SCHODKI = [0, 1, 0.3, 0.85, 0.15];      // wyrównanie kolejnych lini
 function typoMotyw(P) {
   const t = (P && P.typo) || {};
   const m = TYPO_MOTYWY[t.motyw] || TYPO_MOTYWY.czysty;
-  return t.akcent ? { ...m, akcent: t.akcent } : m;
+  const akcent = t.akcent || (Array.isArray(t.paleta) && t.paleta[0]);
+  return akcent ? { ...m, akcent } : m;
 }
 function typoBloki(P) { return ((P && P.typo && P.typo.bloki) || []).filter((b) => b && Array.isArray(b.slowa) && b.slowa.length); }
 function typoAktywne(P, now) { return typoBloki(P).filter((b) => now >= b.start + Math.max(0, +(b.slowa[0].t) || 0) - TYPO_LEAD && now < b.end); }
@@ -185,6 +187,12 @@ function typoSzum() {
   TYPO_SZUM = c;
   return c;
 }
+function typoJasnosc(hex) {               // względna luminancja WCAG (0–1), ta sama co luminancja() w typografia.py
+  const h = String(hex || "#ffffff").replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6), 16) || 0xffffff;
+  const f = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * f(((n >> 16) & 255) / 255) + 0.7152 * f(((n >> 8) & 255) / 255) + 0.0722 * f((n & 255) / 255);
+}
 function typoCiemniej(hex, k) {
   const h = String(hex || "#ffffff").replace("#", "");
   const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6), 16) || 0xffffff;
@@ -217,8 +225,9 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
   const konturFaza = wejscie === "kontur" && a < 1;
   const cien = () => { g.shadowColor = "rgba(0,0,0,0.55)"; g.shadowBlur = px * 0.16; g.shadowOffsetY = px * 0.04; };
   const bezCienia = () => { g.shadowColor = "transparent"; g.shadowBlur = 0; g.shadowOffsetY = 0; };
-  if (s.styl === "tlo") {
-    g.fillStyle = m.akcent;
+  const plyta = s.styl === "tlo" ? (s.src && s.src.kolor) || m.akcent : null;   // płytka w kolorze słowa
+  if (plyta) {
+    g.fillStyle = plyta;
     g.fillRect(x - px * 0.12, y - px * 0.82, s.w + px * 0.24, px * 1.02);
   }
   if (s.styl === "3d" && !konturFaza) {          // wyciągnięcie w głąb: kopie w ciemniejszym kolorze, potem lico
@@ -234,7 +243,7 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
     const fa = konturFaza ? typoClamp((a - 0.45) / 0.55, 0, 1) : 1;
     if (fa > 0) {
       g.globalAlpha = alpha * fa;
-      g.fillStyle = s.styl === "tlo" ? "#111111" : fill;
+      g.fillStyle = plyta ? (typoJasnosc(plyta) > 0.36 ? "#111111" : "#FFFFFF") : fill;   // napis na płytce: kontrast
       if (s.styl === "blask") { g.shadowColor = fill; g.shadowBlur = px * 0.38; g.fillText(tekst, x, y); }
       if (s.styl !== "3d" && s.styl !== "tlo" && s.styl !== "blask") cien();
       g.fillText(tekst, x, y);

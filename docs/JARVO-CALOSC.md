@@ -117,8 +117,9 @@ Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo s
 Animacja z kodu ma twardy pomiar przed oddaniem (`html_wideo.py pomiar`: czas czytania, kadr i strefy UI platformy,
 kontrast, czarne przerwy, martwe odcinki, rytm; „gotowe” tylko z pełnym i aktualnym raportem) i parametry
 (`parametry.json`), które właściciel stroi na żywo w HQ. Typografia do nagrania z mową (`typografia.py`, skill
-`typografia-edit`): reżyser z reguł układa bloki słów, Wideograf poprawia je znaczeniem (puenta = uderzenie w kolorze
-akcentu, myśl = dalej i kursywą, bez czerwieni domyślnie), mocne słowo staje za osobą (maska MODNet), a plan zostaje
+`typografia-edit`): reżyser z reguł układa bloki słów, Wideograf poprawia je znaczeniem (puenta = uderzenie, myśl =
+dalej i kursywą), kolory bierze z kadru (dwa akcenty w kontraście ze sceną, np. niebo → ciemna czerwień i złoto,
+na zmianę po mocnych słowach), mocne słowo staje za osobą (maska MODNet), a plan zostaje
 w projekcie montażu do poprawek w HQ; gotowego planu nie nadpisuje bez wyraźnej prośby.
 
 ---

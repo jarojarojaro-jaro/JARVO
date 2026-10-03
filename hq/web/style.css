@@ -657,6 +657,10 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-sw button.is-on { outline: 2px solid var(--ed-ink); outline-offset: 2px; }
 .thq-ed-sw-more { display: grid; place-items: center; background: conic-gradient(#ff5f5f, #ffd25f, #6fe08a, #56cce0, #7a8bff, #e07aff, #ff5f5f); color: #111; font-weight: 700; font-size: 13px; overflow: hidden; }
 .thq-ed-sw-more input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.thq-ed-sw.is-pal { display: flex; gap: 10px; margin-bottom: 4px; }
+.thq-ed-sw.is-pal button { width: 44px; height: 28px; border-radius: 8px; --r: 8px; }
+.thq-ed-sw-pal { position: relative; width: 44px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,.22); cursor: pointer; overflow: hidden; }
+.thq-ed-sw-pal input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .thq-ed-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(54px, 1fr)); gap: 2px; }
 .thq-ed-act { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; padding: 9px 4px 8px; text-align: center; border: 0; border-radius: 10px;
   background: none; cursor: pointer; font-size: 11.5px; font-weight: 500; color: var(--ed-ink-2); transition: background .15s, color .15s; }

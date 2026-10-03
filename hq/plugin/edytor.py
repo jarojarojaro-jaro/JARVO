@@ -161,6 +161,10 @@ def normalize_typo(raw: Any, total: float) -> dict:
     out = {"motyw": raw.get("motyw") if raw.get("motyw") in TYPO_MOTYWY else "czysty", "bloki": []}
     if isinstance(raw.get("akcent"), str) and _HEX.match(raw["akcent"]):
         out["akcent"] = raw["akcent"]
+    paleta = [x.upper() for x in raw.get("paleta") or [] if isinstance(x, str) and _HEX.match(x)][:4] \
+        if isinstance(raw.get("paleta"), list) else []
+    if paleta:                                     # kolory z kadru (typografia.py): pierwszy = akcent bez marki
+        out["paleta"] = paleta
     bloki = raw.get("bloki") if isinstance(raw.get("bloki"), list) else []
     for b in bloki[:MAX_TYPO]:
         if not isinstance(b, dict) or not isinstance(b.get("slowa"), list):

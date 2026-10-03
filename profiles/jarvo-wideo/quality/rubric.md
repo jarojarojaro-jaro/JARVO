@@ -30,6 +30,7 @@
 ## Typografia jak z montażu (`typografia-edit`)
 - Blokujące: słowa na ekranie inne niż w mowie (poza liczebnikiem zapisanym cyfrą); napis na twarzy albo w strefie UI;
   plan poprawiony przez właściciela w HQ nadpisany (`plan --nowy` bez jego prośby); brak projektu `.edycja.json`.
-- Ważne: kolor na całych blokach albo na zwykłych słowach, czerwony motyw albo czerwień bez powodu w treści czy marce,
-  więcej niż dwa kolory poza bielą, więcej niż jedno uderzenie w bloku, za osobą częściej niż co szósty blok,
+- Ważne: kolor na całych blokach albo na zwykłych słowach, jeden kolor na wszystkie mocne słowa, akcent w barwie
+  sceny albo ginący na tle (bez płytki), czerwień na scenie czerwonej lub ciepłej bez powodu w treści czy marce,
+  więcej niż dwa akcenty poza bielą (plus kolor znaczenia), więcej niż jedno uderzenie w bloku, za osobą częściej niż co szósty blok,
   słowo, które wchodzi przed dźwiękiem albo długo po nim; arkusz nieobejrzany.

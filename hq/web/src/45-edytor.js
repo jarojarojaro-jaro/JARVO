@@ -988,6 +988,12 @@ function VideoEditor({ path, onClose }) {
     const T = P.typo || { motyw: "czysty", bloki: [] };
     return { ...P, typo: { ...T, ...fn({ ...T, bloki: T.bloki || [] }) } };
   });
+  // kolor palety filmu (typografia.py: z kontrastu z kadrem) zmieniony tu: słowa w starym kolorze idą za nim
+  const typoPaletaUpd = (i, v, lv) => typoApply((T) => {
+    const stary = String((T.paleta || [])[i] || "").toUpperCase(), nowy = String(v).toUpperCase();
+    return { paleta: (T.paleta || []).map((x, k) => (k === i ? nowy : x)),
+      bloki: T.bloki.map((b) => ({ ...b, slowa: b.slowa.map((w) => (stary && String(w.kolor || "").toUpperCase() === stary ? { ...w, kolor: nowy } : w)) })) };
+  }, lv);
   const typoUpd = (id, patch, lv) => typoApply((T) => ({ bloki: T.bloki.map((b) => (b.id === id ? typoBez({ ...b, ...(typeof patch === "function" ? patch(b) : patch) }) : b)) }), lv);
   const slowoUpd = (id, j, patch, lv) => typoUpd(id, (b) => ({ slowa: b.slowa.map((w, k) => (k === j ? typoBez({ ...w, ...patch }) : w)) }), lv);
   const [typoW, setTypoW] = useState(null);      // numer zaznaczonego słowa w bloku (panel słowa)
@@ -1608,7 +1614,10 @@ function VideoEditor({ path, onClose }) {
   const seg = (items, cur, set) => html`<div class="thq-ed-seg">${items.map(([k2, label]) => html`<button type="button" key=${k2} class=${cx(cur === k2 && "is-on")} onClick=${() => set(k2)}>${label}</button>`)}</div>`;
   // kroje: siatka z nazwą pisaną danym krojem (lista ED_FONTS w 44-napisy.js, pliki lokalnie w fonts/kroje)
   const fontPick = (cur, set) => html`<div class="thq-ed-fonts">${ED_FONTS.map(([f, n]) => html`<button type="button" key=${f} class=${cx(cur === f && "is-on")} style=${{ fontFamily: f }} onClick=${() => set(f)}>${n}</button>`)}</div>`;
-  const swatches = (cur, set) => html`<div class="thq-ed-sw">${ED_COLORS.map((c) => html`<button type="button" key=${c} class=${cx(String(cur).toLowerCase() === c.toLowerCase() && "is-on")}
+  // pal: kolory palety filmu (typografia) w osobnym rzędzie nad stałymi kolorami
+  const swatches = (cur, set, pal) => html`${(pal || []).length > 0 && html`<div class="thq-ed-sw is-pal">${pal.map((c) => html`<button type="button" key=${c}
+    class=${cx(String(cur).toLowerCase() === c.toLowerCase() && "is-on")} style=${{ background: c }} onClick=${() => set(c)} aria-label=${c}
+    title=${L("Paleta z filmu", "Palette from the film")}></button>`)}</div>`}<div class="thq-ed-sw">${ED_COLORS.map((c) => html`<button type="button" key=${c} class=${cx(String(cur).toLowerCase() === c.toLowerCase() && "is-on")}
     style=${{ background: c }} onClick=${() => set(c)} aria-label=${c}></button>`)}<label class="thq-ed-sw-more" title=${L("Inny kolor", "Other color")}>+<input type="color" value=${cur || "#ffffff"} onInput=${(e) => set(e.target.value, true)} onChange=${H.commit}/></label></div>`;
   const act = (icon, label, fn, opts = {}) => html`<button type="button" class=${cx("thq-ed-act", opts.bad && "is-bad", opts.on && "is-on")} disabled=${opts.disabled} onClick=${fn}>${ED_ICON[icon]}<span>${label}</span></button>`;
   const mediaList = (kinds) => html`<ul class="thq-ed-list">${media.filter((m) => kinds.includes(m.kind)).map((m) => html`<li key=${m.path}><button type="button" onClick=${() => { addMedia(m); if (mobile) setTool(m.kind === "audio" ? "audio" : "edit"); }} title=${L("Dodaj do osi czasu", "Add to the timeline")}>
@@ -1709,7 +1718,11 @@ function VideoEditor({ path, onClose }) {
       <p class="thq-ed-sub">${L("Typografia słowo po słowie", "Word-by-word typography")}${n ? ` · ${n} ${L(plForma(n, BLOKI), n === 1 ? "block" : "blocks")}` : ""}</p>
       ${n ? html`
         <label>${L("Motyw", "Theme")}${seg(Object.entries(TYPO_MOTYWY).map(([k2, x]) => [k2, L(...x.nazwa)]), TYPO_MOTYWY[T.motyw] ? T.motyw : "czysty", (v) => typoApply(() => ({ motyw: v })))}</label>
-        <label>${L("Akcent: kolor uderzenia", "Accent: hit word color")}${swatches(m.akcent, (v, lv) => typoApply(() => ({ akcent: v }), lv))}</label>
+        ${(T.paleta || []).length > 0 && html`<label>${L("Paleta z filmu", "Palette from the film")}<div class="thq-ed-sw is-pal">${T.paleta.map((c, i) => html`<label key=${i}
+          class="thq-ed-sw-pal" style=${{ background: c }} title=${L("Zmień kolor: wszystkie słowa w nim pójdą za nim", "Change the color: every word in it follows")}>
+          <input type="color" value=${c} onInput=${(e) => typoPaletaUpd(i, e.target.value, true)} onChange=${H.commit}/></label>`)}</div></label>
+        <p class="thq-ed-note">${L("Wideograf dobrał te kolory do kadru (kontrast z barwami sceny) i rozłożył je na mocne słowa.", "The video agent picked these colors to contrast with the footage and spread them over the strong words.")}</p>`}
+        <label>${L("Akcent: kolor uderzenia", "Accent: hit word color")}${swatches(m.akcent, (v, lv) => typoApply(() => ({ akcent: v }), lv), T.paleta)}</label>
         ${T.akcent && html`<button type="button" class="thq-ed-btn is-wide" onClick=${() => typoApply(() => ({ akcent: undefined }))}>${ED_ICON.reset} ${L("Akcent z motywu", "Theme accent")}</button>`}
         <p class="thq-ed-note">${L("Kliknij blok na osi albo na podglądzie, żeby zmienić słowa, układ, głębię i ruch.", "Click a block on the timeline or the preview to change words, layout, depth and motion.")}</p>
         <div class="thq-ed-acts">
@@ -1738,7 +1751,7 @@ function VideoEditor({ path, onClose }) {
         class=${cx(`is-w${typoClamp(Math.round(+x.waga || 0), 0, 3)}`, k === j && "is-on")} onClick=${() => setTypoW(k)}>${x.tekst}</button>`)}</div>
       <input class="thq-ed-input" type="text" value=${w.tekst} aria-label=${L("Tekst słowa", "Word text")} onInput=${(e) => su({ tekst: e.target.value }, true)} onBlur=${H.commit}/>
       <label>${L("Waga słowa", "Word weight")}${seg(TYPO_WAGI_NAZWY.map(([pl, en], k2) => [k2, L(pl, en)]), wyg.waga, (v) => su({ waga: v }))}</label>
-      <label>${L("Kolor", "Color")}${swatches(wyg.kolor, (v, lv) => su({ kolor: v }, lv))}</label>
+      <label>${L("Kolor", "Color")}${swatches(wyg.kolor, (v, lv) => su({ kolor: v }, lv), (p.typo || {}).paleta)}</label>
       ${w.kolor && html`<button type="button" class="thq-ed-btn is-wide" onClick=${() => su({ kolor: undefined })}>${ED_ICON.reset} ${L("Kolor z motywu (akcent tylko na uderzeniu)", "Theme color (accent only on the hit)")}</button>`}
       <label>${L("Krój", "Font")}<div class="thq-ed-fonts">${[["", auto], ...Object.entries(TYPO_KROJE).map(([k2, f]) => [k2, f[3]])].map(([k2, n]) => {
         const f = k2 && TYPO_KROJE[k2];
