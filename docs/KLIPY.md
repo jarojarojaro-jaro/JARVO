@@ -25,12 +25,12 @@ napisy, tytuł, muzykę, a eksport robi nową wersję.
   ② Wideograf czyta transkrypcję według master promptu (skill clipmaker, references/master-prompt.md)
        ocena 0–100 każdego okna → kandydaci z najlepszych okien całego nagrania (2–3× więcej niż rolek)
        → ocena na 6 osiach → wybór N różnych tematów → plan.json → klipy.py sprawdz
-       kadr mówcy: vision_analyze arkusza klatek → focus x/y dla każdego segmentu
+       arkusze klatek (vision_analyze): ile osób, plansze; fx/fy tylko tam, gdzie kadr nie ma stać na twarzy
         │
         ▼
   ③ klipy.py zbuduj <nagranie> plan.json     skrypt, 0 tokenów
        dla każdej rolki: projekt 1080×1920 (segmenty ze źródła z granicą dosuniętą ze środka słowa do przerwy,
-       kadr z focusem, cięcie pauz > 0,6 s i „yyy”,
+       kadr na twarzy z twarze.py (YuNet) albo z planu, cięcie pauz > 0,6 s i „yyy”,
        napisy karaoke ze słów, tytuł-hook na pierwsze sekundy, opcjonalnie muzyka) → render tym samym silnikiem
        co „Eksportuj” → klip-N-<slug>.mp4 + klip-N-<slug>.edycja.json
         │
@@ -74,7 +74,7 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 | Element | Domyślnie | W projekcie |
 |---|---|---|
 | format | 1080×1920, 30 fps (9:16); na życzenie 1920×1080 (16:9) | `canvas`; `format` w planie albo rolce |
-| kadr | mówca z poziomego nagrania: przycięcie do pionu z punktem skupienia na twarzy; dwie osoby: segment na osobę | klip `fit: cover` + **nowe** `fx`, `fy` (0–1) i `zoom` (1–2) |
+| kadr | mówca z poziomego nagrania: przycięcie do pionu na twarzy (`twarze.py`, YuNet, 2 próbki/s: twarz na środku, oczy na ~1/3; mały ruch kadr ignoruje, nowa twarz albo duże przesunięcie potwierdzone przez ~1,5 s = nowe ujęcie z cięciem w przerwie między słowami) | klip `fit: cover` + `fx`, `fy` (0–1) i `zoom` (1–2) |
 | rytm | wycięte pauzy > 0,6 s i „yyy” (zostaje 0,12 s oddechu); punch-in (zoom 1,15) na mocnym zdaniu | kolejne klipy z tego samego źródła |
 | napisy | **karaoke**: 2–4 słowa w linii, aktywne słowo w kolorze akcentu, grube, z obrysem, w dolnej 1/3 poza strefą UI platform | **nowy** typ napisu: `words` + `hl` |
 | hook | tytuł na górze przez pierwsze ~3 s | zwykły napis (`texts`) |
@@ -105,9 +105,11 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 
 - **VPS 8 GB:** transkrypcja 1 h nagrania to ~6–12 min Parakeeta (jedna naraz, ~1,2 GB RAM); render rolki
   30–60 s w ~0,5–1× czasu rzeczywistego. Rolki renderują się jedna po drugiej.
-- **Rozpoznawanie mówców (kto mówi):** nie w v1 (brak lekkiego modelu na CPU); kadr ustawia Wideograf z klatek.
-  Automatyczne śledzenie twarzy (ruchomy kadr) też nie w v1: stały punkt skupienia na segment + podział segmentu
-  przy zmianie ujęcia wystarcza dla typowego podcastu/wywiadu.
+- **Kadr na twarz** (od 2026-10-03, za openshorts): YuNet z OpenCV Zoo (MIT, 230 KB, ONNX na CPU, ~15 ms na
+  klatkę) przez `twarze.py`; wynik w `<nagranie>.twarze.json`. Kadr jest stały w obrębie ujęcia (edytor nie ma
+  klatek kluczowych), więc zamiast płynnej jazdy kamery jest nowe ujęcie przy zmianie twarzy albo dużym ruchu.
+  Przy kilku twarzach kadr trzyma największą (obecna ×3), dopóki inna nie wygra przez ~1,5 s.
+- **Rozpoznawanie mówców (kto mówi):** nie w v1; przy kilku osobach w kadrze wygrywa największa twarz.
 - **Prawa:** tylko materiał użytkownika albo z jego zgodą (jak w każdym montażu nagrań).
 - **Publikacja** rolek na platformy: poza zakresem (A2, osobna decyzja).
 

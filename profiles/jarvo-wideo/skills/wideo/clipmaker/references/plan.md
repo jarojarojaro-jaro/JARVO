@@ -15,6 +15,7 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
     "tnij_pauzy": 0.6,
     "bez_wtracen": true,
     "punch": true,
+    "kadr_auto": true,
     "muzyka": null,
     "muzyka_glosnosc": 0.12
   },
@@ -23,7 +24,7 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
       "slug": "3-bledy-w-cenach",
       "tytul": "Tracisz marżę?",
       "taktyka": "liczba na start",
-      "segmenty": [{"od": 754.2, "do": 781.9, "fx": 0.42, "fy": 0.38, "zoom": 1.0}],
+      "segmenty": [{"od": 754.2, "do": 781.9}],
       "oceny": {"hook": 8, "samodzielnosc": 9, "wartosc": 8, "emocja": 7, "puenta": 8, "udostepnienie": 7},
       "dlaczego": "konkretna lista z liczbami, zamyka się puentą",
       "opis": "Trzy błędy, przez które zarabiasz mniej niż konkurencja.",
@@ -41,9 +42,10 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
 | `styl.tnij_pauzy` | wycina pauzy dłuższe niż tyle sekund (zostaje oddech 0,12 s); `null` = bez cięcia | 0,6 |
 | `styl.bez_wtracen` | wycina „yyy”, „eee”, „mmm” | `true` |
 | `styl.punch` | co drugie ujęcie po cięciu przybliżone ×1,12 (ukrywa skok obrazu) | `true` |
+| `styl.kadr_auto` | segment bez `fx`/`fy` kadrowany na twarz (`twarze.py`); `false` = środek kadru | `true` |
 | `styl.muzyka` | plik muzyki pod mową (licencja w KLIPY.md), głośność `muzyka_glosnosc` | brak |
 | `rolki[].slug` | a-z, 0-9, „-”, do 40 znaków; nazwa pliku `klip-N-<slug>.mp4` | — |
-| `rolki[].segmenty` | 1–3 fragmenty źródła: `od`, `do`, kadr `fx`/`fy` (0–1, punkt skupienia), `zoom` (1–3) | fx 0,5, fy 0,4 (pion) |
+| `rolki[].segmenty` | 1–3 fragmenty źródła: `od`, `do`, kadr `fx`/`fy` (0–1, punkt skupienia; tylko gdy nie twarz), `zoom` (1–3) | kadr na twarz; bez twarzy fx 0,5, fy 0,4 (pion) |
 | `rolki[].tytul` | tytuł-hook na ekranie, ≤ 6 słów; nie powtarza pierwszego zdania mowy (`sprawdz` ostrzega) | — |
 | `rolki[].taktyka` | taktyka hooka ze skilla `hooki` (np. „pod prąd”, „historia od środka”); trafia do KLIPY.md | — |
 | `rolki[].oceny` | 6 osi z master promptu | — |

@@ -236,7 +236,8 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
   → napisy karaoke → muzyka ściszana pod głos → montaż FFmpeg w 9:16/16:9/1:1/4:5, z planu `plan.json` (`film.py`),
 - **warianty A/B** z jednego planu (hook, głos, tempo, długość), wspólne sceny z cache,
 - **montaż nagrań** użytkownika: cięcie, usuwanie ciszy, kadr 9:16 z poziomego, głośność −14 LUFS, napisy,
-- **klipy z długich nagrań** (podcast, webinar): transkrypcja Parakeet z czasem słów → wybór fragmentów → klipy z napisami,
+- **klipy z długich nagrań** (podcast, webinar): transkrypcja Parakeet z czasem słów → wybór fragmentów → klipy z napisami
+  i kadrem 9:16 na twarzy mówcy (`klipy.py`, `twarze.py` z YuNet),
 - **typografia jak z montażu** do nagrania z mową (`typografia.py`, skill `typografia-edit`): słowa w rytmie mowy, różne
   wielkości, kroje, głębia, skos i 3D, mocne słowo za osobą (maska MODNet, `maska.py`); forma wynika ze znaczenia,
   kolory z palety kadru (dwa akcenty w kontraście ze sceną, rozpisane na zmianę po mocnych słowach), styl filmu

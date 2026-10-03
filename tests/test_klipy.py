@@ -171,3 +171,62 @@ def test_rebuild_does_not_overwrite_user_edit(nagranie, tmp_path):
         K.main(["zbuduj", str(pl), "-o", str(out), "--bez-renderu"])
     assert "Poprawione w HQ" in pp.read_text(encoding="utf-8")
     assert K.main(["zbuduj", str(pl), "-o", str(out), "--bez-renderu", "--nadpisz"]) == 0
+
+
+def twarz(x, y=0.4, s=0.1):
+    """Twarz jak z twarze.py: ramka 0–1 wokół środka (x, y), bok s, pewność, 10 liczb punktów twarzy."""
+    return [x - s / 2, y - s / 2, x + s / 2, y + s / 2, 0.9] + [x, y] * 5
+
+
+def test_tracker_holds_face_and_switches_after_three_samples():
+    a, b = twarz(0.3, s=0.12), twarz(0.7, s=0.1)
+    probki = [[0.0, [a, b]], [0.5, [a]], [1.0, []],                         # bez twarzy: trzyma poprzednią
+              [1.5, [twarz(0.3, s=0.1), twarz(0.7, s=0.14)]],              # większa obca twarz tylko raz: bonus ×3 trzyma
+              [2.0, [b]], [2.5, [b]], [3.0, [b]], [3.5, [b]]]              # trzy próbki z rzędu → zmiana od pierwszej
+    slad = K.sledz(probki)
+    xs = [None if f is None else round((f[0] + f[2]) / 2, 2) for _, f, _ in slad]
+    assert xs == [0.3, 0.3, 0.3, 0.3, 0.7, 0.7, 0.7, 0.7] and [n for *_, n in slad] == [0, 0, 0, 0, 1, 1, 1, 1]
+    skok = K.sledz([[t / 2, [twarz(0.3 if t < 3 else 0.5)]] for t in range(6)])      # ta sama osoba po skoku kadru
+    assert [n for *_, n in skok] == [0, 0, 0, 1, 1, 1]
+
+
+def test_frame_settings_ignore_small_moves_and_confirm_big_ones():
+    szer = 0.316                                      # kadr 9:16 z 16:9: 0,316 szerokości źródła; próg 0,11
+    slad = [(t / 2, twarz(x, s=0.3), 0) for t, x in enumerate([0.30, 0.33, 0.28, 0.45, 0.46, 0.31,  # 2 daleko: nic
+                                                             0.31, 0.50, 0.52, 0.51, 0.50])]      # 3+: nowe od 3.5
+    ust = K.ustawienia(slad, szer)
+    assert [u["od"] for u in ust] == [0.0, 3.5]
+    assert ust[0]["x"] == pytest.approx(0.31, abs=0.011) and ust[1]["x"] == pytest.approx(0.51, abs=0.011)
+    assert K.ustawienia([(0.0, None, 0), (0.5, None, 0)], szer) == []
+    inna = K.ustawienia([(0.0, twarz(0.3), 0), (0.5, twarz(0.31), 0), (1.0, twarz(0.7), 1)], szer)
+    assert [u["od"] for u in inna] == [0.0, 1.0]                                            # inna twarz: od razu
+
+
+def test_focus_from_face_and_split_in_word_gap():
+    assert K.ogniskowa(0.691, 0.3, 1080, 1920, 1.0, 1920, 1080) == (0.779, 0.5)   # 16:9 → 9:16: wysokość cała
+    assert K.ogniskowa(0.5, 0.5, 1080, 1920, 1.0, 1920, 1080)[0] == 0.5
+    fx, fy = K.ogniskowa(0.691, 0.36, 1080, 1920, 1.12, 1920, 1080)                # punch-in: fy już działa
+    assert 0.76 < fx < 0.78 and 0.1 < fy < 0.3
+    assert K.ogniskowa(0.9, 0.9, 1080, 1920, 1.0, 1080, 1920) == (0.5, 0.5)         # te same proporcje: bez przesunięcia
+    ust = [{"od": 0.0, "x": 0.3, "y": 0.4}, {"od": 5.4, "x": 0.7, "y": 0.4}]
+    words = [[4.0, 4.9, "a"], [5.3, 6.0, "b"]]
+    czesci = K.podziel(0.0, 10.0, ust, words)
+    assert [(a, b) for a, b, _ in czesci] == [(0.0, 5.1), (5.1, 10.0)] and czesci[1][2]["x"] == 0.7
+    assert K.podziel(0.0, 5.9, ust, words) == [(0.0, 5.9, ust[0])]                   # część < 0,8 s: bez podziału
+    assert K.podziel(1.0, 2.0, [], words) == [(1.0, 2.0, None)]
+
+
+def test_reel_frames_speaker_face_when_plan_has_no_focus(nagranie):
+    p = K.wczytaj_plan_dict(plan(nagranie, segmenty=[{"od": 0.9, "do": 12.0}]))
+    tw = {"w": 1920, "h": 1080, "co": 0.5,
+          "probki": [[t / 2, [twarz(0.3 if t < 12 else 0.7)]] for t in range(2, 25)]}   # od 6 s inna osoba
+    proj = K.projekt_rolki(p, p["rolki"][0], nagranie, WORDS, {"w": 1920, "h": 1080, "duration": 60.0}, tw)
+    assert proj["clipmaker"]["kadr"] == ["twarz"]
+    fx = [c["fx"] for c in proj["clips"]]
+    assert fx[0] == K.ogniskowa(0.3, 0.4, 1080, 1920, 1.0, 1920, 1080)[0] and fx[-1] > 0.75 and fx[0] < 0.25
+    bez = K.projekt_rolki(p, p["rolki"][0], nagranie, WORDS, {"w": 1920, "h": 1080}, None)
+    assert bez["clipmaker"]["kadr"] == ["srodek"] and {c["fx"] for c in bez["clips"]} == {0.5}
+    info = {"w": 1920, "h": 1080, "video": True, "duration": 60.0}
+    assert K.odcinki_twarzy(p, WORDS, info) == [(0.9, 12.0)]
+    assert K.odcinki_twarzy(K.wczytaj_plan_dict(plan(nagranie)), WORDS, info) == []          # fx w planie
+    assert K.odcinki_twarzy(p, WORDS, {**info, "w": 1080, "h": 1920}) == []                  # pion z pionu

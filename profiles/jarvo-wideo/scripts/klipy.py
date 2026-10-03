@@ -14,8 +14,9 @@ sprawdz: plan.json przed budową (czasy w źródle, długości, hook, kadr, ocen
 rolek, pokrycie nagrania). Błędy = kod 1, uwagi nie blokują.
 
 zbuduj: każda rolka → <out>/klip-N-<slug>.edycja.json (projekt edytora: segmenty ze źródła z granicą dosuniętą
-ze środka słowa do przerwy obok, wycięte pauzy i wtrącenia, kadr z punktem skupienia, punch-in na cięciach,
-napisy karaoke ze słów, tytuł-hook) i render tym samym
+ze środka słowa do przerwy obok, wycięte pauzy i wtrącenia, kadr na twarzy mówcy, gdy plan nie podaje fx/fy
+(twarze.py, YuNet: śledzenie z bezwładnością, nowe ujęcie przy zmianie twarzy albo dużym przesunięciu),
+punch-in na cięciach, napisy karaoke ze słów, tytuł-hook) i render tym samym
 silnikiem co „Eksportuj” → <out>/klip-N-<slug>.mp4, na końcu KLIPY.md. Człowiek otwiera rolkę w HQ („✎ Edytuj”)
 i poprawia wszystko; eksport z edytora robi nową wersję obok.
 
@@ -44,12 +45,16 @@ PRZED, PO = 0.08, 0.25   # zapas przed pierwszym i po ostatnim słowie segmentu
 LEAD, TAIL = 0.35, 0.45  # granica dosunięta ze słowa: najwyżej tyle ciszy przed / po słowie (połowa przerwy; za openshorts)
 OKNO = 90.0              # okno transkrypcji do oceny 0–100: długie nagranie przeczytane i ocenione równo, nie tylko początek
 WSPOLNE = 0.2            # dwie rolki dzielą więcej materiału źródła niż tyle krótszej z nich → uwaga
+KADR_Y = 0.38            # środek twarzy na tej wysokości kadru (oczy mniej więcej na 1/3)
+ZMIANA = 3               # tyle próbek z rzędu (≈ 1,5 s), zanim kadr przejdzie na inną twarz albo w nowe miejsce
+BONUS = 3.0              # twarz w kadrze liczy się ×3 przy wyborze (za openshorts: kadr nie skacze między twarzami)
+ODEJSCIE = 0.35          # twarz odeszła od ustawienia kadru o tyle szerokości kadru → nowe ustawienie
 PUNCH = 1.12             # przybliżenie co drugiego ujęcia po cięciu (ukrywa skok obrazu)
 HL = pr.KARAOKE_HL
 ZLE_STARTY = ("no i", "i ", "a ", "tak jak mówiłem", "wracając do", "jak mówiłem", "więc", "no więc", "no to",
               "ale ", "bo ", "czyli", "and ", "so ", "but ", "like i said", "anyway")
 STYL = {"napisy": "karaoke", "hl": HL, "tytul": True, "tytul_s": 3.0, "tnij_pauzy": 0.6, "bez_wtracen": True,
-        "punch": True, "muzyka": None, "muzyka_glosnosc": 0.12}
+        "punch": True, "kadr_auto": True, "muzyka": None, "muzyka_glosnosc": 0.12}
 
 
 def mmss(s: float) -> str:
@@ -383,26 +388,153 @@ def fragmenty(od: float, do: float, words: list, prog: float | None, bez_wtracen
     return [(round(a, 3), round(b, 3)) for a, b in merged]
 
 
-def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict) -> dict:
+# ---------------------------------------------------------------- kadr na twarz (twarze.py)
+
+def twarze_zrodla(src: Path, odcinki: list[tuple[float, float]]) -> dict | None:
+    """twarze.py Pythonem narzędzi (onnxruntime z obrazu); błąd albo brak modelu = None i kadr z planu albo środek."""
+    if not odcinki:
+        return None
+    py = "/opt/jarvo/venv/bin/python" if Path("/opt/jarvo/venv/bin/python").exists() else sys.executable
+    arg = ",".join(f"{a:.3f}-{b:.3f}" for a, b in odcinki)
+    try:
+        r = subprocess.run([py, str(HERE / "twarze.py"), "wykryj", str(src), "--odcinki", arg], capture_output=True,
+                           text=True, timeout=3600)
+        if r.returncode == 0:
+            return json.loads(r.stdout)
+        powod = (r.stderr or r.stdout).strip()[-240:]
+    except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+        powod = str(exc)
+    print(f"uwaga: wykrywanie twarzy niedostępne ({powod}); kadr z planu albo środek", file=sys.stderr)
+    return None
+
+
+def _srodek(f: list) -> tuple[float, float]:
+    return (f[0] + f[2]) / 2, (f[1] + f[3]) / 2
+
+
+def ta_sama(a: list, b: list) -> bool:
+    """Ta sama twarz w dwóch próbkach: środki bliżej niż 0,6 szerokości większej z nich."""
+    (ax, ay), (bx, by) = _srodek(a), _srodek(b)
+    return ((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5 < 0.6 * max(a[2] - a[0], b[2] - b[0])
+
+
+def sledz(probki: list) -> list[tuple[float, list | None, int]]:
+    """Twarz kadru w każdej próbce (za SpeakerTracker z openshorts): największa, a obecna z bonusem ×3; inna twarz
+    (albo ta sama po skoku, np. zmiana ujęcia) przejmuje kadr dopiero po ZMIANA próbkach z rzędu, od pierwszej
+    z nich. Próbka bez twarzy trzyma poprzednią. Wynik: (chwila, twarz, numer twarzy kadru)."""
+    out: list[list] = []
+    cur, kand, od, n = None, None, 0, 0
+    for t, twarze in probki:
+        if not twarze:
+            out.append([t, cur, n])
+            continue
+        best = max(twarze, key=lambda f: (f[2] - f[0]) * (f[3] - f[1]) * (BONUS if cur and ta_sama(f, cur) else 1))
+        if cur is None or ta_sama(best, cur):
+            cur, kand = best, None
+        else:
+            if not (kand and ta_sama(best, kand)):
+                od = len(out)
+            kand = best
+            if len(out) + 1 - od >= ZMIANA:
+                cur, kand, n = best, None, n + 1
+                for k in range(od, len(out)):          # zmiana od pierwszej próbki nowej twarzy
+                    out[k][1] = next((f for f in probki[k][1] if ta_sama(f, best)), best)
+                    out[k][2] = n
+            else:
+                cur = next((f for f in twarze if ta_sama(f, cur)), cur)
+        out.append([t, cur, n])
+    return [(t, f, k) for t, f, k in out]
+
+
+def ustawienia(slad: list, szer: float) -> list[dict]:
+    """Ślad twarzy (sledz) → kolejne ustawienia kadru {od, x, y} (środek twarzy 0–1 źródła). Nowe ustawienie, gdy
+    kadr przeszedł na inną twarz albo twarz odeszła o > ODEJSCIE szerokości kadru na ZMIANA próbek (za
+    SmoothedCameraman: mały ruch kadr ignoruje, duży musi się potwierdzić)."""
+    out: list[dict] = []
+    xs: list[float] = []
+    ys: list[float] = []
+    ost, daleko = None, []
+    for t, f, nr in slad:
+        if f is None:
+            continue
+        x, y = _srodek(f)
+        if out and nr != ost:
+            out.append({"od": t, "x": x, "y": y})
+            xs, ys, daleko = [x], [y], []
+        elif out and abs(x - sorted(xs)[len(xs) // 2]) > ODEJSCIE * szer:
+            daleko.append((t, x, y))
+            if len(daleko) >= ZMIANA:
+                out.append({"od": daleko[0][0], "x": x, "y": y})
+                xs, ys, daleko = [d[1] for d in daleko], [d[2] for d in daleko], []
+        else:
+            if not out:
+                out.append({"od": t, "x": x, "y": y})
+            xs.append(x)
+            ys.append(y)
+            daleko = []
+        ost = nr
+        out[-1]["x"], out[-1]["y"] = sorted(xs)[len(xs) // 2], sorted(ys)[len(ys) // 2]
+    if out:
+        out[0]["od"] = slad[0][0]
+    return out
+
+
+def ogniskowa(x: float, y: float, W: int, H: int, zoom: float, sw: float, sh: float) -> tuple[float, float]:
+    """Środek twarzy (0–1 źródła) → fx, fy klipu `cover` (edytor.cover_filter): twarz na środku w poziomie
+    i na KADR_Y wysokości kadru, o ile kadr nie wyjdzie poza obraz."""
+    k = max(W * zoom / sw, H * zoom / sh)
+    iw, ih = sw * k, sh * k
+    fx = (x * iw - W / 2) / (iw - W) if iw - W > 1 else 0.5
+    fy = (y * ih - KADR_Y * H) / (ih - H) if ih - H > 1 else 0.5
+    return round(min(1.0, max(0.0, fx)), 3), round(min(1.0, max(0.0, fy)), 3)
+
+
+def podziel(a: float, b: float, ust: list[dict], words: list) -> list[tuple[float, float, dict | None]]:
+    """Kawałek źródła → części według ustawień kadru; podział w przerwie między słowami najbliżej zmiany (±0,75 s),
+    części krótsze niż 0,8 s doklejone do sąsiada."""
+    if not ust:
+        return [(a, b, None)]
+    tniemy = [a]
+    for u in ust[1:]:
+        if a + 0.8 <= u["od"] <= b - 0.8:
+            luki = [(float(w1[1]) + float(w2[0])) / 2 for w1, w2 in zip(words, words[1:])
+                    if abs((float(w1[1]) + float(w2[0])) / 2 - u["od"]) <= 0.75 and a + 0.8 <= float(w1[1]) <= b - 0.8]
+            t = min(luki, key=lambda g: abs(g - u["od"])) if luki else u["od"]
+            if t - tniemy[-1] >= 0.8:
+                tniemy.append(round(t, 3))
+    tniemy.append(b)
+    wybierz = lambda t0, t1: max((u for u in ust if u["od"] <= (t0 + t1) / 2), key=lambda u: u["od"], default=ust[0])  # noqa: E731
+    return [(t0, t1, wybierz(t0, t1)) for t0, t1 in zip(tniemy, tniemy[1:])]
+
+
+def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarze: dict | None = None) -> dict:
     st = plan["styl"]
     fmt = r.get("format") or plan.get("format") or "9:16"
     W, H = FORMATY[fmt]
     pion = fmt == "9:16"
     # poziome źródło w pionowym kadrze (i odwrotnie) → wypełnij z punktem skupienia; ten sam kształt → też cover
-    clips, k, gr = [], 0, []
+    sw = float((info or {}).get("w") or (twarze or {}).get("w") or 0)
+    sh = float((info or {}).get("h") or (twarze or {}).get("h") or 0)
+    clips, k, gr, kadr = [], 0, [], []
     for s in r["segmenty"]:
         od, do = granice(float(s["od"]), float(s["do"]), words, (info or {}).get("duration"))
         gr.append([od, do])
-        for a, b in fragmenty(od, do, words, st.get("tnij_pauzy"), st.get("bez_wtracen", True)):
-            zoom = float(s.get("zoom", 1.0))
-            if st.get("punch") and k % 2 == 1:
-                zoom = min(3.0, zoom * PUNCH)
-            clips.append({"id": pr.new_id("c"), "src": str(src), "kind": "video", "in": a, "out": b, "speed": 1,
-                          "volume": 1, "muted": False, "fit": "cover", "fx": float(s.get("fx", 0.5)),
-                          "fy": float(s.get("fy", 0.4 if pion else 0.5)), "zoom": round(zoom, 3)})
-            k += 1
+        auto = auto_kadr(st, s) and sw and sh
+        ust = ustawienia(sledz([p for p in (twarze or {}).get("probki") or [] if od - 0.01 <= p[0] <= do + 0.01]),
+                         min(1.0, (W / H) / (sw / sh))) if auto else []
+        kadr.append("plan" if not auto_kadr(st, s) else "twarz" if ust else "srodek")
+        for a0, b0 in fragmenty(od, do, words, st.get("tnij_pauzy"), st.get("bez_wtracen", True)):
+            for a, b, u in podziel(a0, b0, ust, words):
+                zoom = float(s.get("zoom", 1.0))
+                if st.get("punch") and k % 2 == 1:
+                    zoom = min(3.0, zoom * PUNCH)
+                fx, fy = (ogniskowa(u["x"], u["y"], W, H, zoom, sw, sh) if u
+                          else (float(s.get("fx", 0.5)), float(s.get("fy", 0.4 if pion else 0.5))))
+                clips.append({"id": pr.new_id("c"), "src": str(src), "kind": "video", "in": a, "out": b, "speed": 1,
+                              "volume": 1, "muted": False, "fit": "cover", "fx": fx, "fy": fy, "zoom": round(zoom, 3)})
+                k += 1
     proj = {"version": 1, "format": fmt, "canvas": {"w": W, "h": H, "fps": FPS}, "clips": clips, "texts": [], "audio": [],
-            "clipmaker": {"slug": r["slug"], "segmenty": r["segmenty"], "granice": gr, "zrodlo": str(src)}}
+            "clipmaker": {"slug": r["slug"], "segmenty": r["segmenty"], "granice": gr, "kadr": kadr, "zrodlo": str(src)}}
     total = pr.total(proj)
     # napisy karaoke: krótkie linie (2–4 słowa w pionie), nad strefą przycisków platform
     look = {**pr.CAP_DEFAULT, "size": 76 if pion else 60, **(pr.PION if pion else {"y": 0.86, "maxw": 0.8}),
@@ -429,6 +561,24 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict) -> di
             proj["audio"].append({"id": pr.new_id("a"), "src": str(m.resolve()), "start": 0.0, "in": 0.0,
                                   "out": min(md, total), "volume": float(st.get("muzyka_glosnosc") or 0.12)})
     return proj
+
+
+def auto_kadr(st: dict, s: dict) -> bool:
+    """Kadr z twarzy, gdy plan nie podaje fx ani fy segmentu (i styl go nie wyłącza)."""
+    return bool(st.get("kadr_auto", True)) and "fx" not in s and "fy" not in s
+
+
+def odcinki_twarzy(plan: dict, words: list, info: dict, tylko: str | None = None) -> list[tuple[float, float]]:
+    """Odcinki źródła, w których trzeba znaleźć twarze: segmenty bez fx/fy, gdy kadr ma inne proporcje niż źródło."""
+    sw, sh = float(info.get("w") or 0), float(info.get("h") or 0)
+    out = []
+    for r in plan["rolki"]:
+        W, H = FORMATY[r.get("format") or plan.get("format") or "9:16"]
+        if (tylko and r["slug"] != tylko) or not info.get("video") or not sw or not sh or abs(W / H - sw / sh) < 0.05:
+            continue
+        out += [granice(float(s["od"]), float(s["do"]), words, info.get("duration"))
+                for s in r["segmenty"] if auto_kadr(plan["styl"], s)]
+    return out
 
 
 def podpis(proj: dict) -> str:
@@ -470,6 +620,10 @@ def cmd_zbuduj(a) -> int:
         ensure_render_env()
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
+    odc = odcinki_twarzy(plan, ctx["words"], ctx["info"], a.tylko)
+    if odc:
+        print(f"▶ twarze (YuNet): {len(odc)} odcinków, {sum(b - a for a, b in odc):.0f} s źródła", flush=True)
+    twarze = twarze_zrodla(ctx["src"], odc)
     wyniki = []
     for n, r in enumerate(plan["rolki"], 1):
         if a.tylko and r["slug"] != a.tylko:
@@ -478,12 +632,13 @@ def cmd_zbuduj(a) -> int:
         if edytowana_recznie(film) and not a.nadpisz:
             raise SystemExit(f"{film.name}: projekt zmieniono po zbudowaniu (np. w edytorze HQ). Poprawiaj go przez "
                              "projekt.py (kadr, usun, napisy…) albo zbuduj z --nadpisz, jeśli te zmiany mają zniknąć")
-        proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"])
+        proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"], twarze)
         ed.normalize(proj, pr.resolve)                     # ta sama walidacja co eksport z edytora
         proj["clipmaker"]["podpis"] = podpis(proj)
         pr.save(film, proj)
         dl = pr.total(proj)
-        print(f"▶ rolka {n}: {film.name} · {len(proj['clips'])} ujęć · {dl:.1f} s · {sum(1 for t in proj['texts'] if t.get('cap'))} napisów", flush=True)
+        print(f"▶ rolka {n}: {film.name} · {len(proj['clips'])} ujęć · {dl:.1f} s · {sum(1 for t in proj['texts'] if t.get('cap'))} napisów"
+              f" · kadr: {', '.join(proj['clipmaker']['kadr'])}", flush=True)
         if not a.bez_renderu:
             if pr.cmd_render(film, argparse.Namespace(out=str(film))) != 0:
                 raise SystemExit(f"render {film.name} nie wyszedł")
