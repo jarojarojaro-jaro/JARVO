@@ -96,6 +96,14 @@ Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, Morp
 - **Tekst:** wyrasta spod linii maski; tekst podmieniany w zmieniającym kształt pojemniku ma własną maskę i własne
   wejście/wyjście (inaczej nachodzi); pisanie w stałych liniach, kamera nie goni zawijającego się kursora.
 - **Pętla:** ostatnia klatka = pierwsza, łącznie z pozycją i prędkością kursora (inaczej zacina się na przejściu).
+- **Liczby ruchu** (za skillem fframes, MIT): wejście 0,3–0,6 s, wyjście 0,2–0,3 s (szybciej i bliżej), spoczynek
+  1–3 s z małym ruchem w tle. Wejście z krótkiego dystansu (40–120 px) z kryciem 0 → 1; skala od 0,9–0,96, nigdy
+  od 0; obrót najwyżej ±6°. Kolejno: elementy listy co 60–120 ms, słowa co 40–60 ms, litery co 20–40 ms; naraz
+  jeden główny ruch, reszta mniej i później. Animuj `transform` i krycie, nie rozmiar czcionki (drży).
+  Sprężyny do wzoru wyżej (masa 1): **szybka** ω 17,3, ζ 0,75 (interfejs, lekkie przestrzelenie), **miękka**
+  ω 12,2, ζ 0,73 (przyjazna), **skoczna** ω 14,8, ζ 0,40 (rzadko). Krzywe: `bezier(0.16, 1, 0.3, 1)` (szybko, potem
+  osiada: slajdy, plansze), `bezier(0.65, 0, 0.35, 1)` (kamera, przemiany). Licznik „0 → 12 480”: 1,2–1,8 s tą
+  pierwszą krzywą, cyfry o stałej szerokości (`font-variant-numeric: tabular-nums`), wyrównane do prawej.
 
 ## Pułapki renderu
 - `will-change` na czymś, co skaluje kamera → rozmyty tekst; nie używaj. `z-index` na każdej warstwie.
@@ -106,7 +114,8 @@ Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, Morp
 - `backdrop-filter: url()` źle czyta mapy przesunięć w Chromium: „szkło” = klon sceny pod elementem + filtr SVG.
 - Szybki ruch: `--subklatki 8` (4 zostawia duchy) i trochę wolniej; potem klatka po klatce przez szybkie chwile
   i `qa_wideo.py` (wykrywa pojedyncze „mrugnięcia”).
-- Dźwięk: prawdziwy efekt na każde zdarzenie, położony wg szczytu (`rytm.py efekt.wav --szczyt`), całość −14 LUFS.
+- Dźwięk: prawdziwy efekt na każde zdarzenie, położony wg szczytu (`rytm.py efekt.wav --szczyt`), całość −14 LUFS;
+  czasy efektów z tych samych stałych co animacja (zasady w `lektor-i-dzwiek`).
 
 ## Render
 ```bash

@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -44,7 +44,7 @@ powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. D
   muzyka marki `brands/<marka>/muzyka/`, plik z karty, a gdy ich brak: podkłady CC0 z biblioteki edytora
   (`projekt.py dzwieki --muzyka`, `dodaj-dzwiek`; „losowa” bierze je sama). Inny utwór tylko z licencją
   (zaproponuj w RAPORT: YouTube Audio Library, Pixabay Music, pobrane przez użytkownika do biblioteki).
-- Głośność pod lektorem 0,10–0,18 (plan: `glosnosc`); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
+- Głośność pod lektorem 0,08–0,16, czyli −22…−16 dB względem głosu (plan: `glosnosc`, domyślnie 0,14); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.
 - Nigdy: muzyka z list przebojów, „znalezione na YouTube”, muzyka z cudzych filmów.
 - Rytm: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3` (BPM, takty, drop): cięcia na taktach, najmocniejsza
@@ -72,14 +72,22 @@ Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność
 
 - Każdy efekt dokładnie na swojej klatce (wg osi animacji): `rytm.py efekty/*.wav --szczyt` mówi, gdzie ma szczyt,
   więc start = chwila zdarzenia − szczyt (pliki z biblioteki CC0 mają szczyt na początku).
-- Umiar: 1 efekt na kilka sekund, whoosh na przejściu, „kasa” przy cenie, oklaski przy wyniku. Cicho pod lektorem
-  (głośność efektu ok. 0,5–0,8, −18…−12 dB względem głosu), całość −14 LUFS.
+- Czas efektu (za skillem fframes, MIT): **whoosh** zaczyna się ok. 0,15 s przed szczytem ruchu, **pop i klik**
+  w klatce, w której element się pojawia (od −0,03 do +0,05 s). W filmie z kodu czasy efektów licz z tych samych
+  stałych co animacja, wtedy przesuną się razem ze sceną.
+- Umiar: 1 efekt na kilka sekund, whoosh na przejściu, „kasa” przy cenie, oklaski przy wyniku.
+- Głośność względem głosu (głos = 0 dB): muzyka pod głosem −22…−16 dB (wyżej, „Muzyka”), efekty interfejsu i whoosh
+  −14…−8 dB, a gdy lektor mówi w tej chwili, ciszej: −18…−12 dB (głośność efektu ok. 0,5–0,8); całość −14 LUFS.
+  Ogranicznik nie naprawia złych proporcji: popraw głośności ścieżek.
 - Dźwięk z nagrania: `projekt.py wyodrebnij <film> <id klipu>` robi z dźwięku klipu osobne audio (np. żeby przeciągnąć
   go pod inne ujęcie), `--plik inny.mp4` bierze dźwięk z innego filmu. `projekt.py lektor <film> "tekst" --start S`:
   lektor wprost na oś projektu.
 
 ## Głośność nagrań
-`montaz.py glosnosc <plik> -o <wynik> --lufs -14` (dwa przejścia loudnorm). Pomiar: `qa_wideo.py <plik>` → `lufs`, `true_peak`.
+`montaz.py glosnosc <plik> -o <wynik> --lufs -14` (dwa przejścia loudnorm). Pomiar: `qa_wideo.py <plik>` → `lufs`, `true_peak`,
+`lra` (rozpiętość głośności). Cele: −14 LUFS (podcast −16), true peak ≤ −1 dBTP, rozpiętość 4–10 LU (więcej = ciche
+i głośne części do wyrównania; `qa_wideo.py` ostrzega od 10 LU w filmie od 10 s), sceny z głosem w granicach ok. 2 LU
+od siebie, cisza tylko tam, gdzie zaplanowana (nagła cisza = ścieżka kończy się za wcześnie albo brak pliku).
 
 ## Własny lektor użytkownika
 Plik nagrania w planie: `"lektor": {"plik": "out/wideo/src/lektor.m4a"}` + `czas` scen (albo podział wg długości tekstu);
@@ -88,4 +96,5 @@ napisy z transkrypcji. Najpierw `montaz.py cisza` i `glosnosc` na nagraniu.
 ## Definition of Done
 - [ ] głos dobrany do marki i odbiorcy (uzasadnienie 1 zdanie w RAPORT),
 - [ ] wymowa nazw i liczb sprawdzona; tempo 2–3 słowa/s,
-- [ ] −14 LUFS ±2, true peak ≤ −1 dBTP; muzyka nie zagłusza głosu i ma źródło z licencją.
+- [ ] −14 LUFS ±2, true peak ≤ −1 dBTP, rozpiętość ≤ 10 LU; muzyka nie zagłusza głosu i ma źródło z licencją,
+- [ ] efekty na swoich klatkach (whoosh ~0,15 s przed szczytem ruchu, pop w klatce pojawienia).

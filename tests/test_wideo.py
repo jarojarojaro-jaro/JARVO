@@ -523,6 +523,21 @@ def test_qa_single_frame_pop_but_not_cut_or_pan(tmp_path):
 
 
 @pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
+def test_qa_rozpietosc_glosnosci(tmp_path):
+    """LRA (za skillem fframes): równy dźwięk przechodzi, połowa filmu o 16 dB ciszej to ostrzeżenie (cel 4–10 LU)."""
+    qa = _wscript("qa_wideo")
+    pliki = {}
+    for nazwa, af in (("rowny", "volume=0.5"), ("skoki", "volume='if(lt(t,6),0.08,0.5)':eval=frame")):
+        f = pliki[nazwa] = tmp_path / f"{nazwa}.mp4"
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=25:d=12",
+                        "-f", "lavfi", "-i", "anoisesrc=c=pink:d=12:a=0.3", "-af", af, "-shortest",
+                        "-pix_fmt", "yuv420p", "-c:a", "aac", str(f)], check=True)
+    rowny, skoki = qa.check(pliki["rowny"], None, None, False, None), qa.check(pliki["skoki"], None, None, False, None)
+    assert rowny["metryki"]["lra"] < 4 and not any("rozpiętość" in w for w in rowny["ostrzezenia"])
+    assert skoki["metryki"]["lra"] > 10 and any("rozpiętość głośności" in w for w in skoki["ostrzezenia"])
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
 def test_rytm_sfx_peak(tmp_path):
     rytm = _wscript("rytm")
     wav = tmp_path / "klik.wav"

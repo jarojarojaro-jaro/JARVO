@@ -4,7 +4,7 @@
     python3 qa_wideo.py film.mp4 [--platforma tiktok] [--format 9:16] [--lektor] [--arkusz out/wideo/qa.jpg] [--json]
 
 Sprawdza: kontener i kodeki (H.264 + AAC, yuv420p, faststart), rozdzielczość i proporcje, fps, długość wobec
-platformy, głośność (LUFS zintegrowane i true peak), czarne klatki, zamrożony obraz, cisze w dźwięku,
+platformy, głośność (LUFS zintegrowane, true peak i rozpiętość LRA), czarne klatki, zamrożony obraz, cisze w dźwięku,
 pojedyncze „mrugnięcia” (jedna klatka inna niż obie sąsiednie: błąd renderu, zgubiony stan, zła klatka przejścia).
 --arkusz: klatki z początku (hook), środka i końca z zaznaczonymi strefami interfejsu platformy (9:16, bez --platforma TikTok):
 na nich widać, czy napisy, tekst i logo nie wchodzą pod przyciski i opis.
@@ -33,6 +33,7 @@ PLATFORMS = {
 }
 LUFS_OK = (-16.0, -12.0)
 TRUE_PEAK_MAX = -1.0
+LRA_MAX = 10.0          # rozpiętość głośności (LU): 4–10 dla filmów z głosem i muzyką (za skillem fframes)
 
 
 def moov_first(path: Path) -> bool:
@@ -84,6 +85,8 @@ def analyze(path: Path, has_audio: bool) -> dict:
     out["lufs"] = float(m.group(1)) if m else None
     m = re.search(r"Peak:\s+(-?[\d.]+|-inf) dBFS", summary)
     out["true_peak"] = float(m.group(1)) if m and m.group(1) != "-inf" else None
+    m = re.search(r"LRA:\s+(-?[\d.]+) LU\b", summary)
+    out["lra"] = float(m.group(1)) if m else None
     return out
 
 
@@ -193,6 +196,9 @@ def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkus
                 f"głośność {an['lufs']} LUFS (cel −14, zakres {LUFS_OK[0]}…{LUFS_OK[1]}): montaz.py glosnosc")
         if an["true_peak"] is not None and an["true_peak"] > TRUE_PEAK_MAX:
             warns.append(f"true peak {an['true_peak']} dBFS > {TRUE_PEAK_MAX} (przester na telefonie)")
+        if an.get("lra") is not None and an["lra"] > LRA_MAX and dur >= 10:
+            warns.append(f"rozpiętość głośności {an['lra']} LU > {LRA_MAX:g} (cel 4–10): ciche i głośne części do wyrównania "
+                         "(głośność ścieżek, montaz.py glosnosc)")
     for s, e in an["czarne"]:
         if s < 0.3:
             errors.append(f"czarny początek {s:.1f}–{e:.1f} s: pierwsza klatka to miniatura i hook")
@@ -213,7 +219,7 @@ def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkus
     res = {"plik": str(path), "ok": not errors, "bledy": errors, "ostrzezenia": warns,
            "metryki": {"sek": round(dur, 2), "rozdzielczosc": f"{v['width']}x{v['height']}", "fps": v["fps"],
                        "wideo": v["codec"], "audio": a and a["codec"], "mb": round(info["size"] / 1048576, 2),
-                       "lufs": an["lufs"], "true_peak": an["true_peak"]}}
+                       "lufs": an["lufs"], "true_peak": an["true_peak"], "lra": an.get("lra")}}
     if arkusz:
         res["arkusz"] = str(sheet(path, dur, v["width"], v["height"], arkusz, marks=True, platform=platform))
     return res
