@@ -535,6 +535,7 @@ def safe_path(raw: str, roots: Roots) -> Path | None:
 
 
 SKIP_DIRS = {"node_modules", ".git", "__pycache__", ".cache", "archiwum", ".astro", "dist-cache"}
+SKIP_SUFFIXES = (".maska",)   # dane robocze edytora obok filmu: sylwetki osoby klatka po klatce (<film>.maska/)
 SCAN_MAX = 5000   # twardy limit plików na jedno zapytanie (duże projekty)
 
 
@@ -556,7 +557,7 @@ def list_outputs(dirs: Iterable[Path], roots: Roots, limit: int = OUTPUT_LIMIT) 
         for root, subdirs, names in os.walk(d):
             if scanned > SCAN_MAX:                    # limit kończy całe przejście, nie tylko bieżący katalog
                 break
-            subdirs[:] = [s for s in subdirs if s not in SKIP_DIRS and not s.startswith(".")]
+            subdirs[:] = [s for s in subdirs if s not in SKIP_DIRS and not s.startswith(".") and not s.endswith(SKIP_SUFFIXES)]
             for n in names:
                 scanned += 1
                 if scanned > SCAN_MAX:

@@ -364,6 +364,19 @@ def test_outputs_prune_heavy_dirs(tmp_path):
     assert [f["name"] for f in files] == ["a.png"]
 
 
+def test_outputs_skip_mask_frames_next_to_film(tmp_path):
+    """Sylwetki osoby (`<film>.maska/`, setki PNG) to dane edytora, nie wyniki: nie wypychają filmów z listy."""
+    jarvo = tmp_path / "jarvo"
+    out = jarvo / "workspaces" / "jarvo-wideo" / "out" / "typo"
+    (out / "film.maska").mkdir(parents=True)
+    (out / "film.mp4").write_bytes(b"x")
+    for i in range(30):
+        (out / "film.maska" / f"k{i:06d}.png").write_bytes(b"x")
+    (out / "film.maska" / "indeks.json").write_text("{}", encoding="utf-8")
+    files = core.list_outputs([jarvo / "workspaces" / "jarvo-wideo"], core.Roots(jarvo_dir=jarvo), limit=5)
+    assert [f["name"] for f in files] == ["film.mp4"]
+
+
 def test_outputs_scan_limit_stops_whole_walk(tmp_path, monkeypatch):
     """Po SCAN_MAX plików przejście kończy się całe: kolejne katalogi nie są już listowane."""
     jarvo = tmp_path / "jarvo"

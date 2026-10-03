@@ -23,7 +23,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Panel agenta: Teraz | sesja pracownika w `state.db` profilu | karta, nad którą pracuje, czas, sygnał życia i oś kroków na żywo (narzędzia, wypowiedzi, błędy) |
 | Panel agenta: Karty | kanban | karty agenta według stanu (7 dni), klik otwiera kartę z historią i komentarzami |
 | Okno karty | kanban + katalog roboczy karty | na wierzchu **cel** (inny kolor), kontekst, **wynik** (pliki z `WYJŚCIA` oznaczone ★) i raport wykonawcy; pełne zlecenie (wejścia, DoD, granice), komentarze i historia zwinięte |
-| Panel agenta: Wyniki | katalogi robocze | pliki z `out/`: miniatury grafik, podgląd tekstu, PDF, wideo |
+| Panel agenta: Wyniki | katalogi robocze | pliki z `out/`: miniatury grafik, podgląd tekstu, PDF, wideo (bez katalogów roboczych: `node_modules`, `.git`, sylwetki `<film>.maska/`) |
 | Czat: zdjęcia i pliki | czat HQ + `/opt/data/jarvo/inbox/` | 📎, wklejanie Ctrl+V (zrzut ekranu) i przeciąganie. Plik trafia do `inbox/<data>/`, agent dostaje jego ścieżkę (linia `📎 …`), zdjęcie także jako obraz (model bez widzenia dostaje opis od Hermesa) |
 | Czat: pliki od agenta | odpowiedź agenta | linia `MEDIA:<ścieżka>` i obrazy `data:image` jako miniatury, ścieżki `/opt/data/jarvo/…` i adresy http(s) klikalne; obraz ma „Kopiuj obraz” (np. do Telegrama) |
 | Akcje pliku wynikowego | plugin + pomocnik hosta | **▶ Odpal** (strona HTML w nowej karcie, `:9120`), **Pokaż w folderze** (Eksplorator Windows w lokalnej instalacji WSL; gdzie indziej: **Kopiuj ścieżkę**), **Pobierz**, podgląd/kod |
