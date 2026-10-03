@@ -184,6 +184,12 @@ def test_stock_without_key_is_a_clear_error(monkeypatch):
         stock.search("kawa")
 
 
+def test_montaz_chwile_ciec():
+    # do krytyka.py ciecia --czasy: koniec każdego fragmentu w gotowym pliku
+    assert montaz.pozycje_ciec([(3.0, 41.5), (47.0, 80.0), (90.0, 95.0)]) == [38.5, 71.5]
+    assert montaz.pozycje_ciec([(0.0, 5.0)]) == []
+
+
 def test_montaz_time_parsing():
     assert montaz.parse_time("1:10.5") == pytest.approx(70.5)
     assert montaz.parse_time("0:01:02") == 62

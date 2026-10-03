@@ -1,7 +1,7 @@
 ---
 name: clipmaker
 description: "Długie nagranie → edytowalne rolki z napisami karaoke."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-09-30"
+    reviewed: "2026-10-03"
 ---
 
 # Clipmaker: długie nagranie → rolki
@@ -51,7 +51,9 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
    piszesz, dlaczego zostają.
 6. **Zbuduj** (render po kolei, ~0,5–1× długości rolki każda).
 7. **Kontrola każdej rolki:** `python3 $HERMES_HOME/scripts/qa_wideo.py <rolka>.mp4` + 2–3 klatki (`vision_analyze`):
-   twarz w kadrze, napisy czytelne i poza strefą UI, tytuł nie zasłania twarzy. Poprawka jednej rolki: zmień plan
+   twarz w kadrze, napisy czytelne i poza strefą UI, tytuł nie zasłania twarzy. Cięcia: `krytyka.py ciecia <rolka>.mp4`
+   (projekt leży obok, słowa z analizy mowy nagrania) i każdy obraz cięcia przez `vision_analyze`; słowo przecięte
+   albo trzask = poprawka (`kontrola-wideo`, krok 1c). Poprawka jednej rolki: zmień plan
    i `zbuduj --tylko <slug>`; rolka **zmieniona w HQ przez człowieka** → tylko `projekt.py` (`kadr`, `usun`,
    `napisy --karaoke`, `render`), bo `zbuduj` odmówi nadpisania jego pracy.
 8. **Oddanie:** `KLIPY.md` (tworzy `zbuduj`: tabela, czasy w źródle, opisy, hashtagi) + MP4 + projekty.
@@ -72,5 +74,5 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
 - [ ] każda rolka: hook w pierwszych 1–3 s, jedna myśl zrozumiała bez reszty nagrania, puenta na końcu, 20–60 s,
 - [ ] tytuł-hook nie powtarza zdania mówionego; rolki mają ≥ 3 różne taktyki hooka (gdy rolek ≥ 3),
 - [ ] oceny w KANDYDACI.md (średnia ≥ 7, hook ≥ 7), rolki o różnych tematach, czasy w źródle w KLIPY.md,
-- [ ] `klipy.py sprawdz` bez błędów, `qa_wideo.py` bez błędów dla każdej rolki, twarz mówcy w kadrze,
+- [ ] `klipy.py sprawdz` bez błędów, `qa_wideo.py` i `krytyka.py ciecia` bez błędów dla każdej rolki, twarz mówcy w kadrze,
 - [ ] napisy poprawione (nazwy własne, liczby), projekty otwierają się w edytorze HQ.

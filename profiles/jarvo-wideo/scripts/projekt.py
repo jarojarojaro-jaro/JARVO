@@ -848,6 +848,8 @@ def cmd_render(film: Path, a) -> int:
     otwarte = [n.get("id") for n in proj.get("notes") or [] if isinstance(n, dict) and not n.get("done")]
     if otwarte:
         print(f"⚠ otwarte uwagi właściciela: {', '.join(map(str, otwarte))} (zamknij: projekt.py uwaga <film> <id> --zrobione|--odrzuc)")
+    if len(p["clips"]) > 1:
+        print(f"Cięcia sprawdzisz obrazem: krytyka.py ciecia {out} --projekt {film}")
     print(f"MEDIA:{out}")
     return 0
 

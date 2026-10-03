@@ -1,7 +1,7 @@
 ---
 name: montaz-nagran
 description: "Montaż nagrań: cięcie, cisza, kadr 9:16, dźwięk, napisy."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-10-03"
 ---
 
 # Montaż nagrań użytkownika
@@ -39,7 +39,9 @@ zostaw jego napisy albo zapytaj o wersję „czystą”.
 3. **Cięcie:** `montaz.py wytnij <nagranie> -o out/wideo/src/ciecie.mp4 --zakresy "0:03-0:41.5,0:47-1:20"`.
 4. **Cisza:** `montaz.py cisza <plik> -o out/wideo/src/bez-ciszy.mp4` (próg −35 dB; głośne tło: `--prog -30`;
    wolniejszy rytm: `--min 0.8`). Alternatywa z obrazu: `auto-editor`, jeśli jest (`command -v auto-editor`).
-   - ✅ Punkt kontrolny: obejrzyj 2–3 miejsca cięć (`kadry.py arkusz`): nie ucięte słowa, brak „skoków” w pół gestu.
+   - ✅ Punkt kontrolny: `krytyka.py ciecia <plik> --czasy <lista „ciecia” z wyniku wytnij/cisza>` i każdy obraz
+     przez `vision_analyze`: nie ucięte słowa (słowo na czerwonej linii, kolec fali), brak „skoków” w pół gestu.
+     Słowo ucięte → zakres o 0,1–0,2 s dalej od słowa (`wytnij`) albo większy `--zapas` (`cisza`).
 5. **Kadr pod format:** `montaz.py kadr <plik> -o out/wideo/src/pion.mp4 --format 9:16 --x 0.45` (x = środek obiektu
    z przeglądu). Nagranie ekranu, slajdy, dwie osoby w kadrze: `--tryb rozmyte`.
 6. **Dźwięk:** `montaz.py glosnosc <plik> -o <wynik> --lufs -14`; muzyka pod głos: `lektor-i-dzwiek`.
@@ -50,7 +52,7 @@ zostaw jego napisy albo zapytaj o wersję „czystą”.
 - `out/wideo/<nazwa>-<format>.mp4` (+ `.srt`), pośrednie w `out/wideo/src/`, lista cięć i decyzji w RAPORT.md.
 
 ## Definition of Done
-- [ ] wpadki i długie cisze usunięte bez ucinania słów; cięcia obejrzane,
+- [ ] wpadki i długie cisze usunięte bez ucinania słów; każde cięcie obejrzane (`krytyka.py ciecia`),
 - [ ] obiekt w kadrze po zmianie formatu; format i długość zgodne z platformą,
 - [ ] −14 LUFS ±2, napisy poprawne, `qa_wideo.py` bez błędów,
 - [ ] oryginał nietknięty (praca na kopiach w `out/wideo/src/`).

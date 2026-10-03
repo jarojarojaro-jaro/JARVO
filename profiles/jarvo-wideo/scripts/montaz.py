@@ -11,6 +11,7 @@
 Czas: sekundy (75.5) albo m:ss(.x) / h:mm:ss. Każde cięcie jest przekodowane (dokładne co do klatki).
 kadr --x: środek kadru w poziomie (0 = lewa krawędź, 0.5 = środek, 1 = prawa); rozmyte = całe ujęcie
 na rozmytym tle (dobre do slajdów i nagrań ekranu). glosnosc: dwa przejścia loudnorm (pomiar → korekta).
+wytnij i cisza wypisują `ciecia`: chwile cięć w gotowym pliku (do `krytyka.py ciecia --czasy`).
 transkrypcja: Parakeet (jarvo-stt) → słowa z czasem (JSON) + tekst z czasami co --co sekund (do wyboru fragmentów).
 """
 
@@ -56,6 +57,15 @@ def parse_ranges(spec: str) -> list[tuple[float, float]]:
 
 def has_audio(path: Path) -> bool:
     return bool(wl.probe(path)["audio"])
+
+
+def pozycje_ciec(ranges: list[tuple[float, float]]) -> list[float]:
+    """Chwile cięć w gotowym pliku (s): koniec każdego fragmentu poza ostatnim, do `krytyka.py ciecia --czasy`."""
+    out, t = [], 0.0
+    for a, b in ranges[:-1]:
+        t += b - a
+        out.append(round(t, 3))
+    return out
 
 
 def cut(src: Path, ranges: list[tuple[float, float]], out: Path) -> Path:
@@ -119,7 +129,8 @@ def remove_silence(src: Path, out: Path, thresh_db: float, min_len: float, pad: 
         raise SystemExit("Całe nagranie to cisza (sprawdź --prog).")
     cut(src, keep, out)
     kept = sum(b - a for a, b in keep)
-    return out, {"przed_s": round(dur, 2), "po_s": round(kept, 2), "wyciete_s": round(dur - kept, 2), "fragmenty": len(keep)}
+    return out, {"przed_s": round(dur, 2), "po_s": round(kept, 2), "wyciete_s": round(dur - kept, 2), "fragmenty": len(keep),
+                 "ciecia": pozycje_ciec(keep)}
 
 
 def loudness(src: Path, out: Path, target: float) -> tuple[Path, dict]:
@@ -203,8 +214,10 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"Brak pliku: {src}")
     try:
         if args.cmd == "wytnij":
-            out = cut(src, parse_ranges(args.zakresy), Path(args.o))
-            print(json.dumps({"plik": str(out), "sek": round(wl.duration(out), 2)}, ensure_ascii=False))
+            zakresy = parse_ranges(args.zakresy)
+            out = cut(src, zakresy, Path(args.o))
+            print(json.dumps({"plik": str(out), "sek": round(wl.duration(out), 2), "ciecia": pozycje_ciec(zakresy)},
+                             ensure_ascii=False))
         elif args.cmd == "kadr":
             out = reframe(src, Path(args.o), args.format, args.x, args.tryb)
             print(json.dumps({"plik": str(out), "format": args.format}, ensure_ascii=False))

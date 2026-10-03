@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-10-03"
 ---
 
 # Kontrola wideo (bramka jakości)
@@ -35,6 +35,17 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    strony). Ustalenia to fakty, nie opinie: poprawiasz albo zapisujesz świadomy wyjątek z powodem (`--wyjatek`).
    **„Gotowe” tylko z pełnym i aktualnym raportem** (`html_wideo.py aktualny <strona>` = 0); po każdej zmianie
    pliku animacji raport jest nieaktualny. Ostrzeżenia (martwy odcinek, rytm) sprawdzasz okiem w kroku 4a.
+1c. **Cięcia** (każdy film z cięciami: montaż nagrania, rolka, projekt edytora): `python3 $HERMES_HOME/scripts/krytyka.py
+   ciecia <film.mp4> --projekt <oryginał>` (film z `projekt.py render`; rolka clipmakera ma projekt obok i nie
+   potrzebuje opcji), `--czasy` z listy `ciecia` z `montaz.py`, bez nich cięcia z obrazu. Na każde cięcie jeden obraz:
+   4 klatki przed i 4 za czerwonym paskiem, fala dźwięku z cieniem ciszy, słowa, linia cięcia. Każdy obraz
+   `vision_analyze`: przeskok w pół gestu, czarna albo pusta klatka, napis zasłonięty albo urwany na cięciu, kolec
+   fali na linii (trzask), słowo przecięte linią.
+   - `problemy` (trzask, cięcie w pół słowa) poprawiasz przed oceną: granica klipu za koniec słowa albo przed jego
+     początek, z zapasem 40–200 ms. `uwagi` (cięcie tuż przy słowie, przeskok w tym samym kadrze) słuchasz i oglądasz;
+     przeskok gasi przybliżenie drugiej części (`projekt.py kadr <id> --wypelnij --zoom 1.15`) albo przebitka.
+   - Po poprawce i renderze sprawdzasz tylko poprawione cięcia: `--tylko 2,5`.
+   - ✅ Punkt kontrolny: `ok: true` i każdy obraz obejrzany.
 2. **Oglądanie:** `vision_analyze` na arkuszu (`qa.jpg`: klatki 0 s, 0,5 s, 1,5 s, ¼, ½, ¾, koniec; czerwone pola =
    strefy UI). Pytania: czy hook jest czytelny w klatce 0–1,5 s? czy napisy/tekst/logo wchodzą w czerwone pola?
    czy ujęcia pasują do tekstu? artefakty, znaki wodne, obcy tekst? Dodatkowo `SCENARIUSZ.md` i `.srt` (błędy w słowach).
@@ -72,6 +83,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 
 ## Definition of Done
 - [ ] `qa_wideo.py` bez błędów (JSON w raporcie), arkusz obejrzany,
+- [ ] film z cięciami: `krytyka.py ciecia` bez problemów (trzask, słowo w pół), każdy obraz cięcia obejrzany,
 - [ ] animacja HTML: `html_wideo.py aktualny` = 0 (pomiar pełny, aktualny, bez błędów; wyjątki z powodem w raporcie),
 - [ ] `kontrola.json` z wynikiem ≥ 85 i PASS albo nazwane braki po 2 rundach,
 - [ ] każda różnica ma najmniejszą poprawkę; wynik nie jest zawyżany,

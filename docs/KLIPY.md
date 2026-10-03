@@ -33,7 +33,8 @@ napisy, tytuł, muzykę, a eksport robi nową wersję.
        co „Eksportuj” → klip-N-<slug>.mp4 + klip-N-<slug>.edycja.json
         │
         ▼
-  ④ kontrola: qa_wideo.py + klatki kontrolne (kadr, napisy w strefie bezpiecznej) + krytyka według osi
+  ④ kontrola: qa_wideo.py + klatki kontrolne (kadr, napisy w strefie bezpiecznej) + obraz każdego cięcia
+     (krytyka.py ciecia: klatki, fala, słowa; trzask i słowo przecięte) + krytyka według osi
         │
         ▼
   ⑤ oddanie: out/wideo/klipy/ (MP4 + projekty), KLIPY.md (tytuły, opisy, hashtagi, czasy w źródle, oceny)
