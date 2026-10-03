@@ -670,6 +670,60 @@ function VideoEditor({ path, onClose }) {
   strefaRef.current = strefa;
 
   const typoFontRef = useRef("");
+  // sylwetka osoby (maska.py Wideografa): napis z warstwy „tyl” chowa się za osobą także w podglądzie
+  const maskaRef = useRef({ info: null, img: new Map(), oc: null });
+  const typoTyl = !!(p && typoBloki(p).some((b) => b.warstwa === "tyl"));
+  useEffect(() => {
+    if (!typoTyl || !api.editMaska) { maskaRef.current.info = null; return undefined; }
+    let live = true;
+    api.editMaska(path).then((d) => {
+      if (!live) return;
+      const m = maskaRef.current;
+      if (!d || !d.klucz || !m.info || m.info.klucz !== d.klucz) m.img.clear();
+      m.info = d && d.klucz ? { ...d, set: new Set(d.klatki) } : null;
+      drawOverlay();
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [typoTyl, p && p.typo, path]);
+  const WCZYTUJE = "…";
+  function maskaKlatka(k) {          // ImageBitmap sylwetki klatki k albo null (wczytuje w tle i rysuje ponownie)
+    const m = maskaRef.current, inf = m.info;
+    if (!inf || !inf.set.has(k)) return null;
+    const hit = m.img.get(k);
+    if (hit && hit !== WCZYTUJE) return hit;
+    if (!hit) {
+      if (m.img.size > 600) m.img.clear();
+      m.img.set(k, WCZYTUJE);
+      api.fileBlob(`${inf.dir}/k${String(k).padStart(6, "0")}.png`).then((b) => createImageBitmap(b))
+        .then((bm) => { m.img.set(k, bm); drawOverlay(); }).catch(() => m.img.delete(k));
+    }
+    return null;
+  }
+  // osoba z bieżącej klatki (kadr jak w podglądzie: fitBox) przycięta sylwetką, nad warstwą „tyl”
+  function osobaNaWierzch(g, P, w, h, now) {
+    const m = maskaRef.current, inf = m.info;
+    if (!inf || inf.klucz !== maskaKlucz(P) || !typoAktywne(P, now).some((b) => b.warstwa === "tyl")) return;
+    const k = Math.floor(now * (+inf.fps || P.canvas.fps || 30) + 1e-6);
+    for (let j = 1; j <= 12; j++) maskaKlatka(k + j);     // kolejne klatki z wyprzedzeniem (odtwarzanie)
+    const bm = maskaKlatka(k);
+    if (!bm) return;
+    const L2 = layoutClips(P.clips);
+    const seg = L2.find((x) => now < x.end - 1e-6) || L2[L2.length - 1];
+    const el = seg && seg.c.kind === "image" ? player.imgRef.current : player.vids[player.st.current.slot].current;
+    const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
+    if (!vw || !vh) return;
+    const oc = m.oc || (m.oc = document.createElement("canvas"));
+    if (oc.width !== w || oc.height !== h) { oc.width = w; oc.height = h; }
+    const o = oc.getContext("2d");
+    o.globalCompositeOperation = "source-over";
+    o.clearRect(0, 0, w, h);
+    const r = fitBox(vw, vh, w, h, seg.c);
+    try { o.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { return; }
+    o.globalCompositeOperation = "destination-in";
+    o.drawImage(bm, 0, 0, w, h);
+    o.globalCompositeOperation = "source-over";
+    g.drawImage(oc, 0, 0);
+  }
   function drawOverlay() {
     const c = overlayRef.current, P = projRef.current;
     if (!c || !P) return;
@@ -696,7 +750,9 @@ function VideoEditor({ path, onClose }) {
         typoFontRef.current = fk;
         Promise.all(typoFonty(P, w, h).map(([f, txt]) => fontLoad(f, txt))).then(() => drawOverlay());
       }
-      typoRysuj(g, P, w, h, now);
+      typoRysuj(g, P, w, h, now, "tyl");
+      osobaNaWierzch(g, P, w, h, now);
+      typoRysuj(g, P, w, h, now, "przod");
     }
     for (const x of P.texts) {
       if (now < x.start || now >= x.end) continue;
@@ -1001,6 +1057,8 @@ function VideoEditor({ path, onClose }) {
             typo[k].push([s.od, s.do, png]);
           }
         }
+        g.clearRect(0, 0, w, h);
+        typo.pusty = c.toDataURL("image/webp", 0.92);   // pusta klatka w tym samym formacie co klatki (lista concat)
       }
       const r = await api.editExport(path, { ...p, texts }, pngs, karaoke, typo);
       setJob(r);

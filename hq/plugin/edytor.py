@@ -373,10 +373,75 @@ def blur_filter(W: int, H: int, i: int) -> str:
             f"[bb{i}][ff{i}]overlay=(W-w)/2:(H-h)/2")
 
 
+def maska_dir(video: Path) -> Path:
+    """Sylwetki osoby do typografii „za osobą” (Wideograf: maska.py klatki): `<film>.maska/` obok filmu."""
+    return video.with_name(f"{video.stem}.maska")
+
+
+def _k3(x: Any, d: float) -> str:
+    try:
+        return f"{float(x if x is not None else d):.3f}"
+    except (TypeError, ValueError):
+        return f"{d:.3f}"
+
+
+def maska_klucz(p: dict) -> str:
+    """Klucz osi dla sylwetek: klipy (plik, przycięcie, tempo, kadr) i kadr. Inna oś = inne klatki, sylwetki nie
+    pasują. Ten sam napis liczy edytor HQ (maskaKlucz w 48-typografia.js), więc podgląd wie, czy maska jest aktualna."""
+    parts = []
+    for c in p.get("clips") or []:
+        fit = c.get("fit") if c.get("fit") in ("cover", "blur") else "contain"
+        kadr = f",{_k3(c.get('fx'), 0.5)},{_k3(c.get('fy'), 0.5)},{_k3(c.get('zoom'), 1)}" if fit == "cover" else ""
+        parts.append(f"{c.get('src')}|{_k3(c.get('in'), 0)}|{_k3(c.get('out'), 0)}|{_k3(c.get('speed'), 1)}|{fit}{kadr}")
+    cv = p.get("canvas") or {}
+    return ";".join(parts) + f"#{int(cv.get('w') or 0)}x{int(cv.get('h') or 0)}@{_k3(cv.get('fps'), 30)}"
+
+
+def maska_indeks(video: Path, raw: dict) -> dict | None:
+    """indeks.json sylwetek, gdy pasuje do osi projektu `raw` (klucz i fps), inaczej None."""
+    try:
+        idx = json.loads((maska_dir(video) / "indeks.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    cv = raw.get("canvas") or {}
+    if not isinstance(idx, dict) or idx.get("klucz") != maska_klucz(raw) or _k3(idx.get("fps"), 0) != _k3(cv.get("fps"), 30):
+        return None
+    return idx
+
+
+def maska_concat(video: Path, raw: dict, p: dict, tmpdir: Path) -> Path | None:
+    """Warstwa sylwetek pod eksport (lista concat jak typo_concat): klatki bloków „za osobą”, które mają sylwetkę;
+    reszta przezroczysta. Brak bloków za osobą albo nieaktualna maska = None (napis zostaje w całości widoczny)."""
+    tyl = [b for b in (p.get("typo") or {}).get("bloki", []) if b.get("warstwa") == "tyl"]
+    idx = maska_indeks(video, raw) if tyl else None
+    if not idx:
+        return None
+    F, d = float(p["canvas"]["fps"]), maska_dir(video)
+    jest = {int(k) for k in idx.get("klatki") or [] if isinstance(k, int)}
+    n = max(1, round(p["duration"] * F))
+    w = [False] * n
+    for b in tyl:
+        for k in range(max(0, int(b["start"] * F)), min(n, int(round(b["end"] * F)) + 1)):
+            w[k] = k in jest and (d / f"k{k:06d}.png").is_file()
+    if not any(w):
+        return None
+    segs: list[tuple[float, Path | None]] = []
+    for k, on in enumerate(w):
+        png = d / f"k{k:06d}.png" if on else None
+        if segs and png is None and segs[-1][1] is None:
+            segs[-1] = (segs[-1][0] + 1 / F, None)
+        else:
+            segs.append((1 / F, png))
+    blank = blank_png(tmpdir / "maska-pusta.png", int(idx.get("w") or 32), int(idx.get("h") or 32))
+    return typo_concat(segs, blank, tmpdir / "maska.ffconcat")
+
+
 def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
-                  ffmpeg: str = "ffmpeg", karaoke: Path | None = None, typo: dict | None = None) -> list[str]:
+                  ffmpeg: str = "ffmpeg", karaoke: Path | None = None, typo: dict | None = None,
+                  maska: Path | None = None) -> list[str]:
     """Argumenty ffmpeg dla znormalizowanego projektu. `has_audio[src] -> bool` z ffprobe.
-    `typo` = {"tyl": lista concat, "przod": lista concat}: warstwy typografii (z typo_concat) pod tekstami."""
+    `typo` = {"tyl": lista concat, "przod": lista concat}: warstwy typografii (z typo_concat) pod tekstami.
+    `maska` = lista concat sylwetek (maska_concat): osoba z filmu wraca nad warstwę „tyl”, więc napis jest za nią."""
     W, H, F = p["canvas"]["w"], p["canvas"]["h"], p["canvas"]["fps"]
     args = [ffmpeg, "-nostdin", "-hide_banner", "-y", "-loglevel", "error", "-progress", "pipe:1", "-nostats"]
     graph: list[str] = []
@@ -404,7 +469,10 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
         seg_labels.append(f"[v{i}][a{i}]")
     graph.append(f"{''.join(seg_labels)}concat=n={len(p['clips'])}:v=1:a=1[vc][ac]")
 
-    vlast = "vc"
+    vlast, osoba = "vc", None
+    if maska and (typo or {}).get("tyl"):
+        graph.append("[vc]split[vcm][vco]")  # kopia klatki: z niej wycinamy osobę według sylwetki
+        vlast, osoba = "vcm", "vco"
     for warstwa in ("tyl", "przod"):       # typografia: najpierw warstwa „za osobą”, potem przednia
         lista = (typo or {}).get(warstwa)
         if not lista:
@@ -414,6 +482,13 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
         graph.append(f"[{yi}:v]fps={F},format=rgba[ty{warstwa}]")
         graph.append(f"[{vlast}][ty{warstwa}]overlay=0:0:format=auto:eof_action=pass[vy{warstwa}]")
         vlast = f"vy{warstwa}"
+        if warstwa == "tyl" and osoba:
+            args += ["-reinit_filter", "0", "-f", "concat", "-safe", "0", "-i", str(maska)]
+            mi = n; n += 1
+            graph.append(f"[{mi}:v]fps={F},scale={W}:{H}:flags=bicubic,format=rgba,alphaextract[mka]")
+            graph.append(f"[{osoba}]format=rgba[osb];[osb][mka]alphamerge[osa]")
+            graph.append(f"[{vlast}][osa]overlay=0:0:format=auto:eof_action=pass[vos]")
+            vlast = "vos"
     for k, (t, png) in enumerate(zip(p["texts"], text_pngs)):
         if t.get("kara") and karaoke:
             continue                        # ten napis jest w warstwie karaoke niżej

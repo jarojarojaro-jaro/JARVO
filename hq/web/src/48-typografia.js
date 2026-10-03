@@ -306,6 +306,18 @@ function typoRysuj(ctx, P, W, H, now, warstwa) {
   }
   return out;
 }
+// Klucz osi dla sylwetek osoby (maska.py): ten sam napis co edytor.maska_klucz w Pythonie. Inny klucz = klipy
+// zmieniły się po liczeniu maski, więc jej klatki nie pasują i napis „za osobą” zostaje w całości widoczny.
+function maskaKlucz(P) {
+  const k3 = (x, d) => { const v = Number.isFinite(+x) && x !== null && x !== "" ? +x : d; return v.toFixed(3); };
+  const czesci = ((P && P.clips) || []).map((c) => {
+    const fit = c.fit === "cover" || c.fit === "blur" ? c.fit : "contain";
+    const kadr = fit === "cover" ? `,${k3(c.fx, 0.5)},${k3(c.fy, 0.5)},${k3(c.zoom, 1)}` : "";
+    return `${c.src}|${k3(c.in, 0)}|${k3(c.out, 0)}|${k3(c.speed, 1)}|${fit}${kadr}`;
+  });
+  const cv = (P && P.canvas) || {};
+  return `${czesci.join(";")}#${Math.trunc(+cv.w || 0)}x${Math.trunc(+cv.h || 0)}@${k3(cv.fps, 30)}`;
+}
 // Teksty bloków do wczytania krojów (krój + tekst: polskie znaki z podzbioru latin-ext).
 function typoFonty(P, W, H) {
   const m = typoMotyw(P);

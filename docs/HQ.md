@@ -62,7 +62,7 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/reset
         ├─ POST /api/plugins/jarvo-hq/upload      plik z czatu (📎, Ctrl+V, przeciągnięcie) ─► /opt/data/jarvo/inbox/<data>/
         ├─ GET/POST /api/plugins/jarvo-hq/edit/…  edytor filmów: info, media, save, stamp, srt, speech, proxy,
-        │                                          proxy-file, export, job/<id>[/cancel] (sekcja 2a)
+        │                                          proxy-file, maska, export, job/<id>[/cancel] (sekcja 2a)
         ├─ GET  /api/plugins/jarvo-hq/anim/check  czy plik HTML to animacja z kontraktem (przycisk „◐ Animacja”)
         ├─ GET  /api/plugins/jarvo-hq/anim/info   link podglądu z mostkiem ─► :9120, parametry, stan pomiaru (sekcja 2b)
         ├─ POST /api/plugins/jarvo-hq/anim/params nowe wartości ─► parametry.json obok strony
@@ -146,8 +146,15 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   najmocniejszego słowa. Plan układa Wideograf (`typografia.py plan`, reżyser z reguł: mowa, głośność słów, pauzy,
   interpunkcja, cięcia ujęć) i poprawia według znaczenia (`typografia.py popraw`); serwer sprawdza go
   (`edytor.normalize_typo`). Przy eksporcie przeglądarka rysuje klatkę tylko tam, gdzie obraz warstwy się zmienia
-  (`typoOdcinki`), wysyła je jako WebP (PNG, gdy przeglądarka nie zna WebP), a ffmpeg nakłada dwie warstwy z demuxera
-  `concat` pod zwykłymi napisami: „za osobą” (`tyl`) i przednią.
+  (`typoOdcinki`), wysyła je jako WebP (PNG, gdy przeglądarka nie zna WebP) razem z pustą klatką w tym samym formacie
+  (demuxer `concat` dekoduje całą listę kodekiem pierwszego pliku, więc serwer odrzuca mieszankę PNG i WebP), a ffmpeg
+  nakłada dwie warstwy pod zwykłymi napisami: „za osobą” (`tyl`) i przednią.
+- **Napis za osobą** (głębia jak z montażu: osoba przed słowem): Wideograf liczy maską MODNet (`maska.py`) sylwetkę
+  osoby klatka po klatce dla bloków warstwy `tyl` i zapisuje ją obok filmu (`<film>.maska/`: PNG z kanałem alfa
+  i `indeks.json` z kluczem osi). Podgląd pobiera indeks (`GET /edit/maska`) i rysuje: warstwa `tyl` → osoba z bieżącej
+  klatki filmu wycięta sylwetką → warstwa przednia; eksport robi to samo w ffmpeg (`edytor.maska_concat`, `alphamerge`).
+  Klucz osi (klipy, przycięcie, tempo, kadr; `edytor.maska_klucz` = `maskaKlucz` w `48-typografia.js`) pilnuje, żeby
+  po zmianie klipów nie użyć starych sylwetek: wtedy napis jest po prostu widoczny w całości.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
   `volume`, `muted`, `fit`), napisy, muzyka i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
 - **Eksport** (`POST /edit/export`): serwer sprawdza projekt (ścieżki tylko z katalogów floty, limity długości

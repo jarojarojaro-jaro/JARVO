@@ -331,4 +331,5 @@ przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w Jarvo HQ albo link, 
 | brak miejsca na dysku | `docker system prune`, stare rendery w `/srv/jarvo/data/hermes/jarvo/workspaces/*/` |
 | mało RAM-u, OOM w `docker logs` / `dmesg` | `docker stats`; zmniejsz `kanban.max_in_progress` w `profiles/_host/config.yaml` (domyślnie 3) i `deploy.sh --no-pull`; sprawdź swap (`swapon --show`) |
 | pierwsza wiadomość głosowa długo się przetwarza | pobiera się model Parakeet (0,65 GB) do `/srv/jarvo/data/hermes/jarvo/models`; raz. Z góry: `docker exec -u hermes jarvo-hermes jarvo-stt --prefetch` |
+| typografia bez napisu za osobą, w logu „maska osoby niedostępna” | model MODNet (26 MB) pobiera się przy pierwszym planie do `/srv/jarvo/data/hermes/jarvo/models/modnet`; bez sieci plan idzie bez maski. Z góry: `docker exec -u hermes jarvo-hermes /opt/jarvo/venv/bin/python /opt/data/profiles/jarvo-wideo/scripts/maska.py model` |
 | przeglądarka agenta nie widzi strony (pusta treść) | Lightpanda nie obsługuje wszystkiego; Hermes sam przełącza na Chromium przy zrzutach i błędach. Gdy strona uparcie nie działa: `browser.engine: chrome` w `profiles/<agent>/config.yaml` |

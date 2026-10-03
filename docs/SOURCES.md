@@ -21,6 +21,7 @@ Komponenty obrazu `jarvo-hermes` o znaczeniu licencyjnym (pełna lista narzędzi
 | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (NVIDIA), eksport ONNX [istupakov/parakeet-tdt-0.6b-v3-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx) | model rozpoznawania mowy (pobierany przy pierwszym użyciu, nie w repo ani w obrazie) | CC-BY-4.0 |
 | [onnx-asr](https://github.com/istupakov/onnx-asr) + [ONNX Runtime](https://github.com/microsoft/onnxruntime) | uruchamianie modelu mowy na CPU | MIT |
 | [Silero VAD](https://github.com/snakers4/silero-vad) | wykrywanie mowy przed Parakeetem w `jarvo-stt` (pobierany przy pierwszym użyciu, nie w repo ani w obrazie) | MIT |
+| [MODNet](https://github.com/ZHKKKe/MODNet) (ZHKKKe), eksport ONNX [DavG25/modnet-pretrained-models](https://huggingface.co/DavG25/modnet-pretrained-models) `903cc06` (`modnet_photographic_portrait_matting.onnx`, SHA-256 `07c308cf…84df9`) | maska osoby dla typografii Wideografa (`maska.py`: napis obok twarzy albo za osobą); pobierany przy pierwszym użyciu do `/opt/data/jarvo/models/modnet/` z przypiętej wersji i sprawdzany sumą, nie w repo ani w obrazie | Apache-2.0 |
 
 ## 2. Skille dołączane do agentów (vendoring)
 
@@ -142,7 +143,7 @@ przekrojami modeli z klocków, bez użycia znaków towarowych ani zasobów produ
 | Licencja | Co robimy |
 |---|---|
 | MIT | zachowujemy informację o prawach autorskich i licencję (`LICENSE-UPSTREAM` przy każdym skillu) |
-| Apache-2.0 | licencja przy skillu, `NOTICE` źródła (jeśli istnieje), treść bez zmian (zmiany oznaczylibyśmy w pliku) |
+| Apache-2.0 | licencja przy skillu, `NOTICE` źródła (jeśli istnieje), treść bez zmian (zmiany oznaczylibyśmy w pliku); model MODNet pobierany z Hugging Face, nie redystrybuujemy go |
 | AGPL-3.0 (SearXNG, Lightpanda, opcjonalnie Postiz) | programy uruchamiamy bez modyfikacji (Lightpanda: binarka z oficjalnego obrazu, tylko usunięte symbole debugowania), tylko prywatnie; zmieniona wersja udostępniana przez sieć innym wymagałaby publikacji źródeł |
 | CC-BY-SA-4.0 (getsentry `security-review`, Trail of Bits) | dołączamy **bez zmian**, z atrybucją i licencją przy skillu; tłumaczenie albo przeróbka byłaby adaptacją i musiałaby zostać na CC BY-SA, dlatego metodę Trail of Bits `insecure-defaults` przepisaliśmy własnymi regułami (`security_check.py`), bez kopiowania tekstu. Znaki towarowe (logo Trail of Bits, Sentry) nie są objęte licencją |
 | CC-BY-4.0 (model Parakeet) | uznanie autorstwa (NVIDIA) w tym pliku; model pobierany z Hugging Face, nie redystrybuujemy go |

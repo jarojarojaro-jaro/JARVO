@@ -455,11 +455,19 @@ ARKUSZ_JS = """async ([P, W, H, kadry, cols]) => {
     const sheet = document.createElement("canvas"); sheet.width = cw * cols; sheet.height = ch * rows;
     const sg = sheet.getContext("2d"); sg.fillStyle = "#111"; sg.fillRect(0, 0, sheet.width, sheet.height);
     const c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
+    const oc = document.createElement("canvas"); oc.width = W; oc.height = H; const o = oc.getContext("2d");
     for (let i = 0; i < kadry.length; i++) {
-        const [src, t] = kadry[i];
+        const [src, t, maska] = kadry[i];
         const img = new Image(); img.src = src; await img.decode();
         g.clearRect(0, 0, W, H); g.drawImage(img, 0, 0, W, H);
-        typoRysuj(g, P, W, H, t);
+        typoRysuj(g, P, W, H, t, "tyl");
+        if (maska) {          // osoba nad warstwą „za osobą”: klatka przycięta sylwetką
+            const m = new Image(); m.src = maska; await m.decode();
+            o.globalCompositeOperation = "source-over"; o.clearRect(0, 0, W, H); o.drawImage(img, 0, 0, W, H);
+            o.globalCompositeOperation = "destination-in"; o.drawImage(m, 0, 0, W, H);
+            g.drawImage(oc, 0, 0);
+        }
+        typoRysuj(g, P, W, H, t, "przod");
         const x = (i % cols) * cw, y = Math.floor(i / cols) * ch;
         sg.drawImage(c, x, y, cw, ch);
         sg.fillStyle = "rgba(0,0,0,.7)"; sg.fillRect(x, y, 70, 22); sg.fillStyle = "#FFE14D";
@@ -469,16 +477,20 @@ ARKUSZ_JS = """async ([P, W, H, kadry, cols]) => {
 }"""
 
 
-def arkusz_typografii(proj: dict, plan: dict, chwile: list[float], out: Path) -> Path:
-    """Arkusz do oceny okiem: klatki filmu w podanych chwilach z typografią narysowaną tym samym rendererem."""
+def arkusz_typografii(proj: dict, plan: dict, chwile: list[float], out: Path, film: Path | None = None) -> Path:
+    """Arkusz do oceny okiem: klatki filmu w podanych chwilach z typografią narysowaną tym samym rendererem
+    (z sylwetką osoby nad napisem „za osobą”, gdy maska.py ją policzył)."""
     cv = proj["canvas"]
     k = min(1.0, 720 / max(cv["w"], cv["h"]))
     W, H = even(cv["w"] * k), even(cv["h"] * k)
+    idx = ed.maska_indeks(film, proj) if film else None
     with tempfile.TemporaryDirectory(prefix="typo-arkusz-") as tmp, strona() as page:
         kadry = []
         for i, t in enumerate(chwile):
             f = kadr_osi(proj, t, W, H, Path(tmp) / f"k{i}.png")
-            kadry.append(["data:image/png;base64," + base64.b64encode(f.read_bytes()).decode(), t])
+            m = ed.maska_dir(film) / f"k{int(t * float(cv['fps']) + 1e-6):06d}.png" if idx else None
+            kadry.append(["data:image/png;base64," + base64.b64encode(f.read_bytes()).decode(), t,
+                          "data:image/png;base64," + base64.b64encode(m.read_bytes()).decode() if m and m.is_file() else None])
         data = page.evaluate(ARKUSZ_JS, [{"typo": plan}, W, H, kadry, 4 if H > W else 3])
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(base64.b64decode(data.split(",", 1)[1]))
@@ -508,7 +520,8 @@ def cmd_render(film: Path, a) -> int:
         pngs, rest = allp[:len(kept)], iter(allp[len(kept):])
         kara = {x["i"]: [next(rest) for _ in texts[x["i"]]["words"]] for x in p["texts"] if x.get("kara")}
         layer = ed.karaoke_concat(p, kara, ed.blank_png(Path(tmp) / "pusty.png", W, H), Path(tmp) / "karaoke.ffconcat") if kara else None
-        cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer, typo=typo)
+        maska = ed.maska_concat(film, proj, p, Path(tmp)) if typo.get("tyl") else None   # osoba nad napisem „za”
+        cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer, typo=typo, maska=maska)
         t0 = time.time()
         r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:

@@ -280,6 +280,27 @@ async def edit_info(path: str):
     return await asyncio.to_thread(gather)
 
 
+@router.get("/edit/maska")
+async def edit_maska(path: str):
+    """Sylwetki osoby do typografii „za osobą” (Wideograf: maska.py): indeks klatek i katalog. Edytor sam porównuje
+    klucz osi (maskaKlucz) z bieżącym projektem, więc po zmianie klipów nie użyje nieaktualnych sylwetek."""
+    p = _media_path(path)
+    if p is None or ed.media_kind(p) != "video":
+        raise HTTPException(404, "Film poza katalogami floty")
+
+    def read():
+        try:
+            idx = json.loads((ed.maska_dir(p) / "indeks.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        if not isinstance(idx, dict):
+            return {}
+        return {"dir": str(ed.maska_dir(p)), "klucz": str(idx.get("klucz") or ""), "fps": idx.get("fps"),
+                "klatki": [k for k in idx.get("klatki") or [] if isinstance(k, int)][:100000]}
+
+    return await asyncio.to_thread(read)
+
+
 @router.get("/edit/media")
 async def edit_media(path: str):
     """Opis jednego pliku (np. muzyka wysłana z dysku przez czat)."""
@@ -513,13 +534,15 @@ def _data_klatka(url: str, base: Path) -> Path:
 
 
 def _typo_warstwy(raw, proj: dict, tmpdir: Path) -> dict:
-    """Klatki typografii z przeglądarki ({"tyl"|"przod": [[od, do, WebP/PNG albo null], …]} w numerach klatek)
-    → listy concat. Odcinki muszą iść po kolei i nie wychodzić poza film."""
+    """Klatki typografii z przeglądarki ({"tyl"|"przod": [[od, do, WebP/PNG albo null], …], "pusty": przezroczysta
+    klatka}, numery klatek) → listy concat. Odcinki muszą iść po kolei i nie wychodzić poza film. Wszystkie klatki
+    i pusta w jednym formacie: demuxer concat dekoduje całą listę kodekiem pierwszego pliku (PNG wśród WebP = błąd
+    dekodera i warstwa znika z filmu)."""
     if not isinstance(raw, dict):
         return {}
-    cv, fps = proj["canvas"], proj["canvas"]["fps"]
+    fps = proj["canvas"]["fps"]
     limit = int(math.ceil(proj["duration"] * fps)) + 2
-    out, blank = {}, None
+    listy = {}
     for warstwa in ("tyl", "przod"):
         segs = raw.get(warstwa)
         if not segs:
@@ -536,7 +559,16 @@ def _typo_warstwy(raw, proj: dict, tmpdir: Path) -> dict:
             prev = b
             dest = _data_klatka(seg[2], tmpdir / f"typo-{warstwa}-{k:05d}") if seg[2] else None
             lista.append(((b - a) / fps, dest))
-        blank = blank or ed.blank_png(tmpdir / "typo-pusty.png", cv["w"], cv["h"])
+        listy[warstwa] = lista
+    if not listy:
+        return {}
+    cv = proj["canvas"]
+    blank = (_data_klatka(raw["pusty"], tmpdir / "typo-pusty") if raw.get("pusty")
+             else ed.blank_png(tmpdir / "typo-pusty.png", cv["w"], cv["h"]))
+    if {d.suffix for lista in listy.values() for _t, d in lista if d} - {blank.suffix}:
+        raise ed.ProjectError("Typografia: klatki w różnych formatach (PNG i WebP). Odśwież edytor i eksportuj jeszcze raz.")
+    out = {}
+    for warstwa, lista in listy.items():
         d = ed.typo_concat(lista, blank, tmpdir / f"typo-{warstwa}.ffconcat")
         if d:
             out[warstwa] = d
@@ -629,7 +661,8 @@ async def edit_export(request: Request):
             if c["kind"] == "video" and str(c["src"]) not in has_audio:
                 has_audio[str(c["src"])] = (await asyncio.to_thread(ed.probe, c["src"])).get("audio", False)
         out = ed.export_name(p)
-        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"], karaoke=layer, typo=typo)
+        maska = ed.maska_concat(p, body.get("project") or {}, proj, tmpdir) if typo.get("tyl") else None
+        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"], karaoke=layer, typo=typo, maska=maska)
     except (ed.ProjectError, ValueError) as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(400, str(exc))

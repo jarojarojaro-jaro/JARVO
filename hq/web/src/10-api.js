@@ -79,6 +79,7 @@ const liveApi = {
   },
   editInfo: (path) => SDK.fetchJSON(`${API_ROOT}/edit/info?path=${encodeURIComponent(path)}`),
   editMedia: (path) => SDK.fetchJSON(`${API_ROOT}/edit/media?path=${encodeURIComponent(path)}`),
+  editMaska: (path) => SDK.fetchJSON(`${API_ROOT}/edit/maska?path=${encodeURIComponent(path)}`),
   async editSave(path, project, base, force) {
     const res = await fetch(`${basePath()}${API_ROOT}/edit/save`, { method: "POST", credentials: "include",
       headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ path, project, base, force: !!force }) });

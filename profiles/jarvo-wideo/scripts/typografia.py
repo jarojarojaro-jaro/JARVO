@@ -3,7 +3,7 @@
 skosem i perspektywą 3D, jako plan bloków w projekcie edytora HQ (`<film>.edycja.json`, klucz `typo`).
 
     typografia.py plan <film> [--motyw czysty|kino|ulica|energia|elegancki] [--akcent "#FFD400"]
-                              [--tempo spokojne|normalne|ostre] [--zostaw-napisy] [--ziarno N]
+                              [--tempo spokojne|normalne|ostre] [--zostaw-napisy] [--ziarno N] [--bez-maski]
     typografia.py pokaz <film> [--json]          # plan w skrócie: bloki, układy, wagi słów (do poprawek)
     typografia.py popraw <film> zmiany.json       # Twoje poprawki reżyserskie (format niżej)
     typografia.py arkusz <film> [-o out/wideo/typografia.jpg] [--ile 12]   # klatki: film + typografia (vision)
@@ -12,7 +12,9 @@ skosem i perspektywą 3D, jako plan bloków w projekcie edytora HQ (`<film>.edyc
 plan (0 tokenów, reżyser z reguł): mowa z <źródło>.mowa.json (Parakeet; brak = analiza jak w edytorze), głośność
 każdego słowa (krzyk = mocne słowo), pauzy, interpunkcja, cięcia ujęć → frazy (bloki po 1–5 słów), waga słowa 0–3
 (0 słowo funkcyjne małe, 3 uderzenie: największe, w akcencie, z efektem motywu), linie bloku, układ bloku
-(kolumna, schodki, srodek, skos, 3d, rozrzut; „za” = za osobą, gdy jest maska), obrót, wejście słów i wyjście bloku.
+(kolumna, schodki, srodek, skos, 3d, rozrzut), obrót, wejście słów i wyjście bloku. Maska osoby (maska.py, MODNet):
+blok staje obok twarzy, nie na niej, a najwyżej co szósty z jednym mocnym słowem idzie „za osobę” (sylwetki klatek
+w <film>.maska/, eksport i edytor kładą osobę z powrotem nad napisem). Bez modelu albo z --bez-maski: miejsca domyślne.
 Te same dane rysuje edytor HQ (hq/web/src/48-typografia.js), więc człowiek widzi i poprawia wszystko na osi.
 
 pokaz + popraw = Twoja reżyseria (zasady: skill typografia-edit): znaczenie słowa → forma. zmiany.json:
@@ -374,6 +376,169 @@ def miejsce(i: int, W: int, H: int, uklad: str) -> dict:
             "w": 0.5}
 
 
+# ---------------------------------------------------------------- miejsce z maską osoby (maska.py)
+
+def _pole(a: list[float]) -> float:
+    return max(0.0, a[2] - a[0]) * max(0.0, a[3] - a[1])
+
+
+def _wspolne(a: list[float], b: list[float] | None) -> float:
+    if not b:
+        return 0.0
+    return _pole([max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])])
+
+
+def rozmiar_bloku(b: dict, w: float, W: int, H: int) -> tuple[float, float]:
+    """Szacunek ramki bloku (część kadru) przed rysowaniem: blok wypełnia ~80% szerokości, linia ma tyle znaków,
+    ile jej słowa, a wysokość jak w rendererze ma limit (pion 30%, poziom 50%)."""
+    linie_: dict[int, int] = {}
+    for x in b["slowa"]:
+        linie_[x["linia"]] = linie_.get(x["linia"], 0) + len(x["tekst"]) + 1
+    znaki = max(4, max(linie_.values()) - 1)
+    bw = 0.8 * w
+    px = bw * W / (0.52 * znaki)
+    bh = min(len(linie_) * px * 1.05 / H, 0.3 if H > W else 0.5)
+    return bw, bh
+
+
+def miejsce_z_maski(b: dict, o: dict, W: int, H: int, poprzednie: tuple[float, float] | None = None) -> dict:
+    """Kotwica i szerokość bloku z osobą w kadrze: nie na twarzy (głowa z zapasem), raczej poza sylwetką, w strefie
+    bezpiecznej platformy (pion: nad opisem i obok przycisków), blisko zwykłego miejsca i poprzedniego bloku."""
+    pion = H > W
+    baza = miejsce(0, W, H, b["uklad"])
+    g = o.get("glowa")
+    twarz = [g[0] - 0.03, g[1] - 0.02, g[2] + 0.03, g[3] + 0.03] if g else None
+    osoba = o.get("osoba")
+    best, wynik = None, math.inf
+    for w in (baza["w"], baza["w"] * 0.8, baza["w"] * 0.62):
+        bw, bh = rozmiar_bloku(b, w, W, H)
+        for x in (0.28, 0.36, 0.44, 0.5, 0.56, 0.64, 0.72):
+            for y in (0.2, 0.28, 0.36, 0.44, 0.52, 0.6, 0.68, 0.76):
+                r = [x - bw / 2, y - bh / 2, x + bw / 2, y + bh / 2]
+                pole = max(_pole(r), 1e-6)
+                c = 9.0 * _wspolne(r, twarz) / pole + 1.2 * _wspolne(r, osoba) / pole
+                c += 1.6 * math.hypot(x - baza["x"], y - baza["y"]) + 1.5 * (1 - w / baza["w"])
+                gora, dol, prawo = (0.14, 0.8, 0.86) if pion else (0.06, 0.92, 0.96)
+                c += 6.0 * (max(0.0, gora - r[1]) + max(0.0, r[3] - dol) + max(0.0, r[2] - prawo) + max(0.0, 0.04 - r[0]))
+                if poprzednie:
+                    c += 0.35 * math.hypot(x - poprzednie[0], y - poprzednie[1])
+                if c < wynik:
+                    best, wynik = {"x": x, "y": y, "w": round(w, 3)}, c
+    return best
+
+
+ZA_ZNAKI = 14            # najwięcej znaków napisu za osobą: jedna linia, uderzenie z małymi słowami i jednostką
+
+
+def _dl(slowa: list[dict]) -> int:
+    return sum(len(x["tekst"]) for x in slowa) + max(0, len(slowa) - 1)
+
+
+def czesc_za(b: dict) -> tuple[int, int] | None:
+    """Słowa [i, j) bloku, które pójdą za osobę: uderzenie (waga 3), krótka jednostka po nim („PIĘĆ minut”, do 12
+    znaków) i małe słowa przed nim („w PRZYSZŁYM”), razem do ZA_ZNAKI. Napis za osobą zostaje do końca frazy
+    (≥ 0,5 s), reszta frazy wchodzi przed osobą obok niego; część przed uderzeniem musi się dać przeczytać
+    (≥ 0,3 s), a same małe słowa nie zostają osobno."""
+    s = b["slowa"]
+    h = next((j for j, x in enumerate(s) if x["waga"] == 3), None)
+    if h is None or _dl(s[h:h + 1]) > ZA_ZNAKI:
+        return None
+    i, j = h, h + 1
+    if j < len(s) and s[j]["waga"] >= 2 and _dl(s[i:j + 1]) <= 12:
+        j += 1
+    while i > 0 and s[i - 1]["waga"] == 0 and _dl(s[i - 1:j]) <= ZA_ZNAKI:
+        i -= 1
+    if all(x["waga"] == 0 for x in s[:i]):
+        i = 0
+    if all(x["waga"] == 0 for x in s[j:]):
+        j = len(s)
+    dlugosc, od = b["end"] - b["start"], (s[i]["t"] if i else 0.0)
+    if dlugosc - od < 0.5 or (i and od < 0.3) or (j < len(s) and dlugosc - s[j]["t"] < 0.3):
+        return None
+    return i, j
+
+
+def za_osoba(b: dict, o: dict, W: int, H: int) -> bool:
+    """Część bloku może stanąć za osobą: jest uderzenie (czesc_za), głowa wyraźna i nie za szeroka (napis za nią
+    ma być czytelny: głowa zasłania najwyżej ~40% jego szerokości), nad głową miejsce na górę liter, osoba
+    w kadrze, ale nie na cały kadr."""
+    g = o.get("glowa")
+    if not g or not o.get("osoba") or czesc_za(b) is None:
+        return False
+    gw, gh = g[2] - g[0], g[3] - g[1]
+    return (0.08 <= gh <= 0.45 and gw <= 0.4 * (0.94 if H > W else 0.7) and g[1] >= (0.14 if H > W else 0.1)
+            and 0.04 <= o.get("pokrycie", 0) <= 0.7)
+
+
+def _linie_od_zera(slowa: list[dict]) -> None:
+    nr = {v: n for n, v in enumerate(sorted({x["linia"] for x in slowa}))}
+    for x in slowa:
+        x["linia"] = nr[x["linia"]]
+
+
+def wydziel_za(b: dict, i: int, j: int, g: list[float], W: int, H: int) -> list[dict]:
+    """Blok → [część przed] + część za osobą + [część po]. Za osobą: duży napis w jednej linii, bez skosu, nad
+    środkiem głowy tak, że głowa zasłania tylko dół środkowych liter; zostaje do końca frazy. Część przed
+    zostaje w miejscu bloku i znika cięciem, gdy wchodzi uderzenie; część po wchodzi przed osobą, pod napisem."""
+    s, d0, dl = b["slowa"], b["start"], b["end"] - b["start"]
+    baza = {k: v for k, v in b.items() if k != "slowa"}
+
+    def czesc(a: int, z: int, sufiks: str) -> dict:
+        od = s[a]["t"] if a else 0.0
+        nb = {**baza, "id": b["id"] + sufiks, "start": round(d0 + od, 3), "end": b["end"],
+              "slowa": [{**x, "t": round(x["t"] - od, 3), "k": round(x["k"] - od, 3)} for x in s[a:z]]}
+        _linie_od_zera(nb["slowa"])
+        return nb
+
+    za = czesc(i, j, "b" if i else "")
+    x = min(0.7, max(0.3, (g[0] + g[2]) / 2))           # środek głowy, a napis cały w kadrze
+    w = min(0.94 if H > W else 0.7, 2 * (min(x, 1 - x) - 0.03))
+    for x_ in za["slowa"]:
+        x_.pop("glebia", None)
+        x_["linia"] = 0
+    bh = rozmiar_bloku(za, w, W, H)[1]
+    za.update({"uklad": "za", "warstwa": "tyl", "rot": 0, "tilt": 0, "x": round(x, 3), "w": round(w, 3),
+               "y": round(min(0.7, max(bh / 2 + 0.02, g[1] + 0.1 * bh)), 3)})
+    czesci = [za]
+    if i:
+        przed = czesc(0, i, "")
+        przed.update({"end": round(za["start"] - 0.02, 3), "wyjscie": "ciecie"})
+        czesci.insert(0, przed)
+    if j < len(s):
+        po = czesc(j, len(s), "c" if i else "b")
+        ph = rozmiar_bloku(po, po["w"], W, H)[1]
+        if abs(po["y"] - za["y"]) < (bh + ph) / 2 + 0.02:      # pod napisem za osobą, nie na nim
+            po["y"] = round(min(0.8 - ph / 2, za["y"] + (bh + ph) / 2 + 0.04), 3)
+        czesci.append(po)
+    return czesci
+
+
+def uloz_z_maska(plan: dict, opisy: list[dict], W: int, H: int, total: float, udzial: float = 1 / 6) -> dict:
+    """Plan po masce osoby: każdy blok z osobą w kadrze dostaje miejsce obok twarzy (miejsce_z_maski), a najwyżej
+    co szósty blok (nie dwa z rzędu) z uderzeniem oddaje je „za osobę”: duże, na wysokości czoła, osoba przed nim
+    (wydziel_za; reszta frazy zostaje przed osobą)."""
+    plan = json.loads(json.dumps(plan))
+    bloki = plan["bloki"]
+    po_t = {round(x["t"], 3): x for x in opisy}
+    poprz = None
+    kandydaci = []
+    for i, b in enumerate(bloki):
+        o = po_t.get(round((b["start"] + b["end"]) / 2, 3))
+        if not o or not o.get("osoba"):
+            continue
+        b.update(miejsce_z_maski(b, o, W, H, poprz))
+        poprz = (b["x"], b["y"])
+        if za_osoba(b, o, W, H):
+            kandydaci.append((i, o))
+    limit, wybrane = max(1, round(len(bloki) * udzial)), {}
+    for i, o in sorted(kandydaci, key=lambda io: _dl(bloki[io[0]]["slowa"][slice(*czesc_za(bloki[io[0]]))])):
+        if len(wybrane) >= limit or {i - 1, i + 1} & set(wybrane):
+            continue
+        wybrane[i] = wydziel_za(bloki[i], *czesc_za(bloki[i]), o["glowa"], W, H)
+    plan["bloki"] = [c for i, b in enumerate(bloki) for c in wybrane.get(i, [b])]
+    return ed.normalize_typo(plan, total)
+
+
 def zbuduj_plan(slowa: list[dict], ciecia: list[float], W: int, H: int, total: float, motyw: str = "czysty",
                 tempo: str = "normalne", ziarno: int = 0, akcent: str | None = None) -> dict:
     """Cały plan typografii (czyste funkcje: testy bez ffmpeg i przeglądarki)."""
@@ -427,6 +592,29 @@ def zbuduj_plan(slowa: list[dict], ciecia: list[float], W: int, H: int, total: f
 
 # ---------------------------------------------------------------- polecenia
 
+def maska(film: Path, *args: str) -> str | None:
+    """maska.py Pythonem narzędzi (onnxruntime z obrazu); błąd albo brak modelu = None i plan bez maski."""
+    py = "/opt/jarvo/venv/bin/python" if Path("/opt/jarvo/venv/bin/python").exists() else sys.executable
+    try:
+        r = subprocess.run([py, str(HERE / "maska.py"), args[0], str(film), *args[1:]], capture_output=True, text=True,
+                           timeout=1800)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"uwaga: maska osoby niedostępna ({exc}); typografia bez niej", file=sys.stderr)
+        return None
+    if r.returncode != 0:
+        print(f"uwaga: maska osoby niedostępna ({(r.stderr or r.stdout).strip()[-240:]}); typografia bez niej",
+              file=sys.stderr)
+        return None
+    return r.stdout
+
+
+def sylwetki(film: Path, plan: dict) -> int:
+    """Sylwetki osoby (maska.py klatki) pod każdy blok za osobą (warstwa „tyl”); policzone klatki zostają.
+    Zwraca liczbę bloków z sylwetkami (bez nich eksport rysuje blok bez osoby przed nim)."""
+    return sum(1 for b in plan["bloki"] if b["warstwa"] == "tyl"
+               and maska(film, "klatki", "--od", f"{b['start']:.3f}", "--do", f"{b['end']:.3f}") is not None)
+
+
 def cmd_plan(film: Path, a) -> int:
     proj = pr.load(film)
     cv = proj["canvas"]
@@ -435,12 +623,21 @@ def cmd_plan(film: Path, a) -> int:
     if not slowa:
         raise SystemExit("brak mowy w nagraniu: typografia potrzebuje słów (sprawdź dźwięk albo transkrypcję)")
     plan = zbuduj_plan(slowa, ciecia, cv["w"], cv["h"], total, a.motyw, a.tempo, a.ziarno, a.akcent)
+    za = 0
+    if not a.bez_maski:
+        opisy = maska(film, "opis", "--chwile", ",".join(f"{(b['start'] + b['end']) / 2:.3f}" for b in plan["bloki"]))
+        if opisy is not None:
+            plan = uloz_z_maska(plan, json.loads(opisy), cv["w"], cv["h"], total)
+            proj["typo"] = plan
+            pr.save(film, proj)                 # maska.py klatki liczy klucz osi z zapisanego projektu
+            za = sylwetki(film, plan)
     proj["typo"] = plan
     if not a.zostaw_napisy:
         proj["texts"] = [x for x in proj.get("texts") or [] if not x.get("cap")]
     pr.save(film, proj)
     n_slow = sum(len(b["slowa"]) for b in plan["bloki"])
-    print(f"Typografia: {len(plan['bloki'])} bloków, {n_slow} słów, motyw {plan['motyw']} · cięcia: {len(ciecia)}")
+    print(f"Typografia: {len(plan['bloki'])} bloków, {n_slow} słów, motyw {plan['motyw']} · cięcia: {len(ciecia)}"
+          + ("" if a.bez_maski else f" · za osobą: {za}"))
     print(f"Dalej: typografia.py pokaz {film} → popraw według znaczenia → typografia.py arkusz {film} → projekt.py render {film}")
     return 0
 
@@ -559,9 +756,13 @@ def cmd_popraw(film: Path, a) -> int:
     plan, uwagi = zastosuj(ed.normalize_typo(proj.get("typo"), total), zmiany, total)
     proj["typo"] = plan
     pr.save(film, proj)
+    tyl = sum(1 for b in plan["bloki"] if b["warstwa"] == "tyl")
+    za = sylwetki(film, plan) if tyl else 0
+    if za < tyl:
+        uwagi.append(f"{tyl - za} z {tyl} bloków za osobą bez sylwetki (maska niedostępna): osoba nie zasłoni napisu")
     for u in uwagi:
         print(f"uwaga: {u}")
-    print(f"Typografia: {len(plan['bloki'])} bloków po poprawkach")
+    print(f"Typografia: {len(plan['bloki'])} bloków po poprawkach" + (f" · za osobą: {za}" if tyl else ""))
     return 0
 
 
@@ -596,7 +797,7 @@ def cmd_arkusz(film: Path, a) -> int:
         raise SystemExit("brak planu typografii: typografia.py plan <film>")
     out = Path(a.out) if a.out else film.with_name(f"{film.stem}.typografia.jpg")
     chwile = chwile_arkusza(plan, a.ile)
-    pr.arkusz_typografii(proj, plan, chwile, out)
+    pr.arkusz_typografii(proj, plan, chwile, out, film)
     print(f"Arkusz: {out} ({len(chwile)} klatek; oceń vision_analyze: czytelność, twarz, strefy UI, sens akcentów)")
     print(f"MEDIA:{out}")
     return 0
@@ -612,6 +813,7 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--tempo", choices=tuple(TEMPO), default="normalne")
     sp.add_argument("--ziarno", type=int, default=0, help="inny wariant układów (ten sam numer = ten sam plan)")
     sp.add_argument("--zostaw-napisy", action="store_true", help="nie usuwaj zwykłych napisów z projektu")
+    sp.add_argument("--bez-maski", action="store_true", help="bez maski osoby (MODNet): miejsca domyślne, bez „za osobą”")
     sp.set_defaults(fn=cmd_plan)
     sp = sub.add_parser("pokaz", help="plan w skrócie")
     sp.add_argument("film")
