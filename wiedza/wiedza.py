@@ -35,15 +35,18 @@ from pathlib import Path
 DOMYSLNY_SKARBIEC = os.environ.get("JARVO_KNOWLEDGE_DIR", "/opt/data/jarvo/knowledge")
 
 FOLDERY = ("zrodla/rozmowy", "zrodla/karty", "zrodla/pliki", "zrodla/jarvo-repo", "skrzynka/zrobione", "agenci",
-           "projekty", "brands", "user", "podmioty", "pojecia", "orzeczenia/marki", "rozmowy", "fleet")
+           "projekty", "brands", "inspiracje/strony", "user", "podmioty", "pojecia", "orzeczenia/marki", "rozmowy", "fleet")
 # folder → (nazwa pliku huba, tytuł)
 HUBY = {"": ("_hub-skarbiec", "Skarbiec wiedzy"), "agenci": ("_hub-agenci", "Agenci"), "projekty": ("_hub-projekty", "Projekty"),
-        "brands": ("_hub-marki", "Marki"), "user": ("_hub-ty", "Ty"), "podmioty": ("_hub-podmioty", "Podmioty"),
-        "pojecia": ("_hub-pojecia", "Pojęcia"), "orzeczenia": ("_hub-orzeczenia", "Orzeczenia"), "rozmowy": ("_hub-rozmowy", "Rozmowy")}
+        "brands": ("_hub-marki", "Marki"), "inspiracje": ("_hub-inspiracje", "Inspiracje"), "user": ("_hub-ty", "Ty"),
+        "podmioty": ("_hub-podmioty", "Podmioty"), "pojecia": ("_hub-pojecia", "Pojęcia"), "orzeczenia": ("_hub-orzeczenia", "Orzeczenia"),
+        "rozmowy": ("_hub-rozmowy", "Rozmowy")}
 OPISY_FOLDEROW = {
     "agenci": "Jeden katalog na agenta: hub (rola, skille, skrypty z `fleet.yaml`) i notatki o tym, czego się nauczył.",
     "projekty": "Jedna notatka na misję albo projekt: stan, decyzje, wyniki (linki do plików), marka, agenci.",
     "brands": "Brand kity (`brands/<marka>/`): kolory, fonty, ton. Orzeczenia marki: `orzeczenia/marki/<marka>.md`.",
+    "inspiracje": ("Strony referencyjne branż słabo pokrytych w katalogu Inspo (`inspiracje/strony/<branża>/<domena>`): układ, "
+                   "paleta, fonty, zrzuty; pisze Web skillem `inspiracje-stron`. Inspiracja, nie wzór do kopiowania."),
     "user": "Kim jesteś, czym się zajmujesz, oferta, klienci, głos marki (`user/USER.md` z wywiadu Jarva).",
     "podmioty": "Firmy, ludzie w rolach publicznych, narzędzia, konkurenci, dostawcy: jedna notatka na rzecz.",
     "pojecia": "Metody, wzorce, definicje, lekcje ogólne: jedna notatka na pojęcie.",
@@ -52,7 +55,8 @@ OPISY_FOLDEROW = {
 }
 POZA_WYSZUKIWANIEM = ("zrodla/", "skrzynka/")          # domyślnie nie wracają w wynikach (surowe i szkice)
 PLIKI_SPECJALNE = {"INDEX.md", "LOG.md", "LINT.md", "SCHEMA.md"}
-BEZ_FRONTMATTERU = ("brands/", "user/", "zrodla/", "skrzynka/")   # własne formaty (brand kit, USER.md, źródła, szkice)
+# własne formaty (brand kit, karta strony referencyjnej z DESIGN.md dembrandta, USER.md, źródła, szkice)
+BEZ_FRONTMATTERU = ("brands/", "inspiracje/", "user/", "zrodla/", "skrzynka/")
 TYPY = {"hub", "agent", "projekt", "podmiot", "pojecie", "fakt", "decyzja", "lekcja", "zrodlo", "rozmowa", "orzeczenia", "skill"}
 STATUSY = {"aktualna", "do-sprawdzenia", "sprzeczna", "przestarzala", "generowane"}
 WYMAGANE = ("typ", "utworzono", "zmieniono", "status")
@@ -668,6 +672,8 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             skille = "\n".join(f"- [[{SKILLE}/{s['name']}|{s['name']}]]: {s.get('description', '').strip()}"
                                for s in a.get("skills", [])) or "_brak_"
             skrypty = ", ".join(f"`{s}`" for s in a.get("scripts", [])) or "_brak_"
+            mcp = "; ".join(f"`{m['name']}`" + (f" ({', '.join(m['tools'])})" if m.get("tools") else "") for m in a.get("mcp") or [])
+            mcp_linia = f"\n- serwery MCP: {mcp}" if mcp else ""
             zewn = a.get("external_skills") or []
             zewn_linia = (f"\n- skille zewnętrzne ({len(zewn)}): " + ", ".join(f"`{s}`" for s in zewn)) if zewn else ""
             wsp = a.get("shared_skills") or []
@@ -681,7 +687,7 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                             if zmiany else "")
             gen = (f"## Z rejestru floty (fleet.yaml)\n- rola: {a.get('kind', '')} · autonomia: {a.get('autonomy_max', '')} · "
                    f"pokój HQ: {a.get('label', a.get('room', ''))} (`{a.get('room', '')}`) · temat Telegrama: `{a.get('telegram_topic', '')}`\n"
-                   f"- skille ({len(a.get('skills', []))}):\n{skille}{zewn_linia}\n- skrypty: {skrypty}{zmiany_linia}")
+                   f"- skille ({len(a.get('skills', []))}):\n{skille}{zewn_linia}\n- skrypty: {skrypty}{mcp_linia}{zmiany_linia}")
             pl = sk.plik(rel)
             tekst = pl.read_text(encoding="utf-8")
             m = re.search(r"^(# .+\n\n)\*\*(.+)\*\*$", tekst, re.M)

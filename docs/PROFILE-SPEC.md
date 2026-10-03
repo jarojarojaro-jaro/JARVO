@@ -156,6 +156,7 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 | Pamięć własna agenta | `memories/MEMORY.md` profilu | agent (np. „ta strona używa Tailwind”) |
 | Wiedza o Tobie | MVP: `knowledge/user/USER.md` (onboarding) + pamięć użytkownika Jarva; później wspólny provider (np. Honcho) | Jarvo (onboarding), agenci czytają |
 | Brand kity | `knowledge/brands/<marka>/` | `jarvo-web` / `jarvo-studio` |
+| Strony referencyjne branż (inspiracje) | `knowledge/inspiracje/strony/<branża>/` | `jarvo-web` (skill `inspiracje-stron`) |
 | Historia zleceń | kanban (`kanban.db`) | Jarvo i agenci |
 
 ---
@@ -280,7 +281,7 @@ profiles/jarvo-web/
 ├── distribution.yaml        # manifest dystrybucji Hermesa
 ├── SOUL.md                  # main prompt
 ├── config.yaml              # model (@@MODEL@@ z fleet.yaml), reasoning_effort, toolsety per platforma, zgody,
-│                            # terminal/przeglądarka/delegacja (mcp_servers: dziś żaden profil)
+│                            # terminal/przeglądarka/delegacja, mcp_servers (dziś tylko jarvo-web: inspo)
 ├── .no-bundled-skills       # snajper i orkiestrator: bez katalogu skilli Hermesa (brak tylko u jarvo-reka)
 ├── toolbox.yaml             # narzędzia OSS (nasz manifest + healthchecki)
 ├── skills/

@@ -22,11 +22,11 @@ const bilingual = (pairs) => Object.defineProperties({}, Object.fromEntries(
 
 const FOLDER_NAMES = bilingual({
   "": ["Skarbiec", "Vault"], agenci: ["Agenci", "Agents"], projekty: ["Projekty", "Projects"], brands: ["Marki", "Brands"],
-  user: ["Ty", "You"], podmioty: ["Podmioty", "Entities"], pojecia: ["Pojęcia", "Concepts"], orzeczenia: ["Orzeczenia", "Rulings"],
+  inspiracje: ["Inspiracje", "Inspiration"], user: ["Ty", "You"], podmioty: ["Podmioty", "Entities"], pojecia: ["Pojęcia", "Concepts"], orzeczenia: ["Orzeczenia", "Rulings"],
   rozmowy: ["Rozmowy", "Conversations"], fleet: ["Flota", "Fleet"],
 });
 const FOLDER_COLORS = {
-  agenci: "#2C6ED5", projekty: "#D98A00", brands: "#C2185B", user: "#1E9A61", podmioty: "#7B4FCF", pojecia: "#00897B",
+  agenci: "#2C6ED5", projekty: "#D98A00", brands: "#C2185B", inspiracje: "#0E9FB8", user: "#1E9A61", podmioty: "#7B4FCF", pojecia: "#00897B",
   orzeczenia: "#D2392E", rozmowy: "#8793A2", fleet: "#5D4037", "": "#9AA6B4",
 };
 const folderName = (f) => FOLDER_NAMES[f] || f;

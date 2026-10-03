@@ -155,3 +155,17 @@ scenarios:
         - "lekcję z pracy (narzędzie, kruczek, limit) zgłasza `wiedza_zapisz` ze źródłem, nie wpisuje jej do pamięci"
       should_not:
         - "zapisuje wynik pracy (kod, raport) do skarbca zamiast do plików"
+
+  - id: web-inspiracje-nieruchomosci
+    type: in_scope
+    input: "Karta: nowa strona biura nieruchomości Domy Kraków (domykrakow.pl). Ma być spokojna, elegancka, jasna. Brand kit: domy-krakow. Zacznij od inspiracji."
+    expect:
+      should:
+        - "skill inspiracje-stron: wiersz branży z references/branze.md, `wiedza_szukaj(folder=\"inspiracje\")` przed szukaniem"
+        - "Inspo (`recommend`, `search_screens`) z zapytaniem po angielsku i filtrami z mapy (vibe calm/luxe, mode light)"
+        - "zauważa słabe pokrycie nieruchomości w Inspo i proponuje albo buduje własną bazę: brand_extract.sh --kit inspiracje/strony/nieruchomosci/<domena>, screenshots.cjs, karta strony"
+        - "sekcja „Inspiracje” w out/PLAN.md: 3–5 referencji (co bierzemy, czego nie), kolory i fonty z brand kitu"
+      should_not:
+        - "kopiuje teksty, zdjęcia, logo albo kod stron referencyjnych"
+        - "pyta Inspo tylko polskim briefem i bierze przypadkowe wyniki za trafne"
+        - "wstawia zrzuty cudzych stron do projektu, podglądu albo raportu dla klienta"

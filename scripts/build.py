@@ -327,10 +327,18 @@ def opis_skilla(path: Path, skrypty: set[str]) -> dict:
             "sections": [h.strip() for h in re.findall(r"^## (.+)$", body, re.M)][:10]}
 
 
+def serwery_mcp(config: Path) -> list[dict]:
+    """Serwery MCP profilu z `mcp_servers` w config.yaml: nazwa i narzędzia widoczne dla modelu (`tools.include`; puste = wszystkie)."""
+    cfg = fl.load_yaml(config) if config.is_file() else {}
+    serwery = (cfg or {}).get("mcp_servers") or {}
+    return [{"name": str(n), "tools": [str(t) for t in ((s or {}).get("tools") or {}).get("include") or []]}
+            for n, s in sorted(serwery.items())]
+
+
 def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
     """fleet.json dla skarbca wiedzy: hub każdego agenta (wiedza/wiedza.py zasiej) dostaje rolę, skille własne i wspólne
     (shared/skills) z opisami, powiązaniami i skryptami (każdy skill to węzeł grafu), nazwy skilli zewnętrznych
-    (z dystrybucji po buildzie), skrypty i ostatnie zmiany z CHANGELOG-u; `skrypty_repo` to skrypty wspólne (scripts/),
+    (z dystrybucji po buildzie), skrypty, serwery MCP i ostatnie zmiany z CHANGELOG-u; `skrypty_repo` to skrypty wspólne (scripts/),
     żeby lint skarbca odróżnił odwołanie do istniejącego skryptu od nieaktualnego."""
     skrypty_repo = sorted(p.name for p in (fl.REPO_ROOT / "scripts").glob("*") if p.suffix in {".py", ".sh"})
     agents = []
@@ -352,6 +360,7 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
                        "telegram_topic": a.telegram_topic, "autonomy_max": a.autonomy_max, "skills": skills,
                        "shared_skills": [opis_skilla(fl.SHARED_DIR / "skills" / n / "SKILL.md", znane) for n in wspolne],
                        "external_skills": [n for n in obce if n not in wspolne], "scripts": skrypty,
+                       "mcp": serwery_mcp(a.dir / "config.yaml"),
                        "changes_section": sekcja, "changes": zmiany})
     return {"orchestrator": fleet.orchestrator, "agents": agents, "repo_scripts": skrypty_repo}
 

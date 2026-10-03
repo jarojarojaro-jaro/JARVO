@@ -21,6 +21,8 @@
 - Obrazy bez AVIF/WebP, bez `srcset`/wymiarów.
 - Brak JSON-LD tam, gdzie treść na to pozwala (Organization, Product, FAQ).
 - Tekst roboczy nieoznaczony jako `[SZKIC]`.
+- Nowa strona / landing bez sekcji „Inspiracje” w `out/PLAN.md`: wybrane 3–5 referencji z uzasadnieniem
+  (co bierzemy, czego nie; skill `inspiracje-stron`).
 
 ## Uwagi (nie blokują)
 - Preferencje estetyczne w granicach brand kitu, drobne różnice wyników Lighthouse (±3 pkt).

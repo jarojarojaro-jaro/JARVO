@@ -79,6 +79,7 @@ RAM narzędzi zmierzony w kontenerze (szczyt, proces żyje tylko na czas zadania
 | transkrypcja Parakeet (36 s wideo → tekst/SRT, 2 wątki CPU) | ~1,1–1,3 GB | 10–12 s |
 | dembrandt (tokeny marki ze strony) | ~170 MB | 9 s |
 | Markdown → PDF (pandoc + Chromium) | ~70 MB | 0,4 s |
+| serwer MCP Inspo (inspiracje Weba; pomiar poza kontenerem, Node 22) | ~220 MB, do 15 min bezczynności | start 2,6 s |
 | pracownik kanbana (proces Hermesa z agentem) | ~250–350 MB (szac.) | cały czas trwania karty |
 
 **Budżet 8 GB (najgorszy realny przypadek naraz):** spoczynek 0,7 + 3 pracowników 1,0 + przeglądarki 0,4 +

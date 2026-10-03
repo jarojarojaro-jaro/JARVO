@@ -19,7 +19,7 @@ FLEET = {"orchestrator": "jarvo", "agents": [
     {"name": "jarvo-web", "short": "Web", "title": "Web Senior Dev", "emoji": "🌐", "kind": "specialist", "description": "Strony i SEO.",
      "room": "devlab", "label": "Pracownia webowa", "telegram_topic": "web", "autonomy_max": "A1",
      "skills": [{"name": "nowa-strona", "description": "Nowa strona: od briefu do wdrożenia."}], "external_skills": ["gsap", "seo-audit"],
-     "scripts": ["audit.sh", "seo_check.py"]},
+     "scripts": ["audit.sh", "seo_check.py"], "mcp": [{"name": "inspo", "tools": ["recommend", "search_screens"]}]},
     {"name": "jarvo-lowca", "short": "Łowca", "title": "Łowca leadów", "emoji": "🎯", "kind": "specialist", "description": "Leady B2B.",
      "room": "radar", "label": "Radar", "telegram_topic": "lowca", "autonomy_max": "A1", "skills": [], "scripts": ["krs.py"]},
 ]}
@@ -52,12 +52,13 @@ def skarbiec(tmp_path, monkeypatch):
 def test_zasiew_huby_orzeczenia_docs_git(skarbiec, tmp_path):
     sk = skarbiec
     huby = {p.name for p in sk.root.rglob("_hub-*.md")}
-    assert huby == {"_hub-skarbiec.md", "_hub-agenci.md", "_hub-projekty.md", "_hub-marki.md", "_hub-ty.md", "_hub-podmioty.md",
-                    "_hub-pojecia.md", "_hub-orzeczenia.md", "_hub-rozmowy.md", "_hub-jarvo.md", "_hub-web.md", "_hub-łowca.md"}
+    assert huby == {"_hub-skarbiec.md", "_hub-agenci.md", "_hub-projekty.md", "_hub-marki.md", "_hub-inspiracje.md", "_hub-ty.md",
+                    "_hub-podmioty.md", "_hub-pojecia.md", "_hub-orzeczenia.md", "_hub-rozmowy.md", "_hub-jarvo.md", "_hub-web.md", "_hub-łowca.md"}
     assert len(huby) == len({h for h in huby})                       # nazwy unikalne w całym skarbcu (etykiety w grafie)
     hub = (sk.root / "agenci/jarvo-web/_hub-web.md").read_text(encoding="utf-8")
     assert "[[fleet/skille/nowa-strona|nowa-strona]]: Nowa strona: od briefu do wdrożenia." in hub
     assert "skille zewnętrzne (2): `gsap`, `seo-audit`" in hub
+    assert "- serwery MCP: `inspo` (recommend, search_screens)" in hub
     assert "[[orzeczenia/web|Orzeczenia: Web]]" in hub and "<!-- Jarvo:GEN lista -->" in hub
     assert (sk.root / "orzeczenia/łowca.md").exists() and (sk.root / "orzeczenia/wszyscy.md").exists()
     assert (sk.root / "zrodla/jarvo-repo/PLAN.md").exists() and (sk.root / "SCHEMA.md").exists() and (sk.root / "LINT.md").exists()
@@ -215,6 +216,29 @@ def test_lint_czysty_i_bledy(skarbiec):
     assert re.search(r"za długa \(30\d słów, limit 250\): \[\[podmioty/za dluga\]\]", o)
     assert "sierota (linkuje tylko lista huba): [[podmioty/bez zrodla]]" in o and "bez linku do huba folderu: [[podmioty/bez zrodla]]" in o
     assert (sk.root / "LINT.md").read_text(encoding="utf-8").startswith("# Lint skarbca (2026-09-30)")
+    ix.zamknij()
+
+
+def test_inspiracje_wlasny_format_w_grafie_i_szukaniu(skarbiec):
+    """Własna baza stron referencyjnych Weba (skill inspiracje-stron): karta strony + DESIGN.md z dembrandta bez frontmattera.
+    Lint nie zgłasza błędów formatu, szukanie z folder="inspiracje" ją znajduje, hub folderu ją listuje, graf ma węzeł."""
+    sk = skarbiec
+    hub = (sk.root / "inspiracje/_hub-inspiracje.md").read_text(encoding="utf-8")
+    assert "inspiracje-stron" in hub and (sk.root / "inspiracje/strony").is_dir()
+    assert "[[inspiracje/_hub-inspiracje|Inspiracje]]" in (sk.root / "_hub-skarbiec.md").read_text(encoding="utf-8")
+    karta = "inspiracje/strony/nieruchomosci/domy-przyklad.pl"
+    notatka(sk, karta, "domy-przyklad.pl (nieruchomości)", "Biuro nieruchomości: hero ze zdjęciem i wyszukiwarką ofert.",
+            typ="zrodlo", zrodlo="https://domy-przyklad.pl", agent="jarvo-web",
+            linki=["inspiracje/_hub-inspiracje", f"{karta}/DESIGN", "fleet/lekcje"])
+    (sk.root / karta).mkdir()
+    (sk.root / karta / "DESIGN.md").write_text("# Design system: domy-przyklad.pl\n\nKolory: #1F3A5F, #F4EFE6.\n", encoding="utf-8")
+    ix = w.Indeks(sk)
+    r = w.lint(sk, ix)
+    assert not [b for b in r["bledy"] if "inspiracje/" in b], r["bledy"]
+    assert [x["sciezka"] for x in ix.szukaj("nieruchomości wyszukiwarka", folder="inspiracje")] == [karta]
+    w.odswiez_listy_hubow(sk, ix)
+    assert f"[[{karta}|" in (sk.root / "inspiracje/_hub-inspiracje.md").read_text(encoding="utf-8")
+    assert {"z": karta, "do": "inspiracje/_hub-inspiracje", "auto": False} in ix.graf()["linki"]
     ix.zamknij()
 
 

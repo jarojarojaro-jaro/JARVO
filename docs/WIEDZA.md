@@ -18,7 +18,7 @@ przed każdą turą dostaje 3–5 najbardziej pasujących notatek i swoje orzecz
 i po karcie ustalenia wracają do skarbca jako szkice, które nocna kompilacja wpina w istniejące notatki. Ty oglądasz graf
 w zakładce **Wiedza** dashboardu (albo w Obsidianie: to ten sam folder).
 
-**Na przykładzie Weba.** W skarbcu jest gałąź `agenci/jarvo-web/`: hub „Web” (rola, 9 skilli z jednym zdaniem każdy, skrypty,
+**Na przykładzie Weba.** W skarbcu jest gałąź `agenci/jarvo-web/`: hub „Web” (rola, 10 skilli z jednym zdaniem każdy, skrypty,
 narzędzia, pokój w HQ; generowany z `fleet.yaml`), a pod nim notatki: „bramka jakości blokuje przy KRYTYCZNE/WYSOKIE”, „Lightpanda
 nie renderuje three.js: zrzuty przez Chromium”, „strona M&W: audyt 2026-09-30, LCP 22,5 s, brak kontaktu” (projekt), „orzeczenie:
 w stronach użytkownika nigdy `innerHTML`”. Gdy piszesz do Weba „zrób landing dla marki X”, przed pierwszą turą Web dostaje: hub
@@ -93,6 +93,8 @@ knowledge/                       # = skarbiec (vault Obsidiana): same pliki Mark
 │       └── lightpanda nie renderuje three.js.md       # notatki o skryptach, limitach, kruczkach
 ├── projekty/_hub-projekty.md    # hub + notatka na misję/projekt (strona X, kampania Y, klipy Z): stan, decyzje, wyniki (linki)
 ├── brands/_hub-marki.md         # brand kity (bez zmian) + hub „Marki”; orzeczenia marki w orzeczenia/marki/<marka>.md
+├── inspiracje/_hub-inspiracje.md # strony referencyjne branż słabo pokrytych w Inspo (skill Weba `inspiracje-stron`):
+│   └── strony/<branża>/<domena>.md  #   karta strony + katalog <domena>/ (DESIGN.md i tokeny z dembrandta, zrzuty 375/1440)
 ├── user/_hub-ty.md              # USER.md (bez zmian) + notatki „firma”, „oferta”, „klienci”, „głos marki” (hub „Ty”)
 ├── podmioty/_hub-podmioty.md    # firmy, ludzie (tylko publiczne role), narzędzia, konkurenci, dostawcy: jedna notatka na rzecz
 ├── pojecia/_hub-pojecia.md      # metody, wzorce, definicje, lekcje ogólne („bramka jakości”, „test A/B/C bayesowski”)
@@ -113,6 +115,7 @@ Poza skarbcem: indeks wyszukiwarki `state/wiedza.db` (SQLite FTS5, odtwarzalny z
 | `orzeczenia/` | agent na Twoje słowo (`wiedza_orzeczenie`), formularz w HQ | gdy poprawiasz agenta |
 | notatki, `LOG.md`, ręczne części hubów | **tylko kompilacja** (`jarvo-wiedza`, tani model) i `zasiej` (0 tokenów) | noc / próg szkiców / ręcznie |
 | `fleet/skille/` (węzły skilli) | tylko `zasiej` z `build/wiedza/fleet.json` (0 tokenów) | każde wdrożenie |
+| `brands/`, `inspiracje/` (własne formaty) | skille skryptami: `brand-z-url` (Web, Studio), `inspiracje-stron` (Web: `brand_extract.sh --kit`, `screenshots.cjs`, karta strony) | „naucz się marki”; branża słabo pokryta w katalogu Inspo |
 | `INDEX.md`, listy notatek w hubach (bloki `Jarvo:GEN`), indeks FTS5 | `wiedza.py indeksuj` (0 tokenów, deterministycznie z plików) | po każdej kompilacji, zasiewie, na żądanie |
 | `LINT.md` | lint (0 tokenów) | co tydzień i przed kompilacją |
 
@@ -334,7 +337,8 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    `python3 /opt/jarvo/repo/wiedza/wiedza.py`): `zasiej` (katalogi, `SCHEMA.md`, huby folderów i agentów z `build/wiedza/fleet.json`,
    orzeczenia, `fleet/lekcje.md`, docs repo do `zrodla/jarvo-repo/`, git init i punkt zapisu), `indeksuj` (FTS5 w `state/wiedza.db`,
    `INDEX.md`, listy w hubach), `szukaj`, `czytaj`, `zapisz`, `orzeczenie`, `lint`, `graf`, `cofnij`, `status`; `wiedza/SCHEMA.md`;
-   `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami, zewnętrzne z locka, skrypty), `install-fleet.sh`
+   `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami, zewnętrzne z locka, skrypty, serwery MCP
+   z `config.yaml` z narzędziami z `tools.include`), `install-fleet.sh`
    zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane; pogrubiony opis huba agenta idzie
    za opisem z `fleet.yaml`, dopóki człowiek go nie zmienił; lustro `zrodla/jarvo-repo/` traci dokumenty usunięte z repo).
    **Cała flota w grafie:** każdy skill floty (własny i wspólny z `shared/skills/`) to węzeł `fleet/skille/<skill>`: opis, wersja,
@@ -446,7 +450,7 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 |---|---|
 | `wiedza/wiedza.py` | narzędzie skarbca (zasiew, indeks, szukanie, szkice, orzeczenia, lint, graf, punkty zapisu); importowane przez wtyczkę |
 | `wiedza/SCHEMA.md` | zasady skarbca kopiowane do `knowledge/SCHEMA.md` |
-| `scripts/build.py` → `build/wiedza/fleet.json` | dane do hubów agentów (rola, skille z opisami, skille zewnętrzne, skrypty) |
+| `scripts/build.py` → `build/wiedza/fleet.json` | dane do hubów agentów (rola, skille z opisami, skille zewnętrzne, skrypty, serwery MCP) |
 | `scripts/install-fleet.sh` (krok „Skarbiec wiedzy”) | `zasiej` przy każdym wdrożeniu |
 | `tests/test_wiedza.py` | testy skarbca |
 | `wiedza/plugin/plugin.yaml`, `wiedza/plugin/__init__.py` | wtyczka `jarvo-wiedza`: dostawca pamięci (`SkarbiecProvider`), hak kanbana (`karta_zamknieta`), zadanie pomocnicze `jarvo_wiedza` |

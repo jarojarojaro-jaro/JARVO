@@ -1,17 +1,17 @@
 ---
 name: landing-produktowy
 description: "Landing produktu pod SEO i konwersję, z danymi z researchu."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [web, landing, seo, cro, product]
-    related_skills: [nowa-strona, seo-page, seo-schema, seo-content-brief, cro, site-architecture]
+    related_skills: [nowa-strona, inspiracje-stron, seo-page, seo-schema, seo-content-brief, cro, site-architecture]
   jarvo:
     agent: jarvo-web
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-10-03"
 ---
 
 # Landing produktowy
@@ -21,6 +21,10 @@ Wariant `nowa-strona` nastawiony na **jedną frazę główną i jedną konwersj�
 ## Wejścia (z karty)
 - raport `jarvo-sherlock` (rynek + `slowa-kluczowe.csv`), brand kit, nazwa produktu, CTA, ewentualnie copy od `jarvo-studio`.
 - Brak researchu słów kluczowych → nie zgaduj. `kanban_block(kind="needs_input")`: „potrzebny research SEO albo fraza główna”.
+
+## Inspiracje (przed projektem)
+Skill `inspiracje-stron`: 3–5 landingów z branży produktu (Inspo: `recommend` z `pageType` `landing`, przy cenniku też
+`pricing`) i sekcja „Inspiracje” w PLAN.md: układ hero, kolejność sekcji, miejsce CTA i dowodów. Bierzemy wzorce, nie teksty.
 
 ## Struktura (domyślna, dopasuj do produktu)
 1. **Hero:** H1 z frazą główną w naturalnym brzmieniu, obietnica w 1 zdaniu, CTA, wizual produktu.

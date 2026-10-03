@@ -5,8 +5,8 @@ Strony od faviconu po SEO. Spec: [docs/FLEET.md](../../docs/FLEET.md#jarvo-web-w
 | Element | Zawartość |
 |---|---|
 | `SOUL.md` | main prompt: budżety jakości, mobile-first, marka, A2 dla produkcji |
-| `skills/web/` | 9: brand-z-url, audyt-strony, nowa-strona, bramka-jakosci, landing-produktowy, favicon-i-meta, optymalizacja-obrazow, wdrozenie, bezpieczenstwo-aplikacji |
+| `skills/web/` | 10: inspiracje-stron, brand-z-url, audyt-strony, nowa-strona, bramka-jakosci, landing-produktowy, favicon-i-meta, optymalizacja-obrazow, wdrozenie, bezpieczenstwo-aplikacji |
 | skille zewnętrzne | 58: getsentry `security-review` (OWASP), Trail of Bits `supply-chain-risk-auditor`, web-quality-skills (5), claude-seo (13), marketingskills (3), Anthropic (2), Hermes (7, w tym `systematic-debugging`), impeccable, GSAP (8), Three.js (10), motion (5), text-to-lottie, graf-kodu (`shared/skills`): `vendor/skills.lock.yaml` |
-| `scripts/` | `audit.sh` (Lighthouse + axe + linkinator + SEO + zrzuty), `seo_check.py`, `screenshots.cjs`, `a11y.cjs`, `favicons.cjs`, `images.cjs`, `brand_extract.sh`, `hostile.cjs` (testy wrogie: wolne łącze, brak JS, 320 px, klawiatura…), `security_check.py` (bezpieczeństwo repo, zależności i strony, próby `atak` na podglądzie) |
-| `config.yaml` | model strong; produkcja/DNS/push na main → eskalacja; pracownicy bez zgody = odmowa |
+| `scripts/` | `audit.sh` (Lighthouse + axe + linkinator + SEO + zrzuty), `seo_check.py`, `screenshots.cjs`, `a11y.cjs`, `favicons.cjs`, `images.cjs`, `brand_extract.sh` (brand kit; `--kit` dla stron referencyjnych w skarbcu), `hostile.cjs` (testy wrogie: wolne łącze, brak JS, 320 px, klawiatura…), `security_check.py` (bezpieczeństwo repo, zależności i strony, próby `atak` na podglądzie) |
+| `config.yaml` | model strong; produkcja/DNS/push na main → eskalacja; pracownicy bez zgody = odmowa; MCP `inspo` (katalog Inspo, lokalnie po stdio, `lazy`, 6 narzędzi) |
 | `quality/rubric.md` | rubryka sędziego |

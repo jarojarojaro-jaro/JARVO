@@ -35,6 +35,7 @@ obserwowalność przez Langfuse w `plugins/observability/`.
 | [html-validate](https://github.com/html-validate/html-validate) | walidacja HTML | MIT | 2026-09 | CLI |
 | [glyphhanger](https://github.com/zachleat/glyphhanger) | subsetting fontów | MIT | 2026-06 | CLI |
 | [dembrandt](https://github.com/dembrandt/dembrandt) | **wyciąga system designu ze strony** (logo, kolory, typografia, odstępy) jako tokeny W3C, czyli podstawa `brand-z-url` | MIT | 2026-09 | CLI + skrypt |
+| [Inspo](https://github.com/Nutlope/inspo) (`inspo-mcp`) | **katalog 832 prawdziwych stron** (2320 podstron: zrzuty desktop i mobile, paleta, fonty, opis układu) jako inspiracja przed projektem; podstawa `inspiracje-stron` | MIT | 2026-09 | MCP `inspo` (stdio, lokalnie) |
 | [CSS Analyzer](https://github.com/projectwallace/css-analyzer) | statystyki CSS (kolory, fonty, złożoność) do audytów | MIT | 2026-09 | skrypt |
 | [webappanalyzer](https://github.com/enthec/webappanalyzer) | wykrywanie technologii na audytowanej stronie | GPL-3.0 | 2026-09 | skrypt (dane) |
 | [web-vitals](https://github.com/GoogleChrome/web-vitals) | pomiar Core Web Vitals u prawdziwych użytkowników na budowanych stronach | Apache-2.0 | 2026-09 | biblioteka w projektach |
@@ -267,7 +268,7 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 | obraz Hermesa | `/opt/hermes` | Python 3.13 Hermesa (Debian 13; nie ruszamy), Node, `uv`, ffmpeg/ffprobe, Chromium |
 | pakiety systemowe | apt | pandoc, qpdf, ocrmypdf + tesseract (pol, eng), exiftool, jq, sqlite3, fonty z polskimi znakami |
 | przeglądarki | `/usr/local/bin/lightpanda`, `/usr/local/bin/chromium` (`CHROME_PATH`) | Lightpanda dla `browser_*` agentów (agent-browser); jedna Chromium z obrazu Hermesa dla zrzutów, PDF, Lighthouse, Playwright i dembrandta |
-| narzędzia Node | `/opt/jarvo/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt |
+| narzędzia Node | `/opt/jarvo/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt, inspo-mcp (serwer MCP Weba) |
 | narzędzia Pythona | venv `/opt/jarvo/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet); dodatki `JARVO_EXTRAS`: rembg, auto-editor, docling, manim |
 | claude-seo | `/opt/jarvo/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
 | sidecary | sieć `jarvo-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
@@ -289,4 +290,10 @@ Skrypty Pythona, które potrzebują bibliotek z venv narzędzi, same przełącza
 **MCP:** serwery MCP dopisujemy w `config.yaml` profilu, w sekcji `mcp_servers` (Hermes nie czyta
 `mcp.json` z profilu). Zasada bez zmian: tylko te serwery, których agent naprawdę używa, bo każde
 narzędzie w schemacie kosztuje tokeny przy każdym zapytaniu.
+Pierwszy włączony: `inspo` u `jarvo-web` (pakiet z obrazu, stdio, `lazy`: proces startuje przy pierwszym wywołaniu
+i znika po 15 min bezczynności; z 15 narzędzi serwera w schemacie modelu tylko 6 z `tools.include`, ~10 KB; `trust: untrusted`:
+narzędzie bez `readOnlyHint=true`, np. z nowej wersji, czeka na zgodę).
+Nie używamy hostowanego endpointu inspomcp.dev ani `TOGETHER_API_KEY` (bez klucza wyszukiwanie jest leksykalne,
+więc zapytania po angielsku). Serwer pobiera katalog (~2,3 MB) z CDN autorów przy każdym starcie; Hermes przekazuje
+serwerom stdio tylko bezpieczne zmienne środowiska (bez proxy), więc za proxy HTTPS ten pobór nie przejdzie.
 

@@ -18,6 +18,7 @@ Komponenty obrazu `jarvo-hermes` o znaczeniu licencyjnym (pełna lista narzędzi
 |---|---|---|
 | [Lightpanda](https://github.com/lightpanda-io/browser) 0.4.0 | przeglądarka headless dla `browser_*` (binarka z oficjalnego obrazu, tylko `strip`) | AGPL-3.0 |
 | [agent-browser](https://github.com/vercel-labs/agent-browser) | sterownik narzędzi przeglądarki Hermesa | Apache-2.0 |
+| [Nutlope/inspo](https://github.com/Nutlope/inspo) (Together AI), pakiet npm `inspo-mcp` 0.1.16 (repo przejrzane na commicie `0e1e636`) | serwer MCP `inspo` Weba (skill `inspiracje-stron`): katalog prawdziwych stron jako inspiracja przed projektem; stdio, lokalnie, bez hostowanego endpointu i bez `TOGETHER_API_KEY`. Katalog i miniatury pobiera z CDN autorów, nie z obrazu. **Zrzuty i treści stron należą do ich autorów** (MIT obejmuje kod Inspo): tylko inspiracja, nie kopiujemy grafik ani tekstów, nie hostujemy zrzutów | MIT |
 | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (NVIDIA), eksport ONNX [istupakov/parakeet-tdt-0.6b-v3-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx) | model rozpoznawania mowy (pobierany przy pierwszym użyciu, nie w repo ani w obrazie) | CC-BY-4.0 |
 | [onnx-asr](https://github.com/istupakov/onnx-asr) + [ONNX Runtime](https://github.com/microsoft/onnxruntime) | uruchamianie modelu mowy na CPU | MIT |
 | [Silero VAD](https://github.com/snakers4/silero-vad) | wykrywanie mowy przed Parakeetem w `jarvo-stt` (pobierany przy pierwszym użyciu, nie w repo ani w obrazie) | MIT |
@@ -148,6 +149,7 @@ przekrojami modeli z klocków, bez użycia znaków towarowych ani zasobów produ
 | AGPL-3.0 (SearXNG, Lightpanda, opcjonalnie Postiz) | programy uruchamiamy bez modyfikacji (Lightpanda: binarka z oficjalnego obrazu, tylko usunięte symbole debugowania), tylko prywatnie; zmieniona wersja udostępniana przez sieć innym wymagałaby publikacji źródeł |
 | CC-BY-SA-4.0 (getsentry `security-review`, Trail of Bits) | dołączamy **bez zmian**, z atrybucją i licencją przy skillu; tłumaczenie albo przeróbka byłaby adaptacją i musiałaby zostać na CC BY-SA, dlatego metodę Trail of Bits `insecure-defaults` przepisaliśmy własnymi regułami (`security_check.py`), bez kopiowania tekstu. Znaki towarowe (logo Trail of Bits, Sentry) nie są objęte licencją |
 | CC-BY-4.0 (model Parakeet) | uznanie autorstwa (NVIDIA) w tym pliku; model pobierany z Hugging Face, nie redystrybuujemy go |
+| cudze strony (katalog Inspo, własna baza `inspiracje/` w skarbcu) | bez licencji dla nas: bierzemy wzorce (układ, rytm, skala), nie grafiki, zdjęcia, teksty, logo ani kod; zrzuty zostają w skarbcu do użytku wewnętrznego, nie trafiają do projektów, podglądów ani do klientów |
 
 Aktualizacja źródła = zmiana `rev` w locku (pełny SHA), build, przegląd różnic w skillach, evals, commit.
 Walidator odrzuca źródło bez przypiętego SHA albo bez licencji.

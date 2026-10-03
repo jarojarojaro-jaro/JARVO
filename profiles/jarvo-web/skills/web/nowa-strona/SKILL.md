@@ -1,17 +1,17 @@
 ---
 name: nowa-strona
 description: "Nowa strona od briefu do podglądu (Astro, mobile-first)."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [web, astro, build, frontend]
-    related_skills: [systematic-debugging, frontend-design, design-md, popular-web-designs, favicon-i-meta, optymalizacja-obrazow, audyt-strony, wdrozenie, animate, gsap-core, gsap-scrolltrigger, threejs-fundamentals]
+    related_skills: [systematic-debugging, inspiracje-stron, frontend-design, design-md, popular-web-designs, favicon-i-meta, optymalizacja-obrazow, audyt-strony, wdrozenie, animate, gsap-core, gsap-scrolltrigger, threejs-fundamentals]
   jarvo:
     agent: jarvo-web
     autonomy: A1
-    reviewed: "2026-09-30"
+    reviewed: "2026-10-03"
 ---
 
 # Nowa strona
@@ -19,8 +19,11 @@ metadata:
 ## Kroki
 1. **Brief → plan strony** (`out/PLAN.md`): cel, odbiorca, sekcje (kolejność i treść każdej), CTA, brand kit, języki.
    Brak treści? Roboczy tekst oznaczony `[SZKIC]` (copy docelowe robi `jarvo-studio`).
-2. **Kierunek wizualny:** brand kit (`DESIGN.md`, tokeny) → zasady z `frontend-design`. Brak brand kitu → wybierz
-   bazę z `popular-web-designs`, uzasadnij w PLAN.md i zapytaj przez `kanban_block(kind="needs_input")`, jeśli wybór jest kluczowy.
+2. **Inspiracje → kierunek wizualny.** Najpierw skill `inspiracje-stron`: 3–5 prawdziwych stron z branży klienta
+   (katalog Inspo, serwer MCP `inspo`, albo własna baza w skarbcu) i sekcja „Inspiracje” w PLAN.md: co bierzemy, czego nie.
+   Potem brand kit (`DESIGN.md`, tokeny) → zasady z `frontend-design`; z inspiracji tylko układ, rytm i skala, nic kopiowanego.
+   Brak brand kitu → wybierz bazę z `popular-web-designs`, uzasadnij w PLAN.md i zapytaj przez
+   `kanban_block(kind="needs_input")`, jeśli wybór jest kluczowy.
 3. **Szkielet (Astro):**
    ```bash
    cd out && npm create astro@latest site -- --template minimal --no-install --no-git --skip-houston --yes

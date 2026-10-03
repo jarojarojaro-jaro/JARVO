@@ -216,6 +216,10 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     web = next(a for a in dane["agents"] if a["name"] == "jarvo-web")
     assert web["short"] == "Web" and any(s["name"] == "bezpieczenstwo-aplikacji" and s["description"] for s in web["skills"])
     assert "security_check.py" in web["scripts"]
+    # serwery MCP z config.yaml profilu (hub agenta w grafie wiedzy): Web ma inspo z narzędziami z tools.include
+    assert web["mcp"] == [{"name": "inspo", "tools": ["recommend", "search_screens", "get_screen", "get_design_system",
+                                                       "get_site_pages", "find_similar"]}]
+    assert next(a for a in dane["agents"] if a["name"] == "jarvo-lowca")["mcp"] == []
     # skarbiec idzie za kodem: ostatnie zmiany z CHANGELOG-u profilu i skrypty wspólne repo (lint nieaktualnych notatek)
     assert web["changes_section"] == "Niewydane" and web["changes"] and all(len(z) <= 280 for z in web["changes"])
     assert "odcisk.py" in dane["repo_scripts"] and "build.py" in dane["repo_scripts"]

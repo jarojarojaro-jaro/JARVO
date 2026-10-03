@@ -9,7 +9,7 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 |---|---|
 | 🛰️ `jarvo` | Main Judge: przyjmuje zlecenia, planuje misje, rozdziela karty, ocenia, raportuje, patroluje |
 | 🔎 `jarvo-sherlock` | detektyw researchu: wiele źródeł, weryfikacja faktów, raporty z cytatami |
-| 🌐 `jarvo-web` | Web Senior Dev: brand z URL, audyty, strony i landingi, SEO, favicony, obrazy |
+| 🌐 `jarvo-web` | Web Senior Dev: brand z URL, inspiracje z branży (Inspo), audyty, strony i landingi, SEO, favicony, obrazy |
 | 🎬 `jarvo-studio` | marketing i kreacja: grafiki social, obrazy AI (OpenRouter), copy PL, kampanie |
 | 🎥 `jarvo-wideo` | wideograf: krótkie filmy z tematu (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, klipy z nagrań, typografia jak z montażu |
 | 📈 `jarvo-ads` | specjalista Ads: Meta i Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem |

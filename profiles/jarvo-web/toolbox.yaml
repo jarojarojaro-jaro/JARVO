@@ -12,11 +12,27 @@ tools:
   - {name: svgo, source: https://github.com/svg/svgo, license: MIT, version: see-infra, install: {method: npm, spec: svgo}, integration: cli, used_by_skills: [optymalizacja-obrazow], healthcheck: "svgo --version", autonomy: A1}
   - {name: agent-browser, source: https://github.com/vercel-labs/agent-browser, license: Apache-2.0, version: see-infra, install: {method: npm, spec: agent-browser}, integration: hermes-browser-driver, used_by_skills: [audyt-strony, brand-z-url], healthcheck: "agent-browser --version", autonomy: A0, notes: "Sterownik browser_* z silnikiem Lightpanda (lekki); zrzuty i render przez Chromium."}
   - {name: dembrandt, source: https://github.com/dembrandt/dembrandt, license: MIT, version: see-infra, install: {method: npm, spec: dembrandt}, integration: skill-script, used_by_skills: [brand-z-url], healthcheck: "dembrandt --version", autonomy: A0}
+  - name: inspo-mcp
+    source: https://github.com/Nutlope/inspo
+    license: MIT
+    version: see-infra
+    install: {method: npm, spec: inspo-mcp}
+    integration: mcp
+    used_by_skills: [inspiracje-stron, nowa-strona, landing-produktowy]
+    healthcheck: >-
+      echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"healthcheck","version":"0"}}}'
+      | timeout 30 inspo-mcp --stdio | grep -q '"name":"inspo"'
+    autonomy: A0
+    notes: >-
+      Serwer MCP `inspo` w config.yaml (stdio, lazy, trust: untrusted, 6 narzędzi z tools.include, INSPO_PROFILE=full, INSPO_IMAGES=thumbs,
+      INSPO_MAX_TOKENS=5000). Katalog 832 stron / 2320 podstron pobiera z CDN autorów przy starcie procesu, więc healthcheck
+      sprawdza też dostęp do CDN. Bez TOGETHER_API_KEY (wyszukiwanie leksykalne + filtry); hostowanego endpointu nie używamy.
+      Zrzuty to własność autorów stron: tylko inspiracja, nie kopiujemy grafik ani tekstów i nie hostujemy zrzutów.
   - {name: astro, source: https://github.com/withastro/astro, license: MIT, version: per-project, install: {method: npm, spec: "npm create astro@latest (per projekt)"}, integration: cli, used_by_skills: [nowa-strona, landing-produktowy], healthcheck: "node --version", autonomy: A1}
   - {name: claude-seo-runtime, source: https://github.com/AgriciDaniel/claude-seo, license: MIT, version: e77e783e38eeb738424eb72117abbd2dacdd88af, install: {method: git, spec: /opt/jarvo/vendor/claude-seo}, integration: skill-script, used_by_skills: [seo-technical, seo-page, seo-audit], healthcheck: "\"$CLAUDE_PLUGIN_ROOT/scripts/claude-seo\" --help", autonomy: A0}
 
 sidecars: []
 hermes_skills: [popular-web-designs, design-md, claude-design, impeccable, scrollcraft, publish-site, cloudflare-temporary-deploy]
 hermes_plugins: [image-utils]
-mcp_servers: [context7]    # dokumentacja bibliotek; włączany w config.yaml po weryfikacji w fazie 0
+mcp_servers: [inspo, context7]    # inspo: włączony w config.yaml (skill inspiracje-stron); context7: planowany, po weryfikacji
 env_requires: [OPENROUTER_API_KEY]

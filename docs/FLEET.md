@@ -13,7 +13,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 |---|---|---|---|---|---|
 | `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [13 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 1 (`writing-for-agents`, mattpocock) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski | [23](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [7 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 16 (Hermes, marketingskills, wspólny `transkrypcja-filmu`) | search_fanout, extract, sources | [13](../evals/jarvo-sherlock/scenarios.yaml) |
-| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [9 w `skills/web/`](../profiles/jarvo-web/skills/web) | 58 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [16](../evals/jarvo-web/scenarios.yaml) |
+| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 58 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [17](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 23 (marketingskills, Anthropic, Hermes, impeccable, wspólny `hooki`) | render_html, check_media | [12](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [16 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 59 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, demo_strony, typografia, maska (+ wideo_lib) | [28](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [13](../evals/jarvo-ads/scenarios.yaml) |
@@ -102,7 +102,8 @@ Pracy dziedzinowej nie wykonuje (zasada SOUL, nie brak narzędzi).
 ## `jarvo-web`: Web Senior Dev
 
 **Misja:** wie o stronach wszystko. Robi nowe strony, ulepsza i usprawnia stare, uczy
-się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
+się Twojej marki z istniejącej strony i robi strony produktowe pod SEO. Przed projektem ogląda prawdziwe strony
+z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z nich bierze.
 
 **Zakres wiedzy (knowledge packi w `references/`):**
 - **Fundamenty:** semantyczny HTML, nowoczesny CSS, mobile-first, breakpointy, typografia, dark mode.
@@ -125,6 +126,9 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
   ton i komponenty do `knowledge/brands/<marka>/` (z `DESIGN.md`)
 - [T] `audyt-strony`: Lighthouse, dostępność (axe), SEO, obrazy i responsywność (zrzuty na kilku
   szerokościach), wynik jako raport z priorytetami
+- [T] `inspiracje-stron`: przed projektem 3–5 stron referencyjnych z branży klienta: katalog Inspo (MCP `inspo`,
+  832 prawdziwe strony ze zrzutami, paletą i układem) według mapy polskich branż, a dla branż słabo pokrytych
+  (nieruchomości, gabinety, salony, kancelarie…) własna baza w skarbcu `inspiracje/strony/<branża>/`; wnioski w PLAN.md
 - [T] `nowa-strona`: od briefu do wdrożenia (domyślny stack: Astro dla stron marketingowych)
 - [T] `bramka-jakosci`: rubryka designu 10 osi (wynik 0–100, zaliczenie od 90, rundy poprawek) i testy wrogie
   (`hostile.cjs`: wolne łącze, brak JS, 320 px, klawiatura, długie polskie słowa, reduced motion, zasoby zewnętrzne)
@@ -136,8 +140,8 @@ się Twojej marki z istniejącej strony i robi strony produktowe pod SEO.
   lista 26 punktów (w tym funkcje AI, sesje, CSRF, kopie zapasowe), przegląd kodu
 
 **Narzędzia:** terminal, pliki, przeglądarka (Lightpanda, Chromium do zrzutów), Node.js, a do tego Lighthouse, axe-core,
-Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate; MCP `context7`
-zaplanowany (jeszcze niewłączony w `config.yaml`). Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-web-web-senior-dev).
+Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate; MCP `inspo` (katalog stron
+Inspo, lokalnie po stdio, włączony w `config.yaml`, startuje przy pierwszym użyciu), MCP `context7` zaplanowany. Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-web-web-senior-dev).
 
 **Rubryka sędziego (DoD):** strona buduje się bez błędów, Lighthouse ≥ 90 we wszystkich
 kategoriach (albo uzasadnienie), komplet faviconów i meta, poprawne zrzuty mobile i desktop,
