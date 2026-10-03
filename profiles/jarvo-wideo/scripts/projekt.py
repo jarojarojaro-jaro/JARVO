@@ -90,8 +90,9 @@ def load(film: Path) -> dict:
     if not info.get("ok"):
         raise SystemExit(f"nie mogę odczytać filmu: {film}")
     fps = info.get("fps") or 30
+    w, h = ed.kadr_eksportu(even(info.get("w") or 1920), even(info.get("h") or 1080))   # 4K → 1080p, jak w edytorze
     return {"version": 1, "format": "orig",
-            "canvas": {"w": even(info.get("w") or 1920), "h": even(info.get("h") or 1080), "fps": min(FPS, key=lambda f: abs(f - fps))},
+            "canvas": {"w": w, "h": h, "fps": min(FPS, key=lambda f: abs(f - fps))},
             "clips": [{"id": new_id("c"), "src": str(film), "kind": "video", "in": 0, "out": info.get("duration") or 5,
                        "speed": 1, "volume": 1, "muted": False, "fit": "contain"}],
             "texts": [], "audio": []}

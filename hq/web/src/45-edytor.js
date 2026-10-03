@@ -140,6 +140,14 @@ let edSeq = 0;
 const edId = (p) => `${p}${Date.now().toString(36)}${(edSeq++).toString(36)}`;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const even = (n) => { n = Math.round(n); return Math.max(2, n - (n % 2)); };
+// kadr o proporcjach źródła z krótszym bokiem najwyżej 1080 px (4K z iPhone'a → 1080×1920): platformy pokazują
+// najwyżej 1080p, a eksport 4K z warstwami typografii i maską nie mieści się w pamięci VPS. Ta sama reguła:
+// edytor.kadr_eksportu (serwer i Wideograf); napisy i typografia skalują się z krótszym bokiem kadru.
+const ED_KROTSZY = 1080;
+function edKadr(w, h) {
+  const k = Math.min(1, ED_KROTSZY / Math.max(1, Math.min(w, h)));
+  return [even(Math.floor(w * k + 0.5)), even(Math.floor(h * k + 0.5))];
+}
 const clipDur = (c) => (c.out - c.in) / (c.speed || 1);
 const audioDur = (m) => m.out - m.in;
 function fmtT(s, fine) {
@@ -504,9 +512,9 @@ function usePlayer(proj, meta, onTick) {
 
 // ------------------------------------------------------------------ edytor
 function initialProject(file) {
-  const w = file.w || 1920, h = file.h || 1080;
+  const [w, h] = edKadr(even(file.w || 1920), even(file.h || 1080));
   return {
-    version: 1, format: "orig", canvas: { w: even(w), h: even(h), fps: [24, 25, 30, 50, 60].reduce((a, f) => (Math.abs(f - (file.fps || 30)) < Math.abs(a - (file.fps || 30)) ? f : a), 30) },
+    version: 1, format: "orig", canvas: { w, h, fps: [24, 25, 30, 50, 60].reduce((a, f) => (Math.abs(f - (file.fps || 30)) < Math.abs(a - (file.fps || 30)) ? f : a), 30) },
     clips: [{ id: edId("c"), src: file.path, kind: "video", in: 0, out: file.duration || 5, speed: 1, volume: 1, muted: false, fit: "contain" }],
     texts: [], audio: [],
   };
@@ -622,7 +630,8 @@ function VideoEditor({ path, onClose }) {
         clips: proj.clips.filter((c) => ok.has(c.src)).map((c) => ({ ...c, id: c.id || edId("c") })),
         audio: (proj.audio || []).filter((c) => ok.has(c.src)).map((c) => ({ ...c, id: c.id || edId("a") })) };
       if (!proj.clips.length) proj = initialProject(d.file);
-      return proj;
+      const [cw, ch] = edKadr(even(+(proj.canvas || {}).w || 1920), even(+(proj.canvas || {}).h || 1080));   // stary projekt 4K → 1080p
+      return { ...proj, canvas: { ...(proj.canvas || {}), w: cw, h: ch } };
   }
   // zmiany z zewnątrz (Wideograf przez projekt.py): wczytujemy jako zwykły krok, więc ↶ cofa zmiany agenta
   const baseRef = useRef(0);
@@ -1014,7 +1023,7 @@ function VideoEditor({ path, onClose }) {
   const innyKadr = (src, W, H) => { const m = meta[src]; return !!(m && m.w && m.h) && Math.abs(m.w / m.h - W / H) > 0.02 * (W / H); };
   const setCanvas = (format) => H.apply((P) => {
     const f = meta[path] || {};
-    const [w, h] = format === "orig" ? [even(f.w || 1920), even(f.h || 1080)] : ED_SIZES[format];
+    const [w, h] = format === "orig" ? edKadr(even(f.w || 1920), even(f.h || 1080)) : ED_SIZES[format];
     // klip, który pasował do starego kadru, a do nowego nie: rozmyte tło zamiast czarnych pasów (wybrane Pasy zostają)
     const clips = P.clips.map((c) => ((c.fit || "contain") === "contain" && !innyKadr(c.src, P.canvas.w, P.canvas.h) && innyKadr(c.src, w, h) ? { ...c, fit: "blur" } : c));
     return { ...P, format, canvas: { ...P.canvas, w, h }, clips };

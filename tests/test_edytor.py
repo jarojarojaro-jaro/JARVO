@@ -33,6 +33,35 @@ def _resolver(tmp: Path):
     return resolve
 
 
+KADRY = [(2160, 3840), (3840, 2160), (1242, 2688), (1080, 1920), (720, 1280), (3840, 3840), (1440, 1080), (16, 3840)]
+
+
+def test_kadr_eksportu_najwyzej_1080p_z_proporcjami(tmp_path):
+    """Nagranie 4K z telefonu → kadr 1080×1920 (pamięć eksportu z typografią i maską); mniejsze zostają."""
+    assert ed.kadr_eksportu(2160, 3840) == (1080, 1920) and ed.kadr_eksportu(3840, 2160) == (1920, 1080)
+    assert ed.kadr_eksportu(1080, 1920) == (1080, 1920) and ed.kadr_eksportu(720, 1280) == (720, 1280)
+    w, h = ed.kadr_eksportu(1242, 2688)
+    assert w == 1080 and w % 2 == 0 and h % 2 == 0 and abs(h / w - 2688 / 1242) < 0.003
+    f = _files(tmp_path)
+    p = ed.normalize({"canvas": {"w": 2160, "h": 3840, "fps": 60}, "clips": [{"src": str(f["a.mp4"]), "in": 0, "out": 2}]},
+                     _resolver(tmp_path))
+    assert p["canvas"] == {"w": 1080, "h": 1920, "fps": 60}
+
+
+def test_kadr_eksportu_ten_sam_w_edytorze(tmp_path):
+    """edKadr (45-edytor.js) liczy to samo co edytor.kadr_eksportu: eksport z HQ i render agenta mają jeden kadr."""
+    if not shutil.which("node"):
+        pytest.skip("brak node")
+    import re
+    js = (ROOT / "hq" / "web" / "src" / "45-edytor.js").read_text(encoding="utf-8")
+    prog = "\n".join([re.search(r"^const even = .*$", js, re.M).group(0), re.search(r"^const ED_KROTSZY = .*$", js, re.M).group(0),
+                      re.search(r"^function edKadr\(.*?^}", js, re.S | re.M).group(0),
+                      f"console.log(JSON.stringify({json.dumps(KADRY)}.map(([w, h]) => edKadr(w, h))));"])
+    r = subprocess.run(["node", "-e", prog], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert [tuple(x) for x in json.loads(r.stdout)] == [ed.kadr_eksportu(w, h) for w, h in KADRY]
+
+
 def test_normalize_limits_and_defaults(tmp_path):
     f = _files(tmp_path)
     p = ed.normalize({"canvas": {"w": 1081, "h": 1919, "fps": 29},

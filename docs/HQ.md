@@ -174,6 +174,12 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat → nakładki → miks z limiterem), H.264 + AAC,
   `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
   i dopiero gotowy dostaje nazwę `film-edycja[-N].mp4`: nic nie jest nadpisywane.
+  Kadr ma krótszy bok najwyżej 1080 px przy proporcjach źródła (nagranie 4K z iPhone'a 2160×3840 → 1080×1920;
+  `edytor.kadr_eksportu` = `edKadr` w `45-edytor.js`, tak samo `projekt.py`): platformy i tak pokazują najwyżej 1080p,
+  a 4K z warstwami typografii i maską nie mieściło się w pamięci kontenera. Warstwy z klatek (typografia, maska,
+  karaoke) zmieniają format przed filtrem `fps`, nie po nim, bo `fps` powtarza długą klatkę od razu wiele razy
+  i każda powtórka po konwersji to nowa pełna klatka w pamięci (pomiar 1080×1920, 18 s, 3 warstwy: 1,1 GB stałe
+  zamiast rosnących do OOM).
 - **Klip o innych proporcjach niż kadr** (np. poziome nagranie w pionie 9:16) ma trzy tryby: **Pasy** (całe ujęcie,
   czarne pasy), **Rozmyte tło** (całe ujęcie na rozmytym, przyciemnionym tle z niego samego; `fit: "blur"`) i
   **Wypełnij** (przycięcie). Wybór jest w ustawieniach klipu, a w **Format** dla wszystkich takich klipów naraz.

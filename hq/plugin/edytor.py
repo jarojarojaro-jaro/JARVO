@@ -81,14 +81,24 @@ def _even(n: float) -> int:
     return max(2, n - (n % 2))       # libx264 + yuv420p wymaga parzystych wymiarów
 
 
+MAX_KROTSZY = 1080   # krótszy bok kadru: platformy pokazują najwyżej 1080p, a 4K z warstwami typografii i maską nie mieści się w pamięci VPS
+
+
+def kadr_eksportu(w: int, h: int) -> tuple[int, int]:
+    """Kadr o proporcjach źródła z krótszym bokiem najwyżej 1080 px (np. 2160×3840 z iPhone'a → 1080×1920).
+    Ta sama reguła co edKadr w hq/web/src/45-edytor.js; napisy i typografia skalują się z krótszym bokiem."""
+    k = min(1.0, MAX_KROTSZY / max(1, min(w, h)))
+    return _even(math.floor(w * k + 0.5)), _even(math.floor(h * k + 0.5))
+
+
 def normalize(project: dict, resolve) -> dict:
     """Sprawdza i porządkuje projekt. `resolve(src) -> Path | None` pilnuje katalogów floty."""
     if not isinstance(project, dict):
         raise ProjectError("Projekt musi być obiektem JSON.")
     cv = project.get("canvas") or {}
     fps = int(_num(cv.get("fps"), 1, 60, 30))
-    canvas = {"w": _even(_num(cv.get("w"), 16, 3840, 1920)), "h": _even(_num(cv.get("h"), 16, 3840, 1080)),
-              "fps": min(FPS_ALLOWED, key=lambda f: abs(f - fps))}
+    cw, ch = kadr_eksportu(_even(_num(cv.get("w"), 16, 3840, 1920)), _even(_num(cv.get("h"), 16, 3840, 1080)))
+    canvas = {"w": cw, "h": ch, "fps": min(FPS_ALLOWED, key=lambda f: abs(f - fps))}
 
     clips = []
     for c in (project.get("clips") or [])[:MAX_CLIPS + 1]:
@@ -492,21 +502,25 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
     if maska and (typo or {}).get("tyl"):
         graph.append("[vc]split[vcm][vco]")  # kopia klatki: z niej wycinamy osobę według sylwetki
         vlast, osoba = "vcm", "vco"
+    # Warstwy z listy concat (typografia, maska, karaoke): długi odcinek to jedna klatka, którą `fps` powtarza od razu
+    # (np. 3 s × 60 kl.). Konwersja formatu stoi więc PRZED `fps`, a nakładka ma ten sam format (yuv420): powtórzenie
+    # to odwołanie do tej samej klatki. Konwersja za `fps` robiła z każdego powtórzenia pełną klatkę w pamięci
+    # (4K z iPhone'a: ponad 4,5 GB i zabity ffmpeg; na długim filmie pamięć rosła z czasem pustego odcinka).
     for warstwa in ("tyl", "przod"):       # typografia: najpierw warstwa „za osobą”, potem przednia
         lista = (typo or {}).get(warstwa)
         if not lista:
             continue
         args += ["-reinit_filter", "0", "-f", "concat", "-safe", "0", "-i", str(lista)]
         yi = n; n += 1
-        graph.append(f"[{yi}:v]fps={F},format=rgba[ty{warstwa}]")
-        graph.append(f"[{vlast}][ty{warstwa}]overlay=0:0:format=auto:eof_action=pass[vy{warstwa}]")
+        graph.append(f"[{yi}:v]format=yuva420p,fps={F}[ty{warstwa}]")
+        graph.append(f"[{vlast}][ty{warstwa}]overlay=0:0:format=yuv420:eof_action=pass[vy{warstwa}]")
         vlast = f"vy{warstwa}"
         if warstwa == "tyl" and osoba:
             args += ["-reinit_filter", "0", "-f", "concat", "-safe", "0", "-i", str(maska)]
             mi = n; n += 1
-            graph.append(f"[{mi}:v]fps={F},scale={W}:{H}:flags=bicubic,format=rgba,alphaextract[mka]")
+            graph.append(f"[{mi}:v]scale={W}:{H}:flags=bicubic,format=rgba,alphaextract,fps={F}[mka]")
             graph.append(f"[{osoba}]format=rgba[osb];[osb][mka]alphamerge[osa]")
-            graph.append(f"[{vlast}][osa]overlay=0:0:format=auto:eof_action=pass[vos]")
+            graph.append(f"[{vlast}][osa]overlay=0:0:format=yuv420:eof_action=pass[vos]")
             vlast = "vos"
     for k, (t, png) in enumerate(zip(p["texts"], text_pngs)):
         if t.get("kara") and karaoke:
@@ -521,8 +535,8 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
         # w trakcie i nakładka gubi warstwę (sprawdzone testem na kolorach)
         args += ["-reinit_filter", "0", "-f", "concat", "-safe", "0", "-i", str(karaoke)]
         ki = n; n += 1
-        graph.append(f"[{ki}:v]fps={F},format=rgba[kl]")
-        graph.append(f"[{vlast}][kl]overlay=0:0:format=auto:eof_action=pass[vk]")
+        graph.append(f"[{ki}:v]format=yuva420p,fps={F}[kl]")
+        graph.append(f"[{vlast}][kl]overlay=0:0:format=yuv420:eof_action=pass[vk]")
         vlast = "vk"
 
     alast = "ac"
