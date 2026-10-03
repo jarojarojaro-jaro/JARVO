@@ -267,6 +267,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   przewijana palcem pod stałym wskaźnikiem na środku (dwa palce: przybliżenie), a na dole pasek **Edytuj · Audio ·
   Tekst · Napisy · Format**. Narzędzie otwiera panel od dołu; dotknięcie klipu, napisu albo muzyki na osi otwiera
   jego ustawienia, uchwyty do przycinania pojawiają się na zaznaczonym elemencie.
+- Plan dalszej rozbudowy (szybkie cięcie, audio, naklejki, animacje klipów) i stan kroków: [EDYTOR-PLAN.md](EDYTOR-PLAN.md).
 - Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg)
   i `tests/test_edytor_przejscia.py` (przejścia: oś, eksport, podgląd = film).
 
