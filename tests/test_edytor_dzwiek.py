@@ -86,6 +86,28 @@ def test_ciche_ciecia_w_poleceniu(tmp_path):
     assert "afade=t=in:st=0:d=0.025:curve=tri,afade=t=out:st=0.975:d=0.025:curve=tri,adelay=1000|1000[m1]" in cmd
 
 
+def test_podzial_bez_wyciszenia(tmp_path):
+    """Klip tylko podzielony (np. pod przybliżenie drugiej części) gra dalej ten sam dźwięk: bez dziury 2×25 ms
+    w środku słowa. Prawdziwe cięcie dalej dostaje wyciszenie, tak samo podzielone audio na osi."""
+    for n in ("a.mp4", "m.mp3"):
+        (tmp_path / n).write_bytes(b"x")
+    a, m = str(tmp_path / "a.mp4"), str(tmp_path / "m.mp3")
+    p = ed.normalize({"clips": [{"src": a, "in": 0, "out": 2}, {"src": a, "in": 2, "out": 4, "zoom": 1.15, "fit": "cover"},
+                                {"src": a, "in": 5, "out": 6}],
+                      "audio": [{"src": m, "start": 0, "in": 1, "out": 3}, {"src": m, "start": 2, "in": 3, "out": 4}]},
+                     lambda s: Path(s) if Path(s).is_file() else None)
+    cmd = " ".join(ed.build_command(p, {a: True}, [], tmp_path / "o.mp4"))
+    a0 = cmd.split("[a0]")[0].rsplit("[0:a]", 1)[1]
+    a1 = cmd.split("[a1]")[0].rsplit("[1:a]", 1)[1]
+    assert "afade=t=in:st=0:d=0.025" in a0 and "afade=t=out" not in a0          # podział: bez wyciszenia na styku
+    assert "afade=t=in" not in a1 and "afade=t=out:st=1.975:d=0.025" in a1      # dalej prawdziwe cięcie (4 → 5 s)
+    assert "afade=t=in:st=0:d=0.025:curve=tri,adelay=0|0[m0]" in cmd           # audio: tylko wejście (od środka pliku)
+    assert "afade=t=out:st=0.975:d=0.025:curve=tri,adelay=2000|2000[m1]" in cmd   # ciąg dalszy: tylko wyjście
+    assert not ed.ciagly(p["clips"][1], p["clips"][2])
+    p["clips"][1]["volume"] = 0.5                                                # inna głośność = skok, wyciszenie wraca
+    assert not ed.ciagly(p["clips"][0], p["clips"][1])
+
+
 @pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
 def test_ciecie_bez_kliku(tmp_path):
     """Dwa kawałki tej samej fali w różnych fazach (szczyt → zero): bez wyciszenia na styku jest skok fali (klik),

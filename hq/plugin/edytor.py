@@ -123,6 +123,21 @@ def ciche_ciecie(d: float) -> float:
     return min(CICHE_CIECIE, max(0.0, d) / 4)
 
 
+def ciagly(a: dict | None, b: dict | None) -> bool:
+    """Klip b gra dalej dźwięk klipu a bez przerwy (klip tylko podzielony, np. pod przybliżenie): to samo źródło,
+    ten sam czas źródła, tempo i głośność. Na takim podziale fala nie skacze, więc nie dostaje mikro-wyciszenia."""
+    return bool(a and b and a.get("kind") == b.get("kind") == "video" and str(a.get("src")) == str(b.get("src"))
+                and abs(float(b.get("in", 0)) - float(a.get("out", 0))) < 1e-3 and a.get("speed") == b.get("speed")
+                and not a.get("muted") and not b.get("muted") and a.get("volume") == b.get("volume"))
+
+
+def ciagle_audio(a: dict, b: dict) -> bool:
+    """Audio b to dalszy ciąg audio a na osi (podzielony podkład albo lektor): bez dziury z mikro-wyciszenia."""
+    return (str(a.get("src")) == str(b.get("src")) and abs(float(b.get("in", 0)) - float(a.get("out", 0))) < 1e-3
+            and abs(float(b.get("start", 0)) - float(a.get("start", 0)) - (float(a.get("out", 0)) - float(a.get("in", 0)))) < 1e-3
+            and a.get("volume") == b.get("volume"))
+
+
 def afade(fi: float, fo: float, st: float, d: float) -> str:
     """Zanik liniowy (curve=tri, jak zanikGain w podglądzie) dźwięku, który zaczyna się w st i trwa d; "" bez zaniku.
     afade daje ciszę przed narastaniem i po wyciszeniu (także w zapasie przejścia), tak samo jak podgląd."""
@@ -636,9 +651,12 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
             graph.append(f"[{vi}:a]{chain},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
                          + (f"adelay={round(brak * 1000)}:all=1," if brak > 1e-4 else "")
                          + f"apad,atrim=duration={_f(L)},asetpts=PTS-STARTPTS"
-                         # cięcie bez przejścia i bez zaniku dostaje mikro-wyciszenie (przejście ma acrossfade)
-                         + (f",{zan}" if (zan := afade(c.get("fade_in", 0) or (0 if pre else ciche_ciecie(L - pre - post)),
-                                                       c.get("fade_out", 0) or (0 if post else ciche_ciecie(L - pre - post)),
+                         # cięcie bez przejścia i bez zaniku dostaje mikro-wyciszenie (przejście ma acrossfade);
+                         # podział ciągłego materiału nie jest cięciem dźwięku, więc zostaje bez wyciszenia
+                         + (f",{zan}" if (zan := afade(c.get("fade_in", 0) or (0 if pre or (i and ciagly(p["clips"][i - 1], c))
+                                                                                else ciche_ciecie(L - pre - post)),
+                                                       c.get("fade_out", 0) or (0 if post or ciagly(c, (p["clips"][i + 1:] or [None])[0])
+                                                                                 else ciche_ciecie(L - pre - post)),
                                                        pre, L - pre - post)) else "")
                          + f"[a{i}]")
         else:
@@ -699,8 +717,10 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
             ms = int(round(m["start"] * 1000))
             # audio przycięte od środka: mikro-wyciszenie na początku (od początku pliku zostaje atak efektu) i na końcu
             mik = ciche_ciecie(m["out"] - m["in"])
-            zan = afade(m.get("fade_in", 0) or (mik if m["in"] > 0.001 else 0), m.get("fade_out", 0) or mik,
-                        0, m["out"] - m["in"])
+            dalej = any(ciagle_audio(m, x) for x in p["audio"])        # podzielone audio gra dalej bez dziury
+            dalszy = any(ciagle_audio(x, m) for x in p["audio"])
+            zan = afade(m.get("fade_in", 0) or (mik if m["in"] > 0.001 and not dalszy else 0),
+                        m.get("fade_out", 0) or (0 if dalej else mik), 0, m["out"] - m["in"])
             graph.append(f"[{mi}:a]asetpts=PTS-STARTPTS,volume={_f(m['volume'])},aresample=48000,"
                          f"aformat=sample_fmts=fltp:channel_layouts=stereo,{zan + ',' if zan else ''}adelay={ms}|{ms}[m{k}]")
             mix.append(f"[m{k}]")
