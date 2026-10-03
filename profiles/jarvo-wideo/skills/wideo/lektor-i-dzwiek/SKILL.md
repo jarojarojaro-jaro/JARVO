@@ -41,8 +41,20 @@ powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. D
 
 ## Muzyka
 - Źródła: biblioteka użytkownika `@@KNOWLEDGE_DIR@@/wideo/muzyka/` (plan: `"muzyka": {"plik": "losowa"}`),
-  muzyka marki `brands/<marka>/muzyka/`, plik z karty. Brak utworów z licencją → film bez muzyki
+  muzyka marki `brands/<marka>/muzyka/`, plik z karty, a gdy ich brak: podkłady CC0 z biblioteki edytora
+  (`projekt.py dzwieki --muzyka`, `dodaj-dzwiek`; „losowa” bierze je sama). Inny utwór tylko z licencją
   (zaproponuj w RAPORT: YouTube Audio Library, Pixabay Music, pobrane przez użytkownika do biblioteki).
+
+## Efekty dźwiękowe (biblioteka CC0)
+- `python3 $HERMES_HOME/scripts/projekt.py dzwieki [--kategoria K] [--szukaj fraza]`: 157 efektów
+  w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia, akcja, interfejs, technika, natura, zwierzęta, codzienne,
+  zabawne, gry i retro, dżingle) i 9 podkładów (`--muzyka`); ta sama biblioteka co menu Audio w edytorze HQ.
+- `projekt.py dodaj-dzwiek <film> <id> --start S [--glosnosc 0.8]`: efekt na osi (kopia w `<katalog filmu>/dzwieki/`).
+  Efekt gra od razu w chwili `--start` (cisza na początku pliku jest przycięta): stawiaj go na cięciu albo akcji.
+- Umiar: 1 efekt na kilka sekund, whoosh na przejściu, „kasa” przy cenie, oklaski przy wyniku; głośność efektu
+  pod lektorem ok. 0,5–0,8.
+- `projekt.py wyodrebnij <film> <id klipu>`: dźwięk klipu jako osobne audio (np. żeby przeciągnąć go pod inne ujęcie);
+  `--plik inny.mp4` bierze dźwięk z innego filmu. `projekt.py lektor <film> "tekst" --start S`: lektor wprost na oś.
 - Głośność pod lektorem 0,10–0,18 (plan: `glosnosc`); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.
 - Nigdy: muzyka z list przebojów, „znalezione na YouTube”, muzyka z cudzych filmów.

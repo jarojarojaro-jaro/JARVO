@@ -27,13 +27,16 @@ Jarvo zostaje nadrzędny: z cudzych projektów bierzemy tylko wzorce i pliki na 
 
 ## Krok 2. Audio
 
-- **Efekty dźwiękowe wbudowane:** mała biblioteka ok. 100 dźwięków CC0 (Kenney, Freesound z licencją CC0), razem
-  3–5 MB, katalog jak `kroje.py` (nazwa, kategoria, długość, licencja, suma); np. liczenie banknotów, spadające monety,
-  strzał, plusk wody, kliknięcie, whoosh.
-- **Wyodrębnij:** dźwięk z innego filmu jako osobne audio.
-- **Tekst na mowę:** lektor Edge TTS (ten sam co w `film.py`), głos i tempo do wyboru.
-- **Muzyka:** biblioteka użytkownika, muzyka marki i utwory z anidoodle, z odsłuchem przed dodaniem.
-- **Nagraj:** mikrofon w przeglądarce (wymaga HTTPS, np. Tailscale serve); bez HTTPS wgranie notatki głosowej.
+Menu **Audio** (przycisk „Dodaj audio” pod osią, na komputerze zakładka „Audio” w panelu, `hq/web/src/44-audio.js`)
+ma pięć kart. Każdy dodany dźwięk to plik obok filmu (`dzwieki/`, `lektor/`), więc projekt działa też bez biblioteki.
+
+| Funkcja | Stan | Opis |
+|---|---|---|
+| Efekty dźwiękowe | ✅ | Biblioteka CC0 w repo (`hq/web/dzwieki/`, `scripts/dzwieki.py`): 157 efektów w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia, akcja, interfejs, technika, natura, zwierzęta, codzienne, zabawne, gry, dżingle) z Kenney i Freesound (tylko CC0, licencja sprawdzana przy pobraniu), 8,1 MB; szukanie po polsku i angielsku, odsłuch, dodanie we wskaźniku; `projekt.py dzwieki` i `dodaj-dzwiek` |
+| Muzyka | ✅ | 9 podkładów CC0 z biblioteki (do 60 s, z wyciszeniem), muzyka ze skarbca (`wideo/muzyka`, `brands/*/muzyka`), pliki z folderu filmu, wgranie z dysku; bez popularnych utworów; podkład dodaje się ciszej (30%) |
+| Wyodrębnij | ✅ | Dźwięk z innego filmu jako osobne audio, a w panelu klipu „Wyodrębnij dźwięk” jak w CapCut: dźwięk klipu zostaje w tym samym miejscu osi, klip się wycisza (AAC kopiowane bez straty); `projekt.py wyodrebnij` |
+| Lektor | ✅ | Tekst na mowę Edge TTS (ten sam co w `film.py`), 5 głosów i tempo −30…+30%; `projekt.py lektor` (z czasami słów do napisów) |
+| Nagraj | ✅ | Mikrofon w przeglądarce (MediaRecorder, serwer zapisuje AAC); wymaga HTTPS albo localhost, bez tego wgranie notatki głosowej z telefonu |
 
 ## Krok 3. Tekst
 

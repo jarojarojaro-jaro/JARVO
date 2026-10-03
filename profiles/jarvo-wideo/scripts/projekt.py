@@ -8,6 +8,10 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py pokaz <film>                        # co jest na osi (klipy, napisy, audio, długość)
     projekt.py dodaj-audio <film> <plik> [--start S] [--od S] [--do S] [--glosnosc 0.8] [--wycisz-film] [--narastanie 1] [--wyciszanie 2]
     projekt.py dzwiek <film> <id> [--glosnosc 0.3] [--narastanie S] [--wyciszanie S] [--wycisz|--wlacz]   # klip albo audio
+    projekt.py dzwieki [--kategoria pieniadze] [--szukaj monety] [--muzyka]   # biblioteka CC0 (efekty i podkłady)
+    projekt.py dodaj-dzwiek <film> <id> [--start S] [--glosnosc 1] [--narastanie S] [--wyciszanie S]   # z biblioteki
+    projekt.py wyodrebnij <film> (<id klipu> | --plik inny.mp4 [--start S])   # dźwięk z filmu jako osobne audio
+    projekt.py lektor <film> "tekst" [--start S] [--glos pl-PL-MarekNeural] [--tempo +5%]   # Edge TTS jak film.py
     projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain] [--kroj Poppins]
                                            [--y 0.78] [--rozmiar 72] [--kolor #FFFFFF] [--tlo #000000]
     projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--rozmyte|--dopasuj|--wypelnij --fx X --fy Y --zoom Z]
@@ -59,6 +63,7 @@ import edytor as ed  # noqa: E402
 NAPISY_JS = next((p for p in (HERE / "edytor_napisy.js", _REPO / "hq" / "web" / "src" / "44-napisy.js") if p.exists()), None)
 TYPO_JS = next((p for p in (HERE / "edytor_typografia.js", _REPO / "hq" / "web" / "src" / "48-typografia.js") if p.exists()), None)
 KROJE = next((p for p in (HERE / "kroje", _REPO / "hq" / "web" / "fonts" / "kroje") if (p / "kroje.css").exists()), None)
+DZWIEKI = next((p for p in (HERE / "dzwieki", _REPO / "hq" / "web" / "dzwieki") if (p / "katalog.json").exists()), None)
 TEXT_DEFAULT = {"x": 0.5, "y": 0.78, "size": 72, "color": "#FFFFFF", "bg": "#000000", "style": "shadow",
                 "font": "system-ui, 'Segoe UI', Roboto, sans-serif", "bold": True, "align": "center", "maxw": 0.86}
 CAP_DEFAULT = {**TEXT_DEFAULT, "y": 0.84, "size": 58, "style": "outline", "maxw": 0.84,
@@ -484,6 +489,122 @@ def cmd_wytnij(film: Path, a) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- audio: biblioteka, wyodrębnienie, lektor
+
+def cmd_dzwieki(_film, a) -> int:
+    """Biblioteka CC0 (ta sama co menu Audio w edytorze HQ): id do `dodaj-dzwiek`, kategoria, długość, nazwa."""
+    kat = ed.dzwieki_katalog(DZWIEKI)
+    if not kat["dzwieki"]:
+        raise SystemExit("brak biblioteki dźwięków (hq/web/dzwieki, scripts/dzwieki w profilu)")
+    nazwy = {k["id"]: k["nazwa"] for k in kat["kategorie"]}
+    q = (a.szukaj or "").lower()
+    rows = [d for d in kat["dzwieki"]
+            if (not a.kategoria or d["kat"] == a.kategoria) and (not a.muzyka or d["kat"] == "muzyka")
+            and (not q or q in f"{d['id']} {d['nazwa']} {d['en']}".lower())]
+    if not rows:
+        print(f"Nic nie pasuje. Kategorie: {', '.join(nazwy)}")
+        return 1
+    for d in rows:
+        print(f"  {d['id']:<26} {nazwy.get(d['kat'], d['kat']):<12} {d['dl']:6.2f} s  {d['nazwa']}")
+    print(f"{len(rows)} z {len(kat['dzwieki'])} (CC0, autorzy w {DZWIEKI}/LICENCJE.md). Dodaj: projekt.py dodaj-dzwiek <film> <id> --start S")
+    return 0
+
+
+def dodaj_plik_audio(film: Path, proj: dict, src: Path, start: float, glosnosc: float, a, od: float = 0.0,
+                     do: float | None = None) -> dict:
+    dur = ed.probe(src).get("duration") or 0
+    do = dur if do is None else do
+    if do - od <= 0.05:
+        raise SystemExit(f"pusty dźwięk: {src}")
+    item = {"id": new_id("a"), "src": str(src), "start": max(0.0, start), "in": od, "out": do,
+            "volume": max(0.0, min(2.0, glosnosc)), **zanik_z_arg(a, do - od)}
+    proj.setdefault("audio", []).append(item)
+    return item
+
+
+def cmd_dodaj_dzwiek(film: Path, a) -> int:
+    proj = load(film)
+    hit = ed.dzwiek_plik(DZWIEKI, a.id)
+    if not hit:
+        raise SystemExit(f"nie ma „{a.id}” w bibliotece (lista: projekt.py dzwieki)")
+    dest = ed.dzwiek_do_filmu(DZWIEKI, a.id, film)
+    vol = a.glosnosc if a.glosnosc is not None else (0.3 if hit[0]["kat"] == "muzyka" else 1.0)
+    item = dodaj_plik_audio(film, proj, dest, a.start, vol, a)
+    save(film, proj)
+    print(f"Dodano dźwięk [{item['id']}] {hit[0]['nazwa']} ({dest.name}) od {item['start']:.2f} s ({item['out'] - item['in']:.2f} s)")
+    return 0
+
+
+def wyodrebnij_plik(film: Path, src: Path) -> Path:
+    """Ta sama ścieżka i polecenie co „Wyodrębnij” w edytorze HQ (edytor.wyodrebnij_cel / wyodrebnij_cmd)."""
+    info = ed.probe(src)
+    if not info.get("audio"):
+        raise SystemExit(f"ten film nie ma dźwięku: {src.name}")
+    dest = ed.wyodrebnij_cel(film, src)
+    if not dest.is_file() or dest.stat().st_mtime < src.stat().st_mtime:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        r = subprocess.run(ed.wyodrebnij_cmd(src, dest, info.get("acodec")), capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit(f"ffmpeg: {(r.stderr.strip().splitlines() or ['błąd'])[-1]}")
+    return dest
+
+
+def cmd_wyodrebnij(film: Path, a) -> int:
+    """Klip z osi: dźwięk staje się osobnym audio w tym samym miejscu, a klip jest wyciszony (jak w CapCut).
+    --plik: dźwięk innego filmu jako audio od --start."""
+    proj = load(film)
+    if a.plik:
+        src = resolve(a.plik)
+        if not src or ed.media_kind(src) != "video":
+            raise SystemExit(f"to nie film: {a.plik}")
+        item = dodaj_plik_audio(film, proj, wyodrebnij_plik(film, src), a.start or 0.0, 1.0, a)
+        save(film, proj)
+        print(f"Dodano dźwięk filmu [{item['id']}] {src.name} od {item['start']:.2f} s ({item['out'] - item['in']:.2f} s)")
+        return 0
+    if not a.id:
+        raise SystemExit("podaj id klipu (z `pokaz`) albo --plik")
+    hit = next(((c, s) for c, s, _e in layout(proj["clips"]) if c.get("id") == a.id), None)
+    if not hit:
+        raise SystemExit(f"nie ma klipu {a.id} (lista: projekt.py pokaz)")
+    c, s = hit
+    if c.get("kind") == "image" or ed.media_kind(c["src"]) != "video":
+        raise SystemExit("zdjęcie nie ma dźwięku")
+    if abs(float(c.get("speed") or 1) - 1) > 1e-6:
+        raise SystemExit("klip ma zmienione tempo: wyodrębnienie działa przy tempie 1× (dźwięk audio nie zmienia tempa)")
+    if c.get("muted"):
+        raise SystemExit("klip jest wyciszony: najpierw `dzwiek <film> <id> --wlacz`, jeśli chcesz jego dźwięk")
+    item = {"id": new_id("a"), "src": str(wyodrebnij_plik(film, Path(c["src"]))), "start": round(s, 4),
+            "in": c["in"], "out": c["out"], "volume": c.get("volume", 1),
+            **{k: c[k] for k in ("fadeIn", "fadeOut") if c.get(k)}}
+    proj.setdefault("audio", []).append(item)
+    c["muted"] = True
+    save(film, proj)
+    print(f"Dźwięk klipu [{c['id']}] jest teraz osobnym audio [{item['id']}] od {s:.2f} s; klip wyciszony")
+    return 0
+
+
+def cmd_lektor(film: Path, a) -> int:
+    """Lektor Edge TTS (wideo_lib: ten sam co film.py, z cache) → <katalog filmu>/lektor/ → audio od --start."""
+    import shutil as _sh
+    import wideo_lib as wl
+    tekst = " ".join(a.tekst.split())
+    if not tekst:
+        raise SystemExit("pusty tekst lektora")
+    glos = a.glos or ed.GLOSY[0]
+    tempo = ed.tempo_tts(a.tempo)
+    proj = load(film)
+    dest = ed.lektor_cel(film, tekst, glos, tempo)
+    if not dest.is_file():
+        sp = wl.speak_many([{"text": tekst, "voice": glos, "rate": tempo}])[0]
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        _sh.copy2(sp.audio, dest)
+        wl.write_json(dest.with_suffix(".slowa.json"), [w.__dict__ for w in sp.words])
+    item = dodaj_plik_audio(film, proj, dest, a.start, 1.0, a)
+    save(film, proj)
+    print(f"Dodano lektora [{item['id']}] {dest.name} od {item['start']:.2f} s ({item['out'] - item['in']:.2f} s, {glos}, {tempo})")
+    return 0
+
+
 def cmd_usun(film: Path, a) -> int:
     proj = load(film)
     for key in ("clips", "texts", "audio"):
@@ -808,6 +929,28 @@ def main(argv: list[str] | None = None) -> int:
     sp = film_cmd("wytnij", cmd_wytnij, "wytnij odcinek osi; reszta się dosuwa")
     sp.add_argument("--od", type=float, required=True, help="początek odcinka (s osi)")
     sp.add_argument("--do", type=float, required=True, help="koniec odcinka (s osi)")
+    sp = sub.add_parser("dzwieki", help="biblioteka dźwięków CC0 (efekty i podkłady)")
+    sp.add_argument("--kategoria", help="np. przejscia, reakcje, pieniadze, uderzenia, akcja, muzyka")
+    sp.add_argument("--szukaj", help="fragment nazwy (po polsku albo angielsku)")
+    sp.add_argument("--muzyka", action="store_true", help="tylko podkłady muzyczne")
+    sp.set_defaults(fn=cmd_dzwieki, film=None)
+    sp = film_cmd("dodaj-dzwiek", cmd_dodaj_dzwiek, "efekt albo podkład z biblioteki")
+    sp.add_argument("id", help="id z `dzwieki`")
+    sp.add_argument("--start", type=float, default=0.0, help="od której sekundy osi gra")
+    sp.add_argument("--glosnosc", type=float, help="0–2 (domyślnie 1, podkład 0.3)")
+    sp.add_argument("--narastanie", type=float, help="s")
+    sp.add_argument("--wyciszanie", type=float, help="s")
+    sp = film_cmd("wyodrebnij", cmd_wyodrebnij, "dźwięk klipu albo innego filmu jako osobne audio")
+    sp.add_argument("id", nargs="?", help="klip z osi (z `pokaz`): dźwięk zostaje w tym samym miejscu, klip wyciszony")
+    sp.add_argument("--plik", help="inny film: jego dźwięk jako audio")
+    sp.add_argument("--start", type=float, help="z --plik: od której sekundy osi (domyślnie 0)")
+    sp = film_cmd("lektor", cmd_lektor, "lektor Edge TTS jako audio")
+    sp.add_argument("tekst")
+    sp.add_argument("--start", type=float, default=0.0)
+    sp.add_argument("--glos", choices=ed.GLOSY, help="domyślnie pl-PL-MarekNeural")
+    sp.add_argument("--tempo", help="np. +5% albo -10% (od −50% do +50%)")
+    sp.add_argument("--narastanie", type=float, help="s")
+    sp.add_argument("--wyciszanie", type=float, help="s")
     film_cmd("usun", cmd_usun, "usuń element po id").add_argument("id")
     sp = film_cmd("uwaga", cmd_uwaga, "zamknij uwagę z osi edytora")
     sp.add_argument("id")
@@ -817,6 +960,8 @@ def main(argv: list[str] | None = None) -> int:
     film_cmd("sprawdz", cmd_sprawdz, "walidacja projektu")
     film_cmd("render", cmd_render, "złóż film (jak „Eksportuj”)").add_argument("--out")
     a = ap.parse_args(argv)
+    if a.film is None:
+        return a.fn(None, a)
     film = Path(a.film).resolve()
     if not film.is_file():
         raise SystemExit(f"nie ma filmu: {film}")

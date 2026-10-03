@@ -310,6 +310,163 @@ async def edit_media(path: str):
     return await asyncio.to_thread(_media_entry, p)
 
 
+# ------------------------------------------------------------------ edytor: menu Audio
+# Biblioteka CC0 obok wtyczki (hqbuild kopiuje hq/web/dzwieki), w repo hq/web/dzwieki. Każde dodanie zapisuje plik
+# obok filmu (dzwieki/, lektor/), więc eksport i Wideograf (projekt.py) widzą zwykłe pliki z katalogów floty.
+DZWIEKI = next((d for d in (_HERE / "dzwieki", _HERE.parent / "web" / "dzwieki") if (d / "katalog.json").is_file()), None)
+NAGRANIE_MAX = 60 * 2**20
+
+
+def _film(raw: str) -> Path:
+    p = _media_path(raw)
+    if p is None or ed.media_kind(p) != "video":
+        raise HTTPException(404, "Film poza katalogami floty")
+    return p
+
+
+def _wideo_skrypt(name: str) -> Path | None:
+    """Skrypt Wideografa (lektor: film.py): z zainstalowanego profilu, a w repo z profiles/jarvo-wideo."""
+    for d in (core.HOME / "profiles" / "jarvo-wideo" / "scripts", _HERE.parents[1] / "profiles" / "jarvo-wideo" / "scripts"):
+        if (d / name).is_file():
+            return d / name
+    return None
+
+
+@router.get("/edit/dzwieki")
+async def edit_dzwieki():
+    """Katalog biblioteki dźwięków: kategorie, efekty i podkłady (CC0)."""
+    return await asyncio.to_thread(ed.dzwieki_katalog, DZWIEKI)
+
+
+@router.get("/edit/dzwiek-plik")
+async def edit_dzwiek_plik(id: str):
+    """Plik z biblioteki do odsłuchu przed dodaniem."""
+    hit = ed.dzwiek_plik(DZWIEKI, id)
+    if not hit:
+        raise HTTPException(404, "Nie ma takiego dźwięku w bibliotece")
+    return FileResponse(hit[1], media_type="audio/mpeg", headers={"Cache-Control": "private, max-age=86400"})
+
+
+@router.post("/edit/dzwiek")
+async def edit_dzwiek(request: Request):
+    """Dźwięk z biblioteki → kopia w <katalog filmu>/dzwieki/ → opis pliku do dodania na oś."""
+    body = await request.json()
+    film = _film(str(body.get("path") or ""))
+    try:
+        dest = await asyncio.to_thread(ed.dzwiek_do_filmu, DZWIEKI, str(body.get("id") or ""), film)
+    except ed.ProjectError as exc:
+        raise HTTPException(404, str(exc))
+    return await asyncio.to_thread(_media_entry, dest)
+
+
+@router.get("/edit/muzyka")
+async def edit_muzyka():
+    """Muzyka ze skarbca (knowledge/wideo/muzyka i knowledge/brands/<marka>/muzyka): ta sama, którą bierze film.py."""
+    def zbierz():
+        kn = core.JARVO_DIR / "knowledge"
+        dirs = [("", kn / "wideo" / "muzyka")] + [(b.name, b / "muzyka") for b in sorted((kn / "brands").glob("*")) if b.is_dir()]
+        out = []
+        for marka, d in dirs:
+            if not d.is_dir():
+                continue
+            for f in sorted(d.rglob("*"))[:200]:
+                if f.is_file() and ed.media_kind(f) == "audio" and core.safe_path(str(f), ROOTS):
+                    out.append({**_media_entry(f), "marka": marka})
+                if len(out) >= 60:
+                    return out
+        return out
+    return {"muzyka": await asyncio.to_thread(zbierz)}
+
+
+@router.post("/edit/wyodrebnij")
+async def edit_wyodrebnij(request: Request):
+    """Dźwięk innego filmu (albo klipu z osi) jako osobny plik audio w <katalog filmu>/dzwieki/."""
+    body = await request.json()
+    film = _film(str(body.get("path") or ""))
+    src = _media_path(str(body.get("src") or ""))
+    if src is None or ed.media_kind(src) != "video":
+        raise HTTPException(404, "Źródło poza katalogami floty albo to nie film")
+    info = await asyncio.to_thread(_probe, src)
+    if not info.get("audio"):
+        raise HTTPException(400, "Ten film nie ma dźwięku")
+    t = ed.tools()
+    if not t["ffmpeg"]:
+        raise HTTPException(503, "Brak ffmpeg w kontenerze")
+    dest = ed.wyodrebnij_cel(film, src)
+    if not dest.is_file() or dest.stat().st_mtime < src.stat().st_mtime:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_name(f".{dest.stem}.part{dest.suffix}")
+        try:
+            code, err = await _proc(*ed.wyodrebnij_cmd(src, tmp, info.get("acodec"), t["ffmpeg"]), timeout=900)
+            if code != 0:
+                raise HTTPException(500, (err.strip().splitlines() or ["ffmpeg: błąd"])[-1][:300])
+            tmp.replace(dest)
+        finally:
+            tmp.unlink(missing_ok=True)
+    return await asyncio.to_thread(_media_entry, dest)
+
+
+@router.post("/edit/lektor")
+async def edit_lektor(request: Request):
+    """Tekst na mowę: ten sam lektor co u Wideografa (film.py lektor, Edge TTS, cache) → <katalog filmu>/lektor/."""
+    body = await request.json()
+    film = _film(str(body.get("path") or ""))
+    tekst = " ".join(str(body.get("text") or "").split())
+    if not tekst:
+        raise HTTPException(400, "Wpisz tekst lektora")
+    if len(tekst) > ed.LEKTOR_MAX:
+        raise HTTPException(400, f"Tekst dłuższy niż {ed.LEKTOR_MAX} znaków")
+    glos = str(body.get("glos") or ed.GLOSY[0])
+    if glos not in ed.GLOSY:
+        raise HTTPException(400, "Nieznany głos")
+    tempo = ed.tempo_tts(body.get("tempo"))
+    skrypt = _wideo_skrypt("film.py")
+    if skrypt is None:
+        raise HTTPException(503, "Brak skryptu lektora (profil Wideografa nie jest zainstalowany)")
+    dest = ed.lektor_cel(film, tekst, glos, tempo)
+    if not dest.is_file():
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            code, err = await _proc(sys.executable, str(skrypt), "lektor", tekst, "-o", str(dest), "--glos", glos,
+                                    "--tempo", tempo, timeout=300)
+        except RuntimeError as exc:
+            raise HTTPException(504, f"Lektor: {exc}")
+        if code != 0 or not dest.is_file():
+            raise HTTPException(502, (err.strip().splitlines() or ["Lektor (Edge TTS) nie odpowiedział"])[-1][:300])
+    return await asyncio.to_thread(_media_entry, dest)
+
+
+@router.post("/edit/nagranie")
+async def edit_nagranie(request: Request):
+    """Nagranie z mikrofonu (MediaRecorder: webm/opus albo mp4) → AAC w <katalog filmu>/lektor/nagranie-<czas>.m4a."""
+    from urllib.parse import unquote
+
+    film = _film(unquote(request.headers.get("X-Film-Path", "")))
+    t = ed.tools()
+    if not t["ffmpeg"]:
+        raise HTTPException(503, "Brak ffmpeg w kontenerze")
+    dest = ed.nagranie_cel(film, time.time())
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    raw = dest.with_name(f".{dest.stem}.surowe")
+    size = 0
+    try:
+        with raw.open("wb") as f:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > NAGRANIE_MAX:
+                    raise HTTPException(413, f"Nagranie większe niż {NAGRANIE_MAX // 2**20} MB")
+                f.write(chunk)
+        if not size:
+            raise HTTPException(400, "Puste nagranie")
+        code, err = await _proc(*ed.nagranie_cmd(raw, dest, t["ffmpeg"]), timeout=300)
+        if code != 0 or not dest.is_file():
+            dest.unlink(missing_ok=True)
+            raise HTTPException(400, "Nie udało się odczytać nagrania: " + (err.strip().splitlines() or [""])[-1][:200])
+    finally:
+        raw.unlink(missing_ok=True)
+    return await asyncio.to_thread(_media_entry, dest)
+
+
 @router.post("/edit/save")
 async def edit_save(request: Request):
     body = await request.json()

@@ -515,6 +515,8 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "src" / "44-napisy.js", dest / "scripts" / "edytor_napisy.js")
         shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "src" / "48-typografia.js", dest / "scripts" / "edytor_typografia.js")
         shutil.copytree(fl.REPO_ROOT / "hq" / "web" / "fonts" / "kroje", dest / "scripts" / "kroje", dirs_exist_ok=True)
+        # biblioteka dźwięków CC0 (ta sama co w menu Audio edytora): projekt.py dzwieki / dodaj-dzwiek, podkłady film.py
+        shutil.copytree(fl.REPO_ROOT / "hq" / "web" / "dzwieki", dest / "scripts" / "dzwieki", dirs_exist_ok=True)
 
     # SOUL.md
     soul_path = dest / "SOUL.md"

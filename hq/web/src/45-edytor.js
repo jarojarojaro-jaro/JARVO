@@ -97,6 +97,7 @@ const ED_ICON = {
   trash: svgI(html`<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>`),
   speech: svgI(html`<path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/>`),
   upload: svgI(html`<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>`),
+  extract: svgI(html`<rect x="3" y="3" width="18" height="8" rx="1.5"/><path d="M7 3v8M17 3v8M5 17h1.5M9 15v4M13 14v6M17 16v2M20 17h0"/>`),
   back: svgI(html`<path d="m15 18-6-6 6-6"/>`),
   camera: svgI(html`<path d="M14.5 4h-5L7.5 6.5H4.5A1.5 1.5 0 0 0 3 8v10a1.5 1.5 0 0 0 1.5 1.5h15A1.5 1.5 0 0 0 21 18V8a1.5 1.5 0 0 0-1.5-1.5h-3z"/><circle cx="12" cy="12.5" r="3.5"/>`),
   pin: svgI(html`<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>`),
@@ -1310,6 +1311,39 @@ function VideoEditor({ path, onClose }) {
     });
     setSel({ type: "clip", id: c.id });
   }
+  // menu Audio (44-audio.js): plik obok filmu → element audio od wskaźnika (albo od chwili startu nagrania)
+  function addAudioFile(m, volume, at) {
+    if ((projRef.current.audio || []).length >= 32) { alert(L("Najwyżej 32 elementy audio.", "At most 32 audio items.")); return; }
+    addMeta([m]);
+    const x = { id: edId("a"), src: m.path, start: +clamp(at === undefined ? tRef.current : at, 0, total).toFixed(3), in: 0,
+      out: m.duration || 10, volume: volume === undefined ? 1 : volume };
+    H.apply((P) => ({ ...P, audio: [...P.audio, x] }));
+    setSel({ type: "audio", id: x.id });
+    if (mobileRef.current) setTool(null);
+  }
+  async function uploadAudioAdd(files) {
+    for (const f of files) {
+      const up = await api.upload(f);
+      const m = await api.editMedia(up.path);
+      if (m.kind !== "audio") throw new Error(L("To nie jest plik audio.", "This is not an audio file."));
+      addAudioFile(m, 1);
+    }
+  }
+  // Wyodrębnij dźwięk klipu (jak w CapCut): ten sam fragment jako osobne audio w tym samym miejscu osi, klip wyciszony.
+  // Tak samo projekt.py wyodrebnij <film> <id> (edytor.wyodrebnij_cel: plik w <katalog filmu>/dzwieki/).
+  const mozeWyodrebnic = (c) => c.kind !== "image" && !c.muted && Math.abs((c.speed || 1) - 1) < 1e-6 && (meta[c.src] || {}).audio !== false;
+  async function wyodrebnijKlip(c) {
+    const s = segs.find((x) => x.c.id === c.id);
+    if (!s || !mozeWyodrebnic(c)) return;
+    try {
+      const m = await api.editWyodrebnij(path, c.src);
+      addMeta([m]);
+      const x = { id: edId("a"), src: m.path, start: +s.start.toFixed(4), in: c.in, out: c.out, volume: c.volume === undefined ? 1 : c.volume,
+        ...(c.fadeIn ? { fadeIn: c.fadeIn } : {}), ...(c.fadeOut ? { fadeOut: c.fadeOut } : {}) };
+      H.apply((P) => ({ ...P, clips: P.clips.map((y) => (y.id === c.id ? { ...y, muted: true } : y)), audio: [...P.audio, x] }));
+      setSel({ type: "audio", id: x.id });
+    } catch (e) { alert(e.message || String(e)); }
+  }
   async function uploadMedia(files) {
     for (const f of files) {
       try {
@@ -1843,6 +1877,8 @@ function VideoEditor({ path, onClose }) {
       ${act("copy", L("Duplikuj", "Duplicate"), duplicate)}
       ${p.clips[p.clips.length - 1].id !== c.id && act("trans", L("Przejście", "Transition"), () => { setSel({ type: "tr", id: c.id }); if (mobile) setTool("tr"); }, { on: !!c.transition })}
       ${c.kind !== "image" && act(c.muted ? "mute" : "volume", c.muted ? L("Włącz dźwięk", "Unmute") : L("Wycisz", "Mute"), () => upd("clip", c.id, { muted: !c.muted }))}
+      ${c.kind !== "image" && act("extract", L("Wyodrębnij dźwięk", "Extract audio"), () => wyodrebnijKlip(c), { disabled: !mozeWyodrebnic(c),
+        title: Math.abs((c.speed || 1) - 1) > 1e-6 ? L("Działa przy tempie 1×", "Works at 1× speed") : L("Dźwięk klipu jako osobne audio, klip wyciszony", "The clip's sound as a separate audio; the clip is muted") })}
       ${act("trash", L("Usuń", "Delete"), remove, { bad: true, disabled: p.clips.length <= 1 })}
     </div>`}
     ${jest(only, "kadr") && html`<label>${L("Kadr", "Framing")}${seg(ED_FITS.map(([k2, pl, en]) => [k2, L(pl, en)]), c.fit || "contain", (v) => upd("clip", c.id, { fit: v }))}</label>`}
@@ -1934,13 +1970,9 @@ function VideoEditor({ path, onClose }) {
     <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>`}
   </div>`;
 
-  const audioAdd = () => html`<div class="thq-ed-form">
-    <div class="thq-ed-acts">${act(allMuted ? "mute" : "volume", allMuted ? L("Włącz dźwięk filmu", "Unmute video") : L("Wycisz dźwięk filmu", "Mute video audio"),
-      () => H.apply((P) => ({ ...P, clips: P.clips.map((c) => ({ ...c, muted: !allMuted })) })), { on: allMuted })}</div>
-    <p class="thq-ed-note">${L("Muzyka i dźwięki z katalogu filmu:", "Music and sounds from the film's folder:")}</p>
-    ${media.some((m) => m.kind === "audio") ? mediaList(["audio"]) : html`<p class="thq-ed-note">${L("Brak plików audio w katalogu.", "No audio files in the folder.")}</p>`}
-    ${uploadBtn("audio/*")}
-  </div>`;
+  const audioAdd = () => html`<${AudioMenu} path=${path} media=${media} start=${t} onAdd=${addAudioFile} onUploadAdd=${uploadAudioAdd}
+    wgrajFilm=${uploadBtn("video/*")} top=${html`<div class="thq-ed-acts">${act(allMuted ? "mute" : "volume", allMuted ? L("Włącz dźwięk filmu", "Unmute video") : L("Wycisz dźwięk filmu", "Mute video audio"),
+      () => H.apply((P) => ({ ...P, clips: P.clips.map((c) => ({ ...c, muted: !allMuted })) })), { on: allMuted })}</div>`}/>`;
 
   const captionTools = () => html`<div class="thq-ed-form">
     ${info.stt ? html`<button type="button" class="thq-ed-btn is-main is-wide" disabled=${speechBusy} onClick=${() => autoCaptions(false)}>
@@ -2190,9 +2222,8 @@ function VideoEditor({ path, onClose }) {
       <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>${(meta[m.src] || {}).name || ""}${Math.abs(m.volume - 1) > 0.01 ? ` · ${fmtDb(m.volume)}` : ""}</span>${volLine("audio", m)}${fadeMarks(m, audioNaOsi(m, total))}
       <i class="thq-ed-h is-r" onPointerDown=${(e) => audioDown(e, m, "r")}></i></div>`;
     })}
-    ${!p.audio.length && (mobile
-      ? html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("audio"); }}>${ED_ICON.plus}${L("Dodaj audio", "Add audio")}</button>`
-      : html`<span class="thq-ed-hint">${L("Muzyka: dodaj plik audio z panelu Media", "Music: add an audio file from the Media panel")}</span>`)}
+    ${!p.audio.length && html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }}
+      onClick=${(e) => { e.stopPropagation(); setSel(null); if (mobile) setTool("audio"); else setSide("audio"); }}>${ED_ICON.plus}${L("Dodaj audio", "Add audio")}</button>`}
   </div>`;
   const speechTrack = hasSpeech && html`<div class="thq-ed-track is-speech" onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
     ${bars.map((b, i) => html`<div key=${`b${i}`} class="thq-ed-bar-say" style=${{ left: `${b.t0 * pps}px`, width: `${Math.max(2, (b.t1 - b.t0) * pps)}px` }} title=${b.text}><span>${b.text}</span></div>`)}
@@ -2255,6 +2286,7 @@ function VideoEditor({ path, onClose }) {
         ["parts", L("Podziel", "Parts"), "clip:podziel"],
         ["speed", c.kind === "image" ? L("Czas", "Length") : L("Tempo", "Speed"), "clip:tempo"],
         c.kind !== "image" && [c.muted ? "mute" : "volume", L("Głośność", "Volume"), "clip:glos"],
+        c.kind !== "image" && ["extract", L("Wyodrębnij", "Extract"), () => wyodrebnijKlip(c), !mozeWyodrebnic(c)],
         ["crop", L("Kadr", "Framing"), "clip:kadr"],
         p.clips[p.clips.length - 1].id !== c.id && ["trans", L("Przejście", "Transition"), () => { setSel({ type: "tr", id: c.id }); setTool("tr"); }],
         ["copy", L("Duplikuj", "Duplicate"), duplicate],
@@ -2347,6 +2379,7 @@ function VideoEditor({ path, onClose }) {
       <aside class="thq-ed-side">
         <div class="thq-ed-tabs">
           <button type="button" class=${cx(side === "media" && "is-on")} onClick=${() => setSide("media")}>${ED_ICON.film}<span>${L("Media", "Media")}</span></button>
+          <button type="button" class=${cx(side === "audio" && "is-on")} onClick=${() => setSide("audio")}>${ED_ICON.audio}<span>${L("Audio", "Audio")}</span></button>
           <button type="button" class=${cx(side === "captions" && "is-on")} onClick=${() => setSide("captions")}>${ED_ICON.captions}<span>${L("Napisy", "Captions")}</span></button>
           <button type="button" class=${cx(side === "speech" && "is-on")} onClick=${() => setSide("speech")}>${ED_ICON.speech}<span>${L("Mowa", "Speech")}</span></button>
           <button type="button" class=${cx(side === "inspect" && "is-on")} onClick=${() => setSide("inspect")}>${ED_ICON.sliders}<span>${L("Ustawienia", "Settings")}</span></button>
@@ -2358,7 +2391,7 @@ function VideoEditor({ path, onClose }) {
           ${mediaList(["video", "image", "audio"])}
           ${act(allMuted ? "mute" : "volume", allMuted ? L("Włącz dźwięk filmu", "Unmute video") : L("Wycisz dźwięk filmu", "Mute video audio"),
             () => H.apply((P) => ({ ...P, clips: P.clips.map((c) => ({ ...c, muted: !allMuted })) })), { on: allMuted })}
-        </div>` : side === "captions" ? captionTools() : side === "speech" ? speechTools() : inspector()}
+        </div>` : side === "audio" ? audioAdd() : side === "captions" ? captionTools() : side === "speech" ? speechTools() : inspector()}
       </aside>
       <section class="thq-ed-stage-wrap">
         ${stage}

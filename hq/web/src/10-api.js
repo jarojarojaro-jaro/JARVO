@@ -80,6 +80,26 @@ const liveApi = {
   editInfo: (path) => SDK.fetchJSON(`${API_ROOT}/edit/info?path=${encodeURIComponent(path)}`),
   editMedia: (path) => SDK.fetchJSON(`${API_ROOT}/edit/media?path=${encodeURIComponent(path)}`),
   editMaska: (path) => SDK.fetchJSON(`${API_ROOT}/edit/maska?path=${encodeURIComponent(path)}`),
+  // menu Audio: biblioteka CC0, muzyka ze skarbca, wyodrębnienie, lektor, nagranie (każde zwraca opis pliku obok filmu)
+  editDzwieki: () => SDK.fetchJSON(`${API_ROOT}/edit/dzwieki`),
+  async dzwiekBlob(id) {
+    const res = await rawFetch(`${API_ROOT}/edit/dzwiek-plik?id=${encodeURIComponent(id)}`);
+    return res.blob();
+  },
+  editDzwiek: (path, id) => SDK.fetchJSON(`${API_ROOT}/edit/dzwiek`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, id }) }),
+  editMuzyka: () => SDK.fetchJSON(`${API_ROOT}/edit/muzyka`),
+  async editWyodrebnij(path, src) {
+    const res = await rawFetch(`${API_ROOT}/edit/wyodrebnij`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, src }) });
+    return res.json();
+  },
+  async editLektor(path, text, glos, tempo) {
+    const res = await rawFetch(`${API_ROOT}/edit/lektor`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, text, glos, tempo }) });
+    return res.json();
+  },
+  async editNagranie(path, blob) {
+    const res = await rawFetch(`${API_ROOT}/edit/nagranie`, { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-Film-Path": encodeURIComponent(path) }, body: blob });
+    return res.json();
+  },
   async editSave(path, project, base, force) {
     const res = await fetch(`${basePath()}${API_ROOT}/edit/save`, { method: "POST", credentials: "include",
       headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ path, project, base, force: !!force }) });

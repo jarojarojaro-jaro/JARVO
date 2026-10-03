@@ -4,7 +4,7 @@
     python3 scripts/hqbuild.py --out build/plugins/jarvo-hq     # plugin (wołane też przez scripts/build.py)
     python3 scripts/hqbuild.py --demo build/hq-demo            # samodzielne demo z symulacją floty
 
-Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, edytor.py, animacja.py, pomiar.py, fleet.json, dist/index.js, dist/style.css}.
+Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, edytor.py, animacja.py, pomiar.py, fleet.json, dzwieki/, dist/index.js, dist/style.css}.
 dist/index.js to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku.
 """
 
@@ -94,6 +94,8 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     shutil.copytree(fl.REPO_ROOT / "branding" / "fonts", dash / "dist" / "fonts")
     # krój edytora filmów (Inter, OFL): zapas, gdy system nie ma SF Pro / Segoe UI / Roboto
     shutil.copytree(HQ / "web" / "fonts", dash / "dist" / "fonts", dirs_exist_ok=True)
+    # biblioteka dźwięków CC0 edytora (scripts/dzwieki.py): menu Audio, odsłuch i kopia obok filmu przy dodaniu
+    shutil.copytree(HQ / "web" / "dzwieki", dash / "dzwieki")
     # wspólne klucze floty: plugin pilnuje ich na bieżąco (skrypt jest też uruchamiany przy wdrożeniu)
     shutil.copy2(fl.REPO_ROOT / "scripts" / "share_keys.py", dash / "share_keys.py")
     # pomiar animacji Wideografa: HQ pokazuje raport i sprawdza jego aktualność tym samym kodem

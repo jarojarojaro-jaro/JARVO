@@ -84,6 +84,7 @@ Pliki w repo:
 | `hq/plugin/animacja.py` | animacja HTML: schemat i zapis `parametry.json`, stan pomiaru, mostek podglądu (testy: `tests/test_animacja.py`); build dokłada do pluginu `pomiar.py` Wideografa (odcisk i aktualność raportu) |
 | `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność; edytor i okno animacji z własnymi tokenami) |
+| `hq/web/dzwieki/` | biblioteka dźwięków CC0 menu Audio i Wideografa (157 efektów w 13 kategoriach, 9 podkładów; `katalog.json`, `LICENCJE.md` z autorem i źródłem każdego pliku), budowana przez `scripts/dzwieki.py` (`pobierz`, `zbuduj`, `sprawdz`; test `tests/test_dzwieki.py`) |
 | `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto; `kroje/`: kroje napisów i typografii (OFL, `scripts/kroje.py`) |
 | `branding/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css`; te same pliki na stronie logowania |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |
@@ -131,6 +132,17 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   (`tests/test_edytor_dzwiek.py`). Muzyka dłuższa niż film cichnie na końcu filmu. Pola `fadeIn`, `fadeOut` w projekcie.
 - **Pasy audio:** muzyka, lektor i efekty grające naraz leżą na osi jeden pod drugim (element trafia na pierwszy
   wolny pas, `pasyAudio`), do 32 elementów audio w projekcie; eksport miesza wszystkie.
+- **Menu Audio** (jak w CapCut; „Dodaj audio” pod osią, na komputerze zakładka „Audio” w panelu, `44-audio.js`):
+  **Efekty** (157 efektów CC0 w 13 kategoriach: przejścia, reakcje, pieniądze, uderzenia, akcja, interfejs, technika,
+  natura, zwierzęta, codzienne, zabawne, gry, dżingle; szukanie po polsku i angielsku, odsłuch, „+” dodaje we wskaźniku),
+  **Muzyka** (9 podkładów CC0, muzyka ze skarbca `wideo/muzyka` i `brands/*/muzyka`, pliki z folderu filmu, wgranie
+  z dysku; podkład wchodzi ciszej, 30%), **Wyodrębnij** (dźwięk z innego filmu z folderu albo wgranego), **Lektor**
+  (Edge TTS, 5 głosów, tempo −30…+30%, `film.py lektor`) i **Nagraj** (mikrofon w przeglądarce, serwer zapisuje AAC;
+  wymaga HTTPS albo localhost, bez tego wgranie notatki głosowej z telefonu). W panelu klipu **Wyodrębnij dźwięk**:
+  dźwięk klipu zostaje w tym samym miejscu osi jako osobne audio (AAC kopiowane bez straty), klip się wycisza.
+  Dodany plik trafia obok filmu (`dzwieki/`, `lektor/`), więc projekt nie zależy od biblioteki. Endpointy
+  `/edit/dzwieki`, `/edit/dzwiek-plik`, `/edit/dzwiek`, `/edit/muzyka`, `/edit/wyodrebnij`, `/edit/lektor`,
+  `/edit/nagranie`; test `tests/test_dzwieki.py`.
 - **Wygląd jak w CapCut:** grafitowe tło, jeden akcent (cyjan: **Eksportuj**, aktywne narzędzie, zaznaczenie), krój
   systemowy (SF Pro na iPhonie i Macu, Segoe UI na Windows, Roboto na Androidzie) z Inter jako zapasem
   (`hq/web/fonts/`, OFL), ikony SVG jednym stylem linii zamiast emoji, czas `00:05.20`. Na osi: miniatury klipu w
@@ -259,7 +271,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
-  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `usun`, `uwaga`,
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `dzwieki`, `dodaj-dzwiek`, `wyodrebnij`, `lektor`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy i typografię rysują te same funkcje (`hq/web/src/44-napisy.js`, `48-typografia.js`) w przeglądarce bez
   okna, więc plik od agenta wygląda jak eksport z edytora. Typografię na tym samym projekcie układa `typografia.py`

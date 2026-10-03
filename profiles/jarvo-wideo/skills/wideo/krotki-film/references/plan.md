@@ -32,7 +32,7 @@
 | `lektor` | `{glos, tempo, glosnosc, wysokosc}`; `{plik: "nagranie.mp3"}` = własny lektor (napisy z transkrypcji); `false` = bez lektora | Marek, `+0%` |
 | `napisy.styl` | `karaoke` (aktywne słowo w kolorze akcentu) · `zwykle` · `brak` | `karaoke` |
 | `napisy` (reszta) | `font`, `font_plik` (TTF/OTF marki), `kolor`, `akcent`, `obrys`, `pozycja` (`dol`/`srodek`/`gora`), `wielkie`, `rozmiar` (mnożnik) | Inter, biały, #FFD400 |
-| `muzyka` | `{plik: ścieżka | "losowa" | "brak", glosnosc: 0–1, katalog}`; „losowa” = biblioteka `@@KNOWLEDGE_DIR@@/wideo/muzyka/` albo `brands/<marka>/muzyka/` | brak |
+| `muzyka` | `{plik: ścieżka | "losowa" | "brak", glosnosc: 0–1, katalog}`; „losowa” = biblioteka `@@KNOWLEDGE_DIR@@/wideo/muzyka/` albo `brands/<marka>/muzyka/`, a gdy pusta: podkład CC0 z biblioteki edytora (`projekt.py dzwieki --muzyka`) | brak |
 | `marka` | `{nazwa, logo, pozycja: gora-prawo | gora-lewo | dol-prawo | dol-lewo}` | brak logo |
 | `przejscie` | `ciecie` · `przenikanie` (0,35 s) | `ciecie` |
 | `sceny[].tekst` | zdanie lektora (1–2 zdania, ≤ 22 słowa) | wymagane z lektorem |

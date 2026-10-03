@@ -38,6 +38,10 @@ XFADE = 0.35                 # przenikanie
 PLATFORM_MAX = {"9:16": 90, "1:1": 120, "4:5": 120, "16:9": 600}   # rozsądna górna granica krótkiego formatu
 EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F]")          # libass nie rysuje emoji (puste kratki)
 KNOWLEDGE = Path(os.environ.get("JARVO_KNOWLEDGE_DIR", "/opt/data/jarvo/knowledge"))
+# podkłady CC0 z biblioteki edytora HQ (scripts/dzwieki.py): zapas dla „losowej”, gdy skarbiec nie ma muzyki
+_HERE = Path(__file__).resolve().parent
+BIBLIOTEKA_MUZYKI = next((d for d in (_HERE / "dzwieki" / "muzyka", _HERE.parents[2] / "hq" / "web" / "dzwieki" / "muzyka")
+                          if d.is_dir()), None) if len(_HERE.parents) > 2 else None
 
 
 def log(msg: str) -> None:
@@ -203,6 +207,9 @@ def pick_music(plan: dict, plan_dir: Path) -> Path | None:
         dirs.append(KNOWLEDGE / "brands" / brand / "muzyka")
     dirs.append(KNOWLEDGE / "wideo" / "muzyka")
     tracks = sorted(p for d in dirs if d.is_dir() for p in d.rglob("*") if p.suffix.lower() in wl.AUDIO_EXT)
+    if not tracks and BIBLIOTEKA_MUZYKI:
+        tracks = sorted(p for p in BIBLIOTEKA_MUZYKI.glob("*") if p.suffix.lower() in wl.AUDIO_EXT)
+        log(f"muzyka „losowa”: skarbiec bez utworów, biorę podkład CC0 z biblioteki ({BIBLIOTEKA_MUZYKI})")
     if not tracks:
         log(f"! muzyka „losowa”: brak utworów w {', '.join(str(d) for d in dirs)}; film bez muzyki")
         return None

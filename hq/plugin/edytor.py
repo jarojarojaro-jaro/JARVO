@@ -722,8 +722,9 @@ def probe(path: Path, ffprobe: str = "ffprobe") -> dict:
         a, b = v["r_frame_rate"].split("/")
         fps = round(float(a) / float(b), 3) if float(b) else None
     dur = (data.get("format") or {}).get("duration")
+    a = next((s for s in streams if s.get("codec_type") == "audio"), {})
     return {"ok": True, "duration": float(dur) if dur not in (None, "N/A") else None, "w": w, "h": h, "fps": fps,
-            "audio": any(s.get("codec_type") == "audio" for s in streams),
+            "audio": bool(a), "acodec": a.get("codec_name"),
             "video": bool(v) and media_kind(path) != "audio", "vcodec": v.get("codec_name")}
 
 
@@ -817,6 +818,97 @@ def kroje_css(root: Path | None, rodziny: set[str] | None = None) -> str:
 
 def tools() -> dict:
     return {"ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe"), "stt": stt_bin()}
+
+
+# ----------------------------------------------------------------------------- audio: biblioteka, wyodrębnienie, lektor
+# Biblioteka dźwięków CC0 (scripts/dzwieki.py): hq/web/dzwieki w repo, dzwieki/ obok wtyczki, scripts/dzwieki
+# u Wideografa. Dodanie kopiuje plik obok filmu, więc projekt nie zależy od biblioteki (jak przy wgranym pliku).
+DZWIEKI_DIR = "dzwieki"      # podkatalog katalogu filmu: efekty z biblioteki i dźwięk wyodrębniony z filmów
+LEKTOR_DIR = "lektor"        # podkatalog katalogu filmu: lektor (Edge TTS) i nagrania z mikrofonu
+GLOSY = ("pl-PL-MarekNeural", "pl-PL-ZofiaNeural", "en-US-AndrewMultilingualNeural", "en-US-AvaMultilingualNeural",
+         "de-DE-SeraphinaMultilingualNeural")
+LEKTOR_MAX = 3000            # znaków tekstu lektora z edytora
+
+
+def dzwieki_katalog(root: Path | None) -> dict:
+    """katalog.json biblioteki (kategorie i dźwięki); brak katalogu = pusta biblioteka."""
+    try:
+        kat = json.loads((Path(root) / "katalog.json").read_text(encoding="utf-8")) if root else {}
+    except (OSError, ValueError):
+        kat = {}
+    return {"kategorie": kat.get("kategorie") or [], "dzwieki": kat.get("dzwieki") or []}
+
+
+def dzwiek_plik(root: Path | None, id_: str) -> tuple[dict, Path] | None:
+    """Wpis i plik dźwięku z biblioteki po id (plik tylko z katalog.json, wewnątrz biblioteki)."""
+    w = next((d for d in dzwieki_katalog(root)["dzwieki"] if d.get("id") == id_), None)
+    if not w or not root:
+        return None
+    base = Path(root).resolve()
+    p = (base / str(w.get("plik") or "")).resolve()
+    if base not in p.parents or not p.is_file():
+        return None
+    return w, p
+
+
+def dzwiek_do_filmu(root: Path | None, id_: str, film: Path) -> Path:
+    """Kopia dźwięku z biblioteki w <katalog filmu>/dzwieki/<id>.mp3 (ta sama przy kolejnym dodaniu)."""
+    hit = dzwiek_plik(root, id_)
+    if not hit:
+        raise ProjectError(f"Nie ma dźwięku „{id_}” w bibliotece.")
+    _w, src = hit
+    dest = film.parent / DZWIEKI_DIR / src.name
+    if not dest.is_file() or dest.stat().st_size != src.stat().st_size:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_name(f".{dest.name}.part")
+        shutil.copyfile(src, tmp)
+        tmp.replace(dest)
+    return dest
+
+
+def _nazwa_pliku(stem: str, limit: int = 40) -> str:
+    s = re.sub(r"[^\w-]+", "-", stem, flags=re.UNICODE).strip("-_")[:limit]
+    return s or "plik"
+
+
+def wyodrebnij_cel(film: Path, src: Path) -> Path:
+    """<katalog filmu>/dzwieki/<nazwa źródła>-dzwiek.m4a: dźwięk innego filmu jako osobny plik audio."""
+    return film.parent / DZWIEKI_DIR / f"{_nazwa_pliku(src.stem)}-dzwiek.m4a"
+
+
+def wyodrebnij_cmd(src: Path, dest: Path, acodec: str | None, ffmpeg: str = "ffmpeg") -> list[str]:
+    """Sam dźwięk z filmu: AAC kopiowany bez straty, inny kodek kodowany do AAC 192 kb/s."""
+    enc = ["-c:a", "copy"] if acodec == "aac" else ["-c:a", "aac", "-b:a", "192k"]
+    return [ffmpeg, "-nostdin", "-hide_banner", "-y", "-i", str(src), "-map", "0:a:0", "-vn", "-sn", "-dn",
+            *enc, "-movflags", "+faststart", str(dest)]
+
+
+def lektor_cel(film: Path, tekst: str, glos: str, tempo: str) -> Path:
+    """<katalog filmu>/lektor/lektor-<początek tekstu>-<skrót>.mp3 (ten sam tekst i głos = ten sam plik)."""
+    import hashlib
+    h = hashlib.sha256(f"{glos}|{tempo}|{tekst}".encode()).hexdigest()[:8]
+    return film.parent / LEKTOR_DIR / f"lektor-{_nazwa_pliku(tekst.lower(), 24)}-{h}.mp3"
+
+
+def tempo_tts(v: Any) -> str:
+    """Tempo lektora jako procent Edge TTS (+10%, -5%), od −50% do +50%."""
+    try:
+        n = int(round(float(str(v).strip().rstrip("%") or 0)))
+    except ValueError:
+        n = 0
+    n = max(-50, min(50, n))
+    return f"{n:+d}%"
+
+
+def nagranie_cel(film: Path, now: float) -> Path:
+    import time
+    return film.parent / LEKTOR_DIR / f"nagranie-{time.strftime('%Y%m%d-%H%M%S', time.localtime(now))}.m4a"
+
+
+def nagranie_cmd(src: Path, dest: Path, ffmpeg: str = "ffmpeg") -> list[str]:
+    """Nagranie z przeglądarki (webm/opus albo mp4) → AAC mono 48 kHz, które gra w każdej przeglądarce i w eksporcie."""
+    return [ffmpeg, "-nostdin", "-hide_banner", "-y", "-i", str(src), "-vn", "-ac", "1", "-ar", "48000",
+            "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(dest)]
 
 
 # ----------------------------------------------------------------------------- mowa: pauzy, wtrącenia, napisy
