@@ -579,7 +579,11 @@ def kolor_filter(raw: Any) -> str:
 
 
 def kolor_pomiar_cmd(src: Path, a: float, b: float, ffmpeg: str = "ffmpeg") -> list[str]:
-    """Pomiar klatek klipu pod „Auto” (signalstats na ~12 klatkach); wynik w stderr, czyta go kolor_z_pomiaru."""
+    """Pomiar klatek klipu pod „Auto” (signalstats na ~12 klatkach, zdjęcie: jedna klatka); wynik w stderr,
+    czyta go kolor_z_pomiaru."""
+    if media_kind(Path(src)) == "image":
+        return [ffmpeg, "-nostdin", "-hide_banner", "-nostats", "-loglevel", "info", "-i", str(src),
+                "-vf", "scale=320:-2,signalstats,metadata=print", "-frames:v", "1", "-f", "null", "-"]
     d = max(0.1, b - a)
     return [ffmpeg, "-nostdin", "-hide_banner", "-nostats", "-loglevel", "info", "-ss", _f(a), "-t", _f(d), "-i", str(src),
             "-vf", f"fps={min(4.0, max(0.5, 12 / d)):.3f},scale=320:-2,signalstats,metadata=print", "-an", "-f", "null", "-"]

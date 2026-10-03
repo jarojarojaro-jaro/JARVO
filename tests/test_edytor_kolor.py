@@ -122,6 +122,19 @@ def test_filtr_ffmpeg_liczy_jak_przepis(tmp_path, kol):
         assert list(out[3 * k:3 * k + 3]) == pytest.approx(_przepis(px, kol), abs=2.5), px
 
 
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_auto_mierzy_film_i_zdjecie(tmp_path):
+    """Pomiar pod „Auto” działa na klipie z filmu i ze zdjęcia (zdjęcie bez -ss/-t: jedna klatka)."""
+    f, img = tmp_path / "ciemny.mp4", tmp_path / "ciemny.png"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=25:d=2,eq=brightness=-0.3:contrast=0.6",
+                    "-pix_fmt", "yuv420p", str(f)], check=True)
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(f), "-frames:v", "1", str(img)], check=True)
+    for src, a, b in ((f, 0.5, 1.5), (img, 0, 3)):
+        r = subprocess.run(ed.kolor_pomiar_cmd(src, a, b), capture_output=True, text=True)
+        w = ed.kolor_z_pomiaru(r.stderr)
+        assert r.returncode == 0 and w and w["color"]["brightness"] > 0, (src, r.stderr[-300:])
+
+
 @pytest.fixture()
 def film(tmp_path):
     f = tmp_path / "film.mp4"
