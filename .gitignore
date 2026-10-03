@@ -15,3 +15,6 @@ infra/env/secrets/*.env
 
 # katalog instalacji floty zapisany przez install.sh (JARVO_LOCAL)
 /.jarvo-local
+
+# lokalny katalog Claude Code (robocze kopie agentów)
+.claude/worktrees/

@@ -33,7 +33,8 @@ SECRET_PATTERNS = [
     (re.compile(r"AKIA[0-9A-Z]{16}"), "klucz AWS"),
     (re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"), "klucz prywatny"),
 ]
-SKIP_DIRS = {".git", "build", "node_modules", "__pycache__", ".pytest_cache"}
+# .claude: lokalny katalog Claude Code (robocze kopie agentów w worktrees), nie należy do repo
+SKIP_DIRS = {".git", ".claude", "build", "node_modules", "__pycache__", ".pytest_cache"}
 # dokumenty z pełną listą floty: każdy aktywny agent musi w nich wystąpić jako `nazwa`
 DOCS_WITH_FLEET = ["README.md", "docs/FLEET.md", "docs/JARVO-CALOSC.md", "docs/BOSS.md", "docs/TOOLBOX.md"]
 # kolumny tabel w dokumentach, których liczba w wierszu agenta musi zgadzać się z repo
