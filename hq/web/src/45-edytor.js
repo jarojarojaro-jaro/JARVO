@@ -751,8 +751,9 @@ function VideoEditor({ path, onClose }) {
     }
     return null;
   }
-  // osoba z bieżącej klatki (kadr jak w podglądzie: fitBox) przycięta sylwetką, nad warstwą „tyl”
-  function osobaNaWierzch(g, P, w, h, now) {
+  // osoba z bieżącej klatki (kadr jak w podglądzie: fitBox) przycięta sylwetką, nad warstwą „tyl”;
+  // w strefach platformy przyciemniona jak reszta wideo pod nimi (zs, cien: te same co w drawOverlay)
+  function osobaNaWierzch(g, P, w, h, now, zs, cien) {
     const m = maskaRef.current, inf = m.info;
     if (!inf || inf.klucz !== maskaKlucz(P) || !typoAktywne(P, now).some((b) => b.warstwa === "tyl")) return;
     const k = Math.floor(now * (+inf.fps || P.canvas.fps || 30) + 1e-6);
@@ -773,6 +774,10 @@ function VideoEditor({ path, onClose }) {
     try { o.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { return; }
     o.globalCompositeOperation = "destination-in";
     o.drawImage(bm, 0, 0, w, h);
+    if (zs.length) {
+      o.globalCompositeOperation = "source-atop"; o.fillStyle = cien;
+      for (const z of zs) o.fillRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0);
+    }
     o.globalCompositeOperation = "source-over";
     g.drawImage(oc, 0, 0);
   }
@@ -784,11 +789,11 @@ function VideoEditor({ path, onClose }) {
     const g = c.getContext("2d");
     g.clearRect(0, 0, w, h);
     const now = tRef.current;
-    const pf = strefaRef.current, zs = strefyUI(w, h, pf);
+    const pf = strefaRef.current, zs = strefyUI(w, h, pf), cien = "rgba(0,0,0,0.38)";
     if (zs.length) {
       // strefy interfejsu platformy: tylko na podglądzie (eksport i kadr dla agenta rysują napisy osobno)
       g.save();
-      g.fillStyle = "rgba(0,0,0,0.38)"; g.strokeStyle = "rgba(255,69,58,0.85)"; g.lineWidth = Math.max(1, w / 540); g.setLineDash([w / 90, w / 140]);
+      g.fillStyle = cien; g.strokeStyle = "rgba(255,69,58,0.85)"; g.lineWidth = Math.max(1, w / 540); g.setLineDash([w / 90, w / 140]);
       for (const z of zs) { g.fillRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0); g.strokeRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0); }
       const fs = Math.round(w / 26);
       g.setLineDash([]); g.font = `600 ${fs}px system-ui, sans-serif`; g.fillStyle = "rgba(255,255,255,0.9)"; g.textBaseline = "top";
@@ -803,7 +808,7 @@ function VideoEditor({ path, onClose }) {
         Promise.all(typoFonty(P, w, h).map(([f, txt]) => fontLoad(f, txt))).then(() => drawOverlay());
       }
       typoRysuj(g, P, w, h, now, "tyl");
-      osobaNaWierzch(g, P, w, h, now);
+      osobaNaWierzch(g, P, w, h, now, zs, cien);
       typoRysuj(g, P, w, h, now, "przod");
       const s = selRef.current, b = s && s.type === "typo" && typoAktywne(P, now).find((x) => x.id === s.id);
       if (b) {                                       // zaznaczony blok: ramka w jego obrocie
@@ -844,9 +849,9 @@ function VideoEditor({ path, onClose }) {
     if (vw && vh) blurBg(c, el, vw, vh, P.canvas.w, P.canvas.h);
   }
   useEffect(() => { drawBlur(); }, [p]);
-  useEffect(() => {      // po przewinięciu i wczytaniu klatki (pauza): tło z nowej klatki
+  useEffect(() => {      // po przewinięciu i wczytaniu klatki (pauza): tło i osoba za napisem z nowej klatki
     const els = [...player.vids.map((r) => r.current), player.imgRef.current].filter(Boolean);
-    const on = () => drawBlur();
+    const on = () => { drawBlur(); drawOverlay(); };
     for (const e of els) for (const ev of ["seeked", "loadeddata", "load"]) e.addEventListener(ev, on);
     return () => { for (const e of els) for (const ev of ["seeked", "loadeddata", "load"]) e.removeEventListener(ev, on); };
   }, [!!p]);

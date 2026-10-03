@@ -166,6 +166,8 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   osoby klatka po klatce dla bloków warstwy `tyl` i zapisuje ją obok filmu (`<film>.maska/`: PNG z kanałem alfa
   i `indeks.json` z kluczem osi). Podgląd pobiera indeks (`GET /edit/maska`) i rysuje: warstwa `tyl` → osoba z bieżącej
   klatki filmu wycięta sylwetką → warstwa przednia; eksport robi to samo w ffmpeg (`edytor.maska_concat`, `alphamerge`).
+  Po przewinięciu podgląd rysuje osobę jeszcze raz z nowej klatki (zdarzenie `seeked`), a w strefach platformy
+  przyciemnia ją jak resztę wideo.
   Klucz osi (klipy, przycięcie, tempo, kadr; `edytor.maska_klucz` = `maskaKlucz` w `48-typografia.js`) pilnuje, żeby
   po zmianie klipów nie użyć starych sylwetek: wtedy napis jest po prostu widoczny w całości.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
