@@ -13,6 +13,8 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py kadr <film> <id> [--rozmyte|--dopasuj|--wypelnij] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
     projekt.py napisy <film> [--srt plik.srt] [--karaoke [#FFE14D]] [--kroj Kanit]   # napisy ze słów (<źródło>.mowa.json) albo SRT
     projekt.py przejscie <film> <id>|--wszystkie [--typ fade] [--dlugosc 0.5] [--usun]   # przejście na cięciu po klipie
+    projekt.py tnij <film> <id> (--w S | --czesci 3)   # podziel klip w chwili osi albo na równe części
+    projekt.py wytnij <film> --od S --do S          # wytnij kawałek osi (przez klipy); reszta się dosuwa
     projekt.py usun <film> <id>                    # usuń klip / tekst / audio o danym id (z `pokaz`)
     projekt.py uwaga <film> <id> (--zrobione "co zmieniłem" | --odrzuc "dlaczego")   # zamknij uwagę z osi edytora
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
@@ -377,6 +379,69 @@ def cmd_przejscie(film: Path, a) -> int:
     return 0
 
 
+MIN_CZESC = 0.1      # najkrótszy kawałek po cięciu (ED_MIN w edytorze HQ)
+
+
+def cmd_tnij(film: Path, a) -> int:
+    """Podział klipu jak „Tnij” w edytorze: oś się nie zmienia, przejście zostaje na ostatniej części."""
+    proj = load(film)
+    lay = layout(proj["clips"])
+    k = next((i for i, (c, _s, _e) in enumerate(lay) if c.get("id") == a.id), None)
+    if k is None:
+        raise SystemExit(f"nie ma klipu o id {a.id} (lista: projekt.py pokaz)")
+    c, s, e = lay[k]
+    if a.czesci:
+        if a.czesci < 2 or (e - s) / a.czesci < MIN_CZESC:
+            raise SystemExit(f"klip ma {e - s:.2f} s: części muszą mieć co najmniej {MIN_CZESC} s")
+        punkty = [s + (e - s) * j / a.czesci for j in range(1, a.czesci)]
+    else:
+        if a.w is None or not (s + MIN_CZESC <= a.w <= e - MIN_CZESC):
+            raise SystemExit(f"--w musi leżeć w klipie z zapasem {MIN_CZESC} s ({s:.2f}–{e:.2f} s osi)")
+        punkty = [a.w]
+    sp = float(c.get("speed") or 1)
+    granice = [c["in"], *(round(c["in"] + (t - s) * sp, 4) for t in punkty), c["out"]]
+    czesci = [{**c, "id": c["id"] if j == 0 else new_id("c"), "in": granice[j], "out": granice[j + 1]} for j in range(len(granice) - 1)]
+    for x in czesci[:-1]:
+        x.pop("transition", None)
+    proj["clips"] = proj["clips"][:k] + czesci + proj["clips"][k + 1:]
+    save(film, proj)
+    for x, xs, xe in layout(czesci):
+        print(f"  [{x['id']}] {s + xs:6.2f}–{s + xe:6.2f}  (źródło {x['in']:.2f}–{x['out']:.2f})")
+    return 0
+
+
+def wytnij_zakres(proj: dict, od: float, do: float) -> dict:
+    """Projekt bez odcinka osi od–do (przez wszystkie klipy), jak wycinanie pauz w edytorze HQ (cutTimeline): kawałek
+    klipu krótszy niż 0,04 s znika, przejście zostaje na ostatnim kawałku, napisy, typografia, uwagi i audio dosuwają się
+    (edytor.remap_times)."""
+    clips = []
+    for c, s, e in layout(proj["clips"]):
+        kaw = [(s, e)] if do <= s or od >= e else [(s, min(od, e)), (max(do, s), e)]
+        kaw = [(x, y) for x, y in kaw if y - x >= 0.04]
+        sp = float(c.get("speed") or 1)
+        for j, (x, y) in enumerate(kaw):
+            n = {**c, "id": c.get("id") if j == 0 else new_id("c"),
+                 "in": round(c["in"] + (x - s) * sp, 4) if x > s else c["in"], "out": round(c["in"] + (y - s) * sp, 4) if y < e else c["out"]}
+            if j < len(kaw) - 1:
+                n.pop("transition", None)
+            clips.append(n)
+    if not clips:
+        raise SystemExit("po wycięciu nie zostałby żaden klip")
+    return ed.remap_times(proj, {**proj, "clips": clips})
+
+
+def cmd_wytnij(film: Path, a) -> int:
+    proj = load(film)
+    t0 = total(proj)
+    od, do = max(0.0, a.od), min(t0, a.do)
+    if do - od < 0.02:
+        raise SystemExit(f"pusty zakres: film ma {t0:.2f} s, --od musi być mniejsze niż --do")
+    nowy = wytnij_zakres(proj, od, do)
+    save(film, nowy)
+    print(f"Wycięto {od:.2f}–{do:.2f} s osi; film ma teraz {total(nowy):.2f} s (było {t0:.2f} s). Napisy i audio dosunięte.")
+    return 0
+
+
 def cmd_usun(film: Path, a) -> int:
     proj = load(film)
     for key in ("clips", "texts", "audio"):
@@ -683,6 +748,14 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--typ", choices=ed.PRZEJSCIA, help="rodzaj (domyślnie fade albo obecny)")
     sp.add_argument("--dlugosc", type=float, help="sekundy 0.1–3 (domyślnie 0.5 albo obecna)")
     sp.add_argument("--usun", action="store_true", help="zwykłe cięcie zamiast przejścia")
+    sp = film_cmd("tnij", cmd_tnij, "podziel klip (oś się nie zmienia)")
+    sp.add_argument("id", help="klip (z `pokaz`)")
+    g = sp.add_mutually_exclusive_group(required=True)
+    g.add_argument("--w", type=float, help="chwila osi (s), w której tniesz")
+    g.add_argument("--czesci", type=int, help="na tyle równych części (np. 3)")
+    sp = film_cmd("wytnij", cmd_wytnij, "wytnij odcinek osi; reszta się dosuwa")
+    sp.add_argument("--od", type=float, required=True, help="początek odcinka (s osi)")
+    sp.add_argument("--do", type=float, required=True, help="koniec odcinka (s osi)")
     film_cmd("usun", cmd_usun, "usuń element po id").add_argument("id")
     sp = film_cmd("uwaga", cmd_uwaga, "zamknij uwagę z osi edytora")
     sp.add_argument("id")

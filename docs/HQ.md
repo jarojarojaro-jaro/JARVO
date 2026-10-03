@@ -208,6 +208,12 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   kadr bez tła i pasów, a panel Format mówi to wprost. Podgląd rysuje tło na małej kanwie pod wideo (rozmycie w CSS),
   eksport tym samym przepisem co `film.py --tryb rozmyte` (`edytor.blur_filter`: `boxblur` + `eq`), Wideograf:
   `projekt.py dodaj-klip|kadr --rozmyte|--dopasuj|--wypelnij`.
+- **Szybkie cięcie** (jak w CapCut): w ustawieniach klipu **Usuń z lewej** (od początku klipu do wskaźnika,
+  klawisz Q) i **Usuń z prawej** (od wskaźnika do końca klipu, W), a **Podziel na równe części** tnie klip na 2, 3
+  albo 4 kawałki (np. 7,5 s → 3 × 2,5 s), więc środek wycinasz jednym usunięciem. Reszta osi się dosuwa razem
+  z napisami, typografią, uwagami i muzyką (`remapTimes`), przejście zostaje na tym samym cięciu (ostatnia część).
+  Logika bez Reacta: `hq/web/src/47-ciecie.js` (testy w node: `tests/test_edytor_ciecie.py`). Wideograf:
+  `projekt.py tnij <film> <id> --w S|--czesci N` i `projekt.py wytnij <film> --od S --do S` (odcinek osi przez klipy).
 - **Przejścia między klipami** (jak w CapCut): na każdym cięciu osi jest mały kwadrat; klik otwiera panel z 16
   przejściami (Przenikanie, Przez czerń, Przez biel, Rozmycie, Przybliżenie, Piksele, Przesuń w lewo/prawo/górę/dół,
   Najazd z prawej/lewej, Zasłona w lewo/prawo, Miękka zasłona, Koło), każde z animowaną miniaturą, suwakiem długości
@@ -247,7 +253,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
-  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `przejscie`, `usun`, `uwaga`,
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `przejscie`, `tnij`, `wytnij`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy i typografię rysują te same funkcje (`hq/web/src/44-napisy.js`, `48-typografia.js`) w przeglądarce bez
   okna, więc plik od agenta wygląda jak eksport z edytora. Typografię na tym samym projekcie układa `typografia.py`
