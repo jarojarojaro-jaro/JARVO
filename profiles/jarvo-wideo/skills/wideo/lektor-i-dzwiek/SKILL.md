@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-10-03"
 ---
 
 # Lektor i dźwięk
@@ -44,17 +44,6 @@ powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. D
   muzyka marki `brands/<marka>/muzyka/`, plik z karty, a gdy ich brak: podkłady CC0 z biblioteki edytora
   (`projekt.py dzwieki --muzyka`, `dodaj-dzwiek`; „losowa” bierze je sama). Inny utwór tylko z licencją
   (zaproponuj w RAPORT: YouTube Audio Library, Pixabay Music, pobrane przez użytkownika do biblioteki).
-
-## Efekty dźwiękowe (biblioteka CC0)
-- `python3 $HERMES_HOME/scripts/projekt.py dzwieki [--kategoria K] [--szukaj fraza]`: 157 efektów
-  w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia, akcja, interfejs, technika, natura, zwierzęta, codzienne,
-  zabawne, gry i retro, dżingle) i 9 podkładów (`--muzyka`); ta sama biblioteka co menu Audio w edytorze HQ.
-- `projekt.py dodaj-dzwiek <film> <id> --start S [--glosnosc 0.8]`: efekt na osi (kopia w `<katalog filmu>/dzwieki/`).
-  Efekt gra od razu w chwili `--start` (cisza na początku pliku jest przycięta): stawiaj go na cięciu albo akcji.
-- Umiar: 1 efekt na kilka sekund, whoosh na przejściu, „kasa” przy cenie, oklaski przy wyniku; głośność efektu
-  pod lektorem ok. 0,5–0,8.
-- `projekt.py wyodrebnij <film> <id klipu>`: dźwięk klipu jako osobne audio (np. żeby przeciągnąć go pod inne ujęcie);
-  `--plik inny.mp4` bierze dźwięk z innego filmu. `projekt.py lektor <film> "tekst" --start S`: lektor wprost na oś.
 - Głośność pod lektorem 0,10–0,18 (plan: `glosnosc`); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.
 - Nigdy: muzyka z list przebojów, „znalezione na YouTube”, muzyka z cudzych filmów.
@@ -62,19 +51,32 @@ powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. D
   scena na dropie; sprawdź uchem przy swobodnym tempie.
 
 ## Efekty dźwiękowe
-- Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania (syntetyczne brzmią tanio): biblioteka marki,
-  `@@KNOWLEDGE_DIR@@/wideo/sfx/`, Mixkit i Pixabay (darmowe komercyjnie, bez podpisu; źródło i licencja w RAPORT).
-- **Najpierw syntezuj (zalecane):** efekty z osi czasu obrazu, bez plików i licencji:
-  `node $ANIM/scripts/sound.mjs cues.json film.mp4 final.mp4 --lufs -14 [--bed muzyka.wav --bed-at 2.0]`
-  (`eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env animacja)"`). `cues.json`: `[{"sfx":"click","t":0.94},
-  {"sfx":"whoosh","t":1.08,"dur":0.5}]`; dźwięki: pop, whoosh, whip, tick, thump, crack, sparkle, buzz, scratch,
-  drip, boing, riser, splash, click, step, fall, chime, chirp, burner (+ `vol`, `pan`, `pitch` 0,9–1,3, żeby się nie powtarzały).
-  Czasy: zdarzenia w obrazie (klik, zmiana stanu, cięcie) i bity z `rytm.py`; cue **~0,03 s przed** klatką zdarzenia.
-  Bez ciągłego „skrobania” pod rysowaniem: dźwięk mają kontakty, nie rysowanie.
-- Pobierasz sam: strona kategorii `mixkit.co/free-sound-effects/<słowo>/` (np. click, whoosh, pop, typing) ma linki
-  do plików `assets.mixkit.co/…` → `curl -L` do `out/wideo/src/sfx/`; jeden efekt na zdarzenie, nazwa = zdarzenie.
+Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność źródeł:
+1. **Biblioteka CC0 (najpierw, montaż i projekt z edytora HQ):** `python3 $HERMES_HOME/scripts/projekt.py dzwieki
+   [--kategoria K] [--szukaj fraza]`: 157 efektów w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia, akcja,
+   interfejs, technika, natura, zwierzęta, codzienne, zabawne, gry i retro, dżingle) i 9 podkładów (`--muzyka`); ta sama
+   biblioteka co menu Audio w edytorze HQ, licencja CC0, bez podpisu.
+   `projekt.py dodaj-dzwiek <film> <id> --start S [--glosnosc 0.8]`: efekt na osi (kopia w `<katalog filmu>/dzwieki/`).
+   Efekt gra od razu w chwili `--start` (cisza na początku pliku jest przycięta): stawiaj go na cięciu albo akcji.
+2. **Synteza z osi animacji (film z kodu, wiele zdarzeń co do klatki):** efekty bez plików i licencji:
+   `node $ANIM/scripts/sound.mjs cues.json film.mp4 final.mp4 --lufs -14 [--bed muzyka.wav --bed-at 2.0]`
+   (`eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env animacja)"`). `cues.json`: `[{"sfx":"click","t":0.94},
+   {"sfx":"whoosh","t":1.08,"dur":0.5}]`; dźwięki: pop, whoosh, whip, tick, thump, crack, sparkle, buzz, scratch,
+   drip, boing, riser, splash, click, step, fall, chime, chirp, burner (+ `vol`, `pan`, `pitch` 0,9–1,3, żeby się nie powtarzały).
+   Czasy: zdarzenia w obrazie (klik, zmiana stanu, cięcie) i bity z `rytm.py`; cue **~0,03 s przed** klatką zdarzenia.
+   Bez ciągłego „skrobania” pod rysowaniem: dźwięk mają kontakty, nie rysowanie.
+3. **Brak w bibliotece:** biblioteka marki, `@@KNOWLEDGE_DIR@@/wideo/sfx/`, Mixkit i Pixabay (darmowe komercyjnie;
+   źródło i licencja w RAPORT). Strona kategorii `mixkit.co/free-sound-effects/<słowo>/` (np. click, whoosh, pop,
+   typing) ma linki do plików `assets.mixkit.co/…` → `curl -L` do `out/wideo/src/sfx/`; jeden efekt na zdarzenie,
+   nazwa = zdarzenie.
+
 - Każdy efekt dokładnie na swojej klatce (wg osi animacji): `rytm.py efekty/*.wav --szczyt` mówi, gdzie ma szczyt,
-  więc start = chwila zdarzenia − szczyt. Cicho pod lektorem (−18…−12 dB względem głosu), całość −14 LUFS.
+  więc start = chwila zdarzenia − szczyt (pliki z biblioteki CC0 mają szczyt na początku).
+- Umiar: 1 efekt na kilka sekund, whoosh na przejściu, „kasa” przy cenie, oklaski przy wyniku. Cicho pod lektorem
+  (głośność efektu ok. 0,5–0,8, −18…−12 dB względem głosu), całość −14 LUFS.
+- Dźwięk z nagrania: `projekt.py wyodrebnij <film> <id klipu>` robi z dźwięku klipu osobne audio (np. żeby przeciągnąć
+  go pod inne ujęcie), `--plik inny.mp4` bierze dźwięk z innego filmu. `projekt.py lektor <film> "tekst" --start S`:
+  lektor wprost na oś projektu.
 
 ## Głośność nagrań
 `montaz.py glosnosc <plik> -o <wynik> --lufs -14` (dwa przejścia loudnorm). Pomiar: `qa_wideo.py <plik>` → `lufs`, `true_peak`.
