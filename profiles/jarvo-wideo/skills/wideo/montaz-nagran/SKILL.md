@@ -1,12 +1,12 @@
 ---
 name: montaz-nagran
 description: "Montaż nagrań: cięcie, cisza, kadr 9:16, dźwięk, napisy."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
-    tags: [video, editing, ffmpeg, reframe, silence, audio]
+    tags: [video, editing, ffmpeg, reframe, silence, audio, color]
     related_skills: [napisy, lektor-i-dzwiek, clipmaker, dobor-ujec, kontrola-wideo, formaty-wideo]
   jarvo:
     agent: jarvo-wideo
@@ -45,6 +45,11 @@ zostaw jego napisy albo zapytaj o wersję „czystą”.
 5. **Kadr pod format:** `montaz.py kadr <plik> -o out/wideo/src/pion.mp4 --format 9:16 --x 0.45` (x = środek obiektu
    z przeglądu). Nagranie ekranu, slajdy, dwie osoby w kadrze: `--tryb rozmyte`.
 6. **Dźwięk:** `montaz.py glosnosc <plik> -o <wynik> --lufs -14`; muzyka pod głos: `lektor-i-dzwiek`.
+   **Kolor** (gdy obraz jest ciemny, płaski, wyblakły albo właściciel prosi o nastrój): projekt montażu filmu
+   (`projekt.py`, ten sam co w edytorze HQ) → `projekt.py kolor <plik> --wszystkie --auto --podglad`, nastrój
+   `--styl naturalny|cieply|chlodny|kinowy|zywy|czb|wyblakly` (suwaki `--jasnosc/--kontrast/--nasycenie/--temperatura`
+   −100…100), potem `projekt.py render <plik>`. Obraz z `--podglad` (przed | po) przez `vision_analyze`: skóra
+   naturalna, nie pomarańczowa ani szara, światła i cienie nie zjedzone. Jeden kolor na cały film, z umiarem.
 7. **Napisy:** `napisy` (transkrypcja → korekta SRT → wypalenie).
 8. **Kontrola:** `kontrola-wideo`; oddanie jak w `krotki-film` (link, miniatura, RAPORT z listą cięć).
 
@@ -54,5 +59,6 @@ zostaw jego napisy albo zapytaj o wersję „czystą”.
 ## Definition of Done
 - [ ] wpadki i długie cisze usunięte bez ucinania słów; każde cięcie obejrzane (`krytyka.py ciecia`),
 - [ ] obiekt w kadrze po zmianie formatu; format i długość zgodne z platformą,
+- [ ] kolor (jeśli zmieniany) jeden na film, skóra naturalna, podgląd przed i po obejrzany,
 - [ ] −14 LUFS ±2, napisy poprawne, `qa_wideo.py` bez błędów,
 - [ ] oryginał nietknięty (praca na kopiach w `out/wideo/src/`).

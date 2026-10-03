@@ -6,6 +6,7 @@ Projekt montażu to mały JSON (zapisywany obok filmu jako `<nazwa>.edycja.json`
      "clips": [{"src": "/opt/data/jarvo/.../film.mp4", "in": 0.0, "out": 4.2, "speed": 1.0,
                 "volume": 1.0, "muted": false, "fit": "contain",     # pasy; "blur" = rozmyte tło; "cover" + fx, fy, zoom
                 "fadeIn": 0.0, "fadeOut": 0.0,                      # narastanie i wyciszanie dźwięku (s, opcjonalne)
+                "color": {"look": "cieply", "contrast": 10},          # korekcja koloru (opcjonalna, KOLOR_STYLE)
                 "transition": {"type": "fade", "dur": 0.5}}],      # przejście do następnego klipu (opcjonalne)
      "texts": [{"start": 0.5, "end": 3.0, ...}],          # wygląd rysuje przeglądarka (PNG na klatkę)
      "audio": [{"src": ".../muzyka.mp3", "start": 0.0, "in": 0.0, "out": 30.0, "volume": 0.4, "fadeOut": 2.0}]}
@@ -59,6 +60,23 @@ PRZEJSCIA = ("fade", "fadeblack", "fadewhite", "blur", "zoomin", "pixelize", "sl
              "slidedown", "coverleft", "coverright", "wipeleft", "wiperight", "smoothleft", "circleopen")
 PRZEJSCIE_D = 0.5        # domyślna długość przejścia (s)
 ROZMYCIE_PRZEJSCIA = 40  # rozmycie przy cięciu: σ = krótszy bok kadru / 40 (27 px przy 1080)
+# Korekcja koloru klipu („Kolor” w edytorze HQ, projekt.py kolor): styl i cztery suwaki −100…100. Przepis jest jeden:
+# krzywa na kanał z pięciu punktów (0, ¼, ½, ¾, 1) i macierz nasycenia. Podgląd rysuje go filtrem SVG
+# (feComponentTransfer „table” + feColorMatrix, hq/web/src/49-kolor.js), eksport tymi samymi liczbami w lutrgb
+# i colorchannelmixer, więc kolor w podglądzie i w pliku jest ten sam. Style za browser-use/video-use (grade.py:
+# neutral_punch, warm_cinematic) i filtrami CapCut; krzywa S (`krzywa`) i uniesiona czerń (`lift`) siedzą w stylu.
+KOLOR_STYLE = {
+    "naturalny": {"contrast": 8, "saturation": 6, "krzywa": 0.5},
+    "cieply": {"contrast": 10, "saturation": -6, "temperature": 30, "krzywa": 0.6},
+    "chlodny": {"contrast": 6, "saturation": -4, "temperature": -28},
+    "kinowy": {"contrast": 14, "saturation": -16, "temperature": 10, "krzywa": 1.0},
+    "zywy": {"contrast": 10, "saturation": 30},
+    "czb": {"contrast": 18, "saturation": -100, "krzywa": 0.6},
+    "wyblakly": {"contrast": -18, "saturation": -24, "lift": 0.07},
+}                        # te same klucze i liczby co ED_KOLOR_STYLE w 49-kolor.js
+KOLOR_SUWAKI = ("brightness", "contrast", "saturation", "temperature")
+KOLOR_X = (0.0, 0.25, 0.5, 0.75, 1.0)
+KOLOR_S = (0.0, -0.04, 0.0, 0.04, 0.0)      # krzywa S: cienie w dół, światła w górę
 MAX_AUDIO = 32           # muzyka, lektor i efekty (na osi w pasach jeden pod drugim)
 ZANIK_MAX = 10.0         # najdłuższe narastanie albo wyciszanie (s), najwyżej połowa elementu (ZANIK_MAX w 43-dzwiek.js)
 MAX_WORDS = 40           # słów w jednym napisie karaoke (linia napisu ma ich 2–8)
@@ -183,6 +201,9 @@ def normalize(project: dict, resolve) -> dict:
         tr = c.get("transition")
         if isinstance(tr, dict) and tr.get("type") in PRZEJSCIA:
             clips[-1]["transition"] = {"type": tr["type"], "dur": _num(tr.get("dur"), 0.1, 3, PRZEJSCIE_D)}
+        kol = kolor_norm(c.get("color"))
+        if kol:
+            clips[-1]["color"] = kol
     if not clips:
         raise ProjectError("Oś czasu jest pusta: dodaj co najmniej jeden klip.")
     total = sum((c["out"] - c["in"]) / c["speed"] for c in clips)
@@ -483,6 +504,104 @@ def cover_filter(W: int, H: int, c: dict) -> str:
             f"crop={W}:{H}:(iw-{W})*{_f(fx)}:(ih-{H})*{_f(fy)}")
 
 
+def _r4(v: float) -> float:
+    return math.floor(v * 10000 + 0.5) / 10000        # jak r4 w 49-kolor.js (Math.round), nie zaokrąglanie bankiera
+
+
+def kolor_norm(raw: Any) -> dict | None:
+    """Korekcja koloru klipu: styl z KOLOR_STYLE i suwaki całkowite −100…100 (zera odpadają); None = bez korekty."""
+    if not isinstance(raw, dict):
+        return None
+    out: dict = {"look": raw["look"]} if raw.get("look") in KOLOR_STYLE else {}
+    for k in KOLOR_SUWAKI:
+        v = int(math.floor(_num(raw.get(k), -100, 100, 0) + 0.5))
+        if v:
+            out[k] = v
+    return out or None
+
+
+def kolor_domyslne(look: str) -> dict:
+    """Suwaki, które ustawia wybór stylu (potem człowiek albo agent może je przesunąć)."""
+    return {k: v for k, v in KOLOR_STYLE.get(look, {}).items() if k in KOLOR_SUWAKI}
+
+
+def kolor_tabele(raw: Any) -> tuple[dict, float] | None:
+    """Przepis koloru: krzywa każdego kanału w pięciu punktach (0…1) i nasycenie (1 = bez zmiany).
+    Kolejność: krzywa S i lift stylu → kontrast wokół ½ → jasność → temperatura (zysk R/G/B) → obcięcie do 0…1."""
+    k = kolor_norm(raw)
+    if not k:
+        return None
+    st = KOLOR_STYLE.get(k.get("look") or "", {})
+    a, lift = st.get("krzywa", 0.0), st.get("lift", 0.0)
+    kon = 1 + k.get("contrast", 0) / 100 * 0.35
+    jas = k.get("brightness", 0) / 100 * 0.2
+    t = k.get("temperature", 0) / 100
+    zysk = {"r": 1 + 0.10 * t, "g": 1 + 0.02 * t, "b": 1 - 0.12 * t}
+    sn = k.get("saturation", 0) / 100
+    tab = {}
+    for ch in ("r", "g", "b"):
+        ys = []
+        for x, sx in zip(KOLOR_X, KOLOR_S):
+            y = lift + (1 - lift) * (x + a * sx)
+            y = (y - 0.5) * kon + 0.5 + jas
+            ys.append(_r4(min(1.0, max(0.0, y * zysk[ch]))))
+        tab[ch] = ys
+    return tab, _r4(1 + sn if sn < 0 else 1 + 0.8 * sn)
+
+
+def kolor_macierz(s: float) -> list[list[float]]:
+    """Macierz nasycenia z Filter Effects (CSS saturate, feColorMatrix type=saturate): luminancja 0,213/0,715/0,072."""
+    return [[0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s],
+            [0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s],
+            [0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s]]
+
+
+def _lut_expr(ys: list[float]) -> str:
+    """Krzywa z pięciu punktów jak feFuncX type=table: odcinki liniowe co 63,75 wartości (0…255)."""
+    seg = [f"{ys[i] * 255:.4f}{(ys[i + 1] - ys[i]) * 4:+.6f}*(val-{i * 63.75:g})" for i in range(4)]
+    return f"if(lt(val,63.75),{seg[0]},if(lt(val,127.5),{seg[1]},if(lt(val,191.25),{seg[2]},{seg[3]})))"
+
+
+def kolor_filter(raw: Any) -> str:
+    """Filtry FFmpeg korekcji koloru klipu (RGB, ten sam przepis co filtr SVG podglądu); "" = bez korekty."""
+    t = kolor_tabele(raw)
+    if not t:
+        return ""
+    tab, s = t
+    out = []
+    if any(list(tab[ch]) != list(KOLOR_X) for ch in tab):
+        out.append(f"lutrgb=r='{_lut_expr(tab['r'])}':g='{_lut_expr(tab['g'])}':b='{_lut_expr(tab['b'])}'")
+    if abs(s - 1) > 1e-6:
+        m = kolor_macierz(s)
+        out.append("colorchannelmixer=" + ":".join(f"{a}{b}={m[i][j]:.6f}" for i, a in enumerate("rgb")
+                                                    for j, b in enumerate("rgb")))
+    return ",".join(out)
+
+
+def kolor_pomiar_cmd(src: Path, a: float, b: float, ffmpeg: str = "ffmpeg") -> list[str]:
+    """Pomiar klatek klipu pod „Auto” (signalstats na ~12 klatkach); wynik w stderr, czyta go kolor_z_pomiaru."""
+    d = max(0.1, b - a)
+    return [ffmpeg, "-nostdin", "-hide_banner", "-nostats", "-loglevel", "info", "-ss", _f(a), "-t", _f(d), "-i", str(src),
+            "-vf", f"fps={min(4.0, max(0.5, 12 / d)):.3f},scale=320:-2,signalstats,metadata=print", "-an", "-f", "null", "-"]
+
+
+def kolor_z_pomiaru(log: str) -> dict | None:
+    """„Auto” za video-use (auto_grade): tylko korekta niedoświetlenia, płaskiego obrazu i wyblakłych barw, bez
+    przesunięcia barwy i najwyżej ±30 na suwaku („czysto, nie stylizowane”). Średnie Y i nasycenia z signalstats."""
+    v: dict[str, list[float]] = {k: [] for k in ("YAVG", "YLOW", "YHIGH", "SATAVG")}
+    for m in re.finditer(r"lavfi\.signalstats\.(YAVG|YLOW|YHIGH|SATAVG)=([\d.]+)", log):
+        v[m.group(1)].append(float(m.group(2)))
+    if not all(v.values()):
+        return None
+    sr = {k: sum(x) / len(x) for k, x in v.items()}
+    y, zakres, sat = (sr["YAVG"] - 16) / 219, (sr["YHIGH"] - sr["YLOW"]) / 219, sr["SATAVG"]
+    jas = min(30, round((0.45 - y) / 0.2 * 100)) if y < 0.40 else max(-15, round((0.58 - y) / 0.2 * 100)) if y > 0.62 else 0
+    kon = min(30, round((0.62 / max(zakres, 0.2) - 1) / 0.35 * 100)) if zakres < 0.55 else 0
+    nas = 15 if sat < 14 else -10 if sat > 55 else 0
+    kol = {"brightness": jas, "contrast": kon, "saturation": nas}
+    return {"color": kolor_norm(kol), "pomiar": {"jasnosc": round(y, 3), "rozpietosc": round(zakres, 3), "nasycenie": round(sat, 1)}}
+
+
 def blur_filter(W: int, H: int, i: int) -> str:
     """„Rozmyte tło”: całe ujęcie na środku, pod nim to samo ujęcie pokrywające kadr, rozmyte i lekko przyciemnione
     (jak `film.py --tryb rozmyte`; podgląd: blurBg w przeglądarce). Etykiety z numerem klipu: jeden graf na eksport.
@@ -640,7 +759,8 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                else f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black")
         glowa = tr[i - 1]["d"] if i and tr[i - 1] and tr[i - 1]["type"] == "blur" else 0.0
         ogon = tr[i]["d"] if tr[i] and tr[i]["type"] == "blur" else 0.0
-        graph.append(f"[{vi}:v]setpts=(PTS-STARTPTS)/{_f(sp)},fps={F},{fit},setsar=1,format=yuv420p,"
+        kol = kolor_filter(c.get("color"))      # korekcja koloru po kadrze: obejmuje też rozmyte tło, jak w podglądzie
+        graph.append(f"[{vi}:v]setpts=(PTS-STARTPTS)/{_f(sp)},fps={F},{fit}{',' + kol if kol else ''},setsar=1,format=yuv420p,"
                      + (f"tpad=start_mode=clone:start_duration={_f(brak)}," if brak > 1e-4 else "")
                      + f"tpad=stop_mode=clone:stop_duration={_f(post + 1)},trim=duration={_f(L)},setpts=PTS-STARTPTS"
                      + (rozmycie_przejscia(i, L, F, smax, glowa, ogon) if glowa or ogon else "")

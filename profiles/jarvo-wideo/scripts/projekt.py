@@ -16,6 +16,8 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
                                            [--y 0.78] [--rozmiar 72] [--kolor #FFFFFF] [--tlo #000000]
     projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--rozmyte|--dopasuj|--wypelnij --fx X --fy Y --zoom Z]
     projekt.py kadr <film> <id> [--rozmyte|--dopasuj|--wypelnij] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
+    projekt.py kolor <film> <id>|--wszystkie [--styl cieply] [--jasnosc N] [--kontrast N] [--nasycenie N]
+                     [--temperatura N] [--auto] [--usun] [--podglad]   # korekcja koloru klipu (suwaki −100…100)
     projekt.py napisy <film> [--srt plik.srt] [--karaoke [#FFE14D]] [--kroj Kanit]   # napisy ze słów (<źródło>.mowa.json) albo SRT
     projekt.py przejscie <film> <id>|--wszystkie [--typ fade] [--dlugosc 0.5] [--usun]   # przejście na cięciu po klipie
     projekt.py tnij <film> <id> (--w S | --czesci 3)   # podziel klip w chwili osi albo na równe części
@@ -137,6 +139,81 @@ def resolve(raw: str) -> Path | None:
 
 # ---------------------------------------------------------------- polecenia
 
+KOLOR_ARGI = {"jasnosc": "brightness", "kontrast": "contrast", "nasycenie": "saturation", "temperatura": "temperature"}
+
+
+def opis_koloru(k: dict | None) -> str:
+    k = ed.kolor_norm(k)
+    if not k:
+        return ""
+    nazwy = {v: n for n, v in KOLOR_ARGI.items()}
+    suw = ", ".join(f"{nazwy[x]} {k[x]:+d}" for x in ed.KOLOR_SUWAKI if x in k)
+    return f" · kolor {k.get('look') or 'własny'}" + (f" ({suw})" if suw else "")
+
+
+def kolor_auto(c: dict) -> dict:
+    """Pomiar klatek klipu jak „Auto” w edytorze HQ (edytor.kolor_pomiar_cmd → kolor_z_pomiaru)."""
+    r = subprocess.run(ed.kolor_pomiar_cmd(Path(c["src"]), float(c.get("in", 0)), float(c.get("out", 0)), ed.tools()["ffmpeg"] or "ffmpeg"),
+                       capture_output=True, text=True)
+    wynik = ed.kolor_z_pomiaru(r.stderr) if r.returncode == 0 else None
+    if not wynik:
+        raise SystemExit(f"nie udało się zmierzyć klatek klipu {c.get('id')}: {(r.stderr.strip().splitlines() or [''])[-1][:200]}")
+    print(f"  pomiar [{c.get('id')}]: jasność {wynik['pomiar']['jasnosc']}, rozpiętość {wynik['pomiar']['rozpietosc']}, "
+          f"nasycenie {wynik['pomiar']['nasycenie']}")
+    return wynik["color"] or {}
+
+
+def kolor_podglad(film: Path, c: dict) -> Path:
+    """Klatka ze środka klipu: lewa połowa przed korektą, prawa po niej (ten sam filtr co eksport)."""
+    out = film.with_name(f"{film.stem}-kolor-{c.get('id')}.jpg")
+    kol = ed.kolor_filter(c.get("color")) or "null"
+    t = (float(c.get("in", 0)) + float(c.get("out", 0))) / 2
+    wej = [] if ed.media_kind(Path(c["src"])) == "image" else ["-ss", f"{t:.3f}"]
+    r = subprocess.run([ed.tools()["ffmpeg"] or "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", *wej, "-i", str(c["src"]),
+                        "-frames:v", "1", "-filter_complex", f"[0:v]scale=-2:540,format=rgb24,split[a][b];[b]{kol},format=rgb24[k];[a][k]hstack",
+                        "-q:v", "3", str(out)], capture_output=True, text=True)
+    if r.returncode:
+        raise SystemExit(f"podgląd koloru: {r.stderr.strip()[-300:]}")
+    return out
+
+
+def cmd_kolor(film: Path, a) -> int:
+    proj = load(film)
+    clips = proj["clips"]
+    if a.wszystkie:
+        cele = clips
+    else:
+        if not a.id:
+            raise SystemExit("podaj id klipu (z `pokaz`) albo --wszystkie")
+        c = next((x for x in clips if x.get("id") == a.id), None)
+        if c is None:
+            raise SystemExit(f"nie ma klipu o id {a.id} (lista: projekt.py pokaz)")
+        cele = [c]
+    zmiany = {v: getattr(a, n) for n, v in KOLOR_ARGI.items() if getattr(a, n) is not None}
+    for c in cele:
+        if a.usun:
+            c.pop("color", None)
+            continue
+        kol = dict(c.get("color") or {})
+        if a.styl:
+            kol = {} if a.styl == "brak" else {"look": a.styl, **ed.kolor_domyslne(a.styl)}
+        if a.auto:
+            kol = {**{k: v for k, v in kol.items() if k not in ed.KOLOR_SUWAKI}, **kolor_auto(c)}
+        kol = ed.kolor_norm({**kol, **zmiany})
+        if kol:
+            c["color"] = kol
+        else:
+            c.pop("color", None)
+    save(film, proj)
+    for c in cele:
+        print(f"Kolor [{c.get('id')}]: {opis_koloru(c.get('color'))[len(' · kolor '):] or 'bez korekty'}")
+    if a.podglad:
+        out = kolor_podglad(film, cele[0])
+        print(f"Przed | po (klatka ze środka klipu {cele[0].get('id')}): {out}")
+        print(f"MEDIA:{out}")
+    return 0
+
+
 def cmd_pokaz(film: Path, a) -> int:
     proj = load(film)
     exists = ed.project_path(film).is_file()
@@ -148,7 +225,7 @@ def cmd_pokaz(film: Path, a) -> int:
     for (c, s, e), tr in zip(layout(proj["clips"]), trs):
         extra = "".join([f" · tempo {c.get('speed', 1)}×" if c.get("speed", 1) != 1 else "", " · wyciszony" if c.get("muted") else "",
                          f" · głośność {c.get('volume', 1):.2f}" if c.get("volume", 1) != 1 else ""])
-        print(f"  [{c.get('id')}] {s:6.2f}–{e:6.2f}  {Path(c['src']).name} (źródło {c['in']:.2f}–{c['out']:.2f}){extra}{opis_zaniku(c)}")
+        print(f"  [{c.get('id')}] {s:6.2f}–{e:6.2f}  {Path(c['src']).name} (źródło {c['in']:.2f}–{c['out']:.2f}){extra}{opis_zaniku(c)}{opis_koloru(c.get('color'))}")
         if tr:
             print(f"      ↳ przejście {tr['type']} {tr['d']:.2f} s ({e - tr['d'] / 2:.2f}–{e + tr['d'] / 2:.2f})")
         elif c.get("transition") and c is not proj["clips"][-1]:
@@ -912,6 +989,15 @@ def main(argv: list[str] | None = None) -> int:
     sp = film_cmd("kadr", cmd_kadr, "kadr klipu: wypełnij/dopasuj, punkt skupienia, przybliżenie")
     sp.add_argument("id")
     kadr_args(sp)
+    sp = film_cmd("kolor", cmd_kolor, "korekcja koloru klipu (styl, suwaki −100…100, Auto z pomiaru klatek)")
+    sp.add_argument("id", nargs="?", help="klip (z `pokaz`)")
+    sp.add_argument("--wszystkie", action="store_true", help="każdy klip (jeden kolor na film)")
+    sp.add_argument("--styl", choices=[*ed.KOLOR_STYLE, "brak"], help="styl; ustawia jego suwaki (potem można je zmienić)")
+    for n in KOLOR_ARGI:
+        sp.add_argument(f"--{n}", type=int, help="−100…100 (0 = bez zmiany)")
+    sp.add_argument("--auto", action="store_true", help="delikatna korekta z pomiaru klatek (ciemne jaśniej, płaskie z kontrastem)")
+    sp.add_argument("--usun", action="store_true", help="bez korekty koloru")
+    sp.add_argument("--podglad", action="store_true", help="klatka przed | po obok filmu (do vision_analyze)")
     sp = film_cmd("napisy", cmd_napisy, "napisy ze słów albo z SRT")
     sp.add_argument("--srt")
     sp.add_argument("--karaoke", nargs="?", const="", metavar="KOLOR",

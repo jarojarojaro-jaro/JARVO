@@ -92,6 +92,10 @@ const liveApi = {
     const res = await rawFetch(`${API_ROOT}/edit/wyodrebnij`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, src }) });
     return res.json();
   },
+  async editKolorAuto(src, inn, out) {
+    const res = await rawFetch(`${API_ROOT}/edit/kolor-auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src, in: inn, out }) });
+    return res.json();
+  },
   async editLektor(path, text, glos, tempo) {
     const res = await rawFetch(`${API_ROOT}/edit/lektor`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, text, glos, tempo }) });
     return res.json();

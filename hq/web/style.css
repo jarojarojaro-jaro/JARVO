@@ -788,6 +788,9 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-trmini { position: relative; display: grid; place-items: center; width: 60px; height: 40px; overflow: hidden; border-radius: 7px; background: #000; color: var(--ed-muted); }
 .thq-ed-trmini svg { width: 18px; height: 18px; }
 .thq-ed-trmini.is-none { background: var(--ed-panel-2); }
+.thq-ed-kolprob { display: block; width: 60px; height: 40px; border-radius: 7px;   /* próbka stylu koloru: cień, skóra, niebo, zieleń, jasne */
+  background: linear-gradient(90deg, #262626 0 16%, #c98f6b 16% 38%, #6f9fd0 38% 60%, #5f9a48 60% 82%, #efe4cf 82%); }
+.thq-ed-trgrid button.is-on .thq-ed-kolprob { box-shadow: 0 0 0 2px var(--ed-accent); }
 .thq-ed-trmini i { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; font-size: 15px; font-weight: 700; color: rgba(255,255,255,.9); }
 .thq-ed-trmini i.is-a { background: linear-gradient(135deg, #E0745A, #8C3B5E); }
 .thq-ed-trmini i.is-b { background: linear-gradient(135deg, #3F9BD8, #2C5A9E); }

@@ -24,6 +24,7 @@ Jarvo zostaje nadrzędny: z cudzych projektów bierzemy tylko wzorce i pliki na 
 | Zanik audio | ✅ | Narastanie i wyciszanie na początku i końcu każdego audio i klipu (suwaki, trójkąt na osi, `afade` liniowo jak podgląd); `projekt.py dzwiek` i `dodaj-audio --narastanie/--wyciszanie`; ciche cięcia: 25 ms wyciszenia na każdym twardym cięciu w eksporcie |
 | Kilka ścieżek audio | ✅ | Muzyka, lektor i efekty grające naraz na osobnych pasach osi (pierwszy wolny pas), do 32 elementów audio |
 | Paski ikon na telefonie | ✅ | Pasek główny, pasek klipu, audio i tekstu jak w CapCut, z „<” powrotu; ikona otwiera jedną sekcję ustawień |
+| Kolor klipu | ✅ | 7 stylów z próbką i suwaki jasność, kontrast, nasycenie, temperatura; Auto z pomiaru klatek; na wszystkie klipy; podgląd filtrem SVG = eksport `lutrgb` + `colorchannelmixer` (jeden przepis, test pikseli); `projekt.py kolor` (z `--auto` i `--podglad`) |
 
 ## Krok 2. Audio
 
@@ -50,8 +51,8 @@ ma pięć kart. Każdy dodany dźwięk to plik obok filmu (`dzwieki/`, `lektor/`
 
 ## Krok 5. Później (jako dodatki)
 
-- Jasność, kontrast, filtry i odszumianie (`eq`, `afftdn`), efekty, krzywa tempa, obraz w obrazie, ściszanie muzyki
-  pod mową (ducking).
+- Odszumianie (`afftdn`), efekty, krzywa tempa, obraz w obrazie, ściszanie muzyki pod mową (ducking).
+  Jasność, kontrast i filtry są już w kroku 1 („Kolor klipu”).
 
 ## Źródła i licencje
 

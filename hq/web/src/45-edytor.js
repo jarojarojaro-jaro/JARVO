@@ -104,6 +104,7 @@ const ED_ICON = {
   film: svgI(html`<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>`),
   image: svgI(html`<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5.2-5.2L5.5 20"/>`),
   sliders: svgI(html`<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>`),
+  kolor: svgI(html`<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>`),
   alignL: svgI(html`<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>`),
   alignC: svgI(html`<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>`),
   alignR: svgI(html`<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>`),
@@ -462,8 +463,8 @@ function usePlayer(proj, meta, onTick) {
       el.style.clipPath = css.clipPath || "";
       el.style.maskImage = css.maskImage || "";
       el.style.webkitMaskImage = css.webkitMaskImage || "";
-      el.style.filter = css.filter || "";
       const s = S.seg[k], v = vids[k].current;     // dźwięk klipów przenika się jak acrossfade w eksporcie
+      el.style.filter = [s && kolorFiltr(s.c), css.filter].filter(Boolean).join(" ");   // kolor klipu, potem przejście
       if (s && v && s.c.kind !== "image") {
         v.volume = clamp(s.c.volume ?? 1, 0, 1) * (!styl ? 1 : k === ka ? 1 - W.q : W.q) * zanikGain(t - s.start, s.end - s.start, s.c.fadeIn, s.c.fadeOut);
       }
@@ -490,9 +491,11 @@ function usePlayer(proj, meta, onTick) {
       o.fillStyle = "#000"; o.fillRect(0, 0, w, h);
       const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
       if (s && vw && vh) {
+        o.filter = kolorFiltr(s.c) || "none";
         if (s.c.fit === "blur" && blurs[k].current && blurs[k].current.width) o.drawImage(blurs[k].current, -w * 0.04, -h * 0.04, w * 1.08, h * 1.08);
         const r = fitBox(vw, vh, w, h, s.c);
         try { o.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { /* klatka jeszcze niegotowa */ }
+        o.filter = "none";
       }
       g.globalAlpha = al;
       g.drawImage(tmp, 0, 0);
@@ -702,6 +705,7 @@ function VideoEditor({ path, onClose }) {
   const openFile = React.useContext(FileCtx);
   const [info, setInfo] = useState(null);
   const [err, setErr] = useState(null);
+  const [kolorBusy, setKolorBusy] = useState(false);   // „Auto” koloru klipu: pomiar klatek na serwerze
   const [meta, setMeta] = useState({});
   const [strips, setStrips] = useState({});
   const [waves, setWaves] = useState({});        // fala dźwięku każdego pliku audio na osi
@@ -935,7 +939,9 @@ function VideoEditor({ path, onClose }) {
     o.globalCompositeOperation = "source-over";
     o.clearRect(0, 0, w, h);
     const r = fitBox(vw, vh, w, h, seg.c);
-    try { o.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { return; }
+    o.filter = kolorFiltr(seg.c) || "none";         // osoba w tym samym kolorze co klip pod napisem
+    try { o.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { o.filter = "none"; return; }
+    o.filter = "none";
     o.globalCompositeOperation = "destination-in";
     o.drawImage(bm, 0, 0, w, h);
     if (zs.length) {
@@ -1047,13 +1053,16 @@ function VideoEditor({ path, onClose }) {
     const now = tRef.current;
     const { el, vw, vh, c: clip } = klatkaPodgladu() || {};
     if (vw && vh) {
+      const kf = kolorFiltr(clip);
       if (clip.fit === "blur") {
         const s = blurBg(document.createElement("canvas"), el, vw, vh, W, Hh);
-        g.save(); g.filter = `blur(${Math.round(Math.max(W, Hh) / 160)}px) brightness(0.92)`;
+        g.save(); g.filter = `${kf ? `${kf} ` : ""}blur(${Math.round(Math.max(W, Hh) / 160)}px) brightness(0.92)`;
         g.drawImage(s, -W * 0.06, -Hh * 0.06, W * 1.12, Hh * 1.12); g.restore();
       }
       const r = fitBox(vw, vh, W, Hh, clip);
+      g.filter = kf || "none";
       try { g.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { /* klatka jeszcze niegotowa: zostaje czarne tło */ }
+      g.filter = "none";
     }
     for (const x of P.texts) if (now >= x.start && now < x.end) drawText(g, x, W, Hh, karaokeIndex(x, now));
     const r = shotRect(a, b, W, Hh);
@@ -1890,6 +1899,7 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Przybliżenie", "Zoom")} · ${(c.zoom ?? 1).toFixed(2)}×
         <input type="range" min="1" max="3" step="0.05" value=${c.zoom ?? 1} onInput=${(e) => upd("clip", c.id, { zoom: +e.target.value }, true)} onChange=${H.commit}/></label>
     </div>`}
+    ${jest(only, "kolor") && kolorTools(c)}
     ${jest(only, "tempo") && c.kind !== "image" && html`<label>${L("Tempo", "Speed")} · ${c.speed}×${seg(ED_SPEEDS.map((s) => [s, `${s}×`]), c.speed, (v) => clipPatch(c.id, { speed: v }))}</label>`}
     ${jest(only, "tempo") && c.kind === "image" && html`<label>${L("Czas planszy", "Still duration")} · ${(c.out - c.in).toFixed(1)} s
       <input type="range" min="0.5" max="15" step="0.5" value=${c.out - c.in} onInput=${(e) => clipPatch(c.id, { out: c.in + +e.target.value }, true)} onChange=${H.commit}/></label>`}
@@ -1901,6 +1911,37 @@ function VideoEditor({ path, onClose }) {
     ${only === "podziel" && !czesci.length && html`<p class="thq-ed-note">${L("Klip jest za krótki na podział.", "The clip is too short to split.")}</p>`}
     ${!only && html`<p class="thq-ed-note">${(meta[c.src] || {}).name || c.src.split("/").pop()}${c.kind !== "image" ? ` · ${fmtT(c.in, true)} – ${fmtT(c.out, true)}` : ""}</p>`}
   </div>`;
+  };
+
+  // Kolor klipu (jak „Dopasuj” i „Filtry” w CapCut): styl, cztery suwaki, Auto z pomiaru klatek, ten sam kolor na
+  // wszystkie klipy. Przepis w 49-kolor.js; eksport liczy go tak samo (edytor.kolor_filter), Wideograf: projekt.py kolor.
+  async function kolorAuto(c) {
+    setKolorBusy(true);
+    try {
+      const r = await api.editKolorAuto(c.src, c.in, c.out);
+      if (!r || r.detail || r.error) throw new Error((r && (r.detail || r.error)) || "Auto");
+      upd("clip", c.id, { color: kolorNorm(r.color || {}) || undefined });
+    } catch (e) { alert(e.message || String(e)); }
+    finally { setKolorBusy(false); }
+  }
+  const kolorTools = (c) => {
+    const k = kolorNorm(c.color) || {};
+    const setK = (patch, lv) => upd("clip", c.id, (x) => ({ color: kolorNorm({ ...(x.color || {}), ...patch }) || undefined }), lv);
+    const styl = (look) => upd("clip", c.id, { color: look ? kolorNorm({ look, ...kolorDomyslne(look) }) : undefined });
+    const doWszystkich = () => H.apply((P) => ({ ...P, clips: P.clips.map((x) => ({ ...x, color: c.color ? { ...c.color } : undefined })) }));
+    return html`<div class="thq-ed-field"><span>${L("Styl koloru", "Color look")}</span><div class="thq-ed-trgrid thq-ed-kolory">
+        <button type="button" class=${cx(!k.look && "is-on")} onClick=${() => styl(null)}><span class="thq-ed-kolprob"></span><small>${L("Brak", "None")}</small></button>
+        ${ED_KOLOR_NAZWY.map(([key, pl, en]) => html`<button type="button" key=${key} class=${cx(k.look === key && "is-on")} onClick=${() => styl(key)}>
+          <span class="thq-ed-kolprob" style=${{ filter: kolorFiltr({ color: { look: key, ...kolorDomyslne(key) } }) }}></span><small>${L(pl, en)}</small></button>`)}
+      </div></div>
+      ${ED_KOLOR_SUWAKI.map(([key, pl, en]) => html`<label key=${key}>${L(pl, en)} · ${(k[key] || 0) > 0 ? "+" : ""}${k[key] || 0}
+        <input type="range" min="-100" max="100" step="1" value=${k[key] || 0} onInput=${(e) => setK({ [key]: +e.target.value }, true)} onChange=${H.commit}/></label>`)}
+      <div class="thq-ed-acts">
+        ${act("spark", kolorBusy ? L("Mierzę…", "Measuring…") : L("Auto", "Auto"), () => kolorAuto(c), { disabled: kolorBusy,
+          title: L("Delikatna korekta z pomiaru klatek: ciemny obraz jaśniej, płaski z kontrastem, wyblakły z kolorem", "A gentle fix measured from the frames: dark gets brighter, flat gets contrast, washed-out gets color") })}
+        ${act("copy", L("Na wszystkie klipy", "Apply to all clips"), doWszystkich, { disabled: p.clips.length < 2 })}
+        ${c.color && act("reset", L("Bez korekty", "Reset"), () => upd("clip", c.id, { color: undefined }))}
+      </div>`;
   };
 
   // przejście po klipie c (na cięciu z następnym): rodzaj z animowaną miniaturą, długość, podgląd, do wszystkich cięć
@@ -2288,6 +2329,7 @@ function VideoEditor({ path, onClose }) {
         c.kind !== "image" && [c.muted ? "mute" : "volume", L("Głośność", "Volume"), "clip:glos"],
         c.kind !== "image" && ["extract", L("Wyodrębnij", "Extract"), () => wyodrebnijKlip(c), !mozeWyodrebnic(c)],
         ["crop", L("Kadr", "Framing"), "clip:kadr"],
+        ["kolor", L("Kolor", "Color"), "clip:kolor"],
         p.clips[p.clips.length - 1].id !== c.id && ["trans", L("Przejście", "Transition"), () => { setSel({ type: "tr", id: c.id }); setTool("tr"); }],
         ["copy", L("Duplikuj", "Duplicate"), duplicate],
         ["trash", L("Usuń", "Delete"), remove, p.clips.length <= 1, true],

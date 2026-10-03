@@ -250,6 +250,17 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   Podgląd ma dwie warstwy (klip i następny) stylowane przez `przejscieStyl` tymi samymi wzorami co `xfade`
   (krycie, przesunięcie, maska, rozmycie, piksele na kanwie), a test porównuje kolory podglądu z klatkami z ffmpeg
   (`tests/test_edytor_przejscia.py`). Wideograf: `projekt.py przejscie <film> <id>|--wszystkie [--typ] [--dlugosc] [--usun]`.
+- **Kolor** (jak „Filtry” i „Dopasuj” w CapCut): w ustawieniach klipu (na telefonie ikona „Kolor” na pasku klipu)
+  styl koloru z próbką (Naturalny, Ciepły, Chłodny, Kinowy, Żywy, Czarno-biały, Wyblakły) i cztery suwaki −100…100:
+  **Jasność**, **Kontrast**, **Nasycenie**, **Temperatura**. Styl ustawia suwaki, potem można je przesuwać. **Auto**
+  mierzy klatki klipu na serwerze (`signalstats`) i delikatnie poprawia ciemny, płaski albo wyblakły obraz (najwyżej
+  ±30, bez przesuwania barwy; za `auto_grade` z browser-use/video-use). **Na wszystkie klipy** daje jeden kolor całemu
+  filmowi. Przepis jest jeden: krzywa każdego kanału w pięciu punktach i macierz nasycenia. Podgląd rysuje go filtrem
+  SVG na warstwie klipu (`hq/web/src/49-kolor.js`, obejmuje rozmyte tło, osobę nad napisem i kadr dla Wideografa),
+  eksport tymi samymi liczbami w `lutrgb` i `colorchannelmixer` (`edytor.kolor_filter`), a test porównuje oba
+  i sprawdza piksele z ffmpeg (`tests/test_edytor_kolor.py`). Zapis: `color: {look, brightness, contrast, saturation,
+  temperature}` w klipie. Wideograf: `projekt.py kolor <film> <id>|--wszystkie [--styl] [--jasnosc] [--kontrast]
+  [--nasycenie] [--temperatura] [--auto] [--usun] [--podglad]` (podgląd = klatka przed i po obok siebie).
 - **Kadr:** klip w trybie „Wypełnij” (np. pion 9:16 z poziomego nagrania) ma w ustawieniach suwaki **Kadr: poziomo**,
   **Kadr: pionowo** i **Przybliżenie** (1–3×, punch-in). Zapisują się w klipie jako `fx`, `fy`, `zoom`; eksport tnie
   ten sam fragment (`crop` z punktem skupienia w ffmpeg), który pokazuje podgląd (CSS `object-position` + `scale`).
@@ -276,7 +287,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
-  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `dzwieki`, `dodaj-dzwiek`, `wyodrebnij`, `lektor`, `usun`, `uwaga`,
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `kolor`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `dzwieki`, `dodaj-dzwiek`, `wyodrebnij`, `lektor`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy i typografię rysują te same funkcje (`hq/web/src/44-napisy.js`, `48-typografia.js`) w przeglądarce bez
   okna, więc plik od agenta wygląda jak eksport z edytora. Typografię na tym samym projekcie układa `typografia.py`
@@ -301,8 +312,9 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   komputer pokazuje naraz w „Ustawieniach”). **Edytuj** zaznacza klip pod wskaźnikiem, **Tekst** dodaje napis
   i otwiera jego treść. Uchwyty do przycinania pojawiają się na zaznaczonym elemencie.
 - Plan dalszej rozbudowy (szybkie cięcie, audio, naklejki, animacje klipów) i stan kroków: [EDYTOR-PLAN.md](EDYTOR-PLAN.md).
-- Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg)
-  i `tests/test_edytor_przejscia.py` (przejścia: oś, eksport, podgląd = film).
+- Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg),
+  `tests/test_edytor_przejscia.py` (przejścia: oś, eksport, podgląd = film) i `tests/test_edytor_kolor.py` (kolor: przepis
+  podglądu = eksport, piksele ffmpeg, `projekt.py kolor`).
 
 ## 2b. Animacja HTML: podgląd na żywo i parametry
 

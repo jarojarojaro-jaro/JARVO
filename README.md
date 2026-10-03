@@ -93,7 +93,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [TOOLBOX.md](docs/TOOLBOX.md) | narzędzia open-source per agent i stan instalacji w obrazie |
 | [VPS.md](docs/VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring |
 | [HQ.md](docs/HQ.md) | Jarvo HQ: GUI floty, architektura, bezpieczeństwo, pokoje |
-| [EDYTOR-PLAN.md](docs/EDYTOR-PLAN.md) | plan edytora filmów HQ jak CapCut: przejścia, szybkie cięcie, audio (efekty, lektor, nagranie), naklejki, animacje klipów; stan kroków |
+| [EDYTOR-PLAN.md](docs/EDYTOR-PLAN.md) | plan edytora filmów HQ jak CapCut: przejścia, szybkie cięcie, audio (efekty, lektor, nagranie), kolor, naklejki, animacje klipów; stan kroków |
 | [KLIPY.md](docs/KLIPY.md) | projekt clipmakera Wideografa: długie nagranie → edytowalne rolki 9:16 z napisami karaoke |
 | [ADS.md](docs/ADS.md) | projekt agenta reklam płatnych `jarvo-ads` i Skarbca (strażnik budżetu) |
 | [LEADY.md](docs/LEADY.md) | projekt Łowcy leadów: sygnały zakupowe z oficjalnych źródeł → lista firm z „dlaczego teraz” |

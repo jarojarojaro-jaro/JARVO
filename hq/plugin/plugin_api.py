@@ -406,6 +406,26 @@ async def edit_wyodrebnij(request: Request):
     return await asyncio.to_thread(_media_entry, dest)
 
 
+@router.post("/edit/kolor-auto")
+async def edit_kolor_auto(request: Request):
+    """„Auto” koloru klipu (za video-use auto_grade): signalstats na ~12 klatkach klipu → delikatne suwaki
+    jasności, kontrastu i nasycenia (edytor.kolor_z_pomiaru, to samo co projekt.py kolor --auto)."""
+    body = await request.json()
+    src = _media_path(str(body.get("src") or ""))
+    if src is None or ed.media_kind(src) not in ("video", "image"):
+        raise HTTPException(404, "Klip poza katalogami floty albo to nie obraz")
+    t = ed.tools()
+    if not t["ffmpeg"]:
+        raise HTTPException(503, "Brak ffmpeg w kontenerze")
+    a = ed._num(body.get("in"), 0, ed.MAX_DURATION, 0)
+    b = ed._num(body.get("out"), a, ed.MAX_DURATION, a + 3)
+    code, log = await _proc(*ed.kolor_pomiar_cmd(src, a, b, t["ffmpeg"]), timeout=180)
+    wynik = ed.kolor_z_pomiaru(log) if code == 0 else None
+    if not wynik:
+        raise HTTPException(500, "Nie udało się zmierzyć klatek klipu")
+    return wynik
+
+
 @router.post("/edit/lektor")
 async def edit_lektor(request: Request):
     """Tekst na mowę: ten sam lektor co u Wideografa (film.py lektor, Edge TTS, cache) → <katalog filmu>/lektor/."""
