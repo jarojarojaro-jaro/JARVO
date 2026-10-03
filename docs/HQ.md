@@ -178,7 +178,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   `edytor.kadr_eksportu` = `edKadr` w `45-edytor.js`, tak samo `projekt.py`): platformy i tak pokazują najwyżej 1080p,
   a 4K z warstwami typografii i maską nie mieściło się w pamięci kontenera. Warstwy z klatek (typografia, maska,
   karaoke) zmieniają format przed filtrem `fps`, nie po nim, bo `fps` powtarza długą klatkę od razu wiele razy
-  i każda powtórka po konwersji to nowa pełna klatka w pamięci (pomiar 1080×1920, 18 s, 3 warstwy: 1,1 GB stałe
+  i każda powtórka po konwersji to nowa pełna klatka w pamięci (pomiar 1080×1920 60 kl/s, 10 s, 3 warstwy: 1,1 GB stałe
   zamiast rosnących do OOM).
 - **Klip o innych proporcjach niż kadr** (np. poziome nagranie w pionie 9:16) ma trzy tryby: **Pasy** (całe ujęcie,
   czarne pasy), **Rozmyte tło** (całe ujęcie na rozmytym, przyciemnionym tle z niego samego; `fit: "blur"`) i
