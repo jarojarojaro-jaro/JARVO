@@ -15,7 +15,8 @@ rolek, pokrycie nagrania). Błędy = kod 1, uwagi nie blokują.
 
 zbuduj: każda rolka → <out>/klip-N-<slug>.edycja.json (projekt edytora: segmenty ze źródła z granicą dosuniętą
 ze środka słowa do przerwy obok, wycięte pauzy i wtrącenia, kadr na twarzy mówcy, gdy plan nie podaje fx/fy
-(twarze.py, YuNet: śledzenie z bezwładnością, nowe ujęcie przy zmianie twarzy albo dużym przesunięciu),
+(twarze.py, YuNet: śledzenie z bezwładnością, nowe ujęcie przy zmianie twarzy albo dużym przesunięciu; kilka osób
+w kadrze → kadr na tej, która mówi, z ruchu ust w czasie mowy),
 punch-in na cięciach, głośność klipów do −14 LUFS z pomiaru źródła, napisy karaoke ze słów, tytuł-hook)
 i render tym samym
 silnikiem co „Eksportuj” → <out>/klip-N-<slug>.mp4, na końcu KLIPY.md. Człowiek otwiera rolkę w HQ („✎ Edytuj”)
@@ -52,6 +53,9 @@ ZMIANA = 3               # tyle próbek z rzędu (≈ 1,5 s), zanim kadr przejdz
 BONUS = 3.0              # twarz w kadrze liczy się ×3 przy wyborze (za openshorts: kadr nie skacze między twarzami)
 ODEJSCIE = 0.35          # twarz odeszła od ustawienia kadru o tyle szerokości kadru → nowe ustawienie
 LUFS, SZCZYT = -14.0, -1.5   # głośność rolki i najwyższy szczyt (jak montaz.py glosnosc i qa_wideo.py)
+OKNO_MOWY = 0.5          # kto mówi: decyzja co pół sekundy
+PRZEWAGA = 0.15          # mówiący wygrywa okno, gdy jego ruch ust (po normalizacji) jest wyższy o tyle od drugiego
+KILKA = 0.3              # segment z kilkoma osobami: ≥ 2 wyraźne twarze w tylu próbkach
 PUNCH = 1.12             # przybliżenie co drugiego ujęcia po cięciu (ukrywa skok obrazu)
 HL = pr.KARAOKE_HL
 ZLE_STARTY = ("no i", "i ", "a ", "tak jak mówiłem", "wracając do", "jak mówiłem", "więc", "no więc", "no to",
@@ -393,14 +397,15 @@ def fragmenty(od: float, do: float, words: list, prog: float | None, bez_wtracen
 
 # ---------------------------------------------------------------- kadr na twarz (twarze.py)
 
-def twarze_zrodla(src: Path, odcinki: list[tuple[float, float]]) -> dict | None:
-    """twarze.py Pythonem narzędzi (onnxruntime z obrazu); błąd albo brak modelu = None i kadr z planu albo środek."""
+def twarze_zrodla(src: Path, odcinki: list[tuple[float, float]], polecenie: str = "wykryj") -> dict | None:
+    """twarze.py Pythonem narzędzi (onnxruntime z obrazu); błąd albo brak modelu = None i kadr z planu albo środek
+    (przy `usta`: kadr na największej twarzy zamiast na mówiącym)."""
     if not odcinki:
         return None
     py = "/opt/jarvo/venv/bin/python" if Path("/opt/jarvo/venv/bin/python").exists() else sys.executable
     arg = ",".join(f"{a:.3f}-{b:.3f}" for a, b in odcinki)
     try:
-        r = subprocess.run([py, str(HERE / "twarze.py"), "wykryj", str(src), "--odcinki", arg], capture_output=True,
+        r = subprocess.run([py, str(HERE / "twarze.py"), polecenie, str(src), "--odcinki", arg], capture_output=True,
                            text=True, timeout=3600)
         if r.returncode == 0:
             return json.loads(r.stdout)
@@ -482,6 +487,103 @@ def ustawienia(slad: list, szer: float) -> list[dict]:
     return out
 
 
+def kilka_osob(probki: list) -> bool:
+    """Segment, w którym kadr musi wybierać: ≥ 2 wyraźne twarze (≥ 0,35 pola największej) w ≥ KILKA próbek."""
+    pole = lambda f: (f[2] - f[0]) * (f[3] - f[1])  # noqa: E731
+    n = sum(1 for _, tw in probki if len([f for f in tw if pole(f) >= 0.35 * max(map(pole, tw))]) >= 2)
+    return bool(probki) and n >= KILKA * len(probki)
+
+
+def _centyl(v: list[float], q: float) -> float:
+    v = sorted(v)
+    return v[min(len(v) - 1, int(q * (len(v) - 1) + 0.5))] if v else 0.0
+
+
+def mowiacy(usta: list, words: list) -> tuple[list[tuple[float, int | None]], dict[int, tuple[float, float]]]:
+    """Kto mówi (za active_speaker z openshorts). Twarze z gęstych próbek (twarze.py usta) → osoby po położeniu;
+    ruch ust osoby w oknach OKNO_MOWY, liczony tylko tam, gdzie są słowa (cisza nie głosuje), znormalizowany do
+    jej własnego zakresu (zarost, światło i wielkość twarzy nie grają): spoczynek = 20. centyl, ale najwyżej połowa
+    80. (ktoś, kto mówi cały czas, nie spada do zera), skala ≥ ćwierć mediany ruchu wszystkich w mowie (szum
+    słuchacza nie rośnie do rozmiarów mowy). Okno wygrywa osoba z przewagą (o PRZEWAGA i o 30%), a zmiana mówiącego
+    wchodzi po ZMIANA wygranych oknach z rzędu (od pierwszego z nich).
+    Wynik: [(początek okna, osoba albo None)], {osoba: środek (x, y)}."""
+    osoby: dict[int, list[float]] = {}            # osoba → [x, y, szerokość]
+    ruchy: list[tuple[float, dict[int, float]]] = []
+    for t, twarze in usta:
+        r: dict[int, float] = {}
+        for f in twarze:
+            x, y, fw = (f[0] + f[2]) / 2, (f[1] + f[3]) / 2, f[2] - f[0]
+            o = min(osoby, key=lambda k: abs(osoby[k][0] - x) + abs(osoby[k][1] - y), default=None)
+            if o is None or abs(osoby[o][0] - x) > 0.6 * max(fw, osoby[o][2]) or abs(osoby[o][1] - y) > 0.6 * max(fw, osoby[o][2]):
+                o = len(osoby)
+                osoby[o] = [x, y, fw]
+            else:
+                osoby[o] = [0.8 * osoby[o][0] + 0.2 * x, 0.8 * osoby[o][1] + 0.2 * y, 0.8 * osoby[o][2] + 0.2 * fw]
+            if f[4] is not None:
+                r[o] = max(r.get(o, 0.0), float(f[4]))
+        ruchy.append((t, r))
+    if not ruchy:
+        return [], {}
+    t0, t1 = ruchy[0][0], ruchy[-1][0]
+    okna = []
+    k = 0
+    while t0 + k * OKNO_MOWY <= t1:
+        a = t0 + k * OKNO_MOWY
+        b = a + OKNO_MOWY
+        w_oknie = [r for t, r in ruchy if a <= t < b]
+        sr = {o: sum(r[o] for r in w_oknie if o in r) / n for o in osoby
+              if (n := sum(1 for r in w_oknie if o in r))}
+        mowa = any(float(w[0]) < b and float(w[1]) > a for w in words)
+        okna.append((a, sr, mowa))
+        k += 1
+    podloga = max(1e-3, 0.25 * _centyl([v for _, sr, mowa in okna if mowa for v in sr.values()], 0.5))
+    zakres = {}
+    for o in osoby:
+        v = [sr[o] for _, sr, _ in okna if o in sr]
+        p20, p80 = _centyl(v, 0.2), _centyl(v, 0.8)
+        spoczynek = min(p20, 0.5 * p80)
+        zakres[o] = (spoczynek, max(p80 - spoczynek, podloga))
+    werdykty: list[int | None] = []
+    for _, sr, mowa in okna:
+        norm = sorted(((max(0.0, (v - zakres[o][0]) / zakres[o][1]), o) for o, v in sr.items()), reverse=True)
+        if not mowa or not norm:
+            werdykty.append(None)
+        elif len(norm) == 1 or (norm[0][0] - norm[1][0] >= PRZEWAGA and norm[0][0] >= 1.3 * norm[1][0]):
+            werdykty.append(norm[0][1])
+        else:
+            werdykty.append(None)
+    out: list[int | None] = []
+    cur, kand, od = None, None, 0
+    for i, v in enumerate(werdykty):
+        if v is not None and v != cur:
+            if v != kand:
+                kand, od = v, i
+            if sum(1 for x in werdykty[od:i + 1] if x == v) >= ZMIANA or cur is None:
+                cur, kand = v, None
+                out[od:] = [cur] * (len(out) - od)
+        elif v == cur:
+            kand = None
+        out.append(cur)
+    if out and out[0] is None:                    # przed pierwszą decyzją: pierwszy mówiący
+        pierwszy = next((x for x in out if x is not None), None)
+        out = [pierwszy if x is None else x for x in out]
+    return [(a, o) for (a, _, _), o in zip(okna, out)], {o: (v[0], v[1]) for o, v in osoby.items()}
+
+
+def na_mowiacego(probki: list, kto: list, osoby: dict) -> list:
+    """Próbki 2/s → przy każdej tylko twarz osoby, która mówi (tracker i ustawienia kadru idą wtedy za mówiącym)."""
+    out = []
+    for t, twarze in probki:
+        o = next((o for a, o in reversed(kto) if a <= t + 1e-6), kto[0][1] if kto else None)
+        if o is None or o not in osoby or not twarze:
+            out.append([t, twarze])
+            continue
+        x, y = osoby[o]
+        f = min(twarze, key=lambda f: abs((f[0] + f[2]) / 2 - x) + abs((f[1] + f[3]) / 2 - y))
+        out.append([t, [f] if abs((f[0] + f[2]) / 2 - x) < 0.6 * (f[2] - f[0]) + 0.05 else twarze])
+    return out
+
+
 def ogniskowa(x: float, y: float, W: int, H: int, zoom: float, sw: float, sh: float) -> tuple[float, float]:
     """Środek twarzy (0–1 źródła) → fx, fy klipu `cover` (edytor.cover_filter): twarz na środku w poziomie
     i na KADR_Y wysokości kadru, o ile kadr nie wyjdzie poza obraz."""
@@ -493,16 +595,16 @@ def ogniskowa(x: float, y: float, W: int, H: int, zoom: float, sw: float, sh: fl
 
 
 def podziel(a: float, b: float, ust: list[dict], words: list) -> list[tuple[float, float, dict | None]]:
-    """Kawałek źródła → części według ustawień kadru; podział w przerwie między słowami najbliżej zmiany (±0,75 s),
-    części krótsze niż 0,8 s doklejone do sąsiada."""
+    """Kawałek źródła → części według ustawień kadru; podział w najdłuższej przerwie między słowami w ±0,75 s od zmiany
+    (zmiana mówiącego to zwykle pauza; przy równych przerwach najbliższa), części krótsze niż 0,8 s bez podziału."""
     if not ust:
         return [(a, b, None)]
     tniemy = [a]
     for u in ust[1:]:
         if a + 0.8 <= u["od"] <= b - 0.8:
-            luki = [(float(w1[1]) + float(w2[0])) / 2 for w1, w2 in zip(words, words[1:])
+            luki = [(round(float(w2[0]) - float(w1[1]), 2), (float(w1[1]) + float(w2[0])) / 2) for w1, w2 in zip(words, words[1:])
                     if abs((float(w1[1]) + float(w2[0])) / 2 - u["od"]) <= 0.75 and a + 0.8 <= float(w1[1]) <= b - 0.8]
-            t = min(luki, key=lambda g: abs(g - u["od"])) if luki else u["od"]
+            t = max(luki, key=lambda g: (g[0], -abs(g[1] - u["od"])))[1] if luki else u["od"]
             if t - tniemy[-1] >= 0.8:
                 tniemy.append(round(t, 3))
     tniemy.append(b)
@@ -510,7 +612,8 @@ def podziel(a: float, b: float, ust: list[dict], words: list) -> list[tuple[floa
     return [(t0, t1, wybierz(t0, t1)) for t0, t1 in zip(tniemy, tniemy[1:])]
 
 
-def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarze: dict | None = None) -> dict:
+def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarze: dict | None = None,
+                  usta: dict | None = None) -> dict:
     st = plan["styl"]
     fmt = r.get("format") or plan.get("format") or "9:16"
     W, H = FORMATY[fmt]
@@ -523,9 +626,14 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarz
         od, do = granice(float(s["od"]), float(s["do"]), words, (info or {}).get("duration"))
         gr.append([od, do])
         auto = auto_kadr(st, s) and sw and sh
-        ust = ustawienia(sledz([p for p in (twarze or {}).get("probki") or [] if od - 0.01 <= p[0] <= do + 0.01]),
-                         min(1.0, (W / H) / (sw / sh))) if auto else []
-        kadr.append("plan" if not auto_kadr(st, s) else "twarz" if ust else "srodek")
+        probki = [p for p in (twarze or {}).get("probki") or [] if od - 0.01 <= p[0] <= do + 0.01] if auto else []
+        gesto = [p for p in (usta or {}).get("probki") or [] if od - 0.01 <= p[0] <= do + 0.01]
+        kto, osoby = mowiacy(gesto, words) if probki and gesto and kilka_osob(probki) else ([], {})
+        mow = any(o is not None for _, o in kto)
+        if mow:
+            probki = na_mowiacego(probki, kto, osoby)
+        ust = ustawienia(sledz(probki), min(1.0, (W / H) / (sw / sh))) if auto else []
+        kadr.append("plan" if not auto_kadr(st, s) else ("mowiacy" if mow else "twarz") if ust else "srodek")
         for a0, b0 in fragmenty(od, do, words, st.get("tnij_pauzy"), st.get("bez_wtracen", True)):
             for a, b, u in podziel(a0, b0, ust, words):
                 zoom = float(s.get("zoom", 1.0))
@@ -668,6 +776,10 @@ def cmd_zbuduj(a) -> int:
     if odc:
         print(f"▶ twarze (YuNet): {len(odc)} odcinków, {sum(b - a for a, b in odc):.0f} s źródła", flush=True)
     twarze = twarze_zrodla(ctx["src"], odc)
+    kilka = [(a, b) for a, b in odc if kilka_osob([p for p in (twarze or {}).get("probki") or [] if a - 0.01 <= p[0] <= b + 0.01])]
+    if kilka:
+        print(f"▶ kto mówi (ruch ust, 8 klatek/s): {len(kilka)} odcinków z kilkoma osobami", flush=True)
+    usta = twarze_zrodla(ctx["src"], kilka, "usta")
     wyniki = []
     for n, r in enumerate(plan["rolki"], 1):
         if a.tylko and r["slug"] != a.tylko:
@@ -676,7 +788,7 @@ def cmd_zbuduj(a) -> int:
         if edytowana_recznie(film) and not a.nadpisz:
             raise SystemExit(f"{film.name}: projekt zmieniono po zbudowaniu (np. w edytorze HQ). Poprawiaj go przez "
                              "projekt.py (kadr, usun, napisy…) albo zbuduj z --nadpisz, jeśli te zmiany mają zniknąć")
-        proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"], twarze)
+        proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"], twarze, usta)
         gl = glosnosc_zrodla(ctx["src"], [(c["in"], c["out"]) for c in proj["clips"]]) if ctx["info"].get("audio") else None
         if gl:
             v = wzmocnienie(*gl)

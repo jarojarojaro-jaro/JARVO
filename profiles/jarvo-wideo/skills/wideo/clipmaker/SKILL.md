@@ -1,7 +1,7 @@
 ---
 name: clipmaker
 description: "Długie nagranie → edytowalne rolki z napisami karaoke."
-version: 1.3.0
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -46,10 +46,13 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
    i jednym zdaniem „dlaczego” (albo „dlaczego odpada”).
 4. **Kadr:** segment **bez** `fx`/`fy` `zbuduj` kadruje sam na twarz (`twarze.py`, YuNet, 2 próbki na sekundę):
    twarz na środku, oczy na ~1/3 wysokości, kadr trzyma się twarzy i nie skacze przy małym ruchu; nowa twarz albo
-   duże przesunięcie (potwierdzone przez ~1,5 s) daje nowe ujęcie z cięciem w przerwie między słowami. Obejrzyj
+   duże przesunięcie (potwierdzone przez ~1,5 s) daje nowe ujęcie z cięciem w przerwie między słowami. **Kilka osób
+   w kadrze** (podcast, wywiad w planie ogólnym): kadr idzie za tą, która mówi (ruch ust 8 klatek/s w czasie słów,
+   zmiana po ~1,5 s przewagi, cięcie w najdłuższej przerwie obok); krótkie „mhm” słuchacza kadru nie rusza. Obejrzyj
    arkusze `out/wideo/klipy/klatki/arkusz-*.jpg` (`vision_analyze`): ile osób, czy są plansze. `fx`/`fy` w segmencie
    wpisujesz tylko, gdy kadr ma pokazać coś innego niż twarz (plansza, rzecz w ręku, ekran); wtedy auto nie działa.
-   `zbuduj` wypisuje przy rolce `kadr: twarz | plan | srodek` (`srodek` = bez twarzy w segmencie albo bez modelu).
+   `zbuduj` wypisuje przy rolce `kadr: mowiacy | twarz | plan | srodek` (`srodek` = bez twarzy w segmencie albo bez
+   modelu). Po budowie obejrzyj klatkę z każdego ujęcia: zły mówca → `fx` w segmencie albo podział segmentu.
 5. **Plan** → `out/wideo/klipy/plan.json` według [`references/plan.md`](references/plan.md). `klipy.py sprawdz`:
    błędy poprawiasz zawsze; uwagi („tnie słowo” z miejscem, dokąd `zbuduj` dosunie granicę, „zaczyna się od „no i””,
    długość, „rolki dzielą N% materiału”, „wszystkie rolki z jednej połowy”) poprawiasz albo w KANDYDACI.md piszesz,

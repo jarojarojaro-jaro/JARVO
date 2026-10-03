@@ -95,7 +95,8 @@ wersje A/B, opisane w KANDYDACI.md).
 - **Format:** 9:16 domyślnie; 16:9, gdy zlecenie mówi YouTube poziomo / LinkedIn albo nagranie to ekran ze slajdami,
   których nie da się pokazać w pionie.
 - **Kadr:** twarz mówcy w górnej połowie kadru pionowego, oczy mniej więcej na 1/3 wysokości. Robi to `zbuduj` sam
-  (segment bez `fx`/`fy`); własny kadr podajesz tylko dla planszy, rzeczy w ręku albo ekranu.
+  (segment bez `fx`/`fy`), a przy kilku osobach w kadrze idzie za tą, która mówi; własny kadr podajesz tylko dla
+  planszy, rzeczy w ręku albo ekranu.
 
 ## 7. Zapis
 `KANDYDACI.md`: mapa tematów + tabela okien (N, od–do, ocena 0–100, najlepszy moment albo „słabe, bo…”) + tabela

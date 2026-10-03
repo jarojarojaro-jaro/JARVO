@@ -74,7 +74,7 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 | Element | Domyślnie | W projekcie |
 |---|---|---|
 | format | 1080×1920, 30 fps (9:16); na życzenie 1920×1080 (16:9) | `canvas`; `format` w planie albo rolce |
-| kadr | mówca z poziomego nagrania: przycięcie do pionu na twarzy (`twarze.py`, YuNet, 2 próbki/s: twarz na środku, oczy na ~1/3; mały ruch kadr ignoruje, nowa twarz albo duże przesunięcie potwierdzone przez ~1,5 s = nowe ujęcie z cięciem w przerwie między słowami) | klip `fit: cover` + `fx`, `fy` (0–1) i `zoom` (1–2) |
+| kadr | mówca z poziomego nagrania: przycięcie do pionu na twarzy (`twarze.py`, YuNet, 2 próbki/s: twarz na środku, oczy na ~1/3; mały ruch kadr ignoruje, nowa twarz albo duże przesunięcie potwierdzone przez ~1,5 s = nowe ujęcie z cięciem w przerwie między słowami); kilka osób w kadrze: kadr na tej, która mówi (ruch ust, `twarze.py usta`) | klip `fit: cover` + `fx`, `fy` (0–1) i `zoom` (1–2) |
 | rytm | wycięte pauzy > 0,6 s i „yyy” (zostaje 0,12 s oddechu); punch-in (zoom 1,15) na mocnym zdaniu | kolejne klipy z tego samego źródła |
 | napisy | **karaoke**: 2–4 słowa w linii, aktywne słowo w kolorze akcentu, grube, z obrysem, w dolnej 1/3 poza strefą UI platform | **nowy** typ napisu: `words` + `hl` |
 | hook | tytuł na górze przez pierwsze ~3 s | zwykły napis (`texts`) |
@@ -109,7 +109,11 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
   klatkę) przez `twarze.py`; wynik w `<nagranie>.twarze.json`. Kadr jest stały w obrębie ujęcia (edytor nie ma
   klatek kluczowych), więc zamiast płynnej jazdy kamery jest nowe ujęcie przy zmianie twarzy albo dużym ruchu.
   Przy kilku twarzach kadr trzyma największą (obecna ×3), dopóki inna nie wygra przez ~1,5 s.
-- **Rozpoznawanie mówców (kto mówi):** nie w v1; przy kilku osobach w kadrze wygrywa największa twarz.
+- **Kto mówi** (od 2026-10-03, za openshorts `active_speaker`): przy kilku wyraźnych twarzach w segmencie
+  `twarze.py usta` liczy ruch ust każdej twarzy 8 klatek/s (obszar ust i szczęki według kącików ust, minus połowa
+  ruchu oczu i nosa), `klipy.py` głosuje w oknach 0,5 s tylko tam, gdzie są słowa, normalizuje ruch każdej osoby do
+  jej zakresu i zmienia mówiącego po trzech wygranych oknach z rzędu; cięcie w najdłuższej przerwie obok zmiany.
+  Bez słów albo przy remisie kadr zostaje na poprzedniej osobie, a bez modelu na największej twarzy.
 - **Prawa:** tylko materiał użytkownika albo z jego zgodą (jak w każdym montażu nagrań).
 - **Publikacja** rolek na platformy: poza zakresem (A2, osobna decyzja).
 

@@ -258,3 +258,45 @@ def test_source_loudness_of_reel_segments(tmp_path):
     assert glosna[0] - cicha[0] == pytest.approx(12.0, abs=1.0)              # 0,05 → 0,2 = +12 dB
     oba = K.glosnosc_zrodla(src, [(0.5, 5.5), (6.5, 11.5)])
     assert cicha[0] < oba[0] < glosna[0] and oba[1] >= glosna[1] - 0.5
+
+
+def rozmowa(zamiana=4.0, wtracenie=None, dl=8.0):
+    """Gęste próbki (8/s) dwóch osób: lewa (x 0,27) mówi do `zamiana`, potem prawa (x 0,75); ruch ust mówiącego
+    skacze 0,3/0,5, słuchającego ~0,02. `wtracenie`: (od, do) krótkiej wypowiedzi prawej osoby w środku."""
+    out = []
+    for k in range(int(dl * 8)):
+        t = k / 8
+        prawa = t >= zamiana or (wtracenie and wtracenie[0] <= t < wtracenie[1])
+        mowi = 0.3 if k % 2 else 0.5
+        out.append([t, [twarz(0.27)[:4] + [None if k == 0 else (0.02 if prawa else mowi)],
+                        twarz(0.75)[:4] + [None if k == 0 else (mowi if prawa else 0.02)]]])
+    return out
+
+
+SLOWA_CIAGLE = [[t / 4, t / 4 + 0.2, "słowo"] for t in range(32)]
+
+
+def test_active_speaker_from_mouth_motion_during_speech():
+    kto, osoby = K.mowiacy(rozmowa(), SLOWA_CIAGLE)
+    lewa = min(osoby, key=lambda o: osoby[o][0])
+    assert [o == lewa for _, o in kto] == [True] * 8 + [False] * 8          # zmiana dokładnie w 4,0 s (wstecz)
+    kto, osoby = K.mowiacy(rozmowa(zamiana=99, wtracenie=(2.0, 2.5)), SLOWA_CIAGLE)
+    assert {osoby[o][0] < 0.5 for _, o in kto} == {True}                    # mówi cały czas + jedno okno wtrącenia
+    kto, _ = K.mowiacy(rozmowa(), [])
+    assert {o for _, o in kto} == {None}                                    # bez słów nikt nie głosuje
+    assert K.kilka_osob([[0.0, [twarz(0.27), twarz(0.75)]], [0.5, [twarz(0.27)]]])
+    assert not K.kilka_osob([[0.0, [twarz(0.27), twarz(0.75, s=0.03)]], [0.5, [twarz(0.27)]]])   # mała twarz w tle
+
+
+def test_reel_cuts_to_whoever_speaks(nagranie):
+    p = K.wczytaj_plan_dict(plan(nagranie, segmenty=[{"od": 0.9, "do": 8.0}], styl={"tnij_pauzy": None}))
+    tw = {"w": 1920, "h": 1080, "probki": [[t / 2, [twarz(0.27), twarz(0.75)]] for t in range(2, 17)]}
+    usta = {"probki": rozmowa()}
+    slowa = [w for w in SLOWA_CIAGLE if w[1] <= 3.95 or w[0] >= 4.3]                # przerwa 3,7–4,5 przy zmianie
+    proj = K.projekt_rolki(p, p["rolki"][0], nagranie, slowa, {"w": 1920, "h": 1080}, tw, usta)
+    assert proj["clipmaker"]["kadr"] == ["mowiacy"]
+    clips = proj["clips"]
+    assert len(clips) == 2 and clips[0]["out"] == pytest.approx(4.225, abs=0.01)     # cięcie w przerwie 3,95–4,5
+    assert clips[0]["fx"] < 0.3 and clips[1]["fx"] > 0.7
+    bez = K.projekt_rolki(p, p["rolki"][0], nagranie, slowa, {"w": 1920, "h": 1080}, tw, None)
+    assert bez["clipmaker"]["kadr"] == ["twarz"] and len({c["fx"] for c in bez["clips"]}) == 1

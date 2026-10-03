@@ -4,10 +4,16 @@ sam, bez zgadywania fx/fy z arkusza klatek.
 
     twarze.py model                                          # pobierz model raz (230 KB, przypięta suma SHA-256)
     twarze.py wykryj <nagranie> --odcinki 10-35.5,60-80 [--co 0.5]
+    twarze.py usta <nagranie> --odcinki 10-35.5 [--co 0.125]  # ruch ust każdej twarzy (kto mówi)
 
 wykryj: JSON {"w", "h", "co", "probki": [[t, [[x0, y0, x1, y1, pewnosc, oczy i usta: 10 liczb], …]], …]} ze
 współrzędnymi 0–1 klatki źródła (po obrocie z telefonu). Próbki leżą na stałej siatce co `co` sekund, więc odcinki
 różnych rolek dzielą wyniki: policzone próbki zostają w <nagranie>.twarze.json obok nagrania.
+
+usta: to samo gęściej (8 klatek/s) i przy każdej twarzy ruch ust względem poprzedniej klatki: różnica obszaru ust
+i szczęki (według kącików ust) minus połowa różnicy obszaru oczu i nosa (ruch głowy; mówiący też rusza głową, więc nie
+cała), na jasności znormalizowanej w obszarze (światło i kontrast nie grają). Wynik: {"co", "probki": [[t, [[x0, y0, x1, y1, ruch], …]], …]}; ruch = null w pierwszej
+klatce ciągu. klipy.py wybiera z tego mówiącego (za openshorts: active_speaker).
 
 Działa Pythonem narzędzi z obrazu (/opt/jarvo/venv: onnxruntime + numpy, bez OpenCV); klipy.py woła go sam.
 Klatka: dłuższy bok 640 (wejście modelu 640×640 z dopełnieniem), dekodowanie wyjść jak cv::FaceDetectorYN.
@@ -140,6 +146,59 @@ class Detektor:
         return out
 
 
+USTA_CO = 0.125           # ruch ust: 8 klatek na sekundę (mowa to 4–8 ruchów ust na sekundę)
+SIATKA = (12, 16)         # obszar ust i obszar odniesienia próbkowane do 12×16 punktów
+
+
+def _obszar(szary, x0: float, y0: float, x1: float, y1: float):
+    """Obszar klatki (współrzędne w pikselach) próbkowany do SIATKA, jasność znormalizowana (średnia 0, odchylenie 1)."""
+    import numpy as np  # noqa: PLC0415
+    h, w = szary.shape
+    ys = np.clip(np.linspace(y0, y1, SIATKA[0]).round().astype(int), 0, h - 1)
+    xs = np.clip(np.linspace(x0, x1, SIATKA[1]).round().astype(int), 0, w - 1)
+    o = szary[np.ix_(ys, xs)]
+    return (o - o.mean()) / (o.std() + 8.0)
+
+
+def obszary(f: list[float], szary, w: int, h: int):
+    """Twarz (0–1, z punktami) → (obszar ust i szczęki, obszar oczu i nosa) w znormalizowanej jasności."""
+    (ex1, ey1, ex2, ey2, nx, ny, mx1, my1, mx2, my2) = [v * (w if k % 2 == 0 else h) for k, v in enumerate(f[5:15])]
+    fw = (f[2] - f[0]) * w
+    mw = max(abs(mx2 - mx1), 0.25 * fw)
+    mx, my = (mx1 + mx2) / 2, (my1 + my2) / 2
+    usta = _obszar(szary, mx - 0.8 * mw, my - 0.5 * mw, mx + 0.8 * mw, my + 0.9 * mw)
+    oczy = _obszar(szary, min(ex1, ex2) - 0.2 * mw, min(ey1, ey2) - 0.3 * mw, max(ex1, ex2) + 0.2 * mw, ny)
+    return usta, oczy
+
+
+def ruch_ust(det: Detektor, src: Path, chwile: list[float], w: int, h: int) -> dict[str, list]:
+    """Chwila → twarze [x0, y0, x1, y1, ruch]; ruch liczony z poprzednią klatką ciągu (ta sama twarz = najbliższy
+    środek), null w pierwszej klatce i przy nowej twarzy."""
+    import numpy as np  # noqa: PLC0415
+    out: dict[str, list] = {}
+    poprz: list[tuple[list[float], object, object]] = []
+    ost = None
+    for t, rgb in klatki(src, chwile, w, h):
+        if ost is None or t - ost > 1.5 * USTA_CO:
+            poprz = []
+        ost = t
+        szary = np.frombuffer(rgb, dtype=np.uint8).reshape(h, w, 3).astype(np.float32) @ np.array([0.299, 0.587, 0.114],
+                                                                                                    dtype=np.float32)
+        teraz, wynik = [], []
+        for f in det.twarze(rgb, w, h):
+            u, o = obszary(f, szary, w, h)
+            cx, fw = (f[0] + f[2]) / 2, f[2] - f[0]
+            para = min(poprz, key=lambda p: abs((p[0][0] + p[0][2]) / 2 - cx), default=None)
+            ruch = None
+            if para and abs((para[0][0] + para[0][2]) / 2 - cx) < 0.5 * fw:
+                ruch = round(max(0.0, float(np.abs(u - para[1]).mean() - 0.5 * np.abs(o - para[2]).mean())), 4)
+            teraz.append((f, u, o))
+            wynik.append([*f[:4], ruch])
+        poprz = teraz
+        out[f"{t:.3f}"] = wynik
+    return out
+
+
 def siatka(od: float, do: float, co: float = CO) -> list[float]:
     """Chwile próbek odcinka na stałej siatce (wspólne dla nakładających się odcinków)."""
     k0, k1 = math.ceil(od / co - 1e-9), math.floor(do / co + 1e-9)
@@ -194,6 +253,40 @@ def wykryj(src: Path, odcinki: list[tuple[float, float]], co: float = CO) -> dic
     return {"w": W, "h": H, "co": co, "probki": [[t, pam["probki"][f"{t:.3f}"]] for t in chwile if f"{t:.3f}" in pam["probki"]]}
 
 
+def usta(src: Path, odcinki: list[tuple[float, float]], co: float = USTA_CO) -> dict:
+    v = wl.probe(src).get("video") or {}
+    W, H = int(v.get("width") or 0), int(v.get("height") or 0)
+    if not W or not H:
+        raise SystemExit(f"{src.name}: brak obrazu (twarze tylko z wideo)")
+    w, h = rozmiar(W, H)
+    pp = pamiec_path(src)
+    try:
+        pam = json.loads(pp.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pam = {}
+    if pam.get("model") != MODEL_SHA256[:12] or pam.get("w") != W or pam.get("h") != H:
+        pam = {"model": MODEL_SHA256[:12], "co": CO, "w": W, "h": H, "probki": {}}
+    if (pam.get("usta") or {}).get("co") != co:
+        pam["usta"] = {"co": co, "probki": {}}
+    zapis = pam["usta"]["probki"]
+    nowe = {}
+    det = None
+    for od, do in odcinki:             # odcinek liczony w całości (ruch potrzebuje poprzedniej klatki)
+        chwile = siatka(max(0.0, od - co), do, co)
+        if all(f"{t:.3f}" in zapis for t in chwile[1:]):
+            continue
+        det = det or Detektor()
+        nowe.update(ruch_ust(det, src, chwile, w, h))
+    if nowe:
+        zapis.update(nowe)
+        try:
+            pp.write_text(json.dumps(pam, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
+    chwile = sorted({t for od, do in odcinki for t in siatka(od, do, co)})
+    return {"w": W, "h": H, "co": co, "probki": [[t, zapis[f"{t:.3f}"]] for t in chwile if f"{t:.3f}" in zapis]}
+
+
 def odcinki_arg(s: str) -> list[tuple[float, float]]:
     out = []
     for kaw in s.split(","):
@@ -215,6 +308,12 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--co", type=float, default=CO, help="odstęp próbek w sekundach (domyślnie 0,5)")
     sp.set_defaults(fn=lambda a: print(json.dumps(wykryj(Path(a.nagranie).resolve(), odcinki_arg(a.odcinki),
                                                           max(0.04, a.co)))) or 0)
+    sp = sub.add_parser("usta", help="ruch ust każdej twarzy w odcinkach (JSON)")
+    sp.add_argument("nagranie")
+    sp.add_argument("--odcinki", required=True, help="od-do po przecinku, sekundy źródła")
+    sp.add_argument("--co", type=float, default=USTA_CO, help="odstęp klatek w sekundach (domyślnie 0,125)")
+    sp.set_defaults(fn=lambda a: print(json.dumps(usta(Path(a.nagranie).resolve(), odcinki_arg(a.odcinki),
+                                                       max(0.04, a.co)))) or 0)
     a = ap.parse_args(argv)
     return a.fn(a)
 

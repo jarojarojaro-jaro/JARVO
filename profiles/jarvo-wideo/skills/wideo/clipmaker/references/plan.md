@@ -52,7 +52,8 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
 
 **Granice segmentów.** `od` albo `do` w środku słowa `zbuduj` dosuwa do przerwy obok (słowo zostaje, gdy jego środek
 jest w segmencie; zapas ciszy to połowa przerwy, najwyżej 0,35 s przed i 0,45 s po słowie). Plan zostaje bez zmian,
-a czasy po dosunięciu są w projekcie (`clipmaker.granice`) i w KLIPY.md. `sprawdz` ostrzega też, gdy dwie rolki
+a czasy po dosunięciu są w projekcie (`clipmaker.granice`) i w KLIPY.md. Skąd kadr segmentu, mówi
+`clipmaker.kadr`: `mowiacy` (kilka osób, kadr za tą, która mówi), `twarz`, `plan` (fx/fy z planu), `srodek`. `sprawdz` ostrzega też, gdy dwie rolki
 dzielą ponad 20% materiału źródła albo gdy przy nagraniu ≥ 10 min wszystkie (≥ 3) rolki są z jednej połowy.
 
 Poprawka po zbudowaniu: zmień plan i `klipy.py zbuduj plan.json --tylko <slug>`. Rolka zmieniona już w edytorze HQ
