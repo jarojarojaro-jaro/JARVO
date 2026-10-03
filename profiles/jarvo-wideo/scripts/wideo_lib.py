@@ -115,9 +115,27 @@ def run(cmd: list[str], cwd: Path | None = None, quiet: bool = True) -> subproce
     return res
 
 
+def obrot(v: dict) -> int:
+    """Obrót wyświetlania w stopniach: macierz obrotu (ffmpeg 5+, side_data_list) albo stary tag `rotate`.
+    Ta sama reguła co `obrot` w hq/plugin/edytor.py."""
+    for sd in v.get("side_data_list") or []:
+        if sd.get("rotation") is not None:
+            try:
+                return int(round(float(sd["rotation"]))) % 360
+            except (TypeError, ValueError):
+                break
+    try:
+        return int(round(float((v.get("tags") or {}).get("rotate", 0)))) % 360
+    except (TypeError, ValueError):
+        return 0
+
+
 def probe(path: Path) -> dict:
+    """Parametry pliku. Wymiary wideo tak, jak film się wyświetla: pion z telefonu (poziome klatki + obrót 90°)
+    ma width < height, bo ffmpeg obraca klatki przy dekodowaniu."""
     res = run(["ffprobe", "-v", "error", "-show_entries",
-               "stream=index,codec_type,codec_name,width,height,r_frame_rate,pix_fmt,sample_rate,channels:format=duration,size,format_name",
+               "stream=index,codec_type,codec_name,width,height,r_frame_rate,pix_fmt,sample_rate,channels"
+               ":stream_side_data=rotation:stream_tags=rotate:format=duration,size,format_name",
                "-of", "json", str(path)])
     data = json.loads(res.stdout or "{}")
     streams = data.get("streams", [])
@@ -131,7 +149,9 @@ def probe(path: Path) -> dict:
     return {
         "duration": float(fmt.get("duration") or 0), "size": int(fmt.get("size") or 0),
         "format_name": fmt.get("format_name", ""),
-        "video": v and {"codec": v.get("codec_name"), "width": v.get("width"), "height": v.get("height"),
+        "video": v and {"codec": v.get("codec_name"),
+                        **dict(zip(("width", "height"), (v.get("height"), v.get("width")) if obrot(v) in (90, 270)
+                                   else (v.get("width"), v.get("height")))),
                         "fps": round(fps, 3), "pix_fmt": v.get("pix_fmt")},
         "audio": a and {"codec": a.get("codec_name"), "sample_rate": int(a.get("sample_rate") or 0),
                         "channels": a.get("channels")},

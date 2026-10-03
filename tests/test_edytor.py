@@ -128,6 +128,38 @@ def test_parse_progress():
     assert ed.parse_progress("out_time_us=N/A\n") is None
 
 
+def test_obrot_z_macierzy_i_starego_tagu():
+    """Pion z telefonu: poziome klatki + obrót. ffmpeg 5+ podaje go w side_data_list, starszy w tagu `rotate`."""
+    assert ed.obrot({"side_data_list": [{"side_data_type": "Display Matrix", "rotation": -90}]}) == 270
+    assert ed.obrot({"side_data_list": [{"rotation": 90}], "tags": {"rotate": "0"}}) == 90
+    assert ed.obrot({"tags": {"rotate": "90"}}) == 90
+    assert ed.obrot({"side_data_list": [{"side_data_type": "CPB"}], "tags": {}}) == 0
+    assert ed.obrot({"tags": {"rotate": "x"}}) == 0 and ed.obrot({}) == 0
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_pion_z_telefonu_z_obrotem(tmp_path):
+    """Film 640×360 z obrotem 90° (tak zapisuje telefon) to pion 360×640: kadr projektu i eksport w pionie."""
+    run = lambda *a: subprocess.run(["ffmpeg", "-loglevel", "error", "-y", *a], check=True)
+    run("-f", "lavfi", "-i", "testsrc2=s=640x360:r=25:d=2", "-f", "lavfi", "-i", "sine=d=2", "-shortest",
+        "-pix_fmt", "yuv420p", str(tmp_path / "poz.mp4"))
+    if subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-display_rotation", "90", "-i", str(tmp_path / "poz.mp4"),
+                       "-c", "copy", str(tmp_path / "tel.mp4")]).returncode:
+        pytest.skip("ffmpeg bez -display_rotation (starszy niż 6.1)")
+    info = ed.probe(tmp_path / "tel.mp4")
+    assert (info["w"], info["h"]) == (360, 640)
+    p = ed.normalize({"canvas": {"w": info["w"], "h": info["h"], "fps": 25},
+                      "clips": [{"src": str(tmp_path / "tel.mp4"), "in": 0, "out": 1}]}, _resolver(tmp_path))
+    out = tmp_path / "o.mp4"
+    r = subprocess.run(ed.build_command(p, {str(tmp_path / "tel.mp4"): True}, [], out), capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert (ed.probe(out)["w"], ed.probe(out)["h"]) == (360, 640)
+    # klatka eksportu bez czarnych pasów: obrócony obraz wypełnia cały pionowy kadr
+    pas = subprocess.run(["ffmpeg", "-v", "error", "-i", str(out), "-vf", "crop=360:40:0:0", "-frames:v", "1",
+                          "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, check=True).stdout
+    assert len(pas) == 360 * 40 and max(pas) > 60          # górny pas kadru ma obraz, nie czarne tło
+
+
 @pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
 def test_real_export(tmp_path):
     run = lambda *a: subprocess.run(["ffmpeg", "-loglevel", "error", "-y", *a], check=True)

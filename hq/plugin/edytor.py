@@ -703,11 +703,27 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
     return args
 
 
+def obrot(v: dict) -> int:
+    """Obrót wyświetlania strumienia wideo w stopniach (0, 90, 180, 270). Telefon zapisuje film pionowy jako poziome
+    klatki z macierzą obrotu: ffmpeg 5+ podaje ją w side_data_list („rotation”), starszy w tagu `rotate`."""
+    for sd in v.get("side_data_list") or []:
+        if sd.get("rotation") is not None:
+            try:
+                return int(round(float(sd["rotation"]))) % 360
+            except (TypeError, ValueError):
+                break
+    try:
+        return int(round(float((v.get("tags") or {}).get("rotate", 0)))) % 360
+    except (TypeError, ValueError):
+        return 0
+
+
 def probe(path: Path, ffprobe: str = "ffprobe") -> dict:
-    """Czas, wymiary i obecność dźwięku (ffprobe). Obraz: wymiary, bez czasu."""
+    """Czas, wymiary (tak jak film się wyświetla, po obrocie) i obecność dźwięku (ffprobe). Obraz: wymiary, bez czasu."""
     try:
         r = subprocess.run([ffprobe, "-v", "error", "-show_entries",
-                            "format=duration:stream=codec_type,codec_name,width,height,r_frame_rate:stream_tags=rotate",
+                            "format=duration:stream=codec_type,codec_name,width,height,r_frame_rate"
+                            ":stream_side_data=rotation:stream_tags=rotate",
                             "-of", "json", str(path)], capture_output=True, text=True, timeout=20)
         data = json.loads(r.stdout or "{}")
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
@@ -715,7 +731,7 @@ def probe(path: Path, ffprobe: str = "ffprobe") -> dict:
     streams = data.get("streams") or []
     v = next((s for s in streams if s.get("codec_type") == "video"), {})
     w, h = v.get("width"), v.get("height")
-    if str((v.get("tags") or {}).get("rotate", "0")) in ("90", "-90", "270"):
+    if obrot(v) in (90, 270):           # ffmpeg obraca klatki przy dekodowaniu, więc kadr liczymy po obrocie
         w, h = h, w
     fps = None
     if v.get("r_frame_rate") and "/" in v["r_frame_rate"]:

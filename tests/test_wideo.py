@@ -69,6 +69,27 @@ def test_srt_roundtrip_and_proportional_words():
     assert spread[0].end < spread[1].end == pytest.approx(2.0, abs=.01)
 
 
+def test_obrot_jak_w_edytorze():
+    ed = load_script("hq/plugin/edytor.py", "edytor_obrot")
+    for v in ({"side_data_list": [{"rotation": -90}]}, {"tags": {"rotate": "90"}}, {"tags": {"rotate": "180"}}, {}):
+        assert wl.obrot(v) == ed.obrot(v)
+    assert wl.obrot({"side_data_list": [{"rotation": -90}]}) == 270
+
+
+@needs_ffmpeg
+def test_probe_pion_z_telefonu(tmp_path):
+    """Poziome klatki + obrót 90° (tak zapisuje telefon): qa_wideo, napisy i kadry widzą pion 360×640."""
+    poz, tel = tmp_path / "poz.mp4", tmp_path / "tel.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=25:d=1",
+                    "-pix_fmt", "yuv420p", str(poz)], check=True)
+    if subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-display_rotation", "90", "-i", str(poz), "-c", "copy",
+                       str(tel)]).returncode:
+        pytest.skip("ffmpeg bez -display_rotation (starszy niż 6.1)")
+    v = wl.probe(tel)["video"]
+    assert (v["width"], v["height"]) == (360, 640)
+    assert (wl.probe(poz)["video"]["width"], wl.probe(poz)["video"]["height"]) == (640, 360)
+
+
 def test_slugify_polish():
     assert wl.slugify("Kawa: 3 mity o łódzkiej żółtej kawie!") == "kawa-3-mity-o-lodzkiej-zoltej-kawie"
 
