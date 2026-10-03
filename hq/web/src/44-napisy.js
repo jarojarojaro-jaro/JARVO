@@ -2,14 +2,27 @@
 // trzy miejsca: podgląd w edytorze, eksport z edytora (PNG na napis) i Wideograf (projekt.py render przez
 // przeglądarkę bez okna). Dzięki temu napis wygląda tak samo w podglądzie, w pliku z edytora i w pliku od agenta.
 
+// Kroje spoza systemu leżą lokalnie (hq/web/fonts/kroje, OFL, scripts/kroje.py): podgląd, eksport i render agenta
+// mają te same pliki, bez Google Fonts.
 const ED_FONTS = [
   ["system-ui, 'Segoe UI', Roboto, sans-serif", "Bezszeryfowy"], ["'Bricolage Grotesque', system-ui, sans-serif", "Display"],
   ["Georgia, 'Times New Roman', serif", "Szeryfowy"], ["'JetBrains Mono', ui-monospace, monospace", "Mono"],
+  ["'Anton', Impact, sans-serif", "Anton"], ["'Bebas Neue', Impact, sans-serif", "Bebas"],
+  ["'Barlow Condensed', 'Arial Narrow', sans-serif", "Barlow"], ["'Oswald', 'Arial Narrow', sans-serif", "Oswald"],
+  ["'Playfair Display', Georgia, serif", "Playfair"], ["'Caveat', cursive", "Odręczny"], ["'Rubik Dirt', Impact, sans-serif", "Grunge"],
 ];
 
 function textFont(t, H, W) {
   const px = Math.max(6, (t.size || 64) * Math.min(W, H) / 1080);
   return { px, font: `${t.bold === false ? 500 : 800} ${px}px ${t.font || ED_FONTS[0][0]}` };
+}
+// Wczytanie kroju z TEKSTEM napisu: bez tekstu przeglądarka bierze tylko podzbiór „latin” i polskie znaki
+// rysuje krojem zastępczym. `fontGotowy` = już wczytany (podgląd rysuje od razu, a po wczytaniu jeszcze raz).
+function fontLoad(font, text) {
+  try { return document.fonts.load(font, String(text || "") || " "); } catch (_) { return Promise.resolve([]); }
+}
+function fontGotowy(font, text) {
+  try { return document.fonts.check(font, String(text || "") || " "); } catch (_) { return true; }
 }
 function wrapLines(ctx, text, maxW) {
   const out = [];

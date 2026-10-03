@@ -310,4 +310,4 @@ tabelę „komu oddać” z pól `oddaj_gdy` wszędzie, gdzie skill ma `<!-- Jar
 brakuje usługi z `metadata.jarvo.wymaga` (i dopisuje je do SOUL jako niedostępne),
 tokeny `@@…@@` w `config.yaml`, `distribution.yaml` i skillach, wspólne zakazy w `approvals.deny`, `fallback_providers`,
 `DESCRIPTION.md` kategorii, skille z locka z licencjami oraz `cron/jobs.json` (u Wideografa także silnik edytora HQ
-`edytor.py` i `edytor_napisy.js` w `scripts/`).
+`edytor.py`, `edytor_napisy.js` i kroje `kroje/` w `scripts/`).

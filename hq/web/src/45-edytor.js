@@ -173,7 +173,7 @@ function remapTimes(P0, P1) {
 const projTotal = (p) => p.clips.reduce((a, c) => a + clipDur(c), 0);
 
 async function textPng(t, W, H, hi = -1) {
-  try { await document.fonts.load(textFont(t, H, W).font); } catch (_) { /* czcionka systemowa */ }
+  await fontLoad(textFont(t, H, W).font, t.text);
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   drawText(c.getContext("2d"), t, W, H, hi);
@@ -690,6 +690,8 @@ function VideoEditor({ path, onClose }) {
     }
     for (const x of P.texts) {
       if (now < x.start || now >= x.end) continue;
+      const fnt = textFont(x, h, w).font;
+      if (!fontGotowy(fnt, x.text)) fontLoad(fnt, x.text).then(() => drawOverlay());
       const b = drawText(g, x, w, h, karaokeIndex(x, now));
       const s = selRef.current, hit = zs.length && strefyKolizja(b, w, h, pf).length;
       if (hit || (s && s.type === "text" && s.id === x.id)) {
@@ -1356,6 +1358,8 @@ function VideoEditor({ path, onClose }) {
 
   // ---- panele narzędzi (te same na komputerze i telefonie)
   const seg = (items, cur, set) => html`<div class="thq-ed-seg">${items.map(([k2, label]) => html`<button type="button" key=${k2} class=${cx(cur === k2 && "is-on")} onClick=${() => set(k2)}>${label}</button>`)}</div>`;
+  // kroje: siatka z nazwą pisaną danym krojem (lista ED_FONTS w 44-napisy.js, pliki lokalnie w fonts/kroje)
+  const fontPick = (cur, set) => html`<div class="thq-ed-fonts">${ED_FONTS.map(([f, n]) => html`<button type="button" key=${f} class=${cx(cur === f && "is-on")} style=${{ fontFamily: f }} onClick=${() => set(f)}>${n}</button>`)}</div>`;
   const swatches = (cur, set) => html`<div class="thq-ed-sw">${ED_COLORS.map((c) => html`<button type="button" key=${c} class=${cx(String(cur).toLowerCase() === c.toLowerCase() && "is-on")}
     style=${{ background: c }} onClick=${() => set(c)} aria-label=${c}></button>`)}<label class="thq-ed-sw-more" title=${L("Inny kolor", "Other color")}>+<input type="color" value=${cur || "#ffffff"} onInput=${(e) => set(e.target.value, true)} onChange=${H.commit}/></label></div>`;
   const act = (icon, label, fn, opts = {}) => html`<button type="button" class=${cx("thq-ed-act", opts.bad && "is-bad", opts.on && "is-on")} disabled=${opts.disabled} onClick=${fn}>${ED_ICON[icon]}<span>${label}</span></button>`;
@@ -1398,7 +1402,7 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Kolor", "Color")}${swatches(x.color, (v, lv) => u({ color: v }, lv))}</label>
       ${(x.style === "box" || x.style === "outline") && html`<label>${x.style === "box" ? L("Tło", "Box") : L("Obrys", "Outline")}${swatches(x.bg || "#000000", (v, lv) => u({ bg: v }, lv))}</label>`}
       <label>${L("Rozmiar", "Size")} · ${Math.round(x.size)}<input type="range" min="16" max="220" value=${x.size} onInput=${(e) => u({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
-      <label>${L("Krój", "Font")}${seg(ED_FONTS.map(([f, n]) => [f, n]), x.font, (v) => u({ font: v }))}</label>
+      <label>${L("Krój", "Font")}${fontPick(x.font, (v) => u({ font: v }))}</label>
       <div class="thq-ed-row">
         ${seg([["left", ED_ICON.alignL], ["center", ED_ICON.alignC], ["right", ED_ICON.alignR]], x.align, (v) => u({ align: v }))}
         <label class="thq-ed-check"><input type="checkbox" checked=${x.bold !== false} onChange=${(e) => u({ bold: e.target.checked })}/> ${L("Gruby", "Bold")}</label>

@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Kroje napisów lokalnie (`scripts/kroje/`, OFL: Anton, Bebas Neue, Barlow Condensed, Oswald, Playfair Display, Caveat, Rubik Dirt, Bricolage Grotesque, JetBrains Mono): `projekt.py render` nie pobiera już krojów z Google Fonts, tylko wstawia te same pliki co edytor HQ, i wczytuje krój razem z tekstem napisu (polskie znaki bez kroju zastępczego).
 - Explainer, wariant „dla właściciela” (`rodzaje-filmu/references/explainer.md`): film, który ma tłumaczyć, a nie sprzedawać: bez haka sprzedażowego i CTA, fakty tylko z WEJŚĆ karty (lista fakt → źródło w RAPORT), HTML Canvas/SVG albo Manim (styl 3Blue1Brown), lektor prostym polskim (zdanie do 20 słów), 60–90 s, bez płatnej generacji AI.
 - Rozmyte tło w projekcie montażu (`fit: "blur"`, jak w edytorze HQ): `projekt.py dodaj-klip` daje je domyślnie klipowi o innych proporcjach niż kadr (zamiast czarnych pasów), `--rozmyte`, `--dopasuj` i `--wypelnij` wybierają tryb jawnie w `dodaj-klip` i `kadr` (jeden naraz). Eksport: `edytor.blur_filter` (przepis z `film.py --tryb rozmyte`, promień rośnie z kadrem).
 - Strefy interfejsu 9:16 z jednej tabeli `wideo_lib.STREFY_UI` (TikTok, Reels, Shorts; te same liczby co w edytorze HQ): arkusz `qa_wideo.py` zaznacza strefy wybranej `--platforma` (bez niej TikTok), `pomiar.py` liczy tekst pod strefą od jego widocznej części; napisy ASS (`film.py`, `napisy.py`) mają dolny margines 26% zamiast 24%, nad opisem TikToka. Kadr 4:5 nie ma już stref 9:16.

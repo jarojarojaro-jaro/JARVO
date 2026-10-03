@@ -453,6 +453,22 @@ def stt_bin() -> str | None:
     return shutil.which("jarvo-stt") or ("/opt/jarvo/bin/jarvo-stt" if Path("/opt/jarvo/bin/jarvo-stt").exists() else None)
 
 
+def kroje_css(root: Path | None) -> str:
+    """kroje.css z plikami wstawionymi jako data: URL (przeglądarka bez okna nie sięga do plików ani do sieci).
+    `root` = katalog kroje/ (hq/web/fonts/kroje w repo, scripts/kroje w profilu Wideografa); brak = pusty CSS."""
+    import base64
+    if not root or not (Path(root) / "kroje.css").is_file():
+        return ""
+    root = Path(root)
+
+    def inline(m: re.Match) -> str:
+        f = root / m.group(1)
+        if f.suffix != ".woff2" or f.parent != root or not f.is_file():
+            return m.group(0)
+        return f"url(data:font/woff2;base64,{base64.b64encode(f.read_bytes()).decode()})"
+    return re.sub(r"url\(([\w.-]+)\)", inline, (root / "kroje.css").read_text(encoding="utf-8"))
+
+
 def tools() -> dict:
     return {"ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe"), "stt": stt_bin()}
 

@@ -1,6 +1,8 @@
 /* Jarvo HQ: style pluginu dashboardu Hermesa. Wszystko w przestrzeni .thq-* (bez wpływu na dashboard).
    Kolory powierzchni biorą tokeny motywu dashboardu (--color-*), z własnymi wartościami zapasowymi. */
 @import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&family=Pixelify+Sans:wght@400;500;600;700&display=swap");
+/* kroje napisów i typografii edytora (OFL, lokalnie): te same pliki biorą render agenta i eksport */
+@import url("fonts/kroje/kroje.css");
 
 .thq-root, .thq-headbar {
   /* Motyw dashboardu Hermesa: tekst to --color-card-foreground (--color-foreground bywa pusty). */
@@ -644,6 +646,11 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-seg button svg { width: 16px; height: 16px; }
 .thq-ed-seg button:hover { color: var(--ed-ink-2); }
 .thq-ed-seg button.is-on { background: var(--ed-panel-3); color: var(--ed-ink); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.thq-ed-fonts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px; border-radius: 9px; background: var(--ed-bg); }
+.thq-ed-fonts button { height: 32px; padding: 0 6px; border: 0; border-radius: 7px; background: none; cursor: pointer; color: var(--ed-ink-2);
+  font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .15s, color .15s; }
+.thq-ed-fonts button:hover { color: var(--ed-ink); }
+.thq-ed-fonts button.is-on { background: var(--ed-panel-3); color: var(--ed-ink); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
 .thq-ed-sw { display: grid; grid-template-columns: repeat(9, 1fr); justify-items: center; align-items: center; gap: 6px; max-width: 340px; }
 .thq-ed-sw button, .thq-ed-sw-more { position: relative; width: 25px; height: 25px; border-radius: 50%; border: 1px solid rgba(255,255,255,.18); cursor: pointer; padding: 0; transition: transform .12s; }
 .thq-ed-sw button:hover { transform: scale(1.08); }

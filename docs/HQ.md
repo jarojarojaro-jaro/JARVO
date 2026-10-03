@@ -84,7 +84,7 @@ Pliki w repo:
 | `hq/plugin/animacja.py` | animacja HTML: schemat i zapis `parametry.json`, stan pomiaru, mostek podglądu (testy: `tests/test_animacja.py`); build dokłada do pluginu `pomiar.py` Wideografa (odcisk i aktualność raportu) |
 | `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność; edytor i okno animacji z własnymi tokenami) |
-| `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto |
+| `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto; `kroje/`: kroje napisów i typografii (OFL, `scripts/kroje.py`) |
 | `branding/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css`; te same pliki na stronie logowania |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |
 | `hq/web/demo/` | strona demo i symulator floty |
@@ -132,7 +132,12 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i okno **◐ Animacja** nie biorą wyglądu z motywu dashboardu: „tarcza” w `style.css` cofa to, co motyw Fosfor
   wymusza (`!important` na zaokrągleniach i tle pól, poświata tekstu, wyłączone animacje).
 - **Napisy** rysuje jedna funkcja na kanwie: w podglądzie i przy eksporcie (PNG na napis nakładany przez ffmpeg),
-  więc plik wygląda jak podgląd, łącznie z krojem.
+  więc plik wygląda jak podgląd, łącznie z krojem. **Kroje** napisów (Anton, Bebas Neue, Barlow Condensed, Oswald,
+  Playfair Display, Caveat, Rubik Dirt, Bricolage Grotesque, JetBrains Mono; OFL, latin + latin-ext) leżą lokalnie
+  w `hq/web/fonts/kroje/` (`kroje.css`, sumy SHA-256 w `sumy.json`, wersje w `scripts/kroje.py`; `kroje.py sprawdz`
+  w testach). Panel tekstu pokazuje je siatką z nazwą pisaną danym krojem. Krój wczytuje się razem z tekstem napisu
+  (`fontLoad`), więc polskie znaki nie spadają na krój zastępczy; render agenta wstawia te same pliki jako data: URL
+  (`edytor.kroje_css`), bez Google Fonts.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
   `volume`, `muted`, `fit`), napisy i muzyka. Po ponownym otwarciu edycja jest tam, gdzie była.
 - **Eksport** (`POST /edit/export`): serwer sprawdza projekt (ścieżki tylko z katalogów floty, limity długości

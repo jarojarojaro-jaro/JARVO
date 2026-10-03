@@ -47,6 +47,7 @@ for cand in (HERE, _REPO / "hq" / "plugin"):
 import edytor as ed  # noqa: E402
 
 NAPISY_JS = next((p for p in (HERE / "edytor_napisy.js", _REPO / "hq" / "web" / "src" / "44-napisy.js") if p.exists()), None)
+KROJE = next((p for p in (HERE / "kroje", _REPO / "hq" / "web" / "fonts" / "kroje") if (p / "kroje.css").exists()), None)
 TEXT_DEFAULT = {"x": 0.5, "y": 0.78, "size": 72, "color": "#FFFFFF", "bg": "#000000", "style": "shadow",
                 "font": "system-ui, 'Segoe UI', Roboto, sans-serif", "bold": True, "align": "center", "maxw": 0.86}
 CAP_DEFAULT = {**TEXT_DEFAULT, "y": 0.84, "size": 58, "style": "outline", "maxw": 0.84,
@@ -358,14 +359,13 @@ def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path,
         browser = p.chromium.launch(**({"executable_path": exe} if exe else {}))
         page = browser.new_page()
         page.set_content("<!doctype html><meta charset=utf-8><body></body>")
-        try:   # te same kroje co w HQ; bez sieci zostają systemowe
-            page.add_style_tag(url="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap")
-        except Exception:  # noqa: BLE001
-            pass
+        kroje = ed.kroje_css(KROJE)   # te same pliki krojów co edytor HQ (lokalnie, bez sieci)
+        if kroje:
+            page.add_style_tag(content=kroje)
         page.add_script_tag(content=NAPISY_JS.read_text(encoding="utf-8"))
         for i, t in enumerate(texts):
             data = page.evaluate("""async ([t, W, H, hi]) => {
-                try { await document.fonts.load(textFont(t, H, W).font); } catch (_) {}
+                await fontLoad(textFont(t, H, W).font, t.text);
                 const c = document.createElement("canvas"); c.width = W; c.height = H;
                 drawText(c.getContext("2d"), t, W, H, hi);
                 return c.toDataURL("image/png");
