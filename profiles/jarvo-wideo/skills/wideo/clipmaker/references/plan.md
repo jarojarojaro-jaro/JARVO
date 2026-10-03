@@ -41,7 +41,7 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
 | `styl.tytul`, `tytul_s` | tytuł-hook z rolki na górze przez pierwsze sekundy | `true`, 3 s |
 | `styl.tnij_pauzy` | wycina pauzy dłuższe niż tyle sekund (zostaje oddech 0,12 s); `null` = bez cięcia | 0,6 |
 | `styl.bez_wtracen` | wycina „yyy”, „eee”, „mmm” | `true` |
-| `styl.punch` | co drugie ujęcie po cięciu przybliżone ×1,12 (ukrywa skok obrazu) | `true` |
+| `styl.punch` | `true`: zbliżenie ×1,12 na akcentach mowy (słowo głośniej niż zwykle i ważne: liczba, wykrzyknik, puenta), najwyżej ~3 na minutę i co ≥ 18 s, trwa 1,3–3,5 s do cięcia albo przerwy; `"ciecia"`: co drugie ujęcie po cięciu; `false`: bez | `true` |
 | `styl.kadr_auto` | segment bez `fx`/`fy` kadrowany na twarz (`twarze.py`); `false` = środek kadru | `true` |
 | `styl.muzyka` | plik muzyki pod mową (licencja w KLIPY.md), głośność `muzyka_glosnosc` | brak |
 | `rolki[].slug` | a-z, 0-9, „-”, do 40 znaków; nazwa pliku `klip-N-<slug>.mp4` | — |
@@ -53,7 +53,8 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
 **Granice segmentów.** `od` albo `do` w środku słowa `zbuduj` dosuwa do przerwy obok (słowo zostaje, gdy jego środek
 jest w segmencie; zapas ciszy to połowa przerwy, najwyżej 0,35 s przed i 0,45 s po słowie). Plan zostaje bez zmian,
 a czasy po dosunięciu są w projekcie (`clipmaker.granice`) i w KLIPY.md. Skąd kadr segmentu, mówi
-`clipmaker.kadr`: `mowiacy` (kilka osób, kadr za tą, która mówi), `twarz`, `plan` (fx/fy z planu), `srodek`. `sprawdz` ostrzega też, gdy dwie rolki
+`clipmaker.kadr`: `mowiacy` (kilka osób, kadr za tą, która mówi), `twarz`, `plan` (fx/fy z planu), `srodek`;
+zbliżenia na akcentach (czas osi od–do) są w `clipmaker.zblizenia`. `sprawdz` ostrzega też, gdy dwie rolki
 dzielą ponad 20% materiału źródła albo gdy przy nagraniu ≥ 10 min wszystkie (≥ 3) rolki są z jednej połowy.
 
 Poprawka po zbudowaniu: zmień plan i `klipy.py zbuduj plan.json --tylko <slug>`. Rolka zmieniona już w edytorze HQ

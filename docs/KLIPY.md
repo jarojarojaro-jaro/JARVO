@@ -75,7 +75,7 @@ Plik `skills/wideo/clipmaker/references/master-prompt.md`, czytany zawsze przed 
 |---|---|---|
 | format | 1080×1920, 30 fps (9:16); na życzenie 1920×1080 (16:9) | `canvas`; `format` w planie albo rolce |
 | kadr | mówca z poziomego nagrania: przycięcie do pionu na twarzy (`twarze.py`, YuNet, 2 próbki/s: twarz na środku, oczy na ~1/3; mały ruch kadr ignoruje, nowa twarz albo duże przesunięcie potwierdzone przez ~1,5 s = nowe ujęcie z cięciem w przerwie między słowami); kilka osób w kadrze: kadr na tej, która mówi (ruch ust, `twarze.py usta`) | klip `fit: cover` + `fx`, `fy` (0–1) i `zoom` (1–2) |
-| rytm | wycięte pauzy > 0,6 s i „yyy” (zostaje 0,12 s oddechu); punch-in (zoom 1,15) na mocnym zdaniu | kolejne klipy z tego samego źródła |
+| rytm | wycięte pauzy > 0,6 s i „yyy” (zostaje 0,12 s oddechu); zbliżenie ×1,12 na akcencie mowy (słowo głośniej niż zwykle u mówcy i ważne treścią, waga słowa z `typografia.py`), najwyżej ~3 na minutę i co ≥ 18 s, 1,3–3,5 s do cięcia albo przerwy | kolejne klipy z tego samego źródła; zbliżenie = klip podzielony w tym samym materiale z `zoom` 1,12 (eksport nie wycisza takiego styku), czasy w `clipmaker.zblizenia` |
 | napisy | **karaoke**: 2–4 słowa w linii, aktywne słowo w kolorze akcentu, grube, z obrysem, w dolnej 1/3 poza strefą UI platform | **nowy** typ napisu: `words` + `hl` |
 | hook | tytuł na górze przez pierwsze ~3 s | zwykły napis (`texts`) |
 | dźwięk | głośność −14 LUFS: `zbuduj` mierzy fragmenty źródła (ebur128) i ustawia głośność klipów (najwyżej ×2, szczyt ≤ −1,5 dBFS); opcjonalnie cicha muzyka pod mową | `volume` klipów, `audio` |

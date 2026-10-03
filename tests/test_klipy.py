@@ -100,7 +100,7 @@ def test_project_is_editable_reel(nagranie):
     assert proj["format"] == "9:16" and proj["canvas"] == {"w": 1080, "h": 1920, "fps": 30}
     clips = proj["clips"]
     assert all(c["fit"] == "cover" and c["fx"] == 0.3 for c in clips)
-    assert clips[0]["zoom"] == 1.0 and clips[1]["zoom"] == pytest.approx(K.PUNCH)       # punch-in na cięciu
+    assert {c["zoom"] for c in clips} == {1.0}                       # bez pomiaru głośności słów: bez zbliżeń
     caps = [t for t in proj["texts"] if t.get("cap")]
     assert caps and all(t["hl"] == K.HL and t["words"] for t in caps)                   # karaoke
     assert "yyy" not in " ".join(t["text"] for t in caps)                              # wtrącenie wycięte
@@ -115,6 +115,40 @@ def test_project_is_editable_reel(nagranie):
     p16 = K.wczytaj_plan_dict({**plan(nagranie), "format": "16:9", "styl": {"napisy": None, "tytul": False, "punch": False}})
     proj16 = K.projekt_rolki(p16, p16["rolki"][0], nagranie, WORDS, {})
     assert proj16["canvas"]["w"] == 1920 and proj16["texts"] == [] and {c["zoom"] for c in proj16["clips"]} == {1.0}
+
+
+def test_accents_pick_loud_meaningful_words_spaced_apart():
+    slowa = [[0.5 + i * 0.5, 0.85 + i * 0.5, "słowo", -30.0 + (i % 3) * 0.5] for i in range(56)]     # 0,5–28,35 s
+    for t, tekst in ((6.0, "40000!"), (12.0, "ogromne!"), (25.0, "naprawdę!")):
+        slowa[round((t - 0.5) / 0.5)][2:] = [tekst, -22.0]
+    assert K.akcenty(slowa, 30.0) == [6.0, 25.0]            # 12 s za blisko mocniejszego 6 s (odstęp 18 s)
+    assert K.akcenty(slowa, 20.0) == [6.0]                  # ~3 na minutę: 20 s → jedno
+    slowa[10][3] = -22.0                                    # głośne „słowo” w 5,5 s: głośność bez treści to nie akcent
+    assert K.akcenty(slowa, 30.0) == [6.0, 25.0]
+    assert K.akcenty([[*w[:3], None] for w in slowa], 30.0) == []          # bez pomiaru głośności nic
+    slowa[0][2:] = ["99999!", -22.0]                        # pierwsza sekunda zostaje bez zbliżenia (hook)
+    assert K.akcenty(slowa, 30.0) == [6.0, 25.0]
+
+
+def test_punch_in_on_accent_splits_continuous_material(nagranie):
+    ciagle = [[0.5 + i * 0.5, 0.85 + i * 0.5, "słowo"] for i in range(40)]                     # mowa bez pauz
+    ciagle[11][2] = "40000!"                                                                  # 6,0–6,35 s
+    glosy = {f"{w[0]:.3f}": (-20.0 if w[2] == "40000!" else -30.0) for w in ciagle}
+    p = K.wczytaj_plan_dict(plan(nagranie, segmenty=[{"od": 0.4, "do": 20.4}]))
+    proj = K.projekt_rolki(p, p["rolki"][0], nagranie, ciagle, {}, glosy=glosy)
+    c = proj["clips"]
+    assert [x["zoom"] for x in c] == [1.0, pytest.approx(K.PUNCH), 1.0]
+    assert c[0]["out"] == c[1]["in"] == 5.925 and c[1]["out"] == c[2]["in"] == 7.425   # w przerwach między słowami
+    assert proj["clipmaker"]["zblizenia"] == [[5.5, 7.0]]                                # na osi (rolka od 0,425 s)
+    assert c[1]["id"] != c[0]["id"] and all(x["src"] == c[0]["src"] for x in c)
+    assert ed.ciagly(c[0], c[1]) and ed.ciagly(c[1], c[2])          # ten sam materiał: eksport nie wycisza styku
+    stary = K.wczytaj_plan_dict({**plan(nagranie), "styl": {"punch": "ciecia"}})
+    zoomy = [x["zoom"] for x in K.projekt_rolki(stary, stary["rolki"][0], nagranie, WORDS, {})["clips"]]
+    assert zoomy[:2] == [1.0, pytest.approx(K.PUNCH)]                                  # co drugie ujęcie po cięciu
+    bez = K.wczytaj_plan_dict({**plan(nagranie), "styl": {"punch": False}})
+    assert K.projekt_rolki(bez, bez["rolki"][0], nagranie, ciagle, {}, glosy=glosy)["clipmaker"]["zblizenia"] == []
+    zly = K.wczytaj_plan_dict({**plan(nagranie), "styl": {"punch": "zawsze"}})
+    assert any("styl.punch" in b for b in K.sprawdz_plan(zly)[0])
 
 
 def test_build_writes_projects_and_klipy_md(nagranie, tmp_path, capsys):
@@ -258,6 +292,9 @@ def test_source_loudness_of_reel_segments(tmp_path):
     assert glosna[0] - cicha[0] == pytest.approx(12.0, abs=1.0)              # 0,05 → 0,2 = +12 dB
     oba = K.glosnosc_zrodla(src, [(0.5, 5.5), (6.5, 11.5)])
     assert cicha[0] < oba[0] < glosna[0] and oba[1] >= glosna[1] - 0.5
+    slowa = [[1.0, 1.4, "cicho"], [7.0, 7.4, "głośno"], [11.0, 11.4, "poza"]]
+    db = K.glosnosc_slow(src, slowa, [(0.5, 8.0)])                          # słowo poza odcinkiem bez pomiaru
+    assert set(db) == {"1.000", "7.000"} and db["7.000"] - db["1.000"] == pytest.approx(12.0, abs=1.5)
 
 
 def rozmowa(zamiana=4.0, wtracenie=None, dl=8.0):

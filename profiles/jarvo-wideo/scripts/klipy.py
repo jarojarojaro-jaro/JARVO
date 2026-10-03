@@ -17,7 +17,7 @@ zbuduj: każda rolka → <out>/klip-N-<slug>.edycja.json (projekt edytora: segme
 ze środka słowa do przerwy obok, wycięte pauzy i wtrącenia, kadr na twarzy mówcy, gdy plan nie podaje fx/fy
 (twarze.py, YuNet: śledzenie z bezwładnością, nowe ujęcie przy zmianie twarzy albo dużym przesunięciu; kilka osób
 w kadrze → kadr na tej, która mówi, z ruchu ust w czasie mowy),
-punch-in na cięciach, głośność klipów do −14 LUFS z pomiaru źródła, napisy karaoke ze słów, tytuł-hook)
+zbliżenia na akcentach mowy, głośność klipów do −14 LUFS z pomiaru źródła, napisy karaoke ze słów, tytuł-hook)
 i render tym samym
 silnikiem co „Eksportuj” → <out>/klip-N-<slug>.mp4, na końcu KLIPY.md. Człowiek otwiera rolkę w HQ („✎ Edytuj”)
 i poprawia wszystko; eksport z edytora robi nową wersję obok.
@@ -56,7 +56,12 @@ LUFS, SZCZYT = -14.0, -1.5   # głośność rolki i najwyższy szczyt (jak monta
 OKNO_MOWY = 0.5          # kto mówi: decyzja co pół sekundy
 PRZEWAGA = 0.15          # mówiący wygrywa okno, gdy jego ruch ust (po normalizacji) jest wyższy o tyle od drugiego
 KILKA = 0.3              # segment z kilkoma osobami: ≥ 2 wyraźne twarze w tylu próbkach
-PUNCH = 1.12             # przybliżenie co drugiego ujęcia po cięciu (ukrywa skok obrazu)
+PUNCH = 1.12             # zbliżenie (punch-in): ×1,12 to widać, a głowa w kadrze na twarz jeszcze się mieści
+AKCENT_ODSTEP = 18.0     # zbliżenia na akcentach co najmniej tyle sekund osi od siebie (openshorts punch_in: 18 s
+AKCENT_NA_MIN = 3        # i najwyżej ~3 na minutę; częściej to drganie, nie akcent)
+AKCENT_Z = 1.0           # akcent: słowo głośniej niż zwykle u mówcy (odchylenia od mediany, jak w typografii)
+AKCENT_WYNIK = 2.5       # i ważne treścią (waga słowa z typografii: liczba, wykrzyknik, długie, koniec zdania)
+TRZYMAJ = (1.3, 3.5)     # zbliżenie trwa tyle i wraca na cięciu albo w przerwie między słowami
 HL = pr.KARAOKE_HL
 ZLE_STARTY = ("no i", "i ", "a ", "tak jak mówiłem", "wracając do", "jak mówiłem", "więc", "no więc", "no to",
               "ale ", "bo ", "czyli", "and ", "so ", "but ", "like i said", "anyway")
@@ -279,6 +284,8 @@ def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
     rolki = plan.get("rolki") or []
     if (plan.get("styl") or {}).get("napisy") not in ("karaoke", "zwykle", None):
         bledy.append("styl.napisy: karaoke, zwykle albo null")
+    if (plan.get("styl") or {}).get("punch", True) not in (True, False, None, "akcenty", "ciecia"):
+        bledy.append("styl.punch: true (zbliżenia na akcentach), \"ciecia\" (co drugie ujęcie po cięciu) albo false")
     if not 1 <= len(rolki) <= 12:
         bledy.append(f"rolek: {len(rolki)} (dozwolone 1–12)")
     slugi, czasy = set(), []
@@ -612,8 +619,97 @@ def podziel(a: float, b: float, ust: list[dict], words: list) -> list[tuple[floa
     return [(t0, t1, wybierz(t0, t1)) for t0, t1 in zip(tniemy, tniemy[1:])]
 
 
+def slowa_rolki(clips: list[dict], words: list, glosy: dict | None) -> list[list]:
+    """Słowa źródła w czasie osi rolki: [t0, t1, tekst, dB albo None] (słowo należy do klipu z jego środkiem)."""
+    out, s = [], 0.0
+    for c in clips:
+        for w0, w1, w in words:
+            if c["in"] <= (float(w0) + float(w1)) / 2 < c["out"]:
+                out.append([s + max(float(w0), c["in"]) - c["in"], s + min(float(w1), c["out"]) - c["in"], str(w),
+                            (glosy or {}).get(f"{float(w0):.3f}")])
+        s += c["out"] - c["in"]
+    return out
+
+
+def akcenty(slowa: list[list], total: float) -> list[float]:
+    """Chwile osi na zbliżenia: słowo wyraźnie głośniejsze niż zwykle u mówcy i ważne treścią (waga słowa jak
+    w typografii), najwyżej AKCENT_NA_MIN na minutę i co najmniej AKCENT_ODSTEP s od siebie, najmocniejsze najpierw.
+    Nie w pierwszej sekundzie (pierwsza klatka i hook) i nie tuż przed końcem rolki."""
+    import typografia as ty  # noqa: PLC0415  (waga słowa i głośność względem mówcy: jedna miara akcentu we flocie)
+    db = [w[3] for w in slowa if w[3] is not None]
+    if len(db) < 5:
+        return []
+    z = iter(ty.z_glosnosci(db))
+    kand = []
+    for i, (t0, t1, tekst, d) in enumerate(slowa):
+        if d is None:
+            continue
+        zi = next(z)
+        nast = slowa[i + 1] if i + 1 < len(slowa) else None
+        ost = tekst.rstrip().endswith(ty.INTERP_KONIEC) or nast is None or nast[0] - t1 > 0.6
+        wyn = ty.wynik_slowa({"tekst": tekst, "z": zi}, ost)
+        if zi >= AKCENT_Z and wyn >= AKCENT_WYNIK and 1.0 <= t0 <= total - TRZYMAJ[0]:
+            kand.append((wyn, zi, -t0))
+    ile, out = max(1, round(AKCENT_NA_MIN * total / 60)), []
+    for _wyn, _zi, t in sorted(kand, reverse=True):
+        if len(out) < ile and all(abs(-t - x) >= AKCENT_ODSTEP for x in out):
+            out.append(-t)
+    return sorted(out)
+
+
+def _starty(clips: list[dict]) -> tuple[list[float], float]:
+    out, s = [], 0.0
+    for c in clips:
+        out.append(s)
+        s += c["out"] - c["in"]
+    return out, s
+
+
+def _rozetnij(clips: list[dict], meta: list, T: float) -> None:
+    """Klip pod chwilą osi T → dwa klipy z tego samego materiału (edytor nie wycisza takiego styku: dźwięk gra dalej)."""
+    st, _ = _starty(clips)
+    for i, (c, s) in enumerate(zip(clips, st)):
+        if s + 0.04 < T < s + c["out"] - c["in"] - 0.04:
+            t = round(c["in"] + T - s, 3)
+            clips[i:i + 1] = [{**c, "out": t}, {**c, "id": pr.new_id("c"), "in": t}]
+            meta[i:i + 1] = [meta[i], meta[i]]
+            return
+
+
+def przybliz(clips: list[dict], meta: list, slowa: list[list], chwile: list[float], W: int, H: int,
+             sw: float, sh: float) -> list[list[float]]:
+    """Zbliżenie ×PUNCH na każdym akcencie: od cięcia w ostatnich 0,6 s przed słowem albo od przerwy tuż przed nim
+    (najwyżej 0,12 s), do pierwszego cięcia albo przerwy między słowami po TRZYMAJ[0] s (najdalej TRZYMAJ[1] s).
+    Twarz zostaje w tym samym miejscu kadru (fx, fy liczone od nowa przy większym zoomie). Wynik: [od, do] na osi."""
+    luki = [(a[1] + b[0]) / 2 for a, b in zip(slowa, slowa[1:]) if b[0] - a[1] >= 0.08]
+    out = []
+    for t in chwile:
+        st, total = _starty(clips)
+        ciecia = st[1:]
+        pe = max((w[1] for w in slowa if w[0] < t - 1e-6 and w[1] <= t + 1e-6), default=None)
+        przed = [g for g in ciecia if t - 0.6 <= g <= t + 0.02]
+        p = max(0.0, max(przed) if przed else max(t - 0.12, (pe + t) / 2 if pe is not None else t - 0.12))
+        o0, o1 = p + TRZYMAJ[0], p + TRZYMAJ[1]
+        e = next((g for g in ciecia if o0 <= g <= o1), None)
+        if e is None:
+            e = next((g for g in luki if o0 <= g <= o1), min(total, o1))
+        if total - e < 0.3:
+            e = total
+        _rozetnij(clips, meta, p)
+        _rozetnij(clips, meta, e)
+        st, _ = _starty(clips)
+        for i, (c, s) in enumerate(zip(clips, st)):
+            if s >= p - 0.05 and s + c["out"] - c["in"] <= e + 0.05:
+                u, baza = meta[i]
+                c["zoom"] = round(min(3.0, baza * PUNCH), 3)
+                if u:
+                    c["fx"], c["fy"] = ogniskowa(u["x"], u["y"], W, H, c["zoom"], sw, sh)
+        out.append([round(p, 2), round(e, 2)])
+    return out
+
+
 def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarze: dict | None = None,
-                  usta: dict | None = None) -> dict:
+                  usta: dict | None = None, glosy: dict | None = None) -> dict:
     st = plan["styl"]
     fmt = r.get("format") or plan.get("format") or "9:16"
     W, H = FORMATY[fmt]
@@ -621,7 +717,7 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarz
     # poziome źródło w pionowym kadrze (i odwrotnie) → wypełnij z punktem skupienia; ten sam kształt → też cover
     sw = float((info or {}).get("w") or (twarze or {}).get("w") or 0)
     sh = float((info or {}).get("h") or (twarze or {}).get("h") or 0)
-    clips, k, gr, kadr = [], 0, [], []
+    clips, k, gr, kadr, meta = [], 0, [], [], []
     for s in r["segmenty"]:
         od, do = granice(float(s["od"]), float(s["do"]), words, (info or {}).get("duration"))
         gr.append([od, do])
@@ -637,15 +733,21 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarz
         for a0, b0 in fragmenty(od, do, words, st.get("tnij_pauzy"), st.get("bez_wtracen", True)):
             for a, b, u in podziel(a0, b0, ust, words):
                 zoom = float(s.get("zoom", 1.0))
-                if st.get("punch") and k % 2 == 1:
+                meta.append((u, zoom))
+                if st.get("punch") == "ciecia" and k % 2 == 1:     # stary sposób: co drugie ujęcie po cięciu
                     zoom = min(3.0, zoom * PUNCH)
                 fx, fy = (ogniskowa(u["x"], u["y"], W, H, zoom, sw, sh) if u
                           else (float(s.get("fx", 0.5)), float(s.get("fy", 0.4 if pion else 0.5))))
                 clips.append({"id": pr.new_id("c"), "src": str(src), "kind": "video", "in": a, "out": b, "speed": 1,
                               "volume": 1, "muted": False, "fit": "cover", "fx": fx, "fy": fy, "zoom": round(zoom, 3)})
                 k += 1
+    zbl = []
+    if st.get("punch") in (True, "akcenty") and clips:
+        slowa = slowa_rolki(clips, words, glosy)
+        zbl = przybliz(clips, meta, slowa, akcenty(slowa, _starty(clips)[1]), W, H, sw, sh)
     proj = {"version": 1, "format": fmt, "canvas": {"w": W, "h": H, "fps": FPS}, "clips": clips, "texts": [], "audio": [],
-            "clipmaker": {"slug": r["slug"], "segmenty": r["segmenty"], "granice": gr, "kadr": kadr, "zrodlo": str(src)}}
+            "clipmaker": {"slug": r["slug"], "segmenty": r["segmenty"], "granice": gr, "kadr": kadr, "zrodlo": str(src),
+                          "zblizenia": zbl}}
     total = pr.total(proj)
     # napisy karaoke: krótkie linie (2–4 słowa w pionie), nad strefą przycisków platform
     look = {**pr.CAP_DEFAULT, "size": 76 if pion else 60, **(pr.PION if pion else {"y": 0.86, "maxw": 0.8}),
@@ -696,6 +798,30 @@ def glosnosc_zrodla(src: Path, odcinki: list[tuple[float, float]]) -> tuple[floa
     if r.returncode or not i or float(i.group(1)) < -69:
         return None
     return float(i.group(1)), float(pk.group(1)) if pk else 0.0
+
+
+def glosnosc_slow(src: Path, words: list, odcinki: list[tuple[float, float]]) -> dict[str, float]:
+    """Głośność słów (dB RMS) w odcinkach źródła: {"<początek słowa>": dB}; ffmpeg → 8 kHz mono, jeden na odcinek."""
+    import array  # noqa: PLC0415
+    out: dict[str, float] = {}
+    for a, b in odcinki:
+        try:
+            r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-ss", f"{a:.3f}", "-t",
+                                f"{b - a:.3f}", "-i", str(src), "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"],
+                               capture_output=True)
+        except OSError:
+            return {}
+        pcm = array.array("h")
+        pcm.frombytes(r.stdout[: len(r.stdout) // 2 * 2])
+        for w0, w1, _w in words:
+            w0, w1 = float(w0), float(w1)
+            if not a <= (w0 + w1) / 2 < b:
+                continue
+            i, j = int((max(w0, a) - a) * 8000), int((min(w1, b) - a) * 8000)
+            kaw = pcm[i:max(j, i + 1)]
+            if kaw:
+                out[f"{w0:.3f}"] = round(20 * math.log10(math.sqrt(sum(x * x for x in kaw) / len(kaw)) / 32768 + 1e-9), 2)
+    return out
 
 
 def wzmocnienie(lufs: float, szczyt: float) -> float:
@@ -788,7 +914,10 @@ def cmd_zbuduj(a) -> int:
         if edytowana_recznie(film) and not a.nadpisz:
             raise SystemExit(f"{film.name}: projekt zmieniono po zbudowaniu (np. w edytorze HQ). Poprawiaj go przez "
                              "projekt.py (kadr, usun, napisy…) albo zbuduj z --nadpisz, jeśli te zmiany mają zniknąć")
-        proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"], twarze, usta)
+        glosy = (glosnosc_slow(ctx["src"], ctx["words"], [granice(float(s["od"]), float(s["do"]), ctx["words"], ctx["dur"])
+                                                          for s in r["segmenty"]])
+                 if plan["styl"].get("punch") in (True, "akcenty") and ctx["info"].get("audio") else None)
+        proj = projekt_rolki(plan, r, ctx["src"], ctx["words"], ctx["info"], twarze, usta, glosy)
         gl = glosnosc_zrodla(ctx["src"], [(c["in"], c["out"]) for c in proj["clips"]]) if ctx["info"].get("audio") else None
         if gl:
             v = wzmocnienie(*gl)
@@ -801,7 +930,9 @@ def cmd_zbuduj(a) -> int:
         dl = pr.total(proj)
         print(f"▶ rolka {n}: {film.name} · {len(proj['clips'])} ujęć · {dl:.1f} s · {sum(1 for t in proj['texts'] if t.get('cap'))} napisów"
               f" · kadr: {', '.join(proj['clipmaker']['kadr'])}"
-              + (f" · głośność {gl[0]:.1f} LUFS → ×{proj['clipmaker']['glosnosc']['volume']}" if gl else ""), flush=True)
+              + (f" · głośność {gl[0]:.1f} LUFS → ×{proj['clipmaker']['glosnosc']['volume']}" if gl else "")
+              + (" · zbliżenia " + ", ".join(f"{a:.1f}–{b:.1f} s" for a, b in proj["clipmaker"]["zblizenia"])
+                 if proj["clipmaker"].get("zblizenia") else ""), flush=True)
         if not a.bez_renderu:
             if pr.cmd_render(film, argparse.Namespace(out=str(film))) != 0:
                 raise SystemExit(f"render {film.name} nie wyszedł")
