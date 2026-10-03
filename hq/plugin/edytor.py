@@ -38,8 +38,10 @@ TYPO_UKLADY = ("kolumna", "schodki", "srodek", "skos", "3d", "za", "rozrzut")
 TYPO_WEJSCIA = ("ciecie", "pop", "kontur", "maska", "pisanie", "zjazd")
 TYPO_WYJSCIA = ("ciecie", "zanik", "smuga")
 TYPO_STYLE = ("wypelnij", "kontur", "3d", "blask", "tlo")
-TYPO_KROJE = ("bricolage", "bricolageL", "anton", "bebas", "barlow", "barlowI", "barlowL", "oswald", "playfair",
-              "playfairI", "caveat", "grunge", "mono")
+TYPO_KROJE = ("bricolage", "bricolageL", "montserrat", "montserratI", "montserratL", "unbounded", "unboundedL", "anton",
+              "bebas", "barlow", "barlowI", "barlowL", "oswald", "titan", "baloo", "balooL", "playfair", "playfairI",
+              "instrument", "instrumentI", "caveat", "pacifico", "shrikhand", "bangers", "neon", "grunge", "space",
+              "spaceL", "mono")   # te same klucze co TYPO_KROJE w 48-typografia.js
 MAX_AUDIO = 12
 MAX_WORDS = 40           # słów w jednym napisie karaoke (linia napisu ma ich 2–8)
 MAX_DURATION = 3 * 3600.0

@@ -10,6 +10,9 @@ const ED_FONTS = [
   ["'Anton', Impact, sans-serif", "Anton"], ["'Bebas Neue', Impact, sans-serif", "Bebas"],
   ["'Barlow Condensed', 'Arial Narrow', sans-serif", "Barlow"], ["'Oswald', 'Arial Narrow', sans-serif", "Oswald"],
   ["'Playfair Display', Georgia, serif", "Playfair"], ["'Caveat', cursive", "Odręczny"], ["'Rubik Dirt', Impact, sans-serif", "Grunge"],
+  ["'Montserrat', 'Arial Black', sans-serif", "Montserrat"], ["'Unbounded', 'Arial Black', sans-serif", "Unbounded"],
+  ["'Baloo 2', 'Arial Rounded MT Bold', sans-serif", "Baloo"], ["'Titan One', 'Arial Rounded MT Bold', sans-serif", "Titan"],
+  ["'Space Grotesk', system-ui, sans-serif", "Space"], ["'Instrument Serif', Georgia, serif", "Instrument"],
 ];
 
 function textFont(t, H, W) {

@@ -133,8 +133,11 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i okno **◐ Animacja** nie biorą wyglądu z motywu dashboardu: „tarcza” w `style.css` cofa to, co motyw Fosfor
   wymusza (`!important` na zaokrągleniach i tle pól, poświata tekstu, wyłączone animacje).
 - **Napisy** rysuje jedna funkcja na kanwie: w podglądzie i przy eksporcie (PNG na napis nakładany przez ffmpeg),
-  więc plik wygląda jak podgląd, łącznie z krojem. **Kroje** napisów (Anton, Bebas Neue, Barlow Condensed, Oswald,
-  Playfair Display, Caveat, Rubik Dirt, Bricolage Grotesque, JetBrains Mono; OFL, latin + latin-ext) leżą lokalnie
+  więc plik wygląda jak podgląd, łącznie z krojem. **Kroje** napisów (19 rodzin OFL: Bricolage Grotesque, Montserrat,
+  Unbounded, Anton, Bebas Neue, Barlow Condensed, Oswald, Titan One, Baloo 2, Playfair Display, Instrument Serif,
+  Caveat, Pacifico, Shrikhand, Bangers, Tilt Neon, Rubik Dirt, Space Grotesk, JetBrains Mono; latin + latin-ext,
+  a test czyta mapę znaków każdego pliku i sprawdza „ąćęłńóśźż”; w panelu typografii pogrupowane: mocne, wąskie,
+  okrągłe, szeryfowe, odręczne, ozdobne, techniczne) leżą lokalnie
   w `hq/web/fonts/kroje/` (`kroje.css`, sumy SHA-256 w `sumy.json`, wersje w `scripts/kroje.py`; `kroje.py sprawdz`
   w testach). Panel tekstu pokazuje je siatką z nazwą pisaną danym krojem. Krój wczytuje się razem z tekstem napisu
   (`fontLoad`), więc polskie znaki nie spadają na krój zastępczy; render agenta wstawia te same pliki jako data: URL

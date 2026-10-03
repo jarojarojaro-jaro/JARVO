@@ -1753,10 +1753,11 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Waga słowa", "Word weight")}${seg(TYPO_WAGI_NAZWY.map(([pl, en], k2) => [k2, L(pl, en)]), wyg.waga, (v) => su({ waga: v }))}</label>
       <label>${L("Kolor", "Color")}${swatches(wyg.kolor, (v, lv) => su({ kolor: v }, lv), (p.typo || {}).paleta)}</label>
       ${w.kolor && html`<button type="button" class="thq-ed-btn is-wide" onClick=${() => su({ kolor: undefined })}>${ED_ICON.reset} ${L("Kolor z motywu (akcent tylko na uderzeniu)", "Theme color (accent only on the hit)")}</button>`}
-      <label>${L("Krój", "Font")}<div class="thq-ed-fonts">${[["", auto], ...Object.entries(TYPO_KROJE).map(([k2, f]) => [k2, f[3]])].map(([k2, n]) => {
+      <label>${L("Krój", "Font")}<div class="thq-ed-fonts">${[["", auto, ""], ...Object.entries(TYPO_KROJE).map(([k2, f]) => [k2, f[3], f[4]])].map(([k2, n, g], i, all) => {
         const f = k2 && TYPO_KROJE[k2];
-        return html`<button type="button" key=${k2 || "auto"} class=${cx((w.kroj || "") === k2 && "is-on")} onClick=${() => su({ kroj: k2 || undefined })}
+        const btn = html`<button type="button" key=${k2 || "auto"} class=${cx((w.kroj || "") === k2 && "is-on")} onClick=${() => su({ kroj: k2 || undefined })}
           style=${f ? { fontFamily: f[0], fontWeight: f[1], fontStyle: f[2] ? "italic" : "normal" } : {}}>${n}</button>`;
+        return g && g !== all[i - 1][2] ? [html`<span key=${`g${g}`} class="thq-ed-fonts-gr">${L(...TYPO_KROJE_GRUPY[g])}</span>`, btn] : btn;
       })}</div></label>
       <label>${L("Styl", "Style")}${seg([["", auto], ...TYPO_STYLE.map((k2) => [k2, L(...TYPO_STYLE_NAZWY[k2])])], w.styl || "", (v) => su({ styl: v || undefined }))}</label>
       <label>${L("Głębia słowa", "Word depth")}${seg([[-1, L("Dalej", "Back")], [0, L("Zwykła", "Normal")], [1, L("Bliżej", "Front")]], wyg.glebia, (v) => su({ glebia: v || undefined }))}</label>

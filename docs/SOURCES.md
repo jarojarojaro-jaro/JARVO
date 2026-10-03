@@ -126,7 +126,7 @@ Autorstwo zaznaczamy w polu `author` skilla albo `source` pliku w `references/`.
 | React | dostarczany przez SDK dashboardu Hermesa; w trybie demo 18.3.1 z cdnjs | MIT |
 | Bricolage Grotesque, Atkinson Hyperlegible, JetBrains Mono, Pixelify Sans | kroje (Google Fonts) | OFL-1.1 |
 | Inter (The Inter Project Authors, przez `@fontsource-variable/inter` 5.3.0) | krój zapasowy edytora filmów w HQ, dołączony w `hq/web/fonts/` (latin + latin-ext, zmienna grubość) | OFL-1.1 |
-| Anton, Bebas Neue, Barlow Condensed, Oswald, Playfair Display, Caveat, Rubik Dirt, Bricolage Grotesque, JetBrains Mono (przez Fontsource 5.3.0, wersje i pliki w `scripts/kroje.py`) | kroje napisów i typografii edytora i Wideografa, dołączone w `hq/web/fonts/kroje/` z licencjami `OFL-*.txt` i sumami SHA-256 | OFL-1.1 |
+| Anton, Bebas Neue, Barlow Condensed, Oswald, Playfair Display, Caveat, Rubik Dirt, Bricolage Grotesque, JetBrains Mono, Montserrat, Unbounded, Titan One, Baloo 2, Instrument Serif, Space Grotesk, Shrikhand, Pacifico, Bangers, Tilt Neon (przez Fontsource 5.3.0, wersje i pliki w `scripts/kroje.py`) | kroje napisów i typografii edytora i Wideografa, dołączone w `hq/web/fonts/kroje/` z licencjami `OFL-*.txt` i sumami SHA-256 | OFL-1.1 |
 | VT323 (Peter Hull), IBM Plex Mono (IBM) | kroje motywu Fosfor, dołączone w `branding/fonts/` | OFL-1.1 |
 
 Pixel art wieży, pokoi i postaci jest rysowany kodem w tym repo (`hq/web/src/20-art.js`); inspiracja

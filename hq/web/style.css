@@ -650,6 +650,7 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-fonts button { height: 32px; padding: 0 6px; border: 0; border-radius: 7px; background: none; cursor: pointer; color: var(--ed-ink-2);
   font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .15s, color .15s; }
 .thq-ed-fonts button:hover { color: var(--ed-ink); }
+.thq-ed-fonts-gr { grid-column: 1 / -1; padding: 6px 6px 1px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--ed-muted); }
 .thq-ed-fonts button.is-on { background: var(--ed-panel-3); color: var(--ed-ink); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
 .thq-ed-sw { display: grid; grid-template-columns: repeat(9, 1fr); justify-items: center; align-items: center; gap: 6px; max-width: 340px; }
 .thq-ed-sw button, .thq-ed-sw-more { position: relative; width: 25px; height: 25px; border-radius: 50%; border: 1px solid rgba(255,255,255,.18); cursor: pointer; padding: 0; transition: transform .12s; }
