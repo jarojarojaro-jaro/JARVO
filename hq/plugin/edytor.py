@@ -4,12 +4,15 @@ Projekt montażu to mały JSON (zapisywany obok filmu jako `<nazwa>.edycja.json`
 
     {"version": 1, "canvas": {"w": 1080, "h": 1920, "fps": 30},
      "clips": [{"src": "/opt/data/jarvo/.../film.mp4", "in": 0.0, "out": 4.2, "speed": 1.0,
-                "volume": 1.0, "muted": false, "fit": "contain"}],     # pasy; "blur" = rozmyte tło; "cover" + fx, fy, zoom
+                "volume": 1.0, "muted": false, "fit": "contain",     # pasy; "blur" = rozmyte tło; "cover" + fx, fy, zoom
+                "transition": {"type": "fade", "dur": 0.5}}],      # przejście do następnego klipu (opcjonalne)
      "texts": [{"start": 0.5, "end": 3.0, ...}],          # wygląd rysuje przeglądarka (PNG na klatkę)
      "audio": [{"src": ".../muzyka.mp3", "start": 0.0, "in": 0.0, "out": 30.0, "volume": 0.4}]}
 
 Klipy leżą jeden za drugim (ścieżka główna jak w CapCut), napisy i muzyka mają własny czas.
-Eksport: jeden przebieg ffmpeg (klipy → concat → nakładki PNG → miks audio), plik obok oryginału.
+Przejście leży na środku cięcia i nie skraca filmu: klip A gra dalej za cięciem, klip B zaczyna przed nim
+(materiał spoza przycięcia; gdy go brak, stoi skrajna klatka), więc napisy i muzyka zostają na miejscu.
+Eksport: jeden przebieg ffmpeg (klipy → concat albo xfade/acrossfade → nakładki PNG → miks audio), plik obok oryginału.
 Napisy rasteryzuje przeglądarka tą samą funkcją, którą rysuje podgląd, więc eksport wygląda jak podgląd.
 """
 
@@ -49,6 +52,12 @@ TYPO_KROJE = ("bricolage", "bricolageL", "montserrat", "montserratI", "montserra
               "shrikhand", "bangers", "neon", "grunge", "righteous", "bungee", "monoton", "pixel", "glitch",
               "bubbles", "russo", "blackops", "sigmar", "rammetto", "space", "spaceL", "mono", "audiowide", "chakra",
               "spaceMono", "majorMono")   # te same klucze co TYPO_KROJE w 48-typografia.js
+# Przejścia między klipami: klucz = nazwa przejścia xfade w FFmpeg, "blur" = przenikanie z rozmyciem Gaussa (nasze).
+# Te same klucze co ED_PRZEJSCIA w hq/web/src/49-przejscia.js (podgląd rysuje je tymi samymi wzorami).
+PRZEJSCIA = ("fade", "fadeblack", "fadewhite", "blur", "zoomin", "pixelize", "slideleft", "slideright", "slideup",
+             "slidedown", "coverleft", "coverright", "wipeleft", "wiperight", "smoothleft", "circleopen")
+PRZEJSCIE_D = 0.5        # domyślna długość przejścia (s)
+ROZMYCIE_PRZEJSCIA = 40  # rozmycie przy cięciu: σ = krótszy bok kadru / 40 (27 px przy 1080)
 MAX_AUDIO = 12
 MAX_WORDS = 40           # słów w jednym napisie karaoke (linia napisu ma ich 2–8)
 MAX_DURATION = 3 * 3600.0
@@ -128,6 +137,9 @@ def normalize(project: dict, resolve) -> dict:
                       # kadr przy „Wypełnij”: punkt skupienia (0–1, 0,5 = środek) i przybliżenie (punch-in)
                       "fx": _num(c.get("fx"), 0, 1, 0.5), "fy": _num(c.get("fy"), 0, 1, 0.5),
                       "zoom": _num(c.get("zoom"), 1, 3, 1)})
+        tr = c.get("transition")
+        if isinstance(tr, dict) and tr.get("type") in PRZEJSCIA:
+            clips[-1]["transition"] = {"type": tr["type"], "dur": _num(tr.get("dur"), 0.1, 3, PRZEJSCIE_D)}
     if not clips:
         raise ProjectError("Oś czasu jest pusta: dodaj co najmniej jeden klip.")
     total = sum((c["out"] - c["in"]) / c["speed"] for c in clips)
@@ -157,7 +169,7 @@ def normalize(project: dict, resolve) -> dict:
         if b - a >= MIN_CLIP:
             audio.append({"src": path, "in": a, "out": b, "start": start, "volume": _num(m.get("volume"), 0, 2, 1)})
     return {"canvas": canvas, "clips": clips, "texts": texts, "audio": audio, "duration": total,
-            "typo": normalize_typo(project.get("typo"), total)}
+            "przejscia": przejscia_osi(clips, canvas["fps"]), "typo": normalize_typo(project.get("typo"), total)}
 
 
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -243,6 +255,24 @@ def layout_clips(clips: list[dict]) -> list[tuple[dict, float, float]]:
         d = (float(c.get("out", 0)) - float(c.get("in", 0))) / float(c.get("speed") or 1)
         out.append((c, t, t + d))
         t += d
+    return out
+
+
+def przejscia_osi(clips: list[dict], fps: int) -> list[dict | None]:
+    """Przejście po każdym klipie (None = zwykłe cięcie) jako {"type", "d"}: parzysta liczba klatek (połowa przed
+    cięciem, połowa za nim), najwyżej tyle, ile trwa krótszy z sąsiednich klipów. Przejście nie zmienia osi: film
+    trwa tyle samo. Ta sama reguła co przejsciaOsi w hq/web/src/49-przejscia.js (podgląd)."""
+    def dl(x: dict) -> float:
+        return (float(x.get("out", 0)) - float(x.get("in", 0))) / float(x.get("speed") or 1)
+    out: list[dict | None] = []
+    for i, c in enumerate(clips):
+        tr, n = c.get("transition"), (clips[i + 1] if i + 1 < len(clips) else None)
+        if n is None or not isinstance(tr, dict) or tr.get("type") not in PRZEJSCIA:
+            out.append(None)
+            continue
+        cap = 2 * math.floor(min(dl(c), dl(n)) * fps / 2 + 1e-6)
+        k = min(2 * math.floor(_num(tr.get("dur"), 0.1, 3, PRZEJSCIE_D) * fps / 2 + 0.5), cap)
+        out.append({"type": tr["type"], "d": k / fps} if k >= 2 else None)
     return out
 
 
@@ -417,6 +447,23 @@ def blur_filter(W: int, H: int, i: int) -> str:
             f"[bb{i}][ff{i}]overlay=(W-w)/2:(H-h)/2")
 
 
+def rozmycie_przejscia(i: int, L: float, F: int, smax: float, glowa: float, ogon: float) -> str:
+    """Przejście „rozmycie” na odcinku klipu i (długość L): σ rośnie liniowo do pełnego `smax` na końcu (ogon = długość
+    przejścia za klipem) i maleje od pełnego na początku (głowa = przejście przed klipem); przenikanie robi xfade.
+    Krok co klatkę przez sendcmd, a poza oknami gblur jest wyłączony (enable). Podgląd: CSS blur w przejscieStyl."""
+    cmds, okna = [], []
+    if glowa:
+        n = max(1, round(glowa * F))
+        cmds += [(k / F, smax * (1 - k / n)) for k in range(n + 1)]
+        okna.append(f"between(t,0,{_f(glowa)})")
+    if ogon:
+        n, t0 = max(1, round(ogon * F)), L - ogon
+        cmds += [(t0 + k / F, smax * k / n) for k in range(n + 1)]
+        okna.append(f"between(t,{_f(t0)},{_f(L + 1)})")
+    lista = ";".join(f"{t:.4f} gblur@pb{i} sigma {s:.2f}" for t, s in cmds)
+    return f",sendcmd=c='{lista}',gblur@pb{i}=sigma=0:enable='{'+'.join(okna)}'"
+
+
 def maska_dir(video: Path) -> Path:
     """Sylwetki osoby do typografii „za osobą” (Wideograf: maska.py klatki): `<film>.maska/` obok filmu."""
     return video.with_name(f"{video.stem}.maska")
@@ -480,6 +527,38 @@ def maska_concat(video: Path, raw: dict, p: dict, tmpdir: Path) -> Path | None:
     return typo_concat(segs, blank, tmpdir / "maska.ffconcat")
 
 
+def xfade_graph(tr: list[dict | None], dlug: list[float], F: int) -> list[str]:
+    """Łączenie odcinków [v{i}][a{i}] o długościach `dlug`: klipy bez przejścia między sobą sklejone (concat), grupy
+    nałożone przejściem (xfade obrazu, acrossfade dźwięku) o długość przejścia; wynik [vc][ac]."""
+    grupy: list[list[int]] = [[0]]
+    for i in range(1, len(dlug)):
+        if tr[i - 1]:
+            grupy.append([i])
+        else:
+            grupy[-1].append(i)
+    graph: list[str] = []
+    cur: tuple[str, str] | None = None
+    cur_len = 0.0
+    for g, idx in enumerate(grupy):
+        if len(idx) == 1:
+            lv, la = f"v{idx[0]}", f"a{idx[0]}"
+        else:
+            graph.append(f"{''.join(f'[v{i}][a{i}]' for i in idx)}concat=n={len(idx)}:v=1:a=1[gq{g}][ga{g}]")
+            graph.append(f"[gq{g}]fps={F}[gv{g}]")
+            lv, la = f"gv{g}", f"ga{g}"
+        glen = sum(dlug[i] for i in idx)
+        if cur is None:
+            cur, cur_len = (lv, la), glen
+            continue
+        t = tr[idx[0] - 1]
+        ov, oa = ("vc", "ac") if g == len(grupy) - 1 else (f"xv{g}", f"xa{g}")
+        graph.append(f"[{cur[0]}][{lv}]xfade=transition={'fade' if t['type'] == 'blur' else t['type']}:"
+                     f"duration={_f(t['d'])}:offset={_f(cur_len - t['d'])}[{ov}]")
+        graph.append(f"[{cur[1]}][{la}]acrossfade=d={_f(t['d'])}:c1=tri:c2=tri[{oa}]")
+        cur, cur_len = (ov, oa), cur_len + glen - t["d"]
+    return graph
+
+
 def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                   ffmpeg: str = "ffmpeg", karaoke: Path | None = None, typo: dict | None = None,
                   maska: Path | None = None) -> list[str]:
@@ -491,27 +570,48 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
     graph: list[str] = []
     n = 0
     seg_labels = []
+    # przejście na środku cięcia: odcinek klipu jest dłuższy o połowę przejścia przed nim (pre) i za nim (post),
+    # a xfade nakłada sąsiednie odcinki o całe przejście, więc film trwa tyle samo co bez przejść
+    tr = p.get("przejscia") or [None] * len(p["clips"])
+    jest_tr = any(tr)
+    smax = max(2, round(min(W, H) / ROZMYCIE_PRZEJSCIA))
+    dlug: list[float] = []
     for i, c in enumerate(p["clips"]):
-        dur_src = c["out"] - c["in"]
-        dur = dur_src / c["speed"]
+        sp = c["speed"]
+        pre = tr[i - 1]["d"] / 2 if i and tr[i - 1] else 0.0
+        post = tr[i]["d"] / 2 if tr[i] else 0.0
+        L = (c["out"] - c["in"]) / sp + pre + post
+        dlug.append(L)
+        brak = 0.0                     # materiału przed klipem za mało na połowę przejścia: pierwsza klatka stoi
         if c["kind"] == "image":
-            args += ["-loop", "1", "-framerate", str(F), "-t", _f(dur_src), "-i", str(c["src"])]
+            args += ["-loop", "1", "-framerate", str(F), "-t", _f(L), "-i", str(c["src"])]
         else:
-            args += ["-ss", _f(c["in"]), "-t", _f(dur_src), "-i", str(c["src"])]
+            od = c["in"] - pre * sp
+            brak, od = max(0.0, -od / sp), max(0.0, od)
+            args += ["-ss", _f(od), "-t", _f(c["out"] + post * sp - od), "-i", str(c["src"])]
         vi = n; n += 1
         fit = (cover_filter(W, H, c) if c["fit"] == "cover" else blur_filter(W, H, i) if c["fit"] == "blur"
                else f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black")
-        graph.append(f"[{vi}:v]setpts=(PTS-STARTPTS)/{_f(c['speed'])},fps={F},{fit},setsar=1,format=yuv420p,"
-                     f"tpad=stop_mode=clone:stop_duration=1,trim=duration={_f(dur)},setpts=PTS-STARTPTS[v{i}]")
+        glowa = tr[i - 1]["d"] if i and tr[i - 1] and tr[i - 1]["type"] == "blur" else 0.0
+        ogon = tr[i]["d"] if tr[i] and tr[i]["type"] == "blur" else 0.0
+        graph.append(f"[{vi}:v]setpts=(PTS-STARTPTS)/{_f(sp)},fps={F},{fit},setsar=1,format=yuv420p,"
+                     + (f"tpad=start_mode=clone:start_duration={_f(brak)}," if brak > 1e-4 else "")
+                     + f"tpad=stop_mode=clone:stop_duration={_f(post + 1)},trim=duration={_f(L)},setpts=PTS-STARTPTS"
+                     + (rozmycie_przejscia(i, L, F, smax, glowa, ogon) if glowa or ogon else "")
+                     + (f",fps={F}" if jest_tr else "") + f"[v{i}]")    # xfade chce stałej liczby klatek
         if c["kind"] == "video" and not c["muted"] and has_audio.get(str(c["src"])) and c["volume"] > 0:
-            chain = ",".join(x for x in ("asetpts=PTS-STARTPTS", _atempo(c["speed"]),
+            chain = ",".join(x for x in ("asetpts=PTS-STARTPTS", _atempo(sp),
                                          f"volume={_f(c['volume'])}" if c["volume"] != 1 else "") if x)
             graph.append(f"[{vi}:a]{chain},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
-                         f"apad,atrim=duration={_f(dur)},asetpts=PTS-STARTPTS[a{i}]")
+                         + (f"adelay={round(brak * 1000)}:all=1," if brak > 1e-4 else "")
+                         + f"apad,atrim=duration={_f(L)},asetpts=PTS-STARTPTS[a{i}]")
         else:
-            graph.append(f"anullsrc=r=48000:cl=stereo,atrim=duration={_f(dur)},aformat=sample_fmts=fltp[a{i}]")
+            graph.append(f"anullsrc=r=48000:cl=stereo,atrim=duration={_f(L)},aformat=sample_fmts=fltp[a{i}]")
         seg_labels.append(f"[v{i}][a{i}]")
-    graph.append(f"{''.join(seg_labels)}concat=n={len(p['clips'])}:v=1:a=1[vc][ac]")
+    if not jest_tr:
+        graph.append(f"{''.join(seg_labels)}concat=n={len(p['clips'])}:v=1:a=1[vc][ac]")
+    else:
+        graph += xfade_graph(tr, dlug, F)
 
     vlast, osoba = "vc", None
     if maska and (typo or {}).get("tyl"):

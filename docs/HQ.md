@@ -188,9 +188,10 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   Klucz osi (klipy, przycięcie, tempo, kadr; `edytor.maska_klucz` = `maskaKlucz` w `48-typografia.js`) pilnuje, żeby
   po zmianie klipów nie użyć starych sylwetek: wtedy napis jest po prostu widoczny w całości.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
-  `volume`, `muted`, `fit`), napisy, muzyka i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
+  `volume`, `muted`, `fit`, `transition`), napisy, muzyka i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
 - **Eksport** (`POST /edit/export`): serwer sprawdza projekt (ścieżki tylko z katalogów floty, limity długości
-  i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat → nakładki → miks z limiterem), H.264 + AAC,
+  i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat albo xfade przy przejściach → nakładki → miks
+  z limiterem), H.264 + AAC,
   `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
   i dopiero gotowy dostaje nazwę `film-edycja[-N].mp4`: nic nie jest nadpisywane.
   Kadr ma krótszy bok najwyżej 1080 px przy proporcjach źródła (nagranie 4K z iPhone'a 2160×3840 → 1080×1920;
@@ -207,6 +208,19 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   kadr bez tła i pasów, a panel Format mówi to wprost. Podgląd rysuje tło na małej kanwie pod wideo (rozmycie w CSS),
   eksport tym samym przepisem co `film.py --tryb rozmyte` (`edytor.blur_filter`: `boxblur` + `eq`), Wideograf:
   `projekt.py dodaj-klip|kadr --rozmyte|--dopasuj|--wypelnij`.
+- **Przejścia między klipami** (jak w CapCut): na każdym cięciu osi jest mały kwadrat; klik otwiera panel z 16
+  przejściami (Przenikanie, Przez czerń, Przez biel, Rozmycie, Przybliżenie, Piksele, Przesuń w lewo/prawo/górę/dół,
+  Najazd z prawej/lewej, Zasłona w lewo/prawo, Miękka zasłona, Koło), każde z animowaną miniaturą, suwakiem długości
+  (0,1–3 s), **Podgląd** (odtwarza samo cięcie) i **Do wszystkich cięć**. Przejście leży na środku cięcia i **nie skraca
+  filmu**: klip A gra dalej za cięciem (materiał za przycięciem, a gdy go brak, ostatnia klatka), klip B zaczyna przed
+  cięciem, więc napisy, muzyka i uwagi zostają na miejscu. Długość to parzysta liczba klatek, najwyżej tyle, ile trwa
+  krótszy z dwóch klipów (`przejsciaOsi` w `49-przejscia.js` = `edytor.przejscia_osi`); okno przejścia widać na osi jako
+  paski. Zapis: `transition: {type, dur}` w klipie przed cięciem; Tnij zostawia przejście na prawej części, wycinanie
+  pauz na ostatnim kawałku. Eksport: `xfade` i `acrossfade` w ffmpeg na wydłużonych odcinkach (dźwięk przenika się
+  razem z obrazem), „Rozmycie” to przenikanie z rozmyciem Gaussa rosnącym do cięcia (`sendcmd` + `gblur`).
+  Podgląd ma dwie warstwy (klip i następny) stylowane przez `przejscieStyl` tymi samymi wzorami co `xfade`
+  (krycie, przesunięcie, maska, rozmycie, piksele na kanwie), a test porównuje kolory podglądu z klatkami z ffmpeg
+  (`tests/test_edytor_przejscia.py`). Wideograf: `projekt.py przejscie <film> <id>|--wszystkie [--typ] [--dlugosc] [--usun]`.
 - **Kadr:** klip w trybie „Wypełnij” (np. pion 9:16 z poziomego nagrania) ma w ustawieniach suwaki **Kadr: poziomo**,
   **Kadr: pionowo** i **Przybliżenie** (1–3×, punch-in). Zapisują się w klipie jako `fx`, `fy`, `zoom`; eksport tnie
   ten sam fragment (`crop` z punktem skupienia w ffmpeg), który pokazuje podgląd (CSS `object-position` + `scale`).
@@ -233,7 +247,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
-  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `usun`, `uwaga`,
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `przejscie`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy i typografię rysują te same funkcje (`hq/web/src/44-napisy.js`, `48-typografia.js`) w przeglądarce bez
   okna, więc plik od agenta wygląda jak eksport z edytora. Typografię na tym samym projekcie układa `typografia.py`
@@ -253,7 +267,8 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   przewijana palcem pod stałym wskaźnikiem na środku (dwa palce: przybliżenie), a na dole pasek **Edytuj · Audio ·
   Tekst · Napisy · Format**. Narzędzie otwiera panel od dołu; dotknięcie klipu, napisu albo muzyki na osi otwiera
   jego ustawienia, uchwyty do przycinania pojawiają się na zaznaczonym elemencie.
-- Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg).
+- Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg)
+  i `tests/test_edytor_przejscia.py` (przejścia: oś, eksport, podgląd = film).
 
 ## 2b. Animacja HTML: podgląd na żywo i parametry
 

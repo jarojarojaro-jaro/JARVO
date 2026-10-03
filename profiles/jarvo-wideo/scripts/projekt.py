@@ -12,6 +12,7 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--rozmyte|--dopasuj|--wypelnij --fx X --fy Y --zoom Z]
     projekt.py kadr <film> <id> [--rozmyte|--dopasuj|--wypelnij] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
     projekt.py napisy <film> [--srt plik.srt] [--karaoke [#FFE14D]] [--kroj Kanit]   # napisy ze słów (<źródło>.mowa.json) albo SRT
+    projekt.py przejscie <film> <id>|--wszystkie [--typ fade] [--dlugosc 0.5] [--usun]   # przejście na cięciu po klipie
     projekt.py usun <film> <id>                    # usuń klip / tekst / audio o danym id (z `pokaz`)
     projekt.py uwaga <film> <id> (--zrobione "co zmieniłem" | --odrzuc "dlaczego")   # zamknij uwagę z osi edytora
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
@@ -19,6 +20,8 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     (typografia słowo po słowie, klucz `typo`: plan i poprawki robi typografia.py; render rysuje ją tak jak edytor)
 
 Czas S w sekundach osi (po cięciach i zmianach tempa), chyba że opis mówi „źródła” (--od/--do).
+Przejście leży na środku cięcia i nie skraca filmu (napisy i audio zostają na miejscu); długość to parzysta liczba
+klatek, najwyżej tyle, ile trwa krótszy z dwóch klipów (`pokaz` pokazuje, co wyszło).
 Nic nie nadpisuje oryginału: render zapisuje film-edycja.mp4, film-edycja-2.mp4…
 
 Uwagi (`notes` w projekcie) zostawia właściciel w edytorze HQ: prośba przypięta do chwili osi, często z kadrem
@@ -133,10 +136,15 @@ def cmd_pokaz(film: Path, a) -> int:
     cv = proj["canvas"]
     print(f"Kadr {cv['w']}×{cv['h']} @ {cv['fps']} fps · długość {total(proj):.2f} s")
     print("Klipy (ścieżka główna, jeden za drugim):")
-    for c, s, e in layout(proj["clips"]):
+    trs = ed.przejscia_osi(proj["clips"], cv["fps"])
+    for (c, s, e), tr in zip(layout(proj["clips"]), trs):
         extra = "".join([f" · tempo {c.get('speed', 1)}×" if c.get("speed", 1) != 1 else "", " · wyciszony" if c.get("muted") else "",
                          f" · głośność {c.get('volume', 1):.2f}" if c.get("volume", 1) != 1 else ""])
         print(f"  [{c.get('id')}] {s:6.2f}–{e:6.2f}  {Path(c['src']).name} (źródło {c['in']:.2f}–{c['out']:.2f}){extra}")
+        if tr:
+            print(f"      ↳ przejście {tr['type']} {tr['d']:.2f} s ({e - tr['d'] / 2:.2f}–{e + tr['d'] / 2:.2f})")
+        elif c.get("transition") and c is not proj["clips"][-1]:
+            print(f"      ↳ przejście {c['transition'].get('type')}: klipy za krótkie, zostaje zwykłe cięcie")
     print("Napisy i teksty:" if proj.get("texts") else "Napisy i teksty: brak")
     for x in proj.get("texts") or []:
         print(f"  [{x.get('id')}] {x['start']:6.2f}–{x['end']:6.2f}  {'napis' if x.get('cap') else 'tekst'}: {x.get('text', '')!r}")
@@ -331,6 +339,41 @@ def cmd_napisy(film: Path, a) -> int:
         for k in lines if k["start"] < t]
     save(film, proj)
     print(f"Napisy: {sum(1 for x in proj['texts'] if x.get('cap'))} linii")
+    return 0
+
+
+def cmd_przejscie(film: Path, a) -> int:
+    proj = load(film)
+    clips = proj["clips"]
+    if a.wszystkie:
+        cele = clips[:-1]
+    else:
+        if not a.id:
+            raise SystemExit("podaj id klipu przed cięciem (z `pokaz`) albo --wszystkie")
+        c = next((x for x in clips if x.get("id") == a.id), None)
+        if c is None:
+            raise SystemExit(f"nie ma klipu o id {a.id} (lista: projekt.py pokaz)")
+        if c is clips[-1]:
+            raise SystemExit("za ostatnim klipem nie ma cięcia: przejście ustawiasz na klipie przed cięciem")
+        cele = [c]
+    if not cele:
+        raise SystemExit("jeden klip: nie ma cięcia na przejście")
+    for c in cele:
+        if a.usun:
+            c.pop("transition", None)
+            continue
+        old = c.get("transition") or {}
+        c["transition"] = {"type": a.typ or old.get("type") or "fade",
+                           "dur": round(min(3.0, max(0.1, a.dlugosc if a.dlugosc is not None else old.get("dur") or ed.PRZEJSCIE_D)), 3)}
+    save(film, proj)
+    trs = ed.przejscia_osi(clips, proj["canvas"]["fps"])
+    for c, (_c, _s, e) in zip(clips, layout(clips)):
+        if c not in cele:
+            continue
+        tr = trs[clips.index(c)]
+        stan = (f"{tr['type']} {tr['d']:.2f} s" if tr else "zwykłe cięcie" if a.usun or not c.get("transition")
+                else "klipy za krótkie, zostaje zwykłe cięcie")
+        print(f"Cięcie po [{c.get('id')}] ({e:.2f} s): {stan}")
     return 0
 
 
@@ -634,6 +677,12 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--karaoke", nargs="?", const="", metavar="KOLOR",
                     help="aktywne słowo w kolorze (domyślnie żółty); tylko napisy ze słów, nie z SRT")
     sp.add_argument("--kroj", help="krój napisów z listy edytora: nazwa albo rodzina")
+    sp = film_cmd("przejscie", cmd_przejscie, "przejście na cięciu po klipie (nie skraca filmu)")
+    sp.add_argument("id", nargs="?", help="klip przed cięciem (z `pokaz`)")
+    sp.add_argument("--wszystkie", action="store_true", help="na każdym cięciu")
+    sp.add_argument("--typ", choices=ed.PRZEJSCIA, help="rodzaj (domyślnie fade albo obecny)")
+    sp.add_argument("--dlugosc", type=float, help="sekundy 0.1–3 (domyślnie 0.5 albo obecna)")
+    sp.add_argument("--usun", action="store_true", help="zwykłe cięcie zamiast przejścia")
     film_cmd("usun", cmd_usun, "usuń element po id").add_argument("id")
     sp = film_cmd("uwaga", cmd_uwaga, "zamknij uwagę z osi edytora")
     sp.add_argument("id")

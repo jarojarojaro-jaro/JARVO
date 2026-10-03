@@ -76,7 +76,7 @@ function askMessage({ path, cursor, where, text, shot, notes, urls }) {
       + (n.img ? ` · kadr \`${n.img}\`${pic(n.img)}` : "")));
   }
   lines.push("Pracuj na tym projekcie: `python3 $HERMES_HOME/scripts/projekt.py pokaz <film>` (uwagi też tam są), zmiany przez "
-    + "`projekt.py dodaj-audio / dodaj-tekst / dodaj-klip / kadr / napisy / usun`"
+    + "`projekt.py dodaj-audio / dodaj-tekst / dodaj-klip / kadr / napisy / przejscie / usun`"
     + (open.length ? ", każdą uwagę zamknij: `projekt.py uwaga <film> <id> --zrobione \"co zmieniłeś\"` albo `--odrzuc \"dlaczego\"`" : "")
     + ", na końcu `projekt.py render <film>` i linia MEDIA:. Kadry oglądasz przez vision_analyze. Nie cofaj moich cięć; edytor sam wczyta Twoje zmiany.");
   lines.push("Typografia słowo po słowie (skill `typografia-edit`): `typografia.py pokaz / popraw / paleta / style / sylwetki <film>`, "

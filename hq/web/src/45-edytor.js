@@ -1,6 +1,6 @@
 // Edytor filmów (styl CapCut): podgląd, oś czasu z miniaturami, napisy, muzyka, eksport ffmpeg na serwerze.
-// Bez bibliotek: dwa elementy <video> na zmianę (płynne przejścia między klipami), napisy rysowane na
-// kanwie tą samą funkcją w podglądzie i przy eksporcie (PNG na napis), więc plik wygląda jak podgląd.
+// Bez bibliotek: dwie warstwy (<video> albo <img>) na zmianę, płynne cięcia i przejścia między klipami (49-przejscia.js),
+// napisy rysowane na kanwie tą samą funkcją w podglądzie i przy eksporcie (PNG na napis), więc plik wygląda jak podgląd.
 
 const EditCtx = React.createContext(null);
 const ED_AGENT = "jarvo-wideo";
@@ -83,6 +83,7 @@ const ED_ICON = {
   check: svgI(html`<path d="M5 12l5 5 9-10"/>`),
   spark: svgI(html`<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>`),
   split: svgI(html`<path d="M12 3v18M8 7l-4 5 4 5M16 7l4 5-4 5"/>`),
+  trans: svgI(html`<path d="M4 5.5 12 12l-8 6.5zM20 5.5 12 12l8 6.5z"/>`),
   speed: svgI(html`<path d="M12 14l4-4"/><path d="M3.3 17a9 9 0 1 1 17.4 0"/>`),
   volume: svgI(html`<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>`),
   mute: svgI(html`<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6M22 9l-6 6"/>`),
@@ -155,6 +156,8 @@ function fmtT(s, fine) {
   const m = Math.floor(s / 60), r = s - m * 60;
   return fine ? `${m}:${r.toFixed(2).padStart(5, "0")}` : `${m}:${String(Math.floor(r)).padStart(2, "0")}`;
 }
+const fmtSek = (d) => `${L(String(+(+d).toFixed(2)).replace(".", ","), String(+(+d).toFixed(2)))} s`;
+const trNazwa = (type) => { const r = ED_PRZEJSCIA.find(([k]) => k === type); return r ? L(r[1], r[2]) : type; };
 function layoutClips(clips) {
   let t = 0;
   return clips.map((c) => { const s = t; t += clipDur(c); return { c, start: s, end: t }; });
@@ -362,23 +365,37 @@ function useHistory(initial) {
   return { p: h.present, apply, live, liveFrom, commit, undo, redo, reset, canUndo: h.past.length > 0, canRedo: h.future.length > 0 };
 }
 
-// ------------------------------------------------------------------ odtwarzacz: dwa <video> na zmianę
+// ------------------------------------------------------------------ odtwarzacz: dwie warstwy na zmianę
+// Warstwa = rozmyte tło klipu (fit "blur"), <video> i <img>. Klip gra w jednej warstwie, następny czeka w drugiej
+// (cięcie bez mrugnięcia). Na cięciu z przejściem grają obie: A dalej za cięciem, B od chwili przed cięciem, a wygląd
+// warstw (krycie, przesunięcie, maska, rozmycie) liczy przejscieStyl, tak jak xfade w eksporcie. W oknie przejścia
+// czas płynie z zegara, poza nim z bieżącego wideo (tempo, zacięcia dekodera).
 function usePlayer(proj, meta, onTick) {
   const vids = [useRef(null), useRef(null)];
-  const imgRef = useRef(null);
+  const imgs = [useRef(null), useRef(null)];
+  const layers = [useRef(null), useRef(null)];
+  const blurs = [useRef(null), useRef(null)];
+  const pixRef = useRef(null);
   const audios = useRef(new Map());
-  const st = useRef({ t: 0, playing: false, slot: 0, idx: -1, loaded: [null, null], last: 0, raf: 0 });
+  // seg[k] = odcinek osi w warstwie k, tok[k] = numer wstawienia (późne wczytanie starego klipu nie nadpisze nowego)
+  // hold: po przejściu czas nie cofa się, gdy wideo B ruszyło z opóźnieniem (play() ~0,1 s), tylko czeka na nie
+  const st = useRef({ t: 0, playing: false, slot: 0, idx: -1, url: [null, null], seg: [null, null], tok: [0, 0], tr: null,
+    stopAt: null, last: 0, raf: 0, hold: null });
   const projRef = useRef(proj);
   projRef.current = proj;
   const [playing, setPlaying] = useState(false);
 
   const segs = () => layoutClips(projRef.current.clips);
+  const trs = () => przejsciaOsi(projRef.current.clips, (projRef.current.canvas || {}).fps);
   const total = () => projTotal(projRef.current);
   const findSeg = (t) => {
     const L = segs();
     for (let i = 0; i < L.length; i++) if (t < L[i].end - 1e-6) return [i, L[i]];
     return L.length ? [L.length - 1, L[L.length - 1]] : [-1, null];
   };
+  const lokal = (s, t) => s.c.in + (t - s.start) * (s.c.speed || 1);
+  const slotOf = (s) => [0, 1].find((k) => st.current.seg[k] && st.current.seg[k].c.id === s.c.id) ?? -1;
+  const elOf = (k) => (st.current.seg[k] && st.current.seg[k].c.kind === "image" ? imgs[k].current : vids[k].current);
   // kadr jak w eksporcie (edytor.py cover_filter): object-position = punkt skupienia, scale(zoom) wokół niego
   function applyFit(el, c) {
     const cover = c.fit === "cover";
@@ -389,21 +406,88 @@ function usePlayer(proj, meta, onTick) {
     el.style.transformOrigin = `${fx * 100}% ${fy * 100}%`;
     el.style.transform = z !== 1 ? `scale(${z})` : "";
   }
-  async function load(slot, c, local) {
-    const v = vids[slot].current;
-    if (!v) return;
-    const url = await mediaUrl(c.src);
-    if (st.current.loaded[slot] !== url) { v.src = url; st.current.loaded[slot] = url; }
+  // odcinek s w warstwie k w chwili osi t (także poza klipem: zapas przed nim i za nim w oknie przejścia)
+  async function place(k, s, t, play) {
+    const S = st.current, v = vids[k].current, im = imgs[k].current;
+    if (!v || !im || !s) return;
+    const tok = ++S.tok[k];
+    S.seg[k] = s;
+    const url = await mediaUrl(s.c.src);
+    if (S.tok[k] !== tok) return;
+    if (s.c.kind === "image") {
+      if (im.getAttribute("src") !== url) im.src = url;
+      applyFit(im, s.c);
+      im.classList.add("is-on"); v.classList.remove("is-on");
+      v.pause();
+      return;
+    }
+    if (S.url[k] !== url) { v.src = url; S.url[k] = url; }
     if (v.readyState < 1) await new Promise((ok) => { v.addEventListener("loadedmetadata", ok, { once: true }); setTimeout(ok, 4000); });
-    if (Math.abs(v.currentTime - local) > 0.02) v.currentTime = local;
-    v.playbackRate = c.speed || 1;
-    v.volume = clamp(c.volume ?? 1, 0, 1);
-    v.muted = !!c.muted;
-    applyFit(v, c);
+    if (S.tok[k] !== tok) return;
+    const u = lokal(s, t), dur = Number.isFinite(v.duration) ? v.duration : Infinity;
+    const loc = clamp(u, 0, Math.max(0, dur - 0.001));
+    if (Math.abs(v.currentTime - loc) > 0.02) v.currentTime = loc;
+    v.playbackRate = s.c.speed || 1;
+    v.muted = !!s.c.muted;
+    applyFit(v, s.c);
+    v.classList.add("is-on"); im.classList.remove("is-on");
+    if (play && u >= 0 && u < dur) await v.play().catch(() => {});
+    else v.pause();
   }
-  function show(kind, slot) {
-    vids.forEach((r, i) => r.current && r.current.classList.toggle("is-on", kind === "video" && i === slot));
-    if (imgRef.current) imgRef.current.classList.toggle("is-on", kind === "image");
+  // wygląd obu warstw w chwili t: jedna widoczna, a w oknie przejścia obie według przejscieStyl
+  function render(t) {
+    const S = st.current, P = projRef.current, box = layers[0].current && layers[0].current.parentElement;
+    if (!box || !P) return;
+    const L = segs(), W = przejscieW(L, trs(), t);
+    const ka = W ? (S.seg[1] && S.seg[1].c.id === L[W.i].c.id ? 1 : 0) : S.slot, kb = 1 - ka;
+    const styl = W ? przejscieStyl(W.type, W.q) : null;
+    const px = (box.clientWidth / Math.max(1, P.canvas.w)) * Math.max(2, Math.round(Math.min(P.canvas.w, P.canvas.h) / ED_PRZ_ROZMYCIE));
+    for (const k of [0, 1]) {
+      const el = layers[k].current;
+      if (!el) continue;
+      const on = styl ? true : k === S.slot;
+      const css = styl ? przejscieCss(k === ka ? styl.a : styl.b, px) : {};
+      el.style.visibility = on ? "visible" : "hidden";
+      el.style.zIndex = k === (styl ? kb : S.slot) ? "2" : "1";
+      el.style.opacity = css.opacity || "";
+      el.style.transform = css.transform || "";
+      el.style.clipPath = css.clipPath || "";
+      el.style.maskImage = css.maskImage || "";
+      el.style.webkitMaskImage = css.webkitMaskImage || "";
+      el.style.filter = css.filter || "";
+      const s = S.seg[k], v = vids[k].current;     // dźwięk klipów przenika się jak acrossfade w eksporcie
+      if (s && v && s.c.kind !== "image") v.volume = clamp(s.c.volume ?? 1, 0, 1) * (!styl ? 1 : k === ka ? 1 - W.q : W.q);
+    }
+    box.style.background = styl ? styl.tlo : "";
+    const pc = pixRef.current;
+    if (pc) {
+      pc.classList.toggle("is-on", !!(styl && styl.piksel));
+      if (styl && styl.piksel) piksele(pc, styl.piksel, ka, kb, W.q);
+    }
+  }
+  // „Piksele”: obie warstwy na małej kanwie (bok piksela z przejscieStyl), CSS powiększa ją bez wygładzania
+  const pixTmp = useRef(null);
+  function piksele(pc, bok, ka, kb, q) {
+    const P = projRef.current, W = P.canvas.w, H = P.canvas.h, b = Math.max(1, bok * Math.min(W, H));
+    const w = Math.max(2, Math.round(W / b)), h = Math.max(2, Math.round(H / b));
+    if (pc.width !== w || pc.height !== h) { pc.width = w; pc.height = h; }
+    const tmp = pixTmp.current || (pixTmp.current = document.createElement("canvas"));
+    if (tmp.width !== w || tmp.height !== h) { tmp.width = w; tmp.height = h; }
+    const g = pc.getContext("2d"), o = tmp.getContext("2d");
+    g.globalAlpha = 1;
+    for (const [k, al] of [[ka, 1], [kb, q]]) {
+      const s = st.current.seg[k], el = elOf(k);
+      o.fillStyle = "#000"; o.fillRect(0, 0, w, h);
+      const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
+      if (s && vw && vh) {
+        if (s.c.fit === "blur" && blurs[k].current && blurs[k].current.width) o.drawImage(blurs[k].current, -w * 0.04, -h * 0.04, w * 1.08, h * 1.08);
+        const r = fitBox(vw, vh, w, h, s.c);
+        try { o.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { /* klatka jeszcze niegotowa */ }
+      }
+      g.globalAlpha = al;
+      g.drawImage(tmp, 0, 0);
+    }
+    g.globalAlpha = 1;
   }
   function syncAudio(t, play) {
     const items = projRef.current.audio || [];
@@ -422,56 +506,83 @@ function usePlayer(proj, meta, onTick) {
       }
     }
   }
-  async function preloadNext(i) {
-    const L = segs();
-    const n = L[i + 1];
-    if (n && n.c.kind !== "image") await load(1 - st.current.slot, n.c, n.c.in);
+  // następny klip czeka w drugiej warstwie od chwili, w której się pokaże (przy przejściu: przed cięciem)
+  function preloadNext(i) {
+    const L = segs(), n = L[i + 1], tr = trs()[i];
+    if (n) place(1 - st.current.slot, n, tr ? L[i].end - tr.d / 2 : n.start, false);
   }
-  async function enter(i, local, play) {
-    const L = segs();
-    const s = L[i];
-    if (!s) return;
-    const S = st.current;
-    S.idx = i;
-    if (s.c.kind === "image") {
-      const url = await mediaUrl(s.c.src);
-      if (imgRef.current && imgRef.current.getAttribute("src") !== url) imgRef.current.src = url;
-      if (imgRef.current) applyFit(imgRef.current, s.c);
-      show("image");
-      vids.forEach((r) => r.current && r.current.pause());
+  // stan warstw w chwili t (przewinięcie, start, zmiana projektu)
+  async function sync(t, play) {
+    const S = st.current, L = segs(), W = przejscieW(L, trs(), t);
+    if (W) {
+      const A = L[W.i], B = L[W.i + 1];
+      let ka = slotOf(A);
+      if (ka < 0) ka = slotOf(B) >= 0 ? 1 - slotOf(B) : S.slot;
+      S.tr = W.i;
+      S.idx = t < W.T ? W.i : W.i + 1;
+      S.slot = t < W.T ? ka : 1 - ka;
+      render(t);
+      await Promise.all([place(ka, A, t, play), place(1 - ka, B, t, play)]);
     } else {
-      // gotowy slot (przeładowany wcześniej) = przejście bez mrugnięcia
-      const other = 1 - S.slot;
-      const ready = vids[other].current && S.loaded[other] === (await mediaUrl(s.c.src)) && Math.abs(vids[other].current.currentTime - local) < 0.08;
-      if (ready) S.slot = other;
-      await load(S.slot, s.c, local);
-      show("video", S.slot);
-      vids[1 - S.slot].current && vids[1 - S.slot].current.pause();
-      if (play) await vids[S.slot].current.play().catch(() => {});
+      const [i, s] = findSeg(t);
+      if (!s) return;
+      const k = slotOf(s) >= 0 ? slotOf(s) : S.slot;
+      S.tr = null; S.idx = i; S.slot = k;
+      render(t);
+      await place(k, s, t, play);
+      const o = vids[1 - k].current;
+      if (o) o.pause();
+      preloadNext(i);
     }
-    preloadNext(i);
+    render(t);
   }
   function frame(now) {
     const S = st.current;
     if (!S.playing) return;
     const dt = Math.min(0.1, (now - S.last) / 1000);
     S.last = now;
-    const L = segs();
+    const L = segs(), T = trs(), tot = total();
     const s = L[S.idx];
     if (!s) { stop(); return; }
-    if (s.c.kind === "image") S.t += dt;
+    const v = vids[S.slot].current;
+    if (S.tr !== null || s.c.kind === "image" || !v) S.t += dt;
     else {
-      const v = vids[S.slot].current;
       S.t = s.start + (v.currentTime - s.c.in) / (s.c.speed || 1);
-      if (v.ended) S.t = s.end;
+      if (v.ended) S.t = Math.max(S.t, s.end);
+      if (S.hold !== null) { if (S.t < S.hold) S.t = S.hold; else S.hold = null; }
     }
-    if (S.t >= s.end - 0.01) {
-      if (S.idx + 1 >= L.length) { S.t = total(); stop(); onTick(S.t, true); return; }
+    if (S.stopAt !== null && S.t >= S.stopAt) { S.t = S.stopAt; stop(); onTick(S.t, true); return; }
+    if (S.t >= tot - 0.005) { S.t = tot; stop(); onTick(S.t, true); return; }
+    const W = przejscieW(L, T, S.t);
+    if (W) {
+      const A = L[W.i], B = L[W.i + 1];
+      let ka = slotOf(A);
+      if (ka < 0) ka = S.slot;
+      const kb = 1 - ka;
+      if (S.tr !== W.i) {                         // wejście w przejście: B rusza w drugiej warstwie
+        S.tr = W.i;
+        place(kb, B, S.t, true);
+      }
+      const vb = vids[kb].current;                // B bez materiału przed sobą stoi na pierwszej klatce, aż dojdzie czas
+      if (B.c.kind !== "image" && vb && vb.paused && st.current.seg[kb] === B && lokal(B, S.t) >= 0) vb.play().catch(() => {});
+      if (S.t >= W.T && S.idx === W.i) { S.idx = W.i + 1; S.slot = kb; }
+    } else if (S.tr !== null) {                   // koniec przejścia: dalej gra B
+      S.tr = null;
+      S.hold = S.t;
+      const k = slotOf(L[S.idx]);
+      if (k >= 0) S.slot = k;
+      const o = vids[1 - S.slot].current;
+      if (o) o.pause();
+      preloadNext(S.idx);
+    } else if (S.t >= s.end - 0.01 && S.idx + 1 < L.length) {   // zwykłe cięcie: następny klip czeka w drugiej warstwie
       S.t = s.end;
-      const i = S.idx + 1;
+      const i = S.idx + 1, n = L[i];
       S.idx = i;
-      enter(i, L[i].c.in, true);
+      const k = slotOf(n) >= 0 ? slotOf(n) : S.slot;
+      S.slot = k;
+      place(k, n, n.start, true).then(() => { const o = vids[1 - k].current; if (o && st.current.tr === null) o.pause(); preloadNext(i); });
     }
+    render(S.t);
     syncAudio(S.t, true);
     onTick(S.t, false);
     S.raf = requestAnimationFrame(frame);
@@ -479,6 +590,7 @@ function usePlayer(proj, meta, onTick) {
   function stop() {
     const S = st.current;
     S.playing = false;
+    S.stopAt = null;
     cancelAnimationFrame(S.raf);
     vids.forEach((r) => r.current && r.current.pause());
     syncAudio(S.t, false);
@@ -487,9 +599,9 @@ function usePlayer(proj, meta, onTick) {
   async function seek(t) {
     const S = st.current;
     S.t = clamp(t, 0, Math.max(0, total() - 0.001));
+    S.hold = null;
     onTick(S.t, false);            // kursor i czas od razu, klatka dociąga się w tle
-    const [i, s] = findSeg(S.t);
-    if (s) await enter(i, s.c.in + (S.t - s.start) * (s.c.speed || 1), S.playing);
+    await sync(S.t, S.playing);
     syncAudio(S.t, S.playing);
     onTick(S.t, true);
   }
@@ -503,11 +615,18 @@ function usePlayer(proj, meta, onTick) {
     S.last = performance.now();
     S.raf = requestAnimationFrame(frame);
   }
+  // odcinek a–b (np. podgląd wybranego przejścia) i pauza na końcu
+  async function playRange(a, b) {
+    stop();
+    st.current.t = clamp(a, 0, Math.max(0, total() - 0.001));
+    await play();
+    st.current.stopAt = Math.min(b, total());
+  }
   const toggle = () => (st.current.playing ? stop() : play());
   // nowe elementy <video> (np. przełączenie układu telefon/komputer): zapomnij stare źródła
-  const remount = () => { st.current.loaded = [null, null]; st.current.idx = -1; };
+  const remount = () => { const S = st.current; S.url = [null, null]; S.seg = [null, null]; S.tr = null; S.idx = -1; };
   useEffect(() => () => { cancelAnimationFrame(st.current.raf); }, []);
-  return { vids, imgRef, audios, st, playing, play, stop, toggle, seek, remount };
+  return { vids, imgs, layers, blurs, pixRef, audios, st, playing, play, stop, toggle, seek, playRange, remount, elOf, render };
 }
 
 // ------------------------------------------------------------------ edytor
@@ -537,6 +656,36 @@ function useOverDashboard() {
     }
     return () => raised.forEach(([node, prev]) => { node.style.zIndex = prev; });
   }, []);
+}
+
+// Miniatura przejścia w panelu: kafelki A i B animowane tym samym przejscieStyl co podgląd. Jeden zegar rAF
+// dla wszystkich miniatur, style ustawiane wprost (bez renderu); zegar staje, gdy panel się zamknie.
+const trMini = new Set();
+let trMiniRaf = 0;
+function trMiniTick(now) {
+  const x = (now % 1800) / 1800, q = Math.min(1, Math.max(0, (x - 0.2) / 0.6));
+  for (const f of trMini) f(q);
+  trMiniRaf = trMini.size ? requestAnimationFrame(trMiniTick) : 0;
+}
+function TrMini({ type }) {
+  const box = useRef(null), a = useRef(null), b = useRef(null);
+  useEffect(() => {
+    const f = (q) => {
+      const s = przejscieStyl(type, q);
+      for (const [el, o] of [[a.current, s.a], [b.current, s.b]]) {
+        if (!el) continue;
+        const css = przejscieCss(o, 6);
+        el.style.opacity = css.opacity; el.style.transform = css.transform; el.style.clipPath = css.clipPath;
+        el.style.maskImage = css.maskImage; el.style.webkitMaskImage = css.webkitMaskImage;
+        el.style.filter = s.piksel ? `blur(${(s.piksel * 30).toFixed(1)}px)` : css.filter;   // piksele w miniaturze: zmiękczenie
+      }
+      if (box.current) box.current.style.background = s.tlo;
+    };
+    trMini.add(f);
+    if (!trMiniRaf) trMiniRaf = requestAnimationFrame(trMiniTick);
+    return () => { trMini.delete(f); };
+  }, [type]);
+  return html`<span class="thq-ed-trmini" ref=${box} aria-hidden="true"><i ref=${a} class="is-a">A</i><i ref=${b} class="is-b">B</i></span>`;
 }
 
 function VideoEditor({ path, onClose }) {
@@ -701,6 +850,11 @@ function VideoEditor({ path, onClose }) {
   const ppsRef = useRef(pps);
   ppsRef.current = pps;
   const player = usePlayer(p || { clips: [], texts: [], audio: [] }, meta, onTick);
+  // element (wideo albo obraz) z klatką odcinka seg: jego warstwa, a gdy jeszcze się nie wczytał, bieżąca
+  const elSeg = (seg) => {
+    const S = player.st.current, k = [0, 1].find((j) => S.seg[j] && S.seg[j].c.id === seg.c.id);
+    return player.elOf(k ?? S.slot);
+  };
   const projRef = useRef(p);
   projRef.current = p;
   const selRef = useRef(sel);
@@ -762,7 +916,7 @@ function VideoEditor({ path, onClose }) {
     if (!bm) return;
     const L2 = layoutClips(P.clips);
     const seg = L2.find((x) => now < x.end - 1e-6) || L2[L2.length - 1];
-    const el = seg && seg.c.kind === "image" ? player.imgRef.current : player.vids[player.st.current.slot].current;
+    const el = seg && elSeg(seg);
     const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
     if (!vw || !vh) return;
     const oc = m.oc || (m.oc = document.createElement("canvas"));
@@ -831,30 +985,27 @@ function VideoEditor({ path, onClose }) {
     }
   }
   useEffect(() => { drawOverlay(); }, [p, sel, strefa]);
-  // rozmyte tło bieżącego klipu (fit "blur"): mała kanwa pod wideo, rozmyta i powiększona w CSS
-  const blurRef = useRef(null);
+  // rozmyte tło klipu w każdej warstwie (fit "blur"): mała kanwa pod wideo, rozmyta i powiększona w CSS
   function drawBlur() {
-    const c = blurRef.current, P = projRef.current;
-    if (!c || !P) return;
-    let seg = null;
-    if (P.clips.some((x) => x.fit === "blur")) {
-      const now = tRef.current, L2 = layoutClips(P.clips);
-      seg = L2.find((x) => now < x.end - 1e-6) || L2[L2.length - 1];
+    const P = projRef.current, S = player.st.current;
+    if (!P) return;
+    for (const k of [0, 1]) {
+      const c = player.blurs[k].current, s = S.seg[k];
+      if (!c) continue;
+      const on = !!s && s.c.fit === "blur";
+      c.classList.toggle("is-on", on);
+      if (!on) continue;
+      const el = player.elOf(k), vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
+      if (vw && vh) blurBg(c, el, vw, vh, P.canvas.w, P.canvas.h);
     }
-    const on = !!seg && seg.c.fit === "blur";
-    c.classList.toggle("is-on", on);
-    if (!on) return;
-    const el = seg.c.kind === "image" ? player.imgRef.current : player.vids[player.st.current.slot].current;
-    const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
-    if (vw && vh) blurBg(c, el, vw, vh, P.canvas.w, P.canvas.h);
   }
   useEffect(() => { drawBlur(); }, [p]);
-  useEffect(() => {      // po przewinięciu i wczytaniu klatki (pauza): tło i osoba za napisem z nowej klatki
-    const els = [...player.vids.map((r) => r.current), player.imgRef.current].filter(Boolean);
-    const on = () => { drawBlur(); drawOverlay(); };
+  useEffect(() => {      // po przewinięciu i wczytaniu klatki (pauza): tło, przejście i osoba za napisem z nowej klatki
+    const els = [...player.vids, ...player.imgs].map((r) => r.current).filter(Boolean);
+    const on = () => { drawBlur(); player.render(tRef.current); drawOverlay(); };
     for (const e of els) for (const ev of ["seeked", "loadeddata", "load"]) e.addEventListener(ev, on);
     return () => { for (const e of els) for (const ev of ["seeked", "loadeddata", "load"]) e.removeEventListener(ev, on); };
-  }, [!!p]);
+  }, [!!p, mobile]);
   // tekst w strefie platformy: nazwy stref do ostrzeżenia w panelu (pusto = poza strefami albo kadr poziomy)
   const measure = useRef(null);
   function strefyTekstu(x) {
@@ -871,7 +1022,7 @@ function VideoEditor({ path, onClose }) {
     const P = projRef.current, now = tRef.current;
     const L2 = layoutClips(P.clips);
     const seg = L2.find((x) => now < x.end - 1e-6) || L2[L2.length - 1];
-    const el = seg && seg.c.kind === "image" ? player.imgRef.current : player.vids[player.st.current.slot].current;
+    const el = seg && elSeg(seg);
     const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
     return vw && vh ? { el, vw, vh, c: seg.c } : null;
   }
@@ -981,7 +1132,8 @@ function VideoEditor({ path, onClose }) {
 
   const total = p ? projTotal(p) : 0;
   const segs = p ? layoutClips(p.clips) : [];
-  const selItem = !p || !sel ? null : (sel.type === "clip" ? p.clips : sel.type === "text" ? p.texts : sel.type === "typo" ? typoBloki(p)
+  const trsOsi = p ? przejsciaOsi(p.clips, p.canvas.fps) : [];
+  const selItem = !p || !sel ? null : (sel.type === "clip" || sel.type === "tr" ? p.clips : sel.type === "text" ? p.texts : sel.type === "typo" ? typoBloki(p)
     : sel.type === "audio" ? p.audio : []).find((x) => x.id === sel.id) || null;
 
   // ---------------------------------------------------------------- operacje
@@ -1068,7 +1220,7 @@ function VideoEditor({ path, onClose }) {
     if (!s) return;
     const cut = s.c.in + (now - s.start) * (s.c.speed || 1);
     const right = { ...s.c, id: edId("c"), in: cut };
-    H.apply((P) => ({ ...P, clips: P.clips.flatMap((c) => (c.id === s.c.id ? [{ ...c, out: cut }, right] : [c])) }));
+    H.apply((P) => ({ ...P, clips: P.clips.flatMap((c) => (c.id === s.c.id ? [{ ...c, out: cut, transition: undefined }, right] : [c])) }));
     setSel({ type: "clip", id: right.id });
   }
   function remove() {
@@ -1081,6 +1233,7 @@ function VideoEditor({ path, onClose }) {
       return;
     }
     if (sel.type === "clip" && p.clips.length <= 1) return;
+    if (sel.type === "tr") { upd("clip", sel.id, { transition: undefined }); setSel(null); if (mobileRef.current) setTool(null); return; }
     if (sel.type === "typo") typoApply((T) => ({ bloki: T.bloki.filter((x) => x.id !== sel.id) }));
     else if (sel.type === "clip") clipsChange((cs) => cs.filter((x) => x.id !== sel.id));   // reszta osi dosuwa się z napisami
     else {
@@ -1090,7 +1243,7 @@ function VideoEditor({ path, onClose }) {
     setSel(null);
   }
   function duplicate() {
-    if (!sel || !selItem) return;
+    if (!sel || !selItem || sel.type === "tr") return;
     if (sel.type === "typo") {                    // kopia bloku zaraz po nim (ta sama długość, w filmie)
       const d = selItem.end - selItem.start, st = Math.min(selItem.end, Math.max(0, total - d));
       const copy = { ...selItem, id: typoNoweId(new Set(typoBloki(p).map((x) => x.id)), selItem.id), start: +st.toFixed(3), end: +(st + d).toFixed(3) };
@@ -1430,7 +1583,7 @@ function VideoEditor({ path, onClose }) {
       if (!(sel && sel.id === id)) setTypoW(null);
     }
     setSel({ type, id });
-    if (mobileRef.current) setTool(type === "clip" ? "edit" : type);   // "mark" → panel znacznika
+    if (mobileRef.current) setTool(type === "clip" ? "edit" : type);   // "mark" → panel znacznika, "tr" → przejścia
     else setSide("inspect");
   };
 
@@ -1544,7 +1697,8 @@ function VideoEditor({ path, onClose }) {
     for (const s of layoutClips(projRef.current.clips)) {
       let pieces = [[s.start, s.end]];
       for (const [a, b] of rs) pieces = pieces.flatMap(([x, y]) => (b <= x || a >= y ? [[x, y]] : [[x, Math.min(a, y)], [Math.max(b, x), y]]).filter(([u, v]) => v - u >= 0.04));
-      pieces.forEach(([x, y], k) => clips.push({ ...s.c, id: k ? edId("c") : s.c.id, in: s.c.in + (x - s.start) * s.c.speed, out: s.c.in + (y - s.start) * s.c.speed }));
+      pieces.forEach(([x, y], k) => clips.push({ ...s.c, id: k ? edId("c") : s.c.id, in: s.c.in + (x - s.start) * s.c.speed, out: s.c.in + (y - s.start) * s.c.speed,
+        transition: k === pieces.length - 1 ? s.c.transition : undefined }));
     }
     if (!clips.length) return 0;
     const shift = (t) => { let d = 0; for (const [a, b] of rs) { if (t >= b) d += b - a; else if (t > a) d += t - a; } return t - d; };
@@ -1647,6 +1801,7 @@ function VideoEditor({ path, onClose }) {
     <div class="thq-ed-acts">
       ${act("split", L("Tnij", "Split"), split)}
       ${act("copy", L("Duplikuj", "Duplicate"), duplicate)}
+      ${p.clips[p.clips.length - 1].id !== c.id && act("trans", L("Przejście", "Transition"), () => { setSel({ type: "tr", id: c.id }); if (mobile) setTool("tr"); }, { on: !!c.transition })}
       ${c.kind !== "image" && act(c.muted ? "mute" : "volume", c.muted ? L("Włącz dźwięk", "Unmute") : L("Wycisz", "Mute"), () => upd("clip", c.id, { muted: !c.muted }))}
       ${act("trash", L("Usuń", "Delete"), remove, { bad: true, disabled: p.clips.length <= 1 })}
     </div>
@@ -1666,6 +1821,37 @@ function VideoEditor({ path, onClose }) {
       <input type="range" min="0.5" max="15" step="0.5" value=${c.out - c.in} onInput=${(e) => clipPatch(c.id, { out: c.in + +e.target.value }, true)} onChange=${H.commit}/></label>`}
     <p class="thq-ed-note">${(meta[c.src] || {}).name || c.src.split("/").pop()}${c.kind !== "image" ? ` · ${fmtT(c.in, true)} – ${fmtT(c.out, true)}` : ""}</p>
   </div>`;
+
+  // przejście po klipie c (na cięciu z następnym): rodzaj z animowaną miniaturą, długość, podgląd, do wszystkich cięć
+  const trTools = (c) => {
+    const i = p.clips.findIndex((x) => x.id === c.id), n = p.clips[i + 1];
+    if (!n) return html`<div class="thq-ed-form"><p class="thq-ed-note">${L("Za ostatnim klipem nie ma cięcia.", "There is no cut after the last clip.")}</p></div>`;
+    const F = p.canvas.fps || 30, cur = c.transition, ef = trsOsi[i];
+    const maxD = Math.min(3, Math.floor(Math.min(przDur(c), przDur(n)) * 10) / 10);
+    const za_krotkie = 2 * Math.floor(Math.min(przDur(c), przDur(n)) * F / 2 + 1e-6) < 2;
+    const setTr = (patch, lv) => upd("clip", c.id, (x) => ({ transition: patch && { type: "fade", dur: ED_PRZ_D, ...(x.transition || {}), ...patch } }), lv);
+    const T = layoutClips(p.clips)[i].end;
+    const podglad = () => { const d = ef ? ef.d : ED_PRZ_D; player.playRange(Math.max(0, T - d / 2 - 0.8), T + d / 2 + 0.8); };
+    const doWszystkich = () => H.apply((P) => ({ ...P, clips: P.clips.map((x, k) => (k < P.clips.length - 1 ? { ...x, transition: cur ? { ...cur } : undefined } : x)) }));
+    return html`<div class="thq-ed-form">
+      ${za_krotkie ? html`<p class="thq-ed-note is-warn">${L("Klipy przy tym cięciu są za krótkie na przejście.", "The clips at this cut are too short for a transition.")}</p>` : html`
+      <div class="thq-ed-trgrid">
+        <button type="button" class=${cx(!cur && "is-on")} onClick=${() => setTr(null)}><span class="thq-ed-trmini is-none">${ED_ICON.close}</span><small>${L("Brak", "None")}</small></button>
+        ${ED_PRZEJSCIA.map(([k2, pl, en]) => html`<button type="button" key=${k2} class=${cx(cur && cur.type === k2 && "is-on")} onClick=${() => setTr({ type: k2 })}>
+          <${TrMini} type=${k2}/><small>${L(pl, en)}</small></button>`)}
+      </div>
+      ${cur && html`<label>${L("Długość", "Duration")} · ${fmtSek(ef ? ef.d : cur.dur)}
+        <input type="range" min="0.1" max=${Math.max(0.1, maxD)} step="0.1" value=${Math.min(cur.dur ?? ED_PRZ_D, maxD)}
+          onInput=${(e) => setTr({ dur: +e.target.value }, true)} onChange=${H.commit}/></label>`}
+      <div class="thq-ed-acts">
+        ${act("play", L("Podgląd", "Preview"), podglad)}
+        ${act("copy", L("Do wszystkich cięć", "Apply to all cuts"), doWszystkich, { disabled: p.clips.length < 3 })}
+        ${cur && act("trash", L("Usuń", "Remove"), remove, { bad: true })}
+      </div>
+      <p class="thq-ed-note">${L("Przejście leży na środku cięcia i nie skraca filmu: napisy i muzyka zostają na miejscu.",
+        "The transition sits on the middle of the cut and does not shorten the film: texts and music stay in place.")}</p>`}
+    </div>`;
+  };
 
   const textTools = (x) => {
     const u = (patch, lv) => upd("text", x.id, patch, lv);
@@ -1868,11 +2054,13 @@ function VideoEditor({ path, onClose }) {
   // ---- wspólne elementy: scena, oś czasu
   const stage = html`<div class="thq-ed-fit" ref=${wrapRef}>
     <div class="thq-ed-stage" ref=${stageRef} style=${stageSize}>
-      <canvas ref=${blurRef} class="thq-ed-blur" aria-hidden="true"></canvas>
-      <video ref=${player.vids[0]} class="thq-ed-v" playsinline preload="auto" onError=${codecFallback}></video>
-      <video ref=${player.vids[1]} class="thq-ed-v" playsinline preload="auto" onError=${codecFallback}></video>
+      ${[0, 1].map((k) => html`<div key=${k} ref=${player.layers[k]} class="thq-ed-layer">
+        <canvas ref=${player.blurs[k]} class="thq-ed-blur" aria-hidden="true"></canvas>
+        <video ref=${player.vids[k]} class="thq-ed-v" playsinline preload="auto" onError=${codecFallback}></video>
+        <img ref=${player.imgs[k]} class="thq-ed-v" alt=""/>
+      </div>`)}
+      <canvas ref=${player.pixRef} class="thq-ed-pix" aria-hidden="true"></canvas>
       ${proxying > 0 && html`<p class="thq-ed-codec is-info"><span class="thq-ed-spin is-small"></span> ${L("Przygotowuję podgląd dla tej przeglądarki (kopia WebM na serwerze, raz)…", "Preparing a preview this browser can play (one-time WebM copy)…")}</p>`}
-      <img ref=${player.imgRef} class="thq-ed-v" alt=""/>
       <canvas ref=${overlayRef} class="thq-ed-overlay" onPointerDown=${stagePointer}></canvas>
       ${shot && html`<div class=${cx("thq-ed-shot", shot.a && "is-drag", shot.busy && "is-busy")} onPointerDown=${shot.busy ? null : shotDown}>
         ${shot.a && html`<i style=${{ left: `${Math.min(shot.a.x, shot.b.x) * 100}%`, top: `${Math.min(shot.a.y, shot.b.y) * 100}%`,
@@ -1919,12 +2107,20 @@ function VideoEditor({ path, onClose }) {
         bg = s.c.kind === "image" ? { backgroundImage: `url(${strip.url})`, backgroundSize: "auto 100%", backgroundRepeat: "repeat-x" }
           : { backgroundImage: `url(${strip.url})`, backgroundSize: `${strip.dur / s.c.speed * pps}px 100%`, backgroundPosition: `${-s.c.in / s.c.speed * pps}px 0` };
       }
-      return html`<div key=${s.c.id} class=${cx("thq-ed-item is-clip", sel && sel.id === s.c.id && "is-sel", dragIdx === i && "is-drag")}
+      return html`<div key=${s.c.id} class=${cx("thq-ed-item is-clip", sel && sel.type === "clip" && sel.id === s.c.id && "is-sel", dragIdx === i && "is-drag")}
         style=${{ left: `${s.start * pps}px`, width: `${Math.max(4, wpx)}px`, ...bg }} onPointerDown=${(e) => clipDown(e, s, i)} onClick=${(e) => pick(e, "clip", s.c.id)}>
         <i class="thq-ed-h is-l" onPointerDown=${(e) => clipDown(e, s, i, "l")}></i>
         <span class="thq-ed-cl">${s.c.muted && ED_ICON.mute}${s.c.speed !== 1 ? `${s.c.speed}× · ` : ""}${!s.c.muted && Math.abs((s.c.volume ?? 1) - 1) > 0.01 ? `${fmtDb(s.c.volume)} · ` : ""}${fmtT(s.end - s.start, true)}</span>
         ${s.c.kind !== "image" && volLine("clip", s.c)}
         <i class="thq-ed-h is-r" onPointerDown=${(e) => clipDown(e, s, i, "r")}></i></div>`;
+    })}
+    ${segs.slice(0, -1).map((s, i) => {          // cięcie: okno przejścia (pasek) i przycisk wyboru
+      const tr = trsOsi[i], on = sel && sel.type === "tr" && sel.id === s.c.id;
+      return html`${tr && html`<i key=${`w${s.c.id}`} class="thq-ed-trw" style=${{ left: `${(s.end - tr.d / 2) * pps}px`, width: `${tr.d * pps}px` }}></i>`}
+        <button type="button" key=${`t${s.c.id}`} class=${cx("thq-ed-trb", tr && "is-set", on && "is-sel")} style=${{ left: `${s.end * pps}px` }}
+          onPointerDown=${(e) => e.stopPropagation()} onClick=${(e) => pick(e, "tr", s.c.id)}
+          title=${tr ? `${L("Przejście", "Transition")}: ${trNazwa(tr.type)} · ${fmtSek(tr.d)}` : L("Dodaj przejście", "Add a transition")}
+          aria-label=${tr ? `${L("Przejście", "Transition")}: ${trNazwa(tr.type)}` : L("Dodaj przejście", "Add a transition")}>${tr ? ED_ICON.trans : ED_ICON.plus}</button>`;
     })}
     ${mobile && html`<button type="button" class="thq-ed-addclip" style=${{ left: `${total * pps + 8}px` }} onClick=${(e) => { e.stopPropagation(); setSel(null); setTool("media"); }}
       aria-label=${L("Dodaj klip", "Add clip")}>${ED_ICON.plus}</button>`}
@@ -2000,6 +2196,7 @@ function VideoEditor({ path, onClose }) {
     else if (tool === "speech") { sheet = speechTools(); title = L("Mowa, pauzy i wtrącenia", "Speech, pauses and fillers"); }
     else if (tool === "mark" && markSel) { sheet = markTools(markSel); title = L("Znacznik", "Mark"); }
     else if (tool === "typo" && selItem && sel.type === "typo") { sheet = typoTools(selItem); title = L("Typografia", "Typography"); }
+    else if (tool === "tr" && selItem && sel.type === "tr") { sheet = trTools(selItem); title = L("Przejście", "Transition"); }
     else if (tool === "format") { sheet = formatTools(); title = L("Format", "Format"); }
     else if (tool === "media") { sheet = html`<div class="thq-ed-form">${mediaList(["video", "image"])}${uploadBtn("video/*,image/png,image/jpeg,image/webp")}</div>`; title = L("Dodaj klip", "Add clip"); }
     return html`<div class=${cx("thq-ed is-mobile", sheet && "has-sheet")} role="dialog" aria-modal="true" aria-label=${L("Edytor filmu", "Video editor")}>
@@ -2042,7 +2239,8 @@ function VideoEditor({ path, onClose }) {
           <p><kbd>← →</kbd> ${L("klatka", "frame")}</p>
         </div></div></div>`;
     }
-    return sel.type === "clip" ? clipTools(selItem) : sel.type === "text" ? textTools(selItem) : sel.type === "typo" ? typoTools(selItem) : audioTools(selItem);
+    return sel.type === "clip" ? clipTools(selItem) : sel.type === "tr" ? trTools(selItem) : sel.type === "text" ? textTools(selItem)
+      : sel.type === "typo" ? typoTools(selItem) : audioTools(selItem);
   };
   return html`<div class="thq-ed" role="dialog" aria-modal="true" aria-label=${L("Edytor filmu", "Video editor")}>
     <header class="thq-ed-top">
@@ -2085,7 +2283,7 @@ function VideoEditor({ path, onClose }) {
     <div class="thq-ed-tools">
       <button type="button" class="thq-ed-tool" onClick=${split} title=${`${L("Tnij", "Split")} (S)`}>${ED_ICON.split}<span>${L("Tnij", "Split")}</span></button>
       <button type="button" class="thq-ed-tool" onClick=${addText} title=${`${L("Napis", "Text")} (T)`}>${ED_ICON.text}<span>${L("Napis", "Text")}</span></button>
-      <button type="button" class="thq-ed-tool" disabled=${!sel} onClick=${duplicate} title=${`${L("Duplikuj", "Duplicate")} (Ctrl+D)`}>${ED_ICON.copy}<span>${L("Duplikuj", "Duplicate")}</span></button>
+      <button type="button" class="thq-ed-tool" disabled=${!sel || sel.type === "tr"} onClick=${duplicate} title=${`${L("Duplikuj", "Duplicate")} (Ctrl+D)`}>${ED_ICON.copy}<span>${L("Duplikuj", "Duplicate")}</span></button>
       <button type="button" class="thq-ed-tool" disabled=${!sel || (sel.type === "clip" && p.clips.length <= 1)} onClick=${remove} title=${`${L("Usuń", "Delete")} (Del)`}>${ED_ICON.trash}<span>${L("Usuń", "Delete")}</span></button>
       <span class="thq-ed-grow"></span>
       <button type="button" class="thq-ed-ico is-sm" onClick=${() => setPps((x) => clamp(x / 1.4, 4, 400))} aria-label=${L("Oddal", "Zoom out")} title=${L("Oddal", "Zoom out")}>${ED_ICON.minus}</button>
@@ -2187,7 +2385,9 @@ function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen, notes, addNot
   const open = openNotes(notes);
   const where = sel ? (sel.type === "text" ? `napis „${sel.item.text}” (${fmtT(sel.item.start, true)}–${fmtT(sel.item.end, true)})`
     : sel.type === "typo" ? `blok typografii ${sel.item.id} „${typoTekst(sel.item)}” (${fmtT(sel.item.start, true)}–${fmtT(sel.item.end, true)}${sel.item.warstwa === "tyl" ? ", za osobą" : ""})`
-    : sel.type === "clip" ? `klip ${sel.item.src.split("/").pop()} (${fmtT(sel.item.in, true)}–${fmtT(sel.item.out, true)} źródła)` : `muzyka ${sel.item.src.split("/").pop()}`) : "nic";
+    : sel.type === "clip" ? `klip ${sel.item.src.split("/").pop()} (${fmtT(sel.item.in, true)}–${fmtT(sel.item.out, true)} źródła)`
+    : sel.type === "tr" ? `cięcie po klipie ${sel.item.id} (${sel.item.src.split("/").pop()}), przejście: ${sel.item.transition ? `${sel.item.transition.type}, ${sel.item.transition.dur ?? ED_PRZ_D} s` : "brak"}`
+    : `muzyka ${sel.item.src.split("/").pop()}`) : "nic";
   const text = (ask.text || "").trim();
   const canSend = !ask.busy && (text || open.length || ask.shot);
   const send = async () => {
