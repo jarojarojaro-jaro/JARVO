@@ -159,3 +159,25 @@ def test_uwagi_z_edytora_zamykane_przez_agenta(film, capsys):
     assert next(n for n in proj(film)["notes"] if n["id"] == "n2")["odp"].startswith("odrzucona: ")
     pr.main(["render", str(film)])
     assert "otwarte uwagi" not in capsys.readouterr().out
+
+
+def test_kroj_napisu_z_listy_edytora():
+    """--kroj: nazwa z edytora albo rodzina (bez wielkości liter) → ten sam napis CSS co w ED_FONTS."""
+    lista = pr.kroje_napisow()
+    assert len(lista) >= 70 and lista[0][0].startswith("system-ui")
+    assert pr.kroj_z_nazwy("Bąbelki") == pr.kroj_z_nazwy("rubik bubbles") == "'Rubik Bubbles', Impact, sans-serif"
+    assert pr.kroj_z_nazwy("Poppins") == "'Poppins', Arial, sans-serif" and pr.kroj_z_nazwy(None) is None
+    with pytest.raises(SystemExit, match="nie ma kroju „Comic Sans”"):
+        pr.kroj_z_nazwy("Comic Sans")
+
+
+def test_dodaj_tekst_i_napisy_z_krojem(film):
+    assert pr.main(["dodaj-tekst", str(film), "Zażółć", "--start", "0", "--koniec", "2", "--kroj", "Kanit"]) == 0
+    assert proj(film)["texts"][0]["font"] == "'Kanit', 'Arial Black', sans-serif"
+    ed.speech_path(film).write_text(json.dumps(ed.speech_data([[0.1, 0.5, "Raz"], [0.5, 0.9, "dwa."]], [], 4.0)),
+                                    encoding="utf-8")
+    assert pr.main(["napisy", str(film), "--kroj", "Bungee"]) == 0
+    caps = [x for x in proj(film)["texts"] if x.get("cap")]
+    assert caps and all(x["font"] == "'Bungee', Impact, sans-serif" for x in caps)
+    assert pr.main(["napisy", str(film)]) == 0                     # bez --kroj: krój napisów zostaje
+    assert all(x["font"] == "'Bungee', Impact, sans-serif" for x in proj(film)["texts"] if x.get("cap"))

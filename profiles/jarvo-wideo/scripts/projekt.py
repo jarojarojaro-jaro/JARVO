@@ -7,11 +7,11 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
 
     projekt.py pokaz <film>                        # co jest na osi (klipy, napisy, audio, długość)
     projekt.py dodaj-audio <film> <plik> [--start S] [--od S] [--do S] [--glosnosc 0.8] [--wycisz-film]
-    projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain]
+    projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain] [--kroj Poppins]
                                            [--y 0.78] [--rozmiar 72] [--kolor #FFFFFF] [--tlo #000000]
     projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--rozmyte|--dopasuj|--wypelnij --fx X --fy Y --zoom Z]
     projekt.py kadr <film> <id> [--rozmyte|--dopasuj|--wypelnij] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
-    projekt.py napisy <film> [--srt plik.srt] [--karaoke [#FFE14D]]   # napisy ze słów (<źródło>.mowa.json) albo SRT
+    projekt.py napisy <film> [--srt plik.srt] [--karaoke [#FFE14D]] [--kroj Kanit]   # napisy ze słów (<źródło>.mowa.json) albo SRT
     projekt.py usun <film> <id>                    # usuń klip / tekst / audio o danym id (z `pokaz`)
     projekt.py uwaga <film> <id> (--zrobione "co zmieniłem" | --odrzuc "dlaczego")   # zamknij uwagę z osi edytora
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
@@ -32,6 +32,7 @@ import argparse
 import base64
 import contextlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -193,6 +194,26 @@ def cmd_dodaj_audio(film: Path, a) -> int:
     return 0
 
 
+def kroje_napisow() -> list[tuple[str, str, str]]:
+    """Kroje zwykłych napisów z listy edytora (ED_FONTS w 44-napisy.js): (rodzina CSS, nazwa, grupa)."""
+    js = NAPISY_JS.read_text(encoding="utf-8") if NAPISY_JS else ""
+    lista = js[js.find("const ED_FONTS"):js.find("];", js.find("const ED_FONTS"))]
+    return re.findall(r'\[\s*"([^"]+)", "([^"]+)", "(\w+)", \d+, \d+\]', lista)
+
+
+def kroj_z_nazwy(nazwa: str | None) -> str | None:
+    """--kroj: nazwa z edytora („Bąbelki”) albo rodzina („Rubik Bubbles”), bez wielkości liter → rodzina CSS z listy
+    (ta sama co w edytorze, więc grubość i podgląd się zgadzają)."""
+    if nazwa is None:
+        return None
+    lista = kroje_napisow()
+    n = nazwa.strip().strip("'\"").casefold()
+    for css, nazwa_ed, _g in lista:
+        if n in (nazwa_ed.casefold(), css.split(",")[0].strip("'\" ").casefold()):
+            return css
+    raise SystemExit(f"nie ma kroju „{nazwa}”; są: {', '.join(n for _c, n, _g in lista)}")
+
+
 def cmd_dodaj_tekst(film: Path, a) -> int:
     proj = load(film)
     t = total(proj)
@@ -200,7 +221,7 @@ def cmd_dodaj_tekst(film: Path, a) -> int:
         raise SystemExit(f"zły czas napisu (film ma {t:.2f} s)")
     base = CAP_DEFAULT if a.napis else TEXT_DEFAULT
     x = {**base, **pion(proj), "id": new_id("t"), "text": a.tekst, "start": a.start, "end": min(a.koniec, t)}
-    for k, v in (("style", a.styl), ("y", a.y), ("size", a.rozmiar), ("color", a.kolor), ("bg", a.tlo)):
+    for k, v in (("style", a.styl), ("y", a.y), ("size", a.rozmiar), ("color", a.kolor), ("bg", a.tlo), ("font", kroj_z_nazwy(a.kroj))):
         if v is not None:
             x[k] = v
     if a.napis:
@@ -302,6 +323,8 @@ def cmd_napisy(film: Path, a) -> int:
     look = {k: old[k] for k in ("x", "y", "size", "color", "bg", "style", "font", "bold", "maxw", "hl") if old and k in old}
     if a.karaoke is not None:
         look["hl"] = a.karaoke or KARAOKE_HL
+    if a.kroj is not None:
+        look["font"] = kroj_z_nazwy(a.kroj)
     proj["texts"] = [x for x in proj.get("texts") or [] if not x.get("cap")] + [
         {**CAP_DEFAULT, **pion(proj), **look, "id": new_id("t"), "cap": True, "start": k["start"], "end": min(k["end"], t), "text": k["text"],
          **({"words": k["words"]} if k.get("words") else {})}
@@ -346,10 +369,22 @@ def ensure_playwright() -> None:
     nz.wymagaj_playwright(__file__, "JARVO_PROJEKT_REEXEC", "napisy renderuje przeglądarka")
 
 
+# rodziny krojów, których użyją napisy i typografia projektów (ta sama funkcja wyboru kroju co przy rysowaniu)
+RODZINY_JS = """(plany) => {
+    const out = new Set(), rodzina = (f) => (f.match(/px (.*)$/) || [0, f])[1].split(",")[0].trim().replace(/^['"]|['"]$/g, "");
+    for (const P of plany) {
+        for (const t of P.texts || []) out.add(rodzina(textFont(t, 1920, 1080).font));
+        if (P.typo && typeof typoFonty === "function") for (const [f] of typoFonty(P, 1080, 1920)) out.add(rodzina(f));
+    }
+    return [...out];
+}"""
+
+
 @contextlib.contextmanager
-def strona():
+def strona(plany: list[dict] | None = None):
     """Przeglądarka bez okna z krojami edytora (lokalnie) i jego rendererami: napisy (44-napisy.js) i typografia
-    (48-typografia.js). Jedno uruchomienie na cały render."""
+    (48-typografia.js). Jedno uruchomienie na cały render. `plany` = projekty ({texts, typo}) do narysowania:
+    strona dostaje tylko ich kroje (bez listy wszystkie, kilka MB)."""
     if NAPISY_JS is None:
         raise SystemExit("brak edytor_napisy.js obok skryptu (przebuduj profil)")
     ensure_playwright()
@@ -363,12 +398,13 @@ def strona():
         browser = p.chromium.launch(**({"executable_path": exe} if exe else {}))
         page = browser.new_page()
         page.set_content("<!doctype html><meta charset=utf-8><body></body>")
-        kroje = ed.kroje_css(KROJE)   # te same pliki krojów co edytor HQ (lokalnie, bez sieci)
-        if kroje:
-            page.add_style_tag(content=kroje)
         page.add_script_tag(content=NAPISY_JS.read_text(encoding="utf-8"))
         if TYPO_JS is not None:
             page.add_script_tag(content=TYPO_JS.read_text(encoding="utf-8"))
+        rodziny = set(page.evaluate(RODZINY_JS, plany)) if plany is not None else None
+        kroje = ed.kroje_css(KROJE, rodziny)   # te same pliki krojów co edytor HQ (lokalnie, bez sieci)
+        if kroje:
+            page.add_style_tag(content=kroje)
         try:
             yield page
         finally:
@@ -387,7 +423,7 @@ def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path,
     if not texts:
         return []
     if page is None:
-        with strona() as pg:
+        with strona([{"texts": texts}]) as pg:
             return text_pngs(texts, W, H, out_dir, hi, pg)
     hi = hi or [-1] * len(texts)
     paths = []
@@ -490,7 +526,8 @@ def arkusz_typografii(proj: dict, plan: dict, chwile: list[float], out: Path, fi
     W, H = even(cv["w"] * k), even(cv["h"] * k)
     idx = ed.maska_indeks(film, proj) if film else None
     kafle = [(chwile[0], podpis, q) for podpis, q in warianty] if warianty else [(t, None, None) for t in chwile]
-    with tempfile.TemporaryDirectory(prefix="typo-arkusz-") as tmp, strona() as page:
+    plany = [{"typo": q} for q in ([plan] + [q for _p, q in warianty or []])]
+    with tempfile.TemporaryDirectory(prefix="typo-arkusz-") as tmp, strona(plany) as page:
         kadry, obrazy = [], {}
         for t, podpis, q in kafle:
             if t not in obrazy:                     # ta sama chwila w kilku wariantach: jedna klatka filmu
@@ -522,7 +559,7 @@ def cmd_render(film: Path, a) -> int:
                                           for j in range(len(texts[x["i"]]["words"]))]
         allp, typo = [], {}
         if jobs or p["typo"]["bloki"]:
-            with strona() as page:
+            with strona([{"texts": [t for t, _ in jobs], "typo": p["typo"]}]) as page:
                 allp = text_pngs([t for t, _ in jobs], W, H, Path(tmp), [j for _, j in jobs], page=page)
                 typo = typo_warstwy(p["typo"], W, H, p["canvas"]["fps"], p["duration"], Path(tmp), page)
         pngs, rest = allp[:len(kept)], iter(allp[len(kept):])
@@ -572,6 +609,7 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--kolor")
     sp.add_argument("--tlo", help="kolor tła (styl box) albo obrysu (outline)")
     sp.add_argument("--napis", action="store_true", help="napis (wspólny styl napisów w edytorze)")
+    sp.add_argument("--kroj", help="krój z listy edytora: nazwa („Bąbelki”) albo rodzina („Rubik Bubbles”)")
     sp = film_cmd("dodaj-klip", cmd_dodaj_klip, "klip albo plansza na ścieżce głównej")
     sp.add_argument("plik")
     sp.add_argument("--od", type=float)
@@ -595,6 +633,7 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--srt")
     sp.add_argument("--karaoke", nargs="?", const="", metavar="KOLOR",
                     help="aktywne słowo w kolorze (domyślnie żółty); tylko napisy ze słów, nie z SRT")
+    sp.add_argument("--kroj", help="krój napisów z listy edytora: nazwa albo rodzina")
     film_cmd("usun", cmd_usun, "usuń element po id").add_argument("id")
     sp = film_cmd("uwaga", cmd_uwaga, "zamknij uwagę z osi edytora")
     sp.add_argument("id")

@@ -1619,7 +1619,18 @@ function VideoEditor({ path, onClose }) {
   // ---- panele narzędzi (te same na komputerze i telefonie)
   const seg = (items, cur, set) => html`<div class="thq-ed-seg">${items.map(([k2, label]) => html`<button type="button" key=${k2} class=${cx(cur === k2 && "is-on")} onClick=${() => set(k2)}>${label}</button>`)}</div>`;
   // kroje: siatka z nazwą pisaną danym krojem (lista ED_FONTS w 44-napisy.js, pliki lokalnie w fonts/kroje)
-  const fontPick = (cur, set) => html`<div class="thq-ed-fonts">${ED_FONTS.map(([f, n]) => html`<button type="button" key=${f} class=${cx(cur === f && "is-on")} style=${{ fontFamily: f }} onClick=${() => set(f)}>${n}</button>`)}</div>`;
+  // z nagłówkami grup jak siatka krojów typografii (TYPO_KROJE_GRUPY w 48-typografia.js); pole przewija się samo
+  // do wybranego kroju przy pierwszym pokazaniu
+  const fontBox = (el) => {
+    if (!el || el.dataset.przewiniete) return;
+    el.dataset.przewiniete = "1";
+    const on = el.querySelector(".is-on");
+    if (on) el.scrollTop = Math.max(0, on.offsetTop - el.clientHeight / 2 + on.offsetHeight / 2);
+  };
+  const fontPick = (cur, set) => html`<div class="thq-ed-fonts" ref=${fontBox}>${ED_FONTS.map(([f, n, g, waga], i) => {
+    const btn = html`<button type="button" key=${f} class=${cx(cur === f && "is-on")} style=${{ fontFamily: f, fontWeight: waga }} onClick=${() => set(f)}>${n}</button>`;
+    return i === 0 || g !== ED_FONTS[i - 1][2] ? [html`<span key=${`g${g}`} class="thq-ed-fonts-gr">${L(...(g === "systemowe" ? ["Systemowe", "System"] : TYPO_KROJE_GRUPY[g]))}</span>`, btn] : btn;
+  })}</div>`;
   // pal: kolory palety filmu (typografia) w osobnym rzędzie nad stałymi kolorami
   const swatches = (cur, set, pal) => html`${(pal || []).length > 0 && html`<div class="thq-ed-sw is-pal">${pal.map((c) => html`<button type="button" key=${c}
     class=${cx(String(cur).toLowerCase() === c.toLowerCase() && "is-on")} style=${{ background: c }} onClick=${() => set(c)} aria-label=${c}
@@ -1665,7 +1676,7 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Kolor", "Color")}${swatches(x.color, (v, lv) => u({ color: v }, lv))}</label>
       ${(x.style === "box" || x.style === "outline") && html`<label>${x.style === "box" ? L("Tło", "Box") : L("Obrys", "Outline")}${swatches(x.bg || "#000000", (v, lv) => u({ bg: v }, lv))}</label>`}
       <label>${L("Rozmiar", "Size")} · ${Math.round(x.size)}<input type="range" min="16" max="220" value=${x.size} onInput=${(e) => u({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
-      <label>${L("Krój", "Font")}${fontPick(x.font, (v) => u({ font: v }))}</label>
+      <div class="thq-ed-field"><span>${L("Krój", "Font")}</span>${fontPick(x.font, (v) => u({ font: v }))}</div>
       <div class="thq-ed-row">
         ${seg([["left", ED_ICON.alignL], ["center", ED_ICON.alignC], ["right", ED_ICON.alignR]], x.align, (v) => u({ align: v }))}
         <label class="thq-ed-check"><input type="checkbox" checked=${x.bold !== false} onChange=${(e) => u({ bold: e.target.checked })}/> ${L("Gruby", "Bold")}</label>
@@ -1762,12 +1773,12 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Waga słowa", "Word weight")}${seg(TYPO_WAGI_NAZWY.map(([pl, en], k2) => [k2, L(pl, en)]), wyg.waga, (v) => su({ waga: v }))}</label>
       <label>${L("Kolor", "Color")}${swatches(wyg.kolor, (v, lv) => su({ kolor: v }, lv), (p.typo || {}).paleta)}</label>
       ${w.kolor && html`<button type="button" class="thq-ed-btn is-wide" onClick=${() => su({ kolor: undefined })}>${ED_ICON.reset} ${L("Kolor z motywu (akcent tylko na uderzeniu)", "Theme color (accent only on the hit)")}</button>`}
-      <label>${L("Krój", "Font")}<div class="thq-ed-fonts">${[["", auto, ""], ...Object.entries(TYPO_KROJE).map(([k2, f]) => [k2, f[3], f[4]])].map(([k2, n, g], i, all) => {
+      <div class="thq-ed-field"><span>${L("Krój", "Font")}</span><div class="thq-ed-fonts" ref=${fontBox}>${[["", auto, ""], ...Object.entries(TYPO_KROJE).map(([k2, f]) => [k2, f[3], f[4]])].map(([k2, n, g], i, all) => {
         const f = k2 && TYPO_KROJE[k2];
         const btn = html`<button type="button" key=${k2 || "auto"} class=${cx((w.kroj || "") === k2 && "is-on")} onClick=${() => su({ kroj: k2 || undefined })}
           style=${f ? { fontFamily: f[0], fontWeight: f[1], fontStyle: f[2] ? "italic" : "normal" } : {}}>${n}</button>`;
         return g && g !== all[i - 1][2] ? [html`<span key=${`g${g}`} class="thq-ed-fonts-gr">${L(...TYPO_KROJE_GRUPY[g])}</span>`, btn] : btn;
-      })}</div></label>
+      })}</div></div>
       <label>${L("Styl", "Style")}${seg([["", auto], ...TYPO_STYLE.map((k2) => [k2, L(...TYPO_STYLE_NAZWY[k2])])], w.styl || "", (v) => su({ styl: v || undefined }))}</label>
       <label>${L("Głębia słowa", "Word depth")}${seg([[-1, L("Dalej", "Back")], [0, L("Zwykła", "Normal")], [1, L("Bliżej", "Front")]], wyg.glebia, (v) => su({ glebia: v || undefined }))}</label>
       <label>${L("Wielkie litery", "Capitals")}${seg([["", auto], ["tak", "AA"], ["nie", "Aa"]], w.wielkie === true ? "tak" : w.wielkie === false ? "nie" : "", (v) => su({ wielkie: v === "tak" ? true : v === "nie" ? false : undefined }))}</label>

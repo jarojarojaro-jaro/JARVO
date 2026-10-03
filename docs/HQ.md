@@ -133,15 +133,19 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i okno **◐ Animacja** nie biorą wyglądu z motywu dashboardu: „tarcza” w `style.css` cofa to, co motyw Fosfor
   wymusza (`!important` na zaokrągleniach i tle pól, poświata tekstu, wyłączone animacje).
 - **Napisy** rysuje jedna funkcja na kanwie: w podglądzie i przy eksporcie (PNG na napis nakładany przez ffmpeg),
-  więc plik wygląda jak podgląd, łącznie z krojem. **Kroje** napisów (19 rodzin OFL: Bricolage Grotesque, Montserrat,
-  Unbounded, Anton, Bebas Neue, Barlow Condensed, Oswald, Titan One, Baloo 2, Playfair Display, Instrument Serif,
-  Caveat, Pacifico, Shrikhand, Bangers, Tilt Neon, Rubik Dirt, Space Grotesk, JetBrains Mono; latin + latin-ext,
-  a test czyta mapę znaków każdego pliku i sprawdza „ąćęłńóśźż”; w panelu typografii pogrupowane: mocne, wąskie,
-  okrągłe, szeryfowe, odręczne, ozdobne, techniczne) leżą lokalnie
-  w `hq/web/fonts/kroje/` (`kroje.css`, sumy SHA-256 w `sumy.json`, wersje w `scripts/kroje.py`; `kroje.py sprawdz`
-  w testach). Panel tekstu pokazuje je siatką z nazwą pisaną danym krojem. Krój wczytuje się razem z tekstem napisu
-  (`fontLoad`), więc polskie znaki nie spadają na krój zastępczy; render agenta wstawia te same pliki jako data: URL
-  (`edytor.kroje_css`), bez Google Fonts.
+  więc plik wygląda jak podgląd, łącznie z krojem. **Kroje** napisów i typografii: 68 rodzin OFL (lista w
+  `scripts/kroje.py`, m.in. Montserrat, Poppins, Inter, Kanit, Anton, Bebas Neue, Teko, Titan One, Nunito, Playfair
+  Display, Bodoni Moda, Lobster, Dancing Script, Bangers, Bungee, Monoton, Press Start 2P, Rubik Bubbles, Space Mono;
+  latin + latin-ext, a test czyta mapę znaków każdego pliku i sprawdza „ąćęłńóśźż”; kroje bez polskich znaków albo
+  bez licencji OFL odpadają przy dodawaniu) leżą lokalnie w `hq/web/fonts/kroje/` (`kroje.css`, sumy SHA-256
+  w `sumy.json`, wersje w `scripts/kroje.py`; `kroje.py sprawdz` w testach). Każdy jest do wyboru w panelu tekstu
+  (`ED_FONTS` w `44-napisy.js`: 70 pozycji z dwoma systemowymi) i w panelu słowa typografii (`TYPO_KROJE`), w obu
+  przewijanym polem z nagłówkami grup (systemowe, mocne, wąskie, okrągłe, szeryfowe, odręczne, ozdobne, techniczne)
+  i nazwą pisaną danym krojem; pole samo przewija się do wybranego kroju. Lista napisów zna grubości plików
+  (pogrubiony i zwykły), więc krój z jedną grubością nie jest sztucznie pogrubiany. Krój wczytuje się razem
+  z tekstem napisu (`fontLoad`), więc polskie znaki nie spadają na krój zastępczy; render agenta wstawia te same
+  pliki jako data: URL (`edytor.kroje_css`), tylko kroje użyte w projekcie (`projekt.strona` liczy je funkcją
+  rysującą; wszystkie to kilka MB i sekunda dłuższy start), bez Google Fonts.
 - **Typografia** jak z montażu (słowo po słowie: różne wielkości, kroje, kolory, głębia, skos, perspektywa 3D): plan
   w projekcie (`typo`: motyw, akcent, paleta i bloki z układem, kotwicą, obrotem, perspektywą, warstwą, wejściem i wyjściem;
   słowa z czasem, wagą 0–3, linią, głębią, krojem, kolorem, stylem i znacznikiem płytki) rysuje jeden renderer

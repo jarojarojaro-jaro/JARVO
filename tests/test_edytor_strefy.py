@@ -53,7 +53,7 @@ def test_agent_stawia_tekst_nad_opisem_w_pionie(tmp_path, monkeypatch):
         monkeypatch.setattr(pr, "load", lambda f, proj=proj: proj)
         monkeypatch.setattr(pr, "save", lambda f, p: zapis.update(p=p))
         a = type("A", (), {"tekst": "Hej", "start": 1.0, "koniec": 3.0, "napis": False, "styl": None, "y": None,
-                           "rozmiar": None, "kolor": None, "tlo": None})()
+                           "rozmiar": None, "kolor": None, "tlo": None, "kroj": None})()
         pr.cmd_dodaj_tekst(film, a)
         assert zapis["p"]["texts"][0]["y"] == y
     assert "const ED_PION = { y: 0.68, maxw: 0.74 };" in JS and pr.PION == {"y": 0.68, "maxw": 0.74}   # edytor = agent

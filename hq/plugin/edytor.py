@@ -39,10 +39,16 @@ TYPO_UKLADY = ("kolumna", "schodki", "srodek", "skos", "3d", "za", "rozrzut")
 TYPO_WEJSCIA = ("ciecie", "pop", "kontur", "maska", "pisanie", "zjazd")
 TYPO_WYJSCIA = ("ciecie", "zanik", "smuga")
 TYPO_STYLE = ("wypelnij", "kontur", "3d", "blask", "tlo", "obrys")
-TYPO_KROJE = ("bricolage", "bricolageL", "montserrat", "montserratI", "montserratL", "unbounded", "unboundedL", "anton",
-              "bebas", "barlow", "barlowI", "barlowL", "oswald", "titan", "baloo", "balooL", "playfair", "playfairI",
-              "instrument", "instrumentI", "caveat", "pacifico", "shrikhand", "bangers", "neon", "grunge", "space",
-              "spaceL", "mono")   # te same klucze co TYPO_KROJE w 48-typografia.js
+TYPO_KROJE = ("bricolage", "bricolageL", "montserrat", "montserratI", "montserratL", "unbounded", "unboundedL",
+              "poppins", "poppinsL", "inter", "interL", "archivo", "rubik", "spartan", "kanit", "kanitI", "outfit",
+              "syne", "raleway", "anton", "bebas", "barlow", "barlowI", "barlowL", "oswald", "teko", "fjalla",
+              "staatliches", "shoulders", "saira", "titan", "baloo", "balooL", "nunito", "paytone", "dynapuff",
+              "coiny", "grandstander", "playfair", "playfairI", "instrument", "instrumentI", "abril", "dmserif",
+              "dmserifI", "lora", "bodoni", "cormorant", "cormorantI", "fraunces", "alfaslab", "yeseva", "caveat",
+              "pacifico", "dancing", "lobster", "kaushan", "greatvibes", "amatic", "brush", "patrick", "graffiti",
+              "shrikhand", "bangers", "neon", "grunge", "righteous", "bungee", "monoton", "pixel", "glitch",
+              "bubbles", "russo", "blackops", "sigmar", "rammetto", "space", "spaceL", "mono", "audiowide", "chakra",
+              "spaceMono", "majorMono")   # te same klucze co TYPO_KROJE w 48-typografia.js
 MAX_AUDIO = 12
 MAX_WORDS = 40           # słów w jednym napisie karaoke (linia napisu ma ich 2–8)
 MAX_DURATION = 3 * 3600.0
@@ -660,20 +666,25 @@ def stt_bin() -> str | None:
     return shutil.which("jarvo-stt") or ("/opt/jarvo/bin/jarvo-stt" if Path("/opt/jarvo/bin/jarvo-stt").exists() else None)
 
 
-def kroje_css(root: Path | None) -> str:
+def kroje_css(root: Path | None, rodziny: set[str] | None = None) -> str:
     """kroje.css z plikami wstawionymi jako data: URL (przeglądarka bez okna nie sięga do plików ani do sieci).
-    `root` = katalog kroje/ (hq/web/fonts/kroje w repo, scripts/kroje w profilu Wideografa); brak = pusty CSS."""
+    `root` = katalog kroje/ (hq/web/fonts/kroje w repo, scripts/kroje w profilu Wideografa); brak = pusty CSS.
+    `rodziny` = tylko te kroje (render wstawia te, których projekt używa: wszystkie to kilka MB i sekunda startu)."""
     import base64
     if not root or not (Path(root) / "kroje.css").is_file():
         return ""
     root = Path(root)
+    css = (root / "kroje.css").read_text(encoding="utf-8")
+    if rodziny is not None:
+        css = "\n".join(r for r in css.splitlines() if not r.startswith("@font-face")
+                        or (m := re.search(r'font-family: "([^"]+)"', r)) and m.group(1) in rodziny) + "\n"
 
     def inline(m: re.Match) -> str:
         f = root / m.group(1)
         if f.suffix != ".woff2" or f.parent != root or not f.is_file():
             return m.group(0)
         return f"url(data:font/woff2;base64,{base64.b64encode(f.read_bytes()).decode()})"
-    return re.sub(r"url\(([\w.-]+)\)", inline, (root / "kroje.css").read_text(encoding="utf-8"))
+    return re.sub(r"url\(([\w.-]+)\)", inline, css)
 
 
 def tools() -> dict:
