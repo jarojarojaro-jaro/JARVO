@@ -363,7 +363,7 @@ def ciecia(film: Path, katalog: Path, czasy: list[float] | None = None, projekt:
     except ImportError:
         raise SystemExit("✗ brak Pillow: uruchom python3 z venv Hermesa (/opt/hermes/.venv/bin/python3)")
     dl, fps = wl.duration(film), eval_fps(film)
-    slowa, uwaga_filmu = [], None
+    slowa, uwaga_filmu, info = [], None, None
     if not czasy and not projekt and film.with_name(f"{film.stem}.edycja.json").is_file():
         projekt = film                                   # rolka clipmakera: projekt leży obok filmu
     if czasy:
@@ -381,6 +381,8 @@ def ciecia(film: Path, katalog: Path, czasy: list[float] | None = None, projekt:
             uwaga_filmu = f"film trwa {dl:.2f} s, a projekt {dl_proj:.2f} s: wyrenderuj projekt ponownie albo podaj właściwy film"
     else:
         lista, zrodlo = [{"t": t} for t in sceny(film, prog_sceny)], "zmiany ujęcia w obrazie"
+        info = ("filtr scene widzi zmiany ujęcia, nie cięcia w tym samym ujęciu (montaż mowy): takie podaj przez --czasy "
+                "(lista „ciecia” z montaz.py) albo --projekt")
     if slowa_plik:
         slowa = wczytaj_slowa(slowa_plik)
     a = pcm(film)
@@ -426,6 +428,7 @@ def ciecia(film: Path, katalog: Path, czasy: list[float] | None = None, projekt:
     problemy = sum(len(c["problemy"]) for c in wyniki)
     return {"film": str(film), "zrodlo_ciec": zrodlo, "ciec": len(lista), "katalog": str(katalog), "ciecia": wyniki,
             "problemy": problemy, "uwagi": sum(len(c["uwagi"]) for c in wyniki), **({"uwaga": uwaga_filmu} if uwaga_filmu else {}),
+            **({"info": info} if info else {}),
             "ok": problemy == 0 and not uwaga_filmu,
             "obejrzyj": "każdy obraz przez vision_analyze: przeskok w pół gestu, czarna albo pusta klatka, tekst zasłonięty "
                         "albo urwany na cięciu, kolec fali na czerwonej linii (trzask), słowo przecięte linią"}
