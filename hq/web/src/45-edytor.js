@@ -1920,7 +1920,12 @@ function VideoEditor({ path, onClose }) {
     try {
       const r = await api.editKolorAuto(c.src, c.in, c.out);
       if (!r || r.detail || r.error) throw new Error((r && (r.detail || r.error)) || "Auto");
-      upd("clip", c.id, { color: kolorNorm(r.color || {}) || undefined });
+      // jak projekt.py kolor --auto: styl zostaje, suwaki z pomiaru
+      const auto = kolorNorm(r.color || {}) || {};
+      upd("clip", c.id, (x) => ({ color: kolorNorm({ look: (x.color || {}).look, ...auto }) || undefined }));
+      const zm = ED_KOLOR_SUWAKI.filter(([k]) => auto[k]).map(([k, pl, en]) => `${L(pl, en).toLowerCase()} ${auto[k] > 0 ? "+" : ""}${auto[k]}`);
+      setToast(zm.length ? `Auto: ${zm.join(", ")}` : L("Auto: obraz jest dobrze naświetlony, suwaki bez korekty.", "Auto: the image is well exposed, sliders left at zero."));
+      setTimeout(() => setToast(""), 6000);
     } catch (e) { alert(e.message || String(e)); }
     finally { setKolorBusy(false); }
   }

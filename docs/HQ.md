@@ -254,7 +254,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   styl koloru z próbką (Naturalny, Ciepły, Chłodny, Kinowy, Żywy, Czarno-biały, Wyblakły) i cztery suwaki −100…100:
   **Jasność**, **Kontrast**, **Nasycenie**, **Temperatura**. Styl ustawia suwaki, potem można je przesuwać. **Auto**
   mierzy klatki klipu na serwerze (`signalstats`) i delikatnie poprawia ciemny, płaski albo wyblakły obraz (najwyżej
-  ±30, bez przesuwania barwy; za `auto_grade` z browser-use/video-use). **Na wszystkie klipy** daje jeden kolor całemu
+  ±30, bez przesuwania barwy; za `auto_grade` z browser-use/video-use); styl zostaje, Auto ustawia suwaki i mówi, co zmienił. **Na wszystkie klipy** daje jeden kolor całemu
   filmowi. Przepis jest jeden: krzywa każdego kanału w pięciu punktach i macierz nasycenia. Podgląd rysuje go filtrem
   SVG na warstwie klipu (`hq/web/src/49-kolor.js`, obejmuje rozmyte tło, osobę nad napisem i kadr dla Wideografa),
   eksport tymi samymi liczbami w `lutrgb` i `colorchannelmixer` (`edytor.kolor_filter`), a test porównuje oba
