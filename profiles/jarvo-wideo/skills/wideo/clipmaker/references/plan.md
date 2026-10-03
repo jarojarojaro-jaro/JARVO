@@ -48,5 +48,10 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
 | `rolki[].taktyka` | taktyka hooka ze skilla `hooki` (np. „pod prąd”, „historia od środka”); trafia do KLIPY.md | — |
 | `rolki[].oceny` | 6 osi z master promptu | — |
 
+**Granice segmentów.** `od` albo `do` w środku słowa `zbuduj` dosuwa do przerwy obok (słowo zostaje, gdy jego środek
+jest w segmencie; zapas ciszy to połowa przerwy, najwyżej 0,35 s przed i 0,45 s po słowie). Plan zostaje bez zmian,
+a czasy po dosunięciu są w projekcie (`clipmaker.granice`) i w KLIPY.md. `sprawdz` ostrzega też, gdy dwie rolki
+dzielą ponad 20% materiału źródła albo gdy przy nagraniu ≥ 10 min wszystkie (≥ 3) rolki są z jednej połowy.
+
 Poprawka po zbudowaniu: zmień plan i `klipy.py zbuduj plan.json --tylko <slug>`. Rolka zmieniona już w edytorze HQ
 → `projekt.py` na jej projekcie (zbuduj nie nadpisze pracy człowieka bez `--nadpisz`).

@@ -7,6 +7,14 @@ przewija szybko i decyduje w 1–2 sekundy. Rolka ma sens sama w sobie albo nie 
 Przeczytaj całą transkrypcję i wypisz **mapę tematów**: temat · od–do · o czym (jedno zdanie). Dopiero z mapy
 wybierasz kandydatów, żeby rolki pokryły różne wątki, a nie pięć razy ten sam.
 
+**Ocena okien.** Transkrypcja jest pocięta na okna ~90 s (`## Okno N`). **Każde** okno dostaje ocenę 0–100 i jedno
+zdanie, także słabe (nie pomijasz ich, tylko piszesz, że są słabe). Główne kryterium to **test 2 sekund**: czy
+pierwsze 2 s najlepszego momentu w oknie zatrzymają widza, który nie widział nic więcej? Używasz całej skali:
+w zwykłym nagraniu większość okien to nie rolka, więc 70+ tylko dla okien, które przechodzą test, a powitania,
+organizacyjne, dygresje i pożegnania poniżej 30, nawet przy ciekawym temacie. Kandydatów szukasz w najwyżej
+ocenionych oknach **z całego nagrania**: długie nagranie czyta się nierówno i łatwo wybrać wszystko z początku
+(`klipy.py sprawdz` ostrzega, gdy wszystkie rolki są z jednej połowy).
+
 ## 2. Czego szukasz (typy momentów)
 | Typ | Rozpoznasz po | Przykład hooka |
 |---|---|---|
@@ -32,18 +40,27 @@ emocja → świadek, riposta → pytanie / domyślna odpowiedź. Wypowiedź z ko
   - **tytuł-hook** na ekranie **nie powtarza** zdania mówionego: dokłada stawkę, wywołuje odbiorcę albo nazywa
     konflikt (mówca: „Trzy błędy w cenach…” → tytuł „Tracisz marżę?”, nie „3 błędy w cenach”).
     `klipy.py sprawdz` ostrzega, gdy tytuł powtarza pierwsze sekundy mowy.
+  **O tym momencie, nie o całym filmie:** tytuł-hook i opis nazywają konkret, który dzieje się w tej rolce
+  (narzędzie, liczba, teza, imię, czynność). Tytuł, który pasowałby do każdej rolki z tego nagrania („Jak
+  rozwinąć firmę”), jest zły; nie ma czego nazwać → zacytuj najmocniejsze zdanie rolki zamiast streszczać temat.
   Każdemu kandydatowi nadajesz **taktykę** z tabeli 18 taktyk (`taktyka` w planie); wśród wybranych rolek ≥ 3 różne.
   Najlepsze zdanie jest w środku fragmentu? Wolno zacząć od niego (segment 1 = to zdanie, segment 2 = rozwinięcie),
   **jeśli sens się nie zmienia** i oba segmenty są z tego samego wątku.
 - **Środek:** konkret (liczba, przykład, obraz), jedna myśl. Pierwsze ~15 s rozwija przesłankę hooka
   (widz zatrzymany na „przestałem wysyłać raporty” zostaje dla „dlaczego”), a nie skacze do innego wątku. Dygresje wycinasz segmentami (do 3 segmentów).
+- **Samodzielność:** rolka zaczyna się od zaimka, „to”, „więc” albo od odpowiedzi na pytanie zadane wcześniej →
+  przesuń **początek wcześniej**, tam gdzie myśl się zaczyna, albo odpuść kandydata. Nigdy nie naprawiasz tego
+  ucinaniem puenty: rolka, która straciła puentę, żeby zmieścić kontekst, jest gorsza od obu.
 - **Koniec:** puenta, wniosek albo zdanie domykające; nigdy urwane w pół zdania. Świetnie, gdy koniec zachęca do
   obejrzenia jeszcze raz albo do komentarza.
 - **Długość:** 20–60 s; domyślnie 25–45 s. Krócej, gdy myśl jest skończona; dłużej tylko przy historii, która trzyma.
 
 ### Cięcia (rzemiosło)
 - **Nigdy w środku słowa.** `od` i `do` segmentu stawiasz w przerwie między słowami (czasy słów są w `nagranie.mowa.json`);
-  `klipy.py sprawdz` ostrzega „tnie słowo”.
+  `klipy.py sprawdz` ostrzega „tnie słowo” i mówi, dokąd `zbuduj` dosunie granicę: do przerwy obok słowa (słowo
+  zostaje, gdy większa jego część jest w segmencie; zapas to połowa przerwy, najwyżej 0,35 s przed i 0,45 s po).
+  Dosunięcie może dodać albo zabrać słowo, więc sprawdzasz, czy zdanie dalej się zgadza; prawdziwe czasy rolki są
+  w KLIPY.md.
 - **Zapas na krawędziach 30–200 ms:** czasy słów z rozpoznawania mowy pływają o kilkadziesiąt milisekund, więc cięcie
   tuż przy słowie ucina jego początek albo końcówkę. Skrypt sam zostawia ~80 ms przed pierwszym słowem, ~250 ms po
   ostatnim i ~120 ms oddechu po wyciętej pauzie; ręcznie przesuwasz krawędź, gdy słychać ucięcie (szybkie tempo: bliżej
@@ -62,7 +79,9 @@ emocja → świadek, riposta → pytanie / domyślna odpowiedź. Wypowiedź z ko
 | udostępnienie | „wyślę to komuś” | może ktoś skomentuje | nikt nie podzieli się |
 
 Do rolki trafia kandydat ze **średnią ≥ 7 i hookiem ≥ 7**. Za mało takich? Oddaj mniej rolek i napisz dlaczego
-(nie naciągaj ocen). Wśród wybranych: różne tematy i typy; dwie rolki nie dzielą więcej niż ~20% czasu.
+(nie naciągaj ocen). Wśród wybranych: różne tematy i typy, żadne dwie nie robią tej samej puenty ani nie
+opowiadają tej samej historii; dwie rolki nie dzielą więcej niż ~20% czasu (`sprawdz` to liczy; wyjątek: świadome
+wersje A/B, opisane w KANDYDACI.md).
 
 ## 5. Uczciwość (twarde)
 - Nie wycinasz tak, żeby zmienić sens: ironia, cytat cudzego poglądu („niektórzy mówią, że…”), zaprzeczenie
@@ -78,6 +97,6 @@ Do rolki trafia kandydat ze **średnią ≥ 7 i hookiem ≥ 7**. Za mało takich
 - **Kadr:** twarz mówcy w górnej połowie kadru pionowego (fy ~0,35–0,45), oczy mniej więcej na 1/3 wysokości.
 
 ## 7. Zapis
-`KANDYDACI.md`: mapa tematów + tabela kandydatów (od–do, typ, taktyka, hook: zdanie + tytuł + pierwsza klatka,
-oceny, dlaczego / dlaczego odpada).
+`KANDYDACI.md`: mapa tematów + tabela okien (N, od–do, ocena 0–100, najlepszy moment albo „słabe, bo…”) + tabela
+kandydatów (od–do, okno, typ, taktyka, hook: zdanie + tytuł + pierwsza klatka, oceny, dlaczego / dlaczego odpada).
 `plan.json`: wybrane rolki (schemat: `plan.md`). Potem `klipy.py sprawdz`.

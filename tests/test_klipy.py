@@ -56,12 +56,42 @@ def test_plan_check_errors_and_warnings(nagranie):
     assert any("zaczyna się od „no i" in u for u in uwagi) and any("oceny poniżej progu" in u for u in uwagi)
     tnie = plan(nagranie, segmenty=[{"od": 1.5, "do": 12.0}])
     _, uwagi, _ = K.sprawdz_plan(K.wczytaj_plan_dict(tnie))
-    assert any("tnie słowo „błędy”" in u for u in uwagi)
+    assert any("tnie słowo „błędy”" in u and "dosunie granicę do przerwy, 1.32 s" in u for u in uwagi)
     echo = plan(nagranie, tytul="Trzy błędy w cenach")                  # tytuł = pierwsze zdanie mówione
     _, uwagi, _ = K.sprawdz_plan(K.wczytaj_plan_dict(echo))
     assert any("tytuł powtarza pierwsze zdanie" in u for u in uwagi)
     _, uwagi, _ = K.sprawdz_plan(K.wczytaj_plan_dict(plan(nagranie, tytul="Tracisz marżę?")))
     assert not any("tytuł powtarza" in u for u in uwagi)
+
+
+def test_boundary_inside_word_moves_to_gap():
+    # środek słowa po stronie segmentu → słowo zostaje; zapas = połowa przerwy, najwyżej LEAD / TAIL
+    assert K.dosun(1.5, WORDS, False, 60) == 1.325          # „błędy” 1.35–1.70: większość w segmencie → od jego startu
+    assert K.dosun(1.6, WORDS, False, 60) == 1.725          # większość przed granicą → słowo odpada, start przy „yyy”
+    assert K.dosun(3.8, WORDS, True, 60) == 4.45            # „cenach.” zostaje, po nim 6 s ciszy → TAIL 0,45
+    assert K.dosun(3.6, WORDS, True, 60) == 3.525           # „cenach.” odpada → koniec po „w”, w połowie przerwy
+    assert K.dosun(5.0, WORDS, True, 60) == 5.0             # granica w ciszy zostaje
+    assert K.granice(1.5, 1.6, WORDS) == (1.325, 1.725)      # całe słowo zamiast jego środka
+    assert K.granice(1.6, 1.65, WORDS) == (1.6, 1.65)        # dosunięcie zjadłoby segment → bez zmian
+
+
+def test_reels_sharing_material_and_one_half_only(nagranie, monkeypatch):
+    dwa = plan(nagranie)
+    dwa["rolki"].append({**dwa["rolki"][0], "slug": "znowu", "segmenty": [{"od": 1.0, "do": 11.0}]})
+    dwa["rolki"].append({**dwa["rolki"][0], "slug": "inna", "segmenty": [{"od": 12.0, "do": 21.0}]})
+    _, uwagi, _ = K.sprawdz_plan(K.wczytaj_plan_dict(dwa))
+    assert [u for u in uwagi if "dzielą" in u] == [u for u in uwagi if u.startswith("rolki 1 i 2 dzielą 100%")]
+    assert len([u for u in uwagi if "dzielą" in u]) == 1 and not any("połowy" in u for u in uwagi)   # 60 s: za krótkie
+    monkeypatch.setattr(ed, "probe", lambda p: {"ok": True, "duration": 1200.0, "video": True, "audio": True})
+    _, uwagi, _ = K.sprawdz_plan(K.wczytaj_plan_dict(dwa))
+    assert any("wszystkie rolki z pierwszej połowy" in u for u in uwagi)
+
+
+def test_windows_cover_recording_at_sentence_boundaries():
+    zd = [{"od": float(t), "do": t + 8.0, "tekst": "x"} for t in range(0, 300, 10)]
+    ok = K.okna(zd)
+    assert [o["od"] for o in ok] == [0.0, 90.0, 180.0, 270.0] and ok[-1]["do"] == 298.0
+    assert all(a["do"] < b["od"] for a, b in zip(ok, ok[1:])) and sum(o["zdan"] for o in ok) == len(zd)
 
 
 def test_project_is_editable_reel(nagranie):
@@ -77,6 +107,11 @@ def test_project_is_editable_reel(nagranie):
     tytul = [t for t in proj["texts"] if not t.get("cap")]
     assert tytul[0]["text"] == "3 błędy w cenach" and tytul[0]["end"] == 3.0
     ed.normalize(proj, lambda s: Path(s) if Path(s).exists() else None)                # przejdzie eksport z edytora
+    assert proj["clipmaker"]["granice"] == [[0.9, 12.0]]                                # granice w ciszy: bez zmian
+    tnie = K.wczytaj_plan_dict(plan(nagranie, segmenty=[{"od": 1.5, "do": 10.4}]))     # w „błędy” i w „i”
+    pt = K.projekt_rolki(tnie, tnie["rolki"][0], nagranie, WORDS, {"duration": 60.0})
+    assert pt["clipmaker"]["granice"] == [[1.325, 10.325]] and pt["clipmaker"]["segmenty"][0]["od"] == 1.5
+    assert pt["clips"][0]["in"] == 1.325 and pt["clips"][-1]["out"] <= 10.325
     p16 = K.wczytaj_plan_dict({**plan(nagranie), "format": "16:9", "styl": {"napisy": None, "tytul": False, "punch": False}})
     proj16 = K.projekt_rolki(p16, p16["rolki"][0], nagranie, WORDS, {})
     assert proj16["canvas"]["w"] == 1920 and proj16["texts"] == [] and {c["zoom"] for c in proj16["clips"]} == {1.0}
@@ -118,7 +153,8 @@ def test_real_prepare_without_speech_model(tmp_path, monkeypatch):
     assert K.main(["przygotuj", str(src), "-o", str(out)]) == 0
     a = json.loads((out / "analiza.json").read_text(encoding="utf-8"))
     assert a["slowa"] == 2 and a["arkusze"] and Path(a["arkusze"][0]["plik"]).is_file()
-    assert "[00:00.5–00:01.0] Cześć." in (out / "transkrypcja.txt").read_text(encoding="utf-8")
+    tr = (out / "transkrypcja.txt").read_text(encoding="utf-8")
+    assert "[00:00.5–00:01.0] Cześć." in tr and "## Okno 1 [00:00.5–00:02.4]" in tr and a["okna"][0]["zdan"] == 2
 
 
 def test_rebuild_does_not_overwrite_user_edit(nagranie, tmp_path):

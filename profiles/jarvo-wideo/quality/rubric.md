@@ -25,7 +25,10 @@
   brak KANDYDACI.md z ocenami albo plan.json; `klipy.py sprawdz` z błędami; rolka bez projektu `.edycja.json`
   (człowiek nie może jej poprawić w HQ); twarz mówcy poza kadrem.
 - Ważne: hook później niż w 3 s, rolka urwana w pół zdania, dwie rolki o tym samym temacie, oceny < 7 bez wyjaśnienia,
-  nazwy własne i liczby w napisach niepoprawione, rolka zmieniona przez człowieka nadpisana przez `zbuduj`.
+  nazwy własne i liczby w napisach niepoprawione, rolka zmieniona przez człowieka nadpisana przez `zbuduj`,
+  okna transkrypcji bez ocen 0–100 albo wszystkie rolki z początku długiego nagrania bez wyjaśnienia, dwie rolki
+  z tego samego materiału (> 20%) bez dopisku „wersje A/B”, tytuł ogólny o całym nagraniu zamiast konkretu rolki,
+  puenta ucięta, żeby zmieścić kontekst.
 
 ## Typografia jak z montażu (`typografia-edit`)
 - Blokujące: słowa na ekranie inne niż w mowie (poza liczebnikiem zapisanym cyfrą); napis na twarzy albo w strefie UI;

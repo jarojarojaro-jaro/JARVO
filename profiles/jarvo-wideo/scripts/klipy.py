@@ -7,12 +7,15 @@
 
 przygotuj (0 tokenów): mowa (Parakeet: słowa z czasem, pauzy, wtrącenia) do <nagranie>.mowa.json — tego samego
 pliku używa zakładka „Mowa” w edytorze HQ; cięcia ujęć; arkusze klatek z czasem (do vision_analyze: gdzie jest
-mówca); transkrypcja.txt ze zdaniami i czasami (to czytasz według master promptu) i analiza.json.
+mówca); transkrypcja.txt ze zdaniami i czasami, podzielona na okna ~90 s (to czytasz według master promptu,
+każde okno dostaje ocenę) i analiza.json.
 
-sprawdz: plan.json przed budową (czasy w źródle, długości, hook, kadr, oceny). Błędy = kod 1, uwagi nie blokują.
+sprawdz: plan.json przed budową (czasy w źródle, długości, hook, kadr, oceny, granice w słowach, wspólny materiał
+rolek, pokrycie nagrania). Błędy = kod 1, uwagi nie blokują.
 
-zbuduj: każda rolka → <out>/klip-N-<slug>.edycja.json (projekt edytora: segmenty ze źródła, wycięte pauzy
-i wtrącenia, kadr z punktem skupienia, punch-in na cięciach, napisy karaoke ze słów, tytuł-hook) i render tym samym
+zbuduj: każda rolka → <out>/klip-N-<slug>.edycja.json (projekt edytora: segmenty ze źródła z granicą dosuniętą
+ze środka słowa do przerwy obok, wycięte pauzy i wtrącenia, kadr z punktem skupienia, punch-in na cięciach,
+napisy karaoke ze słów, tytuł-hook) i render tym samym
 silnikiem co „Eksportuj” → <out>/klip-N-<slug>.mp4, na końcu KLIPY.md. Człowiek otwiera rolkę w HQ („✎ Edytuj”)
 i poprawia wszystko; eksport z edytora robi nową wersję obok.
 
@@ -38,6 +41,9 @@ FORMATY = {"9:16": (1080, 1920), "16:9": (1920, 1080)}
 FPS = 30
 ODDECH = 0.12            # tyle ciszy zostaje po wycięciu pauzy (jak w edytorze)
 PRZED, PO = 0.08, 0.25   # zapas przed pierwszym i po ostatnim słowie segmentu
+LEAD, TAIL = 0.35, 0.45  # granica dosunięta ze słowa: najwyżej tyle ciszy przed / po słowie (połowa przerwy; za openshorts)
+OKNO = 90.0              # okno transkrypcji do oceny 0–100: długie nagranie przeczytane i ocenione równo, nie tylko początek
+WSPOLNE = 0.2            # dwie rolki dzielą więcej materiału źródła niż tyle krótszej z nich → uwaga
 PUNCH = 1.12             # przybliżenie co drugiego ujęcia po cięciu (ukrywa skok obrazu)
 HL = pr.KARAOKE_HL
 ZLE_STARTY = ("no i", "i ", "a ", "tak jak mówiłem", "wracając do", "jak mówiłem", "więc", "no więc", "no to",
@@ -131,6 +137,17 @@ def zdania(words: list, max_gap: float = 1.0, max_dur: float = 25.0) -> list[dic
     return out
 
 
+def okna(zd: list[dict], dl: float = OKNO) -> list[dict]:
+    """Zdania → okna ~`dl` s (granica zawsze między zdaniami). Każde okno agent ocenia 0–100, zanim wybierze rolki."""
+    out: list[dict] = []
+    for z in zd:
+        if not out or z["od"] - out[-1]["od"] >= dl:
+            out.append({"n": len(out) + 1, "od": z["od"], "do": z["do"], "zdan": 0})
+        out[-1]["do"] = z["do"]
+        out[-1]["zdan"] += 1
+    return out
+
+
 def cmd_przygotuj(a) -> int:
     src = Path(a.nagranie).resolve()
     if not src.is_file():
@@ -146,20 +163,25 @@ def cmd_przygotuj(a) -> int:
     sheets = arkusze(src, dur, out / "klatki") if info.get("video") else []
     zd = zdania(d["words"])
     pauzy = [s for s in d.get("silences") or [] if s[1] - s[0] >= 1.5]
-    lines = [f"# Transkrypcja: {src.name} · {mmss(dur)} · {len(d['words'])} słów · {len(cuts)} cięć ujęć",
-             "# [od–do w ŹRÓDLE] zdanie; (yyy) = wtrącenie; (pauza N s) = cisza ≥ 1,5 s", ""]
-    pi = 0
+    ok = okna(zd)
+    lines = [f"# Transkrypcja: {src.name} · {mmss(dur)} · {len(d['words'])} słów · {len(cuts)} cięć ujęć · {len(ok)} okien",
+             "# [od–do w ŹRÓDLE] zdanie; (yyy) = wtrącenie; (pauza N s) = cisza ≥ 1,5 s",
+             "# ## Okno N: ~90 s; każde oceniasz 0–100 w KANDYDACI.md (master prompt, krok 1)", ""]
+    pi, starty = 0, {o["od"]: o for o in ok}
     for z in zd:
         while pi < len(pauzy) and pauzy[pi][0] < z["od"]:
             lines.append(f"      (pauza {pauzy[pi][1] - pauzy[pi][0]:.1f} s)")
             pi += 1
+        if z["od"] in starty:
+            o = starty.pop(z["od"])
+            lines += ([""] if o["n"] > 1 else []) + [f"## Okno {o['n']} [{mmss(o['od'])}–{mmss(o['do'])}]"]
         lines.append(f"[{mmss(z['od'])}–{mmss(z['do'])}] {z['tekst']}")
     (out / "transkrypcja.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     res = {"zrodlo": str(src), "sek": round(dur, 2), "w": info.get("w"), "h": info.get("h"), "fps": info.get("fps"),
-           "slowa": len(d["words"]), "zdania": len(zd), "ciecia_ujec": cuts, "arkusze": sheets,
+           "slowa": len(d["words"]), "zdania": len(zd), "okna": ok, "ciecia_ujec": cuts, "arkusze": sheets,
            "mowa": str(ed.speech_path(src)), "transkrypcja": str(out / "transkrypcja.txt")}
     (out / "analiza.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"✓ {out / 'transkrypcja.txt'} ({len(zd)} zdań) · {len(sheets)} arkuszy klatek · {out / 'analiza.json'}")
+    print(f"✓ {out / 'transkrypcja.txt'} ({len(zd)} zdań, {len(ok)} okien) · {len(sheets)} arkuszy klatek · {out / 'analiza.json'}")
     print("Dalej: master prompt (skill clipmaker) → plan.json → klipy.py sprawdz → klipy.py zbuduj")
     return 0
 
@@ -197,6 +219,43 @@ def powtarza_mowe(tytul: str, words: list, od: float, okno: float = 4.0) -> bool
     return len(tt) >= 2 and len(tt & mowa) / len(tt) >= 0.6
 
 
+def dosun(t: float, words: list, koniec: bool, dur: float | None = None) -> float:
+    """Granica w środku słowa → przerwa obok (ASR myli się o dziesiątki ms, model przy liczeniu czasów bardziej).
+    Słowo zostaje w segmencie, gdy jest w nim jego środek (jak w `fragmenty`); zapas ciszy to połowa przerwy,
+    najwyżej LEAD przed słowem i TAIL po nim. Granica w ciszy (albo dalej niż 1,5 s od przerwy) zostaje."""
+    i = next((i for i, w in enumerate(words) if float(w[0]) + 0.01 < t < float(w[1]) - 0.01), None)
+    if i is None:
+        return t
+    mid = (float(words[i][0]) + float(words[i][1])) / 2
+    if not koniec:
+        j = i if mid >= t else i + 1
+        if j >= len(words):
+            return t
+        s = float(words[j][0])
+        przerwa = s - (float(words[j - 1][1]) if j else 0.0)
+        nowy = s - min(LEAD, max(0.0, przerwa) / 2)
+    else:
+        j = i if mid < t else i - 1
+        if j < 0:
+            return t
+        e = float(words[j][1])
+        przerwa = (float(words[j + 1][0]) if j + 1 < len(words) else (dur or e + 2 * TAIL)) - e
+        nowy = e + min(TAIL, max(0.0, przerwa) / 2)
+    if abs(nowy - t) > 1.5:
+        return t
+    return round(min(max(nowy, 0.0), dur or nowy), 3)
+
+
+def granice(od: float, do: float, words: list, dur: float | None = None) -> tuple[float, float]:
+    """Segment planu → segment z granicami w przerwach; dosunięcie, które zjadłoby segment, nie wchodzi."""
+    a, b = dosun(od, words, False, dur), dosun(do, words, True, dur)
+    return (a, b) if b - a >= 0.3 else (od, do)
+
+
+def _wspolne(a: list[tuple[float, float]], b: list[tuple[float, float]]) -> float:
+    return sum(max(0.0, min(y1, y2) - max(x1, x2)) for x1, y1 in a for x2, y2 in b)
+
+
 def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
     bledy, uwagi = [], []
     src = Path(str(plan.get("zrodlo") or ""))
@@ -210,7 +269,7 @@ def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
         bledy.append("styl.napisy: karaoke, zwykle albo null")
     if not 1 <= len(rolki) <= 12:
         bledy.append(f"rolek: {len(rolki)} (dozwolone 1–12)")
-    slugi = set()
+    slugi, czasy = set(), []
     for n, r in enumerate(rolki, 1):
         tag = f"rolka {n} ({r.get('slug')})"
         slug = str(r.get("slug") or "")
@@ -225,7 +284,7 @@ def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
         segs = r.get("segmenty") or []
         if not 1 <= len(segs) <= 3:
             bledy.append(f"{tag}: segmentów {len(segs)} (dozwolone 1–3)")
-        suma, prev = 0.0, -1.0
+        suma, prev, cz = 0.0, -1.0, []
         for s in segs:
             od, do = float(s.get("od", -1)), float(s.get("do", -1))
             if not 0 <= od < do <= dur + 0.05:
@@ -235,6 +294,7 @@ def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
                 uwagi.append(f"{tag}: segmenty nie idą po kolei w źródle: upewnij się, że sens się nie zmienia")
             prev = do
             suma += do - od
+            cz.append((od, do))
             for k in ("fx", "fy"):
                 if k in s and not 0 <= float(s[k]) <= 1:
                     bledy.append(f"{tag}: {k}={s[k]} (0–1)")
@@ -243,7 +303,11 @@ def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
             for t, gdzie in ((od, "początek"), (do, "koniec")):
                 w = next((w for w in words if w[0] + 0.05 < t < w[1] - 0.05), None)
                 if w:
-                    uwagi.append(f"{tag}: {gdzie} {t:.2f} s tnie słowo „{w[2]}” ({w[0]:.2f}–{w[1]:.2f})")
+                    nowy = dosun(t, words, gdzie == "koniec", dur)
+                    dalej = (f": zbuduj dosunie granicę do przerwy, {nowy:.2f} s" if nowy != t
+                             else ": przesuń granicę do przerwy między słowami")
+                    uwagi.append(f"{tag}: {gdzie} {t:.2f} s tnie słowo „{w[2]}” ({w[0]:.2f}–{w[1]:.2f}){dalej}")
+        czasy.append((n, cz))
         if segs and not bledy:
             if not 8 <= suma <= 90:
                 bledy.append(f"{tag}: długość {suma:.1f} s (dozwolone 8–90, najlepiej 20–60)")
@@ -266,6 +330,21 @@ def sprawdz_plan(plan: dict) -> tuple[list[str], list[str], dict]:
             sr = sum(float(v) for v in oc.values()) / len(oc)
             if sr < 7 or float(oc.get("hook", 10)) < 7:
                 uwagi.append(f"{tag}: oceny poniżej progu (średnia {sr:.1f}, hook {oc.get('hook')}): master prompt mówi ≥ 7")
+    # wspólny materiał: dwie rolki z tego samego fragmentu to jedna rolka dwa razy (chyba że świadome wersje A/B)
+    for i, (na, a) in enumerate(czasy):
+        for nb, b in czasy[i + 1:]:
+            krotsza = min(sum(y - x for x, y in a), sum(y - x for x, y in b))
+            if a and b and krotsza > 0 and (w := _wspolne(a, b) / krotsza) > WSPOLNE:
+                uwagi.append(f"rolki {na} i {nb} dzielą {w:.0%} materiału źródła (master prompt: najwyżej ~20%): "
+                             "zostaw mocniejszą albo napisz w KANDYDACI.md, że to wersje A/B")
+    # pokrycie: długie nagranie, a wszystkie rolki z jednej połowy → okna drugiej połowy zostały nieocenione
+    konce = [y for _, cz in czasy for _, y in cz]
+    poczatki = [x for _, cz in czasy for x, _ in cz]
+    if dur >= 600 and len(czasy) >= 3 and konce:
+        polowa = "pierwszej" if max(konce) <= dur / 2 else "drugiej" if min(poczatki) >= dur / 2 else ""
+        if polowa:
+            uwagi.append(f"wszystkie rolki z {polowa} połowy nagrania: oceń okna z drugiej części (transkrypcja.txt, "
+                         "„## Okno N”) i weź z niej rolkę, jeśli któreś ma ocenę jak wybrane")
     return bledy, uwagi, {"src": src, "dur": dur, "words": words, "info": info}
 
 
@@ -310,9 +389,11 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict) -> di
     W, H = FORMATY[fmt]
     pion = fmt == "9:16"
     # poziome źródło w pionowym kadrze (i odwrotnie) → wypełnij z punktem skupienia; ten sam kształt → też cover
-    clips, k = [], 0
+    clips, k, gr = [], 0, []
     for s in r["segmenty"]:
-        for a, b in fragmenty(float(s["od"]), float(s["do"]), words, st.get("tnij_pauzy"), st.get("bez_wtracen", True)):
+        od, do = granice(float(s["od"]), float(s["do"]), words, (info or {}).get("duration"))
+        gr.append([od, do])
+        for a, b in fragmenty(od, do, words, st.get("tnij_pauzy"), st.get("bez_wtracen", True)):
             zoom = float(s.get("zoom", 1.0))
             if st.get("punch") and k % 2 == 1:
                 zoom = min(3.0, zoom * PUNCH)
@@ -321,7 +402,7 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict) -> di
                           "fy": float(s.get("fy", 0.4 if pion else 0.5)), "zoom": round(zoom, 3)})
             k += 1
     proj = {"version": 1, "format": fmt, "canvas": {"w": W, "h": H, "fps": FPS}, "clips": clips, "texts": [], "audio": [],
-            "clipmaker": {"slug": r["slug"], "segmenty": r["segmenty"], "zrodlo": str(src)}}
+            "clipmaker": {"slug": r["slug"], "segmenty": r["segmenty"], "granice": gr, "zrodlo": str(src)}}
     total = pr.total(proj)
     # napisy karaoke: krótkie linie (2–4 słowa w pionie), nad strefą przycisków platform
     look = {**pr.CAP_DEFAULT, "size": 76 if pion else 60, **(pr.PION if pion else {"y": 0.86, "maxw": 0.8}),
@@ -406,7 +487,8 @@ def cmd_zbuduj(a) -> int:
         if not a.bez_renderu:
             if pr.cmd_render(film, argparse.Namespace(out=str(film))) != 0:
                 raise SystemExit(f"render {film.name} nie wyszedł")
-        wyniki.append({"n": n, "r": r, "film": film, "dl": dl, "ujecia": len(proj["clips"])})
+        wyniki.append({"n": n, "r": r, "film": film, "dl": dl, "ujecia": len(proj["clips"]),
+                       "granice": proj["clipmaker"]["granice"]})
     pisz_klipy_md(plan, wyniki, out, ctx)
     print(f"✓ {out / 'KLIPY.md'}")
     return 0
@@ -421,7 +503,7 @@ def pisz_klipy_md(plan: dict, wyniki: list[dict], out: Path, ctx: dict) -> None:
     for w in wyniki:
         r, oc = w["r"], w["r"].get("oceny") or {}
         sr = f"{sum(float(v) for v in oc.values()) / len(oc):.1f}" if oc else "–"
-        segs = ", ".join(f"{mmss(float(s['od']))}–{mmss(float(s['do']))}" for s in r["segmenty"])
+        segs = ", ".join(f"{mmss(od)}–{mmss(do)}" for od, do in w["granice"])     # po dosunięciu do przerw
         lines.append(f"| {w['n']} | {r.get('tytul') or r['slug']} | {w['dl']:.0f} s | {segs} | {sr} | `{w['film'].name}` |")
     for w in wyniki:
         r = w["r"]

@@ -1,7 +1,7 @@
 ---
 name: clipmaker
 description: "Długie nagranie → edytowalne rolki z napisami karaoke."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -31,7 +31,7 @@ człowiek otwiera rolkę w HQ („✎ Edytuj”) i poprawia cięcia, kadr, napis
 ## Kroki
 ```bash
 K=$HERMES_HOME/scripts/klipy.py
-python3 $K przygotuj <nagranie> -o out/wideo/klipy        # mowa (Parakeet), cięcia ujęć, arkusze klatek, transkrypcja.txt
+python3 $K przygotuj <nagranie> -o out/wideo/klipy        # mowa (Parakeet), cięcia ujęć, arkusze klatek, transkrypcja.txt z oknami ~90 s
 python3 $K sprawdz out/wideo/klipy/plan.json              # po napisaniu planu
 python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
 ```
@@ -40,15 +40,17 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
    Nagranie 60 min to ~6–12 min rozpoznawania mowy: wyślij `kanban_heartbeat` przed startem.
 2. **Przeczytaj** `out/wideo/klipy/transkrypcja.txt` w całości (długie: po kawałku, ale całe) i
    [`references/master-prompt.md`](references/master-prompt.md). Tam jest, co jest dobrą rolką i jak oceniać.
-3. **Kandydaci** → `out/wideo/klipy/KANDYDACI.md`: 2–3× więcej niż rolek, każdy z czasem w źródle, hookiem
+3. **Okna i kandydaci** → `out/wideo/klipy/KANDYDACI.md`: najpierw ocena 0–100 **każdego** okna `## Okno N`
+   (test 2 sekund, cała skala), potem kandydaci z najlepszych okien całego nagrania: 2–3× więcej niż rolek, każdy z czasem w źródle, hookiem
    w trzech warstwach (zdanie, tytuł na ekran, pierwsza klatka) i taktyką (skill `hooki`), puentą, ocenami 6 osi
    i jednym zdaniem „dlaczego” (albo „dlaczego odpada”).
 4. **Kadr:** obejrzyj arkusze `out/wideo/klipy/klatki/arkusz-*.jpg` (`vision_analyze`): gdzie jest twarz mówcy
    (fx, fy 0–1), ile osób, czy są plansze. Dwie osoby i zmiana ujęcia w środku rolki → dwa segmenty, każdy
    ze swoim fx (cięcia ujęć są w `analiza.json`).
 5. **Plan** → `out/wideo/klipy/plan.json` według [`references/plan.md`](references/plan.md). `klipy.py sprawdz`:
-   błędy poprawiasz zawsze; uwagi („tnie słowo”, „zaczyna się od „no i””, długość) poprawiasz albo w KANDYDACI.md
-   piszesz, dlaczego zostają.
+   błędy poprawiasz zawsze; uwagi („tnie słowo” z miejscem, dokąd `zbuduj` dosunie granicę, „zaczyna się od „no i””,
+   długość, „rolki dzielą N% materiału”, „wszystkie rolki z jednej połowy”) poprawiasz albo w KANDYDACI.md piszesz,
+   dlaczego zostają.
 6. **Zbuduj** (render po kolei, ~0,5–1× długości rolki każda).
 7. **Kontrola każdej rolki:** `python3 $HERMES_HOME/scripts/qa_wideo.py <rolka>.mp4` + 2–3 klatki (`vision_analyze`):
    twarz w kadrze, napisy czytelne i poza strefą UI, tytuł nie zasłania twarzy. Cięcia: `krytyka.py ciecia <rolka>.mp4`
@@ -73,6 +75,7 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
 ## Definition of Done
 - [ ] każda rolka: hook w pierwszych 1–3 s, jedna myśl zrozumiała bez reszty nagrania, puenta na końcu, 20–60 s,
 - [ ] tytuł-hook nie powtarza zdania mówionego; rolki mają ≥ 3 różne taktyki hooka (gdy rolek ≥ 3),
-- [ ] oceny w KANDYDACI.md (średnia ≥ 7, hook ≥ 7), rolki o różnych tematach, czasy w źródle w KLIPY.md,
+- [ ] każde okno ocenione 0–100 w KANDYDACI.md, oceny rolek (średnia ≥ 7, hook ≥ 7), rolki o różnych tematach
+      i puentach, tytuł nazywa konkret tej rolki, czasy w źródle w KLIPY.md,
 - [ ] `klipy.py sprawdz` bez błędów, `qa_wideo.py` i `krytyka.py ciecia` bez błędów dla każdej rolki, twarz mówcy w kadrze,
 - [ ] napisy poprawione (nazwy własne, liczby), projekty otwierają się w edytorze HQ.
