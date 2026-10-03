@@ -513,6 +513,7 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
     if (dest / "scripts" / "projekt.py").exists():
         shutil.copy2(fl.REPO_ROOT / "hq" / "plugin" / "edytor.py", dest / "scripts" / "edytor.py")
         shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "src" / "44-napisy.js", dest / "scripts" / "edytor_napisy.js")
+        shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "src" / "48-typografia.js", dest / "scripts" / "edytor_typografia.js")
         shutil.copytree(fl.REPO_ROOT / "hq" / "web" / "fonts" / "kroje", dest / "scripts" / "kroje", dirs_exist_ok=True)
 
     # SOUL.md

@@ -31,6 +31,15 @@ MEDIA_EXT = VIDEO_EXT | IMAGE_EXT | AUDIO_EXT
 
 MAX_CLIPS = 200
 MAX_TEXTS = 60
+MAX_TYPO = 400           # bloków typografii (blok = 1–6 słów naraz, jak w montażu słowo po słowie)
+MAX_TYPO_WORDS = 14
+TYPO_MOTYWY = ("czysty", "kino", "ulica", "energia", "elegancki")   # te same klucze co TYPO_MOTYWY w 48-typografia.js
+TYPO_UKLADY = ("kolumna", "schodki", "srodek", "skos", "3d", "za", "rozrzut")
+TYPO_WEJSCIA = ("ciecie", "pop", "kontur", "maska", "pisanie", "zjazd")
+TYPO_WYJSCIA = ("ciecie", "zanik", "smuga")
+TYPO_STYLE = ("wypelnij", "kontur", "3d", "blask", "tlo")
+TYPO_KROJE = ("bricolage", "bricolageL", "anton", "bebas", "barlow", "barlowI", "barlowL", "oswald", "playfair",
+              "playfairI", "caveat", "grunge", "mono")
 MAX_AUDIO = 12
 MAX_WORDS = 40           # słów w jednym napisie karaoke (linia napisu ma ich 2–8)
 MAX_DURATION = 3 * 3600.0
@@ -128,7 +137,78 @@ def normalize(project: dict, resolve) -> dict:
         b = min(b, a + (total - start))          # muzyka nie wychodzi poza film
         if b - a >= MIN_CLIP:
             audio.append({"src": path, "in": a, "out": b, "start": start, "volume": _num(m.get("volume"), 0, 2, 1)})
-    return {"canvas": canvas, "clips": clips, "texts": texts, "audio": audio, "duration": total}
+    return {"canvas": canvas, "clips": clips, "texts": texts, "audio": audio, "duration": total,
+            "typo": normalize_typo(project.get("typo"), total)}
+
+
+_HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def normalize_typo(raw: Any, total: float) -> dict:
+    """Plan typografii (`projekt.typo`) w bezpiecznej postaci: bloki w czasie filmu, liczby w zakresach, klucze
+    z list (rysuje je 48-typografia.js; nieznane wartości wracają do domyślnych motywu)."""
+    raw = raw if isinstance(raw, dict) else {}
+    out = {"motyw": raw.get("motyw") if raw.get("motyw") in TYPO_MOTYWY else "czysty", "bloki": []}
+    if isinstance(raw.get("akcent"), str) and _HEX.match(raw["akcent"]):
+        out["akcent"] = raw["akcent"]
+    bloki = raw.get("bloki") if isinstance(raw.get("bloki"), list) else []
+    for b in bloki[:MAX_TYPO]:
+        if not isinstance(b, dict) or not isinstance(b.get("slowa"), list):
+            continue
+        s = _num(b.get("start"), 0, total, 0)
+        e = _num(b.get("end"), 0, total, s)
+        if e - s < MIN_CLIP:
+            continue
+        slowa = []
+        for w in b["slowa"][:MAX_TYPO_WORDS]:
+            if not isinstance(w, dict) or not str(w.get("tekst") or "").strip():
+                continue
+            t = _num(w.get("t"), 0, e - s, 0)
+            x = {"t": round(t, 3), "k": round(_num(w.get("k"), t, e - s, t), 3), "tekst": str(w["tekst"]).strip()[:40],
+                 "waga": int(_num(w.get("waga"), 0, 3, 1)), "linia": int(_num(w.get("linia"), 0, MAX_TYPO_WORDS, len(slowa)))}
+            if w.get("glebia") in (-1, 1):
+                x["glebia"] = w["glebia"]
+            if isinstance(w.get("kolor"), str) and _HEX.match(w["kolor"]):
+                x["kolor"] = w["kolor"]
+            if w.get("kroj") in TYPO_KROJE:
+                x["kroj"] = w["kroj"]
+            if w.get("styl") in TYPO_STYLE:
+                x["styl"] = w["styl"]
+            if w.get("wejscie") in TYPO_WEJSCIA:
+                x["wejscie"] = w["wejscie"]
+            if isinstance(w.get("wielkie"), bool):
+                x["wielkie"] = w["wielkie"]
+            if w.get("skala") is not None:
+                x["skala"] = round(_num(w.get("skala"), 0.3, 3, 1), 3)
+            slowa.append(x)
+        if not slowa:
+            continue
+        nb = {"id": str(b.get("id") or f"b{len(out['bloki'])}")[:32], "start": round(s, 3), "end": round(e, 3),
+              "uklad": b.get("uklad") if b.get("uklad") in TYPO_UKLADY else "kolumna",
+              "x": round(_num(b.get("x"), 0, 1, 0.5), 4), "y": round(_num(b.get("y"), 0, 1, 0.3), 4),
+              "w": round(_num(b.get("w"), 0.15, 1, 0.62), 4), "rot": round(_num(b.get("rot"), -45, 45, 0), 2),
+              "tilt": round(_num(b.get("tilt"), -45, 45, 0), 2), "rozmiar": round(_num(b.get("rozmiar"), 0.3, 3, 1), 3),
+              "warstwa": "tyl" if b.get("warstwa") == "tyl" else "przod", "slowa": slowa}
+        for k, ok in (("wejscie", TYPO_WEJSCIA), ("wyjscie", TYPO_WYJSCIA)):
+            if b.get(k) in ok:
+                nb[k] = b[k]
+        out["bloki"].append(nb)
+    out["bloki"].sort(key=lambda b: b["start"])
+    return out
+
+
+def typo_concat(segments: list[tuple[float, Path | None]], blank: Path, dest: Path) -> Path | None:
+    """Warstwa typografii jako lista demuxera concat: (czas trwania, PNG albo None = przezroczysta klatka).
+    Klatki rysuje przeglądarka tylko tam, gdzie obraz się zmienia (typoOdcinki), reszta to długie odcinki."""
+    if not any(png for _d, png in segments):
+        return None
+    lines = ["ffconcat version 1.0"]
+    for dur, png in segments:
+        if dur >= 0.0005:
+            lines.extend([f"file '{png or blank}'", f"duration {dur:.4f}"])
+    lines.append(f"file '{blank}'")
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return dest
 
 
 def layout_clips(clips: list[dict]) -> list[tuple[dict, float, float]]:
@@ -294,8 +374,9 @@ def blur_filter(W: int, H: int, i: int) -> str:
 
 
 def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
-                  ffmpeg: str = "ffmpeg", karaoke: Path | None = None) -> list[str]:
-    """Argumenty ffmpeg dla znormalizowanego projektu. `has_audio[src] -> bool` z ffprobe."""
+                  ffmpeg: str = "ffmpeg", karaoke: Path | None = None, typo: dict | None = None) -> list[str]:
+    """Argumenty ffmpeg dla znormalizowanego projektu. `has_audio[src] -> bool` z ffprobe.
+    `typo` = {"tyl": lista concat, "przod": lista concat}: warstwy typografii (z typo_concat) pod tekstami."""
     W, H, F = p["canvas"]["w"], p["canvas"]["h"], p["canvas"]["fps"]
     args = [ffmpeg, "-nostdin", "-hide_banner", "-y", "-loglevel", "error", "-progress", "pipe:1", "-nostats"]
     graph: list[str] = []
@@ -324,6 +405,15 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
     graph.append(f"{''.join(seg_labels)}concat=n={len(p['clips'])}:v=1:a=1[vc][ac]")
 
     vlast = "vc"
+    for warstwa in ("tyl", "przod"):       # typografia: najpierw warstwa „za osobą”, potem przednia
+        lista = (typo or {}).get(warstwa)
+        if not lista:
+            continue
+        args += ["-reinit_filter", "0", "-f", "concat", "-safe", "0", "-i", str(lista)]
+        yi = n; n += 1
+        graph.append(f"[{yi}:v]fps={F},format=rgba[ty{warstwa}]")
+        graph.append(f"[{vlast}][ty{warstwa}]overlay=0:0:format=auto:eof_action=pass[vy{warstwa}]")
+        vlast = f"vy{warstwa}"
     for k, (t, png) in enumerate(zip(p["texts"], text_pngs)):
         if t.get("kara") and karaoke:
             continue                        # ten napis jest w warstwie karaoke niżej

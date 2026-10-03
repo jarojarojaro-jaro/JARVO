@@ -16,6 +16,7 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py uwaga <film> <id> (--zrobione "co zmieniłem" | --odrzuc "dlaczego")   # zamknij uwagę z osi edytora
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
     projekt.py render <film> [--out plik.mp4]      # nowa wersja obok oryginału, na końcu linia MEDIA:
+    (typografia słowo po słowie, klucz `typo`: plan i poprawki robi typografia.py; render rysuje ją tak jak edytor)
 
 Czas S w sekundach osi (po cięciach i zmianach tempa), chyba że opis mówi „źródła” (--od/--do).
 Nic nie nadpisuje oryginału: render zapisuje film-edycja.mp4, film-edycja-2.mp4…
@@ -28,6 +29,8 @@ edytor pokazuje je wtedy jako ✓ z Twoim opisem. `render` ostrzega, gdy został
 from __future__ import annotations
 
 import argparse
+import base64
+import contextlib
 import json
 import subprocess
 import sys
@@ -47,6 +50,7 @@ for cand in (HERE, _REPO / "hq" / "plugin"):
 import edytor as ed  # noqa: E402
 
 NAPISY_JS = next((p for p in (HERE / "edytor_napisy.js", _REPO / "hq" / "web" / "src" / "44-napisy.js") if p.exists()), None)
+TYPO_JS = next((p for p in (HERE / "edytor_typografia.js", _REPO / "hq" / "web" / "src" / "48-typografia.js") if p.exists()), None)
 KROJE = next((p for p in (HERE / "kroje", _REPO / "hq" / "web" / "fonts" / "kroje") if (p / "kroje.css").exists()), None)
 TEXT_DEFAULT = {"x": 0.5, "y": 0.78, "size": 72, "color": "#FFFFFF", "bg": "#000000", "style": "shadow",
                 "font": "system-ui, 'Segoe UI', Roboto, sans-serif", "bold": True, "align": "center", "maxw": 0.86}
@@ -134,6 +138,9 @@ def cmd_pokaz(film: Path, a) -> int:
     print("Napisy i teksty:" if proj.get("texts") else "Napisy i teksty: brak")
     for x in proj.get("texts") or []:
         print(f"  [{x.get('id')}] {x['start']:6.2f}–{x['end']:6.2f}  {'napis' if x.get('cap') else 'tekst'}: {x.get('text', '')!r}")
+    typo = ed.normalize_typo(proj.get("typo"), total(proj))
+    if typo["bloki"]:
+        print(f"Typografia: {len(typo['bloki'])} bloków, motyw {typo['motyw']} (szczegóły: typografia.py pokaz)")
     print("Audio:" if proj.get("audio") else "Audio: brak")
     for m in proj.get("audio") or []:
         print(f"  [{m.get('id')}] od {m['start']:6.2f} przez {m['out'] - m['in']:.2f} s  {Path(m['src']).name} · głośność {m.get('volume', 1):.2f}")
@@ -338,13 +345,10 @@ def ensure_playwright() -> None:
     nz.wymagaj_playwright(__file__, "JARVO_PROJEKT_REEXEC", "napisy renderuje przeglądarka")
 
 
-def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path,
-              hi: list[int] | None = None) -> list[Path]:
-    """Każdy napis → PNG W×H, rysowany TĄ SAMĄ funkcją co w edytorze (44-napisy.js) w przeglądarce bez okna.
-    `hi[k]` ≥ 0: napis karaoke z aktywnym słowem o tym numerze (jeden obraz na słowo)."""
-    if not texts:
-        return []
-    hi = hi or [-1] * len(texts)
+@contextlib.contextmanager
+def strona():
+    """Przeglądarka bez okna z krojami edytora (lokalnie) i jego rendererami: napisy (44-napisy.js) i typografia
+    (48-typografia.js). Jedno uruchomienie na cały render."""
     if NAPISY_JS is None:
         raise SystemExit("brak edytor_napisy.js obok skryptu (przebuduj profil)")
     ensure_playwright()
@@ -354,7 +358,6 @@ def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path,
         exe = nz.headless_shell()
     except Exception:  # noqa: BLE001 - poza obrazem floty: domyślna przeglądarka playwright
         exe = None
-    paths = []
     with sync_playwright() as p:
         browser = p.chromium.launch(**({"executable_path": exe} if exe else {}))
         page = browser.new_page()
@@ -363,19 +366,123 @@ def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path,
         if kroje:
             page.add_style_tag(content=kroje)
         page.add_script_tag(content=NAPISY_JS.read_text(encoding="utf-8"))
-        for i, t in enumerate(texts):
-            data = page.evaluate("""async ([t, W, H, hi]) => {
-                await fontLoad(textFont(t, H, W).font, t.text);
-                const c = document.createElement("canvas"); c.width = W; c.height = H;
-                drawText(c.getContext("2d"), t, W, H, hi);
-                return c.toDataURL("image/png");
-            }""", [t, W, H, hi[i]])
-            import base64
-            dest = out_dir / f"napis-{i}{'' if hi[i] < 0 else f'-slowo-{hi[i]}'}.png"
-            dest.write_bytes(base64.b64decode(data.split(",", 1)[1]))
-            paths.append(dest)
-        browser.close()
+        if TYPO_JS is not None:
+            page.add_script_tag(content=TYPO_JS.read_text(encoding="utf-8"))
+        try:
+            yield page
+        finally:
+            browser.close()
+
+
+def _png(data_url: str, dest: Path) -> Path:
+    dest.write_bytes(base64.b64decode(data_url.split(",", 1)[1]))
+    return dest
+
+
+def text_pngs(texts: list[dict], W: int, H: int, out_dir: Path,
+              hi: list[int] | None = None, page=None) -> list[Path]:
+    """Każdy napis → PNG W×H, rysowany TĄ SAMĄ funkcją co w edytorze (44-napisy.js) w przeglądarce bez okna.
+    `hi[k]` ≥ 0: napis karaoke z aktywnym słowem o tym numerze (jeden obraz na słowo)."""
+    if not texts:
+        return []
+    if page is None:
+        with strona() as pg:
+            return text_pngs(texts, W, H, out_dir, hi, pg)
+    hi = hi or [-1] * len(texts)
+    paths = []
+    for i, t in enumerate(texts):
+        data = page.evaluate("""async ([t, W, H, hi]) => {
+            await fontLoad(textFont(t, H, W).font, t.text);
+            const c = document.createElement("canvas"); c.width = W; c.height = H;
+            drawText(c.getContext("2d"), t, W, H, hi);
+            return c.toDataURL("image/png");
+        }""", [t, W, H, hi[i]])
+        paths.append(_png(data, out_dir / f"napis-{i}{'' if hi[i] < 0 else f'-slowo-{hi[i]}'}.png"))
     return paths
+
+
+TYPO_KLATKI_JS = """async ([P, W, H, fps, total, warstwa, partia]) => {
+    for (const [f, txt] of typoFonty(P, W, H)) await fontLoad(f, txt);
+    const segs = typoOdcinki(P, fps, total, warstwa);
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const g = c.getContext("2d");
+    const out = [];
+    for (const s of segs) {
+        if (!s.podpis) { out.push([s.od, s.do, null]); continue; }
+        g.clearRect(0, 0, W, H);
+        typoRysuj(g, P, W, H, (s.od + 0.5) / fps, warstwa);
+        out.push([s.od, s.do, partia ? c.toDataURL("image/png") : ""]);
+    }
+    return out;
+}"""
+
+
+def typo_warstwy(plan: dict, W: int, H: int, fps: int, total: float, out_dir: Path, page) -> dict[str, Path]:
+    """Warstwy typografii (przód i „za osobą”) jako listy concat: przeglądarka rysuje klatkę tylko tam,
+    gdzie obraz się zmienia (wejście słowa, wyjście bloku), resztę ffmpeg trzyma jako długie odcinki."""
+    if not plan.get("bloki") or TYPO_JS is None:
+        return {}
+    blank = ed.blank_png(out_dir / "typo-pusty.png", W, H)
+    out = {}
+    for warstwa in ("tyl", "przod"):
+        if not any((b.get("warstwa") == "tyl") == (warstwa == "tyl") for b in plan["bloki"]):
+            continue
+        segs = page.evaluate(TYPO_KLATKI_JS, [{"typo": plan}, W, H, fps, total, warstwa, True])
+        lista = [((b - a) / fps, _png(png, out_dir / f"typo-{warstwa}-{a:06d}.png") if png else None) for a, b, png in segs]
+        dest = ed.typo_concat(lista, blank, out_dir / f"typo-{warstwa}.ffconcat")
+        if dest:
+            out[warstwa] = dest
+    return out
+
+
+def kadr_osi(proj: dict, t: float, W: int, H: int, dest: Path) -> Path:
+    """Klatka osi w chwili t w kadrze W×H (klip, czas źródła, dopasowanie jak przy eksporcie)."""
+    lay = layout(proj["clips"])
+    c, s, _e = next((x for x in lay if x[1] <= t < x[2]), lay[-1])
+    u = float(c["in"]) + (t - s) * float(c.get("speed") or 1)
+    fit = (ed.cover_filter(W, H, {"zoom": 1, "fx": 0.5, "fy": 0.5, **c}) if c.get("fit") == "cover"
+           else ed.blur_filter(W, H, 0) if c.get("fit") == "blur"
+           else f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black")
+    src = ["-i", str(c["src"])] if c.get("kind") == "image" else ["-ss", f"{max(0.0, u):.3f}", "-i", str(c["src"])]
+    subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", *src, "-frames:v", "1",
+                    "-filter_complex", f"[0:v]{fit}", str(dest)], check=True)
+    return dest
+
+
+ARKUSZ_JS = """async ([P, W, H, kadry, cols]) => {
+    for (const [f, txt] of typoFonty(P, W, H)) await fontLoad(f, txt);
+    const cw = Math.min(W, 420), ch = Math.round(cw * H / W), rows = Math.ceil(kadry.length / cols);
+    const sheet = document.createElement("canvas"); sheet.width = cw * cols; sheet.height = ch * rows;
+    const sg = sheet.getContext("2d"); sg.fillStyle = "#111"; sg.fillRect(0, 0, sheet.width, sheet.height);
+    const c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
+    for (let i = 0; i < kadry.length; i++) {
+        const [src, t] = kadry[i];
+        const img = new Image(); img.src = src; await img.decode();
+        g.clearRect(0, 0, W, H); g.drawImage(img, 0, 0, W, H);
+        typoRysuj(g, P, W, H, t);
+        const x = (i % cols) * cw, y = Math.floor(i / cols) * ch;
+        sg.drawImage(c, x, y, cw, ch);
+        sg.fillStyle = "rgba(0,0,0,.7)"; sg.fillRect(x, y, 70, 22); sg.fillStyle = "#FFE14D";
+        sg.font = "600 14px system-ui, sans-serif"; sg.fillText(t.toFixed(2) + " s", x + 6, y + 16);
+    }
+    return sheet.toDataURL("image/jpeg", 0.86);
+}"""
+
+
+def arkusz_typografii(proj: dict, plan: dict, chwile: list[float], out: Path) -> Path:
+    """Arkusz do oceny okiem: klatki filmu w podanych chwilach z typografią narysowaną tym samym rendererem."""
+    cv = proj["canvas"]
+    k = min(1.0, 720 / max(cv["w"], cv["h"]))
+    W, H = even(cv["w"] * k), even(cv["h"] * k)
+    with tempfile.TemporaryDirectory(prefix="typo-arkusz-") as tmp, strona() as page:
+        kadry = []
+        for i, t in enumerate(chwile):
+            f = kadr_osi(proj, t, W, H, Path(tmp) / f"k{i}.png")
+            kadry.append(["data:image/png;base64," + base64.b64encode(f.read_bytes()).decode(), t])
+        data = page.evaluate(ARKUSZ_JS, [{"typo": plan}, W, H, kadry, 4 if H > W else 3])
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(base64.b64decode(data.split(",", 1)[1]))
+    return out
 
 
 def cmd_render(film: Path, a) -> int:
@@ -390,14 +497,18 @@ def cmd_render(film: Path, a) -> int:
     has_audio = {str(c["src"]): ed.probe(c["src"]).get("audio", False) for c in p["clips"] if c["kind"] == "video"}
     with tempfile.TemporaryDirectory(prefix="projekt-") as tmp:
         W, H = p["canvas"]["w"], p["canvas"]["h"]
-        # jedno uruchomienie przeglądarki: zwykłe obrazy napisów, potem obraz na każde słowo napisów karaoke
+        # jedno uruchomienie przeglądarki: zwykłe obrazy napisów, obraz na każde słowo napisów karaoke, typografia
         jobs = [(t, -1) for t in kept] + [(texts[x["i"]], j) for x in p["texts"] if x.get("kara")
                                           for j in range(len(texts[x["i"]]["words"]))]
-        allp = text_pngs([t for t, _ in jobs], W, H, Path(tmp), [j for _, j in jobs])
+        allp, typo = [], {}
+        if jobs or p["typo"]["bloki"]:
+            with strona() as page:
+                allp = text_pngs([t for t, _ in jobs], W, H, Path(tmp), [j for _, j in jobs], page=page)
+                typo = typo_warstwy(p["typo"], W, H, p["canvas"]["fps"], p["duration"], Path(tmp), page)
         pngs, rest = allp[:len(kept)], iter(allp[len(kept):])
         kara = {x["i"]: [next(rest) for _ in texts[x["i"]]["words"]] for x in p["texts"] if x.get("kara")}
         layer = ed.karaoke_concat(p, kara, ed.blank_png(Path(tmp) / "pusty.png", W, H), Path(tmp) / "karaoke.ffconcat") if kara else None
-        cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer)
+        cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer, typo=typo)
         t0 = time.time()
         r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:

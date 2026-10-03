@@ -87,8 +87,8 @@ const liveApi = {
     return res.json();
   },
   editStamp: (path) => SDK.fetchJSON(`${API_ROOT}/edit/stamp?path=${encodeURIComponent(path)}`),
-  async editExport(path, project, texts, karaoke) {
-    const res = await rawFetch(`${API_ROOT}/edit/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, project, texts, karaoke: karaoke || {} }) });
+  async editExport(path, project, texts, karaoke, typo) {
+    const res = await rawFetch(`${API_ROOT}/edit/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, project, texts, karaoke: karaoke || {}, typo: typo || {} }) });
     return res.json();
   },
   editSrt: (path) => SDK.fetchJSON(`${API_ROOT}/edit/srt?path=${encodeURIComponent(path)}`),

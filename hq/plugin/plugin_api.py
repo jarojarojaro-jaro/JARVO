@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import math
 import os
 import sys
 import shutil
@@ -496,6 +497,52 @@ def _data_png(url: str, dest: Path) -> None:
     dest.write_bytes(raw)
 
 
+def _data_klatka(url: str, base: Path) -> Path:
+    """Klatka typografii z przeglądarki: WebP (edytor, lżejszy) albo PNG; rozszerzenie z zawartości, nie z nagłówka."""
+    import base64
+    head, _, data = str(url).partition(",")
+    if head not in ("data:image/png;base64", "data:image/webp;base64") or not data:
+        raise ed.ProjectError("Klatka typografii musi być obrazem PNG albo WebP (data URL).")
+    raw = base64.b64decode(data, validate=True)
+    ext = ".png" if raw.startswith(b"\x89PNG") else ".webp" if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP" else None
+    if ext is None or len(raw) > 12 * 2**20:
+        raise ed.ProjectError("Klatka typografii jest uszkodzona albo za duża.")
+    dest = base.with_suffix(ext)
+    dest.write_bytes(raw)
+    return dest
+
+
+def _typo_warstwy(raw, proj: dict, tmpdir: Path) -> dict:
+    """Klatki typografii z przeglądarki ({"tyl"|"przod": [[od, do, WebP/PNG albo null], …]} w numerach klatek)
+    → listy concat. Odcinki muszą iść po kolei i nie wychodzić poza film."""
+    if not isinstance(raw, dict):
+        return {}
+    cv, fps = proj["canvas"], proj["canvas"]["fps"]
+    limit = int(math.ceil(proj["duration"] * fps)) + 2
+    out, blank = {}, None
+    for warstwa in ("tyl", "przod"):
+        segs = raw.get(warstwa)
+        if not segs:
+            continue
+        if not isinstance(segs, list) or len(segs) > 20000:
+            raise ed.ProjectError("Typografia: za dużo odcinków albo zły format.")
+        lista, prev = [], 0
+        for k, seg in enumerate(segs):
+            if not isinstance(seg, list) or len(seg) != 3:
+                raise ed.ProjectError("Typografia: zły odcinek.")
+            a, b = int(seg[0]), int(seg[1])
+            if a != prev or b <= a or b > limit:
+                raise ed.ProjectError("Typografia: odcinki nie idą po kolei.")
+            prev = b
+            dest = _data_klatka(seg[2], tmpdir / f"typo-{warstwa}-{k:05d}") if seg[2] else None
+            lista.append(((b - a) / fps, dest))
+        blank = blank or ed.blank_png(tmpdir / "typo-pusty.png", cv["w"], cv["h"])
+        d = ed.typo_concat(lista, blank, tmpdir / f"typo-{warstwa}.ffconcat")
+        if d:
+            out[warstwa] = d
+    return out
+
+
 async def _run_export(job: dict, cmd: list[str], total: float, tmpdir: Path, out: Path) -> None:
     part = out.with_name(f".{out.stem}.part.mp4")
     cmd = cmd[:-1] + [str(part)]
@@ -576,12 +623,13 @@ async def edit_export(request: Request):
         if kara:
             cv = proj["canvas"]
             layer = ed.karaoke_concat(proj, kara, ed.blank_png(tmpdir / "pusty.png", cv["w"], cv["h"]), tmpdir / "karaoke.ffconcat")
+        typo = _typo_warstwy(body.get("typo"), proj, tmpdir)
         has_audio = {}
         for c in proj["clips"]:
             if c["kind"] == "video" and str(c["src"]) not in has_audio:
                 has_audio[str(c["src"])] = (await asyncio.to_thread(ed.probe, c["src"])).get("audio", False)
         out = ed.export_name(p)
-        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"], karaoke=layer)
+        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"], karaoke=layer, typo=typo)
     except (ed.ProjectError, ValueError) as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(400, str(exc))

@@ -80,9 +80,9 @@ Pliki w repo:
 | `hq/plugin/manifest.json` | manifest pluginu dashboardu (zakładka BASE w menu, przed CHAT) |
 | `hq/plugin/plugin_api.py` | trasy FastAPI, proxy czatu do gatewaya |
 | `hq/plugin/hq_core.py` | logika stanu (bez FastAPI, testowana w `tests/test_hq_core.py`) |
-| `hq/plugin/edytor.py` | edytor filmów: walidacja projektu, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`) |
+| `hq/plugin/edytor.py` | edytor filmów: walidacja projektu i planu typografii, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`, `tests/test_typografia.py`) |
 | `hq/plugin/animacja.py` | animacja HTML: schemat i zapis `parametry.json`, stan pomiaru, mostek podglądu (testy: `tests/test_animacja.py`); build dokłada do pluginu `pomiar.py` Wideografa (odcisk i aktualność raportu) |
-| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, HUD, aplikacja, widżet aktualizacji |
+| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność; edytor i okno animacji z własnymi tokenami) |
 | `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto; `kroje/`: kroje napisów i typografii (OFL, `scripts/kroje.py`) |
 | `branding/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css`; te same pliki na stronie logowania |
@@ -138,8 +138,18 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   w testach). Panel tekstu pokazuje je siatką z nazwą pisaną danym krojem. Krój wczytuje się razem z tekstem napisu
   (`fontLoad`), więc polskie znaki nie spadają na krój zastępczy; render agenta wstawia te same pliki jako data: URL
   (`edytor.kroje_css`), bez Google Fonts.
+- **Typografia** jak z montażu (słowo po słowie: różne wielkości, kroje, kolory, głębia, skos, perspektywa 3D): plan
+  w projekcie (`typo`: motyw, akcent i bloki z układem, kotwicą, obrotem, perspektywą, warstwą, wejściem i wyjściem;
+  słowa z czasem, wagą 0–3, linią, głębią, krojem, kolorem i stylem) rysuje jeden renderer `hq/web/src/48-typografia.js`
+  w podglądzie, przy eksporcie i w renderze Wideografa. Pięć motywów (`czysty` domyślny, `kino`, `ulica`, `energia`,
+  `elegancki`); kolor akcentu tylko na uderzeniu (waga 3), a blok wypełnia część swojej szerokości zależnie od
+  najmocniejszego słowa. Plan układa Wideograf (`typografia.py plan`, reżyser z reguł: mowa, głośność słów, pauzy,
+  interpunkcja, cięcia ujęć) i poprawia według znaczenia (`typografia.py popraw`); serwer sprawdza go
+  (`edytor.normalize_typo`). Przy eksporcie przeglądarka rysuje klatkę tylko tam, gdzie obraz warstwy się zmienia
+  (`typoOdcinki`), wysyła je jako WebP (PNG, gdy przeglądarka nie zna WebP), a ffmpeg nakłada dwie warstwy z demuxera
+  `concat` pod zwykłymi napisami: „za osobą” (`tyl`) i przednią.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
-  `volume`, `muted`, `fit`), napisy i muzyka. Po ponownym otwarciu edycja jest tam, gdzie była.
+  `volume`, `muted`, `fit`), napisy, muzyka i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
 - **Eksport** (`POST /edit/export`): serwer sprawdza projekt (ścieżki tylko z katalogów floty, limity długości
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat → nakładki → miks z limiterem), H.264 + AAC,
   `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
@@ -180,8 +190,9 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
   poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `napisy`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
-  a napisy rysuje ta sama funkcja (`hq/web/src/44-napisy.js`) w przeglądarce bez okna, więc plik od agenta wygląda
-  jak eksport z edytora. Edytor co 3 s (gdy karta jest widoczna) sprawdza, czy projekt zmienił się z zewnątrz: bez Twoich niezapisanych zmian
+  a napisy i typografię rysują te same funkcje (`hq/web/src/44-napisy.js`, `48-typografia.js`) w przeglądarce bez
+  okna, więc plik od agenta wygląda jak eksport z edytora. Typografię na tym samym projekcie układa `typografia.py`
+  (`plan`, `pokaz`, `popraw`, `arkusz`, `usun`). Edytor co 3 s (gdy karta jest widoczna) sprawdza, czy projekt zmienił się z zewnątrz: bez Twoich niezapisanych zmian
   wczytuje wersję agenta sam (jako zwykły krok, ↶ ją cofa), a przy kolizji pyta: „Wczytaj jego wersję” albo
   „Zostaw moją”. Zapis nigdy nie nadpisuje po cichu cudzej zmiany (serwer odrzuca go jako nieaktualny).
 - **Uwagi na osi i kadr do Wideografa** (pomysł z Remocn Studio, MIT): w panelu „Poproś agenta” **📌 Uwaga w 0:04.2**

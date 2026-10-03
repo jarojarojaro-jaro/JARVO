@@ -669,6 +669,7 @@ function VideoEditor({ path, onClose }) {
   const strefaRef = useRef(strefa);
   strefaRef.current = strefa;
 
+  const typoFontRef = useRef("");
   function drawOverlay() {
     const c = overlayRef.current, P = projRef.current;
     if (!c || !P) return;
@@ -687,6 +688,15 @@ function VideoEditor({ path, onClose }) {
       g.setLineDash([]); g.font = `600 ${fs}px system-ui, sans-serif`; g.fillStyle = "rgba(255,255,255,0.9)"; g.textBaseline = "top";
       for (const z of zs) if (z.k === "top" || z.k === "bottom") g.fillText(`${ED_STREFY[pf].name} · ${L(...ED_STREFY_OPIS[z.k])}`, w * 0.05, z.k === "top" ? fs * 0.6 : h - fs * 1.8);
       g.restore();
+    }
+    // typografia (słowo po słowie) pod zwykłymi tekstami; kroje wczytują się raz na zmianę planu
+    if (typoBloki(P).length) {
+      const fk = typoFonty(P, w, h).map(([f, txt]) => f + txt).join("|");
+      if (typoFontRef.current !== fk) {
+        typoFontRef.current = fk;
+        Promise.all(typoFonty(P, w, h).map(([f, txt]) => fontLoad(f, txt))).then(() => drawOverlay());
+      }
+      typoRysuj(g, P, w, h, now);
     }
     for (const x of P.texts) {
       if (now < x.start || now >= x.end) continue;
@@ -967,7 +977,32 @@ function VideoEditor({ path, onClose }) {
         const ws = karaokeWords(x);
         if (ws) { karaoke[i] = []; for (let k = 0; k < ws.length; k++) karaoke[i].push(await textPng(x, w, h, k)); }
       }
-      const r = await api.editExport(path, { ...p, texts }, pngs, karaoke);
+      // typografia: klatka tylko tam, gdzie obraz warstwy się zmienia (typoOdcinki), reszta to długie odcinki
+      const typo = {};
+      if (typoBloki(p).length) {
+        for (const [f, txt] of typoFonty(p, w, h)) await fontLoad(f, txt);
+        const fps = p.canvas.fps || 30;
+        const warstwy = ["tyl", "przod"].filter((k) => typoBloki(p).some((b) => (b.warstwa === "tyl" ? "tyl" : "przod") === k));
+        const plan = warstwy.map((k) => [k, typoOdcinki(p, fps, total, k)]);
+        const ile = plan.reduce((a, [, segs]) => a + segs.filter((s) => s.podpis).length, 0);
+        const c = document.createElement("canvas"); c.width = w; c.height = h;
+        const g = c.getContext("2d");
+        let gotowe = 0;
+        for (const [k, segs] of plan) {
+          typo[k] = [];
+          for (const s of segs) {
+            let png = null;
+            if (s.podpis) {
+              g.clearRect(0, 0, w, h);
+              typoRysuj(g, p, w, h, (s.od + 0.5) / fps, k);
+              png = c.toDataURL("image/webp", 0.92);   // WebP ~3,5× lżejszy od PNG, tak samo ostry; bez WebP przeglądarka da PNG
+              if (++gotowe % 10 === 0) { setJob({ state: "prep", progress: gotowe / ile }); await new Promise((r) => setTimeout(r, 0)); }
+            }
+            typo[k].push([s.od, s.do, png]);
+          }
+        }
+      }
+      const r = await api.editExport(path, { ...p, texts }, pngs, karaoke, typo);
       setJob(r);
     } catch (e) { setJob({ state: "error", error: e.message || String(e) }); }
   }
@@ -1738,7 +1773,7 @@ function ExportBox({ job, onClose, onOpen }) {
   const done = job.state === "done", bad = job.state === "error" || job.state === "cancelled";
   const file = done ? { ...fileFromPath(job.out), size: job.size } : null;
   return html`<div class="thq-ed-export" role="status">
-    ${!done && !bad && html`<p><strong>${job.state === "prep" ? L("Przygotowuję napisy…", "Preparing texts…") : L(`Eksport ${pct}%`, `Exporting ${pct}%`)}</strong></p>
+    ${!done && !bad && html`<p><strong>${job.state === "prep" ? (job.progress ? L(`Rysuję typografię ${pct}%`, `Drawing typography ${pct}%`) : L("Przygotowuję napisy…", "Preparing texts…")) : L(`Eksport ${pct}%`, `Exporting ${pct}%`)}</strong></p>
       <div class="thq-ed-bar"><i style=${{ width: `${pct}%` }}></i></div>
       ${job.id && html`<button type="button" class="thq-ed-btn" onClick=${() => api.editCancel(job.id).catch(() => {})}>${L("Przerwij", "Cancel")}</button>`}`}
     ${done && html`<p class="thq-ed-subi">${ED_ICON.check}<span><strong>${L("Gotowe", "Done")}</strong> · ${file.name} · ${bytes(job.size)}</span></p>
