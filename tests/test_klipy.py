@@ -165,6 +165,14 @@ def test_rebuild_does_not_overwrite_user_edit(nagranie, tmp_path):
     assert K.main(["zbuduj", str(pl), "-o", str(out), "--bez-renderu"]) == 0       # bez zmian człowieka: wolno
     pp = out / "klip-1-trzy-bledy.edycja.json"
     proj = json.loads(pp.read_text(encoding="utf-8"))
+    for c in proj["clips"]:                                  # samo otwarcie w HQ: edytor zapisuje 1.0 jako 1
+        c["zoom"] = int(c["zoom"]) if c["zoom"] == int(c["zoom"]) else c["zoom"]
+    proj["notes"] = []
+    pp.write_text(json.dumps(proj), encoding="utf-8")
+    assert not K.edytowana_recznie(out / "klip-1-trzy-bledy.mp4")
+    stary = {**proj, "clipmaker": {**proj["clipmaker"], "podpis": K.podpis(proj, kanon=False)}}
+    pp.write_text(json.dumps(stary), encoding="utf-8")                                 # podpis sprzed sprowadzenia liczb
+    assert not K.edytowana_recznie(out / "klip-1-trzy-bledy.mp4")
     proj["texts"][0]["text"] = "Poprawione w HQ"                                        # człowiek edytował rolkę
     pp.write_text(json.dumps(proj), encoding="utf-8")
     with pytest.raises(SystemExit, match="zmieniono po zbudowaniu"):

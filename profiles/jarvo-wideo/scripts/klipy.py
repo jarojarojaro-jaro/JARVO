@@ -614,15 +614,26 @@ def odcinki_twarzy(plan: dict, words: list, info: dict, tylko: str | None = None
     return out
 
 
-def podpis(proj: dict) -> str:
+def _kanon(x):
+    """Liczby w jednej postaci: edytor HQ zapisuje 1.0 jako 1, a samo otwarcie rolki to jeszcze nie edycja."""
+    if isinstance(x, bool) or not isinstance(x, (int, float, list, dict)):
+        return x
+    if isinstance(x, (int, float)):
+        return round(float(x), 4)
+    return [_kanon(v) for v in x] if isinstance(x, list) else {k: _kanon(v) for k, v in x.items()}
+
+
+def podpis(proj: dict, kanon: bool = True) -> str:
     """Odcisk treści projektu (klipy, napisy, audio, kadr): po nim poznajemy, czy ktoś edytował rolkę w HQ."""
     import hashlib
     tresc = {k: proj.get(k) for k in ("canvas", "clips", "texts", "audio")}
-    return hashlib.sha1(json.dumps(tresc, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
+    return hashlib.sha1(json.dumps(_kanon(tresc) if kanon else tresc, sort_keys=True, ensure_ascii=False)
+                        .encode()).hexdigest()[:16]
 
 
 def edytowana_recznie(film: Path) -> bool:
-    """Projekt rolki zmieniony po zbudowaniu (albo bez podpisu): ponowne zbuduj nie może go po cichu nadpisać."""
+    """Projekt rolki zmieniony po zbudowaniu (albo bez podpisu): ponowne zbuduj nie może go po cichu nadpisać.
+    Podpis bez sprowadzenia liczb (rolki zbudowane przed 2026-10-03) też się liczy."""
     pp = ed.project_path(film)
     if not pp.is_file():
         return False
@@ -630,7 +641,7 @@ def edytowana_recznie(film: Path) -> bool:
         proj = json.loads(pp.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return True
-    return (proj.get("clipmaker") or {}).get("podpis") != podpis(proj)
+    return (proj.get("clipmaker") or {}).get("podpis") not in (podpis(proj), podpis(proj, kanon=False))
 
 
 def ensure_render_env() -> None:
