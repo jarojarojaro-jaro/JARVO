@@ -919,6 +919,14 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-nav button svg { width: 24px; height: 24px; stroke-width: 1.6; }
 .thq-ed-nav button.is-on { color: var(--ed-ink); }
 .thq-ed-nav button.is-on svg { color: var(--ed-accent); }
+/* pasek ikon zaznaczonego elementu (klip, audio, tekst): „<” wraca do głównego paska, ikony przewijane w bok */
+.thq-ed-nav.is-ctx { justify-content: flex-start; gap: 2px; padding-left: 0; }
+.thq-ed-nav .thq-ed-back { flex: none; width: 44px; justify-content: center; border-right: 1px solid var(--ed-line); color: var(--ed-ink); }
+.thq-ed-navscroll { flex: 1; min-width: 0; display: flex; overflow-x: auto; scrollbar-width: none; }
+.thq-ed-navscroll::-webkit-scrollbar { display: none; }
+.thq-ed-navscroll button { flex: 0 0 auto; min-width: 64px; white-space: nowrap; }
+.thq-ed-nav button:disabled { opacity: .35; cursor: default; }
+.thq-ed-nav button.is-bad { color: #FF6B5E; }
 .thq-ed.is-mobile .thq-ed-export { bottom: 92px; }
 .thq-ed.is-mobile .thq-ed-ask { top: 60px; right: 12px; width: calc(100vw - 24px); }
 .thq-ed.is-mobile .thq-ed-banner { top: 62px; }

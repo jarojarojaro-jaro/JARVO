@@ -277,8 +277,12 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   z jego opisem, a `render` ostrzega o otwartych. Logika bez Reacta: `hq/web/src/46-uwagi.js` (testy w node).
 - **Telefon (do 860 px):** układ jak w CapCut: podgląd na górze, pod nim czas, odtwarzanie i cofnij/ponów, oś czasu
   przewijana palcem pod stałym wskaźnikiem na środku (dwa palce: przybliżenie), a na dole pasek **Edytuj · Audio ·
-  Tekst · Napisy · Format**. Narzędzie otwiera panel od dołu; dotknięcie klipu, napisu albo muzyki na osi otwiera
-  jego ustawienia, uchwyty do przycinania pojawiają się na zaznaczonym elemencie.
+  Tekst · Napisy · Mowa · Format**. Dotknięcie klipu, napisu albo muzyki na osi zmienia dolny pasek na ikony tego
+  elementu (z **<** powrotu): klip **Tnij · Z lewej · Z prawej · Podziel · Tempo · Głośność · Kadr · Przejście ·
+  Duplikuj · Usuń**, audio **Tnij · Głośność · Duplikuj · Usuń**, tekst **Edytuj · Styl · Krój · Układ · Tnij ·
+  Duplikuj · Usuń**. Akcja działa od razu, a ustawienie otwiera panel od dołu z jedną sekcją (te same sekcje, które
+  komputer pokazuje naraz w „Ustawieniach”). **Edytuj** zaznacza klip pod wskaźnikiem, **Tekst** dodaje napis
+  i otwiera jego treść. Uchwyty do przycinania pojawiają się na zaznaczonym elemencie.
 - Plan dalszej rozbudowy (szybkie cięcie, audio, naklejki, animacje klipów) i stan kroków: [EDYTOR-PLAN.md](EDYTOR-PLAN.md).
 - Logika serwera: `hq/plugin/edytor.py` (bez FastAPI), testy: `tests/test_edytor.py` (także prawdziwy eksport ffmpeg)
   i `tests/test_edytor_przejscia.py` (przejścia: oś, eksport, podgląd = film).

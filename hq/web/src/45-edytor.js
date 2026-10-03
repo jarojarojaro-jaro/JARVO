@@ -87,6 +87,9 @@ const ED_ICON = {
   delL: svgI(html`<path d="M15 3v18"/><path d="M4 8.5l7 7M11 8.5l-7 7"/><path d="M15 9h5v6h-5"/>`),
   delR: svgI(html`<path d="M9 3v18"/><path d="M13 8.5l7 7M20 8.5l-7 7"/><path d="M9 9H4v6h5"/>`),
   parts: svgI(html`<rect x="2.5" y="7" width="19" height="10" rx="1.5"/><path d="M8.8 4.5v15M15.2 4.5v15"/>`),
+  crop: svgI(html`<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>`),
+  palette: svgI(html`<path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-.9-.7-1.4-.7-2.3 0-.9.7-1.6 1.6-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8.5-9-8.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>`),
+  font: svgI(html`<path d="M3 18 8 5l5 13M5 13.5h6"/><path d="M15.5 10.5c.5-.6 1.3-1 2.2-1 1.6 0 2.3.9 2.3 2.4V18M20 14.5h-2.6c-1.4 0-2.4.7-2.4 1.8s.8 1.7 2 1.7c1.6 0 3-1.2 3-3"/>`),
   speed: svgI(html`<path d="M12 14l4-4"/><path d="M3.3 17a9 9 0 1 1 17.4 0"/>`),
   volume: svgI(html`<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>`),
   mute: svgI(html`<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6M22 9l-6 6"/>`),
@@ -1611,7 +1614,8 @@ function VideoEditor({ path, onClose }) {
       if (!(sel && sel.id === id)) setTypoW(null);
     }
     setSel({ type, id });
-    if (mobileRef.current) setTool(type === "clip" ? "edit" : type);   // "mark" → panel znacznika, "tr" → przejścia
+    // telefon: klip, audio i tekst → pasek ikon elementu (jak w CapCut), znacznik, przejście i typografia → od razu panel
+    if (mobileRef.current) setTool(type === "clip" || type === "audio" || type === "text" ? null : type);
     else setSide("inspect");
   };
 
@@ -1819,17 +1823,20 @@ function VideoEditor({ path, onClose }) {
     title=${L("Paleta z filmu", "Palette from the film")}></button>`)}</div>`}<div class="thq-ed-sw">${ED_COLORS.map((c) => html`<button type="button" key=${c} class=${cx(String(cur).toLowerCase() === c.toLowerCase() && "is-on")}
     style=${{ background: c }} onClick=${() => set(c)} aria-label=${c}></button>`)}<label class="thq-ed-sw-more" title=${L("Inny kolor", "Other color")}>+<input type="color" value=${cur || "#ffffff"} onInput=${(e) => set(e.target.value, true)} onChange=${H.commit}/></label></div>`;
   const act = (icon, label, fn, opts = {}) => html`<button type="button" class=${cx("thq-ed-act", opts.bad && "is-bad", opts.on && "is-on")} disabled=${opts.disabled} onClick=${fn} title=${opts.title}>${ED_ICON[icon]}<span>${label}</span></button>`;
-  const mediaList = (kinds) => html`<ul class="thq-ed-list">${media.filter((m) => kinds.includes(m.kind)).map((m) => html`<li key=${m.path}><button type="button" onClick=${() => { addMedia(m); if (mobile) setTool(m.kind === "audio" ? "audio" : "edit"); }} title=${L("Dodaj do osi czasu", "Add to the timeline")}>
+  const mediaList = (kinds) => html`<ul class="thq-ed-list">${media.filter((m) => kinds.includes(m.kind)).map((m) => html`<li key=${m.path}><button type="button" onClick=${() => { addMedia(m); if (mobile) setTool(null); }} title=${L("Dodaj do osi czasu", "Add to the timeline")}>
     <span class=${cx("thq-ed-mk", `is-${m.kind}`)}>${m.kind === "audio" ? ED_ICON.audio : m.kind === "image" ? ED_ICON.image : ED_ICON.film}</span>
     <span class="thq-ed-mn">${m.name}</span><span class="thq-ed-md">${m.duration ? edTC(m.duration, false) : ""}</span><span class="thq-ed-plus">${ED_ICON.plus}</span></button></li>`)}</ul>`;
   const uploadBtn = (accept) => html`<label class="thq-ed-btn is-wide thq-ed-upload">${ED_ICON.upload} ${L("Dodaj z urządzenia", "Add from device")}
     <input type="file" multiple accept=${accept} onChange=${(e) => { uploadMedia(Array.from(e.target.files || [])); e.target.value = ""; }}/></label>`;
 
-  const clipTools = (c) => {
+  // Ustawienia w sekcjach: komputer pokazuje wszystkie naraz, telefon jedną (ikona na pasku klipu, audio albo tekstu).
+  // only = klucz sekcji albo nic (wszystkie z przyciskami akcji).
+  const jest = (only, k) => !only || only === k;
+  const clipTools = (c, only) => {
     const sc = segs.find((x) => x.c.id === c.id), wsk = !!sc && t > sc.start + ED_MIN / 2 && t < sc.end - ED_MIN / 2;
     const czesci = [2, 3, 4].filter((n) => clipDur(c) / n >= ED_MIN * 2);
     return html`<div class="thq-ed-form">
-    <div class="thq-ed-acts">
+    ${!only && html`<div class="thq-ed-acts">
       ${act("split", L("Tnij", "Split"), split)}
       ${act("delL", L("Usuń z lewej", "Delete left"), () => trimAt("l"), { disabled: !wsk, title: `${L("Usuń od początku klipu do wskaźnika", "Delete from the clip start to the playhead")} (Q)` })}
       ${act("delR", L("Usuń z prawej", "Delete right"), () => trimAt("r"), { disabled: !wsk, title: `${L("Usuń od wskaźnika do końca klipu", "Delete from the playhead to the clip end")} (W)` })}
@@ -1837,9 +1844,9 @@ function VideoEditor({ path, onClose }) {
       ${p.clips[p.clips.length - 1].id !== c.id && act("trans", L("Przejście", "Transition"), () => { setSel({ type: "tr", id: c.id }); if (mobile) setTool("tr"); }, { on: !!c.transition })}
       ${c.kind !== "image" && act(c.muted ? "mute" : "volume", c.muted ? L("Włącz dźwięk", "Unmute") : L("Wycisz", "Mute"), () => upd("clip", c.id, { muted: !c.muted }))}
       ${act("trash", L("Usuń", "Delete"), remove, { bad: true, disabled: p.clips.length <= 1 })}
-    </div>
-    <label>${L("Kadr", "Framing")}${seg(ED_FITS.map(([k2, pl, en]) => [k2, L(pl, en)]), c.fit || "contain", (v) => upd("clip", c.id, { fit: v }))}</label>
-    ${c.fit === "cover" && html`<div class="thq-ed-crop">
+    </div>`}
+    ${jest(only, "kadr") && html`<label>${L("Kadr", "Framing")}${seg(ED_FITS.map(([k2, pl, en]) => [k2, L(pl, en)]), c.fit || "contain", (v) => upd("clip", c.id, { fit: v }))}</label>`}
+    ${jest(only, "kadr") && c.fit === "cover" && html`<div class="thq-ed-crop">
       <label>${L("Kadr: poziomo", "Frame: horizontal")} · ${Math.round((c.fx ?? 0.5) * 100)}%
         <input type="range" min="0" max="1" step="0.01" value=${c.fx ?? 0.5} onInput=${(e) => upd("clip", c.id, { fx: +e.target.value }, true)} onChange=${H.commit}/></label>
       <label>${L("Kadr: pionowo", "Frame: vertical")} · ${Math.round((c.fy ?? 0.5) * 100)}%
@@ -1847,14 +1854,16 @@ function VideoEditor({ path, onClose }) {
       <label>${L("Przybliżenie", "Zoom")} · ${(c.zoom ?? 1).toFixed(2)}×
         <input type="range" min="1" max="3" step="0.05" value=${c.zoom ?? 1} onInput=${(e) => upd("clip", c.id, { zoom: +e.target.value }, true)} onChange=${H.commit}/></label>
     </div>`}
-    ${c.kind !== "image" && html`<label>${L("Tempo", "Speed")} · ${c.speed}×${seg(ED_SPEEDS.map((s) => [s, `${s}×`]), c.speed, (v) => clipPatch(c.id, { speed: v }))}</label>`}
-    ${c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}% (${fmtDb(c.muted ? 0 : c.volume)})
-      <input type="range" min="0" max="2" step="0.05" value=${c.volume} onInput=${(e) => upd("clip", c.id, { volume: +e.target.value, muted: false }, true)} onChange=${H.commit}/></label>`}
-    ${c.kind !== "image" && !c.muted && fadeTools("clip", c, clipDur(c))}
-    ${c.kind === "image" && html`<label>${L("Czas planszy", "Still duration")} · ${(c.out - c.in).toFixed(1)} s
+    ${jest(only, "tempo") && c.kind !== "image" && html`<label>${L("Tempo", "Speed")} · ${c.speed}×${seg(ED_SPEEDS.map((s) => [s, `${s}×`]), c.speed, (v) => clipPatch(c.id, { speed: v }))}</label>`}
+    ${jest(only, "tempo") && c.kind === "image" && html`<label>${L("Czas planszy", "Still duration")} · ${(c.out - c.in).toFixed(1)} s
       <input type="range" min="0.5" max="15" step="0.5" value=${c.out - c.in} onInput=${(e) => clipPatch(c.id, { out: c.in + +e.target.value }, true)} onChange=${H.commit}/></label>`}
-    ${czesci.length > 0 && html`<label>${L("Podziel na równe części", "Split into equal parts")} · ${fmtSek(clipDur(c))}${seg(czesci.map((n) => [n, `${n} × ${fmtSek(clipDur(c) / n)}`]), null, (n) => podziel(c.id, n))}</label>`}
-    <p class="thq-ed-note">${(meta[c.src] || {}).name || c.src.split("/").pop()}${c.kind !== "image" ? ` · ${fmtT(c.in, true)} – ${fmtT(c.out, true)}` : ""}</p>
+    ${jest(only, "glos") && c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}% (${fmtDb(c.muted ? 0 : c.volume)})
+      <input type="range" min="0" max="2" step="0.05" value=${c.volume} onInput=${(e) => upd("clip", c.id, { volume: +e.target.value, muted: false }, true)} onChange=${H.commit}/></label>`}
+    ${jest(only, "glos") && c.kind !== "image" && !c.muted && fadeTools("clip", c, clipDur(c))}
+    ${only === "glos" && c.kind !== "image" && html`<div class="thq-ed-acts">${act(c.muted ? "mute" : "volume", c.muted ? L("Włącz dźwięk", "Unmute") : L("Wycisz", "Mute"), () => upd("clip", c.id, { muted: !c.muted }), { on: c.muted })}</div>`}
+    ${jest(only, "podziel") && czesci.length > 0 && html`<label>${L("Podziel na równe części", "Split into equal parts")} · ${fmtSek(clipDur(c))}${seg(czesci.map((n) => [n, `${n} × ${fmtSek(clipDur(c) / n)}`]), null, (n) => podziel(c.id, n))}</label>`}
+    ${only === "podziel" && !czesci.length && html`<p class="thq-ed-note">${L("Klip jest za krótki na podział.", "The clip is too short to split.")}</p>`}
+    ${!only && html`<p class="thq-ed-note">${(meta[c.src] || {}).name || c.src.split("/").pop()}${c.kind !== "image" ? ` · ${fmtT(c.in, true)} – ${fmtT(c.out, true)}` : ""}</p>`}
   </div>`;
   };
 
@@ -1889,23 +1898,23 @@ function VideoEditor({ path, onClose }) {
     </div>`;
   };
 
-  const textTools = (x) => {
+  const textTools = (x, only) => {
     const u = (patch, lv) => upd("text", x.id, patch, lv);
     return html`<div class="thq-ed-form">
-      <textarea rows="2" value=${x.text} placeholder=${L("Wpisz tekst", "Type text")} onInput=${(e) => u({ text: e.target.value }, true)} onBlur=${H.commit}></textarea>
+      ${jest(only, "tekst") && html`<textarea rows="2" value=${x.text} placeholder=${L("Wpisz tekst", "Type text")} onInput=${(e) => u({ text: e.target.value }, true)} onBlur=${H.commit}></textarea>`}
       ${strefaUwaga(strefyTekstu(x), x.cap ? L("Napis", "The caption") : L("Tekst", "The text"), L("Przesuń go na podglądzie.", "Move it on the preview."))}
-      <label>${L("Styl", "Style")}${seg(ED_STYLES.map(([k2, pl, en]) => [k2, L(pl, en)]), x.style, (v) => u({ style: v }))}</label>
+      ${jest(only, "styl") && html`<label>${L("Styl", "Style")}${seg(ED_STYLES.map(([k2, pl, en]) => [k2, L(pl, en)]), x.style, (v) => u({ style: v }))}</label>
       <label>${L("Kolor", "Color")}${swatches(x.color, (v, lv) => u({ color: v }, lv))}</label>
-      ${(x.style === "box" || x.style === "outline") && html`<label>${x.style === "box" ? L("Tło", "Box") : L("Obrys", "Outline")}${swatches(x.bg || "#000000", (v, lv) => u({ bg: v }, lv))}</label>`}
-      <label>${L("Rozmiar", "Size")} · ${Math.round(x.size)}<input type="range" min="16" max="220" value=${x.size} onInput=${(e) => u({ size: +e.target.value }, true)} onChange=${H.commit}/></label>
-      <div class="thq-ed-field"><span>${L("Krój", "Font")}</span>${fontPick(x.font, (v) => u({ font: v }))}</div>
-      <div class="thq-ed-row">
+      ${(x.style === "box" || x.style === "outline") && html`<label>${x.style === "box" ? L("Tło", "Box") : L("Obrys", "Outline")}${swatches(x.bg || "#000000", (v, lv) => u({ bg: v }, lv))}</label>`}`}
+      ${jest(only, "uklad") && html`<label>${L("Rozmiar", "Size")} · ${Math.round(x.size)}<input type="range" min="16" max="220" value=${x.size} onInput=${(e) => u({ size: +e.target.value }, true)} onChange=${H.commit}/></label>`}
+      ${jest(only, "kroj") && html`<div class="thq-ed-field"><span>${L("Krój", "Font")}</span>${fontPick(x.font, (v) => u({ font: v }))}</div>`}
+      ${jest(only, "uklad") && html`<div class="thq-ed-row">
         ${seg([["left", ED_ICON.alignL], ["center", ED_ICON.alignC], ["right", ED_ICON.alignR]], x.align, (v) => u({ align: v }))}
         <label class="thq-ed-check"><input type="checkbox" checked=${x.bold !== false} onChange=${(e) => u({ bold: e.target.checked })}/> ${L("Gruby", "Bold")}</label>
       </div>
-      ${!mobile && html`<label>${L("Szerokość", "Width")} · ${Math.round((x.maxw || 0.86) * 100)}%<input type="range" min="0.2" max="1" step="0.01" value=${x.maxw || 0.86} onInput=${(e) => u({ maxw: +e.target.value }, true)} onChange=${H.commit}/></label>`}
-      <p class="thq-ed-note">${fmtT(x.start, true)} – ${fmtT(x.end, true)} · ${L("przeciągnij napis na podglądzie, żeby go przesunąć", "drag the text on the preview to move it")}</p>
-      <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>
+      <label>${L("Szerokość", "Width")} · ${Math.round((x.maxw || 0.86) * 100)}%<input type="range" min="0.2" max="1" step="0.01" value=${x.maxw || 0.86} onInput=${(e) => u({ maxw: +e.target.value }, true)} onChange=${H.commit}/></label>`}
+      ${!only && html`<p class="thq-ed-note">${fmtT(x.start, true)} – ${fmtT(x.end, true)} · ${L("przeciągnij napis na podglądzie, żeby go przesunąć", "drag the text on the preview to move it")}</p>
+      <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>`}
     </div>`;
   };
 
@@ -1917,12 +1926,12 @@ function VideoEditor({ path, onClose }) {
       <input type="range" min="0" max=${mx} step="0.1" value=${Math.min(+item[key] || 0, mx)} onInput=${(e) => upd(type, item.id, { [key]: +e.target.value || undefined }, true)} onChange=${H.commit}/></label>`;
     return html`<div class="thq-ed-row2">${one("fadeIn", "Narastanie", "Fade in")}${one("fadeOut", "Wyciszanie", "Fade out")}</div>`;
   };
-  const audioTools = (m) => html`<div class="thq-ed-form">
-    <p class="thq-ed-sub thq-ed-subi">${ED_ICON.audio}<span>${(meta[m.src] || {}).name || m.src.split("/").pop()}</span></p>
+  const audioTools = (m, only) => html`<div class="thq-ed-form">
+    ${!only && html`<p class="thq-ed-sub thq-ed-subi">${ED_ICON.audio}<span>${(meta[m.src] || {}).name || m.src.split("/").pop()}</span></p>`}
     <label>${L("Głośność", "Volume")} · ${Math.round(m.volume * 100)}% (${fmtDb(m.volume)})<input type="range" min="0" max="2" step="0.05" value=${m.volume} onInput=${(e) => upd("audio", m.id, { volume: +e.target.value }, true)} onChange=${H.commit}/></label>
     ${fadeTools("audio", m, audioNaOsi(m, total))}
-    <p class="thq-ed-note">${L("Od", "From")} ${fmtT(m.start, true)} · ${L("długość", "length")} ${fmtT(audioDur(m), true)}</p>
-    <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>
+    ${!only && html`<p class="thq-ed-note">${L("Od", "From")} ${fmtT(m.start, true)} · ${L("długość", "length")} ${fmtT(audioDur(m), true)}</p>
+    <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>`}
   </div>`;
 
   const audioAdd = () => html`<div class="thq-ed-form">
@@ -2123,12 +2132,12 @@ function VideoEditor({ path, onClose }) {
       onClick=${(e) => { e.stopPropagation(); player.seek(n.t); setNoteHi(n.id); if (!ask) setAsk({ text: "", reply: "", busy: false }); }}>${n.done ? "✓" : ""}</button>`)}
   </div>`;
   const textTrack = html`<div class="thq-ed-track is-text" style=${{ height: `${(p.texts.length ? nLanes : 1) * 26 + 6}px` }} onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
-    ${mobile && html`<button type="button" class="thq-ed-lane" onPointerDown=${(e) => e.stopPropagation()} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text"); }} aria-label=${L("Dodaj tekst", "Add text")}>${ED_ICON.text}</button>`}
+    ${mobile && html`<button type="button" class="thq-ed-lane" onPointerDown=${(e) => e.stopPropagation()} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text:tekst"); }} aria-label=${L("Dodaj tekst", "Add text")}>${ED_ICON.text}</button>`}
     ${p.texts.map((x) => html`<div key=${x.id} class=${cx("thq-ed-item is-text", x.cap && "is-cap", sel && sel.id === x.id && "is-sel")}
       style=${{ left: `${x.start * pps}px`, width: `${Math.max(6, (x.end - x.start) * pps)}px`, top: `${3 + textLane[x.id] * 26}px` }}
       onPointerDown=${(e) => textDown(e, x)} onClick=${(e) => pick(e, "text", x.id)}>
       <i class="thq-ed-h is-l" onPointerDown=${(e) => textDown(e, x, "l")}></i><span>${x.text}</span><i class="thq-ed-h is-r" onPointerDown=${(e) => textDown(e, x, "r")}></i></div>`)}
-    ${mobile && !p.texts.length && html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text"); }}>${ED_ICON.plus}${L("Dodaj tekst", "Add text")}</button>`}
+    ${mobile && !p.texts.length && html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text:tekst"); }}>${ED_ICON.plus}${L("Dodaj tekst", "Add text")}</button>`}
   </div>`;
   const typoLane = {}, tLanes = [];
   for (const b of typoBloki(p).slice().sort((a, c) => a.start - c.start)) {
@@ -2226,18 +2235,45 @@ function VideoEditor({ path, onClose }) {
     const TOOLS = [["edit", L("Edytuj", "Edit")], ["audio", L("Audio", "Audio")], ["text", L("Tekst", "Text")], ["captions", L("Napisy", "Captions")], ["speech", L("Mowa", "Speech")], ["format", L("Format", "Format")]];
     const openTool = (k2) => {
       if (tool === k2) { setTool(null); return; }
-      if (k2 === "edit" && !(sel && sel.type === "clip")) {
+      if (k2 === "edit") {                         // Edytuj: klip pod wskaźnikiem i jego pasek ikon
         const s = segs.find((x) => t >= x.start && t < x.end) || segs[segs.length - 1];
         if (s) setSel({ type: "clip", id: s.c.id });
+        setTool(null);
+        return;
       }
-      if (k2 === "text" && !(sel && sel.type === "text")) { addText(); }
-      if (k2 === "audio" && !(sel && sel.type === "audio")) setSel(null);
+      if (k2 === "text") { addText(); setTool("text:tekst"); return; }
+      if (k2 === "audio") setSel(null);
       setTool(k2);
     };
+    // Pasek ikon zaznaczonego elementu (jak w CapCut): akcja od razu albo „typ:sekcja” = panel z jedną sekcją ustawień
+    const wskIn = (c) => { const sc = segs.find((x) => x.c.id === c.id); return !!sc && t > sc.start + ED_MIN / 2 && t < sc.end - ED_MIN / 2; };
+    const BARY = {
+      clip: (c) => [
+        ["split", L("Tnij", "Split"), split],
+        ["delL", L("Z lewej", "Del. left"), () => trimAt("l"), !wskIn(c)],
+        ["delR", L("Z prawej", "Del. right"), () => trimAt("r"), !wskIn(c)],
+        ["parts", L("Podziel", "Parts"), "clip:podziel"],
+        ["speed", c.kind === "image" ? L("Czas", "Length") : L("Tempo", "Speed"), "clip:tempo"],
+        c.kind !== "image" && [c.muted ? "mute" : "volume", L("Głośność", "Volume"), "clip:glos"],
+        ["crop", L("Kadr", "Framing"), "clip:kadr"],
+        p.clips[p.clips.length - 1].id !== c.id && ["trans", L("Przejście", "Transition"), () => { setSel({ type: "tr", id: c.id }); setTool("tr"); }],
+        ["copy", L("Duplikuj", "Duplicate"), duplicate],
+        ["trash", L("Usuń", "Delete"), remove, p.clips.length <= 1, true],
+      ],
+      audio: () => [["split", L("Tnij", "Split"), split], ["volume", L("Głośność", "Volume"), "audio:glos"],
+        ["copy", L("Duplikuj", "Duplicate"), duplicate], ["trash", L("Usuń", "Delete"), remove, false, true]],
+      text: () => [["text", L("Edytuj", "Edit"), "text:tekst"], ["palette", L("Styl", "Style"), "text:styl"], ["font", L("Krój", "Font"), "text:kroj"],
+        ["alignC", L("Układ", "Layout"), "text:uklad"], ["split", L("Tnij", "Split"), split], ["copy", L("Duplikuj", "Duplicate"), duplicate],
+        ["trash", L("Usuń", "Delete"), remove, false, true]],
+    };
+    const ctx = sel && selItem && BARY[sel.type] ? BARY[sel.type](selItem).filter(Boolean) : null;
+    const [tk, sek] = (tool || "").split(":");
     let sheet = null, title = "";
-    if (tool === "edit" && selItem && sel.type === "clip") { sheet = clipTools(selItem); title = L("Klip", "Clip"); }
-    else if (tool === "text" && selItem && sel.type === "text") { sheet = textTools(selItem); title = selItem.cap ? L("Napis", "Caption") : L("Tekst", "Text"); }
-    else if (tool === "audio") { sheet = selItem && sel.type === "audio" ? audioTools(selItem) : audioAdd(); title = L("Audio", "Audio"); }
+    if (sek && selItem && sel.type === tk) {
+      sheet = tk === "clip" ? clipTools(selItem, sek) : tk === "audio" ? audioTools(selItem, sek) : textTools(selItem, sek);
+      title = (ctx.find((b) => b[2] === tool) || [])[1] || "";
+    }
+    else if (tool === "audio") { sheet = audioAdd(); title = L("Audio", "Audio"); }
     else if (tool === "captions") { sheet = captionTools(); title = L("Napisy", "Captions"); }
     else if (tool === "speech") { sheet = speechTools(); title = L("Mowa, pauzy i wtrącenia", "Speech, pauses and fillers"); }
     else if (tool === "mark" && markSel) { sheet = markTools(markSel); title = L("Znacznik", "Mark"); }
@@ -2265,10 +2301,15 @@ function VideoEditor({ path, onClose }) {
       </div>
       ${timeline}
       ${sheet && html`<div class="thq-ed-sheet">
-        <header><strong>${title}</strong><button type="button" class="thq-ed-ico" onClick=${() => { setTool(null); if (tool !== "captions" && tool !== "format") setSel(null); }} aria-label=${L("Gotowe", "Done")}>${ED_ICON.check}</button></header>
+        <header><strong>${title}</strong><button type="button" class="thq-ed-ico" onClick=${() => { setTool(null); if (tool === "tr" && sel) setSel({ type: "clip", id: sel.id }); else if (!sek && tool !== "captions" && tool !== "format") setSel(null); }} aria-label=${L("Gotowe", "Done")}>${ED_ICON.check}</button></header>
         ${sheet}
       </div>`}
-      <nav class="thq-ed-nav">${TOOLS.map(([k2, label]) => html`<button type="button" key=${k2} class=${cx(tool === k2 && "is-on")} onClick=${() => openTool(k2)}>${ED_ICON[k2]}<span>${label}</span></button>`)}</nav>
+      ${ctx ? html`<nav class="thq-ed-nav is-ctx">
+        <button type="button" class="thq-ed-back" onClick=${() => { setSel(null); setTool(null); }} aria-label=${L("Wróć do narzędzi", "Back to tools")}>${ED_ICON.back}</button>
+        <div class="thq-ed-navscroll">${ctx.map(([ic, label, fn, dis, bad]) => html`<button type="button" key=${ic + label} disabled=${!!dis}
+          class=${cx(typeof fn === "string" && tool === fn && "is-on", bad && "is-bad")}
+          onClick=${() => (typeof fn === "string" ? setTool(tool === fn ? null : fn) : fn())}>${ED_ICON[ic]}<span>${label}</span></button>`)}</div>
+      </nav>` : html`<nav class="thq-ed-nav">${TOOLS.map(([k2, label]) => html`<button type="button" key=${k2} class=${cx(tool === k2 && "is-on")} onClick=${() => openTool(k2)}>${ED_ICON[k2]}<span>${label}</span></button>`)}</nav>`}
       ${exportBox}
     </div>`;
   }
