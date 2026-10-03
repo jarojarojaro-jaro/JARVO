@@ -177,6 +177,10 @@ def test_verify_raportu(tmp_path, monkeypatch, capsys):
     # ręcznie poprawiony adres w bloku źródeł nie przejdzie
     raport.write_text(tekst.replace("- [1] https://stat.gov.pl/r", "- [1] https://stat.gov.pl/inny"), encoding="utf-8")
     assert sources.main(["verify", str(raport)]) == 1
+    # adres z nawiasami (Wikipedia) przechodzi cały, a koniec linku markdown nie wchodzi do adresu
+    assert sources._URL_RE.search("- [3] https://en.wikipedia.org/wiki/Python_(programming_language) — W").group(0) == \
+        "https://en.wikipedia.org/wiki/Python_(programming_language)"
+    assert sources._URL_RE.search("[x](https://a.pl/r).").group(0) == "https://a.pl/r"
     # angielskie nagłówek i znacznik też działają (raport po angielsku)
     raport.write_text("Unemployment reached five point one percent [1].\nGrowth may slow down later [unverified].\n\n"
                       "Sources:\n[1] https://stat.gov.pl/r\n", encoding="utf-8")

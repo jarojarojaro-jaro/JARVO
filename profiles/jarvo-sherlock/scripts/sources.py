@@ -60,7 +60,9 @@ _CITE_RE = re.compile(r"\[(\d{1,4})\](?![(:])")
 _NAGLOWEK_RE = re.compile(
     r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:źródła|zrodla|sources):?(?:\*\*)?\s*$", re.IGNORECASE)
 _LINIA_ZRODLA_RE = re.compile(r"^\s*(?:[-*]\s+)?\[(\d{1,4})\]\s*[-–:]?\s*(\S+)")
-_URL_RE = re.compile(r"https?://[^\s\"'<>)\]}]+")
+# Adres z nawiasami w parach (Wikipedia: /wiki/Python_(programming_language)) zostaje cały; nawias zamykający
+# bez pary (koniec linku markdown) już nie należy do adresu.
+_URL_RE = re.compile(r"https?://(?:[^\s\"'<>()\[\]{}]|\([^\s\"'<>()]*\))+")
 _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 # Jawna deklaracja: tego twierdzenia nie potwierdza żadne źródło z rejestru.
 _NIEZWERYFIKOWANE_RE = re.compile(r"\[(?:niezweryfikowane|unverified)\]", re.IGNORECASE)
