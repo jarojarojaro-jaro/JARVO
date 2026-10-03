@@ -423,4 +423,4 @@ console.log(JSON.stringify({a, b}));""")
     assert len(a["images"]) == 4 and "(obraz 4)" in m and "(obraz 5)" not in m   # limit obrazów; reszta jako ścieżki
     assert b["attachments"] == [] and b["images"] == [] and "Uwagi na osi" not in b["message"] and "uwaga <film>" not in b["message"]
     assert "Prośba: dodaj lektora" in b["message"] and "film.edycja.json" in b["message"]
-    assert "skill `typografia-edit`" in b["message"] and "typografia.py pokaz / popraw / paleta / sylwetki <film>" in b["message"]
+    assert "skill `typografia-edit`" in b["message"] and "typografia.py pokaz / popraw / paleta / style / sylwetki <film>" in b["message"]

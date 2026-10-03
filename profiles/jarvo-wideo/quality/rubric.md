@@ -33,4 +33,5 @@
 - Ważne: kolor na całych blokach albo na zwykłych słowach, jeden kolor na wszystkie mocne słowa, akcent w barwie
   sceny albo ginący na tle (bez płytki), czerwień na scenie czerwonej lub ciepłej bez powodu w treści czy marce,
   więcej niż dwa akcenty poza bielą (plus kolor znaczenia), więcej niż jedno uderzenie w bloku, za osobą częściej niż co szósty blok,
-  słowo, które wchodzi przed dźwiękiem albo długo po nim; arkusz nieobejrzany.
+  słowo, które wchodzi przed dźwiękiem albo długo po nim; arkusz nieobejrzany; styl niepasujący do rodzaju nagrania
+  (tabela w skillu) albo cienki szeryf i neon na jasnym, pstrym tle; styl wybrany przez właściciela w HQ zmieniony.

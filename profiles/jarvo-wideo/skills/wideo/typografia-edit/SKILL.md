@@ -28,8 +28,8 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
 - Nie: film z lektorem i stockiem (tam karaoke z `napisy`), film z samego tekstu bez osoby (`rodzaje-filmu` → typografia).
 
 ## Kroki
-1. **Plan** (0 tokenów, reżyser z reguł): `python3 $HERMES_HOME/scripts/typografia.py plan <film> [--motyw czysty]
-   [--akcent <kolor marki>] [--tempo spokojne|normalne|ostre]`. Projekt powstaje sam z filmu, a zwykłe napisy znikają
+1. **Plan** (0 tokenów, reżyser z reguł): `python3 $HERMES_HOME/scripts/typografia.py plan <film> --motyw <styl>
+   [--akcent <kolor marki>] [--tempo spokojne|normalne|ostre]`; styl z tabeli „Styl filmu”. Projekt powstaje sam z filmu, a zwykłe napisy znikają
    (zostają z `--zostaw-napisy`). Kolory dobiera sam z kadru (sekcja „Kolor”). **Gdy plan już jest, nie układam go
    od nowa:** mógł go poprawić właściciel. `--nowy` tylko na jego wyraźną prośbę; same kolory zmienia
    `typografia.py paleta <film>` (układ i poprawki zostają).
@@ -38,7 +38,8 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
 3. **Reżyseruję znaczeniem** (tabela niżej): `zmiany.json` → `typografia.py popraw <film> zmiany.json`. Poprawiam tylko
    bloki, które tego potrzebują; poprawek właściciela nie cofam.
 4. **Oglądam:** `typografia.py arkusz <film> -o out/wideo/typografia.jpg` → `vision_analyze` (lista „Kontrola”).
-   Najwyżej dwie rundy poprawek.
+   Najwyżej dwie rundy poprawek. Gdy styl nie jest oczywisty albo właściciel pyta o inne: `typografia.py style <film>`
+   (ten sam blok filmu w każdym stylu, linia MEDIA:) i polecam jeden albo dwa z powodem.
 5. **Render:** `python3 $HERMES_HOME/scripts/projekt.py render <film>` → linia MEDIA:, a w odpowiedzi jedno zdanie, że
    wszystko poprawi się w edytorze HQ (pas „Typografia”).
 
@@ -65,6 +66,30 @@ Kod 1 = model maski niedostępny (RUNBOOK); wtedy napis jest widoczny w całośc
 Rytm robi zmiana, nie dekoracja: ten sam układ najwyżej dwa razy z rzędu; po głośnym bloku cichszy.
 Bloki krótsze niż 0,5 s łączę z sąsiednim (`polacz`), długie zdanie dzielę na pauzie (`podziel`).
 
+## Styl filmu (motyw)
+Styl to decyzja o całym filmie: kroje, styl słów i uderzenia, wejście, wyjście, skos. Wybieram go z rodzaju nagrania
+i kadru, nie z gustu; jeden styl na film. Zmiana stylu (`{"motyw": "…"}` w `zmiany.json` albo karta stylu w HQ)
+nie rusza układu, kolorów ani poprawek.
+
+| Rodzaj nagrania | Styl | Wygląd |
+|---|---|---|
+| zwykła rolka, poradnik, nie wiadomo | `czysty` | Bricolage, pełne litery z cieniem |
+| podcast, wywiad, ekspert, biznes | `podcast` | Montserrat Black WIELKIMI, gruby obrys, wejście pop |
+| vlog, lifestyle, podróż, jedzenie | `vlog` | Titan One z obrysem, uderzenie 3D |
+| humor, reakcja, gaming, dzieci | `komiks` | Bangers z obrysem, uderzenie 3D, większy skos |
+| moda, uroda, sztuka, spokojna opowieść | `magazyn` | Instrument Serif, kursywa w małych słowach |
+| premium, luksus, nieruchomości | `elegancki` | Playfair, wejście maską |
+| technologia, AI, kod, SaaS | `tech` | Space Grotesk, małe słowa Mono, pisanie, uderzenie na płytce |
+| startup, produkt, design | `nowoczesny` | Unbounded szeroki WIELKIMI, wejście konturem |
+| retro, muzyka lat 70–90, kawiarnia | `retro` | Shrikhand i Pacifico, uderzenie 3D |
+| noc, impreza, klub, ciemny kadr | `neon` | Tilt Neon, uderzenie świeci; na jasnym kadrze nie |
+| historia, dramat, trailer | `kino` | Barlow kursywa WIELKIMI, smuga, uderzenie 3D |
+| ulica, rap, sport, bunt | `ulica` | Anton z teksturą zdartej farby |
+| motywacja, energia, sprzedaż na żywo | `energia` | Bebas i odręczny, uderzenie świeci |
+
+Na jasnym, pstrym tle (plaża, miasto w dzień) wygrywają style z obrysem (`podcast`, `vlog`, `komiks`) albo płytką
+(`tech`); cienkie szeryfy (`magazyn`, `elegancki`) potrzebują spokojnego tła. Właściciel wybrał styl w HQ: nie zmieniam go.
+
 ## Kolor
 Kolor bierze się z materiału, nie z motywu. Jeden kolor na wszystkie mocne słowa to błąd (uwaga właściciela).
 - **Paleta z kadru** (`plan` i `paleta` liczą ją same, `pokaz` ją wypisuje): dwa akcenty w kontraście z barwami
@@ -72,7 +97,8 @@ Kolor bierze się z materiału, nie z motywu. Jeden kolor na wszystkie mocne sł
   i fiolet, ciepłe drewno i skóra → turkus i niebieski, czerwone wnętrze → zieleń i niebieski. Bonus ma kolor, który
   już mocno świeci w kadrze (czerwona czapka); pomarańczowe i złote słowa przy dużej ilości skóry i piasku przegrywają.
 - **Wariant z tła:** na jasnym tle (niebo, ściana) ciemny wariant, na ciemnym jasny. Słowo, które nie odcina się
-  od tła pod blokiem, dostaje płytkę w swoim kolorze (`tlo`; napis na płytce czarny albo biały z kontrastu).
+  od tła pod blokiem, dostaje znacznik `plyta`: płytka w swoim kolorze (napis na niej czarny albo biały z kontrastu),
+  a w stylu z obrysem sam obrys.
 - **Rozpisanie:** akcenty na zmianę (A, B, A, B…) po mocnych słowach: uderzenie w każdym bloku, który je ma,
   i najważniejsze słowo (waga 2) w co drugim bloku bez uderzenia. Reszta biała. Najwyżej dwa akcenty i biel,
   plus jeden kolor znaczenia, gdy treść go niesie (zielony przy zysku, czerwony przy stracie). Trzeci akcent to chaos.
@@ -84,8 +110,9 @@ Kolor bierze się z materiału, nie z motywu. Jeden kolor na wszystkie mocne sł
   jest kolorem marki. Na scenie czerwonej, pomarańczowej i przy dużej ilości skóry nie.
 
 ## Krój, głębia, ruch
-- Krój zostawiam z motywu („Auto”). W bloku najwyżej dwa kroje, w filmie trzy (główny, lekki, kursywa).
-  Odręczny (`caveat`) tylko w motywie `energia` albo jako dopisek; `grunge` tylko w `ulica`; `mono` do kodu i danych.
+- Krój zostawiam ze stylu („Auto”). W bloku najwyżej dwa kroje, w filmie trzy (główny, lekki, kursywa).
+  Odręczne (`caveat`, `pacifico`) tylko w stylach `energia` i `retro` albo jako dopisek; `grunge` tylko w `ulica`;
+  `neon` tylko w `neon`; `mono` do kodu i danych.
 - Obrót do ±12°, `tilt` do ±35°: dalej słowo przestaje być czytelne na telefonie.
 - Czasów słów (`t`, `k`) nie ruszam bez powodu: słowo ma wejść z dźwiękiem. Na cięciu ujęcia wyjście `ciecie`.
 - **Za osobą** najwyżej co szósty blok, jedna linia, do 14 znaków; głowa nie może zasłonić najważniejszych liter.
@@ -94,7 +121,8 @@ Kolor bierze się z materiału, nie z motywu. Jeden kolor na wszystkie mocne sł
 ## Format `zmiany.json`
 Pola bloku: `uklad`, `x`, `y` (kotwica 0–1), `w`, `rot`, `tilt`, `warstwa` (`przod`/`tyl`), `rozmiar`, `wejscie`,
 `wyjscie`, `start`, `end`. Pola słowa: `tekst`, `waga` 0–3, `linia`, `glebia` −1/0/1, `kolor`, `kroj`, `styl`
-(`wypelnij`, `kontur`, `3d`, `blask`, `tlo`), `wejscie`, `wielkie`, `skala`; `null` przywraca wartość z motywu.
+(`wypelnij`, `kontur`, `3d`, `blask`, `tlo`, `obrys`), `plyta` (`true`: płytka przy słabym kontraście), `wejscie`,
+`wielkie`, `skala`; `null` przywraca wartość ze stylu. Na górze `"motyw"` zmienia styl całego filmu.
 ```json
 {"bloki": [
   {"blok": "b03", "uklad": "kolumna", "slowa": {"0": {"waga": 2}, "3": {"waga": 3, "tekst": "5 MIN"}}},
@@ -111,6 +139,7 @@ Pola bloku: `uklad`, `x`, `y` (kotwica 0–1), `w`, `rot`, `tilt`, `warstwa` (`p
 - Kolory z palety kadru, rozpisane na zmianę; żaden akcent nie ginie na tle; nie jeden kolor na wszystko i nie
   więcej niż dwa akcenty poza bielą (plus kolor znaczenia).
 - Bloki różnią się układem i wielkością, ale każda różnica ma powód w treści.
+- Styl pasuje do rodzaju nagrania (tabela „Styl filmu”), a cienkie litery nie stoją na pstrym tle.
 
 ## Definition of Done
 - [ ] plan w projekcie (`typo`), poprawki właściciela z HQ nienaruszone, `popraw` bez ostrzeżeń albo z wyjaśnieniem,

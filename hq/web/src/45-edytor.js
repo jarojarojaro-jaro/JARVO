@@ -111,7 +111,7 @@ const TYPO_UKLAD_NAZWY = { kolumna: ["Kolumna", "Column"], schodki: ["Schodki", 
 const TYPO_WEJSCIA_NAZWY = { ciecie: ["Cięcie", "Cut"], pop: ["Pop", "Pop"], kontur: ["Kontur", "Outline"], maska: ["Wysuw", "Reveal"],
   pisanie: ["Pisanie", "Typing"], zjazd: ["Wjazd", "Slide"] };
 const TYPO_WYJSCIA_NAZWY = { ciecie: ["Cięcie", "Cut"], zanik: ["Zanik", "Fade"], smuga: ["Smuga", "Smear"] };
-const TYPO_STYLE_NAZWY = { wypelnij: ["Pełny", "Fill"], kontur: ["Kontur", "Outline"], "3d": ["3D", "3D"], blask: ["Blask", "Glow"], tlo: ["Tło", "Box"] };
+const TYPO_STYLE_NAZWY = { wypelnij: ["Pełny", "Fill"], kontur: ["Kontur", "Outline"], "3d": ["3D", "3D"], blask: ["Blask", "Glow"], tlo: ["Tło", "Box"], obrys: ["Obrys", "Stroke"] };
 const TYPO_WAGI_NAZWY = [["Małe", "Small"], ["Zwykłe", "Normal"], ["Ważne", "Strong"], ["Uderzenie", "Hit"]];
 const typoBez = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== null));
 const typoNoweId = (ids, base) => { let k = 1; while (ids.has(`${base}${String.fromCharCode(97 + k)}`)) k++; return `${base}${String.fromCharCode(97 + k)}`; };
@@ -866,6 +866,15 @@ function VideoEditor({ path, onClose }) {
   const strefaUwaga = (hits, kto, rada) => hits.length > 0 && html`<p class="thq-ed-note is-warn">⚠ ${kto} ${L("wchodzi pod interfejs", "sits under the interface of")} ${ED_STREFY[strefa].name} (${[...new Set(hits)].map((k) => L(...ED_STREFY_OPIS[k])).join(", ")}). ${rada}</p>`;
 
   // ---------------------------------------------------------------- kadr do Wideografa i uwagi na osi
+  // bieżąca klatka podglądu (wideo albo obraz klipu pod wskaźnikiem) z jej klipem; null = jeszcze niewczytana
+  function klatkaPodgladu() {
+    const P = projRef.current, now = tRef.current;
+    const L2 = layoutClips(P.clips);
+    const seg = L2.find((x) => now < x.end - 1e-6) || L2[L2.length - 1];
+    const el = seg && seg.c.kind === "image" ? player.imgRef.current : player.vids[player.st.current.slot].current;
+    const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
+    return vw && vh ? { el, vw, vh, c: seg.c } : null;
+  }
   // Kadr składamy jak podgląd: klatka w tym samym kadrze (fitBox = applyFit) i napisy tą samą funkcją drawText.
   async function captureFrame(a, b) {
     const P = projRef.current;
@@ -875,17 +884,14 @@ function VideoEditor({ path, onClose }) {
     const g = c.getContext("2d");
     g.fillStyle = "#000"; g.fillRect(0, 0, W, Hh);
     const now = tRef.current;
-    const L2 = layoutClips(P.clips);
-    const seg = L2.find((x) => now < x.end - 1e-6) || L2[L2.length - 1];
-    const el = seg && seg.c.kind === "image" ? player.imgRef.current : player.vids[player.st.current.slot].current;
-    const vw = el && (el.videoWidth || el.naturalWidth), vh = el && (el.videoHeight || el.naturalHeight);
+    const { el, vw, vh, c: clip } = klatkaPodgladu() || {};
     if (vw && vh) {
-      if (seg.c.fit === "blur") {
+      if (clip.fit === "blur") {
         const s = blurBg(document.createElement("canvas"), el, vw, vh, W, Hh);
         g.save(); g.filter = `blur(${Math.round(Math.max(W, Hh) / 160)}px) brightness(0.92)`;
         g.drawImage(s, -W * 0.06, -Hh * 0.06, W * 1.12, Hh * 1.12); g.restore();
       }
-      const r = fitBox(vw, vh, W, Hh, seg.c);
+      const r = fitBox(vw, vh, W, Hh, clip);
       try { g.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { /* klatka jeszcze niegotowa: zostaje czarne tło */ }
     }
     for (const x of P.texts) if (now >= x.start && now < x.end) drawText(g, x, W, Hh, karaokeIndex(x, now));
@@ -1717,7 +1723,10 @@ function VideoEditor({ path, onClose }) {
     return html`<div class="thq-ed-typo-plan">
       <p class="thq-ed-sub">${L("Typografia słowo po słowie", "Word-by-word typography")}${n ? ` · ${n} ${L(plForma(n, BLOKI), n === 1 ? "block" : "blocks")}` : ""}</p>
       ${n ? html`
-        <label>${L("Motyw", "Theme")}${seg(Object.entries(TYPO_MOTYWY).map(([k2, x]) => [k2, L(...x.nazwa)]), TYPO_MOTYWY[T.motyw] ? T.motyw : "czysty", (v) => typoApply(() => ({ motyw: v })))}</label>
+        <div class="thq-ed-field"><span>${L("Styl filmu", "Film style")} · ${L(...(TYPO_MOTYWY[T.motyw] || TYPO_MOTYWY.czysty).nazwa)}</span>
+          <${TypoStyle} P=${p} klatka=${klatkaPodgladu} onPick=${(v) => typoApply(() => ({ motyw: v }))}/>
+          <p class="thq-ed-note">${L("Styl zmienia kroje, obrys, ruch i uderzenie w całym filmie. Układ bloków, kolory i Twoje poprawki zostają.",
+            "A style changes fonts, stroke, motion and the hit word across the film. Block layout, colors and your edits stay.")}</p></div>
         ${(T.paleta || []).length > 0 && html`<label>${L("Paleta z filmu", "Palette from the film")}<div class="thq-ed-sw is-pal">${T.paleta.map((c, i) => html`<label key=${i}
           class="thq-ed-sw-pal" style=${{ background: c }} title=${L("Zmień kolor: wszystkie słowa w nim pójdą za nim", "Change the color: every word in it follows")}>
           <input type="color" value=${c} onInput=${(e) => typoPaletaUpd(i, e.target.value, true)} onChange=${H.commit}/></label>`)}</div></label>
@@ -2075,6 +2084,60 @@ function VideoEditor({ path, onClose }) {
     ${timeline}
     ${exportBox}
   </div>`;
+}
+
+// Karty stylów typografii: blok filmu (z uderzeniem; bez planu przykład) w każdym motywie na kadrze z podglądu,
+// narysowany tym samym rendererem co podgląd i eksport. Klik zmienia motyw całego filmu (układ i kolory zostają).
+const TYPO_KARTA = [480, 300];   // piksele kanwy karty (2× wielkość na ekranie)
+function typoProbka(P) {
+  const ocena = (b) => {    // bez ręcznego kroju i stylu (nie zmieniają się z motywem), z uderzeniem, różne wagi
+    const w = new Set(b.slowa.map((x) => Math.round(+x.waga || 0)));
+    return (b.slowa.some((x) => x.kroj || x.styl) ? 0 : 1000) + (w.has(3) ? 100 : 0) + w.size * 10 + Math.min(b.slowa.length, 4);
+  };
+  const b = typoBloki(P).filter((x) => x.warstwa !== "tyl" && x.slowa.length <= 5).reduce((a, x) => (!a || ocena(x) > ocena(a) ? x : a), null);
+  const slowa = b ? b.slowa : [{ tekst: L("to", "it"), waga: 0, linia: 0 }, { tekst: L("działa", "works"), waga: 1, linia: 0 }, { tekst: L("świetnie", "great"), waga: 3, linia: 1 }];
+  return { id: "styl", start: 0, end: 10, uklad: "srodek", x: 0.5, y: 0.5, w: 0.9, rozmiar: 1.75, warstwa: "przod",   // na całą kartę
+    zrodloY: b ? +b.y || 0.5 : 0.5, slowa: slowa.map((x) => ({ ...x, t: 0, k: 0.2 })) };
+}
+function TypoStyle({ P, klatka, onPick }) {
+  const T = P.typo || {}, cur = TYPO_MOTYWY[T.motyw] ? T.motyw : "czysty";
+  const probka = typoProbka(P);
+  const klucz = JSON.stringify([probka.slowa, T.akcent || "", T.paleta || []]);
+  const [tlo, setTlo] = useState(null);
+  useEffect(() => {        // tło kart: pas klatki podglądu na wysokości bloku (kontrast jak w filmie)
+    const f = klatka();
+    if (!f) return;
+    const [W, H] = TYPO_KARTA, c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    const k = Math.max(W / f.vw, H / f.vh), sh = H / k;
+    const sy = typoClamp(probka.zrodloY * f.vh - sh / 2, 0, f.vh - sh);
+    try { c.getContext("2d").drawImage(f.el, (f.vw - W / k) / 2, sy, W / k, sh, 0, 0, W, H); setTlo(c); } catch (_) { /* klatka niegotowa: szare tło */ }
+  }, [cur]);
+  return html`<div class="thq-ed-style" role="group" aria-label=${L("Styl filmu", "Film style")}>${Object.keys(TYPO_MOTYWY).map((k) => html`<${TypoStylKarta}
+    key=${k} k=${k} T=${T} probka=${probka} klucz=${klucz} tlo=${tlo} on=${k === cur} onPick=${onPick}/>`)}</div>`;
+}
+function TypoStylKarta({ k, T, probka, klucz, tlo, on, onPick }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return undefined;
+    let alive = true;
+    const [W, H] = TYPO_KARTA;
+    const Pk = { typo: { ...T, motyw: k, bloki: [probka] } };
+    const draw = () => {
+      if (!alive) return;
+      if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+      const g = c.getContext("2d");
+      g.fillStyle = "#3a3d42"; g.fillRect(0, 0, W, H);
+      if (tlo) g.drawImage(tlo, 0, 0, W, H);
+      typoRysuj(g, Pk, W, H, 1);
+    };
+    draw();
+    Promise.all(typoFonty(Pk, W, H).map(([f, t]) => fontLoad(f, t))).then(draw);
+    return () => { alive = false; };
+  }, [k, klucz, tlo]);
+  return html`<button type="button" class=${cx("thq-ed-styl", on && "is-on")} aria-pressed=${on} onClick=${() => onPick(k)}>
+    <canvas ref=${ref}></canvas><span>${L(...TYPO_MOTYWY[k].nazwa)}</span></button>`;
 }
 
 function EdAudio({ m, audios }) {

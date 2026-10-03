@@ -33,11 +33,12 @@ MAX_CLIPS = 200
 MAX_TEXTS = 60
 MAX_TYPO = 400           # bloków typografii (blok = 1–6 słów naraz, jak w montażu słowo po słowie)
 MAX_TYPO_WORDS = 14
-TYPO_MOTYWY = ("czysty", "kino", "ulica", "energia", "elegancki")   # te same klucze co TYPO_MOTYWY w 48-typografia.js
+TYPO_MOTYWY = ("czysty", "kino", "ulica", "energia", "elegancki", "podcast", "vlog", "komiks", "magazyn", "tech",
+               "nowoczesny", "retro", "neon")   # te same klucze co TYPO_MOTYWY w 48-typografia.js
 TYPO_UKLADY = ("kolumna", "schodki", "srodek", "skos", "3d", "za", "rozrzut")
 TYPO_WEJSCIA = ("ciecie", "pop", "kontur", "maska", "pisanie", "zjazd")
 TYPO_WYJSCIA = ("ciecie", "zanik", "smuga")
-TYPO_STYLE = ("wypelnij", "kontur", "3d", "blask", "tlo")
+TYPO_STYLE = ("wypelnij", "kontur", "3d", "blask", "tlo", "obrys")
 TYPO_KROJE = ("bricolage", "bricolageL", "montserrat", "montserratI", "montserratL", "unbounded", "unboundedL", "anton",
               "bebas", "barlow", "barlowI", "barlowL", "oswald", "titan", "baloo", "balooL", "playfair", "playfairI",
               "instrument", "instrumentI", "caveat", "pacifico", "shrikhand", "bangers", "neon", "grunge", "space",
@@ -190,6 +191,8 @@ def normalize_typo(raw: Any, total: float) -> dict:
                 x["kroj"] = w["kroj"]
             if w.get("styl") in TYPO_STYLE:
                 x["styl"] = w["styl"]
+            if w.get("plyta") is True:             # słaby kontrast z tłem: płytka, chyba że motyw daje obrys
+                x["plyta"] = True
             if w.get("wejscie") in TYPO_WEJSCIA:
                 x["wejscie"] = w["wejscie"]
             if isinstance(w.get("wielkie"), bool):

@@ -144,12 +144,16 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   (`edytor.kroje_css`), bez Google Fonts.
 - **Typografia** jak z montażu (słowo po słowie: różne wielkości, kroje, kolory, głębia, skos, perspektywa 3D): plan
   w projekcie (`typo`: motyw, akcent, paleta i bloki z układem, kotwicą, obrotem, perspektywą, warstwą, wejściem i wyjściem;
-  słowa z czasem, wagą 0–3, linią, głębią, krojem, kolorem i stylem) rysuje jeden renderer `hq/web/src/48-typografia.js`
-  w podglądzie, przy eksporcie i w renderze Wideografa. Pięć motywów (`czysty` domyślny, `kino`, `ulica`, `energia`,
-  `elegancki`). Kolory mocnych słów to **paleta z kadru** (`typo.paleta`, dwa akcenty, które `typografia.py` dobiera
+  słowa z czasem, wagą 0–3, linią, głębią, krojem, kolorem, stylem i znacznikiem płytki) rysuje jeden renderer
+  `hq/web/src/48-typografia.js` w podglądzie, przy eksporcie i w renderze Wideografa. Trzynaście stylów filmu (motywów:
+  `czysty` domyślny, `kino`, `ulica`, `energia`, `elegancki`, `podcast`, `vlog`, `komiks`, `magazyn`, `tech`,
+  `nowoczesny`, `retro`, `neon`); styl to kroje, styl słów i uderzenia (`wypelnij`, `kontur`, `3d`, `blask`, `tlo`
+  albo `obrys`: gruby obrys pod literą, czarny przy jasnym słowie, biały przy ciemnym), wejście, wyjście i skos.
+  Kolory mocnych słów to **paleta z kadru** (`typo.paleta`, dwa akcenty, które `typografia.py` dobiera
   z kontrastu z barwami sceny, np. niebieskie niebo → ciemna czerwień i złoto); akcentem bez palety jest kolor
   motywu, a kolor marki (`akcent`) wygrywa z obydwoma. Słowo w stylu `tlo` ma płytkę w swoim kolorze z czarnym albo
-  białym napisem (kontrast). Blok wypełnia część swojej szerokości zależnie od najmocniejszego słowa. Plan układa Wideograf (`typografia.py plan`, reżyser z reguł: mowa, głośność słów, pauzy,
+  białym napisem (kontrast); słowo ze znacznikiem `plyta` (kolor słabo odcina się od tła) dostaje ją samo, chyba że
+  styl filmu daje mu obrys. Styl `blask` ciemnego koloru ma jasny rdzeń (neon nie gaśnie). Blok wypełnia część swojej szerokości zależnie od najmocniejszego słowa. Plan układa Wideograf (`typografia.py plan`, reżyser z reguł: mowa, głośność słów, pauzy,
   interpunkcja, cięcia ujęć) i poprawia według znaczenia (`typografia.py popraw`); serwer sprawdza go
   (`edytor.normalize_typo`). Przy eksporcie przeglądarka rysuje klatkę tylko tam, gdzie obraz warstwy się zmienia
   (`typoOdcinki`), wysyła je jako WebP (PNG, gdy przeglądarka nie zna WebP) razem z pustą klatką w tym samym formacie
@@ -164,7 +168,9 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   Na podglądzie blok przeciąga się z przyciąganiem do środka kadru; na osi zmienia się jego czas (lewa krawędź
   zostawia słowa przy ich czasie w filmie). **Tnij** dzieli blok na słowie pod wskaźnikiem, jest też **Połącz
   z następnym**, **Duplikuj** i **Usuń**; wszystko to jeden krok cofania. Panel **Napisy** ma sekcję typografii:
-  motyw, **paleta z filmu** (zmiana koloru palety przenosi na nowy kolor wszystkie słowa w starym, tak jak
+  **Styl filmu** (karty 13 stylów: blok tego filmu z uderzeniem narysowany tym samym rendererem na pasie bieżącej
+  klatki podglądu; klik zmienia motyw, układ, kolory i poprawki zostają; `TypoStyle` w `45-edytor.js`),
+  **paleta z filmu** (zmiana koloru palety przenosi na nowy kolor wszystkie słowa w starym, tak jak
   `typografia.py popraw` z `"paleta"`), akcent, nowy blok, usunięcie planu albo prośba do Wideografa o plan.
   Kolory palety stoją też pierwsze przy kolorze słowa. Przycięcie, usunięcie, tempo
   i przestawienie klipów przesuwają bloki i czasy słów razem z materiałem (`typoNaOsi` w `remapTimes`

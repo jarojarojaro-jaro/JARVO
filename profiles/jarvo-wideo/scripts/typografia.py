@@ -2,13 +2,14 @@
 """Typografia jak z montażu: nagranie z mową → napisy słowo po słowie z różną wielkością, krojem, kolorem, głębią,
 skosem i perspektywą 3D, jako plan bloków w projekcie edytora HQ (`<film>.edycja.json`, klucz `typo`).
 
-    typografia.py plan <film> [--motyw czysty|kino|ulica|energia|elegancki] [--akcent "#C8102E"] [--paleta A,B]
+    typografia.py plan <film> [--motyw czysty|podcast|vlog|…] [--akcent "#C8102E"] [--paleta A,B]
                               [--tempo spokojne|normalne|ostre] [--zostaw-napisy] [--ziarno N] [--bez-maski] [--nowy]
     typografia.py pokaz <film> [--json]          # plan w skrócie: bloki, układy, wagi słów (do poprawek)
     typografia.py popraw <film> zmiany.json       # Twoje poprawki reżyserskie (format niżej)
     typografia.py sylwetki <film>                 # sylwetki osoby pod bloki „za osobą” (np. ustawione w edytorze)
     typografia.py paleta <film> [--paleta A,B] [--akcent marka] [--bez-akcentu]   # kolory z kadru na gotowym planie
     typografia.py arkusz <film> [-o out/wideo/typografia.jpg] [--ile 12]   # klatki: film + typografia (vision)
+    typografia.py style <film> [-o …] [--blok b03] [--motywy podcast,vlog]   # ten sam blok w każdym motywie
     typografia.py usun <film>                     # usuń plan typografii z projektu
 
 plan (0 tokenów, reżyser z reguł): mowa z <źródło>.mowa.json (Parakeet; brak = analiza jak w edytorze), głośność
@@ -21,6 +22,10 @@ Paleta z kadru: dwa akcenty z kontrastu z materiałem (główna barwa sceny → 
 i morze → ciemna czerwień; bonus za mocny kolor już w kadrze, kara za barwy skóry przy osobie), wariant ciemny albo
 jasny z tła pod blokami, kolory na zmianę po mocnych słowach (uderzenia i co drugi blok bez uderzenia), płytka
 pod słowem, które nie odcina się od tła.
+Motyw to styl całego filmu (13: czysty, kino, ulica, energia, elegancki, podcast, vlog, komiks, magazyn, tech,
+nowoczesny, retro, neon): kroje, styl słów i uderzenia (wypełnienie, obrys, 3D, blask, płytka, kontur), wejście,
+wyjście i skos. `style` rysuje ten sam blok filmu w każdym motywie, żeby wybrać styl okiem; zmiana motywu nie rusza
+układu, kolorów ani poprawek.
 Te same dane rysuje edytor HQ (hq/web/src/48-typografia.js), więc człowiek widzi i poprawia wszystko na osi.
 Gotowy plan mógł już poprawić człowiek, więc `plan` go nie nadpisuje: poprawiasz go `popraw`, a od nowa układasz
 tylko na wyraźną prośbę (`--nowy`).
@@ -83,9 +88,26 @@ PRZYMIOTNIK = re.compile(r"\w{2,}(ego|emu|ymi|ich|ych|ym|im|ej|ą|ny|na|ne|wy|wa
 TRZYMAJ = 0.35           # blok zostaje po ostatnim słowie (czytanie), chyba że wcześniej jest następny albo cięcie
 UDERZENIA = 0.34         # część bloków z uderzeniem (waga 3 w kolorze akcentu)
 MOTYWY = ed.TYPO_MOTYWY
-SKOS = {"czysty": 5, "kino": 7, "ulica": 4, "energia": 10, "elegancki": 3}   # jak `skos` w TYPO_MOTYWY (48-typografia.js)
-WYJSCIE_CIECIE = {"czysty": "zanik", "kino": "smuga", "ulica": "ciecie", "energia": "smuga", "elegancki": "zanik"}
-WYJSCIE_ZWYKLE = {"czysty": "zanik", "kino": "zanik", "ulica": "ciecie", "energia": "zanik", "elegancki": "zanik"}
+# motyw (styl filmu) → skala skosu w stopniach, wyjście bloku na cięciu ujęcia i po pauzie w mowie, styl słów i styl
+# uderzenia; te same wartości co `skos`, `wyjscie`, `styl`, `hit` w TYPO_MOTYWY (48-typografia.js), test pilnuje zgodności
+MOTYW_CECHY = {
+    "czysty": {"skos": 5, "ciecie": "zanik", "zwykle": "zanik", "styl": "wypelnij", "hit": "wypelnij"},
+    "kino": {"skos": 7, "ciecie": "smuga", "zwykle": "zanik", "styl": "wypelnij", "hit": "3d"},
+    "ulica": {"skos": 4, "ciecie": "ciecie", "zwykle": "ciecie", "styl": "wypelnij", "hit": "wypelnij"},
+    "energia": {"skos": 10, "ciecie": "smuga", "zwykle": "zanik", "styl": "wypelnij", "hit": "blask"},
+    "elegancki": {"skos": 3, "ciecie": "zanik", "zwykle": "zanik", "styl": "wypelnij", "hit": "wypelnij"},
+    "podcast": {"skos": 3, "ciecie": "ciecie", "zwykle": "ciecie", "styl": "obrys", "hit": "obrys"},
+    "vlog": {"skos": 8, "ciecie": "zanik", "zwykle": "zanik", "styl": "obrys", "hit": "3d"},
+    "komiks": {"skos": 10, "ciecie": "smuga", "zwykle": "zanik", "styl": "obrys", "hit": "3d"},
+    "magazyn": {"skos": 2, "ciecie": "zanik", "zwykle": "zanik", "styl": "wypelnij", "hit": "wypelnij"},
+    "tech": {"skos": 0, "ciecie": "ciecie", "zwykle": "ciecie", "styl": "wypelnij", "hit": "tlo"},
+    "nowoczesny": {"skos": 4, "ciecie": "smuga", "zwykle": "zanik", "styl": "wypelnij", "hit": "wypelnij"},
+    "retro": {"skos": 6, "ciecie": "zanik", "zwykle": "zanik", "styl": "wypelnij", "hit": "3d"},
+    "neon": {"skos": 5, "ciecie": "zanik", "zwykle": "zanik", "styl": "wypelnij", "hit": "blask"},
+}
+SKOS = {k: v["skos"] for k, v in MOTYW_CECHY.items()}
+WYJSCIE_CIECIE = {k: v["ciecie"] for k, v in MOTYW_CECHY.items()}
+WYJSCIE_ZWYKLE = {k: v["zwykle"] for k, v in MOTYW_CECHY.items()}
 
 
 def _rng(*klucz) -> float:
@@ -674,8 +696,9 @@ def pokoloruj(plan: dict, paleta: list[str], tla: dict[str, float]) -> dict:
     """Paleta na planie: wariant każdej rodziny (ciemny/jasny) z lepszym kontrastem z tłem pod blokami, a kolory
     rozpisane na zmianę (A, B, A, B…) po mocnych słowach: uderzenie w każdym bloku, który je ma, i najważniejsze słowo
     (waga 2) w co drugim bloku bez uderzenia, żeby film nie był biały z trzema kolorowymi słowami. Słowo, które
-    w kolorze nie odcina się od tła pod blokiem, dostaje płytkę w tym kolorze (styl „tlo”). Słowa z kolorem
-    (poprawka człowieka) zostają i nie przesuwają kolejki. tla: id bloku → jasność tła pod nim (0–1)."""
+    w kolorze nie odcina się od tła pod blokiem, dostaje znacznik `plyta`: renderer kładzie pod nim płytkę w tym
+    kolorze, a w motywie z obrysem zostaje obrys (ten sam kontrast; zmiana motywu w HQ nie zostawia płytek).
+    Słowa z kolorem (poprawka człowieka) zostają i nie przesuwają kolejki. tla: id bloku → jasność tła pod nim (0–1)."""
     plan = json.loads(json.dumps(plan))
     jasnosci = sorted(tla.values()) or [0.4]
     mediana = lambda c: sorted(kontrast(luminancja(*_hex_rgb(c)), j) for j in jasnosci)[len(jasnosci) // 2]  # noqa: E731
@@ -697,7 +720,7 @@ def pokoloruj(plan: dict, paleta: list[str], tla: dict[str, float]) -> dict:
             tlo = tla.get(b["id"])
             if tlo is not None and "styl" not in w and b.get("uklad") != "za" \
                     and kontrast(luminancja(*_hex_rgb(kolor)), tlo) < KONTRAST_PLYTA:
-                w["styl"] = "tlo"
+                w["plyta"] = True
     return plan
 
 
@@ -856,7 +879,7 @@ def cmd_plan(film: Path, a) -> int:
 
 
 def opis_slowa(w: dict) -> str:
-    extra = "".join(f" {k}={w[k]}" for k in ("kolor", "kroj", "styl", "glebia") if k in w)
+    extra = "".join(f" {k}={w[k]}" for k in ("kolor", "kroj", "styl", "glebia") if k in w) + (" płytka" if w.get("plyta") else "")
     return f"[{w['waga']}]{w['tekst']}{('{' + extra.strip() + '}') if extra else ''}"
 
 
@@ -888,7 +911,7 @@ def cmd_pokaz(film: Path, a) -> int:
 
 
 POLA_BLOKU = ("start", "end", "uklad", "x", "y", "w", "rot", "tilt", "warstwa", "wejscie", "wyjscie", "rozmiar")
-POLA_SLOWA = ("tekst", "waga", "linia", "glebia", "kolor", "kroj", "styl", "wejscie", "wielkie", "skala", "t", "k")
+POLA_SLOWA = ("tekst", "waga", "linia", "glebia", "kolor", "kroj", "styl", "plyta", "wejscie", "wielkie", "skala", "t", "k")
 
 
 def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
@@ -1044,7 +1067,7 @@ WYJSCIE_CZAS = {"ciecie": 0.0, "zanik": 0.16, "smuga": 0.14}   # jak TYPO_WYJSCI
 
 def chwile_arkusza(plan: dict, ile: int) -> list[float]:
     """Chwile, w których blok jest pełny (ostatnie słowo weszło), a wyjście jeszcze się nie zaczęło."""
-    wy = lambda b: WYJSCIE_CZAS.get(b.get("wyjscie") or WYJSCIE_ZWYKLE.get(plan.get("motyw"), "zanik"), 0.16)  # noqa: E731
+    wy = lambda b: WYJSCIE_CZAS.get(b.get("wyjscie") or WYJSCIE_CIECIE.get(plan.get("motyw"), "zanik"), 0.16)  # noqa: E731
     t = [round(max(b["start"] + b["slowa"][-1]["t"], min(b["end"] - wy(b) - 0.03, b["start"] + b["slowa"][-1]["t"] + 0.3)), 3)
          for b in plan["bloki"]]
     if len(t) <= ile:
@@ -1064,6 +1087,42 @@ def cmd_arkusz(film: Path, a) -> int:
     chwile = chwile_arkusza(plan, a.ile)
     pr.arkusz_typografii(proj, plan, chwile, out, film)
     print(f"Arkusz: {out} ({len(chwile)} klatek; oceń vision_analyze: czytelność, twarz, strefy UI, sens akcentów)")
+    print(f"MEDIA:{out}")
+    return 0
+
+
+def blok_wzorcowy(plan: dict) -> dict:
+    """Blok do arkusza stylów: przed osobą, bez ręcznego kroju i stylu słów (te nie zmieniają się z motywem),
+    z uderzeniem i z kilkoma słowami (widać krój główny, mały i uderzenie)."""
+    def ocena(b: dict) -> tuple:
+        wagi = {w["waga"] for w in b["slowa"]}
+        reczne = any("kroj" in w or "styl" in w for w in b["slowa"])
+        return (b["warstwa"] != "tyl", not reczne, 3 in wagi, len(wagi), min(len(b["slowa"]), 4), b["end"] - b["start"])
+    return max(plan["bloki"], key=ocena)
+
+
+def cmd_style(film: Path, a) -> int:
+    import narzedzia as nz
+    nz.wymagaj_playwright(__file__, "JARVO_TYPO_REEXEC", "arkusz rysuje przeglądarka")   # re-exec TEGO skryptu
+    proj = pr.load(film)
+    plan = ed.normalize_typo(proj.get("typo"), pr.total(proj))
+    if not plan["bloki"]:
+        raise SystemExit("brak planu typografii: typografia.py plan <film>")
+    motywy = [x.strip() for x in a.motywy.split(",")] if a.motywy else list(MOTYWY)
+    zle = [x for x in motywy if x not in MOTYWY]
+    if zle:
+        raise SystemExit(f"nie ma motywu: {', '.join(zle)} (są: {', '.join(MOTYWY)})")
+    b = next((x for x in plan["bloki"] if x["id"] == a.blok), None) if a.blok else blok_wzorcowy(plan)
+    if b is None:
+        raise SystemExit(f"nie ma bloku {a.blok} (numery: typografia.py pokaz {film})")
+    jeden = {**plan, "bloki": [b]}
+    t = chwile_arkusza(jeden, 1)[0]
+    warianty = [(f"{k} (teraz)" if k == plan["motyw"] else k, {**jeden, "motyw": k}) for k in motywy]
+    out = Path(a.out) if a.out else film.with_name(f"{film.stem}.style.jpg")
+    pr.arkusz_typografii(proj, plan, [t], out, film, warianty=warianty)
+    print(f"Style: {out} · blok {b['id']} „{' '.join(w['tekst'] for w in b['slowa'])}” w {t:.2f} s · motywy: {', '.join(motywy)}")
+    print("Zmiana stylu całego filmu: zmiany.json {\"motyw\": \"<nazwa>\"} → typografia.py popraw (układ, kolory i poprawki"
+          " zostają), albo karta stylu w edytorze HQ.")
     print(f"MEDIA:{out}")
     return 0
 
@@ -1104,6 +1163,12 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("-o", "--out")
     sp.add_argument("--ile", type=int, default=12)
     sp.set_defaults(fn=cmd_arkusz)
+    sp = sub.add_parser("style", help="ten sam blok filmu w każdym motywie (do wyboru stylu)")
+    sp.add_argument("film")
+    sp.add_argument("-o", "--out")
+    sp.add_argument("--blok", help="id bloku (domyślnie blok z uderzeniem i kilkoma słowami)")
+    sp.add_argument("--motywy", help="tylko te motywy, po przecinku")
+    sp.set_defaults(fn=cmd_style)
     sp = sub.add_parser("usun", help="usuń plan typografii")
     sp.add_argument("film")
     sp.set_defaults(fn=cmd_usun)

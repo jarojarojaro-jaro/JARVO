@@ -4,7 +4,7 @@
 // poprawia go w edytorze. Czas słowa liczony od początku bloku: przesunięcie bloku zabiera słowa ze sobą.
 //
 // projekt.typo = {motyw, akcent, paleta, bloki: [{id, start, end, uklad, x, y, w, rot, tilt, warstwa, wejscie, wyjscie,
-//                 rozmiar, slowa: [{t, k, tekst, waga 0–3, linia, glebia −1|0|1, kolor, kroj, styl}]}]}
+//                 rozmiar, slowa: [{t, k, tekst, waga 0–3, linia, glebia −1|0|1, kolor, kroj, styl, plyta}]}]}
 
 const TYPO_KROJE = {   // klucz → [rodzina CSS, grubość, kursywa, nazwa, grupa]; pliki w fonts/kroje (OFL, polskie znaki)
   bricolage: ["'Bricolage Grotesque', system-ui, sans-serif", 800, false, "Bricolage", "mocne"],
@@ -40,8 +40,9 @@ const TYPO_KROJE = {   // klucz → [rodzina CSS, grubość, kursywa, nazwa, gru
 const TYPO_KROJE_GRUPY = { mocne: ["Mocne", "Bold"], waskie: ["Wąskie", "Condensed"], okragle: ["Okrągłe", "Rounded"],
   szeryfowe: ["Szeryfowe", "Serif"], odreczne: ["Odręczne", "Script"], ozdobne: ["Ozdobne", "Display"],
   techniczne: ["Techniczne", "Tech"] };
-// Motyw = zestaw decyzji: kroje (główny, mały do słów funkcyjnych, drugi do słów „z tyłu”), kolory, wejście/wyjście,
-// styl najmocniejszego słowa, tekstura, skala skosu (stopnie; reżyser typografia.py ma tę samą tabelę SKOS).
+// Motyw (styl filmu) = zestaw decyzji: kroje (główny, mały do słów funkcyjnych, drugi do słów „z tyłu”), kolory,
+// wejście/wyjście, styl słów (`styl`, domyślnie wypełnienie) i najmocniejszego słowa (`hit`), tekstura, skala skosu
+// (stopnie). Reżyser typografia.py ma te same wartości w MOTYW_CECHY (skos, wyjście, style), test pilnuje zgodności.
 // Kolor marki nadpisuje akcent (projekt.typo.akcent), a bez marki akcentem jest pierwszy kolor palety z kadru
 // (projekt.typo.paleta, typografia.py); kolor motywu zostaje tylko, gdy palety nie ma.
 const TYPO_MOTYWY = {
@@ -55,11 +56,27 @@ const TYPO_MOTYWY = {
     kolor: "#FFFFFF", wielkie: true, wejscie: "pop", wyjscie: "smuga", hit: "blask", skos: 10, lh: 0.9 },
   elegancki: { nazwa: ["Elegancki", "Elegant"], kroj: "playfair", maly: "playfairI", drugi: "playfairI", akcent: "#E8C872",
     kolor: "#FFFFFF", wielkie: false, wejscie: "maska", wyjscie: "zanik", hit: "wypelnij", skos: 3, lh: 1.05 },
+  podcast: { nazwa: ["Podcast", "Podcast"], kroj: "montserrat", maly: "montserratL", drugi: "montserratI", akcent: "#FFD400",
+    kolor: "#FFFFFF", wielkie: true, wejscie: "pop", wyjscie: "ciecie", styl: "obrys", hit: "obrys", skos: 3, lh: 0.95 },
+  vlog: { nazwa: ["Vlog", "Vlog"], kroj: "titan", maly: "balooL", drugi: "baloo", akcent: "#FF7AC6",
+    kolor: "#FFFFFF", wielkie: false, wejscie: "pop", wyjscie: "zanik", styl: "obrys", hit: "3d", skos: 8, lh: 1.0 },
+  komiks: { nazwa: ["Komiks", "Comic"], kroj: "bangers", maly: "bangers", drugi: "bangers", akcent: "#FFE14D",
+    kolor: "#FFFFFF", wielkie: true, wejscie: "pop", wyjscie: "smuga", styl: "obrys", hit: "3d", skos: 10, lh: 0.95 },
+  magazyn: { nazwa: ["Magazyn", "Magazine"], kroj: "instrument", maly: "instrumentI", drugi: "instrumentI", akcent: "#F2C94C",
+    kolor: "#FFFFFF", wielkie: false, wejscie: "maska", wyjscie: "zanik", hit: "wypelnij", skos: 2, lh: 0.92 },
+  tech: { nazwa: ["Tech", "Tech"], kroj: "space", maly: "mono", drugi: "spaceL", akcent: "#5EEAD4",
+    kolor: "#FFFFFF", wielkie: false, wejscie: "pisanie", wyjscie: "ciecie", hit: "tlo", skos: 0, lh: 1.0 },
+  nowoczesny: { nazwa: ["Nowoczesny", "Modern"], kroj: "unbounded", maly: "unboundedL", drugi: "spaceL", akcent: "#B79CFF",
+    kolor: "#FFFFFF", wielkie: true, wejscie: "kontur", wyjscie: "smuga", hit: "wypelnij", skos: 4, lh: 0.98 },
+  retro: { nazwa: ["Retro", "Retro"], kroj: "shrikhand", maly: "pacifico", drugi: "pacifico", akcent: "#FF8A3D",
+    kolor: "#FFF4E0", wielkie: false, wejscie: "pop", wyjscie: "zanik", hit: "3d", skos: 6, lh: 1.05 },
+  neon: { nazwa: ["Neon", "Neon"], kroj: "neon", maly: "neon", drugi: "neon", akcent: "#FF7AC6",
+    kolor: "#FFFFFF", wielkie: true, wejscie: "pop", wyjscie: "zanik", hit: "blask", skos: 5, lh: 1.0 },
 };
 const TYPO_UKLADY = ["kolumna", "schodki", "srodek", "skos", "3d", "za", "rozrzut"];
 const TYPO_WEJSCIA = { ciecie: 0, pop: 0.14, kontur: 0.24, maska: 0.18, pisanie: 0.3, zjazd: 0.16 };
 const TYPO_WYJSCIA = { ciecie: 0, zanik: 0.16, smuga: 0.14 };
-const TYPO_STYLE = ["wypelnij", "kontur", "3d", "blask", "tlo"];
+const TYPO_STYLE = ["wypelnij", "kontur", "3d", "blask", "tlo", "obrys"];
 const TYPO_WAGA = [0.58, 1, 1.45, 2.1];            // mnożnik rozmiaru: słowo funkcyjne, zwykłe, ważne, uderzenie
 const TYPO_CEL = [0.62, 0.62, 0.8, 1];             // część szerokości bloku (w), którą wypełnia blok, wg najmocniejszego słowa
 const TYPO_LEAD = 0.03;                            // słowo pojawia się tuż przed dźwiękiem (oko wyprzedza ucho)
@@ -86,7 +103,9 @@ function typoSlowo(w, m, uklad) {
   const glebia = typoClamp(Math.round(+w.glebia || 0), -1, 1);
   const kroj = w.kroj && TYPO_KROJE[w.kroj] ? w.kroj : waga === 0 ? m.maly : glebia < 0 ? m.drugi : m.kroj;
   const kolor = w.kolor || (waga === 3 ? m.akcent : m.kolor);   // akcent tylko na uderzeniu: kolor ma znaczyć, nie zdobić
-  const styl = TYPO_STYLE.includes(w.styl) ? w.styl : waga === 3 && uklad !== "za" ? m.hit : "wypelnij";
+  const auto = waga === 3 && uklad !== "za" ? m.hit : m.styl || "wypelnij";
+  // `plyta`: kolor słabo odcina się od tła (typografia.py) → płytka, a w motywie z obrysem obrys wystarczy
+  const styl = TYPO_STYLE.includes(w.styl) ? w.styl : w.plyta && auto !== "obrys" && uklad !== "za" ? "tlo" : auto;
   const wielkie = w.wielkie ?? (m.wielkie || waga === 3);
   const tekst = String(w.tekst || "");
   return { waga, glebia, kroj, kolor, styl, tekst: wielkie ? tekst.toLocaleUpperCase("pl-PL") : tekst };
@@ -212,6 +231,12 @@ function typoJasnosc(hex) {               // względna luminancja WCAG (0–1), 
   const f = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
   return 0.2126 * f(((n >> 16) & 255) / 255) + 0.7152 * f(((n >> 8) & 255) / 255) + 0.0722 * f((n & 255) / 255);
 }
+function typoJasniej(hex, k) {           // kolor przesunięty o k (0–1) w stronę bieli
+  const h = String(hex || "#ffffff").replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6), 16) || 0xffffff;
+  const f = (c) => Math.round(c + (255 - c) * k);
+  return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
 function typoCiemniej(hex, k) {
   const h = String(hex || "#ffffff").replace("#", "");
   const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6), 16) || 0xffffff;
@@ -254,6 +279,11 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
     g.fillStyle = typoCiemniej(fill, 0.32);
     for (let i = n; i >= 1; i--) g.fillText(tekst, x + i * 0.75, y + i);
   }
+  if (s.styl === "obrys" && !konturFaza) {      // gruby obrys pod literą (napisy z social): czytelne na każdym tle
+    g.lineJoin = "round"; g.lineWidth = Math.max(2, px * 0.15);
+    g.strokeStyle = typoJasnosc(fill) > 0.18 ? "#0B0B0B" : "#FFFFFF";   // ciemne słowo: biały obrys jak naklejka
+    cien(); g.strokeText(tekst, x, y); bezCienia();
+  }
   if (s.styl === "kontur" || konturFaza) {
     g.lineJoin = "round"; g.lineWidth = Math.max(1.5, px * 0.045); g.strokeStyle = fill;
     cien(); g.strokeText(tekst, x, y); bezCienia();
@@ -263,8 +293,11 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
     if (fa > 0) {
       g.globalAlpha = alpha * fa;
       g.fillStyle = plyta ? (typoJasnosc(plyta) > 0.36 ? "#111111" : "#FFFFFF") : fill;   // napis na płytce: kontrast
-      if (s.styl === "blask") { g.shadowColor = fill; g.shadowBlur = px * 0.38; g.fillText(tekst, x, y); }
-      if (s.styl !== "3d" && s.styl !== "tlo" && s.styl !== "blask") cien();
+      if (s.styl === "blask") {                  // neon: poświata w kolorze, jasny rdzeń (ciemny kolor nie gaśnie)
+        g.shadowColor = fill; g.shadowBlur = px * 0.38; g.fillText(tekst, x, y);
+        if (typoJasnosc(fill) < 0.3) g.fillStyle = typoJasniej(fill, 0.55);
+      }
+      if (s.styl !== "3d" && s.styl !== "tlo" && s.styl !== "blask" && s.styl !== "obrys") cien();
       g.fillText(tekst, x, y);
       bezCienia();
     }

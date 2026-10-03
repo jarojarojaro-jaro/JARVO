@@ -318,6 +318,12 @@ def test_js_i_python_te_same_listy():
     m = re.search(r"const TYPO_MOTYWY = \{(.*?)\n\};", JS, re.S).group(1)
     assert tuple(re.findall(r"^  (\w+): \{", m, re.M)) == ed.TYPO_MOTYWY
     assert dict(zip(ed.TYPO_MOTYWY, map(int, re.findall(r"skos: (\d+)", m)))) == ty.SKOS
+    assert tuple(ty.MOTYW_CECHY) == ed.TYPO_MOTYWY
+    for motyw, cechy in ty.MOTYW_CECHY.items():      # wyjście motywu, styl słów i uderzenia jak w rendererze
+        blok = re.search(rf"^  {motyw}: \{{(.*?)\}},?$", m, re.S | re.M).group(1)
+        pole = lambda k, d=None: (re.findall(rf"\b{k}: \"(\w+)\"", blok) or [d])[0]  # noqa: E731
+        assert (pole("wyjscie"), pole("styl", "wypelnij"), pole("hit")) == (cechy["ciecie"], cechy["styl"], cechy["hit"]), motyw
+        assert {cechy["styl"], cechy["hit"]} <= set(ed.TYPO_STYLE) and {cechy["ciecie"], cechy["zwykle"]} <= set(ed.TYPO_WYJSCIA)
     assert tuple(json.loads(re.search(r"const TYPO_UKLADY = (\[.*?\]);", JS).group(1))) == ed.TYPO_UKLADY
     assert tuple(json.loads(re.search(r"const TYPO_STYLE = (\[.*?\]);", JS).group(1))) == ed.TYPO_STYLE
     wej = re.search(r"const TYPO_WEJSCIA = \{(.*?)\};", JS).group(1)
@@ -752,9 +758,11 @@ def test_pokoloruj_plytka_tylko_przy_slabym_kontrascie_i_nie_rusza_poprawek():
     plan = plan_z_uderzeniami(3)
     plan["bloki"][2]["slowa"][1]["kolor"] = "#FFFFFF"                  # poprawka człowieka zostaje
     out = ty.pokoloruj(plan, ["#B3122E", "#A87A12"], {"b0": 0.12, "b1": 0.6, "b2": 0.6})
-    assert out["bloki"][0]["slowa"][1] == {**plan["bloki"][0]["slowa"][1], "kolor": "#B3122E", "styl": "tlo"}
-    assert "styl" not in out["bloki"][1]["slowa"][1]
+    assert out["bloki"][0]["slowa"][1] == {**plan["bloki"][0]["slowa"][1], "kolor": "#B3122E", "plyta": True}
+    assert "plyta" not in out["bloki"][1]["slowa"][1] and "styl" not in out["bloki"][1]["slowa"][1]
     assert out["bloki"][2]["slowa"][1]["kolor"] == "#FFFFFF"
+    assert ed.normalize_typo(out, 10)["bloki"][0]["slowa"][1]["plyta"] is True     # znacznik przechodzi walidację
+    assert "plyta" not in ed.normalize_typo({"bloki": [{**out["bloki"][0], "slowa": [{"tekst": "x", "plyta": "tak"}]}]}, 10)["bloki"][0]["slowa"][0]
 
 
 def test_zmien_palete_przenosi_slowa_i_normalize_ja_trzyma():
@@ -785,6 +793,51 @@ def test_renderer_akcent_z_palety_i_napis_na_plytce():
     assert abs(o[3] - ty.luminancja(*ty._hex_rgb("#B3122E"))) < 1e-6   # ta sama luminancja co w Pythonie
     assert abs(o[4] - ty.luminancja(*ty._hex_rgb("#F2C94C"))) < 1e-6
     assert "plyta ? (typoJasnosc(plyta) > 0.36" in JS                   # ciemna płytka → biały napis
+
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_renderer_styl_z_motywu_plytka_i_obrys():
+    """Styl słowa: ręczny > płytka przy słabym kontraście > styl motywu; w motywie z obrysem płytki nie ma."""
+    o = node("const S = (w, motyw, uklad) => typoSlowo(w, typoMotyw({typo: {motyw}}), uklad || 'kolumna').styl;"
+             "console.log(JSON.stringify([S({tekst: 'a', waga: 1}, 'czysty'), S({tekst: 'a', waga: 3}, 'kino'),"
+             " S({tekst: 'a', waga: 1}, 'podcast'), S({tekst: 'a', waga: 3}, 'vlog'), S({tekst: 'a', waga: 3, plyta: true}, 'czysty'),"
+             " S({tekst: 'a', waga: 3, plyta: true}, 'podcast'), S({tekst: 'a', waga: 3, plyta: true}, 'czysty', 'za'),"
+             " S({tekst: 'a', waga: 3, plyta: true, styl: '3d'}, 'czysty'), S({tekst: 'a', waga: 2, plyta: true}, 'vlog')]));")
+    assert o == ["wypelnij", "3d", "obrys", "3d", "tlo", "obrys", "wypelnij", "3d", "obrys"]
+    assert 'g.strokeStyle = typoJasnosc(fill) > 0.18 ? "#0B0B0B" : "#FFFFFF"' in JS          # ciemne słowo: biały obrys
+
+
+def test_blok_wzorcowy_przed_osoba_z_uderzeniem():
+    plan = ed.normalize_typo({"bloki": [
+        blok([("raz", 1)], start=0.5),
+        {**blok([("ZA", 3), ("tym", 0)], start=2.0), "id": "b2", "uklad": "za", "warstwa": "tyl"},
+        {**blok([("to", 0), ("jest", 1), ("TANIEJ", 3)], start=4.0), "id": "b3"},
+        {**blok([("dwa", 1), ("słowa", 2)], start=6.0), "id": "b4"}]}, 10)
+    assert ty.blok_wzorcowy(plan)["id"] == "b3"
+    plan["bloki"][2]["slowa"][2]["kroj"] = "titan"                     # ręczny krój: motyw go nie zmieni
+    assert ty.blok_wzorcowy(plan)["id"] == "b4"
+
+
+def test_polecenie_style_ten_sam_blok_w_kazdym_motywie(tmp_path, monkeypatch, capsys):
+    src = _projekt_typo(tmp_path, [blok([("raz", 1)], start=0.5), {**blok([("to", 0), ("DZIAŁA", 3)], start=3.0), "id": "b2"}])
+    import narzedzia
+    monkeypatch.setattr(narzedzia, "wymagaj_playwright", lambda *a: None)
+    wolania = []
+    monkeypatch.setattr(ty.pr, "arkusz_typografii", lambda proj, plan, chwile, out, film, warianty=None:
+                        wolania.append((plan, chwile, out, warianty)))
+    assert ty.main(["style", str(src)]) == 0
+    plan, chwile, out, warianty = wolania[-1]
+    assert [p for p, _ in warianty] == ["czysty (teraz)", *ed.TYPO_MOTYWY[1:]]
+    assert {q["motyw"] for _, q in warianty} == set(ed.TYPO_MOTYWY)
+    assert all([b["id"] for b in q["bloki"]] == ["b2"] for _, q in warianty)          # tylko blok wzorcowy
+    assert len(chwile) == 1 and 3.0 < chwile[0] < plan["bloki"][1]["end"] and out.name.endswith(".style.jpg")
+    assert "MEDIA:" in capsys.readouterr().out
+    assert ty.main(["style", str(src), "--blok", "b05", "--motywy", "podcast,neon"]) == 0
+    assert [p for p, _ in wolania[-1][3]] == ["podcast", "neon"] and wolania[-1][3][0][1]["bloki"][0]["id"] == "b05"
+    with pytest.raises(SystemExit, match="nie ma motywu: disco"):
+        ty.main(["style", str(src), "--motywy", "podcast,disco"])
+    with pytest.raises(SystemExit, match="nie ma bloku b99"):
+        ty.main(["style", str(src), "--blok", "b99"])
 
 
 def test_polecenie_paleta_zmienia_kolory_nie_uklad(tmp_path, monkeypatch):

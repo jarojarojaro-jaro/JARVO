@@ -79,7 +79,7 @@ function askMessage({ path, cursor, where, text, shot, notes, urls }) {
     + "`projekt.py dodaj-audio / dodaj-tekst / dodaj-klip / kadr / napisy / usun`"
     + (open.length ? ", każdą uwagę zamknij: `projekt.py uwaga <film> <id> --zrobione \"co zmieniłeś\"` albo `--odrzuc \"dlaczego\"`" : "")
     + ", na końcu `projekt.py render <film>` i linia MEDIA:. Kadry oglądasz przez vision_analyze. Nie cofaj moich cięć; edytor sam wczyta Twoje zmiany.");
-  lines.push("Typografia słowo po słowie (skill `typografia-edit`): `typografia.py pokaz / popraw / paleta / sylwetki <film>`, "
+  lines.push("Typografia słowo po słowie (skill `typografia-edit`): `typografia.py pokaz / popraw / paleta / style / sylwetki <film>`, "
     + "`typografia.py plan` tylko gdy projekt nie ma jeszcze planu; moje poprawki bloków zostają.");
   return { message: lines.join("\n"), attachments, images };
 }
