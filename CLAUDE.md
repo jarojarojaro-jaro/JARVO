@@ -37,3 +37,5 @@
 - **Filmy renderujemy szybko.** Bez motion bluru (`html_wideo.py --subklatki` zostaje na 1), klatki w kilku
   przeglądarkach naraz (`klatki --czasy` po kawałkach), potem sklejenie ffmpeg. Jeśli render i tak potrwa dłużej
   niż kilka minut, najpierw mówimy właścicielowi, ile, zanim go puścimy.
+  Gotowy film wysyłamy właścicielowi (on pobiera go do siebie), a potem usuwamy w piaskownicy klatki, nagrania
+  i filmy robocze. Instalacja Jarva zostaje.
