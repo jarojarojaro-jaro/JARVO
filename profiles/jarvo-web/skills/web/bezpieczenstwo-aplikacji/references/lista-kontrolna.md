@@ -16,7 +16,7 @@ tylko kod.
 | 4 | Weryfikacja e-mail | rejestracja bez kliknięcia w link | brak dostępu do funkcji do czasu weryfikacji |
 | 5 | Hasła haszowane | kod rejestracji | argon2id albo bcrypt (koszt ≥ 12); nigdy md5/sha1/plain |
 | 6 | Tokeny poza localStorage | `security_check.py repo` | ciasteczko `HttpOnly; Secure; SameSite=Lax` |
-| 7 | Sekrety tylko na serwerze | `security_check.py url` (JS wysyłany do przeglądarki), zmienne `NEXT_PUBLIC_*`/`VITE_*` | na froncie tylko klucze publiczne (anon, publishable) |
+| 7 | Sekrety tylko na serwerze | `security_check.py url` (JS wysyłany do przeglądarki, publiczne mapy źródeł `.js.map`), zmienne `NEXT_PUBLIC_*`/`VITE_*` | na froncie tylko klucze publiczne (anon, publishable); mapy źródeł nie na serwerze produkcyjnym |
 | 8 | `.env` poza gitem | `security_check.py repo` (też historia) | `.env*` w `.gitignore`, w repo tylko `.env.example` |
 | 9 | Sekrety poza logami | logi aplikacji, `console.log` przy auth/płatnościach | brak tokenów, haseł, pełnych danych kart i PESEL w logach |
 | 10 | SQL z parametrami | `security_check.py repo`, przegląd zapytań | `$1`/`?`/ORM; zero sklejania stringów |

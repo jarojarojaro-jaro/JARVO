@@ -1,6 +1,10 @@
 # Changelog: jarvo-web
 
 ## Niewydane
+- `security_check.py url` wykrywa publiczne mapy źródeł skryptów strony (komentarz `sourceMappingURL`, nagłówek
+  `SourceMap`, plik `<skrypt>.map` obok, mapa wbudowana `data:`): mapa z `sourcesContent` odtwarza czytelny kod frontu
+  (ŚREDNIE), sekret w odzyskanym kodzie to KRYTYCZNE, mapa bez kodu NISKIE. Strona SPA odpowiadająca na `.map` swoim
+  HTML-em to nie mapa. `repo` zgłasza `productionBrowserSourceMaps: true`. Skill `bezpieczenstwo-aplikacji` 1.2.0.
 - Skill `inspiracje-stron` i serwer MCP `inspo` (katalog Inspo: 832 prawdziwe strony): przed projektem strony lub landingu 3–5 stron referencyjnych z branży i sekcja „Inspiracje” w `out/PLAN.md` (co bierzemy, czego nie; nic kopiowanego). Krok w `nowa-strona` (2) i `landing-produktowy`, punkt „Ważne” w rubryce, eval `web-inspiracje-nieruchomosci`.
 - Mapa 18 polskich branż na filtry Inspo z zapytaniem po angielsku i policzonym pokryciem (`references/branze.md`). Branża słabo pokryta (nieruchomości, gabinety, salony, kancelarie…) → własna baza w skarbcu `inspiracje/strony/<branża>/<domena>` (karta strony, `DESIGN.md`, zrzuty tylko wewnętrznie) przez `brand_extract.sh --kit` i `screenshots.cjs`.
 - MCP `inspo`: healthcheck robi prawdziwe `search_screens` w okrojonym środowisku jak Hermes (samo `initialize` przechodziło, gdy katalog się nie pobrał), a serwer dostaje `NODE_EXTRA_CA_CERTS` z systemowym zbiorem certyfikatów (bez tego za proxy z własnym CA: `SELF_SIGNED_CERT_IN_CHAIN`).

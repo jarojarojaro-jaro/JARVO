@@ -48,7 +48,12 @@ def aplikacja(dziurawa: bool):
                                      b'</script></html>', "text/html")
             if p == "/assets/app.js":
                 js = f'const a="{jwt("anon")}";' + (f'const s="{KLUCZ}";const r="{jwt("service_role")}";' if dziurawa else "")
+                js += "\n//# sourceMappingURL=app.js.map" if dziurawa else ""
                 return self.odp(200, js.encode(), "application/javascript")
+            if p == "/assets/app.js.map" and dziurawa:
+                mapa = {"version": 3, "sources": ["webpack://app/./src/lib/platnosci.ts", "webpack://app/./node_modules/react/index.js"],
+                        "sourcesContent": [f'// TODO usunąć\nconst klucz = "{KLUCZ}";', "module.exports = {}"], "mappings": "AAAA"}
+                return self.odp(200, json.dumps(mapa).encode())
             if p == "/api/admin":
                 return self.odp(200, b'{"users":[]}') if dziurawa or self.sesja() else self.odp(401)
             if p == "/api/orders/1":
@@ -136,12 +141,37 @@ def test_url_finds_server_keys_in_page_js(capsys):
     assert {x["co"].split(" w JS")[0] for x in wyn} == {"klucz Stripe (live)", "klucz Supabase service_role / JWT"}
     assert all(x["gdzie"].endswith("/assets/app.js") for x in wyn)
     assert KLUCZ not in txt                                                    # sekret nigdy w raporcie
+    mapy = {x["co"]: x for x in json.loads(txt)["ustalenia"] if "map" in x["co"]}
+    assert mapy["publiczna mapa źródeł z kodem źródłowym (1 własnych plików, np. src/lib/platnosci.ts)"]["waga"] == "ŚREDNIE"
+    zmapy = mapy["klucz Stripe (live) w kodzie z publicznej mapy źródeł"]
+    assert zmapy["waga"] == "KRYTYCZNE" and zmapy["gdzie"].endswith("/assets/app.js.map → src/lib/platnosci.ts")
     srv, base = aplikacja(dziurawa=False)
     try:
         sc.main(["url", base, "--json"])
     finally:
         srv.shutdown()
-    assert not [x for x in json.loads(capsys.readouterr().out)["ustalenia"] if "JS" in x["co"]]   # klucz anon jest publiczny
+    czyste = json.loads(capsys.readouterr().out)["ustalenia"]
+    assert not [x for x in czyste if "JS" in x["co"] or "map" in x["co"]]     # klucz anon jest publiczny; .map to strona SPA, nie mapa
+
+
+def test_source_maps_inline_and_without_code(monkeypatch):
+    mapa = {"version": 3, "sources": ["../src/main.ts"], "sourcesContent": ["const x = 1"], "mappings": ""}
+    wbud = "data:application/json;base64," + base64.b64encode(json.dumps(mapa).encode()).decode()
+    wyn = sc.mapa_zrodel("https://a.pl/app.js", f"x()\n//# sourceMappingURL={wbud}", {})
+    assert [(x["waga"], x["co"]) for x in wyn] == [("ŚREDNIE", "publiczna mapa źródeł z kodem źródłowym (1 własnych plików, np. src/main.ts)")]
+    assert wyn[0]["gdzie"] == "https://a.pl/app.js (mapa wbudowana w skrypt)"
+    pytania = []
+
+    def fake(url, **kw):
+        pytania.append(url)
+        return (200, {}, [], json.dumps({"version": 3, "sources": ["a.ts", "b.ts"], "mappings": ""}).encode())
+    monkeypatch.setattr(sc, "pobierz", fake)
+    wyn = sc.mapa_zrodel("https://a.pl/_next/static/x.js?v=2", "x()", {"sourcemap": "/maps/x.js.map"})
+    assert pytania == ["https://a.pl/maps/x.js.map"] and wyn[0]["waga"] == "NISKIE" and "2 plików" in wyn[0]["co"]
+    assert sc.mapa_zrodel("https://a.pl/x.js", "x()\n//# sourceMappingURL=https://cdn.obca.pl/x.js.map", {}) == []   # obca domena
+    assert pytania == ["https://a.pl/maps/x.js.map"]
+    sc.mapa_zrodel("https://a.pl/y.js?v=1", "y()", {})
+    assert pytania[-1] == "https://a.pl/y.js.map"                               # bez komentarza: plik .map obok skryptu
 
 
 def test_dependencies_missing_young_and_lookalike(tmp_path, monkeypatch):

@@ -1,7 +1,7 @@
 ---
 name: bezpieczenstwo-aplikacji
 description: "Bezpieczeństwo aplikacji: skan, próby, 26 punktów."
-version: 1.1.0
+version: 1.2.0
 author: "Jarvo (metodyka przeglądu wg anthropics/claude-code-security-review, MIT)"
 license: MIT
 metadata:
@@ -46,7 +46,9 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
 2. **Skan działającej strony** (podgląd albo produkcja): `python3 $HERMES_HOME/scripts/security_check.py url <URL>`
    (HTTPS, HSTS, CSP, clickjacking, nosniff, Referrer/Permissions-Policy, flagi ciasteczek sesji, CORS z obcej domeny,
    ślady błędów, publiczne `/.env`, `/.git`, kopie zapasowe, **klucze serwerowe w JS wysyłanym do przeglądarki**;
-   klucz `anon` Supabase i klucze Google Maps/Firebase są publiczne z założenia, liczy się ich ograniczenie).
+   klucz `anon` Supabase i klucze Google Maps/Firebase są publiczne z założenia, liczy się ich ograniczenie;
+   **publiczne mapy źródeł**: `.js.map` z `sourcesContent` odtwarza czytelny kod frontu, bo minifikacja to nie
+   szyfrowanie: ŚREDNIE, a sekret w odzyskanym kodzie KRYTYCZNE). W `repo` także `productionBrowserSourceMaps: true`.
 2b. **Próby na działającej aplikacji** (podgląd z backendem): dwa konta testowe (A i B) zakładasz sam na podglądzie,
    ich nagłówki sesji bierzesz z odpowiedzi logowania, potem:
    ```bash

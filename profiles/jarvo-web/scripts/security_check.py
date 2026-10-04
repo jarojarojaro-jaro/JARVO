@@ -3,7 +3,8 @@
 
     python3 security_check.py repo <katalog projektu> [--offline] [--json]   # kod: sekrety, .env w gicie, zależności, wzorce ryzyka
     python3 security_check.py url https://strona.pl [--json]                 # działająca strona: nagłówki, ciasteczka, CORS,
-                                                                             # wycieki, klucze w JS wysyłanym do przeglądarki
+                                                                             # wycieki, klucze w JS wysyłanym do przeglądarki,
+                                                                             # publiczne mapy źródeł (.js.map z kodem)
     python3 security_check.py atak http://localhost:4321 [próby…] [--json]    # nieniszczące próby na działającej aplikacji
 
 `atak` (tylko nasz podgląd albo aplikacja użytkownika za jego zgodą: `--zgoda-wlasciciela`), próby wybierasz flagami:
@@ -69,6 +70,8 @@ RYZYKA = [  # (waga, opis, wzorzec, poprawka) — tylko wzorce o niskim odsetku 
      "lista dozwolonych domen; nigdy * razem z credentials"),
     ("ŚREDNIE", "tryb debug na stałe", r"(?i)(DEBUG\s*=\s*True|app\.debug\s*=\s*true|debug:\s*true)", "debug tylko z env i nigdy na produkcji"),
     ("NISKIE", "haszowanie hasła słabym algorytmem", r"(?i)(md5|sha1)\s*\(.*pass", "argon2id albo bcrypt (koszt ≥ 12)"),
+    ("ŚREDNIE", "mapy źródeł publikowane w buildzie produkcyjnym (cały kod frontu do przeczytania)",
+     r"productionBrowserSourceMaps\s*:\s*true", "productionBrowserSourceMaps: false; mapy tylko do narzędzia błędów (Sentry), nie na serwer"),
 ]
 # Niebezpieczne ustawienia domyślne (metoda za Trail of Bits `insecure-defaults`, reguły własne): liczy się, czy aplikacja
 # DZIAŁA z tą wartością, gdy brakuje konfiguracji. `env.get(X, 'dev')` działa ze znanym sekretem, `env[X]` się wywraca.
@@ -341,7 +344,7 @@ def rola_jwt(token: str) -> str | None:
         return None
 
 
-def sekrety_w_js(tekst: str, gdzie: str) -> list[dict]:
+def sekrety_w_js(tekst: str, gdzie: str, skad: str = "JS wysyłanym do przeglądarki") -> list[dict]:
     wyn = []
     for nazwa, wz in SEKRETY[:8]:
         for m in re.finditer(wz, tekst):
@@ -351,12 +354,59 @@ def sekrety_w_js(tekst: str, gdzie: str) -> list[dict]:
             if nazwa.startswith("klucz Supabase") and rola_jwt(s) not in ("service_role", "supabase_admin"):
                 continue                                   # klucz anon: publiczny z założenia, chroni go RLS
             if nazwa == "klucz Google API":
-                wyn.append(u("ŚREDNIE", "klucz Google API w JS strony", gdzie,
+                wyn.append(u("ŚREDNIE", f"klucz Google API w {skad}", gdzie,
                              "klucze Maps/Firebase bywają publiczne: ogranicz je (referrer, lista API) w konsoli Google"))
             else:
-                wyn.append(u("KRYTYCZNE", f"{nazwa} w JS wysyłanym do przeglądarki", gdzie,
+                wyn.append(u("KRYTYCZNE", f"{nazwa} w {skad}", gdzie,
                              "klucz tylko na serwerze (trasa API/proxy); UNIEWAŻNIJ klucz u dostawcy"))
             break
+    return wyn
+
+
+POPRAWKA_MAP = ("wyłącz mapy na produkcji (Next: productionBrowserSourceMaps: false; Vite/Astro: build.sourcemap false albo "
+                "'hidden' i nie wgrywaj plików .map na serwer); mapy tylko do narzędzia błędów (Sentry)")
+
+
+def _krotko(zrodlo: str) -> str:
+    return re.sub(r"^(?:\.\./|\./)+", "", re.sub(r"^(?:webpack|vite|turbopack)://[^/]*/", "", zrodlo))[-60:]
+
+
+def mapa_zrodel(js: str, tekst: str, naglowki: dict) -> list[dict]:
+    """Publiczna mapa źródeł skryptu: komentarz sourceMappingURL, nagłówek SourceMap albo plik <skrypt>.map obok.
+    Mapa z `sourcesContent` odtwarza czytelny kod frontu (minifikacja to nie szyfrowanie): ŚREDNIE; sekret w odzyskanym
+    kodzie: KRYTYCZNE; mapa bez kodu (nazwy plików i struktura projektu): NISKIE. Mapa z obcej domeny poza zakresem."""
+    ref = naglowki.get("sourcemap") or naglowki.get("x-sourcemap") or ""
+    if m := re.findall(r"[#@]\s*sourceMappingURL=(\S+)", tekst[-20000:]):
+        ref = m[-1]
+    if ref.startswith("data:"):
+        try:
+            mapa = json.loads(base64.b64decode(ref.split(",", 1)[1]))
+        except (ValueError, IndexError):
+            return []
+        gdzie = f"{js} (mapa wbudowana w skrypt)"
+    else:
+        gdzie = urllib.parse.urljoin(js, ref) if ref else js.split("?")[0] + ".map"
+        if urllib.parse.urlsplit(gdzie).netloc != urllib.parse.urlsplit(js).netloc:
+            return []
+        s, _, _, b = pobierz(gdzie, limit=30_000_000)
+        if s != 200 or not b.lstrip().startswith(b"{"):         # 404 albo strona SPA zamiast mapy
+            return []
+        try:
+            mapa = json.loads(b)
+        except ValueError:
+            return []
+    if not isinstance(mapa, dict) or not mapa.get("sources"):
+        return []
+    zrodla = [str(z) for z in mapa["sources"]]
+    tresci = mapa.get("sourcesContent") or []
+    wlasne = [_krotko(z) for z, c in zip(zrodla, tresci) if "node_modules" not in z and isinstance(c, str) and c.strip()]
+    if not any(isinstance(c, str) and c.strip() for c in tresci):
+        return [u("NISKIE", f"publiczna mapa źródeł bez kodu ({len(zrodla)} plików: nazwy i struktura projektu)", gdzie, POPRAWKA_MAP)]
+    wyn = [u("ŚREDNIE", f"publiczna mapa źródeł z kodem źródłowym ({len(wlasne)} własnych plików"
+                        + (f", np. {', '.join(wlasne[:3])})" if wlasne else ")"), gdzie, POPRAWKA_MAP)]
+    for z, c in zip(zrodla, tresci):
+        if isinstance(c, str) and "node_modules" not in z:
+            wyn += sekrety_w_js(c, f"{gdzie} → {_krotko(z)}", "kodzie z publicznej mapy źródeł")
     return wyn
 
 
@@ -376,9 +426,10 @@ def strona(url: str) -> list[dict]:
     html = body.decode("utf-8", "replace")
     wyn += sekrety_w_js(html, base)                              # skrypty wbudowane w HTML
     for js in skrypty_strony(base, html):
-        s, _, _, b = pobierz(js, limit=8_000_000)
+        s, hjs, _, b = pobierz(js, limit=8_000_000)
         if s == 200:
-            wyn += sekrety_w_js(b.decode("utf-8", "replace"), js)
+            tekst = b.decode("utf-8", "replace")
+            wyn += sekrety_w_js(tekst, js) + mapa_zrodel(js, tekst, hjs)
     body = body[:3000]
     if base.startswith("http://"):
         wyn.append(u("WYSOKIE", "strona bez HTTPS", base, "certyfikat (Let's Encrypt) i przekierowanie 301 na https"))

@@ -208,7 +208,7 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   High/critical bez przejrzanego wyjątku (`vendor/skan-wyjatki.yaml`, przypięty do commitu) zatrzymuje wdrożenie.
 - **Bezpieczeństwo aplikacji (jarvo-web):** skill `bezpieczenstwo-aplikacji` (26 punktów, w tym funkcje AI, sesje,
   CSRF, kopie zapasowe), skaner repo/URL (`security_check.py`: niebezpieczne ustawienia domyślne, zależności nieistniejące
-  albo podszyte, klucze w JS strony), nieniszczące próby na podglądzie (`security_check.py atak`: trasy bez sesji, IDOR
+  albo podszyte, klucze w JS strony, publiczne mapy źródeł `.js.map` z kodem), nieniszczące próby na podglądzie (`security_check.py atak`: trasy bez sesji, IDOR
   na dwóch kontach, limit logowania, upload, wylogowanie), audyt zależności (`supply-chain-risk-auditor`,
   Trail of Bits), przegląd kodu wg OWASP (`security-review`, getsentry); bramka jakości BLOKUJE oddanie strony przy
   KRYTYCZNE/WYSOKIE.
