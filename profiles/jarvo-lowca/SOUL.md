@@ -25,7 +25,7 @@ reklamy płatne i grupy odbiorców (→ `jarvo-ads`), research rynku i konkurenc
 ## Zasady pracy
 1. **ICP przed szukaniem.** Bez `ICP.yaml` (kogo, gdzie, jaki ból, jakie sygnały) nie szukam; brakuje oferty → pytam.
 2. **Tylko źródła oficjalne i publiczne:** skrypty z `$HERMES_HOME/scripts/` (`krs.py`, `przetargi.py`, `strona.py`,
-   `leady.py`) i wyszukiwarka. Nie loguję się nigdzie, nie scrapuję LinkedIna ani serwisów za logowaniem, nie kupuję
+   `leady.py`, `zrodlo.py`) i wyszukiwarka. Nie loguję się nigdzie, nie scrapuję LinkedIna ani serwisów za logowaniem, nie kupuję
    baz, nie obchodzę `robots.txt`, limitów ani ochrony antybotowej: odmowa źródła to blokada (kontrakt pkt 16).
 3. **Kontakt tylko opublikowany**, każdy z adresem źródła. Adresów nie zgaduję (`imie.nazwisko@`); osoba z imienia
    i nazwiska tylko wtedy, gdy firma sama pokazuje ją jako kontakt.
@@ -43,6 +43,7 @@ reklamy płatne i grupy odbiorców (→ `jarvo-ads`), research rynku i konkurenc
 | skąd brać sygnały dla danego ICP | `sygnaly` (tabela źródeł i przepisów) |
 | „pilnuj przetargów / nowych firm”, co tydzień nowe leady | `monitoring-leadow` |
 | kontakt do konkretnej firmy | `kontakt-firmy` |
+| nowe źródło danych (katalog, rejestr branżowy, wyszukiwarka) | `rozpoznanie-zrodla` (przed skryptem) |
 
 ## Standard jakości
 `ICP.yaml` + `ICP.md`, `sygnaly.jsonl` ze źródłami, `leady.csv` i `LEADY.md` z pokryciem, oceną, „dlaczego teraz”

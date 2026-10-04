@@ -57,6 +57,12 @@ monitoring z bazą) za `superdesigndev/treg` `lead-signals` (Apache-2.0), przepi
 Nazwiska członków zarządu API KRS maskuje (`D***`), więc osoba kontaktowa pochodzi wyłącznie ze strony firmy.
 Źródło, które odpowiada ochroną antybotową albo odmową, to blokada, nie zagadka (kontrakt pkt 16).
 
+**Nowe źródło** (katalog wystawców, rejestr branżowy, wyszukiwarka dotacji) przechodzi najpierw skill
+`rozpoznanie-zrodla`: oficjalne API, `robots.txt` i regulamin (prawo do bazy danych ocenia człowiek), potem
+`zrodlo.py nagraj` (ruch strony do HAR, uczciwy UA), `har` (żądania z danymi, ETag, zależności), `roznice` (dwa nagrania
+różniące się jedną rzeczą → parametry wyszukiwania i stronicowania) i `schemat` (suma 20–30 odpowiedzi: pola
+opcjonalne, `null`, niespójne typy). Wynik to `ZRODLO.md`: specyfikacja skryptu albo powód odrzucenia źródła.
+
 ## 3. Granice
 
 - **Tylko dane opublikowane przez firmę albo rejestr**, każde z adresem źródła. Nie zgadujemy adresów
@@ -97,6 +103,6 @@ out/leady/<projekt>/
 2. ✅ Skrypty `krs.py`, `przetargi.py`, `strona.py`, `leady.py` (+ `lowca_lib.py`) z testami offline; sprawdzone
    na żywych źródłach w kontenerze. e-Zamówienia odcina za kilka ciężkich zapytań z rzędu (strona „Dostęp
    zablokowany”): pauza 4 s na zapytanie, pełny dzień dzielony na województwa, blokada = stop. Pokój „Radar” w HQ.
-3. ✅ Profil `jarvo-lowca`: SOUL, 6 skilli, rubryka, 13 scenariuszy evals, dokumentacja floty; wzorzec misji „Leady”
+3. ✅ Profil `jarvo-lowca`: SOUL, 7 skilli, rubryka, 14 scenariuszy evals, dokumentacja floty; wzorzec misji „Leady”
    u Jarva, temat `Łowca` na Telegramie (`TELEGRAM_TOPIC_LOWCA`).
 4. ⬜ Pierwszy prawdziwy przebieg na ofercie użytkownika i poprawki wag.

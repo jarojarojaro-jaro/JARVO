@@ -1,6 +1,13 @@
 # Changelog: jarvo-lowca
 
 ## Niewydane
+- Nowy skill `rozpoznanie-zrodla` i skrypt `zrodlo.py` (+ `har.cjs`): zanim powstanie skrypt do nowego publicznego
+  źródła, Łowca sprawdza oficjalne API, `robots.txt` i regulamin, nagrywa ruch strony do HAR (playwright-core, uczciwy UA,
+  odmowa = blokada, kod 3), wypisuje żądania z danymi, nagłówki do pobierania przyrostowego i zależności między
+  wywołaniami (`har`), porównuje dwa nagrania różniące się jedną rzeczą (`roznice`) i liczy schemat z wielu odpowiedzi:
+  pola opcjonalne, `null`, niespójne typy, przykłady z maskowanymi e-mailami i numerami (`schemat`, osobno dla każdego
+  żądania, `--zadanie`). Piksele śledzące i analityka nie liczą się jako dane. Wynik: `ZRODLO.md`
+  w `zrodla/<nazwa>/`. Eval `lowca-nowe-zrodlo`.
 - `strona.py`: tekst sąsiednich elementów już się nie skleja („KRS: 0000745671</p><a>hello@…” dawało fałszywy adres
   `0000745671hello@`, „reach us at<a>hello@” dawało `athello@`), a numery z etykietą REGON, KRS, NIP, BDO nie są brane
   za telefon. Odcisk strony liczony jak dotąd, więc baza monitoringu nie zgłosi fałszywej zmiany.
