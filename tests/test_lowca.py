@@ -144,6 +144,57 @@ def test_company_site(monkeypatch):
     assert w["odcisk"] and strona.odcisk("Oferta  2026") == strona.odcisk("Oferta 2031") != strona.odcisk("Nowa oferta")
 
 
+UKRYTE = {
+    "https://next.pl/robots.txt": "",
+    "https://next.pl": """<html><head><title>Next</title>
+        <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [
+          {"@type": "WebSite", "name": "Strona", "url": "https://next.pl"},
+          {"@type": ["Organization", "LocalBusiness"], "name": "Next", "legalName": "NEXT SP. Z O.O.", "telephone": "+48 22 123 45 67",
+           "taxID": "PL9510001003", "sameAs": ["https://www.linkedin.com/company/next-pl", "https://www.facebook.com/nextpl"],
+           "address": {"@type": "PostalAddress", "streetAddress": "ul. Prosta 1", "postalCode": "00-001", "addressLocality": "Warszawa"},
+           "contactPoint": {"@type": "ContactPoint", "contactType": "sprzedaż", "email": "sprzedaz@next.pl"}}]}</script>
+        <script id="__NEXT_DATA__" type="application/json">{"props": {"pageProps": {"stopka": {"email": "biuro@next.pl",
+          "phoneNumber": "601 222 333", "licznik": "221234567", "logo": "logo@2x.png"}}}, "buildId": "x"}</script>
+        <script>self.__next_f.push([1,"2:[\\"$\\",\\"a\\",null,{\\"href\\":\\"mailto:rsc@next.pl\\"}]"])</script>
+        </head><body><a href="/kontakt">Kontakt</a><div id="__next"></div></body></html>""",
+    "https://next.pl/kontakt": """<html><body><p>Napisz: biuro@next.pl</p>
+        <script type="application/json" id="__NUXT_DATA__">[{"data": 1}, {"kontakt": 2}, {"telefon": 3, "mail": 4}, "512 345 678", "nuxt@next.pl"]</script>
+        <script>window.__NUXT__=(function(a){return {config:{phone:"+48 600 700 800",nip:"951-000-10-03"}}}(1))</script>
+        </body></html>""",
+}
+
+
+def test_company_site_hidden_data(monkeypatch):
+    monkeypatch.setattr(ll, "http", lambda url, **kw: (200, UKRYTE[url]) if url in UKRYTE else (404, ""))
+    w = strona.kontakt("next.pl")
+    emaile = {e["email"]: e for e in w["emaile"]}
+    assert emaile["biuro@next.pl"]["skad"] == "next-data"                       # strona główna pokazuje go tylko w danych Next
+    assert emaile["sprzedaz@next.pl"]["skad"] == "json-ld" and emaile["sprzedaz@next.pl"]["kontekst"] == "sprzedaż"
+    assert emaile["rsc@next.pl"]["skad"] == "rsc" and emaile["nuxt@next.pl"]["skad"] == "nuxt"
+    assert not any("2x" in e for e in emaile)
+    tel = {t["numer"]: t for t in w["telefony"]}
+    assert tel["+48 221 234 567"]["skad"] == "json-ld" and tel["+48 601 222 333"]["skad"] == "next-data"
+    assert tel["+48 512 345 678"]["skad"] == "nuxt" and "+48 600 700 800" in tel     # Nuxt 3 (tablica) i Nuxt 2 (JS)
+    assert len(tel) == 4                                                              # „licznik” to nie telefon
+    assert w["nip"] == ["9510001003"]
+    assert w["adres"] == {"tekst": "ul. Prosta 1, 00-001 Warszawa", "zrodlo": "https://next.pl", "skad": "json-ld"}
+    assert w["nazwa"]["tekst"] == "NEXT SP. Z O.O."
+    assert w["social"] == {"linkedin": "https://linkedin.com/company/next-pl", "facebook": "https://facebook.com/nextpl"}
+    ukryte = {(u["skad"], u["zrodlo"]): u for u in w["ukryte"]}
+    assert ukryte[("json-ld", "https://next.pl")]["pola"] == ["NIP", "adres", "e-mail", "nazwa", "social", "telefon"]
+    assert {s for s, _ in ukryte} == {"json-ld", "next-data", "rsc", "nuxt"}
+
+
+def test_hidden_data_parsers():
+    assert strona.ladunki("<script>var x = 1</script>") == []
+    z = strona.zbierz_ukryte('{"phone": "22 1"}', "nuxt")                              # uszkodzony fragment: bez zgadywania
+    assert z["telefony"] == [] and z["emaile"] == []
+    z = strona.zbierz_ukryte({"@type": "Organization", "name": "X", "address": "ul. Długa 5, Kraków"}, "json-ld")
+    assert z["adres"] == "ul. Długa 5, Kraków" and z["nazwa"] == "X"
+    z = strona.zbierz_ukryte({"@type": "Person", "name": "Anna", "email": "anna@x.pl", "telephone": "601 222 333"}, "json-ld")
+    assert z["nazwa"] is None and z["emaile"] == [("anna@x.pl", "Anna")]
+
+
 def test_blocked_source_is_a_stop(monkeypatch):
     class R:
         status = 200

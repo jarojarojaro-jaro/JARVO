@@ -167,7 +167,7 @@ Bez Skarbca agent pracuje na eksportach CSV. Wydatki tylko na poziomie A2, w kop
 | [API KRS](https://api-krs.ms.gov.pl) (Ministerstwo Sprawiedliwości) | odpisy firm (NIP, PKD, adres, kapitał, e-mail i www, jeśli podane) i dzienny biuletyn wpisów | dane publiczne | n/d | `krs.py` |
 | [e-Zamówienia BZP](https://ezamowienia.gov.pl) (API tablicy ogłoszeń) | ogłoszenia o zamówieniach i wyniki ze zwycięzcą (NIP); odcina za serię ciężkich zapytań, stąd pauza 4 s | dane publiczne | n/d | `przetargi.py bzp`, healthcheck `przetargi.py sprawdz bzp` |
 | [TED API v3](https://api.ted.europa.eu) | przetargi unijne z CPV | dane publiczne (reuse UE) | n/d | `przetargi.py ted`, healthcheck `przetargi.py sprawdz ted` |
-| `strona.py`, `leady.py`, `lowca_lib.py` | kontakt opublikowany na stronie firmy (`robots.txt`), technologie, odcisk strony; lista leadów, ocena wg ICP, monitoring | własny kod | n/d | skrypt |
+| `strona.py`, `leady.py`, `lowca_lib.py` | kontakt opublikowany na stronie firmy (`robots.txt`), także z danych ukrytych w HTML (JSON-LD, Next.js, Nuxt), technologie, odcisk strony; lista leadów, ocena wg ICP, monitoring | własny kod | n/d | skrypt |
 
 Wszystkie źródła bez kluczy. Odmowa źródła (403/429, strona antybotowa) = blokada, bez obchodzenia ([LEADY.md](LEADY.md)).
 

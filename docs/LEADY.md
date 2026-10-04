@@ -30,7 +30,8 @@ monitoring z bazą) za `superdesigndev/treg` `lead-signals` (Apache-2.0), przepi
         │
         ▼
   ④ kontakt-firmy      strona.py kontakt: e-maile, telefony, formularz, osoby z zespołu, które firma opublikowała
-                       (każdy z adresem strony) + adres/strona z KRS; bez zgadywania adresów, bez LinkedIna
+                       (każdy z adresem strony), także z danych ukrytych w HTML (JSON-LD, Next.js, Nuxt, RSC)
+                       + adres/strona z KRS; bez zgadywania adresów, bez LinkedIna
         │
         ▼
   ⑤ lista-leadow       leady.py: leady.csv (deduplikacja), ocena wg ICP, LEADY.md (top N z „dlaczego teraz”),
@@ -48,7 +49,7 @@ monitoring z bazą) za `superdesigndev/treg` `lead-signals` (Apache-2.0), przepi
 | KRS, API Ministerstwa Sprawiedliwości (`api-krs.ms.gov.pl`) | biuletyn: podmioty z wpisami danego dnia (~4 tys.); odpis: nazwa, NIP, REGON, forma, adres, województwo, PKD, kapitał, data rejestracji, e-mail i strona (jeśli podane) | bez klucza | nowa firma w PKD i regionie z ICP; wpis zmian |
 | e-Zamówienia, BZP (`ezamowienia.gov.pl/mo-board/api`) | ogłoszenia o zamówieniach i wynikach: zamawiający (NIP), przedmiot, CPV, termin ofert | bez klucza | przetarg na to, co sprzedajesz; wynik (zwycięzca = nowa praca do wykonania) |
 | TED (`api.ted.europa.eu/v3`) | ogłoszenia unijne (także PL), CPV, zamawiający | bez klucza | jw. powyżej progów UE |
-| Strona firmy (`strona.py`) | kontakt, zespół, kariera, technologia (CMS, sklep, analityka, piksele), odcisk strony | publiczna strona, `robots.txt`, uczciwy UA | technologia konkurenta albo brak narzędzia; rekrutacja; zmiana strony |
+| Strona firmy (`strona.py`) | kontakt, zespół, kariera, technologia (CMS, sklep, analityka, piksele), odcisk strony; dane ukryte w HTML (schema.org JSON-LD, `__NEXT_DATA__`, Nuxt, RSC): nazwa, adres, telefon, e-mail, NIP | publiczna strona, `robots.txt`, uczciwy UA | technologia konkurenta albo brak narzędzia; rekrutacja; zmiana strony |
 | Wyszukiwarka (SearXNG floty) | oferty pracy, newsy, finansowanie, targi, wypowiedzi firm | narzędzie `web_search` | rekrutacja na rolę, inwestycja, ekspansja |
 | Biała lista VAT (`wl-api.mf.gov.pl`) | status VAT, NIP ↔ KRS | bez klucza; z części chmur odpowiada ochroną antybotową | weryfikacja firmy (opcjonalnie) |
 | REGON (BIR), CEIDG | działalności jednoosobowe, PKD | bezpłatny klucz użytkownika | poza pierwszą wersją |

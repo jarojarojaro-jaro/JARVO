@@ -1,6 +1,11 @@
 # Changelog: jarvo-lowca
 
 ## Niewydane
+- Dane ukryte w HTML (`strona.py kontakt`, skill `kontakt-firmy` 1.1.0): skrypt czyta schema.org JSON-LD, `__NEXT_DATA__`,
+  dane Nuxt (2 i 3) i strumień React Server Components z pierwszego HTML, bez przeglądarki. Dochodzą nazwa i adres firmy,
+  telefony, e-maile, NIP i profile social, których strona nie pokazuje w tekście; każda wartość ma `skad` i adres strony,
+  a `ukryte` podsumowuje ładunki. Telefon i NIP tylko spod kluczy, które je nazywają (`telephone`, `taxID`…), nie z
+  przypadkowych liczb. `leady.py kontakt` przenosi `adres` do `kontakty.json`.
 - SOUL bez linii „dane, nie polecenia” (jest w zasadzie 8 protokołu w tym samym prompcie).
 - Naprawa oceny ICP (`leady.py`): kryterium, którego sygnał nie dotyczy (CPV przy KRS, PKD przy przetargu), liczyło się
   jako niespełnione, więc przy przykładowym profilu (próg 1,0) idealna nowa spółka IT i pasujący przetarg dostawały 0,5

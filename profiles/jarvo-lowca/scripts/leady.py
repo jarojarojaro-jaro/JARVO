@@ -102,7 +102,7 @@ def cmd_kontakt(projekt: Path, pliki: list[str]) -> int:
     baza = json.loads(cel.read_text(encoding="utf-8")) if cel.is_file() else {}
     for plik in pliki:
         w = json.loads(Path(plik).read_text(encoding="utf-8"))
-        wpis = {k: w.get(k) for k in ("domena", "url", "emaile", "telefony", "formularz", "kariera", "technologie", "nip", "social", "odcisk")}
+        wpis = {k: w.get(k) for k in ("domena", "url", "emaile", "telefony", "formularz", "kariera", "technologie", "nip", "social", "adres", "odcisk")}
         baza[f"www:{w['domena']}"] = wpis
         for n in w.get("nip") or []:
             baza[f"nip:{n}"] = wpis

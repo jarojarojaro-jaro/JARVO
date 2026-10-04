@@ -8,6 +8,10 @@ Tylko domena firmy: strona główna + podstrony kontakt / o nas / zespół / kar
 Szanuje `robots.txt`, przedstawia się uczciwie (User-Agent jarvo-lowca), odmowa albo ochrona antybotowa = blokada.
 Każdy e-mail i telefon ma adres strony, na której jest opublikowany, i krótki kontekst (np. „Anna Nowak, dyrektor
 sprzedaży”). Adresów nie zgadujemy. Typ e-maila: ogolny (biuro@), rolowy (sprzedaz@), osobowy (imię, skrzynka darmowa).
+
+Dane ukryte w HTML: strona często ma w pierwszym HTML więcej, niż pokazuje (schema.org JSON-LD, `__NEXT_DATA__`,
+dane Nuxt, strumień React Server Components). Skrypt czyta je bez przeglądarki: nazwa i adres firmy, telefon, e-mail,
+NIP, profile społecznościowe. Każda taka wartość ma pole `skad` (json-ld | next-data | nuxt | rsc) i adres strony.
 """
 
 from __future__ import annotations
@@ -46,6 +50,15 @@ TECH = {  # sygnatury w HTML strony: nazwa → wzorzec
     "CookieYes": r"cookieyes", "Booksy": r"booksy\.com", "Calendly": r"calendly\.com", "Przelewy24": r"przelewy24", "PayU": r"secure\.payu|payu\.com",
     "Stripe": r"js\.stripe\.com", "Tpay": r"tpay\.com", "reCAPTCHA": r"google\.com/recaptcha",
 }
+
+# dane ukryte w HTML: klucze, po których poznajemy pole (małe litery, bez - i _)
+SKRYPT = re.compile(r"<script\b([^>]*)>(.*?)</script\s*>", re.I | re.S)
+RSC = re.compile(r'self\.__next_f\.push\(\[\s*\d+\s*,\s*("(?:[^"\\]|\\.)*")\s*\]\)')
+K_TEL = {"tel", "telefon", "telephone", "phone", "phonenumber", "mobile", "mobilephone", "komorka", "numertelefonu"}
+K_NIP = {"nip", "taxid", "vatid", "vat", "vatnumber", "taxnumber"}
+K_TEKST = re.compile(r"""["']?(tel|telefon|telephone|phone|phoneNumber|mobile|nip|taxID|vatID)["']?\s*:\s*["']([^"'\n]{6,40})["']""", re.I)
+TYPY_NIE_FIRMA = {"person", "website", "webpage", "breadcrumblist", "listitem", "imageobject", "searchaction", "sitenavigationelement",
+                  "article", "blogposting", "faqpage", "question", "answer", "offer", "product", "review", "rating", "aggregaterating"}
 
 
 class Czytnik(HTMLParser):
@@ -125,6 +138,146 @@ def odcisk(tekst: str) -> str:
     return hashlib.sha256(norm.encode()).hexdigest()[:16]
 
 
+def ladunki(surowy: str) -> list[tuple[str, object]]:
+    """Dane ukryte w HTML: lista (skąd, dane). Dane to obiekt JSON albo tekst, gdy skrypt to JS, a nie JSON (Nuxt 2)."""
+    out, rsc = [], []
+    for m in SKRYPT.finditer(surowy):
+        atr, tresc = m.group(1), m.group(2).strip()
+        if "self.__next_f.push" in tresc:                       # React Server Components: kawałki tekstu w stringach JS
+            for s in RSC.findall(tresc):
+                try:
+                    rsc.append(json.loads(s))
+                except ValueError:
+                    pass
+            continue
+        if re.search(r"application/ld\+json", atr, re.I):
+            skad = "json-ld"
+        elif re.search(r"""id=["']?__NEXT_DATA__""", atr):
+            skad = "next-data"
+        elif re.search(r"""id=["']?__NUXT_DATA__""", atr) or re.match(r"window\.__NUXT__\s*=", tresc):
+            skad = "nuxt"
+        else:
+            continue
+        tresc = re.sub(r"^(?://\s*)?<!\[CDATA\[|(?://\s*)?\]\]>$", "", tresc).strip()
+        try:
+            out.append((skad, json.loads(tresc)))
+        except ValueError:
+            out.append((skad, html.unescape(tresc)))
+    if rsc:
+        out.append(("rsc", "".join(rsc)))
+    return out
+
+
+def _adres(d: dict) -> str:
+    kod_miasto = " ".join(s for s in (d.get("postalCode"), d.get("addressLocality")) if isinstance(s, str)).strip()
+    return ", ".join(c.strip() for c in (d.get("streetAddress"), kod_miasto) if isinstance(c, str) and c.strip())
+
+
+def zbierz_ukryte(dane: object, skad: str) -> dict:
+    """Z jednego ładunku: e-maile (z kontekstem węzła), telefony, NIP, adres i nazwa firmy (JSON-LD), profile social.
+    Telefon i NIP tylko spod kluczy, które je nazywają (phone, telephone, nip, taxID…) albo z `tel:`, bo w danych
+    aplikacji jest pełno liczb, które tylko wyglądają jak numer."""
+    z: dict = {"emaile": [], "telefony": [], "nip": [], "adres": None, "nazwa": None, "social": {}}
+
+    def emaile(tekst: str, ktx: str) -> None:
+        for e in ll.emaile(tekst.replace("mailto:", " ")):
+            if all(e != x for x, _ in z["emaile"]):
+                z["emaile"].append((e, ktx))
+
+    def telefony(tekst: str) -> None:
+        z["telefony"] += [t for t in ll.telefony(tekst) if t not in z["telefony"]]
+
+    def nip(tekst: str) -> None:
+        if (n := ll.nip(tekst)) and n not in z["nip"]:
+            z["nip"].append(n)
+
+    def social(tekst: str) -> None:
+        for nazwa, wz in SOCIAL.items():
+            if nazwa not in z["social"] and (m := re.search(wz, tekst, re.I)):
+                z["social"][nazwa] = "https://" + m.group(0).rstrip("/\\")
+
+    def pole(klucz: str, w: str, rodzic: object) -> None:
+        k = re.sub(r"[-_\s]", "", klucz.lower())
+        if "@" in w:
+            ktx = ", ".join(rodzic[a] for a in ("name", "jobTitle", "contactType") if isinstance(rodzic, dict) and isinstance(rodzic.get(a), str))
+            emaile(w, ktx[:120])
+        if k in K_TEL or w.lower().startswith("tel:"):
+            telefony(w[4:] if w.lower().startswith("tel:") else w)
+        if k in K_NIP:
+            nip(w)
+        if skad == "json-ld" and k == "address" and not z["adres"]:
+            z["adres"] = w.strip()
+        if len(w) < 500:
+            social(w)
+
+    def wezel(x: object, klucz: str, rodzic: object) -> None:
+        if isinstance(x, dict):
+            if skad == "json-ld":
+                typy = {t.lower() for t in (x.get("@type") if isinstance(x.get("@type"), list) else [x.get("@type")]) if isinstance(t, str)}
+                if not z["adres"] and (x.get("streetAddress") or x.get("postalCode")):
+                    z["adres"] = _adres(x) or None
+                if (not z["nazwa"] and typy and not typy & (TYPY_NIE_FIRMA | {"postaladdress", "contactpoint"})
+                        and any(a in x for a in ("telephone", "email", "address", "taxID", "vatID", "legalName"))):
+                    z["nazwa"] = x.get("legalName") or x.get("name")
+            for k, v in x.items():
+                wezel(v, k, x)
+        elif isinstance(x, list):
+            for v in x:
+                wezel(v, klucz, rodzic)
+        elif isinstance(x, (str, int)) and not isinstance(x, bool):
+            pole(klucz or "", str(x), rodzic)
+
+    if isinstance(dane, str):                                     # JS albo uszkodzony JSON: tylko wzorce z kluczem
+        emaile(dane, "")
+        for m in K_TEKST.finditer(dane):
+            (nip if m.group(1).lower() in ("nip", "taxid", "vatid") else telefony)(m.group(2))
+        for m in re.finditer(r"tel:([+\d\s().-]{9,20})", dane):
+            telefony(m.group(1))
+        social(dane)
+        return z
+    if skad == "nuxt" and isinstance(dane, list):                 # Nuxt 3: płaska tablica, obiekt = {klucz: indeks wartości}
+        for d in dane:
+            if isinstance(d, dict):
+                for k, i in d.items():
+                    if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(dane) and isinstance(dane[i], (str, int)):
+                        pole(k, str(dane[i]), d)
+    wezel(dane, "", None)
+    return z
+
+
+def dolacz_ukryte(wynik: dict, z: dict, skad: str, url: str) -> None:
+    """Dopisuje do wyniku strony to, czego nie było w widocznym tekście; `ukryte` mówi, co który ładunek zawierał."""
+    pola, nowe = [], 0
+    for e, ktx in z["emaile"]:
+        pola.append("e-mail")
+        if not any(x["email"] == e for x in wynik["emaile"]):
+            wynik["emaile"].append({"email": e, "rodzaj": ll.typ_emaila(e), "zrodlo": url, "kontekst": ktx, "skad": skad})
+            nowe += 1
+    for t in z["telefony"]:
+        pola.append("telefon")
+        if not any(x["numer"] == t for x in wynik["telefony"]):
+            wynik["telefony"].append({"numer": t, "zrodlo": url, "skad": skad})
+            nowe += 1
+    for n in z["nip"]:
+        pola.append("NIP")
+        if n not in wynik["nip"]:
+            wynik["nip"].append(n)
+            nowe += 1
+    for nazwa, link in z["social"].items():
+        pola.append("social")
+        if nazwa not in wynik["social"]:
+            wynik["social"][nazwa] = link
+            nowe += 1
+    for klucz in ("adres", "nazwa"):
+        if z[klucz]:
+            pola.append(klucz)
+            if not wynik[klucz]:
+                wynik[klucz] = {"tekst": z[klucz], "zrodlo": url, "skad": skad}
+                nowe += 1
+    if pola:
+        wynik["ukryte"].append({"skad": skad, "zrodlo": url, "pola": sorted(set(pola)), "nowe": nowe})
+
+
 def kontakt(start: str, max_stron: int = 8) -> dict:
     if "://" not in start:
         start = "https://" + start
@@ -132,7 +285,7 @@ def kontakt(start: str, max_stron: int = 8) -> dict:
     rp = robots(start)
     wynik = {"domena": dom, "url": start, "tytul": "", "opis": "", "strony": [], "emaile": [], "telefony": [],
              "formularz": None, "kariera": None, "technologie": [], "nip": [], "social": {}, "odcisk": None,
-             "pominiete_robots": [], "bledy": []}
+             "nazwa": None, "adres": None, "ukryte": [], "pominiete_robots": [], "bledy": []}
     kolejka, widziane = [start], set()
     while kolejka and len(wynik["strony"]) < max_stron:
         url = kolejka.pop(0).split("#")[0]
@@ -171,6 +324,8 @@ def kontakt(start: str, max_stron: int = 8) -> dict:
         for nazwa, wz in SOCIAL.items():
             if nazwa not in wynik["social"] and (m := re.search(wz, surowy, re.I)):
                 wynik["social"][nazwa] = "https://" + m.group(0).rstrip("/\\")
+        for skad, dane in ladunki(surowy):
+            dolacz_ukryte(wynik, zbierz_ukryte(dane, skad), skad, url)
         for href, atekst in c.linki:
             cel = urllib.parse.urljoin(url, href).split("#")[0]
             if ll.domena(cel) != dom or not cel.startswith("http") or re.search(r"\.(pdf|jpe?g|png|zip|docx?)$", cel, re.I):
@@ -222,6 +377,10 @@ def main(argv: list[str] | None = None) -> int:
     for t in w["telefony"][:5]:
         print(f"  tel. {t['numer']} · {t['zrodlo']}")
     print(f"  formularz: {w['formularz'] or '–'} · kariera: {w['kariera'] or '–'} · social: {', '.join(w['social']) or '–'}")
+    if w["adres"]:
+        print(f"  adres: {w['adres']['tekst']} · {w['adres']['skad']} · {w['adres']['zrodlo']}")
+    for u in w["ukryte"]:
+        print(f"  dane ukryte ({u['skad']}) · {u['zrodlo']}: {', '.join(u['pola'])}; nowe wartości: {u['nowe']}")
     if w["pominiete_robots"]:
         print(f"  pominięte (robots.txt): {len(w['pominiete_robots'])}")
     return 0

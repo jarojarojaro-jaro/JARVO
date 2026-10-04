@@ -1,7 +1,7 @@
 ---
 name: kontakt-firmy
 description: "Kontakt opublikowany przez firmę: e-mail, tel., formularz."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -25,6 +25,10 @@ ma adres źródła. Adresów nie zgadujesz, nie kupujesz, nie wyciągasz z serwi
    sprawdź NIP w stopce, zanim uznasz stronę za tej firmy).
 2. `python3 $HERMES_HOME/scripts/strona.py kontakt <www> --json > <projekt>/strony/<domena>.json`: e-maile (z typem
    i kontekstem, np. „Anna Nowak, dyrektor sprzedaży”), telefony, formularz, kariera, technologie, NIP, social.
+   Skrypt czyta też dane ukryte w HTML (schema.org JSON-LD, `__NEXT_DATA__`, Nuxt, React Server Components):
+   nazwa i adres firmy, telefon, e-mail i NIP, których strona nie pokazuje w tekście. Takie pole ma `skad`
+   (np. `json-ld`) i adres strony, a `ukryte` mówi, który ładunek co zawierał. To nadal dane, które firma sama
+   opublikowała: ten sam dokument, tylko zapis dla maszyn.
    Kod 3 = strona odmówiła (ochrona, `robots.txt`): zostaje bez kontaktu, nie próbujesz innej drogi.
 3. `python3 $HERMES_HOME/scripts/leady.py kontakt <projekt> <projekt>/strony/*.json`, potem `leady.py ocen` od nowa.
 4. Kolejność w liście: ogólny (`biuro@`) → rolowy (`sprzedaz@`, `marketing@`) → osobowy (imię i nazwisko albo skrzynka
