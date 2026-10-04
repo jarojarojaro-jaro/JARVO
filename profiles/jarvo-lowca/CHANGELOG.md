@@ -1,6 +1,9 @@
 # Changelog: jarvo-lowca
 
 ## Niewydane
+- `strona.py`: tekst sąsiednich elementów już się nie skleja („KRS: 0000745671</p><a>hello@…” dawało fałszywy adres
+  `0000745671hello@`, „reach us at<a>hello@” dawało `athello@`), a numery z etykietą REGON, KRS, NIP, BDO nie są brane
+  za telefon. Odcisk strony liczony jak dotąd, więc baza monitoringu nie zgłosi fałszywej zmiany.
 - Dane ukryte w HTML (`strona.py kontakt`, skill `kontakt-firmy` 1.1.0): skrypt czyta schema.org JSON-LD, `__NEXT_DATA__`,
   dane Nuxt (2 i 3) i strumień React Server Components z pierwszego HTML, bez przeglądarki. Dochodzą nazwa i adres firmy,
   telefony, e-maile, NIP i profile social, których strona nie pokazuje w tekście; każda wartość ma `skad` i adres strony,

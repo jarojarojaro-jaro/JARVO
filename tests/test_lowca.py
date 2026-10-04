@@ -185,6 +185,17 @@ def test_company_site_hidden_data(monkeypatch):
     assert {s for s, _ in ukryte} == {"json-ld", "next-data", "rsc", "nuxt"}
 
 
+def test_company_site_text_not_glued(monkeypatch):
+    stopka = ("<html><body><div>Oferta</div><footer><p>REGON: 300826280 KRS: 0000745671</p><a href='mailto:hello@x.pl'>hello@x.pl</a>"
+              "<p>reach us at<a href='/k'>hello@x.pl</a></p><p>tel. 534 205 209</p></footer></body></html>")
+    monkeypatch.setattr(ll, "http", lambda url, **kw: (200, stopka) if url == "https://x.pl" else (404, ""))
+    w = strona.kontakt("x.pl")
+    assert [e["email"] for e in w["emaile"]] == ["hello@x.pl"]                         # nie „0000745671hello@”, nie „athello@”
+    assert [t["numer"] for t in w["telefony"]] == ["+48 534 205 209"]                  # REGON to nie telefon
+    stary = "\nOferta\nREGON: 300826280 KRS: 0000745671hello@x.pl\nreach us athello@x.pl\ntel. 534 205 209"
+    assert w["odcisk"] == strona.odcisk(stary)                     # odcisk jak przed poprawką: monitoring nie widzi fałszywej zmiany
+
+
 def test_hidden_data_parsers():
     assert strona.ladunki("<script>var x = 1</script>") == []
     z = strona.zbierz_ukryte('{"phone": "22 1"}', "nuxt")                              # uszkodzony fragment: bez zgadywania

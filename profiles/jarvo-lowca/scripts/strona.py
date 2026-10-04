@@ -61,6 +61,14 @@ TYPY_NIE_FIRMA = {"person", "website", "webpage", "breadcrumblist", "listitem", 
                   "article", "blogposting", "faqpage", "question", "answer", "offer", "product", "review", "rating", "aggregaterating"}
 
 
+# odstęp między elementami: przy szukaniu kontaktów spacja, w odcisku strony nic (odciski z bazy monitoringu zostają ważne)
+ODSTEP = "\x1f"
+BLOKI = {"br", "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "section", "footer", "address"}     # nowa linia jak dotąd
+INLINE = {"a", "td", "th", "button", "label", "h5", "h6", "header", "ul", "ol", "dd", "dt"}
+# numery z etykietą (REGON, KRS, NIP, BDO…) to nie telefony, choć mają 9–10 cyfr
+IDENTYFIKATORY = re.compile(r"\b(?:REGON|KRS|NIP|VAT(?:[\s-]?(?:ID|UE|EU))?|BDO|EORI|PESEL)\b[\s:.#№-]*(?:[A-Z]{2})?[\d \t\u00a0-]{7,20}\d", re.I)
+
+
 class Czytnik(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -83,10 +91,14 @@ class Czytnik(HTMLParser):
             self._w_tytule = True
         elif tag == "meta" and (a.get("name") or "").lower() == "description":
             self.opis = a.get("content") or ""
-        if tag in ("br", "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "section", "footer", "address"):
+        if tag in BLOKI:
             self.tekst.append("\n")
+        elif tag in INLINE:
+            self.tekst.append(ODSTEP)
 
     def handle_endtag(self, tag):
+        if tag in BLOKI or tag in INLINE:                   # „KRS: 0000745671</p><a>hello@…” nie skleja się w jeden adres
+            self.tekst.append(ODSTEP)
         if tag in ("script", "style", "noscript", "svg"):
             self._pomin = max(0, self._pomin - 1)
         elif tag == "a" and self._href is not None:
@@ -301,15 +313,16 @@ def kontakt(start: str, max_stron: int = 8) -> dict:
             wynik["bledy"].append(str(e))
             continue
         wynik["strony"].append(url)
-        tekst = html.unescape("".join(c.tekst))
+        caly = html.unescape("".join(c.tekst))
+        tekst = caly.replace(ODSTEP, " ")
         if url == start or not wynik["odcisk"]:
-            wynik["tytul"], wynik["opis"], wynik["odcisk"] = c.tytul.strip(), c.opis.strip(), odcisk(tekst)
+            wynik["tytul"], wynik["opis"], wynik["odcisk"] = c.tytul.strip(), c.opis.strip(), odcisk(caly.replace(ODSTEP, ""))
         mailto = [urllib.parse.unquote(h[7:].split("?")[0]) for h, _ in c.linki if h.lower().startswith("mailto:")]
         for e in ll.emaile(" ".join(mailto) + " " + tekst):
             if not any(x["email"] == e for x in wynik["emaile"]):
                 wynik["emaile"].append({"email": e, "rodzaj": ll.typ_emaila(e), "zrodlo": url, "kontekst": kontekst(ll.odslon(tekst).lower(), e)})
         tel = [h[4:] for h, _ in c.linki if h.lower().startswith("tel:")]
-        for t in ll.telefony(" ".join(tel) + " " + tekst):
+        for t in ll.telefony(" ".join(tel) + " " + IDENTYFIKATORY.sub(" ", tekst)):
             if not any(x["numer"] == t for x in wynik["telefony"]):
                 wynik["telefony"].append({"numer": t, "zrodlo": url})
         if not wynik["formularz"] and FORMULARZ.search(surowy):
