@@ -34,3 +34,6 @@
   (start `dockerd`, obraz `hermes-ca:test` = Hermes + certyfikat proxy, `docker build --network host` obrazu
   `jarvo-hermes:local`, bo budowanie przez compose nie widzi proxy, instalacja i `deploy.sh --no-pull --no-build`).
   Kolejne uruchomienia przebudowują obraz tylko po zmianie `infra/` (albo z `--rebuild`).
+- **Filmy renderujemy szybko.** Bez motion bluru (`html_wideo.py --subklatki` zostaje na 1), klatki w kilku
+  przeglądarkach naraz (`klatki --czasy` po kawałkach), potem sklejenie ffmpeg. Jeśli render i tak potrwa dłużej
+  niż kilka minut, najpierw mówimy właścicielowi, ile, zanim go puścimy.
