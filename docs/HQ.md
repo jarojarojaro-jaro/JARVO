@@ -62,7 +62,8 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/reset
         ├─ POST /api/plugins/jarvo-hq/upload      plik z czatu (📎, Ctrl+V, przeciągnięcie) ─► /opt/data/jarvo/inbox/<data>/
         ├─ GET/POST /api/plugins/jarvo-hq/edit/…  edytor filmów: info, media, save, stamp, srt, speech, proxy,
-        │                                          proxy-file, maska, export, job/<id>[/cancel] (sekcja 2a)
+        │                                          proxy-file, maska, glos-tlo, glos-probka, export,
+        │                                          job/<id>[/cancel] (sekcja 2a)
         ├─ GET  /api/plugins/jarvo-hq/anim/check  czy plik HTML to animacja z kontraktem (przycisk „◐ Animacja”)
         ├─ GET  /api/plugins/jarvo-hq/anim/info   link podglądu z mostkiem ─► :9120, parametry, stan pomiaru (sekcja 2b)
         ├─ POST /api/plugins/jarvo-hq/anim/params nowe wartości ─► parametry.json obok strony
@@ -211,7 +212,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   Klucz osi (klipy, przycięcie, tempo, kadr; `edytor.maska_klucz` = `maskaKlucz` w `48-typografia.js`) pilnuje, żeby
   po zmianie klipów nie użyć starych sylwetek: wtedy napis jest po prostu widoczny w całości.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
-  `volume`, `muted`, `fit`, `transition`, `fadeIn`, `fadeOut`), napisy, muzyka i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
+  `volume`, `muted`, `fit`, `transition`, `fadeIn`, `fadeOut`, `color`, `voice`), napisy, muzyka i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
 - **Eksport** (`POST /edit/export`): serwer sprawdza projekt (ścieżki tylko z katalogów floty, limity długości
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat albo xfade przy przejściach → nakładki → miks
   z limiterem), H.264 + AAC,
@@ -261,6 +262,17 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i sprawdza piksele z ffmpeg (`tests/test_edytor_kolor.py`). Zapis: `color: {look, brightness, contrast, saturation,
   temperature}` w klipie. Wideograf: `projekt.py kolor <film> <id>|--wszystkie [--styl] [--jasnosc] [--kontrast]
   [--nasycenie] [--temperatura] [--auto] [--usun] [--podglad]` (podgląd = klatka przed i po obok siebie).
+- **Czysty głos** (jak „Redukcja szumów” i „Wzmocnienie głosu” w CapCut): w ustawieniach dźwięku klipu i każdego
+  audio **Brak / Lekko / Średnio / Mocno** (`voice` w projekcie, `edytor.glos_filter`). Lekko: dudnienie poniżej 80 Hz
+  i łagodne wyrównanie, dobre nagranie. Średnio: też syczenie, odszumianie (`afftdn`) z progiem z tła nagrania
+  i ekspander, który ścisza pauzy (pomiar: tło −10 dB, mowa +2 dB). Mocno: telefon, laptop, hałas (tło ~−15 dB, mowa
+  równiejsza, szczyty do −1 dBFS). **Auto** mierzy tło nagrania na serwerze (najcichsze 10% okien 50 ms) i dobiera
+  poziom; **Odsłuchaj** gra 8 s od wskaźnika po czyszczeniu, bo podgląd gra oryginał (przeglądarka nie odszumia).
+  Przed eksportem serwer mierzy tło każdego źródła raz. Dźwięk klipu z czystym głosem ma w eksporcie osobne wejście
+  z sekundą zapasu przed klipem i ścięte opóźnienie `afftdn` (25 ms): usta zgadzają się z obrazem, a klip podzielony
+  pod zbliżenie gra bez dziury. Za kajisho5/ffmpeg-skill (MIT), z progiem i ekspanderem dobranymi pomiarem
+  (`tests/test_glos.py`). Wideograf: `projekt.py glos <film> <id>|--wszystkie [--poziom auto|lekki|sredni|mocny|brak]
+  [--probka]`, cały plik: `montaz.py glos`, rolki clipmakera: `klipy.py zbuduj --glos` (domyślnie auto).
 - **Kadr:** klip w trybie „Wypełnij” (np. pion 9:16 z poziomego nagrania) ma w ustawieniach suwaki **Kadr: poziomo**,
   **Kadr: pionowo** i **Przybliżenie** (1–3×, punch-in). Zapisują się w klipie jako `fx`, `fy`, `zoom`; eksport tnie
   ten sam fragment (`crop` z punktem skupienia w ffmpeg), który pokazuje podgląd (CSS `object-position` + `scale`).
@@ -293,7 +305,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   liniowego, `tonemap` mobius, z powrotem do BT.709). Przeliczenie idzie po dopasowaniu do kadru (4K z telefonu
   w pełnej rozdzielczości liczy się kilka razy dłużej), przed korekcją koloru i napisami.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
-  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `kolor`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `dzwieki`, `dodaj-dzwiek`, `wyodrebnij`, `lektor`, `usun`, `uwaga`,
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `kolor`, `glos`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `dzwieki`, `dodaj-dzwiek`, `wyodrebnij`, `lektor`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy i typografię rysują te same funkcje (`hq/web/src/44-napisy.js`, `48-typografia.js`) w przeglądarce bez
   okna, więc plik od agenta wygląda jak eksport z edytora. Typografię na tym samym projekcie układa `typografia.py`

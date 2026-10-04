@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Montaż nagrań: cięcie fragmentów, kadr pod format (9:16 z poziomego), usuwanie ciszy, głośność, transkrypcja.
+"""Montaż nagrań: cięcie fragmentów, kadr pod format (9:16 z poziomego), usuwanie ciszy, głośność, czysty głos, transkrypcja.
 
     python3 montaz.py wytnij nagranie.mp4 -o klip.mp4 --zakresy "0:12.5-0:41,1:10-1:32.4"
     python3 montaz.py kadr nagranie.mp4 -o pion.mp4 --format 9:16 [--x 0.5] [--tryb przytnij|rozmyte]
     python3 montaz.py cisza nagranie.mp4 -o bez-ciszy.mp4 [--prog -35] [--min 0.5] [--zapas 0.12]
     python3 montaz.py glosnosc film.mp4 -o film-14lufs.mp4 [--lufs -14]
+    python3 montaz.py glos nagranie.mp4 -o czysty.mp4 [--poziom auto|lekki|sredni|mocny]
     python3 montaz.py transkrypcja nagranie.mp4 [-o out/wideo/transkrypcja] [--co 20]
     python3 montaz.py napraw film.mp4 -o film-ok.mp4       # yuv420p/zakres TV/faststart po silnikach zewnętrznych
 
 Czas: sekundy (75.5) albo m:ss(.x) / h:mm:ss. Każde cięcie jest przekodowane (dokładne co do klatki).
 kadr --x: środek kadru w poziomie (0 = lewa krawędź, 0.5 = środek, 1 = prawa); rozmyte = całe ujęcie
 na rozmytym tle (dobre do slajdów i nagrań ekranu). glosnosc: dwa przejścia loudnorm (pomiar → korekta).
+glos: czysty głos jak w edytorze HQ (edytor.glos_filter: dudnienie, syczenie, szum, ciszej w pauzach, wyrównanie);
+auto = poziom z tła nagrania; obraz kopiowany bez zmian. Potem glosnosc (kompresor zmienia głośność).
 wytnij i cisza wypisują `ciecia`: chwile cięć w gotowym pliku (do `krytyka.py ciecia --czasy`).
 transkrypcja: Parakeet (jarvo-stt) → słowa z czasem (JSON) + tekst z czasami co --co sekund (do wyboru fragmentów).
 """
@@ -152,6 +155,23 @@ def loudness(src: Path, out: Path, target: float) -> tuple[Path, dict]:
     return out, {"przed_lufs": float(meas["input_i"]), "cel_lufs": target}
 
 
+def voice(src: Path, out: Path, poziom: str) -> tuple[Path, dict]:
+    """Czysty głos na całym nagraniu (ten sam łańcuch co eksport edytora HQ), obraz kopiowany bez zmian."""
+    ed = wl.ed
+    if not has_audio(src):
+        raise SystemExit("Nagranie nie ma dźwięku.")
+    dur = wl.duration(src)
+    r = subprocess.run(ed.szum_cmd(src), capture_output=True, text=True)
+    tlo = ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
+    poziom = ed.glos_auto(tlo) if poziom == "auto" else poziom
+    wej, chain = ed.glos_wejscie(0.0, dur, poziom, tlo)      # bez opóźnienia afftdn: usta zgodne z obrazem
+    out.parent.mkdir(parents=True, exist_ok=True)
+    wl.run(["ffmpeg", "-y", "-i", str(src), *wej, "-i", str(src), "-map", "0:v?", "-map", "1:a:0",
+            "-af", f"asetpts=PTS-STARTPTS,{chain},aresample=48000,apad=whole_dur={dur:.3f}",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-t", f"{dur:.3f}", "-movflags", "+faststart", str(out)])
+    return out, {"poziom": poziom, "tlo_db": tlo}
+
+
 def fix(src: Path, out: Path) -> Path:
     """Film z zewnętrznego silnika → standard platform: yuv420p w zakresie TV, H.264, AAC, faststart (dźwięk bez zmian)."""
     audio = ["-c:a", "aac", "-b:a", "192k"] if has_audio(src) else []
@@ -202,6 +222,11 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("plik")
     g.add_argument("-o", required=True)
     g.add_argument("--lufs", type=float, default=-14.0)
+    v = sub.add_parser("glos", help="czysty głos: dudnienie, syczenie, szum, ciszej w pauzach, wyrównanie (obraz bez zmian)")
+    v.add_argument("plik")
+    v.add_argument("-o", required=True)
+    v.add_argument("--poziom", choices=["auto", *wl.ed.GLOS], default="auto",
+                   help="auto = z tła nagrania; lekki = dobry pokój, sredni = zwykły, mocny = telefon, laptop, hałas")
     n = sub.add_parser("napraw", help="yuv420p (zakres TV), H.264, AAC, faststart: dla filmów z lemo/anidoodle/HyperFrames")
     n.add_argument("plik")
     n.add_argument("-o", required=True)
@@ -228,6 +253,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
         elif args.cmd == "glosnosc":
             out, stats = loudness(src, Path(args.o), args.lufs)
+            print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
+        elif args.cmd == "glos":
+            out, stats = voice(src, Path(args.o), args.poziom)
             print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
         elif args.cmd == "napraw":
             out = fix(src, Path(args.o))

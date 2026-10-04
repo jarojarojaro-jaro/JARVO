@@ -70,6 +70,7 @@ function groupLines(ws, maxChars = 32, maxGap = 0.6, maxDur = 3.5) {
 }
 const edSleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const svgI = (body) => html`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const ED_GLOS = [[null, "Brak", "Off"], ["lekki", "Lekko", "Light"], ["sredni", "Średnio", "Medium"], ["mocny", "Mocno", "Strong"]];
 const ED_ICON = {
   edit: svgI(html`<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/>`),
   audio: svgI(html`<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>`),
@@ -708,6 +709,8 @@ function VideoEditor({ path, onClose }) {
   const [info, setInfo] = useState(null);
   const [err, setErr] = useState(null);
   const [kolorBusy, setKolorBusy] = useState(false);   // „Auto” koloru klipu: pomiar klatek na serwerze
+  const [glosBusy, setGlosBusy] = useState("");         // czysty głos: "auto" (pomiar tła) albo "gra" (odsłuch)
+  const glosAudio = useRef(null);
   const [meta, setMeta] = useState({});
   const [strips, setStrips] = useState({});
   const [waves, setWaves] = useState({});        // fala dźwięku każdego pliku audio na osi
@@ -1908,6 +1911,7 @@ function VideoEditor({ path, onClose }) {
     ${jest(only, "glos") && c.kind !== "image" && html`<label>${L("Głośność", "Volume")} · ${Math.round((c.muted ? 0 : c.volume) * 100)}% (${fmtDb(c.muted ? 0 : c.volume)})
       <input type="range" min="0" max="2" step="0.05" value=${c.volume} onInput=${(e) => upd("clip", c.id, { volume: +e.target.value, muted: false }, true)} onChange=${H.commit}/></label>`}
     ${jest(only, "glos") && c.kind !== "image" && !c.muted && fadeTools("clip", c, clipDur(c))}
+    ${jest(only, "glos") && c.kind !== "image" && !c.muted && glosTools("clip", c)}
     ${only === "glos" && c.kind !== "image" && html`<div class="thq-ed-acts">${act(c.muted ? "mute" : "volume", c.muted ? L("Włącz dźwięk", "Unmute") : L("Wycisz", "Mute"), () => upd("clip", c.id, { muted: !c.muted }), { on: c.muted })}</div>`}
     ${jest(only, "podziel") && czesci.length > 0 && html`<label>${L("Podziel na równe części", "Split into equal parts")} · ${fmtSek(clipDur(c))}${seg(czesci.map((n) => [n, `${n} × ${fmtSek(clipDur(c) / n)}`]), null, (n) => podziel(c.id, n))}</label>`}
     ${only === "podziel" && !czesci.length && html`<p class="thq-ed-note">${L("Klip jest za krótki na podział.", "The clip is too short to split.")}</p>`}
@@ -1950,6 +1954,46 @@ function VideoEditor({ path, onClose }) {
         ${c.color && act("reset", L("Bez korekty", "Reset"), () => upd("clip", c.id, { color: undefined }))}
       </div>`;
   };
+
+  // Czysty głos klipu albo audio (edytor.glos_filter): lekko = dudnienie i wyrównanie, średnio = też odszumianie
+  // i ciszej w pauzach, mocno = telefon, laptop. Podgląd gra oryginał (przeglądarka nie odszumia), więc „Odsłuchaj”
+  // gra 8 s od wskaźnika po czyszczeniu z serwera, a „Auto” dobiera poziom z tła nagrania. Wideograf: projekt.py glos.
+  async function glosAuto(type, x) {
+    setGlosBusy("auto");
+    try {
+      const r = await api.editGlosTlo(x.src, x.in, x.out);
+      upd(type, x.id, { voice: r.poziom });
+      const g = ED_GLOS.find(([k]) => k === r.poziom) || [r.poziom, r.poziom, r.poziom], nazwa = L(g[1], g[2]).toLowerCase();
+      const db = r.tlo == null ? "" : `${Math.round(r.tlo)}`.replace("-", "−");
+      setToast(r.tlo == null ? L(`Auto: ${nazwa} (nie udało się zmierzyć tła).`, `Auto: ${nazwa} (background not measured).`)
+        : L(`Auto: tło ${db} dB → ${nazwa}.`, `Auto: background ${db} dB → ${nazwa}.`));
+      setTimeout(() => setToast(""), 6000);
+    } catch (e) { alert(e.message || String(e)); }
+    finally { setGlosBusy(""); }
+  }
+  async function glosOdsluch(type, x) {
+    if (glosAudio.current) { glosAudio.current.pause(); glosAudio.current = null; setGlosBusy(""); return; }
+    const s = type === "clip" ? segs.find((y) => y.c.id === x.id) : null;
+    const od = s ? (t >= s.start && t < s.end ? s.c.in + (t - s.start) * (s.c.speed || 1) : x.in)
+      : (t >= x.start && t < x.start + audioDur(x) ? x.in + (t - x.start) : x.in);
+    setGlosBusy("gra");
+    try {
+      const a = new Audio(URL.createObjectURL(await api.editGlosProbka(x.src, x.in, x.out, x.voice, od)));
+      glosAudio.current = a;
+      a.onended = () => { if (glosAudio.current === a) { glosAudio.current = null; setGlosBusy(""); } URL.revokeObjectURL(a.src); };
+      await a.play();
+    } catch (e) { glosAudio.current = null; setGlosBusy(""); alert(e.message || String(e)); }
+  }
+  const glosTools = (type, x) => html`<div class="thq-ed-field"><span>${L("Czysty głos", "Clean voice")}</span>
+      ${seg(ED_GLOS.map(([k, pl, en]) => [k, L(pl, en)]), x.voice || null, (v) => upd(type, x.id, { voice: v || undefined }))}
+      <div class="thq-ed-acts">
+        ${act("spark", glosBusy === "auto" ? L("Mierzę tło…", "Measuring…") : L("Auto", "Auto"), () => glosAuto(type, x), { disabled: !!glosBusy,
+          title: L("Poziom z tła nagrania: cicho → lekko, zwykły pokój → średnio, głośne tło → mocno", "Level from the background noise: quiet → light, normal room → medium, loud → strong") })}
+        ${x.voice && act(glosBusy === "gra" ? "pause" : "volume", glosBusy === "gra" ? L("Zatrzymaj", "Stop") : L("Odsłuchaj", "Listen"), () => glosOdsluch(type, x),
+          { disabled: glosBusy === "auto", title: L("8 s od wskaźnika po czyszczeniu (podgląd gra oryginał)", "8 s from the playhead, cleaned (the preview plays the original)") })}
+      </div>
+      ${x.voice && html`<p class="thq-ed-note">${L("Podgląd gra oryginał; czysty głos słychać w „Odsłuchaj” i w eksporcie.", "The preview plays the original; hear the clean voice with “Listen” and in the export.")}</p>`}
+    </div>`;
 
   // przejście po klipie c (na cięciu z następnym): rodzaj z animowaną miniaturą, długość, podgląd, do wszystkich cięć
   const trTools = (c) => {
@@ -2014,6 +2058,7 @@ function VideoEditor({ path, onClose }) {
     ${!only && html`<p class="thq-ed-sub thq-ed-subi">${ED_ICON.audio}<span>${(meta[m.src] || {}).name || m.src.split("/").pop()}</span></p>`}
     <label>${L("Głośność", "Volume")} · ${Math.round(m.volume * 100)}% (${fmtDb(m.volume)})<input type="range" min="0" max="2" step="0.05" value=${m.volume} onInput=${(e) => upd("audio", m.id, { volume: +e.target.value }, true)} onChange=${H.commit}/></label>
     ${fadeTools("audio", m, audioNaOsi(m, total))}
+    ${glosTools("audio", m)}
     ${!only && html`<p class="thq-ed-note">${L("Od", "From")} ${fmtT(m.start, true)} · ${L("długość", "length")} ${fmtT(audioDur(m), true)}</p>
     <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>`}
   </div>`;

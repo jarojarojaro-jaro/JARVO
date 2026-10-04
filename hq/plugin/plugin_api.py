@@ -19,7 +19,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 _HERE = Path(__file__).resolve().parent
 
@@ -245,6 +245,21 @@ def _probe(p: Path) -> dict:
     return _probe_cache[key]
 
 
+_tlo_cache: dict[tuple, float | None] = {}
+
+
+async def _tlo(src: Path, a: float = 0.0, d: float = ed.SZUM_MAX) -> float | None:
+    """Tło nagrania (dB) pod czysty głos: pomiar raz na wersję pliku i zakres (edytor.szum_cmd)."""
+    st = src.stat()
+    key = (str(src), st.st_mtime_ns, st.st_size, round(a), round(d))
+    if key not in _tlo_cache:
+        if len(_tlo_cache) > 256:
+            _tlo_cache.clear()
+        code, log = await _proc(*ed.szum_cmd(src, ed.tools()["ffmpeg"] or "ffmpeg", a, d), timeout=300)
+        _tlo_cache[key] = ed.szum_z_logu(log) if code == 0 else None
+    return _tlo_cache[key]
+
+
 def _media_entry(p: Path) -> dict:
     info = _probe(p)
     return {"path": str(p), "name": p.name, "kind": ed.media_kind(p), "size": p.stat().st_size,
@@ -424,6 +439,49 @@ async def edit_kolor_auto(request: Request):
     if not wynik:
         raise HTTPException(500, "Nie udało się zmierzyć klatek klipu")
     return wynik
+
+
+def _glos_body(body: dict) -> tuple[Path, float, float]:
+    src = _media_path(str(body.get("src") or ""))
+    if src is None or ed.media_kind(src) not in ("video", "audio"):
+        raise HTTPException(404, "Plik poza katalogami floty albo bez dźwięku")
+    if not ed.tools()["ffmpeg"]:
+        raise HTTPException(503, "Brak ffmpeg w kontenerze")
+    a = ed._num(body.get("in"), 0, ed.MAX_DURATION, 0)
+    return src, a, ed._num(body.get("out"), a, ed.MAX_DURATION, a + 3)
+
+
+@router.post("/edit/glos-tlo")
+async def edit_glos_tlo(request: Request):
+    """Tło nagrania klipu (dB) i poziom czystego głosu dobrany do niego („Auto”, edytor.glos_auto)."""
+    src, a, b = _glos_body(await request.json())
+    tlo = await _tlo(src, max(0.0, a - 30), b - max(0.0, a - 30) + 30)
+    return {"tlo": tlo, "poziom": ed.glos_auto(tlo)}
+
+
+@router.post("/edit/glos-probka")
+async def edit_glos_probka(request: Request):
+    """Odsłuch czystego głosu przed eksportem: 8 s klipu od wskazanej chwili źródła po łańcuchu poziomu (MP3)."""
+    import uuid
+
+    body = await request.json()
+    src, a, b = _glos_body(body)
+    poziom = ed.glos_norm(body.get("voice"))
+    if not poziom:
+        raise HTTPException(400, "Nieznany poziom czystego głosu")
+    od = min(max(a, ed._num(body.get("od"), 0, ed.MAX_DURATION, a)), max(a, b - 1))
+    tlo = await _tlo(src, max(0.0, a - 30), b - max(0.0, a - 30) + 30)
+    tmp = core.JARVO_DIR / "state" / "edytor" / f"glos-{uuid.uuid4().hex[:12]}.mp3"
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        code, log = await _proc(*ed.glos_probka_cmd(src, od, min(8.0, b - od), poziom, tlo, tmp, ed.tools()["ffmpeg"]), timeout=120)
+        if code != 0 or not tmp.is_file():
+            raise HTTPException(500, "Nie udało się przygotować odsłuchu: " + log.strip()[-200:])
+        data = tmp.read_bytes()
+    finally:
+        tmp.unlink(missing_ok=True)
+    return Response(content=data, media_type="audio/mpeg", headers={"Cache-Control": "no-store",
+                                                                    "X-Jarvo-Tlo": "" if tlo is None else str(tlo)})
 
 
 @router.post("/edit/lektor")
@@ -840,9 +898,11 @@ async def edit_export(request: Request):
             if c["kind"] == "video" and str(c["src"]) not in has_audio:
                 info = await asyncio.to_thread(ed.probe, c["src"])
                 has_audio[str(c["src"])], sdr[str(c["src"])] = info.get("audio", False), info.get("sdr", "")
+        szum = {s: await _tlo(Path(s), a, d) for s, (a, d) in ed.szum_zakresy(proj).items()}   # czysty głos
         out = ed.export_name(p)
         maska = ed.maska_concat(p, body.get("project") or {}, proj, tmpdir) if typo.get("tyl") else None
-        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"], karaoke=layer, typo=typo, maska=maska, sdr=sdr)
+        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"], karaoke=layer, typo=typo, maska=maska,
+                               sdr=sdr, szum=szum)
     except (ed.ProjectError, ValueError) as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(400, str(exc))

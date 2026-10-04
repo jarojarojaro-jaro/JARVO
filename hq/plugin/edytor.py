@@ -6,10 +6,11 @@ Projekt montażu to mały JSON (zapisywany obok filmu jako `<nazwa>.edycja.json`
      "clips": [{"src": "/opt/data/jarvo/.../film.mp4", "in": 0.0, "out": 4.2, "speed": 1.0,
                 "volume": 1.0, "muted": false, "fit": "contain",     # pasy; "blur" = rozmyte tło; "cover" + fx, fy, zoom
                 "fadeIn": 0.0, "fadeOut": 0.0,                      # narastanie i wyciszanie dźwięku (s, opcjonalne)
+                "voice": "sredni",                                  # czysty głos: lekki | sredni | mocny (opcjonalny)
                 "color": {"look": "cieply", "contrast": 10},          # korekcja koloru (opcjonalna, KOLOR_STYLE)
                 "transition": {"type": "fade", "dur": 0.5}}],      # przejście do następnego klipu (opcjonalne)
      "texts": [{"start": 0.5, "end": 3.0, ...}],          # wygląd rysuje przeglądarka (PNG na klatkę)
-     "audio": [{"src": ".../muzyka.mp3", "start": 0.0, "in": 0.0, "out": 30.0, "volume": 0.4, "fadeOut": 2.0}]}
+     "audio": [{"src": ".../muzyka.mp3", "start": 0.0, "in": 0.0, "out": 30.0, "volume": 0.4, "fadeOut": 2.0}]}   # + "voice"
 
 Klipy leżą jeden za drugim (ścieżka główna jak w CapCut), napisy i muzyka mają własny czas.
 Przejście leży na środku cięcia i nie skraca filmu: klip A gra dalej za cięciem, klip B zaczyna przed nim
@@ -146,14 +147,15 @@ def ciagly(a: dict | None, b: dict | None) -> bool:
     ten sam czas źródła, tempo i głośność. Na takim podziale fala nie skacze, więc nie dostaje mikro-wyciszenia."""
     return bool(a and b and a.get("kind") == b.get("kind") == "video" and str(a.get("src")) == str(b.get("src"))
                 and abs(float(b.get("in", 0)) - float(a.get("out", 0))) < 1e-3 and a.get("speed") == b.get("speed")
-                and not a.get("muted") and not b.get("muted") and a.get("volume") == b.get("volume"))
+                and not a.get("muted") and not b.get("muted") and a.get("volume") == b.get("volume")
+                and a.get("voice") == b.get("voice"))
 
 
 def ciagle_audio(a: dict, b: dict) -> bool:
     """Audio b to dalszy ciąg audio a na osi (podzielony podkład albo lektor): bez dziury z mikro-wyciszenia."""
     return (str(a.get("src")) == str(b.get("src")) and abs(float(b.get("in", 0)) - float(a.get("out", 0))) < 1e-3
             and abs(float(b.get("start", 0)) - float(a.get("start", 0)) - (float(a.get("out", 0)) - float(a.get("in", 0)))) < 1e-3
-            and a.get("volume") == b.get("volume"))
+            and a.get("volume") == b.get("volume") and a.get("voice") == b.get("voice"))
 
 
 def afade(fi: float, fo: float, st: float, d: float) -> str:
@@ -204,6 +206,8 @@ def normalize(project: dict, resolve) -> dict:
         kol = kolor_norm(c.get("color"))
         if kol:
             clips[-1]["color"] = kol
+        if kind == "video" and glos_norm(c.get("voice")):
+            clips[-1]["voice"] = c["voice"]
     if not clips:
         raise ProjectError("Oś czasu jest pusta: dodaj co najmniej jeden klip.")
     total = sum((c["out"] - c["in"]) / c["speed"] for c in clips)
@@ -232,6 +236,8 @@ def normalize(project: dict, resolve) -> dict:
         b = min(b, a + (total - start))          # muzyka nie wychodzi poza film
         if b - a >= MIN_CLIP:
             audio.append({"src": path, "in": a, "out": b, "start": start, "volume": _num(m.get("volume"), 0, 2, 1)})
+            if glos_norm(m.get("voice")):
+                audio[-1]["voice"] = m["voice"]
             fi, fo = zanik(m, b - a)             # wyciszenie liczone od końca w filmie (muzyka dłuższa niż film)
             if fi or fo:
                 audio[-1].update(fade_in=fi, fade_out=fo)
@@ -607,6 +613,98 @@ def kolor_z_pomiaru(log: str) -> dict | None:
     return {"color": kolor_norm(kol), "pomiar": {"jasnosc": round(y, 3), "rozpietosc": round(zakres, 3), "nasycenie": round(sat, 1)}}
 
 
+# Czysty głos klipu albo audio („voice”: lekki | sredni | mocny). Za kajisho5/ffmpeg-skill (MIT, audio.py VOICE_LEVELS:
+# highpass 80 Hz, de-esser, afftdn, kompresor, w mocnym drugi stopień i limiter), poprawione naszym pomiarem na polskiej
+# mowie z szumem wentylatora (tło −47 dB, mowa −19 dB): ich stałe afftdn=nf=-25 ze śledzeniem tła (tn=1) ściszało tło
+# o ~3 dB, a kompresory z podbiciem podnosiły je z powrotem (mocny: pauzy GŁOŚNIEJSZE niż w nagraniu). U nas próg
+# odszumiania z tła nagrania (nf = tło + 6 dB, mocny + 12 dB: mowa bez szkody, falkowe afwtdn ją psuło) i ekspander
+# (agate z ograniczonym zasięgiem, próg tło + 6 dB) przed kompresorem: pauzy ciszej o ~10 dB (średni, mowa +2 dB)
+# i ~15 dB (mocny, ta sama głośność, mowa równiejsza), lekki bez zmian tła. afftdn opóźnia dźwięk o 25 ms: eksport
+# daje głosowi osobne wejście z zapasem przed klipem (GLOS_ZAPAS) i ścina opóźnienie, więc usta zgadzają się
+# z obrazem, a podział klipu (zbliżenie) nie ma dziury.
+GLOS = ("lekki", "sredni", "mocny")
+GLOS_ZAPAS = 1.0          # s materiału przed klipem: odszumianie i kompresor wchodzą w klip rozpędzone
+GLOS_OPOZNIENIE = 0.025   # opóźnienie afftdn (okno 25 ms, niezależnie od próbkowania)
+GLOS_TLO = -50.0          # tło (dB RMS), gdy pomiaru brak: telefon w cichym pokoju
+SZUM_OKNO = 0.05          # okno pomiaru tła (s); tło = najcichsze 10% okien z dźwiękiem
+SZUM_MAX = 600.0          # najwyżej tyle sekund źródła mierzymy (tło to cecha nagrania, nie klipu)
+
+
+def glos_norm(raw: Any) -> str | None:
+    return raw if raw in GLOS else None
+
+
+def glos_filter(poziom: str | None, tlo: float | None = None) -> str:
+    """Łańcuch czystego głosu dla poziomu; `tlo` = zmierzone tło źródła w dB (szum_z_logu), None = GLOS_TLO."""
+    if poziom not in GLOS:
+        return ""
+    if poziom == "lekki":                       # dobry pokój: dudnienie i wyrównanie, szum i syczenie bez zmian
+        return "highpass=f=80,acompressor=threshold=-18dB:ratio=2:attack=5:release=80:makeup=1.4"
+    t = GLOS_TLO if tlo is None else tlo
+    nf = lambda o: max(-80, min(-20, round(t + o)))       # noqa: E731  (zakres afftdn)
+    prog = f"{10 ** ((t + 6) / 20):.5f}"                  # ekspander: wszystko ciszej niż tło + 6 dB to pauza
+    c1 = "acompressor=threshold=-18dB:ratio=3:attack=5:release=80:makeup=2"
+    if poziom == "sredni":
+        return (f"highpass=f=80,deesser=i=0.4,afftdn=nr=20:nf={nf(6)},"
+                f"agate=threshold={prog}:ratio=2:range=0.35:attack=5:release=250,{c1}")
+    return (f"highpass=f=80,deesser=i=0.4,afftdn=nr=25:nf={nf(12)},"      # telefon, laptop: szczyty do −1 dBFS
+            f"agate=threshold={prog}:ratio=3:range=0.18:attack=5:release=250,{c1},deesser=i=0.6,"
+            "acompressor=threshold=-24dB:ratio=4:attack=5:release=120:makeup=3,alimiter=limit=0.891251:level=disabled")
+
+
+def glos_opoznienie(poziom: str | None) -> float:
+    return GLOS_OPOZNIENIE if poziom in ("sredni", "mocny") else 0.0
+
+
+def glos_auto(tlo: float | None) -> str:
+    """Poziom z samego tła nagrania: cicho → lekki, zwykły pokój → średni, głośne tło → mocny."""
+    return "sredni" if tlo is None else "lekki" if tlo <= -60 else "mocny" if tlo > -42 else "sredni"
+
+
+def szum_cmd(src: Path, ffmpeg: str = "ffmpeg", a: float = 0.0, d: float = SZUM_MAX) -> list[str]:
+    """Pomiar tła nagrania: RMS w oknach 50 ms po tym samym highpass co łańcuch głosu (wynik w stderr)."""
+    n = round(48000 * SZUM_OKNO)
+    return [ffmpeg, "-nostdin", "-hide_banner", "-nostats", "-loglevel", "info", "-ss", _f(max(0.0, a)),
+            "-t", _f(min(SZUM_MAX, max(0.5, d))), "-i", str(src), "-vn", "-map", "0:a:0",
+            "-af", f"aresample=48000,highpass=f=80,asetnsamples=n={n}:p=0,astats=metadata=1:reset=1:measure_perchannel=none"
+            ":measure_overall=RMS_level,ametadata=print:key=lavfi.astats.Overall.RMS_level", "-f", "null", "-"]
+
+
+def szum_z_logu(log: str) -> float | None:
+    """Tło (dB RMS) z wyniku szum_cmd: 10. percentyl okien z dźwiękiem (cyfrowa cisza odpada); None = za mało okien."""
+    v = sorted(float(x) for x in re.findall(r"lavfi\.astats\.Overall\.RMS_level=(-?\d+(?:\.\d+)?)", log) if float(x) > -90)
+    return round(v[len(v) // 10], 1) if len(v) >= 10 else None
+
+
+def szum_zakresy(p: dict) -> dict[str, tuple[float, float]]:
+    """Źródła z głosem średnim albo mocnym (znormalizowany projekt) → (od, długość) pomiaru tła: obszar ich klipów
+    i audio z zapasem 30 s, najwyżej SZUM_MAX. Jeden pomiar na plik, wynik do build_command(szum=...)."""
+    zak: dict[str, list[float]] = {}
+    for x in [*p["clips"], *p["audio"]]:
+        if glos_opoznienie(x.get("voice")):
+            z = zak.setdefault(str(x["src"]), [x["in"], x["out"]])
+            z[0], z[1] = min(z[0], x["in"]), max(z[1], x["out"])
+    return {s: (max(0.0, a - 30), min(SZUM_MAX, b - max(0.0, a - 30) + 30)) for s, (a, b) in zak.items()}
+
+
+def glos_wejscie(od: float, dl: float, poziom: str | None, tlo: float | None) -> tuple[list[str], str]:
+    """Osobne wejście dźwięku z zapasem przed `od` i łańcuch: głos, ścięcie zapasu i opóźnienia afftdn.
+    Zwraca (argumenty wejścia, filtr po asetpts) dla odcinka źródła od `od` długości `dl`."""
+    z = min(GLOS_ZAPAS, max(0.0, od))
+    lat = glos_opoznienie(poziom)
+    return (["-ss", _f(od - z), "-t", _f(dl + z + lat + 0.05)],
+            f"{glos_filter(poziom, tlo)},atrim=start={_f(z + lat)},asetpts=PTS-STARTPTS")
+
+
+def glos_probka_cmd(src: Path, a: float, d: float, poziom: str | None, tlo: float | None, out: Path,
+                    ffmpeg: str = "ffmpeg") -> list[str]:
+    """Kawałek dźwięku klipu po czyszczeniu głosu (odsłuch w edytorze przed eksportem). MP3, bo gra w każdej
+    przeglądarce (Chromium bez kodeków własnościowych nie odtwarza AAC)."""
+    wej, ch = glos_wejscie(a, d, poziom, tlo)
+    return [ffmpeg, "-nostdin", "-hide_banner", "-y", "-loglevel", "error", *wej, "-i", str(src), "-vn", "-map", "0:a:0",
+            "-af", f"asetpts=PTS-STARTPTS,{ch},atrim=duration={_f(d)}", "-c:a", "libmp3lame", "-b:a", "160k", str(out)]
+
+
 def blur_filter(W: int, H: int, i: int) -> str:
     """„Rozmyte tło”: całe ujęcie na środku, pod nim to samo ujęcie pokrywające kadr, rozmyte i lekko przyciemnione
     (jak `film.py --tryb rozmyte`; podgląd: blurBg w przeglądarce). Etykiety z numerem klipu: jeden graf na eksport.
@@ -731,9 +829,10 @@ def xfade_graph(tr: list[dict | None], dlug: list[float], F: int) -> list[str]:
 
 def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                   ffmpeg: str = "ffmpeg", karaoke: Path | None = None, typo: dict | None = None,
-                  maska: Path | None = None, sdr: dict | None = None) -> list[str]:
+                  maska: Path | None = None, sdr: dict | None = None, szum: dict | None = None) -> list[str]:
     """Argumenty ffmpeg dla znormalizowanego projektu. `has_audio[src] -> bool` z ffprobe.
     `sdr[src]` = łańcuch HDR → zwykły obraz z probe() (film HDR z telefonu); stoi za kadrem, przed korekcją koloru.
+    `szum[src]` = tło nagrania w dB (szum_z_logu) pod czysty głos („voice”); brak = GLOS_TLO.
     `typo` = {"tyl": lista concat, "przod": lista concat}: warstwy typografii (z typo_concat) pod tekstami.
     `maska` = lista concat sylwetek (maska_concat): osoba z filmu wraca nad warstwę „tyl”, więc napis jest za nią."""
     W, H, F = p["canvas"]["w"], p["canvas"]["h"], p["canvas"]["fps"]
@@ -774,9 +873,15 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                      + (rozmycie_przejscia(i, L, F, smax, glowa, ogon) if glowa or ogon else "")
                      + (f",fps={F}" if jest_tr else "") + f"[v{i}]")    # xfade chce stałej liczby klatek
         if c["kind"] == "video" and not c["muted"] and has_audio.get(str(c["src"])) and c["volume"] > 0:
-            chain = ",".join(x for x in ("asetpts=PTS-STARTPTS", _atempo(sp),
+            ai, glos = vi, ""
+            if c.get("voice"):              # czysty głos: osobne wejście dźwięku z zapasem (glos_wejscie)
+                wej, glos = glos_wejscie(max(0.0, c["in"] - pre * sp), c["out"] + post * sp - max(0.0, c["in"] - pre * sp),
+                                         c["voice"], (szum or {}).get(str(c["src"])))
+                args += [*wej, "-i", str(c["src"])]
+                ai = n; n += 1
+            chain = ",".join(x for x in ("asetpts=PTS-STARTPTS", glos, _atempo(sp),
                                          f"volume={_f(c['volume'])}" if c["volume"] != 1 else "") if x)
-            graph.append(f"[{vi}:a]{chain},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+            graph.append(f"[{ai}:a]{chain},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
                          + (f"adelay={round(brak * 1000)}:all=1," if brak > 1e-4 else "")
                          + f"apad,atrim=duration={_f(L)},asetpts=PTS-STARTPTS"
                          # cięcie bez przejścia i bez zaniku dostaje mikro-wyciszenie (przejście ma acrossfade);
@@ -840,7 +945,13 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
     if p["audio"]:
         mix = ["[ac]"]
         for k, m in enumerate(p["audio"]):
-            args += ["-ss", _f(m["in"]), "-t", _f(m["out"] - m["in"]), "-i", str(m["src"])]
+            glos = ""
+            if m.get("voice"):
+                wej, glos = glos_wejscie(m["in"], m["out"] - m["in"], m["voice"], (szum or {}).get(str(m["src"])))
+                glos += f",atrim=duration={_f(m['out'] - m['in'])}"
+                args += [*wej, "-i", str(m["src"])]
+            else:
+                args += ["-ss", _f(m["in"]), "-t", _f(m["out"] - m["in"]), "-i", str(m["src"])]
             mi = n; n += 1
             ms = int(round(m["start"] * 1000))
             # audio przycięte od środka: mikro-wyciszenie na początku (od początku pliku zostaje atak efektu) i na końcu
@@ -849,7 +960,7 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
             dalszy = any(ciagle_audio(x, m) for x in p["audio"])
             zan = afade(m.get("fade_in", 0) or (mik if m["in"] > 0.001 and not dalszy else 0),
                         m.get("fade_out", 0) or (0 if dalej else mik), 0, m["out"] - m["in"])
-            graph.append(f"[{mi}:a]asetpts=PTS-STARTPTS,volume={_f(m['volume'])},aresample=48000,"
+            graph.append(f"[{mi}:a]asetpts=PTS-STARTPTS,{glos + ',' if glos else ''}volume={_f(m['volume'])},aresample=48000,"
                          f"aformat=sample_fmts=fltp:channel_layouts=stereo,{zan + ',' if zan else ''}adelay={ms}|{ms}[m{k}]")
             mix.append(f"[m{k}]")
         graph.append(f"{''.join(mix)}amix=inputs={len(mix)}:duration=first:normalize=0,"

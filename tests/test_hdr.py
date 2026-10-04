@@ -102,7 +102,7 @@ def test_podglad_i_auto_kolor_po_przeliczeniu(tmp_path):
     js = (REPO / "hq" / "web" / "src" / "45-edytor.js").read_text(encoding="utf-8")
     assert re.search(r"function canPlayVideo\(m\) \{\n.*\n\s*if \(m && m\.kind === \"video\" && m\.hdr\) return false;", js)
     api = (REPO / "hq" / "plugin" / "plugin_api.py").read_text(encoding="utf-8")
-    assert '"vcodec", "hdr")' in api and "sdr=sdr)" in api
+    assert '"vcodec", "hdr")' in api and "sdr=sdr" in api
 
 
 def _ffprobe_json(stream: dict) -> str:

@@ -3,7 +3,7 @@
 
     klipy.py przygotuj <nagranie> [-o out/wideo/klipy] [--od-nowa]
     klipy.py sprawdz <plan.json>
-    klipy.py zbuduj <plan.json> [-o out/wideo/klipy] [--bez-renderu] [--tylko SLUG] [--nadpisz]
+    klipy.py zbuduj <plan.json> [-o out/wideo/klipy] [--bez-renderu] [--tylko SLUG] [--nadpisz] [--glos auto|lekki|sredni|mocny|brak]
 
 przygotuj (0 tokenów): mowa (Parakeet: słowa z czasem, pauzy, wtrącenia) do <nagranie>.mowa.json — tego samego
 pliku używa zakładka „Mowa” w edytorze HQ; cięcia ujęć; arkusze klatek z czasem (do vision_analyze: gdzie jest
@@ -17,7 +17,8 @@ zbuduj: każda rolka → <out>/klip-N-<slug>.edycja.json (projekt edytora: segme
 ze środka słowa do przerwy obok, wycięte pauzy i wtrącenia, kadr na twarzy mówcy, gdy plan nie podaje fx/fy
 (twarze.py, YuNet: śledzenie z bezwładnością, nowe ujęcie przy zmianie twarzy albo dużym przesunięciu; kilka osób
 w kadrze → kadr na tej, która mówi, z ruchu ust w czasie mowy),
-zbliżenia na akcentach mowy, pierwsza klatka bez mrugnięcia, głośność klipów do −14 LUFS z pomiaru źródła, napisy karaoke ze słów, tytuł-hook)
+zbliżenia na akcentach mowy, pierwsza klatka bez mrugnięcia, czysty głos z poziomem dobranym do tła nagrania
+(--glos, edytor.glos_filter), głośność klipów do −14 LUFS z pomiaru źródła po czyszczeniu, napisy karaoke ze słów, tytuł-hook)
 i render tym samym
 silnikiem co „Eksportuj” → <out>/klip-N-<slug>.mp4 i okładka klip-N-<slug>-okladka.jpg (duża, ostra twarz do kamery,
 oczy otwarte), na końcu KLIPY.md. Człowiek otwiera rolkę w HQ („✎ Edytuj”)
@@ -901,18 +902,19 @@ def projekt_rolki(plan: dict, r: dict, src: Path, words: list, info: dict, twarz
     return proj
 
 
-def glosnosc_zrodla(src: Path, odcinki: list[tuple[float, float]]) -> tuple[float, float] | None:
+def glosnosc_zrodla(src: Path, odcinki: list[tuple[float, float]], glos: str = "") -> tuple[float, float] | None:
     """Głośność zintegrowana (LUFS) i szczyt prawdziwy (dBFS) kawałków źródła, które trafiają do rolki, razem
     (ebur128 po aselect: wycięte pauzy i wtrącenia nie liczą się do szczytu; cisza odpada bramką pomiaru).
     Bez 30 ms na brzegach kawałka: tam eksport wycisza cięcie (ciche cięcia), więc trzask na styku nie gra.
-    Dźwięk idzie przez tę samą zamianę na stereo 48 kHz co eksport edytora (szczyt mono spada tam o 3 dB)."""
+    Dźwięk idzie przez tę samą zamianę na stereo 48 kHz co eksport edytora (szczyt mono spada tam o 3 dB),
+    a `glos` (łańcuch czystego głosu rolki) przed nią: kompresor zmienia głośność i szczyty."""
     odcinki = [(a + 0.03, b - 0.03) if b - a > 0.2 else (a, b) for a, b in odcinki]
     if not odcinki:
         return None
     t0, t1 = min(a for a, _ in odcinki), max(b for _, b in odcinki)
     wybor = "+".join(f"between(t\\,{a - t0:.3f}\\,{b - t0:.3f})" for a, b in odcinki)
     cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-ss", f"{t0:.3f}", "-t", f"{t1 - t0:.3f}", "-i", str(src),
-           "-vn", "-af", f"aselect={wybor},asetpts=N/SR/TB,aresample=48000,"   # jak eksport: mono → stereo −3 dB
+           "-vn", "-af", f"aselect={wybor},asetpts=N/SR/TB,{glos + ',' if glos else ''}aresample=48000,"   # jak eksport: mono → stereo −3 dB
            "aformat=sample_fmts=fltp:channel_layouts=stereo,ebur128=peak=true", "-f", "null", "-"]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True)
@@ -1043,6 +1045,18 @@ def cmd_zbuduj(a) -> int:
     if kilka:
         print(f"▶ kto mówi (ruch ust, 8 klatek/s): {len(kilka)} odcinków z kilkoma osobami", flush=True)
     usta = twarze_zrodla(ctx["src"], kilka, "usta")
+    glos, tlo = None, None                         # czysty głos: jeden poziom na nagranie, z tła (auto) albo z --glos
+    if a.glos != "brak" and ctx["info"].get("audio"):
+        seg = [(float(s["od"]), float(s["do"])) for r in plan["rolki"] if not a.tylko or r["slug"] == a.tylko for s in r["segmenty"]]
+        if seg:
+            od = max(0.0, min(x for x, _ in seg) - 30)
+            try:
+                r = subprocess.run(ed.szum_cmd(ctx["src"], "ffmpeg", od, max(y for _, y in seg) - od + 30), capture_output=True, text=True)
+                tlo = ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
+            except OSError:
+                tlo = None
+            glos = ed.glos_auto(tlo) if a.glos == "auto" else a.glos
+            print(f"▶ czysty głos: {glos}" + (f" (tło nagrania {tlo:.0f} dB)" if tlo is not None else ""), flush=True)
     wyniki = []
     for n, r in enumerate(plan["rolki"], 1):
         if a.tylko and r["slug"] != a.tylko:
@@ -1072,7 +1086,11 @@ def cmd_zbuduj(a) -> int:
         plik_okl = film.with_name(film.stem + "-okladka.jpg")
         if ok and zapisz_okladke(ctx["src"], proj["clips"][ok[2]], ok[1], W, H, plik_okl):
             proj["clipmaker"]["okladka"] = {"t": ok[0], "plik": plik_okl.name}
-        gl = glosnosc_zrodla(ctx["src"], [(c["in"], c["out"]) for c in proj["clips"]]) if ctx["info"].get("audio") else None
+        if glos:
+            for c in proj["clips"]:
+                c["voice"] = glos
+        gl = (glosnosc_zrodla(ctx["src"], [(c["in"], c["out"]) for c in proj["clips"]], ed.glos_filter(glos, tlo))
+              if ctx["info"].get("audio") else None)
         if gl:
             v = wzmocnienie(*gl)
             for c in proj["clips"]:
@@ -1152,6 +1170,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--bez-renderu", action="store_true", help="tylko projekty (render później: projekt.py render albo edytor HQ)")
     p.add_argument("--tylko", help="zbuduj tylko rolkę o tym slugu (poprawka jednej rolki)")
     p.add_argument("--nadpisz", action="store_true", help="nadpisz rolkę zmienioną w edytorze HQ (zmiany człowieka znikną)")
+    p.add_argument("--glos", choices=["auto", *ed.GLOS, "brak"], default="auto",
+                   help="czysty głos rolek: auto = z tła nagrania (cicho lekki, pokój sredni, głośne tło mocny), brak = bez")
     p.set_defaults(fn=cmd_zbuduj)
     a = ap.parse_args(argv)
     return a.fn(a)

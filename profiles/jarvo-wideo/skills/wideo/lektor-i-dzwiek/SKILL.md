@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -20,7 +20,8 @@ Lektor: Edge TTS (darmowy, bez klucza, neuronowe głosy PL). Muzyka: tylko z pra
 dla platform społecznościowych: −14 LUFS zintegrowane, true peak ≤ −1 dBTP.
 
 ## Kiedy użyć
-- Dobór głosu i tempa do filmu, lektor do cudzego nagrania, muzyka i balans, wyrównanie głośności.
+- Dobór głosu i tempa do filmu, lektor do cudzego nagrania, muzyka i balans, wyrównanie głośności, czysty głos
+  w nagraniu (szum, dudnienie, syczenie).
 
 ## Głosy
 | Głos | Charakter | Dobre do |
@@ -38,6 +39,19 @@ powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. D
 - Test wymowy („odsłuch” uszami Parakeet): `film.py lektor "<zdanie>" -o /tmp/test.mp3`, potem
   `montaz.py transkrypcja /tmp/test.mp3 -o /tmp/test` i porównaj `/tmp/test.txt` z tekstem. Słowo rozpoznane
   inaczej = niewyraźna wymowa: zmień zapis (fonetycznie, prościej) i powtórz.
+
+## Czysty głos (nagranie właściciela, telefon, laptop)
+Szum wentylatora, dudnienie, syczące „s” i nierówna głośność. Trzy poziomy (ten sam łańcuch w edytorze HQ, `projekt.py`,
+`montaz.py` i clipmakerze): **lekki** = dobre nagranie (dudnienie i łagodne wyrównanie, tło bez zmian), **sredni** =
+zwykły pokój (też syczenie, odszumianie i ciszej w pauzach: tło −10 dB, mowa +2 dB), **mocny** = telefon, laptop,
+hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera poziom z tła nagrania.
+- Projekt montażu (edytor HQ, rolka clipmakera): `projekt.py glos <film> --wszystkie [--poziom auto]`; poziom do
+  odsłuchu dla właściciela: `--probka` (8 s po czyszczeniu obok filmu, `MEDIA:`). `pokaz` mówi, co ustawione.
+- Cały plik (nagranie przed montażem): `montaz.py glos <nagranie> -o <wynik> [--poziom auto]`, obraz bez zmian,
+  potem `montaz.py glosnosc` (kompresor zmienia głośność).
+- Clipmaker robi to sam (`zbuduj --glos auto`, `brak` = bez).
+- Nie na lektorze TTS ani muzyce: one są czyste; czysty głos to nagrania mikrofonem.
+- Mocny ścisza też ciche końcówki słów w głośnym tle: przy szeptach i cichych fragmentach zostań przy średnim.
 
 ## Muzyka
 - Źródła: biblioteka użytkownika `@@KNOWLEDGE_DIR@@/wideo/muzyka/` (plan: `"muzyka": {"plik": "losowa"}`),

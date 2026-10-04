@@ -1,7 +1,7 @@
 ---
 name: montaz-nagran
 description: "Montaż nagrań: cięcie, cisza, kadr 9:16, dźwięk, napisy."
-version: 1.2.1
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -47,7 +47,9 @@ zostaw jego napisy albo zapytaj o wersję „czystą”.
      Słowo ucięte → zakres o 0,1–0,2 s dalej od słowa (`wytnij`) albo większy `--zapas` (`cisza`).
 5. **Kadr pod format:** `montaz.py kadr <plik> -o out/wideo/src/pion.mp4 --format 9:16 --x 0.45` (x = środek obiektu
    z przeglądu). Nagranie ekranu, slajdy, dwie osoby w kadrze: `--tryb rozmyte`.
-6. **Dźwięk:** `montaz.py glosnosc <plik> -o <wynik> --lufs -14`; muzyka pod głos: `lektor-i-dzwiek`.
+6. **Dźwięk:** szum, dudnienie albo syczenie w nagraniu → czysty głos (`lektor-i-dzwiek`): w projekcie
+   `projekt.py glos <plik> --wszystkie`, na samym pliku `montaz.py glos <plik> -o <wynik>` (poziom auto z tła).
+   Potem `montaz.py glosnosc <plik> -o <wynik> --lufs -14`; muzyka pod głos: `lektor-i-dzwiek`.
    **Kolor** (gdy obraz jest ciemny, płaski, wyblakły albo właściciel prosi o nastrój): projekt montażu filmu
    (`projekt.py`, ten sam co w edytorze HQ) → `projekt.py kolor <plik> --wszystkie --auto --podglad`, nastrój
    `--styl naturalny|cieply|chlodny|kinowy|zywy|czb|wyblakly` (suwaki `--jasnosc/--kontrast/--nasycenie/--temperatura`

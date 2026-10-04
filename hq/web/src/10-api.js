@@ -96,6 +96,15 @@ const liveApi = {
     const res = await rawFetch(`${API_ROOT}/edit/kolor-auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src, in: inn, out }) });
     return res.json();
   },
+  // czysty głos klipu albo audio: tło nagrania i poziom „Auto”, odsłuch 8 s po czyszczeniu (edytor.glos_filter)
+  async editGlosTlo(src, inn, out) {
+    const res = await rawFetch(`${API_ROOT}/edit/glos-tlo`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src, in: inn, out }) });
+    return res.json();
+  },
+  async editGlosProbka(src, inn, out, voice, od) {
+    const res = await rawFetch(`${API_ROOT}/edit/glos-probka`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src, in: inn, out, voice, od }) });
+    return res.blob();
+  },
   async editLektor(path, text, glos, tempo) {
     const res = await rawFetch(`${API_ROOT}/edit/lektor`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, text, glos, tempo }) });
     return res.json();

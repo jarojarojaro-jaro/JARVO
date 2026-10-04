@@ -18,6 +18,7 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py kadr <film> <id> [--rozmyte|--dopasuj|--wypelnij] [--fx 0.4] [--fy 0.35] [--zoom 1.15]   # kadr klipu
     projekt.py kolor <film> <id>|--wszystkie [--styl cieply] [--jasnosc N] [--kontrast N] [--nasycenie N]
                      [--temperatura N] [--auto] [--usun] [--podglad]   # korekcja koloru klipu (suwaki −100…100)
+    projekt.py glos <film> <id>|--wszystkie [--poziom auto|lekki|sredni|mocny|brak] [--probka]   # czysty głos klipu albo audio
     projekt.py napisy <film> [--srt plik.srt] [--karaoke [#FFE14D]] [--kroj Kanit]   # napisy ze słów (<źródło>.mowa.json) albo SRT
     projekt.py przejscie <film> <id>|--wszystkie [--typ fade] [--dlugosc 0.5] [--usun]   # przejście na cięciu po klipie
     projekt.py tnij <film> <id> (--w S | --czesci 3)   # podziel klip w chwili osi albo na równe części
@@ -163,6 +164,57 @@ def kolor_auto(c: dict) -> dict:
     return wynik["color"] or {}
 
 
+def tlo_nagrania(src: Path, a: float, b: float) -> float | None:
+    """Tło nagrania (dB) wokół odcinka źródła, jak „Auto” czystego głosu w edytorze (edytor.szum_cmd)."""
+    od = max(0.0, a - 30)
+    r = subprocess.run(ed.szum_cmd(src, ed.tools()["ffmpeg"] or "ffmpeg", od, b - od + 30), capture_output=True, text=True)
+    return ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
+
+
+def cmd_glos(film: Path, a) -> int:
+    """Czysty głos klipu albo audio (edytor.glos_filter): poziom wprost albo `auto` z tła nagrania; `--probka` zapisuje
+    8 s po czyszczeniu obok filmu (odsłuch dla właściciela)."""
+    proj = load(film)
+    if a.wszystkie:
+        cele = [c for c in proj["clips"] if c.get("kind", "video") == "video" and not c.get("muted")]
+    else:
+        if not a.id:
+            raise SystemExit("podaj id klipu albo audio (z `pokaz`) albo --wszystkie")
+        cele = [x for x in [*proj["clips"], *(proj.get("audio") or [])] if x.get("id") == a.id]
+        if not cele:
+            raise SystemExit(f"nie ma klipu ani audio o id {a.id} (lista: projekt.py pokaz)")
+    tla: dict[str, float | None] = {}
+    for x in cele:
+        src = resolve(str(x["src"]))
+        if src is None or not ed.probe(src).get("audio"):
+            print(f"[{x.get('id')}] bez dźwięku: pomijam")
+            continue
+        if a.poziom == "brak":
+            x.pop("voice", None)
+            print(f"[{x.get('id')}] czysty głos: wyłączony")
+            continue
+        if str(src) not in tla:
+            tla[str(src)] = tlo_nagrania(src, float(x["in"]), float(x["out"]))
+        tlo = tla[str(src)]
+        x["voice"] = ed.glos_auto(tlo) if a.poziom == "auto" else a.poziom
+        print(f"[{x.get('id')}] czysty głos: {x['voice']}" + (f" (tło nagrania {tlo:.0f} dB)" if tlo is not None else " (tła nie udało się zmierzyć)"))
+    save(film, proj)
+    if a.probka:
+        x = next((y for y in cele if y.get("voice")), None)
+        if x is None:
+            raise SystemExit("--probka: żaden element nie ma czystego głosu")
+        src = resolve(str(x["src"]))
+        out = film.with_name(f"{film.stem}.glos-{x.get('id')}.mp3")
+        d = min(8.0, float(x["out"]) - float(x["in"]))
+        r = subprocess.run(ed.glos_probka_cmd(src, float(x["in"]), d, x["voice"], tla.get(str(src)), out,
+                                              ed.tools()["ffmpeg"] or "ffmpeg"), capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit(f"próbka się nie udała: {r.stderr.strip()[-300:]}")
+        print(f"Próbka {d:.0f} s po czyszczeniu (do odsłuchu dla właściciela): {out}")
+        print(f"MEDIA:{out}")
+    return 0
+
+
 def kolor_podglad(film: Path, c: dict) -> Path:
     """Klatka ze środka klipu: lewa połowa przed korektą, prawa po niej (ten sam filtr co eksport; film HDR po
     przeliczeniu na zwykły obraz, jak w eksporcie)."""
@@ -227,7 +279,8 @@ def cmd_pokaz(film: Path, a) -> int:
     trs = ed.przejscia_osi(proj["clips"], cv["fps"])
     for (c, s, e), tr in zip(layout(proj["clips"]), trs):
         extra = "".join([f" · tempo {c.get('speed', 1)}×" if c.get("speed", 1) != 1 else "", " · wyciszony" if c.get("muted") else "",
-                         f" · głośność {c.get('volume', 1):.2f}" if c.get("volume", 1) != 1 else ""])
+                         f" · głośność {c.get('volume', 1):.2f}" if c.get("volume", 1) != 1 else "",
+                         f" · czysty głos {c['voice']}" if c.get("voice") else ""])
         print(f"  [{c.get('id')}] {s:6.2f}–{e:6.2f}  {Path(c['src']).name} (źródło {c['in']:.2f}–{c['out']:.2f}){extra}{opis_zaniku(c)}{opis_koloru(c.get('color'))}")
         if tr:
             print(f"      ↳ przejście {tr['type']} {tr['d']:.2f} s ({e - tr['d'] / 2:.2f}–{e + tr['d'] / 2:.2f})")
@@ -241,7 +294,8 @@ def cmd_pokaz(film: Path, a) -> int:
         print(f"Typografia: {len(typo['bloki'])} bloków, motyw {typo['motyw']} (szczegóły: typografia.py pokaz)")
     print("Audio:" if proj.get("audio") else "Audio: brak")
     for m in proj.get("audio") or []:
-        print(f"  [{m.get('id')}] od {m['start']:6.2f} przez {m['out'] - m['in']:.2f} s  {Path(m['src']).name} · głośność {m.get('volume', 1):.2f}{opis_zaniku(m)}")
+        print(f"  [{m.get('id')}] od {m['start']:6.2f} przez {m['out'] - m['in']:.2f} s  {Path(m['src']).name} · głośność {m.get('volume', 1):.2f}{opis_zaniku(m)}"
+              + (f" · czysty głos {m['voice']}" if m.get("voice") else ""))
     notes = sorted((n for n in proj.get("notes") or [] if isinstance(n, dict)), key=lambda n: float(n.get("t") or 0))
     if notes:
         otwarte = sum(1 for n in notes if not n.get("done"))
@@ -923,7 +977,12 @@ def cmd_render(film: Path, a) -> int:
         kara = {x["i"]: [next(rest) for _ in texts[x["i"]]["words"]] for x in p["texts"] if x.get("kara")}
         layer = ed.karaoke_concat(p, kara, ed.blank_png(Path(tmp) / "pusty.png", W, H), Path(tmp) / "karaoke.ffconcat") if kara else None
         maska = ed.maska_concat(film, proj, p, Path(tmp)) if typo.get("tyl") else None   # osoba nad napisem „za”
-        cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer, typo=typo, maska=maska, sdr=sdr)
+        szum = {}                                              # czysty głos: tło nagrania pod próg odszumiania
+        for s, (od, dl) in ed.szum_zakresy(p).items():
+            r = subprocess.run(ed.szum_cmd(Path(s), ed.tools()["ffmpeg"] or "ffmpeg", od, dl), capture_output=True, text=True)
+            szum[s] = ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
+            print(f"  czysty głos: {Path(s).name}, tło {'?' if szum[s] is None else f'{szum[s]:.0f}'} dB")
+        cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer, typo=typo, maska=maska, sdr=sdr, szum=szum)
         t0 = time.time()
         r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
@@ -1007,6 +1066,12 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--auto", action="store_true", help="delikatna korekta z pomiaru klatek (ciemne jaśniej, płaskie z kontrastem)")
     sp.add_argument("--usun", action="store_true", help="bez korekty koloru")
     sp.add_argument("--podglad", action="store_true", help="klatka przed | po obok filmu (do vision_analyze)")
+    sp = film_cmd("glos", cmd_glos, "czysty głos klipu albo audio: lekki, sredni, mocny albo auto z tła nagrania")
+    sp.add_argument("id", nargs="?", help="klip albo audio (z `pokaz`)")
+    sp.add_argument("--wszystkie", action="store_true", help="każdy klip wideo z dźwiękiem")
+    sp.add_argument("--poziom", choices=["auto", *ed.GLOS, "brak"], default="auto",
+                    help="auto = z tła nagrania (cicho lekki, pokój sredni, głośne tło mocny); brak = wyłącz")
+    sp.add_argument("--probka", action="store_true", help="8 s po czyszczeniu obok filmu (.mp3) do odsłuchu")
     sp = film_cmd("napisy", cmd_napisy, "napisy ze słów albo z SRT")
     sp.add_argument("--srt")
     sp.add_argument("--karaoke", nargs="?", const="", metavar="KOLOR",

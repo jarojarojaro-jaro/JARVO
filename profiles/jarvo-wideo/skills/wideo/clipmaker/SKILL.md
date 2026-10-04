@@ -1,7 +1,7 @@
 ---
 name: clipmaker
 description: "Długie nagranie → edytowalne rolki z napisami karaoke."
-version: 1.6.0
+version: 1.7.0
 author: Jarvo
 license: MIT
 metadata:
@@ -59,6 +59,9 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
    dlaczego zostają.
 6. **Zbuduj** (render po kolei, ~0,5–1× długości rolki każda). Głośność rolki `zbuduj` ustawia sam z pomiaru źródła
    (−14 LUFS, głośność klipów najwyżej ×2); bardzo ciche nagranie zostaje poniżej celu i `qa_wideo.py` to pokaże.
+   Czysty głos też sam: poziom z tła nagrania (`▶ czysty głos: sredni (tło nagrania −47 dB)`), głośność mierzona
+   już po czyszczeniu; inny poziom `--glos lekki|sredni|mocny`, bez czyszczenia `--glos brak` (np. muzyka w tle,
+   którą słychać celowo).
    Zbliżenia też sam: ×1,12 na akcencie (słowo wyraźnie głośniej niż zwykle u mówcy i ważne: liczba, wykrzyknik,
    puenta), najwyżej ~3 na minutę i co ≥ 18 s; `zbuduj` wypisuje ich czasy. Za mało albo za dużo → `styl.punch`.
    **Pierwsza klatka i okładka** też z twarzy: pierwsza klatka w mrugnięciu, rozmyta albo bokiem → `zbuduj` przesuwa

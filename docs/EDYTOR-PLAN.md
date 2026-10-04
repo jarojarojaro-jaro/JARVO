@@ -37,6 +37,7 @@ ma pięć kart. Każdy dodany dźwięk to plik obok filmu (`dzwieki/`, `lektor/`
 | Muzyka | ✅ | 9 podkładów CC0 z biblioteki (do 60 s, z wyciszeniem), muzyka ze skarbca (`wideo/muzyka`, `brands/*/muzyka`), pliki z folderu filmu, wgranie z dysku; bez popularnych utworów; podkład dodaje się ciszej (30%) |
 | Wyodrębnij | ✅ | Dźwięk z innego filmu jako osobne audio, a w panelu klipu „Wyodrębnij dźwięk” jak w CapCut: dźwięk klipu zostaje w tym samym miejscu osi, klip się wycisza (AAC kopiowane bez straty); `projekt.py wyodrebnij` |
 | Lektor | ✅ | Tekst na mowę Edge TTS (ten sam co w `film.py`), 5 głosów i tempo −30…+30%; `projekt.py lektor` (z czasami słów do napisów) |
+| Czysty głos | ✅ | Klip i każde audio: Brak / Lekko / Średnio / Mocno (odszumianie z progiem z tła nagrania, ekspander w pauzach, de-esser, kompresor), Auto z pomiaru tła, Odsłuchaj 8 s po czyszczeniu; `projekt.py glos`, `montaz.py glos`, `klipy.py zbuduj --glos` |
 | Nagraj | ✅ | Mikrofon w przeglądarce (MediaRecorder, serwer zapisuje AAC); wymaga HTTPS albo localhost, bez tego wgranie notatki głosowej z telefonu |
 
 ## Krok 3. Tekst
@@ -51,8 +52,8 @@ ma pięć kart. Każdy dodany dźwięk to plik obok filmu (`dzwieki/`, `lektor/`
 
 ## Krok 5. Później (jako dodatki)
 
-- Odszumianie (`afftdn`), efekty, krzywa tempa, obraz w obrazie, ściszanie muzyki pod mową (ducking).
-  Jasność, kontrast i filtry są już w kroku 1 („Kolor klipu”).
+- Efekty, krzywa tempa, obraz w obrazie, ściszanie muzyki pod mową (ducking).
+  Jasność, kontrast i filtry są już w kroku 1 („Kolor klipu”), odszumianie w kroku 2 („Czysty głos”).
 
 ## Źródła i licencje
 
