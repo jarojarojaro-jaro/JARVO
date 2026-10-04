@@ -1,7 +1,7 @@
 ---
 name: zywy-schemat
 description: "Żywy schemat: przepływ, który działa; post X, Instagram."
-version: 1.0.0
+version: 1.0.1
 author: Jarvo
 license: MIT
 metadata:
@@ -41,12 +41,14 @@ motywy Jarva, polskie kroje i kontrolę, a `html_wideo.py` (preset `livepanel`) 
    wpisuj ręcznie. Tekst w bezpiecznych marginesach: 6% boków, 8% góry i dołu (pion: strefy UI platformy).
 3. **Strona:** `python3 $HERMES_HOME/scripts/zywy_schemat.py strona schemat.json -o out/wideo/<projekt>/schemat.html`
    (uwagi `!` o braku źródeł i krojach spoza zestawu poprawiasz od razu). Strona działa offline w każdej przeglądarce, w pętli.
-4. **Kontrola** (wszystko na tej samej stronie):
-   - `zywy_schemat.py sprawdz schemat.html`: kod 0 (tekst w ramkach, ramki nie nachodzą na siebie, brak błędów strony);
-   - `html_wideo.py klatki schemat.html --preset livepanel --czasy <po jednej chwili na krok> --arkusz arkusz.jpg`
-     i `vision_analyze`: czy da się przeczytać na telefonie i czy podświetlona ramka, strzałka i wiersz listy mówią to samo;
-   - `html_wideo.py pomiar schemat.html --preset livepanel --dlugosc <canvas.duration>`: 0 błędów (kontrast WCAG,
-     marginesy, kroje zastępcze).
+4. **Kontrola** (wszystko na tej samej stronie, `P=out/wideo/<projekt>`):
+   - `zywy_schemat.py sprawdz $P/schemat.html`: kod 0 (tekst w ramkach, ramki nie nachodzą na siebie, brak błędów strony);
+   - `html_wideo.py klatki $P/schemat.html --preset livepanel --czasy <po jednej chwili na krok> --out $P/klatki
+     --arkusz $P/klatki/arkusz.jpg` i `vision_analyze`: czy da się przeczytać na telefonie i czy podświetlona ramka,
+     strzałka i wiersz listy mówią to samo;
+   - **na końcu** `html_wideo.py pomiar $P/schemat.html --preset livepanel --dlugosc <canvas.duration>`: 0 błędów
+     (kontrast WCAG, marginesy, kroje zastępcze). Pomiar ma odcisk plików z katalogu strony: plik dopisany tam później
+     (np. arkusz obok strony) go unieważnia i `film` ostrzega „zmierz ponownie”; klatki i arkusz trzymaj w `$P/klatki/`.
 5. **Film:** `zywy_schemat.py film schemat.html -o out/wideo/<projekt>/schemat.mp4`: około 2 min na 28 s w 4:5,
    z cichą ścieżką AAC (Telegram i komunikatory nie zamieniają go w GIF). Muzyka: `--bez-audio`, potem `film.py`.
 6. **Oddanie:** MP4, strona HTML (na stronę firmy osadza `jarvo-web`), `RAPORT.md` ze źródłami liczb, formatem,
