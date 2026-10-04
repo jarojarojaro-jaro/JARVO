@@ -1,7 +1,7 @@
 ---
 name: formaty-wideo
 description: "Formaty wideo platform: wymiary, długość, strefy UI."
-version: 1.0.0
+version: 1.0.1
 author: Jarvo
 license: MIT
 metadata:
@@ -25,6 +25,9 @@ Tabela platform: `references/specs.md` (zgodna z `qa_wideo.py --platforma`).
 ## Zasady techniczne (wszystkie platformy)
 - MP4, H.264 High, `yuv420p`, 30 fps (24/25 dla materiału filmowego, 60 dla gier/sportu), AAC 48 kHz 192 kb/s,
   `+faststart`. `film.py` i `montaz.py` robią to domyślnie.
+- Zwykły obraz (SDR, BT.709), nie HDR: platformy i telefony pokazują HDR inaczej niż podgląd (sprany albo przepalony).
+  Nagranie HDR z telefonu (iPhone domyślnie) przeliczają same `montaz.py`, `napisy.py`, `film.py`, `projekt.py render`
+  i eksport edytora HQ; `qa_wideo.py` zgłasza HDR w gotowym pliku jako błąd.
 - Głośność −14 LUFS, true peak ≤ −1 dBTP.
 - Pierwsza klatka = miniatura w wielu miejscach: hook i tekst od klatki 0, nie czarna plansza.
 - Plik < 250 MB dla krótkich formatów (zwykle 5–30 MB).

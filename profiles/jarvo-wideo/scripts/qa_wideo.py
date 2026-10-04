@@ -3,7 +3,7 @@
 
     python3 qa_wideo.py film.mp4 [--platforma tiktok] [--format 9:16] [--lektor] [--arkusz out/wideo/qa.jpg] [--json]
 
-Sprawdza: kontener i kodeki (H.264 + AAC, yuv420p, faststart), rozdzielczość i proporcje, fps, długość wobec
+Sprawdza: kontener i kodeki (H.264 + AAC, yuv420p, faststart, bez HDR), rozdzielczość i proporcje, fps, długość wobec
 platformy, głośność (LUFS zintegrowane, true peak i rozpiętość LRA), czarne klatki, zamrożony obraz, cisze w dźwięku,
 pojedyncze „mrugnięcia” (jedna klatka inna niż obie sąsiednie: błąd renderu, zgubiony stan, zła klatka przejścia).
 --arkusz: klatki z początku (hook), środka i końca z zaznaczonymi strefami interfejsu platformy (9:16, bez --platforma TikTok):
@@ -181,6 +181,9 @@ def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkus
         errors.append(f"kodek wideo {v['codec']} (platformy: H.264)")
     if v["pix_fmt"] != "yuv420p":
         errors.append(f"pix_fmt {v['pix_fmt']} (wymagane yuv420p, inaczej część telefonów nie odtworzy)")
+    if v.get("hdr"):
+        errors.append(f"film w HDR ({v['hdr']}): platformy i telefony pokażą go inaczej niż w podglądzie; przelicz na "
+                      "zwykły obraz (eksport edytora HQ, projekt.py render, montaz.py robią to same)")
     if not 23.9 <= (v["fps"] or 0) <= 60.1:
         warns.append(f"fps {v['fps']} (zalecane 24–60, standard 30)")
     if not a:

@@ -153,8 +153,8 @@ def opis_koloru(k: dict | None) -> str:
 
 def kolor_auto(c: dict) -> dict:
     """Pomiar klatek klipu jak „Auto” w edytorze HQ (edytor.kolor_pomiar_cmd → kolor_z_pomiaru)."""
-    r = subprocess.run(ed.kolor_pomiar_cmd(Path(c["src"]), float(c.get("in", 0)), float(c.get("out", 0)), ed.tools()["ffmpeg"] or "ffmpeg"),
-                       capture_output=True, text=True)
+    r = subprocess.run(ed.kolor_pomiar_cmd(Path(c["src"]), float(c.get("in", 0)), float(c.get("out", 0)), ed.tools()["ffmpeg"] or "ffmpeg",
+                                           sdr=ed.probe(Path(c["src"])).get("sdr", "")), capture_output=True, text=True)
     wynik = ed.kolor_z_pomiaru(r.stderr) if r.returncode == 0 else None
     if not wynik:
         raise SystemExit(f"nie udało się zmierzyć klatek klipu {c.get('id')}: {(r.stderr.strip().splitlines() or [''])[-1][:200]}")
@@ -164,13 +164,16 @@ def kolor_auto(c: dict) -> dict:
 
 
 def kolor_podglad(film: Path, c: dict) -> Path:
-    """Klatka ze środka klipu: lewa połowa przed korektą, prawa po niej (ten sam filtr co eksport)."""
+    """Klatka ze środka klipu: lewa połowa przed korektą, prawa po niej (ten sam filtr co eksport; film HDR po
+    przeliczeniu na zwykły obraz, jak w eksporcie)."""
     out = film.with_name(f"{film.stem}-kolor-{c.get('id')}.jpg")
     kol = ed.kolor_filter(c.get("color")) or "null"
+    sdr = ed.probe(Path(c["src"])).get("sdr", "")
     t = (float(c.get("in", 0)) + float(c.get("out", 0))) / 2
     wej = [] if ed.media_kind(Path(c["src"])) == "image" else ["-ss", f"{t:.3f}"]
     r = subprocess.run([ed.tools()["ffmpeg"] or "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", *wej, "-i", str(c["src"]),
-                        "-frames:v", "1", "-filter_complex", f"[0:v]scale=-2:540,format=rgb24,split[a][b];[b]{kol},format=rgb24[k];[a][k]hstack",
+                        "-frames:v", "1", "-filter_complex",
+                        f"[0:v]scale=-2:540,{sdr + ',' if sdr else ''}format=rgb24,split[a][b];[b]{kol},format=rgb24[k];[a][k]hstack",
                         "-q:v", "3", str(out)], capture_output=True, text=True)
     if r.returncode:
         raise SystemExit(f"podgląd koloru: {r.stderr.strip()[-300:]}")
@@ -829,8 +832,9 @@ def kadr_osi(proj: dict, t: float, W: int, H: int, dest: Path) -> Path:
            else ed.blur_filter(W, H, 0) if c.get("fit") == "blur"
            else f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black")
     src = ["-i", str(c["src"])] if c.get("kind") == "image" else ["-ss", f"{max(0.0, u):.3f}", "-i", str(c["src"])]
+    sdr = ed.probe(Path(c["src"])).get("sdr", "") if c.get("kind") != "image" else ""
     subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", *src, "-frames:v", "1",
-                    "-filter_complex", f"[0:v]{fit}", str(dest)], check=True)
+                    "-filter_complex", f"[0:v]{fit}{',' + sdr if sdr else ''}", str(dest)], check=True)
     return dest
 
 
@@ -899,7 +903,12 @@ def cmd_render(film: Path, a) -> int:
         raise SystemExit(f"projekt nie przechodzi walidacji: {exc}")
     kept = [texts[x["i"]] for x in p["texts"]]   # tylko napisy, które przeszły walidację, w tej samej kolejności
     out = Path(a.out) if a.out else ed.export_name(film)
-    has_audio = {str(c["src"]): ed.probe(c["src"]).get("audio", False) for c in p["clips"] if c["kind"] == "video"}
+    info_src = {str(c["src"]): ed.probe(c["src"]) for c in p["clips"] if c["kind"] == "video"}
+    has_audio = {k: v.get("audio", False) for k, v in info_src.items()}
+    sdr = {k: v.get("sdr", "") for k, v in info_src.items()}           # film HDR z telefonu → zwykły obraz
+    for k, v in info_src.items():
+        if v.get("hdr"):
+            print(f"  HDR ({v['hdr']}): {Path(k).name} przeliczam na zwykły obraz (SDR)")
     with tempfile.TemporaryDirectory(prefix="projekt-") as tmp:
         W, H = p["canvas"]["w"], p["canvas"]["h"]
         # jedno uruchomienie przeglądarki: zwykłe obrazy napisów, obraz na każde słowo napisów karaoke, typografia
@@ -914,7 +923,7 @@ def cmd_render(film: Path, a) -> int:
         kara = {x["i"]: [next(rest) for _ in texts[x["i"]]["words"]] for x in p["texts"] if x.get("kara")}
         layer = ed.karaoke_concat(p, kara, ed.blank_png(Path(tmp) / "pusty.png", W, H), Path(tmp) / "karaoke.ffconcat") if kara else None
         maska = ed.maska_concat(film, proj, p, Path(tmp)) if typo.get("tyl") else None   # osoba nad napisem „za”
-        cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer, typo=typo, maska=maska)
+        cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer, typo=typo, maska=maska, sdr=sdr)
         t0 = time.time()
         r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:

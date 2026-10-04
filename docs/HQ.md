@@ -286,6 +286,12 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 - **Każda przeglądarka:** gdy przeglądarka nie odtwarza kodeka filmu (np. Chromium bez H.264, ProRes), edytor sam
   prosi serwer o kopię podglądową WebM (VP9, do 540 p, klatka kluczowa co 0,5 s dla szybkiego przewijania; raz na
   plik, w `state/edytor/proxy/`, sprząta się po 7 dniach). Eksport zawsze bierze oryginał w pełnej jakości.
+- **Film HDR z telefonu** (iPhone: Dolby Vision z warstwą HLG; też HDR10 i HLG z Androida): `probe` rozpoznaje go
+  po znacznikach koloru i danych Dolby Vision (`edytor.hdr`). Przeglądarka pokazałaby go sprany albo za ciemny, więc
+  podgląd zawsze idzie przez kopię WebM po przeliczeniu kolorów, a eksport, „Auto” koloru i `projekt.py render`
+  przeliczają klip na zwykły obraz (SDR, BT.709) tym samym łańcuchem (`edytor.sdr_filter`: `zscale` do światła
+  liniowego, `tonemap` mobius, z powrotem do BT.709). Przeliczenie idzie po dopasowaniu do kadru (4K z telefonu
+  w pełnej rozdzielczości liczy się kilka razy dłużej), przed korekcją koloru i napisami.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
   poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `kolor`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `dzwieki`, `dodaj-dzwiek`, `wyodrebnij`, `lektor`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),

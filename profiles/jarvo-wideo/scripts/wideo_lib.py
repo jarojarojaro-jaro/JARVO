@@ -19,6 +19,15 @@ import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# silnik edytora HQ (wspólne reguły z eksportem, np. HDR → zwykły obraz): w dystrybucji kopiowany obok (build.py),
+# w repo leży w hq/plugin (jak w projekt.py)
+_HERE = Path(__file__).resolve().parent
+for _cand in (_HERE, (_HERE.parents[2] if len(_HERE.parents) > 2 else _HERE) / "hq" / "plugin"):
+    if (_cand / "edytor.py").exists():
+        sys.path.insert(0, str(_cand))
+        break
+import edytor as ed  # noqa: E402
+
 # ------------------------------------------------------------------ formaty
 
 FORMATS = {  # proporcje → rozdzielczość finalna (szkic: połowa)
@@ -132,10 +141,11 @@ def obrot(v: dict) -> int:
 
 def probe(path: Path) -> dict:
     """Parametry pliku. Wymiary wideo tak, jak film się wyświetla: pion z telefonu (poziome klatki + obrót 90°)
-    ma width < height, bo ffmpeg obraca klatki przy dekodowaniu."""
+    ma width < height, bo ffmpeg obraca klatki przy dekodowaniu. `video.hdr` = rodzaj HDR (np. „HLG” z iPhone'a)
+    albo None, `video.sdr` = łańcuch przeliczenia na zwykły obraz (edytor.sdr_filter; "" dla zwykłego filmu)."""
     res = run(["ffprobe", "-v", "error", "-show_entries",
-               "stream=index,codec_type,codec_name,width,height,r_frame_rate,pix_fmt,sample_rate,channels"
-               ":stream_side_data=rotation:stream_tags=rotate:format=duration,size,format_name",
+               f"stream=index,codec_type,codec_name,width,height,r_frame_rate,pix_fmt,sample_rate,channels,{ed.PROBE_KOLOR}"
+               f":stream_side_data={ed.PROBE_SIDE}:stream_tags=rotate:format=duration,size,format_name",
                "-of", "json", str(path)])
     data = json.loads(res.stdout or "{}")
     streams = data.get("streams", [])
@@ -146,13 +156,15 @@ def probe(path: Path) -> dict:
         n, d = v["r_frame_rate"].split("/")
         fps = float(n) / float(d) if float(d) else 0.0
     fmt = data.get("format", {})
+    hd = ed.hdr(v) if v and not is_image(Path(path)) else None
     return {
         "duration": float(fmt.get("duration") or 0), "size": int(fmt.get("size") or 0),
         "format_name": fmt.get("format_name", ""),
         "video": v and {"codec": v.get("codec_name"),
                         **dict(zip(("width", "height"), (v.get("height"), v.get("width")) if obrot(v) in (90, 270)
                                    else (v.get("width"), v.get("height")))),
-                        "fps": round(fps, 3), "pix_fmt": v.get("pix_fmt")},
+                        "fps": round(fps, 3), "pix_fmt": v.get("pix_fmt"),
+                        "hdr": hd and hd["rodzaj"], "hdr_uwaga": hd and hd["uwaga"], "sdr": ed.sdr_filter(hd)},
         "audio": a and {"codec": a.get("codec_name"), "sample_rate": int(a.get("sample_rate") or 0),
                         "channels": a.get("channels")},
     }
@@ -160,6 +172,21 @@ def probe(path: Path) -> dict:
 
 def duration(path: Path) -> float:
     return probe(path)["duration"]
+
+
+def sdr(path: Path) -> str:
+    """Łańcuch HDR → zwykły obraz dla filmu (edytor.sdr_filter) albo "" (zwykły film, zdjęcie, brak obrazu).
+    Wstawiasz go po skalowaniu do kadru, przed napisami i korekcją koloru; HDR zgłaszamy na stderr."""
+    v = probe(path).get("video") or {}
+    if v.get("hdr"):
+        print(f"HDR ({v['hdr']}): {Path(path).name} przeliczam na zwykły obraz (SDR)"
+              + (f"; uwaga: {v['hdr_uwaga']}" if v.get("hdr_uwaga") else ""), file=sys.stderr)
+    return v.get("sdr") or ""
+
+
+def z_sdr(chain: str, sdr_vf: str) -> str:
+    """`chain` + przeliczenie HDR (gdy jest), przecinkiem; pusty łańcuch zostaje pusty."""
+    return ",".join(x for x in (chain, sdr_vf) if x)
 
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".avif", ".bmp"}

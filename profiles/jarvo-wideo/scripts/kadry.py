@@ -41,7 +41,7 @@ def contact_rows(videos: list[Path], per: int, out: Path, cell_w: int = 240) -> 
             for k in range(per):
                 t = times[min(k, len(times) - 1)]
                 label = f"{vi}.{k + 1} {t:.1f}s"
-                base = (f"scale={cell_w}:{cell_h}:force_original_aspect_ratio=decrease,"
+                base = (f"scale={cell_w}:{cell_h}:force_original_aspect_ratio=decrease,{v.get('sdr') + ',' if v.get('sdr') else ''}"
                         f"pad={cell_w}:{wl.even(cell_w * 1.8)}:(ow-iw)/2:(oh-ih)/2:color=0x15171C")
                 cell = tdir / f"c{n:03d}.png"
                 seek = [] if wl.is_image(video) else ["-ss", f"{t:.2f}"]
@@ -79,7 +79,7 @@ def reference(video: Path, fps: float, out_dir: Path, per_sheet: int = 40, cols:
         cnt = min(per_sheet, n - first)
         rows = (cnt + cols - 1) // cols
         dest = out_dir / f"wzor-{k + 1}.jpg"
-        base = f"fps={fps},scale={cw}:{ch}"
+        base = wl.z_sdr(f"fps={fps},scale={cw}:{ch}", v.get("sdr") or "")    # wzór w HDR: klatki po przeliczeniu
         label = f",drawtext=text='%{{pts\\:hms\\:{first / fps:.3f}}}':x=4:y=4:fontsize=14:fontcolor=white:box=1:boxcolor=black@0.7:boxborderw=3"
         tile = f",tile={cols}x{rows}:padding=4:color=0x0B0D12"
         common = ["ffmpeg", "-y", "-ss", f"{first / fps:.3f}", "-t", f"{cnt / fps:.3f}", "-i", str(video), "-frames:v", "1", "-q:v", "3"]

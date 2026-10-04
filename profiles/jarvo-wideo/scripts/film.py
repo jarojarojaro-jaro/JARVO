@@ -256,8 +256,9 @@ def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -
     mode = uj.get("dopasuj", "przytnij")
     key_src = wl.file_key(src["plik"]) if src.get("plik") else [src.get("kolor")]
     end = uj.get("koniec", "petla")
+    sdr = wl.sdr(src["plik"]) if src["typ"] == "wideo" else ""     # ujęcie HDR (telefon, stock) → zwykły obraz
     key = wl.digest("scena-v1", key_src, w, h, round(dur, 3), uj.get("od", 0), uj.get("ruch"), mode, draft,
-                    *([end] if end != "petla" else []))
+                    *([end] if end != "petla" else []), *(["sdr"] if sdr else []))
     out = wl.cache_dir("sceny") / f"{key}.mp4"
     if out.exists() and out.stat().st_size > 0:
         return out
@@ -289,7 +290,7 @@ def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -
         loop = ["-stream_loop", "-1"] if short and end != "stop" else []
         hold = f"tpad=stop_mode=clone:stop_duration={dur:.3f}," if short and end == "stop" else ""
         fit = fit_filter(w, h, mode)
-        chain = f"{hold}{fit},fps={wl.FPS},{wl.TV_RANGE},setsar=1"
+        chain = f"{hold}{wl.z_sdr(fit, sdr)},fps={wl.FPS},{wl.TV_RANGE},setsar=1"
         if mode == "rozmyte":
             args = ["-filter_complex", f"[0:v]{chain}[v]", "-map", "[v]"]
         else:

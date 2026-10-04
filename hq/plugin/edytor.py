@@ -578,15 +578,16 @@ def kolor_filter(raw: Any) -> str:
     return ",".join(out)
 
 
-def kolor_pomiar_cmd(src: Path, a: float, b: float, ffmpeg: str = "ffmpeg") -> list[str]:
+def kolor_pomiar_cmd(src: Path, a: float, b: float, ffmpeg: str = "ffmpeg", sdr: str = "") -> list[str]:
     """Pomiar klatek klipu pod „Auto” (signalstats na ~12 klatkach, zdjęcie: jedna klatka); wynik w stderr,
-    czyta go kolor_z_pomiaru."""
+    czyta go kolor_z_pomiaru. `sdr` (probe) = film HDR: mierzymy obraz po przeliczeniu, jak w eksporcie."""
     if media_kind(Path(src)) == "image":
         return [ffmpeg, "-nostdin", "-hide_banner", "-nostats", "-loglevel", "info", "-i", str(src),
                 "-vf", "scale=320:-2,signalstats,metadata=print", "-frames:v", "1", "-f", "null", "-"]
     d = max(0.1, b - a)
     return [ffmpeg, "-nostdin", "-hide_banner", "-nostats", "-loglevel", "info", "-ss", _f(a), "-t", _f(d), "-i", str(src),
-            "-vf", f"fps={min(4.0, max(0.5, 12 / d)):.3f},scale=320:-2,signalstats,metadata=print", "-an", "-f", "null", "-"]
+            "-vf", f"fps={min(4.0, max(0.5, 12 / d)):.3f},scale=320:-2,{sdr + ',' if sdr else ''}signalstats,metadata=print",
+            "-an", "-f", "null", "-"]
 
 
 def kolor_z_pomiaru(log: str) -> dict | None:
@@ -730,8 +731,9 @@ def xfade_graph(tr: list[dict | None], dlug: list[float], F: int) -> list[str]:
 
 def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                   ffmpeg: str = "ffmpeg", karaoke: Path | None = None, typo: dict | None = None,
-                  maska: Path | None = None) -> list[str]:
+                  maska: Path | None = None, sdr: dict | None = None) -> list[str]:
     """Argumenty ffmpeg dla znormalizowanego projektu. `has_audio[src] -> bool` z ffprobe.
+    `sdr[src]` = łańcuch HDR → zwykły obraz z probe() (film HDR z telefonu); stoi za kadrem, przed korekcją koloru.
     `typo` = {"tyl": lista concat, "przod": lista concat}: warstwy typografii (z typo_concat) pod tekstami.
     `maska` = lista concat sylwetek (maska_concat): osoba z filmu wraca nad warstwę „tyl”, więc napis jest za nią."""
     W, H, F = p["canvas"]["w"], p["canvas"]["h"], p["canvas"]["fps"]
@@ -764,7 +766,9 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
         glowa = tr[i - 1]["d"] if i and tr[i - 1] and tr[i - 1]["type"] == "blur" else 0.0
         ogon = tr[i]["d"] if tr[i] and tr[i]["type"] == "blur" else 0.0
         kol = kolor_filter(c.get("color"))      # korekcja koloru po kadrze: obejmuje też rozmyte tło, jak w podglądzie
-        graph.append(f"[{vi}:v]setpts=(PTS-STARTPTS)/{_f(sp)},fps={F},{fit}{',' + kol if kol else ''},setsar=1,format=yuv420p,"
+        hd = (sdr or {}).get(str(c["src"])) if c["kind"] == "video" else ""
+        graph.append(f"[{vi}:v]setpts=(PTS-STARTPTS)/{_f(sp)},fps={F},{fit}{',' + hd if hd else ''}"
+                     f"{',' + kol if kol else ''},setsar=1,format=yuv420p,"
                      + (f"tpad=start_mode=clone:start_duration={_f(brak)}," if brak > 1e-4 else "")
                      + f"tpad=stop_mode=clone:stop_duration={_f(post + 1)},trim=duration={_f(L)},setpts=PTS-STARTPTS"
                      + (rozmycie_przejscia(i, L, F, smax, glowa, ogon) if glowa or ogon else "")
@@ -874,12 +878,64 @@ def obrot(v: dict) -> int:
         return 0
 
 
+# HDR z telefonu → zwykły obraz (SDR, BT.709). Za kajisho5/ffmpeg-skill (MIT, color.py i probe.py): rozpoznanie
+# po znacznikach strumienia i Dolby Vision, łańcuch zscale + tonemap. iPhone nagrywa domyślnie HDR (Dolby Vision
+# z warstwą HLG): bez przeliczenia sama zamiana na yuv420p daje szary, sprany obraz (pomiar na syntetycznym HLG
+# z obrazu testowego: nasycenie 44 zamiast 117, PQ: 25). Krzywa mobius z przejściem 0,5 i bez odbarwiania wraca
+# do 110 przy jasności 123/126; hable przyciemnia (100/126), domyślne desat=2 zabiera kolor (61).
+HDR_TRC = {"smpte2084": "HDR10 (PQ)", "arib-std-b67": "HLG"}
+TONEMAP = "mobius:param=0.5:desat=0"
+_ZSCALE_TRC = {"bt709", "bt2020-10", "bt2020-12", "smpte170m", "bt470bg", "bt470m", "smpte240m", "iec61966-2-1"}
+_ZSCALE_MAT = {"bt709", "bt2020nc", "bt2020c", "smpte170m", "bt470bg", "smpte240m", "fcc", "ycgco"}
+PROBE_KOLOR = "color_transfer,color_primaries,color_space,color_range"
+PROBE_SIDE = "rotation,side_data_type,dv_profile,dv_bl_signal_compatibility_id"
+
+
+def hdr(v: dict) -> dict | None:
+    """Strumień wideo z ffprobe (znaczniki koloru i side_data_list) → opis HDR albo None (zwykły obraz).
+    `tonemap`: sygnał HDR (PQ, HLG, Dolby Vision) do zmapowania; BT.2020 bez HDR potrzebuje tylko zmiany gamy."""
+    trc, prim = v.get("color_transfer") or "", v.get("color_primaries") or ""
+    dovi = next((sd for sd in v.get("side_data_list") or []
+                 if "dv_profile" in sd or "DOVI" in str(sd.get("side_data_type") or "")), None)
+    mat = v.get("color_space") if v.get("color_space") in _ZSCALE_MAT else "bt2020nc"
+    rng = "pc" if v.get("color_range") in ("pc", "jpeg", "full") else "tv"
+    if trc in HDR_TRC or dovi:
+        uwaga = None
+        if dovi:
+            prof = dovi.get("dv_profile")
+            rodzaj = f"Dolby Vision{f' (profil {prof})' if prof is not None else ''}"
+            if trc not in HDR_TRC:          # warstwa bazowa bez znaczników: profil 8.1 to HDR10 (PQ)
+                trc = "smpte2084"
+            if str(prof) == "5":
+                uwaga = "profil 5 nie ma warstwy zgodnej z HDR10/HLG: kolory po przeliczeniu mogą być przesunięte"
+        else:
+            rodzaj = HDR_TRC[trc]
+        return {"rodzaj": rodzaj, "tonemap": True, "trc": trc, "prim": "bt2020", "mat": mat, "range": rng, "uwaga": uwaga}
+    if prim == "bt2020":
+        return {"rodzaj": "BT.2020 (SDR)", "tonemap": False, "trc": trc if trc in _ZSCALE_TRC else "bt709",
+                "prim": "bt2020", "mat": mat, "range": rng, "uwaga": None}
+    return None
+
+
+def sdr_filter(h: dict | None) -> str:
+    """Łańcuch filtrów HDR → SDR BT.709 yuv420p ("" dla zwykłego obrazu). Liczy w float RGB, więc stawiamy go PO
+    skalowaniu do kadru (4K: 8× wolniej przed skalowaniem, po nim ok. 2× czasu samego kadrowania); korekcja koloru
+    i napisy idą za nim, bo zakładają zwykły obraz."""
+    if not h:
+        return ""
+    wej = (f"zscale=tin={h['trc']}:pin={h['prim']}:min={h['mat']}:rin={h['range']}:t=linear:npl=100,"
+           "format=gbrpf32le,zscale=p=bt709")
+    mapa = f",tonemap=tonemap={TONEMAP}" if h["tonemap"] else ""
+    return f"{wej}{mapa},zscale=t=bt709:m=bt709:r=tv,format=yuv420p"
+
+
 def probe(path: Path, ffprobe: str = "ffprobe") -> dict:
-    """Czas, wymiary (tak jak film się wyświetla, po obrocie) i obecność dźwięku (ffprobe). Obraz: wymiary, bez czasu."""
+    """Czas, wymiary (tak jak film się wyświetla, po obrocie) i obecność dźwięku (ffprobe). Obraz: wymiary, bez czasu.
+    `hdr`: rodzaj HDR (np. „HLG”) albo None, `sdr`: łańcuch przeliczenia na zwykły obraz (sdr_filter) albo ""."""
     try:
         r = subprocess.run([ffprobe, "-v", "error", "-show_entries",
-                            "format=duration:stream=codec_type,codec_name,width,height,r_frame_rate"
-                            ":stream_side_data=rotation:stream_tags=rotate",
+                            f"format=duration:stream=codec_type,codec_name,width,height,r_frame_rate,{PROBE_KOLOR}"
+                            f":stream_side_data={PROBE_SIDE}:stream_tags=rotate",
                             "-of", "json", str(path)], capture_output=True, text=True, timeout=20)
         data = json.loads(r.stdout or "{}")
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
@@ -895,9 +951,11 @@ def probe(path: Path, ffprobe: str = "ffprobe") -> dict:
         fps = round(float(a) / float(b), 3) if float(b) else None
     dur = (data.get("format") or {}).get("duration")
     a = next((s for s in streams if s.get("codec_type") == "audio"), {})
+    hd = hdr(v) if v and media_kind(path) == "video" else None
     return {"ok": True, "duration": float(dur) if dur not in (None, "N/A") else None, "w": w, "h": h, "fps": fps,
             "audio": bool(a), "acodec": a.get("codec_name"),
-            "video": bool(v) and media_kind(path) != "audio", "vcodec": v.get("codec_name")}
+            "video": bool(v) and media_kind(path) != "audio", "vcodec": v.get("codec_name"),
+            "hdr": hd and hd["rodzaj"], "sdr": sdr_filter(hd)}
 
 
 def export_name(video: Path) -> Path:
@@ -1145,16 +1203,18 @@ def speech_data(words: list, silences: list, duration: float | None) -> dict:
             "lines": lines_from_words(words)}
 
 
-def proxy_key(src: Path) -> str:
+def proxy_key(src: Path, sdr: str = "") -> str:
     import hashlib
     st = src.stat()
-    return hashlib.sha1(f"{src}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:20]
+    return hashlib.sha1(f"{src}|{st.st_size}|{int(st.st_mtime)}{'|sdr' if sdr else ''}".encode()).hexdigest()[:20]
 
 
-def proxy_command(src: Path, out: Path, ffmpeg: str = "ffmpeg") -> list[str]:
+def proxy_command(src: Path, out: Path, ffmpeg: str = "ffmpeg", sdr: str = "") -> list[str]:
     """Kopia do podglądu, którą odtworzy każda przeglądarka: WebM VP9 do 540 p, klatka kluczowa co 0,5 s
-    (szybkie przewijanie), szybkie kodowanie. Eksport i tak bierze oryginał."""
+    (szybkie przewijanie), szybkie kodowanie. Eksport i tak bierze oryginał. `sdr` (probe): film HDR dostaje
+    podgląd po przeliczeniu kolorów, więc w edytorze widać to samo co w eksporcie."""
     return [ffmpeg, "-nostdin", "-hide_banner", "-y", "-loglevel", "error", "-i", str(src),
-            "-vf", "scale=-2:'min(540,ih)':flags=bilinear,format=yuv420p", "-c:v", "libvpx-vp9", "-deadline", "realtime",
+            "-vf", f"scale=-2:'min(540,ih)':flags=bilinear,{sdr + ',' if sdr else ''}format=yuv420p",
+            "-c:v", "libvpx-vp9", "-deadline", "realtime",
             "-cpu-used", "8", "-row-mt", "1", "-b:v", "1200k", "-g", "15", "-c:a", "libopus", "-b:a", "96k", "-ac", "2",
             "-f", "webm", str(out)]

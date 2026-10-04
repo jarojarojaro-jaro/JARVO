@@ -123,12 +123,13 @@ def arkusze(src: Path, dur: float, out: Path, na_arkusz: int = 24, kolumny: int 
     co = max(5.0, dur / 72)
     n = max(1, int(dur / co))
     out.mkdir(parents=True, exist_ok=True)
+    sdr = ed.probe(src).get("sdr", "")         # nagranie HDR z telefonu: klatki po przeliczeniu, jak w rolce
     wynik = []
     for k, first in enumerate(range(0, n, na_arkusz)):
         cnt = min(na_arkusz, n - first)
         dest = out / f"arkusz-{k + 1}.jpg"
         t0 = first * co
-        base = f"fps=1/{co:.3f},scale=320:-2"
+        base = f"fps=1/{co:.3f},scale=320:-2{',' + sdr if sdr else ''}"
         label = (f",drawtext=text='%{{pts\\:hms\\:{t0:.3f}}}':x=4:y=4:fontsize=16:fontcolor=white:"
                  "box=1:boxcolor=black@0.7:boxborderw=3")
         tile = f",tile={kolumny}x{(cnt + kolumny - 1) // kolumny}:padding=4:color=0x0B0D12"
@@ -818,10 +819,12 @@ def pierwsza_klatka(c0: dict, ocena: dict | None, wz: dict, W: int, H: int, sw: 
 
 
 def zapisz_okladke(src: Path, c: dict, t: float, W: int, H: int, plik: Path) -> bool:
-    """Klatka źródła w kadrze klipu (ten sam filtr co eksport, bez napisów i tytułu) → JPG W×H."""
+    """Klatka źródła w kadrze klipu (ten sam filtr co eksport, bez napisów i tytułu; HDR po przeliczeniu) → JPG W×H."""
+    sdr = ed.probe(src).get("sdr", "")
     try:
         r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t:.3f}", "-i",
-                            str(src), "-vf", ed.cover_filter(W, H, c), "-frames:v", "1", "-q:v", "2", str(plik)],
+                            str(src), "-vf", ed.cover_filter(W, H, c) + (f",{sdr}" if sdr else ""), "-frames:v", "1",
+                            "-q:v", "2", str(plik)],
                            capture_output=True)
     except OSError:
         return False

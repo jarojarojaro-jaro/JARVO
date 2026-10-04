@@ -248,7 +248,7 @@ def _probe(p: Path) -> dict:
 def _media_entry(p: Path) -> dict:
     info = _probe(p)
     return {"path": str(p), "name": p.name, "kind": ed.media_kind(p), "size": p.stat().st_size,
-            "mtime": p.stat().st_mtime, **{k: info.get(k) for k in ("duration", "w", "h", "fps", "audio", "vcodec")}}
+            "mtime": p.stat().st_mtime, **{k: info.get(k) for k in ("duration", "w", "h", "fps", "audio", "vcodec", "hdr")}}
 
 
 @router.get("/edit/info")
@@ -419,7 +419,7 @@ async def edit_kolor_auto(request: Request):
         raise HTTPException(503, "Brak ffmpeg w kontenerze")
     a = ed._num(body.get("in"), 0, ed.MAX_DURATION, 0)
     b = ed._num(body.get("out"), a, ed.MAX_DURATION, a + 3)
-    code, log = await _proc(*ed.kolor_pomiar_cmd(src, a, b, t["ffmpeg"]), timeout=180)
+    code, log = await _proc(*ed.kolor_pomiar_cmd(src, a, b, t["ffmpeg"], sdr=_probe(src).get("sdr", "")), timeout=180)
     wynik = ed.kolor_z_pomiaru(log) if code == 0 else None
     if not wynik:
         raise HTTPException(500, "Nie udało się zmierzyć klatek klipu")
@@ -627,14 +627,16 @@ async def edit_speech(request: Request):
 
 
 # kopia podglądowa (WebM VP9) dla filmów, których kodeka przeglądarka nie odtwarza (np. Chromium bez H.264)
+# i dla filmów HDR z telefonu: podgląd po przeliczeniu kolorów, jak eksport (przeglądarka pokazałaby oryginał HDR)
 def _proxy_file(src: Path) -> Path:
-    return core.JARVO_DIR / "state" / "edytor" / "proxy" / f"{ed.proxy_key(src)}.webm"
+    return core.JARVO_DIR / "state" / "edytor" / "proxy" / f"{ed.proxy_key(src, _probe(src).get('sdr', ''))}.webm"
 
 
 async def _run_proxy(job: dict, src: Path, out: Path) -> None:
     part = out.with_name(f".{out.stem}.part.webm")
     try:
-        code, err = await _proc(*ed.proxy_command(src, part, ffmpeg=ed.tools()["ffmpeg"]), timeout=3600)
+        code, err = await _proc(*ed.proxy_command(src, part, ffmpeg=ed.tools()["ffmpeg"], sdr=_probe(src).get("sdr", "")),
+                                timeout=3600)
         if code != 0 or not part.is_file():
             raise RuntimeError((err.strip().splitlines() or [f"ffmpeg: kod {code}"])[-1][:300])
         part.replace(out)
@@ -833,13 +835,14 @@ async def edit_export(request: Request):
             cv = proj["canvas"]
             layer = ed.karaoke_concat(proj, kara, ed.blank_png(tmpdir / "pusty.png", cv["w"], cv["h"]), tmpdir / "karaoke.ffconcat")
         typo = _typo_warstwy(body.get("typo"), proj, tmpdir)
-        has_audio = {}
+        has_audio, sdr = {}, {}
         for c in proj["clips"]:
             if c["kind"] == "video" and str(c["src"]) not in has_audio:
-                has_audio[str(c["src"])] = (await asyncio.to_thread(ed.probe, c["src"])).get("audio", False)
+                info = await asyncio.to_thread(ed.probe, c["src"])
+                has_audio[str(c["src"])], sdr[str(c["src"])] = info.get("audio", False), info.get("sdr", "")
         out = ed.export_name(p)
         maska = ed.maska_concat(p, body.get("project") or {}, proj, tmpdir) if typo.get("tyl") else None
-        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"], karaoke=layer, typo=typo, maska=maska)
+        cmd = ed.build_command(proj, has_audio, files, out, ffmpeg=t["ffmpeg"], karaoke=layer, typo=typo, maska=maska, sdr=sdr)
     except (ed.ProjectError, ValueError) as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(400, str(exc))

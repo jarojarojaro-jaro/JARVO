@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.1.0
+version: 1.1.1
 author: Jarvo
 license: MIT
 metadata:
@@ -27,7 +27,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    --arkusz out/wideo/<film>/qa.jpg --json`.
    Sprawdza też pojedyncze „mrugnięcia” (jedna klatka inna niż obie sąsiednie): obejrzyj te chwile i popraw scenę.
    Błąd (`bledy`) = poprawka przed oceną; typowe: głośność → `montaz.py glosnosc`, format → ponowny render,
-   czarny początek → pierwsza scena z obrazem.
+   czarny początek → pierwsza scena z obrazem, film w HDR → `montaz.py napraw` (przelicza na zwykły obraz).
    - ✅ Punkt kontrolny: `ok: true`.
 1b. **Animacja HTML (nasz kontrakt, `--preset jarvo`):** `python3 $HERMES_HOME/scripts/html_wideo.py pomiar <strona>
    --preset jarvo --dlugosc <s> --platforma <…>` mierzy z DOM i klatek: czas czytania, tekst poza kadrem i pod UI

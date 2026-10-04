@@ -73,7 +73,8 @@ def main(argv: list[str] | None = None) -> int:
                 shutil.copy2(args.font_plik, Path(tmp) / "fonts")
                 extra = ":fontsdir=fonts"
             audio = ["-c:a", "copy"] if wl.probe(video)["audio"] else []
-            wl.run(["ffmpeg", "-y", "-i", str(video.resolve()), "-vf", f"ass=n.ass{extra},{wl.TV_RANGE}", "-c:v", "libx264", "-preset", "medium",
+            vf = wl.z_sdr(wl.sdr(video), f"ass=n.ass{extra}")      # film HDR: napisy na obrazie po przeliczeniu
+            wl.run(["ffmpeg", "-y", "-i", str(video.resolve()), "-vf", f"{vf},{wl.TV_RANGE}", "-c:v", "libx264", "-preset", "medium",
                     "-crf", "19", "-pix_fmt", "yuv420p", *wl.ENC_LIMITS, *audio, "-movflags", "+faststart", str(out.resolve())],
                    cwd=Path(tmp))
         result["wideo"] = str(out)

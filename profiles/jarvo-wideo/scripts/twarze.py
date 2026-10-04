@@ -234,7 +234,9 @@ def siatka(od: float, do: float, co: float = CO) -> list[float]:
 
 
 def klatki(src: Path, chwile: list[float], w: int, h: int):
-    """(chwila, RGB w×h) dla chwil siatki; jeden ffmpeg na ciąg sąsiednich chwil (fps = 1/co)."""
+    """(chwila, RGB w×h) dla chwil siatki; jeden ffmpeg na ciąg sąsiednich chwil (fps = 1/co). Nagranie HDR
+    z telefonu: klatki po przeliczeniu na zwykły obraz (ostrość i oczy liczone jak na rolce)."""
+    sdr = (wl.probe(src).get("video") or {}).get("sdr") or ""
     i = 0
     while i < len(chwile):
         j = i
@@ -243,7 +245,7 @@ def klatki(src: Path, chwile: list[float], w: int, h: int):
         co = (chwile[j] - chwile[i]) / (j - i) if j > i else 1.0
         n = j - i + 1
         r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-ss", f"{chwile[i]:.3f}",
-                            "-i", str(src), "-vf", f"fps={1 / co:.6f},scale={w}:{h}", "-frames:v", str(n),
+                            "-i", str(src), "-vf", wl.z_sdr(f"fps={1 / co:.6f},scale={w}:{h}", sdr), "-frames:v", str(n),
                             "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True)
         size = w * h * 3
         for k in range(min(n, len(r.stdout) // size)):
@@ -327,7 +329,8 @@ def ocen(src: Path, chwile: list[float]) -> dict:
     det, out = Detektor(), []
     for t in sorted(chwile):           # każda chwila osobno: pierwsza klatka od t, jak w eksporcie klipu od `in` = t
         r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-ss", f"{t:.3f}", "-i", str(src),
-                            "-vf", f"scale={w}:{h}", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                            "-vf", wl.z_sdr(f"scale={w}:{h}", v.get("sdr") or ""), "-frames:v", "1", "-f", "rawvideo",
+                            "-pix_fmt", "rgb24", "-"],
                            capture_output=True, check=True)
         if len(r.stdout) < w * h * 3:
             continue

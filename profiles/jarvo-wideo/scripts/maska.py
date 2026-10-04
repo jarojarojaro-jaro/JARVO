@@ -85,6 +85,7 @@ def klatki_osi(proj: dict, numery: list[int], fps: float, w: int, h: int):
     """(numer klatki osi, RGB w×h) dla podanych numerów; jeden ffmpeg na ciągły odcinek w jednym klipie."""
     lay = pr.layout(proj["clips"])
     numery = sorted(set(numery))
+    sdr_src: dict[str, str] = {}
     i = 0
     while i < len(numery):
         t0 = numery[i] / fps
@@ -96,8 +97,11 @@ def klatki_osi(proj: dict, numery: list[int], fps: float, w: int, h: int):
         sp = float(c.get("speed") or 1)
         u = float(c["in"]) + (t0 - s) * sp
         src = ["-i", str(c["src"])] if c.get("kind") == "image" else ["-ss", f"{max(0.0, u):.3f}", "-i", str(c["src"])]
-        chain = f"[0:v]setpts=(PTS-STARTPTS)/{sp},fps={fps},{dopasowanie(c, w, h)}" if c.get("kind") != "image" \
-            else f"[0:v]{dopasowanie(c, w, h)}"
+        if c.get("kind") != "image" and str(c["src"]) not in sdr_src:     # HDR: sylwetka z obrazu po przeliczeniu
+            sdr_src[str(c["src"])] = ed.probe(Path(c["src"])).get("sdr", "")
+        sdr = sdr_src.get(str(c["src"]), "")
+        chain = f"[0:v]setpts=(PTS-STARTPTS)/{sp},fps={fps},{dopasowanie(c, w, h)}{',' + sdr if sdr else ''}" \
+            if c.get("kind") != "image" else f"[0:v]{dopasowanie(c, w, h)}"
         r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", *src, "-filter_complex", chain,
                             "-frames:v", str(1 if c.get("kind") == "image" else n), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                            capture_output=True, check=True)

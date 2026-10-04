@@ -70,6 +70,7 @@ def pozycje_ciec(ranges: list[tuple[float, float]]) -> list[float]:
 
 def cut(src: Path, ranges: list[tuple[float, float]], out: Path) -> Path:
     audio = has_audio(src)
+    sdr = wl.sdr(src)                  # film HDR z telefonu → zwykły obraz (bez tego wychodzi szary i sprany)
     fc, labels = [], []
     for i, (a, b) in enumerate(ranges):
         fc.append(f"[0:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS[v{i}]")
@@ -80,7 +81,7 @@ def cut(src: Path, ranges: list[tuple[float, float]], out: Path) -> Path:
             labels.append(f"[a{i}]")
     n = len(ranges)
     fc.append("".join(labels) + f"concat=n={n}:v=1:a={1 if audio else 0}[vc]" + ("[a]" if audio else ""))
-    fc.append(f"[vc]{wl.TV_RANGE}[v]")
+    fc.append(f"[vc]{wl.z_sdr(sdr, wl.TV_RANGE)}[v]")
     maps = ["-map", "[v]"] + (["-map", "[a]"] if audio else [])
     out.parent.mkdir(parents=True, exist_ok=True)
     wl.run(["ffmpeg", "-y", "-i", str(src), "-filter_complex", ";".join(fc), *maps, *ENC, str(out)])
@@ -90,13 +91,14 @@ def cut(src: Path, ranges: list[tuple[float, float]], out: Path) -> Path:
 def reframe(src: Path, out: Path, fmt: str, x: float, mode: str) -> Path:
     w, h = wl.parse_format(fmt)
     x = min(1.0, max(0.0, x))
+    sdr = wl.sdr(src)                  # HDR → zwykły obraz po kadrze (w kadrze 1080 p, nie w 4K źródła)
     if mode == "rozmyte":
         fc = (f"[0:v]split[a][b];[a]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},boxblur=24:2,"
               f"eq=brightness=-0.08[bg];[b]scale={w}:{h}:force_original_aspect_ratio=decrease[fg];"
-              f"[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1,{wl.TV_RANGE}[v]")
+              f"[bg][fg]overlay=(W-w)/2:(H-h)/2,{wl.z_sdr('setsar=1', sdr)},{wl.TV_RANGE}[v]")
     else:
         fc = (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos,"
-              f"crop={w}:{h}:x=(iw-{w})*{x:.3f}:y=(ih-{h})/2,setsar=1,{wl.TV_RANGE}[v]")
+              f"crop={w}:{h}:x=(iw-{w})*{x:.3f}:y=(ih-{h})/2,{wl.z_sdr('setsar=1', sdr)},{wl.TV_RANGE}[v]")
     maps = ["-map", "[v]"] + (["-map", "0:a"] if has_audio(src) else [])
     out.parent.mkdir(parents=True, exist_ok=True)
     wl.run(["ffmpeg", "-y", "-i", str(src), "-filter_complex", fc, *maps, *ENC, str(out)])
@@ -154,7 +156,7 @@ def fix(src: Path, out: Path) -> Path:
     """Film z zewnętrznego silnika → standard platform: yuv420p w zakresie TV, H.264, AAC, faststart (dźwięk bez zmian)."""
     audio = ["-c:a", "aac", "-b:a", "192k"] if has_audio(src) else []
     out.parent.mkdir(parents=True, exist_ok=True)
-    wl.run(["ffmpeg", "-y", "-i", str(src), "-vf", wl.TV_RANGE, "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+    wl.run(["ffmpeg", "-y", "-i", str(src), "-vf", wl.z_sdr(wl.sdr(src), wl.TV_RANGE), "-c:v", "libx264", "-preset", "medium", "-crf", "18",
             *wl.ENC_LIMITS, *audio, "-movflags", "+faststart", str(out)])
     return out
 

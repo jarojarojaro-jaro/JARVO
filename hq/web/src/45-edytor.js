@@ -236,6 +236,8 @@ const edUrls = new Map();       // src → Promise<blob url>
 const CODEC_TYPE = { h264: 'video/mp4; codecs="avc1.42E01E"', hevc: 'video/mp4; codecs="hvc1.1.6.L93.B0"', vp9: 'video/webm; codecs="vp9"',
   vp8: 'video/webm; codecs="vp8"', av1: 'video/mp4; codecs="av01.0.05M.08"' };
 function canPlayVideo(m) {
+  // film HDR z telefonu: podgląd z kopii po przeliczeniu kolorów, tak jak eksport (przeglądarka pokazałaby oryginał HDR)
+  if (m && m.kind === "video" && m.hdr) return false;
   if (!m || m.kind !== "video" || !m.vcodec) return true;
   const type = CODEC_TYPE[m.vcodec];
   try { return !!type && document.createElement("video").canPlayType(type) !== ""; } catch (_) { return true; }
@@ -2192,7 +2194,7 @@ function VideoEditor({ path, onClose }) {
         <img ref=${player.imgs[k]} class="thq-ed-v" alt=""/>
       </div>`)}
       <canvas ref=${player.pixRef} class="thq-ed-pix" aria-hidden="true"></canvas>
-      ${proxying > 0 && html`<p class="thq-ed-codec is-info"><span class="thq-ed-spin is-small"></span> ${L("Przygotowuję podgląd dla tej przeglądarki (kopia WebM na serwerze, raz)…", "Preparing a preview this browser can play (one-time WebM copy)…")}</p>`}
+      ${proxying > 0 && html`<p class="thq-ed-codec is-info"><span class="thq-ed-spin is-small"></span> ${L("Przygotowuję podgląd (kopia WebM na serwerze, raz; film HDR z telefonu po przeliczeniu kolorów)…", "Preparing a preview (one-time WebM copy; phone HDR video with converted colours)…")}</p>`}
       <canvas ref=${overlayRef} class="thq-ed-overlay" onPointerDown=${stagePointer}></canvas>
       ${shot && html`<div class=${cx("thq-ed-shot", shot.a && "is-drag", shot.busy && "is-busy")} onPointerDown=${shot.busy ? null : shotDown}>
         ${shot.a && html`<i style=${{ left: `${Math.min(shot.a.x, shot.b.x) * 100}%`, top: `${Math.min(shot.a.y, shot.b.y) * 100}%`,

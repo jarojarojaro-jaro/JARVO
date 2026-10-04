@@ -1,7 +1,7 @@
 ---
 name: montaz-nagran
 description: "Montaż nagrań: cięcie, cisza, kadr 9:16, dźwięk, napisy."
-version: 1.2.0
+version: 1.2.1
 author: Jarvo
 license: MIT
 metadata:
@@ -34,6 +34,9 @@ zostaw jego napisy albo zapytaj o wersję „czystą”.
 ## Kroki
 1. **Przegląd:** `qa_wideo.py <nagranie>` (rozdzielczość, fps, głośność) i `kadry.py arkusz <nagranie> --klatek 6`
    → `vision_analyze`: gdzie jest obiekt/osoba w kadrze, jakość, wpadki widoczne w obrazie.
+   Nagranie HDR z telefonu (`qa_wideo.py` pisze „film w HDR”): nic nie robisz, `montaz.py` (wytnij, cisza, kadr,
+   napraw), `napisy.py` i `projekt.py render` przeliczają je na zwykły obraz same; `glosnosc` kopiuje obraz, więc
+   na samym HDR najpierw `napraw`.
 2. **Transkrypcja** (gdy jest mowa): `montaz.py transkrypcja <nagranie> -o out/wideo/src/transkrypcja`
    → `.txt` z czasami: wpadki, powtórzenia, fragmenty do wycięcia.
 3. **Cięcie:** `montaz.py wytnij <nagranie> -o out/wideo/src/ciecie.mp4 --zakresy "0:03-0:41.5,0:47-1:20"`.
