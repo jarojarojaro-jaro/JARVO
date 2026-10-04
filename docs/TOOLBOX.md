@@ -126,6 +126,7 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 | [video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) | kinowe filmy produktu: 152 przepisy ujęć, szablon | Apache-2.0 | 2026-09 | `narzedzia.py instaluj shotcraft` |
 | [bang-motion](https://github.com/bangtutorial/bang-motion) | openery, promo, explainery z wyglądem z marki | MIT | 2026-09 | skill |
 | [pixel2motion](https://github.com/nolangz/pixel2motion) | logo z obrazka → animacja SVG / GIF / MP4 | MIT | 2026-09 | skill |
+| [live-panel](https://github.com/ythx-101/live-panel-skill) | żywy schemat z JSON: układ stoi, kropki po strzałkach, kroki, log, liczniki; strona offline i MP4 | MIT | 2026-10 | skill + `zywy_schemat.py`, `html_wideo.py --preset livepanel` |
 | [lottie](https://github.com/diffusionstudio/lottie) | animacje Lottie na strony i aplikacje | MIT | 2026-09 | skill (Wideograf + Web) |
 | [screenwriting-skills](https://github.com/jtydhr88/screenwriting-skills) | premisa, scena, dialog, konflikt (do `scenariusz`) | MIT | 2026-09 | skille |
 | [Manim CE](https://github.com/ManimCommunity/manim) | animacje edukacyjne i matematyczne (skill [H] `manim-video`, dodatek `manim`) | MIT | 2026-09 | CLI |

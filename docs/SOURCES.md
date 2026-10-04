@@ -61,6 +61,7 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [diffusionstudio/lottie](https://github.com/diffusionstudio/lottie) | `3c72912` | MIT | Wideograf, Web (text-to-lottie) |
 | [nolangz/pixel2motion](https://github.com/nolangz/pixel2motion) | `e9faedb` | MIT | Wideograf (logo → animacja SVG) |
 | [bangtutorial/bang-motion](https://github.com/bangtutorial/bang-motion) | `c1aa65e` | MIT | Wideograf (motion graphics z marki) |
+| [ythx-101/live-panel-skill](https://github.com/ythx-101/live-panel-skill) | `8a70aa2` | MIT (projekty odtworzone w przykładach należą do ich autorów) | Wideograf (żywe schematy: szablon strony i gramatyka ruchu; bez filmów przykładów) |
 | [iart-ai/kinetic-typography-skills](https://github.com/iart-ai/kinetic-typography-skills) `fccc94b`, [iart-ai/data-animation-skills](https://github.com/iart-ai/data-animation-skills) `8ce2709`, [iart-ai/tiktok-video-skills](https://github.com/iart-ai/tiktok-video-skills) `2a77533` | jw. | MIT | Wideograf (typografia, wykresy, belki, odliczanie) |
 | [jtydhr88/screenwriting-skills](https://github.com/jtydhr88/screenwriting-skills) | `357d134` | MIT | Wideograf (5 skilli warsztatu do `scenariusz`) |
 | [greensock/gsap-skills](https://github.com/greensock/gsap-skills) | `aed9cfd` | MIT | Wideograf, Web (8 skilli GSAP) |

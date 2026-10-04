@@ -27,6 +27,8 @@ wyjatki:
      powod: "przekazuje środowisko do podprocesu ewaluacji, bez zmiennej CLAUDECODE"}
   - {zrodlo: hyperframes, rev: 8798e40, skill: skills/media-use, regula: "hermes:python_os_environ", plik: "audio/scripts/lib/gemini-auth*.py",
      powod: "odczyt klucza Gemini ze zmiennej GCS_CREDS i testy tej funkcji; floty nie dotyczy (nie mamy klucza Gemini)"}
+  - {zrodlo: live-panel, rev: 8a70aa2, skill: ., regula: "hermes:python_os_environ", plik: scripts/livepanel.py,
+     powod: "kopia środowiska + numery potoków LP_R/LP_W dla `sh -c exec chrome 3<&… 4>&…` (DevTools przez potok), nic nie wychodzi"}
 
   # --- sieć lokalna i oficjalne API w przykładach
   - {zrodlo: anthropic-skills, rev: "3337550", skill: skills/webapp-testing, regula: gniazdo, plik: scripts/with_server.py,
@@ -63,6 +65,8 @@ wyjatki:
      plik: references/standalone-harness.md, powod: "przykład HTML: komentarz CSS i względne ścieżki do skryptów playera w repo upstreamu"}
 
   # --- kod silników
+  - {zrodlo: live-panel, rev: 8a70aa2, skill: ., regula: [eval, "hermes:eval_string"], plik: "scripts/*.py",
+     powod: "metoda `Chrome.eval` = Runtime.evaluate w Chrome bez okna; wyrażenia to stałe JS (`window.__check()`, `window.__ready`), nie eval w Pythonie"}
   - {zrodlo: anidoodle, rev: f335700, skill: skills/anidoodle, regula: "hermes:dump_all_env", plik: "engine/src/*",
      powod: "typ `Env` silnika canvas (wymiary, cache płótna), nie zmienne środowiskowe"}
   - {zrodlo: motion-graphics, rev: e8d610a, skill: skills/motion-broll, regula: ["hermes:python_os_system", "hermes:python_os_popen"],

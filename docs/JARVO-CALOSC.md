@@ -62,7 +62,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | Gabinet śledczy (`study`) | sherlock | 8 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | Pracownia webowa (`devlab`) | web | 10 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, copy PL, kampanie, kalendarze | Atelier kreatywne (`atelier`) | studio | 6 |
-| 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, typografia jak z montażu, filmy z kodu, maskotka | Studio filmowe (`filmstudio`) | wideo | 16 |
+| 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, typografia jak z montażu, filmy z kodu, żywe schematy, maskotka | Studio filmowe (`filmstudio`) | wideo | 17 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem | Sala operacyjna (`office`) | ads | 10 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 7 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 10 |
@@ -122,7 +122,10 @@ kontrast, czarne przerwy, martwe odcinki, rytm; „gotowe” tylko z pełnym i a
 dalej i kursywą), kolory bierze z kadru (dwa akcenty w kontraście ze sceną, np. niebo → ciemna czerwień i złoto,
 na zmianę po mocnych słowach), styl filmu wybiera z 13 według rodzaju nagrania (podcast z obrysem, vlog, tech,
 magazyn i inne; karty stylów w HQ), mocne słowo staje za osobą (maska MODNet), a plan zostaje
-w projekcie montażu do poprawek w HQ; gotowego planu nie nadpisuje bez wyraźnej prośby.
+w projekcie montażu do poprawek w HQ; gotowego planu nie nadpisuje bez wyraźnej prośby. Żywy schemat (`zywy_schemat.py`,
+skill `zywy-schemat`, silnik strony live-panel, MIT): flota, przepływ zlecenia albo architektura jako film, w którym
+układ stoi, a kropki płyną po strzałkach i kroki podświetlają się po kolei; formaty X, Instagram, pion, motywy
+w kolorach Jarva, kroje lokalnie, kontrola układu i `html_wideo.py pomiar` przed filmem.
 
 ---
 

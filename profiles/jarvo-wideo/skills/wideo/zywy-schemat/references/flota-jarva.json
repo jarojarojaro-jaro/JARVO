@@ -1,0 +1,2383 @@
+{
+ "meta": {
+  "title": "Jak działa flota Jarva",
+  "lang": "pl"
+ },
+ "canvas": {
+  "preset": "ig",
+  "duration": 28,
+  "fps": 30
+ },
+ "theme": {
+  "preset": "jarvo-jasny"
+ },
+ "credit": {
+  "text": "Misja i kolejność poglądowe · flota JARVO: 9 agentów (fleet.yaml) · ruch: live-panel (MIT)",
+  "y": 1204,
+  "size": 13
+ },
+ "machines": {
+  "seq": {
+   "type": "cycle",
+   "period": 3.5,
+   "t0": 0,
+   "values": [
+    "plan",
+    "sherlock",
+    "studio",
+    "wideograf",
+    "web",
+    "ads",
+    "recenzja",
+    "wynik"
+   ]
+  }
+ },
+ "elements": [
+  {
+   "type": "text",
+   "x": 65,
+   "y": 148,
+   "w": 950,
+   "align": "center",
+   "size": 44,
+   "b": 1,
+   "c": "ink",
+   "t": "Jak działa flota Jarva"
+  },
+  {
+   "type": "text",
+   "x": 65,
+   "y": 192,
+   "w": 950,
+   "align": "center",
+   "size": 18,
+   "c": "dim",
+   "t": "9 agentów: Jarvo prowadzi, 8 specjalistów robi"
+  },
+  {
+   "type": "box",
+   "x": 300,
+   "y": 218,
+   "w": 480,
+   "h": 68,
+   "color": "gy",
+   "fill": "gyf",
+   "pad": [
+    9,
+    8,
+    8
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "👤 Ty: zlecenie",
+     "size": 20,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "na Telegramie albo w HQ, zwykłym językiem",
+     "size": 14,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0,
+     7
+    ]
+   },
+   "then": {
+    "glow": "ak",
+    "border": 2.6,
+    "color": "ak"
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     540,
+     286
+    ],
+    [
+     540,
+     326
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "box",
+   "x": 300,
+   "y": 326,
+   "w": 480,
+   "h": 100,
+   "color": "ak",
+   "fill": "akf",
+   "pad": [
+    9,
+    8,
+    8
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "🛰️ Jarvo",
+     "size": 23,
+     "b": 1,
+     "c": "rdt"
+    },
+    {
+     "t": "przyjmuje zlecenie, zakłada misję",
+     "size": 15,
+     "c": "fg"
+    },
+    {
+     "t": "i rozbija ją na karty kanbana",
+     "size": 15,
+     "c": "fg"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0,
+     6
+    ]
+   },
+   "then": {
+    "glow": "ak",
+    "border": 2.6,
+    "color": "ak"
+   }
+  },
+  {
+   "type": "box",
+   "x": 65,
+   "y": 326,
+   "w": 190,
+   "h": 100,
+   "color": "bl",
+   "fill": "blf",
+   "pad": [
+    12,
+    6,
+    6
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "📚 Skarbiec wiedzy",
+     "size": 16,
+     "b": 1,
+     "c": "blt"
+    },
+    {
+     "t": "skille, decyzje, lekcje",
+     "size": 13,
+     "c": "fg"
+    },
+    {
+     "t": "czytany przed pracą",
+     "size": 13,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0,
+     7
+    ]
+   },
+   "then": {
+    "glow": "bl",
+    "border": 2.6,
+    "color": "bl"
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     255,
+     360
+    ],
+    [
+     300,
+     360
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 9,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     300,
+     392
+    ],
+    [
+     255,
+     392
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 9,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     7
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "box",
+   "x": 825,
+   "y": 326,
+   "w": 190,
+   "h": 100,
+   "color": "yl",
+   "fill": "ylf",
+   "pad": [
+    12,
+    6,
+    6
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "📋 Kanban",
+     "size": 16,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "karta: cel, DoD, agent",
+     "size": 13,
+     "c": "fg"
+    },
+    {
+     "t": "1 karta = 1 zadanie",
+     "size": 13,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0
+    ]
+   },
+   "then": {
+    "glow": "yl",
+    "border": 2.6,
+    "color": "yl"
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     780,
+     376
+    ],
+    [
+     825,
+     376
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 9,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     540,
+     426
+    ],
+    [
+     540,
+     462
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     120,
+     462
+    ],
+    [
+     960,
+     462
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     120,
+     628
+    ],
+    [
+     960,
+     628
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     540,
+     628
+    ],
+    [
+     540,
+     664
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "box",
+   "x": 65,
+   "y": 498,
+   "w": 110,
+   "h": 100,
+   "color": "bl",
+   "fill": "blf",
+   "pad": [
+    8,
+    3,
+    3
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "🔎",
+     "size": 28,
+     "h": 1.55
+    },
+    {
+     "t": "Sherlock",
+     "size": 15,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "research",
+     "size": 12.5,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     1
+    ]
+   },
+   "then": {
+    "glow": "ak",
+    "border": 2.6,
+    "color": "ak"
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     120,
+     462
+    ],
+    [
+     120,
+     498
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 8,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     1
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     120,
+     598
+    ],
+    [
+     120,
+     628
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     1
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "box",
+   "x": 185,
+   "y": 498,
+   "w": 110,
+   "h": 100,
+   "color": "tl",
+   "fill": "tlf",
+   "pad": [
+    8,
+    3,
+    3
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "🌐",
+     "size": 28,
+     "h": 1.55
+    },
+    {
+     "t": "Web",
+     "size": 15,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "strony",
+     "size": 12.5,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     4
+    ]
+   },
+   "then": {
+    "glow": "ak",
+    "border": 2.6,
+    "color": "ak"
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     240,
+     462
+    ],
+    [
+     240,
+     498
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 8,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     4
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     240,
+     598
+    ],
+    [
+     240,
+     628
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     4
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "box",
+   "x": 305,
+   "y": 498,
+   "w": 110,
+   "h": 100,
+   "color": "or",
+   "fill": "orf",
+   "pad": [
+    8,
+    3,
+    3
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "🎬",
+     "size": 28,
+     "h": 1.55
+    },
+    {
+     "t": "Studio",
+     "size": 15,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "posty, copy",
+     "size": 12.5,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     2
+    ]
+   },
+   "then": {
+    "glow": "ak",
+    "border": 2.6,
+    "color": "ak"
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     360,
+     462
+    ],
+    [
+     360,
+     498
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 8,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     2
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     360,
+     598
+    ],
+    [
+     360,
+     628
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     2
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "box",
+   "x": 425,
+   "y": 498,
+   "w": 110,
+   "h": 100,
+   "color": "pu",
+   "fill": "puf",
+   "pad": [
+    8,
+    3,
+    3
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "🎥",
+     "size": 28,
+     "h": 1.55
+    },
+    {
+     "t": "Wideograf",
+     "size": 15,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "filmy",
+     "size": 12.5,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     3
+    ]
+   },
+   "then": {
+    "glow": "ak",
+    "border": 2.6,
+    "color": "ak"
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     480,
+     462
+    ],
+    [
+     480,
+     498
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 8,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     3
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     480,
+     598
+    ],
+    [
+     480,
+     628
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     3
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "box",
+   "x": 545,
+   "y": 498,
+   "w": 110,
+   "h": 100,
+   "color": "yl",
+   "fill": "ylf",
+   "pad": [
+    8,
+    3,
+    3
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "📈",
+     "size": 28,
+     "h": 1.55
+    },
+    {
+     "t": "Ads",
+     "size": 15,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "reklamy",
+     "size": 12.5,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     5
+    ]
+   },
+   "then": {
+    "glow": "ak",
+    "border": 2.6,
+    "color": "ak"
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     600,
+     462
+    ],
+    [
+     600,
+     498
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 8,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     5
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     600,
+     598
+    ],
+    [
+     600,
+     628
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     5
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "box",
+   "x": 665,
+   "y": 498,
+   "w": 110,
+   "h": 100,
+   "color": "gn",
+   "fill": "gnf",
+   "pad": [
+    8,
+    3,
+    3
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "🎯",
+     "size": 28,
+     "h": 1.55
+    },
+    {
+     "t": "Łowca",
+     "size": 15,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "leady",
+     "size": 12.5,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     720,
+     462
+    ],
+    [
+     720,
+     498
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 8
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     720,
+     598
+    ],
+    [
+     720,
+     628
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false
+  },
+  {
+   "type": "box",
+   "x": 785,
+   "y": 498,
+   "w": 110,
+   "h": 100,
+   "color": "mc",
+   "fill": "mcf",
+   "pad": [
+    8,
+    3,
+    3
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "📱",
+     "size": 28,
+     "h": 1.55
+    },
+    {
+     "t": "Aplikacje",
+     "size": 15,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "mobilne",
+     "size": 12.5,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     840,
+     462
+    ],
+    [
+     840,
+     498
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 8
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     840,
+     598
+    ],
+    [
+     840,
+     628
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false
+  },
+  {
+   "type": "box",
+   "x": 905,
+   "y": 498,
+   "w": 110,
+   "h": 100,
+   "color": "gy",
+   "fill": "gyf",
+   "pad": [
+    8,
+    3,
+    3
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "🦾",
+     "size": 28,
+     "h": 1.55
+    },
+    {
+     "t": "Prawa ręka",
+     "size": 15,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "zadania",
+     "size": 12.5,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     960,
+     462
+    ],
+    [
+     960,
+     498
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 8
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     960,
+     598
+    ],
+    [
+     960,
+     628
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "arrow": false
+  },
+  {
+   "type": "box",
+   "x": 300,
+   "y": 664,
+   "w": 480,
+   "h": 84,
+   "color": "gn",
+   "fill": "gnf",
+   "pad": [
+    7,
+    8,
+    8
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "✅ Recenzja Jarva",
+     "size": 18,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "Definition of Done, jakość, źródła;",
+     "size": 14,
+     "c": "fg"
+    },
+    {
+     "t": "poprawki wracają do agenta",
+     "size": 14,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     6
+    ]
+   },
+   "then": {
+    "glow": "gn",
+    "border": 2.6,
+    "color": "gn"
+   }
+  },
+  {
+   "type": "path",
+   "points": [
+    [
+     540,
+     748
+    ],
+    [
+     540,
+     784
+    ]
+   ],
+   "color": "line",
+   "width": 2.0,
+   "r": 8,
+   "head": 10,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     7
+    ]
+   },
+   "then": {
+    "color": "ak",
+    "width": 3.2
+   }
+  },
+  {
+   "type": "box",
+   "x": 300,
+   "y": 784,
+   "w": 480,
+   "h": 66,
+   "color": "gy",
+   "fill": "gyf",
+   "pad": [
+    9,
+    8,
+    8
+   ],
+   "align": "center",
+   "lines": [
+    {
+     "t": "📦 Wynik u Ciebie",
+     "size": 18,
+     "b": 1,
+     "c": "ink"
+    },
+    {
+     "t": "pliki i raport; wydatki tylko za Twoją zgodą",
+     "size": 14,
+     "c": "dim"
+    }
+   ],
+   "radius": 10,
+   "border": 1.5,
+   "when": {
+    "var": "seq.i",
+    "in": [
+     7
+    ]
+   },
+   "then": {
+    "glow": "ak",
+    "border": 2.6,
+    "color": "ak"
+   }
+  },
+  {
+   "type": "box",
+   "x": 65,
+   "y": 874,
+   "w": 950,
+   "h": 262,
+   "color": "gy",
+   "fill": "wh",
+   "pad": [
+    8,
+    6,
+    6
+   ],
+   "align": "left",
+   "lines": [
+    {
+     "t": "Misja (przykład): premiera nowego produktu",
+     "size": 17,
+     "b": 1,
+     "c": "ink",
+     "align": "left",
+     "indent": 10,
+     "h": 1.4
+    },
+    {
+     "align": "left",
+     "indent": 10,
+     "when": {
+      "var": "seq.i",
+      "eq": 0
+     },
+     "then": {
+      "bg": "akf"
+     },
+     "h": 1.12,
+     "items": [
+      {
+       "w": 56,
+       "runs": [
+        {
+         "t": "1.",
+         "size": 15,
+         "c": "dim",
+         "when": {
+          "var": "seq.i",
+          "eq": 0
+         },
+         "then": {
+          "c": "rdt",
+          "b": 1
+         }
+        }
+       ]
+      },
+      {
+       "w": 170,
+       "runs": [
+        {
+         "t": "🛰️ Jarvo",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 0
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      },
+      {
+       "grow": 1,
+       "runs": [
+        {
+         "t": "misja i 5 kart; najpierw skarbiec: co już wiemy",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 0
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "align": "left",
+     "indent": 10,
+     "when": {
+      "var": "seq.i",
+      "eq": 1
+     },
+     "then": {
+      "bg": "akf"
+     },
+     "h": 1.12,
+     "items": [
+      {
+       "w": 56,
+       "runs": [
+        {
+         "t": "2.",
+         "size": 15,
+         "c": "dim",
+         "when": {
+          "var": "seq.i",
+          "eq": 1
+         },
+         "then": {
+          "c": "rdt",
+          "b": 1
+         }
+        }
+       ]
+      },
+      {
+       "w": 170,
+       "runs": [
+        {
+         "t": "🔎 Sherlock",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 1
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      },
+      {
+       "grow": 1,
+       "runs": [
+        {
+         "t": "research rynku i konkurencji, ze źródłami",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 1
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "align": "left",
+     "indent": 10,
+     "when": {
+      "var": "seq.i",
+      "eq": 2
+     },
+     "then": {
+      "bg": "akf"
+     },
+     "h": 1.12,
+     "items": [
+      {
+       "w": 56,
+       "runs": [
+        {
+         "t": "3.",
+         "size": 15,
+         "c": "dim",
+         "when": {
+          "var": "seq.i",
+          "eq": 2
+         },
+         "then": {
+          "c": "rdt",
+          "b": 1
+         }
+        }
+       ]
+      },
+      {
+       "w": 170,
+       "runs": [
+        {
+         "t": "🎬 Studio",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 2
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      },
+      {
+       "grow": 1,
+       "runs": [
+        {
+         "t": "posty i copy na premierę",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 2
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "align": "left",
+     "indent": 10,
+     "when": {
+      "var": "seq.i",
+      "eq": 3
+     },
+     "then": {
+      "bg": "akf"
+     },
+     "h": 1.12,
+     "items": [
+      {
+       "w": 56,
+       "runs": [
+        {
+         "t": "4.",
+         "size": 15,
+         "c": "dim",
+         "when": {
+          "var": "seq.i",
+          "eq": 3
+         },
+         "then": {
+          "c": "rdt",
+          "b": 1
+         }
+        }
+       ]
+      },
+      {
+       "w": 170,
+       "runs": [
+        {
+         "t": "🎥 Wideograf",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 3
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      },
+      {
+       "grow": 1,
+       "runs": [
+        {
+         "t": "film 30 s na Reels",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 3
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "align": "left",
+     "indent": 10,
+     "when": {
+      "var": "seq.i",
+      "eq": 4
+     },
+     "then": {
+      "bg": "akf"
+     },
+     "h": 1.12,
+     "items": [
+      {
+       "w": 56,
+       "runs": [
+        {
+         "t": "5.",
+         "size": 15,
+         "c": "dim",
+         "when": {
+          "var": "seq.i",
+          "eq": 4
+         },
+         "then": {
+          "c": "rdt",
+          "b": 1
+         }
+        }
+       ]
+      },
+      {
+       "w": 170,
+       "runs": [
+        {
+         "t": "🌐 Web",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 4
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      },
+      {
+       "grow": 1,
+       "runs": [
+        {
+         "t": "landing produktu",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 4
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "align": "left",
+     "indent": 10,
+     "when": {
+      "var": "seq.i",
+      "eq": 5
+     },
+     "then": {
+      "bg": "akf"
+     },
+     "h": 1.12,
+     "items": [
+      {
+       "w": 56,
+       "runs": [
+        {
+         "t": "6.",
+         "size": 15,
+         "c": "dim",
+         "when": {
+          "var": "seq.i",
+          "eq": 5
+         },
+         "then": {
+          "c": "rdt",
+          "b": 1
+         }
+        }
+       ]
+      },
+      {
+       "w": 170,
+       "runs": [
+        {
+         "t": "📈 Ads",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 5
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      },
+      {
+       "grow": 1,
+       "runs": [
+        {
+         "t": "kampania Meta; budżet czeka na Twoją zgodę",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 5
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "align": "left",
+     "indent": 10,
+     "when": {
+      "var": "seq.i",
+      "eq": 6
+     },
+     "then": {
+      "bg": "akf"
+     },
+     "h": 1.12,
+     "items": [
+      {
+       "w": 56,
+       "runs": [
+        {
+         "t": "7.",
+         "size": 15,
+         "c": "dim",
+         "when": {
+          "var": "seq.i",
+          "eq": 6
+         },
+         "then": {
+          "c": "rdt",
+          "b": 1
+         }
+        }
+       ]
+      },
+      {
+       "w": 170,
+       "runs": [
+        {
+         "t": "✅ Jarvo",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 6
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      },
+      {
+       "grow": 1,
+       "runs": [
+        {
+         "t": "recenzja; poprawki wracają do kart",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 6
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "align": "left",
+     "indent": 10,
+     "when": {
+      "var": "seq.i",
+      "eq": 7
+     },
+     "then": {
+      "bg": "akf"
+     },
+     "h": 1.12,
+     "items": [
+      {
+       "w": 56,
+       "runs": [
+        {
+         "t": "8.",
+         "size": 15,
+         "c": "dim",
+         "when": {
+          "var": "seq.i",
+          "eq": 7
+         },
+         "then": {
+          "c": "rdt",
+          "b": 1
+         }
+        }
+       ]
+      },
+      {
+       "w": 170,
+       "runs": [
+        {
+         "t": "📦 Ty",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 7
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      },
+      {
+       "grow": 1,
+       "runs": [
+        {
+         "t": "wynik u Ciebie, lekcje trafiają do skarbca",
+         "size": 15,
+         "c": "fg",
+         "when": {
+          "var": "seq.i",
+          "eq": 7
+         },
+         "then": {
+          "b": 1,
+          "c": "ink"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "radius": 10,
+   "border": 1.5
+  },
+  {
+   "type": "text",
+   "x": 65,
+   "y": 1166,
+   "w": 950,
+   "align": "center",
+   "size": 14,
+   "c": "dim",
+   "t": "● kropka = karta albo wynik w drodze · obwódka = kto teraz pracuje · jeden krok co 3,5 s"
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     286
+    ],
+    [
+     540,
+     326
+    ]
+   ],
+   "period": 1.0,
+   "offsets": [
+    0,
+    0.5
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     255,
+     360
+    ],
+    [
+     300,
+     360
+    ]
+   ],
+   "period": 0.9,
+   "offsets": [
+    0
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     300,
+     392
+    ],
+    [
+     255,
+     392
+    ]
+   ],
+   "period": 0.9,
+   "offsets": [
+    0
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     7
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     780,
+     376
+    ],
+    [
+     825,
+     376
+    ]
+   ],
+   "period": 0.9,
+   "offsets": [
+    0.3
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     426
+    ],
+    [
+     540,
+     462
+    ],
+    [
+     120,
+     462
+    ],
+    [
+     120,
+     498
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0,
+    0.8
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     1
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     120,
+     598
+    ],
+    [
+     120,
+     628
+    ],
+    [
+     540,
+     628
+    ],
+    [
+     540,
+     664
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0.4,
+    1.2
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     1
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     426
+    ],
+    [
+     540,
+     462
+    ],
+    [
+     240,
+     462
+    ],
+    [
+     240,
+     498
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0,
+    0.8
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     4
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     240,
+     598
+    ],
+    [
+     240,
+     628
+    ],
+    [
+     540,
+     628
+    ],
+    [
+     540,
+     664
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0.4,
+    1.2
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     4
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     426
+    ],
+    [
+     540,
+     462
+    ],
+    [
+     360,
+     462
+    ],
+    [
+     360,
+     498
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0,
+    0.8
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     2
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     360,
+     598
+    ],
+    [
+     360,
+     628
+    ],
+    [
+     540,
+     628
+    ],
+    [
+     540,
+     664
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0.4,
+    1.2
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     2
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     426
+    ],
+    [
+     540,
+     462
+    ],
+    [
+     480,
+     462
+    ],
+    [
+     480,
+     498
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0,
+    0.8
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     3
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     480,
+     598
+    ],
+    [
+     480,
+     628
+    ],
+    [
+     540,
+     628
+    ],
+    [
+     540,
+     664
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0.4,
+    1.2
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     3
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     426
+    ],
+    [
+     540,
+     462
+    ],
+    [
+     600,
+     462
+    ],
+    [
+     600,
+     498
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0,
+    0.8
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     5
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     600,
+     598
+    ],
+    [
+     600,
+     628
+    ],
+    [
+     540,
+     628
+    ],
+    [
+     540,
+     664
+    ]
+   ],
+   "period": 1.6,
+   "offsets": [
+    0.4,
+    1.2
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     5
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     426
+    ],
+    [
+     540,
+     462
+    ],
+    [
+     960,
+     462
+    ]
+   ],
+   "period": 3.0,
+   "offsets": [
+    0
+   ],
+   "color": "gy",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0,
+     6,
+     7
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     426
+    ],
+    [
+     540,
+     462
+    ],
+    [
+     120,
+     462
+    ]
+   ],
+   "period": 3.0,
+   "offsets": [
+    1.5
+   ],
+   "color": "gy",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     0,
+     6,
+     7
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     628
+    ],
+    [
+     540,
+     664
+    ]
+   ],
+   "period": 1.0,
+   "offsets": [
+    0,
+    0.5
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     6
+    ]
+   }
+  },
+  {
+   "type": "flow",
+   "path": [
+    [
+     540,
+     748
+    ],
+    [
+     540,
+     784
+    ]
+   ],
+   "period": 1.0,
+   "offsets": [
+    0,
+    0.5
+   ],
+   "color": "pk",
+   "when": {
+    "var": "seq.i",
+    "in": [
+     7
+    ]
+   }
+  }
+ ]
+}

@@ -16,6 +16,7 @@ Mówię konkretem („hook 1,4 s, cięcie co 2,5 s, −14 LUFS”), pokazuję sz
 - filmy z kodu: 39 stylów kina (lemo-opuscar), rysunek i timelapse (anidoodle), B-roll do nagrań (motion-broll),
   HyperFrames, Manim, Remotion (kinowe filmy produktu video-shotcraft, typografia, wykresy), bang-motion,
   logo w ruchu (pixel2motion), Lottie; muzyka syntezowana kodem,
+- żywe schematy na posty (flota, przepływ zlecenia, architektura, które „działają”; `zywy-schemat`),
 - ujęcia z AI (`video_generate`, obraz → wideo), napisy PL, formaty i bezpieczne strefy platform.
 
 ## Poza zakresem
@@ -48,6 +49,7 @@ research i fakty do scenariusza (→ `jarvo-sherlock` albo jego raport), strony 
 | długi materiał → rolki (edytowalne w HQ, napisy karaoke) | `clipmaker` |
 | demo strony / aplikacji (kursor, napisy kroków) | `demo-strony` |
 | animacja z kodu, film w stylu, B-roll do nagrania, rysunek, muzyka kodem | `film-z-kodu` (wybór: `motion-broll`, `lemo-opuscar`, `anidoodle`, `hyperframes`, `manim-video`, Remotion/`video-shotcraft`, `bang-motion`, `pixel2motion`, `text-to-lottie`) |
+| żywy schemat na post: przepływ, architektura, flota, które „działają” | `zywy-schemat` |
 | ujęcia generowane przez AI | `wideo-ai` |
 | lektor, muzyka, głośność | `lektor-i-dzwiek` |
 | wymiary, długości, strefy UI | `formaty-wideo` |

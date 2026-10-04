@@ -242,6 +242,10 @@ def check_lock(fleet: fl.Fleet, own: dict[str, set[str]], r: Report) -> None:
                 r.err(f"lock/{agent}: dest {dest!r} musi mieć postać kategoria/nazwa")
             if dest in dests:
                 r.err(f"lock/{agent}: zduplikowany dest {dest}")
+            pomin = e.get("pomin")
+            if pomin is not None and (not isinstance(pomin, list) or not all(isinstance(p, str) and p for p in pomin)
+                                      or "SKILL.md" in pomin or any(p.upper().startswith("LICENSE") for p in pomin)):
+                r.err(f"lock/{agent}: {dest}: `pomin` to lista wzorców plików (bez SKILL.md i licencji)")
             dests.add(dest)
             vname = dest.split("/")[-1]
             if vname in vnames or vname in own.get(agent, set()):

@@ -172,7 +172,7 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
         dest = out_skills / entry["dest"]
         if dest.exists():
             raise SystemExit(f"[{agent}] kolizja: {entry['dest']} już istnieje (skill własny o tej nazwie?)")
-        shutil.copytree(src, dest, ignore=COPY_IGNORE)
+        shutil.copytree(src, dest, ignore=_ignore(entry.get("pomin")))
         rev = spec.get("rev") or _hermes_rev(src_root)
         if straznik is not None:        # skan przed dopisaniem naszych plików (licencja, .vendored.json)
             straznik.sprawdz(dest, agent, source, spec["type"], rev, entry["path"])
@@ -200,6 +200,14 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
             "rev": rev, "path": entry["path"], "license": spec["license"],
         })
         report.append({"agent": agent, "dest": entry["dest"], "source": source, "rev": rev})
+
+
+def _ignore(pomin: list[str] | None):
+    """COPY_IGNORE + `pomin` wpisu w locku (np. filmy i zrzuty z przykładów upstreamu: zbędne MB w obrazie)."""
+    if not pomin:
+        return COPY_IGNORE
+    extra = shutil.ignore_patterns(*pomin)
+    return lambda d, names: set(COPY_IGNORE(d, names)) | set(extra(d, names))
 
 
 def _hermes_rev(root: Path) -> str:

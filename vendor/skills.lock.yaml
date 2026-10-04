@@ -8,6 +8,8 @@
 # `dest` = <kategoria>/<nazwa> w skills/ profilu. Rodziny skilli, które odwołują się do
 # siebie ścieżkami względnymi (../hyperframes-animation/…, ../seo/references/…), MUSZĄ
 # lądować w tej samej kategorii.
+# `pomin` (opcjonalnie, przy wpisie agenta) = wzorce plików i katalogów, których build nie kopiuje
+# (np. filmy i zrzuty przykładów); SKILL.md i LICENSE* zostają zawsze.
 
 version: 1
 
@@ -124,6 +126,14 @@ sources:
     rev: e9faedb28930df0da2acf17da00c80730a78cfe8
     license: MIT
     license_file: LICENSE
+  live-panel:
+    type: git
+    repo: https://github.com/ythx-101/live-panel-skill
+    rev: 8a70aa2c4e3fac68b40e2472407e32e2637a7a36
+    license: MIT
+    license_file: LICENSE
+    # Kod MIT; projekty odtworzone w examples/codex-agents i examples/agent-architecture należą do ich autorów
+    # (README upstreamu, „Credits”): Wideograf uczy się z ich configów, nie publikuje ich (skill zywy-schemat).
   bang-motion:
     type: git
     repo: https://github.com/bangtutorial/bang-motion
@@ -367,6 +377,9 @@ agents:
     - {source: remotion-skills, path: skills/remotion-best-practices, dest: video/remotion-best-practices}
     - {source: lottie, path: skills/text-to-lottie, dest: video/text-to-lottie}
     - {source: pixel2motion, path: ., dest: video/pixel2motion}
+    # Żywe schematy: szablon strony i gramatyka ruchu; render i kontrola przez zywy_schemat.py i html_wideo.py.
+    # Bez filmów i zrzutów przykładów (ok. 7 MB), configi zostają.
+    - {source: live-panel, path: ., dest: video/live-panel, pomin: ["*.mp4", "screenshots"]}
     - {source: bang-motion, path: ., dest: video/bang-motion}
     - {source: iart-kinetic-typography, path: skills/kinetic-typography, dest: video/kinetic-typography}
     - {source: iart-data-animation, path: skills/chart-animation, dest: video/chart-animation}

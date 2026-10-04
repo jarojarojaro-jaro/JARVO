@@ -1,7 +1,7 @@
 ---
 name: schemat
 description: "Schemat w rozmowie: SVG → PNG, gdy obraz wyjaśni szybciej."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-10-02"
+    reviewed: "2026-10-04"
 ---
 
 # Schemat
@@ -24,6 +24,7 @@ piszesz SVG, narzędzie `schemat` robi z niego PNG i daje linię `MEDIA:<ścież
 - Odpowiedź opisuje przepływ, kto komu co oddaje, warstwy, oś czasu albo porównanie, a tekst miałby ponad 6 zdań.
   Wtedy wyślij schemat i 1–3 zdania zamiast ściany tekstu.
 - Nie do: grafik dla klientów (Studio), filmów (wzorzec „Wyjaśnij mi filmem”), danych z wykresem do raportu.
+  Żywy schemat na post (kropki po strzałkach, kroki po kolei, X / Instagram) to film: karta dla Wideografa (`zywy-schemat`).
 
 ## Kroki
 1. Jedna myśl na rysunek. Zapisz ją jako tytuł (np. „Jak zlecenie trafia do agenta”).

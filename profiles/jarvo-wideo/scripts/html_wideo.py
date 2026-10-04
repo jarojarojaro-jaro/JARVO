@@ -22,6 +22,7 @@ Presety (flagi je nadpisują):
   iart          ?t=<s>, gotowe: window.__ready        (kinetic-typography, chart-animation, lower-thirds…)
   pixel2motion  ?t=<ms>, gotowe: window.__p2mReady, kadr #logo-root
   bang          window.OPENER.seek(t), ?clean=1, rozmiar z OPENER.W/H (bang-motion; zamiast snap/export-frames.mjs)
+  livepanel     window.seek(t), ?manual, gotowe: window.__ready, rozmiar z #stage (żywy schemat: zywy_schemat.py strona)
 --subklatki N (wideo): motion blur, każda klatka to średnia N chwil między klatkami (N× dłużej).
 --serwer: strona z http://127.0.0.1 (fetch plików obok, moduły ES, /_lib/ = wspólne node_modules narzędzi).
 lottie: renderer Skottie z oficjalnego playera (canvaskit-wasm, `narzedzia.py instaluj lottie`), ten sam co w playerze.
@@ -66,6 +67,10 @@ PRESETS: dict[str, dict] = {
     "bang": {"seek": BANG_SEEK, "query": {"clean": "1"},
              "gotowe": "window.OPENER && window.OPENER.ready && (!window.OPENER.clipsReady || window.OPENER.clipsReady())",
              "rozmiar_js": "[window.OPENER.W || 1920, window.OPENER.H || 1080]"},
+    # ?manual: szablon live-panel nie odpala pętli rAF; rozmiar płótna z #stage (canvas.width/height configu)
+    "livepanel": {"seek": "(t) => { window.seek(t); }", "gotowe": "window.__ready === true", "query": {"manual": "1"},
+                  "rozmiar_js": "[parseInt(document.getElementById('stage').style.width) || 1200, "
+                                "parseInt(document.getElementById('stage').style.height) || 1500]"},
 }
 DEFAULTS = {"param": "t", "jednostka": "s", "gotowe": None, "seek": None, "selektor": None, "query": {},
             "rozmiar_js": None, "serwer": False}

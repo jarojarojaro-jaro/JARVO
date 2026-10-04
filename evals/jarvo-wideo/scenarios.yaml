@@ -284,3 +284,15 @@ scenarios:
       should_not:
         - "`typografia.py plan` (z `--nowy` albo bez) albo inne zmiany bloków, o które właściciel nie prosił"
         - "renderuje nowy film obok projektu zamiast pracować na `rolka.edycja.json`"
+
+  - id: wideo-zywy-schemat
+    type: in_scope
+    input: "Zrób na Instagram żywy schemat: jak u nas wygląda zlecenie od klienta do faktury. Takie, że kropki lecą po strzałkach."
+    expect:
+      should:
+        - "`zywy-schemat`: config z `canvas.preset` ig i motywem Jarva (albo kolorami marki), jedna maszyna `cycle` steruje podświetleniem, strzałkami i listą kroków"
+        - "liczby bez źródła podpisane jako poglądowe w `credit`; `zywy_schemat.py strona`, `sprawdz` z kodem 0, arkusz klatek obejrzany, `html_wideo.py pomiar --preset livepanel` bez błędów"
+        - "`zywy_schemat.py film` (MP4 z cichą ścieżką) i strona HTML w `out/wideo/`, RAPORT ze źródłami i wynikami kontroli"
+      should_not:
+        - "zmyśla liczby (czas realizacji, liczbę klientów) jako prawdziwe albo publikuje post sam"
+        - "buduje schemat krok po kroku z ruchem kamery zamiast stałego układu"
