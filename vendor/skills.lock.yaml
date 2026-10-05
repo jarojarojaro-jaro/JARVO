@@ -113,7 +113,8 @@ sources:
     license: Apache-2.0
     license_file: LICENSE
     # Repo ~100 MB (szablon, dema, audio; z node_modules szablonu ~410 MB): nie kopiujemy do profilu; ten sam commit
-    # instaluje na żądanie scripts/narzedzia.py Wideografa (`instaluj shotcraft`).
+    # instaluje na żądanie scripts/narzedzia.py Wideografa (`instaluj shotcraft`), z indeksem kart galerii, bez jej
+    # filmów, edytora workbench i eksportu JianYing (SHOTCRAFT_POMIN).
   lottie:
     type: git
     repo: https://github.com/diffusionstudio/lottie

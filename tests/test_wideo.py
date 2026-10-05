@@ -141,6 +141,22 @@ def test_check_plan_rejects_unknown_clip_end(tmp_path):
     assert film.check_plan(plan, tmp_path)["ok"]
 
 
+def test_check_plan_warns_small_photo_for_camera_move(tmp_path, monkeypatch):
+    """Zdjęcie 1080×1920 w 9:16: z ruchem kamery (1,12×) rozciągnięte, bez ruchu w porządku; 2× zrzut w porządku."""
+    plan = plan_base(tmp_path)
+    wymiary = {"w": 1080, "h": 1920}
+    monkeypatch.setattr(film.wl, "probe", lambda p: {"video": {"width": wymiary["w"], "height": wymiary["h"]}})
+    rep = film.check_plan(plan, tmp_path)
+    assert rep["ok"] and any("1080×1920" in w and "1210×2151" in w for w in rep["ostrzezenia"])
+    plan["sceny"][0]["ujecie"]["ruch"] = "brak"
+    assert not any("zdjęcie" in w for w in film.check_plan(plan, tmp_path)["ostrzezenia"])
+    plan["sceny"][0]["ujecie"]["ruch"] = "panorama"
+    wymiary.update(w=2160, h=3840)
+    assert not any("zdjęcie" in w for w in film.check_plan(plan, tmp_path)["ostrzezenia"])
+    plan["sceny"][0]["ujecie"]["ruch"] = "obrot"
+    assert any("`ruch` 'obrot' nieznany" in w for w in film.check_plan(plan, tmp_path)["ostrzezenia"])
+
+
 @needs_ffmpeg
 def test_short_code_clip_holds_last_frame_or_loops(tmp_path, monkeypatch):
     """Animacja z kodu krótsza od sceny: `koniec: stop` trzyma ostatnią klatkę, domyślnie (stock) pętla; obie mają długość sceny."""
@@ -331,7 +347,20 @@ def test_pinned_clone_upgrades_and_keeps_demos(tmp_path):
     nz.clone_pinned(f"file://{up}", b, dest, nz.LEMO_POMIN, keep=nz.LEMO_DODANE)
     assert nz.git_head(dest) == b and (dest / "AGENTS.md").read_text() == "v2"
     assert (dest / "styles/ink/demo/d.js").exists() and not (dest / "styles/engraving/demo").exists()
-    nz.clone_pinned(f"file://{up}", b, dest, nz.LEMO_POMIN, keep=nz.LEMO_DODANE)  # ten sam commit: nic
+    (dest / "AGENTS.md").write_text("lokalnie")
+    nz.clone_pinned(f"file://{up}", b, dest, nz.LEMO_POMIN, keep=nz.LEMO_DODANE)  # ten sam commit i lista: nic
+    assert (dest / "AGENTS.md").read_text() == "lokalnie"
+    # ten sam commit, krótsza lista wykluczeń (jak SHOTCRAFT_POMIN zamiast całej galerii): plik wraca, demo zostaje
+    nz.clone_pinned(f"file://{up}", b, dest, [e for e in nz.LEMO_POMIN if e != "/styleboard/"], keep=nz.LEMO_DODANE)
+    assert (dest / "styleboard/x.html").exists() and (dest / "styles/ink/demo/d.js").exists()
+    assert (dest / "AGENTS.md").read_text() == "v2" and not (dest / "styles/engraving/demo").exists()
+
+
+def test_shotcraft_keeps_card_index_but_not_media_or_editor():
+    """Shotcraft: indeks kart galerii zostaje (skill sprawdza w nim nazwę karty), filmy galerii i edytor nie."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    assert not any(e.startswith("/gallery/") and e.rstrip("/") in ("/gallery", "/gallery/api") for e in nz.SHOTCRAFT_POMIN)
+    assert {"/gallery/media/", "/workbench/", "/jianying-export/"} <= set(nz.SHOTCRAFT_POMIN)
 
 
 def test_lemo_markers_match_skill_setup(monkeypatch, tmp_path):

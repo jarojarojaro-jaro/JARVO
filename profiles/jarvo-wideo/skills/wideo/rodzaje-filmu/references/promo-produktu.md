@@ -38,7 +38,8 @@ Nie to: jak działa zjawisko → `explainer.md`; samo logo → `logo-intro.md`; 
 - **Wygląda drogo, gdy:** nic nie zanika, tylko zmienia kształt; każda scena rośnie z poprzedniej (bez cięć);
   coś dzieje się na każdym bicie; mały sprężysty „odbój”, gdy element ląduje; kamera robi jeden ruch naraz;
   **dźwięk na każdym kliknięciu i świście**: syntezowany z osi czasu (`sound.mjs`, skill `lektor-i-dzwiek`: click, pop,
-  whoosh, tick z wariacją `pitch`) albo biblioteka marki / Mixkit / Pixabay (licencja w RAPORT).
+  whoosh, tick z wariacją `pitch`) albo biblioteka marki / Mixkit / Pixabay (tylko darmowa licencja sprawdzona
+  na stronie pliku; link i licencja w RAPORT, zasady w `lektor-i-dzwiek`).
 - **Styl domyślny** (gdy marka nie mówi inaczej): 2D, ciepła biel tła, czarny UI, jeden kolor akcentu, jeden czysty
   font (Geist albo Inter); bez 3D, ciemnego motywu, poświat, cząsteczek i przenikań. Keynote Apple, nie trailer gry.
 - **Prawdziwe ekrany, twardo:** najpierw `python3 $HERMES_HOME/scripts/assety.py <URL> [--podstrony /cennik]` (zrzuty

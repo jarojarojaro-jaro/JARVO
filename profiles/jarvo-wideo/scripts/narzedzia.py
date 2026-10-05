@@ -17,6 +17,7 @@ Zasady (VPS 8 GB, bez dubli):
 - pakiety npm i Python raz do /opt/data/jarvo/narzedzia (przeżywają restart), a nie w każdym projekcie,
 - biblioteki z repo (lemo-opuscar, video-shotcraft, player Lottie) przypięte do commitów z vendor/skills.lock.yaml
   (bez samoczynnych aktualizacji; nowy commit w repo Jarva → `instaluj` przenosi istniejący klon na niego);
+  video-shotcraft z indeksem kart galerii, bez jej filmów, edytora workbench i eksportu JianYing;
   HDRI do stylów 3D lemo (~12 MB) zawsze; ciężkie assety lemo (głos Kokoro ~340 MB, sample ~1,4 GB) tylko
   z JARVO_EXTRAS „lemo”.
 """
@@ -52,6 +53,9 @@ LEMO_POZIOMY = {"core": "requirements.txt", "music": "requirements-music.txt", "
 SHOTCRAFT = ROOT / "video-shotcraft"
 SHOTCRAFT_REPO = "https://github.com/Vincentwei1021/video-shotcraft.git"
 SHOTCRAFT_REV = "e2d8928c57ef84701f9b0119ca4a1c28a62050c1"   # vendor/skills.lock.yaml → video-shotcraft
+# galeria zostaje (gallery/api/library.json = indeks 157 kart, ~1,2 MB); bez filmów galerii, ich edytora (workbench)
+# i eksportu do JianYing – Jarvo ma własny edytor HQ
+SHOTCRAFT_POMIN = ["/gallery/media/", "/gallery/og-image.jpg", "/workbench/", "/jianying-export/"]
 LOTTIE = ROOT / "lottie-player"
 LOTTIE_REPO = "https://github.com/diffusionstudio/lottie.git"
 LOTTIE_REV = "3c72912fad543897f90045ed4d355813837927fc"      # vendor/skills.lock.yaml → lottie
@@ -207,18 +211,20 @@ def git_head(dest: Path) -> str:
 
 def clone_pinned(repo: str, rev: str, dest: Path, exclude: list[str], keep: re.Pattern | None = None) -> None:
     """Klon bez historii plików (blob:none) i bez ścieżek `exclude`, na przypiętym commicie. Klon na innym commicie
-    przechodzi na nowy: nowy `rev` w repo Jarva = aktualizacja przy następnym `instaluj`. Wpisy sparse-checkout
-    pasujące do `keep` (np. dema dodane później) zostają."""
+    przechodzi na nowy: nowy `rev` w repo Jarva = aktualizacja przy następnym `instaluj`; zmieniona lista `exclude`
+    trafia też do klonu na tym samym commicie. Wpisy sparse-checkout pasujące do `keep` (np. dema dodane później) zostają."""
     if (dest / ".git").exists():
-        if git_head(dest) == rev:
-            return
-        run(["git", "-C", str(dest), "fetch", "--quiet", "--filter=blob:none", "origin", rev])
+        if git_head(dest) != rev:
+            run(["git", "-C", str(dest), "fetch", "--quiet", "--filter=blob:none", "origin", rev])
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
         run(["git", "clone", "--quiet", "--filter=blob:none", "--sparse", "--no-checkout", repo, str(dest)])
     lista = subprocess.run(["git", "-C", str(dest), "sparse-checkout", "list"], capture_output=True, text=True).stdout
     dodane = [w for w in lista.splitlines() if keep and keep.fullmatch(w)]
-    run(["git", "-C", str(dest), "sparse-checkout", "set", "--no-cone", "/*", *[f"!{e}" for e in exclude], *dodane])
+    wzorce = ["/*", *[f"!{e}" for e in exclude], *dodane]
+    if git_head(dest) == rev and lista.splitlines() == wzorce:
+        return
+    run(["git", "-C", str(dest), "sparse-checkout", "set", "--no-cone", *wzorce])
     run(["git", "-C", str(dest), "checkout", "--quiet", "--force", rev])
 
 
@@ -302,7 +308,7 @@ def install_shotcraft() -> None:
     install_remotion()
     ensure_node([PUPPETEER])
     ensure_chrome_wrapper()
-    clone_pinned(SHOTCRAFT_REPO, SHOTCRAFT_REV, SHOTCRAFT, ["/gallery/"])
+    clone_pinned(SHOTCRAFT_REPO, SHOTCRAFT_REV, SHOTCRAFT, SHOTCRAFT_POMIN)
     tpl = SHOTCRAFT / "template"
     if not (tpl / "node_modules" / ".jarvo-ok").exists():
         run(["npm", "ci", "--no-audit", "--no-fund", "--silent"], cwd=tpl, env=NO_DOWNLOAD)
@@ -362,7 +368,9 @@ def status() -> dict:
         "animacja": (NODE / "node_modules" / "@napi-rs" / "canvas").exists(),
         "remotion": (NODE / "node_modules" / "@remotion" / "cli").exists(),
         "puppeteer": (NODE / "node_modules" / "puppeteer").exists(),
-        "shotcraft": (SHOTCRAFT / "template" / "node_modules" / ".jarvo-ok").exists(),
+        # indeks kart galerii: bez niego skill nie sprawdzi nazwy karty (starsze instalacje go pomijały)
+        "shotcraft": (SHOTCRAFT / "template" / "node_modules" / ".jarvo-ok").exists()
+                     and (SHOTCRAFT / "gallery" / "api" / "library.json").exists(),
         "lottie": (LOTTIE / "public" / "canvaskit.wasm").exists() and (canvaskit_dir() / "canvaskit.js").exists(),
         "pelne_lemo": full_extras(),
     }

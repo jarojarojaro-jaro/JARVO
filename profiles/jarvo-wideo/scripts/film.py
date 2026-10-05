@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import math
 import os
 import random
 import re
@@ -34,6 +35,9 @@ WORDS_PER_SEC = 2.5          # tempo Edge TTS po polsku przy +0% (do szacunku be
 SCENE_GAP = 0.18             # oddech między scenami
 TAIL = 0.6                   # zapas na końcu filmu
 MIN_SCENE = 1.2
+# ruch kamery na zdjęciu (Ken Burns) → największe powiększenie kadru; zdjęcie mniejsze niż wyjście × powiększenie
+# jest rozciągane i miękkie (zrzut strony robimy w 2×)
+RUCH_ZOOM = {"zoom": 1.12, "oddal": 1.12, "panorama": 1.10, "brak": 1.0}
 XFADE = 0.35                 # przenikanie
 PLATFORM_MAX = {"9:16": 90, "1:1": 120, "4:5": 120, "16:9": 600}   # rozsądna górna granica krótkiego formatu
 EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F]")          # libass nie rysuje emoji (puste kratki)
@@ -117,6 +121,26 @@ def formats_of(plan: dict, override: str | None) -> list[str]:
     return fm
 
 
+def photo_warnings(i: int, path: Path, ruch: str, fmts: list[str]) -> list[str]:
+    """Zdjęcie za małe na kadr z ruchem kamery (powiększenie > 5%) albo nieznany `ruch`."""
+    if ruch not in RUCH_ZOOM:
+        return [f"scena {i}: `ruch` {ruch!r} nieznany ({' | '.join(RUCH_ZOOM)}); użyję zoom"]
+    try:
+        v = wl.probe(path).get("video") or {}
+        iw, ih = int(v["width"]), int(v["height"])
+    except (Exception, SystemExit):            # brak ffprobe albo uszkodzony plik: render powie więcej
+        return []
+    out = []
+    for f in fmts:
+        w, h = wl.FORMATS[f]
+        skala = max(w / iw, h / ih) * RUCH_ZOOM[ruch]
+        if skala > 1.05:
+            potrzeba = f"{math.ceil(w * RUCH_ZOOM[ruch])}×{math.ceil(h * RUCH_ZOOM[ruch])}"
+            out.append(f"scena {i}: zdjęcie {iw}×{ih} przy ruchu „{ruch}” w {f} rozciągnięte {skala:.2f}× (miękki obraz); "
+                       f"daj co najmniej {potrzeba} (zrzut strony w 2×) albo `ruch: brak`")
+    return out
+
+
 def check_plan(plan: dict, plan_dir: Path) -> dict:
     """Błędy blokujące render + ostrzeżenia redakcyjne + szacunek długości (bez syntezy mowy)."""
     errors, warns = [], []
@@ -156,6 +180,8 @@ def check_plan(plan: dict, plan_dir: Path) -> dict:
             errors.append(f"scena {i}: `ujecie` musi mieć dokładnie jedno z: stock, stock_id, plik, kolor")
         elif kinds[0] == "plik" and not resolve(uj["plik"], plan_dir).exists():
             errors.append(f"scena {i}: plik nie istnieje: {uj['plik']}")
+        elif kinds[0] == "plik" and wl.is_image(resolve(uj["plik"], plan_dir)):
+            warns += photo_warnings(i, resolve(uj["plik"], plan_dir), uj.get("ruch", "zoom"), fmts)
         elif kinds[0] == "kolor":
             try:
                 wl.hex_to_ass(uj["kolor"])
@@ -269,14 +295,14 @@ def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -
     elif src["typ"] == "zdjecie":
         frames = max(1, int(round(dur * wl.FPS)))
         big_w, big_h = (w, h) if draft else (wl.even(w * 1.6), wl.even(h * 1.6))
-        z = 0.12
+        z = round(RUCH_ZOOM["zoom"] - 1, 2)
         motion = uj.get("ruch", "zoom")
         if motion == "brak":
             zexpr, xexpr, yexpr = "1", "0", "0"
         elif motion == "oddal":
             zexpr, xexpr, yexpr = f"max(1.0,{1 + z}-{z}*on/{frames})", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
         elif motion == "panorama":
-            zexpr, xexpr, yexpr = "1.10", f"(iw-iw/zoom)*on/{frames}", "ih/2-(ih/zoom/2)"
+            zexpr, xexpr, yexpr = f"{RUCH_ZOOM['panorama']:.2f}", f"(iw-iw/zoom)*on/{frames}", "ih/2-(ih/zoom/2)"
         else:
             zexpr, xexpr, yexpr = f"min({1 + z},1+{z}*on/{frames})", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
         vf = (f"scale={big_w}:{big_h}:force_original_aspect_ratio=increase,crop={big_w}:{big_h},"

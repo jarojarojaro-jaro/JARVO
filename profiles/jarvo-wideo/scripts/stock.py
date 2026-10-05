@@ -30,8 +30,9 @@ UA = "Jarvo-Wideograf/1.0 (+https://github.com/)"
 LICENSES = {
     "pexels": "Licencja Pexels: darmowe użycie komercyjne, bez wymogu podpisu (mile widziany); nie sprzedawać bez zmian, "
               "nie sugerować poparcia osób z kadru. https://www.pexels.com/license/",
-    "pixabay": "Licencja Pixabay: darmowe użycie komercyjne, bez wymogu podpisu; nie sprzedawać bez zmian, "
-               "uważać na znaki towarowe i rozpoznawalne osoby. https://pixabay.com/service/license-summary/",
+    "pixabay": "Licencja Pixabay (Content License): darmowe użycie komercyjne, bez wymogu podpisu; nie sprzedawać "
+               "ani nie rozpowszechniać samego pliku, rozpoznawalne znaki towarowe nie w reklamie towarów i usług, "
+               "rozpoznawalne osoby nie w złym świetle. https://pixabay.com/service/license-summary/",
 }
 
 

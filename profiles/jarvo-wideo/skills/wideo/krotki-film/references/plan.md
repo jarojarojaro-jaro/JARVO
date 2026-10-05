@@ -46,7 +46,9 @@
 ## Zasady
 - `stock` (zapytanie) wybiera automatycznie najlepszy wynik; do finału wpisuj `stock_id` po obejrzeniu (`dobor-ujec`).
 - Zapytania stock po angielsku dają więcej trafień; 2–4 słowa, konkretny obiekt i ujęcie („coffee beans macro”).
-- Zdjęcia dostają ruch kamery automatycznie (Ken Burns); statyczna scena > 4 s nuży.
+- Zdjęcia dostają ruch kamery automatycznie (Ken Burns); statyczna scena > 4 s nuży. Ruch powiększa kadr
+  (zoom i oddal 1,12×, panorama 1,10×), więc zdjęcie ma być o tyle większe od wyjścia (9:16: 1210×2151, zrzut strony
+  w 2×); `sprawdz` ostrzega o mniejszym, a wtedy lepszy `ruch: brak` niż miękki obraz.
 - Nie wpisuj tekstu do obrazu AI: tekst idzie przez `tekst_ekranowy` albo napisy (ostre, poprawne litery).
   Bez emoji w napisach i tekstach ekranowych (renderer napisów pokazuje je jako puste kratki).
 - Bez klucza stock: `plik` (AI, własne) i `kolor`; `film.py sprawdz` powie, czego brakuje.

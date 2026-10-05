@@ -132,10 +132,26 @@ npx remotion still src/index.ts AiflPromo out/look.png --frame=60 --browser-exec
 npx remotion render src/index.ts AiflPromo out/promo.mp4 --concurrency=2 --browser-executable="$REMOTION_BROWSER_EXECUTABLE"
 ```
 - SKILL.md jest po chińsku (+ opis EN): czytasz, piszesz RAPORT po polsku. Opcjonalny Runway pomijamy (płatny).
+- **Tryb: zawsze 自主自由创作** (samodzielny, `$SHOTCRAFT/references/pipeline.md` od etapu 0 do końca).
+  Nie pytasz o tryb, choć SKILL.md każe (właściciel zatwierdza gotowy film, nie etapy). Szablon Ink Press
+  (`template/TEMPLATE.md`) tylko wtedy, gdy właściciel go nazwie; 共同创作 (`guided-free-creation.md`) nie używamy.
+- **Karta ujęcia, zawsze w tej kolejności:** nazwa karty i `style-key` z `$SHOTCRAFT/gallery/api/library.json`
+  (indeks 157 kart) → pełna karta `references/shots/<kategoria>/<nazwa>.md` → dokładne demo TSX z jej sekcji
+  „参考实现” (`demos/…`). Parametry z dema (krzywe, czasy, kolejność) są sprawdzone: przenosisz je, a nie piszesz
+  ruchu od nowa z samego opisu; tego, co karta oznacza jako „已知坑/命门”, nie osłabiasz.
+- **Karty z polem „原片出处”** (ruch odtworzony z cudzej reklamy: ClickUp, Notion, Figma, Slack…) bierzesz tylko
+  jako technikę ruchu. Nigdy nie kopiujesz kadrów, układu, tekstów ani kolejności ujęć tamtej reklamy.
+- **Pomijasz:** edytor workbench (`node workbench/scripts/open.mjs`, `src/workbench.ts`, `npm run parity`;
+  `instaluj` go nie pobiera, poprawki robi właściciel w edytorze HQ), całe „交付收尾” (prośba o oznaczenie autora,
+  wysyłka do ich galerii prac, eksport do JianYing), niezależnego recenzenta-subagenta (sam robisz kontrolę klatek
+  z `kontrola-wideo`, ocenia właściciel) i drugą wersję bez muzyki (tylko na prośbę: ten sam render z `bgm` = false).
+- Zostaje z nich: prawdziwe zrzuty strony w 2× zamiast rysowanych makiet, dane wrażliwe na zrzutach zastąpione
+  zmyślonymi, wygląd z kolorów i krojów produktu, cięcia w rytm muzyki, ≤ 3 uderzenia całego kadru na film,
+  zero `Math.random` i `Date.now`.
 - Screenshoty strony klienta: `cp $SHOTCRAFT/assets/scripts/capture-template.mjs .`, popraw CONFIG na górze,
   `python3 $HERMES_HOME/scripts/narzedzia.py link .`, `node capture-template.mjs` (puppeteer na przeglądarce z obrazu).
 - Dema z `@remotion/motion-blur`: `npm i @remotion/motion-blur@4.0.484 --prefer-offline` w projekcie.
-- Dźwięki z `assets/audio/` wolno używać (ATTRIBUTION.md), źródło do RAPORT.md. Workbench (port 5198) nie jest potrzebny.
+- Dźwięki z `assets/audio/` wolno używać (ATTRIBUTION.md), źródło do RAPORT.md.
 
 ## Animacja HTML → wideo: `html_wideo.py` (nasza animacja, iart kinetic-typography, bang-motion, pixel2motion)
 ```bash

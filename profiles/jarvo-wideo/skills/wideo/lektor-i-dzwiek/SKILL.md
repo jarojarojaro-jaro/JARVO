@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.3.0
+version: 1.3.1
 author: Jarvo
 license: MIT
 metadata:
@@ -57,7 +57,9 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
 - Źródła: biblioteka użytkownika `@@KNOWLEDGE_DIR@@/wideo/muzyka/` (plan: `"muzyka": {"plik": "losowa"}`),
   muzyka marki `brands/<marka>/muzyka/`, plik z karty, a gdy ich brak: podkłady CC0 z biblioteki edytora
   (`projekt.py dzwieki --muzyka`, `dodaj-dzwiek`; „losowa” bierze je sama). Inny utwór tylko z licencją
-  (zaproponuj w RAPORT: YouTube Audio Library, Pixabay Music, pobrane przez użytkownika do biblioteki).
+  (zaproponuj w RAPORT: YouTube Audio Library, Pixabay Music, pobrane przez użytkownika do biblioteki). Przy utworze
+  z sieci zapisz w RAPORT link do jego strony i nazwę licencji: część darmowych utworów ma zgłoszenia Content ID,
+  a ten link pozwala właścicielowi odwołać zgłoszenie.
 - Głośność pod lektorem 0,08–0,16, czyli −22…−16 dB względem głosu (plan: `glosnosc`, domyślnie 0,14); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.
 - Nigdy: muzyka z list przebojów, „znalezione na YouTube”, muzyka z cudzych filmów.
@@ -79,10 +81,12 @@ Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność
    drip, boing, riser, splash, click, step, fall, chime, chirp, burner (+ `vol`, `pan`, `pitch` 0,9–1,3, żeby się nie powtarzały).
    Czasy: zdarzenia w obrazie (klik, zmiana stanu, cięcie) i bity z `rytm.py`; cue **~0,03 s przed** klatką zdarzenia.
    Bez ciągłego „skrobania” pod rysowaniem: dźwięk mają kontakty, nie rysowanie.
-3. **Brak w bibliotece:** biblioteka marki, `@@KNOWLEDGE_DIR@@/wideo/sfx/`, Mixkit i Pixabay (darmowe komercyjnie;
-   źródło i licencja w RAPORT). Strona kategorii `mixkit.co/free-sound-effects/<słowo>/` (np. click, whoosh, pop,
-   typing) ma linki do plików `assets.mixkit.co/…` → `curl -L` do `out/wideo/src/sfx/`; jeden efekt na zdarzenie,
-   nazwa = zdarzenie.
+3. **Brak w bibliotece:** biblioteka marki, `@@KNOWLEDGE_DIR@@/wideo/sfx/`, potem Mixkit i Pixabay, ale **tylko
+   pliki z darmową licencją sprawdzoną na stronie tego pliku**: Mixkit „Free License” (nie „Restricted”), Pixabay
+   „Content License” (bez sponsorowanych wyników iStock w wyszukiwarce: są płatne). Do RAPORT: link do strony pliku
+   i nazwa licencji. Plik żyje tylko w filmie: nie oddajesz go klientowi osobno ani w paczce plików.
+   Strona kategorii `mixkit.co/free-sound-effects/<słowo>/` (np. click, whoosh, pop, typing) ma linki do plików
+   `assets.mixkit.co/…` → `curl -L` do `out/wideo/src/sfx/`; jeden efekt na zdarzenie, nazwa = zdarzenie.
 
 - Każdy efekt dokładnie na swojej klatce (wg osi animacji): `rytm.py efekty/*.wav --szczyt` mówi, gdzie ma szczyt,
   więc start = chwila zdarzenia − szczyt (pliki z biblioteki CC0 mają szczyt na początku).
