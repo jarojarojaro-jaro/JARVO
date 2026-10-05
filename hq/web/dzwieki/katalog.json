@@ -98,7 +98,12 @@
    "autor": "qubodup",
    "zrodlo": "https://freesound.org/people/qubodup/sounds/60013/",
    "licencja": "CC0-1.0",
-   "sha256": "39b173396fdfd54a0ecd999c0e04bc9c477ad20c32e51a97f56e35259e870977"
+   "sha256": "39b173396fdfd54a0ecd999c0e04bc9c477ad20c32e51a97f56e35259e870977",
+   "szczyt": 0.08,
+   "rola": [
+    "ruch"
+   ],
+   "gra": false
   },
   {
    "id": "whoosh-szybki",
@@ -110,7 +115,12 @@
    "autor": "florianreichelt",
    "zrodlo": "https://freesound.org/people/florianreichelt/sounds/683101/",
    "licencja": "CC0-1.0",
-   "sha256": "981db5c9589d6ebcd2ca43861de3f07a32f96f892734c5ab0d8975004c895812"
+   "sha256": "981db5c9589d6ebcd2ca43861de3f07a32f96f892734c5ab0d8975004c895812",
+   "szczyt": 0.03,
+   "rola": [
+    "ruch"
+   ],
+   "gra": false
   },
   {
    "id": "swoosh",
@@ -122,7 +132,12 @@
    "autor": "Halgrimm",
    "zrodlo": "https://freesound.org/people/Halgrimm/sounds/169867/",
    "licencja": "CC0-1.0",
-   "sha256": "abe12b2817a512d3448fbaa75d34db0660505c4b9ea567f94a89f76ee2da96d7"
+   "sha256": "abe12b2817a512d3448fbaa75d34db0660505c4b9ea567f94a89f76ee2da96d7",
+   "szczyt": 1.0,
+   "rola": [
+    "ruch"
+   ],
+   "gra": false
   },
   {
    "id": "swoosh-przejscie",
@@ -134,7 +149,13 @@
    "autor": "adh.dreaming",
    "zrodlo": "https://freesound.org/people/adh.dreaming/sounds/632763/",
    "licencja": "CC0-1.0",
-   "sha256": "711dacefb80af16d1a742299b1fca7191f854eb7f87e824a4e4c2849871b5acd"
+   "sha256": "711dacefb80af16d1a742299b1fca7191f854eb7f87e824a4e4c2849871b5acd",
+   "szczyt": 0.07,
+   "rola": [
+    "ruch",
+    "przejscie"
+   ],
+   "gra": false
   },
   {
    "id": "whoosh-sredni",
@@ -146,7 +167,12 @@
    "autor": "moogy73",
    "zrodlo": "https://freesound.org/people/moogy73/sounds/425706/",
    "licencja": "CC0-1.0",
-   "sha256": "5f3c24a01e8d3cfe3dca8a6a04ebbe19dccc90ab66fa3c607a950f3f3c9f98cf"
+   "sha256": "5f3c24a01e8d3cfe3dca8a6a04ebbe19dccc90ab66fa3c607a950f3f3c9f98cf",
+   "szczyt": 0.12,
+   "rola": [
+    "ruch"
+   ],
+   "gra": false
   },
   {
    "id": "swoosh-dlugi",
@@ -158,7 +184,12 @@
    "autor": "Shinplaster",
    "zrodlo": "https://freesound.org/people/Shinplaster/sounds/264777/",
    "licencja": "CC0-1.0",
-   "sha256": "3f18c2861302f85f195ffaed832b5dced5732b71fd1afcd737e713d3e65b5379"
+   "sha256": "3f18c2861302f85f195ffaed832b5dced5732b71fd1afcd737e713d3e65b5379",
+   "szczyt": 4.74,
+   "rola": [
+    "ruch"
+   ],
+   "gra": false
   },
   {
    "id": "swoosh-wybuch",
@@ -170,7 +201,12 @@
    "autor": "Electroviolence",
    "zrodlo": "https://freesound.org/people/Electroviolence/sounds/234555/",
    "licencja": "CC0-1.0",
-   "sha256": "0faa3fd3aef8a1e5233173864f2ccbf424b20157c00be44a33537861277ac7e0"
+   "sha256": "0faa3fd3aef8a1e5233173864f2ccbf424b20157c00be44a33537861277ac7e0",
+   "szczyt": 0.89,
+   "rola": [
+    "przejscie"
+   ],
+   "gra": false
   },
   {
    "id": "bicz",
@@ -182,7 +218,12 @@
    "autor": "denao270",
    "zrodlo": "https://freesound.org/people/denao270/sounds/346373/",
    "licencja": "CC0-1.0",
-   "sha256": "cf86781c9d27c3bccd0bf913e9911f0a424de25f360be02924ca726e4b7fdc44"
+   "sha256": "cf86781c9d27c3bccd0bf913e9911f0a424de25f360be02924ca726e4b7fdc44",
+   "szczyt": 0.03,
+   "rola": [
+    "ruch"
+   ],
+   "gra": false
   },
   {
    "id": "narastanie",
@@ -194,7 +235,12 @@
    "autor": "syntheffects",
    "zrodlo": "https://freesound.org/people/syntheffects/sounds/685256/",
    "licencja": "CC0-1.0",
-   "sha256": "3a824290f4397bf570429f5b79b64ceaf1f774002a4c4f1c70e091c7fe971623"
+   "sha256": "3a824290f4397bf570429f5b79b64ceaf1f774002a4c4f1c70e091c7fe971623",
+   "szczyt": 2.16,
+   "rola": [
+    "narastanie"
+   ],
+   "gra": false
   },
   {
    "id": "narastanie-krotkie",
@@ -206,7 +252,12 @@
    "autor": "Rizzard",
    "zrodlo": "https://freesound.org/people/Rizzard/sounds/561207/",
    "licencja": "CC0-1.0",
-   "sha256": "bb85169a452d23495042f26c3272729380d74d1f1674c9e5931e3432eb2fc866"
+   "sha256": "bb85169a452d23495042f26c3272729380d74d1f1674c9e5931e3432eb2fc866",
+   "szczyt": 1.77,
+   "rola": [
+    "narastanie"
+   ],
+   "gra": false
   },
   {
    "id": "uderzenie-przejscia",
@@ -218,7 +269,13 @@
    "autor": "AudioPapkin",
    "zrodlo": "https://freesound.org/people/AudioPapkin/sounds/648534/",
    "licencja": "CC0-1.0",
-   "sha256": "6199b131d7cfc276d2462c8afd0ad3726933fcd3166bde35dc3abebb0b881c51"
+   "sha256": "6199b131d7cfc276d2462c8afd0ad3726933fcd3166bde35dc3abebb0b881c51",
+   "szczyt": 1.09,
+   "rola": [
+    "uderzenie",
+    "przejscie"
+   ],
+   "gra": false
   },
   {
    "id": "przewijanie",
@@ -230,7 +287,12 @@
    "autor": "richienoodles",
    "zrodlo": "https://freesound.org/people/richienoodles/sounds/178555/",
    "licencja": "CC0-1.0",
-   "sha256": "b7ceef600d344e2424cb87bc293b441b67362b8df447ea9d204546f39c65a05f"
+   "sha256": "b7ceef600d344e2424cb87bc293b441b67362b8df447ea9d204546f39c65a05f",
+   "szczyt": 1.3,
+   "rola": [
+    "przejscie"
+   ],
+   "gra": false
   },
   {
    "id": "oklaski",
@@ -242,7 +304,10 @@
    "autor": "Sandermotions",
    "zrodlo": "https://freesound.org/people/Sandermotions/sounds/277022/",
    "licencja": "CC0-1.0",
-   "sha256": "c9de5e409a3a166bc1f4816bbef4b5ce818e2bf39c3e98c07a92438840e80e75"
+   "sha256": "c9de5e409a3a166bc1f4816bbef4b5ce818e2bf39c3e98c07a92438840e80e75",
+   "szczyt": 1.38,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "wiwaty",
@@ -254,7 +319,10 @@
    "autor": "jayfrosting",
    "zrodlo": "https://freesound.org/people/jayfrosting/sounds/333404/",
    "licencja": "CC0-1.0",
-   "sha256": "60d9132cb3e58259e7ec145f6564ca752db8c3978b2ee0e4e0dc53bfc8e46046"
+   "sha256": "60d9132cb3e58259e7ec145f6564ca752db8c3978b2ee0e4e0dc53bfc8e46046",
+   "szczyt": 0.36,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "tlum-hura",
@@ -266,7 +334,10 @@
    "autor": "qubodup",
    "zrodlo": "https://freesound.org/people/qubodup/sounds/182571/",
    "licencja": "CC0-1.0",
-   "sha256": "3c7e43478e2211f1e711a638eb725810e829bce7c2439164de06600ed90539fa"
+   "sha256": "3c7e43478e2211f1e711a638eb725810e829bce7c2439164de06600ed90539fa",
+   "szczyt": 2.39,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "smiech",
@@ -278,7 +349,10 @@
    "autor": "snakebarney",
    "zrodlo": "https://freesound.org/people/snakebarney/sounds/138112/",
    "licencja": "CC0-1.0",
-   "sha256": "e34b9665863257f018f6348d69c76113aa291a5b03621b1e464bc0faf49b379f"
+   "sha256": "e34b9665863257f018f6348d69c76113aa291a5b03621b1e464bc0faf49b379f",
+   "szczyt": 0.69,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "smiech-oklaski",
@@ -290,7 +364,10 @@
    "autor": "Kinoton",
    "zrodlo": "https://freesound.org/people/Kinoton/sounds/371562/",
    "licencja": "CC0-1.0",
-   "sha256": "eb9cf39f62b6e13a05ba093a82e97e3f53760fbb2dbbfe4fd81bc069e2a5e1b3"
+   "sha256": "eb9cf39f62b6e13a05ba093a82e97e3f53760fbb2dbbfe4fd81bc069e2a5e1b3",
+   "szczyt": 3.88,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "werble",
@@ -302,7 +379,10 @@
    "autor": "adriann",
    "zrodlo": "https://freesound.org/people/adriann/sounds/191718/",
    "licencja": "CC0-1.0",
-   "sha256": "29752591b0fdb43e54db64ee7e098379ef9f99030f1bb12bfe0509b2664c7f30"
+   "sha256": "29752591b0fdb43e54db64ee7e098379ef9f99030f1bb12bfe0509b2664c7f30",
+   "szczyt": 4.14,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "werble-talerz",
@@ -314,7 +394,10 @@
    "autor": "tlwmdbt",
    "zrodlo": "https://freesound.org/people/tlwmdbt/sounds/440829/",
    "licencja": "CC0-1.0",
-   "sha256": "a47f2e5f542266e5a751450e71e7a5cae5752fb2904ca621fc1e7f6d323f2c37"
+   "sha256": "a47f2e5f542266e5a751450e71e7a5cae5752fb2904ca621fc1e7f6d323f2c37",
+   "szczyt": 0.17,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "porazka",
@@ -326,7 +409,10 @@
    "autor": "TaranP",
    "zrodlo": "https://freesound.org/people/TaranP/sounds/362206/",
    "licencja": "CC0-1.0",
-   "sha256": "0e909eebd0e1375cd9f397e927dbb16bb7aff40874414006d0973493cb7dddc5"
+   "sha256": "0e909eebd0e1375cd9f397e927dbb16bb7aff40874414006d0973493cb7dddc5",
+   "szczyt": 1.24,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "tadam",
@@ -338,7 +424,10 @@
    "autor": "plasterbrain",
    "zrodlo": "https://freesound.org/people/plasterbrain/sounds/397355/",
    "licencja": "CC0-1.0",
-   "sha256": "db591195db63189c146e58ff44977520a87219bd21a1915845076b31fff97f5d"
+   "sha256": "db591195db63189c146e58ff44977520a87219bd21a1915845076b31fff97f5d",
+   "szczyt": 0.12,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dobrze",
@@ -350,7 +439,10 @@
    "autor": "ertfelda",
    "zrodlo": "https://freesound.org/people/ertfelda/sounds/243701/",
    "licencja": "CC0-1.0",
-   "sha256": "0b8374122ba4642ef9eeee247848c3d66b6c2ec4ae2bf2c2e89260c6d7356e85"
+   "sha256": "0b8374122ba4642ef9eeee247848c3d66b6c2ec4ae2bf2c2e89260c6d7356e85",
+   "szczyt": 0.07,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "sukces",
@@ -362,7 +454,10 @@
    "autor": "FunWithSound",
    "zrodlo": "https://freesound.org/people/FunWithSound/sounds/456965/",
    "licencja": "CC0-1.0",
-   "sha256": "d1414b76e59a30e2d9e5905e2f29b8ae53f424c0a520c8c32654f6706affb420"
+   "sha256": "d1414b76e59a30e2d9e5905e2f29b8ae53f424c0a520c8c32654f6706affb420",
+   "szczyt": 0.09,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "zle",
@@ -374,7 +469,10 @@
    "autor": "Producing_RayLite",
    "zrodlo": "https://freesound.org/people/Producing_RayLite/sounds/700641/",
    "licencja": "CC0-1.0",
-   "sha256": "83977ff1321599dad2f3d942a067530b87c70681a488cc0926d95458229d8fcc"
+   "sha256": "83977ff1321599dad2f3d942a067530b87c70681a488cc0926d95458229d8fcc",
+   "szczyt": 0.3,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "zgrzyt-plyty",
@@ -386,7 +484,10 @@
    "autor": "simkiott",
    "zrodlo": "https://freesound.org/people/simkiott/sounds/43404/",
    "licencja": "CC0-1.0",
-   "sha256": "a0bceb47d360837c2061bf8517ec00de0960d8a8415485f53264eb54fb4f4475"
+   "sha256": "a0bceb47d360837c2061bf8517ec00de0960d8a8415485f53264eb54fb4f4475",
+   "szczyt": 0.61,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "magia",
@@ -398,7 +499,12 @@
    "autor": "MLaudio",
    "zrodlo": "https://freesound.org/people/MLaudio/sounds/511485/",
    "licencja": "CC0-1.0",
-   "sha256": "7da0b4d36b7f6dabbaa54b0751541ccfebe5c032a284dbb3f45d6968cbf9dcde"
+   "sha256": "7da0b4d36b7f6dabbaa54b0751541ccfebe5c032a284dbb3f45d6968cbf9dcde",
+   "szczyt": 0.06,
+   "rola": [
+    "blysk"
+   ],
+   "gra": false
   },
   {
    "id": "osiagniecie",
@@ -410,7 +516,10 @@
    "autor": "SkySpeira",
    "zrodlo": "https://freesound.org/people/SkySpeira/sounds/715067/",
    "licencja": "CC0-1.0",
-   "sha256": "396b5f0c8b8c3f6cb775ab49030e107c17720357f1b24400e8cf511c37db9e1e"
+   "sha256": "396b5f0c8b8c3f6cb775ab49030e107c17720357f1b24400e8cf511c37db9e1e",
+   "szczyt": 0.23,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "kasa",
@@ -422,7 +531,10 @@
    "autor": "Zott820",
    "zrodlo": "https://freesound.org/people/Zott820/sounds/209578/",
    "licencja": "CC0-1.0",
-   "sha256": "1a4b6b366d8f524429319aed3056804da1c4c2d50e82ec9c3ae0def94cce1c77"
+   "sha256": "1a4b6b366d8f524429319aed3056804da1c4c2d50e82ec9c3ae0def94cce1c77",
+   "szczyt": 0.33,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "kasa-2",
@@ -434,7 +546,10 @@
    "autor": "CapsLok",
    "zrodlo": "https://freesound.org/people/CapsLok/sounds/184438/",
    "licencja": "CC0-1.0",
-   "sha256": "53f0981e3003c106c0f8af51bfc2809d5d233d366de2b3be57b59fb47a45487f"
+   "sha256": "53f0981e3003c106c0f8af51bfc2809d5d233d366de2b3be57b59fb47a45487f",
+   "szczyt": 0.29,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "liczenie-banknotow",
@@ -446,7 +561,10 @@
    "autor": "madvedj",
    "zrodlo": "https://freesound.org/people/madvedj/sounds/178097/",
    "licencja": "CC0-1.0",
-   "sha256": "53c447c061610c6a4bfcd02859dbf19965749ede3fac1dd79eb43cc2025fba91"
+   "sha256": "53c447c061610c6a4bfcd02859dbf19965749ede3fac1dd79eb43cc2025fba91",
+   "szczyt": 1.5,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "spadajace-monety",
@@ -458,7 +576,10 @@
    "autor": "Jace",
    "zrodlo": "https://freesound.org/people/Jace/sounds/17502/",
    "licencja": "CC0-1.0",
-   "sha256": "1130497ddee2f0a549d94a209173b0e73042441449100f1a291842cf752432d3"
+   "sha256": "1130497ddee2f0a549d94a209173b0e73042441449100f1a291842cf752432d3",
+   "szczyt": 0.1,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "moneta",
@@ -470,7 +591,10 @@
    "autor": "Rocotilos",
    "zrodlo": "https://freesound.org/people/Rocotilos/sounds/343462/",
    "licencja": "CC0-1.0",
-   "sha256": "d43f1724c4068817230303c979cfb584d57d187957e9f82fff9426348dc69756"
+   "sha256": "d43f1724c4068817230303c979cfb584d57d187957e9f82fff9426348dc69756",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "moneta-gra",
@@ -482,7 +606,10 @@
    "autor": "LeMudCrab",
    "zrodlo": "https://freesound.org/people/LeMudCrab/sounds/163451/",
    "licencja": "CC0-1.0",
-   "sha256": "f12e32aab7372890e6bca8f3ded1c861495b9689cd33f95eb84827a05b54fb76"
+   "sha256": "f12e32aab7372890e6bca8f3ded1c861495b9689cd33f95eb84827a05b54fb76",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "wygrana-automat",
@@ -494,7 +621,10 @@
    "autor": "jack126guy",
    "zrodlo": "https://freesound.org/people/jack126guy/sounds/361346/",
    "licencja": "CC0-1.0",
-   "sha256": "7189792a13e789f76d4f5acd075116d8203e9c1a105f1298ba9f7af0297103b2"
+   "sha256": "7189792a13e789f76d4f5acd075116d8203e9c1a105f1298ba9f7af0297103b2",
+   "szczyt": 0.79,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "monety-w-dloni",
@@ -506,7 +636,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/rpg-audio",
    "licencja": "CC0-1.0",
-   "sha256": "0785a43e31008f4873cd52405caf81757af4a1c178877b2debfa3a943bf4b7b4"
+   "sha256": "0785a43e31008f4873cd52405caf81757af4a1c178877b2debfa3a943bf4b7b4",
+   "szczyt": 0.11,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "monety-w-dloni-2",
@@ -518,7 +651,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/rpg-audio",
    "licencja": "CC0-1.0",
-   "sha256": "aeeabbfadbfebecbf14b76f2d5cb77f75adaa62804ec4a520eb37bfdaeb12118"
+   "sha256": "aeeabbfadbfebecbf14b76f2d5cb77f75adaa62804ec4a520eb37bfdaeb12118",
+   "szczyt": 0.07,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "zetony",
@@ -530,7 +666,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/casino-audio",
    "licencja": "CC0-1.0",
-   "sha256": "f415b74d05e8e7edc59be65a3e818411a72e173194758e66edfbef29ff689922"
+   "sha256": "f415b74d05e8e7edc59be65a3e818411a72e173194758e66edfbef29ff689922",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "zetony-2",
@@ -542,7 +681,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/casino-audio",
    "licencja": "CC0-1.0",
-   "sha256": "b3e3a807244742972c046321f3b903e9533b968a8f365a3892d8c0c232721ff7"
+   "sha256": "b3e3a807244742972c046321f3b903e9533b968a8f365a3892d8c0c232721ff7",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "skaner",
@@ -554,7 +696,10 @@
    "autor": "zerolagtime",
    "zrodlo": "https://freesound.org/people/zerolagtime/sounds/144418/",
    "licencja": "CC0-1.0",
-   "sha256": "12d95ef87e73a90dea63d46cf0058a2cf78cd74f913cf6f48b34b7a77795d885"
+   "sha256": "12d95ef87e73a90dea63d46cf0058a2cf78cd74f913cf6f48b34b7a77795d885",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "boom-kinowy",
@@ -566,7 +711,12 @@
    "autor": "Julien_Matthey",
    "zrodlo": "https://freesound.org/people/Julien_Matthey/sounds/201571/",
    "licencja": "CC0-1.0",
-   "sha256": "a7784b28373df658476dba41d19bed6e3be4e5467ae966915a1b7ce744168052"
+   "sha256": "a7784b28373df658476dba41d19bed6e3be4e5467ae966915a1b7ce744168052",
+   "szczyt": 0.01,
+   "rola": [
+    "uderzenie"
+   ],
+   "gra": false
   },
   {
    "id": "uderzenie-duze",
@@ -578,7 +728,12 @@
    "autor": "AudioPapkin",
    "zrodlo": "https://freesound.org/people/AudioPapkin/sounds/430977/",
    "licencja": "CC0-1.0",
-   "sha256": "176f24a176b8ec9f37b9197b6a3f58345e5042780a61dd2c1821016062a65107"
+   "sha256": "176f24a176b8ec9f37b9197b6a3f58345e5042780a61dd2c1821016062a65107",
+   "szczyt": 0.14,
+   "rola": [
+    "uderzenie"
+   ],
+   "gra": false
   },
   {
    "id": "uderzenie-niskie",
@@ -590,7 +745,12 @@
    "autor": "AudioPapkin",
    "zrodlo": "https://freesound.org/people/AudioPapkin/sounds/430978/",
    "licencja": "CC0-1.0",
-   "sha256": "1e0ab1e53f94872d40c290ecac3a9cb233efb48778a515066ee06d4f1e59e18e"
+   "sha256": "1e0ab1e53f94872d40c290ecac3a9cb233efb48778a515066ee06d4f1e59e18e",
+   "szczyt": 0.71,
+   "rola": [
+    "uderzenie"
+   ],
+   "gra": false
   },
   {
    "id": "bas",
@@ -602,7 +762,10 @@
    "autor": "uzerx",
    "zrodlo": "https://freesound.org/people/uzerx/sounds/59540/",
    "licencja": "CC0-1.0",
-   "sha256": "f69369b7d407661e69e869aef2ee05608e296d6340f1fd3cc74311ccea22b8b1"
+   "sha256": "f69369b7d407661e69e869aef2ee05608e296d6340f1fd3cc74311ccea22b8b1",
+   "szczyt": 2.35,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "cios-boks",
@@ -614,7 +777,10 @@
    "autor": "newagesoup",
    "zrodlo": "https://freesound.org/people/newagesoup/sounds/348244/",
    "licencja": "CC0-1.0",
-   "sha256": "d96fd3b0de641526323fbf9b5d67a203f7112d17c7f5bc9a563e0cfbbab945a7"
+   "sha256": "d96fd3b0de641526323fbf9b5d67a203f7112d17c7f5bc9a563e0cfbbab945a7",
+   "szczyt": 0.07,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "cios",
@@ -626,7 +792,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "628549a3dbf70d1597ef9461af1536738340fbb5a278efeef24946451031a945"
+   "sha256": "628549a3dbf70d1597ef9461af1536738340fbb5a278efeef24946451031a945",
+   "szczyt": 0.03,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "cios-lekki",
@@ -638,7 +807,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "1ad5e1196bfae75e8b17c17419bcb9b4111db4325762c6db6044cbf393c6e4f4"
+   "sha256": "1ad5e1196bfae75e8b17c17419bcb9b4111db4325762c6db6044cbf393c6e4f4",
+   "szczyt": 0.03,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "metal",
@@ -650,7 +822,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "c5dd8a0ab2eabd1fcc9073a681486f3ec165b94d8647973cb685e74e7b9cc4a9"
+   "sha256": "c5dd8a0ab2eabd1fcc9073a681486f3ec165b94d8647973cb685e74e7b9cc4a9",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "drewno",
@@ -662,7 +837,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "465ac7510af34ff3cc203c8895a374120dcd784b90c17e43fb7a09c48139c135"
+   "sha256": "465ac7510af34ff3cc203c8895a374120dcd784b90c17e43fb7a09c48139c135",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "szklo",
@@ -674,7 +852,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "ebcb1e1d601f74be1d1242cae132fb8ba3dadaa9c4818d73c6fc8f83b18dba01"
+   "sha256": "ebcb1e1d601f74be1d1242cae132fb8ba3dadaa9c4818d73c6fc8f83b18dba01",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzwon",
@@ -686,7 +867,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "e3b9c4471642ba2e6c4d1136d7e48030811907325374725c3b117e42db1a5cf8"
+   "sha256": "e3b9c4471642ba2e6c4d1136d7e48030811907325374725c3b117e42db1a5cf8",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "miekkie",
@@ -698,7 +882,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "2ca5e5fb7ea7ba1eeb51b0393f191a6a4dd97dbb4baab7a6673f6289aa43b3e4"
+   "sha256": "2ca5e5fb7ea7ba1eeb51b0393f191a6a4dd97dbb4baab7a6673f6289aa43b3e4",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "talerz",
@@ -710,7 +897,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "23847b18dbf9765a54c843aa7fd080eff35ad143dae15455dc59f65c2ddbc764"
+   "sha256": "23847b18dbf9765a54c843aa7fd080eff35ad143dae15455dc59f65c2ddbc764",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "tluczone-szklo",
@@ -722,7 +912,10 @@
    "autor": "avrahamy",
    "zrodlo": "https://freesound.org/people/avrahamy/sounds/141563/",
    "licencja": "CC0-1.0",
-   "sha256": "b779868ea9e4c9b39255f2279fbf2e927b15348b44ede00fb1111dd23fa206de"
+   "sha256": "b779868ea9e4c9b39255f2279fbf2e927b15348b44ede00fb1111dd23fa206de",
+   "szczyt": 0.04,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "strzal-pistolet",
@@ -734,7 +927,10 @@
    "autor": "michorvath",
    "zrodlo": "https://freesound.org/people/michorvath/sounds/427592/",
    "licencja": "CC0-1.0",
-   "sha256": "74371b8b496b2a28e1defa3325cdab4bf491d8df9144226da98dcffa2ceb5273"
+   "sha256": "74371b8b496b2a28e1defa3325cdab4bf491d8df9144226da98dcffa2ceb5273",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "strzal-strzelba",
@@ -746,7 +942,10 @@
    "autor": "michorvath",
    "zrodlo": "https://freesound.org/people/michorvath/sounds/427595/",
    "licencja": "CC0-1.0",
-   "sha256": "c450776f3c874f4977639615e8b4136f27dbb586545d2509aa2b8ca4e0c08640"
+   "sha256": "c450776f3c874f4977639615e8b4136f27dbb586545d2509aa2b8ca4e0c08640",
+   "szczyt": 0.04,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "strzal",
@@ -758,7 +957,10 @@
    "autor": "ShawnyBoy",
    "zrodlo": "https://freesound.org/people/ShawnyBoy/sounds/166191/",
    "licencja": "CC0-1.0",
-   "sha256": "7653ada66811cc5caa9b222eaeaf7430f5638bb1e248c049e1a0da51d1a4dcc6"
+   "sha256": "7653ada66811cc5caa9b222eaeaf7430f5638bb1e248c049e1a0da51d1a4dcc6",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "seria",
@@ -770,7 +972,10 @@
    "autor": "ShawnyBoy",
    "zrodlo": "https://freesound.org/people/ShawnyBoy/sounds/165394/",
    "licencja": "CC0-1.0",
-   "sha256": "359e52d84c690602410e59e458ddc2c40bfec8add5fddebe39b2ce55945ad1ad"
+   "sha256": "359e52d84c690602410e59e458ddc2c40bfec8add5fddebe39b2ce55945ad1ad",
+   "szczyt": 1.5,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "wybuch",
@@ -782,7 +987,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/sci-fi-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "a55af6e0f029a8586d5e1d015595132fc19c6288ebce3eaebd8229f13badd1b1"
+   "sha256": "a55af6e0f029a8586d5e1d015595132fc19c6288ebce3eaebd8229f13badd1b1",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "wybuch-2",
@@ -794,7 +1002,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/sci-fi-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "6813ffbc2f48e5b94f966531173d3b10fdd3a7090f9b45ef0cd1df998ea571e1"
+   "sha256": "6813ffbc2f48e5b94f966531173d3b10fdd3a7090f9b45ef0cd1df998ea571e1",
+   "szczyt": 0.23,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "wybuch-gleboki",
@@ -806,7 +1017,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/sci-fi-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "253b2bc9c11a4b3fb2cc559bb1ea3ec2c0e53f165b2a77e16ff337d729344d53"
+   "sha256": "253b2bc9c11a4b3fb2cc559bb1ea3ec2c0e53f165b2a77e16ff337d729344d53",
+   "szczyt": 0.22,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "rakieta",
@@ -818,7 +1032,10 @@
    "autor": "EcoDTR",
    "zrodlo": "https://freesound.org/people/EcoDTR/sounds/36847/",
    "licencja": "CC0-1.0",
-   "sha256": "1c8ec758f9c628eac76398bd7a91fd652517442cce032dfc84463365e39ce1fb"
+   "sha256": "1c8ec758f9c628eac76398bd7a91fd652517442cce032dfc84463365e39ce1fb",
+   "szczyt": 0.67,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "laser-duzy",
@@ -830,7 +1047,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/sci-fi-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "60c447990dcb89d81ca9db47e4eaf895c58ad9ae28ec3fb86dd309fd7586b228"
+   "sha256": "60c447990dcb89d81ca9db47e4eaf895c58ad9ae28ec3fb86dd309fd7586b228",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "laser-maly",
@@ -842,7 +1062,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/sci-fi-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "51bed1a4d050ac92a7523811b01f9ca0b06d61ed764b760c4ea42a2ea66f4aa9"
+   "sha256": "51bed1a4d050ac92a7523811b01f9ca0b06d61ed764b760c4ea42a2ea66f4aa9",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "laser-retro",
@@ -854,7 +1077,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/sci-fi-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "d7468f6bdf391ed5e7348d015778270e379ae882a08499ca57f8a598cfc8c898"
+   "sha256": "d7468f6bdf391ed5e7348d015778270e379ae882a08499ca57f8a598cfc8c898",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "pole-silowe",
@@ -866,7 +1092,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/sci-fi-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "301cb7b27b7a52fa76379a2ef840c6ff7e48ba85b2447c154490548941b7dfa4"
+   "sha256": "301cb7b27b7a52fa76379a2ef840c6ff7e48ba85b2447c154490548941b7dfa4",
+   "szczyt": 0.15,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "noz",
@@ -878,7 +1107,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/rpg-audio",
    "licencja": "CC0-1.0",
-   "sha256": "1f656c9a3094bbd02fc35bc5b7b81eb5a42a8fce33c590c56c204ff3361bceef"
+   "sha256": "1f656c9a3094bbd02fc35bc5b7b81eb5a42a8fce33c590c56c204ff3361bceef",
+   "szczyt": 0.19,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "klik",
@@ -890,7 +1122,12 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "cda65e73b70a95582bfaa0829d48fa1a3e1ae7e09953a9e3e4118ba8f7bedecc"
+   "sha256": "cda65e73b70a95582bfaa0829d48fa1a3e1ae7e09953a9e3e4118ba8f7bedecc",
+   "szczyt": 0.0,
+   "rola": [
+    "klik"
+   ],
+   "gra": false
   },
   {
    "id": "klik-2",
@@ -902,7 +1139,12 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "9f2cdd07380c044e44f20c023648ed42c7d4b798a35cd6efb0f78e8acfdb125e"
+   "sha256": "9f2cdd07380c044e44f20c023648ed42c7d4b798a35cd6efb0f78e8acfdb125e",
+   "szczyt": 0.0,
+   "rola": [
+    "klik"
+   ],
+   "gra": false
   },
   {
    "id": "klik-myszy",
@@ -914,7 +1156,12 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/ui-audio",
    "licencja": "CC0-1.0",
-   "sha256": "5093d279b595b320f1c2bee3b297d18c7c2fd1f73756325af2c4f783fa2db4fb"
+   "sha256": "5093d279b595b320f1c2bee3b297d18c7c2fd1f73756325af2c4f783fa2db4fb",
+   "szczyt": 0.01,
+   "rola": [
+    "klik"
+   ],
+   "gra": false
   },
   {
    "id": "wybor",
@@ -926,7 +1173,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "08dff3a0dcd0b26970434fae68a7a31668a1640978b8fadfd2ca9b97f324ba37"
+   "sha256": "08dff3a0dcd0b26970434fae68a7a31668a1640978b8fadfd2ca9b97f324ba37",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "potwierdzenie",
@@ -938,7 +1188,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "6d16e3aa88aa98157af9ba2ebba4532eb0cee3ac468ac753b1f9328b8e6f5b52"
+   "sha256": "6d16e3aa88aa98157af9ba2ebba4532eb0cee3ac468ac753b1f9328b8e6f5b52",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "blad",
@@ -950,7 +1203,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "63f91631f49de460cde1caeee058310ef4ee0955b34d4aa9247f64ce3743c877"
+   "sha256": "63f91631f49de460cde1caeee058310ef4ee0955b34d4aa9247f64ce3743c877",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "pytanie",
@@ -962,7 +1218,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "32a608a87d6013bd7378a70db1f34612d2b86c3d338d91d3756a786fc9ab8f2b"
+   "sha256": "32a608a87d6013bd7378a70db1f34612d2b86c3d338d91d3756a786fc9ab8f2b",
+   "szczyt": 0.16,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "przelacznik",
@@ -974,7 +1233,12 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "687102f2335f62cf1cc53aa6ed4961618864c739a7c597e66d67783c001f140d"
+   "sha256": "687102f2335f62cf1cc53aa6ed4961618864c739a7c597e66d67783c001f140d",
+   "szczyt": 0.0,
+   "rola": [
+    "klik"
+   ],
+   "gra": false
   },
   {
    "id": "szarpniecie",
@@ -986,7 +1250,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "b0232b4d5c8fe7941b368e9bafae5aee9ad46114935c18b223fb2264d55f850c"
+   "sha256": "b0232b4d5c8fe7941b368e9bafae5aee9ad46114935c18b223fb2264d55f850c",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "upuszczenie",
@@ -998,7 +1265,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "c8a8c0d59d9a4f16e7ec06c8112aafc40b25de22709ad61ca4dd32f3de71ba06"
+   "sha256": "c8a8c0d59d9a4f16e7ec06c8112aafc40b25de22709ad61ca4dd32f3de71ba06",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "ding-szklany",
@@ -1010,7 +1280,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "e0a5a716e15b3665f9b0e485b2645499930d49b7734f15f828aab1ab4bb94462"
+   "sha256": "e0a5a716e15b3665f9b0e485b2645499930d49b7734f15f828aab1ab4bb94462",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "bong",
@@ -1022,7 +1295,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "8077fa987f5c490275a8c3b68655fa994de88e7d2992ea72469e5780b173822b"
+   "sha256": "8077fa987f5c490275a8c3b68655fa994de88e7d2992ea72469e5780b173822b",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "tik",
@@ -1034,7 +1310,12 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "d775cfd9409a803f4c467ea171f9416430988ff7c9deea395a33587fd8572947"
+   "sha256": "d775cfd9409a803f4c467ea171f9416430988ff7c9deea395a33587fd8572947",
+   "szczyt": 0.0,
+   "rola": [
+    "klik"
+   ],
+   "gra": false
   },
   {
    "id": "otworz",
@@ -1046,7 +1327,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "9625cc58bcc896976b55ca5f20c4e36b8ddb08dbfff3e4bd14ee100b184f177f"
+   "sha256": "9625cc58bcc896976b55ca5f20c4e36b8ddb08dbfff3e4bd14ee100b184f177f",
+   "szczyt": 0.13,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "zamknij",
@@ -1058,7 +1342,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/interface-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "a1d3d8ee258222c5882451140bca01b3cf609f19ec702b03bc7a205cfb173210"
+   "sha256": "a1d3d8ee258222c5882451140bca01b3cf609f19ec702b03bc7a205cfb173210",
+   "szczyt": 0.12,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "powiadomienie",
@@ -1070,7 +1357,10 @@
    "autor": "Jofae",
    "zrodlo": "https://freesound.org/people/Jofae/sounds/380482/",
    "licencja": "CC0-1.0",
-   "sha256": "adc2b75fa86acba807ce33bb9279d3b04e6504dad86ac52dc30d86d05e44df8b"
+   "sha256": "adc2b75fa86acba807ce33bb9279d3b04e6504dad86ac52dc30d86d05e44df8b",
+   "szczyt": 0.02,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "wiadomosc",
@@ -1082,7 +1372,10 @@
    "autor": "Froey_",
    "zrodlo": "https://freesound.org/people/Froey_/sounds/760369/",
    "licencja": "CC0-1.0",
-   "sha256": "f4d72238028dcfe3024d5fdf3b8868985437f16e418d8566eb40f7355f9f1356"
+   "sha256": "f4d72238028dcfe3024d5fdf3b8868985437f16e418d8566eb40f7355f9f1356",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "pop",
@@ -1094,7 +1387,12 @@
    "autor": "ConarB13",
    "zrodlo": "https://freesound.org/people/ConarB13/sounds/401542/",
    "licencja": "CC0-1.0",
-   "sha256": "a7fcf07dfa98dc2a6176fcb59c77833887032d3ceccaf60126caee8d9ba2152b"
+   "sha256": "a7fcf07dfa98dc2a6176fcb59c77833887032d3ceccaf60126caee8d9ba2152b",
+   "szczyt": 0.01,
+   "rola": [
+    "pojawienie"
+   ],
+   "gra": false
   },
   {
    "id": "plop",
@@ -1106,7 +1404,12 @@
    "autor": "Breviceps",
    "zrodlo": "https://freesound.org/people/Breviceps/sounds/447910/",
    "licencja": "CC0-1.0",
-   "sha256": "acc214d85c9f2a9e03d230622d0a43269315e88d7764271e636023f0b469d5dc"
+   "sha256": "acc214d85c9f2a9e03d230622d0a43269315e88d7764271e636023f0b469d5dc",
+   "szczyt": 0.0,
+   "rola": [
+    "pojawienie"
+   ],
+   "gra": false
   },
   {
    "id": "migawka",
@@ -1118,7 +1421,12 @@
    "autor": "roachpowder",
    "zrodlo": "https://freesound.org/people/roachpowder/sounds/170229/",
    "licencja": "CC0-1.0",
-   "sha256": "9ee796678dcaa9a50be83bfb62c328c5adef5f1954d0d013118905858ef89b4f"
+   "sha256": "9ee796678dcaa9a50be83bfb62c328c5adef5f1954d0d013118905858ef89b4f",
+   "szczyt": 0.18,
+   "rola": [
+    "klik"
+   ],
+   "gra": false
   },
   {
    "id": "migawka-telefon",
@@ -1130,7 +1438,10 @@
    "autor": "pooky1",
    "zrodlo": "https://freesound.org/people/pooky1/sounds/431588/",
    "licencja": "CC0-1.0",
-   "sha256": "e4be6cce1f0cd6b5076f978352ca04a07bff7cc9c58857a11b6a8537cc302b00"
+   "sha256": "e4be6cce1f0cd6b5076f978352ca04a07bff7cc9c58857a11b6a8537cc302b00",
+   "szczyt": 0.25,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "lustrzanka",
@@ -1142,7 +1453,10 @@
    "autor": "xef6",
    "zrodlo": "https://freesound.org/people/xef6/sounds/61059/",
    "licencja": "CC0-1.0",
-   "sha256": "fa059489817a47d6ca144f71dbfb3a1e9f93cd9a8bd054985af6df187b410cee"
+   "sha256": "fa059489817a47d6ca144f71dbfb3a1e9f93cd9a8bd054985af6df187b410cee",
+   "szczyt": 0.07,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "klawiatura",
@@ -1154,7 +1468,12 @@
    "autor": "Breviceps",
    "zrodlo": "https://freesound.org/people/Breviceps/sounds/447909/",
    "licencja": "CC0-1.0",
-   "sha256": "b6ffab1e1649e7263535583e610c1d570656e75346b6e0df61a547092bf1f38b"
+   "sha256": "b6ffab1e1649e7263535583e610c1d570656e75346b6e0df61a547092bf1f38b",
+   "szczyt": 3.62,
+   "rola": [
+    "pisanie"
+   ],
+   "gra": false
   },
   {
    "id": "klawiatura-mechaniczna",
@@ -1166,7 +1485,12 @@
    "autor": "newagesoup",
    "zrodlo": "https://freesound.org/people/newagesoup/sounds/348239/",
    "licencja": "CC0-1.0",
-   "sha256": "b0132e35634dfef7e8666b0490453fa96979312a746ac2ab302bc1de9f30381a"
+   "sha256": "b0132e35634dfef7e8666b0490453fa96979312a746ac2ab302bc1de9f30381a",
+   "szczyt": 0.02,
+   "rola": [
+    "pisanie"
+   ],
+   "gra": false
   },
   {
    "id": "pisanie-cyfrowe",
@@ -1178,7 +1502,12 @@
    "autor": "Sky_Motion",
    "zrodlo": "https://freesound.org/people/Sky_Motion/sounds/416777/",
    "licencja": "CC0-1.0",
-   "sha256": "42eefa303c65be43ffefbb18e49e4b71cfc6d0263698ecb31ca883112d05e51d"
+   "sha256": "42eefa303c65be43ffefbb18e49e4b71cfc6d0263698ecb31ca883112d05e51d",
+   "szczyt": 0.65,
+   "rola": [
+    "pisanie"
+   ],
+   "gra": false
   },
   {
    "id": "dane",
@@ -1190,7 +1519,10 @@
    "autor": "Sky_Motion",
    "zrodlo": "https://freesound.org/people/Sky_Motion/sounds/511418/",
    "licencja": "CC0-1.0",
-   "sha256": "9f4aae0fdc067e60c7fc5065067f05a10b6c7c2f737198692c6f3665f724d7f3"
+   "sha256": "9f4aae0fdc067e60c7fc5065067f05a10b6c7c2f737198692c6f3665f724d7f3",
+   "szczyt": 0.81,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "wibracja",
@@ -1202,7 +1534,10 @@
    "autor": "Breviceps",
    "zrodlo": "https://freesound.org/people/Breviceps/sounds/515295/",
    "licencja": "CC0-1.0",
-   "sha256": "c1b6b90310b7bd3c2d7d7b36cf38d1a69e8ce4ede64cc7d03c6849e630920dbe"
+   "sha256": "c1b6b90310b7bd3c2d7d7b36cf38d1a69e8ce4ede64cc7d03c6849e630920dbe",
+   "szczyt": 0.35,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "bip",
@@ -1214,7 +1549,10 @@
    "autor": "phatcorns",
    "zrodlo": "https://freesound.org/people/phatcorns/sounds/250104/",
    "licencja": "CC0-1.0",
-   "sha256": "6959e46eb31cd3a3fc531b1db51eee2b0a3a21d3b84e85f5dc7984196285f54f"
+   "sha256": "6959e46eb31cd3a3fc531b1db51eee2b0a3a21d3b84e85f5dc7984196285f54f",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "glitch",
@@ -1226,7 +1564,12 @@
    "autor": "AmicaSys",
    "zrodlo": "https://freesound.org/people/AmicaSys/sounds/332711/",
    "licencja": "CC0-1.0",
-   "sha256": "ccfd18d362b213d79e7b26d68e81ed1827a5f67bbe2f1ddad3d0a81e58a9078f"
+   "sha256": "ccfd18d362b213d79e7b26d68e81ed1827a5f67bbe2f1ddad3d0a81e58a9078f",
+   "szczyt": 0.0,
+   "rola": [
+    "przejscie"
+   ],
+   "gra": false
   },
   {
    "id": "glitch-vhs",
@@ -1238,7 +1581,12 @@
    "autor": "Sassaby",
    "zrodlo": "https://freesound.org/people/Sassaby/sounds/264935/",
    "licencja": "CC0-1.0",
-   "sha256": "09346ef1c050d35cbfb91356e82dbd9d1bbe0a2117ed911a83c3ca40d539d42d"
+   "sha256": "09346ef1c050d35cbfb91356e82dbd9d1bbe0a2117ed911a83c3ca40d539d42d",
+   "szczyt": 0.06,
+   "rola": [
+    "przejscie"
+   ],
+   "gra": false
   },
   {
    "id": "komputer",
@@ -1250,7 +1598,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/sci-fi-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "9cb891813d76c5e6df3749fd284ee98e8469d15eb4c26b16f86012f5ed7ef4ef"
+   "sha256": "9cb891813d76c5e6df3749fd284ee98e8469d15eb4c26b16f86012f5ed7ef4ef",
+   "szczyt": 2.17,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "plusk",
@@ -1262,7 +1613,10 @@
    "autor": "petenice",
    "zrodlo": "https://freesound.org/people/petenice/sounds/9508/",
    "licencja": "CC0-1.0",
-   "sha256": "fc492027ba85edefac7528ea82fa93aa8f0cd4ad0fb337fdfce8281fb133ed3b"
+   "sha256": "fc492027ba85edefac7528ea82fa93aa8f0cd4ad0fb337fdfce8281fb133ed3b",
+   "szczyt": 0.2,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "plusk-duzy",
@@ -1274,7 +1628,10 @@
    "autor": "qubodup",
    "zrodlo": "https://freesound.org/people/qubodup/sounds/442773/",
    "licencja": "CC0-1.0",
-   "sha256": "e7d1a335c7ea0e99b3a447eadb7def51dc48da7ddc51dc7bd1da20553c0cc069"
+   "sha256": "e7d1a335c7ea0e99b3a447eadb7def51dc48da7ddc51dc7bd1da20553c0cc069",
+   "szczyt": 0.11,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "kropla",
@@ -1286,7 +1643,12 @@
    "autor": "Mafon2",
    "zrodlo": "https://freesound.org/people/Mafon2/sounds/371274/",
    "licencja": "CC0-1.0",
-   "sha256": "689cd4dfdf66f61e71b4c0ed23e7dcbb46054757ba18c0f3bb985cc34a685033"
+   "sha256": "689cd4dfdf66f61e71b4c0ed23e7dcbb46054757ba18c0f3bb985cc34a685033",
+   "szczyt": 0.06,
+   "rola": [
+    "pojawienie"
+   ],
+   "gra": false
   },
   {
    "id": "deszcz",
@@ -1298,7 +1660,10 @@
    "autor": "Jeffreys2",
    "zrodlo": "https://freesound.org/people/Jeffreys2/sounds/137022/",
    "licencja": "CC0-1.0",
-   "sha256": "1e34ba6e4850f2d86777887f7cb5d55bb5ba5eb1fb4c28dbbb213f0a9f230fee"
+   "sha256": "1e34ba6e4850f2d86777887f7cb5d55bb5ba5eb1fb4c28dbbb213f0a9f230fee",
+   "szczyt": 0.49,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "duze-krople",
@@ -1310,7 +1675,10 @@
    "autor": "macdaddyno1",
    "zrodlo": "https://freesound.org/people/macdaddyno1/sounds/396483/",
    "licencja": "CC0-1.0",
-   "sha256": "7b4d277268a54820452b506ba4f16e5e95e30529c913da79ea61b7425884a91e"
+   "sha256": "7b4d277268a54820452b506ba4f16e5e95e30529c913da79ea61b7425884a91e",
+   "szczyt": 7.29,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "wiatr",
@@ -1322,7 +1690,10 @@
    "autor": "crashoverride6",
    "zrodlo": "https://freesound.org/people/crashoverride6/sounds/146932/",
    "licencja": "CC0-1.0",
-   "sha256": "fba0c6f6a6c8bb7fd07d471aee9d8271409cea89d2db18eadd0584331c5b7563"
+   "sha256": "fba0c6f6a6c8bb7fd07d471aee9d8271409cea89d2db18eadd0584331c5b7563",
+   "szczyt": 1.52,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "wiatr-krotki",
@@ -1334,7 +1705,10 @@
    "autor": "RutgerMuller",
    "zrodlo": "https://freesound.org/people/RutgerMuller/sounds/104078/",
    "licencja": "CC0-1.0",
-   "sha256": "4779bb2bd92e10c95a40822c3652daf173a907101437ed33482e1e507d24e367"
+   "sha256": "4779bb2bd92e10c95a40822c3652daf173a907101437ed33482e1e507d24e367",
+   "szczyt": 0.93,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "grzmot",
@@ -1346,7 +1720,10 @@
    "autor": "netaj",
    "zrodlo": "https://freesound.org/people/netaj/sounds/193170/",
    "licencja": "CC0-1.0",
-   "sha256": "5ff10dc6ca837f6d5c087b7ae61ae1a9fd6aea1de1162aad503b399ce300ed87"
+   "sha256": "5ff10dc6ca837f6d5c087b7ae61ae1a9fd6aea1de1162aad503b399ce300ed87",
+   "szczyt": 0.95,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "grzmot-krotki",
@@ -1358,7 +1735,10 @@
    "autor": "Josh74000MC",
    "zrodlo": "https://freesound.org/people/Josh74000MC/sounds/475094/",
    "licencja": "CC0-1.0",
-   "sha256": "cfba61f5dfebc69a32d5493d81521de2145468d5e047bccba9534e21d744403d"
+   "sha256": "cfba61f5dfebc69a32d5493d81521de2145468d5e047bccba9534e21d744403d",
+   "szczyt": 0.3,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "ptaki",
@@ -1370,7 +1750,10 @@
    "autor": "swiftoid",
    "zrodlo": "https://freesound.org/people/swiftoid/sounds/182502/",
    "licencja": "CC0-1.0",
-   "sha256": "75182dddae77365d5a2a176822e1866f56e17ab5af60dfb2f989d01bf9bcd502"
+   "sha256": "75182dddae77365d5a2a176822e1866f56e17ab5af60dfb2f989d01bf9bcd502",
+   "szczyt": 2.54,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "ptaszarnia",
@@ -1382,7 +1765,10 @@
    "autor": "bunting",
    "zrodlo": "https://freesound.org/people/bunting/sounds/204341/",
    "licencja": "CC0-1.0",
-   "sha256": "2165306145a55d6089ff77b34a65f61f38c142c3c0cb16b2ca53ac1417c3a90e"
+   "sha256": "2165306145a55d6089ff77b34a65f61f38c142c3c0cb16b2ca53ac1417c3a90e",
+   "szczyt": 2.6,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "kot",
@@ -1394,7 +1780,10 @@
    "autor": "tuberatanka",
    "zrodlo": "https://freesound.org/people/tuberatanka/sounds/110011/",
    "licencja": "CC0-1.0",
-   "sha256": "99417852f5b331a8363307a9f5543fd2ab052469762faaa6ec1d0e447a410fd6"
+   "sha256": "99417852f5b331a8363307a9f5543fd2ab052469762faaa6ec1d0e447a410fd6",
+   "szczyt": 0.44,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "kot-2",
@@ -1406,7 +1795,10 @@
    "autor": "skymary",
    "zrodlo": "https://freesound.org/people/skymary/sounds/412017/",
    "licencja": "CC0-1.0",
-   "sha256": "2f0addbd14edbfb49b2298f5dcde5fa9bc9dfa8493c6ed8ba7277e8ada7d6d5e"
+   "sha256": "2f0addbd14edbfb49b2298f5dcde5fa9bc9dfa8493c6ed8ba7277e8ada7d6d5e",
+   "szczyt": 0.69,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "pies",
@@ -1418,7 +1810,10 @@
    "autor": "kwahmah_02",
    "zrodlo": "https://freesound.org/people/kwahmah_02/sounds/277058/",
    "licencja": "CC0-1.0",
-   "sha256": "80638bf93adab7b8d59894d1b7b611ef2f4bcb7d51f84c99225f8742ab19edc7"
+   "sha256": "80638bf93adab7b8d59894d1b7b611ef2f4bcb7d51f84c99225f8742ab19edc7",
+   "szczyt": 0.06,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "piesek",
@@ -1430,7 +1825,10 @@
    "autor": "LittleBigSounds",
    "zrodlo": "https://freesound.org/people/LittleBigSounds/sounds/163459/",
    "licencja": "CC0-1.0",
-   "sha256": "29f8f67e3dfc23e55f407b7211feac4c343fda13ac7c4202d8f9d29a3b058f7f"
+   "sha256": "29f8f67e3dfc23e55f407b7211feac4c343fda13ac7c4202d8f9d29a3b058f7f",
+   "szczyt": 0.5,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "mewy",
@@ -1442,7 +1840,10 @@
    "autor": "Snapper4298",
    "zrodlo": "https://freesound.org/people/Snapper4298/sounds/166703/",
    "licencja": "CC0-1.0",
-   "sha256": "9de52b1a45332a98a99da7b0c72d9185a23c48fc75f687eb8572a8f28370801f"
+   "sha256": "9de52b1a45332a98a99da7b0c72d9185a23c48fc75f687eb8572a8f28370801f",
+   "szczyt": 1.84,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "pukanie",
@@ -1454,7 +1855,10 @@
    "autor": "wjtaylor",
    "zrodlo": "https://freesound.org/people/wjtaylor/sounds/268500/",
    "licencja": "CC0-1.0",
-   "sha256": "6f4dd9913cd928464a873abee5a28a8d5be9b239f244a55fc92ac01e79e2d4ca"
+   "sha256": "6f4dd9913cd928464a873abee5a28a8d5be9b239f244a55fc92ac01e79e2d4ca",
+   "szczyt": 1.53,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "walenie-w-drzwi",
@@ -1466,7 +1870,10 @@
    "autor": "Macif",
    "zrodlo": "https://freesound.org/people/Macif/sounds/194365/",
    "licencja": "CC0-1.0",
-   "sha256": "dee080a5a707569bb38f0f9553ff7db6d8406a4d9a5ad6b711663a858da0e66b"
+   "sha256": "dee080a5a707569bb38f0f9553ff7db6d8406a4d9a5ad6b711663a858da0e66b",
+   "szczyt": 0.58,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzwonek-do-drzwi",
@@ -1478,7 +1885,10 @@
    "autor": "MatthewWong",
    "zrodlo": "https://freesound.org/people/MatthewWong/sounds/361564/",
    "licencja": "CC0-1.0",
-   "sha256": "183aa7c3fab9099fd253af21c00792d523874f7e8fa86f4e57a97b89b5cbffa9"
+   "sha256": "183aa7c3fab9099fd253af21c00792d523874f7e8fa86f4e57a97b89b5cbffa9",
+   "szczyt": 0.32,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "drzwi-otwarcie",
@@ -1490,7 +1900,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/rpg-audio",
    "licencja": "CC0-1.0",
-   "sha256": "93910ecfea7469fc3145cd32d9c996c6b0e840d5c17cd9a30695c94d2b1e16a2"
+   "sha256": "93910ecfea7469fc3145cd32d9c996c6b0e840d5c17cd9a30695c94d2b1e16a2",
+   "szczyt": 0.2,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "drzwi-zamkniecie",
@@ -1502,7 +1915,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/rpg-audio",
    "licencja": "CC0-1.0",
-   "sha256": "d8a1b071932dfd4373d1f5c6fefed9b80daf7ca7098ddaf85912a38660baa410"
+   "sha256": "d8a1b071932dfd4373d1f5c6fefed9b80daf7ca7098ddaf85912a38660baa410",
+   "szczyt": 0.2,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "skrzypienie",
@@ -1514,7 +1930,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/rpg-audio",
    "licencja": "CC0-1.0",
-   "sha256": "e495cc2e2b3a21e1b06c0df238141a80305c5a1ed9482efe92df0660791f0003"
+   "sha256": "e495cc2e2b3a21e1b06c0df238141a80305c5a1ed9482efe92df0660791f0003",
+   "szczyt": 0.37,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "krok-beton",
@@ -1526,7 +1945,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "45045672f943fe91174c694ec4745e82a195707b9e6dcc08d4a962430ccae5b5"
+   "sha256": "45045672f943fe91174c694ec4745e82a195707b9e6dcc08d4a962430ccae5b5",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "krok-drewno",
@@ -1538,7 +1960,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/impact-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "1b183cd2837f3c67f374d30d5ffd8a4dfa23f5bc7c49a901ebaa6b29bddb5577"
+   "sha256": "1b183cd2837f3c67f374d30d5ffd8a4dfa23f5bc7c49a901ebaa6b29bddb5577",
+   "szczyt": 0.0,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "kartka",
@@ -1550,7 +1975,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/rpg-audio",
    "licencja": "CC0-1.0",
-   "sha256": "1848234eef2152c5b63dedd5756ce35d22ce5669a78a2532aba6fb03329e3f75"
+   "sha256": "1848234eef2152c5b63dedd5756ce35d22ce5669a78a2532aba6fb03329e3f75",
+   "szczyt": 0.52,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "ksiazka",
@@ -1562,7 +1990,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/rpg-audio",
    "licencja": "CC0-1.0",
-   "sha256": "6a0f16da49bbe4572e19ba4d7925d7c576f14611f4a6350a5bd58912bdba4c98"
+   "sha256": "6a0f16da49bbe4572e19ba4d7925d7c576f14611f4a6350a5bd58912bdba4c98",
+   "szczyt": 0.06,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "zegar",
@@ -1574,7 +2005,10 @@
    "autor": "olver",
    "zrodlo": "https://freesound.org/people/olver/sounds/130388/",
    "licencja": "CC0-1.0",
-   "sha256": "8eda3163cfee180ab4de0b960d9e547ee759801fd6ece90e172e51e819d43204"
+   "sha256": "8eda3163cfee180ab4de0b960d9e547ee759801fd6ece90e172e51e819d43204",
+   "szczyt": 1.48,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "stoper",
@@ -1586,7 +2020,10 @@
    "autor": "DavidJGurney",
    "zrodlo": "https://freesound.org/people/DavidJGurney/sounds/275802/",
    "licencja": "CC0-1.0",
-   "sha256": "91cd7df1d53726e25481119cab23af65d06a905e89b2ef71ec2964e0e347d5b6"
+   "sha256": "91cd7df1d53726e25481119cab23af65d06a905e89b2ef71ec2964e0e347d5b6",
+   "szczyt": 3.5,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "budzik",
@@ -1598,7 +2035,10 @@
    "autor": "tuberatanka",
    "zrodlo": "https://freesound.org/people/tuberatanka/sounds/102435/",
    "licencja": "CC0-1.0",
-   "sha256": "6283d434316c0c6e3b94352a65d62deec27ab7e1d9111854a8a2d92d90c9dfee"
+   "sha256": "6283d434316c0c6e3b94352a65d62deec27ab7e1d9111854a8a2d92d90c9dfee",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzwonek",
@@ -1610,7 +2050,12 @@
    "autor": "5ro4",
    "zrodlo": "https://freesound.org/people/5ro4/sounds/611113/",
    "licencja": "CC0-1.0",
-   "sha256": "cff251e3733dee0017f9d30facfbe813c33d48588a9bb3323ceff52f0ab7077c"
+   "sha256": "cff251e3733dee0017f9d30facfbe813c33d48588a9bb3323ceff52f0ab7077c",
+   "szczyt": 0.06,
+   "rola": [
+    "blysk"
+   ],
+   "gra": false
   },
   {
    "id": "ding-kuchenka",
@@ -1622,7 +2067,10 @@
    "autor": "sethlind",
    "zrodlo": "https://freesound.org/people/sethlind/sounds/265012/",
    "licencja": "CC0-1.0",
-   "sha256": "461181b7f755fde023d9e7ac1b52b05c790f6e68fee5689866a42b63f7a70952"
+   "sha256": "461181b7f755fde023d9e7ac1b52b05c790f6e68fee5689866a42b63f7a70952",
+   "szczyt": 0.08,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "klakson",
@@ -1634,7 +2082,10 @@
    "autor": "MicktheMicGuy",
    "zrodlo": "https://freesound.org/people/MicktheMicGuy/sounds/434878/",
    "licencja": "CC0-1.0",
-   "sha256": "def720d1c4d18e3a42733c1ec68f2c090583e545ccb6bafb784e29d097842411"
+   "sha256": "def720d1c4d18e3a42733c1ec68f2c090583e545ccb6bafb784e29d097842411",
+   "szczyt": 0.3,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "serce",
@@ -1646,7 +2097,10 @@
    "autor": "Lunardrive",
    "zrodlo": "https://freesound.org/people/Lunardrive/sounds/22416/",
    "licencja": "CC0-1.0",
-   "sha256": "87e25b3dfaa2c0bfa61fe443dda8839e80735a17f130aff626061d123c7ee736"
+   "sha256": "87e25b3dfaa2c0bfa61fe443dda8839e80735a17f130aff626061d123c7ee736",
+   "szczyt": 1.83,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "boing",
@@ -1658,7 +2112,10 @@
    "autor": "magnuswaker",
    "zrodlo": "https://freesound.org/people/magnuswaker/sounds/540790/",
    "licencja": "CC0-1.0",
-   "sha256": "cc3e1baf4b7f67fc70f58b6731b27484b08dbf3af2e6a45924e8062388bbfb2b"
+   "sha256": "cc3e1baf4b7f67fc70f58b6731b27484b08dbf3af2e6a45924e8062388bbfb2b",
+   "szczyt": 0.03,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "odbicie",
@@ -1670,7 +2127,10 @@
    "autor": "Jofae",
    "zrodlo": "https://freesound.org/people/Jofae/sounds/383240/",
    "licencja": "CC0-1.0",
-   "sha256": "719f6ac5b7bd9506b8f419f26eef41c78380e6f5bc5f3a7184452db1da70bd3d"
+   "sha256": "719f6ac5b7bd9506b8f419f26eef41c78380e6f5bc5f3a7184452db1da70bd3d",
+   "szczyt": 0.21,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "skok",
@@ -1682,7 +2142,10 @@
    "autor": "Hemplock",
    "zrodlo": "https://freesound.org/people/Hemplock/sounds/618961/",
    "licencja": "CC0-1.0",
-   "sha256": "7c910d4e5cab7bcdb454ced19f131105f70eb321dd0a50d98757de6e76800f69"
+   "sha256": "7c910d4e5cab7bcdb454ced19f131105f70eb321dd0a50d98757de6e76800f69",
+   "szczyt": 0.01,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "skoki-anime",
@@ -1694,7 +2157,10 @@
    "autor": "plasterbrain",
    "zrodlo": "https://freesound.org/people/plasterbrain/sounds/396196/",
    "licencja": "CC0-1.0",
-   "sha256": "521612b31676dd1fcd5c96c54a92274151bc83fd49a8817e76498578de79f6f7"
+   "sha256": "521612b31676dd1fcd5c96c54a92274151bc83fd49a8817e76498578de79f6f7",
+   "szczyt": 1.46,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "bum-kreskowka",
@@ -1706,7 +2172,10 @@
    "autor": "Johnnyfarmer",
    "zrodlo": "https://freesound.org/people/Johnnyfarmer/sounds/209771/",
    "licencja": "CC0-1.0",
-   "sha256": "cb79435c703e50a57af5ee8ec24e73b2e9c9c4a487c546981de4091a3903ebb1"
+   "sha256": "cb79435c703e50a57af5ee8ec24e73b2e9c9c4a487c546981de4091a3903ebb1",
+   "szczyt": 0.05,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "pyk",
@@ -1718,7 +2187,12 @@
    "autor": "AlaskaRobotics",
    "zrodlo": "https://freesound.org/people/AlaskaRobotics/sounds/221091/",
    "licencja": "CC0-1.0",
-   "sha256": "3cea6722aa6a0bc6b1634dfe74f170208689152050ff4086d316a88273a1e5b1"
+   "sha256": "3cea6722aa6a0bc6b1634dfe74f170208689152050ff4086d316a88273a1e5b1",
+   "szczyt": 0.02,
+   "rola": [
+    "pojawienie"
+   ],
+   "gra": false
   },
   {
    "id": "sluz",
@@ -1730,7 +2204,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/sci-fi-sounds",
    "licencja": "CC0-1.0",
-   "sha256": "18028ef9555452f344af74212ecea22d8a67cec8286a2c1d787108a6ec737ecd"
+   "sha256": "18028ef9555452f344af74212ecea22d8a67cec8286a2c1d787108a6ec737ecd",
+   "szczyt": 0.41,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "power-up",
@@ -1742,7 +2219,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/digital-audio",
    "licencja": "CC0-1.0",
-   "sha256": "f4d0331dc2879a13b672270d42e6d58e0ce8722996a6389e46f2150061517643"
+   "sha256": "f4d0331dc2879a13b672270d42e6d58e0ce8722996a6389e46f2150061517643",
+   "szczyt": 0.68,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "power-up-2",
@@ -1754,7 +2234,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/digital-audio",
    "licencja": "CC0-1.0",
-   "sha256": "beb135675bfa1442de6dce9d371a9bb687def169f8aece252e814e48da1af720"
+   "sha256": "beb135675bfa1442de6dce9d371a9bb687def169f8aece252e814e48da1af720",
+   "szczyt": 0.16,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "wygrana-gra",
@@ -1766,7 +2249,10 @@
    "autor": "GabrielAraujo",
    "zrodlo": "https://freesound.org/people/GabrielAraujo/sounds/242501/",
    "licencja": "CC0-1.0",
-   "sha256": "d64d54fb8924ded6bf44291e55a6d78e7f77e3395010d6f0938a1e3a4002ce9f"
+   "sha256": "d64d54fb8924ded6bf44291e55a6d78e7f77e3395010d6f0938a1e3a4002ce9f",
+   "szczyt": 0.11,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "skok-retro",
@@ -1778,7 +2264,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/digital-audio",
    "licencja": "CC0-1.0",
-   "sha256": "f01c004ffddf24283f5a6a1f04c1039737f72e04b918b0840d0a87f36832a1ac"
+   "sha256": "f01c004ffddf24283f5a6a1f04c1039737f72e04b918b0840d0a87f36832a1ac",
+   "szczyt": 0.02,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "zap",
@@ -1790,7 +2279,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/digital-audio",
    "licencja": "CC0-1.0",
-   "sha256": "c4cb315fef09f8453c45b20e1748e06c19a9d531a38b4a37e6cf806c86cca820"
+   "sha256": "c4cb315fef09f8453c45b20e1748e06c19a9d531a38b4a37e6cf806c86cca820",
+   "szczyt": 0.02,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "trzy-tony",
@@ -1802,7 +2294,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/digital-audio",
    "licencja": "CC0-1.0",
-   "sha256": "d21f422482a138e5d9929a47def808bac60236fc2b72eae575dc55c07debd2f6"
+   "sha256": "d21f422482a138e5d9929a47def808bac60236fc2b72eae575dc55c07debd2f6",
+   "szczyt": 0.14,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "w-gore",
@@ -1814,7 +2309,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/digital-audio",
    "licencja": "CC0-1.0",
-   "sha256": "6bf514172a9c65bbc375848066970ffa412e658bbebb027c1f644ce0043bb5c6"
+   "sha256": "6bf514172a9c65bbc375848066970ffa412e658bbebb027c1f644ce0043bb5c6",
+   "szczyt": 0.05,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "w-dol",
@@ -1826,7 +2324,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/digital-audio",
    "licencja": "CC0-1.0",
-   "sha256": "f5e7ac4e24e318e4ee3f84e58e462f2002aa43b6632619c47b5e5f4fb8a3318a"
+   "sha256": "f5e7ac4e24e318e4ee3f84e58e462f2002aa43b6632619c47b5e5f4fb8a3318a",
+   "szczyt": 0.23,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "pep",
@@ -1838,7 +2339,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/digital-audio",
    "licencja": "CC0-1.0",
-   "sha256": "100d9fb53b3bc34796aa8ad084e6ebe25f94460ccf6d8cf1175a236397dcf7b2"
+   "sha256": "100d9fb53b3bc34796aa8ad084e6ebe25f94460ccf6d8cf1175a236397dcf7b2",
+   "szczyt": 0.08,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "laser-gra",
@@ -1850,7 +2354,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/digital-audio",
    "licencja": "CC0-1.0",
-   "sha256": "df1986bc571b9ddd700200ad312cde7c2f4105a3855c51df7e23b07ee94dbe1e"
+   "sha256": "df1986bc571b9ddd700200ad312cde7c2f4105a3855c51df7e23b07ee94dbe1e",
+   "szczyt": 0.2,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "dzingiel-hit",
@@ -1862,7 +2369,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "92f4720a3a24b5b6a1b906352b4c5db1c745851a5cea08525f33ae4f8f46d39d"
+   "sha256": "92f4720a3a24b5b6a1b906352b4c5db1c745851a5cea08525f33ae4f8f46d39d",
+   "szczyt": 0.13,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzingiel-hit-2",
@@ -1874,7 +2384,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "aeb9b7017cb8ff6a46fe95d9ea1c4698973b53d049c545c7c8453e38d18d8498"
+   "sha256": "aeb9b7017cb8ff6a46fe95d9ea1c4698973b53d049c545c7c8453e38d18d8498",
+   "szczyt": 0.36,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzingiel-8bit",
@@ -1886,7 +2399,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "f8d1e65413f7a726c407b097c611a2735ef499dd9e20b3bff6bdaddf4b9d0c54"
+   "sha256": "f8d1e65413f7a726c407b097c611a2735ef499dd9e20b3bff6bdaddf4b9d0c54",
+   "szczyt": 0.31,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "dzingiel-8bit-2",
@@ -1898,7 +2414,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "937d43a141306376e542d213f37dd4ce402ce98ce1d370f2c2b11378ab32ab93"
+   "sha256": "937d43a141306376e542d213f37dd4ce402ce98ce1d370f2c2b11378ab32ab93",
+   "szczyt": 0.12,
+   "rola": [],
+   "gra": true
   },
   {
    "id": "dzingiel-pizzicato",
@@ -1910,7 +2429,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "8fe41233a29f446f767841cb78d8a1ed05a17efc8f53eded403b5722cfa04c00"
+   "sha256": "8fe41233a29f446f767841cb78d8a1ed05a17efc8f53eded403b5722cfa04c00",
+   "szczyt": 0.15,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzingiel-pizzicato-2",
@@ -1922,7 +2444,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "17b1a7828ae7e65185c69206a4c7189e3d704ed89dc9f3516c8cbe6151527713"
+   "sha256": "17b1a7828ae7e65185c69206a4c7189e3d704ed89dc9f3516c8cbe6151527713",
+   "szczyt": 0.13,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzingiel-saksofon",
@@ -1934,7 +2459,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "0bce64ed788253bf9683670432eb319b03376abd0138c14295eb71925597fe56"
+   "sha256": "0bce64ed788253bf9683670432eb319b03376abd0138c14295eb71925597fe56",
+   "szczyt": 0.11,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzingiel-saksofon-2",
@@ -1946,7 +2474,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "bece1989c360f6f1f6129a5aab2ab921d72297cab8387845ca9ebdbdadc29354"
+   "sha256": "bece1989c360f6f1f6129a5aab2ab921d72297cab8387845ca9ebdbdadc29354",
+   "szczyt": 0.66,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzingiel-steel",
@@ -1958,7 +2489,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "3f7c210653b194c732248685800083723ac92842c468dd5018cf900ba271bf8c"
+   "sha256": "3f7c210653b194c732248685800083723ac92842c468dd5018cf900ba271bf8c",
+   "szczyt": 0.13,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "dzingiel-steel-2",
@@ -1970,7 +2504,10 @@
    "autor": "Kenney",
    "zrodlo": "https://kenney.nl/assets/music-jingles",
    "licencja": "CC0-1.0",
-   "sha256": "dcd7b001389792887295527a35be97c8dc90763671485cbe803ef5744db78913"
+   "sha256": "dcd7b001389792887295527a35be97c8dc90763671485cbe803ef5744db78913",
+   "szczyt": 0.25,
+   "rola": [],
+   "gra": false
   },
   {
    "id": "muzyka-energia",

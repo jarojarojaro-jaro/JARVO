@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.3.4
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -79,11 +79,17 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
 ## Efekty dźwiękowe
 Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność źródeł:
 1. **Biblioteka CC0 (najpierw, montaż i projekt z edytora HQ):** `python3 $HERMES_HOME/scripts/projekt.py dzwieki
-   [--kategoria K] [--szukaj fraza]`: 157 efektów w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia, akcja,
-   interfejs, technika, natura, zwierzęta, codzienne, zabawne, gry i retro, dżingle) i 9 podkładów (`--muzyka`); ta sama
-   biblioteka co menu Audio w edytorze HQ, licencja CC0, bez podpisu.
+   [--kategoria K] [--rola R] [--szukaj fraza]`: 157 efektów w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia,
+   akcja, interfejs, technika, natura, zwierzęta, codzienne, zabawne, gry i retro, dżingle) i 9 podkładów (`--muzyka`);
+   ta sama biblioteka co menu Audio w edytorze HQ, licencja CC0, bez podpisu. Przy efekcie: szczyt (s od początku
+   pliku), rola i flaga „gra”. Role (za video-shotcraft, Apache-2.0: słownik efektów dobierasz do rodzaju filmu):
+   narastanie, uderzenie, blysk, ruch (whoosh), przejscie, pojawienie, klik, pisanie.
+   **Film produktowy i reklama: bez efektów z flagą „gra”** (syntetyczne tony interfejsu i dźwięki z gier: film brzmi
+   jak gra mobilna). Zakazana jest barwa, nie czynność: prawdziwy klik albo przełącznik pod kliknięcie w obrazie
+   zostaje. Wyjątek: film celowo w stylu gry (pixel, 8-bit) albo „system mówi” (potwierdzenie, błąd), opisany w RAPORT.
    `projekt.py dodaj-dzwiek <film> <id> --start S [--glosnosc 0.8]`: efekt na osi (kopia w `<katalog filmu>/dzwieki/`).
-   Efekt gra od razu w chwili `--start` (cisza na początku pliku jest przycięta): stawiaj go na cięciu albo akcji.
+   Efekt gra od razu w chwili `--start` (cisza na początku pliku jest przycięta). `--na T` zamiast `--start` kładzie
+   efekt tak, by jego szczyt trafił w T (narastanie zaczyna się ok. 2 s wcześniej): tak stawiasz efekt na cięciu i akcji.
 2. **Synteza z osi animacji (film z kodu, wiele zdarzeń co do klatki):** efekty bez plików i licencji:
    `node $ANIM/scripts/sound.mjs cues.json film.mp4 final.mp4 --lufs -14 [--bed muzyka.wav --bed-at 2.0]`
    (`eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env animacja)"`). `cues.json`: `[{"sfx":"click","t":0.94},
@@ -99,7 +105,8 @@ Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność
    `assets.mixkit.co/…` → `curl -L` do `out/wideo/src/sfx/`; jeden efekt na zdarzenie, nazwa = zdarzenie.
 
 - Każdy efekt dokładnie na swojej klatce (wg osi animacji): `rytm.py efekty/*.wav --szczyt` mówi, gdzie ma szczyt,
-  więc start = chwila zdarzenia − szczyt (pliki z biblioteki CC0 mają szczyt na początku).
+  więc start = chwila zdarzenia − szczyt (pliki z biblioteki CC0: szczyt w `projekt.py dzwieki`, a `dodaj-dzwiek --na`
+  liczy start sam; klik i pop mają szczyt w pierwszych 0,02 s, narastanie na końcu).
 - Czas efektu (za skillem fframes, MIT): **whoosh** zaczyna się ok. 0,15 s przed szczytem ruchu, **pop i klik**
   w klatce, w której element się pojawia (od −0,03 do +0,05 s). W filmie z kodu czasy efektów licz z tych samych
   stałych co animacja, wtedy przesuną się razem ze sceną.

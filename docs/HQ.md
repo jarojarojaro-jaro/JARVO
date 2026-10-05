@@ -85,7 +85,7 @@ Pliki w repo:
 | `hq/plugin/animacja.py` | animacja HTML: schemat i zapis `parametry.json`, stan pomiaru, mostek podglądu (testy: `tests/test_animacja.py`); build dokłada do pluginu `pomiar.py` Wideografa (odcisk i aktualność raportu) |
 | `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność; edytor i okno animacji z własnymi tokenami) |
-| `hq/web/dzwieki/` | biblioteka dźwięków CC0 menu Audio i Wideografa (157 efektów w 13 kategoriach, 9 podkładów; `katalog.json`, `LICENCJE.md` z autorem i źródłem każdego pliku), budowana przez `scripts/dzwieki.py` (`pobierz`, `zbuduj`, `sprawdz`; test `tests/test_dzwieki.py`) |
+| `hq/web/dzwieki/` | biblioteka dźwięków CC0 menu Audio i Wideografa (157 efektów w 13 kategoriach, 9 podkładów; `katalog.json` z rolą, szczytem i flagą „gra” każdego efektu, `LICENCJE.md` z autorem i źródłem każdego pliku), budowana przez `scripts/dzwieki.py` (`pobierz`, `zbuduj`, `zmierz`, `sprawdz`; test `tests/test_dzwieki.py`) |
 | `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto; `kroje/`: kroje napisów i typografii (OFL, `scripts/kroje.py`) |
 | `branding/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css`; te same pliki na stronie logowania |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |

@@ -8,8 +8,8 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py pokaz <film>                        # co jest na osi (klipy, napisy, audio, długość)
     projekt.py dodaj-audio <film> <plik> [--start S] [--od S] [--do S] [--glosnosc 0.8] [--wycisz-film] [--narastanie 1] [--wyciszanie 2]
     projekt.py dzwiek <film> <id> [--glosnosc 0.3] [--narastanie S] [--wyciszanie S] [--wycisz|--wlacz]   # klip albo audio
-    projekt.py dzwieki [--kategoria pieniadze] [--szukaj monety] [--muzyka]   # biblioteka CC0 (efekty i podkłady)
-    projekt.py dodaj-dzwiek <film> <id> [--start S] [--glosnosc 1] [--narastanie S] [--wyciszanie S]   # z biblioteki
+    projekt.py dzwieki [--kategoria pieniadze] [--rola uderzenie] [--szukaj monety] [--muzyka]   # biblioteka CC0
+    projekt.py dodaj-dzwiek <film> <id> [--start S | --na T] [--glosnosc 1] [--narastanie S] [--wyciszanie S]   # --na: szczyt w T
     projekt.py wyodrebnij <film> (<id klipu> | --plik inny.mp4 [--start S])   # dźwięk z filmu jako osobne audio
     projekt.py lektor <film> "tekst" [--start S] [--glos pl-PL-MarekNeural] [--tempo +5%]   # Edge TTS jak film.py
     projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain] [--kroj Poppins]
@@ -634,13 +634,19 @@ def cmd_dzwieki(_film, a) -> int:
     q = (a.szukaj or "").lower()
     rows = [d for d in kat["dzwieki"]
             if (not a.kategoria or d["kat"] == a.kategoria) and (not a.muzyka or d["kat"] == "muzyka")
+            and (not a.rola or a.rola in (d.get("rola") or []))
             and (not q or q in f"{d['id']} {d['nazwa']} {d['en']}".lower())]
     if not rows:
-        print(f"Nic nie pasuje. Kategorie: {', '.join(nazwy)}")
+        role = sorted({r for d in kat["dzwieki"] for r in d.get("rola") or []})
+        print(f"Nic nie pasuje. Kategorie: {', '.join(nazwy)}" + (f"; role: {', '.join(role)}" if role else ""))
         return 1
     for d in rows:
-        print(f"  {d['id']:<26} {nazwy.get(d['kat'], d['kat']):<12} {d['dl']:6.2f} s  {d['nazwa']}")
-    print(f"{len(rows)} z {len(kat['dzwieki'])} (CC0, autorzy w {DZWIEKI}/LICENCJE.md). Dodaj: projekt.py dodaj-dzwiek <film> <id> --start S")
+        cechy = ([f"szczyt {d['szczyt']:.2f} s"] if d.get("szczyt") is not None else []) + list(d.get("rola") or []) \
+            + (["gra: nie do reklamy"] if d.get("gra") else [])
+        print(f"  {d['id']:<26} {nazwy.get(d['kat'], d['kat']):<12} {d['dl']:6.2f} s  {d['nazwa']}"
+              + (f"  ({', '.join(cechy)})" if cechy else ""))
+    print(f"{len(rows)} z {len(kat['dzwieki'])} (CC0, autorzy w {DZWIEKI}/LICENCJE.md). "
+          "Dodaj: projekt.py dodaj-dzwiek <film> <id> --start S (albo --na T: szczyt efektu w T)")
     return 0
 
 
@@ -663,9 +669,12 @@ def cmd_dodaj_dzwiek(film: Path, a) -> int:
         raise SystemExit(f"nie ma „{a.id}” w bibliotece (lista: projekt.py dzwieki)")
     dest = ed.dzwiek_do_filmu(DZWIEKI, a.id, film)
     vol = a.glosnosc if a.glosnosc is not None else (0.3 if hit[0]["kat"] == "muzyka" else 1.0)
-    item = dodaj_plik_audio(film, proj, dest, a.start, vol, a)
+    szczyt = float(hit[0].get("szczyt") or 0)
+    start = a.start if a.na is None else a.na - szczyt          # --na: najgłośniejsza chwila efektu trafia w T
+    item = dodaj_plik_audio(film, proj, dest, max(0.0, start), vol, a, od=max(0.0, -start))
     save(film, proj)
-    print(f"Dodano dźwięk [{item['id']}] {hit[0]['nazwa']} ({dest.name}) od {item['start']:.2f} s ({item['out'] - item['in']:.2f} s)")
+    print(f"Dodano dźwięk [{item['id']}] {hit[0]['nazwa']} ({dest.name}) od {item['start']:.2f} s ({item['out'] - item['in']:.2f} s)"
+          + (f", szczyt na {a.na:.2f} s" if a.na is not None else ""))
     return 0
 
 
@@ -1096,10 +1105,13 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--kategoria", help="np. przejscia, reakcje, pieniadze, uderzenia, akcja, muzyka")
     sp.add_argument("--szukaj", help="fragment nazwy (po polsku albo angielsku)")
     sp.add_argument("--muzyka", action="store_true", help="tylko podkłady muzyczne")
+    sp.add_argument("--rola", help="narastanie, uderzenie, blysk, ruch, przejscie, pojawienie, klik, pisanie")
     sp.set_defaults(fn=cmd_dzwieki, film=None)
     sp = film_cmd("dodaj-dzwiek", cmd_dodaj_dzwiek, "efekt albo podkład z biblioteki")
     sp.add_argument("id", help="id z `dzwieki`")
-    sp.add_argument("--start", type=float, default=0.0, help="od której sekundy osi gra")
+    gr = sp.add_mutually_exclusive_group()
+    gr.add_argument("--start", type=float, default=0.0, help="od której sekundy osi gra")
+    gr.add_argument("--na", type=float, help="chwila osi, w którą ma trafić szczyt efektu (start = T − szczyt)")
     sp.add_argument("--glosnosc", type=float, help="0–2 (domyślnie 1, podkład 0.3)")
     sp.add_argument("--narastanie", type=float, help="s")
     sp.add_argument("--wyciszanie", type=float, help="s")

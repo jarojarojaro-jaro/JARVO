@@ -33,7 +33,7 @@ ma pięć kart. Każdy dodany dźwięk to plik obok filmu (`dzwieki/`, `lektor/`
 
 | Funkcja | Stan | Opis |
 |---|---|---|
-| Efekty dźwiękowe | ✅ | Biblioteka CC0 w repo (`hq/web/dzwieki/`, `scripts/dzwieki.py`): 157 efektów w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia, akcja, interfejs, technika, natura, zwierzęta, codzienne, zabawne, gry, dżingle) z Kenney i Freesound (tylko CC0, licencja sprawdzana przy pobraniu), 8,1 MB; szukanie po polsku i angielsku, odsłuch, dodanie we wskaźniku; `projekt.py dzwieki` i `dodaj-dzwiek` |
+| Efekty dźwiękowe | ✅ | Biblioteka CC0 w repo (`hq/web/dzwieki/`, `scripts/dzwieki.py`): 157 efektów w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia, akcja, interfejs, technika, natura, zwierzęta, codzienne, zabawne, gry, dżingle) z Kenney i Freesound (tylko CC0, licencja sprawdzana przy pobraniu), 8,1 MB; szukanie po polsku i angielsku, odsłuch, dodanie we wskaźniku; `projekt.py dzwieki` (z `--rola`; katalog ma rolę, szczyt i flagę „gra” każdego efektu) i `dodaj-dzwiek` (`--na`: szczyt efektu w chwili) |
 | Muzyka | ✅ | 9 podkładów CC0 z biblioteki (do 60 s, z wyciszeniem), muzyka ze skarbca (`wideo/muzyka`, `brands/*/muzyka`), pliki z folderu filmu, wgranie z dysku; bez popularnych utworów; podkład dodaje się ciszej (30%) |
 | Wyodrębnij | ✅ | Dźwięk z innego filmu jako osobne audio, a w panelu klipu „Wyodrębnij dźwięk” jak w CapCut: dźwięk klipu zostaje w tym samym miejscu osi, klip się wycisza (AAC kopiowane bez straty); `projekt.py wyodrebnij` |
 | Lektor | ✅ | Tekst na mowę Edge TTS (ten sam co w `film.py`), 5 głosów i tempo −30…+30%; `projekt.py lektor` (z czasami słów do napisów) |

@@ -8,7 +8,13 @@ obok filmu (<katalog filmu>/dzwieki/), więc projekt działa bez biblioteki i po
 
     python3 scripts/dzwieki.py pobierz [--cache KAT]   # surowe pliki do pamięci podręcznej (sieć: kenney.nl, freesound.org)
     python3 scripts/dzwieki.py zbuduj [--cache KAT]    # ffmpeg: przycięcie ciszy, głośność, mp3, katalog.json
+    python3 scripts/dzwieki.py zmierz                  # ffmpeg: tylko szczyty, role i flagi w katalog.json (pliki bez zmian)
     python3 scripts/dzwieki.py sprawdz                 # pliki, sumy SHA-256 i katalog zgodne z DZWIEKI (test i CI)
+
+Każdy efekt ma w katalogu `szczyt` (s od początku pliku do najgłośniejszych 10 ms: narastanie ma go na końcu, więc
+start = chwila zdarzenia − szczyt), `rola` (do czego służy w zdaniu dźwiękowym i serii, ROLE niżej) i `gra`
+(syntetyczny dźwięk interfejsu albo gry: nie do filmu produktowego). Role i flaga za video-shotcraft (Apache-2.0):
+słownik efektów dobiera się do rodzaju filmu, a w reklamie zakazana jest barwa „jak z gry”, nie sama czynność.
 
 `pobierz` przy każdym dźwięku z Freesound czyta jego stronę i odmawia, gdy licencja nie jest CC0. Bez klucza API:
 Freesound daje bez logowania podgląd HQ (mp3 128 kb/s), a to wystarcza do krótkich efektów i podkładów.
@@ -17,6 +23,7 @@ Freesound daje bez logowania podgląd HQ (mp3 128 kb/s), a to wystarcza do krót
 from __future__ import annotations
 
 import argparse
+import array
 import hashlib
 import json
 import re
@@ -65,6 +72,28 @@ def fs(num: int, autor: str) -> dict:
 def kn(paczka: str, plik: str) -> dict:
     return {"kenney": paczka, "plik": plik, "autor": "Kenney"}
 
+
+# role efektów: zdanie dźwiękowe (narastanie → uderzenie → błysk), seria (dwa efekty jednej roli na zmianę),
+# przejście (whoosh w przerwie w mowie); jeden efekt może mieć kilka ról, kolejność = kolejność wyboru
+ROLE: dict[str, list[str]] = {
+    "narastanie": ["narastanie", "narastanie-krotkie"],
+    "uderzenie": ["boom-kinowy", "uderzenie-duze", "uderzenie-niskie", "uderzenie-przejscia"],
+    "blysk": ["magia", "dzwonek"],
+    "ruch": ["whoosh", "whoosh-szybki", "whoosh-sredni", "swoosh", "swoosh-przejscie", "swoosh-dlugi", "bicz"],
+    "przejscie": ["swoosh-przejscie", "uderzenie-przejscia", "swoosh-wybuch", "przewijanie", "glitch", "glitch-vhs"],
+    "pojawienie": ["pop", "plop", "pyk", "kropla"],
+    "klik": ["klik", "klik-2", "klik-myszy", "przelacznik", "tik", "migawka"],
+    "pisanie": ["klawiatura-mechaniczna", "klawiatura", "pisanie-cyfrowe"],
+}
+OPIS_ROL = {"narastanie": "napięcie przed dużą chwilą", "uderzenie": "lądowanie, stempel, najgłośniejsza chwila",
+            "blysk": "błysk po uderzeniu, światło", "ruch": "whoosh pod ruch kamery i elementu",
+            "przejscie": "zmiana sceny", "pojawienie": "element wskakuje (seria: na zmianę)",
+            "klik": "kliknięcie, przełącznik, migawka", "pisanie": "pisanie tekstu na ekranie"}
+# syntetyczne tony interfejsu i dźwięki z gier: brzmią jak gra mobilna, więc nie do filmu produktowego i reklamy
+# (wyjątek: film celowo w stylu gry, 8-bit, albo „system mówi”: potwierdzenie, błąd)
+GRA = {"wybor", "potwierdzenie", "blad", "pytanie", "bong", "szarpniecie", "upuszczenie", "ding-szklany", "otworz",
+       "zamknij", "moneta-gra", "osiagniecie", "laser-duzy", "laser-maly", "laser-retro", "pole-silowe",
+       "dzingiel-8bit", "dzingiel-8bit-2"}
 
 # id (unikalne, nazwa pliku), kategoria, nazwa PL, nazwa EN, źródło
 DZWIEKI: list[tuple[str, str, str, str, dict]] = [
@@ -261,6 +290,14 @@ def plik_wzgl(d: tuple) -> str:
     return f"{d[1]}/{d[0]}.mp3"
 
 
+def role_id(id_: str) -> list[str]:
+    return [r for r, ids in ROLE.items() if id_ in ids]
+
+
+def gra(d: tuple) -> bool:
+    return d[1] == "gry" or d[0] in GRA
+
+
 # ---------------------------------------------------------------- pobranie (sieć)
 
 def _get(url: str) -> bytes:
@@ -379,11 +416,44 @@ def zbuduj(cache: Path) -> int:
     return sprawdz()
 
 
+def szczyt(path: Path) -> float:
+    """Sekunda najgłośniejszych 10 ms pliku (mono 8 kHz, jak `rytm.py --szczyt`): tu efekt ma trafić w zdarzenie."""
+    r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-i", str(path), "-ac", "1",
+                        "-ar", "8000", "-f", "s16le", "-"], capture_output=True, check=True)
+    a = array.array("h")
+    a.frombytes(r.stdout[:len(r.stdout) // 2 * 2])
+    if sys.byteorder == "big":
+        a.byteswap()
+    energie = [sum(x * x for x in a[i:i + 80]) for i in range(0, len(a), 80)]
+    return round(max(range(len(energie)), key=energie.__getitem__) / 100, 2) if energie else 0.0
+
+
+def cechy(d: tuple, path: Path) -> dict:
+    """Pola katalogu liczone z pliku i list ROLE/GRA (efekty; podkłady nie mają szczytu ani roli)."""
+    if d[1] == "muzyka":
+        return {}
+    return {"szczyt": szczyt(path), "rola": role_id(d[0]), "gra": gra(d)}
+
+
 def wpis(d: tuple, path: Path) -> dict:
     id_, kat, nazwa, en, z = d
     return {"id": id_, "kat": kat, "nazwa": nazwa, "en": en, "plik": plik_wzgl(d), "dl": round(dlugosc(path), 3),
             "autor": z["autor"], "zrodlo": zrodlo_url(z), "licencja": "CC0-1.0",
-            "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), **cechy(d, path)}
+
+
+def zmierz() -> int:
+    """Szczyty, role i flagi „gra” do istniejącego katalog.json: pliki i sumy zostają (bez pamięci podręcznej)."""
+    if not shutil.which("ffmpeg"):
+        raise SystemExit("brak ffmpeg (zmierz w kontenerze jarvo-hermes albo z ffmpeg w PATH)")
+    kat = json.loads(KATALOG.read_text(encoding="utf-8"))
+    po_id = {d[0]: d for d in DZWIEKI}
+    for w in kat["dzwieki"]:
+        for k in ("szczyt", "rola", "gra"):
+            w.pop(k, None)
+        w.update(cechy(po_id[w["id"]], DIR / w["plik"]))
+    KATALOG.write_text(json.dumps(kat, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    return sprawdz()
 
 
 def katalog(wpisy: list[dict]) -> dict:
@@ -411,6 +481,11 @@ def bledy() -> list[str]:
     out += [f"{d[0]}: nieznana kategoria {d[1]}" for d in DZWIEKI if d[1] not in kats]
     out += [f"{d[0]}: id tylko z małych liter, cyfr i „-”" for d in DZWIEKI if not re.fullmatch(r"[a-z0-9-]+", d[0])]
     out += [f"{d[0]}: paczka Kenney spoza KENNEY" for d in DZWIEKI if "kenney" in d[4] and d[4]["kenney"] not in KENNEY]
+    efekty = {d[0] for d in DZWIEKI if d[1] != "muzyka"}
+    out += [f"ROLE[{r}]: {i} nie jest efektem z DZWIEKI" for r, ids in ROLE.items() for i in ids if i not in efekty]
+    out += [f"ROLE[{r}]: tylko {len(ids)} efekt (seria potrzebuje dwóch różnych)" for r, ids in ROLE.items() if len(ids) < 2]
+    out += [f"GRA: {i} nie jest efektem z DZWIEKI" for i in sorted(GRA - efekty)]
+    out += [f"{r}: rola bez opisu w OPIS_ROL" for r in ROLE if r not in OPIS_ROL]
     if not KATALOG.is_file():
         return out + ["brak katalog.json (python3 scripts/dzwieki.py zbuduj)"]
     kat = json.loads(KATALOG.read_text(encoding="utf-8"))
@@ -425,6 +500,11 @@ def bledy() -> list[str]:
             continue
         if (w["kat"], w["nazwa"], w["en"], w["plik"], w["zrodlo"], w["licencja"]) != (d[1], d[2], d[3], plik_wzgl(d), zrodlo_url(d[4]), "CC0-1.0"):
             out.append(f"{d[0]}: wpis w katalog.json niezgodny z DZWIEKI (zbuduj)")
+        if d[1] != "muzyka":
+            if (w.get("rola"), w.get("gra")) != (role_id(d[0]), gra(d)):
+                out.append(f"{d[0]}: rola albo flaga „gra” w katalog.json niezgodna z ROLE/GRA (zmierz)")
+            if not isinstance(w.get("szczyt"), (int, float)) or not 0 <= w["szczyt"] <= float(w.get("dl") or 0):
+                out.append(f"{d[0]}: brak szczytu w katalog.json albo poza długością (zmierz)")
         p = DIR / plik_wzgl(d)
         if not p.is_file():
             out.append(f"brak pliku {plik_wzgl(d)}")
@@ -433,6 +513,11 @@ def bledy() -> list[str]:
         limit = MUZYKA_MAX if d[1] == "muzyka" else EFEKT_MAX
         if not 0 < float(w.get("dl") or 0) <= limit + 0.1:
             out.append(f"{d[0]}: długość {w.get('dl')} s poza 0–{limit:.0f} s")
+    sumy: dict[str, str] = {}
+    for w in kat.get("dzwieki") or []:          # ten sam plik pod dwiema nazwami: seria „na zmianę” grałaby jeden dźwięk
+        if w.get("sha256") in sumy:
+            out.append(f"{w['id']}: ten sam plik co {sumy[w['sha256']]} (suma SHA-256)")
+        sumy.setdefault(w.get("sha256"), w["id"])
     zbedne = sorted({p.relative_to(DIR).as_posix() for p in DIR.glob("*/*.mp3")} - {plik_wzgl(d) for d in DZWIEKI})
     if zbedne:
         out.append(f"pliki spoza DZWIEKI: {', '.join(zbedne)}")
@@ -455,13 +540,15 @@ def sprawdz() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", nargs="?", default="sprawdz", choices=["pobierz", "zbuduj", "sprawdz"])
+    ap.add_argument("cmd", nargs="?", default="sprawdz", choices=["pobierz", "zbuduj", "zmierz", "sprawdz"])
     ap.add_argument("--cache", type=Path, default=CACHE, help="surowe pliki (domyślnie .cache/dzwieki w repo)")
     a = ap.parse_args(argv)
     if a.cmd == "pobierz":
         return pobierz(a.cache)
     if a.cmd == "zbuduj":
         return zbuduj(a.cache)
+    if a.cmd == "zmierz":
+        return zmierz()
     return sprawdz()
 
 

@@ -88,6 +88,30 @@ def test_lista_dla_agenta(capsys):
     assert pr.main(["dzwieki", "--szukaj", "applause"]) == 0 and "oklaski" in capsys.readouterr().out
     assert pr.main(["dzwieki", "--muzyka"]) == 0 and "muzyka-lofi" in capsys.readouterr().out
     assert pr.main(["dzwieki", "--szukaj", "zzzz"]) == 1
+    assert pr.main(["dzwieki", "--rola", "narastanie"]) == 0
+    out = capsys.readouterr().out
+    assert "narastanie-krotkie" in out and "whoosh " not in out and "szczyt" in out
+    assert pr.main(["dzwieki", "--kategoria", "gry"]) == 0 and "gra: nie do reklamy" in capsys.readouterr().out
+
+
+def test_role_szczyty_i_flagi_gier():
+    # role (zdanie dźwiękowe, seria), szczyt i flaga „gra” w katalogu zgodne z ROLE/GRA; narastanie ma szczyt na końcu
+    kat = {d["id"]: d for d in ed.dzwieki_katalog(LIB)["dzwieki"]}
+    for rola, ids in dz.ROLE.items():
+        assert len({kat[i]["sha256"] for i in ids}) == len(ids) >= 2, rola     # seria na zmianę = różne pliki
+        assert all(rola in kat[i]["rola"] for i in ids)
+    assert all(kat[i]["szczyt"] > 0.8 * kat[i]["dl"] for i in dz.ROLE["narastanie"])
+    assert all(kat[i]["szczyt"] < 0.2 for i in ("boom-kinowy", "klik", "pop", "magia"))
+    assert kat["power-up"]["gra"] and kat["potwierdzenie"]["gra"] and not kat["klik"]["gra"] and not kat["whoosh"]["gra"]
+    assert all("szczyt" not in d for d in kat.values() if d["kat"] == "muzyka")
+
+
+def test_bledy_wykrywaja_ten_sam_plik_pod_dwiema_nazwami(tmp_path, monkeypatch):
+    kat = json.loads((LIB / "katalog.json").read_text(encoding="utf-8"))
+    kat["dzwieki"][1]["sha256"] = kat["dzwieki"][0]["sha256"]
+    (tmp_path / "katalog.json").write_text(json.dumps(kat), encoding="utf-8")
+    monkeypatch.setattr(dz, "KATALOG", tmp_path / "katalog.json")
+    assert any("ten sam plik co whoosh" in e for e in dz.bledy())
 
 
 @pytest.fixture()
@@ -110,6 +134,14 @@ def test_agent_dodaje_dzwiek_i_podklad(film, capsys):
     assert Path(a[0]["src"]) == film.parent / "dzwieki" / "kasa.mp3" and a[0]["start"] == 1.5 and a[0]["volume"] == 1.0
     assert a[1]["volume"] == 0.3 and a[1]["fadeOut"] == 1.0                     # podkład ciszej, z wyciszeniem
     assert pr.main(["sprawdz", str(film)]) == 0
+    # --na: najgłośniejsza chwila efektu w T (narastanie zaczyna się wcześniej); za blisko początku = przycięty początek
+    szczyt = next(d for d in ed.dzwieki_katalog(LIB)["dzwieki"] if d["id"] == "narastanie")["szczyt"]
+    assert pr.main(["dodaj-dzwiek", str(film), "narastanie", "--na", "3.0"]) == 0
+    assert pr.main(["dodaj-dzwiek", str(film), "narastanie", "--na", "1.0"]) == 0
+    n1, n2 = proj(film)["audio"][2:]
+    assert n1["start"] == pytest.approx(3.0 - szczyt) and n1["in"] == 0
+    assert n2["start"] == 0 and n2["in"] == pytest.approx(szczyt - 1.0)
+    assert "szczyt na 1.00 s" in capsys.readouterr().out
 
 
 @pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
