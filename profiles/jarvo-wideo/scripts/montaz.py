@@ -11,7 +11,8 @@
 
 Czas: sekundy (75.5) albo m:ss(.x) / h:mm:ss. Każde cięcie jest przekodowane (dokładne co do klatki).
 kadr --x: środek kadru w poziomie (0 = lewa krawędź, 0.5 = środek, 1 = prawa); rozmyte = całe ujęcie
-na rozmytym tle (dobre do slajdów i nagrań ekranu). glosnosc: dwa przejścia loudnorm (pomiar → korekta).
+na rozmytym tle (dobre do slajdów i nagrań ekranu). glosnosc: dwa przejścia loudnorm (pomiar → korekta), potem
+limiter szczytów (true peak ≤ −1).
 glos: czysty głos jak w edytorze HQ (edytor.glos_filter: dudnienie, syczenie, szum, ciszej w pauzach, wyrównanie);
 auto = poziom z tła nagrania; obraz kopiowany bez zmian. Potem glosnosc (kompresor zmienia głośność).
 wytnij i cisza wypisują `ciecia`: chwile cięć w gotowym pliku (do `krytyka.py ciecia --czasy`).
@@ -146,9 +147,11 @@ def loudness(src: Path, out: Path, target: float) -> tuple[Path, dict]:
     if not m:
         raise SystemExit("Pomiar głośności nie powiódł się (brak dźwięku?).")
     meas = json.loads(m.group(0))
+    # loudnorm daje 192 kHz: limiter tutaj łapie też szczyty między próbkami (true peak), bo AAC i podniesienie
+    # głośności potrafią wypchnąć szczyt ponad 0 dBFS (qa_wideo: true peak ≤ −1); −2 dBFS zostawia zapas na koder
     af = (f"loudnorm=I={target}:TP=-1.5:LRA=11:measured_I={meas['input_i']}:measured_TP={meas['input_tp']}:"
           f"measured_LRA={meas['input_lra']}:measured_thresh={meas['input_thresh']}:offset={meas['target_offset']}:"
-          "linear=true,aresample=48000")
+          "linear=true,alimiter=limit=0.79:level=false:attack=1:release=50,aresample=48000")
     out.parent.mkdir(parents=True, exist_ok=True)
     wl.run(["ffmpeg", "-y", "-i", str(src), "-af", af, "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags",
             "+faststart", str(out)])

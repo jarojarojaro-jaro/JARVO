@@ -216,6 +216,23 @@ def test_montaz_time_parsing():
         montaz.parse_ranges("10-5")
 
 
+def test_montaz_glosnosc_limiter_true_peak(tmp_path, monkeypatch):
+    """glosnosc: po loudnorm (192 kHz) limiter −2 dBFS, dopiero potem 48 kHz i AAC: szczyty między próbkami też
+    zostają pod progiem qa_wideo (true peak ≤ −1). Bez niego film z kodu podniesiony z −16 do −14 LUFS miał +0,2 dBFS."""
+    pomiar = ('{"input_i": "-16.04", "input_tp": "-1.40", "input_lra": "3.2", "input_thresh": "-26.3", '
+              '"target_offset": "0.1"}')
+    monkeypatch.setattr(montaz.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, "", pomiar))
+    wywolane = []
+    monkeypatch.setattr(montaz.wl, "run", lambda cmd, *a, **k: wywolane.append(cmd))
+    out, info = montaz.loudness(tmp_path / "a.mp4", tmp_path / "b.mp4", -14.0)
+    af = wywolane[0][wywolane[0].index("-af") + 1]
+    lancuch = [f.split("=")[0] for f in af.split(",")]
+    assert lancuch == ["loudnorm", "alimiter", "aresample"] and "linear=true" in af
+    limit = float(re.search(r"alimiter=limit=([\d.]+)", af).group(1))
+    assert limit <= 0.8 and "level=false" in af                                # −2 dBFS, bez podbijania po limiterze
+    assert wywolane[0][wywolane[0].index("-c:v") + 1] == "copy" and info == {"przed_lufs": -16.04, "cel_lufs": -14.0}
+
+
 def test_platform_specs_in_sync_with_skill_reference():
     md = (REPO / "profiles/jarvo-wideo/skills/wideo/formaty-wideo/references/specs.md").read_text(encoding="utf-8")
     rows = re.findall(r"^\| `([a-z0-9-]+)` \|[^|]*\| (\d+:\d+) \| (\d+)×(\d+) \| (\d+) s \| (\d+)–(\d+) s", md, flags=re.M)

@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.3.1
+version: 1.3.2
 author: Jarvo
 license: MIT
 metadata:
@@ -102,7 +102,8 @@ Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność
   lektor wprost na oś projektu.
 
 ## Głośność nagrań
-`montaz.py glosnosc <plik> -o <wynik> --lufs -14` (dwa przejścia loudnorm). Pomiar: `qa_wideo.py <plik>` → `lufs`, `true_peak`,
+`montaz.py glosnosc <plik> -o <wynik> --lufs -14` (dwa przejścia loudnorm, potem limiter szczytów, więc podniesienie
+głośności nie wypycha true peak ponad −1; film z `sound.mjs` wychodzi ok. −16 LUFS i tędy idzie na −14). Pomiar: `qa_wideo.py <plik>` → `lufs`, `true_peak`,
 `lra` (rozpiętość głośności). Cele: −14 LUFS (podcast −16), true peak ≤ −1 dBTP, rozpiętość 4–10 LU (więcej = ciche
 i głośne części do wyrównania; `qa_wideo.py` ostrzega od 10 LU w filmie od 10 s), sceny z głosem w granicach ok. 2 LU
 od siebie, cisza tylko tam, gdzie zaplanowana (nagła cisza = ścieżka kończy się za wcześnie albo brak pliku).
