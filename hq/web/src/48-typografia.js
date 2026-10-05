@@ -126,11 +126,14 @@ const TYPO_MOTYWY = {
     kolor: "#FFF4E0", wielkie: false, wejscie: "pop", wyjscie: "zanik", hit: "3d", skos: 6, lh: 1.05 },
   neon: { nazwa: ["Neon", "Neon"], kroj: "neon", maly: "neon", drugi: "neon", akcent: "#FF7AC6",
     kolor: "#FFFFFF", wielkie: true, wejscie: "pop", wyjscie: "zanik", hit: "blask", skos: 5, lh: 1.0 },
+  // napisy jak z programu rozrywkowego (za mg-styles-15, MIT, demos/18-hanazi): obrys uderzenia `obrys`, reszty `obrys2`
+  show: { nazwa: ["Show", "Show"], kroj: "titan", maly: "balooL", drugi: "baloo", akcent: "#FFE14D", obrys: "#FF3D7F",
+    obrys2: "#1E2A78", kolor: "#FFFFFF", wielkie: false, wejscie: "skok", wyjscie: "zanik", styl: "show", hit: "show", skos: 6, lh: 0.95 },
 };
 const TYPO_UKLADY = ["kolumna", "schodki", "srodek", "skos", "3d", "za", "rozrzut"];
-const TYPO_WEJSCIA = { ciecie: 0, pop: 0.14, kontur: 0.24, maska: 0.18, pisanie: 0.3, zjazd: 0.16 };
+const TYPO_WEJSCIA = { ciecie: 0, pop: 0.14, kontur: 0.24, maska: 0.18, pisanie: 0.3, zjazd: 0.16, skok: 0.4 };
 const TYPO_WYJSCIA = { ciecie: 0, zanik: 0.16, smuga: 0.14 };
-const TYPO_STYLE = ["wypelnij", "kontur", "3d", "blask", "tlo", "obrys"];
+const TYPO_STYLE = ["wypelnij", "kontur", "3d", "blask", "tlo", "obrys", "show"];
 const TYPO_WAGA = [0.58, 1, 1.45, 2.1];            // mnożnik rozmiaru: słowo funkcyjne, zwykłe, ważne, uderzenie
 const TYPO_CEL = [0.62, 0.62, 0.8, 1];             // część szerokości bloku (w), którą wypełnia blok, wg najmocniejszego słowa
 const TYPO_LEAD = 0.03;                            // słowo pojawia się tuż przed dźwiękiem (oko wyprzedza ucho)
@@ -149,6 +152,12 @@ function typoFont(key, px) { const k = typoKroj(key); return `${k[2] ? "italic "
 function typoClamp(x, a, b) { return Math.min(b, Math.max(a, x)); }
 function typoEaseOut(a) { return 1 - Math.pow(1 - typoClamp(a, 0, 1), 3); }
 function typoEaseBack(a) { const c = 1.9, x = typoClamp(a, 0, 1) - 1; return 1 + (c + 1) * x * x * x + c * x * x; }
+// Skok od zera (sprężyna tłumiona ζ 0,517, ω 22, za mg-styles-15 demos/18-hanazi): szczyt 1,15 po 0,167 s (5. klatka
+// przy 30 fps), ~1,01 po 0,27 s; t w sekundach od początku wejścia.
+function typoSkok(t) {
+  const z = 0.517, w = 22, wd = w * Math.sqrt(1 - z * z);
+  return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t));
+}
 function typoHash(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; }
 
 // Wygląd słowa po motywie i nadpisaniach: krój, kolor, styl, wielkie litery.
@@ -158,8 +167,8 @@ function typoSlowo(w, m, uklad) {
   const kroj = w.kroj && TYPO_KROJE[w.kroj] ? w.kroj : waga === 0 ? m.maly : glebia < 0 ? m.drugi : m.kroj;
   const kolor = w.kolor || (waga === 3 ? m.akcent : m.kolor);   // akcent tylko na uderzeniu: kolor ma znaczyć, nie zdobić
   const auto = waga === 3 && uklad !== "za" ? m.hit : m.styl || "wypelnij";
-  // `plyta`: kolor słabo odcina się od tła (typografia.py) → płytka, a w motywie z obrysem obrys wystarczy
-  const styl = TYPO_STYLE.includes(w.styl) ? w.styl : w.plyta && auto !== "obrys" && uklad !== "za" ? "tlo" : auto;
+  // `plyta`: kolor słabo odcina się od tła (typografia.py) → płytka, a w motywie z obrysem (obrys, show) obrys wystarczy
+  const styl = TYPO_STYLE.includes(w.styl) ? w.styl : w.plyta && auto !== "obrys" && auto !== "show" && uklad !== "za" ? "tlo" : auto;
   const wielkie = w.wielkie ?? (m.wielkie || waga === 3);
   const tekst = String(w.tekst || "");
   return { waga, glebia, kroj, kolor, styl, tekst: wielkie ? tekst.toLocaleUpperCase("pl-PL") : tekst };
@@ -279,23 +288,26 @@ function typoSzum() {
   TYPO_SZUM = c;
   return c;
 }
-function typoJasnosc(hex) {               // względna luminancja WCAG (0–1), ta sama co luminancja() w typografia.py
+function typoRgb(hex) {                  // "#RGB" / "#RRGGBB" → [r, g, b]; błędny kolor = biały (czarny zostaje czarny)
   const h = String(hex || "#ffffff").replace("#", "");
-  const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6), 16) || 0xffffff;
+  const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6), 16);
+  const v = Number.isNaN(n) ? 0xffffff : n;
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+function typoJasnosc(hex) {               // względna luminancja WCAG (0–1), ta sama co luminancja() w typografia.py
   const f = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-  return 0.2126 * f(((n >> 16) & 255) / 255) + 0.7152 * f(((n >> 8) & 255) / 255) + 0.0722 * f((n & 255) / 255);
+  const [r, g, b] = typoRgb(hex);
+  return 0.2126 * f(r / 255) + 0.7152 * f(g / 255) + 0.0722 * f(b / 255);
 }
 function typoJasniej(hex, k) {           // kolor przesunięty o k (0–1) w stronę bieli
-  const h = String(hex || "#ffffff").replace("#", "");
-  const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6), 16) || 0xffffff;
-  const f = (c) => Math.round(c + (255 - c) * k);
-  return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  return `rgb(${typoRgb(hex).map((c) => Math.round(c + (255 - c) * k)).join(",")})`;
+}
+function typoMieszaj(a, b, k) {          // kolor a przesunięty o k (0–1) w stronę b
+  const B = typoRgb(b);
+  return `rgb(${typoRgb(a).map((c, i) => Math.round(c + (B[i] - c) * k)).join(",")})`;
 }
 function typoCiemniej(hex, k) {
-  const h = String(hex || "#ffffff").replace("#", "");
-  const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6), 16) || 0xffffff;
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, bb = n & 255;
-  return `rgb(${Math.round(r * k)},${Math.round(g * k)},${Math.round(bb * k)})`;
+  return `rgb(${typoRgb(hex).map((c) => Math.round(c * k)).join(",")})`;
 }
 
 // Jedno słowo na kanwie bloku (współrzędne bloku), z wejściem a (0–1).
@@ -313,6 +325,9 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
     alpha *= typoClamp(a * 3, 0, 1);
   } else if (wejscie === "zjazd" && a < 1) {
     x += (1 - typoEaseOut(a)) * px * 0.5; alpha *= a;
+  } else if (wejscie === "skok" && a < 1) {     // rośnie od zera z przeskokiem, oparte o linię pisma
+    const k = Math.max(0.001, typoSkok(a * TYPO_WEJSCIA.skok));
+    g.translate(x + s.w / 2, y); g.scale(k, k); g.translate(-(x + s.w / 2), -y);
   } else if (wejscie === "maska" && a < 1) {
     g.beginPath(); g.rect(x - px, y - px * 1.05, s.w + px * 2, px * 1.3); g.clip();
     y += (1 - typoEaseOut(a)) * px * 1.1;
@@ -327,6 +342,17 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
   if (plyta) {
     g.fillStyle = plyta;
     g.fillRect(x - px * 0.12, y - px * 0.82, s.w + px * 0.24, px * 1.02);
+  }
+  const obw = s.waga === 3 ? m.obrys || "#FF3D7F" : m.obrys2 || "#1E2A78";   // kolor obrysu w stylu show
+  if (s.styl === "show" && !konturFaza) {       // program rozrywkowy: dwie kopie w głąb, obrys w kolorze, biały obrys
+    const bialy = px * 0.075, zew = px * 0.07, ext = Math.max(2, px * 0.09);   // jak 13/12/16 px przy 172 px
+    g.lineJoin = "round"; g.lineWidth = 2 * (bialy + zew);
+    g.shadowColor = "rgba(26,10,40,0.36)"; g.shadowBlur = px * 0.064; g.shadowOffsetY = px * 0.07;
+    g.strokeStyle = typoCiemniej(obw, 0.62);
+    for (const d of [ext, ext / 2]) g.strokeText(tekst, x + d * 0.3, y + d);
+    bezCienia();
+    g.strokeStyle = obw; g.strokeText(tekst, x, y);
+    g.lineWidth = 2 * bialy; g.strokeStyle = "#FFFFFF"; g.strokeText(tekst, x, y);
   }
   if (s.styl === "3d" && !konturFaza) {          // wyciągnięcie w głąb: kopie w ciemniejszym kolorze, potem lico
     const n = Math.max(3, Math.round(px * 0.09));
@@ -351,9 +377,19 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
         g.shadowColor = fill; g.shadowBlur = px * 0.38; g.fillText(tekst, x, y);
         if (typoJasnosc(fill) < 0.3) g.fillStyle = typoJasniej(fill, 0.55);
       }
-      if (s.styl !== "3d" && s.styl !== "tlo" && s.styl !== "blask" && s.styl !== "obrys") cien();
+      if (s.styl === "show") {                   // gradient z góry na dół: jaśniej → kolor → w stronę obrysu
+        const gr = g.createLinearGradient(0, y - px * 0.8, 0, y + px * 0.1);
+        gr.addColorStop(0, typoJasniej(fill, 0.75)); gr.addColorStop(0.5, fill); gr.addColorStop(1, typoMieszaj(fill, obw, 0.35));
+        g.fillStyle = gr;
+      }
+      if (s.styl !== "3d" && s.styl !== "tlo" && s.styl !== "blask" && s.styl !== "obrys" && s.styl !== "show") cien();
       g.fillText(tekst, x, y);
       bezCienia();
+      if (s.styl === "show") {                   // połysk: biel 0,55 u góry litery, znika w 46% wysokości
+        const gl = g.createLinearGradient(0, y - px * 0.8, 0, y + px * 0.1);
+        gl.addColorStop(0, "rgba(255,255,255,0.55)"); gl.addColorStop(0.46, "rgba(255,255,255,0)");
+        g.fillStyle = gl; g.fillText(tekst, x, y);
+      }
     }
   }
   if (m.tekstura && s.kroj !== "grunge") {        // zdarta farba w skali słowa: małe słowo dalej czytelne

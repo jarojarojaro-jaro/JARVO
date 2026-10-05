@@ -40,11 +40,11 @@ MAX_TEXTS = 60
 MAX_TYPO = 400           # bloków typografii (blok = 1–6 słów naraz, jak w montażu słowo po słowie)
 MAX_TYPO_WORDS = 14
 TYPO_MOTYWY = ("czysty", "kino", "ulica", "energia", "elegancki", "podcast", "vlog", "komiks", "magazyn", "tech",
-               "nowoczesny", "retro", "neon")   # te same klucze co TYPO_MOTYWY w 48-typografia.js
+               "nowoczesny", "retro", "neon", "show")   # te same klucze co TYPO_MOTYWY w 48-typografia.js
 TYPO_UKLADY = ("kolumna", "schodki", "srodek", "skos", "3d", "za", "rozrzut")
-TYPO_WEJSCIA = ("ciecie", "pop", "kontur", "maska", "pisanie", "zjazd")
+TYPO_WEJSCIA = ("ciecie", "pop", "kontur", "maska", "pisanie", "zjazd", "skok")
 TYPO_WYJSCIA = ("ciecie", "zanik", "smuga")
-TYPO_STYLE = ("wypelnij", "kontur", "3d", "blask", "tlo", "obrys")
+TYPO_STYLE = ("wypelnij", "kontur", "3d", "blask", "tlo", "obrys", "show")
 TYPO_KROJE = ("bricolage", "bricolageL", "montserrat", "montserratI", "montserratL", "unbounded", "unboundedL",
               "poppins", "poppinsL", "inter", "interL", "archivo", "rubik", "spartan", "kanit", "kanitI", "outfit",
               "syne", "raleway", "anton", "bebas", "barlow", "barlowI", "barlowL", "oswald", "teko", "fjalla",

@@ -119,9 +119,9 @@ const ED_ICON = {
 const TYPO_UKLAD_NAZWY = { kolumna: ["Kolumna", "Column"], schodki: ["Schodki", "Steps"], srodek: ["Środek", "Center"], skos: ["Skos", "Slant"],
   "3d": ["3D", "3D"], za: ["Za osobą", "Behind"], rozrzut: ["Rozrzut", "Scatter"] };
 const TYPO_WEJSCIA_NAZWY = { ciecie: ["Cięcie", "Cut"], pop: ["Pop", "Pop"], kontur: ["Kontur", "Outline"], maska: ["Wysuw", "Reveal"],
-  pisanie: ["Pisanie", "Typing"], zjazd: ["Wjazd", "Slide"] };
+  pisanie: ["Pisanie", "Typing"], zjazd: ["Wjazd", "Slide"], skok: ["Skok", "Bounce"] };
 const TYPO_WYJSCIA_NAZWY = { ciecie: ["Cięcie", "Cut"], zanik: ["Zanik", "Fade"], smuga: ["Smuga", "Smear"] };
-const TYPO_STYLE_NAZWY = { wypelnij: ["Pełny", "Fill"], kontur: ["Kontur", "Outline"], "3d": ["3D", "3D"], blask: ["Blask", "Glow"], tlo: ["Tło", "Box"], obrys: ["Obrys", "Stroke"] };
+const TYPO_STYLE_NAZWY = { wypelnij: ["Pełny", "Fill"], kontur: ["Kontur", "Outline"], "3d": ["3D", "3D"], blask: ["Blask", "Glow"], tlo: ["Tło", "Box"], obrys: ["Obrys", "Stroke"], show: ["Show", "Show"] };
 const TYPO_WAGI_NAZWY = [["Małe", "Small"], ["Zwykłe", "Normal"], ["Ważne", "Strong"], ["Uderzenie", "Hit"]];
 const typoBez = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== null));
 const typoNoweId = (ids, base) => { let k = 1; while (ids.has(`${base}${String.fromCharCode(97 + k)}`)) k++; return `${base}${String.fromCharCode(97 + k)}`; };

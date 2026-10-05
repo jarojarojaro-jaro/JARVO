@@ -1,7 +1,7 @@
 ---
 name: typografia-edit
 description: "Typografia z montażu do nagrania z mową, też za osobą."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -86,6 +86,7 @@ nie rusza układu, kolorów ani poprawek.
 | historia, dramat, trailer | `kino` | Barlow kursywa WIELKIMI, smuga, uderzenie 3D |
 | ulica, rap, sport, bunt | `ulica` | Anton z teksturą zdartej farby |
 | motywacja, energia, sprzedaż na żywo | `energia` | Bebas i odręczny, uderzenie świeci |
+| reakcje, humor, kulisy, „show” na social | `show` | Titan One, biały i kolorowy obrys, wyciągnięcie, wejście skokiem |
 
 Na jasnym, pstrym tle (plaża, miasto w dzień) wygrywają style z obrysem (`podcast`, `vlog`, `komiks`) albo płytką
 (`tech`); cienkie szeryfy (`magazyn`, `elegancki`) potrzebują spokojnego tła. Właściciel wybrał styl w HQ: nie zmieniam go.

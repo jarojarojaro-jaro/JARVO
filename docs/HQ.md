@@ -173,10 +173,11 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
 - **Typografia** jak z montażu (słowo po słowie: różne wielkości, kroje, kolory, głębia, skos, perspektywa 3D): plan
   w projekcie (`typo`: motyw, akcent, paleta i bloki z układem, kotwicą, obrotem, perspektywą, warstwą, wejściem i wyjściem;
   słowa z czasem, wagą 0–3, linią, głębią, krojem, kolorem, stylem i znacznikiem płytki) rysuje jeden renderer
-  `hq/web/src/48-typografia.js` w podglądzie, przy eksporcie i w renderze Wideografa. Trzynaście stylów filmu (motywów:
+  `hq/web/src/48-typografia.js` w podglądzie, przy eksporcie i w renderze Wideografa. Czternaście stylów filmu (motywów:
   `czysty` domyślny, `kino`, `ulica`, `energia`, `elegancki`, `podcast`, `vlog`, `komiks`, `magazyn`, `tech`,
-  `nowoczesny`, `retro`, `neon`); styl to kroje, styl słów i uderzenia (`wypelnij`, `kontur`, `3d`, `blask`, `tlo`
-  albo `obrys`: gruby obrys pod literą, czarny przy jasnym słowie, biały przy ciemnym), wejście, wyjście i skos.
+  `nowoczesny`, `retro`, `neon`, `show`); styl to kroje, styl słów i uderzenia (`wypelnij`, `kontur`, `3d`, `blask`,
+  `tlo`, `obrys`: gruby obrys pod literą, czarny przy jasnym słowie, biały przy ciemnym, albo `show`: biała litera
+  z kolorowym obrysem i wyciągnięciem jak w programie rozrywkowym), wejście (np. `skok`), wyjście i skos.
   Kolory mocnych słów to **paleta z kadru** (`typo.paleta`, dwa akcenty, które `typografia.py` dobiera
   z kontrastu z barwami sceny, np. niebieskie niebo → ciemna czerwień i złoto); akcentem bez palety jest kolor
   motywu, a kolor marki (`akcent`) wygrywa z obydwoma. Słowo w stylu `tlo` ma płytkę w swoim kolorze z czarnym albo
@@ -196,7 +197,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   Na podglądzie blok przeciąga się z przyciąganiem do środka kadru; na osi zmienia się jego czas (lewa krawędź
   zostawia słowa przy ich czasie w filmie). **Tnij** dzieli blok na słowie pod wskaźnikiem, jest też **Połącz
   z następnym**, **Duplikuj** i **Usuń**; wszystko to jeden krok cofania. Panel **Napisy** ma sekcję typografii:
-  **Styl filmu** (karty 13 stylów: blok tego filmu z uderzeniem narysowany tym samym rendererem na pasie bieżącej
+  **Styl filmu** (karty 14 stylów: blok tego filmu z uderzeniem narysowany tym samym rendererem na pasie bieżącej
   klatki podglądu; klik zmienia motyw, układ, kolory i poprawki zostają; `TypoStyle` w `45-edytor.js`),
   **paleta z filmu** (zmiana koloru palety przenosi na nowy kolor wszystkie słowa w starym, tak jak
   `typografia.py popraw` z `"paleta"`), akcent, nowy blok, usunięcie planu albo prośba do Wideografa o plan.

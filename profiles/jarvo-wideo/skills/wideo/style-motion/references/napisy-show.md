@@ -15,7 +15,8 @@ instalowane. Oglądasz okładkę i kod (napisy wzoru są po chińsku; liczby i b
 
 ## Nie do
 - Luksus, B2B, formalna marka (kancelaria, bank): skill `typografia-edit` (spokojne napisy przy mowie).
-- Napisy do mowy słowo w słowo: skill `napisy`; rolki z długiego nagrania: `clipmaker`.
+- Napisy do mowy słowo w słowo: skill `napisy`; rolki z długiego nagrania: `clipmaker`. Słowa mowy w tym wyglądzie
+  (obrysy, wyciągnięcie, skok) bez budowania strony: styl `show` w skillu `typografia-edit`.
 - Brak nagrania klienta (sama grafika): `naklejki.md`. Film poziomy bez nowego układu: styl jest pionowy z natury.
 
 ## Cechy stylu (sprawdzalne)

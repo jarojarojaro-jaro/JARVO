@@ -807,6 +807,21 @@ def test_renderer_styl_z_motywu_plytka_i_obrys():
     assert 'g.strokeStyle = typoJasnosc(fill) > 0.18 ? "#0B0B0B" : "#FFFFFF"' in JS          # ciemne słowo: biały obrys
 
 
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_motyw_show_skok_i_styl():
+    """Show (napisy z programu rozrywkowego): skok od zera ze szczytem 1,15 w 5. klatce, styl show bez płytki."""
+    o = node("const S = (w, uklad) => typoSlowo(w, typoMotyw({typo: {motyw: 'show'}}), uklad || 'kolumna').styl;"
+             "const k = [0, 5 / 30, 8 / 30, 0.4].map((t) => +typoSkok(t).toFixed(3));"
+             "console.log(JSON.stringify([k, S({tekst: 'a', waga: 1}), S({tekst: 'a', waga: 3, plyta: true}),"
+             " typoMieszaj('#FFFFFF', '#000000', 0.5), typoMotyw({typo: {motyw: 'show'}}).wejscie,"
+             " typoJasnosc('#000000'), typoJasnosc('#fff'), typoJasnosc('zly'), typoCiemniej('#000', 0.5)]));")
+    k, zwykle, plyta, szary, wejscie, czarny, bialy, zly, ciemny = o
+    assert k[0] == 0 and 1.14 <= k[1] <= 1.16 and abs(k[2] - 1) < 0.03 and abs(k[3] - 1) < 0.015
+    assert (zwykle, plyta, szary, wejscie) == ("show", "show", "rgb(128,128,128)", "skok")
+    assert (czarny, bialy, zly, ciemny) == (0, 1, 1, "rgb(0,0,0)")      # czarne słowo nie jest brane za białe
+
+
 def test_blok_wzorcowy_przed_osoba_z_uderzeniem():
     plan = ed.normalize_typo({"bloki": [
         blok([("raz", 1)], start=0.5),

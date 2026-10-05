@@ -241,7 +241,7 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 - **typografia jak z montażu** do nagrania z mową (`typografia.py`, skill `typografia-edit`): słowa w rytmie mowy, różne
   wielkości, kroje, głębia, skos i 3D, mocne słowo za osobą (maska MODNet, `maska.py`); forma wynika ze znaczenia,
   kolory z palety kadru (dwa akcenty w kontraście ze sceną, rozpisane na zmianę po mocnych słowach), styl filmu
-  z 13 (np. `podcast` z obrysem, `vlog`, `tech`, `magazyn`) dobrany do rodzaju nagrania, `typografia.py style`
+  z 14 (np. `podcast` z obrysem, `vlog`, `tech`, `magazyn`) dobrany do rodzaju nagrania, `typografia.py style`
   pokazuje ten sam blok w każdym; plan leży w projekcie montażu, więc właściciel poprawia każde słowo w edytorze HQ,
 - **żywe schematy** (skill `zywy-schemat`, silnik strony [live-panel](https://github.com/ythx-101/live-panel-skill)): flota,
   przepływ zlecenia albo architektura, która „działa” (kropki po strzałkach, kroki podświetlane po kolei), na posty X

@@ -22,10 +22,10 @@ Paleta z kadru: dwa akcenty z kontrastu z materiałem (główna barwa sceny → 
 i morze → ciemna czerwień; bonus za mocny kolor już w kadrze, kara za barwy skóry przy osobie), wariant ciemny albo
 jasny z tła pod blokami, kolory na zmianę po mocnych słowach (uderzenia i co drugi blok bez uderzenia), płytka
 pod słowem, które nie odcina się od tła.
-Motyw to styl całego filmu (13: czysty, kino, ulica, energia, elegancki, podcast, vlog, komiks, magazyn, tech,
-nowoczesny, retro, neon): kroje, styl słów i uderzenia (wypełnienie, obrys, 3D, blask, płytka, kontur), wejście,
-wyjście i skos. `style` rysuje ten sam blok filmu w każdym motywie, żeby wybrać styl okiem; zmiana motywu nie rusza
-układu, kolorów ani poprawek.
+Motyw to styl całego filmu (14: czysty, kino, ulica, energia, elegancki, podcast, vlog, komiks, magazyn, tech,
+nowoczesny, retro, neon, show): kroje, styl słów i uderzenia (wypełnienie, obrys, 3D, blask, płytka, kontur, show
+jak w programie rozrywkowym), wejście, wyjście i skos. `style` rysuje ten sam blok filmu w każdym motywie, żeby wybrać
+styl okiem; zmiana motywu nie rusza układu, kolorów ani poprawek.
 Te same dane rysuje edytor HQ (hq/web/src/48-typografia.js), więc człowiek widzi i poprawia wszystko na osi.
 Gotowy plan mógł już poprawić człowiek, więc `plan` go nie nadpisuje: poprawiasz go `popraw`, a od nowa układasz
 tylko na wyraźną prośbę (`--nowy`).
@@ -104,6 +104,7 @@ MOTYW_CECHY = {
     "nowoczesny": {"skos": 4, "ciecie": "smuga", "zwykle": "zanik", "styl": "wypelnij", "hit": "wypelnij"},
     "retro": {"skos": 6, "ciecie": "zanik", "zwykle": "zanik", "styl": "wypelnij", "hit": "3d"},
     "neon": {"skos": 5, "ciecie": "zanik", "zwykle": "zanik", "styl": "wypelnij", "hit": "blask"},
+    "show": {"skos": 6, "ciecie": "zanik", "zwykle": "zanik", "styl": "show", "hit": "show"},
 }
 SKOS = {k: v["skos"] for k, v in MOTYW_CECHY.items()}
 WYJSCIE_CIECIE = {k: v["ciecie"] for k, v in MOTYW_CECHY.items()}
