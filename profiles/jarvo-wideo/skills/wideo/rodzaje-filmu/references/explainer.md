@@ -37,13 +37,15 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 - Zwroty akcji i callbacki: coś z haka wraca w puencie; drobne gagi (onomatopeje) trzymają uwagę.
 - Lektor najpierw (`film.py lektor` → czasy słów), animacja pod słowa; na ekranie ≤ 6 słów naraz (reszta w napisach).
 - Jedna metafora wizualna na pojęcie; porównania do rzeczy znanych („jak stadion pełen…”).
+- **Bez efektu PowerPointa** (`ruch-i-kompozycja.md` rozdz. 3): jeden wolny najazd kamery na ujęcie, nowy element
+  tylko na ważnym zdaniu, stary ustępuje nowemu, ≤ 3 grupy naraz, jeden bohater ≥ 1/4 krótszego boku kadru.
 
 ## Brief (`out/wideo/src/BRIEF.md`)
 ```
 Temat i jedno zdanie, które widz ma zapamiętać:
 Widz (co już wie, czego nie):
 Fakty i źródła (z karty / raportu Sherlocka), niepewności:
-Bohater / obiekt prowadzący:          Styl i silnik:
+Bohater / obiekt prowadzący:          Styl i silnik:          Charakter ruchu (ruch-i-kompozycja.md):
 Sceny (czas → idea formalna → zdanie lektora):
 Format, długość, CTA:                 Dźwięk (muzyka, efekty):
 ```

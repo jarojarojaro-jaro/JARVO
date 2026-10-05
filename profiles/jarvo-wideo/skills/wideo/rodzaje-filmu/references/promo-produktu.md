@@ -33,10 +33,10 @@ Nie to: jak działa zjawisko → `explainer.md`; samo logo → `logo-intro.md`; 
 - „Jedna forma, bez cięć”: kolejne stany UI to ten sam element zmieniający rozmiar, promień i kolor; treść wchodzi
   po rozpoczęciu przemiany i znika przed następną (tekst nigdy się nie nakłada).
 - Sprężyny z małym przerzutem (nie gumowe); krótki blur przy zmianie treści; kamera przybliża, żeby stan wypełniał kadr.
-- Akcent (kolor marki) przenosi element, a nie przejście z czerni; kursor prowadzi oko.
-- Pętla: ostatnia klatka = pierwsza (reklamy w feedzie grają w kółko).
+- Akcent (kolor marki) przenosi element, a nie przejście z czerni; kursor prowadzi oko. Pętla: ostatnia klatka = pierwsza.
 - **Wygląda drogo, gdy:** nic nie zanika, tylko zmienia kształt; każda scena rośnie z poprzedniej (bez cięć);
-  coś dzieje się na każdym bicie; mały sprężysty „odbój”, gdy element ląduje; kamera robi jeden ruch naraz;
+  coś dzieje się na każdym bicie; ruch w charakterze marki (`ruch-i-kompozycja.md`; „odbój” nie w `zaufanie`),
+  ważna rzecz po wylądowaniu stoi ≥ 1 s; kamera robi jeden ruch naraz;
   **dźwięk na każdym kliknięciu i świście**: syntezowany z osi czasu (`sound.mjs`, skill `lektor-i-dzwiek`: click, pop,
   whoosh, tick z wariacją `pitch`) albo biblioteka marki / Mixkit / Pixabay (tylko darmowa licencja sprawdzona
   na stronie pliku; link i licencja w RAPORT, zasady w `lektor-i-dzwiek`).

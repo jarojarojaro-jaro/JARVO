@@ -31,6 +31,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(os.environ.get("JARVO_NARZEDZIA", "/opt/data/jarvo/narzedzia" if Path("/opt/data/jarvo").is_dir()
@@ -70,6 +71,10 @@ PUPPETEER = "puppeteer@24.43.1"
 # biblioteki własnych animacji HTML (kontrakt `jarvo`): html_wideo.py serwuje je pod /_lib/, bez CDN
 # (three: MIT; gsap: „Standard no-charge license”, darmowa także komercyjnie)
 HTML_LIBS = ["three@0.186.1", "gsap@3.15.0", "p5@2.3.4"]   # p5: algorithmic-art
+# nasze moduły JS do animacji HTML (ruch.js: charaktery ruchu, smugi): kopia obok node_modules, bo npm usuwa
+# z node_modules obce katalogi; html_wideo.py i podgląd HQ serwują ją pod /_lib/jarvo/
+JARVO_JS = ROOT / "jarvo-js"
+JARVO_JS_PLIKI = ["ruch.js"]
 PY_BASE = ["numpy", "pillow"]
 PY_HTML = [f"playwright=={PW_VERSION}", "imageio"]   # imageio: slack-gif-creator (GIF przez Pillow)
 PY_MODULES = {"pillow": "PIL", "kokoro-onnx": "kokoro_onnx", "faster-whisper": "faster_whisper"}
@@ -245,6 +250,23 @@ def install_html() -> None:
     ensure_chrome_wrapper()
     ensure_venv(PY_BASE + PY_HTML)
     ensure_node([PUPPETEER, *HTML_LIBS])
+    sync_jarvo_js()
+
+
+def sync_jarvo_js() -> Path:
+    """Moduły JS Jarva (JARVO_JS_PLIKI ze scripts/) do JARVO_JS, gdy ich tam nie ma albo się zmieniły."""
+    JARVO_JS.mkdir(parents=True, exist_ok=True)
+    for nazwa in JARVO_JS_PLIKI:
+        tresc = (Path(__file__).resolve().parent / nazwa).read_bytes()
+        cel = JARVO_JS / nazwa
+        if not cel.exists() or cel.read_bytes() != tresc:
+            # własny plik tymczasowy: kilka przeglądarek renderu naraz synchronizuje ten sam moduł
+            fd, tmp = tempfile.mkstemp(dir=JARVO_JS, prefix=f".{nazwa}.")
+            with os.fdopen(fd, "wb") as f:
+                f.write(tresc)
+            os.chmod(tmp, 0o644)
+            os.replace(tmp, cel)
+    return JARVO_JS
 
 
 def lemo_sig(*files: Path) -> str:
@@ -358,7 +380,8 @@ def status() -> dict:
         "venv": (VENV / "bin" / "python").exists(),
         "motion": (NODE / "node_modules" / "playwright").exists() and (VENV / "bin" / "python").exists(),
         "html": venv_has("playwright") and venv_has("PIL"),
-        "html_biblioteki": all(npm_installed(p, NODE / "node_modules") for p in HTML_LIBS),
+        "html_biblioteki": all(npm_installed(p, NODE / "node_modules") for p in HTML_LIBS)
+                           and all((JARVO_JS / n).exists() for n in JARVO_JS_PLIKI),
         # gotowe = przypięty commit i pakiety ze znacznikami setup.sh; po zmianie LEMO_REV → `instaluj lemo` aktualizuje
         "lemo": (LEMO / ".git").exists() and git_head(LEMO) == LEMO_REV and all(map(lemo_gotowe, [None, *lemo_poziomy()])),
         "lemo_hdri": hdri.is_dir() and any(hdri.glob("*.hdr")),

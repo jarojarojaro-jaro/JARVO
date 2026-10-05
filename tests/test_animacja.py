@@ -120,6 +120,13 @@ def test_biblioteki_lib_tylko_z_node_modules(tmp_path):
     assert core.lib_file("gsap/dist/gsap.min.js", nm) == (nm / "gsap" / "dist" / "gsap.min.js").resolve()
     for zle in ("../sekret.txt", ".bin/x", "link", "gsap", "", "gsap/dist/brak.js"):
         assert core.lib_file(zle, nm) is None, zle
+    # jarvo/… = moduły Wideografa (ruch.js) z osobnego katalogu, z tymi samymi zabezpieczeniami
+    js = tmp_path / "jarvo-js"
+    js.mkdir()
+    (js / "ruch.js").write_text("export const x = 1;", encoding="utf-8")
+    assert core.lib_file("jarvo/ruch.js", nm, js) == (js / "ruch.js").resolve()
+    for zle in ("jarvo", "jarvo/", "jarvo/../sekret.txt", "jarvo/brak.js"):
+        assert core.lib_file(zle, nm, js) is None, zle
 
 
 def test_plugin_ma_modul_animacji_i_pomiaru(tmp_path):

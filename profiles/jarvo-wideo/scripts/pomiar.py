@@ -13,13 +13,20 @@ z przeglądarki teksty (widoczna część, granice glifów, krycie, kolor, rozmi
     czarna_przerwa        czarna klatka między scenami (nie na początku i końcu)                   błąd
     martwy_odcinek        obraz bez zmiany dłużej niż 3 s (koniec: 4 s)                             ostrzeżenie
     monotonny_rytm        zmiany w równych odstępach bez akcentu                                    ostrzeżenie
+    pusta_scena           największy obiekt < 15% krótszego boku kadru dłużej niż 1,5 s             ostrzeżenie
+    bez_oddechu           < 0,8 s spokoju przed przejściem do nowego ujęcia (ujęcie ≥ 2 s; wyjście   ostrzeżenie
+                          i wejście do 1,2 s się nie liczą) albo koniec filmu stoi < 0,8 s (logo, puenta:
+                          ≥ 1 s); film w pętli bez kontroli końca
+    uderzenia_kadru       więcej niż 3 uderzenia całego kadru (błysk, wstrząs, pompa skali)         ostrzeżenie
     zasob / blad_js       plik nie wczytał się / błąd JavaScript na stronie                         błąd
 
 Raport ma odcisk źródeł (pliki animacji + ustawienia pomiaru): zmiana czegokolwiek = raport nieaktualny. Film z kodu
 HTML oddajesz tylko z pełnym (`--tryb pelny`) i aktualnym raportem bez błędów; świadomy wyjątek (`--wyjatek`) ma powód.
 Tekst rysowany na kanwie/WebGL animacja podaje sama: `window.__teksty()` → [{tekst, x, y, w, h, kolor, rozmiar, krycie,
 widoczny?, id?}] dla bieżącej klatki (kontrakt HTML). Ograniczenia: maski (overflow: hidden) liczone jako widoczne;
-tło pod tekstem to mediana pikseli wokół glifów.
+tło pod tekstem to mediana pikseli wokół glifów. Kontrole kompozycji (pusta scena, oddech, uderzenia) to przybliżenia
+z małych klatek (zasady: rodzaje-filmu/references/ruch-i-kompozycja.md, za shotcraft i anything2explainer): ostrzegają,
+nie blokują.
 """
 
 from __future__ import annotations
@@ -37,6 +44,12 @@ import wideo_lib as wl  # noqa: E402
 
 STATYKA_PROG = 0.06             # największa zmiana piksela (miniatura 96 px) poniżej = obraz stoi
 CZERN_PROG = 0.035              # średnia jasność poniżej = czarna klatka
+OBIEKT_PUSTY = 0.15             # największy obiekt < 15% krótszego boku kadru dłużej niż 1,5 s = pusta scena
+SPOKOJ = 0.006                  # średnia zmiana miniatury poniżej = kadr osiadł (drobny ruch w tle wolno)
+NOWE_UJECIE = 0.25              # część pikseli miniatury zmieniona naraz (bez powrotu) = nowe ujęcie albo duża zmiana
+UDERZENIE = 0.4                 # część zmieniona naraz, a po ≤ 0,3 s kadr wraca = uderzenie całego kadru
+ODDECH = 0.8                    # s spokoju przed nowym ujęciem i na końcu (zasada: 1 s; próbki co 0,1 s)
+PRZEJSCIE = 1.2                 # s na wyjście starego ujęcia i wejście nowego: spokój liczy się sprzed nich
 GENERYCZNE = {"serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-serif", "ui-sans-serif",
               "ui-monospace", "ui-rounded", "emoji", "math", "fangsong", "inherit", "initial", "-apple-system",
               "blinkmacsystemfont"}
@@ -275,6 +288,184 @@ def analiza(probki: list[dict], dlugosc: float, hz: float, platforma: str | None
             out.append(_ustalenie("monotonny_rytm", "ostrz", f"{len(odst) + 1} zmian co ~{statistics.mean(odst):.1f} s, bez akcentu",
                                   "zróżnicuj długość ujęć: krótsze przy akcji, dłuższe przy puencie; jeden mocny akcent",
                                   szczyty[0], szczyty[-1]))
+    out += kompozycja(probki, dt)
+    return out
+
+
+def _spokoj_przed(zm: list, k: int, okno: int) -> int:
+    """Najdłuższy ciąg spokojnych próbek (zmiana < SPOKOJ), który kończy się w `okno` próbkach przed k."""
+    naj, j = 0, k - 1
+    while j >= 1 and j >= k - okno:
+        ciag = 0
+        while j - ciag >= 1 and zm[j - ciag] is not None and zm[j - ciag] < SPOKOJ:
+            ciag += 1
+        naj = max(naj, ciag)
+        j -= ciag + 1
+    return naj
+
+
+def kompozycja(probki: list[dict], dt: float) -> list[dict]:
+    """Pusta scena, oddech przed nowym ujęciem i na końcu, uderzenia całego kadru. Pola próbek z pomiaru przeglądarki:
+    `obiekt` (obiekt_glowny), `czesc` i `powrot` (ruch_kadru), `do_poczatku` w ostatniej; bez nich kontrola milczy."""
+    out: list[dict] = []
+    n = len(probki)
+    jasna = [p.get("luma") is None or p["luma"] >= CZERN_PROG for p in probki]
+    # pusta scena: odcinki, w których największy obiekt jest mały (czarne klatki się nie liczą)
+    i = 0
+    while i < n:
+        o = probki[i].get("obiekt")
+        if o is not None and o < OBIEKT_PUSTY and jasna[i]:
+            j = i
+            while j + 1 < n and probki[j + 1].get("obiekt") is not None and probki[j + 1]["obiekt"] < OBIEKT_PUSTY and jasna[j + 1]:
+                j += 1
+            if (j - i + 1) * dt >= 1.5:
+                naj = max(probki[k]["obiekt"] for k in range(i, j + 1))
+                out.append(_ustalenie("pusta_scena", "ostrz", f"największy obiekt w kadrze ma najwyżej {naj:.0%} krótszego boku "
+                                      f"przez {(j - i + 1) * dt:.1f} s", "jeden bohater ujęcia ≥ 1/4 krótszego boku (duża liczba, "
+                                      "powiększony element, zdjęcie); małe rzeczy zbierz w jeden duży układ",
+                                      probki[i]["t"], probki[j]["t"] + dt, obiekt=naj))
+            i = j + 1
+        else:
+            i += 1
+    zm = [p.get("zmiana") for p in probki]
+    cz = [p.get("czesc") for p in probki]
+    pw = [p.get("powrot") for p in probki]
+    wraca = [cz[k] is not None and pw[k] is not None and zm[k] and pw[k] <= 0.35 * zm[k] for k in range(n)]
+    # uderzenia całego kadru: duża część kadru zmienia się i wraca (błysk, wstrząs, pompa skali)
+    uderzenia, k = [], 1
+    while k < n:
+        if cz[k] is not None and cz[k] >= UDERZENIE and wraca[k]:
+            uderzenia.append(probki[k]["t"])
+            while k + 1 < n and cz[k + 1] is not None and cz[k + 1] >= UDERZENIE:
+                k += 1
+        k += 1
+    if len(uderzenia) > 3:
+        out.append(_ustalenie("uderzenia_kadru", "ostrz", f"{len(uderzenia)} uderzeń całego kadru (w {', '.join(f'{t:.1f}' for t in uderzenia[:8])} s); "
+                              "najwyżej 3 na film", "zostaw 3 na najmocniejszych bitach, resztę bitów tylko na elementach",
+                              uderzenia[0], uderzenia[-1] + dt, chwile=uderzenia))
+    # oddech przed nowym ujęciem: duża zmiana bez powrotu po ujęciu ≥ 2 s, a w PRZEJSCIE s przed nią (wyjście starego
+    # ujęcia, pusta chwila, początek wejścia) nie kończy się żaden spokój ≥ ODDECH s
+    bez, poprzednie, k = [], 0.0, 1
+    while k < n:
+        if cz[k] is not None and cz[k] >= NOWE_UJECIE and not wraca[k]:
+            spokoj = _spokoj_przed(zm, k, round(PRZEJSCIE / dt))
+            if probki[k]["t"] - poprzednie >= 2.0 - 1e-6 and spokoj * dt < ODDECH:
+                bez.append((probki[k]["t"], spokoj * dt))
+            while k + 1 < n and cz[k + 1] is not None and cz[k + 1] >= NOWE_UJECIE * 0.5:   # przejście w kilku próbkach
+                k += 1
+            poprzednie = probki[k]["t"]
+        k += 1
+    if bez:
+        out.append(_ustalenie("bez_oddechu", "ostrz", f"{len(bez)} × nowe ujęcie zaraz po zatrzymaniu ruchu ("
+                              + ", ".join(f"{t:.1f} s po {s:.1f} s spokoju" for t, s in bez[:6]) + ")",
+                              "po wylądowaniu ostatniego elementu daj 1–1,5 s spokoju, zanim ujęcie zniknie; ruch kamery kończ "
+                              "co najmniej 1 s przed wyjściem", bez[0][0], bez[-1][0] + dt, chwile=[t for t, _ in bez]))
+    # koniec: ostatni kadr (logo, puenta) stoi ≥ 1 s; wygaszenie do czerni na końcu nie liczy się jako ruch
+    ost = probki[-1].get("do_poczatku")
+    if ost is not None and ost >= 0.02 and n > 1:
+        koniec = n
+        while koniec > 1 and not jasna[koniec - 1]:
+            koniec -= 1
+        while koniec > 1 and probki[koniec - 1].get("luma") is not None and probki[koniec - 2].get("luma") is not None \
+                and probki[koniec - 1]["luma"] < probki[koniec - 2]["luma"] - 0.004 and koniec < n:
+            koniec -= 1                                                    # trwające wygaszenie
+        spokoj = 0
+        while koniec - 1 - spokoj >= 1 and zm[koniec - 1 - spokoj] is not None and zm[koniec - 1 - spokoj] < SPOKOJ:
+            spokoj += 1
+        if spokoj * dt < ODDECH:
+            out.append(_ustalenie("bez_oddechu", "ostrz", f"koniec: ostatni kadr stoi {spokoj * dt:.1f} s",
+                                  "logo albo puenta na końcu stoi co najmniej 1 s bez ruchu (film w pętli: ostatnia klatka = pierwsza)",
+                                  probki[max(0, koniec - 1 - spokoj)]["t"], probki[-1]["t"] + dt))
+    return out
+
+
+def obiekt_glowny(jpg: bytes) -> float:
+    """Wielkość największego obiektu w kadrze jako część krótszego boku (0–1). Tło = mediana ramki kadru; obiekt =
+    spójne piksele wyraźnie inne niż tło; litery i słowa jednej linii łączą się w jeden obiekt; szeroki obiekt liczy się
+    jak wyższy (min(szer., 4 × wys.) / 2,5). Kadr prawie cały inny niż ramka albo niejednolita ramka (zdjęcie, gradient,
+    wzór w tle) = 1: tła nie da się ustalić, nie oceniamy."""
+    from PIL import Image
+    im = Image.open(io.BytesIO(jpg)).convert("RGB")
+    skala = 96 / min(im.size)
+    w, h = max(1, round(im.size[0] * skala)), max(1, round(im.size[1] * skala))
+    px = list(im.resize((w, h)).getdata())
+    ramka = px[:w] + px[-w:] + px[::w] + px[w - 1::w]
+    tlo = [statistics.median(p[c] for p in ramka) for c in range(3)]
+    def inny(p: tuple) -> bool:
+        return max(abs(p[0] - tlo[0]), abs(p[1] - tlo[1]), abs(p[2] - tlo[2])) > 40
+    maska = [inny(p) for p in px]
+    if sum(maska) > 0.85 * len(maska) or sum(map(inny, ramka)) > 0.5 * len(ramka):
+        return 1.0
+    rodzic: dict[int, int] = {}
+
+    def szukaj(a: int) -> int:
+        while rodzic[a] != a:
+            rodzic[a] = rodzic[rodzic[a]]
+            a = rodzic[a]
+        return a
+    odcinki, poprzednie, nid = [], [], 0
+    for y in range(h):                              # składowe spójne przez odcinki w wierszach (sąsiedztwo 8)
+        biezace, x, wiersz = [], 0, maska[y * w:(y + 1) * w]
+        while x < w:
+            if not wiersz[x]:
+                x += 1
+                continue
+            x0 = x
+            while x < w and wiersz[x]:
+                x += 1
+            nid += 1
+            rodzic[nid] = nid
+            for a0, a1, pid in poprzednie:
+                if a0 <= x and x0 <= a1:
+                    ra, rb = szukaj(nid), szukaj(pid)
+                    if ra != rb:
+                        rodzic[ra] = rb
+            biezace.append((x0, x, nid))
+            odcinki.append((y, x0, x, nid))
+        poprzednie = biezace
+    ramki: dict[int, list[int]] = {}
+    for y, x0, x1, i in odcinki:
+        r = ramki.setdefault(szukaj(i), [x0, y, x1, y + 1, 0])
+        r[0], r[1], r[2], r[3], r[4] = min(r[0], x0), min(r[1], y), max(r[2], x1), max(r[3], y + 1), r[4] + x1 - x0
+    pudla = sorted((r[:4] for r in ramki.values() if r[4] >= 3), key=lambda r: -(r[2] - r[0]) * (r[3] - r[1]))[:150]
+    zmiana = True
+    while zmiana:                                    # litery i słowa jednej linii → jeden obiekt
+        zmiana = False
+        for a in range(len(pudla)):
+            for b in range(a + 1, len(pudla)):
+                p, q = pudla[a], pudla[b]
+                hp, hq = p[3] - p[1], q[3] - q[1]
+                wspolne = min(p[3], q[3]) - max(p[1], q[1])
+                przerwa = max(p[0], q[0]) - min(p[2], q[2])
+                if wspolne >= 0.5 * min(hp, hq) and przerwa <= 0.6 * max(hp, hq):
+                    pudla[a] = [min(p[0], q[0]), min(p[1], q[1]), max(p[2], q[2]), max(p[3], q[3])]
+                    del pudla[b]
+                    zmiana = True
+                    break
+            if zmiana:
+                break
+    if not pudla:
+        return 0.0
+    naj = max(max(r[3] - r[1], min(r[2] - r[0], 4 * (r[3] - r[1])) / 2.5) for r in pudla)
+    return round(min(1.0, naj / min(w, h)), 3)
+
+
+def ruch_kadru(miniatury: list[bytes]) -> list[dict]:
+    """Dla każdej próbki z miniatur (luma_i_zmiana, ten sam rozmiar): `czesc` = część pikseli zmieniona o > 10%
+    względem poprzedniej, `powrot` = najmniejsza średnia różnica między poprzednią a jedną z 3 następnych (kadr
+    wraca = uderzenie, nie nowe ujęcie); w ostatniej `do_poczatku` = średnia różnica z pierwszą (pętla ≈ 0)."""
+    out: list[dict] = []
+    roz = lambda a, b: sum(abs(x - y) for x, y in zip(a, b)) / (255 * max(1, len(a)))   # noqa: E731
+    for i, m in enumerate(miniatury):
+        d: dict = {}
+        if i and len(miniatury[i - 1]) == len(m):
+            d["czesc"] = round(sum(1 for x, y in zip(m, miniatury[i - 1]) if abs(x - y) > 26) / max(1, len(m)), 4)
+            dalej = [miniatury[k] for k in range(i + 1, min(len(miniatury), i + 4)) if len(miniatury[k]) == len(m)]
+            if dalej:
+                d["powrot"] = round(min(roz(miniatury[i - 1], x) for x in dalej), 5)
+        out.append(d)
+    if len(miniatury) > 1 and len(miniatury[0]) == len(miniatury[-1]):
+        out[-1]["do_poczatku"] = round(roz(miniatury[0], miniatury[-1]), 5)
     return out
 
 

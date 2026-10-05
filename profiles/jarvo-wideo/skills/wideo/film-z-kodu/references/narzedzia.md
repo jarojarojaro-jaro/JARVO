@@ -163,7 +163,8 @@ python3 $H wideo  out/wideo/src/logo/logo_motion.html --preset pixel2motion --sk
 python3 $H wideo  out/wideo/src/opener/index.html --preset bang --dlugosc 12 -o out/wideo/opener.mp4
 ```
 - **Nasza animacja** (Canvas, SVG, Three.js, GSAP): kontrakt `rodzaje-filmu/references/kontrakt-html.md`,
-  `--preset jarvo` (serwer lokalny, biblioteki z `/_lib/`, `?render=1`), `--subklatki 4` = motion blur.
+  `--preset jarvo` (serwer lokalny, biblioteki z `/_lib/`, `?render=1`); ruch i smugi zamiast motion bluru z
+  `/_lib/jarvo/ruch.js` (`--subklatki N` wydłuża render N razy: tylko na prośbę właściciela).
 - **Szybki render:** `wideo` dzieli oś na odcinki i robi klatki w kilku przeglądarkach naraz (samo: do 4, połowa
   rdzeni, ~1 GB wolnej pamięci na przeglądarkę; `--rownolegle N`), film ten sam co z jednej. Pełne rendery
   (`html_wideo.py wideo`, `film.py render`, `projekt.py render`) zajmują miejsce: najwyżej 2 naraz na maszynie,

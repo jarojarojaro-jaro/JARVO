@@ -116,7 +116,9 @@ Syntetyczne SFX, biblioteka inspiracji, produkcja etapami, formaty platform z je
 Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo strony (`demo_strony.py`, metoda ECC
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.
 Animacja z kodu ma twardy pomiar przed oddaniem (`html_wideo.py pomiar`: czas czytania, kadr i strefy UI platformy,
-kontrast, czarne przerwy, martwe odcinki, rytm; „gotowe” tylko z pełnym i aktualnym raportem) i parametry
+kontrast, czarne przerwy, martwe odcinki, rytm, pusta scena, oddech, uderzenia kadru; „gotowe” tylko z pełnym
+i aktualnym raportem), ruch z charakterem marki (`/_lib/jarvo/ruch.js`: 6 charakterów, smugi zamiast motion bluru)
+i parametry
 (`parametry.json`), które właściciel stroi na żywo w HQ. Typografia do nagrania z mową (`typografia.py`, skill
 `typografia-edit`): reżyser z reguł układa bloki słów, Wideograf poprawia je znaczeniem (puenta = uderzenie, myśl =
 dalej i kursywą), kolory bierze z kadru (dwa akcenty w kontraście ze sceną, np. niebo → ciemna czerwień i złoto,

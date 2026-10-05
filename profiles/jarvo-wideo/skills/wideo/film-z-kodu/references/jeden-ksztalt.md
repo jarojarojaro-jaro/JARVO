@@ -29,7 +29,7 @@ Ostatnia klatka = pierwsza, więc film się zapętla. Pasuje do promo produktu, 
   3. Tekst w przemieniającym się kontenerze wchodzi po starcie przemiany i wychodzi przed następną.
   4. Wskaźniki (zakładki): przód i tył na różnych sprężynach, więc się rozciągają.
   5. Siatka bitów z rytm.py; start na mocnym bicie; dźwięki UI (click, pop, whoosh) z sound.mjs na zdarzeniach.
-  6. Render html_wideo.py --subklatki 4 (motion blur).
+  6. Render html_wideo.py wideo (bez podklatek); szybki ruch = smuga i duchy z /_lib/jarvo/ruch.js.
 </budowa>
 <pulapki>
   Nigdy will-change na tym, co kamera skaluje (rozmyty tekst).

@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.1.1
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-03"
+    reviewed: "2026-10-05"
 ---
 
 # Kontrola wideo (bramka jakości)
@@ -31,10 +31,11 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    - ✅ Punkt kontrolny: `ok: true`.
 1b. **Animacja HTML (nasz kontrakt, `--preset jarvo`):** `python3 $HERMES_HOME/scripts/html_wideo.py pomiar <strona>
    --preset jarvo --dlugosc <s> --platforma <…>` mierzy z DOM i klatek: czas czytania, tekst poza kadrem i pod UI
-   platformy, kontrast, kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów (`pomiar.md` obok
+   platformy, kontrast, kroje zastępcze, czarne przerwy, martwe odcinki, rytm, pusta scena, brak oddechu przed
+   cięciem i na końcu, uderzenia całego kadru, błędy JS i zasobów (`pomiar.md` obok
    strony). Ustalenia to fakty, nie opinie: poprawiasz albo zapisujesz świadomy wyjątek z powodem (`--wyjatek`).
    **„Gotowe” tylko z pełnym i aktualnym raportem** (`html_wideo.py aktualny <strona>` = 0); po każdej zmianie
-   pliku animacji raport jest nieaktualny. Ostrzeżenia (martwy odcinek, rytm) sprawdzasz okiem w kroku 4a.
+   pliku animacji raport jest nieaktualny. Ostrzeżenia (martwy odcinek, rytm, kompozycja) sprawdzasz okiem w kroku 4a.
 1c. **Cięcia** (każdy film z cięciami: montaż nagrania, rolka, projekt edytora): `python3 $HERMES_HOME/scripts/krytyka.py
    ciecia <film.mp4> --projekt <oryginał>` (film z `projekt.py render`; rolka clipmakera ma projekt obok i nie
    potrzebuje opcji), `--czasy` z listy `ciecia` z `montaz.py`, bez nich cięcia z obrazu. Na każde cięcie jeden obraz:

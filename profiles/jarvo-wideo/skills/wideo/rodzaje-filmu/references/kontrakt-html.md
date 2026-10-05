@@ -10,7 +10,8 @@ w pętli) i do renderu klatka po klatce: `html_wideo.py --preset jarvo` woła `w
 2. `window.__W`, `window.__H` = rozmiar kadru (1080×1920 pion, 1920×1080 poziom); `window.__DUR` = długość w s.
 3. `window.__ready = true` dopiero po fontach (`await document.fonts.ready`), obrazach i teksturach.
 4. Biblioteki lokalnie z `/_lib/` (html_wideo serwuje wspólne `node_modules`; `narzedzia.py instaluj html`):
-   Three.js `/_lib/three/build/three.module.js` (+ `/_lib/three/examples/jsm/…`), GSAP `/_lib/gsap/dist/gsap.min.js`.
+   Three.js `/_lib/three/build/three.module.js` (+ `/_lib/three/examples/jsm/…`), GSAP `/_lib/gsap/dist/gsap.min.js`,
+   nasz ruch `/_lib/jarvo/ruch.js` (charakter ruchu z marki, lądowanie, wyjście, smugi: `ruch-i-kompozycja.md`).
    Bez CDN: render ma działać offline i zawsze tak samo.
 5. Tekst jako prawdziwy tekst (font z polskimi znakami: sprawdź „Zażółć gęślą jaźń” na arkuszu), nie bitmapa z AI.
 6. **Tekst na kanwie podajesz pomiarowi:** `window.__teksty = () => [...]` zwraca teksty bieżącej klatki
@@ -96,6 +97,8 @@ Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, Morp
 - **Tekst:** wyrasta spod linii maski; tekst podmieniany w zmieniającym kształt pojemniku ma własną maskę i własne
   wejście/wyjście (inaczej nachodzi); pisanie w stałych liniach, kamera nie goni zawijającego się kursora.
 - **Pętla:** ostatnia klatka = pierwsza, łącznie z pozycją i prędkością kursora (inaczej zacina się na przejściu).
+- **Charakter ruchu** marki (6 do wyboru, czasy i krzywe w `ruch.js`) ustala długość głównego ruchu, krzywą
+  i przestrzelenie dla całego filmu (`ruch-i-kompozycja.md`); liczby niżej to drobne ruchy w jego obrębie.
 - **Liczby ruchu** (za skillem fframes, MIT): wejście 0,3–0,6 s, wyjście 0,2–0,3 s (szybciej i bliżej), spoczynek
   1–3 s z małym ruchem w tle. Wejście z krótkiego dystansu (40–120 px) z kryciem 0 → 1; skala od 0,9–0,96, nigdy
   od 0; obrót najwyżej ±6°. Kolejno: elementy listy co 60–120 ms, słowa co 40–60 ms, litery co 20–40 ms; naraz
@@ -112,7 +115,8 @@ Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, Morp
 - Wideo w stronie: przekoduj all-intra (`ffmpeg -i in.mp4 -g 1 -an klip.mp4`), wczytaj jako blob URL (serwer renderu
   nie przewija zakresami), w `__seek` ustaw `currentTime` i zwróć `Promise` czekający na `seeked`.
 - `backdrop-filter: url()` źle czyta mapy przesunięć w Chromium: „szkło” = klon sceny pod elementem + filtr SVG.
-- Szybki ruch: `--subklatki 8` (4 zostawia duchy) i trochę wolniej; potem klatka po klatce przez szybkie chwile
+- Szybki ruch: smuga, duchy albo rozciągnięcie z `ruch.js` (motion blur z `--subklatki` wydłuża render N razy:
+  tylko na prośbę właściciela) i trochę wolniej; potem klatka po klatce przez szybkie chwile
   i `qa_wideo.py` (wykrywa pojedyncze „mrugnięcia”).
 - Dźwięk: prawdziwy efekt na każde zdarzenie, położony wg szczytu (`rytm.py efekt.wav --szczyt`), całość −14 LUFS;
   czasy efektów z tych samych stałych co animacja (zasady w `lektor-i-dzwiek`).
@@ -127,10 +131,11 @@ python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 -
 - Najpierw arkusz (1 klatka na scenę) → vision → poprawki; dopiero potem całość.
 - **Pomiar** (`pomiar.json` + `pomiar.md` obok strony): czas czytania (błąd poniżej 70% minimum dla szybkiego
   czytelnika, ostrzeżenie poniżej spokojnego czytania: znaki bez spacji / 15 + 1,5 s), tekst poza kadrem i pod UI platformy, kontrast,
-  kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów. W trakcie poprawek `--tryb szybki`;
+  kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów; ostrzeżenia kompozycji: pusta scena,
+  brak oddechu przed cięciem i na końcu, > 3 uderzenia całego kadru. W trakcie poprawek `--tryb szybki`;
   film oddajesz tylko z pełnym i aktualnym raportem bez błędów (`html_wideo.py aktualny <strona>` = 0). Świadomy
   wyjątek z powodem: `--wyjatek "czas_czytania@Logo=znak marki, nie tekst do czytania"`.
-- `--subklatki 4` = motion blur (4× dłużej); tylko w finale i przy szybkim ruchu. `--alfa -o x.mov` = przezroczyste tło.
+- `--subklatki N` = motion blur (render N× dłuższy): tylko na wyraźną prośbę właściciela. `--alfa -o x.mov` = przezroczyste tło.
 - WebGL liczy się na CPU (VPS bez GPU): zmierz czas 1 klatki (`klatki --czasy 5`) i oszacuj całość, zanim ruszysz 60 s w 60 fps.
   `wideo` renderuje w kilku przeglądarkach naraz (samo: do 4, według rdzeni i pamięci; `--rownolegle N`) i czeka
   na miejsce, gdy na maszynie trwają już 2 pełne rendery albo przy trwającym renderze wolnej pamięci jest < 30%.

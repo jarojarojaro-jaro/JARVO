@@ -179,3 +179,77 @@ def test_podsumowanie_i_cli_html_wideo(tmp_path, monkeypatch):
     (tmp_path / "pomiar.json").write_text(json.dumps({"odcisk": pm.odcisk(anim, ust), "ustawienia": ust,
                                                        "pokrycie": {"pelne": True}, "werdykt": {"ok": True}}), encoding="utf-8")
     assert hw.main(["aktualny", str(anim)]) == 0
+
+
+def test_kompozycja_pusta_scena_oddech_i_uderzenia():
+    """Kontrole z pomiaru przeglądarki (pola obiekt, czesc, powrot, do_poczatku); bez tych pól milczą."""
+    def pr(dlugosc, obiekt=lambda t: 0.4, czesc=lambda t: 0.01, powrot=lambda t: 0.05, zmiana=lambda t: 0.0,
+           do_poczatku=0.3, luma=lambda t: 0.5):
+        out = probki(dlugosc, luma=luma, zmiana=zmiana)
+        for p in out:
+            p.update(obiekt=obiekt(p["t"]), czesc=czesc(p["t"]), powrot=powrot(p["t"]))
+        out[-1]["do_poczatku"] = do_poczatku
+        return out
+    kody_ = lambda ust: [u["kod"] for u in ust]                                         # noqa: E731
+    # spokojny film: ujęcie co 3 s, przed każdym 1,2 s spokoju, koniec stoi 1,5 s
+    ruch = lambda t: 0.03 if (t % 3.0) < 1.6 and t < 7.5 else 0.0                       # noqa: E731
+    ciecia = lambda t: 0.6 if round(t * 10) in (30, 60) else 0.01                       # noqa: E731
+    assert pm.kompozycja(pr(9, czesc=ciecia, zmiana=ruch), 0.1) == []
+    # pusta scena: obiekt 8% przez 2 s; krócej niż 1,5 s albo na czarnym: nic
+    ust = pm.kompozycja(pr(6, obiekt=lambda t: 0.08 if 1.0 <= t < 3.0 else 0.4), 0.1)
+    assert kody_(ust) == ["pusta_scena"] and (ust[0]["od"], ust[0]["do"]) == (1.0, 3.0)
+    assert "pusta_scena" not in kody_(pm.kompozycja(pr(6, obiekt=lambda t: 0.08 if 1.0 <= t < 2.2 else 0.4), 0.1))
+    assert "pusta_scena" not in kody_(pm.kompozycja(pr(6, obiekt=lambda t: 0.02, luma=lambda t: 0.01), 0.1))
+    # cięcie 0,2 s po zatrzymaniu ruchu w ujęciu 4 s → bez_oddechu; szybki montaż (ujęcia < 2 s) nie
+    ruch2 = lambda t: 0.03 if t < 3.8 or 4.0 <= t < 6.5 else 0.0                       # noqa: E731
+    ust = pm.kompozycja(pr(8, czesc=lambda t: 0.6 if round(t * 10) == 40 else 0.01, zmiana=ruch2), 0.1)
+    assert [u["chwile"] for u in ust if u["kod"] == "bez_oddechu"] == [[4.0]]
+    # wyjście starego ujęcia (4,4–4,7 s) i wejście nowego (4,9 s) po 1,9 s spokoju: oddech był, przed przejściem
+    wyjscie = lambda t: 0.03 if t < 2.5 or 4.4 <= t < 4.7 or t >= 4.8 else 0.0         # noqa: E731
+    wejscie = lambda t: 0.6 if round(t * 10) == 49 else 0.01                           # noqa: E731
+    assert "bez_oddechu" not in kody_(pm.kompozycja(pr(8, czesc=wejscie, zmiana=lambda t: wyjscie(t) if t < 7 else 0.0), 0.1))
+    krotko = lambda t: 0.03 if t < 4.0 or 4.4 <= t < 4.7 or 4.8 <= t < 7 else 0.0      # noqa: E731
+    assert [u["chwile"] for u in pm.kompozycja(pr(8, czesc=wejscie, zmiana=krotko), 0.1) if u["kod"] == "bez_oddechu"] == [[4.9]]
+    montaz = lambda t: 0.6 if round(t * 10) in (12, 24, 36) else 0.01                  # noqa: E731
+    assert pm.kompozycja(pr(6, czesc=montaz, zmiana=lambda t: 0.03 if t < 4.5 else 0.0), 0.1) == []
+    # koniec: ruch do ostatniej klatki → ostrzeżenie; pętla (ostatnia = pierwsza) albo wygaszenie po spokoju: nic
+    ust = pm.kompozycja(pr(5, zmiana=lambda t: 0.03), 0.1)
+    assert [u["opis"] for u in ust] == ["koniec: ostatni kadr stoi 0.0 s"]
+    assert pm.kompozycja(pr(5, zmiana=lambda t: 0.03, do_poczatku=0.0), 0.1) == []
+    wygaszenie = lambda t: 0.5 if t < 4.5 else 0.5 - (t - 4.4)                        # noqa: E731
+    assert pm.kompozycja(pr(5, zmiana=lambda t: 0.03 if t < 3.0 or t >= 4.5 else 0.0, luma=wygaszenie), 0.1) == []
+    # uderzenia: 4 błyski, po których kadr wraca → ostrzeżenie; 3 wolno; zmiana bez powrotu to nie uderzenie
+    blyski = lambda t: 0.7 if round(t * 10) in (10, 20, 30, 40) else 0.01             # noqa: E731
+    stoi = lambda t: 0.0                                                                # noqa: E731
+    ust = pm.kompozycja(pr(6, czesc=blyski, powrot=lambda t: 0.001, zmiana=lambda t: 0.2 if round(t * 10) in (10, 20, 30, 40) else 0.0), 0.1)
+    assert [u["chwile"] for u in ust if u["kod"] == "uderzenia_kadru"] == [[1.0, 2.0, 3.0, 4.0]]
+    trzy = lambda t: 0.7 if round(t * 10) in (10, 20, 30) else 0.01                   # noqa: E731
+    assert pm.kompozycja(pr(6, czesc=trzy, powrot=lambda t: 0.001, zmiana=stoi), 0.1) == []
+    # stare próbki bez pól kompozycji: kontrole milczą
+    assert pm.kompozycja(probki(5), 0.1) == []
+
+
+def test_obiekt_glowny_i_ruch_kadru():
+    Image = pytest.importorskip("PIL.Image")
+    ImageDraw = pytest.importorskip("PIL.ImageDraw")
+
+    def jpg(rysuj, size=(1920, 1080), tlo=(245, 243, 238)):
+        im = Image.new("RGB", size, tlo)
+        rysuj(ImageDraw.Draw(im))
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=90)
+        return buf.getvalue()
+    pusty = jpg(lambda d: d.rectangle((900, 500, 960, 560), fill=(20, 20, 20)))               # mała ikonka 60 px
+    bohater = jpg(lambda d: d.ellipse((760, 240, 1160, 840), fill=(200, 30, 40)))           # koło 600 px
+    napis = jpg(lambda d: [d.rectangle((300 + 170 * i, 470, 300 + 170 * i + 130, 600), fill=(10, 10, 10)) for i in range(8)])
+    zdjecie = jpg(lambda d: [d.rectangle((0, y, 1920, y + 40), fill=((y * 7) % 255, 90, 160)) for y in range(0, 1080, 40)])
+    assert pm.obiekt_glowny(pusty) < 0.08
+    assert 0.5 <= pm.obiekt_glowny(bohater) <= 0.6
+    assert pm.obiekt_glowny(napis) >= 0.15            # osiem „liter” w linii = jeden szeroki obiekt
+    assert pm.obiekt_glowny(zdjecie) == 1.0
+    assert pm.obiekt_glowny(jpg(lambda d: None)) == 0.0
+    a, b = bytes([10] * 100), bytes([200] * 100)
+    r = pm.ruch_kadru([a, a, b, a, a, a])             # błysk w próbce 2 i powrót
+    assert r[0] == {} and r[1]["czesc"] == 0 and r[2]["czesc"] == 1.0 and r[2]["powrot"] == 0.0
+    assert r[-1]["do_poczatku"] == 0.0
+    assert pm.ruch_kadru([a, b, b, b])[1]["powrot"] == pytest.approx(190 / 255, abs=1e-4)   # nowe ujęcie: nie wraca

@@ -30,7 +30,8 @@ Nie to: coś ma zostać wyjaśnione → `explainer.md`; hasło jest treścią �
 - Cięcia i akcenty na taktach muzyki; cisza i bezruch też są rytmem (0,3 s zatrzymania przed dropem).
 - Infinite zoom: skala rośnie wykładniczo przy stałej prędkości (czas segmentu ∝ log(przybliżenia));
   następny świat siedzi w „portalu” poprzedniego i przejmuje kadr, gdy go wypełni.
-- Motion blur z podklatek (`html_wideo.py … --subklatki 4`) przy szybkim ruchu; ziarno i winieta z umiarem.
+- Szybki ruch: smugi, duchy i rozciągnięcie z `/_lib/jarvo/ruch.js` zamiast motion bluru z podklatek (render N razy
+  dłuższy; tylko na prośbę właściciela), zasady w `ruch-i-kompozycja.md`; ziarno i winieta z umiarem.
 - Pętla idealna: stan w `t = DUR` równy stanowi w `t = 0` (sprawdź klatkę pierwszą i ostatnią obok siebie).
 
 ## Brief (`out/wideo/src/BRIEF.md`)

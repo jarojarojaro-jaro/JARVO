@@ -639,14 +639,21 @@ def is_animation(p: Path) -> bool:
 
 # wspólne biblioteki animacji (three, gsap) z katalogu narzędzi Wideografa: ten sam /_lib/ co w html_wideo.py
 LIB_ROOT = Path(os.environ.get("JARVO_NARZEDZIA", str(JARVO_DIR / "narzedzia"))) / "node" / "node_modules"
+# /_lib/jarvo/… = moduły Wideografa (ruch.js), kopia z narzedzia.py sync_jarvo_js (instaluj html, każdy html_wideo.py)
+JARVO_JS_ROOT = LIB_ROOT.parent.parent / "jarvo-js"
 
 
-def lib_file(rel: str, root: Path | None = None) -> Path | None:
-    """Plik biblioteki spod node_modules narzędzi (bez ukrytych, bez wyjścia poza katalog, także symlinkiem)."""
+def lib_file(rel: str, root: Path | None = None, jarvo_root: Path | None = None) -> Path | None:
+    """Plik biblioteki spod node_modules narzędzi albo `jarvo/…` z modułów Wideografa (bez ukrytych, bez wyjścia
+    poza katalog, także symlinkiem)."""
     root = (root or LIB_ROOT)
     parts = [x for x in rel.split("/") if x]
     if not parts or any(x.startswith(".") or "\x00" in x or "\\" in x for x in parts):
         return None
+    if parts[0] == "jarvo":
+        root, parts = (jarvo_root or JARVO_JS_ROOT), parts[1:]
+        if not parts:
+            return None
     try:
         base = root.resolve(strict=True)
         p = base.joinpath(*parts).resolve(strict=True)

@@ -491,6 +491,8 @@ def test_html_presets_and_flags_override():
     assert hw.resolve_opts(None)["param"] == "t"
     with pytest.raises(SystemExit):
         hw.resolve_opts("nie-ma")
+    # płótno 2D na CPU: na GPU wyczyszczona nakładka (smuga) dawała w zrzucie treść sprzed dwóch klatek
+    assert "--disable-accelerated-2d-canvas" in hw.BROWSER_ARGS
 
 
 def test_html_time_values_and_urls(tmp_path):
@@ -557,6 +559,7 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
     import urllib.request
     nz_mod = sys.modules["narzedzia"]                                     # ten sam moduł, którego używa html_wideo
     monkeypatch.setattr(nz_mod, "NODE", tmp_path / "node")
+    monkeypatch.setattr(nz_mod, "JARVO_JS", tmp_path / "jarvo-js")
     lib = tmp_path / "node" / "node_modules" / "three" / "build"
     lib.mkdir(parents=True)
     (lib / "three.module.js").write_text("export const ok = 1;")
@@ -571,10 +574,22 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
             assert b"ok" in r.read()
         with urllib.request.urlopen(base + "/_lib/three/build/three.module.js") as r:
             assert r.headers["Content-Type"].startswith("text/javascript") and b"ok" in r.read()
-        with pytest.raises(urllib.error.HTTPError):
-            urllib.request.urlopen(base + "/_lib/../../sekret.txt")
+        with urllib.request.urlopen(base + "/_lib/jarvo/ruch.js") as r:            # nasz moduł, kopia ze scripts/
+            assert b"export const CHARAKTERY" in r.read()
+        assert (tmp_path / "jarvo-js" / "ruch.js").read_bytes() == (REPO / "profiles/jarvo-wideo/scripts/ruch.js").read_bytes()
+        for zle in ("/_lib/../../sekret.txt", "/_lib/jarvo/../../sekret.txt"):
+            with pytest.raises(urllib.error.HTTPError):
+                urllib.request.urlopen(base + zle)
     finally:
         httpd.shutdown()
+    # stara kopia + kilka przeglądarek renderu naraz: na końcu cały plik, bez resztek plików tymczasowych
+    import threading
+    (tmp_path / "jarvo-js" / "ruch.js").write_text("stare")
+    watki = [threading.Thread(target=nz_mod.sync_jarvo_js) for _ in range(8)]
+    [w.start() for w in watki]
+    [w.join() for w in watki]
+    assert (tmp_path / "jarvo-js" / "ruch.js").read_bytes() == (REPO / "profiles/jarvo-wideo/scripts/ruch.js").read_bytes()
+    assert sorted(x.name for x in (tmp_path / "jarvo-js").iterdir()) == ["ruch.js"]
 
 
 def test_html_parallel_browsers_split_the_timeline(monkeypatch, tmp_path):
@@ -644,7 +659,7 @@ def test_rodzaje_index_matches_files_and_stays_lean():
     linked = set(re.findall(r"`references/([a-z0-9-]+)\.md`", index))
     files = {p.stem for p in (RODZAJE_DIR / "references").glob("*.md")}
     assert linked == files
-    types = files - {"kontrakt-html"}
+    types = files - {"kontrakt-html", "ruch-i-kompozycja"}               # wspólne dla wielu rodzajów
     assert types == set(insp.RODZAJE)                                     # każdy rodzaj ma inspiracje i odwrotnie
     for name in sorted(types):
         text = (RODZAJE_DIR / "references" / f"{name}.md").read_text(encoding="utf-8")
@@ -763,3 +778,40 @@ def test_narzedzia_exempts_exact_pins_from_uv_quarantine():
     nz = _wscript("narzedzia")
     assert nz.uv_exempt(["numpy", "playwright==1.63.0", "imageio"]) == ["--exclude-newer-package", "playwright=false"]
     assert nz.py_module("playwright==1.63.0") == "playwright" and nz.py_module("pillow") == "PIL"
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="brak node")
+def test_ruch_js_characters_landing_and_smear(tmp_path):
+    """ruch.js: 6 charakterów, lądowanie kończy się dokładnie w celu (skala 1, bez ściśnięcia), przestrzelenie skali
+    = `przestrzal`, wyjście szybsze od wejścia, smuga rysuje kapsułę tylko przy ruchu."""
+    skrypt = tmp_path / "t.mjs"
+    skrypt.write_text("""
+import * as R from %s;
+const out = {};
+for (const [n, c] of Object.entries(R.CHARAKTERY)) {
+  let maxS = 0, minSy = 9;
+  for (let i = 0; i <= 200; i++) { const l = R.ladowanie(i / 200 * c.czas, 0, n); maxS = Math.max(maxS, l.skala); minSy = Math.min(minSy, l.sy); }
+  const kon = R.ladowanie(c.czas + 1, 0, n), pocz = R.ladowanie(-1, 0, n);
+  out[n] = {maxS, minSy, kon: [kon.p, kon.skala, kon.sy, kon.u], pocz: [pocz.p, pocz.skala], wyj: R.wyjscie(c.czas * 0.5, 0, n).p};
+}
+const ops = [];
+const g = {save() {}, restore() {}, beginPath() {}, moveTo(...a) { ops.push(['m', ...a]); }, lineTo(...a) { ops.push(['l', ...a]); },
+           stroke() { ops.push(['s']); }, createLinearGradient() { return {addColorStop(o, c) { ops.push(['c', o, c]); }}; }};
+const ruch = R.smuga(g, (t) => [1000 * t, 50], 1, 10, '#ff3300');
+const stoi = R.smuga(g, () => [5, 5], 1, 10, '#ff3300');
+let blad = '';
+try { R.ladowanie(0, 0, 'nerwowy'); } catch (e) { blad = String(e.message); }
+console.log(JSON.stringify({out, ops, ruch, stoi, blad, rozc: R.rozciagniecie(0)}));
+""" % json.dumps(str(REPO / "profiles/jarvo-wideo/scripts/ruch.js")))
+    wynik = json.loads(subprocess.run(["node", str(skrypt)], capture_output=True, text=True, check=True).stdout)
+    out = wynik["out"]
+    assert list(out) == ["zaufanie", "luksus", "odwazny", "zabawny", "spokojny", "przyjazny"]
+    for n, w in out.items():
+        assert w["kon"] == [1, 1, 1, 1] and w["pocz"] == [0, 0.92], n             # koniec w celu, start od 0,92
+        assert w["wyj"] == 0, n                                                    # wyjście = połowa czasu wejścia
+    assert out["zaufanie"]["maxS"] == pytest.approx(1.0) and out["zaufanie"]["minSy"] == 1   # nie skacze, nie ściska
+    assert out["odwazny"]["maxS"] == pytest.approx(1.12, abs=0.002) and out["odwazny"]["minSy"] < 0.9
+    assert out["luksus"]["maxS"] == pytest.approx(1.02, abs=0.002)
+    assert wynik["ruch"] is True and wynik["stoi"] is False
+    assert ["c", 0, "#ff330000"] in wynik["ops"] and ["c", 1, "#ff3300"] in wynik["ops"]   # ogon przezroczysty
+    assert "nieznany charakter" in wynik["blad"] and wynik["rozc"] == {"sx": 1, "sy": 1}

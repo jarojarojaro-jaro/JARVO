@@ -1,7 +1,7 @@
 ---
 name: rodzaje-filmu
 description: "Rodzaj filmu → jeden plik: silnik, struktura, rzemiosło."
-version: 1.2.2
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-03"
+    reviewed: "2026-10-05"
 ---
 
 # Rodzaje filmu
@@ -39,11 +39,13 @@ Niejasne? Rozstrzyga cel z karty: wyjaśnić → explainer, sprzedać → promo,
 opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprzedać czy zachwycić?”).
 
 ## Kroki
-1. Rodzaj z indeksu → jego plik. Własna animacja HTML (Canvas, SVG, Three.js, GSAP) → też `references/kontrakt-html.md`.
+1. Rodzaj z indeksu → jego plik. Każdy film z kodu → też `references/ruch-i-kompozycja.md` (charakter ruchu z marki,
+   oddech, jeden bohater, przejścia, smugi zamiast motion bluru; kod: `ruch.js`). Własna animacja HTML (Canvas, SVG, Three.js, GSAP)
+   → też `references/kontrakt-html.md`.
    **Film-wzór** („zrób coś takiego”): `kadry.py wzor wzor.mp4` (klatki co 0,5 s, cięcia, rytm) → rozpisz go na bity
    (przejścia, kamera, kolory, fonty) i przenieś tę strukturę na produkt; treści, logo i assetów wzoru nie bierzesz.
 2. **Brief** `out/wideo/src/BRIEF.md` w 6 częściach: **wejścia** (pliki, dane, marka), **kierunek** (styl w 3 zdaniach +
-   czego nie ma być), **struktura** (mapa bitów: sekunda → scena → ruch → dźwięk), **budowa** (silnik, format, fps),
+   czego nie ma być, charakter ruchu z marki), **struktura** (mapa bitów: sekunda → scena → ruch → dźwięk), **budowa** (silnik, format, fps),
    **pułapki**, **start** (pierwszy krok). Szablon pól z pliku rodzaju. Brak wejścia: karta → brand kit → rozsądna
    domyślna nazwana w RAPORT; pytasz tylko o to, bez czego film będzie zły.
    Muzyka: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3` → BPM, takty, drop; cięcia i zmiany na taktach.
@@ -57,11 +59,12 @@ opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprz
 ## Zasady wspólne
 - Pierwsze 2 s: coś się dzieje (ruch, pytanie, liczba), nie logo na czarnym tle.
 - Jedna myśl i jedna idea formalna na scenę; jeden system (paleta 3–4 kolory, 1–2 fonty, siatka, grubość linii).
+- Jeden charakter ruchu na film, jeden bohater na ujęcie, ważna rzecz po wylądowaniu stoi ≥ 1 s, ≤ 3 uderzenia kadru.
 - Czas z `t`, nie z zegara: każdą klatkę da się wyrenderować osobno i zawsze tak samo.
 - Prawdziwe dane, UI i fakty; zero zmyślonych liczb, logo i cytatów. Brak danych: mniej konkretu albo pytanie przez Jarva.
 - Arkusz klatek przed renderem całości; gotowy film obejrzany jeszcze raz (arkusz z `qa_wideo.py`).
 
 ## Definition of Done
 - [ ] rodzaj nazwany w RAPORT z uzasadnieniem; przeczytany tylko jego plik (plus kontrakt HTML, gdy dotyczy),
-- [ ] `BRIEF.md` wypełniony, wynik zgodny z sekcją „Wynik” pliku rodzaju,
+- [ ] `BRIEF.md` wypełniony (z charakterem ruchu), wynik zgodny z sekcją „Wynik” pliku rodzaju,
 - [ ] kontrola rodzaju odhaczona, `qa_wideo.py` bez błędów, `kontrola-wideo` ≥ 85.

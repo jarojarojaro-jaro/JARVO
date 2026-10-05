@@ -80,7 +80,10 @@ PRESETS: dict[str, dict] = {
 }
 DEFAULTS = {"param": "t", "jednostka": "s", "gotowe": None, "seek": None, "selektor": None, "query": {},
             "rozmiar_js": None, "serwer": False}
+# --disable-accelerated-2d-canvas: płótno 2D rysowane na CPU. Na GPU (swiftshader) płótno tylko wyczyszczone (np. nakładka
+# ze smugą, gdy nic nie leci) trafiało do zrzutu ze starą treścią sprzed dwóch klatek; szybkość renderu ta sama.
 BROWSER_ARGS = ["--enable-webgl", "--ignore-gpu-blocklist", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
+                "--disable-accelerated-2d-canvas",
                 "--autoplay-policy=no-user-gesture-required", "--allow-file-access-from-files"]
 RAF2 = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
 FONTS = "() => (document.fonts ? document.fonts.ready.then(() => true) : true)"
@@ -368,12 +371,15 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
     extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, ".wasm": "application/wasm",
                       ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json"}
     lib_root: Path | None = None      # /_lib/… → wspólne node_modules narzędzi (three, gsap)
+    jarvo_root: Path | None = None    # /_lib/jarvo/… → nasze moduły (ruch.js)
 
     def translate_path(self, path: str) -> str:
         clean = unquote(urlsplit(path).path)
         if self.lib_root is not None and clean.startswith("/_lib/"):
-            root = self.lib_root.resolve()
-            target = (root / clean[len("/_lib/"):]).resolve()
+            root, rel = self.lib_root.resolve(), clean[len("/_lib/"):]
+            if self.jarvo_root is not None and rel.startswith("jarvo/"):
+                root, rel = self.jarvo_root.resolve(), rel[len("jarvo/"):]
+            target = (root / rel).resolve()
             return str(target) if root in target.parents else str(root / "__poza_lib__")
         return super().translate_path(path)
 
@@ -382,7 +388,8 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
 
 
 def serve(root: Path, lib: bool = False) -> http.server.ThreadingHTTPServer:
-    handler = type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules"}) if lib else _Quiet
+    handler = (type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules", "jarvo_root": nz.sync_jarvo_js()})
+               if lib else _Quiet)
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(handler, directory=str(root)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd
@@ -464,7 +471,7 @@ def zmierz(src: str, o: dict, dlugosc: float, hz: float, size: tuple[int, int], 
         httpd = serve(page_file.parent, lib=True)
         src = f"http://127.0.0.1:{httpd.server_address[1]}/{quote(page_file.name)}"
     times = [i / hz for i in range(max(1, int(math.floor(dlugosc * hz + 1e-9))))]
-    probki, jpgs, prev, rodziny = [], {}, None, set()
+    probki, jpgs, prev, rodziny, miniatury = [], {}, None, set(), []
     try:
         with sync_playwright() as p:
             browser = launch(p)
@@ -496,15 +503,18 @@ def zmierz(src: str, o: dict, dlugosc: float, hz: float, size: tuple[int, int], 
                 d = page.evaluate(pm.SONDA_JS)
                 jpg = page.screenshot(type="jpeg", quality=60)
                 luma, zmiana, ruch, prev = pm.luma_i_zmiana(jpg, prev)
+                miniatury.append(bytes(prev))
                 for x in d["teksty"]:
                     first = x["family"].split(",")[0].strip().strip("'\"")
                     if first and first.lower() not in pm.GENERYCZNE:
                         rodziny.add(first)
                 probki.append({"t": round(t, 4), "W": d["W"], "H": d["H"], "teksty": d["teksty"], "luma": round(luma, 4),
                                "zmiana": None if zmiana is None else round(zmiana, 5),
-                               "ruch": None if ruch is None else round(ruch, 4)})
+                               "ruch": None if ruch is None else round(ruch, 4), "obiekt": pm.obiekt_glowny(jpg)})
                 if d["teksty"]:
                     jpgs[len(probki) - 1] = jpg
+            for p_, r_ in zip(probki, pm.ruch_kadru(miniatury)):
+                p_.update(r_)
             czcionki = page.evaluate(pm.CZCIONKI_JS, sorted(rodziny))
             rozmiar = [page.viewport_size["width"], page.viewport_size["height"]]
             browser.close()
