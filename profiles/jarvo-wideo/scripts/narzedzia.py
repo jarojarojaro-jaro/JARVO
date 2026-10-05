@@ -97,10 +97,10 @@ PUPPETEER = "puppeteer@24.43.1"
 # (three: MIT; gsap: „Standard no-charge license”, darmowa także komercyjnie)
 HTML_LIBS = ["three@0.186.1", "gsap@3.15.0", "p5@2.3.4"]   # p5: algorithmic-art
 # nasze moduły JS do animacji HTML (ruch.js: charaktery ruchu, smugi; kreska, morph, crt, plotno, piksel: techniki
-# stylów motion design z wzorów mg-styles-15): kopia obok node_modules, bo npm usuwa
+# stylów motion design z wzorów mg-styles-15; os_czasu.js: chwile lektora po nazwie z film.py narracja): kopia obok node_modules, bo npm usuwa
 # z node_modules obce katalogi; html_wideo.py i podgląd HQ serwują ją pod /_lib/jarvo/
 JARVO_JS = ROOT / "jarvo-js"
-JARVO_JS_PLIKI = ["ruch.js", "kreska.js", "morph.js", "crt.js", "plotno.js", "piksel.js"]
+JARVO_JS_PLIKI = ["ruch.js", "kreska.js", "morph.js", "crt.js", "plotno.js", "piksel.js", "os_czasu.js"]
 PY_BASE = ["numpy", "pillow"]
 PY_HTML = [f"playwright=={PW_VERSION}", "imageio"]   # imageio: slack-gif-creator (GIF przez Pillow)
 PY_MODULES = {"pillow": "PIL", "kokoro-onnx": "kokoro_onnx", "faster-whisper": "faster_whisper"}

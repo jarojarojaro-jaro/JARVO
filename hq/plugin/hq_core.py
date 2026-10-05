@@ -639,7 +639,7 @@ def is_animation(p: Path) -> bool:
 
 # wspólne biblioteki animacji (three, gsap) z katalogu narzędzi Wideografa: ten sam /_lib/ co w html_wideo.py
 LIB_ROOT = Path(os.environ.get("JARVO_NARZEDZIA", str(JARVO_DIR / "narzedzia"))) / "node" / "node_modules"
-# /_lib/jarvo/… = moduły Wideografa (ruch.js, kreska.js, morph.js, crt.js, plotno.js, piksel.js), kopia z narzedzia.py sync_jarvo_js (instaluj html, każdy html_wideo.py)
+# /_lib/jarvo/… = moduły Wideografa (ruch.js, kreska.js, morph.js, crt.js, plotno.js, piksel.js, os_czasu.js), kopia z narzedzia.py sync_jarvo_js (instaluj html, każdy html_wideo.py)
 JARVO_JS_ROOT = LIB_ROOT.parent.parent / "jarvo-js"
 # /_lib/kroje/… = kroje OFL z polskimi znakami, te same pliki co edytor HQ (animacja: <link href="/_lib/kroje/kroje.css">)
 _TU = Path(__file__).resolve().parent

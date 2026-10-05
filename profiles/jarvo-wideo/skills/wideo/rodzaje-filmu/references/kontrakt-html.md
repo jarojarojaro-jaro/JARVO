@@ -128,6 +128,43 @@ Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, Morp
   duża chwila = zdanie dźwiękowe (narastanie → uderzenie → błysk), seria elementów = dwa efekty na zmianę, coraz ciszej;
   czasy efektów z tych samych stałych co animacja (zasady w `lektor-i-dzwiek`).
 
+## Film z lektorem: oś czasu z narracji
+Lektor najpierw, animacja za nim. Tekst lektora w `out/wideo/src/narracja.txt`:
+```
+# Kolejka                                   ← rozdział (tylko film od 3 min: plansza rozdziału), nie jest czytany
+Wchodzisz do piekarni o siódmej rano.       ← linia = jedno zdanie lektora
+Przed tobą {kolejka}dziesięć osób. | Każdy czeka.   ← | = podział napisu, {nazwa} = chwila na początku słowa
+                                            ← pusty wiersz = koniec akapitu = cięcie ujęcia
+To pół godziny dziennie.{zegar}             ← {nazwa} na końcu linii = koniec zdania
+```
+```bash
+python3 $HERMES_HOME/scripts/film.py narracja out/wideo/src/narracja.txt --sprawdz          # tekst, szacunek długości
+python3 $HERMES_HOME/scripts/film.py narracja out/wideo/src/narracja.txt -o out/wideo/src/lektor.wav \
+  --os out/wideo/src/<nazwa>/os_czasu.json --cel 60-90 [--glos pl-PL-ZofiaNeural] [--tempo -5%]
+```
+Każde zdanie jest syntezowane osobno, przycięte do słyszalnej mowy i położone z pauzą: 0,33 s w akapicie, 1 s po
+akapicie, 1,5 s przed rozdziałem, 0,5 s na wejście i 1,5 s na końcu (`--pauzy zdanie=0.4,akapit=1.2`). Wynik:
+`lektor.wav` od 0 s filmu (pauzy są już w pliku), `lektor.slowa.json` i `lektor.srt` (napisy z podziałami `|`)
+oraz `os_czasu.json`: zdania, ujęcia, rozdziały, napisy i chwile po nazwie. Strona czyta go modułem `os_czasu.js`:
+```js
+import { wczytajOs } from '/_lib/jarvo/os_czasu.js';
+const O = await wczytajOs();                          // os_czasu.json obok strony
+Object.assign(window, { __W: W, __H: H, __DUR: O.dlugosc });
+// w draw(t):
+const u = O.ujecie(t);                                // bieżące ujęcie: u.id, u.nr, u.start, u.koniec, u.mowa_koniec
+const wejscie = O.postep(t, O.bit('kolejka', -0.2), O.bit('kolejka', 0.3));   // liczba wchodzi ze słowem
+const napis = O.napis(t);                             // grupa napisów w chwili t (gdy strona rysuje napisy sama)
+```
+- W scenie z lektorem żadnych sekund wpisanych w kod: każda chwila z `O.bit()`: `u3` (początek ujęcia),
+  `u3.z2` (2. zdanie), `u3.mowa_koniec`, `u3.koniec` (cięcie), `r2` (rozdział), własna `{nazwa}` z narracji.
+  Element wchodzi od 0,2 s przed do 0,1 s po swoim słowie; nowy element tylko na ważnym zdaniu.
+- Ujęcie = akapit. Cięcie wypada w pauzie po akapicie, 0,25 s przed pierwszym słowem następnego: obraz zmienia
+  się, gdy lektor milknie, a ostatni element ląduje najpóźniej przy `uN.mowa_koniec` i stoi do cięcia (oddech).
+- Inny tekst, głos albo tempo = `film.py narracja` jeszcze raz; strona się nie zmienia, idzie za nową osią. Nazwa
+  chwili, której w osi już nie ma, zatrzymuje render i pomiar z nazwą (`nieznana chwila „…”`), nic nie przesuwa się po cichu.
+- `--dlugosc` renderu i pomiaru = `O.dlugosc` (narracja podaje gotowe polecenie). Napisy wypalasz z
+  `lektor.slowa.json` (`napisy.py --slowa`) albo rysuje je strona z `O.napis(t)`, nie oba naraz.
+
 ## Render
 ```bash
 H=$HERMES_HOME/scripts/html_wideo.py

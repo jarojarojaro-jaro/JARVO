@@ -4,6 +4,7 @@
     python3 film.py sprawdz plan.json                        # walidacja i szacunek długości, bez renderu
     python3 film.py render plan.json [--szkic] [--format 9:16,16:9] [--wariant B | --wszystkie] [--out out/wideo]
     python3 film.py lektor "Tekst lektora." -o lektor.mp3 [--glos pl-PL-ZofiaNeural] [--tempo +5%]
+    python3 film.py narracja narracja.txt -o src/lektor.wav [--os src/anim/os_czasu.json] [--cel 60-90] [--sprawdz]
     python3 film.py glosy                                    # polskie głosy Edge TTS
     python3 film.py cache [--starsze-niz 14]                 # rozmiar cache i sprzątanie
 
@@ -11,6 +12,12 @@ Format planu: skill krotki-film, plik references/plan.md. Każdy etap ma cache (
 po normalizacji), więc warianty i poprawki renderują się szybko, a drugi render tego samego planu nie pobiera
 niczego z sieci. `--szkic` = połowa rozdzielczości i szybkie kodowanie: do sprawdzenia rytmu przed finałem.
 Wynik: <out>/<slug>/<slug>[-wariant]-<format>.mp4, .srt, miniatura, film.json (sceny, źródła, licencje, czasy).
+
+`narracja`: lektor filmu z kodu z pliku narracji (zdanie w linii, pusty wiersz = nowe ujęcie, `# tytuł` = rozdział,
+`|` = podział napisu, `{nazwa}` = chwila przed słowem). Zdania syntezowane osobno, wycięte do słyszalnej mowy i ułożone
+z pauzami (w akapicie 0,33 s, między akapitami 1 s, przed rozdziałem 1,5 s): jeden plik lektora, `os_czasu.json`
+(zdania, ujęcia, rozdziały, napisy, chwile po nazwie dla `bit()` z `/_lib/jarvo/os_czasu.js`), słowa z czasem i SRT.
+Nowe nagranie lektora = nowa oś, animacja idzie za nią sama.
 """
 
 from __future__ import annotations
@@ -553,6 +560,351 @@ def cmd_check(args) -> int:
     return 0 if report["ok"] else 1
 
 
+# ------------------------------------------------------------------ narracja: lektor z pauzami i oś czasu
+
+# Pauzy (s) między słyszalną mową: w akapicie krótki oddech, na końcu akapitu (= cięcie ujęcia) pełna sekunda,
+# przed rozdziałem dłużej. Obraz zmienia się w pauzie, więc rytm jest spokojny, a nowy kadr wchodzi z nowym zdaniem.
+PAUZY = {"wstep": 0.5, "zdanie": 0.33, "akapit": 1.0, "rozdzial": 1.5, "koniec": 1.5}
+ZAPAS_PRZED, ZAPAS_PO = 0.02, 0.06       # wycinek mowy: tyle ciszy zostaje przed i po słyszalnym dźwięku
+CIECIE_PRZED = 0.25                      # cięcie ujęcia tyle przed pierwszym zdaniem następnego (najwyżej 1/3 pauzy)
+SR_LEKTORA = 48000
+SLOW_W_ZDANIU, ZNAKOW_W_NAPISIE, ZDAN_W_UJECIU = 20, 42, 4
+TEMPO_MAX, UJECIE_MIN, ROZDZIAL_MIN, ROZDZIALY_OD = 2.7, 4.0, 60.0, 180.0
+NAZWA_CHWILI = re.compile(r"^[^\W\d][\w-]*$")
+AUTO_CHWILA = re.compile(r"^(u\d+|r\d+|start|koniec)([.].*)?$")
+SKROTY = {"np", "m.in", "tj", "tzw", "ok", "godz", "ul", "r", "tys", "mln", "mld", "zł", "nr", "dr", "prof", "itd", "itp",
+          "wg", "pt", "ww", "al", "św", "tel", "min", "sek", "proc"}
+
+
+def _znaki(s: str) -> str:
+    return re.sub(r"[^\w]", "", s.lower())
+
+
+def _kilka_zdan(tekst: str) -> bool:
+    """Czy w linii kończy się zdanie, a po nim zaczyna następne (kropka/!/? + spacja + wielka litera; nie po skrócie)."""
+    for m in re.finditer(r"(\S+)[.!?…]\s+[A-ZĄĆĘŁŃÓŚŹŻ0-9„\"]", tekst):
+        poprzednie = m.group(1).lower().rstrip(".")
+        if poprzednie not in SKROTY and not re.fullmatch(r"\d+", poprzednie):
+            return True
+    return False
+
+
+def parse_narracja(tekst: str) -> dict:
+    """Plik narracji → rozdziały, akapity (= ujęcia) i linie (= zdania lektora) z podziałami napisów i chwilami.
+
+    Linia = jedno zdanie lektora. Pusty wiersz kończy akapit, czyli ujęcie. `# tytuł` zaczyna rozdział (tytuł nie
+    jest czytany). `|` dzieli napis w miejscu oddechu (nie jest czytany). `{nazwa}` przed słowem = chwila na początku
+    tego słowa, na końcu linii = koniec zdania. `//` na początku wiersza = komentarz."""
+    bledy, ostrz = [], []
+    rozdzialy: list[dict] = []
+    akapit: list[dict] | None = None
+    nazwy: set[str] = set()
+
+    def rozdzial(tytul: str) -> dict:
+        r = {"tytul": tytul, "akapity": []}
+        rozdzialy.append(r)
+        return r
+
+    for nr, surowa in enumerate(tekst.splitlines(), 1):
+        wiersz = surowa.strip()
+        if wiersz.startswith("//"):
+            continue
+        if not wiersz:
+            akapit = None
+            continue
+        if wiersz.startswith("#"):
+            rozdzial(wiersz.lstrip("#").strip())
+            akapit = None
+            continue
+        slowa, podzialy, chwile = [], set(), []
+        for tok in re.findall(r"\{[^{}]*\}|\||[^\s{}|]+|[{}]", wiersz):
+            if tok == "|":
+                if slowa:
+                    podzialy.add(len(slowa) - 1)
+            elif tok.startswith("{") and tok.endswith("}"):
+                nazwa = tok[1:-1].strip()
+                if not NAZWA_CHWILI.match(nazwa):
+                    bledy.append(f"wiersz {nr}: chwila {tok}: nazwa z liter, cyfr, _ i - (np. {{licznik}})")
+                elif AUTO_CHWILA.match(nazwa):
+                    bledy.append(f"wiersz {nr}: chwila {tok} zajęta (u3, u3.z2, r1, start, koniec nadaje skrypt)")
+                elif nazwa in nazwy:
+                    bledy.append(f"wiersz {nr}: chwila {tok} już jest; nazwy chwil muszą być różne")
+                else:
+                    nazwy.add(nazwa)
+                    chwile.append((nazwa, len(slowa)))
+            elif tok in "{}":
+                bledy.append(f"wiersz {nr}: niedomknięta chwila (samo „{tok}”; zapis: {{nazwa}}słowo)")
+            else:
+                slowa.append(tok)
+        if not slowa:
+            bledy.append(f"wiersz {nr}: linia bez słów do przeczytania")
+            continue
+        if not rozdzialy:
+            rozdzial("")
+        if akapit is None:
+            akapit = []
+            rozdzialy[-1]["akapity"].append(akapit)
+        czysty = " ".join(slowa)
+        akapit.append({"wiersz": nr, "tekst": czysty, "slowa": slowa, "podzialy": sorted(podzialy | {len(slowa) - 1}),
+                       "chwile": chwile})
+        if len(slowa) > SLOW_W_ZDANIU:
+            ostrz.append(f"wiersz {nr}: zdanie ma {len(slowa)} słów (> {SLOW_W_ZDANIU}): podziel na dwa")
+        if _kilka_zdan(czysty):
+            ostrz.append(f"wiersz {nr}: kilka zdań w jednej linii: każde zdanie w osobnej (pauzy i chwile liczone na linię)")
+        poczatek = 0
+        for k in sorted(podzialy):
+            napis = " ".join(slowa[poczatek:k + 1])
+            if len(napis) > ZNAKOW_W_NAPISIE:
+                ostrz.append(f"wiersz {nr}: napis „{napis[:30]}…” ma {len(napis)} znaków (> {ZNAKOW_W_NAPISIE}): dodaj | w miejscu oddechu")
+            poczatek = k + 1
+    rozdzialy = [r for r in rozdzialy if r["akapity"]]
+    if not rozdzialy:
+        bledy.append("narracja bez zdań")
+    for r in rozdzialy:
+        for a in r["akapity"]:
+            if len(a) > ZDAN_W_UJECIU:
+                ostrz.append(f"wiersz {a[0]['wiersz']}: akapit ma {len(a)} zdań (> {ZDAN_W_UJECIU}): podziel na dwa ujęcia")
+    return {"rozdzialy": rozdzialy, "bledy": bledy, "ostrzezenia": ostrz}
+
+
+def linie_narracji(narr: dict) -> list[dict]:
+    """Płaska lista linii z numerem ujęcia, zdania w ujęciu, rozdziału i rodzajem pauzy przed linią."""
+    out, u = [], 0
+    for ri, r in enumerate(narr["rozdzialy"], 1):
+        for ai, akapit in enumerate(r["akapity"]):
+            u += 1
+            for zi, ln in enumerate(akapit, 1):
+                pauza = ("wstep" if not out else "zdanie" if zi > 1 else "akapit" if ai > 0 else "rozdzial")
+                out.append({**ln, "rozdzial": ri, "ujecie": u, "zdanie": zi, "pauza": pauza,
+                            "id": f"u{u}.z{zi}"})
+    return out
+
+
+def czasy_tokenow(tokeny: list[str], slowa: list[wl.Word]) -> list[tuple[float, float, int]]:
+    """Każde słowo tekstu → (początek, koniec, indeks słowa lektora). Edge TTS czyta tekst, który dostał, ale bywa,
+    że skleja słowa („2024 roku”) albo dzieli je inaczej: dopasowanie po literach i cyfrach, nie po spacjach;
+    w sklejonym słowie czas dzielony według liter."""
+    if not slowa:
+        return [(0.0, 0.0, -1)] * len(tokeny)
+    zn_s = [_znaki(w.text) for w in slowa]
+    zn_t = [_znaki(t) for t in tokeny]
+    skala = (sum(map(len, zn_s)) or 1) / (sum(map(len, zn_t)) or 1)    # inne litery niż w tekście: proporcjonalnie
+    granice, poz = [], 0
+    for z in zn_s:
+        granice.append((poz, poz + len(z)))
+        poz += len(z)
+    out, poz = [], 0
+    for z in zn_t:
+        p0, p1 = poz * skala, (poz + len(z)) * skala
+        k = next((i for i, (a, b) in enumerate(granice) if a <= (p0 + p1) / 2 < b), len(slowa) - 1)
+        a, b = granice[k]
+        w = slowa[k]
+        def czas(p, a=a, b=b, w=w):
+            return w.start + (w.end - w.start) * (min(max(p, a), b) - a) / max(1, b - a)
+        out.append((czas(p0), czas(p1), k))
+        poz += len(z)
+    return out
+
+
+def cisza_z_logu(log_ffmpeg: str, dlugosc: float) -> tuple[float, float]:
+    """Log `silencedetect` → (początek, koniec) słyszalnej mowy: cisza od zera i cisza do końca pliku."""
+    starty = [float(x) for x in re.findall(r"silence_start: (-?[\d.]+)", log_ffmpeg)]
+    konce = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", log_ffmpeg)]
+    od, do = 0.0, dlugosc
+    if starty and starty[0] <= 0.01 and konce:
+        od = konce[0]
+    if starty and (len(konce) < len(starty) or konce[-1] >= dlugosc - 0.03):
+        if not (len(starty) == 1 and starty[0] <= 0.01):
+            do = starty[-1]
+    return od, max(od, do)
+
+
+def granice_mowy(sp) -> tuple[float, float]:
+    r = wl.run(["ffmpeg", "-i", str(sp.audio), "-af", "silencedetect=n=-50dB:d=0.02", "-f", "null", "-"], quiet=False)
+    od, do = cisza_z_logu(r.stderr or "", sp.duration)
+    if sp.words:
+        od = min(od, sp.words[0].end)                           # nigdy nie tniemy w środku pierwszego słowa
+        do = min(sp.duration, max(do, sp.words[-1].end))         # ani przed końcem ostatniego
+    return od, do
+
+
+def uloz_os(linie: list[dict], mowy: list[dict], pauzy: dict, rozdzialy: list[dict]) -> dict:
+    """Linie + mowa każdej linii ({od, do, slowa} w czasie jej pliku) → oś czasu filmu: gdzie wkleić mowę, słowa,
+    zdania, ujęcia, rozdziały i nazwane chwile. Czysta funkcja (bez dźwięku)."""
+    t, kawalki, zdania, slowa_osi = 0.0, [], [], []
+    chwile: dict[str, float] = {"start": 0.0}
+    for ln, m in zip(linie, mowy):
+        t += pauzy[ln["pauza"]]
+        przes = t - m["od"]
+        start, koniec = round(t, 3), round(t + (m["do"] - m["od"]), 3)
+        kawalki.append({"od": max(0.0, m["od"] - ZAPAS_PRZED), "do": m["do"] + ZAPAS_PO,
+                        "na": max(0.0, t - min(ZAPAS_PRZED, m["od"]))})
+        tok = czasy_tokenow(ln["slowa"], m["slowa"])
+        przytnij = lambda x: round(min(max(x + przes, start), koniec), 3)  # noqa: E731
+        for nazwa, i in ln["chwile"]:
+            chwile[nazwa] = przytnij(tok[i][0]) if i < len(tok) else koniec
+        disp = wl.align_display(m["slowa"], ln["tekst"])
+        podz = {tok[i][2] for i in ln["podzialy"] if i < len(tok)}
+        slowa_zd = [wl.Word(przytnij(w.start), przytnij(w.end), d.text, k in podz or k == len(disp) - 1)
+                    for k, (w, d) in enumerate(zip(m["slowa"], disp))]
+        slowa_osi += slowa_zd
+        zdania.append({"id": ln["id"], "ujecie": f"u{ln['ujecie']}", "rozdzial": f"r{ln['rozdzial']}", "wiersz": ln["wiersz"],
+                       "tekst": ln["tekst"], "start": start, "koniec": koniec,
+                       "slowa": [{"tekst": w.text, "start": w.start, "koniec": w.end} for w in slowa_zd]})
+        chwile[ln["id"]], chwile[ln["id"] + ".koniec"] = start, koniec
+        t = koniec
+    dlugosc = round(t + pauzy["koniec"], 3)
+    ujecia: list[dict] = []
+    for z in zdania:
+        if not ujecia or ujecia[-1]["id"] != z["ujecie"]:
+            ujecia.append({"id": z["ujecie"], "nr": len(ujecia) + 1, "rozdzial": z["rozdzial"], "mowa_start": z["start"],
+                           "zdania": []})
+        ujecia[-1]["zdania"].append(z["id"])
+        ujecia[-1]["mowa_koniec"] = z["koniec"]
+    for i, u in enumerate(ujecia):
+        u["start"] = ujecia[i - 1]["koniec"] if i else 0.0
+        nast = ujecia[i + 1]["mowa_start"] if i + 1 < len(ujecia) else None
+        u["koniec"] = round(nast - min(CIECIE_PRZED, (nast - u["mowa_koniec"]) / 3), 3) if nast is not None else dlugosc
+        u["sek"] = round(u["koniec"] - u["start"], 3)
+        for k, v in (("", u["start"]), (".mowa", u["mowa_start"]), (".mowa_koniec", u["mowa_koniec"]), (".koniec", u["koniec"])):
+            chwile[u["id"] + k] = v
+    rozdz = []
+    for ri, r in enumerate(rozdzialy, 1):
+        uj = [u for u in ujecia if u["rozdzial"] == f"r{ri}"]
+        if uj:
+            rozdz.append({"id": f"r{ri}", "nr": ri, "tytul": r["tytul"], "start": uj[0]["start"], "koniec": uj[-1]["koniec"],
+                          "sek": round(uj[-1]["koniec"] - uj[0]["start"], 3), "ujecia": [u["id"] for u in uj]})
+            chwile[f"r{ri}"], chwile[f"r{ri}.koniec"] = uj[0]["start"], uj[-1]["koniec"]
+    chwile["koniec"] = dlugosc
+    napisy = [{"start": g[0].start, "koniec": g[-1].end, "tekst": " ".join(w.text for w in g)}
+              for g in wl.chunk_words(slowa_osi, 7, ZNAKOW_W_NAPISIE)]
+    return {"dlugosc": dlugosc, "mowa_s": round(sum(z["koniec"] - z["start"] for z in zdania), 3), "pauzy": pauzy,
+            "rozdzialy": rozdz, "ujecia": ujecia, "zdania": zdania, "chwile": chwile, "napisy": napisy,
+            "_kawalki": kawalki, "_slowa": slowa_osi}
+
+
+def tempo_narracji(os_: dict) -> float:
+    """Słowa na sekundę tak, jak słyszy je widz: od pierwszego do ostatniego zdania, z pauzami między nimi."""
+    if not os_["zdania"]:
+        return 0.0
+    czas = os_["zdania"][-1]["koniec"] - os_["zdania"][0]["start"]
+    return sum(len(z["tekst"].split()) for z in os_["zdania"]) / czas if czas > 0 else 0.0
+
+
+def kontrola_osi(os_: dict, cel: tuple[float, float] | None) -> list[str]:
+    """Ostrzeżenia po syntezie: tempo lektora, krótkie ujęcia, rozdziały w krótkim filmie, długość względem celu."""
+    out = []
+    tempo = tempo_narracji(os_)
+    if tempo > TEMPO_MAX:
+        out.append(f"lektor mówi {tempo:.2f} słowa/s razem z pauzami (> {TEMPO_MAX}): --tempo -5% albo krótszy tekst")
+    for u in os_["ujecia"]:
+        if u["sek"] < UJECIE_MIN and len(os_["ujecia"]) > 1:
+            out.append(f"{u['id']} trwa {u['sek']:.1f} s (< {UJECIE_MIN:g} s): połącz akapit z sąsiednim")
+    rozdz = os_["rozdzialy"]
+    if len(rozdz) > 1 and os_["dlugosc"] < ROZDZIALY_OD:
+        out.append(f"{len(rozdz)} rozdziały w filmie {os_['dlugosc']:.0f} s: rozdziały i ich plansze dopiero od "
+                   f"{ROZDZIALY_OD / 60:.0f} min (krótszy film = jedna opowieść bez podziału)")
+    elif len(rozdz) > 1:
+        out += [f"rozdział {r['id']} „{r['tytul']}” trwa {r['sek']:.0f} s (< {ROZDZIAL_MIN:g} s): połącz z sąsiednim"
+                for r in rozdz if r["sek"] < ROZDZIAL_MIN]
+    if cel and not cel[0] <= os_["dlugosc"] <= cel[1]:
+        out.append(f"film ma {os_['dlugosc']:.1f} s, a cel to {cel[0]:g}–{cel[1]:g} s: "
+                   f"{'skróć' if os_['dlugosc'] > cel[1] else 'rozwiń'} tekst (≈ {WORDS_PER_SEC} słowa/s)")
+    return out
+
+
+def zloz_lektor(mowy_pliki: list[Path], kawalki: list[dict], dlugosc: float, out: Path) -> None:
+    """Wycinki mowy wklejone w swoje chwile osi, cisza między nimi: jeden plik, dokładnie co do próbki."""
+    import array
+    import subprocess
+    import wave
+    bufor = array.array("h", bytes(2 * int(round(dlugosc * SR_LEKTORA))))
+    for plik, k in zip(mowy_pliki, kawalki):
+        r = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", str(plik), "-f", "s16le", "-ac", "1",
+                            "-ar", str(SR_LEKTORA), "-"], capture_output=True)
+        if r.returncode:
+            raise wl.FFError(f"ffmpeg nie odczytał {plik}: {r.stderr.decode(errors='replace')[-300:]}")
+        pcm = array.array("h")
+        pcm.frombytes(r.stdout[:len(r.stdout) // 2 * 2])
+        a, b = int(round(k["od"] * SR_LEKTORA)), min(len(pcm), int(round(k["do"] * SR_LEKTORA)))
+        na = int(round(k["na"] * SR_LEKTORA))
+        for i, v in enumerate(pcm[a:b], na):
+            if i >= len(bufor):
+                break
+            bufor[i] = max(-32768, min(32767, bufor[i] + v))
+    wav = out if out.suffix.lower() == ".wav" else out.with_suffix(".tmp.wav")
+    with wave.open(str(wav), "wb") as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)
+        f.setframerate(SR_LEKTORA)
+        f.writeframes(bufor.tobytes())
+    if wav != out:
+        wl.run(["ffmpeg", "-y", "-i", str(wav), str(out)])
+        wav.unlink()
+
+
+def _pauzy(spec: str | None) -> dict:
+    p = dict(PAUZY)
+    for part in filter(None, (spec or "").split(",")):
+        k, _, v = part.partition("=")
+        if k.strip() not in p:
+            raise SystemExit(f"--pauzy: nieznany rodzaj {k.strip()!r} ({', '.join(PAUZY)})")
+        p[k.strip()] = float(v)
+    return p
+
+
+def _cel(spec: str | None) -> tuple[float, float] | None:
+    if not spec:
+        return None
+    a, _, b = spec.replace("–", "-").partition("-")
+    return float(a), float(b or a)
+
+
+def cmd_narration(args) -> int:
+    zrodlo = Path(args.plik)
+    narr = parse_narracja(zrodlo.read_text(encoding="utf-8"))
+    linie = linie_narracji(narr) if not narr["bledy"] else []
+    pauzy, cel = _pauzy(args.pauzy), _cel(args.cel)
+    slow = sum(len(ln["slowa"]) for ln in linie)
+    szac = slow / WORDS_PER_SEC + sum(pauzy[ln["pauza"]] for ln in linie) + pauzy["koniec"]
+    raport = {"ok": not narr["bledy"], "bledy": narr["bledy"], "ostrzezenia": list(narr["ostrzezenia"]),
+              "zdania": len(linie), "slowa": slow, "ujecia": len({ln["ujecie"] for ln in linie}),
+              "rozdzialy": len(narr["rozdzialy"]), "szacunek_s": round(szac, 1)}
+    if narr["bledy"] or args.sprawdz:
+        if cel and linie and not cel[0] <= szac <= cel[1]:
+            raport["ostrzezenia"].append(f"szacunek {szac:.0f} s poza celem {cel[0]:g}–{cel[1]:g} s")
+        print(json.dumps(raport, ensure_ascii=False, indent=1))
+        return 0 if raport["ok"] else 1
+    wl.need("ffmpeg")
+    log(f"▶ lektor: {len(linie)} zdań, głos {args.glos}, tempo {args.tempo}")
+    mowy_tts = wl.speak_many([{"text": ln["tekst"], "voice": args.glos, "rate": args.tempo} for ln in linie])
+    mowy = []
+    for sp in mowy_tts:
+        od, do = granice_mowy(sp)
+        mowy.append({"od": od, "do": do, "slowa": sp.words})
+    os_ = uloz_os(linie, mowy, pauzy, narr["rozdzialy"])
+    out = Path(args.o)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    zloz_lektor([sp.audio for sp in mowy_tts], os_.pop("_kawalki"), os_["dlugosc"], out)
+    slowa = os_.pop("_slowa")
+    sciezka_os = Path(args.os) if args.os else out.parent / "os_czasu.json"
+    sciezka_os.parent.mkdir(parents=True, exist_ok=True)
+    slowa_json, srt = out.with_suffix(".slowa.json"), out.with_suffix(".srt")
+    wl.write_json(slowa_json, [{"start": w.start, "end": w.end, "text": w.text, **({"podzial": True} if w.podzial else {})}
+                               for w in slowa])
+    srt.write_text(wl.build_srt(slowa), encoding="utf-8")
+    os_ = {"wersja": 1, "zrodlo": str(zrodlo), "lektor": str(out), "glos": args.glos, "tempo": args.tempo, **os_}
+    wl.write_json(sciezka_os, os_)
+    raport["ostrzezenia"] += kontrola_osi(os_, cel)
+    raport.update({"dlugosc_s": os_["dlugosc"], "mowa_s": os_["mowa_s"],
+                   "tempo_slow_s": round(tempo_narracji(os_), 2),
+                   "pliki": {"lektor": str(out), "os_czasu": str(sciezka_os), "slowa": str(slowa_json), "srt": str(srt)},
+                   "render": f"html_wideo.py wideo <strona> --preset jarvo --dlugosc {os_['dlugosc']:g}"})
+    raport.pop("szacunek_s")
+    print(json.dumps(raport, ensure_ascii=False, indent=1))
+    return 0
+
+
 def cmd_voice(args) -> int:
     text = Path(args.plik).read_text(encoding="utf-8") if args.plik else args.tekst
     if not text:
@@ -617,12 +969,21 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("-o", required=True)
     v.add_argument("--glos", default=wl.DEFAULT_VOICE)
     v.add_argument("--tempo", default="+0%")
+    n = sub.add_parser("narracja", help="lektor z pliku narracji: pauzy z akapitów, oś czasu z chwilami (os_czasu.json)")
+    n.add_argument("plik", help="narracja.txt")
+    n.add_argument("-o", default="out/wideo/src/lektor.wav", help="plik lektora (.wav, albo .mp3/.m4a)")
+    n.add_argument("--os", help="gdzie zapisać os_czasu.json (domyślnie obok lektora; strona animacji czyta go obok siebie)")
+    n.add_argument("--glos", default=wl.DEFAULT_VOICE)
+    n.add_argument("--tempo", default="+0%")
+    n.add_argument("--pauzy", help="np. zdanie=0.4,akapit=1.2 (domyślnie " + ",".join(f"{k}={v:g}" for k, v in PAUZY.items()) + ")")
+    n.add_argument("--cel", help="docelowa długość w s, np. 60-90 (ostrzeżenie poza zakresem)")
+    n.add_argument("--sprawdz", action="store_true", help="tylko kontrola tekstu i szacunek długości, bez syntezy")
     sub.add_parser("glosy", help="polskie głosy Edge TTS")
     k = sub.add_parser("cache", help="rozmiar cache; --starsze-niz N usuwa pliki starsze niż N dni")
     k.add_argument("--starsze-niz", type=float, default=None)
     args = ap.parse_args(argv)
     try:
-        return {"render": cmd_render, "sprawdz": cmd_check, "lektor": cmd_voice, "glosy": cmd_voices,
+        return {"render": cmd_render, "sprawdz": cmd_check, "lektor": cmd_voice, "narracja": cmd_narration, "glosy": cmd_voices,
                 "cache": cmd_cache}[args.cmd](args)
     except wl.FFError as exc:
         print(f"✗ {exc}", file=sys.stderr)

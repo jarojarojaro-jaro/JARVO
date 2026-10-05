@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("plik")
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--srt", help="użyj (poprawionego) SRT zamiast transkrypcji")
-    src.add_argument("--slowa", help="JSON słów z czasem [{start,end,text}] (film.py lektor / montaz.py transkrypcja)")
+    src.add_argument("--slowa", help="JSON słów z czasem [{start,end,text,podzial?}] (film.py lektor / narracja / montaz.py transkrypcja)")
     ap.add_argument("--wypal", action="store_true", help="wypal napisy w obraz (MP4)")
     ap.add_argument("--styl", choices=["karaoke", "zwykle"], default="karaoke")
     ap.add_argument("--kolor", default="#FFFFFF")
@@ -45,8 +45,8 @@ def main(argv: list[str] | None = None) -> int:
     if not video.exists():
         raise SystemExit(f"Brak pliku: {video}")
     if args.slowa:
-        words = [wl.Word(float(w["start"]), float(w["end"]), str(w.get("text") or w.get("word"))) for w in
-                 json.loads(Path(args.slowa).read_text(encoding="utf-8"))]
+        words = [wl.Word(float(w["start"]), float(w["end"]), str(w.get("text") or w.get("word")), bool(w.get("podzial")))
+                 for w in json.loads(Path(args.slowa).read_text(encoding="utf-8"))]
     elif args.srt:
         words = wl.words_from_lines(wl.parse_srt(Path(args.srt).read_text(encoding="utf-8")))
     else:

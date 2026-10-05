@@ -35,7 +35,9 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 - Liczby prawdziwe, ze źródłem i uczciwą niepewnością (zakres zamiast jednej liczby, gdy szacunki się różnią).
 - Bohater albo obiekt prowadzi przez cały film (foton, kropla, paczka danych); ma osobowość (mimika, reakcje).
 - Zwroty akcji i callbacki: coś z haka wraca w puencie; drobne gagi (onomatopeje) trzymają uwagę.
-- Lektor najpierw (`film.py lektor` → czasy słów), animacja pod słowa; na ekranie ≤ 6 słów naraz (reszta w napisach).
+- Lektor najpierw: `narracja.txt` (zdanie w linii, akapit = ujęcie) → `film.py narracja` → `lektor.wav` z pauzami
+  z akapitów i `os_czasu.json`; animacja bierze chwile po nazwie (`kontrakt-html.md`, „Film z lektorem”), więc nowe
+  nagranie lektora jej nie psuje. Na ekranie ≤ 6 słów naraz (reszta w napisach).
 - Jedna metafora wizualna na pojęcie; porównania do rzeczy znanych („jak stadion pełen…”).
 - **Bez efektu PowerPointa** (`ruch-i-kompozycja.md` rozdz. 3): jeden wolny najazd kamery na ujęcie, nowy element
   tylko na ważnym zdaniu, stary ustępuje nowemu, ≤ 3 grupy naraz, jeden bohater ≥ 1/4 krótszego boku kadru.

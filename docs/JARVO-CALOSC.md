@@ -115,6 +115,9 @@ dźwięk), każda min. 8/10, plus lista zakazanych klisz. Prawdziwe assety marki
 Syntetyczne SFX, biblioteka inspiracji, produkcja etapami, formaty platform z jednego timeline.
 Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo strony (`demo_strony.py`, metoda ECC
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.
+Film z kodu z lektorem zaczyna się od pliku narracji (`film.py narracja`): zdanie w linii, akapit = ujęcie, pauzy
+z akapitów (0,33 s w akapicie, 1 s między akapitami, 1,5 s przed rozdziałem) i oś czasu `os_czasu.json`, z której
+animacja bierze chwile po nazwie (`/_lib/jarvo/os_czasu.js`); nowe nagranie lektora nie psuje animacji.
 Animacja z kodu ma twardy pomiar przed oddaniem (`html_wideo.py pomiar`: czas czytania, kadr i strefy UI platformy,
 kontrast, czarne przerwy, martwe odcinki, rytm, pusta scena, oddech, uderzenia kadru; „gotowe” tylko z pełnym
 i aktualnym raportem), ruch z charakterem marki (`/_lib/jarvo/ruch.js`: 6 charakterów, smugi zamiast motion bluru)

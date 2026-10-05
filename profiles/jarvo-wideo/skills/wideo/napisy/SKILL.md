@@ -1,7 +1,7 @@
 ---
 name: napisy
 description: "Napisy PL: z lektora albo transkrypcji, korekta, wypalenie."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -39,7 +39,8 @@ Tekst ekranowy (hook) jest u góry i nie koliduje z napisami.
    (wyciąć albo wygwiazdkować wg karty), podział na sensowne frazy. Czasów nie ruszam, chyba że linia jest pusta.
 3. **Wypalenie:** `napisy.py <wideo> --srt <poprawiony.srt> --wypal [--styl zwykle] [--akcent "#FFD400"]
    [--font-plik <font marki>] [--pozycja srodek] [--male]` → `<wideo>.napisy.mp4`.
-   Czasy słów z lektora (`film.py lektor` → `.slowa.json`): `--slowa <plik>` zamiast `--srt` (karaoke co do słowa).
+   Czasy słów z lektora (`film.py lektor` albo `film.py narracja` → `.slowa.json`): `--slowa <plik>` zamiast `--srt`
+   (karaoke co do słowa; podziały `|` z narracji zostają granicami napisów).
 4. **Kontrola:** `qa_wideo.py <wynik> --arkusz out/wideo/qa-napisy.jpg` → `vision_analyze`: czytelność na telefonie,
    brak kolizji ze strefami UI (czerwone pola na arkuszu), polskie znaki renderują się poprawnie.
 

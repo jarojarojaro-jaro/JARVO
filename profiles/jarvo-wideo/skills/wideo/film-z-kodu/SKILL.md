@@ -1,7 +1,7 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.5.2
+version: 3.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -93,8 +93,9 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 ## Kroki
 1. **Rodzaj, brief i format** (`rodzaje-filmu`, `formaty-wideo`): plik rodzaju → `out/wideo/src/BRIEF.md`
    (platforma, długość, cel, jedno przesłanie, CTA, brand kit); silnik z pliku rodzaju albo z tabeli.
-2. **Scenariusz** (`scenariusz`): hook, beat sheet sekunda po sekundzie; lektor PL najpierw (`film.py lektor` →
-   czasy słów), animacje pod te czasy.
+2. **Scenariusz** (`scenariusz`): hook, beat sheet sekunda po sekundzie; lektor PL najpierw: film z lektorem =
+   `film.py narracja` (pauzy z akapitów, `os_czasu.json` z chwilami po nazwie: `rodzaje-filmu/references/kontrakt-html.md`,
+   „Film z lektorem”), krótki tekst = `film.py lektor` → czasy słów; animacje pod te chwile, nie pod wpisane sekundy.
 3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie|mg>`
    (raz; dalej z cache), `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`.
    Skill silnika każe coś doinstalować, pobrać przeglądarkę (`npx playwright install`, `npm i puppeteer`) albo

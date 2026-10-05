@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.7.0
+version: 1.8.0
 author: Jarvo
 license: MIT
 metadata:
@@ -32,6 +32,17 @@ dla platform społecznościowych: −14 LUFS zintegrowane, true peak ≤ −1 dB
 
 Lista na żywo: `python3 $HERMES_HOME/scripts/film.py glosy`. Tempo: `+0%` spokojnie, `+5…+12%` social,
 powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. Dialog: `glos` w pojedynczej scenie.
+
+## Lektor filmu z kodu (narracja)
+Explainer i każdy film z kodu z lektorem: `film.py narracja narracja.txt -o out/wideo/src/lektor.wav --os <strona>/os_czasu.json`.
+Linia = zdanie, pusty wiersz = akapit = ujęcie, `# tytuł` = rozdział, `|` = podział napisu w miejscu oddechu,
+`{nazwa}` = chwila dla animacji. Zdania syntezowane osobno i przycięte do słyszalnej mowy, potem pauzy: 0,33 s
+w akapicie, 1 s po akapicie (tu tnie się ujęcie), 1,5 s przed rozdziałem. Film brzmi spokojnie, bo obraz zmienia się
+w pauzie, a nie w środku zdania; liczysz ok. 2 słowa na sekundę filmu (60 s ≈ 120 słów, 90 s ≈ 180).
+Jedno zdanie na linię: dwa zdania w linii Edge rozdziela własną, nierówną pauzą (zmierzone: ponad 1 s), więc
+`narracja` o tym ostrzega. Ostrzega też o zdaniu > 20 słów, napisie > 42 znaków, akapicie > 4 zdań, ujęciu < 4 s,
+tempie > 2,7 słowa/s razem z pauzami (Marek przy `+0%` mówi ok. 2,3) i długości poza `--cel`.
+`--sprawdz` = sama kontrola tekstu i szacunek, bez syntezy.
 
 ## Wymowa
 - Liczby tak, jak mają zabrzmieć („trzydzieści procent” gdy „30%” brzmi źle), skróty rozwinięte („między innymi”).

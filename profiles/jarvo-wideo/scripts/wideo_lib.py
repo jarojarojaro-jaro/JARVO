@@ -290,6 +290,7 @@ class Word:
     start: float
     end: float
     text: str
+    podzial: bool = False      # po tym słowie kończy się grupa napisów (`|` i koniec linii w `film.py narracja`)
 
 
 @dataclass
@@ -420,7 +421,7 @@ def align_display(words: list[Word], text: str) -> list[Word]:
                 disp, j = toks[k], k + 1
                 break
         disp = disp.strip("\"'„”«»()[]").rstrip(",.;:…")
-        out.append(Word(w.start, w.end, disp or w.text))
+        out.append(Word(w.start, w.end, disp or w.text, w.podzial))
     return out
 
 
@@ -430,14 +431,15 @@ ORPHANS = {"a", "i", "o", "u", "w", "z", "do", "na", "od", "po", "za", "ze", "we
 
 
 def chunk_words(words: list[Word], max_words: int, max_chars: int) -> list[list[Word]]:
-    """Grupy słów na ekran: limit słów i znaków, przerwa po końcu zdania albo przy pauzie > 0,45 s."""
+    """Grupy słów na ekran: limit słów i znaków, przerwa po końcu zdania, przy pauzie > 0,45 s albo po słowie
+    z `podzial` (podział zaznaczony w tekście lektora)."""
     groups: list[list[Word]] = []
     cur: list[Word] = []
     for w in words:
         if cur:
             text_len = len(" ".join(x.text for x in cur + [w]))
             pause = w.start - cur[-1].end
-            sentence_end = re.search(r"[.!?…]$", cur[-1].text)
+            sentence_end = re.search(r"[.!?…]$", cur[-1].text) or cur[-1].podzial
             if len(cur) >= max_words or text_len > max_chars or pause > 0.45 or sentence_end:
                 carry = []
                 if (not sentence_end and pause <= 0.45 and len(cur) > 1
@@ -452,7 +454,8 @@ def chunk_words(words: list[Word], max_words: int, max_chars: int) -> list[list[
     merged: list[list[Word]] = []
     for g in groups:
         prev = merged[-1] if merged else None
-        if (prev and len(g) == 1 and not re.search(r"[.!?…]$", prev[-1].text) and g[0].start - prev[-1].end <= 0.45
+        if (prev and len(g) == 1 and not re.search(r"[.!?…]$", prev[-1].text) and not prev[-1].podzial
+                and g[0].start - prev[-1].end <= 0.45
                 and len(" ".join(x.text for x in prev + g)) <= max_chars + 8):
             prev.extend(g)
         else:
@@ -561,7 +564,7 @@ def build_ass(w: int, h: int, words: list[Word], style: SubStyle, titles: list[t
         fade = "{\\fad(0,120)}" if a <= 0.01 else "{\\fad(120,120)}"   # od pierwszej klatki (miniatura, hook)
         ev.append(f"Dialogue: 1,{ass_time(a)},{ass_time(b)},Tytul,,0,0,0,,{fade}{t}")
     if style.styl != "brak" and words:
-        disp = [Word(x.start, x.end, x.text.upper() if style.wielkie else x.text) for x in words]
+        disp = [Word(x.start, x.end, x.text.upper() if style.wielkie else x.text, x.podzial) for x in words]
         max_chars = 18 if portrait else 30
         groups = chunk_words(disp, 3 if style.styl == "karaoke" else 7, max_chars if style.styl == "karaoke" else max_chars * 2)
         for gi, g in enumerate(groups):
