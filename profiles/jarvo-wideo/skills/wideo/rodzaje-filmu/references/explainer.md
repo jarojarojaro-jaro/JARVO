@@ -18,6 +18,8 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 | matematyka, algorytm, fizyka | `manim-video` |
 | liczby i wykresy w centrum | `dane.md` (+ ten plik dla narracji) |
 | kinowy, markowy („premium”) | `lemo-opuscar` |
+| instrukcja krok po kroku (montaż, konfiguracja, przepis), spokojny lektor „jak w szkolnym filmie” | `lemo-opuscar` `midcentury-toon` (kreskówka lat 50.) |
+| nauka, historia, muzeum, dziedzictwo marki (rycina, która rysuje się sama) | `lemo-opuscar` `engraving` (miedzioryt) |
 
 ## Struktura
 | 60 s | 30 s | Scena |

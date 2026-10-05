@@ -295,6 +295,72 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     assert nz.full_extras()
 
 
+def test_pinned_clone_upgrades_and_keeps_demos(tmp_path):
+    """Nowy rev w repo Jarva przenosi istniejący klon na nowy commit; demo dodane przez `setup.sh demo` zostaje."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    up = tmp_path / "up"
+
+    def git(*a, cwd=up):
+        return subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True, text=True,
+                              env={**__import__("os").environ, **env}).stdout.strip()
+
+    def commit(files: dict[str, str]) -> str:
+        for rel, body in files.items():
+            (up / rel).parent.mkdir(parents=True, exist_ok=True)
+            (up / rel).write_text(body)
+        git("add", "-A")
+        git("commit", "-q", "-m", "c")
+        return git("rev-parse", "HEAD")
+
+    up.mkdir()
+    git("init", "-q", "-b", "main")
+    git("config", "uploadpack.allowFilter", "true")
+    git("config", "uploadpack.allowAnySHA1InWant", "true")
+    a = commit({"AGENTS.md": "v1", "styles/ink/STYLE.md": "s", "styles/ink/demo/d.js": "d", "styles/ink/poster.jpg": "p",
+                "styleboard/x.html": "x"})
+    b = commit({"AGENTS.md": "v2", "styles/engraving/STYLE.md": "e", "styles/engraving/demo/d.js": "d"})
+    dest = tmp_path / "lib"
+    nz.clone_pinned(f"file://{up}", a, dest, nz.LEMO_POMIN, keep=nz.LEMO_DODANE)
+    assert nz.git_head(dest) == a and (dest / "styles/ink/STYLE.md").exists()
+    assert not (dest / "styles/ink/demo").exists() and not (dest / "styleboard").exists()
+    assert not (dest / "styles/ink/poster.jpg").exists()
+    git("sparse-checkout", "add", "/styles/ink/demo/", cwd=dest)                    # jak `setup.sh demo ink`
+    nz.clone_pinned(f"file://{up}", b, dest, nz.LEMO_POMIN, keep=nz.LEMO_DODANE)
+    assert nz.git_head(dest) == b and (dest / "AGENTS.md").read_text() == "v2"
+    assert (dest / "styles/ink/demo/d.js").exists() and not (dest / "styles/engraving/demo").exists()
+    nz.clone_pinned(f"file://{up}", b, dest, nz.LEMO_POMIN, keep=nz.LEMO_DODANE)  # ten sam commit: nic
+
+
+def test_lemo_markers_match_skill_setup(monkeypatch, tmp_path):
+    """Znaczniki pakietów mają treść, którą liczy setup.sh skilla (cksum plików + wersja Pythona venv)."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    monkeypatch.setattr(nz, "LEMO", tmp_path)
+    (tmp_path / "package.json").write_text("{}\n")
+    (tmp_path / "package-lock.json").write_text("{\"lockfileVersion\": 3}\n")
+    (tmp_path / "requirements.txt").write_text("numpy\nscipy\n")
+    (tmp_path / "node_modules").mkdir()
+    py = tmp_path / ".venv" / "bin" / "python"
+    py.parent.mkdir(parents=True)
+    py.write_text("#!/bin/sh\necho 'Python 3.12.7'\n")
+    py.chmod(0o755)
+    sig = 'sig() { cat "$@" 2>/dev/null | cksum | cut -d" " -f1; }; '
+    node = subprocess.run(["sh", "-c", sig + "sig package.json package-lock.json"], cwd=tmp_path,
+                          capture_output=True, text=True).stdout.strip()
+    core = subprocess.run(["sh", "-c", sig + 'echo "$(sig requirements.txt)-$(.venv/bin/python -V 2>&1 | cut -d. -f1,2)"'],
+                          cwd=tmp_path, capture_output=True, text=True).stdout.strip()
+    assert nz.lemo_znacznik(None) == (tmp_path / "node_modules" / ".lemo-ok", node)
+    assert nz.lemo_znacznik("core") == (tmp_path / ".venv" / ".lemo-core", core) and core.endswith("-Python 3.12")
+    assert not nz.lemo_gotowe("core")
+    (tmp_path / ".venv" / ".lemo-core").write_text(core + "\n")
+    assert nz.lemo_gotowe("core")
+    (tmp_path / "requirements.txt").write_text("numpy\n")                        # zmiana wymagań = instalacja od nowa
+    assert not nz.lemo_gotowe("core")
+    assert nz.lemo_poziomy() == ["core", "music"]
+    monkeypatch.setenv("JARVO_EXTRAS", "lemo")
+    assert nz.lemo_poziomy() == ["core", "music", "voice"]
+
+
 def test_code_tools_helpers(monkeypatch, tmp_path):
     nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
     # starszy układ przeglądarki (chrome-linux/headless_shell) i wybór najnowszego buildu po numerze, nie alfabetycznie

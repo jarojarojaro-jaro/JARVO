@@ -13,6 +13,8 @@ Nie to: jak działa zjawisko → `explainer.md`; samo logo → `logo-intro.md`; 
 | strona albo aplikacja klienta (screenshoty, ruch kamery 2.5D, cięcia na bit, dźwięk) | `video-shotcraft` |
 | UI jako jedna forma, która się przekształca (przycisk → loader → karta…) | własny HTML (`kontrakt-html.md`) + spec „jeden kształt” (skill `film-z-kodu`, `jeden-ksztalt.md`) |
 | ciemny keynote, wielka liczba, living screencast | `lemo-opuscar` (`dark-keynote`, `living-screencast`) |
+| przegląd parametrów produktu z częściami (skan w hologram, ramki celownika, liczby „dokręcają się” do wartości), ekran targowy | `lemo-opuscar` `hologram-hud` |
+| miejsce, szlak, wydarzenie, seria plakatów (płaskie farby sitodruku, warstwa po warstwie) | `lemo-opuscar` `silkscreen-poster` |
 | szybko, tekst + obrazy produktu | HyperFrames `product-launch-video` |
 | produkt fizyczny w 3D | `scena-3d.md` |
 

@@ -14,7 +14,7 @@ Nie to: coś ma zostać wyjaśnione → `explainer.md`; hasło jest treścią �
 | szybko z szablonów, tekst + kształty | HyperFrames `motion-graphics` |
 | rysowany, organiczny | `anidoodle` |
 | opener z wyglądem marki | `bang-motion` |
-| 39 stylów kina (akwarela, anime, pixel, papier…) | `lemo-opuscar` |
+| 43 style kina (akwarela, anime, pixel, papier, miedzioryt, sitodruk…) | `lemo-opuscar` |
 
 ## Struktura
 | 15 s | Rytm |

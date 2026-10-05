@@ -10,7 +10,7 @@ Nie to: wyjaśnianie zjawiska z bohaterem-maskotką → `explainer.md`; trailer 
 ## Silnik
 | Styl | Silnik |
 |---|---|
-| 39 stylów kina (akwarela, anime, papier, klocki, pixel RPG…) z reżyserią | `lemo-opuscar` |
+| 43 style kina (akwarela, anime, papier, klocki, pixel RPG, miedzioryt…) z reżyserią | `lemo-opuscar` |
 | rysunek, bajka szkicowana, timelapse rysowania | `anidoodle` |
 | własna postać w Canvas / Three.js | własny HTML (`kontrakt-html.md`) |
 | realistyczne ujęcia (tylko za zgodą, płatne) | `wideo-ai` (limit z karty) |

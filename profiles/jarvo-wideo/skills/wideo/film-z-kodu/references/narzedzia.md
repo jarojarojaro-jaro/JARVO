@@ -33,18 +33,34 @@ Wynik dla użytkownika: klipy + `preview.mp4` + `TIMING.md` (montaż finalny u n
 
 ## lemo-opuscar (film w stylu)
 ```bash
+python3 $HERMES_HOME/scripts/narzedzia.py instaluj lemo          # raz; także gdy `sprawdz` pokazuje "lemo": false (nowa wersja)
 eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env lemo)"      # LIB, LEMO_OPUSCAR_HOME, PLAYWRIGHT_CHROME
 cat "$LIB/AGENTS.md"; sed -n 1,80p "$LIB/styles/README.md"         # potem DIRECTOR.md, TECHNIQUE.md, STYLE.md stylu
 ```
-- `sh $SK/scripts/setup.sh` znajdzie bibliotekę w `$LEMO_OPUSCAR_HOME` (przypięty commit, bez aktualizacji);
-  `setup.sh deps` nic nie zrobi (zależności gotowe). Demo stylu do nauki: `sh $SK/scripts/setup.sh demo <slug>`.
+- **43 style.** Cztery z nich to style sceniczne, robiące konkretną robotę: `midcentury-toon` (kreskówka lat 50.:
+  instrukcja krok po kroku), `hologram-hud` (skan produktu w hologram: przegląd parametrów), `silkscreen-poster`
+  (plakat sitodrukowy: miejsce, szlak, wydarzenie), `engraving` (miedzioryt: nauka, muzeum, historia marki).
+  Przypadki użycia z §11 ich `STYLE.md` to gramatyka kolejności informacji i czasu na ekranie; treść i układ są nasze.
+- **Najpierw własny scenariusz.** `TREATMENT.md` z trzema wariantami struktury i wyborem (DIRECTOR.md §4) piszemy,
+  zanim otworzymy `DEMO.md` albo kod dema. Demo tylko do nauki technik (pędzel, rig, shader, miks), nigdy jego fabuła,
+  ujęcia, rekwizyty i oś czasu. Podmiana tekstu w `content.json` dema to test techniczny, nigdy film dla klienta.
+- `sh $SK/scripts/setup.sh` znajdzie bibliotekę w `$LEMO_OPUSCAR_HOME` (przypięty commit, bez aktualizacji).
+  `setup.sh deps` pomijamy: pakiety są gotowe po `instaluj lemo`. Demo stylu, dopiero po `TREATMENT.md`:
+  `sh $SK/scripts/setup.sh demo <slug>`.
+- **Czas czytania.** Strona wystawia `window.TEXTS = t => [{id, text, x0, y0, x1, y1}]` (każdy napis widoczny w chwili
+  `t`, pełny tekst od pierwszej klatki, także przy efekcie maszyny do pisania). Przed renderem
+  `cd "$LIB" && node core/render/readcheck.mjs "<projekt>"`: 0 = każdy napis stoi ≥ litery/15 + 1,5 s, 1 = za krótko
+  albo ucięty kadrem, 2 = brak `TEXTS` (to nie jest zaliczenie). Napisy z `.srt` sprawdza się osobno.
 - **Lektor PL:** zamiast `core/tts/tts.py` (Kokoro: tylko EN/ZH) i `asr_check.py`:
   `python3 $HERMES_HOME/scripts/lektor_linie.py <projekt>/lines.json <projekt>/voices --glos pl-PL-ZofiaNeural --sprawdz`
   (te same pliki: `<id>.wav`, `dur.json`, `words.json`). Liczby w tekście lektora słownie, w napisach cyframi.
-- **Muzyka:** sample instrumentów (1,35 GB) i Kokoro są tylko z `JARVO_EXTRAS="lemo"`. Bez nich: `core/audio/pluck.py`,
-  `sfx.py` (proceduralne, bez plików) albo muzyka z anidoodle / biblioteki marki.
-- Render: `cd "$LIB" && node core/render/video.mjs "<projekt>" --fps 24 --workers 2 --out "<projekt>/out/video24.mp4"`
-  (**2 workery** na VPS 8 GB: każdy to osobna przeglądarka), miks `sh core/render/mux.sh …` (−14 LUFS).
+- **Muzyka:** sample instrumentów (~1,4 GB) i Kokoro są tylko z `JARVO_EXTRAS="lemo"`. Bez nich: `core/audio/pluck.py`
+  (instrumenty szarpane z syntezy, numba jest w instalacji), `sfx.py` (efekty bez plików) albo muzyka z anidoodle /
+  biblioteki marki.
+- Render: `cd "$LIB" && RENDER_SLOTS=1 node core/render/video.mjs "<projekt>" --fps 24 --workers 2 --out "<projekt>/out/video24.mp4"`
+  (**2 workery** na VPS 8 GB: każdy to osobna przeglądarka; `RENDER_SLOTS=1`: drugi cały render czeka na pierwszy,
+  także przy wolnej pamięci < 30 %). Miks `sh core/render/mux.sh <video> <mix.wav> <out.mp4>` (−14 LUFS, szczyt
+  −1,2 dBTP, wypisuje zmierzoną głośność i ostrzega, gdy film jej nie trzyma).
 - Film to 30–60 min pracy: storyboard tylko, gdy karta prosi. Wynik: `<nazwa>.mp4`, `.srt`, `poster.jpg`, `TREATMENT.md`.
 
 ## claude-animation (rysunek w Node canvas, postaci, efekty gry, dźwięk syntezowany)

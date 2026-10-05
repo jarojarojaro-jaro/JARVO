@@ -75,7 +75,7 @@ sources:
   lemo-opuscar:
     type: git
     repo: https://github.com/lemomo-ai/lemo-opuscar
-    rev: 108fa78e8468df90a94f3860099484e412447199
+    rev: b65efe6ea393fdc71212898ea4c57c754cfefa46
     license: MIT
     license_file: LICENSE
     # Skill tylko wskazuje bibliotekę; bibliotekę (ten sam commit) instaluje scripts/narzedzia.py Wideografa.

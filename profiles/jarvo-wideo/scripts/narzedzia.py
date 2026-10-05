@@ -15,8 +15,9 @@ Zasady (VPS 8 GB, bez dubli):
   playwright (Node i Python) przypięta do tej przeglądarki (PW_VERSION),
 - pakiety npm i Python raz do /opt/data/jarvo/narzedzia (przeżywają restart), a nie w każdym projekcie,
 - biblioteki z repo (lemo-opuscar, video-shotcraft, player Lottie) przypięte do commitów z vendor/skills.lock.yaml
-  (bez samoczynnych aktualizacji); HDRI do stylów 3D lemo (~12 MB) zawsze; ciężkie assety lemo (głos Kokoro
-  ~340 MB, sample ~1,35 GB) tylko z JARVO_EXTRAS „lemo”.
+  (bez samoczynnych aktualizacji; nowy commit w repo Jarva → `instaluj` przenosi istniejący klon na niego);
+  HDRI do stylów 3D lemo (~12 MB) zawsze; ciężkie assety lemo (głos Kokoro ~340 MB, sample ~1,4 GB) tylko
+  z JARVO_EXTRAS „lemo”.
 """
 
 from __future__ import annotations
@@ -37,7 +38,15 @@ PW_VERSION = "1.63.0"                 # = chromium_headless_shell z obrazu Herme
 
 LEMO = ROOT / "lemo-opuscar"
 LEMO_REPO = "https://github.com/lemomo-ai/lemo-opuscar.git"
-LEMO_REV = "108fa78e8468df90a94f3860099484e412447199"        # vendor/skills.lock.yaml → lemo-opuscar
+LEMO_REV = "b65efe6ea393fdc71212898ea4c57c754cfefa46"        # vendor/skills.lock.yaml → lemo-opuscar
+# jak sparse-checkout setup.sh skilla: bez źródeł dem, galerii i dużych obrazów; dema dodane przez
+# `setup.sh demo <slug>` (LEMO_DODANE) zostają przy aktualizacji
+LEMO_POMIN = ["/styles/*/demo/", "/styleboard/", "/docs/frames/", "/docs/cover.jpg", "/docs/opuscar98.jpg",
+              "/styles/*/poster.jpg"]
+LEMO_DODANE = re.compile(r"/styles/[^/*]+/(demo/|poster\.jpg)")
+# poziomy zależności Pythona biblioteki (= `setup.sh deps [voice] [music]`): plik requirements i znacznik .venv/.lemo-<poziom>;
+# core: efekty, miks, napisy; music: numba dla instrumentów proceduralnych pluck.py; voice (Kokoro, Whisper) tylko z dodatkami
+LEMO_POZIOMY = {"core": "requirements.txt", "music": "requirements-music.txt", "voice": "requirements-voice.txt"}
 SHOTCRAFT = ROOT / "video-shotcraft"
 SHOTCRAFT_REPO = "https://github.com/Vincentwei1021/video-shotcraft.git"
 SHOTCRAFT_REV = "e2d8928c57ef84701f9b0119ca4a1c28a62050c1"   # vendor/skills.lock.yaml → video-shotcraft
@@ -57,8 +66,6 @@ PUPPETEER = "puppeteer@24.43.1"
 HTML_LIBS = ["three@0.186.1", "gsap@3.15.0", "p5@2.3.4"]   # p5: algorithmic-art
 PY_BASE = ["numpy", "pillow"]
 PY_HTML = [f"playwright=={PW_VERSION}", "imageio"]   # imageio: slack-gif-creator (GIF przez Pillow)
-PY_LEMO = ["scipy", "soundfile", "soxr", "librosa"]
-PY_LEMO_FULL = ["kokoro-onnx", "faster-whisper"]
 PY_MODULES = {"pillow": "PIL", "kokoro-onnx": "kokoro_onnx", "faster-whisper": "faster_whisper"}
 NO_DOWNLOAD = {"PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1", "PUPPETEER_SKIP_DOWNLOAD": "1"}
 # puppeteer i `chrome --headless --screenshot` nie dodają --no-sandbox, a Chromium jako root bez niego nie wstaje
@@ -192,13 +199,25 @@ def ensure_node(pkgs: list[str]) -> None:
         run(["npm", "install", "--no-audit", "--no-fund", "--silent", *missing], cwd=NODE, env=NO_DOWNLOAD)
 
 
-def clone_pinned(repo: str, rev: str, dest: Path, exclude: list[str]) -> None:
+def git_head(dest: Path) -> str:
+    return subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+
+
+def clone_pinned(repo: str, rev: str, dest: Path, exclude: list[str], keep: re.Pattern | None = None) -> None:
+    """Klon bez historii plików (blob:none) i bez ścieżek `exclude`, na przypiętym commicie. Klon na innym commicie
+    przechodzi na nowy: nowy `rev` w repo Jarva = aktualizacja przy następnym `instaluj`. Wpisy sparse-checkout
+    pasujące do `keep` (np. dema dodane później) zostają."""
     if (dest / ".git").exists():
-        return
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    run(["git", "clone", "--quiet", "--filter=blob:none", "--sparse", "--no-checkout", repo, str(dest)])
-    run(["git", "-C", str(dest), "sparse-checkout", "set", "--no-cone", "/*", *[f"!{e}" for e in exclude]])
-    run(["git", "-C", str(dest), "checkout", "--quiet", rev])
+        if git_head(dest) == rev:
+            return
+        run(["git", "-C", str(dest), "fetch", "--quiet", "--filter=blob:none", "origin", rev])
+    else:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        run(["git", "clone", "--quiet", "--filter=blob:none", "--sparse", "--no-checkout", repo, str(dest)])
+    lista = subprocess.run(["git", "-C", str(dest), "sparse-checkout", "list"], capture_output=True, text=True).stdout
+    dodane = [w for w in lista.splitlines() if keep and keep.fullmatch(w)]
+    run(["git", "-C", str(dest), "sparse-checkout", "set", "--no-cone", "/*", *[f"!{e}" for e in exclude], *dodane])
+    run(["git", "-C", str(dest), "checkout", "--quiet", "--force", rev])
 
 
 def install_motion() -> None:
@@ -220,26 +239,56 @@ def install_html() -> None:
     ensure_node([PUPPETEER, *HTML_LIBS])
 
 
+def lemo_sig(*files: Path) -> str:
+    """Suma plików jak `sig` w setup.sh skilla (cat | cksum): te same znaczniki = setup.sh uznaje pakiety za gotowe."""
+    out = subprocess.run(["sh", "-c", 'cat "$@" 2>/dev/null | cksum | cut -d" " -f1', "sh", *map(str, files)],
+                         capture_output=True, text=True).stdout
+    return out.strip()
+
+
+def lemo_znacznik(poziom: str | None) -> tuple[Path, str]:
+    """(plik znacznika, oczekiwana treść): None = pakiety npm, inaczej poziom Pythona (suma pliku + wersja Pythona)."""
+    if poziom is None:
+        return LEMO / "node_modules" / ".lemo-ok", lemo_sig(LEMO / "package.json", LEMO / "package-lock.json")
+    p = subprocess.run([str(LEMO / ".venv" / "bin" / "python"), "-V"], capture_output=True, text=True)
+    wersja = ".".join((p.stdout or p.stderr).strip().split(".")[:2])          # „Python 3.12”, jak `cut -d. -f1,2`
+    return LEMO / ".venv" / f".lemo-{poziom}", f"{lemo_sig(LEMO / LEMO_POZIOMY[poziom])}-{wersja}"
+
+
+def lemo_gotowe(poziom: str | None) -> bool:
+    plik, tresc = lemo_znacznik(poziom)
+    return plik.exists() and plik.read_text(encoding="utf-8").strip() == tresc
+
+
+def lemo_poziomy() -> list[str]:
+    return ["core", "music"] + (["voice"] if full_extras() else [])
+
+
 def install_lemo() -> None:
-    clone_pinned(LEMO_REPO, LEMO_REV, LEMO, ["/styles/*/demo/", "/styleboard/"])
+    clone_pinned(LEMO_REPO, LEMO_REV, LEMO, LEMO_POMIN, keep=LEMO_DODANE)
     # przypięta wersja: skill-owy setup.sh nie aktualizuje biblioteki, której nie oznaczył jako swojej
     subprocess.run(["git", "-C", str(LEMO), "config", "--unset", "lemo.managed"], capture_output=True)
-    if not (LEMO / "node_modules" / ".lemo-ok").exists():
+    if not lemo_gotowe(None):
         run(["npm", "install", "--no-audit", "--no-fund", "--silent"], cwd=LEMO, env=NO_DOWNLOAD)
-        (LEMO / "node_modules" / ".lemo-ok").touch()
+        # npm potrafi przepisać package-lock.json: wersja z repo, żeby suma zgadzała się z setup.sh
+        subprocess.run(["git", "-C", str(LEMO), "checkout", "-q", "--", "package.json", "package-lock.json"], capture_output=True)
+        plik, tresc = lemo_znacznik(None)
+        plik.write_text(tresc + "\n", encoding="utf-8")
     lemo_venv = LEMO / ".venv"
-    if not (lemo_venv / ".lemo-ok").exists():
-        if not (lemo_venv / "bin" / "python").exists():
-            run(["uv", "venv", "--quiet", "--python", "3.12", str(lemo_venv)] if shutil.which("uv")
-                else [sys.executable, "-m", "venv", str(lemo_venv)])
-        pip_install(str(lemo_venv / "bin" / "python"), PY_BASE + PY_LEMO + (PY_LEMO_FULL if full_extras() else []))
-        (lemo_venv / ".lemo-ok").touch()
+    if not (lemo_venv / "bin" / "python").exists():
+        run(["uv", "venv", "--quiet", "--python", "3.12", str(lemo_venv)] if shutil.which("uv")
+            else [sys.executable, "-m", "venv", str(lemo_venv)])
+    for poziom in lemo_poziomy():
+        if not lemo_gotowe(poziom):
+            pip_install(str(lemo_venv / "bin" / "python"), ["-r", str(LEMO / LEMO_POZIOMY[poziom])])
+            plik, tresc = lemo_znacznik(poziom)
+            plik.write_text(tresc + "\n", encoding="utf-8")
     # HDRI (Poly Haven, CC0, ~12 MB): światło i odbicia w stylach 3D (brick-toy, paper-popup, paper-lantern…) – zawsze
     if not (LEMO / "core" / "assets" / "polyhaven").is_dir() or not any((LEMO / "core" / "assets" / "polyhaven").glob("*.hdr")):
         run(["sh", "tools/fetch.sh", "hdri"], cwd=LEMO)
     if full_extras():
-        for what in ("voice", "instruments"):
-            run(["sh", "tools/fetch.sh", what], cwd=LEMO)
+        for what in (["voice"], ["instruments", "all"]):
+            run(["sh", "tools/fetch.sh", *what], cwd=LEMO)
 
 
 def install_remotion() -> None:
@@ -302,7 +351,8 @@ def status() -> dict:
         "motion": (NODE / "node_modules" / "playwright").exists() and (VENV / "bin" / "python").exists(),
         "html": venv_has("playwright") and venv_has("PIL"),
         "html_biblioteki": all(npm_installed(p, NODE / "node_modules") for p in HTML_LIBS),
-        "lemo": (LEMO / "node_modules" / ".lemo-ok").exists() and (LEMO / ".venv" / ".lemo-ok").exists(),
+        # gotowe = przypięty commit i pakiety ze znacznikami setup.sh; po zmianie LEMO_REV → `instaluj lemo` aktualizuje
+        "lemo": (LEMO / ".git").exists() and git_head(LEMO) == LEMO_REV and all(map(lemo_gotowe, [None, *lemo_poziomy()])),
         "lemo_hdri": hdri.is_dir() and any(hdri.glob("*.hdr")),
         "lemo_glos_kokoro": (LEMO / "core" / "tts" / "kokoro-v1.0.onnx").exists(),
         "lemo_sample": instruments.is_dir() and any(instruments.iterdir()),

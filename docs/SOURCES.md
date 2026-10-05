@@ -58,7 +58,7 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [AgriciDaniel/claude-seo](https://github.com/AgriciDaniel/claude-seo) | `e77e783` | MIT | Web (skille + skrypty w obrazie) |
 | [anthropics/skills](https://github.com/anthropics/skills) | `3337550` | Apache-2.0 (tylko skille z licencją Apache w katalogu) | Web, Studio, Ręka, Wideograf (slack-gif-creator), Studio (algorithmic-art) |
 | [Barty-Bart/motion-graphics](https://github.com/Barty-Bart/motion-graphics) (skill motion-broll) | `e8d610a` | MIT | Wideograf (B-roll zgrany ze słowami) |
-| [lemomo-ai/lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | `108fa78` | MIT (assety CC0 / CC BY / OFL) | Wideograf (39 stylów filmu; biblioteka instalowana przez `narzedzia.py`) |
+| [lemomo-ai/lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | `b65efe6` | MIT (assety CC0 / CC BY / OFL) | Wideograf (43 style filmu; biblioteka instalowana przez `narzedzia.py`) |
 | [alexgreensh/anidoodle](https://github.com/alexgreensh/anidoodle) | `f335700` | Apache-2.0 | Wideograf (rysunek kodem, muzyka syntezowana) |
 | [buildwithhanif/claude-animation-skill](https://github.com/buildwithhanif/claude-animation-skill) | `4ddb8c8` | MIT | Wideograf (animacja w Node canvas, postaci, efekty, dźwięk syntezowany z osi czasu) |
 | [remotion-dev/skills](https://github.com/remotion-dev/skills) | `cf49eff` | Remotion License (darmowa dla osoby / firmy do 3 osób) | Wideograf (router `remotion-best-practices` ze wszystkimi `remotion-*/REFERENCE.md`) |
