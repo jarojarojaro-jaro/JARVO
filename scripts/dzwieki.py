@@ -446,7 +446,7 @@ def zmierz() -> int:
     """Szczyty, role i flagi „gra” do istniejącego katalog.json: pliki i sumy zostają (bez pamięci podręcznej)."""
     if not shutil.which("ffmpeg"):
         raise SystemExit("brak ffmpeg (zmierz w kontenerze jarvo-hermes albo z ffmpeg w PATH)")
-    kat = json.loads(KATALOG.read_text(encoding="utf-8"))
+    kat = katalog(json.loads(KATALOG.read_text(encoding="utf-8"))["dzwieki"])   # role w kolejności wyboru
     po_id = {d[0]: d for d in DZWIEKI}
     for w in kat["dzwieki"]:
         for k in ("szczyt", "rola", "gra"):
@@ -459,7 +459,7 @@ def zmierz() -> int:
 def katalog(wpisy: list[dict]) -> dict:
     return {"wersja": 1, "opis": "Biblioteka dźwięków CC0 (scripts/dzwieki.py). Plik generowany.",
             "kategorie": [{"id": k, "nazwa": n, "en": e, "muzyka": k == "muzyka"} for k, n, e in KATEGORIE],
-            "dzwieki": wpisy}
+            "role": ROLE, "dzwieki": wpisy}
 
 
 def licencje() -> str:
@@ -494,6 +494,8 @@ def bledy() -> list[str]:
         out.append("katalog.json ma inne dźwięki albo kolejność niż DZWIEKI (zbuduj)")
     if [c["id"] for c in kat.get("kategorie") or []] != [k for k, *_ in KATEGORIE]:
         out.append("katalog.json ma inne kategorie niż KATEGORIE (zbuduj)")
+    if kat.get("role") != ROLE:
+        out.append("katalog.json ma inne role albo kolejność niż ROLE (zmierz)")
     for d in DZWIEKI:
         w = wpisy.get(d[0])
         if not w:

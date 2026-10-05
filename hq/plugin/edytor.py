@@ -1172,12 +1172,12 @@ LEKTOR_MAX = 3000            # znaków tekstu lektora z edytora
 
 
 def dzwieki_katalog(root: Path | None) -> dict:
-    """katalog.json biblioteki (kategorie i dźwięki); brak katalogu = pusta biblioteka."""
+    """katalog.json biblioteki (kategorie, role efektów w kolejności wyboru i dźwięki); brak = pusta biblioteka."""
     try:
         kat = json.loads((Path(root) / "katalog.json").read_text(encoding="utf-8")) if root else {}
     except (OSError, ValueError):
         kat = {}
-    return {"kategorie": kat.get("kategorie") or [], "dzwieki": kat.get("dzwieki") or []}
+    return {"kategorie": kat.get("kategorie") or [], "role": kat.get("role") or {}, "dzwieki": kat.get("dzwieki") or []}
 
 
 def dzwiek_plik(root: Path | None, id_: str) -> tuple[dict, Path] | None:

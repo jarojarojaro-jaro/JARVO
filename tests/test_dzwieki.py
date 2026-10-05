@@ -97,6 +97,7 @@ def test_lista_dla_agenta(capsys):
 def test_role_szczyty_i_flagi_gier():
     # role (zdanie dźwiękowe, seria), szczyt i flaga „gra” w katalogu zgodne z ROLE/GRA; narastanie ma szczyt na końcu
     kat = {d["id"]: d for d in ed.dzwieki_katalog(LIB)["dzwieki"]}
+    assert ed.dzwieki_katalog(LIB)["role"] == dz.ROLE                       # kolejność wyboru (zdanie bierze pierwszy)
     for rola, ids in dz.ROLE.items():
         assert len({kat[i]["sha256"] for i in ids}) == len(ids) >= 2, rola     # seria na zmianę = różne pliki
         assert all(rola in kat[i]["rola"] for i in ids)
@@ -142,6 +143,43 @@ def test_agent_dodaje_dzwiek_i_podklad(film, capsys):
     assert n1["start"] == pytest.approx(3.0 - szczyt) and n1["in"] == 0
     assert n2["start"] == 0 and n2["in"] == pytest.approx(szczyt - 1.0)
     assert "szczyt na 1.00 s" in capsys.readouterr().out
+
+
+def test_plan_serii_na_zmiane_ciszej_i_bez_karabinu():
+    ruchy = {"whoosh-szybki": 0.157, "whoosh": 0.47, "swoosh": 1.93}
+    plan = pr.plan_serii([2.0, 2.2, 2.4, 2.6, 2.8, 3.0], ["pop", "plop"], ruchy)
+    assert [x["id"] for x in plan] == ["pop", "plop"] * 3
+    assert [x["glosnosc"] for x in plan] == [0.4, 0.37, 0.34, 0.31, 0.28, 0.25]       # schodek jak u shotcraft
+    plan = pr.plan_serii([1.0, 1.3, 1.33, 2.0, 2.03, 2.06, 2.09, 2.5], ["pop", "plop"], ruchy)
+    assert [(x["id"], x.get("pominiete"), x.get("zamiast")) for x in plan] == [
+        ("pop", 0, None), ("plop", 1, None), ("whoosh-szybki", None, 4), ("pop", 0, None)]   # 2 za blisko: pierwszy; 4: whoosh
+    assert plan[2]["t"] == pytest.approx(2.045)
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_zdanie_i_seria_na_osi(film, capsys):
+    kat = {d["id"]: d for d in ed.dzwieki_katalog(LIB)["dzwieki"]}
+    assert pr.main(["zdanie", str(film), "--na", "2.5"]) == 0
+    nar, ud, bl = proj(film)["audio"]
+    assert Path(nar["src"]).stem == "narastanie" and Path(ud["src"]).stem == "boom-kinowy" and Path(bl["src"]).stem == "magia"
+    assert nar["start"] + kat["narastanie"]["szczyt"] - nar["in"] == pytest.approx(2.5)        # szczyty w jednej chwili
+    assert nar["start"] == pytest.approx(2.5 - pr.ZDANIE_ROZBIEG) and nar["fadeIn"] > 0      # słychać 1,17 s narastania
+    assert ud["start"] + kat["boom-kinowy"]["szczyt"] == pytest.approx(2.5)
+    assert bl["start"] + kat["magia"]["szczyt"] == pytest.approx(2.5 + pr.ZDANIE_ODSTEP)
+    assert (nar["volume"], ud["volume"], bl["volume"]) == (0.5, 0.9, 0.45)
+    assert pr.main(["zdanie", str(film), "--na", "1.0", "--przed", "brak", "--po", "brak"]) == 0
+    assert "⚠" not in capsys.readouterr().out
+    assert pr.main(["zdanie", str(film), "--na", "3.0", "--przed", "brak", "--po", "brak"]) == 0
+    assert "3. głośne uderzenie" in capsys.readouterr().out
+    assert pr.main(["seria", str(film), "--czasy", "0.5,0.7,0.9"]) == 0
+    seria = proj(film)["audio"][-3:]
+    assert [Path(m["src"]).stem for m in seria] == ["pop", "plop", "pop"]
+    assert [m["volume"] for m in seria] == [0.4, 0.325, 0.25]
+    p = proj(film)
+    p["audio"] += [dict(p["audio"][-1]) for _ in range(ed.MAX_AUDIO - len(p["audio"]) - 1)]
+    pr.save(film, p)
+    with pytest.raises(SystemExit, match="najwyżej 32"):           # edytor pominąłby nadmiar bez słowa
+        pr.main(["zdanie", str(film), "--na", "2.0"])
 
 
 @pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")

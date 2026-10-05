@@ -10,6 +10,10 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py dzwiek <film> <id> [--glosnosc 0.3] [--narastanie S] [--wyciszanie S] [--wycisz|--wlacz]   # klip albo audio
     projekt.py dzwieki [--kategoria pieniadze] [--rola uderzenie] [--szukaj monety] [--muzyka]   # biblioteka CC0
     projekt.py dodaj-dzwiek <film> <id> [--start S | --na T] [--glosnosc 1] [--narastanie S] [--wyciszanie S]   # --na: szczyt w T
+    projekt.py zdanie <film> --na T [--przed ID|brak] [--uderzenie ID] [--po ID|brak] [--rozbieg 1.17] [--odstep 0.83]
+                                    # narastanie → uderzenie → błysk: duża chwila filmu (najwyżej 2 na film)
+    projekt.py seria <film> --czasy 2.0,2.2,2.4 [--id pop] [--id2 plop] [--glosnosc-od 0.4 --glosnosc-do 0.25]
+                                    # seria elementów: dwa efekty na zmianę, coraz ciszej; za gęsto → jeden whoosh
     projekt.py wyodrebnij <film> (<id klipu> | --plik inny.mp4 [--start S])   # dźwięk z filmu jako osobne audio
     projekt.py lektor <film> "tekst" [--start S] [--glos pl-PL-MarekNeural] [--tempo +5%]   # Edge TTS jak film.py
     projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain] [--kroj Poppins]
@@ -678,6 +682,138 @@ def cmd_dodaj_dzwiek(film: Path, a) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- zdanie dźwiękowe i seria (za video-shotcraft, Apache-2.0)
+
+ZDANIE_ROZBIEG = 1.17       # narastanie słychać 35 klatek (przy 30 kl./s) przed uderzeniem
+ZDANIE_ODSTEP = 0.83        # błysk 25 klatek po uderzeniu
+ZDANIE_GLOSNOSC = {"narastanie": 0.5, "uderzenie": 0.9, "blysk": 0.45}   # uderzenie to najgłośniejsza chwila filmu
+ZDANIE_MAX = 2              # finał i najwyżej jedna kulminacja: częste duże uderzenie traci siłę
+SERIA_GLOSNOSC = (0.40, 0.25)   # pierwszy i ostatni element: ciszej z każdym, jak oddalanie się, nie karabin
+SERIA_ODSTEP = 0.1          # gęściej niż co 3 klatki (30 kl./s) ucho nie liczy uderzeń: jeden whoosh zamiast serii
+
+
+def efekt(id_: str) -> dict:
+    hit = ed.dzwiek_plik(DZWIEKI, id_)
+    if not hit:
+        raise SystemExit(f"nie ma „{id_}” w bibliotece (lista: projekt.py dzwieki)")
+    if hit[0]["kat"] == "muzyka":
+        raise SystemExit(f"„{id_}” to podkład, nie efekt")
+    return hit[0]
+
+
+def rola_ids(rola: str) -> list[str]:
+    """Efekty roli w kolejności wyboru (katalog „role”, z ROLE w scripts/dzwieki.py)."""
+    return list(ed.dzwieki_katalog(DZWIEKI)["role"].get(rola) or [])
+
+
+def miejsce_na_audio(proj: dict, ile: int) -> None:
+    """Edytor bierze najwyżej MAX_AUDIO elementów audio, a nadmiar pomija bez słowa: odmowa przed dodaniem."""
+    jest = len(proj.get("audio") or [])
+    if jest + ile > ed.MAX_AUDIO:
+        raise SystemExit(f"za dużo audio: projekt ma {jest}, doszłoby {ile}, a edytor bierze najwyżej {ed.MAX_AUDIO} "
+                         "(połącz efekty w jeden plik albo usuń zbędne: projekt.py usun)")
+
+
+def poloz_efekt(film: Path, proj: dict, id_: str, szczyt_na: float, glosnosc: float,
+                rozbieg: float | None = None) -> dict:
+    """Efekt z biblioteki tak, by jego szczyt trafił w `szczyt_na` (s osi). `rozbieg`: słychać najwyżej tyle s przed
+    szczytem (dłuższy początek przycięty i wchodzi z narastaniem); początek osi przycina tak samo."""
+    sz = float(efekt(id_).get("szczyt") or 0)
+    od = sz - rozbieg if rozbieg is not None and sz > rozbieg else 0.0
+    start = szczyt_na - (sz - od)
+    if start < 0:
+        od, start = od - start, 0.0
+    zan = argparse.Namespace(narastanie=min(0.3, sz - od) if od > 0 else None, wyciszanie=None)
+    return dodaj_plik_audio(film, proj, ed.dzwiek_do_filmu(DZWIEKI, id_, film), start, glosnosc, zan, od=od)
+
+
+def zdania_w_projekcie(proj: dict) -> int:
+    """Ile głośnych uderzeń (rola „uderzenie”, głośność ≥ 0,8) jest już na osi."""
+    ids = set(rola_ids("uderzenie"))
+    return sum(1 for m in proj.get("audio") or [] if Path(str(m.get("src") or "")).stem in ids
+               and float(m.get("volume") or 0) >= 0.8)
+
+
+def cmd_zdanie(film: Path, a) -> int:
+    """Narastanie → uderzenie → błysk na jedną chwilę T (szczyty: narastania i uderzenia w T, błysku w T + odstęp)."""
+    proj = load(film)
+    czesci = [(r, x) for r, x in (("narastanie", a.przed), ("uderzenie", a.uderzenie), ("blysk", a.po)) if x != "brak"]
+    czesci = [(r, x or rola_ids(r)[0]) for r, x in czesci]
+    miejsce_na_audio(proj, len(czesci))
+    byly = zdania_w_projekcie(proj)
+    print(f"Zdanie dźwiękowe na {a.na:.2f} s:")
+    for rola, id_ in czesci:
+        na = a.na + (a.odstep if rola == "blysk" else 0.0)
+        item = poloz_efekt(film, proj, id_, na, round(ZDANIE_GLOSNOSC[rola] * a.glosnosc, 3),
+                           a.rozbieg if rola == "narastanie" else None)
+        print(f"  {rola:<10} [{item['id']}] {id_:<20} od {item['start']:6.2f} s, szczyt {na:6.2f} s, głośność {item['volume']:.2f}")
+    save(film, proj)
+    if byly + (1 if any(r == "uderzenie" for r, _ in czesci) else 0) > ZDANIE_MAX:
+        print(f"⚠ to już {byly + 1}. głośne uderzenie w filmie: częste traci siłę (najwyżej {ZDANIE_MAX}: finał i jedna "
+              "kulminacja; resztę zrób mniejszym efektem albo ciszą przed akcentem)")
+    return 0
+
+
+def plan_serii(czasy: list[float], ids: list[str], ruchy: dict[str, float], od: float = SERIA_GLOSNOSC[0],
+               do: float = SERIA_GLOSNOSC[1], odstep: float = SERIA_ODSTEP) -> list[dict]:
+    """Seria elementów: efekty z `ids` na zmianę, głośność liniowo od `od` do `do`. Trafienia bliżej niż `odstep`
+    ucho zlewa: dwa = zostaje pierwsze, trzy i więcej = jeden whoosh (z `ruchy`: id → długość) szczytem w środku."""
+    czasy = sorted(czasy)
+    n = len(czasy)
+    vol = [round(od + (do - od) * i / (n - 1), 3) if n > 1 else od for i in range(n)]
+    grupy: list[list[int]] = []
+    for i, t in enumerate(czasy):
+        if grupy and t - czasy[grupy[-1][-1]] < odstep:
+            grupy[-1].append(i)
+        else:
+            grupy.append([i])
+    out, k = [], 0
+    for g in grupy:
+        if len(g) <= 2:
+            out.append({"id": ids[k % len(ids)], "t": czasy[g[0]], "glosnosc": vol[g[0]], "pominiete": len(g) - 1})
+            k += 1
+            continue
+        a, b = czasy[g[0]], czasy[g[-1]]
+        w = min(ruchy, key=lambda x: abs(ruchy[x] - (b - a + 0.2)))
+        out.append({"id": w, "t": round((a + b) / 2, 3), "glosnosc": round(sum(vol[i] for i in g) / len(g), 3),
+                    "zamiast": len(g), "od": a, "do": b})
+    return out
+
+
+def cmd_seria(film: Path, a) -> int:
+    proj = load(film)
+    try:
+        czasy = [float(x) for x in a.czasy.replace(";", ",").split(",") if x.strip()]
+    except ValueError:
+        raise SystemExit("--czasy: liczby sekund po przecinku, np. 2.0,2.2,2.4")
+    if len(czasy) < 2:
+        raise SystemExit("seria to co najmniej 2 czasy (jeden efekt: dodaj-dzwiek --na T)")
+    pierwszy = a.id or rola_ids("pojawienie")[0]
+    w = efekt(pierwszy)
+    drugi = a.id2
+    if not drugi:
+        para = [i for i in rola_ids((w.get("rola") or ["?"])[0]) if i != pierwszy
+                and efekt(i).get("sha256") != w.get("sha256")]
+        drugi = para[0] if para else None
+    if drugi:
+        efekt(drugi)
+    else:
+        print(f"⚠ „{pierwszy}” nie ma pary w swojej roli: jeden plik raz za razem brzmi jak karabin (podaj --id2)")
+    ruchy = {i: float(efekt(i).get("dl") or 0) for i in rola_ids("ruch")}
+    plan = plan_serii(czasy, [pierwszy] + ([drugi] if drugi else []), ruchy, a.glosnosc_od, a.glosnosc_do)
+    miejsce_na_audio(proj, len(plan))
+    for x in plan:
+        item = poloz_efekt(film, proj, x["id"], x["t"], x["glosnosc"])
+        if x.get("zamiast"):
+            print(f"  {x['od']:6.2f}–{x['do']:.2f} s: {x['zamiast']} trafień gęściej niż co {SERIA_ODSTEP:g} s "
+                  f"→ jeden {x['id']} [{item['id']}] (szczyt {x['t']:.2f} s, głośność {item['volume']:.2f})")
+        else:
+            print(f"  {x['t']:6.2f} s  {x['id']:<12} [{item['id']}] głośność {item['volume']:.2f}"
+                  + (f"  (pominięte {x['pominiete']} za blisko)" if x["pominiete"] else ""))
+    save(film, proj)
+    return 0
+
+
 def wyodrebnij_plik(film: Path, src: Path) -> Path:
     """Ta sama ścieżka i polecenie co „Wyodrębnij” w edytorze HQ (edytor.wyodrebnij_cel / wyodrebnij_cmd)."""
     info = ed.probe(src)
@@ -1115,6 +1251,20 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--glosnosc", type=float, help="0–2 (domyślnie 1, podkład 0.3)")
     sp.add_argument("--narastanie", type=float, help="s")
     sp.add_argument("--wyciszanie", type=float, help="s")
+    sp = film_cmd("zdanie", cmd_zdanie, "zdanie dźwiękowe: narastanie → uderzenie → błysk na jedną chwilę")
+    sp.add_argument("--na", type=float, required=True, help="chwila uderzenia (s osi): stempel, logo, lądowanie")
+    sp.add_argument("--przed", help="narastanie (domyślnie pierwsze z roli; „brak” = bez)")
+    sp.add_argument("--uderzenie", help="uderzenie (domyślnie pierwsze z roli)")
+    sp.add_argument("--po", help="błysk po uderzeniu (domyślnie pierwszy z roli; „brak” = bez)")
+    sp.add_argument("--rozbieg", type=float, default=ZDANIE_ROZBIEG, help="ile s narastania przed uderzeniem")
+    sp.add_argument("--odstep", type=float, default=ZDANIE_ODSTEP, help="ile s po uderzeniu błysk")
+    sp.add_argument("--glosnosc", type=float, default=1.0, help="mnożnik głośności całego zdania")
+    sp = film_cmd("seria", cmd_seria, "seria elementów: dwa efekty na zmianę, coraz ciszej")
+    sp.add_argument("--czasy", required=True, help="chwile elementów (s osi) po przecinku")
+    sp.add_argument("--id", help="pierwszy efekt (domyślnie pop)")
+    sp.add_argument("--id2", help="drugi efekt na zmianę (domyślnie następny z tej samej roli)")
+    sp.add_argument("--glosnosc-od", type=float, default=SERIA_GLOSNOSC[0])
+    sp.add_argument("--glosnosc-do", type=float, default=SERIA_GLOSNOSC[1])
     sp = film_cmd("wyodrebnij", cmd_wyodrebnij, "dźwięk klipu albo innego filmu jako osobne audio")
     sp.add_argument("id", nargs="?", help="klip z osi (z `pokaz`): dźwięk zostaje w tym samym miejscu, klip wyciszony")
     sp.add_argument("--plik", help="inny film: jego dźwięk jako audio")

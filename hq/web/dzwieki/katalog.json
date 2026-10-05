@@ -87,6 +87,58 @@
    "muzyka": true
   }
  ],
+ "role": {
+  "narastanie": [
+   "narastanie",
+   "narastanie-krotkie"
+  ],
+  "uderzenie": [
+   "boom-kinowy",
+   "uderzenie-duze",
+   "uderzenie-niskie",
+   "uderzenie-przejscia"
+  ],
+  "blysk": [
+   "magia",
+   "dzwonek"
+  ],
+  "ruch": [
+   "whoosh",
+   "whoosh-szybki",
+   "whoosh-sredni",
+   "swoosh",
+   "swoosh-przejscie",
+   "swoosh-dlugi",
+   "bicz"
+  ],
+  "przejscie": [
+   "swoosh-przejscie",
+   "uderzenie-przejscia",
+   "swoosh-wybuch",
+   "przewijanie",
+   "glitch",
+   "glitch-vhs"
+  ],
+  "pojawienie": [
+   "pop",
+   "plop",
+   "pyk",
+   "kropla"
+  ],
+  "klik": [
+   "klik",
+   "klik-2",
+   "klik-myszy",
+   "przelacznik",
+   "tik",
+   "migawka"
+  ],
+  "pisanie": [
+   "klawiatura-mechaniczna",
+   "klawiatura",
+   "pisanie-cyfrowe"
+  ]
+ },
  "dzwieki": [
   {
    "id": "whoosh",

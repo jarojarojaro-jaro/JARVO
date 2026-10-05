@@ -125,6 +125,7 @@ Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, Morp
   tylko na prośbę właściciela) i trochę wolniej; potem klatka po klatce przez szybkie chwile
   i `qa_wideo.py` (wykrywa pojedyncze „mrugnięcia”).
 - Dźwięk: prawdziwy efekt na każde zdarzenie, położony wg szczytu (`rytm.py efekt.wav --szczyt`), całość −14 LUFS;
+  duża chwila = zdanie dźwiękowe (narastanie → uderzenie → błysk), seria elementów = dwa efekty na zmianę, coraz ciszej;
   czasy efektów z tych samych stałych co animacja (zasady w `lektor-i-dzwiek`).
 
 ## Render

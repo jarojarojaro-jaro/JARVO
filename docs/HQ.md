@@ -306,7 +306,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   liniowego, `tonemap` mobius, z powrotem do BT.709). Przeliczenie idzie po dopasowaniu do kadru (4K z telefonu
   w pełnej rozdzielczości liczy się kilka razy dłużej), przed korekcją koloru i napisami.
 - **Wspólny projekt z Wideografem:** „Poproś agenta” każe Wideografowi pracować na tym samym `*.edycja.json`
-  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `kolor`, `glos`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `dzwieki`, `dodaj-dzwiek`, `wyodrebnij`, `lektor`, `usun`, `uwaga`,
+  poleceniem `projekt.py` (`pokaz`, `dodaj-audio`, `dodaj-tekst`, `dodaj-klip`, `kadr`, `kolor`, `glos`, `napisy`, `przejscie`, `tnij`, `wytnij`, `dzwiek`, `dzwieki`, `dodaj-dzwiek`, `zdanie`, `seria`, `wyodrebnij`, `lektor`, `usun`, `uwaga`,
   `sprawdz`, `render`). `render` używa tego samego silnika co „Eksportuj” (`edytor.py` kopiowany przy buildzie obok skryptu),
   a napisy i typografię rysują te same funkcje (`hq/web/src/44-napisy.js`, `48-typografia.js`) w przeglądarce bez
   okna, więc plik od agenta wygląda jak eksport z edytora. Typografię na tym samym projekcie układa `typografia.py`

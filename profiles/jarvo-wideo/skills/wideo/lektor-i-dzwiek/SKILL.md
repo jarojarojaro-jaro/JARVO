@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -111,6 +111,18 @@ Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność
   w klatce, w której element się pojawia (od −0,03 do +0,05 s). W filmie z kodu czasy efektów licz z tych samych
   stałych co animacja, wtedy przesuną się razem ze sceną.
 - Umiar: 1 efekt na kilka sekund, whoosh na przejściu, „kasa” przy cenie, oklaski przy wyniku.
+- **Zdanie dźwiękowe** (za video-shotcraft, Apache-2.0) na dużą chwilę: stempel logo, finał, lądowanie głównego
+  elementu. Narastanie (słychać 1,17 s, czyli 35 klatek przy 30 kl./s) → uderzenie (najgłośniejsza chwila filmu)
+  → błysk 0,83 s (25 klatek) po uderzeniu. `projekt.py zdanie <film> --na T [--przed ID|brak] [--uderzenie ID]
+  [--po ID|brak]` kładzie wszystkie trzy szczytami (efekty z ról narastanie, uderzenie, blysk). Najwyżej 2 na film
+  (finał i jedna kulminacja): częste duże uderzenie traci siłę, `zdanie` ostrzega przy trzecim. Film z kodu: to samo
+  w `cues.json` (riser, thump, sparkle) z tych samych czasów.
+- **Seria bez karabinu** (elementy listy wskakują po kolei, karty, kafelki): dwa różne efekty na zmianę, głośność
+  od 0,40 do 0,25 (każdy następny ciszej, jak oddalanie się), odstępy z animacji (gdy przyspiesza, efekty też).
+  Gęściej niż co 0,1 s (3 klatki) ucho nie liczy uderzeń: zamiast nich jeden whoosh przez cały zlepek.
+  `projekt.py seria <film> --czasy 2.0,2.2,2.4 [--id pop] [--id2 plop]` robi to sam (para z tej samej roli, inny plik).
+  Film z kodu: w `cues.json` na zmianę dwa dźwięki (np. pop i drip albo inny `pitch`), `vol` od 0,40 do 0,25.
+  Cel: rytm, który da się policzyć, nie maszynowe powtórzenie.
 - Głośność względem głosu (głos = 0 dB): muzyka pod głosem −22…−16 dB (wyżej, „Muzyka”), efekty interfejsu i whoosh
   −14…−8 dB, a gdy lektor mówi w tej chwili, ciszej: −18…−12 dB (głośność efektu ok. 0,5–0,8); całość −14 LUFS.
   Ogranicznik nie naprawia złych proporcji: popraw głośności ścieżek.
