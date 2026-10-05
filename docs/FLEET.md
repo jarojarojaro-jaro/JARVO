@@ -13,7 +13,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 |---|---|---|---|---|---|
 | `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [13 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 1 (`writing-for-agents`, mattpocock) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski | [23](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [8 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 15 (Hermes, marketingskills, wspólny `transkrypcja-filmu`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [15](../evals/jarvo-sherlock/scenarios.yaml) |
-| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 58 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [17](../evals/jarvo-web/scenarios.yaml) |
+| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 58 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólny `graf-kodu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [18](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 23 (marketingskills, Anthropic, Hermes, impeccable, wspólny `hooki`) | render_html, check_media | [12](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [18 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 60 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, live-panel, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, muzyka, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, twarze, demo_strony, typografia, maska, zywy_schemat (+ wideo_lib; moduły JS stron: ruch, kreska, morph, crt, plotno, piksel, os_czasu, strona, ujecia) | [30](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [13](../evals/jarvo-ads/scenarios.yaml) |
@@ -109,8 +109,9 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
 - **Fundamenty:** semantyczny HTML, nowoczesny CSS, mobile-first, breakpointy, typografia, dark mode.
 - **Ikony i meta:** komplet faviconów (`favicon.ico`, SVG, `apple-touch-icon`, ikony do
   manifestu 192/512 i maskable), `site.webmanifest`, meta tagi, Open Graph i karty X/Twitter.
-- **SEO techniczne:** title i description, canonical, hreflang, `sitemap.xml`, `robots.txt`,
-  dane strukturalne JSON-LD (Product, Organization, FAQ, Breadcrumb…), linkowanie wewnętrzne.
+- **SEO techniczne:** title i description (inne na każdej podstronie), canonical, hreflang, sitemap, `robots.txt`,
+  `llms.txt`, strona 404 (prawdziwy status 404), obraz OG 1200×630, landmarki HTML, dane strukturalne JSON-LD
+  (Product, Organization, FAQ, Breadcrumb…), linkowanie wewnętrzne. `seo_check.py --dir dist` sprawdza cały build.
 - **Obrazy:** AVIF/WebP, `srcset`/`sizes`, lazy loading, jawne wymiary (bez skoków layoutu), kompresja.
 - **Wydajność:** Core Web Vitals (LCP, INP, CLS), budżety wydajności, fonty, krytyczny CSS.
 - **Dostępność:** WCAG 2.2 AA, kontrast, nawigacja klawiaturą, alt teksty.

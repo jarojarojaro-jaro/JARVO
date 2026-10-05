@@ -8,8 +8,8 @@ wskazówki do projektu, nie porada prawna.
 ## 1. Zasada: wartość, nie objętość
 
 Miarą jest to, co już robią Web i Wideograf: **gotowy, sprawdzalny w sekundę wynik, którego zwykły czat
-z AI nie da, bo nie ma narzędzi, danych ani pamięci.** Web daje `llms.txt`, sitemapę, favicony i WebP po
-26-punktowej liście kontrolnej. Wideograf tnie długie nagranie na rolki z napisami i oddaje je do
+z AI nie da, bo nie ma narzędzi, danych ani pamięci.** Web daje `llms.txt`, sitemapę, stronę 404, favicony i WebP
+sprawdzone 23-punktową listą widoczności (`seo_check.py`). Wideograf tnie długie nagranie na rolki z napisami i oddaje je do
 wbudowanego edytora.
 
 Z tego wynikają cztery reguły tego planu:

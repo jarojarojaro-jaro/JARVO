@@ -1,7 +1,7 @@
 ---
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A0
-    reviewed: "2026-09-28"
+    reviewed: "2026-10-05"
 ---
 
 # Audyt strony
@@ -25,7 +25,7 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
    - axe-core (pełna lista naruszeń WCAG),
    - linkinator (martwe linki, do 2 poziomów),
    - `seo_check.py` (head, meta, OG, JSON-LD, H1, alt, wymiary obrazów, linki wewnętrzne, czyste adresy, robots,
-     sitemap, llms.txt, hreflang); pełna lista widoczności (19 punktów, llms.txt, linki zewnętrzne): `references/widocznosc.md`,
+     sitemap, llms.txt, strona 404, obraz OG, landmarki, hreflang); pełna lista widoczności (23 punkty, llms.txt, 404, linki zewnętrzne): `references/widocznosc.md`,
    - `security_check.py url` (nagłówki, HTTPS, wycieki; szczegóły: skill `bezpieczenstwo-aplikacji`),
    - zrzuty 375/768/1440 + wykrywanie poziomego przewijania.
    - ✅ Punkt kontrolny: `out/audyt/summary.json` istnieje; błędy narzędzi są opisane, nie przemilczane.

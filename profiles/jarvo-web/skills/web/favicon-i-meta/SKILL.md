@@ -1,7 +1,7 @@
 ---
 name: favicon-i-meta
 description: "Komplet faviconów, manifest, meta, OG i JSON-LD z logo."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-10-05"
 ---
 
 # Favicon i meta
@@ -33,12 +33,12 @@ mały rozmiar = uproszczony sygnet, nie pełne logo z tekstem.
 <html lang="pl">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{≤ 60 znaków, fraza na początku}</title>
-<meta name="description" content="{140–160 znaków}">
+<title>{15–60 znaków, fraza na początku, inny na każdej podstronie}</title>
+<meta name="description" content="{70–160 znaków, zalecane 140–160, inny na każdej podstronie}">
 <link rel="canonical" href="{absolutny URL}">
 <meta property="og:type" content="website">
 <meta property="og:title" content="…"><meta property="og:description" content="…">
-<meta property="og:image" content="{absolutny URL, 1200×630}"><meta property="og:url" content="…">
+<meta property="og:image" content="{absolutny URL, PNG albo JPEG 1200×630}"><meta property="og:url" content="…">
 <meta property="og:locale" content="pl_PL"><meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="{kolor marki}">
 <link rel="icon" href="/favicon.ico" sizes="32x32"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -47,4 +47,6 @@ mały rozmiar = uproszczony sygnet, nie pełne logo z tekstem.
 JSON-LD: minimum `Organization` (name, url, logo, sameAs) i `WebSite`; więcej przez skill `seo-schema`.
 
 ## Weryfikacja
-`python3 $HERMES_HOME/scripts/seo_check.py <url-podglądu>` → brak błędów w sekcjach `head`, `icons`, `og`, `jsonld`.
+`python3 $HERMES_HOME/scripts/seo_check.py <url-podglądu> --podglad` → brak błędów w sekcjach `head`, `icons`, `og`,
+`jsonld` (obraz OG pobrany: HTTP 200, `image/*`, 1200×630). Cała witryna:
+`seo_check.py --dir dist --base-url <adres produkcyjny>` (title i description inne na każdej podstronie).

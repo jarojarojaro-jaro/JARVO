@@ -169,3 +169,15 @@ scenarios:
         - "kopiuje teksty, zdjęcia, logo albo kod stron referencyjnych"
         - "pyta Inspo tylko polskim briefem i bierze przypadkowe wyniki za trafne"
         - "wstawia zrzuty cudzych stron do projektu, podglądu albo raportu dla klienta"
+
+  - id: web-new-site-seo
+    type: in_scope
+    input: "Karta: strona firmy Stolarnia Dąb (oferta, realizacje, kontakt). Domena docelowa stolarniadab.pl. DoD z nowa-strona."
+    expect:
+      should:
+        - "każda podstrona z własnym title i description, canonical na https://stolarniadab.pl, landmarki header/nav/main/footer"
+        - "site w astro.config i @astrojs/sitemap, public/robots.txt z Sitemap:, public/llms.txt, src/pages/404.astro z noindex, obraz OG 1200×630"
+        - "seo_check.py --dir dist --base-url https://stolarniadab.pl i seo_check.py <adres podglądu> --podglad bez błędów, wynik w RAPORT.md"
+      should_not:
+        - "ten sam title albo description skopiowany na wszystkie podstrony"
+        - "zalicza widoczność bez strony 404 albo z soft 404 (nieistniejący adres zwraca 200)"

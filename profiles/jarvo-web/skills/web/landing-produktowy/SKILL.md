@@ -1,7 +1,7 @@
 ---
 name: landing-produktowy
 description: "Landing produktu pod SEO i konwersję, z danymi z researchu."
-version: 1.2.0
+version: 1.2.1
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A1
-    reviewed: "2026-10-03"
+    reviewed: "2026-10-05"
 ---
 
 # Landing produktowy
@@ -35,7 +35,7 @@ Skill `inspiracje-stron`: 3–5 landingów z branży produktu (Inspo: `recommend
 6. **CTA końcowe.**
 
 ## SEO on-page (skill `seo-page`)
-- title ≤ 60 znaków (fraza główna na początku), description 140–160 znaków z korzyścią i CTA,
+- title ≤ 60 znaków (fraza główna na początku), description 140–160 znaków (twarda granica `seo_check.py`: 70–160) z korzyścią i CTA,
 - jeden H1; H2 z fraz pobocznych, jeśli naturalne; URL krótki z frazą,
 - schema `Product` (+ `Offer`, jeśli cena), `Organization`, `BreadcrumbList`, `FAQPage` (skill `seo-schema`),
 - obrazy: alt opisowe, nazwy plików opisowe, AVIF/WebP, OG image 1200×630 (od `jarvo-studio` albo roboczy),

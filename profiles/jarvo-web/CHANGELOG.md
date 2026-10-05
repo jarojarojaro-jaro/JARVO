@@ -1,6 +1,17 @@
 # Changelog: jarvo-web
 
 ## Niewydane
+- `seo_check.py` 1.1: każda nowa strona ma sprawdzone 8 rzeczy: obraz OG (bezwzględny adres, HTTP 200, `image/*`,
+  1200×630 z nagłówka pliku) i `twitter:card`, strona 404 (losowy adres musi dać 404, 200 = „soft 404”), title
+  i description inne na każdej podstronie, landmarki (jeden `<main>`, `<header>`, `<nav>`, `<footer>`), `alt="TODO"`
+  jako błąd, canonical bezwzględny na tym samym hoście, `robots.txt` (także odpowiedź HTML zamiast pliku), `/llms.txt`,
+  sitemap (także z wpisu `Sitemap:`). Brak canonical, `twitter:card`, robots, sitemap i llms.txt to teraz błędy.
+  Nowe tryby: `--dir dist` (cały build bez sieci: duplikaty title, description i canonical, `404.html`, pliki
+  w katalogu, strony poza sitemapą, obraz OG z dysku) i `--podglad` (noindex i canonical na domenie produkcyjnej to
+  info, obraz OG sprawdzany na adresie podglądu). `nowa-strona` 1.4.0: `site` i `@astrojs/sitemap`, `robots.txt`,
+  `llms.txt`, `404.astro`, `og.png`, landmarki w layoucie, DoD z `--dir` i `--podglad`. Lista widoczności 19 → 23
+  punkty, próg description wszędzie 70–160 (zalecane 140–160), rubryka blokuje brak 404/sitemap/robots/llms,
+  duplikaty title i description oraz brak `<main>`. Eval `web-new-site-seo`.
 - `security_check.py url` wykrywa publiczne mapy źródeł skryptów strony (komentarz `sourceMappingURL`, nagłówek
   `SourceMap`, plik `<skrypt>.map` obok, mapa wbudowana `data:`): mapa z `sourcesContent` odtwarza czytelny kod frontu
   (ŚREDNIE), sekret w odzyskanym kodzie to KRYTYCZNE, mapa bez kodu NISKIE. Strona SPA odpowiadająca na `.map` swoim

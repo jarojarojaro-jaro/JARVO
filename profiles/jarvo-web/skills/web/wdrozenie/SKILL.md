@@ -1,7 +1,7 @@
 ---
 name: wdrozenie
 description: "Podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą)."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A2
-    reviewed: "2026-09-30"
+    reviewed: "2026-10-05"
 ---
 
 # Podgląd i wdrożenie
@@ -28,7 +28,7 @@ Z zgodą:
 1. Sprawdź, czy build jest identyczny z zaakceptowanym: `python3 /opt/jarvo/repo/scripts/odcisk.py out/site/dist --sprawdz <odcisk ze zgody>`
    (kod 1 = `dist/` zmienił się po zgodzie → nowa zgoda).
 2. Wdróż skillem `publish-site` (GitHub Pages / Cloudflare Pages / Netlify), zgodnie z celem ze zgody. Nic więcej.
-3. Po wdrożeniu: `seo_check.py` + Lighthouse + `security_check.py url` na produkcyjnym URL, zrzuty, weryfikacja przekierowań i HTTPS.
+3. Po wdrożeniu: `seo_check.py <produkcyjny URL>` (bez `--podglad`: noindex i soft 404 to błędy) + Lighthouse + `security_check.py url` na produkcyjnym URL, zrzuty, weryfikacja przekierowań i HTTPS.
 4. Raport: URL, commit/wersja, wyniki po wdrożeniu, jak cofnąć (rollback).
 
 ## Nigdy

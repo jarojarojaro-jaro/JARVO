@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import struct
 import zipfile
 
 import pytest
@@ -27,7 +28,9 @@ GOOD_HTML = """<!doctype html>
 <meta property="og:image" content="https://nova.example/og.png"><meta property="og:url" content="https://nova.example/serum">
 <meta property="og:type" content="product"><meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Product","name":"Nova"},{"@type":"Organization"}]}</script>
-</head><body><h1>Serum Nova</h1><h2>Skład</h2><img src="a.webp" alt="Butelka" width="800" height="600"></body></html>
+</head><body><header><nav><a href="/">Start</a> <a href="/serum">Serum</a> <a href="/kontakt">Kontakt</a></nav></header>
+<main><h1>Serum Nova</h1><h2>Skład</h2><img src="a.webp" alt="Butelka serum Nova" width="800" height="600">
+<img src="/ozdobnik.svg" alt="" width="40" height="40"></main><footer>© Nova Kosmetyki</footer></body></html>
 """
 
 
@@ -48,7 +51,8 @@ def test_seo_broken_page():
     joined = json.dumps(r, ensure_ascii=False)
     for expected in ["brak <title>", "brak meta description", "brak atrybutu lang", "brak meta viewport",
                      "noindex", "brak favicon", "brak og:title", "brak og:image", "niepoprawny JSON-LD",
-                     "liczba H1: 0", "przeskok nagłówków h2 → h4", "1 obrazów bez alt"]:
+                     "liczba H1: 0", "przeskok nagłówków h2 → h4", "1 obrazów bez alt", "brak <main>",
+                     "brak twitter:card", "brak link rel=canonical"]:
         assert expected in joined, expected
     assert r["summary"]["errors"] >= 10
 
@@ -56,6 +60,143 @@ def test_seo_broken_page():
 def test_seo_title_length_warning():
     r = seo.check(GOOD_HTML.replace("Serum Nova: lekkie serum z witaminą C", "Nova"), None)
     assert any("title ma 4 znaków" in w for w in r["head"]["warnings"])
+
+
+def png(w=1200, h=630) -> bytes:
+    return b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + struct.pack(">II", w, h) + b"\x08\x02\x00\x00\x00"
+
+
+def test_seo_wymiary_obrazu():
+    jpeg = (b"\xff\xd8" + b"\xff\xe0" + struct.pack(">H", 16) + b"JFIF\x00" + b"\x00" * 9
+            + b"\xff\xc0" + struct.pack(">HBHH", 17, 8, 630, 1200) + b"\x00" * 10)
+    gif = b"GIF89a" + struct.pack("<HH", 600, 315)
+    webp = b"RIFF" + b"\x00" * 4 + b"WEBPVP8X" + b"\x00" * 8 + (1199).to_bytes(3, "little") + (629).to_bytes(3, "little")
+    assert seo.wymiary_obrazu(png()) == (1200, 630)
+    assert seo.wymiary_obrazu(jpeg) == (1200, 630)
+    assert seo.wymiary_obrazu(gif) == (600, 315)
+    assert seo.wymiary_obrazu(webp) == (1200, 630)
+    assert seo.wymiary_obrazu(b"nie obraz") is None
+
+
+def test_seo_canonical_alt_i_landmarki():
+    html = (GOOD_HTML.replace('href="https://nova.example/serum"', 'href="/serum"')
+            .replace('alt="Butelka serum Nova"', 'alt="TODO"').replace('alt=""', 'alt="ozdobnik.svg"')
+            .replace("<header><nav>", "<div><div>").replace("</nav></header>", "</div></div>"))
+    r = seo.check(html, None)
+    assert any("canonical nie jest bezwzględnym" in e for e in r["head"]["errors"])
+    assert any('alt="TODO"' in e for e in r["content"]["errors"])
+    assert any("alt bez opisu" in w for w in r["content"]["warnings"])
+    assert any("<header>, <nav>" in w for w in r["content"]["warnings"])
+    dwa_main = seo.check(GOOD_HTML.replace("<footer>", "<main>x</main><footer>"), None)
+    assert any("2 elementy <main>" in w for w in dwa_main["content"]["warnings"])
+    assert seo.check(GOOD_HTML.replace("<main>", '<div role="main">').replace("</main>", "</div>"),
+                     None)["summary"]["errors"] == 0                     # rola ARIA liczy się jak znacznik
+
+
+class Serwer:
+    """Podmiana seo.pobierz: ścieżka → (status, typ, treść); reszta adresów to strona 404."""
+
+    def __init__(self, pliki: dict, brak=(404, "text/html", b"<html><title>Nie ma</title></html>")):
+        self.pliki, self.brak, self.adresy = pliki, brak, []
+
+    def __call__(self, url, limit=5_000_000):
+        self.adresy.append(url)
+        sp = seo.urllib.parse.urlsplit(url)
+        status, typ, tresc = self.pliki.get(sp.path, self.brak)
+        return seo.Odpowiedz(status, typ, tresc, url)
+
+
+DOBRY_SERWER = {
+    "/robots.txt": (200, "text/plain", b"User-agent: *\nAllow: /\nSitemap: https://nova.example/sitemap-index.xml\n"),
+    "/sitemap-index.xml": (200, "application/xml", b"<sitemapindex><sitemap><loc>x</loc></sitemap></sitemapindex>"),
+    "/llms.txt": (200, "text/plain", "# Nova Kosmetyki\n> Serum z witaminą C\n".encode()),
+    "/og.png": (200, "image/png", png()),
+}
+
+
+def test_seo_crawl_dobry_serwer(monkeypatch):
+    serwer = Serwer(DOBRY_SERWER)
+    monkeypatch.setattr(seo, "pobierz", serwer)
+    r = seo.check(GOOD_HTML, "https://nova.example/serum")
+    assert r["summary"]["errors"] == 0 and r["summary"]["warnings"] == 0, r
+    assert "obraz OG https://nova.example/og.png: 1200×630" in r["og"]["info"]
+    assert any(i.startswith("strona 404: /jarvo-nie-istnieje-") for i in r["crawl"]["info"])
+    assert "sitemap: /sitemap-index.xml" in r["crawl"]["info"]
+
+
+def test_seo_crawl_soft_404_i_braki(monkeypatch):
+    zly = {"/robots.txt": (200, "text/html", b"<!doctype html><html>strona</html>"),
+           "/og.png": (200, "text/html", b"<html></html>")}
+    monkeypatch.setattr(seo, "pobierz", Serwer(zly, brak=(200, "text/html", b"<html><title>Start</title></html>")))
+    r = seo.check(GOOD_HTML, "https://nova.example/serum")
+    bledy = " | ".join(r["crawl"]["errors"] + r["og"]["errors"])
+    for oczekiwany in ["robots.txt zwraca HTML", "brak sitemap", "llms.txt nie zaczyna się", "soft 404",
+                       "Content-Type 'text/html'"]:
+        assert oczekiwany in bledy, oczekiwany
+    monkeypatch.setattr(seo, "pobierz", Serwer({**DOBRY_SERWER, "/og.png": (200, "image/png", png(800, 800))}))
+    assert any("ma 800×800" in w for w in seo.check(GOOD_HTML, "https://nova.example/serum")["og"]["warnings"])
+
+
+def test_seo_podglad(monkeypatch):
+    serwer = Serwer(DOBRY_SERWER)
+    monkeypatch.setattr(seo, "pobierz", serwer)
+    html = GOOD_HTML.replace("<title>", '<meta name="robots" content="noindex"><title>')
+    ostro = seo.check(html, "http://localhost:4321/serum")
+    assert any("noindex" in e for e in ostro["head"]["errors"])
+    assert any("inny host" in e for e in ostro["head"]["errors"])
+    r = seo.check(html, "http://localhost:4321/serum", podglad=True)
+    assert r["summary"]["errors"] == 0, r
+    assert "http://localhost:4321/og.png" in serwer.adresy             # obraz OG z produkcji sprawdzony na podglądzie
+
+
+def strona(tytul: str, sciezka: str, opis: str = "") -> str:
+    opis = opis or f"{tytul}: opis strony dla wyszukiwarki, unikalny dla tej podstrony i dość długi, żeby przejść."
+    return (GOOD_HTML.replace("Serum Nova: lekkie serum z witaminą C", tytul)
+            .replace("https://nova.example/serum", "https://nova.example" + sciezka)
+            .replace(re.search(r'name="description" content="([^"]+)"', GOOD_HTML).group(1), opis))
+
+
+def zbuduj(dist, strony: dict) -> None:
+    for rel, html in strony.items():
+        (dist / rel).parent.mkdir(parents=True, exist_ok=True)
+        (dist / rel).write_text(html, encoding="utf-8")
+    (dist / "robots.txt").write_text("User-agent: *\nAllow: /\nSitemap: https://nova.example/sitemap-index.xml\n")
+    (dist / "llms.txt").write_text("# Nova\n")
+    (dist / "og.png").write_bytes(png())
+    (dist / "sitemap-0.xml").write_text("<urlset><url><loc>https://nova.example/</loc></url>"
+                                        "<url><loc>https://nova.example/serum/</loc></url></urlset>")
+
+
+def test_seo_dir(tmp_path, capsys):
+    dist = tmp_path / "dist"
+    zbuduj(dist, {"index.html": strona("Nova Kosmetyki: serum i kremy z witaminą C", "/"),
+                  "serum/index.html": strona("Serum Nova: lekkie serum z witaminą C", "/serum/"),
+                  "404.html": GOOD_HTML.replace('<link rel="canonical" href="https://nova.example/serum">', "")
+                  .replace("<title>", '<meta name="robots" content="noindex"><title>')
+                  .replace("Serum Nova: lekkie serum z witaminą C", "Nie ma takiej strony: Nova Kosmetyki")})
+    r = seo.check_dir(dist, "https://nova.example")
+    assert r["summary"] == {"errors": 0, "warnings": 0, "strony": 3}, r
+    assert seo.main(["--dir", str(dist), "--base-url", "https://nova.example"]) == 0
+    assert "PODSUMOWANIE: 3 stron, 0 błędów, 0 ostrzeżeń" in capsys.readouterr().out
+
+    zbuduj(dist, {"kontakt.html": strona("Serum Nova: lekkie serum z witaminą C", "/kontakt")})
+    (dist / "404.html").unlink()
+    (dist / "og.png").unlink()
+    r = seo.check_dir(dist, "https://inna.example")
+    bledy = json.dumps(r, ensure_ascii=False)
+    for oczekiwany in ["ten sam title na 2 stronach", "brak 404.html", "obraz OG /og.png nie istnieje",
+                       "canonical na hoście nova.example", "1 stron poza sitemapą"]:
+        assert oczekiwany in bledy, oczekiwany
+    assert seo.main(["--dir", str(dist)]) == 1
+    with pytest.raises(SystemExit):
+        seo.main([])                                                    # ani adresu, ani --dir
+
+
+def test_seo_plik_bez_sieci(tmp_path, capsys):
+    plik = tmp_path / "index.html"
+    plik.write_text(GOOD_HTML, encoding="utf-8")
+    assert seo.main([str(plik), "--json"]) == 0
+    assert seo.BEZ_SIECI in json.loads(capsys.readouterr().out)["crawl"]["info"]
 
 
 # ----------------------------------------------------------------------- sources

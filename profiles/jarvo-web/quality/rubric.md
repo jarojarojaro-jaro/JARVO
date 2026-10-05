@@ -5,6 +5,9 @@
 - Lighthouse mobile < 90 w którejś kategorii bez uzasadnienia i planu (sędzia mierzy sam w rundzie 2).
 - Poziome przewijanie lub nachodzące elementy na 375, 768 albo 1440 px.
 - Brak w `<head>`: title, description, canonical, lang, viewport, favicon, OG title/image.
+- Widoczność nowej strony (`seo_check.py --dir dist`): brak `404.html` albo soft 404 (nieistniejący adres daje 200),
+  brak sitemap, `robots.txt` lub `llms.txt`, ten sam title albo description na kilku podstronach, brak `<main>`,
+  obraz OG, którego nie ma albo nie jest obrazem.
 - Krytyczne lub poważne naruszenia axe (kontrast, brak etykiet formularzy, obrazy bez alt w treści).
 - Martwe linki wewnętrzne.
 - Niezgodność z brand kitem (kolory/fonty spoza kitu bez uzasadnienia).
