@@ -182,6 +182,63 @@ def test_zdanie_i_seria_na_osi(film, capsys):
         pr.main(["zdanie", str(film), "--na", "2.0"])
 
 
+def test_ocena_slyszalnosci_progi_i_porady():
+    # tło: głos −20 dB, oddech 2,0–2,5 s; efekty: whoosh tuż przed oddechem, pop w oddechu, klik pod głosem, błysk bez dźwięku
+    tlo = [-20.0] * 200 + [-60.0] * 50 + [-20.0] * 350
+    env = lambda db, n=20: [db] * n                                                   # noqa: E731
+    r = pr.ocena_slyszalnosci([
+        {"nazwa": "whoosh", "start": 1.6, "env": env(-22), "glosnosc": 0.6, "rola": ["ruch"]},
+        {"nazwa": "pop", "start": 2.1, "env": env(-30), "glosnosc": 0.4, "rola": ["pojawienie"]},
+        {"nazwa": "klik", "start": 3.0, "env": env(-35), "glosnosc": 0.5, "rola": ["klik"]},
+        {"nazwa": "boom", "start": 4.0, "env": env(-35), "glosnosc": 0.5, "rola": ["uderzenie"]},
+        {"nazwa": "magia", "start": 5.0, "env": env(-50), "glosnosc": 0.45, "rola": ["blysk"]}], tlo, 6.0)
+    w = {x["nazwa"]: x for x in r["efekty"]}
+    assert [w[n]["ocena"] for n in ("whoosh", "pop", "klik", "boom", "magia")] == [
+        "slychac", "czysto", "zagluszony", "zagluszony", "brak"]
+    assert w["whoosh"]["porada"] == "przesuń szczyt na 2.05 s (cisza w tle)"      # przejście → do oddechu
+    assert w["klik"]["porada"] == "głośniej: 1.58"                                  # oddech za daleko (> 0,6 s)
+    assert w["boom"]["porada"].startswith("głośniej")                               # zdanie stoi w miejscu
+    assert r["przerwy"] == [[2.0, 2.5]] and r["wymagane_czysto"] == 3 and not r["ok"]
+    assert any("bez dźwięku" in b or "prawie bez" in b for b in r["bledy"]) and any("czysto słyszalnych 1" in b for b in r["bledy"])
+    r = pr.ocena_slyszalnosci([{"nazwa": f"z{i}", "start": 0.5 + i, "env": env(-40), "rola": ["klik"]} for i in range(3)]
+                              + [{"nazwa": "x", "start": 2.1, "env": env(-30), "rola": []}], tlo, 6.0)
+    assert any("zagłuszonych 3 z 4" in b for b in r["bledy"])
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_slychac_projektu_tym_samym_miksem_co_eksport(film, tmp_path, capsys):
+    assert pr.main(["seria", str(film), "--czasy", "0.5,1.0,1.5"]) == 0
+    assert pr.main(["zdanie", str(film), "--na", "2.5", "--przed", "brak"]) == 0
+    raport = tmp_path / "slychac.json"
+    kod = pr.main(["slychac", str(film), "--json", str(raport)])
+    r = json.loads(raport.read_text(encoding="utf-8"))
+    assert kod == (0 if r["ok"] else 1) and len(r["efekty"]) == 5
+    assert all(-25 < e["tlo_db"] < -16 for e in r["efekty"])            # sinus z klipu (ok. −21 dBFS) bez efektów
+    assert [e["nazwa"] for e in r["efekty"]][:3] == ["pop", "plop", "pop"]
+    assert r["efekty"][0]["efekt_db"] > r["efekty"][2]["efekt_db"]     # seria coraz ciszej
+    out = capsys.readouterr().out
+    assert "względem tła" in out and "Wynik:" in out
+
+
+@pytest.mark.skipif(not (HAS_FF and shutil.which("node")), reason="brak ffmpeg albo node")
+def test_slychac_cues_filmu_z_kodu(tmp_path, capsys):
+    # zastępczy sound.mjs z tym samym mix(): test nie zależy od zainstalowanego skilla animacji
+    (tmp_path / "sound.mjs").write_text(
+        "export function mix(cues, dur) { const n = Math.round(dur * 48000), L = new Float32Array(n), R = new Float32Array(n);"
+        " for (const c of cues) { const v = c.vol ?? .5, i0 = Math.round(c.t * 48000);"
+        " for (let i = 0; i < 9600 && i0 + i < n; i++) { L[i0 + i] += v * Math.sin(i / 3); R[i0 + i] += v * Math.sin(i / 3); } }"
+        " return [L, R]; }\n", encoding="utf-8")
+    (tmp_path / "cues.json").write_text(json.dumps([{"sfx": "pop", "t": 0.5}, {"sfx": "whoosh", "t": 1.2, "vol": 0.01}]))
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=f=300:d=2", str(tmp_path / "bed.wav")], check=True)
+    raport = tmp_path / "r.json"
+    pr.main(["slychac", "--cues", str(tmp_path / "cues.json"), "--bed", str(tmp_path / "bed.wav"),
+             "--sound", str(tmp_path / "sound.mjs"), "--json", str(raport)])
+    pop, whoosh = json.loads(raport.read_text(encoding="utf-8"))["efekty"]
+    assert 0.5 <= pop["t"] <= 0.7 and pop["ocena"] == "czysto"   # stała głośność 0,2 s: szczyt gdzieś w tym czasie
+    assert whoosh["ocena"] == "zagluszony" and whoosh["rola"] == ["ruch"]
+    assert pop["tlo_db"] == pytest.approx(-27, abs=2)                               # sinus −21 dBFS × bed-vol 0,5
+
+
 @pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
 def test_wyodrebnij_dzwiek_klipu_i_innego_filmu(film, tmp_path):
     pr.save(film, {"version": 1, "canvas": {"w": 320, "h": 240, "fps": 25}, "texts": [], "audio": [],

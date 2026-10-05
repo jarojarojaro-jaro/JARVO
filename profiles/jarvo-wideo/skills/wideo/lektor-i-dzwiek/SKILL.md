@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.5.0
+version: 1.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -126,6 +126,15 @@ Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność
 - Głośność względem głosu (głos = 0 dB): muzyka pod głosem −22…−16 dB (wyżej, „Muzyka”), efekty interfejsu i whoosh
   −14…−8 dB, a gdy lektor mówi w tej chwili, ciszej: −18…−12 dB (głośność efektu ok. 0,5–0,8); całość −14 LUFS.
   Ogranicznik nie naprawia złych proporcji: popraw głośności ścieżek.
+- **Słyszalność** (pomysł i progi za video-talkcraft, licencja niekomercyjna: tylko zasada i liczby): efekt, którego
+  nie słychać pod głosem, jest tylko kosztem. Po ułożeniu efektów: projekt z edytora `projekt.py slychac <film>`
+  (tło składane tym samym kodem co eksport, bez efektów), film z kodu `projekt.py slychac final.mp4 --cues cues.json
+  --bed glos.wav` (te same `--bed-vol`/`--bed-at` co dla `sound.mjs`). Każdy efekt kontra tło w tej samej chwili:
+  **czysto** (w ciszy tła, czyli w oddechu lektora albo pauzie muzyki, albo 6 dB nad tłem), **słychać** (najwyżej
+  6 dB pod tłem), **zagłuszony**, **bez dźwięku** (szczyt poniżej −45 dBFS). Do poprawy (kod wyjścia 1): jakikolwiek bez
+  dźwięku, zagłuszonych ponad połowa albo czysto słyszalnych mniej niż max(3, długość/30 s). Poprawka: whoosh,
+  przejście, pop i klik przesuń w ciszę tła w pobliżu (rada podaje sekundę; efekt przejścia najlepiej w oddechu
+  ok. 0,3 s między zdaniami), a narastanie, uderzenie i błysk zdania zostają w miejscu i idą głośniej.
 - Dźwięk z nagrania: `projekt.py wyodrebnij <film> <id klipu>` robi z dźwięku klipu osobne audio (np. żeby przeciągnąć
   go pod inne ujęcie), `--plik inny.mp4` bierze dźwięk z innego filmu. `projekt.py lektor <film> "tekst" --start S`:
   lektor wprost na oś projektu.

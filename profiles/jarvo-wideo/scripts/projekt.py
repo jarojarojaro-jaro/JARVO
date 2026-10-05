@@ -14,6 +14,8 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
                                     # narastanie → uderzenie → błysk: duża chwila filmu (najwyżej 2 na film)
     projekt.py seria <film> --czasy 2.0,2.2,2.4 [--id pop] [--id2 plop] [--glosnosc-od 0.4 --glosnosc-do 0.25]
                                     # seria elementów: dwa efekty na zmianę, coraz ciszej; za gęsto → jeden whoosh
+    projekt.py slychac <film> [--json raport.json]          # czy efekty słychać pod głosem i muzyką (po montażu)
+    projekt.py slychac [obraz.mp4] --cues cues.json --bed glos.wav [--bed-vol 0.5] [--bed-at 0]   # film z kodu
     projekt.py wyodrebnij <film> (<id klipu> | --plik inny.mp4 [--start S])   # dźwięk z filmu jako osobne audio
     projekt.py lektor <film> "tekst" [--start S] [--glos pl-PL-MarekNeural] [--tempo +5%]   # Edge TTS jak film.py
     projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain] [--kroj Poppins]
@@ -46,9 +48,12 @@ edytor pokazuje je wtedy jako ✓ z Twoim opisem. `render` ostrzega, gdy został
 from __future__ import annotations
 
 import argparse
+import array
 import base64
 import contextlib
 import json
+import math
+import os
 import re
 import subprocess
 import sys
@@ -814,6 +819,234 @@ def cmd_seria(film: Path, a) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- słyszalność efektów (pomysł i progi za video-talkcraft,
+# licencja niekomercyjna: tylko pomysł i liczby, kod i opis własne)
+
+SLUCH_SR = 16000            # pomiar: mono 16 kHz, obwiednia co 10 ms
+SLUCH_OBECNY = -45.0        # szczyt efektu poniżej: efektu nie ma (za cicho w ogóle)
+SLUCH_MASKA = -6.0          # efekt cichszy od tła o więcej: zagłuszony
+SLUCH_CZYSTO = 6.0          # efekt głośniejszy od tła o tyle albo w przerwie w mowie: słychać czysto
+SLUCH_PRZERWA = 0.3         # przerwa w mowie (oddech) od tylu sekund
+SLUCH_ZAGLUSZONE_MAX = 0.5  # zagłuszonych najwyżej połowa
+SLUCH_CZYSTE_NA = 30.0      # czysto słyszalnych co najmniej max(3, długość / 30 s)
+SLUCH_PRZESUN = {"ruch", "przejscie", "pojawienie", "klik", "pisanie"}   # te wolno przesunąć do przerwy; zdanie stoi
+CUE_ROLA = {"whoosh": "ruch", "whip": "ruch", "riser": "narastanie", "thump": "uderzenie", "crack": "uderzenie",
+            "sparkle": "blysk", "chime": "blysk", "pop": "pojawienie", "drip": "pojawienie", "boing": "pojawienie",
+            "chirp": "pojawienie", "click": "klik", "tick": "klik", "step": "klik", "scratch": "przejscie",
+            "splash": "przejscie", "fall": "ruch", "buzz": "klik", "burner": "ruch"}
+
+
+def obwiednia_db(x, sr: int) -> list[float]:
+    """RMS w oknach 10 ms → dBFS (cisza = −100)."""
+    n = sr // 100
+    out = []
+    for i in range(0, len(x) - n + 1, n):
+        e = sum(v * v for v in x[i:i + n]) / n
+        out.append(10 * math.log10(e) if e > 1e-10 else -100.0)
+    return out
+
+
+def pcm_mono(path: Path, od: float = 0.0, dl: float | None = None, sr: int = SLUCH_SR) -> array.array:
+    cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-ss", f"{max(0.0, od):.3f}"]
+    cmd += ["-t", f"{dl:.3f}"] if dl else []
+    r = subprocess.run(cmd + ["-i", str(path), "-vn", "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"],
+                       capture_output=True, check=True)
+    a = array.array("f")
+    a.frombytes(r.stdout[:len(r.stdout) // 4 * 4])
+    if sys.byteorder == "big":
+        a.byteswap()
+    return a
+
+
+def _srednia_db(v: list[float]) -> float:
+    e = sum(10 ** (x / 10) for x in v) / len(v) if v else 0.0
+    return 10 * math.log10(e) if e > 1e-10 else -100.0
+
+
+def przerwy_w_tle(tlo: list[float]) -> tuple[float, list[tuple[float, float]]]:
+    """Ciche miejsca tła (oddech lektora, pauza muzyki): próg = 90. centyl tła − 20 dB, nie niżej niż −45 dBFS;
+    przerwy ≥ SLUCH_PRZERWA s jako (od, do) w s."""
+    zywe = sorted(v for v in tlo if v > -60)
+    prog = max(SLUCH_OBECNY, zywe[int(0.9 * (len(zywe) - 1))] - 20) if zywe else SLUCH_OBECNY
+    out, i = [], 0
+    while i < len(tlo):
+        if tlo[i] < prog:
+            j = i
+            while j < len(tlo) and tlo[j] < prog:
+                j += 1
+            if (j - i) / 100 >= SLUCH_PRZERWA:
+                out.append((i / 100, j / 100))
+            i = j
+        else:
+            i += 1
+    return prog, out
+
+
+def ocena_slyszalnosci(zdarzenia: list[dict], tlo: list[float], dur: float) -> dict:
+    """`zdarzenia`: {"id", "nazwa", "start" (s osi), "env" (dB co 10 ms od startu), "glosnosc", "rola"}; `tlo`: dB co 10 ms
+    od 0 (głos, muzyka, dźwięk klipów, bez efektów). Każdy efekt mierzony w swoim „ciele” (do 10 dB pod szczytem,
+    od 50 ms przed do 450 ms po szczycie) kontra tło w tych samych chwilach."""
+    prog, przerwy = przerwy_w_tle(tlo)
+    wiersze = []
+    for z in zdarzenia:
+        env = z["env"] or [-100.0]
+        k = max(range(len(env)), key=env.__getitem__)
+        szczyt = env[k]
+        cialo = [i for i in range(max(0, k - 5), min(len(env), k + 46)) if env[i] >= szczyt - 10]
+        t0 = round(z["start"] * 100)
+        fx = [env[i] for i in cialo]
+        bg = [tlo[t0 + i] if 0 <= t0 + i < len(tlo) else -100.0 for i in cialo]
+        sfx_db, tlo_db = _srednia_db(fx), _srednia_db(bg)
+        zapas = sfx_db - tlo_db
+        w_przerwie = tlo_db < prog
+        t_szczyt = round(z["start"] + k / 100, 2)
+        ocena = ("brak" if szczyt < SLUCH_OBECNY else "czysto" if w_przerwie or zapas >= SLUCH_CZYSTO
+                 else "slychac" if zapas >= SLUCH_MASKA else "zagluszony")
+        porada = None
+        przesun = bool(set(z.get("rola") or []) & SLUCH_PRZESUN) or not z.get("rola")
+        przejscie = bool(set(z.get("rola") or []) & {"ruch", "przejscie"})
+        blisko = [a for a, _b in przerwy if abs(a + 0.05 - t_szczyt) <= 0.6]
+        if ocena != "brak" and blisko and przesun and (ocena == "zagluszony" or (ocena == "slychac" and przejscie)):
+            porada = f"przesuń szczyt na {min(blisko, key=lambda a: abs(a - t_szczyt)) + 0.05:.2f} s (cisza w tle)"
+        elif ocena in ("zagluszony", "brak"):
+            g = (z.get("glosnosc") or 1.0) * 10 ** ((max(SLUCH_MASKA - zapas, SLUCH_OBECNY - szczyt) + 1) / 20)
+            porada = f"głośniej: {g:.2f}" if g <= 2 else "za cicho nawet przy głośności 2: zmień efekt albo ścisz tło w tej chwili"
+        wiersze.append({"id": z.get("id"), "nazwa": z.get("nazwa"), "t": t_szczyt, "szczyt_db": round(szczyt, 1),
+                        "efekt_db": round(sfx_db, 1), "tlo_db": round(tlo_db, 1), "zapas_db": round(zapas, 1),
+                        "ocena": ocena, "porada": porada, "rola": z.get("rola") or []})
+    n = len(wiersze)
+    ile = {o: sum(1 for w in wiersze if w["ocena"] == o) for o in ("czysto", "slychac", "zagluszony", "brak")}
+    wymagane = min(max(3, math.ceil(dur / SLUCH_CZYSTE_NA)), n)
+    bledy = []
+    if ile["brak"]:
+        bledy.append(f"{ile['brak']} efekt(ów) prawie bez dźwięku (szczyt poniżej {SLUCH_OBECNY:g} dBFS)")
+    if n and ile["zagluszony"] > SLUCH_ZAGLUSZONE_MAX * n:
+        bledy.append(f"zagłuszonych {ile['zagluszony']} z {n} (najwyżej połowa)")
+    if ile["czysto"] < wymagane:
+        bledy.append(f"czysto słyszalnych {ile['czysto']}, potrzeba {wymagane} (max(3, długość/30 s)): połóż efekty "
+                     f"w cichych miejscach tła (jest ich {len(przerwy)}) albo podnieś głośność")
+    return {"efekty": wiersze, "ile": ile, "wymagane_czysto": wymagane, "prog_przerwy_db": round(prog, 1),
+            "przerwy": [[round(a, 2), round(b, 2)] for a, b in przerwy], "dlugosc": round(dur, 2),
+            "ok": not bledy, "bledy": bledy}
+
+
+def tlo_projektu(film: Path, proj: dict, efekty_src: set[str]) -> list[float]:
+    """Dźwięk projektu bez efektów, złożony tym samym grafem co eksport (głos z czyszczeniem, przejścia, zaniki),
+    obraz w małym kadrze; PCM zamiast AAC, żeby nic nie przesunęło czasu."""
+    p = ed.normalize({**proj, "texts": []}, resolve)
+    p = {**p, "texts": [], "audio": [m for m in p["audio"] if str(m["src"]) not in efekty_src]}
+    W, H = p["canvas"]["w"], p["canvas"]["h"]
+    p["canvas"] = {**p["canvas"], "w": 64, "h": max(16, round(64 * H / W / 2) * 2)}
+    info = {str(c["src"]): ed.probe(c["src"]) for c in p["clips"] if c["kind"] == "video"}
+    szum = {}
+    for src, (od, dl) in ed.szum_zakresy(p).items():
+        r = subprocess.run(ed.szum_cmd(Path(src), ed.tools()["ffmpeg"] or "ffmpeg", od, dl), capture_output=True, text=True)
+        szum[src] = ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
+    with tempfile.TemporaryDirectory(prefix="slychac-") as tmp:
+        out = Path(tmp) / "tlo.mov"
+        cmd = ed.build_command(p, {k: v.get("audio", False) for k, v in info.items()}, [], out, szum=szum)
+        i = cmd.index("-c:a")
+        cmd[i + 1:i + 4] = ["pcm_s16le"]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit(f"ffmpeg (tło bez efektów): {(r.stderr.strip().splitlines() or ['błąd'])[-1]}")
+        return obwiednia_db(pcm_mono(out), SLUCH_SR)
+
+
+def zdarzenia_projektu(film: Path, proj: dict) -> list[dict]:
+    """Efekty z biblioteki na osi (pliki w <katalog filmu>/dzwieki/ o id efektu, nie podkład)."""
+    kat = {d["id"]: d for d in ed.dzwieki_katalog(DZWIEKI)["dzwieki"] if d["kat"] != "muzyka"}
+    out = []
+    for m in proj.get("audio") or []:
+        src = resolve(str(m.get("src") or ""))
+        w = kat.get(src.stem) if src and src.parent.name == ed.DZWIEKI_DIR else None
+        if not w:
+            continue
+        od, do, vol = float(m.get("in") or 0), float(m.get("out") or 0), float(m.get("volume", 1) or 0)
+        x = pcm_mono(src, od, max(0.05, do - od))
+        out.append({"id": m.get("id"), "nazwa": w["id"], "start": float(m.get("start") or 0), "glosnosc": vol,
+                    "rola": w.get("rola") or [], "src": str(src),
+                    "env": [v + 20 * math.log10(vol) if vol > 0 else -100.0 for v in obwiednia_db(x, SLUCH_SR)]})
+    return out
+
+
+def zdarzenia_cues(cues: Path, sound: Path) -> list[dict]:
+    """Każdy cue z `cues.json` osobno przez mix() z sound.mjs (ta sama synteza co w filmie, przed loudnorm)."""
+    lista = json.loads(cues.read_text(encoding="utf-8"))
+    with tempfile.TemporaryDirectory(prefix="cues-") as tmp:
+        js = ("import { mix } from " + json.dumps(sound.resolve().as_uri()) + "; import fs from 'node:fs';"
+              "const cues = JSON.parse(fs.readFileSync(process.env.CUES, 'utf8'));"
+              "cues.forEach((c, i) => { const [L, R] = mix([{ ...c, t: 0 }], (c.dur || 1.5) + 0.6);"
+              "const m = new Float32Array(L.length); for (let k = 0; k < L.length; k++) m[k] = (L[k] + R[k]) / 2;"
+              "fs.writeFileSync(`${process.env.OUT}/c${i}.f32`, Buffer.from(m.buffer)); });")
+        r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True, text=True,
+                           env={**os.environ, "CUES": str(cues), "OUT": tmp})
+        if r.returncode != 0:
+            raise SystemExit(f"node sound.mjs: {(r.stderr.strip().splitlines() or ['błąd'])[-1]}")
+        out = []
+        for i, c in enumerate(lista):
+            x = array.array("f")
+            x.frombytes((Path(tmp) / f"c{i}.f32").read_bytes())
+            if sys.byteorder == "big":
+                x.byteswap()
+            out.append({"id": f"cue {i + 1}", "nazwa": str(c.get("sfx") or "pop"), "start": float(c.get("t") or 0),
+                        "glosnosc": float(c.get("vol", 0.5)), "rola": [CUE_ROLA.get(str(c.get("sfx") or "pop"), "klik")],
+                        "env": obwiednia_db(x, 48000)})
+    return out
+
+
+def wypisz_slychac(nazwa: str, r: dict) -> int:
+    znak = {"czysto": "✓", "slychac": "·", "zagluszony": "✗", "brak": "✗"}
+    opis = {"czysto": "czysto", "slychac": "słychać", "zagluszony": "zagłuszony", "brak": "prawie bez dźwięku"}
+    print(f"{nazwa}: {len(r['efekty'])} efektów · ciche miejsca tła (oddech, pauza muzyki) od {SLUCH_PRZERWA:g} s: "
+          f"{len(r['przerwy'])} (tło poniżej {r['prog_przerwy_db']:g} dBFS)")
+    for w in sorted(r["efekty"], key=lambda w: w["t"]):
+        print(f"  {znak[w['ocena']]} {w['t']:6.2f} s  {w['nazwa']:<20} {w['zapas_db']:+5.1f} dB względem tła  "
+              f"{opis[w['ocena']]}" + (f"  → {w['porada']}" if w["porada"] else ""))
+    i = r["ile"]
+    print(f"Czysto {i['czysto']}, słychać {i['slychac']}, zagłuszone {i['zagluszony']}, bez dźwięku {i['brak']} "
+          f"(czysto potrzeba {r['wymagane_czysto']}).")
+    for b in r["bledy"]:
+        print(f"✗ {b}")
+    print("Wynik: OK" if r["ok"] else "Wynik: DO POPRAWY")
+    return 0 if r["ok"] else 1
+
+
+def cmd_slychac(_film, a) -> int:
+    """Czy efekty słychać: każdy efekt kontra tło (głos, muzyka, dźwięk klipów) w tych samych chwilach."""
+    if a.cues:
+        if not a.bed and not a.film:
+            raise SystemExit("film z kodu: --cues cues.json --bed glos.wav (podkład z głosem, ten sam co dla sound.mjs)")
+        import narzedzia
+        sound = Path(a.sound) if a.sound else Path(os.environ.get("ANIM") or narzedzia.ANIMACJA_SKILL) / "scripts" / "sound.mjs"
+        if not sound.is_file():
+            raise SystemExit(f"brak sound.mjs ({sound}): narzedzia.py instaluj animacja")
+        zd = zdarzenia_cues(Path(a.cues), sound)
+        dur = float(ed.probe(Path(a.film)).get("duration") or 0) if a.film else 0.0
+        tlo: list[float] = []
+        if a.bed:
+            bed = [v + 20 * math.log10(a.bed_vol) for v in obwiednia_db(pcm_mono(Path(a.bed)), SLUCH_SR)]
+            tlo = [-100.0] * round(a.bed_at * 100) + bed
+        dur = dur or max([len(tlo) / 100] + [z["start"] + len(z["env"]) / 100 for z in zd])
+        tlo = (tlo + [-100.0] * round(dur * 100))[:round(dur * 100)]
+        nazwa = Path(a.cues).name
+    else:
+        if not a.film:
+            raise SystemExit("podaj film projektu (albo --cues i --bed dla filmu z kodu)")
+        film = _film or Path(a.film).resolve()
+        proj = load(film)
+        zd = zdarzenia_projektu(film, proj)
+        if not zd:
+            print("Na osi nie ma efektów z biblioteki (projekt.py dzwieki, dodaj-dzwiek).")
+            return 0
+        tlo = tlo_projektu(film, proj, {z["src"] for z in zd})
+        dur, nazwa = len(tlo) / 100, film.name
+    r = ocena_slyszalnosci(zd, tlo, dur)
+    if a.json:
+        Path(a.json).write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
+    return wypisz_slychac(nazwa, r)
+
+
 def wyodrebnij_plik(film: Path, src: Path) -> Path:
     """Ta sama ścieżka i polecenie co „Wyodrębnij” w edytorze HQ (edytor.wyodrebnij_cel / wyodrebnij_cmd)."""
     info = ed.probe(src)
@@ -1265,6 +1498,15 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--id2", help="drugi efekt na zmianę (domyślnie następny z tej samej roli)")
     sp.add_argument("--glosnosc-od", type=float, default=SERIA_GLOSNOSC[0])
     sp.add_argument("--glosnosc-do", type=float, default=SERIA_GLOSNOSC[1])
+    sp = sub.add_parser("slychac", help="czy efekty słychać pod głosem i muzyką (projekt albo cues.json filmu z kodu)")
+    sp.add_argument("film", nargs="?", help="film projektu (obok <film>.edycja.json); z --cues: obraz (długość)")
+    sp.add_argument("--cues", help="film z kodu: cues.json dla sound.mjs")
+    sp.add_argument("--bed", help="film z kodu: podkład z głosem i muzyką (ten sam co --bed sound.mjs)")
+    sp.add_argument("--bed-vol", type=float, default=0.5)
+    sp.add_argument("--bed-at", type=float, default=0.0)
+    sp.add_argument("--sound", help="ścieżka sound.mjs (domyślnie z narzedzia.py env animacja)")
+    sp.add_argument("--json", help="zapisz raport do pliku JSON")
+    sp.set_defaults(fn=cmd_slychac)
     sp = film_cmd("wyodrebnij", cmd_wyodrebnij, "dźwięk klipu albo innego filmu jako osobne audio")
     sp.add_argument("id", nargs="?", help="klip z osi (z `pokaz`): dźwięk zostaje w tym samym miejscu, klip wyciszony")
     sp.add_argument("--plik", help="inny film: jego dźwięk jako audio")
