@@ -59,6 +59,9 @@ sys.path.insert(0, str(HERE))
 import narzedzia as nz  # noqa: E402
 import wideo_lib as wl  # noqa: E402
 
+# kroje OFL z polskimi znakami (kopia hq/web/fonts/kroje przy buildzie): strona ładuje /_lib/kroje/kroje.css
+KROJE = next((p for p in (HERE / "kroje", HERE.parents[2] / "hq" / "web" / "fonts" / "kroje") if (p / "kroje.css").exists()), None)
+
 BANG_SEEK = """async (t) => {
   const O = window.OPENER;
   if (O.seekFrame) { await O.seekFrame(t); O.seek(t); return; }
@@ -424,7 +427,8 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
     extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, ".wasm": "application/wasm",
                       ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json"}
     lib_root: Path | None = None      # /_lib/… → wspólne node_modules narzędzi (three, gsap)
-    jarvo_root: Path | None = None    # /_lib/jarvo/… → nasze moduły (ruch.js)
+    jarvo_root: Path | None = None    # /_lib/jarvo/… → nasze moduły (ruch.js, kreska.js…)
+    kroje_root: Path | None = None    # /_lib/kroje/… → kroje OFL z polskimi znakami (kroje.css, te same co edytor HQ)
     aliasy: dict[str, Path] = {}      # preset mg: /assets/, /demos/, /node_modules/ spoza katalogu strony
 
     def translate_path(self, path: str) -> str:
@@ -433,6 +437,8 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
             root, rel = self.lib_root.resolve(), clean[len("/_lib/"):]
             if self.jarvo_root is not None and rel.startswith("jarvo/"):
                 root, rel = self.jarvo_root.resolve(), rel[len("jarvo/"):]
+            elif self.kroje_root is not None and rel.startswith("kroje/"):
+                root, rel = self.kroje_root.resolve(), rel[len("kroje/"):]
             target = (root / rel).resolve()
             return str(target) if root in target.parents else str(root / "__poza_lib__")
         for prefiks, katalog in self.aliasy.items():
@@ -455,7 +461,7 @@ def aliasy(o: dict) -> dict[str, Path]:
 
 def serve(root: Path, lib: bool = False, alias: dict[str, Path] | None = None) -> http.server.ThreadingHTTPServer:
     handler = (type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules", "jarvo_root": nz.sync_jarvo_js(),
-                                        "aliasy": alias or {}})
+                                        "kroje_root": KROJE, "aliasy": alias or {}})
                if lib else _Quiet)
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(handler, directory=str(root)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()

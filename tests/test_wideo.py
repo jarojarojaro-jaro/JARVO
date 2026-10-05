@@ -631,7 +631,9 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
         with urllib.request.urlopen(base + "/_lib/jarvo/ruch.js") as r:            # nasz moduł, kopia ze scripts/
             assert b"export const CHARAKTERY" in r.read()
         assert (tmp_path / "jarvo-js" / "ruch.js").read_bytes() == (REPO / "profiles/jarvo-wideo/scripts/ruch.js").read_bytes()
-        for zle in ("/_lib/../../sekret.txt", "/_lib/jarvo/../../sekret.txt"):
+        with urllib.request.urlopen(base + "/_lib/kroje/kroje.css") as r:          # kroje z polskimi znakami (edytor HQ)
+            assert b'font-family: "Anton"' in r.read()
+        for zle in ("/_lib/../../sekret.txt", "/_lib/jarvo/../../sekret.txt", "/_lib/kroje/../../../sekret.txt"):
             with pytest.raises(urllib.error.HTTPError):
                 urllib.request.urlopen(base + zle)
     finally:
@@ -664,7 +666,9 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
     [w.start() for w in watki]
     [w.join() for w in watki]
     assert (tmp_path / "jarvo-js" / "ruch.js").read_bytes() == (REPO / "profiles/jarvo-wideo/scripts/ruch.js").read_bytes()
-    assert sorted(x.name for x in (tmp_path / "jarvo-js").iterdir()) == ["ruch.js"]
+    assert sorted(x.name for x in (tmp_path / "jarvo-js").iterdir()) == sorted(nz_mod.JARVO_JS_PLIKI)
+    for nazwa in nz_mod.JARVO_JS_PLIKI:                                         # każdy moduł Jarva = kopia ze scripts/
+        assert (tmp_path / "jarvo-js" / nazwa).read_bytes() == (REPO / "profiles/jarvo-wideo/scripts" / nazwa).read_bytes()
 
 
 def test_html_parallel_browsers_split_the_timeline(monkeypatch, tmp_path):
@@ -923,6 +927,58 @@ console.log(JSON.stringify({out, ops, ruch, stoi, blad, rozc: R.rozciagniecie(0)
     assert wynik["ruch"] is True and wynik["stoi"] is False
     assert ["c", 0, "#ff330000"] in wynik["ops"] and ["c", 1, "#ff3300"] in wynik["ops"]   # ogon przezroczysty
     assert "nieznany charakter" in wynik["blad"] and wynik["rozc"] == {"sx": 1, "sy": 1}
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="brak node")
+def test_style_motion_js_modules(tmp_path):
+    """Moduły technik stylów (kreska, morph, crt, plotno, piksel): ta sama klatka = ten sam rysunek, nowe ziarno =
+    wrzenie linii o ~2 px, arkusz ekspozycji liczy rysunki, morph trzyma pole i przechodzi przez koło, ściśnięcie
+    nie zmienia pola, kafle papieru i ziarna bez szwu i bez przesunięcia jasności, paleta przechodzi stopniami."""
+    d = REPO / "profiles/jarvo-wideo/scripts"
+    skrypt = tmp_path / "t.mjs"
+    skrypt.write_text("""
+import * as K from %s; import * as M from %s; import * as C from %s; import * as P from %s; import * as X from %s;
+const g = {beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, fill() {}, save() {}, restore() {}, clip() {}};
+const linia = (z) => K.kreska(g, [[100, 100], [300, 140], [500, 100]], {ziarno: z});
+const a = linia(3), b = linia(3), c = linia(4);
+const plan = [[0, 2], [8, 1], [24, 2]];
+const pr = M.para([[0, 0], [100, 0], [100, 100], [0, 100]], [[300, 0], [400, 100], [200, 100]], {n: 120});
+const pol = M.przemiana(pr, 0.5), [sx, sy] = M.srodek(pol), Q = M.macierzScisku(0.7, 1.3);
+const papier = P.kafelPapieru(256), ziarno = P.kafelZiarna(64);
+let szew = 0, sr = 0;
+for (let y = 0; y < 256; y++) szew = Math.max(szew, Math.abs(papier[y * 256 * 4] - papier[(y * 256 + 255) * 4]));
+for (let i = 0; i < ziarno.length; i += 4) sr += ziarno[i];
+const bf = X.bufor(8, 4); X.linia(bf, 0, 0, 7, 3, 2);
+const pal = X.paleta(['#000000', '#ffffff', '#808080', '#404040', '#c0c0c0'], {dzien: [1, 0], noc: [0, 1]});
+console.log(JSON.stringify({
+  ten_sam: JSON.stringify(a) === JSON.stringify(b),
+  wrzenie: Math.max(...a.map((p, i) => Math.hypot(p[0] - c[i][0], p[1] - c[i][1]))),
+  eksp: [0, 7, 8, 23, 24, 26].map((f) => { const e = K.ekspozycja(f, plan); return [e.f, e.id, e.krok]; }),
+  rys: K.rysunek(1.0, 24),
+  pola: [M.pole(M.przemiana(pr, 0)), M.pole(pol), M.pole(M.przemiana(pr, 1))],
+  promienie: pol.map((p) => Math.hypot(p[0] - sx, p[1] - sy)),
+  det: Q[0] * Q[3] - Q[1] * Q[2], uderzenie: [M.uderzenie(1 - 2 / 30, 1), M.uderzenie(1, 1), M.uderzenie(3, 1)],
+  kolor: [M.mieszajKolor('#ff0000', '#0000ff', 0), M.mieszajKolor('#ff0000', '#0000ff', 1), M.zOklab(M.oklab('#ffb627'))],
+  szew, srednia: sr / (ziarno.length / 4), kropka: [P.promienKropki(1, 6.5), P.promienKropki(0, 6.5)],
+  bres: Array.from(bf.px).join(''), stopnie: [0, 0.2, 0.5, 1].map((u) => Array.from(pal.tablica('dzien', 'noc', u))),
+  bayer: [0, 1, 2, 3].flatMap((y) => [0, 1, 2, 3].map((x) => X.bayer(x, y))).filter((v) => v < 0.5).length,
+  tryby: Object.keys(C.TRYBY), wl: [C.wlaczanie(0, 0), C.wlaczanie(1, 0), C.wylaczanie(0.1, 0)],
+}));
+""" % tuple(json.dumps(str(d / n)) for n in ("kreska.js", "morph.js", "crt.js", "plotno.js", "piksel.js")))
+    w = json.loads(subprocess.run(["node", str(skrypt)], capture_output=True, text=True, check=True).stdout)
+    assert w["ten_sam"] and 1.0 < w["wrzenie"] < 3.0                     # amp 2,2 px: widać, ale linia ta sama
+    assert w["eksp"] == [[0, 0, 2], [6, 3, 2], [8, 4, 1], [23, 19, 1], [24, 20, 2], [26, 21, 2]]
+    assert w["rys"]["t"] == 1 and w["rys"]["krok"] == 2 and w["rys"]["id"] == 12
+    assert w["pola"][0] == pytest.approx(10000) and w["pola"][1] == pytest.approx(10000, rel=0.01)
+    assert w["pola"][2] == pytest.approx(5000 * 2, rel=0.01)              # trójkąt 200×100 → pole 10 000
+    assert max(w["promienie"]) - min(w["promienie"]) < 0.5                # w połowie drogi: koło
+    assert w["det"] == pytest.approx(1) and w["uderzenie"][0] == 0 and w["uderzenie"][2] == 0 and w["uderzenie"][1] > 0
+    assert w["kolor"] == ["#ff0000", "#0000ff", "#ffb627"]
+    assert w["szew"] <= 3 and w["srednia"] == pytest.approx(128, abs=2)
+    assert w["kropka"][0] == 0 and w["kropka"][1] == pytest.approx(6.5 / 2 * 2 ** 0.5)
+    assert w["bres"] == "22000000002200000000220000000022"
+    assert w["stopnie"] == [[1, 0], [4, 3], [3, 4], [0, 1]]               # biel → jasnoszary → ciemnoszary → czerń
+    assert w["bayer"] == 8 and w["tryby"] == ["crt", "vhs", "hud"] and w["wl"] == [0, 1, 0.5]
 
 
 def test_czekaj_gotowe_mowi_dlaczego(monkeypatch):

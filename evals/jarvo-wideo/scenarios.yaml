@@ -296,3 +296,15 @@ scenarios:
       should_not:
         - "zmyśla liczby (czas realizacji, liczbę klientów) jako prawdziwe albo publikuje post sam"
         - "buduje schemat krok po kroku z ruchem kamery zamiast stałego układu"
+
+  - id: wideo-styl-motion
+    type: in_scope
+    input: "Zrób 15-sekundowy filmik dla piekarni Kłos na Instagram, w stylu ręcznie rysowanej kreskówki, takiej, gdzie linie lekko drgają. Logo i hasło „Chleb jak dawniej” na końcu."
+    expect:
+      should:
+        - "`style-motion`: czyta tylko kartę `kreska.md`, ogląda wzór (`$MGSTYLES/videos/05-cel-boil.jpg` albo `html_wideo.py klatki … --preset mg`) i bierze z niego techniki, nie fabułę"
+        - "strona w kontrakcie jarvo z `/_lib/jarvo/kreska.js` (rysunek co 2 klatki, wrzenie linii, wypełnienie obok konturu) i `plotno.js` (papier, kurz), kroje z `/_lib/kroje/kroje.css` sprawdzone na polskich znakach, paleta z marki piekarni"
+        - "9:16 jako nowy układ, kulminacja ok. 60–65% z krótką ciszą przed nią, logo i hasło po 80%, `html_wideo.py pomiar` bez błędów i render bez `--subklatki`"
+      should_not:
+        - "używa ziarna, kurzu, washi albo zdjęć z `$MGSTYLES/assets` lub dem 06, 18, 19 w filmie klienta"
+        - "kopiuje film-wzór z podmienionym tekstem albo pyta o zatwierdzenie pierwszego ujęcia"

@@ -62,7 +62,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | Gabinet śledczy (`study`) | sherlock | 8 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | Pracownia webowa (`devlab`) | web | 10 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, copy PL, kampanie, kalendarze | Atelier kreatywne (`atelier`) | studio | 6 |
-| 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, typografia jak z montażu, filmy z kodu, żywe schematy, maskotka | Studio filmowe (`filmstudio`) | wideo | 17 |
+| 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, typografia jak z montażu, filmy z kodu, 15 stylów motion design, żywe schematy, maskotka | Studio filmowe (`filmstudio`) | wideo | 18 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem | Sala operacyjna (`office`) | ads | 10 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 7 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 10 |
@@ -127,7 +127,14 @@ magazyn i inne; karty stylów w HQ), mocne słowo staje za osobą (maska MODNet)
 w projekcie montażu do poprawek w HQ; gotowego planu nie nadpisuje bez wyraźnej prośby. Żywy schemat (`zywy_schemat.py`,
 skill `zywy-schemat`, silnik strony live-panel, MIT): flota, przepływ zlecenia albo architektura jako film, w którym
 układ stoi, a kropki płyną po strzałkach i kroki podświetlają się po kolei; formaty X, Instagram, pion, motywy
-w kolorach Jarva, kroje lokalnie, kontrola układu i `html_wideo.py pomiar` przed filmem.
+w kolorach Jarva, kroje lokalnie, kontrola układu i `html_wideo.py pomiar` przed filmem. Style motion design
+(skill `style-motion`): 15 kart stylów (rysunek z wrzącą linią, izometria, płaski wektor, morph, HUD, kolaż, Bauhaus,
+synthwave, pixel art, zorza i szkło, płyn, napisy show i inne) z cechami do sprawdzenia, rytmem i dźwiękiem; do każdej
+film-wzór 10 s z mg-styles-15 (MIT) do obejrzenia (`narzedzia.py instaluj mg`, `html_wideo.py klatki --preset mg`),
+a silniki stylów w modułach stron `/_lib/jarvo/`: `kreska.js` (wrząca linia, pióro, wypełnienie obok konturu),
+`morph.js` (przemiana kształtów przez koło, uderzenie, kolor w OKLab), `crt.js` (kineskop, VHS, HUD w jednym filtrze
+WebGL2), `plotno.js` (papier, ziarno, kurz, druk z płyt, raster) i `piksel.js` (pixel art z paletą i ditheringiem);
+kroje z polskimi znakami strona bierze z `/_lib/kroje/kroje.css`.
 
 ---
 

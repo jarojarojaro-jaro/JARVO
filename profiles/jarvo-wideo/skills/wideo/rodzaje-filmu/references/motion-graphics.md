@@ -14,6 +14,7 @@ Nie to: coś ma zostać wyjaśnione → `explainer.md`; hasło jest treścią �
 | szybko z szablonów, tekst + kształty | HyperFrames `motion-graphics` |
 | rysowany, organiczny | `anidoodle` |
 | opener z wyglądem marki | `bang-motion` |
+| 15 stylów motion design (wrząca linia, izometria, morph, HUD, Bauhaus, synthwave, pixel…) | skill `style-motion`: karta stylu + moduły `/_lib/jarvo/` |
 | 43 style kina (akwarela, anime, pixel, papier, miedzioryt, sitodruk…) | `lemo-opuscar` |
 
 ## Struktura

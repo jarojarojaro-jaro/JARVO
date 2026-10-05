@@ -165,7 +165,7 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/05-cel-boil/in
   `06-collage`, `18-hanazi`, `19-paperclip` (zdjęcia bez podanego źródła: `instaluj mg` ich nie pobiera, tak jak
   filmów MP4 i próbek dźwięku). Strona, która nie wystartuje, mówi dlaczego (błędy JS, brakujące pliki).
 - Kroje wzorów `instaluj mg` bierze z google/fonts (OFL, Apache-2.0); chińskie spoza google/fonts zastępuje
-  Noto Sans SC. To kroje do podglądu: w naszym filmie kroje z `/_lib/` z polskimi znakami.
+  Noto Sans SC. To kroje do podglądu: w naszym filmie kroje z polskimi znakami z `/_lib/kroje/kroje.css`.
 - Tekstura papieru jest CC0; ziarno, kurz i washi z `$MGSTYLES/assets/textures` nie mają podanego źródła:
   tylko do podglądu, w filmie klienta ziarno i kurz robisz sam w kodzie.
 

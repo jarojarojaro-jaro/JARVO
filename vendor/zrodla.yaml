@@ -279,9 +279,9 @@ zrodla:
     notatka: "MIT: biblioteka 273 ruchów + losowanie, „najpierw pomysł”, katalog tanich chwytów; propozycja 2026-10-05 bez decyzji"
   mg-styles-15:
     repo: https://github.com/Vincentwei1021/mg-styles-15
-    status: do-wdrozenia
+    status: uzywane
     przejrzane: 49052d80bfaf9fa8412cc9710530e5e95a3b8d8c
-    notatka: "MIT: 15 stylów, moduły technik, mgaudio; zatwierdzone 2026-10-05"
+    notatka: "MIT: 15 stylów (skill style-motion, karty i wzory), moduły technik w /_lib/jarvo/; mgaudio w toku; zatwierdzone 2026-10-05"
   video-talkcraft:
     repo: https://github.com/Vincentwei1021/video-talkcraft
     status: do-wdrozenia

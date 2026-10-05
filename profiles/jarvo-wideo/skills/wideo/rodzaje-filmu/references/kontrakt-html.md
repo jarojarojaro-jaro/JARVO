@@ -11,9 +11,15 @@ w pętli) i do renderu klatka po klatce: `html_wideo.py --preset jarvo` woła `w
 3. `window.__ready = true` dopiero po fontach (`await document.fonts.ready`), obrazach i teksturach.
 4. Biblioteki lokalnie z `/_lib/` (html_wideo serwuje wspólne `node_modules`; `narzedzia.py instaluj html`):
    Three.js `/_lib/three/build/three.module.js` (+ `/_lib/three/examples/jsm/…`), GSAP `/_lib/gsap/dist/gsap.min.js`,
-   nasz ruch `/_lib/jarvo/ruch.js` (charakter ruchu z marki, lądowanie, wyjście, smugi: `ruch-i-kompozycja.md`).
+   nasz ruch `/_lib/jarvo/ruch.js` (charakter ruchu z marki, lądowanie, wyjście, smugi: `ruch-i-kompozycja.md`),
+   moduły stylów `/_lib/jarvo/{kreska,morph,crt,plotno,piksel}.js` (skill `style-motion`).
    Bez CDN: render ma działać offline i zawsze tak samo.
-5. Tekst jako prawdziwy tekst (font z polskimi znakami: sprawdź „Zażółć gęślą jaźń” na arkuszu), nie bitmapa z AI.
+5. Tekst jako prawdziwy tekst, nie bitmapa z AI. Kroje: `<link rel="stylesheet" href="/_lib/kroje/kroje.css">`
+   = 68 krojów OFL z polskimi znakami (te same co w edytorze HQ, np. Anton, Inter, Fraunces, Caveat, Press Start 2P,
+   Space Mono), wpisujesz rodzinę po nazwie; sprawdź „Zażółć gęślą jaźń” na arkuszu. Polskie litery są w osobnym
+   pliku kroju (latin-ext), który przeglądarka pobiera dopiero, gdy zobaczy taki znak: tekst na kanwie (`fillText`)
+   pierwszej klatki wyjdzie innym krojem. Przed `__ready` każdy krój kanwy z próbką:
+   `await document.fonts.load('64px "Anton"', 'ąćęłńóśźżĄĆĘŁŃÓŚŹŻ')`.
 6. **Tekst na kanwie podajesz pomiarowi:** `window.__teksty = () => [...]` zwraca teksty bieżącej klatki
    `{tekst, x, y, w, h, kolor, rozmiar, krycie, widoczny?, id?}` (prostokąt w pikselach kadru, `widoczny` = odsłonięta
    część przy pisaniu). Tekst w DOM (HTML, SVG) `pomiar` czyta sam; bez `__teksty` tekst z `fillText` jest dla niego

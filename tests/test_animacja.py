@@ -127,6 +127,14 @@ def test_biblioteki_lib_tylko_z_node_modules(tmp_path):
     assert core.lib_file("jarvo/ruch.js", nm, js) == (js / "ruch.js").resolve()
     for zle in ("jarvo", "jarvo/", "jarvo/../sekret.txt", "jarvo/brak.js"):
         assert core.lib_file(zle, nm, js) is None, zle
+    # kroje/… = kroje edytora z polskimi znakami (animacja ładuje /_lib/kroje/kroje.css)
+    kr = tmp_path / "kroje"
+    kr.mkdir()
+    (kr / "kroje.css").write_text("@font-face {}", encoding="utf-8")
+    assert core.lib_file("kroje/kroje.css", nm, js, kr) == (kr / "kroje.css").resolve()
+    for zle in ("kroje", "kroje/../sekret.txt", "kroje/brak.woff2"):
+        assert core.lib_file(zle, nm, js, kr) is None, zle
+    assert (core.KROJE_ROOT / "kroje.css").is_file()                    # w repo: hq/web/fonts/kroje
 
 
 def test_plugin_ma_modul_animacji_i_pomiaru(tmp_path):
