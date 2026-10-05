@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.6.0
+version: 1.7.0
 author: Jarvo
 license: MIT
 metadata:
@@ -56,10 +56,23 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
 ## Muzyka
 - Źródła: biblioteka użytkownika `@@KNOWLEDGE_DIR@@/wideo/muzyka/` (plan: `"muzyka": {"plik": "losowa"}`),
   muzyka marki `brands/<marka>/muzyka/`, plik z karty, a gdy ich brak: podkłady CC0 z biblioteki edytora
-  (`projekt.py dzwieki --muzyka`, `dodaj-dzwiek`; „losowa” bierze je sama). Inny utwór tylko z licencją
+  (`projekt.py dzwieki --muzyka`, `dodaj-dzwiek`; „losowa” bierze je sama) albo muzyka pisana kodem pod ten film
+  (`muzyka.py`, niżej). Inny utwór tylko z licencją
   (zaproponuj w RAPORT: YouTube Audio Library, Pixabay Music, pobrane przez użytkownika do biblioteki). Przy utworze
   z sieci zapisz w RAPORT link do jego strony i nazwę licencji: część darmowych utworów ma zgłoszenia Content ID,
   a ten link pozwala właścicielowi odwołać zgłoszenie.
+- **Muzyka pisana kodem pod obraz** (film z kodu, motion graphics, logo, promo; mgaudio z mg-styles-15, MIT,
+  sample VCSL CC0, więc bez licencji do sprawdzania): `python3 $HERMES_HOME/scripts/muzyka.py zrob obraz.mp4
+  -o final.mp4 --cues cues.json --styl <styl ze style-motion>` albo `--przepis` (`muzyka.py przepisy`: 15 gatunków
+  od synthwave po explainer). Utwór powstaje pod ten film: takt 0 kulminacji w chwili najmocniejszego uderzenia
+  z `cues.json` (albo `--kulminacja T`), od logo (ostatni błysk albo `--koniec T`) gra końcowy akord do ostatniej
+  klatki, tempo z zakresu gatunku dobrane do zdarzeń. Efekty z `cues.json` (nazwy jak w `sound.mjs`, plus własne
+  mgaudio: `muzyka.py efekty`) grają w tych samych chwilach, a muzyka przysiada pod każdym o 3 dB: to zamiast
+  `sound.mjs`, nie razem z nim. Wynik: −14 LUFS, szczyt ≤ −1 dBTP także po AAC, słyszalność każdego efektu
+  (te same progi co `slychac`), plan `final.muzyka.json` (tempo, takty, sekcje, akordy). Cięcia i akcenty obrazu
+  kładziesz na `takty` z planu (rytm.py zgaduje początek taktu i bywa przesunięty o 2 bity); kod wyjścia 1 = do
+  poprawy. Pod lektora: `muzyka.py zrob --bez-efektow --dlugosc S -o podklad.wav`, potem plan film.py
+  `"muzyka": {"plik": …}` albo `projekt.py dodaj-audio`. Raz: `narzedzia.py instaluj mgaudio` (ok. 450 MB).
 - Głośność pod lektorem 0,08–0,16, czyli −22…−16 dB względem głosu (plan: `glosnosc`, domyślnie 0,14); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.
 - Nigdy: muzyka z list przebojów, „znalezione na YouTube”, muzyka z cudzych filmów.

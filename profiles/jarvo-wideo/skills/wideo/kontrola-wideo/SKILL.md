@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.3.0
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -52,6 +52,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    - Efekty dźwiękowe: `python3 $HERMES_HOME/scripts/projekt.py slychac <oryginał>` (projekt) albo
      `projekt.py slychac final.mp4 --cues cues.json --bed glos.wav` (film z kodu): „Wynik: OK”, czyli żaden efekt bez
      dźwięku, zagłuszonych najwyżej połowa, dość czysto słyszalnych; poprawki według rad przy efektach.
+     Muzyka z `muzyka.py` sprawdza to sama przy renderze (`kontrola.ok` w `*.muzyka.json`, „Wynik: OK”).
    - ✅ Punkt kontrolny: `ok: true` i każdy obraz obejrzany.
 2. **Oglądanie:** `vision_analyze` na arkuszu (`qa.jpg`: klatki 0 s, 0,5 s, 1,5 s, ¼, ½, ¾, koniec; czerwone pola =
    strefy UI). Pytania: czy hook jest czytelny w klatce 0–1,5 s? czy napisy/tekst/logo wchodzą w czerwone pola?
@@ -92,7 +93,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 - [ ] `qa_wideo.py` bez błędów (JSON w raporcie), arkusz obejrzany,
 - [ ] film z cięciami: `krytyka.py ciecia` bez problemów (trzask, słowo w pół), każdy obraz cięcia obejrzany,
 - [ ] cięcia pod muzykę: `rytm.py sprawdz` bez ✗ (siatka „niepewna”: sprawdzone uchem),
-- [ ] film z efektami: `projekt.py slychac` z wynikiem OK,
+- [ ] film z efektami: `projekt.py slychac` z wynikiem OK (muzyka z `muzyka.py`: jej „Wynik: OK”),
 - [ ] animacja HTML: `html_wideo.py aktualny` = 0 (pomiar pełny, aktualny, bez błędów; wyjątki z powodem w raporcie),
 - [ ] `kontrola.json` z wynikiem ≥ 85 i PASS albo nazwane braki po 2 rundach,
 - [ ] każda różnica ma najmniejszą poprawkę; wynik nie jest zawyżany,

@@ -1,7 +1,7 @@
 ---
 name: style-motion
 description: "15 stylów motion design: karta, wzór, moduły JS."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -71,7 +71,11 @@ zdaniem uzasadnienia w RAPORT.md.
 6. **Ruch.** Charakter ruchu z marki (`ruch.js`, `rodzaje-filmu/references/ruch-i-kompozycja.md`), hak od klatki 0,
    kulminacja w 60–65% z krótką ciszą tuż przed nią, logo i hasło po 80%, końcowy kadr stoi 0,8–1,2 s z drobnym ruchem.
 7. **Dźwięk** z tej samej osi (`cues.json`): skill `lektor-i-dzwiek`, gatunek i uderzenia z karty, −14 LUFS.
-   Synteza i podkład: `sound.mjs`; efekty z biblioteki CC0 potem na gotowy film: `projekt.py dodaj-dzwiek <film> <id>
+   Najpierw muzyka pisana pod ten film: `muzyka.py zrob out/wideo/film.mp4 -o out/wideo/final.mp4 --cues
+   out/wideo/src/cues.json --styl <styl>` (przepis mgaudio dla stylu, kulminacja i logo z osi, efekty w tych samych
+   chwilach; `muzyka.py przepisy` pokazuje alternatywę bliższą karcie, np. kreska → `--przepis variety`; brak
+   dodatku → `narzedzia.py instaluj mgaudio`). Muzyka klienta albo podkład z biblioteki: synteza efektów
+   `sound.mjs` z `--bed`; efekty z biblioteki CC0 potem na gotowy film: `projekt.py dodaj-dzwiek <film> <id>
    --start S` (raz na efekt) i `projekt.py render <film>`. Na koniec `qa_wideo.py`: poniżej −15 LUFS (tak zwykle
    wychodzi po `sound.mjs`) → `montaz.py glosnosc <film> -o <wynik> --lufs -14`.
 8. **Kontrola:** punkty „Kontrola” z karty, `html_wideo.py pomiar … --preset jarvo` pełny i aktualny bez błędów, potem `kontrola-wideo`.

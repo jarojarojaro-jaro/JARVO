@@ -73,8 +73,8 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/10-synthwave/i
   kadru. Wzór ma 16:9 na sztywno (`CSS = vec2(1920., 1080.)`, `TITLE_W` 1400, `SHIFT`).
 
 ## Dźwięk
-- Synthwave 100 BPM (wzór: a-moll): bramkowany werbel, pad z lat 80., bas w ósemkach; muzyka z licencją
-  (w bibliotece nie ma synthwave'u), takty z `rytm.py`.
+- Synthwave 100 BPM (wzór: a-moll): bramkowany werbel, pad z lat 80., bas w ósemkach: `muzyka.py zrob …
+  --styl synthwave` (w bibliotece CC0 nie ma synthwave'u; takty z planu `*.muzyka.json`) albo muzyka z licencją.
 - Start: szum taśmy, `click` przy PLAY; palmy `whoosh` (`pan` po stronie palmy); auto: `whoosh` i `klakson`
   z biblioteki; przewijanie: `przewijanie` albo `glitch-vhs`; tytuł: `thump` + `crack` i `boom-kinowy`.
 - Neon: `buzz` tylko w klatkach, gdy świeci, każdy ponowny zapłon cichy `chime` (`pitch` 1,2); przed zapłonem

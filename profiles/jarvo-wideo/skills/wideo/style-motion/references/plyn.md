@@ -72,7 +72,8 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/07-liquid/inde
   (podłoga `FY` 872, horyzont `HOR` 786, klucze kamery, `bloomAt` 960/540): przelicz wszystko.
 
 ## Dźwięk
-- Future bass 150 BPM (wzór: D-dur): każde lądowanie to strojona „mokra” nuta; muzyka z licencją, takty z `rytm.py`.
+- Future bass 150 BPM (wzór: D-dur): każde lądowanie to strojona „mokra” nuta; `muzyka.py zrob … --styl plyn`
+  (takty z planu `*.muzyka.json`) albo muzyka z licencją, takty z `rytm.py`.
 - Lądowania: `drip` i `splash` z `sound.mjs` (`pitch` niżej dla dużej kropli), pęknięcie szyjki `pop`; z biblioteki
   `kropla`, `plusk`, `plusk-duzy`, `sluz`, `plop`.
 - Zalew: muzyka „pod wodą” (stłumione wysokie) 4,0–5,35 s; przed znakiem `riser`, potem 0,2 s ciszy.

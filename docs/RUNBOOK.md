@@ -112,7 +112,7 @@ SEARXNG_SECRET=…                  # wygenerowany przez bootstrap, zostaw
 DASHBOARD_PASSWORD=…              # hasło do dashboardu (użytkownik: jarvo), wygenerowane przez bootstrap
 HERMES_MEM_LIMIT=5g               # sufit RAM kontenera Hermesa (VPS 8 GB); przy 16 GB można 10g
 HERMES_CPUS=4
-JARVO_EXTRAS=                      # opcjonalnie: rembg media office docling manim (więcej dysku, nie RAM)
+JARVO_EXTRAS=                      # opcjonalnie: rembg media office docling manim (więcej dysku, nie RAM); Wideograf: lemo mgaudio
 ```
 
 **`/srv/jarvo/compose/jarvo.env`** (ID Telegrama i dostawca modeli, nie sekrety):

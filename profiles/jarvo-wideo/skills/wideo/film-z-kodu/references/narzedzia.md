@@ -163,7 +163,11 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/05-cel-boil/in
   gotowy film klienta. `--preset mg` (kontrakt `window.DEMO` + `renderAt(t)` + `__ready`) służy do obejrzenia wzoru.
 - Rusza 11 wzorów (klatki 6–25 s). Cztery oglądasz tylko z okładki i kodu: `04-3d-render` (klatki z Blendera),
   `06-collage`, `18-hanazi`, `19-paperclip` (zdjęcia bez podanego źródła: `instaluj mg` ich nie pobiera, tak jak
-  filmów MP4 i próbek dźwięku). Strona, która nie wystartuje, mówi dlaczego (błędy JS, brakujące pliki).
+  filmów MP4; próbki dźwięku dokłada dodatek `instaluj mgaudio`). Strona, która nie wystartuje, mówi dlaczego
+  (błędy JS, brakujące pliki).
+- Dźwięk wzorów to mgaudio (`lib/audio`, `demos/*/audio.py`): muzyka i efekty pisane kodem. U nas robi to
+  `muzyka.py` (skill `lektor-i-dzwiek`); własny kod z mgaudio uruchamiasz Pythonem dodatku
+  (`eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env mgaudio)"`, `$MGAUDIO_PY`, `sys.path` += `$MGAUDIO`).
 - Kroje wzorów `instaluj mg` bierze z google/fonts (OFL, Apache-2.0); chińskie spoza google/fonts zastępuje
   Noto Sans SC. To kroje do podglądu: w naszym filmie kroje z polskimi znakami z `/_lib/kroje/kroje.css`.
 - Tekstura papieru jest CC0; ziarno, kurz i washi z `$MGSTYLES/assets/textures` nie mają podanego źródła:

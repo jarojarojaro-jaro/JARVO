@@ -75,7 +75,8 @@ filmie). `--mb 1` to flaga ich harnessu (`harness/render.mjs`, domyślnie 8 pró
   nad dolną strefą UI). Wzór ma W/H, `RES` shadera, `inTrim` i pętle 15/9 linii na sztywno.
 
 ## Dźwięk
-- Minimalne techno z kliknięć, 120 BPM (wzór: a-moll); muzyka z licencją, takty z `rytm.py`.
+- Minimalne techno z kliknięć, 120 BPM (wzór: a-moll): `muzyka.py zrob … --styl bauhaus` (przepis techno, takty
+  z planu `*.muzyka.json`) albo muzyka z licencją, takty z `rytm.py`.
 - Lądowania: `tick` albo `click` z `sound.mjs` (`pitch` 0,9–1,3, `pan` według x); obrót grupy: 12 × `tick` na zębach.
 - Przed kaskadą 1/8 taktu (0,06 s) ciszy, potem `thump` i `bas` z biblioteki; kulminacja: `crack` i `talerz`
   z biblioteki, etykiety `click`; docisk: cichy `thump`. Efekt 0,03 s przed klatką, całość −14 LUFS.

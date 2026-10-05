@@ -134,7 +134,9 @@ film-wzór 10 s z mg-styles-15 (MIT) do obejrzenia (`narzedzia.py instaluj mg`, 
 a silniki stylów w modułach stron `/_lib/jarvo/`: `kreska.js` (wrząca linia, pióro, wypełnienie obok konturu),
 `morph.js` (przemiana kształtów przez koło, uderzenie, kolor w OKLab), `crt.js` (kineskop, VHS, HUD w jednym filtrze
 WebGL2), `plotno.js` (papier, ziarno, kurz, druk z płyt, raster) i `piksel.js` (pixel art z paletą i ditheringiem);
-kroje z polskimi znakami strona bierze z `/_lib/kroje/kroje.css`.
+kroje z polskimi znakami strona bierze z `/_lib/kroje/kroje.css`. Muzykę pod taki film Wideograf pisze kodem
+(`muzyka.py`, mgaudio z mg-styles-15, dodatek `narzedzia.py instaluj mgaudio`): gatunek ze stylu, kulminacja i logo
+z osi filmu, efekty w tych samych chwilach, −14 LUFS i kontrola słyszalności każdego efektu.
 
 ---
 

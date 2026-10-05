@@ -123,7 +123,8 @@ sources:
     license_file: LICENSE
     # 15 filmów-wzorów stylów motion design (kod, notatki stylów, okładki). Nie kopiujemy do profilu: ten sam commit
     # instaluje na żądanie scripts/narzedzia.py Wideografa (`instaluj mg`), bez filmów, strony pokazowej, zdjęć bez
-    # opisanego źródła i modeli do Blendera (MGSTYLES_POMIN); kroje wzorów z google/fonts (kroje_mg).
+    # opisanego źródła i modeli do Blendera (MGSTYLES_POMIN); kroje wzorów z google/fonts (kroje_mg). Dodatek
+    # `instaluj mgaudio` dokłada sample VCSL (CC0, lib/audio/samples) do tego samego klonu dla muzyka.py.
   lottie:
     type: git
     repo: https://github.com/diffusionstudio/lottie

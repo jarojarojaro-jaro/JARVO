@@ -71,7 +71,8 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/05-cel-boil/in
 
 ## Dźwięk
 - Swingujący jazz 120 BPM (bit co 0,5 s = 12 klatek): kontrabas pizzicato, ksylofon, miotełki, pianino;
-  akcent z `projekt.py dzwieki --kategoria dzingle` (pizzicato).
+  akcent z `projekt.py dzwieki --kategoria dzingle` (pizzicato). Kodem: `muzyka.py zrob … --przepis variety`
+  (pizzicato, najbliżej ścieżki wzoru) albo `--styl kreska` (lofi z pianinem, przepis mgaudio dla tego stylu).
 - Cue ok. 0,03 s przed klatką: potarcie `scratch` + `burner`, skok `whoosh`, lądowania `pop` i `boing`, iskry
   `sparkle`, kreska tytułu = nuta (`chime`, `pitch` 0,9 → 1,3), kartkowanie `kartka` (`--kategoria codzienne`).
 - Kulminacja: 0,25 s ciszy, potem `thump` + `crack` + `bum-kreskowka` najgłośniej (reszta `vol` 0,5–0,8); −14 LUFS.

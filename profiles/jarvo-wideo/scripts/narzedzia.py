@@ -2,7 +2,7 @@
 """Narzędzia „wideo z kodu”: sprawdzenie i instalacja raz, we wspólnym katalogu.
 
     python3 narzedzia.py sprawdz                 # co jest gotowe, czego brak (JSON)
-    python3 narzedzia.py instaluj [motion|lemo|anidoodle|animacja|remotion|shotcraft|html|lottie|mg|wszystko]
+    python3 narzedzia.py instaluj [motion|lemo|anidoodle|animacja|remotion|shotcraft|html|lottie|mg|mgaudio|wszystko]
     python3 narzedzia.py env <narzedzie>         # zmienne środowiska do wklejenia: eval "$(python3 narzedzia.py env motion)"
     python3 narzedzia.py link <katalog>          # <katalog>/node_modules → wspólne (skrypty .mjs nie czytają NODE_PATH)
     python3 narzedzia.py kroje <katalog>         # brakujące kroje z <katalog>/fonts.css: google/fonts (OFL) + polskie znaki
@@ -10,7 +10,8 @@
 Narzędzia: motion (motion-broll), lemo (lemo-opuscar), anidoodle, remotion (skill remotion-best-practices, iart),
 shotcraft (video-shotcraft na Remotion), html (html_wideo.py: animacja HTML → klatki / MP4; pixel2motion, iart,
 bang-motion), lottie (oficjalny player Skottie do text-to-lottie + eksport przez html_wideo.py lottie),
-mg (mg-styles-15: kod 15 filmów-wzorów stylów motion design, notatki stylów, okładki, tekstury, kroje wzorów).
+mg (mg-styles-15: kod 15 filmów-wzorów stylów motion design, notatki stylów, okładki, tekstury, kroje wzorów),
+mgaudio (dodatek: muzyka i efekty pisane kodem z mg-styles-15 dla muzyka.py; własny venv ok. 390 MB i sample 56 MB).
 
 Zasady (VPS 8 GB, bez dubli):
 - przeglądarka: Chromium headless z obrazu Hermesa (PLAYWRIGHT_BROWSERS_PATH), nic nie pobieramy; wersja
@@ -22,7 +23,7 @@ Zasady (VPS 8 GB, bez dubli):
   mg-styles-15 bez filmów (okładki zostają), strony pokazowej, zdjęć bez opisanego źródła i modeli do Blendera,
   z krojami wzorów z google/fonts (OFL, Apache-2.0; chińskie spoza google/fonts zastępuje Noto Sans SC);
   HDRI do stylów 3D lemo (~12 MB) zawsze; ciężkie assety lemo (głos Kokoro ~340 MB, sample ~1,4 GB) tylko
-  z JARVO_EXTRAS „lemo”.
+  z JARVO_EXTRAS „lemo”; mgaudio w `wszystko` tylko z JARVO_EXTRAS „mgaudio” (osobno: `instaluj mgaudio`).
 """
 
 from __future__ import annotations
@@ -66,12 +67,21 @@ MGSTYLES_REV = "49052d80bfaf9fa8412cc9710530e5e95a3b8d8c"   # vendor/skills.lock
 # zostaje kod 15 dem, prompty (notatki stylów), okładki (videos/*.jpg), tekstury (papier CC0; ziarno, kurz i washi
 # bez podanego źródła: tylko do podglądu wzoru) i kod mgaudio (~55 MB); bez filmów (420 MB), strony pokazowej,
 # zdjęć bez opisanego źródła (koty 18-hanazi, wycinki 06-collage, naklejki 19-paperclip), modeli i siatek
-# do Blendera (04-3d-render) i sampli mgaudio (56 MB, dodatek dźwięku)
+# do Blendera (04-3d-render) i sampli mgaudio (56 MB: dochodzą z dodatkiem `instaluj mgaudio`)
 MGSTYLES_POMIN = ["/videos/*.mp4", "/docs/", "/site/", "/index.html", "/.nojekyll", "/demos/18-hanazi/assets/",
                   "/demos/06-collage/assets/", "/demos/04-3d-render/assets/", "/demos/19-paperclip/assets/stickers/",
                   "/lib/audio/samples/"]
 # biblioteki, które importują dema (importmap → /node_modules/…); three jest w HTML_LIBS w tej samej wersji
 MG_LIBS = ["d3@7.9.0", "opentype.js@2.0.0", "simplex-noise@4.0.3", "topojson-client@3.1.0"]
+# mgaudio (lib/audio wzorów, MIT): muzyka i efekty pisane kodem (muzyka.py). Własny venv, bo numba/llvmlite,
+# scipy i pedalboard to ok. 390 MB, których reszta narzędzi nie potrzebuje; wersje jak w requirements.txt wzorów
+# (bez matplotlib i librosa: spektrogram PNG i zmiana wysokości dźwięku, których muzyka.py nie używa).
+# Sample VCSL (CC0, 56 MB, 15 instrumentów) dochodzą do klonu wzorów jako dodany wpis sparse-checkout.
+MGAUDIO_VENV = ROOT / "venv-mgaudio"
+MGAUDIO_PY = ["numpy==2.4.6", "scipy==1.16.3", "soundfile==0.14.0", "numba==0.66.0", "pedalboard==0.9.25",
+              "pyloudnorm==0.2.0"]
+MG_SAMPLE = "/lib/audio/samples/"
+MG_DODANE = re.compile(re.escape(MG_SAMPLE))
 LOTTIE = ROOT / "lottie-player"
 LOTTIE_REPO = "https://github.com/diffusionstudio/lottie.git"
 LOTTIE_REV = "3c72912fad543897f90045ed4d355813837927fc"      # vendor/skills.lock.yaml → lottie
@@ -126,8 +136,12 @@ def headless_shell() -> str | None:
     return None
 
 
+def dodatek(nazwa: str) -> bool:
+    return nazwa in os.environ.get("JARVO_EXTRAS", "").replace(",", " ").split()
+
+
 def full_extras() -> bool:
-    return "lemo" in os.environ.get("JARVO_EXTRAS", "").replace(",", " ").split()
+    return dodatek("lemo")
 
 
 def run(cmd: list[str], cwd: Path | None = None, env: dict | None = None) -> None:
@@ -184,15 +198,25 @@ def pip_install(python: str, pkgs: list[str]) -> None:
         run([python, "-m", "pip", "install", "--quiet", *pkgs])
 
 
-def ensure_venv(pkgs: list[str]) -> None:
-    if not (VENV / "bin" / "python").exists():
+def py_ma(python: Path, spec: str) -> bool:
+    """Paczka jest w tym Pythonie; przy pinie (==X.Y.Z) dokładnie w tej wersji (zmiana pinu = doinstaluj)."""
+    if "==" in spec:
+        kod = f"import importlib.metadata as m; print(m.version({py_name(spec)!r}))"
+        p = subprocess.run([str(python), "-c", kod], capture_output=True, text=True)
+        return p.returncode == 0 and p.stdout.strip() == spec.split("==", 1)[1]
+    return subprocess.run([str(python), "-c", f"import {py_module(spec)}"], capture_output=True).returncode == 0
+
+
+def ensure_venv(pkgs: list[str], venv: Path = VENV) -> None:
+    python = venv / "bin" / "python"
+    if not python.exists():
         if shutil.which("uv"):
-            run(["uv", "venv", "--quiet", "--python", "3.12", str(VENV)])
+            run(["uv", "venv", "--quiet", "--python", "3.12", str(venv)])
         else:
-            run([sys.executable, "-m", "venv", str(VENV)])
-    missing = [p for p in pkgs if subprocess.run([py(), "-c", f"import {py_module(p)}"], capture_output=True).returncode != 0]
+            run([sys.executable, "-m", "venv", str(venv)])
+    missing = [p for p in pkgs if not py_ma(python, p)]
     if missing:
-        pip_install(py(), missing)
+        pip_install(str(python), missing)
 
 
 def npm_name(spec: str) -> str:
@@ -356,9 +380,60 @@ def install_shotcraft() -> None:
 def install_mg() -> None:
     install_html()
     ensure_node(MG_LIBS)
-    clone_pinned(MGSTYLES_REPO, MGSTYLES_REV, MGSTYLES, MGSTYLES_POMIN)
+    clone_pinned(MGSTYLES_REPO, MGSTYLES_REV, MGSTYLES, MGSTYLES_POMIN, keep=MG_DODANE)
+    napraw_indeks_sampli()
     for uwaga in kroje_mg(MGSTYLES):
         print(f"! {uwaga}", file=sys.stderr)
+
+
+def sample_mg() -> Path:
+    return MGSTYLES / MG_SAMPLE.strip("/")
+
+
+def napraw_indeks_sampli(katalog: Path | None = None) -> int:
+    """index.json sampli mgaudio wymienia 598 plików z 40 instrumentów, a repo ma 102 z 15: przepis, który sięgnie
+    po brakujący (np. lofi po kalimbę, guofeng po cytrę dantranh), kończy się błędem otwarcia pliku. Zostawiamy
+    w indeksie tylko pliki, które są; instrument bez plików znika, więc mgaudio bierze wtedy swoją syntezę
+    (`available()` = False). Zwraca liczbę usuniętych wpisów (0 = indeks już zgodny albo sampli nie ma)."""
+    katalog = katalog or sample_mg()
+    plik = katalog / "index.json"
+    if not plik.exists():
+        return 0
+    indeks = json.loads(plik.read_text(encoding="utf-8"))
+    zgodny = {k: [w for w in v if (katalog / w["file"]).is_file()] for k, v in indeks.items()}
+    zgodny = {k: v for k, v in zgodny.items() if v}
+    usuniete = sum(map(len, indeks.values())) - sum(map(len, zgodny.values()))
+    if usuniete:
+        plik.write_text(json.dumps(zgodny, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(f"↪ indeks sampli mgaudio: {usuniete} wpisów bez pliku usunięte, zostało {len(zgodny)} instrumentów", flush=True)
+    return usuniete
+
+
+def indeks_sampli_zgodny(katalog: Path | None = None) -> bool:
+    katalog = katalog or sample_mg()
+    try:
+        indeks = json.loads((katalog / "index.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return bool(indeks) and all((katalog / w["file"]).is_file() for v in indeks.values() for w in v)
+
+
+def mgaudio_gotowe() -> bool:
+    """Kod i sample z przypiętego commitu, indeks sampli bez brakujących plików i venv z pakietami mgaudio."""
+    pakiety = ("numba", "scipy", "pedalboard", "pyloudnorm", "soundfile")
+    return ((MGSTYLES / ".git").exists() and git_head(MGSTYLES) == MGSTYLES_REV
+            and (MGSTYLES / "lib/audio/mgaudio/__init__.py").exists() and indeks_sampli_zgodny()
+            and (MGAUDIO_VENV / "bin" / "python").exists()
+            and all(any((MGAUDIO_VENV / "lib").glob(f"python3*/site-packages/{m}*")) for m in pakiety))
+
+
+def install_mgaudio() -> None:
+    clone_pinned(MGSTYLES_REPO, MGSTYLES_REV, MGSTYLES, MGSTYLES_POMIN, keep=MG_DODANE)
+    lista = subprocess.run(["git", "-C", str(MGSTYLES), "sparse-checkout", "list"], capture_output=True, text=True).stdout
+    if MG_SAMPLE not in lista.splitlines():
+        run(["git", "-C", str(MGSTYLES), "sparse-checkout", "add", MG_SAMPLE])
+    napraw_indeks_sampli()
+    ensure_venv(MGAUDIO_PY, MGAUDIO_VENV)
 
 
 def install_lottie() -> None:
@@ -422,11 +497,13 @@ def status() -> dict:
         # wzory stylów: przypięty commit, notatki stylów i biblioteki dem
         "mg": (MGSTYLES / ".git").exists() and git_head(MGSTYLES) == MGSTYLES_REV and (MGSTYLES / "prompts").is_dir()
               and (MGSTYLES / MG_CJK).exists() and all(npm_installed(p, NODE / "node_modules") for p in MG_LIBS),
+        # muzyka kodem (dodatek): kod i sample z przypiętego commitu, indeks sampli bez brakujących plików, venv
+        "mgaudio": mgaudio_gotowe(),
         "pelne_lemo": full_extras(),
     }
 
 
-TOOLS = ("motion", "lemo", "anidoodle", "animacja", "remotion", "shotcraft", "html", "lottie", "mg")
+TOOLS = ("motion", "lemo", "anidoodle", "animacja", "remotion", "shotcraft", "html", "lottie", "mg", "mgaudio")
 
 
 def env_for(tool: str) -> dict:
@@ -457,6 +534,9 @@ def env_for(tool: str) -> dict:
     if tool == "lottie":
         return {**base, "LOTTIE_PLAYER": str(LOTTIE), "PYTHON": py(), **real, "CHROME_BIN": chrome,
                 "PATH": f"{VENV / 'bin'}:{os.environ.get('PATH', '')}"}
+    if tool == "mgaudio":
+        # muzyka.py sama przechodzi na ten Python; MGAUDIO = katalog do sys.path przy własnym kodzie z mgaudio
+        return {"MGAUDIO": str(MGSTYLES / "lib" / "audio"), "MGAUDIO_PY": str(MGAUDIO_VENV / "bin" / "python")}
     raise SystemExit(f"nieznane narzędzie: {tool!r} ({' | '.join(TOOLS)})")
 
 
@@ -665,9 +745,9 @@ def main(argv: list[str] | None = None) -> int:
         what = args[1] if len(args) > 1 else "wszystko"
         steps = {"motion": [install_motion], "lemo": [install_lemo], "anidoodle": [install_anidoodle], "animacja": [install_animacja],
                  "remotion": [install_remotion], "shotcraft": [install_shotcraft], "html": [install_html],
-                 "lottie": [install_lottie], "mg": [install_mg],
+                 "lottie": [install_lottie], "mg": [install_mg], "mgaudio": [install_mgaudio],
                  "wszystko": [install_motion, install_html, install_anidoodle, install_animacja, install_lemo, install_shotcraft,
-                              install_lottie, install_mg]}.get(what)
+                              install_lottie, install_mg, *([install_mgaudio] if dodatek("mgaudio") else [])]}.get(what)
         if not steps:
             raise SystemExit(f"instaluj: {' | '.join(TOOLS)} | wszystko")
         if not headless_shell():

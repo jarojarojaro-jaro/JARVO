@@ -252,7 +252,7 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
   silniki stylów przeniesione do modułów `/_lib/jarvo/` (`kreska.js`, `morph.js`, `crt.js`, `plotno.js`, `piksel.js`),
 - **filmy z kodu** (HyperFrames, Manim) i **ujęcia z AI** (`video_generate`, obraz → wideo, rejestr kosztów).
 
-**Jakość:** `qa_wideo.py` (kodeki, format, długość, LUFS i rozpiętość głośności LRA, czarne i zamrożone klatki, pojedyncze „mrugnięcia” klatek, arkusz ze strefami UI 9:16). **Rytm i wzór:** `rytm.py` (BPM, takty, drop pod cięcia, perkusja: stopa, werbel, talerze; `sprawdz` po renderze: każde cięcie kontra bit), `kadry.py wzor` (film-wzór → klatki co 0,5 s, cięcia, rytm → mapa bitów)
+**Jakość:** `qa_wideo.py` (kodeki, format, długość, LUFS i rozpiętość głośności LRA, czarne i zamrożone klatki, pojedyncze „mrugnięcia” klatek, arkusz ze strefami UI 9:16). **Rytm i wzór:** `rytm.py` (BPM, takty, drop pod cięcia, perkusja: stopa, werbel, talerze; `sprawdz` po renderze: każde cięcie kontra bit), `muzyka.py` (muzyka pod obraz pisana kodem z mgaudio, MIT: gatunek ze stylu, kulminacja i koniec z osi filmu, efekty w tych samych chwilach, −14 LUFS, słyszalność efektów; dodatek `narzedzia.py instaluj mgaudio`, ok. 450 MB), `kadry.py wzor` (film-wzór → klatki co 0,5 s, cięcia, rytm → mapa bitów)
 + `kontrola-wideo` (ocena 0–100 w 10 osiach, PASS od 85, najwyżej 2 rundy poprawek). Każde ujęcie oglądane (vision),
 źródła i licencje w `film.json`.
 
