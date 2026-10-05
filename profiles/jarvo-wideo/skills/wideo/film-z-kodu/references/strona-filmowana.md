@@ -21,7 +21,8 @@ python3 $HERMES_HOME/scripts/assety.py <URL> --film --out out/wideo/src/<nazwa>/
 
 - **`cele`:** `{id, typ, tekst, x, y, w, h}` w pikselach CSS całej strony (piksel obrazu = × `dpr`). Typy: `logo`,
   `nawigacja`, `naglowek` (z `poziom`), `przycisk`, `cena`, `karta`, `formularz`, `obraz`, `sekcja`, `wlasny`.
-  Cel z polem `wycinek` ma swój plik; `brak` = własny selektor nic nie znalazł.
+  Cel z polem `wycinek` ma swój plik; `brak` = własny selektor nic nie znalazł. `napis` (nagłówek, cena) = ramka
+  samego tekstu, gdy blok jest szerszy od napisu: po niej idą zakreślacz i lupa, kamera celuje w środek bloku.
 - **Przygotowanie strony** robi skrypt: paski przypięte (fixed, sticky) wracają na miejsce, baner cookie znika (zgody
   nie klikamy), przewinięcie do końca i z powrotem wczytuje leniwe obrazy, fonty i animacje są gotowe. W wyniku
   `przygotowanie` = ile ukrył i ile odpiął. Baner wciąż widoczny na kaflu → kadrujesz poza nim.

@@ -18,7 +18,7 @@ UKLAD = {"url": "http://127.0.0.1:8765/", "strony": {"start": {
                 "kafle": [{"plik": "start-desktop-1.png", "y": 0, "h": 2561}],
                 "pusta": [{"plik": "start-desktop-pusta-1.png", "y": 0, "h": 2561}],
                 "cele": [{"id": "naglowek-1", "typ": "naglowek", "poziom": 1, "tekst": "Chleb", "x": 390, "y": 240, "w": 568, "h": 276,
-                          "wycinek": "start-desktop-naglowek-1.png"},
+                          "wycinek": "start-desktop-naglowek-1.png", "napis": {"x": 390, "y": 250, "w": 420, "h": 256}},
                          {"id": "przycisk-2", "typ": "przycisk", "tekst": "Zamów", "x": 390, "y": 671, "w": 202, "h": 55},
                          {"id": "cena-2", "typ": "cena", "tekst": "18 zł", "x": 816, "y": 1647, "w": 287, "h": 40},
                          {"id": "karta-4", "typ": "karta", "tekst": "Pszenny", "x": 414, "y": 1368, "w": 345, "h": 419},
@@ -110,6 +110,18 @@ console.log(JSON.stringify({ wy: [wy(0), wy(1.5), wy(3.6), wy(wy.do), wy(2.6)], 
     assert w["u"][2]["x"] == pytest.approx(674) and w["u"][2]["y"] == pytest.approx(378)       # środek nagłówka
     assert w["z"][0] == 0 and 0 < w["z"][1]["u"] < 1 and w["z"][2] == 1
     assert w["z"][1]["pas"]["x"] == 810 and w["z"][1]["pas"]["h"] == pytest.approx(40 * 0.82)
+
+
+def test_zakreslacz_i_lupa_po_samym_napisie():
+    w = node("""
+const st = S.stronaZUkladu(uklad);
+const z = S.zakreslacz({ strona: st, cel: 'naglowek-1', od: 0 });
+const l = S.lupa({ strona: st, cel: 'naglowek-1', od: 0, do: 2 });
+console.log(JSON.stringify({ pas: z(1).pas, zrodlo: l(1, { x: 960, y: 378, zoom: 1 }).zrodlo, srodek: st.srodek('naglowek-1') }));
+""")
+    assert w["pas"]["x"] == 384 and w["pas"]["w"] == 432                     # napis 420 px + 2 × 6, nie blok 568 px
+    assert w["zrodlo"] == {"x": 378, "y": 238, "w": 444, "h": 280}
+    assert w["srodek"] == {"x": 674, "y": 378}                               # kamera dalej celuje w środek bloku
 
 
 def test_plan_ruchow():

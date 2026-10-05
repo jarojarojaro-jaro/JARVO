@@ -121,6 +121,8 @@ def test_film_w_przegladarce(tmp_path, capsys):
     assert d["dpr"] == 2 and d["szer"] == 1920 and d["przygotowanie"]["ukryte"] >= 1 and d["przygotowanie"]["przypiete"] >= 1
     ids = {c["id"]: c for c in d["cele"]}
     assert ids["naglowek-1"]["tekst"] == "Chleb co rano" and ids["naglowek-1"].get("wycinek")
+    n = ids["naglowek-1"]["napis"]                                   # h1 na całą szerokość, napis krótki: ramka tekstu
+    assert n["x"] == ids["naglowek-1"]["x"] and n["w"] < ids["naglowek-1"]["w"] / 2 and ids["cena-1"]["napis"]["w"] < 100
     assert ids["cena-1"]["tekst"] == "18 zł" and ids["dol"]["y"] > 2600 and ids["dol"].get("wycinek")
     assert all((out / "film" / k["plik"]).exists() for k in d["kafle"] + d["pusta"]) and d["pusta"]
     assert (out / "marka.css").read_text(encoding="utf-8").count("--marka-") >= 8

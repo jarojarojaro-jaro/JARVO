@@ -180,7 +180,7 @@ export function najazd({ strona, cel = null, od = 0, do: koniec, z = 1, na = 1.0
 export function lupa({ strona, cel, od = 0, do: koniec, powiekszenie = LICZBY.lupa, kadr = kadrDomyslny(),
                        margines = 12, tlo = LICZBY.lupaTlo } = {}) {
   if (koniec === undefined) throw new Error('lupa: podaj „do”');
-  const c = strona.cel(cel);
+  const c = strona.cel(cel).napis ?? strona.cel(cel);          // napis węższy od bloku: lupa na samym tekście
   const zrodlo = { x: c.x - margines, y: c.y - margines, w: c.w + 2 * margines, h: c.h + 2 * margines };
   const f = (t, kam) => {
     const wej = clamp((t - od) / LICZBY.lupaWejscie), wyj = clamp((t - (koniec - 0.2)) / 0.2);
@@ -216,9 +216,9 @@ export function uderzenie({ strona, cel, od = 0, baza, przyblizenie = LICZBY.ude
   return oznacz(f, 'uderzenie', od, od + czas, dopasuj(strona, kadr) * przyblizenie);
 }
 
-// Zakreślacz pod tekstem celu: pas przeciąga się w 0,4–0,8 s. f(t) → {u, pas {x, y, w, h} na stronie}.
+// Zakreślacz pod tekstem celu (ramka `napis`, gdy blok jest szerszy): pas przeciąga się w 0,4–0,8 s. f(t) → {u, pas {x, y, w, h}}.
 export function zakreslacz({ strona, cel, od = 0, czas = LICZBY.zakreslacz } = {}) {
-  const c = strona.cel(cel);
+  const c = strona.cel(cel).napis ?? strona.cel(cel);
   const f = (t) => {
     const u = gladko(clamp((t - od) / czas));
     return { u, pas: { x: c.x - 6, y: c.y + c.h * 0.12, w: (c.w + 12) * u, h: c.h * 0.82 } };

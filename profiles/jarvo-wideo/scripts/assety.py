@@ -170,6 +170,8 @@ CELE_JS = r"""
   const box = (el) => { const r = el.getBoundingClientRect();
     return {x: Math.round(r.left + scrollX), y: Math.round(r.top + scrollY), w: Math.round(r.width), h: Math.round(r.height)}; };
   const tekst = (el) => (el.innerText || el.getAttribute('aria-label') || el.getAttribute('alt') || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const ramkaTekstu = (el) => { const r = document.createRange(); r.selectNodeContents(el); const b = r.getBoundingClientRect();
+    return b.width > 0 ? {x: Math.round(b.left + scrollX), y: Math.round(b.top + scrollY), w: Math.round(b.width), h: Math.round(b.height)} : null; };
   const maxY = limit;
   const cele = [], uzyte = new Set(), licz = {};
   const dodaj = (typ, el, extra = {}) => {
@@ -179,6 +181,9 @@ CELE_JS = r"""
     const id = `${typ}-${licz[typ]}`;
     el.setAttribute('data-jarvo-cel', id); uzyte.add(el);
     cele.push({id, typ, tekst: tekst(el), ...b, ...extra});
+    if (typ === 'naglowek' || typ === 'cena') {          // blok bywa szerszy od napisu: zakreślacz i lupa idą po tekście
+      const n = ramkaTekstu(el); if (n && n.w < b.w - 8) cele[cele.length - 1].napis = n;
+    }
   };
   const LOGO = 'header [class*=logo], nav [class*=logo], a[href="/"] img, a[href="/"] svg, header img, header svg';
   const pierwsze = (sel) => [...document.querySelectorAll(sel)].find(vis);
