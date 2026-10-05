@@ -94,7 +94,7 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
    (platforma, długość, cel, jedno przesłanie, CTA, brand kit); silnik z pliku rodzaju albo z tabeli.
 2. **Scenariusz** (`scenariusz`): hook, beat sheet sekunda po sekundzie; lektor PL najpierw (`film.py lektor` →
    czasy słów), animacje pod te czasy.
-3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie>`
+3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie|mg>`
    (raz; dalej z cache), `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`.
    Skill silnika każe coś doinstalować, pobrać przeglądarkę (`npx playwright install`, `npm i puppeteer`) albo
    zaktualizować skille (`remotion-upgrade`, `npx skills add`)? Nie rób tego: `references/narzedzia.md` mówi, czym to zastąpić.

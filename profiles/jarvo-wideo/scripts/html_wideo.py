@@ -23,6 +23,9 @@ Presety (flagi je nadpisują):
   pixel2motion  ?t=<ms>, gotowe: window.__p2mReady, kadr #logo-root
   bang          window.OPENER.seek(t), ?clean=1, rozmiar z OPENER.W/H (bang-motion; zamiast snap/export-frames.mjs)
   livepanel     window.seek(t), ?manual, gotowe: window.__ready, rozmiar z #stage (żywy schemat: zywy_schemat.py strona)
+  mg            wzory stylów motion design z mg-styles-15: window.renderAt(t) i animacje CSS ustawione na t,
+                rozmiar z window.DEMO; /assets/, /demos/ z instalacji wzorów (`narzedzia.py instaluj mg`),
+                /node_modules/ = wspólne biblioteki (three, d3, opentype.js, simplex-noise, topojson-client)
 --subklatki N (wideo): motion blur, każda klatka to średnia N chwil między klatkami (N× dłużej).
 --rownolegle N (wideo): klatki w N przeglądarkach naraz, każda swój odcinek osi; domyślnie samo (do 4, połowa
 rdzeni, ~1 GB wolnej pamięci na przeglądarkę, co najmniej 24 klatki na przeglądarkę). Pełny render (wideo, lottie -o)
@@ -62,6 +65,10 @@ BANG_SEEK = """async (t) => {
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   O.seek(t);
 }"""
+MG_SEEK = """async (t) => {
+  for (const a of document.getAnimations()) { try { a.pause(); a.currentTime = t * 1000; } catch (e) {} }
+  if (typeof window.renderAt === 'function') await window.renderAt(t);
+}"""
 PRESETS: dict[str, dict] = {
     # ?render=1: strona nie odpala pętli podglądu (rAF z zegarem nadpisałby klatkę między seek a zrzutem)
     # seek nie zwraca wyniku __seek: oś GSAP to obiekt „thenable” (await czekałby na koniec zatrzymanej osi)
@@ -74,12 +81,15 @@ PRESETS: dict[str, dict] = {
              "gotowe": "window.OPENER && window.OPENER.ready && (!window.OPENER.clipsReady || window.OPENER.clipsReady())",
              "rozmiar_js": "[window.OPENER.W || 1920, window.OPENER.H || 1080]"},
     # ?manual: szablon live-panel nie odpala pętli rAF; rozmiar płótna z #stage (canvas.width/height configu)
+    # mg-styles-15: jak ich harness/render.mjs (renderAt + animacje CSS/WAAPI zatrzymane w chwili t)
+    "mg": {"seek": MG_SEEK, "gotowe": "window.__ready === true", "serwer": True, "aliasy": "mg",
+           "rozmiar_js": "[(window.DEMO || {}).width || 1920, (window.DEMO || {}).height || 1080]"},
     "livepanel": {"seek": "(t) => { window.seek(t); }", "gotowe": "window.__ready === true", "query": {"manual": "1"},
                   "rozmiar_js": "[parseInt(document.getElementById('stage').style.width) || 1200, "
                                 "parseInt(document.getElementById('stage').style.height) || 1500]"},
 }
 DEFAULTS = {"param": "t", "jednostka": "s", "gotowe": None, "seek": None, "selektor": None, "query": {},
-            "rozmiar_js": None, "serwer": False}
+            "rozmiar_js": None, "serwer": False, "aliasy": None}
 # --disable-accelerated-2d-canvas: płótno 2D rysowane na CPU. Na GPU (swiftshader) płótno tylko wyczyszczone (np. nakładka
 # ze smugą, gdy nic nie leci) trafiało do zrzutu ze starą treścią sprzed dwóch klatek; szybkość renderu ta sama.
 BROWSER_ARGS = ["--enable-webgl", "--ignore-gpu-blocklist", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
@@ -208,8 +218,20 @@ def launch(p):
 def _page(browser, size: tuple[int, int], scale: float, errors: list[str]):
     page = browser.new_page(viewport={"width": size[0], "height": size[1]}, device_scale_factor=scale)
     page.on("pageerror", lambda e: errors.append(str(e)))
+    page.on("response", lambda r: errors.append(f"brak pliku {urlsplit(r.url).path} (HTTP {r.status})")
+            if r.status >= 400 and not r.url.endswith("/favicon.ico") else None)
     page.set_default_timeout(TIMEOUT_MS)
     return page
+
+
+def czekaj_gotowe(page, warunek: str, errors: list[str]) -> None:
+    """Czeka na gotowość strony; gdy nie przyjdzie, mówi dlaczego (błędy JS, brakujące pliki), a nie sam timeout."""
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+    try:
+        page.wait_for_function(warunek, timeout=TIMEOUT_MS)
+    except PlaywrightTimeout:
+        powody = "; ".join(e[:200] for e in dict.fromkeys(errors)) or "bez błędów JS i brakujących plików"
+        raise SystemExit(f"strona nie jest gotowa po {TIMEOUT_MS // 1000} s ({warunek}): {powody}") from None
 
 
 def capture(src: str, times: list[float], names: list[str], out_dir: Path, o: dict, fps: float, size: tuple[int, int],
@@ -222,7 +244,7 @@ def capture(src: str, times: list[float], names: list[str], out_dir: Path, o: di
 
     def settle(page) -> None:
         if o["gotowe"]:
-            page.wait_for_function(o["gotowe"], timeout=TIMEOUT_MS)
+            czekaj_gotowe(page, o["gotowe"], errors)
         page.evaluate(FONTS)
         page.evaluate(RAF2)
 
@@ -231,7 +253,7 @@ def capture(src: str, times: list[float], names: list[str], out_dir: Path, o: di
         page_file = Path(src).resolve()
         if not page_file.exists():
             raise SystemExit(f"brak pliku: {src}")
-        httpd = serve(page_file.parent, lib=True)
+        httpd = serve(page_file.parent, lib=True, alias=aliasy(o))
         src = f"http://127.0.0.1:{httpd.server_address[1]}/{quote(page_file.name)}"
     try:
         _run_capture(sync_playwright, src, times, names, out_dir, o, fps, size, size_explicit, scale, alfa, wait_ms,
@@ -240,7 +262,7 @@ def capture(src: str, times: list[float], names: list[str], out_dir: Path, o: di
         if httpd:
             httpd.shutdown()
     for e in dict.fromkeys(errors):
-        print(f"  ! błąd JS na stronie: {e[:300]}", file=sys.stderr)
+        print(f"  ! strona: {e[:300]}", file=sys.stderr)
     return frames
 
 
@@ -372,6 +394,7 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
                       ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json"}
     lib_root: Path | None = None      # /_lib/… → wspólne node_modules narzędzi (three, gsap)
     jarvo_root: Path | None = None    # /_lib/jarvo/… → nasze moduły (ruch.js)
+    aliasy: dict[str, Path] = {}      # preset mg: /assets/, /demos/, /node_modules/ spoza katalogu strony
 
     def translate_path(self, path: str) -> str:
         clean = unquote(urlsplit(path).path)
@@ -381,14 +404,27 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
                 root, rel = self.jarvo_root.resolve(), rel[len("jarvo/"):]
             target = (root / rel).resolve()
             return str(target) if root in target.parents else str(root / "__poza_lib__")
+        for prefiks, katalog in self.aliasy.items():
+            if clean.startswith(prefiks):
+                root = katalog.resolve()
+                target = (root / clean[len(prefiks):]).resolve()
+                return str(target) if root in target.parents else str(root / "__poza_aliasu__")
         return super().translate_path(path)
 
     def log_message(self, *args) -> None:  # noqa: D401 - cisza w logach
         pass
 
 
-def serve(root: Path, lib: bool = False) -> http.server.ThreadingHTTPServer:
-    handler = (type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules", "jarvo_root": nz.sync_jarvo_js()})
+def aliasy(o: dict) -> dict[str, Path]:
+    """Ścieżki spoza katalogu strony, których szuka preset: mg = wzory z instalacji mg-styles-15 i ich biblioteki."""
+    if o.get("aliasy") == "mg":
+        return {"/node_modules/": nz.NODE / "node_modules", "/assets/": nz.MGSTYLES / "assets", "/demos/": nz.MGSTYLES / "demos"}
+    return {}
+
+
+def serve(root: Path, lib: bool = False, alias: dict[str, Path] | None = None) -> http.server.ThreadingHTTPServer:
+    handler = (type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules", "jarvo_root": nz.sync_jarvo_js(),
+                                        "aliasy": alias or {}})
                if lib else _Quiet)
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(handler, directory=str(root)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -468,7 +504,7 @@ def zmierz(src: str, o: dict, dlugosc: float, hz: float, size: tuple[int, int], 
         page_file = Path(src).resolve()
         if not page_file.exists():
             raise SystemExit(f"brak pliku: {src}")
-        httpd = serve(page_file.parent, lib=True)
+        httpd = serve(page_file.parent, lib=True, alias=aliasy(o))
         src = f"http://127.0.0.1:{httpd.server_address[1]}/{quote(page_file.name)}"
     times = [i / hz for i in range(max(1, int(math.floor(dlugosc * hz + 1e-9))))]
     probki, jpgs, prev, rodziny, miniatury = [], {}, None, set(), []
@@ -481,7 +517,7 @@ def zmierz(src: str, o: dict, dlugosc: float, hz: float, size: tuple[int, int], 
 
             def settle() -> None:
                 if o["gotowe"]:
-                    page.wait_for_function(o["gotowe"], timeout=TIMEOUT_MS)
+                    czekaj_gotowe(page, o["gotowe"], errors)
                 page.evaluate(FONTS)
                 page.evaluate(RAF2)
             if o["seek"]:
@@ -521,7 +557,7 @@ def zmierz(src: str, o: dict, dlugosc: float, hz: float, size: tuple[int, int], 
     finally:
         if httpd:
             httpd.shutdown()
-    return {"probki": probki, "jpgs": jpgs, "czcionki": czcionki, "bledy_js": list(dict.fromkeys(errors)),
+    return {"probki": probki, "jpgs": jpgs, "czcionki": czcionki, "bledy_js": [e for e in dict.fromkeys(errors) if not e.startswith("brak pliku ")],
             "zasoby": [f for f in dict.fromkeys(failed) if not f.split(" (")[0].endswith("/favicon.ico")], "rozmiar": rozmiar}
 
 

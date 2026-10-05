@@ -1,8 +1,8 @@
 # Silniki zewnętrzne u nas
 
-motion-broll, lemo-opuscar, anidoodle, Remotion (+ iart), video-shotcraft, bang-motion, pixel2motion, Lottie.
-Skille silników są w profilu (`skills/video/<nazwa>`, przypięte commity w `vendor/skills.lock.yaml`; video-shotcraft
-i player Lottie instaluje `narzedzia.py`). Ich instrukcje zakładają laptopa z Claude Code; poniżej różnice u nas.
+motion-broll, lemo-opuscar, anidoodle, Remotion (+ iart), video-shotcraft, mg-styles-15, bang-motion, pixel2motion, Lottie.
+Skille silników są w profilu (`skills/video/<nazwa>`, przypięte commity w `vendor/skills.lock.yaml`; video-shotcraft,
+mg-styles-15 i player Lottie instaluje `narzedzia.py`). Ich instrukcje zakładają laptopa z Claude Code; poniżej różnice u nas.
 Ścieżka skilla: `SK=$HERMES_HOME/skills/video/<nazwa>` (zmienne nie przeżywają między wywołaniami terminala:
 wklejaj przypisanie w każdym).
 
@@ -152,6 +152,22 @@ npx remotion render src/index.ts AiflPromo out/promo.mp4 --concurrency=2 --brows
   `python3 $HERMES_HOME/scripts/narzedzia.py link .`, `node capture-template.mjs` (puppeteer na przeglądarce z obrazu).
 - Dema z `@remotion/motion-blur`: `npm i @remotion/motion-blur@4.0.484 --prefer-offline` w projekcie.
 - Dźwięki z `assets/audio/` wolno używać (ATTRIBUTION.md), źródło do RAPORT.md.
+
+## mg-styles-15 (wzory 15 stylów motion design, MIT)
+```bash
+python3 $HERMES_HOME/scripts/narzedzia.py instaluj mg; eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env mg)"
+ls $MGSTYLES/demos $MGSTYLES/prompts                  # kod 15 filmów-wzorów (10 s) i notatki stylów; okładki: $MGSTYLES/videos/*.jpg
+python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/05-cel-boil/index.html --preset mg --czasy 1,4,8 --arkusz out/wideo/wzor.jpg
+```
+- Wzór to kod do podejrzenia i przeniesienia (krzywe, czasy, warstwy) do naszej animacji w kontrakcie jarvo, a nie
+  gotowy film klienta. `--preset mg` (kontrakt `window.DEMO` + `renderAt(t)` + `__ready`) służy do obejrzenia wzoru.
+- Rusza 11 wzorów (klatki 6–25 s). Cztery oglądasz tylko z okładki i kodu: `04-3d-render` (klatki z Blendera),
+  `06-collage`, `18-hanazi`, `19-paperclip` (zdjęcia bez podanego źródła: `instaluj mg` ich nie pobiera, tak jak
+  filmów MP4 i próbek dźwięku). Strona, która nie wystartuje, mówi dlaczego (błędy JS, brakujące pliki).
+- Kroje wzorów `instaluj mg` bierze z google/fonts (OFL, Apache-2.0); chińskie spoza google/fonts zastępuje
+  Noto Sans SC. To kroje do podglądu: w naszym filmie kroje z `/_lib/` z polskimi znakami.
+- Tekstura papieru jest CC0; ziarno, kurz i washi z `$MGSTYLES/assets/textures` nie mają podanego źródła:
+  tylko do podglądu, w filmie klienta ziarno i kurz robisz sam w kodzie.
 
 ## Animacja HTML → wideo: `html_wideo.py` (nasza animacja, iart kinetic-typography, bang-motion, pixel2motion)
 ```bash

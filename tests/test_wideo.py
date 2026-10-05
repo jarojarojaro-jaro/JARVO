@@ -291,6 +291,9 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     assert nz.env_for("motion")["NODE_PATH"].endswith("node/node_modules")
     assert lock["sources"]["video-shotcraft"]["rev"] == nz.SHOTCRAFT_REV
     assert lock["sources"]["lottie"]["rev"] == nz.LOTTIE_REV                # player = ten sam commit co skill
+    assert lock["sources"]["mg-styles-15"]["rev"] == nz.MGSTYLES_REV        # wzory stylów motion design
+    assert "/videos/*.mp4" in nz.MGSTYLES_POMIN and "/demos/18-hanazi/assets/" in nz.MGSTYLES_POMIN
+    assert "/demos/19-paperclip/assets/stickers/" in nz.MGSTYLES_POMIN       # zdjęcia bez podanego źródła
     assert {"video/remotion-best-practices", "video/bang-motion", "video/pixel2motion", "video/text-to-lottie",
             "video/kinetic-typography", "screenwriting/sw-scene-craft"} <= dests
     # router Remotion zawiera resztę skilli Remotion: osobne kopie byłyby dublami
@@ -307,6 +310,8 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     assert html["PUPPETEER_EXECUTABLE_PATH"] == html["CHROME_BIN"] == str(wrapper) and html["JARVO_CHROME_REAL"] == str(shell)
     assert nz.env_for("remotion")["REMOTION_BROWSER_EXECUTABLE"] == str(shell)
     assert nz.env_for("lottie")["LOTTIE_PLAYER"].endswith("lottie-player")
+    mg = nz.env_for("mg")
+    assert mg["MGSTYLES"].endswith("mg-styles-15") and mg["CHROME_BIN"] == str(wrapper)
     with pytest.raises(SystemExit):
         nz.env_for("puppeteer-core")
     monkeypatch.setenv("JARVO_EXTRAS", "media lemo")
@@ -453,6 +458,55 @@ def test_kroje_from_google_fonts_and_polish_letters(tmp_path, capsys):
     assert nz.kroje(fonts, zrodlo) == uwagi and zrodlo.pytania == ["nieznany"]   # drugi raz pyta tylko o brakujący
 
 
+def test_kroje_mg_from_google_fonts_and_cjk_substitute(tmp_path, capsys):
+    """`instaluj mg`: kroje z fonts.css wzorów i z ich kodu (`/demos/…ttf`) dochodzą z google/fonts (OFL, potem
+    Apache) z licencją obok; chiński spoza google/fonts i Noto Serif SC (25 MB) to dowiązanie do Noto Sans SC."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+
+    class Zrodlo:
+        katalog = {("ofl", "inter"): {"Inter[opsz,wght].ttf": b"inter", "OFL.txt": b"OFL"},
+                   ("ofl", "notosanssc"): {"NotoSansSC[wght].ttf": b"noto", "OFL.txt": b"OFL"},
+                   ("ofl", "notoserifsc"): {"NotoSerifSC[wght].ttf": b"serif", "OFL.txt": b"OFL"},
+                   ("apache", "luckiestguy"): {"LuckiestGuy-Regular.ttf": b"lucky", "LICENSE.txt": b"Apache"},
+                   ("ofl", "mrdafoe"): {"MrDafoe-Regular.ttf": b"dafoe", "OFL.txt": b"OFL"}}
+        pytania: list[tuple[str, str]] = []
+
+        def pliki(self, rodzina, licencja="ofl"):
+            self.pytania.append((licencja, rodzina))
+            return list(self.katalog.get((licencja, rodzina), {}))
+
+        def plik(self, rodzina, nazwa, licencja="ofl"):
+            return self.katalog[(licencja, rodzina)][nazwa]
+
+    mg = tmp_path / "mg"
+    (mg / "assets/fonts").mkdir(parents=True)
+    (mg / "assets/fonts/fonts.css").write_text("".join(
+        f"@font-face{{src:url('/assets/fonts/{p}') format('truetype')}}" for p in (
+            "cjk/alibabapuhuiti3/AlibabaPuHuiTi-3-85-Bold.ttf", "latin/inter/Inter-VF.ttf", "cjk/notosanssc/NotoSansSC-VF.ttf",
+            "cjk/notoserifsc/NotoSerifSC-VF.ttf", "latin/luckiestguy/LuckiestGuy-Regular.ttf", "latin/brak/Brak-Bold.ttf")),
+        encoding="utf-8")
+    (mg / "demos/10-synthwave").mkdir(parents=True)
+    (mg / "demos/10-synthwave/index.html").write_text(
+        "<script>fetch('/demos/10-synthwave/assets/fonts/MrDafoe-Regular.ttf')</script>", encoding="utf-8")
+    zrodlo = Zrodlo()
+    uwagi = nz.kroje_mg(mg, zrodlo)
+    f = mg / "assets/fonts"
+    assert (f / "latin/inter/Inter-VF.ttf").read_bytes() == b"inter" and (f / "latin/inter/OFL.txt").exists()
+    assert (f / "latin/luckiestguy/LuckiestGuy-Regular.ttf").read_bytes() == b"lucky"
+    assert (f / "latin/luckiestguy/LICENSE.txt").read_bytes() == b"Apache"
+    dafoe = mg / "demos/10-synthwave/assets/fonts"
+    assert (dafoe / "MrDafoe-Regular.ttf").read_bytes() == b"dafoe" and (dafoe / "OFL-mrdafoe.txt").exists()
+    for zastepczy in ("cjk/alibabapuhuiti3/AlibabaPuHuiTi-3-85-Bold.ttf", "cjk/notoserifsc/NotoSerifSC-VF.ttf"):
+        p = f / zastepczy
+        assert p.is_symlink() and p.read_bytes() == b"noto" and not os.path.isabs(os.readlink(p))
+    assert ("ofl", "notoserifsc") not in zrodlo.pytania                       # 25 MB: nie pyta, od razu zastępczy
+    assert uwagi == ["/assets/fonts/latin/brak/Brak-Bold.ttf: nie ma go w google/fonts; "
+                     "wzór narysuje go krojem zastępczym albo nie wystartuje"]
+    assert "↪ Noto Sans SC zamiast: AlibabaPuHuiTi-3-85-Bold.ttf, NotoSerifSC-VF.ttf" in capsys.readouterr().out
+    zrodlo.pytania.clear()
+    assert nz.kroje_mg(mg, zrodlo) == uwagi and zrodlo.pytania == [("ofl", "brak"), ("apache", "brak")]
+
+
 def test_code_tools_helpers(monkeypatch, tmp_path):
     nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
     # starszy układ przeglądarki (chrome-linux/headless_shell) i wybór najnowszego buildu po numerze, nie alfabetycznie
@@ -578,6 +632,27 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
             assert b"export const CHARAKTERY" in r.read()
         assert (tmp_path / "jarvo-js" / "ruch.js").read_bytes() == (REPO / "profiles/jarvo-wideo/scripts/ruch.js").read_bytes()
         for zle in ("/_lib/../../sekret.txt", "/_lib/jarvo/../../sekret.txt"):
+            with pytest.raises(urllib.error.HTTPError):
+                urllib.request.urlopen(base + zle)
+    finally:
+        httpd.shutdown()
+    # preset mg: /assets/, /demos/ z instalacji wzorów, /node_modules/ = wspólne biblioteki; bez wyjścia poza nie
+    monkeypatch.setattr(nz_mod, "MGSTYLES", tmp_path / "mg")
+    (tmp_path / "mg" / "assets" / "textures").mkdir(parents=True)
+    (tmp_path / "mg" / "assets" / "textures" / "grain.png").write_bytes(b"png")
+    (tmp_path / "mg" / "demos" / "01").mkdir(parents=True)
+    (tmp_path / "mg" / "demos" / "01" / "film.js").write_text("export const f = 1;")
+    o = hw.resolve_opts("mg")
+    assert o["serwer"] and "renderAt" in o["seek"] and "getAnimations" in o["seek"] and "DEMO" in o["rozmiar_js"]
+    assert hw.aliasy(hw.resolve_opts("jarvo")) == {}
+    httpd = hw.serve(site, lib=True, alias=hw.aliasy(o))
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    try:
+        for url, tresc in (("/assets/textures/grain.png", b"png"), ("/demos/01/film.js", b"export"),
+                           ("/node_modules/three/build/three.module.js", b"ok"), ("/index.html", b"ok")):
+            with urllib.request.urlopen(base + url) as r:
+                assert tresc in r.read(), url
+        for zle in ("/assets/../../sekret.txt", "/demos/../../sekret.txt", "/node_modules/../../sekret.txt"):
             with pytest.raises(urllib.error.HTTPError):
                 urllib.request.urlopen(base + zle)
     finally:
@@ -815,3 +890,25 @@ console.log(JSON.stringify({out, ops, ruch, stoi, blad, rozc: R.rozciagniecie(0)
     assert wynik["ruch"] is True and wynik["stoi"] is False
     assert ["c", 0, "#ff330000"] in wynik["ops"] and ["c", 1, "#ff3300"] in wynik["ops"]   # ogon przezroczysty
     assert "nieznany charakter" in wynik["blad"] and wynik["rozc"] == {"sx": 1, "sy": 1}
+
+
+def test_czekaj_gotowe_mowi_dlaczego(monkeypatch):
+    """Strona bez gotowości: zamiast samego timeoutu powód (błędy JS i brakujące pliki, każdy raz)."""
+    import types
+
+    class Timeout(Exception):
+        pass
+    api = types.ModuleType("playwright.sync_api")
+    api.TimeoutError = Timeout
+    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", api)
+
+    class Strona:
+        def wait_for_function(self, warunek, timeout):
+            raise Timeout(warunek)
+    bledy = ["brak pliku /assets/fonts/x.ttf (HTTP 404)", "init failed", "init failed"]
+    with pytest.raises(SystemExit, match=r"nie jest gotowa po 60 s \(window.__ready === true\): "
+                                         r"brak pliku /assets/fonts/x.ttf \(HTTP 404\); init failed$"):
+        hw.czekaj_gotowe(Strona(), "window.__ready === true", bledy)
+    with pytest.raises(SystemExit, match="bez błędów JS i brakujących plików"):
+        hw.czekaj_gotowe(Strona(), "window.__ready === true", [])

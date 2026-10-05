@@ -115,6 +115,15 @@ sources:
     # Repo ~100 MB (szablon, dema, audio; z node_modules szablonu ~410 MB): nie kopiujemy do profilu; ten sam commit
     # instaluje na żądanie scripts/narzedzia.py Wideografa (`instaluj shotcraft`), z indeksem kart galerii, bez jej
     # filmów, edytora workbench i eksportu JianYing (SHOTCRAFT_POMIN).
+  mg-styles-15:
+    type: git
+    repo: https://github.com/Vincentwei1021/mg-styles-15
+    rev: 49052d80bfaf9fa8412cc9710530e5e95a3b8d8c
+    license: MIT
+    license_file: LICENSE
+    # 15 filmów-wzorów stylów motion design (kod, notatki stylów, okładki). Nie kopiujemy do profilu: ten sam commit
+    # instaluje na żądanie scripts/narzedzia.py Wideografa (`instaluj mg`), bez filmów, strony pokazowej, zdjęć bez
+    # opisanego źródła i modeli do Blendera (MGSTYLES_POMIN); kroje wzorów z google/fonts (kroje_mg).
   lottie:
     type: git
     repo: https://github.com/diffusionstudio/lottie
