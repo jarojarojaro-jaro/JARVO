@@ -274,9 +274,9 @@ zrodla:
     notatka: "licencja niekomercyjna (PolyForm NC): tylko pomysły, zasady i liczby własnym tekstem i kodem; zatwierdzone 2026-10-05; używane: zasady narracji, pauzy z akapitów (film.py narracja), brief do filmu Sherlocka (fakty.py), kontrole kompozycji w pomiarze"
   cinetic:
     repo: https://github.com/Leonxlnx/cinetic
-    status: czeka
+    status: odlozone
     przejrzane: bee5d7807205d5543472c38312507f9bf366cbbf
-    notatka: "MIT: biblioteka 273 ruchów + losowanie, „najpierw pomysł”, katalog tanich chwytów; propozycja 2026-10-05 bez decyzji"
+    notatka: "MIT: biblioteka 273 ruchów + losowanie, „najpierw pomysł”, katalog tanich chwytów; właściciel 2026-10-05: odpuszczamy"
   mg-styles-15:
     repo: https://github.com/Vincentwei1021/mg-styles-15
     status: uzywane
