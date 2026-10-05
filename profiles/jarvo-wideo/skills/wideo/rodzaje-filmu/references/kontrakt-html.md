@@ -183,7 +183,8 @@ python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 -
 - **Pomiar** (`pomiar.json` + `pomiar.md` obok strony): czas czytania (błąd poniżej 70% minimum dla szybkiego
   czytelnika, ostrzeżenie poniżej spokojnego czytania: znaki bez spacji / 15 + 1,5 s), tekst poza kadrem i pod UI platformy, kontrast,
   kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów; ostrzeżenia kompozycji: pusta scena,
-  brak oddechu przed cięciem i na końcu, > 3 uderzenia całego kadru. W trakcie poprawek `--tryb szybki`;
+  brak oddechu przed cięciem i na końcu, > 3 uderzenia całego kadru. Tekst w oknie z `overflow` (licznik bębnowy, pasek
+  cyfr) liczy się tylko w widocznej części, a czas czytania tylko w końcowym postoju. W trakcie poprawek `--tryb szybki`;
   film oddajesz tylko z pełnym i aktualnym raportem bez błędów (`html_wideo.py aktualny <strona>` = 0). Świadomy
   wyjątek z powodem: `--wyjatek "czas_czytania@Logo=znak marki, nie tekst do czytania"`.
 - `--subklatki N` = motion blur (render N× dłuższy): tylko na wyraźną prośbę właściciela. `--alfa -o x.mov` = przezroczyste tło.

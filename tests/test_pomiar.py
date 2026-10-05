@@ -72,6 +72,27 @@ def test_czas_czytania_i_odslanianie():
     assert [(u["kod"], u["waga"]) for u in krotko] == [("czas_czytania", "ostrz")] and "spokojne" in krotko[0]["opis"]
 
 
+def test_licznik_w_oknie_czytany_tylko_gdy_stoi():
+    """Cyfry przejeżdżające przez okno licznika (okno z overflow) to nie tekst do czytania; cyfra, która stanęła, tak."""
+    def tt(t):
+        out = []
+        if t < 1.0:                                   # „0” stoi na starcie licznika, potem odjeżdża przez krawędź okna
+            out.append({**tekst(1, "0", y0=600 - max(0, t - 0.5) * 900, y1=680 - max(0, t - 0.5) * 900), "okno": t >= 0.6})
+        if 0.5 <= t:                                  # „3” wjeżdża przez okno i stoi do końca
+            jedzie = t < 0.8
+            out.append({**tekst(2, "3", y0=600 + (0.8 - t) * 300 * jedzie), "okno": jedzie})
+        if 3.0 <= t < 3.1:                            # zwykły tekst (bez okna) mignął: dalej błąd
+            out.append(tekst(3, "9"))
+        return out
+    ust = pm.analiza(probki(5, tt), 5, HZ, None)
+    assert [(u["kod"], u["tekst"]) for u in ust if u["kod"] == "czas_czytania"] == [("czas_czytania", "9")]
+    def krotko(t):                                    # wjechał i stoi, ale za krótko: liczy się normalnie
+        if 1.0 <= t < 1.6:
+            return [{**tekst(1, "3", y0=600 + (1.2 - t) * 300 * (t < 1.2)), "okno": t < 1.2}]
+        return []
+    assert [u["kod"] for u in pm.analiza(probki(2, krotko), 2, HZ, None)] == ["czas_czytania"]
+
+
 def test_poza_kadrem_strefy_i_kontrast():
     def tt(t):
         return [tekst(1, "Superpromocja", x0=420, x1=1500, y0=1100, y1=1240, a=1.0) if 1.0 <= t < 2.0 else None,

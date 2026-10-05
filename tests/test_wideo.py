@@ -1193,3 +1193,31 @@ def test_inspiracje_ujecia_katalog_kart(tmp_path, monkeypatch, capsys):
     assert "[tylko technika: notion-ai.mp4 0:03]" in out and "style (podgląd w galerii): paper" in out
     with pytest.raises(SystemExit, match="nie ma karty 'paper'"):
         insp.main(["ujecia", "--karta", "paper"])
+
+
+SONDA_STRONA = """<html><body style="margin:0;width:400px;height:300px;overflow:hidden">
+<div style="position:absolute;inset:0;overflow:hidden">
+ <div style="position:absolute;left:20px;top:20px;width:60px;height:50px;overflow:hidden;font:40px/50px sans-serif">
+  <div style="transform:translateY(-150px)">""" + "".join(f"<div>{i}</div>" for i in range(10)) + """</div></div>
+ <div style="position:absolute;left:330px;top:200px;font:30px sans-serif;white-space:nowrap">poza kadrem</div>
+ <div style="position:absolute;left:20px;top:120px;font:30px sans-serif"><span>Chleb</span> <span>co</span> <span>rano</span></div>
+ <div style="position:absolute;left:200px;top:20px;width:80px;height:60px;overflow:hidden;font:40px/40px sans-serif">
+  <div style="transform:translateY(-45px)"><div>8</div><div>9</div></div></div>
+</div></body></html>"""
+
+
+def test_sonda_przycina_tekst_do_okna():
+    """Licznik bębnowy: pasek cyfr w oknie z overflow widać tylko w oknie (jedna cyfra). Kontener na cały kadr nie
+    przycina, więc tekst wychodzący poza kadr dalej się liczy."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    pm = load_script("profiles/jarvo-wideo/scripts/pomiar.py")
+    with sync_api.sync_playwright() as p:
+        przegladarka = hw.launch(p)
+        strona = przegladarka.new_page(viewport={"width": 400, "height": 300})
+        strona.set_content(SONDA_STRONA)
+        w = strona.evaluate(pm.SONDA_JS)
+        przegladarka.close()
+    widac = {t["seen"]: t for t in w["teksty"]}
+    assert sorted(t for t in widac if t.isdigit()) == ["3", "9"] and widac["3"]["y0"] >= 20 and widac["3"]["y1"] <= 70
+    assert widac["9"]["okno"] and not widac["3"].get("okno")              # „9” przycięte trochę, „8” całkiem: niewidoczne
+    assert widac["poza kadrem"]["x1"] > 400 and "Chleb co rano" in widac  # spacje między spanami zostają

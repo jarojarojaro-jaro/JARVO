@@ -27,8 +27,10 @@ Liczby sprawdzamy, gdy obok strony albo katalog wyżej leży fakty.json (brief S
 Raport ma odcisk źródeł (pliki animacji, ustawienia pomiaru i fakty.json): zmiana czegokolwiek = raport nieaktualny. Film z kodu
 HTML oddajesz tylko z pełnym (`--tryb pelny`) i aktualnym raportem bez błędów; świadomy wyjątek (`--wyjatek`) ma powód.
 Tekst rysowany na kanwie/WebGL animacja podaje sama: `window.__teksty()` → [{tekst, x, y, w, h, kolor, rozmiar, krycie,
-widoczny?, id?}] dla bieżącej klatki (kontrakt HTML). Ograniczenia: maski (overflow: hidden) liczone jako widoczne;
-tło pod tekstem to mediana pikseli wokół glifów. Kontrole kompozycji (pusta scena, oddech, uderzenia) to przybliżenia
+widoczny?, id?}] dla bieżącej klatki (kontrakt HTML). Okno z overflow (np. licznik bębnowy) przycina tekst: liczy się
+tylko jego widoczna część (ucięty o ponad połowę = niewidoczny), a tekst, który przez okno przejeżdżał, czytamy
+tylko w końcowym postoju; okno na cały kadr nie przycina (tekst poza kadrem zostaje błędem). Ograniczenia: clip-path
+i mask-image liczone jako widoczne; tło pod tekstem to mediana pikseli wokół glifów. Kontrole kompozycji (pusta scena, oddech, uderzenia) to przybliżenia
 z małych klatek (zasady: rodzaje-filmu/references/ruch-i-kompozycja.md, za shotcraft i anything2explainer): ostrzegają,
 nie blokują.
 """
@@ -61,7 +63,8 @@ POMIN_W_ODCISKU = {"out", "node_modules", ".git", "__pycache__", "klatki", "rend
 WYJSCIA_EXT = {".mp4", ".mov", ".webm", ".gif", ".mkv"}
 
 # Sonda w przeglądarce: bloki tekstu (najbliższy przodek blokowy węzłów tekstowych), widoczna część tekstu (węzły
-# z kryciem ≥ 0,5), granice glifów (Range.getClientRects), krycie, kolor, cień/obrys, rozmiar i krój.
+# z kryciem ≥ 0,5, glify przycięte do okien z overflow mniejszych niż kadr), granice glifów (Range.getClientRects),
+# krycie, kolor, cień/obrys, rozmiar i krój.
 SONDA_JS = r"""() => {
   const W = innerWidth, H = innerHeight;
   const ids = window.__jarvoPomiar || (window.__jarvoPomiar = { m: new WeakMap(), n: 0 });
@@ -70,15 +73,44 @@ SONDA_JS = r"""() => {
     const s = getComputedStyle(e); if (s.display === "none" || s.visibility === "hidden") return 0; o *= parseFloat(s.opacity || "1"); } return o; };
   const blockOf = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) {
     const d = getComputedStyle(e).display; if (!/^inline/.test(d) && d !== "contents") return e; } return document.body; };
+  // okno przycinające: część wspólna przodków z overflow ≠ visible, mniejszych niż kadr (kadr przycina sam: poza kadrem)
+  const clips = new Map();
+  const clipOf = (el) => { if (clips.has(el)) return clips.get(el);
+    let c = null;
+    for (let e = el; e && e !== document.body && e !== document.documentElement; e = e.parentElement) {
+      const s = getComputedStyle(e), ox = s.overflowX !== "visible", oy = s.overflowY !== "visible";
+      if (!ox && !oy) continue;
+      const r = e.getBoundingClientRect();
+      if (r.left <= 0 && r.top <= 0 && r.right >= W && r.bottom >= H) continue;
+      const q = { l: ox ? r.left : -1e9, t: oy ? r.top : -1e9, r: ox ? r.right : 1e9, b: oy ? r.bottom : 1e9 };
+      c = c ? { l: Math.max(c.l, q.l), t: Math.max(c.t, q.t), r: Math.min(c.r, q.r), b: Math.min(c.b, q.b) } : q;
+    }
+    clips.set(el, c); return c; };
+  const przytnij = (q, c) => { if (!c) return q;
+    const l = Math.max(q.left, c.l), t = Math.max(q.top, c.t), r = Math.min(q.right, c.r), b = Math.min(q.bottom, c.b);
+    return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t }; };
   const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = tw.nextNode(); n; n = tw.nextNode()) {
     const txt = n.nodeValue.replace(/\s+/g, " ");
-    if (!txt.trim() || !n.parentElement || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(n.parentElement.tagName)) continue;
+    if (!n.parentElement || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(n.parentElement.tagName)) continue;
+    if (!txt.trim()) {                     // spacja między słowami w osobnych spanach (typografia słowo po słowie)
+      const x = blocks.get(ids.m.get(blockOf(n.parentElement)));
+      if (x && txt) { if (!x.full.endsWith(" ")) x.full += " "; if (x.seen && !x.seen.endsWith(" ")) x.seen += " "; }
+      continue;
+    }
     const b = blockOf(n.parentElement);
     if (!ids.m.has(b)) ids.m.set(b, ++ids.n);
     const id = ids.m.get(b);
     const r = document.createRange(); r.selectNodeContents(n);
-    const rects = [...r.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5);
+    const okno = clipOf(n.parentElement);
+    let ciety = false;
+    const rects = [];
+    for (const q0 of r.getClientRects()) {
+      if (q0.width <= 0.5 || q0.height <= 0.5) continue;
+      const q = przytnij(q0, okno);
+      if (q.width < q0.width - 0.5 || q.height < q0.height - 0.5) ciety = true;
+      if (q.width >= q0.width * 0.5 && q.height >= q0.height * 0.5) rects.push(q);   // ucięty o ponad połowę: nieczytelny
+    }
     const a = opac(n.parentElement);
     let x = blocks.get(id);
     if (!x) { const s = getComputedStyle(n.parentElement);
@@ -87,6 +119,7 @@ SONDA_JS = r"""() => {
             stroke: parseFloat(s.webkitTextStrokeWidth || "0") > 0 ? s.webkitTextStrokeColor : "" };
       blocks.set(id, x); }
     x.full += txt;
+    if (ciety) x.okno = true;
     if (a >= 0.5 && rects.length) {
       x.seen += txt; x.a = Math.max(x.a, a);
       for (const q of rects) { x.x0 = Math.min(x.x0, q.left); x.y0 = Math.min(x.y0, q.top); x.x1 = Math.max(x.x1, q.right); x.y1 = Math.max(x.y1, q.bottom); }
@@ -207,12 +240,21 @@ def analiza(probki: list[dict], dlugosc: float, hz: float, platforma: str | None
     for tid, ciag in przebieg.items():
         pelny = max((x["full"] for _, x in ciag), key=len)
         krotki = pelny if len(pelny) <= 60 else pelny[:57] + "…"
-        # czas czytania: chwile, gdy cały tekst jest odsłonięty i dobrze widoczny
-        dostepny = sum(dt for _, x in ciag if x["a"] >= 0.6 and len(x["seen"]) >= len(pelny) * 0.98)
+        # czas czytania: chwile, gdy cały tekst jest odsłonięty i dobrze widoczny. Tekst, który przejeżdżał przez
+        # okno (licznik bębnowy, pasek cyfr), czytamy tylko w końcowym postoju: cyfra w drodze to klatka licznika
+        czytany = ciag
+        if any(x.get("okno") for _, x in ciag):
+            czytany = []
+            for i in range(len(ciag) - 1, 0, -1):
+                (ta, a), (tb, b) = ciag[i - 1], ciag[i]
+                if b.get("okno") or abs(tb - ta - dt) > dt / 2 or abs(b["y0"] - a["y0"]) > 0.5 or abs(b["x0"] - a["x0"]) > 0.5:
+                    break
+                czytany.insert(0, ciag[i])
+        dostepny = sum(dt for _, x in czytany if x["a"] >= 0.6 and len(x["seen"]) >= len(pelny) * 0.98)
         minimum = czas_czytania(pelny, jezyk)
         potrzeba = max(minimum, czas_wygodny(pelny))
         t0, t1 = ciag[0][0], ciag[-1][0] + dt
-        if potrzeba and dostepny < potrzeba:
+        if potrzeba and czytany and dostepny < potrzeba:
             waga = "blad" if dostepny < minimum * 0.7 else "ostrz"
             out.append(_ustalenie("czas_czytania", waga, f"„{krotki}” czytelny {dostepny:.1f} s, potrzeba ok. {potrzeba:.1f} s"
                                   + (f" (szybki czytelnik: {minimum:.1f} s)" if waga == "blad" else " na spokojne przeczytanie"),
