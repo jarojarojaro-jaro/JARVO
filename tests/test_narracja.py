@@ -71,6 +71,25 @@ def test_parsowanie_bledy_i_ostrzezenia_tekstu():
     assert film.parse_narracja("// sam komentarz\n\n# Tytuł bez zdań\n")["bledy"] == ["narracja bez zdań"]
 
 
+def test_kontrola_tekstu_z_zasad_narracji():
+    """Start od powitania albo definicji, akapity jak lista, lektor opisujący obraz, koniec, który streszcza, rozdział
+    bez pytania; dobry tekst bez ostrzeżeń."""
+    zly = ("Cześć, dziś opowiem o kolejkach.\nPo pierwsze piekarz.\n\nPo drugie klienci.\nNa ekranie widzisz wykres.\n\n"
+           "# Drugi\nKolejny akapit.\n\nPodsumowując, kolejki są złe.\n")
+    o = film.parse_narracja(zly)["ostrzezenia"]
+    assert any("start od powitania" in x for x in o) and any("wiersze 4, 8: akapity zaczynają się jak lista" in x for x in o)
+    assert any("opisuje obraz („Na ekranie”)" in x for x in o) and any("wiersz 10: koniec streszcza" in x for x in o)
+    assert any("wiersz 5: rozdział 1 nie kończy się pytaniem" in x for x in o)
+    assert "start od definicji" in film.parse_narracja("Kolejka to zjawisko społeczne.")["ostrzezenia"][0]
+    assert "start od definicji" in film.parse_narracja("RAG, czyli wyszukiwanie przed odpowiedzią.")["ostrzezenia"][0]
+    dobry = ("Wchodzisz do piekarni o siódmej rano.\nPrzed tobą dziesięć osób.\n\n# Dlaczego\nSkąd ta kolejka?\n\n"
+             "# Mechanizm\nBo chleb kroi się dopiero przy ladzie.\nWięc każdy klient to minuta.\n")
+    assert film.parse_narracja(dobry)["ostrzezenia"] == ["wiersz 2: rozdział 1 nie kończy się pytaniem, na które "
+                                                          "odpowiada następny (zasada 9)"]
+    assert film.parse_narracja(NARRACJA.replace("bochenków.{po}", "bochenków?{po}"))["ostrzezenia"] == [
+        "wiersz 3: kilka zdań w jednej linii: każde zdanie w osobnej (pauzy i chwile liczone na linię)"]
+
+
 def test_czasy_tokenow_po_literach_takze_w_sklejonym_slowie():
     tokeny = ["W", "2024", "roku", "sprzedano", "3,5", "mln"]
     slowa = [wl.Word(0.0, 0.1, "W"), wl.Word(0.1, 1.1, "2024 roku"), wl.Word(1.1, 1.5, "sprzedano"),

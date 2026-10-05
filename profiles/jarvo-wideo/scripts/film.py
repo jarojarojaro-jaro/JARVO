@@ -576,6 +576,46 @@ SKROTY = {"np", "m.in", "tj", "tzw", "ok", "godz", "ul", "r", "tys", "mln", "mld
           "wg", "pt", "ww", "al", "św", "tel", "min", "sek", "proc"}
 
 
+# zasady narracji (skill scenariusz, references/narracja.md): to, co da się złapać ze słów
+START_POWITANIE = re.compile(r"^(cześć|dzień dobry|witaj\w*|hej\b|w tym (filmie|odcinku|materiale)|dziś (opowiem|pokażę|powiem)"
+                             r"|dzisiaj (opowiem|pokażę|powiem)|chcę (wam|ci) (opowiedzieć|pokazać))", re.I)
+START_DEFINICJA = re.compile(r"^[\w-]+(?:,? [\w-]+){0,3},? (to|oznacza|czyli|nazywamy|jest to)\b", re.I)
+AKAPIT_LISTA = re.compile(r"^(po (pierwsze|drugie|trzecie|czwarte|piąte)|kolejn\w*|następn\w*|ponadto|dodatkowo|poza tym"
+                          r"|oprócz tego|warto (też|również)|(druga|trzecia|czwarta) rzecz)\b", re.I)
+OPIS_OBRAZU = re.compile(r"\b(na ekranie|jak widać|jak widzisz|widzisz tu\w*|tutaj widzimy|spójrz na"
+                         r"|na (tym )?(wykresie|obrazku|zdjęciu|animacji|schemacie) (widać|widzisz))\b", re.I)
+KONIEC_STRESZCZA = re.compile(r"^(podsumowując|podsumowanie|reasumując|w skrócie|krótko mówiąc|tak więc|na koniec podsumujmy)\b", re.I)
+
+
+def kontrola_tekstu(rozdzialy: list[dict]) -> list[str]:
+    """Ostrzeżenia z zasad narracji: start od powitania albo definicji, akapity jak lista, lektor opisujący obraz,
+    koniec, który streszcza, rozdział bez pytania na końcu. Linii opowieści i skali liczb skrypt nie oceni."""
+    akapity = [a for r in rozdzialy for a in r["akapity"]]
+    if not akapity:
+        return []
+    out = []
+    pierwsza = akapity[0][0]
+    if START_POWITANIE.match(pierwsza["tekst"]):
+        out.append(f"wiersz {pierwsza['wiersz']}: start od powitania; zacznij w sytuacji widza (scenariusz/references/narracja.md, zasada 1)")
+    elif START_DEFINICJA.match(pierwsza["tekst"]):
+        out.append(f"wiersz {pierwsza['wiersz']}: start od definicji; zacznij w sytuacji widza, nazwę podaj później (zasady 1 i 6)")
+    lista = [a[0]["wiersz"] for a in akapity if AKAPIT_LISTA.match(a[0]["tekst"])]
+    if len(lista) >= 2:
+        out.append(f"wiersze {', '.join(map(str, lista))}: akapity zaczynają się jak lista; połącz je przyczyną "
+                   f"(więc, ale, dlatego), żeby była jedna linia opowieści (zasada 2)")
+    out += [f"wiersz {ln['wiersz']}: lektor opisuje obraz („{m.group(0)}”); powiedz to, czego obraz nie mówi (zasada 7)"
+            for a in akapity for ln in a if (m := OPIS_OBRAZU.search(ln["tekst"]))]
+    out += [f"wiersz {ln['wiersz']}: koniec streszcza; wróć do sytuacji z początku i pokaż ją inaczej (zasada 8)"
+            for ln in akapity[-1] if KONIEC_STRESZCZA.match(ln["tekst"])]
+    if len(rozdzialy) > 1:
+        for i, r in enumerate(rozdzialy[:-1], 1):
+            ostatnie = r["akapity"][-1][-1]
+            if not ostatnie["tekst"].rstrip().endswith("?"):
+                nazwa = f"rozdział {i}" + (f" „{r['tytul']}”" if r["tytul"] else "")
+                out.append(f"wiersz {ostatnie['wiersz']}: {nazwa} nie kończy się pytaniem, na które odpowiada następny (zasada 9)")
+    return out
+
+
 def _znaki(s: str) -> str:
     return re.sub(r"[^\w]", "", s.lower())
 
@@ -660,6 +700,7 @@ def parse_narracja(tekst: str) -> dict:
     rozdzialy = [r for r in rozdzialy if r["akapity"]]
     if not rozdzialy:
         bledy.append("narracja bez zdań")
+    ostrz += kontrola_tekstu(rozdzialy)
     for r in rozdzialy:
         for a in r["akapity"]:
             if len(a) > ZDAN_W_UJECIU:

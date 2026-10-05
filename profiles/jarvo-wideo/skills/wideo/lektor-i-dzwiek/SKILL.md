@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-03"
+    reviewed: "2026-10-05"
 ---
 
 # Lektor i dźwięk
@@ -41,8 +41,9 @@ w akapicie, 1 s po akapicie (tu tnie się ujęcie), 1,5 s przed rozdziałem. Fil
 w pauzie, a nie w środku zdania; liczysz ok. 2 słowa na sekundę filmu (60 s ≈ 120 słów, 90 s ≈ 180).
 Jedno zdanie na linię: dwa zdania w linii Edge rozdziela własną, nierówną pauzą (zmierzone: ponad 1 s), więc
 `narracja` o tym ostrzega. Ostrzega też o zdaniu > 20 słów, napisie > 42 znaków, akapicie > 4 zdań, ujęciu < 4 s,
-tempie > 2,7 słowa/s razem z pauzami (Marek przy `+0%` mówi ok. 2,3) i długości poza `--cel`.
-`--sprawdz` = sama kontrola tekstu i szacunek, bez syntezy.
+tempie > 2,7 słowa/s razem z pauzami (Marek przy `+0%` mówi ok. 2,3) i długości poza `--cel`, a z zasad
+narracji (`scenariusz/references/narracja.md`) o powitaniu albo definicji na start, liście zamiast opowieści,
+opisie obrazu i streszczeniu na końcu. `--sprawdz` = sama kontrola tekstu i szacunek, bez syntezy.
 
 ## Wymowa
 - Liczby tak, jak mają zabrzmieć („trzydzieści procent” gdy „30%” brzmi źle), skróty rozwinięte („między innymi”).

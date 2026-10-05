@@ -24,11 +24,14 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 ## Struktura
 | 60 s | 30 s | Scena |
 |---|---|---|
-| 0–3 | 0–2 | **Hak:** pytanie, paradoks albo zaskakująca liczba („Światło, które widzisz, błądziło w Słońcu tysiące lat”) |
+| 0–3 | 0–2 | **Hak:** sytuacja widza, pytanie, paradoks albo zaskakująca liczba („Światło, które widzisz, błądziło w Słońcu tysiące lat”); nie definicja, nie powitanie |
 | 3–10 | 2–6 | **Stawka:** dlaczego to ważne dla widza |
 | 10–45 | 6–24 | **Mechanizm** w 3–4 krokach; krok = scena = jedna idea formalna (zoom, przekrój, licznik, porównanie) |
 | 45–55 | 24–28 | **Przykład z życia** albo zaskakujący wniosek |
-| 55–60 | 28–30 | **Jedno zdanie podsumowania** + CTA (jeśli karta go chce) |
+| 55–60 | 28–30 | **Puenta:** koniec odwraca początek (wraca do sytuacji z haka i pokazuje ją inaczej), nie streszcza; CTA tylko, gdy karta go chce |
+
+Tekst lektora według zasad narracji (`scenariusz/references/narracja.md`: start w sytuacji, jedna linia opowieści,
+liczba w skali, którą czuć, koniec odwraca początek); `film.py narracja --sprawdz` łapie to, co widać ze słów.
 
 ## Rzemiosło
 - Symuluj zamiast rysować: błądzenie losowe to prawdziwe błądzenie (z ziarnem), orbita liczona z prawa, nie klatki z ręki.
@@ -38,7 +41,7 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 - Lektor najpierw: `narracja.txt` (zdanie w linii, akapit = ujęcie) → `film.py narracja` → `lektor.wav` z pauzami
   z akapitów i `os_czasu.json`; animacja bierze chwile po nazwie (`kontrakt-html.md`, „Film z lektorem”), więc nowe
   nagranie lektora jej nie psuje. Na ekranie ≤ 6 słów naraz (reszta w napisach).
-- Jedna metafora wizualna na pojęcie; porównania do rzeczy znanych („jak stadion pełen…”).
+- Jedna analogia prowadzi przez cały film, jedna metafora wizualna na pojęcie; porównania do znanych („jak stadion…”).
 - **Bez efektu PowerPointa** (`ruch-i-kompozycja.md` rozdz. 3): jeden wolny najazd kamery na ujęcie, nowy element
   tylko na ważnym zdaniu, stary ustępuje nowemu, ≤ 3 grupy naraz, jeden bohater ≥ 1/4 krótszego boku kadru.
 

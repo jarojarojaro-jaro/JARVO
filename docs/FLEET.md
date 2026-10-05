@@ -253,7 +253,9 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 - **filmy z kodu** (HyperFrames, Manim) i **ujęcia z AI** (`video_generate`, obraz → wideo, rejestr kosztów);
   lektor filmu z kodu z pliku narracji (`film.py narracja`: zdanie w linii, akapit = ujęcie, pauzy 0,33 s / 1 s /
   1,5 s, oś czasu `os_czasu.json` z chwilami po nazwie, które animacja bierze z `/_lib/jarvo/os_czasu.js`, więc nowe
-  nagranie lektora jej nie psuje),
+  nagranie lektora jej nie psuje; tekst pisany według zasad narracji: start w sytuacji widza, jedna linia opowieści,
+  liczba w skali, którą czuć, koniec odwraca początek, a `--sprawdz` łapie powitanie, definicję na start, listę
+  zamiast opowieści, opis obrazu i streszczenie na końcu),
 
 **Jakość:** `qa_wideo.py` (kodeki, format, długość, LUFS i rozpiętość głośności LRA, czarne i zamrożone klatki, pojedyncze „mrugnięcia” klatek, arkusz ze strefami UI 9:16). **Rytm i wzór:** `rytm.py` (BPM, takty, drop pod cięcia, perkusja: stopa, werbel, talerze; `sprawdz` po renderze: każde cięcie kontra bit), `muzyka.py` (muzyka pod obraz pisana kodem z mgaudio, MIT: gatunek ze stylu, kulminacja i koniec z osi filmu, efekty w tych samych chwilach, −14 LUFS, słyszalność efektów; dodatek `narzedzia.py instaluj mgaudio`, ok. 450 MB), `kadry.py wzor` (film-wzór → klatki co 0,5 s, cięcia, rytm → mapa bitów)
 + `kontrola-wideo` (ocena 0–100 w 10 osiach, PASS od 85, najwyżej 2 rundy poprawek). Każde ujęcie oglądane (vision),

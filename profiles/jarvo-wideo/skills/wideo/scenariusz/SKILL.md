@@ -1,7 +1,7 @@
 ---
 name: scenariusz
 description: "Scenariusz krótkiego wideo: hook, rytm, tekst lektora."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,13 +11,15 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-09-30"
+    reviewed: "2026-10-05"
 ---
 
 # Scenariusz krótkiego wideo
 
 Film krótki wygrywa w pierwszych 2 sekundach i przegrywa na każdej zbędnej. Wzorce hooków i struktur z polskimi
 przykładami: `references/hooki.md`; metoda (trzy warstwy, 18 taktyk, korpus słów klientów): skill `hooki`.
+Film, który coś wyjaśnia (explainer, „wyjaśnij mi filmem”, film z kodu z lektorem): zasady narracji, budżet słów
+i kontrola w `references/narracja.md`, tekst w pliku `narracja.txt` dla `film.py narracja`.
 
 ## Kiedy użyć
 - Przed każdym filmem z lektorem albo tekstem na ekranie (`krotki-film`, `film-z-kodu`, `warianty-ab`).
@@ -42,7 +44,8 @@ formie bierz tylko zasady (hak = zwrot wartości, jedna scena = jedna zmiana), n
 
 ## Kroki
 1. **Jedno zdanie przesłania** („Widz ma wyjść z przekonaniem, że…”). Nie da się → temat za szeroki, zawęź.
-2. **Budżet słów:** długość × 2,5 słowa/s (lektor Edge +0%); 30 s ≈ 70 słów. Hook ≤ 12 słów, scena ≤ 22.
+2. **Budżet słów:** krótki film (`film.py render`) długość × 2,5 słowa/s (lektor Edge +0%), 30 s ≈ 70 słów;
+   film z narracją (`film.py narracja`, pauzy z akapitów) × 2, 60 s ≈ 120 słów. Hook ≤ 12 słów, scena ≤ 22.
 3. **Hook (0–2 s):** wzorzec z `references/hooki.md`, taktyka ze skilla `hooki`; konkret, liczba, konflikt albo
    obietnica; bez „Cześć, dziś…”. Wypisz **trzy warstwy**: obraz pierwszej sekundy, zdanie lektora, tekst ekranowy
    (≤ 5 słów, zrozumiały bez dźwięku). Tekst ekranowy nie powtarza lektora: dokłada stawkę albo wywołuje odbiorcę.
@@ -58,6 +61,8 @@ formie bierz tylko zasady (hak = zwrot wartości, jedna scena = jedna zmiana), n
 ## Wyjścia
 - `out/wideo/SCENARIUSZ.md`: przesłanie, odbiorca, długość, tabela scen (nr, tekst lektora, tekst ekranowy, obraz,
   zapytanie stock, czas szacowany), CTA, źródła faktów.
+- Film z narracją: `out/wideo/src/narracja.txt` (zdanie w linii, akapit = ujęcie) i wynik
+  `film.py narracja --sprawdz` bez ostrzeżeń albo z powodem w RAPORT.
 
 ## Definition of Done
 - [ ] jedno przesłanie; hook ≤ 12 słów i ≤ 2,5 s czytania, trzy warstwy hooka bez powtórzeń,
