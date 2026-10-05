@@ -5,6 +5,7 @@
     python3 narzedzia.py instaluj [motion|lemo|anidoodle|animacja|remotion|shotcraft|html|lottie|wszystko]
     python3 narzedzia.py env <narzedzie>         # zmienne środowiska do wklejenia: eval "$(python3 narzedzia.py env motion)"
     python3 narzedzia.py link <katalog>          # <katalog>/node_modules → wspólne (skrypty .mjs nie czytają NODE_PATH)
+    python3 narzedzia.py kroje <katalog>         # brakujące kroje z <katalog>/fonts.css: google/fonts (OFL) + polskie znaki
 
 Narzędzia: motion (motion-broll), lemo (lemo-opuscar), anidoodle, remotion (skill remotion-best-practices, iart),
 shotcraft (video-shotcraft na Remotion), html (html_wideo.py: animacja HTML → klatki / MP4; pixel2motion, iart,
@@ -26,6 +27,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -408,6 +410,121 @@ def link(target: Path) -> Path:
     return nm
 
 
+POLSKIE = "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ"
+GOOGLE_FONTS_REPO = "https://github.com/google/fonts.git"
+
+
+def znaki_kroju(path: Path) -> set[int]:
+    """Kody znaków z tabeli cmap pliku TTF/OTF (formaty 4 i 12), bez dodatkowych bibliotek."""
+    data = path.read_bytes()
+    u16 = lambda o: struct.unpack_from(">H", data, o)[0]                  # noqa: E731
+    cmap = next((struct.unpack_from(">II", data, 12 + 16 * i + 8) for i in range(u16(4))
+                 if data[12 + 16 * i:16 + 16 * i] == b"cmap"), None)
+    kody: set[int] = set()
+    if not cmap:
+        return kody
+    off = cmap[0]
+    for i in range(u16(off + 2)):
+        s = off + struct.unpack_from(">I", data, off + 8 + 8 * i)[0]
+        fmt = u16(s)
+        if fmt == 4:
+            seg = u16(s + 6) // 2
+            ends, starts = s + 14, s + 16 + 2 * seg
+            deltas, ranges = starts + 2 * seg, starts + 4 * seg
+            for k in range(seg):
+                a, b = u16(starts + 2 * k), u16(ends + 2 * k)
+                delta, ro = struct.unpack_from(">h", data, deltas + 2 * k)[0], u16(ranges + 2 * k)
+                for c in range(a, min(b, 0xFFFE) + 1):
+                    g = (c + delta) & 0xFFFF if ro == 0 else u16(ranges + 2 * k + ro + 2 * (c - a))
+                    if g:
+                        kody.add(c)
+        elif fmt == 12:
+            for k in range(struct.unpack_from(">I", data, s + 12)[0]):
+                a, b, _ = struct.unpack_from(">III", data, s + 16 + 12 * k)
+                kody.update(range(a, b + 1))
+    return kody
+
+
+class GoogleFonts:
+    """Kroje OFL z repo google/fonts przez git (bez API GitHuba, które ma limit zapytań): płytki klon bez plików
+    w ROOT/google-fonts (same drzewa katalogów), plik kroju dociągany dopiero przy odczycie."""
+
+    def __init__(self, repo: Path | None = None) -> None:
+        self.repo = repo or ROOT / "google-fonts"
+        self.odswiezone = False
+
+    def _git(self, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", "-C", str(self.repo), *args], capture_output=True)
+
+    def pliki(self, rodzina: str) -> list[str]:
+        if not (self.repo / "HEAD").exists():
+            self.repo.parent.mkdir(parents=True, exist_ok=True)
+            run(["git", "clone", "--quiet", "--bare", "--depth=1", "--filter=blob:none", GOOGLE_FONTS_REPO, str(self.repo)])
+            self.odswiezone = True
+        out = self._git("ls-tree", "--name-only", "HEAD", f"ofl/{rodzina}/").stdout.decode()
+        if not out and not self.odswiezone:                  # rodzina nowsza niż nasza kopia: raz odśwież
+            self._git("fetch", "--quiet", "--depth=1", "origin", "+HEAD:HEAD")
+            self.odswiezone = True
+            out = self._git("ls-tree", "--name-only", "HEAD", f"ofl/{rodzina}/").stdout.decode()
+        return [line.rsplit("/", 1)[-1] for line in out.splitlines()]
+
+    def plik(self, rodzina: str, nazwa: str) -> bytes:
+        p = self._git("cat-file", "blob", f"HEAD:ofl/{rodzina}/{nazwa}")
+        if p.returncode:
+            raise OSError(p.stderr.decode().strip() or f"brak ofl/{rodzina}/{nazwa}")
+        return p.stdout
+
+
+def dopasuj_kroj(nazwa: str, pliki: list[str]) -> str | None:
+    """Plik z katalogu google/fonts dla nazwy z fonts.css: dokładny, a inaczej zmienny (`Rodzina[wght].ttf`,
+    z kursywą, gdy nazwa ją ma), a gdy go brak, statyczny o tym samym stylu (`-Bold`); nazwa bez stylu bierze
+    Regular/Italic. Innej grubości nie podstawia (Black zamiast Regular zmieniłby wygląd po cichu)."""
+    if nazwa in pliki:
+        return nazwa
+    kursywa = "italic" in nazwa.lower()
+    ttf = sorted(p for p in pliki if p.lower().endswith((".ttf", ".otf")) and ("italic" in p.lower()) == kursywa)
+    zmienne = [p for p in ttf if "[" in p]
+    if zmienne:
+        return zmienne[0]
+    styl = re.search(r"-([A-Za-z]+)\.(?:ttf|otf)$", nazwa)
+    kandydat = styl.group(1) if styl else ("Italic" if kursywa else "Regular")
+    trafione = [p for p in ttf if p.rsplit(".", 1)[0].endswith("-" + kandydat)]
+    if trafione:
+        return trafione[0]
+    return None if styl or len(ttf) != 1 else ttf[0]
+
+
+def kroje(katalog: Path, zrodlo: GoogleFonts | None = None) -> list[str]:
+    """Kroje wymienione w <katalog>/fonts.css, których nie ma obok: pobiera z github.com/google/fonts (OFL) razem
+    z licencją i sprawdza polskie znaki w każdym. Zwraca uwagi; pusta lista = wszystko jest i ma polskie znaki."""
+    css = (katalog / "fonts.css").read_text(encoding="utf-8")
+    zrodlo = zrodlo or GoogleFonts()
+    uwagi, katalogi = [], {}
+    for nazwa in dict.fromkeys(re.findall(r"url\(\s*['\"]?([^'\")]+?)['\"]?\s*\)", css)):
+        if "/" in nazwa or not nazwa.lower().endswith((".ttf", ".otf")):
+            continue
+        cel = katalog / nazwa
+        if not cel.exists():
+            rodzina = re.split(r"[-.\[]", nazwa)[0].lower()
+            if rodzina not in katalogi:
+                katalogi[rodzina] = zrodlo.pliki(rodzina)
+            pliki = katalogi[rodzina]
+            wybor = dopasuj_kroj(nazwa, pliki)
+            if not wybor:
+                uwagi.append(f"{nazwa}: nie ma go w google/fonts (ofl/{rodzina}); pobierz ręcznie albo zmień krój")
+                continue
+            cel.write_bytes(zrodlo.plik(rodzina, wybor))
+            licencje = {p.name.lower() for p in katalog.glob("*.txt")}       # OFL-Rodzina.txt albo OFL.txt obok
+            if "OFL.txt" in pliki and not licencje & {f"ofl-{rodzina}.txt", "ofl.txt"}:
+                (katalog / f"OFL-{rodzina}.txt").write_bytes(zrodlo.plik(rodzina, "OFL.txt"))
+            print(f"↓ {nazwa} ← google/fonts ofl/{rodzina}/{wybor}", flush=True)
+        brak = [z for z in POLSKIE if ord(z) not in znaki_kroju(cel)]
+        if brak:
+            uwagi.append(f"{nazwa}: brak polskich znaków {''.join(brak)} (przeglądarka podstawi inny krój): "
+                         "zmień krój na taki z polskimi znakami")
+    return uwagi
+
+
 def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
@@ -421,6 +538,16 @@ def main(argv: list[str] | None = None) -> int:
         for k, v in env_for(args[1] if len(args) > 1 else "").items():
             print(f"export {k}={json.dumps(v)}")
         return 0
+    if cmd == "kroje":
+        if len(args) < 2:
+            raise SystemExit("kroje <katalog z fonts.css>")
+        try:
+            uwagi = kroje(Path(args[1]))
+        except (OSError, subprocess.CalledProcessError) as e:
+            print(f"! nie mogę pobrać krojów z google/fonts: {e}", file=sys.stderr)
+            return 1
+        print("\n".join(f"! {u}" for u in uwagi) or "kroje gotowe, wszystkie z polskimi znakami")
+        return 1 if uwagi else 0
     if cmd == "link":
         if len(args) < 2:
             raise SystemExit("link <katalog>")

@@ -47,6 +47,12 @@ cat "$LIB/AGENTS.md"; sed -n 1,80p "$LIB/styles/README.md"         # potem DIREC
 - `sh $SK/scripts/setup.sh` znajdzie bibliotekę w `$LEMO_OPUSCAR_HOME` (przypięty commit, bez aktualizacji).
   `setup.sh deps` pomijamy: pakiety są gotowe po `instaluj lemo`. Demo stylu, dopiero po `TREATMENT.md`:
   `sh $SK/scripts/setup.sh demo <slug>`.
+- **Kroje.** Pliki krojów z `fonts.css` dema i projektu nie są w repo biblioteki.
+  `python3 $HERMES_HOME/scripts/narzedzia.py kroje <projekt>/fonts` pobiera brakujące z google/fonts (OFL, licencja
+  obok) i sprawdza polskie znaki w każdym `.ttf`/`.otf`; kod 1 = są uwagi. „Brak polskich znaków” (np. Share Tech
+  Mono, Oleo Script) = zmień krój w `fonts.css` na podobny z polskimi znakami (JetBrains Mono, Lobster), bo inaczej
+  przeglądarka wstawi inny krój w środek słowa. Podzbiory `woff2` w `core/fonts/` nie są sprawdzane: polski tekst
+  idzie krojem z `fonts.css` projektu.
 - **Czas czytania.** Strona wystawia `window.TEXTS = t => [{id, text, x0, y0, x1, y1}]` (każdy napis widoczny w chwili
   `t`, pełny tekst od pierwszej klatki, także przy efekcie maszyny do pisania). Przed renderem
   `cd "$LIB" && node core/render/readcheck.mjs "<projekt>"`: 0 = każdy napis stoi ≥ litery/15 + 1,5 s, 1 = za krótko

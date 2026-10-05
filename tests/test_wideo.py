@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import struct
 import subprocess
 import sys
 
@@ -359,6 +360,67 @@ def test_lemo_markers_match_skill_setup(monkeypatch, tmp_path):
     assert nz.lemo_poziomy() == ["core", "music"]
     monkeypatch.setenv("JARVO_EXTRAS", "lemo")
     assert nz.lemo_poziomy() == ["core", "music", "voice"]
+
+
+def _zapisz(p, dane: bytes):
+    p.write_bytes(dane)
+    return p
+
+
+def _ttf(*znaki: str) -> bytes:
+    """Najmniejszy plik TTF z samą tabelą cmap (format 4): każdy znak wskazuje glif 1."""
+    kody = sorted(ord(z) for z in znaki) + [0xFFFF]
+    n = len(kody)
+    pole = lambda wartosci: b"".join(struct.pack(">H", w & 0xFFFF) for w in wartosci)   # noqa: E731
+    sub = (struct.pack(">HHHHHHH", 4, 16 + 8 * n, 0, 2 * n, 0, 0, 0) + pole(kody) + b"\0\0" + pole(kody)
+           + pole([1 - k for k in kody]) + pole([0] * n))
+    cmap = struct.pack(">HHHHI", 0, 1, 3, 1, 12) + sub
+    return struct.pack(">IHHHH", 0x10000, 1, 16, 0, 0) + b"cmap" + struct.pack(">III", 0, 28, len(cmap)) + cmap
+
+
+def test_kroje_from_google_fonts_and_polish_letters(tmp_path, capsys):
+    """`narzedzia.py kroje`: brakujące kroje z fonts.css dochodzą z google/fonts z licencją, a krój bez polskich
+    liter (albo spoza google/fonts) trafia do uwag; innej grubości nie podstawia."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    pl, ascii_ = _ttf(*"abcąćęłńóśźżĄĆĘŁŃÓŚŹŻ"), _ttf(*"abcó")
+    assert set(map(chr, nz.znaki_kroju(_zapisz(tmp_path / "pl.ttf", pl)))) == set("abcąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
+    assert nz.dopasuj_kroj("BodoniModa-Italic-VF.ttf", ["BodoniModa[opsz,wght].ttf",
+                                                        "BodoniModa-Italic[opsz,wght].ttf"]) == "BodoniModa-Italic[opsz,wght].ttf"
+    assert nz.dopasuj_kroj("Lobster.ttf", ["Lobster-Regular.ttf", "OFL.txt"]) == "Lobster-Regular.ttf"
+    assert nz.dopasuj_kroj("Rajdhani-SemiBold.otf", ["Rajdhani-Bold.ttf", "Rajdhani-SemiBold.ttf"]) == "Rajdhani-SemiBold.ttf"
+    assert nz.dopasuj_kroj("Rajdhani-Black.ttf", ["Rajdhani-Regular.ttf"]) is None
+
+    class Zrodlo:
+        katalog = {"lato": {"Lato-Regular.ttf": pl, "OFL.txt": b"OFL"},
+                   "jost": {"Jost[wght].ttf": pl, "Jost-Italic[wght].ttf": ascii_, "OFL.txt": b"OFL"},
+                   "oleoscript": {"OleoScript-Regular.ttf": ascii_, "OFL.txt": b"OFL"}}
+        pytania: list[str] = []
+
+        def pliki(self, rodzina):
+            self.pytania.append(rodzina)
+            return list(self.katalog.get(rodzina, {}))
+
+        def plik(self, rodzina, nazwa):
+            return self.katalog[rodzina][nazwa]
+
+    fonts = tmp_path / "fonts"
+    fonts.mkdir()
+    (fonts / "fonts.css").write_text(
+        "@font-face{src:url('Lato-Regular.ttf')}@font-face{src:url(Jost.ttf)}@font-face{src:url(\"Jost.ttf\")}"
+        "@font-face{src:url(OleoScript-Regular.ttf)}@font-face{src:url(Mono.ttf)}@font-face{src:url(Nieznany-Regular.ttf)}"
+        "@font-face{src:url(../wspolne/Inne.ttf)}", encoding="utf-8")
+    _zapisz(fonts / "Mono.ttf", pl)                                      # już jest obok: nie pobiera
+    _zapisz(fonts / "OFL-Jost.txt", b"OFL")                              # licencja z biblioteki (inna wielkość liter)
+    zrodlo = Zrodlo()
+    uwagi = nz.kroje(fonts, zrodlo)
+    assert (fonts / "Lato-Regular.ttf").read_bytes() == pl and (fonts / "Jost.ttf").read_bytes() == pl
+    assert (fonts / "OFL-lato.txt").exists() and not (fonts / "OFL-jost.txt").exists()
+    assert sorted(zrodlo.pytania) == ["jost", "lato", "nieznany", "oleoscript"]   # każda rodzina raz, bez ../
+    assert len(uwagi) == 2 and "OleoScript-Regular.ttf: brak polskich znaków ąćęłńśźż" in uwagi[0]
+    assert "Nieznany-Regular.ttf: nie ma go w google/fonts" in uwagi[1]
+    assert "↓ Jost.ttf ← google/fonts ofl/jost/Jost[wght].ttf" in capsys.readouterr().out
+    zrodlo.pytania.clear()
+    assert nz.kroje(fonts, zrodlo) == uwagi and zrodlo.pytania == ["nieznany"]   # drugi raz pyta tylko o brakujący
 
 
 def test_code_tools_helpers(monkeypatch, tmp_path):
