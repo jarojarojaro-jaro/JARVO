@@ -18,7 +18,8 @@ dociągnięte do końca. Cała strona w kaflach (≤ 12 000 px wysokości), mapa
 w, h} w pikselach CSS całej strony: nagłówki, przyciski, obrazy, sekcje, karty, formularze, ceny, logo, nawigacja),
 wycinki ważnych elementów z przezroczystym tłem (logo, h1, przyciski, karty, ceny, formularze i `--wycinki`)
 i pusta plansza (kafle bez wyciętych elementów: wycinek wlatuje na swoje prawdziwe miejsce).
-Zrzut 2× wystarcza na najazd do 2× bez rozmycia (zasada: rozdzielczość ≥ kadr × największe przybliżenie).
+Zrzut 2× wystarcza na najazd do 2× bez rozmycia (zasada: rozdzielczość ≥ kadr × największe przybliżenie);
+filmujesz go modułem `/_lib/jarvo/strona.js` (skill `film-z-kodu`, `references/strona-filmowana.md`).
 Wymaga: playwright w Pythonie (`narzedzia.py instaluj html`). Kod wyjścia: 0 ok, 2 strona niedostępna.
 """
 from __future__ import annotations

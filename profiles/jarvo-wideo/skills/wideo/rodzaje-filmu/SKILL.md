@@ -1,7 +1,7 @@
 ---
 name: rodzaje-filmu
 description: "Rodzaj filmu → jeden plik: silnik, struktura, rzemiosło."
-version: 1.5.0
+version: 1.5.1
 author: Jarvo
 license: MIT
 metadata:

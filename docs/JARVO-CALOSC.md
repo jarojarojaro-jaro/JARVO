@@ -112,7 +112,8 @@ Skrypty: `ads.py` (klient Skarbca, exit 3 gdy nie podłączony), `planer.py`, `e
 Pętla krytyki: film oceniany na **7 osiach** (hook, telefon, ruch, różnorodność, kompozycja, marka,
 dźwięk), każda min. 8/10, plus lista zakazanych klisz. Prawdziwe assety marki pobierane ze strony
 (`assety.py`: zrzuty, logo, marka w siedmiu rolach kolorów ze skalą kroju i rogami; `--film`: strona w 2× z mapą
-elementów, wycinkami i pustą planszą do filmowania). Mówiąca maskotka-robot z polskim lektorem (`maskotka.py`, Edge TTS pl-PL-MarekNeural).
+elementów, wycinkami i pustą planszą do filmowania; kamera po niej `/_lib/jarvo/strona.js`: przewijanie z postojami,
+wycieczka po elementach, lupa, zakreślacz, uderzenie, z kontrolą planu ruchów przed renderem). Mówiąca maskotka-robot z polskim lektorem (`maskotka.py`, Edge TTS pl-PL-MarekNeural).
 Syntetyczne SFX, biblioteka inspiracji, produkcja etapami, formaty platform z jednego timeline.
 Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo strony (`demo_strony.py`, metoda ECC
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.
