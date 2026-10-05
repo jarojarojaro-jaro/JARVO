@@ -65,8 +65,9 @@ cat "$LIB/AGENTS.md"; sed -n 1,80p "$LIB/styles/README.md"         # potem DIREC
   biblioteki marki.
 - Render: `cd "$LIB" && RENDER_SLOTS=1 node core/render/video.mjs "<projekt>" --fps 24 --workers 2 --out "<projekt>/out/video24.mp4"`
   (**2 workery** na VPS 8 GB: każdy to osobna przeglądarka; `RENDER_SLOTS=1`: drugi cały render czeka na pierwszy,
-  także przy wolnej pamięci < 30 %). Miks `sh core/render/mux.sh <video> <mix.wav> <out.mp4>` (−14 LUFS, szczyt
-  −1,2 dBTP, wypisuje zmierzoną głośność i ostrzega, gdy film jej nie trzyma).
+  także przy wolnej pamięci < 30 %). Miks `LEMO_COLOR=bt709 sh core/render/mux.sh <video> <mix.wav> <out.mp4>`
+  (−14 LUFS, szczyt −1,2 dBTP, wypisuje zmierzoną głośność i ostrzega, gdy film jej nie trzyma). Bez `LEMO_COLOR=bt709`
+  mux zostawia pełny zakres `yuvj420p`, który `qa_wideo.py` blokuje (część odtwarzaczy i platform źle go wyświetla).
 - Film to 30–60 min pracy: storyboard tylko, gdy karta prosi. Wynik: `<nazwa>.mp4`, `.srt`, `poster.jpg`, `TREATMENT.md`.
 
 ## claude-animation (rysunek w Node canvas, postaci, efekty gry, dźwięk syntezowany)

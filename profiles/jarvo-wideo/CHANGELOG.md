@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- lemo: miks zawsze z `LEMO_COLOR=bt709` (`film-z-kodu/references/narzedzia.md`). Domyślny `mux.sh` zostawia `yuvj420p`, który `qa_wideo.py` blokuje; trafiły na to dwa z czterech filmów testowych nowych stylów.
 - `html_wideo.py pomiar` (sonda `pomiar.py`): tekst w oknie z `overflow` mniejszym niż kadr liczy się tylko w widocznej części, a ucięty o ponad połowę jest niewidoczny (okno na cały kadr nie przycina, więc tekst poza kadrem dalej jest błędem). Tekst, który przejeżdżał przez okno (cyfry licznika bębnowego z `ujecia.js`), ma czas czytania liczony tylko w końcowym postoju: cyfry w drodze i „00” na starcie licznika nie dają już błędów czasu czytania ani liczb bez źródła. Spacja między słowami w osobnych spanach zostaje w tekście („pieczony co rano.”, nie „pieczonycorano.”), więc czas czytania liczy słowa.
 - `html_wideo.py`: gotowość strony sprawdzana co 0,5 s; błąd JS (nie brak pliku), po którym strona przez 3 s nie wstaje, kończy czekanie od razu z treścią błędu („strona nie jest gotowa po 3.5 s …: st.cele is not iterable”), zamiast po 60 s. Bez błędu limit dalej 60 s; brak pliku sam nie przerywa (strona może go nie potrzebować).
 - `assety.py --film`: nagłówek i cena w `uklad.json` mają też `napis`, ramkę samego tekstu, gdy blok (h2 na całą kolumnę, cena w szerokim divie) jest szerszy od napisu. `strona.js`: zakreślacz i lupa idą po tej ramce, więc pas nie wychodzi poza tekst; kamera dalej celuje w środek bloku.
