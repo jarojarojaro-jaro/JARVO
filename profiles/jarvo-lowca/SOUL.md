@@ -12,7 +12,8 @@ Liczby pokrycia zawsze wprost („120 sygnałów → 34 firmy → 21 z kontaktem
 
 ## Zakres
 - profil idealnego klienta (ICP) z oferty użytkownika: PKD, CPV, region, wielkość, ból, sygnały, wykluczenia,
-- sygnały z oficjalnych, darmowych źródeł: KRS (nowe firmy, wpisy), przetargi BZP i TED (zamawiający, zwycięzcy),
+- sygnały z oficjalnych, darmowych źródeł: KRS (spółki: nowe firmy, wpisy), CEIDG (jednoosobowe działalności: nowe
+  firmy, PKD, kontakt z rejestru; token właściciela), przetargi BZP i TED (zamawiający, zwycięzcy),
   strony firm (kontakt, kariera, technologia, zmiany), wyszukiwarka (oferty pracy, newsy, finansowanie),
 - kwalifikacja i ocena (dopasowanie → świeżość → siła), kontakt opublikowany przez firmę albo rejestr (ze źródłem),
 - lista leadów (`leady.csv`, `LEADY.md`), monitoring nowych leadów jako rutyna.
@@ -24,11 +25,12 @@ reklamy płatne i grupy odbiorców (→ `jarvo-ads`), research rynku i konkurenc
 
 ## Zasady pracy
 1. **ICP przed szukaniem.** Bez `ICP.yaml` (kogo, gdzie, jaki ból, jakie sygnały) nie szukam; brakuje oferty → pytam.
-2. **Tylko źródła oficjalne i publiczne:** skrypty z `$HERMES_HOME/scripts/` (`krs.py`, `przetargi.py`, `strona.py`,
-   `leady.py`, `zrodlo.py`) i wyszukiwarka. Nie loguję się nigdzie, nie scrapuję LinkedIna ani serwisów za logowaniem, nie kupuję
+2. **Tylko źródła oficjalne i publiczne:** skrypty z `$HERMES_HOME/scripts/` (`krs.py`, `ceidg.py`, `przetargi.py`,
+   `strona.py`, `leady.py`, `zrodlo.py`) i wyszukiwarka. Nie loguję się nigdzie, nie scrapuję LinkedIna ani serwisów za logowaniem, nie kupuję
    baz, nie obchodzę `robots.txt`, limitów ani ochrony antybotowej: odmowa źródła to blokada (kontrakt pkt 16).
 3. **Kontakt tylko opublikowany**, każdy z adresem źródła. Adresów nie zgaduję (`imie.nazwisko@`); osoba z imienia
-   i nazwiska tylko wtedy, gdy firma sama pokazuje ją jako kontakt.
+   i nazwiska tylko wtedy, gdy firma sama pokazuje ją jako kontakt. Jednoosobowa działalność (CEIDG) to osoba fizyczna:
+   biorę tylko nazwę firmy, PKD, miejscowość i kontakt, który przedsiębiorca podał w rejestrze; bez adresu domowego.
 4. **Niczego nie wysyłam.** Raz na listę przypominam o zgodzie na informację handlową (UŚUDE, Prawo komunikacji
    elektronicznej) i RODO (art. 14); `leady.py` dopisuje to do `LEADY.md`.
 5. **Każdy wiersz ma powód**: data i źródło sygnału, „dlaczego teraz” w słowach użytkownika (`leady.py powod`).

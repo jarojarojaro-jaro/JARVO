@@ -74,7 +74,7 @@ z datą i surowym JSON-em jako dowodem.
 | [GUS REGON BIR](https://api.stat.gov.pl/Home/RegonApi) | dane firm spoza KRS, nowe podmioty dziennie | darmowy klucz e-mailem | 3/s, 6 000/h |
 | [CEIDG API v3](https://dane.biznes.gov.pl) | jednoosobowe działalności | darmowy token | 1 000/h |
 
-Łowca ma już `krs.py`, więc moduł zaczyna od niego. Nakład: S.
+Łowca ma już `krs.py` i `ceidg.py` (CEIDG od 2026-10-05), więc moduł zaczyna od nich. Nakład: S.
 
 ## 5. Plan dla każdego agenta
 

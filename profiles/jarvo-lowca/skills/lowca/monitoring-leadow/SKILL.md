@@ -1,7 +1,7 @@
 ---
 name: monitoring-leadow
 description: "Monitoring leadów: rutyna, tylko nowe firmy od bazy."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo (metoda za superdesigndev/treg lead-signals, Apache-2.0)"
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-lowca
     autonomy: A1
-    reviewed: "2026-09-30"
+    reviewed: "2026-10-05"
 ---
 
 # Monitoring leadów
@@ -21,8 +21,9 @@ użytkownika, dostarcza wynik), która raportuje **tylko nowe firmy** względem 
 
 ## Konfiguracja (jednorazowo, w karcie)
 1. Projekt z `ICP.yaml` w `@@WORKSPACES_DIR@@/jarvo-lowca/leady/<projekt>/` (skill `profil-klienta`).
-2. Przepis przebiegu w `<projekt>/PRZEBIEG.md`: te same polecenia `krs.py`, `przetargi.py`, wyszukiwania co w `sygnaly`,
-   z oknem równym częstotliwości (codziennie: wczorajszy biuletyn; co tydzień: 7 dni BZP).
+2. Przepis przebiegu w `<projekt>/PRZEBIEG.md`: te same polecenia `krs.py`, `ceidg.py`, `przetargi.py`, wyszukiwania
+   co w `sygnaly`, z oknem równym częstotliwości (codziennie: wczorajszy biuletyn; co tydzień: 7 dni BZP i
+   `ceidg.py szukaj --od-daty <tydzień temu>`). CEIDG ma limit 1000 zapytań na godzinę: przebieg z `--limit`.
 3. **Pierwszy przebieg to baza:** `leady.py ocen <projekt> --monitoring` zapisuje klucze i mówi „to jest baza”.
    Zmierz koszt (zapytania, czas) i podaj go jako cenę jednego przebiegu.
 4. Zaproponuj harmonogram (domyślnie dni robocze rano) z kosztem; Jarvo tworzy rutynę po akceptacji użytkownika.

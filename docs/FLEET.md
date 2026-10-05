@@ -17,7 +17,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [6 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 23 (marketingskills, Anthropic, Hermes, impeccable, wspólny `hooki`) | render_html, check_media | [12](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [18 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 60 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, live-panel, Hermes, wspólne `transkrypcja-filmu`, `hooki` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, muzyka, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, twarze, demo_strony, typografia, maska, zywy_schemat (+ wideo_lib; moduły JS stron: ruch, kreska, morph, crt, plotno, piksel, os_czasu, strona, ujecia) | [30](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 6 (marketingskills, wspólny `hooki`) | ads, planer, eksperyment, eksport | [13](../evals/jarvo-ads/scenarios.yaml) |
-| `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 0 | krs, przetargi, strona, leady, zrodlo | [14](../evals/jarvo-lowca/scenarios.yaml) |
+| `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 0 | krs, ceidg, przetargi, strona, leady, zrodlo | [15](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 20 (Expo, React Native, ASO; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 4 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [12](../evals/jarvo-reka/scenarios.yaml) |
 
@@ -315,15 +315,15 @@ test, audyt i raport z eksportu CSV.
 
 ## `jarvo-lowca`: Łowca leadów
 
-Szuka firm, dla których teraz jest dobry moment na rozmowę: nowe spółki w KRS (PKD i region z profilu klienta),
-przetargi w BZP i TED (zamawiający kupuje to, co sprzedajesz; zwycięzca potrzebuje wykonawców), oferty pracy,
+Szuka firm, dla których teraz jest dobry moment na rozmowę: nowe spółki w KRS i nowe jednoosobowe działalności
+w CEIDG (PKD i region z profilu klienta; CEIDG na darmowym tokenie właściciela), przetargi w BZP i TED (zamawiający kupuje to, co sprzedajesz; zwycięzca potrzebuje wykonawców), oferty pracy,
 technologia i zmiany na stronach firm, newsy. Oddaje ranking z „dlaczego teraz”, źródłem sygnału i kontaktem, który
 firma sama opublikowała; monitoring pokazuje tylko nowe firmy. Tylko źródła oficjalne i publiczne, bez LinkedIna
 i baz kupionych, niczego nie wysyła. Pełny projekt: [LEADY.md](LEADY.md).
 
 **Skille:** [T] `profil-klienta`, `sygnaly` (+ tabela źródeł i przepisów), `kwalifikacja`, `kontakt-firmy`,
 `lista-leadow`, `monitoring-leadow`, `rozpoznanie-zrodla` (nowe źródło: nagranie ruchu HAR, różnice, schemat).
-Skrypty: `krs.py`, `przetargi.py`, `strona.py`, `leady.py`, `zrodlo.py` (+ `har.cjs`).
+Skrypty: `krs.py`, `ceidg.py`, `przetargi.py`, `strona.py`, `leady.py`, `zrodlo.py` (+ `har.cjs`).
 
 ---
 

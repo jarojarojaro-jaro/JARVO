@@ -199,8 +199,8 @@ agents:
     title: "Łowca leadów"
     emoji: "🎯"
     description: >-
-      Szukanie klientów (leadów B2B) po sygnałach zakupowych z oficjalnych źródeł: nowe firmy w KRS,
-      przetargi (e-Zamówienia, TED) i ich zwycięzcy, oferty pracy, technologia i zmiany na stronach firm,
+      Szukanie klientów (leadów B2B) po sygnałach zakupowych z oficjalnych źródeł: nowe firmy w KRS i CEIDG
+      (jednoosobowe działalności), przetargi (e-Zamówienia, TED) i ich zwycięzcy, oferty pracy, technologia i zmiany na stronach firm,
       newsy. Profil idealnego klienta, kwalifikacja, ranking firm z „dlaczego teraz”, kontakt opublikowany
       przez firmę (ze źródłem), monitoring nowych leadów. Niczego nie wysyła.
     model_tier: strong
@@ -215,8 +215,8 @@ agents:
       title: "Lead hunter"
       hq_label: "Sales radar"
       description: >-
-        Finds B2B leads from buying signals in official sources: new companies in the KRS register, public tenders (e-Zamówienia, TED) and their winners, job ads, technology and changes on company websites, news. Ideal customer profile, qualification, a ranked list of companies with "why now", contacts the company published itself (with the source), monitoring for new leads. Never sends anything.
-    oddaj_gdy: "szukanie klientów B2B: profil idealnego klienta, firmy z sygnałem zakupowym (KRS, przetargi, rekrutacje), lista leadów"
+        Finds B2B leads from buying signals in official sources: new companies in the KRS register and new sole proprietorships in CEIDG, public tenders (e-Zamówienia, TED) and their winners, job ads, technology and changes on company websites, news. Ideal customer profile, qualification, a ranked list of companies with "why now", contacts the company published itself (with the source), monitoring for new leads. Never sends anything.
+    oddaj_gdy: "szukanie klientów B2B: profil idealnego klienta, firmy z sygnałem zakupowym (KRS, CEIDG, przetargi, rekrutacje), lista leadów"
     status: active
 
   - name: jarvo-mobile

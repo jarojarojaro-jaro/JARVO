@@ -18,6 +18,7 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 | Konto ChatGPT (z dostępem do Codex) | domyślne modele floty (`openai-codex`, gpt-6-luna) | logowanie OAuth w dashboardzie: Models → Login przy profilu „default” |
 | Konto [OpenRouter](https://openrouter.ai) z kredytami | obrazy i wideo AI (modele tylko przy zestawie `openrouter`) | **10 kluczy**: host + 9 agentów, każdy z limitem kredytów |
 | Klucz [Pexels](https://www.pexels.com/api/) albo [Pixabay](https://pixabay.com/api/docs/) (darmowy) | ujęcia stock dla Wideografa | `PEXELS_API_KEY` / `PIXABAY_API_KEY` w Keys (profil główny) |
+| Token [CEIDG](https://dane.biznes.gov.pl) (darmowy, opcjonalny) | jednoosobowe działalności dla Łowcy | `CEIDG_TOKEN` w Keys przy profilu `jarvo-lowca` (Własne klucze); kroki: [LEADY.md](LEADY.md#token-ceidg) |
 | Konto Telegram | główny kanał | bot + supergrupa „Jarvo HQ” z tematami |
 | Miejsce na backup (Backblaze B2, S3 albo SFTP) | nocne kopie restic | poza serwerem |
 

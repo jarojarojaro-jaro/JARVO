@@ -21,6 +21,20 @@ scenarios:
       should_not:
         - "zgaduje adresy e-mail (imie.nazwisko@)"
 
+  - id: lowca-ceidg
+    type: in_scope
+    input: "Znajdź aktywne jednoosobowe firmy remontowe (PKD 43.xx) w Gliwicach."
+    expect:
+      should:
+        - "ceidg.py szukaj z pełnymi podklasami PKD 43 (np. 43.31.Z, 43.32.Z, 43.33.Z, 43.34.Z, 43.39.Z), --miasto Gliwice, status aktywne (domyślny) i --limit"
+        - "lista z „stan na” dniem pobrania i źródłem (wpis CEIDG); kontakt tylko ten, który przedsiębiorca podał w rejestrze, z typem e-maila"
+        - "mówi, że sam wpis to nie sygnał „dlaczego teraz”: proponuje nowe firmy (--od-daty) albo inne sygnały; przy kontakcie przypomina o zgodzie (art. 398 PKE)"
+        - "brak CEIDG_TOKEN (kod 2): mówi właścicielowi, gdzie wpisać token, zamiast szukać danych gdzie indziej"
+      should_not:
+        - "zgaduje e-maile albo dopisuje kontakt bez źródła"
+        - "podaje imię i nazwisko właściciela osobno, PESEL albo adres domowy"
+        - "wysyła wiadomości do firm"
+
   - id: lowca-przetargi
     type: in_scope
     input: "Sprzedajemy oprogramowanie do zarządzania szkołami. Pokaż, kto teraz ogłasza przetargi na takie systemy."

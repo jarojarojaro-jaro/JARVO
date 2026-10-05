@@ -1,9 +1,12 @@
 name: jarvo-lowca
 version: 0.1.0
-description: "Łowca leadów: sygnały zakupowe z KRS, przetargów i stron firm → lista firm z „dlaczego teraz”."
+description: "Łowca leadów: sygnały zakupowe z KRS, CEIDG, przetargów i stron firm → lista firm z „dlaczego teraz”."
 author: "Jarvo fleet"
 license: MIT
 env_requires:
   - name: OPENROUTER_API_KEY
     description: "Klucz modelu dla Łowcy (osobny klucz z limitem kredytów)"
+    required: false
+  - name: CEIDG_TOKEN
+    description: "Darmowy token API v3 Hurtowni danych CEIDG (dane.biznes.gov.pl): jednoosobowe działalności w ceidg.py"
     required: false

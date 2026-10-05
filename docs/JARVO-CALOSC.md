@@ -64,7 +64,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, copy PL, kampanie, kalendarze | Atelier kreatywne (`atelier`) | studio | 6 |
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, typografia jak z montażu, filmy z kodu, 15 stylów motion design, żywe schematy, maskotka | Studio filmowe (`filmstudio`) | wideo | 18 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem | Sala operacyjna (`office`) | ads | 10 |
-| 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 7 |
+| 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 7 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 10 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | Warsztat (`workshop`) | reka | 4 |
 
@@ -94,10 +94,11 @@ przed `npx expo install`), 20 skilli zewnętrznych (Expo, Callstack, Vercel, ASO
 
 ### 2a''. jarvo-lowca — szczegóły
 Łowca leadów B2B z oficjalnych, darmowych źródeł: KRS (API MS: biuletyn dnia i odpisy; nazwiska zarządu maskowane),
+CEIDG (API v3 Hurtowni danych na darmowym tokenie właściciela: jednoosobowe działalności, minimum danych osoby),
 e-Zamówienia BZP (ogłoszenia i wyniki ze zwycięzcą), TED, strony firm (`robots.txt`, uczciwy UA), wyszukiwarka.
 Ocena: dopasowanie do `ICP.yaml` → świeżość → siła; kontakt tylko opublikowany przez firmę albo rejestr, ze źródłem;
-przypomnienie o zgodzie na informację handlową (UŚUDE, PKE) i RODO w każdej liście. Skrypty: `krs.py`, `przetargi.py`,
-`strona.py`, `leady.py`; nowe źródło najpierw rozpoznaje (`zrodlo.py`: nagranie ruchu HAR, różnice dwóch nagrań,
+przypomnienie o zgodzie na informację handlową (UŚUDE, PKE) i RODO w każdej liście. Skrypty: `krs.py`, `ceidg.py`,
+`przetargi.py`, `strona.py`, `leady.py`; nowe źródło najpierw rozpoznaje (`zrodlo.py`: nagranie ruchu HAR, różnice dwóch nagrań,
 schemat z wielu odpowiedzi) i opisuje w `ZRODLO.md`, zanim powstanie skrypt. Projekt: [LEADY.md](LEADY.md).
 
 ### 2a'. jarvo-ads — szczegóły

@@ -168,12 +168,15 @@ Bez Skarbca agent pracuje na eksportach CSV. Wydatki tylko na poziomie A2, w kop
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
 | [API KRS](https://api-krs.ms.gov.pl) (Ministerstwo Sprawiedliwości) | odpisy firm (NIP, PKD, adres, kapitał, e-mail i www, jeśli podane) i dzienny biuletyn wpisów | dane publiczne | n/d | `krs.py` |
+| [CEIDG API v3](https://dane.biznes.gov.pl) (Hurtownia danych CEIDG i Biznes.gov.pl, MRiT) | jednoosobowe działalności po PKD, miejscu, statusie i dacie rozpoczęcia; szczegóły: PKD, telefon, e-mail, www podane w rejestrze (biała lista pól, minimum danych osoby); limit 1000 zapytań/h | dane publiczne (open data), darmowy token `CEIDG_TOKEN` | n/d | `ceidg.py szukaj`, `firma`, `sprawdz`; healthcheck `ceidg.py --help` |
 | [e-Zamówienia BZP](https://ezamowienia.gov.pl) (API tablicy ogłoszeń) | ogłoszenia o zamówieniach i wyniki ze zwycięzcą (NIP); odcina za serię ciężkich zapytań, stąd pauza 4 s | dane publiczne | n/d | `przetargi.py bzp`, healthcheck `przetargi.py sprawdz bzp` |
 | [TED API v3](https://api.ted.europa.eu) | przetargi unijne z CPV | dane publiczne (reuse UE) | n/d | `przetargi.py ted`, healthcheck `przetargi.py sprawdz ted` |
 | `strona.py`, `leady.py`, `lowca_lib.py` | kontakt opublikowany na stronie firmy (`robots.txt`), także z danych ukrytych w HTML (JSON-LD, Next.js, Nuxt), technologie, odcisk strony; lista leadów, ocena wg ICP, monitoring | własny kod | n/d | skrypt |
 | `zrodlo.py`, `har.cjs` | rozpoznanie nowego źródła: nagranie ruchu strony do HAR (`robots.txt`, uczciwy UA, playwright-core), żądania z danymi, różnice dwóch nagrań, schemat sumy odpowiedzi (pola opcjonalne, `null`, niespójne typy) | własny kod | n/d | skrypt, skill `rozpoznanie-zrodla` |
 
-Wszystkie źródła bez kluczy. Odmowa źródła (403/429, strona antybotowa) = blokada, bez obchodzenia ([LEADY.md](LEADY.md)).
+Źródła bez kluczy, oprócz CEIDG: darmowy token właściciela w Kluczach profilu `jarvo-lowca`
+([LEADY.md](LEADY.md#token-ceidg)). Odmowa źródła (403/429, strona antybotowa) = blokada, bez obchodzenia; w CEIDG
+429 to limit godzinowy, który skrypt przeczekuje, a 401/403 to zły token ([LEADY.md](LEADY.md)).
 
 ---
 

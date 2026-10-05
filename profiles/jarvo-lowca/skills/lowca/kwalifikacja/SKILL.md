@@ -1,7 +1,7 @@
 ---
 name: kwalifikacja
 description: "Kwalifikacja: odsiew szumu, dopasowanie, świeżość, siła."
-version: 1.1.0
+version: 1.2.0
 author: "Jarvo (metoda za superdesigndev/treg lead-signals, Apache-2.0)"
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-lowca
     autonomy: A1
-    reviewed: "2026-09-30"
+    reviewed: "2026-10-05"
 ---
 
 # Kwalifikacja
@@ -21,6 +21,9 @@ dopasowania = brak wiersza), potem **świeżość** (sygnał sprzed tygodnia bij
 (dwa niezależne sygnały na jednej firmie biją jeden); przy remisie wyżej firma z opublikowanym kontaktem. Liczy to `leady.py ocen` według `ICP.yaml`; Ty sprawdzasz,
 czy liczby mają sens. Dopasowanie liczy tylko kryteria, które dane sygnału pozwalają sprawdzić; reszta jest w kolumnie
 `niesprawdzone` (np. `cpv, slowa` przy nowej spółce z KRS): przy czołówce dopilnuj ich sam, zanim lead trafi dalej.
+Opis wpisu z KRS i CEIDG to tylko branża (PKD), więc słowa kluczowe sprawdzasz na stronie firmy. Sam wpis w CEIDG
+(`ceidg-firma`) ma wagę 0: dokłada PKD i kontakt, ale nie robi leada; leadem jest `ceidg-nowa-firma` albo firma
+z innym sygnałem. ICP bez jednoosobowych firm: `wyklucz_formy: [JEDNOOSOBOWA]`.
 
 ## Kroki
 1. `python3 $HERMES_HOME/scripts/leady.py ocen <projekt> --top 30` → `leady.csv`, `LEADY.md`.

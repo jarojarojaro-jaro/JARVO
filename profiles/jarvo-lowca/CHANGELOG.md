@@ -1,6 +1,23 @@
 # Changelog: jarvo-lowca
 
 ## Niewydane
+- CEIDG (decyzja właściciela): nowy skrypt `ceidg.py` do oficjalnego API v3 Hurtowni danych CEIDG (dane.biznes.gov.pl,
+  darmowy token `CEIDG_TOKEN`). KRS to spółki, CEIDG to jednoosobowe działalności. `szukaj` po pełnych kodach PKD,
+  miejscowości, województwie, powiecie, gminie, statusie (domyślnie aktywne) i dacie rozpoczęcia, strony za
+  `links.next`, szczegóły partiami (`/firma?ids=`); `firma` po NIP, REGON albo identyfikatorze; `sprawdz` (czy token
+  działa); `--z-pliku` offline. Wyjście w formacie sygnałów: `ceidg-nowa-firma` (start w ostatnich 30 dniach albo
+  zaplanowany) i `ceidg-firma` (sam wpis, waga 0: PKD i kontakt dla firmy z innym sygnałem), ze `zrodlo` i `stan_na`.
+  Minimum danych osoby fizycznej (biała lista pól: bez imienia i nazwiska właściciela, ulicy, adresu korespondencyjnego,
+  obywatelstwa, adresu do e-Doręczeń; PESEL-u API nie zwraca), kontakt tylko podany w rejestrze, przypomnienie o zgodzie
+  (art. 398 PKE). Limit 1000 zapytań/h: co najmniej 4 s między zapytaniami, 429 przeczekane (min. 180 s, dwa ponowienia,
+  potem kod 3), 5xx i sieć: trzy próby; brak albo zły token (401, 403): kod 2 z instrukcją, token nigdy w wyjściu
+  i tylko do hosta API (bez przekierowań). Token wpisuje właściciel w Jarvo HQ (Klucze profilu), a `config.yaml`
+  przepuszcza go do terminala (`terminal.env_passthrough`). Skille `sygnaly` 1.1.0, `kontakt-firmy` 1.2.0,
+  `kwalifikacja` 1.2.0, `lista-leadow` 1.1.0, `monitoring-leadow` 1.1.0; eval `lowca-ceidg`. Opis i `oddaj_gdy`
+  w `fleet.yaml` wymieniają CEIDG, więc Jarvo kieruje tu też prośby o jednoosobowe firmy.
+- `leady.py`: typy `ceidg-nowa-firma` i `ceidg-firma`, etykieta źródła CEIDG w `LEADY.md`; opis wpisu z CEIDG, jak
+  z KRS, nie liczy się do słów kluczowych; telefon z sygnału (rejestr) trafia do listy, gdy strona go nie podaje,
+  a nowa kolumna `telefon_zrodlo` mówi skąd.
 - Nowy skill `rozpoznanie-zrodla` i skrypt `zrodlo.py` (+ `har.cjs`): zanim powstanie skrypt do nowego publicznego
   źródła, Łowca sprawdza oficjalne API, `robots.txt` i regulamin, nagrywa ruch strony do HAR (playwright-core, uczciwy UA,
   odmowa = blokada, kod 3), wypisuje żądania z danymi, nagłówki do pobierania przyrostowego i zależności między

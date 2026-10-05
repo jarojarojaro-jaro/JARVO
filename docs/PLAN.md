@@ -203,7 +203,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 11 skilli dowodzenia ([BOSS.md](BOSS.md)).
 - ✅ `jarvo-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
 - ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
-- ✅ Walidator + testy (`make validate`, `make test`, CI) + 171 scenariuszy evals.
+- ✅ Walidator + testy (`make validate`, `make test`, CI) + 172 scenariusze evals.
 
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
@@ -227,7 +227,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - 🟡 `jarvo-ads` (reklamy Meta i Google): SOUL, 10 skilli, skrypty, rubryka, 13 scenariuszy evals; bez kluczy ([ADS.md](ADS.md)).
 - 🟡 Clipmaker Wideografa: długie nagranie → edytowalne rolki (kadr z focusem, napisy karaoke, `klipy.py`); kroki 1–4 gotowe, krok 5: test na prawdziwym nagraniu ([KLIPY.md](KLIPY.md)).
 - ⬜ Skarbiec: sejf tokenów reklamowych, koperty zatwierdzane kodem, STOP ([ADS.md](ADS.md)).
-- 🟡 Łowca leadów `jarvo-lowca`: SOUL, 7 skilli, skrypty (KRS, BZP, TED, strony firm, rozpoznanie nowego źródła), rubryka, 14 scenariuszy evals; sygnały → lista firm z „dlaczego teraz” i opublikowanym kontaktem; brak pierwszego przebiegu na prawdziwej ofercie ([LEADY.md](LEADY.md)).
+- 🟡 Łowca leadów `jarvo-lowca`: SOUL, 7 skilli, skrypty (KRS, CEIDG, BZP, TED, strony firm, rozpoznanie nowego źródła), rubryka, 15 scenariuszy evals; sygnały → lista firm z „dlaczego teraz” i opublikowanym kontaktem; brak pierwszego przebiegu na prawdziwej ofercie ([LEADY.md](LEADY.md)).
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
 - ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).

@@ -30,6 +30,9 @@ terminal:
   backend: local
   cwd: "@@WORKSPACES_DIR@@/jarvo-lowca"
   timeout: 600
+  # Klucze z .env profilu, które terminal przekazuje skryptom. Gateway obsługuje wiele profili naraz
+  # (multiplex_profiles), więc .env Łowcy nie trafia do środowiska procesu: bez tej listy ceidg.py nie zobaczy tokenu.
+  env_passthrough: [CEIDG_TOKEN]
 
 browser:
   backend: "off"

@@ -12,6 +12,17 @@ tools:
     autonomy: A0
     optional: true
     notes: "krs.py: odpisy i dzienny biuletyn wpisów. Nazwiska zarządu API maskuje."
+  - name: ceidg-api
+    source: https://dane.biznes.gov.pl/api/ceidg/v3 (Hurtownia danych CEIDG i Biznes.gov.pl, Ministerstwo Rozwoju i Technologii)
+    license: dane publiczne (open data, rejestr jawny)
+    version: "api v3"
+    install: {method: api, spec: "CEIDG_TOKEN (darmowy token JWT z dane.biznes.gov.pl)"}
+    integration: skill-script
+    used_by_skills: [sygnaly, kontakt-firmy, kwalifikacja, lista-leadow, monitoring-leadow]
+    healthcheck: "python3 /opt/jarvo/repo/profiles/jarvo-lowca/scripts/ceidg.py --help"
+    autonomy: A0
+    optional: true
+    notes: "ceidg.py szukaj/firma: jednoosobowe działalności (KRS = spółki). Limit 1000 zapytań/h, skrypt ≥ 4 s między zapytaniami; 429 = czeka i ponawia, potem kod 3. Token tylko w nagłówku, nigdy w wyjściu. Minimum danych osoby: bez imienia i nazwiska, ulicy, adresu korespondencyjnego; `ceidg.py sprawdz` sprawdza token."
   - name: e-zamowienia-bzp
     source: https://ezamowienia.gov.pl/mo-board/api/v1/notice (Urząd Zamówień Publicznych)
     license: dane publiczne

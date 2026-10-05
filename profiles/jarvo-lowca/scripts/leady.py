@@ -26,8 +26,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lowca_lib as ll  # noqa: E402
 
-DOMYSLNE_SYGNALY = {  # typ → waga (0–3), okno świeżości w dniach
-    "krs-nowa-firma": (2, 30), "krs-wpis": (1, 14), "przetarg-ogloszenie": (3, 14), "przetarg-wygrany": (2, 30),
+DOMYSLNE_SYGNALY = {  # typ → waga (0–3), okno świeżości w dniach; ceidg-firma = sam wpis w rejestrze: dane i kontakt, nie powód
+    "krs-nowa-firma": (2, 30), "krs-wpis": (1, 14), "ceidg-nowa-firma": (2, 30), "ceidg-firma": (0, 30),
+    "przetarg-ogloszenie": (3, 14), "przetarg-wygrany": (2, 30),
     "przetarg-ted": (2, 30), "rekrutacja": (2, 30), "strona-technologia": (1, 90), "strona-kariera": (1, 60),
     "strona-zmiana": (1, 30), "news": (1, 30), "finansowanie": (2, 60), "reklamy": (1, 30), "inne": (1, 30),
 }
@@ -36,10 +37,11 @@ PRZYPOMNIENIE = ("Zanim ktokolwiek napisze do tych firm: informacja handlowa mai
                  "opublikowany na stronie to nie zgoda. Przed kampanią: podstawa prawna, lista wypisanych, informacja o źródle "
                  "danych (RODO art. 14). Lista jest do Twojej decyzji; nic nie zostało wysłane.")
 POLA = ["klucz", "nazwa", "nip", "krs", "woj", "miejscowosc", "www", "ocena", "dopasowanie", "niesprawdzone", "sygnaly", "dlaczego_teraz",
-        "zrodla", "email", "email_rodzaj", "email_zrodlo", "telefon", "formularz", "nowy", "pierwszy_raz"]
+        "zrodla", "email", "email_rodzaj", "email_zrodlo", "telefon", "telefon_zrodlo", "formularz", "nowy", "pierwszy_raz"]
+REJESTRY = ("krs-", "ceidg-")   # sygnały z rejestru: opis to branża (PKD), nie potrzeba firmy
 
 
-ETYKIETY = [("api-krs.ms.gov.pl", "KRS"), ("ezamowienia.gov.pl", "BZP"), ("ted.europa.eu", "TED")]
+ETYKIETY = [("api-krs.ms.gov.pl", "KRS"), ("biznes.gov.pl", "CEIDG"), ("ezamowienia.gov.pl", "BZP"), ("ted.europa.eu", "TED")]
 
 
 def etykieta(url: str) -> str:
@@ -143,9 +145,9 @@ def zawiera(tekst: str, fraza: str) -> bool:
 def ocena_icp(firma: dict, sygnaly: list[dict], icp: dict) -> tuple[float, list[str]] | None:
     """Dopasowanie do ICP: (część SPRAWDZALNYCH kryteriów, które firma spełnia, lista niesprawdzonych); None = wykluczona.
 
-    Kryterium liczy się tylko wtedy, gdy sygnały mają dane, którymi da się je sprawdzić: PKD ma firma z KRS, CPV ma
+    Kryterium liczy się tylko wtedy, gdy sygnały mają dane, którymi da się je sprawdzić: PKD ma firma z KRS i CEIDG, CPV ma
     przetarg, województwo ma firma z adresem, a słowa opisują potrzebę (przedmiot przetargu, rekrutacja, news, strona;
-    opis wpisu w KRS to tylko branża). Brak danych to „nie wiadomo”, nie „nie pasuje”: nowa spółka z KRS nie traci
+    opis wpisu w KRS i CEIDG to tylko branża). Brak danych to „nie wiadomo”, nie „nie pasuje”: nowa spółka z KRS nie traci
     punktów za brak CPV, a przetarg za brak PKD. Gdy żadnego kryterium nie da się sprawdzić, dopasowanie = 0,5
     (przechodzi przy domyślnym progu 0,5, odpada przy progu 1,0)."""
     d = icp["dopasowanie"]
@@ -175,7 +177,7 @@ def ocena_icp(firma: dict, sygnaly: list[dict], icp: dict) -> tuple[float, list[
         cpv = [c for s in sygnaly for c in ((s.get("szczegoly") or {}).get("cpv") or [])]
         kryterium("cpv", bool(cpv), any(str(c).startswith(str(p)) for c in cpv for p in d["cpv"]))
     if d.get("slowa"):
-        opisuje_potrzebe = any(not str(s.get("typ") or "").startswith("krs-") for s in sygnaly)
+        opisuje_potrzebe = any(not str(s.get("typ") or "").startswith(REJESTRY) for s in sygnaly)
         kryterium("slowa", opisuje_potrzebe, any(zawiera(tekst, w) for w in d["slowa"]))
     if wyniki:
         return sum(wyniki) / len(wyniki), niesprawdzone
@@ -224,6 +226,10 @@ def ocen_firmy(sygnaly: list[dict], kontakty: dict, powody: dict, icp: dict, dzi
                                                  for s in ss for c in s.get("kontakty") or [] if c.get("typ") == "email"]
         emaile.sort(key=lambda e: {"ogolny": 0, "rolowy": 1, "osobowy": 2}.get(e.get("rodzaj"), 3))
         e = emaile[0] if emaile else {}
+        telefony = ([{"numer": t.get("numer"), "zrodlo": t.get("zrodlo")} for t in kt.get("telefony") or []]
+                    + [{"numer": c["wartosc"], "zrodlo": c.get("zrodlo")} for s in ss for c in s.get("kontakty") or []
+                       if c.get("typ") == "telefon" and c.get("wartosc")])
+        tel = telefony[0] if telefony else {}
         out.append({
             "klucz": k, "nazwa": firma.get("nazwa"), "nip": firma.get("nip"), "krs": firma.get("krs"), "woj": firma.get("woj"),
             "miejscowosc": firma.get("miejscowosc"), "www": firma.get("www") or (kt.get("domena") and f"https://{kt['domena']}"),
@@ -232,7 +238,7 @@ def ocen_firmy(sygnaly: list[dict], kontakty: dict, powody: dict, icp: dict, dzi
             "dlaczego_teraz": powody.get(k) or najlepszy.get("opis") or najlepszy["typ"],
             "zrodla": " ".join(dict.fromkeys(s.get("zrodlo") for s in ss if s.get("zrodlo"))),
             "email": e.get("email"), "email_rodzaj": e.get("rodzaj"), "email_zrodlo": e.get("zrodlo"),
-            "telefon": ((kt.get("telefony") or [{}])[0]).get("numer"), "formularz": kt.get("formularz"),
+            "telefon": tel.get("numer"), "telefon_zrodlo": tel.get("zrodlo"), "formularz": kt.get("formularz"),
         })
     out.sort(key=lambda r: (-r["ocena"], not (r["email"] or r["telefon"] or r["formularz"]), r["nazwa"] or ""))   # remis: z kontaktem wyżej
     return out
