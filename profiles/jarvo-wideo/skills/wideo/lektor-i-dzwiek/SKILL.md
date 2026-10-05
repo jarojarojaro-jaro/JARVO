@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.3.3
+version: 1.3.4
 author: Jarvo
 license: MIT
 metadata:
@@ -70,7 +70,7 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
   „zgniecenie”), **werbel** = zamiana (cięcie, nowy element), **talerze** = gęstość drobnego ruchu (gęste: drobny
   ruch może być gęsty, rzadkie: spokój). `uderzenia` to pula do wyboru, nie lista zdarzeń: stopa gra prawie na
   każdym bicie. Uderzenie całego kadru (błysk, wstrząs) tylko na `najmocniejsze`: najwyżej 3 na film, co najmniej
-  16 bitów od siebie.
+  16 bitów od siebie, najpierw stopy na bicie (razem z cięciem), nic w pierwszej sekundzie.
 - Po renderze: `rytm.py sprawdz final.mp4 [--plan cues.json | --projekt film.edycja.json | --ciecia 1.2,3.4]` liczy
   bity z dźwięku GOTOWEGO filmu i błąd każdego cięcia (bez planu: cięcia wykryte w obrazie): do 1,5 klatki idealnie,
   do 3 dobrze, ponad 3 popraw (kod wyjścia 1). Wszystkie cięcia przesunięte o tyle samo to przesunięcie dźwięku

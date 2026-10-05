@@ -950,6 +950,13 @@ def test_rytm_siatka_pol_i_podwojna():
     nai = rytm.najmocniejsze([{"t": 0.25 + k * p, "s": 0.5 + (0.4 if k in (4, 6, 20) else 0), "k": "stopa"}
                               for k in range(0, 32, 2)], [0.25 + k * p for k in range(32)], p)
     assert [o["t"] for o in nai] == [2.25, 10.25] and all(o["na_bicie"] for o in nai)   # 6 za blisko 4 (< 16 bitów)
+    nai = rytm.najmocniejsze([{"t": 0.75, "s": 1.0, "k": "stopa"}, {"t": 4.5, "s": 1.0, "k": "stopa"},
+                              {"t": 4.25, "s": 0.6, "k": "stopa"}, {"t": 12.25, "s": 0.5, "k": "stopa"}],
+                             [0.25 + k * p for k in range(32)], p)
+    assert [o["t"] for o in nai] == [4.25, 12.25]          # w 1. sekundzie i w pół bitu: nie, choć głośniejsze
+    assert rytm.opis_talerzy([{"t": 0.0, "do": 2.0, "talerze": 8}, {"t": 2.0, "do": 4.0, "talerze": 1},
+                              {"t": 4.0, "do": 5.1, "talerze": 0}]) == [
+        "takt 1 (0.0–2.0 s): talerze gęsto", "takty 2–3 (2.0–5.1 s): talerze rzadko"]
     assert rytm.czasy_planu([{"sfx": "pop", "t": 1.2}, {"t": 0.4, "na_bit": False}, 2.0]) == [1.2, 2.0]
     assert rytm.czasy_planu({"ciecia": {"co_takt": [0.25, 2.25]}}) == [0.25, 2.25]
 

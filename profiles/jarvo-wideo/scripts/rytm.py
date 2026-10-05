@@ -11,7 +11,8 @@ spokojniejszym fragmencie) i propozycja cięć: co takt, a na dropie najmocniejs
 (za video-shotcraft, Apache-2.0): stopa 40–160 Hz (uderzenie, „zgniecenie” kadru), werbel 150–500 Hz razem
 z trzaskiem 1–3 kHz (zamiana, cięcie: „teraz coś innego”) i talerze 6–14 kHz (gęstość drobnego ruchu: gęste talerze
 = drobny ruch może być gęsty, rzadkie = spokój). `uderzenia` to pula kandydatów, nie wyzwalacz: stopa gra prawie
-na każdym bicie, a uderzenie całego kadru dostają tylko `najmocniejsze` (2–3 na film, co najmniej 16 bitów od siebie).
+na każdym bicie, a uderzenie całego kadru dostają tylko `najmocniejsze` (2–3 na film, co najmniej 16 bitów od siebie,
+najpierw stopy na bicie, nic w pierwszej sekundzie).
 Siatka jest sprawdzana na prawdziwych uderzeniach: 0,5×, 1× i 2× tempa, wygrywa ta, w której bity trafiają
 w uderzenia, a stopa w bity (`siatka`: trafienia, średni błąd, dryf, ocena).
 sprawdz (po renderze): cięcia filmu (bez planu: wykryte w obrazie) kontra bity z dźwięku GOTOWEGO filmu, błąd
@@ -315,15 +316,21 @@ def wybierz_siatke(first: float, period: float, dur: float, uderzenia: list[dict
 
 
 def najmocniejsze(uderzenia: list[dict], bity: list[float], okres: float, ile: int = 3) -> list[dict]:
-    """2–3 najmocniejsze stopy na film, co najmniej 16 bitów od siebie: tylko tu uderzenie całego kadru."""
-    out = []
-    for u in sorted((u for u in uderzenia if u["k"] == "stopa"), key=lambda u: -u["s"]):
-        if len(out) >= ile:
-            break
-        if all(abs(u["t"] - o["t"]) >= NAJ_ODSTEP * okres for o in out):
+    """2–3 najmocniejsze stopy na film, co najmniej 16 bitów od siebie: tylko tu uderzenie całego kadru.
+    Najpierw stopy na bicie (uderzenie kadru idzie z cięciem na siatce), spoza bitu tylko, gdy tamtych zabraknie;
+    nic w pierwszej sekundzie od pierwszego bitu (uderzenie potrzebuje czegoś przed sobą)."""
+    if not bity:
+        return []
+    kandydaci = []
+    for u in uderzenia:
+        if u["k"] == "stopa" and u["t"] >= bity[0] + 1.0 - TOL:
             b = najblizszy(bity, u["t"])
-            out.append({"t": u["t"], "s": u["s"], "bit": bity.index(b) if b is not None else None,
-                        "na_bicie": b is not None and abs(b - u["t"]) <= TOL})
+            kandydaci.append({"t": u["t"], "s": u["s"], "bit": bity.index(b), "na_bicie": abs(b - u["t"]) <= TOL})
+    out: list[dict] = []
+    for na_bicie in (True, False):
+        for k in sorted((k for k in kandydaci if k["na_bicie"] == na_bicie), key=lambda k: -k["s"]):
+            if len(out) < ile and all(abs(k["t"] - o["t"]) >= NAJ_ODSTEP * okres for o in out):
+                out.append(k)
     return sorted(out, key=lambda o: o["t"])
 
 
@@ -336,7 +343,7 @@ def takty_info(env: list[float], bars: list[float], uderzenia: list[dict], start
         srednie.append(sum(seg) / len(seg) if seg else 0.0)
     top = max(srednie, default=0.0) or 1.0
     talerze = [u["t"] for u in uderzenia if u["k"] == "talerz"]
-    return [{"t": a, "energia": round(e / top, 2), "talerze": sum(1 for t in talerze if a <= t < b)}
+    return [{"t": a, "do": round(b, 3), "energia": round(e / top, 2), "talerze": sum(1 for t in talerze if a <= t < b)}
             for a, b, e in zip(granice, granice[1:], srednie)]
 
 
@@ -348,7 +355,8 @@ def opis_talerzy(info: list[dict]) -> list[str]:
         j = i
         while j + 1 < len(info) and klasa(info[j + 1]["talerze"]) == klasa(info[i]["talerze"]):
             j += 1
-        out.append(f"takty {i + 1}–{j + 1} ({info[i]['t']:.1f}–{info[j]['t']:.1f} s): talerze {klasa(info[i]['talerze'])}")
+        nr = f"takt {i + 1}" if i == j else f"takty {i + 1}–{j + 1}"
+        out.append(f"{nr} ({info[i]['t']:.1f}–{info[j]['do']:.1f} s): talerze {klasa(info[i]['talerze'])}")
         i = j + 1
     return out
 
@@ -540,8 +548,11 @@ def main(argv: list[str] | None = None) -> int:
         print("Najmocniejsze (tylko tu uderzenie całego kadru): " + ", ".join(
             f"{o['t']:.2f} s" + ("" if o["na_bicie"] else " (między bitami)") for o in r["najmocniejsze"]))
     if ile["talerz"]:
-        for linia in opis_talerzy(r["takty_info"])[:6]:
+        linie = opis_talerzy(r["takty_info"])
+        for linia in linie[:6]:
             print("  " + linia)
+        if len(linie) > 6:
+            print(f"  … i {len(linie) - 6} kolejnych odcinków (pełna lista: --json, klucz takty_info)")
     return 0
 
 
