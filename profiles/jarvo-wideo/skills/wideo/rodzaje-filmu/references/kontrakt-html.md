@@ -8,7 +8,8 @@ w pętli) i do renderu klatka po klatce: `html_wideo.py --preset jarvo` woła `w
    `performance.now`, `setTimeout`, `Math.random` bez ziarna (`mulberry32(seed)`), zero stanu z poprzedniej klatki
    (fizyka i cząstki liczone od `t = 0` albo z krokiem stałym od zera do `t`).
 2. `window.__W`, `window.__H` = rozmiar kadru (1080×1920 pion, 1920×1080 poziom); `window.__DUR` = długość w s.
-3. `window.__ready = true` dopiero po fontach (`await document.fonts.ready`), obrazach i teksturach.
+3. `window.__ready = true` dopiero po fontach (`await document.fonts.ready`), obrazach i teksturach. Błąd JS przed
+   gotowością zatrzymuje render po 3 s z treścią błędu (bez błędu czeka do 60 s).
 4. Biblioteki lokalnie z `/_lib/` (html_wideo serwuje wspólne `node_modules`; `narzedzia.py instaluj html`):
    Three.js `/_lib/three/build/three.module.js` (+ `/_lib/three/examples/jsm/…`), GSAP `/_lib/gsap/dist/gsap.min.js`,
    nasz ruch `/_lib/jarvo/ruch.js` (charakter ruchu z marki, lądowanie, wyjście, smugi: `ruch-i-kompozycja.md`),

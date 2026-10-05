@@ -104,6 +104,8 @@ RAF2 = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame
 FONTS = "() => (document.fonts ? document.fonts.ready.then(() => true) : true)"
 LOTTIE_ASSET_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ttf", ".otf", ".ttc", ".woff", ".woff2"}
 TIMEOUT_MS = 60_000
+KROK_GOTOWOSCI_MS = 500         # gotowość sprawdzana co pół sekundy
+PO_BLEDZIE_JS_MS = 3_000        # błąd JS, a strony dalej brak: koniec czekania po 3 s, nie po minucie
 HZ_POMIARU = {"pelny": 10.0, "szybki": 4.0}
 
 
@@ -230,13 +232,21 @@ def _page(browser, size: tuple[int, int], scale: float, errors: list[str]):
 
 
 def czekaj_gotowe(page, warunek: str, errors: list[str]) -> None:
-    """Czeka na gotowość strony; gdy nie przyjdzie, mówi dlaczego (błędy JS, brakujące pliki), a nie sam timeout."""
+    """Czeka na gotowość strony; gdy nie przyjdzie, mówi dlaczego (błędy JS, brakujące pliki), a nie sam timeout.
+    Błąd JS (nie brak pliku) bez gotowości przez PO_BLEDZIE_JS_MS kończy czekanie od razu: strona już nie wstanie."""
     from playwright.sync_api import TimeoutError as PlaywrightTimeout
-    try:
-        page.wait_for_function(warunek, timeout=TIMEOUT_MS)
-    except PlaywrightTimeout:
-        powody = "; ".join(e[:200] for e in dict.fromkeys(errors)) or "bez błędów JS i brakujących plików"
-        raise SystemExit(f"strona nie jest gotowa po {TIMEOUT_MS // 1000} s ({warunek}): {powody}") from None
+    krokow, po_bledzie, blad_w = TIMEOUT_MS // KROK_GOTOWOSCI_MS, PO_BLEDZIE_JS_MS // KROK_GOTOWOSCI_MS, None
+    for n in range(1, krokow + 1):
+        try:
+            page.wait_for_function(warunek, timeout=KROK_GOTOWOSCI_MS)
+            return
+        except PlaywrightTimeout:
+            pass
+        if blad_w is None and any(not e.startswith("brak pliku ") for e in errors):
+            blad_w = n
+        if n == krokow or (blad_w is not None and n - blad_w >= po_bledzie):
+            powody = "; ".join(e[:200] for e in dict.fromkeys(errors)) or "bez błędów JS i brakujących plików"
+            raise SystemExit(f"strona nie jest gotowa po {n * KROK_GOTOWOSCI_MS / 1000:g} s ({warunek}): {powody}")
 
 
 def capture(src: str, times: list[float], names: list[str], out_dir: Path, o: dict, fps: float, size: tuple[int, int],

@@ -1108,14 +1108,31 @@ def test_czekaj_gotowe_mowi_dlaczego(monkeypatch):
     monkeypatch.setitem(sys.modules, "playwright.sync_api", api)
 
     class Strona:
+        proby = 0
+
         def wait_for_function(self, warunek, timeout):
+            assert timeout == 500
+            self.proby += 1
             raise Timeout(warunek)
     bledy = ["brak pliku /assets/fonts/x.ttf (HTTP 404)", "init failed", "init failed"]
-    with pytest.raises(SystemExit, match=r"nie jest gotowa po 60 s \(window.__ready === true\): "
+    s = Strona()
+    with pytest.raises(SystemExit, match=r"nie jest gotowa po 3.5 s \(window.__ready === true\): "
                                          r"brak pliku /assets/fonts/x.ttf \(HTTP 404\); init failed$"):
-        hw.czekaj_gotowe(Strona(), "window.__ready === true", bledy)
+        hw.czekaj_gotowe(s, "window.__ready === true", bledy)      # błąd JS: 3 s po nim koniec, nie minuta
+    assert s.proby == 7
+    with pytest.raises(SystemExit, match=r"po 60 s .*: brak pliku /a.png \(HTTP 404\)$"):
+        hw.czekaj_gotowe(Strona(), "window.__ready === true", ["brak pliku /a.png (HTTP 404)"])   # sam brak pliku: czeka
     with pytest.raises(SystemExit, match="bez błędów JS i brakujących plików"):
         hw.czekaj_gotowe(Strona(), "window.__ready === true", [])
+
+    class Gotowa(Strona):
+        def wait_for_function(self, warunek, timeout):
+            self.proby += 1
+            if self.proby < 3:
+                raise Timeout(warunek)
+    g = Gotowa()
+    hw.czekaj_gotowe(g, "window.__ready === true", ["blad przejsciowy"])
+    assert g.proby == 3
 
 
 def _shotcraft(root):
