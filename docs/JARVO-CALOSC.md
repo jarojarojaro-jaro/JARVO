@@ -304,7 +304,7 @@ SOURCES (licencje).
   (`PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:$PATH`), a GUI przez zalogowany dashboard.
   Wszystko ma się spinać: build → instalacja → healthchecki → realne użycie.
 - **Piaskownica Claude Code:** `JARVO_LOCAL=<scratchpad>/jarvo-local bash scripts/sandbox-up.sh` robi wszystko:
-  `dockerd`, obraz `hermes-ca:test` (Hermes + certyfikat proxy), `jarvo-hermes:local` przez
+  `dockerd` (po restarcie piaskownicy usuwa stare pliki pid demona), obraz `hermes-ca:test` (Hermes + certyfikat proxy), `jarvo-hermes:local` przez
   `docker build --network host` (compose nie widzi proxy), instalację w `jarvo-local` i
   `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` lub `branding/` albo z `--rebuild`.
 - Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (na Linuksie sam doinstalowuje pakiety i Docker

@@ -43,6 +43,13 @@ mkdir -p "$L"/{compose,secrets,build,data}
 
 log "dockerd"
 if ! docker info >/dev/null 2>&1; then
+  # Po restarcie piaskownicy zostają pliki pid starego demona. Numer z pliku może trafić w inny proces,
+  # a dockerd czeka wtedy 15 s na „działający” containerd i się wyłącza. Plik zostaje tylko przy żywym containerd.
+  for pid_plik in /var/run/docker/containerd/containerd.pid /var/run/docker.pid; do
+    [[ -f "$pid_plik" ]] || continue
+    proces="$(ps -p "$(cat "$pid_plik")" -o comm= 2>/dev/null || true)"
+    [[ "$proces" == containerd || ( "$pid_plik" == /var/run/docker.pid && "$proces" == dockerd ) ]] || rm -f "$pid_plik"
+  done
   nohup dockerd >"$L/dockerd.log" 2>&1 &
   for _ in $(seq 60); do docker info >/dev/null 2>&1 && break; sleep 1; done
   docker info >/dev/null 2>&1 || fail "dockerd nie wstał (log: $L/dockerd.log)"
