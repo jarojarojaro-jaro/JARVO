@@ -7,11 +7,12 @@
     python3 html_wideo.py lottie scena/lottie.json --klatki 0,45,89 --arkusz arkusz.jpg
     python3 html_wideo.py pomiar anim.html --dlugosc 6 [--preset jarvo] [--platforma tiktok] [--tryb pelny|szybki]
                                 [--wyjatek "czas_czytania@Logo=znak marki, nie tekst do czytania"] [--json pomiar.json]
+                                [--fakty fakty.json]
     python3 html_wideo.py aktualny anim.html [--raport pomiar.json]   # 0 = raport pełny, aktualny i bez błędów
 
 pomiar: teksty z DOM i małe klatki w każdej próbce (10/s; szybki 4/s): czas czytania, tekst poza kadrem i pod UI
-platformy, kontrast WCAG, kroje zastępcze, czarne przerwy, martwe odcinki, monotonny rytm, błędy JS i zasobów
-(szczegóły: pomiar.py). Raport z odciskiem plików animacji: po każdej zmianie nieaktualny. Kod 1 = błędy.
+platformy, kontrast WCAG, kroje zastępcze, czarne przerwy, martwe odcinki, monotonny rytm, błędy JS i zasobów,
+liczby na ekranie bez źródła w fakty.json (szczegóły: pomiar.py). Raport z odciskiem plików animacji: po każdej zmianie nieaktualny. Kod 1 = błędy.
 
 Każda klatka to stan animacji w chwili t (uprząż czasu strony, nie zegar ścienny), więc wideo jest płynne
 i powtarzalne niezależnie od szybkości maszyny. Uprząż: parametr w URL (--param t --jednostka s|ms|klatka;
@@ -613,6 +614,8 @@ def raport_pomiaru(anim: Path, wynik: dict, ustawienia: dict, tryb: str, hz: flo
         if bg:
             tla[tid] = (bg, probki[i]["t"])
     ust = pm.analiza(probki, ustawienia["dlugosc"], hz, ustawienia.get("platforma"), ustawienia.get("jezyk", "pl"), tla)
+    if ustawienia.get("fakty"):
+        ust += pm.liczby_ekranu(probki, hz, json.loads(Path(ustawienia["fakty"]["plik"]).read_text(encoding="utf-8")))
     teksty_rodzin: dict[str, list[str]] = {}
     for p in probki:
         for x in p["teksty"]:
@@ -675,6 +678,8 @@ def main(argv: list[str] | None = None) -> int:
             s.add_argument("--jezyk", default="pl", help="tempo czytania (pl, en)")
             s.add_argument("--wyjatek", action="append", default=[], help="KOD[@fragment tekstu]=powód (świadomy wyjątek)")
             s.add_argument("--json", help="raport (domyślnie pomiar.json obok animacji) + pomiar.md")
+            s.add_argument("--fakty", help="brief Sherlocka: liczby na ekranie muszą mieć w nim źródło (domyślnie "
+                           "fakty.json obok strony albo katalog wyżej)")
         elif name == "klatki":
             s.add_argument("--czasy", required=True, help="sekundy po przecinku, np. 0,1.5,3")
             s.add_argument("--out", default="out/wideo/klatki")
@@ -784,8 +789,9 @@ def cmd_pomiar(a, o: dict, size: tuple[int, int]) -> int:
     anim = Path(a.zrodlo).resolve()
     hz = HZ_POMIARU[a.tryb]
     wyj = pm.wyjatki(a.wyjatek)
+    fakty = pm.fakty_info(Path(a.fakty).resolve() if a.fakty else pm.wl.znajdz_fakty(anim.parent))
     ustawienia = {"dlugosc": a.dlugosc, "rozmiar": a.rozmiar or None, "preset": a.preset, "query": o["query"],
-                  "platforma": a.platforma, "jezyk": a.jezyk}
+                  "platforma": a.platforma, "jezyk": a.jezyk, **({"fakty": fakty} if fakty else {})}
     wynik = zmierz(str(anim), o, a.dlugosc, hz, size, bool(a.rozmiar), a.czekaj)
     raport = raport_pomiaru(anim, wynik, ustawienia, a.tryb, hz, wyj)
     out = _raport_path(a.zrodlo, a.json)

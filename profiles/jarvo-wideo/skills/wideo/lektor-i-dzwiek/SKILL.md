@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.8.0
+version: 1.9.0
 author: Jarvo
 license: MIT
 metadata:
@@ -44,10 +44,16 @@ Jedno zdanie na linię: dwa zdania w linii Edge rozdziela własną, nierówną p
 tempie > 2,7 słowa/s razem z pauzami (Marek przy `+0%` mówi ok. 2,3) i długości poza `--cel`, a z zasad
 narracji (`scenariusz/references/narracja.md`) o powitaniu albo definicji na start, liście zamiast opowieści,
 opisie obrazu i streszczeniu na końcu. `--sprawdz` = sama kontrola tekstu i szacunek, bez syntezy.
+Brief Sherlocka `fakty.json` obok narracji albo katalog wyżej (albo `--fakty`): liczba cyframi z listy niepewnych
+= błąd i bez syntezy, liczba bez pokrycia w briefie = ostrzeżenie (dopisz źródło albo usuń). Słowniczek briefu
+(`wymowa`) i `--wymowa wymowa.json` (`{"Next.js": "nekst dżej es"}`) zmieniają tylko to, co czyta lektor:
+napisy, `slowa.json` i chwile `{nazwa}` zostają w pisowni z tekstu.
 
 ## Wymowa
 - Liczby tak, jak mają zabrzmieć („trzydzieści procent” gdy „30%” brzmi źle), skróty rozwinięte („między innymi”).
-- Obce nazwy marek: zapis fonetyczny w tekście lektora, poprawny zapis w `tekst_ekranowy` i SRT.
+  W narracji fakt zostaje cyframi (sprawdzany z briefem, napis pokazuje „30%”), a brzmienie poprawia `--wymowa`.
+- Obce nazwy marek: zapis fonetyczny w tekście lektora, poprawny zapis w `tekst_ekranowy` i SRT; w narracji
+  zapis poprawny w tekście, a fonetyczny w słowniczku briefu albo `--wymowa`.
 - Test wymowy („odsłuch” uszami Parakeet): `film.py lektor "<zdanie>" -o /tmp/test.mp3`, potem
   `montaz.py transkrypcja /tmp/test.mp3 -o /tmp/test` i porównaj `/tmp/test.txt` z tekstem. Słowo rozpoznane
   inaczej = niewyraźna wymowa: zmień zapis (fonetycznie, prościej) i powtórz.

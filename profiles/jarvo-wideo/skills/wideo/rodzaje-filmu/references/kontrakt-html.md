@@ -164,6 +164,10 @@ const napis = O.napis(t);                             // grupa napisów w chwili
   chwili, której w osi już nie ma, zatrzymuje render i pomiar z nazwą (`nieznana chwila „…”`), nic nie przesuwa się po cichu.
 - `--dlugosc` renderu i pomiaru = `O.dlugosc` (narracja podaje gotowe polecenie). Napisy wypalasz z
   `lektor.slowa.json` (`napisy.py --slowa`) albo rysuje je strona z `O.napis(t)`, nie oba naraz.
+- Fakty: brief Sherlocka w `out/wideo/src/fakty.json` (katalog wyżej niż strona). `narracja` sprawdza z nim liczby
+  lektora, a `pomiar` liczby na ekranie stojące ≥ 0,5 s (klatki licznika w ruchu nie): `liczba_niepewna` = błąd,
+  `liczba_bez_zrodla` = ostrzeżenie (oś wykresu, numer kroku: `--wyjatek "liczba_bez_zrodla@50=oś wykresu…"`).
+  Zmiana briefu = pomiar nieaktualny.
 
 ## Render
 ```bash

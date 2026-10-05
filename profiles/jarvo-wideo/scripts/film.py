@@ -5,6 +5,7 @@
     python3 film.py render plan.json [--szkic] [--format 9:16,16:9] [--wariant B | --wszystkie] [--out out/wideo]
     python3 film.py lektor "Tekst lektora." -o lektor.mp3 [--glos pl-PL-ZofiaNeural] [--tempo +5%]
     python3 film.py narracja narracja.txt -o src/lektor.wav [--os src/anim/os_czasu.json] [--cel 60-90] [--sprawdz]
+                             [--fakty src/fakty.json] [--wymowa wymowa.json]
     python3 film.py glosy                                    # polskie głosy Edge TTS
     python3 film.py cache [--starsze-niz 14]                 # rozmiar cache i sprzątanie
 
@@ -17,7 +18,9 @@ Wynik: <out>/<slug>/<slug>[-wariant]-<format>.mp4, .srt, miniatura, film.json (s
 `|` = podział napisu, `{nazwa}` = chwila przed słowem). Zdania syntezowane osobno, wycięte do słyszalnej mowy i ułożone
 z pauzami (w akapicie 0,33 s, między akapitami 1 s, przed rozdziałem 1,5 s): jeden plik lektora, `os_czasu.json`
 (zdania, ujęcia, rozdziały, napisy, chwile po nazwie dla `bit()` z `/_lib/jarvo/os_czasu.js`), słowa z czasem i SRT.
-Nowe nagranie lektora = nowa oś, animacja idzie za nią sama.
+Nowe nagranie lektora = nowa oś, animacja idzie za nią sama. Z `fakty.json` (brief Sherlocka) liczba lektora
+z listy niepewnych zatrzymuje syntezę, a liczba bez źródła daje ostrzeżenie; słowniczek briefu i `--wymowa` mówią
+lektorowi, jak czytać termin („Next.js” → „nekst dżej es”), a napisy zostają w pisowni z tekstu.
 """
 
 from __future__ import annotations
@@ -708,16 +711,52 @@ def parse_narracja(tekst: str) -> dict:
     return {"rozdzialy": rozdzialy, "bledy": bledy, "ostrzezenia": ostrz}
 
 
-def linie_narracji(narr: dict) -> list[dict]:
-    """Płaska lista linii z numerem ujęcia, zdania w ujęciu, rozdziału i rodzajem pauzy przed linią."""
+ZNAKI_BRZEGU = "\"'„”«»()[]"
+
+
+def _rdzen(tok: str) -> str:
+    return tok.strip(ZNAKI_BRZEGU).rstrip(",.;:!?…").strip(ZNAKI_BRZEGU).casefold()
+
+
+def do_czytania(slowa: list[str], wymowa: dict[str, str] | None
+                ) -> tuple[list[str], list[tuple[int, int, int, int]], list[str]]:
+    """Słowa do napisów → słowa dla lektora: termin ze słowniczka (też kilkuwyrazowy, bez wielkości liter) zastąpiony
+    zapisem wymowy („Next.js” → „nekst dżej es”), interpunkcja z końca zostaje. Mapa: dla każdego słowa napisu
+    (początek, koniec) słów lektora oraz (część, ile), gdy kilka słów napisu dzieli jeden zapis wymowy. Na końcu
+    lista użytych terminów."""
+    klucze = sorted((([_rdzen(t) for t in k.split()], v.split(), k) for k, v in (wymowa or {}).items()
+                     if k.strip() and v.strip()), key=lambda kv: -len(kv[0]))
+    tts, mapa, uzyte, i = [], [], [], 0
+    while i < len(slowa):
+        for klucz, zamiana, termin in klucze:
+            n = len(klucz)
+            if [_rdzen(t) for t in slowa[i:i + n]] == klucz:
+                ogon = slowa[i + n - 1][len(slowa[i + n - 1].rstrip(",.;:!?…")):]
+                a = len(tts)
+                tts += zamiana[:-1] + [zamiana[-1] + ogon]
+                mapa += [(a, len(tts), k, n) for k in range(n)]
+                uzyte.append(termin)
+                i += n
+                break
+        else:
+            mapa.append((len(tts), len(tts) + 1, 0, 1))
+            tts.append(slowa[i])
+            i += 1
+    return tts, mapa, uzyte
+
+
+def linie_narracji(narr: dict, wymowa: dict[str, str] | None = None) -> list[dict]:
+    """Płaska lista linii z numerem ujęcia, zdania w ujęciu, rozdziału, rodzajem pauzy przed linią i tekstem dla
+    lektora (z wymową terminów ze słowniczka)."""
     out, u = [], 0
     for ri, r in enumerate(narr["rozdzialy"], 1):
         for ai, akapit in enumerate(r["akapity"]):
             u += 1
             for zi, ln in enumerate(akapit, 1):
                 pauza = ("wstep" if not out else "zdanie" if zi > 1 else "akapit" if ai > 0 else "rozdzial")
-                out.append({**ln, "rozdzial": ri, "ujecie": u, "zdanie": zi, "pauza": pauza,
-                            "id": f"u{u}.z{zi}"})
+                tts, mapa, uzyte = do_czytania(ln["slowa"], wymowa)
+                out.append({**ln, "rozdzial": ri, "ujecie": u, "zdanie": zi, "pauza": pauza, "id": f"u{u}.z{zi}",
+                            "tts_slowa": tts, "tts": " ".join(tts), "mapa": mapa, "wymowa": uzyte})
     return out
 
 
@@ -780,14 +819,24 @@ def uloz_os(linie: list[dict], mowy: list[dict], pauzy: dict, rozdzialy: list[di
         start, koniec = round(t, 3), round(t + (m["do"] - m["od"]), 3)
         kawalki.append({"od": max(0.0, m["od"] - ZAPAS_PRZED), "do": m["do"] + ZAPAS_PO,
                         "na": max(0.0, t - min(ZAPAS_PRZED, m["od"]))})
-        tok = czasy_tokenow(ln["slowa"], m["slowa"])
+        tts_czasy = czasy_tokenow(ln.get("tts_slowa") or ln["slowa"], m["slowa"])
+        tok = []                                   # czas każdego słowa napisu (przez mapę wymowy)
+        for i, (a, b, czesc, ile) in enumerate(ln.get("mapa") or [(i, i + 1, 0, 1) for i in range(len(ln["slowa"]))]):
+            t0, t1 = tts_czasy[a][0], tts_czasy[b - 1][1]
+            d = (t1 - t0) / ile
+            tok.append((t0 + czesc * d, t0 + (czesc + 1) * d))
         przytnij = lambda x: round(min(max(x + przes, start), koniec), 3)  # noqa: E731
         for nazwa, i in ln["chwile"]:
             chwile[nazwa] = przytnij(tok[i][0]) if i < len(tok) else koniec
-        disp = wl.align_display(m["slowa"], ln["tekst"])
-        podz = {tok[i][2] for i in ln["podzialy"] if i < len(tok)}
-        slowa_zd = [wl.Word(przytnij(w.start), przytnij(w.end), d.text, k in podz or k == len(disp) - 1)
-                    for k, (w, d) in enumerate(zip(m["slowa"], disp))]
+        slowa_zd: list[wl.Word] = []
+        for i, (slowo, (t0, t1)) in enumerate(zip(ln["slowa"], tok)):
+            podzial = i in ln["podzialy"] or i == len(tok) - 1
+            if not _znaki(slowo):                  # sama interpunkcja („–”): nie jest słowem napisu
+                if podzial and slowa_zd:
+                    slowa_zd[-1].podzial = True
+                continue
+            tekst = slowo.strip(ZNAKI_BRZEGU).rstrip(",.;:…").strip(ZNAKI_BRZEGU) or slowo
+            slowa_zd.append(wl.Word(przytnij(t0), przytnij(t1), tekst, podzial))
         slowa_osi += slowa_zd
         zdania.append({"id": ln["id"], "ujecie": f"u{ln['ujecie']}", "rozdzial": f"r{ln['rozdzial']}", "wiersz": ln["wiersz"],
                        "tekst": ln["tekst"], "start": start, "koniec": koniec,
@@ -901,16 +950,50 @@ def _cel(spec: str | None) -> tuple[float, float] | None:
     return float(a), float(b or a)
 
 
+def fakty_i_wymowa(sciezka_fakty: Path | None, sciezka_wymowa: str | None) -> tuple[dict | None, dict[str, str]]:
+    """fakty.json (brief Sherlocka) i słownik wymowy: `slowniczek[].wymowa` z faktów, nadpisany plikiem --wymowa."""
+    fakty = json.loads(sciezka_fakty.read_text(encoding="utf-8")) if sciezka_fakty else None
+    wymowa = {str(t["termin"]): str(t["wymowa"]) for t in (fakty or {}).get("slowniczek") or []
+              if isinstance(t, dict) and t.get("termin") and t.get("wymowa")}
+    if sciezka_wymowa:
+        wymowa.update({str(k): str(v) for k, v in json.loads(Path(sciezka_wymowa).read_text(encoding="utf-8")).items()})
+    return fakty, wymowa
+
+
+def kontrola_liczb(linie: list[dict], fakty: dict) -> tuple[list[str], list[str]]:
+    """Liczby lektora zapisane cyframi kontra fakty.json: z listy niepewnych = błąd, bez pokrycia = ostrzeżenie."""
+    pewne, niepewne = wl.liczby_faktow(fakty)
+    bledy, ostrz = [], []
+    for ln in linie:
+        for zapis, rodzaj in wl.sprawdz_liczby(ln["tekst"], pewne, niepewne):
+            if rodzaj == "niepewna":
+                bledy.append(f"wiersz {ln['wiersz']}: liczba „{zapis}” jest na liście niepewnych w fakty.json: "
+                             "nie trafia do lektora")
+            else:
+                ostrz.append(f"wiersz {ln['wiersz']}: liczba „{zapis}” bez źródła w fakty.json: dopisz ją do briefu "
+                             "Sherlocka albo usuń (scenariusz/references/narracja.md, zasada 4)")
+    return bledy, ostrz
+
+
 def cmd_narration(args) -> int:
     zrodlo = Path(args.plik)
     narr = parse_narracja(zrodlo.read_text(encoding="utf-8"))
-    linie = linie_narracji(narr) if not narr["bledy"] else []
+    sciezka_fakty = Path(args.fakty) if args.fakty else wl.znajdz_fakty(zrodlo.resolve().parent)
+    fakty, wymowa = fakty_i_wymowa(sciezka_fakty, args.wymowa)
+    linie = linie_narracji(narr, wymowa) if not narr["bledy"] else []
+    if fakty is not None:
+        b, o = kontrola_liczb(linie, fakty)
+        narr["bledy"] += b
+        narr["ostrzezenia"] += o
     pauzy, cel = _pauzy(args.pauzy), _cel(args.cel)
-    slow = sum(len(ln["slowa"]) for ln in linie)
+    slow = sum(len(ln["tts_slowa"]) for ln in linie)
     szac = slow / WORDS_PER_SEC + sum(pauzy[ln["pauza"]] for ln in linie) + pauzy["koniec"]
     raport = {"ok": not narr["bledy"], "bledy": narr["bledy"], "ostrzezenia": list(narr["ostrzezenia"]),
-              "zdania": len(linie), "slowa": slow, "ujecia": len({ln["ujecie"] for ln in linie}),
-              "rozdzialy": len(narr["rozdzialy"]), "szacunek_s": round(szac, 1)}
+              "zdania": len(linie), "slowa": sum(len(ln["slowa"]) for ln in linie),
+              "ujecia": len({ln["ujecie"] for ln in linie}), "rozdzialy": len(narr["rozdzialy"]),
+              "fakty": str(sciezka_fakty) if sciezka_fakty else None,
+              "wymowa": sorted({t for ln in linie for t in ln["wymowa"]}),
+              "szacunek_s": round(szac, 1)}
     if narr["bledy"] or args.sprawdz:
         if cel and linie and not cel[0] <= szac <= cel[1]:
             raport["ostrzezenia"].append(f"szacunek {szac:.0f} s poza celem {cel[0]:g}–{cel[1]:g} s")
@@ -918,7 +1001,7 @@ def cmd_narration(args) -> int:
         return 0 if raport["ok"] else 1
     wl.need("ffmpeg")
     log(f"▶ lektor: {len(linie)} zdań, głos {args.glos}, tempo {args.tempo}")
-    mowy_tts = wl.speak_many([{"text": ln["tekst"], "voice": args.glos, "rate": args.tempo} for ln in linie])
+    mowy_tts = wl.speak_many([{"text": ln["tts"], "voice": args.glos, "rate": args.tempo} for ln in linie])
     mowy = []
     for sp in mowy_tts:
         od, do = granice_mowy(sp)
@@ -1018,6 +1101,9 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--tempo", default="+0%")
     n.add_argument("--pauzy", help="np. zdanie=0.4,akapit=1.2 (domyślnie " + ",".join(f"{k}={v:g}" for k, v in PAUZY.items()) + ")")
     n.add_argument("--cel", help="docelowa długość w s, np. 60-90 (ostrzeżenie poza zakresem)")
+    n.add_argument("--fakty", help="brief Sherlocka (domyślnie fakty.json obok narracji albo katalog wyżej): liczby "
+                   "lektora muszą mieć w nim źródło, słowniczek daje wymowę terminów")
+    n.add_argument("--wymowa", help='JSON {"Next.js": "nekst dżej es"}: jak lektor ma czytać termin (napis zostaje w pisowni)')
     n.add_argument("--sprawdz", action="store_true", help="tylko kontrola tekstu i szacunek długości, bez syntezy")
     sub.add_parser("glosy", help="polskie głosy Edge TTS")
     k = sub.add_parser("cache", help="rozmiar cache; --starsze-niz N usuwa pliki starsze niż N dni")

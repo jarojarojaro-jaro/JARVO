@@ -651,3 +651,78 @@ def transcribe_words(media: Path) -> list[Word]:
 def write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+
+
+# ------------------------------------------------------------------ fakty do filmu (brief Sherlocka: fakty.json)
+
+# 3,5 · 12 480 · 12.480 · 2024 · 0.75 · 3,5 mln; spacja albo kropka co trzy cyfry = tysiące, przecinek = ułamek
+_LICZBA = re.compile(r"(?<![\w,.])(\d{1,3}(?:[   ]\d{3})+|\d{1,3}(?:\.\d{3})+(?![.,]?\d)|\d+)((?:[,.]\d+)?)(?![\d])"
+                     r"(?:\s*(tys\.?|tysięcy|tysiące|mln|milion\w*|mld|miliard\w*|thousand|million|billion|k|M|B)\b)?")
+_MNOZNIKI = {"tys": 1e3, "tysięcy": 1e3, "tysiące": 1e3, "thousand": 1e3, "k": 1e3, "mln": 1e6, "million": 1e6, "M": 1e6,
+             "mld": 1e9, "billion": 1e9, "B": 1e9}
+LICZBY_STRUKTURALNE = {0.0, 1.0, 2.0, 3.0}      # „trzy kroki”, „dwa razy”: wyliczenie, nie fakt do źródła
+
+
+def _mnoznik(slowo: str | None) -> float:
+    s = (slowo or "").rstrip(".")
+    return _MNOZNIKI.get(s) or (1e6 if s.startswith("milion") else 1e9 if s.startswith("miliard") else 1.0)
+
+
+def liczby_w_tekscie(tekst: str) -> list[tuple[str, set[float]]]:
+    """Liczby zapisane cyframi: [(zapis, możliwe wartości)]. „3,5 mln” → {3.5, 3 500 000}, więc fakt „3,5 mln”
+    pokrywa i „3,5 mln”, i „3 500 000” na ekranie; „1,234” dostaje też 1234 (zapis angielski). Ten sam zapis
+    rozumie `fakty.py` Sherlocka."""
+    out = []
+    for m in _LICZBA.finditer(tekst or ""):
+        calosc = re.sub(r"[   .]", "", m.group(1))
+        ulamek = m.group(2) or ""
+        wartosci = {float(calosc + ulamek.replace(",", "."))}
+        if re.fullmatch(r"[,.]\d{3}", ulamek):
+            wartosci.add(float(calosc + ulamek[1:]))
+        k = _mnoznik(m.group(3))
+        if k != 1.0:
+            wartosci |= {v * k for v in wartosci}
+        out.append((m.group(0).strip(), wartosci))
+    return out
+
+
+POLA_BEZ_FAKTOW = {"zrodla", "id", "tier", "wiarygodnosc"}     # numery źródeł i ocena to nie liczby faktów
+
+
+def _napisy_w(obj) -> list[str]:
+    if isinstance(obj, str):
+        return [obj]
+    if isinstance(obj, dict):
+        return [s for k, v in obj.items() if k not in POLA_BEZ_FAKTOW for s in _napisy_w(v)]
+    if isinstance(obj, list):
+        return [s for v in obj for s in _napisy_w(v)]
+    return [str(obj)] if isinstance(obj, (int, float)) and not isinstance(obj, bool) else []
+
+
+def liczby_faktow(fakty: dict) -> tuple[set[float], set[float]]:
+    """fakty.json → (liczby ze źródłem, liczby tylko z listy niepewnych). Ze źródłem = każda liczba w faktach,
+    ich przeliczeniach na odczuwalną skalę, przypadkach i datach; `niepewne` nie trafia ani do lektora, ani na ekran.
+    Numery źródeł ([3]) to nie liczby faktów: pola `zrodla`, `id` i ocena wiarygodności są pomijane."""
+    def zbierz(obj) -> set[float]:
+        return {v for s in _napisy_w(obj) for _, vs in liczby_w_tekscie(s) for v in vs}
+    pewne = zbierz({k: v for k, v in fakty.items() if k != "niepewne"})
+    return pewne, zbierz(fakty.get("niepewne") or []) - pewne
+
+
+def sprawdz_liczby(tekst: str, pewne: set[float], niepewne: set[float]) -> list[tuple[str, str]]:
+    """Liczby z tekstu bez pokrycia w faktach: [(zapis, 'brak' | 'niepewna')]; liczby 0–3 pomijamy (wyliczenia)."""
+    out = []
+    for zapis, vs in liczby_w_tekscie(tekst):
+        if vs & LICZBY_STRUKTURALNE or any(abs(v - p) <= 1e-9 * max(1.0, abs(p)) for v in vs for p in pewne):
+            continue
+        out.append((zapis, "niepewna" if vs & niepewne else "brak"))
+    return out
+
+
+def znajdz_fakty(*katalogi: Path) -> Path | None:
+    """fakty.json obok strony albo pliku narracji, albo katalog wyżej (out/wideo/src/)."""
+    for k in katalogi:
+        for d in (k, k.parent):
+            if (d / "fakty.json").is_file():
+                return d / "fakty.json"
+    return None

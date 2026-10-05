@@ -269,9 +269,9 @@ zrodla:
     notatka: "MIT: ~290 agentów w 20 działach; właściciel odłożył 2026-10-05 (ewentualnie skille sprzedaży u Łowcy)"
   anything2explainer:
     repo: https://github.com/Vincentwei1021/anything2explainer
-    status: do-wdrozenia
+    status: uzywane
     przejrzane: 735c79c8724e897e8971cd59dde7e5aa11e4d6ce
-    notatka: "licencja niekomercyjna (PolyForm NC): tylko pomysły, zasady i liczby własnym tekstem i kodem; zatwierdzone 2026-10-05"
+    notatka: "licencja niekomercyjna (PolyForm NC): tylko pomysły, zasady i liczby własnym tekstem i kodem; zatwierdzone 2026-10-05; używane: zasady narracji, pauzy z akapitów (film.py narracja), brief do filmu Sherlocka (fakty.py), kontrole kompozycji w pomiarze"
   cinetic:
     repo: https://github.com/Leonxlnx/cinetic
     status: czeka
@@ -284,6 +284,6 @@ zrodla:
     notatka: "MIT: 15 stylów (skill style-motion, karty i wzory), moduły technik w /_lib/jarvo/; mgaudio: muzyka.py (dodatek instaluj mgaudio); zatwierdzone 2026-10-05"
   video-talkcraft:
     repo: https://github.com/Vincentwei1021/video-talkcraft
-    status: do-wdrozenia
+    status: uzywane
     przejrzane: 4cd673df4b7a6a35784a0881df223721789c5e23
-    notatka: "licencja niekomercyjna (PolyForm NC): tylko pomysły, zasady i liczby własnym tekstem i kodem; zatwierdzone 2026-10-05"
+    notatka: "licencja niekomercyjna (PolyForm NC): tylko pomysły, zasady i liczby własnym tekstem i kodem; zatwierdzone 2026-10-05; używane: słyszalność efektów (projekt.py slychac)"

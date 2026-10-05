@@ -64,13 +64,18 @@ Jako pierwszy kontakt z firmą z listy Łowcy: audyt to wartość bez dostępu d
 ## 10. Wyjaśnij mi filmem
 Prośba „wytłumacz mi to filmem” (pomysł Karpathy'ego: zrozumienie szybciej z filmu niż z tekstu). Przy trudnym temacie
 możesz sam zaproponować film jednym zdaniem; zlecasz dopiero po „tak”.
-1. opcjonalnie `jarvo-sherlock` / `fakty`, gdy tematu nie ma w skarbcu, w raportach misji ani w dokumentacji.
+1. opcjonalnie `jarvo-sherlock` / `fakty`, gdy tematu nie ma w skarbcu, w raportach misji ani w dokumentacji:
+   brief do filmu (`raport-sledztwa/references/brief-do-filmu.md`). DoD: `out/fakty.json` (sytuacja widza,
+   przesłanie, mechanizm, liczby z przeczytanego źródła A–C z przeliczeniem i datą, analogie z `psuje_sie`,
+   słowniczek z wymową, niepewne), `fakty.py sprawdz out/fakty.json` bez błędów, krótki RAPORT ze źródłami.
 2. `jarvo-wideo` / `wyjasnienie` (parents: fakty): rodzaj explainer, wariant „dla właściciela”
    (`rodzaje-filmu/references/explainer.md`). Karta:
    - KONTEKST: film dla właściciela, żeby zrozumiał <temat>; nie do publikacji; co już wie, czego nie.
-   - WEJŚCIA: pełne ścieżki notatek skarbca, raportów misji albo dokumentów, z których pochodzą fakty.
+   - WEJŚCIA: `out/fakty.json` karty `fakty` (kopiuje do `out/wideo/src/`) albo pełne ścieżki notatek skarbca,
+     raportów misji i dokumentów, z których pochodzą fakty.
    - DoD: 60–90 s, 16:9 (9:16, gdy prosi o telefon), lektor PL i napisy, zdanie lektora do 20 słów, każdy fakt
-     z WEJŚĆ (lista faktów i źródeł w RAPORT), `qa_wideo.py` bez błędów.
+     z WEJŚĆ (lista faktów i źródeł w RAPORT); z briefem: `film.py narracja` i `html_wideo.py pomiar` bez
+     `liczba_niepewna`, każda `liczba_bez_zrodla` wyjaśniona w RAPORT; `qa_wideo.py` bez błędów.
    - GRANICE: A1, bez płatnej generacji AI (`video_generate`, `image_generate`), bez publikacji, budżet 30 min.
 Po akceptacji wyślij ścieżkę pliku i jedno zdanie, czego film uczy.
 

@@ -209,6 +209,84 @@ def test_cmd_narracja_zapisuje_lektora_os_slowa_i_srt(tmp_path, monkeypatch, cap
     assert teksty == []
 
 
+def test_wymowa_terminow_lektor_czyta_inaczej_napis_zostaje():
+    tts, mapa, uzyte = film.do_czytania(["Zbuduj", "to", "w", "„Next.js”,", "potem", "visual", "studio", "code."],
+                                        {"Next.js": "nekst dżej es", "Visual Studio Code": "wiżual studio kołd"})
+    assert tts == ["Zbuduj", "to", "w", "nekst", "dżej", "es,", "potem", "wiżual", "studio", "kołd."]
+    assert mapa[3] == (3, 6, 0, 1) and mapa[5:] == [(7, 10, 0, 3), (7, 10, 1, 3), (7, 10, 2, 3)]
+    assert sorted(uzyte) == ["Next.js", "Visual Studio Code"]
+    assert film.do_czytania(["Ala", "ma", "kota."], None)[:2] == (["Ala", "ma", "kota."], [(0, 1, 0, 1), (1, 2, 0, 1), (2, 3, 0, 1)])
+    n = film.parse_narracja("Zbuduj to w {nazwa}Next.js – szybko.\n")
+    linie = film.linie_narracji(n, {"next.js": "nekst dżej es"})
+    assert linie[0]["tts"] == "Zbuduj to w nekst dżej es – szybko." and linie[0]["wymowa"] == ["next.js"]
+    os_ = film.uloz_os(linie, [mowa(ln["tts_slowa"]) for ln in linie], film.PAUZY, n["rozdzialy"])
+    slowa = os_["_slowa"]
+    assert [w.text for w in slowa] == ["Zbuduj", "to", "w", "Next.js", "szybko"]            # pisownia z tekstu, bez „–”
+    z0 = os_["zdania"][0]["start"]
+    assert slowa[3].start == pytest.approx(z0 + 0.1 + 3 * 0.3 - 0.22)                     # od „nekst”
+    assert slowa[3].end == pytest.approx(z0 + 0.1 + 5 * 0.3 + 0.28 - 0.22)                # do końca „es”
+    assert os_["chwile"]["nazwa"] == slowa[3].start
+    assert os_["napisy"][0]["tekst"] == "Zbuduj to w Next.js szybko"
+
+
+FAKTY = {"temat": "kolejka w piekarni",
+         "liczby": [{"id": "L1", "wartosc": "3,5 mln", "jednostka": "bochenków", "twierdzenie": "sprzedano w 2024",
+                     "zrodla": [12], "tier": "B", "skala": "jeden co 9 sekund", "data": "2024"}],
+         "slowniczek": [{"termin": "bochenków", "prosto": "chleb", "wymowa": "bo-chen-kuf"}],
+         "niepewne": ["ok. 40 osób dziennie rezygnuje z kolejki (jedno źródło D)"]}
+
+
+def test_liczby_lektora_kontra_fakty():
+    pewne, niepewne = wl.liczby_faktow(FAKTY)
+    assert {3.5, 2024.0, 9.0} <= pewne and 12.0 not in pewne and niepewne == {40.0}
+    assert wl.sprawdz_liczby("Jeden bochenek co 9 sekund, 3 razy", pewne, niepewne) == []
+    assert wl.sprawdz_liczby("40 osób odchodzi, a 12 wraca", pewne, niepewne) == [("40", "niepewna"), ("12", "brak")]
+    n = film.parse_narracja("Rano stoi 40 osób.\nW 2024 roku sprzedano 3,5 mln bochenków.\nCzeka 7 minut.\n")
+    bledy, ostrz = film.kontrola_liczb(film.linie_narracji(n), FAKTY)
+    assert len(bledy) == 1 and "wiersz 1: liczba „40” jest na liście niepewnych" in bledy[0]
+    assert len(ostrz) == 1 and "wiersz 3: liczba „7” bez źródła" in ostrz[0]
+
+
+def test_cmd_narracja_z_faktami_i_wymowa(tmp_path, monkeypatch, capsys):
+    (tmp_path / "fakty.json").write_text(json.dumps(FAKTY, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "wideo").mkdir()
+    src = tmp_path / "wideo" / "narracja.txt"                         # fakty.json katalog wyżej: znaleziony sam
+    src.write_text(NARRACJA, encoding="utf-8")
+    assert film.main(["narracja", str(src), "--sprawdz"]) == 0
+    r = json.loads(capsys.readouterr().out)
+    assert r["fakty"] == str(tmp_path / "fakty.json") and r["wymowa"] == ["bochenków"]
+    assert not any("bez źródła" in o for o in r["ostrzezenia"])       # 2024 i 3,5 mln są w faktach
+    teksty = []
+
+    def speak_many(items):
+        teksty.extend(it["text"] for it in items)
+        return [wl.Speech(tmp_path / "x.mp3", 3.0, mowa(it["text"].split(), "2024")["slowa"]) for it in items]
+    monkeypatch.setattr(film.wl, "speak_many", speak_many)
+    monkeypatch.setattr(film.wl, "need", lambda tool: tool)
+    monkeypatch.setattr(film, "granice_mowy", lambda sp: (0.22, sp.words[-1].end))
+    monkeypatch.setattr(film, "zloz_lektor", lambda pliki, kaw, dl, out: out.write_bytes(b"RIFF"))
+    wymowa = tmp_path / "wymowa.json"
+    wymowa.write_text(json.dumps({"bochenków": "bochenkuw"}), encoding="utf-8")
+    out = tmp_path / "wideo" / "lektor.wav"
+    assert film.main(["narracja", str(src), "-o", str(out), "--wymowa", str(wymowa)]) == 0
+    capsys.readouterr()
+    assert teksty[2] == "W 2024 roku sprzedano 3,5 mln bochenkuw."     # --wymowa nadpisuje słowniczek
+    assert "bochenków" in out.with_suffix(".srt").read_text(encoding="utf-8")
+    # liczba z listy niepewnych zatrzymuje syntezę
+    teksty.clear()
+    src.write_text("Rano w kolejce stoi 40 osób.\n", encoding="utf-8")
+    assert film.main(["narracja", str(src), "-o", str(out)]) == 1
+    r = json.loads(capsys.readouterr().out)
+    assert teksty == [] and not r["ok"] and "niepewnych" in r["bledy"][0]
+    # bez fakty.json (ani obok, ani katalog wyżej) nie ma kontroli liczb ani wymowy
+    bez = tmp_path / "inny" / "wideo" / "narracja.txt"
+    bez.parent.mkdir(parents=True)
+    bez.write_text("Rano w kolejce stoi 40 osób.\n", encoding="utf-8")
+    assert film.main(["narracja", str(bez), "--sprawdz"]) == 0
+    r = json.loads(capsys.readouterr().out)
+    assert r["ok"] and r["fakty"] is None and r["wymowa"] == []
+
+
 @pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
 def test_zloz_lektor_wkleja_wycinki_co_do_probki(tmp_path):
     import array

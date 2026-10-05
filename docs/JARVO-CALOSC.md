@@ -118,10 +118,13 @@ Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo s
 Film z kodu z lektorem zaczyna się od pliku narracji (`film.py narracja`): zdanie w linii, akapit = ujęcie, pauzy
 z akapitów (0,33 s w akapicie, 1 s między akapitami, 1,5 s przed rozdziałem) i oś czasu `os_czasu.json`, z której
 animacja bierze chwile po nazwie (`/_lib/jarvo/os_czasu.js`); nowe nagranie lektora nie psuje animacji.
+Fakty do explainera daje Sherlock w briefie `fakty.json` (liczby z przeczytanego źródła A–C, przeliczenie na skalę,
+analogie z miejscem, w którym kłamią, słowniczek z wymową, lista niepewnych; `fakty.py sprawdz`). Lektor i pomiar
+animacji sprawdzają z nim każdą liczbę: z listy niepewnych zatrzymuje, bez źródła ostrzega.
 Animacja z kodu ma twardy pomiar przed oddaniem (`html_wideo.py pomiar`: czas czytania, kadr i strefy UI platformy,
-kontrast, czarne przerwy, martwe odcinki, rytm, pusta scena, oddech, uderzenia kadru; „gotowe” tylko z pełnym
-i aktualnym raportem), ruch z charakterem marki (`/_lib/jarvo/ruch.js`: 6 charakterów, smugi zamiast motion bluru)
-i parametry
+kontrast, czarne przerwy, martwe odcinki, rytm, pusta scena, oddech, uderzenia kadru, liczby kontra `fakty.json`;
+„gotowe” tylko z pełnym i aktualnym raportem), ruch z charakterem marki (`/_lib/jarvo/ruch.js`: 6 charakterów,
+smugi zamiast motion bluru) i parametry
 (`parametry.json`), które właściciel stroi na żywo w HQ. Typografia do nagrania z mową (`typografia.py`, skill
 `typografia-edit`): reżyser z reguł układa bloki słów, Wideograf poprawia je znaczeniem (puenta = uderzenie, myśl =
 dalej i kursywą), kolory bierze z kadru (dwa akcenty w kontraście ze sceną, np. niebo → ciemna czerwień i złoto,

@@ -18,9 +18,13 @@ z przeglądarki teksty (widoczna część, granice glifów, krycie, kolor, rozmi
                           i wejście do 1,2 s się nie liczą) albo koniec filmu stoi < 0,8 s (logo, puenta:
                           ≥ 1 s); film w pętli bez kontroli końca
     uderzenia_kadru       więcej niż 3 uderzenia całego kadru (błysk, wstrząs, pompa skali)         ostrzeżenie
+    liczba_niepewna       liczba na ekranie (≥ 0,5 s) z listy niepewnych w fakty.json               błąd
+    liczba_bez_zrodla     liczba na ekranie (≥ 0,5 s) bez pokrycia w fakty.json (oś, numer kroku:   ostrzeżenie
+                          wyjątek z powodem); liczby 0–3 i klatki licznika w ruchu pomijane
     zasob / blad_js       plik nie wczytał się / błąd JavaScript na stronie                         błąd
 
-Raport ma odcisk źródeł (pliki animacji + ustawienia pomiaru): zmiana czegokolwiek = raport nieaktualny. Film z kodu
+Liczby sprawdzamy, gdy obok strony albo katalog wyżej leży fakty.json (brief Sherlocka) albo podano `--fakty`.
+Raport ma odcisk źródeł (pliki animacji, ustawienia pomiaru i fakty.json): zmiana czegokolwiek = raport nieaktualny. Film z kodu
 HTML oddajesz tylko z pełnym (`--tryb pelny`) i aktualnym raportem bez błędów; świadomy wyjątek (`--wyjatek`) ma powód.
 Tekst rysowany na kanwie/WebGL animacja podaje sama: `window.__teksty()` → [{tekst, x, y, w, h, kolor, rozmiar, krycie,
 widoczny?, id?}] dla bieżącej klatki (kontrakt HTML). Ograniczenia: maski (overflow: hidden) liczone jako widoczne;
@@ -304,6 +308,46 @@ def _spokoj_przed(zm: list, k: int, okno: int) -> int:
     return naj
 
 
+LICZBA_WIDOCZNA = 0.5            # s: tyle musi stać tekst z liczbą, żeby ją sprawdzić (licznik w ruchu się nie liczy)
+
+
+def liczby_ekranu(probki: list[dict], hz: float, fakty: dict) -> list[dict]:
+    """Liczby w tekstach na ekranie kontra fakty.json: każda wersja tekstu widoczna w całości co najmniej 0,5 s.
+    Z listy niepewnych = błąd (nie trafia na ekran), bez pokrycia = ostrzeżenie (fakt bez źródła albo oś wykresu)."""
+    pewne, niepewne = wl.liczby_faktow(fakty)
+    dt = 1.0 / hz
+    wersje: dict[tuple, list[float]] = {}
+    for p in probki:
+        for x in p.get("teksty") or []:
+            if x["a"] >= 0.6 and len(x["seen"]) >= len(x["full"]) * 0.98:
+                wersje.setdefault((x["id"], x["full"]), []).append(p["t"])
+    out, byly = [], set()
+    for (_, full), ts in wersje.items():
+        if len(ts) * dt < LICZBA_WIDOCZNA - 1e-9:
+            continue
+        krotki = full if len(full) <= 60 else full[:57] + "…"
+        for zapis, rodzaj in wl.sprawdz_liczby(full, pewne, niepewne):
+            if (zapis, full) in byly:
+                continue
+            byly.add((zapis, full))
+            if rodzaj == "niepewna":
+                out.append(_ustalenie("liczba_niepewna", "blad", f"„{zapis}” w „{krotki}” jest na liście niepewnych w fakty.json",
+                                      "usuń liczbę z ekranu albo poproś Sherlocka o drugie źródło", ts[0], ts[-1] + dt,
+                                      tekst=full, liczba=zapis))
+            else:
+                out.append(_ustalenie("liczba_bez_zrodla", "ostrz", f"„{zapis}” w „{krotki}” bez źródła w fakty.json",
+                                      "dopisz liczbę do briefu Sherlocka albo usuń; oś wykresu i numer kroku: wyjątek z powodem",
+                                      ts[0], ts[-1] + dt, tekst=full, liczba=zapis))
+    return out
+
+
+def fakty_info(sciezka: Path | None) -> dict | None:
+    """Ścieżka i skrót fakty.json do ustawień pomiaru (zmiana briefu = raport nieaktualny)."""
+    if not sciezka:
+        return None
+    return {"plik": str(sciezka), "sha": hashlib.sha256(sciezka.read_bytes()).hexdigest()[:16]}
+
+
 def kompozycja(probki: list[dict], dt: float) -> list[dict]:
     """Pusta scena, oddech przed nowym ujęciem i na końcu, uderzenia całego kadru. Pola próbek z pomiaru przeglądarki:
     `obiekt` (obiekt_glowny), `czesc` i `powrot` (ruch_kadru), `do_poczatku` w ostatniej; bez nich kontrola milczy."""
@@ -545,6 +589,11 @@ def aktualnosc(anim: Path, raport: dict) -> list[str]:
     powody = []
     if raport.get("odcisk") != odcisk(anim, raport.get("ustawienia") or {}):
         powody.append("pliki animacji albo ustawienia zmieniły się po pomiarze: zmierz ponownie")
+    f = (raport.get("ustawienia") or {}).get("fakty")
+    if f and (not Path(f["plik"]).is_file() or fakty_info(Path(f["plik"]))["sha"] != f["sha"]):
+        powody.append("fakty.json zmienił się po pomiarze (liczby na ekranie): zmierz ponownie")
+    elif not f and wl.znajdz_fakty(anim.resolve().parent):
+        powody.append("obok animacji jest fakty.json, a pomiar był bez niego (liczby na ekranie): zmierz ponownie")
     pok = raport.get("pokrycie") or {}
     if not pok.get("pelne"):
         powody.append(f"pomiar niepełny (tryb {pok.get('tryb', '?')}, {pok.get('hz', '?')} próbek/s): do oddania --tryb pelny")

@@ -1,7 +1,7 @@
 ---
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
-version: 1.1.0
+version: 1.1.1
 author: Jarvo
 license: MIT
 metadata:
@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-10-02"
+    reviewed: "2026-10-05"
 ---
 
 # Dispatch: jak rozdać pracę

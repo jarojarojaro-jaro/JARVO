@@ -1,7 +1,7 @@
 ---
 name: raport-sledztwa
-description: "Format raportu: odpowiedź, dowody, pewność, luki, źródła."
-version: 1.1.0
+description: "Raport: odpowiedź, dowody, luki, źródła; brief do filmu."
+version: 1.2.0
 author: "Jarvo (zasady cytowania inspirowane open_deep_research, MIT)"
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-sherlock
     autonomy: A1
-    reviewed: "2026-10-03"
+    reviewed: "2026-10-05"
 ---
 
 # Raport śledztwa
@@ -31,6 +31,12 @@ Plik: `out/RAPORT.md`. Szablon: `references/RAPORT.template.md`.
 8. Długość: tyle, ile trzeba. Streszczenie ≤ 10 zdań; szczegóły w sekcjach.
 9. **Sprawdzenie przed oddaniem:** `sources.py verify out/RAPORT.md --min-coverage 0.5` kończy się „cytowania OK”,
    a linia `info:` z wyniku trafia do sekcji „Metoda”.
+
+## Brief do filmu
+Karta `fakty` przed filmem, który coś wyjaśnia: zamiast długiego raportu `out/fakty.json` dla Wideografa (liczby
+z oceną, przeliczeniem i źródłem, analogie, słowniczek z wymową, lista niepewnych) i krótki `out/RAPORT.md`.
+Format i kroki: `references/brief-do-filmu.md`. Przed oddaniem `$HERMES_HOME/scripts/fakty.py sprawdz out/fakty.json`
+kończy się ✓.
 
 ## Dla Jarva
 Jarvo relacjonuje wyniki użytkownikowi, więc pierwszy akapit i sekcja „Rekomendacja” muszą być

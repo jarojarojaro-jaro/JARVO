@@ -1,7 +1,7 @@
 ---
 name: scenariusz
 description: "Scenariusz krótkiego wideo: hook, rytm, tekst lektora."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -36,6 +36,7 @@ i kontrola w `references/narracja.md`, tekst w pliku `narracja.txt` dla `film.py
 | odbiorca i platforma | tak | 9:16, odbiorca z brand kitu |
 | długość | nie | 20–40 s |
 | CTA | nie | „zapisz/obserwuj” albo cel z karty |
+| brief Sherlocka `fakty.json` | przy explainerze | liczby tylko z WEJŚĆ karty; kopiujesz go do `out/wideo/src/` (sprawdza liczby i daje wymowę) |
 
 ## Warsztat (gdy film ma fabułę, postać albo dialog)
 Wiedza z `screenwriting/` (McKee, Egri): premisa i jedno przesłanie → `sw-premise-theme`; scena jako zwrot wartości

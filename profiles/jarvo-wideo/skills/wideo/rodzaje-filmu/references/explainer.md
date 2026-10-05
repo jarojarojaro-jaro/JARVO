@@ -7,8 +7,8 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 - 30–60 s na social (9:16 albo 1:1), 60–90 s na YouTube i stronę (16:9); lektor PL + napisy wypalone.
 - Muzyka pod lektorem, efekty zsynchronizowane z akcją, miks −14 LUFS; źródła faktów w RAPORT.
 - **Wariant „dla właściciela”** (karta „wyjaśnij mi filmem” od Jarva): ma tłumaczyć, nie sprzedawać. Bez haka
-  sprzedażowego i CTA; fakty tylko z WEJŚĆ karty (lista fakt → plik w RAPORT, brak faktu = pytanie do Jarva); lektor
-  prostym polskim (zdanie ≤ 20 słów, strona czynna); 60–90 s, 16:9; bez płatnej generacji AI (koszt 0 zł).
+  sprzedażowego i CTA; fakty tylko z WEJŚĆ karty, zwykle brief Sherlocka `fakty.json` (lista fakt → plik w RAPORT,
+  brak faktu = pytanie do Jarva); lektor prostym polskim (zdanie ≤ 20 słów); 60–90 s, 16:9; bez płatnej AI (0 zł).
 
 ## Silnik
 | Styl | Silnik |
@@ -40,8 +40,9 @@ liczba w skali, którą czuć, koniec odwraca początek); `film.py narracja --sp
 - Zwroty akcji i callbacki: coś z haka wraca w puencie; drobne gagi (onomatopeje) trzymają uwagę.
 - Lektor najpierw: `narracja.txt` (zdanie w linii, akapit = ujęcie) → `film.py narracja` → `lektor.wav` z pauzami
   z akapitów i `os_czasu.json`; animacja bierze chwile po nazwie (`kontrakt-html.md`, „Film z lektorem”), więc nowe
-  nagranie lektora jej nie psuje. Na ekranie ≤ 6 słów naraz (reszta w napisach).
-- Jedna analogia prowadzi przez cały film, jedna metafora wizualna na pojęcie; porównania do znanych („jak stadion…”).
+  nagranie lektora jej nie psuje. `fakty.json` w `src/`: trudne nazwy lektor czyta ze słowniczka briefu (`wymowa`).
+- Na ekranie ≤ 6 słów naraz (reszta w napisach). Jedna analogia na film (z briefu, nie dalej niż jej `psuje_sie`),
+  jedna metafora wizualna na pojęcie; porównania do znanych („jak stadion…”).
 - **Bez efektu PowerPointa** (`ruch-i-kompozycja.md` rozdz. 3): jeden wolny najazd kamery na ujęcie, nowy element
   tylko na ważnym zdaniu, stary ustępuje nowemu, ≤ 3 grupy naraz, jeden bohater ≥ 1/4 krótszego boku kadru.
 
@@ -49,7 +50,7 @@ liczba w skali, którą czuć, koniec odwraca początek); `film.py narracja --sp
 ```
 Temat i jedno zdanie, które widz ma zapamiętać:
 Widz (co już wie, czego nie):
-Fakty i źródła (z karty / raportu Sherlocka), niepewności:
+Fakty (`src/fakty.json` od Sherlocka albo lista z WEJŚĆ), analogia, niepewności:
 Bohater / obiekt prowadzący:          Styl i silnik:          Charakter ruchu (ruch-i-kompozycja.md):
 Sceny (czas → idea formalna → zdanie lektora):
 Format, długość, CTA:                 Dźwięk (muzyka, efekty):
@@ -62,7 +63,7 @@ Format, długość, CTA:                 Dźwięk (muzyka, efekty):
 
 ## Kontrola
 - Arkusz 1 klatka na scenę: czy każda scena ma jedną czytelną ideę; paski klatek na przejściach.
-- Każda liczba na ekranie i w lektorze zgodna ze źródłem; napisy = lektor (nazwy, liczby, polskie znaki).
+- Liczby lektora i ekranu kontra `fakty.json` (`film.py narracja`, `pomiar`): ostrzeżenie wyjaśniasz w RAPORT; napisy = lektor.
 - Test „wyciszony telefon”: bez dźwięku film nadal da się zrozumieć z obrazu i napisów.
 
 ## Inspiracje

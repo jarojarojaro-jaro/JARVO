@@ -37,4 +37,6 @@ nasz): ten sam materiał napisany według tych zasad oceniono na 8,2/10, a uło�
 Skrypt łapie to, co da się złapać ze słów: start od definicji albo powitania, akapity zaczynane jak lista („po
 pierwsze”, „kolejny”, „ponadto”), lektor opisujący obraz („na ekranie”, „jak widać”), koniec, który streszcza
 („podsumowując”, „w skrócie”), rozdział bez pytania na końcu, kilka zdań w linii, za długie zdania, napisy i akapity.
+Z briefem Sherlocka (`fakty.json` obok narracji) sprawdza też liczby zapisane cyframi: z listy niepewnych = błąd,
+bez pokrycia w briefie = ostrzeżenie; liczbę słowami („dziesięć osób”) przepuszcza, więc fakt piszesz cyframi.
 Linii opowieści, analogii i skali liczb nie sprawdzi: czytasz tekst na głos i odpowiadasz na testy z zasad 2, 4 i 5.

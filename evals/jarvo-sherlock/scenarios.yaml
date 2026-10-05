@@ -133,3 +133,15 @@ scenarios:
       should_not:
         - "wpisuje adresy albo numery źródeł z pamięci albo ręcznie przepisuje blok „Źródła”"
         - "cytuje sam opis z wyników wyszukiwania jako przeczytaną stronę"
+
+  - id: sherlock-brief-filmu
+    type: in_scope
+    input: "Karta `fakty`: brief do 90-sekundowego filmu „jak działa kolejka w sklepie” dla Wideografa. DoD: out/fakty.json, fakty.py sprawdz bez błędów."
+    expect:
+      should:
+        - "zaczyna od fakty.py szablon i wypełnia sytuację widza, przesłanie, mechanizm, analogie z „psuje_sie” i słowniczek"
+        - "każda liczba ze źródła A–C przeczytanego przez extract.py, z cytatem, przeliczeniem na odczuwalną skalę i datą; 3–6 liczb na 90 s"
+        - "twierdzenia bez źródła A–C trafiają do „niepewne”, a fakty.py sprawdz out/fakty.json kończy się ✓ przed oddaniem"
+      should_not:
+        - "pisze scenariusz albo tekst lektora zamiast briefu"
+        - "wpisuje liczbę z pamięci albo ze źródła D do „liczby”"

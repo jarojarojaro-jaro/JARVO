@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Wzorzec „Wyjaśnij mi filmem” (dispatch-playbook 1.1.1): karta Sherlocka `fakty` oddaje brief do filmu `out/fakty.json` sprawdzony `fakty.py`; Wideograf dostaje go w WEJŚCIACH, a DoD wymaga lektora i pomiaru animacji bez liczby z listy niepewnych i wyjaśnienia w RAPORT każdej liczby bez źródła.
 - `schemat` 1.1.0: żywy schemat na post (kropki po strzałkach, X / Instagram) to film, więc karta dla Wideografa (`zywy-schemat`), nie PNG w rozmowie.
 - Skille floty w grafie wiedzy: każdy skill (własny i wspólny) to węzeł `fleet/skille/<skill>` z opisem, agentami, powiązanymi skillami i skryptami (zasiew z repo). `wiedza_szukaj(folder="fleet")` odpowiada, który skill i który agent robi daną rzecz; przypomnienia przed turą ich nie zawierają.
 - Przegląd tygodnia jako strona (czwarty pomysł z posta Karpathy'ego: liczby łatwiej czytać z obrazu): `raport_strona.py` bez modelu robi z danych `fleet_report.py --mode weekly` stronę z kaflami, paskami jakości i tokenów na agenta i listami kart (`workspaces/jarvo/raporty/tydzien-RRRR-MM-DD.html`, podgląd w HQ, link na 7 dni). `weekly-review` 1.3.0: link w ostatniej linii wiadomości, plik strony w źródle szkicu „Tydzień floty” w skarbcu. Pusty tydzień: bez strony.

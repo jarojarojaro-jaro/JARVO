@@ -159,6 +159,47 @@ def test_odcisk_wyjatki_i_aktualnosc(tmp_path):
     assert any("zmieniły się" in p for p in pm.aktualnosc(anim, raport))
 
 
+FAKTY = {"liczby": [{"id": "L1", "wartosc": "3,5 mln", "zrodla": [12], "tier": "B", "skala": "jeden co 9 s"}],
+         "niepewne": ["40% klientów rezygnuje (jedno źródło)"]}
+
+
+def test_liczby_na_ekranie_kontra_fakty(tmp_path):
+    def teksty(t):
+        out = [tekst(1, "3,5 mln bochenków rocznie")]
+        if t < 1.0:                                                    # licznik w ruchu: każda wartość 0,1 s
+            out.append(tekst(2, f"{int(t * 1000) + 517} zł", y0=800, y1=860))
+        if 1.0 <= t < 2.0:
+            out.append(tekst(3, "40% klientów odchodzi", y0=900, y1=960))
+        if 2.0 <= t < 2.3:                                             # za krótko, żeby czytać: nie sprawdzamy
+            out.append(tekst(4, "77 sekund", y0=1000, y1=1060))
+        if t >= 3.0:
+            out.append(tekst(5, "Krok 2: 12 dni czekania", y0=1100, y1=1160))
+        return out
+    u = pm.liczby_ekranu(probki(5, teksty), HZ, FAKTY)
+    assert kody(u) == [("liczba_bez_zrodla", "ostrz"), ("liczba_niepewna", "blad")]
+    n = next(x for x in u if x["kod"] == "liczba_niepewna")
+    assert n["liczba"] == "40" and n["od"] == 1.0 and n["do"] == 2.0
+    assert next(x for x in u if x["kod"] == "liczba_bez_zrodla")["liczba"] == "12"
+    wyj = pm.wyjatki(["liczba_bez_zrodla@12 dni=numer kroku z planu, nie fakt do źródła"])
+    pm.zastosuj_wyjatki(u, wyj)
+    assert pm.werdykt(u) == {"bledy": 1, "ostrzezenia": 0, "wyjatki": 1, "ok": False}
+    # odcisk: zmiana briefu albo brief dopisany po pomiarze = raport nieaktualny
+    (tmp_path / "anim").mkdir()
+    anim = tmp_path / "anim" / "anim.html"
+    anim.write_text("<p>1</p>", encoding="utf-8")
+    raport = {"ustawienia": {"dlugosc": 5}, "pokrycie": {"pelne": True}, "werdykt": {"ok": True}}
+    raport["odcisk"] = pm.odcisk(anim, raport["ustawienia"])
+    assert pm.aktualnosc(anim, raport) == []
+    fakty = tmp_path / "fakty.json"
+    fakty.write_text(json.dumps(FAKTY), encoding="utf-8")
+    assert any("pomiar był bez niego" in x for x in pm.aktualnosc(anim, raport))
+    ust = {"dlugosc": 5, "fakty": pm.fakty_info(fakty)}
+    raport = {**raport, "ustawienia": ust, "odcisk": pm.odcisk(anim, ust)}
+    assert pm.aktualnosc(anim, raport) == [] and pm.fakty_info(None) is None
+    fakty.write_text(json.dumps({**FAKTY, "niepewne": []}), encoding="utf-8")
+    assert any("fakty.json zmienił się" in x for x in pm.aktualnosc(anim, raport))
+
+
 def test_podsumowanie_i_cli_html_wideo(tmp_path, monkeypatch):
     raport = {"plik": "anim.html", "werdykt": {"ok": False, "bledy": 1, "ostrzezenia": 1, "wyjatki": 1},
               "pokrycie": {"probek": 50, "hz": 10.0, "tryb": "pelny"}, "czcionki_brak": ["Brakujący"],
