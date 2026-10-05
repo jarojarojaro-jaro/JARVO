@@ -295,8 +295,8 @@ Skrypty Pythona, które potrzebują bibliotek z venv narzędzi, same przełącza
 `mcp.json` z profilu). Zasada bez zmian: tylko te serwery, których agent naprawdę używa, bo każde
 narzędzie w schemacie kosztuje tokeny przy każdym zapytaniu.
 Pierwszy włączony: `inspo` u `jarvo-web` (pakiet z obrazu, stdio, `lazy`: proces startuje przy pierwszym wywołaniu
-i znika po 15 min bezczynności; z 15 narzędzi serwera w schemacie modelu tylko 6 z `tools.include`, ~10 KB; `trust: untrusted`:
-narzędzie bez `readOnlyHint=true`, np. z nowej wersji, czeka na zgodę).
+i znika po 15 min bezczynności; z 15 narzędzi serwera w schemacie modelu tylko 6 z `tools.include`, ~10 KB; `trust: full`, bo Hermes 0.21.5 z SDK `mcp` 2.0 nie widzi `readOnlyHint` i przy `untrusted` każde wywołanie
+czekałoby na zgodę, której w pracy z kanbana nikt nie da; wersja jest przypięta, a wszystkie narzędzia 0.1.16 są tylko do odczytu).
 Nie używamy hostowanego endpointu inspomcp.dev ani `TOGETHER_API_KEY` (bez klucza wyszukiwanie jest leksykalne,
 więc zapytania po angielsku). Serwer pobiera katalog (~2,3 MB) z CDN autorów przy każdym starcie; Hermes przekazuje
 serwerom stdio tylko bezpieczne zmienne środowiska (`PATH`, `HOME`, bez proxy), więc `config.yaml` podaje mu wprost
