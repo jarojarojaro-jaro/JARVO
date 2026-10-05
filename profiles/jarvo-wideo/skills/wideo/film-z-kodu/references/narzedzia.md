@@ -136,7 +136,8 @@ npx remotion render src/index.ts AiflPromo out/promo.mp4 --concurrency=2 --brows
   Nie pytasz o tryb, choć SKILL.md każe (właściciel zatwierdza gotowy film, nie etapy). Szablon Ink Press
   (`template/TEMPLATE.md`) tylko wtedy, gdy właściciel go nazwie; 共同创作 (`guided-free-creation.md`) nie używamy.
 - **Karta ujęcia, zawsze w tej kolejności:** nazwa karty i `style-key` z `$SHOTCRAFT/gallery/api/library.json`
-  (indeks 157 kart) → pełna karta `references/shots/<kategoria>/<nazwa>.md` → dokładne demo TSX z jej sekcji
+  (indeks 157 kart; szukasz `python3 $HERMES_HOME/scripts/inspiracje.py ujecia [--kategoria kamera] [--energia wysoka]
+  [--szukaj scroll]`, całość jednej: `--karta <nazwa>`) → pełna karta `references/shots/<kategoria>/<nazwa>.md` → dokładne demo TSX z jej sekcji
   „参考实现” (`demos/…`). Parametry z dema (krzywe, czasy, kolejność) są sprawdzone: przenosisz je, a nie piszesz
   ruchu od nowa z samego opisu; tego, co karta oznacza jako „已知坑/命门”, nie osłabiasz.
 - **Karty z polem „原片出处”** (ruch odtworzony z cudzej reklamy: ClickUp, Notion, Figma, Slack…) bierzesz tylko

@@ -67,4 +67,4 @@ Formaty i długości:                                 CTA:
 - Licencja Remotion (shotcraft) i muzyki w RAPORT.
 
 ## Inspiracje
-`python3 $HERMES_HOME/scripts/inspiracje.py promo-produktu --ile 3` (albo `--szukaj "one shape"`, `--szukaj keynote`).
+`python3 $HERMES_HOME/scripts/inspiracje.py promo-produktu --ile 3` (albo `--szukaj keynote`); karty ujęć: `inspiracje.py ujecia --kategoria wejscie-ui`.

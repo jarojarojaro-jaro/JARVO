@@ -1,7 +1,7 @@
 ---
 name: rodzaje-filmu
 description: "Rodzaj filmu → jeden plik: silnik, struktura, rzemiosło."
-version: 1.5.1
+version: 1.5.2
 author: Jarvo
 license: MIT
 metadata:
@@ -50,7 +50,7 @@ opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprz
    domyślna nazwana w RAPORT; pytasz tylko o to, bez czego film będzie zły.
    Muzyka: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3` → BPM, takty, drop, perkusja; cięcia na taktach, po renderze `rytm.py sprawdz`.
 3. Inspiracje tylko, gdy brief nie ma pomysłu na formę:
-   `python3 $HERMES_HOME/scripts/inspiracje.py <rodzaj> --ile 3` (prompty twórców filmów Opus 5.5 z dwóch list, pobierane w locie); `inspiracje.py --drogi` pokazuje, jak naprawdę powstały opisane filmy (droga produkcji z dowodem): sprawdź, zanim obiecasz „jeden prompt”.
+   `python3 $HERMES_HOME/scripts/inspiracje.py <rodzaj> --ile 3` (prompty twórców filmów Opus 5.5 z dwóch list, pobierane w locie); `inspiracje.py --drogi` pokazuje, jak naprawdę powstały opisane filmy (droga produkcji z dowodem): sprawdź, zanim obiecasz „jeden prompt”. Pojedyncze ujęcie (wejście UI, kamera, liczby, przejście, finał): `inspiracje.py ujecia --kategoria <…>` (157 kart video-shotcraft z naszym odpowiednikiem).
    Bierzesz strukturę i chwyty, nie tekst; zainspirowało → autor i link w RAPORT.
 4. Scenariusz i lektor (`scenariusz`), silnik z pliku rodzaju (komendy: `film-z-kodu`). **Mapa bitów + 4 kadry
    kluczowe** (arkusz) do oceny, zanim wyrenderujesz całość; potem 2–3 rundy uwag „jak reżyser”, nie od zera.

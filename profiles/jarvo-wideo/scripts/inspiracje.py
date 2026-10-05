@@ -6,6 +6,13 @@ i guanmo-ai/awesome-ai-motion, MIT) oraz opisane drogi produkcji (athemeroy/awes
     python3 inspiracje.py --pelny <slug>          # cały prompt jednego wpisu
     python3 inspiracje.py --rodzaje               # nasze rodzaje → kategorie i słowa listy
     python3 inspiracje.py --drogi [--ile 3]       # jak naprawdę powstały filmy: droga produkcji + przykłady z dowodem
+    python3 inspiracje.py ujecia [--kategoria kamera] [--energia wysoka] [--szukaj scroll] [--ile 12]
+    python3 inspiracje.py ujecia --karta deck-deal-flyin   # karta ujęcia: plik, demo, czas, energia, skąd ruch, nasz odpowiednik
+
+`ujecia` = katalog 157 kart ujęć video-shotcraft (Apache-2.0) z zainstalowanej kopii (`narzedzia.py instaluj shotcraft`):
+nazwa, kategoria, energia, czas, opis (po chińsku: tłumaczysz w głowie, nie kopiujesz), ścieżki karty i dema TSX.
+Karta z ruchem odtworzonym z cudzej reklamy albo cudzego filmu ma znak „tylko technika”: bierzesz sam ruch, nigdy
+kadrów, układu ani tekstów. „u nas” = gotowy odpowiednik w naszym kodzie (`/_lib/jarvo/…`), od niego zaczynasz.
 
 Lista nie ma licencji (prompty należą do autorów), więc NIE trzymamy jej w repo: pobieramy w locie z przypiętego
 commita (cache 30 dni) i czytamy jak publiczną stronę. Bierz strukturę i chwyty, nie tekst; zainspirowało → autor
@@ -24,6 +31,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import narzedzia as nz  # noqa: E402
 import wideo_lib as wl  # noqa: E402
 
 REPO = "https://github.com/yihui-dev/awesome-opus5-5-videos"
@@ -70,6 +78,139 @@ RODZAJE: dict[str, dict] = {
     "logo-intro": {"kategorie": [], "wzorce": WZORCE["logo-intro"]},
     "fabula": {"kategorie": ["stories", "characters"], "wzorce": WZORCE["fabula"]},
 }
+
+
+# ---------------------------------------------------------------- karty ujęć video-shotcraft
+KATEGORIE = {"otwarcie": "opening", "typografia": "typography", "wejscie-ui": "ui-entrance", "kamera": "camera",
+             "dane": "data", "interakcja": "interaction", "przejscie": "transition", "rytm": "rhythm",
+             "efekty": "effects", "zakonczenie": "outro"}
+ENERGIE = {"niska": (0, 2.5), "srednia": (2.5, 3.5), "wysoka": (3.5, 9)}
+# karta shotcraft → nasz odpowiednik (moduł pod /_lib/jarvo/ albo zasada w skillu)
+NASZE: dict[str, str] = {
+    "crash-zoom-punch": "strona.js uderzenie() (crash zoom w cel strony; najwyżej 2 na film)",
+    "smear-multiples": "ruch.js smuga(), duchy(), rozciagniecie() (szybki ruch bez motion bluru)",
+    "marker-underline-title": "strona.js zakreslacz() (pas pod tekstem w 0,4–0,8 s)",
+    "shot-transitions": "rodzaje-filmu/references/ruch-i-kompozycja.md §5 (słownik przejść) + projekt.py przejscie",
+    "transition-hidden-cut": "rodzaje-filmu/references/ruch-i-kompozycja.md §5 (ukryte cięcia)",
+}
+
+
+def energia_poziom(tekst: str) -> float | None:
+    """Energia karty („中高（…）”, „A 高”, „由低到高”, „峰值”) → 1 (niska) … 5 (wysoka); „n/a” = None."""
+    t = re.sub(r"^[AB]\s+", "", (tekst or "").strip())
+    if not t or t.lower().startswith("n/a"):
+        return None
+    glowa = re.split(r"[（(]", t, maxsplit=1)[0]
+    if any(x in glowa for x in ("峰值", "高潮", "极高")):
+        return 5.0
+    oceny = [{"低": 1, "中": 3, "高": 5}[z] for z in glowa if z in "低中高"]
+    return round(sum(oceny) / len(oceny), 2) if oceny else None
+
+
+def _frontmatter(md: str) -> dict[str, str]:
+    m = re.match(r"---\n(.*?)\n---", md, re.S)
+    out = {}
+    for linia in (m.group(1).splitlines() if m else []):
+        k, _, v = linia.partition(":")
+        if v:
+            out[k.strip()] = v.strip()
+    return out
+
+
+def zrodla_obce(root: Path) -> dict[str, str]:
+    """Karty z ruchem podpatrzonym w cudzych filmach (ATTRIBUTION.md, tabela „逐卡来源映射”): nazwa → źródło."""
+    plik = root / "references" / "shots" / "ATTRIBUTION.md"
+    if not plik.exists():
+        return {}
+    tekst = plik.read_text(encoding="utf-8")
+    sekcja = tekst.split("逐卡来源映射", 1)[-1] if "逐卡来源映射" in tekst else ""
+    out = {}
+    for wiersz in sekcja.splitlines():
+        kom = [k.strip() for k in wiersz.strip().strip("|").split("|")]
+        if len(kom) >= 2 and "`" in kom[1]:
+            for nazwa in re.findall(r"`([a-z0-9-]+)`", kom[1]):
+                out[nazwa] = kom[0]
+    return out
+
+
+def katalog_ujec(root: Path | None = None) -> list[dict]:
+    """Karty z `gallery/api/library.json` zainstalowanego video-shotcraft + plik karty: demo, „原片出处”, źródło obce."""
+    root = root or nz.SHOTCRAFT
+    lib = root / "gallery" / "api" / "library.json"
+    if not lib.exists():
+        raise SystemExit(f"brak katalogu kart ({lib}): python3 $HERMES_HOME/scripts/narzedzia.py instaluj shotcraft")
+    dane = json.loads(lib.read_text(encoding="utf-8"))
+    obce = zrodla_obce(root)
+    karty = []
+    for c in dane.get("cards", []):
+        plik = root / c.get("source", "")
+        md = plik.read_text(encoding="utf-8") if plik.is_file() else ""
+        fm = _frontmatter(md)
+        demo = re.search(r"##\s*参考实现\s*\n+\s*`?(demos/[^\s`（(]+)", md)
+        oryginal = re.search(r"原片出处[:：]\s*(.+)", md)
+        kat = c.get("category", "")
+        karty.append({
+            "nazwa": c["name"], "kategoria": next((pl for pl, en in KATEGORIE.items() if en == kat), kat),
+            "energia": c.get("energy") or fm.get("能量", ""), "poziom": energia_poziom(c.get("energy") or fm.get("能量", "")),
+            "czas": c.get("duration") or fm.get("时长", ""), "opis": c.get("summary") or fm.get("一句话", ""),
+            "kiedy": c.get("use") or fm.get("适用", ""), "zamiar": c.get("intention", ""),
+            "karta": str(plik), "demo": str(root / demo.group(1)) if demo else None,
+            "style": [st.get("key") for st in c.get("styles", [])],
+            "tylko_technika": (oryginal.group(1).strip() if oryginal else None) or obce.get(c["name"]),
+            "u_nas": NASZE.get(c["name"]),
+        })
+    return karty
+
+
+def wybierz_ujecia(karty: list[dict], kategoria: str | None = None, energia: str | None = None,
+                   szukaj: str | None = None, ile: int = 12) -> list[dict]:
+    if kategoria:
+        kat = kategoria if kategoria in KATEGORIE else next((pl for pl, en in KATEGORIE.items() if en == kategoria), None)
+        if not kat:
+            raise SystemExit(f"nieznana kategoria {kategoria!r} ({' | '.join(KATEGORIE)})")
+        karty = [k for k in karty if k["kategoria"] == kat]
+    if energia:
+        if energia not in ENERGIE:
+            raise SystemExit(f"nieznana energia {energia!r} ({' | '.join(ENERGIE)})")
+        lo, hi = ENERGIE[energia]
+        karty = [k for k in karty if k["poziom"] is not None and lo <= k["poziom"] < hi]
+    if szukaj:
+        fraza = szukaj.lower()
+        karty = [k for k in karty if fraza in " ".join(str(k[p]) for p in ("nazwa", "opis", "kiedy", "zamiar", "style")).lower()]
+    # najpierw karty z naszym odpowiednikiem, potem własne (bez „tylko technika”), na końcu alfabetycznie
+    karty = sorted(karty, key=lambda k: (k["u_nas"] is None, k["tylko_technika"] is not None, k["nazwa"]))
+    return karty[:ile]
+
+
+def pokaz_ujecie(k: dict, pelna: bool = False) -> str:
+    poziom = {None: "?"}.get(k["poziom"]) or next(n for n, (lo, hi) in ENERGIE.items() if lo <= k["poziom"] < hi)
+    znaki = "".join([f"  [u nas: {k['u_nas']}]" if k["u_nas"] else "",
+                     f"  [tylko technika: {k['tylko_technika']}]" if k["tylko_technika"] else ""])
+    linie = [f"## {k['nazwa']} · {k['kategoria']} · energia {poziom} · {k['czas'][:40]}{znaki}", k["opis"]]
+    if pelna:
+        linie += [f"kiedy: {k['kiedy']}", f"zamiar: {k['zamiar']}", f"energia: {k['energia']}",
+                  f"style (podgląd w galerii): {', '.join(filter(None, k['style']))}"]
+    linie.append(f"karta: {k['karta']}" + (f"\ndemo: {k['demo']}" if k["demo"] else ""))
+    return "\n".join(linie) + "\n"
+
+
+def ujecia(a) -> int:
+    karty = katalog_ujec()
+    if a.karta:
+        k = next((x for x in karty if x["nazwa"] == a.karta), None)
+        if not k:
+            podobne = [x["nazwa"] for x in karty if a.karta.split("-")[0] in x["nazwa"]][:8]
+            raise SystemExit(f"nie ma karty {a.karta!r}" + (f" (podobne: {', '.join(podobne)})" if podobne else ""))
+        print(pokaz_ujecie(k, pelna=True))
+        return 0
+    found = wybierz_ujecia(karty, a.kategoria, a.energia, a.szukaj, a.ile or 12)
+    print(f"# Karty ujęć video-shotcraft (Apache-2.0): {len(found)} z {len(karty)} · kategorie: {' | '.join(KATEGORIE)}\n"
+          "Kolejność: karta → demo TSX (parametry sprawdzone) → nasz kod. Opis po chińsku tłumaczysz, nie kopiujesz.\n")
+    for k in found:
+        print(pokaz_ujecie(k))
+    if not found:
+        print("brak trafień: zdejmij --energia / --szukaj")
+    return 0
 
 
 def fetch(url: str, name: str, refresh: bool, check=json.loads) -> str | None:
@@ -182,8 +323,11 @@ def show(it: dict, limit: int | None = 1500) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("rodzaj", nargs="?", help=" | ".join(RODZAJE))
-    ap.add_argument("--ile", type=int, default=3)
+    ap.add_argument("rodzaj", nargs="?", help=" | ".join(RODZAJE) + " | ujecia (karty ujęć shotcraft)")
+    ap.add_argument("--ile", type=int, default=None, help="ile wyników (prompty: 3, karty ujęć: 12)")
+    ap.add_argument("--kategoria", help="ujecia: " + " | ".join(KATEGORIE))
+    ap.add_argument("--energia", choices=list(ENERGIE), help="ujecia: niska | srednia | wysoka")
+    ap.add_argument("--karta", metavar="NAZWA", help="ujecia: pełna karta jednego ujęcia")
     ap.add_argument("--tag", help="canvas, threejs, svg, shader, gsap, css, audio, particles, playable, pixel…")
     ap.add_argument("--szukaj", help="fraza w prompcie (po angielsku), np. whiteboard, \"one shape\"")
     ap.add_argument("--pelny", metavar="SLUG", help="pokaż cały prompt jednego wpisu")
@@ -191,6 +335,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--drogi", action="store_true", help="drogi produkcji z przykładami (co naprawdę zrobił model)")
     ap.add_argument("--odswiez", action="store_true", help="pobierz listę ponownie")
     a = ap.parse_args(argv)
+    if a.rodzaj == "ujecia":
+        return ujecia(a)
+    a.ile = a.ile or 3
     if a.rodzaje:
         print(json.dumps(RODZAJE, ensure_ascii=False, indent=1))
         return 0

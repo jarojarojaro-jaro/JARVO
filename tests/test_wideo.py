@@ -1116,3 +1116,62 @@ def test_czekaj_gotowe_mowi_dlaczego(monkeypatch):
         hw.czekaj_gotowe(Strona(), "window.__ready === true", bledy)
     with pytest.raises(SystemExit, match="bez błędów JS i brakujących plików"):
         hw.czekaj_gotowe(Strona(), "window.__ready === true", [])
+
+
+def _shotcraft(root):
+    """Mała kopia video-shotcraft: library.json, dwie karty, ATTRIBUTION z tabelą kart z cudzych filmów."""
+    (root / "gallery" / "api").mkdir(parents=True)
+    (root / "references" / "shots" / "camera").mkdir(parents=True)
+    (root / "references" / "shots" / "typography").mkdir(parents=True)
+    karty = [
+        {"name": "crash-zoom-punch", "category": "camera", "energy": "高（瞬时）", "duration": "约 0.5s", "summary": "急推",
+         "use": "强调", "intention": "", "source": "references/shots/camera/crash-zoom-punch.md", "styles": [{"key": "crash-zoom-punch"}]},
+        {"name": "paper-title-card", "category": "typography", "energy": "低（呼吸）", "duration": "1.7s", "summary": "纸上标题",
+         "use": "title", "intention": "", "source": "references/shots/typography/paper-title-card.md", "styles": [{"key": "paper"}]},
+        {"name": "blur-slide", "category": "typography", "energy": "A 中低", "duration": "1s", "summary": "模糊滑入",
+         "use": "", "intention": "", "source": "references/shots/typography/blur-slide.md", "styles": []},
+        {"name": "shot-transitions", "category": "transition", "energy": "n/a（技法卡）", "duration": "", "summary": "转场",
+         "use": "", "intention": "", "source": "references/shots/transition/shot-transitions.md", "styles": []},
+    ]
+    (root / "gallery" / "api" / "library.json").write_text(json.dumps({"cards": karty}, ensure_ascii=False), encoding="utf-8")
+    (root / "references" / "shots" / "camera" / "crash-zoom-punch.md").write_text(
+        "---\nname: crash-zoom-punch\n能量: 高\n---\n## 参考实现\n`demos/camera/crash-zoom-punch/CrashZoom.tsx`\n", encoding="utf-8")
+    (root / "references" / "shots" / "typography" / "paper-title-card.md").write_text(
+        "---\nname: paper-title-card\n---\n## 参考实现\ndemos/typography/paper-title-card/PaperTitleCard.tsx（原 template）\n"
+        "原片出处：notion-ai.mp4 0:03\n", encoding="utf-8")
+    (root / "references" / "shots" / "ATTRIBUTION.md").write_text(
+        "# x\n## 逐卡来源映射\n| 来源 | 卡片 |\n|---|---|\n| remotion-bits.dev | `blur-slide`、`card-stack` |\n", encoding="utf-8")
+
+
+def test_inspiracje_ujecia_katalog_kart(tmp_path, monkeypatch, capsys):
+    """Katalog kart shotcraft: kategorie po polsku, energia z chińskiego opisu, demo z karty, „tylko technika” z pola
+    原片出处 i z tabeli ATTRIBUTION, nasz odpowiednik na górze; bez instalacji jasny komunikat."""
+    assert [insp.energia_poziom(x) for x in ("高（瞬时）", "中高", "A 中低", "由低到高", "峰值（全）", "n/a（技法卡）", "")] == \
+        [5, 4, 2, 3, 5, None, None]
+    monkeypatch.setattr(insp.nz, "SHOTCRAFT", tmp_path / "brak")
+    with pytest.raises(SystemExit, match="instaluj shotcraft"):
+        insp.katalog_ujec()
+    _shotcraft(tmp_path / "sc")
+    karty = {k["nazwa"]: k for k in insp.katalog_ujec(tmp_path / "sc")}
+    assert karty["crash-zoom-punch"]["kategoria"] == "kamera" and karty["crash-zoom-punch"]["u_nas"].startswith("strona.js")
+    assert karty["crash-zoom-punch"]["demo"].endswith("demos/camera/crash-zoom-punch/CrashZoom.tsx")
+    assert karty["paper-title-card"]["tylko_technika"] == "notion-ai.mp4 0:03"
+    assert karty["paper-title-card"]["demo"].endswith("PaperTitleCard.tsx")
+    assert karty["blur-slide"]["tylko_technika"] == "remotion-bits.dev" and karty["blur-slide"]["poziom"] == 2
+    assert karty["crash-zoom-punch"]["tylko_technika"] is None and karty["shot-transitions"]["demo"] is None
+    lista = list(karty.values())
+    assert [k["nazwa"] for k in insp.wybierz_ujecia(lista, "typografia")] == ["blur-slide", "paper-title-card"]
+    assert [k["nazwa"] for k in insp.wybierz_ujecia(lista, energia="niska")] == ["blur-slide", "paper-title-card"]
+    assert [k["nazwa"] for k in insp.wybierz_ujecia(lista, szukaj="paper")] == ["paper-title-card"]
+    assert insp.wybierz_ujecia(lista)[0]["nazwa"] == "crash-zoom-punch"                      # nasz odpowiednik pierwszy
+    with pytest.raises(SystemExit, match="nieznana kategoria"):
+        insp.wybierz_ujecia(lista, "reklama")
+    monkeypatch.setattr(insp.nz, "SHOTCRAFT", tmp_path / "sc")
+    assert insp.main(["ujecia", "--kategoria", "camera"]) == 0                                # nazwa angielska też
+    out = capsys.readouterr().out
+    assert "## crash-zoom-punch · kamera · energia wysoka" in out and "[u nas: strona.js uderzenie()" in out
+    assert insp.main(["ujecia", "--karta", "paper-title-card"]) == 0
+    out = capsys.readouterr().out
+    assert "[tylko technika: notion-ai.mp4 0:03]" in out and "style (podgląd w galerii): paper" in out
+    with pytest.raises(SystemExit, match="nie ma karty 'paper'"):
+        insp.main(["ujecia", "--karta", "paper"])
