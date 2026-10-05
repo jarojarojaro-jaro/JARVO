@@ -148,8 +148,10 @@ npx remotion render src/index.ts AiflPromo out/promo.mp4 --concurrency=2 --brows
 - Zostaje z nich: prawdziwe zrzuty strony w 2× zamiast rysowanych makiet, dane wrażliwe na zrzutach zastąpione
   zmyślonymi, wygląd z kolorów i krojów produktu, cięcia w rytm muzyki, ≤ 3 uderzenia całego kadru na film,
   zero `Math.random` i `Date.now`.
-- Screenshoty strony klienta: `cp $SHOTCRAFT/assets/scripts/capture-template.mjs .`, popraw CONFIG na górze,
-  `python3 $HERMES_HOME/scripts/narzedzia.py link .`, `node capture-template.mjs` (puppeteer na przeglądarce z obrazu).
+- Screenshoty strony klienta: `python3 $HERMES_HOME/scripts/assety.py <URL> --film --out public/live` (kafle 2×,
+  wycinki, pusta plansza, `film/uklad.json` z prostokątami w pikselach strony, jak `layout.json` shotcraft; opis:
+  `strona-filmowana.md`) i kolory z `marka.json`. Inny układ (wiele tras, interakcja przed zrzutem): `cp $SHOTCRAFT/assets/scripts/capture-template.mjs .`,
+  popraw CONFIG na górze, `python3 $HERMES_HOME/scripts/narzedzia.py link .`, `node capture-template.mjs`.
 - Dema z `@remotion/motion-blur`: `npm i @remotion/motion-blur@4.0.484 --prefer-offline` w projekcie.
 - Dźwięki z `assets/audio/` wolno używać (ATTRIBUTION.md), źródło do RAPORT.md.
 

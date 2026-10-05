@@ -42,10 +42,10 @@ Nie to: jak działa zjawisko → `explainer.md`; samo logo → `logo-intro.md`; 
   na stronie pliku; link i licencja w RAPORT, zasady w `lektor-i-dzwiek`).
 - **Styl domyślny** (gdy marka nie mówi inaczej): 2D, ciepła biel tła, czarny UI, jeden kolor akcentu, jeden czysty
   font (Geist albo Inter); bez 3D, ciemnego motywu, poświat, cząsteczek i przenikań. Keynote Apple, nie trailer gry.
-- **Prawdziwe ekrany, twardo:** najpierw `python3 $HERMES_HOME/scripts/assety.py <URL> [--podstrony /cennik]` (zrzuty
-  desktop i telefon, logo, paleta z użyciem, fonty → `out/wideo/src/assets/assety.json`); wypisz w RAPORT, co masz i czego
-  brak. Kadrujesz i animujesz wycinki tych zrzutów. **Nigdy nie rysujesz UI produktu z wyobraźni**; aplikacja za
-  logowaniem → zrzuty od klienta. Dane w UI z produktu, nie „Lorem”.
+- **Prawdziwe ekrany, twardo:** najpierw `python3 $HERMES_HOME/scripts/assety.py <URL> --film [--podstrony /cennik]`:
+  zrzuty, logo, fonty, marka (`marka.css`: kolory, kroje, rogi) i strona w 2× z wycinkami (`film-z-kodu`,
+  `references/strona-filmowana.md`); w RAPORT co masz i czego brak. Animujesz te zrzuty w kolorach marki. **Nigdy
+  nie rysujesz UI z wyobraźni**; aplikacja za logowaniem → zrzuty od klienta. Dane w UI z produktu, nie „Lorem”.
 
 ## Brief (`out/wideo/src/BRIEF.md`)
 ```

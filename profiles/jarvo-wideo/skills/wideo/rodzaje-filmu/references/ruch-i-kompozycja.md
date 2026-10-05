@@ -28,7 +28,8 @@ const l = ladowanie(t, 1.2, CH);                          // {p, skala, sx, sy, 
 el.style.transform = `translateY(${(1 - l.p) * 80}px) scale(${l.skala * l.sx}, ${l.skala * l.sy})`;
 const w = wyjscie(t, 4.6, CH);                            // wyjście szybsze (połowa czasu), krycie w.krycie
 ```
-Sprawdzian: opisz ruch gotowego filmu trzema słowami; mają pasować do słów marki. Wyjątek: element, który ma
+Podpowiedź z wyglądu strony: `assety.py` zapisuje w `marka.json` pole `charakter` (z rogów przycisków, nasycenia
+akcentu i kroju nagłówka, dowód w `dlaczego`). Sprawdzian: opisz ruch gotowego filmu trzema słowami; mają pasować do słów marki. Wyjątek: element, który ma
 „spaść” albo „przybić pieczątkę”, może się odbić także w charakterze `zaufanie`.
 
 ## 2. Oddech i tempo

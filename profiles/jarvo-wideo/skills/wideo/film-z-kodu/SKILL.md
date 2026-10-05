@@ -1,7 +1,7 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.6.0
+version: 3.7.0
 author: Jarvo
 license: MIT
 metadata:
@@ -29,6 +29,7 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 | **własna animacja** w Canvas, SVG, Three.js, GSAP (dowolny pomysł, pełna kontrola) | HTML wg `rodzaje-filmu/references/kontrakt-html.md` + `html_wideo.py --preset jarvo` | 20–60 min |
 | **Jarvo mówi**: maskotka marki (robot) z polskim lektorem, oczy i wskaźnik głosu w rytm mowy, napisy karaoke | `python3 $HERMES_HOME/scripts/maskotka.py "tekst" -o film.mp4 [--format 9x16\|1x1\|16x9]` | 1–3 min |
 | **styl motion design** (wrząca linia, izometria, płaski wektor, morph, HUD, kolaż, Bauhaus, synthwave, pixel art, zorza i szkło, płyn, napisy show…): karta stylu z cechami do sprawdzenia, film-wzór 10 s, moduły `/_lib/jarvo/` | **`style-motion`** (HTML + `html_wideo.py --preset jarvo`) | 30–90 min |
+| **strona klienta w filmie**: zrzut 2× z mapą elementów i wycinkami, kolory i kroje marki, wycinek ląduje w swoim miejscu | HTML wg `references/strona-filmowana.md` (zrzut `assety.py --film`) | 30–60 min |
 | **UI morph**: jeden kontener przechodzi przez 8–12 stanów produktu, kursor klika, zero cięć, pętla | HTML wg spec `references/jeden-ksztalt.md` (zrzuty z `assety.py`) | 30–60 min |
 | animowane wstawki (B-roll) do **nagrania użytkownika**, zgrane ze słowami; przebitka albo przezroczysty panel | **motion-broll** | 20–60 min |
 | **cały krótki film** 30–75 s w jednym z 43 stylów kina (keynote, screencast, akwarela, anime, 3D, pixel RPG, miedzioryt, hologram…) | **lemo-opuscar** | 30–60 min, dużo tokenów |
