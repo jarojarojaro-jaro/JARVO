@@ -1,0 +1,289 @@
+# Spis źródeł Jarva: każde repo, z którego bierzemy kod, skille albo wzorce, i te, które obserwujemy.
+#
+# `scripts/zrodla.py sprawdz` porównuje `przejrzane` z obecnym stanem repo i pokazuje nowości (zmiany, nowe katalogi,
+# zmiana licencji). Rutyna pon/śr/pt robi z tego raport do zatwierdzenia przez właściciela; nic nie aktualizuje sama.
+# Po przeglądzie: `scripts/zrodla.py przejrzane <nazwa> [commit]`. Przypięcie wersji kopiowanej do floty to osobna
+# decyzja: `rev` w skills.lock.yaml (i stała w narzędziu, które instaluje bibliotekę), zawsze po zgodzie właściciela.
+#
+# status: uzywane       = kod, skill albo wzorce są w Jarvie (opis i licencja w docs/SOURCES.md)
+#         do-wdrozenia  = właściciel zatwierdził, wdrażamy
+#         czeka         = przejrzane, czeka na decyzję właściciela
+#         odlozone      = właściciel odłożył; nowości tylko w skrócie
+# przejrzane = ostatni commit, który przejrzeliśmy (pełny SHA). validate.py pilnuje, żeby każde repo z SOURCES.md
+# i skills.lock.yaml było w spisie.
+
+version: 1
+
+zrodla:
+  # — skille (vendoring, skills.lock.yaml) —
+  anidoodle:
+    repo: https://github.com/alexgreensh/anidoodle
+    status: uzywane
+    przejrzane: f3357000ceea9682b1ab66455634dbbf7fd7796b
+  anthropic-skills:
+    repo: https://github.com/anthropics/skills
+    status: uzywane
+    przejrzane: 33375500bcea98d610eb30ce10ac4e59b89c390d
+  aso-skills:
+    repo: https://github.com/appeeky/aso-skills
+    status: uzywane
+    przejrzane: 8de1ee18d8971723ac49320f01c574b8972ed1a5
+  awesome-ai-motion:
+    repo: https://github.com/guanmo-ai/awesome-ai-motion
+    status: uzywane
+    przejrzane: dff7a79b9da34dc1553634cabcae22a583ab02fc
+  awesome-opus-5-5-videos:
+    repo: https://github.com/athemeroy/awesome-opus-5-5-videos
+    status: uzywane
+    przejrzane: f0728e6fd1e5ec496815c1c7ba115bc70e3a31f9
+  awesome-opus5-5-videos:
+    repo: https://github.com/yihui-dev/awesome-opus5-5-videos
+    status: uzywane
+    przejrzane: 6cdcea6c01a8bb6af836746017983cff32f465cb
+  bang-motion:
+    repo: https://github.com/bangtutorial/bang-motion
+    status: uzywane
+    przejrzane: c1aa65e921c970d858705fcb4a53a8294d1a4131
+  callstack-skills:
+    repo: https://github.com/callstackincubator/agent-skills
+    status: uzywane
+    przejrzane: 61e6e7dfdf3a8ee862254c200d751fcb1fb863dc
+  claude-animation:
+    repo: https://github.com/buildwithhanif/claude-animation-skill
+    status: uzywane
+    przejrzane: 4ddb8c80fdec96dc9f55d4b9bdee60bde6f0134b
+  claude-seo:
+    repo: https://github.com/AgriciDaniel/claude-seo
+    status: uzywane
+    przejrzane: e77e783e38eeb738424eb72117abbd2dacdd88af
+  codebase-memory-mcp:
+    repo: https://github.com/DeusData/codebase-memory-mcp
+    status: uzywane
+    przejrzane: 268a9d8886642eb7f9b2ce45f5ce27cdecf0f519
+  ecc:
+    repo: https://github.com/affaan-m/ECC
+    status: uzywane
+    przejrzane: c70874fae9eb0e5ad0365beb7e2955899fd1d30f
+  emil-skills:
+    repo: https://github.com/emilkowalski/skills
+    status: uzywane
+    przejrzane: d16ebe60d09a5ba2afcb7054ede9d0a10c9f6128
+  expo-skills:
+    repo: https://github.com/expo/skills
+    status: uzywane
+    przejrzane: c0dadf355d4caa4e1720de372f0f8766df1a8978
+  getsentry-security:
+    repo: https://github.com/getsentry/skills
+    status: uzywane
+    przejrzane: d18b7aa8ba878354e5c348310230e652f7690f9c
+  gsap-skills:
+    repo: https://github.com/greensock/gsap-skills
+    status: uzywane
+    przejrzane: aed9cfd3277740755f6bfc1155c7aa645403b760
+  hyperframes:
+    repo: https://github.com/heygen-com/hyperframes
+    status: uzywane
+    przejrzane: 8798e40da8d56b2f0f3be0b74198d0cbbec1dc06
+  iart-data-animation:
+    repo: https://github.com/iart-ai/data-animation-skills
+    status: uzywane
+    przejrzane: 8ce2709c3992490251e8a991535b1945f01c6865
+  iart-kinetic-typography:
+    repo: https://github.com/iart-ai/kinetic-typography-skills
+    status: uzywane
+    przejrzane: fccc94bd325d824235ee9e715e65abde57b6513a
+  iart-tiktok-video:
+    repo: https://github.com/iart-ai/tiktok-video-skills
+    status: uzywane
+    przejrzane: 2a775336b5a638cbf8a61dbd785f9a1b649be016
+  impeccable:
+    repo: https://github.com/pbakaus/impeccable
+    status: uzywane
+    przejrzane: 114ea1d3838fca73b253af45f873b9c4f5f213c8
+  lemo-opuscar:
+    repo: https://github.com/lemomo-ai/lemo-opuscar
+    status: uzywane
+    przejrzane: b65efe6ea393fdc71212898ea4c57c754cfefa46
+    notatka: "przejrzane do b65efe6 (43 style); wersja we flocie to rev w skills.lock.yaml i LEMO_REV w narzedzia.py Wideografa"
+  live-panel:
+    repo: https://github.com/ythx-101/live-panel-skill
+    status: uzywane
+    przejrzane: 8a70aa2c4e3fac68b40e2472407e32e2637a7a36
+  lottie:
+    repo: https://github.com/diffusionstudio/lottie
+    status: uzywane
+    przejrzane: 3c72912fad543897f90045ed4d355813837927fc
+  marketingskills:
+    repo: https://github.com/coreyhaines31/marketingskills
+    status: uzywane
+    przejrzane: 5b2c0007766c6a1cf1d53fd8fc73e979e0821022
+  mattpocock-skills:
+    repo: https://github.com/mattpocock/skills
+    status: uzywane
+    przejrzane: d81f3a183412e71a5b1e84ca21bc1a35eea03a60
+  motion-graphics:
+    repo: https://github.com/Barty-Bart/motion-graphics
+    status: uzywane
+    przejrzane: e8d610adcf946367430c8b43a97aad8059befaad
+  pixel2motion:
+    repo: https://github.com/nolangz/pixel2motion
+    status: uzywane
+    przejrzane: e9faedb28930df0da2acf17da00c80730a78cfe8
+  remocn-studio:
+    repo: https://github.com/Remocn/remocn-studio
+    status: uzywane
+    przejrzane: 86f64ee6b2e5b9fa69c81ba2e99151a14c178b33
+  remotion-skills:
+    repo: https://github.com/remotion-dev/skills
+    status: uzywane
+    przejrzane: cf49eff5d4463b33966b6618c83f7295797dd028
+  screenwriting-skills:
+    repo: https://github.com/jtydhr88/screenwriting-skills
+    status: uzywane
+    przejrzane: 357d1348ccaa1ab75f2f51ef7c90a7f00a686c76
+  threejs-skills:
+    repo: https://github.com/CloudAI-X/threejs-skills
+    status: uzywane
+    przejrzane: b1c623076c661fc9b03dac19292e825a5d106823
+  trailofbits:
+    repo: https://github.com/trailofbits/skills
+    status: uzywane
+    przejrzane: 82fe8226252622fa807643bdca1710901198553a
+  vercel-skills:
+    repo: https://github.com/vercel-labs/agent-skills
+    status: uzywane
+    przejrzane: 063bee94c3f4df8453406c830b0a7df0f2860278
+  video-shotcraft:
+    repo: https://github.com/Vincentwei1021/video-shotcraft
+    status: uzywane
+    przejrzane: 5ddbf521038b0a7accfb6dc1e0a9eb29c67277ab
+    notatka: "od e2d8928 (wersja we flocie) do 5ddbf52 doszedł tylko rosyjski interfejs workbencha"
+  web-quality-skills:
+    repo: https://github.com/addyosmani/web-quality-skills
+    status: uzywane
+    przejrzane: afa8da942115f2961fdbfa80807ea0b232ff6c00
+  # — platforma i narzędzia obrazu —
+  agent-browser:
+    repo: https://github.com/vercel-labs/agent-browser
+    status: uzywane
+    przejrzane: 526157cfd4ec64f45939f9ba0f10d5936aa7ac33
+  browser:
+    repo: https://github.com/lightpanda-io/browser
+    status: uzywane
+    przejrzane: d15600f5bef59e7583d4878c2f1178e46a4de0b9
+  hermes-agent:
+    repo: https://github.com/NousResearch/hermes-agent
+    status: uzywane
+    przejrzane: 7157422022ff06f3e632d1dd394ee1253b17ad37
+  inspo:
+    repo: https://github.com/Nutlope/inspo
+    status: uzywane
+    przejrzane: 0e1e6363f980eb303a75428bcf3de4969c69a7df
+  modnet:
+    repo: https://github.com/ZHKKKe/MODNet
+    status: uzywane
+    przejrzane: 28165a451e4610c9d77cfdf925a94610bb2810fb
+  onnx-asr:
+    repo: https://github.com/istupakov/onnx-asr
+    status: uzywane
+    przejrzane: 675f0e68c24d846ee1775743e92d9b4ed452380e
+  onnxruntime:
+    repo: https://github.com/microsoft/onnxruntime
+    status: uzywane
+    przejrzane: d9b8ddc0c8cc9d4d5c08915f3d00e74875cc5013
+  opencv-zoo:
+    repo: https://github.com/opencv/opencv_zoo
+    status: uzywane
+    przejrzane: 47534e27c9851bb1128ccc0102f1145e27f23f98
+  silero-vad:
+    repo: https://github.com/snakers4/silero-vad
+    status: uzywane
+    przejrzane: 1e261b036686cd0017d500ee96acd1c4ba572a9d
+  # — metody i prompty (inspiracja, własny tekst) —
+  claude-code-security-review:
+    repo: https://github.com/anthropics/claude-code-security-review
+    status: uzywane
+    przejrzane: 0c6a49f1fa56a1d472575da86a94dbc1edb78eda
+  deep-research:
+    repo: https://github.com/dzhng/deep-research
+    status: uzywane
+    przejrzane: 1f8f3e285bbc23e80b98a66a64effab9069f3ad4
+  ffmpeg-skill:
+    repo: https://github.com/kajisho5/ffmpeg-skill
+    status: uzywane
+    przejrzane: a991599bfe3f072bac3835083f8bbb30efcd9a99
+  fframes:
+    repo: https://github.com/dmtrKovalenko/fframes
+    status: uzywane
+    przejrzane: 055bb6b9dcbbcca6532206847d43ea8e81fa2a0b
+  firstmate:
+    repo: https://github.com/kunchenguid/firstmate
+    status: uzywane
+    przejrzane: f470a01c098c1536d83b802874bd954a2c04b506
+  marketing-os:
+    repo: https://github.com/Yuzzyuk/marketing-os
+    status: uzywane
+    przejrzane: bb67dff5f04b390e861ee11433166e4519e7f4c0
+  moneyprinterturbo:
+    repo: https://github.com/harry0703/MoneyPrinterTurbo
+    status: uzywane
+    przejrzane: 8e259e9f072c9e08464f040cd658d4eb046a57d0
+  oh-my-hermes:
+    repo: https://github.com/rlaope/oh-my-hermes
+    status: uzywane
+    przejrzane: e3880be9146778d620a87ddfa2848ce811a97bd5
+  open-deep-research:
+    repo: https://github.com/langchain-ai/open_deep_research
+    status: uzywane
+    przejrzane: 1b7d2e80db9faa586165c60e09096dbbfd483a64
+  openshorts:
+    repo: https://github.com/mutonby/openshorts
+    status: uzywane
+    przejrzane: 06a119c280e545bc3f55f2b7b036d4c187630d50
+  storm:
+    repo: https://github.com/stanford-oval/storm
+    status: uzywane
+    przejrzane: fb951af7744dab086e34962e9bc6fe878e145f83
+  superpowers:
+    repo: https://github.com/obra/superpowers
+    status: uzywane
+    przejrzane: 8ca22dba9a94f28898bbce59f2537ff4d87c747d
+  treg:
+    repo: https://github.com/superdesigndev/treg
+    status: uzywane
+    przejrzane: 8b2826d87d56bcd7d3889c081fde2c768ac09f97
+  video-use:
+    repo: https://github.com/browser-use/video-use
+    status: uzywane
+    przejrzane: b877063835e6ea6e457124da7e28a0ae26691dc3
+  # — Jarvo HQ —
+  htm:
+    repo: https://github.com/developit/htm
+    status: uzywane
+    przejrzane: d62dcfdc721e47bc1923a2cb7a01ebd594ab0c25
+  # — przejrzane, poza SOURCES.md —
+  agency-agents:
+    repo: https://github.com/msitarzewski/agency-agents
+    status: odlozone
+    przejrzane: d3f71c4bb8922d3eea7576237a870dd59b3cdd52
+    notatka: "MIT: ~290 agentów w 20 działach; właściciel odłożył 2026-10-05 (ewentualnie skille sprzedaży u Łowcy)"
+  anything2explainer:
+    repo: https://github.com/Vincentwei1021/anything2explainer
+    status: do-wdrozenia
+    przejrzane: 735c79c8724e897e8971cd59dde7e5aa11e4d6ce
+    notatka: "licencja niekomercyjna (PolyForm NC): tylko pomysły, zasady i liczby własnym tekstem i kodem; zatwierdzone 2026-10-05"
+  cinetic:
+    repo: https://github.com/Leonxlnx/cinetic
+    status: czeka
+    przejrzane: bee5d7807205d5543472c38312507f9bf366cbbf
+    notatka: "MIT: biblioteka 273 ruchów + losowanie, „najpierw pomysł”, katalog tanich chwytów; propozycja 2026-10-05 bez decyzji"
+  mg-styles-15:
+    repo: https://github.com/Vincentwei1021/mg-styles-15
+    status: do-wdrozenia
+    przejrzane: 49052d80bfaf9fa8412cc9710530e5e95a3b8d8c
+    notatka: "MIT: 15 stylów, moduły technik, mgaudio; zatwierdzone 2026-10-05"
+  video-talkcraft:
+    repo: https://github.com/Vincentwei1021/video-talkcraft
+    status: do-wdrozenia
+    przejrzane: 4cd673df4b7a6a35784a0881df223721789c5e23
+    notatka: "licencja niekomercyjna (PolyForm NC): tylko pomysły, zasady i liczby własnym tekstem i kodem; zatwierdzone 2026-10-05"

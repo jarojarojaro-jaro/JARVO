@@ -279,6 +279,48 @@ def check_skan_wyjatki(r: Report) -> None:
             r.warn(f"{tag}: rev {rev} ≠ lock {str(spec.get('rev'))[:7]}: wyjątek nie działa, przejrzyj ustalenie na nowo")
 
 
+ZRODLA_STATUSY = {"uzywane", "do-wdrozenia", "czeka", "odlozone"}
+
+
+def check_zrodla(r: Report) -> None:
+    """vendor/zrodla.yaml: każde repo z docs/SOURCES.md i skills.lock.yaml jest w spisie, z przejrzanym commitem."""
+    path = fl.REPO_ROOT / "vendor" / "zrodla.yaml"
+    if not path.exists():
+        r.err("brak vendor/zrodla.yaml (spis źródeł)")
+        return
+    zrodla = (fl.load_yaml(path) or {}).get("zrodla") or {}
+    repos: dict[str, str] = {}
+    for name, spec in zrodla.items():
+        spec = spec or {}
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", str(name)):
+            r.err(f"zrodla: nazwa {name!r} tylko z małych liter, cyfr i myślników")
+        m = re.fullmatch(r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", str(spec.get("repo", "")))
+        if not m:
+            r.err(f"zrodla/{name}: repo musi być adresem https://github.com/<właściciel>/<repo>")
+        elif m.group(1).lower() in repos:
+            r.err(f"zrodla/{name}: repo już w spisie jako {repos[m.group(1).lower()]}")
+        else:
+            repos[m.group(1).lower()] = name
+        if spec.get("status") not in ZRODLA_STATUSY:
+            r.err(f"zrodla/{name}: status {spec.get('status')!r} spoza {sorted(ZRODLA_STATUSY)}")
+        if not re.fullmatch(r"[0-9a-f]{40}", str(spec.get("przejrzane", ""))):
+            r.err(f"zrodla/{name}: przejrzane musi być pełnym SHA commitu")
+    sources_md = (fl.REPO_ROOT / "docs" / "SOURCES.md").read_text(encoding="utf-8")
+    w_sources = {m.lower().removesuffix(".git").rstrip(".")
+                 for m in re.findall(r"github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", sources_md)}
+    for repo in sorted(w_sources - set(repos)):
+        r.err(f"zrodla: github.com/{repo} (docs/SOURCES.md) nie ma w vendor/zrodla.yaml")
+    for name, spec in (fl.load_lock().get("sources") or {}).items():
+        url = str(spec.get("repo", "")).lower().removesuffix(".git")
+        if spec.get("type") == "git" and url.removeprefix("https://github.com/") not in repos:
+            r.err(f"zrodla: źródło {name} z skills.lock.yaml ({url}) nie ma w vendor/zrodla.yaml")
+    w_lock = {str(s.get("repo", "")).lower().removesuffix(".git").removeprefix("https://github.com/")
+              for s in (fl.load_lock().get("sources") or {}).values()}
+    for repo, name in repos.items():
+        if zrodla[name].get("status") == "uzywane" and repo not in w_sources | w_lock:
+            r.err(f"zrodla/{name}: status uzywane, a repo nie ma w docs/SOURCES.md (licencja i atrybucja)")
+
+
 def check_cron(a: fl.Agent, own_skills: set[str], vendored: set[str], r: Report) -> None:
     src = a.dir / "cron" / "jobs.yaml"
     if not src.exists():
@@ -535,6 +577,7 @@ def run() -> Report:
         own[a.name] = check_profile(fleet, a, protocol, r)
     check_lock(fleet, own, r)
     check_skan_wyjatki(r)
+    check_zrodla(r)
     for a in fleet.active():
         vendored = {Path(e["dest"]).name for e in (lock.get("agents", {}).get(a.name) or [])}
         extra = {"roster"} if a.name == fleet.orchestrator else set()

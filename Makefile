@@ -2,7 +2,7 @@
 PY ?= python3
 HERMES_SRC ?=
 
-.PHONY: help dev-deps validate test build models pins hq-demo deploy harvest new-agent
+.PHONY: help dev-deps validate test build models pins zrodla hq-demo deploy harvest new-agent
 
 help:
 	@echo "make dev-deps           zależności do testów i walidacji (pytest, pyyaml, shellcheck)"
@@ -11,6 +11,7 @@ help:
 	@echo "make build HERMES_SRC=… build dystrybucji do build/ (wymaga drzewa Hermesa)"
 	@echo "make models             czy modele z fleet.yaml istnieją u wybranego dostawcy"
 	@echo "make pins               czy piny npm spełniają zasady obrazu Hermesa (wiek ≥ 14 dni, engines)"
+	@echo "make zrodla             nowości w repo, z których bierzemy (vendor/zrodla.yaml), do przeglądu"
 	@echo "make hq-demo            Jarvo HQ w trybie demo (symulowana flota) do build/hq-demo"
 	@echo "make deploy             wdrożenie na VPS (scripts/deploy.sh)"
 	@echo "make harvest            raport skilli zmienionych przez agentów na VPS"
@@ -33,6 +34,9 @@ models:
 
 pins:
 	$(PY) scripts/check-pins.py
+
+zrodla:
+	$(PY) scripts/zrodla.py sprawdz
 
 hq-demo:
 	$(PY) scripts/hqbuild.py --demo build/hq-demo

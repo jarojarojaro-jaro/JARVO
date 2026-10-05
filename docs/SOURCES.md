@@ -4,6 +4,11 @@ Jarvo jest zbudowany na cudzej, otwartej pracy. Ten plik mówi, **co** wzięliś
 **licencji** i **jak** spełniamy jej warunki. Narzędzia uruchamiane przez agentów (npm, Python, sidecary)
 są opisane osobno w [TOOLBOX.md](TOOLBOX.md), razem z polityką licencji.
 
+Każde repo z tego pliku (i każde źródło z `skills.lock.yaml`) ma wpis w spisie [`vendor/zrodla.yaml`](../vendor/zrodla.yaml):
+status i ostatni przejrzany commit. `python3 scripts/zrodla.py sprawdz` pokazuje, co w nich doszło od przeglądu
+(commity, nowe katalogi i skille, zmiana licencji). Spis trzyma też repo przejrzane, ale jeszcze niewdrożone
+(`czeka`, `odlozone`). Nowej wersji nie bierzemy sama z siebie: aktualizacja przypięcia to decyzja właściciela.
+
 ## 1. Platforma
 
 | Projekt | Rola | Licencja |

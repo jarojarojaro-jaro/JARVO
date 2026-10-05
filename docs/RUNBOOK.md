@@ -283,6 +283,7 @@ sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh
 | aktualizacja Hermesa | zmień `HERMES_IMAGE` w `compose/.env` → `deploy.sh --rebuild` (tag ruchomy, np. `latest`: `--rebuild --pull-base`) → `pin-images.sh` |
 | evals (staging, izolowane dane) | `bash scripts/evals-staging.sh --agent jarvo` (koszt: klucze agentów + sędzia) |
 | red team (ataki promptfoo, tylko środowisko testowe) | `bash scripts/redteam.sh` albo `bash scripts/redteam.sh --filtr ads` (koszt: tokeny modeli) |
+| nowości w repo, z których bierzemy (skille, style, wzorce) | `make zrodla` (`python3 scripts/zrodla.py sprawdz`): commity od ostatniego przeglądu, nowe katalogi i skille, ⚠ zmiana licencji; spis w [`vendor/zrodla.yaml`](../vendor/zrodla.yaml). Rutyna Claude Code „Źródła Jarva” robi to w poniedziałki, środy i piątki rano i przysyła propozycje; **nic nie wdraża bez Twojej zgody**. Po przeglądzie `zrodla.py przejrzane <nazwa>` |
 | skille, które agenci zmienili sami | `bash scripts/harvest-skills.sh > harvest.md`, przegląd, przeniesienie do repo |
 | skarbiec wiedzy (drugi mózg floty) | zakładka **Wiedza** (`:9119/wiedza`): graf, notatki, orzeczenia (Twoje korekty), skrzynka szkiców; ręczna kompilacja `docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/wiedza-kompiluj.sh` (`--na-sucho` = podgląd); szczegóły [WIEDZA.md](WIEDZA.md) |
 | nowy agent | lokalnie `make new-agent NAME=jarvo-x TITLE="…"`, uzupełnienie, `make validate`, status `active`, deploy |
