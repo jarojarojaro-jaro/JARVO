@@ -92,6 +92,17 @@ NASZE: dict[str, str] = {
     "marker-underline-title": "strona.js zakreslacz() (pas pod tekstem w 0,4–0,8 s)",
     "shot-transitions": "rodzaje-filmu/references/ruch-i-kompozycja.md §5 (słownik przejść) + projekt.py przejscie",
     "transition-hidden-cut": "rodzaje-filmu/references/ruch-i-kompozycja.md §5 (ukryte cięcia)",
+    "deck-deal-flyin": "ujecia.js rozdanie(), startRozdania(), zapowiedzRozdania() (karty z talii do siatki)",
+    "list-stack-press": "ujecia.js stos(), docisk(), podswietlenie(), licznikZdarzen() (stos z dociskiem)",
+    "row-embed": "ujecia.js wiersz() (wiersz wpada w swoje miejsce w zrzucie, szew akcentu)",
+    "type-and-filter": "ujecia.js pisanie(), filtr(), doSlotu(), klik() (wyszukiwarka i wynik)",
+    "paper-title-card": "ujecia.js tytulPapier() (słowa wciskane w papier, jedno słowo-akcent)",
+    "odometer-digit-roll": "ujecia.js licznikBebnowy() (cyfry jak w liczniku, najwyżej 6)",
+    "beat-cut-moves": "ujecia.js przyspieszenie(), flesz() (cięcia na bit; raz na film)",
+    "speed-ramp-freeze": "ujecia.js przemapuj(), sprawdzTempo(), kolko() (zwolnienie i stop-klatka)",
+    "depth-layer-moves": "ujecia.js paralaksa(), dollyZoom() (warstwy głębi; dolly raz na film)",
+    "outro-group-photo-launch": "ujecia.js grupaElement(), grupaLitera(), grupaKamera() (finał: zdjęcie grupowe)",
+    "spotlight-hero-card": "ujecia.js reflektor(), kartaBohatera() (reflektor na bohaterze, wolno)",
 }
 
 

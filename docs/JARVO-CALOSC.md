@@ -113,7 +113,8 @@ Pętla krytyki: film oceniany na **7 osiach** (hook, telefon, ruch, różnorodno
 dźwięk), każda min. 8/10, plus lista zakazanych klisz. Prawdziwe assety marki pobierane ze strony
 (`assety.py`: zrzuty, logo, marka w siedmiu rolach kolorów ze skalą kroju i rogami; `--film`: strona w 2× z mapą
 elementów, wycinkami i pustą planszą do filmowania; kamera po niej `/_lib/jarvo/strona.js`: przewijanie z postojami,
-wycieczka po elementach, lupa, zakreślacz, uderzenie, z kontrolą planu ruchów przed renderem). Mówiąca maskotka-robot z polskim lektorem (`maskotka.py`, Edge TTS pl-PL-MarekNeural).
+wycieczka po elementach, lupa, zakreślacz, uderzenie, z kontrolą planu ruchów przed renderem; 11 ujęć z kart video-shotcraft
+w HTML bez Remotion: `/_lib/jarvo/ujecia.js`, np. karty rozdane z talii, licznik bębnowy, reflektor na bohaterze). Mówiąca maskotka-robot z polskim lektorem (`maskotka.py`, Edge TTS pl-PL-MarekNeural).
 Syntetyczne SFX, biblioteka inspiracji (prompty twórców i katalog 157 kart ujęć video-shotcraft: `inspiracje.py ujecia`), produkcja etapami, formaty platform z jednego timeline.
 Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo strony (`demo_strony.py`, metoda ECC
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.

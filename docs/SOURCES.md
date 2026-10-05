@@ -62,7 +62,7 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [alexgreensh/anidoodle](https://github.com/alexgreensh/anidoodle) | `f335700` | Apache-2.0 | Wideograf (rysunek kodem, muzyka syntezowana) |
 | [buildwithhanif/claude-animation-skill](https://github.com/buildwithhanif/claude-animation-skill) | `4ddb8c8` | MIT | Wideograf (animacja w Node canvas, postaci, efekty, dźwięk syntezowany z osi czasu) |
 | [remotion-dev/skills](https://github.com/remotion-dev/skills) | `cf49eff` | Remotion License (darmowa dla osoby / firmy do 3 osób) | Wideograf (router `remotion-best-practices` ze wszystkimi `remotion-*/REFERENCE.md`) |
-| [Vincentwei1021/video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) | `e2d8928` | Apache-2.0 | Wideograf (kinowe filmy produktu; instaluje narzedzia.py) |
+| [Vincentwei1021/video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) | `e2d8928` | Apache-2.0 | Wideograf (kinowe filmy produktu; instaluje narzedzia.py); liczby 11 kart (czasy, krzywe, limity) w naszym `ujecia.js`, zasady zrzutu i wycinków w `assety.py --film` i `strona.js` |
 | [Vincentwei1021/mg-styles-15](https://github.com/Vincentwei1021/mg-styles-15) | `49052d8` | MIT (papier, próbki, dane map CC0 / domena publiczna; obrysy liter OFL; ziarno, kurz, washi i zdjęcia bez podanego źródła) | Wideograf (skill `style-motion`: wzory 15 stylów motion design, silniki stylów przeniesione do `/_lib/jarvo/`; instaluje narzedzia.py) |
 | [diffusionstudio/lottie](https://github.com/diffusionstudio/lottie) | `3c72912` | MIT | Wideograf, Web (text-to-lottie) |
 | [nolangz/pixel2motion](https://github.com/nolangz/pixel2motion) | `e9faedb` | MIT | Wideograf (logo → animacja SVG) |

@@ -48,6 +48,8 @@ python3 $HERMES_HOME/scripts/assety.py <URL> --film --out out/wideo/src/<nazwa>/
 - Wycinki w 2× są ostre do przybliżenia 2×. Większe przybliżenie tylko na chwilę uderzenia.
 - `S.wycinek(scena, strona, 'karta-4')` kładzie wycinek jako `<img>` w jego miejscu na scenie; ruch dokładasz sam
   (`ladowanie` z `ruch.js`), a scenę budujesz z pustej planszy: `zbudujStrone(kadr, strona, {pusta: true})`.
+- Gotowe wejścia z kart shotcraft (`ujecia.md`): karty rozdane z talii (`rozdanie`), stos z dociskiem (`stos`),
+  wiersz wpadający w tabelę (`wiersz`), wynik wyszukiwania jadący do slotu (`doSlotu`).
 
 ## 4. Kamera po stronie (`/_lib/jarvo/strona.js`)
 Strona się filmuje, nie wkleja: kamera przewija, jedzie od elementu do elementu, pokazuje lupę albo zakreśla tekst.

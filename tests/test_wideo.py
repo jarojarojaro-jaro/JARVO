@@ -1160,8 +1160,9 @@ def test_inspiracje_ujecia_katalog_kart(tmp_path, monkeypatch, capsys):
     assert karty["blur-slide"]["tylko_technika"] == "remotion-bits.dev" and karty["blur-slide"]["poziom"] == 2
     assert karty["crash-zoom-punch"]["tylko_technika"] is None and karty["shot-transitions"]["demo"] is None
     lista = list(karty.values())
-    assert [k["nazwa"] for k in insp.wybierz_ujecia(lista, "typografia")] == ["blur-slide", "paper-title-card"]
-    assert [k["nazwa"] for k in insp.wybierz_ujecia(lista, energia="niska")] == ["blur-slide", "paper-title-card"]
+    assert karty["paper-title-card"]["u_nas"].startswith("ujecia.js tytulPapier()")
+    assert [k["nazwa"] for k in insp.wybierz_ujecia(lista, "typografia")] == ["paper-title-card", "blur-slide"]  # nasz port pierwszy
+    assert [k["nazwa"] for k in insp.wybierz_ujecia(lista, energia="niska")] == ["paper-title-card", "blur-slide"]
     assert [k["nazwa"] for k in insp.wybierz_ujecia(lista, szukaj="paper")] == ["paper-title-card"]
     assert insp.wybierz_ujecia(lista)[0]["nazwa"] == "crash-zoom-punch"                      # nasz odpowiednik pierwszy
     with pytest.raises(SystemExit, match="nieznana kategoria"):

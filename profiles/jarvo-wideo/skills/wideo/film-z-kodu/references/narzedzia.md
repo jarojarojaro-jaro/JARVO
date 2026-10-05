@@ -140,6 +140,9 @@ npx remotion render src/index.ts AiflPromo out/promo.mp4 --concurrency=2 --brows
   [--szukaj scroll]`, całość jednej: `--karta <nazwa>`) → pełna karta `references/shots/<kategoria>/<nazwa>.md` → dokładne demo TSX z jej sekcji
   „参考实现” (`demos/…`). Parametry z dema (krzywe, czasy, kolejność) są sprawdzone: przenosisz je, a nie piszesz
   ruchu od nowa z samego opisu; tego, co karta oznacza jako „已知坑/命门”, nie osłabiasz.
+- **Karta ze znakiem „u nas: ujecia.js”** (11 kart: rozdanie, stos, wiersz, wyszukiwarka, tytuł w papierze, licznik
+  bębnowy, cięcia na bit, zwolnienie, głębia, finał, reflektor) idzie w HTML z `/_lib/jarvo/ujecia.js`
+  (`ujecia.md`), bez projektu Remotion; Remotion zostaje dla reszty kart i całego filmu shotcraft.
 - **Karty z polem „原片出处”** (ruch odtworzony z cudzej reklamy: ClickUp, Notion, Figma, Slack…) bierzesz tylko
   jako technikę ruchu. Nigdy nie kopiujesz kadrów, układu, tekstów ani kolejności ujęć tamtej reklamy.
 - **Pomijasz:** edytor workbench (`node workbench/scripts/open.mjs`, `src/workbench.ts`, `npm run parity`;
