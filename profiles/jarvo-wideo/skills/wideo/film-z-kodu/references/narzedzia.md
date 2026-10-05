@@ -185,6 +185,8 @@ python3 $H wideo  out/wideo/src/opener/index.html --preset bang --dlugosc 12 -o 
   rdzeni, ~1 GB wolnej pamięci na przeglądarkę; `--rownolegle N`), film ten sam co z jednej. Pełne rendery
   (`html_wideo.py wideo`, `film.py render`, `projekt.py render`) zajmują miejsce: najwyżej 2 naraz na maszynie,
   drugi tylko przy wolnej pamięci ≥ 30% (`JARVO_RENDER_MIEJSCA`, `JARVO_RENDER_WOLNA`); czekanie widać w logu (⏳).
+  Klatkę zrzuca samo Chromium (CDP, ten sam obraz co zwykły zrzut, 1080p ok. 0,2 s); gdy na dysku nie zmieszczą się
+  takie klatki (~2 B na piksel), idzie zwykły zrzut (wolniej), a gdy i on nie, render staje od razu z liczbami.
 - Strona musi mieć uprząż czasu: iart `?t=<s>` + `window.__ready`, pixel2motion `?t=<ms>` + `window.__p2mReady`,
   bang-motion `window.OPENER.seek(t)`. Własna animacja: `--param/--jednostka` albo `--seek "t => tl.seek(t)"`.
 - `.mov --alfa` (ProRes 4444) do nakładania na nagranie; `.mp4` do publikacji. Potem `qa_wideo.py`, lektor i napisy jak zawsze.

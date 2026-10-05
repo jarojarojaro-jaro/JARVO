@@ -693,6 +693,39 @@ def test_html_parallel_browsers_split_the_timeline(monkeypatch, tmp_path):
         == [tmp_path / x for x in names[:5]]
 
 
+def test_html_fast_frame_capture_via_cdp(tmp_path):
+    """Zrzut klatki prosto z Chromium (CDP, optimizeForSpeed); bez sesji CDP → None (wtedy zwykły page.screenshot)."""
+    import base64
+    wyslane = []
+
+    class Cdp:
+        def send(self, metoda, parametry):
+            wyslane.append((metoda, parametry))
+            return {"data": base64.b64encode(b"\x89PNG-klatka").decode()}
+
+    class Kontekst:
+        def __init__(self, ok): self.ok = ok
+        def new_cdp_session(self, page):
+            if not self.ok:
+                raise RuntimeError("to nie Chromium")
+            return Cdp()
+
+    class Strona:
+        def __init__(self, ok): self.context = Kontekst(ok)
+
+    zrzut = hw.zrzut_cdp(Strona(True))
+    zrzut(tmp_path / "f00000.png")
+    assert (tmp_path / "f00000.png").read_bytes() == b"\x89PNG-klatka"
+    assert wyslane == [("Page.captureScreenshot", {"format": "png", "optimizeForSpeed": True})]
+    assert hw.zrzut_cdp(Strona(False)) is None
+    hd = (1920, 1080)                                                       # 600 klatek 1080p ≈ 1,2 GB pikseli
+    assert hw.zrzut_na_dysk(600, hd, 1.0, 10 * 10**9) is True                # miejsce na szybki zrzut (~2 B/px)
+    assert hw.zrzut_na_dysk(600, hd, 1.0, 2 * 10**9) is False                # tylko na zwykły (~1 B/px)
+    with pytest.raises(SystemExit, match="za mało miejsca"):
+        hw.zrzut_na_dysk(600, hd, 1.0, 10**9)
+    assert hw.zrzut_na_dysk(600, hd, 2.0, 6 * 10**9) is False                # --skala 2 = 4× więcej pikseli
+
+
 def test_render_slots_limit_and_memory_gate(monkeypatch, tmp_path):
     """Najwyżej JARVO_RENDER_MIEJSCA renderów naraz; drugi obok trwającego tylko przy wolnej pamięci ≥ progu;
     miejsce trzymane przez padnięty proces wraca samo (flock)."""

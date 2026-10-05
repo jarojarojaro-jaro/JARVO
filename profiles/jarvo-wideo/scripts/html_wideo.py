@@ -39,6 +39,7 @@ Wyjście: .mp4 (H.264, yuv420p, zakres TV, faststart), .mov (ProRes; z --alfa 44
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
 import functools
 import http.server
@@ -279,11 +280,38 @@ def capture_rownolegle(src: str, times: list[float], names: list[str], out_dir: 
     return [f for w in wyniki for f in w]
 
 
+def zrzut_cdp(page):
+    """Zrzut całej strony prosto z Chromium (CDP, PNG z optimizeForSpeed): ten sam obraz co page.screenshot piksel
+    w piksel, ok. 4× szybciej (1080p w kontenerze: ~0,2 s zamiast ~0,8 s na klatkę), plik ~2× większy (klatki
+    robocze i tak znikają po złożeniu filmu). None = sesja CDP niedostępna, wtedy zwykły page.screenshot."""
+    try:
+        cdp = page.context.new_cdp_session(page)
+    except Exception:
+        return None
+    return lambda path: Path(path).write_bytes(base64.b64decode(
+        cdp.send("Page.captureScreenshot", {"format": "png", "optimizeForSpeed": True})["data"]))
+
+
+def zrzut_na_dysk(klatek: int, size: tuple[int, int], skala: float, wolne: int) -> bool:
+    """Czy klatki filmu zmieszczą się szybkim zrzutem (PNG lżej ściśnięty, do ~2 B na piksel; 1080p ~3–4 MB).
+    Nie: zwykły zrzut (~1 B na piksel, wolniej) albo przerwa z liczbami, gdy i tak się nie zmieszczą."""
+    px = klatek * size[0] * size[1] * skala ** 2
+    zapas = 0.5e9
+    if wolne >= 2 * px + zapas:
+        return True
+    if wolne >= px + zapas:
+        return False
+    raise SystemExit(f"za mało miejsca na klatki ({klatek}): potrzeba ok. {(px + zapas) / 1e9:.1f} GB, wolne "
+                     f"{wolne / 1e9:.1f} GB; skróć film, zmniejsz --rozmiar/--skala albo zwolnij miejsce")
+
+
 def _run_capture(sync_playwright, src, times, names, out_dir, o, fps, size, size_explicit, scale, alfa, wait_ms,
                  frames, errors, settle) -> None:
     with sync_playwright() as p:
         browser = launch(p)
         page = _page(browser, size, scale, errors)
+        lekki = o["selektor"] or alfa or o.get("zrzut_lekki")          # kadr elementu, alfa, mało miejsca na dysku
+        szybki = None if lekki else zrzut_cdp(page)
         if o["seek"]:
             page.goto(page_url(src, o["query"]), wait_until="load")
             settle(page)
@@ -301,8 +329,11 @@ def _run_capture(sync_playwright, src, times, names, out_dir, o, fps, size, size
             if wait_ms:
                 page.wait_for_timeout(wait_ms)
             path = out_dir / name
-            target = page.locator(o["selektor"]).first if o["selektor"] else page
-            target.screenshot(path=str(path), omit_background=alfa)
+            if szybki:
+                szybki(path)
+            else:
+                target = page.locator(o["selektor"]).first if o["selektor"] else page
+                target.screenshot(path=str(path), omit_background=alfa)
             frames.append(path)
         browser.close()
 
@@ -706,6 +737,10 @@ def main(argv: list[str] | None = None) -> int:
     work = Path(tempfile.mkdtemp(prefix="jarvo-html-klatki-"))
     n = max(1, a.subklatki)
     przegladarki = ile_przegladarek(len(times) * n, a.rownolegle)
+    if not zrzut_na_dysk(len(times) * (n + (n > 1)), size, a.skala, shutil.disk_usage(work).free):
+        o = {**o, "zrzut_lekki": True}
+        print("ℹ mało miejsca na dysku: klatki zwykłym zrzutem (pliki o połowę mniejsze, render ok. 3× wolniejszy)",
+              file=sys.stderr)
     with wl.miejsce_renderu("html_wideo wideo"):
         if n == 1:
             frames = capture_rownolegle(a.zrodlo, times, [f"f{i:05d}.png" for i in range(len(times))], work, o, a.fps,
