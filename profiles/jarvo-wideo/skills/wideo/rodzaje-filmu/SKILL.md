@@ -1,7 +1,7 @@
 ---
 name: rodzaje-filmu
 description: "Rodzaj filmu → jeden plik: silnik, struktura, rzemiosło."
-version: 1.3.0
+version: 1.3.1
 author: Jarvo
 license: MIT
 metadata:
@@ -48,7 +48,7 @@ opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprz
    czego nie ma być, charakter ruchu z marki), **struktura** (mapa bitów: sekunda → scena → ruch → dźwięk), **budowa** (silnik, format, fps),
    **pułapki**, **start** (pierwszy krok). Szablon pól z pliku rodzaju. Brak wejścia: karta → brand kit → rozsądna
    domyślna nazwana w RAPORT; pytasz tylko o to, bez czego film będzie zły.
-   Muzyka: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3` → BPM, takty, drop; cięcia i zmiany na taktach.
+   Muzyka: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3` → BPM, takty, drop, perkusja; cięcia na taktach, po renderze `rytm.py sprawdz`.
 3. Inspiracje tylko, gdy brief nie ma pomysłu na formę:
    `python3 $HERMES_HOME/scripts/inspiracje.py <rodzaj> --ile 3` (prompty twórców filmów Opus 5.5 z dwóch list, pobierane w locie); `inspiracje.py --drogi` pokazuje, jak naprawdę powstały opisane filmy (droga produkcji z dowodem): sprawdź, zanim obiecasz „jeden prompt”.
    Bierzesz strukturę i chwyty, nie tekst; zainspirowało → autor i link w RAPORT.

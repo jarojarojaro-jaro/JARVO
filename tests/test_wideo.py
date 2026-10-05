@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import shutil
@@ -900,6 +901,96 @@ def test_rytm_sfx_peak(tmp_path):
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
                     "aevalsrc='if(gte(t,0.15),sin(2*PI*900*t)*exp(-40*(t-0.15)),0)':s=44100:d=0.6", str(wav)], check=True)
     assert rytm.peak(wav)["szczyt"] == pytest.approx(0.15, abs=0.02)
+
+
+def _perkusja_wav(path, bpm=120.0, dur=20.0, first=0.25, glosna=None, przesun=0.0):
+    """Pętla perkusji: stopa na 1 i 3 (55 Hz ze spadkiem wysokości), werbel na 2 i 4 (szum), talerz na ósemkach
+    (9 kHz); `glosna` = chwila jednej mocniejszej stopy. Bez ffmpeg (moduł wave)."""
+    import random
+    import wave
+    sr, p = 44100, 60 / bpm
+    rnd = random.Random(7)
+    x = [0.0] * int(sr * dur)
+
+    def dodaj(t0, dl, f):
+        i0 = int((t0 + przesun) * sr)
+        for i in range(max(0, i0), min(len(x), i0 + int(dl * sr))):
+            x[i] += f((i - i0) / sr)
+    k = 0
+    while first + k * p / 2 < dur:
+        t = first + k * p / 2
+        dodaj(t, 0.05, lambda u: 0.12 * math.sin(2 * math.pi * 9000 * u) * math.exp(-60 * u))
+        if k % 2 == 0:
+            if (k // 2) % 2 == 0:
+                g = 1.0 if glosna is not None and abs(t - glosna) < 0.01 else 0.55
+                dodaj(t, 0.4, lambda u, g=g: g * math.sin(2 * math.pi * (55 * u + 2 * (1 - math.exp(-30 * u)))) * math.exp(-8 * u))
+            else:
+                dodaj(t, 0.2, lambda u: 0.35 * rnd.uniform(-1, 1) * math.exp(-18 * u))
+        k += 1
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(b"".join(int(max(-1.0, min(1.0, v)) * 32000).to_bytes(2, "little", signed=True) for v in x))
+    return path
+
+
+def test_rytm_siatka_pol_i_podwojna():
+    """Za wolna siatka gubi werbel na 2 i 4, za szybka ma puste bity: wygrywa prawdziwe tempo (bez ffmpeg)."""
+    rytm = _wscript("rytm")
+    p = 0.5
+    uderzenia = sorted([{"t": round(0.25 + k * p, 3), "s": 0.8, "k": "stopa" if k % 2 == 0 else "werbel"}
+                        for k in range(32)], key=lambda u: u["t"])
+    for okres in (1.0, 0.25):                                              # 60 i 240 BPM zamiast 120
+        first, per, siatka = rytm.wybierz_siatke(0.25, okres, 16.5, uderzenia)
+        assert per == pytest.approx(0.5) and first == pytest.approx(0.25) and siatka["mnoznik"] != 1
+    first, per, siatka = rytm.wybierz_siatke(0.25, 0.5, 16.5, uderzenia)
+    assert per == 0.5 and siatka["mnoznik"] == 1 and siatka["ocena"] == "pewna"
+    assert siatka["trafienia"] == 1 and siatka["sredni_blad_ms"] == 0
+    nai = rytm.najmocniejsze([{"t": 0.25 + k * p, "s": 0.5 + (0.4 if k in (4, 6, 20) else 0), "k": "stopa"}
+                              for k in range(0, 32, 2)], [0.25 + k * p for k in range(32)], p)
+    assert [o["t"] for o in nai] == [2.25, 10.25] and all(o["na_bicie"] for o in nai)   # 6 za blisko 4 (< 16 bitów)
+    assert rytm.czasy_planu([{"sfx": "pop", "t": 1.2}, {"t": 0.4, "na_bit": False}, 2.0]) == [1.2, 2.0]
+    assert rytm.czasy_planu({"ciecia": {"co_takt": [0.25, 2.25]}}) == [0.25, 2.25]
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
+def test_rytm_pasma_perkusji(tmp_path):
+    """Stopa, werbel i talerze z osobnych pasm; najmocniejsza stopa wskazana jako miejsce na uderzenie kadru."""
+    rytm = _wscript("rytm")
+    r = rytm.analyze(_perkusja_wav(tmp_path / "petla.wav", glosna=10.25))
+    assert r["bpm"] == pytest.approx(120, abs=0.5) and r["siatka"]["ocena"] in ("pewna", "dobra")
+    po = {k: [u["t"] for u in r["uderzenia"] if u["k"] == k] for k in ("stopa", "werbel", "talerz")}
+    assert len(po["stopa"]) == pytest.approx(20, abs=1) and len(po["werbel"]) == pytest.approx(20, abs=1)
+    assert all(abs((t - 0.25) % 1.0) < 0.03 or abs((t - 0.25) % 1.0 - 1) < 0.03 for t in po["stopa"])
+    assert all(abs((t - 0.75) % 1.0) < 0.03 or abs((t - 0.75) % 1.0 - 1) < 0.03 for t in po["werbel"])
+    assert len(po["talerz"]) >= 70                                          # ósemki: 4 na sekundę
+    assert 10.25 in [round(o["t"], 2) for o in r["najmocniejsze"]] or \
+        any(abs(o["t"] - 10.25) < 0.02 for o in r["najmocniejsze"])
+    assert all(i["talerze"] >= 7 for i in r["takty_info"][:-1])
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak ffmpeg")
+def test_rytm_sprawdz_ciecia_po_renderze(tmp_path):
+    """Cięcia z obrazu kontra bity z dźwięku gotowego filmu; wspólne przesunięcie wszystkich cięć rozpoznane."""
+    rytm = _wscript("rytm")
+    wav = _perkusja_wav(tmp_path / "petla.wav", dur=10.0)
+    film = tmp_path / "film.mp4"
+    kolory = [("red", 2.25), ("blue", 2.5), ("green", 1.65), ("yellow", 3.6)]   # cięcia 2,25 · 4,75 · 6,40 (źle)
+    wejscia = []
+    for c, d in kolory:
+        wejscia += ["-f", "lavfi", "-i", f"color=c={c}:s=320x180:r=30:d={d}"]
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", *wejscia, "-i", str(wav), "-filter_complex",
+                    f"concat=n={len(kolory)}:v=1:a=0,format=yuv420p[v]", "-map", "[v]", "-map", f"{len(kolory)}:a",
+                    "-c:a", "aac", "-shortest", str(film)], check=True)
+    assert rytm.ciecia_obrazu(film) == pytest.approx([2.233, 4.733, 6.4], abs=0.04)
+    r = rytm.sprawdz(film, rytm.ciecia_obrazu(film), 30.0)
+    assert [w["ocena"] for w in r["ciecia"]][:2] != ["popraw", "popraw"] and r["ciecia"][2]["ocena"] == "popraw"
+    assert r["popraw"] == 1
+    assert rytm.main(["sprawdz", str(film), "--ciecia", "2.25,4.75", "--json", str(tmp_path / "r.json")]) == 0
+    assert rytm.main(["sprawdz", str(film)]) == 1
+    late = rytm.sprawdz(wav, [0.25 + k * 0.5 + 0.08 for k in range(16)], 30.0)    # 80 ms za późno, wszystkie
+    assert late["wspolne_przesuniecie_ms"] == pytest.approx(80, abs=12) and late["popraw"] == 0
 
 
 def test_narzedzia_exempts_exact_pins_from_uv_quarantine():

@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.2.0
+version: 1.2.1
 author: Jarvo
 license: MIT
 metadata:
@@ -46,6 +46,9 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
      początek, z zapasem 40–200 ms. `uwagi` (cięcie tuż przy słowie, przeskok w tym samym kadrze) słuchasz i oglądasz;
      przeskok gasi przybliżenie drugiej części (`projekt.py kadr <id> --wypelnij --zoom 1.15`) albo przebitka.
    - Po poprawce i renderze sprawdzasz tylko poprawione cięcia: `--tylko 2,5`.
+   - Cięcia pod muzykę: `python3 $HERMES_HOME/scripts/rytm.py sprawdz <film.mp4> [--plan cues.json | --projekt
+     <oryginał>]` liczy bity z dźwięku gotowego filmu; ✗ (ponad 3 klatki od bitu) poprawiasz, a wspólne przesunięcie
+     wszystkich cięć poprawiasz jednym przesunięciem muzyki i efektów (zasady w `lektor-i-dzwiek`).
    - ✅ Punkt kontrolny: `ok: true` i każdy obraz obejrzany.
 2. **Oglądanie:** `vision_analyze` na arkuszu (`qa.jpg`: klatki 0 s, 0,5 s, 1,5 s, ¼, ½, ¾, koniec; czerwone pola =
    strefy UI). Pytania: czy hook jest czytelny w klatce 0–1,5 s? czy napisy/tekst/logo wchodzą w czerwone pola?
@@ -85,6 +88,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 ## Definition of Done
 - [ ] `qa_wideo.py` bez błędów (JSON w raporcie), arkusz obejrzany,
 - [ ] film z cięciami: `krytyka.py ciecia` bez problemów (trzask, słowo w pół), każdy obraz cięcia obejrzany,
+- [ ] cięcia pod muzykę: `rytm.py sprawdz` bez ✗ (siatka „niepewna”: sprawdzone uchem),
 - [ ] animacja HTML: `html_wideo.py aktualny` = 0 (pomiar pełny, aktualny, bez błędów; wyjątki z powodem w raporcie),
 - [ ] `kontrola.json` z wynikiem ≥ 85 i PASS albo nazwane braki po 2 rundach,
 - [ ] każda różnica ma najmniejszą poprawkę; wynik nie jest zawyżany,

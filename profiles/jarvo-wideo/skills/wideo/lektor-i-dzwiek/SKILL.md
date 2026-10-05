@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.3.2
+version: 1.3.3
 author: Jarvo
 license: MIT
 metadata:
@@ -63,8 +63,18 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
 - Głośność pod lektorem 0,08–0,16, czyli −22…−16 dB względem głosu (plan: `glosnosc`, domyślnie 0,14); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.
 - Nigdy: muzyka z list przebojów, „znalezione na YouTube”, muzyka z cudzych filmów.
-- Rytm: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3` (BPM, takty, drop): cięcia na taktach, najmocniejsza
-  scena na dropie; sprawdź uchem przy swobodnym tempie.
+- Rytm: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3 [--json rytm.json]` (BPM, takty, drop, perkusja): cięcia
+  na taktach, najmocniejsza scena na dropie. Najpierw `siatka`: „pewna” i „dobra” to bity pod cięcia, „niepewna”
+  (swobodne tempo, mowa, brak perkusji) to tylko wskazówka, sprawdź uchem.
+  Perkusja w trzech pasmach mówi, jaki ruch (za video-shotcraft, Apache-2.0): **stopa** = uderzenie (skok skali,
+  „zgniecenie”), **werbel** = zamiana (cięcie, nowy element), **talerze** = gęstość drobnego ruchu (gęste: drobny
+  ruch może być gęsty, rzadkie: spokój). `uderzenia` to pula do wyboru, nie lista zdarzeń: stopa gra prawie na
+  każdym bicie. Uderzenie całego kadru (błysk, wstrząs) tylko na `najmocniejsze`: najwyżej 3 na film, co najmniej
+  16 bitów od siebie.
+- Po renderze: `rytm.py sprawdz final.mp4 [--plan cues.json | --projekt film.edycja.json | --ciecia 1.2,3.4]` liczy
+  bity z dźwięku GOTOWEGO filmu i błąd każdego cięcia (bez planu: cięcia wykryte w obrazie): do 1,5 klatki idealnie,
+  do 3 dobrze, ponad 3 popraw (kod wyjścia 1). Wszystkie cięcia przesunięte o tyle samo to przesunięcie dźwięku
+  przy kodowaniu (AAC): przesuń całą muzykę i efekty o podane ms, nie poprawiaj cięć po kolei.
 
 ## Efekty dźwiękowe
 Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność źródeł:
