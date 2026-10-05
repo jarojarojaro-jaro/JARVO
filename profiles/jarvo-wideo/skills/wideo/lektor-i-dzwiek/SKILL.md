@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.9.0
+version: 1.10.0
 author: Jarvo
 license: MIT
 metadata:
@@ -89,8 +89,12 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
   `sound.mjs`, nie razem z nim. Wynik: −14 LUFS, szczyt ≤ −1 dBTP także po AAC, słyszalność każdego efektu
   (te same progi co `slychac`), plan `final.muzyka.json` (tempo, takty, sekcje, akordy). Cięcia i akcenty obrazu
   kładziesz na `takty` z planu (rytm.py zgaduje początek taktu i bywa przesunięty o 2 bity); kod wyjścia 1 = do
-  poprawy. Pod lektora: `muzyka.py zrob --bez-efektow --dlugosc S -o podklad.wav`, potem plan film.py
-  `"muzyka": {"plik": …}` albo `projekt.py dodaj-audio`. Raz: `narzedzia.py instaluj mgaudio` (ok. 450 MB).
+  poprawy. Z lektorem (`film.py narracja` → `lektor.wav`): `muzyka.py zrob obraz.mp4 -o final.mp4 --lektor
+  lektor.wav --cues cues.json` miksuje głos ok. 10 dB nad muzyką, muzyka przysiada o 8 dB, gdy lektor mówi
+  (razem ok. −18 dB), i wraca w pauzach między akapitami (oddech w akapicie jej nie podnosi), efekty pod mową
+  ciszej o 4 dB; słyszalność efektów liczona względem głosu i muzyki, a raport podaje muzykę pod głosem i w pauzach
+  (poza −22…−14 dB = uwaga). Efekt przejścia kładziesz w pauzie akapitu (`odcinki` mowy w planie). Sam podkład:
+  `--bez-efektow --dlugosc S -o podklad.wav`, potem plan film.py `"muzyka": {"plik": …}` albo `projekt.py dodaj-audio`. Raz: `narzedzia.py instaluj mgaudio` (ok. 450 MB).
 - Głośność pod lektorem 0,08–0,16, czyli −22…−16 dB względem głosu (plan: `glosnosc`, domyślnie 0,14); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.
 - Nigdy: muzyka z list przebojów, „znalezione na YouTube”, muzyka z cudzych filmów.

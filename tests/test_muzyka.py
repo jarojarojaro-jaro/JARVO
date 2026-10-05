@@ -161,3 +161,43 @@ def test_pin_paczki_sprawdza_wersje_i_dodatek_z_env(monkeypatch):
     monkeypatch.setenv("JARVO_EXTRAS", "lemo,mgaudio")
     assert nz.dodatek("mgaudio") and nz.full_extras() and not nz.dodatek("office")
     assert {"numba==0.66.0", "pedalboard==0.9.25"} <= set(nz.MGAUDIO_PY)    # wersje jak requirements.txt wzorów
+
+
+def test_lektor_odcinki_mowy_krzywa_sciszenia_i_proporcje():
+    # 10 ms: 0,3 s ciszy, mowa 1 s z oddechem 0,3 s w środku, pauza akapitu 1 s, mowa 0,5 s, trzask 30 ms
+    env = [-90.0] * 30 + [-20.0] * 40 + [-80.0] * 30 + [-22.0] * 30 + [-90.0] * 100 + [-18.0] * 50 + [-90.0] * 50 \
+        + [-30.0] * 3 + [-90.0] * 20
+    seg = mz.segmenty_mowy(env)
+    assert seg == [(0.3, 1.3), (2.3, 2.8)]                         # oddech sklejony, pauza akapitu nie, trzask pominięty
+    assert mz.segmenty_mowy([]) == [] and mz.segmenty_mowy([-100.0] * 50) == []
+    g = mz.krzywa_sciszenia(seg, 3.5, 8.0)
+    assert len(g) == 351 and g[0] == 0.0 and g[100] == -8.0 and g[200] == 0.0
+    assert g[24] == pytest.approx(-8.0 * 0.06 / 0.12)               # zejście 0,12 s przed mową
+    assert g[150] == pytest.approx(-8.0 * 0.5)                      # powrót 0,4 s po mowie: w połowie
+    assert g[170] == 0.0 and min(g[225:290]) == -8.0
+    glos = [-100.0] * 30 + [-20.0] * 100 + [-100.0] * 100 + [-20.0] * 50 + [-100.0] * 70
+    muz = [-30.0] * 30 + [-38.0] * 100 + [-30.0] * 100 + [-38.0] * 50 + [-30.0] * 70
+    p = mz.proporcje_lektora(glos, muz, seg)
+    assert p["muzyka_pod_glosem_db"] == -18.0 and p["muzyka_w_pauzach_db"] == -10.0 and p["uwagi"] == []
+    assert p["mowa_s"] == 1.5 and p["odcinki"] == 2
+    glosno = mz.proporcje_lektora(glos, [-25.0] * 350, seg)
+    assert glosno["muzyka_pod_glosem_db"] == -5.0 and "głos ginie" in glosno["uwagi"][0]
+    cicho = mz.proporcje_lektora(glos, [-60.0] * 350, seg)
+    assert "prawie jej nie słychać" in cicho["uwagi"][0]
+
+
+def test_lektor_w_cli_dlugosc_z_lektora(tmp_path, monkeypatch):
+    lektor = tmp_path / "lektor.wav"
+    lektor.write_bytes(b"RIFF")
+    zlapane = {}
+    monkeypatch.setattr(mz, "dlugosc_filmu", lambda p: 12.5)
+
+    def stop(a, dlugosc, zd):
+        zlapane.update(dlugosc=dlugosc, zd=zd)
+        raise SystemExit("stop")
+    monkeypatch.setattr(mz, "plan_muzyki", stop)
+    with pytest.raises(SystemExit, match="stop"):
+        mz.main(["zrob", "-o", str(tmp_path / "m.wav"), "--lektor", str(lektor), "--lektor-od", "0.5", "--bez-efektow"])
+    assert zlapane["dlugosc"] == 13.0                               # bez obrazu i --dlugosc: koniec lektora
+    with pytest.raises(SystemExit, match="brak pliku lektora"):
+        mz.main(["zrob", "-o", str(tmp_path / "m.wav"), "--lektor", str(tmp_path / "nie.wav")])

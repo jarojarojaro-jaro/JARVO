@@ -188,6 +188,8 @@ python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 -
   `wideo` renderuje w kilku przeglądarkach naraz (samo: do 4, według rdzeni i pamięci; `--rownolegle N`) i czeka
   na miejsce, gdy na maszynie trwają już 2 pełne rendery albo przy trwającym renderze wolnej pamięci jest < 30%.
 - Dźwięk (lektor, muzyka, efekty) dokłada `film.py` (`"plik"` + `"koniec": "stop"`) albo `montaz.py`; potem `qa_wideo.py`.
+  Film z lektorem z `narracja` i muzyką pisaną kodem: `muzyka.py zrob film.mp4 -o final.mp4 --lektor src/lektor.wav
+  --cues cues.json` (głos w miksie, muzyka ściszana pod mowę, efekty w pauzach; skill `lektor-i-dzwiek`).
 
 ## Trzy formaty z jednej osi czasu
 Jedna scena, jedna oś czasu, **układ liczony z rozmiaru kadru**, a nie stałe piksele: `const L = layout(W, H)`

@@ -6,6 +6,7 @@
     muzyka.py zrob [obraz.mp4] -o final.mp4|muzyka.wav [--cues cues.json] [--styl kreska | --przepis lofi]
                    [--dlugosc S] [--kulminacja T] [--koniec T] [--tempo 100] [--tonacja A --tryb minor]
                    [--opcje '{"keys": "rhodes"}'] [--bez-efektow] [--lufs -14] [--json plan.json]
+                   [--lektor lektor.wav [--lektor-od 0]]
     muzyka.py sprawdz muzyka.wav [--lufs -14]   # głośność, szczyt prawdziwy, pasma, faza, najdłuższa cisza
 
 Silnik: mgaudio z mg-styles-15 (MIT, Vincentwei1021): syntezatory, perkusja, sample VCSL (CC0), mastering
@@ -20,6 +21,11 @@ początek dźwięku) dostają odpowiednik z mgaudio w tej samej chwili; `{"mg": 
 "cinematic"}}` to dowolny efekt mgaudio, a t to jego chwila synchronizacji (atak uderzenia, przelot whoosha,
 koniec narastania). Efekty mgaudio mają poziom z konstrukcji (ok. 2 dB nad muzyką, `vol` 0,5 = 0 dB, 0,25 = −6 dB),
 a muzyka przysiada o 3 dB wokół każdego.
+Z lektorem (`--lektor`, np. z `film.py narracja`): głos w miksie ok. 10 dB nad muzyką, a muzyka przysiada o 8 dB,
+gdy lektor mówi (razem ok. −18 dB pod głosem; schodzi 0,12 s przed pierwszym słowem, wraca przez 0,4 s po ostatnim).
+Przerwy krótsze niż 0,5 s (oddech w akapicie) jej nie podnoszą, pauza między akapitami (1 s) już tak. Efekty pod
+mową ciszej o 4 dB, a ich słyszalność liczona jest względem głosu i muzyki. Mastering bez podbicia góry i saturacji
+(głos zostaje naturalny); długość filmu bez obrazu i `--dlugosc` = koniec lektora.
 Z obrazem: dźwięk zastępuje ścieżkę filmu (AAC 192k, obraz bez przekodowania); obok zostają <wynik>.muzyka.wav
 (do edytora HQ: `projekt.py dodaj-audio`, do planu film.py: `"muzyka": {"plik": …}`) i <wynik>.muzyka.json
 (plan: tempo, takty, sekcje, akordy, efekty, kontrola). Bez obrazu: WAV i plan obok.
@@ -251,6 +257,12 @@ def dlugosc_filmu(path: Path) -> float:
         raise SystemExit(f"nie umiem odczytać długości {path}: {out.stderr.strip()[:200]}")
 
 
+def ma_dzwiek(path: Path) -> bool:
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0",
+                          str(path)], capture_output=True, text=True)
+    return bool(out.stdout.strip())
+
+
 def glosnosc_pliku(path: Path) -> dict:
     """LUFS i szczyt prawdziwy ścieżki dźwięku (ffmpeg ebur128, ten sam pomiar co qa_wideo.py)."""
     log = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-map", "0:a:0",
@@ -260,6 +272,79 @@ def glosnosc_pliku(path: Path) -> dict:
     p = re.search(r"Peak:\s+(-?[\d.]+|-inf) dBFS", s)
     return {"lufs": float(m.group(1)) if m else None,
             "szczyt_dbtp": float(p.group(1)) if p and p.group(1) != "-inf" else None}
+
+
+# ---------------------------------------------------------------- lektor w miksie (decyzje bez mgaudio)
+
+GLOS_NAD_MUZYKA = 10.0          # dB: głos (LUFS) nad muzyką bez ściszenia
+SCISZENIE_POD_GLOSEM = 8.0      # dB: muzyka przysiada, gdy lektor mówi (razem ok. −18 dB pod głosem)
+EFEKTY_POD_GLOSEM = 4.0         # dB: efekty ciszej pod mową (lektor-i-dzwiek: −18…−12 dB względem głosu)
+MOWA_SCAL = 0.5                 # s: krótsza przerwa (oddech w akapicie) nie podnosi muzyki; pauza akapitu (1 s) tak
+MOWA_PRZED, MOWA_PO = 0.12, 0.4  # s: muzyka schodzi przed pierwszym słowem i wraca po ostatnim
+POD_GLOSEM_ZAKRES = (-22.0, -14.0)   # dB muzyki względem głosu, gdy lektor mówi (skill: −22…−16, z zapasem)
+
+
+def segmenty_mowy(env_db: list[float], krok: float = 0.01, scal: float = MOWA_SCAL,
+                  min_dl: float = 0.08) -> list[tuple[float, float]]:
+    """Obwiednia głosu (dB co `krok` s) → odcinki mowy [(od, do)]: próg 35 dB pod głośnymi fragmentami (95. centyl,
+    nie niżej niż −55 dB), przerwy krótsze niż `scal` sklejone, trzaski krótsze niż `min_dl` pominięte."""
+    if not env_db:
+        return []
+    srt = sorted(env_db)
+    prog = max(-55.0, srt[int(0.95 * (len(srt) - 1))] - 35.0)
+    seg: list[list[float]] = []
+    for i, v in enumerate(env_db):
+        if v <= prog:
+            continue
+        t0, t1 = i * krok, (i + 1) * krok
+        if seg and t0 - seg[-1][1] < scal - 1e-9:
+            seg[-1][1] = t1
+        else:
+            seg.append([t0, t1])
+    return [(round(a, 3), round(b, 3)) for a, b in seg if b - a >= min_dl - 1e-9]
+
+
+def krzywa_sciszenia(segmenty: list[tuple[float, float]], dlugosc: float, glebokosc: float,
+                     przed: float = MOWA_PRZED, po: float = MOWA_PO, krok: float = 0.01) -> list[float]:
+    """dB co `krok` s: 0 poza mową, −glebokosc w mowie; zejście przez `przed` s przed mową, powrót przez `po` po niej."""
+    n = int(round(dlugosc / krok)) + 1
+    g = [0.0] * n
+    for a, b in segmenty:
+        for i in range(max(0, int((a - przed) / krok) - 1), min(n, int((b + po) / krok) + 2)):
+            t = i * krok
+            if t < a:
+                d = -glebokosc * max(0.0, t - (a - przed)) / przed
+            elif t <= b:
+                d = -glebokosc
+            else:
+                d = -glebokosc * max(0.0, 1 - (t - b) / po)
+            g[i] = min(g[i], round(d, 4) + 0.0)
+    return g
+
+
+def _srednia_energii_db(env: list[float], idx: list[int]) -> float | None:
+    e = [10 ** (env[i] / 10) for i in idx if 0 <= i < len(env)]
+    return round(10 * math.log10(sum(e) / len(e)), 1) if e and sum(e) > 0 else None
+
+
+def proporcje_lektora(glos: list[float], muzyka: list[float], segmenty: list[tuple[float, float]],
+                      krok: float = 0.01) -> dict:
+    """Gotowy miks po stemach (dB co `krok` s): muzyka względem głosu, gdy lektor mówi, i głośność muzyki w pauzach
+    względem głosu. Poza zakresem POD_GLOSEM_ZAKRES = uwaga (głos ginie albo muzyki nie słychać)."""
+    mowa = {i for a, b in segmenty for i in range(round(a / krok), round(b / krok))}
+    w_mowie = sorted(mowa)
+    pauzy = [i for i in range(len(muzyka)) if i not in mowa]
+    g, mm, mp = (_srednia_energii_db(glos, w_mowie), _srednia_energii_db(muzyka, w_mowie),
+                 _srednia_energii_db(muzyka, pauzy))
+    pod = round(mm - g, 1) if g is not None and mm is not None else None
+    w_pauzach = round(mp - g, 1) if g is not None and mp is not None else None
+    uwagi = []
+    if pod is not None and pod > POD_GLOSEM_ZAKRES[1]:
+        uwagi.append(f"muzyka pod głosem {pod:+.1f} dB względem lektora (głośniej niż {POD_GLOSEM_ZAKRES[1]:g}): głos ginie")
+    if pod is not None and pod < POD_GLOSEM_ZAKRES[0]:
+        uwagi.append(f"muzyka pod głosem {pod:+.1f} dB względem lektora (ciszej niż {POD_GLOSEM_ZAKRES[0]:g}): prawie jej nie słychać")
+    return {"mowa_s": round(len(w_mowie) * krok, 2), "odcinki": len(segmenty), "muzyka_pod_glosem_db": pod,
+            "muzyka_w_pauzach_db": w_pauzach, "uwagi": uwagi}
 
 
 # ---------------------------------------------------------------- mgaudio (tylko w venv dodatku)
@@ -312,6 +397,39 @@ def dzwiek_efektu(z: dict, sfx, drums, form):
     return s
 
 
+def wczytaj_lektora(sciezka: Path):
+    """Lektor (WAV, MP3, M4A…) → stereo float 48 kHz (2, n) przez ffmpeg, bez zapisu na dysk."""
+    import numpy as np  # noqa: PLC0415
+    r = subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-i", str(sciezka), "-f", "f32le", "-ac", "2", "-ar", "48000",
+                        "-"], capture_output=True)
+    if r.returncode or not r.stdout:
+        raise SystemExit(f"nie umiem odczytać lektora {sciezka}: {r.stderr.decode(errors='replace')[:200]}")
+    return np.frombuffer(r.stdout, dtype=np.float32).reshape(-1, 2).T.astype(np.float64)
+
+
+def dodaj_lektora(m, dane, od: float, dlugosc: float) -> dict:
+    """Głos jako ścieżka `lektor` (grupa `glos`, GLOS_NAD_MUZYKA dB nad poziomem muzyki), muzyka i efekty ściszane
+    krzywą z odcinków mowy. Krzywe działają na gotowe grupy (post_fx), po ich własnym przysiadaniu pod efektami."""
+    import numpy as np  # noqa: PLC0415
+    from mgaudio.core import as_sound  # noqa: PLC0415
+    sr = 48000
+    if od + dane.shape[1] / sr > dlugosc + 0.05:
+        raise SystemExit(f"lektor ({dane.shape[1] / sr:.2f} s od {od:g} s) dłuższy niż film ({dlugosc:.2f} s)")
+    poziom_muzyki = m.group("music").level if m.group("music").level is not None else -20.0
+    m.track("lektor", group="glos", level=poziom_muzyki + GLOS_NAD_MUZYKA).add(as_sound(dane.astype(np.float32)), at=od)
+    env = [-100.0] * int(round(od * 100)) + obwiednia(dane.mean(axis=0), sr)
+    segmenty = segmenty_mowy(env)
+    t = np.arange(m.N) / sr
+    siatka = np.arange(int(round(dlugosc / 0.01)) + 1) * 0.01
+    for grupa, gleb in (("music", SCISZENIE_POD_GLOSEM), ("sfx", EFEKTY_POD_GLOSEM)):
+        g = 10 ** (np.interp(t, siatka, krzywa_sciszenia(segmenty, dlugosc, gleb)) / 20)
+        m.group(grupa).post_fx.append(lambda x, g=g: x * g[None, :])
+    # głos zostaje naturalny: bez saturacji taśmy, podbicia góry i pochylenia z masteringu przepisu
+    m.master_kw.update(warmth=0.0, air=0.0, tilt=0.0)
+    return {"segmenty": segmenty, "mowa_s": round(sum(b - a for a, b in segmenty), 2),
+            "poziom_lufs_przed_masterem": poziom_muzyki + GLOS_NAD_MUZYKA}
+
+
 def plan_muzyki(a, dlugosc: float, zd: list[dict]) -> dict:
     """Decyzje przed renderem (czyste, bez mgaudio): przepis, kulminacja, koniec, tempo, zdarzenia do siatki."""
     przepis, opcje, wzor = wybierz_przepis(a)
@@ -348,9 +466,13 @@ def cmd_zrob(a) -> int:
         raise SystemExit("z obrazem wynik to .mp4 (dźwięk zastępuje ścieżkę filmu)")
     if not obraz and wynik.suffix.lower() != ".wav":
         raise SystemExit("bez obrazu wynik to .wav (albo podaj obraz.mp4)")
-    dlugosc = a.dlugosc or (dlugosc_filmu(obraz) if obraz else None)
+    lektor = Path(a.lektor).resolve() if getattr(a, "lektor", None) else None
+    if lektor and not lektor.is_file():
+        raise SystemExit(f"brak pliku lektora: {lektor}")
+    dlugosc = a.dlugosc or (dlugosc_filmu(obraz) if obraz else None) \
+        or (round(a.lektor_od + dlugosc_filmu(lektor), 3) if lektor else None)
     if not dlugosc:
-        raise SystemExit("podaj --dlugosc S albo obraz.mp4")
+        raise SystemExit("podaj --dlugosc S, obraz.mp4 albo --lektor")
     zd = [] if a.bez_efektow else [zdarzenie(c) for c in wczytaj_cues(Path(a.cues) if a.cues else None)]
     plan = plan_muzyki(a, dlugosc, zd)
     mga = mgaudio()
@@ -388,6 +510,7 @@ def cmd_zrob(a) -> int:
         umieszczone.append({"nazwa": z["nazwa"], "zrodlo": z["zrodlo"], "chwila": round(chwila, 3),
                             "start": round(chwila - s.sync, 3), "glosnosc_db": z["db"], "rola": z["rola"]})
 
+    lektor_info = dodaj_lektora(m, wczytaj_lektora(lektor), a.lektor_od, plan["dlugosc"]) if lektor else None
     wav = wynik if not obraz else wynik.with_suffix(".muzyka.wav")
     wav.parent.mkdir(parents=True, exist_ok=True)
     # do MP4 zapas 0,5 dB: AAC dokłada przesterowania między próbkami
@@ -395,7 +518,12 @@ def cmd_zrob(a) -> int:
     res = mga.qc.analyze(str(wav), expected=plan["dlugosc"], onsets=False)
     kontrola = ocena(res, a.lufs, slyszalnosc(m, polozone, wav, plan["dlugosc"]) if polozone else None)
     kontrola["uwagi"] += tlok(zd)
+    if lektor_info:
+        kontrola["lektor"] = lektor_w_miksie(m, wav, lektor_info["segmenty"])
+        kontrola["uwagi"] += kontrola["lektor"]["uwagi"]
     if obraz:
+        if not lektor and ma_dzwiek(obraz):
+            kontrola["uwagi"].append("obraz miał własny dźwięk i został zastąpiony; lektora daj przez --lektor")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(obraz), "-i", str(wav), "-map", "0:v:0", "-map", "1:a:0",
                         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart",
                         str(wynik)], check=True)
@@ -418,6 +546,10 @@ def cmd_zrob(a) -> int:
         "skad": plan["zrodla"], "akordy": fs["chords"], "akord_koncowy": fs["final"], "takty": takty,
         "siatka": {"zdarzenia": len(siatka), "w_klatce": na_siatce, "najwiekszy_blad_s": fs["hit_fit_err"], "lista": siatka},
         "efekty": umieszczone, "kontrola": kontrola,
+        **({"lektor": {"plik": str(lektor), "od": a.lektor_od, "mowa_s": lektor_info["mowa_s"],
+                       "odcinki": [list(x) for x in lektor_info["segmenty"]],
+                       "glos_nad_muzyka_db": GLOS_NAD_MUZYKA, "sciszenie_db": SCISZENIE_POD_GLOSEM,
+                       "efekty_pod_glosem_db": EFEKTY_POD_GLOSEM}} if lektor_info else {}),
         "pliki": {"wav": str(wav), **({"mp4": str(wynik)} if obraz else {})},
     }
     plan_json = Path(a.json).resolve() if a.json else (wynik.with_suffix(".muzyka.json"))
@@ -456,10 +588,24 @@ def slyszalnosc(m, polozone: list, wav: Path, dlugosc: float) -> dict:
         surowe[i0:i0 + len(d)] += d
         bufory.append((z, i0, d))
     grupa = rms(mono(st["group.sfx"])) / rms(surowe) if "group.sfx" in st else 1.0
-    tlo = obwiednia(mono(st["group.music"]) * master, sr) if "group.music" in st else [-100.0] * int(dlugosc * 100)
+    tlo_grupy = [mono(st[k]) for k in ("group.music", "group.glos") if k in st]     # tło = muzyka i lektor
+    tlo = obwiednia(sum(tlo_grupy) * master, sr) if tlo_grupy else [-100.0] * int(dlugosc * 100)
     zdarzenia = [{"nazwa": z["nazwa"], "start": i0 / sr, "env": obwiednia(d * grupa * master, sr), "rola": [z["rola"]],
                   "glosnosc": 0.5 * 10 ** (z["db"] / 20)} for z, i0, d in bufory]
     return pj.ocena_slyszalnosci(zdarzenia, tlo, dlugosc)
+
+
+def lektor_w_miksie(m, wav: Path, segmenty: list[tuple[float, float]]) -> dict:
+    """Proporcje w gotowym miksie: stemy głosu i muzyki przeskalowane jak master (gotowy WAV kontra suma grup)."""
+    import numpy as np  # noqa: PLC0415
+    import soundfile as sf  # noqa: PLC0415
+    st = m.stems
+    mono = lambda x: np.asarray(x, dtype=np.float64).mean(axis=0)  # noqa: E731
+    rms = lambda x: float(np.sqrt(np.mean(np.square(x))) + 1e-12)  # noqa: E731
+    gotowy, sr = sf.read(str(wav), always_2d=True)
+    master = rms(gotowy.T.mean(axis=0)) / rms(sum(mono(v) for k, v in st.items() if k.startswith("group.")))
+    return proporcje_lektora(obwiednia(mono(st["group.glos"]) * master, sr),
+                             obwiednia(mono(st["group.music"]) * master, sr), segmenty)
 
 
 def ocena(res: dict, lufs: float, sluch: dict | None) -> dict:
@@ -496,8 +642,12 @@ def wypisz(p: dict, plan_json: Path) -> None:
         print(f"  efekty: {len(p['efekty'])} · czysto {sl['ile']['czysto']}, słychać {sl['ile']['slychac']}, "
               f"zagłuszone {sl['ile']['zagluszony']}, bez dźwięku {sl['ile']['brak']}")
         for w in sorted(sl["efekty"], key=lambda w: w["t"]):
-            print(f"    {znak[w['ocena']]} {w['t']:6.2f} s  {w['nazwa']:<14} {w['zapas_db']:+5.1f} dB nad muzyką  "
+            print(f"    {znak[w['ocena']]} {w['t']:6.2f} s  {w['nazwa']:<14} {w['zapas_db']:+5.1f} dB nad tłem  "
                   f"{opis[w['ocena']]}" + (f"  → {w['porada'].replace('głośniej: ', 'głośniej: vol ')}" if w["porada"] else ""))
+    if k.get("lektor"):
+        lk = k["lektor"]
+        print(f"  lektor: mowa {lk['mowa_s']:g} s w {lk['odcinki']} odcinkach; muzyka pod głosem "
+              f"{lk['muzyka_pod_glosem_db']} dB, w pauzach {lk['muzyka_w_pauzach_db']} dB względem lektora")
     print(f"  kontrola: {k['lufs']} LUFS, szczyt {k['szczyt_dbtp']} dBTP, korelacja L/P {k['korelacja_lp']}"
           + (f"; MP4 {k['mp4']['lufs']} LUFS, {k['mp4']['szczyt_dbtp']} dBTP" if k.get("mp4") else ""))
     for u in k["uwagi"]:
@@ -567,6 +717,8 @@ def main(argv: list[str] | None = None) -> int:
     z.add_argument("--bez-efektow", action="store_true", help="sama muzyka (efekty osobno albo pod lektora)")
     z.add_argument("--lufs", type=float, default=-14.0)
     z.add_argument("--json", help="plan (domyślnie <wynik>.muzyka.json)")
+    z.add_argument("--lektor", help="głos do miksu (lektor.wav z film.py narracja): muzyka ściszana pod mowę")
+    z.add_argument("--lektor-od", type=float, default=0.0, help="chwila filmu, od której gra lektor (s)")
     z.set_defaults(fn=cmd_zrob)
     s = sub.add_parser("sprawdz", help="kontrola gotowej muzyki (WAV)")
     s.add_argument("plik")
