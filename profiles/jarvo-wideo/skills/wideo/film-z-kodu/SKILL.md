@@ -1,7 +1,7 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.4.1
+version: 3.5.0
 author: Jarvo
 license: MIT
 metadata:

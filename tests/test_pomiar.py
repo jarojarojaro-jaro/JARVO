@@ -40,6 +40,7 @@ def test_czas_czytania_i_kolory():
     assert pm.czas_czytania("") == 0 and pm.czas_czytania("Kawa") == 0.73 and pm.czas_czytania("Kawa Jarvo") == 1.07
     assert pm.czas_czytania("Najlepsza kawa w mieście od 1998 roku") == round(0.4 + 7 / 3, 2)
     assert pm.czas_czytania("The best coffee in town", "en") < pm.czas_czytania("Najlepsza kawa w całym mieście")
+    assert pm.czas_wygodny("") == 0 and pm.czas_wygodny("Ustaw stację") == round(11 / 15 + 1.5, 2)   # spacje się nie liczą
     assert pm.kolor_css("rgb(10, 20, 30)") == (10, 20, 30, 1.0) and pm.kolor_css("rgba(0, 0, 0, 0.5)")[3] == 0.5
     assert pm.kolor_css("rgb(1 2 3 / 40%)")[3] == 0.4 and pm.kolor_css("#fff") == (255, 255, 255, 1.0)
     assert pm.kolor_css("#22222280")[3] == pytest.approx(128 / 255) and pm.kolor_css("czerwony") is None
@@ -65,6 +66,10 @@ def test_czas_czytania_i_odslanianie():
     cz = {u["tekst"] if u["od"] < 1 else "pisanie": u for u in ust if u["kod"] == "czas_czytania"}
     assert cz[pelny]["waga"] == "blad" and cz[pelny]["dostepny"] == pytest.approx(0.6)
     assert cz["pisanie"]["waga"] == "ostrz" and cz["pisanie"]["dostepny"] < cz["pisanie"]["potrzeba"]   # 4 s minus pisanie
+    assert cz[pelny]["minimum"] == pm.czas_czytania(pelny) and cz[pelny]["potrzeba"] == pm.czas_wygodny(pelny)
+    # dość dla szybkiego czytelnika (≥ 70% minimum), za mało na spokojne przeczytanie: ostrzeżenie, nie błąd
+    krotko = pm.analiza(probki(4, lambda t: [tekst(1, "Ustaw stację")] if 1.0 <= t < 2.2 else []), 4, HZ, None)
+    assert [(u["kod"], u["waga"]) for u in krotko] == [("czas_czytania", "ostrz")] and "spokojne" in krotko[0]["opis"]
 
 
 def test_poza_kadrem_strefy_i_kontrast():

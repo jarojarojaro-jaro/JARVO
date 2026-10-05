@@ -125,12 +125,15 @@ python3 $H pomiar out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 -
 python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 --fps 30 -o out/wideo/<nazwa>.mp4
 ```
 - Najpierw arkusz (1 klatka na scenę) → vision → poprawki; dopiero potem całość.
-- **Pomiar** (`pomiar.json` + `pomiar.md` obok strony): czas czytania, tekst poza kadrem i pod UI platformy, kontrast,
+- **Pomiar** (`pomiar.json` + `pomiar.md` obok strony): czas czytania (błąd poniżej 70% minimum dla szybkiego
+  czytelnika, ostrzeżenie poniżej spokojnego czytania: znaki bez spacji / 15 + 1,5 s), tekst poza kadrem i pod UI platformy, kontrast,
   kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów. W trakcie poprawek `--tryb szybki`;
   film oddajesz tylko z pełnym i aktualnym raportem bez błędów (`html_wideo.py aktualny <strona>` = 0). Świadomy
   wyjątek z powodem: `--wyjatek "czas_czytania@Logo=znak marki, nie tekst do czytania"`.
 - `--subklatki 4` = motion blur (4× dłużej); tylko w finale i przy szybkim ruchu. `--alfa -o x.mov` = przezroczyste tło.
 - WebGL liczy się na CPU (VPS bez GPU): zmierz czas 1 klatki (`klatki --czasy 5`) i oszacuj całość, zanim ruszysz 60 s w 60 fps.
+  `wideo` renderuje w kilku przeglądarkach naraz (samo: do 4, według rdzeni i pamięci; `--rownolegle N`) i czeka
+  na miejsce, gdy na maszynie trwają już 2 pełne rendery albo przy trwającym renderze wolnej pamięci jest < 30%.
 - Dźwięk (lektor, muzyka, efekty) dokłada `film.py` (`"plik"` + `"koniec": "stop"`) albo `montaz.py`; potem `qa_wideo.py`.
 
 ## Trzy formaty z jednej osi czasu

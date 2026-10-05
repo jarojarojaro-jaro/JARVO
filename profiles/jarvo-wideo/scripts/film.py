@@ -513,7 +513,8 @@ def cmd_render(args) -> int:
     fmts = formats_of(plan, args.format)
     outdir = Path(args.out)
     suffix = (lambda n: f"-{wl.slugify(n, 16)}") if plan.get("warianty") else (lambda n: "")
-    results = [render_variant(variant_plan(plan, n), n, suffix(n), fmts, args.szkic, outdir, plan_path.parent) for n in names]
+    with wl.miejsce_renderu("film.py render"):
+        results = [render_variant(variant_plan(plan, n), n, suffix(n), fmts, args.szkic, outdir, plan_path.parent) for n in names]
     print(json.dumps({"ok": True, "filmy": results}, ensure_ascii=False, indent=1))
     return 0
 

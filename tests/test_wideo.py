@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import struct
@@ -545,6 +546,60 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
             urllib.request.urlopen(base + "/_lib/../../sekret.txt")
     finally:
         httpd.shutdown()
+
+
+def test_html_parallel_browsers_split_the_timeline(monkeypatch, tmp_path):
+    """--rownolegle: kolejne odcinki osi po równo, każdy w swoim wątku; klatki wracają w kolejności osi."""
+    assert hw.ile_przegladarek(300, None, rdzenie=8, wolne_gb=16) == 4          # samo: do 4
+    assert hw.ile_przegladarek(300, None, rdzenie=4, wolne_gb=16) == 2          # połowa rdzeni
+    assert hw.ile_przegladarek(300, None, rdzenie=16, wolne_gb=1.5) == 1        # ~1 GB na przeglądarkę
+    assert hw.ile_przegladarek(60, 6) == 2 and hw.ile_przegladarek(10, 3) == 1  # co najmniej 24 klatki na przeglądarkę
+    times = hw.frame_times(4, 25)                                               # 100 klatek
+    names = [f"f{i:05d}.png" for i in range(len(times))]
+    kawalki = hw.odcinki(times, names, 3)
+    assert [len(t) for t, _ in kawalki] == [34, 34, 32] and [n for _, ns in kawalki for n in ns] == names
+    import threading
+    razem, odcinki = threading.Barrier(3, timeout=10), []
+
+    def fake_capture(src, t, n, out_dir, *rest):
+        odcinki.append(t[0])
+        razem.wait()                                                        # trzy przeglądarki naraz, nie po kolei
+        return [out_dir / x for x in n]
+
+    monkeypatch.setattr(hw, "capture", fake_capture)
+    frames = hw.capture_rownolegle("a.html", times, names, tmp_path, {}, 25, (1920, 1080), False, 1.0, False, 0, 3)
+    assert frames == [tmp_path / x for x in names] and sorted(odcinki) == [0, times[34], times[68]]
+    razem = threading.Barrier(1)
+    assert hw.capture_rownolegle("a.html", times[:5], names[:5], tmp_path, {}, 25, (1920, 1080), False, 1.0, False, 0, 1) \
+        == [tmp_path / x for x in names[:5]]
+
+
+def test_render_slots_limit_and_memory_gate(monkeypatch, tmp_path):
+    """Najwyżej JARVO_RENDER_MIEJSCA renderów naraz; drugi obok trwającego tylko przy wolnej pamięci ≥ progu;
+    miejsce trzymane przez padnięty proces wraca samo (flock)."""
+    monkeypatch.setenv("JARVO_RENDER_KATALOG", str(tmp_path))
+    monkeypatch.setenv("JARVO_RENDER_MIEJSCA", "2")
+    monkeypatch.delenv("JARVO_RENDER_ZAJETE", raising=False)
+    trzymaj = ("import fcntl, sys, time; f = open(sys.argv[1], 'a+'); fcntl.flock(f, fcntl.LOCK_EX); "
+               "print('ok', flush=True); time.sleep(30)")
+    inny = subprocess.Popen([sys.executable, "-c", trzymaj, str(tmp_path / "miejsce0")], stdout=subprocess.PIPE, text=True)
+    try:
+        assert inny.stdout.readline().strip() == "ok"                           # ktoś renderuje w miejscu 0
+        monkeypatch.setattr(wl, "wolna_pamiec", lambda: (55.0, 4.0))
+        with wl.miejsce_renderu("test"):
+            assert os.environ["JARVO_RENDER_ZAJETE"] == "1" and (tmp_path / "miejsce1").read_text().startswith(str(os.getpid()))
+            with wl.miejsce_renderu("w środku"):                                # render z renderu nie zajmuje drugiego
+                pass
+        assert "JARVO_RENDER_ZAJETE" not in os.environ
+        # mało pamięci przy trwającym renderze: czeka; gdy tamten padnie, rusza od razu
+        monkeypatch.setattr(wl, "wolna_pamiec", lambda: (12.0, 1.0))
+        monkeypatch.setattr(wl.time, "sleep", lambda s: inny.kill() or inny.wait())
+        with wl.miejsce_renderu("test"):
+            pass
+        assert inny.returncode is not None
+    finally:
+        inny.kill()
+        inny.wait()
 
 
 # ------------------------------------------------------------------ rodzaje filmu i inspiracje

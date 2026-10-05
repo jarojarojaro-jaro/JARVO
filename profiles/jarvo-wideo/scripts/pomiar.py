@@ -5,7 +5,8 @@ Pomysł z Remocn Studio (`design_check`, MIT): zamiast oceniać piksele gotowego
 z przeglądarki teksty (widoczna część, granice glifów, krycie, kolor, rozmiar) i robimy małą klatkę. Z tego:
 
     tekst_poza_kadrem     tekst w pełni widoczny wychodzi poza kadr (≥ 0,25 s)                     błąd
-    czas_czytania         tekst widoczny krócej, niż trzeba na przeczytanie (pl: 0,4 s + 3 słowa/s)  błąd / ostrzeżenie
+    czas_czytania         tekst widoczny krócej, niż trzeba na przeczytanie: poniżej 70% minimum     błąd
+                          (pl: 0,4 s + 3 słowa/s), poniżej spokojnego czytania (znaki / 15 + 1,5 s)  ostrzeżenie
     strefa_platformy      tekst pod interfejsem platformy (9:16: wideo_lib.STREFY_UI, bez platformy TikTok)  błąd przy --platforma
     kontrast              tekst a tło za nim poniżej WCAG (4,5:1; duży tekst 3:1)                  błąd
     czcionka_zastepcza    krój z CSS niedostępny: render pokaże inny niż projekt                   błąd
@@ -110,6 +111,13 @@ def czas_czytania(tekst: str, jezyk: str = "pl") -> float:
     return round(max(0.5 if slowa == 1 else 0.8, 0.4 + slowa / tempo), 2)
 
 
+def czas_wygodny(tekst: str) -> float:
+    """Sekundy na spokojne przeczytanie tekstu w ruchomym kadrze: znaki bez spacji / 15 + 1,5 s (oko najpierw musi
+    tekst znaleźć). Liczby z lemo-opuscar (DIRECTOR.md §7, `readcheck.mjs`, MIT); u nas próg ostrzeżenia."""
+    znaki = len(re.sub(r"\s+", "", tekst))
+    return round(znaki / 15 + 1.5, 2) if znaki else 0.0
+
+
 def kolor_css(s: str) -> tuple[float, float, float, float] | None:
     """rgb()/rgba() z getComputedStyle albo #rgb / #rrggbb / #rrggbbaa (kolory podane przez __teksty)."""
     h = re.fullmatch(r"\s*#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\s*", s or "")
@@ -184,13 +192,15 @@ def analiza(probki: list[dict], dlugosc: float, hz: float, platforma: str | None
         krotki = pelny if len(pelny) <= 60 else pelny[:57] + "…"
         # czas czytania: chwile, gdy cały tekst jest odsłonięty i dobrze widoczny
         dostepny = sum(dt for _, x in ciag if x["a"] >= 0.6 and len(x["seen"]) >= len(pelny) * 0.98)
-        potrzeba = czas_czytania(pelny, jezyk)
+        minimum = czas_czytania(pelny, jezyk)
+        potrzeba = max(minimum, czas_wygodny(pelny))
         t0, t1 = ciag[0][0], ciag[-1][0] + dt
         if potrzeba and dostepny < potrzeba:
-            waga = "blad" if dostepny < potrzeba * 0.7 else "ostrz"
-            out.append(_ustalenie("czas_czytania", waga, f"„{krotki}” czytelny {dostepny:.1f} s, potrzeba ok. {potrzeba:.1f} s",
+            waga = "blad" if dostepny < minimum * 0.7 else "ostrz"
+            out.append(_ustalenie("czas_czytania", waga, f"„{krotki}” czytelny {dostepny:.1f} s, potrzeba ok. {potrzeba:.1f} s"
+                                  + (f" (szybki czytelnik: {minimum:.1f} s)" if waga == "blad" else " na spokojne przeczytanie"),
                                   "pokaż tekst dłużej, odsłoń go wcześniej albo skróć", t0, t1, tekst=pelny,
-                                  dostepny=round(dostepny, 2), potrzeba=potrzeba))
+                                  dostepny=round(dostepny, 2), potrzeba=potrzeba, minimum=minimum))
         # poza kadrem: w pełni widoczny tekst wystający poza kadr
         poza = [(t, x) for t, x in ciag if x["a"] >= 0.9 and (x["x0"] < -2 or x["y0"] < -2 or x["x1"] > W + 2 or x["y1"] > H + 2)]
         if len(poza) * dt >= 0.25:

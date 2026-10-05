@@ -148,6 +148,10 @@ python3 $H wideo  out/wideo/src/opener/index.html --preset bang --dlugosc 12 -o 
 ```
 - **Nasza animacja** (Canvas, SVG, Three.js, GSAP): kontrakt `rodzaje-filmu/references/kontrakt-html.md`,
   `--preset jarvo` (serwer lokalny, biblioteki z `/_lib/`, `?render=1`), `--subklatki 4` = motion blur.
+- **Szybki render:** `wideo` dzieli oś na odcinki i robi klatki w kilku przeglądarkach naraz (samo: do 4, połowa
+  rdzeni, ~1 GB wolnej pamięci na przeglądarkę; `--rownolegle N`), film ten sam co z jednej. Pełne rendery
+  (`html_wideo.py wideo`, `film.py render`, `projekt.py render`) zajmują miejsce: najwyżej 2 naraz na maszynie,
+  drugi tylko przy wolnej pamięci ≥ 30% (`JARVO_RENDER_MIEJSCA`, `JARVO_RENDER_WOLNA`); czekanie widać w logu (⏳).
 - Strona musi mieć uprząż czasu: iart `?t=<s>` + `window.__ready`, pixel2motion `?t=<ms>` + `window.__p2mReady`,
   bang-motion `window.OPENER.seek(t)`. Własna animacja: `--param/--jednostka` albo `--seek "t => tl.seek(t)"`.
 - `.mov --alfa` (ProRes 4444) do nakładania na nagranie; `.mp4` do publikacji. Potem `qa_wideo.py`, lektor i napisy jak zawsze.

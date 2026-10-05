@@ -24,6 +24,9 @@ Presety (flagi je nadpisują):
   bang          window.OPENER.seek(t), ?clean=1, rozmiar z OPENER.W/H (bang-motion; zamiast snap/export-frames.mjs)
   livepanel     window.seek(t), ?manual, gotowe: window.__ready, rozmiar z #stage (żywy schemat: zywy_schemat.py strona)
 --subklatki N (wideo): motion blur, każda klatka to średnia N chwil między klatkami (N× dłużej).
+--rownolegle N (wideo): klatki w N przeglądarkach naraz, każda swój odcinek osi; domyślnie samo (do 4, połowa
+rdzeni, ~1 GB wolnej pamięci na przeglądarkę, co najmniej 24 klatki na przeglądarkę). Pełny render (wideo, lottie -o)
+czeka na miejsce: najwyżej 2 naraz na maszynie, drugi tylko przy wolnej pamięci ≥ 30% (wideo_lib.miejsce_renderu).
 --serwer: strona z http://127.0.0.1 (fetch plików obok, moduły ES, /_lib/ = wspólne node_modules narzędzi).
 lottie: renderer Skottie z oficjalnego playera (canvaskit-wasm, `narzedzia.py instaluj lottie`), ten sam co w playerze.
 Wyjście: .mp4 (H.264, yuv420p, zakres TV, faststart), .mov (ProRes; z --alfa 4444 z przezroczystością),
@@ -33,14 +36,17 @@ Wyjście: .mp4 (H.264, yuv420p, zakres TV, faststart), .mov (ProRes; z --alfa 44
 from __future__ import annotations
 
 import argparse
+import contextlib
 import functools
 import http.server
 import json
 import math
+import os
 import shutil
 import sys
 import tempfile
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
@@ -123,6 +129,22 @@ def frame_times(duration: float, fps: float) -> list[float]:
 def subframe_times(times: list[float], fps: float, n: int) -> list[float]:
     """N chwil w obrębie każdej klatki (0, 1/n, … czasu klatki) do uśrednienia w motion blur."""
     return [t + k / (fps * n) for t in times for k in range(n)]
+
+
+def ile_przegladarek(klatek: int, zadane: int | None = None, rdzenie: int | None = None, wolne_gb: float | None = None) -> int:
+    """Przeglądarki naraz przy renderze klatek: `zadane` albo samo (do 4, połowa rdzeni, ~1 GB wolnej pamięci na
+    przeglądarkę); każda dostaje co najmniej 24 klatki, bo jej start i wczytanie strony kosztują kilka sekund."""
+    if not zadane:
+        rdzenie = rdzenie or os.cpu_count() or 2
+        wolne_gb = wl.wolna_pamiec()[1] if wolne_gb is None else wolne_gb
+        zadane = min(4, max(1, rdzenie // 2), max(1, int(wolne_gb)))
+    return max(1, min(zadane, klatek // 24 or 1))
+
+
+def odcinki(times: list[float], names: list[str], n: int) -> list[tuple[list[float], list[str]]]:
+    """Oś czasu na n kolejnych odcinków po równo (przeglądarka przewija swój odcinek po kolei, jak przy jednej)."""
+    k = max(1, math.ceil(len(times) / max(1, n)))
+    return [(times[i:i + k], names[i:i + k]) for i in range(0, len(times), k)]
 
 
 def resolve_opts(preset: str | None, **flags) -> dict:
@@ -217,6 +239,19 @@ def capture(src: str, times: list[float], names: list[str], out_dir: Path, o: di
     for e in dict.fromkeys(errors):
         print(f"  ! błąd JS na stronie: {e[:300]}", file=sys.stderr)
     return frames
+
+
+def capture_rownolegle(src: str, times: list[float], names: list[str], out_dir: Path, o: dict, fps: float,
+                       size: tuple[int, int], size_explicit: bool, scale: float, alfa: bool, wait_ms: int, n: int) -> list[Path]:
+    """capture() w n przeglądarkach naraz: każda w swoim wątku z własnym Playwright i swoim odcinkiem osi czasu.
+    Klatki są te same co z jednej przeglądarki (stan strony w chwili t, nie zegar), więc film też."""
+    kawalki = odcinki(times, names, n)
+    if len(kawalki) == 1:
+        return capture(src, times, names, out_dir, o, fps, size, size_explicit, scale, alfa, wait_ms)
+    with ThreadPoolExecutor(len(kawalki)) as ex:
+        wyniki = list(ex.map(lambda k: capture(src, k[0], k[1], out_dir, o, fps, size, size_explicit, scale, alfa, wait_ms),
+                             kawalki))
+    return [f for w in wyniki for f in w]
 
 
 def _run_capture(sync_playwright, src, times, names, out_dir, o, fps, size, size_explicit, scale, alfa, wait_ms,
@@ -567,6 +602,7 @@ def main(argv: list[str] | None = None) -> int:
             s.add_argument("--arkusz", help="dodatkowo arkusz ~12 klatek z filmu")
             s.add_argument("--zostaw-klatki", action="store_true")
             s.add_argument("--subklatki", type=int, default=1, help="motion blur: średnia N chwil na klatkę (2–8)")
+            s.add_argument("--rownolegle", type=int, help="przeglądarki naraz (domyślnie samo: do 4, wg rdzeni i pamięci)")
     ak = sub.add_parser("aktualny")
     ak.add_argument("zrodlo", help="plik .html animacji")
     ak.add_argument("--raport", help="raport pomiaru (domyślnie pomiar.json obok animacji)")
@@ -589,8 +625,9 @@ def main(argv: list[str] | None = None) -> int:
         if not a.wyjscie and not a.klatki:
             raise SystemExit("lottie: podaj -o film.mp4 albo --klatki 0,45,89")
         work = Path(a.out) if a.klatki else Path(tempfile.mkdtemp(prefix="jarvo-lottie-klatki-"))
-        frames, labels, info = lottie_render(Path(a.plik).resolve(), parse_times(a.klatki) if a.klatki else None,
-                                             a.fps, work, a.alfa, a.tlo, a.skala)
+        with wl.miejsce_renderu("html_wideo lottie") if a.wyjscie else contextlib.nullcontext():
+            frames, labels, info = lottie_render(Path(a.plik).resolve(), parse_times(a.klatki) if a.klatki else None,
+                                                 a.fps, work, a.alfa, a.tlo, a.skala)
         result = {"klatek": len(frames), "fps_animacji": info["fps"], "rozmiar": [info["w"], info["h"]]}
         if a.arkusz:
             pick = frames if a.klatki else frames[:: max(1, len(frames) // 12)]
@@ -622,16 +659,19 @@ def main(argv: list[str] | None = None) -> int:
     times = frame_times(a.dlugosc, a.fps)
     work = Path(tempfile.mkdtemp(prefix="jarvo-html-klatki-"))
     n = max(1, a.subklatki)
-    if n == 1:
-        frames = capture(a.zrodlo, times, [f"f{i:05d}.png" for i in range(len(times))], work, o, a.fps, size,
-                         bool(a.rozmiar), a.skala, a.alfa, a.czekaj)
-    else:
-        sub_times = subframe_times(times, a.fps, n)
-        subs = capture(a.zrodlo, sub_times, [f"s{i:06d}.png" for i in range(len(sub_times))], work / "sub", o, a.fps,
-                       size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj)
-        frames = [blend(subs[i * n:(i + 1) * n], work / f"f{i:05d}.png", a.alfa) for i in range(len(times))]
-    out = encode(work, a.fps, Path(a.wyjscie), a.alfa)
-    result = {"film": str(out), "klatek": len(frames), "fps": a.fps, **({"subklatki": n} if n > 1 else {})}
+    przegladarki = ile_przegladarek(len(times) * n, a.rownolegle)
+    with wl.miejsce_renderu("html_wideo wideo"):
+        if n == 1:
+            frames = capture_rownolegle(a.zrodlo, times, [f"f{i:05d}.png" for i in range(len(times))], work, o, a.fps,
+                                        size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj, przegladarki)
+        else:
+            sub_times = subframe_times(times, a.fps, n)
+            subs = capture_rownolegle(a.zrodlo, sub_times, [f"s{i:06d}.png" for i in range(len(sub_times))], work / "sub",
+                                      o, a.fps, size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj, przegladarki)
+            frames = [blend(subs[i * n:(i + 1) * n], work / f"f{i:05d}.png", a.alfa) for i in range(len(times))]
+        out = encode(work, a.fps, Path(a.wyjscie), a.alfa)
+    result = {"film": str(out), "klatek": len(frames), "fps": a.fps, "przegladarki": przegladarki,
+              **({"subklatki": n} if n > 1 else {})}
     if a.arkusz:
         step = max(1, len(frames) // 12)
         result["arkusz"] = str(sheet(frames[::step], [f"t={t:.2f}s" for t in times[::step]], Path(a.arkusz)))

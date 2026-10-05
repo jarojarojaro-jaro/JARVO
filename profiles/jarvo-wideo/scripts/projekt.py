@@ -963,7 +963,8 @@ def cmd_render(film: Path, a) -> int:
     for k, v in info_src.items():
         if v.get("hdr"):
             print(f"  HDR ({v['hdr']}): {Path(k).name} przeliczam na zwykły obraz (SDR)")
-    with tempfile.TemporaryDirectory(prefix="projekt-") as tmp:
+    import wideo_lib as wl
+    with wl.miejsce_renderu("projekt.py render"), tempfile.TemporaryDirectory(prefix="projekt-") as tmp:
         W, H = p["canvas"]["w"], p["canvas"]["h"]
         # jedno uruchomienie przeglądarki: zwykłe obrazy napisów, obraz na każde słowo napisów karaoke, typografia
         jobs = [(t, -1) for t in kept] + [(texts[x["i"]], j) for x in p["texts"] if x.get("kara")

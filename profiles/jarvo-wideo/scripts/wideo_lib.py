@@ -8,6 +8,7 @@ a gdy go brak, doinstalowujemy go tym samym mechanizmem, którego używa narzęd
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import os
@@ -15,6 +16,8 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import time
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -76,6 +79,88 @@ def cache_dir(*parts: str) -> Path:
     p = Path(base, *parts)
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+# ------------------------------------------------------------------ miejsca renderu
+
+RENDER_MIEJSCA = 2          # pełnych renderów naraz na maszynie (JARVO_RENDER_MIEJSCA)
+RENDER_WOLNA = 30.0         # % wolnej pamięci, przy którym kolejny render rusza obok trwającego (JARVO_RENDER_WOLNA)
+
+
+def wolna_pamiec() -> tuple[float, float]:
+    """(procent, GB) dostępnej pamięci: limit kontenera (cgroup v2), gdy jest, a inaczej /proc/meminfo; bez nich (100, 8)."""
+    try:
+        cg = Path("/sys/fs/cgroup")
+        limit = (cg / "memory.max").read_text().strip()
+        if limit.isdigit():
+            wolne = int(limit) - int((cg / "memory.current").read_text().strip())
+            return 100.0 * wolne / int(limit), wolne / 2 ** 30
+    except (OSError, ValueError):
+        pass
+    try:
+        info = dict(line.split(":", 1) for line in Path("/proc/meminfo").read_text().splitlines() if ":" in line)
+        avail, total = (int(info[k].split()[0]) for k in ("MemAvailable", "MemTotal"))
+        return 100.0 * avail / total, avail / 2 ** 20
+    except (OSError, KeyError, ValueError, ZeroDivisionError):
+        return 100.0, 8.0
+
+
+@contextlib.contextmanager
+def miejsce_renderu(co: str = "render", czekaj_s: float = 2.0):
+    """Najwyżej JARVO_RENDER_MIEJSCA (domyślnie 2) pełnych renderów naraz na tej maszynie, a kolejny obok trwającego
+    rusza tylko przy wolnej pamięci ≥ JARVO_RENDER_WOLNA % (domyślnie 30); pierwszy rusza zawsze. Pomysł i liczby
+    z lemo-opuscar (`core/render/slot.mjs`, MIT), u nas blokada `flock` na pliku miejsca, więc padnięty proces
+    zwalnia miejsce sam. Render uruchomiony z renderu (JARVO_RENDER_ZAJETE=1) nie zajmuje drugiego miejsca."""
+    if os.environ.get("JARVO_RENDER_ZAJETE") == "1":
+        yield
+        return
+    import fcntl
+    miejsca = max(1, int(os.environ.get("JARVO_RENDER_MIEJSCA") or RENDER_MIEJSCA))
+    prog = float(os.environ.get("JARVO_RENDER_WOLNA") or RENDER_WOLNA)
+    katalog = Path(os.environ.get("JARVO_RENDER_KATALOG") or Path(tempfile.gettempdir()) / f"jarvo-render-{os.getuid()}")
+    katalog.mkdir(parents=True, exist_ok=True)
+    start, nastepny_komunikat = time.monotonic(), 0.0
+    while True:
+        moje, zajete = None, 0
+        for i in range(miejsca):
+            f = open(katalog / f"miejsce{i}", "a+")
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                zajete += 1
+                f.close()
+                continue
+            if moje is None:
+                moje = f
+            else:
+                fcntl.flock(f, fcntl.LOCK_UN)
+                f.close()
+        if moje is not None and (zajete == 0 or wolna_pamiec()[0] >= prog):
+            break
+        if moje is not None:
+            fcntl.flock(moje, fcntl.LOCK_UN)
+            moje.close()
+        czekam = time.monotonic() - start
+        if czekam >= nastepny_komunikat:
+            powod = "wszystkie miejsca zajęte" if moje is None else f"wolna pamięć < {prog:g}% przy trwającym renderze"
+            print(f"⏳ {co}: czekam na miejsce renderu ({powod}; najwyżej {miejsca} naraz)", file=sys.stderr, flush=True)
+            nastepny_komunikat = czekam + 60
+        time.sleep(czekaj_s)
+    stare = os.environ.get("JARVO_RENDER_ZAJETE")
+    os.environ["JARVO_RENDER_ZAJETE"] = "1"          # podprocesy renderu (ffmpeg, html_wideo z innego skryptu) już w środku
+    try:
+        moje.seek(0)
+        moje.truncate()
+        moje.write(f"{os.getpid()} {co}\n")
+        moje.flush()
+        yield
+    finally:
+        if stare is None:
+            os.environ.pop("JARVO_RENDER_ZAJETE", None)
+        else:
+            os.environ["JARVO_RENDER_ZAJETE"] = stare
+        fcntl.flock(moje, fcntl.LOCK_UN)
+        moje.close()
 
 
 def digest(*items) -> str:
