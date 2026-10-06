@@ -62,21 +62,23 @@ def test_tekst_kanwy_sklejony_w_linie():
   rodzina: 'Inter', waga: 400, kolor: '#ffffff', krycie: 1, rozmiar: 40, ...o});
 console.log(JSON.stringify(H.scal([z('1', 100, 120), z('2', 122, 142), z('zł', 160, 190),
   z('Tytuł', 100, 300, 200), z('Tytuł', 100, 300, 200), z('Inny', 100, 300, 400, {kolor: '#000000', krycie: 0.5}),
-  z('daleko', 900, 1000)])));""")
-    assert [x["tekst"] for x in w] == ["12 zł", "Tytuł", "Inny", "daleko"]   # cyfry po znaku, kontur nie dubluje
+  z('daleko', 900, 1000), z('1', 100, 116, 600), z('1', 130, 146, 600), z('2', 150, 172, 600), z(',', 172, 180, 600),
+  z('0', 180, 202, 600), z('40 plików', 104, 304, 804, {kolor: '#15161c'}), z('40 plików', 100, 300, 800, {kolor: '#ffcb6b'})])));""")
+    # cyfry po znaku, kontur nie dubluje, cyfry o stałej szerokości (szersze odstępy) to jedna liczba, cień pod napisem znika
+    assert [x["tekst"] for x in w] == ["12 zł", "Tytuł", "Inny", "daleko", "112,0", "40 plików"] and w[-1]["kolor"] == "#ffcb6b"
     assert w[0] == {"tekst": "12 zł", "x": 100, "y": 50, "w": 90, "h": 30, "kolor": "#ffffff", "rozmiar": 40,
-                    "krycie": 1, "font": "Inter", "waga": 400, "klucz": '40px "Inter"|#ffffff'}
+                    "krycie": 1, "font": "Inter", "waga": 400, "klucz": '#px "Inter"|#ffffff'}
 
 
 def test_id_napisu_stale_miedzy_probkami():
     """Licznik (8,9 → 130,5), tekst pisany po literze i napis w ruchu zostają jednym napisem dla czasu czytania."""
     w = node("""const P = [], z = (tekst, klucz = 'f|#fff') => ({tekst, klucz});
-const kolejne = [[z('8,9')], [z('16,4'), z('P')], [z('130,5'), z('Przy')], [z('130,5'), z('Przychody'), z('Przychody')],
+const kolejne = [[z('8,9')], [z('16,4'), z('P|')], [z('130,5'), z('Przy|')], [z('130,5'), z('Przychody'), z('Przychody')],
   [z('Koszty'), z('130,5'), z('130,5', 'g|#000')]];
 console.log(JSON.stringify({ id: kolejne.map((f) => H.nadajId(f, P).map((x) => x.tekst + ':' + x.id)),
   rodziny: [H.rodzinaZ('bold 58px PuHui-Bold'), H.rodzinaZ('96px "Cinzel-700", serif'), H.rodzinaZ('600 34px RobotoCondensed')],
   wagi: [H.wagaZ('bold 58px X'), H.wagaZ('600 34px X'), H.wagaZ('26px X')], klucz: 'klucz' in H.nadajId([z('a')], [])[0] }));""")
-    assert w["id"] == [["8,9:k1"], ["16,4:k1", "P:k2"], ["130,5:k1", "Przy:k2"], ["130,5:k1", "Przychody:k2", "Przychody:k3"],
+    assert w["id"] == [["8,9:k1"], ["16,4:k1", "P|:k2"], ["130,5:k1", "Przy|:k2"], ["130,5:k1", "Przychody:k2", "Przychody:k3"],
                        ["Koszty:k4", "130,5:k1", "130,5:k5"]]
     assert w["rodziny"] == ["PuHui-Bold", "Cinzel-700", "RobotoCondensed"] and w["wagi"] == [700, 600, 400]
     assert w["klucz"] is False
@@ -110,3 +112,16 @@ console.log(JSON.stringify([t('Słowa w zdaniu i AI'), t('a² + b² = c²'), t('
            "  .map(s => ({ s, zh: isZh(s), it: /^[a-zA-Z]$/.test(s), gap: 0 }));\n")
     out = node(f"console.log(JSON.stringify(H.latka('t1_3b1b', {json.dumps(kod)})));")
     assert out.strip() == "const toks = text => window.HUASHU_PL.tokeny(String(text)).map(([s, it]) => ({ s, zh: isZh(s), it, gap: 0 }));"
+
+
+def test_zrodlo_wykresu_ciemniejsze():
+    """Szary źródła pod wykresem (#7c868b, 3,7:1 na bieli) ciemniejszy w klipie i w CH.frame: kontrast ≥ 4,5:1."""
+    kod = "c.globalAlpha = MO.seg(lt, 0.2, 0.6); c.font = `400 ${L.srcF.size}px ${CN}`; c.fillStyle = '#7c868b';"
+    w = node(f"console.log(JSON.stringify({{out: H.latka('t3_finance_chart', {json.dumps(kod)}), z: H.ZRODLO}}));")
+    assert "#7c868b" not in w["out"] and w["z"] in w["out"]
+
+    def lum(h: str) -> float:
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    assert 1.05 / (lum(w["z"]) + 0.05) >= 4.5

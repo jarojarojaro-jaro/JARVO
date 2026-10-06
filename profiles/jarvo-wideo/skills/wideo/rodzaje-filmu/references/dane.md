@@ -10,6 +10,7 @@ Nie to: dane tylko jako jedna liczba w haku → rodzaj filmu, do którego należ
 ## Silnik
 | Materiał | Silnik |
 |---|---|
+| wykres pod lektora jak w The Economist (słupki, linia, świece, wielka liczba): osie, potem dane, jedno oznaczenie, liczba staje na słowie | `gramatyki-explainera` (`wykresy`, `gramatyka.py`) |
 | wykres liniowy, słupkowy, kołowy, licznik, bar chart race | `chart-animation` (Remotion) |
 | infografika z ikonami, sekcjami, strzałkami | `animated-infographic` (Remotion) |
 | mapa (trasa, rozkład na terenie) | `remotion-best-practices` (mapy) |

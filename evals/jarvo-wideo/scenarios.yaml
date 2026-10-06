@@ -332,3 +332,15 @@ scenarios:
       should_not:
         - "wypala napisy w obraz (`napisy.py --wypal`) albo oddaje jeden zmiksowany plik dźwięku, gdy silnik dał warstwy osobno"
         - "oddaje film, który nie jest renderem projektu, albo nadpisuje projekt poprawiony już w edytorze (`--nadpisz` bez prośby)"
+
+  - id: wideo-gramatyka-wykresy
+    type: in_scope
+    input: "W explainerze o piekarni jest zdanie: „W pięć lat przychody wzrosły z 16,7 do 130,5 mln zł”. Zrób do niego wykres w pionie na Reelsy, liczby są w briefie Sherlocka."
+    expect:
+      should:
+        - "`gramatyki-explainera`: wybór `wykresy` z `references/wybor.md`, potem tylko karta `wykresy.md`; silnik `narzedzia.py instaluj huashu`"
+        - "`gramatyka.py szablon wykresy --format 9:16 -o out/wideo/src/klip-wykresy/spec.json`: liczby i źródło z `fakty.json` (bez znaczka „dane przykładowe”), tytuł-wniosek z mnożnikiem do policzenia z liczb, słupki przypięte do słów lektora (`slowo` z `os_czasu.json`), `safe.bottom` pod napisy"
+        - "`gramatyka.py sprawdz` z kodem 0, `render --klatki` obejrzany (polskie liczby z przecinkiem, oś od 0, zielony = wzrost), `gramatyka.py pomiar` bez błędów, klip `render -o …mp4` do projektu edytora"
+      should_not:
+        - "wpisuje liczby spoza `fakty.json` albo nazywa 7,8 razy tyle „wzrostem o 7,8 raza”"
+        - "zostawia chińskie napisy silnika albo używa klatek postaci autora silnika w filmie klienta"

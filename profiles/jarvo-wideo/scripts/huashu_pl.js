@@ -12,6 +12,7 @@
 //    z tej samej paczki silnika, które mają ą–ż; nazwa rodziny zostaje, więc kod stylów i gramatyk się nie zmienia;
 // 2. liczby po polsku: TY.fmt z przecinkiem dziesiętnym, twardą spacją tysięcy od 5 cyfr i znakiem minus „−”;
 // 3. napisy wpisane w kod silnika („示意数据” itd.) po polsku, także przy pomiarze szerokości (measureText);
+//    szary źródła pod wykresem ciemniejszy (#5f696e, 5,6:1 na bieli zamiast 3,7:1);
 // 4. postać gramatyki historyjki (TOON.bean) neutralna: włosy zamiast kapelusza, bez okularów i zegarka autora,
 //    kolory z window.POSTAC (marka klienta) albo spokojne domyślne;
 // 5. kontrakt Jarva: window.__seek(t) (prepare + renderFrame), __W/__H z rozmiaru klipu, __teksty() z tekstu
@@ -85,15 +86,20 @@
           || (x.ostatni === q.tekst && Math.abs(x.ox0 - q.x0) < 2 && Math.abs(x.y0 - q.y0) < 2 + 0.2 * r)));
       if (!g) { grupy.push({ ...q, ox0: q.x0, ostatni: q.tekst }); continue; }
       if (g.ostatni === q.tekst && Math.abs(g.ox0 - q.x0) < 2) continue;          // ten sam tekst drugi raz (kontur)
-      g.tekst += (q.x0 - g.x1 > 0.18 * r ? ' ' : '') + q.tekst;
+      // cyfry o stałej szerokości (TY.tabular: każda w swojej komórce) mają odstępy szersze niż litery: to wciąż jedna liczba
+      const liczba = /[\d.,\u00a0−-]$/.test(g.tekst) && /^[\d.,%]/.test(q.tekst);
+      g.tekst += (q.x0 - g.x1 > 0.18 * r && !liczba && !/^\s/.test(q.tekst) ? ' ' : '') + q.tekst;
       g.x0 = Math.min(g.x0, q.x0); g.y0 = Math.min(g.y0, q.y0); g.x1 = Math.max(g.x1, q.x1); g.y1 = Math.max(g.y1, q.y1);
       g.ox0 = q.x0; g.ostatni = q.tekst;
     }
-    return grupy.filter((g) => g.tekst.trim()).map((g) => ({
+    // cień albo obwódka w innym kolorze: ten sam tekst i krój, przesunięty o kilka px, narysowany wcześniej (pod spodem)
+    const cien = (g, i) => grupy.some((h, j) => j > i && h.tekst === g.tekst && h.font === g.font && h.kolor !== g.kolor
+      && Math.abs(h.x0 - g.x0) <= 0.15 * (g.rozmiar || 16) && Math.abs(h.y0 - g.y0) <= 0.15 * (g.rozmiar || 16));
+    return grupy.filter((g, i) => g.tekst.trim() && !cien(g, i)).map((g) => ({
       tekst: g.tekst, x: Math.round(g.x0 * 10) / 10, y: Math.round(g.y0 * 10) / 10,
       w: Math.round((g.x1 - g.x0) * 10) / 10, h: Math.round((g.y1 - g.y0) * 10) / 10,
       kolor: g.kolor || undefined, rozmiar: Math.round(g.rozmiar * 10) / 10, krycie: g.krycie, font: g.rodzina,
-      waga: g.waga, klucz: g.font + '|' + g.kolor,
+      waga: g.waga, klucz: g.font.replace(/[\d.]+px/, '#px') + '|' + g.kolor,     // napis rosnący przy wejściu to ten sam napis
     }));
   }
 
@@ -102,12 +108,12 @@
   const wagaZ = (f) => { const m = /(?:^|\s)(bold|[1-9]00)(?=\s)/.exec(f); return m ? (m[1] === 'bold' ? 700 : +m[1]) : 400; };
 
   // ten sam napis w kolejnych próbkach pomiaru dostaje to samo id (pomiar liczy czas czytania po id): ten sam krój
-  // i kolor, liczby zwinięte do „#” (licznik 8,9 → 130,5 to jeden napis), a tekst pisany po literze to ten sam napis,
-  // dopóki jeden jest początkiem drugiego. Położenie się nie liczy: napis wjeżdżający z boku to wciąż ten sam napis.
+  // i kolor (bez rozmiaru), liczby zwinięte do „#” (licznik 8,9 → 130,5 to jeden napis), a tekst pisany po literze
+  // (z kursorem „|” na końcu albo bez) to ten sam napis, dopóki jeden jest początkiem drugiego. Położenie się nie liczy: napis wjeżdżający z boku to wciąż ten sam napis.
   function nadajId(lista, pamiec) {
     const uzyte = new Set();
     return lista.map((q) => {
-      const t = q.tekst.replace(/[−-]?\d[\d\u00a0 .,]*/g, '#').trim();
+      const t = q.tekst.replace(/[−-]?\d[\d\u00a0 .,]*/g, '#').replace(/[|▌▍_]+$/, '').trim();   // bez kursora pisania
       let m = pamiec.find((p) => p.klucz === q.klucz && !uzyte.has(p.id) && (p.t.startsWith(t) || t.startsWith(p.t)));
       if (!m) { m = { id: 'k' + (pamiec.length + 1), klucz: q.klucz, t }; pamiec.push(m); } else if (t.length > m.t.length) m.t = t;
       uzyte.add(m.id);
@@ -210,6 +216,7 @@
   // i biała koszulka. Łatka podmienia ten fragment przy wczytaniu clips/y4_storytime.js (commit przypięty
   // w narzedzia.py); gdy kod się zmieni i fragment nie pasuje, strona rzuca błąd, zamiast pokazać postać autora
   const P_ = 'window.HUASHU_PL.postac()';
+  const ZRODLO = '#5f696e';                      // 5,6:1 na bieli (WCAG AA dla małego tekstu)
   const LATKI = {
     y4_storytime: [
       ["c.fillStyle = '#FFFFFF'; c.beginPath(); c.ellipse(0, 300, 330, 200, 0, Math.PI, 0);",
@@ -222,6 +229,8 @@
       ["c.beginPath(); c.ellipse(0, -12, 280, 64, 0, 0, 7); c.fill(); c.stroke();", ''],
     ],
     // 3b1b: podział tekstu na tokeny wzoru (tokeny niżej) zamiast angielskiego [A-Za-z]{2,}
+    // wykresy: źródło pod wykresem #7c868b na bieli ma 3,7:1 (pomiar: kontrast poniżej 4,5:1); ten sam szary ciemniej
+    t3_finance_chart: [["c.fillStyle = '#7c868b';", `c.fillStyle = '${ZRODLO}';`]],
     t1_3b1b: [
       ["const toks = text => (String(text).match(/[A-Za-z]{2,}|./gu) || []).flatMap(s => s.length > 1 && !/[a-z]/.test(s) ? [...s] : [s])   // 全大写的一串（QK）是几个变量，拆开\n  .map(s => ({ s, zh: isZh(s), it: /^[a-zA-Z]$/.test(s), gap: 0 }));",
         "const toks = text => window.HUASHU_PL.tokeny(String(text)).map(([s, it]) => ({ s, zh: isZh(s), it, gap: 0 }));"],
@@ -252,7 +261,7 @@
     return kod;
   }
 
-  W.HUASHU_PL = { fonty, fmt, pl, scal, nadajId, rodzinaZ, wagaZ, postac, latka, tokeny, PODMIANY, SLOWNIK };
+  W.HUASHU_PL = { fonty, fmt, pl, scal, nadajId, rodzinaZ, wagaZ, postac, latka, tokeny, PODMIANY, SLOWNIK, ZRODLO };
   if (typeof document === 'undefined') return;                         // node (testy): same czyste funkcje
 
   // ---------- podpięcie w przeglądarce ----------
@@ -260,6 +269,7 @@
   if (W.TY) W.TY.fmt = fmt;
   if (W.CH && W.CH.bars) { const bars = W.CH.bars; W.CH.bars = (c, d, yS, bw, p, o = {}) => bars(c, d, yS, bw, p, { fmt: (v) => fmt(v, 0), ...o }); }
   if (W.TOON && W.TOON.bean) W.TOON.bean = bean;
+  if (W.CH && W.CH.frame) { const frame = W.CH.frame; W.CH.frame = (c, lt, o = {}) => frame(c, lt, { srcCol: ZRODLO, ...o }); }
 
   // gramatyka clips/<nazwa>.js: clip.js pobiera ją adresem względnym (strona filmu leży w katalogu projektu)
   // synchronicznym XHR i wykonuje responseText; tu adres z /_lib/huashu/ i łatki postaci

@@ -13,6 +13,7 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 ## Silnik
 | Styl | Silnik |
 |---|---|
+| fragment lektora w jednej z 8 gramatyk (wykresy, tablica, 3Blue1Brown, kolaż Vox, prezentacja, historyjka z postacią, typografia kinetyczna, Kurzgesagt): klip z jednego spec, cue na słowach lektora | `gramatyki-explainera` (`gramatyka.py`) |
 | diagramy, ikony, schematy, „studio motion design” | własny HTML Canvas/SVG (`kontrakt-html.md`) albo HyperFrames `faceless-explainer` |
 | rysowany, tablica, szkicownik | `anidoodle` |
 | matematyka, algorytm, fizyka | `manim-video` |
@@ -30,8 +31,7 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 | 45–55 | 24–28 | **Przykład z życia** albo zaskakujący wniosek |
 | 55–60 | 28–30 | **Puenta:** koniec odwraca początek (wraca do sytuacji z haka i pokazuje ją inaczej), nie streszcza; CTA tylko, gdy karta go chce |
 
-Tekst lektora według zasad narracji (`scenariusz/references/narracja.md`: start w sytuacji, jedna linia opowieści,
-liczba w skali, którą czuć, koniec odwraca początek); `film.py narracja --sprawdz` łapie to, co widać ze słów.
+Tekst lektora według zasad narracji (`scenariusz/references/narracja.md`: start w sytuacji, jedna linia opowieści, liczba w skali, którą czuć, koniec odwraca początek); `film.py narracja --sprawdz` łapie to, co widać ze słów.
 
 ## Rzemiosło
 - Symuluj zamiast rysować: błądzenie losowe to prawdziwe błądzenie (z ziarnem), orbita liczona z prawa, nie klatki z ręki.

@@ -13,9 +13,9 @@ Mówię konkretem („hook 1,4 s, cięcie co 2,5 s, −14 LUFS”), pokazuję sz
 - warianty do testów A/B (hook, głos, tempo, muzyka, format),
 - montaż nagrań użytkownika: cięcie, usuwanie ciszy, kadr 9:16 z poziomego, dźwięk, napisy,
 - klipy z długich nagrań (podcast, webinar, wywiad) na krótkie formaty,
-- filmy z kodu: 43 style kina (lemo-opuscar), 15 stylów motion design, rysunek, B-roll do nagrań, HyperFrames,
+- filmy z kodu: 43 style kina (lemo-opuscar), 15 stylów motion design, 8 gramatyk explainera, rysunek, B-roll do nagrań, HyperFrames,
   Manim, Remotion, logo w ruchu, Lottie; muzyka kodem,
-- żywe schematy na posty (flota, przepływ zlecenia, architektura, które „działają”; `zywy-schemat`),
+- żywe schematy na posty (przepływ, który „działa”),
 - ujęcia z AI (`video_generate`, obraz → wideo), napisy PL, formaty i bezpieczne strefy platform.
 
 ## Poza zakresem
@@ -47,12 +47,13 @@ research i fakty do scenariusza (→ `jarvo-sherlock` albo jego raport), strony 
 | film z tematu / „zrób reelsa o…” | `krotki-film` (+ `scenariusz`, `material-stock`, `dobor-ujec`) |
 | kilka wersji do testu | `warianty-ab` |
 | surowe nagranie do obróbki | `montaz-nagran` (+ `napisy`) |
-| nagranie z mową → napisy jak z montażu (słowo po słowie, za osobą), prośba z HQ o typografię | `typografia-edit` |
+| nagranie z mową → napisy jak z montażu (słowo po słowie, za osobą) | `typografia-edit` |
 | długi materiał → rolki (edytowalne w HQ, napisy karaoke) | `clipmaker` |
 | demo strony / aplikacji | `demo-strony` |
 | animacja z kodu, film w stylu, B-roll do nagrania, rysunek, muzyka kodem | `film-z-kodu` (tabela silników) |
-| styl motion design (wrząca linia, izometria, morph, HUD, Bauhaus, pixel art…) | `style-motion` (tylko karta stylu) |
+| styl motion design (wrząca linia, izometria, HUD, pixel art…) | `style-motion` (tylko karta stylu) |
 | żywy schemat na post (przepływ, architektura) | `zywy-schemat` |
+| fragment z lektorem: wykres, tablica, 3b1b, Vox… | `gramatyki-explainera` |
 | ujęcia generowane przez AI | `wideo-ai` |
 | lektor, muzyka, głośność | `lektor-i-dzwiek` |
 | wymiary, długości, strefy UI | `formaty-wideo` |
