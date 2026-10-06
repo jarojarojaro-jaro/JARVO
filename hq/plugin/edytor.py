@@ -85,9 +85,11 @@ MAX_DURATION = 3 * 3600.0
 MIN_CLIP = 0.04          # jedna klatka przy 25 fps
 CICHE_CIECIE = 0.025     # mikro-wyciszenie (s) dźwięku na twardym cięciu: cięcie w środku fali daje słyszalny klik
 FPS_ALLOWED = (24, 25, 30, 50, 60)
-# limiter miksu w eksporcie: szczyt −2 dBFS bez podnoszenia całości (level=false), więc po AAC szczyt prawdziwy zostaje
-# pod −1 dBTP, jak chcą platformy i qa_wideo.py (ten sam limit co montaz.py glosnosc)
+# limiter miksu w eksporcie: szczyt −2 dBFS bez podnoszenia całości (level=false), liczony na 4× próbkowaniu (szczyty
+# między próbkami), więc po AAC szczyt prawdziwy zostaje pod −1 dBTP, jak chcą platformy i qa_wideo.py (ten sam limit co
+# montaz.py glosnosc); bez nadpróbkowania transjenty (foley, szarpane struny) wychodziły po AAC na −0,9 dBTP
 LIMIT_EKSPORTU = 0.79
+LIMITER_EKSPORTU = f"aresample=192000,alimiter=limit={LIMIT_EKSPORTU}:level=false,aresample=48000"
 
 
 class ProjectError(ValueError):
@@ -1015,7 +1017,7 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                          f"aformat=sample_fmts=fltp:channel_layouts=stereo,{zan + ',' if zan else ''}adelay={ms}|{ms}[m{k}]")
             mix.append(f"[m{k}]")
         graph.append(f"{''.join(mix)}amix=inputs={len(mix)}:duration=first:normalize=0,"
-                     f"alimiter=limit={LIMIT_EKSPORTU}:level=false[amx]")
+                     f"{LIMITER_EKSPORTU}[amx]")
         alast = "amx"
 
     args += ["-filter_complex", ";".join(graph), "-map", f"[{vlast}]", "-map", f"[{alast}]",

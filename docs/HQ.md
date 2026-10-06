@@ -229,8 +229,8 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i `linked`) i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
 - **Eksport** (`POST /edit/export`): serwer sprawdza projekt (ścieżki tylko z katalogów floty, limity długości
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat albo xfade przy przejściach → nakładki → miks
-  z limiterem: szczyt −2 dBFS bez podnoszenia całości, `edytor.LIMIT_EKSPORTU`, więc po AAC szczyt prawdziwy
-  zostaje pod −1 dBTP, jak chcą platformy i `qa_wideo.py`), H.264 + AAC,
+  z limiterem: szczyt −2 dBFS bez podnoszenia całości, liczony na 4× próbkowaniu, `edytor.LIMITER_EKSPORTU`, więc
+  po AAC szczyt prawdziwy zostaje pod −1 dBTP, jak chcą platformy i `qa_wideo.py`), H.264 + AAC,
   `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
   i dopiero gotowy dostaje nazwę `film-edycja[-N].mp4`: nic nie jest nadpisywane.
   Kadr ma krótszy bok najwyżej 1080 px przy proporcjach źródła (nagranie 4K z iPhone'a 2160×3840 → 1080×1920;

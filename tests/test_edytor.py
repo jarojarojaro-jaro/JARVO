@@ -111,6 +111,8 @@ def test_command_is_argument_list(tmp_path):
     assert "concat=n=2:v=1:a=1" in graph and "anullsrc" in graph        # wyciszony klip = cisza
     assert "crop=" in graph and "atempo=2" in graph
     assert "between(t,0,1)" in graph and "amix=inputs=2" in graph and "adelay=500|500" in graph
+    # limiter bez podnoszenia całości, na 4× próbkowaniu: szczyt po AAC pod −1 dBTP także przy transjentach
+    assert "aresample=192000,alimiter=limit=0.79:level=false,aresample=48000[amx]" in graph
     assert cmd[-1] == str(tmp_path / "o.mp4") and str(png) in cmd
 
 
