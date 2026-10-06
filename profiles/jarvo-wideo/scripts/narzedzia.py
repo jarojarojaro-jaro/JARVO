@@ -2,7 +2,7 @@
 """Narzędzia „wideo z kodu”: sprawdzenie i instalacja raz, we wspólnym katalogu.
 
     python3 narzedzia.py sprawdz                 # co jest gotowe, czego brak (JSON)
-    python3 narzedzia.py instaluj [motion|lemo|anidoodle|animacja|remotion|shotcraft|html|lottie|mg|mgaudio|wszystko]
+    python3 narzedzia.py instaluj [motion|lemo|anidoodle|animacja|remotion|shotcraft|html|lottie|mg|mgaudio|huashu|wszystko]
     python3 narzedzia.py env <narzedzie>         # zmienne środowiska do wklejenia: eval "$(python3 narzedzia.py env motion)"
     python3 narzedzia.py link <katalog>          # <katalog>/node_modules → wspólne (skrypty .mjs nie czytają NODE_PATH)
     python3 narzedzia.py kroje <katalog>         # brakujące kroje z <katalog>/fonts.css: google/fonts (OFL) + polskie znaki
@@ -11,7 +11,9 @@ Narzędzia: motion (motion-broll), lemo (lemo-opuscar), anidoodle, remotion (ski
 shotcraft (video-shotcraft na Remotion), html (html_wideo.py: animacja HTML → klatki / MP4; pixel2motion, iart,
 bang-motion), lottie (oficjalny player Skottie do text-to-lottie + eksport przez html_wideo.py lottie),
 mg (mg-styles-15: kod 15 filmów-wzorów stylów motion design, notatki stylów, okładki, tekstury, kroje wzorów),
-mgaudio (dodatek: muzyka i efekty pisane kodem z mg-styles-15 dla muzyka.py; własny venv ok. 390 MB i sample 56 MB).
+mgaudio (dodatek: muzyka i efekty pisane kodem z mg-styles-15 dla muzyka.py; własny venv ok. 390 MB i sample 56 MB),
+huashu (huashu-art-motion: silnik kanwy 2D z 35 stylami malarskimi i 8 gramatykami explainera, ok. 45 MB z gitem;
+podawany stronom pod /_lib/huashu/, polska nakładka /_lib/jarvo/huashu_pl.js).
 
 Zasady (VPS 8 GB, bez dubli):
 - przeglądarka: Chromium headless z obrazu Hermesa (PLAYWRIGHT_BROWSERS_PATH), nic nie pobieramy; wersja
@@ -22,6 +24,7 @@ Zasady (VPS 8 GB, bez dubli):
   video-shotcraft z indeksem kart galerii, bez jej filmów, edytora workbench i eksportu JianYing;
   mg-styles-15 bez filmów (okładki zostają), strony pokazowej, zdjęć bez opisanego źródła i modeli do Blendera,
   z krojami wzorów z google/fonts (OFL, Apache-2.0; chińskie spoza google/fonts zastępuje Noto Sans SC);
+  huashu-art-motion bez assets/ (filmy pokazowe, plansze, rysunki postaci autora) i danych kresek kroju AR PL (Arphic);
   HDRI do stylów 3D lemo (~12 MB) zawsze; ciężkie assety lemo (głos Kokoro ~340 MB, sample ~1,4 GB) tylko
   z JARVO_EXTRAS „lemo”; mgaudio w `wszystko` tylko z JARVO_EXTRAS „mgaudio” (osobno: `instaluj mgaudio`).
 """
@@ -82,6 +85,14 @@ MGAUDIO_PY = ["numpy==2.4.6", "scipy==1.16.3", "soundfile==0.14.0", "numba==0.66
               "pyloudnorm==0.2.0"]
 MG_SAMPLE = "/lib/audio/samples/"
 MG_DODANE = re.compile(re.escape(MG_SAMPLE))
+# huashu-art-motion (MIT): silnik kanwy 2D (scripts/engine: biblioteki, 35 scen stylów, 8 gramatyk explainera, przejścia,
+# kroje OFL). Bez assets/ (filmy pokazowe 23 MB, plansze przeglądowe i rysunki postaci autora: silnik ich nie używa)
+# i danych kresek kroju AR PL (strokes.js filmu-wzoru spacex: licencja Arphic, nie MIT). Klatki postaci autora
+# w demos/_shared/hero i demos/long_scroll/frames zostają tylko do podglądu ich filmów-wzorów, nigdy w filmie klienta.
+HUASHU = ROOT / "huashu-art-motion"
+HUASHU_REPO = "https://github.com/alchaincyf/huashu-art-motion.git"
+HUASHU_REV = "26dba25b2b495c2138848c29a2c90df356a20325"     # vendor/skills.lock.yaml → huashu-art-motion
+HUASHU_POMIN = ["/assets/", "/scripts/engine/reference_films/spacex/spacex_wb/assets/strokes.js"]
 LOTTIE = ROOT / "lottie-player"
 LOTTIE_REPO = "https://github.com/diffusionstudio/lottie.git"
 LOTTIE_REV = "3c72912fad543897f90045ed4d355813837927fc"      # vendor/skills.lock.yaml → lottie
@@ -97,10 +108,12 @@ PUPPETEER = "puppeteer@24.43.1"
 # (three: MIT; gsap: „Standard no-charge license”, darmowa także komercyjnie)
 HTML_LIBS = ["three@0.186.1", "gsap@3.15.0", "p5@2.3.4"]   # p5: algorithmic-art
 # nasze moduły JS do animacji HTML (ruch.js: charaktery ruchu, smugi; kreska, morph, crt, plotno, piksel: techniki
-# stylów motion design z wzorów mg-styles-15; os_czasu.js: chwile lektora po nazwie z film.py narracja): kopia obok node_modules, bo npm usuwa
+# stylów motion design z wzorów mg-styles-15; os_czasu.js: chwile lektora po nazwie z film.py narracja; huashu_pl.js:
+# polska nakładka na bibliotekę huashu): kopia obok node_modules, bo npm usuwa
 # z node_modules obce katalogi; html_wideo.py i podgląd HQ serwują ją pod /_lib/jarvo/
 JARVO_JS = ROOT / "jarvo-js"
-JARVO_JS_PLIKI = ["ruch.js", "kreska.js", "morph.js", "crt.js", "plotno.js", "piksel.js", "os_czasu.js", "strona.js", "ujecia.js"]
+JARVO_JS_PLIKI = ["ruch.js", "kreska.js", "morph.js", "crt.js", "plotno.js", "piksel.js", "os_czasu.js", "strona.js", "ujecia.js",
+                  "huashu_pl.js"]
 PY_BASE = ["numpy", "pillow"]
 PY_HTML = [f"playwright=={PW_VERSION}", "imageio"]   # imageio: slack-gif-creator (GIF przez Pillow)
 PY_MODULES = {"pillow": "PIL", "kokoro-onnx": "kokoro_onnx", "faster-whisper": "faster_whisper"}
@@ -387,6 +400,18 @@ def install_mg() -> None:
         print(f"! {uwaga}", file=sys.stderr)
 
 
+def install_huashu() -> None:
+    install_html()
+    clone_pinned(HUASHU_REPO, HUASHU_REV, HUASHU, HUASHU_POMIN)
+
+
+def huashu_gotowe() -> bool:
+    """Przypięty commit z bibliotekami silnika, scenami stylów i gramatykami."""
+    silnik = HUASHU / "scripts" / "engine"
+    return ((HUASHU / ".git").exists() and git_head(HUASHU) == HUASHU_REV and (silnik / "lib" / "paint.js").exists()
+            and (silnik / "scenes" / "index.js").exists() and (silnik / "clip.js").exists())
+
+
 def sample_mg() -> Path:
     return MGSTYLES / MG_SAMPLE.strip("/")
 
@@ -500,11 +525,13 @@ def status() -> dict:
               and (MGSTYLES / MG_CJK).exists() and all(npm_installed(p, NODE / "node_modules") for p in MG_LIBS),
         # muzyka kodem (dodatek): kod i sample z przypiętego commitu, indeks sampli bez brakujących plików, venv
         "mgaudio": mgaudio_gotowe(),
+        # style malarskie i gramatyki explainera: przypięty commit silnika
+        "huashu": huashu_gotowe(),
         "pelne_lemo": full_extras(),
     }
 
 
-TOOLS = ("motion", "lemo", "anidoodle", "animacja", "remotion", "shotcraft", "html", "lottie", "mg", "mgaudio")
+TOOLS = ("motion", "lemo", "anidoodle", "animacja", "remotion", "shotcraft", "html", "lottie", "mg", "mgaudio", "huashu")
 
 
 def env_for(tool: str) -> dict:
@@ -512,12 +539,14 @@ def env_for(tool: str) -> dict:
     shell = headless_shell() or ""
     chrome = str(CHROME_WRAPPER) if shell and CHROME_WRAPPER.exists() else shell     # dla puppeteer i CHROME_BIN
     real = {"JARVO_CHROME_REAL": shell} if shell else {}
-    if tool in ("motion", "html", "mg"):
+    if tool in ("motion", "html", "mg", "huashu"):
         env = {**base, "NODE_PATH": str(NODE / "node_modules"), "PYTHON": py(),
                "PATH": f"{VENV / 'bin'}:{os.environ.get('PATH', '')}"}
         if tool == "motion":
             return env
         env = {**env, **real, "CHROME_BIN": chrome, "PUPPETEER_EXECUTABLE_PATH": chrome}
+        if tool == "huashu":
+            return {**env, "HUASHU": str(HUASHU)}
         return {**env, "MGSTYLES": str(MGSTYLES)} if tool == "mg" else env
     if tool == "lemo":
         return {**base, "LEMO_OPUSCAR_HOME": str(LEMO), "LIB": str(LEMO), **({"PLAYWRIGHT_CHROME": shell} if shell else {})}
@@ -746,9 +775,9 @@ def main(argv: list[str] | None = None) -> int:
         what = args[1] if len(args) > 1 else "wszystko"
         steps = {"motion": [install_motion], "lemo": [install_lemo], "anidoodle": [install_anidoodle], "animacja": [install_animacja],
                  "remotion": [install_remotion], "shotcraft": [install_shotcraft], "html": [install_html],
-                 "lottie": [install_lottie], "mg": [install_mg], "mgaudio": [install_mgaudio],
+                 "lottie": [install_lottie], "mg": [install_mg], "mgaudio": [install_mgaudio], "huashu": [install_huashu],
                  "wszystko": [install_motion, install_html, install_anidoodle, install_animacja, install_lemo, install_shotcraft,
-                              install_lottie, install_mg, *([install_mgaudio] if dodatek("mgaudio") else [])]}.get(what)
+                              install_lottie, install_mg, install_huashu, *([install_mgaudio] if dodatek("mgaudio") else [])]}.get(what)
         if not steps:
             raise SystemExit(f"instaluj: {' | '.join(TOOLS)} | wszystko")
         if not headless_shell():

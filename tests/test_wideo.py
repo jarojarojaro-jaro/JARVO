@@ -312,6 +312,10 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     assert lock["sources"]["mg-styles-15"]["rev"] == nz.MGSTYLES_REV        # wzory stylów motion design
     assert "/videos/*.mp4" in nz.MGSTYLES_POMIN and "/demos/18-hanazi/assets/" in nz.MGSTYLES_POMIN
     assert "/demos/19-paperclip/assets/stickers/" in nz.MGSTYLES_POMIN       # zdjęcia bez podanego źródła
+    assert lock["sources"]["huashu-art-motion"]["rev"] == nz.HUASHU_REV     # style malarskie i gramatyki explainera
+    assert "/assets/" in nz.HUASHU_POMIN                                    # filmy pokazowe i postać autora
+    assert any(e.endswith("spacex_wb/assets/strokes.js") for e in nz.HUASHU_POMIN)   # kreski kroju AR PL (Arphic)
+    assert "huashu_pl.js" in nz.JARVO_JS_PLIKI and "huashu" in nz.TOOLS
     assert {"video/remotion-best-practices", "video/bang-motion", "video/pixel2motion", "video/text-to-lottie",
             "video/kinetic-typography", "screenwriting/sw-scene-craft"} <= dests
     # router Remotion zawiera resztę skilli Remotion: osobne kopie byłyby dublami
@@ -330,6 +334,8 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     assert nz.env_for("lottie")["LOTTIE_PLAYER"].endswith("lottie-player")
     mg = nz.env_for("mg")
     assert mg["MGSTYLES"].endswith("mg-styles-15") and mg["CHROME_BIN"] == str(wrapper)
+    hs = nz.env_for("huashu")
+    assert hs["HUASHU"].endswith("huashu-art-motion") and hs["CHROME_BIN"] == str(wrapper) and "MGSTYLES" not in hs
     with pytest.raises(SystemExit):
         nz.env_for("puppeteer-core")
     monkeypatch.setenv("JARVO_EXTRAS", "media lemo")
@@ -618,6 +624,31 @@ def test_html_sheet_and_encode_from_frames(tmp_path):
     assert wl.probe(mov)["video"]["pix_fmt"].startswith("yuva")
 
 
+def test_html_huashu_preset(monkeypatch):
+    """Strony silnika huashu-art-motion: prepare + renderFrame, rozmiar z __size, błąd startu przerywa czekanie."""
+    o = hw.resolve_opts("huashu", query={"film": "gallery"})
+    assert o["serwer"] and o["query"] == {"render": "1", "film": "gallery"}
+    assert "window.prepare" in o["seek"] and "window.renderFrame(t)" in o["seek"]
+    assert o["blad_startu"] == "window.__bootFailed" and "__size" in o["rozmiar_js"]
+    assert hw.resolve_opts("jarvo")["blad_startu"] is None
+
+    import types
+    sync_api = types.ModuleType("playwright.sync_api")
+    sync_api.TimeoutError = type("TimeoutError", (Exception,), {})
+    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", sync_api)
+
+    class Strona:
+        def wait_for_function(self, warunek, timeout):
+            raise sync_api.TimeoutError("czekam")
+
+        def evaluate(self, kod):
+            return "没有这个语法：clips/x.js（HTTP 404）" if "__bootFailed" in kod else None
+
+    with pytest.raises(SystemExit, match="strona nie wstała: .*clips/x.js"):
+        hw.czekaj_gotowe(Strona(), "window.__ready === true", [], "window.__bootFailed")
+
+
 def test_html_jarvo_preset_query_merge_and_subframes():
     o = hw.resolve_opts("jarvo", query={"lang": "pl"})
     assert o["serwer"] and o["query"] == {"render": "1", "lang": "pl"}      # --query dokłada, render=1 zostaje
@@ -632,6 +663,9 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
     nz_mod = sys.modules["narzedzia"]                                     # ten sam moduł, którego używa html_wideo
     monkeypatch.setattr(nz_mod, "NODE", tmp_path / "node")
     monkeypatch.setattr(nz_mod, "JARVO_JS", tmp_path / "jarvo-js")
+    monkeypatch.setattr(nz_mod, "HUASHU", tmp_path / "huashu")
+    (tmp_path / "huashu" / "scripts" / "engine" / "clips").mkdir(parents=True)
+    (tmp_path / "huashu" / "scripts" / "engine" / "clips" / "y2_vox.js").write_text("CLIPS.y2_vox = {};")
     lib = tmp_path / "node" / "node_modules" / "three" / "build"
     lib.mkdir(parents=True)
     (lib / "three.module.js").write_text("export const ok = 1;")
@@ -651,7 +685,12 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
         assert (tmp_path / "jarvo-js" / "ruch.js").read_bytes() == (REPO / "profiles/jarvo-wideo/scripts/ruch.js").read_bytes()
         with urllib.request.urlopen(base + "/_lib/kroje/kroje.css") as r:          # kroje z polskimi znakami (edytor HQ)
             assert b'font-family: "Anton"' in r.read()
-        for zle in ("/_lib/../../sekret.txt", "/_lib/jarvo/../../sekret.txt", "/_lib/kroje/../../../sekret.txt"):
+        with urllib.request.urlopen(base + "/_lib/huashu/clips/y2_vox.js") as r:   # silnik huashu-art-motion
+            assert b"CLIPS.y2_vox" in r.read()
+        with urllib.request.urlopen(base + "/_lib/jarvo/huashu_pl.js") as r:       # polska nakładka na silnik
+            assert b"HUASHU_PL" in r.read()
+        for zle in ("/_lib/../../sekret.txt", "/_lib/jarvo/../../sekret.txt", "/_lib/kroje/../../../sekret.txt",
+                    "/_lib/huashu/../../../../sekret.txt"):
             with pytest.raises(urllib.error.HTTPError):
                 urllib.request.urlopen(base + zle)
     finally:

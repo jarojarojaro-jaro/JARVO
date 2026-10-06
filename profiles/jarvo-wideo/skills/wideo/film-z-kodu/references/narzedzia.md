@@ -1,8 +1,8 @@
 # Silniki zewnętrzne u nas
 
-motion-broll, lemo-opuscar, anidoodle, Remotion (+ iart), video-shotcraft, mg-styles-15, bang-motion, pixel2motion, Lottie.
-Skille silników są w profilu (`skills/video/<nazwa>`, przypięte commity w `vendor/skills.lock.yaml`; video-shotcraft,
-mg-styles-15 i player Lottie instaluje `narzedzia.py`). Ich instrukcje zakładają laptopa z Claude Code; poniżej różnice u nas.
+motion-broll, lemo-opuscar, anidoodle, Remotion (+ iart), video-shotcraft, mg-styles-15, huashu-art-motion, bang-motion,
+pixel2motion, Lottie. Skille silników są w profilu (`skills/video/<nazwa>`, przypięte commity w `vendor/skills.lock.yaml`;
+video-shotcraft, mg-styles-15, huashu-art-motion i player Lottie instaluje `narzedzia.py`). Ich instrukcje zakładają laptopa z Claude Code; poniżej różnice u nas.
 Ścieżka skilla: `SK=$HERMES_HOME/skills/video/<nazwa>` (zmienne nie przeżywają między wywołaniami terminala:
 wklejaj przypisanie w każdym).
 
@@ -187,6 +187,33 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/05-cel-boil/in
   Noto Sans SC. To kroje do podglądu: w naszym filmie kroje z polskimi znakami z `/_lib/kroje/kroje.css`.
 - Tekstura papieru jest CC0; ziarno, kurz i washi z `$MGSTYLES/assets/textures` nie mają podanego źródła:
   tylko do podglądu, w filmie klienta ziarno i kurz robisz sam w kodzie.
+
+## huashu-art-motion (silnik kanwy 2D: 35 stylów malarskich, 8 gramatyk explainera, MIT)
+```bash
+python3 $HERMES_HOME/scripts/narzedzia.py instaluj huashu; eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env huashu)"
+ls $HUASHU/scripts/engine/{lib,scenes,clips}          # biblioteki, sceny-wzory stylów, gramatyki (clip.js czyta spec JSON)
+python3 $HERMES_HOME/scripts/html_wideo.py klatki $HUASHU/scripts/engine/index.html --preset huashu \
+  --query film=demos/y2_vox --czasy 2,6,10 --arkusz out/wideo/wzor-vox.jpg   # ich film-wzór (gallery = 35 stylów)
+```
+- Nasza strona ładuje silnik z `/_lib/huashu/` (= `$HUASHU/scripts/engine/`), a po bibliotekach, przed `clip.js`
+  / `engine.js` i własnym kodem, polską nakładkę `/_lib/jarvo/huashu_pl.js`. Strona ma `<canvas id="c">`, suwak
+  `#scrub` i `#tt` (silnik je czyta) i idzie `--preset jarvo`: nakładka daje `__seek`, `__W`/`__H`, `__teksty`
+  (tekst z kanwy dla pomiaru) i przerywa render od razu, gdy silnik nie wstanie.
+- Nakładka podmienia kroje bez polskich znaków pod tą samą nazwą: PuHui-* i NotoSansSC → Inter (te same grubości),
+  NotoSerifSC → EB Garamond, LXGWWenKai-500 i GochiHand → Caveat 600, LilitaOne → Poppins 800, Rye → Alfa Slab One,
+  UnifrakturMaguntia → IM Fell English, NotoSerifJP → Cormorant Garamond 700. Liczby z `TY.fmt` po polsku
+  (`1234,5`, `12 345 678`, `−3,3`), napisy z kodu silnika po polsku („dane przykładowe”, „Źródło: …”, „oś Y nie
+  zaczyna się od 0”). Postać gramatyki historyjki jest neutralna (włosy, bez kapelusza, okularów i zegarka autora),
+  kolory z `window.POSTAC = {skora, linia, wlosy, koszulka, spodnie, buty}` (marka klienta).
+- Gramatyka 3b1b: polskie słowa (z ą–ż) idą prostym krojem w całości, „w”, „z”, „i” przed słowem nie są zmiennymi,
+  kursywą zostają pojedyncze litery wzoru. `__teksty` daje stałe id napisu (licznik, pisanie po literze = jeden napis)
+  i krój bez rozmiaru, więc `pomiar` liczy czas czytania i kroje zastępcze jak na stronie DOM. Łatki kodu gramatyk
+  pasują do przypiętego commitu silnika; inny kod = błąd strony („łatka … nie pasuje”), nie postać autora.
+- `--preset huashu` służy tylko do obejrzenia ich stron (film-wzór, galeria): bez nakładki, z ich krojami.
+- Klatki postaci autora (`demos/_shared/hero`, `demos/long_scroll/frames`) są tylko do podglądu ich filmów-wzorów,
+  nigdy w filmie klienta. `instaluj huashu` nie pobiera `assets/` (filmy pokazowe, plansze, rysunki postaci) ani
+  kresek chińskiego kroju AR PL (`strokes.js`, licencja Arphic). Ich `render.py`, `qa.py` i uv nie są nam potrzebne:
+  render, pomiar i kontrola są nasze (`html_wideo.py`, `krytyka.py`, `qa_wideo.py`).
 
 ## Animacja HTML → wideo: `html_wideo.py` (nasza animacja, iart kinetic-typography, bang-motion, pixel2motion)
 ```bash

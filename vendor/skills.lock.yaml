@@ -133,6 +133,18 @@ sources:
     # instaluje na żądanie scripts/narzedzia.py Wideografa (`instaluj mg`), bez filmów, strony pokazowej, zdjęć bez
     # opisanego źródła i modeli do Blendera (MGSTYLES_POMIN); kroje wzorów z google/fonts (kroje_mg). Dodatek
     # `instaluj mgaudio` dokłada sample VCSL (CC0, lib/audio/samples) do tego samego klonu dla muzyka.py.
+  huashu-art-motion:
+    type: git
+    repo: https://github.com/alchaincyf/huashu-art-motion
+    rev: 26dba25b2b495c2138848c29a2c90df356a20325
+    license: MIT
+    license_file: LICENSE
+    # silnik kanwy 2D: 35 stylów malarskich (sceny-wzory), 8 gramatyk explainera (clips), biblioteki wykresów,
+    # schematów, typografii i ruchu, kroje OFL (lib/fonts/LICENSES.md). Nie kopiujemy do profilu: ten sam commit
+    # instaluje na żądanie scripts/narzedzia.py Wideografa (`instaluj huashu`), bez assets/ (filmy pokazowe,
+    # plansze, rysunki postaci autora: poza MIT) i strokes.js (kreski kroju AR PL, licencja Arphic) (HUASHU_POMIN).
+    # Klatki postaci autora w demos/_shared/hero i demos/long_scroll/frames: tylko podgląd ich filmów-wzorów.
+    # Polska nakładka (kroje z ą–ż, liczby, napisy, neutralna postać, kontrakt jarvo): scripts/huashu_pl.js.
   lottie:
     type: git
     repo: https://github.com/diffusionstudio/lottie

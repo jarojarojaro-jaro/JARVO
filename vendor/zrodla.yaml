@@ -84,6 +84,11 @@ zrodla:
     repo: https://github.com/heygen-com/hyperframes
     status: uzywane
     przejrzane: 8798e40da8d56b2f0f3be0b74198d0cbbec1dc06
+  huashu-art-motion:
+    repo: https://github.com/alchaincyf/huashu-art-motion
+    status: uzywane
+    przejrzane: 26dba25b2b495c2138848c29a2c90df356a20325
+    notatka: "MIT: 35 stylów malarskich i 8 gramatyk explainera (silnik kanwy 2D, instaluj huashu, /_lib/huashu/), polska nakładka huashu_pl.js; bez assets/, postaci autora i strokes.js (Arphic); wersja we flocie to rev w skills.lock.yaml i HUASHU_REV w narzedzia.py (ten sam commit); zatwierdzone 2026-10-06"
   iart-data-animation:
     repo: https://github.com/iart-ai/data-animation-skills
     status: uzywane

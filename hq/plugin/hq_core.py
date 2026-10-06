@@ -639,24 +639,28 @@ def is_animation(p: Path) -> bool:
 
 # wspólne biblioteki animacji (three, gsap) z katalogu narzędzi Wideografa: ten sam /_lib/ co w html_wideo.py
 LIB_ROOT = Path(os.environ.get("JARVO_NARZEDZIA", str(JARVO_DIR / "narzedzia"))) / "node" / "node_modules"
-# /_lib/jarvo/… = moduły Wideografa (ruch.js, kreska.js, morph.js, crt.js, plotno.js, piksel.js, os_czasu.js), kopia z narzedzia.py sync_jarvo_js (instaluj html, każdy html_wideo.py)
+# /_lib/jarvo/… = moduły Wideografa (ruch.js, kreska.js, morph.js, crt.js, plotno.js, piksel.js, os_czasu.js, huashu_pl.js…), kopia z narzedzia.py sync_jarvo_js (instaluj html, każdy html_wideo.py)
 JARVO_JS_ROOT = LIB_ROOT.parent.parent / "jarvo-js"
 # /_lib/kroje/… = kroje OFL z polskimi znakami, te same pliki co edytor HQ (animacja: <link href="/_lib/kroje/kroje.css">)
 _TU = Path(__file__).resolve().parent
 KROJE_ROOT = next((d for d in (_TU / "dist" / "fonts" / "kroje", _TU.parent / "web" / "fonts" / "kroje")
                    if (d / "kroje.css").is_file()), _TU / "dist" / "fonts" / "kroje")
+# /_lib/huashu/… = silnik huashu-art-motion (style malarskie, gramatyki explainera), instalacja narzedzia.py instaluj huashu
+HUASHU_ROOT = LIB_ROOT.parent.parent / "huashu-art-motion" / "scripts" / "engine"
 
 
 def lib_file(rel: str, root: Path | None = None, jarvo_root: Path | None = None,
-             kroje_root: Path | None = None) -> Path | None:
-    """Plik biblioteki spod node_modules narzędzi, `jarvo/…` z modułów Wideografa albo `kroje/…` z krojów edytora
-    (bez ukrytych, bez wyjścia poza katalog, także symlinkiem)."""
+             kroje_root: Path | None = None, huashu_root: Path | None = None) -> Path | None:
+    """Plik biblioteki spod node_modules narzędzi, `jarvo/…` z modułów Wideografa, `kroje/…` z krojów edytora albo
+    `huashu/…` z silnika huashu-art-motion (bez ukrytych, bez wyjścia poza katalog, także symlinkiem)."""
     root = (root or LIB_ROOT)
     parts = [x for x in rel.split("/") if x]
     if not parts or any(x.startswith(".") or "\x00" in x or "\\" in x for x in parts):
         return None
-    if parts[0] in ("jarvo", "kroje"):
-        root, parts = ((jarvo_root or JARVO_JS_ROOT) if parts[0] == "jarvo" else (kroje_root or KROJE_ROOT)), parts[1:]
+    if parts[0] in ("jarvo", "kroje", "huashu"):
+        root = {"jarvo": jarvo_root or JARVO_JS_ROOT, "kroje": kroje_root or KROJE_ROOT,
+                "huashu": huashu_root or HUASHU_ROOT}[parts[0]]
+        parts = parts[1:]
         if not parts:
             return None
     try:

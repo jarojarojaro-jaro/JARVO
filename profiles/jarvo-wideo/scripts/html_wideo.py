@@ -19,7 +19,10 @@ i powtarzalne niezależnie od szybkości maszyny. Uprząż: parametr w URL (--pa
 strona czyta go przy wczytaniu i pauzuje) albo funkcja seek w JS (--seek "t => tl.seek(t)", bez przeładowań).
 Presety (flagi je nadpisują):
   jarvo          nasz kontrakt (rodzaje-filmu/references/kontrakt-html.md): window.__seek(t), window.__ready,
-                rozmiar z window.__W/__H, strona z lokalnego serwera: biblioteki z /_lib/ (three, gsap), bez CDN
+                rozmiar z window.__W/__H, strona z lokalnego serwera: biblioteki z /_lib/ (three, gsap), bez CDN;
+                /_lib/huashu/ = silnik huashu-art-motion (`narzedzia.py instaluj huashu`), /_lib/jarvo/huashu_pl.js
+  huashu        strony silnika huashu-art-motion (index.html ?film=gallery|demos/<gramatyka>, clip.html):
+                window.prepare(t) + renderFrame(t), gotowe: window.__ready, rozmiar z window.__size (domyślnie 1920×1080)
   iart          ?t=<s>, gotowe: window.__ready        (kinetic-typography, chart-animation, lower-thirds…)
   pixel2motion  ?t=<ms>, gotowe: window.__p2mReady, kadr #logo-root
   bang          window.OPENER.seek(t), ?clean=1, rozmiar z OPENER.W/H (bang-motion; zamiast snap/export-frames.mjs)
@@ -89,12 +92,16 @@ PRESETS: dict[str, dict] = {
     # mg-styles-15: jak ich harness/render.mjs (renderAt + animacje CSS/WAAPI zatrzymane w chwili t)
     "mg": {"seek": MG_SEEK, "gotowe": "window.__ready === true", "serwer": True, "aliasy": "mg",
            "rozmiar_js": "[(window.DEMO || {}).width || 1920, (window.DEMO || {}).height || 1080]"},
+    # huashu-art-motion: ich render.py robi to samo (prepare dociąga zasoby odcinka, renderFrame rysuje klatkę t)
+    "huashu": {"seek": "async (t) => { if (window.prepare) await window.prepare(t); window.renderFrame(t); }",
+               "gotowe": "window.__ready === true", "serwer": True, "query": {"render": "1"},
+               "blad_startu": "window.__bootFailed", "rozmiar_js": "window.__size || [1920, 1080]"},
     "livepanel": {"seek": "(t) => { window.seek(t); }", "gotowe": "window.__ready === true", "query": {"manual": "1"},
                   "rozmiar_js": "[parseInt(document.getElementById('stage').style.width) || 1200, "
                                 "parseInt(document.getElementById('stage').style.height) || 1500]"},
 }
 DEFAULTS = {"param": "t", "jednostka": "s", "gotowe": None, "seek": None, "selektor": None, "query": {},
-            "rozmiar_js": None, "serwer": False, "aliasy": None}
+            "rozmiar_js": None, "serwer": False, "aliasy": None, "blad_startu": None}
 # --disable-accelerated-2d-canvas: płótno 2D rysowane na CPU. Na GPU (swiftshader) płótno tylko wyczyszczone (np. nakładka
 # ze smugą, gdy nic nie leci) trafiało do zrzutu ze starą treścią sprzed dwóch klatek; szybkość renderu ta sama.
 BROWSER_ARGS = ["--enable-webgl", "--ignore-gpu-blocklist", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
@@ -231,9 +238,10 @@ def _page(browser, size: tuple[int, int], scale: float, errors: list[str]):
     return page
 
 
-def czekaj_gotowe(page, warunek: str, errors: list[str]) -> None:
+def czekaj_gotowe(page, warunek: str, errors: list[str], blad_startu: str | None = None) -> None:
     """Czeka na gotowość strony; gdy nie przyjdzie, mówi dlaczego (błędy JS, brakujące pliki), a nie sam timeout.
-    Błąd JS (nie brak pliku) bez gotowości przez PO_BLEDZIE_JS_MS kończy czekanie od razu: strona już nie wstanie."""
+    Błąd JS (nie brak pliku) bez gotowości przez PO_BLEDZIE_JS_MS kończy czekanie od razu: strona już nie wstanie.
+    `blad_startu` (JS): komunikat strony, która sama złapała swój błąd startu (huashu: window.__bootFailed)."""
     from playwright.sync_api import TimeoutError as PlaywrightTimeout
     krokow, po_bledzie, blad_w = TIMEOUT_MS // KROK_GOTOWOSCI_MS, PO_BLEDZIE_JS_MS // KROK_GOTOWOSCI_MS, None
     for n in range(1, krokow + 1):
@@ -242,6 +250,8 @@ def czekaj_gotowe(page, warunek: str, errors: list[str]) -> None:
             return
         except PlaywrightTimeout:
             pass
+        if blad_startu and (msg := page.evaluate(f"() => {blad_startu}")):
+            raise SystemExit(f"strona nie wstała: {str(msg)[:400]}")
         if blad_w is None and any(not e.startswith("brak pliku ") for e in errors):
             blad_w = n
         if n == krokow or (blad_w is not None and n - blad_w >= po_bledzie):
@@ -259,7 +269,7 @@ def capture(src: str, times: list[float], names: list[str], out_dir: Path, o: di
 
     def settle(page) -> None:
         if o["gotowe"]:
-            czekaj_gotowe(page, o["gotowe"], errors)
+            czekaj_gotowe(page, o["gotowe"], errors, o["blad_startu"])
         page.evaluate(FONTS)
         page.evaluate(RAF2)
 
@@ -440,6 +450,7 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
     lib_root: Path | None = None      # /_lib/… → wspólne node_modules narzędzi (three, gsap)
     jarvo_root: Path | None = None    # /_lib/jarvo/… → nasze moduły (ruch.js, kreska.js…)
     kroje_root: Path | None = None    # /_lib/kroje/… → kroje OFL z polskimi znakami (kroje.css, te same co edytor HQ)
+    huashu_root: Path | None = None   # /_lib/huashu/… → silnik huashu-art-motion (scripts/engine: lib, scenes, clips)
     aliasy: dict[str, Path] = {}      # preset mg: /assets/, /demos/, /node_modules/ spoza katalogu strony
 
     def translate_path(self, path: str) -> str:
@@ -450,6 +461,8 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
                 root, rel = self.jarvo_root.resolve(), rel[len("jarvo/"):]
             elif self.kroje_root is not None and rel.startswith("kroje/"):
                 root, rel = self.kroje_root.resolve(), rel[len("kroje/"):]
+            elif self.huashu_root is not None and rel.startswith("huashu/"):
+                root, rel = self.huashu_root.resolve(), rel[len("huashu/"):]
             target = (root / rel).resolve()
             return str(target) if root in target.parents else str(root / "__poza_lib__")
         for prefiks, katalog in self.aliasy.items():
@@ -472,7 +485,8 @@ def aliasy(o: dict) -> dict[str, Path]:
 
 def serve(root: Path, lib: bool = False, alias: dict[str, Path] | None = None) -> http.server.ThreadingHTTPServer:
     handler = (type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules", "jarvo_root": nz.sync_jarvo_js(),
-                                        "kroje_root": KROJE, "aliasy": alias or {}})
+                                        "kroje_root": KROJE, "huashu_root": nz.HUASHU / "scripts" / "engine",
+                                        "aliasy": alias or {}})
                if lib else _Quiet)
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(handler, directory=str(root)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -565,7 +579,7 @@ def zmierz(src: str, o: dict, dlugosc: float, hz: float, size: tuple[int, int], 
 
             def settle() -> None:
                 if o["gotowe"]:
-                    czekaj_gotowe(page, o["gotowe"], errors)
+                    czekaj_gotowe(page, o["gotowe"], errors, o["blad_startu"])
                 page.evaluate(FONTS)
                 page.evaluate(RAF2)
             if o["seek"]:

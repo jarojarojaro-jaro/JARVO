@@ -134,6 +134,14 @@ def test_biblioteki_lib_tylko_z_node_modules(tmp_path):
     assert core.lib_file("kroje/kroje.css", nm, js, kr) == (kr / "kroje.css").resolve()
     for zle in ("kroje", "kroje/../sekret.txt", "kroje/brak.woff2"):
         assert core.lib_file(zle, nm, js, kr) is None, zle
+    # huashu/… = silnik huashu-art-motion (style malarskie, gramatyki explainera) z katalogu narzędzi
+    hs = tmp_path / "engine"
+    (hs / "lib").mkdir(parents=True)
+    (hs / "lib" / "paint.js").write_text("// paint", encoding="utf-8")
+    assert core.lib_file("huashu/lib/paint.js", nm, js, kr, hs) == (hs / "lib" / "paint.js").resolve()
+    for zle in ("huashu", "huashu/", "huashu/../sekret.txt", "huashu/lib/brak.js"):
+        assert core.lib_file(zle, nm, js, kr, hs) is None, zle
+    assert core.HUASHU_ROOT.parts[-3:] == ("huashu-art-motion", "scripts", "engine")
     assert (core.KROJE_ROOT / "kroje.css").is_file()                    # w repo: hq/web/fonts/kroje
 
 
