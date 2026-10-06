@@ -1,7 +1,7 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.11.0
+version: 3.12.0
 author: Jarvo
 license: MIT
 metadata:
@@ -97,6 +97,18 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 13. **Film = projekt edytora:** każdy film z kodu oddajesz jako projekt HQ (`projekt.py z-kodu`, `references/projekt-edytora.md`):
    obraz bez wypalonych napisów, głos i efekty przypięte do obrazu, muzyka osobno, napisy tekstem; film to render
    projektu. Właściciel sam wytnie ujęcie, zdejmie muzykę albo poprawi napis.
+14. **Długi film z odcinków: najpierw szkielet.** Wspólne stałe (linia gruntu, wzrost postaci, prędkość, paleta),
+   interfejs odcinka i czas z osi całego filmu, potem odcinki, także równolegle (`delegate_task`: każdy dostaje
+   szkielet, wzorcowe ujęcie i samokontrolę). Zdarzenia liczysz od osi filmu albo początku interakcji, nie „sekundę X
+   od wejścia w odcinek”. W huashu tak złożone 24 odcinki od 4 grup skleiły się za pierwszym razem.
+15. **Szablon i parametry sprawdzasz na nieprzyjaznych danych:** długi tytuł, liczby ujemne i ułamki, pion, brak
+   zrzutu, przezroczyste tło (`parametry.json`, spec gramatyki). Dobry film pokazowy to jeszcze nie dobry szablon:
+   z 8 gramatyk huashu po sparametryzowaniu tylko 3 nadawały się wprost.
+16. **Bez dokładanych gagów:** ozdoba albo gag fabularny, o który właściciel nie prosił, idzie jako propozycja
+   (próbka albo zdanie w RAPORT.md), nie do filmu. Uwaga recenzji „czegoś brakuje” to informacja, nie zgoda.
+17. **Wybrana wersja jest zamrożona:** gdy właściciel wybrał wersję, kod, oś czasu, miks i napisy zostają jak są;
+   kandydaci i wersja wybrana leżą w `out/wideo/src/<film>/`, poprawki idą do nowej wersji, bez potwierdzenia nic
+   nie nadpisujesz.
 
 ## Kroki
 1. **Rodzaj, brief i format** (`rodzaje-filmu`, `formaty-wideo`): plik rodzaju → `out/wideo/src/BRIEF.md`

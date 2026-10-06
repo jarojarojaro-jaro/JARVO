@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.6.0
+version: 1.7.0
 author: Jarvo
 license: MIT
 metadata:
@@ -63,6 +63,8 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 2. **Oglądanie:** `vision_analyze` na arkuszu (`qa.jpg`: klatki 0 s, 0,5 s, 1,5 s, ¼, ½, ¾, koniec; czerwone pola =
    strefy UI). Pytania: czy hook jest czytelny w klatce 0–1,5 s? czy napisy/tekst/logo wchodzą w czerwone pola?
    czy ujęcia pasują do tekstu? artefakty, znaki wodne, obcy tekst? Dodatkowo `SCENARIUSZ.md` i `.srt` (błędy w słowach).
+   Film z liczbami i mechanizmem: czy logika się zgadza, nie tylko obraz (oś od 0 albo podpisana, jednostka, źródło,
+   „o 9 razy” kontra „do 9-krotności”, ten sam koniec serii na dwóch wykresach, strzałka w dobrą stronę).
 3. **Ocena** wg `references/rubryka.md`: start 100, odejmowanie za każdą różnicę; każda różnica ma
    **najmniejszą poprawkę** (konkretna scena, konkretne pole planu albo polecenie).
 4. **Werdykt** `out/wideo/<film>/kontrola.json`:
@@ -85,6 +87,14 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    i ramki, tytuł na gradiencie, rozmyty skalowany tekst, martwy takt, szarpnięcie na szwie pętli.
    Zapisz w `kontrola.json` pola `osie` (7 liczb) i `problemy` (3 najgorsze, każdy z `t` w sekundach i poprawką).
    Popraw 3 najgorsze, wyrenderuj ponownie tylko te sekundy (gdy silnik pozwala), nowa runda.
+   - **Niezależny recenzent:** film z wielu odcinków albo dłuższy niż 60 s ogląda też podagent (`delegate_task`),
+     który dostaje tylko gotowy film, arkusze i brief, bez kodu. Autor nie widzi własnych błędów: w huashu recenzja
+     złapała „dwie głowy”, „pięć razy podnosi filiżankę” i spóźnione przejścia po 3 rundach autora.
+   - **Dziennik problemów** w `krytyka.md`: każdy problem z czasem, przyczyną, zmianą i ponownym sprawdzeniem; powrót
+     starego problemu zapisujesz osobno od nowego. Ten sam typ problemu trzy rundy z rzędu i dwie różne poprawki
+     nie działają → wracasz do materiału albo możliwości silnika, nie łatasz trzeci raz.
+   - **Własną kontrolę też sprawdzasz:** bramkę albo skrypt sprawdzający, który napisałeś do filmu, raz celowo
+     zepsuj (usuń scenę, brakujący znak) i zobacz, że świeci na czerwono.
    `krytyka.py ocena kontrola.json` = 0 dopiero, gdy **każda oś ≥ 8**. Maks. 3 rundy; potem oddajesz
    z uczciwie nazwanymi brakami. Historia rund (osie + problemy) w `out/wideo/<film>/krytyka.md`.
 5. **Poprawki:** REVISE → popraw plan/pliki wg `roznice`, render, nowa runda (`runda` + 1). Najwyżej 2 rundy poprawek;

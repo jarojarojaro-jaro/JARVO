@@ -2,7 +2,8 @@
 
 Czytasz przy każdej własnej animacji (HTML, Remotion, lemo) obok pliku rodzaju. Skąd: video-shotcraft (Apache-2.0:
 charaktery ruchu, oddech, tempo, uderzenia, jeden bohater na otwarcie, blask), video-talkcraft i anything2explainer
-(licencja niekomercyjna: wzięte tylko pomysły i liczby, opisane po naszemu, bez ich kodu i tekstu).
+(licencja niekomercyjna: wzięte tylko pomysły i liczby, opisane po naszemu, bez ich kodu i tekstu), huashu-art-motion
+(MIT: zasady sprawdzone na 36 stylach i 8 gramatykach, z dowodami w `style-malarskie/references/zasady-huashu.md`).
 Kod: `/_lib/jarvo/ruch.js` (charaktery, lądowanie, wyjście, smugi), kontrola: `html_wideo.py pomiar`.
 
 ## 1. Charakter ruchu z marki (przed pierwszą klatką)
@@ -57,6 +58,11 @@ akcentu i kroju nagłówka, dowód w `dlaczego`). Sprawdzian: opisz ruch gotoweg
   zdążyć to powtórzyć); główna akcja otwarcia może trwać ≥ 3 s, gdy co chwilę coś się w niej zmienia.
 - **Szybkość z przyspieszenia, nie ze stałej prędkości.** Żadnego ruchu liniowego. Seria elementów wchodzi coraz
   szybciej (jak rozdawanie kart), potem 0,5 s spokoju.
+- **Na bicie odsłonięcie, nie start ruchu.** Wejście pod bit zaczyna się wcześniej: start = bit − chwila odsłonięcia
+  w ruchu × długość ruchu, a w klatce bitu widać zmianę na całym ekranie (przy przejściu ruszają obie warstwy, stara
+  i nowa). W huashu uderzenie samą nową warstwą spóźniało 6 z 15 przejść o 0,1–0,17 s.
+- **Otwarcie maluje się samo:** pierwszy obraz powstaje procesem swojego materiału (kreska się wypisuje, kolory druku
+  spadają warstwami, piksele zapalają się wierszami, wykres najpierw stawia osie). Klatka 0 nie jest pustym tłem.
 - **Ruch z treści, nie wypełniacz:** czasownik z lektora ma swoją czynność na ekranie (dane płyną, kropki biegną,
   coś się zapełnia). Bez sztucznego „pływania” i „oddychania” elementów, żeby tylko coś się ruszało.
 
@@ -86,6 +92,10 @@ jak w dokumencie. Zasady:
   pojawienie się głównego pojęcia i ewentualnie puenta. Pozostałe ważne chwile mają skromniejsze wersje.
 - **Uderzenia całego kadru najwyżej 3 na film** (pompa skali całego obrazu, wstrząs, klatka błysku, negatyw):
   tylko na najmocniejszych bitach, daleko od siebie. Pozostałe bity ruszają same elementy, nie cały kadr.
+- **Kadr z informacją składasz po kolei:** najpierw struktura (osie, układ, płótno), potem dane, na końcu oznaczasz
+  jedną rzecz. Tak samo przy budowie: najpierw obiekty, relacje i kamera, faktura i ozdoby na końcu.
+- **Małe rzeczy rób większe, niż podpowiada intuicja:** rozpoznawalny motyw i rekwizyt sprawdzasz na stopklatce
+  w rozmiarze docelowym (w testach huashu motywy trzeba było powiększyć 1,35–2×, zanim dało się je odczytać).
 - **Kamera stoi pewnie:** w filmie produktu bez drgań „z ręki”. Odblask przesuwający się po elemencie raz na ujęcie,
   tylko na bohaterze, przycięty do jego zaokrąglonych rogów.
 
@@ -103,12 +113,19 @@ kamery po obu stronach biegnie w tę samą stronę.
 | Odjazd w chłód | wszystko gaśnie, barwa chłodnieje | start z mniejszej skali, odjazd | `fadeblack` długie |
 | Rozsypanie | bohater rozpada się na drobiny | nowa scena składa się z drobin w tym samym miejscu | brak (tylko w kodzie) |
 
+- **Kamera to funkcja czasu filmu, przejście tylko składa dwa ujęcia.** Najazd w przejściu prowadzi dalej kamerę
+  starego ujęcia (w wektorach), nie powiększa wyrenderowanej klatki. Najazd przez okrągły obiekt kończy się
+  powiększeniem ≥ połowa przekątnej kadru / promień obiektu (1920×1080: ≥ 1100 / r), inaczej ostatnia klatka skacze.
+- **Ruch ciągły przez cięcie:** postać albo przedmiot widoczny po obu stronach przejścia liczy ruch z czasu całego
+  filmu `t`, nie od nowa w każdym ujęciu (inaczej widz widzi „pięć razy podnosi filiżankę” zamiast jednej chwili).
 - **Czarne uderzenie raz na film**, na największym zwrocie. Odjazd w chłód pasuje na koniec i do spokojnych marek.
 - **Ukryte cięcia:** przez przedmiot z pierwszego planu (przesłania kadr i odsłania nowy), dopasowanie kształtu
   (koło → koło w tym samym miejscu i rozmiarze), linia, która przechodzi w ramkę następnego ujęcia (raz na film,
   jako znak rozpoznawczy).
 - **Jedno długie ujęcie** zamiast cięć: cała treść na jednym dużym płótnie, kamera jedzie od miejsca do miejsca
-  (≤ 1,5 szerokości kadru na sekundę), treść pojawia się, gdy kamera się zbliża.
+  (≤ 1,5 szerokości kadru na sekundę), treść pojawia się, gdy kamera się zbliża. Kamera jedzie tylko do przodu:
+  jej pozycja to największa dotąd wartość celu z wygładzeniem, więc na postojach nie cofa się (w huashu cofanie
+  o 68–256 px w 17 z 24 odcinków widz zauważył od razu).
 
 ## 6. Szybki ruch bez motion bluru
 Rozmycie ruchu (`html_wideo.py --subklatki N`) wydłuża render N razy, więc go nie używamy (tylko na wyraźną prośbę
@@ -122,7 +139,22 @@ właściciela). Szybki ruch rysujesz sam, w animacji:
 - **Linie prędkości:** 3–6 cienkich kresek za obiektem przez 0,1–0,2 s.
 Nigdy na tekście, który widz ma przeczytać.
 
-## 7. Kontrola
+## 7. Obraz żyje, ale nie migocze
+- **Ruch główny i 2–4 pętle z motywów treści** (żywy obraz, scena stylu, tło pod lektora): jedna czynność główna,
+  w tle małe pętle wzięte z tego, co jest w kadrze (para z filiżanki, liście, światło na wodzie). W huashu 16 scen
+  według tej zasady ruszało 1,6–14% kadru bez skoków. Pętla bez związku z treścią to wypełniacz (rozdz. 2).
+- **Bez nowego losu co kilka klatek:** faktura i pole kierunków zmieniają się płynnie z czasem (szum od `t`),
+  pociągnięcia i ziarno stoją. Nowe ziarno całego kadru 8 razy na sekundę zmienia więcej pikseli niż przejście i widz
+  widzi migotanie. „Wrzenie” tylko linii rysunku (`style-motion`, `kreska.js`).
+- **Przewijany wzór zawijasz modulo jego prawdziwego okresu** (kropki w siatce sześciokątnej: dwa rzędy, nie odstęp
+  kropek; meander, fryz, taśma: cały powtarzalny kawałek), inaczej w klatce zawinięcia wzór skacze.
+- **Bezruch z gramatyki to nie zacięcie:** napis po wylądowaniu stoi, opowieść stoi na puencie, a ruch dają kamera
+  i tło. Pod mową wolno (przestoje pilnuje zasada tempa, rozdz. 2); ostrzeżenie `martwy_odcinek` przy takim bezruchu
+  opisujesz wyjątkiem z powodem.
+- **Nieruchome raz, co klatkę tylko to, co się rusza:** tło i stałe warstwy rysujesz raz na osobną kanwę i kopiujesz;
+  czas klatki mierzysz prawdziwym renderem (`html_wideo.py klatki --czasy`), nie czasem samego JS.
+
+## 8. Kontrola
 `krytyka.py tempo` (zasada tempa, rozdz. 2) blokuje: przestój ≥ 2 s albo luka obrazu > 6 s pod mową to poprawka.
 `html_wideo.py pomiar` (ostrzeżenia, nie blokują): `pusta_scena` (największy obiekt < 15% krótszego boku
 dłużej niż 1,5 s), `bez_oddechu` (ujęcie ≥ 2 s ma < 0,8 s spokoju przed przejściem; wyjście starego i wejście

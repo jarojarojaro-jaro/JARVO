@@ -1,7 +1,7 @@
 ---
 name: rodzaje-filmu
 description: "Rodzaj filmu → jeden plik: silnik, struktura, rzemiosło."
-version: 1.7.0
+version: 1.8.0
 author: Jarvo
 license: MIT
 metadata:
@@ -40,7 +40,7 @@ opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprz
 
 ## Kroki
 1. Rodzaj z indeksu → jego plik. Każdy film z kodu → też `references/ruch-i-kompozycja.md` (charakter ruchu z marki,
-   oddech, jeden bohater, przejścia, smugi zamiast motion bluru; kod: `ruch.js`). Własna animacja HTML (Canvas, SVG, Three.js, GSAP)
+   oddech, jeden bohater, przejścia, smugi zamiast motion bluru, obraz żywy bez migotania; kod: `ruch.js`). Własna animacja HTML (Canvas, SVG, Three.js, GSAP)
    → też `references/kontrakt-html.md`.
    **Film-wzór** („zrób coś takiego”): `kadry.py wzor wzor.mp4` (klatki co 0,5 s, cięcia, rytm, przejścia na siatce bitów, mapa ruchu) → rozpisz go na bity
    (przejścia, kamera, kolory, fonty) i przenieś tę strukturę na produkt; treści, logo i assetów wzoru nie bierzesz.

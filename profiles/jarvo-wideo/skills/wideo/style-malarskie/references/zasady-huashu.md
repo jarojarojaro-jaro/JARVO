@@ -4,6 +4,9 @@ Surowiec do naszych reguł: zasady z repo huashu-art-motion (MIT), które zadzia
 **zasada → dowód (liczba, jedno zdanie) → kiedy stosować**, czasem z „dlaczego”, jeśli źródło je podaje. Pułapki są
 w kartach metody (`metoda.md`, rozdz. 8). Gdy zasada zadziała u nas ponownie, dopisz dowód; gdy zawiedzie, opisz
 granicę.
+Zasady ogólne (nie tylko dla stylów malarskich) są też w skillach ruchu i kontroli: `ruch-i-kompozycja.md`
+(skill `rodzaje-filmu`; rozdz. 2: 4, 5, 28; rozdz. 4: 11, 31, 46; rozdz. 5: 3, 27, 43; rozdz. 7: 12, 13, 14, 19, 29),
+`film-z-kodu` prawa 14–17 (15, 41, 37, 39, 49), `kontrola-wideo` kroki 2 i 4a (16, 25, 30, 48).
 
 Numeracja jest ciągła. W źródle numery 33–35 występują dwa razy, a jeden wpis nie ma numeru: tu to zasady 33–40.
 Litery A, B, G1–G3 to niezależne grupy wykonawców testów (A, B: nowe style; G1, G2: gramatyki z YouTube;
