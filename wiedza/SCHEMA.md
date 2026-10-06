@@ -34,7 +34,7 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 
 | Folder | Co | Hub |
 |---|---|---|
-| `zrodla/` | surowe: `rozmowy/` (wyciągi z sesji), `karty/` (raporty z kart), `pliki/` (od człowieka), `jarvo-repo/` (docs repo) | brak (poza wyszukiwaniem) |
+| `zrodla/` | surowe: `rozmowy/` (wyciągi z sesji), `karty/` (raporty z kart), `pliki/` (od człowieka), `jarvo-repo/` (kopia repo przy wdrożeniu: docs, pliki profili, materiały skilli, spis źródeł; w grafie) | brak (poza wyszukiwaniem) |
 | `skrzynka/` | szkice do kompilacji; `zrobione/` po kompilacji | brak |
 | `agenci/<agent>/` | hub agenta (z `fleet.yaml`) i jego notatki (lekcje, narzędzia, kruczki) | `agenci/_hub-agenci`, `agenci/<agent>/_hub-<krótka nazwa>` |
 | `projekty/` | jedna notatka na misję/projekt: stan, decyzje, wyniki (linki), marka, agenci | `projekty/_hub-projekty` |
@@ -46,7 +46,7 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 | `orzeczenia/` | `wszyscy.md`, `<agent>.md`, `marki/<marka>.md` | `orzeczenia/_hub-orzeczenia` |
 | `rozmowy/` | skompilowane ustalenia z rozmów i kart | `rozmowy/_hub-rozmowy` |
 | `fleet/lekcje.md` | księga lekcji floty (skill `fleet-improvement`) | linkowana z hubów agentów |
-| `fleet/skille/` | jeden węzeł na skill floty (własny i wspólny), generowany przy zasiewie z repo: opis, agenci, powiązane skille, skrypty; nie edytuj, poza domyślnym szukaniem (`folder=fleet`) | linkowane z hubów agentów |
+| `fleet/skille/` | jeden węzeł na skill floty (własny i wspólny), generowany przy zasiewie z repo: opis, agenci, powiązane skille, skrypty, materiały; nie edytuj, poza domyślnym szukaniem (`folder=fleet`) | linkowane z hubów agentów |
 
 Pliki specjalne w korzeniu: `_hub-skarbiec.md` (strona główna), `INDEX.md` (generowany), `LOG.md` (tylko dopisywanie),
 `LINT.md` (ostatni raport), `SCHEMA.md` (ten plik). Bloki `<!-- Jarvo:GEN … -->` w hubach są generowane: nie edytuj ich ręcznie.

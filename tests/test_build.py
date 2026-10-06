@@ -218,8 +218,16 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     assert "security_check.py" in web["scripts"]
     # serwery MCP z config.yaml profilu (hub agenta w grafie wiedzy): Web ma inspo z narzędziami z tools.include
     assert web["mcp"] == [{"name": "inspo", "tools": ["recommend", "search_screens", "get_screen", "get_design_system",
-                                                       "get_site_pages", "find_similar"]}]
-    assert next(a for a in dane["agents"] if a["name"] == "jarvo-lowca")["mcp"] == []
+                                                       "get_site_pages", "find_similar"], "trust": "full"}]
+    lowca = next(a for a in dane["agents"] if a["name"] == "jarvo-lowca")
+    assert lowca["mcp"] == []
+    # hub w skarbcu: same nazwy zmiennych (bez wartości), narzędzia z toolbox.yaml, identyfikatory evals
+    assert "CEIDG_TOKEN" in lowca["env"] and "ceidg-api" in lowca["tools"]
+    assert {"id": "lowca-icp-first", "type": "in_scope"} in lowca["evals"]
+    wideo = next(a for a in dane["agents"] if a["name"] == "jarvo-wideo")
+    rodzaje = next(s for s in wideo["skills"] if s["name"] == "rodzaje-filmu")
+    assert "ruch-i-kompozycja" in rodzaje["references"]
+    assert any(z["name"] == "cinetic" and z["status"] == "odlozone" for z in dane["zrodla"])
     # skarbiec idzie za kodem: ostatnie zmiany z CHANGELOG-u profilu i skrypty wspólne repo (lint nieaktualnych notatek)
     assert web["changes_section"] == "Niewydane" and web["changes"] and all(len(z) <= 280 for z in web["changes"])
     assert "odcisk.py" in dane["repo_scripts"] and "build.py" in dane["repo_scripts"]
@@ -235,6 +243,27 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     web = next(a for a in build.wiedza_fleet(fleet, dist)["agents"] if a["name"] == "jarvo-web")
     assert [s["name"] for s in web["shared_skills"]] == ["graf-kodu"] and web["external_skills"] == ["gsap"]
     assert web["shared_skills"][0]["path"] == "shared/skills/graf-kodu/SKILL.md"
+
+
+def test_changelog_punkty_lamane_w_kilku_liniach(tmp_path):
+    ch = tmp_path / "CHANGELOG.md"
+    ch.write_text("# Changelog\n\n## Niewydane\n- Pierwszy punkt\n  złamany na dwie linie.\n- Drugi.\n\n"
+                  "Akapit po liście.\n  wcięty, ale nie punkt\n\n## 0.1.0\n- stary\n", encoding="utf-8")
+    assert build.ostatnie_zmiany(ch) == ("Niewydane", ["Pierwszy punkt złamany na dwie linie.", "Drugi."])
+
+
+def test_repo_do_skarbca_zasady_zmiany_materialy_zrodla(built, tmp_path):
+    fleet, out = built
+    dane = build.wiedza_fleet(fleet, out)
+    cel = tmp_path / "repo"
+    assert build.repo_do_skarbca(fleet, cel, dane) > 50
+    soul = (cel / "profiles/jarvo-wideo/SOUL.md").read_text(encoding="utf-8")
+    assert "Zasada tempa" in soul and fl.PROTOCOL_MARKER not in soul
+    for rel in ("profiles/jarvo-wideo/CHANGELOG.md", "profiles/jarvo-wideo/README.md", "profiles/jarvo-wideo/quality/rubric.md",
+                "profiles/jarvo-wideo/skills/wideo/rodzaje-filmu/references/ruch-i-kompozycja.md"):
+        assert (cel / rel).is_file(), rel
+    zrodla = (cel / "vendor/zrodla.md").read_text(encoding="utf-8")
+    assert "| [cinetic](https://github.com/Leonxlnx/cinetic) | odlozone |" in zrodla
 
 
 def test_generalist_handoff_table_covers_every_specialist(built):

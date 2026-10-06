@@ -84,7 +84,9 @@ knowledge/                       # = skarbiec (vault Obsidiana): same pliki Mark
 │   ├── rozmowy/                 #   eksporty rozmów (wyciąg z sesji zapisany przy jej końcu, patrz §5)
 │   ├── karty/                   #   raporty z kart (kopia out/RAPORT.md, KLIPY.md, LEADY.md… po zamknięciu karty)
 │   ├── pliki/                   #   artykuły, transkrypcje, PDF-y, które wrzucisz („zapisz to w wiedzy”)
-│   └── jarvo-repo/              #   docs/*.md tego repo (kopiowane przy wdrożeniu): jak działa sama flota
+│   └── jarvo-repo/              #   kopia repo przy wdrożeniu (w grafie, poza domyślnym szukaniem): docs/*.md, a w układzie
+│                                #   repo pliki profili (profiles/<agent>/SOUL, README, CHANGELOG, quality/rubric), materiały
+│                                #   skilli (…/references/*.md, też shared/skills) i spis źródeł vendor/zrodla.md
 ├── skrzynka/                    # SZKICE czekające na kompilację: jeden plik = jeden szkic (kto, kiedy, skąd, treść)
 │   └── zrobione/                #   szkice po kompilacji (30 dni, potem kasowane; źródła są w zrodla/)
 ├── agenci/_hub-agenci.md        # hub „Agenci” + katalog na agenta
@@ -110,7 +112,7 @@ Poza skarbcem: indeks wyszukiwarki `state/wiedza.db` (SQLite FTS5, odtwarzalny z
 
 | Folder | Kto pisze | Kiedy |
 |---|---|---|
-| `zrodla/` | haki wtyczki (rozmowy, karty), Ty (pliki), wdrożenie (docs repo) | koniec sesji, zamknięcie karty, „zapisz to w wiedzy”, deploy |
+| `zrodla/` | haki wtyczki (rozmowy, karty), Ty (pliki), wdrożenie (docs repo, pliki profili, materiały skilli, spis źródeł) | koniec sesji, zamknięcie karty, „zapisz to w wiedzy”, deploy |
 | `skrzynka/` | każdy agent (`wiedza_zapisz`), haki (koniec sesji, kompresja, karta, pamięć) | na bieżąco, bez modelu albo z tanim modelem |
 | `orzeczenia/` | agent na Twoje słowo (`wiedza_orzeczenie`), formularz w HQ | gdy poprawiasz agenta |
 | notatki, `LOG.md`, ręczne części hubów | **tylko kompilacja** (`jarvo-wiedza`, tani model) i `zasiej` (0 tokenów) | noc / próg szkiców / ręcznie |
@@ -205,7 +207,7 @@ z jednym średnim skillem. Dla porównania MEMORY.md+USER.md to dziś do ~1400 t
   agent w trakcie pracy           ──wiedza_zapisz─────────────►  skrzynka/<agent>-<data>-<slug>.md
   Twoja korekta                   ──wiedza_orzeczenie / HQ────►  orzeczenia/<kto>.md          (od razu, bez kompilacji)
   plik / link od Ciebie           ──„zapisz to w wiedzy”──────►  zrodla/pliki/… (kopia, defuddle dla stron) + szkic
-  docs repo, fleet.yaml           ──deploy: wiedza.py zasiej──►  zrodla/jarvo-repo/, huby agentów (0 tokenów)
+  repo (docs, profile), fleet.yaml ──deploy: wiedza.py zasiej──►  zrodla/jarvo-repo/, huby agentów (0 tokenów)
                                                                          │
                                                        kompilacja (§6): skrzynka → notatki, INDEX, LOG, punkt zapisu git
 ```
@@ -335,20 +337,28 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
 1. ✅ **Plan** (ten dokument), decyzje z §10 zaakceptowane 2026-09-30.
 2. ✅ **Skarbiec i skrypt** `wiedza/wiedza.py` (bez zależności poza biblioteką standardową; w kontenerze
    `python3 /opt/jarvo/repo/wiedza/wiedza.py`): `zasiej` (katalogi, `SCHEMA.md`, huby folderów i agentów z `build/wiedza/fleet.json`,
-   orzeczenia, `fleet/lekcje.md`, docs repo do `zrodla/jarvo-repo/`, git init i punkt zapisu), `indeksuj` (FTS5 w `state/wiedza.db`,
+   orzeczenia, `fleet/lekcje.md`, docs repo i `--repo` (pliki profili z buildu) do `zrodla/jarvo-repo/`, git init i punkt zapisu), `indeksuj` (FTS5 w `state/wiedza.db`,
    `INDEX.md`, listy w hubach), `szukaj`, `czytaj`, `zapisz`, `orzeczenie`, `lint`, `graf`, `cofnij`, `status`; `wiedza/SCHEMA.md`;
-   `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami, zewnętrzne z locka, skrypty, serwery MCP
-   z `config.yaml` z narzędziami z `tools.include`), `install-fleet.sh`
+   `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami i materiałami, zewnętrzne z locka, skrypty,
+   serwery MCP z `config.yaml` z `trust` i narzędziami z `tools.include`, nazwy zmiennych środowiska z `distribution.yaml`
+   i `terminal.env_passthrough` bez wartości, narzędzia z `toolbox.yaml`, identyfikatory evals, spis źródeł z
+   `vendor/zrodla.yaml`) i `build/wiedza/repo/` (SOUL bez znacznika protokołu, README, CHANGELOG, rubryka, `references/*.md`
+   skilli, `vendor/zrodla.md`), `install-fleet.sh`
    zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane; pogrubiony opis huba agenta idzie
-   za opisem z `fleet.yaml`, dopóki człowiek go nie zmienił; lustro `zrodla/jarvo-repo/` traci dokumenty usunięte z repo).
+   za opisem z `fleet.yaml`, dopóki człowiek go nie zmienił; lustro `zrodla/jarvo-repo/` traci dokumenty i pliki usunięte z repo).
+   **Kopia repo w grafie:** `zrodla/jarvo-repo/` jest poza domyślnym szukaniem (`--zrodla` ją włącza), ale w grafie:
+   hub skarbca linkuje dokumenty repo i spis źródeł, hub agenta jego zasady (SOUL), README, rubrykę i cały CHANGELOG,
+   a węzeł skilla jego materiały (`references`).
    **Cała flota w grafie:** każdy skill floty (własny i wspólny z `shared/skills/`) to węzeł `fleet/skille/<skill>`: opis, wersja,
    data przeglądu, plik w repo, agenci (linki do hubów), powiązane skille (z `related_skills` i nazw w treści skilla), skrypty floty
-   wymienione w skillu i sekcje. Hub agenta linkuje swoje skille, więc graf pokazuje agent → skill → skrypty i skill → skill.
+   wymienione w skillu, sekcje i materiały (linki do kopii `references/*.md`). Hub agenta linkuje swoje skille, więc graf pokazuje agent → skill → skrypty i skill → skill.
    Węzeł zmienia się tylko razem ze skillem, a skill usunięty z floty znika. Węzły skilli nie wchodzą do przypomnień ani do
    domyślnego szukania (agent ma swoje skille w prompcie); `wiedza_szukaj(folder="fleet")` je zwraca, `INDEX.md` liczy je jedną linią.
    **Skarbiec idzie za kodem:** blok `Jarvo:GEN` huba agenta ma też ostatnie zmiany z `CHANGELOG.md` profilu (sekcja
-   „Niewydane” albo najnowsza wersja, do 6 punktów), więc agent widzi, co się w nim i w innych zmieniło; `lint` porównuje
-   odwołania do skryptów w notatkach o flocie (`agenci/`, `pojecia/`, `fleet/`, `orzeczenia/`) z tym, co jest w repo
+   „Niewydane” albo najnowsza wersja, do 6 punktów; punkt złamany na kilka linii w całości, cały CHANGELOG w kopii repo),
+   serwery MCP z `trust`, nazwy zmiennych środowiska, narzędzia z `toolbox.yaml` i identyfikatory evals, więc agent widzi,
+   co się w nim i w innych zmieniło; `lint` porównuje
+   odwołania do skryptów (`.py`, `.sh`, `.js`, `.cjs`, `.mjs`) w notatkach o flocie (`agenci/`, `pojecia/`, `fleet/`, `orzeczenia/`) z tym, co jest w repo
    (`state/wiedza-kod.json` z zasiewu), i ostrzega „nieaktualna wobec repo”, a przegląd tygodnia zgłasza to w „co dryfuje”.
    Testy: `tests/test_wiedza.py`.
    Sprawdzone w kontenerze: huby 9 agentów, wyszukiwanie po polsku bez ogonków, lint bez błędów, punkty zapisu git.

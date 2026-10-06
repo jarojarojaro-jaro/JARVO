@@ -306,13 +306,30 @@ def build_wiedza_plugin(out: Path) -> Path:
     return out
 
 
+def punkty_listy(tresc: str) -> list[str]:
+    """Punkty listy markdown („- …”) w jednej linii każdy: wiersze wcięte pod punktem (punkt złamany na kilka linii,
+    podpunkty) doklejamy do niego, zamiast je gubić."""
+    punkty: list[str] = []
+    otwarty = False                                     # zwykły akapit zamyka punkt: wcięcie pod nim nie jest dalszym ciągiem
+    for ln in tresc.splitlines():
+        if ln.startswith("- "):
+            punkty.append(ln[2:])
+            otwarty = True
+        elif otwarty and ln[:1] in (" ", "\t") and ln.strip():
+            punkty[-1] += " " + ln.strip()
+        elif ln.strip():
+            otwarty = False
+    return [" ".join(p.split()) for p in punkty if p.strip()]
+
+
 def ostatnie_zmiany(changelog: Path, n: int = 6, dlugosc: int = 280) -> tuple[str, list[str]]:
-    """(nagłówek, punkty) pierwszej niepustej sekcji CHANGELOG-u profilu („Niewydane” albo ostatnia wersja)."""
+    """(nagłówek, punkty) pierwszej niepustej sekcji CHANGELOG-u profilu („Niewydane” albo ostatnia wersja).
+    Cały CHANGELOG trafia do skarbca jako kopia (`repo_do_skarbca`); tu tylko kilka najnowszych na hub agenta."""
     if not changelog.is_file():
         return "", []
     for sekcja in changelog.read_text(encoding="utf-8").split("\n## ")[1:]:
         tytul, _, tresc = sekcja.partition("\n")
-        punkty = [" ".join(ln[2:].split()) for ln in tresc.splitlines() if ln.startswith("- ")]
+        punkty = punkty_listy(tresc)
         if punkty:
             return tytul.strip(), [p if len(p) <= dlugosc else p[:dlugosc - 1].rstrip() + "…" for p in punkty[:n]]
     return "", []
@@ -332,15 +349,87 @@ def opis_skilla(path: Path, skrypty: set[str]) -> dict:
             "related": [str(s) for s in (meta.get("hermes") or {}).get("related_skills") or []],
             "mentions": sorted(set(re.findall(r"`([a-z][a-z0-9-]{2,40})`", body)) - {path.parent.name}),
             "scripts": sorted(s for s in skrypty if re.search(rf"(?<![\w.-]){re.escape(s)}\b", body)),
-            "sections": [h.strip() for h in re.findall(r"^## (.+)$", body, re.M)][:10]}
+            "sections": [h.strip() for h in re.findall(r"^## (.+)$", body, re.M)][:10],
+            "references": sorted(r.stem for r in (path.parent / "references").glob("*.md"))}
 
 
 def serwery_mcp(config: Path) -> list[dict]:
     """Serwery MCP profilu z `mcp_servers` w config.yaml: nazwa i narzędzia widoczne dla modelu (`tools.include`; puste = wszystkie)."""
     cfg = fl.load_yaml(config) if config.is_file() else {}
     serwery = (cfg or {}).get("mcp_servers") or {}
-    return [{"name": str(n), "tools": [str(t) for t in ((s or {}).get("tools") or {}).get("include") or []]}
+    return [{"name": str(n), "tools": [str(t) for t in ((s or {}).get("tools") or {}).get("include") or []],
+             **({"trust": str(s["trust"])} if isinstance(s, dict) and s.get("trust") else {})}
             for n, s in sorted(serwery.items())]
+
+
+def zmienne_srodowiska(agent_dir: Path) -> list[str]:
+    """Same NAZWY zmiennych, które profil dostaje z .env (distribution.yaml `env_requires`, config.yaml
+    `terminal.env_passthrough`); wartości nigdy nie trafiają do skarbca."""
+    dist = fl.load_yaml(agent_dir / "distribution.yaml") if (agent_dir / "distribution.yaml").is_file() else {}
+    cfg = fl.load_yaml(agent_dir / "config.yaml") if (agent_dir / "config.yaml").is_file() else {}
+    nazwy = [str(e.get("name")) for e in (dist or {}).get("env_requires") or [] if isinstance(e, dict) and e.get("name")]
+    nazwy += [str(n) for n in ((cfg or {}).get("terminal") or {}).get("env_passthrough") or []]
+    return list(dict.fromkeys(nazwy))
+
+
+def evale_agenta(name: str) -> list[dict]:
+    plik = fl.REPO_ROOT / "evals" / name / "scenarios.yaml"
+    dane = fl.load_yaml(plik) if plik.is_file() else {}
+    return [{"id": str(s["id"]), "type": str(s.get("type", ""))} for s in (dane or {}).get("scenarios") or [] if s.get("id")]
+
+
+def narzedzia_agenta(agent_dir: Path) -> list[str]:
+    dane = fl.load_yaml(agent_dir / "toolbox.yaml") if (agent_dir / "toolbox.yaml").is_file() else {}
+    return [str(x["name"]) for x in (dane or {}).get("tools") or [] if isinstance(x, dict) and x.get("name")]
+
+
+def zrodla_zewnetrzne() -> list[dict]:
+    """vendor/zrodla.yaml dla skarbca: każde repo, z którego bierzemy, i jego status (używane, odłożone…)."""
+    dane = fl.load_yaml(fl.REPO_ROOT / "vendor" / "zrodla.yaml") or {}
+    return [{"name": str(n), "repo": str(z.get("repo", "")), "status": str(z.get("status", "")),
+             "przejrzane": str(z.get("przejrzane", ""))[:7], "notatka": " ".join(str(z.get("notatka", "")).split())}
+            for n, z in sorted((dane.get("zrodla") or {}).items())]
+
+
+def repo_do_skarbca(fleet: fl.Fleet, out: Path, dane: dict) -> int:
+    """Kopia plików repo, które opisują flotę, a nie są w docs/: dla każdego agenta SOUL (bez znacznika protokołu),
+    README, CHANGELOG, rubryka i materiały (references) jego skilli, w układzie repo (`profiles/<agent>/…`,
+    `shared/skills/…`), plus spis źródeł `vendor/zrodla.md`. `wiedza.py zasiej --repo` kładzie ją w
+    `zrodla/jarvo-repo/`, a huby i węzły skilli linkują do tych plików."""
+    if out.exists():
+        shutil.rmtree(out)
+    pliki = 0
+
+    def kopiuj(src: Path, rel: str, tekst: str | None = None) -> None:
+        nonlocal pliki
+        if tekst is None and not src.is_file():
+            return
+        cel = out / rel
+        cel.parent.mkdir(parents=True, exist_ok=True)
+        cel.write_text(tekst if tekst is not None else src.read_text(encoding="utf-8"), encoding="utf-8")
+        pliki += 1
+
+    for a in fleet.active():
+        baza = f"profiles/{a.name}"
+        soul = a.dir / "SOUL.md"
+        if soul.is_file():
+            kopiuj(soul, f"{baza}/SOUL.md", soul.read_text(encoding="utf-8").replace(fl.PROTOCOL_MARKER + "\n\n", "")
+                   .replace(fl.PROTOCOL_MARKER, ""))
+        for rel in ("README.md", "CHANGELOG.md", "quality/rubric.md"):
+            kopiuj(a.dir / rel, f"{baza}/{rel}")
+    for a in dane["agents"]:
+        for s in [*a["skills"], *a["shared_skills"]]:
+            katalog = (fl.REPO_ROOT / s["path"]).parent
+            for r in s.get("references") or []:
+                kopiuj(katalog / "references" / f"{r}.md", f"{Path(s['path']).parent.as_posix()}/references/{r}.md")
+    wiersze = ["# Źródła zewnętrzne (vendor/zrodla.yaml)", "",
+               "Każde repo, z którego Jarvo bierze kod, skille albo wzorce, i te, które obserwujemy. Licencje i co dokładnie",
+               "wzięte: `SOURCES.md`. Status: uzywane, do-wdrozenia, czeka (na decyzję właściciela), odlozone.", "",
+               "| Źródło | Status | Przejrzane | Notatka |", "|---|---|---|---|"]
+    for z in dane["zrodla"]:
+        wiersze.append(f"| [{z['name']}]({z['repo']}) | {z['status']} | `{z['przejrzane']}` | {z['notatka'].replace('|', '/')} |")
+    kopiuj(Path(), "vendor/zrodla.md", "\n".join(wiersze) + "\n")
+    return pliki
 
 
 def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
@@ -348,7 +437,7 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
     (shared/skills) z opisami, powiązaniami i skryptami (każdy skill to węzeł grafu), nazwy skilli zewnętrznych
     (z dystrybucji po buildzie), skrypty, serwery MCP i ostatnie zmiany z CHANGELOG-u; `skrypty_repo` to skrypty wspólne (scripts/),
     żeby lint skarbca odróżnił odwołanie do istniejącego skryptu od nieaktualnego."""
-    skrypty_repo = sorted(p.name for p in (fl.REPO_ROOT / "scripts").glob("*") if p.suffix in {".py", ".sh"})
+    skrypty_repo = sorted(p.name for p in (fl.REPO_ROOT / "scripts").glob("*") if p.suffix in {".py", ".sh", ".js", ".mjs", ".cjs"})
     agents = []
     for a in fleet.active():
         wlasne = fl.available_skills(a.dir / "skills")[0]
@@ -368,9 +457,10 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
                        "telegram_topic": a.telegram_topic, "autonomy_max": a.autonomy_max, "skills": skills,
                        "shared_skills": [opis_skilla(fl.SHARED_DIR / "skills" / n / "SKILL.md", znane) for n in wspolne],
                        "external_skills": [n for n in obce if n not in wspolne], "scripts": skrypty,
-                       "mcp": serwery_mcp(a.dir / "config.yaml"),
+                       "mcp": serwery_mcp(a.dir / "config.yaml"), "env": zmienne_srodowiska(a.dir),
+                       "tools": narzedzia_agenta(a.dir), "evals": evale_agenta(a.name),
                        "changes_section": sekcja, "changes": zmiany})
-    return {"orchestrator": fleet.orchestrator, "agents": agents, "repo_scripts": skrypty_repo}
+    return {"orchestrator": fleet.orchestrator, "agents": agents, "repo_scripts": skrypty_repo, "zrodla": zrodla_zewnetrzne()}
 
 
 def render_handoff_table(fleet: fl.Fleet, agent: fl.Agent) -> str:
@@ -674,9 +764,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"✓ Jarvo HQ: {hq_dir.relative_to(out)}")
 
     # skarbiec wiedzy (docs/WIEDZA.md): huby agentów zasiewa install-fleet.sh z tego pliku (wiedza/wiedza.py zasiej)
-    fl.write_json(out / "wiedza" / "fleet.json", wiedza_fleet(fleet, profiles_out))
+    dane_wiedzy = wiedza_fleet(fleet, profiles_out)
+    fl.write_json(out / "wiedza" / "fleet.json", dane_wiedzy)
+    n_repo = repo_do_skarbca(fleet, out / "wiedza" / "repo", dane_wiedzy)
     build_wiedza_plugin(out / "plugins" / WIEDZA_PLUGIN)
-    print(f"✓ skarbiec wiedzy: wiedza/fleet.json, plugins/{WIEDZA_PLUGIN}")
+    print(f"✓ skarbiec wiedzy: wiedza/fleet.json, wiedza/repo ({n_repo} plików), plugins/{WIEDZA_PLUGIN}")
 
     notes = build_host(fleet, out / "host", env)
     for note in notes:

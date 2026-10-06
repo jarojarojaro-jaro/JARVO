@@ -15,8 +15,10 @@
   w dokumentach przeglądowych i liczby w kolumnach „Skille” / „Workflowy własne” / „Evals” tabel.
 - **Skarbiec wiedzy (knowledge base) też zgodny z kodem.** Agenci czytają skarbiec (`/opt/data/jarvo/knowledge`), więc
   zmiana w kodzie albo flocie musi do niego dotrzeć. Zasiew przy każdym wdrożeniu (`wiedza.py zasiej`) odświeża sam:
-  lustro `docs/*.md` w `zrodla/jarvo-repo/`, bloki `Jarvo:GEN` hubów agentów (skille, skrypty, skille zewnętrzne,
-  ostatnie zmiany z `CHANGELOG.md` profilu), węzły grafu `fleet/skille/` (każdy skill: opis, agenci, powiązane skille, skrypty)
+  lustro `docs/*.md` w `zrodla/jarvo-repo/` i tam też, w układzie repo, SOUL, README, CHANGELOG i rubryka każdego profilu,
+  materiały skilli (`references/*.md`) i spis źródeł (`vendor/zrodla.md`), bloki `Jarvo:GEN` hubów agentów (skille, skrypty,
+  skille zewnętrzne, serwery MCP, nazwy zmiennych, narzędzia, evals, ostatnie zmiany z `CHANGELOG.md` profilu i linki do
+  kopii jego plików), węzły grafu `fleet/skille/` (każdy skill: opis, agenci, powiązane skille, skrypty, materiały)
   i opis agenta z `fleet.yaml`; lint skarbca wskazuje notatki o flocie
   z odwołaniem do skryptu, którego już nie ma. Dlatego każda zmiana zachowania agenta ma wpis w CHANGELOG profilu. Wszystko inne, co opisuje kod (szablony i treści w `knowledge/`, `wiedza/SCHEMA.md`,
   generatory hubów w `wiedza.py`), zmieniamy w tym samym commicie; po wdrożeniu sprawdzamy w kontenerze, że skarbiec

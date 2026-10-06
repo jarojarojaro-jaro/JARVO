@@ -41,7 +41,7 @@ rm -rf "$DATA/jarvo/knowledge/brands/_szablon" && cp -r "$REPO/knowledge/brands/
 
 # 1b. skarbiec wiedzy (docs/WIEDZA.md): huby agentów z buildu, SCHEMA, INDEX, docs repo jako źródła; 0 tokenów, git na punkty zapisu
 log "Skarbiec wiedzy"
-$PY "$REPO/wiedza/wiedza.py" --skarbiec "$DATA/jarvo/knowledge" --stan "$DATA/jarvo/state" zasiej --fleet "$BUILD/wiedza/fleet.json" --docs "$REPO/docs"
+$PY "$REPO/wiedza/wiedza.py" --skarbiec "$DATA/jarvo/knowledge" --stan "$DATA/jarvo/state" zasiej --fleet "$BUILD/wiedza/fleet.json" --docs "$REPO/docs" --repo "$BUILD/wiedza/repo"
 
 # 2. profil hosta: config (scalanie kluczy floty), SOUL, sekrety
 log "Profil hosta"

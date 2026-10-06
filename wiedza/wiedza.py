@@ -2,7 +2,8 @@
 """Skarbiec wiedzy floty Jarvo (drugi mózg): narzędzie bez zależności poza biblioteką standardową.
 
 Skarbiec to katalog zwykłych plików Markdown (projekt: docs/WIEDZA.md). Ten skrypt:
-  zasiej      katalogi, SCHEMA.md, huby (z fleet.json), INDEX, LOG, orzeczenia, docs repo → zrodla/jarvo-repo, git init
+  zasiej      katalogi, SCHEMA.md, huby (z fleet.json), INDEX, LOG, orzeczenia, docs repo i pliki profili (SOUL, README,
+              CHANGELOG, rubryka, materiały skilli, spis źródeł) → zrodla/jarvo-repo, git init
   indeksuj    indeks FTS5 (state/wiedza.db), INDEX.md i listy w hubach z plików (0 tokenów, deterministycznie)
   szukaj      wyszukiwanie po polsku (ogonki bez znaczenia), wynik: ścieżka · streszczenie
   czytaj      cała notatka
@@ -54,6 +55,8 @@ OPISY_FOLDEROW = {
     "rozmowy": "Skompilowane ustalenia z rozmów i kart: decyzje, fakty, pliki. Surowe wyciągi leżą w `zrodla/rozmowy/`.",
 }
 POZA_WYSZUKIWANIEM = ("zrodla/", "skrzynka/")          # domyślnie nie wracają w wynikach (surowe i szkice)
+LUSTRO_REPO = "zrodla/jarvo-repo"                     # kopia repo przy wdrożeniu: poza wyszukiwaniem, ale w grafie
+LUSTRO_KATALOGI = ("profiles", "shared", "vendor")     # podkatalogi z `--repo` (płaskie *.md obok to docs/)
 PLIKI_SPECJALNE = {"INDEX.md", "LOG.md", "LINT.md", "SCHEMA.md"}
 # własne formaty (brand kit, karta strony referencyjnej z DESIGN.md dembrandta, USER.md, źródła, szkice)
 BEZ_FRONTMATTERU = ("brands/", "inspiracje/", "user/", "zrodla/", "skrzynka/")
@@ -64,7 +67,7 @@ BEZ_ZRODLA = {"hub", "agent", "orzeczenia", "skill"}         # generowane z repo
 SKILLE = "fleet/skille"                                       # skill floty = węzeł grafu (zasiew z fleet.json)
 # notatki o samej flocie (nie o klientach): ich odwołania do skryptów lint porównuje z repo (state/wiedza-kod.json)
 O_FLOCIE = ("agenci/", "pojecia/", "fleet/", "orzeczenia/")
-SKRYPT_RE = re.compile(r"`(?:[^`\s]*/)?([\w-]+\.(?:py|sh|cjs|mjs))\b[^`]*`")
+SKRYPT_RE = re.compile(r"`(?:[^`\s]*/)?([\w-]+\.(?:py|sh|js|cjs|mjs))\b[^`]*`")
 MAX_SLOW = {"hub": 400, "agent": 600, "projekt": 400}
 DOMYSLNY_MAX_SLOW = 250
 GEN_RE = re.compile(r"<!-- Jarvo:GEN (\w+) -->.*?<!-- /Jarvo:GEN \1 -->", re.S)
@@ -496,10 +499,12 @@ class Indeks:
             we[l["do_"]] = we.get(l["do_"], 0) + 1
             wy[l["z"]] = wy.get(l["z"], 0) + 1
             linki.append({"z": l["z"], "do": l["do_"], "auto": bool(l["auto"])})
+        def w_grafie(s: str) -> bool:                  # kopia repo (docs, zasady agentów, materiały skilli) też jest w grafie
+            return not s.startswith(POZA_WYSZUKIWANIEM) or s.startswith(LUSTRO_REPO + "/")
         wezly = [{"id": r["sciezka"], "tytul": r["tytul"], "folder": r["folder"], "typ": r["typ"], "status": r["status"],
                   "hub": bool(r["hub"]), "agent": r["agent"], "zmieniono": r["zmieniono"], "we": we.get(r["sciezka"], 0),
-                  "wy": wy.get(r["sciezka"], 0)} for r in self.notatki() if not r["sciezka"].startswith(POZA_WYSZUKIWANIEM)]
-        return {"wezly": wezly, "linki": [l for l in linki if not l["z"].startswith(POZA_WYSZUKIWANIEM)]}
+                  "wy": wy.get(r["sciezka"], 0)} for r in self.notatki() if w_grafie(r["sciezka"])]
+        return {"wezly": wezly, "linki": [l for l in linki if w_grafie(l["z"])]}
 
 
 # ------------------------------------------------------------------------------------------------ INDEX.md i listy hubów
@@ -582,8 +587,14 @@ def hub_agenta(a: dict) -> tuple[str, str]:
     return f"agenci/{a['name']}/_hub-{krotki}", krotki
 
 
-def notatka_skilla(s: dict, agenci: list[tuple[str, str, str]], znane: set[str]) -> str:
-    """Notatka-węzeł skilla floty: opis, kto go ma, powiązane skille i skrypty (linki robi zasiew, nie autor)."""
+def lustro(rel_repo: str) -> str:
+    """Ścieżka pliku repo w skarbcu (kopia z `zasiej --repo`), bez `.md`: cel linku."""
+    return f"{LUSTRO_REPO}/{rel_repo[:-3] if rel_repo.endswith('.md') else rel_repo}"
+
+
+def notatka_skilla(s: dict, agenci: list[tuple[str, str, str]], znane: set[str], w_lustrze: set[str] | None = None) -> str:
+    """Notatka-węzeł skilla floty: opis, kto go ma, powiązane skille i skrypty (linki robi zasiew, nie autor);
+    materiały skilla (references) linkują do ich kopii w `zrodla/jarvo-repo/`, gdy zasiew ją położył."""
     powiazane = [n for n in dict.fromkeys([*s.get("related", []), *s.get("mentions", [])]) if n in znane and n != s["name"]]
     obce = [n for n in s.get("related", []) if n not in znane]
     wiersze = ["- agent: " + ", ".join(f"[[{hub}|{nazwa}]]" for hub, nazwa, _a in agenci)]
@@ -598,12 +609,16 @@ def notatka_skilla(s: dict, agenci: list[tuple[str, str, str]], znane: set[str])
         wiersze.append("- powiązane skille: " + ", ".join([f"[[{SKILLE}/{n}|{n}]]" for n in powiazane] + [f"`{n}`" for n in obce]))
     if s.get("sections"):
         wiersze.append("- sekcje: " + " · ".join(s["sections"]))
+    katalog = s.get("path", "").rsplit("/", 1)[0]
+    materialy = [r for r in s.get("references") or [] if lustro(f"{katalog}/references/{r}") in (w_lustrze or set())]
+    if materialy:
+        wiersze.append("- materiały (references): " + ", ".join(f"[[{lustro(f'{katalog}/references/{r}')}|{r}]]" for r in materialy))
     opis = s.get("description") or "(skill bez opisu)"
     return (f"# {s['name']}\n\n**{opis}**\n\n"
             + zastap_blok("", "skill", "## Z repo (SKILL.md i fleet.yaml)\n" + "\n".join(wiersze)).strip() + "\n")
 
 
-def zasiej_skille(sk: Skarbiec, skille: dict[str, tuple[dict, list]]) -> int:
+def zasiej_skille(sk: Skarbiec, skille: dict[str, tuple[dict, list]], w_lustrze: set[str] | None = None) -> int:
     """`fleet/skille/<nazwa>.md` dla każdego skilla floty (własnego i wspólnego): węzeł grafu połączony z hubami agentów,
     powiązanymi skillami i skryptami. Plik zmienia się tylko, gdy zmienił się skill; skill usunięty z floty znika."""
     katalog = sk.root / SKILLE
@@ -611,7 +626,7 @@ def zasiej_skille(sk: Skarbiec, skille: dict[str, tuple[dict, list]]) -> int:
     zmienione = 0
     for nazwa, (s, agenci) in sorted(skille.items()):
         rel = f"{SKILLE}/{nazwa}"
-        tresc = notatka_skilla(s, agenci, set(skille))
+        tresc = notatka_skilla(s, agenci, set(skille), w_lustrze)
         stare_fm, stara = podziel(sk.plik(rel).read_text(encoding="utf-8")) if sk.istnieje(rel) else ({}, None)
         if stara is not None and stara.strip() == tresc.strip():
             continue
@@ -628,11 +643,42 @@ def zasiej_skille(sk: Skarbiec, skille: dict[str, tuple[dict, list]]) -> int:
     return zmienione
 
 
-def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | None) -> dict:
+def zasiej_lustro(sk: Skarbiec, repo: Path) -> tuple[int, set[str]]:
+    """Pliki profili z buildu (`wiedza/repo`: SOUL, README, CHANGELOG, rubryka, materiały skilli, spis źródeł) do
+    `zrodla/jarvo-repo/` w układzie repo. Plik zmieniony w repo jest nadpisywany, usunięty znika."""
+    cel = sk.root / LUSTRO_REPO
+    nowe: set[str] = set()
+    zmienione = 0
+    for src in sorted(repo.rglob("*.md")):
+        rel = src.relative_to(repo).as_posix()
+        if rel.split("/", 1)[0] not in LUSTRO_KATALOGI:
+            continue
+        nowe.add(rel)
+        dst = cel / rel
+        dane = src.read_bytes()
+        if not dst.exists() or dst.read_bytes() != dane:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(dane)
+            zmienione += 1
+    for katalog in LUSTRO_KATALOGI:
+        for stary in sorted((cel / katalog).rglob("*.md")) if (cel / katalog).is_dir() else []:
+            if stary.relative_to(cel).as_posix() not in nowe:
+                stary.unlink()
+                zmienione += 1
+        for d in sorted((cel / katalog).rglob("*"), reverse=True) if (cel / katalog).is_dir() else []:
+            if d.is_dir() and not any(d.iterdir()):
+                d.rmdir()
+    return zmienione, {lustro(r) for r in nowe}
+
+
+def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | None, repo: Path | None = None) -> dict:
     sk.root.mkdir(parents=True, exist_ok=True)
     for f in FOLDERY:
         (sk.root / f).mkdir(parents=True, exist_ok=True)
-    raport = {"huby": 0, "agenci": 0, "skille": 0, "docs": 0, "git": False}
+    raport = {"huby": 0, "agenci": 0, "skille": 0, "docs": 0, "repo": 0, "git": False}
+    w_lustrze: set[str] = set()
+    if repo and repo.is_dir():
+        raport["repo"], w_lustrze = zasiej_lustro(sk, repo)
     if schema and schema.exists():
         shutil.copy2(schema, sk.root / "SCHEMA.md")
     # huby folderów (część ręczna zostaje: piszemy tylko, gdy pliku nie ma; bloki GEN odświeżane zawsze)
@@ -672,8 +718,24 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             skille = "\n".join(f"- [[{SKILLE}/{s['name']}|{s['name']}]]: {s.get('description', '').strip()}"
                                for s in a.get("skills", [])) or "_brak_"
             skrypty = ", ".join(f"`{s}`" for s in a.get("scripts", [])) or "_brak_"
-            mcp = "; ".join(f"`{m['name']}`" + (f" ({', '.join(m['tools'])})" if m.get("tools") else "") for m in a.get("mcp") or [])
+            def serwer(m: dict) -> str:
+                czesci = ([f"trust: {m['trust']}"] if m.get("trust") else []) + ([", ".join(m["tools"])] if m.get("tools") else [])
+                return f"`{m['name']}`" + (f" ({' · '.join(czesci)})" if czesci else "")
+            mcp = "; ".join(serwer(m) for m in a.get("mcp") or [])
             mcp_linia = f"\n- serwery MCP: {mcp}" if mcp else ""
+            env = a.get("env") or []
+            if env:
+                mcp_linia += "\n- zmienne środowiska (same nazwy, wartości w .env): " + ", ".join(f"`{e}`" for e in env)
+            if a.get("tools"):
+                mcp_linia += f"\n- narzędzia (toolbox.yaml, {len(a['tools'])}): " + ", ".join(f"`{x}`" for x in a["tools"])
+            if a.get("evals"):
+                mcp_linia += f"\n- evals ({len(a['evals'])}): " + ", ".join(f"`{e['id']}`" for e in a["evals"])
+            pliki_repo = [(f"profiles/{a['name']}/{r}", etykieta) for r, etykieta in
+                          (("SOUL.md", "zasady (SOUL)"), ("README.md", "README"), ("quality/rubric.md", "rubryka"),
+                           ("CHANGELOG.md", "wszystkie zmiany"))]
+            z_repo = [f"[[{lustro(r)}|{etykieta}]]" for r, etykieta in pliki_repo if lustro(r) in w_lustrze]
+            if z_repo:
+                mcp_linia += "\n- z repo: " + " · ".join(z_repo)
             zewn = a.get("external_skills") or []
             zewn_linia = (f"\n- skille zewnętrzne ({len(zewn)}): " + ", ".join(f"`{s}`" for s in zewn)) if zewn else ""
             wsp = a.get("shared_skills") or []
@@ -704,7 +766,7 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
         # skrypty, które naprawdę są w repo: lint wskazuje notatki floty odwołujące się do nieistniejących
         znane_skrypty = sorted({s for a in fleet.get("agents", []) for s in a.get("scripts", [])} | set(fleet.get("repo_scripts") or []))
         (sk.stan / "wiedza-kod.json").write_text(json.dumps({"skrypty": znane_skrypty}, ensure_ascii=False, indent=1), encoding="utf-8")
-        raport["skille"] = zasiej_skille(sk, skille_floty)
+        raport["skille"] = zasiej_skille(sk, skille_floty, w_lustrze)
     if not sk.istnieje("orzeczenia/wszyscy"):
         sk.zapisz_plik("orzeczenia/wszyscy", sklej(_hub_frontmatter("orzeczenia", "człowiek"),
                                                    "# Orzeczenia: wszyscy\n\n**Korekty od użytkownika dla całej floty, jedna datowana linia każda.**\n\n"
@@ -714,21 +776,30 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                                              "# Księga lekcji floty\n\n**Obserwacje z recenzji sędziego: jedna linia = jedna sprawdzalna reguła z licznikiem potwierdzeń.**\n\n"
                                              "## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n"))
     if docs and docs.is_dir():
-        lustro = sk.root / "zrodla" / "jarvo-repo"
+        katalog_docs = sk.root / LUSTRO_REPO
         nazwy = set()
         for d in sorted(docs.glob("*.md")):
-            shutil.copy2(d, lustro / d.name)
+            shutil.copy2(d, katalog_docs / d.name)
             nazwy.add(d.name)
             raport["docs"] += 1
-        for stara in lustro.glob("*.md"):            # dokument usunięty z repo nie zostaje w skarbcu jako „źródło”
+        for stara in katalog_docs.glob("*.md"):            # dokument usunięty z repo nie zostaje w skarbcu jako „źródło”
             if stara.name not in nazwy:
                 stara.unlink()
+    # hub główny: dokumenty repo i spis źródeł (kopie w zrodla/jarvo-repo/), żeby były w grafie przy skarbcu
+    docs_w = sorted(p.stem for p in (sk.root / LUSTRO_REPO).glob("*.md"))
+    linie_repo = [f"- [[{LUSTRO_REPO}/{n}|{n}]]" for n in docs_w]
+    if f"{LUSTRO_REPO}/vendor/zrodla" in w_lustrze:
+        linie_repo.append(f"- [[{LUSTRO_REPO}/vendor/zrodla|Źródła zewnętrzne]] · repo, z których bierzemy, i ich status")
+    if linie_repo:
+        p = sk.plik(HUBY[""][0])
+        sk.zapisz_plik(HUBY[""][0], zastap_blok(p.read_text(encoding="utf-8"), "repo",
+                                                "## Z repo (kopia przy wdrożeniu)\n" + "\n".join(linie_repo)))
     if not (sk.root / "INDEX.md").exists():
         (sk.root / "INDEX.md").write_text("# Indeks skarbca\n\n_Pusty do pierwszego `wiedza.py indeksuj`._\n", encoding="utf-8")
     if not (sk.root / "LINT.md").exists():
         (sk.root / "LINT.md").write_text("# Lint skarbca\n\n_Jeszcze nie uruchomiono `wiedza.py lint`._\n", encoding="utf-8")
     sk.dopisz_log("zasiew", f"huby: {raport['huby']} folderów, {raport['agenci']} agentów; skille: {raport['skille']} zmienionych; "
-                            f"docs repo: {raport['docs']} plików")
+                            f"docs repo: {raport['docs']} plików; pliki profili: {raport['repo']} zmienionych")
     raport["git"] = sk.git_init() and sk.punkt_zapisu("zasiew skarbca")
     return raport
 
@@ -933,6 +1004,7 @@ def main(argv: list[str] | None = None) -> int:
     z = sub.add_parser("zasiej", help="katalogi, huby, INDEX, LOG, orzeczenia, docs repo, git init")
     z.add_argument("--fleet", help="fleet.json z buildu (agenci, skille, skrypty)")
     z.add_argument("--docs", help="katalog docs/ repo → zrodla/jarvo-repo/")
+    z.add_argument("--repo", help="wiedza/repo z buildu (pliki profili, materiały skilli, spis źródeł) → zrodla/jarvo-repo/")
     z.add_argument("--schema", default=str(Path(__file__).with_name("SCHEMA.md")), help="SCHEMA.md do skopiowania")
     i = sub.add_parser("indeksuj", help="indeks FTS5 + INDEX.md + listy hubów")
     i.add_argument("--pelny", action="store_true")
@@ -971,7 +1043,8 @@ def main(argv: list[str] | None = None) -> int:
     sk = Skarbiec(a.skarbiec, a.stan)
     if a.cmd == "zasiej":
         fleet = json.loads(Path(a.fleet).read_text(encoding="utf-8")) if a.fleet else None
-        r = zasiej(sk, fleet, Path(a.docs) if a.docs else None, Path(a.schema) if a.schema else None)
+        r = zasiej(sk, fleet, Path(a.docs) if a.docs else None, Path(a.schema) if a.schema else None,
+                   Path(a.repo) if a.repo else None)
         ix = Indeks(sk)
         ix.odswiez(pelny=True)
         n = zbuduj_index(sk, ix)

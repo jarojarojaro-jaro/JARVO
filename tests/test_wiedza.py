@@ -71,6 +71,54 @@ def test_zasiew_huby_orzeczenia_docs_git(skarbiec, tmp_path):
     assert (sk.root / ".git").exists() == GIT
 
 
+def test_zasiew_kopii_repo_linki_z_hubow_skilli_i_graf(tmp_path, monkeypatch):
+    monkeypatch.setenv("WIEDZA_DZIS", "2026-09-30")
+    root, stan = tmp_path / "knowledge", tmp_path / "state"
+    repo = tmp_path / "repo"
+    pliki = {"profiles/jarvo-web/SOUL.md": "# Web\n\n## Misja\nStrony.\n", "profiles/jarvo-web/CHANGELOG.md": "# Changelog\n",
+             "profiles/jarvo-web/skills/web/nowa-strona/references/seo.md": "# SEO\n\nMeta i sitemap.\n",
+             "vendor/zrodla.md": "# Źródła zewnętrzne\n\n| a | b |\n", "inne/pominiete.md": "# x\n"}
+    for rel, tresc in pliki.items():
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(tresc, encoding="utf-8")
+    fleet = json.loads(json.dumps(FLEET))
+    web = fleet["agents"][1]
+    web["skills"][0].update(path="profiles/jarvo-web/skills/web/nowa-strona/SKILL.md", references=["seo", "brak-w-kopii"])
+    web["mcp"][0]["trust"] = "full"
+    web.update(env=["INSPO_TOKEN"], tools=["lighthouse"], evals=[{"id": "web-new-site", "type": "in_scope"}])
+    (tmp_path / "fleet.json").write_text(json.dumps(fleet, ensure_ascii=False), encoding="utf-8")
+    argv = ["--skarbiec", str(root), "--stan", str(stan), "zasiej", "--fleet", str(tmp_path / "fleet.json"), "--repo", str(repo)]
+    assert w.main(argv) == 0
+    lustro = root / "zrodla/jarvo-repo"
+    assert (lustro / "profiles/jarvo-web/SOUL.md").exists() and (lustro / "vendor/zrodla.md").exists()
+    assert not (lustro / "inne").exists()                              # tylko profile, shared i vendor
+    hub = (root / "agenci/jarvo-web/_hub-web.md").read_text(encoding="utf-8")
+    assert "- serwery MCP: `inspo` (trust: full · recommend, search_screens)" in hub
+    assert "- zmienne środowiska (same nazwy, wartości w .env): `INSPO_TOKEN`" in hub
+    assert "- narzędzia (toolbox.yaml, 1): `lighthouse`" in hub and "- evals (1): `web-new-site`" in hub
+    assert ("- z repo: [[zrodla/jarvo-repo/profiles/jarvo-web/SOUL|zasady (SOUL)]] · "
+            "[[zrodla/jarvo-repo/profiles/jarvo-web/CHANGELOG|wszystkie zmiany]]") in hub
+    skill = (root / "fleet/skille/nowa-strona.md").read_text(encoding="utf-8")
+    assert ("- materiały (references): [[zrodla/jarvo-repo/profiles/jarvo-web/skills/web/nowa-strona/references/seo|seo]]"
+            in skill) and "brak-w-kopii" not in skill
+    assert "[[zrodla/jarvo-repo/vendor/zrodla|Źródła zewnętrzne]]" in (root / "_hub-skarbiec.md").read_text(encoding="utf-8")
+    sk = w.Skarbiec(root, stan)
+    ix = w.Indeks(sk)
+    ix.odswiez()
+    graf = ix.graf()
+    ids = {n["id"] for n in graf["wezly"]}
+    assert "zrodla/jarvo-repo/profiles/jarvo-web/SOUL" in ids and not any(i.startswith("skrzynka/") for i in ids)
+    assert any(l["z"] == "fleet/skille/nowa-strona" and l["do"].endswith("references/seo") for l in graf["linki"])
+    assert w.lint(sk, ix)["bledy"] == []
+    # plik usunięty z repo znika z kopii, zmieniony jest nadpisany
+    (repo / "profiles/jarvo-web/skills/web/nowa-strona/references/seo.md").unlink()
+    (repo / "profiles/jarvo-web/SOUL.md").write_text("# Web\n\nNowe zasady.\n", encoding="utf-8")
+    assert w.main(argv) == 0
+    assert not (lustro / "profiles/jarvo-web/skills").exists()
+    assert "Nowe zasady" in (lustro / "profiles/jarvo-web/SOUL.md").read_text(encoding="utf-8")
+    assert "materiały" not in (root / "fleet/skille/nowa-strona.md").read_text(encoding="utf-8")
+
+
 def test_ponowny_zasiew_zachowuje_reczna_czesc_i_odswieza_blok(skarbiec, tmp_path):
     sk = skarbiec
     p = sk.root / "agenci/jarvo-web/_hub-web.md"
@@ -297,7 +345,10 @@ def test_graf_i_status(skarbiec, capsys):
     graf = json.loads(capsys.readouterr().out.splitlines()[-1])
     wezly = {n["id"]: n for n in graf["wezly"]}
     assert wezly["pojecia/_hub-pojecia"]["hub"] and wezly["pojecia/bramka jakości"]["folder"] == "pojecia"
-    assert not any(n["id"].startswith("zrodla/") for n in graf["wezly"])
+    # surowe źródła poza grafem; kopia repo (docs, zasady agentów) w grafie, połączona z hubem skarbca
+    zrodla_w = {n["id"] for n in graf["wezly"] if n["id"].startswith("zrodla/")}
+    assert zrodla_w == {"zrodla/jarvo-repo/PLAN"}
+    assert any(l["z"] == "_hub-skarbiec" and l["do"] == "zrodla/jarvo-repo/PLAN" for l in graf["linki"])
     reczne = [l for l in graf["linki"] if l["z"] == "pojecia/bramka jakości"]
     assert {l["do"] for l in reczne} == {"pojecia/_hub-pojecia", "agenci/jarvo-web/_hub-web"} and not any(l["auto"] for l in reczne)
     assert any(l["z"] == "pojecia/_hub-pojecia" and l["do"] == "pojecia/bramka jakości" and l["auto"] for l in graf["linki"])   # lista huba
