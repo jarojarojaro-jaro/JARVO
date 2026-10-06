@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.5.0
+version: 1.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -97,6 +97,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 
 ## Definition of Done
 - [ ] `qa_wideo.py` bez błędów (JSON w raporcie), arkusz obejrzany,
+- [ ] film z kodu: projekt edytora (`projekt.py z-kodu`) i `qa_wideo.py --z-kodu` bez błędów (film = render projektu),
 - [ ] `krytyka.py tempo` z `ok: true` (zero przestojów ≥ 2 s, zero luk obrazu > 6 s pod mową),
 - [ ] film z cięciami: `krytyka.py ciecia` bez problemów (trzask, słowo w pół), każdy obraz cięcia obejrzany,
 - [ ] cięcia pod muzykę: `rytm.py sprawdz` bez ✗ (siatka „niepewna”: sprawdzone uchem),

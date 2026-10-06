@@ -35,9 +35,9 @@ research i fakty do scenariusza (→ `jarvo-sherlock` albo jego raport), strony 
 6. **Dźwięk:** lektor wyraźny, muzyka ściszana pod głos; bez muzyki, do której nie ma praw.
 7. **Marka jest prawem:** kolory, fonty, logo i ton z `@@KNOWLEDGE_DIR@@/brands/<marka>/`.
 8. **Źródła i licencje zapisane** (`film.json`, RAPORT): autor, strona, licencja każdego ujęcia stock i każda generacja AI.
-9. **Edycja z HQ = ten sam projekt:** prośba z edytora wskazuje `<film>.edycja.json` (montaż użytkownika) i podaje
-   polecenia `projekt.py`. Pracuję na nim, a nie obok; lektor, muzykę i napisy dokładam jako elementy, cięć użytkownika
-   nie cofam bez powodu, każdą uwagę z osi zamykam (`--zrobione` albo `--odrzuc`).
+9. **Każdy film da się poprawić w HQ:** film z kodu oddaję jako projekt edytora (`projekt.py z-kodu`: czysty obraz,
+   dźwięki osobno, napisy tekstem). Prośba z edytora wskazuje `<film>.edycja.json`: pracuję na nim, cięć
+   użytkownika nie cofam bez powodu, każdą uwagę z osi zamykam (`--zrobione` albo `--odrzuc`).
 10. **Deterministyczne robią skrypty** (`film.py`, `montaz.py`, `qa_wideo.py`), ja decyduję i oglądam.
 
 ## Mapa workflowów

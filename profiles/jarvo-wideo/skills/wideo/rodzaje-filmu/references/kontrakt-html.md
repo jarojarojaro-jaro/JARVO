@@ -165,8 +165,9 @@ const napis = O.napis(t);                             // grupa napisów w chwili
   się, gdy lektor milknie, a ostatni element ląduje najpóźniej przy `uN.mowa_koniec` i stoi do cięcia (oddech).
 - Inny tekst, głos albo tempo = `film.py narracja` jeszcze raz; strona się nie zmienia, idzie za nową osią. Nazwa
   chwili, której w osi już nie ma, zatrzymuje render i pomiar z nazwą (`nieznana chwila „…”`), nic nie przesuwa się po cichu.
-- `--dlugosc` renderu i pomiaru = `O.dlugosc` (narracja podaje gotowe polecenie). Napisy wypalasz z
-  `lektor.slowa.json` (`napisy.py --slowa`) albo rysuje je strona z `O.napis(t)`, nie oba naraz.
+- `--dlugosc` renderu i pomiaru = `O.dlugosc` (narracja podaje gotowe polecenie). Napisy lektora idą do projektu
+  edytora z `lektor.slowa.json` (`projekt.py z-kodu --slowa`), a strona ich nie rysuje (`O.napis(t)` tylko w podglądzie
+  albo, gdy napis jest częścią animacji i właściciel o to prosi).
 - Fakty: brief Sherlocka w `out/wideo/src/fakty.json` (katalog wyżej niż strona). `narracja` sprawdza z nim liczby
   lektora, a `pomiar` liczby na ekranie stojące ≥ 0,5 s (klatki licznika w ruchu nie): `liczba_niepewna` = błąd,
   `liczba_bez_zrodla` = ostrzeżenie (oś wykresu, numer kroku: `--wyjatek "liczba_bez_zrodla@50=oś wykresu…"`).
@@ -193,7 +194,9 @@ python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 -
   na miejsce, gdy na maszynie trwają już 2 pełne rendery albo przy trwającym renderze wolnej pamięci jest < 30%.
 - Dźwięk (lektor, muzyka, efekty) dokłada `film.py` (`"plik"` + `"koniec": "stop"`) albo `montaz.py`; potem `qa_wideo.py`.
   Film z lektorem z `narracja` i muzyką pisaną kodem: `muzyka.py zrob film.mp4 -o final.mp4 --lektor src/lektor.wav
-  --cues cues.json` (głos w miksie, muzyka ściszana pod mowę, efekty w pauzach; skill `lektor-i-dzwiek`).
+  --cues cues.json` (głos w miksie, muzyka ściszana pod mowę, efekty w pauzach; skill `lektor-i-dzwiek`), potem
+  `projekt.py z-kodu <film> --obraz film.mp4 --z-muzyki final.muzyka.json --ciecia src/os_czasu.json --slowa
+  src/lektor.slowa.json --render`: film oddajesz jako projekt edytora (`film-z-kodu/references/projekt-edytora.md`).
 
 ## Trzy formaty z jednej osi czasu
 Jedna scena, jedna oś czasu, **układ liczony z rozmiaru kadru**, a nie stałe piksele: `const L = layout(W, H)`

@@ -162,7 +162,8 @@ def wymagaj_playwright(skrypt: str, flaga: str, komunikat: str = "brak playwrigh
     except ImportError:
         pass
     venv_py = Path(py())
-    if venv_py.exists() and Path(sys.prefix).resolve() != VENV.resolve() and not os.environ.get(flaga):
+    wprost = Path(sys.argv[0]).resolve() == Path(skrypt).resolve()    # import z innego skryptu: jego argv nie pasuje
+    if wprost and venv_py.exists() and Path(sys.prefix).resolve() != VENV.resolve() and not os.environ.get(flaga):
         os.environ[flaga] = "1"
         os.execv(str(venv_py), [str(venv_py), str(Path(skrypt).resolve()), *sys.argv[1:]])
     raise SystemExit(f"{komunikat}: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html{dopisek}")

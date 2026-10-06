@@ -29,6 +29,9 @@ mową ciszej o 4 dB, a ich słyszalność liczona jest względem głosu i muzyki
 Z obrazem: dźwięk zastępuje ścieżkę filmu (AAC 192k, obraz bez przekodowania); obok zostają <wynik>.muzyka.wav
 (do edytora HQ: `projekt.py dodaj-audio`, do planu film.py: `"muzyka": {"plik": …}`) i <wynik>.muzyka.json
 (plan: tempo, takty, sekcje, akordy, efekty, kontrola). Bez obrazu: WAV i plan obok.
+Ścieżki do edytora: obok WAV katalog <wav bez .wav>.sciezki/ z warstwami miksu osobno (muzyka.wav, efekty.wav,
+glos.wav; float, od 0 s do końca filmu, ta sama skala co master), lista w planie pod "sciezki". Film z kodu oddajesz
+jako projekt: `projekt.py z-kodu <film> --obraz <obraz> --z-muzyki <plan.muzyka.json>`.
 Instalacja raz: python3 $HERMES_HOME/scripts/narzedzia.py instaluj mgaudio (pakiety ok. 390 MB, sample 56 MB).
 """
 
@@ -515,6 +518,7 @@ def cmd_zrob(a) -> int:
     wav.parent.mkdir(parents=True, exist_ok=True)
     # do MP4 zapas 0,5 dB: AAC dokłada przesterowania między próbkami
     m.export(str(wav), lufs=a.lufs, tp=-1.5 if obraz else -1.0, analyze=False)
+    sciezki = zapisz_sciezki(m, wav)
     res = mga.qc.analyze(str(wav), expected=plan["dlugosc"], onsets=False)
     kontrola = ocena(res, a.lufs, slyszalnosc(m, polozone, wav, plan["dlugosc"]) if polozone else None)
     kontrola["uwagi"] += tlok(zd)
@@ -551,11 +555,46 @@ def cmd_zrob(a) -> int:
                        "glos_nad_muzyka_db": GLOS_NAD_MUZYKA, "sciszenie_db": SCISZENIE_POD_GLOSEM,
                        "efekty_pod_glosem_db": EFEKTY_POD_GLOSEM}} if lektor_info else {}),
         "pliki": {"wav": str(wav), **({"mp4": str(wynik)} if obraz else {})},
+        "sciezki": sciezki,
     }
     plan_json = Path(a.json).resolve() if a.json else (wynik.with_suffix(".muzyka.json"))
     plan_json.write_text(json.dumps(wynik_json, ensure_ascii=False, indent=1), encoding="utf-8")
     wypisz(wynik_json, plan_json)
     return 0 if kontrola["ok"] else 1
+
+
+GRUPY_SCIEZEK = {"group.sfx": "efekty", "group.glos": "glos"}    # każda inna grupa (music…) = muzyka
+
+
+def sciezki_dir(wav: Path) -> Path:
+    return wav.with_name(f"{wav.stem}.sciezki")
+
+
+def zapisz_sciezki(m, wav: Path) -> dict:
+    """Warstwy miksu osobno do edytora (`projekt.py z-kodu --z-muzyki`): grupy po przysiadaniu pod efektami i lektorem,
+    przeskalowane jak master (gotowy WAV kontra suma grup, jak w kontroli), float bez obcinania, od 0 s do końca."""
+    import numpy as np  # noqa: PLC0415
+    import soundfile as sf  # noqa: PLC0415
+    grupy = {k: np.asarray(v, dtype=np.float64) for k, v in m.stems.items() if k.startswith("group.")}
+    if not grupy:
+        return {}
+    rms = lambda x: float(np.sqrt(np.mean(np.square(x))) + 1e-12)  # noqa: E731
+    gotowy, sr = sf.read(str(wav), always_2d=True)
+    master = rms(gotowy.T.mean(axis=0)) / rms(sum(v.mean(axis=0) for v in grupy.values()))
+    warstwy: dict[str, object] = {}
+    for k, v in grupy.items():
+        nazwa = GRUPY_SCIEZEK.get(k, "muzyka")
+        warstwy[nazwa] = warstwy[nazwa] + v if nazwa in warstwy else v
+    kat = sciezki_dir(wav)
+    kat.mkdir(parents=True, exist_ok=True)
+    wynik = {}
+    for nazwa, v in warstwy.items():
+        if not np.any(np.abs(v) > 1e-6):            # pusta grupa (np. efekty bez cues.json) nie idzie do edytora
+            continue
+        plik = kat / f"{nazwa}.wav"
+        sf.write(str(plik), (v * master).T.astype(np.float32), sr, subtype="FLOAT")
+        wynik[nazwa] = str(plik)
+    return wynik
 
 
 def obwiednia(x, sr: int = 48000):
@@ -652,6 +691,9 @@ def wypisz(p: dict, plan_json: Path) -> None:
           + (f"; MP4 {k['mp4']['lufs']} LUFS, {k['mp4']['szczyt_dbtp']} dBTP" if k.get("mp4") else ""))
     for u in k["uwagi"]:
         print(f"  ! {u}")
+    if p.get("sciezki"):
+        print(f"  ścieżki do edytora: {', '.join(p['sciezki'])} w {Path(next(iter(p['sciezki'].values()))).parent}/ "
+              f"(projekt.py z-kodu <film> --obraz <obraz> --z-muzyki {plan_json})")
     print(f"Wynik: {'OK' if k['ok'] else 'DO POPRAWY'} · plan {plan_json}")
     if "mp4" in p["pliki"]:
         print(f"MEDIA:{p['pliki']['mp4']}")

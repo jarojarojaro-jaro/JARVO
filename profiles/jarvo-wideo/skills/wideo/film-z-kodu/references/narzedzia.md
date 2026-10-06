@@ -72,7 +72,11 @@ cat "$LIB/AGENTS.md"; sed -n 1,80p "$LIB/styles/README.md"         # potem DIREC
   także przy wolnej pamięci < 30 %). Miks `LEMO_COLOR=bt709 sh core/render/mux.sh <video> <mix.wav> <out.mp4>`
   (−14 LUFS, szczyt −1,2 dBTP, wypisuje zmierzoną głośność i ostrzega, gdy film jej nie trzyma). Bez `LEMO_COLOR=bt709`
   mux zostawia pełny zakres `yuvj420p`, który `qa_wideo.py` blokuje (część odtwarzaczy i platform źle go wyświetla).
-- Film to 30–60 min pracy: storyboard tylko, gdy karta prosi. Wynik: `<nazwa>.mp4`, `.srt`, `poster.jpg`, `TREATMENT.md`.
+- **Oddanie jako projekt edytora** (`projekt-edytora.md`, rozdz. lemo): render z `--q nosub=1`, `mix.py` zapisuje
+  obok `mix.wav` warstwy `out/sciezki/{glos,efekty,muzyka}.wav`, `mux.sh` daje czysty obraz z ziarnem
+  (`out/obraz.mp4`), a film składa `projekt.py z-kodu … --ciecia events.json --napisy out/<nazwa>.srt --render`.
+- Film to 30–60 min pracy: storyboard tylko, gdy karta prosi. Wynik: `<nazwa>.mp4` (render projektu), `<nazwa>.edycja.json`
+  z `<nazwa>-sciezki/`, `.srt`, `poster.jpg`, `TREATMENT.md`.
 
 ## claude-animation (rysunek w Node canvas, postaci, efekty gry, dźwięk syntezowany)
 Bez przeglądarki i GPU: `@napi-rs/canvas` + ffmpeg, najlżejszy silnik na VPS. Film = `frame(ctx, t)`.
@@ -231,7 +235,8 @@ python3 $HERMES_HOME/scripts/html_wideo.py lottie "$LOTTIE_PLAYER/public/project
   Po pracy zatrzymaj serwer: `pkill -f "[v]ite.*--port 3030"` (nawias: wzorzec nie trafia w samą komendę).
 
 ## Łączenie
-- obraz z lemo/anidoodle + lektor PL + napisy: `napisy.py <film> --slowa <words>` albo `film.py` z `plik` w scenach
+- film z kodu do oddania: `projekt.py z-kodu` (obraz bez napisów, dźwięki osobno, napisy tekstem; `projekt-edytora.md`),
+- obraz z lemo/anidoodle jako ujęcie w filmie z planu: `film.py` z `plik` w scenach
   (`"ujecie": {"plik": "…mp4", "koniec": "stop"}`: krótsza animacja trzyma ostatnią klatkę zamiast zaczynać od nowa),
 - klipy z `html_wideo.py`, Remotion, Lottie: tak samo jak wyżej (`plik` + `koniec: stop`) albo nałożone na nagranie (`.mov` z alfą),
 - klipy motion-broll w nagraniu: `composite.py` (podgląd) albo `montaz.py`, potem `napisy` i `glosnosc`,

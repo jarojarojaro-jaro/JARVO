@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.10.0
+version: 1.11.0
 author: Jarvo
 license: MIT
 metadata:
@@ -93,7 +93,9 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
   lektor.wav --cues cues.json` miksuje głos ok. 10 dB nad muzyką, muzyka przysiada o 8 dB, gdy lektor mówi
   (razem ok. −18 dB), i wraca w pauzach między akapitami (oddech w akapicie jej nie podnosi), efekty pod mową
   ciszej o 4 dB; słyszalność efektów liczona względem głosu i muzyki, a raport podaje muzykę pod głosem i w pauzach
-  (poza −22…−14 dB = uwaga). Efekt przejścia kładziesz w pauzie akapitu (`odcinki` mowy w planie). Sam podkład:
+  (poza −22…−14 dB = uwaga). Efekt przejścia kładziesz w pauzie akapitu (`odcinki` mowy w planie). Obok planu
+  leżą warstwy miksu osobno (`<wynik>.muzyka.sciezki/`: muzyka, efekty, głos; w planie `"sciezki"`): z nich
+  `projekt.py z-kodu … --z-muzyki <plan>` składa projekt edytora, w którym właściciel zdejmie albo podmieni muzykę. Sam podkład:
   `--bez-efektow --dlugosc S -o podklad.wav`, potem plan film.py `"muzyka": {"plik": …}` albo `projekt.py dodaj-audio`. Raz: `narzedzia.py instaluj mgaudio` (ok. 450 MB).
 - Głośność pod lektorem 0,08–0,16, czyli −22…−16 dB względem głosu (plan: `glosnosc`, domyślnie 0,14); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.

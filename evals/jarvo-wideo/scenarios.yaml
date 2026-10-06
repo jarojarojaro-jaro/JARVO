@@ -320,3 +320,15 @@ scenarios:
       should_not:
         - "przyspiesza cały film (wyższe tempo odtwarzania, szybszy lektor ponad 3 słowa/s) albo dokłada ruch-wypełniacz (pływanie, konfetti), żeby tylko coś się ruszało"
         - "tnie gotowe MP4 tak, że rwie lektora i muzykę"
+
+  - id: wideo-z-kodu-edytowalny
+    type: in_scope
+    input: "Zrób 20-sekundowy explainer z kodu o tym, jak działa nasz młyn, z lektorem, muzyką i napisami. Chcę go potem sam poprawić w edytorze."
+    expect:
+      should:
+        - "obraz renderowany bez wypalonych napisów (strona nie rysuje napisów lektora, lemo `--q nosub=1`), dźwięki jako osobne pliki: lektor, efekty, muzyka (`muzyka.py zrob` zostawia warstwy w `<wynik>.muzyka.sciezki/`, lemo `mix.py` w `out/sciezki/`)"
+        - "`projekt.py z-kodu <film> --obraz … --ciecia os_czasu.json|events.json --z-muzyki …|--glos/--efekty/--muzyka … --slowa|--napisy … --render`: obraz w ujęciach, głos i efekty przypięte do obrazu, muzyka osobno, napisy tekstem, film = render projektu"
+        - "`qa_wideo.py <film> --z-kodu --lektor` bez błędów, w RAPORT: projekt do poprawek w HQ → Wideograf → Wyniki → Edytuj"
+      should_not:
+        - "wypala napisy w obraz (`napisy.py --wypal`) albo oddaje jeden zmiksowany plik dźwięku, gdy silnik dał warstwy osobno"
+        - "oddaje film, który nie jest renderem projektu, albo nadpisuje projekt poprawiony już w edytorze (`--nadpisz` bez prośby)"

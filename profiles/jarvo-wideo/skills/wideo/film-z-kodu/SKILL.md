@@ -1,7 +1,7 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.10.0
+version: 3.11.0
 author: Jarvo
 license: MIT
 metadata:
@@ -20,6 +20,7 @@ Animacje, typografia w ruchu, UI, wykresy, rysunek: każda klatka rysowana kodem
 są ostre i poprawne, nic nie jest „z AI”. Film z ujęć stock, lektora i napisów bez animacji → `krotki-film`.
 Instalacja, środowisko i polski lektor dla silników zewnętrznych: `references/narzedzia.md` (przeczytaj przed
 pierwszym użyciem silnika spoza HyperFrames/Manim).
+Oddanie filmu jako projektu edytora HQ (wszystkie silniki): `references/projekt-edytora.md`.
 
 ## Wybór silnika
 Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlaczego. Ta tabela to pełna lista silników.
@@ -91,6 +92,9 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
    `parametry.json` + `window.__params` (kontrakt HTML, reguła 7; właściciel stroi je w HQ, **◐ Animacja**); szablony w `motion-design` to wzorce kompozycji z rejestru
    remocn, niczego z niego nie instalujesz. Przykłady w Remotion przenosisz na wybrany silnik (Remotion tylko,
    gdy go wybrałeś: firmy powyżej 3 osób potrzebują licencji Remotion).
+13. **Film = projekt edytora:** każdy film z kodu oddajesz jako projekt HQ (`projekt.py z-kodu`, `references/projekt-edytora.md`):
+   obraz bez wypalonych napisów, głos i efekty przypięte do obrazu, muzyka osobno, napisy tekstem; film to render
+   projektu. Właściciel sam wytnie ujęcie, zdejmie muzykę albo poprawi napis.
 
 ## Kroki
 1. **Rodzaj, brief i format** (`rodzaje-filmu`, `formaty-wideo`): plik rodzaju → `out/wideo/src/BRIEF.md`
@@ -105,12 +109,17 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 4. **Look:** jedna–trzy klatki stylu renderowane prawdziwym kodem → obejrzyj (vision), popraw, dopiero potem całość.
    Akceptacja użytkownika tylko przy dużych zleceniach (karta mówi) – inaczej decydujesz sam.
 5. **Budowa i render** wg SKILL.md wybranego silnika (i w lemo: `$LIB/AGENTS.md`, `DIRECTOR.md`, `TECHNIQUE.md`, `STYLE.md`).
-6. **Dźwięk:** lektor PL (Edge TTS), muzyka (anidoodle albo biblioteka), miks −14 LUFS (`montaz.py glosnosc` albo lemo `mux.sh`).
-7. **Napisy:** `napisy.py <film> --slowa out/wideo/src/lektor.slowa.json --wypal` (gdy tekst nie jest częścią animacji).
-8. **Kontrola** (`kontrola-wideo`), oddanie: link `jarvo_link.py`, miniatura, źródła projektu w `out/wideo/src/`.
+6. **Dźwięk osobno:** lektor PL (Edge TTS), efekty, muzyka (`muzyka.py zrob` zostawia warstwy miksu, lemo `mix.py`
+   zapisuje `out/sciezki/`, biblioteka); każda warstwa to osobny plik, nie jeden wypalony miks.
+7. **Projekt i napisy:** `projekt.py z-kodu <film> --obraz <obraz bez napisów> --ciecia … --glos/--efekty/--muzyka
+   (albo --z-muzyki) --slowa lektor.slowa.json|--napisy film.srt --render` (`references/projekt-edytora.md`); napisy
+   lektora nie są wypalane w obraz, tylko leżą w projekcie jako tekst. −14 LUFS liczy `z-kodu`.
+8. **Kontrola** (`kontrola-wideo`, `qa_wideo.py <film> --z-kodu`), oddanie: link `jarvo_link.py`, miniatura, źródła
+   projektu w `out/wideo/src/`, w RAPORT.md „projekt do poprawek: HQ → Wideograf → Wyniki → Edytuj”.
 
 ## Definition of Done
 - [ ] silnik dobrany do celu i uzasadniony; bramka narzędzia (gdy jest) zaliczona,
 - [ ] hak w pierwszych 2 s, zmiana co sekundę, puenta; tekst czytelny w ruchu,
 - [ ] zero zmyślonych liczb; assety z licencją w RAPORT.md,
-- [ ] `qa_wideo.py` bez błędów, `kontrola.json` ≥ 85, źródła projektu w `out/wideo/src/`.
+- [ ] film = render projektu edytora (`projekt.py z-kodu`): czysty obraz w ujęciach, dźwięki osobno, napisy tekstem,
+- [ ] `qa_wideo.py --z-kodu` bez błędów, `kontrola.json` ≥ 85, źródła projektu w `out/wideo/src/`.

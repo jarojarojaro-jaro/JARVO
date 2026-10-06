@@ -50,7 +50,7 @@ Poziom 2 (później): ruch elementów animacji z parametrów (okno ◐ Animacja)
 |---|---|---|
 | Dźwięk przypięty do obrazu | ✅ | Element audio z `linked` (głos, efekty) idzie przy cięciu, usunięciu, przestawieniu i duplikacji klipów kawałkami za swoim obrazem; łańcuch na osi, „Odłącz od obrazu” w panelu; `projekt.py dzwiek --przypnij/--odlacz` |
 | Projekt z filmu z kodu | ✅ | `projekt.py z-kodu`: czysty obraz (bez wypalonych napisów, bez dźwięku) pocięty na ujęcia (`--ciecia`: liczby, `events.json` lemo, `os_czasu.json`), głos i efekty przypięte do obrazu, muzyka osobno, napisy z SRT albo słów (karaoke); kopie w `<film>-sciezki/` ze wzmocnieniem do −14 LUFS (elementy na 0 dB, gdy szczyt pozwala); `--render`: film = render projektu; projektu zmienionego w edytorze nie nadpisze bez `--nadpisz`. Limiter eksportu −2 dBFS (szczyt prawdziwy pod −1 dBTP) |
-| Silniki i reguła oddania | planowane | lemo, kontrakt HTML z `muzyka.py`, pozostałe silniki; bez projektu film nie jest oddany (`kontrola-wideo`) |
+| Silniki i reguła oddania | ✅ | `muzyka.py zrob` zostawia warstwy miksu (`<wynik>.muzyka.sciezki/`: muzyka, efekty, głos), a `z-kodu --z-muzyki` bierze je z planu (słowa przesunięte jak głos); lemo: render `--q nosub=1`, `mix.py` zapisuje `out/sciezki/`, `--ciecia events.json`, `--napisy` z SRT; `maskotka.py` oddaje projekt sam. Reguła w SOUL, `film-z-kodu` (`references/projekt-edytora.md`), `kontrola-wideo`, rubryce i evals; `qa_wideo.py --z-kodu`: błąd bez projektu, bez jego plików albo gdy film nie jest jego renderem |
 
 ## Krok 3. Tekst
 

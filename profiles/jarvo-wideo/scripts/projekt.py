@@ -32,8 +32,9 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py usun <film> <id>                    # usuń klip / tekst / audio o danym id (z `pokaz`)
     projekt.py uwaga <film> <id> (--zrobione "co zmieniłem" | --odrzuc "dlaczego")   # zamknij uwagę z osi edytora
     projekt.py z-kodu <film> --obraz czysty.mp4 [--ciecia 5.4,9.6|events.json|os_czasu.json] [--glos lektor.wav[@od]]
-                      [--efekty fx.wav] [--muzyka muzyka.wav] [--audio NAZWA=plik[@od]] [--napisy film.srt | --slowa
-                      lektor.slowa.json] [--karaoke] [--kroj Caveat] [--styl box] [--kolor #hex] [--tlo #hex] [--render]
+                      [--efekty fx.wav] [--muzyka muzyka.wav] [--z-muzyki plan.muzyka.json] [--audio NAZWA=plik[@od]]
+                      [--napisy film.srt | --slowa lektor.slowa.json[@od]] [--karaoke] [--kroj Caveat] [--styl box]
+                      [--kolor #hex] [--tlo #hex] [--render]
                                     # film z kodu jako projekt: obraz w ujęciach, głos i efekty przypięte do obrazu,
                                     # muzyka osobno, napisy tekstem, suma −14 LUFS; --render: film = render projektu
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
@@ -47,7 +48,10 @@ Nic nie nadpisuje oryginału: render zapisuje film-edycja.mp4, film-edycja-2.mp4
 
 Film z kodu (`z-kodu`): czysty obraz i dźwięki trafiają do `<film>-sciezki/` (obraz bez dźwięku, WAV 48 kHz), projekt
 obok filmu, a film powstaje z projektu (`--render` albo `render <film> --out <film>`), więc w edytorze HQ widać
-dokładnie to, co oddano. Projektu zmienionego w edytorze `z-kodu` nie nadpisze bez `--nadpisz`.
+dokładnie to, co oddano. Projektu zmienionego w edytorze `z-kodu` nie nadpisze bez `--nadpisz`. `--z-muzyki` bierze
+warstwy z planu `muzyka.py zrob` (muzyka, efekty, głos osobno; jawne --glos/--efekty/--muzyka mają pierwszeństwo).
+Słowa (`--slowa`) mają czasy od początku lektora: przesuwa je to samo „od” co głos (`--glos plik@od` albo lektor
+w planie muzyki), chyba że podasz własne `--slowa plik@od`.
 
 Uwagi (`notes` w projekcie) zostawia właściciel w edytorze HQ: prośba przypięta do chwili osi, często z kadrem
 (obraz w inboxie, oglądasz go przez vision_analyze). Każdą zamykasz `uwaga … --zrobione` albo `--odrzuc` z powodem;
@@ -1397,7 +1401,7 @@ def cmd_render(film: Path, a) -> int:
 # ---------------------------------------------------------------- film z kodu → projekt edytora (poziom 1)
 
 Z_KODU_LUFS = -14.0          # suma dźwięków projektu: głośność platform (qa_wideo), limiter eksportu trzyma szczyt
-NAZWY_SCIEZEK = {"glos": "Głos", "muzyka": "Muzyka", "efekty": "Efekty"}
+NAZWY_SCIEZEK = {"glos": "Głos", "efekty": "Efekty", "muzyka": "Muzyka"}      # kolejność = kolejność na osi
 PL_ASCII = str.maketrans("ąćęłńóśźż", "acelnoszz")   # nazwa pliku ścieżki z nazwy („Tło” → tlo.wav)
 
 
@@ -1552,6 +1556,32 @@ def edytowany(film: Path) -> bool:
     return not zk or zk.get("podpis") != podpis(proj)
 
 
+def _od(spec: str) -> tuple[str, float | None]:
+    """„plik” albo „plik@1.5” → (plik, od); bez liczby po @ całość to nazwa pliku."""
+    if "@" in spec:
+        x, y = spec.rsplit("@", 1)
+        try:
+            return x, max(0.0, float(y))
+        except ValueError:
+            pass
+    return spec, None
+
+
+def z_planu_muzyki(path: Path) -> tuple[dict, float | None]:
+    """Warstwy z planu `muzyka.py zrob` ("sciezki": {muzyka, efekty, glos}, każda od 0 s) i chwila lektora w filmie."""
+    try:
+        j = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"--z-muzyki: nie umiem odczytać {path}: {exc}")
+    sc = {k: v for k, v in (j.get("sciezki") or {}).items() if k in NAZWY_SCIEZEK and v}
+    if not sc:
+        raise SystemExit(f"--z-muzyki: {path.name} nie ma ścieżek (zrób muzykę od nowa: muzyka.py zrob zapisuje je sama)")
+    baza = path.parent
+    sc = {k: str((baza / v) if not Path(v).is_absolute() else Path(v)) for k, v in sc.items()}
+    od = (j.get("lektor") or {}).get("od")
+    return sc, (float(od) if "glos" in sc and od is not None else None)
+
+
 def projekt_z_kodu(film: Path, a) -> dict:
     """Projekt edytora z części filmu z kodu: czysty obraz (bez dźwięku, pocięty na ujęcia), głos i efekty przypięte
     do obrazu, muzyka osobno, napisy jako tekst. Kopie w <film>-sciezki/, głośność sumy do --lufs."""
@@ -1579,8 +1609,16 @@ def projekt_z_kodu(film: Path, a) -> dict:
         proj["clips"].append({"id": new_id("c"), "src": str(cel), "kind": "video", "in": round(x, 3), "out": round(y, 3),
                               "speed": 1, "volume": 1, "muted": False, "fit": "contain"})
     zrodla = {"obraz": str(obraz)}
-    sciezki = [(rola, spec, rola != "muzyka", NAZWY_SCIEZEK[rola]) for rola in ("glos", "efekty", "muzyka")
-               for spec in [getattr(a, rola)] if spec]
+    specs = {rola: getattr(a, rola) for rola in NAZWY_SCIEZEK}
+    glos_od = _od(a.glos)[1] if a.glos else None
+    if getattr(a, "z_muzyki", None):
+        z_muzyki, lektor_od = z_planu_muzyki(Path(a.z_muzyki).resolve())
+        for rola, plik in z_muzyki.items():
+            if not specs[rola]:
+                specs[rola] = plik
+                glos_od = lektor_od if rola == "glos" else glos_od
+        zrodla["muzyka_plan"] = str(Path(a.z_muzyki).resolve())
+    sciezki = [(rola, spec, rola != "muzyka", NAZWY_SCIEZEK[rola]) for rola, spec in specs.items() if spec]
     for spec in a.audio or []:
         nazwa, _, plik = spec.partition("=")
         if not plik:
@@ -1611,7 +1649,11 @@ def projekt_z_kodu(film: Path, a) -> dict:
         zrodla[rola] = str(src)
     pion_ = h > w
     if a.napisy or a.slowa:
-        slowa = slowa_z_pliku(Path(a.slowa)) if a.slowa else None
+        slowa = None
+        if a.slowa:
+            plik_slow, od_slow = _od(a.slowa)
+            przes = od_slow if od_slow is not None else (glos_od or 0.0)
+            slowa = [[w[0] + przes, w[1] + przes, *w[2:]] for w in slowa_z_pliku(Path(plik_slow))]
         look = {**CAP_DEFAULT, **pion(proj)}
         for arg, key in (("styl", "style"), ("kolor", "color"), ("tlo", "bg"), ("rozmiar", "size"), ("y", "y")):
             if getattr(a, arg) is not None:
@@ -1626,7 +1668,7 @@ def projekt_z_kodu(film: Path, a) -> dict:
             proj["texts"].append({**look, "id": new_id("t"), "cap": True, "start": round(ln["start"], 3),
                                   "end": round(min(ln["end"], dur), 3), "text": ln["text"],
                                   **({"words": ln["words"]} if look.get("hl") and ln.get("words") else {})})
-        zrodla["napisy"] = str(Path(a.napisy or a.slowa).resolve())
+        zrodla["napisy"] = str(Path(a.napisy or _od(a.slowa)[0]).resolve())
     proj["zKodu"] = {"zrodla": zrodla, "sciezki": str(kat), "ciecia": granice[1:-1],
                      **({"lufs_przed": lufs, "lufs": a.lufs} if lufs is not None else {})}
     try:
@@ -1815,9 +1857,11 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--glos", help="lektor: plik[@od] (przypięty do obrazu)")
     sp.add_argument("--efekty", help="efekty i foley: plik[@od] (przypięte do obrazu)")
     sp.add_argument("--muzyka", help="muzyka: plik[@od] (osobno: przy cięciu gra dalej)")
+    sp.add_argument("--z-muzyki", help="plan muzyka.py zrob (<wynik>.muzyka.json): muzyka, efekty i głos z jego ścieżek")
     sp.add_argument("--audio", action="append", help="inna ścieżka przypięta do obrazu: NAZWA=plik[@od] (np. Tło=room.wav)")
     sp.add_argument("--napisy", help="napisy z SRT (podział linii jak w filmie)")
-    sp.add_argument("--slowa", help="słowa z czasem (film.py narracja: lektor.slowa.json): napisy albo karaoke do SRT")
+    sp.add_argument("--slowa", help="słowa z czasem (film.py narracja: lektor.slowa.json[@od]): napisy albo karaoke do SRT; "
+                                    "bez @od przesunięte jak głos")
     sp.add_argument("--karaoke", nargs="?", const="", help="podświetlenie słowa (domyślnie #FFE14D)")
     sp.add_argument("--kroj", help="krój napisów z listy edytora (np. Caveat, Kanit)")
     sp.add_argument("--styl", choices=["shadow", "box", "outline", "plain"], help="wygląd napisów")

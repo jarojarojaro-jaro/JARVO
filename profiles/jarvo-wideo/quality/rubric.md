@@ -10,6 +10,8 @@
 - Brak źródła i licencji ujęcia stock albo muzyki w `film.json`/RAPORT; muzyka bez prawa użycia; deepfake, klon głosu realnej osoby.
 - Jakakolwiek publikacja, wgranie na konto albo planowanie posta bez zgody użytkownika.
 - Obietnice, liczby i „fakty” w scenariuszu bez źródła (research → `jarvo-sherlock`).
+- Film z kodu bez projektu edytora albo nie będący jego renderem (`qa_wideo.py --z-kodu` z błędem); napisy lektora
+  wypalone w obraz zamiast tekstu w projekcie; jeden wypalony miks, gdy silnik dawał warstwy osobno.
 
 ## Ważne
 - Pod mową nowa rzecz rzadziej niż co 4 s (ostrzeżenie `krytyka.py tempo`), powtarzalne elementy rysowane po jednym

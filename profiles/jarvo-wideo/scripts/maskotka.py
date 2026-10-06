@@ -5,8 +5,9 @@
     python3 maskotka.py --plik tekst.txt -o film.mp4 [--format 9x16|1x1|16x9] [--glos pl-PL-MarekNeural]
                         [--tlo "#0E121A"] [--akcent "#B8FF3D"] [--bez-napisow] [--fps 30]
 
-Wynik: MP4 z lektorem (Edge TTS, czasy słów), napisami karaoke (napisy.py, poza strefami UI) i plikiem
-<film>.slowa.json. Animacja jest czystą funkcją czasu: głośność lektora (obwiednia 100/s) steruje wskaźnikiem głosu
+Wynik: MP4 z lektorem (Edge TTS, czasy słów), napisami karaoke i plikiem <film>.slowa.json. Film jest renderem
+projektu edytora HQ (`projekt.py z-kodu`): obraz, głos przypięty do obrazu i napisy jako tekst, więc właściciel
+poprawi napis albo utnie zdanie w edytorze. `--bez-napisow`: sam film, bez projektu. Animacja jest czystą funkcją czasu: głośność lektora (obwiednia 100/s) steruje wskaźnikiem głosu
 i poświatą oczu, mrugnięcia mają stałe chwile (powtarzalny render). Robot to prawdziwa grafika marki (pixel art,
 skalowanie bez rozmycia). Do reklam i reelsów „Jarvo mówi”, intro/outro, odpowiedzi w social media.
 Kod wyjścia: 0 ok, 2 złe wejście.
@@ -129,16 +130,17 @@ def main(argv: list[str] | None = None) -> int:
     if ff.wait():
         print("✗ ffmpeg nie złożył filmu", file=sys.stderr)
         return 2
-    if not a.bez_napisow:
-        r = subprocess.run([sys.executable, str(Path(__file__).with_name("napisy.py")), str(surowy), "--slowa", str(slowa),
-                            "--wypal", "--akcent", a.akcent], capture_output=True, text=True)
-        gotowy = surowy.with_name(surowy.stem + ".napisy.mp4")
-        if r.returncode or not gotowy.exists():
-            print(f"✗ napisy: {(r.stderr or r.stdout)[-300:]}", file=sys.stderr)
+    if not a.bez_napisow:                 # film = render projektu edytora: napisy karaoke jako tekst, głos osobno
+        r = subprocess.run([sys.executable, str(Path(__file__).with_name("projekt.py")), "z-kodu", str(out), "--obraz",
+                            str(surowy), "--glos", str(mowa.audio), "--slowa", f"{slowa}@0", "--karaoke", a.akcent,
+                            "--render"], capture_output=True, text=True)
+        if r.returncode or not out.exists():
+            print(f"✗ projekt filmu: {(r.stderr or r.stdout)[-300:]}", file=sys.stderr)
             return 2
-        gotowy.replace(out)
-    print(json.dumps({"film": str(out), "sek": round(dur, 2), "slowa": str(slowa), "format": a.format,
-                      "glos": a.glos}, ensure_ascii=False))
+        surowy.unlink(missing_ok=True)    # obraz jest już w <film>-sciezki/
+    print(json.dumps({"film": str(out), "sek": round(dur, 2), "slowa": str(slowa), "format": a.format, "glos": a.glos,
+                      **({} if a.bez_napisow else {"projekt": str(out.with_name(f"{out.stem}.edycja.json"))})},
+                     ensure_ascii=False))
     return 0
 
 

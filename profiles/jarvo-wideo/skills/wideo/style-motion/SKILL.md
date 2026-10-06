@@ -1,7 +1,7 @@
 ---
 name: style-motion
 description: "15 stylów motion design: karta, wzór, moduły JS."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -75,9 +75,11 @@ zdaniem uzasadnienia w RAPORT.md.
    out/wideo/src/cues.json --styl <styl>` (przepis mgaudio dla stylu, kulminacja i logo z osi, efekty w tych samych
    chwilach; `muzyka.py przepisy` pokazuje alternatywę bliższą karcie, np. kreska → `--przepis variety`; brak
    dodatku → `narzedzia.py instaluj mgaudio`). Muzyka klienta albo podkład z biblioteki: synteza efektów
-   `sound.mjs` z `--bed`; efekty z biblioteki CC0 potem na gotowy film: `projekt.py dodaj-dzwiek <film> <id>
-   --start S` (raz na efekt) i `projekt.py render <film>`. Na koniec `qa_wideo.py`: poniżej −15 LUFS (tak zwykle
-   wychodzi po `sound.mjs`) → `montaz.py glosnosc <film> -o <wynik> --lufs -14`.
+   `sound.mjs` z `--bed` (efekty osobnym plikiem, nie wmiksowane w muzykę). Oddajesz projekt edytora:
+   `projekt.py z-kodu <film> --obraz out/wideo/film.mp4 --z-muzyki out/wideo/final.muzyka.json --render` (albo
+   `--efekty`/`--muzyka` z plików, `film-z-kodu/references/projekt-edytora.md`), potem `qa_wideo.py --z-kodu`.
+   Efekty z biblioteki CC0 dokładasz już do tego projektu: `projekt.py dodaj-dzwiek <film> <id> --start S` (raz na
+   efekt) i `projekt.py render <film> --out <film>`.
 8. **Kontrola:** punkty „Kontrola” z karty, `html_wideo.py pomiar … --preset jarvo` pełny i aktualny bez błędów, potem `kontrola-wideo`.
 9. **Render szybki:** `html_wideo.py wideo out/wideo/src/index.html --preset jarvo --dlugosc N -o out/wideo/film.mp4` bez `--subklatki` (motion blur
    tylko na prośbę właściciela), przeglądarki równolegle same (`--rownolegle`). Czas: `klatki` na 2–3 najcięższych

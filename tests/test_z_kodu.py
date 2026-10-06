@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from conftest import load_script
+from conftest import REPO, load_script
 
 pr = load_script("profiles/jarvo-wideo/scripts/projekt.py", "jarvo_projekt_z_kodu_test")
 ed = pr.ed
@@ -182,6 +182,37 @@ def test_z_kodu_slowa_karaoke_i_bez_glosnosci(tmp_path, czesci):
     assert cap["text"] == "Młyn Zawada." and cap["hl"] == pr.KARAOKE_HL and cap["words"] == [[0.0, 0.4, "Młyn"], [0.4, 0.9, "Zawada."]]
 
 
+def test_z_kodu_z_planu_muzyki_slowa_od_lektora(tmp_path, czesci):
+    kat = czesci / "final.muzyka.sciezki"                       # muzyka.py zrob: warstwy miksu od 0 s
+    kat.mkdir()
+    for n in ("muzyka", "efekty", "glos"):
+        (kat / f"{n}.wav").write_bytes(b"x")
+    plan = czesci / "final.muzyka.json"
+    plan.write_text(json.dumps({"lektor": {"plik": "lektor.wav", "od": 0.5},
+                                "sciezki": {"muzyka": str(kat / "muzyka.wav"), "efekty": "final.muzyka.sciezki/efekty.wav",
+                                            "glos": str(kat / "glos.wav")}}))
+    slowa = czesci / "lektor.slowa.json"
+    slowa.write_text(json.dumps([{"start": 1.0, "end": 1.4, "text": "Młyn"}, {"start": 1.4, "end": 1.9, "text": "Zawada."}]))
+    film = tmp_path / "final.mp4"
+    assert pr.main(["z-kodu", str(film), "--obraz", str(czesci / "obraz24.mp4"), "--z-muzyki", str(plan),
+                    "--muzyka", str(czesci / "music.wav"), "--slowa", str(slowa), "--karaoke"]) == 0
+    p = json.loads(ed.project_path(film).read_text(encoding="utf-8"))
+    a = {m["label"]: m for m in p["audio"]}
+    assert [m["label"] for m in p["audio"]] == ["Głos", "Efekty", "Muzyka"]
+    assert a["Głos"]["start"] == 0.0 and a["Głos"]["linked"] and a["Efekty"]["linked"]   # warstwa ma już lektora od 0,5 s
+    assert p["zKodu"]["zrodla"]["efekty"] == str(kat / "efekty.wav")                      # ścieżka względna od planu
+    assert p["zKodu"]["zrodla"]["muzyka"] == str(czesci / "music.wav")                    # jawne --muzyka wygrywa
+    (cap,) = p["texts"]
+    assert (cap["start"], cap["end"]) == (1.5, 2.4)                    # słowa przesunięte o chwilę lektora z planu
+    assert pr.main(["z-kodu", str(film), "--obraz", str(czesci / "obraz24.mp4"), "--glos", f"{czesci / 'voice.wav'}@2",
+                    "--slowa", f"{slowa}@0"]) == 0                     # własne @od słów wygrywa z głosem
+    (cap,) = json.loads(ed.project_path(film).read_text(encoding="utf-8"))["texts"]
+    assert (cap["start"], cap["end"]) == (1.0, 1.9)
+    plan.write_text(json.dumps({"pliki": {"wav": "x.wav"}}))
+    with pytest.raises(SystemExit, match="nie ma ścieżek"):
+        pr.main(["z-kodu", str(film), "--obraz", str(czesci / "obraz24.mp4"), "--z-muzyki", str(plan)])
+
+
 def test_z_kodu_zle_wejscie(tmp_path, czesci):
     with pytest.raises(SystemExit, match="NAZWA=plik"):
         pr.main(["z-kodu", str(tmp_path / "f.mp4"), "--obraz", str(czesci / "obraz24.mp4"), "--audio", str(czesci / "room.wav")])
@@ -209,3 +240,58 @@ def test_kopia_i_glosnosc_sumy_z_ffmpeg(tmp_path):
     dwa = pr.glosnosc_sumy([m, {**m, "volume": 1.0}], 2.0)
     assert dwa - raz == pytest.approx(6.0, abs=0.3)                  # dwa razy to samo = +6 dB
     assert subprocess.run(["ffprobe", "-v", "error", str(tmp_path / "s" / "glos.wav")]).returncode == 0
+
+
+def test_qa_wideo_film_z_kodu_ma_projekt_i_jest_jego_renderem(tmp_path):
+    qa = load_script("profiles/jarvo-wideo/scripts/qa_wideo.py")
+    film = tmp_path / "mlyn.mp4"
+    film.write_bytes(b"v")
+    e, w = qa.projekt_z_kodu(film, 27.0, wymagany=True)
+    assert len(e) == 1 and "bez projektu edytora" in e[0] and "projekt.py z-kodu" in e[0]
+    assert qa.projekt_z_kodu(film, 27.0, wymagany=False) == ([], [])          # zwykły film bez projektu: nic
+    obraz = tmp_path / "mlyn-sciezki" / "obraz.mp4"
+    obraz.parent.mkdir()
+    obraz.write_bytes(b"v")
+    pp = tmp_path / "mlyn.edycja.json"
+    proj = {"clips": [{"src": str(obraz), "in": 0, "out": 13.5}, {"src": str(obraz), "in": 13.5, "out": 27, "speed": 1}],
+            "audio": [{"src": str(tmp_path / "mlyn-sciezki" / "glos.wav")}], "zKodu": {}}
+    pp.write_text(json.dumps({k: v for k, v in proj.items() if k != "zKodu"}))
+    assert "brak zKodu" in qa.projekt_z_kodu(film, 27.0, wymagany=True)[0][0]
+    pp.write_text(json.dumps(proj))
+    e, _ = qa.projekt_z_kodu(film, 27.0, wymagany=False)                       # projekt z-kodu sprawdzany zawsze
+    assert len(e) == 1 and "glos.wav" in e[0]
+    (tmp_path / "mlyn-sciezki" / "glos.wav").write_bytes(b"a")
+    assert qa.projekt_z_kodu(film, 27.0, wymagany=True)[0] == []
+    e, _ = qa.projekt_z_kodu(film, 30.0, wymagany=True)
+    assert "nie jest renderem projektu" in e[0]
+    import os
+    os.utime(film, (1_000_000, 1_000_000))                                    # projekt nowszy niż film
+    assert "zmieniony po renderze" in qa.projekt_z_kodu(film, 27.0, wymagany=True)[1][0]
+
+
+def test_playwright_z_innego_skryptu_bez_podmiany_argumentow(tmp_path, monkeypatch):
+    """projekt.py wołany z innego skryptu (np. maskotka.py) nie może się uruchomić od nowa z cudzymi argumentami."""
+    import sys as _sys
+    nz = pr.nz if hasattr(pr, "nz") else load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    venv_py = tmp_path / "bin" / "python"
+    venv_py.parent.mkdir()
+    venv_py.write_text("")
+    monkeypatch.setattr(nz, "py", lambda: str(venv_py))
+    monkeypatch.setattr(nz, "VENV", tmp_path)
+    monkeypatch.delenv("JARVO_TEST_PW", raising=False)
+    wywolane = []
+
+    def execv(prog, args):
+        wywolane.append(args)
+        raise RuntimeError("execv")
+    monkeypatch.setattr(nz.os, "execv", execv)
+    monkeypatch.setitem(_sys.modules, "playwright", None)              # brak playwright w tym Pythonie
+    projekt = str(REPO / "profiles/jarvo-wideo/scripts/projekt.py")
+    monkeypatch.setattr(_sys, "argv", ["maskotka.py", "Cześć, jestem Jarvo."])
+    with pytest.raises(SystemExit, match="instaluj html"):
+        nz.wymagaj_playwright(projekt, "JARVO_TEST_PW")
+    assert wywolane == []
+    monkeypatch.setattr(_sys, "argv", [projekt, "render", "film.mp4"])
+    with pytest.raises(RuntimeError, match="execv"):
+        nz.wymagaj_playwright(projekt, "JARVO_TEST_PW")
+    assert wywolane[0][1:] == [projekt, "render", "film.mp4"]

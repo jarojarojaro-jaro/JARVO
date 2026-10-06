@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Kontrola techniczna filmu przed oddaniem: jedno przejście FFmpeg, wynik w JSON i arkusz klatek do oceny okiem.
 
-    python3 qa_wideo.py film.mp4 [--platforma tiktok] [--format 9:16] [--lektor] [--arkusz out/wideo/qa.jpg] [--json]
+    python3 qa_wideo.py film.mp4 [--platforma tiktok] [--format 9:16] [--lektor] [--z-kodu] [--arkusz out/wideo/qa.jpg] [--json]
 
 Sprawdza: kontener i kodeki (H.264 + AAC, yuv420p, faststart, bez HDR), rozdzielczość i proporcje, fps, długość wobec
 platformy, głośność (LUFS zintegrowane, true peak i rozpiętość LRA), czarne klatki, zamrożony obraz, cisze w dźwięku,
 pojedyncze „mrugnięcia” (jedna klatka inna niż obie sąsiednie: błąd renderu, zgubiony stan, zła klatka przejścia).
 --arkusz: klatki z początku (hook), środka i końca z zaznaczonymi strefami interfejsu platformy (9:16, bez --platforma TikTok):
 na nich widać, czy napisy, tekst i logo nie wchodzą pod przyciski i opis.
+Film z kodu (`--z-kodu`, i zawsze, gdy obok leży projekt z `projekt.py z-kodu`): projekt edytora `<film>.edycja.json`
+istnieje, jego pliki są na miejscu, a film to jego render (ta sama długość, film nie starszy niż projekt), więc
+właściciel otworzy w edytorze HQ dokładnie to, co dostał.
 Kod wyjścia 1 = jest błąd blokujący. Tabela platform zgodna z skills/wideo/formaty-wideo/references/specs.md.
 """
 
@@ -156,7 +159,37 @@ def single_frame_pops(frames: list[bytes], fps: float = 30, min_jump: float = 14
     return out
 
 
-def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkusz: Path | None) -> dict:
+def projekt_z_kodu(path: Path, dur: float, wymagany: bool) -> tuple[list[str], list[str]]:
+    """Film z kodu oddajemy jako projekt edytora (`projekt.py z-kodu`): projekt jest, pliki są, film = jego render."""
+    errors, warns = [], []
+    pp = path.with_name(f"{path.stem}.edycja.json")          # jak edytor.project_path
+    try:
+        proj = json.loads(pp.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        if wymagany:
+            errors.append(f"film z kodu bez projektu edytora ({pp.name}): projekt.py z-kodu {path.name} --obraz <czysty obraz> "
+                          "… --render, inaczej właściciel nie poprawi go w edytorze HQ")
+        return errors, warns
+    except (OSError, ValueError) as exc:
+        return [f"projekt edytora {pp.name} nieczytelny: {exc}"], warns
+    if "zKodu" not in proj:
+        if wymagany:
+            errors.append(f"{pp.name} nie jest projektem filmu z kodu (brak zKodu): projekt.py z-kodu {path.name} … --nadpisz")
+        return errors, warns
+    pliki = {str(x.get("src")) for k in ("clips", "audio") for x in proj.get(k) or [] if x.get("src")}
+    brak = sorted(Path(f).name for f in pliki if not Path(f).is_file())
+    if brak:
+        errors.append(f"projekt edytora wskazuje pliki, których nie ma ({', '.join(brak[:4])}): edytor go nie otworzy")
+    os_ = sum((float(c.get("out", 0)) - float(c.get("in", 0))) / float(c.get("speed") or 1) for c in proj.get("clips") or [])
+    if abs(os_ - dur) > 0.1:
+        errors.append(f"film ({dur:.2f} s) nie jest renderem projektu ({os_:.2f} s): projekt.py render {path.name} --out {path.name}")
+    elif pp.stat().st_mtime > path.stat().st_mtime + 1:
+        warns.append(f"projekt zmieniony po renderze filmu: projekt.py render {path.name} --out {path.name}")
+    return errors, warns
+
+
+def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkusz: Path | None,
+          z_kodu: bool = False) -> dict:
     errors, warns = [], []
     info = wl.probe(path)
     v, a = info["video"], info["audio"]
@@ -219,6 +252,9 @@ def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkus
         for s, e in an["cisze"]:
             if (e or dur) - s >= 2.0:
                 warns.append(f"cisza {s:.1f}–{(e or dur):.1f} s w filmie z lektorem")
+    e_, w_ = projekt_z_kodu(path, dur, z_kodu)
+    errors += e_
+    warns += w_
     res = {"plik": str(path), "ok": not errors, "bledy": errors, "ostrzezenia": warns,
            "metryki": {"sek": round(dur, 2), "rozdzielczosc": f"{v['width']}x{v['height']}", "fps": v["fps"],
                        "wideo": v["codec"], "audio": a and a["codec"], "mb": round(info["size"] / 1048576, 2),
@@ -234,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--platforma", choices=sorted(PLATFORMS))
     ap.add_argument("--format", help="9:16 | 16:9 | 1:1 | 4:5 (domyślnie z platformy)")
     ap.add_argument("--lektor", action="store_true", help="film z lektorem: brak audio i długie cisze to błąd/ostrzeżenie")
+    ap.add_argument("--z-kodu", action="store_true", help="film z kodu: bez projektu edytora (projekt.py z-kodu) to błąd")
     ap.add_argument("--arkusz", help="JPG z klatkami i strefami UI (przy wielu plikach: katalog)")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
@@ -245,7 +282,7 @@ def main(argv: list[str] | None = None) -> int:
             ark = Path(args.arkusz)
             if len(args.plik) > 1:
                 ark = ark / f"qa-{Path(f).stem}.jpg"
-        results.append(check(Path(f), args.platforma, args.format, args.lektor, ark))
+        results.append(check(Path(f), args.platforma, args.format, args.lektor, ark, args.z_kodu))
     if args.json:
         print(json.dumps(results if len(results) > 1 else results[0], ensure_ascii=False, indent=1))
     else:
