@@ -5,6 +5,7 @@
     python3 krytyka.py pasek film.mp4 --t 4.2 [--klatek 12] [-o pasek.jpg]    # kolejne klatki wokół szybkiej akcji
     python3 krytyka.py martwe film.mp4 [--prog 2.5]                           # odcinki bez zmiany obrazu (martwy takt)
     python3 krytyka.py puls film.mp4 [--prog 3] [--min 1.5]                   # gdzie film ZWALNIA (mało nowego), pod retime.py
+    python3 krytyka.py tempo film.mp4 [--mowa film.srt|mowa.json]             # ZASADA TEMPA: przestój = ani mowy, ani nowej rzeczy
     python3 krytyka.py petla film.mp4 [-o petla.mp4]                          # szew pętli: ostatnia vs pierwsza klatka
     python3 krytyka.py ciecia film.mp4 [--projekt film.edycja.json | --czasy 2.4,5.1] [--slowa film.mowa.json]
                               [--okno 1.5] [--tylko 2,5] [-o katalog]          # obraz każdego cięcia: klatki, fala, słowa
@@ -114,6 +115,96 @@ def puls(film: Path, prog: float = 3.0, min_s: float = 1.5, fps: float = 5.0) ->
     suma = sum(w["sek"] for w in wolne)
     return {"dlugosc_s": n, "wolne": wolne, "wolne_s": suma, "udzial_wolnych": round(suma / max(1, n), 2),
             "ok": suma / max(1, n) <= 0.25, "prog": prog, "min_s": min_s}
+
+
+# ---------------------------------------------------------------- tempo: zasada „nigdy przestoju” (social, retencja)
+ZDARZENIE = 1.5          # zmiana klatki (64×64, szarość, co 0,1 s) od tej wartości = widać coś nowego (cięcie, wejście, skok)
+PRZESTOJ = (1.2, 2.0)    # ani mowy, ani nowej rzeczy na ekranie: ostrzeżenie od 1,2 s, błąd od 2 s
+LUKA_OBRAZU = (4.0, 6.0) # pod mową obraz też musi się zmieniać: ostrzeżenie od 4 s, błąd od 6 s
+KONIEC = 2.0             # spokojna plansza końcowa do 2 s na samym końcu jest w porządku
+# Progi z pomiaru czterech filmów lemo (2026-10-06): „Młyn” (za wolny w ocenie właściciela) ma przestoje 2,2–3,6 s
+# i luki obrazu 6–7 s; „Termia”, „Noc lampionów” i „Kaucja” (dobre) nie mają przestoju ≥ 2 s ani luki > 6 s.
+
+
+def mowa_z_pliku(plik: Path) -> list[tuple[float, float]]:
+    """Odcinki mowy z SRT albo JSON-u słów ([t0, t1, tekst] albo {start/end | od/do}, też pod kluczem slowa/words/
+    segments). Przerwy krótsze niż 0,25 s między słowami to dalej mowa."""
+    tekst = plik.read_text(encoding="utf-8")
+    odc: list[tuple[float, float]] = []
+    if plik.suffix.lower() == ".srt":
+        def sek(s: str) -> float:
+            h, m, r = s.replace(".", ",").split(":")
+            s2, ms = (r.split(",") + ["0"])[:2]
+            return int(h) * 3600 + int(m) * 60 + int(s2) + int(ms.ljust(3, "0")[:3]) / 1000
+        odc = [(sek(a), sek(b)) for a, b in re.findall(r"(\d+:\d\d:\d\d[,.]\d+)\s*-->\s*(\d+:\d\d:\d\d[,.]\d+)", tekst)]
+    else:
+        dane = json.loads(tekst)
+        if isinstance(dane, dict):
+            dane = next((dane[k] for k in ("slowa", "words", "segments") if isinstance(dane.get(k), list)), [])
+        for w in dane or []:
+            if isinstance(w, (list, tuple)) and len(w) >= 2:
+                odc.append((float(w[0]), float(w[1])))
+            elif isinstance(w, dict):
+                a, b = w.get("start", w.get("od")), w.get("end", w.get("do"))
+                if a is not None and b is not None:
+                    odc.append((float(a), float(b)))
+    scalone: list[list[float]] = []
+    for a, b in sorted(odc):
+        if scalone and a - scalone[-1][1] < 0.25:
+            scalone[-1][1] = max(scalone[-1][1], b)
+        else:
+            scalone.append([a, b])
+    return [(a, b) for a, b in scalone]
+
+
+def tempo_z(d: list[float], fps: float, mowa: list[tuple[float, float]]) -> dict:
+    """Zasada tempa na różnicach klatek `d` (co 1/fps s) i odcinkach mowy. Przestój: ani mowy, ani nowej rzeczy
+    na ekranie. Luka obrazu: odstęp między nowymi rzeczami na ekranie, nawet gdy lektor mówi."""
+    krok = 1 / fps
+    dlugosc = len(d) * krok
+    zdarzenia = [round((i + 1) * krok, 2) for i, v in enumerate(d) if v >= ZDARZENIE]
+    zd = set(int(round(t * fps)) for t in zdarzenia)
+
+    def mowi(t: float) -> bool:
+        return any(a <= t <= b for a, b in mowa)
+
+    przestoje, start = [], None
+    n = int(round(dlugosc * fps))
+    for i in range(n + 2):
+        t = i * krok
+        spokoj = i <= n and i not in zd and not mowi(t)
+        if spokoj:
+            start = t if start is None else start
+        elif start is not None:
+            koniec = min(t, dlugosc)
+            dl = koniec - start
+            na_koncu = koniec >= dlugosc - krok and dl <= KONIEC
+            if dl >= PRZESTOJ[0] and not na_koncu:
+                przestoje.append({"od": round(start, 1), "do": round(koniec, 1), "sek": round(dl, 1),
+                                  "poziom": "błąd" if dl >= PRZESTOJ[1] else "ostrzeżenie"})
+            start = None
+    luki, prev = [], 0.0
+    for t in zdarzenia + [dlugosc]:
+        dl = t - prev
+        if dl > LUKA_OBRAZU[0] and not (t >= dlugosc and dl <= KONIEC):
+            luki.append({"od": round(prev, 1), "do": round(t, 1), "sek": round(dl, 1),
+                         "poziom": "błąd" if dl > LUKA_OBRAZU[1] else "ostrzeżenie"})
+        prev = t
+    mowa_s = sum(min(b, dlugosc) - a for a, b in mowa if a < dlugosc)
+    bledy = [x for x in przestoje + luki if x["poziom"] == "błąd"]
+    return {"dlugosc_s": round(dlugosc, 1), "udzial_mowy": round(mowa_s / max(dlugosc, 0.1), 2),
+            "nowe_rzeczy_na_10s": round(sum(1 for i in zd if i - 1 not in zd) / max(dlugosc, 0.1) * 10, 1),
+            "przestoje": przestoje, "luki_obrazu": luki, "ok": not bledy,
+            "zasada": "nigdy ≥ 2 s bez mowy i bez nowej rzeczy; pod mową nowa rzecz co ≤ 6 s (cel: co 2 s)"}
+
+
+def tempo(film: Path, mowa: Path | None = None, fps: float = 10.0) -> dict:
+    """`tempo_z` na gotowym filmie. Mowa: --mowa albo `<film>.srt` obok filmu; bez niej film liczy się jako bez lektora
+    (wtedy co 2 s musi być coś nowego na ekranie)."""
+    plik = mowa or next((p for p in (film.with_suffix(".srt"),) if p.exists()), None)
+    r = tempo_z(roznice(film, fps), fps, mowa_z_pliku(plik) if plik else [])
+    r["mowa"] = str(plik) if plik else "brak (film bez lektora albo podaj --mowa)"
+    return r
 
 
 def petla(film: Path, out: Path | None) -> dict:
@@ -471,6 +562,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("martwe"); s.add_argument("film"); s.add_argument("--prog", type=float, default=2.5)
     s = sub.add_parser("puls"); s.add_argument("film"); s.add_argument("--prog", type=float, default=3.0)
     s.add_argument("--min", type=float, default=1.5)
+    s = sub.add_parser("tempo"); s.add_argument("film"); s.add_argument("--mowa", help="SRT albo JSON słów (domyślnie <film>.srt)")
     s = sub.add_parser("petla"); s.add_argument("film"); s.add_argument("-o")
     s = sub.add_parser("ciecia"); s.add_argument("film"); s.add_argument("--projekt", help="<film>.edycja.json (albo oryginał obok niego)")
     s.add_argument("--czasy", help="chwile cięć w s, po przecinku"); s.add_argument("--slowa", help="mowa.json gotowego filmu")
@@ -491,6 +583,8 @@ def main(argv: list[str] | None = None) -> int:
         r = martwe(Path(a.film), a.prog)
     elif a.cmd == "puls":
         r = puls(Path(a.film), a.prog, a.min)
+    elif a.cmd == "tempo":
+        r = tempo(Path(a.film), Path(a.mowa) if a.mowa else None)
     elif a.cmd == "petla":
         r = petla(Path(a.film), Path(a.o) if a.o else None)
     elif a.cmd == "ciecia":

@@ -308,3 +308,15 @@ scenarios:
       should_not:
         - "używa ziarna, kurzu, washi albo zdjęć z `$MGSTYLES/assets` lub dem 06, 18, 19 w filmie klienta"
         - "kopiuje film-wzór z podmienionym tekstem albo pyta o zatwierdzenie pierwszego ujęcia"
+
+  - id: wideo-tempo
+    type: in_scope
+    input: "Ten film o młynie z kodu jest fajny, ale za wolny: ziarna rysują się po jednym, a w paru miejscach nic się nie dzieje i nikt nie mówi. Popraw, ma być na Reelsy."
+    expect:
+      should:
+        - "`krytyka.py tempo` na filmie z napisami lektora (`--mowa` albo `.srt` obok) i lista przestojów (≥ 2 s bez mowy i bez nowej rzeczy) i luk obrazu (> 6 s pod mową) z sekundami"
+        - "zagęszcza według zasady tempa: ziarna po 2–3 naraz z przesunięciem 0,1–0,2 s, szczegółowe rysowanie tylko głównego elementu (≤ 1,5 s), zdanie lektora albo nowa rzecz w każdej pauzie; film z kodu przez oś czasu (`events.json`, `retime.py`), nie cięciem MP4"
+        - "po renderze `krytyka.py tempo` z `ok: true`, potem `kontrola-wideo`; w RAPORT ile przestojów było i ile zostało"
+      should_not:
+        - "przyspiesza cały film (wyższe tempo odtwarzania, szybszy lektor ponad 3 słowa/s) albo dokłada ruch-wypełniacz (pływanie, konfetti), żeby tylko coś się ruszało"
+        - "tnie gotowe MP4 tak, że rwie lektora i muzykę"

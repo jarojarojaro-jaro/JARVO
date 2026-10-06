@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-05"
+    reviewed: "2026-10-06"
 ---
 
 # Kontrola wideo (bramka jakości)
@@ -28,6 +28,12 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    Sprawdza też pojedyncze „mrugnięcia” (jedna klatka inna niż obie sąsiednie): obejrzyj te chwile i popraw scenę.
    Błąd (`bledy`) = poprawka przed oceną; typowe: głośność → `montaz.py glosnosc`, format → ponowny render,
    czarny początek → pierwsza scena z obrazem, film w HDR → `montaz.py napraw` (przelicza na zwykły obraz).
+   - ✅ Punkt kontrolny: `ok: true`.
+1a. **Tempo (każdy film):** `python3 $HERMES_HOME/scripts/krytyka.py tempo <film.mp4> [--mowa <lektor>.srt]` (`.srt`
+   obok filmu bierze sam; film bez lektora: bez opcji). Zasada tempa (`rodzaje-filmu`, `ruch-i-kompozycja.md` rozdz. 2):
+   nigdy ≥ 2 s bez mowy i bez nowej rzeczy na ekranie, pod mową nowa rzecz najdalej co 6 s. `przestoje` i `luki_obrazu`
+   z poziomem „błąd” poprawiasz przed oceną: zagęść (powtarzalne po 2–3 naraz, krótsze rysowanie), dołóż zdanie lektora
+   albo skróć ujęcie (film z kodu: `retime.py`). Ostrzeżenia oglądasz w tych sekundach.
    - ✅ Punkt kontrolny: `ok: true`.
 1b. **Animacja HTML (nasz kontrakt, `--preset jarvo`):** `python3 $HERMES_HOME/scripts/html_wideo.py pomiar <strona>
    --preset jarvo --dlugosc <s> --platforma <…>` mierzy z DOM i klatek: czas czytania, tekst poza kadrem i pod UI
@@ -71,7 +77,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    bądź surowym motion directorem, nie dumnym autorem. Narzędzia (`$HERMES_HOME/scripts/krytyka.py`):
    - `telefon <film>`: 1 klatka/s w 360 px szerokości (czy każdy tekst da się przeczytać na telefonie?),
    - `pasek <film> --t <s>`: 12 kolejnych klatek wokół każdej szybkiej akcji i każdej zmiany stanu,
-   - `martwe <film>`: odcinki bez zmiany obrazu > 2,5 s (martwy takt),
+   - `martwe <film>`: odcinki bez zmiany obrazu > 2,5 s (martwy takt; tempo z mową liczy krok 1a),
    - `petla <film>`: szew pętli (tylko gdy film ma się zapętlać), `determinizm <anim.html> --czasy …` (HTML).
    Oceń 7 osi w skali 1–10: hook (2 s), telefon (360 px), ruch (sprężyny, wyhamowanie), różnorodność (nowość
    co 2–4 s), kompozycja (zero chwytów z `references/zakazane.md`), marka, dźwięk (zdarzenia na bitach).
@@ -91,6 +97,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 
 ## Definition of Done
 - [ ] `qa_wideo.py` bez błędów (JSON w raporcie), arkusz obejrzany,
+- [ ] `krytyka.py tempo` z `ok: true` (zero przestojów ≥ 2 s, zero luk obrazu > 6 s pod mową),
 - [ ] film z cięciami: `krytyka.py ciecia` bez problemów (trzask, słowo w pół), każdy obraz cięcia obejrzany,
 - [ ] cięcia pod muzykę: `rytm.py sprawdz` bez ✗ (siatka „niepewna”: sprawdzone uchem),
 - [ ] film z efektami: `projekt.py slychac` z wynikiem OK (muzyka z `muzyka.py`: jej „Wynik: OK”),

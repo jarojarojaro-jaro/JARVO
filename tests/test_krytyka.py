@@ -159,3 +159,54 @@ def test_przeskok_ten_sam_kadr(tmp_path):
     c = krytyka.ciecia(film, tmp_path / "c", czasy=[1.0])["ciecia"][0]
     assert c["rodzaj"] == "przeskok" and any("przybliżenie" in u for u in c["uwagi"]), c
     assert not c["problemy"]                                        # przeskok to uwaga, nie błąd
+
+
+def test_tempo_przestoj_to_ani_mowy_ani_nowej_rzeczy():
+    fps = 10.0
+    d = [0.2] * 100                                  # 10 s spokojnego obrazu
+    for t in (1.0, 3.0, 5.0, 7.0, 9.0):              # nowa rzecz co 2 s
+        d[int(t * fps) - 1] = 5.0
+    r = krytyka.tempo_z(d, fps, [])
+    assert r["ok"] and not [p for p in r["przestoje"] if p["poziom"] == "błąd"]
+    d2 = [0.2] * 100
+    d2[9] = 5.0                                      # jedna rzecz w 1. sekundzie, potem nic
+    r = krytyka.tempo_z(d2, fps, [(1.0, 4.0)])       # lektor mówi tylko 1–4 s
+    assert not r["ok"]
+    assert r["przestoje"][0]["od"] == 4.1 and r["przestoje"][0]["poziom"] == "błąd"
+    assert any(l["poziom"] == "błąd" for l in r["luki_obrazu"])          # 9 s bez nowej rzeczy
+    # pod mową spokojny obraz to nie przestój, ale luka obrazu > 6 s dalej jest błędem
+    r = krytyka.tempo_z(d2, fps, [(0.0, 10.0)])
+    assert not r["przestoje"] and not r["ok"]
+
+
+def test_tempo_plansza_koncowa_do_2_s_jest_ok():
+    fps = 10.0
+    d = [0.2] * 60
+    for t in (0.5, 2.0, 3.5):
+        d[int(t * fps) - 1] = 5.0
+    r = krytyka.tempo_z(d, fps, [(0.0, 4.2)])        # od 4,2 s do końca (6 s) spokojna plansza 1,8 s
+    assert r["ok"] and not r["przestoje"] and not r["luki_obrazu"]
+    assert r["nowe_rzeczy_na_10s"] == 5.0
+
+
+def test_mowa_z_srt_i_json(tmp_path):
+    srt = tmp_path / "f.srt"
+    srt.write_text("1\n00:00:00,800 --> 00:00:04,403\nKażdy worek.\n\n2\n00:00:04,500 --> 00:00:06,000\nDalej.\n",
+                   encoding="utf-8")
+    assert krytyka.mowa_z_pliku(srt) == [(0.8, 6.0)]               # przerwa 0,1 s to dalej mowa
+    js = tmp_path / "m.json"
+    js.write_text(json.dumps({"slowa": [[0.0, 0.4, "Ala"], [0.5, 0.9, "ma"], [2.0, 2.5, "kota"]]}))
+    assert krytyka.mowa_z_pliku(js) == [(0.0, 0.9), (2.0, 2.5)]
+    js.write_text(json.dumps([{"start": 1, "end": 2}, {"od": 3, "do": 4}]))
+    assert krytyka.mowa_z_pliku(js) == [(1.0, 2.0), (3.0, 4.0)]
+
+
+@needs_ff
+def test_tempo_na_filmie_i_srt_obok(tmp_path):
+    still = _film(tmp_path / "s.mp4", "color=c=red", 7)            # 7 s jednej planszy
+    r = krytyka.tempo(still)
+    assert not r["ok"] and r["mowa"].startswith("brak") and r["przestoje"][0]["poziom"] == "błąd"
+    (tmp_path / "s.srt").write_text("1\n00:00:00,000 --> 00:00:07,000\nCały czas mówię.\n", encoding="utf-8")
+    r = krytyka.tempo(still)                                        # SRT obok filmu bierze sam
+    assert r["mowa"].endswith("s.srt") and not r["przestoje"]
+    assert not r["ok"] and r["luki_obrazu"][0]["poziom"] == "błąd"  # lektor mówi, ale 7 s nic nowego

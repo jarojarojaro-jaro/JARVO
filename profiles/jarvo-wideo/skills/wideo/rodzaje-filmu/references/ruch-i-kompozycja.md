@@ -33,16 +33,32 @@ akcentu i kroju nagłówka, dowód w `dlaczego`). Sprawdzian: opisz ruch gotoweg
 „spaść” albo „przybić pieczątkę”, może się odbić także w charakterze `zaufanie`.
 
 ## 2. Oddech i tempo
+**Zasada tempa (nadrzędna; filmy idą na social media, więc muszą trzymać widza):**
+- **Nigdy ≥ 2 s bez mowy i bez nowej rzeczy na ekranie.** Gdy obraz stoi (element wylądował, widz czyta), mówi lektor;
+  gdy lektor robi pauzę, na ekranie wchodzi coś nowego. Wyjątek: spokojna plansza końcowa do 2 s.
+- **Pod mową nowa rzecz co ok. 2 s, najdalej co 6 s:** wejście, zmiana stanu, cięcie, liczba, ruch kamery z celem.
+- **Rysujesz tylko to, co główne.** Szczegółowe rysowanie (kreska, szraf, grawer, pisanie odręczne) dostaje jeden
+  główny element ujęcia i trwa ≤ 1–1,5 s; reszta wchodzi szybko (≤ 0,4 s) albo już stoi. Wszystkiego dokładnie
+  narysować się nie da i nie trzeba.
+- **Powtarzalne naraz:** ziarna, ikony, kafle, punkty listy wchodzą po 2–3 jednocześnie (przesunięcie 0,1–0,2 s),
+  nie jedno po drugim.
+- **Ale nie na przesadę:** jedna główna akcja naraz, cięcia nie częściej niż co ok. 0,8 s, tekst stoi tyle, ile trwa
+  przeczytanie, ważna rzecz po wylądowaniu stoi ≥ 1 s (pod mową albo na końcu).
+- **Sprawdza** `krytyka.py tempo <film.mp4> [--mowa lektor.srt]` (`.srt` obok filmu bierze sam): błąd = przestój ≥ 2 s
+  albo luka obrazu > 6 s pod mową; poprawka przed oddaniem. Puszczasz na animaticu albo szkicu, nie dopiero na finale.
+  Progi z pomiaru: „Młyn” (za wolny w ocenie właściciela) miał przestoje 2,2–3,6 s, dobre filmy żadnego.
+
 - **Ważne rzeczy stoją po wylądowaniu.** Logo, liczba, hasło: po ostatnim ruchu co najmniej 1 s bez ruchu, zanim
   zniknie ujęcie. Logo na otwarciu i na końcu tak samo. Po serii szybkich cięć dłuższa pauza.
 - **Koniec ujęcia:** ostatni element wylądował → 1–1,5 s spokoju (bez nowych elementów, bez ruchu kamery; trwająca
   czynność, np. płynące kropki, może trwać) → wyjście. Ruch kamery kończy się co najmniej 1 s przed wyjściem.
-- **Pierwsza wersja jest prawie zawsze za szybka:** zwolnij o jeden stopień. Główna akcja otwarcia trwa ≥ 3 s,
-  pisanie, klikanie i filtrowanie idą w tempie człowieka (widz ma zdążyć to powtórzyć).
+- **Pojedynczy ruch w pierwszej wersji bywa za szybki:** zwolnij go o jeden stopień (sprężyna, wyhamowanie), ale
+  nie dokładaj spokoju, bo tempo trzyma zasada wyżej. Pisanie, klikanie i filtrowanie idą w tempie człowieka (widz ma
+  zdążyć to powtórzyć); główna akcja otwarcia może trwać ≥ 3 s, gdy co chwilę coś się w niej zmienia.
 - **Szybkość z przyspieszenia, nie ze stałej prędkości.** Żadnego ruchu liniowego. Seria elementów wchodzi coraz
   szybciej (jak rozdawanie kart), potem 0,5 s spokoju.
-- **Nic nie stoi martwe dłużej niż 3 s:** czasownik z lektora ma swoją czynność na ekranie (dane płyną, kropki biegną,
-  coś się zapełnia). Ale bez sztucznego „pływania” i „oddychania” elementów, żeby tylko coś się ruszało.
+- **Ruch z treści, nie wypełniacz:** czasownik z lektora ma swoją czynność na ekranie (dane płyną, kropki biegną,
+  coś się zapełnia). Bez sztucznego „pływania” i „oddychania” elementów, żeby tylko coś się ruszało.
 
 ## 3. Bez efektu PowerPointa (lektor, explainer)
 Skąd się bierze: kadr stoi, elementy tylko wjeżdżają i zamierają, sceny zmieniają się jak slajdy, a treść piętrzy się
@@ -107,6 +123,7 @@ właściciela). Szybki ruch rysujesz sam, w animacji:
 Nigdy na tekście, który widz ma przeczytać.
 
 ## 7. Kontrola
+`krytyka.py tempo` (zasada tempa, rozdz. 2) blokuje: przestój ≥ 2 s albo luka obrazu > 6 s pod mową to poprawka.
 `html_wideo.py pomiar` (ostrzeżenia, nie blokują): `pusta_scena` (największy obiekt < 15% krótszego boku
 dłużej niż 1,5 s), `bez_oddechu` (ujęcie ≥ 2 s ma < 0,8 s spokoju przed przejściem; wyjście starego i wejście
 nowego do 1,2 s się nie liczą; koniec filmu stoi < 0,8 s, film w pętli pomijany), `uderzenia_kadru` (> 3 uderzenia całego kadru). To przybliżenia z małych klatek: zanim

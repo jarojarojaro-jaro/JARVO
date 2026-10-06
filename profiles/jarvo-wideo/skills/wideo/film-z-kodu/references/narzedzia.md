@@ -41,6 +41,10 @@ cat "$LIB/AGENTS.md"; sed -n 1,80p "$LIB/styles/README.md"         # potem DIREC
   instrukcja krok po kroku), `hologram-hud` (skan produktu w hologram: przegląd parametrów), `silkscreen-poster`
   (plakat sitodrukowy: miejsce, szlak, wydarzenie), `engraving` (miedzioryt: nauka, muzeum, historia marki).
   Przypadki użycia z §11 ich `STYLE.md` to gramatyka kolejności informacji i czasu na ekranie; treść i układ są nasze.
+- **Tempo:** style rysowane (`engraving`, `midcentury-toon`) kuszą, żeby wszystko kreślić kreska po kresce. Szczegółowo
+  rysujesz tylko główny element ujęcia (≤ 1,5 s), powtarzalne (ziarna, kłosy, ikony) po 2–3 naraz, a gdy obraz stoi,
+  mówi lektor (`ruch-i-kompozycja.md` rozdz. 2). Na animaticu z roboczym lektorem `krytyka.py tempo`; w `events.json`
+  żadne zdarzenie rysowania nie trwa dłużej niż 1,5 s.
 - **Najpierw własny scenariusz.** `TREATMENT.md` z trzema wariantami struktury i wyborem (DIRECTOR.md §4) piszemy,
   zanim otworzymy `DEMO.md` albo kod dema. Demo tylko do nauki technik (pędzel, rig, shader, miks), nigdy jego fabuła,
   ujęcia, rekwizyty i oś czasu. Podmiana tekstu w `content.json` dema to test techniczny, nigdy film dla klienta.

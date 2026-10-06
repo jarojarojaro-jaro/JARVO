@@ -44,7 +44,7 @@ liczba w skali, którą czuć, koniec odwraca początek); `film.py narracja --sp
 - Na ekranie ≤ 6 słów naraz (reszta w napisach). Jedna analogia na film (z briefu, nie dalej niż jej `psuje_sie`),
   jedna metafora wizualna na pojęcie; porównania do znanych („jak stadion…”).
 - **Bez efektu PowerPointa** (`ruch-i-kompozycja.md` rozdz. 3): jeden wolny najazd kamery na ujęcie, nowy element
-  tylko na ważnym zdaniu, stary ustępuje nowemu, ≤ 3 grupy naraz, jeden bohater ≥ 1/4 krótszego boku kadru.
+  tylko na ważnym zdaniu (między nimi tempo trzymają zmiany stanu i lektor: zasada tempa, rozdz. 2), stary ustępuje nowemu, ≤ 3 grupy naraz, jeden bohater ≥ 1/4 krótszego boku kadru.
 
 ## Brief (`out/wideo/src/BRIEF.md`)
 ```

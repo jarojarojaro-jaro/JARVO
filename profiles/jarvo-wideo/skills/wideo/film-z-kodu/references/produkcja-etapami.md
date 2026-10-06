@@ -14,7 +14,7 @@ filmy powstawały nie z jednego promptu, tylko z bramek. **Każda bramka kończy
 | 2 | Przewodnik stylu z referencji (paleta hex, font, faktura, kamera, jak wchodzi i wychodzi tekst; **gramatyka, nie treść**) | `docs/style_guide.md` | 1–3 klatki stylu obejrzane |
 | 3 | Lista ujęć na siatce bitów: czas, stan początkowy → akcja → stan końcowy, kamera, tekst, dźwięk | `docs/shotlist.md` | każde ujęcie ma stan końcowy, na który da się wskazać |
 | 4 | Stopklatki każdego ujęcia → arkusz → krytyka | `out/stills.png` | 7 osi ≥ 8 na stopklatkach |
-| 5 | Animatic 960×540 z roboczym dźwiękiem | `out/animatic.mp4` | rytm: `krytyka.py martwe` czysto, żadnych dłużyzn |
+| 5 | Animatic 960×540 z roboczym dźwiękiem | `out/animatic.mp4` | rytm: `krytyka.py tempo` z `ok: true` (lektor roboczy jako `--mowa`), żadnych dłużyzn |
 | 6 | Najtrudniejsze 2–4 s w pełnej jakości (kontakt, zasłanianie, szybki ruch) | `out/probka.mp4` | `krytyka.py pasek` bez wyskoków |
 | 7 | Pełny render, szlif, dźwięk, miks −14 LUFS | `out/final.mp4` | `kontrola-wideo` + pętla krytyki |
 | 8 | Oddanie: film, plakat (poster), arkusz, źródła z README | `out/` | DoD karty |

@@ -4,8 +4,9 @@ Film z kodu (HyperFrames, HTML) jest funkcją czasu, więc tempo poprawiasz na O
 Cięcie gotowego wideo rwie muzykę i lektora; przesunięcie chwil w źródle pozwala wygenerować dźwięk od nowa.
 
 ## Pętla
-1. **Zmierz:** `krytyka.py puls film.mp4` → gdzie film zwalnia (odcinki „mało nowego”; `martwe` łapie tylko zamrożony
-   obraz, a tło z ruchem nim nie jest). Cel retencji: udział wolnych ≤ 25 %, nowa rzecz co 1–2 s, hak od klatki 0.
+1. **Zmierz:** `krytyka.py tempo film.mp4 --mowa lektor.srt` → przestoje (ani mowy, ani nowej rzeczy) i luki obrazu
+   pod mową, czyli co zagęścić; `krytyka.py puls film.mp4` → gdzie film zwalnia (odcinki „mało nowego”; `martwe` łapie
+   tylko zamrożony obraz, a tło z ruchem nim nie jest). Cel retencji: udział wolnych ≤ 25 %, nowa rzecz co 1–2 s, hak od klatki 0.
 2. **Kotwice** (`kotwice.json`): `{"kotwice": [[stary, nowy], …], "koniec": 24}`: chwile w starym filmie → chwile w nowym.
    Zagęszczaj: wejścia par zamiast pojedynczo, licznik 1 s zamiast 1,6 s, przejście od razu po ostatnim słowie,
    pierwsza sekunda bez wstępu. Ruch (wjazdy, sprężyny) zostaje płynny: retime skraca długości animacji tylko do
@@ -14,6 +15,6 @@ Cięcie gotowego wideo rwie muzykę i lektora; przesunięcie chwil w źródle po
    dwa pliki z `data-composition-id` w korzeniu = błąd `check`). `retime.py mapuj kotwice.json 12.5 25` daje nowe czasy.
 4. **Dźwięk od nowa na nowej osi:** lektor `--rate +10…15%` i krótsze zdania, wejścia lektora z `mapuj`; muzyka
    generowana pod nowe granice scen (nie ciąć starej); SFX przez `Mix(remap=M)`. Pod −14 LUFS: `montaz.py glosnosc`.
-5. **Sprawdź:** `hyperframes check`, snapshoty, render, ponownie `krytyka.py puls` (udział wolnych spadł?), `qa_wideo.py`.
+5. **Sprawdź:** `hyperframes check`, snapshoty, render, ponownie `krytyka.py tempo` (`ok: true`) i `puls` (udział wolnych spadł?), `qa_wideo.py`.
 
 Uwaga: kompozycja musi mieć jeden `const tl = gsap.timeline({ paused: true });` i zegar HUD jako `tl.to(clock, …)`.

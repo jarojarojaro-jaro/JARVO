@@ -1,7 +1,7 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.9.1
+version: 3.10.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-05"
+    reviewed: "2026-10-06"
 ---
 
 # Film z kodu
@@ -80,7 +80,7 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 10. **HyperFrames: check przed renderem.** Po każdej zmianie kompozycji `npx hyperframes check` (lint + walidacja
    w przeglądarce, `--snapshots` na klatki) i render dopiero przy czystym wyniku: według HeyGen mediana 1 render zamiast 2
    i ~połowa kosztu tokenów. Promo z marki: `hyperframes capture <URL>` (skill `product-launch-video`) albo `assety.py`.
-11. **Za wolno?** `krytyka.py puls` pokazuje, gdzie film zwalnia; poprawiasz na osi czasu przez `retime.py`
+11. **Za wolno?** `krytyka.py tempo` (przestoje i luki obrazu, zasada tempa) i `puls` pokazują, gdzie film zwalnia; poprawiasz na osi czasu przez `retime.py`
    (`references/retime.md`), nie cięciem MP4.
 9. **Pętla krytyki przed oddaniem:** `kontrola-wideo` krok 4a (7 osi 1–10, 3 najgorsze problemy, aż wszystko ≥ 8).
 12. **Reżyseria ruchu i usterki renderu:** `motion-design` (kierunek, inscenizacja, ciągłość, easing, timing, słownik

@@ -8,7 +8,7 @@ dopóki nie zniknie. Wynik to liczba całkowita; PASS od 85 (przy czystej techni
 | 1 | Hook | treść w 0–2 s, zrozumiała bez dźwięku, klatka 0 nie jest pusta | „pierwsze 2 s to logo na czarnym tle” |
 | 2 | Przesłanie | jedno, jasne; widz wie, po co oglądał | „dwa tematy: parzenie i ceny” |
 | 3 | Dopasowanie obrazu | ujęcie pokazuje to, o czym mówi lektor | „scena 2 mówi o mleku, obraz: ziarna” |
-| 4 | Rytm | zmiana obrazu co 2–4 s, brak dłużyzn, tempo lektora 2–3 słowa/s | „scena 4 stoi 6 s” |
+| 4 | Rytm | nowa rzecz co ok. 2 s albo mówi lektor, zero przestojów ≥ 2 s (`krytyka.py tempo`), tempo lektora 2–3 słowa/s | „scena 4 stoi 6 s” |
 | 5 | Napisy | poprawne, zsynchronizowane, czytelne, poza strefami UI | „nazwa marki z błędem w 0:07” |
 | 6 | Dźwięk | głos wyraźny, muzyka pod głosem, bez trzasków i nagłych skoków | „muzyka głośniejsza od lektora w 0:12” |
 | 7 | Jakość obrazu | ostrość, brak artefaktów AI, spójna kolorystyka | „scena 3 AI: zdeformowana dłoń” |

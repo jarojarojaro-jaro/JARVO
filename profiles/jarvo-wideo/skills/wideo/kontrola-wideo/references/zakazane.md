@@ -16,6 +16,7 @@ Model bez referencji wraca do tych samych chwytów. Każdy z nich w filmie = pro
 | wybuchy cząsteczek, konfetti bez powodu | wypełniacz pustej sceny | zdarzenie z przyczyną (klik → reakcja UI), albo nic |
 | przejazd liniowy (stała prędkość, twardy stop) | wygląda jak slajd | sprężyna: przyspieszenie, minimalny przestrzał, wyhamowanie |
 | ta sama długość każdego ujęcia | metronom, brak akcentu | ujęcia na siatce bitów, mocne na taktach, dłuższy oddech przed puentą |
-| tekst stoi, wszystko inne stoi | martwy takt | co 2–4 s coś nowego: kamera, zmiana stanu, cięcie |
+| tekst stoi, wszystko inne stoi | martwy takt | co ok. 2 s coś nowego (kamera, zmiana stanu, cięcie) albo mówi lektor; nigdy ≥ 2 s ciszy i bezruchu (`krytyka.py tempo`) |
+| powtarzalne rysowane po jednym (ziarno po ziarnie), wszystko rysowane dokładnie | dłuży się, widz ucieka | 2–3 naraz z przesunięciem 0,1–0,2 s; szczegółowo tylko główny element, ≤ 1,5 s |
 | interfejs produktu narysowany z wyobraźni | kłamie o produkcie | prawdziwe zrzuty (Playwright), animowane wycinki prawdziwego UI |
 | skalowany tekst z `will-change`, rozmyty przy zoomie | nieczytelny | kamera w wektorach, tekst renderowany w docelowej skali |
