@@ -92,9 +92,9 @@
       g.x0 = Math.min(g.x0, q.x0); g.y0 = Math.min(g.y0, q.y0); g.x1 = Math.max(g.x1, q.x1); g.y1 = Math.max(g.y1, q.y1);
       g.ox0 = q.x0; g.ostatni = q.tekst;
     }
-    // cień albo obwódka w innym kolorze: ten sam tekst i krój, przesunięty o kilka px, narysowany wcześniej (pod spodem)
+    // cień albo obwódka w innym kolorze: ten sam tekst i krój, przesunięty najwyżej o 0,2 kroju, narysowany wcześniej (pod spodem)
     const cien = (g, i) => grupy.some((h, j) => j > i && h.tekst === g.tekst && h.font === g.font && h.kolor !== g.kolor
-      && Math.abs(h.x0 - g.x0) <= 0.15 * (g.rozmiar || 16) && Math.abs(h.y0 - g.y0) <= 0.15 * (g.rozmiar || 16));
+      && Math.abs(h.x0 - g.x0) <= 0.2 * (g.rozmiar || 16) && Math.abs(h.y0 - g.y0) <= 0.2 * (g.rozmiar || 16));
     return grupy.filter((g, i) => g.tekst.trim() && !cien(g, i)).map((g) => ({
       tekst: g.tekst, x: Math.round(g.x0 * 10) / 10, y: Math.round(g.y0 * 10) / 10,
       w: Math.round((g.x1 - g.x0) * 10) / 10, h: Math.round((g.y1 - g.y0) * 10) / 10,

@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, hyperframes, manim, motion-graphics, animation, code]
-    related_skills: [rodzaje-filmu, style-motion, gramatyki-explainera, zywy-schemat, motion-design, video-lessons, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
+    related_skills: [rodzaje-filmu, style-motion, gramatyki-explainera, style-malarskie, zywy-schemat, motion-design, video-lessons, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
@@ -31,6 +31,7 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 | **Jarvo mówi**: maskotka marki (robot) z polskim lektorem, oczy i wskaźnik głosu w rytm mowy, napisy karaoke | `python3 $HERMES_HOME/scripts/maskotka.py "tekst" -o film.mp4 [--format 9x16\|1x1\|16x9]` | 1–3 min |
 | **styl motion design** (wrząca linia, izometria, płaski wektor, morph, HUD, kolaż, Bauhaus, synthwave, pixel art, zorza i szkło, płyn, napisy show…): karta stylu z cechami do sprawdzenia, film-wzór 10 s, moduły `/_lib/jarvo/` | **`style-motion`** (HTML + `html_wideo.py --preset jarvo`) | 30–90 min |
 | **fragment explainera z lektorem** w jednej z 8 gramatyk (wykresy jak The Economist, rysowana tablica, 3Blue1Brown, kolaż Vox, prezentacja z premiery, historyjka z postacią, typografia kinetyczna, Kurzgesagt): klip z jednego spec, cue na słowach lektora, 16:9, 9:16, alfa | **`gramatyki-explainera`** (`gramatyka.py`, silnik huashu-art-motion) | 15–40 min |
+| **żywy obraz w stylu malarza** (35 stylów: jaskinia, Egipt, mozaika, gotyk, Van Gogh, Klimt, tusz, Hopper, Ghibli, Haring, piksel 8-bit…): karta stylu, scena-wzór do przerobienia, przejście-podpis, odcinki na siatce bitów, 16:9 | **`style-malarskie`** (`malarz.py`, silnik huashu-art-motion) | 30–90 min |
 | **strona klienta w filmie**: zrzut 2× z mapą elementów i wycinkami, kolory i kroje marki; kamera przewija z postojami, jedzie po elementach, lupa, zakreślacz, uderzenie; wycinek ląduje w swoim miejscu | HTML wg `references/strona-filmowana.md` (zrzut `assety.py --film`, kamera `/_lib/jarvo/strona.js`) | 30–60 min |
 | **ujęcie z karty shotcraft w HTML** (karty rozdane z talii, stos z dociskiem, wiersz wpada w tabelę, wyszukiwarka i klik, tytuł w papierze, licznik bębnowy, cięcia na bit, zwolnienie i stop-klatka, głębia, finał zdjęcie grupowe, reflektor na bohaterze) | HTML wg `references/ujecia.md` (`/_lib/jarvo/ujecia.js`: liczby z kart, bez Remotion) | 20–40 min |
 | **UI morph**: jeden kontener przechodzi przez 8–12 stanów produktu, kursor klika, zero cięć, pętla | HTML wg spec `references/jeden-ksztalt.md` (zrzuty z `assety.py`) | 30–60 min |

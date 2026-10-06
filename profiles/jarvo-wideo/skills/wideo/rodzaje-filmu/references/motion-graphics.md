@@ -16,6 +16,7 @@ Nie to: coś ma zostać wyjaśnione → `explainer.md`; hasło jest treścią �
 | opener z wyglądem marki | `bang-motion` |
 | 15 stylów motion design (wrząca linia, izometria, morph, HUD, Bauhaus, synthwave, pixel…) | skill `style-motion`: karta stylu + moduły `/_lib/jarvo/` |
 | 43 style kina (akwarela, anime, pixel, papier, miedzioryt, sitodruk…) | `lemo-opuscar` |
+| 35 stylów malarskich jako żywy obraz (jaskinia, Van Gogh, Klimt, tusz, Hopper…), przegląd epok | skill `style-malarskie` (`malarz.py`) |
 
 ## Struktura
 | 15 s | Rytm |

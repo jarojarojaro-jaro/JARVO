@@ -350,7 +350,8 @@ def opis_skilla(path: Path, skrypty: set[str]) -> dict:
             "mentions": sorted(set(re.findall(r"`([a-z][a-z0-9-]{2,40})`", body)) - {path.parent.name}),
             "scripts": sorted(s for s in skrypty if re.search(rf"(?<![\w.-]){re.escape(s)}\b", body)),
             "sections": [h.strip() for h in re.findall(r"^## (.+)$", body, re.M)][:10],
-            "references": sorted(r.stem for r in (path.parent / "references").glob("*.md"))}
+            "references": sorted(r.relative_to(path.parent / "references").with_suffix("").as_posix()
+                                 for r in (path.parent / "references").rglob("*.md"))}
 
 
 def serwery_mcp(config: Path) -> list[dict]:

@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [video, explainer, motion-graphics, 3d, product, typography, data, logo, story]
-    related_skills: [krotki-film, film-z-kodu, style-motion, gramatyki-explainera, montaz-nagran, clipmaker, scenariusz, formaty-wideo, kontrola-wideo]
+    related_skills: [krotki-film, film-z-kodu, style-motion, gramatyki-explainera, style-malarskie, montaz-nagran, clipmaker, scenariusz, formaty-wideo, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1

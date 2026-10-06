@@ -63,9 +63,11 @@ def test_tekst_kanwy_sklejony_w_linie():
 console.log(JSON.stringify(H.scal([z('1', 100, 120), z('2', 122, 142), z('zł', 160, 190),
   z('Tytuł', 100, 300, 200), z('Tytuł', 100, 300, 200), z('Inny', 100, 300, 400, {kolor: '#000000', krycie: 0.5}),
   z('daleko', 900, 1000), z('1', 100, 116, 600), z('1', 130, 146, 600), z('2', 150, 172, 600), z(',', 172, 180, 600),
-  z('0', 180, 202, 600), z('40 plików', 104, 304, 804, {kolor: '#15161c'}), z('40 plików', 100, 300, 800, {kolor: '#ffcb6b'})])));""")
+  z('0', 180, 202, 600), z('40 plików', 104, 304, 804, {kolor: '#15161c'}), z('40 plików', 100, 300, 800, {kolor: '#ffcb6b'}),
+  z('WORLD 1-1', 208, 408, 1008, {kolor: '#0b1d24', rozmiar: 48}), z('WORLD 1-1', 200, 400, 1000, {rozmiar: 48})])));""")
     # cyfry po znaku, kontur nie dubluje, cyfry o stałej szerokości (szersze odstępy) to jedna liczba, cień pod napisem znika
-    assert [x["tekst"] for x in w] == ["12 zł", "Tytuł", "Inny", "daleko", "112,0", "40 plików"] and w[-1]["kolor"] == "#ffcb6b"
+    assert [x["tekst"] for x in w] == ["12 zł", "Tytuł", "Inny", "daleko", "112,0", "40 plików", "WORLD 1-1"]
+    assert w[-2]["kolor"] == "#ffcb6b" and w[-1]["kolor"] == "#ffffff"   # cień 8 px przy kroju 48 px (14_8bit)
     assert w[0] == {"tekst": "12 zł", "x": 100, "y": 50, "w": 90, "h": 30, "kolor": "#ffffff", "rozmiar": 40,
                     "krycie": 1, "font": "Inter", "waga": 400, "klucz": '#px "Inter"|#ffffff'}
 

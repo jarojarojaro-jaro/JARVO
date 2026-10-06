@@ -227,6 +227,8 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     wideo = next(a for a in dane["agents"] if a["name"] == "jarvo-wideo")
     rodzaje = next(s for s in wideo["skills"] if s["name"] == "rodzaje-filmu")
     assert "ruch-i-kompozycja" in rodzaje["references"]
+    malarskie = next(s for s in wideo["skills"] if s["name"] == "style-malarskie")
+    assert {"wybor", "style/09_postimp"} <= set(malarskie["references"])     # karty stylów z podkatalogu też w skarbcu
     assert any(z["name"] == "cinetic" and z["status"] == "odlozone" for z in dane["zrodla"])
     # skarbiec idzie za kodem: ostatnie zmiany z CHANGELOG-u profilu i skrypty wspólne repo (lint nieaktualnych notatek)
     assert web["changes_section"] == "Niewydane" and web["changes"] and all(len(z) <= 280 for z in web["changes"])

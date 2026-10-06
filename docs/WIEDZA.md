@@ -86,7 +86,7 @@ knowledge/                       # = skarbiec (vault Obsidiana): same pliki Mark
 │   ├── pliki/                   #   artykuły, transkrypcje, PDF-y, które wrzucisz („zapisz to w wiedzy”)
 │   └── jarvo-repo/              #   kopia repo przy wdrożeniu (w grafie, poza domyślnym szukaniem): docs/*.md, a w układzie
 │                                #   repo pliki profili (profiles/<agent>/SOUL, README, CHANGELOG, quality/rubric), materiały
-│                                #   skilli (…/references/*.md, też shared/skills) i spis źródeł vendor/zrodla.md
+│                                #   skilli (…/references/**/*.md, też shared/skills) i spis źródeł vendor/zrodla.md
 ├── skrzynka/                    # SZKICE czekające na kompilację: jeden plik = jeden szkic (kto, kiedy, skąd, treść)
 │   └── zrobione/                #   szkice po kompilacji (30 dni, potem kasowane; źródła są w zrodla/)
 ├── agenci/_hub-agenci.md        # hub „Agenci” + katalog na agenta
@@ -342,7 +342,7 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami i materiałami, zewnętrzne z locka, skrypty,
    serwery MCP z `config.yaml` z `trust` i narzędziami z `tools.include`, nazwy zmiennych środowiska z `distribution.yaml`
    i `terminal.env_passthrough` bez wartości, narzędzia z `toolbox.yaml`, identyfikatory evals, spis źródeł z
-   `vendor/zrodla.yaml`) i `build/wiedza/repo/` (SOUL bez znacznika protokołu, README, CHANGELOG, rubryka, `references/*.md`
+   `vendor/zrodla.yaml`) i `build/wiedza/repo/` (SOUL bez znacznika protokołu, README, CHANGELOG, rubryka, `references/**/*.md`
    skilli, `vendor/zrodla.md`), `install-fleet.sh`
    zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane; pogrubiony opis huba agenta idzie
    za opisem z `fleet.yaml`, dopóki człowiek go nie zmienił; lustro `zrodla/jarvo-repo/` traci dokumenty i pliki usunięte z repo).
@@ -351,7 +351,7 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    a węzeł skilla jego materiały (`references`).
    **Cała flota w grafie:** każdy skill floty (własny i wspólny z `shared/skills/`) to węzeł `fleet/skille/<skill>`: opis, wersja,
    data przeglądu, plik w repo, agenci (linki do hubów), powiązane skille (z `related_skills` i nazw w treści skilla), skrypty floty
-   wymienione w skillu, sekcje i materiały (linki do kopii `references/*.md`). Hub agenta linkuje swoje skille, więc graf pokazuje agent → skill → skrypty i skill → skill.
+   wymienione w skillu, sekcje i materiały (linki do kopii `references/**/*.md`, także z podkatalogów, np. karty stylów). Hub agenta linkuje swoje skille, więc graf pokazuje agent → skill → skrypty i skill → skill.
    Węzeł zmienia się tylko razem ze skillem, a skill usunięty z floty znika. Węzły skilli nie wchodzą do przypomnień ani do
    domyślnego szukania (agent ma swoje skille w prompcie); `wiedza_szukaj(folder="fleet")` je zwraca, `INDEX.md` liczy je jedną linią.
    **Skarbiec idzie za kodem:** blok `Jarvo:GEN` huba agenta ma też ostatnie zmiany z `CHANGELOG.md` profilu (sekcja

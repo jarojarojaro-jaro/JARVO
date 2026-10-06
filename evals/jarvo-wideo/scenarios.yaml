@@ -344,3 +344,15 @@ scenarios:
       should_not:
         - "wpisuje liczby spoza `fakty.json` albo nazywa 7,8 razy tyle „wzrostem o 7,8 raza”"
         - "zostawia chińskie napisy silnika albo używa klatek postaci autora silnika w filmie klienta"
+
+  - id: wideo-styl-malarski
+    type: in_scope
+    input: "Galeria w Krakowie robi noc muzeów. Zrób 8-sekundowy spot w stylu Van Gogha: ich kawiarnia nocą, w oknie napis „Noc Muzeów 2026”."
+    expect:
+      should:
+        - "`style-malarskie`: styl `09_postimp` z `references/wybor.md`, tylko karta `style/09_postimp.md` i `metoda.md`; silnik `narzedzia.py instaluj huashu`"
+        - "`malarz.py wzor 09_postimp` obejrzany, potem `malarz.py nowy out/wideo/src/<film> --styl 09_postimp` i przerobiona scena (kawiarnia zamiast pokoju, technika pociągnięć i wirów zostaje), napis krojem z polskimi znakami"
+        - "czas renderu policzony przed startem (styl ciężki, ok. 110 ms na klatkę), stopklatki obok wzoru, `krytyka.py determinizm` i `html_wideo.py pomiar` bez błędów, film 1920×1080, a pion przez projekt edytora (`projekt.py kadr … --wypelnij` albo `--rozmyte`)"
+      should_not:
+        - "oddaje scenę-wzór z dziewczyną i kotem bez zmian albo używa postaci autora silnika (`rig_huashu.js`)"
+        - "maluje kopię konkretnego obrazu Van Gogha zamiast jego techniki albo wpisuje „Van Gogh” do napisów spotu"

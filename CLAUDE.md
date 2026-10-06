@@ -16,7 +16,7 @@
 - **Skarbiec wiedzy (knowledge base) też zgodny z kodem.** Agenci czytają skarbiec (`/opt/data/jarvo/knowledge`), więc
   zmiana w kodzie albo flocie musi do niego dotrzeć. Zasiew przy każdym wdrożeniu (`wiedza.py zasiej`) odświeża sam:
   lustro `docs/*.md` w `zrodla/jarvo-repo/` i tam też, w układzie repo, SOUL, README, CHANGELOG i rubryka każdego profilu,
-  materiały skilli (`references/*.md`) i spis źródeł (`vendor/zrodla.md`), bloki `Jarvo:GEN` hubów agentów (skille, skrypty,
+  materiały skilli (`references/**/*.md`, z podkatalogami) i spis źródeł (`vendor/zrodla.md`), bloki `Jarvo:GEN` hubów agentów (skille, skrypty,
   skille zewnętrzne, serwery MCP, nazwy zmiennych, narzędzia, evals, ostatnie zmiany z `CHANGELOG.md` profilu i linki do
   kopii jego plików), węzły grafu `fleet/skille/` (każdy skill: opis, agenci, powiązane skille, skrypty, materiały)
   i opis agenta z `fleet.yaml`; lint skarbca wskazuje notatki o flocie

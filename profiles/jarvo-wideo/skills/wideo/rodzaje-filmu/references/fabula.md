@@ -12,6 +12,7 @@ Nie to: wyjaśnianie zjawiska z bohaterem-maskotką → `explainer.md`; trailer 
 |---|---|
 | 43 style kina (akwarela, anime, papier, klocki, pixel RPG, miedzioryt…) z reżyserią | `lemo-opuscar` |
 | rysunek, bajka szkicowana, timelapse rysowania | `anidoodle` |
+| bohater idzie przez obrazy w stylach epok (długi zwój) | skill `style-malarskie` (`dlugi-zwoj.md`) |
 | własna postać w Canvas / Three.js | własny HTML (`kontrakt-html.md`) |
 | realistyczne ujęcia (tylko za zgodą, płatne) | `wideo-ai` (limit z karty) |
 
