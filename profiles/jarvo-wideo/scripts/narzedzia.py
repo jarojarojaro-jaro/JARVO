@@ -182,6 +182,23 @@ def wymagaj_playwright(skrypt: str, flaga: str, komunikat: str = "brak playwrigh
     raise SystemExit(f"{komunikat}: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html{dopisek}")
 
 
+def wymagaj_modulow(skrypt: str, flaga: str, moduly: tuple[str, ...] = ("numpy", "PIL")) -> bool:
+    """numpy i Pillow są w venv narzędzi (`instaluj html`): bez nich skrypt uruchomiony wprost raz rusza od nowa
+    tamtym Pythonem (`flaga` w env blokuje pętlę). False = nie ma ich i tam (albo skrypt zaimportowano z innego)."""
+    try:
+        for m in moduly:
+            __import__(m)
+        return True
+    except ImportError:
+        pass
+    venv_py = Path(py())
+    wprost = Path(sys.argv[0]).resolve() == Path(skrypt).resolve()
+    if wprost and venv_py.exists() and Path(sys.prefix).resolve() != VENV.resolve() and not os.environ.get(flaga):
+        os.environ[flaga] = "1"
+        os.execv(str(venv_py), [str(venv_py), str(Path(skrypt).resolve()), *sys.argv[1:]])
+    return False
+
+
 def py_name(spec: str) -> str:
     """Nazwa paczki ze specyfikacji pip („playwright==1.63.0” → playwright)."""
     return re.split(r"[=<>!~\[]", spec, maxsplit=1)[0].strip()

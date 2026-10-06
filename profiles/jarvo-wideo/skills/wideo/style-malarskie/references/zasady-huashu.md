@@ -149,13 +149,15 @@ G3: gramatyki nauki i finansów). `qa.py` źródła odpowiada u nas zestaw: `kry
 **21. Mapa ruchu przed startem pokazuje, że „obraz żyje”.**
 - Dowód: mapa ruchu wzoru pokazała, że w każdym odcinku rusza się 2,5–34% powierzchni (a nie stoi jeden obraz),
   i to przesądziło o całej drodze produkcji.
-- Kiedy: przed każdym filmem ze wzoru. U nas mapy ruchu nie ma: gęsty arkusz `kadry.py wzor --fps …`
-  i `krytyka.py pasek` wokół akcji.
+- Kiedy: przed każdym filmem ze wzoru: `kadry.py wzor` → `ruch-1.jpg` (na czerwono, co się rusza w odcinku)
+  i `ruch_proc` każdego odcinka w `wzor.json`; szczegół akcji: gęsty arkusz `--fps …` i `krytyka.py pasek`.
 
 **22. Siatkę dopasowujesz jako „największy krok przy ≥ 80% punktów wewnętrznych”.**
 - Dowód: najmniejsza suma błędów wybiera bardzo mały krok i na siłę dopasowuje wszystko; po zmianie z 16 wykrytych
   punktów wyszło 14,1 klatki (ósemka przy 128 BPM), a 3 fałszywe punkty oznaczone jako odstające.
-- Kiedy: rozpis rytmu cudzej muzyki albo montażu (`rytm.md`).
+- Kiedy: rozpis rytmu cudzej muzyki albo montażu (`rytm.md`); u nas `kadry.py wzor` (pole `siatka`). Przy kilku
+  startach siatka bywa przypadkowa: `przypadek` mówi, jak często losowe starty dają równie duży krok; tempo bierzesz
+  z niej tylko przy `pewna` (≤ 5% albo krok pasuje do tempa muzyki z `rytm.py`).
 
 ## VI. Skala (scalenie 36 stylów)
 
@@ -188,7 +190,7 @@ G3: gramatyki nauki i finansów). `qa.py` źródła odpowiada u nas zestaw: `kry
   ma ani razu, a pierwsza tablica miała dymki myśli, których nie ma w próbkach RSA; G2 zmierzył film TheOdd1sOut:
   średnie ujęcie 2,4 s, 70% sąsiednich klatek bez żadnej zmiany.
 - Kiedy: przed nową gramatyką weź 2–5 reprezentatywnych filmów i zmierz długość ujęć, udział bezruchu i typy przejść
-  (`kadry.py wzor`), dopiero potem pisz kartę. Zapamiętane „cechy stylu” często należą do kogoś innego.
+  (`kadry.py wzor`: `sr_odcinek_s`, `bez_zmian_proc`, arkusze `przejscia/`), dopiero potem pisz kartę. Zapamiętane „cechy stylu” często należą do kogoś innego.
 
 **27. Kamera zależy tylko od czasu filmu; funkcja przejścia tylko składa dwa ujęcia.**
 - Dowód: przejazd ze skalą ×60 w Kurzgesagt jest w całości przerysowywany wektorowo i się nie rozmywa; w Vox

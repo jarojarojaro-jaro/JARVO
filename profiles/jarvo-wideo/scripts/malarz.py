@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -33,6 +32,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import narzedzia as nz  # noqa: E402
+import wideo_lib as wl  # noqa: E402
 
 SKILL = HERE.parent / "skills" / "wideo" / "style-malarskie"
 KARTY = SKILL / "references" / "style"
@@ -233,26 +233,8 @@ def cmd_wzor(a) -> int:
 
 def wymagaj_obrazu() -> None:
     """numpy i Pillow są w Pythonie narzędzi (`narzedzia.py instaluj html`): bez nich skrypt raz rusza tamtym."""
-    try:
-        import numpy  # noqa: F401
-        from PIL import Image  # noqa: F401
-        return
-    except ImportError:
-        pass
-    venv_py = Path(nz.py())
-    if venv_py.exists() and Path(sys.prefix).resolve() != nz.VENV.resolve() and not os.environ.get("JARVO_MALARZ_REEXEC"):
-        os.environ["JARVO_MALARZ_REEXEC"] = "1"
-        os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
-    raise SystemExit("✗ brak numpy/Pillow: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html")
-
-
-def czcionka(rozmiar: int):
-    from PIL import ImageFont
-    for p in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf",
-              "/Library/Fonts/Arial Unicode.ttf"):
-        if Path(p).exists():
-            return ImageFont.truetype(p, rozmiar)
-    return ImageFont.load_default()
+    if not nz.wymagaj_modulow(__file__, "JARVO_MALARZ_REEXEC"):
+        raise SystemExit("✗ brak numpy/Pillow: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html")
 
 
 def arkusz_galerii(klatki: list[Path], podpisy: list[str], out: Path, kolumny: int = 5, szer: int = 384) -> Path:
@@ -260,7 +242,7 @@ def arkusz_galerii(klatki: list[Path], podpisy: list[str], out: Path, kolumny: i
     wys, pas = szer * H // W, 26
     wiersze = -(-len(klatki) // kolumny)
     plotno = Image.new("RGB", (szer * kolumny, (wys + pas) * wiersze), "#1c1c1c")
-    rys, font = ImageDraw.Draw(plotno), czcionka(15)
+    rys, font = ImageDraw.Draw(plotno), wl.czcionka(15)
     for i, (k, podpis) in enumerate(zip(klatki, podpisy)):
         x, y = (i % kolumny) * szer, (i // kolumny) * (wys + pas)
         plotno.paste(Image.open(k).convert("RGB").resize((szer, wys)), (x, y + pas))

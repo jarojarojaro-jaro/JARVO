@@ -42,7 +42,7 @@ opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprz
 1. Rodzaj z indeksu → jego plik. Każdy film z kodu → też `references/ruch-i-kompozycja.md` (charakter ruchu z marki,
    oddech, jeden bohater, przejścia, smugi zamiast motion bluru; kod: `ruch.js`). Własna animacja HTML (Canvas, SVG, Three.js, GSAP)
    → też `references/kontrakt-html.md`.
-   **Film-wzór** („zrób coś takiego”): `kadry.py wzor wzor.mp4` (klatki co 0,5 s, cięcia, rytm) → rozpisz go na bity
+   **Film-wzór** („zrób coś takiego”): `kadry.py wzor wzor.mp4` (klatki co 0,5 s, cięcia, rytm, przejścia na siatce bitów, mapa ruchu) → rozpisz go na bity
    (przejścia, kamera, kolory, fonty) i przenieś tę strukturę na produkt; treści, logo i assetów wzoru nie bierzesz.
 2. **Brief** `out/wideo/src/BRIEF.md` w 6 częściach: **wejścia** (pliki, dane, marka), **kierunek** (styl w 3 zdaniach +
    czego nie ma być, charakter ruchu z marki), **struktura** (mapa bitów: sekunda → scena → ruch → dźwięk), **budowa** (silnik, format, fps),

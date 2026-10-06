@@ -269,6 +269,19 @@ def sdr(path: Path) -> str:
     return v.get("sdr") or ""
 
 
+def czcionka(rozmiar: int):
+    """Krój z polskimi znakami do podpisów na arkuszach (Pillow)."""
+    from PIL import ImageFont
+    for p in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf",
+              "/usr/share/fonts/dejavu/DejaVuSans.ttf", "/Library/Fonts/Arial Unicode.ttf"):
+        if Path(p).exists():
+            return ImageFont.truetype(p, rozmiar)
+    try:
+        return ImageFont.load_default(size=rozmiar)
+    except TypeError:
+        return ImageFont.load_default()
+
+
 def z_sdr(chain: str, sdr_vf: str) -> str:
     """`chain` + przeliczenie HDR (gdy jest), przecinkiem; pusty łańcuch zostaje pusty."""
     return ",".join(x for x in (chain, sdr_vf) if x)

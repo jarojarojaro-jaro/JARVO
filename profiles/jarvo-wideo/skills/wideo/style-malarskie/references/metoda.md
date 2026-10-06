@@ -98,8 +98,8 @@ Niezależnie od drogi najpierw powstaje jedna „właściwa” klatka.
 - **Jest film-wzór:** ostatnią klatkę odcinka przed przejściem podaj modelowi obrazu jako referencję. Prompt:
   „zachowaj dokładnie kompozycję, kadr, położenie i wielkość każdego przedmiotu, kolory i pociągnięcia z obrazu
   referencyjnego; zmień tylko dwie rzeczy: …”. W teście nałożenie 50% na oryginał pokrywa się prawie piksel
-  w piksel. Kompozycję trzyma obraz referencyjny, nie współrzędne opisane w tekście. Klatki wzoru:
-  `python3 $HERMES_HOME/scripts/kadry.py wzor film-wzor.mp4 --fps 2 -o out/wideo/wzor`.
+  w piksel. Kompozycję trzyma obraz referencyjny, nie współrzędne opisane w tekście. Ostatnie klatki odcinków
+  w pełnym kadrze: `python3 $HERMES_HOME/scripts/kadry.py wzor film-wzor.mp4 -o out/wideo/wzor` → `ref/odc01.png` ….
 - **Nie ma wzoru:** najpierw ustal szkielet sceny (współrzędne kompozycji wzorcowej), zrób zrzut makiety szkieletu
   i użyj go jako referencji.
 - **Bramka trzech kierunków:** interpretację postaci (w replice: strój epoki / ta sama osoba w podróży / oryginał
@@ -340,8 +340,10 @@ SCENES['<id>'] = { draw(c, lt, t) { /* maluje cały kadr 1920×1080 */ }, init(I
 
 ### Dwa punkty startu
 **Jest film-wzór:** `python3 $HERMES_HOME/scripts/kadry.py wzor film-wzor.mp4 -o out/wideo/wzor` daje arkusze klatek
-z czasem, cięcia i rytm (zamiast ich `breakdown.py`). Klatki wzoru decydują o kompozycji, motywach i kolorach;
-co w obrazie się rusza, odczytaj z gęstszego arkusza (`--fps`) i `krytyka.py pasek` wokół akcji.
+z czasem, cięcia, rytm i rozbiór ruchu (port ich `breakdown.py`): starty przejść na siatce bitów, arkusz każdego
+przejścia co 2 klatki (`przejscia/P01.jpg`), mapę ruchu odcinków (`ruch-1.jpg`) i klatki kluczowe (`ref/odc01.png`
+w pełnym kadrze). Klatki wzoru decydują o kompozycji, motywach i kolorach; co w obrazie się rusza, pokazuje mapa
+ruchu, szczegół akcji gęstszy arkusz (`--fps`) i `krytyka.py pasek`.
 
 **Nie ma wzoru** (częściej):
 1. Zapisz 3–5 najbardziej rozpoznawalnych elementów formalnych stylu (materiał, pociągnięcie, paleta, motyw, ślady

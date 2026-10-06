@@ -8,7 +8,7 @@ zasady i liczby z rozpisu, nie nuty oryginału. Mechanizm obrazu: `metoda.md`.
 
 | Zadanie | Polecenie |
 |---|---|
-| Rozpis filmu-wzoru: klatki co 1/fps s, cięcia, rytm muzyki (`wzor.json`) | `python3 $HERMES_HOME/scripts/kadry.py wzor film-wzor.mp4 --fps 2 -o out/wideo/wzor` |
+| Rozpis filmu-wzoru: klatki co 1/fps s, cięcia, rytm muzyki, starty przejść i ich siatka (krok, tempo, odstające, `przypadek`), mapa ruchu, klatki kluczowe (`wzor.json`) | `python3 $HERMES_HOME/scripts/kadry.py wzor film-wzor.mp4 --fps 2 -o out/wideo/wzor` |
 | Tempo, pierwszy bit (faza), bity, takty, perkusja w trzech pasmach | `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3 --json out/wideo/src/rytm.json` |
 | Po renderze: cięcia filmu kontra bity (błąd w klatkach: do 1,5 idealnie, do 3 dobrze) | `python3 $HERMES_HOME/scripts/rytm.py sprawdz out/wideo/film.mp4 --ciecia 1.2,3.4` |
 | Muzyka pisana kodem pod obraz, efekty w chwilach z cues.json | `python3 $HERMES_HOME/scripts/muzyka.py zrob out/wideo/film.mp4 -o out/wideo/final.mp4 --cues cues.json --tempo 128` |
