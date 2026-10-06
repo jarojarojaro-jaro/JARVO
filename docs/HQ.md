@@ -137,7 +137,19 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   Cięcie w środku fali dawało klik, a rolki z clipmakera i cięcia z zakładki „Mowa” mają takich cięć dużo. Test mierzy
   skok fali na styku dwóch kawałków sinusa (`test_ciecie_bez_kliku`). Pomysł z browser-use/video-use (MIT).
 - **Pasy audio:** muzyka, lektor i efekty grające naraz leżą na osi jeden pod drugim (element trafia na pierwszy
-  wolny pas, `pasyAudio`), do 32 elementów audio w projekcie; eksport miesza wszystkie.
+  wolny pas, `pasyAudio`), do 64 elementów audio w projekcie; eksport miesza wszystkie.
+- **Dźwięk przypięty do obrazu** (`linked` w elemencie audio; głos i efekty filmu z kodu): przy cięciu, usunięciu,
+  przestawieniu i duplikacji klipów idzie kawałkami za materiałem, pod którym grał (wycięte ujęcie zabiera swój głos,
+  przestawione go przenosi), zamiast tylko się przesuwać jak muzyka. Kawałki stykające się na osi i w pliku łączą się
+  z powrotem, kolejne kawałki dostają id `<id>-k`; tempo klipu nie zmienia tempa dźwięku. Na osi łańcuch przed nazwą
+  (pole `label`, np. „Głos”, albo nazwa pliku) i ciemniejszy pas; w panelu „Odłącz od obrazu” / „Przypnij do obrazu”.
+  Ta sama reguła w `remapTimes` i `edytor.remap_times` (`przypiete`), test parytetu w `tests/test_edytor_os.py`;
+  u agenta `projekt.py dzwiek <film> <id> --przypnij|--odlacz`.
+- **Film z kodu w edytorze:** każdy film, który Wideograf robi kodem (lemo, animacja HTML i inne), oddaje jako projekt
+  (`projekt.py z-kodu`): czysty obraz bez wypalonych napisów pocięty na ujęcia, głos i efekty przypięte do obrazu, muzyka
+  osobno, napisy jako tekst; kopie w `<film>-sciezki/`, suma dźwięków −14 LUFS wpisana w kopie. Sam film to render tego
+  projektu, więc „Edytuj” pokazuje dokładnie to, co oddano, a cięcie, podmiana muzyki i poprawka napisu działają jak
+  w nagraniu. Plan: [EDYTOR-PLAN.md](EDYTOR-PLAN.md#film-z-kodu-w-edytorze-poziom-1).
 - **Menu Audio** (jak w CapCut; „Dodaj audio” pod osią, na komputerze zakładka „Audio” w panelu, `44-audio.js`):
   **Efekty** (157 efektów CC0 w 13 kategoriach: przejścia, reakcje, pieniądze, uderzenia, akcja, interfejs, technika,
   natura, zwierzęta, codzienne, zabawne, gry, dżingle; szukanie po polsku i angielsku, odsłuch, „+” dodaje we wskaźniku),
@@ -213,10 +225,12 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   Klucz osi (klipy, przycięcie, tempo, kadr; `edytor.maska_klucz` = `maskaKlucz` w `48-typografia.js`) pilnuje, żeby
   po zmianie klipów nie użyć starych sylwetek: wtedy napis jest po prostu widoczny w całości.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
-  `volume`, `muted`, `fit`, `transition`, `fadeIn`, `fadeOut`, `color`, `voice`), napisy, muzyka i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
+  `volume`, `muted`, `fit`, `transition`, `fadeIn`, `fadeOut`, `color`, `voice`), napisy, audio (także `label`
+  i `linked`) i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.
 - **Eksport** (`POST /edit/export`): serwer sprawdza projekt (ścieżki tylko z katalogów floty, limity długości
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat albo xfade przy przejściach → nakładki → miks
-  z limiterem), H.264 + AAC,
+  z limiterem: szczyt −2 dBFS bez podnoszenia całości, `edytor.LIMIT_EKSPORTU`, więc po AAC szczyt prawdziwy
+  zostaje pod −1 dBTP, jak chcą platformy i `qa_wideo.py`), H.264 + AAC,
   `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
   i dopiero gotowy dostaje nazwę `film-edycja[-N].mp4`: nic nie jest nadpisywane.
   Kadr ma krótszy bok najwyżej 1080 px przy proporcjach źródła (nagranie 4K z iPhone'a 2160×3840 → 1080×1920;

@@ -36,6 +36,7 @@ const strefyKolizja = (box, W, H, pf) => strefyUI(W, H, pf)
 const ED_FITS = [["contain", "Pasy", "Bars"], ["blur", "Rozmyte tło", "Blurred"], ["cover", "Wypełnij", "Fill"]];
 const ED_STYLES = [["shadow", "Cień", "Shadow"], ["box", "Tło", "Box"], ["outline", "Obrys", "Outline"], ["plain", "Zwykły", "Plain"]];
 const ED_MIN = 0.1;
+const ED_MAX_AUDIO = 64;      // elementów audio w projekcie (MAX_AUDIO w edytor.py): muzyka, lektor, efekty i kawałki dźwięku przypiętego do obrazu
 const ED_COLORS = ["#FFFFFF", "#000000", "#FFD60A", "#FF453A", "#32D74B", "#0A84FF", "#BF5AF2", "#FF9F0A"];
 const ED_CAP = { x: 0.5, y: 0.84, size: 58, color: "#FFFFFF", bg: "#000000", style: "outline", bold: true, align: "center", maxw: 0.84,
   font: "'Bricolage Grotesque', system-ui, sans-serif" };
@@ -102,6 +103,7 @@ const ED_ICON = {
   back: svgI(html`<path d="m15 18-6-6 6-6"/>`),
   camera: svgI(html`<path d="M14.5 4h-5L7.5 6.5H4.5A1.5 1.5 0 0 0 3 8v10a1.5 1.5 0 0 0 1.5 1.5h15A1.5 1.5 0 0 0 21 18V8a1.5 1.5 0 0 0-1.5-1.5h-3z"/><circle cx="12" cy="12.5" r="3.5"/>`),
   pin: svgI(html`<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>`),
+  link: svgI(html`<path d="M10 13.5a4.5 4.5 0 0 0 6.6.4l3-3a4.5 4.5 0 0 0-6.4-6.4L11.6 6"/><path d="M14 10.5a4.5 4.5 0 0 0-6.6-.4l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.6-1.6"/>`),
   film: svgI(html`<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>`),
   image: svgI(html`<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5.2-5.2L5.5 20"/>`),
   sliders: svgI(html`<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>`),
@@ -174,7 +176,8 @@ function layoutClips(clips) {
 }
 // Oś magnetyczna (jak CapCut): po każdej zmianie klipów (usunięcie, wstawienie, przycięcie, tempo, przestawienie) napisy
 // i uwagi idą za materiałem, z którego pochodzą (czas źródła klipu), a muzyka i lektor przesuwają się o wycięty albo
-// wstawiony czas. Przy samym przestawieniu napis jedzie w całości z klipem, w którym leży, a audio stoi.
+// wstawiony czas. Przy samym przestawieniu napis jedzie w całości z klipem, w którym leży, a audio stoi. Dźwięk
+// przypięty do obrazu (linked) idzie kawałkami za materiałem (przypiete).
 // Ta sama reguła w edytor.py remap_times (zmiany agenta przez projekt.py).
 function remapTimes(P0, P1) {
   const L0 = layoutClips(P0.clips), L1 = layoutClips(P1.clips);
@@ -205,9 +208,41 @@ function remapTimes(P0, P1) {
     const mid = (b.start + b.end) / 2, d = map(mid) - mid;
     return typoNaOsi(b, (x) => x + d);
   });
+  const uzyte = new Set((P1.audio || []).map((m) => m.id));
   return { ...P1, texts,
-    audio: reorder ? P1.audio : (P1.audio || []).map((m) => ({ ...m, start: r(map(m.start)) })),
+    audio: (P1.audio || []).flatMap((m) => m.linked ? przypiete(m, L0, L1, ids0, uzyte) : reorder ? [m] : [{ ...m, start: r(map(m.start)) }]),
     notes: (P1.notes || []).map((n) => ({ ...n, t: r(map(n.t)) })), ...(typo ? { typo } : {}) };
+}
+// Dźwięk przypięty do obrazu (linked: głos i efekty filmu z kodu) po zmianie klipów: każdy kawałek materiału, który został
+// na osi, gra dalej pod tym samym obrazem (wycięte ujęcie zabiera swój dźwięk, przestawione go przenosi, zduplikowane
+// powtarza). Kawałki stykające się na osi i w pliku łączą się w jeden element; pierwszy zostaje z id elementu, kolejne
+// dostają wolne id `<id>-k`. Tempo klipu nie zmienia tempa dźwięku. Ta sama reguła w edytor.py przypiete.
+function przypiete(m, L0, L1, ids0, uzyte) {
+  const s0 = +m.start || 0, i0 = +m.in || 0, e0 = s0 + (+m.out || 0) - i0, kaw = [];
+  for (const o of L0) {
+    const x = Math.max(o.start, s0), y = Math.min(o.end, e0);         // część elementu pod starym klipem
+    if (y - x < 1e-6) continue;
+    const sp0 = o.c.speed || 1, in0 = +o.c.in || 0, u0 = in0 + (x - o.start) * sp0, u1 = in0 + (y - o.start) * sp0;
+    for (const n of L1) {
+      if (n.c.src !== o.c.src || !(n.c.id === o.c.id || !ids0.has(n.c.id))) continue;
+      const v0 = Math.max(u0, +n.c.in || 0), v1 = Math.min(u1, +n.c.out || 0);
+      if (v1 - v0 < 1e-6) continue;
+      kaw.push([n.start + (v0 - (+n.c.in || 0)) / (n.c.speed || 1), i0 + o.start + (v0 - in0) / sp0 - s0, i0 + o.start + (v1 - in0) / sp0 - s0]);
+    }
+  }
+  kaw.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const zl = [];
+  for (const k of kaw) {
+    const p = zl[zl.length - 1];
+    if (p && Math.abs(k[0] - p[0] - (p[2] - p[1])) < 1e-3 && Math.abs(k[1] - p[2]) < 1e-3) p[2] = k[2];
+    else zl.push(k);
+  }
+  const r = (x) => +x.toFixed(3);
+  return zl.map(([st, a, b], j) => {
+    let id = m.id;
+    if (j) { let n = 1; while (uzyte.has(`${m.id}-${n}`)) n++; id = `${m.id}-${n}`; uzyte.add(id); }
+    return { ...m, id, start: r(st), in: r(a), out: r(b) };
+  });
 }
 // Blok typografii po zmianie osi: początek, koniec i każde słowo (czas od początku bloku) przez tę samą funkcję czasu,
 // więc słowo zostaje przy swoim dźwięku; blok z wyciętego fragmentu (krótszy niż 0,05 s) wypada.
@@ -1327,7 +1362,7 @@ function VideoEditor({ path, onClose }) {
   }
   // menu Audio (44-audio.js): plik obok filmu → element audio od wskaźnika (albo od chwili startu nagrania)
   function addAudioFile(m, volume, at) {
-    if ((projRef.current.audio || []).length >= 32) { alert(L("Najwyżej 32 elementy audio.", "At most 32 audio items.")); return; }
+    if ((projRef.current.audio || []).length >= ED_MAX_AUDIO) { alert(L(`Najwyżej ${ED_MAX_AUDIO} elementy audio.`, `At most ${ED_MAX_AUDIO} audio items.`)); return; }
     addMeta([m]);
     const x = { id: edId("a"), src: m.path, start: +clamp(at === undefined ? tRef.current : at, 0, total).toFixed(3), in: 0,
       out: m.duration || 10, volume: volume === undefined ? 1 : volume };
@@ -2054,13 +2089,17 @@ function VideoEditor({ path, onClose }) {
       <input type="range" min="0" max=${mx} step="0.1" value=${Math.min(+item[key] || 0, mx)} onInput=${(e) => upd(type, item.id, { [key]: +e.target.value || undefined }, true)} onChange=${H.commit}/></label>`;
     return html`<div class="thq-ed-row2">${one("fadeIn", "Narastanie", "Fade in")}${one("fadeOut", "Wyciszanie", "Fade out")}</div>`;
   };
+  const audioNazwa = (m) => m.label || (meta[m.src] || {}).name || m.src.split("/").pop();
   const audioTools = (m, only) => html`<div class="thq-ed-form">
-    ${!only && html`<p class="thq-ed-sub thq-ed-subi">${ED_ICON.audio}<span>${(meta[m.src] || {}).name || m.src.split("/").pop()}</span></p>`}
+    ${!only && html`<p class="thq-ed-sub thq-ed-subi">${m.linked ? ED_ICON.link : ED_ICON.audio}<span>${audioNazwa(m)}</span></p>`}
+    ${!only && m.linked && html`<p class="thq-ed-note">${L("Przypięte do obrazu: przy cięciu i przestawianiu klipów idzie razem z nimi.", "Linked to the video: follows clips when you cut or move them.")}</p>`}
     <label>${L("Głośność", "Volume")} · ${Math.round(m.volume * 100)}% (${fmtDb(m.volume)})<input type="range" min="0" max="2" step="0.05" value=${m.volume} onInput=${(e) => upd("audio", m.id, { volume: +e.target.value }, true)} onChange=${H.commit}/></label>
     ${fadeTools("audio", m, audioNaOsi(m, total))}
     ${glosTools("audio", m)}
     ${!only && html`<p class="thq-ed-note">${L("Od", "From")} ${fmtT(m.start, true)} · ${L("długość", "length")} ${fmtT(audioDur(m), true)}</p>
-    <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>`}
+    <div class="thq-ed-acts">${act("split", L("Tnij", "Split"), split)}${act("copy", L("Duplikuj", "Duplicate"), duplicate)}${
+      act("link", m.linked ? L("Odłącz od obrazu", "Unlink") : L("Przypnij do obrazu", "Link to video"), () => upd("audio", m.id, { linked: !m.linked }), { on: m.linked })}${
+      act("trash", L("Usuń", "Delete"), remove, { bad: true })}</div>`}
   </div>`;
 
   const audioAdd = () => html`<${AudioMenu} path=${path} media=${media} start=${t} onAdd=${addAudioFile} onUploadAdd=${uploadAudioAdd}
@@ -2310,9 +2349,9 @@ function VideoEditor({ path, onClose }) {
     ${p.audio.map((m) => {
       const w = waves[m.src];
       const wave = w && w.url ? { backgroundImage: `url(${w.url})`, backgroundSize: `${w.dur * pps}px 100%`, backgroundPosition: `${-m.in * pps}px 0`, backgroundRepeat: "no-repeat" } : {};
-      return html`<div key=${m.id} class=${cx("thq-ed-item is-audio", sel && sel.id === m.id && "is-sel")}
+      return html`<div key=${m.id} class=${cx("thq-ed-item is-audio", m.linked && "is-linked", sel && sel.id === m.id && "is-sel")}
       style=${{ left: `${m.start * pps}px`, top: `${(pasy.pas[m.id] || 0) * 38}px`, width: `${Math.max(6, audioDur(m) * pps)}px`, ...wave }} onPointerDown=${(e) => audioDown(e, m)} onClick=${(e) => pick(e, "audio", m.id)}>
-      <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>${(meta[m.src] || {}).name || ""}${Math.abs(m.volume - 1) > 0.01 ? ` · ${fmtDb(m.volume)}` : ""}</span>${volLine("audio", m)}${fadeMarks(m, audioNaOsi(m, total))}
+      <i class="thq-ed-h is-l" onPointerDown=${(e) => audioDown(e, m, "l")}></i><span>${m.linked && ED_ICON.link}${audioNazwa(m)}${Math.abs(m.volume - 1) > 0.01 ? ` · ${fmtDb(m.volume)}` : ""}</span>${volLine("audio", m)}${fadeMarks(m, audioNaOsi(m, total))}
       <i class="thq-ed-h is-r" onPointerDown=${(e) => audioDown(e, m, "r")}></i></div>`;
     })}
     ${!p.audio.length && html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }}

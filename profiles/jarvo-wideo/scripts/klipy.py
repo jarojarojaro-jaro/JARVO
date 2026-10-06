@@ -982,21 +982,9 @@ def odcinki_twarzy(plan: dict, words: list, info: dict, tylko: str | None = None
     return out
 
 
-def _kanon(x):
-    """Liczby w jednej postaci: edytor HQ zapisuje 1.0 jako 1, a samo otwarcie rolki to jeszcze nie edycja."""
-    if isinstance(x, bool) or not isinstance(x, (int, float, list, dict)):
-        return x
-    if isinstance(x, (int, float)):
-        return round(float(x), 4)
-    return [_kanon(v) for v in x] if isinstance(x, list) else {k: _kanon(v) for k, v in x.items()}
-
-
 def podpis(proj: dict, kanon: bool = True) -> str:
     """Odcisk treści projektu (klipy, napisy, audio, kadr): po nim poznajemy, czy ktoś edytował rolkę w HQ."""
-    import hashlib
-    tresc = {k: proj.get(k) for k in ("canvas", "clips", "texts", "audio")}
-    return hashlib.sha1(json.dumps(_kanon(tresc) if kanon else tresc, sort_keys=True, ensure_ascii=False)
-                        .encode()).hexdigest()[:16]
+    return pr.podpis(proj, kanon)
 
 
 def edytowana_recznie(film: Path) -> bool:

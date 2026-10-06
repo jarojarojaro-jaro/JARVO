@@ -106,3 +106,54 @@ def test_projekt_usun_i_wstaw_dosuwaja_os(tmp_path, monkeypatch):
     monkeypatch.setattr(pr, "save", lambda f, p: zapis.update(p=p))
     pr.cmd_usun(film, type("A", (), {"id": "b"})())
     sprawdz(zapis["p"], *PRZYPADKI["usun_srodek"][1:])
+
+
+# dźwięk przypięty do obrazu (linked): głos przez cały film i efekt 12–16 s (w klipie b) idą kawałkami za materiałem
+P0L = {**P0, "audio": [*P0["audio"], {"id": "glos", "start": 0, "in": 0, "out": 30, "linked": True, "volume": 0.8},
+                       {"id": "fx", "start": 12, "in": 0, "out": 4, "linked": True}]}
+PRZYPIETE = {
+    "usun_srodek": {"glos": (0, 0, 10), "glos-1": (10, 20, 30)},                       # efekt znika z ujęciem
+    "przytnij_koniec": {"glos": (0, 0, 6), "glos-1": (6, 10, 30), "fx": (8, 0, 4)},
+    "przytnij_poczatek": {"glos": (0, 0, 10), "glos-1": (10, 13, 30), "fx": (10, 1, 4)},
+    "wstaw": {"glos": (0, 0, 10), "glos-1": (15, 10, 30), "fx": (17, 0, 4)},
+    "tempo": {"glos": (0, 0, 20), "glos-1": (15, 20, 30), "fx": (11, 0, 4)},           # tempo klipu nie zmienia dźwięku
+    "przestaw": {"glos": (0, 20, 30), "glos-1": (10, 0, 20), "fx": (22, 0, 4)},
+    "podziel": {"glos": (0, 0, 30), "fx": (12, 0, 4)},                                 # podział niczego nie tnie
+    "duplikuj": {"glos": (0, 0, 20), "glos-1": (20, 10, 30), "fx": (12, 0, 4), "fx-1": (22, 0, 4)},
+}
+DUPLIKAT = [klip("a", 0, 10), klip("b", 10, 20), klip("bd", 10, 20), klip("c", 20, 30)]
+
+
+def sprawdz_przypiete(wynik, oczekiwane):
+    linked = {m["id"]: (m["start"], m["in"], m["out"]) for m in wynik["audio"] if m.get("linked")}
+    assert linked == oczekiwane
+    assert all(m.get("volume") == 0.8 for m in wynik["audio"] if str(m["id"]).startswith("glos"))   # reszta pól zostaje
+    assert [m["id"] for m in wynik["audio"] if not m.get("linked")] == ["m", "tlo"]
+
+
+def przypadek_przypiete(nazwa):
+    return {**P0L, "clips": DUPLIKAT} if nazwa == "duplikuj" else {**P0L, "clips": PRZYPADKI[nazwa][0]["clips"]}
+
+
+@pytest.mark.parametrize("nazwa", sorted(PRZYPIETE))
+def test_dzwiek_przypiety_idzie_za_obrazem(nazwa):
+    sprawdz_przypiete(ed.remap_times(P0L, przypadek_przypiete(nazwa)), PRZYPIETE[nazwa])
+
+
+def test_dzwiek_przypiety_bez_zmiany_klipow_zostaje_jak_byl():
+    wynik = ed.remap_times(P0L, P0L)
+    assert [m for m in wynik["audio"] if m.get("linked")] == [m for m in P0L["audio"] if m.get("linked")]
+
+
+def test_dzwiek_przypiety_przegladarka_tak_samo():
+    if not shutil.which("node"):
+        pytest.skip("brak node")
+    fn = lambda name: re.search(rf"^function {name}\(.*?^}}", JS, re.S | re.M).group(0)
+    prog = (re.search(r"^const clipDur = .*$", JS, re.M).group(0) + "\n" + fn("layoutClips") + "\n" + fn("remapTimes") + "\n"
+            + fn("przypiete") + "\n" + fn("typoNaOsi") + "\n" + fn("typoPrzesun") + "\n"
+            + f"const P0 = {json.dumps(P0L)};\nconst C = {json.dumps({k: przypadek_przypiete(k) for k in PRZYPIETE})};\n"
+            + "const out = {}; for (const k in C) out[k] = remapTimes(P0, C[k]);\nconsole.log(JSON.stringify(out));")
+    wyniki = json.loads(subprocess.run(["node", "-e", prog], capture_output=True, text=True, check=True).stdout)
+    for nazwa, oczekiwane in PRZYPIETE.items():
+        sprawdz_przypiete(wyniki[nazwa], oczekiwane)
+        assert wyniki[nazwa]["audio"] == ed.remap_times(P0L, przypadek_przypiete(nazwa))["audio"]

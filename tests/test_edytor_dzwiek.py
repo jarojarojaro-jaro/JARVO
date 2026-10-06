@@ -59,8 +59,8 @@ def test_normalize_zanik_w_granicach(tmp_path):
     cmd = " ".join(ed.build_command(p, {str(tmp_path / "a.mp4"): True}, [], tmp_path / "o.mp4"))
     assert "afade=t=in:st=0:d=1:curve=tri,afade=t=out:st=1.5:d=0.5:curve=tri[a0]" in cmd
     assert "afade=t=in:st=0:d=1:curve=tri,afade=t=out:st=1.5:d=1.5:curve=tri,adelay=3000|3000[m0]" in cmd
-    assert len(ed.normalize({"clips": [{"src": str(tmp_path / "a.mp4")}], "audio": [{"src": str(tmp_path / "m.mp3"), "out": 1}] * 40},
-                            lambda s: Path(s) if Path(s).is_file() else None)["audio"]) == ed.MAX_AUDIO == 32
+    assert len(ed.normalize({"clips": [{"src": str(tmp_path / "a.mp4")}], "audio": [{"src": str(tmp_path / "m.mp3"), "out": 1}] * 80},
+                            lambda s: Path(s) if Path(s).is_file() else None)["audio"]) == ed.MAX_AUDIO == 64
 
 
 def test_ciche_ciecia_w_poleceniu(tmp_path):

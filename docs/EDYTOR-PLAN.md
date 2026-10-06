@@ -22,7 +22,7 @@ Jarvo zostaje nadrzędny: z cudzych projektów bierzemy tylko wzorce i pliki na 
 | Przejścia między klipami | ✅ | 16 rodzajów, kwadrat na cięciu, animowane miniatury, długość, „Do wszystkich cięć”; nie skraca filmu (środek cięcia, napisy zostają); eksport `xfade` + `acrossfade`; `projekt.py przejscie` |
 | Szybkie cięcie | ✅ | Usuń z lewej (od początku klipu do wskaźnika, Q) i z prawej (od wskaźnika, W), podział klipu na 2–4 równe części (np. 7,5 s → 3 × 2,5 s, środek usunięty jednym ruchem, reszta się dosuwa); `projekt.py tnij` i `wytnij` |
 | Zanik audio | ✅ | Narastanie i wyciszanie na początku i końcu każdego audio i klipu (suwaki, trójkąt na osi, `afade` liniowo jak podgląd); `projekt.py dzwiek` i `dodaj-audio --narastanie/--wyciszanie`; ciche cięcia: 25 ms wyciszenia na każdym twardym cięciu w eksporcie |
-| Kilka ścieżek audio | ✅ | Muzyka, lektor i efekty grające naraz na osobnych pasach osi (pierwszy wolny pas), do 32 elementów audio |
+| Kilka ścieżek audio | ✅ | Muzyka, lektor i efekty grające naraz na osobnych pasach osi (pierwszy wolny pas), do 64 elementów audio |
 | Paski ikon na telefonie | ✅ | Pasek główny, pasek klipu, audio i tekstu jak w CapCut, z „<” powrotu; ikona otwiera jedną sekcję ustawień |
 | Kolor klipu | ✅ | 7 stylów z próbką i suwaki jasność, kontrast, nasycenie, temperatura; Auto z pomiaru klatek; na wszystkie klipy; podgląd filtrem SVG = eksport `lutrgb` + `colorchannelmixer` (jeden przepis, test pikseli); `projekt.py kolor` (z `--auto` i `--podglad`) |
 
@@ -39,6 +39,18 @@ ma pięć kart. Każdy dodany dźwięk to plik obok filmu (`dzwieki/`, `lektor/`
 | Lektor | ✅ | Tekst na mowę Edge TTS (ten sam co w `film.py`), 5 głosów i tempo −30…+30%; `projekt.py lektor` (z czasami słów do napisów) |
 | Czysty głos | ✅ | Klip i każde audio: Brak / Lekko / Średnio / Mocno (odszumianie z progiem z tła nagrania, ekspander w pauzach, de-esser, kompresor), Auto z pomiaru tła, Odsłuchaj 8 s po czyszczeniu; `projekt.py glos`, `montaz.py glos`, `klipy.py zbuduj --glos` |
 | Nagraj | ✅ | Mikrofon w przeglądarce (MediaRecorder, serwer zapisuje AAC); wymaga HTTPS albo localhost, bez tego wgranie notatki głosowej z telefonu |
+
+## Film z kodu w edytorze (poziom 1)
+
+Prośba właściciela: każdy film, który Wideograf robi kodem (lemo, animacja HTML, anidoodle i inne), da się otworzyć
+w edytorze i poprawić jak nagranie: podmienić albo wyciszyć muzykę, poprawić i przesunąć napisy, zmienić głośność, ciąć.
+Poziom 2 (później): ruch elementów animacji z parametrów (okno ◐ Animacja) i ponowny render obrazu.
+
+| Funkcja | Stan | Opis |
+|---|---|---|
+| Dźwięk przypięty do obrazu | ✅ | Element audio z `linked` (głos, efekty) idzie przy cięciu, usunięciu, przestawieniu i duplikacji klipów kawałkami za swoim obrazem; łańcuch na osi, „Odłącz od obrazu” w panelu; `projekt.py dzwiek --przypnij/--odlacz` |
+| Projekt z filmu z kodu | ✅ | `projekt.py z-kodu`: czysty obraz (bez wypalonych napisów, bez dźwięku) pocięty na ujęcia (`--ciecia`: liczby, `events.json` lemo, `os_czasu.json`), głos i efekty przypięte do obrazu, muzyka osobno, napisy z SRT albo słów (karaoke); kopie w `<film>-sciezki/` ze wzmocnieniem do −14 LUFS (elementy na 0 dB, gdy szczyt pozwala); `--render`: film = render projektu; projektu zmienionego w edytorze nie nadpisze bez `--nadpisz`. Limiter eksportu −2 dBFS (szczyt prawdziwy pod −1 dBTP) |
+| Silniki i reguła oddania | planowane | lemo, kontrakt HTML z `muzyka.py`, pozostałe silniki; bez projektu film nie jest oddany (`kontrola-wideo`) |
 
 ## Krok 3. Tekst
 

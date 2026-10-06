@@ -178,7 +178,7 @@ def test_zdanie_i_seria_na_osi(film, capsys):
     p = proj(film)
     p["audio"] += [dict(p["audio"][-1]) for _ in range(ed.MAX_AUDIO - len(p["audio"]) - 1)]
     pr.save(film, p)
-    with pytest.raises(SystemExit, match="najwyżej 32"):           # edytor pominąłby nadmiar bez słowa
+    with pytest.raises(SystemExit, match="najwyżej 64"):           # edytor pominąłby nadmiar bez słowa
         pr.main(["zdanie", str(film), "--na", "2.0"])
 
 

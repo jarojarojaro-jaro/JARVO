@@ -7,7 +7,7 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
 
     projekt.py pokaz <film>                        # co jest na osi (klipy, napisy, audio, długość)
     projekt.py dodaj-audio <film> <plik> [--start S] [--od S] [--do S] [--glosnosc 0.8] [--wycisz-film] [--narastanie 1] [--wyciszanie 2]
-    projekt.py dzwiek <film> <id> [--glosnosc 0.3] [--narastanie S] [--wyciszanie S] [--wycisz|--wlacz]   # klip albo audio
+    projekt.py dzwiek <film> <id> [--glosnosc 0.3] [--narastanie S] [--wyciszanie S] [--wycisz|--wlacz] [--przypnij|--odlacz]
     projekt.py dzwieki [--kategoria pieniadze] [--rola uderzenie] [--szukaj monety] [--muzyka]   # biblioteka CC0
     projekt.py dodaj-dzwiek <film> <id> [--start S | --na T] [--glosnosc 1] [--narastanie S] [--wyciszanie S]   # --na: szczyt w T
     projekt.py zdanie <film> --na T [--przed ID|brak] [--uderzenie ID] [--po ID|brak] [--rozbieg 1.17] [--odstep 0.83]
@@ -31,6 +31,11 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py wytnij <film> --od S --do S          # wytnij kawałek osi (przez klipy); reszta się dosuwa
     projekt.py usun <film> <id>                    # usuń klip / tekst / audio o danym id (z `pokaz`)
     projekt.py uwaga <film> <id> (--zrobione "co zmieniłem" | --odrzuc "dlaczego")   # zamknij uwagę z osi edytora
+    projekt.py z-kodu <film> --obraz czysty.mp4 [--ciecia 5.4,9.6|events.json|os_czasu.json] [--glos lektor.wav[@od]]
+                      [--efekty fx.wav] [--muzyka muzyka.wav] [--audio NAZWA=plik[@od]] [--napisy film.srt | --slowa
+                      lektor.slowa.json] [--karaoke] [--kroj Caveat] [--styl box] [--kolor #hex] [--tlo #hex] [--render]
+                                    # film z kodu jako projekt: obraz w ujęciach, głos i efekty przypięte do obrazu,
+                                    # muzyka osobno, napisy tekstem, suma −14 LUFS; --render: film = render projektu
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
     projekt.py render <film> [--out plik.mp4]      # nowa wersja obok oryginału, na końcu linia MEDIA:
     (typografia słowo po słowie, klucz `typo`: plan i poprawki robi typografia.py; render rysuje ją tak jak edytor)
@@ -38,7 +43,11 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
 Czas S w sekundach osi (po cięciach i zmianach tempa), chyba że opis mówi „źródła” (--od/--do).
 Przejście leży na środku cięcia i nie skraca filmu (napisy i audio zostają na miejscu); długość to parzysta liczba
 klatek, najwyżej tyle, ile trwa krótszy z dwóch klipów (`pokaz` pokazuje, co wyszło).
-Nic nie nadpisuje oryginału: render zapisuje film-edycja.mp4, film-edycja-2.mp4…
+Nic nie nadpisuje oryginału: render zapisuje film-edycja.mp4, film-edycja-2.mp4… (`--out` wskazuje inny plik).
+
+Film z kodu (`z-kodu`): czysty obraz i dźwięki trafiają do `<film>-sciezki/` (obraz bez dźwięku, WAV 48 kHz), projekt
+obok filmu, a film powstaje z projektu (`--render` albo `render <film> --out <film>`), więc w edytorze HQ widać
+dokładnie to, co oddano. Projektu zmienionego w edytorze `z-kodu` nie nadpisze bez `--nadpisz`.
 
 Uwagi (`notes` w projekcie) zostawia właściciel w edytorze HQ: prośba przypięta do chwili osi, często z kadrem
 (obraz w inboxie, oglądasz go przez vision_analyze). Każdą zamykasz `uwaga … --zrobione` albo `--odrzuc` z powodem;
@@ -303,8 +312,10 @@ def cmd_pokaz(film: Path, a) -> int:
         print(f"Typografia: {len(typo['bloki'])} bloków, motyw {typo['motyw']} (szczegóły: typografia.py pokaz)")
     print("Audio:" if proj.get("audio") else "Audio: brak")
     for m in proj.get("audio") or []:
-        print(f"  [{m.get('id')}] od {m['start']:6.2f} przez {m['out'] - m['in']:.2f} s  {Path(m['src']).name} · głośność {m.get('volume', 1):.2f}{opis_zaniku(m)}"
-              + (f" · czysty głos {m['voice']}" if m.get("voice") else ""))
+        print(f"  [{m.get('id')}] od {m['start']:6.2f} przez {m['out'] - m['in']:.2f} s  "
+              + (f"{m['label']} ({Path(m['src']).name})" if m.get("label") else Path(m["src"]).name)
+              + f" · głośność {m.get('volume', 1):.2f}{opis_zaniku(m)}"
+              + (f" · czysty głos {m['voice']}" if m.get("voice") else "") + (" · przypięte do obrazu" if m.get("linked") else ""))
     notes = sorted((n for n in proj.get("notes") or [] if isinstance(n, dict)), key=lambda n: float(n.get("t") or 0))
     if notes:
         otwarte = sum(1 for n in notes if not n.get("done"))
@@ -385,12 +396,17 @@ def cmd_dzwiek(film: Path, a) -> int:
         if "muted" not in x and x not in proj["clips"]:
             raise SystemExit("--wycisz/--wlacz dotyczy klipu; audio wyciszasz --glosnosc 0")
         x["muted"] = bool(a.wycisz)
+    if a.przypnij or a.odlacz:
+        if x in proj["clips"]:
+            raise SystemExit("--przypnij/--odlacz dotyczy elementu audio (dźwięk klipu i tak idzie z klipem)")
+        x["linked"] = bool(a.przypnij)
     for arg, key in (("narastanie", "fadeIn"), ("wyciszanie", "fadeOut")):
         if getattr(a, arg) == 0:                   # 0 = bez zaniku
             x.pop(key, None)
     x.update(zanik_z_arg(a, d, x))
     save(film, proj)
-    print(f"[{a.id}] głośność {x.get('volume', 1):.2f}{' · wyciszony' if x.get('muted') else ''}{opis_zaniku(x)}")
+    print(f"[{a.id}] głośność {x.get('volume', 1):.2f}{' · wyciszony' if x.get('muted') else ''}{opis_zaniku(x)}"
+          f"{' · przypięte do obrazu' if x.get('linked') else ''}")
     return 0
 
 
@@ -1378,6 +1394,272 @@ def cmd_render(film: Path, a) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- film z kodu → projekt edytora (poziom 1)
+
+Z_KODU_LUFS = -14.0          # suma dźwięków projektu: głośność platform (qa_wideo), limiter eksportu trzyma szczyt
+NAZWY_SCIEZEK = {"glos": "Głos", "muzyka": "Muzyka", "efekty": "Efekty"}
+PL_ASCII = str.maketrans("ąćęłńóśźż", "acelnoszz")   # nazwa pliku ścieżki z nazwy („Tło” → tlo.wav)
+
+
+def sciezki_dir(film: Path) -> Path:
+    """Katalog czystego obrazu i dźwięków projektu filmu z kodu: projekt nie zależy od plików roboczych silnika."""
+    return film.with_name(f"{film.stem}-sciezki")
+
+
+def kanon(x):
+    """Liczby w jednej postaci: edytor HQ zapisuje 1.0 jako 1, a samo otwarcie projektu to jeszcze nie edycja."""
+    if isinstance(x, bool) or not isinstance(x, (int, float, list, dict)):
+        return x
+    if isinstance(x, (int, float)):
+        return round(float(x), 4)
+    return [kanon(v) for v in x] if isinstance(x, list) else {k: kanon(v) for k, v in x.items()}
+
+
+def podpis(proj: dict, kanoniczny: bool = True) -> str:
+    """Odcisk treści projektu (kadr, klipy, napisy, audio): po nim poznajemy, czy ktoś edytował film w HQ."""
+    import hashlib
+    tresc = {k: proj.get(k) for k in ("canvas", "clips", "texts", "audio")}
+    return hashlib.sha1(json.dumps(kanon(tresc) if kanoniczny else tresc, sort_keys=True, ensure_ascii=False)
+                        .encode()).hexdigest()[:16]
+
+
+def ciecia_z(spec: str | None, dur: float) -> list[float]:
+    """--ciecia: „5.4,9.6”, lista liczb w JSON, events.json lemo (zdarzenia `cut`) albo os_czasu.json z film.py
+    narracja (początki ujęć). Cięcia bliżej niż 0,1 s od brzegu filmu odpadają."""
+    if not spec:
+        return []
+    p = Path(spec)
+    if p.is_file():
+        d = json.loads(p.read_text(encoding="utf-8"))
+        if isinstance(d, dict) and isinstance(d.get("ujecia"), list):
+            t = [float(u["start"]) for u in d["ujecia"][1:] if isinstance(u, dict) and "start" in u]
+        else:
+            xs = d.get("ev") if isinstance(d, dict) else d
+            t = [float(x) if isinstance(x, (int, float)) else float(x["t"]) for x in xs or []
+                 if isinstance(x, (int, float)) or (isinstance(x, dict) and x.get("type") == "cut" and "t" in x)]
+    else:
+        try:
+            t = [float(x) for x in spec.replace(";", ",").split(",") if x.strip()]
+        except ValueError:
+            raise SystemExit(f"--ciecia: liczby po przecinku albo plik JSON, nie {spec!r}")
+    return sorted({round(x, 3) for x in t if MIN_CZESC <= x <= dur - MIN_CZESC})
+
+
+def slowa_z_pliku(path: Path) -> list[list]:
+    """Słowa z czasem [[start, end, tekst, podział]]: film.py narracja / lektor ([{start, end, text, podzial}]),
+    analiza mowy edytora ({"words": [[start, end, tekst]]}) albo sama lista [[start, end, tekst]]."""
+    d = json.loads(path.read_text(encoding="utf-8"))
+    xs = d.get("words") if isinstance(d, dict) else d
+    out = []
+    for w in xs or []:
+        if isinstance(w, dict) and str(w.get("text") or w.get("word") or "").strip():
+            out.append([float(w["start"]), float(w["end"]), str(w.get("text") or w.get("word")).strip(), bool(w.get("podzial"))])
+        elif isinstance(w, (list, tuple)) and len(w) >= 3 and str(w[2]).strip():
+            out.append([float(w[0]), float(w[1]), str(w[2]).strip(), False])
+    if not out:
+        raise SystemExit(f"{path}: brak słów z czasem")
+    return sorted(out, key=lambda w: w[0])
+
+
+def linie_napisow(srt: Path | None, slowa: list[list] | None, pion_: bool, karaoke: bool) -> list[dict]:
+    """Linie napisów: z SRT (podział taki jak w filmie) albo ze słów tym samym podziałem co napisy wypalane
+    (wideo_lib.chunk_words: karaoke po 3 słowa, zwykłe do 7, polskie sierotki). Ze słowami każda linia ma czasy słów
+    (karaoke w edytorze), o ile liczba słów się zgadza."""
+    import wideo_lib as wl
+    if srt:
+        lines = [{"start": k["start"], "end": k["end"], "text": " ".join(str(k["text"]).split())}
+                 for k in ed.parse_srt(srt.read_text(encoding="utf-8", errors="replace"))]
+        for ln in lines if slowa else []:
+            ws = [w for w in slowa if ln["start"] - 0.05 <= (w[0] + w[1]) / 2 <= ln["end"] + 0.05]
+            if ws and len(ws) == len(ln["text"].split()):
+                ln["words"] = [[round(max(0.0, w[0] - ln["start"]), 3), round(max(0.0, w[1] - ln["start"]), 3), t]
+                               for w, t in zip(ws, ln["text"].split())]
+        return lines
+    znaki = 18 if pion_ else 30
+    grupy = wl.chunk_words([wl.Word(w[0], w[1], w[2], w[3]) for w in slowa or []],
+                           3 if karaoke else 7, znaki if karaoke else znaki * 2)
+    return [{"start": g[0].start, "end": g[-1].end, "text": " ".join(w.text for w in g),
+             "words": [[round(w.start - g[0].start, 3), round(w.end - g[0].start, 3), w.text] for w in g]} for g in grupy]
+
+
+def _ebur(args: list[str]) -> tuple[float | None, float | None]:
+    """(LUFS, szczyt próbki dBFS) z podsumowania ebur128 polecenia ffmpeg."""
+    r = subprocess.run(args, capture_output=True, text=True)
+    s = r.stderr.split("Summary:")[-1]
+    m, pk = re.search(r"I:\s+(-?[\d.]+) LUFS", s), re.search(r"Peak:\s+(-?[\d.]+|-inf) dBFS", s)
+    return (float(m.group(1)) if m and r.returncode == 0 else None,
+            float(pk.group(1)) if pk and pk.group(1) != "-inf" else None)
+
+
+def kopia_dzwieku(src: Path, dest: Path, dl: float | None = None, wzmocnienie: float = 1.0) -> float:
+    """Ścieżka dźwięku (najwyżej `dl` s) → WAV 48 kHz stereo 16 bit w katalogu ścieżek, ze wzmocnieniem wpisanym
+    w plik (element audio zostaje na 0 dB). Gdy szczyt wyszedłby ponad −0,1 dBFS (miks silnika bywa w float ponad
+    0 dBFS przed jego limiterem), plik dostaje tylko tyle, ile się mieści; zwraca głośność elementu na resztę."""
+    ff = ed.tools()["ffmpeg"] or "ffmpeg"
+    _lufs, szczyt = _ebur([ff, "-nostdin", "-hide_banner", "-nostats", "-i", str(src), "-map", "0:a:0",
+                           *(["-t", ed._f(dl)] if dl else []), "-af", "ebur128=peak=sample", "-f", "null", "-"])
+    k = min(wzmocnienie, 10 ** ((-0.1 - szczyt) / 20)) if szczyt is not None else wzmocnienie
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run([ff, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-map", "0:a:0",
+                        *(["-t", ed._f(dl)] if dl else []),
+                        *(["-af", f"volume={k:.6f}"] if abs(k - 1) > 1e-4 else []), "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le",
+                        str(dest)], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit(f"nie umiem skopiować dźwięku {src}: {r.stderr.strip()[-300:]}")
+    return wzmocnienie / k
+
+
+def glosnosc_sumy(audio: list[dict], dur: float) -> float | None:
+    """LUFS sumy elementów audio tak, jak zmiesza je eksport (głośność, miejsce na osi, bez limitera)."""
+    ff = ed.tools()["ffmpeg"] or "ffmpeg"
+    args, graph, mix = [ff, "-nostdin", "-hide_banner", "-nostats"], [], ""
+    for k, m in enumerate(audio):
+        args += ["-ss", ed._f(m["in"]), "-t", ed._f(m["out"] - m["in"]), "-i", str(m["src"])]
+        ms = int(round(m["start"] * 1000))
+        graph.append(f"[{k}:a]volume={ed._f(m['volume'])},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+                     f"adelay={ms}|{ms}[m{k}]")
+        mix += f"[m{k}]"
+    graph.append(f"{mix}amix=inputs={len(audio)}:duration=longest:normalize=0,apad=whole_dur={ed._f(dur)},"
+                 f"atrim=end={ed._f(dur)},ebur128=peak=sample[o]")
+    return _ebur([*args, "-filter_complex", ";".join(graph), "-map", "[o]", "-f", "null", "-"])[0]
+
+
+def _plik_od(spec: str) -> tuple[Path, float]:
+    """„plik.wav” albo „plik.wav@1.5” (od której sekundy filmu gra)."""
+    plik, od = spec, 0.0
+    if "@" in spec:
+        a, b = spec.rsplit("@", 1)
+        try:
+            plik, od = a, float(b)
+        except ValueError:
+            pass
+    p = Path(plik).resolve()
+    if not p.is_file() or ed.media_kind(p) not in ("audio", "video"):
+        raise SystemExit(f"nie ma pliku dźwięku: {p}")
+    return p, max(0.0, od)
+
+
+def edytowany(film: Path) -> bool:
+    """Projekt filmu z kodu zmieniony po zbudowaniu (np. w edytorze HQ): z-kodu nie nadpisze go po cichu."""
+    pp = ed.project_path(film)
+    if not pp.is_file():
+        return False
+    try:
+        proj = json.loads(pp.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    zk = proj.get("zKodu") or proj.get("clipmaker")
+    return not zk or zk.get("podpis") != podpis(proj)
+
+
+def projekt_z_kodu(film: Path, a) -> dict:
+    """Projekt edytora z części filmu z kodu: czysty obraz (bez dźwięku, pocięty na ujęcia), głos i efekty przypięte
+    do obrazu, muzyka osobno, napisy jako tekst. Kopie w <film>-sciezki/, głośność sumy do --lufs."""
+    obraz = Path(a.obraz).resolve()
+    info = ed.probe(obraz)
+    if not info.get("ok") or not info.get("duration"):
+        raise SystemExit(f"nie mogę odczytać obrazu: {obraz}")
+    dur = float(info["duration"])
+    kat = sciezki_dir(film)
+    kat.mkdir(parents=True, exist_ok=True)
+    ff = ed.tools()["ffmpeg"] or "ffmpeg"
+    cel = kat / f"obraz{obraz.suffix.lower()}"
+    if obraz != cel:
+        r = subprocess.run([ff, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(obraz), "-map", "0:v:0",
+                            "-c:v", "copy", "-an", *(["-movflags", "+faststart"] if cel.suffix in (".mp4", ".mov", ".m4v") else []),
+                            str(cel)], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit(f"nie umiem skopiować obrazu: {r.stderr.strip()[-300:]}")
+    w, h = ed.kadr_eksportu(even(info.get("w") or 1920), even(info.get("h") or 1080))
+    proj = {"version": 1, "format": "orig",
+            "canvas": {"w": w, "h": h, "fps": min(FPS, key=lambda f: abs(f - (info.get("fps") or 30)))},
+            "clips": [], "texts": [], "audio": []}
+    granice = [0.0, *ciecia_z(a.ciecia, dur), dur]
+    for x, y in zip(granice, granice[1:]):
+        proj["clips"].append({"id": new_id("c"), "src": str(cel), "kind": "video", "in": round(x, 3), "out": round(y, 3),
+                              "speed": 1, "volume": 1, "muted": False, "fit": "contain"})
+    zrodla = {"obraz": str(obraz)}
+    sciezki = [(rola, spec, rola != "muzyka", NAZWY_SCIEZEK[rola]) for rola in ("glos", "efekty", "muzyka")
+               for spec in [getattr(a, rola)] if spec]
+    for spec in a.audio or []:
+        nazwa, _, plik = spec.partition("=")
+        if not plik:
+            raise SystemExit(f"--audio: NAZWA=plik[@od], nie {spec!r}")
+        plik_nazwa = re.sub(r"[^a-z0-9-]+", "-", nazwa.strip().lower().translate(PL_ASCII)).strip("-") or "dzwiek"
+        sciezki.append((plik_nazwa, plik, True, nazwa.strip()))
+    wejscia = []
+    for rola, spec, przypiete, nazwa in sciezki:
+        src, od = _plik_od(spec)
+        if any(w[0] == rola for w in wejscia):
+            raise SystemExit(f"dwie ścieżki o nazwie {rola}: daj inne NAZWA w --audio")
+        dl = ed.probe(src).get("duration") or 0.0
+        out = round(min(dl, dur - od), 3)
+        if out < ed.MIN_CLIP:
+            raise SystemExit(f"{src.name}: dźwięk zaczyna się za końcem filmu albo jest pusty")
+        wejscia.append((rola, src, od, out, przypiete, nazwa))
+    # głośność sumy liczona z oryginałów, a wzmocnienie do --lufs trafia w kopie (elementy zostają na 0 dB)
+    lufs = (glosnosc_sumy([{"src": str(src), "start": od, "in": 0.0, "out": out, "volume": 1.0}
+                           for _r, src, od, out, _p, _n in wejscia], dur) if wejscia and a.lufs is not None else None)
+    g = 10 ** ((a.lufs - lufs) / 20) if lufs is not None else 1.0
+    for rola, src, od, out, przypiete, nazwa in wejscia:
+        dest = kat / f"{rola}.wav"
+        vol = kopia_dzwieku(src, dest, out, g)
+        if vol > 2.0:
+            print(f"  ⚠ {nazwa}: za cichy nawet przy 200% głośności; całość będzie cichsza niż {a.lufs:g} LUFS")
+        proj["audio"].append({"id": new_id("a"), "src": str(dest), "start": round(od, 3), "in": 0.0, "out": out,
+                              "volume": round(min(2.0, vol), 3), "label": nazwa, **({"linked": True} if przypiete else {})})
+        zrodla[rola] = str(src)
+    pion_ = h > w
+    if a.napisy or a.slowa:
+        slowa = slowa_z_pliku(Path(a.slowa)) if a.slowa else None
+        look = {**CAP_DEFAULT, **pion(proj)}
+        for arg, key in (("styl", "style"), ("kolor", "color"), ("tlo", "bg"), ("rozmiar", "size"), ("y", "y")):
+            if getattr(a, arg) is not None:
+                look[key] = getattr(a, arg)
+        if a.kroj is not None:
+            look["font"] = kroj_z_nazwy(a.kroj)
+        if a.karaoke is not None:
+            look["hl"] = a.karaoke or KARAOKE_HL
+        for ln in linie_napisow(Path(a.napisy) if a.napisy else None, slowa, pion_, a.karaoke is not None):
+            if ln["start"] >= dur - ed.MIN_CLIP:
+                continue
+            proj["texts"].append({**look, "id": new_id("t"), "cap": True, "start": round(ln["start"], 3),
+                                  "end": round(min(ln["end"], dur), 3), "text": ln["text"],
+                                  **({"words": ln["words"]} if look.get("hl") and ln.get("words") else {})})
+        zrodla["napisy"] = str(Path(a.napisy or a.slowa).resolve())
+    proj["zKodu"] = {"zrodla": zrodla, "sciezki": str(kat), "ciecia": granice[1:-1],
+                     **({"lufs_przed": lufs, "lufs": a.lufs} if lufs is not None else {})}
+    try:
+        ed.normalize(proj, resolve)                    # ta sama walidacja co eksport z edytora
+    except ed.ProjectError as exc:
+        raise SystemExit(f"projekt nie przechodzi walidacji: {exc}")
+    return proj
+
+
+def cmd_z_kodu(film: Path, a) -> int:
+    if film.suffix.lower() not in ed.VIDEO_EXT:
+        raise SystemExit(f"film to plik wideo (np. {film.stem}.mp4), nie {film.name}")
+    if edytowany(film) and not a.nadpisz:
+        raise SystemExit(f"{film.name}: projekt zmieniono po zbudowaniu (np. w edytorze HQ). Poprawiaj go poleceniami "
+                         "projekt.py albo zbuduj z --nadpisz, jeśli te zmiany mają zniknąć")
+    proj = projekt_z_kodu(film, a)
+    zk = proj["zKodu"]
+    zk["podpis"] = podpis(proj)
+    save(film, proj)
+    caps = sum(1 for t in proj["texts"] if t.get("cap"))
+    print(f"Projekt: {ed.project_path(film)}")
+    print(f"  obraz {total(proj):.2f} s w {len(proj['clips'])} ujęciach · "
+          + (", ".join(f"{m['label']} {m['volume']:.2f}{' (przypięte)' if m.get('linked') else ''}" for m in proj["audio"]) or "bez dźwięku")
+          + f" · {caps} napisów" + (f" · suma {zk['lufs_przed']:.1f} → {zk['lufs']:g} LUFS" if zk.get("lufs_przed") is not None else ""))
+    print(f"  ścieżki: {zk['sciezki']}/", flush=True)            # przed renderem: przeglądarka nie powtórzy bufora
+    if a.render:
+        if cmd_render(film, argparse.Namespace(out=str(film))) != 0:
+            raise SystemExit("render projektu nie wyszedł")
+    else:
+        print(f"Film = render projektu: projekt.py render {film} --out {film}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1406,6 +1688,9 @@ def main(argv: list[str] | None = None) -> int:
     g = sp.add_mutually_exclusive_group()
     g.add_argument("--wycisz", action="store_true", help="wycisz dźwięk klipu")
     g.add_argument("--wlacz", action="store_true", help="włącz dźwięk klipu")
+    g = sp.add_mutually_exclusive_group()
+    g.add_argument("--przypnij", action="store_true", help="audio przypięte do obrazu: przy cięciu klipów idzie z nimi")
+    g.add_argument("--odlacz", action="store_true", help="audio odłączone od obrazu: przy cięciu tylko się przesuwa")
     sp = film_cmd("dodaj-tekst", cmd_dodaj_tekst, "tekst albo napis na obrazie")
     sp.add_argument("tekst")
     sp.add_argument("--start", type=float, required=True)
@@ -1524,13 +1809,32 @@ def main(argv: list[str] | None = None) -> int:
     g = sp.add_mutually_exclusive_group(required=True)
     g.add_argument("--zrobione", help="co zmieniłeś (zobaczy to właściciel w edytorze)")
     g.add_argument("--odrzuc", help="dlaczego nie (np. kolizja z inną uwagą, wymaga decyzji)")
+    sp = film_cmd("z-kodu", cmd_z_kodu, "film z kodu jako projekt edytora: czysty obraz, osobne dźwięki, napisy")
+    sp.add_argument("--obraz", required=True, help="czysty obraz filmu: bez wypalonych napisów (dźwięk pliku pomijany)")
+    sp.add_argument("--ciecia", help="cięcia ujęć: „5.4,9.6”, events.json lemo albo os_czasu.json (klipy na osi)")
+    sp.add_argument("--glos", help="lektor: plik[@od] (przypięty do obrazu)")
+    sp.add_argument("--efekty", help="efekty i foley: plik[@od] (przypięte do obrazu)")
+    sp.add_argument("--muzyka", help="muzyka: plik[@od] (osobno: przy cięciu gra dalej)")
+    sp.add_argument("--audio", action="append", help="inna ścieżka przypięta do obrazu: NAZWA=plik[@od] (np. Tło=room.wav)")
+    sp.add_argument("--napisy", help="napisy z SRT (podział linii jak w filmie)")
+    sp.add_argument("--slowa", help="słowa z czasem (film.py narracja: lektor.slowa.json): napisy albo karaoke do SRT")
+    sp.add_argument("--karaoke", nargs="?", const="", help="podświetlenie słowa (domyślnie #FFE14D)")
+    sp.add_argument("--kroj", help="krój napisów z listy edytora (np. Caveat, Kanit)")
+    sp.add_argument("--styl", choices=["shadow", "box", "outline", "plain"], help="wygląd napisów")
+    sp.add_argument("--kolor", help="kolor tekstu napisów (#RRGGBB)")
+    sp.add_argument("--tlo", help="kolor tła albo obrysu napisów (#RRGGBB)")
+    sp.add_argument("--rozmiar", type=float, help="wielkość napisów (domyślnie 58; przy 1080 px krótszego boku)")
+    sp.add_argument("--y", type=float, help="położenie napisów w pionie (0 góra – 1 dół)")
+    sp.add_argument("--lufs", type=float, default=Z_KODU_LUFS, help="głośność sumy dźwięków (domyślnie −14)")
+    sp.add_argument("--nadpisz", action="store_true", help="nadpisz projekt zmieniony w edytorze")
+    sp.add_argument("--render", action="store_true", help="od razu złóż film z projektu (film = render projektu)")
     film_cmd("sprawdz", cmd_sprawdz, "walidacja projektu")
     film_cmd("render", cmd_render, "złóż film (jak „Eksportuj”)").add_argument("--out")
     a = ap.parse_args(argv)
     if a.film is None:
         return a.fn(None, a)
     film = Path(a.film).resolve()
-    if not film.is_file():
+    if not film.is_file() and not (a.cmd == "z-kodu" and film.parent.is_dir()):   # z-kodu: film powstaje z projektu
         raise SystemExit(f"nie ma filmu: {film}")
     return a.fn(film, a)
 

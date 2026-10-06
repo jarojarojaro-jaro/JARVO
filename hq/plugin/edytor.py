@@ -78,13 +78,16 @@ KOLOR_STYLE = {
 KOLOR_SUWAKI = ("brightness", "contrast", "saturation", "temperature")
 KOLOR_X = (0.0, 0.25, 0.5, 0.75, 1.0)
 KOLOR_S = (0.0, -0.04, 0.0, 0.04, 0.0)      # krzywa S: cienie w dół, światła w górę
-MAX_AUDIO = 32           # muzyka, lektor i efekty (na osi w pasach jeden pod drugim)
+MAX_AUDIO = 64           # muzyka, lektor, efekty i kawałki dźwięku przypiętego do obrazu (na osi w pasach jeden pod drugim)
 ZANIK_MAX = 10.0         # najdłuższe narastanie albo wyciszanie (s), najwyżej połowa elementu (ZANIK_MAX w 43-dzwiek.js)
 MAX_WORDS = 40           # słów w jednym napisie karaoke (linia napisu ma ich 2–8)
 MAX_DURATION = 3 * 3600.0
 MIN_CLIP = 0.04          # jedna klatka przy 25 fps
 CICHE_CIECIE = 0.025     # mikro-wyciszenie (s) dźwięku na twardym cięciu: cięcie w środku fali daje słyszalny klik
 FPS_ALLOWED = (24, 25, 30, 50, 60)
+# limiter miksu w eksporcie: szczyt −2 dBFS bez podnoszenia całości (level=false), więc po AAC szczyt prawdziwy zostaje
+# pod −1 dBTP, jak chcą platformy i qa_wideo.py (ten sam limit co montaz.py glosnosc)
+LIMIT_EKSPORTU = 0.79
 
 
 class ProjectError(ValueError):
@@ -349,11 +352,56 @@ def przejscia_osi(clips: list[dict], fps: int) -> list[dict | None]:
     return out
 
 
+def przypiete(m: dict, l0: list, l1: list, ids0: set, uzyte: set) -> list[dict]:
+    """Dźwięk przypięty do obrazu (`linked`, np. głos i efekty filmu z kodu) po zmianie klipów: każdy kawałek materiału,
+    który został na osi, gra dalej pod tym samym obrazem (wycięte ujęcie zabiera swój dźwięk, przestawione go przenosi,
+    zduplikowane powtarza). Kawałki stykające się na osi i w pliku łączą się z powrotem w jeden element; pierwszy
+    zostaje z id elementu, kolejne dostają wolne id `<id>-k`. Tempo klipu nie zmienia tempa dźwięku. Ta sama reguła
+    co przypiete w hq/web/src/45-edytor.js."""
+    s0, i0 = float(m.get("start", 0)), float(m.get("in", 0))
+    e0 = s0 + float(m.get("out", 0)) - i0
+    kaw = []
+    for c0, a0, b0 in l0:
+        x, y = max(a0, s0), min(b0, e0)                      # część elementu pod starym klipem
+        if y - x < 1e-6:
+            continue
+        sp0, in0 = float(c0.get("speed") or 1), float(c0.get("in", 0))
+        u0, u1 = in0 + (x - a0) * sp0, in0 + (y - a0) * sp0  # ten kawałek w czasie źródła
+        for c1, a1, _b1 in l1:
+            if c1.get("src") != c0.get("src") or not (c1.get("id") == c0.get("id") or c1.get("id") not in ids0):
+                continue
+            v0, v1 = max(u0, float(c1.get("in", 0))), min(u1, float(c1.get("out", 0)))
+            if v1 - v0 < 1e-6:
+                continue
+            kaw.append([a1 + (v0 - float(c1.get("in", 0))) / float(c1.get("speed") or 1),
+                        i0 + a0 + (v0 - in0) / sp0 - s0, i0 + a0 + (v1 - in0) / sp0 - s0])
+    kaw.sort(key=lambda k: (k[0], k[1]))
+    zlaczone: list[list[float]] = []
+    for k in kaw:
+        p = zlaczone[-1] if zlaczone else None
+        if p and abs(k[0] - p[0] - (p[2] - p[1])) < 1e-3 and abs(k[1] - p[2]) < 1e-3:
+            p[2] = k[2]
+        else:
+            zlaczone.append(k)
+    out = []
+    for j, (st, a, b) in enumerate(zlaczone):
+        id_ = m.get("id")
+        if j:
+            n = 1
+            while f"{m.get('id')}-{n}" in uzyte:
+                n += 1
+            id_ = f"{m.get('id')}-{n}"
+            uzyte.add(id_)
+        out.append({**m, "id": id_, "start": round(st, 3), "in": round(a, 3), "out": round(b, 3)})
+    return out
+
+
 def remap_times(p0: dict, p1: dict) -> dict:
     """Oś magnetyczna, ta sama reguła co remapTimes w hq/web/src/45-edytor.js: po zmianie klipów (usunięcie, wstawienie,
     przycięcie, tempo, przestawienie) napisy, uwagi i bloki typografii (z każdym słowem) idą za materiałem, z którego
     pochodzą (czas źródła klipu), a muzyka i lektor przesuwają się o wycięty albo wstawiony czas. Przy samym
-    przestawieniu napis i blok jadą w całości z klipem."""
+    przestawieniu napis i blok jadą w całości z klipem. Dźwięk przypięty do obrazu (`linked`) idzie kawałkami
+    za materiałem (`przypiete`)."""
     l0, l1 = layout_clips(p0.get("clips") or []), layout_clips(p1.get("clips") or [])
     tot0, tot1 = (l0[-1][2] if l0 else 0.0), (l1[-1][2] if l1 else 0.0)
     ids0 = {c.get("id") for c in p0.get("clips") or []}
@@ -395,9 +443,12 @@ def remap_times(p0: dict, p1: dict) -> dict:
             a, b = mapuj(a), mapuj(b)
         if b - a >= 0.05:
             texts.append({**x, "start": round(a, 3), "end": round(b, 3)})
-    audio = p1.get("audio") or []
-    if not reorder:
-        audio = [{**m, "start": round(mapuj(float(m.get("start", 0))), 3)} for m in audio]
+    audio, uzyte = [], {m.get("id") for m in p1.get("audio") or []}
+    for m in p1.get("audio") or []:
+        if m.get("linked"):
+            audio += przypiete(m, l0, l1, ids0, uzyte)
+        else:
+            audio.append(m if reorder else {**m, "start": round(mapuj(float(m.get("start", 0))), 3)})
     notes = [{**n, "t": round(mapuj(float(n.get("t", 0))), 3)} for n in p1.get("notes") or []]
     out = {**p1, "texts": texts, "audio": audio, "notes": notes}
     typo = p1.get("typo")
@@ -964,7 +1015,7 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                          f"aformat=sample_fmts=fltp:channel_layouts=stereo,{zan + ',' if zan else ''}adelay={ms}|{ms}[m{k}]")
             mix.append(f"[m{k}]")
         graph.append(f"{''.join(mix)}amix=inputs={len(mix)}:duration=first:normalize=0,"
-                     f"alimiter=limit=0.97[amx]")
+                     f"alimiter=limit={LIMIT_EKSPORTU}:level=false[amx]")
         alast = "amx"
 
     args += ["-filter_complex", ";".join(graph), "-map", f"[{vlast}]", "-map", f"[{alast}]",
