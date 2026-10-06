@@ -105,6 +105,11 @@ zrodla:
     status: uzywane
     przejrzane: b65efe6ea393fdc71212898ea4c57c754cfefa46
     notatka: "43 style; wersja we flocie to rev w skills.lock.yaml i LEMO_REV w narzedzia.py Wideografa (ten sam commit)"
+  lemo-wake:
+    repo: https://github.com/lemomo-ai/lemo-wake
+    status: uzywane
+    przejrzane: ebb758c66c61cf571b57d341ec3f5cbb4bf74d08
+    notatka: "Studio (decyzja właściciela 2026-10-06): obraz → pętla 5 s i warstwy PSD (skill zywy-obraz); bez skilla upload; licencja CC BY-NC 4.0: komercyjnie tylko za zgodą autora; wersja we flocie to rev w skills.lock.yaml i REV w lemo_wake.py Studia (ten sam commit)"
   live-panel:
     repo: https://github.com/ythx-101/live-panel-skill
     status: uzywane

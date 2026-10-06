@@ -124,8 +124,8 @@ agents:
     title: "Marketing i kreacja"
     emoji: "🎬"
     description: >-
-      Grafiki promocyjne, posty na social media, copy, kampanie i kalendarze publikacji,
-      zgodnie z brand kitem. Filmy zamawia u Wideografa. Przygotowuje pakiety, nie publikuje
+      Grafiki promocyjne, posty na social media, żywe zdjęcia (pętle i warstwy PSD), copy, kampanie
+      i kalendarze publikacji, zgodnie z brand kitem. Filmy zamawia u Wideografa. Przygotowuje pakiety, nie publikuje
       bez zgody.
     model_tier: strong
     delegation_tier: fast
@@ -138,7 +138,7 @@ agents:
       title: "Marketing & creative"
       hq_label: "Creative atelier"
       description: >-
-        Promo graphics, social media posts, copy, campaigns and publishing calendars, all on brand. Orders videos from the Videographer. Prepares packages; never publishes without approval.
+        Promo graphics, social media posts, living photos (loops and PSD layers), copy, campaigns and publishing calendars, all on brand. Orders videos from the Videographer. Prepares packages; never publishes without approval.
     oddaj_gdy: "treść albo grafika ma reprezentować markę publicznie: copy, grafiki social, kampania, kalendarz postów"
     status: active
 

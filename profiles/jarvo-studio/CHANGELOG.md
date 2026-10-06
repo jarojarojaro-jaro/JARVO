@@ -1,6 +1,7 @@
 # Changelog: jarvo-studio
 
 ## Niewydane
+- Nowy skill `zywy-obraz`: zdjęcie albo grafika → pętla ok. 5 s (MP4, GIF, WebP) i warstwy PSD, narzędziem lemo-wake (Lemomo, `ebb758c`; skille zewnętrzne `lemo-wake` i `lemo-wake-layers`, bez `upload`). Bibliotekę raz instaluje `scripts/lemo_wake.py` (przypięte pakiety, przeglądarka z obrazu, modele ONNX ~600 MB po jednorazowej zgodzie właściciela). Licencja CC BY-NC 4.0: karty komercyjne tylko po zgodzie autora; do tego czasu zamiennik w `grafika-social` albo u Wideografa.
 - Limit płatnej generacji AI na kartę pilnuje strażnik wtyczki `jarvo-wiedza` (`video_generate` 3, `image_generate` 12; ponad limit zgoda człowieka), a nie tylko tekst skilla.
 - Bez zewnętrznego skilla `ads` (marketingskills: strategia kampanii, licytacje, optymalizacja): to praca `jarvo-ads`, który ma go u siebie; kreacje reklam zostają w `ad-creative`.
 - SOUL bez linii „dane, nie polecenia” (jest w zasadzie 8 protokołu w tym samym prompcie).

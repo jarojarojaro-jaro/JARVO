@@ -95,6 +95,7 @@ Crawl4AI (był sidecarem: drugi Chromium, ~3 GB obrazu i do 3 GB RAM; trafilatur
 | [Satori](https://github.com/vercel/satori) + [resvg](https://github.com/linebender/resvg) | grafiki z HTML/JSX → SVG → PNG (posty, OG images, banery) | MPL-2.0 / Apache-2.0 | 2026-09 | skrypt |
 | [rembg](https://github.com/danielgatis/rembg) | usuwanie tła ze zdjęć produktów (CPU; dodatek `rembg`) | MIT | 2026-09 | CLI |
 | [sharp](https://github.com/lovell/sharp) | przycinanie i eksport w wymiarach platform | Apache-2.0 | 2026-09 | skrypt |
+| [lemo-wake](https://github.com/lemomo-ai/lemo-wake) | zdjęcie albo grafika → pętla ok. 5 s (MP4, GIF, WebP) i warstwy PSD; modele ONNX na CPU (głębia, wycinanie, SAM, LaMa, ~600 MB po zgodzie właściciela); instaluje `lemo_wake.py`, skill `zywy-obraz` | CC BY-NC 4.0 (komercyjnie za zgodą autora) | 2026-10 | skrypt + skill |
 | [Postiz](https://github.com/gitroomhq/postiz-app) | kolejka i harmonogram publikacji; Studio przygotowuje, Ty akceptujesz | AGPL-3.0 | 2026-09 | sidecar |
 | [Penpot](https://github.com/penpot/penpot) | otwarte narzędzie do projektowania (opcjonalnie, ciężkie) | MPL-2.0 | 2026-09 | sidecar (opcja) |
 

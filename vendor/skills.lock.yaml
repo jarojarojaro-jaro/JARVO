@@ -79,6 +79,14 @@ sources:
     license: MIT
     license_file: LICENSE
     # Skill tylko wskazuje bibliotekę; bibliotekę (ten sam commit) instaluje scripts/narzedzia.py Wideografa.
+  lemo-wake:
+    type: git
+    repo: https://github.com/lemomo-ai/lemo-wake
+    rev: ebb758c66c61cf571b57d341ec3f5cbb4bf74d08
+    license: CC-BY-NC-4.0
+    license_file: LICENSE
+    notice: "lemo-wake (c) Lemomo, CC BY-NC 4.0: tylko użycie niekomercyjne; komercyjne za zgodą autora (skill zywy-obraz Studia)."
+    # Skrypty i szablon z biblioteki (ten sam commit), którą instaluje scripts/lemo_wake.py Studia; skill upload pomijamy.
   claude-animation:
     type: git
     repo: https://github.com/buildwithhanif/claude-animation-skill
@@ -338,6 +346,9 @@ agents:
     - {source: hermes, path: optional-skills/creative/meme-generation, dest: creative/meme-generation}
     - {source: hermes, path: optional-skills/creative/excalidraw, dest: creative/excalidraw}
     - {source: hermes, path: optional-skills/creative/concept-diagrams, dest: creative/concept-diagrams}
+    # lemo-wake: w profilu sama instrukcja; skrypty i szablon z biblioteki $LW (lemo_wake.py), nie z kopii skilla
+    - {source: lemo-wake, path: skills/wake, dest: design/lemo-wake, pomin: ["scripts", "assets"]}
+    - {source: lemo-wake, path: skills/layers, dest: design/lemo-wake-layers, pomin: ["scripts"]}
 
   jarvo-wideo:
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}

@@ -12,6 +12,7 @@ celem i odbiorcą. Zero ogólników w stylu „angażujący content”; pokazuj�
 ## Zakres
 - copy: posty, hooki, CTA, opisy produktów, e-maile, reklamy (polski jako domyślny),
 - grafiki: posty i karuzele, stories, OG images, banery, miniatury, infografiki (z kodu: HTML/CSS → PNG, SVG),
+- żywe obrazy: zdjęcie albo grafika jako pętla ok. 5 s (MP4, GIF) i warstwy PSD (lemo-wake, tylko niekomercyjnie bez zgody autora),
 - generacja AI: obrazy przez OpenRouter (narzędzie `image_generate`),
 - brief filmu do kampanii (przesłanie, hook, CTA, formaty) dla `jarvo-wideo`,
 - strategia contentu: kalendarze, kampanie, launch, psychologia przekazu,
@@ -42,6 +43,7 @@ Budowa stron (→ `jarvo-web`), filmy, montaż, lektor i napisy (→ `jarvo-wide
 | grafiki na social, OG, banery | `grafika-social` (+ `canvas-design`, `theme-factory`, `image`) |
 | film w kampanii | brief w `pakiet-kampanii` → karta dla `jarvo-wideo` (przez Jarva) |
 | obraz z AI | `generacja-ai` |
+| ożywić zdjęcie lub grafikę (pętla, GIF), rozbić na warstwy PSD | `zywy-obraz` (+ `lemo-wake`, `lemo-wake-layers`) |
 | wymiary, limity, formaty | `formaty-platform` |
 | teksty | `copy-pl` (+ `copywriting`, `copy-editing`, `social`, `humanizer`) |
 | kreacje reklam (brief od `jarvo-ads`) | `ad-creative` (+ `grafika-social`, `copy-pl`); kampanie płatne prowadzi `jarvo-ads` |

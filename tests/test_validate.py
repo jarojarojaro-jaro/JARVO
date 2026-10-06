@@ -110,7 +110,7 @@ def test_profile_without_fleet_entry(repo_copy):
 def test_docs_count_must_match_repo(repo_copy):
     import shutil
     shutil.rmtree(repo_copy / "profiles/jarvo-studio/skills/studio/copy-pl")
-    assert errors_matching(validate.run(), r"docs/FLEET.md: jarvo-studio ma 5 \(skille\), a tabela podaje 6")
+    assert errors_matching(validate.run(), r"docs/FLEET.md: jarvo-studio ma 6 \(skille\), a tabela podaje 7")
 
 
 def test_docs_must_list_whole_fleet(repo_copy):
