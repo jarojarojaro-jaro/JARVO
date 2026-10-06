@@ -45,7 +45,9 @@ def test_szablon_przechodzi_sprawdzenie(tmp_path, nazwa, fmt):
     assert not [o for o in r["ostrzezenia"] if "pion" in o or "upDown" in o]
     assert {q["kind"] for q in spec["cues"]} <= set(gm.GRAMATYKI[nazwa]["kinds"])
     if fmt == "9:16":
-        assert (spec["width"], spec["height"], spec["safe"]) == (1080, 1920, {"top": 140, "bottom": 520})
+        assert (spec["width"], spec["height"], spec["safe"]) == (1080, 1920, {"top": 140, "bottom": 700})
+    else:
+        assert spec["safe"] == {"bottom": 250}                       # nad pasem napisów lektora (wideo_lib.PAS_NAPISOW)
 
 
 def test_szablon_nie_nadpisuje(tmp_path):
@@ -115,7 +117,9 @@ def test_tekst_obrazy_i_liczby(tmp_path):
     # dane przykładowe: liczb nie sprawdzamy
     spec2 = {"grammar": "kinetyczna", "duration": 4, "cues": [{"at": 1, "kind": "number", "data": {"value": 77},
                                                                "text": "dane przykładowe"}]}
-    assert gm.rozwiaz(spec2, zapisz(tmp_path / "p", spec2, fakty=fakty))["ostrzezenia"] == []
+    # (jedyne ostrzeżenie: spec bez `safe` wchodzi w pas napisów lektora)
+    assert gm.rozwiaz(spec2, zapisz(tmp_path / "p", spec2, fakty=fakty))["ostrzezenia"] == [
+        "poziom bez `safe.bottom` ≥ 250: pas napisów lektora (y 830–1005 px) wejdzie na treść"]
 
 
 def test_strona_klipu(tmp_path, monkeypatch):

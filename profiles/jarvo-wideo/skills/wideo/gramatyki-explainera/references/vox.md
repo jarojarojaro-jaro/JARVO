@@ -73,7 +73,7 @@ Bez zrzutów też działa: tytuł i fiszki. Ostatni cue jest przypięty do słow
 - **Polskie karty są dłuższe.** Żeby pisanie zostało przy 13 znakach/s, odstęp do następnego cue ma wynosić co najmniej liczba znaków / 13 + 1,45 s; krótszy odstęp przyspiesza pisanie (najwyżej 40 znaków/s). Gęste cue każą też kamerze ruszać, zanim dojedzie.
 - **Prawdziwe materiały zostają prawdziwe.** Zrzuty proporcjonalnie, bez ucinania kluczowego UI; nie podrabiaj archiwum, którego nie ma.
 - **Tryb `--alfa`** usuwa tylko biurko; cienie kart zostają, karty czytają się jak „unoszące się nad obrazem”.
-- **Napisy wypalane.** Pod napisy ustaw `safe.bottom` (pion 1080×1920: 490–570, poziom: 160–220); klip przesuwa środek obrazu i liczy powiększenie tylko w pasie między `safe.top` a H − `safe.bottom`.
+- **Napisy wypalane.** Pod napisy ustaw `safe.bottom` (pion 1080×1920: 700, poziom: 250); klip przesuwa środek obrazu i liczy powiększenie tylko w pasie między `safe.top` a H − `safe.bottom`.
 
 ## Kontrola
 - Czy kamera jedzie płynnie, a elementy na biurku skokowo w 12 fps, licząc od `at`?

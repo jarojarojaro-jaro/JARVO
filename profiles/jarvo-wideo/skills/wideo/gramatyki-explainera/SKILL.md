@@ -64,7 +64,7 @@ liczby po polsku, neutralna postać), a spec, render i kontrola są nasze (`gram
 - **Jeden punkt uwagi, wejście wolne, wyjście szybkie, postój po zatrzymaniu** (liczba ≥ 0,5 s, puenta ≥ 0,9 s).
 - **Prawda w danych:** słupki od 0, oś nie od 0 napisana, jednostka i źródło na ekranie, mnożnik do policzenia
   z liczb na obrazie; zielony = wzrost (`upDown: "us"`, wstawiany sam).
-- **Pion:** `safe.bottom` 490–570 pod napisy lektora, `safe.top` pod zakładki platformy (szablon: 140 na TikToka);
+- **Napisy lektora:** `safe.bottom` 700 w pionie, 250 w poziomie (pas napisów, szablon wpisuje sam), `safe.top` pod zakładki platformy (szablon: 140 na TikToka);
   prawego paska przycisków `safe` nie ominie (`kontrakt-spec.md`). Tekst w kadrze kontra wypalone napisy:
   przesuń napisy albo w tym fragmencie ich nie wypalaj.
 - **Postać `historyjka`:** neutralna albo w kolorach marki (`"postac"` w spec); usta same z obwiedni lektora.

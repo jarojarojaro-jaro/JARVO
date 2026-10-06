@@ -184,7 +184,8 @@ python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 -
 - Najpierw arkusz (1 klatka na scenę) → vision → poprawki; dopiero potem całość.
 - **Pomiar** (`pomiar.json` + `pomiar.md` obok strony): czas czytania (błąd poniżej 70% minimum dla szybkiego
   czytelnika, ostrzeżenie poniżej spokojnego czytania: znaki bez spacji / 15 + 1,5 s), tekst poza kadrem i pod UI platformy, kontrast,
-  kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów; ostrzeżenia kompozycji: pusta scena,
+  dwa różne napisy na sobie (≥ 30% mniejszego przez ≥ 0,3 s), tekst w pasie napisów lektora (sam, gdy obok strony
+  leży lektor: `os_czasu.json`, `*.slowa.json`, `*.srt`, `lektor*.wav`; ręcznie `--napisy tak|nie`), kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów; ostrzeżenia kompozycji: pusta scena,
   brak oddechu przed cięciem i na końcu, > 3 uderzenia całego kadru. Tekst w oknie z `overflow` (licznik bębnowy, pasek
   cyfr) liczy się tylko w widocznej części, a czas czytania tylko w końcowym postoju. W trakcie poprawek `--tryb szybki`;
   film oddajesz tylko z pełnym i aktualnym raportem bez błędów (`html_wideo.py aktualny <strona>` = 0). Świadomy

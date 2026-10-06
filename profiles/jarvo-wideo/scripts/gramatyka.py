@@ -75,8 +75,10 @@ LIBY = ["fonts", "util", "paint", "kit", "motion", "camera", "diagram", "typo", 
 NUMBER_MIN = {"kinetyczna": 0.7}            # number: liczenie startuje w at − 0,9 s (kinetyczna − 0,7 s)
 DODATKI = ("od", "do", "os", "postac")
 POLA_CUE_JARVO = ("slowo", "nth", "offset")
-# 9:16: góra pod zakładki TikToka (131 px), dół pod napisy lektora; lewo/prawo gramatyki prawie nie czytają
-FORMATY = {"16:9": (1920, 1080, {}), "9:16": (1080, 1920, {"top": 140, "bottom": 520})}
+# dół nad pasem napisów lektora (wideo_lib.PAS_NAPISOW: 16:9 250 px, 9:16 700 px), w 9:16 góra pod zakładki TikToka
+# (131 px); lewo/prawo gramatyki prawie nie czytają
+FORMATY = {"16:9": (1920, 1080, {"bottom": wl.margines_napisow(1920, 1080)}),
+           "9:16": (1080, 1920, {"top": 140, "bottom": wl.margines_napisow(1080, 1920)})}
 CJK = re.compile(r"[⺀-鿿豈-﫿　-〿＀-￯]")
 BRZEG = "„”\"'«»()[]{}.,;:!?…–—-‒"
 DANE_PRZYKLADOWE = re.compile(r"dane\s+przykładowe", re.I)
@@ -338,8 +340,11 @@ def rozwiaz(spec: dict, plik: Path, os_cli: str | None = None, fakty_cli: str | 
             if isinstance(hit, (int, float)) and dur and not 0 <= hit <= dur:
                 bledy.append(f"historyjka: data.hit = {hit:g} s poza klipem (sekundy bezwzględne klipu, 0–{dur:g})")
     safe = spec.get("safe") or {}
-    if isinstance(h, (int, float)) and isinstance(w, (int, float)) and h > w and (safe.get("bottom") or 0) < 400:
-        ostrz.append("pion bez `safe.bottom` ≥ 490: pas napisów lektora (ok. 1400–1520 px) wejdzie na treść")
+    if isinstance(h, (int, float)) and isinstance(w, (int, float)) and w > 0 and h > 0 \
+            and (safe.get("bottom") or 0) < wl.margines_napisow(w, h):
+        pas = wl.pas_napisow(w, h)
+        ostrz.append(f"{'pion' if h > w else 'poziom'} bez `safe.bottom` ≥ {wl.margines_napisow(w, h)}: pas napisów "
+                     f"lektora (y {pas[1]:.0f}–{pas[3]:.0f} px) wejdzie na treść")
     # tekst: po polsku, bez znaków CJK (kroje nakładki ich nie mają)
     teksty = teksty_data(data) + [t for q in nowe for t in teksty_cue(q)]
     for t in teksty:
@@ -548,7 +553,7 @@ def cmd_pomiar(a) -> int:
         extra += ["--wyjatek", w]
     if r["fakty"]:
         extra += ["--fakty", r["fakty"]]
-    return html_wideo("pomiar", str(page), "--preset", "jarvo", "--rozmiar", _rozmiar(r),
+    return html_wideo("pomiar", str(page), "--preset", "jarvo", "--rozmiar", _rozmiar(r), "--napisy", "tak",
                       "--dlugosc", f"{r['spec']['duration']:g}", *extra)
 
 

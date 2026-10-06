@@ -77,7 +77,7 @@ Lektor: „…najpierw pobieranie, potem indeks, na końcu ranking. To ranking d
 - **Po `enter` pierwszy `point` dopiero po `at + dur`,** inaczej wyskoczy w trakcie wyjazdu z nowej planety.
 - **Tytuł znika przy pierwszym `highlight` albo `enter`.** Jeśli ma stać dłużej, przesuń ten cue.
 - **Polskie etykiety są dłuższe niż chińskie.** Etykieta ma 1 linię i zmniejsza się, aż się zmieści; trzymaj 1–2 słowa. Nazwa planety (`center`, `text` w `enter`) mieści się w kole: najpierw mniejszy krój, potem 2 linie.
-- **Napisy wypalane.** Pod napisy ustaw `safe.bottom` (pion 1080×1920: 490–570, poziom: 160–220); klip układa węzły i etykiety tylko między `safe.top` a H − `safe.bottom`.
+- **Napisy wypalane.** Pod napisy ustaw `safe.bottom` (pion 1080×1920: 700, poziom: 250); klip układa węzły i etykiety tylko między `safe.top` a H − `safe.bottom`.
 
 ## Kontrola
 - Czy w każdym oknie 0,5 s coś się rusza (`qa_wideo.py`, pary identycznych klatek ok. 0%)?

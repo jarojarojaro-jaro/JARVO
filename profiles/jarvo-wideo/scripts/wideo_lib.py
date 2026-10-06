@@ -549,6 +549,24 @@ def safe_margins(w: int, h: int) -> dict:
     return {"dol": even(h * 0.08), "srodek": 0, "gora": even(h * 0.08), "l": even(w * 0.06), "r": even(w * 0.06)}
 
 
+# Pas napisów lektora: część kadru, którą zakryją napisy. Edytor HQ i projekt.py: środek napisu y 0,84 (w pionie
+# 0,68), krój 58 px na 1080, wiersz 1,18, do dwóch wierszy; napisy ASS (build_ass): dół z safe_margins, krój 0,058
+# (pion 0,074) krótszego boku, do dwóch wierszy. Ułamki kadru (x0, y0, x1, y1) z zapasem na obrys;
+# tests/test_pomiar.py pilnuje zgodności z obiema drogami napisów.
+PAS_NAPISOW = {"pion": (0.075, 1220 / 1920, 0.875, 1440 / 1920), "poziom": (0.055, 830 / 1080, 0.945, 1005 / 1080)}
+
+
+def pas_napisow(w: int, h: int) -> tuple[float, float, float, float]:
+    """Prostokąt pasa napisów lektora w px kadru w×h."""
+    x0, y0, x1, y1 = PAS_NAPISOW["pion" if h > w else "poziom"]
+    return (w * x0, h * y0, w * x1, h * y1)
+
+
+def margines_napisow(w: int, h: int) -> int:
+    """Dolny margines treści (`safe.bottom` gramatyk), przy którym nic nie wchodzi w pas napisów."""
+    return int(-(-(h - pas_napisow(w, h)[1] - 1e-6) // 1))
+
+
 def build_ass(w: int, h: int, words: list[Word], style: SubStyle, titles: list[tuple[float, float, str]] | None = None) -> str:
     """Plik ASS: napisy z czasu słów (karaoke = aktywne słowo w kolorze akcentu) + teksty ekranowe scen."""
     portrait = h > w

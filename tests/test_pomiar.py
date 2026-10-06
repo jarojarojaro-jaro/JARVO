@@ -315,3 +315,59 @@ def test_obiekt_glowny_i_ruch_kadru():
     assert r[0] == {} and r[1]["czesc"] == 0 and r[2]["czesc"] == 1.0 and r[2]["powrot"] == 0.0
     assert r[-1]["do_poczatku"] == 0.0
     assert pm.ruch_kadru([a, b, b, b])[1]["powrot"] == pytest.approx(190 / 255, abs=1e-4)   # nowe ujęcie: nie wraca
+
+
+def test_pas_napisow_zgodny_z_napisami_edytora_i_ass():
+    """Pas napisów (wideo_lib.PAS_NAPISOW) obejmuje dwa wiersze napisów edytora HQ / projekt.py i napisów ASS."""
+    import projekt
+    wl = pm.wl
+    for w, h in ((1080, 1920), (1920, 1080)):
+        x0, y0, x1, y1 = wl.pas_napisow(w, h)
+        cap = {**projekt.CAP_DEFAULT, **(projekt.PION if h > w else {})}
+        px = cap["size"] * min(w, h) / 1080                      # 44-napisy.js: textFont / textBox
+        cy, pol = cap["y"] * h, 1.18 * px + 0.1 * px
+        assert y0 <= cy - pol and cy + pol <= y1
+        assert x0 <= w * (1 - cap["maxw"]) / 2 and w * (1 + cap["maxw"]) / 2 <= x1
+        m = wl.safe_margins(w, h)                                 # build_ass: dół, krój, obrys
+        size = wl.even(min(w, h) * (0.074 if h > w else 0.058))
+        obrys = max(2, round(size * 0.075))
+        dol = h - m["dol"] + obrys + max(1, obrys // 2)          # obrys i cień pod ostatnim wierszem
+        assert y0 <= h - m["dol"] - 2 * 1.2 * size and dol <= y1
+        assert x0 <= m["l"] and w - m["r"] <= x1
+    assert wl.margines_napisow(1080, 1920) == 700 and wl.margines_napisow(1920, 1080) == 250
+
+
+def test_pas_napisow_tylko_przy_napisach():
+    def tt(t):
+        out = [tekst(1, "Przychody rosną", y0=1250, y1=1320)] if 1.0 <= t < 2.0 else []     # w pasie (1220–1440)
+        if 3.0 <= t < 3.2:
+            out.append(tekst(2, "Krótko", y0=1250, y1=1320))                                # mignął: < 0,3 s
+        out.append(tekst(3, "Nad pasem", y0=1100, y1=1215))                                   # dół 5 px nad pasem
+        return out
+    p = probki(4, tt)
+    ust = pm.analiza(p, 4, HZ, None, napisy=True)
+    pas = [u for u in ust if u["kod"] == "pas_napisow"]
+    assert [(u["tekst"], u["waga"], u["od"], u["do"]) for u in pas] == [("Przychody rosną", "blad", 1.0, 2.0)]
+    assert "1220–1440" in pas[0]["opis"]
+    assert not [u for u in pm.analiza(p, 4, HZ, None) if u["kod"] == "pas_napisow"]      # bez napisów lektora: nic
+
+
+def test_napisy_na_sobie():
+    def tt(t):
+        out = []
+        if 1.0 <= t < 1.6:                                       # dwa różne napisy, połowa mniejszego przykryta
+            out += [tekst(1, "Cena 99 zł", x0=100, x1=500), tekst(2, "Nowość", x0=300, x1=700, y0=620, y1=700)]
+        if 2.0 <= t < 2.2:                                       # mijają się w przejściu: za krótko
+            out += [tekst(3, "Stary", x0=100, x1=500, y0=900, y1=980), tekst(4, "Nowy", x0=100, x1=500, y0=900, y1=980)]
+        if 3.0 <= t < 4.0:                                       # ten sam tekst dwa razy (cień pod spodem), licznik w oknie
+            out += [tekst(5, "Jarvo", y0=1000, y1=1080), tekst(6, "Jarvo", x0=104, y0=1004, x1=904, y1=1084),
+                    {**tekst(7, "12", y0=1000, y1=1080), "okno": True}]
+        return out
+    ust = [u for u in pm.analiza(probki(5, tt), 5, HZ, None) if u["kod"] == "napisy_na_sobie"]
+    assert [(u["tekst"], u["drugi"], u["waga"], u["od"], u["do"]) for u in ust] == [("Cena 99 zł", "Nowość", "blad", 1.0, 1.6)]
+
+
+def test_napisy_auto(tmp_path):
+    assert not pm.napisy_auto(tmp_path)
+    (tmp_path / "lektor.slowa.json").write_text("[]", encoding="utf-8")
+    assert pm.napisy_auto(tmp_path)

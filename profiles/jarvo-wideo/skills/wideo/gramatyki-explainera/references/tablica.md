@@ -72,7 +72,7 @@ Drugi cue jest przypięty do słowa „pilnują” w narracji z `offset` 0,5 s, 
 - **Dużo kolorów, cienka albo równa linia, ręka wisi w kadrze.** Tylko czerń i jeden akcent, linia ok. 0,65% wysokości kadru; ręka wchodzi tylko do rysowania.
 - **Mieszanie RSA i Minute Physics.** Albo jedna tablica i ruch kamery, albo kartka na stronę i cięcia.
 - **Za gęste cue.** Pisanie i rysowanie przyspieszają. Polskie zdania mają więcej znaków niż chińskie: trzymaj punkt do ok. 30 znaków i daj mu czas – przy 16 znakach/s potrzeba (odstęp do następnego cue − 0,3 s) ≥ znaki / 16, a dla tytułu (odstęp − 0,15 s) ≥ znaki / 7,5. W 3–8 s najlepiej 2–5 cue.
-- **Tekst w kadrze konkuruje z wypalanymi napisami.** Przesuń napisy albo nie wypalaj ich w tym fragmencie; ustaw `safe.bottom` (pion 1080×1920: 490–570, poziom: 160–220), klip układa treść tylko w tym pasie.
+- **Tekst w kadrze konkuruje z wypalanymi napisami.** Przesuń napisy albo nie wypalaj ich w tym fragmencie; ustaw `safe.bottom` (pion 1080×1920: 700, poziom: 250), klip układa treść tylko w tym pasie.
 - **Zła nazwa ikony** daje sam podpis bez rysunku (ostrzeżenie). Nazwy tylko z listy.
 - **Tryb `--alfa`:** tusz dostaje białą obwódkę (8 kierunków), żeby był widoczny na ciemnym obrazie.
 

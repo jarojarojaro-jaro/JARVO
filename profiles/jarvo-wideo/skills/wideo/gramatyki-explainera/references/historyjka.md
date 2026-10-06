@@ -82,7 +82,7 @@ Pierwszy cue jest przypięty do słowa „poprosiłem” w narracji: `gramatyka.
 - **Usta bez obwiedni w polskim tekście.** 6,5 znaku/s to tempo chińskich znaków; polskie zdanie ma ich znacznie więcej, więc bez obwiedni usta ruszają się dłużej niż lektor. Daj lektora (`os_czasu.json` obok spec albo katalog wyżej: `gramatyka.py` wstawi `window.VO_ENV`) albo skróć `text` tak, żeby znaki / 6,5 ≈ długość zdania w sekundach, a treść dymka wpisz w `sub`.
 - **Chińskie wartości domyślne w kadrze.** Zawsze wpisz `data.app` po polsku (domyślnie „AI助手”) i `data.mark` (`"?"` albo `"!"`; domyślny „？” jest pełnej szerokości).
 - **`data.hit` to sekundy bezwzględne,** nie względem `at`. Gdy `at` liczysz ze `slowo`, `hit` się z nim nie przesuwa: wpisz czas słowa z `os_czasu.json` (sylaba liczby) albo pomiń `hit` (domyślnie `at + 1.3`).
-- **`safe` przesuwa tylko tekst** (dymki i wielki napis w `insert`). Postać, stół i twarz w `react` to grafika: w pionie wchodzą w pas napisów; napisy na ciele są czytelne, ale grafika się nie odsunie. Pas napisów: `safe.bottom` 490–570 w pionie 1080×1920, 160–220 w poziomie.
+- **`safe` przesuwa tylko tekst** (dymki i wielki napis w `insert`). Postać, stół i twarz w `react` to grafika: w pionie wchodzą w pas napisów; napisy na ciele są czytelne, ale grafika się nie odsunie. Pas napisów: `safe.bottom` 700 w pionie 1080×1920, 250 w poziomie.
 - **Klatki postaci liczone z bezwzględnej siatki 24 fps:** lądowanie cue może się różnić o 1 klatkę. Sprawdź na stopklatkach.
 - **Tryb `--alfa`:** bez pokoju; postać i dymek rysują się normalnie, w `insert` tylko monitor i tył głowy.
 

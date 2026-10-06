@@ -37,7 +37,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    - ✅ Punkt kontrolny: `ok: true`.
 1b. **Animacja HTML (nasz kontrakt, `--preset jarvo`):** `python3 $HERMES_HOME/scripts/html_wideo.py pomiar <strona>
    --preset jarvo --dlugosc <s> --platforma <…>` mierzy z DOM i klatek: czas czytania, tekst poza kadrem i pod UI
-   platformy, kontrast, kroje zastępcze, czarne przerwy, martwe odcinki, rytm, pusta scena, brak oddechu przed
+   platformy, kontrast, dwa napisy na sobie, tekst w pasie napisów lektora (przy lektorze, `--napisy`), kroje zastępcze, czarne przerwy, martwe odcinki, rytm, pusta scena, brak oddechu przed
    cięciem i na końcu, uderzenia całego kadru, błędy JS i zasobów (`pomiar.md` obok
    strony). Ustalenia to fakty, nie opinie: poprawiasz albo zapisujesz świadomy wyjątek z powodem (`--wyjatek`).
    **„Gotowe” tylko z pełnym i aktualnym raportem** (`html_wideo.py aktualny <strona>` = 0); po każdej zmianie

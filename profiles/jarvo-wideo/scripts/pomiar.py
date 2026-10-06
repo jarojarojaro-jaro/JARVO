@@ -8,6 +8,8 @@ z przeglądarki teksty (widoczna część, granice glifów, krycie, kolor, rozmi
     czas_czytania         tekst widoczny krócej, niż trzeba na przeczytanie: poniżej 70% minimum     błąd
                           (pl: 0,4 s + 3 słowa/s), poniżej spokojnego czytania (znaki / 15 + 1,5 s)  ostrzeżenie
     strefa_platformy      tekst pod interfejsem platformy (9:16: wideo_lib.STREFY_UI, bez platformy TikTok)  błąd przy --platforma
+    pas_napisow           tekst w pasie napisów lektora (wideo_lib.PAS_NAPISOW) ≥ 0,3 s: napisy go zakryją  błąd przy napisach
+    napisy_na_sobie       dwa różne teksty nachodzą na siebie (≥ 30% mniejszego) ≥ 0,3 s            błąd
     kontrast              tekst a tło za nim poniżej WCAG (4,5:1; duży tekst 3:1)                  błąd
     czcionka_zastepcza    krój z CSS niedostępny: render pokaże inny niż projekt                   błąd
     czarna_przerwa        czarna klatka między scenami (nie na początku i końcu)                   błąd
@@ -23,6 +25,11 @@ z przeglądarki teksty (widoczna część, granice glifów, krycie, kolor, rozmi
                           wyjątek z powodem); liczby 0–3 i klatki licznika w ruchu pomijane
     zasob / blad_js       plik nie wczytał się / błąd JavaScript na stronie                         błąd
 
+Pas napisów sprawdzamy, gdy film dostanie napisy lektora (`html_wideo.py pomiar --napisy tak`; `auto`: obok strony
+leży os_czasu.json, *.slowa.json, *.srt albo lektor*.wav; `gramatyka.py pomiar` zawsze). Nachodzące napisy (za qa.py
+huashu-art-motion, MIT): ten sam tekst narysowany dwa razy (obrys, cień) to jeden napis, tekst w oknie z overflow
+(licznik) się nie liczy; obrócone napisy mają prostokąt otaczający większy niż litery, więc fałszywy alarm sprawdzasz
+na klatce i opisujesz wyjątkiem.
 Liczby sprawdzamy, gdy obok strony albo katalog wyżej leży fakty.json (brief Sherlocka) albo podano `--fakty`.
 Raport ma odcisk źródeł (pliki animacji, ustawienia pomiaru i fakty.json): zmiana czegokolwiek = raport nieaktualny. Film z kodu
 HTML oddajesz tylko z pełnym (`--tryb pelny`) i aktualnym raportem bez błędów; świadomy wyjątek (`--wyjatek`) ma powód.
@@ -56,6 +63,9 @@ NOWE_UJECIE = 0.25              # część pikseli miniatury zmieniona naraz (be
 UDERZENIE = 0.4                 # część zmieniona naraz, a po ≤ 0,3 s kadr wraca = uderzenie całego kadru
 ODDECH = 0.8                    # s spokoju przed nowym ujęciem i na końcu (zasada: 1 s; próbki co 0,1 s)
 PRZEJSCIE = 1.2                 # s na wyjście starego ujęcia i wejście nowego: spokój liczy się sprzed nich
+NA_SOBIE = 0.3                  # część mniejszego napisu przykryta drugim = napisy na sobie
+TRWALE = 0.3                    # s: krócej to klatki ruchu (napis wjeżdża, drugi odjeżdża), nie usterka
+LEKTOR_OBOK = ("os_czasu.json", "*.slowa.json", "*.srt", "lektor*.wav")
 GENERYCZNE = {"serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-serif", "ui-sans-serif",
               "ui-monospace", "ui-rounded", "emoji", "math", "fangsong", "inherit", "initial", "-apple-system",
               "blinkmacsystemfont"}
@@ -222,9 +232,56 @@ def _ustalenie(kod, waga, opis, poprawka, t0, t1, **extra) -> dict:
     return {"kod": kod, "waga": waga, "opis": opis, "poprawka": poprawka, "od": round(t0, 2), "do": round(t1, 2), **extra}
 
 
+def napisy_auto(katalog: Path) -> bool:
+    """Film dostanie napisy lektora: obok strony leży oś czasu, słowa, SRT albo nagranie lektora."""
+    return any(next(katalog.glob(w), None) for w in LEKTOR_OBOK)
+
+
+def _serie(chwile: list[float], dt: float) -> list[tuple[float, float]]:
+    """Chwile próbek → ciągłe odcinki (od, do) bez przerw dłuższych niż próbka."""
+    out: list[list[float]] = []
+    for t in sorted(chwile):
+        if out and t - out[-1][1] <= dt * 1.5:
+            out[-1][1] = t
+        else:
+            out.append([t, t])
+    return [(a, b + dt) for a, b in out]
+
+
+def nakladanie(probki: list[dict], dt: float) -> list[dict]:
+    """Dwa różne teksty na sobie (≥ 30% mniejszego) przez ≥ 0,3 s. Ten sam tekst dwa razy (obrys, cień, warstwa
+    pod spodem) to jeden napis; tekst przycięty oknem (licznik bębnowy) i słabo widoczny (krycie < 0,6) pomijany."""
+    pary: dict[tuple, list[float]] = {}
+    nazwy: dict = {}
+    for p in probki:
+        W, H = p["W"], p["H"]
+        vis = [x for x in p.get("teksty") or [] if x["a"] >= 0.6 and not x.get("okno") and x["x1"] > x["x0"] and x["y1"] > x["y0"]
+               and _przeciecie((x["x0"], x["y0"], x["x1"], x["y1"]), (0, 0, W, H)) > 0]
+        for i, a in enumerate(vis):
+            for b in vis[i + 1:]:
+                if a["full"] == b["full"] or a["id"] == b["id"]:
+                    continue
+                ra, rb = (a["x0"], a["y0"], a["x1"], a["y1"]), (b["x0"], b["y0"], b["x1"], b["y1"])
+                mniejszy = min((ra[2] - ra[0]) * (ra[3] - ra[1]), (rb[2] - rb[0]) * (rb[3] - rb[1]))
+                if mniejszy > 0 and _przeciecie(ra, rb) / mniejszy > NA_SOBIE:
+                    klucz = tuple(sorted((str(a["id"]), str(b["id"]))))
+                    pary.setdefault(klucz, []).append(p["t"])
+                    nazwy[klucz] = (a["full"], b["full"])
+    out = []
+    for klucz, chwile in pary.items():
+        for t0, t1 in _serie(chwile, dt):
+            if t1 - t0 >= TRWALE - 1e-9:
+                a, b = (s if len(s) <= 40 else s[:37] + "…" for s in nazwy[klucz])
+                out.append(_ustalenie("napisy_na_sobie", "blad", f"„{a}” i „{b}” nachodzą na siebie ({t1 - t0:.1f} s)",
+                                      "rozsuń napisy albo pokaż je po kolei (drugi po zejściu pierwszego)", t0, t1,
+                                      tekst=nazwy[klucz][0], drugi=nazwy[klucz][1]))
+    return sorted(out, key=lambda u: u["od"])
+
+
 def analiza(probki: list[dict], dlugosc: float, hz: float, platforma: str | None = None, jezyk: str = "pl",
-            tla: dict | None = None) -> list[dict]:
-    """Próbki [{t, W, H, teksty, luma, zmiana}] → ustalenia. `tla`: id tekstu → (kolor tła RGB, chwila) z klatek."""
+            tla: dict | None = None, napisy: bool = False) -> list[dict]:
+    """Próbki [{t, W, H, teksty, luma, zmiana}] → ustalenia. `tla`: id tekstu → (kolor tła RGB, chwila) z klatek.
+    `napisy`: film dostanie napisy lektora, więc tekst w ich pasie to błąd."""
     out: list[dict] = []
     if not probki:
         return out
@@ -232,6 +289,7 @@ def analiza(probki: list[dict], dlugosc: float, hz: float, platforma: str | None
     W, H = probki[0]["W"], probki[0]["H"]
     zony = strefy(W, H, platforma)
     twarde_strefy = bool(platforma) or H > W
+    pas = wl.pas_napisow(W, H) if napisy else None
     # teksty: przebieg w czasie
     przebieg: dict[int, list[tuple[float, dict]]] = {}
     for p in probki:
@@ -275,6 +333,19 @@ def analiza(probki: list[dict], dlugosc: float, hz: float, platforma: str | None
                                       "przesuń tekst do bezpiecznego środka kadru (formaty-wideo)", pod[0][0], pod[-1][0] + dt,
                                       tekst=pelny, strefa=nazwa))
                 break
+        # pas napisów lektora: dół tekstu wchodzi w pas (z tolerancją 0,4% kadru), tekst choć w 10% w kadrze
+        if pas:
+            w_pasie = [t for t, x in ciag if x["a"] >= 0.6 and x["y1"] > pas[1] + 0.004 * H and x["y0"] < pas[3]
+                       and x["x1"] > pas[0] and x["x0"] < pas[2]
+                       and _przeciecie((x["x0"], x["y0"], x["x1"], x["y1"]), (0, 0, W, H))
+                       > 0.1 * max(1.0, (x["x1"] - x["x0"]) * (x["y1"] - x["y0"]))]
+            for s0, s1 in _serie(w_pasie, dt):
+                if s1 - s0 >= TRWALE - 1e-9:
+                    out.append(_ustalenie("pas_napisow", "blad", f"„{krotki}” w pasie napisów lektora "
+                                          f"(y {pas[1]:.0f}–{pas[3]:.0f} px) przez {s1 - s0:.1f} s",
+                                          "podnieś tekst nad pas napisów (gramatyki: safe.bottom) albo pokaż go, gdy lektor milczy",
+                                          s0, s1, tekst=pelny))
+                    break
         # kontrast z tłem zmierzonym na klatce
         if tla and tid in tla:
             bg, tk = tla[tid]
@@ -334,6 +405,7 @@ def analiza(probki: list[dict], dlugosc: float, hz: float, platforma: str | None
             out.append(_ustalenie("monotonny_rytm", "ostrz", f"{len(odst) + 1} zmian co ~{statistics.mean(odst):.1f} s, bez akcentu",
                                   "zróżnicuj długość ujęć: krótsze przy akcji, dłuższe przy puencie; jeden mocny akcent",
                                   szczyty[0], szczyty[-1]))
+    out += nakladanie(probki, dt)
     out += kompozycja(probki, dt)
     return out
 

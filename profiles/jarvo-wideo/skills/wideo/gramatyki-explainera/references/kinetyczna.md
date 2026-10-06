@@ -83,7 +83,7 @@ Lektor: „Wolno znaczy szybko. Wolno, bo jedna zmiana naraz…”. Drugi cue je
 - **`number` z `at` < 0,7** jest w pierwszej klatce już w połowie liczenia. Ustaw `at` na chwilę, w której lektor wypowiada liczbę.
 - **Za mało czasu na czytanie.** Główne słowo co najmniej 0,5 s, zdanie pomocnicze co najmniej liczba znaków / 13 s, nie krócej niż 1,0 s.
 - **Lista dłuższa niż 5 punktów:** pasek postępu zwęża odcinki, ale treść robi się nieczytelna. Przejdź na infografikę.
-- **Tekst w kadrze konkuruje z wypalanymi napisami.** Przesuń napisy albo nie wypalaj ich w tym fragmencie; ustaw `safe.bottom` (pion 1080×1920: 490–570, poziom: 160–220), blok słowa i pasek postępu zostają w tym pasie.
+- **Tekst w kadrze konkuruje z wypalanymi napisami.** Przesuń napisy albo nie wypalaj ich w tym fragmencie; ustaw `safe.bottom` (pion 1080×1920: 700, poziom: 250), blok słowa i pasek postępu zostają w tym pasie.
 - **Tryb `--alfa`:** bez tła i kropek; tekst biały z ciemnym obrysem, zakreślacz koralowy.
 
 ## Kontrola

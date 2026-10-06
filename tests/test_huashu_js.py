@@ -118,9 +118,13 @@ console.log(JSON.stringify([t('Słowa w zdaniu i AI'), t('a² + b² = c²'), t('
 
 def test_zrodlo_wykresu_ciemniejsze():
     """Szary źródła pod wykresem (#7c868b, 3,7:1 na bieli) ciemniejszy w klipie i w CH.frame: kontrast ≥ 4,5:1."""
-    kod = "c.globalAlpha = MO.seg(lt, 0.2, 0.6); c.font = `400 ${L.srcF.size}px ${CN}`; c.fillStyle = '#7c868b';"
+    kod = ("c.globalAlpha = MO.seg(lt, 0.2, 0.6); c.font = `400 ${L.srcF.size}px ${CN}`; c.fillStyle = '#7c868b';\n"
+           "if (kind === 'bar' && hiI >= 0 && S[hiI] && S[hiI].value >= 0 && S.some((r, j) => j !== hiI && "
+           "r.value >= S[hiI].value)) {   // 标注的不是最高那根\n")
     w = node(f"console.log(JSON.stringify({{out: H.latka('t3_finance_chart', {json.dumps(kod)}), z: H.ZRODLO}}));")
     assert "#7c868b" not in w["out"] and w["z"] in w["out"]
+    # zapas na podpis highlight także nad najwyższym słupkiem (inaczej podpis na jego liczbie)
+    assert "if (kind === 'bar' && hiI >= 0 && S[hiI] && S[hiI].value >= 0) {" in w["out"] and "S.some(" not in w["out"]
 
     def lum(h: str) -> float:
         c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]

@@ -229,8 +229,12 @@
       ["c.beginPath(); c.ellipse(0, -12, 280, 64, 0, 0, 7); c.fill(); c.stroke();", ''],
     ],
     // 3b1b: podział tekstu na tokeny wzoru (tokeny niżej) zamiast angielskiego [A-Za-z]{2,}
-    // wykresy: źródło pod wykresem #7c868b na bieli ma 3,7:1 (pomiar: kontrast poniżej 4,5:1); ten sam szary ciemniej
-    t3_finance_chart: [["c.fillStyle = '#7c868b';", `c.fillStyle = '${ZRODLO}';`]],
+    // wykresy: źródło pod wykresem #7c868b na bieli ma 3,7:1 (pomiar: kontrast poniżej 4,5:1); ten sam szary ciemniej.
+    // Zapas nad wykresem na podpis `highlight` oryginał dokłada tylko, gdy obok stoi wyższy słupek; przy najwyższym
+    // słupku blisko góry osi podpis spadał na jego własną liczbę („najwięcej” na „120”, pomiar: napisy_na_sobie)
+    t3_finance_chart: [["c.fillStyle = '#7c868b';", `c.fillStyle = '${ZRODLO}';`],
+      ["if (kind === 'bar' && hiI >= 0 && S[hiI] && S[hiI].value >= 0 && S.some((r, j) => j !== hiI && r.value >= S[hiI].value)) {",
+        "if (kind === 'bar' && hiI >= 0 && S[hiI] && S[hiI].value >= 0) {"]],
     t1_3b1b: [
       ["const toks = text => (String(text).match(/[A-Za-z]{2,}|./gu) || []).flatMap(s => s.length > 1 && !/[a-z]/.test(s) ? [...s] : [s])   // 全大写的一串（QK）是几个变量，拆开\n  .map(s => ({ s, zh: isZh(s), it: /^[a-zA-Z]$/.test(s), gap: 0 }));",
         "const toks = text => window.HUASHU_PL.tokeny(String(text)).map(([s, it]) => ({ s, zh: isZh(s), it, gap: 0 }));"],

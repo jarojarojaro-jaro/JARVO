@@ -266,8 +266,8 @@ G3: gramatyki nauki i finansów). `qa.py` źródła odpowiada u nas zestaw: `kry
   stopklatce (`gramatyka.py render … --klatki`); ocena na oko myli się zwykle o 20–30%.
 
 **36. Gramatyka z tekstem ustępuje pasowi napisów, a nie napisy animacji.**
-- Dowód: w pionie etykieta wykresu t3 wypadała na y≈1460, na wypalonych napisach (1400–1520); z `safe` wykres leży
-  w 300–1430, w tym samym obszarze co inne materiały, zero zasłonięć w próbkach klatek; po uwadze recenzji, że biel na
+- Dowód: w pionie etykieta wykresu t3 wypadała na y≈1460, na wypalonych napisach (1400–1520 w ich filmie; u nas pas napisów to 1220–1440,
+  `safe.bottom` 700); z `safe` wykres leży w 300–1430 (ich wartości), w tym samym obszarze co inne materiały, zero zasłonięć w próbkach klatek; po uwadze recenzji, że biel na
   cały ekran między ciemnymi zrzutami to największy skok jasności, `safe.fill` = kolor tła filmu i wykres stał się
   kartą w tym samym miejscu i na tym samym tle co zrzuty obok.
 - Dlaczego: napisy wypala eksport jednolicie, przesuwanie ich dla jednego fragmentu rusza cały łańcuch eksportu;
@@ -368,7 +368,8 @@ Te zasady źródło podaje bez liczb (liczby są w 33–38), więc mają postać
   nakładanie się napisów, pas napisów, prawie pusty kadr); duże ozdobne litery mogą dać fałszywy alarm, więc
   oglądasz wskazaną klatkę. Jasne tło: osobne sprawdzenie, czy grafika wchodzi w pas napisów (w źródle
   `subzone_gate.py`, próg ciemnych pikseli; na tle z fakturą nie działa).
-- Kiedy: przed oddaniem. U nas `html_wideo.py pomiar` (tekst poza kadrem, strefy platformy, kontrast) i arkusz
+- Kiedy: przed oddaniem. U nas `html_wideo.py pomiar` (tekst poza kadrem, strefy platformy, kontrast, napisy na sobie, tekst w pasie
+  napisów lektora `--napisy`; grafika bez tekstu w pasie: oko na arkuszu) i arkusz
   `qa_wideo.py --arkusz`.
 
 **48. Niezależna recenzja z dziennikiem problemów.**

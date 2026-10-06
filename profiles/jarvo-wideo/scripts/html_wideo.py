@@ -5,7 +5,7 @@
     python3 html_wideo.py wideo  anim.html --dlugosc 6 [--fps 30] -o film.mp4 [--preset …] [--alfa]
     python3 html_wideo.py lottie scena/lottie.json [-o film.mp4|.mov|.webm|.gif] [--alfa] [--tlo "#101010"]
     python3 html_wideo.py lottie scena/lottie.json --klatki 0,45,89 --arkusz arkusz.jpg
-    python3 html_wideo.py pomiar anim.html --dlugosc 6 [--preset jarvo] [--platforma tiktok] [--tryb pelny|szybki]
+    python3 html_wideo.py pomiar anim.html --dlugosc 6 [--preset jarvo] [--platforma tiktok] [--tryb pelny|szybki] [--napisy auto|tak|nie]
                                 [--wyjatek "czas_czytania@Logo=znak marki, nie tekst do czytania"] [--json pomiar.json]
                                 [--fakty fakty.json]
     python3 html_wideo.py aktualny anim.html [--raport pomiar.json]   # 0 = raport pełny, aktualny i bez błędów
@@ -637,7 +637,8 @@ def raport_pomiaru(anim: Path, wynik: dict, ustawienia: dict, tryb: str, hz: flo
         bg = pm.tlo_wokol(wynik["jpgs"][i], (x["x0"], x["y0"], x["x1"], x["y1"]))
         if bg:
             tla[tid] = (bg, probki[i]["t"])
-    ust = pm.analiza(probki, ustawienia["dlugosc"], hz, ustawienia.get("platforma"), ustawienia.get("jezyk", "pl"), tla)
+    ust = pm.analiza(probki, ustawienia["dlugosc"], hz, ustawienia.get("platforma"), ustawienia.get("jezyk", "pl"), tla,
+                     napisy=bool(ustawienia.get("napisy")))
     if ustawienia.get("fakty"):
         ust += pm.liczby_ekranu(probki, hz, json.loads(Path(ustawienia["fakty"]["plik"]).read_text(encoding="utf-8")))
     teksty_rodzin: dict[str, list[str]] = {}
@@ -700,6 +701,8 @@ def main(argv: list[str] | None = None) -> int:
             s.add_argument("--tryb", choices=sorted(HZ_POMIARU), default="pelny", help="pelny 10 próbek/s (do oddania), szybki 4/s")
             s.add_argument("--platforma", help="tiktok | ig-reel | yt-shorts | youtube…: strefy UI platformy jako błędy")
             s.add_argument("--jezyk", default="pl", help="tempo czytania (pl, en)")
+            s.add_argument("--napisy", choices=["auto", "tak", "nie"], default="auto", help="film dostanie napisy lektora: "
+                           "tekst w ich pasie = błąd (auto: obok strony os_czasu.json, *.slowa.json, *.srt albo lektor*.wav)")
             s.add_argument("--wyjatek", action="append", default=[], help="KOD[@fragment tekstu]=powód (świadomy wyjątek)")
             s.add_argument("--json", help="raport (domyślnie pomiar.json obok animacji) + pomiar.md")
             s.add_argument("--fakty", help="brief Sherlocka: liczby na ekranie muszą mieć w nim źródło (domyślnie "
@@ -814,8 +817,10 @@ def cmd_pomiar(a, o: dict, size: tuple[int, int]) -> int:
     hz = HZ_POMIARU[a.tryb]
     wyj = pm.wyjatki(a.wyjatek)
     fakty = pm.fakty_info(Path(a.fakty).resolve() if a.fakty else pm.wl.znajdz_fakty(anim.parent))
+    napisy = a.napisy == "tak" or (a.napisy == "auto" and pm.napisy_auto(anim.parent))
     ustawienia = {"dlugosc": a.dlugosc, "rozmiar": a.rozmiar or None, "preset": a.preset, "query": o["query"],
-                  "platforma": a.platforma, "jezyk": a.jezyk, **({"fakty": fakty} if fakty else {})}
+                  "platforma": a.platforma, "jezyk": a.jezyk, **({"napisy": True} if napisy else {}),
+                  **({"fakty": fakty} if fakty else {})}
     wynik = zmierz(str(anim), o, a.dlugosc, hz, size, bool(a.rozmiar), a.czekaj)
     raport = raport_pomiaru(anim, wynik, ustawienia, a.tryb, hz, wyj)
     out = _raport_path(a.zrodlo, a.json)

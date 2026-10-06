@@ -31,7 +31,7 @@ Schemat (komentarze tylko tutaj; w pliku JSON ich nie pisz). Dodatki Jarva w spe
 {
   "grammar": "t3_finance_chart",          // id z kodu (tabela niżej), bo clip.js ładuje clips/<grammar>.js
   "duration": 7, "fps": 30, "width": 1920, "height": 1080,
-  "safe": { "top": 140, "bottom": 520 },     // opcjonalnie: krawędzie do ominięcia (px), niżej
+  "safe": { "top": 140, "bottom": 700 },     // opcjonalnie: krawędzie do ominięcia (px), niżej
   "alpha": false,                          // opcjonalnie: true = bez tła
   "data": { },                             // parametry gramatyki (karta); nieznane pola są ignorowane
   "cues": [ { "at": 1.2, "kind": "bar", "text": "…", "sub": "…", "data": { }, "image": "zrzut.png", "dur": 1.0 } ]
@@ -82,8 +82,11 @@ Które pola czyta dana gramatyka – tabela w jej karcie.
 
 - **Wszystkie 8 gramatyk honoruje `top` i `bottom`:** treść tylko między top a H − bottom. `wykresy` – układ współrzędnych i wiersz źródła; `vox` – powiększenie kamery i środek kadru; `3b1b`, `prezentacja`, `kurzgesagt`, `tablica`, `kinetyczna` – cały układ; `historyjka` – dymki i wielki napis wstawki (postać, stół i twarz w zbliżeniu reakcji to grafika: w pionie wchodzą w pas napisów; napisy na ciele są czytelne, ale grafika się nie odsunie).
 - **`left` i `right` nie zmieniają układu w żadnej gramatyce**: działają tylko z `fill` (zamalowanie), treść i tak dochodzi do krawędzi.
-- **Wartości:** pion 1080×1920 – pas napisów ok. 1400–1520 px, `bottom` 490–570; `top` pod zakładki platformy:
-  TikTok 140 (szablon `--format 9:16` wpisuje `top` 140 i `bottom` 520), Shorts 180, Reels 270; poziom zwykle `bottom` 160–220.
+- **Wartości:** pas napisów lektora (edytor HQ, `projekt.py` i napisy ASS, do dwóch wierszy) to w pionie 1080×1920
+  y 1220–1440 px, więc `bottom` 700; w poziomie 1920×1080 y 830–1005 px, `bottom` 250 (stała `PAS_NAPISOW`
+  w `wideo_lib.py`; szablon `--format 9:16` wpisuje `top` 140 i `bottom` 700, 16:9 `bottom` 250, a `sprawdz` ostrzega
+  przy mniejszym). `top` pod zakładki platformy: TikTok 140, Shorts 180, Reels 270. `gramatyka.py pomiar` sprawdza
+  pas napisów sam (`--napisy tak`): tekst klipu w pasie dłużej niż 0,3 s to błąd.
 - **Prawy pasek przycisków TikToka** (ok. 13% szerokości) zasłania to, co gramatyka stawia przy prawej krawędzi
   (w `wykresy` etykiety osi Y i wielka liczba), a `right` tego nie przesunie. `gramatyka.py pomiar --platforma tiktok`
   to pokaże: albo klip w montażu mniejszy i przesunięty w lewo (projekt edytora), albo świadomy wyjątek
