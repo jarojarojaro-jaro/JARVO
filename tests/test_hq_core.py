@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import fleetlib as fl
 from conftest import load_script
 
 core = load_script("hq/plugin/hq_core.py", "jarvo_hq_core_test")
@@ -263,6 +264,12 @@ def test_hq_plugin_build(tmp_path):
     dash = hqbuild.build_plugin(tmp_path / "jarvo-hq")
     for rel in ("manifest.json", "plugin_api.py", "hq_core.py", "animacja.py", "pomiar.py", "konwertuj.py", "fleet.json", "dist/index.js", "dist/style.css", "dist/LICENSE-htm"):
         assert (dash / rel).exists(), rel
+    # figura floty: iso.py ze szablonem, licencją iso-glow i krojem OFL (bez przykładów)
+    iso = dash / "izometria"
+    for rel in ("scripts/iso.py", "scripts/iso_flota.js", "scripts/iso_jarvo.js", "assets/iso-glow/LICENSE",
+                "assets/iso-glow/assets/gallery.html", *(f"scripts/kroje/{k}" for k in fl.ISO_KROJE)):
+        assert (iso / rel).exists(), rel
+    assert not (iso / "assets" / "przyklady").exists() and not list(iso.rglob("__pycache__"))
     manifest = json.loads((dash / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["name"] == "jarvo-hq" and manifest["api"] == "plugin_api.py" and manifest["tab"]["path"] == "/base" and manifest["tab"]["position"] == "before:chat"
     js = (dash / "dist" / "index.js").read_text(encoding="utf-8")
@@ -319,6 +326,27 @@ def test_plugin_api_helpers(tmp_path, monkeypatch):
     env.write_text('# c\nAPI_SERVER_KEY="abc123abc123abc123"\nexport X=1\n', encoding="utf-8")
     base, key = api._api_target("jarvo")
     assert base.endswith("/p/jarvo") and key == "abc123abc123abc123"
+
+
+
+def test_plugin_flota_strona(tmp_path, monkeypatch):
+    """Centrala → Jak działa usługa: strona figury floty z fleet.json pluginu, przebudowana po zmianie floty."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    import hqbuild
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    api = load_script("hq/plugin/plugin_api.py", "jarvo_hq_plugin_api_flota")
+    plik = tmp_path / "fleet.json"
+    fl.write_json(plik, hqbuild.fleet_json())
+    strona = api.flota_strona(plik).decode("utf-8")
+    assert "<title>Flota Jarvo</title>" in strona and '"nazwa": "Sherlock"' in strona and "fonts.googleapis" not in strona
+    assert '"Jarvo"' in strona and api.flota_strona(plik) is api.flota_strona(plik)      # pamiętana
+    dane = json.loads(plik.read_text(encoding="utf-8"))
+    dane["agents"] = dane["agents"][:3]
+    fl.write_json(plik, dane)
+    import os
+    os.utime(plik, ns=(1, 2))                                   # inna data pliku = inna flota
+    assert '"nazwa": "Studio"' not in api.flota_strona(plik).decode("utf-8")
 
 
 # ------------------------------------------------------------ regresje z przeglądu

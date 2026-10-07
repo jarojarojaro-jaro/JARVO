@@ -233,6 +233,9 @@
 .thq-center section { padding-top: 12px; }
 .thq-h2 { display: flex; align-items: center; gap: 8px; font: 800 1.05rem/1.2 var(--thq-display); margin: 4px 0 8px; }
 /* konwerter plików w Centrali (55-konwerter.js) */
+.thq-flota-fig { display: block; width: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--thq-line); border-radius: var(--thq-radius);
+  background: color-mix(in srgb, var(--thq-ink) 85%, var(--thq-surface)); }
+.thq-flota-akcje { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
 .thq-konw.is-drop { outline: 2px dashed var(--thq-accent); outline-offset: 2px; border-radius: var(--thq-radius); }
 .thq-konw-drop { display: grid; gap: 2px; width: 100%; padding: 12px; text-align: left; border: 1px dashed var(--thq-line);
   border-radius: var(--thq-radius); background: var(--thq-surface-2); font-size: 0.86rem; }

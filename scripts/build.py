@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fleetlib as fl  # noqa: E402
 import skan_skilli  # noqa: E402
 
-ISO_KROJ = ("jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono-latin-ext-wght-normal.woff2", "OFL-JetBrainsMono.txt")
+ISO_KROJ = fl.ISO_KROJE
 COPY_IGNORE = shutil.ignore_patterns(
     "__pycache__", "*.pyc", ".DS_Store", "node_modules", ".git", ".github", ".env", "*.env", "jobs.yaml"
 )
@@ -178,11 +178,7 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
         if straznik is not None:        # skan przed dopisaniem naszych plików (licencja, .vendored.json)
             straznik.sprawdz(dest, agent, source, spec["type"], rev, entry["path"])
         if source == "jarvo" and (dest / "scripts" / "iso.py").exists():
-            # izometria: krój JetBrains Mono (OFL) z krojów HQ obok iso.py, strona figur bez Google Fonts
-            kroje = dest / "scripts" / "kroje"
-            kroje.mkdir(exist_ok=True)
-            for name in ISO_KROJ:
-                shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "fonts" / "kroje" / name, kroje / name)
+            fl.kopiuj_kroje_izometrii(dest / "scripts")     # izometria: krój OFL obok iso.py, bez Google Fonts
         # licencja
         if spec.get("license_file") == "per-skill":
             lic = next((p for p in dest.iterdir() if p.name.lower().startswith("license")), None)

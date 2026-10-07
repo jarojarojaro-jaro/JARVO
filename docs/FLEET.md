@@ -46,7 +46,7 @@ Legenda przy skillach:
 
 Snajperzy nie dzielą pamięci ani workflowów dziedzinowych (wspólne są tylko skille z `shared/skills/`:
 narzędziowe jak `graf-kodu` i `izometria` (figury izometryczne ze świeceniem u Weba, Studia i Wideografa: strona, PNG,
-film; `iso.py flota` rysuje flotę z rejestru) i metodyczne jak `hooki`, oraz te same skille zewnętrzne z locka). Jeden skill ma każdy agent:
+film; `iso.py flota` rysuje flotę z rejestru, ta sama figura jest w HQ: Centrala → Jak działa usługa) i metodyczne jak `hooki`, oraz te same skille zewnętrzne z locka). Jeden skill ma każdy agent:
 `konwersja-plikow` (plik → inny format na serwerze: zdjęcia z HEIC, wideo, audio, PDF, Word; usuwa też metadane:
 miejsce GPS, telefon, daty, autor; ten sam konwerter masz w HQ: Centrala → Konwerter).
 Wszyscy znają też **Ciebie**:

@@ -4,7 +4,7 @@
     python3 scripts/hqbuild.py --out build/plugins/jarvo-hq     # plugin (wołane też przez scripts/build.py)
     python3 scripts/hqbuild.py --demo build/hq-demo            # samodzielne demo z symulacją floty
 
-Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, edytor.py, animacja.py, pomiar.py, liczby.py, konwertuj.py,
+Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, edytor.py, animacja.py, pomiar.py, liczby.py, konwertuj.py, izometria/,
 fleet.json, dzwieki/, dist/index.js, dist/style.css}.
 dist/index.js to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku.
 """
@@ -105,6 +105,11 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     shutil.copy2(fl.REPO_ROOT / "profiles" / "jarvo" / "scripts" / "liczby.py", dash / "liczby.py")
     # konwerter plików w Centrali: ten sam skrypt co wspólny skill floty `konwersja-plikow`
     shutil.copy2(fl.REPO_ROOT / "shared" / "skills" / "konwersja-plikow" / "scripts" / "konwertuj.py", dash / "konwertuj.py")
+    # figura floty w Centrali („Jak działa usługa”): ten sam iso.py co wspólny skill `izometria`, z szablonem,
+    # licencją iso-glow (MIT) i krojem OFL; plugin buduje stronę z fleet.json
+    shutil.copytree(fl.REPO_ROOT / "shared" / "skills" / "izometria", dash / "izometria",
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "przyklady", "examples"))
+    fl.kopiuj_kroje_izometrii(dash / "izometria" / "scripts")
     fl.write_json(dash / "fleet.json", fleet_json(fleet))
     return dash
 

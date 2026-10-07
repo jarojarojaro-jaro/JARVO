@@ -978,10 +978,12 @@ def _preview_handler():
             self.end_headers()
             self.wfile.write(data)
 
-        def _static(self, data: bytes, ctype: str, body: bool):
+        def _static(self, data: bytes, ctype: str, body: bool, csp: str | None = None):
             self.send_response(200)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
+            if csp:
+                self.send_header("Content-Security-Policy", csp)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Cache-Control", "no-store")
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -995,6 +997,11 @@ def _preview_handler():
             # mostek podglądu animacji (HQ ↔ strona przez postMessage) i wspólne biblioteki animacji (three, gsap)
             if path == "/_jarvo/most.js":
                 return self._static(anim.MOST_JS.encode(), "text/javascript; charset=utf-8", body)
+            if path == "/_jarvo/flota.html":                # Centrala → Jak działa usługa (figura floty)
+                try:
+                    return self._static(flota_strona(), "text/html; charset=utf-8", body, csp=PREVIEW_CSP)
+                except Exception as exc:  # brak iso.py albo zły fleet.json: opis zamiast zerwanego połączenia
+                    return self._fail(503, f"Figura floty niedostępna: {exc}")
             if path.startswith("/_lib/"):
                 lib = core.lib_file(path[len("/_lib/"):])
                 if lib is None:
@@ -1723,6 +1730,43 @@ async def konwerter_job(jid: str):
     if not job:
         raise HTTPException(404, "Nie ma takiej zamiany")
     return _job_view(job)
+
+
+# ------------------------------------------------------------------ figura floty (Centrala → Jak działa usługa)
+# Ten sam iso.py co wspólny skill `izometria` (hqbuild kopiuje skill obok; w repo czytany z shared/skills):
+# klikalna wieża floty z fleet.json, demo = droga zlecenia. Strona budowana w pamięci (na nowo po zmianie floty)
+# i podawana przez serwer podglądu (osobny port, sandbox), bo ma własne skrypty.
+_ISO_PLIK = next((p for p in (_HERE / "izometria" / "scripts" / "iso.py",
+                              _HERE.parents[1] / "shared" / "skills" / "izometria" / "scripts" / "iso.py")
+                  if p.is_file()), None)
+iso = _load("jarvo_hq_iso", str(_ISO_PLIK)) if _ISO_PLIK else None
+FLOTA_PATH = "/_jarvo/flota.html"
+JARVO_AKCENT = "#D4213D"           # akcent HQ (--thq-accent): figura świeci kolorem Jarva
+_flota = sys.modules.setdefault("jarvo_hq_flota_state", type(sys)("jarvo_hq_flota_state"))
+
+
+def flota_strona(fleet_file: Path | None = None) -> bytes:
+    """Strona figury floty (HTML) z fleet.json pluginu; pamiętana, póki plik floty się nie zmieni."""
+    if iso is None:
+        raise RuntimeError("brak iso.py w pluginie (przebuduj HQ)")
+    plik = fleet_file or FLEET_FILE
+    klucz = (str(plik), plik.stat().st_mtime_ns)
+    if getattr(_flota, "klucz", None) != klucz:
+        dane = iso.dane_floty(iso.wczytaj_flote(plik))
+        strona, _ = iso.zbuduj([("flota.js", iso.figura_floty(dane))], tytul="Flota Jarvo",
+                               paleta=[iso.akcent_marki(f"Jarvo={JARVO_AKCENT}")], motyw="auto")
+        _flota.klucz, _flota.strona = klucz, strona.encode("utf-8")
+    return _flota.strona
+
+
+@router.get("/flota")
+async def flota():
+    """Gdzie przeglądarka znajdzie figurę floty: {port, path} serwera podglądu (host składa przeglądarka)."""
+    if iso is None:
+        raise HTTPException(503, "Figura floty niedostępna: brak iso.py w pluginie (przebuduj HQ).")
+    if not getattr(_preview, "server", None):
+        raise HTTPException(503, f"Podgląd stron nie działa: {_preview.error or 'serwer nie wystartował'}")
+    return {"port": PREVIEW_PORT, "path": FLOTA_PATH}
 
 
 @router.post("/chat/{name}/reset")

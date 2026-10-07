@@ -36,6 +36,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Centrala: Misje | `missions/INDEX.md` + kanban | postęp misji (kostki kart w kolorach stanu) |
 | Centrala: Na bieżąco | zdarzenia kanbana | kto zaczął, oddał do oceny, skończył, utknął |
 | Centrala: Konwerter | `konwertuj.py` (ten sam co wspólny skill floty `konwersja-plikow`) + `/opt/data/jarvo/inbox/` | wrzucasz plik (upuść albo wybierz, kilka naraz, do 2 GB, z paskiem wysyłki), wybierasz format z listy pogrupowanej (zdjęcie, wideo, dźwięk, PDF, dokument; tylko to, co da się zrobić tym obrazem), opcje rozmiaru i jakości, strony PDF; **Zmniejsz** (ten sam format), **Połącz w jeden PDF**, **Usuń metadane** (zdjęcie, film, dźwięk: ten sam plik bez miejsca GPS, telefonu, dat i opisów, bez przekodowania; po wrzuceniu karta pokazuje, co plik mówi o Tobie, a po czyszczeniu, co usunięto; każda zamiana na inny format też je usuwa). Zamiana na serwerze, w tle i po kolei; wynik w `inbox/<data>/konwerter/` z rozmiarem przed i po, **Pobierz** i podgląd, kilka plików także jako ZIP. W demo widać cele, zamiana działa w instalacji |
+| Centrala: Jak działa usługa | `iso.py` (wspólny skill `izometria`, kopia w pluginie) + `fleet.json` + serwer podglądu `:9120` | **▶ Pokaż flotę jako figurę**: klikalna wieża floty w kolorze Jarva (mostek Jarva, pokoje agentów z rejestru, terminal TY, skrzynka RAPORT). Od razu gra demo: zlecenie przechodzi przez flotę (Ty → Jarvo → karty → ocena → raport), a odczyt mówi, który to krok. Klik w pokój = kto to, klik w terminal TY = zlecenie jeszcze raz; **↻ Jeszcze raz**, **↗ Pełny ekran** (do pokazania klientowi), **Zwiń**. Strona budowana z `fleet.json` pluginu, na nowo po zmianie floty. W demo: komunikat, figura działa w instalacji |
 
 Decyzje świadomie idą przez Jarva, a nie bezpośrednio do karty: szef zapisuje je w dzienniku misji i pilnuje
 reszty (skill `decision-queue` zna format wiadomości z HQ). Wyjątek: „Ponów kartę” odblokowuje kartę porzuconą
@@ -53,6 +54,7 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ POST /api/plugins/jarvo-hq/task/<id>/retry  „Ponów kartę” porzuconą po błędach (hermes kanban unblock)
         ├─ GET  /api/plugins/jarvo-hq/file?path=   podgląd pliku z katalogów floty
         ├─ POST /api/plugins/jarvo-hq/site        link „Odpal” (token) ─► :9120 serwer podglądu stron w pluginie
+        ├─ GET  /api/plugins/jarvo-hq/flota       figura floty w Centrali ─► :9120/_jarvo/flota.html (bez tokenu)
         ├─ POST /api/plugins/jarvo-hq/reveal      prośba „Pokaż w folderze” ─► pomocnik hosta (explorer.exe)
         ├─ POST /api/plugins/jarvo-hq/android     link „📱 Ekran telefonu” (token) ─► :9122 proxy ekranu w pluginie
         │                                          ─► jarvo-android-ekran:8000 (ws-scrcpy, HTTP i WebSocket)
@@ -88,7 +90,8 @@ Pliki w repo:
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu i planu typografii, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`, `tests/test_typografia.py`) |
 | `hq/plugin/animacja.py` | animacja HTML: schemat i zapis `parametry.json`, stan pomiaru, mostek podglądu (testy: `tests/test_animacja.py`); build dokłada do pluginu `pomiar.py` Wideografa (odcisk i aktualność raportu) |
 | `shared/skills/konwersja-plikow/scripts/konwertuj.py` (kopiowany do pluginu) | konwerter plików karty Konwerter w Centrali, ten sam co skill floty (testy: `tests/test_konwertuj.py`, `tests/test_hq_core.py`) |
-| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, konwerter plików (`55-konwerter.js`), HUD, aplikacja, widżet aktualizacji |
+| `shared/skills/izometria/` (kopiowany do pluginu jako `izometria/`, bez przykładów, z krojem OFL) | figura floty w Centrali: `iso.py flota` z `fleet.json` pluginu, ten sam co skill floty (testy: `tests/test_iso.py`, `tests/test_hq_core.py`) |
+| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, konwerter plików (`55-konwerter.js`), figura floty (`56-flota.js`), HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność; edytor i okno animacji z własnymi tokenami) |
 | `hq/web/dzwieki/` | biblioteka dźwięków CC0 menu Audio i Wideografa (157 efektów w 13 kategoriach, 9 podkładów; `katalog.json` z rolą, szczytem i flagą „gra” każdego efektu, `LICENCJE.md` z autorem i źródłem każdego pliku), budowana przez `scripts/dzwieki.py` (`pobierz`, `zbuduj`, `zmierz`, `sprawdz`; test `tests/test_dzwieki.py`) |
 | `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto; `kroje/`: kroje napisów i typografii (OFL, `scripts/kroje.py`) |
@@ -398,8 +401,9 @@ przy każdym pliku HTML, który ma obok `parametry.json` albo `__seek` w kodzie 
   (`/opt/data/profiles/<agent>`), więc `hq_core` wylicza z niego korzeń danych (`/opt/data/jarvo`). Nagłówek `CSP: sandbox` bez
   `allow-same-origin` daje stronie nieprzezroczyste pochodzenie: jej skrypty działają, ale nie czytają ciasteczek
   i nie wyślą ich do dashboardu. Nowa karta nie ma `window.opener`. Pliki ukryte, `..` i symlinki na zewnątrz: 404.
-  Bez tokenu serwer podaje tylko mostek `/_jarvo/most.js` i biblioteki `/_lib/…` (otwarte pakiety npm z
-  `narzedzia/node/node_modules`, bez plików ukrytych i symlinków na zewnątrz). Mostek trafia do strony tylko z
+  Bez tokenu serwer podaje tylko mostek `/_jarvo/most.js`, biblioteki `/_lib/…` (otwarte pakiety npm z
+  `narzedzia/node/node_modules`, bez plików ukrytych i symlinków na zewnątrz) i figurę floty `/_jarvo/flota.html`
+  (strona z kodu: nazwy i role agentów z `fleet.json`, nic z katalogów floty; ten sam `CSP: sandbox`). Mostek trafia do strony tylko z
   `?jarvo-podglad=1` (okno **◐ Animacja**) i przyjmuje wiadomości wyłącznie od okna nadrzędnego.
 - **📱 Ekran telefonu**: ws-scrcpy nie ma logowania, więc działa tylko w sieci floty (bez portów); jedyne wejście to
   proxy w pluginie na porcie 9122 (ten sam `JARVO_BIND_IP`). Link `/<token>/` wydaje zalogowany dashboard albo agent

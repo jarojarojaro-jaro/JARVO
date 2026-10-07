@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,8 @@ AUTONOMY_LEVELS = {"A0", "A1", "A2", "A3"}
 HQ_ROOMS = {"bridge", "study", "devlab", "atelier", "filmstudio", "workshop", "office", "radar", "apps"}   # pokoje w Jarvo HQ (hq/web/src/20-art.js)
 # Hermes ucina opis skilla w indeksie promptu do 60 znaków (agent/skill_utils.py).
 SKILL_PROMPT_DESC_LIMIT = 60
+# krój figur skilla `izometria` (JetBrains Mono, OFL, z krojów HQ): build skilla i plugin HQ kładą go obok iso.py
+ISO_KROJE = ("jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono-latin-ext-wght-normal.woff2", "OFL-JetBrainsMono.txt")
 # Budżet main promptu (SOUL.md) w przybliżonych tokenach (~3.5 znaku/token dla PL/EN).
 SOUL_TOKEN_BUDGET = 3200
 
@@ -316,6 +319,14 @@ def protocol_for(text: str, orchestrator: bool) -> str:
 
 def approx_tokens(text: str) -> int:
     return int(len(text) / 3.5) + 1
+
+
+def kopiuj_kroje_izometrii(scripts: Path) -> None:
+    """Krój figur obok iso.py (`<skill>/scripts/kroje/`): strona figur bez Google Fonts, z polskimi znakami."""
+    kroje = scripts / "kroje"
+    kroje.mkdir(parents=True, exist_ok=True)
+    for name in ISO_KROJE:
+        shutil.copy2(REPO_ROOT / "hq" / "web" / "fonts" / "kroje" / name, kroje / name)
 
 
 def write_json(path: Path, data: Any) -> None:

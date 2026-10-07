@@ -102,6 +102,7 @@ const liveApi = {
   },
   site: (path) => SDK.fetchJSON(`${API_ROOT}/site`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
   android: () => SDK.fetchJSON(`${API_ROOT}/android`, { method: "POST" }),
+  flota: () => SDK.fetchJSON(`${API_ROOT}/flota`),       // figura floty w Centrali: {port, path} serwera podglądu
   reveal: (path) => SDK.fetchJSON(`${API_ROOT}/reveal`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
   host: () => SDK.fetchJSON(`${API_ROOT}/host`),
   async fileBlob(path) {

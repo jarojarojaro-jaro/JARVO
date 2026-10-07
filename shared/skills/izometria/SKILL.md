@@ -25,6 +25,7 @@ Czysty SVG bez bibliotek: strona z jedną figurą waży ~40 KB (z krojem ~115 KB
 - **Schemat usługi:** „jak działa usługa” jako budynek albo urządzenie, w którym zapalają się kolejne etapy.
 - **Flota Jarva:** `iso.py flota` sam robi figurę z `fleet.yaml`: wieża z mostkiem Jarva i pokojami agentów, a demo
   to droga zlecenia (Ty → Jarvo → karty dla agentów → ocena → raport). Na nasze materiały: post, strona, film.
+  Tę samą figurę właściciel ogląda w HQ (Centrala → Jak działa usługa).
 
 ## Kiedy NIE używać
 - zdjęcie produktu, realistyczny render, logo i znaki towarowe (nigdy nie rysujesz prawdziwych logo ani sylwetek

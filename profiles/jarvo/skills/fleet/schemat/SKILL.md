@@ -25,8 +25,9 @@ piszesz SVG, narzędzie `schemat` robi z niego PNG i daje linię `MEDIA:<ścież
   Wtedy wyślij schemat i 1–3 zdania zamiast ściany tekstu.
 - Nie do: grafik dla klientów (Studio), filmów (wzorzec „Wyjaśnij mi filmem”), danych z wykresem do raportu.
   Żywy schemat na post (kropki po strzałkach, kroki po kolei, X / Instagram) to film: karta dla Wideografa (`zywy-schemat`).
-- „Jak działa usługa” / „pokaż flotę” jako świecąca, klikalna figura (grafika, post, strona, oferta): jedna karta dla
-  Studia, `iso.py flota` (skill `izometria`) i PNG z `iso.py png`; film to karta dla Wideografa (`iso.py wideo`).
+- „Jak działa usługa” / „pokaż flotę” jako świecąca, klikalna figura: właściciel ma ją w HQ (Centrala → Jak działa
+  usługa). Grafika, post, strona albo oferta z nią to jedna karta dla Studia, `iso.py flota` (skill `izometria`) i PNG
+  z `iso.py png`; film to karta dla Wideografa (`iso.py wideo`).
 
 ## Kroki
 1. Jedna myśl na rysunek. Zapisz ją jako tytuł (np. „Jak zlecenie trafia do agenta”).

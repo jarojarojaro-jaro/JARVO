@@ -407,6 +407,7 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
     konwStart: async () => { throw new Error("W trybie demo zamiana nie działa: konwerter pracuje na serwerze lokalnej instalacji Jarva."); },
     konwJob: async () => ({ state: "error", error: "demo" }),
     site: async () => ({ url: URL.createObjectURL(new Blob([SAMPLE_SITE], { type: "text/html" })) }),
+    flota: async () => { throw new Error("Figura floty działa w zainstalowanym Jarvo (serwer podglądu)."); },
     reveal: async () => { throw new Error("W trybie demo nie ma hosta: folder otwiera się w lokalnej instalacji."); },
     host: async () => ({ explorer: false, preview: true, data_win: "\\\\wsl.localhost\\Ubuntu\\home\\ty\\jarvo-local\\data\\hermes" }),
     fileBlob,

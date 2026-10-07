@@ -168,6 +168,7 @@ function Center({ state, agents, onAnswer, onOpenTask, onOpenFile, focus }) {
         : html`<ul class="thq-list">${missions.map((m) => html`<${MissionRow} key=${m.id} m=${m} agents=${agents} onOpenTask=${onOpenTask} onOpenFile=${onOpenFile}/>`)}</ul>`}
     </section>
     <${Konwerter} onOpenFile=${onOpenFile}/>
+    <${JakDziala}/>
     <section>
       <h2 class="thq-h2">${L("Na bieżąco", "Activity")}</h2>
       ${feed.length === 0 ? html`<p class="thq-muted">${L("Tablica jest spokojna.", "The board is quiet.")}</p>`

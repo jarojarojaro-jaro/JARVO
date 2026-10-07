@@ -282,7 +282,7 @@ scenarios:
     expect:
       should:
         - "jedna karta dla jarvo-studio bez misji: `iso.py flota --przyklad lowca,web`, PNG z `iso.py png` po demo (`--czas 7`) w formacie posta, DoD „PNG obejrzany, oddany linią MEDIA:”"
-        - "mówi jednym zdaniem, że Studio zrobi grafikę z figury floty"
+        - "mówi jednym zdaniem, że Studio zrobi grafikę z figury floty, a klikalną wersję właściciel ma już w HQ (Centrala → Jak działa usługa)"
       should_not:
         - "rysuje figurę sam albo odsyła do zewnętrznego generatora grafik"
         - "zakłada misję albo karty dla kilku agentów"

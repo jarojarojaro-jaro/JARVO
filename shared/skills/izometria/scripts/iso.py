@@ -20,7 +20,7 @@ i demo() po czasie strony, więc PNG w chwili t i film są zawsze takie same) i 
 z tokenów, bez zewnętrznych skryptów i adresów, czas z api). PNG i `sprawdz --przegladarka` robi
 iso_render.cjs (Chromium z obrazu), film html_wideo.py Wideografa (--preset jarvo).
 Figura floty (`flota`, szablon iso_flota.js): mostek szefa, pokoje agentów z fleet.yaml, demo = droga zlecenia
-przez flotę.
+przez flotę; tę samą figurę z fleet.json pokazuje Centrala HQ (Jak działa usługa).
 Stopka „Made with ISO-GLOW”: zostaje na naszych materiałach, --bez-stopki na pracach dla klientów (atrybucja
 licencji jest w docs/SOURCES.md i w LICENSE skilla).
 """
@@ -71,6 +71,7 @@ KADR_CSS = """
   :root[data-kadr] figure { height:100%; display:flex; flex-direction:column; gap:1.2vmin; padding:4vmin;
     border:0; border-radius:0; background:transparent; font-size:max(13px, 1.7vmin); }
   :root[data-kadr]:not([data-podpis]) .cap { display:none; }
+  :root[data-kadr] #hint { display:none; }   /* podpis w kadrze = „Rys. N · nazwa” i odczyt; podpowiedź tylko na stronie */
   :root[data-kadr] #stageHolder { aspect-ratio:auto; flex:1; min-height:0; }
   :root[data-tlo="0"] { color-scheme:normal; }
   :root[data-tlo="0"], :root[data-tlo="0"] body { background:transparent; }
