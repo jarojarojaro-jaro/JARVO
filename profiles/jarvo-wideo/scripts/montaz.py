@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Montaż nagrań: cięcie fragmentów, kadr pod format (9:16 z poziomego), usuwanie ciszy, głośność, czysty głos, transkrypcja.
+"""Montaż nagrań: cięcie fragmentów, kadr pod format (9:16 z poziomego), usuwanie ciszy, głośność, czysty głos,
+stabilizacja nagrań z ręki, transkrypcja.
 
     python3 montaz.py wytnij nagranie.mp4 -o klip.mp4 --zakresy "0:12.5-0:41,1:10-1:32.4"
     python3 montaz.py kadr nagranie.mp4 -o pion.mp4 --format 9:16 [--x 0.5] [--tryb przytnij|rozmyte]
     python3 montaz.py cisza nagranie.mp4 -o bez-ciszy.mp4 [--prog -35] [--min 0.5] [--zapas 0.12]
     python3 montaz.py glosnosc film.mp4 -o film-14lufs.mp4 [--lufs -14]
     python3 montaz.py glos nagranie.mp4 -o czysty.mp4 [--poziom auto|lekki|sredni|mocny]
+    python3 montaz.py stabilizuj nagranie.mp4 -o stabilne.mp4 [--sila lekka|srednia|mocna] [--statyw] [--zoom 0]
+    python3 montaz.py stabilizuj nagranie.mp4 --tylko-pomiar   # samo drżenie kamery (czy stabilizować)
     python3 montaz.py transkrypcja nagranie.mp4 [-o out/wideo/transkrypcja] [--co 20]
     python3 montaz.py napraw film.mp4 -o film-ok.mp4       # yuv420p/zakres TV/faststart po silnikach zewnętrznych
 
@@ -15,6 +18,9 @@ na rozmytym tle (dobre do slajdów i nagrań ekranu). glosnosc: dwa przejścia l
 limiter szczytów (true peak ≤ −1).
 glos: czysty głos jak w edytorze HQ (edytor.glos_filter: dudnienie, syczenie, szum, ciszej w pauzach, wyrównanie);
 auto = poziom z tła nagrania; obraz kopiowany bez zmian. Potem glosnosc (kompresor zmienia głośność).
+stabilizuj: dwa przejścia vidstab (ruch kamery → wygładzona droga, kadr lekko powiększony bez czarnych brzegów),
+4K zmniejszone do 1080p; drżenie przed i po (% szerokości kadru) z tego samego pomiaru. Na całym nagraniu przed
+cięciem (cięcie w środku psuje wygładzanie). --statyw: kamera ma stać w miejscu (bez panoram). Bez vidstab: deshake.
 wytnij i cisza wypisują `ciecia`: chwile cięć w gotowym pliku (do `krytyka.py ciecia --czasy`).
 transkrypcja: Parakeet (jarvo-stt) → słowa z czasem (JSON) + tekst z czasami co --co sekund (do wyboru fragmentów).
 """
@@ -22,10 +28,14 @@ transkrypcja: Parakeet (jarvo-stt) → słowa z czasem (JSON) + tekst z czasami 
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
+import math
 import re
+import statistics
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -184,6 +194,110 @@ def fix(src: Path, out: Path) -> Path:
     return out
 
 
+# Stabilizacja nagrań z ręki: za kajisho5/ffmpeg-skill (MIT, stabilize.py: dwa przejścia vidstab), z naszym pomiarem
+STAB = {"lekka": (4, 10), "srednia": (6, 15), "mocna": (9, 30)}   # siła → (shakiness detekcji, wygładzanie ± klatek)
+DESHAKE = {"lekka": 16, "srednia": 32, "mocna": 64}              # bez vidstab: zasięg ruchu deshake (px)
+STAB_MAX = 1920                     # dłuższy bok: 4K z telefonu → 1080p (kilka razy szybciej, platformy i tak 1080p)
+POMIAR_SZER = 640                   # pomiar drżenia na kopii tej szerokości (przed i po tak samo)
+ODSTRZ = "unsharp=5:5:0.8:3:3:0.4"  # powiększenie kadru zmiękcza obraz (dwuliniowo + to: 2× szybciej niż bicubic)
+
+
+def ma_vidstab() -> bool:
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True)
+    return "vidstabdetect" in r.stdout and "vidstabtransform" in r.stdout
+
+
+def ruch_z_trf(tekst: str) -> list[tuple[float, float]]:
+    """Ruch obrazu klatka do klatki (px) z pliku vidstabdetect (ASCII): mediana ruchów lokalnych `LM vx vy`
+    (mediana pomija ruch osób i rzeczy w kadrze); klatka bez pól pomiaru = bez ruchu."""
+    out = []
+    for line in tekst.splitlines():
+        if not line.startswith("Frame "):
+            continue
+        lm = re.findall(r"\(LM (-?\d+) (-?\d+) ", line)
+        out.append((statistics.median(int(x) for x, _ in lm), statistics.median(int(y) for _, y in lm))
+                   if lm else (0.0, 0.0))
+    return out
+
+
+def drzenie_z_ruchu(ruch: list[tuple[float, float]], szer: int, okno: int = 15) -> float:
+    """Drżenie kamery w % szerokości kadru: średnia odległość drogi kamery (suma ruchów) od jej wygładzenia
+    (średnia z ±`okno` klatek, przy brzegach okno symetrycznie mniejsze). Płynna panorama i najazd zostają
+    w wygładzeniu, drżenie ręki nie."""
+    if len(ruch) < 3 or szer <= 0:
+        return 0.0
+    xs = list(itertools.accumulate(dx for dx, _ in ruch))
+    ys = list(itertools.accumulate(dy for _, dy in ruch))
+    n, odl = len(xs), []
+    for i in range(n):
+        k = min(okno, i, n - 1 - i)
+        sx, sy = sum(xs[i - k:i + k + 1]) / (2 * k + 1), sum(ys[i - k:i + k + 1]) / (2 * k + 1)
+        odl.append(math.hypot(xs[i] - sx, ys[i] - sy))
+    return round(100 * sum(odl) / n / szer, 3)
+
+
+def drzenie(path: Path) -> float:
+    """Drżenie nagrania (`drzenie_z_ruchu`) z vidstabdetect na kopii szerokości POMIAR_SZER."""
+    with tempfile.TemporaryDirectory() as tmp:     # plik ruchu w katalogu roboczym: ścieżka bez cytowania w filtrze
+        wl.run(["ffmpeg", "-i", str(Path(path).resolve()), "-vf",
+                f"scale={POMIAR_SZER}:-2,vidstabdetect=shakiness=8:result=ruch.trf", "-an", "-f", "null", "-"],
+               cwd=Path(tmp))
+        return drzenie_z_ruchu(ruch_z_trf((Path(tmp) / "ruch.trf").read_text()), POMIAR_SZER)
+
+
+def rada_drzenia(proc: float) -> str:
+    """Siła z drżenia (% szerokości; progi z nagrań testowych: statyw 0, lekko 0,3, z ręki 0,8, mocno 2,3)."""
+    if proc < 0.15:
+        return "stabilne: nie stabilizuj"
+    if proc < 0.5:
+        return "lekkie drżenie: --sila lekka"
+    return "z ręki: --sila srednia" if proc < 1.5 else "mocno trzęsie: --sila mocna"
+
+
+def stabilize(src: Path, out: Path, sila: str, statyw: bool = False, zoom: float = 0.0,
+              pomiar: bool = True) -> tuple[Path, dict]:
+    v = wl.probe(src).get("video")
+    if not v:
+        raise SystemExit("Plik bez obrazu.")
+    w, h = int(v["width"]), int(v["height"])
+    skala = ""
+    if max(w, h) > STAB_MAX:
+        k = STAB_MAX / max(w, h)
+        w, h = round(w * k / 2) * 2, round(h * k / 2) * 2
+        skala = f"scale={w}:{h}:flags=lanczos"
+    vidstab = ma_vidstab()
+    przed = drzenie(src) if pomiar and vidstab else None
+    sdr = wl.sdr(src)                  # HDR → zwykły obraz przed vidstab (inaczej ffmpeg tnie 10 bitów na ślepo)
+    statyw_opt = ":tripod=1" if statyw else ""
+    out = out.resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        if vidstab:
+            shak, wygl = STAB[sila]
+            wl.run(["ffmpeg", "-i", str(src.resolve()), "-vf",
+                    ",".join(x for x in (skala, f"vidstabdetect=shakiness={shak}:accuracy=15:result=ruch.trf{statyw_opt}")
+                             if x), "-an", "-f", "null", "-"], cwd=Path(tmp))
+            ruch = (f"vidstabtransform=input=ruch.trf:smoothing={wygl}:optzoom=1:zoom={zoom:g}:interpol=bilinear"
+                    f"{statyw_opt}")
+        else:
+            r = DESHAKE[sila]
+            ruch = f"deshake=rx={r}:ry={r}"
+        vf = ",".join(x for x in (skala, sdr, ruch, ODSTRZ, wl.TV_RANGE) if x)
+        wl.run(["ffmpeg", "-y", "-i", str(src.resolve()), "-vf", vf, "-map", "0:v:0", "-map", "0:a:0?", *ENC, str(out)],
+               cwd=Path(tmp))
+    stats = {"sila": sila, "metoda": "vidstab" if vidstab else "deshake", "statyw": statyw, "rozmiar": f"{w}x{h}",
+             "sek": round(wl.duration(out), 2)}
+    if przed is not None:
+        po = drzenie(out)
+        stats.update(drzenie_przed_proc=przed, drzenie_po_proc=po)
+        if przed < 0.15:
+            stats["uwaga"] = "nagranie było prawie stabilne: zostaw oryginał, powiększenie kadru nic nie daje"
+        elif po > 0.7 * przed:
+            stats["uwaga"] = ("drżenie spadło mało: obejrzyj (to może być ruch osoby, nie kamery); "
+                              "spróbuj --sila mocna albo --statyw")
+    return out, stats
+
+
 def transcript(src: Path, outbase: Path, every: float) -> dict:
     words = wl.transcribe_words(src)
     outbase.parent.mkdir(parents=True, exist_ok=True)
@@ -233,6 +347,15 @@ def main(argv: list[str] | None = None) -> int:
     n = sub.add_parser("napraw", help="yuv420p (zakres TV), H.264, AAC, faststart: dla filmów z lemo/anidoodle/HyperFrames")
     n.add_argument("plik")
     n.add_argument("-o", required=True)
+    st = sub.add_parser("stabilizuj", help="nagranie z ręki: dwa przejścia vidstab, drżenie przed i po")
+    st.add_argument("plik")
+    st.add_argument("-o", default=None)
+    st.add_argument("--sila", choices=list(STAB), default="srednia",
+                    help="lekka = lekko drży, srednia = z ręki, mocna = w marszu, z auta")
+    st.add_argument("--statyw", action="store_true", help="kamera ma stać w miejscu (bez panoram i najazdów)")
+    st.add_argument("--zoom", type=float, default=0.0, help="dodatkowe powiększenie w %% (ponad samo ukrycie brzegów)")
+    st.add_argument("--tylko-pomiar", action="store_true", help="tylko drżenie kamery, bez stabilizacji")
+    st.add_argument("--bez-pomiaru", action="store_true", help="bez pomiaru drżenia przed i po (szybciej)")
     t = sub.add_parser("transkrypcja")
     t.add_argument("plik")
     t.add_argument("-o", default=None, help="baza nazwy wyników (domyślnie obok nagrania)")
@@ -259,6 +382,17 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
         elif args.cmd == "glos":
             out, stats = voice(src, Path(args.o), args.poziom)
+            print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
+        elif args.cmd == "stabilizuj":
+            if args.tylko_pomiar:
+                if not ma_vidstab():
+                    raise SystemExit("FFmpeg bez vidstab: pomiar drżenia niedostępny.")
+                proc = drzenie(src)
+                print(json.dumps({"plik": str(src), "drzenie_proc": proc, "rada": rada_drzenia(proc)}, ensure_ascii=False))
+                return 0
+            if not args.o:
+                raise SystemExit("Podaj -o <wynik> (albo --tylko-pomiar).")
+            out, stats = stabilize(src, Path(args.o), args.sila, args.statyw, max(0.0, args.zoom), not args.bez_pomiaru)
             print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
         elif args.cmd == "napraw":
             out = fix(src, Path(args.o))

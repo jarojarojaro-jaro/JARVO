@@ -217,6 +217,94 @@ def test_montaz_time_parsing():
         montaz.parse_ranges("10-5")
 
 
+TRF = """VID.STAB 1
+#      accuracy = 15
+Frame 1 (List 0 [])
+Frame 2 (List 3 [(LM 4 -2 293 81 48 0.68 1.29),(LM 5 -1 558 147 48 0.26 0.74),(LM 40 30 346 81 48 0.55 1.27)])
+Frame 3 (List 2 [(LM -3 2 293 81 48 0.68 1.29),(LM -1 0 558 147 48 0.26 0.74)])
+"""
+
+
+def test_montaz_ruch_z_trf_mediana_pomija_obiekty():
+    # mediana ruchów lokalnych: jedno pole z ruchem osoby (40, 30) nie zmienia ruchu kamery
+    assert montaz.ruch_z_trf(TRF) == [(0.0, 0.0), (5, -1), (-2.0, 1.0)]
+
+
+def test_montaz_drzenie_panorama_zero_reka_wiecej():
+    panorama = [(3.0, 0.0)] * 120                                     # płynna panorama: nie drżenie
+    assert montaz.drzenie_z_ruchu(panorama, 640) == pytest.approx(0.0, abs=1e-9)
+    reka = [(6.0 * (-1) ** i, 4.0 * (-1) ** (i // 2)) for i in range(120)]
+    pan_reka = [(3.0 + dx, dy) for dx, dy in reka]
+    assert montaz.drzenie_z_ruchu(reka, 640) > 0.3
+    assert montaz.drzenie_z_ruchu(pan_reka, 640) == pytest.approx(montaz.drzenie_z_ruchu(reka, 640), rel=0.05)
+    assert montaz.drzenie_z_ruchu(reka, 1280) == pytest.approx(montaz.drzenie_z_ruchu(reka, 640) / 2, rel=0.01)
+    assert montaz.drzenie_z_ruchu([(9.0, 9.0)], 640) == 0.0
+    assert [montaz.rada_drzenia(x).split(":")[0] for x in (0.05, 0.3, 0.8, 2.3)] == \
+        ["stabilne", "lekkie drżenie", "z ręki", "mocno trzęsie"]
+
+
+def _stab_atrapa(monkeypatch, vidstab, w=3840, h=2160, przed=0.9, po=0.05):
+    wywolane = []
+    monkeypatch.setattr(montaz, "ma_vidstab", lambda: vidstab)
+    monkeypatch.setattr(montaz.wl, "probe", lambda p: {"video": {"width": w, "height": h}, "audio": None})
+    monkeypatch.setattr(montaz.wl, "sdr", lambda p: "zscale=t=bt709")
+    monkeypatch.setattr(montaz.wl, "duration", lambda p: 4.0)
+    monkeypatch.setattr(montaz.wl, "run", lambda cmd, *a, **k: wywolane.append((cmd, k.get("cwd"))))
+    pomiary = iter([przed, po])
+    monkeypatch.setattr(montaz, "drzenie", lambda p: next(pomiary))
+    return wywolane
+
+
+def test_montaz_stabilizuj_dwa_przejscia_vidstab(tmp_path, monkeypatch):
+    wywolane = _stab_atrapa(monkeypatch, vidstab=True)
+    out, info = montaz.stabilize(tmp_path / "a.mp4", tmp_path / "w" / "b.mp4", "mocna", statyw=True, zoom=2)
+    (det, cwd1), (enc, cwd2) = wywolane
+    vf1, vf2 = det[det.index("-vf") + 1], enc[enc.index("-vf") + 1]
+    # plik ruchu we wspólnym katalogu roboczym obu przejść (ścieżka bez cytowania w filtrze)
+    assert cwd1 == cwd2 and "result=ruch.trf" in vf1 and "input=ruch.trf" in vf2
+    assert vf1 == "scale=1920:1080:flags=lanczos,vidstabdetect=shakiness=9:accuracy=15:result=ruch.trf:tripod=1"
+    assert [f.split("=")[0] for f in vf2.split(",")] == \
+        ["scale", "zscale", "vidstabtransform", "unsharp", "scale", "format"]     # 4K → 1080p, HDR przed vidstab
+    assert "smoothing=30:optzoom=1:zoom=2" in vf2 and vf2.endswith(montaz.wl.TV_RANGE) and ":tripod=1" in vf2
+    assert enc[enc.index("-map") + 1] == "0:v:0" and "0:a:0?" in enc and (tmp_path / "w").is_dir()
+    assert info == {"sila": "mocna", "metoda": "vidstab", "statyw": True, "rozmiar": "1920x1080", "sek": 4.0,
+                    "drzenie_przed_proc": 0.9, "drzenie_po_proc": 0.05}
+
+
+def test_montaz_stabilizuj_uwagi_i_deshake(tmp_path, monkeypatch):
+    _stab_atrapa(monkeypatch, vidstab=True, w=1080, h=1920, przed=0.1, po=0.1)
+    _, info = montaz.stabilize(tmp_path / "a.mp4", tmp_path / "b.mp4", "lekka")
+    assert info["rozmiar"] == "1080x1920" and "prawie stabilne" in info["uwaga"]
+    _stab_atrapa(monkeypatch, vidstab=True, w=1080, h=1920, przed=1.0, po=0.8)
+    assert "spadło mało" in montaz.stabilize(tmp_path / "a.mp4", tmp_path / "b.mp4", "srednia")[1]["uwaga"]
+    wywolane = _stab_atrapa(monkeypatch, vidstab=False, w=1280, h=720)
+    _, info = montaz.stabilize(tmp_path / "a.mp4", tmp_path / "b.mp4", "srednia")
+    (enc, _), = wywolane                                                   # jedno przejście, bez pomiaru
+    assert enc[enc.index("-vf") + 1].split(",")[:2] == ["zscale=t=bt709", "deshake=rx=32:ry=32"]
+    assert info["metoda"] == "deshake" and "drzenie_przed_proc" not in info
+
+
+@needs_ffmpeg
+def test_montaz_stabilizuj_nagranie_z_reki(tmp_path):
+    """Prawdziwy ffmpeg: drżący kadr ze zdjęcia → tyle samo sekund, dźwięk zostaje; na Linuksie drżenie
+    wyraźnie spada (libvidstab na innych systemach liczy inaczej: tam tylko, że narzędzie zadziałało)."""
+    if not montaz.ma_vidstab():
+        pytest.skip("ffmpeg bez vidstab")
+    zdj, src, out = tmp_path / "z.png", tmp_path / "reka.mp4", tmp_path / "stab.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=960x540", "-frames:v", "1",
+                    str(zdj)], check=True)
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-loop", "1", "-framerate", "30", "-i", str(zdj), "-f", "lavfi",
+                    "-i", "sine=f=440:sample_rate=48000", "-vf",
+                    "crop=840:472:60+14*sin(n*1.1)+9*sin(n*2.3):34+11*cos(n*1.5),scale=640:360,format=yuv420p",
+                    "-t", "3", "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", str(src)], check=True)
+    assert montaz.main(["stabilizuj", str(src), "-o", str(out), "--sila", "srednia"]) == 0
+    info = montaz.wl.probe(out)
+    assert abs(info["duration"] - 3.0) < 0.2 and info["audio"] and info["video"]["pix_fmt"] == "yuv420p"
+    if sys.platform.startswith("linux"):
+        przed, po = montaz.drzenie(src), montaz.drzenie(out)
+        assert przed > 0.3 and po < przed / 2
+
+
 def test_montaz_glosnosc_limiter_true_peak(tmp_path, monkeypatch):
     """glosnosc: po loudnorm (192 kHz) limiter −2 dBFS, dopiero potem 48 kHz i AAC: szczyty między próbkami też
     zostają pod progiem qa_wideo (true peak ≤ −1). Bez niego film z kodu podniesiony z −16 do −14 LUFS miał +0,2 dBFS."""
