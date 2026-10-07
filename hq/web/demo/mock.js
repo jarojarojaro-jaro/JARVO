@@ -386,6 +386,20 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
     reset: async (name) => { S.chats[name] = []; return { ok: true }; },
     retry: async () => ({ ok: true }),
     upload: async (file) => ({ path: `/opt/data/jarvo/inbox/demo/${file.name}`, name: file.name, rel: file.name, size: file.size, kind: /^image\//.test(file.type) ? "image" : "other" }),
+    // konwerter w Centrali: w demo widać cele, ale zamiana działa tylko w instalacji (na serwerze)
+    konwUpload: async (file, onProgress) => { if (onProgress) onProgress(1); return { path: `/opt/data/jarvo/inbox/demo/${file.name}`, name: file.name, size: file.size, kind: "other" }; },
+    konwCele: async (path) => {
+      const ext = (path.split(".").pop() || "").toLowerCase();
+      const C = (format, grupa, nazwa, opis) => ({ format, grupa, nazwa, opis, kroki: 1, trasa: [`${ext}→${format}`] });
+      const cele = /^(jpe?g|png|webp|heic|avif|gif)$/.test(ext)
+        ? [C("jpg", "obraz", "JPG", "zdjęcia, mały plik"), C("png", "obraz", "PNG", "bez strat"), C("webp", "obraz", "WebP", "mały, na strony"), C("pdf", "pdf", "PDF", "do druku i wysyłki")]
+        : /^(mp4|mov|webm|mkv)$/.test(ext)
+          ? [C("mp4", "wideo", "MP4", "działa wszędzie"), C("gif", "obraz", "GIF", "animacja"), C("mp3", "audio", "MP3", "działa wszędzie")]
+          : [C("pdf", "pdf", "PDF", "do druku i wysyłki"), C("txt", "tekst", "TXT", "sam tekst")];
+      return { path, name: path.split("/").pop(), size: 0, format: ext, nazwa: ext.toUpperCase(), grupa: "obraz", cele: cele.filter((c) => c.format !== ext) };
+    },
+    konwStart: async () => { throw new Error("W trybie demo zamiana nie działa: konwerter pracuje na serwerze lokalnej instalacji Jarva."); },
+    konwJob: async () => ({ state: "error", error: "demo" }),
     site: async () => ({ url: URL.createObjectURL(new Blob([SAMPLE_SITE], { type: "text/html" })) }),
     reveal: async () => { throw new Error("W trybie demo nie ma hosta: folder otwiera się w lokalnej instalacji."); },
     host: async () => ({ explorer: false, preview: true, data_win: "\\\\wsl.localhost\\Ubuntu\\home\\ty\\jarvo-local\\data\\hermes" }),

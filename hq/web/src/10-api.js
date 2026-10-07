@@ -69,6 +69,37 @@ const liveApi = {
     });
     return res.json();
   },
+  // konwerter w Centrali: wysyłka z postępem (XHR; fetch nie mówi, ile już poszło), cele, zadanie w tle
+  konwUpload(file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${basePath()}${API_ROOT}/konwerter/upload`);
+      xhr.withCredentials = true;
+      const h = authHeaders({ "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name || "plik") });
+      Object.entries(h).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+      xhr.onload = () => {
+        let body = null;
+        try { body = JSON.parse(xhr.responseText); } catch (_) { /* nie-JSON */ }
+        if (xhr.status >= 200 && xhr.status < 300 && body) resolve(body);
+        else reject(new Error((body && (body.detail || body.error)) || `HTTP ${xhr.status}`));
+      };
+      xhr.onerror = () => reject(new Error(L("Wysyłka przerwana", "Upload interrupted")));
+      xhr.send(file);
+    });
+  },
+  async konwCele(path) {
+    const res = await rawFetch(`${API_ROOT}/konwerter/cele?path=${encodeURIComponent(path)}`);
+    return res.json();
+  },
+  async konwStart(body) {
+    const res = await rawFetch(`${API_ROOT}/konwerter`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    return res.json();
+  },
+  async konwJob(id) {
+    const res = await rawFetch(`${API_ROOT}/konwerter/job/${encodeURIComponent(id)}`);
+    return res.json();
+  },
   site: (path) => SDK.fetchJSON(`${API_ROOT}/site`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
   android: () => SDK.fetchJSON(`${API_ROOT}/android`, { method: "POST" }),
   reveal: (path) => SDK.fetchJSON(`${API_ROOT}/reveal`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),

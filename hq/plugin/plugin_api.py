@@ -1548,9 +1548,8 @@ async def chat_send(name: str, request: Request):
                                       "X-Jarvo-HQ-Session": sid})
 
 
-@router.post("/upload")
-async def upload(request: Request):
-    """Plik z czatu HQ (wklejony, przeciągnięty, z 📎) → /opt/data/jarvo/inbox/<data>/<nazwa>."""
+async def _przyjmij(request: Request, limit: int) -> dict:
+    """Plik z przeglądarki strumieniem → /opt/data/jarvo/inbox/<data>/<nazwa> (nazwa z X-File-Name, oczyszczona)."""
     from urllib.parse import unquote
 
     inbox = core.JARVO_DIR / "inbox"
@@ -1562,8 +1561,8 @@ async def upload(request: Request):
         with tmp.open("wb") as f:
             async for chunk in request.stream():
                 size += len(chunk)
-                if size > core.UPLOAD_MAX:
-                    raise HTTPException(413, f"Plik większy niż {core.UPLOAD_MAX // 2**20} MB")
+                if size > limit:
+                    raise HTTPException(413, f"Plik większy niż {limit // 2**20} MB")
                 f.write(chunk)
         if not size:
             raise HTTPException(400, "Pusty plik")
@@ -1571,6 +1570,140 @@ async def upload(request: Request):
     finally:
         tmp.unlink(missing_ok=True)
     return core.file_entry(target, inbox)
+
+
+@router.post("/upload")
+async def upload(request: Request):
+    """Plik z czatu HQ (wklejony, przeciągnięty, z 📎) → inbox; limit jak dla załącznika rozmowy."""
+    return await _przyjmij(request, core.UPLOAD_MAX)
+
+
+# ------------------------------------------------------------------ konwerter plików (Centrala)
+# Ten sam konwertuj.py co wspólny skill floty `konwersja-plikow` (hqbuild kopiuje go obok; w repo czytany
+# z shared/skills). Plik z HQ → inbox (do 2 GB), wynik w inbox/<data>/konwerter/, pobranie przez /file?download.
+# Zamiana w wątku, jedna naraz (film potrafi zająć cały procesor); następne czekają w kolejce.
+import dataclasses  # noqa: E402
+import threading  # noqa: E402
+
+_KONW_PLIK = next((p for p in (_HERE / "konwertuj.py",
+                               _HERE.parents[1] / "shared" / "skills" / "konwersja-plikow" / "scripts" / "konwertuj.py")
+                   if p.is_file()), None)
+konw = _load("jarvo_hq_konwertuj", str(_KONW_PLIK)) if _KONW_PLIK else None   # ścieżka absolutna: _HERE / abs = abs
+_konw = sys.modules.setdefault("jarvo_hq_konw_state", type(sys)("jarvo_hq_konw_state"))
+if not hasattr(_konw, "jobs"):
+    _konw.jobs = {}
+    _konw.lock = threading.Lock()
+
+
+def _konwerter():
+    if konw is None:
+        raise HTTPException(503, "Konwerter niedostępny: brak konwertuj.py w pluginie (przebuduj HQ).")
+    return konw
+
+
+def _konw_zrodlo(raw: str) -> Path:
+    p = core.safe_path(str(raw or ""), ROOTS)
+    if p is None:
+        raise HTTPException(404, f"Nie ma pliku w katalogach floty: {Path(str(raw or '')).name}")
+    return p
+
+
+@router.post("/konwerter/upload")
+async def konwerter_upload(request: Request):
+    return await _przyjmij(request, core.KONWERTER_MAX)
+
+
+@router.get("/konwerter/cele")
+async def konwerter_cele(path: str):
+    """Na co da się zamienić plik: cele pogrupowane (obraz, wideo, audio, pdf…) według silników w obrazie."""
+    k = _konwerter()
+    p = _konw_zrodlo(path)
+    try:
+        fmt = k.format_pliku(p)
+        cele = await asyncio.to_thread(k.cele, fmt)
+    except k.Blad as exc:
+        raise HTTPException(400, core.konwerter_blad(str(exc)))
+    return {"path": str(p), "name": p.name, "size": p.stat().st_size, "format": fmt, "nazwa": k.FORMATY[fmt][1],
+            "grupa": k.FORMATY[fmt][0], "cele": cele}
+
+
+def _konwertuj_wszystko(job: dict, k, srcs: list[Path], na: str, opt, polacz: bool, out_dir: Path) -> dict:
+    with _konw.lock:
+        job["state"], job["started"] = "running", time.time()
+        inbox = core.JARVO_DIR / "inbox"
+        wyniki, bledy = [], []
+        if polacz:
+            wyniki.append(k.polacz(srcs, k.wolna_sciezka(out_dir / f"{srcs[0].stem}-razem.pdf"), opt))
+        else:
+            for s in srcs:
+                try:
+                    wyniki.append(k.konwertuj(s, na, katalog=out_dir, opt=dataclasses.replace(opt, zasoby=None)))
+                except k.Blad as exc:
+                    if len(srcs) == 1:
+                        raise
+                    bledy.append({"name": s.name, "error": core.konwerter_blad(str(exc))})
+        pliki = [Path(p) for w in wyniki for p in w["pliki"]]
+        if not pliki:
+            raise k.Blad(bledy[0]["error"] if bledy else "Nic nie powstało.")
+        paczka = None
+        if len(pliki) > 1:
+            nazwa = f"{srcs[0].stem}-{'pdf' if polacz else na}.zip"
+            paczka = core.file_entry(core.spakuj(pliki, out_dir / nazwa), inbox)
+        return {"files": [core.file_entry(p, inbox) for p in pliki], "zip": paczka, "errors": bledy,
+                "route": wyniki[0]["trasa"], "before": sum(w["rozmiar_przed"] for w in wyniki),
+                "after": sum(w["rozmiar_po"] for w in wyniki),
+                "note": next((w["uwaga"] for w in wyniki if w.get("uwaga")), None)}
+
+
+async def _run_konwersja(job: dict, *args) -> None:
+    try:
+        job.update(await asyncio.to_thread(_konwertuj_wszystko, job, *args))
+        job["state"] = "done"
+    except Exception as exc:   # Blad konwertera = opis po polsku; inny błąd też pokazujemy zamiast wisieć
+        job["state"], job["error"] = "error", core.konwerter_blad(str(exc)) or exc.__class__.__name__
+    finally:
+        job["ended"] = time.time()
+
+
+@router.post("/konwerter")
+async def konwerter_start(request: Request):
+    """{paths: [...], na: "pdf", jakosc?, rozmiar?, strony?, dpi?, polacz?} → zadanie w tle (stan: /konwerter/job/<id>)."""
+    k = _konwerter()
+    body = await request.json()
+    paths = body.get("paths")
+    if not isinstance(paths, list) or not 1 <= len(paths) <= core.KONWERTER_PLIKOW:
+        raise HTTPException(400, f"Podaj od 1 do {core.KONWERTER_PLIKOW} plików")
+    srcs = [_konw_zrodlo(x) for x in paths]
+    polacz = bool(body.get("polacz"))
+    na = "pdf" if polacz else k.norm(str(body.get("na") or ""))
+    try:
+        opt = k.Opcje(**core.konwerter_opcje(body))
+        if na not in k.FORMATY:
+            raise k.Blad(f"Nie znam formatu „{na}”")
+        if polacz and len(srcs) < 2:
+            raise k.Blad("Do łączenia potrzeba co najmniej dwóch plików.")
+        k.parse_rozmiar(opt.rozmiar)
+        k.strony_lista(opt.strony, None)
+    except (ValueError, k.Blad) as exc:
+        raise HTTPException(400, core.konwerter_blad(str(exc)))
+    for jid in [x for x, j in _konw.jobs.items() if j.get("ended") and time.time() - j["ended"] > 3600]:
+        _konw.jobs.pop(jid, None)
+    import uuid
+
+    jid = uuid.uuid4().hex[:12]
+    job = {"id": jid, "state": "queued", "created": time.time(), "na": na, "names": [p.name for p in srcs]}
+    _konw.jobs[jid] = job
+    out_dir = core.konwerter_katalog(core.JARVO_DIR / "inbox", time.time())
+    job["task"] = asyncio.create_task(_run_konwersja(job, k, srcs, na, opt, polacz, out_dir))
+    return _job_view(job)
+
+
+@router.get("/konwerter/job/{jid}")
+async def konwerter_job(jid: str):
+    job = _konw.jobs.get(jid)
+    if not job:
+        raise HTTPException(404, "Nie ma takiej zamiany")
+    return _job_view(job)
 
 
 @router.post("/chat/{name}/reset")

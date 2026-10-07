@@ -18,6 +18,7 @@ import re
 import sqlite3
 import sys
 import time
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -614,6 +615,67 @@ def upload_target(inbox: Path, raw_name: str | None, now: float) -> Path:
         n += 1
         p = day / (f"{stem}-{n}.{ext}" if ext else f"{stem}-{n}")
     return p
+
+
+# ------------------------------------------------------------------------- konwerter plików (Centrala)
+KONWERTER_MAX = 2 * 2**30      # film z telefonu bywa duży; plik idzie strumieniem na dysk, nie do pamięci
+KONWERTER_PLIKOW = 50          # najwięcej plików w jednej zamianie (partia albo łączenie w PDF)
+ZIP_BEZ_KOMPRESJI = {".jpg", ".jpeg", ".png", ".webp", ".avif", ".heic", ".gif", ".mp4", ".mov", ".webm", ".mkv",
+                     ".mp3", ".m4a", ".aac", ".ogg", ".opus", ".flac", ".docx", ".odt", ".xlsx", ".pptx", ".epub", ".zip"}
+
+
+def konwerter_katalog(inbox: Path, now: float) -> Path:
+    """Wyniki konwertera HQ: inbox/<data>/konwerter/ (obok plików wrzuconych tego dnia, w katalogach podglądu)."""
+    return inbox / time.strftime("%Y-%m-%d", time.localtime(now)) / "konwerter"
+
+
+def spakuj(pliki: list[Path], dst: Path) -> Path:
+    """Kilka wyników (np. strony PDF jako obrazy) → jeden ZIP do pobrania; nazwy w archiwum bez katalogów,
+    pliki już skompresowane (zdjęcia, filmy, DOCX) bez ponownej kompresji. Istniejącego ZIP-a nie nadpisuje."""
+    n, cel = 2, dst
+    while cel.exists():
+        cel = dst.with_name(f"{dst.stem}-{n}{dst.suffix}")
+        n += 1
+    uzyte: set[str] = set()
+    with zipfile.ZipFile(cel, "w") as z:
+        for p in pliki:
+            nazwa, i = p.name, 2
+            while nazwa in uzyte:
+                nazwa = f"{p.stem}-{i}{p.suffix}"
+                i += 1
+            uzyte.add(nazwa)
+            z.write(p, nazwa, compress_type=zipfile.ZIP_STORED if p.suffix.lower() in ZIP_BEZ_KOMPRESJI else zipfile.ZIP_DEFLATED)
+    return cel
+
+
+def konwerter_opcje(body: dict) -> dict:
+    """Opcje zamiany z HQ → argumenty Opcje konwertuj.py (jakość 1–100, rozmiar, strony, dpi); błąd = ValueError."""
+    out: dict = {}
+    if body.get("jakosc") not in (None, ""):
+        q = int(body["jakosc"])
+        if not 1 <= q <= 100:
+            raise ValueError("Jakość od 1 do 100")
+        out["jakosc"] = q
+    for k in ("rozmiar", "strony"):
+        v = str(body.get(k) or "").strip()
+        if len(v) > 40:
+            raise ValueError(f"Za długie pole {k}")
+        if v:
+            out[k] = v
+    if body.get("dpi") not in (None, ""):
+        out["dpi"] = max(36, min(600, int(body["dpi"])))
+    return out
+
+
+KONWERTER_FLAGI = ((r"\s*Formaty: python3 konwertuj\.py --formaty", ""), (r"--na (\w+)", lambda m: f"format {m[1].upper()}"),
+                   (r"--strony", "strony"), (r"--rozmiar", "rozmiar"), (r"--jakosc", "jakość"), (r"\s*\(-o\)", ""))
+
+
+def konwerter_blad(msg: str) -> str:
+    """Komunikat konwertuj.py (pisany dla agenta, z flagami CLI) → tekst dla właściciela w HQ."""
+    for wzor, na in KONWERTER_FLAGI:
+        msg = re.sub(wzor, na, msg)
+    return msg
 
 
 def file_entry(p: Path, base: Path | None = None) -> dict:

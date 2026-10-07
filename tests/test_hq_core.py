@@ -261,7 +261,7 @@ def test_hq_plugin_build(tmp_path):
     import hqbuild
 
     dash = hqbuild.build_plugin(tmp_path / "jarvo-hq")
-    for rel in ("manifest.json", "plugin_api.py", "hq_core.py", "animacja.py", "pomiar.py", "fleet.json", "dist/index.js", "dist/style.css", "dist/LICENSE-htm"):
+    for rel in ("manifest.json", "plugin_api.py", "hq_core.py", "animacja.py", "pomiar.py", "konwertuj.py", "fleet.json", "dist/index.js", "dist/style.css", "dist/LICENSE-htm"):
         assert (dash / rel).exists(), rel
     manifest = json.loads((dash / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["name"] == "jarvo-hq" and manifest["api"] == "plugin_api.py" and manifest["tab"]["path"] == "/base" and manifest["tab"]["position"] == "before:chat"
@@ -500,6 +500,51 @@ def test_upload_names_and_targets(tmp_path):
     t1.parent.mkdir(parents=True)
     t1.write_bytes(b"x")
     assert core.upload_target(tmp_path, "foto.png", NOW).name == "foto-2.png"
+
+
+def test_konwerter_katalog_zip_i_opcje(tmp_path):
+    import zipfile
+    kat = core.konwerter_katalog(tmp_path, NOW)
+    assert kat.parent.parent == tmp_path and kat.name == "konwerter"         # inbox/<data>/konwerter (katalog podglądu)
+    kat.mkdir(parents=True)
+    (kat / "a").mkdir()
+    pliki = [kat / "umowa-01.png", kat / "umowa-02.png", kat / "a" / "umowa-01.png", kat / "notatka.txt"]
+    for p in pliki:
+        p.write_bytes(b"x" * 100)
+    z = core.spakuj(pliki, kat / "umowa-png.zip")
+    with zipfile.ZipFile(z) as zz:
+        assert zz.namelist() == ["umowa-01.png", "umowa-02.png", "umowa-01-2.png", "notatka.txt"]   # bez katalogów, bez zderzeń
+        assert zz.getinfo("umowa-01.png").compress_type == zipfile.ZIP_STORED
+        assert zz.getinfo("notatka.txt").compress_type == zipfile.ZIP_DEFLATED
+    assert core.spakuj(pliki[:1], kat / "umowa-png.zip").name == "umowa-png-2.zip"        # istniejący ZIP zostaje
+    assert core.konwerter_opcje({"jakosc": "75", "rozmiar": " 720p ", "strony": "", "dpi": 9999}) == \
+        {"jakosc": 75, "rozmiar": "720p", "dpi": 600}
+    assert core.konwerter_opcje({}) == {}
+    for zle in ({"jakosc": 0}, {"jakosc": "dużo"}, {"rozmiar": "x" * 41}):
+        with pytest.raises(ValueError):
+            core.konwerter_opcje(zle)
+
+
+def test_konwerter_bledy_bez_flag_cli():
+    assert core.konwerter_blad("Złe --strony „abc”: np. 1-3,5 albo 4-") == "Złe strony „abc”: np. 1-3,5 albo 4-"
+    assert core.konwerter_blad("Nie znam formatu „xyz”. Formaty: python3 konwertuj.py --formaty") == "Nie znam formatu „xyz”."
+    assert core.konwerter_blad("Z PDF nie zrobisz Worda: sam tekst daje --na txt.") == "Z PDF nie zrobisz Worda: sam tekst daje format TXT."
+    assert core.konwerter_blad("Żeby go zmniejszyć, podaj --rozmiar albo --jakosc.") == "Żeby go zmniejszyć, podaj rozmiar albo jakość."
+
+
+def test_konwerter_w_hq():
+    """Karta Konwerter w Centrali: te same trasy w pluginie i w przeglądarce, ten sam konwertuj.py co skill floty."""
+    root = Path(__file__).resolve().parent.parent
+    api = (root / "hq" / "plugin" / "plugin_api.py").read_text(encoding="utf-8")
+    for route in ('"/konwerter/upload"', '"/konwerter/cele"', '"/konwerter"', '"/konwerter/job/{jid}"'):
+        assert f"@router.{'get' if 'cele' in route or 'job' in route else 'post'}({route})" in api, route
+    assert "core.KONWERTER_MAX" in api and "_konw.lock" in api and "core.safe_path" in api
+    web = (root / "hq" / "web" / "src" / "10-api.js").read_text(encoding="utf-8")
+    for call in ("/konwerter/upload", "/konwerter/cele?path=", "/konwerter`", "/konwerter/job/"):
+        assert call in web, call
+    assert "<${Konwerter} onOpenFile=${onOpenFile}/>" in (root / "hq" / "web" / "src" / "60-hud.js").read_text(encoding="utf-8")
+    mock = (root / "hq" / "web" / "demo" / "mock.js").read_text(encoding="utf-8")
+    assert all(f"{m}:" in mock for m in ("konwUpload", "konwCele", "konwStart", "konwJob"))
 
 
 def test_compose_message_and_user_text():

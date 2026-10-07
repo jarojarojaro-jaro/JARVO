@@ -232,6 +232,19 @@
 .thq-center { gap: 0; overflow: auto; padding: 4px 16px 16px; }
 .thq-center section { padding-top: 12px; }
 .thq-h2 { display: flex; align-items: center; gap: 8px; font: 800 1.05rem/1.2 var(--thq-display); margin: 4px 0 8px; }
+/* konwerter plików w Centrali (55-konwerter.js) */
+.thq-konw.is-drop { outline: 2px dashed var(--thq-accent); outline-offset: 2px; border-radius: var(--thq-radius); }
+.thq-konw-drop { display: grid; gap: 2px; width: 100%; padding: 12px; text-align: left; border: 1px dashed var(--thq-line);
+  border-radius: var(--thq-radius); background: var(--thq-surface-2); font-size: 0.86rem; }
+.thq-konw-drop:hover { border-color: var(--thq-accent); }
+.thq-konw-stan { margin: 4px 0; font-size: 0.9rem; }
+.thq-konw-opcje { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 2px 0 8px; font-size: 0.8rem; color: var(--thq-muted); }
+.thq-konw-opcje select, .thq-konw-opcje input { font: inherit; color: var(--thq-ink); background: var(--thq-surface); border: 1px solid var(--thq-line); border-radius: 6px; padding: 2px 4px; }
+.thq-konw-grupa { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 0 0 6px; }
+.thq-konw-grupa > .thq-muted { min-width: 82px; font-size: 0.78rem; }
+.thq-konw-grupa .thq-act-btn { padding: 3px 9px; font-size: 0.8rem; }
+.thq-konw-lista li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.thq-konw-lista .thq-act-btn { margin-left: auto; padding: 2px 9px; font-size: 0.8rem; }
 .thq-h4 { display: flex; align-items: center; gap: 6px; font: 700 0.78rem/1 var(--thq-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--thq-muted); margin: 16px 0 8px; }
 .thq-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--thq-surface-2); font: 700 0.74rem var(--thq-mono); color: var(--thq-muted); letter-spacing: 0; }
 .thq-panel-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; }

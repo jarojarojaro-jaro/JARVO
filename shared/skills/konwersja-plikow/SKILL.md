@@ -1,7 +1,7 @@
 ---
 name: konwersja-plikow
 description: "Plik → inny format: zdjęcia, wideo, audio, PDF, Word."
-version: 1.0.0
+version: 1.0.1
 author: "Jarvo (wzór: convt; narzędzia: Pillow, FFmpeg, Ghostscript, qpdf, pandoc, Chromium, LibreOffice)"
 license: MIT
 metadata:
@@ -17,10 +17,11 @@ metadata:
 Człowiek (albo inny agent) potrzebuje pliku w innym formacie: „zamień na PDF”, „zrób z tego JPG”, „wyciągnij
 dźwięk z filmu”, „zmniejsz to zdjęcie”, „połącz te skany w jeden PDF”, „HEIC z iPhone'a nie otwiera się”.
 Robisz to sam, od razu, na serwerze: plik nie wychodzi na żaden zewnętrzny konwerter. Skrypt nie zużywa tokenów
-modelu.
+modelu. To samo narzędzie właściciel ma w HQ (Centrala → Konwerter): prostą zamianę może zrobić sam.
 
 Bez narzędzia `terminal` (Jarvo na czacie) nie uruchomisz skryptu: jedna karta dla `jarvo-reka` bez misji
-(CEL: plik w formacie X; WEJŚCIA: pełna ścieżka z 📎; DoD: wynik istnieje, oddany linią `MEDIA:`).
+(CEL: plik w formacie X; WEJŚCIA: pełna ścieżka z 📎; DoD: wynik istnieje, oddany linią `MEDIA:`). Właścicielowi
+w HQ możesz też wskazać Centrala → Konwerter: zrobi to sam w kilka sekund.
 
 ## Kroki
 ```bash

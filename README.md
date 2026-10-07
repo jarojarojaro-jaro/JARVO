@@ -20,7 +20,8 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 ## Jarvo HQ
 
 Dashboard floty w przeglądarce: budynek z pokojami agentów, dymki z tym, co każdy robi teraz, podgląd pracy
-na żywo, wyniki, decyzje i czat z Jarvem albo dowolnym agentem. Szczegóły: [docs/HQ.md](docs/HQ.md).
+na żywo, wyniki, decyzje, czat z Jarvem albo dowolnym agentem i konwerter plików (zdjęcie, film, dźwięk, PDF, Word
+→ inny format na serwerze). Szczegóły: [docs/HQ.md](docs/HQ.md).
 Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
 
 ## Szybki start

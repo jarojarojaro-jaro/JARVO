@@ -35,6 +35,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Centrala: Decyzje | kanban (`blocked` + `needs_input`, karty porzucone po błędach) | pytania agentów; odpowiedź idzie do Jarva, który odblokowuje kartę i zapisuje decyzję. Karta porzucona po błędach ma **Ponów kartę** (wraca do kolejki) albo **Przekaż Jarvowi** |
 | Centrala: Misje | `missions/INDEX.md` + kanban | postęp misji (kostki kart w kolorach stanu) |
 | Centrala: Na bieżąco | zdarzenia kanbana | kto zaczął, oddał do oceny, skończył, utknął |
+| Centrala: Konwerter | `konwertuj.py` (ten sam co wspólny skill floty `konwersja-plikow`) + `/opt/data/jarvo/inbox/` | wrzucasz plik (upuść albo wybierz, kilka naraz, do 2 GB, z paskiem wysyłki), wybierasz format z listy pogrupowanej (zdjęcie, wideo, dźwięk, PDF, dokument; tylko to, co da się zrobić tym obrazem), opcje rozmiaru i jakości, strony PDF; **Zmniejsz** (ten sam format), **Połącz w jeden PDF**. Zamiana na serwerze, w tle i po kolei; wynik w `inbox/<data>/konwerter/` z rozmiarem przed i po, **Pobierz** i podgląd, kilka plików także jako ZIP. W demo widać cele, zamiana działa w instalacji |
 
 Decyzje świadomie idą przez Jarva, a nie bezpośrednio do karty: szef zapisuje je w dzienniku misji i pilnuje
 reszty (skill `decision-queue` zna format wiadomości z HQ). Wyjątek: „Ponów kartę” odblokowuje kartę porzuconą
@@ -61,6 +62,8 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/send ─► gateway :8642 /p/<agent>/api/sessions/<id>/chat/stream (SSE)
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/reset
         ├─ POST /api/plugins/jarvo-hq/upload      plik z czatu (📎, Ctrl+V, przeciągnięcie) ─► /opt/data/jarvo/inbox/<data>/
+        ├─ GET/POST /api/plugins/jarvo-hq/konwerter/…  konwerter w Centrali: upload (do 2 GB), cele?path=, POST /konwerter
+        │                                          (zamiana w tle, jedna naraz), job/<id>; wynik ─► inbox/<data>/konwerter/
         ├─ GET/POST /api/plugins/jarvo-hq/edit/…  edytor filmów: info, media, save, stamp, srt, speech, proxy,
         │                                          proxy-file, maska, glos-tlo, glos-probka, export,
         │                                          job/<id>[/cancel] (sekcja 2a)
@@ -83,7 +86,8 @@ Pliki w repo:
 | `hq/plugin/hq_core.py` | logika stanu (bez FastAPI, testowana w `tests/test_hq_core.py`) |
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu i planu typografii, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`, `tests/test_typografia.py`) |
 | `hq/plugin/animacja.py` | animacja HTML: schemat i zapis `parametry.json`, stan pomiaru, mostek podglądu (testy: `tests/test_animacja.py`); build dokłada do pluginu `pomiar.py` Wideografa (odcisk i aktualność raportu) |
-| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, HUD, aplikacja, widżet aktualizacji |
+| `shared/skills/konwersja-plikow/scripts/konwertuj.py` (kopiowany do pluginu) | konwerter plików karty Konwerter w Centrali, ten sam co skill floty (testy: `tests/test_konwertuj.py`, `tests/test_hq_core.py`) |
+| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, konwerter plików (`55-konwerter.js`), HUD, aplikacja, widżet aktualizacji |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność; edytor i okno animacji z własnymi tokenami) |
 | `hq/web/dzwieki/` | biblioteka dźwięków CC0 menu Audio i Wideografa (157 efektów w 13 kategoriach, 9 podkładów; `katalog.json` z rolą, szczytem i flagą „gra” każdego efektu, `LICENCJE.md` z autorem i źródłem każdego pliku), budowana przez `scripts/dzwieki.py` (`pobierz`, `zbuduj`, `zmierz`, `sprawdz`; test `tests/test_dzwieki.py`) |
 | `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto; `kroje/`: kroje napisów i typografii (OFL, `scripts/kroje.py`) |
