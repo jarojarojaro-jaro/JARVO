@@ -237,6 +237,23 @@ w przejrzane testy regresji), `gonogo` (wynik evali → decyzja o wdrożeniu).
 
 ---
 
+## Wszyscy agenci: skill `konwersja-plikow`
+
+Wspólny skill floty (`shared/skills/konwersja-plikow/`, wzór: [convt](https://github.com/opencoredev/convt), AGPL-3.0,
+bez jego kodu): `konwertuj.py` wybiera najtańszą trasę przez silniki, które są w obrazie (bez silnika trasa znika).
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| [Pillow](https://github.com/python-pillow/Pillow) + [pillow-heif](https://github.com/bigcat88/pillow_heif) (z obrazu Hermesa) | zdjęcia: HEIC z iPhone'a, AVIF, WebP, PNG, JPG, TIFF, ICO, PSD (odczyt); zdjęcia → PDF | MIT-CMU / BSD-3 | 2026-09 | skrypt |
+| FFmpeg (z obrazu Hermesa) | wideo, audio, GIF, SVG → PNG; H.264 z MOV do MP4 samym przepakowaniem | LGPL/GPL | n/d | skrypt |
+| [Ghostscript](https://www.ghostscript.com) (z OCRmyPDF) | PDF → obrazy stron, tekst, mniejszy PDF | AGPL-3.0 (osobny program) | 2026-09 | CLI |
+| [qpdf](https://github.com/qpdf/qpdf) | łączenie PDF, liczba stron | Apache-2.0 | 2026-09 | CLI |
+| [Pandoc](https://github.com/jgm/pandoc) | DOCX, ODT, Markdown, HTML, EPUB, RTF między sobą (filtr Lua bez plików z dysku i z sieci) | GPL-2.0 | 2026-09 | CLI |
+| Chromium (z obrazu) | HTML → PDF (serwer druku tylko z katalogu dokumentu, bez sieci) | BSD | n/d | CLI |
+| [LibreOffice](https://www.libreoffice.org) | Excel, PowerPoint, stare .doc/.xls/.ppt, CSV ↔ XLSX (dodatek `office`) | MPL-2.0 | 2026-09 | CLI |
+
+---
+
 ## Infrastruktura (VPS)
 
 | Narzędzie | Po co | Licencja | Ostatni commit |

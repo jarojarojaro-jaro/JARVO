@@ -534,7 +534,8 @@ udział ekranów WebView.
 | `odrzucenie` | `odrzucenie.py`: wiadomość recenzenta → wytyczna → poprawka, wyjaśnienie albo odwołanie, odpowiedź po angielsku; wyuczona kontrola listy (N1, N2…) (§10) |
 | `utrzymanie-aplikacji` | `utrzymanie.py`: stan (SDK, buildy, App Store, opinie), kalendarz terminów sklepów z `.ics`, plan podniesienia SDK, poprawka przez EAS Update (A2: zgoda, odcisk kodu natywnego = build w sklepie, inaczej nowa wersja przez `wydanie`) |
 
-Skille zewnętrzne przypięte w `vendor/skills.lock.yaml` (20, licencje i skan `skan_skilli.py` 2026-10-02):
+Skille zewnętrzne przypięte w `vendor/skills.lock.yaml` (20, licencje i skan `skan_skilli.py` 2026-10-02; w tym samym
+locku jest też wspólny skill floty `konwersja-plikow` z `shared/skills/`):
 
 | Źródło | Licencja | Co bierzemy |
 |---|---|---|

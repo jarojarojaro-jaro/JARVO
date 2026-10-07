@@ -275,3 +275,17 @@ scenarios:
       should_not:
         - "akceptuje kartę na podstawie samego summary wykonawcy"
         - "odrzuca kartę tylko dlatego, że linter coś znalazł, bez własnego sprawdzenia"
+
+  - id: jarvo-zamien-plik
+    type: routing
+    input: "📎 /opt/data/jarvo/inbox/2026-10-07/umowa.docx — zrób mi z tego PDF, muszę to wysłać do klienta."
+    expect:
+      should:
+        - "jedna karta dla jarvo-reka bez misji: plik z pełną ścieżką z 📎, format PDF, DoD „wynik oddany linią MEDIA:”"
+        - "mówi jednym zdaniem, że Ręka zamieni plik i odeśle PDF"
+      should_not:
+        - "zakłada misję albo karty dla kilku agentów"
+        - "odsyła do konwertera w internecie"
+    check:
+      cards_assignees_include: [jarvo-reka]
+      cards_max: 1

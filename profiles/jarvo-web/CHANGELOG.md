@@ -1,6 +1,7 @@
 # Changelog: jarvo-web
 
 ## Niewydane
+- Wspólny skill `konwersja-plikow` (`shared/skills/`, wzór: opencoredev/convt, AGPL, kod własny): plik → inny format na serwerze, bez wysyłania do zewnętrznego konwertera i bez tokenów modelu. `konwertuj.py` zamienia zdjęcia (HEIC z iPhone'a, AVIF, WebP, PNG, JPG, ICO, PDF), wideo i audio (MP4, MOV, WebM, GIF, MP3, WAV…; H.264 z MOV do MP4 samym przepakowaniem), PDF (na obrazy stron, tekst, mniejszy PDF, łączenie kilku plików w jeden) i dokumenty (DOCX, ODT, Markdown, HTML, EPUB, RTF → PDF i między sobą; trasa do 3 kroków, np. DOCX → HTML → PDF). `--rozmiar`, `--jakosc`, `--strony`, `--cele` (na co da się zamienić plik). Metadane zdjęć (GPS) nie przechodzą; obrazki w dokumentach tylko z katalogu dokumentu (bez plików z serwera i z sieci). Wynik oddany linią `MEDIA:`.
 - `seo_check.py` 1.1: każda nowa strona ma sprawdzone 8 rzeczy: obraz OG (bezwzględny adres, HTTP 200, `image/*`,
   1200×630 z nagłówka pliku) i `twitter:card`, strona 404 (losowy adres musi dać 404, 200 = „soft 404”), title
   i description inne na każdej podstronie, landmarki (jeden `<main>`, `<header>`, `<nav>`, `<footer>`), `alt="TODO"`

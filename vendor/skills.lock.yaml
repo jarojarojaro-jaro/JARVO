@@ -256,8 +256,10 @@ sources:
 
 agents:
   jarvo:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: mattpocock-skills, path: skills/productivity/writing-for-agents, dest: meta/writing-for-agents}
   jarvo-sherlock:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
     - {source: hermes, path: skills/web/blocked-page-recovery, dest: research/blocked-page-recovery}
     - {source: hermes, path: optional-skills/research/searxng-search, dest: research/searxng-search}
@@ -275,6 +277,7 @@ agents:
     - {source: marketingskills, path: skills/customer-research, dest: market/customer-research}
 
   jarvo-web:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: hermes, path: skills/software-development/systematic-debugging, dest: kod/systematic-debugging}
     - {source: getsentry-security, path: skills/security-review, dest: bezpieczenstwo/security-review}
@@ -335,6 +338,7 @@ agents:
     - {source: hermes, path: optional-skills/web-development/cloudflare-temporary-deploy, dest: deploy/cloudflare-temporary-deploy}
 
   jarvo-studio:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: anthropic-skills, path: skills/algorithmic-art, dest: design/algorithmic-art}
     - {source: impeccable, path: .hermes/skills/impeccable, dest: design/impeccable}
@@ -363,6 +367,7 @@ agents:
     - {source: lemo-wake, path: skills/layers, dest: design/lemo-wake-layers, pomin: ["scripts"]}
 
   jarvo-wideo:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
     - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
@@ -431,6 +436,7 @@ agents:
     - {source: remocn-studio, path: agent/skills/video-lessons, dest: video/video-lessons}
 
   jarvo-ads:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: marketingskills, path: skills/ads, dest: marketing/ads}
     - {source: marketingskills, path: skills/ab-testing, dest: marketing/ab-testing}
@@ -438,12 +444,14 @@ agents:
     - {source: marketingskills, path: skills/analytics, dest: marketing/analytics}
     - {source: marketingskills, path: skills/ad-creative, dest: marketing/ad-creative}
   jarvo-reka:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
     - {source: mattpocock-skills, path: skills/productivity/writing-for-agents, dest: meta/writing-for-agents}
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}
 
   jarvo-mobile:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     # Expo: router, natywny wygląd, animacje, dane, strona → aplikacja, sklepy, aktualizacje, podnoszenie SDK.
     # Sekcja „Submitting Feedback” każdego skilla (npx submit-expo-feedback) jest zablokowana w approvals.deny profilu.
     - {source: expo-skills, path: plugins/expo/skills/expo-router, dest: expo/expo-router}
@@ -466,3 +474,5 @@ agents:
     - {source: aso-skills, path: skills/android-aso, dest: aso/android-aso}
     - {source: aso-skills, path: skills/localization, dest: aso/localization}
     - {source: aso-skills, path: skills/review-management, dest: aso/review-management}
+  jarvo-lowca:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}

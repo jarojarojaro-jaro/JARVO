@@ -1,6 +1,7 @@
 # Changelog: jarvo-lowca
 
 ## Niewydane
+- Wspólny skill `konwersja-plikow` (`shared/skills/`, wzór: opencoredev/convt, AGPL, kod własny): plik → inny format na serwerze, bez wysyłania do zewnętrznego konwertera i bez tokenów modelu. `konwertuj.py` zamienia zdjęcia (HEIC z iPhone'a, AVIF, WebP, PNG, JPG, ICO, PDF), wideo i audio (MP4, MOV, WebM, GIF, MP3, WAV…; H.264 z MOV do MP4 samym przepakowaniem), PDF (na obrazy stron, tekst, mniejszy PDF, łączenie kilku plików w jeden) i dokumenty (DOCX, ODT, Markdown, HTML, EPUB, RTF → PDF i między sobą; trasa do 3 kroków, np. DOCX → HTML → PDF). `--rozmiar`, `--jakosc`, `--strony`, `--cele` (na co da się zamienić plik). Metadane zdjęć (GPS) nie przechodzą; obrazki w dokumentach tylko z katalogu dokumentu (bez plików z serwera i z sieci). Wynik oddany linią `MEDIA:`.
 - CEIDG (decyzja właściciela): nowy skrypt `ceidg.py` do oficjalnego API v3 Hurtowni danych CEIDG (dane.biznes.gov.pl,
   darmowy token `CEIDG_TOKEN`). KRS to spółki, CEIDG to jednoosobowe działalności. `szukaj` po pełnych kodach PKD,
   miejscowości, województwie, powiecie, gminie, statusie (domyślnie aktywne) i dacie rozpoczęcia, strony za

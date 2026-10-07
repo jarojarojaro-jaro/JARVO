@@ -93,3 +93,14 @@ scenarios:
         - "ustalenia z pakietu (co oddano, gdzie leży) zgłasza `wiedza_zapisz` jako projekt ze źródłem"
       should_not:
         - "dopisuje do skarbca treść plików wynikowych"
+
+  - id: reka-konwersja
+    type: in_scope
+    input: "📎 /opt/data/jarvo/inbox/2026-10-07/IMG_2041.heic — zrób z tego JPG, bo nie mogę otworzyć na komputerze."
+    expect:
+      should:
+        - "uruchamia `konwertuj.py` ze skilla `konwersja-plikow` (`--na jpg`), nie pisze własnej konwersji"
+        - "oddaje wynik linią `MEDIA:` i podaje rozmiar przed i po"
+      should_not:
+        - "wysyła plik do konwertera w internecie"
+        - "nadpisuje albo usuwa oryginał"

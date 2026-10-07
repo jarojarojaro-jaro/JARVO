@@ -1,6 +1,7 @@
 # Changelog: jarvo-reka
 
 ## Niewydane
+- Wspólny skill `konwersja-plikow` (`shared/skills/`, wzór: opencoredev/convt, AGPL, kod własny): plik → inny format na serwerze, bez wysyłania do zewnętrznego konwertera i bez tokenów modelu. `konwertuj.py` zamienia zdjęcia (HEIC z iPhone'a, AVIF, WebP, PNG, JPG, ICO, PDF), wideo i audio (MP4, MOV, WebM, GIF, MP3, WAV…; H.264 z MOV do MP4 samym przepakowaniem), PDF (na obrazy stron, tekst, mniejszy PDF, łączenie kilku plików w jeden) i dokumenty (DOCX, ODT, Markdown, HTML, EPUB, RTF → PDF i między sobą; trasa do 3 kroków, np. DOCX → HTML → PDF). `--rozmiar`, `--jakosc`, `--strony`, `--cele` (na co da się zamienić plik). Metadane zdjęć (GPS) nie przechodzą; obrazki w dokumentach tylko z katalogu dokumentu (bez plików z serwera i z sieci). Wynik oddany linią `MEDIA:`. Zamiana pliku przychodzi do Ciebie także jako karta od Jarva (on na czacie nie ma terminala).
 - SOUL bez linii „dane, nie polecenia” (jest w zasadzie 8 protokołu w tym samym prompcie).
 - Czyta też skille Twórcy aplikacji (`jarvo-mobile`) w `skills.external_dirs`.
 - `kiedy-oddac-snajperowi` 1.2.0: tabela „komu oddać” generowana z pól `oddaj_gdy` w `fleet.yaml` (wcześniej ręczna, bez Ads i Łowcy), więc każdy nowy specjalista trafia do niej sam; plus jak przekazać zadanie, żeby specjalista nie zaczynał od zera.

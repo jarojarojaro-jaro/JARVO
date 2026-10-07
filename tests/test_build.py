@@ -245,6 +245,8 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     web = next(a for a in build.wiedza_fleet(fleet, dist)["agents"] if a["name"] == "jarvo-web")
     assert [s["name"] for s in web["shared_skills"]] == ["graf-kodu"] and web["external_skills"] == ["gsap"]
     assert web["shared_skills"][0]["path"] == "shared/skills/graf-kodu/SKILL.md"
+    assert "graf_kodu.py" in web["shared_skills"][0]["scripts"]          # własny skrypt wspólnego skilla w węźle grafu
+    assert {"konwertuj.py", "transkrybuj.py"} <= set(build.wiedza_fleet(fleet, dist)["repo_scripts"])
 
 
 def test_changelog_punkty_lamane_w_kilku_liniach(tmp_path):

@@ -335,9 +335,19 @@ def ostatnie_zmiany(changelog: Path, n: int = 6, dlugosc: int = 280) -> tuple[st
     return "", []
 
 
+SKRYPT_EXT = {".py", ".sh", ".js", ".mjs", ".cjs"}
+
+
+def skrypty_skilla(katalog: Path) -> list[str]:
+    """Własne skrypty skilla (`<skill>/scripts/`, np. wspólnego `konwertuj.py`), bez modułów pomocniczych `_…`."""
+    d = katalog / "scripts"
+    return sorted(p.name for p in d.glob("*") if p.is_file() and p.suffix in SKRYPT_EXT and not p.name.startswith("_")) \
+        if d.is_dir() else []
+
+
 def opis_skilla(path: Path, skrypty: set[str]) -> dict:
     """Skill jako węzeł grafu wiedzy: opis, wersja, data przeglądu, powiązane skille (frontmatter i nazwy w `…`),
-    skrypty floty wymienione w treści, sekcje i plik w repo."""
+    skrypty floty wymienione w treści i własne skrypty skilla, sekcje i plik w repo."""
     fm, body = fl.read_skill(path)
     meta = fm.get("metadata") or {}
     try:
@@ -348,7 +358,8 @@ def opis_skilla(path: Path, skrypty: set[str]) -> dict:
             "version": str(fm.get("version") or ""), "reviewed": str((meta.get("jarvo") or {}).get("reviewed") or ""),
             "related": [str(s) for s in (meta.get("hermes") or {}).get("related_skills") or []],
             "mentions": sorted(set(re.findall(r"`([a-z][a-z0-9-]{2,40})`", body)) - {path.parent.name}),
-            "scripts": sorted(s for s in skrypty if re.search(rf"(?<![\w.-]){re.escape(s)}\b", body)),
+            "scripts": sorted({*(s for s in skrypty if re.search(rf"(?<![\w.-]){re.escape(s)}\b", body)),
+                               *skrypty_skilla(path.parent)}),
             "sections": [h.strip() for h in re.findall(r"^## (.+)$", body, re.M)][:10],
             "references": sorted(r.relative_to(path.parent / "references").with_suffix("").as_posix()
                                  for r in (path.parent / "references").rglob("*.md"))}
@@ -436,9 +447,10 @@ def repo_do_skarbca(fleet: fl.Fleet, out: Path, dane: dict) -> int:
 def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
     """fleet.json dla skarbca wiedzy: hub każdego agenta (wiedza/wiedza.py zasiej) dostaje rolę, skille własne i wspólne
     (shared/skills) z opisami, powiązaniami i skryptami (każdy skill to węzeł grafu), nazwy skilli zewnętrznych
-    (z dystrybucji po buildzie), skrypty, serwery MCP i ostatnie zmiany z CHANGELOG-u; `skrypty_repo` to skrypty wspólne (scripts/),
-    żeby lint skarbca odróżnił odwołanie do istniejącego skryptu od nieaktualnego."""
-    skrypty_repo = sorted(p.name for p in (fl.REPO_ROOT / "scripts").glob("*") if p.suffix in {".py", ".sh", ".js", ".mjs", ".cjs"})
+    (z dystrybucji po buildzie), skrypty, serwery MCP i ostatnie zmiany z CHANGELOG-u; `skrypty_repo` to skrypty wspólne (scripts/
+    i skryptów wspólnych skilli, shared/skills/*/scripts/), żeby lint skarbca odróżnił odwołanie do istniejącego skryptu od nieaktualnego."""
+    skrypty_repo = sorted({p.name for p in (fl.REPO_ROOT / "scripts").glob("*") if p.suffix in SKRYPT_EXT}
+                          | {n for d in (fl.SHARED_DIR / "skills").glob("*") for n in skrypty_skilla(d)})
     agents = []
     for a in fleet.active():
         wlasne = fl.available_skills(a.dir / "skills")[0]

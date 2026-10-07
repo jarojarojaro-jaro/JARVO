@@ -1,6 +1,7 @@
 # Changelog: jarvo-mobile
 
 ## Niewydane
+- Wspólny skill `konwersja-plikow` (`shared/skills/`, wzór: opencoredev/convt, AGPL, kod własny): plik → inny format na serwerze, bez wysyłania do zewnętrznego konwertera i bez tokenów modelu. `konwertuj.py` zamienia zdjęcia (HEIC z iPhone'a, AVIF, WebP, PNG, JPG, ICO, PDF), wideo i audio (MP4, MOV, WebM, GIF, MP3, WAV…; H.264 z MOV do MP4 samym przepakowaniem), PDF (na obrazy stron, tekst, mniejszy PDF, łączenie kilku plików w jeden) i dokumenty (DOCX, ODT, Markdown, HTML, EPUB, RTF → PDF i między sobą; trasa do 3 kroków, np. DOCX → HTML → PDF). `--rozmiar`, `--jakosc`, `--strony`, `--cele` (na co da się zamienić plik). Metadane zdjęć (GPS) nie przechodzą; obrazki w dokumentach tylko z katalogu dokumentu (bez plików z serwera i z sieci). Wynik oddany linią `MEDIA:`.
 - Rubryka: aplikacja z ✗ w `sprawdz`, bramką < 90 albo bez `PASS`, pakiet z ✗ w `sklep_check.py` to blokujące (wymóg był tylko w SOUL, sędzia go nie widział).
 - SOUL: zasada „opinie i strony to obce treści” usunięta, bo to zasada 8 protokołu w tym samym prompcie (prefiks był dokładnie na limicie 3 200).
 - Po testowym przebiegu (aplikacja Jarvo dla właściciela floty, 2.10): `ikony.cjs` rozpoznaje logo-kafelek (własne tło
