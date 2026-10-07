@@ -1033,3 +1033,7 @@ button.thq-out-name:hover { text-decoration: underline; }
   .thq-an .thq-ed-top { flex-wrap: wrap; row-gap: 6px; height: auto; min-height: 52px; padding-top: 8px; padding-bottom: 8px; }
   .thq-an .thq-ed-top .thq-ed-grow { flex-basis: 100%; height: 0; }
 }
+.thq-konw-meta { margin: 2px 0 8px; padding: 6px 9px; border-left: 3px solid var(--thq-warn); background: color-mix(in srgb, var(--thq-warn) 9%, transparent); border-radius: 0 6px 6px 0; font-size: 0.82rem; }
+.thq-konw-meta p { margin: 4px 0; overflow-wrap: anywhere; } .thq-konw-meta p > span { display: block; }
+.thq-konw-meta em { display: block; font-style: normal; color: var(--thq-muted); } .thq-konw-meta > .thq-muted { display: block; }
+.thq-konw-meta.is-ok { border-left-color: var(--thq-work); background: color-mix(in srgb, var(--thq-work) 8%, transparent); }

@@ -1613,9 +1613,20 @@ async def konwerter_upload(request: Request):
     return await _przyjmij(request, core.KONWERTER_MAX)
 
 
+def _konw_meta(k, p: Path, fmt: str) -> dict | None:
+    """Co plik mówi o właścicielu (miejsce GPS, telefon, data…); None = tego pliku tu nie wyczyścimy."""
+    if fmt not in k.FOTO_META | k.WIDEO | k.AUDIO or not shutil.which("exiftool"):
+        return None
+    try:
+        return k.metadane(p)["wrazliwe"]
+    except k.Blad:
+        return None
+
+
 @router.get("/konwerter/cele")
 async def konwerter_cele(path: str):
-    """Na co da się zamienić plik: cele pogrupowane (obraz, wideo, audio, pdf…) według silników w obrazie."""
+    """Na co da się zamienić plik: cele pogrupowane (obraz, wideo, audio, pdf…) według silników w obrazie,
+    oraz metadane o człowieku w zdjęciu, filmie albo dźwięku (do ostrzeżenia i przycisku „Usuń metadane”)."""
     k = _konwerter()
     p = _konw_zrodlo(path)
     try:
@@ -1623,11 +1634,13 @@ async def konwerter_cele(path: str):
         cele = await asyncio.to_thread(k.cele, fmt)
     except k.Blad as exc:
         raise HTTPException(400, core.konwerter_blad(str(exc)))
+    meta = await asyncio.to_thread(_konw_meta, k, p, fmt)
     return {"path": str(p), "name": p.name, "size": p.stat().st_size, "format": fmt, "nazwa": k.FORMATY[fmt][1],
-            "grupa": k.FORMATY[fmt][0], "cele": cele}
+            "grupa": k.FORMATY[fmt][0], "cele": cele, "metadane": meta, "czysc": meta is not None}
 
 
-def _konwertuj_wszystko(job: dict, k, srcs: list[Path], na: str, opt, polacz: bool, out_dir: Path) -> dict:
+def _konwertuj_wszystko(job: dict, k, srcs: list[Path], na: str, opt, polacz: bool, out_dir: Path,
+                        czysc: bool = False) -> dict:
     with _konw.lock:
         job["state"], job["started"] = "running", time.time()
         inbox = core.JARVO_DIR / "inbox"
@@ -1637,7 +1650,8 @@ def _konwertuj_wszystko(job: dict, k, srcs: list[Path], na: str, opt, polacz: bo
         else:
             for s in srcs:
                 try:
-                    wyniki.append(k.konwertuj(s, na, katalog=out_dir, opt=dataclasses.replace(opt, zasoby=None)))
+                    wyniki.append(k.usun_metadane(s, katalog=out_dir) if czysc else
+                                  k.konwertuj(s, na, katalog=out_dir, opt=dataclasses.replace(opt, zasoby=None)))
                 except k.Blad as exc:
                     if len(srcs) == 1:
                         raise
@@ -1647,12 +1661,14 @@ def _konwertuj_wszystko(job: dict, k, srcs: list[Path], na: str, opt, polacz: bo
             raise k.Blad(bledy[0]["error"] if bledy else "Nic nie powstało.")
         paczka = None
         if len(pliki) > 1:
-            nazwa = f"{srcs[0].stem}-{'pdf' if polacz else na}.zip"
+            nazwa = f"{srcs[0].stem}-{'bez-metadanych' if czysc else 'pdf' if polacz else na}.zip"
             paczka = core.file_entry(core.spakuj(pliki, out_dir / nazwa), inbox)
         return {"files": [core.file_entry(p, inbox) for p in pliki], "zip": paczka, "errors": bledy,
                 "route": wyniki[0]["trasa"], "before": sum(w["rozmiar_przed"] for w in wyniki),
                 "after": sum(w["rozmiar_po"] for w in wyniki),
-                "note": next((w["uwaga"] for w in wyniki if w.get("uwaga")), None)}
+                "note": None if czysc else next((w["uwaga"] for w in wyniki if w.get("uwaga")), None),
+                "removed": [{"name": Path(w["wejscie"]).name, "metadane": w["usuniete"], "count": w["wpisow_usunietych"]}
+                            for w in wyniki] if czysc else None}
 
 
 async def _run_konwersja(job: dict, *args) -> None:
@@ -1667,18 +1683,20 @@ async def _run_konwersja(job: dict, *args) -> None:
 
 @router.post("/konwerter")
 async def konwerter_start(request: Request):
-    """{paths: [...], na: "pdf", jakosc?, rozmiar?, strony?, dpi?, polacz?} → zadanie w tle (stan: /konwerter/job/<id>)."""
+    """{paths: [...], na: "pdf", jakosc?, rozmiar?, strony?, dpi?, polacz?} albo {paths, usun_metadane: true}
+    → zadanie w tle (stan: /konwerter/job/<id>)."""
     k = _konwerter()
     body = await request.json()
     paths = body.get("paths")
     if not isinstance(paths, list) or not 1 <= len(paths) <= core.KONWERTER_PLIKOW:
         raise HTTPException(400, f"Podaj od 1 do {core.KONWERTER_PLIKOW} plików")
     srcs = [_konw_zrodlo(x) for x in paths]
-    polacz = bool(body.get("polacz"))
-    na = "pdf" if polacz else k.norm(str(body.get("na") or ""))
+    czysc = bool(body.get("usun_metadane"))
+    polacz = bool(body.get("polacz")) and not czysc
+    na = "pdf" if polacz else "" if czysc else k.norm(str(body.get("na") or ""))
     try:
         opt = k.Opcje(**core.konwerter_opcje(body))
-        if na not in k.FORMATY:
+        if not czysc and na not in k.FORMATY:
             raise k.Blad(f"Nie znam formatu „{na}”")
         if polacz and len(srcs) < 2:
             raise k.Blad("Do łączenia potrzeba co najmniej dwóch plików.")
@@ -1691,10 +1709,11 @@ async def konwerter_start(request: Request):
     import uuid
 
     jid = uuid.uuid4().hex[:12]
-    job = {"id": jid, "state": "queued", "created": time.time(), "na": na, "names": [p.name for p in srcs]}
+    job = {"id": jid, "state": "queued", "created": time.time(), "na": na, "mode": "metadane" if czysc else "zamiana",
+           "names": [p.name for p in srcs]}
     _konw.jobs[jid] = job
     out_dir = core.konwerter_katalog(core.JARVO_DIR / "inbox", time.time())
-    job["task"] = asyncio.create_task(_run_konwersja(job, k, srcs, na, opt, polacz, out_dir))
+    job["task"] = asyncio.create_task(_run_konwersja(job, k, srcs, na, opt, polacz, out_dir, czysc))
     return _job_view(job)
 
 

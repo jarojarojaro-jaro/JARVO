@@ -545,6 +545,16 @@ def test_konwerter_w_hq():
     assert "<${Konwerter} onOpenFile=${onOpenFile}/>" in (root / "hq" / "web" / "src" / "60-hud.js").read_text(encoding="utf-8")
     mock = (root / "hq" / "web" / "demo" / "mock.js").read_text(encoding="utf-8")
     assert all(f"{m}:" in mock for m in ("konwUpload", "konwCele", "konwStart", "konwJob"))
+    # metadane: ostrzeżenie po wrzuceniu, przycisk „Usuń metadane”, raport co usunięto
+    assert '"metadane": meta, "czysc": meta is not None' in api and "k.usun_metadane(s, katalog=out_dir) if czysc" in api
+    assert '"removed": [' in api and "metadane, czysc:" in mock
+    karta = (root / "hq" / "web" / "src" / "55-konwerter.js").read_text(encoding="utf-8")
+    assert "usun_metadane: true" in karta and "zadanie.removed" in karta and "f.czysc" in karta
+    import re
+    from conftest import load_script
+    blok = re.search(r"const KONW_META = bilingual\(\{(.*?)\}\);", karta, re.S)[1]
+    wrazliwe = [k for k, _, _ in load_script("shared/skills/konwersja-plikow/scripts/konwertuj.py").WRAZLIWE]
+    assert re.findall(r"(\w+): \[", blok) == wrazliwe          # te same kategorie w karcie i w konwerterze
 
 
 def test_compose_message_and_user_text():

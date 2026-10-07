@@ -35,7 +35,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Centrala: Decyzje | kanban (`blocked` + `needs_input`, karty porzucone po błędach) | pytania agentów; odpowiedź idzie do Jarva, który odblokowuje kartę i zapisuje decyzję. Karta porzucona po błędach ma **Ponów kartę** (wraca do kolejki) albo **Przekaż Jarvowi** |
 | Centrala: Misje | `missions/INDEX.md` + kanban | postęp misji (kostki kart w kolorach stanu) |
 | Centrala: Na bieżąco | zdarzenia kanbana | kto zaczął, oddał do oceny, skończył, utknął |
-| Centrala: Konwerter | `konwertuj.py` (ten sam co wspólny skill floty `konwersja-plikow`) + `/opt/data/jarvo/inbox/` | wrzucasz plik (upuść albo wybierz, kilka naraz, do 2 GB, z paskiem wysyłki), wybierasz format z listy pogrupowanej (zdjęcie, wideo, dźwięk, PDF, dokument; tylko to, co da się zrobić tym obrazem), opcje rozmiaru i jakości, strony PDF; **Zmniejsz** (ten sam format), **Połącz w jeden PDF**. Zamiana na serwerze, w tle i po kolei; wynik w `inbox/<data>/konwerter/` z rozmiarem przed i po, **Pobierz** i podgląd, kilka plików także jako ZIP. W demo widać cele, zamiana działa w instalacji |
+| Centrala: Konwerter | `konwertuj.py` (ten sam co wspólny skill floty `konwersja-plikow`) + `/opt/data/jarvo/inbox/` | wrzucasz plik (upuść albo wybierz, kilka naraz, do 2 GB, z paskiem wysyłki), wybierasz format z listy pogrupowanej (zdjęcie, wideo, dźwięk, PDF, dokument; tylko to, co da się zrobić tym obrazem), opcje rozmiaru i jakości, strony PDF; **Zmniejsz** (ten sam format), **Połącz w jeden PDF**, **Usuń metadane** (zdjęcie, film, dźwięk: ten sam plik bez miejsca GPS, telefonu, dat i opisów, bez przekodowania; po wrzuceniu karta pokazuje, co plik mówi o Tobie, a po czyszczeniu, co usunięto; każda zamiana na inny format też je usuwa). Zamiana na serwerze, w tle i po kolei; wynik w `inbox/<data>/konwerter/` z rozmiarem przed i po, **Pobierz** i podgląd, kilka plików także jako ZIP. W demo widać cele, zamiana działa w instalacji |
 
 Decyzje świadomie idą przez Jarva, a nie bezpośrednio do karty: szef zapisuje je w dzienniku misji i pilnuje
 reszty (skill `decision-queue` zna format wiadomości z HQ). Wyjątek: „Ponów kartę” odblokowuje kartę porzuconą
@@ -62,8 +62,9 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/send ─► gateway :8642 /p/<agent>/api/sessions/<id>/chat/stream (SSE)
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/reset
         ├─ POST /api/plugins/jarvo-hq/upload      plik z czatu (📎, Ctrl+V, przeciągnięcie) ─► /opt/data/jarvo/inbox/<data>/
-        ├─ GET/POST /api/plugins/jarvo-hq/konwerter/…  konwerter w Centrali: upload (do 2 GB), cele?path=, POST /konwerter
-        │                                          (zamiana w tle, jedna naraz), job/<id>; wynik ─► inbox/<data>/konwerter/
+        ├─ GET/POST /api/plugins/jarvo-hq/konwerter/…  konwerter w Centrali: upload (do 2 GB), cele?path= (+ metadane),
+        │                                          POST /konwerter (zamiana albo usun_metadane, w tle, jedna naraz),
+        │                                          job/<id>; wynik ─► inbox/<data>/konwerter/
         ├─ GET/POST /api/plugins/jarvo-hq/edit/…  edytor filmów: info, media, save, stamp, srt, speech, proxy,
         │                                          proxy-file, maska, glos-tlo, glos-probka, export,
         │                                          job/<id>[/cancel] (sekcja 2a)

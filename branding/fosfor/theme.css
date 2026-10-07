@@ -117,6 +117,7 @@ div[class*="hover:text-foreground"]:hover { background: color-mix(in srgb, var(-
 .thq-konw.is-drop { outline-color: var(--fos-fill) !important; border-radius: 0 !important; }
 .thq-konw-drop { border-radius: 0 !important; border-color: var(--fos-line) !important; background: transparent !important; color: var(--fos) !important; }
 .thq-konw-drop:hover { border-color: var(--fos-fill) !important; }
+.thq-konw-meta { border-radius: 0 !important; background: transparent !important; border-left-color: var(--fos) !important; color: var(--fos) !important; }
 
 /* motyw dwukolorowy (biało-czerwony Jarvo): czerwony neon na ramkach, białe napisy.
    W motywach jednokolorowych --fos-neon = transparent, więc nic się nie zmienia. */

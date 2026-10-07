@@ -9,6 +9,16 @@ const KONW_GRUPY = bilingual({
 const KONW_ROZMIARY = [["", "Oryginał", "Original"], ["1920", "1920 px", "1920 px"], ["1080", "1080 px", "1080 px"],
   ["720p", "720p", "720p"], ["50%", "50%", "50%"]];
 const KONW_JAKOSC = [["", "Zwykła", "Normal"], ["95", "Najlepsza", "Best"], ["50", "Mniejszy plik", "Smaller file"]];
+// metadane o człowieku w zdjęciu, filmie albo dźwięku (klucze z konwertuj.py: WRAZLIWE)
+const KONW_META = bilingual({
+  miejsce: ["Miejsce (GPS)", "Location (GPS)"], urzadzenie: ["Telefon albo aparat", "Phone or camera"],
+  czas: ["Data i godzina", "Date and time"], osoba: ["Autor albo właściciel", "Author or owner"],
+  opis: ["Opis albo komentarz", "Description or comment"], identyfikator: ["Identyfikatory zdjęcia", "Photo IDs"],
+  miniatura: ["Miniatura w pliku", "Embedded thumbnail"],
+});
+// każda informacja w osobnej linii; przy kilku plikach nad nimi nazwa pliku
+const konwMeta = (m, nazwa) => html`${nazwa && html`<em>${nazwa}</em>`}${Object.entries(m || {}).map(([k, v]) =>
+  html`<span key=${k}>${KONW_META[k] || v.opis}${v.wartosc ? `: ${v.wartosc}` : ""}</span>`)}`;
 // „Zmniejsz” bez wybranych opcji: jakość, przy której plik zwykle wyraźnie maleje
 const KONW_ZMNIEJSZ = { obraz: 75, wideo: 60, pdf: 50, audio: 40 };
 
@@ -102,6 +112,9 @@ function Konwerter({ onOpenFile }) {
   const moznaZmniejszyc = jedenFormat && KONW_ZMNIEJSZ[jedenFormat.grupa] != null;
   const moznaPolaczyc = pliki.length > 1 && pliki.every((f) => f.format === "pdf" || (f.cele || []).some((c) => c.format === "pdf"));
   const zPdf = pliki.some((f) => f.format === "pdf");
+  const moznaCzyscic = pliki.length > 0 && pliki.every((f) => f.czysc);
+  const zMetadanymi = pliki.filter((f) => f.metadane && Object.keys(f.metadane).length);
+  const czyszczenie = zadanie && zadanie.mode === "metadane";
   const wybierz = (e) => { e.target.files && dodaj(e.target.files); e.target.value = ""; };
   const sekundy = zadanie && zadanie.started ? Math.max(0, Math.round(Date.now() / 1000 - zadanie.started)) : 0;
 
@@ -111,8 +124,8 @@ function Konwerter({ onOpenFile }) {
     <input ref=${fileRef} type="file" multiple hidden onChange=${wybierz}/>
     ${etap === "start" && html`<button type="button" class="thq-konw-drop" onClick=${() => fileRef.current && fileRef.current.click()}>
       <strong>${L("Upuść plik albo kliknij", "Drop a file or click")}</strong>
-      <span class="thq-muted">${L("Zdjęcie (też HEIC z iPhone'a), film, dźwięk, PDF, Word. Zamiana na serwerze, plik nigdzie nie wychodzi.",
-        "Photo (iPhone HEIC too), video, audio, PDF, Word. Converted on the server, the file goes nowhere else.")}</span>
+      <span class="thq-muted">${L("Zdjęcie (też HEIC z iPhone'a), film, dźwięk, PDF, Word. Zamiana na serwerze, plik nigdzie nie wychodzi. Usuwa też metadane (GPS, telefon).",
+        "Photo (iPhone HEIC too), video, audio, PDF, Word. Converted on the server, the file goes nowhere else. Also strips metadata (GPS, phone).")}</span>
     </button>`}
     ${etap === "wysylanie" && postep && html`<div class="thq-konw-stan">
       <p>${L("Wysyłam", "Uploading")} ${postep.z > 1 ? `${postep.nr}/${postep.z} ` : ""}<strong>${postep.nazwa}</strong>…</p>
@@ -122,6 +135,12 @@ function Konwerter({ onOpenFile }) {
     ${pliki.length > 0 && etap !== "wysylanie" && html`<div class="thq-chips thq-konw-pliki">
       ${pliki.map((f) => html`<span key=${f.path} class="thq-chip" title=${f.path}><em>${f.name}</em> ${f.nazwa} · ${bytes(f.size)}</span>`)}
       ${etap !== "praca" && html`<button type="button" class="thq-chips-toggle" onClick=${reset}>${L("Inny plik", "Other file")}</button>`}
+    </div>`}
+    ${etap === "wybor" && zMetadanymi.length > 0 && html`<div class="thq-konw-meta" role="note">
+      <strong>${L("W pliku są dane o Tobie", "The file carries data about you")}</strong>
+      ${zMetadanymi.slice(0, 5).map((f) => html`<p key=${f.path}>${konwMeta(f.metadane, pliki.length > 1 && f.name)}</p>`)}
+      ${zMetadanymi.length > 5 && html`<p class="thq-muted">${L(`…i ${zMetadanymi.length - 5} więcej.`, `…and ${zMetadanymi.length - 5} more.`)}</p>`}
+      <span class="thq-muted">${L("Znikną po „Usuń metadane” albo zamianie na inny format.", "They go away with “Remove metadata” or a conversion to another format.")}</span>
     </div>`}
     ${etap === "wybor" && html`<div class="thq-konw-wybor">
       <div class="thq-konw-opcje">
@@ -138,7 +157,7 @@ function Konwerter({ onOpenFile }) {
         ${g.cele.map((c) => html`<button key=${c.format} type="button" class="thq-act-btn" onClick=${() => zamien(c.format)}
           title=${`${c.opis} · ${c.trasa.join(" → ")}`}>${c.nazwa}</button>`)}
       </div>`)}
-      ${(moznaZmniejszyc || moznaPolaczyc) && html`<div class="thq-konw-grupa">
+      ${(moznaZmniejszyc || moznaPolaczyc || moznaCzyscic) && html`<div class="thq-konw-grupa">
         <span class="thq-muted">${L("Inne", "Other")}</span>
         ${moznaZmniejszyc && html`<button type="button" class="thq-act-btn"
           title=${L("Ten sam format, mniejszy plik (rozmiar i jakość z opcji)", "Same format, smaller file (size and quality from options)")}
@@ -146,14 +165,27 @@ function Konwerter({ onOpenFile }) {
           ${L("Zmniejsz", "Shrink")} ${jedenFormat.nazwa}</button>`}
         ${moznaPolaczyc && html`<button type="button" class="thq-act-btn" onClick=${() => zamien("pdf", { polacz: true })}>
           ${L("Połącz w jeden PDF", "Merge into one PDF")}</button>`}
+        ${moznaCzyscic && html`<button type="button" class="thq-act-btn" onClick=${() => zamien("", { usun_metadane: true })}
+          title=${L("Ten sam plik bez miejsca GPS, telefonu, dat i opisów; obraz i dźwięk bez zmian", "Same file without GPS location, phone, dates and descriptions; picture and sound unchanged")}>
+          ${L("Usuń metadane", "Remove metadata")}</button>`}
       </div>`}
     </div>`}
     ${etap === "praca" && html`<p class="thq-konw-stan" role="status">
       ${zadanie && zadanie.state === "queued" ? L("Czekam na poprzednią zamianę…", "Waiting for the previous conversion…")
+        : czyszczenie ? L(`Usuwam metadane… ${sekundy} s`, `Removing metadata… ${sekundy} s`)
         : L(`Zamieniam na ${(zadanie && zadanie.na || "").toUpperCase()}… ${sekundy} s`, `Converting to ${(zadanie && zadanie.na || "").toUpperCase()}… ${sekundy} s`)}
     </p>`}
     ${etap === "gotowe" && zadanie && html`<div class="thq-konw-wynik">
       <p class="thq-ok">✓ ${L("Gotowe", "Done")}: ${bytes(zadanie.before)} → ${bytes(zadanie.after)}</p>
+      ${zadanie.removed && html`<div class="thq-konw-meta is-ok">
+        ${zadanie.removed.some((r) => Object.keys(r.metadane || {}).length) && html`<strong>${L("Usunięte", "Removed")}</strong>`}
+        ${zadanie.removed.slice(0, 5).map((r) => html`<p key=${r.name}>${Object.keys(r.metadane || {}).length
+          ? konwMeta(r.metadane, zadanie.removed.length > 1 && r.name)
+          : html`${zadanie.removed.length > 1 && html`<em>${r.name}</em>`}<span>${r.count
+            ? L(`Tylko wpisy techniczne: ${r.count}`, `Technical entries only: ${r.count}`)
+            : L("W pliku nie było metadanych.", "The file had no metadata.")}</span>`}</p>`)}
+        ${zadanie.removed.length > 5 && html`<p class="thq-muted">${L(`…i ${zadanie.removed.length - 5} więcej.`, `…and ${zadanie.removed.length - 5} more.`)}</p>`}
+        <span class="thq-muted">${L("Sprawdzone po czyszczeniu: nic o Tobie nie zostało.", "Checked after cleaning: nothing about you is left.")}</span></div>`}
       ${zadanie.note && html`<p class="thq-muted">${L("Wynik nie jest mniejszy od oryginału: zostaw oryginał.", "The result is not smaller than the original: keep the original.")}</p>`}
       ${zadanie.zip && html`<p><button type="button" class="thq-act-btn is-run" onClick=${() => downloadFile(zadanie.zip).catch((e) => setBlad(e.message))}>
         ${L("Pobierz wszystko", "Download all")} (ZIP, ${konwPlikow(zadanie.files.length)})</button></p>`}

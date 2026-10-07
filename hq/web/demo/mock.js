@@ -396,7 +396,13 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
         : /^(mp4|mov|webm|mkv)$/.test(ext)
           ? [C("mp4", "wideo", "MP4", "działa wszędzie"), C("gif", "obraz", "GIF", "animacja"), C("mp3", "audio", "MP3", "działa wszędzie")]
           : [C("pdf", "pdf", "PDF", "do druku i wysyłki"), C("txt", "tekst", "TXT", "sam tekst")];
-      return { path, name: path.split("/").pop(), size: 0, format: ext, nazwa: ext.toUpperCase(), grupa: "obraz", cele: cele.filter((c) => c.format !== ext) };
+      const M = (opis, wartosc) => ({ opis, wartosc, wpisy: 1 });
+      const metadane = /^(jpe?g|heic)$/.test(ext)
+        ? { miejsce: M("miejsce (GPS)", "50.0614, 19.9366"), urzadzenie: M("telefon albo aparat", "Apple iPhone 15 Pro"), czas: M("data i godzina", "2026-10-05 14:31") }
+        : /^(mov|mp4)$/.test(ext) ? { miejsce: M("miejsce (GPS)", "50.0614, 19.9366"), czas: M("data i godzina", "2026-10-05 14:31") }
+          : /^(png|webp|avif|gif|webm|mkv)$/.test(ext) ? {} : null;
+      return { path, name: path.split("/").pop(), size: 0, format: ext, nazwa: ext.toUpperCase(), grupa: "obraz", cele: cele.filter((c) => c.format !== ext),
+        metadane, czysc: metadane !== null };
     },
     konwStart: async () => { throw new Error("W trybie demo zamiana nie działa: konwerter pracuje na serwerze lokalnej instalacji Jarva."); },
     konwJob: async () => ({ state: "error", error: "demo" }),
