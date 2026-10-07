@@ -263,6 +263,7 @@ Wspólny skill (`shared/skills/izometria/`): klikalne figury izometryczne ze św
 bez bibliotek), PNG w chwili t i film. Szablon, kernel i przykłady z iso-glow bez zmian w `assets/iso-glow/`; `iso.py`
 dokłada polskie napisy, krój OFL zamiast Google Fonts, kolor marki z kontrastem na obu motywach, tryb kadru do
 `<iframe>`, kontrolę figur i zegar wirtualny (`iso_jarvo.js`), dzięki któremu PNG i film wychodzą zawsze tak samo.
+`iso.py flota` robi figurę floty z `fleet.yaml` (`iso_flota.js`: mostek Jarva, pokoje agentów, demo = droga zlecenia).
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|

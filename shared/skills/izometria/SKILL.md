@@ -1,7 +1,7 @@
 ---
 name: izometria
 description: "Figury izometryczne ze świeceniem: strona, PNG, film."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo (szablon i kernel: iso-glow, April Zhu, na iso-figure, Tolga Cohce; MIT)"
 license: MIT
 metadata:
@@ -23,6 +23,8 @@ Czysty SVG bez bibliotek: strona z jedną figurą waży ~40 KB (z krojem ~115 KB
 - **Studio:** grafika na social media (PNG), spójna seria ikon izometrycznych dla marki (jedna paleta, `--wszystkie`).
 - **Wideograf:** figura z `demo()` nagrana na film: intro, explainer, rolka (styl świecenia pasuje do Fosforu).
 - **Schemat usługi:** „jak działa usługa” jako budynek albo urządzenie, w którym zapalają się kolejne etapy.
+- **Flota Jarva:** `iso.py flota` sam robi figurę z `fleet.yaml`: wieża z mostkiem Jarva i pokojami agentów, a demo
+  to droga zlecenia (Ty → Jarvo → karty dla agentów → ocena → raport). Na nasze materiały: post, strona, film.
 
 ## Kiedy NIE używać
 - zdjęcie produktu, realistyczny render, logo i znaki towarowe (nigdy nie rysujesz prawdziwych logo ani sylwetek
@@ -40,6 +42,8 @@ python3 $I sprawdz out/iso/ekspres.html --przegladarka                         #
 python3 $I png out/iso/ekspres.html -o out/iso/ekspres.png --czas 1.6 --rozmiar 1080x1350 --podpis
 python3 $I png out/iso/seria.html -o out/iso/ikony.png --wszystkie --przezroczyste --rozmiar 800x800
 python3 $I wideo out/iso/ekspres.html -o out/wideo/ekspres.mp4 --dlugosc 6 --rozmiar 1080x1920   # Wideograf
+python3 $I flota -o out/iso/flota.html --podpis                               # flota z fleet.yaml (bez fig.js)
+python3 $I png out/iso/flota.html -o out/iso/flota.png --czas 7 --rozmiar 1200x1200 --podpis
 ```
 1. **Nazwij wynik figury, zanim narysujesz:** co daje naciśnięcie (napis, liczba, światło, ruch). Figura, na którą
    można tylko patrzeć, to dekoracja: wybierz inny przedmiot albo dodaj działanie.
@@ -63,6 +67,9 @@ python3 $I wideo out/iso/ekspres.html -o out/wideo/ekspres.mp4 --dlugosc 6 --roz
 - Parametry adresu nadpisują ustawienia: `?kadr`, `?podpis`, `?motyw=jasny`, `?akcent=cyan`, `?tlo=0`, `?figura=id`, `?demo`.
 - `png --czas S`: stan w sekundzie S demo (0 = stan startowy); `--skala 2` ostrzej; rozmiary: 1080x1080 post,
   1080x1350 IG, 1080x1920 story, 1200x630 OG.
+- `flota`: `-o plik.js` = sama figura (do strony z innymi figurami), `-o plik.html` = od razu strona (opcje jak
+  w `zbuduj`, domyślnie paleta `city`); `--przyklad sherlock,web,studio` = kto pracuje w demo (domyślnie pierwszych
+  trzech z rejestru); demo trwa ~6,5 s, więc PNG z `--czas 7`, film `--dlugosc 8`.
 - `wideo` woła `html_wideo.py` Wideografa (`--preset jarvo`, render klatka po klatce w kilku przeglądarkach).
   Inny agent zleca film Wideografowi kartą (WEJŚCIA: strona .html, id figury, długość, format).
 

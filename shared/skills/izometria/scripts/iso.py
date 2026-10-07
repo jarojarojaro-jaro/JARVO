@@ -10,6 +10,8 @@
                        [--skala 2] [--motyw ciemny] [--akcent NAZWA] [--przezroczyste] [--podpis]
     python3 iso.py wideo strona.html -o film.mp4 [--figura ID] [--dlugosc 6] [--fps 30] [--rozmiar 1920x1080]
                          [--motyw ciemny] [--podpis] [--rownolegle N]
+    python3 iso.py flota -o flota.html|flota.js [--fleet fleet.yaml] [--przyklad sherlock,web,studio]
+                         [opcje jak w zbuduj]   # wieża floty z fleet.yaml: „jak działa usługa”
 
 Szablon i kernel: iso-glow (April Zhu) na iso-figure (Tolga Cohce), MIT, kopia w assets/iso-glow. Nakładka Jarva:
 polskie napisy, krój OFL z obrazu zamiast Google Fonts (JetBrains Mono, polskie znaki), paleta z koloru marki,
@@ -17,6 +19,8 @@ tryb kadru (sama figura: osadzenie na stronie, PNG, film), zegar wirtualny (iso_
 i demo() po czasie strony, więc PNG w chwili t i film są zawsze takie same) i kontrola figur (kolory tylko
 z tokenów, bez zewnętrznych skryptów i adresów, czas z api). PNG i `sprawdz --przegladarka` robi
 iso_render.cjs (Chromium z obrazu), film html_wideo.py Wideografa (--preset jarvo).
+Figura floty (`flota`, szablon iso_flota.js): mostek szefa, pokoje agentów z fleet.yaml, demo = droga zlecenia
+przez flotę.
 Stopka „Made with ISO-GLOW”: zostaje na naszych materiałach, --bez-stopki na pracach dla klientów (atrybucja
 licencji jest w docs/SOURCES.md i w LICENSE skilla).
 """
@@ -40,6 +44,7 @@ SKILL = HERE.parent
 SZABLON = SKILL / "assets" / "iso-glow" / "assets" / "gallery.html"
 GLOWA_JS = HERE / "iso_jarvo.js"
 RENDER_JS = HERE / "iso_render.cjs"
+FLOTA_JS = HERE / "iso_flota.js"
 REPO = next((p for p in HERE.parents if (p / "fleet.yaml").exists()), None)
 KROJ = ("jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono-latin-ext-wght-normal.woff2")
 KROJE = [p for p in (HERE / "kroje", REPO / "hq" / "web" / "fonts" / "kroje" if REPO else None) if p]
@@ -50,6 +55,8 @@ MOTYWY = ("auto", "ciemny", "jasny")
 PANEL = {"ciemny": "#141516", "jasny": "#f6f6f5"}
 GOOGLE_FONTS = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap">'
 ZNACZNIK = re.compile(r"/\*ISO_JARVO\*/(.*?)/\*ISO_JARVO\*/", re.S)
+ZNACZNIK_FLOTY = re.compile(r"/\*FLOTA\*/(.*?)/\*FLOTA\*/", re.S)
+ROLA_MAX = 22             # znaków roli na szybie pokoju (dłuższa = obcięta z „…”)
 STOPKA = ('  <!-- Made-with credit: keep by default; delete this footer if you don\'t want it. -->\n'
           '  <footer class="made-with"><a href="https://iso-glow.vercel.app" target="_blank" rel="noopener">'
           'Made with ISO-GLOW ↗</a></footer>\n')
@@ -331,6 +338,69 @@ def zbuduj(figury: list[tuple[str, str]], tytul: str = "Figury", paleta: str | l
     return s, raport
 
 
+# ---------------------------------------------------------------- figura floty (fleet.yaml → iso_flota.js)
+
+def plik_floty(podany: Path | None = None) -> Path:
+    """fleet.yaml: podany, z repo (skill w repo) albo z instalacji Jarva (/opt/jarvo/repo, JARVO_REPO)."""
+    kandydaci = [podany] if podany else [REPO / "fleet.yaml" if REPO else None,
+                                         Path(os.environ.get("JARVO_REPO") or "/opt/jarvo/repo") / "fleet.yaml"]
+    for k in filter(None, kandydaci):
+        if k.is_file():
+            return k
+    raise Blad("nie ma fleet.yaml (podaj --fleet ścieżka)" if not podany else f"brak pliku {podany}")
+
+
+def wczytaj_flote(plik: Path) -> list[dict]:
+    """Agenci z fleet.yaml albo z fleet.json HQ (ta sama lista, inne klucze)."""
+    tekst = plik.read_text(encoding="utf-8")
+    if plik.suffix == ".json":
+        dane = json.loads(tekst)
+    else:
+        try:
+            import yaml
+        except ImportError as exc:
+            raise Blad("brak pyyaml (jest w Hermesie: uruchom pythonem z /opt/hermes/.venv)") from exc
+        dane = yaml.safe_load(tekst)
+    agenci = dane.get("agents") if isinstance(dane, dict) else dane
+    if not isinstance(agenci, list) or not agenci:
+        raise Blad(f"{plik.name}: brak listy agentów")
+    return agenci
+
+
+def _rola(tytul: str) -> str:
+    t = " ".join(str(tytul or "").split()).lower()
+    return t if len(t) <= ROLA_MAX else t[:ROLA_MAX - 1].rstrip() + "…"
+
+
+def dane_floty(agenci: list[dict], przyklad: list[str] | None = None) -> dict:
+    """{szef, agenci, przyklad}: szef = orkiestrator (mostek), reszta w kolejności z rejestru (po dwa na piętro),
+    przyklad = numery agentów, którzy pracują w demo (domyślnie pierwszych trzech)."""
+    szef = next((a for a in agenci if a.get("kind") == "orchestrator"), agenci[0])
+    reszta = [a for a in agenci if a is not szef]
+    wpis = lambda a: {"id": a.get("name", ""), "nazwa": a.get("hq_short") or a.get("short") or a.get("title") or a.get("name", "?"),
+                      "rola": _rola(a.get("title") or "")}
+    out = {"szef": wpis(szef), "agenci": [wpis(a) for a in reszta]}
+    if przyklad is None:
+        out["przyklad"] = list(range(min(3, len(reszta))))
+    else:
+        klucze = [{a["id"].lower(), a["id"].lower().removeprefix("jarvo-"), a["nazwa"].lower()} for a in out["agenci"]]
+        out["przyklad"] = []
+        for nazwa in przyklad:
+            nr = next((i for i, k in enumerate(klucze) if nazwa.strip().lower() in k), None)
+            if nr is None:
+                raise Blad(f"--przyklad: nie ma agenta {nazwa!r} (są: {', '.join(a['id'] for a in out['agenci'])})")
+            out["przyklad"].append(nr)
+    return out
+
+
+def figura_floty(dane: dict) -> str:
+    """Kod figury floty z danymi (iso_flota.js z podmienionym blokiem FLOTA)."""
+    js = FLOTA_JS.read_text(encoding="utf-8")
+    if len(ZNACZNIK_FLOTY.findall(js)) != 1:
+        raise Blad("iso_flota.js: brak znacznika /*FLOTA*/")
+    return ZNACZNIK_FLOTY.sub(lambda m: f"/*FLOTA*/{_js_json(dane)}/*FLOTA*/", js, count=1)
+
+
 # ---------------------------------------------------------------- przeglądarka (iso_render.cjs) i film (html_wideo.py)
 
 def _rozmiar(s: str) -> tuple[int, int]:
@@ -419,20 +489,27 @@ def _wypisz_kontrole(r: dict) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    def opcje_budowy(b, tytul: str, paleta: str):
+        b.add_argument("-o", "--wyjscie", type=Path, required=True)
+        b.add_argument("--tytul", default=tytul)
+        b.add_argument("--paleta", choices=PALETY, default=paleta, help="ember (ciepłe, przedmioty) | city (miasto, budynki)")
+        b.add_argument("--akcent", action="append", default=[], help="kolor marki: '#E4572E', 'Nazwa=#E4572E[,#jaśniejszy]' "
+                       "(kilka razy = kilka kolorów do wyboru); zastępuje paletę")
+        b.add_argument("--motyw", choices=MOTYWY, default="auto")
+        b.add_argument("--kadr", action="store_true", help="sama figura na całej stronie (osadzenie w <iframe> na stronie klienta)")
+        b.add_argument("--podpis", action="store_true", help="w kadrze także „Rys. N · nazwa” i odczyt")
+        b.add_argument("--demo", action="store_true", help="figura od razu odgrywa demo() (otwiera się zapalona)")
+        b.add_argument("--bez-stopki", action="store_true", help="bez „Made with ISO-GLOW” (prace dla klientów)")
+        b.add_argument("--kroj", choices=["osadz", "systemowy"], default="osadz",
+                       help="osadz = JetBrains Mono w pliku (~75 KB, polskie znaki), systemowy = krój mono systemu")
+
     b = sub.add_parser("zbuduj", help="figury .js → jedna strona HTML (działa z dysku, bez sieci)")
     b.add_argument("figury", nargs="+", type=Path)
-    b.add_argument("-o", "--wyjscie", type=Path, required=True)
-    b.add_argument("--tytul", default="Figury")
-    b.add_argument("--paleta", choices=PALETY, default="ember", help="ember (ciepłe, przedmioty) | city (miasto, budynki)")
-    b.add_argument("--akcent", action="append", default=[], help="kolor marki: '#E4572E', 'Nazwa=#E4572E[,#jaśniejszy]' "
-                   "(kilka razy = kilka kolorów do wyboru); zastępuje paletę")
-    b.add_argument("--motyw", choices=MOTYWY, default="auto")
-    b.add_argument("--kadr", action="store_true", help="sama figura na całej stronie (osadzenie w <iframe> na stronie klienta)")
-    b.add_argument("--podpis", action="store_true", help="w kadrze także „Rys. N · nazwa” i odczyt")
-    b.add_argument("--demo", action="store_true", help="figura od razu odgrywa demo() (otwiera się zapalona)")
-    b.add_argument("--bez-stopki", action="store_true", help="bez „Made with ISO-GLOW” (prace dla klientów)")
-    b.add_argument("--kroj", choices=["osadz", "systemowy"], default="osadz",
-                   help="osadz = JetBrains Mono w pliku (~75 KB, polskie znaki), systemowy = krój mono systemu")
+    opcje_budowy(b, "Figury", "ember")
+    fl = sub.add_parser("flota", help="figura floty z fleet.yaml (.js) albo od razu strona (.html): jak działa usługa")
+    fl.add_argument("--fleet", type=Path, help="fleet.yaml albo fleet.json HQ (domyślnie z repo albo /opt/jarvo/repo)")
+    fl.add_argument("--przyklad", help="kto pracuje w demo, po przecinku (np. sherlock,web,studio); domyślnie pierwszych trzech")
+    opcje_budowy(fl, "Flota Jarvo", "city")
     s = sub.add_parser("sprawdz", help="kontrola figur (.js albo zbudowanej strony)")
     s.add_argument("plik", type=Path)
     s.add_argument("--przegladarka", action="store_true", help="też w Chromium: każda figura, demo, błędy JS, tekst poza kadrem")
@@ -465,10 +542,22 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--rownolegle", type=int)
     a = ap.parse_args(argv)
     try:
+        if a.cmd == "flota":
+            dane = dane_floty(wczytaj_flote(plik_floty(a.fleet)), a.przyklad.split(",") if a.przyklad else None)
+            js = figura_floty(dane)
+            if a.wyjscie.suffix.lower() == ".js":
+                a.wyjscie.parent.mkdir(parents=True, exist_ok=True)
+                a.wyjscie.write_text(js, encoding="utf-8")
+                print(json.dumps({"figura": str(a.wyjscie), "agentow": len(dane["agenci"]) + 1}, ensure_ascii=False))
+                return 0
+            a.figury, a.cmd = [("flota.js", js)], "zbuduj"
         if a.cmd == "zbuduj":
             paleta = [akcent_marki(x, i + 1) for i, x in enumerate(a.akcent)] if a.akcent else a.paleta
             figury = []
             for plik in a.figury:
+                if isinstance(plik, tuple):
+                    figury.append(plik)
+                    continue
                 if not plik.exists():
                     raise Blad(f"brak pliku {plik}")
                 figury.append((str(plik), plik.read_text(encoding="utf-8")))

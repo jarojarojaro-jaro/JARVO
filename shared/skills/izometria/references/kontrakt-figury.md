@@ -114,6 +114,8 @@ skrypt liczy sam). Widz wybiera kolor w przełączniku; PNG i film: `--akcent <n
 - Render (`?render=1`): kadr + zegar wirtualny (`iso_jarvo.js`), `window.__seek(t)`, `__ready`, `__W`/`__H`:
   kontrakt `html_wideo.py --preset jarvo`. Cofnięcie czasu = figura od nowa i znów do przodu.
 - Stopka iso-glow zostaje na naszych materiałach; `--bez-stopki` na pracach dla klientów.
+- `iso.py flota`: figura floty z `fleet.yaml` (szablon `scripts/iso_flota.js`, dane między znacznikami `/*FLOTA*/`).
+  Wzór figury z wieloma klikalnymi częściami, stanem w jednym obiekcie, kablami i impulsami (`api.replay`) po kolei.
 - Zakazy z oryginału: żadnych prawdziwych logo, sylwetek markowych produktów ani znaków towarowych; ściany tylko
   przez `plane()` (TOP/FRONT/SIDE), nie ręcznie skośne wielokąty; bez zewnętrznych skryptów; `svg role="img"`
   i `aria-label` ustawia szablon z `aria`.

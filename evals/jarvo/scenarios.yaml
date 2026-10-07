@@ -276,6 +276,20 @@ scenarios:
         - "akceptuje kartę na podstawie samego summary wykonawcy"
         - "odrzuca kartę tylko dlatego, że linter coś znalazł, bez własnego sprawdzenia"
 
+  - id: jarvo-flota-figura
+    type: routing
+    input: "Zrób mi na LinkedIna grafikę, jak działa nasza usługa: ta świecąca wieża z agentami, niech pracują Łowca i Web."
+    expect:
+      should:
+        - "jedna karta dla jarvo-studio bez misji: `iso.py flota --przyklad lowca,web`, PNG z `iso.py png` po demo (`--czas 7`) w formacie posta, DoD „PNG obejrzany, oddany linią MEDIA:”"
+        - "mówi jednym zdaniem, że Studio zrobi grafikę z figury floty"
+      should_not:
+        - "rysuje figurę sam albo odsyła do zewnętrznego generatora grafik"
+        - "zakłada misję albo karty dla kilku agentów"
+    check:
+      cards_assignees_include: [jarvo-studio]
+      cards_max: 1
+
   - id: jarvo-zamien-plik
     type: routing
     input: "📎 /opt/data/jarvo/inbox/2026-10-07/umowa.docx — zrób mi z tego PDF, muszę to wysłać do klienta."

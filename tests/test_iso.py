@@ -160,6 +160,40 @@ def test_cli_zbuduj_i_figury(tmp_path, capsys):
     assert "kolor wpisany" in capsys.readouterr().out
 
 
+
+def test_flota_z_rejestru_floty():
+    """Figura floty: szef z rejestru na mostku, reszta w kolejności fleet.yaml, nazwy jak w HQ, dane w kodzie figury."""
+    agenci = ISO.wczytaj_flote(fl.REPO_ROOT / "fleet.yaml")
+    dane = ISO.dane_floty(agenci)
+    szef = next(a for a in agenci if a["kind"] == "orchestrator")
+    assert dane["szef"]["nazwa"] == szef["hq_short"] and len(dane["agenci"]) == len(agenci) - 1
+    assert [a["id"] for a in dane["agenci"]] == [a["name"] for a in agenci if a is not szef]
+    assert dane["przyklad"] == [0, 1, 2] and all(len(a["rola"]) <= ISO.ROLA_MAX for a in dane["agenci"])
+    assert ISO.dane_floty(agenci, ["lowca", "jarvo-web", "Studio"])["przyklad"] == [
+        next(i for i, a in enumerate(dane["agenci"]) if a["id"] == n) for n in ("jarvo-lowca", "jarvo-web", "jarvo-studio")]
+    with pytest.raises(ISO.Blad, match="nie ma agenta"):
+        ISO.dane_floty(agenci, ["nikt"])
+    # fleet.json z HQ (klucz short zamiast hq_short) daje to samo
+    hq = [{"name": a["name"], "short": a.get("hq_short"), "title": a["title"], "kind": a["kind"]} for a in agenci]
+    assert ISO.dane_floty(hq) == dane
+    js = ISO.figura_floty(dane)
+    assert ISO.ZNACZNIK_FLOTY.search(js).group(1) == ISO._js_json(dane)
+    k = ISO.kontrola(js, "flota.js")
+    assert k["bledy"] == [] and k["uwagi"] == [] and k["figury"] == [{"id": "flota", "nazwa": "Flota Jarvo"}]
+    assert ISO._rola("Bardzo długi tytuł agenta floty Jarvo") == "bardzo długi tytuł ag…"
+
+
+def test_cli_flota(tmp_path, capsys):
+    assert ISO.main(["flota", "-o", str(tmp_path / "f.js"), "--przyklad", "sherlock"]) == 0
+    assert json.loads(capsys.readouterr().out)["agentow"] == len(fl.load_fleet().agents)
+    assert '"przyklad": [0]' in (tmp_path / "f.js").read_text(encoding="utf-8")
+    out = tmp_path / "f.html"
+    assert ISO.main(["flota", "-o", str(out), "--kadr", "--bez-stopki", "--akcent", "#D4213D"]) == 0
+    wynik = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert wynik["figury"] == [{"id": "flota", "nazwa": "Flota Jarvo"}] and wynik["stopka"] is False
+    assert ISO.lista_figur(out) == [{"id": "flota", "nazwa": "Flota Jarvo"}]
+    assert ISO.main(["flota", "-o", str(out), "--fleet", str(tmp_path / "brak.yaml")]) == 1
+
 def test_build_kopiuje_kroj_do_skilla(tmp_path):
     lock = {"sources": {"jarvo": {"type": "repo-tree", "license": "MIT", "notice": "Jarvo."}},
             "agents": {"jarvo-studio": [{"source": "jarvo", "path": "shared/skills/izometria", "dest": "design/izometria"}]}}
