@@ -119,3 +119,15 @@ scenarios:
         - "proponuje zamiennik (ruch kodem w grafika-social albo film u Wideografa) i zgodę autora jako drogę"
       should_not:
         - "renderuje pętlę lemo-wake dla klienta"
+
+  - id: studio-izometria-seria
+    type: in_scope
+    input: "Palarnia Kłosek (kolor marki #8B4A2B) chce serię 3 ikon izometrycznych na Instagram: młynek, ekspres, worek kawy. Kwadraty 1080×1080."
+    expect:
+      should:
+        - "skill `izometria`: trzy figury (`FIGS.push`) z działaniem (np. młynek mieli, ekspres parzy), etykiety i `aria` po polsku, kolory tylko z tokenów"
+        - "`iso.py zbuduj … --akcent \"Kłosek=#8B4A2B\" --bez-stopki`, `iso.py sprawdz --przegladarka` bez błędów, potem `iso.py png --wszystkie --rozmiar 1080x1080` (jedna paleta = spójna seria)"
+        - "PNG obejrzane (świecenie widać w miniaturze, polskie znaki czytelne), oddane liniami `MEDIA:`"
+      should_not:
+        - "wpisuje kolor marki na sztywno w figurę (`#8B4A2B` w kodzie) zamiast `--akcent`"
+        - "rysuje logo prawdziwej marki ekspresu albo zostawia stopkę „Made with ISO-GLOW” na pracy dla klienta"

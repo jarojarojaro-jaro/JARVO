@@ -9,8 +9,8 @@
 #         do-wdrozenia  = właściciel zatwierdził, wdrażamy
 #         czeka         = przejrzane, czeka na decyzję właściciela
 #         odlozone      = właściciel odłożył; nowości tylko w skrócie
-# przejrzane = ostatni commit, który przejrzeliśmy (pełny SHA). validate.py pilnuje, żeby każde repo z SOURCES.md
-# i skills.lock.yaml było w spisie.
+# przejrzane = ostatni commit, który przejrzeliśmy (pełny SHA); źródło bez repo git (`paczka`: adres archiwum .tar.gz)
+# ma tu SHA-256 przejrzanej paczki. validate.py pilnuje, żeby każde repo z SOURCES.md i skills.lock.yaml było w spisie.
 
 version: 1
 
@@ -172,6 +172,19 @@ zrodla:
     repo: https://github.com/addyosmani/web-quality-skills
     status: uzywane
     przejrzane: afa8da942115f2961fdbfa80807ea0b232ff6c00
+  # — kod skopiowany do skilli własnych (shared/skills) —
+  # paczka (źródło bez repo git): przejrzane = SHA-256 paczki, kopia = nasza kopia w repo (sprawdz porównuje pliki),
+  # nazwy = pliki przemianowane w kopii
+  ai-iso-skill:
+    repo: https://github.com/MrBongoC/ai-iso-skill
+    status: uzywane
+    przejrzane: 44b4da7714148eef547cc1b102e433472dfe3531
+  iso-glow:
+    paczka: https://iso-glow.vercel.app/iso-glow.tar.gz
+    kopia: shared/skills/izometria/assets/iso-glow
+    nazwy: {SKILL.md: ISO-GLOW.md}
+    status: uzywane
+    przejrzane: 1e69ce19b06d4517c4398d64ff284f4fe7a96b2479fa4af26d8822c7e0189bc1
   # — platforma i narzędzia obrazu —
   agent-browser:
     repo: https://github.com/vercel-labs/agent-browser

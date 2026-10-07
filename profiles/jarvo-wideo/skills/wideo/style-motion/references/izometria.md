@@ -20,6 +20,8 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/03-isometric/i
 - Ludzie i emocje z bliska (postacie są tu maleńkie): `plaski-wektor.md` albo `kreska.md`.
 - Produkt z bliska (krem, butelka, pudełko): `3d.md`. Liczby jako główna treść: `dane.md` (skill `rodzaje-filmu`).
 - Film tani i na jutro: dziesiątki budynków to dużo kodu i długi render; wybierz `plaski-wektor.md`.
+- Jedno urządzenie albo budynek cienką kreską na ciemnym panelu, ze świeceniem tego, co działa (w stylu Fosforu),
+  które ma też być klikalne na stronie: wspólny skill `izometria` (`iso.py wideo`, render w sekundach).
 
 ## Cechy stylu (sprawdzalne)
 - Kamera ortograficzna wzdłuż (1, 1, 1): wysokość 35,264°, azymut 45°, krawędzie ekranu pod ±30°, wysokość kadru

@@ -9,7 +9,8 @@
 `sprawdz` pyta każde repo o obecny commit (git ls-remote, równolegle) i dla tych, które zmieniły się od
 `przejrzane`, pobiera tylko historię od tamtej chwili (bez plików, same drzewa): liczba i tytuły commitów,
 pliki dodane / zmienione / usunięte, nowe katalogi (do 2 poziomów), nowe i zmienione SKILL.md, zmiana pliku
-licencji (⚠). Raport jest po polsku w Markdownie (albo JSON); z niego rutyna pon/śr/pt robi propozycje dla
+licencji (⚠). Źródło bez repo git (`paczka`: adres archiwum .tar.gz, np. iso-glow) ma w `przejrzane` SHA-256
+paczki: inna suma = nowa wersja, a pliki paczki porównujemy z naszą kopią w repo (`kopia`, `nazwy`). Raport jest po polsku w Markdownie (albo JSON); z niego rutyna pon/śr/pt robi propozycje dla
 właściciela. Skrypt niczego nie wdraża: `przejrzane` i `status` zmieniają tylko spis, a wersja kopiowana do
 floty (`rev` w skills.lock.yaml, stałe w narzędziach) zmienia się osobno, po zgodzie właściciela.
 Kod wyjścia 0 także przy nowościach; 1 przy błędzie spisu, nieznanej nazwie albo niedostępnym repo.
@@ -34,6 +35,8 @@ import fleetlib as fl  # noqa: E402
 SPIS = fl.REPO_ROOT / "vendor" / "zrodla.yaml"
 STATUSY = ("uzywane", "do-wdrozenia", "czeka", "odlozone")
 SHA = re.compile(r"[0-9a-f]{40}")
+SHA256 = re.compile(r"[0-9a-f]{64}")
+PACZKA_MAX = 50 * 1024 * 1024
 LICENCJA = re.compile(r"(LICEN[CS]E|COPYING|NOTICE)(\.[A-Za-z]+)?$", re.I)
 GIT_ENV = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "true", "LC_ALL": "C"}
 POKAZ_COMMITOW = 12
@@ -139,7 +142,71 @@ def nowosci(url: str, galaz: str, od: str, do: str, robocze: Path) -> dict:
     return wynik
 
 
+def pobierz(url: str) -> bytes:
+    import urllib.request
+    with urllib.request.urlopen(url, timeout=60) as r:          # noqa: S310 (adres ze spisu, https)
+        dane = r.read(PACZKA_MAX + 1)
+    if len(dane) > PACZKA_MAX:
+        raise RuntimeError(f"paczka większa niż {PACZKA_MAX // 2**20} MB")
+    return dane
+
+
+def pliki_paczki(dane: bytes) -> dict[str, str]:
+    """ścieżka (bez katalogu głównego archiwum) → SHA-256 pliku; nic nie rozpakowujemy na dysk."""
+    import hashlib
+    import io
+    import tarfile
+    out = {}
+    with tarfile.open(fileobj=io.BytesIO(dane), mode="r:*") as tar:
+        for m in tar.getmembers():
+            if not m.isfile():
+                continue
+            czesci = m.name.lstrip("./").split("/", 1)
+            if len(czesci) == 2 and czesci[1]:
+                out[czesci[1]] = hashlib.sha256(tar.extractfile(m).read()).hexdigest()
+    return out
+
+
+def pliki_kopii(kopia: Path, nazwy: dict[str, str]) -> dict[str, str]:
+    """Nasza kopia w repo w układzie paczki (przemianowane pliki pod nazwą z paczki) → SHA-256."""
+    import hashlib
+    wstecz = {v: k for k, v in nazwy.items()}
+    return {wstecz.get(p.relative_to(kopia).as_posix(), p.relative_to(kopia).as_posix()):
+            hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(kopia.rglob("*")) if p.is_file()}
+
+
+def sprawdz_paczke(nazwa: str, spec: dict, pobieranie=pobierz) -> dict:
+    import hashlib
+    url = str(spec.get("paczka", ""))
+    w = {"nazwa": nazwa, "repo": url, "paczka": True, "status": spec.get("status"), "przejrzane": spec.get("przejrzane"),
+         "pin": None}
+    try:
+        dane = pobieranie(url)
+    except Exception as e:  # noqa: BLE001 (sieć, HTTP, za duża paczka: raport, nie wyjątek)
+        w["blad"] = f"niedostępne: {e}"
+        return w
+    w["glowa"] = hashlib.sha256(dane).hexdigest()
+    w["zmiany"] = w["glowa"] != w["przejrzane"]
+    if not w["zmiany"]:
+        return w
+    try:
+        nowe = pliki_paczki(dane)
+    except Exception as e:  # noqa: BLE001
+        w["blad"] = f"nie da się otworzyć paczki: {e}"
+        return w
+    w["commity"] = []
+    if spec.get("kopia"):
+        stare = pliki_kopii(fl.REPO_ROOT / str(spec["kopia"]), dict(spec.get("nazwy") or {}))
+        w.update(dodane=sorted(set(nowe) - set(stare)), usuniete=sorted(set(stare) - set(nowe)),
+                 zmienione=sorted(p for p in set(nowe) & set(stare) if nowe[p] != stare[p]))
+        w["licencja"] = sorted(p for p in w["dodane"] + w["zmienione"] + w["usuniete"] if LICENCJA.match(p.rsplit("/", 1)[-1]))
+        w["zmienione_skille"] = [p for p in w["zmienione"] if p.rsplit("/", 1)[-1] == "SKILL.md"]
+    return w
+
+
 def sprawdz_jedno(nazwa: str, spec: dict, piny: dict[str, str], robocze: Path) -> dict:
+    if spec.get("paczka"):
+        return sprawdz_paczke(nazwa, spec)
     url = str(spec.get("repo", ""))
     w = {"nazwa": nazwa, "repo": url, "status": spec.get("status"), "przejrzane": spec.get("przejrzane"),
          "pin": piny.get(url.lower().removesuffix(".git"))}
@@ -205,6 +272,8 @@ def raport(wyniki: list[dict], pelny: bool = False) -> str:
         out.append("Nic nowego od ostatniego przeglądu.")
     for w in pelne:
         ile = "ostatnie commity" if w.get("przepisana") else _commity(len(w.get("commity", [])))
+        if w.get("paczka"):
+            ile = "nowa wersja paczki"
         out.append(f"## {w['nazwa']} ({w['status']}): {ile} od `{_krotko(w['przejrzane'])}`")
         out.append("")
         if w["repo"].startswith("https://github.com/"):
@@ -221,7 +290,12 @@ def raport(wyniki: list[dict], pelny: bool = False) -> str:
         out += _lista("nowe katalogi", w.get("nowe_katalogi", []), pelny)
         out += _lista("nowe skille", w.get("nowe_skille", []), pelny)
         out += _lista("zmienione skille", w.get("zmienione_skille", []), pelny)
-        if "dodane" in w:
+        if w.get("paczka"):
+            out.append(f"- paczka {w['repo']}: SHA-256 `{_krotko(w['glowa'])}…` (przejrzana `{_krotko(w['przejrzane'])}…`)")
+            out += _lista("nowe pliki względem naszej kopii", w.get("dodane", []), pelny)
+            out += _lista("zmienione pliki", w.get("zmienione", []), pelny)
+            out += _lista("pliki, których już nie ma", w.get("usuniete", []), pelny)
+        elif "dodane" in w:
             out.append(f"- pliki: {len(w['dodane'])} nowych, {len(w['zmienione'])} zmienionych, "
                        f"{len(w['usuniete'])} usuniętych")
         commity = w.get("commity", [])
@@ -272,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("nazwy", nargs="*")
     p.add_argument("--json", action="store_true")
     p.add_argument("--pelny", action="store_true", help="wszystkie commity i ścieżki, bez skracania")
-    p = sub.add_parser("przejrzane", help="zapisz przejrzany commit (domyślnie obecny)")
+    p = sub.add_parser("przejrzane", help="zapisz przejrzany commit albo SHA-256 paczki (domyślnie obecny)")
     p.add_argument("nazwa")
     p.add_argument("commit", nargs="?")
     p = sub.add_parser("status", help="zmień status źródła")
@@ -283,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
         zrodla = wczytaj(a.spis)
         if a.cmd == "lista":
             for n, s in zrodla.items():
-                print(f"{n:32} {s.get('status', ''):13} {_krotko(s.get('przejrzane'))}  {s.get('repo')}")
+                print(f"{n:32} {s.get('status', ''):13} {_krotko(s.get('przejrzane'))}  {s.get('repo') or s.get('paczka')}")
             return 0
         if a.cmd == "sprawdz":
             nieznane = [n for n in a.nazwy if n not in zrodla]
@@ -300,9 +374,15 @@ def main(argv: list[str] | None = None) -> int:
             ustaw(a.spis, a.nazwa, "status", a.status)
             print(f"{a.nazwa}: status {a.status}")
             return 0
-        sha = a.commit or glowa(str(zrodla[a.nazwa]["repo"]))[1]
-        if not SHA.fullmatch(sha):
-            raise BladSpisu("podaj pełny SHA commitu (40 znaków)")
+        if zrodla[a.nazwa].get("paczka"):
+            import hashlib
+            sha = a.commit or hashlib.sha256(pobierz(str(zrodla[a.nazwa]["paczka"]))).hexdigest()
+            if not SHA256.fullmatch(sha):
+                raise BladSpisu("podaj SHA-256 paczki (64 znaki)")
+        else:
+            sha = a.commit or glowa(str(zrodla[a.nazwa]["repo"]))[1]
+            if not SHA.fullmatch(sha):
+                raise BladSpisu("podaj pełny SHA commitu (40 znaków)")
         ustaw(a.spis, a.nazwa, "przejrzane", sha)
         print(f"{a.nazwa}: przejrzane do {_krotko(sha)}")
         return 0

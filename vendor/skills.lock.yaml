@@ -17,7 +17,7 @@ sources:
   jarvo:
     type: repo-tree          # skille własne floty wspólne dla kilku agentów: shared/skills w tym repo
     license: MIT
-    notice: "Jarvo. Silnik graf-kodu: codebase-memory-mcp (c) DeusData, MIT, pobierany przy pierwszym użyciu."
+    notice: "Jarvo. Silnik graf-kodu: codebase-memory-mcp (c) DeusData, MIT, pobierany przy pierwszym użyciu. Izometria: szablon iso-glow (c) April Zhu i iso-figure (c) Tolga Cohce, MIT (assets/iso-glow/LICENSE)."
   hermes:
     type: hermes-tree
     license: MIT
@@ -279,6 +279,7 @@ agents:
   jarvo-web:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
+    - {source: jarvo, path: shared/skills/izometria, dest: design/izometria}
     - {source: hermes, path: skills/software-development/systematic-debugging, dest: kod/systematic-debugging}
     - {source: getsentry-security, path: skills/security-review, dest: bezpieczenstwo/security-review}
     - {source: trailofbits, path: plugins/supply-chain-risk-auditor/skills/supply-chain-risk-auditor, dest: bezpieczenstwo/supply-chain-risk-auditor}
@@ -340,6 +341,7 @@ agents:
   jarvo-studio:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
+    - {source: jarvo, path: shared/skills/izometria, dest: design/izometria}
     - {source: anthropic-skills, path: skills/algorithmic-art, dest: design/algorithmic-art}
     - {source: impeccable, path: .hermes/skills/impeccable, dest: design/impeccable}
     - {source: marketingskills, path: skills/copywriting, dest: marketing/copywriting}
@@ -370,6 +372,7 @@ agents:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
+    - {source: jarvo, path: shared/skills/izometria, dest: design/izometria}
     - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
     - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}
     - {source: gsap-skills, path: skills/gsap-scrolltrigger, dest: gsap/gsap-scrolltrigger}

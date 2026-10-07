@@ -104,6 +104,12 @@ Programy pobierane przez skille przy pierwszym użyciu (nie w repo ani w obrazie
 |---|---|---|---|
 | [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | 0.11.0 (`linux-*-portable`) | MIT (licencje zależności: `THIRD_PARTY_NOTICES.md` obok programu) | Web, Ręka: skill `graf-kodu` (tryb poleceń, bez MCP i bez procesu w tle) |
 
+Kod skopiowany do skilla własnego floty (`shared/skills`), z plikiem licencji autorów obok:
+
+| Projekt | Wersja | Licencja | Dla kogo |
+|---|---|---|---|
+| [iso-glow](https://iso-glow.vercel.app) (April Zhu), na [MrBongoC/ai-iso-skill](https://github.com/MrBongoC/ai-iso-skill) (iso-figure, Tolga Cohce) | paczka `iso-glow.tar.gz` (SHA-256 `1e69ce19…89bc1`), iso-figure `44b4da7` | MIT (© 2026 April Zhu, © 2026 Tolga Cohce; `shared/skills/izometria/assets/iso-glow/LICENSE`) | Web, Studio, Wideograf: skill `izometria`. Szablon galerii, kernel izometrii i dwa przykłady bez zmian w `assets/iso-glow/` (ich `SKILL.md` jako `ISO-GLOW.md`, żeby nie był osobnym skillem); nasza nakładka `iso.py` + `iso_jarvo.js` (polskie napisy, krój JetBrains Mono zamiast Google Fonts, kolor marki, kadr, zegar wirtualny do PNG i filmu, kontrola figur). Stopka „Made with ISO-GLOW” zostaje na naszych materiałach; na pracach dla klientów jej nie ma, autorów podajemy tutaj |
+
 ## 3. Metodologie i prompty (inspiracja, własny tekst)
 
 Te projekty nie są kopiowane. Przeczytaliśmy je i napisaliśmy własne skille po polsku według ich metod
@@ -162,7 +168,7 @@ przekrojami modeli z klocków, bez użycia znaków towarowych ani zasobów produ
 
 | Licencja | Co robimy |
 |---|---|
-| MIT | zachowujemy informację o prawach autorskich i licencję (`LICENSE-UPSTREAM` przy każdym skillu) |
+| MIT | zachowujemy informację o prawach autorskich i licencję (`LICENSE-UPSTREAM` przy każdym skillu; kod skopiowany do skilla własnego: plik `LICENSE` autorów obok kopii) |
 | Apache-2.0 | licencja przy skillu, `NOTICE` źródła (jeśli istnieje), treść bez zmian (zmiany oznaczylibyśmy w pliku); model MODNet pobierany z Hugging Face, nie redystrybuujemy go |
 | AGPL-3.0 (SearXNG, Lightpanda, opcjonalnie Postiz) | programy uruchamiamy bez modyfikacji (Lightpanda: binarka z oficjalnego obrazu, tylko usunięte symbole debugowania), tylko prywatnie; zmieniona wersja udostępniana przez sieć innym wymagałaby publikacji źródeł |
 | CC-BY-SA-4.0 (getsentry `security-review`, Trail of Bits) | dołączamy **bez zmian**, z atrybucją i licencją przy skillu; tłumaczenie albo przeróbka byłaby adaptacją i musiałaby zostać na CC BY-SA, dlatego metodę Trail of Bits `insecure-defaults` przepisaliśmy własnymi regułami (`security_check.py`), bez kopiowania tekstu. Znaki towarowe (logo Trail of Bits, Sentry) nie są objęte licencją |

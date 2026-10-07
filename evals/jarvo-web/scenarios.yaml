@@ -181,3 +181,14 @@ scenarios:
       should_not:
         - "ten sam title albo description skopiowany na wszystkie podstrony"
         - "zalicza widoczność bez strony 404 albo z soft 404 (nieistniejący adres zwraca 200)"
+
+  - id: web-izometria-hero
+    type: in_scope
+    input: "Karta: na stronie piekarni Złoty Kłos w sekcji „Jak to działa” daj klikalną ilustrację pieca, który piecze chleb po kliknięciu. Kolor marki #C2410C."
+    expect:
+      should:
+        - "skill `izometria`: figura pieca z działaniem (klik = pieczenie, odczyt), `iso.py zbuduj … --kadr --bez-stopki --akcent \"#C2410C\"` do `public/`, osadzona `<iframe … title loading=\"lazy\">`"
+        - "`iso.py sprawdz --przegladarka` bez błędów, PNG z `iso.py png` jako obraz zastępczy, strona dalej przechodzi listę kontrolną (lighthouse, a11y)"
+      should_not:
+        - "dokłada zewnętrzny skrypt, CDN albo Google Fonts do figury"
+        - "zostawia stopkę „Made with ISO-GLOW” na stronie klienta"

@@ -13,9 +13,9 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 |---|---|---|---|---|---|
 | `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [13 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 2 (`writing-for-agents`, mattpocock; wspólny `konwersja-plikow`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski | [24](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [8 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 16 (Hermes, marketingskills, wspólne `transkrypcja-filmu` i `konwersja-plikow`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [15](../evals/jarvo-sherlock/scenarios.yaml) |
-| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 59 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu` i `konwersja-plikow`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [18](../evals/jarvo-web/scenarios.yaml) |
-| `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 26 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki` i `konwersja-plikow`) | render_html, check_media, lemo_wake | [14](../evals/jarvo-studio/scenarios.yaml) |
-| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [20 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 61 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, live-panel, Hermes, wspólne `transkrypcja-filmu`, `hooki`, `konwersja-plikow` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, muzyka, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, twarze, demo_strony, typografia, maska, zywy_schemat, gramatyka, malarz (+ wideo_lib; moduły JS stron: ruch, kreska, morph, crt, plotno, piksel, os_czasu, strona, ujecia) | [34](../evals/jarvo-wideo/scenarios.yaml) |
+| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 60 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria` i `konwersja-plikow`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [19](../evals/jarvo-web/scenarios.yaml) |
+| `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 27 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria` i `konwersja-plikow`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
+| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [20 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 62 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, live-panel, Hermes, wspólne `transkrypcja-filmu`, `hooki`, `izometria`, `konwersja-plikow` i inne) | film, stock, kadry, montaz, napisy, qa_wideo, rytm, muzyka, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, twarze, demo_strony, typografia, maska, zywy_schemat, gramatyka, malarz (+ wideo_lib; moduły JS stron: ruch, kreska, morph, crt, plotno, piksel, os_czasu, strona, ujecia) | [35](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 7 (marketingskills, wspólne `hooki` i `konwersja-plikow`) | ads, planer, eksperyment, eksport | [13](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 1 (wspólny `konwersja-plikow`) | krs, ceidg, przetargi, strona, leady, zrodlo | [15](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 21 (Expo, React Native, ASO; wspólny `konwersja-plikow`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
@@ -45,7 +45,8 @@ Legenda przy skillach:
 ## Warstwa wspólna: wiedza o Tobie i Twoich markach
 
 Snajperzy nie dzielą pamięci ani workflowów dziedzinowych (wspólne są tylko skille z `shared/skills/`:
-narzędziowe jak `graf-kodu` i metodyczne jak `hooki`, oraz te same skille zewnętrzne z locka). Jeden skill ma każdy agent:
+narzędziowe jak `graf-kodu` i `izometria` (figury izometryczne ze świeceniem u Weba, Studia i Wideografa: strona, PNG,
+film) i metodyczne jak `hooki`, oraz te same skille zewnętrzne z locka). Jeden skill ma każdy agent:
 `konwersja-plikow` (plik → inny format na serwerze: zdjęcia z HEIC, wideo, audio, PDF, Word; usuwa też metadane:
 miejsce GPS, telefon, daty, autor; ten sam konwerter masz w HQ: Centrala → Konwerter).
 Wszyscy znają też **Ciebie**:
@@ -125,7 +126,8 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
 - [H] `claude-design`, `popular-web-designs`, `design-md`, `scrollcraft`, `publish-site`, `cloudflare-temporary-deploy`,
   `systematic-debugging` (przyczyna błędu builda albo skryptu, zanim poprawka)
 - [Z] `impeccable`, web-quality-skills (5), claude-seo (13), marketingskills (3), Anthropic (2), GSAP (8), Three.js (10),
-  motion Emila Kowalskiego (5), `text-to-lottie`, wspólny `graf-kodu` (`shared/skills/`), getsentry `security-review`
+  motion Emila Kowalskiego (5), `text-to-lottie`, wspólne `graf-kodu` i `izometria` (`shared/skills/`: klikalna figura
+  izometryczna na stronę klienta, `<iframe>` bez stopki, kolor marki), getsentry `security-review`
   (przegląd kodu wg OWASP), Trail of Bits `supply-chain-risk-auditor` (ryzyko zależności)
 - [T] `brand-z-url`: podajesz stronę, a agent crawluje ją i wyciąga logo, kolory, fonty,
   ton i komponenty do `knowledge/brands/<marka>/` (z `DESIGN.md`)
@@ -221,7 +223,8 @@ Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-studio-marketing-i-kreacja).
   `excalidraw`, `concept-diagrams`
 - [Z] marketingskills (11: copywriting, social, launch, ad-creative…), Anthropic (3: `algorithmic-art`,
   `canvas-design`, `theme-factory`), `impeccable`, lemo-wake (2: `lemo-wake`, `lemo-wake-layers`);
-  wspólny `hooki` (`shared/skills/`: trzy warstwy hooka, 18 taktyk)
+  wspólne `hooki` (`shared/skills/`: trzy warstwy hooka, 18 taktyk) i `izometria` (figury izometryczne ze świeceniem:
+  PNG na social, seria ikon w jednej palecie marki)
 - [T] `formaty-platform` (specyfikacje i szablony), [T] `grafika-social` (szablony HTML do PNG w brand kicie),
   [T] `pakiet-kampanii` (posty + grafiki + brief wideo + kalendarz), [T] `generacja-ai` (obrazy), [T] `copy-pl` (+ sito AI-izmów), [T] `zywy-obraz` (pętla 5 s i warstwy PSD z lemo-wake), [T] `publikacja`
 
@@ -286,7 +289,8 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 [H] `manim-video`, `ai-presenter-video`; [Z] `hyperframes` (12 skilli rodziny), marketingskills `video`, GSAP (8),
 Three.js (10), screenwriting (5), iart (5), motion (3), Remotion, motion-broll, lemo-opuscar, anidoodle, claude-animation,
 bang-motion, pixel2motion, `text-to-lottie`, `slack-gif-creator`, `motion-design` i `video-lessons` (Remocn Studio),
-`live-panel`, wspólne `transkrypcja-filmu`, `hooki` i `konwersja-plikow` (razem 61).
+`live-panel`, wspólne `transkrypcja-filmu`, `hooki`, `izometria` (figura z `demo()` na film przez `html_wideo.py`)
+i `konwersja-plikow` (razem 62).
 Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#jarvo-wideo-wideograf).
 
 **Zasada:** **nie publikuje sam** i nie kupuje materiałów; bez deepfake'ów i klonowania głosów realnych osób.

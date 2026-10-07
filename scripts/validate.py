@@ -294,6 +294,16 @@ def check_zrodla(r: Report) -> None:
         spec = spec or {}
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", str(name)):
             r.err(f"zrodla: nazwa {name!r} tylko z małych liter, cyfr i myślników")
+        if spec.get("paczka"):          # źródło bez repo git: archiwum, przejrzane = SHA-256 paczki
+            if not re.fullmatch(r"https://[^\s]+\.(tar\.gz|tgz|tar\.xz|tar\.bz2|tar)", str(spec["paczka"])):
+                r.err(f"zrodla/{name}: paczka musi być adresem https archiwum .tar.gz / .tgz / .tar.xz")
+            if not re.fullmatch(r"[0-9a-f]{64}", str(spec.get("przejrzane", ""))):
+                r.err(f"zrodla/{name}: przejrzane paczki musi być jej SHA-256 (64 znaki)")
+            if spec.get("kopia") and not (fl.REPO_ROOT / str(spec["kopia"])).is_dir():
+                r.err(f"zrodla/{name}: kopia {spec['kopia']} nie istnieje w repo")
+            if spec.get("status") not in ZRODLA_STATUSY:
+                r.err(f"zrodla/{name}: status {spec.get('status')!r} spoza {sorted(ZRODLA_STATUSY)}")
+            continue
         m = re.fullmatch(r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", str(spec.get("repo", "")))
         if not m:
             r.err(f"zrodla/{name}: repo musi być adresem https://github.com/<właściciel>/<repo>")

@@ -257,6 +257,22 @@ a `--usun-metadane` daje ten sam plik bez nich, bez przekodowania; `--metadane` 
 
 ---
 
+## Web, Studio, Wideograf: skill `izometria`
+
+Wspólny skill (`shared/skills/izometria/`): klikalne figury izometryczne ze świeceniem w jednym pliku HTML (czysty SVG,
+bez bibliotek), PNG w chwili t i film. Szablon, kernel i przykłady z iso-glow bez zmian w `assets/iso-glow/`; `iso.py`
+dokłada polskie napisy, krój OFL zamiast Google Fonts, kolor marki z kontrastem na obu motywach, tryb kadru do
+`<iframe>`, kontrolę figur i zegar wirtualny (`iso_jarvo.js`), dzięki któremu PNG i film wychodzą zawsze tak samo.
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| [iso-glow](https://iso-glow.vercel.app) (April Zhu) na [iso-figure](https://github.com/MrBongoC/ai-iso-skill) (Tolga Cohce) | szablon galerii, kernel izometrii, klasy świecenia, palety, 2 przykłady | MIT | paczka 2026-10 (`1e69ce1…`), iso-figure 2026-10-04 | kopia w skillu |
+| JetBrains Mono (z krojów HQ, `hq/web/fonts/kroje`) | krój figur z polskimi znakami, w pliku strony | OFL-1.1 | n/d | build kopiuje obok `iso.py` |
+| Chromium + playwright-core (Node, z obrazu) | `iso.py png` i `sprawdz --przegladarka` (`iso_render.cjs`) | BSD / Apache-2.0 | n/d | skrypt |
+| `html_wideo.py` Wideografa | `iso.py wideo`: film klatka po klatce (`--preset jarvo`) | nasz | n/d | skrypt |
+
+---
+
 ## Infrastruktura (VPS)
 
 | Narzędzie | Po co | Licencja | Ostatni commit |

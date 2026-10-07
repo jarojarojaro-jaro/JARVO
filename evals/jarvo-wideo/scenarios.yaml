@@ -356,3 +356,13 @@ scenarios:
       should_not:
         - "oddaje scenę-wzór z dziewczyną i kotem bez zmian albo używa postaci autora silnika (`rig_huashu.js`)"
         - "maluje kopię konkretnego obrazu Van Gogha zamiast jego techniki albo wpisuje „Van Gogh” do napisów spotu"
+
+  - id: wideo-izometria-rolka
+    type: in_scope
+    input: "Karta od Studia: z figury out/iso/ekspres.html (id ekspres) zrób 6-sekundową rolkę 9:16 w stylu Fosfor, ekspres ma parzyć kawę."
+    expect:
+      should:
+        - "`iso.py wideo out/iso/ekspres.html --figura ekspres --dlugosc 6 --rozmiar 1080x1920` (html_wideo.py --preset jarvo, zegar wirtualny), demo figury pokazuje parzenie w pierwszych sekundach"
+        - "klatki obejrzane (np. `iso.py png --czas` albo arkusz), `html_wideo.py pomiar` bez błędów, film oddany linią `MEDIA:`"
+      should_not:
+        - "nagrywa ekran przeglądarki w czasie rzeczywistym zamiast renderu klatka po klatce"
