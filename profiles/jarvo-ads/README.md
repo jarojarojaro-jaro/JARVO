@@ -6,6 +6,6 @@ Płatne reklamy od planu po raport. Projekt i bezpieczeństwo budżetu: [docs/AD
 |---|---|
 | `SOUL.md` | main prompt: cel biznesowy, pieniądze tylko przez Skarbiec, uczciwe werdykty, mapa workflowów |
 | `skills/ads/` | 10: plan-kampanii, plan-testu, start-kampanii, podlacz-konto, audyt-konta, optymalizacja, raport-reklam, wnioski-marki, sledzenie-konwersji, zgodnosc-reklam |
-| skille zewnętrzne | 7: marketingskills: `ads`, `ab-testing`, `attribution`, `analytics`, `ad-creative`; wspólne `hooki` i `konwersja-plikow` (plik → inny format) (`vendor/skills.lock.yaml`) |
+| skille zewnętrzne | 7: marketingskills: `ads`, `ab-testing`, `attribution`, `analytics`, `ad-creative`; wspólne `hooki` i `konwersja-plikow` (plik → inny format albo bez metadanych) (`vendor/skills.lock.yaml`) |
 | `scripts/` | `ads.py` (jedyne wejście do Skarbca), `planer.py` (moc testu, prognoza), `eksperyment.py` (P(najlepszy), werdykt), `eksport.py` (CSV z Ads Managera / Google Ads → dane) |
 | `quality/rubric.md` | rubryka sędziego |

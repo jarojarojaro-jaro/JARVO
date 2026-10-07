@@ -19,7 +19,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 7 (marketingskills, wspólne `hooki` i `konwersja-plikow`) | ads, planer, eksperyment, eksport | [13](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 1 (wspólny `konwersja-plikow`) | krs, ceidg, przetargi, strona, leady, zrodlo | [15](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 21 (Expo, React Native, ASO; wspólny `konwersja-plikow`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
-| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 5 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`, `konwersja-plikow`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [13](../evals/jarvo-reka/scenarios.yaml) |
+| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 5 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`, `konwersja-plikow`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [14](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
 
@@ -46,8 +46,8 @@ Legenda przy skillach:
 
 Snajperzy nie dzielą pamięci ani workflowów dziedzinowych (wspólne są tylko skille z `shared/skills/`:
 narzędziowe jak `graf-kodu` i metodyczne jak `hooki`, oraz te same skille zewnętrzne z locka). Jeden skill ma każdy agent:
-`konwersja-plikow` (plik → inny format na serwerze: zdjęcia z HEIC, wideo, audio, PDF, Word; ten sam konwerter
-masz w HQ: Centrala → Konwerter).
+`konwersja-plikow` (plik → inny format na serwerze: zdjęcia z HEIC, wideo, audio, PDF, Word; usuwa też metadane:
+miejsce GPS, telefon, daty, autor; ten sam konwerter masz w HQ: Centrala → Konwerter).
 Wszyscy znają też **Ciebie**:
 - **profil użytkownika**: kim jesteś, czym się zajmujesz, preferencje (MVP: `knowledge/user/USER.md`
   z wywiadu onboardingowego Jarva; później wspólny provider pamięci, np. Honcho),

@@ -6,7 +6,7 @@ Firmy z „dlaczego teraz” z oficjalnych, darmowych źródeł. Projekt i grani
 |---|---|
 | `SOUL.md` | main prompt: ICP przed szukaniem, tylko źródła oficjalne i publiczne, kontakt opublikowany ze źródłem, nic nie wysyła |
 | `skills/lowca/` | 7: profil-klienta, sygnaly (+ tabela źródeł), kwalifikacja, kontakt-firmy, lista-leadow, monitoring-leadow, rozpoznanie-zrodla |
-| skille zewnętrzne | 1: wspólny `konwersja-plikow` (plik → inny format: zdjęcia, wideo, audio, PDF, Word) (`vendor/skills.lock.yaml`) |
+| skille zewnętrzne | 1: wspólny `konwersja-plikow` (plik → inny format: zdjęcia, wideo, audio, PDF, Word; plik bez metadanych, np. GPS) (`vendor/skills.lock.yaml`) |
 | `scripts/` | `krs.py` (odpisy, biuletyn dnia, nowe firmy), `ceidg.py` (CEIDG API v3: jednoosobowe działalności po PKD i miejscu, nowe firmy, kontakt podany w rejestrze; token `CEIDG_TOKEN`, `sprawdz`), `przetargi.py` (BZP ogłoszenia i wyniki ze zwycięzcą, TED, `sprawdz` jako healthcheck), `strona.py` (kontakt, kariera, technologia, odcisk strony; także dane ukryte w HTML: JSON-LD, Next.js, Nuxt, RSC), `leady.py` (sygnały, kontakty, ocena wg ICP, `leady.csv`, `LEADY.md`, monitoring), `zrodlo.py` + `har.cjs` (rozpoznanie nowego źródła: nagranie HAR, różnice, schemat), `lowca_lib.py` |
 | `quality/rubric.md` | rubryka sędziego |
 

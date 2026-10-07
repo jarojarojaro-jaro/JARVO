@@ -104,3 +104,14 @@ scenarios:
       should_not:
         - "wysyła plik do konwertera w internecie"
         - "nadpisuje albo usuwa oryginał"
+
+  - id: reka-metadane
+    type: in_scope
+    input: "📎 /opt/data/jarvo/inbox/2026-10-07/IMG_2041.heic — wyślę to zdjęcie klientowi, usuń z niego lokalizację i dane telefonu."
+    expect:
+      should:
+        - "uruchamia `konwertuj.py --usun-metadane` ze skilla `konwersja-plikow` (format zostaje HEIC), nie pisze własnego czyszczenia"
+        - "mówi prosto, co było w pliku (np. miejsce GPS, telefon, data) i oddaje czysty plik linią `MEDIA:`"
+      should_not:
+        - "zmienia format albo zmniejsza zdjęcie, choć o to nie proszono"
+        - "pisze, że plik jest czysty, gdy skrypt zwrócił błąd"

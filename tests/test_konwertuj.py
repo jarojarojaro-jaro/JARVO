@@ -371,6 +371,138 @@ def test_skill_jest_u_calej_floty():
         assert wpisy == [{"source": "jarvo", "path": "shared/skills/konwersja-plikow", "dest": "pliki/konwersja-plikow"}], a
 
 
+# --------------------------------------------------------------------------- metadane
+
+# wynik `exiftool -j -G1 -a -s -n` dla zdjęcia z iPhone'a (skrót)
+IPHONE = {
+    "SourceFile": "/x/IMG_2041.jpg", "System:FileName": "IMG_2041.jpg", "System:FileModifyDate": "2026:10:07 10:00:00",
+    "File:FileType": "JPEG", "File:Comment": "tajny komentarz", "IFD0:Make": "Apple", "IFD0:Model": "iPhone 15 Pro",
+    "IFD0:Orientation": 6, "IFD0:Software": "18.1", "ExifIFD:DateTimeOriginal": "2026:10:05 14:31:00",
+    "ExifIFD:OffsetTimeOriginal": "+02:00", "ExifIFD:LensModel": "iPhone 15 Pro back camera", "ExifIFD:ColorSpace": 65535,
+    "GPS:GPSLatitude": 50.0614, "GPS:GPSLongitude": 19.9366, "Composite:GPSLatitude": 50.0614,
+    "Composite:GPSLongitude": 19.9366, "Composite:GPSPosition": "50.0614 19.9366", "XMP-dc:Description": "Dom przy Rynku",
+    "IPTC:Keywords": ["dom", "rynek"], "IFD0:Artist": "Jan Kowalski", "ExifIFD:ImageUniqueID": "ABC123",
+    "IFD1:ThumbnailImage": "(Binary data 3170 bytes, use -b option to extract)", "ICC_Profile:DeviceModel": "Apple",
+    "ICC_Profile:ProfileDateTime": "2022:01:01 00:00:00", "ExifIFD:UserComment": "",
+}
+# film po przepakowaniu przez ffmpeg: zerowe daty w nagłówkach to brak daty
+CZYSTY_FILM = {"QuickTime:CreateDate": "0000:00:00 00:00:00", "Track1:TrackCreateDate": "0000:00:00 00:00:00",
+               "Track1:HandlerDescription": "VideoHandler", "Track1:VendorID": "FFmpeg", "Composite:Rotation": 270}
+
+
+def test_metadane_kategorie_i_opis():
+    kat = K.kategorie(IPHONE)
+    assert set(kat) == {"miejsce", "urzadzenie", "czas", "osoba", "opis", "identyfikator", "miniatura"}
+    assert "File:Comment" in kat["opis"] and "ExifIFD:UserComment" not in kat["opis"]     # pusty nie liczy się
+    assert not any(k.startswith(("System:", "Composite:", "ICC_Profile:")) for v in kat.values() for k in v)
+    assert "IFD0:Orientation" not in sum(kat.values(), []) and "ExifIFD:ColorSpace" not in sum(kat.values(), [])
+    o = K._opisz(IPHONE)
+    assert list(o) == ["miejsce", "urzadzenie", "czas", "osoba", "opis", "identyfikator", "miniatura"]
+    assert o["miejsce"]["wartosc"] == "50.0614, 19.9366"
+    assert o["urzadzenie"]["wartosc"] == "Apple iPhone 15 Pro"
+    assert o["czas"]["wartosc"] == "2026-10-05 14:31"
+    assert o["opis"]["wartosc"] == "Dom przy Rynku"           # opis przed słowami kluczowymi
+    assert o["osoba"]["wartosc"] == "Jan Kowalski" and o["miniatura"]["wartosc"] == ""
+    assert K.kategorie(CZYSTY_FILM) == {}
+    aparat = K._opisz({"IFD0:Make": "Canon", "IFD0:Model": "Canon EOS R5", "ID3:Location": "+50.06+019.93/"})
+    assert aparat["urzadzenie"]["wartosc"] == "Canon EOS R5" and aparat["miejsce"]["wartosc"] == "+50.06+019.93/"
+
+
+def test_usun_metadane_polecenia(monkeypatch, tmp_path):
+    wolane = []
+    monkeypatch.setattr(K, "_run", lambda cmd, *a, **k: wolane.append(cmd))
+    K._wyczysc(tmp_path / "a.heic", tmp_path / "b.heic", "heic")
+    e = wolane[-1]
+    assert e[0] == "exiftool" and "-all=" in e and "-trailer:all=" in e
+    assert e[e.index("-tagsFromFile") + 1:e.index("-o")] == ["@", "-ColorSpaceTags", "-Orientation"]   # kolory i obrót zostają
+    K._wyczysc(tmp_path / "a.mov", tmp_path / "b.mov", "mov")
+    f = wolane[-1]
+    assert f[0] == "ffmpeg" and f[f.index("-c") + 1] == "copy" and "0:V" in f and "0:s?" in f
+    assert f[f.index("-map_metadata") + 1] == "-1" and "-1" == f[f.index("-map_chapters") + 1] and "+bitexact" in f
+    assert "+faststart" in f and f[f.index("-strict") + 1] == "unofficial"
+    K._wyczysc(tmp_path / "a.mp3", tmp_path / "b.mp3", "mp3")
+    m = wolane[-1]
+    assert m[m.index("-map") + 1] == "0:a" and "0:V" not in m and "+faststart" not in m   # bez okładki
+
+
+def test_usun_metadane_wynik_i_kontrola(monkeypatch, tmp_path):
+    src = tmp_path / "IMG_2041.jpg"
+    src.write_bytes(b"jpg-z-gps")
+    monkeypatch.setattr(K.shutil, "which", lambda n: f"/usr/bin/{n}")
+    zostaw = {"IFD0:Orientation": 6, "ExifIFD:ColorSpace": 65535}
+    po = [zostaw]
+    monkeypatch.setattr(K, "_exiftool_json", lambda p: IPHONE if Path(p) == src else po[0])
+    monkeypatch.setattr(K, "_wyczysc", lambda a, b, z: b.write_bytes(b"jpg"))
+    r = K.usun_metadane(src)
+    out = Path(r["pliki"][0])
+    assert out.name == "IMG_2041-bez-metadanych.jpg" and out.read_bytes() == b"jpg" and src.read_bytes() == b"jpg-z-gps"
+    assert r["usuniete"]["miejsce"]["wartosc"] == "50.0614, 19.9366" and r["wpisow_usunietych"] == 15   # 17 wpisów, obrót i kolory zostają
+    assert r["trasa"] == ["bez metadanych (exiftool)"] and "uwaga" not in r
+    assert Path(K.usun_metadane(src, katalog=tmp_path / "out")["pliki"][0]) == tmp_path / "out" / "IMG_2041.jpg"
+    # coś zostało po czyszczeniu: błąd i żadnego pliku (zamiast fałszywego „czyste”)
+    po[0] = {**zostaw, "GPS:GPSLatitude": 50.06}
+    with pytest.raises(K.Blad, match=r"Nie udało się usunąć wszystkiego \(miejsce \(GPS\)\)"):
+        K.usun_metadane(src, dst=tmp_path / "x.jpg")
+    assert not (tmp_path / "x.jpg").exists()
+    # czysty plik: wynik jest, z uwagą
+    po[0] = zostaw
+    monkeypatch.setattr(K, "_exiftool_json", lambda p: zostaw)
+    assert K.usun_metadane(src, dst=tmp_path / "y.jpg")["uwaga"] == "w pliku nie było metadanych do usunięcia"
+
+
+def test_usun_metadane_bledy(monkeypatch, tmp_path):
+    pdf, film = tmp_path / "a.pdf", tmp_path / "a.mp4"
+    pdf.write_bytes(b"%PDF")
+    film.write_bytes(b"x")
+    with pytest.raises(K.Blad, match="nie z PDF"):
+        K.usun_metadane(pdf)
+    monkeypatch.setattr(K.shutil, "which", lambda n: None)
+    with pytest.raises(K.Blad, match="wymaga exiftool"):
+        K.usun_metadane(film)
+    with pytest.raises(K.Blad, match="Odczyt metadanych wymaga exiftool"):
+        K.metadane(film)
+    with pytest.raises(K.Blad, match="Nie ma pliku"):
+        K.usun_metadane(tmp_path / "brak.jpg")
+
+
+def test_zamiana_filmu_i_dzwieku_bez_metadanych(silniki):
+    silniki(WSZYSTKIE)
+    ff = K.silnik("ffmpeg")
+    info = {"ok": True, "v": {"codec_name": "h264"}, "a": {"codec_name": "aac"}}
+    for na, inf in (("mp4", info), ("mp3", info), ("gif", {}), ("webm", {})):
+        for cmd in ff.polecenia(Path("a.mov"), Path(f"b.{na}"), "mov", na, K.Opcje(), inf):
+            i = cmd.index("-map_metadata")
+            assert cmd[i:i + 6] == K.FF_BEZ_METADANYCH, na     # GPS z Androida nie przechodzi do MP4/MP3
+
+
+def test_zamiana_dopilnowuje_czystosci(monkeypatch, tmp_path):
+    p = tmp_path / "a.gif"
+    p.write_bytes(b"gif-z-komentarzem")
+    stan = {"brudny": True}
+    monkeypatch.setattr(K.shutil, "which", lambda n: f"/usr/bin/{n}")
+    monkeypatch.setattr(K, "_exiftool_json", lambda f: {"File:Comment": "ul. Długa 5"} if stan["brudny"] else {})
+
+    def czysc(a, b, z):
+        b.write_bytes(b"gif")
+        stan["brudny"] = False
+    monkeypatch.setattr(K, "_wyczysc", czysc)
+    K._dopilnuj([p, tmp_path / "a.pdf"])
+    assert p.read_bytes() == b"gif" and not list(tmp_path.glob(".*"))
+
+
+def test_cli_metadane(monkeypatch, tmp_path, capsys):
+    a = tmp_path / "a.jpg"
+    a.write_bytes(b"x")
+    monkeypatch.setattr(K, "metadane", lambda p: {"plik": str(p), "wrazliwe": {}, "czysty": True})
+    assert K.main([str(a), "--metadane"]) == 0
+    assert json.loads(capsys.readouterr().out)["czysty"] is True
+    assert K.main([str(a), "--usun-metadane", "--na", "png"]) == 1
+    assert "zostawia format" in capsys.readouterr().err
+    monkeypatch.setattr(K, "usun_metadane", lambda p, d, k: {"pliki": [str(d or p)]})
+    assert K.main([str(a), "--usun-metadane", "-o", str(tmp_path / "b.jpg")]) == 0
+    assert json.loads(capsys.readouterr().out)["pliki"] == [str(tmp_path / "b.jpg")]
+
+
 # --------------------------------------------------------------------------- prawdziwe narzędzia (obraz Jarva)
 
 def _pil():
@@ -428,4 +560,30 @@ def test_prawdziwy_pandoc_nie_wciaga_plikow_z_dysku(tmp_path):
             import zipfile
             with zipfile.ZipFile(r["pliki"][0]) as z:
                 assert not any(b"SEKRET-123" in z.read(n) for n in z.namelist()), na
+    K._graf.cache_clear()
+
+
+@pytest.mark.skipif(not (shutil.which("exiftool") and shutil.which("ffmpeg")), reason="brak exiftool albo ffmpeg")
+def test_prawdziwe_usuwanie_metadanych(tmp_path):
+    K._graf.cache_clear()
+    jpg, mov = tmp_path / "zdj.jpg", tmp_path / "film.mov"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=320x240", "-frames:v", "1", str(jpg)],
+                   check=True)
+    subprocess.run(["exiftool", "-q", "-overwrite_original", "-Make=Apple", "-Model=iPhone 15 Pro", "-GPSLatitude=50.0614",
+                    "-GPSLatitudeRef=N", "-GPSLongitude=19.9366", "-GPSLongitudeRef=E", "-Orientation#=6",
+                    "-DateTimeOriginal=2026:10:05 14:31:00", "-Comment=ul. Długa 5", str(jpg)], check=True)
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25:duration=1",
+                    "-f", "lavfi", "-i", "sine=duration=1", "-c:v", "libx264", "-c:a", "aac", "-shortest",
+                    "-metadata", "location=+50.0614+019.9366/", "-metadata", "creation_time=2026-10-05T12:31:00Z",
+                    str(mov)], check=True)
+    assert set(K.metadane(jpg)["wrazliwe"]) == {"miejsce", "urzadzenie", "czas", "opis"}
+    assert "miejsce" in K.metadane(mov)["wrazliwe"]
+    r = K.usun_metadane(jpg)
+    out = Path(r["pliki"][0])
+    assert K.metadane(out)["czysty"] and out.name == "zdj-bez-metadanych.jpg"
+    o = subprocess.run(["exiftool", "-s3", "-n", "-Orientation", str(out)], capture_output=True, text=True).stdout
+    assert o.strip() == "6"                                           # obrót zostaje
+    assert K.metadane(Path(K.usun_metadane(mov)["pliki"][0]))["czysty"]
+    for na in ("mp4", "mp3"):                                         # zamiana też nie przenosi GPS z Androida
+        assert K.metadane(Path(K.konwertuj(mov, na)["pliki"][0]))["czysty"], na
     K._graf.cache_clear()

@@ -241,6 +241,8 @@ w przejrzane testy regresji), `gonogo` (wynik evali → decyzja o wdrożeniu).
 
 Wspólny skill floty (`shared/skills/konwersja-plikow/`, wzór: [convt](https://github.com/opencoredev/convt), AGPL-3.0,
 bez jego kodu): `konwertuj.py` wybiera najtańszą trasę przez silniki, które są w obrazie (bez silnika trasa znika).
+Metadane (miejsce GPS, telefon, daty, autor, opisy) nie przechodzą przez żadną zamianę zdjęcia, filmu ani dźwięku,
+a `--usun-metadane` daje ten sam plik bez nich, bez przekodowania; `--metadane` pokazuje, co plik mówi o człowieku.
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
@@ -249,6 +251,7 @@ bez jego kodu): `konwertuj.py` wybiera najtańszą trasę przez silniki, które 
 | [Ghostscript](https://www.ghostscript.com) (z OCRmyPDF) | PDF → obrazy stron, tekst, mniejszy PDF | AGPL-3.0 (osobny program) | 2026-09 | CLI |
 | [qpdf](https://github.com/qpdf/qpdf) | łączenie PDF, liczba stron | Apache-2.0 | 2026-09 | CLI |
 | [Pandoc](https://github.com/jgm/pandoc) | DOCX, ODT, Markdown, HTML, EPUB, RTF między sobą (filtr Lua bez plików z dysku i z sieci) | GPL-2.0 | 2026-09 | CLI |
+| [ExifTool](https://exiftool.org) (w obrazie Jarva) | metadane: odczyt, usuwanie ze zdjęć bez przekodowania (piksele, profil kolorów i obrót zostają), kontrola wyniku każdej zamiany | GPL/Artistic (jak Perl) | n/d | CLI |
 | Chromium (z obrazu) | HTML → PDF (serwer druku tylko z katalogu dokumentu, bez sieci) | BSD | n/d | CLI |
 | [LibreOffice](https://www.libreoffice.org) | Excel, PowerPoint, stare .doc/.xls/.ppt, CSV ↔ XLSX (dodatek `office`) | MPL-2.0 | 2026-09 | CLI |
 

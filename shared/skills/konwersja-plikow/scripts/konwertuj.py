@@ -4,6 +4,8 @@
     python3 konwertuj.py <plik…|katalog> --na <format> [-o wynik | --katalog DIR] [--jakosc 1-100]
                          [--rozmiar 1080|720p|50%|1920x1080] [--strony 1-3,5] [--dpi 150] [--polacz] [-r]
     python3 konwertuj.py <plik> --cele          # na co można zamienić ten plik (JSON)
+    python3 konwertuj.py <plik…> --metadane     # co plik mówi o człowieku: miejsce GPS, telefon, data, autor (JSON)
+    python3 konwertuj.py <plik…|katalog> --usun-metadane [-o wynik | --katalog DIR]   # ten sam plik bez metadanych
     python3 konwertuj.py --formaty              # formaty i silniki dostępne tutaj (JSON)
 
 Silniki (co jest w obrazie, to działa; bez silnika trasa znika): Pillow (zdjęcia, HEIC z iPhone'a, AVIF, PSD,
@@ -16,7 +18,9 @@ Wynik obok pliku (albo -o / --katalog); istniejącego pliku nie nadpisuje: nazwa
 nigdy nie powiększa. --jakosc: zdjęcia (domyślnie 85), film (domyślnie 75), audio (kb/s ≈ 3,2 × jakość),
 PDF → PDF (mniejszy plik). Ten sam format z --rozmiar albo --jakosc = zmniejszenie pliku.
 --polacz: kilka plików (zdjęcia, PDF, dokumenty) → jeden PDF. --strony: strony PDF do obrazów („1-3,5”, „4-”).
-Metadane zdjęć (np. GPS) nie przechodzą do wyniku; profil koloru zostaje.
+Metadane (miejsce GPS, telefon, daty, autor, opisy) nie przechodzą do wyniku zamiany zdjęcia, filmu ani dźwięku;
+profil koloru i obrót zostają. --usun-metadane (exiftool, FFmpeg): ten sam format bez przekodowania, a wynik
+jest sprawdzany (coś zostało = błąd, nie plik); bez -o wynik obok: <nazwa>-bez-metadanych.<ext>.
 Wynik: JSON {pliki, trasa, rozmiar_przed, rozmiar_po, sek}; kod 1 = błąd z opisem po polsku.
 """
 
@@ -95,6 +99,8 @@ MAX_KROKOW = 3
 MAX_STRON = 200          # PDF → obrazy bez --strony
 WIDEO = {"mp4", "mov", "webm", "mkv", "avi"}
 AUDIO = {"mp3", "wav", "m4a", "aac", "ogg", "opus", "flac"}
+# bez miejsca, telefonu, dat, tytułów i rozdziałów; bitexact: bez dopisku „Lavf…” (obrót obrazu zostaje: to nie metadane)
+FF_BEZ_METADANYCH = ["-map_metadata", "-1", "-map_chapters", "-1", "-fflags", "+bitexact"]
 
 
 class Blad(Exception):
@@ -356,6 +362,8 @@ def zapisz_obraz(src: Path, dst: Path, na: str, opt: Opcje) -> None:
         kw.update(quality=q, optimize=True, progressive=True)
     elif na in ("webp", "avif", "heic"):
         kw.update(quality=q)
+        if na == "heic":   # pillow_heif sam przepisałby EXIF i XMP źródła (z GPS)
+            kw.update(exif=None, xmp=None, metadata=[])
     elif na == "png":
         kw.update(optimize=True)
     elif na == "tiff":
@@ -435,6 +443,7 @@ class FFmpeg(Silnik):
         wej = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src)]
         if z == "svg":
             return [[*wej, "-frames:v", "1", "-update", "1", str(dst)]]
+        wej += FF_BEZ_METADANYCH
         if na in AUDIO:
             if info.get("ok") and a is None:
                 raise Blad("Ten plik nie ma dźwięku: nie ma czego zapisać jako audio.")
@@ -823,6 +832,8 @@ def konwertuj(src: Path, na: str, dst: Path | None = None, katalog: Path | None 
             q = out if len(biezace) == 1 else wolna_sciezka(out.with_name(f"{_baza(p)}{out.suffix}"))
             shutil.move(str(p), q)
             wyniki.append(q)
+    if FORMATY[z][0] in ("obraz", "wideo", "audio"):
+        _dopilnuj(wyniki)
     przed, po = src.stat().st_size, _rozmiar(wyniki)
     wynik = {"wejscie": str(src), "na": na, "trasa": [f"{a}→{b} ({s})" for a, b, s in kroki],
              "pliki": [str(p) for p in wyniki], "rozmiar_przed": przed, "rozmiar_po": po,
@@ -889,6 +900,202 @@ def formaty() -> dict:
             "rozszerzenia": sorted({*FORMATY, *ALIASY})}
 
 
+# --------------------------------------------------------------------------- metadane
+
+FOTO_META = {"jpg", "png", "webp", "heic", "avif", "tiff", "gif"}   # exiftool czyści je bez ponownego kodowania
+BEZ_KONTROLI = re.compile(r"^(System|File|Composite|ExifTool|ICC.*)$")   # spoza pliku, wyliczone albo celowo zostaje
+ZAWSZE = {"File:Comment"}   # komentarz JPG/GIF exiftool podaje w grupie File
+WRAZLIWE = (   # (klucz, opis, nazwy tagów exiftool); pierwsza pasująca kategoria wygrywa
+    ("miejsce", "miejsce (GPS)", r"GPS\w*|\w*Location\w*|\w*Coordinates|\w*ISO6709|City|Country\w*|State|"
+                                r"Province-State|Sub-?location"),
+    ("urzadzenie", "telefon albo aparat", r"Make|Model|LensMake|LensModel|LensInfo|LensID|Software|HostComputer|"
+                                         r"CameraModelName|UniqueCameraModel|Android\w+|\w*SerialNumber\w*"),
+    ("czas", "data i godzina", r"DateTimeOriginal|CreateDate|CreationDate|CreationTime|ModifyDate|DateTimeDigitized|"
+                               r"DateCreated|DateTimeCreated|DigitalCreation\w+|TimeCreated|MetadataDate|DateTime|"
+                               r"SubSec\w+|OffsetTime\w*|Track(Create|Modify)Date|Media(Create|Modify)Date|"
+                               r"ContentCreateDate|RecordingTime|Date"),
+    ("osoba", "autor albo właściciel", r"Artist|Author|Creator|Creator(Address|City|Country|WorkEmail|WorkTelephone|"
+                                     r"WorkURL)|By-line|Copyright|CopyrightNotice|Rights|OwnerName|CameraOwnerName|"
+                                     r"XPAuthor|LastModifiedBy|Credit|Publisher|PersonInImage|"
+                                     r"Region(Name|PersonDisplayName)|AlbumArtist|Composer|Performer|Band|"
+                                     r"Writer-Editor|Director|Producer"),
+    ("opis", "opis, tytuł albo komentarz", r"ImageDescription|Description|Title|Subject|Keywords|Comment|UserComment|"
+                                          r"XP(Comment|Keywords|Subject|Title)|Caption-Abstract|Headline|Label|Album|"
+                                          r"ObjectName|SpecialInstructions|Notes|Lyrics\w*"),
+    ("identyfikator", "identyfikatory zdjęcia", r"\w*(UUID|UniqueID|DocumentID|InstanceID|ContentIdentifier|RequestID)\w*"),
+    ("miniatura", "miniatura w środku pliku", r"Thumbnail\w*|PreviewImage\w*|OtherImage\w*|MPImage\d*|CoverArt|Picture"),
+)
+_WRAZLIWE = [(k, o, re.compile(rf"^(?:{w})$")) for k, o, w in WRAZLIWE]
+_DATA = re.compile(r"^(\d{4})[:-](\d\d)[:-](\d\d)(?:[ T](\d\d):(\d\d))?")
+
+
+def _zero_data(v) -> bool:
+    """„0000:00:00 00:00:00” (pusta data w nagłówku filmu) to brak daty."""
+    return not re.search(r"[1-9]", str(v))
+
+
+def _tekst(v, n: int = 60) -> str:
+    t = re.sub(r"\s+", " ", ", ".join(map(str, v)) if isinstance(v, list) else str(v)).strip()
+    return t if len(t) <= n else t[: n - 1] + "…"
+
+
+def _exiftool_json(p: Path) -> dict:
+    r = _run(["exiftool", "-j", "-G1", "-a", "-s", "-n", "-m", "-api", "LargeFileSupport=1", os.path.abspath(p)],
+             "exiftool", 600)
+    try:
+        dane = json.loads(r.stdout or "[]")
+    except ValueError:
+        raise Blad("exiftool: nieczytelny wynik") from None
+    return dane[0] if dane else {}
+
+
+def _wpisy(tagi: dict) -> set[str]:
+    """Wpisy z samego pliku (bez nazwy i dat pliku na dysku, wyliczonych i profilu kolorów)."""
+    return {k for k in tagi if k in ZAWSZE or (":" in k and not BEZ_KONTROLI.match(k.rpartition(":")[0]))}
+
+
+def kategorie(tagi: dict) -> dict[str, list[str]]:
+    """Wrażliwe wpisy z wyniku exiftool (-j -G1 -n) pogrupowane: {miejsce: [tagi], urzadzenie: […], …}."""
+    out: dict[str, list[str]] = {}
+    for klucz in sorted(_wpisy(tagi)):
+        v = tagi[klucz]
+        if v is None or not _tekst(v).strip(" ,"):
+            continue
+        nazwa = klucz.rpartition(":")[2]
+        for k, _, wzor in _WRAZLIWE:
+            if wzor.match(nazwa):
+                if k != "czas" or not _zero_data(v):
+                    out.setdefault(k, []).append(klucz)
+                break
+    return out
+
+
+def _pokaz(k: str, tagi: dict, klucze: list[str]) -> str:
+    """Krótko, co jest w pliku: „50.0614, 19.9366”, „Apple iPhone 15 Pro”, „2026-10-05 14:31”."""
+    def wart(*nazwy):
+        for n in nazwy:
+            for x in klucze:
+                if x.rpartition(":")[2] == n and not (k == "czas" and _zero_data(tagi[x])):
+                    return tagi[x]
+        return None
+    if k == "miejsce":
+        lat, lon = tagi.get("Composite:GPSLatitude"), tagi.get("Composite:GPSLongitude")
+        if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+            return f"{lat:.4f}, {lon:.4f}"
+    elif k == "urzadzenie":
+        marka, model = _tekst(wart("Make") or ""), _tekst(wart("Model") or "")
+        if model:
+            return model if marka and model.lower().startswith(marka.lower()) else f"{marka} {model}".strip()
+    elif k == "czas":
+        v = wart("DateTimeOriginal", "CreationDate", "DateCreated", "CreateDate", "DateTime", "ModifyDate") \
+            or tagi[klucze[0]]
+        m = _DATA.match(str(v))
+        if m:
+            return f"{m[1]}-{m[2]}-{m[3]}" + (f" {m[4]}:{m[5]}" if m[4] else "")
+    elif k in ("identyfikator", "miniatura"):
+        return ""
+    elif k == "opis":
+        return _tekst(wart("Description", "ImageDescription", "Title", "Caption-Abstract", "Headline", "Comment",
+                           "UserComment") or tagi[klucze[0]])
+    return _tekst(tagi[klucze[0]])
+
+
+def _opisz(tagi: dict) -> dict:
+    kat = kategorie(tagi)
+    return {k: {"opis": o, "wartosc": _pokaz(k, tagi, kat[k]), "wpisy": len(kat[k])} for k, o, _ in WRAZLIWE if k in kat}
+
+
+def metadane(src: Path) -> dict:
+    """Co plik mówi o człowieku: {plik, format, wrazliwe: {miejsce: {opis, wartosc, wpisy}, …}, czysty}."""
+    src = Path(src)
+    if not src.is_file():
+        raise Blad(f"Nie ma pliku: {src}")
+    if not shutil.which("exiftool"):
+        raise Blad("Odczyt metadanych wymaga exiftool (jest w obrazie Jarva).")
+    w = _opisz(_exiftool_json(src))
+    return {"plik": str(src), "format": format_pliku(src), "wrazliwe": w, "czysty": not w}
+
+
+def _wyczysc(src: Path, dst: Path, z: str) -> None:
+    """Kopia bez metadanych. Zdjęcie: exiftool (piksele bez zmian; profil kolorów i obrót zostają).
+    Film i dźwięk: ffmpeg przepakowuje strumienie bez kodowania (bez okładki, ścieżek danych i rozdziałów)."""
+    if z in FOTO_META:
+        _run(["exiftool", "-m", "-q", "-q", "-all=", "-trailer:all=", "-tagsFromFile", "@", "-ColorSpaceTags",
+              "-Orientation", "-o", os.path.abspath(dst), os.path.abspath(src)], "exiftool", 600)
+        return
+    mapy = ["-map", "0:a"] if z in AUDIO else ["-map", "0:V", "-map", "0:a?", "-map", "0:s?"]
+    dalej = ["-movflags", "+faststart"] if z in ("mp4", "mov", "m4a") else []
+    if z in ("mp4", "mov"):
+        dalej += ["-strict", "unofficial"]       # zostaje opis Dolby Vision z iPhone'a
+    _run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), *mapy, "-c", "copy",
+          *FF_BEZ_METADANYCH, *dalej, str(dst)], "FFmpeg", 3 * 3600)
+
+
+def _sprawdz(p: Path) -> dict:
+    """Po czyszczeniu nic wrażliwego nie może zostać: inaczej błąd i brak pliku (lepiej niż fałszywe „czyste”)."""
+    tagi = _exiftool_json(p)
+    zostalo = _opisz(tagi)
+    if zostalo:
+        p.unlink(missing_ok=True)
+        raise Blad("Nie udało się usunąć wszystkiego (" + ", ".join(v["opis"] for v in zostalo.values())
+                   + "). Pliku nie oddaję.")
+    return tagi
+
+
+def usun_metadane(src: Path, dst: Path | None = None, katalog: Path | None = None) -> dict:
+    """Ten sam plik bez metadanych (GPS, telefon, daty, autor, opisy, miniatury); obraz i dźwięk bez zmian."""
+    t0 = time.monotonic()
+    src = Path(src)
+    if not src.is_file():
+        raise Blad(f"Nie ma pliku: {src}")
+    z = format_pliku(src)
+    if z not in FOTO_META | WIDEO | AUDIO:
+        raise Blad(f"Metadane usuwam ze zdjęć (JPG, PNG, WebP, HEIC, AVIF, TIFF, GIF), filmów i dźwięku, "
+                   f"nie z {FORMATY[z][1]}.")
+    if not shutil.which("exiftool"):
+        raise Blad("Usuwanie metadanych wymaga exiftool (jest w obrazie Jarva).")
+    if z not in FOTO_META and not shutil.which("ffmpeg"):
+        raise Blad("Film i dźwięk czyści FFmpeg (jest w obrazie Jarva).")
+    if dst or katalog:
+        out = cel_sciezka(src, z, Path(dst) if dst else None, Path(katalog) if katalog else None)
+    else:
+        out = wolna_sciezka(src.with_name(f"{src.stem}-bez-metadanych.{z}"))
+    if out.resolve() == src.resolve():
+        raise Blad("Wynik nadpisałby plik źródłowy: podaj inną nazwę (-o).")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    przed = _exiftool_json(src)
+    with tempfile.TemporaryDirectory(prefix="metadane-") as t:
+        tmp = Path(t) / f"czysty.{z}"
+        _wyczysc(src, tmp, z)
+        po = _sprawdz(tmp)
+        shutil.move(str(tmp), out)
+    usuniete = _opisz(przed)
+    wynik = {"wejscie": str(src), "na": z, "trasa": [f"bez metadanych ({'exiftool' if z in FOTO_META else 'FFmpeg'})"],
+             "pliki": [str(out)], "usuniete": usuniete, "wpisow_usunietych": len(_wpisy(przed) - _wpisy(po)),
+             "rozmiar_przed": src.stat().st_size, "rozmiar_po": out.stat().st_size,
+             "sek": round(time.monotonic() - t0, 2)}
+    if not usuniete and not wynik["wpisow_usunietych"]:
+        wynik["uwaga"] = "w pliku nie było metadanych do usunięcia"
+    return wynik
+
+
+def _dopilnuj(pliki: list[Path]) -> None:
+    """Zamiana zdjęcia, filmu albo dźwięku: wynik bez wrażliwych metadanych, nawet gdy biblioteka coś przepisała."""
+    if not shutil.which("exiftool"):
+        return
+    for p in pliki:
+        f = norm(p.suffix)
+        if f not in FOTO_META | WIDEO | AUDIO or not kategorie(_exiftool_json(p)):
+            continue
+        tmp = p.with_name(f".{p.stem}-czysty.{f}")
+        try:
+            _wyczysc(p, tmp, f)
+            _sprawdz(tmp)
+            os.replace(tmp, p)
+        finally:
+            tmp.unlink(missing_ok=True)
+
+
 # --------------------------------------------------------------------------- CLI
 
 def _pliki(wejscia: list[str], rekursywnie: bool) -> list[Path]:
@@ -917,6 +1124,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-r", action="store_true", dest="rekursywnie", help="katalog z podkatalogami")
     ap.add_argument("--cele", action="store_true", help="na co można zamienić plik")
     ap.add_argument("--formaty", action="store_true", help="formaty i silniki dostępne tutaj")
+    ap.add_argument("--metadane", action="store_true", help="co plik mówi o człowieku (GPS, telefon, data, autor)")
+    ap.add_argument("--usun-metadane", action="store_true", help="ten sam plik bez metadanych (zdjęcia, filmy, dźwięk)")
     args = ap.parse_args(argv)
     dump = lambda d: print(json.dumps(d, ensure_ascii=False, indent=1))  # noqa: E731
     try:
@@ -931,8 +1140,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.cele:
             dump({"plik": str(pliki[0]), "format": format_pliku(pliki[0]), "cele": cele(format_pliku(pliki[0]))})
             return 0
-        if not args.na and not args.polacz:
-            ap.error("podaj --na <format> (albo --cele, --polacz)")
+        if args.metadane:
+            m = [metadane(p) for p in pliki]
+            dump(m[0] if len(m) == 1 else m)
+            return 0
+        if args.usun_metadane and (args.na or args.polacz):
+            raise Blad("--usun-metadane zostawia format: bez --na i --polacz (zamiana na inny format też je usuwa).")
+        if not args.na and not args.polacz and not args.usun_metadane:
+            ap.error("podaj --na <format> (albo --cele, --polacz, --metadane, --usun-metadane)")
         opt = Opcje(jakosc=args.jakosc, rozmiar=args.rozmiar, strony=args.strony, dpi=args.dpi)
         if args.polacz:
             dst = Path(args.wyjscie) if args.wyjscie else wolna_sciezka(
@@ -944,9 +1159,9 @@ def main(argv: list[str] | None = None) -> int:
         wyniki, bledy = [], []
         for p in pliki:
             try:
-                wyniki.append(konwertuj(p, args.na, Path(args.wyjscie) if args.wyjscie else None,
-                                        Path(args.katalog) if args.katalog else None,
-                                        Opcje(**{**opt.__dict__, "zasoby": None})))
+                dst, kat = Path(args.wyjscie) if args.wyjscie else None, Path(args.katalog) if args.katalog else None
+                wyniki.append(usun_metadane(p, dst, kat) if args.usun_metadane else
+                              konwertuj(p, args.na, dst, kat, Opcje(**{**opt.__dict__, "zasoby": None})))
             except Blad as exc:
                 if len(pliki) == 1:
                     raise
