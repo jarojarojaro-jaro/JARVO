@@ -564,6 +564,7 @@ async function typoKontrola(P, W, H, opt = {}) {
   const biez = new Map(), seria = new Map(), zgloszone = new Set();
   const koniec = Math.max(0, ...bloki.map((b) => b.end));
   for (let k = 0; k * K.krok < koniec; k++) {
+    if (k % 30 === 29) await new Promise((ok) => setTimeout(ok, 0));   // edytor HQ: strona nie zamiera na długim filmie
     const t = (k + 0.5) * K.krok, akt = [];
     for (const b of typoAktywne(P, t)) {
       const st = typoStan(b, P, t);

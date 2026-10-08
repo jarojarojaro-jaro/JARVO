@@ -827,6 +827,12 @@ button.thq-out-name:hover { text-decoration: underline; }
 .thq-ed-typo-slowa button.is-on { background: var(--ed-panel-3); color: var(--ed-ink); box-shadow: 0 1px 2px rgba(0,0,0,.35), inset 0 -2px 0 var(--ed-typo); }
 .thq-ed-typo-plan { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; padding-top: 16px; border-top: 1px solid var(--ed-line); }
 .thq-ed-typo-plan > * { flex-shrink: 0; }
+.thq-ed-kontrola-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.thq-ed-kontrola-lista button { width: 100%; text-align: left; font: inherit; font-size: 12px; line-height: 1.35; padding: 6px 8px; border-radius: 6px;
+  border: 1px solid var(--ed-line); background: transparent; color: inherit; cursor: pointer; }
+.thq-ed-kontrola-lista button:hover { background: rgba(255,255,255,0.06); }
+.thq-ed-kontrola-lista .is-blad { border-left: 3px solid #FF453A; }
+.thq-ed-kontrola-lista .is-uwaga { border-left: 3px solid #FFB020; }
 .thq-ed-field { display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: var(--ed-muted); font-weight: 500; }
 .thq-ed-style { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .thq-ed-styl { display: flex; flex-direction: column; gap: 4px; padding: 3px 3px 5px; border: 0; border-radius: 9px; background: var(--ed-bg); color: var(--ed-ink-2);

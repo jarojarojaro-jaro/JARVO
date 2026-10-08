@@ -1214,6 +1214,7 @@ function VideoEditor({ path, onClose }) {
   const typoUpd = (id, patch, lv) => typoApply((T) => ({ bloki: T.bloki.map((b) => (b.id === id ? typoBez({ ...b, ...(typeof patch === "function" ? patch(b) : patch) }) : b)) }), lv);
   const slowoUpd = (id, j, patch, lv) => typoUpd(id, (b) => ({ slowa: b.slowa.map((w, k) => (k === j ? typoBez({ ...w, ...patch }) : w)) }), lv);
   const [typoW, setTypoW] = useState(null);      // numer zaznaczonego słowa w bloku (panel słowa)
+  const [kontrola, setKontrola] = useState(null); // kontrola napisów: {busy} albo {wynik, plan: JSON planu w chwili pomiaru}
   function typoPodziel(b, now) {                  // nowy blok od słowa pod wskaźnikiem (albo od następnego, gdy wskaźnik jest w przerwie)
     const j = b.slowa.findIndex((w, k) => k > 0 && b.start + Math.max(+w.t || 0, +w.k || 0) > now + 1e-6);
     if (j <= 0) return false;
@@ -2131,6 +2132,43 @@ function VideoEditor({ path, onClose }) {
     ${typoPlanTools()}
   </div>`;
 
+  // ---- kontrola napisów: typoKontrola (48-typografia.js, ta sama co `typografia.py sprawdz`) na kanwie z krótszym
+  // bokiem 540 px, ze strefami wybranej platformy i sylwetkami osoby (gdy aktualne); problem → skok do chwili i bloku
+  async function sprawdzNapisy() {
+    const P = projRef.current;
+    if (!P || !P.typo) return;
+    const k = Math.min(1, 540 / Math.min(P.canvas.w, P.canvas.h));
+    const W = Math.round(P.canvas.w * k / 2) * 2, Hh = Math.round(P.canvas.h * k / 2) * 2;
+    const strefy = strefyUI(W, Hh, strefa).map((z) => ({ ...z, nazwa: ED_STREFY_OPIS[z.k] }));
+    const inf = maskaRef.current.info;
+    const sylwetka = inf && inf.klucz === maskaKlucz(P) ? async (t) => {
+      const kl = Math.floor(t * (+inf.fps || P.canvas.fps || 30) + 1e-6);
+      if (!inf.set.has(kl)) return null;
+      try { return await createImageBitmap(await api.fileBlob(`${inf.dir}/k${String(kl).padStart(6, "0")}.png`)); } catch (_) { return null; }
+    } : async () => null;
+    setKontrola({ busy: true });
+    try {
+      const wynik = await typoKontrola(P, W, Hh, { strefy, sylwetka });
+      setKontrola({ wynik, plan: JSON.stringify(P.typo) });
+    } catch (e) {
+      setKontrola({ blad: String((e && e.message) || e) });
+    }
+  }
+  const kontrolaTools = () => {
+    const K = kontrola, stary = K && K.wynik && K.plan !== JSON.stringify(p.typo);
+    const bl = K && K.wynik ? K.wynik.problemy.filter((x) => x.poziom === "blad").length : 0, uw = K && K.wynik ? K.wynik.problemy.length - bl : 0;
+    return html`<div class="thq-ed-field thq-ed-kontrola"><span>${L("Kontrola napisów", "Caption check")}${K && K.wynik ? ` · ${L(`błędy ${bl}, uwagi ${uw}`, `errors ${bl}, warnings ${uw}`)}` : ""}</span>
+      <button type="button" class="thq-ed-btn is-wide" disabled=${K && K.busy} onClick=${sprawdzNapisy}>${ED_ICON.spark} ${K && K.busy ? L("Sprawdzam…", "Checking…") : K && K.wynik ? L("Sprawdź jeszcze raz", "Check again") : L("Sprawdź napisy", "Check captions")}</button>
+      ${K && K.blad && html`<p class="thq-ed-note is-warn">⚠ ${K.blad}</p>`}
+      ${stary && html`<p class="thq-ed-note">${L("Plan zmienił się od sprawdzenia: sprawdź jeszcze raz.", "The plan changed since the check: check again.")}</p>`}
+      ${K && K.wynik && !K.wynik.problemy.length && html`<p class="thq-ed-note">✓ ${L("Bez problemów: napisy w kadrze, nie stykają się, za osobą czytelne.", "No problems: captions in frame, not touching, readable behind the person.")}</p>`}
+      ${K && K.wynik && K.wynik.problemy.length > 0 && html`<ul class="thq-ed-kontrola-lista">${K.wynik.problemy.map((x, i) => html`<li key=${i}>
+        <button type="button" class=${cx(x.poziom === "blad" ? "is-blad" : "is-uwaga")} onClick=${() => { player.seek(x.t); if (x.blok && typoBloki(p).some((b) => b.id === x.blok)) setSel({ type: "typo", id: x.blok }); }}>
+          <b>${x.poziom === "blad" ? "✗" : "⚠"} ${fmtT(x.t, true)}</b> ${L(...x.opis)}</button></li>`)}</ul>`}
+      <p class="thq-ed-note">${L("Mierzy litery tak, jak wyjdą w eksporcie: poza kadrem, na sobie, stykające się, za osobą, pod przyciskami platformy.", "Measures the letters as exported: off-frame, overlapping, touching, behind the person, under platform buttons.")}</p>
+    </div>`;
+  };
+
   // ---- typografia: plan (motyw, akcent) i blok ze słowami (48-typografia.js rysuje, tu tylko dane);
   // sekcja planu siedzi w formularzu panelu Napisy i bloku, żeby całość przewijała się jednym paskiem
   const typoPlanTools = () => {
@@ -2149,6 +2187,7 @@ function VideoEditor({ path, onClose }) {
         <label>${L("Akcent: kolor uderzenia", "Accent: hit word color")}${swatches(m.akcent, (v, lv) => typoApply(() => ({ akcent: v }), lv), T.paleta)}</label>
         ${T.akcent && html`<button type="button" class="thq-ed-btn is-wide" onClick=${() => typoApply(() => ({ akcent: undefined }))}>${ED_ICON.reset} ${L("Akcent z motywu", "Theme accent")}</button>`}
         <p class="thq-ed-note">${L("Kliknij blok na osi albo na podglądzie, żeby zmienić słowa, układ, głębię i ruch.", "Click a block on the timeline or the preview to change words, layout, depth and motion.")}</p>
+        ${kontrolaTools()}
         <div class="thq-ed-acts">
           ${act("plus", L("Dodaj blok", "Add block"), typoDodaj)}
           ${act("trash", L("Usuń typografię", "Remove typography"), () => { H.apply(({ typo: _t, ...rest }) => rest); setSel(null); }, { bad: true })}

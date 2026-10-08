@@ -220,8 +220,12 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   **Styl filmu** (karty 14 stylów: blok tego filmu z uderzeniem narysowany tym samym rendererem na pasie bieżącej
   klatki podglądu; klik zmienia motyw, układ, kolory i poprawki zostają; `TypoStyle` w `45-edytor.js`),
   **paleta z filmu** (zmiana koloru palety przenosi na nowy kolor wszystkie słowa w starym, tak jak
-  `typografia.py popraw` z `"paleta"`), akcent, nowy blok, usunięcie planu albo prośba do Wideografa o plan.
-  Kolory palety stoją też pierwsze przy kolorze słowa. Przycięcie, usunięcie, tempo
+  `typografia.py popraw` z `"paleta"`), akcent, nowy blok, usunięcie planu albo prośba do Wideografa o plan,
+  oraz **Kontrola napisów** („Sprawdź napisy”): `typoKontrola` z `48-typografia.js`, ta sama co `typografia.py sprawdz`,
+  mierzy tusz liter na kanwie z krótszym bokiem 540 px, ze strefami wybranej platformy i sylwetkami osoby (gdy aktualne):
+  napis poza kadrem, bloki na sobie, stykające się litery, napis za osobą nieczytelny albo niezasłonięty, strefy, małe
+  słowa; lista błędów i uwag, klik przenosi wskaźnik do tej chwili i zaznacza blok, a po zmianie planu lista prosi
+  o ponowne sprawdzenie. Kolory palety stoją też pierwsze przy kolorze słowa. Przycięcie, usunięcie, tempo
   i przestawienie klipów przesuwają bloki i czasy słów razem z materiałem (`typoNaOsi` w `remapTimes`
   i `edytor.remap_times`; test: `tests/test_edytor_os.py`).
 - **Napis za osobą** (głębia jak z montażu: osoba przed słowem): Wideograf liczy maską MODNet (`maska.py`) sylwetkę
