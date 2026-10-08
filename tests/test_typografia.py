@@ -874,3 +874,82 @@ def test_polecenie_paleta_zmienia_kolory_nie_uklad(tmp_path, monkeypatch):
     proj["typo"] = po                                                    # druga paleta: słowa idą za nią
     assert ty.main(["paleta", str(film), "--paleta", "#1D4ED8,#BE185D"]) == 0
     assert [b["slowa"][1].get("kolor") for b in zapis["typo"]["bloki"]] == ["#1D4ED8", "#FFFFFF", "#BE185D"]
+
+
+# ---------------------------------------------------------------- kontrola napisów (typoKontrola, typografia.py sprawdz)
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_js_kontrola_tusz_styk_i_pokrycie():
+    """Pomiary kontroli na maskach z ręki: ramka tuszu, styk bliżej niż r (okno kwadratowe), część pod sylwetką."""
+    prog = """
+const w = 40, h = 20, M = (pola) => { const m = new Uint8Array(w * h); for (const [x0, y0, x1, y1] of pola)
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) m[y * w + x] = 1; return m; };
+const a = M([[2, 2, 10, 8]]), b = M([[13, 2, 20, 8]]), c = M([[11, 2, 12, 8]]), s = M([[0, 5, 40, 20]]);
+const R = (m) => typoRamkaTuszu(m, w, h);
+console.log(JSON.stringify({ramka: R(a), pusta: R(new Uint8Array(w * h)),
+  styk3: typoStyk(a, R(a), b, R(b), w, h, 3), styk4: typoStyk(a, R(a), b, R(b), w, h, 4),
+  sasiad: typoStyk(a, R(a), c, R(c), w, h, 2), oddalony: typoStyk(c, R(c), b, R(b), w, h, 1),
+  pokrycie: typoPokrycie(a, s), bez: typoPokrycie(new Uint8Array(w * h), s),
+  pelna: typoChwilaPelna({start: 1, end: 3, wyjscie: 'zanik', slowa: [{t: 0}, {t: 0.5}]}, typoMotyw({})),
+  krotki: typoChwilaPelna({start: 1, end: 1.7, wyjscie: 'zanik', slowa: [{t: 0}, {t: 0.5}]}, typoMotyw({}))}));
+"""
+    o = node(prog)
+    assert o["ramka"] == {"x0": 2, "y0": 2, "x1": 10, "y1": 8} and o["pusta"] is None
+    assert o["styk3"] is False and o["styk4"] is True            # odstęp 3 puste kolumny: styk dopiero przy r = 4
+    assert o["sasiad"] is True and o["oddalony"] is False
+    assert o["pokrycie"] == pytest.approx(0.5) and o["bez"] == 0
+    assert o["pelna"] == pytest.approx(1.8) and o["krotki"] == pytest.approx(1.51)   # 0,3 s po ostatnim słowie, przed wyjściem
+
+
+def test_strefy_kontroli_z_wideo_lib():
+    pion = ty.strefy_kontroli(540, 960, "tiktok")
+    assert [z["k"] for z in pion] == ["góra", "dół", "lewy", "prawy"]
+    assert pion[1]["y0"] == pytest.approx(960 * (1 - 0.252)) and pion[1]["nazwa"][1] == "bottom"
+    assert ty.strefy_kontroli(540, 960, "brak") == [] and ty.strefy_kontroli(960, 540, "tiktok") == []
+
+
+def test_polecenie_sprawdz_bledy_kod_wyjscia_i_arkusz(tmp_path, monkeypatch, capsys):
+    src = _projekt_typo(tmp_path, [blok([("raz", 1)], start=0.5), {**blok([("to", 0), ("DZIAŁA", 3)], start=3.0), "id": "b2"}])
+    import narzedzia
+    monkeypatch.setattr(narzedzia, "wymagaj_playwright", lambda *a: None)
+    wynik = {"bloki": 2, "problemy": [
+        {"poziom": "blad", "kod": "poza-kadrem", "blok": "b1", "t": 0.6, "opis": ["„raz” wychodzi poza kadr", "x"]},
+        {"poziom": "uwaga", "kod": "strefa", "blok": "b2", "t": 3.3, "opis": ["„to DZIAŁA” pod interfejsem", "y"]}]}
+    wolania, arkusze = [], []
+    monkeypatch.setattr(ty, "kontrola", lambda film, proj, plan, platforma: wolania.append(platforma) or wynik)
+    monkeypatch.setattr(ty.pr, "arkusz_typografii", lambda proj, plan, chwile, out, film, warianty=None: arkusze.append((chwile, out)))
+    assert ty.main(["sprawdz", str(src), "--arkusz"]) == 1
+    out = capsys.readouterr().out
+    assert "błędy 1 · uwagi 1" in out and "✗" in out and "⚠" in out and "MEDIA:" in out
+    assert wolania == ["tiktok"] and arkusze[-1][0] == [0.6] and arkusze[-1][1].name.endswith(".kontrola.jpg")
+    wynik["problemy"] = wynik["problemy"][1:]                          # same uwagi: kod 0, arkusz z chwilami uwag
+    assert ty.main(["sprawdz", str(src), "--strefa", "reels", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["problemy"][0]["kod"] == "strefa" and wolania[-1] == "reels"
+    wynik["problemy"] = []
+    assert ty.main(["sprawdz", str(src), "--arkusz", str(tmp_path / "k.jpg")]) == 0
+    assert "bez problemów" in capsys.readouterr().out and len(arkusze) == 1   # bez problemów nie ma arkusza
+
+
+def test_kontrola_w_przegladarce(tmp_path):
+    """Cała kontrola w Chromium: blok poza kadrem, bloki na sobie, stykające się litery, za osobą bez sylwetek, strefa."""
+    pytest.importorskip("playwright.sync_api")
+    w = lambda t, tekst, waga, linia: {"t": t, "k": t + 0.3, "tekst": tekst, "waga": waga, "linia": linia}  # noqa: E731
+    b = lambda i, start, x, y, slowa, **kw: {"id": i, "start": start, "end": start + 1.5, "uklad": "kolumna", "x": x, "y": y,  # noqa: E731
+                                             "w": 0.6, "warstwa": "przod", "wyjscie": "ciecie", "slowa": slowa, **kw}
+    plan = ed.normalize_typo({"motyw": "czysty", "bloki": [
+        b("b01", 0, 0.97, 0.4, [w(0, "WYJEŻDŻA", 3, 0)]),
+        b("b02", 2, 0.5, 0.45, [w(0, "pierwszy", 2, 0)]), b("b03", 2.2, 0.5, 0.47, [w(0, "drugi", 2, 0)]),
+        b("b04", 4, 0.5, 0.4, [w(0, "jogging", 2, 0), w(0.2, "ŹÓŁĆ", 3, 1)], w=0.8),
+        b("b05", 6, 0.5, 0.4, [w(0, "spokojnie", 1, 0), w(0.2, "tutaj", 1, 1)]),
+        b("b06", 8, 0.5, 0.2, [w(0, "ZA", 3, 0)], uklad="za", warstwa="tyl", w=0.9),
+        b("b07", 10, 0.5, 0.9, [w(0, "nisko", 2, 0)])]}, 12.0)
+    film = tmp_path / "f.mp4"
+    proj = {"canvas": {"w": 1080, "h": 1920, "fps": 30}, "clips": []}
+    try:
+        wynik = ty.kontrola(film, proj, plan, "tiktok")
+    except Exception as exc:  # noqa: BLE001 - brak przeglądarki w tym środowisku
+        pytest.skip(f"przeglądarka niedostępna: {exc}")
+    kody = {(x["kod"], x["blok"]) for x in wynik["problemy"]}
+    assert {("poza-kadrem", "b01"), ("bloki-na-sobie", "b03"), ("slowa-sie-stykaja", "b04"),
+            ("brak-sylwetek", "b06"), ("strefa", "b07")} <= kody
+    assert not any(blok == "b05" for _, blok in kody) and wynik["bloki"] == 7

@@ -269,6 +269,7 @@ scenarios:
     expect:
       should:
         - "`typografia.py plan` (motyw `czysty` albo akcent z brand kitu), potem `pokaz` i `popraw` według znaczenia: puenta, liczba i obietnica jako uderzenie (jedno na blok), słowa funkcyjne małe, myśl dalej i kursywą"
+        - "`typografia.py sprawdz` bez błędów (napisy w kadrze, nie na sobie, litery się nie stykają, za osobą czytelne) przed renderem; błąd poprawiony przez `popraw` i sprawdzony znowu"
         - "`typografia.py arkusz` obejrzany przez vision_analyze (czytelność, twarz i strefy UI wolne, kolor tylko na uderzeniach), `projekt.py render` z linią MEDIA: i informacją, że całość poprawi się w edytorze HQ"
       should_not:
         - "robi całe bloki albo wszystkie słowa w kolorze, wybiera czerwony motyw (`kino`, `ulica`) bez prośby i bez czerwonej marki"

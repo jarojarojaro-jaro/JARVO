@@ -405,9 +405,10 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
 }
 
 // Blok na osobnej kanwie (tekstura, perspektywa i smuga działają na całości), potem na kanwę główną z obrotem.
-function typoRysujBlok(ctx, b, P, W, H, now) {
+// `stan` (opcjonalnie) zamiast stanu w chwili now: kontrola rysuje tak pojedyncze słowa bloku.
+function typoRysujBlok(ctx, b, P, W, H, now, stan) {
   const m = typoMotyw(P);
-  const st = typoStan(b, P, now);
+  const st = stan || typoStan(b, P, now);
   if (!st.slowa.some((a) => a >= 0)) return null;
   const u = typoUklad(ctx, b, P, W, H);
   const pad = Math.ceil(Math.max(...u.slowa.map((s) => s.px)) * 0.5);
@@ -479,4 +480,161 @@ function typoFonty(P, W, H) {
     out.set(f, (out.get(f) || "") + s.tekst);
   }
   return [...out.entries()];
+}
+
+// ---------------------------------------------------------------- kontrola napisów
+// Mierzy tusz liter (nie ramkę bloku) tym samym rendererem co podgląd i eksport, za wzorcami frame-bounds.js
+// i glyph-gaps.js z camera-3d-captions (HeyGen, hyperframes-community-skills, Apache-2.0):
+//   poza kadrem        tusz bloku za krawędzią kadru przez `kroki` kroków po 1/15 s z rzędu (wyjście bloku się nie liczy),
+//   bloki na sobie     tusz dwóch bloków widocznych naraz bliżej niż `styk`,
+//   słowa się stykają  tusz dwóch słów pełnego bloku bliżej niż `styk` (słowa rysowane osobno, ten sam układ),
+//   za osobą           widać mniej niż `widac` tuszu napisu z tyłu albo osoba go wcale nie zasłania (efekt niewidoczny),
+//   strefa, mały       pełny blok pod interfejsem platformy, słowo mniejsze niż `maly` (uwagi).
+// Miary w pikselach przy krótszym boku 1080, skalowane do kanwy pomiaru; tusz = krycie ≥ `prog` (bez cienia i poświaty).
+const TYPO_KONTROLA = { krok: 1 / 15, kroki: 5, poza: 3, styk: 4, widac: 0.6, dotyka: 0.03, maly: 30, prog: 160 };
+const TYPO_STRONY = { lewo: ["z lewej", "left"], prawo: ["z prawej", "right"], gora: ["u góry", "top"], dol: ["na dole", "bottom"] };
+
+function typoTusz(g, w, h, prog) {          // kanwa → maska 0/1 tuszu
+  const d = g.getImageData(0, 0, w, h).data, m = new Uint8Array(w * h);
+  for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] >= prog ? 1 : 0;
+  return m;
+}
+function typoRamkaTuszu(m, w, h) {          // {x0, y0, x1, y1} tuszu (x1, y1 tuż za ostatnim pikselem) albo null
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    const o = y * w;
+    for (let x = 0; x < w; x++) if (m[o + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; }
+  }
+  return x1 < 0 ? null : { x0, y0, x1: x1 + 1, y1: y1 + 1 };
+}
+// Tusz a i b bliżej niż r pikseli (okno kwadratowe)? ra, rb = ich ramki; suma z obrazu całkowego tylko przy styku ramek.
+function typoStyk(a, ra, b, rb, w, h, r) {
+  if (!ra || !rb) return false;
+  const x0 = Math.max(rb.x0, ra.x0 - r), y0 = Math.max(rb.y0, ra.y0 - r);
+  const x1 = Math.min(rb.x1, ra.x1 + r), y1 = Math.min(rb.y1, ra.y1 + r);
+  if (x0 >= x1 || y0 >= y1) return false;
+  const cx0 = Math.max(0, x0 - r), cy0 = Math.max(0, y0 - r), cx1 = Math.min(w, x1 + r), cy1 = Math.min(h, y1 + r);
+  const cw = cx1 - cx0, ch = cy1 - cy0, I = new Int32Array((cw + 1) * (ch + 1));
+  for (let y = 0; y < ch; y++) {
+    let s = 0;
+    for (let x = 0; x < cw; x++) { s += a[(cy0 + y) * w + cx0 + x]; I[(y + 1) * (cw + 1) + x + 1] = I[y * (cw + 1) + x + 1] + s; }
+  }
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    if (!b[y * w + x]) continue;
+    const xa = Math.max(cx0, x - r) - cx0, xb = Math.min(cx1, x + r + 1) - cx0;
+    const ya = Math.max(cy0, y - r) - cy0, yb = Math.min(cy1, y + r + 1) - cy0;
+    if (I[yb * (cw + 1) + xb] - I[ya * (cw + 1) + xb] - I[yb * (cw + 1) + xa] + I[ya * (cw + 1) + xa] > 0) return true;
+  }
+  return false;
+}
+function typoPokrycie(tusz, sylwetka) {      // część tuszu pod sylwetką (0–1); bez tuszu = 0
+  let n = 0, pod = 0;
+  for (let i = 0; i < tusz.length; i++) if (tusz[i]) { n++; if (sylwetka[i]) pod++; }
+  return n ? pod / n : 0;
+}
+function typoChwilaPelna(b, m) {            // pełny blok: ostatnie słowo weszło, wyjście jeszcze nie (jak chwile_arkusza)
+  const wy = TYPO_WYJSCIA[b.wyjscie || m.wyjscie] ?? 0, ost = b.start + (+b.slowa[b.slowa.length - 1].t || 0);
+  return Math.max(ost, Math.min(b.end - wy - 0.03, ost + 0.3));
+}
+
+// Kontrola planu na kanwie W×H. opt: {strefy: [{k, x0, y0, x1, y1, nazwa: [pl, en]}] (interfejs platformy w kadrze),
+// sylwetka: async (t) => obraz osoby z kanałem alfa albo null (maska.py; bez niej napisy za osobą bez pomiaru)}.
+// Wynik: {bloki, problemy: [{poziom: "blad"|"uwaga", kod, blok, t, opis: [pl, en]}]} po czasie.
+async function typoKontrola(P, W, H, opt = {}) {
+  const K = TYPO_KONTROLA, S = Math.min(W, H) / 1080, m = typoMotyw(P), bloki = typoBloki(P);
+  if (typeof fontLoad === "function") for (const [f, txt] of typoFonty(P, W, H)) await fontLoad(f, txt);
+  const r = Math.max(1, Math.round(K.styk * S)), tol = Math.max(1, Math.round(K.poza * S));
+  const pad = Math.round(Math.min(W, H) * 0.2), cw = W + 2 * pad, ch = H + 2 * pad;
+  const c = document.createElement("canvas"); c.width = cw; c.height = ch;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  const out = [];
+  const px = (v) => Math.round(v / S);
+  const dodaj = (poziom, kod, b, t, pl, en) => out.push({ poziom, kod, blok: b ? b.id : null, t: Math.round(t * 100) / 100, opis: [pl, en] });
+  const tekst = (b) => b.slowa.map((w) => w.tekst).join(" ");
+  const rysuj = (b, t, stan) => {             // tusz bloku na kanwie z marginesem (kadr przesunięty o pad)
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cw, ch); g.translate(pad, pad);
+    typoRysujBlok(g, b, P, W, H, t, stan);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    const mk = typoTusz(g, cw, ch, K.prog);
+    return { m: mk, r: typoRamkaTuszu(mk, cw, ch) };
+  };
+  const zaKadr = (q) => q ? { lewo: pad - q.x0, prawo: q.x1 - pad - W, gora: pad - q.y0, dol: q.y1 - pad - H } : {};
+
+  // 1. Oś po 1/15 s: poza kadrem (seria kroków) i bloki na sobie; tusz liczony tylko przy zmianie stanu bloku.
+  const biez = new Map(), seria = new Map(), zgloszone = new Set();
+  const koniec = Math.max(0, ...bloki.map((b) => b.end));
+  for (let k = 0; k * K.krok < koniec; k++) {
+    const t = (k + 0.5) * K.krok, akt = [];
+    for (const b of typoAktywne(P, t)) {
+      const st = typoStan(b, P, t);
+      if (st.e > 0) { seria.delete(b.id); continue; }          // wyjście (smuga, zanik) może wyjść za kadr
+      const klucz = st.slowa.map((a) => (a < 0 ? "-" : a.toFixed(3))).join(",");
+      let x = biez.get(b.id);
+      if (!x || x.klucz !== klucz) { x = { klucz, ...rysuj(b, t, st) }; biez.set(b.id, x); }
+      akt.push([b, x]);
+      const z = zaKadr(x.r), [str, ile] = Object.entries(z).sort((p, q) => q[1] - p[1])[0] || ["", 0];
+      if (ile > tol) {
+        const s0 = seria.get(b.id) || { od: t, n: 0, ile: 0, str };
+        s0.n++; if (ile > s0.ile) { s0.ile = ile; s0.str = str; }
+        seria.set(b.id, s0);
+        if (s0.n === K.kroki && !zgloszone.has(`poza:${b.id}`)) {
+          zgloszone.add(`poza:${b.id}`);
+          dodaj("blad", "poza-kadrem", b, s0.od, `„${tekst(b)}” wychodzi poza kadr ${TYPO_STRONY[s0.str][0]} (${px(s0.ile)} px): przesuń blok do środka (x, y) albo zmniejsz (rozmiar, w)`,
+            `"${tekst(b)}" leaves the frame ${TYPO_STRONY[s0.str][1]} (${px(s0.ile)} px): move it inwards or make it smaller`);
+        }
+      } else seria.delete(b.id);
+    }
+    for (let i = 0; i < akt.length; i++) for (let j = i + 1; j < akt.length; j++) {
+      const [a, xa] = akt[i], [b, xb] = akt[j], id = `styk:${a.id}:${b.id}`;
+      if (zgloszone.has(id) || !typoStyk(xa.m, xa.r, xb.m, xb.r, cw, ch, r)) continue;
+      zgloszone.add(id);
+      dodaj("blad", "bloki-na-sobie", b, t, `bloki ${a.id} i ${b.id} nachodzą na siebie („${tekst(a)}” / „${tekst(b)}”): rozsuń je (y) albo skróć pierwszy`,
+        `blocks ${a.id} and ${b.id} overlap: move them apart or shorten the first one`);
+    }
+    for (const id of [...biez.keys()]) if (!akt.some(([b]) => b.id === id)) biez.delete(id);
+  }
+
+  // 2. Pełny blok: słowa się stykają, strefy interfejsu, małe słowa, napis za osobą.
+  for (const b of bloki) {
+    const tf = typoChwilaPelna(b, m), wy = b.wyjscie || m.wyjscie, n = b.slowa.length;
+    const pelny = { slowa: b.slowa.map(() => 1), e: 0, wy };
+    const slowa = n > 1 ? b.slowa.map((_w, j) => rysuj(b, tf, { slowa: b.slowa.map((_x, i) => (i === j ? 1 : -1)), e: 0, wy })) : [];
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      if (!typoStyk(slowa[i].m, slowa[i].r, slowa[j].m, slowa[j].r, cw, ch, r)) continue;
+      const sty = [i, j].map((q) => typoSlowo(b.slowa[q], m, b.uklad).styl);
+      const plyta = sty.some((s) => s === "tlo" || s === "show");      // płytki i naklejki mogą się dotykać
+      dodaj(plyta ? "uwaga" : "blad", "slowa-sie-stykaja", b, tf, `w ${b.id} „${b.slowa[i].tekst}” i „${b.slowa[j].tekst}” stykają się literami: rozsuń linie (linia słowa), zmniejsz słowo (skala) albo zmień układ`,
+        `in ${b.id} "${b.slowa[i].tekst}" and "${b.slowa[j].tekst}" touch: split the lines, scale down or change the layout`);
+    }
+    const caly = rysuj(b, tf, pelny);
+    if (caly.r && opt.strefy && opt.strefy.length) {
+      const q = { x0: caly.r.x0 - pad, y0: caly.r.y0 - pad, x1: caly.r.x1 - pad, y1: caly.r.y1 - pad };
+      const pod = opt.strefy.filter((s) => q.x0 < s.x1 && q.x1 > s.x0 && q.y0 < s.y1 && q.y1 > s.y0);
+      if (pod.length) dodaj("uwaga", "strefa", b, tf, `„${tekst(b)}” wchodzi pod interfejs platformy (${pod.map((s) => s.nazwa[0]).join(", ")}): przesuń blok`,
+        `"${tekst(b)}" sits under the platform interface (${pod.map((s) => s.nazwa[1]).join(", ")}): move it`);
+    }
+    const u = typoUklad(g, b, P, W, H), mini = u.slowa.reduce((a, s) => (s.px < a.px ? s : a), u.slowa[0]);
+    if (mini && px(mini.px) < K.maly) dodaj("uwaga", "male-slowo", b, tf, `„${mini.src.tekst}” w ${b.id} ma tylko ${px(mini.px)} px: na telefonie ledwo widać (powiększ blok albo słowo)`,
+      `"${mini.src.tekst}" in ${b.id} is only ${px(mini.px)} px: hard to read on a phone`);
+    if (b.warstwa !== "tyl" || !opt.sylwetka) continue;
+    const sc = document.createElement("canvas"); sc.width = cw; sc.height = ch;
+    const sg = sc.getContext("2d", { willReadFrequently: true });
+    let widac = 1, zaslania = 0, ile = 0, tMin = tf;
+    for (let t = tf; t <= Math.max(tf, b.end - (TYPO_WYJSCIA[wy] ?? 0) - 0.03) && ile < 8; t += 0.2) {
+      const obraz = await opt.sylwetka(t);
+      if (!obraz) continue;
+      sg.clearRect(0, 0, cw, ch); sg.drawImage(obraz, pad, pad, W, H);
+      const pok = typoPokrycie(rysuj(b, t, pelny).m, typoTusz(sg, cw, ch, 128));
+      ile++; zaslania = Math.max(zaslania, pok);
+      if (1 - pok < widac) { widac = 1 - pok; tMin = t; }
+    }
+    if (!ile) dodaj("uwaga", "brak-sylwetek", b, tf, `${b.id} stoi za osobą, ale nie ma sylwetek (typografia.py sylwetki <film>): w eksporcie napis będzie w całości przed osobą`,
+      `${b.id} is behind the person but has no silhouettes: it will render fully in front`);
+    else if (widac < K.widac) dodaj("blad", "za-osoba-nieczytelne", b, tMin, `„${tekst(b)}” za osobą: widać tylko ${Math.round(widac * 100)}% liter (min. ${Math.round(K.widac * 100)}%): przesuń wyżej (y), zmniejsz albo daj przed osobę`,
+      `"${tekst(b)}" behind the person: only ${Math.round(widac * 100)}% visible: move it up, shrink it or put it in front`);
+    else if (zaslania < K.dotyka) dodaj("uwaga", "za-osoba-niewidoczne", b, tf, `„${tekst(b)}” stoi za osobą, ale osoba go nie zasłania: efektu nie widać (przesuń niżej, żeby głowa zakryła dół liter)`,
+      `"${tekst(b)}" is behind the person but nothing covers it: move it down so the head covers the bottom`);
+  }
+  out.sort((a, b) => a.t - b.t || (a.poziom === b.poziom ? 0 : a.poziom === "blad" ? -1 : 1));
+  return { bloki: bloki.length, problemy: out };
 }

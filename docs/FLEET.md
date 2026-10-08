@@ -252,7 +252,8 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
   wielkości, kroje, głębia, skos i 3D, mocne słowo za osobą (maska MODNet, `maska.py`); forma wynika ze znaczenia,
   kolory z palety kadru (dwa akcenty w kontraście ze sceną, rozpisane na zmianę po mocnych słowach), styl filmu
   z 14 (np. `podcast` z obrysem, `vlog`, `tech`, `magazyn`) dobrany do rodzaju nagrania, `typografia.py style`
-  pokazuje ten sam blok w każdym; plan leży w projekcie montażu, więc właściciel poprawia każde słowo w edytorze HQ,
+  pokazuje ten sam blok w każdym, a `typografia.py sprawdz` mierzy tusz liter (poza kadrem, bloki na sobie, stykające
+  się litery, napis za osobą czytelny i naprawdę zasłonięty, strefy platformy); plan leży w projekcie montażu, więc właściciel poprawia każde słowo w edytorze HQ,
 - **żywe schematy** (skill `zywy-schemat`, silnik strony [live-panel](https://github.com/ythx-101/live-panel-skill)): flota,
   przepływ zlecenia albo architektura, która „działa” (kropki po strzałkach, kroki podświetlane po kolei), na posty X
   i Instagram; `zywy_schemat.py` dokłada formaty platform, motywy Jarva i polskie kroje, `html_wideo.py` mierzy i renderuje,

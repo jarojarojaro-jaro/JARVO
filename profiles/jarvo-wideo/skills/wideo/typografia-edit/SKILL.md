@@ -1,7 +1,7 @@
 ---
 name: typografia-edit
 description: "Typografia z montażu do nagrania z mową, też za osobą."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-03"
+    reviewed: "2026-10-08"
 ---
 
 # Typografia jak z montażu
@@ -37,10 +37,14 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
    bloków czytam za każdym razem od nowa (cięcie w HQ robi nowe bloki, np. `b04b`).
 3. **Reżyseruję znaczeniem** (tabela niżej): `zmiany.json` → `typografia.py popraw <film> zmiany.json`. Poprawiam tylko
    bloki, które tego potrzebują; poprawek właściciela nie cofam.
-4. **Oglądam:** `typografia.py arkusz <film> -o out/wideo/typografia.jpg` → `vision_analyze` (lista „Kontrola”).
+4. **Sprawdzam miarą:** `typografia.py sprawdz <film> --arkusz` (kadr pionowy: `--strefa` platformy, domyślnie
+   TikTok). Mierzy tusz liter tym samym rendererem: napis poza kadrem, bloki na sobie, słowa stykające się literami,
+   napis za osobą nieczytelny albo niczym niezasłonięty (błędy, kod 1), blok pod interfejsem platformy i za małe słowo
+   (uwagi). Każdy błąd poprawiam (`popraw`) i sprawdzam znowu; uwagę poprawiam albo uzasadniam w odpowiedzi.
+5. **Oglądam:** `typografia.py arkusz <film> -o out/wideo/typografia.jpg` → `vision_analyze` (lista „Kontrola”).
    Najwyżej dwie rundy poprawek. Gdy styl nie jest oczywisty albo właściciel pyta o inne: `typografia.py style <film>`
    (ten sam blok filmu w każdym stylu, linia MEDIA:) i polecam jeden albo dwa z powodem.
-5. **Render:** `python3 $HERMES_HOME/scripts/projekt.py render <film>` → linia MEDIA:, a w odpowiedzi jedno zdanie, że
+6. **Render:** `python3 $HERMES_HOME/scripts/projekt.py render <film>` → linia MEDIA:, a w odpowiedzi jedno zdanie, że
    wszystko poprawi się w edytorze HQ (pas „Typografia”).
 
 Prośba z HQ o sylwetkę (blok ustawiony „za osobą”): `typografia.py sylwetki <film>` → arkusz tego miejsca → odpowiedź.
@@ -135,6 +139,7 @@ Pola bloku: `uklad`, `x`, `y` (kotwica 0–1), `w`, `rot`, `tilt`, `warstwa` (`p
 `popraw` ostrzega, gdy blok ma więcej niż jedno uderzenie, i gdy blok za osobą nie ma sylwetki.
 
 ## Kontrola (arkusz, `vision_analyze`)
+Miarę (kadr, stykanie, za osobą, strefy) robi `sprawdz`; okiem oceniam to, czego miara nie widzi:
 - Najmniejsze słowo czytelne na telefonie, polskie znaki i liczby poprawne, tekst zgodny z mową.
 - Żaden napis nie zakrywa twarzy (poza świadomym „za osobą”) ani stref UI platformy (`formaty-wideo`).
 - Kolory z palety kadru, rozpisane na zmianę; żaden akcent nie ginie na tle; nie jeden kolor na wszystko i nie
@@ -144,5 +149,6 @@ Pola bloku: `uklad`, `x`, `y` (kotwica 0–1), `w`, `rot`, `tilt`, `warstwa` (`p
 
 ## Definition of Done
 - [ ] plan w projekcie (`typo`), poprawki właściciela z HQ nienaruszone, `popraw` bez ostrzeżeń albo z wyjaśnieniem,
+- [ ] `typografia.py sprawdz` bez błędów (uwagi poprawione albo uzasadnione),
 - [ ] arkusz obejrzany: lista „Kontrola” spełniona,
 - [ ] render z linią MEDIA: i informacją, że całość poprawi się w edytorze HQ.

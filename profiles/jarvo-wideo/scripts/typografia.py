@@ -10,6 +10,7 @@ skosem i perspektywą 3D, jako plan bloków w projekcie edytora HQ (`<film>.edyc
     typografia.py paleta <film> [--paleta A,B] [--akcent marka] [--bez-akcentu]   # kolory z kadru na gotowym planie
     typografia.py arkusz <film> [-o out/wideo/typografia.jpg] [--ile 12]   # klatki: film + typografia (vision)
     typografia.py style <film> [-o …] [--blok b03] [--motywy podcast,vlog]   # ten sam blok w każdym motywie
+    typografia.py sprawdz <film> [--strefa tiktok|reels|shorts|brak] [--json] [--arkusz [plik]]   # kontrola napisów
     typografia.py usun <film>                     # usuń plan typografii z projektu
 
 plan (0 tokenów, reżyser z reguł): mowa z <źródło>.mowa.json (Parakeet; brak = analiza jak w edytorze), głośność
@@ -27,6 +28,9 @@ nowoczesny, retro, neon, show): kroje, styl słów i uderzenia (wypełnienie, ob
 jak w programie rozrywkowym), wejście, wyjście i skos. `style` rysuje ten sam blok filmu w każdym motywie, żeby wybrać
 styl okiem; zmiana motywu nie rusza układu, kolorów ani poprawek.
 Te same dane rysuje edytor HQ (hq/web/src/48-typografia.js), więc człowiek widzi i poprawia wszystko na osi.
+`sprawdz` mierzy tusz liter tym samym rendererem: napis poza kadrem (1/3 s i dłużej), bloki na sobie, słowa stykające
+się literami, napis za osobą nieczytelny (widać < 60%) albo niczym niezasłonięty (błędy), blok pod interfejsem
+platformy, słowo < 30 px przy 1080 (uwagi); kod wyjścia 1 przy błędzie, `--arkusz` = klatki z problemami do obejrzenia.
 Gotowy plan mógł już poprawić człowiek, więc `plan` go nie nadpisuje: poprawiasz go `popraw`, a od nowa układasz
 tylko na wyraźną prośbę (`--nowy`).
 
@@ -875,7 +879,7 @@ def cmd_plan(film: Path, a) -> int:
     print(f"Typografia: {len(plan['bloki'])} bloków, {n_slow} słów, motyw {plan['motyw']} · cięcia: {len(ciecia)}"
           + ("" if a.bez_maski else f" · za osobą: {za}")
           + (f" · paleta z kadru: {' '.join(plan['paleta'])}" if plan.get("paleta") else " · kolory z motywu"))
-    print(f"Dalej: typografia.py pokaz {film} → popraw według znaczenia → typografia.py arkusz {film} → projekt.py render {film}")
+    print(f"Dalej: typografia.py pokaz {film} → popraw według znaczenia → typografia.py sprawdz {film} → arkusz → projekt.py render {film}")
     return 0
 
 
@@ -1128,6 +1132,76 @@ def cmd_style(film: Path, a) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- kontrola napisów
+
+KONTROLA_BOK = 540        # krótszy bok kanwy pomiaru: tusz liter widać dokładnie, a minuta filmu liczy się kilka sekund
+KONTROLA_JS = """async ([P, W, H, strefy, maska]) => {   // maska: pytaj Pythona o sylwetki osoby
+    const sylwetka = maska ? async (t) => {
+        const u = await window.__jarvoMaska(t);
+        if (!u) return null;
+        const im = new Image(); im.src = u; await im.decode(); return im;
+    } : null;
+    return await typoKontrola(P, W, H, { strefy, sylwetka });
+}"""
+STREFY_EN = {"góra": "top", "dół": "bottom", "lewy": "left margin", "prawy": "right buttons"}
+
+
+def strefy_kontroli(W: int, H: int, platforma: str) -> list[dict]:
+    """Strefy interfejsu platformy na kanwie pomiaru (te same liczby co edytor HQ: wideo_lib.STREFY_UI)."""
+    if platforma == "brak":
+        return []
+    import wideo_lib as wl
+    return [{"k": n.split()[0], "x0": x0, "y0": y0, "x1": x1, "y1": y1, "nazwa": [n, STREFY_EN.get(n.split()[0], n)]}
+            for n, (x0, y0, x1, y1) in wl.strefy_ui(W, H, platforma)]
+
+
+def kontrola(film: Path, proj: dict, plan: dict, platforma: str = "tiktok") -> dict:
+    """typoKontrola (48-typografia.js) w przeglądarce bez okna, z sylwetkami osoby z maska.py (gdy aktualne)."""
+    import base64
+    cv = proj["canvas"]
+    k = min(1.0, KONTROLA_BOK / min(cv["w"], cv["h"]))
+    W, H = pr.even(cv["w"] * k), pr.even(cv["h"] * k)
+    idx = ed.maska_indeks(film, proj)
+    fps = float(cv.get("fps") or 30)
+
+    def sylwetka(t: float) -> str | None:     # nieaktualna maska albo brak klatki = brak sylwetki (uwaga kontroli)
+        f = ed.maska_dir(film) / f"k{int(float(t) * fps + 1e-6):06d}.png"
+        return "data:image/png;base64," + base64.b64encode(f.read_bytes()).decode() if idx and f.is_file() else None
+
+    with pr.strona([{"typo": plan}]) as page:
+        page.expose_function("__jarvoMaska", sylwetka)
+        return page.evaluate(KONTROLA_JS, [{"typo": plan}, W, H, strefy_kontroli(W, H, platforma), True])
+
+
+def cmd_sprawdz(film: Path, a) -> int:
+    import narzedzia as nz
+    nz.wymagaj_playwright(__file__, "JARVO_TYPO_REEXEC", "kontrolę rysuje przeglądarka")   # re-exec TEGO skryptu
+    proj = pr.load(film)
+    plan = ed.normalize_typo(proj.get("typo"), pr.total(proj))
+    if not plan["bloki"]:
+        raise SystemExit("brak planu typografii: typografia.py plan <film>")
+    wynik = kontrola(film, proj, plan, a.strefa)
+    problemy = wynik["problemy"]
+    bledy = [x for x in problemy if x["poziom"] == "blad"]
+    if a.json:
+        print(json.dumps(wynik, ensure_ascii=False, indent=1))
+    else:
+        print(f"Kontrola napisów: {wynik['bloki']} bloków · błędy {len(bledy)} · uwagi {len(problemy) - len(bledy)}")
+        for x in problemy:
+            print(f"  {'✗' if x['poziom'] == 'blad' else '⚠'} {x['t']:6.2f} s  {x['blok'] or '':4}  {x['opis'][0]}")
+        if not problemy:
+            print("  bez problemów: napisy w kadrze, nie stykają się, za osobą czytelne")
+        else:
+            print("Popraw: zmiany.json → typografia.py popraw (albo w edytorze HQ), potem sprawdz jeszcze raz.")
+    if a.arkusz is not None and problemy:
+        chwile = sorted({x["t"] for x in bledy} or {x["t"] for x in problemy})[:12]
+        out = Path(a.arkusz) if a.arkusz else film.with_name(f"{film.stem}.kontrola.jpg")
+        pr.arkusz_typografii(proj, plan, chwile, out, film)
+        print(f"Arkusz problemów: {out} (obejrzyj vision_analyze)")
+        print(f"MEDIA:{out}")
+    return 1 if bledy else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1170,6 +1244,13 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--blok", help="id bloku (domyślnie blok z uderzeniem i kilkoma słowami)")
     sp.add_argument("--motywy", help="tylko te motywy, po przecinku")
     sp.set_defaults(fn=cmd_style)
+    sp = sub.add_parser("sprawdz", help="kontrola napisów: poza kadrem, na sobie, stykające się, za osobą, strefy")
+    sp.add_argument("film")
+    sp.add_argument("--strefa", choices=("tiktok", "reels", "shorts", "brak"), default="tiktok",
+                    help="interfejs platformy w kadrze pionowym (domyślnie TikTok, jak w edytorze)")
+    sp.add_argument("--json", action="store_true")
+    sp.add_argument("--arkusz", nargs="?", const="", help="klatki z problemami do obejrzenia (domyślnie <film>.kontrola.jpg)")
+    sp.set_defaults(fn=cmd_sprawdz)
     sp = sub.add_parser("usun", help="usuń plan typografii")
     sp.add_argument("film")
     sp.set_defaults(fn=cmd_usun)
