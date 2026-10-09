@@ -99,13 +99,48 @@ def renderuj(svg: str, tytul: str, katalog: Path, przegladarka: str | None = Non
     with tempfile.TemporaryDirectory(prefix="jarvo-schemat-", ignore_cleanup_errors=True) as tmp:
         src = Path(tmp) / "schemat.html"
         src.write_text(strona(svg, w, h), encoding="utf-8")
-        r = subprocess.run([przegladarka, "--headless=new", "--no-sandbox", "--disable-gpu", "--hide-scrollbars",
-                            "--no-first-run", "--disable-extensions", "--disable-background-networking",
-                            "--force-device-scale-factor=2", f"--window-size={w},{h}", f"--user-data-dir={tmp}/profil",
-                            f"--screenshot={out}", src.as_uri()], capture_output=True, text=True, timeout=60)
-    if r.returncode != 0 or not out.is_file() or out.stat().st_size < 100:
-        raise RuntimeError(f"Chromium nie zrobił zrzutu: {(r.stderr or '').strip()[-300:]}")
+        bledy = Path(tmp) / "stderr.txt"
+        with bledy.open("w") as err:
+            p = subprocess.Popen([przegladarka, "--headless=new", "--no-sandbox", "--disable-gpu", "--hide-scrollbars",
+                                  "--no-first-run", "--disable-extensions", "--disable-background-networking",
+                                  "--force-device-scale-factor=2", f"--window-size={w},{h}",
+                                  f"--user-data-dir={tmp}/profil", f"--screenshot={out}", src.as_uri()],
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err)
+            kod = _czekaj_na_zrzut(p, out, 60)
+        stderr = bledy.read_text(errors="replace")
+    if not _pelny_png(out) or kod not in (0, None):
+        raise RuntimeError(f"Chromium nie zrobił zrzutu: {stderr.strip()[-300:]}")
     return out
+
+
+def _pelny_png(plik: Path) -> bool:
+    """Cały PNG: nagłówek i końcowy blok IEND (plik zapisany do końca)."""
+    try:
+        with plik.open("rb") as f:
+            if f.read(8) != b"\x89PNG\r\n\x1a\n":
+                return False
+            f.seek(-12, 2)
+            return f.read(12) == b"\x00\x00\x00\x00IEND\xaeB`\x82"
+    except OSError:
+        return False
+
+
+def _czekaj_na_zrzut(p: subprocess.Popen, out: Path, limit: float) -> int | None:
+    """Kod wyjścia Chromium albo None, gdy zapisał cały zrzut i nie wychodzi sam (zdarza się w --headless=new
+    bez D-Bus, np. na maszynach CI): wtedy go zamykamy. Po limicie bez zrzutu też zamykamy i zwracamy -9."""
+    koniec = time.monotonic() + limit
+    while time.monotonic() < koniec:
+        try:
+            return p.wait(timeout=0.5)
+        except subprocess.TimeoutExpired:
+            if _pelny_png(out):
+                try:
+                    return p.wait(timeout=3)   # zwykle sam wychodzi chwilę po zapisie
+                except subprocess.TimeoutExpired:
+                    p.kill(); p.wait()
+                    return None
+    p.kill(); p.wait()
+    return -9
 
 
 def katalog_schematow() -> Path:

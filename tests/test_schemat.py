@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import shutil
 import stat
+import time
+from pathlib import Path
 
 import pytest
 
@@ -33,10 +35,36 @@ def test_strona_bez_sieci_i_skryptow():
     assert s.slug("Jak działa skarbiec wiedzy?") == "jak-dziala-skarbiec-wiedzy" and s.slug("???") == "schemat"
 
 
-def test_obsluz_z_udawanym_chromium(tmp_path, monkeypatch):
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 200 + b"\x00\x00\x00\x00IEND\xaeB`\x82"
+
+
+def _udawany_chromium(tmp_path: Path, potem: str = "") -> Path:
+    """Udawany Chromium zapisuje cały PNG pod --screenshot=, potem robi `potem` (np. wisi jak w CI)."""
+    (tmp_path / "wzor.png").write_bytes(PNG)
     fake = tmp_path / "chromium"
-    fake.write_text('#!/bin/sh\nfor a in "$@"; do case "$a" in --screenshot=*) printf "%0200d" 0 > "${a#--screenshot=}";; esac; done\n')
+    fake.write_text('#!/bin/sh\nfor a in "$@"; do case "$a" in --screenshot=*) '
+                    f'cp "{tmp_path}/wzor.png" "${{a#--screenshot=}}";; esac; done\n{potem}\n')
     fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    return fake
+
+
+def test_chromium_wiszacy_po_zrzucie(tmp_path):
+    """Chromium --headless=new bez D-Bus (maszyny CI) zapisuje zrzut i nie wychodzi: bierzemy zrzut, zamykamy go."""
+    t0 = time.monotonic()
+    png = s.renderuj(SVG, "test", tmp_path / "out", przegladarka=str(_udawany_chromium(tmp_path, "exec sleep 300")))
+    assert png.read_bytes() == PNG and time.monotonic() - t0 < 15
+
+
+def test_chromium_bez_zrzutu_to_blad(tmp_path):
+    fake = tmp_path / "pusty"
+    fake.write_text("#!/bin/sh\nexit 0\n")
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    with pytest.raises(RuntimeError, match="nie zrobił zrzutu"):
+        s.renderuj(SVG, "test", tmp_path / "out", przegladarka=str(fake))
+
+
+def test_obsluz_z_udawanym_chromium(tmp_path, monkeypatch):
+    fake = _udawany_chromium(tmp_path)
     monkeypatch.setenv("JARVO_CHROMIUM", str(fake))
     monkeypatch.setenv("JARVO_SCHEMATY_DIR", str(tmp_path / "schematy"))
     w = json.loads(s.obsluz({"svg": SVG, "tytul": "Jak działa skarbiec"}))
