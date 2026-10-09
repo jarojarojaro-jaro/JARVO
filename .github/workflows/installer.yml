@@ -2,7 +2,7 @@
 # od zera, macOS z jego bashem 3.2 i Windows z Windows PowerShell 5.1, zanim trafi do ludzi.
 #  - linux: świeży kontener Ubuntu bez gita, Pythona i Dockera → install.sh → Docker Engine → jarvo up pobiera
 #    gotowy obraz z GHCR → dashboard → aktualizacja → down → uninstall (scripts/install-test.sh, JARVO_TEST_PULL=1);
-#  - macos: testy instalatora i próba na sucho na prawdziwym macOS (bash 3.2, sw_vers, sysctl, Homebrew);
+#  - macos: próba na sucho na prawdziwym macOS (bash 3.2, sw_vers, sysctl, Homebrew), jarvo i plist LaunchAgenta;
 #    pełna instalacja z Colimą tylko na żądanie (mac_pelna), bo minuty macOS są drogie;
 #  - windows: składnia, PSScriptAnalyzer i próby na sucho install.ps1 w Windows PowerShell 5.1 i PowerShell 7.
 name: installer
@@ -86,13 +86,13 @@ jobs:
           grep -q "System: macOS" <<<"$out"
           grep -qE "colima start --cpu [0-9]+ --memory [0-9]+ --disk 60" <<<"$out"
           ! grep -q "apt-get\|get.docker.com" <<<"$out"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Testy instalatora
+      - name: Polecenie jarvo na macOS (LaunchAgent, pomoc, wersja)
         run: |
-          pip install -q -r requirements-dev.txt
-          python -m pytest -q tests/test_installer.py
+          bash bin/jarvo help | grep -q "jarvo autostart"
+          bash bin/jarvo version
+          JARVO_LOCAL="$RUNNER_TEMP/flota" bash bin/jarvo autostart print > "$RUNNER_TEMP/pl.jarvo.updater.plist"
+          plutil -lint "$RUNNER_TEMP/pl.jarvo.updater.plist"
+          grep -q "<string>$PWD/bin/jarvo</string>" "$RUNNER_TEMP/pl.jarvo.updater.plist"
 
   macos-pelna:
     if: ${{ inputs.mac_pelna }}

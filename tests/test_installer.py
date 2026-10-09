@@ -11,6 +11,7 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,9 @@ INSTALL = ROOT / "install.sh"
 JARVO = ROOT / "bin/jarvo"
 LOCAL_UP = ROOT / "scripts/local-up.sh"
 SCRIPTS = [INSTALL, JARVO, LOCAL_UP]
+# próby na sucho udają Linuksa i macOS podmienionymi programami (uname, sw_vers, sysctl) na Linuksie; na prawdziwym
+# macOS wygrywa systemowy uname i Homebrew, więc tam CI (installer.yml) sprawdza install.sh i jarvo na żywo
+pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="testy instalatora udają systemy na Linuksie")
 # programy, których instalator ma doinstalować, gdy ich brak (poza PATH testu)
 TOOLS = ("git", "curl", "python3", "openssl", "docker")
 

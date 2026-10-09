@@ -30,7 +30,7 @@ docker info >/dev/null 2>&1 || fail "dockerd nie działa (scripts/sandbox-up.sh)
 [[ $PULL == 1 ]] || docker image inspect jarvo-hermes:local >/dev/null 2>&1 || fail "Brak obrazu jarvo-hermes:local (scripts/sandbox-up.sh)."
 
 # proxy piaskownicy słucha tylko na 127.0.0.1: przekaźnik na adresie mostka Dockera, żeby kontener testowy go widział
-PORT="${HTTPS_PROXY##*:}"; BRIDGE=172.17.0.1; PROXY="http://$BRIDGE:$PORT"
+PORT="${HTTPS_PROXY:-}"; PORT="${PORT##*:}"; BRIDGE=172.17.0.1; PROXY="http://$BRIDGE:$PORT"
 RELAY=""
 if [[ $SANDBOX == 1 ]] && ! (exec 3<>"/dev/tcp/$BRIDGE/$PORT") 2>/dev/null; then
   python3 - "$PORT" "$BRIDGE" <<'PY' &

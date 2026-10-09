@@ -168,7 +168,7 @@ function InstallWsl {
   # innych dystrybucji, więc własny ~/.wslconfig nikomu nie przeszkadza; istniejącego nie ruszamy.
   $cfg = Join-Path (EnvOr "USERPROFILE" (EnvOr "HOME" ".")) ".wslconfig"
   if ($Ram -ge 8 -and $Ram -lt 16 -and -not (Test-Path $cfg)) {
-    WriteText $cfg "# Jarvo (install.ps1): pamięć maszyny WSL dla floty; usuń plik, żeby wrócić do domyślnej połowy RAM`r`n[wsl2]`r`nmemory=$($Ram - 3)GB`r`n" $false
+    WriteText $cfg "# Jarvo (install.ps1): pamięć maszyny WSL dla floty; bez tego pliku WSL wraca do domyślnej połowy RAM`r`n[wsl2]`r`nmemory=$($Ram - 3)GB`r`n" $false
     Say "WSL dostanie $($Ram - 3) GB RAM ($cfg)."
   }
   if ($Dry) { Show "Start-Process wsl.exe --install --no-distribution -Verb RunAs"; $code = 0 }
@@ -293,7 +293,7 @@ function Uninstall {
   if (-not (Ask "Na pewno?")) { return }
   Wsl --unregister $Distro
   $vbs = StartupVbs
-  if ($Dry) { Show "usuń $vbs i $JarvoDir" } else { Remove-Item $vbs, $JarvoDir -Recurse -Force -ErrorAction SilentlyContinue }
+  if ($Dry) { Show "Remove-Item $vbs, $JarvoDir" } else { Remove-Item $vbs, $JarvoDir -Recurse -Force -ErrorAction SilentlyContinue }
   Say "Gotowe. Inne dystrybucje WSL zostały bez zmian."
 }
 
@@ -310,7 +310,7 @@ function Main {
   $resumed = Test-Path (Join-Path $JarvoDir "po-restarcie")
   if (-not (WslReady) -and $resumed -and -not $Dry) {
     # po restarcie WSL nadal nie działa (np. starszy Windows 10 bez jądra WSL2): aktualizacja WSL, bez kolejnego restartu
-    Say "Kończę instalację WSL (aktualizacja; Windows może poprosić o zgodę administratora)…"
+    Say "Dokładam aktualizację WSL ( Windows może poprosić o zgodę administratora)…"
     try { Start-Process wsl.exe -ArgumentList "--update" -Verb RunAs -Wait | Out-Null } catch { Warn "Bez zgody administratora nie zaktualizuję WSL." }
     if (-not (WslReady)) { Die "WSL nadal nie działa po restarcie. Otwórz PowerShell jako administrator, wpisz: wsl --install --no-distribution, uruchom ponownie komputer i wklej polecenie instalacji jeszcze raz." }
   }

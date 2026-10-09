@@ -60,6 +60,18 @@ def test_script_analyzer_clean():
     assert r.returncode == 0, r.stdout + r.stderr
 
 
+@pytest.mark.parametrize("ansi", ["cp1250", "cp1252"])
+def test_parses_when_read_as_ansi(tmp_path, ansi):
+    """Windows PowerShell 5.1 czyta plik bez BOM w kodowaniu ANSI (polski Windows: cp1250). Np. „ń” (C5 84)
+    staje się wtedy „Å„”, a „„” PowerShell traktuje jak cudzysłów: plik pobrany i uruchomiony ręcznie musi się
+    i tak sparsować (polskie litery w komunikatach będą wtedy krzaczkami, ale instalacja ruszy)."""
+    mangled = tmp_path / "ansi.ps1"
+    mangled.write_text(PS1.read_bytes().decode(ansi, errors="replace"), encoding="utf-8-sig")
+    r = _ps("$e = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("
+            f"'{mangled}', [ref]$null, [ref]$e); $e | ForEach-Object {{ $_.ToString() }}; exit $e.Count")
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
 def test_no_typographic_quotes_in_code():
     """PowerShell traktuje „ ” ‘ ’ jak cudzysłowy, a – — jak minus: w kodzie tylko ASCII, polskie znaki w napisach."""
     for i, line in enumerate(PS1.read_text(encoding="utf-8").splitlines(), 1):
