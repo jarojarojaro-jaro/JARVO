@@ -260,7 +260,8 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - 🟡 Instalator jednym poleceniem na Linuksie, macOS i Windowsie (Docker, WSL i autostart instalowane same): plan w [INSTALER.md](INSTALER.md);
   etap 1 (Linux: pakiety, Docker Engine, polecenie `jarvo`, autostart, `uninstall`, test od zera w kontenerze) ✅ 2026-09-30;
   etap 2 (gotowy obraz amd64/arm64 w GHCR) i etap 3 (macOS: Homebrew, Colima, wolumeny, LaunchAgent) zbudowane 2026-10-09,
-  macOS czeka na próbę na prawdziwym Macu.
+  macOS czeka na próbę na prawdziwym Macu; etap 4 (Windows: WSL2, restart i dalszy ciąg, dystrybucja `Jarvo`, autostart)
+  zbudowany 2026-10-09, czeka na próbę na prawdziwym Windowsie.
 
 ### Faza ∞
 Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…

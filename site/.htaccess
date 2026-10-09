@@ -10,6 +10,10 @@
   <FilesMatch "\.(woff2|png|svg|ico)$">
     Header set Cache-Control "public, max-age=2592000"
   </FilesMatch>
+  # instalatory: zawsze najnowsza wersja
+  <FilesMatch "^install\.(sh|ps1)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
 </IfModule>
 
 # HTTPS i bez www
@@ -28,3 +32,5 @@ Options -Indexes
 
 AddType application/manifest+json .webmanifest
 AddType text/plain .txt
+# instalatory jako tekst UTF-8 (curl | bash, irm | iex w PowerShell 5.1 czyta kodowanie z nagłówka)
+AddType "text/plain; charset=utf-8" .sh .ps1

@@ -259,7 +259,7 @@ Statyczna strona wgrywana na FTP. Ma: `.htaccess` (HSTS, CSP `frame-ancestors 'n
 nosniff, Referrer/Permissions-Policy, redirecty HTTPS i non-www, 404 dla dotfiles), `robots.txt`,
 `sitemap.xml`, `llms.txt`, `site.webmanifest`, favicon; `index.html` z canonical, JSON-LD, opisem
 130 znaków, width/height na obrazach; `app.js` bez innerHTML (DOM/DOMParser).
-Wdrożenie: `bash scripts/deploy-site.sh`. **Zostało po stronie użytkownika:** wgrać na FTP i sprawdzić
+Wdrożenie: `bash scripts/deploy-site.sh` (razem z instalatorami: `jarvo.pl/install.sh`, `jarvo.pl/install.ps1`). **Zostało po stronie użytkownika:** wgrać na FTP i sprawdzić
 nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-security|x-frame"`.
 
 ---
@@ -288,7 +288,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo) |
 | `site/` | landing jarvo.pl |
-| `install.sh`, `install.ps1`, `bin/jarvo` | instalator jednym poleceniem (Linux/WSL2: sam instaluje pakiety i Docker Engine; macOS: Homebrew, Colima, dane w wolumenach Dockera, LaunchAgent; Windows): repo do `~/jarvo`, gotowy obraz z GHCR, klucz dostępu do prywatnego repo (`JARVO_TOKEN`), polecenie `jarvo` (`up`, `status`, `update` = `git pull` + instalator, `uninstall`…); opis i plan w [INSTALER.md](INSTALER.md) |
+| `install.sh`, `install.ps1`, `bin/jarvo` | instalator jednym poleceniem (Linux/WSL2: sam instaluje pakiety i Docker Engine; macOS: Homebrew, Colima, dane w wolumenach Dockera, LaunchAgent; Windows: WSL2 z restartem i dalszym ciągiem, własna dystrybucja `Jarvo`, Docker Engine w niej, autostart): repo do `~/jarvo`, gotowy obraz z GHCR, klucz dostępu do prywatnego repo (`JARVO_TOKEN`), polecenie `jarvo` (`up`, `status`, `update` = `git pull` + instalator, `uninstall`…); opis i plan w [INSTALER.md](INSTALER.md) |
 | `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`: pytest, pyyaml, shellcheck) |
 | `tests/`, `docs/` | testy pytest, dokumentacja |
 

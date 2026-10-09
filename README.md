@@ -26,15 +26,17 @@ Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
 
 ## Szybki start
 
-Instalacja lokalna jednym poleceniem (Linux, WSL2, macOS; repo do `~/jarvo`, flota w `~/jarvo-local`,
+Instalacja lokalna jednym poleceniem (Linux, macOS, Windows; repo do `~/jarvo`, flota w `~/jarvo-local`,
 potem http://localhost:9119/base). Instalator sam doinstalowuje wszystko, czego brakuje: na Linuksie
 i w WSL pakiety i Docker Engine, na macOS Homebrew, bash, git, Pythona i Dockera w darmowej Colimie
-(działający Docker Desktop albo OrbStack zostaje). Obraz floty pobiera gotowy z GHCR. Prywatne repo:
+(działający Docker Desktop albo OrbStack zostaje), na Windowsie WSL2 (jeden restart, potem dalej sam),
+własną dystrybucję Linuksa `Jarvo` i Dockera w niej. Obraz floty pobiera gotowy z GHCR. Prywatne repo:
 instalator poprosi o klucz dostępu (`JARVO_TOKEN`). Szczegóły: [docs/INSTALER.md](docs/INSTALER.md):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash
-# Windows (PowerShell):  irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
+curl -fsSL https://jarvo.pl/install.sh | bash                 # Linux, macOS (Terminal)
+# Windows (PowerShell, zwykły użytkownik):  irm https://jarvo.pl/install.ps1 | iex
+# z GitHuba (repo publiczne): https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh (i .ps1)
 # bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
 # potem:      jarvo status | logs | chat | update | down | uninstall      (jarvo help: wszystkie)
 # jarvo update = git pull + ten sam instalator (nowe programy hosta, gdy wersja Jarvo ich wymaga)
@@ -79,7 +81,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`knowledge/`](knowledge) | szablon brand kitu kopiowany na serwer |
 | [`branding/`](branding) | skórka Jarvo: terminal, favicon, motyw i tłumaczenie dashboardu |
 | [`site/`](site) | landing jarvo.pl (`scripts/deploy-site.sh`) |
-| [`install.sh`](install.sh), [`install.ps1`](install.ps1) | instalator jednym poleceniem (Linux/WSL2 z instalacją Dockera, macOS, Windows) |
+| [`install.sh`](install.sh), [`install.ps1`](install.ps1) | instalator jednym poleceniem: Linux/WSL2 (pakiety, Docker Engine), macOS (Homebrew, Colima), Windows (WSL2, dystrybucja `Jarvo`, Docker w niej) |
 | [`bin/jarvo`](bin/jarvo) | polecenie użytkownika po instalacji: `up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall` |
 | [`requirements-dev.txt`](requirements-dev.txt) | zależności testów i walidacji (`make dev-deps`) |
 | [`tests/`](tests) | testy pytest |
@@ -103,7 +105,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [LEADY.md](docs/LEADY.md) | projekt Łowcy leadów: sygnały zakupowe z oficjalnych źródeł → lista firm z „dlaczego teraz” |
 | [WIEDZA.md](docs/WIEDZA.md) | projekt skarbca wiedzy (drugi mózg floty): notatki Markdown z linkami, wtyczka `jarvo-wiedza`, zakładka „Wiedza” z grafem |
 | [RUNBOOK.md](docs/RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
-| [INSTALER.md](docs/INSTALER.md) | plan instalatora jednym poleceniem na Linuksie, macOS i Windowsie: diagnoza, etapy, ocena trudności |
+| [INSTALER.md](docs/INSTALER.md) | instalator jednym poleceniem na Linuksie, macOS i Windowsie: jak działa na każdym systemie, aktualizacje, testy, etapy |
 | [ROZWOJ-FLOTY.md](docs/ROZWOJ-FLOTY.md) | plan dopracowania agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności jako skill Weba |
 | [MOBILE.md](docs/MOBILE.md) | projekt Twórcy aplikacji `jarvo-mobile`: pełny proces od pomysłu do sklepu (darmowy audyt mobilny, prototyp Expo na telefonie, Android w dashboardzie i iOS w chmurze, bramka aplikacji, lista kontrolna sklepów, zrzuty, odrzucenia, aplikacja ze strony, utrzymanie); etapy i stan w §16 |
 | [SOURCES.md](docs/SOURCES.md) | źródła, atrybucje i licencje |

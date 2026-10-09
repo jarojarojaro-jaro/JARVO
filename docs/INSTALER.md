@@ -5,7 +5,8 @@ i otwarty dashboard. Bez ręcznego instalowania Dockera, bez czytania dokumentac
 opisuje, co już działa, czego brakuje na każdym systemie, jak to zbudować i ile to kosztuje pracy.
 
 Stan: plan z 2026-09-30; **etap 1 (Linux) zbudowany i przetestowany 2026-09-30** (§4a), **etap 2 (obraz w GHCR)
-i etap 3 (macOS) zbudowane 2026-10-09** (§4b; macOS czeka na próbę na prawdziwym Macu), etapy 4–5 w toku.
+i etap 3 (macOS) zbudowane 2026-10-09** (§4b; macOS czeka na próbę na prawdziwym Macu), **etap 4 (Windows)
+zbudowany 2026-10-09** (§4c; czeka na próbę na prawdziwym Windowsie), etap 5 w toku.
 
 ---
 
@@ -14,7 +15,7 @@ i etap 3 (macOS) zbudowane 2026-10-09** (§4b; macOS czeka na próbę na prawdzi
 | Element | Plik | Co robi |
 |---|---|---|
 | Instalator Linux/WSL/macOS | [`install.sh`](../install.sh) | Linux i WSL: sprawdza sprzęt, doinstalowuje `git curl python3 openssl` i Docker Engine, grupa `docker`, klon do `~/jarvo`, polecenie `jarvo`, `jarvo up`, autostart pomocnika, dashboard w przeglądarce; ponowne wklejenie = aktualizacja. macOS (12+): Homebrew (z narzędziami Xcode), `bash git python openssl@3`, Docker w Colimie (działający Docker Desktop/OrbStack zostaje), dane w wolumenach, LaunchAgent. Prywatne repo: klucz dostępu (`JARVO_TOKEN` albo pytanie, gdy klon bez klucza się nie uda), zapisany tylko w `.git/config` repo (0600). `sudo` dopiero wtedy, gdy coś naprawdę go wymaga |
-| Instalator Windows | [`install.ps1`](../install.ps1) | sprawdza WSL i Docker Desktop, odpala `install.sh` w WSL bez pytania o hasło Linuksa (na czas instalacji tymczasowe sudo bez hasła przez `wsl -u root`, usuwane na końcu); etap 4 doda instalację WSL i Dockera |
+| Instalator Windows | [`install.ps1`](../install.ps1) | Windows 10 2004+ / 11, x64 i ARM64: WSL2 bez dystrybucji (jedno okno zgody administratora), restart i dalszy ciąg sam (RunOnce), własna dystrybucja `Jarvo` z oficjalnego obrazu Ubuntu 24.04 (SHA256), użytkownik `jarvo` z sudo bez hasła i systemd, w środku `install.sh` (Docker Engine, obraz, flota), autostart z folderu Autostart, dashboard. Bez Docker Desktop i Microsoft Store. Istniejąca instalacja w innej dystrybucji (np. Ubuntu z Docker Desktop) jest aktualizowana na miejscu |
 | Polecenie użytkownika | [`bin/jarvo`](../bin/jarvo) | `up`, `down`, `status`, `logs`, `update` (`git pull` + ten sam `install.sh`, więc nowe wymagania hosta też dochodzą), `chat`, `open`, `pliki` (macOS: `docker cp` z wolumenu do `~/Jarvo`), `autostart on\|off\|status`, `android on\|off\|status` (telefon testowy Twórcy aplikacji, [MOBILE.md](MOBILE.md) §5), `uninstall [--yes] [--all]`, `version`; sam sięga po grupę `docker` przez `sg`, gdy sesja jeszcze jej nie ma |
 | Postawienie floty | [`scripts/local-up.sh`](../scripts/local-up.sh) | pyta o dostawcę modeli i klucz (albo bierze z `JARVO_PROVIDER`/`JARVO_KEY`/`JARVO_YES=1`), tworzy `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`), buduje obraz (albo `JARVO_NO_BUILD=1`), woła `deploy.sh`, startuje pomocnika aktualizacji; `--prepare` tylko przygotowuje katalog |
 | Autostart | [`infra/autostart/jarvo-updater.service`](../infra/autostart/jarvo-updater.service), [`infra/autostart/pl.jarvo.updater.plist`](../infra/autostart/pl.jarvo.updater.plist) | Linux: usługa `systemd --user` pomocnika aktualizacji (`jarvo autostart on` renderuje i włącza linger). macOS: LaunchAgent `pl.jarvo.updater` uruchamia przy logowaniu `jarvo updater`, który najpierw stawia Dockera (`colima start` albo Docker Desktop). Kontenery wstają same (`restart: unless-stopped`) |
@@ -25,8 +26,9 @@ i etap 3 (macOS) zbudowane 2026-10-09** (§4b; macOS czeka na próbę na prawdzi
 
 Polecenia ze strony: `curl -fsSL …/install.sh | bash` oraz `irm …/install.ps1 | iex`.
 
-**Gdy czegoś brakuje:** na Linuksie, w WSL i na macOS instalator doinstalowuje to sam (etapy 1 i 3).
-Windows nadal wymaga Docker Desktop i WSL zainstalowanych ręcznie: to usuwa etap 4.
+**Gdy czegoś brakuje:** instalator doinstalowuje to sam na każdym systemie: Linux i WSL (etap 1), macOS (etap 3),
+Windows (etap 4: WSL, Linux i Docker). Człowiek potrzebny jest tylko do hasła / zgody administratora i restartu
+Windowsa po włączeniu WSL.
 
 Obraz `jarvo-hermes:local` instalator pobiera gotowy z GHCR (etap 2, amd64 i arm64, ~2–3 minuty);
 buduje na miejscu tylko, gdy obrazu dla tej wersji jeszcze nie ma (kilka–kilkanaście minut, 8 GB RAM).
@@ -36,7 +38,9 @@ Obraz arm64 (Apple Silicon, Windows na ARM) buduje i uruchamia CI na natywnym ru
 `infra/node`, `infra/python`): CI buduje nowy obraz, a `deploy.sh` u każdego go pobiera, więc użytkownik
 nie robi nic. Zmiana tego, co musi być na komputerze (program hosta, wersja Dockera, autostart), idzie do
 `install.sh` / `install.ps1` z podbiciem `HOST_VERSION` w `install.sh`: `jarvo update` uruchamia nowy
-instalator, a `deploy.sh` przypomina „uruchom jarvo update”, gdy `compose/.host-version` jest starsza.
+instalator, a `deploy.sh` przypomina „uruchom jarvo update”, gdy `compose/.host-version` jest starsza. Na Windowsie
+`jarvo update` w Linuksie odświeża wszystko poza samym Windowsem; zmiana w `install.ps1` (WSL, autostart) wymaga
+ponownego `irm https://jarvo.pl/install.ps1 | iex` (drugie uruchomienie = aktualizacja).
 
 ## 2. Diagnoza: co przeszkadza na każdym systemie
 
@@ -66,8 +70,9 @@ macOS    curl -fsSL https://jarvo.pl/install.sh | bash
 Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły użytkownik)
 ```
 
-(`jarvo.pl/install.sh` to przekierowanie na raw GitHub; do czasu domeny działa adres z `README.md`:
-`…/JARVO/main/install.sh`; instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną.)
+(`jarvo.pl/install.sh` i `jarvo.pl/install.ps1` wgrywa `scripts/deploy-site.sh` razem ze stroną, więc działają
+także przy prywatnym repo; z publicznym repo działa też adres z `README.md`: `…/JARVO/main/install.sh`.
+Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywatnym repo pyta o klucz dostępu.)
 
 ### Linux (zrobione, §4a)
 1. Menedżer pakietów (`apt`, `dnf`/`yum`, `pacman`, `zypper`) doinstalowuje `git curl python3 openssl`.
@@ -95,16 +100,28 @@ Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły
    przy logowaniu `jarvo updater` stawia Dockera (Colima / Docker Desktop) i pomocnika aktualizacji;
    kontenery wstają z Dockerem same.
 
-### Windows
-1. `install.ps1` bez uprawnień administratora sprawdza WSL. Brak → `wsl --install --no-distribution`
-   (UAC raz), wpis w `RunOnce`, żeby **po restarcie instalator sam wystartował** i dokończył.
-2. Ubuntu w WSL (`wsl --install -d Ubuntu`); pierwsze uruchomienie z użytkownikiem `jarvo` bez pytań
-   (`ubuntu.exe install --root` + `useradd`), `/etc/wsl.conf` z `systemd=true`.
-3. **Docker Engine wewnątrz WSL** zamiast Docker Desktop (decyzja I2): ten sam skrypt co na Linuksie,
-   zero klikania, zero licencji. Jeśli Docker Desktop już jest i działa, używamy go.
-4. `install.sh` w WSL jak na Linuksie; dashboard pod `http://localhost:9119` (WSL przekazuje porty).
-5. Autostart: zadanie Harmonogramu zadań przy logowaniu (`wsl -d Ubuntu --exec systemctl start jarvo`),
-   pomocnik `updater.py` już umie otwierać Eksplorator na plikach wyników.
+### Windows (zbudowane, §4c)
+1. `install.ps1` jako zwykły użytkownik: Windows 10 2004+ (kompilacja 19041) albo 11, x64 lub ARM64, RAM i dysk.
+   Brak WSL → `wsl --install --no-distribution` (jedno okno UAC; starszy Windows 10: DISM), przy 8–15 GB RAM
+   `~/.wslconfig` z `memory=RAM−3GB` (domyślna połowa to za mało), wpis `RunOnce` z kopią instalatora
+   w `%LOCALAPPDATA%\Jarvo` (z BOM dla PowerShella 5.1; klucz dostępu zaszyfrowany DPAPI), restart, a po
+   zalogowaniu **instalator rusza sam**. WSL dalej nie działa po restarcie → `wsl --update`, potem jasny komunikat.
+2. Własna dystrybucja `Jarvo` zamiast Ubuntu ze Store: oficjalny obraz Canonical
+   (`cloud-images.ubuntu.com/wsl/releases/24.04/current`, suma z `SHA256SUMS`), `wsl --import`, użytkownik `jarvo`
+   z sudo bez hasła (Windows i tak wchodzi do WSL jako root, a hasła Linuksa ludzie zapominają), `/etc/wsl.conf`
+   z `systemd=true` i `default=jarvo`. Wyłączona wirtualizacja (`0x80370102`) → komunikat, co włączyć w BIOS.
+   Inne dystrybucje użytkownika zostają nietknięte.
+3. **Docker Engine wewnątrz WSL** zamiast Docker Desktop (decyzja I2): `install.sh` jak na Linuksie,
+   zero klikania, zero licencji. Jarvo zainstalowane już w innej dystrybucji (np. Ubuntu z Docker Desktop):
+   aktualizacja tam, z tymczasowym sudo bez hasła (`/etc/sudoers.d/zz-jarvo-install`, usuwane na końcu).
+4. Zmienne (`JARVO_TOKEN`, `JARVO_PROVIDER`, `JARVO_KEY`, `JARVO_YES`, `JARVO_BRANCH`, `JARVO_FORCE`) przechodzą
+   do Linuksa przez `WSLENV`, nie przez wiersz poleceń. Dashboard pod `http://localhost:9119` (WSL przekazuje porty).
+5. Autostart: `Jarvo.vbs` w folderze Autostart uruchamia ukryty `wsl.exe -d Jarvo -u root -e sleep infinity`,
+   który trzyma dystrybucję przy życiu; systemd w niej stawia Dockera, kontenery i pomocnika aktualizacji.
+6. `JARVO_UNINSTALL=1` usuwa dystrybucję `Jarvo`, autostart i `%LOCALAPPDATA%\Jarvo`; `JARVO_DRY_RUN=1` pokazuje kroki.
+7. PowerShell 5.1: plik bez BOM (BOM psuje `irm | iex`), w kodzie tylko ASCII (PowerShell czyta „ ” jak cudzysłów),
+   programy (`wsl.exe`, `curl.exe`) z `ErrorActionPreference=Continue` (stderr nie przerywa), błąd przy `irm | iex`
+   nie zamyka okna, a ustawienia sesji wracają po instalacji.
 
 ### Wspólne (każdy system)
 - **Tryb bez pytań:** `JARVO_PROVIDER=openrouter JARVO_KEY=… JARVO_YES=1` dla skryptów i testów;
@@ -127,7 +144,7 @@ Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły
 | 1. Linux ✅ | auto-instalacja pakietów i Docker Engine, `sg docker`, tryb bez pytań, `jarvo` CLI, autostart systemd, `uninstall` | automatyczny: `scripts/install-test.sh` (świeży `ubuntu:24.04` z własnym `dockerd`, w piaskownicy Claude Code) i `tests/test_installer.py`; do zrobienia ręcznie: świeży VPS z systemd (autostart, linger) | zrobione 2026-09-30 |
 | 2. Obraz w GHCR ✅ | workflow `obraz.yml` (amd64 i arm64 na natywnych runnerach, tag `src-<klucz>` z plików obrazu), `deploy.sh` pobiera przez `scripts/obraz.sh`, buduje tylko bez obrazu; Hermes przypięty w `infra/Dockerfile` | CI buduje; `install.sh` pobiera | zrobione 2026-10-09 |
 | 3. macOS 🟡 | Homebrew (z narzędziami Xcode), Colima albo istniejący runtime, wolumeny zamiast katalogów, LaunchAgent, klucz dostępu, `jarvo update` przez instalator | `tests/test_installer.py` (próby na sucho na udawanym macOS: Apple Silicon, 8 GB i macOS 12 → qemu, macOS 11 odmowa, działający Docker zostaje); do zrobienia: **ręczny na prawdziwym Macu** (Intel i M-series), bo runnery GitHuba na macOS nie mają zagnieżdżonej wirtualizacji | kod 2026-10-09; czeka na Maca |
-| 4. Windows | `install.ps1`: WSL bez dystrybucji, RunOnce po restarcie, Ubuntu bez pytań, Docker Engine w WSL, Harmonogram zadań, Eksplorator | **ręczny na prawdziwym Windowsie 11** (masz WSL: test aktualizacji istniejącej instalacji też); CI: PSScriptAnalyzer + próba na sucho | 3–5 dni + Twój Windows |
+| 4. Windows 🟡 | `install.ps1`: WSL bez dystrybucji, RunOnce po restarcie, własna dystrybucja `Jarvo` z obrazu Ubuntu, Docker Engine w WSL, autostart, aktualizacja istniejącej instalacji, odinstalowanie | `tests/test_install_ps1.py` (PowerShell 7 z `make dev-pwsh`: składnia, PSScriptAnalyzer, próby na sucho na udawanym Windowsie, `irm \| iex`); do zrobienia: **ręczny na prawdziwym Windowsie 11** (świeży i z istniejącą instalacją w Ubuntu) | kod 2026-10-09; czeka na Windowsa |
 | 5. Wykończenie | strona `jarvo.pl/install`, onboarding w dashboardzie, `RUNBOOK.md` i `README.md` z jedną sekcją „Instalacja” dla trzech systemów | protokół testu ręcznego (checklista w tym pliku, §6) | 1–2 dni |
 
 Razem: **około dwóch tygodni pracy**, z czego Linux i obraz w GHCR da się zrobić i przetestować
@@ -190,6 +207,20 @@ i 5 GB, macOS 11 → odmowa, działający Docker zostaje, klucz nigdy w wyjściu
 w trybie wolumenów, `docker compose config` dla katalogów i wolumenów), shellcheck, pełny pytest.
 Czego nie sprawdzono: instalacji na prawdziwym Macu (protokół §6).
 
+### 4c. Etap 4 (Windows): co zbudowano i jak sprawdzono
+
+Zbudowane 2026-10-09: `install.ps1` od nowa (§3 Windows), `scripts/dev-pwsh.sh` (`make dev-pwsh`: PowerShell 7.5.5
+i PSScriptAnalyzer 1.24.0, przypięte sumami, do `.tools/`), `PSScriptAnalyzerSettings.psd1` (wyłączone reguły
+z uzasadnieniem), `tests/test_install_ps1.py`, instalatory na jarvo.pl (`scripts/deploy-site.sh`, typ
+`text/plain; charset=utf-8` i `no-cache` w `site/.htaccess`).
+
+Sprawdzone (PowerShell 7 na Linuksie, Windows udawany zmiennymi `JARVO_FAKE_*`): składnia, PSScriptAnalyzer bez
+uwag, świeży Windows (WSL z UAC, `.wslconfig` przy 8 GB, RunOnce, restart), gotowy WSL (pobranie i import
+dystrybucji amd64 / arm64, konfiguracja, `install.sh` jako `jarvo`, autostart, dashboard), istniejąca instalacja
+w Ubuntu (aktualizacja z tymczasowym sudo), własna dystrybucja już jest, odmowy (stary Windows, mało RAM, mało
+dysku, procesor x86), klucz nigdy na ekranie, odinstalowanie, `irm | iex` nie zamyka sesji.
+Czego nie sprawdzono: prawdziwego `wsl.exe`, UAC, restartu i Windows PowerShell 5.1 (protokół §6).
+
 ## 5. Czy to jest ciężkie? (uczciwa ocena)
 
 - **Linux: łatwe.** Wszystko jest skryptowalne, Docker Engine instaluje się jednym poleceniem.
@@ -235,7 +266,8 @@ Na świeżym koncie użytkownika (albo maszynie wirtualnej), bez Dockera:
 | Plik | Rola | Stan |
 |---|---|---|
 | `install.sh` | bootstrap: system, pakiety, Docker (Engine / Colima / istniejący), klucz dostępu, klon, `jarvo up`, autostart, dashboard, `HOST_VERSION` | ✅ Linux/WSL; ✅ macOS (czeka na próbę na Macu) |
-| `install.ps1` | bootstrap Windows: WSL, restart + `RunOnce`, Ubuntu, `install.sh` w WSL, Harmonogram zadań | ⬜ (dziś: sprawdza WSL i Docker Desktop) |
+| `install.ps1` | bootstrap Windows: WSL, restart + `RunOnce`, dystrybucja `Jarvo`, `install.sh` w WSL, autostart (`Jarvo.vbs`), odinstalowanie | ✅ (czeka na próbę na Windowsie) |
+| `scripts/dev-pwsh.sh`, `PSScriptAnalyzerSettings.psd1`, `tests/test_install_ps1.py` | PowerShell 7 i PSScriptAnalyzer do testów, reguły lintu, próby na sucho `install.ps1` | ✅ |
 | `scripts/local-up.sh` | postawienie floty; tryb bez pytań, `--prepare`, `JARVO_NO_BUILD`, wolumeny (`JARVO_VOLUMES`, macOS domyślnie) | ✅ |
 | `bin/jarvo` | polecenie użytkownika (`up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall`, `version`); macOS: Colima, LaunchAgent, wolumeny | ✅ |
 | `infra/autostart/` | `jarvo-updater.service` (systemd user), `pl.jarvo.updater.plist` (LaunchAgent macOS) | ✅ |
