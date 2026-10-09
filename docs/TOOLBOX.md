@@ -119,7 +119,7 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) | transkrypcja z czasem słów: napisy do nagrań, wybór fragmentów, test wymowy lektora | CC-BY-4.0 (model) / MIT | 2026-07 | `jarvo-stt` |
 | [Pexels API](https://www.pexels.com/api/) | darmowe ujęcia i zdjęcia stock (klucz `PEXELS_API_KEY`) | Pexels License | n/d | `stock.py` |
 | [Pixabay API](https://pixabay.com/api/docs/) | darmowe ujęcia i zdjęcia stock (klucz `PIXABAY_API_KEY`), cache 24 h | Pixabay Content License | n/d | `stock.py` |
-| HyperFrames (skill [H] `hyperframes`) | wideo z HTML + GSAP → MP4/WebM | Apache-2.0 | 2026-09 | CLI (`npx`) |
+| HyperFrames 0.8.74 (skill [H] `hyperframes`) | wideo z HTML + GSAP → MP4/WebM | Apache-2.0 | 2026-09 | CLI w obrazie (`npx hyperframes` bez pobierania) |
 | [motion-broll](https://github.com/Barty-Bart/motion-graphics) | animowany B-roll do nagrania, zgrany ze słowami; panele ProRes 4444 z alfą | MIT | 2026-09 | skill + `narzedzia.py` |
 | [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | cały film w 43 stylach (keynote, akwarela, anime, 3D, miedzioryt, hologram…); lektor PL przez `lektor_linie.py` | MIT | 2026-09 | skill + biblioteka (`narzedzia.py`; sample i Kokoro tylko z `JARVO_EXTRAS=lemo` w `compose/.env`, bez przebudowy obrazu: compose przekazuje zmienną do kontenera) |
 | [anidoodle](https://github.com/alexgreensh/anidoodle) | rysunek kodem w 31 stylach, timelapse, HTML offline, muzyka syntezowana | Apache-2.0 | 2026-09 | skill + `narzedzia.py` |
