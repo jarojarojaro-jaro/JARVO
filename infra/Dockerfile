@@ -81,6 +81,8 @@ RUN set -e; cd /opt/jarvo/node && \
     # agent-browser: zostaje tylko binarka tej platformy (paczka niesie 7 wariantów, ~90 MB)
     case "$(uname -m)" in x86_64) ab=linux-x64;; aarch64) ab=linux-arm64;; *) ab=unknown;; esac && \
     find node_modules/agent-browser/bin -name 'agent-browser-*' ! -name "agent-browser-$ab" -delete && \
+    # bit wykonywania nadaje postinstall paczki, a ten jest zablokowany (allowScripts); paczka arm64 przychodzi bez niego
+    chmod 0755 node_modules/agent-browser/bin/agent-browser-$ab && \
     # na PATH natywna binarka zamiast nakładki w Node (jak robi postinstall przy instalacji globalnej)
     ln -sf ../agent-browser/bin/agent-browser-$ab node_modules/.bin/agent-browser && \
     ln -sf /opt/jarvo/node/node_modules/agent-browser/bin/agent-browser-$ab /usr/local/bin/agent-browser && \
