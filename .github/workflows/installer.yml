@@ -1,4 +1,4 @@
-# Instalator na prawdziwych systemach (docs/INSTALER.md): każda zmiana instalatora przechodzi przez Linuksa
+# Instalator na prawdziwych systemach (docs/INSTALER.md): każda zmiana instalatora i obrazu przechodzi przez Linuksa
 # od zera, macOS z jego bashem 3.2 i Windows z Windows PowerShell 5.1, zanim trafi do ludzi.
 #  - linux: świeży kontener Ubuntu bez gita, Pythona i Dockera → install.sh → Docker Engine → jarvo up pobiera
 #    gotowy obraz z GHCR → dashboard → aktualizacja → down → uninstall (scripts/install-test.sh, JARVO_TEST_PULL=1);
@@ -19,6 +19,11 @@ on:
       - scripts/obraz.sh
       - scripts/install-test.sh
       - infra/docker-compose.yml
+      # obraz floty też: nowa zależność w obrazie przechodzi przez instalację od zera (job linux czeka na obraz.yml)
+      - infra/Dockerfile
+      - infra/node/**
+      - infra/python/**
+      - infra/bin/**
       - infra/autostart/**
       - tests/test_installer.py
       - tests/test_install_ps1.py
