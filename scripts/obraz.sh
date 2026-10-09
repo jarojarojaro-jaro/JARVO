@@ -13,7 +13,8 @@
 #
 # Zmienne: JARVO_IMAGE_REPO (domyślnie ghcr.io/jarojarojaro-jaro/jarvo-hermes),
 #          JARVO_BUILD_IMAGE=1 (zawsze buduj na miejscu: `pobierz` od razu zwraca 1; tak samo przy własnym
-#          HERMES_IMAGE w <katalog>/.env, bo obraz z rejestru ma Hermesa przypiętego w infra/Dockerfile).
+#          HERMES_IMAGE w <katalog>/.env, bo obraz z rejestru ma Hermesa przypiętego w infra/Dockerfile),
+#          JARVO_TOKEN (klucz dostępu z instalatora: logowanie do rejestru, gdy obraz nie jest publiczny).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_IMG="${JARVO_IMAGE_REPO:-ghcr.io/jarojarojaro-jaro/jarvo-hermes}"
@@ -33,7 +34,10 @@ case "${1:-}" in
     fi
     k="$(klucz)"; img="$REPO_IMG:src-$k"
     echo "▶ Pobieram gotowy obraz floty ($img)"
-    if ! docker pull -q "$img" >/dev/null 2>&1; then
+    # rejestr prywatnego repo: jednorazowe logowanie kluczem dostępu z instalatora (zostaje w ~/.docker/config.json)
+    if ! docker pull -q "$img" >/dev/null 2>&1 && ! { [[ -n "${JARVO_TOKEN:-}" ]] \
+         && printf '%s' "$JARVO_TOKEN" | docker login "${REPO_IMG%%/*}" -u jarvo --password-stdin >/dev/null 2>&1 \
+         && docker pull -q "$img" >/dev/null 2>&1; }; then
       echo "ℹ Brak gotowego obrazu dla tej wersji (CI jeszcze buduje albo brak dostępu do rejestru): buduję na miejscu."
       exit 1
     fi

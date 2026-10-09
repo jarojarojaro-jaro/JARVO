@@ -27,15 +27,17 @@ Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
 ## Szybki start
 
 Instalacja lokalna jednym poleceniem (Linux, WSL2, macOS; repo do `~/jarvo`, flota w `~/jarvo-local`,
-potem http://localhost:9119/base). Na Linuksie i w WSL instalator sam doinstalowuje brakujące programy
-i Docker Engine; na macOS potrzebny jest działający Docker Desktop albo OrbStack (plan pełnej
-automatyzacji: [docs/INSTALER.md](docs/INSTALER.md)):
+potem http://localhost:9119/base). Instalator sam doinstalowuje wszystko, czego brakuje: na Linuksie
+i w WSL pakiety i Docker Engine, na macOS Homebrew, bash, git, Pythona i Dockera w darmowej Colimie
+(działający Docker Desktop albo OrbStack zostaje). Obraz floty pobiera gotowy z GHCR. Prywatne repo:
+instalator poprosi o klucz dostępu (`JARVO_TOKEN`). Szczegóły: [docs/INSTALER.md](docs/INSTALER.md):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash
 # Windows (PowerShell):  irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
 # bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
 # potem:      jarvo status | logs | chat | update | down | uninstall      (jarvo help: wszystkie)
+# jarvo update = git pull + ten sam instalator (nowe programy hosta, gdy wersja Jarvo ich wymaga)
 # z klonu:    bash bin/jarvo up   (stop: bash bin/jarvo down)
 ```
 

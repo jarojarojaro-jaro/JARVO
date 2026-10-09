@@ -4,7 +4,8 @@ Cel: użytkownik wkleja **jedno polecenie** do terminala, a po kilku minutach ma
 i otwarty dashboard. Bez ręcznego instalowania Dockera, bez czytania dokumentacji. Ten dokument
 opisuje, co już działa, czego brakuje na każdym systemie, jak to zbudować i ile to kosztuje pracy.
 
-Stan: plan z 2026-09-30; **etap 1 (Linux) zbudowany i przetestowany 2026-09-30** (§4a), etapy 2–5 do zrobienia.
+Stan: plan z 2026-09-30; **etap 1 (Linux) zbudowany i przetestowany 2026-09-30** (§4a), **etap 2 (obraz w GHCR)
+i etap 3 (macOS) zbudowane 2026-10-09** (§4b; macOS czeka na próbę na prawdziwym Macu), etapy 4–5 w toku.
 
 ---
 
@@ -12,11 +13,11 @@ Stan: plan z 2026-09-30; **etap 1 (Linux) zbudowany i przetestowany 2026-09-30**
 
 | Element | Plik | Co robi |
 |---|---|---|
-| Instalator Linux/WSL/macOS | [`install.sh`](../install.sh) | Linux i WSL: sprawdza sprzęt, doinstalowuje `git curl python3 openssl` i Docker Engine, grupa `docker`, klon do `~/jarvo`, polecenie `jarvo`, `jarvo up`, autostart pomocnika, dashboard w przeglądarce; ponowne wklejenie = aktualizacja. macOS: sprawdza git, bash 4+ (Homebrew) i działający Docker (etap 3 doda instalację) |
+| Instalator Linux/WSL/macOS | [`install.sh`](../install.sh) | Linux i WSL: sprawdza sprzęt, doinstalowuje `git curl python3 openssl` i Docker Engine, grupa `docker`, klon do `~/jarvo`, polecenie `jarvo`, `jarvo up`, autostart pomocnika, dashboard w przeglądarce; ponowne wklejenie = aktualizacja. macOS (12+): Homebrew (z narzędziami Xcode), `bash git python openssl@3`, Docker w Colimie (działający Docker Desktop/OrbStack zostaje), dane w wolumenach, LaunchAgent. Prywatne repo: klucz dostępu (`JARVO_TOKEN` albo pytanie, gdy klon bez klucza się nie uda), zapisany tylko w `.git/config` repo (0600). `sudo` dopiero wtedy, gdy coś naprawdę go wymaga |
 | Instalator Windows | [`install.ps1`](../install.ps1) | sprawdza WSL i Docker Desktop, odpala `install.sh` w WSL bez pytania o hasło Linuksa (na czas instalacji tymczasowe sudo bez hasła przez `wsl -u root`, usuwane na końcu); etap 4 doda instalację WSL i Dockera |
-| Polecenie użytkownika | [`bin/jarvo`](../bin/jarvo) | `up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart on\|off\|status`, `android on\|off\|status` (telefon testowy Twórcy aplikacji, [MOBILE.md](MOBILE.md) §5), `uninstall [--yes] [--all]`, `version`; sam sięga po grupę `docker` przez `sg`, gdy sesja jeszcze jej nie ma |
+| Polecenie użytkownika | [`bin/jarvo`](../bin/jarvo) | `up`, `down`, `status`, `logs`, `update` (`git pull` + ten sam `install.sh`, więc nowe wymagania hosta też dochodzą), `chat`, `open`, `pliki` (macOS: `docker cp` z wolumenu do `~/Jarvo`), `autostart on\|off\|status`, `android on\|off\|status` (telefon testowy Twórcy aplikacji, [MOBILE.md](MOBILE.md) §5), `uninstall [--yes] [--all]`, `version`; sam sięga po grupę `docker` przez `sg`, gdy sesja jeszcze jej nie ma |
 | Postawienie floty | [`scripts/local-up.sh`](../scripts/local-up.sh) | pyta o dostawcę modeli i klucz (albo bierze z `JARVO_PROVIDER`/`JARVO_KEY`/`JARVO_YES=1`), tworzy `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`), buduje obraz (albo `JARVO_NO_BUILD=1`), woła `deploy.sh`, startuje pomocnika aktualizacji; `--prepare` tylko przygotowuje katalog |
-| Autostart | [`infra/autostart/jarvo-updater.service`](../infra/autostart/jarvo-updater.service) | szablon usługi `systemd --user` pomocnika aktualizacji (`jarvo autostart on` renderuje i włącza linger); kontenery wstają same (`restart: unless-stopped`) |
+| Autostart | [`infra/autostart/jarvo-updater.service`](../infra/autostart/jarvo-updater.service), [`infra/autostart/pl.jarvo.updater.plist`](../infra/autostart/pl.jarvo.updater.plist) | Linux: usługa `systemd --user` pomocnika aktualizacji (`jarvo autostart on` renderuje i włącza linger). macOS: LaunchAgent `pl.jarvo.updater` uruchamia przy logowaniu `jarvo updater`, który najpierw stawia Dockera (`colima start` albo Docker Desktop). Kontenery wstają same (`restart: unless-stopped`) |
 | Wdrożenie | [`scripts/deploy.sh`](../scripts/deploy.sh) | compose build/up, build dystrybucji i instalacja profili w kontenerze, healthchecki |
 | Gotowy obraz | [`scripts/obraz.sh`](../scripts/obraz.sh), [`.github/workflows/obraz.yml`](../.github/workflows/obraz.yml) | GitHub Actions buduje `jarvo-hermes` dla amd64 i arm64 i publikuje w GHCR jako `src-<klucz>` (klucz = skrót `infra/Dockerfile`, `infra/node`, `infra/python`, `infra/bin`, `branding`); `deploy.sh` najpierw pobiera obraz dla klucza swojej wersji repo, a buduje na miejscu tylko, gdy go nie ma (`JARVO_BUILD_IMAGE=1`: zawsze buduj). Wersja Hermesa przypięta w `infra/Dockerfile` (tag + digest), więc klucz obejmuje i ją; własny `HERMES_IMAGE` w `compose/.env` = budowa na miejscu |
 | Serwer (VPS) | [`scripts/bootstrap-vps.sh`](../scripts/bootstrap-vps.sh) | jednorazowe przygotowanie Ubuntu/Debian (Docker, użytkownik, UFW, Tailscale) |
@@ -24,13 +25,18 @@ Stan: plan z 2026-09-30; **etap 1 (Linux) zbudowany i przetestowany 2026-09-30**
 
 Polecenia ze strony: `curl -fsSL …/install.sh | bash` oraz `irm …/install.ps1 | iex`.
 
-**Gdy czegoś brakuje:** na Linuksie i w WSL instalator doinstalowuje to sam (etap 1). Na macOS i Windowsie
-nadal kończy się komunikatem „zainstaluj Docker Desktop…”, i to jest krok, który mają usunąć etapy 3 i 4.
+**Gdy czegoś brakuje:** na Linuksie, w WSL i na macOS instalator doinstalowuje to sam (etapy 1 i 3).
+Windows nadal wymaga Docker Desktop i WSL zainstalowanych ręcznie: to usuwa etap 4.
 
-Obraz `jarvo-hermes:local` buduje się lokalnie (pierwszy raz kilka–kilkanaście minut, ok. 6 GB).
-Obrazy bazowe są wieloarchitekturowe (`nousresearch/hermes-agent` i `lightpanda/browser`:
-`linux/amd64` i `linux/arm64`), a jedyna binarka zależna od procesora w `Dockerfile` (agent-browser)
-ma wariant arm64, więc Apple Silicon **powinien** działać; nikt tego jeszcze nie sprawdził.
+Obraz `jarvo-hermes:local` instalator pobiera gotowy z GHCR (etap 2, amd64 i arm64, ~2–3 minuty);
+buduje na miejscu tylko, gdy obrazu dla tej wersji jeszcze nie ma (kilka–kilkanaście minut, 8 GB RAM).
+Obraz arm64 (Apple Silicon, Windows na ARM) buduje i uruchamia CI na natywnym runnerze arm64.
+
+**Aktualizacje i nowe zależności.** Każda nowa zależność floty trafia do obrazu (`infra/Dockerfile`,
+`infra/node`, `infra/python`): CI buduje nowy obraz, a `deploy.sh` u każdego go pobiera, więc użytkownik
+nie robi nic. Zmiana tego, co musi być na komputerze (program hosta, wersja Dockera, autostart), idzie do
+`install.sh` / `install.ps1` z podbiciem `HOST_VERSION` w `install.sh`: `jarvo update` uruchamia nowy
+instalator, a `deploy.sh` przypomina „uruchom jarvo update”, gdy `compose/.host-version` jest starsza.
 
 ## 2. Diagnoza: co przeszkadza na każdym systemie
 
@@ -72,16 +78,22 @@ Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły
    (`restart: unless-stopped`), a pomocnik aktualizacji jako usługa `systemd --user`
    `jarvo-updater` z `loginctl enable-linger` (`jarvo autostart on|off|status`).
 
-### macOS
-1. Xcode Command Line Tools (bez okna: `softwareupdate` z plikiem `.xcode-select-installing`), Homebrew, gdy
-   brak (oficjalny skrypt, jedno hasło `sudo`), `brew install bash git python openssl`.
-2. Runtime Dockera: **jeśli `docker info` już działa** (Docker Desktop, OrbStack), używamy go. Jeśli nie,
-   **Colima** (`brew install colima docker docker-compose`, `colima start --cpu 4 --memory 8 --disk 60 --vm-type vz
-   --mount-type virtiofs`): darmowa, bez klikania, bez licencji, autostart przez `brew services start colima`.
-3. Dane floty na macOS w **nazwanym wolumenie Dockera** zamiast katalogu `~/jarvo-local/data`
-   (decyzja I1): znika problem mapowania uid 10000 między macOS a VM. Wyniki agentów użytkownik
-   ogląda w dashboardzie (jak teraz) albo przez `jarvo pliki` (`docker cp` do `~/Jarvo`).
-4. Autostart: `launchd` (`~/Library/LaunchAgents/pl.jarvo.fleet.plist`).
+### macOS (zbudowane, §4b)
+1. Homebrew, gdy brak (oficjalny skrypt w trybie `NONINTERACTIVE=1`; sam instaluje narzędzia Xcode bez okna;
+   jedno hasło `sudo`), potem `brew install bash git python openssl@3` i `brew shellenv` w `~/.zprofile`.
+   macOS starszy niż 12 kończy się komunikatem (Homebrew i Colima go nie wspierają); instalacja jako root odmawia.
+2. Runtime Dockera: **jeśli `docker info` już działa** (Docker Desktop, OrbStack, Colima), używamy go; jest
+   Docker Desktop, ale wyłączony → `open -a Docker`. Inaczej **Colima** (`brew install colima docker docker-compose`,
+   `colima start --cpu N --memory M --disk 60 --vm-type vz --mount-type virtiofs`; macOS 12: `qemu`):
+   darmowa, bez klikania, bez licencji. Rozmiar VM z maszyny: procesory połowa (2–6), RAM 8 GB przy ≥16 GB,
+   6 GB przy ≥12 GB, inaczej 5 GB. Wtyczka `docker compose` z Homebrew dopisana do `~/.docker/config.json`.
+3. Dane floty w **nazwanych wolumenach Dockera** (`jarvo-hermes-data`, `jarvo-valkey-data`, `jarvo-build`) zamiast
+   katalogów `~/jarvo-local/data` (decyzja I1): znika problem uid 10000 między macOS a VM. Ten sam
+   `docker-compose.yml` (`${JARVO_VOL_HERMES:-…}`); wybór przy pierwszym `jarvo up` (`JARVO_VOLUMES=1`, na macOS
+   domyślnie). Wyniki agentów: dashboard albo `jarvo pliki` (`docker cp` do `~/Jarvo`).
+4. Autostart: LaunchAgent `~/Library/LaunchAgents/pl.jarvo.updater.plist` (`jarvo autostart on|off|status`):
+   przy logowaniu `jarvo updater` stawia Dockera (Colima / Docker Desktop) i pomocnika aktualizacji;
+   kontenery wstają z Dockerem same.
 
 ### Windows
 1. `install.ps1` bez uprawnień administratora sprawdza WSL. Brak → `wsl --install --no-distribution`
@@ -113,8 +125,8 @@ Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły
 | Etap | Zakres | Test | Nakład |
 |---|---|---|---|
 | 1. Linux ✅ | auto-instalacja pakietów i Docker Engine, `sg docker`, tryb bez pytań, `jarvo` CLI, autostart systemd, `uninstall` | automatyczny: `scripts/install-test.sh` (świeży `ubuntu:24.04` z własnym `dockerd`, w piaskownicy Claude Code) i `tests/test_installer.py`; do zrobienia ręcznie: świeży VPS z systemd (autostart, linger) | zrobione 2026-09-30 |
-| 2. Obraz w GHCR ✅ | workflow `obraz.yml` (amd64 i arm64 na natywnych runnerach, tag `src-<klucz>` z plików obrazu), `deploy.sh` pobiera przez `scripts/obraz.sh`, buduje tylko bez obrazu | CI buduje; `install.sh` pobiera | zrobione 2026-10-09 |
-| 3. macOS | Xcode CLT, Homebrew, Colima albo istniejący runtime, wolumen zamiast katalogu, launchd, test na Apple Silicon | **ręczny na prawdziwym Macu** (Intel i M-series); CI: `shellcheck` + próba na sucho (`JARVO_DRY_RUN=1`), bo runnery GitHuba na macOS arm64 nie mają zagnieżdżonej wirtualizacji | 2–3 dni + Twój Mac |
+| 2. Obraz w GHCR ✅ | workflow `obraz.yml` (amd64 i arm64 na natywnych runnerach, tag `src-<klucz>` z plików obrazu), `deploy.sh` pobiera przez `scripts/obraz.sh`, buduje tylko bez obrazu; Hermes przypięty w `infra/Dockerfile` | CI buduje; `install.sh` pobiera | zrobione 2026-10-09 |
+| 3. macOS 🟡 | Homebrew (z narzędziami Xcode), Colima albo istniejący runtime, wolumeny zamiast katalogów, LaunchAgent, klucz dostępu, `jarvo update` przez instalator | `tests/test_installer.py` (próby na sucho na udawanym macOS: Apple Silicon, 8 GB i macOS 12 → qemu, macOS 11 odmowa, działający Docker zostaje); do zrobienia: **ręczny na prawdziwym Macu** (Intel i M-series), bo runnery GitHuba na macOS nie mają zagnieżdżonej wirtualizacji | kod 2026-10-09; czeka na Maca |
 | 4. Windows | `install.ps1`: WSL bez dystrybucji, RunOnce po restarcie, Ubuntu bez pytań, Docker Engine w WSL, Harmonogram zadań, Eksplorator | **ręczny na prawdziwym Windowsie 11** (masz WSL: test aktualizacji istniejącej instalacji też); CI: PSScriptAnalyzer + próba na sucho | 3–5 dni + Twój Windows |
 | 5. Wykończenie | strona `jarvo.pl/install`, onboarding w dashboardzie, `RUNBOOK.md` i `README.md` z jedną sekcją „Instalacja” dla trzech systemów | protokół testu ręcznego (checklista w tym pliku, §6) | 1–2 dni |
 
@@ -156,6 +168,27 @@ Sprawdzone:
 
 Czego etap 1 nie obejmuje (świadomie): autostart bez systemd (WSL bez `systemd=true`, kontenery testowe),
 instalacja Dockera na macOS (etap 3), WSL i restart Windowsa (etap 4), obraz z rejestru (etap 2).
+
+### 4b. Etapy 2–3 (obraz, macOS, klucz, aktualizacja): co zbudowano i jak sprawdzono
+
+Zbudowane 2026-10-09:
+- **Gotowy obraz** (§1): `obraz.yml` buduje `jarvo-hermes` na natywnych runnerach amd64 i arm64 i łączy je w jeden
+  tag `src-<klucz>`; `deploy.sh` pobiera go przez `scripts/obraz.sh pobierz`, a przy prywatnym pakiecie loguje się
+  do GHCR kluczem z instalatora. Hermes przypięty w `infra/Dockerfile` (tag + digest), żeby CI i budowa na miejscu
+  dawały ten sam obraz.
+- **macOS** (§3): `install.sh` z gałęzią macOS (Homebrew, Colima, rozmiar VM, wtyczka compose), `local-up.sh` z trybem
+  wolumenów (`JARVO_VOLUMES`), `deploy.sh` nadaje wolumenom właściciela 10000 jednorazowym kontenerem,
+  `bin/jarvo` z LaunchAgentem, `pliki` przez `docker cp`, `uninstall --all` usuwa też wolumeny.
+- **Prywatne repo:** `JARVO_TOKEN` (albo pytanie z terminala, ukryte, gdy anonimowy klon się nie uda); klucz trafia
+  tylko do nagłówka git w `.git/config` repo (0600) i do `docker login ghcr.io`, nigdy do logu ani na ekran.
+- **Aktualizacja:** `jarvo update` = `git pull --ff-only` + `exec bash install.sh` (nowa wersja instalatora, bez
+  banera i bez otwierania przeglądarki); `sudo` tylko, gdy trzeba coś doinstalować. `install.sh` zapisuje
+  `HOST_VERSION` w `compose/.host-version`; starsza wersja → `deploy.sh` prosi o `jarvo update`.
+
+Sprawdzone: `tests/test_installer.py` (Homebrew przed Colimą, `sudo -v` przed Homebrew, mała maszyna i macOS 12 → qemu
+i 5 GB, macOS 11 → odmowa, działający Docker zostaje, klucz nigdy w wyjściu i użyty do gita, `local-up.sh --prepare`
+w trybie wolumenów, `docker compose config` dla katalogów i wolumenów), shellcheck, pełny pytest.
+Czego nie sprawdzono: instalacji na prawdziwym Macu (protokół §6).
 
 ## 5. Czy to jest ciężkie? (uczciwa ocena)
 
@@ -201,12 +234,12 @@ Na świeżym koncie użytkownika (albo maszynie wirtualnej), bez Dockera:
 
 | Plik | Rola | Stan |
 |---|---|---|
-| `install.sh` | bootstrap: system, pakiety, Docker (Engine / Colima / istniejący), klon, `jarvo up`, autostart, dashboard | ✅ Linux/WSL; macOS: Docker ręcznie (etap 3) |
+| `install.sh` | bootstrap: system, pakiety, Docker (Engine / Colima / istniejący), klucz dostępu, klon, `jarvo up`, autostart, dashboard, `HOST_VERSION` | ✅ Linux/WSL; ✅ macOS (czeka na próbę na Macu) |
 | `install.ps1` | bootstrap Windows: WSL, restart + `RunOnce`, Ubuntu, `install.sh` w WSL, Harmonogram zadań | ⬜ (dziś: sprawdza WSL i Docker Desktop) |
-| `scripts/local-up.sh` | postawienie floty; tryb bez pytań, `--prepare`, `JARVO_NO_BUILD`; wolumen na macOS i pobieranie obrazu | ✅ / ⬜ (etapy 2–3) |
-| `bin/jarvo` | polecenie użytkownika (`up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall`, `version`) | ✅ |
-| `infra/autostart/` | `jarvo-updater.service` (systemd user) ✅; `pl.jarvo.fleet.plist` (launchd), `jarvo-task.xml` (Harmonogram zadań) ⬜ | |
+| `scripts/local-up.sh` | postawienie floty; tryb bez pytań, `--prepare`, `JARVO_NO_BUILD`, wolumeny (`JARVO_VOLUMES`, macOS domyślnie) | ✅ |
+| `bin/jarvo` | polecenie użytkownika (`up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall`, `version`); macOS: Colima, LaunchAgent, wolumeny | ✅ |
+| `infra/autostart/` | `jarvo-updater.service` (systemd user), `pl.jarvo.updater.plist` (LaunchAgent macOS) | ✅ |
 | `scripts/install-test.sh` | instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem (piaskownica) | ✅ |
-| `tests/test_installer.py` | składnia, shellcheck, próby na sucho, `jarvo`, `local-up.sh --prepare` | ✅ |
+| `tests/test_installer.py` | składnia, shellcheck, próby na sucho (Linux i macOS), klucz dostępu, `jarvo`, `local-up.sh --prepare`, wolumeny, przypięty Hermes | ✅ |
 | `.github/workflows/obraz.yml`, `scripts/obraz.sh` | obraz amd64+arm64 do GHCR, pobieranie zamiast budowy | ✅ |
 | `.github/workflows/installer.yml` | `shellcheck`, PSScriptAnalyzer, test `install.sh` w kontenerze Ubuntu/Debian | ⬜ |

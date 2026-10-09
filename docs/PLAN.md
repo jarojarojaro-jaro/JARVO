@@ -258,7 +258,9 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ `fleet-improvement` Jarva: wnioski z przeglądu tygodnia jako propozycje zmian.
 - ⬜ Wersjonowanie floty (tagi), changelog wydań.
 - 🟡 Instalator jednym poleceniem na Linuksie, macOS i Windowsie (Docker, WSL i autostart instalowane same): plan w [INSTALER.md](INSTALER.md);
-  etap 1 (Linux: pakiety, Docker Engine, polecenie `jarvo`, autostart, `uninstall`, test od zera w kontenerze) ✅ 2026-09-30.
+  etap 1 (Linux: pakiety, Docker Engine, polecenie `jarvo`, autostart, `uninstall`, test od zera w kontenerze) ✅ 2026-09-30;
+  etap 2 (gotowy obraz amd64/arm64 w GHCR) i etap 3 (macOS: Homebrew, Colima, wolumeny, LaunchAgent) zbudowane 2026-10-09,
+  macOS czeka na próbę na prawdziwym Macu.
 
 ### Faza ∞
 Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…

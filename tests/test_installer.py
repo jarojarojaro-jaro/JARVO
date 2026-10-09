@@ -128,6 +128,70 @@ def test_dry_run_with_docker_present_skips_install(tmp_path):
     assert "usermod" not in res.stdout and "groupadd" not in res.stdout   # Docker działa jako użytkownik: bez grupy i sudo do Dockera
 
 
+def _mac_shims(tmp_path: Path, ram_gb: int = 16, ver: str = "14.5") -> Path:
+    """Udawany macOS na Linuksie: uname, sw_vers, sysctl (procesor Apple, RAM)."""
+    d = tmp_path / "mac"
+    d.mkdir(parents=True)
+    _shim(d, "uname", 'case "$1" in -s) echo Darwin;; -m) echo arm64;; *) echo Darwin;; esac\n')
+    _shim(d, "sw_vers", f'echo {ver}\n')
+    _shim(d, "sysctl", f'case "$2" in hw.memsize) echo {ram_gb * 1024 ** 3};; hw.ncpu) echo 8;; esac\n')
+    _shim(d, "id", 'case "$1" in -u) echo 501;; -un) echo tester;; *) echo 501;; esac\n')
+    return d
+
+
+def _dry_mac(tmp_path: Path, extra_shims: Path | None = None, **extra) -> subprocess.CompletedProcess:
+    hide = TOOLS + ("brew", "colima")
+    path = [str(_mac_shims(tmp_path, **{k: extra.pop(k) for k in ("ram_gb", "ver") if k in extra}))]
+    if extra_shims:
+        path.insert(0, str(extra_shims))
+    path.append(str(_bare_path(tmp_path / "p", hide)))
+    return _dry(tmp_path, _os_release(tmp_path, "nieistotne"), PATH=":".join(path), **extra)
+
+
+def test_dry_run_macos_installs_brew_and_colima(tmp_path):
+    res = _dry_mac(tmp_path)
+    assert res.returncode == 0, res.stdout + res.stderr
+    out = res.stdout
+    assert "System: macOS 14.5 (arm64)" in out
+    # hasło raz, przed instalatorem Homebrew (tryb bez pytań wymaga zapamiętanego sudo)
+    assert "$ sudo -v" in out and out.index("$ sudo -v") < out.index("Homebrew/install")
+    assert "brew install -q bash git python openssl@3" in out
+    assert "brew install -q colima docker docker-compose" in out
+    # połowa procesorów, 8 GB przy 16 GB RAM, Virtualization.framework
+    assert "colima start --cpu 4 --memory 8 --disk 60 --vm-type vz --mount-type virtiofs" in out
+    assert "git clone -q --depth 50 -b main" in out and "bin/jarvo up" in out
+    assert "/opt/homebrew/bin/jarvo" in out   # polecenie w katalogu Homebrew: bez sudo
+    assert "apt-get" not in out and "get.docker.com" not in out
+
+
+def test_dry_run_macos_small_and_old(tmp_path):
+    res = _dry_mac(tmp_path, ram_gb=8, ver="12.7")
+    assert res.returncode == 0, res.stdout + res.stderr
+    # macOS 12: bez vz, QEMU z Homebrew; 8 GB RAM: maszyna wirtualna 5 GB
+    assert "colima docker docker-compose qemu" in res.stdout
+    assert "--memory 5 --disk 60 --vm-type qemu" in res.stdout
+    res = _dry_mac(tmp_path / "s", ver="11.7")
+    assert res.returncode == 1 and "macOS 12" in res.stderr
+
+
+def test_dry_run_macos_docker_running_keeps_it(tmp_path):
+    shims = tmp_path / "dk"
+    shims.mkdir()
+    _shim(shims, "docker", 'case "$1 $2" in "compose version"|"info ") exit 0;; version*) echo 28.1;; context*) echo desktop-linux;; esac\n')
+    _shim(shims, "brew", 'case "$1" in shellenv) echo "export HOMEBREW_PREFIX=/opt/homebrew";; --prefix) echo /opt/homebrew;; list) exit 0;; esac\n')
+    res = _dry_mac(tmp_path, extra_shims=shims)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "Docker: 28.1 (już działa: desktop-linux)" in res.stdout
+    assert "colima" not in res.stdout and "Homebrew/install" not in res.stdout
+
+
+def test_token_never_printed_and_used_for_git(tmp_path):
+    res = _dry(tmp_path, _os_release(tmp_path, "ubuntu"), JARVO_TOKEN="ghp_tajnytoken123")
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "ghp_tajnytoken123" not in res.stdout + res.stderr
+    assert "git clone -q --depth 50 -b main" in res.stdout
+
+
 def test_low_ram_refuses_unless_forced(tmp_path):
     meminfo = tmp_path / "meminfo"
     meminfo.write_text("MemTotal:        2000000 kB\n", encoding="utf-8")
@@ -210,6 +274,45 @@ def test_local_up_prepare_without_questions(tmp_path):
     bad = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], env={**env, "JARVO_LOCAL": str(tmp_path / "x"),
                          "JARVO_PROVIDER": "nieznany"}, capture_output=True, text=True, timeout=60)
     assert bad.returncode == 2 and "Nieznany JARVO_PROVIDER" in bad.stdout
+
+
+def test_local_up_prepare_volumes_mode(tmp_path):
+    """macOS (tu JARVO_VOLUMES=1): dane i build w wolumenach Dockera, bez chown katalogów hosta."""
+    bin_dir = tmp_path / "shims"
+    bin_dir.mkdir()
+    _shim(bin_dir, "docker", '[ "$1" = info ] && exit 0; exit 1\n')
+    local = tmp_path / "flota"
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "JARVO_LOCAL": str(local),
+           "JARVO_YES": "1", "JARVO_VOLUMES": "1"}
+    res = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], env=env, capture_output=True, text=True,
+                         timeout=60, stdin=subprocess.DEVNULL)
+    assert res.returncode == 0, res.stdout + res.stderr
+    dot_env = (local / "compose/.env").read_text(encoding="utf-8")
+    assert "JARVO_BUILD=jarvo-build" in dot_env
+    assert "JARVO_VOL_HERMES=jarvo-hermes-data" in dot_env and "JARVO_VOL_VALKEY=jarvo-valkey-data" in dot_env
+    assert (local / "data").stat().st_uid != 10000   # wolumeny: katalogów hosta nie przejmujemy
+
+
+def test_compose_volumes_interpolation(tmp_path):
+    """Ten sam docker-compose.yml: katalogi hosta (Linux) albo wolumeny o stałych nazwach (macOS)."""
+    if shutil.which("docker") is None or subprocess.run(["docker", "compose", "version"], capture_output=True).returncode:
+        pytest.skip("brak docker compose")
+    compose = ROOT / "infra/docker-compose.yml"
+    base = {"DASHBOARD_PASSWORD": "x", "SEARXNG_SECRET": "y", "JARVO_DATA": "/d", "JARVO_BUILD": "/b",
+            "JARVO_REPO": "/r", "JARVO_SECRETS": "/s"}
+
+    def cfg(**extra):
+        r = subprocess.run(["docker", "compose", "-f", str(compose), "config", "--format", "json"],
+                           env={**os.environ, **base, **extra}, capture_output=True, text=True, timeout=60)
+        assert r.returncode == 0, r.stderr
+        import json
+        return {v["target"]: v for v in json.loads(r.stdout)["services"]["hermes"]["volumes"]}
+
+    linux = cfg()
+    assert linux["/opt/data"]["type"] == "bind" and linux["/opt/data"]["source"] == "/d/hermes"
+    mac = cfg(JARVO_VOL_HERMES="jarvo-hermes-data", JARVO_BUILD="jarvo-build")
+    assert mac["/opt/data"] == {**mac["/opt/data"], "type": "volume", "source": "jarvo-hermes-data"}
+    assert mac["/opt/jarvo/build"]["type"] == "volume" and mac["/opt/jarvo/build"]["source"] == "jarvo-build"
 
 
 def test_hermes_pinned_everywhere():

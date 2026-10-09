@@ -14,6 +14,7 @@
 # JARVO_NO_BUILD=1: obraz jarvo-hermes:local jest już gotowy (docker load, rejestr): nigdy nie buduj.
 # JARVO_RESUME_CRON=1: włącz rutyny Jarva (patrol, brief, przegląd tygodnia), domyślnie wstrzymane.
 # JARVO_LOCAL: katalog instalacji (domyślnie ~/jarvo-local).
+# JARVO_VOLUMES=1|0: dane i build w wolumenach Dockera (domyślnie tak na macOS); tylko przy pierwszym przygotowaniu.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 L="${JARVO_LOCAL:-$HOME/jarvo-local}"
@@ -37,7 +38,7 @@ case "${1:-}" in
   "") ;;
   *) echo "Nieznana opcja: $1 (down | --prepare)"; exit 2 ;;
 esac
-docker info >/dev/null 2>&1 || { echo "Docker nie działa (Linux: sudo systemctl start docker; macOS: Docker Desktop; WSL: sudo service docker start)."; exit 1; }
+docker info >/dev/null 2>&1 || { echo "Docker nie działa (Linux: sudo systemctl start docker; macOS: colima start albo Docker Desktop; WSL: sudo service docker start)."; exit 1; }
 
 if [[ ! -f "$L/compose/.env" ]]; then
   echo "▶ Przygotowuję $L"
@@ -76,6 +77,11 @@ if [[ ! -f "$L/compose/.env" ]]; then
       -e "s#^DASHBOARD_PASSWORD=.*#DASHBOARD_PASSWORD=$PASS#" \
       -e "s#^DASHBOARD_SESSION_SECRET=.*#DASHBOARD_SESSION_SECRET=$(openssl rand -hex 32)#" \
       "$ROOT/infra/env/compose.env.example" > "$L/compose/.env"
+  # macOS: dane floty i build w wolumenach Dockera (maszyna wirtualna Dockera nie odda kontenerowi plików hosta)
+  if [[ "${JARVO_VOLUMES:-}" == 1 || ( -z "${JARVO_VOLUMES:-}" && "$(uname -s)" == Darwin ) ]]; then
+    sedi "s#^JARVO_BUILD=.*#JARVO_BUILD=jarvo-build#" "$L/compose/.env"
+    printf 'JARVO_VOL_HERMES=jarvo-hermes-data\nJARVO_VOL_VALKEY=jarvo-valkey-data\n' >> "$L/compose/.env"
+  fi
   sed "s#^JARVO_MODEL_PROVIDER=.*#JARVO_MODEL_PROVIDER=$PROVIDER#" "$ROOT/infra/env/jarvo.env.example" > "$L/compose/jarvo.env"
   for f in "$ROOT"/infra/env/secrets/*.env.example; do
     if [[ $KEYVAR == OPENROUTER_API_KEY ]]; then
@@ -96,8 +102,11 @@ if [[ -n "${JARVO_MODEL_PROVIDER+x}" ]]; then
   sedi "s#^JARVO_MODEL_PROVIDER=.*#JARVO_MODEL_PROVIDER=$JARVO_MODEL_PROVIDER#" "$L/compose/jarvo.env"
   echo "▶ Dostawca modeli: ${JARVO_MODEL_PROVIDER:-openai-codex (domyślny z fleet.yaml)}"
 fi
-# kontener pracuje jako uid 10000 (użytkownik hermes): build i dane muszą być jego
-if [[ "$(owner "$L/build")" != "10000" || "$(owner "$L/data")" != "10000" ]]; then
+# build: katalog na hoście albo wolumen Dockera (macOS); updater i deploy.sh dostają to samo
+BUILD="$(sed -n 's/^JARVO_BUILD=//p' "$L/compose/.env" | tail -1)"; BUILD="${BUILD:-$L/build}"
+# kontener pracuje jako uid 10000 (użytkownik hermes): build i dane muszą być jego (wolumenom nadaje to deploy.sh)
+if ! grep -q '^JARVO_VOL_HERMES=.' "$L/compose/.env" \
+   && [[ "$(owner "$L/build")" != "10000" || "$(owner "$L/data")" != "10000" ]]; then
   $SUDO chown -R 10000:10000 "$L/build" "$L/data"
 fi
 if [[ $PREPARE -eq 1 ]]; then echo "✅ Katalog $L gotowy (env, sekrety). Uruchomienie: jarvo up"; exit 0; fi
@@ -125,7 +134,7 @@ elif brand_changed; then
   FLAGS+=(--rebuild)                # tylko branding/tłumaczenie: ta sama wersja Hermesa, kilka sekund
 fi
 [[ "${JARVO_RESUME_CRON:-0}" == 1 ]] && FLAGS+=(--resume-cron)   # rutyny Jarva (domyślnie wstrzymane)
-JARVO_LOCAL_INSTALL=1 JARVO_COMPOSE_DIR="$L/compose" JARVO_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"
+JARVO_LOCAL_INSTALL=1 JARVO_COMPOSE_DIR="$L/compose" JARVO_BUILD="$BUILD" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"
 touch "$L/.installed"
 
 # pomocnik aktualizacji: przycisk „Aktualizuj” w dashboardzie (git pull + deploy na prośbę z panelu).
@@ -135,9 +144,12 @@ rm -f "$L/updater.pid"
 if systemctl --user is-enabled jarvo-updater.service >/dev/null 2>&1; then
   systemctl --user restart jarvo-updater.service
   echo "▶ Pomocnik aktualizacji: usługa jarvo-updater (systemd)"
+elif [[ "$(uname -s)" == Darwin ]] && launchctl print "gui/$(id -u)/pl.jarvo.updater" >/dev/null 2>&1; then
+  launchctl kickstart -k "gui/$(id -u)/pl.jarvo.updater"
+  echo "▶ Pomocnik aktualizacji: LaunchAgent pl.jarvo.updater"
 else
   DETACH=(); command -v setsid >/dev/null && DETACH=(setsid)
-  JARVO_AUTO_UPDATE="${JARVO_AUTO_UPDATE:-0}" nohup ${DETACH[@]+"${DETACH[@]}"} python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$L/build" \
+  JARVO_AUTO_UPDATE="${JARVO_AUTO_UPDATE:-0}" nohup ${DETACH[@]+"${DETACH[@]}"} python3 "$ROOT/scripts/updater.py" --mode local --compose "$L/compose" --build "$BUILD" \
     >> "$L/updater.log" 2>&1 < /dev/null &
   echo $! > "$L/updater.pid"
 fi

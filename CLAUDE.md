@@ -25,6 +25,11 @@
   mówi to samo co repo (np. `grep` w `/opt/data/jarvo/knowledge`), a `wiedza.py lint` jest bez błędów.
   **Wszystko ma być w grafie wiedzy:** nowy agent, skill, skrypt albo zmiana zachowania ma trafić do grafu (zakładka Wiedza),
   najlepiej przez zasiew z repo; czego zasiew nie obejmuje, dodajemy do zasiewu w tym samym commicie, a nie ręcznie w skarbcu.
+- **Instalacja jednym poleceniem musi działać dalej po każdej zmianie.** Nowa zależność floty (program, paczka npm/pip,
+  model) idzie do obrazu (`infra/Dockerfile`, `infra/node`, `infra/python`): CI zbuduje obraz, `deploy.sh` go pobierze,
+  użytkownik nic nie robi. Coś, co musi być na komputerze użytkownika (program hosta, Docker, autostart), dopisujemy do
+  `install.sh` (Linux, macOS) i `install.ps1` (Windows), podbijamy `HOST_VERSION` w `install.sh` i opisujemy w
+  `docs/INSTALER.md`; `jarvo update` uruchamia wtedy nowy instalator. Wersja Hermesa tylko przez `ARG HERMES_IMAGE`.
 - Przed commitem: `python3 -m pytest -q` i `python3 scripts/validate.py` bez błędów.
   Na czystym kontenerze/maszynie najpierw `make dev-deps` (pytest, pyyaml, shellcheck z `requirements-dev.txt`) —
   nie doinstalowujemy narzędzi ręcznie, wszystko jest przypięte w repo.

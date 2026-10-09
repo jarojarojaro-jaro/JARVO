@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pomocnik aktualizacji Jarvo na macOS (LaunchAgent). `jarvo autostart on` renderuje ten szablon do
+     ~/Library/LaunchAgents/pl.jarvo.updater.plist (@JARVO@ = bin/jarvo, @LOCAL@ = katalog instalacji,
+     @AUTO@ = JARVO_AUTO_UPDATE, @PATH@ = PATH z Homebrew, @LOG@ = log) i ładuje przez launchctl bootstrap.
+     Startuje przy logowaniu i wstaje po awarii; najpierw czeka na Dockera (jarvo updater sam uruchamia Colimę). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>pl.jarvo.updater</string>
+  <key>ProgramArguments</key>
+  <array><string>@JARVO@</string><string>updater</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>@PATH@</string>
+    <key>JARVO_LOCAL</key><string>@LOCAL@</string>
+    <key>JARVO_AUTO_UPDATE</key><string>@AUTO@</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>@LOG@</string>
+  <key>StandardErrorPath</key><string>@LOG@</string>
+</dict>
+</plist>

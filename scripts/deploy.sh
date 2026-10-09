@@ -95,6 +95,20 @@ if [[ $NOBUILD -eq 0 ]] && "${COMPOSE[@]}" config --services 2>/dev/null | grep 
   fi
 fi
 
+# dane i build w wolumenach Dockera (macOS): nowy wolumen należy do roota, a kontener pracuje jako hermes (10000)
+if grep -q '^JARVO_VOL_HERMES=.' "$COMPOSE_DIR/.env"; then
+  "${COMPOSE[@]}" run --rm --no-deps -T --entrypoint "" -u 0 -v "${JARVO_BUILD:-jarvo-build}:/out" hermes \
+    chown 10000:10000 /opt/data /out
+fi
+
+# instalacja na własnym komputerze: ta wersja Jarvo potrzebuje nowszych programów na hoście (Docker, Colima…)?
+# install.sh zapisuje HOST_VERSION przy każdej instalacji i aktualizacji przez `jarvo update`
+if [[ -f "$COMPOSE_DIR/.host-version" ]]; then
+  hv="$(sed -n 's/^HOST_VERSION=//p' "$ROOT/install.sh")"
+  [[ "$(cat "$COMPOSE_DIR/.host-version")" == "$hv" ]] \
+    || echo "ℹ Ta wersja Jarvo potrzebuje nowszych programów na komputerze. Uruchom w terminalu: jarvo update"
+fi
+
 log "Start usług"
 "${COMPOSE[@]}" "${PROFILES[@]}" up -d
 

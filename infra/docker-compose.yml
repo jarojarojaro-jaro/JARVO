@@ -51,7 +51,9 @@ services:
       # dodatki także w działającym kontenerze: „lemo” (sample, głos Kokoro) instaluje narzedzia.py w czasie pracy
       JARVO_EXTRAS: ${JARVO_EXTRAS:-}
     volumes:
-      - ${JARVO_DATA:-/srv/jarvo/data}/hermes:/opt/data
+      # macOS (i JARVO_VOLUMES=1): wolumeny Dockera zamiast katalogów hosta, bo maszyna wirtualna Dockera
+      # nie odda kontenerowi (uid 10000) plików hosta; local-up.sh ustawia JARVO_VOL_* i JARVO_BUILD=jarvo-build
+      - ${JARVO_VOL_HERMES:-${JARVO_DATA:-/srv/jarvo/data}/hermes}:/opt/data
       - ${JARVO_REPO:-/srv/jarvo/repo}:/opt/jarvo/repo:ro
       - ${JARVO_BUILD:-/srv/jarvo/build}:/opt/jarvo/build:ro
       - ${JARVO_SECRETS:-/srv/jarvo/secrets}:/opt/jarvo/secrets:ro
@@ -95,7 +97,7 @@ services:
     container_name: jarvo-valkey
     command: valkey-server --save 30 1 --loglevel warning --maxmemory 48mb --maxmemory-policy allkeys-lru
     volumes:
-      - ${JARVO_DATA:-/srv/jarvo/data}/valkey:/data
+      - ${JARVO_VOL_VALKEY:-${JARVO_DATA:-/srv/jarvo/data}/valkey}:/data
     deploy:
       resources:
         limits: {memory: 96m}
@@ -206,3 +208,9 @@ services:
 networks:
   jarvo-net:
     driver: bridge
+
+# używane tylko, gdy JARVO_VOL_* / JARVO_BUILD wskazują te nazwy (macOS); stałe nazwy bez prefiksu projektu
+volumes:
+  jarvo-hermes-data: {name: jarvo-hermes-data}
+  jarvo-valkey-data: {name: jarvo-valkey-data}
+  jarvo-build: {name: jarvo-build}

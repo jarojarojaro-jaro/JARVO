@@ -288,7 +288,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo) |
 | `site/` | landing jarvo.pl |
-| `install.sh`, `install.ps1`, `bin/jarvo` | instalator jednym poleceniem (Linux/WSL2: sam instaluje pakiety i Docker Engine; macOS; Windows): repo do `~/jarvo`, polecenie `jarvo` (`up`, `status`, `update`, `uninstall`…); plan reszty (macOS, Windows, obraz z rejestru) w [INSTALER.md](INSTALER.md) |
+| `install.sh`, `install.ps1`, `bin/jarvo` | instalator jednym poleceniem (Linux/WSL2: sam instaluje pakiety i Docker Engine; macOS: Homebrew, Colima, dane w wolumenach Dockera, LaunchAgent; Windows): repo do `~/jarvo`, gotowy obraz z GHCR, klucz dostępu do prywatnego repo (`JARVO_TOKEN`), polecenie `jarvo` (`up`, `status`, `update` = `git pull` + instalator, `uninstall`…); opis i plan w [INSTALER.md](INSTALER.md) |
 | `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`: pytest, pyyaml, shellcheck) |
 | `tests/`, `docs/` | testy pytest, dokumentacja |
 
@@ -318,9 +318,12 @@ SOURCES (licencje).
   `docker build --network host` (compose nie widzi proxy), instalację w `jarvo-local` i
   `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` lub `branding/` albo z `--rebuild`.
 - Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (na Linuksie sam doinstalowuje pakiety i Docker
-  Engine; repo do `~/jarvo`) → `jarvo up` (`bin/jarvo` → `scripts/local-up.sh`) → `~/jarvo-local` (`compose/`,
-  `secrets/`, `build/`, `data/`; stare `~/tars-local` przenoszone samo); pomocnik aktualizacji jako usługa
-  `systemd --user` (`jarvo autostart on`). Test od zera w piaskownicy: `scripts/install-test.sh`.
+  Engine, na macOS Homebrew i Colimę; repo do `~/jarvo`) → `jarvo up` (`bin/jarvo` → `scripts/local-up.sh`) →
+  `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`; na macOS dane i build w wolumenach Dockera
+  `jarvo-hermes-data`, `jarvo-valkey-data`, `jarvo-build`; stare `~/tars-local` przenoszone samo); pomocnik
+  aktualizacji jako usługa `systemd --user` albo LaunchAgent `pl.jarvo.updater` (`jarvo autostart on`).
+  `jarvo update` = `git pull` + nowy `install.sh` (wersja wymagań hosta `HOST_VERSION` w `compose/.host-version`).
+  Test od zera w piaskownicy: `scripts/install-test.sh`.
 
 ---
 
