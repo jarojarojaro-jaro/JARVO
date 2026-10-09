@@ -5,6 +5,7 @@
 #
 # --rebuild przebudowuje obraz na tej samej wersji Hermesa; --pull-base (i --first-run) pobiera też najnowszy
 # obraz bazowy Hermesa. Zmiana infra/ w git pull robi jedno i drugie, zmiana branding/ tylko przebudowę.
+# Zanim zbuduje, próbuje pobrać gotowy obraz tej wersji z rejestru (scripts/obraz.sh; JARVO_BUILD_IMAGE=1: zawsze buduj).
 # --no-build nigdy nie buduje obrazu (także przy --first-run): jarvo-hermes:local zbudowano wcześniej
 # (piaskownica Claude Code, scripts/sandbox-up.sh, gdzie budowanie przez compose nie widzi proxy).
 #
@@ -57,6 +58,13 @@ fi
 if [[ $NOBUILD -eq 1 ]]; then
   REBUILD=0
   docker image inspect jarvo-hermes:local >/dev/null 2>&1 || fail "Brak obrazu jarvo-hermes:local (--no-build wymaga gotowego obrazu)."
+fi
+# gotowy obraz z rejestru (GitHub Actions buduje go dla każdej wersji infra/ i branding/): pobranie zamiast budowy
+if [[ $REBUILD -eq 1 ]] && bash "$ROOT/scripts/obraz.sh" pobierz "$COMPOSE_DIR"; then
+  REBUILD=0
+  git -C "$ROOT" rev-parse HEAD:infra > "$COMPOSE_DIR/.infra-tree" 2>/dev/null || true
+  git -C "$ROOT" rev-parse HEAD > "$COMPOSE_DIR/.image-src" 2>/dev/null || true
+  docker image prune -f >/dev/null || true
 fi
 if [[ $REBUILD -eq 1 ]]; then
   log "Budowa obrazu jarvo-hermes (narzędzia agentów)"

@@ -18,6 +18,7 @@ Stan: plan z 2026-09-30; **etap 1 (Linux) zbudowany i przetestowany 2026-09-30**
 | Postawienie floty | [`scripts/local-up.sh`](../scripts/local-up.sh) | pyta o dostawcę modeli i klucz (albo bierze z `JARVO_PROVIDER`/`JARVO_KEY`/`JARVO_YES=1`), tworzy `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`), buduje obraz (albo `JARVO_NO_BUILD=1`), woła `deploy.sh`, startuje pomocnika aktualizacji; `--prepare` tylko przygotowuje katalog |
 | Autostart | [`infra/autostart/jarvo-updater.service`](../infra/autostart/jarvo-updater.service) | szablon usługi `systemd --user` pomocnika aktualizacji (`jarvo autostart on` renderuje i włącza linger); kontenery wstają same (`restart: unless-stopped`) |
 | Wdrożenie | [`scripts/deploy.sh`](../scripts/deploy.sh) | compose build/up, build dystrybucji i instalacja profili w kontenerze, healthchecki |
+| Gotowy obraz | [`scripts/obraz.sh`](../scripts/obraz.sh), [`.github/workflows/obraz.yml`](../.github/workflows/obraz.yml) | GitHub Actions buduje `jarvo-hermes` dla amd64 i arm64 i publikuje w GHCR jako `src-<klucz>` (klucz = skrót `infra/Dockerfile`, `infra/node`, `infra/python`, `infra/bin`, `branding`); `deploy.sh` najpierw pobiera obraz dla klucza swojej wersji repo, a buduje na miejscu tylko, gdy go nie ma (`JARVO_BUILD_IMAGE=1`: zawsze buduj) |
 | Serwer (VPS) | [`scripts/bootstrap-vps.sh`](../scripts/bootstrap-vps.sh) | jednorazowe przygotowanie Ubuntu/Debian (Docker, użytkownik, UFW, Tailscale) |
 | Testy | [`tests/test_installer.py`](../tests/test_installer.py), [`scripts/install-test.sh`](../scripts/install-test.sh) | pytest: składnia, shellcheck, próby na sucho na udawanych dystrybucjach, sprzęt, `jarvo`, `local-up.sh --prepare`; piaskownica: instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem |
 
@@ -112,7 +113,7 @@ Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły
 | Etap | Zakres | Test | Nakład |
 |---|---|---|---|
 | 1. Linux ✅ | auto-instalacja pakietów i Docker Engine, `sg docker`, tryb bez pytań, `jarvo` CLI, autostart systemd, `uninstall` | automatyczny: `scripts/install-test.sh` (świeży `ubuntu:24.04` z własnym `dockerd`, w piaskownicy Claude Code) i `tests/test_installer.py`; do zrobienia ręcznie: świeży VPS z systemd (autostart, linger) | zrobione 2026-09-30 |
-| 2. Obraz w GHCR | workflow `build-image.yml` (buildx amd64+arm64, tag = commit i wersja), `deploy.sh --pull-image`, `local-up.sh` pobiera zamiast budować | CI buduje; `install.sh` na Linuksie w trybie pobierania | 1 dzień |
+| 2. Obraz w GHCR ✅ | workflow `obraz.yml` (amd64 i arm64 na natywnych runnerach, tag `src-<klucz>` z plików obrazu), `deploy.sh` pobiera przez `scripts/obraz.sh`, buduje tylko bez obrazu | CI buduje; `install.sh` pobiera | zrobione 2026-10-09 |
 | 3. macOS | Xcode CLT, Homebrew, Colima albo istniejący runtime, wolumen zamiast katalogu, launchd, test na Apple Silicon | **ręczny na prawdziwym Macu** (Intel i M-series); CI: `shellcheck` + próba na sucho (`JARVO_DRY_RUN=1`), bo runnery GitHuba na macOS arm64 nie mają zagnieżdżonej wirtualizacji | 2–3 dni + Twój Mac |
 | 4. Windows | `install.ps1`: WSL bez dystrybucji, RunOnce po restarcie, Ubuntu bez pytań, Docker Engine w WSL, Harmonogram zadań, Eksplorator | **ręczny na prawdziwym Windowsie 11** (masz WSL: test aktualizacji istniejącej instalacji też); CI: PSScriptAnalyzer + próba na sucho | 3–5 dni + Twój Windows |
 | 5. Wykończenie | strona `jarvo.pl/install`, onboarding w dashboardzie, `RUNBOOK.md` i `README.md` z jedną sekcją „Instalacja” dla trzech systemów | protokół testu ręcznego (checklista w tym pliku, §6) | 1–2 dni |
@@ -207,5 +208,5 @@ Na świeżym koncie użytkownika (albo maszynie wirtualnej), bez Dockera:
 | `infra/autostart/` | `jarvo-updater.service` (systemd user) ✅; `pl.jarvo.fleet.plist` (launchd), `jarvo-task.xml` (Harmonogram zadań) ⬜ | |
 | `scripts/install-test.sh` | instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem (piaskownica) | ✅ |
 | `tests/test_installer.py` | składnia, shellcheck, próby na sucho, `jarvo`, `local-up.sh --prepare` | ✅ |
-| `.github/workflows/build-image.yml` | obraz amd64+arm64 do GHCR | ⬜ (etap 2) |
+| `.github/workflows/obraz.yml`, `scripts/obraz.sh` | obraz amd64+arm64 do GHCR, pobieranie zamiast budowy | ✅ |
 | `.github/workflows/installer.yml` | `shellcheck`, PSScriptAnalyzer, test `install.sh` w kontenerze Ubuntu/Debian | ⬜ |
