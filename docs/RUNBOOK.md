@@ -201,7 +201,7 @@ Przed pierwszym wdrożeniem zaloguj się do Docker Hub (`docker login`), żeby n
 Po udanym wdrożeniu przypnij obrazy do digestów (powtarzalne wdrożenia):
 
 ```bash
-bash scripts/pin-images.sh      # zapisuje digesty w /srv/jarvo/compose/.env (repo bez zmian)
+bash scripts/pin-images.sh      # zapisuje digesty usług w /srv/jarvo/compose/.env (Hermesa przypina repo)
 ```
 
 Uruchom też pomocnika aktualizacji (przycisk „Aktualizuj” w dashboardzie; bootstrap tylko go włączył):
@@ -281,7 +281,7 @@ sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh
 |---|---|
 | wdrożenie zmian z repo | `bash scripts/deploy.sh` (pull → walidacja → build → aktualizacja profili → restart gatewaya) |
 | przebudowa obrazu (nowe narzędzia) | `bash scripts/deploy.sh --rebuild` (automatycznie, gdy zmienił się `infra/Dockerfile`, `infra/node/`, `infra/python/`, `infra/bin/` albo `branding/`) |
-| aktualizacja Hermesa | zmień `HERMES_IMAGE` w `compose/.env` → `deploy.sh --rebuild` (tag ruchomy, np. `latest`: `--rebuild --pull-base`) → `pin-images.sh` |
+| aktualizacja Hermesa | nowa wersja (tag + digest) w `ARG HERMES_IMAGE` w `infra/Dockerfile`, domyślnej w `infra/docker-compose.yml` i `fleet.yaml` → push (CI buduje obraz floty) → `deploy.sh` u każdego pobiera gotowy obraz. Próba na jednej maszynie: `HERMES_IMAGE=…` w `compose/.env` → `deploy.sh --rebuild` (buduje na miejscu) |
 | evals (staging, izolowane dane) | `bash scripts/evals-staging.sh --agent jarvo` (koszt: klucze agentów + sędzia) |
 | red team (ataki promptfoo, tylko środowisko testowe) | `bash scripts/redteam.sh` albo `bash scripts/redteam.sh --filtr ads` (koszt: tokeny modeli) |
 | nowości w repo, z których bierzemy (skille, style, wzorce) | `make zrodla` (`python3 scripts/zrodla.py sprawdz`): commity od ostatniego przeglądu, nowe katalogi i skille, ⚠ zmiana licencji; spis w [`vendor/zrodla.yaml`](../vendor/zrodla.yaml). Rutyna Claude Code „Źródła Jarva” robi to w poniedziałki, środy i piątki rano i przysyła propozycje; **nic nie wdraża bez Twojej zgody**. Po przeglądzie `zrodla.py przejrzane <nazwa>` |

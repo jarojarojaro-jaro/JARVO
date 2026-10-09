@@ -26,7 +26,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 L="${JARVO_LOCAL:-$HOME/jarvo-local}"
 CA="${JARVO_PROXY_CA:-/root/.ccr/ca-bundle.crt}"
-BASE="${HERMES_IMAGE:-nousresearch/hermes-agent:latest}"
+BASE="${HERMES_IMAGE:-$(sed -n 's/^ARG HERMES_IMAGE=//p' "$ROOT/infra/Dockerfile")}"
 COMPOSE=(docker compose -f "$ROOT/infra/docker-compose.yml" --env-file "$L/compose/.env")
 REBUILD=0
 log() { printf '\n\033[1m▶ %s\033[0m\n' "$*"; }

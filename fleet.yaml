@@ -284,5 +284,5 @@ infra:
   # dopiero, gdy usługa jest w infra/docker-compose.yml (do tego czasu agent mówi wprost, czego brakuje)
   uslugi_planowane:
     skarbiec: "strażnik budżetu reklam, docs/ADS.md faza 1"
-  hermes_image: nousresearch/hermes-agent:latest   # przypnij do wersji/digestu przy pierwszym wdrożeniu
+  hermes_image: nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7   # = ARG w infra/Dockerfile
   channels: [telegram, cli, desktop]

@@ -9,7 +9,10 @@
 # Obraz celuje w VPS 8 GB RAM: jedna Chromium (ta z obrazu Hermesa) do renderowania i audytów,
 # Lightpanda do codziennego przeglądania, rozpoznawanie mowy uruchamiane na żądanie, bez cache
 # instalatorów w warstwach. Ciężkie, rzadko używane narzędzia są opcjonalne (JARVO_EXTRAS).
-ARG HERMES_IMAGE=nousresearch/hermes-agent:latest
+# Wersja Hermesa przypięta tagiem i digestem: ten sam obraz bazowy w CI (gotowy obraz w GHCR) i u każdego.
+# Aktualizacja Hermesa = zmiana tej linii, domyślnej w infra/docker-compose.yml i fleet.yaml (test pilnuje zgodności),
+# a CI zbuduje nowy obraz floty. HERMES_IMAGE w compose/.env nadpisuje (wtedy obraz buduje się na miejscu).
+ARG HERMES_IMAGE=nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7
 # Lightpanda (AGPL-3.0, niezmodyfikowana binarka): przeglądarka headless dla narzędzi browser_* agentów.
 # Wersja przypięta digestem; wydanie ≥ 14 dni (ta sama kwarantanna co npm/PyPI).
 ARG LIGHTPANDA_IMAGE=lightpanda/browser:0.4.0@sha256:01eb5d37ba537259d60ebfe32be49d3db4c7b6d1daac23b59b8532126fe30df0
@@ -92,7 +95,7 @@ RUN set -e; cd /opt/jarvo/node && \
     # chrome-headless-shell dokładnie tej wersji, której oczekuje playwright-core (~100 MB, tylko arm64)
     exp="$(node -e "process.stdout.write(require('playwright-core').chromium.executablePath())")" && \
     if [ ! -x "$exp" ]; then echo "Brak $exp: pobieram chrome-headless-shell dla playwright-core"; \
-      node node_modules/playwright-core/cli.js install --only-shell chromium; fi && \
+      PLAYWRIGHT_SKIP_BROWSER_GC=1 node node_modules/playwright-core/cli.js install --only-shell chromium; fi && \
     node -e "require('playwright-core').chromium.launch().then(b => b.close()).then(() => console.log('playwright-core → Chromium OK'))" && \
     npm cache clean --force && rm -rf /root/.npm/_cacache
 ENV NODE_PATH=/opt/jarvo/node/node_modules

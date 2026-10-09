@@ -210,3 +210,25 @@ def test_local_up_prepare_without_questions(tmp_path):
     bad = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], env={**env, "JARVO_LOCAL": str(tmp_path / "x"),
                          "JARVO_PROVIDER": "nieznany"}, capture_output=True, text=True, timeout=60)
     assert bad.returncode == 2 and "Nieznany JARVO_PROVIDER" in bad.stdout
+
+
+def test_hermes_pinned_everywhere():
+    """Jedna wersja Hermesa: ARG w Dockerfile = domyślna w compose = fleet.yaml (klucz obrazu w GHCR jej dotyczy)."""
+    import re
+    pin = re.search(r"^ARG HERMES_IMAGE=(\S+)$", (ROOT / "infra/Dockerfile").read_text(), re.M).group(1)
+    assert re.fullmatch(r"nousresearch/hermes-agent:[\w.-]+@sha256:[0-9a-f]{64}", pin), pin
+    assert "HERMES_IMAGE: ${HERMES_IMAGE:-" + pin + "}" in (ROOT / "infra/docker-compose.yml").read_text()
+    assert f"hermes_image: {pin} " in (ROOT / "fleet.yaml").read_text()
+    assert re.search(r"^HERMES_IMAGE=$", (ROOT / "infra/env/compose.env.example").read_text(), re.M)
+
+
+def test_obraz_own_hermes_builds_locally(tmp_path):
+    """Własny HERMES_IMAGE w compose/.env: obraz z rejestru nie pasuje, więc budowa na miejscu (kod 1, bez docker pull)."""
+    (tmp_path / ".env").write_text("HERMES_IMAGE=hermes-ca:test\n")
+    bin_ = tmp_path / "bin"; bin_.mkdir()
+    _shim(bin_, "docker", 'echo "docker $*" >> "$LOG"; exit 0')
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "LOG": str(tmp_path / "log")}
+    r = subprocess.run(["bash", str(ROOT / "scripts/obraz.sh"), "pobierz", str(tmp_path)], env=env,
+                       capture_output=True, text=True)
+    assert r.returncode == 1 and "Własny HERMES_IMAGE" in r.stdout
+    assert not (tmp_path / "log").exists()

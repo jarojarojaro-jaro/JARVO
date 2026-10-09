@@ -12,7 +12,8 @@
 # rejestru) → kod 1 i deploy.sh buduje na miejscu jak dawniej.
 #
 # Zmienne: JARVO_IMAGE_REPO (domyślnie ghcr.io/jarojarojaro-jaro/jarvo-hermes),
-#          JARVO_BUILD_IMAGE=1 (zawsze buduj na miejscu: `pobierz` od razu zwraca 1).
+#          JARVO_BUILD_IMAGE=1 (zawsze buduj na miejscu: `pobierz` od razu zwraca 1; tak samo przy własnym
+#          HERMES_IMAGE w <katalog>/.env, bo obraz z rejestru ma Hermesa przypiętego w infra/Dockerfile).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_IMG="${JARVO_IMAGE_REPO:-ghcr.io/jarojarojaro-jaro/jarvo-hermes}"
@@ -26,6 +27,10 @@ case "${1:-}" in
   jest) docker manifest inspect "$REPO_IMG:src-$(klucz)" >/dev/null 2>&1 ;;
   pobierz)
     [[ "${JARVO_BUILD_IMAGE:-0}" == 1 ]] && exit 1
+    # własny HERMES_IMAGE w compose/.env: obraz z rejestru ma Hermesa z repo, więc budujemy na miejscu
+    if [[ -n "${2:-}" ]] && grep -q '^HERMES_IMAGE=.' "$2/.env" 2>/dev/null; then
+      echo "ℹ Własny HERMES_IMAGE w $2/.env: buduję obraz na miejscu."; exit 1
+    fi
     k="$(klucz)"; img="$REPO_IMG:src-$k"
     echo "▶ Pobieram gotowy obraz floty ($img)"
     if ! docker pull -q "$img" >/dev/null 2>&1; then

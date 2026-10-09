@@ -42,6 +42,11 @@ cd "$ROOT"
 [[ -f "$COMPOSE_DIR/.env" ]] || fail "Brak $COMPOSE_DIR/.env (skopiuj infra/env/compose.env.example)."
 grep -q '^SEARXNG_SECRET=.\+' "$COMPOSE_DIR/.env" || fail "Ustaw SEARXNG_SECRET w $COMPOSE_DIR/.env"
 grep -q '^DASHBOARD_PASSWORD=.\+' "$COMPOSE_DIR/.env" || fail "Ustaw DASHBOARD_PASSWORD w $COMPOSE_DIR/.env (openssl rand -hex 16)"
+# dawny domyślny HERMES_IMAGE (ruchomy latest) → wersja przypięta w repo (infra/Dockerfile) i gotowy obraz z rejestru
+if grep -qx 'HERMES_IMAGE=nousresearch/hermes-agent:latest' "$COMPOSE_DIR/.env"; then
+  sed -i.bak 's#^HERMES_IMAGE=nousresearch/hermes-agent:latest$#HERMES_IMAGE=#' "$COMPOSE_DIR/.env" && rm -f "$COMPOSE_DIR/.env.bak"
+  REBUILD=1
+fi
 
 if [[ $PULL -eq 1 ]]; then
   log "git pull"

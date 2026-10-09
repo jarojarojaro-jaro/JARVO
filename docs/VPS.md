@@ -43,8 +43,9 @@ Kluczowe decyzje:
 - **Jeden kontener Hermesa, wiele profili.** Tak rekomenduje dokumentacja Hermesa: wspólny cache,
   jeden katalog do backupu, jeden gateway (`gateway.multiplex_profiles`) pod nadzorem s6.
 - **Nasz obraz pochodny:** `FROM nousresearch/hermes-agent:<wersja>` + narzędzia z `toolbox.yaml`
-  wszystkich agentów. Budowany przez `infra/Dockerfile` z `HERMES_IMAGE` z `compose/.env` (domyślnie
-  `:latest`; po pierwszym wdrożeniu `scripts/pin-images.sh` przypina go do digestu).
+  wszystkich agentów. Wersja Hermesa przypięta w repo (`ARG HERMES_IMAGE` w `infra/Dockerfile`, tag + digest),
+  więc GitHub Actions buduje z niej gotowy obraz floty (`scripts/obraz.sh`), a `deploy.sh` go pobiera.
+  Własny `HERMES_IMAGE` w `compose/.env` nadpisuje wersję z repo: wtedy obraz buduje się na miejscu.
 - **Sidecar tylko wtedy, gdy musi być usługą** (SearXNG). Ekstrakcja stron i PDF działają w obrazie
   na żądanie (trafilatura, Lightpanda, pandoc + Chromium): proces żyje tylko na czas zadania, więc
   w spoczynku nie zajmuje RAM-u. Tak cała flota mieści się na VPS z 8 GB.
@@ -248,10 +249,11 @@ laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: s
 osobnym katalogu danych (`/srv/jarvo/staging`) i bez gatewaya, więc scenariusze evals nie ruszają produkcyjnej
 tablicy ani Telegrama. Osobny bot testowy dojdzie, gdy będziemy testować routing Telegrama przed zmianą tras.
 
-**Wersje:** Hermes przypięty do digestu obrazu (`HERMES_IMAGE` w `compose/.env`, zapisuje go `scripts/pin-images.sh`;
-bez tego `:latest`). Aktualizacja Hermesa to świadoma decyzja (np. raz w miesiącu): najpierw staging, potem produkcja.
-Rollback: poprzedni tag repo + `deploy.sh --no-pull --rebuild` na przypiętym `HERMES_IMAGE` (poprzedni obraz
-`jarvo-hermes` przebudowa usuwa).
+**Wersje:** Hermes przypięty w repo do tagu i digestu (`ARG HERMES_IMAGE` w `infra/Dockerfile`; ta sama wartość
+domyślna w `infra/docker-compose.yml` i `fleet.yaml`, pilnuje tego test). Dawny domyślny `HERMES_IMAGE=…:latest`
+w `compose/.env` `deploy.sh` czyści sam. Aktualizacja Hermesa to świadoma decyzja (np. raz w miesiącu): najpierw
+`HERMES_IMAGE` w `compose/.env` na stagingu, potem zmiana w repo. Rollback: poprzedni tag repo + `deploy.sh --no-pull --rebuild`
+(poprzedni obraz `jarvo-hermes` przebudowa usuwa).
 
 ---
 
