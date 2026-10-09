@@ -87,7 +87,12 @@ RUN set -e; cd /opt/jarvo/node && \
     ln -sf ../agent-browser/bin/agent-browser-$ab node_modules/.bin/agent-browser && \
     ln -sf /opt/jarvo/node/node_modules/agent-browser/bin/agent-browser-$ab /usr/local/bin/agent-browser && \
     agent-browser --version && \
-    # jedna Chromium dla wszystkich: playwright-core musi trafić w rewizję przeglądarki z obrazu Hermesa
+    # jedna Chromium dla wszystkich: playwright-core musi trafić w rewizję przeglądarki z obrazu Hermesa.
+    # Obraz Hermesa dla arm64 (Mac z Apple Silicon) ma tylko pełną Chromium starszej rewizji: wtedy dociągamy
+    # chrome-headless-shell dokładnie tej wersji, której oczekuje playwright-core (~100 MB, tylko arm64)
+    exp="$(node -e "process.stdout.write(require('playwright-core').chromium.executablePath())")" && \
+    if [ ! -x "$exp" ]; then echo "Brak $exp: pobieram chrome-headless-shell dla playwright-core"; \
+      node node_modules/playwright-core/cli.js install --only-shell chromium; fi && \
     node -e "require('playwright-core').chromium.launch().then(b => b.close()).then(() => console.log('playwright-core → Chromium OK'))" && \
     npm cache clean --force && rm -rf /root/.npm/_cacache
 ENV NODE_PATH=/opt/jarvo/node/node_modules

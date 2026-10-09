@@ -60,7 +60,7 @@ jobs:
     needs: klucz
     if: needs.klucz.outputs.jest != 'true'
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - platforma: linux/amd64
