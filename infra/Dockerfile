@@ -105,6 +105,11 @@ RUN set -e; cd /opt/jarvo/node && \
 ARG HYPERFRAMES_VERSION=0.8.74
 RUN set -e; npm install -g --no-audit --no-fund "hyperframes@${HYPERFRAMES_VERSION}" && \
     hyperframes --version && npm cache clean --force && rm -rf /root/.npm/_cacache
+# render przez Chromium z obrazu (bez tego hyperframes ściąga własny chrome-headless-shell i pada bez unzip);
+# bez telemetrii (PostHog) i bez sprawdzania nowszej wersji: wersja jest przypięta wyżej
+ENV HYPERFRAMES_BROWSER_PATH=/usr/local/bin/chromium \
+    HYPERFRAMES_NO_TELEMETRY=1 \
+    HYPERFRAMES_NO_UPDATE_CHECK=1
 ENV NODE_PATH=/opt/jarvo/node/node_modules
 ENV PATH="/opt/jarvo/bin:/opt/jarvo/node/node_modules/.bin:${PATH}:/opt/jarvo/venv/bin"
 
