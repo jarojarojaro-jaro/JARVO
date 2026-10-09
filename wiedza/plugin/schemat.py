@@ -8,9 +8,11 @@ linię `MEDIA:<ścieżka>`, którą agent dokleja do odpowiedzi.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
+import select
 import shutil
 import subprocess
 import tempfile
@@ -100,16 +102,15 @@ def renderuj(svg: str, tytul: str, katalog: Path, przegladarka: str | None = Non
         src = Path(tmp) / "schemat.html"
         src.write_text(strona(svg, w, h), encoding="utf-8")
         bledy = Path(tmp) / "stderr.txt"
-        with bledy.open("w") as err:
-            p = subprocess.Popen([przegladarka, "--headless=new", "--no-sandbox", "--disable-gpu", "--hide-scrollbars",
-                                  "--no-first-run", "--disable-extensions", "--disable-background-networking",
-                                  "--force-device-scale-factor=2", f"--window-size={w},{h}",
-                                  f"--user-data-dir={tmp}/profil", f"--screenshot={out}", src.as_uri()],
-                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err)
-            kod = _czekaj_na_zrzut(p, out, 60)
-        stderr = bledy.read_text(errors="replace")
-    if not _pelny_png(out) or kod not in (0, None):
-        raise RuntimeError(f"Chromium nie zrobił zrzutu: {stderr.strip()[-300:]}")
+        try:
+            with bledy.open("w") as err:
+                png = _zrzut_cdp(przegladarka, src.as_uri(), w, h, f"{tmp}/profil", err, limit=60)
+        except (OSError, RuntimeError, ValueError) as e:
+            raise RuntimeError(f"Chromium nie zrobił zrzutu: {e}; {bledy.read_text(errors='replace').strip()[-300:]}")
+    out.write_bytes(png)
+    if not _pelny_png(out):
+        out.unlink(missing_ok=True)
+        raise RuntimeError("Chromium nie zrobił zrzutu: niepełny PNG")
     return out
 
 
@@ -125,22 +126,93 @@ def _pelny_png(plik: Path) -> bool:
         return False
 
 
-def _czekaj_na_zrzut(p: subprocess.Popen, out: Path, limit: float) -> int | None:
-    """Kod wyjścia Chromium albo None, gdy zapisał cały zrzut i nie wychodzi sam (zdarza się w --headless=new
-    bez D-Bus, np. na maszynach CI): wtedy go zamykamy. Po limicie bez zrzutu też zamykamy i zwracamy -9."""
+def _zrzut_cdp(przegladarka: str, url: str, w: int, h: int, profil: str, err, limit: float) -> bytes:
+    """Zrzut strony przez protokół DevTools na potoku (--remote-debugging-pipe: polecenia na fd 3, odpowiedzi na fd 4,
+    JSON zakończony bajtem 0). Działa z chrome-headless-shell i z pełnym Chrome; sama flaga --screenshot w pełnym
+    Chrome od wersji 15x nic nie zapisuje i wisi. Bez sieci i bez portu: tylko potok do własnego procesu."""
+    do_chrome, my_pisz = os.pipe()
+    my_czyt, od_chrome = os.pipe()
+
+    def potoki() -> None:   # w procesie potomnym, przed exec: potoki jako fd 3 i 4
+        os.dup2(do_chrome, 3)
+        os.dup2(od_chrome, 4)
+
+    p = subprocess.Popen([przegladarka, "--headless=new", "--remote-debugging-pipe", "--no-sandbox", "--disable-gpu",
+                          "--hide-scrollbars", "--no-first-run", "--disable-extensions",
+                          "--disable-background-networking", "--disable-component-update", "--disable-sync",
+                          f"--window-size={w},{h}", f"--user-data-dir={profil}", "about:blank"],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err,
+                         preexec_fn=potoki, close_fds=False)
+    os.close(do_chrome)
+    os.close(od_chrome)
     koniec = time.monotonic() + limit
-    while time.monotonic() < koniec:
+    bufor = bytearray()
+    numer = 0
+
+    def czytaj() -> dict:
+        while True:
+            i = bufor.find(b"\0")
+            if i >= 0:
+                wiadomosc = bytes(bufor[:i])
+                del bufor[:i + 1]
+                return json.loads(wiadomosc)
+            zostalo = koniec - time.monotonic()
+            if zostalo <= 0:
+                raise RuntimeError(f"brak odpowiedzi w {limit:g} s")
+            if not select.select([my_czyt], [], [], zostalo)[0]:
+                continue
+            kawalek = os.read(my_czyt, 1 << 20)
+            if not kawalek:
+                raise RuntimeError(f"przeglądarka zakończyła pracę (kod {p.poll()})")
+            bufor.extend(kawalek)
+
+    def wyslij(metoda: str, sesja: str | None = None, **params) -> int:
+        nonlocal numer
+        numer += 1
+        wiad = {"id": numer, "method": metoda, "params": params}
+        if sesja:
+            wiad["sessionId"] = sesja
+        os.write(my_pisz, json.dumps(wiad).encode() + b"\0")
+        return numer
+
+    def wywolaj(metoda: str, sesja: str | None = None, **params) -> dict:
+        nr = wyslij(metoda, sesja, **params)
+        while True:
+            m = czytaj()
+            if m.get("id") == nr:
+                if "error" in m:
+                    raise RuntimeError(f"{metoda}: {m['error'].get('message')}")
+                return m.get("result", {})
+
+    try:
+        cel = wywolaj("Target.createTarget", url="about:blank")["targetId"]
+        sesja = wywolaj("Target.attachToTarget", targetId=cel, flatten=True)["sessionId"]
+        wywolaj("Page.enable", sesja)
+        wywolaj("Emulation.setDeviceMetricsOverride", sesja, width=w, height=h, deviceScaleFactor=2, mobile=False)
+        nr = wyslij("Page.navigate", sesja, url=url)
+        zaladowana = odpowiedz = False
+        while not (zaladowana and odpowiedz):
+            m = czytaj()
+            if m.get("id") == nr:
+                if "error" in m or m.get("result", {}).get("errorText"):
+                    raise RuntimeError(f"Page.navigate: {m.get('error') or m['result']['errorText']}")
+                odpowiedz = True
+            elif m.get("method") == "Page.loadEventFired" and m.get("sessionId") == sesja:
+                zaladowana = True
+        dane = wywolaj("Page.captureScreenshot", sesja, format="png")["data"]
         try:
-            return p.wait(timeout=0.5)
-        except subprocess.TimeoutExpired:
-            if _pelny_png(out):
-                try:
-                    return p.wait(timeout=3)   # zwykle sam wychodzi chwilę po zapisie
-                except subprocess.TimeoutExpired:
-                    p.kill(); p.wait()
-                    return None
-    p.kill(); p.wait()
-    return -9
+            wyslij("Browser.close")
+        except OSError:
+            pass
+        return base64.b64decode(dane)
+    finally:
+        os.close(my_pisz)
+        os.close(my_czyt)
+        try:
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:   # nie zamknęła się sama: zamykamy
+            p.kill()
+            p.wait()
 
 
 def katalog_schematow() -> Path:

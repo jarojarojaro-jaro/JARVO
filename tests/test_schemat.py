@@ -37,34 +37,65 @@ def test_strona_bez_sieci_i_skryptow():
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 200 + b"\x00\x00\x00\x00IEND\xaeB`\x82"
 
+# Udawany Chromium mówi protokołem DevTools na potoku (fd 3 polecenia, fd 4 odpowiedzi, JSON zakończony bajtem 0)
+UDAWANY = r"""#!/usr/bin/env python3
+import base64, json, os, sys, time
+TRYB = sys.argv[0].rsplit("-", 1)[-1]
+assert "--remote-debugging-pipe" in sys.argv and "about:blank" in sys.argv
+if TRYB == "pusty":
+    sys.exit(0)
+bufor = b""
+def odpisz(m):
+    os.write(4, json.dumps(m).encode() + b"\0")
+while True:
+    kawalek = os.read(3, 65536)
+    if not kawalek:
+        break
+    bufor += kawalek
+    while b"\0" in bufor:
+        raw, bufor = bufor.split(b"\0", 1)
+        m = json.loads(raw); metoda = m["method"]; wynik = {}
+        if metoda == "Target.createTarget": wynik = {"targetId": "t1"}
+        elif metoda == "Target.attachToTarget": wynik = {"sessionId": "s1"}
+        elif metoda == "Page.navigate":
+            assert m["params"]["url"].startswith("file://") and m["sessionId"] == "s1"
+            odpisz({"method": "Page.loadEventFired", "sessionId": "s1", "params": {}})
+            wynik = {"frameId": "f"}
+        elif metoda == "Page.captureScreenshot":
+            wynik = {"data": base64.b64encode(open(os.environ["WZOR_PNG"], "rb").read()).decode()}
+        elif metoda == "Browser.close":
+            if TRYB == "wisi":
+                time.sleep(300)
+            sys.exit(0)
+        odpisz({"id": m["id"], "result": wynik, **({"sessionId": m["sessionId"]} if "sessionId" in m else {})})
+"""
 
-def _udawany_chromium(tmp_path: Path, potem: str = "") -> Path:
-    """Udawany Chromium zapisuje cały PNG pod --screenshot=, potem robi `potem` (np. wisi jak w CI)."""
+
+def _udawany_chromium(tmp_path: Path, monkeypatch, tryb: str = "dobry") -> Path:
+    """Udawany Chromium: dobry (zrzut i wyjście), wisi (zrzut, ale nie wychodzi), pusty (wychodzi od razu)."""
     (tmp_path / "wzor.png").write_bytes(PNG)
-    fake = tmp_path / "chromium"
-    fake.write_text('#!/bin/sh\nfor a in "$@"; do case "$a" in --screenshot=*) '
-                    f'cp "{tmp_path}/wzor.png" "${{a#--screenshot=}}";; esac; done\n{potem}\n')
+    monkeypatch.setenv("WZOR_PNG", str(tmp_path / "wzor.png"))
+    fake = tmp_path / f"chromium-{tryb}"
+    fake.write_text(UDAWANY)
     fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
     return fake
 
 
-def test_chromium_wiszacy_po_zrzucie(tmp_path):
-    """Chromium --headless=new bez D-Bus (maszyny CI) zapisuje zrzut i nie wychodzi: bierzemy zrzut, zamykamy go."""
+def test_chromium_wiszacy_po_zrzucie(tmp_path, monkeypatch):
+    """Przeglądarka, która po zrzucie nie zamyka się sama: bierzemy zrzut i ją zamykamy."""
     t0 = time.monotonic()
-    png = s.renderuj(SVG, "test", tmp_path / "out", przegladarka=str(_udawany_chromium(tmp_path, "exec sleep 300")))
+    png = s.renderuj(SVG, "test", tmp_path / "out", przegladarka=str(_udawany_chromium(tmp_path, monkeypatch, "wisi")))
     assert png.read_bytes() == PNG and time.monotonic() - t0 < 15
 
 
-def test_chromium_bez_zrzutu_to_blad(tmp_path):
-    fake = tmp_path / "pusty"
-    fake.write_text("#!/bin/sh\nexit 0\n")
-    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+def test_chromium_bez_zrzutu_to_blad(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="nie zrobił zrzutu"):
-        s.renderuj(SVG, "test", tmp_path / "out", przegladarka=str(fake))
+        s.renderuj(SVG, "test", tmp_path / "out", przegladarka=str(_udawany_chromium(tmp_path, monkeypatch, "pusty")))
+    assert not list((tmp_path / "out").glob("*.png"))
 
 
 def test_obsluz_z_udawanym_chromium(tmp_path, monkeypatch):
-    fake = _udawany_chromium(tmp_path)
+    fake = _udawany_chromium(tmp_path, monkeypatch)
     monkeypatch.setenv("JARVO_CHROMIUM", str(fake))
     monkeypatch.setenv("JARVO_SCHEMATY_DIR", str(tmp_path / "schematy"))
     w = json.loads(s.obsluz({"svg": SVG, "tytul": "Jak działa skarbiec"}))
