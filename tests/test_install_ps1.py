@@ -1,6 +1,7 @@
 """Instalator Windows (install.ps1): składnia, PSScriptAnalyzer i próby na sucho na udawanym Windowsie.
 
-PowerShell 7 z `make dev-pwsh` (.tools/pwsh) albo z PATH; bez niego testy są pomijane. Próba na sucho
+PowerShell 7 z `make dev-pwsh` (.tools/pwsh) albo z PATH; bez niego testy są pomijane. JARVO_TEST_PWSH=powershell
+(CI na Windowsie) uruchamia je w Windows PowerShell 5.1, tym samym, którego używa większość ludzi. Próba na sucho
 (JARVO_DRY_RUN=1) tylko wypisuje kroki; stan Windowsa udają zmienne JARVO_FAKE_* (WSL, dystrybucje,
 kompilacja, procesor, RAM, dysk, folder Autostart).
 """
@@ -15,22 +16,31 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 PS1 = ROOT / "install.ps1"
 LOCAL = ROOT / ".tools/pwsh/pwsh"
-PWSH = str(LOCAL) if LOCAL.exists() else shutil.which("pwsh")
+PWSH = os.environ.get("JARVO_TEST_PWSH") or (str(LOCAL) if LOCAL.exists() else shutil.which("pwsh"))
+WINPS = Path(PWSH or "").stem.lower() == "powershell"   # Windows PowerShell 5.1
 pytestmark = pytest.mark.skipif(not PWSH, reason="brak pwsh (make dev-pwsh)")
+UTF8 = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; "
 
 
 def _ps(command: str, **env) -> subprocess.CompletedProcess:
-    return subprocess.run([PWSH, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
-                          env={**os.environ, **env}, capture_output=True, text=True, timeout=180)
+    return subprocess.run([PWSH, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", UTF8 + command],
+                          env={**os.environ, **env}, capture_output=True, encoding="utf-8", errors="replace",
+                          timeout=180)
 
 
 def _dry(tmp_path: Path, **fake) -> subprocess.CompletedProcess:
-    env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path), "LANG": "C.UTF-8", "JARVO_DRY_RUN": "1",
-           "JARVO_FAKE_BUILD": "22631", "JARVO_FAKE_ARCH": "AMD64", "JARVO_FAKE_RAM_GB": "16",
-           "JARVO_FAKE_DISK_GB": "100", "JARVO_FAKE_WSL": "jest", "JARVO_FAKE_STARTUP": str(tmp_path / "Autostart")}
+    env = {k: v for k, v in os.environ.items() if not k.startswith("JARVO_")}
+    env.update({"HOME": str(tmp_path), "LANG": "C.UTF-8", "JARVO_DRY_RUN": "1",
+                "JARVO_FAKE_BUILD": "22631", "JARVO_FAKE_ARCH": "AMD64", "JARVO_FAKE_RAM_GB": "16",
+                "JARVO_FAKE_DISK_GB": "100", "JARVO_FAKE_WSL": "jest", "JARVO_FAKE_STARTUP": str(tmp_path / "Autostart")})
     env.update(fake)
-    return subprocess.run([PWSH, "-NoLogo", "-NoProfile", "-NonInteractive", "-File", str(PS1)],
-                          env=env, capture_output=True, text=True, timeout=120)
+    script = PS1
+    if WINPS:   # PowerShell 5.1 czyta plik bez BOM jako ANSI; kopia po restarcie (RunOnce) też ma BOM
+        script = tmp_path / "install.ps1"
+        script.write_bytes(b"\xef\xbb\xbf" + PS1.read_bytes())
+    return subprocess.run([PWSH, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+                           f"{UTF8}& '{script}'; exit $LASTEXITCODE"],
+                          env=env, capture_output=True, encoding="utf-8", errors="replace", timeout=120)
 
 
 def test_parses_without_errors():
@@ -134,5 +144,6 @@ def test_dry_uninstall(tmp_path):
 def test_irm_iex_keeps_session(tmp_path):
     """Tak jak `irm … | iex`: błąd nie zamyka okna PowerShella, a ustawienia sesji wracają."""
     env = {"HOME": str(tmp_path), "JARVO_DRY_RUN": "1", "JARVO_FAKE_BUILD": "18363"}
-    r = _ps(f"Get-Content -Raw '{PS1}' | Invoke-Expression; Write-Output \"dalej $ErrorActionPreference\"", **env)
+    # irm dekoduje odpowiedź jako UTF-8 (nagłówek charset), więc i tu UTF-8
+    r = _ps(f"Get-Content -Raw -Encoding UTF8 '{PS1}' | Invoke-Expression; Write-Output \"dalej $ErrorActionPreference\"", **env)
     assert "Potrzebny Windows 10" in r.stdout and "dalej Continue" in r.stdout, r.stdout + r.stderr

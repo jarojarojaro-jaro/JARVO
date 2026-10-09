@@ -22,7 +22,7 @@ zbudowany 2026-10-09** (§4c; czeka na próbę na prawdziwym Windowsie), etap 5 
 | Wdrożenie | [`scripts/deploy.sh`](../scripts/deploy.sh) | compose build/up, build dystrybucji i instalacja profili w kontenerze, healthchecki |
 | Gotowy obraz | [`scripts/obraz.sh`](../scripts/obraz.sh), [`.github/workflows/obraz.yml`](../.github/workflows/obraz.yml) | GitHub Actions buduje `jarvo-hermes` dla amd64 i arm64 i publikuje w GHCR jako `src-<klucz>` (klucz = skrót `infra/Dockerfile`, `infra/node`, `infra/python`, `infra/bin`, `branding`); `deploy.sh` najpierw pobiera obraz dla klucza swojej wersji repo, a buduje na miejscu tylko, gdy go nie ma (`JARVO_BUILD_IMAGE=1`: zawsze buduj). Wersja Hermesa przypięta w `infra/Dockerfile` (tag + digest), więc klucz obejmuje i ją; własny `HERMES_IMAGE` w `compose/.env` = budowa na miejscu |
 | Serwer (VPS) | [`scripts/bootstrap-vps.sh`](../scripts/bootstrap-vps.sh) | jednorazowe przygotowanie Ubuntu/Debian (Docker, użytkownik, UFW, Tailscale) |
-| Testy | [`tests/test_installer.py`](../tests/test_installer.py), [`scripts/install-test.sh`](../scripts/install-test.sh) | pytest: składnia, shellcheck, próby na sucho na udawanych dystrybucjach, sprzęt, `jarvo`, `local-up.sh --prepare`; piaskownica: instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem |
+| Testy | [`tests/test_installer.py`](../tests/test_installer.py), [`tests/test_install_ps1.py`](../tests/test_install_ps1.py), [`scripts/install-test.sh`](../scripts/install-test.sh), [`.github/workflows/installer.yml`](../.github/workflows/installer.yml) | pytest: składnia, shellcheck, próby na sucho na udawanych dystrybucjach, macOS i Windowsie, sprzęt, `jarvo`, `local-up.sh --prepare`; instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem (piaskownica i CI z obrazem z GHCR); CI na prawdziwym macOS i Windowsie |
 
 Polecenia ze strony: `curl -fsSL …/install.sh | bash` oraz `irm …/install.ps1 | iex`.
 
@@ -271,7 +271,7 @@ Na świeżym koncie użytkownika (albo maszynie wirtualnej), bez Dockera:
 | `scripts/local-up.sh` | postawienie floty; tryb bez pytań, `--prepare`, `JARVO_NO_BUILD`, wolumeny (`JARVO_VOLUMES`, macOS domyślnie) | ✅ |
 | `bin/jarvo` | polecenie użytkownika (`up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall`, `version`); macOS: Colima, LaunchAgent, wolumeny | ✅ |
 | `infra/autostart/` | `jarvo-updater.service` (systemd user), `pl.jarvo.updater.plist` (LaunchAgent macOS) | ✅ |
-| `scripts/install-test.sh` | instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem (piaskownica) | ✅ |
+| `scripts/install-test.sh` | instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem: piaskownica (obrazy z zewnętrznego Dockera) albo CI / zwykła maszyna (`JARVO_TEST_PULL=1`: `jarvo up` pobiera obraz z GHCR) | ✅ |
 | `tests/test_installer.py` | składnia, shellcheck, próby na sucho (Linux i macOS), klucz dostępu, `jarvo`, `local-up.sh --prepare`, wolumeny, przypięty Hermes | ✅ |
 | `.github/workflows/obraz.yml`, `scripts/obraz.sh` | obraz amd64+arm64 do GHCR, pobieranie zamiast budowy | ✅ |
-| `.github/workflows/installer.yml` | `shellcheck`, PSScriptAnalyzer, test `install.sh` w kontenerze Ubuntu/Debian | ⬜ |
+| `.github/workflows/installer.yml` | przy każdej zmianie instalatora: Linux od zera w świeżym Ubuntu z obrazem z GHCR (`install-test.sh`, `JARVO_TEST_PULL=1`), macOS (bash 3.2, próba na sucho, testy; pełna instalacja z Colimą na żądanie: `mac_pelna`), Windows (testy `install.ps1` w PowerShell 5.1 i 7, PSScriptAnalyzer) | ✅ |

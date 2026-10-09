@@ -1,0 +1,133 @@
+# Instalator na prawdziwych systemach (docs/INSTALER.md): każda zmiana instalatora przechodzi przez Linuksa
+# od zera, macOS z jego bashem 3.2 i Windows z Windows PowerShell 5.1, zanim trafi do ludzi.
+#  - linux: świeży kontener Ubuntu bez gita, Pythona i Dockera → install.sh → Docker Engine → jarvo up pobiera
+#    gotowy obraz z GHCR → dashboard → aktualizacja → down → uninstall (scripts/install-test.sh, JARVO_TEST_PULL=1);
+#  - macos: testy instalatora i próba na sucho na prawdziwym macOS (bash 3.2, sw_vers, sysctl, Homebrew);
+#    pełna instalacja z Colimą tylko na żądanie (mac_pelna), bo minuty macOS są drogie;
+#  - windows: składnia, PSScriptAnalyzer i próby na sucho install.ps1 w Windows PowerShell 5.1 i PowerShell 7.
+name: installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - install.sh
+      - install.ps1
+      - bin/jarvo
+      - scripts/local-up.sh
+      - scripts/deploy.sh
+      - scripts/obraz.sh
+      - scripts/install-test.sh
+      - infra/docker-compose.yml
+      - infra/autostart/**
+      - tests/test_installer.py
+      - tests/test_install_ps1.py
+      - PSScriptAnalyzerSettings.psd1
+      - .github/workflows/installer.yml
+  workflow_dispatch:
+    inputs:
+      mac_pelna:
+        description: "macOS: pełna instalacja z Colimą (Homebrew, maszyna wirtualna; ~20 min minut macOS)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Testy instalatora (pytest, shellcheck)
+        run: |
+          pip install -q -r requirements-dev.txt
+          python -m pytest -q tests/test_installer.py
+      - name: Miejsce na dysku (obraz floty ~6 GB w Dockerze w kontenerze)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+      - name: Gotowy obraz dla tej wersji (obraz.yml może jeszcze budować)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for i in $(seq 1 45); do
+            bash scripts/obraz.sh jest && { echo "Obraz src-$(bash scripts/obraz.sh klucz) jest."; exit 0; }
+            echo "Czekam na obraz src-$(bash scripts/obraz.sh klucz) ($i/45)…"; sleep 60
+          done
+          echo "::error::Brak obrazu w GHCR dla tej wersji (workflow obraz)"; exit 1
+      - name: Instalacja od zera w świeżym Ubuntu 24.04
+        env:
+          JARVO_TEST_PULL: "1"
+          JARVO_TOKEN: ${{ github.token }}
+          JARVO_LOCAL: ${{ runner.temp }}/jarvo-test
+        run: bash scripts/install-test.sh ubuntu:24.04
+
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Składnia w bashu 3.2 z macOS
+        run: |
+          /bin/bash --version | head -1
+          for f in install.sh bin/jarvo scripts/local-up.sh scripts/deploy.sh scripts/obraz.sh; do /bin/bash -n "$f"; done
+      - name: Próba na sucho na prawdziwym macOS (bez Dockera)
+        run: |
+          out="$(JARVO_DRY_RUN=1 JARVO_DIR="$RUNNER_TEMP/jarvo" /bin/bash install.sh 2>&1)"; echo "$out"
+          grep -q "System: macOS" <<<"$out"
+          grep -qE "colima start --cpu [0-9]+ --memory [0-9]+ --disk 60" <<<"$out"
+          ! grep -q "apt-get\|get.docker.com" <<<"$out"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Testy instalatora
+        run: |
+          pip install -q -r requirements-dev.txt
+          python -m pytest -q tests/test_installer.py
+
+  macos-pelna:
+    if: ${{ inputs.mac_pelna }}
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh bez floty (Homebrew, Colima, Docker, repo, polecenie jarvo)
+        env:
+          JARVO_TOKEN: ${{ github.token }}
+          JARVO_BRANCH: ${{ github.ref_name }}
+        run: |
+          JARVO_SETUP_ONLY=1 JARVO_YES=1 JARVO_FORCE=1 /bin/bash install.sh
+          docker info --format '{{.OperatingSystem}} {{.ServerVersion}}'
+          docker compose version
+          jarvo version
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PSScriptAnalyzer 1.24.0
+        shell: pwsh
+        run: Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0 -Scope CurrentUser -Force
+      - name: Testy install.ps1 w Windows PowerShell 5.1
+        env:
+          JARVO_TEST_PWSH: powershell
+        run: |
+          pip install -q pytest
+          python -m pytest -q tests/test_install_ps1.py
+      - name: Testy install.ps1 w PowerShell 7
+        env:
+          JARVO_TEST_PWSH: pwsh
+        run: python -m pytest -q tests/test_install_ps1.py
