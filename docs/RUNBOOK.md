@@ -112,7 +112,7 @@ JARVO_BIND_IP=100.101.102.103      # IP Tailscale: dashboard i panele tylko w Tw
 SEARXNG_SECRET=…                  # wygenerowany przez bootstrap, zostaw
 DASHBOARD_PASSWORD=…              # hasło do dashboardu (użytkownik: jarvo), wygenerowane przez bootstrap
 HERMES_MEM_LIMIT=5g               # sufit RAM kontenera Hermesa (VPS 8 GB); przy 16 GB można 10g
-HERMES_CPUS=4
+HERMES_CPUS=4                      # sufit CPU; deploy.sh obniża go do liczby procesorów maszyny
 JARVO_EXTRAS=                      # opcjonalnie: rembg media office docling manim (więcej dysku, nie RAM); Wideograf: lemo mgaudio
 ```
 

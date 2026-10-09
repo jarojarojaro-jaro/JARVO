@@ -47,6 +47,22 @@ if grep -qx 'HERMES_IMAGE=nousresearch/hermes-agent:latest' "$COMPOSE_DIR/.env";
   sed -i.bak 's#^HERMES_IMAGE=nousresearch/hermes-agent:latest$#HERMES_IMAGE=#' "$COMPOSE_DIR/.env" && rm -f "$COMPOSE_DIR/.env.bak"
   REBUILD=1
 fi
+# sufit CPU kontenerów najwyżej tyle, ile procesorów widzi Docker (laptop z 2 rdzeniami, mały VPS, Colima
+# z 2 CPU); inaczej Docker odmawia startu: "range of CPUs is from 0.01 to 2.00"
+ncpu="$(docker info --format '{{.NCPU}}' 2>/dev/null || true)"
+if [[ "$ncpu" =~ ^[1-9][0-9]*$ ]]; then
+  for v in HERMES_CPUS=4 ANDROID_CPUS=2; do
+    cur="$(sed -n "s/^${v%=*}=//p" "$COMPOSE_DIR/.env" | tail -1)"; cur="${cur:-${v#*=}}"
+    if awk -v c="$cur" -v n="$ncpu" 'BEGIN { exit !(c + 0 > n + 0) }'; then
+      log "${v%=*}=$cur, a Docker ma $ncpu procesory: ustawiam ${v%=*}=$ncpu"
+      if grep -q "^${v%=*}=" "$COMPOSE_DIR/.env"; then
+        sed -i.bak "s/^${v%=*}=.*/${v%=*}=$ncpu/" "$COMPOSE_DIR/.env" && rm -f "$COMPOSE_DIR/.env.bak"
+      else
+        echo "${v%=*}=$ncpu" >> "$COMPOSE_DIR/.env"
+      fi
+    fi
+  done
+fi
 
 if [[ $PULL -eq 1 ]]; then
   log "git pull"

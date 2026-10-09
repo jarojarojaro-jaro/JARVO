@@ -138,16 +138,17 @@ def test_version_range_check():
 
 # ------------------------------------------------------------------ deploy.sh --no-build, sandbox-up.sh
 
-def _fake_docker(tmp_path, image_exists: bool):
-    """Atrapa `docker`: zapisuje wywołania; `image inspect` zwraca 0 albo 1 (czy obraz jest)."""
+def _fake_docker(tmp_path, image_exists: bool, ncpu: int = 8):
+    """Atrapa `docker`: zapisuje wywołania; `image inspect` zwraca 0 albo 1 (czy obraz jest), `info` liczbę CPU."""
     import os
     bindir = tmp_path / "bin"
-    bindir.mkdir()
+    bindir.mkdir(parents=True)
     log = tmp_path / "docker.log"
     (bindir / "docker").write_text(
         "#!/usr/bin/env bash\n"
         f'echo "$*" >> "{log}"\n'
         f'if [[ "$1 $2" == "image inspect" ]]; then exit {0 if image_exists else 1}; fi\n'
+        f'if [[ "$1" == info ]]; then echo {ncpu}; exit 0; fi\n'
         "exit 0\n", encoding="utf-8")
     (bindir / "docker").chmod(0o755)
     compose = tmp_path / "compose"
@@ -170,6 +171,31 @@ def test_deploy_no_build_never_builds_even_on_first_run(tmp_path):
     assert res.returncode == 0, res.stdout + res.stderr
     calls = log.read_text(encoding="utf-8")
     assert " up -d" in calls and " build " not in calls and "Budowa obrazu" not in res.stdout
+
+
+def test_deploy_caps_cpus_to_docker(tmp_path):
+    """Laptop z 2 rdzeniami (CI na GitHubie też): domyślne HERMES_CPUS=4 Docker by odrzucił przy starcie."""
+    env, _log = _fake_docker(tmp_path, image_exists=True, ncpu=2)
+    dot = tmp_path / "compose" / ".env"
+    dot.write_text(dot.read_text(encoding="utf-8") + "HERMES_CPUS=4\n", encoding="utf-8")
+    res = _deploy(env, "--no-pull", "--no-build")
+    assert res.returncode == 0, res.stdout + res.stderr
+    text = dot.read_text(encoding="utf-8")
+    assert "HERMES_CPUS=2\n" in text and "HERMES_CPUS=4" not in text
+    assert "ANDROID_CPUS" not in text   # 2 mieści się w 2 procesorach
+    # 1 procesor: oba sufity w dół, brakująca zmienna dopisana
+    env, _log = _fake_docker(tmp_path / "jeden", image_exists=True, ncpu=1)
+    assert _deploy(env, "--no-pull", "--no-build").returncode == 0
+    text = (tmp_path / "jeden" / "compose" / ".env").read_text(encoding="utf-8")
+    assert "HERMES_CPUS=1\n" in text and "ANDROID_CPUS=1\n" in text
+
+
+def test_deploy_keeps_cpus_that_fit(tmp_path):
+    env, _log = _fake_docker(tmp_path, image_exists=True, ncpu=8)
+    dot = tmp_path / "compose" / ".env"
+    dot.write_text(dot.read_text(encoding="utf-8") + "HERMES_CPUS=6\n", encoding="utf-8")
+    assert _deploy(env, "--no-pull", "--no-build").returncode == 0
+    assert "HERMES_CPUS=6\n" in dot.read_text(encoding="utf-8")
 
 
 def test_deploy_no_build_requires_existing_image(tmp_path):
