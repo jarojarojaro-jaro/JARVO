@@ -96,6 +96,14 @@ R "sed -i 's#http://#https://#g' /etc/apt/sources.list.d/*.sources /etc/apt/sour
 else
 R "export DEBIAN_FRONTEND=noninteractive; apt-get update -q >/dev/null && apt-get install -y -q ca-certificates sudo >/dev/null"
 fi
+# Docker w kontenerze na hoście z cgroup v2 (runner GitHuba): procesy kontenera do podgrupy i włączone kontrolery,
+# inaczej runc odmawia ("cannot enter cgroupv2 /sys/fs/cgroup/docker ... invalid state"); to samo robi skrypt
+# dind z oficjalnego obrazu docker:dind. Dotyczy tylko testu (Docker w Dockerze), nie komputerów użytkowników.
+R "if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+     mkdir -p /sys/fs/cgroup/init
+     xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true
+     sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control
+   fi"
 R "useradd -m -s /bin/bash tester
    printf 'tester ALL=(ALL) NOPASSWD:ALL\nDefaults env_keep += \"HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy\"\n' > /etc/sudoers.d/tester
    printf '[safe]\n\tdirectory = /mnt/jarvo\n\tdirectory = /mnt/jarvo/.git\n' > /home/tester/.gitconfig && chown tester:tester /home/tester/.gitconfig
