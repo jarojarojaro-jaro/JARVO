@@ -131,7 +131,7 @@ hw_check() {
   if [[ $OS == macos ]]; then ram=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))
   else ram="$(awk '/^MemTotal:/ {print int($2/1024/1024)}' "$MEMINFO" 2>/dev/null || true)"; fi
   ram="${ram:-0}"
-  disk="$(df -Pk "$HOME" 2>/dev/null | awk 'NR==2 {print int($4/1024/1024)}' || true)"
+  disk="${JARVO_DISK_GB:-$(df -Pk "$HOME" 2>/dev/null | awk 'NR==2 {print int($4/1024/1024)}' || true)}"   # testy: udawany dysk
   say "RAM: ${ram} GB, wolne miejsce w $HOME: ${disk:-?} GB"
   if (( ram > 0 && ram < MIN_RAM_GB )); then
     [[ $FORCE == 1 ]] || die "Za mało RAM (${ram} GB): flota potrzebuje ${REC_RAM_GB} GB (minimum ${MIN_RAM_GB}). JARVO_FORCE=1 wymusza."

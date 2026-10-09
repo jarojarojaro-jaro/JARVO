@@ -28,6 +28,7 @@ TOOLS = ("git", "curl", "python3", "openssl", "docker")
 
 def _shim(bin_dir: Path, name: str, body: str) -> None:
     p = bin_dir / name
+    p.unlink(missing_ok=True)   # zamiast dowiązania do systemowego programu (/bin to /usr/bin na wielu systemach)
     p.write_text("#!/bin/sh\n" + body, encoding="utf-8")
     p.chmod(p.stat().st_mode | stat.S_IEXEC)
 
@@ -58,7 +59,7 @@ def _os_release(tmp_path: Path, id_: str, like: str = "") -> Path:
 
 def _dry(tmp_path: Path, os_release: Path, hide=TOOLS, **extra) -> subprocess.CompletedProcess:
     env = {"PATH": str(_bare_path(tmp_path, hide)), "HOME": str(tmp_path / "home"), "LANG": "C.UTF-8",
-           "JARVO_DRY_RUN": "1", "JARVO_DIR": str(tmp_path / "home/jarvo"), "JARVO_OS_RELEASE": str(os_release)}
+           "JARVO_DRY_RUN": "1", "JARVO_DISK_GB": "100", "JARVO_DIR": str(tmp_path / "home/jarvo"), "JARVO_OS_RELEASE": str(os_release)}
     env.update(extra)
     (tmp_path / "home").mkdir(parents=True, exist_ok=True)
     return subprocess.run(["bash", str(INSTALL)], env=env, capture_output=True, text=True, timeout=60)

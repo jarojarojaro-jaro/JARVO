@@ -95,7 +95,8 @@ def renderuj(svg: str, tytul: str, katalog: Path, przegladarka: str | None = Non
     w, h = wymiary(svg)
     katalog.mkdir(parents=True, exist_ok=True)
     out = katalog / f"{time.strftime('%Y%m%d-%H%M%S')}-{slug(tytul)}.png"
-    with tempfile.TemporaryDirectory(prefix="jarvo-schemat-") as tmp:
+    # Chromium potrafi jeszcze dopisywać do profilu po wyjściu: resztki w /tmp nie mogą wywrócić gotowego zrzutu
+    with tempfile.TemporaryDirectory(prefix="jarvo-schemat-", ignore_cleanup_errors=True) as tmp:
         src = Path(tmp) / "schemat.html"
         src.write_text(strona(svg, w, h), encoding="utf-8")
         r = subprocess.run([przegladarka, "--headless=new", "--no-sandbox", "--disable-gpu", "--hide-scrollbars",
