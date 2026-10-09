@@ -222,6 +222,21 @@ def test_jarvo_help_version_and_unknown():
     assert _jarvo("version").returncode == 0
 
 
+def test_jarvo_uninstall_without_registry_image(tmp_path):
+    """uninstall --yes przy obrazie zbudowanym na miejscu (brak tagów src-* z rejestru) kończy się sukcesem."""
+    bin_ = tmp_path / "bin"; bin_.mkdir()
+    _shim(bin_, "docker", 'echo "docker $*" >> "$LOG"\n'
+          'case "$1" in images) echo jarvo-hermes:local;; esac\nexit 0\n')
+    flota = tmp_path / "flota"; (flota / "compose").mkdir(parents=True)
+    (flota / "compose/.env").write_text("DASHBOARD_PASSWORD=x\n")
+    res = _jarvo("uninstall", "--yes", JARVO_LOCAL=str(flota), LOG=str(tmp_path / "log"),
+                 PATH=f"{bin_}:{os.environ['PATH']}", HOME=str(tmp_path))
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "Flota usunięta" in res.stdout and "Dane zostają" in res.stdout
+    assert "docker image rm -f jarvo-hermes:local" in (tmp_path / "log").read_text()
+    assert (flota / "compose/.env").exists()
+
+
 def test_jarvo_unit_rendering(tmp_path):
     res = _jarvo("autostart", "print", JARVO_LOCAL=str(tmp_path / "flota"), JARVO_AUTO_UPDATE="1")
     assert res.returncode == 0, res.stderr
