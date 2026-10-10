@@ -264,6 +264,8 @@ def normalize_typo(raw: Any, total: float) -> dict:
         if isinstance(raw.get("paleta"), list) else []
     if paleta:                                     # kolory z kadru (typografia.py): pierwszy = akcent bez marki
         out["paleta"] = paleta
+    if raw.get("odstep") == "tusz":                # linie bez stykania (nowe plany); bez pola: układ jak dawniej
+        out["odstep"] = "tusz"
     bloki = raw.get("bloki") if isinstance(raw.get("bloki"), list) else []
     for b in bloki[:MAX_TYPO]:
         if not isinstance(b, dict) or not isinstance(b.get("slowa"), list):

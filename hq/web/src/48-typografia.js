@@ -3,8 +3,12 @@
 // i render Wideografa (projekt.py w przeglądarce bez okna). Plan bloków układa typografia.py (reżyser), a człowiek
 // poprawia go w edytorze. Czas słowa liczony od początku bloku: przesunięcie bloku zabiera słowa ze sobą.
 //
-// projekt.typo = {motyw, akcent, paleta, bloki: [{id, start, end, uklad, x, y, w, rot, tilt, warstwa, wejscie, wyjscie,
+// projekt.typo = {motyw, akcent, paleta, odstep, bloki: [{id, start, end, uklad, x, y, w, rot, tilt, warstwa, wejscie, wyjscie,
 //                 rozmiar, slowa: [{t, k, tekst, waga 0–3, linia, glebia −1|0|1, kolor, kroj, styl, plyta}]}]}
+// odstep: "tusz" (nowe plany: reżyser i edytor) = słowa bloku nigdy się nie stykają: odstęp między słowami w linii
+// i między liniami liczony z tuszu liter razem z obrysem stylu (ogonki, kreski nad Ż, Ś, Ć, obrys, cień 3D, płytka),
+// więc małe słowo obok albo nad uderzeniem nie wchodzi w nie literami. Plany bez pola (starsze filmy) rysują się
+// jak dawniej, piksel w piksel.
 
 const TYPO_KROJE = {   // klucz → [rodzina CSS, grubość, kursywa, nazwa, grupa]; pliki w fonts/kroje (OFL, polskie znaki)
   bricolage: ["'Bricolage Grotesque', system-ui, sans-serif", 800, false, "Bricolage", "mocne"],
@@ -136,6 +140,19 @@ const TYPO_WYJSCIA = { ciecie: 0, zanik: 0.16, smuga: 0.14 };
 const TYPO_STYLE = ["wypelnij", "kontur", "3d", "blask", "tlo", "obrys", "show"];
 const TYPO_WAGA = [0.58, 1, 1.45, 2.1];            // mnożnik rozmiaru: słowo funkcyjne, zwykłe, ważne, uderzenie
 const TYPO_CEL = [0.62, 0.62, 0.8, 1];             // część szerokości bloku (w), którą wypełnia blok, wg najmocniejszego słowa
+const TYPO_ODSTEP = 0.12;                          // „tusz”: najmniejszy odstęp = 12% mniejszego z dwóch słów (co najmniej 10 px przy 1080)
+// „tusz”: ile rysunek wychodzi poza literę w danym stylu (obrys, cień 3D, poświata), w ułamku rozmiaru: [boki, góra, dół]
+const TYPO_HALO = { wypelnij: [0.02, 0.02, 0.04], kontur: [0.03, 0.03, 0.03], obrys: [0.09, 0.09, 0.09],
+  show: [0.18, 0.16, 0.26], "3d": [0.08, 0.02, 0.11], blask: [0.1, 0.1, 0.1], tlo: [0.02, 0.02, 0.02] };
+// Tusz słowa względem początku i linii bazowej, w px: {l, r, g, d} (lewo, prawo, góra, dół), z obrysem stylu i płytką.
+function typoTuszSlowa(ctx, s) {
+  ctx.font = typoFont(s.kroj, s.px);
+  const mt = ctx.measureText(s.tekst), [hx, hg, hd] = TYPO_HALO[s.styl] || TYPO_HALO.wypelnij;
+  let l = mt.actualBoundingBoxLeft ?? 0, r = mt.actualBoundingBoxRight ?? s.w;
+  let g = mt.actualBoundingBoxAscent ?? s.px * 0.8, d = mt.actualBoundingBoxDescent ?? s.px * 0.22;
+  if (s.styl === "tlo") { l = Math.max(l, s.px * 0.12); r = Math.max(r, s.w + s.px * 0.12); g = Math.max(g, s.px * 0.82); d = Math.max(d, s.px * 0.2); }
+  return { l: l + hx * s.px, r: r + hx * s.px, g: g + hg * s.px, d: d + hd * s.px };
+}
 const TYPO_LEAD = 0.03;                            // słowo pojawia się tuż przed dźwiękiem (oko wyprzedza ucho)
 const TYPO_SCHODKI = [0, 1, 0.3, 0.85, 0.15];      // wyrównanie kolejnych linii w układzie „schodki”
 
@@ -190,10 +207,17 @@ function typoUklad(ctx, b, P, W, H) {
     (lines[li] = lines[li] || []).push({ ...s, i, px, src: w });
   });
   const rows = lines.filter(Boolean);
+  const tusz = P && P.typo && P.typo.odstep === "tusz";
+  const odstep = (a, b) => Math.max(TYPO_ODSTEP * Math.min(a, b), 10 * S);
   const miara = (row) => {
     for (const s of row) { ctx.font = typoFont(s.kroj, s.px); s.w = ctx.measureText(s.tekst).width; }
     const gap = Math.min(...row.map((s) => s.px)) * 0.26;
-    return { gap, lw: row.reduce((a, s) => a + s.w, 0) + gap * (row.length - 1), lh: Math.max(...row.map((s) => s.px)) * m.lh };
+    const lh = Math.max(...row.map((s) => s.px)) * m.lh;
+    if (!tusz) return { gap, lw: row.reduce((a, s) => a + s.w, 0) + gap * (row.length - 1), lh };
+    // odstęp słów w linii: tusz z obrysem obu słów i 12% mniejszego (małe „a” przy dużym „SCROLL”)
+    const ink = row.map((s) => typoTuszSlowa(ctx, s));
+    const gaps = row.slice(0, -1).map((s, i) => Math.max(gap, ink[i].r + ink[i + 1].l - s.w + odstep(s.px, row[i + 1].px)));
+    return { gap, gaps, lw: row.reduce((a, s) => a + s.w, 0) + gaps.reduce((a, g) => a + g, 0), lh };
   };
   const nat = rows.map(miara);
   const natW = Math.max(1, ...nat.map((r) => r.lw)), natH = Math.max(1, nat.reduce((a, r) => a + r.lh, 0));
@@ -201,24 +225,33 @@ function typoUklad(ctx, b, P, W, H) {
   const k = typoClamp(Math.min(cel / natW, ((H > W ? 0.3 : 0.5) * H) / natH), 0.4, 3.4) * (+b.rozmiar || 1);
   const limit = Math.min(maxW * Math.max(1, +b.rozmiar || 1), W * 0.96);
   const out = [];
-  let y = 0, width = 0;
+  let y = 0, width = 0, prev = null;
   rows.forEach((row) => {
     for (const s of row) s.px *= k;
-    let { gap, lw } = miara(row);
+    let { gap, gaps, lw } = miara(row);
     const fit = lw > limit ? limit / lw : 1;         // za długa linia: cała linia mniejsza, nie poza kadr
-    if (fit < 1) { for (const s of row) { s.px *= fit; s.w *= fit; } lw *= fit; gap *= fit; }
+    if (fit < 1 && tusz) { for (const s of row) s.px *= fit; ({ gap, gaps, lw } = miara(row)); }
+    else if (fit < 1) { for (const s of row) { s.px *= fit; s.w *= fit; } lw *= fit; gap *= fit; }
     const lh = Math.max(...row.map((s) => s.px)) * m.lh;
-    row.lh = lh; row.lw = lw; row.gap = gap; row.y = y + lh * 0.8;
+    row.lh = lh; row.lw = lw; row.gap = gap; row.gaps = gaps; row.y = y + lh * 0.8;
+    if (tusz) {                                      // tusz liter tej linii nad i pod linią bazową, z obrysem stylu
+      const ink = row.map((s) => typoTuszSlowa(ctx, s));
+      row.asc = Math.max(...ink.map((t) => t.g)); row.desc = Math.max(...ink.map((t) => t.d));
+      row.min = Math.min(...row.map((s) => s.px));
+      const min = prev ? prev.y + prev.desc + row.asc + odstep(prev.min, row.min) : -Infinity;
+      if (row.y < min) { y += min - row.y; row.y = min; }   // rozsuwa tylko linie, które by się stykały
+      prev = row;
+    }
     y += lh; width = Math.max(width, lw);
   });
   rows.forEach((row, r) => {
     const f = b.uklad === "kolumna" || b.uklad === "3d" ? 0 : b.uklad === "schodki" ? TYPO_SCHODKI[r % TYPO_SCHODKI.length]
       : b.uklad === "rozrzut" ? typoHash(`${b.id}:${r}`) : 0.5;
     let x = (width - row.lw) * f - width / 2;
-    for (const s of row) {
+    row.forEach((s, i) => {
       out.push({ ...s, x, y: row.y - y / 2, h: s.px });
-      x += s.w + row.gap;
-    }
+      x += s.w + (row.gaps ? row.gaps[i] : row.gap);
+    });
   });
   return { slowa: out.sort((a, c) => a.i - c.i), w: width, h: y, cx: (+b.x || 0.5) * W, cy: (+b.y || 0.3) * H, S };
 }

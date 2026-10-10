@@ -137,6 +137,7 @@ def test_plan_bloki_po_kolei_bez_nakladania():
     p, total = plan()
     b = p["bloki"]
     assert p["motyw"] == "kino" and len(b) >= 6
+    assert p["odstep"] == "tusz"                    # nowy plan: linie bloku bez stykania liter
     assert [x["id"] for x in b] == [f"b{i + 1:02d}" for i in range(len(b))]
     for x, y in zip(b, b[1:]):
         assert x["end"] <= y["start"] + 1e-6
@@ -232,6 +233,8 @@ def test_normalize_typo_zakresy_i_nieznane_wartosci():
          "rozmiar": 3, "warstwa": "przod", "wyjscie": "smuga",
          "slowa": [{"t": 0, "k": 0.5, "tekst": ("Ąę " + "x" * 60)[:40], "waga": 3, "linia": 0, "styl": "3d", "skala": 3}]}]}
     assert ed.normalize_typo(None, 5) == {"motyw": "czysty", "bloki": []}
+    assert ed.normalize_typo({"odstep": "tusz"}, 5)["odstep"] == "tusz"
+    assert "odstep" not in ed.normalize_typo({"odstep": "ciasno"}, 5)     # stary plan bez pola: układ jak dawniej
 
 
 def test_typo_concat_lista_demuxera(tmp_path):
@@ -380,6 +383,59 @@ def test_js_uklad_wypelnia_szerokosc_i_uderzenie_najwieksze():
     assert o["kolor"] == ["#FFFFFF", "#FFFFFF", "#FFD400"]         # akcent tylko na uderzeniu
     assert o["dw"] <= 0.7 * 1080 + 1 and o["dh"] <= 0.3 * 1920 * 1.01   # długi blok: w szerokości i limicie wysokości
 
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_js_odstep_z_tuszu_male_slowo_nad_duzym():
+    """„the / WAY”: małe słowo nad uderzeniem. Plan z odstep=tusz rozsuwa linie, aż tusz liter dzieli co najmniej
+    12% mniejszego słowa; plan bez pola (stare filmy) zostaje piksel w piksel jak dawniej."""
+    ctx = ("const ctx = { font: '', measureText(t) { const px = parseFloat(this.font.match(/([\\d.]+)px/)[1]); "
+           "const ogonek = /[gjpqyĄĘ,]/.test(t) ? 0.24 : 0.02, kreska = /[ŻŹŚĆŃÓ]/.test(t) ? 0.95 : 0.72; "
+           "return { width: Array.from(t).length * px * 0.55, actualBoundingBoxAscent: px * kreska, "
+           "actualBoundingBoxDescent: px * ogonek }; } };")
+    b = {"id": "b1", "start": 0, "end": 2, "uklad": "kolumna", "x": 0.5, "y": 0.6, "w": 0.7,
+         "slowa": [{"t": 0, "tekst": "jutro, gdy", "waga": 0, "linia": 0}, {"t": 0.3, "tekst": "ŻÓŁW", "waga": 3, "linia": 1},
+                   {"t": 0.6, "tekst": "przyjdzie", "waga": 1, "linia": 2}]}
+    js = (ctx + f"\nconst b = {json.dumps(b)};\nconst stary = typoUklad(ctx, b, {{typo: {{motyw: 'plakat'}}}}, 1080, 1920);"
+          "\nconst nowy = typoUklad(ctx, b, {typo: {motyw: 'plakat', odstep: 'tusz'}}, 1080, 1920);"
+          "\nconst tusz = (u) => u.slowa.map((s) => { ctx.font = typoFont(s.kroj, s.px); const m = ctx.measureText(s.tekst);"
+          " return [s.y - m.actualBoundingBoxAscent, s.y + m.actualBoundingBoxDescent, s.px]; });"
+          "\nconsole.log(JSON.stringify({stary: tusz(stary), nowy: tusz(nowy), sy: stary.slowa.map(s => [s.x, s.y, s.px]),"
+          " h: [stary.h, nowy.h]}));")
+    o = node(js)
+    (g0, d0, p0), (g1, d1, p1), (g2, d2, p2) = o["stary"]
+    assert d0 > g1                                                  # bez zasady: ogonki „jutro, gdy” wchodzą w Ż
+    (g0, d0, p0), (g1, d1, p1), (g2, d2, p2) = o["nowy"]
+    assert g1 - d0 >= 0.12 * min(p0, p1) - 0.01 and g2 - d1 >= 0.12 * min(p1, p2) - 0.01
+    assert o["h"][1] > o["h"][0]                                    # blok trochę wyższy, tylko tyle, ile trzeba
+    stary = node(ctx + f"\nconst b = {json.dumps(b)};\nconst u = typoUklad(ctx, b, {{typo: {{motyw: 'plakat'}}}}, 1080, 1920);"
+                 "\nconsole.log(JSON.stringify(u.slowa.map(s => [s.x, s.y, s.px])));")
+    assert stary == o["sy"]                                         # stare plany: ten sam układ
+
+
+def test_js_odstep_z_tuszu_slowa_w_linii():
+    """„SCROLL a BACK” w jednej linii: pochylony krój wystaje za szerokość słowa, obrys dokłada swoje.
+    Z odstep=tusz tusz sąsiednich słów (z obrysem) dzieli co najmniej 12% mniejszego słowa; stare plany bez zmian."""
+    ctx = ("const ctx = { font: '', measureText(t) { const px = parseFloat(this.font.match(/([\\d.]+)px/)[1]); "
+           "const w = Array.from(t).length * px * 0.55; return { width: w, actualBoundingBoxLeft: px * 0.12, "
+           "actualBoundingBoxRight: w + px * 0.2, actualBoundingBoxAscent: px * 0.72, actualBoundingBoxDescent: px * 0.02 }; } };")
+    b = {"id": "b1", "start": 0, "end": 2, "uklad": "kolumna", "x": 0.5, "y": 0.5, "w": 0.9,
+         "slowa": [{"t": 0, "tekst": "SCROLL", "waga": 3, "linia": 0, "styl": "obrys"},
+                   {"t": 0.3, "tekst": "a", "waga": 0, "linia": 0, "styl": "obrys"},
+                   {"t": 0.6, "tekst": "BACK", "waga": 3, "linia": 0, "styl": "obrys"}]}
+    js = (ctx + f"\nconst b = {json.dumps(b)};"
+          "\nconst ink = (u) => u.slowa.map((s) => { ctx.font = typoFont(s.kroj, s.px); const m = ctx.measureText(s.tekst);"
+          " return [s.x - m.actualBoundingBoxLeft, s.x + m.actualBoundingBoxRight, s.px]; });"
+          "\nconst stary = typoUklad(ctx, b, {typo: {motyw: 'plakat'}}, 1080, 1920);"
+          "\nconst nowy = typoUklad(ctx, b, {typo: {motyw: 'plakat', odstep: 'tusz'}}, 1080, 1920);"
+          "\nconsole.log(JSON.stringify({stary: ink(stary), nowy: ink(nowy), w: [stary.w, nowy.w]}));")
+    o = node(js)
+    (l0, r0, p0), (l1, r1, p1), (l2, r2, p2) = o["stary"]
+    assert l1 - r0 < 0.12 * min(p0, p1)                             # bez zasady: „a” prawie wchodzi w „SCROLL”
+    (l0, r0, p0), (l1, r1, p1), (l2, r2, p2) = o["nowy"]
+    halo = 0.09                                                     # obrys po obu stronach
+    assert l1 - r0 >= (0.12 + halo) * min(p0, p1) + halo * p0 - 0.01
+    assert l2 - r1 >= (0.12 + halo) * min(p1, p2) + halo * p2 - 0.01
+    assert o["w"][1] <= 0.9 * 1080 + 0.01                           # dalej mieści się w szerokości bloku
 
 # ---------------------------------------------------------------- przyjęcie klatek z edytora (plugin_api)
 

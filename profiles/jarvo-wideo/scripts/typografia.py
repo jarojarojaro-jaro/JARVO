@@ -815,7 +815,8 @@ def zbuduj_plan(slowa: list[dict], ciecia: list[float], W: int, H: int, total: f
                 x["glebia"] = -1     # słowo „z tyłu”: mniejsze, drugi krój, lekko rozmyte (głębia bez maski)
             nb["slowa"].append(x)
         bloki.append(nb)
-    plan = {"motyw": motyw if motyw in MOTYWY else "czysty", "bloki": bloki}
+    # odstęp z tuszu liter: linie bloku nigdy się nie stykają (zasada dla nowych planów; stare filmy bez zmian)
+    plan = {"motyw": motyw if motyw in MOTYWY else "czysty", "odstep": "tusz", "bloki": bloki}
     if akcent:
         plan["akcent"] = akcent
     return ed.normalize_typo(plan, total)

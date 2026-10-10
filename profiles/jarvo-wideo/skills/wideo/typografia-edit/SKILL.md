@@ -1,7 +1,7 @@
 ---
 name: typografia-edit
 description: "Typografia z montażu do nagrania z mową, też za osobą."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-08"
+    reviewed: "2026-10-10"
 ---
 
 # Typografia jak z montażu
@@ -41,6 +41,10 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
    TikTok). Mierzy tusz liter tym samym rendererem: napis poza kadrem, bloki na sobie, słowa stykające się literami,
    napis za osobą nieczytelny albo niczym niezasłonięty (błędy, kod 1), blok pod interfejsem platformy i za małe słowo
    (uwagi). Każdy błąd poprawiam (`popraw`) i sprawdzam znowu; uwagę poprawiam albo uzasadniam w odpowiedzi.
+   Słowa jednego bloku same się nie stykają: nowy plan ma `"odstep": "tusz"`, więc renderer rozsuwa słowa w linii
+   i linie, gdy tusz liter z obrysem stylu (ogonki, kreski nad Ż, Ś, Ć, pochylony krój, obrys, cień 3D) wszedłby
+   w sąsiednie słowo. Najmniejszy odstęp to 12% mniejszego słowa. Starych planów nie poprawiam
+   (bez tego pola rysują się jak dawniej); poprawiam je tylko na prośbę właściciela.
 5. **Oglądam:** `typografia.py arkusz <film> -o out/wideo/typografia.jpg` → `vision_analyze` (lista „Kontrola”).
    Najwyżej dwie rundy poprawek. Gdy styl nie jest oczywisty albo właściciel pyta o inne: `typografia.py style <film>`
    (ten sam blok filmu w każdym stylu, linia MEDIA:) i polecam jeden albo dwa z powodem.

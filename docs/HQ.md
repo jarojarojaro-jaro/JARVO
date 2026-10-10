@@ -225,7 +225,8 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   mierzy tusz liter na kanwie z krótszym bokiem 540 px, ze strefami wybranej platformy i sylwetkami osoby (gdy aktualne):
   napis poza kadrem, bloki na sobie, stykające się litery, napis za osobą nieczytelny albo niezasłonięty, strefy, małe
   słowa; lista błędów i uwag, klik przenosi wskaźnik do tej chwili i zaznacza blok, a po zmianie planu lista prosi
-  o ponowne sprawdzenie. Kolory palety stoją też pierwsze przy kolorze słowa. Przycięcie, usunięcie, tempo
+  o ponowne sprawdzenie. Nowy plan (reżyser albo pierwszy blok dodany w edytorze) ma `"odstep": "tusz"`: renderer
+  rozsuwa słowa w linii i linie bloku, gdy ich litery z obrysem stylu by się stykały (ogonki, kreski nad Ż, Ś, Ć, pochylony krój, obrys, cień 3D); starsze plany rysują się jak dawniej. Kolory palety stoją też pierwsze przy kolorze słowa. Przycięcie, usunięcie, tempo
   i przestawienie klipów przesuwają bloki i czasy słów razem z materiałem (`typoNaOsi` w `remapTimes`
   i `edytor.remap_times`; test: `tests/test_edytor_os.py`).
 - **Napis za osobą** (głębia jak z montażu: osoba przed słowem): Wideograf liczy maską MODNet (`maska.py`) sylwetkę

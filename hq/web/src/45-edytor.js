@@ -1202,7 +1202,7 @@ function VideoEditor({ path, onClose }) {
   });
   // typografia: blok (pola bloku) i słowo (pola słowa); undefined usuwa pole, więc wraca wartość z motywu
   const typoApply = (fn, lv) => (lv ? H.live : H.apply)((P) => {
-    const T = P.typo || { motyw: "czysty", bloki: [] };
+    const T = P.typo || { motyw: "czysty", odstep: "tusz", bloki: [] };   // nowy plan: linie bez stykania
     return { ...P, typo: { ...T, ...fn({ ...T, bloki: T.bloki || [] }) } };
   });
   // kolor palety filmu (typografia.py: z kontrastu z kadrem) zmieniony tu: słowa w starym kolorze idą za nim
