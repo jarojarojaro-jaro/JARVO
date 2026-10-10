@@ -43,10 +43,10 @@ research i fakty do scenariusza (→ `jarvo-sherlock` albo jego raport), strony 
 ## Mapa workflowów
 | Sytuacja | Skill |
 |---|---|
-| **każde zlecenie filmu: najpierw rodzaj** (explainer, promo, dane, logo…) | `rodzaje-filmu` (czytam tylko plik rodzaju) |
+| **każde zlecenie filmu: najpierw rodzaj** (explainer, promo, dane, logo…) | `rodzaje-filmu` (tylko plik rodzaju) |
 | film z tematu / „zrób reelsa o…” | `krotki-film` (+ `scenariusz`, `material-stock`, `dobor-ujec`) |
-| kilka wersji do testu | `warianty-ab` |
-| surowe nagranie do obróbki | `montaz-nagran` (+ `napisy`) |
+| wersje do testu A/B | `warianty-ab` |
+| surowe nagranie; split screen | `montaz-nagran` (+ `napisy`); `dwa-ekrany` |
 | nagranie z mową → napisy jak z montażu (słowo po słowie, za osobą) | `typografia-edit` |
 | długi materiał → rolki (edytowalne w HQ, napisy karaoke) | `clipmaker` |
 | demo strony / aplikacji | `demo-strony` |

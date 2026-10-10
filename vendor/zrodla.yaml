@@ -251,7 +251,7 @@ zrodla:
     repo: https://github.com/heygen-com/hyperframes-community-skills
     status: uzywane
     przejrzane: ba7a0bb6d3567d124c51f6074625043bfe0b32eb
-    notatka: "Apache-2.0: wzorce camera-3d-captions do typografii Wideografa (kontrola napisów: frame-bounds, glyph-gaps; kamera i głębia w kolejnych krokach), kod własny w 48-typografia.js; zgoda właściciela 2026-10-08"
+    notatka: "Apache-2.0: wzorce camera-3d-captions do typografii Wideografa (kontrola napisów: frame-bounds, glyph-gaps; kamera i głębia w kolejnych krokach), kod własny w 48-typografia.js; zgoda właściciela 2026-10-08. duo przejrzany 2026-10-10: nie bierzemy (zdjęcie z cudzego posta na X bez licencji, tylko 4:3); sposób pracy (dwa okna, test pauzy) w naszym dwa_ekrany.py"
   marketing-os:
     repo: https://github.com/Yuzzyuk/marketing-os
     status: uzywane

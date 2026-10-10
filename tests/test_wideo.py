@@ -20,6 +20,7 @@ film = load_script("profiles/jarvo-wideo/scripts/film.py")
 stock = load_script("profiles/jarvo-wideo/scripts/stock.py", "stock")
 montaz = load_script("profiles/jarvo-wideo/scripts/montaz.py")
 qa = load_script("profiles/jarvo-wideo/scripts/qa_wideo.py")
+dwa = load_script("profiles/jarvo-wideo/scripts/dwa_ekrany.py")
 
 needs_ffmpeg = pytest.mark.skipif(not shutil.which("ffmpeg"), reason="brak FFmpeg")
 W = wl.Word
@@ -1348,3 +1349,72 @@ def test_sonda_przycina_tekst_do_okna():
     assert sorted(t for t in widac if t.isdigit()) == ["3", "9"] and widac["3"]["y0"] >= 20 and widac["3"]["y1"] <= 70
     assert widac["9"]["okno"] and not widac["3"].get("okno")              # „9” przycięte trochę, „8” całkiem: niewidoczne
     assert widac["poza kadrem"]["x1"] > 400 and "Chleb co rano" in widac  # spacje między spanami zostają
+
+
+# ------------------------------------------------------------------ dwa ekrany (split screen)
+
+def test_dwa_ekrany_okna_bez_nakladania_i_w_kadrze():
+    for uklad, (w, h) in (("gora-dol", (1080, 1920)), ("obok", (1920, 1080)), ("telefony", (1080, 1920)),
+                          ("telefony", (1920, 1080)), ("obok", (1080, 1080))):
+        (ax, ay, aw, ah), (bx, by, bw, bh) = dwa.okna(uklad, w, h)
+        for x, y, sw, sh in ((ax, ay, aw, ah), (bx, by, bw, bh)):
+            assert x >= 0 and y >= 0 and x + sw <= w and y + sh <= h and sw % 2 == 0 and sh % 2 == 0
+        assert ax + aw < bx or ay + ah < by                    # szczelina na kreskę, okna się nie nakładają
+    (ax, ay, aw, ah), (bx, by, bw, bh) = dwa.okna("gora-dol", 1080, 1920)
+    assert ay + ah + 6 == by and by + bh == 1920 and aw == bw == 1080
+    (ax, ay, aw, ah), _ = dwa.okna("telefony", 1080, 1920)
+    assert ah / aw == pytest.approx(19.5 / 9, rel=0.01)       # ekran telefonu ma proporcje telefonu
+    assert dwa.okna("przed-po", 1080, 1920) == [(0, 0, 1080, 1920)] * 2
+
+
+def test_dwa_ekrany_kreska_przed_po_plynnie_miedzy_punktami():
+    def wartosc(expr, t):
+        py = expr.replace("if(", "IF(").replace("lt(", "LT(")
+        return eval(py, {"IF": lambda c, a, b: a if c else b, "LT": lambda a, b: a < b, "t": t})  # noqa: S307
+    pts = dwa.punkty_kreski(None, 10.0)                       # domyślnie: A → pół na pół → B
+    assert pts[0] == (0.0, 0.0) and pts[-1] == (10.0, 1.0)
+    e = dwa.wyrazenie_kreski(pts)
+    assert wartosc(e, 0.5) == pytest.approx(0.0) and wartosc(e, 5.0) == pytest.approx(0.5)
+    assert wartosc(e, 9.9) == pytest.approx(1.0) and wartosc(e, 50) == pytest.approx(1.0)
+    vals = [wartosc(e, i / 10) for i in range(101)]
+    assert all(b >= a - 1e-9 for a, b in zip(vals, vals[1:]))   # tylko w jedną stronę, bez skoków
+    assert max(b - a for a, b in zip(vals, vals[1:])) < 0.07
+    wlasne = dwa.punkty_kreski("4=1, 1=0.25", 6.0)             # kolejność dowolna, udział przycięty do 0–1
+    assert wlasne == [(1.0, 0.25), (4.0, 1.0)]
+    e = dwa.wyrazenie_kreski(wlasne)
+    assert wartosc(e, 0) == pytest.approx(0.25) and wartosc(e, 2.5) == pytest.approx(0.625)
+    with pytest.raises(SystemExit):
+        dwa.punkty_kreski("dwa=pół", 6.0)
+
+
+def test_dwa_ekrany_dzwiek_i_parametry(monkeypatch, tmp_path):
+    a, b, zdj = tmp_path / "a.mp4", tmp_path / "b.mp4", tmp_path / "z.png"
+    ma = {a.name: True, b.name: False}
+    monkeypatch.setattr(dwa.wl, "probe", lambda p: {"audio": ma.get(p.name) and {"codec": "aac"}})
+    assert dwa.zrodlo_dzwieku("auto", [a, b]) == [0] and dwa.zrodlo_dzwieku("auto", [b, a]) == [1]
+    assert dwa.zrodlo_dzwieku("oba", [a, b]) == [0] and dwa.zrodlo_dzwieku("b", [a, b]) == []
+    assert dwa.zrodlo_dzwieku("auto", [zdj, zdj]) == [] and dwa.zrodlo_dzwieku("brak", [a, a]) == []
+    assert dwa.kadr_xy("0.2,1.7") == (0.2, 1.0) and dwa.kolor("#0e0f13", 9) == (14, 15, 19, 9)
+    with pytest.raises(SystemExit):
+        dwa.kolor("czerwony")
+    with pytest.raises(SystemExit):
+        dwa.kadr_xy("0.5")
+
+
+@needs_ffmpeg
+def test_dwa_ekrany_render_i_test_pauzy(tmp_path):
+    pytest.importorskip("PIL")
+    a, zdj = tmp_path / "a.mp4", tmp_path / "z.png"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=30:d=2",
+                    "-f", "lavfi", "-i", "sine=d=2", "-shortest", "-pix_fmt", "yuv420p", str(a)], check=True)
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=red:s=200x300", "-frames:v",
+                    "1", str(zdj)], check=True)
+    out, st = dwa.zloz(a, zdj, tmp_path / "gd.mp4", podpisy=["A", "B"])
+    p = wl.probe(out)
+    assert (p["video"]["width"], p["video"]["height"]) == (1080, 1920) and p["audio"]
+    assert st["uklad"] == "gora-dol" and st["dzwiek"] == "a" and st["uwagi"] == []    # A się rusza
+    _, st = dwa.zloz(zdj, zdj, tmp_path / "stoi.mp4", uklad="obok", fmt="16:9", sek=2.0)
+    assert st["dzwiek"] == "brak" and "test pauzy" in st["uwagi"][0]               # dwa zdjęcia: nic się nie rusza
+    _, st = dwa.zloz(zdj, a, tmp_path / "pp.mp4", uklad="przed-po", sek=3.0)
+    assert st["uwagi"] == []                                                         # kreska jedzie
+

@@ -367,3 +367,15 @@ scenarios:
         - "klatki obejrzane (np. `iso.py png --czas` albo arkusz), `html_wideo.py pomiar` bez błędów, film oddany linią `MEDIA:`"
       should_not:
         - "nagrywa ekran przeglądarki w czasie rzeczywistym zamiast renderu klatka po klatce"
+
+  - id: wideo-dwa-ekrany-przed-po
+    type: in_scope
+    input: "W inboksie są remont-przed.jpg i remont-po.mp4 (przejście po gotowej łazience). Zrób rolkę na TikToka: przed i po obok siebie, z podpisami."
+    expect:
+      should:
+        - "`dwa-ekrany`: plan na piśmie, co robi każde okno w każdej sekundzie (test pauzy: nagranie „po” się rusza, zdjęcie „przed” stoi)"
+        - "`dwa_ekrany.py remont-przed.jpg remont-po.mp4 -o out/wideo/<temat>/dwa.mp4 --format 9:16 --podpisy Przed Po` (pion: `gora-dol`) albo `--uklad przed-po` z jadącą kreską; dźwięk z nagrania, `uwagi` z testu pauzy puste"
+        - "`kadry.py arkusz` obejrzany (ważne rzeczy nie ucięte kreską, podpisy czytelne), `qa_wideo.py` bez błędów, film oddany linią `MEDIA:`"
+      should_not:
+        - "rozciąga zdjęcie albo nagranie do okna zamiast przyciąć (`--kadr-a/-b`)"
+        - "wstawia zdjęcie dłoni z telefonem z cudzego posta albo logo producenta telefonu"
