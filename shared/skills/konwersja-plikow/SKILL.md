@@ -1,7 +1,7 @@
 ---
 name: konwersja-plikow
-description: "Plik → inny format albo bez metadanych: zdjęcia, wideo, PDF."
-version: 1.1.0
+description: "Plik → inny format albo bez metadanych: zdjęcia, wideo, PDF, Word."
+version: 1.2.0
 author: "Jarvo (wzór: convt; narzędzia: Pillow, FFmpeg, ExifTool, Ghostscript, qpdf, pandoc, Chromium, LibreOffice)"
 license: MIT
 metadata:
@@ -9,14 +9,15 @@ metadata:
     tags: [files, convert, image, video, audio, pdf, docx, heic, metadata, privacy]
   jarvo:
     autonomy: A0
-    reviewed: "2026-10-07"
+    reviewed: "2026-10-10"
 ---
 
 # Konwersja plików
 
 Człowiek (albo inny agent) potrzebuje pliku w innym formacie: „zamień na PDF”, „zrób z tego JPG”, „wyciągnij
 dźwięk z filmu”, „zmniejsz to zdjęcie”, „połącz te skany w jeden PDF”, „HEIC z iPhone'a nie otwiera się”,
-„usuń lokalizację ze zdjęcia”, „wyślę to klientowi, wyczyść metadane”, „co jest w tym pliku o mnie?”.
+„usuń lokalizację ze zdjęcia”, „wyślę to klientowi, wyczyść metadane”, „co jest w tym pliku o mnie?”,
+„usuń autora i firmę z tego Worda / PDF-a”.
 Robisz to sam, od razu, na serwerze: plik nie wychodzi na żaden zewnętrzny konwerter. Skrypt nie zużywa tokenów
 modelu. To samo narzędzie właściciel ma w HQ (Centrala → Konwerter): prostą zamianę może zrobić sam.
 
@@ -39,6 +40,7 @@ python3 $K katalog/ --na webp --katalog out/webp   # cały katalog (-r z podkata
 python3 $K IMG_2041.heic film.mov --metadane   # co plik mówi o człowieku: miejsce GPS, telefon, data, autor, opis
 python3 $K IMG_2041.heic --usun-metadane       # ten sam plik bez metadanych: IMG_2041-bez-metadanych.heic
 python3 $K zdjecia/ --usun-metadane --katalog czyste/   # cały katalog bez metadanych
+python3 $K oferta.docx umowa.pdf --usun-metadane  # dokument bez autora, firmy, programu, dat i historii zmian
 ```
 1. Plik od człowieka leży w `/opt/data/jarvo/inbox/` (ścieżka po 📎 w zleceniu). Format wyniku z prośby;
    niejasny („zrób, żeby się otwierało”) → wybierz najprostszy powszechny (zdjęcie: JPG, film: MP4, dźwięk: MP3,
@@ -67,7 +69,14 @@ python3 $K zdjecia/ --usun-metadane --katalog czyste/   # cały katalog bez meta
   bez okładki i rozdziałów). Wynik jest sprawdzany: gdy coś wrażliwego zostało, skrypt zwraca błąd i nie oddaje pliku.
   W odpowiedzi powiedz, co było w pliku (pole `usuniete`, np. „miejsce: 50.0614, 19.9366; telefon: Apple iPhone 15
   Pro”). Zdjęcie albo film od człowieka, które idzie dalej (strona klienta, social, wysyłka do kogoś), czyścisz,
-  zanim wyjdzie. PDF i dokumentów to nie dotyczy.
+  zanim wyjdzie.
+- Dokumenty: PDF (exiftool, potem qpdf przepisuje plik, więc starych wersji metadanych nie da się odzyskać) oraz
+  DOCX, XLSX, PPTX, ODT, ODS, ODP (puste właściwości: autor, ostatnio zmieniał, firma, program, szablon, daty,
+  historia zmian, własne pola; treść bajt w bajt). Stare .doc/.xls/.ppt najpierw `--na docx` (xlsx, pptx).
+  PDF z hasłem: skrypt odmawia, powiedz to człowiekowi. Zamiana dokumentu na inny format sama nie czyści:
+  plik dla klienta (oferta, umowa) czyścisz `--usun-metadane` po zamianie.
+- Pole `uwagi`: komentarze albo śledzone zmiany z nazwiskami w treści dokumentu. Skrypt ich nie usuwa (to treść),
+  a Ty mówisz to człowiekowi przed wysyłką.
 - Obrazki w Markdown/HTML/Word tylko z katalogu dokumentu: ścieżki absolutne, z „..” i z internetu wypadają
   (ochrona przed wyciekiem plików z serwera). PDF z HTML drukuje Chromium bez dostępu do sieci.
 - Excel, PowerPoint, stare .doc/.xls/.ppt i CSV ↔ XLSX wymagają LibreOffice (dodatek obrazu `office`). Bez niego

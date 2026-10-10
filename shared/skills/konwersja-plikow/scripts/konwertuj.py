@@ -4,7 +4,7 @@
     python3 konwertuj.py <plik…|katalog> --na <format> [-o wynik | --katalog DIR] [--jakosc 1-100]
                          [--rozmiar 1080|720p|50%|1920x1080] [--strony 1-3,5] [--dpi 150] [--polacz] [-r]
     python3 konwertuj.py <plik> --cele          # na co można zamienić ten plik (JSON)
-    python3 konwertuj.py <plik…> --metadane     # co plik mówi o człowieku: miejsce GPS, telefon, data, autor (JSON)
+    python3 konwertuj.py <plik…> --metadane     # co plik mówi o człowieku: miejsce GPS, telefon, data, autor, firma (JSON)
     python3 konwertuj.py <plik…|katalog> --usun-metadane [-o wynik | --katalog DIR]   # ten sam plik bez metadanych
     python3 konwertuj.py --formaty              # formaty i silniki dostępne tutaj (JSON)
 
@@ -19,8 +19,11 @@ nigdy nie powiększa. --jakosc: zdjęcia (domyślnie 85), film (domyślnie 75), 
 PDF → PDF (mniejszy plik). Ten sam format z --rozmiar albo --jakosc = zmniejszenie pliku.
 --polacz: kilka plików (zdjęcia, PDF, dokumenty) → jeden PDF. --strony: strony PDF do obrazów („1-3,5”, „4-”).
 Metadane (miejsce GPS, telefon, daty, autor, opisy) nie przechodzą do wyniku zamiany zdjęcia, filmu ani dźwięku;
-profil koloru i obrót zostają. --usun-metadane (exiftool, FFmpeg): ten sam format bez przekodowania, a wynik
-jest sprawdzany (coś zostało = błąd, nie plik); bez -o wynik obok: <nazwa>-bez-metadanych.<ext>.
+profil koloru i obrót zostają. --usun-metadane (exiftool, FFmpeg, qpdf): ten sam format bez przekodowania, a wynik
+jest sprawdzany (coś zostało = błąd, nie plik); bez -o wynik obok: <nazwa>-bez-metadanych.<ext>. Dokumenty: PDF
+(exiftool + qpdf przepisuje plik, więc stare wersje metadanych nie zostają w środku) oraz DOCX, XLSX, PPTX, ODT, ODS,
+ODP (właściwości dokumentu: autor, firma, program, szablon, daty, historia zmian, własne pola; treść bez zmian).
+Komentarze i śledzone zmiany z nazwiskami to treść: skrypt je wskazuje (`uwagi`), ale nie usuwa.
 Wynik: JSON {pliki, trasa, rozmiar_przed, rozmiar_po, sek}; kod 1 = błąd z opisem po polsku.
 """
 
@@ -39,6 +42,8 @@ import sys
 import tempfile
 import threading
 import time
+import zipfile
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -903,6 +908,8 @@ def formaty() -> dict:
 # --------------------------------------------------------------------------- metadane
 
 FOTO_META = {"jpg", "png", "webp", "heic", "avif", "tiff", "gif"}   # exiftool czyści je bez ponownego kodowania
+PAKIETY = {"docx", "xlsx", "pptx", "odt", "ods", "odp"}   # ZIP z XML: właściwości czytamy i czyścimy sami
+DOKUMENTY_META = {"pdf"} | PAKIETY
 BEZ_KONTROLI = re.compile(r"^(System|File|Composite|ExifTool|ICC.*)$")   # spoza pliku, wyliczone albo celowo zostaje
 ZAWSZE = {"File:Comment"}   # komentarz JPG/GIF exiftool podaje w grupie File
 WRAZLIWE = (   # (klucz, opis, nazwy tagów exiftool); pierwsza pasująca kategoria wygrywa
@@ -913,8 +920,11 @@ WRAZLIWE = (   # (klucz, opis, nazwy tagów exiftool); pierwsza pasująca katego
     ("czas", "data i godzina", r"DateTimeOriginal|CreateDate|CreationDate|CreationTime|ModifyDate|DateTimeDigitized|"
                                r"DateCreated|DateTimeCreated|DigitalCreation\w+|TimeCreated|MetadataDate|DateTime|"
                                r"SubSec\w+|OffsetTime\w*|Track(Create|Modify)Date|Media(Create|Modify)Date|"
-                               r"ContentCreateDate|RecordingTime|Date"),
-    ("osoba", "autor albo właściciel", r"Artist|Author|Creator|Creator(Address|City|Country|WorkEmail|WorkTelephone|"
+                               r"ContentCreateDate|RecordingTime|Date|LastPrinted|PrintDate"),
+    ("firma", "firma, program albo szablon", r"Company|Manager|Application|AppVersion|Template|CreatorTool|Generator|"
+                                            r"HyperlinkBase"),
+    ("historia", "historia zmian (wersje, czas edycji)", r"RevisionNumber|TotalEditTime|EditingCycles|EditingDuration"),
+    ("osoba", "autor albo właściciel", r"Artist|Author|Creator|InitialCreator|PrintedBy|Creator(Address|City|Country|WorkEmail|WorkTelephone|"
                                      r"WorkURL)|By-line|Copyright|CopyrightNotice|Rights|OwnerName|CameraOwnerName|"
                                      r"XPAuthor|LastModifiedBy|Credit|Publisher|PersonInImage|"
                                      r"Region(Name|PersonDisplayName)|AlbumArtist|Composer|Performer|Band|"
@@ -924,7 +934,11 @@ WRAZLIWE = (   # (klucz, opis, nazwy tagów exiftool); pierwsza pasująca katego
                                           r"ObjectName|SpecialInstructions|Notes|Lyrics\w*"),
     ("identyfikator", "identyfikatory zdjęcia", r"\w*(UUID|UniqueID|DocumentID|InstanceID|ContentIdentifier|RequestID)\w*"),
     ("miniatura", "miniatura w środku pliku", r"Thumbnail\w*|PreviewImage\w*|OtherImage\w*|MPImage\d*|CoverArt|Picture"),
+    ("wlasne", "własne pola dokumentu", r"(?!)"),   # tylko przez grupę Custom (niżej)
 )
+# kategoria po grupie i nazwie, przed wzorami: w PDF Creator i Producer to program, a nie osoba
+PO_GRUPIE = {("PDF", "Creator"): "firma", ("PDF", "Producer"): "firma", ("XMP-pdf", "Producer"): "firma"}
+GRUPA_KATEGORIA = {"Custom": "wlasne"}
 _WRAZLIWE = [(k, o, re.compile(rf"^(?:{w})$")) for k, o, w in WRAZLIWE]
 _DATA = re.compile(r"^(\d{4})[:-](\d\d)[:-](\d\d)(?:[ T](\d\d):(\d\d))?")
 
@@ -949,6 +963,113 @@ def _exiftool_json(p: Path) -> dict:
     return dane[0] if dane else {}
 
 
+# --- dokumenty Office i LibreOffice: właściwości w XML wewnątrz ZIP-a (bez exiftoola i bez dodatkowych paczek)
+OOXML_META = ("docProps/core.xml", "docProps/app.xml", "docProps/custom.xml")
+ODF_META = ("meta.xml",)
+MAX_XML = 8 << 20   # część z właściwościami większa niż 8 MB to nie dokument, tylko pułapka
+NAZWY_XML = {"creator": "Creator", "lastModifiedBy": "LastModifiedBy", "created": "CreateDate",
+             "modified": "ModifyDate", "revision": "RevisionNumber", "lastPrinted": "LastPrinted",
+             "TotalTime": "TotalEditTime", "keywords": "Keywords", "keyword": "Keywords",
+             "creation-date": "CreationDate", "print-date": "PrintDate", "printed-by": "PrintedBy",
+             "initial-creator": "InitialCreator", "editing-cycles": "EditingCycles",
+             "editing-duration": "EditingDuration", "generator": "Generator", "date": "Date"}
+PUSTE_XML = {
+    "docProps/core.xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp='
+                         '"http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc='
+                         '"http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype='
+                         '"http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+                         '</cp:coreProperties>',
+    "docProps/app.xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Properties xmlns='
+                        '"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt='
+                        '"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"></Properties>',
+    "docProps/custom.xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Properties xmlns='
+                           '"http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt='
+                           '"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"></Properties>',
+}
+# komentarze i śledzone zmiany: treść z nazwiskami, której nie usuwamy (tylko mówimy, że jest)
+TRESC_Z_NAZWISKAMI = (
+    (re.compile(r"^(word/comments\w*\.xml|xl/comments\d*\.xml|xl/threadedComments/.+|ppt/comments/.+|"
+                r"ppt/commentAuthors\.xml)$"), re.compile(rb"<(\w+:)?(comment|threadedComment|cm|cmAuthor)[ >]"),
+     "komentarze z nazwiskami autorów"),   # pusty comments.xml (pandoc dodaje go zawsze) się nie liczy
+    (re.compile(r"^word/document\.xml$"), re.compile(rb"<w:(ins|del) "), "śledzone zmiany z nazwiskami autorów"),
+    (re.compile(r"^content\.xml$"), re.compile(rb"<office:annotation[ >]"), "komentarze z nazwiskami autorów"),
+    (re.compile(r"^content\.xml$"), re.compile(rb"<text:changed-region[ >]"), "śledzone zmiany z nazwiskami autorów"),
+)
+
+
+def _lokalna(tag: str) -> str:
+    return tag.rpartition("}")[2]
+
+
+def _czytaj_xml(z: zipfile.ZipFile, nazwa: str):
+    import xml.etree.ElementTree as ET
+    try:
+        info = z.getinfo(nazwa)
+    except KeyError:
+        return None
+    if info.file_size > MAX_XML:
+        raise Blad(f"{nazwa} w dokumencie ma {info.file_size >> 20} MB: to nie wygląda na zwykły dokument.")
+    try:
+        return ET.fromstring(z.read(info))
+    except ET.ParseError:
+        raise Blad(f"Uszkodzony dokument: nieczytelny {nazwa}.") from None
+
+
+def _pakiet_json(p: Path) -> dict:
+    """Właściwości DOCX/XLSX/PPTX/ODT/ODS/ODP w kształcie wyniku exiftoola: {"XML:Creator": …, "Custom:Klient": …}."""
+    tagi: dict = {}
+    try:
+        with zipfile.ZipFile(p) as z:
+            for nazwa in (*OOXML_META, *ODF_META):
+                root = _czytaj_xml(z, nazwa)
+                if root is None:
+                    continue
+                if nazwa == "meta.xml":
+                    root = next((x for x in root if _lokalna(x.tag) == "meta"), root)
+                for el in root:
+                    loc = _lokalna(el.tag)
+                    atr = {_lokalna(k): v for k, v in el.attrib.items()}
+                    if loc in ("property", "user-defined"):           # własne pola (OOXML, ODF)
+                        wart = "".join(el.itertext()).strip()
+                        if atr.get("name") and wart:
+                            tagi[f"Custom:{atr['name']}"] = wart
+                    elif loc == "template" and atr.get("href"):        # szablon ODF w atrybucie
+                        tagi["XML:Template"] = atr["href"]
+                    elif len(el) == 0 and (el.text or "").strip():
+                        tagi[f"XML:{NAZWY_XML.get(loc, loc[:1].upper() + loc[1:])}"] = el.text.strip()
+            if z.comment:
+                tagi["ZIP:Comment"] = z.comment.decode("utf-8", "replace")
+    except (zipfile.BadZipFile, zlib.error, EOFError, OSError) as exc:
+        raise Blad(f"Uszkodzony dokument ({p.name}): {exc}") from None
+    return tagi
+
+
+def _uwagi_tresci(p: Path) -> list[str]:
+    """Co z nazwiskami zostaje w treści dokumentu (komentarze, śledzone zmiany): mówimy, nie ruszamy."""
+    out: list[str] = []
+    try:
+        with zipfile.ZipFile(p) as z:
+            for info in z.infolist():
+                for nazwa, wzor, opis in TRESC_Z_NAZWISKAMI:
+                    if opis in out or not nazwa.match(info.filename):
+                        continue
+                    with z.open(info) as f:      # po kawałku: duży dokument nie trafia cały do pamięci
+                        ogon = b""
+                        while blok := f.read(1 << 20):
+                            if wzor.search(ogon + blok):
+                                out.append(opis)
+                                break
+                            ogon = blok[-64:]
+    except (zipfile.BadZipFile, zlib.error, EOFError, OSError):
+        return []
+    kolejnosc = [o for *_, o in TRESC_Z_NAZWISKAMI]
+    return sorted(out, key=kolejnosc.index)
+
+
+def _odczyt(p: Path) -> dict:
+    return _pakiet_json(p) if format_pliku(p) in PAKIETY else _exiftool_json(p)
+
+
 def _wpisy(tagi: dict) -> set[str]:
     """Wpisy z samego pliku (bez nazwy i dat pliku na dysku, wyliczonych i profilu kolorów)."""
     return {k for k in tagi if k in ZAWSZE or (":" in k and not BEZ_KONTROLI.match(k.rpartition(":")[0]))}
@@ -961,7 +1082,10 @@ def kategorie(tagi: dict) -> dict[str, list[str]]:
         v = tagi[klucz]
         if v is None or not _tekst(v).strip(" ,"):
             continue
-        nazwa = klucz.rpartition(":")[2]
+        grupa, _, nazwa = klucz.rpartition(":")
+        if k := PO_GRUPIE.get((grupa, nazwa)) or GRUPA_KATEGORIA.get(grupa):
+            out.setdefault(k, []).append(klucz)
+            continue
         for k, _, wzor in _WRAZLIWE:
             if wzor.match(nazwa):
                 if k != "czas" or not _zero_data(v):
@@ -986,12 +1110,17 @@ def _pokaz(k: str, tagi: dict, klucze: list[str]) -> str:
         marka, model = _tekst(wart("Make") or ""), _tekst(wart("Model") or "")
         if model:
             return model if marka and model.lower().startswith(marka.lower()) else f"{marka} {model}".strip()
+    elif k == "firma":
+        return _tekst(wart("Company", "Manager", "Application", "Generator", "CreatorTool", "Creator", "Producer",
+                           "Template") or tagi[klucze[0]])
     elif k == "czas":
         v = wart("DateTimeOriginal", "CreationDate", "DateCreated", "CreateDate", "DateTime", "ModifyDate") \
             or tagi[klucze[0]]
         m = _DATA.match(str(v))
         if m:
             return f"{m[1]}-{m[2]}-{m[3]}" + (f" {m[4]}:{m[5]}" if m[4] else "")
+    elif k == "wlasne":
+        return ", ".join(x.rpartition(":")[2] for x in klucze[:3]) + ("…" if len(klucze) > 3 else "")
     elif k in ("identyfikator", "miniatura"):
         return ""
     elif k == "opis":
@@ -1010,15 +1139,30 @@ def metadane(src: Path) -> dict:
     src = Path(src)
     if not src.is_file():
         raise Blad(f"Nie ma pliku: {src}")
-    if not shutil.which("exiftool"):
+    z = format_pliku(src)
+    if z not in PAKIETY and not shutil.which("exiftool"):
         raise Blad("Odczyt metadanych wymaga exiftool (jest w obrazie Jarva).")
-    w = _opisz(_exiftool_json(src))
-    return {"plik": str(src), "format": format_pliku(src), "wrazliwe": w, "czysty": not w}
+    w = _opisz(_odczyt(src))
+    wynik = {"plik": str(src), "format": z, "wrazliwe": w, "czysty": not w}
+    if z in PAKIETY and (u := _uwagi_tresci(src)):
+        wynik["uwagi"] = u
+    return wynik
 
 
 def _wyczysc(src: Path, dst: Path, z: str) -> None:
     """Kopia bez metadanych. Zdjęcie: exiftool (piksele bez zmian; profil kolorów i obrót zostają).
-    Film i dźwięk: ffmpeg przepakowuje strumienie bez kodowania (bez okładki, ścieżek danych i rozdziałów)."""
+    Film i dźwięk: ffmpeg przepakowuje strumienie bez kodowania (bez okładki, ścieżek danych i rozdziałów).
+    PDF: exiftool kasuje Info i XMP, a qpdf przepisuje plik tylko z żywych obiektów (exiftool dopisuje zmiany na końcu,
+    więc bez qpdf stare metadane dałoby się odzyskać). Pakiety Office/ODF: puste części z właściwościami."""
+    if z in PAKIETY:
+        _wyczysc_pakiet(src, dst)
+        return
+    if z == "pdf":
+        with tempfile.TemporaryDirectory(prefix="pdf-meta-") as t:
+            posredni = Path(t) / "bez-info.pdf"
+            _run(["exiftool", "-m", "-q", "-q", "-all:all=", "-o", str(posredni), os.path.abspath(src)], "exiftool", 600)
+            _run(["qpdf", "--deterministic-id", str(posredni), os.path.abspath(dst)], "qpdf", 600)
+        return
     if z in FOTO_META:
         _run(["exiftool", "-m", "-q", "-q", "-all=", "-trailer:all=", "-tagsFromFile", "@", "-ColorSpaceTags",
               "-Orientation", "-o", os.path.abspath(dst), os.path.abspath(src)], "exiftool", 600)
@@ -1031,9 +1175,32 @@ def _wyczysc(src: Path, dst: Path, z: str) -> None:
           *FF_BEZ_METADANYCH, *dalej, str(dst)], "FFmpeg", 3 * 3600)
 
 
+def _wyczysc_pakiet(src: Path, dst: Path) -> None:
+    """Kopia ZIP-a: części z właściwościami puste, daty wpisów 1980-01-01, bez komentarzy ZIP; reszta bajt w bajt
+    (kolejność i kompresja wpisów zostają, więc ODF z „mimetype” na początku dalej się otwiera)."""
+    try:
+        with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, "w") as zout:
+            for info in zin.infolist():
+                nowa = zipfile.ZipInfo(info.filename, date_time=(1980, 1, 1, 0, 0, 0))
+                nowa.compress_type, nowa.external_attr = info.compress_type, info.external_attr
+                if info.filename in PUSTE_XML:
+                    zout.writestr(nowa, PUSTE_XML[info.filename])
+                elif info.filename == "meta.xml":
+                    stary = zin.read(info)[:4096]
+                    v = re.search(rb'office:version="([0-9.]+)"', stary)
+                    zout.writestr(nowa, '<?xml version="1.0" encoding="UTF-8"?>\n<office:document-meta xmlns:office='
+                                        '"urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="'
+                                        f'{v[1].decode() if v else "1.2"}"><office:meta/></office:document-meta>')
+                else:
+                    with zin.open(info) as f, zout.open(nowa, "w") as g:
+                        shutil.copyfileobj(f, g, 1 << 20)
+    except (zipfile.BadZipFile, zlib.error, EOFError, OSError) as exc:
+        raise Blad(f"Uszkodzony dokument ({src.name}): {exc}") from None
+
+
 def _sprawdz(p: Path) -> dict:
     """Po czyszczeniu nic wrażliwego nie może zostać: inaczej błąd i brak pliku (lepiej niż fałszywe „czyste”)."""
-    tagi = _exiftool_json(p)
+    tagi = _odczyt(p)
     zostalo = _opisz(tagi)
     if zostalo:
         p.unlink(missing_ok=True)
@@ -1043,19 +1210,27 @@ def _sprawdz(p: Path) -> dict:
 
 
 def usun_metadane(src: Path, dst: Path | None = None, katalog: Path | None = None) -> dict:
-    """Ten sam plik bez metadanych (GPS, telefon, daty, autor, opisy, miniatury); obraz i dźwięk bez zmian."""
+    """Ten sam plik bez metadanych (GPS, telefon, daty, autor, firma, opisy, miniatury); obraz, dźwięk i treść
+    dokumentu bez zmian."""
     t0 = time.monotonic()
     src = Path(src)
     if not src.is_file():
         raise Blad(f"Nie ma pliku: {src}")
     z = format_pliku(src)
-    if z not in FOTO_META | WIDEO | AUDIO:
-        raise Blad(f"Metadane usuwam ze zdjęć (JPG, PNG, WebP, HEIC, AVIF, TIFF, GIF), filmów i dźwięku, "
-                   f"nie z {FORMATY[z][1]}.")
-    if not shutil.which("exiftool"):
+    if z not in FOTO_META | WIDEO | AUDIO | DOKUMENTY_META:
+        stary = {"doc": "DOCX", "xls": "XLSX", "ppt": "PPTX"}.get(z)
+        raise Blad(f"Metadane usuwam ze zdjęć (JPG, PNG, WebP, HEIC, AVIF, TIFF, GIF), filmów, dźwięku, PDF "
+                   f"i dokumentów (DOCX, XLSX, PPTX, ODT, ODS, ODP), nie z {FORMATY[z][1]}."
+                   + (f" Zamień go najpierw na {stary} (--na {stary.lower()})." if stary else ""))
+    if z not in PAKIETY and not shutil.which("exiftool"):
         raise Blad("Usuwanie metadanych wymaga exiftool (jest w obrazie Jarva).")
-    if z not in FOTO_META and not shutil.which("ffmpeg"):
+    if z in WIDEO | AUDIO and not shutil.which("ffmpeg"):
         raise Blad("Film i dźwięk czyści FFmpeg (jest w obrazie Jarva).")
+    if z == "pdf":
+        if not shutil.which("qpdf"):
+            raise Blad("PDF czyści qpdf (jest w obrazie Jarva).")
+        if subprocess.run(["qpdf", "--is-encrypted", str(src)], capture_output=True).returncode == 0:
+            raise Blad("PDF jest zabezpieczony hasłem albo blokadą edycji: zdejmij zabezpieczenie i spróbuj jeszcze raz.")
     if dst or katalog:
         out = cel_sciezka(src, z, Path(dst) if dst else None, Path(katalog) if katalog else None)
     else:
@@ -1063,19 +1238,23 @@ def usun_metadane(src: Path, dst: Path | None = None, katalog: Path | None = Non
     if out.resolve() == src.resolve():
         raise Blad("Wynik nadpisałby plik źródłowy: podaj inną nazwę (-o).")
     out.parent.mkdir(parents=True, exist_ok=True)
-    przed = _exiftool_json(src)
+    przed = _odczyt(src)
     with tempfile.TemporaryDirectory(prefix="metadane-") as t:
         tmp = Path(t) / f"czysty.{z}"
         _wyczysc(src, tmp, z)
         po = _sprawdz(tmp)
         shutil.move(str(tmp), out)
     usuniete = _opisz(przed)
-    wynik = {"wejscie": str(src), "na": z, "trasa": [f"bez metadanych ({'exiftool' if z in FOTO_META else 'FFmpeg'})"],
+    silnik_ = ("exiftool" if z in FOTO_META else "exiftool + qpdf" if z == "pdf" else "Jarvo (XML w pliku)"
+               if z in PAKIETY else "FFmpeg")
+    wynik = {"wejscie": str(src), "na": z, "trasa": [f"bez metadanych ({silnik_})"],
              "pliki": [str(out)], "usuniete": usuniete, "wpisow_usunietych": len(_wpisy(przed) - _wpisy(po)),
              "rozmiar_przed": src.stat().st_size, "rozmiar_po": out.stat().st_size,
              "sek": round(time.monotonic() - t0, 2)}
     if not usuniete and not wynik["wpisow_usunietych"]:
         wynik["uwaga"] = "w pliku nie było metadanych do usunięcia"
+    if z in PAKIETY and (u := _uwagi_tresci(out)):
+        wynik["uwagi"] = [f"zostało w treści: {x} (usuń je w edytorze, jeśli plik idzie do kogoś)" for x in u]
     return wynik
 
 
@@ -1125,7 +1304,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cele", action="store_true", help="na co można zamienić plik")
     ap.add_argument("--formaty", action="store_true", help="formaty i silniki dostępne tutaj")
     ap.add_argument("--metadane", action="store_true", help="co plik mówi o człowieku (GPS, telefon, data, autor)")
-    ap.add_argument("--usun-metadane", action="store_true", help="ten sam plik bez metadanych (zdjęcia, filmy, dźwięk)")
+    ap.add_argument("--usun-metadane", action="store_true", help="ten sam plik bez metadanych (zdjęcia, filmy, dźwięk, PDF, Word, Excel, PowerPoint)")
     args = ap.parse_args(argv)
     dump = lambda d: print(json.dumps(d, ensure_ascii=False, indent=1))  # noqa: E731
     try:

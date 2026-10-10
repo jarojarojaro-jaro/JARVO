@@ -400,9 +400,11 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
       const metadane = /^(jpe?g|heic)$/.test(ext)
         ? { miejsce: M("miejsce (GPS)", "50.0614, 19.9366"), urzadzenie: M("telefon albo aparat", "Apple iPhone 15 Pro"), czas: M("data i godzina", "2026-10-05 14:31") }
         : /^(mov|mp4)$/.test(ext) ? { miejsce: M("miejsce (GPS)", "50.0614, 19.9366"), czas: M("data i godzina", "2026-10-05 14:31") }
-          : /^(png|webp|avif|gif|webm|mkv)$/.test(ext) ? {} : null;
-      return { path, name: path.split("/").pop(), size: 0, format: ext, nazwa: ext.toUpperCase(), grupa: "obraz", cele: cele.filter((c) => c.format !== ext),
-        metadane, czysc: metadane !== null };
+          : /^(docx|pdf)$/.test(ext) ? { osoba: M("autor albo właściciel", "Jan Kowalski"), firma: M("firma, program albo szablon", "Kowalski Sp. z o.o."), czas: M("data i godzina", "2026-10-05 14:31") }
+            : /^(png|webp|avif|gif|webm|mkv)$/.test(ext) ? {} : null;
+      const uwagi = ext === "docx" ? ["komentarze z nazwiskami autorów"] : [];
+      return { path, name: path.split("/").pop(), size: 0, format: ext, nazwa: ext.toUpperCase(), grupa: ext === "docx" ? "dokument" : ext === "pdf" ? "pdf" : "obraz", cele: cele.filter((c) => c.format !== ext),
+        metadane, uwagi, czysc: metadane !== null };
     },
     konwStart: async () => { throw new Error("W trybie demo zamiana nie działa: konwerter pracuje na serwerze lokalnej instalacji Jarva."); },
     konwJob: async () => ({ state: "error", error: "demo" }),

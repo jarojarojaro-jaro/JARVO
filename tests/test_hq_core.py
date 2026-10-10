@@ -574,10 +574,12 @@ def test_konwerter_w_hq():
     mock = (root / "hq" / "web" / "demo" / "mock.js").read_text(encoding="utf-8")
     assert all(f"{m}:" in mock for m in ("konwUpload", "konwCele", "konwStart", "konwJob"))
     # metadane: ostrzeżenie po wrzuceniu, przycisk „Usuń metadane”, raport co usunięto
-    assert '"metadane": meta, "czysc": meta is not None' in api and "k.usun_metadane(s, katalog=out_dir) if czysc" in api
-    assert '"removed": [' in api and "metadane, czysc:" in mock
+    assert '"metadane": meta and meta["wrazliwe"]' in api and '"czysc": meta is not None' in api
+    assert "k.usun_metadane(s, katalog=out_dir) if czysc" in api and "k.DOKUMENTY_META" in api
+    assert '"removed": [' in api and '"uwagi": w.get("uwagi", [])' in api and "metadane, uwagi, czysc:" in mock
     karta = (root / "hq" / "web" / "src" / "55-konwerter.js").read_text(encoding="utf-8")
     assert "usun_metadane: true" in karta and "zadanie.removed" in karta and "f.czysc" in karta
+    assert "konwUwagi(f.uwagi)" in karta and "konwUwagi(r.uwagi)" in karta   # komentarze w treści dokumentu
     import re
     from conftest import load_script
     blok = re.search(r"const KONW_META = bilingual\(\{(.*?)\}\);", karta, re.S)[1]

@@ -451,11 +451,11 @@ def test_usun_metadane_wynik_i_kontrola(monkeypatch, tmp_path):
 
 
 def test_usun_metadane_bledy(monkeypatch, tmp_path):
-    pdf, film = tmp_path / "a.pdf", tmp_path / "a.mp4"
-    pdf.write_bytes(b"%PDF")
+    doc, film = tmp_path / "a.doc", tmp_path / "a.mp4"
+    doc.write_bytes(b"\xd0\xcf")
     film.write_bytes(b"x")
-    with pytest.raises(K.Blad, match="nie z PDF"):
-        K.usun_metadane(pdf)
+    with pytest.raises(K.Blad, match=r"nie z DOC\. Zamień go najpierw na DOCX \(--na docx\)"):
+        K.usun_metadane(doc)
     monkeypatch.setattr(K.shutil, "which", lambda n: None)
     with pytest.raises(K.Blad, match="wymaga exiftool"):
         K.usun_metadane(film)
@@ -587,3 +587,121 @@ def test_prawdziwe_usuwanie_metadanych(tmp_path):
     for na in ("mp4", "mp3"):                                         # zamiana też nie przenosi GPS z Androida
         assert K.metadane(Path(K.konwertuj(mov, na)["pliki"][0]))["czysty"], na
     K._graf.cache_clear()
+
+
+# --------------------------------------------------------------------------- metadane dokumentów
+
+CORE = ('<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/'
+        'core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/">'
+        '<dc:title>Oferta dla klienta</dc:title><dc:creator>Jan Kowalski</dc:creator>'
+        '<cp:lastModifiedBy>Anna Nowak</cp:lastModifiedBy><cp:revision>14</cp:revision>'
+        '<dcterms:created>2026-10-05T14:31:00Z</dcterms:created></cp:coreProperties>')
+APP = ('<?xml version="1.0"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">'
+       '<Template>Normal.dotm</Template><TotalTime>95</TotalTime><Pages>2</Pages><Application>Microsoft Office Word'
+       '</Application><Company>Kowalski Sp. z o.o.</Company></Properties>')
+CUSTOM = ('<?xml version="1.0"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" '
+          'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property name="Klient" '
+          'pid="2"><vt:lpwstr>Bank X</vt:lpwstr></property></Properties>')
+TRESC = b'<w:document><w:body><w:p><w:ins w:author="Anna Nowak"><w:r><w:t>nowe</w:t></w:r></w:ins></w:p></w:body></w:document>'
+
+
+def _docx(p: Path, czesci: dict) -> Path:
+    import zipfile
+    with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED) as z:
+        for nazwa, dane in czesci.items():
+            z.writestr(zipfile.ZipInfo(nazwa, date_time=(2026, 10, 5, 14, 31, 0)), dane)
+        z.comment = b"Jan K."
+    return p
+
+
+def test_pakiet_odczyt_kategorie_i_uwagi(tmp_path):
+    d = _docx(tmp_path / "oferta.docx", {"[Content_Types].xml": "<Types/>", "word/document.xml": TRESC,
+                                        "word/comments.xml": '<w:comments><w:comment w:author="Anna">x</w:comment></w:comments>', "docProps/core.xml": CORE,
+                                        "docProps/app.xml": APP, "docProps/custom.xml": CUSTOM})
+    tagi = K._pakiet_json(d)
+    assert tagi["XML:Creator"] == "Jan Kowalski" and tagi["XML:TotalEditTime"] == "95" and tagi["Custom:Klient"] == "Bank X"
+    o = K._opisz(tagi)
+    assert list(o) == ["czas", "firma", "historia", "osoba", "opis", "wlasne"]
+    assert o["firma"]["wartosc"] == "Kowalski Sp. z o.o." and o["osoba"]["wartosc"] == "Jan Kowalski"
+    assert o["czas"]["wartosc"] == "2026-10-05 14:31" and o["wlasne"]["wartosc"] == "Klient"
+    assert o["historia"]["wpisy"] == 2 and o["opis"]["wpisy"] == 2      # tytuł i komentarz ZIP-a
+    assert "XML:Pages" not in sum(K.kategorie(tagi).values(), [])         # liczba stron to nie dane o człowieku
+    m = K.metadane(d)
+    assert m["format"] == "docx" and not m["czysty"]
+    assert m["uwagi"] == ["komentarze z nazwiskami autorów", "śledzone zmiany z nazwiskami autorów"]
+
+
+def test_pakiet_odt_meta(tmp_path):
+    meta = ('<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+            'xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:meta>'
+            '<meta:initial-creator>Jan Kowalski</meta:initial-creator><dc:date>2026-10-05T14:31:00</dc:date>'
+            '<meta:generator>LibreOffice/24.2</meta:generator><meta:editing-cycles>3</meta:editing-cycles>'
+            '<meta:template xlink:href="Firma.ott"/><meta:user-defined meta:name="Projekt">Alfa</meta:user-defined>'
+            '<meta:document-statistic meta:page-count="1"/></office:meta></office:document-meta>')
+    d = _docx(tmp_path / "a.odt", {"mimetype": "application/vnd.oasis.opendocument.text", "meta.xml": meta,
+                                   "content.xml": "<office:document-content><office:annotation>x</office:annotation>"
+                                                  "</office:document-content>"})
+    tagi = K._pakiet_json(d)
+    assert tagi["XML:InitialCreator"] == "Jan Kowalski" and tagi["XML:Template"] == "Firma.ott"
+    assert set(K._opisz(tagi)) == {"czas", "firma", "historia", "osoba", "opis", "wlasne"}
+    assert K.metadane(d)["uwagi"] == ["komentarze z nazwiskami autorów"]
+    out = tmp_path / "czysty.odt"
+    K._wyczysc_pakiet(d, out)
+    import zipfile
+    with zipfile.ZipFile(out) as z, zipfile.ZipFile(d) as zrodlo:
+        assert z.namelist()[0] == "mimetype"                               # ODF: mimetype pierwszy, bez kompresji
+        assert z.getinfo("mimetype").compress_type == zrodlo.getinfo("mimetype").compress_type == zipfile.ZIP_STORED
+        assert b'office:version="1.3"' in z.read("meta.xml")
+    assert K._pakiet_json(out) == {}
+
+
+def test_usun_metadane_docx_bez_exiftoola(monkeypatch, tmp_path):
+    import zipfile
+    monkeypatch.setattr(K.shutil, "which", lambda n: None)          # pakiety nie potrzebują exiftoola
+    d = _docx(tmp_path / "oferta.docx", {"word/document.xml": TRESC, "word/comments.xml": "<w:comments/>",
+                                        "docProps/core.xml": CORE,
+                                        "docProps/app.xml": APP, "docProps/custom.xml": CUSTOM,
+                                        "word/media/logo.png": b"\x89PNG" + bytes(range(256))})
+    r = K.usun_metadane(d)
+    out = Path(r["pliki"][0])
+    assert out.name == "oferta-bez-metadanych.docx" and r["trasa"] == ["bez metadanych (Jarvo (XML w pliku))"]
+    assert set(r["usuniete"]) == {"czas", "firma", "historia", "osoba", "opis", "wlasne"}   # pusty comments.xml: bez uwagi
+    assert r["uwagi"] == ["zostało w treści: śledzone zmiany z nazwiskami autorów (usuń je w edytorze, jeśli plik "
+                          "idzie do kogoś)"]
+    with zipfile.ZipFile(d) as a, zipfile.ZipFile(out) as b:
+        assert a.namelist() == b.namelist() and not b.comment
+        assert all(i.date_time == (1980, 1, 1, 0, 0, 0) for i in b.infolist())
+        assert b.read("word/media/logo.png") == a.read("word/media/logo.png") and b.read("word/document.xml") == TRESC
+        for czesc in ("docProps/core.xml", "docProps/app.xml", "docProps/custom.xml"):
+            assert b.read(czesc).decode() == K.PUSTE_XML[czesc]
+    assert K.metadane(out)["czysty"]
+    # zepsuty dokument: błąd po polsku, nie wyjątek zipfile
+    (tmp_path / "zly.docx").write_bytes(b"to nie zip")
+    with pytest.raises(K.Blad, match="Uszkodzony dokument"):
+        K.metadane(tmp_path / "zly.docx")
+
+
+def test_pdf_metadane_kategorie_i_polecenia(monkeypatch, tmp_path):
+    pdf = {"PDF:Author": "Jan Kowalski", "PDF:Creator": "Microsoft Word", "PDF:Producer": "macOS Quartz",
+           "PDF:CreateDate": "2026:10:05 14:31:00", "PDF:PageCount": 2, "XMP-xmp:CreatorTool": "Word",
+           "XMP-xmpMM:DocumentID": "uuid:1", "PDF:Title": "Oferta"}
+    kat = K.kategorie(pdf)
+    assert kat["firma"] == ["PDF:Creator", "PDF:Producer", "XMP-xmp:CreatorTool"] and kat["osoba"] == ["PDF:Author"]
+    assert "PDF:PageCount" not in sum(kat.values(), [])
+    assert K.kategorie({"QuickTime:Producer": "Studio"}) == {"osoba": ["QuickTime:Producer"]}   # w filmie to osoba
+    wolane = []
+    monkeypatch.setattr(K, "_run", lambda cmd, *a, **k: wolane.append(cmd))
+    K._wyczysc(tmp_path / "a.pdf", tmp_path / "b.pdf", "pdf")
+    assert wolane[0][0] == "exiftool" and "-all:all=" in wolane[0]
+    assert wolane[1][:2] == ["qpdf", "--deterministic-id"] and wolane[1][-1] == str(tmp_path / "b.pdf")
+    assert wolane[1][2] == wolane[0][wolane[0].index("-o") + 1]           # qpdf przepisuje wynik exiftoola
+
+
+def test_pdf_zabezpieczony_haslem(monkeypatch, tmp_path):
+    pdf = tmp_path / "umowa.pdf"
+    pdf.write_bytes(b"%PDF")
+    monkeypatch.setattr(K.shutil, "which", lambda n: f"/usr/bin/{n}")
+    monkeypatch.setattr(K.subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(cmd, 0))
+    with pytest.raises(K.Blad, match="zabezpieczony hasłem"):
+        K.usun_metadane(pdf)

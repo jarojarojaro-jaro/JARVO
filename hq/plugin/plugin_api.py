@@ -1621,19 +1621,23 @@ async def konwerter_upload(request: Request):
 
 
 def _konw_meta(k, p: Path, fmt: str) -> dict | None:
-    """Co plik mówi o właścicielu (miejsce GPS, telefon, data…); None = tego pliku tu nie wyczyścimy."""
-    if fmt not in k.FOTO_META | k.WIDEO | k.AUDIO or not shutil.which("exiftool"):
+    """Co plik mówi o właścicielu (miejsce GPS, telefon, data, autor, firma…) i co z nazwiskami jest w treści
+    dokumentu: {wrazliwe, uwagi}; None = tego pliku tu nie wyczyścimy."""
+    if fmt not in k.FOTO_META | k.WIDEO | k.AUDIO | k.DOKUMENTY_META:
+        return None
+    if fmt not in k.PAKIETY and not shutil.which("exiftool") or fmt == "pdf" and not shutil.which("qpdf"):
         return None
     try:
-        return k.metadane(p)["wrazliwe"]
+        m = k.metadane(p)
     except k.Blad:
         return None
+    return {"wrazliwe": m["wrazliwe"], "uwagi": m.get("uwagi", [])}
 
 
 @router.get("/konwerter/cele")
 async def konwerter_cele(path: str):
     """Na co da się zamienić plik: cele pogrupowane (obraz, wideo, audio, pdf…) według silników w obrazie,
-    oraz metadane o człowieku w zdjęciu, filmie albo dźwięku (do ostrzeżenia i przycisku „Usuń metadane”)."""
+    oraz metadane o człowieku w zdjęciu, filmie, dźwięku, PDF i dokumencie (ostrzeżenie i przycisk „Usuń metadane”)."""
     k = _konwerter()
     p = _konw_zrodlo(path)
     try:
@@ -1643,7 +1647,8 @@ async def konwerter_cele(path: str):
         raise HTTPException(400, core.konwerter_blad(str(exc)))
     meta = await asyncio.to_thread(_konw_meta, k, p, fmt)
     return {"path": str(p), "name": p.name, "size": p.stat().st_size, "format": fmt, "nazwa": k.FORMATY[fmt][1],
-            "grupa": k.FORMATY[fmt][0], "cele": cele, "metadane": meta, "czysc": meta is not None}
+            "grupa": k.FORMATY[fmt][0], "cele": cele, "metadane": meta and meta["wrazliwe"],
+            "uwagi": meta["uwagi"] if meta else [], "czysc": meta is not None}
 
 
 def _konwertuj_wszystko(job: dict, k, srcs: list[Path], na: str, opt, polacz: bool, out_dir: Path,
@@ -1674,7 +1679,8 @@ def _konwertuj_wszystko(job: dict, k, srcs: list[Path], na: str, opt, polacz: bo
                 "route": wyniki[0]["trasa"], "before": sum(w["rozmiar_przed"] for w in wyniki),
                 "after": sum(w["rozmiar_po"] for w in wyniki),
                 "note": None if czysc else next((w["uwaga"] for w in wyniki if w.get("uwaga")), None),
-                "removed": [{"name": Path(w["wejscie"]).name, "metadane": w["usuniete"], "count": w["wpisow_usunietych"]}
+                "removed": [{"name": Path(w["wejscie"]).name, "metadane": w["usuniete"], "count": w["wpisow_usunietych"],
+                             "uwagi": w.get("uwagi", [])}
                             for w in wyniki] if czysc else None}
 
 

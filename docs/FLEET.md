@@ -48,7 +48,8 @@ Snajperzy nie dzielą pamięci ani workflowów dziedzinowych (wspólne są tylko
 narzędziowe jak `graf-kodu` i `izometria` (figury izometryczne ze świeceniem u Weba, Studia i Wideografa: strona, PNG,
 film; `iso.py flota` rysuje flotę z rejestru, ta sama figura jest w HQ: Centrala → Jak działa usługa) i metodyczne jak `hooki`, oraz te same skille zewnętrzne z locka). Jeden skill ma każdy agent:
 `konwersja-plikow` (plik → inny format na serwerze: zdjęcia z HEIC, wideo, audio, PDF, Word; usuwa też metadane:
-miejsce GPS, telefon, daty, autor; ten sam konwerter masz w HQ: Centrala → Konwerter).
+miejsce GPS, telefon, daty, autor, a z PDF i dokumentów Office także firmę, program i historię zmian; ten sam
+konwerter masz w HQ: Centrala → Konwerter).
 Wszyscy znają też **Ciebie**:
 - **profil użytkownika**: kim jesteś, czym się zajmujesz, preferencje (MVP: `knowledge/user/USER.md`
   z wywiadu onboardingowego Jarva; później wspólny provider pamięci, np. Honcho),

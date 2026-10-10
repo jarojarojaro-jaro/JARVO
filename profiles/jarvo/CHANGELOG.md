@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- `konwersja-plikow` 1.2.0, metadane dokumentów: `--metadane` i `--usun-metadane` obejmują PDF (exiftool, potem qpdf przepisuje plik, więc stare wersje metadanych nie zostają w środku) oraz DOCX, XLSX, PPTX, ODT, ODS, ODP (autor, ostatnio zmieniał, firma, program, szablon, daty, historia zmian, własne pola; treść bez zmian). Komentarze i śledzone zmiany z nazwiskami skrypt wskazuje w polu `uwagi`, ale ich nie usuwa. PDF z hasłem: odmowa z wyjaśnieniem.
 - HQ, Centrala → Jak działa usługa: flota jako klikalna figura izometryczna w kolorze Jarva (mostek Jarva, pokoje agentów z rejestru, terminal TY, skrzynka RAPORT). Demo pokazuje drogę zlecenia (Ty → Jarvo → karty → ocena → raport); klik w pokój mówi, kto to. Ten sam `iso.py flota` co skill `izometria`; gdy właściciel prosi o tę figurę, wskaż mu Centralę, a grafikę albo film z niej zleć Studiu albo Wideografowi.
 - `schemat` 1.2.0: „jak działa usługa” albo flota jako świecąca, klikalna figura (grafika, post, strona) to jedna karta dla Studia (`iso.py flota`, skill `izometria`), film to karta dla Wideografa.
 - HQ, Centrala → Konwerter: po wrzuceniu zdjęcia, filmu albo dźwięku karta pokazuje, co plik mówi o Tobie (miejsce GPS, telefon, data, autor, opis), a przycisk **Usuń metadane** daje ten sam plik bez nich i bez przekodowania; wynik mówi, co usunięto (sprawdzone po czyszczeniu). Kilka plików naraz: ZIP.

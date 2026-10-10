@@ -9,13 +9,18 @@ const KONW_GRUPY = bilingual({
 const KONW_ROZMIARY = [["", "Oryginał", "Original"], ["1920", "1920 px", "1920 px"], ["1080", "1080 px", "1080 px"],
   ["720p", "720p", "720p"], ["50%", "50%", "50%"]];
 const KONW_JAKOSC = [["", "Zwykła", "Normal"], ["95", "Najlepsza", "Best"], ["50", "Mniejszy plik", "Smaller file"]];
-// metadane o człowieku w zdjęciu, filmie albo dźwięku (klucze z konwertuj.py: WRAZLIWE)
+// metadane o człowieku w zdjęciu, filmie, dźwięku, PDF i dokumencie (klucze z konwertuj.py: WRAZLIWE)
 const KONW_META = bilingual({
   miejsce: ["Miejsce (GPS)", "Location (GPS)"], urzadzenie: ["Telefon albo aparat", "Phone or camera"],
-  czas: ["Data i godzina", "Date and time"], osoba: ["Autor albo właściciel", "Author or owner"],
+  czas: ["Data i godzina", "Date and time"], firma: ["Firma, program albo szablon", "Company, app or template"],
+  historia: ["Historia zmian", "Edit history"], osoba: ["Autor albo właściciel", "Author or owner"],
   opis: ["Opis albo komentarz", "Description or comment"], identyfikator: ["Identyfikatory zdjęcia", "Photo IDs"],
-  miniatura: ["Miniatura w pliku", "Embedded thumbnail"],
+  miniatura: ["Miniatura w pliku", "Embedded thumbnail"], wlasne: ["Własne pola dokumentu", "Custom document fields"],
 });
+// komentarze i śledzone zmiany w treści dokumentu: skrypt ich nie usuwa, tylko mówi (pole „uwagi”)
+const konwUwagi = (u) => (u || []).length > 0 && html`<span class="thq-muted">${L(
+  `W treści zostają: ${u.map((x) => x.replace(/^zostało w treści: /, "").replace(/ \(.*\)$/, "")).join(", ")}. Usuń je w edytorze, jeśli plik idzie do kogoś.`,
+  "Comments or tracked changes with author names stay in the content. Remove them in the editor before sending.")}</span>`;
 // każda informacja w osobnej linii; przy kilku plikach nad nimi nazwa pliku
 const konwMeta = (m, nazwa) => html`${nazwa && html`<em>${nazwa}</em>`}${Object.entries(m || {}).map(([k, v]) =>
   html`<span key=${k}>${KONW_META[k] || v.opis}${v.wartosc ? `: ${v.wartosc}` : ""}</span>`)}`;
@@ -114,6 +119,8 @@ function Konwerter({ onOpenFile }) {
   const zPdf = pliki.some((f) => f.format === "pdf");
   const moznaCzyscic = pliki.length > 0 && pliki.every((f) => f.czysc);
   const zMetadanymi = pliki.filter((f) => f.metadane && Object.keys(f.metadane).length);
+  const zUwagami = pliki.filter((f) => (f.uwagi || []).length);
+  const dokumenty = zMetadanymi.some((f) => ["pdf", "dokument", "arkusz", "prezentacja"].includes(f.grupa));
   const czyszczenie = zadanie && zadanie.mode === "metadane";
   const wybierz = (e) => { e.target.files && dodaj(e.target.files); e.target.value = ""; };
   const sekundy = zadanie && zadanie.started ? Math.max(0, Math.round(Date.now() / 1000 - zadanie.started)) : 0;
@@ -124,8 +131,8 @@ function Konwerter({ onOpenFile }) {
     <input ref=${fileRef} type="file" multiple hidden onChange=${wybierz}/>
     ${etap === "start" && html`<button type="button" class="thq-konw-drop" onClick=${() => fileRef.current && fileRef.current.click()}>
       <strong>${L("Upuść plik albo kliknij", "Drop a file or click")}</strong>
-      <span class="thq-muted">${L("Zdjęcie (też HEIC z iPhone'a), film, dźwięk, PDF, Word. Zamiana na serwerze, plik nigdzie nie wychodzi. Usuwa też metadane (GPS, telefon).",
-        "Photo (iPhone HEIC too), video, audio, PDF, Word. Converted on the server, the file goes nowhere else. Also strips metadata (GPS, phone).")}</span>
+      <span class="thq-muted">${L("Zdjęcie (też HEIC z iPhone'a), film, dźwięk, PDF, Word. Zamiana na serwerze, plik nigdzie nie wychodzi. Usuwa też metadane (GPS, telefon, autor, firma).",
+        "Photo (iPhone HEIC too), video, audio, PDF, Word. Converted on the server, the file goes nowhere else. Also strips metadata (GPS, phone, author, company).")}</span>
     </button>`}
     ${etap === "wysylanie" && postep && html`<div class="thq-konw-stan">
       <p>${L("Wysyłam", "Uploading")} ${postep.z > 1 ? `${postep.nr}/${postep.z} ` : ""}<strong>${postep.nazwa}</strong>…</p>
@@ -140,7 +147,12 @@ function Konwerter({ onOpenFile }) {
       <strong>${L("W pliku są dane o Tobie", "The file carries data about you")}</strong>
       ${zMetadanymi.slice(0, 5).map((f) => html`<p key=${f.path}>${konwMeta(f.metadane, pliki.length > 1 && f.name)}</p>`)}
       ${zMetadanymi.length > 5 && html`<p class="thq-muted">${L(`…i ${zMetadanymi.length - 5} więcej.`, `…and ${zMetadanymi.length - 5} more.`)}</p>`}
-      <span class="thq-muted">${L("Znikną po „Usuń metadane” albo zamianie na inny format.", "They go away with “Remove metadata” or a conversion to another format.")}</span>
+      <span class="thq-muted">${dokumenty
+        ? L("Znikną po „Usuń metadane”.", "They go away with “Remove metadata”.")
+        : L("Znikną po „Usuń metadane” albo zamianie na inny format.", "They go away with “Remove metadata” or a conversion to another format.")}</span>
+    </div>`}
+    ${etap === "wybor" && zUwagami.length > 0 && html`<div class="thq-konw-meta" role="note">
+      ${zUwagami.slice(0, 5).map((f) => html`<p key=${f.path}>${pliki.length > 1 && html`<em>${f.name}</em>`}${konwUwagi(f.uwagi)}</p>`)}
     </div>`}
     ${etap === "wybor" && html`<div class="thq-konw-wybor">
       <div class="thq-konw-opcje">
@@ -183,9 +195,9 @@ function Konwerter({ onOpenFile }) {
           ? konwMeta(r.metadane, zadanie.removed.length > 1 && r.name)
           : html`${zadanie.removed.length > 1 && html`<em>${r.name}</em>`}<span>${r.count
             ? L(`Tylko wpisy techniczne: ${r.count}`, `Technical entries only: ${r.count}`)
-            : L("W pliku nie było metadanych.", "The file had no metadata.")}</span>`}</p>`)}
+            : L("W pliku nie było metadanych.", "The file had no metadata.")}</span>`}${konwUwagi(r.uwagi)}</p>`)}
         ${zadanie.removed.length > 5 && html`<p class="thq-muted">${L(`…i ${zadanie.removed.length - 5} więcej.`, `…and ${zadanie.removed.length - 5} more.`)}</p>`}
-        <span class="thq-muted">${L("Sprawdzone po czyszczeniu: nic o Tobie nie zostało.", "Checked after cleaning: nothing about you is left.")}</span></div>`}
+        <span class="thq-muted">${L("Sprawdzone po czyszczeniu: w metadanych nic o Tobie nie zostało.", "Checked after cleaning: nothing about you is left in the metadata.")}</span></div>`}
       ${zadanie.note && html`<p class="thq-muted">${L("Wynik nie jest mniejszy od oryginału: zostaw oryginał.", "The result is not smaller than the original: keep the original.")}</p>`}
       ${zadanie.zip && html`<p><button type="button" class="thq-act-btn is-run" onClick=${() => downloadFile(zadanie.zip).catch((e) => setBlad(e.message))}>
         ${L("Pobierz wszystko", "Download all")} (ZIP, ${konwPlikow(zadanie.files.length)})</button></p>`}
