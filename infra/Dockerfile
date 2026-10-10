@@ -101,8 +101,8 @@ RUN set -e; cd /opt/jarvo/node && \
 # HyperFrames (wideo z HTML + GSAP; skille Wideografa wołają `npx hyperframes`): globalnie w obrazie, bo npx
 # bierze paczkę z globalnego drzewa bez sieci (inaczej ściągał najnowszą przy pierwszym użyciu, a na świeżej
 # instalacji bez sieci healthcheck padał). puppeteer-core w paczce używa Chromium obrazu (PUPPETEER_EXECUTABLE_PATH).
-# Wersja ≥ 14 dni (npm min-release-age obrazu Hermesa); skille z vendor/skills.lock.yaml są z wersji 0.8.78.
-ARG HYPERFRAMES_VERSION=0.8.74
+# Wersja ≥ 14 dni (npm min-release-age obrazu Hermesa), ta sama co skille z vendor/skills.lock.yaml (commit po v0.8.78).
+ARG HYPERFRAMES_VERSION=0.8.78
 RUN set -e; npm install -g --no-audit --no-fund "hyperframes@${HYPERFRAMES_VERSION}" && \
     hyperframes --version && npm cache clean --force && rm -rf /root/.npm/_cacache
 # render przez Chromium z obrazu (bez tego hyperframes ściąga własny chrome-headless-shell i pada bez unzip);
