@@ -15,7 +15,7 @@
 ARG HERMES_IMAGE=nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7
 # Lightpanda (AGPL-3.0, niezmodyfikowana binarka): przeglądarka headless dla narzędzi browser_* agentów.
 # Wersja przypięta digestem; wydanie ≥ 14 dni (ta sama kwarantanna co npm/PyPI).
-ARG LIGHTPANDA_IMAGE=lightpanda/browser:0.4.0@sha256:01eb5d37ba537259d60ebfe32be49d3db4c7b6d1daac23b59b8532126fe30df0
+ARG LIGHTPANDA_IMAGE=lightpanda/browser:0.4.1@sha256:73f67d2dc0bc243f3a8c87065c9871c98b121197baf7b650df5da91b33b98f02
 
 FROM ${LIGHTPANDA_IMAGE} AS lightpanda
 

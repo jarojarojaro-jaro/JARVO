@@ -187,6 +187,16 @@ def test_dockerfile_hygiene():
     assert re.search(r"LIGHTPANDA_IMAGE=lightpanda/browser:[\d.]+@sha256:[0-9a-f]{64}", code)
 
 
+def test_lightpanda_version_in_docs_matches_image_pin():
+    docker = (REPO / "infra" / "Dockerfile").read_text(encoding="utf-8")
+    pin = re.search(r"^ARG LIGHTPANDA_IMAGE=lightpanda/browser:([\d.]+)@", docker, re.M).group(1)
+    sources = (REPO / "docs" / "SOURCES.md").read_text(encoding="utf-8")
+    assert f"(https://github.com/lightpanda-io/browser) {pin} |" in sources
+    toolbox = yaml.safe_load((REPO / "profiles" / "jarvo-sherlock" / "toolbox.yaml").read_text(encoding="utf-8"))
+    lp = next(t for t in toolbox["tools"] if t["name"] == "lightpanda")
+    assert str(lp["version"]) == pin
+
+
 def test_every_extra_has_a_pin():
     docker = (REPO / "infra" / "Dockerfile").read_text(encoding="utf-8")
     optional = (REPO / "infra" / "python" / "requirements-optional.txt").read_text(encoding="utf-8")

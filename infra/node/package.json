@@ -4,7 +4,7 @@
   "description": "Narzędzia Node floty Jarvo (instalowane w obrazie do /opt/jarvo/node). Wersje przypięte; aktualizacja = PR + `make pins` (obraz Hermesa odrzuca wersje młodsze niż 14 dni: npm min-release-age). playwright-core musi odpowiadać Chromium z obrazu Hermesa (Dockerfile to sprawdza).",
   "license": "MIT",
   "dependencies": {
-    "agent-browser": "0.37.1",
+    "agent-browser": "0.38.1",
     "axe-core": "4.13.0",
     "dembrandt": "0.32.2",
     "favicons": "7.3.1",

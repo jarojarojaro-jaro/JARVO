@@ -24,8 +24,8 @@ obserwowalność przez Langfuse w `plugins/observability/`.
 | [Lighthouse](https://github.com/GoogleChrome/lighthouse) | audyt wydajności, SEO, dostępności, dobrych praktyk | Apache-2.0 | 2026-09 | CLI + skrypt |
 | [axe-core](https://github.com/dequelabs/axe-core) + [axe-core-npm](https://github.com/dequelabs/axe-core-npm) | audyt dostępności (WCAG) | MPL-2.0 | 2026-09 | CLI + skrypt |
 | [Playwright](https://github.com/microsoft/playwright) | zrzuty na wielu szerokościach, testy responsywności | Apache-2.0 | 2026-09 | skrypt |
-| [agent-browser](https://github.com/vercel-labs/agent-browser) | sterownik narzędzi `browser_*` Hermesa (natywna binarka Rust) | Apache-2.0 | 2026-09 | Hermes |
-| [Lightpanda](https://github.com/lightpanda-io/browser) | lekka przeglądarka headless dla agentów (~30 MB na sesję); Chromium tylko do renderu | AGPL-3.0 (osobny program) | 2026-09 | silnik `browser.engine` |
+| [agent-browser](https://github.com/vercel-labs/agent-browser) | sterownik narzędzi `browser_*` Hermesa (natywna binarka Rust) | Apache-2.0 | 2026-10 | Hermes |
+| [Lightpanda](https://github.com/lightpanda-io/browser) | lekka przeglądarka headless dla agentów (~30 MB na sesję); Chromium tylko do renderu | AGPL-3.0 (osobny program) | 2026-10 | silnik `browser.engine` |
 | [sharp](https://github.com/lovell/sharp) | konwersja i kompresja obrazów (AVIF/WebP), warianty `srcset` | Apache-2.0 | 2026-09 | skrypt |
 | [favicons](https://github.com/itgalaxy/favicons) | komplet faviconów, ikon i manifestu z jednego pliku | MIT | 2026-09 | skrypt |
 | [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | mapa dużego repo: kto woła funkcję, wpływ zmian (graf wywołań, lokalnie, bez klucza i tokenów) | MIT | 2026-09 | skill `graf-kodu` (tryb poleceń, pobierany przy pierwszym użyciu) |
@@ -59,7 +59,7 @@ własną przeglądarkę i ~0,3 GB; całą witrynę audytujemy `audit.sh` po kole
 |---|---|---|---|---|
 | [SearXNG](https://github.com/searxng/searxng) | własna metawyszukiwarka (70+ silników), bez kluczy i limitów | AGPL-3.0 | 2026-09 | sidecar + dostawca `searxng` |
 | [trafilatura](https://github.com/adbar/trafilatura) | czysta treść artykułów, metadane, daty publikacji (`extract.py`) | Apache-2.0 | 2026-09 | skrypt |
-| [Lightpanda](https://github.com/lightpanda-io/browser) | strony z JS do Markdown bez Chromium: `lightpanda fetch --dump markdown <url>`; silnik `browser_*` | AGPL-3.0 (osobny program) | 2026-09 | CLI + Hermes |
+| [Lightpanda](https://github.com/lightpanda-io/browser) | strony z JS do Markdown bez Chromium: `lightpanda fetch --dump markdown <url>`; silnik `browser_*` | AGPL-3.0 (osobny program) | 2026-10 | CLI + Hermes |
 | [Scrapling](https://github.com/D4Vinci/Scrapling) | odporny scraping (skill [H] `scrapling`) | BSD-3 | 2026-09 | CLI |
 | [Docling](https://github.com/docling-project/docling) | PDF-y, raporty, tabele → Markdown | MIT | 2026-09 | skrypt |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | napisy i transkrypcje z wideo jako źródła | Unlicense | 2026-09 | CLI |

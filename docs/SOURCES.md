@@ -21,7 +21,7 @@ Komponenty obrazu `jarvo-hermes` o znaczeniu licencyjnym (pełna lista narzędzi
 
 | Projekt | Rola | Licencja |
 |---|---|---|
-| [Lightpanda](https://github.com/lightpanda-io/browser) 0.4.0 | przeglądarka headless dla `browser_*` (binarka z oficjalnego obrazu, tylko `strip`) | AGPL-3.0 |
+| [Lightpanda](https://github.com/lightpanda-io/browser) 0.4.1 | przeglądarka headless dla `browser_*` (binarka z oficjalnego obrazu, tylko `strip`) | AGPL-3.0 |
 | [agent-browser](https://github.com/vercel-labs/agent-browser) | sterownik narzędzi przeglądarki Hermesa | Apache-2.0 |
 | [Nutlope/inspo](https://github.com/Nutlope/inspo) (Together AI), pakiet npm `inspo-mcp` 0.1.16 (repo przejrzane na commicie `0e1e636`) | serwer MCP `inspo` Weba (skill `inspiracje-stron`): katalog prawdziwych stron jako inspiracja przed projektem; stdio, lokalnie, bez hostowanego endpointu i bez `TOGETHER_API_KEY`. Katalog i miniatury pobiera z CDN autorów, nie z obrazu. **Zrzuty i treści stron należą do ich autorów** (MIT obejmuje kod Inspo): tylko inspiracja, nie kopiujemy grafik ani tekstów, nie hostujemy zrzutów | MIT |
 | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (NVIDIA), eksport ONNX [istupakov/parakeet-tdt-0.6b-v3-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx) | model rozpoznawania mowy (pobierany przy pierwszym użyciu, nie w repo ani w obrazie) | CC-BY-4.0 |
