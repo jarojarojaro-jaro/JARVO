@@ -140,6 +140,24 @@ function typoRuchPolacz(a, b, n) {
   if (a && typeof a === "object") return a;
   return b && typeof b === "object" ? (b.ruch === "brak" ? undefined : { ...b, slowo: n + (Number.isInteger(b.slowo) ? b.slowo : 0) }) : undefined;
 }
+// Efekt bloku (pierścień, przejście) przy cięciu w chwili d od początku bloku (jak typografia.efekt_podzial): obie
+// części go mają, druga ze śladem głowy od chwili d; przy łączeniu (drugi blok d s później) efekt pierwszego, a bez
+// niego drugiego ze śladem przesuniętym o d (typografia.efekt_polacz).
+function typoEfektPodzial(e, d) {
+  if (!e || typeof e !== "object") return [undefined, undefined];
+  const s = Array.isArray(e.sledz) && e.sledz.length ? e.sledz : null, { sledz: _s, ...reszta } = e;
+  if (!s) return [e, reszta];
+  const [x, y] = typoSledz({ sledz: s }, d);
+  return [e, { ...reszta, sledz: [[0, +x.toFixed(4), +y.toFixed(4)], ...s.filter((q) => q[0] > d).map((q) => [+(q[0] - d).toFixed(3), q[1], q[2]])] }];
+}
+function typoEfektPolacz(a, b, d) {
+  if (a && typeof a === "object") return a;
+  if (!b || typeof b !== "object") return undefined;
+  const { sledz, ...reszta } = b;
+  return Array.isArray(sledz) && sledz.length ? { ...reszta, sledz: sledz.map((q) => [+(q[0] + d).toFixed(3), q[1], q[2]]) } : reszta;
+}
+const TYPO_EFEKTY_NAZWY = { pierscien: ["Pierścień wokół głowy", "Ring around the head"], przejscie: ["Przez osobę", "Through the person"] };
+const TYPO_KOLEJNOSC_NAZWY = { "za-przod": ["Za osobą → przed", "Behind → in front"], "przod-za": ["Przed osobą → za", "In front → behind"] };
 const typoBez = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== null));
 const typoNoweId = (ids, base) => { let k = 1; while (ids.has(`${base}${String.fromCharCode(97 + k)}`)) k++; return `${base}${String.fromCharCode(97 + k)}`; };
 const typoTekst = (b) => b.slowa.map((w) => w.tekst).join(" ");
@@ -1243,10 +1261,10 @@ function VideoEditor({ path, onClose }) {
     if (j <= 0) return false;
     const d = +b.slowa[j].t || 0, li = Math.round(+b.slowa[j].linia || 0);
     const nid = typoNoweId(new Set(typoBloki(p).map((x) => x.id)), b.id);
-    const [r1, r2] = typoRuchPodzial(b.kamera, j);
+    const [r1, r2] = typoRuchPodzial(b.kamera, j), [e1, e2] = typoEfektPodzial(b.efekt, d);
     typoApply((T) => ({ bloki: T.bloki.flatMap((x) => (x.id !== b.id ? [x] : [
-      typoBez({ ...x, slowa: x.slowa.slice(0, j), end: +(x.start + d - 0.02).toFixed(3), wyjscie: "ciecie", kamera: r1 }),
-      typoBez({ ...x, id: nid, start: +(x.start + d).toFixed(3), kamera: r2, slowa: x.slowa.slice(j).map((w) => ({ ...w, t: +((+w.t || 0) - d).toFixed(3),
+      typoBez({ ...x, slowa: x.slowa.slice(0, j), end: +(x.start + d - 0.02).toFixed(3), wyjscie: "ciecie", kamera: r1, efekt: e1 }),
+      typoBez({ ...x, id: nid, start: +(x.start + d).toFixed(3), kamera: r2, efekt: e2, slowa: x.slowa.slice(j).map((w) => ({ ...w, t: +((+w.t || 0) - d).toFixed(3),
         k: +((+w.k || 0) - d).toFixed(3), linia: Math.max(0, Math.round(+w.linia || 0) - li) })) })])) }));
     setSel({ type: "typo", id: nid });
     setTypoW(null);
@@ -1257,7 +1275,7 @@ function VideoEditor({ path, onClose }) {
     if (!nast) return;
     const d = nast.start - b.start, li = Math.max(...b.slowa.map((w) => Math.round(+w.linia || 0))) + 1;
     typoApply((T) => ({ bloki: T.bloki.filter((x) => x.id !== nast.id).map((x) => (x.id !== b.id ? x : typoBez({ ...x, end: Math.max(x.end, nast.end),
-      wyjscie: nast.wyjscie || x.wyjscie, kamera: typoRuchPolacz(x.kamera, nast.kamera, x.slowa.length), slowa: [...x.slowa, ...nast.slowa.map((w) => ({ ...w, t: +((+w.t || 0) + d).toFixed(3),
+      wyjscie: nast.wyjscie || x.wyjscie, kamera: typoRuchPolacz(x.kamera, nast.kamera, x.slowa.length), efekt: typoEfektPolacz(x.efekt, nast.efekt, d), slowa: [...x.slowa, ...nast.slowa.map((w) => ({ ...w, t: +((+w.t || 0) + d).toFixed(3),
         k: +((+w.k || 0) + d).toFixed(3), linia: Math.round(+w.linia || 0) + li }))] }))) }));
   }
   function typoDodaj() {                           // własny blok w miejscu wskaźnika: jedno mocne słowo do wpisania
@@ -2264,6 +2282,35 @@ function VideoEditor({ path, onClose }) {
       <p class="thq-ed-note">${L("Mniejsze z = bliżej kamery: napis rośnie i jedzie mocniej przy ruchu, a gdy ostrość jest gdzie indziej, mocniej się rozmywa.",
         "Smaller z = closer to the camera: the text grows and moves more with the camera, and blurs more when the focus is elsewhere.")}</p>`;
   };
+  // efekt wow bloku (48-typografia.js: typoEfekt): pierścień wokół głowy, przejście przez osobę, z parametrami;
+  // miejsce na osobie z maski liczy Wideograf (typografia.py efekt), tu przycisk prośby
+  const efektTools = (b, u) => {
+    const e = typoEfekt(b), E = TYPO_EFEKT;
+    const eu = (patch, lv) => u((x) => ({ efekt: typoBez({ ...(x.efekt || {}), ...patch }) }), lv);
+    // efekt sam jest ruchem: blok bez własnego ruchu kamery dostaje „bez ruchu” (najazd ze stylu wypychał koło z kadru)
+    const wybierz = (v) => (!v ? u({ efekt: undefined }) : u({ efekt: { rodzaj: v }, rot: 0, tilt: 0, warstwa: "przod", z: undefined,
+      ...(v === "pierscien" ? { uklad: "srodek" } : {}), ...(b.kamera ? {} : { kamera: { ruch: "brak" } }) }));
+    const prosba = () => setAsk({ text: L(`Ustaw efekt „${L(...TYPO_EFEKTY_NAZWY[e.rodzaj])}” bloku typografii „${typoTekst(b)}” (${b.id}, ${fmtT(b.start, true)}–${fmtT(b.end, true)}) na osobie z maski i policz sylwetkę (typografia.py efekt --blok ${b.id} --rodzaj ${e.rodzaj}).`,
+      `Place the "${L(...TYPO_EFEKTY_NAZWY[e.rodzaj])}" effect of the typography block "${typoTekst(b)}" (${b.id}, ${fmtT(b.start, true)}–${fmtT(b.end, true)}) on the person from the mask and compute the silhouette (typografia.py efekt --blok ${b.id} --rodzaj ${e.rodzaj}).`), reply: "", busy: false });
+    return html`<label>${L("Efekt", "Effect")}${seg([["", L("Brak", "None")], ...TYPO_EFEKTY.map((k2) => [k2, L(...TYPO_EFEKTY_NAZWY[k2])])], e ? e.rodzaj : "", wybierz)}</label>
+      ${e && e.rodzaj === "pierscien" && html`<label>${L("Prędkość", "Speed")} · ${Math.round(e.predkosc)}°/s
+          <input type="range" min=${E.predkoscMin} max=${E.predkoscMax} step="1" value=${e.predkosc} onInput=${(ev) => eu({ predkosc: +ev.target.value }, true)} onChange=${H.commit}/></label>
+        <label>${L("Nachylenie koła", "Ring tilt")} · ${Math.round(e.nachylenie)}°
+          <input type="range" min=${-E.nachylenieMax} max=${E.nachylenieMax} step="1" value=${e.nachylenie} onInput=${(ev) => eu({ nachylenie: +ev.target.value }, true)} onChange=${H.commit}/></label>
+        <label>${L("Przód jedzie", "Front moves")}${seg(TYPO_EFEKT_KIERUNKI.map((k2) => [k2, L(...TYPO_KIERUNKI_NAZWY[k2])]), e.kierunek, (v) => eu({ kierunek: v }))}</label>
+        <label>${L("Napis dookoła", "Text all around")}${seg([["tak", L("Powtórzony", "Repeated")], ["nie", L("Raz", "Once")]], e.powtorz ? "tak" : "nie", (v) => eu({ powtorz: v === "nie" ? false : undefined }))}</label>
+        <p class="thq-ed-note">${L("Środek koła to środek bloku (przeciągnij go na głowę), średnica to szerokość bloku. Przód koła idzie przed twarzą, tył chowa się za osobą.",
+          "The ring centre is the block centre (drag it onto the head), the diameter is the block width. The front passes in front of the face, the back hides behind the person.")}</p>`}
+      ${e && e.rodzaj === "przejscie" && html`<label>${L("Kierunek", "Direction")}${seg(TYPO_EFEKT_KIERUNKI.map((k2) => [k2, L(...TYPO_KIERUNKI_NAZWY[k2])]), e.kierunek, (v) => eu({ kierunek: v }))}</label>
+        <label>${L("Kolejność", "Order")}${seg(TYPO_EFEKT_KOLEJNOSC.map((k2) => [k2, L(...TYPO_KOLEJNOSC_NAZWY[k2])]), e.kolejnosc, (v) => eu({ kolejnosc: v }))}</label>
+        <p class="thq-ed-note">${L("Środek bloku to szew w osi ciała (przeciągnij go na osobę): napis jedzie przez niego i zmienia warstwę, potem stoi do czytania.",
+          "The block centre is the seam on the body axis (drag it onto the person): the text slides through it, switches layer and then holds for reading.")}</p>`}
+      ${e && e.sledz.length > 0 && html`<p class="thq-ed-note">${L(`Środek idzie za głową (${e.sledz.length} pkt z maski).`, `The centre follows the head (${e.sledz.length} points from the mask).`)}</p>
+        <button type="button" class="thq-ed-btn is-wide" onClick=${() => eu({ sledz: undefined })}>${ED_ICON.reset} ${L("Bez śledzenia głowy", "Stop following the head")}</button>`}
+      ${e && !maskaBloku(b) && html`<p class="thq-ed-note is-warn">⚠ ${L("Efekt potrzebuje sylwetki osoby w tym fragmencie: bez niej tył napisu idzie po twarzy.",
+          "The effect needs the person's silhouette here: without it the back of the text runs over the face.")}</p>`}
+      ${e && html`<button type="button" class="thq-ed-btn is-wide" onClick=${prosba}>${ED_ICON.spark} ${L("Poproś Wideografa: efekt na osobie", "Ask the video agent: effect on the person")}</button>`}`;
+  };
   const typoTools = (b) => {
     const m = typoMotyw(p), auto = L("Auto", "Auto");
     const u = (patch, lv) => typoUpd(b.id, patch, lv);
@@ -2271,7 +2318,7 @@ function VideoEditor({ path, onClose }) {
     const j = typoW !== null && typoW < b.slowa.length ? typoW : naj;
     const w = b.slowa[j], wyg = typoSlowo(w, m, b.uklad);       // wygląd słowa teraz (z motywu albo nadpisany)
     const su = (patch, lv) => slowoUpd(b.id, j, patch, lv);
-    const tyl = b.warstwa === "tyl", li = Math.round(+w.linia || 0);
+    const tyl = b.warstwa === "tyl", li = Math.round(+w.linia || 0), pier = (typoEfekt(b) || {}).rodzaj === "pierscien";
     const zWarstwy = (v) => (b.z !== undefined && (v === "tyl") === (typoZ(b) > 1) ? b.z : undefined);   // z zgodne z warstwą zostaje
     const suwak = (label, v, min, max, step, fn, fmt) => html`<label>${label} · ${fmt(v)}
       <input type="range" min=${min} max=${max} step=${step} value=${v} onInput=${(e) => fn(+e.target.value, true)} onChange=${H.commit}/></label>`;
@@ -2298,14 +2345,15 @@ function VideoEditor({ path, onClose }) {
 
       <p class="thq-ed-sub">${L("Blok", "Block")}</p>
       <label>${L("Układ", "Layout")}${seg(TYPO_UKLADY.map((k2) => [k2, L(...TYPO_UKLAD_NAZWY[k2])]), b.uklad, (v) => u(v === "za" ? { uklad: v, warstwa: "tyl", rot: 0, tilt: 0, z: zWarstwy("tyl") } : { uklad: v }))}</label>
-      <label>${L("Głębia bloku", "Block depth")}${seg([["przod", L("Przed osobą", "In front")], ["tyl", L("Za osobą", "Behind")]], tyl ? "tyl" : "przod", (v) => u({ warstwa: v, z: zWarstwy(v) }))}</label>
-      ${tyl && !maskaBloku(b) && html`<p class="thq-ed-note is-warn">⚠ ${L("Osoba zasłoni ten napis, gdy Wideograf policzy jej sylwetkę w tym fragmencie. Do tego czasu napis widać w całości.",
+      ${!typoEfekt(b) && html`<label>${L("Głębia bloku", "Block depth")}${seg([["przod", L("Przed osobą", "In front")], ["tyl", L("Za osobą", "Behind")]], tyl ? "tyl" : "przod", (v) => u({ warstwa: v, z: zWarstwy(v) }))}</label>`}
+      ${efektTools(b, u)}
+      ${tyl && !typoEfekt(b) && !maskaBloku(b) && html`<p class="thq-ed-note is-warn">⚠ ${L("Osoba zasłoni ten napis, gdy Wideograf policzy jej sylwetkę w tym fragmencie. Do tego czasu napis widać w całości.",
           "The person will cover this text once the video agent computes their silhouette here. Until then the text is fully visible.")}</p>
         <button type="button" class="thq-ed-btn is-wide" onClick=${() => setAsk({ text: L(`Policz sylwetkę osoby dla bloku typografii „${typoTekst(b)}” (${fmtT(b.start, true)}–${fmtT(b.end, true)}), żeby napis był za osobą.`,
           `Compute the person's silhouette for the typography block "${typoTekst(b)}" (${fmtT(b.start, true)}–${fmtT(b.end, true)}) so the text sits behind them.`), reply: "", busy: false })}>${ED_ICON.spark} ${L("Poproś Wideografa o sylwetkę", "Ask the video agent for the silhouette")}</button>`}
       ${kameraBlokTools(b, u)}
       ${suwak(L("Rozmiar", "Size"), +b.rozmiar || 1, 0.3, 3, 0.05, (v, lv) => u({ rozmiar: v }, lv), (v) => `${Math.round(v * 100)}%`)}
-      ${suwak(L("Szerokość", "Width"), +b.w || 0.62, 0.15, 1, 0.01, (v, lv) => u({ w: v }, lv), (v) => `${Math.round(v * 100)}%`)}
+      ${suwak(pier ? L("Średnica koła", "Ring diameter") : L("Szerokość", "Width"), +b.w || 0.62, 0.15, 1, 0.01, (v, lv) => u({ w: v }, lv), (v) => `${Math.round(v * 100)}%`)}
       ${suwak(L("Obrót", "Rotation"), +b.rot || 0, -45, 45, 1, (v, lv) => u({ rot: v }, lv), (v) => `${v}°`)}
       ${suwak(L("Perspektywa 3D", "3D perspective"), +b.tilt || 0, -45, 45, 1, (v, lv) => u({ tilt: v }, lv), (v) => `${v}°`)}
       <label>${L("Wejście słów", "Word entrance")}${seg([["", auto], ...Object.keys(TYPO_WEJSCIA).map((k2) => [k2, L(...TYPO_WEJSCIA_NAZWY[k2])])], b.wejscie || "", (v) => u({ wejscie: v || undefined }))}</label>

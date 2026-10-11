@@ -226,7 +226,11 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   napis poza kadrem, bloki na sobie, stykające się litery, napis za osobą nieczytelny albo niezasłonięty, strefy, małe
   słowa, a z kamerą także blok wypchnięty z kadru przez ruch kamery (`poza-kadrem-kamera`: w spoczynku jest w kadrze;
   opis mówi, który ruch), słowo rozmyte głębią ostrości ponad 8% wysokości liter przez 1/3 s (`rozmyte`, błąd)
-  i uderzenie poza ostrością, co najmniej 2 px przy 1080 (`uderzenie-rozmyte`, uwaga); lista błędów i uwag, klik przenosi wskaźnik do tej chwili i zaznacza blok, a po zmianie planu lista prosi
+  i uderzenie poza ostrością, co najmniej 2 px przy 1080 (`uderzenie-rozmyte`, uwaga), a przy efektach pierścień
+  za szybki (`pierscien-szybko`: przód ponad 6 wysokości liter na sekundę) albo ze słowem dłuższym niż przód koła
+  (`pierscien-nieczytelny`: łuk 120°), przejście szybsze niż szerokość kadru na sekundę (`przejscie-szybko`), efekt bez
+  sylwetek osoby (`efekt-bez-sylwetek`; błędy) i efekt obok osoby (`efekt-obok-osoby`: sylwetka nie zasłania tyłu
+  napisu, uwaga); lista błędów i uwag, klik przenosi wskaźnik do tej chwili i zaznacza blok, a po zmianie planu lista prosi
   o ponowne sprawdzenie. Nowy plan (reżyser albo pierwszy blok dodany w edytorze) ma `"odstep": "tusz"`: renderer
   rozsuwa słowa w linii i linie bloku, gdy ich litery z obrysem stylu by się stykały (ogonki, kreski nad Ż, Ś, Ć, pochylony krój, obrys, cień 3D); starsze plany rysują się jak dawniej. Kolory palety stoją też pierwsze przy kolorze słowa. Przycięcie, usunięcie, tempo
   i przestawienie klipów przesuwają bloki i czasy słów razem z materiałem (`typoNaOsi` w `remapTimes`
@@ -284,8 +288,22 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   (`kolejnosc` `za-przod`: wchodzi za osobę, wychodzi przed nią; `przod-za` odwrotnie; `kierunek` `prawo`/`lewo`).
   `sledz` ([[t, dx, dy]], do 40 punktów) przesuwa środek za ruchem głowy w czasie bloku. Podpis klatki eksportu bloku
   z efektem ma czas, więc obie warstwy rysują każdą jego klatkę; sylwetki są potrzebne we wszystkich klatkach bloku
-  (`edytor.maska_concat`), a podgląd kładzie osobę nad warstwą `tyl` także przy efekcie. Plan bez `efekt` rysuje się jak
+  (`edytor.maska_concat`), a podgląd kładzie osobę nad warstwą `tyl` także przy efekcie. Litery pierścienia nie
+  dostają samoczynnej płytki słabego kontrastu (styl `tlo` ustawiony ręcznie zostaje). Plan bez `efekt` rysuje się jak
   dawniej.
+  W panelu bloku sekcja **Efekt** (PL/EN): `Brak`, `Pierścień wokół głowy`, `Przez osobę`. Pierścień ma suwaki
+  prędkości (°/s) i nachylenia koła, „Przód jedzie” (w lewo / w prawo) i „Napis dookoła” (`Powtórzony` / `Raz`),
+  a suwak szerokości bloku nazywa się „Średnica koła”; przejście ma kierunek i kolejność (za osobą → przed nią albo
+  odwrotnie). Blok z efektem nie ma przełącznika „Głębia bloku”, a wybór efektu zostawia blok w warstwie przedniej
+  bez własnej głębi `z` i, gdy blok nie ma własnego ruchu kamery, ustawia „bez ruchu” (efekt sam jest ruchem). Przy
+  śledzeniu głowy panel podaje liczbę punktów i ma „Bez śledzenia głowy”; bez sylwetki w tym fragmencie ostrzega,
+  a przycisk „Poproś Wideografa: efekt na osobie” wysyła prośbę z poleceniem `typografia.py efekt --blok … --rodzaj …`.
+  Cięcie bloku z efektem zostawia efekt w obu częściach (druga ze śladem `sledz` od chwili cięcia), łączenie bierze
+  efekt pierwszego bloku albo drugiego ze śladem przesuniętym (`typoEfektPodzial` / `typoEfektPolacz`, w
+  `typografia.py` `efekt_podzial` i `efekt_polacz`). Wideograf ustawia efekt z maski: `typografia.py efekt <film>
+  --blok ID --rodzaj pierscien|przejscie|brak` (koło na czole, średnica ~1,9 szerokości głowy, w kadrze; przejście
+  z szwem w osi ciała na wysokości piersi; ślad głowy co 0,25 s; sylwetki), a `typografia.py plan --efekty` daje
+  najmocniejszej krótkiej frazie pierścień, następnej przejście (po jednym na 20 bloków).
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
   `volume`, `muted`, `fit`, `transition`, `fadeIn`, `fadeOut`, `color`, `voice`), napisy, audio (także `label`
   i `linked`) i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.

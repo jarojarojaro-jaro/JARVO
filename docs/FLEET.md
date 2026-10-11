@@ -260,7 +260,9 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
   się litery, napis za osobą czytelny i naprawdę zasłonięty, strefy platformy); słowa jednego bloku nowego planu same
   się nie stykają, ani w linii, ani między liniami (odstęp liczony z tuszu liter z obrysem stylu, `"odstep": "tusz"`);
   wirtualna kamera z głębią (`typografia.py kamera`, styl spokojna/dynamiczna z motywu): najazd, odjazd i przesunięcie
-  filmu razem z napisami na różnych głębokościach, z paralaksą i rozmyciem jak w obiektywie; plan leży w projekcie montażu, więc właściciel poprawia każde słowo w edytorze HQ,
+  filmu razem z napisami na różnych głębokościach, z paralaksą i rozmyciem jak w obiektywie; efekty wow z maski osoby
+  (`typografia.py efekt`, `plan --efekty`): napis krąży pierścieniem wokół głowy (przód przed twarzą, tył za osobą)
+  albo przechodzi przez osobę (wchodzi za nią, wychodzi przed nią); plan leży w projekcie montażu, więc właściciel poprawia każde słowo w edytorze HQ,
 - **żywe schematy** (skill `zywy-schemat`, silnik strony [live-panel](https://github.com/ythx-101/live-panel-skill)): flota,
   przepływ zlecenia albo architektura, która „działa” (kropki po strzałkach, kroki podświetlane po kolei), na posty X
   i Instagram; `zywy_schemat.py` dokłada formaty platform, motywy Jarva i polskie kroje, `html_wideo.py` mierzy i renderuje,

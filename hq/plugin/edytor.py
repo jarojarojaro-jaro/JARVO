@@ -348,7 +348,7 @@ def normalize_typo(raw: Any, total: float) -> dict:
         ruch = kamera_ruch_norm(b.get("kamera"), len(slowa))
         if ruch:
             nb["kamera"] = ruch
-        efekt = efekt_norm(b.get("efekt"), e - s)
+        efekt = efekt_norm(b.get("efekt"))
         if efekt:
             nb["efekt"] = efekt
         out["bloki"].append(nb)
@@ -367,10 +367,11 @@ def _bez_bool(v: Any) -> Any:
     return None if isinstance(v, bool) else v
 
 
-def efekt_norm(raw: Any, dlugosc: float) -> dict | None:
+def efekt_norm(raw: Any) -> dict | None:
     """Efekt bloku (`blok.efekt`) w bezpiecznej postaci (jak typoEfekt w 48-typografia.js); zły albo brak = None.
     Pierścień: `kierunek` (lewo = przód jedzie w lewo), `predkosc` °/s, `nachylenie` °, `powtorz` (false = napis raz);
-    przejście: `kierunek` ruchu, `kolejnosc` za-przod / przod-za. `sledz`: [[t, dx, dy]] przesunięcie środka za głową."""
+    przejście: `kierunek` ruchu, `kolejnosc` za-przod / przod-za. `sledz`: [[t, dx, dy]] przesunięcie środka za głową
+    (punkty po końcu bloku zostają: po cięciu i złączeniu bloku ślad wraca cały)."""
     if not isinstance(raw, dict) or raw.get("rodzaj") not in TYPO_EFEKTY:
         return None
     pier = raw["rodzaj"] == "pierscien"
@@ -385,7 +386,7 @@ def efekt_norm(raw: Any, dlugosc: float) -> dict | None:
             e["powtorz"] = False
     else:
         e["kolejnosc"] = raw.get("kolejnosc") if raw.get("kolejnosc") in EFEKT_KOLEJNOSC else "za-przod"
-    sledz = [[round(_num(q[0], 0, dlugosc, 0), 3), round(_num(q[1], -1, 1, 0), 4), round(_num(q[2], -1, 1, 0), 4)]
+    sledz = [[round(_num(q[0], 0, MAX_DURATION, 0), 3), round(_num(q[1], -1, 1, 0), 4), round(_num(q[2], -1, 1, 0), 4)]
              for q in raw.get("sledz") or [] if isinstance(q, (list, tuple)) and len(q) == 3 and all(map(_liczba, q))]
     if sledz:
         e["sledz"] = sorted(sledz, key=lambda q: q[0])[:EFEKT_SLEDZ]

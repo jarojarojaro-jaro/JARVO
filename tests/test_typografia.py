@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import re
 import shutil
 import struct
@@ -1440,7 +1441,7 @@ def test_efekt_js_i_python_te_same_listy_liczby_i_warstwy():
               {**_efekt_blok("x", "z3"), "efekt": None, "warstwa": "tyl"}]
     o = node(f"const B = {json.dumps(bloki)};\nconsole.log(JSON.stringify(B.map((b) => [typoEfekt(b), typoWarstwyBloku(b)])));")
     for b, (e, ws) in zip(bloki, o):
-        py = ed.efekt_norm(b["efekt"], 3.0)
+        py = ed.efekt_norm(b["efekt"])
         if py is None:
             assert e is None
         else:
@@ -1556,3 +1557,197 @@ def test_efekt_w_przegladarce_warstwy_pierscienia_i_przejscia():
     assert b["tyl"]["n"] > 20 and b["przod"]["n"] > 20                 # w połowie drogi napis po obu stronach szwu
     assert b["tyl"]["x"] < 135 < b["przod"]["x"]                       # wejście z lewej (za osobą), wyjście z prawej
     assert b["tyl"]["n"] + b["przod"]["n"] == pytest.approx(b["razem"]["n"], rel=0.05)
+
+
+# ---------------------------------------------------------------- efekty w reżyserii (typografia.py efekt, plan --efekty)
+
+def _opisy(b: dict, dx: float = 0.0, glowa=None, osoba=None) -> list[dict]:
+    """Opis maski co 0,25 s bloku: głowa (GLOWA) przesuwa się w prawo o dx przez cały blok."""
+    g, o = glowa or GLOWA["glowa"], osoba or GLOWA["osoba"]
+    ts = ty.chwile_efektu(b)
+    return [{"t": t, "glowa": [g[0] + dx * (t - b["start"]) / (b["end"] - b["start"]), g[1],
+                              g[2] + dx * (t - b["start"]) / (b["end"] - b["start"]), g[3]],
+             "osoba": o, "pokrycie": 0.3} for t in ts]
+
+
+def test_pierscien_z_maski_na_czole_w_kadrze_i_czytelny():
+    b = {**blok([("TYLKO", 3), ("dziś", 1)], dl=2.4), "warstwa": "tyl", "z": 1.3}
+    nb = ty.pierscien_z_maski(b, _opisy(b), 1080, 1920)
+    g = GLOWA["glowa"]
+    assert nb["x"] == pytest.approx(0.5) and nb["y"] == pytest.approx(g[1] + 0.3 * (g[3] - g[1]))
+    assert nb["w"] == pytest.approx(1.9 * (g[2] - g[0])) and nb["warstwa"] == "przod" and "z" not in nb
+    e = nb["efekt"]
+    assert e["rodzaj"] == "pierscien" and e["kierunek"] == "lewo" and "sledz" not in e   # głowa stoi: bez śladu
+    v = math.radians(e["predkosc"]) / (2 * ty.LITERA * nb.get("rozmiar", 1) * min(ty.EFEKT_WAGA[s["waga"]] for s in b["slowa"]))
+    assert e["predkosc"] <= 40 and v <= ty.OBROTY                  # przód najwyżej 6 wysokości liter na sekundę
+    dlugi = {**b, "slowa": [_w(0, "Najprawdopodobniej", 3)]}
+    assert ty.pierscien_z_maski(dlugi, _opisy(dlugi), 1080, 1920)["rozmiar"] < 1      # długie słowo: mniejsze litery
+    bok = ty.pierscien_z_maski(b, _opisy(b, glowa=[0.74, 0.3, 0.94, 0.5]), 1080, 1920)
+    assert bok["x"] < 0.84 and bok["w"] < 1.9 * 0.2                  # głowa przy krawędzi: mniejsze koło, trochę do środka
+    assert bok["x"] + bok["w"] / 2 <= 1 - ty.EFEKT_BRZEG + 1e-9                          # … całe w kadrze
+    assert nb["kamera"] == {"ruch": "brak"}                         # efekt sam jest ruchem: bez najazdu ze stylu
+    wlasny = {**b, "kamera": {"ruch": "najazd", "sila": 0.3, "krzywa": "plynnie"}}
+    assert ty.pierscien_z_maski(wlasny, _opisy(wlasny), 1080, 1920)["kamera"] == wlasny["kamera"]   # ruch człowieka zostaje
+    ruch = ty.pierscien_z_maski(b, _opisy(b, dx=0.1), 1080, 1920)["efekt"]["sledz"]
+    assert ruch[0][:3] == [0, 0, 0] and ruch[-1][1] == pytest.approx(0.1 * ruch[-1][0] / 2.4, abs=2e-3) and ruch[-1][2] == 0
+    with pytest.raises(ValueError, match="głowy"):
+        ty.pierscien_z_maski(b, [{"t": 1.0, "glowa": None, "osoba": None}], 1080, 1920)
+    assert ed.normalize_typo({"bloki": [nb]}, 10)["bloki"][0]["efekt"] == e                # plan przyjmuje efekt
+
+
+def test_przejscie_z_maski_szew_w_osi_ciala_i_miesci_sie():
+    b = blok([("PRZEZ", 3), ("ciebie", 1)], dl=1.6)
+    b["slowa"][1]["linia"] = 1
+    nb = ty.przejscie_z_maski(b, _opisy(b), 1080, 1920)
+    g = GLOWA["glowa"]
+    assert nb["x"] == pytest.approx(0.5) and nb["y"] == pytest.approx(g[3] + 0.1)        # oś ciała, pierś
+    assert nb["w"] == pytest.approx(0.44) and {s["linia"] for s in nb["slowa"]} == {0}   # jedna linia
+    assert nb["efekt"] == {"rodzaj": "przejscie", "kierunek": "prawo", "kolejnosc": "za-przod"}
+    pol = nb["w"] / 2 + 0.03
+    assert nb["x"] - 2 * pol >= 0 and nb["x"] + 2 * pol <= 1.0 + 1e-9                    # cały napis w kadrze po obu stronach
+    krotki = {**b, "end": b["start"] + 1.1}                                               # krótki blok: węższy napis
+    kw = ty.przejscie_z_maski(krotki, _opisy(krotki), 1080, 1920)["w"]
+    assert kw < 0.44 and 1.5 * 2 * (kw / 2 + 0.03) / (0.7 * 1.1) <= ty.PRZEJSCIE_V + 1e-6   # szczyt ruchu ≤ 0,85 kadru/s
+    assert nb["kamera"] == {"ruch": "brak"}
+    nisko = ty.przejscie_z_maski(b, _opisy(b, glowa=[0.4, 0.5, 0.6, 0.72]), 1080, 1920)
+    assert nisko["y"] == pytest.approx(ty.PRZEJSCIE_Y)                                   # nad opisem platformy
+    lewo = ty.przejscie_z_maski(b, _opisy(b), 1080, 1920, kierunek="lewo", kolejnosc="przod-za")["efekt"]
+    assert lewo["kierunek"] == "lewo" and lewo["kolejnosc"] == "przod-za"
+
+
+def test_kandydaci_efektow_rzadko_na_mocnych_krotkich_frazach():
+    def b(i, start, slowa, dl=2.0, **kw):
+        return {**blok(slowa, start=start, dl=dl), "id": f"b{i:02d}", **kw}
+    plan = {"bloki": [b(1, 0, [("to", 0), ("JEST", 3)]), b(2, 2.2, [("zwykłe", 1), ("zdanie", 1)]),
+                      b(3, 4.4, [("NAPRAWDĘ", 3), ("mocne", 2)]), b(4, 6.6, [("bardzo", 1), ("długie", 1), ("zdanie", 1),
+                                                                            ("z", 0), ("UDERZENIEM", 3)]),
+                      b(5, 8.8, [("ZA", 3)], warstwa="tyl"), b(6, 11.0, [("obok", 1), ("TEGO", 3)]),
+                      b(7, 13.2, [("KRÓTKO", 3)], dl=1.0), b(8, 15.0, [("KONIEC", 3)], dl=1.4)]}
+    opisy = [{"t": round((x["start"] + x["end"]) / 2, 3), **GLOWA} for x in plan["bloki"]]
+    wyb = ty.kandydaci_efektow(plan, opisy)
+    assert list(wyb.values()).count("pierscien") == 1 and list(wyb.values()).count("przejscie") == 1
+    assert not {"b02", "b04", "b05", "b06", "b07"} & set(wyb)       # bez uderzenia, za długie, za osobą i obok, za krótkie
+    assert wyb.get("b03") == "pierscien"                            # najmocniejsza krótka fraza: pierścień
+    bez_glowy = [{**o, "glowa": None} for o in opisy]
+    assert ty.kandydaci_efektow(plan, bez_glowy) == {}
+
+
+def test_efekt_przy_cieciu_i_laczeniu_ten_sam_w_hq():
+    e = {"rodzaj": "pierscien", "kierunek": "lewo", "predkosc": 40, "nachylenie": 14,
+         "sledz": [[0, 0, 0], [1.0, 0.1, 0.02], [2.0, 0.2, 0.0]]}
+    a, b = ty.efekt_podzial(e, 1.5)
+    assert a == e and b["sledz"] == [[0.0, 0.15, 0.01], [0.5, 0.2, 0.0]] and b["predkosc"] == 40
+    assert ty.efekt_podzial({"rodzaj": "przejscie"}, 1) == ({"rodzaj": "przejscie"}, {"rodzaj": "przejscie"})
+    assert ty.efekt_polacz(None, e, 2.0)["sledz"][1] == [3.0, 0.1, 0.02]
+    assert ty.efekt_polacz({"rodzaj": "przejscie"}, e, 2.0) == {"rodzaj": "przejscie"} and ty.efekt_polacz(None, None, 1) is None
+    if HAS_NODE:                                         # HQ liczy to samo (funkcje wycięte z 45-edytor.js)
+        src = (ROOT / "hq/web/src/45-edytor.js").read_text(encoding="utf-8")
+        fns = "\n".join(re.search(rf"^function {fn}\(.*?^\}}", src, re.S | re.M).group(0)
+                        for fn in ("typoEfektPodzial", "typoEfektPolacz"))
+        o = node(fns + f"\nconst e = {json.dumps(e)};\nconsole.log(JSON.stringify([typoEfektPodzial(e, 1.5), "
+                 "typoEfektPolacz(undefined, e, 2.0), typoEfektPolacz({rodzaj: 'przejscie'}, e, 2.0), "
+                 "typoEfektPodzial({rodzaj: 'przejscie'}, 1)]));")
+        assert o == [[a, b], ty.efekt_polacz(None, e, 2.0), {"rodzaj": "przejscie"}, [{"rodzaj": "przejscie"}, {"rodzaj": "przejscie"}]]
+    plan = ed.normalize_typo({"bloki": [{**blok([("raz", 1), ("dwa", 1), ("TRZY", 3)], start=1.0, dl=2.4), "efekt": e}]}, 6)
+    nowy, _ = ty.zastosuj(plan, {"bloki": [{"blok": "b05", "podziel": 2}]}, 6)
+    po = {x["id"]: x.get("efekt") for x in nowy["bloki"]}
+    assert po["b05"]["rodzaj"] == po["b05b"]["rodzaj"] == "pierscien" and po["b05b"]["sledz"][0][0] == 0
+    nowy, _ = ty.zastosuj(nowy, {"bloki": [{"polacz": ["b05", "b05b"]}]}, 6)
+    assert nowy["bloki"][0]["efekt"] == plan["bloki"][0]["efekt"]
+
+
+def test_zastosuj_efekt_parametry_zdjecie_i_odrzucenie():
+    p, total = plan()
+    nowy, uwagi = ty.zastosuj(p, {"bloki": [{"blok": "b01", "efekt": {"rodzaj": "pierscien", "predkosc": 30}},
+                                            {"blok": "b02", "efekt": {"rodzaj": "wir"}}]}, total)
+    b = {x["id"]: x for x in nowy["bloki"]}
+    assert b["b01"]["efekt"]["predkosc"] == 30 and "efekt" not in b["b02"]
+    assert any("b02" in u and "odrzucony" in u for u in uwagi) and any("b01" in u and "typografia.py efekt" in u for u in uwagi)
+    nowy2, uwagi = ty.zastosuj(nowy, {"bloki": [{"blok": "b01", "efekt": {"kierunek": "prawo"}}]}, total)
+    assert nowy2["bloki"][0]["efekt"] | {} == {**b["b01"]["efekt"], "kierunek": "prawo"} and not uwagi   # ten sam efekt: parametry
+    bez, _ = ty.zastosuj(nowy2, {"bloki": [{"blok": "b01", "efekt": None}]}, total)
+    assert "efekt" not in bez["bloki"][0]
+
+
+def test_polecenie_efekt_pokaz_i_sylwetki(tmp_path, monkeypatch, capsys):
+    b1 = {**blok([("TYLKO", 3), ("dziś", 1)], start=1.0, dl=2.0), "id": "b01"}
+    b2 = {**blok([("zwykły", 1)], start=3.5), "id": "b02"}
+    src = _projekt_typo(tmp_path, [b1, b2])
+    wolania = []
+
+    def maska(film, *args):
+        wolania.append(args)
+        if args[0] == "opis":
+            ts = [float(x) for x in args[2].split(",")]
+            return json.dumps([{"t": t, **GLOWA} for t in ts])
+        return "ok"
+    monkeypatch.setattr(ty, "maska", maska)
+    assert ty.main(["efekt", str(src), "--blok", "b01", "--rodzaj", "pierscien", "--predkosc", "30"]) == 0
+    out = capsys.readouterr().out
+    assert "PIERŚCIEŃ 30°/s lewo" in out and "sylwetki gotowe" in out
+    assert [w[0] for w in wolania] == ["opis", "klatki"] and len(wolania[0][2].split(",")) == 9   # co 0,25 s bloku
+    zapis = json.loads(ed.project_path(src).read_text(encoding="utf-8"))["typo"]["bloki"][0]
+    assert zapis["efekt"]["predkosc"] == 30 and zapis["x"] == pytest.approx(0.5)
+    assert ty.main(["pokaz", str(src)]) == 0 and "PIERŚCIEŃ" in capsys.readouterr().out
+    wolania.clear()
+    assert ty.main(["sylwetki", str(src)]) == 0 and len(wolania) == 1          # blok z efektem ma część za osobą
+    capsys.readouterr()
+    assert ty.main(["efekt", str(src), "--blok", "b01", "--rodzaj", "brak"]) == 0
+    assert "efekt" not in json.loads(ed.project_path(src).read_text(encoding="utf-8"))["typo"]["bloki"][0]
+    monkeypatch.setattr(ty, "maska", lambda film, *args: None)                # bez maski: efekt nie ma sensu
+    with pytest.raises(SystemExit, match="maski osoby"):
+        ty.main(["efekt", str(src), "--blok", "b02", "--rodzaj", "przejscie"])
+    with pytest.raises(SystemExit, match="nie ma bloku"):
+        ty.main(["efekt", str(src), "--blok", "b99", "--rodzaj", "przejscie"])
+
+
+def test_kontrola_efektow_w_przegladarce(tmp_path):
+    """Kontrola (Chromium): pierścień za szybki, słowo dłuższe niż przód koła, przejście za szybkie, efekt bez sylwetek
+    (błędy) i efekt obok osoby (uwaga); przejście przez osobę z sylwetką i spokojny pierścień bez tych kodów."""
+    pytest.importorskip("playwright.sync_api")
+    src = tmp_path / "workspaces" / "film.mp4"
+    src.parent.mkdir(parents=True)
+    raw = {"canvas": {"w": 540, "h": 960, "fps": 10}, "clips": [{"src": str(src), "in": 0, "out": 14}], "texts": [], "audio": []}
+    d = ed.maska_dir(src)
+    d.mkdir()
+    w, h = 54, 96                                                    # osoba: lewa połowa kadru
+    row = b"\x00" + bytes((255, 255, 255, 255)) * (w // 2) + bytes((255, 255, 255, 0)) * (w - w // 2)
+    chunk = lambda t, x: struct.pack(">I", len(x)) + t + x + struct.pack(">I", zlib.crc32(t + x) & 0xFFFFFFFF)  # noqa: E731
+    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress(row * h)) + chunk(b"IEND", b""))
+    klatki = list(range(0, 100))                                     # sylwetki do 10 s; dalej bloki bez nich
+    for k in klatki:
+        (d / f"k{k:06d}.png").write_bytes(png)
+    (d / "indeks.json").write_text(json.dumps({"klucz": ed.maska_klucz(raw), "fps": 10, "w": w, "h": h, "klatki": klatki}))
+    b = lambda i, start, end, x, efekt, slowa, **kw: {"id": i, "start": start, "end": end, "uklad": "srodek", "x": x,  # noqa: E731
+                                                       "y": 0.4, "w": 0.5, "warstwa": "przod", "wyjscie": "ciecie",
+                                                       "efekt": efekt, "slowa": slowa, **kw}
+    plan = ed.normalize_typo({"motyw": "czysty", "bloki": [
+        b("b1", 0.0, 2.0, 0.5, {"rodzaj": "pierscien", "predkosc": 170}, [_w(0, "SZYBKO", 3)]),
+        b("b2", 2.2, 4.2, 0.5, {"rodzaj": "pierscien", "predkosc": 20}, [_w(0, "Najprawdopodobniejszego", 3)], w=0.3),
+        b("b3", 4.4, 5.0, 0.5, {"rodzaj": "przejscie"}, [_w(0, "PĘD", 3)], w=0.4),
+        b("b4", 5.2, 7.2, 0.5, {"rodzaj": "przejscie"}, [_w(0, "PRZEZ", 3)], w=0.4),
+        b("b5", 7.4, 9.4, 0.8, {"rodzaj": "pierscien", "predkosc": 20}, [_w(0, "OBOK", 3)], w=0.3),
+        b("b6", 11.0, 13.0, 0.5, {"rodzaj": "przejscie"}, [_w(0, "BEZ", 3)], w=0.4)]}, 14.0)
+    try:
+        wynik = ty.kontrola(src, raw, plan, "brak")
+    except Exception as exc:  # noqa: BLE001 - brak przeglądarki w tym środowisku
+        pytest.skip(f"przeglądarka niedostępna: {exc}")
+    kody = {(x["kod"], x["blok"]) for x in wynik["problemy"]}
+    assert {("pierscien-szybko", "b1"), ("pierscien-nieczytelny", "b2"), ("przejscie-szybko", "b3"),
+            ("efekt-obok-osoby", "b5"), ("efekt-bez-sylwetek", "b6")} <= kody, kody
+    assert not any(blok == "b4" for _, blok in kody), kody          # przejście przez osobę z sylwetką: bez uwag
+    poziom = {x["kod"]: x["poziom"] for x in wynik["problemy"]}
+    assert {poziom[k] for k in ("pierscien-szybko", "pierscien-nieczytelny", "przejscie-szybko", "efekt-bez-sylwetek")} == {"blad"}
+    assert poziom["efekt-obok-osoby"] == "uwaga"
+
+
+def test_efekt_stale_rezysera_jak_w_rendererze():
+    """Reżyser szacuje pierścień i przejście bez przeglądarki: te same liczby co renderer i kontrola w JS."""
+    E = re.search(r"const TYPO_EFEKT = \{(.*?)\};", JS, re.S).group(1)
+    pole = lambda k: float(re.search(rf"\b{k}: ([\d.]+)", E).group(1))  # noqa: E731
+    assert (pole("litera"), pole("droga"), pole("zapas")) == (ty.LITERA, ty.DROGA, ty.ZAPAS)
+    assert tuple(json.loads(re.search(r"const TYPO_EFEKT_WAGA = (\[.*?\]);", JS).group(1))) == ty.EFEKT_WAGA
+    K = re.search(r"const TYPO_KONTROLA = \{(.*?)\};", JS, re.S).group(1)
+    assert float(re.search(r"obroty: ([\d.]+)", K).group(1)) == ty.OBROTY
+    assert ty.PRZEJSCIE_V < float(re.search(r"przejscie: ([\d.]+)", K).group(1))

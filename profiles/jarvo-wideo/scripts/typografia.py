@@ -4,12 +4,14 @@ skosem i perspektywą 3D, jako plan bloków w projekcie edytora HQ (`<film>.edyc
 
     typografia.py plan <film> [--motyw czysty|podcast|vlog|…] [--akcent "#C8102E"] [--paleta A,B]
                               [--tempo spokojne|normalne|ostre] [--kamera auto|spokojna|dynamiczna|brak]
-                              [--zostaw-napisy] [--ziarno N] [--bez-maski] [--nowy]
+                              [--zostaw-napisy] [--ziarno N] [--bez-maski] [--efekty] [--nowy]
     typografia.py pokaz <film> [--json]          # plan w skrócie: bloki, układy, wagi słów (do poprawek)
     typografia.py popraw <film> zmiany.json       # Twoje poprawki reżyserskie (format niżej)
     typografia.py sylwetki <film>                 # sylwetki osoby pod bloki „za osobą” (np. ustawione w edytorze)
     typografia.py paleta <film> [--paleta A,B] [--akcent marka] [--bez-akcentu]   # kolory z kadru na gotowym planie
     typografia.py kamera <film> [--styl spokojna|dynamiczna|brak|auto] [--przyslona 0.5] [--ostrosc napis|osoba] [--bez]
+    typografia.py efekt <film> --blok b03 --rodzaj pierscien|przejscie|brak [--predkosc 40] [--nachylenie 14]
+                               [--kierunek lewo|prawo] [--kolejnosc za-przod|przod-za]   # efekt wow z maski osoby
     typografia.py arkusz <film> [-o out/wideo/typografia.jpg] [--ile 12]   # klatki: film + typografia (vision)
     typografia.py style <film> [-o …] [--blok b03] [--motywy podcast,vlog]   # ten sam blok w każdym motywie
     typografia.py sprawdz <film> [--strefa tiktok|reels|shorts|brak] [--json] [--arkusz [plik]]   # kontrola napisów
@@ -35,12 +37,21 @@ spokojna) dobiera ruchy z bloków: za osobą najazd, uderzenie najazd, po najeź
 2,5 s), spokojny blok przesunięcie (spokojna co trzeci); blok krótszy niż 0,6 s bez ruchu;
 własny ruch bloku (`kamera` w zmiany.json) ma pierwszeństwo. Napisy jadą z paralaksą i rozmyciem głębi ostrości, a film
 i osoba tym samym ruchem (edytor.kamera_filter). `kamera` zmienia styl, przysłonę i ostrość na gotowym planie.
+Efekty wow (`efekt` bloku, maska osoby): `pierscien` = napis krąży pierścieniem wokół głowy (koło na czole, średnica
+~1,9 szerokości głowy, przód przed twarzą, tył za osobą), `przejscie` = napis przechodzi przez osobę (szew w osi ciała,
+na wysokości piersi; wchodzi za osobę i wychodzi przed nią). `efekt` liczy miejsce z maski co 0,25 s bloku (`sledz`:
+środek idzie za głową) i sylwetki; `plan --efekty` daje najmocniejszej krótkiej frazie pierścień, następnej przejście
+(po jednym na 20 bloków). Blok z efektem bez własnego ruchu kamery dostaje `"kamera": {"ruch": "brak"}` (efekt sam
+jest ruchem, najazd wypychał koło z kadru). Efekt to akcent filmu, nie styl: 1–2 na rolkę.
 Te same dane rysuje edytor HQ (hq/web/src/48-typografia.js), więc człowiek widzi i poprawia wszystko na osi.
 `sprawdz` mierzy tusz liter tym samym rendererem: napis poza kadrem (1/3 s i dłużej), bloki na sobie, słowa stykające
 się literami, napis za osobą nieczytelny (widać < 60%) albo niczym niezasłonięty, z kamerą blok wypchnięty z kadru
-przez ruch kamery (`poza-kadrem-kamera`) i słowo rozmyte głębią ostrości ponad 8% wysokości liter (`rozmyte`) (błędy),
-blok pod interfejsem platformy, słowo < 30 px przy 1080, uderzenie poza ostrością ≥ 2 px (uwagi); kod wyjścia 1 przy
-błędzie, `--arkusz` = klatki z problemami do obejrzenia.
+przez ruch kamery (`poza-kadrem-kamera`), słowo rozmyte głębią ostrości ponad 8% wysokości liter (`rozmyte`), pierścień
+za szybki (`pierscien-szybko`: przód > 6 wysokości liter/s) albo ze słowem dłuższym niż przód koła
+(`pierscien-nieczytelny`), przejście szybsze niż szerokość kadru na sekundę (`przejscie-szybko`) i efekt bez sylwetek
+osoby (`efekt-bez-sylwetek`) (błędy), blok pod interfejsem platformy, słowo < 30 px przy 1080, uderzenie poza ostrością
+≥ 2 px, efekt obok osoby (`efekt-obok-osoby`: sylwetka nie zasłania tyłu napisu) (uwagi); kod wyjścia 1 przy błędzie,
+`--arkusz` = klatki z problemami do obejrzenia.
 Gotowy plan mógł już poprawić człowiek, więc `plan` go nie nadpisuje: poprawiasz go `popraw`, a od nowa układasz
 tylko na wyraźną prośbę (`--nowy`).
 
@@ -50,6 +61,7 @@ pokaz + popraw = Twoja reżyseria (zasady: skill typografia-edit): znaczenie sł
      "bloki": [{"blok": "b03", "uklad": "skos", "rot": -8, "warstwa": "tyl", "x": 0.3, "y": 0.4, "z": 1.4,
                 "kamera": {"ruch": "najazd", "sila": 0.8, "krzywa": "uderzenie", "slowo": 4},
                 "slowa": {"4": {"tekst": "A$$", "kolor": "#2ECC40", "waga": 3, "kroj": "playfairI", "styl": "3d"}}},
+               {"blok": "b04", "efekt": {"predkosc": 30, "kierunek": "prawo"}},   # parametry efektu (null = bez)
                {"polacz": ["b05", "b06"]},          # jedna fraza z dwóch bloków
                {"blok": "b08", "podziel": 2},        # nowy blok od słowa 2 (id b08b)
                {"blok": "b07", "usun": true}]}
@@ -589,6 +601,212 @@ def uloz_z_maska(plan: dict, opisy: list[dict], W: int, H: int, total: float, ud
     return ed.normalize_typo(plan, total)
 
 
+# ---------------------------------------------------------------- efekty z maską osoby (pierścień, przejście)
+
+EFEKT_ZNAKI = 18          # najwięcej znaków napisu z efektem: krótka fraza z uderzeniem (pierścień czytelny z przodu)
+EFEKT_KROK = 0.25         # s: co tyle maska.py opisuje głowę w bloku z efektem (śledzenie `sledz`)
+EFEKT_RUCH = 0.006        # najmniejsze przesunięcie głowy (część kadru), które idzie do `sledz`
+PIERSCIEN_GLOWA = 1.9     # średnica koła = tyle szerokości głowy (przód mija twarz, tył chowa się za głową)
+PIERSCIEN_W = (0.34, 0.9)  # średnica koła w części szerokości kadru
+PIERSCIEN_Y = 0.3         # koło na wysokości 30% głowy od czubka (czoło, linia oczu)
+PIERSCIEN_MIN = 1.0       # s: krótszy blok nie dostaje pierścienia (nie zdąży się obrócić)
+PRZEJSCIE_MIN = 1.1       # s: krótszy blok nie dostaje przejścia (byłby szybszy niż TYPO_KONTROLA.przejscie)
+PRZEJSCIE_V = 0.85        # szerokości kadru na sekundę w szczycie przejścia (kontrola: najwyżej 1)
+DROGA = 0.7               # część bloku, w której napis jedzie przez osobę (TYPO_EFEKT.droga w 48-typografia.js)
+ZAPAS = 0.03              # napis mija szew o tyle (TYPO_EFEKT.zapas w 48-typografia.js)
+LITERA = 0.11             # wysokość liter pierścienia w średnicy koła (TYPO_EFEKT.litera w 48-typografia.js)
+EFEKT_WAGA = (0.8, 1, 1.12, 1.25)   # litery pierścienia wg wagi słowa (TYPO_EFEKT_WAGA w 48-typografia.js)
+OBROTY = 6                # najwięcej wysokości liter na sekundę z przodu koła (TYPO_KONTROLA.obroty)
+ZNAK = 0.62               # szacunkowa szerokość znaku w wysokości liter (bez przeglądarki, z zapasem na grube kroje)
+EFEKT_BRZEG = 0.06        # koło najwyżej tyle od boku kadru (litery z boku i zapas na paralaksę kamery)
+PRZEJSCIE_Y = 0.7         # przejście najniżej na tej wysokości: niżej zaczyna się opis platformy (TikTok 0,75)
+
+
+def sledz_w(s: list, t: float) -> tuple[float, float]:
+    """(dx, dy) śladu w chwili t od początku bloku, liniowo między punktami (typoSledz w 48-typografia.js)."""
+    if not s:
+        return 0.0, 0.0
+    if t <= s[0][0]:
+        return s[0][1], s[0][2]
+    for (t0, x0, y0), (t1, x1, y1) in zip(s, s[1:]):
+        if t < t1:
+            f = (t - t0) / max(1e-6, t1 - t0)
+            return x0 + (x1 - x0) * f, y0 + (y1 - y0) * f
+    return s[-1][1], s[-1][2]
+
+
+def efekt_podzial(e, d: float):
+    """Efekt bloku przy cięciu w chwili d (typoEfektPodzial w HQ): obie części go mają, druga ze śladem od chwili d."""
+    if not isinstance(e, dict):
+        return None, None
+    drugi = {k: v for k, v in e.items() if k != "sledz"}
+    if e.get("sledz"):
+        x, y = sledz_w(e["sledz"], d)
+        drugi["sledz"] = [[0.0, round(x, 4), round(y, 4)]] + [[round(q[0] - d, 3), q[1], q[2]] for q in e["sledz"] if q[0] > d]
+    return e, drugi
+
+
+def efekt_polacz(a, b, d: float):
+    """Efekt po złączeniu (drugi blok zaczynał się d s później; typoEfektPolacz w HQ): pierwszego, a bez niego drugiego
+    ze śladem przesuniętym o d."""
+    if isinstance(a, dict):
+        return a
+    if not isinstance(b, dict):
+        return None
+    out = {k: v for k, v in b.items() if k != "sledz"}
+    if b.get("sledz"):
+        out["sledz"] = [[round(q[0] + d, 3), q[1], q[2]] for q in b["sledz"]]
+    return out
+
+
+def _znaki(b: dict) -> int:
+    return sum(len(w["tekst"]) for w in b["slowa"]) + max(0, len(b["slowa"]) - 1)
+
+
+def _bez_ruchu_kamery(nb: dict, b: dict) -> None:
+    """Efekt sam jest ruchem: blok bez własnego ruchu kamery dostaje „brak” (najazd ze stylu wypychał koło z kadru);
+    ruch ustawiony przez człowieka zostaje."""
+    if not isinstance(b.get("kamera"), dict):
+        nb["kamera"] = {"ruch": "brak"}
+
+
+def chwile_efektu(b: dict) -> list[float]:
+    """Chwile osi do opisu głowy w bloku z efektem: początek i co EFEKT_KROK s (najwyżej 16)."""
+    n = max(1, min(16, int((b["end"] - b["start"]) / EFEKT_KROK) + 1))
+    return [round(b["start"] + min(b["end"] - b["start"] - 0.02, i * EFEKT_KROK), 3) for i in range(n)]
+
+
+def _slad(b: dict, opisy: list[dict], srodek) -> tuple[list[float] | None, list[list[float]]]:
+    """Punkt bazowy (pierwszy opis z głową) i ślad [[t, dx, dy]] względem niego; głowa stoi = pusty ślad."""
+    pkt = [(float(o["t"]) - b["start"], *srodek(o["glowa"])) for o in opisy if o.get("glowa") and o.get("osoba")]
+    if not pkt:
+        return None, []
+    _t0, x0, y0 = pkt[0]
+    slad = [[round(max(0.0, t), 3), round(x - x0, 4), round(y - y0, 4)] for t, x, y in pkt]
+    if max(max(abs(q[1]), abs(q[2])) for q in slad) < EFEKT_RUCH:
+        slad = []
+    return [x0, y0], slad[:ed.EFEKT_SLEDZ]
+
+
+def pierscien_z_maski(b: dict, opisy: list[dict], W: int, H: int, **opcje) -> dict:
+    """Blok → pierścień wokół głowy z opisu maski: środek koła na wysokości czoła, średnica ~1,9 szerokości głowy
+    (w kadrze), litery mniejsze, gdy najdłuższe słowo nie mieści się na przodzie koła (łuk 120°), prędkość taka,
+    żeby przód jechał najwyżej OBROTY wysokości liter na sekundę (z zapasem). ValueError: brak głowy w bloku."""
+    g0 = next((o["glowa"] for o in opisy if o.get("glowa") and o.get("osoba")), None)
+    if not g0:
+        raise ValueError("w bloku nie widać głowy osoby (maska.py opis)")
+    baza, slad = _slad(b, opisy, lambda g: ((g[0] + g[2]) / 2, g[1] + PIERSCIEN_Y * (g[3] - g[1])))
+    x, y = baza
+    gw = g0[2] - g0[0]
+    w = min(PIERSCIEN_W[1], max(PIERSCIEN_W[0], PIERSCIEN_GLOWA * gw))
+    w = max(0.25, min(w, 2 * (min(x, 1 - x) - EFEKT_BRZEG)))     # koło w kadrze (z literami po bokach)
+    x = min(1 - EFEKT_BRZEG - w / 2, max(EFEKT_BRZEG + w / 2, x))  # najmniejsze koło przy krawędzi: trochę do środka
+    D = w * W                                                     # średnica w px
+    najdl = max(len(s["tekst"]) * EFEKT_WAGA[s["waga"]] for s in b["slowa"])
+    rozmiar = round(min(1.0, 0.9 * (2 * math.pi / 3) * (D / 2) / max(1.0, najdl * ZNAK * LITERA * D)), 3)
+    dom = ed.EFEKT_PREDKOSC[1]
+    waga = min(EFEKT_WAGA[s["waga"]] for s in b["slowa"])
+    vmax = math.degrees(OBROTY * LITERA * 2 * rozmiar * waga) * 0.8   # °/s: przód OBROTY liter/s najmniejszych, zapas 20%
+    efekt = {"rodzaj": "pierscien", "kierunek": opcje.get("kierunek") or "lewo",
+             "predkosc": opcje.get("predkosc") or round(min(dom, vmax), 1),
+             "nachylenie": ed.EFEKT_NACHYLENIE[1] if opcje.get("nachylenie") is None else opcje["nachylenie"]}
+    if slad:
+        efekt["sledz"] = slad
+    nb = {**b, "uklad": "srodek", "x": round(x, 4), "y": round(y, 4), "w": round(w, 4), "rot": 0, "tilt": 0,
+          "warstwa": "przod", "efekt": efekt}
+    nb.pop("z", None)
+    _bez_ruchu_kamery(nb, b)
+    if rozmiar < 1:
+        nb["rozmiar"] = rozmiar
+    else:
+        nb.pop("rozmiar", None)
+    return nb
+
+
+def przejscie_z_maski(b: dict, opisy: list[dict], W: int, H: int, **opcje) -> dict:
+    """Blok → przejście przez osobę: szew na środku głowy (oś ciała), napis w jednej linii na wysokości piersi, tak
+    szeroki, żeby po obu stronach szwu mieścił się w kadrze. ValueError: brak osoby w bloku."""
+    g0 = next((o for o in opisy if o.get("glowa") and o.get("osoba")), None)
+    if not g0:
+        raise ValueError("w bloku nie widać osoby (maska.py opis)")
+    g, osoba = g0["glowa"], g0["osoba"]
+    baza, slad = _slad(b, opisy, lambda q: ((q[0] + q[2]) / 2, q[3]))
+    x = baza[0]
+    y = min(PRZEJSCIE_Y, osoba[3] - 0.05, max(0.2, g[3] + 0.1))  # pierś: pod brodą, na sylwetce, nad opisem platformy
+    # TYPO_CEL uderzenia = 1: napis ma szerokość w; mieści się po obu stronach szwu i jedzie najwyżej PRZEJSCIE_V
+    # (szczyt płynnego ruchu = 1,5 × średnia: droga 2·(w/2 + ZAPAS) w DROGA czasu bloku)
+    w = round(max(0.15, min(min(x, 1 - x) - 0.06, 2 * (PRZEJSCIE_V * DROGA * (b["end"] - b["start"]) / 3 - ZAPAS))), 4)
+    efekt = {"rodzaj": "przejscie", "kierunek": opcje.get("kierunek") or "prawo",
+             "kolejnosc": opcje.get("kolejnosc") or "za-przod"}
+    if slad:
+        efekt["sledz"] = slad
+    nb = {**b, "uklad": "srodek", "x": round(x, 4), "y": round(y, 4), "w": w, "rot": 0, "tilt": 0, "warstwa": "przod",
+          "efekt": efekt, "slowa": [{**s, "linia": 0} for s in b["slowa"]]}
+    nb.pop("z", None)
+    nb.pop("rozmiar", None)
+    _bez_ruchu_kamery(nb, b)
+    return nb
+
+
+def efekt_z_maski(b: dict, rodzaj: str, opisy: list[dict], W: int, H: int, **opcje) -> dict:
+    return (pierscien_z_maski if rodzaj == "pierscien" else przejscie_z_maski)(b, opisy, W, H, **opcje)
+
+
+def kandydaci_efektow(plan: dict, opisy: list[dict]) -> dict[str, str]:
+    """Bloki na efekty wow (plan --efekty): krótka fraza (≤ EFEKT_ZNAKI znaków) z uderzeniem, przed osobą, z głową
+    w kadrze, nie obok bloku „za osobą”. Pierścień na najmocniejszym bloku ≥ PIERSCIEN_MIN s, przejście na następnym
+    ≥ PRZEJSCIE_MIN s, nie po sąsiedzku; po jednym na każde 20 bloków (co najmniej po jednym). {id bloku: rodzaj}."""
+    bloki = plan["bloki"]
+    po_t = {round(float(o["t"]), 3): o for o in opisy}
+    za = {i for i, b in enumerate(bloki) if b["warstwa"] == "tyl"}
+    ok = []
+    for i, b in enumerate(bloki):
+        o = po_t.get(round((b["start"] + b["end"]) / 2, 3))
+        if (i in za or {i - 1, i + 1} & za or not o or not o.get("glowa") or not o.get("osoba") or "efekt" in b
+                or _znaki(b) > EFEKT_ZNAKI or not any(w["waga"] == 3 for w in b["slowa"])):
+            continue
+        ok.append((energia(b["slowa"]) + 0.2 * (b["end"] - b["start"]), i))
+    limit, wybrane = max(1, len(bloki) // 20), {}
+    for rodzaj, minimum in (("pierscien", PIERSCIEN_MIN), ("przejscie", PRZEJSCIE_MIN)):
+        n = 0
+        for _e, i in sorted(ok, reverse=True):
+            b = bloki[i]
+            if n >= limit or i in wybrane or {i - 1, i + 1} & set(wybrane) or b["end"] - b["start"] < minimum:
+                continue
+            wybrane[i] = rodzaj
+            n += 1
+    return {bloki[i]["id"]: r for i, r in wybrane.items()}
+
+
+def efekty_z_maska(film: Path, plan: dict, wybor: dict[str, str], W: int, H: int, total: float, **opcje) -> tuple[dict, list[str]]:
+    """Efekty na wybranych blokach ({id: rodzaj}; `brak` zdejmuje efekt): opis głowy maską co EFEKT_KROK s w każdym
+    bloku, pierścień albo przejście z maski. Zwraca plan po normalizacji i uwagi (bloki bez osoby zostają bez efektu)."""
+    plan = json.loads(json.dumps(plan))
+    po_id = {b["id"]: b for b in plan["bloki"]}
+    uwagi, chwile = [], {}
+    for i, rodzaj in wybor.items():
+        if rodzaj == "brak":
+            po_id[i].pop("efekt", None)
+        else:
+            chwile[i] = chwile_efektu(po_id[i])
+    if chwile:
+        raw = maska(film, "opis", "--chwile", ",".join(f"{t:.3f}" for ts in chwile.values() for t in ts))
+        if raw is None:
+            raise SystemExit("efekt potrzebuje maski osoby (maska.py, MODNet): bez sylwetki tył napisu szedłby po twarzy")
+        opisy = json.loads(raw)
+        for i, ts in chwile.items():
+            b = po_id[i]
+            moje = [o for o in opisy if b["start"] - 1e-3 <= float(o["t"]) <= b["end"] + 1e-3]
+            try:
+                nowy = efekt_z_maski(dict(b), wybor[i], moje, W, H, **opcje)
+            except ValueError as exc:
+                uwagi.append(f"{i}: {exc}; bez efektu")
+                continue
+            b.clear()
+            b.update(nowy)
+    return ed.normalize_typo(plan, total), uwagi
+
+
 # ---------------------------------------------------------------- paleta z kadru
 
 # Rodziny kolorów napisu: barwa (stopnie), wariant ciemny (na jasne tło), jasny (na ciemne) i smak (kara: oliwkowe
@@ -869,9 +1087,10 @@ def maska(film: Path, *args: str) -> str | None:
 
 
 def sylwetki(film: Path, plan: dict) -> int:
-    """Sylwetki osoby (maska.py klatki) pod każdy blok za osobą (warstwa „tyl”); policzone klatki zostają.
-    Zwraca liczbę bloków z sylwetkami (bez nich eksport rysuje blok bez osoby przed nim)."""
-    return sum(1 for b in plan["bloki"] if b["warstwa"] == "tyl"
+    """Sylwetki osoby (maska.py klatki) pod każdy blok z częścią za osobą (warstwa „tyl”, efekt, słowo z głębią za
+    osobą: edytor.typo_warstwy); policzone klatki zostają. Zwraca liczbę bloków z sylwetkami (bez nich eksport rysuje
+    blok bez osoby przed nim)."""
+    return sum(1 for b in plan["bloki"] if "tyl" in ed.typo_warstwy(b)
                and maska(film, "klatki", "--od", f"{b['start']:.3f}", "--do", f"{b['end']:.3f}") is not None)
 
 
@@ -891,7 +1110,12 @@ def cmd_plan(film: Path, a) -> int:
     if not a.bez_maski:
         opisy = maska(film, "opis", "--chwile", ",".join(f"{(b['start'] + b['end']) / 2:.3f}" for b in plan["bloki"]))
         if opisy is not None:
-            plan = uloz_z_maska(plan, json.loads(opisy), cv["w"], cv["h"], total)
+            opisy = json.loads(opisy)
+            plan = uloz_z_maska(plan, opisy, cv["w"], cv["h"], total)
+            if a.efekty:                        # pierścień i przejście na najmocniejszych krótkich frazach
+                plan, uw = efekty_z_maska(film, plan, kandydaci_efektow(plan, opisy), cv["w"], cv["h"], total)
+                for u in uw:
+                    print(f"uwaga: {u}", file=sys.stderr)
             proj["typo"] = plan
             pr.save(film, proj)                 # maska.py klatki liczy klucz osi z zapisanego projektu
             za = sylwetki(film, plan)
@@ -907,6 +1131,8 @@ def cmd_plan(film: Path, a) -> int:
     n_slow = sum(len(b["slowa"]) for b in plan["bloki"])
     print(f"Typografia: {len(plan['bloki'])} bloków, {n_slow} słów, motyw {plan['motyw']} · cięcia: {len(ciecia)}"
           + ("" if a.bez_maski else f" · za osobą: {za}")
+          + (f" · efekty: {', '.join(b['id'] + ' ' + b['efekt']['rodzaj'] for b in plan['bloki'] if 'efekt' in b) or 'brak'}"
+             if a.efekty and not a.bez_maski else "")
           + (f" · paleta z kadru: {' '.join(plan['paleta'])}" if plan.get("paleta") else " · kolory z motywu")
           + (f" · kamera {plan['kamera']['styl']}: {len(ed.kamera_ruchy(plan))} ruchów" if plan.get("kamera") else ""))
     print(f"Dalej: typografia.py pokaz {film} → popraw według znaczenia → typografia.py sprawdz {film} → arkusz → projekt.py render {film}")
@@ -921,6 +1147,18 @@ def opis_slowa(w: dict) -> str:
 def opis_kamery(plan: dict) -> str:
     k = plan.get("kamera")
     return f" · kamera {k['styl']}, przysłona {k['przyslona']:g}, ostrość {k['ostrosc']}" if k else " · bez kamery"
+
+
+def opis_efektu(b: dict) -> str:
+    """Efekt bloku do `pokaz`: pierścień z prędkością, nachyleniem i kierunkiem, przejście z kierunkiem i kolejnością."""
+    e = b.get("efekt")
+    if not e:
+        return ""
+    sl = f", śledzi głowę ({len(e['sledz'])} pkt)" if e.get("sledz") else ""
+    if e["rodzaj"] == "pierscien":
+        return (f" PIERŚCIEŃ {e['predkosc']:g}°/s {e['kierunek']}, nachylenie {e['nachylenie']:g}°"
+                f"{', raz' if e.get('powtorz') is False else ''}{sl}")
+    return f" PRZEJŚCIE {e['kolejnosc']} w {e['kierunek']}{sl}"
 
 
 def opis_ruchu(b: dict, r: dict | None) -> str:
@@ -953,7 +1191,8 @@ def cmd_pokaz(film: Path, a) -> int:
         for j, w in enumerate(b["slowa"]):
             lin.setdefault(w["linia"], []).append(f"{j}:{opis_slowa(w)}")
         extra = "".join([f" rot {b['rot']:+.0f}" if b["rot"] else "", f" tilt {b['tilt']:+.0f}" if b["tilt"] else "",
-                         " ZA OSOBĄ" if b["warstwa"] == "tyl" else "", f" wyjście {b['wyjscie']}" if b.get("wyjscie") else "",
+                         " ZA OSOBĄ" if b["warstwa"] == "tyl" else "", opis_efektu(b),
+                         f" wyjście {b['wyjscie']}" if b.get("wyjscie") else "",
                          f" z {ed.kamera_z(b):.2f}" if plan.get("kamera") or "z" in b else "",
                          opis_ruchu(b, b.get("kamera") or ruchy.get(b["id"]))])
         print(f"{b['id']} {b['start']:6.2f}–{b['end']:6.2f} {b['uklad']:8s} x{b['x']:.2f} y{b['y']:.2f} w{b['w']:.2f}{extra}"
@@ -963,6 +1202,9 @@ def cmd_pokaz(film: Path, a) -> int:
     if plan.get("kamera"):
         print("Kamera: z = głębia bloku (osoba 1, przed nią mniej); ruch „(styl)” dobrał styl kamery, własny ruch bloku:"
               ' "kamera": {"ruch": "najazd"|"odjazd"|"przesuniecie"|"brak", …} w zmiany.json.')
+    if any("efekt" in b for b in plan["bloki"]):
+        print("Efekt: PIERŚCIEŃ krąży wokół głowy (x, y = środek koła, w = średnica), PRZEJŚCIE idzie przez osobę (x = szew"
+              " w osi ciała); parametry: \"efekt\": {…} w zmiany.json, miejsce z maski: typografia.py efekt.")
     print("Poprawki według znaczenia (skill typografia-edit): zmiany.json → typografia.py popraw <film> zmiany.json")
     return 0
 
@@ -984,7 +1226,8 @@ def ruch_polacz(a, b, n: int):
     return {**b, "slowo": n + (b["slowo"] if isinstance(b.get("slowo"), int) else 0)}
 
 
-POLA_BLOKU = ("start", "end", "uklad", "x", "y", "w", "rot", "tilt", "warstwa", "wejscie", "wyjscie", "rozmiar", "z", "kamera")
+POLA_BLOKU = ("start", "end", "uklad", "x", "y", "w", "rot", "tilt", "warstwa", "wejscie", "wyjscie", "rozmiar", "z", "kamera",
+              "efekt")
 POLA_SLOWA = ("tekst", "waga", "linia", "glebia", "kolor", "kroj", "styl", "plyta", "wejscie", "wielkie", "skala", "t", "k", "z")
 POLA_KAMERY = ("styl", "przyslona", "ostrosc")
 
@@ -1017,6 +1260,9 @@ def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
             ruch = ruch_polacz(a.get("kamera"), b.get("kamera"), len(a["slowa"]))
             if ruch:
                 a["kamera"] = ruch
+            efekt = efekt_polacz(a.get("efekt"), b.get("efekt"), d)
+            if efekt:
+                a["efekt"] = efekt
             a["slowa"] += [{**w, "t": round(w["t"] + d, 3), "k": round(w["k"] + d, 3), "linia": w["linia"] + li}
                            for w in b["slowa"]]
             a["end"] = max(a["end"], b["end"])
@@ -1047,13 +1293,19 @@ def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
                     blok["kamera"] = ruch
                 else:
                     blok.pop("kamera", None)
+            for blok, efekt in zip((b, nowy), efekt_podzial(b.get("efekt"), d)):
+                if efekt:
+                    blok["efekt"] = efekt
             plan["bloki"].append(nowy)
             po_id[nid] = nowy
             continue
         for k in POLA_BLOKU:
             if k in z:
-                if z[k] is None and k in ("z", "kamera"):       # null: głębia z warstwy, ruch ze stylu kamery
+                if z[k] is None and k in ("z", "kamera", "efekt"):   # null: głębia z warstwy, ruch ze stylu, bez efektu
                     b.pop(k, None)
+                elif k == "efekt" and isinstance(z[k], dict) and isinstance(b.get("efekt"), dict) \
+                        and z[k].get("rodzaj", b["efekt"]["rodzaj"]) == b["efekt"]["rodzaj"]:
+                    b[k] = {**b["efekt"], **z[k]}             # parametry tego samego efektu (miejsce i ślad zostają)
                 else:
                     b[k] = z[k]
         if "warstwa" in z and "z" not in z and "z" in b and (b["warstwa"] == "tyl") != (float(b["z"]) > 1):
@@ -1081,6 +1333,12 @@ def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
         zb = zmiany_blokow.get(b["id"], {})
         if zb.get("kamera") is not None and "kamera" not in b:
             uwagi.append(f"{b['id']}: ruch kamery {zb['kamera']!r} odrzucony (ruch: {', '.join(ed.TYPO_RUCHY)})")
+        if zb.get("efekt") is not None and "efekt" not in b:
+            uwagi.append(f"{b['id']}: efekt {zb['efekt']!r} odrzucony (rodzaj: {', '.join(ed.TYPO_EFEKTY)})")
+        if zb.get("efekt") and "efekt" in b and not ({"x", "y", "w"} & set(zb)) and not b["efekt"].get("sledz") \
+                and zb["efekt"].get("rodzaj"):
+            uwagi.append(f"{b['id']}: efekt ustawiony bez miejsca z maski: środek na osobie da typografia.py efekt"
+                         f" --blok {b['id']} --rodzaj {b['efekt']['rodzaj']}")
         if "z" in b and (b["warstwa"] == "tyl") != (b["z"] > 1):
             uwagi.append(f"{b['id']}: głębia z {b['z']:g} nie pasuje do warstwy "
                          f"({'za osobą' if b['warstwa'] == 'tyl' else 'przed osobą'}; osoba stoi na z = 1)")
@@ -1097,7 +1355,7 @@ def cmd_popraw(film: Path, a) -> int:
     plan, uwagi = zastosuj(ed.normalize_typo(proj.get("typo"), total), zmiany, total)
     proj["typo"] = plan
     pr.save(film, proj)
-    tyl = sum(1 for b in plan["bloki"] if b["warstwa"] == "tyl")
+    tyl = sum(1 for b in plan["bloki"] if "tyl" in ed.typo_warstwy(b))
     za = sylwetki(film, plan) if tyl else 0
     if za < tyl:
         uwagi.append(f"{tyl - za} z {tyl} bloków za osobą bez sylwetki (maska niedostępna): osoba nie zasłoni napisu")
@@ -1110,9 +1368,9 @@ def cmd_popraw(film: Path, a) -> int:
 def cmd_sylwetki(film: Path, a) -> int:
     proj = pr.load(film)
     plan = ed.normalize_typo(proj.get("typo"), pr.total(proj))
-    tyl = sum(1 for b in plan["bloki"] if b["warstwa"] == "tyl")
+    tyl = sum(1 for b in plan["bloki"] if "tyl" in ed.typo_warstwy(b))
     if not tyl:
-        print("Brak bloków za osobą (warstwa „tyl”): nie ma czego liczyć")
+        print("Brak bloków za osobą (warstwa „tyl”, efekt, słowo z głębią za osobą): nie ma czego liczyć")
         return 0
     za = sylwetki(film, plan)
     print(f"Sylwetki: {za} z {tyl} bloków za osobą" + ("" if za == tyl else " (maska niedostępna: osoba nie zasłoni reszty)"))
@@ -1184,6 +1442,39 @@ def cmd_kamera(film: Path, a) -> int:
     print(f"{opis[:1].upper()}{opis[1:]} · ruchy: {len(ruchy)}" + (f" ({lista})" if ruchy else ""))
     print(f"Dalej: typografia.py sprawdz {film} → arkusz → projekt.py render {film}")
     return 0
+
+
+def cmd_efekt(film: Path, a) -> int:
+    """Efekt wow na bloku z maski osoby: pierścień wokół głowy albo przejście przez osobę (miejsce, wielkość, ślad
+    za głową) i sylwetki pod blok; `--rodzaj brak` zdejmuje efekt (miejsce zostaje)."""
+    proj = pr.load(film)
+    cv = proj["canvas"]
+    total = pr.total(proj)
+    plan = ed.normalize_typo(proj.get("typo"), total)
+    b = next((x for x in plan["bloki"] if x["id"] == a.blok), None)
+    if b is None:
+        raise SystemExit(f"nie ma bloku {a.blok} (numery: typografia.py pokaz {film})")
+    if a.rodzaj != "brak" and b["warstwa"] == "tyl":
+        print(f"uwaga: {b['id']} stał za osobą; efekt ma obie warstwy, więc blok idzie przed osobę", file=sys.stderr)
+    if a.rodzaj != "brak" and _znaki(b) > EFEKT_ZNAKI:
+        print(f"uwaga: „{' '.join(w['tekst'] for w in b['slowa'])}” ma {_znaki(b)} znaków (efekt czyta się do"
+              f" {EFEKT_ZNAKI}): podziel blok i daj efekt mocnej części", file=sys.stderr)
+    opcje = {k: getattr(a, k) for k in ("predkosc", "nachylenie", "kierunek", "kolejnosc") if getattr(a, k) is not None}
+    plan, uwagi = efekty_z_maska(film, plan, {b["id"]: a.rodzaj}, cv["w"], cv["h"], total, **opcje)
+    for u in uwagi:
+        print(f"uwaga: {u}", file=sys.stderr)
+    proj["typo"] = plan
+    pr.save(film, proj)                          # maska.py klatki liczy klucz osi z zapisanego projektu
+    nb = next(x for x in plan["bloki"] if x["id"] == b["id"])
+    if "efekt" not in nb:
+        print(f"{b['id']}: bez efektu")
+        return 0 if a.rodzaj == "brak" else 1
+    za = sylwetki(film, {"bloki": [nb]})
+    print(f"{nb['id']}:{opis_efektu(nb)} · x {nb['x']:.2f} y {nb['y']:.2f} w {nb['w']:.2f}"
+          + (f" · rozmiar {nb['rozmiar']:g}" if nb.get("rozmiar", 1) != 1 else "")
+          + (" · sylwetki gotowe" if za else " · BEZ SYLWETEK (maska niedostępna): tył napisu pójdzie po twarzy"))
+    print(f"Dalej: typografia.py sprawdz {film} → arkusz → projekt.py render {film}")
+    return 0 if za else 1
 
 
 def cmd_usun(film: Path, a) -> int:
@@ -1343,6 +1634,8 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--ziarno", type=int, default=0, help="inny wariant układów (ten sam numer = ten sam plan)")
     sp.add_argument("--zostaw-napisy", action="store_true", help="nie usuwaj zwykłych napisów z projektu")
     sp.add_argument("--bez-maski", action="store_true", help="bez maski osoby (MODNet): miejsca domyślne, bez „za osobą”")
+    sp.add_argument("--efekty", action="store_true",
+                    help="efekty wow z maski: pierścień wokół głowy i przejście przez osobę na najmocniejszych frazach")
     sp.add_argument("--nowy", action="store_true", help="ułóż od nowa, choć projekt ma już plan (poprawki człowieka giną)")
     sp.set_defaults(fn=cmd_plan)
     sp = sub.add_parser("sylwetki", help="sylwetki osoby pod bloki za osobą")
@@ -1361,6 +1654,15 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--ostrosc", choices=ed.TYPO_OSTROSC, help="ostrość na najnowszym napisie albo na osobie")
     sp.add_argument("--bez", action="store_true", help="usuń kamerę z planu (film stoi, napisy bez głębi ostrości)")
     sp.set_defaults(fn=cmd_kamera)
+    sp = sub.add_parser("efekt", help="efekt wow na bloku z maski osoby: pierścień wokół głowy, przejście przez osobę")
+    sp.add_argument("film")
+    sp.add_argument("--blok", required=True, help="id bloku (typografia.py pokaz)")
+    sp.add_argument("--rodzaj", required=True, choices=(*ed.TYPO_EFEKTY, "brak"), help="brak = zdejmij efekt")
+    sp.add_argument("--predkosc", type=float, help="pierścień: °/s (domyślnie najwyżej 40, czytelnie dla liter)")
+    sp.add_argument("--nachylenie", type=float, help="pierścień: ° (14 domyślnie: przód niżej; ujemne: przód wyżej)")
+    sp.add_argument("--kierunek", choices=ed.EFEKT_KIERUNKI, help="pierścień: w którą stronę jedzie przód; przejście: ruch")
+    sp.add_argument("--kolejnosc", choices=ed.EFEKT_KOLEJNOSC, help="przejście: za-przod (domyślnie) albo przod-za")
+    sp.set_defaults(fn=cmd_efekt)
     sp = sub.add_parser("pokaz", help="plan w skrócie")
     sp.add_argument("film")
     sp.add_argument("--json", action="store_true")

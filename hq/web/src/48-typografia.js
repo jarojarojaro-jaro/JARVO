@@ -561,7 +561,8 @@ function typoPierscienUklad(ctx, b, e, P, W, H) {
     const gl = [], slowa = [];
     let x = 0;
     b.slowa.forEach((w, j) => {
-      const s = typoSlowo(w, m, b.uklad), px = baza * k * TYPO_EFEKT_WAGA[s.waga] * typoClamp(typoLiczba(w.skala, 1), 0.3, 3);
+      // płytka (`plyta`: słaby kontrast) nie pod każdą literą koła; styl `tlo` ustawiony ręcznie zostaje
+      const s = typoSlowo({ ...w, plyta: false }, m, b.uklad), px = baza * k * TYPO_EFEKT_WAGA[s.waga] * typoClamp(typoLiczba(w.skala, 1), 0.3, 3);
       if (j) x += miara(s, px, " ");
       const od = x;
       for (const ch of Array.from(s.tekst)) { const adv = miara(s, px, ch); gl.push({ ch, j, adv, px, s, src: w, a: x + adv / 2 }); x += adv; }
