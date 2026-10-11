@@ -298,6 +298,18 @@ scenarios:
         - "`typografia.py plan --nowy` albo inna zmiana bloków poprawionych przez właściciela"
         - "przysłona 1 albo ruch na każdym bloku bez powodu w treści; render klatek z motion blurem"
 
+  - id: wideo-typografia-efekt
+    type: in_scope
+    input: "Edycja filmu w edytorze HQ: `/opt/data/jarvo/workspaces/jarvo-wideo/out/rolka/rolka.mp4`\nProjekt montażu: `/opt/data/jarvo/workspaces/jarvo-wideo/out/rolka/rolka.edycja.json` (typografia już jest, część bloków poprawiłem).\nProśba: Zrób efekt wow: niech nazwa produktu krąży pierścieniem wokół mojej głowy, a puenta niech przejdzie przeze mnie. Reszta napisów bez zmian."
+    expect:
+      should:
+        - "`typografia.py pokaz`, potem `typografia.py efekt <film> --blok <id> --rodzaj pierscien` na bloku z nazwą i `--rodzaj przejscie` na puencie (krótkie frazy; dłuższy blok najpierw podzielony), miejsce, ślad głowy i sylwetki z maski, nie ręczne `x`/`y`"
+        - "`typografia.py sprawdz` bez błędów `pierscien-szybko`, `pierscien-nieczytelny`, `przejscie-szybko`, `efekt-bez-sylwetek` przed renderem (wolniej, mniejsze litery, krótszy tekst, dłuższy blok), uwaga `efekt-obok-osoby` poprawiona albo uzasadniona"
+        - "arkusz z kilkoma chwilami obu bloków obejrzany przez vision_analyze (tył pierścienia za głową, przód czytelny), `projekt.py render` z linią MEDIA: i zdaniem, że efekt poprawi w edytorze HQ (sekcja „Efekt” w panelu bloku)"
+      should_not:
+        - "`typografia.py plan --nowy` albo zmiana innych bloków, w tym poprawionych przez właściciela"
+        - "efekt na więcej niż 2 blokach albo oddanie efektu bez sylwetek osoby (tył napisu po twarzy)"
+
   - id: wideo-zywy-schemat
     type: in_scope
     input: "Zrób na Instagram żywy schemat: jak u nas wygląda zlecenie od klienta do faktury. Takie, że kropki lecą po strzałkach."

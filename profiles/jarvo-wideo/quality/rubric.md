@@ -45,3 +45,7 @@
 - Kamera (plan z `kamera`): blokujące: ruch kamery wypycha napis z kadru albo słowo do przeczytania jest rozmyte
   w papkę (`sprawdz`: `poza-kadrem-kamera`, `rozmyte`); ważne: ruch na każdym bloku bez powodu w treści, przysłona 1
   bez prośby, uderzenie poza ostrością bez uzasadnienia, kamera albo ruch ustawione przez właściciela w HQ zmienione.
+- Efekty wow (blok z `efekt`): blokujące: efekt bez sylwetek osoby (tył napisu po twarzy, `efekt-bez-sylwetek`),
+  pierścień za szybki albo ze słowem dłuższym niż przód koła, przejście za szybkie (`sprawdz`); ważne: więcej niż
+  2 efekty na rolkę, efekt na długim zdaniu albo liście, miejsce ustawione ręcznie zamiast z maski (`typografia.py efekt`),
+  efekt obok osoby bez uzasadnienia, efekt ustawiony przez właściciela w HQ zmieniony.

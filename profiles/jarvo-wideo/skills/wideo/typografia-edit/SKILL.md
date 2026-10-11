@@ -1,7 +1,7 @@
 ---
 name: typografia-edit
-description: "Typografia z montażu do nagrania z mową: za osobą, z kamerą."
-version: 1.4.0
+description: "Typografia z montażu do mowy: za osobą, kamera, efekty wow."
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -30,7 +30,7 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
 ## Kroki
 1. **Plan** (0 tokenów, reżyser z reguł): `python3 $HERMES_HOME/scripts/typografia.py plan <film> --motyw <styl>
    [--akcent <kolor marki>] [--tempo spokojne|normalne|ostre]`; styl z tabeli „Styl filmu”, kamera ze stylu (sekcja
-   „Kamera i głębia”). Projekt powstaje sam z filmu, a zwykłe napisy znikają
+   „Kamera i głębia”; `--efekty` = 1–2 efekty wow, sekcja „Efekty wow”). Projekt powstaje sam z filmu, a zwykłe napisy znikają
    (zostają z `--zostaw-napisy`). Kolory dobiera sam z kadru (sekcja „Kolor”). **Gdy plan już jest, nie układam go
    od nowa:** mógł go poprawić właściciel. `--nowy` tylko na jego wyraźną prośbę; same kolory zmienia
    `typografia.py paleta <film>` (układ i poprawki zostają).
@@ -42,8 +42,9 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
    TikTok). Mierzy tusz liter tym samym rendererem: napis poza kadrem, bloki na sobie, słowa stykające się literami,
    napis za osobą nieczytelny albo niczym niezasłonięty, a z kamerą blok wypchnięty z kadru ruchem kamery
    (`poza-kadrem-kamera`: słabsza siła, blok bliżej środka, większe `z` albo ruch `brak`) i słowo rozmyte głębią
-   ostrości ponad czytelność (`rozmyte`: mniejsza przysłona, ostrość na napisie, `z` bliżej ostrości) (błędy, kod 1),
-   blok pod interfejsem platformy, za małe słowo i uderzenie poza ostrością (uwagi). Każdy błąd poprawiam (`popraw`) i sprawdzam znowu; uwagę poprawiam albo uzasadniam w odpowiedzi.
+   ostrości ponad czytelność (`rozmyte`: mniejsza przysłona, ostrość na napisie, `z` bliżej ostrości), a przy efektach
+   pierścień za szybki albo nieczytelny, przejście za szybkie i efekt bez sylwetek (błędy, kod 1), blok pod
+   interfejsem platformy, za małe słowo, uderzenie poza ostrością i efekt obok osoby (uwagi). Każdy błąd poprawiam (`popraw`) i sprawdzam znowu; uwagę poprawiam albo uzasadniam w odpowiedzi.
    Słowa jednego bloku same się nie stykają: nowy plan ma `"odstep": "tusz"`, więc renderer rozsuwa słowa w linii
    i linie, gdy tusz liter z obrysem stylu (ogonki, kreski nad Ż, Ś, Ć, pochylony krój, obrys, cień 3D) wszedłby
    w sąsiednie słowo. Najmniejszy odstęp to 12% mniejszego słowa. Starych planów nie poprawiam
@@ -152,9 +153,34 @@ spokojny 0,85), blok za osobą 1,3. `pokaz` wypisuje `z` i ruch każdego bloku (
 - Właściciel ustawia to samo w HQ (sekcja „Kamera” w panelu typografii, „Ruch kamery” i „Głębia z” w panelu bloku);
   jego kamery i ruchów nie cofam. Cięcie i łączenie bloków (`podziel`, `polacz`) przenoszą ruch same.
 
+## Efekty wow
+Dwa efekty z maską osoby (MODNet): **pierścień** (`pierscien`: napis krąży wokół głowy, przód koła przed twarzą, tył
+za osobą, zasłonięty jej sylwetką) i **przejście** (`przejscie`: napis jedzie poziomo przez osobę, wchodzi za nią
+i wychodzi przed nią, `kolejnosc` `za-przod`, albo odwrotnie, `przod-za`; warstwa zmienia się na szwie w osi ciała).
+- **Kiedy:** efekt to akcent filmu, nie styl: 1–2 na rolkę, na krótkiej frazie (do 18 znaków) z uderzeniem, z której
+  widz ma zapamiętać jedną rzecz (nazwa, liczba, puenta). Pierścień na blok ≥ 1 s, przejście ≥ 1,1 s. Nie obok bloku
+  za osobą, nie na liście ani zdaniu do przeczytania, nie gdy głowy nie ma w kadrze.
+- **Jak:** `typografia.py efekt <film> --blok ID --rodzaj pierscien|przejscie [--predkosc 5–180] [--nachylenie ±40]
+  [--kierunek lewo|prawo] [--kolejnosc za-przod|przod-za]` liczy miejsce z maski (koło na czole, średnica ~1,9
+  szerokości głowy, w kadrze; szew przejścia w osi ciała na wysokości piersi, nad opisem platformy), ślad głowy
+  (`sledz`, co 0,25 s) i sylwetki. `--rodzaj brak` zdejmuje efekt. `plan --efekty` wybiera bloki sam (najmocniejsza
+  krótka fraza: pierścień, następna: przejście; po jednym na 20 bloków). Kod 1 = brak maski: efektu nie oddaję.
+- **Pierścień:** prędkość domyślnie 40°/s i najwyżej tyle, żeby przód jechał ≤ 6 wysokości liter na sekundę; najdłuższe
+  słowo mieści się na przodzie koła (łuk 120°), inaczej mniejsze litery (`rozmiar`) albo krótszy tekst. `kierunek`
+  `lewo` czyta się jak pasek, nachylenie 14° (przód niżej) daje głębię; `"powtorz": false` = napis raz.
+- **Przejście:** `x` bloku = szew, napis jedzie w pierwszych 70% bloku i stoi do czytania; szerokość taka, żeby jechał
+  najwyżej 0,85 kadru na sekundę (krótki blok = węższy napis, ewentualnie uwaga o małym słowie).
+- Blok z efektem nie dostaje ruchu kamery ze stylu (`efekt` ustawia `"kamera": {"ruch": "brak"}`): efekt sam jest ruchem.
+  Ruch ustawiony przez właściciela zostaje.
+- Parametry poprawiam w `zmiany.json` (`"efekt": {"predkosc": 30}` łączy się z efektem bloku, `null` go zdejmuje);
+  miejsce (`x`, `y`, `w`) ustawiam przez `efekt`, nie ręcznie, bo ślad i sylwetki idą z maski. W arkuszu sprawdzam
+  2–3 chwile bloku: tył naprawdę chowa się za głową, przód czytelny, nic nie wychodzi z kadru.
+- Właściciel ustawia to samo w HQ (sekcja „Efekt” w panelu bloku, przycisk „Poproś Wideografa: efekt na osobie”
+  = moje polecenie `efekt`); cięcie i łączenie bloków przenoszą efekt ze śladem.
+
 ## Format `zmiany.json`
 Pola bloku: `uklad`, `x`, `y` (kotwica 0–1), `w`, `rot`, `tilt`, `warstwa` (`przod`/`tyl`), `rozmiar`, `wejscie`,
-`wyjscie`, `start`, `end`, `z` (głębia), `kamera` (ruch bloku, sekcja wyżej). Pola słowa: `tekst`, `waga` 0–3, `linia`, `glebia` −1/0/1, `kolor`, `kroj`, `styl`
+`wyjscie`, `start`, `end`, `z` (głębia), `kamera` (ruch bloku, sekcja wyżej), `efekt` (sekcja „Efekty wow”). Pola słowa: `tekst`, `waga` 0–3, `linia`, `glebia` −1/0/1, `kolor`, `kroj`, `styl`
 (`wypelnij`, `kontur`, `3d`, `blask`, `tlo`, `obrys`), `plyta` (`true`: płytka przy słabym kontraście), `wejscie`,
 `wielkie`, `skala`, `z`; `null` przywraca wartość ze stylu. Na górze `"motyw"` zmienia styl całego filmu,
 a `"kamera": {"styl", "przyslona", "ostrosc"}` kamerę (`null` = bez kamery).
@@ -169,7 +195,8 @@ a `"kamera": {"styl", "przyslona", "ostrosc"}` kamerę (`null` = bez kamery).
  "kamera": {"styl": "spokojna", "przyslona": 0.4}}
 ```
 `popraw` ostrzega, gdy blok ma więcej niż jedno uderzenie, gdy blok za osobą nie ma sylwetki, gdy ruch kamery
-jest błędny (odrzuca go) i gdy `z` bloku przeczy warstwie (przód za osobą albo tył przed nią).
+jest błędny (odrzuca go), gdy efekt jest błędny (odrzuca go) albo stoi bez miejsca z maski (`efekt`) i gdy `z`
+bloku przeczy warstwie (przód za osobą albo tył przed nią).
 
 ## Kontrola (arkusz, `vision_analyze`)
 Miarę (kadr, stykanie, za osobą, strefy) robi `sprawdz`; okiem oceniam to, czego miara nie widzi:
@@ -184,5 +211,7 @@ Miarę (kadr, stykanie, za osobą, strefy) robi `sprawdz`; okiem oceniam to, cze
 - [ ] plan w projekcie (`typo`), poprawki właściciela z HQ nienaruszone, `popraw` bez ostrzeżeń albo z wyjaśnieniem,
 - [ ] `typografia.py sprawdz` bez błędów (uwagi poprawione albo uzasadnione), także z kamerą: żaden ruch nie wypycha
       napisu z kadru, żadne słowo do przeczytania nie jest rozmyte w papkę,
+- [ ] efekty (gdy są): najwyżej 1–2 na rolkę, z miejscem i sylwetkami z `efekt`, w arkuszu tył chowa się za osobą,
+      a przód jest czytelny,
 - [ ] arkusz obejrzany: lista „Kontrola” spełniona,
 - [ ] render z linią MEDIA: i informacją, że całość poprawi się w edytorze HQ.
