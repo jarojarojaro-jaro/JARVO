@@ -3,9 +3,13 @@
 
     strona.py kontakt https://firma.pl [--max-stron 8] [--json]
     strona.py zmiana https://firma.pl --baza out/leady/<projekt>/strony.json     # czy strona zmieniła się od ostatniego razu
+    strona.py kontakt https://firma.pl/kontakt --z-html strony/firma.html --json  # strona już przeczytana przez ostrozna.py
 
 Tylko domena firmy: strona główna + podstrony kontakt / o nas / zespół / kariera / impressum / polityka prywatności.
 Szanuje `robots.txt`, przedstawia się uczciwie (User-Agent jarvo-lowca), odmowa albo ochrona antybotowa = blokada.
+Po blokadzie ochrony jedna strona może przyjść z zapasowej przeglądarki (skill `ostrozna-przegladarka`:
+`ostrozna.py <url> --html -o plik.html`, robots.txt sprawdzony tam): `--z-html plik.html` analizuje tylko ją, bez sieci
+i bez podstron, a wynik ma `"odczyt": "camoufox"`.
 Każdy e-mail i telefon ma adres strony, na której jest opublikowany, i krótki kontekst (np. „Anna Nowak, dyrektor
 sprzedaży”). Adresów nie zgadujemy. Typ e-maila: ogolny (biuro@), rolowy (sprzedaz@), osobowy (imię, skrzynka darmowa).
 
@@ -290,25 +294,32 @@ def dolacz_ukryte(wynik: dict, z: dict, skad: str, url: str) -> None:
         wynik["ukryte"].append({"skad": skad, "zrodlo": url, "pola": sorted(set(pola)), "nowe": nowe})
 
 
-def kontakt(start: str, max_stron: int = 8) -> dict:
+def kontakt(start: str, max_stron: int = 8, z_html: str | None = None) -> dict:
+    """z_html: HTML strony `start` przeczytanej już przez ostrozna.py (tylko ta strona, bez sieci)."""
     if "://" not in start:
         start = "https://" + start
     dom = ll.domena(start)
-    rp = robots(start)
+    rp = robots(start) if z_html is None else None
     wynik = {"domena": dom, "url": start, "tytul": "", "opis": "", "strony": [], "emaile": [], "telefony": [],
              "formularz": None, "kariera": None, "technologie": [], "nip": [], "social": {}, "odcisk": None,
              "nazwa": None, "adres": None, "ukryte": [], "pominiete_robots": [], "bledy": []}
-    kolejka, widziane = [start], set()
+    if z_html is not None:
+        wynik["odczyt"], max_stron = "camoufox", 1
+    kolejka, widziane = [start.split("#")[0]], set()
     while kolejka and len(wynik["strony"]) < max_stron:
         url = kolejka.pop(0).split("#")[0]
         if url in widziane:
             continue
         widziane.add(url)
-        if not rp.can_fetch(ll.UA, url):
+        if rp is not None and not rp.can_fetch(ll.UA, url):
             wynik["pominiete_robots"].append(url)
             continue
         try:
-            surowy, c = czytaj(url)
+            if z_html is not None:
+                surowy, c = z_html, Czytnik()
+                c.feed(surowy)
+            else:
+                surowy, c = czytaj(url)
         except ConnectionError as e:
             wynik["bledy"].append(str(e))
             continue
@@ -358,12 +369,16 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("url")
     s.add_argument("--max-stron", type=int, default=8)
     s.add_argument("--json", action="store_true")
+    s.add_argument("--z-html", metavar="PLIK", help="HTML tej strony z ostrozna.py --html (bez sieci, bez podstron)")
     s = sub.add_parser("zmiana")
     s.add_argument("url")
     s.add_argument("--baza", required=True, help="JSON: domena → odcisk z poprzedniego przebiegu (tworzony przy pierwszym)")
     a = ap.parse_args(argv)
+    z_html = None
+    if getattr(a, "z_html", None):
+        z_html = Path(a.z_html).read_text(encoding="utf-8", errors="replace")
     try:
-        w = kontakt(a.url, getattr(a, "max_stron", 3) if a.cmd == "kontakt" else 1)
+        w = kontakt(a.url, getattr(a, "max_stron", 3) if a.cmd == "kontakt" else 1, z_html=z_html)
     except ll.Blokada as e:
         print(f"✗ blokada: {e}", file=sys.stderr)
         return 3

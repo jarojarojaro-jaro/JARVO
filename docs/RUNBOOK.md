@@ -11,7 +11,7 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 
 | Co | Po co | Uwagi |
 |---|---|---|
-| VPS x86_64, Ubuntu 24.04 (albo Debian 12), region UE | wszystko działa tutaj | cała flota: **4 vCPU / 8 GB / 80 GB** (obraz `jarvo-hermes` 4,4 GB, na start ok. 6 GB dysku; RAM w spoczynku ok. 0,7 GB, w szczycie ok. 3,7 GB; szczegóły: [VPS.md §2](VPS.md#2-rozmiar-serwera)) |
+| VPS x86_64, Ubuntu 24.04 (albo Debian 12), region UE | wszystko działa tutaj | cała flota: **4 vCPU / 8 GB / 80 GB** (obraz `jarvo-hermes` 4,8 GB, na start ok. 6,5 GB dysku; RAM w spoczynku ok. 0,7 GB, w szczycie ok. 4,5 GB; szczegóły: [VPS.md §2](VPS.md#2-rozmiar-serwera)) |
 | Darmowe konto Docker Hub | `docker login` na serwerze | anonimowe pobieranie obrazów ma limit, który na współdzielonych IP VPS-ów łatwo wyczerpać |
 | Klucz SSH (ed25519) | logowanie na serwer | hasła będą wyłączone |
 | Konto [Tailscale](https://tailscale.com) (darmowe) | prywatny dostęp do serwera i paneli | nic nie wystawiamy publicznie |

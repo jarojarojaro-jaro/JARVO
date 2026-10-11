@@ -1,17 +1,17 @@
 ---
 name: metoda-sherlocka
 description: "Śledztwo: plan, wątki, źródła pierwotne, weryfikacja."
-version: 1.2.0
+version: 1.3.0
 author: "Jarvo (metodologia inspirowana: langchain-ai/open_deep_research MIT, dzhng/deep-research MIT, STORM MIT)"
 license: MIT
 metadata:
   hermes:
     tags: [research, investigation, verification, citations]
-    related_skills: [szybki-fakt, weryfikacja-faktow, raport-sledztwa, research-rynku, research-seo, cytowania, searxng-search]
+    related_skills: [szybki-fakt, weryfikacja-faktow, raport-sledztwa, research-rynku, research-seo, cytowania, searxng-search, ostrozna-przegladarka]
   jarvo:
     agent: jarvo-sherlock
     autonomy: A1
-    reviewed: "2026-10-03"
+    reviewed: "2026-10-11"
 ---
 
 # Metoda Sherlocka
@@ -44,7 +44,10 @@ Wątki niezależne → `delegate_task(tasks=[...])`. **Każdy subagent dostaje s
 - wspólnym rejestrem źródeł: w każdym wywołaniu `extract.py` i `sources.py` opcja `--rejestr <pełna ścieżka do
   out/zrodla.json>` (każda przeczytana strona dostaje wtedy numer w jednym rejestrze, a nie własne `[1]` w każdym wątku),
 - wymaganiem zwrotu w formacie „learnings” (niżej) + listy URL-i z datami,
-- budżetem: proste pytanie 2–3 wyszukiwania, złożone do 6, stop po 2 wyszukiwaniach bez nowych informacji.
+- budżetem: proste pytanie 2–3 wyszukiwania, złożone do 6, stop po 2 wyszukiwaniach bez nowych informacji,
+- zasadą dla stron, które odmówiły (403/429, „Just a moment…”, captcha): kopia z archiwum (`blocked-page-recovery`),
+  a gdy potrzebny stan bieżący, jedna próba `ostrozna-przegladarka`; jej odmowa to luka, nie zagadka
+  (`references/wyszukiwanie.md`). Subagenci czekają na siebie: jedna taka przeglądarka naraz na serwerze.
 
 Format „learnings” (dla każdego źródła):
 ```

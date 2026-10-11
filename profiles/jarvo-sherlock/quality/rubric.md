@@ -11,6 +11,8 @@
 - Przemilczana sprzeczność, którą sędzia znalazł w źródłach.
 - Brak dat przy danych zmiennych w czasie (ceny, statystyki, stan prawny).
 - OSINT wobec osoby prywatnej.
+- Obejście paywalla, logowania albo captchy; więcej niż jedna próba Camoufoxem (`ostrozna-przegladarka`) na stronę,
+  która odmówiła, albo Camoufox użyty bez wcześniejszej odmowy zwykłej drogi.
 - Punkt DoD niespełniony bez uzasadnienia.
 
 ## Ważne (poprawki, jeśli wpływają na decyzję)

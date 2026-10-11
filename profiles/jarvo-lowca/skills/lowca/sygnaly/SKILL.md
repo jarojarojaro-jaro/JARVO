@@ -1,7 +1,7 @@
 ---
 name: sygnaly
 description: "Sygnały zakupowe: KRS, CEIDG, przetargi, strony, rekrutacje."
-version: 1.1.0
+version: 1.1.1
 author: "Jarvo (metoda za superdesigndev/treg lead-signals, Apache-2.0)"
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-lowca
     autonomy: A1
-    reviewed: "2026-10-05"
+    reviewed: "2026-10-11"
 ---
 
 # Sygnały zakupowe
@@ -32,7 +32,8 @@ wygrała przetarg, rekrutuje, zmieniła stronę. Zbierasz je do `sygnaly.jsonl` 
    python3 $S/przetargi.py ted --od <miesiąc temu> --cpv 72 -o $P/ted.jsonl
    python3 $S/leady.py dodaj $P $P/nowe.jsonl $P/bzp.jsonl …                                       # bez duplikatów
    ```
-   Kod 3 = źródło odmówiło (blokada): zapisz w `risks`, nie próbuj innej drogi.
+   Kod 3 = źródło odmówiło (blokada): zapisz w `risks`, nie próbuj innej drogi (API rejestrów i przetargów nie
+   dostają `ostrozna-przegladarka`; ta jest tylko na pojedynczą stronę firmy, skill `kontakt-firmy`).
    **KRS czy CEIDG:** KRS to spółki, CEIDG (`ceidg.py`) to jednoosobowe działalności (fryzjer, ekipa remontowa,
    księgowa, freelancer IT). Gdy ICP celuje w małe firmy usługowe, CEIDG daje ich najwięcej. Zasady CEIDG:
    - token `CEIDG_TOKEN` (darmowy, wpisuje go właściciel). Kod 2 = brak albo zły token: napisz, gdzie go wpisać

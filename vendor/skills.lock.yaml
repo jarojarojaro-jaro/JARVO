@@ -17,7 +17,7 @@ sources:
   jarvo:
     type: repo-tree          # skille własne floty wspólne dla kilku agentów: shared/skills w tym repo
     license: MIT
-    notice: "Jarvo. Silnik graf-kodu: codebase-memory-mcp (c) DeusData, MIT, pobierany przy pierwszym użyciu. Izometria: szablon iso-glow (c) April Zhu i iso-figure (c) Tolga Cohce, MIT (assets/iso-glow/LICENSE)."
+    notice: "Jarvo. Silnik graf-kodu: codebase-memory-mcp (c) DeusData, MIT, pobierany przy pierwszym użyciu. Izometria: szablon iso-glow (c) April Zhu i iso-figure (c) Tolga Cohce, MIT (assets/iso-glow/LICENSE). Ostrożna przeglądarka: Camoufox (daijro), MPL-2.0, binarka w obrazie Jarvo (infra/Dockerfile), nie w skillu."
   hermes:
     type: hermes-tree
     license: MIT
@@ -261,6 +261,7 @@ agents:
   jarvo-sherlock:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
+    - {source: jarvo, path: shared/skills/ostrozna-przegladarka, dest: web/ostrozna-przegladarka}
     - {source: hermes, path: skills/web/blocked-page-recovery, dest: research/blocked-page-recovery}
     - {source: hermes, path: optional-skills/research/searxng-search, dest: research/searxng-search}
     - {source: hermes, path: optional-skills/research/duckduckgo-search, dest: research/duckduckgo-search}
@@ -479,3 +480,4 @@ agents:
     - {source: aso-skills, path: skills/review-management, dest: aso/review-management}
   jarvo-lowca:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
+    - {source: jarvo, path: shared/skills/ostrozna-przegladarka, dest: web/ostrozna-przegladarka}

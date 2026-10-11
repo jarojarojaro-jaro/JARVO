@@ -197,6 +197,23 @@ def test_lightpanda_version_in_docs_matches_image_pin():
     assert str(lp["version"]) == pin
 
 
+def test_camoufox_pinned_and_lean():
+    """Zapasowa przeglądarka: wersja + SHA-256 dla obu architektur, bez fontów Apple/Microsoft, bez systemd."""
+    docker = (REPO / "infra" / "Dockerfile").read_text(encoding="utf-8")
+    code = "\n".join(line for line in docker.splitlines() if not line.lstrip().startswith("#"))
+    wersja = re.search(r"CAMOUFOX_VERSION=([\w.-]+)", code).group(1)
+    assert re.search(r"CAMOUFOX_SHA256_AMD64=[0-9a-f]{64}", code) and re.search(r"CAMOUFOX_SHA256_ARM64=[0-9a-f]{64}", code)
+    assert "sha256sum -c" in code and "fonts/macos/" in code and "fonts/windows/" in code
+    assert "libgtk-3-0t64" in code and "dbus-x11" in code and "dbus-user-session" not in code
+    tools = (REPO / "infra" / "python" / "requirements-tools.txt").read_text(encoding="utf-8")
+    assert re.search(r"^camoufox==[\d.]+$", tools, re.M) and re.search(r"^playwright==1\.(\d+)\.\d+$", tools, re.M)
+    assert int(re.search(r"^playwright==1\.(\d+)", tools, re.M).group(1)) < 63   # camoufox 0.5.6: playwright < 1.63
+    for agent in ("jarvo-lowca", "jarvo-sherlock"):
+        tb = yaml.safe_load((REPO / "profiles" / agent / "toolbox.yaml").read_text(encoding="utf-8"))
+        cf = next(t for t in tb["tools"] if t["name"] == "camoufox")
+        assert wersja in cf["version"] and "ostrozna.py --sprawdz" in cf["healthcheck"]
+
+
 def test_every_extra_has_a_pin():
     docker = (REPO / "infra" / "Dockerfile").read_text(encoding="utf-8")
     optional = (REPO / "infra" / "python" / "requirements-optional.txt").read_text(encoding="utf-8")

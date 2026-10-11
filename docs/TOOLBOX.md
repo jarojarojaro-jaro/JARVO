@@ -60,6 +60,7 @@ własną przeglądarkę i ~0,3 GB; całą witrynę audytujemy `audit.sh` po kole
 | [SearXNG](https://github.com/searxng/searxng) | własna metawyszukiwarka (70+ silników), bez kluczy i limitów | AGPL-3.0 | 2026-09 | sidecar + dostawca `searxng` |
 | [trafilatura](https://github.com/adbar/trafilatura) | czysta treść artykułów, metadane, daty publikacji (`extract.py`) | Apache-2.0 | 2026-09 | skrypt |
 | [Lightpanda](https://github.com/lightpanda-io/browser) | strony z JS do Markdown bez Chromium: `lightpanda fetch --dump markdown <url>`; silnik `browser_*` | AGPL-3.0 (osobny program) | 2026-10 | CLI + Hermes |
+| [Camoufox](https://github.com/daijro/camoufox) 152.0.4-beta.30 + biblioteka `camoufox` 0.5.6 | zapasowa przeglądarka tylko po odmowie strony (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`, [niżej](#łowca-i-sherlock-skill-ostrozna-przegladarka)) | MPL-2.0 (przeglądarka), MIT (biblioteka) | 2026-10 | skrypt |
 | [Scrapling](https://github.com/D4Vinci/Scrapling) | odporny scraping (skill [H] `scrapling`) | BSD-3 | 2026-09 | CLI |
 | [Docling](https://github.com/docling-project/docling) | PDF-y, raporty, tabele → Markdown | MIT | 2026-09 | skrypt |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | napisy i transkrypcje z wideo jako źródła | Unlicense | 2026-09 | CLI |
@@ -175,11 +176,14 @@ Bez Skarbca agent pracuje na eksportach CSV. Wydatki tylko na poziomie A2, w kop
 | [e-Zamówienia BZP](https://ezamowienia.gov.pl) (API tablicy ogłoszeń) | ogłoszenia o zamówieniach i wyniki ze zwycięzcą (NIP); odcina za serię ciężkich zapytań, stąd pauza 4 s | dane publiczne | n/d | `przetargi.py bzp`, healthcheck `przetargi.py sprawdz bzp` |
 | [TED API v3](https://api.ted.europa.eu) | przetargi unijne z CPV | dane publiczne (reuse UE) | n/d | `przetargi.py ted`, healthcheck `przetargi.py sprawdz ted` |
 | `strona.py`, `leady.py`, `lowca_lib.py` | kontakt opublikowany na stronie firmy (`robots.txt`), także z danych ukrytych w HTML (JSON-LD, Next.js, Nuxt), technologie, odcisk strony; lista leadów, ocena wg ICP, monitoring | własny kod | n/d | skrypt |
+| [Camoufox](https://github.com/daijro/camoufox) (`ostrozna.py`) | jedna próba odczytu strony firmy, która odmówiła zwykłej przeglądarce ([niżej](#łowca-i-sherlock-skill-ostrozna-przegladarka)) | MPL-2.0 | 2026-10 | wspólny skill `ostrozna-przegladarka` |
 | `zrodlo.py`, `har.cjs` | rozpoznanie nowego źródła: nagranie ruchu strony do HAR (`robots.txt`, uczciwy UA, playwright-core), żądania z danymi, różnice dwóch nagrań, schemat sumy odpowiedzi (pola opcjonalne, `null`, niespójne typy) | własny kod | n/d | skrypt, skill `rozpoznanie-zrodla` |
 
 Źródła bez kluczy, oprócz CEIDG: darmowy token właściciela w Kluczach profilu `jarvo-lowca`
 ([LEADY.md](LEADY.md#token-ceidg)). Odmowa źródła (403/429, strona antybotowa) = blokada, bez obchodzenia; w CEIDG
-429 to limit godzinowy, który skrypt przeczekuje, a 401/403 to zły token ([LEADY.md](LEADY.md)).
+429 to limit godzinowy, który skrypt przeczekuje, a 401/403 to zły token ([LEADY.md](LEADY.md)). Jedyny wyjątek:
+publiczna strona, którą zwykła przeglądarka dostała jako odmowę, ma jedną próbę Camoufoxem (`ostrozna-przegladarka`);
+API rejestrów (KRS, CEIDG, BZP, TED) go nie dostają.
 
 ---
 
@@ -278,6 +282,32 @@ dokłada polskie napisy, krój OFL zamiast Google Fonts, kolor marki z kontraste
 
 ---
 
+## Łowca i Sherlock: skill `ostrozna-przegladarka`
+
+Wspólny skill (`shared/skills/ostrozna-przegladarka/`, decyzja właściciela z 2026-10-11): gdy zwykła droga dostała
+odmowę (403/429, „Just a moment…”, „Human Verification”, captcha), `ostrozna.py <url>` czyta tę jedną stronę
+Camoufoxem: Firefoksem, który pokazuje spójny odcisk zwykłej przeglądarki (bez `navigator.webdriver`). Wynik:
+Markdown głównej treści (trafilatura), HTML po JavaScripcie albo zrzut. Nigdy domyślnie i nigdy do API rejestrów.
+
+Granice w kodzie skryptu: robots.txt czytany tą samą przeglądarką (zakaz albo robots.txt niedostępny = blokada),
+tylko http(s) i adresy publiczne, jedna przeglądarka naraz na serwerze, co najmniej 20 s między stronami domeny
+i najwyżej 30 stron domeny na dobę, czysty profil bez ciasteczek, kont, proxy i dodatków. Strona „sprawdzamy, czy
+jesteś człowiekiem” ma do 15 s, żeby sama przepuścić przeglądarkę; skrypt niczego nie klika i nie rozwiązuje captchy.
+Captcha, 401/403/429 albo sam formularz logowania = kod 3 (blokada, koniec próby).
+
+Pomiary (2026-10, Camoufox 152.0.4-beta.30): CreepJS i BrowserScan „Normal” (Chromium: „Robot”), OLX otwiera się
+(Chromium: „Human Verification”). **Serwisy za Cloudflare zwykle zostają zablokowane**: GoWork (robots.txt 403),
+Aleo i rejestr.io (403); G2 raz przepuszcza, raz nie. Wyniki Google zabrania robots.txt, więc skrypt ich nie czyta
+(wyszukiwanie: SearXNG). RAM ok. 0,8 GB na czas jednej strony (Lightpanda ~0,03 GB, Chromium ~0,1–0,4 GB).
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| [Camoufox](https://github.com/daijro/camoufox) 152.0.4-beta.30 (binarka z wydania, SHA-256 amd64 i arm64 w `infra/Dockerfile`) | Firefox z podmienionym odciskiem przeglądarki; w obrazie bez fontów macOS i Windows z paczki, więc udaje tylko Linuksa | MPL-2.0 | 2026-10 | `/opt/jarvo/camoufox`, healthcheck `ostrozna.py --sprawdz` |
+| biblioteka [`camoufox`](https://pypi.org/project/camoufox/) 0.5.6 + [Playwright](https://github.com/microsoft/playwright-python) 1.62.0 | odcisk przeglądarki (BrowserForge) i sterowanie Firefoksem; Playwright na Node z obrazu | MIT / Apache-2.0 | 2026-09 | venv `/opt/jarvo/venv` |
+| GTK 3 (`libgtk-3-0t64`, apt) | biblioteka, bez której Firefox nie startuje, także bez okna | LGPL-2.1 | n/d | pakiet systemowy |
+
+---
+
 ## Infrastruktura (VPS)
 
 | Narzędzie | Po co | Licencja | Ostatni commit |
@@ -316,10 +346,10 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 | Warstwa | Gdzie | Co |
 |---|---|---|
 | obraz Hermesa | `/opt/hermes` | Python 3.13 Hermesa (Debian 13; nie ruszamy), Node, `uv`, ffmpeg/ffprobe, Chromium |
-| pakiety systemowe | apt | pandoc, qpdf, ocrmypdf + tesseract (pol, eng), exiftool, jq, sqlite3, fonty z polskimi znakami |
-| przeglądarki | `/usr/local/bin/lightpanda`, `/usr/local/bin/chromium` (`CHROME_PATH`) | Lightpanda dla `browser_*` agentów (agent-browser); jedna Chromium z obrazu Hermesa dla zrzutów, PDF, Lighthouse, Playwright i dembrandta |
+| pakiety systemowe | apt | pandoc, qpdf, ocrmypdf + tesseract (pol, eng), exiftool, jq, sqlite3, adb, GTK 3 (dla Camoufoxa), fonty z polskimi znakami |
+| przeglądarki | `/usr/local/bin/lightpanda`, `/usr/local/bin/chromium` (`CHROME_PATH`), `/opt/jarvo/camoufox` | Lightpanda dla `browser_*` agentów (agent-browser); jedna Chromium z obrazu Hermesa dla zrzutów, PDF, Lighthouse, Playwright i dembrandta; Camoufox (Firefox) tylko dla `ostrozna.py` Łowcy i Sherlocka po odmowie strony |
 | narzędzia Node | `/opt/jarvo/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt, inspo-mcp (serwer MCP Weba) |
-| narzędzia Pythona | venv `/opt/jarvo/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet), misaki + spaCy `en_core_web_sm` (lektor Paradee); dodatki `JARVO_EXTRAS`: rembg, auto-editor, docling, manim |
+| narzędzia Pythona | venv `/opt/jarvo/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet), misaki + spaCy `en_core_web_sm` (lektor Paradee), camoufox + Playwright 1.62 (sterownik na Node z obrazu); dodatki `JARVO_EXTRAS`: rembg, auto-editor, docling, manim |
 | claude-seo | `/opt/jarvo/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
 | sidecary | sieć `jarvo-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
 
@@ -327,6 +357,9 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
 - globalny npmrc obrazu ma `min-release-age = 14` i `engine-strict`: przypinamy wersje npm starsze niż 14 dni
   i zgodne z Node obrazu; tę samą zasadę stosujemy do pinów Pythona,
 - interpreter Pythona dla venv pobiera `uv` do `/opt/jarvo/uv-python` (nie do `/root`, niedostępnego dla `hermes`),
+- Camoufox: binarka z wydania przypięta wersją i SHA-256 (amd64, arm64), bez fontów macOS i Windows z paczki (0,9 GB);
+  build kończy się startem bez sieci (`navigator.webdriver` = false). Biblioteka `camoufox` dostaje `executable_path`
+  i `ff_version`, więc niczego nie pobiera przy starcie (dodatek uBlock wyłączony, GeoIP wyłączone),
 - jedna Chromium: `playwright-core` (także dembrandta, przez `overrides`) i Playwright claude-seo są przypięte do wersji,
   której przeglądarka jest w obrazie Hermesa; Dockerfile uruchamia ją testowo i zatrzyma build przy niezgodności,
 - `AGENT_BROWSER_EXECUTABLE_PATH` celowo nieustawione: agent-browser użyłby go też dla silnika lightpanda,

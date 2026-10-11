@@ -194,6 +194,10 @@ zrodla:
     repo: https://github.com/lightpanda-io/browser
     status: uzywane
     przejrzane: d15600f5bef59e7583d4878c2f1178e46a4de0b9
+  camoufox:
+    repo: https://github.com/daijro/camoufox
+    status: uzywane
+    przejrzane: 5d06ec1629ac7843508f1e683f83e404fde8db76
   espeak-ng:
     repo: https://github.com/espeak-ng/espeak-ng
     status: uzywane

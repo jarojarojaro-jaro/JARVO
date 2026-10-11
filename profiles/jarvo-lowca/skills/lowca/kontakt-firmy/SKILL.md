@@ -1,17 +1,17 @@
 ---
 name: kontakt-firmy
 description: "Kontakt opublikowany przez firmę: e-mail, tel., formularz."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [leads, contact, company-website, ceidg, gdpr]
-    related_skills: [kwalifikacja, lista-leadow]
+    related_skills: [kwalifikacja, lista-leadow, ostrozna-przegladarka]
   jarvo:
     agent: jarvo-lowca
     autonomy: A1
-    reviewed: "2026-10-05"
+    reviewed: "2026-10-11"
 ---
 
 # Kontakt do firmy
@@ -29,7 +29,15 @@ e-mail i strona, jeśli przedsiębiorca je podał). Każdy kontakt ma adres źr�
    nazwa i adres firmy, telefon, e-mail i NIP, których strona nie pokazuje w tekście. Takie pole ma `skad`
    (np. `json-ld`) i adres strony, a `ukryte` mówi, który ładunek co zawierał. To nadal dane, które firma sama
    opublikowała: ten sam dokument, tylko zapis dla maszyn.
-   Kod 3 = strona odmówiła (ochrona, `robots.txt`): zostaje bez kontaktu, nie próbujesz innej drogi.
+   Kod 3 = strona odmówiła. Zakaz w `robots.txt` → zostaje bez kontaktu. Ochrona przed automatami (403/429,
+   „Human Verification”) → **jedna** próba skillem `ostrozna-przegladarka` na stronie kontaktu (albo głównej):
+   ```bash
+   O=$HERMES_HOME/skills/web/ostrozna-przegladarka/scripts/ostrozna.py
+   python3 $O <url> --html -o <projekt>/strony/<domena>.html
+   python3 $HERMES_HOME/scripts/strona.py kontakt <url> --z-html <projekt>/strony/<domena>.html --json > <projekt>/strony/<domena>.json
+   ```
+   Wynik ma `"odczyt": "camoufox"`; w raporcie przy tym kontakcie dopisz „odczyt przez Camoufox”. Kod 3 także
+   w `ostrozna.py` → firma zostaje bez kontaktu (blokada w raporcie), bez kolejnej drogi.
 3. `python3 $HERMES_HOME/scripts/leady.py kontakt <projekt> <projekt>/strony/*.json`, potem `leady.py ocen` od nowa.
    **Jednoosobowa działalność** (NIP bez KRS, np. zwycięzca przetargu): `python3 $HERMES_HOME/scripts/ceidg.py firma
    --nip <NIP> -o <projekt>/ceidg.jsonl` i `leady.py dodaj`: wpis `ceidg-firma` dokłada PKD i kontakt z CEIDG (ze

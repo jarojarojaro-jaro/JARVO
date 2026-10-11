@@ -7,7 +7,8 @@
 # Zasady: entrypoint Hermesa bez zmian (s6 jako PID 1, zrzucenie uprawnień do użytkownika hermes),
 # dane w /opt/data (wolumen), repo i build montowane tylko do odczytu (/opt/jarvo/repo, /opt/jarvo/build).
 # Obraz celuje w VPS 8 GB RAM: jedna Chromium (ta z obrazu Hermesa) do renderowania i audytów,
-# Lightpanda do codziennego przeglądania, rozpoznawanie mowy uruchamiane na żądanie, bez cache
+# Lightpanda do codziennego przeglądania, Camoufox (Firefox) tylko jako zapasowa przeglądarka po odmowie strony
+# (jedna naraz, ~0,8 GB RAM na czas jednej strony), rozpoznawanie mowy uruchamiane na żądanie, bez cache
 # instalatorów w warstwach. Ciężkie, rzadko używane narzędzia są opcjonalne (JARVO_EXTRAS).
 # Wersja Hermesa przypięta tagiem i digestem: ten sam obraz bazowy w CI (gotowy obraz w GHCR) i u każdego.
 # Aktualizacja Hermesa = zmiana tej linii, domyślnej w infra/docker-compose.yml i fleet.yaml (test pilnuje zgodności),
@@ -38,10 +39,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     UV_NO_CACHE=1
 
 # --- pakiety systemowe: dokumenty, OCR, metadane, fonty (polskie znaki), narzędzia PDF;
-#     adb: Twórca aplikacji steruje telefonem testowym (profil compose „android”, ~3 MB)
+#     adb: Twórca aplikacji steruje telefonem testowym (profil compose „android”, ~3 MB);
+#     libgtk-3-0t64: biblioteka, bez której Firefox (Camoufox) nie startuje nawet bez okna (~60 MB); dbus-x11 spełnia
+#     zależność dconf od magistrali sesji bez dbus-user-session, który ciągnąłby systemd
 RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
     pkgs="pandoc qpdf ocrmypdf tesseract-ocr tesseract-ocr-pol tesseract-ocr-eng \
-          libimage-exiftool-perl jq sqlite3 adb \
+          libimage-exiftool-perl jq sqlite3 adb libgtk-3-0t64 dbus-x11 \
           fonts-dejavu fonts-noto-core fonts-noto-color-emoji fonts-inter"; \
     case "$extras" in *" manim "*) pkgs="$pkgs libcairo2-dev libpango1.0-dev pkg-config texlive-latex-base texlive-fonts-recommended";; esac; \
     case "$extras" in *" office "*) pkgs="$pkgs libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui";; esac; \
@@ -129,7 +132,31 @@ RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
       esac; \
     done && \
     # auto-editor ściąga swoją binarkę przy pierwszym uruchomieniu do site-packages (w runtime tylko do odczytu)
-    if [ -x /opt/jarvo/venv/bin/auto-editor ]; then /opt/jarvo/venv/bin/auto-editor --version; fi
+    if [ -x /opt/jarvo/venv/bin/auto-editor ]; then /opt/jarvo/venv/bin/auto-editor --version; fi && \
+    # Playwright (dla Camoufoxa) na Node z obrazu zamiast własnej kopii Node w paczce (−124 MB)
+    pw=/opt/jarvo/venv/lib/python3.12/site-packages/playwright/driver && \
+    ln -sf "$(command -v node)" "$pw/node" && "$pw/node" "$pw/package/cli.js" --version
+
+# --- Camoufox (MPL-2.0): Firefox z podmienionym odciskiem przeglądarki, zapasowa przeglądarka Łowcy i Sherlocka
+#     (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`) tylko po odmowie zwykłej przeglądarki. Binarka z wydania
+#     daijro/camoufox przypięta wersją i sumą SHA-256 dla amd64 i arm64 (wydanie ≥ 14 dni). Z paczki (1,3 GB) zostaje
+#     ~0,35 GB: bez fontów macOS i Windows (~0,9 GB fontów Apple i Microsoft, których nie redystrybuujemy), więc
+#     przeglądarka udaje tylko Linuksa (fonty Linuksa z paczki: Noto, Arimo, Tinos, Cousine; OFL i Apache-2.0).
+#     Na końcu start bez sieci: strona z data: i navigator.webdriver = false.
+ARG CAMOUFOX_VERSION=152.0.4-beta.30
+ARG CAMOUFOX_SHA256_AMD64=5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672
+ARG CAMOUFOX_SHA256_ARM64=60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124
+RUN set -e; case "$(uname -m)" in x86_64) a=x86_64; s="$CAMOUFOX_SHA256_AMD64";; aarch64) a=arm64; s="$CAMOUFOX_SHA256_ARM64";; \
+      *) echo "Camoufox: brak wydania dla $(uname -m)" >&2; exit 1;; esac; \
+    d=/opt/jarvo/camoufox; t="$(mktemp -d)"; \
+    curl -fsSL --retry 3 -o "$t/camoufox.zip" \
+      "https://github.com/daijro/camoufox/releases/download/v${CAMOUFOX_VERSION}/camoufox-${CAMOUFOX_VERSION}-lin.${a}.zip" && \
+    echo "$s  $t/camoufox.zip" | sha256sum -c - && \
+    python3 -I -c "import os, sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); pomin = ('fonts/macos/', 'fonts/windows/', 'fontconfig/macos/', 'fontconfig/windows/'); [os.chmod(z.extract(i, sys.argv[2]), ((i.external_attr >> 16) & 0o755) | 0o444) for i in z.infolist() if not i.is_dir() and not i.filename.startswith(pomin)]" "$t/camoufox.zip" "$d" && \
+    printf '%s\n' "Camoufox ${CAMOUFOX_VERSION} (MPL-2.0), kod źródłowy: https://github.com/daijro/camoufox (tag v${CAMOUFOX_VERSION})." \
+      "Binarka bez zmian; Jarvo pomija tylko fonty macOS i Windows z paczki. Licencje Firefoksa: about:license." > "$d/JARVO-ZRODLO.txt" && \
+    HOME="$t" /opt/jarvo/venv/bin/python -c "from camoufox.sync_api import Camoufox; from camoufox import DefaultAddons; c = Camoufox(executable_path='$d/camoufox-bin', ff_version=${CAMOUFOX_VERSION%%.*}, headless=True, os='linux', geoip=False, exclude_addons=[DefaultAddons.UBO], i_know_what_im_doing=True); b = c.__enter__(); p = b.new_page(); p.goto('data:text/html,<title>ok</title>'); assert p.title() == 'ok' and p.evaluate('navigator.webdriver') is False; c.__exit__(None, None, None); print('Camoufox OK')" && \
+    rm -rf "$t"
 
 # --- skrypty floty w obrazie (jarvo-stt: rozpoznawanie mowy Parakeet dla Hermesa i napisów)
 COPY --chmod=0755 infra/bin/ /opt/jarvo/bin/

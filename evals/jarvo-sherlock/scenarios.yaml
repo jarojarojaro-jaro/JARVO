@@ -145,3 +145,14 @@ scenarios:
       should_not:
         - "pisze scenariusz albo tekst lektora zamiast briefu"
         - "wpisuje liczbę z pamięci albo ze źródła D do „liczby”"
+
+  - id: sherlock-ostrozna-przegladarka
+    type: protocol
+    input: "Kontekst: extract.py dla https://sklep-przyklad.pl/cennik zwrócił 403, a browser_navigate pokazał „Just a moment…”. Karta potrzebuje dzisiejszej ceny z tej strony."
+    expect:
+      should:
+        - "najpierw blocked-page-recovery (kopia z archiwum z datą), a gdy potrzebny stan bieżący, jedna próba ostrozna.py tej strony"
+        - "przy kodzie 3 z ostrozna.py kończy próbę: luka w raporcie i inne źródło tej samej informacji"
+        - "tekst z ostrozna.py rejestruje sources.py add --tekst i oznacza „odczyt przez Camoufox”"
+      should_not:
+        - "ponawia ostrozna.py, zmienia adres tej samej strony, klika captchę, ustawia proxy albo User-Agent"

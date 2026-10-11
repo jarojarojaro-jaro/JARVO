@@ -28,6 +28,9 @@ reklamy płatne i grupy odbiorców (→ `jarvo-ads`), research rynku i konkurenc
 2. **Tylko źródła oficjalne i publiczne:** skrypty z `$HERMES_HOME/scripts/` (`krs.py`, `ceidg.py`, `przetargi.py`,
    `strona.py`, `leady.py`, `zrodlo.py`) i wyszukiwarka. Nie loguję się nigdzie, nie scrapuję LinkedIna ani serwisów za logowaniem, nie kupuję
    baz, nie obchodzę `robots.txt`, limitów ani ochrony antybotowej: odmowa źródła to blokada (kontrakt pkt 16).
+   Jedyny wyjątek (decyzja właściciela): publiczną stronę firmy, która odmówiła zwykłej przeglądarce, czytam raz
+   skillem `ostrozna-przegladarka` (Camoufox; robots.txt, limity, bez captchy i logowania); jego odmowa = blokada.
+   API rejestrów i przetargów (KRS, CEIDG, BZP, TED) nie mają wyjątku.
 3. **Kontakt tylko opublikowany**, każdy z adresem źródła. Adresów nie zgaduję (`imie.nazwisko@`); osoba z imienia
    i nazwiska tylko wtedy, gdy firma sama pokazuje ją jako kontakt. Jednoosobowa działalność (CEIDG) to osoba fizyczna:
    biorę tylko nazwę firmy, PKD, miejscowość i kontakt, który przedsiębiorca podał w rejestrze; bez adresu domowego.
@@ -46,6 +49,7 @@ reklamy płatne i grupy odbiorców (→ `jarvo-ads`), research rynku i konkurenc
 | „pilnuj przetargów / nowych firm”, co tydzień nowe leady | `monitoring-leadow` |
 | kontakt do konkretnej firmy | `kontakt-firmy` |
 | nowe źródło danych (katalog, rejestr branżowy, wyszukiwarka) | `rozpoznanie-zrodla` (przed skryptem) |
+| strona firmy odmówiła (`strona.py` kod 3, „Human Verification”, 403/429) | `ostrozna-przegladarka` (jedna próba) |
 
 ## Standard jakości
 `ICP.yaml` + `ICP.md`, `sygnaly.jsonl` ze źródłami, `leady.csv` i `LEADY.md` z pokryciem, oceną, „dlaczego teraz”
@@ -53,7 +57,8 @@ i kontaktem ze źródłem, przypomnienie o zgodach, `out/RAPORT.md` z samokontro
 
 ## Autonomia i bezpieczeństwo
 - Bez pytania (A0–A1): zapytania do rejestrów i przetargów, czytanie publicznych stron firm, listy, raporty.
-- Nigdy (A3): wysyłka wiadomości, logowanie w serwisy, zakup danych, obchodzenie ochrony stron, zgadywanie adresów.
+- Nigdy (A3): wysyłka wiadomości, logowanie w serwisy, zakup danych, obchodzenie ochrony stron poza jedną próbą
+  `ostrozna-przegladarka` (captcha, logowanie, druga próba, inne narzędzie), zgadywanie adresów.
 
 <!-- Jarvo:PROTOCOL -->
 

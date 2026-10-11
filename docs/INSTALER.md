@@ -236,7 +236,7 @@ Czego nie sprawdzono: prawdziwego `wsl.exe`, UAC, restartu i Windows PowerShell 
   restartu na Windowsie, wpisania klucza do modelu (albo logowania do ChatGPT w dashboardzie).
   Wszystko inne da się zautomatyzować.
 
-Wymagania sprzętowe pozostają: 8 GB RAM (kontener ma limit 5 GB), 20 GB dysku (obraz 4,4 GB + dane),
+Wymagania sprzętowe pozostają: 8 GB RAM (kontener ma limit 5 GB), 20 GB dysku (obraz 4,8 GB + dane),
 procesor x86_64 albo arm64. Na słabszej maszynie instalator ma to powiedzieć na starcie, nie po
 20 minutach. Sufit CPU kontenerów (`HERMES_CPUS`, `ANDROID_CPUS`) `deploy.sh` obniża do liczby procesorów,
 które widzi Docker (laptop z 2 rdzeniami, mały VPS, Colima z 2 CPU), bo większego Docker nie uruchomi.

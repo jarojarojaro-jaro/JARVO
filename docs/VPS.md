@@ -47,7 +47,7 @@ Kluczowe decyzje:
   więc GitHub Actions buduje z niej gotowy obraz floty (`scripts/obraz.sh`), a `deploy.sh` go pobiera.
   Własny `HERMES_IMAGE` w `compose/.env` nadpisuje wersję z repo: wtedy obraz buduje się na miejscu.
 - **Sidecar tylko wtedy, gdy musi być usługą** (SearXNG). Ekstrakcja stron i PDF działają w obrazie
-  na żądanie (trafilatura, Lightpanda, pandoc + Chromium): proces żyje tylko na czas zadania, więc
+  na żądanie (trafilatura, Lightpanda, pandoc + Chromium, Camoufox po odmowie strony): proces żyje tylko na czas zadania, więc
   w spoczynku nie zajmuje RAM-u. Tak cała flota mieści się na VPS z 8 GB.
 - **Kontener Hermesa jest sandboxem.** Agenci wykonują komendy wewnątrz kontenera (backend
   `local` w kontenerze) i nie dostają gniazda Dockera, które dawałoby im władzę nad hostem
@@ -66,8 +66,8 @@ rendering kodu (FFmpeg, HyperFrames), przeglądarki, transkrypcję i usługi.
 
 | | Zmierzone (Docker, Hermes 0.21.5) |
 |---|---|
-| obraz `jarvo-hermes` | **4,4 GB** (z tego 2,7 GB to sam obraz Hermesa) + SearXNG 0,26 GB + Valkey 0,04 GB |
-| dysk na start | ok. **6 GB**: obrazy + model mowy 0,65 GB (pobierany przy pierwszej wiadomości głosowej) |
+| obraz `jarvo-hermes` | **4,8 GB** (z tego 2,7 GB to sam obraz Hermesa; Camoufox od 2026-10 dokłada 0,4 GB: przeglądarka 0,34 GB, GTK 0,06 GB, Python 0,03 GB) + SearXNG 0,26 GB + Valkey 0,04 GB |
+| dysk na start | ok. **6,5 GB**: obrazy + model mowy 0,65 GB (pobierany przy pierwszej wiadomości głosowej) |
 | RAM w spoczynku | **ok. 0,7 GB**: gateway 350 MB, dashboard 185 MB, SearXNG 130 MB, Valkey 6 MB |
 
 RAM narzędzi zmierzony w kontenerze (szczyt, proces żyje tylko na czas zadania):
@@ -76,6 +76,7 @@ RAM narzędzi zmierzony w kontenerze (szczyt, proces żyje tylko na czas zadania
 |---|---|---|
 | przeglądanie przez Lightpandę (agent-browser, strona z ciężkim JS) | ~35 MB | 0,4 s |
 | to samo w Chromium (zrzuty ekranu, trudne strony) | ~100–250 MB | 0,9 s |
+| Camoufox (`ostrozna.py`: robots.txt + 1 strona, tylko po odmowie zwykłej przeglądarki; jedna naraz) | ~0,8 GB (przeglądarka 0,55 + Playwright 0,25) | 10–25 s |
 | Lighthouse, 1 strona mobile | ~340 MB | 11 s |
 | transkrypcja Parakeet (36 s wideo → tekst/SRT, 2 wątki CPU) | ~1,1–1,3 GB | 10–12 s |
 | dembrandt (tokeny marki ze strony) | ~170 MB | 9 s |
@@ -84,10 +85,10 @@ RAM narzędzi zmierzony w kontenerze (szczyt, proces żyje tylko na czas zadania
 | pracownik kanbana (proces Hermesa z agentem) | ~250–350 MB (szac.) | cały czas trwania karty |
 
 **Budżet 8 GB (najgorszy realny przypadek naraz):** spoczynek 0,7 + 3 pracowników 1,0 + przeglądarki 0,4 +
-Lighthouse 0,35 + transkrypcja 1,2 ≈ **3,7 GB**. Sufity w compose: Hermes 5 GB, SearXNG 384 MB, Valkey 96 MB.
+Camoufox 0,8 + Lighthouse 0,35 + transkrypcja 1,2 ≈ **4,5 GB**. Sufity w compose: Hermes 5 GB, SearXNG 384 MB, Valkey 96 MB.
 Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników z RAM hosta),
 `max_in_progress_per_profile: 2`, `delegation.max_concurrent_children` 2–3, jedna transkrypcja naraz
-(blokada w `jarvo-stt`), swap 4 GB (`bootstrap-vps.sh`, swappiness 10).
+(blokada w `jarvo-stt`), jeden Camoufox naraz (blokada w `ostrozna.py`), swap 4 GB (`bootstrap-vps.sh`, swappiness 10).
 
 | Etap | CPU | RAM | Dysk | Co działa |
 |---|---|---|---|---|

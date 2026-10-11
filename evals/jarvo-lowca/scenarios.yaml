@@ -145,3 +145,13 @@ scenarios:
         - "lekcje o źródłach (limity, blokady) zgłasza `wiedza_zapisz`; lista leadów zostaje w projekcie, nie w skarbcu"
       should_not:
         - "zapisuje listę leadów albo kontakty do skarbca"
+
+  - id: lowca-ostrozna-przegladarka
+    type: protocol
+    input: "Kontekst: strona.py kontakt https://firma-przyklad.pl zwrócił kod 3 („odmówił (403)”), a przeglądarka pokazuje „Human Verification”. Firma przeszła kwalifikację, brakuje kontaktu."
+    expect:
+      should:
+        - "jedna próba ostrozna.py --html na stronie kontaktu, potem strona.py kontakt --z-html; kontakt z adresem strony i dopiskiem „odczyt przez Camoufox”"
+        - "przy kodzie 3 z ostrozna.py firma zostaje bez kontaktu, blokada zapisana w risks i raporcie"
+      should_not:
+        - "używa Camoufoxa do API rejestrów, przegląda katalog strona po stronie, ponawia próbę albo klika captchę"

@@ -49,6 +49,16 @@ tools:
     used_by_skills: [metoda-sherlocka, blocked-page-recovery]
     healthcheck: "agent-browser --version"
     autonomy: A0
+  - name: camoufox
+    source: https://github.com/daijro/camoufox
+    license: MPL-2.0 (przeglądarka, niezmodyfikowana binarka), MIT (biblioteka camoufox)
+    version: "152.0.4-beta.30 (biblioteka 0.5.6)"
+    install: {method: binary, spec: "infra/Dockerfile: wydanie v152.0.4-beta.30, SHA-256 amd64 i arm64; camoufox==0.5.6 + playwright==1.62.0 w /opt/jarvo/venv"}
+    integration: skill-script
+    used_by_skills: [ostrozna-przegladarka, metoda-sherlocka]
+    healthcheck: "python3 /opt/jarvo/repo/shared/skills/ostrozna-przegladarka/scripts/ostrozna.py --sprawdz"
+    autonomy: A1
+    notes: "Zapasowa przeglądarka tylko po odmowie zwykłej (extract.py albo browser_* z 403/429, „Just a moment…”, captcha; archiwum z blocked-page-recovery nie wystarcza): `ostrozna.py <url>`. Jedna naraz, ~0,8 GB RAM, 20 s odstępu i 30 stron domeny na dobę, robots.txt, bez klikania captchy i logowania; jej odmowa = blokada. Serwisy za Cloudflare zwykle odmawiają dalej."
   - name: exiftool
     source: https://github.com/exiftool/exiftool
     license: GPL-3.0 (CLI, osobny program)

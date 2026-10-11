@@ -42,7 +42,7 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 - **Wspólne:** wiedza o Tobie (USER.md), brand kity (`knowledge/brands`) i **skarbiec wiedzy** (`knowledge/`, [WIEDZA.md](WIEDZA.md):
   notatki z linkami, orzeczenia z Twoich korekt, wyciągi z rozmów i kart; wtyczka `jarvo-wiedza` daje każdemu agentowi
   przypomnienia przed turą i narzędzia `wiedza_*`). Pamięć i skille są per agent
-  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `konwersja-plikow` (plik → inny format albo bez metadanych) u wszystkich; Ręka czyta skille wszystkich).
+  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `konwersja-plikow` (plik → inny format albo bez metadanych) u wszystkich, `ostrozna-przegladarka` (jedna próba Camoufoxem po odmowie strony) u Łowcy i Sherlocka; Ręka czyta skille wszystkich).
 - **Nadzór bez palenia tokenów:** dispatcher kanbana i patrol (skrypt bez modelu) pilnują floty
   i budzą Jarva tylko przy anomaliach albo gdy trzeba Twojej decyzji.
 
@@ -99,7 +99,10 @@ e-Zamówienia BZP (ogłoszenia i wyniki ze zwycięzcą), TED, strony firm (`robo
 Ocena: dopasowanie do `ICP.yaml` → świeżość → siła; kontakt tylko opublikowany przez firmę albo rejestr, ze źródłem;
 przypomnienie o zgodzie na informację handlową (UŚUDE, PKE) i RODO w każdej liście. Skrypty: `krs.py`, `ceidg.py`,
 `przetargi.py`, `strona.py`, `leady.py`; nowe źródło najpierw rozpoznaje (`zrodlo.py`: nagranie ruchu HAR, różnice dwóch nagrań,
-schemat z wielu odpowiedzi) i opisuje w `ZRODLO.md`, zanim powstanie skrypt. Projekt: [LEADY.md](LEADY.md).
+schemat z wielu odpowiedzi) i opisuje w `ZRODLO.md`, zanim powstanie skrypt. Strona firmy, która odmówiła zwykłej
+przeglądarce (403/429, „Human Verification”), dostaje jedną próbę Camoufoxem (`ostrozna-przegladarka`: robots.txt,
+20 s odstępu, 30 stron domeny na dobę, bez klikania captchy); serwisy za Cloudflare zwykle odmawiają dalej i to
+zostaje blokadą. Projekt: [LEADY.md](LEADY.md).
 
 ### 2a'. jarvo-ads — szczegóły
 Specjalista Ads Managera dla **Meta (FB/IG) i Google**. Planuje kampanie, robi testy (jedna reklama,
@@ -183,14 +186,15 @@ Definiuje strukturę karty (CEL, Definition of Done, WYJŚCIA, GRANICE) i 17 zas
 m.in. echo celu, jedna weryfikacja bez osłabiania kontroli, stany dowodu, poprawki po recenzji z prawem
 do sprzeciwu popartego dowodem, **reguła 16: „Blokada to koniec, nie zagadka”** (blokada kończy próbę;
 agent nie szuka obejścia, nie zmienia własnej konfiguracji, nie przyjmuje haseł z czatu, nie loguje się
-w cudze konta, nie obchodzi wykrywania automatu) i **reguła 17: zgoda A2 dotyczy dokładnie tej wersji**
+w cudze konta, nie obchodzi wykrywania automatu; jedyny wyjątek zapisany w SOUL Łowcy i Sherlocka: raz czytają
+odrzuconą stronę publiczną zapasową przeglądarką Camoufox, skill `ostrozna-przegladarka`, a jej odmowa to koniec) i **reguła 17: zgoda A2 dotyczy dokładnie tej wersji**
 (odcisk plików `scripts/odcisk.py`; zmiana po zgodzie = nowa zgoda).
 
 ---
 
 ## 4. Infrastruktura (VPS)
 
-Cała flota mieści się na **1 VPS: 4 vCPU / 8 GB RAM / 80 GB**. Obraz ~4,4 GB, w spoczynku ~0,7 GB RAM.
+Cała flota mieści się na **1 VPS: 4 vCPU / 8 GB RAM / 80 GB**. Obraz ~4,8 GB, w spoczynku ~0,7 GB RAM.
 
 **Obraz `jarvo-hermes`** = Hermes Agent + dobrane narzędzia. **Sidecary (docker compose):**
 - `hermes` — silnik agentów,
@@ -203,7 +207,9 @@ Cała flota mieści się na **1 VPS: 4 vCPU / 8 GB RAM / 80 GB**. Obraz ~4,4 GB,
 **Narzędzia w obrazie:** Lightpanda (lekka przeglądarka headless ~30 MB/sesję) + jedna Chromium z obrazu
 Hermesa (`/usr/local/bin/chromium`: render, PDF, zrzuty, Lighthouse), Parakeet przez `jarvo-stt` (onnx-asr;
 model ~0,65 GB pobierany przy pierwszym użyciu), FFmpeg (z obrazu Hermesa), lektor angielski Paradee przez `jarvo-tts`
-(model 9 MB w obrazie, bez sieci). Edge TTS (lektor PL) doinstalowuje Hermes przy pierwszym użyciu. Odchudzone: usunięto Gotenberg i Crawl4AI. (W piaskownicy Claude Code osobno:
+(model 9 MB w obrazie, bez sieci), Camoufox (`/opt/jarvo/camoufox`, Firefox z odciskiem zwykłej przeglądarki,
+~0,35 GB): zapasowa przeglądarka Łowcy i Sherlocka tylko po odmowie strony (`ostrozna.py`, jedna naraz, ~0,8 GB RAM
+na czas jednej strony). Edge TTS (lektor PL) doinstalowuje Hermes przy pierwszym użyciu. Odchudzone: usunięto Gotenberg i Crawl4AI. (W piaskownicy Claude Code osobno:
 Playwright/Chromium w `/opt/pw-browsers`, poza obrazem.)
 
 **Modele:** domyślnie provider `openai-codex` (jeden model `gpt-6-luna`, głębia myślenia per agent
@@ -276,7 +282,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `profiles/_host/` | profil hosta: gateway z multipleksacją, trasy Telegrama, dispatcher kanbana |
 | `shared/protocol/` | kontrakt zlecenia (17 zasad) wstrzykiwany do każdego SOUL |
 | `shared/security/deny.yaml` | reguły blokad dla całej floty |
-| `shared/skills/` | skille wspólne (`graf-kodu`; `transkrypcja-filmu`: link do filmu → tekst mowy; `hooki`: trzy warstwy hooka, 18 taktyk; `izometria`: figury izometryczne ze świeceniem na stronę, PNG i film; `konwersja-plikow`: plik → inny format albo bez metadanych u każdego agenta) |
+| `shared/skills/` | skille wspólne (`graf-kodu`; `transkrypcja-filmu`: link do filmu → tekst mowy; `hooki`: trzy warstwy hooka, 18 taktyk; `izometria`: figury izometryczne ze świeceniem na stronę, PNG i film; `konwersja-plikow`: plik → inny format albo bez metadanych u każdego agenta; `ostrozna-przegladarka`: zapasowa przeglądarka Camoufox Łowcy i Sherlocka po odmowie strony) |
 | `shared/calibration/` | kalibracja SOUL pod rodzinę modelu przy buildzie |
 | `shared/templates/` | szablony SOUL, skilla, evals i toolboxa (`make new-agent`) |
 | `security/redteam/` | promptfoo: prowider, config, scenariusze ataków |

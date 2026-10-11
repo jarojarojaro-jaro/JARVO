@@ -10,6 +10,15 @@
 - skille: `searxng-search`, `duckduckgo-search` (inny indeks = niezależność), `scrapling`, `blocked-page-recovery`,
   `arxiv` (nauka), `youtube-content` (transkrypcje), `reddit-reading` (opinie użytkowników), `rss-feeds`.
 
+## Strona odmówiła (403/429, „Just a moment…”, „Human Verification”, captcha)
+1. Kopia w archiwum: `blocked-page-recovery` (Wayback, archive.today). Cytujesz z datą kopii.
+2. Potrzebny stan bieżący albo kopii nie ma: **jedna** próba Camoufoxem, skill `ostrozna-przegladarka`:
+   `python3 $HERMES_HOME/skills/web/ostrozna-przegladarka/scripts/ostrozna.py <url> -o out/strony/<nazwa>.md`,
+   potem `sources.py add <url> --tekst out/strony/<nazwa>.md --rejestr <rejestr>` (numer `[n]` jak przy `extract.py`)
+   i dopisek „odczyt przez Camoufox” przy źródle w notatkach wątku.
+3. Kod 3 w `ostrozna.py` = koniec: luka w raporcie („źródło odmawia automatom”), szukasz innego źródła tej samej
+   informacji, nie innej drogi do tej strony. Serwisy za Cloudflare zwykle odmawiają także Camoufoxowi.
+
 ## Technika
 1. **Szeroko → wąsko.** Pierwsze zapytanie ogólne, kolejne precyzyjne na podstawie znalezionych nazw i terminów.
 2. **Dwa języki.** Zapytanie po polsku i po angielsku (często inne źródła, inne wyniki).

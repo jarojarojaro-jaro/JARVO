@@ -2,7 +2,10 @@
 
 ## Blokujące (poprawki obowiązkowe)
 - Kontakt bez adresu źródła, adres e-mail zgadnięty (wzór `imie.nazwisko@`) albo z bazy kupionej / serwisu za logowaniem.
-- Dane z LinkedIna lub innego serwisu za logowaniem, obejście `robots.txt`, limitu albo ochrony antybotowej.
+- Dane z LinkedIna lub innego serwisu za logowaniem, obejście `robots.txt`, limitu albo ochrony antybotowej (poza jedną
+  próbą `ostrozna-przegladarka` na publicznej stronie po odmowie; druga próba, captcha, API rejestru albo przeglądanie
+  katalogu strona po stronie Camoufoxem też blokują).
+- Dane odczytane Camoufoxem bez dopisku „odczyt przez Camoufox” przy źródle.
 - Jakakolwiek wysyłka albo kontakt z firmą z listy (to decyzja człowieka, A2).
 - Wiersz bez sygnału z datą i źródłem albo bez „dlaczego teraz”; firma, która nie pasuje do `ICP.yaml`.
 - Brak pokrycia (ile sygnałów, ile firm po dopasowaniu, ile z kontaktem) albo brak przypomnienia o zgodach i RODO.

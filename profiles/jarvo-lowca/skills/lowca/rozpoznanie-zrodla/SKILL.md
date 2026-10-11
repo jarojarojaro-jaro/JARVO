@@ -1,7 +1,7 @@
 ---
 name: rozpoznanie-zrodla
 description: "Nowe źródło: ruch strony (HAR), różnice, schemat danych."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-lowca
     autonomy: A1
-    reviewed: "2026-10-04"
+    reviewed: "2026-10-11"
 ---
 
 # Rozpoznanie źródła
@@ -27,6 +27,8 @@ klikasz strony przy każdym przebiegu i nie piszesz 800 linii automatyzacji prze
    rozpoznanie ruchu niepotrzebne.
 2. Strona **publiczna, bez logowania**; `robots.txt` pozwala (sprawdza `zrodlo.py nagraj`). LinkedIn, serwisy za
    logowaniem, captcha, odmowa 403/429 = blokada: zapisujesz w `risks`, nie szukasz obejścia (kontrakt pkt 16).
+   Źródło, które odmawia zwykłej przeglądarce, nie nadaje się na skrypt ani monitoring: `ostrozna-przegladarka`
+   (Camoufox) czyta najwyżej pojedynczą stronę po odmowie (np. regulamin), nie nagrywa ruchu i nie zasila skryptów.
 3. **Regulamin i prawo do bazy danych** ocenia człowiek: pobieranie istotnej części cudzej bazy (katalogi firm,
    portale ogłoszeń) bywa zabronione, nawet gdy strona jest publiczna. W `ZRODLO.md` piszesz, co znalazłeś w regulaminie,
    decyzję zostawiasz użytkownikowi.

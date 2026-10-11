@@ -65,7 +65,14 @@ Każdy wiersz ma `zrodlo` (wpis w wyszukiwarce firm biznes.gov.pl) i `stan_na` (
 (wyszukiwanie: pełne kody PKD, miasto, województwo, powiat, gmina, status, data rozpoczęcia, strony), `/firma`
 (szczegóły po NIP, REGON albo identyfikatorach, partiami); limit 1000 zapytań na 60 minut, skrypt robi 4 s przerwy,
 na 429 czeka i ponawia ([dokumentacja API v3](https://akademia.biznes.gov.pl/hurtownia-danych-instrukcje-i-dokumentacja/)).
-Źródło, które odpowiada ochroną antybotową albo odmową, to blokada, nie zagadka (kontrakt pkt 16).
+Źródło, które odpowiada ochroną antybotową albo odmową, to blokada, nie zagadka (kontrakt pkt 16). Jedyny wyjątek
+(decyzja właściciela z 2026-10-11): **strona firmy**, która odmówiła zwykłej przeglądarce (403/429, „Human
+Verification”), dostaje jedną próbę zapasową przeglądarką Camoufox (wspólny skill `ostrozna-przegladarka`:
+`ostrozna.py <url> --html`, potem `strona.py kontakt <url> --z-html <plik>`). Skrypt sprawdza robots.txt tą samą
+przeglądarką, trzyma 20 s odstępu i 30 stron domeny na dobę, niczego nie klika i nie rozwiązuje captchy; jego odmowa
+kończy próbę. Szczerze: Camoufox przechodzi testy odcisku przeglądarki i otwiera np. OLX, ale **katalogi firm za
+Cloudflare (GoWork, Aleo, rejestr.io) odmawiają także jemu**. API rejestrów i przetargów (KRS, CEIDG, BZP, TED)
+wyjątku nie mają, a katalogów nie przeglądamy nim strona po stronie.
 
 ### Token CEIDG
 
@@ -97,7 +104,8 @@ opcjonalne, `null`, niespójne typy). Wynik to `ZRODLO.md`: specyfikacja skryptu
 
 - **Tylko dane opublikowane przez firmę albo rejestr**, każde z adresem źródła. Nie zgadujemy adresów
   (`imie.nazwisko@`), nie kupujemy baz, nie scrapujemy LinkedIna ani innych serwisów za logowaniem, nie obchodzimy
-  ochrony stron (`robots.txt`, limity, captcha).
+  ochrony stron (`robots.txt`, limity, captcha). Jedyny wyjątek: jedna próba Camoufoxem na stronie firmy, która
+  odmówiła zwykłej przeglądarce ([wyżej](#2-źródła-sprawdzone-2026-09-30-ceidg-2026-10-05)), z tymi samymi granicami.
 - **Agent niczego nie wysyła.** Wysyłka to decyzja człowieka (A2). Raz na listę agent przypomina: informacja handlowa
   mailem albo telefonicznie do konkretnej osoby co do zasady wymaga jej wcześniejszej zgody (UŚUDE, Prawo komunikacji
   elektronicznej), także w B2B; adres opublikowany na stronie to nie zgoda. Przed kampanią: podstawa prawna, lista
@@ -135,7 +143,7 @@ out/leady/<projekt>/
 2. ✅ Skrypty `krs.py`, `przetargi.py`, `strona.py`, `leady.py` (+ `lowca_lib.py`) z testami offline; sprawdzone
    na żywych źródłach w kontenerze. e-Zamówienia odcina za kilka ciężkich zapytań z rzędu (strona „Dostęp
    zablokowany”): pauza 4 s na zapytanie, pełny dzień dzielony na województwa, blokada = stop. Pokój „Radar” w HQ.
-3. ✅ Profil `jarvo-lowca`: SOUL, 7 skilli, rubryka, 15 scenariuszy evals, dokumentacja floty; wzorzec misji „Leady”
+3. ✅ Profil `jarvo-lowca`: SOUL, 7 skilli, rubryka, 16 scenariuszy evals, dokumentacja floty; wzorzec misji „Leady”
    u Jarva, temat `Łowca` na Telegramie (`TELEGRAM_TOPIC_LOWCA`).
 4. ⬜ Pierwszy prawdziwy przebieg na ofercie użytkownika i poprawki wag.
 5. ✅ CEIDG (2026-10-05, decyzja właściciela): `ceidg.py` (API v3, token właściciela), sygnał `ceidg-nowa-firma`,

@@ -12,12 +12,12 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
 | `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [13 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 2 (`writing-for-agents`, mattpocock; wspólny `konwersja-plikow`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski | [25](../evals/jarvo/scenarios.yaml) |
-| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [8 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 16 (Hermes, marketingskills, wspólne `transkrypcja-filmu` i `konwersja-plikow`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [15](../evals/jarvo-sherlock/scenarios.yaml) |
+| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [8 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 17 (Hermes, marketingskills, wspólne `transkrypcja-filmu`, `konwersja-plikow` i `ostrozna-przegladarka`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [16](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 60 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria` i `konwersja-plikow`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [19](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 27 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria` i `konwersja-plikow`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [21 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 62 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, live-panel, Hermes, wspólne `transkrypcja-filmu`, `hooki`, `izometria`, `konwersja-plikow` i inne) | film, stock, kadry, montaz, dwa_ekrany, napisy, qa_wideo, rytm, muzyka, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, twarze, demo_strony, typografia, maska, zywy_schemat, gramatyka, malarz (+ wideo_lib; moduły JS stron: ruch, kreska, morph, crt, plotno, piksel, os_czasu, strona, ujecia) | [38](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [11 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 7 (marketingskills, wspólne `hooki` i `konwersja-plikow`) | ads, planer, eksperyment, eksport, paczka | [14](../evals/jarvo-ads/scenarios.yaml) |
-| `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 1 (wspólny `konwersja-plikow`) | krs, ceidg, przetargi, strona, leady, zrodlo | [15](../evals/jarvo-lowca/scenarios.yaml) |
+| `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 2 (wspólne `konwersja-plikow` i `ostrozna-przegladarka`) | krs, ceidg, przetargi, strona, leady, zrodlo | [16](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 21 (Expo, React Native, ASO; wspólny `konwersja-plikow`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 5 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`, `konwersja-plikow`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [14](../evals/jarvo-reka/scenarios.yaml) |
 
@@ -179,7 +179,8 @@ składa całość i **weryfikuje**, co jest prawdą.
   `scrapling`, `arxiv`, `youtube-content`, `reddit-reading`, `rss-feeds`,
   `blogwatcher`, `competitor-news-monitor`, `domain-intel`, `osint-investigation`
 - [Z] marketingskills `competitor-profiling`, `customer-research`; wspólny `transkrypcja-filmu` (`shared/skills/`):
-  link albo plik filmu → tekst mowy (napisy platformy albo Parakeet), bez analizy obrazu
+  link albo plik filmu → tekst mowy (napisy platformy albo Parakeet), bez analizy obrazu; wspólny `ostrozna-przegladarka`:
+  strona, która odmówiła zwykłej przeglądarce i nie ma kopii w archiwum, dostaje jedną próbę Camoufoxem (`ostrozna.py`)
 - [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł), [T] `szybki-fakt` (jedna runda, cytat),
   [T] `raport-sledztwa` (format raportu; brief do filmu `out/fakty.json` dla Wideografa, sprawdzany `fakty.py`), [T] `research-seo` (słowa kluczowe i konkurencja, dla `jarvo-web` i `jarvo-studio`),
   [T] `research-rynku` (gracze, oferty, ceny, opinie), [T] `monitoring` (rutyna cron zakładana przez Jarva),
@@ -187,6 +188,7 @@ składa całość i **weryfikuje**, co jest prawdą.
   blok „Źródła” ze skryptu i `verify` raportu przed oddaniem; silnik przeniesiony z Hermesa `grounded-citations`)
 
 **Narzędzia:** wielu dostawców wyszukiwania naraz (własny SearXNG, Brave, Exa…), trafilatura i Lightpanda (strony z JS do Markdown),
+Camoufox tylko po odmowie strony (jedna próba, robots.txt, bez captchy; serwisy za Cloudflare zwykle odmawiają dalej),
 Docling (PDF-y, dodatek obrazu), yt-dlp (transkrypcje), OpenAlex (nauka, wtyczka opcjonalna), rejestr źródeł
 z tekstami stron i cytatami-dowodami (`sources.py`, `out/zrodla.json`), archiwum dowodów lokalnie
 (`sources.py --archive`: HTML i tekst; ArchiveBox jako opcjonalny sidecar w planach), delegowanie wątków.
@@ -352,7 +354,9 @@ firma sama opublikowała; monitoring pokazuje tylko nowe firmy. Tylko źródła 
 i baz kupionych, niczego nie wysyła. Pełny projekt: [LEADY.md](LEADY.md).
 
 **Skille:** [T] `profil-klienta`, `sygnaly` (+ tabela źródeł i przepisów), `kwalifikacja`, `kontakt-firmy`,
-`lista-leadow`, `monitoring-leadow`, `rozpoznanie-zrodla` (nowe źródło: nagranie ruchu HAR, różnice, schemat).
+`lista-leadow`, `monitoring-leadow`, `rozpoznanie-zrodla` (nowe źródło: nagranie ruchu HAR, różnice, schemat);
+wspólne `konwersja-plikow` i `ostrozna-przegladarka` (strona firmy, która odmówiła zwykłej przeglądarce: jedna próba
+Camoufoxem, potem `strona.py kontakt --z-html`; API rejestrów bez wyjątku).
 Skrypty: `krs.py`, `ceidg.py`, `przetargi.py`, `strona.py`, `leady.py`, `zrodlo.py` (+ `har.cjs`).
 
 ---
