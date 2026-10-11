@@ -366,6 +366,12 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
 - jedna Chromium: `playwright-core` (także dembrandta, przez `overrides`) i Playwright claude-seo są przypięte do wersji,
   której przeglądarka jest w obrazie Hermesa; Dockerfile uruchamia ją testowo i zatrzyma build przy niezgodności,
 - `AGENT_BROWSER_EXECUTABLE_PATH` celowo nieustawione: agent-browser użyłby go też dla silnika lightpanda,
+- Lightpanda (1.0.0, przegląd 2026-10-11): obraz `lightpanda/browser` przypięty digestem indeksu (amd64 + arm64),
+  z niego tylko binarka po `strip` (74 MB). Lightpanda domyślnie wysyła telemetrię (identyfikator instalacji i liczniki
+  do `telemetry.lightpanda.io`) i raporty awarii (`curl` do `crash.lightpanda.io`); obraz ustawia
+  `LIGHTPANDA_DISABLE_TELEMETRY=1` (wyłącza oba) i `LIGHTPANDA_DISABLE_CORE_DUMP=1`, a Hermes przekazuje je
+  agent-browserowi. Sprawdzanie nowej wersji tylko na żądanie (`lightpanda version --check`). Od 1.0.0 CORS w `fetch`/XHR
+  jest wymuszany jak w Chromium,
 - bez cache instalatorów w warstwach (`UV_NO_CACHE`, `npm cache clean`) i bez `chmod -R` (kopiuje całe drzewo do nowej warstwy),
 - auto-editor (dodatek `media`) pobiera swoją binarkę przy budowie obrazu (w runtime katalog pakietów jest tylko do odczytu),
 - ManimGX (dodatek `manim`): osobny venv `/opt/jarvo/venvs/manimgx` na Pythonie 3.13 z obrazu Hermesa (Debian 13,

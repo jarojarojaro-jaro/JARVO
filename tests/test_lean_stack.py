@@ -186,6 +186,7 @@ def test_dockerfile_hygiene():
     assert "install-browser" not in code                 # bez drugiej Chromium dla dembrandta
     assert "AGENT_BROWSER_EXECUTABLE_PATH" not in code   # przejąłby też silnik lightpanda
     assert re.search(r"LIGHTPANDA_IMAGE=lightpanda/browser:[\d.]+@sha256:[0-9a-f]{64}", code)
+    assert "LIGHTPANDA_DISABLE_TELEMETRY=1" in code       # Lightpanda bez telemetrii i raportów awarii
 
 
 def test_lightpanda_version_in_docs_matches_image_pin():

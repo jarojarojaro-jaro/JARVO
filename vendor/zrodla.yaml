@@ -194,7 +194,7 @@ zrodla:
   browser:
     repo: https://github.com/lightpanda-io/browser
     status: uzywane
-    przejrzane: d15600f5bef59e7583d4878c2f1178e46a4de0b9
+    przejrzane: 588f6223b9cae8a2406aeef035ed9363a3e404fd
   camoufox:
     repo: https://github.com/daijro/camoufox
     status: uzywane

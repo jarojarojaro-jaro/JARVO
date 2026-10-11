@@ -16,11 +16,11 @@
 ARG HERMES_IMAGE=nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7
 # Lightpanda (AGPL-3.0, niezmodyfikowana binarka): przeglądarka headless dla narzędzi browser_* agentów.
 # Wersja przypięta digestem i przejrzana przed dodaniem (docs/SOURCES.md, „Przegląd przed dodaniem”).
-ARG LIGHTPANDA_IMAGE=lightpanda/browser:0.4.1@sha256:73f67d2dc0bc243f3a8c87065c9871c98b121197baf7b650df5da91b33b98f02
+ARG LIGHTPANDA_IMAGE=lightpanda/browser:1.0.0@sha256:5b84708cb3d9bef841aba4a4cd299f4de0609ac1bd7d4c6fbfcbf168d56b685e
 
 FROM ${LIGHTPANDA_IMAGE} AS lightpanda
 
-# binarka z obrazu Lightpandy ma symbole debugowania (178 MB); po strip 68 MB
+# binarka z obrazu Lightpandy ma symbole debugowania (188 MB); po strip 74 MB
 FROM ${HERMES_IMAGE} AS lightpanda-strip
 USER root
 COPY --from=lightpanda /usr/bin/lightpanda /tmp/lightpanda
@@ -72,7 +72,12 @@ RUN set -e; p=""; \
 COPY --from=lightpanda-strip /tmp/lightpanda /usr/local/bin/lightpanda
 # Uwaga: bez AGENT_BROWSER_EXECUTABLE_PATH, bo agent-browser użyłby go także dla silnika lightpanda;
 # Chromium znajduje sam przez PATH (/usr/local/bin/chromium).
-ENV CHROME_PATH=/usr/local/bin/chromium \
+# Lightpanda domyślnie wysyła telemetrię (identyfikator instalacji do telemetry.lightpanda.io) i raporty awarii
+# (curl do crash.lightpanda.io); LIGHTPANDA_DISABLE_TELEMETRY wyłącza oba. Bez zrzutów pamięci (core dump),
+# bo zawierałyby treść stron (tak samo robi oficjalny obraz). Hermes przekazuje te zmienne do agent-browsera.
+ENV LIGHTPANDA_DISABLE_TELEMETRY=1 \
+    LIGHTPANDA_DISABLE_CORE_DUMP=1 \
+    CHROME_PATH=/usr/local/bin/chromium \
     PUPPETEER_SKIP_DOWNLOAD=1 \
     PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/chromium
 

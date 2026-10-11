@@ -33,13 +33,13 @@ tools:
   - name: lightpanda
     source: https://github.com/lightpanda-io/browser
     license: AGPL-3.0 (niezmodyfikowana binarka, osobny program)
-    version: "0.4.1"
+    version: "1.0.0"
     install: {method: image, spec: "COPY z lightpanda/browser (infra/Dockerfile)"}
     integration: hermes-browser-engine
     used_by_skills: [metoda-sherlocka, blocked-page-recovery]
     healthcheck: "lightpanda version"
     autonomy: A0
-    notes: "Silnik browser_* (browser.engine: lightpanda, ~30 MB RAM na sesję). Zrzuty i trudne strony: Hermes sam przełącza na Chromium. Czysty tekst strony bez przeglądarki: `lightpanda fetch --dump markdown <url>`."
+    notes: "Silnik browser_* (browser.engine: lightpanda, ~30 MB RAM na sesję). Zrzuty i trudne strony: Hermes sam przełącza na Chromium. Czysty tekst strony bez przeglądarki: `lightpanda fetch --dump markdown <url>`. Od 1.0.0 CORS jak w Chromium; telemetria wyłączona w obrazie (`LIGHTPANDA_DISABLE_TELEMETRY`)."
   - name: agent-browser
     source: https://github.com/vercel-labs/agent-browser
     license: Apache-2.0
