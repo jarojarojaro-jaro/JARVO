@@ -243,9 +243,10 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   a słowo własną głębię `z`. Osoba (film) stoi na z = 1, napis przed nią ma z < 1 (bez pola 0,8), za nią z > 1
   (1,3); słowo z `glebia` ±1 jest 15% bliżej albo dalej niż blok. Kamera ma przejazd w głąb i przesunięcie, punkt
   na głębokości z widać w skali z / (z − kz), więc przy najeździe bliższy napis rośnie i przesuwa się mocniej niż film
-  (paralaksa), a w spoczynku wszystko stoi tam, gdzie w planie. Styl dobiera ruchy z bloków (za osobą najazd, po
-  najeździe odjazd, uderzenie najazd, co drugi spokojny blok przesunięcie w stronę bloku; `dynamiczna`: szybki najazd
-  od uderzenia i przesunięcie przy każdym spokojnym bloku); ruch bloku ma pierwszeństwo, `brak` go wyłącza. Najdalej
+  (paralaksa), a w spoczynku wszystko stoi tam, gdzie w planie. Styl dobiera ruchy z bloków: za osobą najazd, uderzenie (waga 3)
+  najazd, a kamera w głębi odjeżdża (`spokojna`: po co najmniej 2,5 s, `dynamiczna`: przy następnym bloku);
+  co trzeci spokojny blok (`dynamiczna`: każdy) przesuwa kamerę w stronę bloku, a `dynamiczna` najeżdża szybko od
+  uderzenia; ruch bloku ma pierwszeństwo, `brak` go wyłącza. Najdalej
   ×1,33 w głąb, a przesunięcie zawsze z takim najazdem, żeby film wypełniał kadr. Ostrość jest na najnowszym bloku
   (przejście 0,3 s) albo na osobie; reszta rozmywa się jak w obiektywie (σ = 13,4·przysłona·|d − df| / d px przy 1080,
   słowa bez własnej głębi najwyżej 6·przysłona px, żeby zostały czytelne). Ruchy liczą tak samo `48-typografia.js`

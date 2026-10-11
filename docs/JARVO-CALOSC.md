@@ -135,7 +135,8 @@ smugi zamiast motion bluru) i parametry
 `typografia-edit`): reżyser z reguł układa bloki słów, Wideograf poprawia je znaczeniem (puenta = uderzenie, myśl =
 dalej i kursywą), kolory bierze z kadru (dwa akcenty w kontraście ze sceną, np. niebo → ciemna czerwień i złoto,
 na zmianę po mocnych słowach), styl filmu wybiera z 14 według rodzaju nagrania (podcast z obrysem, vlog, tech,
-magazyn i inne; karty stylów w HQ), mocne słowo staje za osobą (maska MODNet), a plan zostaje
+magazyn i inne; karty stylów w HQ), mocne słowo staje za osobą (maska MODNet), wirtualna kamera robi najazd, odjazd
+i przesunięcie, a napisy stoją na różnych głębokościach z rozmyciem jak w obiektywie (`typografia.py kamera`), plan zostaje
 w projekcie montażu do poprawek w HQ; gotowego planu nie nadpisuje bez wyraźnej prośby. Żywy schemat (`zywy_schemat.py`,
 skill `zywy-schemat`, silnik strony live-panel, MIT): flota, przepływ zlecenia albo architektura jako film, w którym
 układ stoi, a kropki płyną po strzałkach i kroki podświetlają się po kolei; formaty X, Instagram, pion, motywy

@@ -70,6 +70,7 @@ KAMERA_ZMAX = 0.25        # najgłębszy najazd: film ×1,33 (dalej obraz z tele
 KAMERA_SILA = {"spokojna": 0.35, "dynamiczna": 0.6}   # siła ruchów dobranych ze stylu
 KAMERA_UDERZENIE = 0.4    # s: ruch „uderzenie” (szybki start, miękkie lądowanie) od słowa
 KAMERA_MIN_BLOK = 0.6     # s: krótszy blok nie dostaje ruchu ze stylu (oko nie zdąży go zobaczyć)
+KAMERA_TRZYMAJ = 2.5      # s: spokojna kamera trzyma najazd co najmniej tyle, zanim odjedzie
 TYPO_LEAD = 0.03          # słowo wchodzi tuż przed dźwiękiem (TYPO_LEAD w 48-typografia.js)
 # Przejścia między klipami: klucz = nazwa przejścia xfade w FFmpeg, "blur" = przenikanie z rozmyciem Gaussa (nasze).
 # Te same klucze co ED_PRZEJSCIA w hq/web/src/49-przejscia.js (podgląd rysuje je tymi samymi wzorami).
@@ -366,41 +367,46 @@ def kamera_z(b: dict) -> float:
     return float(z) if isinstance(z, (int, float)) and not isinstance(z, bool) else KAMERA_Z["tyl" if b.get("warstwa") == "tyl" else "przod"]
 
 
-def kamera_auto(b: dict, styl: str, wcisnieta: bool, spokoj: int) -> tuple[dict | None, int]:
-    """Ruch ze stylu kamery dla bloku bez własnego: blok za osobą = najazd (osoba rośnie, napis za nią mniej),
-    po najeździe odjazd do spoczynku, uderzenie (waga 3) = najazd (dynamiczna: szybki, od słowa), co drugi
-    spokojny blok (dynamiczna: każdy) = przesunięcie w stronę bloku, który przez to idzie do środka.
-    Zwraca (ruch albo None, licznik spokojnych bloków)."""
+def kamera_auto(b: dict, styl: str, stan: dict) -> dict | None:
+    """Ruch ze stylu kamery dla bloku bez własnego. Blok za osobą = najazd (osoba rośnie, napis za nią mniej).
+    Kamera w głębi: dynamiczna odjeżdża przy następnym bloku, spokojna trzyma najazd KAMERA_TRZYMAJ s i odjeżdża
+    płynnie z następnym blokiem. W spoczynku uderzenie (waga 3) = najazd (dynamiczna: szybki, od słowa), a co trzeci
+    spokojny blok (dynamiczna: każdy) = przesunięcie w stronę bloku, który przez to idzie do środka kadru.
+    `stan` = {wcisnieta, od (początek najazdu), spokoj (licznik spokojnych bloków)}, zmienia go kamera_ruchy."""
     if b["end"] - b["start"] < KAMERA_MIN_BLOK:
-        return None, spokoj
+        return None
     sila = KAMERA_SILA[styl]
     hit = next((j for j, w in enumerate(b["slowa"]) if w.get("waga") == 3), None)
     if b.get("warstwa") == "tyl":
-        return {"ruch": "najazd", "sila": sila, "krzywa": "plynnie"}, spokoj
-    if wcisnieta:
-        return {"ruch": "odjazd", "sila": sila, "krzywa": "plynnie"}, spokoj
+        return {"ruch": "najazd", "sila": sila, "krzywa": "plynnie"}
+    if stan["wcisnieta"]:
+        if styl == "dynamiczna" or b["start"] - stan["od"] >= KAMERA_TRZYMAJ:
+            return {"ruch": "odjazd", "sila": sila, "krzywa": "plynnie"}
+        return None
     if hit is not None:
         return ({"ruch": "najazd", "sila": sila, "krzywa": "uderzenie", "slowo": hit} if styl == "dynamiczna"
-                else {"ruch": "najazd", "sila": sila, "krzywa": "plynnie"}), spokoj
-    spokoj += 1
-    if styl == "dynamiczna" or spokoj % 2 == 0:
+                else {"ruch": "najazd", "sila": sila, "krzywa": "plynnie"})
+    stan["spokoj"] += 1
+    if styl == "dynamiczna" or stan["spokoj"] % 3 == 0:
         return {"ruch": "przesuniecie", "sila": sila, "krzywa": "plynnie",
-                "kierunek": "prawo" if float(b.get("x", 0.5)) >= 0.5 else "lewo"}, spokoj
-    return None, spokoj
+                "kierunek": "prawo" if float(b.get("x", 0.5)) >= 0.5 else "lewo"}
+    return None
 
 
 def kamera_ruchy(typo: dict) -> list[tuple[dict, dict]]:
     """[(blok, ruch)] po czasie: własny ruch bloku (`blok.kamera`, także „brak”) albo ruch ze stylu planu."""
     styl = (typo.get("kamera") or {}).get("styl")
-    out, wcisnieta, spokoj = [], False, 0
+    out, stan = [], {"wcisnieta": False, "od": 0.0, "spokoj": 0}
     for b in sorted(typo.get("bloki") or [], key=lambda x: x["start"]):
         r = b.get("kamera")
         if r is None and styl in KAMERA_SILA:
-            r, spokoj = kamera_auto(b, styl, wcisnieta, spokoj)
+            r = kamera_auto(b, styl, stan)
         if not r or r.get("ruch") == "brak":
             continue
         out.append((b, r))
-        wcisnieta = r["ruch"] == "najazd" or (wcisnieta and r["ruch"] == "przesuniecie")
+        if r["ruch"] == "najazd" and not stan["wcisnieta"]:
+            stan["od"] = b["start"]
+        stan["wcisnieta"] = r["ruch"] == "najazd" or (stan["wcisnieta"] and r["ruch"] == "przesuniecie")
     return out
 
 

@@ -328,7 +328,7 @@ const TYPO_KIERUNKI = ["lewo", "prawo", "gora", "dol"];
 const TYPO_KRZYWE = ["plynnie", "uderzenie"];
 const TYPO_OSTROSC = ["napis", "osoba"];
 const TYPO_KAMERA = { z: { przod: 0.8, tyl: 1.3 }, zmax: 0.25, sila: { spokojna: 0.35, dynamiczna: 0.6 }, uderzenie: 0.4,
-  minBlok: 0.6, ostrosc: 0.3, rozmycie: 13.4, plaski: 6, wlasne: 12, glebiaSlowa: 0.15 };
+  minBlok: 0.6, trzymaj: 2.5, ostrosc: 0.3, rozmycie: 13.4, plaski: 6, wlasne: 12, glebiaSlowa: 0.15 };
 function typoLiczba(v, d) { return v === null || v === undefined || v === "" || typeof v === "boolean" || !Number.isFinite(+v) ? d : +v; }
 function typoZ(b) {                       // głębia bloku: pole z albo domyślna warstwy
   return b && b.z !== undefined && b.z !== null && b.z !== "" ? typoClamp(typoLiczba(b.z, 1), 0.3, 3) : TYPO_KAMERA.z[b && b.warstwa === "tyl" ? "tyl" : "przod"];
@@ -346,27 +346,28 @@ function typoRuch(b) {                    // własny ruch bloku w bezpiecznej po
   if (Number.isInteger(r.slowo) && r.slowo >= 0 && r.slowo < b.slowa.length) o.slowo = r.slowo;
   return o;
 }
-// Ruch ze stylu kamery dla bloku bez własnego (edytor.kamera_auto): za osobą najazd, po najeździe odjazd,
-// uderzenie = najazd (dynamiczna: szybki, od słowa), co drugi spokojny blok (dynamiczna: każdy) przesunięcie.
-function typoKameraAuto(b, styl, wcisnieta, spokoj) {
-  if (b.end - b.start < TYPO_KAMERA.minBlok) return [null, spokoj];
+// Ruch ze stylu kamery dla bloku bez własnego (edytor.kamera_auto): za osobą najazd; kamera w głębi odjeżdża
+// (dynamiczna: przy następnym bloku, spokojna: po `trzymaj` s); w spoczynku uderzenie = najazd (dynamiczna: szybki,
+// od słowa), co trzeci spokojny blok (dynamiczna: każdy) przesunięcie. `stan` = {wcisnieta, od, spokoj}.
+function typoKameraAuto(b, styl, stan) {
+  if (b.end - b.start < TYPO_KAMERA.minBlok) return null;
   const sila = TYPO_KAMERA.sila[styl], hit = b.slowa.findIndex((w) => +w.waga === 3);
-  if (b.warstwa === "tyl") return [{ ruch: "najazd", sila, krzywa: "plynnie" }, spokoj];
-  if (wcisnieta) return [{ ruch: "odjazd", sila, krzywa: "plynnie" }, spokoj];
-  if (hit >= 0) return [styl === "dynamiczna" ? { ruch: "najazd", sila, krzywa: "uderzenie", slowo: hit } : { ruch: "najazd", sila, krzywa: "plynnie" }, spokoj];
-  spokoj++;
-  if (styl === "dynamiczna" || spokoj % 2 === 0) return [{ ruch: "przesuniecie", sila, krzywa: "plynnie", kierunek: typoLiczba(b.x, 0.5) >= 0.5 ? "prawo" : "lewo" }, spokoj];
-  return [null, spokoj];
+  if (b.warstwa === "tyl") return { ruch: "najazd", sila, krzywa: "plynnie" };
+  if (stan.wcisnieta) return styl === "dynamiczna" || b.start - stan.od >= TYPO_KAMERA.trzymaj ? { ruch: "odjazd", sila, krzywa: "plynnie" } : null;
+  if (hit >= 0) return styl === "dynamiczna" ? { ruch: "najazd", sila, krzywa: "uderzenie", slowo: hit } : { ruch: "najazd", sila, krzywa: "plynnie" };
+  stan.spokoj++;
+  if (styl === "dynamiczna" || stan.spokoj % 3 === 0) return { ruch: "przesuniecie", sila, krzywa: "plynnie", kierunek: typoLiczba(b.x, 0.5) >= 0.5 ? "prawo" : "lewo" };
+  return null;
 }
 function typoKameraRuchy(T) {             // [[blok, ruch]] po czasie (edytor.kamera_ruchy)
-  const styl = T.kamera && T.kamera.styl, out = [];
-  let wcisnieta = false, spokoj = 0;
+  const styl = T.kamera && T.kamera.styl, out = [], stan = { wcisnieta: false, od: 0, spokoj: 0 };
   for (const b of typoBloki({ typo: T }).slice().sort((a, c) => a.start - c.start)) {
     let r = typoRuch(b);
-    if (!r && TYPO_KAMERA.sila[styl]) [r, spokoj] = typoKameraAuto(b, styl, wcisnieta, spokoj);
+    if (!r && TYPO_KAMERA.sila[styl]) r = typoKameraAuto(b, styl, stan);
     if (!r || r.ruch === "brak") continue;
     out.push([b, r]);
-    wcisnieta = r.ruch === "najazd" || (wcisnieta && r.ruch === "przesuniecie");
+    if (r.ruch === "najazd" && !stan.wcisnieta) stan.od = b.start;
+    stan.wcisnieta = r.ruch === "najazd" || (stan.wcisnieta && r.ruch === "przesuniecie");
   }
   return out;
 }

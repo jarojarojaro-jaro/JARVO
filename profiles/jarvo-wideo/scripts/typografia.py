@@ -3,11 +3,13 @@
 skosem i perspektywą 3D, jako plan bloków w projekcie edytora HQ (`<film>.edycja.json`, klucz `typo`).
 
     typografia.py plan <film> [--motyw czysty|podcast|vlog|…] [--akcent "#C8102E"] [--paleta A,B]
-                              [--tempo spokojne|normalne|ostre] [--zostaw-napisy] [--ziarno N] [--bez-maski] [--nowy]
+                              [--tempo spokojne|normalne|ostre] [--kamera auto|spokojna|dynamiczna|brak]
+                              [--zostaw-napisy] [--ziarno N] [--bez-maski] [--nowy]
     typografia.py pokaz <film> [--json]          # plan w skrócie: bloki, układy, wagi słów (do poprawek)
     typografia.py popraw <film> zmiany.json       # Twoje poprawki reżyserskie (format niżej)
     typografia.py sylwetki <film>                 # sylwetki osoby pod bloki „za osobą” (np. ustawione w edytorze)
     typografia.py paleta <film> [--paleta A,B] [--akcent marka] [--bez-akcentu]   # kolory z kadru na gotowym planie
+    typografia.py kamera <film> [--styl spokojna|dynamiczna|brak|auto] [--przyslona 0.5] [--ostrosc napis|osoba] [--bez]
     typografia.py arkusz <film> [-o out/wideo/typografia.jpg] [--ile 12]   # klatki: film + typografia (vision)
     typografia.py style <film> [-o …] [--blok b03] [--motywy podcast,vlog]   # ten sam blok w każdym motywie
     typografia.py sprawdz <film> [--strefa tiktok|reels|shorts|brak] [--json] [--arkusz [plik]]   # kontrola napisów
@@ -27,6 +29,12 @@ Motyw to styl całego filmu (14: czysty, kino, ulica, energia, elegancki, podcas
 nowoczesny, retro, neon, show): kroje, styl słów i uderzenia (wypełnienie, obrys, 3D, blask, płytka, kontur, show
 jak w programie rozrywkowym), wejście, wyjście i skos. `style` rysuje ten sam blok filmu w każdym motywie, żeby wybrać
 styl okiem; zmiana motywu nie rusza układu, kolorów ani poprawek.
+Wirtualna kamera z głębią (`typo.kamera`, `z` bloku): osoba stoi na z = 1, blok przed nią bliżej (mocny 0,65, zwykły
+0,75, spokojny 0,85), za osobą 1,3. Styl kamery (`auto` = z motywu: energia, komiks, ulica, show, neon dynamiczna, reszta
+spokojna) dobiera ruchy z bloków: za osobą najazd, uderzenie najazd, po najeździe odjazd (spokojna trzyma najazd
+2,5 s), spokojny blok przesunięcie (spokojna co trzeci); blok krótszy niż 0,6 s bez ruchu;
+własny ruch bloku (`kamera` w zmiany.json) ma pierwszeństwo. Napisy jadą z paralaksą i rozmyciem głębi ostrości, a film
+i osoba tym samym ruchem (edytor.kamera_filter). `kamera` zmienia styl, przysłonę i ostrość na gotowym planie.
 Te same dane rysuje edytor HQ (hq/web/src/48-typografia.js), więc człowiek widzi i poprawia wszystko na osi.
 `sprawdz` mierzy tusz liter tym samym rendererem: napis poza kadrem (1/3 s i dłużej), bloki na sobie, słowa stykające
 się literami, napis za osobą nieczytelny (widać < 60%) albo niczym niezasłonięty (błędy), blok pod interfejsem
@@ -36,7 +44,9 @@ tylko na wyraźną prośbę (`--nowy`).
 
 pokaz + popraw = Twoja reżyseria (zasady: skill typografia-edit): znaczenie słowa → forma. zmiany.json:
     {"motyw": "kino", "paleta": ["#B3122E", "#F2C94C"],   # nowa paleta: słowa w starych kolorach idą za nią
-     "bloki": [{"blok": "b03", "uklad": "skos", "rot": -8, "warstwa": "tyl", "x": 0.3, "y": 0.4,
+     "kamera": {"styl": "spokojna", "przyslona": 0.4},      # null = bez kamery
+     "bloki": [{"blok": "b03", "uklad": "skos", "rot": -8, "warstwa": "tyl", "x": 0.3, "y": 0.4, "z": 1.4,
+                "kamera": {"ruch": "najazd", "sila": 0.8, "krzywa": "uderzenie", "slowo": 4},
                 "slowa": {"4": {"tekst": "A$$", "kolor": "#2ECC40", "waga": 3, "kroj": "playfairI", "styl": "3d"}}},
                {"polacz": ["b05", "b06"]},          # jedna fraza z dwóch bloków
                {"blok": "b08", "podziel": 2},        # nowy blok od słowa 2 (id b08b)
@@ -93,7 +103,8 @@ TRZYMAJ = 0.35           # blok zostaje po ostatnim słowie (czytanie), chyba ż
 UDERZENIA = 0.34         # część bloków z uderzeniem (waga 3 w kolorze akcentu)
 MOTYWY = ed.TYPO_MOTYWY
 # motyw (styl filmu) → skala skosu w stopniach, wyjście bloku na cięciu ujęcia i po pauzie w mowie, styl słów i styl
-# uderzenia; te same wartości co `skos`, `wyjscie`, `styl`, `hit` w TYPO_MOTYWY (48-typografia.js), test pilnuje zgodności
+# uderzenia; te same wartości co `skos`, `wyjscie`, `styl`, `hit` w TYPO_MOTYWY (48-typografia.js), test pilnuje zgodności.
+# Styl kamery (`plan --kamera auto`): KAMERA_MOTYWU, energiczne motywy dynamiczna, reszta spokojna.
 MOTYW_CECHY = {
     "czysty": {"skos": 5, "ciecie": "zanik", "zwykle": "zanik", "styl": "wypelnij", "hit": "wypelnij"},
     "kino": {"skos": 7, "ciecie": "smuga", "zwykle": "zanik", "styl": "wypelnij", "hit": "3d"},
@@ -111,6 +122,8 @@ MOTYW_CECHY = {
     "show": {"skos": 6, "ciecie": "zanik", "zwykle": "zanik", "styl": "show", "hit": "show"},
 }
 SKOS = {k: v["skos"] for k, v in MOTYW_CECHY.items()}
+KAMERA_MOTYWU = {k: "dynamiczna" if k in ("energia", "komiks", "ulica", "show", "neon") else "spokojna" for k in MOTYW_CECHY}
+KAMERA_PRZYSLONA = 0.5   # głębia ostrości nowego planu: słowa daleko od ostrości miękkie, ale czytelne
 WYJSCIE_CIECIE = {k: v["ciecie"] for k, v in MOTYW_CECHY.items()}
 WYJSCIE_ZWYKLE = {k: v["zwykle"] for k, v in MOTYW_CECHY.items()}
 
@@ -532,7 +545,7 @@ def wydziel_za(b: dict, i: int, j: int, g: list[float], W: int, H: int) -> list[
         x_.pop("glebia", None)
         x_["linia"] = 0
     bh = rozmiar_bloku(za, w, W, H)[1]
-    za.update({"uklad": "za", "warstwa": "tyl", "rot": 0, "tilt": 0, "x": round(x, 3), "w": round(w, 3),
+    za.update({"uklad": "za", "warstwa": "tyl", "rot": 0, "tilt": 0, "x": round(x, 3), "w": round(w, 3), "z": ed.KAMERA_Z["tyl"],
                "y": round(min(0.7, max(bh / 2 + 0.02, g[1] + 0.1 * bh)), 3)})
     czesci = [za]
     if i:
@@ -770,9 +783,19 @@ def probki_kadru(proj: dict, plan: dict, ile: int = 24) -> tuple[list[bytes], di
     return list(klatki.values()), tla
 
 
+def glebia_bloku(blok: list[dict], uklad: str) -> float:
+    """Głębia bloku dla kamery (osoba z = 1): mocna fraza bliżej widza (0,65), zwykła 0,75, spokojna 0,85, za osobą
+    1,3. Przy najeździe bliższy napis rośnie i przesuwa się mocniej, więc puenta „wychodzi” do widza."""
+    if uklad == "za":
+        return ed.KAMERA_Z["tyl"]
+    en = energia(blok)
+    return 0.65 if en >= 1.6 else 0.75 if en >= 0.9 else 0.85
+
+
 def zbuduj_plan(slowa: list[dict], ciecia: list[float], W: int, H: int, total: float, motyw: str = "czysty",
-                tempo: str = "normalne", ziarno: int = 0, akcent: str | None = None) -> dict:
-    """Cały plan typografii (czyste funkcje: testy bez ffmpeg i przeglądarki)."""
+                tempo: str = "normalne", ziarno: int = 0, akcent: str | None = None, kamera: str = "auto") -> dict:
+    """Cały plan typografii (czyste funkcje: testy bez ffmpeg i przeglądarki). `kamera`: styl wirtualnej kamery
+    (`auto` = z motywu, `brak` = plan bez kamery, jak dawniej)."""
     slowa = [dict(w) for w in slowa if str(w.get("tekst") or "").strip()]
     ustaw_wagi(slowa)
     bloki, uklady = [], []
@@ -801,7 +824,7 @@ def zbuduj_plan(slowa: list[dict], ciecia: list[float], W: int, H: int, total: f
         li = linie(blok)
         nb = {"id": f"b{i + 1:02d}", "start": round(start, 3), "end": round(min(total, koniec), 3), "uklad": uklad,
               **{k: round(v, 3) for k, v in m.items()}, "rot": round(rot, 1), "tilt": round(tilt, 1),
-              "warstwa": "tyl" if uklad == "za" else "przod",
+              "warstwa": "tyl" if uklad == "za" else "przod", "z": glebia_bloku(blok, uklad),
               "wyjscie": wyjscie(motyw, ciecie_po is not None, koniec - blok[-1]["a"], nast - koniec),
               "slowa": []}
         for j, w in enumerate(blok):
@@ -819,6 +842,9 @@ def zbuduj_plan(slowa: list[dict], ciecia: list[float], W: int, H: int, total: f
     plan = {"motyw": motyw if motyw in MOTYWY else "czysty", "odstep": "tusz", "bloki": bloki}
     if akcent:
         plan["akcent"] = akcent
+    styl = KAMERA_MOTYWU[plan["motyw"]] if kamera == "auto" else kamera
+    if styl in ed.TYPO_KAMERY and styl != "brak":
+        plan["kamera"] = {"styl": styl, "przyslona": KAMERA_PRZYSLONA, "ostrosc": "napis"}
     return ed.normalize_typo(plan, total)
 
 
@@ -858,7 +884,7 @@ def cmd_plan(film: Path, a) -> int:
     slowa, ciecia = slowa_osi(proj)
     if not slowa:
         raise SystemExit("brak mowy w nagraniu: typografia potrzebuje słów (sprawdź dźwięk albo transkrypcję)")
-    plan = zbuduj_plan(slowa, ciecia, cv["w"], cv["h"], total, a.motyw, a.tempo, a.ziarno, a.akcent)
+    plan = zbuduj_plan(slowa, ciecia, cv["w"], cv["h"], total, a.motyw, a.tempo, a.ziarno, a.akcent, a.kamera)
     za = 0
     if not a.bez_maski:
         opisy = maska(film, "opis", "--chwile", ",".join(f"{(b['start'] + b['end']) / 2:.3f}" for b in plan["bloki"]))
@@ -879,14 +905,31 @@ def cmd_plan(film: Path, a) -> int:
     n_slow = sum(len(b["slowa"]) for b in plan["bloki"])
     print(f"Typografia: {len(plan['bloki'])} bloków, {n_slow} słów, motyw {plan['motyw']} · cięcia: {len(ciecia)}"
           + ("" if a.bez_maski else f" · za osobą: {za}")
-          + (f" · paleta z kadru: {' '.join(plan['paleta'])}" if plan.get("paleta") else " · kolory z motywu"))
+          + (f" · paleta z kadru: {' '.join(plan['paleta'])}" if plan.get("paleta") else " · kolory z motywu")
+          + (f" · kamera {plan['kamera']['styl']}: {len(ed.kamera_ruchy(plan))} ruchów" if plan.get("kamera") else ""))
     print(f"Dalej: typografia.py pokaz {film} → popraw według znaczenia → typografia.py sprawdz {film} → arkusz → projekt.py render {film}")
     return 0
 
 
 def opis_slowa(w: dict) -> str:
-    extra = "".join(f" {k}={w[k]}" for k in ("kolor", "kroj", "styl", "glebia") if k in w) + (" płytka" if w.get("plyta") else "")
+    extra = "".join(f" {k}={w[k]}" for k in ("kolor", "kroj", "styl", "glebia", "z") if k in w) + (" płytka" if w.get("plyta") else "")
     return f"[{w['waga']}]{w['tekst']}{('{' + extra.strip() + '}') if extra else ''}"
+
+
+def opis_kamery(plan: dict) -> str:
+    k = plan.get("kamera")
+    return f" · kamera {k['styl']}, przysłona {k['przyslona']:g}, ostrość {k['ostrosc']}" if k else " · bez kamery"
+
+
+def opis_ruchu(b: dict, r: dict | None) -> str:
+    """Ruch kamery bloku do `pokaz`: własny (pole `kamera`) albo ze stylu (dopisek „styl”)."""
+    if not r:
+        return ""
+    if r["ruch"] == "brak":
+        return " kamera: brak"
+    kier = f" {r['kierunek']}" if r.get("kierunek") else ""
+    od = f" od słowa {r['slowo']}" if r.get("slowo") is not None else ""
+    return f" kamera: {r['ruch']}{kier} {r['sila']:g} {r['krzywa']}{od}{'' if 'kamera' in b else ' (styl)'}"
 
 
 def cmd_pokaz(film: Path, a) -> int:
@@ -901,23 +944,30 @@ def cmd_pokaz(film: Path, a) -> int:
     cv = proj["canvas"]
     print(f"Typografia: {film.name} · motyw {plan['motyw']}{' · akcent ' + plan['akcent'] if plan.get('akcent') else ''}"
           f"{' · paleta ' + ' '.join(plan['paleta']) if plan.get('paleta') else ''}"
-          f" · {len(plan['bloki'])} bloków · kadr {cv['w']}×{cv['h']}")
+          f" · {len(plan['bloki'])} bloków · kadr {cv['w']}×{cv['h']}{opis_kamery(plan)}")
+    ruchy = {b["id"]: r for b, r in ed.kamera_ruchy(plan)}
     for b in plan["bloki"]:
         lin: dict[int, list[str]] = {}
         for j, w in enumerate(b["slowa"]):
             lin.setdefault(w["linia"], []).append(f"{j}:{opis_slowa(w)}")
         extra = "".join([f" rot {b['rot']:+.0f}" if b["rot"] else "", f" tilt {b['tilt']:+.0f}" if b["tilt"] else "",
-                         " ZA OSOBĄ" if b["warstwa"] == "tyl" else "", f" wyjście {b['wyjscie']}" if b.get("wyjscie") else ""])
+                         " ZA OSOBĄ" if b["warstwa"] == "tyl" else "", f" wyjście {b['wyjscie']}" if b.get("wyjscie") else "",
+                         f" z {ed.kamera_z(b):.2f}" if plan.get("kamera") or "z" in b else "",
+                         opis_ruchu(b, b.get("kamera") or ruchy.get(b["id"]))])
         print(f"{b['id']} {b['start']:6.2f}–{b['end']:6.2f} {b['uklad']:8s} x{b['x']:.2f} y{b['y']:.2f} w{b['w']:.2f}{extra}"
               f"  |  {' / '.join(' '.join(v) for _k, v in sorted(lin.items()))}")
     print("\nWaga: [0] małe słowo funkcyjne, [1] zwykłe, [2] ważne (większe), [3] uderzenie (największe, kolor z palety,"
           " jedno na blok, około co trzeci blok).")
+    if plan.get("kamera"):
+        print("Kamera: z = głębia bloku (osoba 1, przed nią mniej); ruch „(styl)” dobrał styl kamery, własny ruch bloku:"
+              ' "kamera": {"ruch": "najazd"|"odjazd"|"przesuniecie"|"brak", …} w zmiany.json.')
     print("Poprawki według znaczenia (skill typografia-edit): zmiany.json → typografia.py popraw <film> zmiany.json")
     return 0
 
 
-POLA_BLOKU = ("start", "end", "uklad", "x", "y", "w", "rot", "tilt", "warstwa", "wejscie", "wyjscie", "rozmiar")
-POLA_SLOWA = ("tekst", "waga", "linia", "glebia", "kolor", "kroj", "styl", "plyta", "wejscie", "wielkie", "skala", "t", "k")
+POLA_BLOKU = ("start", "end", "uklad", "x", "y", "w", "rot", "tilt", "warstwa", "wejscie", "wyjscie", "rozmiar", "z", "kamera")
+POLA_SLOWA = ("tekst", "waga", "linia", "glebia", "kolor", "kroj", "styl", "plyta", "wejscie", "wielkie", "skala", "t", "k", "z")
+POLA_KAMERY = ("styl", "przyslona", "ostrosc")
 
 
 def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
@@ -927,6 +977,13 @@ def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
     for k in ("motyw", "akcent"):
         if k in zmiany:
             plan[k] = zmiany[k]
+    if "kamera" in zmiany:                               # styl, przysłona, ostrość; null = plan bez kamery
+        if zmiany["kamera"] is None:
+            plan.pop("kamera", None)
+        elif isinstance(zmiany["kamera"], dict):
+            plan["kamera"] = {**(plan.get("kamera") or {}), **{k: v for k, v in zmiany["kamera"].items() if k in POLA_KAMERY}}
+        else:
+            uwagi.append("kamera: podaj obiekt {styl, przyslona, ostrosc} albo null")
     if isinstance(zmiany.get("paleta"), list):           # nowa paleta: słowa w starych kolorach idą za nią
         plan = zmien_palete(plan, zmiany["paleta"])
     po_id = {b["id"]: b for b in plan["bloki"]}
@@ -968,7 +1025,12 @@ def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
             continue
         for k in POLA_BLOKU:
             if k in z:
-                b[k] = z[k]
+                if z[k] is None and k in ("z", "kamera"):       # null: głębia z warstwy, ruch ze stylu kamery
+                    b.pop(k, None)
+                else:
+                    b[k] = z[k]
+        if "warstwa" in z and "z" not in z and "z" in b and (b["warstwa"] == "tyl") != (float(b["z"]) > 1):
+            b.pop("z")                                   # blok przestawiony za osobę (albo przed): głębia z warstwy
         for j, zw in (z.get("slowa") or {}).items():
             try:
                 w = b["slowa"][int(j)]
@@ -985,9 +1047,16 @@ def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
                     else:
                         w[k] = zw[k]
     nowy = ed.normalize_typo(plan, total)
+    zmiany_blokow = {str(x.get("blok")): x for x in zmiany.get("bloki") or [] if isinstance(x, dict) and "blok" in x}
     for b in nowy["bloki"]:
         if sum(1 for w in b["slowa"] if w["waga"] == 3) > 1:
             uwagi.append(f"{b['id']}: więcej niż jedno uderzenie (waga 3) w bloku; oko nie wie, gdzie patrzeć")
+        zb = zmiany_blokow.get(b["id"], {})
+        if zb.get("kamera") is not None and "kamera" not in b:
+            uwagi.append(f"{b['id']}: ruch kamery {zb['kamera']!r} odrzucony (ruch: {', '.join(ed.TYPO_RUCHY)})")
+        if "z" in b and (b["warstwa"] == "tyl") != (b["z"] > 1):
+            uwagi.append(f"{b['id']}: głębia z {b['z']:g} nie pasuje do warstwy "
+                         f"({'za osobą' if b['warstwa'] == 'tyl' else 'przed osobą'}; osoba stoi na z = 1)")
     return nowy, uwagi
 
 
@@ -1057,6 +1126,36 @@ def cmd_paleta(film: Path, a) -> int:
           + (f" · marka {plan['akcent']}" if plan.get("akcent") else "")
           + f" · kolory słów: {' '.join(kolory) or 'brak'} · płytki: {plytki}")
     print(f"Dalej: typografia.py arkusz {film} → oceń kolory na klatkach → projekt.py render {film}")
+    return 0
+
+
+def cmd_kamera(film: Path, a) -> int:
+    """Wirtualna kamera na gotowym planie: styl (ruchy z bloków), przysłona i ostrość; układ, kolory, głębie i ruchy
+    ustawione w blokach zostają. --bez usuwa kamerę (plan jak dawniej, film stoi)."""
+    proj = pr.load(film)
+    total = pr.total(proj)
+    plan = ed.normalize_typo(proj.get("typo"), total)
+    if not plan["bloki"]:
+        raise SystemExit("brak planu typografii: typografia.py plan <film>")
+    if a.bez:
+        plan.pop("kamera", None)
+    else:
+        k = dict(plan.get("kamera") or {"styl": KAMERA_MOTYWU[plan["motyw"]], "przyslona": KAMERA_PRZYSLONA, "ostrosc": "napis"})
+        if a.styl:
+            k["styl"] = KAMERA_MOTYWU[plan["motyw"]] if a.styl == "auto" else a.styl
+        if a.przyslona is not None:
+            k["przyslona"] = a.przyslona
+        if a.ostrosc:
+            k["ostrosc"] = a.ostrosc
+        plan["kamera"] = k
+    plan = ed.normalize_typo(plan, total)
+    proj["typo"] = plan
+    pr.save(film, proj)
+    ruchy = ed.kamera_ruchy(plan) if plan.get("kamera") else []
+    lista = ", ".join(f"{b['id']} {r['ruch']}" for b, r in ruchy[:8]) + (" …" if len(ruchy) > 8 else "")
+    opis = opis_kamery(plan).removeprefix(" · ")
+    print(f"{opis[:1].upper()}{opis[1:]} · ruchy: {len(ruchy)}" + (f" ({lista})" if ruchy else ""))
+    print(f"Dalej: typografia.py sprawdz {film} → arkusz → projekt.py render {film}")
     return 0
 
 
@@ -1212,6 +1311,8 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--akcent", help="kolor marki z brand kitu, #RRGGBB: pierwszy w palecie, drugi z kadru")
     sp.add_argument("--paleta", help="paleta zamiast tej z kadru: #RRGGBB,#RRGGBB (np. na prośbę właściciela)")
     sp.add_argument("--tempo", choices=tuple(TEMPO), default="normalne")
+    sp.add_argument("--kamera", choices=("auto", *ed.TYPO_KAMERY), default="auto",
+                    help="wirtualna kamera z głębią: auto = styl z motywu, brak = film stoi (plan jak dawniej)")
     sp.add_argument("--ziarno", type=int, default=0, help="inny wariant układów (ten sam numer = ten sam plan)")
     sp.add_argument("--zostaw-napisy", action="store_true", help="nie usuwaj zwykłych napisów z projektu")
     sp.add_argument("--bez-maski", action="store_true", help="bez maski osoby (MODNet): miejsca domyślne, bez „za osobą”")
@@ -1226,6 +1327,13 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--akcent", help="kolor marki, #RRGGBB: pierwszy w palecie")
     sp.add_argument("--bez-akcentu", action="store_true", help="usuń akcent planu (to nie był kolor marki)")
     sp.set_defaults(fn=cmd_paleta)
+    sp = sub.add_parser("kamera", help="wirtualna kamera z głębią na gotowym planie (styl, przysłona, ostrość)")
+    sp.add_argument("film")
+    sp.add_argument("--styl", choices=("auto", *ed.TYPO_KAMERY), help="ruchy ze stylu (auto = z motywu; brak = bez ruchów)")
+    sp.add_argument("--przyslona", type=float, help="głębia ostrości 0–1 (0 = wszystko ostre, 0.5 domyślnie)")
+    sp.add_argument("--ostrosc", choices=ed.TYPO_OSTROSC, help="ostrość na najnowszym napisie albo na osobie")
+    sp.add_argument("--bez", action="store_true", help="usuń kamerę z planu (film stoi, napisy bez głębi ostrości)")
+    sp.set_defaults(fn=cmd_kamera)
     sp = sub.add_parser("pokaz", help="plan w skrócie")
     sp.add_argument("film")
     sp.add_argument("--json", action="store_true")

@@ -1054,7 +1054,7 @@ def test_kamera_ruchy_ze_stylu_i_wlasne():
                      ("b5", "najazd", "plynnie", None),           # b4 za krótki; za osobą: najazd
                      ("b6", "przesuniecie", "plynnie", "gora")]   # własny ruch bloku
     spok = [(b["id"], r["ruch"]) for b, r in ed.kamera_ruchy(_plan_kamery("spokojna"))]
-    assert spok == [("b1", "najazd"), ("b2", "odjazd"), ("b5", "najazd"), ("b6", "przesuniecie")]   # co drugi spokojny
+    assert spok == [("b1", "najazd"), ("b3", "odjazd"), ("b5", "najazd"), ("b6", "przesuniecie")]   # trzyma najazd 2,5 s
     assert [b["id"] for b, _ in ed.kamera_ruchy(_plan_kamery("brak"))] == ["b6"]    # bez stylu: tylko własne ruchy
     brak = json.loads(json.dumps(p))
     brak["bloki"][0]["kamera"] = {"ruch": "brak"}
@@ -1174,10 +1174,10 @@ def test_kamera_js_i_python_te_same_ruchy():
         for t, s in zip(chwile, o["stan"]):
             assert s == pytest.approx(list(ed.kamera_stan(py, t)), abs=1e-5), (styl, t)
     stale = re.search(r"const TYPO_KAMERA = \{ z: \{ przod: ([\d.]+), tyl: ([\d.]+) \}, zmax: ([\d.]+), sila: \{ spokojna: ([\d.]+), "
-                      r"dynamiczna: ([\d.]+) \}, uderzenie: ([\d.]+),\s+minBlok: ([\d.]+),", JS)
+                      r"dynamiczna: ([\d.]+) \}, uderzenie: ([\d.]+),\s+minBlok: ([\d.]+), trzymaj: ([\d.]+),", JS)
     assert tuple(map(float, stale.groups())) == (ed.KAMERA_Z["przod"], ed.KAMERA_Z["tyl"], ed.KAMERA_ZMAX,
                                                  ed.KAMERA_SILA["spokojna"], ed.KAMERA_SILA["dynamiczna"],
-                                                 ed.KAMERA_UDERZENIE, ed.KAMERA_MIN_BLOK)
+                                                 ed.KAMERA_UDERZENIE, ed.KAMERA_MIN_BLOK, ed.KAMERA_TRZYMAJ)
     assert float(re.search(r"const TYPO_LEAD = ([\d.]+);", JS).group(1)) == ed.TYPO_LEAD
     for nazwa, py in (("TYPO_KAMERY", ed.TYPO_KAMERY), ("TYPO_RUCHY", ed.TYPO_RUCHY), ("TYPO_KIERUNKI", ed.TYPO_KIERUNKI),
                       ("TYPO_KRZYWE", ed.TYPO_KRZYWE), ("TYPO_OSTROSC", ed.TYPO_OSTROSC)):
@@ -1281,3 +1281,56 @@ def test_kamera_w_przegladarce_najazd_i_spoczynek():
     assert spoczynek[0] == spoczynek[1]                          # w spoczynku i bez rozmycia: jak plan bez kamery
     assert ruch[1]["w"] > ruch[0]["w"] * 1.1                     # najazd: blok z = 0,8 rośnie (×1,25)
     assert spoczynek[2]["ostre"] < spoczynek[0]["ostre"] * 0.7   # z = 0,5 przy ostrości na osobie: rozmyte
+
+
+# ---------------------------------------------------------------- kamera w reżyserii (typografia.py)
+
+def test_plan_z_kamera_i_glebia_blokow():
+    p, _ = plan(motyw="kino")
+    assert p["kamera"] == {"styl": "spokojna", "przyslona": 0.5, "ostrosc": "napis"}          # auto: z motywu
+    assert all(0.6 <= b["z"] < 1 for b in p["bloki"])                                         # przed osobą
+    mocne = [b["z"] for b in p["bloki"] if any(w["waga"] == 3 for w in b["slowa"])]
+    assert min(mocne) <= min(b["z"] for b in p["bloki"] if not any(w["waga"] == 3 for w in b["slowa"]))
+    assert plan(motyw="energia")[0]["kamera"]["styl"] == "dynamiczna" and ed.kamera_ruchy(p)
+    slowa = mowa("raz dwa trzy cztery pięć sześć")
+    assert "kamera" not in ty.zbuduj_plan(slowa, [], 1080, 1920, 6, kamera="brak")           # bez kamery: jak dawniej
+    assert set(ty.KAMERA_MOTYWU) == set(ed.TYPO_MOTYWY) and set(ty.KAMERA_MOTYWU.values()) <= set(ed.TYPO_KAMERY)
+
+
+def test_za_osoba_dalej_niz_osoba():
+    b = {**blok([("w", 0), ("PIĘĆ", 3), ("minut", 2), ("dziś", 1)]), "z": 0.75}
+    czesci = ty.wydziel_za(b, 0, 3, GLOWA["glowa"], 1080, 1920)
+    assert [(c["warstwa"], c["z"]) for c in czesci] == [("tyl", 1.3), ("przod", 0.75)]
+
+
+def test_zastosuj_kamera_planu_i_bloku():
+    p, total = plan()
+    nowy, uwagi = ty.zastosuj(p, {"kamera": {"styl": "dynamiczna", "przyslona": 0.8, "obce": 1}, "bloki": [
+        {"blok": "b01", "z": 0.6, "kamera": {"ruch": "najazd", "sila": 0.9, "krzywa": "uderzenie", "slowo": 0}},
+        {"blok": "b02", "kamera": {"ruch": "obrot"}},
+        {"blok": "b03", "warstwa": "tyl"},
+        {"blok": "b04", "warstwa": "tyl", "z": 0.7}]}, total)
+    assert nowy["kamera"] == {"styl": "dynamiczna", "przyslona": 0.8, "ostrosc": "napis"}
+    b = {x["id"]: x for x in nowy["bloki"]}
+    assert b["b01"]["z"] == 0.6 and b["b01"]["kamera"] == {"ruch": "najazd", "sila": 0.9, "krzywa": "uderzenie", "slowo": 0}
+    assert "kamera" not in b["b02"] and any("b02" in u and "odrzucony" in u for u in uwagi)
+    assert "z" not in b["b03"] and ed.kamera_z(b["b03"]) == 1.3                  # za osobą: głębia z warstwy
+    assert any("b04" in u and "nie pasuje" in u for u in uwagi)                  # jawna głębia przed osobą za osobą
+    bez, _ = ty.zastosuj(nowy, {"kamera": None, "bloki": [{"blok": "b01", "kamera": None, "z": None}]}, total)
+    assert "kamera" not in bez and "kamera" not in bez["bloki"][0] and "z" not in bez["bloki"][0]
+
+
+def test_polecenie_kamera_i_pokaz(tmp_path, capsys):
+    src = _projekt_typo(tmp_path, [blok([("raz", 1), ("DWA", 3)]), {**blok([("spokojnie", 1)], start=3.0), "id": "b06"}])
+    assert ty.main(["kamera", str(src), "--styl", "dynamiczna", "--przyslona", "0.3", "--ostrosc", "osoba"]) == 0
+    out = capsys.readouterr().out
+    assert "Kamera dynamiczna, przysłona 0.3, ostrość osoba" in out and "b05 najazd" in out
+    zapis = json.loads(ed.project_path(src).read_text(encoding="utf-8"))["typo"]
+    assert zapis["kamera"] == {"styl": "dynamiczna", "przyslona": 0.3, "ostrosc": "osoba"}
+    assert ty.main(["pokaz", str(src)]) == 0
+    out = capsys.readouterr().out
+    assert "kamera: najazd 0.6 uderzenie od słowa 1 (styl)" in out and " z 0.80" in out
+    assert ty.main(["kamera", str(src), "--bez"]) == 0
+    assert "kamera" not in json.loads(ed.project_path(src).read_text(encoding="utf-8"))["typo"]
+    assert ty.main(["kamera", str(src)]) == 0                                    # bez opcji: styl z motywu
+    assert json.loads(ed.project_path(src).read_text(encoding="utf-8"))["typo"]["kamera"]["styl"] == "spokojna"

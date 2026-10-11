@@ -1,7 +1,7 @@
 ---
 name: typografia-edit
-description: "Typografia z montażu do nagrania z mową, też za osobą."
-version: 1.3.0
+description: "Typografia z montażu do nagrania z mową: za osobą, z kamerą."
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-10"
+    reviewed: "2026-10-11"
 ---
 
 # Typografia jak z montażu
@@ -29,7 +29,8 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
 
 ## Kroki
 1. **Plan** (0 tokenów, reżyser z reguł): `python3 $HERMES_HOME/scripts/typografia.py plan <film> --motyw <styl>
-   [--akcent <kolor marki>] [--tempo spokojne|normalne|ostre]`; styl z tabeli „Styl filmu”. Projekt powstaje sam z filmu, a zwykłe napisy znikają
+   [--akcent <kolor marki>] [--tempo spokojne|normalne|ostre]`; styl z tabeli „Styl filmu”, kamera ze stylu (sekcja
+   „Kamera i głębia”). Projekt powstaje sam z filmu, a zwykłe napisy znikają
    (zostają z `--zostaw-napisy`). Kolory dobiera sam z kadru (sekcja „Kolor”). **Gdy plan już jest, nie układam go
    od nowa:** mógł go poprawić właściciel. `--nowy` tylko na jego wyraźną prośbę; same kolory zmienia
    `typografia.py paleta <film>` (układ i poprawki zostają).
@@ -127,20 +128,44 @@ Kolor bierze się z materiału, nie z motywu. Jeden kolor na wszystkie mocne sł
 - **Za osobą** najwyżej co szósty blok, jedna linia, do 14 znaków; głowa nie może zasłonić najważniejszych liter.
   Plan liczy sylwetkę sam; blok przestawiony w HQ dostaje ją przez `sylwetki`.
 
+## Kamera i głębia
+Plan ma wirtualną kamerę: film, osoba i napisy jadą jednym ruchem, a napisy stoją na różnych głębokościach
+(paralaksa) z rozmyciem jak w obiektywie. Osoba stoi na `z` = 1; blok przed nią bliżej (mocny 0,65, zwykły 0,75,
+spokojny 0,85), blok za osobą 1,3. `pokaz` wypisuje `z` i ruch każdego bloku („(styl)” = dobrany ze stylu).
+- **Styl kamery** dobiera `plan` z motywu (`--kamera auto`): `dynamiczna` dla `energia`, `komiks`, `ulica`, `show`,
+  `neon`, reszta `spokojna`. Zmiana na gotowym planie (układ i poprawki zostają): `typografia.py kamera <film>
+  --styl spokojna|dynamiczna|brak|auto [--przyslona 0–1] [--ostrosc napis|osoba]`; `--bez` usuwa kamerę (film stoi).
+  Wywiad, poradnik, spokojna opowieść: `spokojna`; energia, humor, sprzedaż: `dynamiczna`; właściciel nie chce ruchu,
+  ujęcie z ekranu albo kadr ciasny na twarzy: `brak`.
+- **Ruchy ze stylu:** blok za osobą = najazd (osoba rośnie, napis za nią zostaje w głębi); uderzenie (waga 3) = najazd
+  (`dynamiczna`: szybki, od słowa uderzenia); po najeździe odjazd (`spokojna` trzyma najazd co najmniej 2,5 s);
+  spokojny blok = przesunięcie w stronę bloku (`spokojna` co trzeci). Blok krótszy niż 0,6 s nie dostaje ruchu.
+- **Ruch własny bloku** wygrywa ze stylem: `"kamera": {"ruch": "najazd"|"odjazd"|"przesuniecie"|"brak", "sila": 0.05–1,
+  "krzywa": "plynnie"|"uderzenie", "kierunek": "lewo"|"prawo"|"gora"|"dol", "slowo": <numer słowa startu>}`.
+  Najazd na puentę, która nie ma wagi 3; `brak` na bloku, który ma stać (lista, liczby do przeczytania).
+- **Głębia** (`z` bloku 0,3–3, `z` słowa): mniejsze = bliżej kamery, większe przy ruchu i mocniej rozmyte, gdy ostrość
+  jest gdzie indziej. Ostrość (`ostrosc: napis`) idzie za najnowszym napisem, `osoba` trzyma ją na osobie.
+  `przyslona` 0 = wszystko ostre, 0,5 domyślnie, 1 = mocny bokeh; słowo do przeczytania nie może być rozmyte w papkę.
+- Bez kamery (`kamera: null`, plan sprzed kamery) film stoi, a napisy rysują się jak dawniej.
+
 ## Format `zmiany.json`
 Pola bloku: `uklad`, `x`, `y` (kotwica 0–1), `w`, `rot`, `tilt`, `warstwa` (`przod`/`tyl`), `rozmiar`, `wejscie`,
-`wyjscie`, `start`, `end`. Pola słowa: `tekst`, `waga` 0–3, `linia`, `glebia` −1/0/1, `kolor`, `kroj`, `styl`
+`wyjscie`, `start`, `end`, `z` (głębia), `kamera` (ruch bloku, sekcja wyżej). Pola słowa: `tekst`, `waga` 0–3, `linia`, `glebia` −1/0/1, `kolor`, `kroj`, `styl`
 (`wypelnij`, `kontur`, `3d`, `blask`, `tlo`, `obrys`), `plyta` (`true`: płytka przy słabym kontraście), `wejscie`,
-`wielkie`, `skala`; `null` przywraca wartość ze stylu. Na górze `"motyw"` zmienia styl całego filmu.
+`wielkie`, `skala`, `z`; `null` przywraca wartość ze stylu. Na górze `"motyw"` zmienia styl całego filmu,
+a `"kamera": {"styl", "przyslona", "ostrosc"}` kamerę (`null` = bez kamery).
 ```json
 {"bloki": [
   {"blok": "b03", "uklad": "kolumna", "slowa": {"0": {"waga": 2}, "3": {"waga": 3, "tekst": "5 MIN"}}},
   {"blok": "b05", "slowa": {"1": {"glebia": -1, "kroj": "playfairI"}}},
   {"polacz": ["b06", "b07"]},
-  {"blok": "b09", "podziel": 2}
-]}
+  {"blok": "b09", "podziel": 2},
+  {"blok": "b11", "kamera": {"ruch": "najazd", "sila": 0.8, "krzywa": "uderzenie", "slowo": 2}, "z": 0.7}
+],
+ "kamera": {"styl": "spokojna", "przyslona": 0.4}}
 ```
-`popraw` ostrzega, gdy blok ma więcej niż jedno uderzenie, i gdy blok za osobą nie ma sylwetki.
+`popraw` ostrzega, gdy blok ma więcej niż jedno uderzenie, gdy blok za osobą nie ma sylwetki, gdy ruch kamery
+jest błędny (odrzuca go) i gdy `z` bloku przeczy warstwie (przód za osobą albo tył przed nią).
 
 ## Kontrola (arkusz, `vision_analyze`)
 Miarę (kadr, stykanie, za osobą, strefy) robi `sprawdz`; okiem oceniam to, czego miara nie widzi:
