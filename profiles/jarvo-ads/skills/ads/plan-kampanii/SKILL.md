@@ -1,17 +1,17 @@
 ---
 name: plan-kampanii
 description: "Plan kampanii Meta/Google: cel, struktura, budżet, prognoza."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo"
 license: MIT
 metadata:
   hermes:
     tags: [ads, meta, google, campaign, planning]
-    related_skills: [ads, plan-testu, start-kampanii, sledzenie-konwersji]
+    related_skills: [ads, plan-testu, publikacja-reczna, start-kampanii, sledzenie-konwersji]
   jarvo:
     agent: jarvo-ads
     autonomy: A1
-    reviewed: "2026-09-29"
+    reviewed: "2026-10-11"
 ---
 
 # Plan kampanii
@@ -42,6 +42,8 @@ co dostanie i po czym poznamy sukces.
    (`ads.py statystyki`) albo jawnie oznaczone jako założenie z widełkami.
 7. **Testy (opcjonalnie).** Kilka wersji reklam → `plan-testu`. Jedna dobra reklama też jest ok: wtedy mierzymy względem celu.
 8. **Koperta.** Budżet łączny, maks. dziennie, daty, konta, co wolno w kopercie (wyłączać słabe, przesuwać budżet).
+   Kwota łączna to zgoda, o którą prosisz właściciela; po zgodzie paczka do publikacji (`publikacja-reczna`):
+   właściciel wkleja i klika „Opublikuj”. Przez Skarbiec (`start-kampanii`) tylko, gdy jest zainstalowany.
 
 Punkt kontrolny: czy ktoś spoza projektu zrozumie z planu, co i dlaczego? Czy prognoza ma źródło założeń?
 
@@ -51,7 +53,7 @@ Punkt kontrolny: czy ktoś spoza projektu zrozumie z planu, co i dlaczego? Czy p
 
 ## Wyjścia
 `out/PLAN.md`: cel i miara, platforma i typ kampanii (dlaczego), struktura (tabela), odbiorcy/słowa, budżet i koperta,
-prognoza z widełkami, ryzyka, brief kreacji (lub link do `out/brief-kreacji.md`), co musi zrobić użytkownik (zgoda, konto).
+prognoza z widełkami, ryzyka, brief kreacji (lub link do `out/brief-kreacji.md`), co musi zrobić użytkownik (zgoda na kwotę, publikacja).
 
 ## Definition of Done
 - [ ] cel biznesowy i miara sukcesu wpisane liczbą,

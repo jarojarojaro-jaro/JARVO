@@ -63,7 +63,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | Pracownia webowa (`devlab`) | web | 10 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | Atelier kreatywne (`atelier`) | studio | 7 |
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, dwa ekrany (split screen), typografia jak z montażu, filmy z kodu, 15 stylów motion design, 8 gramatyk explainera, 35 stylów malarskich, żywe schematy, maskotka | Studio filmowe (`filmstudio`) | wideo | 21 |
-| 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, optymalizacja, raporty; wydaje tylko w kopercie z kodem | Sala operacyjna (`office`) | ads | 10 |
+| 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę, publikujesz Ty | Sala operacyjna (`office`) | ads | 11 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 7 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 10 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | Warsztat (`workshop`) | reka | 4 |
@@ -104,10 +104,11 @@ schemat z wielu odpowiedzi) i opisuje w `ZRODLO.md`, zanim powstanie skrypt. Pro
 ### 2a'. jarvo-ads — szczegóły
 Specjalista Ads Managera dla **Meta (FB/IG) i Google**. Planuje kampanie, robi testy (jedna reklama,
 A/B, A/B/C), audytuje konta, optymalizuje i raportuje. Wyniki liczy **statystyką bayesowską**
-(P(best)). 10 skilli: `plan-kampanii`, `plan-testu`, `start-kampanii`, `podlacz-konto`, `audyt-konta`,
-`optymalizacja`, `raport-reklam`, `wnioski-marki`, `sledzenie-konwersji`, `zgodnosc-reklam`.
-Skrypty: `ads.py` (klient Skarbca, exit 3 gdy nie podłączony), `planer.py`, `eksperyment.py`, `eksport.py`.
-**Stan: wpięty technicznie, BEZ kluczy.** Sejf na tokeny (Skarbiec) do zrobienia — patrz §10.
+(P(best)). 11 skilli: `plan-kampanii`, `plan-testu`, `publikacja-reczna`, `start-kampanii`, `podlacz-konto`,
+`audyt-konta`, `optymalizacja`, `raport-reklam`, `wnioski-marki`, `sledzenie-konwersji`, `zgodnosc-reklam`.
+Skrypty: `ads.py` (klient Skarbca, exit 3 gdy nie podłączony), `planer.py`, `eksperyment.py`, `eksport.py`,
+`paczka.py` (paczka do publikacji: sprawdzenie limitów, budżetu ponad zgodę i daty końca, instrukcja krok po kroku).
+**Stan: BEZ kluczy, z wyboru.** Agent przygotowuje kampanię, właściciel ją publikuje. Sejf na tokeny (Skarbiec) odłożony — patrz §10.
 
 ### 2b. jarvo-wideo — szczegóły
 Pętla krytyki: film oceniany na **7 osiach** (hook, telefon, ruch, różnorodność, kompozycja, marka,
@@ -336,7 +337,7 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
 **Pending / pomysły:**
 1. **Skarbiec (zadanie #50):** kontener z tokenem Meta/Google, polityka w kodzie, koperty (spend cap
    zatwierdzany kodem out-of-band, model nigdy nie widzi kodu), szkice PAUSED, STOP zawsze dozwolony,
-   Graph API v25. Do zrobienia, gdy będą klucze.
+   Graph API v25. Odłożony (2026-10-10): do tego czasu agent oddaje paczkę do publikacji, publikujesz Ty.
 2. ✅ **Agenci nie zapisują danych logowania w pamięci (`memory`).** Po red teamie Wideograf zapisał login w pamięci
    (hasła tam nie było). Hasła i logowanie w cudze konta blokują reguła 16 kontraktu i `deny.yaml`; zapis loginu, hasła,
    klucza albo numeru karty do `memory` odrzuca teraz strażnik narzędzi wtyczki `jarvo-wiedza` (hak `pre_tool_call`

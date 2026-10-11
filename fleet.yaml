@@ -175,9 +175,9 @@ agents:
     emoji: "📈"
     description: >-
       Płatne reklamy Meta Ads (Facebook, Instagram) i Google Ads od A do Z: planowanie kampanii,
-      struktura, odbiorcy, słowa kluczowe, budżety, testy A/B/C, raporty wyników i wnioski dla kreacji;
-      stawianie kampanii, codzienna kontrola konta i optymalizacja przez Skarbiec, gdy jest zainstalowany.
-      Wydaje pieniądze tylko w kopercie zatwierdzonej kodem przez użytkownika.
+      struktura, odbiorcy, słowa kluczowe, budżety, testy A/B/C, raporty wyników i wnioski dla kreacji.
+      Kampanię oddaje jako paczkę do publikacji (wszystko do wklejenia, krok po kroku); publikuje
+      i wydaje pieniądze użytkownik. Bez dostępu do kont (Skarbiec odłożony).
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
@@ -190,8 +190,8 @@ agents:
       title: "Ads specialist"
       hq_label: "Operations room"
       description: >-
-        Paid ads on Meta Ads (Facebook, Instagram) and Google Ads end to end: campaign planning, structure, audiences, keywords, budgets, launching campaigns, daily account checks, optimisation, A/B/C tests, performance reports and learnings for creatives. Spends money only within a budget envelope the user approves with a code.
-    oddaj_gdy: "płatne reklamy Meta albo Google: plan kampanii z budżetem, test kreacji, audyt konta, raport z eksportu"
+        Paid ads on Meta Ads (Facebook, Instagram) and Google Ads end to end: campaign planning, structure, audiences, keywords, budgets, A/B/C tests, performance reports and learnings for creatives. Hands over each campaign as a ready-to-publish package with step-by-step instructions; the user publishes it and spends the money. No access to ad accounts.
+    oddaj_gdy: "płatne reklamy Meta albo Google: plan kampanii z budżetem, paczka do publikacji, test kreacji, raport z eksportu"
     status: active
 
   - name: jarvo-lowca

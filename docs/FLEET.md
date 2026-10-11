@@ -16,7 +16,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 60 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria` i `konwersja-plikow`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [19](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 27 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria` i `konwersja-plikow`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [21 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 62 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, live-panel, Hermes, wspólne `transkrypcja-filmu`, `hooki`, `izometria`, `konwersja-plikow` i inne) | film, stock, kadry, montaz, dwa_ekrany, napisy, qa_wideo, rytm, muzyka, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, twarze, demo_strony, typografia, maska, zywy_schemat, gramatyka, malarz (+ wideo_lib; moduły JS stron: ruch, kreska, morph, crt, plotno, piksel, os_czasu, strona, ujecia) | [36](../evals/jarvo-wideo/scenarios.yaml) |
-| `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [10 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 7 (marketingskills, wspólne `hooki` i `konwersja-plikow`) | ads, planer, eksperyment, eksport | [13](../evals/jarvo-ads/scenarios.yaml) |
+| `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [11 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 7 (marketingskills, wspólne `hooki` i `konwersja-plikow`) | ads, planer, eksperyment, eksport, paczka | [14](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 1 (wspólny `konwersja-plikow`) | krs, ceidg, przetargi, strona, leady, zrodlo | [15](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 21 (Expo, React Native, ASO; wspólny `konwersja-plikow`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 5 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`, `konwersja-plikow`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [14](../evals/jarvo-reka/scenarios.yaml) |
@@ -34,7 +34,7 @@ Legenda przy skillach:
 | `jarvo-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
 | `jarvo-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A1 (czyta, pisze raporty) |
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja = A2) |
-| `jarvo-ads` | Specjalista Ads: Meta Ads i Google Ads, kampanie, testy, raporty | snajper | A1 (szkice PAUSED; wydatek = A2 z kodem Skarbca) |
+| `jarvo-ads` | Specjalista Ads: Meta Ads i Google Ads, kampanie, testy, raporty | snajper | A1 (paczka do publikacji; publikuje i wydaje właściciel) |
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
 | `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
 | `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A1 (audyty i rekomendacje; konta sklepów i wysyłka = A2) |
@@ -330,12 +330,12 @@ w kontenerze tylko do odczytu, `:ro`, więc ręka nie może ich modyfikować), [
 
 ## `jarvo-ads`: Specjalista Ads
 
-Meta Ads i Google Ads od planu kampanii po raport: stawianie kampanii, codzienna kontrola konta, testy A/B/C,
-optymalizacja w zatwierdzonej kopercie budżetu,
-wnioski dla Studia i Wideografa. Pieniędzy pilnuje **Skarbiec**, osobny kontener z tokenem Meta, polityką
-i kodami zgody, więc agent nie może wydać złotówki bez Ciebie. Pełny projekt: [ADS.md](ADS.md). Skarbca jeszcze nie ma,
-więc `podlacz-konto`, `start-kampanii` i `optymalizacja` (`wymaga: [skarbiec]`) nie trafiają do profilu; działa plan,
-test, audyt i raport z eksportu CSV.
+Meta Ads i Google Ads od planu kampanii po raport: plan, testy A/B/C, paczka do publikacji, raporty z listą zmian
+do wyklikania, wnioski dla Studia i Wideografa. **Agent przygotowuje, Ty publikujesz:** `publikacja-reczna`
+(`paczka.py`) daje wszystko do wklejenia w Menedżerze reklam albo Google Ads, krok po kroku, z budżetem nie
+wyższym niż Twoja zgoda i datą końca; „Opublikuj” klikasz Ty. Agent nie ma dostępu do kont. Bezpośrednie połączenie
+przez **Skarbiec** (osobny kontener z tokenem, polityką i kodami zgody) jest odłożone; do tego czasu `podlacz-konto`,
+`start-kampanii` i `optymalizacja` (`wymaga: [skarbiec]`) nie trafiają do profilu. Pełny projekt: [ADS.md](ADS.md).
 
 ---
 
@@ -397,7 +397,7 @@ i `templates/ci/jarvo-ios.yml`.
 3. `jarvo-studio`: wymaga najwięcej narzędzi i kluczy API (OpenRouter, FFmpeg, renderery).
 4. `jarvo-reka`: na końcu, bo korzysta ze skilli pozostałych.
 5. `jarvo-wideo`: wydzielony później ze Studia (wideo to osobny warsztat).
-6. `jarvo-ads`: dołączony bez kluczy; Skarbiec (sejf tokenów) jeszcze do zbudowania ([ADS.md](ADS.md)).
+6. `jarvo-ads`: bez kluczy, kampanie jako paczka do publikacji przez właściciela; Skarbiec (sejf tokenów) odłożony ([ADS.md](ADS.md)).
 7. `jarvo-lowca` i `jarvo-mobile`: specjaliści z własnymi skryptami do źródeł publicznych ([LEADY.md](LEADY.md), [MOBILE.md](MOBILE.md)).
 
 Pierwszy wspólny test floty: **„wypuść landing nowego produktu”**. Sherlock robi research

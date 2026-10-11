@@ -1,6 +1,11 @@
 # Jarvo Ads: specjalista Ads Managera (projekt)
 
-> Stan: **agent zbudowany (faza 2, 2026-09-29); Skarbiec (faza 1) jeszcze nie istnieje.** Decyzje z sekcji 14 podjęte.
+> Stan: **agent przygotowuje, Ty publikujesz (decyzja 2026-10-10).** Agent nie ma dostępu do kont: każdą kampanię oddaje
+> jako paczkę (`publikacja-reczna`, `paczka.py`): instrukcja krok po kroku w Menedżerze reklam albo Google Ads, teksty
+> do wklejenia, kreacje z nazwami reklam, budżet nie wyższy niż Twoja zgoda i zawsze z datą końca. „Opublikuj” klikasz Ty,
+> wyniki wracają eksportem CSV (`raport-reklam` z listą zmian do wyklikania). **Bezpośrednie połączenie z kontem
+> (Skarbiec, faza 1) jest odłożone**; opis niżej zostaje jako projekt na później.
+> Agent zbudowany (faza 2, 2026-09-29). Decyzje z sekcji 14 podjęte.
 > Do czasu Skarbca skille `podlacz-konto`, `start-kampanii` i `optymalizacja` (`metadata.jarvo.wymaga: [skarbiec]`) nie
 > trafiają do profilu, a SOUL agenta ma wygenerowaną listę tego, czego nie zrobi. Działają: plan kampanii, plan testu,
 > audyt konta, raport i wnioski z eksportu CSV (`eksport.py`), zgodność reklam. Usługa wraca sama, gdy pojawi się
@@ -220,7 +225,7 @@ Według praktyków po zmianie algorytmu Andromeda kreacje męczą się w 2–3 t
 
 ## 6. Workflowy agenta (skille)
 
-Własne [T] (wszystkie są w `profiles/jarvo-ads/skills/ads/`, 10 skilli):
+Własne [T] (wszystkie są w `profiles/jarvo-ads/skills/ads/`, 11 skilli):
 
 | Skill | Co robi | Poziom |
 |---|---|---|
@@ -228,6 +233,7 @@ Własne [T] (wszystkie są w `profiles/jarvo-ads/skills/ads/`, 10 skilli):
 | `podlacz-konto` | przeprowadza Cię przez Business Managera, aplikację, użytkownika systemowego i token, a w Google Ads przez MCC, token deweloperski i OAuth; tokeny wklejasz do Skarbca (nie do agenta); `ads.py doctor` sprawdza uprawnienia, walutę, strefę czasu, piksel, limit konta | A0 |
 | `audyt-konta` | stan konta: struktura, marnotrawstwo, piksel/CAPI, zmęczone kreacje, szybkie wygrane | A0 |
 | `plan-testu` | hipoteza, zmienna, warianty, metryka z drabiny, planer mocy, koperta, **brief kreacji** dla Studia/Wideografa | A1 |
+| `publikacja-reczna` | paczka do publikacji przez Ciebie: `kampania.json` → `paczka.py` (limity tekstów, budżet ≤ zgoda, data końca, pliki i proporcje kreacji, URL z UTM) → `PUBLIKACJA.md` krok po kroku z listą kontrolną, `teksty.md`, `kreacje/` | A1 |
 | `start-kampanii` | budowa na koncie w PAUSED, podglądy reklam, zgłoszenie koperty, start po kodzie | A1 → A2 |
 | `optymalizacja` | codzienny przegląd w kopercie: przegrani, przesunięcia, zmęczenie, notatka „co i dlaczego” | A2 w kopercie |
 | `raport-reklam` | raport dzienny (tylko gdy jest o czym), tygodniowy z wykresami, końcowy raport testu | A0 |
@@ -338,12 +344,12 @@ na atrapie API (fake Graph), tak jak testy HQ.
 
 Każdy krok: osobny commit, push, pytest + `validate.py` i test w działającym kontenerze (zasady z `CLAUDE.md`).
 
-Stan: ✅ zrobione w kodzie · 🟡 zakodowane, czeka na test na żywo · ⬜ do zrobienia.
+Stan: ✅ zrobione w kodzie · 🟡 zakodowane, czeka na test na żywo · ⬜ do zrobienia · ⏸ odłożone.
 
 | Faza | Co | Test „na żywo” | Stan |
 |---|---|---|---|
-| **1. Skarbiec** | kontener, polityka, dziennik, koperty, kody przez komunikator, STOP, strażnik, adapter Meta, atrapa Graph API, `ads.py` | atrapa + **konto sandbox Meta** (0 zł) | ⬜ Skarbca brak; jest tylko klient `ads.py` (bez Skarbca kod 3) |
-| **2. Agent** | profil `jarvo-ads` (SOUL, 10 skilli, skrypty planera, statystyki i eksportu CSV), rubryka, ≥ 10 evals (w tym „odpal bez pytania”, injection w komentarzu pod reklamą, „zmień metodę płatności”), routing Jarva, figurka w HQ | karta od Jarva → plan → szkic w sandboxie → kod → start | 🟡 w kodzie gotowe (12 evals); test na żywo czeka na Skarbiec |
+| **1. Skarbiec** | kontener, polityka, dziennik, koperty, kody przez komunikator, STOP, strażnik, adapter Meta, atrapa Graph API, `ads.py` | atrapa + **konto sandbox Meta** (0 zł) | ⏸ odłożone (2026-10-10): kampanie publikujesz Ty z paczki; jest tylko klient `ads.py` (bez Skarbca kod 3) |
+| **2. Agent** | profil `jarvo-ads` (SOUL, 11 skilli, skrypty planera, statystyki, eksportu CSV i paczki), rubryka, ≥ 10 evals (w tym „odpal bez pytania”, injection w komentarzu pod reklamą, „zmień metodę płatności”), routing Jarva, figurka w HQ | karta od Jarva → plan → szkic w sandboxie → kod → start | ✅ plan → paczka do publikacji (14 evals); ścieżka przez Skarbiec czeka, aż go zbudujemy |
 | **3. Pierwszy prawdziwy test** | **5 filmów launchowych jako test A/B/C/D/E** na jarvo.pl, mała koperta (Twoja decyzja) | prawdziwe konto, raport końcowy | ⬜ |
 | **4. Pętla wiedzy i HQ** | panel Reklamy, raport tygodniowy z wykresami, wnioski marki czytane przez Studio i Wideografa | drugi test na briefie z wniosków | ⬜ panel, rutyny i czytanie wniosków przez Studio/Wideografa; ✅ Sala operacyjna w HQ, zapis `WNIOSKI.md` przez `wnioski-marki` |
 | **5. Google Ads** | adapter w Skarbcu, test na koncie testowym Google | | ⬜ adapter; po stronie agenta Google już jest (`plan-kampanii`, `podlacz-konto`, CSV w `eksport.py`) |

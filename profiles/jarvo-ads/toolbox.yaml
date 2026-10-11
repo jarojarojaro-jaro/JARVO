@@ -11,4 +11,4 @@ tools:
     healthcheck: "python3 $HERMES_HOME/scripts/ads.py doctor --quiet"
     autonomy: A2
     optional: true
-    notes: "Trzyma tokeny Meta/Google, politykę budżetu, koperty i kody zgody. Bez niego agent działa na eksportach CSV."
+    notes: "Odłożone (decyzja właściciela 2026-10-10): agent oddaje paczkę do publikacji (paczka.py), właściciel publikuje. Skarbiec trzymałby tokeny Meta/Google, politykę budżetu, koperty i kody zgody."

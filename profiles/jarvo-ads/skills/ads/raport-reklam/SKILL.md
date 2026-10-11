@@ -1,17 +1,17 @@
 ---
 name: raport-reklam
 description: "Raport wyników reklam: tydzień, kampania, test, eksport CSV."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo"
 license: MIT
 metadata:
   hermes:
     tags: [ads, reporting]
-    related_skills: [optymalizacja, wnioski-marki]
+    related_skills: [optymalizacja, publikacja-reczna, wnioski-marki]
   jarvo:
     agent: jarvo-ads
     autonomy: A0
-    reviewed: "2026-09-29"
+    reviewed: "2026-10-11"
 ---
 
 # Raport reklam
@@ -34,10 +34,17 @@ metadata:
   z dwóch platform jako faktów (skill `attribution`),
 - wykresy: HTML → PNG (Chromium z obrazu), jedna myśl na wykres, podpisane osie.
 
+## Zmiany do wyklikania (bez podłączonego konta)
+Gdy dane są z eksportu CSV, a kampanię prowadzi właściciel (`publikacja-reczna`), raport kończy się listą zmian,
+które on wyklika: co (reklama, zestaw), co zrobić i gdzie (Menedżer reklam → Reklamy → przełącznik przy nazwie;
+Google Ads → Słowa kluczowe → Wykluczające), dlaczego (liczba z raportu). Sam z siebie proponujesz tylko to,
+co zmniejsza wydatek albo go nie zmienia (wyłącz słabą reklamę, wykluczenie, przesunięcie w tej samej kwocie).
+Więcej pieniędzy, dłuższy termin albo nowa kampania to nowa prośba o zgodę i nowa paczka.
+
 ## Wyjścia
-`out/raporty/<RRRR-MM-DD>.md` (+ PNG), krótka wersja do wiadomości.
+`out/raporty/<RRRR-MM-DD>.md` (+ PNG), krótka wersja do wiadomości, przy eksporcie CSV lista zmian do wyklikania.
 
 ## Definition of Done
 - [ ] daty, źródło, waluta w każdym raporcie,
 - [ ] werdykty testów z `eksperyment.py`, remis nazwany remisem,
-- [ ] jedna konkretna rekomendacja na końcu.
+- [ ] jedna konkretna rekomendacja na końcu (przy CSV: zmiany do wyklikania z miejscem i powodem).
