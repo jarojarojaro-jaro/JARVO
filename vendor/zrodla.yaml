@@ -194,6 +194,10 @@ zrodla:
     repo: https://github.com/lightpanda-io/browser
     status: uzywane
     przejrzane: d15600f5bef59e7583d4878c2f1178e46a4de0b9
+  espeak-ng:
+    repo: https://github.com/espeak-ng/espeak-ng
+    status: uzywane
+    przejrzane: ba90c8e9f440ad544f674a790bb5f53878b6ffc5
   hermes-agent:
     repo: https://github.com/NousResearch/hermes-agent
     status: uzywane
@@ -202,6 +206,10 @@ zrodla:
     repo: https://github.com/Nutlope/inspo
     status: uzywane
     przejrzane: 0e1e6363f980eb303a75428bcf3de4969c69a7df
+  misaki:
+    repo: https://github.com/hexgrad/misaki
+    status: uzywane
+    przejrzane: fba1236595f2d2bf21d414ba6e57d25256afada3
   modnet:
     repo: https://github.com/ZHKKKe/MODNet
     status: uzywane
@@ -218,10 +226,18 @@ zrodla:
     repo: https://github.com/opencv/opencv_zoo
     status: uzywane
     przejrzane: 47534e27c9851bb1128ccc0102f1145e27f23f98
+  paradee:
+    repo: https://github.com/sahilmahendrakar/paradee
+    status: uzywane
+    przejrzane: 9c8b4d7504cbee7e64de2d0341bb690f0b0ab708
   silero-vad:
     repo: https://github.com/snakers4/silero-vad
     status: uzywane
     przejrzane: 1e261b036686cd0017d500ee96acd1c4ba572a9d
+  spacy:
+    repo: https://github.com/explosion/spaCy
+    status: uzywane
+    przejrzane: c2dabfce56ad2991685ec85783cd59637a5d7b8f
   # — metody i prompty (inspiracja, własny tekst) —
   claude-code-security-review:
     repo: https://github.com/anthropics/claude-code-security-review

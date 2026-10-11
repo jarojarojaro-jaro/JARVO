@@ -47,6 +47,8 @@ ENC_LIMITS = ["-threads", THREADS, "-filter_threads", "2", "-x264-params", "rc-l
 PARALLEL = max(1, int(os.environ.get("JARVO_WIDEO_ROWNOLEGLE", "1")))   # sceny normalizowane naraz
 DEFAULT_VOICE = "pl-PL-MarekNeural"
 PL_VOICES = {"pl-PL-MarekNeural": "męski, spokojny", "pl-PL-ZofiaNeural": "żeński, ciepły"}
+# lektor angielski bez sieci i bez limitu: Paradee-8M w obrazie (/opt/jarvo/bin/jarvo-tts); czasy słów z Parakeeta
+LOCAL_VOICES = {"en-US-Paradee": "angielski, lokalny (Paradee, bez sieci)"}
 
 
 def parse_format(fmt: str) -> tuple[int, int]:
@@ -373,10 +375,133 @@ async def _synth(edge_tts, text: str, voice: str, rate: str, volume: str, pitch:
     return words
 
 
+def _speed(rate: str) -> float:
+    """Tempo Edge („+10%”) → szybkość lokalnego lektora (1.1), w granicach 0.5–2.0."""
+    m = re.fullmatch(r"\s*([+-]?\d+(?:\.\d+)?)\s*%\s*", rate or "+0%")
+    return max(0.5, min(2.0, 1 + float(m.group(1)) / 100)) if m else 1.0
+
+
+def _volume(volume: str) -> float:
+    m = re.fullmatch(r"\s*([+-]?\d+(?:\.\d+)?)\s*%\s*", volume or "+0%")
+    return max(0.0, 1 + float(m.group(1)) / 100) if m else 1.0
+
+
+def time_script_words(text: str, heard: list[Word], sentences: list[tuple[float, float, str]]) -> list[Word]:
+    """Słowa tekstu lektora z czasem: dopasowanie do słów usłyszanych przez Parakeeta (difflib), luki rozłożone
+    proporcjonalnie między dopasowanymi sąsiadami, a bez Parakeeta proporcjonalnie w obrębie zdań."""
+    import difflib
+
+    toks = text.split()
+    base = words_from_lines([(a, b, z) for a, b, z in sentences])
+    if len(base) != len(toks):            # zdania rozbite inaczej niż spacje tekstu: jedna linia na całość
+        end = sentences[-1][1] if sentences else 0.0
+        base = words_from_lines([(0.0, end, text)]) if toks else []
+    if not heard:
+        return [Word(w.start, w.end, t) for w, t in zip(base, toks)]
+    times: list[tuple[float, float] | None] = [None] * len(toks)
+    sm = difflib.SequenceMatcher(None, [_norm(t) for t in toks], [_norm(w.text) for w in heard], autojunk=False)
+    for blk in sm.get_matching_blocks():
+        for k in range(blk.size):
+            h = heard[blk.b + k]
+            times[blk.a + k] = (h.start, h.end)
+    i = 0
+    while i < len(toks):
+        if times[i] is not None:
+            i += 1
+            continue
+        j = i
+        while j < len(toks) and times[j] is None:
+            j += 1
+        a = times[i - 1][1] if i > 0 else (base[i].start if base else 0.0)
+        b = times[j][0] if j < len(toks) else (base[j - 1].end if base else a)
+        if b - a < 0.08 * (j - i):        # brak miejsca między sąsiadami: czasy z podziału na zdania
+            for k in range(i, j):
+                times[k] = (base[k].start, base[k].end) if base else (a, a)
+        else:
+            run = words_from_lines([(a, b, " ".join(toks[i:j]))])
+            for k, w in zip(range(i, j), run):
+                times[k] = (w.start, w.end)
+        i = j
+    return [Word(round(a, 3), round(b, 3), t) for (a, b), t in zip(times, toks)]
+
+
+def _heard_per_item(wavs: list[Path], tmp: Path) -> list[list[Word]]:
+    """Słowa usłyszane przez Parakeeta w każdym nagraniu. Wszystkie WAV-y sklejone w jeden plik z 0,6 s ciszy
+    między nimi: model ładuje się raz (narracja to kilkadziesiąt zdań), a słowa wracają do nagrań po czasie.
+    Brak jarvo-stt albo błąd → puste listy (czasy z podziału na zdania)."""
+    import wave
+
+    gap, spans, frames, params = 0.6, [], [], None
+    t = 0.0
+    for w in wavs:
+        with wave.open(str(w), "rb") as r:
+            params = params or r.getparams()
+            data = r.readframes(r.getnframes())
+            dur = r.getnframes() / r.getframerate()
+        if frames:
+            frames.append(b"\0" * (int(gap * params.framerate) * params.sampwidth * params.nchannels))
+            t += gap
+        frames.append(data)
+        spans.append((t, t + dur))
+        t += dur
+    if not frames:
+        return [[] for _ in wavs]
+    joined = tmp / "razem.wav"
+    with wave.open(str(joined), "wb") as out:
+        out.setparams(params)
+        out.writeframes(b"".join(frames))
+    try:
+        heard = transcribe_words(joined)
+    except SystemExit:
+        return [[] for _ in wavs]
+    per: list[list[Word]] = [[] for _ in wavs]
+    for h in heard:
+        mid = (h.start + h.end) / 2
+        for k, (a, b) in enumerate(spans):
+            if a - gap / 2 <= mid < b + gap / 2:
+                per[k].append(Word(round(max(0.0, h.start - a), 3), round(min(b - a, max(0.0, h.end - a)), 3), h.text))
+                break
+    return per
+
+
+def _speak_local(todo: list[tuple]) -> None:
+    """Lektor lokalny: jedno wywołanie jarvo-tts na wszystkie teksty (model ładuje się raz), WAV → MP3,
+    czasy słów z jednego przebiegu Parakeeta (bez niego, np. bez sieci przy pierwszym użyciu: z podziału na zdania)."""
+    tts = os.environ.get("JARVO_TTS_BIN", "/opt/jarvo/bin/jarvo-tts")
+    if not os.path.exists(tts):
+        tts = shutil.which("jarvo-tts") or ""
+    if not tts:
+        raise SystemExit("Brak jarvo-tts (obraz Jarvo: /opt/jarvo/bin/jarvo-tts); głos en-US-Paradee działa tylko w obrazie.")
+    with tempfile.TemporaryDirectory(prefix="jarvo-tts-") as tmpd:
+        tmp = Path(tmpd)
+        jobs = [{"tekst": it["text"], "wyjscie": str(tmp / f"{n}.wav"), "szybkosc": _speed(it.get("rate", "+0%"))}
+                for n, (_, it, _, _, _) in enumerate(todo)]
+        plan = tmp / "zadania.json"
+        plan.write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")
+        res = subprocess.run([tts, "--wsad", str(plan)], capture_output=True, text=True)
+        if res.returncode != 0:
+            tail = "\n".join((res.stderr or res.stdout or "").strip().splitlines()[-6:])
+            raise SystemExit(f"Lektor lokalny (jarvo-tts) nie powiódł się:\n{tail}")
+        done = json.loads(res.stdout)
+        heard = _heard_per_item([Path(j["wyjscie"]) for j in jobs], tmp)
+        for (_, it, mp3, meta, out_set), job, r, h in zip(todo, jobs, done, heard):
+            tmp_mp3 = mp3.with_suffix(".part.mp3")
+            run(["ffmpeg", "-y", "-i", job["wyjscie"], "-af", f"volume={_volume(it.get('volume', '+0%')):.3f}",
+                 "-ar", "24000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "128k", str(tmp_mp3)])
+            tmp_mp3.replace(mp3)
+            words = time_script_words(it["text"], h, [tuple(z) for z in r["zdania"]])
+            dur = duration(mp3)
+            meta.write_text(json.dumps({"duration": dur, "words": [w.__dict__ for w in words], "text": it["text"],
+                                        "voice": it.get("voice"), "czasy": "parakeet" if h else "zdania"},
+                                       ensure_ascii=False), encoding="utf-8")
+            out_set(Speech(mp3, dur, words))
+
+
 def speak_many(items: list[dict], concurrency: int = 4) -> list[Speech]:
-    """Lektor dla wielu tekstów naraz; wynik w cache (ten sam tekst i głos = zero zapytań)."""
+    """Lektor dla wielu tekstów naraz; wynik w cache (ten sam tekst i głos = zero zapytań).
+    Głosy Edge TTS (sieć, czasy słów z usługi) albo lokalny `en-US-Paradee` (LOCAL_VOICES)."""
     out: list[Speech | None] = [None] * len(items)
-    todo = []
+    todo, local = [], []
     for i, it in enumerate(items):
         key = digest("tts-v1", it["text"], it.get("voice", DEFAULT_VOICE), it.get("rate", "+0%"),
                      it.get("volume", "+0%"), it.get("pitch", "+0Hz"))
@@ -385,8 +510,12 @@ def speak_many(items: list[dict], concurrency: int = 4) -> list[Speech]:
         if mp3.exists() and meta.exists() and mp3.stat().st_size > 0:
             m = json.loads(meta.read_text(encoding="utf-8"))
             out[i] = Speech(mp3, m["duration"], [Word(**w) for w in m["words"]])
+        elif it.get("voice") in LOCAL_VOICES:
+            local.append((i, it, mp3, meta, lambda s, i=i: out.__setitem__(i, s)))
         else:
             todo.append((i, it, mp3, meta))
+    if local:
+        _speak_local(local)
     if todo:
         edge_tts = _import_edge_tts()
         _ssl_bundle()

@@ -1222,7 +1222,8 @@ def tools() -> dict:
 DZWIEKI_DIR = "dzwieki"      # podkatalog katalogu filmu: efekty z biblioteki i dźwięk wyodrębniony z filmów
 LEKTOR_DIR = "lektor"        # podkatalog katalogu filmu: lektor (Edge TTS) i nagrania z mikrofonu
 GLOSY = ("pl-PL-MarekNeural", "pl-PL-ZofiaNeural", "en-US-AndrewMultilingualNeural", "en-US-AvaMultilingualNeural",
-         "de-DE-SeraphinaMultilingualNeural")
+         "de-DE-SeraphinaMultilingualNeural", "en-US-Paradee")
+GLOSY_LOKALNE = ("en-US-Paradee",)  # bez sieci (jarvo-tts w obrazie), tylko angielski; czasy słów z Parakeeta
 LEKTOR_MAX = 3000            # znaków tekstu lektora z edytora
 
 

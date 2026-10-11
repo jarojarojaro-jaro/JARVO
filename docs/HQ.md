@@ -163,7 +163,7 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   natura, zwierzęta, codzienne, zabawne, gry, dżingle; szukanie po polsku i angielsku, odsłuch, „+” dodaje we wskaźniku),
   **Muzyka** (9 podkładów CC0, muzyka ze skarbca `wideo/muzyka` i `brands/*/muzyka`, pliki z folderu filmu, wgranie
   z dysku; podkład wchodzi ciszej, 30%), **Wyodrębnij** (dźwięk z innego filmu z folderu albo wgranego), **Lektor**
-  (Edge TTS, 5 głosów, tempo −30…+30%, `film.py lektor`) i **Nagraj** (mikrofon w przeglądarce, serwer zapisuje AAC;
+  (Edge TTS, 5 głosów, i angielski Paradee bez sieci; tempo −30…+30%, `film.py lektor`) i **Nagraj** (mikrofon w przeglądarce, serwer zapisuje AAC;
   wymaga HTTPS albo localhost, bez tego wgranie notatki głosowej z telefonu). W panelu klipu **Wyodrębnij dźwięk**:
   dźwięk klipu zostaje w tym samym miejscu osi jako osobne audio (AAC kopiowane bez straty), klip się wycisza.
   Dodany plik trafia obok filmu (`dzwieki/`, `lektor/`), więc projekt nie zależy od biblioteki. Endpointy

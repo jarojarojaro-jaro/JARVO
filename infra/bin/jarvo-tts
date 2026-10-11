@@ -1,0 +1,160 @@
+#!/opt/jarvo/venv/bin/python
+"""Lokalny lektor angielski floty Jarvo: Paradee-8M (Apache-2.0, int8 ONNX, 9 MB) na CPU, bez sieci.
+
+    jarvo-tts "Hello there." -o glos.wav [--szybkosc 1.1]   → WAV 24 kHz mono
+    jarvo-tts --wsad zadania.json                           → wiele tekstów, model ładowany raz
+    jarvo-tts --sprawdz                                     → krótka próba (healthcheck, testy)
+
+`zadania.json`: [{"tekst": "...", "wyjscie": "a.wav", "szybkosc": 1.0}, ...]. Na wyjściu (stdout) JSON:
+[{"wyjscie": ..., "sekundy": ..., "zdania": [[start, koniec, "zdanie"], ...]}]; czasy zdań służą
+`wideo_lib.speak_many` do napisów, gdy nie ma czasów słów z Parakeeta.
+
+Tekst → fonemy (misaki, ten sam G2P co Kokoro, na którym uczono model; słowa spoza słownika przez
+espeak-ng) → tokeny → jeden graf ONNX → fala 24 kHz. Długi tekst czytany zdanie po zdaniu, z krótką pauzą.
+Model leży w obrazie ($JARVO_TTS_MODEL_DIR, domyślnie /opt/jarvo/models/paradee). Tylko angielski:
+polski lektor to dalej Edge TTS. Logika wnioskowania jak w paradee/tts.py (github.com/sahilmahendrakar/paradee).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+import wave
+from pathlib import Path
+
+MODEL_DIR = Path(os.environ.get("JARVO_TTS_MODEL_DIR", "/opt/jarvo/models/paradee"))
+THREADS = int(os.environ.get("JARVO_TTS_THREADS", "2"))
+SAMPLE_RATE = 24000
+MAX_PHONEMES = 510          # 512 pozycji tekstu, dwie na tokeny brzegowe
+PAUZA_S = 0.22              # cisza między zdaniami
+ZDANIA = re.compile(r"(?<=[.!?…])\s+")
+# po tych skrótach kropka nie kończy zdania (inaczej w środku zdania wypada pauza)
+SKROTY = {"mr", "mrs", "ms", "dr", "prof", "st", "vs", "etc", "e.g", "i.e", "inc", "ltd", "co", "no", "fig", "approx",
+          "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec"}
+
+
+def podziel_zdania(tekst: str) -> list[str]:
+    """Tekst → zdania. Nowa linia zawsze kończy zdanie; kropka nie, gdy stoi po skrócie albo inicjale
+    lub gdy dalej idzie mała litera albo cyfra."""
+    out: list[str] = []
+    for linia in tekst.splitlines():
+        poczatek = len(out)
+        for kawalek in (k.strip() for k in ZDANIA.split(linia.strip())):
+            if not kawalek:
+                continue
+            if len(out) > poczatek and out[-1].endswith("."):
+                ost = out[-1].rsplit(None, 1)[-1].rstrip(".").lower()
+                if ost in SKROTY or len(ost) == 1 or kawalek[0].islower() or kawalek[0].isdigit():
+                    out[-1] += " " + kawalek
+                    continue
+            out.append(kawalek)
+    return out
+
+
+class Paradee:
+    def __init__(self, model_dir: Path = MODEL_DIR, threads: int = THREADS):
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        import numpy as np  # type: ignore
+        import onnxruntime as ort  # type: ignore
+        from misaki import en, espeak  # type: ignore
+
+        self.np = np
+        self.vocab = json.loads((model_dir / "config.json").read_text(encoding="utf-8"))["vocab"]
+        so = ort.SessionOptions()
+        so.intra_op_num_threads = threads
+        so.inter_op_num_threads = 1
+        self.session = ort.InferenceSession(str(model_dir / "paradee_int8.onnx"), so,
+                                            providers=["CPUExecutionProvider"])
+        self.g2p = en.G2P(trf=False, british=False, fallback=espeak.EspeakFallback(british=False), unk="")
+
+    def _fala(self, fonemy: str, szybkosc: float):
+        ids = [0] + [self.vocab[c] for c in fonemy if c in self.vocab][:MAX_PHONEMES] + [0]
+        feed = {"input_ids": self.np.array([ids], dtype=self.np.int64),
+                "speed": self.np.array([szybkosc], dtype=self.np.float32)}
+        return self.session.run(None, feed)[0][0]
+
+    def _kawalki(self, zdanie: str):
+        ps, _ = self.g2p(zdanie)
+        while len(ps) > MAX_PHONEMES:       # bardzo długie zdanie: cięcie na ostatniej spacji, która się mieści
+            cut = ps.rfind(" ", 0, MAX_PHONEMES)
+            cut = cut if cut > 0 else MAX_PHONEMES
+            yield ps[:cut]
+            ps = ps[cut:].lstrip()
+        if ps:
+            yield ps
+
+    def mow(self, tekst: str, szybkosc: float = 1.0):
+        """→ (fala float32, [(start, koniec, zdanie)])."""
+        np = self.np
+        czesci, zdania, t = [], [], 0.0
+        cisza = np.zeros(int(PAUZA_S * SAMPLE_RATE), dtype=np.float32)
+        for zdanie in podziel_zdania(tekst):
+            fala = [self._fala(ps, szybkosc) for ps in self._kawalki(zdanie)]
+            if not fala:
+                continue
+            fala = np.concatenate(fala)
+            if czesci:
+                czesci.append(cisza)
+                t += len(cisza) / SAMPLE_RATE
+            czesci.append(fala)
+            dl = len(fala) / SAMPLE_RATE
+            zdania.append((round(t, 3), round(t + dl, 3), zdanie))
+            t += dl
+        return (np.concatenate(czesci) if czesci else np.zeros(0, dtype=np.float32)), zdania
+
+
+def zapisz_wav(sciezka: Path, fala) -> None:
+    import numpy as np  # type: ignore
+
+    pcm = (np.clip(fala, -1.0, 1.0) * 32767).astype("<i2")
+    sciezka.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(sciezka), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(SAMPLE_RATE)
+        w.writeframes(pcm.tobytes())
+
+
+def wykonaj(model: Paradee, zadania: list[dict]) -> list[dict]:
+    wynik = []
+    for z in zadania:
+        fala, zdania = model.mow(str(z["tekst"]), float(z.get("szybkosc", 1.0)))
+        out = Path(z["wyjscie"])
+        zapisz_wav(out, fala)
+        wynik.append({"wyjscie": str(out), "sekundy": round(len(fala) / SAMPLE_RATE, 3), "zdania": zdania})
+    return wynik
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("tekst", nargs="?")
+    ap.add_argument("-o", "--wyjscie", type=Path)
+    ap.add_argument("--szybkosc", type=float, default=1.0, help="1.0 = normalnie, 1.2 = szybciej (0.5–2.0)")
+    ap.add_argument("--wsad", type=Path, help="JSON z listą zadań {tekst, wyjscie, szybkosc}")
+    ap.add_argument("--sprawdz", action="store_true", help="próba: krótkie zdanie do pamięci, bez pliku")
+    a = ap.parse_args(argv)
+    if not 0.5 <= a.szybkosc <= 2.0:
+        ap.error("--szybkosc: od 0.5 do 2.0")
+    if a.sprawdz:
+        fala, _ = Paradee().mow("Jarvo is ready.")
+        print(json.dumps({"ok": len(fala) > SAMPLE_RATE // 4, "sekundy": round(len(fala) / SAMPLE_RATE, 3)}))
+        return 0 if len(fala) > SAMPLE_RATE // 4 else 1
+    if a.wsad:
+        zadania = json.loads(a.wsad.read_text(encoding="utf-8"))
+    elif a.tekst and a.wyjscie:
+        zadania = [{"tekst": a.tekst, "wyjscie": str(a.wyjscie), "szybkosc": a.szybkosc}]
+    else:
+        ap.error("podaj tekst i -o, albo --wsad")
+    for z in zadania:
+        if not 0.5 <= float(z.get("szybkosc", 1.0)) <= 2.0:
+            ap.error("szybkosc w zadaniu: od 0.5 do 2.0")
+    json.dump(wykonaj(Paradee(), zadania), sys.stdout, ensure_ascii=False)
+    print()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

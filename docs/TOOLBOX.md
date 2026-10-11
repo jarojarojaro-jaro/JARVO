@@ -116,6 +116,7 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 |---|---|---|---|---|
 | FFmpeg (libass, libx264, libvidstab, fontconfig) | cały montaż: normalizacja scen, przejścia, napisy ASS, muzyka z duckingiem, loudnorm, stabilizacja nagrań z ręki, kontrola | LGPL/GPL | n/d | `film.py`, `montaz.py`, `qa_wideo.py`, `rytm.py`, `kadry.py` |
 | [edge-tts](https://github.com/rany2/edge-tts) 7.2.7 | lektor PL za darmo, bez klucza (Marek, Zofia), z czasem słów do napisów karaoke | LGPL-3.0 | 2026-08 | leniwa instalacja Hermesa (`tts.edge`) |
+| [Paradee-8M](https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0) v1.0 (int8 ONNX, 9 MB) + misaki 0.9.4 | lektor angielski bez sieci i bez limitu: głos `en-US-Paradee` w `film.py`, `projekt.py lektor` i edytorze HQ; czasy słów z Parakeeta | Apache-2.0 | 2026-10 | `jarvo-tts` (model w obrazie) |
 | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) | transkrypcja z czasem słów: napisy do nagrań, wybór fragmentów, test wymowy lektora | CC-BY-4.0 (model) / MIT | 2026-07 | `jarvo-stt` |
 | [Pexels API](https://www.pexels.com/api/) | darmowe ujęcia i zdjęcia stock (klucz `PEXELS_API_KEY`) | Pexels License | n/d | `stock.py` |
 | [Pixabay API](https://pixabay.com/api/docs/) | darmowe ujęcia i zdjęcia stock (klucz `PIXABAY_API_KEY`), cache 24 h | Pixabay Content License | n/d | `stock.py` |
@@ -149,7 +150,7 @@ Wzięty pomysł pipeline'u, implementacja własna na FFmpeg. Automatyczna publik
 płatnej licencji. Domyślnie HyperFrames / Motion Canvas / Revideo.
 
 Odrzucone: ComfyUI self-host (GPL-3.0, wymaga GPU; generowanie idzie przez API),
-`rhasspy/piper` (projekt przeniesiony do `OHF-Voice/piper1-gpl` na GPL-3.0; lektor PL robi Edge TTS, a Kokoro, tylko EN/ZH, jest częścią lemo-opuscar).
+`rhasspy/piper` (projekt przeniesiony do `OHF-Voice/piper1-gpl` na GPL-3.0; lektor PL robi Edge TTS, angielski bez sieci Paradee, a Kokoro, tylko EN/ZH, jest częścią lemo-opuscar).
 
 ---
 
@@ -318,7 +319,7 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 | pakiety systemowe | apt | pandoc, qpdf, ocrmypdf + tesseract (pol, eng), exiftool, jq, sqlite3, fonty z polskimi znakami |
 | przeglądarki | `/usr/local/bin/lightpanda`, `/usr/local/bin/chromium` (`CHROME_PATH`) | Lightpanda dla `browser_*` agentów (agent-browser); jedna Chromium z obrazu Hermesa dla zrzutów, PDF, Lighthouse, Playwright i dembrandta |
 | narzędzia Node | `/opt/jarvo/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt, inspo-mcp (serwer MCP Weba) |
-| narzędzia Pythona | venv `/opt/jarvo/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet); dodatki `JARVO_EXTRAS`: rembg, auto-editor, docling, manim |
+| narzędzia Pythona | venv `/opt/jarvo/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet), misaki + spaCy `en_core_web_sm` (lektor Paradee); dodatki `JARVO_EXTRAS`: rembg, auto-editor, docling, manim |
 | claude-seo | `/opt/jarvo/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
 | sidecary | sieć `jarvo-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
 
@@ -331,7 +332,10 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
 - `AGENT_BROWSER_EXECUTABLE_PATH` celowo nieustawione: agent-browser użyłby go też dla silnika lightpanda,
 - bez cache instalatorów w warstwach (`UV_NO_CACHE`, `npm cache clean`) i bez `chmod -R` (kopiuje całe drzewo do nowej warstwy),
 - auto-editor (dodatek `media`) pobiera swoją binarkę przy budowie obrazu (w runtime katalog pakietów jest tylko do odczytu),
-- rozpoznawanie mowy: `/opt/jarvo/bin/jarvo-stt` (Hermes: `HERMES_LOCAL_STT_COMMAND`, `stt.provider: local_command`).
+- rozpoznawanie mowy: `/opt/jarvo/bin/jarvo-stt` (Hermes: `HERMES_LOCAL_STT_COMMAND`, `stt.provider: local_command`),
+- lektor angielski: `/opt/jarvo/bin/jarvo-tts` z modelem Paradee w `/opt/jarvo/models/paradee/`; pliki modelu i koło
+  spaCy przypięte sumą SHA-256, a build kończy się próbą mowy (`jarvo-tts --sprawdz`). misaki bez dodatku `[en]`
+  (ciągnąłby torch, ~5 GB).
 
 Skrypty `.cjs` ładują moduły przez `NODE_PATH`, a ESM-owe pakiety (np. `favicons`) przez `importGlobal()`.
 Skrypty Pythona, które potrzebują bibliotek z venv narzędzi, same przełączają się na `/opt/jarvo/venv`.

@@ -1049,6 +1049,8 @@ def cmd_voices(_args) -> int:
         print(f"{v['ShortName']:<28} {v.get('Gender', ''):<7} {note}")
     print("Wielojęzyczne (też czytają po polsku, inna barwa): en-US-AndrewMultilingualNeural, en-US-AvaMultilingualNeural, "
           "de-DE-SeraphinaMultilingualNeural")
+    for name, note in wl.LOCAL_VOICES.items():
+        print(f"{name:<28} {'':<7} {note}")
     return 0
 
 

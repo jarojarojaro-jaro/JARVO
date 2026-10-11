@@ -5,3 +5,11 @@ yt-dlp==2026.8.19
 # rozpoznawanie mowy: Parakeet TDT 0.6B v3 (int8, ONNX) przez /opt/jarvo/bin/jarvo-stt
 onnx-asr[cpu,hub]==0.12.0
 onnxruntime==1.29.0
+# lektor angielski bez sieci: Paradee-8M (ONNX, model w obrazie) przez /opt/jarvo/bin/jarvo-tts.
+# misaki bez dodatku [en]: ten ciągnie torch (~5 GB); G2P potrzebuje tylko poniższych. Model spaCy
+# en_core_web_sm (koło z sumą sha256) instaluje infra/Dockerfile.
+misaki==0.9.4
+spacy==3.8.16
+espeakng-loader==0.2.4
+phonemizer-fork==3.3.2
+num2words==0.5.14

@@ -199,8 +199,8 @@ Cała flota mieści się na **1 VPS: 4 vCPU / 8 GB RAM / 80 GB**. Obraz ~4,4 GB,
 
 **Narzędzia w obrazie:** Lightpanda (lekka przeglądarka headless ~30 MB/sesję) + jedna Chromium z obrazu
 Hermesa (`/usr/local/bin/chromium`: render, PDF, zrzuty, Lighthouse), Parakeet przez `jarvo-stt` (onnx-asr;
-model ~0,65 GB pobierany przy pierwszym użyciu), FFmpeg (z obrazu Hermesa). Edge TTS (lektor) doinstalowuje
-Hermes przy pierwszym użyciu. Odchudzone: usunięto Gotenberg i Crawl4AI. (W piaskownicy Claude Code osobno:
+model ~0,65 GB pobierany przy pierwszym użyciu), FFmpeg (z obrazu Hermesa), lektor angielski Paradee przez `jarvo-tts`
+(model 9 MB w obrazie, bez sieci). Edge TTS (lektor PL) doinstalowuje Hermes przy pierwszym użyciu. Odchudzone: usunięto Gotenberg i Crawl4AI. (W piaskownicy Claude Code osobno:
 Playwright/Chromium w `/opt/pw-browsers`, poza obrazem.)
 
 **Modele:** domyślnie provider `openai-codex` (jeden model `gpt-6-luna`, głębia myślenia per agent

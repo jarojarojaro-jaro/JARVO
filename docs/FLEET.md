@@ -243,7 +243,7 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 
 **Tryby pracy:**
 - **krótki film z tematu** (pomysł z [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo), własna implementacja):
-  scenariusz → ujęcia (stock Pexels/Pixabay, AI, pliki, plansze) → polski lektor Edge TTS (darmowy, z czasem słów)
+  scenariusz → ujęcia (stock Pexels/Pixabay, AI, pliki, plansze) → polski lektor Edge TTS (darmowy, z czasem słów; po angielsku także lokalny Paradee bez sieci)
   → napisy karaoke → muzyka ściszana pod głos → montaż FFmpeg w 9:16/16:9/1:1/4:5, z planu `plan.json` (`film.py`),
 - **warianty A/B** z jednego planu (hook, głos, tempo, długość), wspólne sceny z cache,
 - **montaż nagrań** użytkownika: cięcie, usuwanie ciszy, kadr 9:16 z poziomego, głośność −14 LUFS, napisy,

@@ -138,6 +138,25 @@ COPY --chmod=0755 infra/bin/ /opt/jarvo/bin/
 ENV HERMES_LOCAL_STT_COMMAND="/opt/jarvo/bin/jarvo-stt {input_path} --output-dir {output_dir} --language {language}" \
     JARVO_MODELS_DIR=/opt/data/jarvo/models
 
+# --- lektor angielski bez sieci (jarvo-tts): Paradee-8M v1.0 (Apache-2.0, int8 ONNX, 9 MB) w obrazie,
+#     model spaCy en_core_web_sm 3.8.0 (MIT) dla G2P misaki. Pliki przypięte sumą sha256; na końcu próba mowy.
+ARG PARADEE_URL=https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0/resolve/v1.0
+ARG SPACY_EN_URL=https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+RUN set -e; d=/opt/jarvo/models/paradee; mkdir -p "$d" /tmp/spacy-en && \
+    curl -fsSL "$PARADEE_URL/onnx/paradee_int8.onnx" -o "$d/paradee_int8.onnx" && \
+    curl -fsSL "$PARADEE_URL/config.json" -o "$d/config.json" && \
+    curl -fsSL "$PARADEE_URL/LICENSE" -o "$d/LICENSE" && \
+    curl -fsSL "$SPACY_EN_URL" -o /tmp/spacy-en/en_core_web_sm-3.8.0-py3-none-any.whl && \
+    printf '%s\n' \
+      "60e8f8a1bc7c546488154e9d99ecac6e9c50baf3f4b684c5b0de48ea03b698eb  $d/paradee_int8.onnx" \
+      "f24046974a3a8c747affefb45c7c504263a99d5081787908b16abe8f5ac94fcd  $d/config.json" \
+      "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  $d/LICENSE" \
+      "1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85  /tmp/spacy-en/en_core_web_sm-3.8.0-py3-none-any.whl" \
+      | sha256sum -c - && \
+    VIRTUAL_ENV=/opt/jarvo/venv uv pip install --no-deps /tmp/spacy-en/en_core_web_sm-3.8.0-py3-none-any.whl && \
+    rm -rf /tmp/spacy-en && \
+    /opt/jarvo/bin/jarvo-tts --sprawdz
+
 # --- claude-seo: runtime skryptów dla skilli SEO (ten sam commit co w vendor/skills.lock.yaml).
 # Playwright przypięty do wersji, której Chromium jest w obrazie (requirements-claude-seo.txt).
 RUN set -e; git init -q /opt/jarvo/vendor/claude-seo && cd /opt/jarvo/vendor/claude-seo && \

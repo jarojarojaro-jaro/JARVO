@@ -505,12 +505,13 @@ async def edit_lektor(request: Request):
     if not dest.is_file():
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
+            # lokalny lektor czeka jeszcze na Parakeeta (czasy słów; przy pierwszym użyciu pobiera model)
             code, err = await _proc(sys.executable, str(skrypt), "lektor", tekst, "-o", str(dest), "--glos", glos,
-                                    "--tempo", tempo, timeout=300)
+                                    "--tempo", tempo, timeout=900 if glos in ed.GLOSY_LOKALNE else 300)
         except RuntimeError as exc:
             raise HTTPException(504, f"Lektor: {exc}")
         if code != 0 or not dest.is_file():
-            raise HTTPException(502, (err.strip().splitlines() or ["Lektor (Edge TTS) nie odpowiedział"])[-1][:300])
+            raise HTTPException(502, (err.strip().splitlines() or ["Lektor nie odpowiedział"])[-1][:300])
     return await asyncio.to_thread(_media_entry, dest)
 
 

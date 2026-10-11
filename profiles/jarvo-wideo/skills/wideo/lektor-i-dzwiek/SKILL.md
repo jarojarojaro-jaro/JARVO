@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.11.0
+version: 1.12.0
 author: Jarvo
 license: MIT
 metadata:
@@ -16,7 +16,7 @@ metadata:
 
 # Lektor i dźwięk
 
-Lektor: Edge TTS (darmowy, bez klucza, neuronowe głosy PL). Muzyka: tylko z prawem użycia. Cel głośności
+Lektor: Edge TTS (darmowy, bez klucza, neuronowe głosy PL); po angielsku także lokalny Paradee (bez sieci). Muzyka: tylko z prawem użycia. Cel głośności
 dla platform społecznościowych: −14 LUFS zintegrowane, true peak ≤ −1 dBTP.
 
 ## Kiedy użyć
@@ -29,6 +29,10 @@ dla platform społecznościowych: −14 LUFS zintegrowane, true peak ≤ −1 dB
 | `pl-PL-MarekNeural` | męski, spokojny, rzeczowy | poradniki, B2B, explainery |
 | `pl-PL-ZofiaNeural` | żeński, ciepły, energiczny | lifestyle, produkt, social |
 | `en-US-AndrewMultilingualNeural`, `en-US-AvaMultilingualNeural` | wielojęzyczne (czytają PL z lekkim akcentem) | inny charakter, testy A/B |
+| `en-US-Paradee` | angielski, męski, lokalny (model w obrazie, bez sieci i limitów) | film po angielsku; **tylko angielski tekst** |
+
+`en-US-Paradee` działa jak inne głosy (`--glos`, `glos` w scenie, edytor HQ), tempo `--tempo` też; `wysokosc`
+pomija. Czasy słów daje Parakeet (pierwsze użycie pobiera jego model, ~0,65 GB), bez niego: rozłożone w zdaniach.
 
 Lista na żywo: `python3 $HERMES_HOME/scripts/film.py glosy`. Tempo: `+0%` spokojnie, `+5…+12%` social,
 powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. Dialog: `glos` w pojedynczej scenie.

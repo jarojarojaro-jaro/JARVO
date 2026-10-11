@@ -1418,3 +1418,100 @@ def test_dwa_ekrany_render_i_test_pauzy(tmp_path):
     _, st = dwa.zloz(zdj, a, tmp_path / "pp.mp4", uklad="przed-po", sek=3.0)
     assert st["uwagi"] == []                                                         # kreska jedzie
 
+
+
+# ------------------------------------------------------------------ lektor lokalny (Paradee, jarvo-tts)
+
+def _jarvo_tts():
+    import importlib.machinery
+    import importlib.util
+    path = str(REPO / "infra" / "bin" / "jarvo-tts")
+    loader = importlib.machinery.SourceFileLoader("jarvo_tts", path)
+    spec = importlib.util.spec_from_loader("jarvo_tts", loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+def test_jarvo_tts_zdania_bez_ciecia_na_skrotach():
+    t = _jarvo_tts()
+    assert t.podziel_zdania("Shipped on Oct. 5th, Dr. Smith said it is 42% faster! Next one.\nNew line. J. R. Tolkien.") == [
+        "Shipped on Oct. 5th, Dr. Smith said it is 42% faster!", "Next one.", "New line.", "J. R. Tolkien."]
+    assert t.podziel_zdania("  \n\n") == []
+
+
+def test_jarvo_tts_szybkosc_poza_zakresem():
+    with pytest.raises(SystemExit):
+        _jarvo_tts().main(["Hi.", "-o", "x.wav", "--szybkosc", "3"])
+
+
+def test_lektor_lokalny_tempo_i_glosnosc():
+    assert wl._speed("+10%") == pytest.approx(1.1)
+    assert wl._speed("-20%") == pytest.approx(0.8)
+    assert wl._speed("+300%") == 2.0 and wl._speed("bzdura") == 1.0
+    assert wl._volume("-50%") == pytest.approx(0.5) and wl._volume("+0%") == 1.0
+    assert "en-US-Paradee" in wl.LOCAL_VOICES
+
+
+def test_czasy_slow_z_parakeeta_i_luki():
+    W = wl.Word
+    text = "Jarvo answers every message by 8 AM."
+    heard = [W(0.3, 0.7, "Jarvo"), W(0.8, 1.2, "answers"), W(1.2, 1.5, "every"), W(1.5, 1.9, "massage"),
+             W(1.9, 2.0, "by"), W(2.0, 2.2, "8"), W(2.3, 2.7, "a.m.")]
+    out = wl.time_script_words(text, heard, [(0.0, 3.0, text)])
+    assert [w.text for w in out] == text.split()                       # pisownia z tekstu, nie z rozpoznania
+    assert (out[0].start, out[0].end) == (0.3, 0.7)
+    assert (out[-1].start, out[-1].end) == (2.3, 2.7)                   # „AM.” = „a.m.” po normalizacji
+    assert 1.5 <= out[3].start < out[3].end <= 1.9                      # „message” źle usłyszane: luka między sąsiadami
+    assert all(a.end <= b.start + 1e-6 for a, b in zip(out, out[1:]))
+
+
+def test_czasy_slow_bez_parakeeta_z_podzialu_na_zdania():
+    out = wl.time_script_words("One two. Three four five.", [], [(0.0, 1.0, "One two."), (1.2, 2.4, "Three four five.")])
+    assert [w.text for w in out] == ["One", "two.", "Three", "four", "five."]
+    assert out[0].start == 0.0 and out[1].end == pytest.approx(1.0, abs=0.01)
+    assert out[2].start == pytest.approx(1.2) and out[-1].end == pytest.approx(2.4, abs=0.01)
+
+
+@needs_ffmpeg
+def test_speak_many_glos_lokalny_przez_jarvo_tts(tmp_path, monkeypatch):
+    """Głos en-US-Paradee idzie przez jarvo-tts (atrapa: ton zamiast mowy), bez Parakeeta czasy z podziału na zdania,
+    drugi raz z cache."""
+    fake = tmp_path / "jarvo-tts"
+    fake.write_text(f"""#!{sys.executable}
+import json, math, struct, sys, wave
+jobs = json.load(open(sys.argv[2]))
+out = []
+for j in jobs:
+    n = int(24000 * 1.5 / j["szybkosc"])
+    with wave.open(j["wyjscie"], "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000)
+        w.writeframes(b"".join(struct.pack("<h", int(8000 * math.sin(i / 9))) for i in range(n)))
+    out.append({{"wyjscie": j["wyjscie"], "sekundy": n / 24000, "zdania": [[0.0, n / 24000, j["tekst"]]]}})
+open(sys.argv[2] + ".log", "a").write("x")
+print(json.dumps(out))
+""")
+    fake.chmod(0o755)
+    monkeypatch.setenv("JARVO_TTS_BIN", str(fake))
+    monkeypatch.setenv("JARVO_STT_BIN", str(tmp_path / "brak-stt"))
+    monkeypatch.setattr(wl.shutil, "which", lambda *_a, **_k: None)
+    monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "cache"))
+    items = [{"text": "Hello there friend.", "voice": "en-US-Paradee", "rate": "+50%"},
+             {"text": "Second line.", "voice": "en-US-Paradee"}]
+    sp = wl.speak_many(items)
+    assert len(sp) == 2 and sp[0].audio.suffix == ".mp3"
+    assert sp[0].duration == pytest.approx(1.0, abs=0.1) and sp[1].duration == pytest.approx(1.5, abs=0.1)
+    assert [w.text for w in sp[0].words] == ["Hello", "there", "friend."]
+    assert json.loads(sp[0].audio.with_suffix(".json").read_text(encoding="utf-8"))["czasy"] == "zdania"
+    fake.unlink()                                                       # drugi raz: cache, bez jarvo-tts
+    assert [s.audio for s in wl.speak_many(items)] == [s.audio for s in sp]
+
+
+def test_glos_lokalny_w_edytorze_hq():
+    import importlib
+    sys.path.insert(0, str(REPO / "hq" / "plugin"))
+    ed = importlib.import_module("edytor")
+    assert "en-US-Paradee" in ed.GLOSY and set(ed.GLOSY_LOKALNE) <= set(ed.GLOSY)
+    js = (REPO / "hq" / "web" / "src" / "44-audio.js").read_text(encoding="utf-8")
+    lista = re.search(r"const AUDIO_GLOSY = \[(.*?)\];", js, re.S).group(1)
+    assert sorted(re.findall(r'\["([\w-]+)",', lista)) == sorted(ed.GLOSY)

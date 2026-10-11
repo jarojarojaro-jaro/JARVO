@@ -1,6 +1,6 @@
 // ------------------------------------------------------------------ edytor: menu Audio (jak w CapCut)
 // Efekty i Muzyka z biblioteki CC0 (scripts/dzwieki.py, odsłuch przed dodaniem), muzyka ze skarbca i z katalogu filmu,
-// Wyodrębnij (dźwięk innego filmu), Lektor (Edge TTS, ten sam co film.py Wideografa), Nagraj (mikrofon przez HTTPS;
+// Wyodrębnij (dźwięk innego filmu), Lektor (Edge TTS albo lokalny Paradee po angielsku, ten sam co film.py Wideografa), Nagraj (mikrofon przez HTTPS;
 // bez HTTPS wgranie notatki głosowej). Każda droga kończy się plikiem obok filmu (dzwieki/, lektor/) i wywołaniem
 // onAdd(opis pliku, głośność, start): element audio na osi. Wideograf ma to samo w projekt.py (dzwieki, dodaj-dzwiek,
 // wyodrebnij, lektor), a prośba z edytora („Poproś agenta”) wymienia te polecenia.
@@ -10,7 +10,8 @@ const AUDIO_ZAKLADKI = [["efekty", "Efekty", "Sounds"], ["muzyka", "Muzyka", "Mu
 const AUDIO_GLOSY = [["pl-PL-MarekNeural", "Marek (PL)", "Marek (PL)"], ["pl-PL-ZofiaNeural", "Zofia (PL)", "Zofia (PL)"],
   ["en-US-AndrewMultilingualNeural", "Andrew (wielojęzyczny)", "Andrew (multilingual)"],
   ["en-US-AvaMultilingualNeural", "Ava (wielojęzyczna)", "Ava (multilingual)"],
-  ["de-DE-SeraphinaMultilingualNeural", "Seraphina (wielojęzyczna)", "Seraphina (multilingual)"]];
+  ["de-DE-SeraphinaMultilingualNeural", "Seraphina (wielojęzyczna)", "Seraphina (multilingual)"],
+  ["en-US-Paradee", "Paradee (EN, lokalny)", "Paradee (EN, local)"]];
 const AUDIO_GLOSNOSC_PODKLADU = 0.3;   // podkład pod mową (jak projekt.py dodaj-dzwiek)
 const audioKatalog = { v: null, p: null };
 const audioUrls = new Map();           // id z biblioteki albo ścieżka → object URL (odsłuch bez ponownego pobierania)
@@ -132,8 +133,11 @@ function AudioMenu({ path, media, start, onAdd, onUploadAdd, wgrajFilm, top }) {
     <button type="button" class="thq-ed-btn is-main is-wide" disabled=${!!busy || !tekst.trim()}
       onClick=${() => zrob("lektor", async () => onAdd(await api.editLektor(path, tekst, glos, tempo), 1))}>
       ${ED_ICON.speech} ${busy === "lektor" ? L("Tworzę lektora…", "Creating the voice-over…") : L("Utwórz i dodaj od wskaźnika", "Create and add at the playhead")}</button>
-    <p class="thq-ed-note">${L("Ten sam lektor co u Wideografa (Edge TTS, bez klucza). Do napisów: zakładka Napisy rozpozna mowę z nagrania.",
-      "The same voice as the Video agent (Edge TTS, no key). For captions, the Captions tab recognises the speech.")}</p>`;
+    <p class="thq-ed-note">${glos === "en-US-Paradee"
+      ? L("Paradee: lokalny lektor tylko po angielsku, bez internetu. Pierwsze użycie trwa dłużej (model mowy do czasów słów).",
+        "Paradee: local English-only voice, no internet. The first use takes longer (speech model for word timings).")
+      : L("Ten sam lektor co u Wideografa (Edge TTS, bez klucza). Do napisów: zakładka Napisy rozpozna mowę z nagrania.",
+        "The same voice as the Video agent (Edge TTS, no key). For captions, the Captions tab recognises the speech.")}</p>`;
 
   const moznaNagrac = typeof window !== "undefined" && window.isSecureContext && navigator.mediaDevices
     && navigator.mediaDevices.getUserMedia && typeof window.MediaRecorder !== "undefined";
