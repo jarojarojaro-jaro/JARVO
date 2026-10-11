@@ -16,7 +16,7 @@ Nie to: sprzedaż produktu z UI → `promo-produktu.md`; sam wykres → `dane.md
 | fragment lektora w jednej z 8 gramatyk (wykresy, tablica, 3Blue1Brown, kolaż Vox, prezentacja, historyjka z postacią, typografia kinetyczna, Kurzgesagt): klip z jednego spec, cue na słowach lektora | `gramatyki-explainera` (`gramatyka.py`) |
 | diagramy, ikony, schematy, „studio motion design” | własny HTML Canvas/SVG (`kontrakt-html.md`) albo HyperFrames `faceless-explainer` |
 | rysowany, tablica, szkicownik | `anidoodle` |
-| matematyka, algorytm, fizyka | `manim-video` |
+| matematyka, algorytm, fizyka | `manim-video` (silnik ManimGX, dodatek `manim`: `film-z-kodu/references/manimgx.md`) |
 | liczby i wykresy w centrum | `dane.md` (+ ten plik dla narracji) |
 | kinowy, markowy („premium”) | `lemo-opuscar` |
 | instrukcja krok po kroku (montaż, konfiguracja, przepis), spokojny lektor „jak w szkolnym filmie” | `lemo-opuscar` `midcentury-toon` (kreskówka lat 50.) |

@@ -29,7 +29,7 @@ RUN strip /tmp/lightpanda && /tmp/lightpanda version
 FROM ${HERMES_IMAGE}
 
 # Dodatki (spacje lub przecinki): rembg (wycinanie tła, ~0,5 GB), media (auto-editor, ~0,2 GB),
-# docling (PDF→Markdown z modelami ML, ~1–2 GB), manim (animacje matematyczne + LaTeX, ~1 GB),
+# docling (PDF→Markdown z modelami ML, ~1–2 GB), manim (animacje matematyczne: ManimGX, ~0,3 GB),
 # office (LibreOffice do XLSX/PPTX→PDF, ~0,5 GB).
 ARG JARVO_EXTRAS=""
 ARG CLAUDE_SEO_REV=e77e783e38eeb738424eb72117abbd2dacdd88af
@@ -46,7 +46,6 @@ RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
     pkgs="pandoc qpdf ocrmypdf tesseract-ocr tesseract-ocr-pol tesseract-ocr-eng \
           libimage-exiftool-perl jq sqlite3 adb libgtk-3-0t64 dbus-x11 \
           fonts-dejavu fonts-noto-core fonts-noto-color-emoji fonts-inter"; \
-    case "$extras" in *" manim "*) pkgs="$pkgs libcairo2-dev libpango1.0-dev pkg-config texlive-latex-base texlive-fonts-recommended";; esac; \
     case "$extras" in *" office "*) pkgs="$pkgs libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui";; esac; \
     apt-get -o Acquire::Retries=3 update && \
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends $pkgs && \
@@ -123,7 +122,7 @@ COPY infra/python/ /opt/jarvo/python/
 RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
     uv venv /opt/jarvo/venv --python 3.12 && \
     VIRTUAL_ENV=/opt/jarvo/venv uv pip install -r /opt/jarvo/python/requirements-tools.txt && \
-    for x in rembg media docling manim; do \
+    for x in rembg media docling; do \
       case "$extras" in *" $x "*) \
         pkg="$(case $x in media) echo auto-editor;; *) echo $x;; esac)"; \
         spec="$(grep -E "^${pkg}(\[[^]]*\])?==" /opt/jarvo/python/requirements-optional.txt)"; \
@@ -136,6 +135,33 @@ RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
     # Playwright (dla Camoufoxa) na Node z obrazu zamiast własnej kopii Node w paczce (−124 MB)
     pw=/opt/jarvo/venv/lib/python3.12/site-packages/playwright/driver && \
     ln -sf "$(command -v node)" "$pw/node" && "$pw/node" "$pw/package/cli.js" --version
+
+# --- ManimGX (dodatek `manim`, https://github.com/academa-labs/manimgx): animacje matematyczne dla skilla manim-video,
+#     kod Manim CE z `from manimgx import *` zamiast `from manim import *`. Koło na Linuksa (manylinux_2_28 x86_64
+#     i aarch64) niesie silnik w Ruście z Mesą lavapipe (render na CPU, bez GPU), x264 i Typst (tekst i wzory bez
+#     LaTeX-a): zero pakietów apt, venv ~0,28 GB zamiast ~1 GB Manim CE z cairo, pango i texlive.
+#     Osobny venv na Pythonie 3.13 (koło abi3 wymaga ≥ 3.13): interpreter z obrazu Hermesa (Debian trixie,
+#     /usr/bin/python3.13, ten sam co .venv Hermesa); gdyby go zabrakło, uv pobierze swój do /opt/jarvo/uv-python (+0,1 GB).
+#     Wszystkie paczki przypięte wersją i sumą sha256 (requirements-manimgx.txt: --require-hashes, tylko koła).
+#     Przegląd 2026-10-11 (decyzja właściciela): licencje (kod MIT, koło linuksowe jako całość GPL-3.0-or-later przez
+#     statyczny x264, dekodery audio ffmpeg LGPL, Mesa MIT, Typst Apache-2.0; fonty manimgx-fonts OFL-1.1), brak
+#     telemetrii i sieci w czasie renderu (sprawdzone bez sieci), koła przypięte sha256, wydanie 2026-10-07. Sieci
+#     używa tylko lektor `self.say()` (fal.ai, FAL_KEY) i `manimgx present` (przeglądarka): u nas zakazane.
+#     uv w /opt/hermes czyta [tool.uv] Hermesa (exclude-newer 14 dni): dokładnie przypięte paczki manimgx zwalniamy
+#     z tego okna jak narzedzia.py. Komenda `manimgx` na PATH: /opt/jarvo/bin/manimgx (cache w /opt/data).
+#     Na końcu próbny render 1 s 640×360 (polski tekst krojem Noto Sans i wzór).
+RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
+    case "$extras" in *" manim "*) ;; *) echo "ManimGX: bez dodatku manim, pomijam"; exit 0;; esac; \
+    uv venv /opt/jarvo/venvs/manimgx --python 3.13 && \
+    VIRTUAL_ENV=/opt/jarvo/venvs/manimgx uv pip install --require-hashes --only-binary :all: \
+      --exclude-newer-package manimgx=false --exclude-newer-package manimgx-fonts=false \
+      --exclude-newer-package manimgx-fonts-cjk=false -r /opt/jarvo/python/requirements-manimgx.txt && \
+    t="$(mktemp -d)" && \
+    printf '%s\n' 'from manimgx import *' 'class Proba(Scene):' '    def construct(self):' \
+      '        self.play(Create(Circle()), FadeIn(Text("Łódź żółć", font="Noto Sans").to_edge(DOWN)), Write(MathTex(r"x^2").to_edge(UP)), run_time=0.5)' \
+      '        self.wait(0.5)' > "$t/proba.py" && \
+    MANIMGX_CACHE_DIR="$t/cache" /opt/jarvo/venvs/manimgx/bin/manimgx render "$t/proba.py" -r 640x360 --fps 30 -o "$t/proba.mp4" && \
+    test -s "$t/proba.mp4" && rm -rf "$t"
 
 # --- Camoufox (MPL-2.0): Firefox z podmienionym odciskiem przeglądarki, zapasowa przeglądarka Łowcy i Sherlocka
 #     (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`) tylko po odmowie zwykłej przeglądarki. Binarka z wydania

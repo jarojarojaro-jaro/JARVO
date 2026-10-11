@@ -306,6 +306,41 @@ def test_montaz_stabilizuj_nagranie_z_reki(tmp_path):
         assert przed > 0.3 and po < przed / 2
 
 
+def test_montaz_napraw_fps_keeps_held_last_frame(tmp_path, monkeypatch):
+    """ManimGX zapisuje MP4 o zmiennym klatkażu, końcowa klatka to jedna długa (2,53 s klipu = 31 klatek); sam `fps=30`
+    dawał 1,03 s. napraw --fps: fps + tpad (kopie ostatniej klatki), potem -t z długości kontenera w pełnych klatkach."""
+    wywolane = []
+    monkeypatch.setattr(montaz.wl, "run", lambda cmd, *a, **k: wywolane.append(cmd))
+    monkeypatch.setattr(montaz.wl, "duration", lambda p: 2.533)
+    monkeypatch.setattr(montaz.wl, "sdr", lambda p: "")
+    monkeypatch.setattr(montaz, "has_audio", lambda p: False)
+    montaz.fix(tmp_path / "scena.mp4", tmp_path / "ok.mp4", fps=30)
+    cmd = wywolane[0]
+    assert cmd[cmd.index("-vf") + 1] == f"fps=30,tpad=stop_mode=clone:stop_duration=2.533,{montaz.wl.TV_RANGE}"
+    assert cmd[cmd.index("-t") + 1] == "2.533333"                            # 76 pełnych klatek
+    wywolane.clear()
+    montaz.fix(tmp_path / "scena.mp4", tmp_path / "ok.mp4")                 # bez --fps: jak dotąd
+    assert "-t" not in wywolane[0] and wywolane[0][wywolane[0].index("-vf") + 1] == montaz.wl.TV_RANGE
+    assert montaz.wl.stala_klatka(60, 0.2) == "fps=60,tpad=stop_mode=clone:stop_duration=1.000"
+
+
+@needs_ffmpeg
+def test_montaz_napraw_fps_pads_video_to_container(tmp_path):
+    """Prawdziwy ffmpeg: obraz krótszy od kontenera (1 s obrazu, 2,5 s dźwięku) → po napraw --fps 30 obraz trwa
+    tyle co klip (75 klatek, stały klatkaż), bo ostatnia klatka jest trzymana, a nie ucięta."""
+    src, out = tmp_path / "scena.mp4", tmp_path / "ok.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=30:d=1", "-f", "lavfi",
+                    "-i", "sine=f=440:sample_rate=48000:d=2.5", "-pix_fmt", "yuv420p", "-c:v", "libx264",
+                    "-c:a", "aac", str(src)], check=True)
+    assert montaz.main(["napraw", str(src), "-o", str(out), "--fps", "30"]) == 0
+    res = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries",
+                          "stream=nb_read_frames,r_frame_rate,avg_frame_rate", "-of", "json", str(out)],
+                         capture_output=True, text=True, check=True)
+    v = json.loads(res.stdout)["streams"][0]
+    assert abs(int(v["nb_read_frames"]) - 75) <= 1 and v["r_frame_rate"] == v["avg_frame_rate"] == "30/1"
+    assert abs(montaz.wl.duration(out) - 2.5) < 0.1
+
+
 def test_montaz_glosnosc_limiter_true_peak(tmp_path, monkeypatch):
     """glosnosc: po loudnorm (192 kHz) limiter −2 dBFS, dopiero potem 48 kHz i AAC: szczyty między próbkami też
     zostają pod progiem qa_wideo (true peak ≤ −1). Bez niego film z kodu podniesiony z −16 do −14 LUFS miał +0,2 dBFS."""

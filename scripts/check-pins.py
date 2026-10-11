@@ -4,7 +4,7 @@
     python3 scripts/check-pins.py [--node 26.5.1] [--python 3.12]
 
 Czy przypięte wersje istnieją i pasują do obrazu: npm `engines.node` względem Node obrazu (`engine-strict` wywraca
-budowę), Python `requires_python` względem venv narzędzi. Wiek wersji to tylko informacja: o dodaniu decyduje
+budowę), Python `requires_python` względem venv narzędzi (ManimGX: venv na 3.13). Wiek wersji to tylko informacja: o dodaniu decyduje
 przegląd źródła (docs/SOURCES.md, „Przegląd przed dodaniem”), nie liczba dni od wydania.
 Kod wyjścia 1 przy problemie. Wymaga dostępu do registry.npmjs.org i pypi.org.
 """
@@ -21,6 +21,8 @@ from pathlib import Path
 
 PKG = Path(__file__).resolve().parent.parent / "infra" / "node" / "package.json"
 PY_REQS = sorted((Path(__file__).resolve().parent.parent / "infra" / "python").glob("requirements-*.txt"))
+# pliki z własnym venv na innym Pythonie niż venv narzędzi (infra/Dockerfile)
+PY_INNY = {"requirements-manimgx.txt": "3.13"}
 
 
 def parse_ts(ts: str) -> dt.datetime:
@@ -34,7 +36,7 @@ def node_satisfies(spec: str | None, node: str) -> bool | None:
     have = tuple(int(x) for x in node.split("."))
     for alt in spec.split("||"):
         ok = True
-        for m in re.finditer(r"(>=|\^|~|>|<=|<)?\s*v?(\d+)(?:\.(\d+))?(?:\.(\d+))?", alt.strip()):
+        for m in re.finditer(r"(>=|!=|\^|~|>|<=|<)?\s*v?(\d+)(?:\.(\d+))?(?:\.(\d+))?", alt.strip()):
             op, parts = m.group(1) or "=", tuple(int(x or 0) for x in m.groups()[1:])
             if op == ">=":
                 ok &= have >= parts
@@ -44,6 +46,8 @@ def node_satisfies(spec: str | None, node: str) -> bool | None:
                 ok &= have < parts
             elif op == "<=":
                 ok &= have <= parts
+            elif op == "!=":
+                ok &= have[: len(parts)] != parts if m.group(4) or m.group(3) else have[0] != parts[0]
             elif op == "^":
                 ok &= have >= parts and have[0] == parts[0]
             elif op == "~":
@@ -101,10 +105,11 @@ def check_python(args, now: dt.datetime) -> int:
                 continue
             age = (now - min(parse_ts(f["upload_time_iso_8601"]) for f in files)).days
             req_py = next((f.get("requires_python") for f in files if f.get("requires_python")), None)
-            py_ok = node_satisfies(req_py.replace(",", " ") if req_py else None, args.python + ".0")
+            py = PY_INNY.get(req.name, args.python)
+            py_ok = node_satisfies(req_py.replace(",", " ") if req_py else None, py + ".0")
             note = []
             if py_ok is False:
-                note.append(f"requires_python {req_py!r} nie obejmuje {args.python}")
+                note.append(f"requires_python {req_py!r} nie obejmuje {py}")
                 bad += 1
             mark = "✗" if py_ok is False else "✓"
             print(f"{mark} {req.name}: {name}=={ver}: {age} dni" + (f"  → {'; '.join(note)}" if note else ""))

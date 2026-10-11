@@ -11,6 +11,7 @@ stabilizacja nagrań z ręki, transkrypcja.
     python3 montaz.py stabilizuj nagranie.mp4 --tylko-pomiar   # samo drżenie kamery (czy stabilizować)
     python3 montaz.py transkrypcja nagranie.mp4 [-o out/wideo/transkrypcja] [--co 20]
     python3 montaz.py napraw film.mp4 -o film-ok.mp4       # yuv420p/zakres TV/faststart po silnikach zewnętrznych
+    python3 montaz.py napraw scena.mp4 -o scena-ok.mp4 --fps 30   # + stały klatkaż (ManimGX: przed sklejaniem)
 
 Czas: sekundy (75.5) albo m:ss(.x) / h:mm:ss. Każde cięcie jest przekodowane (dokładne co do klatki).
 kadr --x: środek kadru w poziomie (0 = lewa krawędź, 0.5 = środek, 1 = prawa); rozmyte = całe ujęcie
@@ -185,12 +186,18 @@ def voice(src: Path, out: Path, poziom: str) -> tuple[Path, dict]:
     return out, {"poziom": poziom, "tlo_db": tlo}
 
 
-def fix(src: Path, out: Path) -> Path:
-    """Film z zewnętrznego silnika → standard platform: yuv420p w zakresie TV, H.264, AAC, faststart (dźwięk bez zmian)."""
+def fix(src: Path, out: Path, fps: int | None = None) -> Path:
+    """Film z zewnętrznego silnika → standard platform: yuv420p w zakresie TV, H.264, AAC, faststart (dźwięk bez zmian).
+    `fps`: stały klatkaż z pełną długością (wl.stala_klatka): klip o zmiennym klatkażu (ManimGX) przed sklejaniem."""
     audio = ["-c:a", "aac", "-b:a", "192k"] if has_audio(src) else []
+    vf, czas = wl.z_sdr(wl.sdr(src), wl.TV_RANGE), []
+    if fps:
+        sek = wl.duration(src)
+        vf = f"{wl.stala_klatka(fps, sek)},{vf}"
+        czas = ["-t", f"{max(1, round(sek * fps)) / fps:.6f}"]     # pełne klatki: tyle, ile trwa klip w kontenerze
     out.parent.mkdir(parents=True, exist_ok=True)
-    wl.run(["ffmpeg", "-y", "-i", str(src), "-vf", wl.z_sdr(wl.sdr(src), wl.TV_RANGE), "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-            *wl.ENC_LIMITS, *audio, "-movflags", "+faststart", str(out)])
+    wl.run(["ffmpeg", "-y", "-i", str(src), "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+            *wl.ENC_LIMITS, *audio, *czas, "-movflags", "+faststart", str(out)])
     return out
 
 
@@ -347,6 +354,8 @@ def main(argv: list[str] | None = None) -> int:
     n = sub.add_parser("napraw", help="yuv420p (zakres TV), H.264, AAC, faststart: dla filmów z lemo/anidoodle/HyperFrames")
     n.add_argument("plik")
     n.add_argument("-o", required=True)
+    n.add_argument("--fps", type=int, default=None,
+                   help="stały klatkaż bez gubienia końca (klip ManimGX o zmiennym klatkażu przed sklejaniem), np. 30")
     st = sub.add_parser("stabilizuj", help="nagranie z ręki: dwa przejścia vidstab, drżenie przed i po")
     st.add_argument("plik")
     st.add_argument("-o", default=None)
@@ -395,8 +404,9 @@ def main(argv: list[str] | None = None) -> int:
             out, stats = stabilize(src, Path(args.o), args.sila, args.statyw, max(0.0, args.zoom), not args.bez_pomiaru)
             print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
         elif args.cmd == "napraw":
-            out = fix(src, Path(args.o))
-            print(json.dumps({"plik": str(out)}, ensure_ascii=False))
+            out = fix(src, Path(args.o), args.fps)
+            print(json.dumps({"plik": str(out), **({"fps": args.fps, "sek": round(wl.duration(out), 3)} if args.fps else {})},
+                             ensure_ascii=False))
         else:
             base = Path(args.o) if args.o else src.with_suffix("")
             print(json.dumps(transcript(src, base, args.co), ensure_ascii=False))

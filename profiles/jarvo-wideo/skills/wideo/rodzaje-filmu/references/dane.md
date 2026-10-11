@@ -14,7 +14,7 @@ Nie to: dane tylko jako jedna liczba w haku → rodzaj filmu, do którego należ
 | wykres liniowy, słupkowy, kołowy, licznik, bar chart race | `chart-animation` (Remotion) |
 | infografika z ikonami, sekcjami, strzałkami | `animated-infographic` (Remotion) |
 | mapa (trasa, rozkład na terenie) | `remotion-best-practices` (mapy) |
-| funkcja, rozkład, algorytm | `manim-video` |
+| funkcja, rozkład, algorytm | `manim-video` (silnik ManimGX: `film-z-kodu/references/manimgx.md`) |
 | nietypowa wizualizacja (cząstki = ludzie, skala) | własny HTML (`kontrakt-html.md`) |
 
 ## Struktura

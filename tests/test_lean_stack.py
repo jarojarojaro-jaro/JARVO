@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.machinery
 import importlib.util
+import os
 import re
 import sys
 from pathlib import Path
@@ -224,6 +225,35 @@ def test_every_extra_has_a_pin():
         assert re.search(rf"^{re.escape(pkg)}(\[[^\]]*\])?==", optional, re.M), extra
     tools = (REPO / "infra" / "python" / "requirements-tools.txt").read_text(encoding="utf-8")
     assert "faster-whisper" not in tools and "onnx-asr" in tools
+
+
+def test_manim_extra_is_manimgx_pinned_by_hash():
+    """Dodatek `manim` = ManimGX w osobnym venv na Pythonie 3.13: każda paczka z wersją i sha256, instalacja
+    --require-hashes z samych kół, bez apt (cairo, pango, texlive) i bez Manim CE; na końcu próbny render."""
+    docker = (REPO / "infra" / "Dockerfile").read_text(encoding="utf-8")
+    code = "\n".join(line for line in docker.splitlines() if not line.lstrip().startswith("#"))
+    for pkg in ("texlive", "libcairo2-dev", "libpango1.0-dev"):
+        assert pkg not in code, pkg
+    assert not re.search(r"for x in [a-z ]*\bmanim\b", code)
+    run = next(r for r in code.split("\nRUN ") if "/opt/jarvo/venvs/manimgx" in r)
+    assert "*\" manim \"*" in run and "--python 3.13" in run
+    assert "--require-hashes" in run and "--only-binary :all:" in run and "requirements-manimgx.txt" in run
+    assert re.search(r"manimgx render .*-r 640x360 --fps 30", run) and "MANIMGX_CACHE_DIR" in run
+    lock = (REPO / "infra" / "python" / "requirements-manimgx.txt").read_text(encoding="utf-8")
+    pins = re.findall(r"^([a-z0-9-]+)==(\S+)(?: ;[^\\]*)? \\\n((?:    --hash=sha256:[0-9a-f]{64}(?: \\)?\n)+)", lock, re.M)
+    names = {n for n, _v, _h in pins}
+    assert len(pins) == len(re.findall(r"^[a-z0-9-]+==", lock, re.M))       # każda paczka ma sumy
+    assert {"manimgx", "manimgx-fonts", "manimgx-fonts-cjk", "numpy", "pillow"} <= names
+    assert ("manimgx", "0.1.1") in {(n, v) for n, v, _h in pins}
+    assert "1afbccb6f5f27fa8e2ce27eb2c46d364afbbd559f35ae93d10b06f4f2db747a7" in lock   # manylinux_2_28 x86_64
+    assert "26ecbdbaf99d35aa62e4a363fc64689c8b40383cc98b6e31bbfac05bdb74957c" in lock   # manylinux_2_28 aarch64
+    optional = (REPO / "infra" / "python" / "requirements-optional.txt").read_text(encoding="utf-8")
+    assert not re.search(r"^manim==", optional, re.M)
+    wrapper = REPO / "infra" / "bin" / "manimgx"
+    assert os.access(wrapper, os.X_OK) and "/opt/jarvo/venvs/manimgx" in wrapper.read_text(encoding="utf-8")
+    tb = yaml.safe_load((REPO / "profiles" / "jarvo-wideo" / "toolbox.yaml").read_text(encoding="utf-8"))
+    mg = next(t for t in tb["tools"] if t["name"] == "manimgx")
+    assert mg["optional"] is True and mg["version"] == "0.1.1" and mg["healthcheck"] == "manimgx --version"
 
 
 def test_node_tools_drop_heavy_packages_and_share_chromium():

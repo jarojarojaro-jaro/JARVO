@@ -136,13 +136,13 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 | [live-panel](https://github.com/ythx-101/live-panel-skill) | żywy schemat z JSON: układ stoi, kropki po strzałkach, kroki, log, liczniki; strona offline i MP4 | MIT | 2026-10 | skill + `zywy_schemat.py`, `html_wideo.py --preset livepanel` |
 | [lottie](https://github.com/diffusionstudio/lottie) | animacje Lottie na strony i aplikacje | MIT | 2026-09 | skill (Wideograf + Web) |
 | [screenwriting-skills](https://github.com/jtydhr88/screenwriting-skills) | premisa, scena, dialog, konflikt (do `scenariusz`) | MIT | 2026-09 | skille |
-| [Manim CE](https://github.com/ManimCommunity/manim) | animacje edukacyjne i matematyczne (skill [H] `manim-video`, dodatek `manim`) | MIT | 2026-09 | CLI |
+| [ManimGX](https://github.com/academa-labs/manimgx) 0.1.1 | animacje edukacyjne i matematyczne: kod Manim CE z `from manimgx import *` (skill [H] `manim-video`, zasady `film-z-kodu/references/manimgx.md`; dodatek `manim`, zamiast Manim CE od 2026-10-11) | MIT (kod); koło Linux jako całość GPL-3.0-or-later (x264, Mesa, Typst Apache-2.0); fonty OFL-1.1 | 2026-10 | CLI `manimgx` |
 | [auto-editor](https://github.com/WyattBlue/auto-editor) | wycinanie ciszy (dodatek `media`; bez niego `montaz.py cisza`) | Unlicense | 2026-09 | CLI |
 | [Remotion](https://github.com/remotion-dev/remotion) | wideo w React (per projekt) | **Remotion License** ⚠️ | 2026-09 | per projekt |
 | [Motion Canvas](https://github.com/motion-canvas/motion-canvas) / [Revideo](https://github.com/redotvideo/revideo) | animacje i render programowy (per projekt) | MIT | 2026-07 | per projekt |
 
 Z Hermesa: `plugins/video_gen/openrouter` i `plugins/image_gen/openrouter` (ujęcia AI, jeden klucz OpenRouter),
-narzędzie `text_to_speech` (Edge, głos pl-PL-MarekNeural w `config.yaml`), skille [H] `manim-video`, `ai-presenter-video`.
+narzędzie `text_to_speech` (Edge, głos pl-PL-MarekNeural w `config.yaml`), skille [H] `manim-video` (silnik ManimGX), `ai-presenter-video`.
 
 Rozważone i odrzucone: [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) (MIT) jako cała aplikacja:
 Streamlit, MoviePy, Redis i drugi silnik transkrypcji (~340 MB repo, dużo RAM) dublowałyby to, co flota już ma.
@@ -368,6 +368,14 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
 - `AGENT_BROWSER_EXECUTABLE_PATH` celowo nieustawione: agent-browser użyłby go też dla silnika lightpanda,
 - bez cache instalatorów w warstwach (`UV_NO_CACHE`, `npm cache clean`) i bez `chmod -R` (kopiuje całe drzewo do nowej warstwy),
 - auto-editor (dodatek `media`) pobiera swoją binarkę przy budowie obrazu (w runtime katalog pakietów jest tylko do odczytu),
+- ManimGX (dodatek `manim`): osobny venv `/opt/jarvo/venvs/manimgx` na Pythonie 3.13 z obrazu Hermesa (Debian 13,
+  `/usr/bin/python3.13`; koło manimgx jest cp313-abi3), wszystkie paczki z sumami sha256
+  ([`requirements-manimgx.txt`](../infra/python/requirements-manimgx.txt), `--require-hashes`, same koła), bez apt
+  (silnik niesie Mesę lavapipe, x264 i Typst: ~0,3 GB zamiast ~1 GB Manim CE z cairo, pango i texlive). Komenda
+  `/opt/jarvo/bin/manimgx` (cache `/opt/data/jarvo/cache/manimgx`), build kończy się próbnym renderem 1 s 640×360.
+  Przegląd 2026-10-11 (decyzja właściciela): licencje (kod MIT, koło GPL-3.0-or-later), brak telemetrii i sieci w czasie
+  renderu (sprawdzone bez sieci), koła przypięte sha256, wydanie 2026-10-07. uv w `/opt/hermes` czyta `[tool.uv]` Hermesa
+  (`exclude-newer` 14 dni), więc trzy paczki manimgx są z tego okna zwolnione (`--exclude-newer-package`),
 - rozpoznawanie mowy: `/opt/jarvo/bin/jarvo-stt` (Hermes: `HERMES_LOCAL_STT_COMMAND`, `stt.provider: local_command`),
 - lektor angielski: `/opt/jarvo/bin/jarvo-tts` z modelem Paradee w `/opt/jarvo/models/paradee/`; pliki modelu i koło
   spaCy przypięte sumą SHA-256, a build kończy się próbą mowy (`jarvo-tts --sprawdz en-US-Paradee`). misaki bez dodatku `[en]`

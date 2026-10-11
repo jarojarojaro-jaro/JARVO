@@ -1,17 +1,17 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.12.1
+version: 3.13.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
-    tags: [video, hyperframes, manim, motion-graphics, animation, code]
+    tags: [video, hyperframes, manim, manimgx, motion-graphics, animation, code]
     related_skills: [rodzaje-filmu, style-motion, gramatyki-explainera, style-malarskie, zywy-schemat, motion-design, video-lessons, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-06"
+    reviewed: "2026-10-11"
 ---
 
 # Film z kodu
@@ -19,7 +19,8 @@ metadata:
 Animacje, typografia w ruchu, UI, wykresy, rysunek: każda klatka rysowana kodem, ffmpeg składa wideo. Tekst i liczby
 są ostre i poprawne, nic nie jest „z AI”. Film z ujęć stock, lektora i napisów bez animacji → `krotki-film`.
 Instalacja, środowisko i polski lektor dla silników zewnętrznych: `references/narzedzia.md` (przeczytaj przed
-pierwszym użyciem silnika spoza HyperFrames/Manim).
+pierwszym użyciem silnika spoza HyperFrames/Manim). Manim (`manim-video`) renderuje u nas ManimGX: przed pierwszą
+sceną `references/manimgx.md` (import, kroje z polskimi literami, wzory, stały klatkaż przed sklejaniem, czasy).
 Oddanie filmu jako projektu edytora HQ (wszystkie silniki): `references/projekt-edytora.md`.
 
 ## Wybór silnika
@@ -43,7 +44,7 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 | animacja na stronę (hero, maskotka za kursorem, GIF, naklejka), plik HTML offline | **anidoodle** (`emit.mjs`) → `jarvo-web` osadza | 15–40 min |
 | muzyka **syntezowana kodem** do dowolnego filmu (bez licencji, bez pobierania) | **anidoodle** `music` → plik do `muzyka` w `film.py` | 10–20 min |
 | promo z animowanym tekstem, szybki launch, slajdy | **HyperFrames** (`hyperframes`, `product-launch-video`, `slideshow`) | 10–30 min |
-| matematyka, algorytmy, wykresy w ruchu | **Manim** (`manim-video`, dodatek `manim`) | 15–40 min |
+| matematyka, algorytmy, wykresy w ruchu (wzór krok po kroku, 3D) | **Manim** (`manim-video` + `references/manimgx.md`: silnik ManimGX, dodatek obrazu `manim`) | 15–40 min; render na CPU 2D ~1,5 s na 1 s 720p30, ~4–5 s na 1 s 1080p60, 3D ~25 s na 1 s |
 | **kinowy film produktu** ze strony/aplikacji (prawdziwe screenshoty, ruchy kamery 2.5D, cięcia na bit, dźwięk) | **video-shotcraft** (`$SHOTCRAFT/SKILL.md`, Remotion) | 40–90 min |
 | film w **React/Remotion** (klient chce Remotion, komponenty, parametryzowane serie) | **Remotion** (`remotion-best-practices`: router do create, markup, render, maps…) | 20–60 min |
 | **animowany wykres / infografika** z prawdziwych danych | `chart-animation`, `animated-infographic` (Remotion) | 15–40 min |

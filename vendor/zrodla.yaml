@@ -225,6 +225,11 @@ zrodla:
     status: uzywane
     przejrzane: 93744740ae645648c003abb09e8c617d9c5e34cd
     notatka: "CC BY-SA 4.0: polski lektor (jarvo-tts, głosy pl-PL-Matcha-Meski = male_voxcpm_1, pl-PL-Matcha-Damski = female_voxcpm_2), wagi ONNX t2 w obrazie z sha256 w infra/Dockerfile, ATTRIBUTION.md i LICENSE obok; port english/polish_*cleaners.py w jarvo_tts_matcha.py. Repo z 2026-10-02, rewizja z 2026-10-10; przegląd 2026-10-11; pliki = same wagi ONNX przypięte sha256"
+  manimgx:
+    repo: https://github.com/academa-labs/manimgx
+    status: uzywane
+    przejrzane: 0507708dc5d731478786de2f46ca8a1660d514d6
+    notatka: "ManimGX 0.1.1 (tag v0.1.1): dodatek obrazu manim zamiast Manim CE, venv /opt/jarvo/venvs/manimgx (Python 3.13), koła przypięte sha256 w infra/python/requirements-manimgx.txt. Przegląd 2026-10-11 (decyzja właściciela, wydanie 2026-10-07): kod MIT, koło Linux GPL-3.0-or-later (x264), fonty OFL-1.1; bez telemetrii i sieci w czasie renderu (sprawdzone bez sieci); self.say() (fal.ai) i present zakazane w film-z-kodu/references/manimgx.md"
   modnet:
     repo: https://github.com/ZHKKKe/MODNet
     status: uzywane

@@ -105,7 +105,7 @@ Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników 
 | `media` | auto-editor: automatyczne cięcie ciszy w nagraniach | ~0,2 GB |
 | `office` | LibreOffice: XLSX/PPTX/DOC → PDF | ~0,5 GB |
 | `docling` | PDF/DOCX → Markdown z modelami ML (tabele, układ) | ~1–2 GB |
-| `manim` | animacje matematyczne (+ LaTeX) | ~1 GB |
+| `manim` | animacje matematyczne: ManimGX (render na CPU, wzory przez Typst, bez LaTeX-a i apt) | ~0,3 GB |
 | `lemo` | Wideograf: sample instrumentów i głos Kokoro (EN/ZH) dla lemo-opuscar; bez przebudowy obrazu: `narzedzia.py instaluj lemo` w działającym kontenerze | ~1,7 GB w `/opt/data` |
 | `mgaudio` | Wideograf: muzyka i efekty pisane kodem pod obraz (`muzyka.py`, mgaudio z mg-styles-15); w `instaluj wszystko` tylko z tym dodatkiem, osobno `narzedzia.py instaluj mgaudio` bez przebudowy obrazu (Wideograf instaluje go sam, gdy film potrzebuje muzyki pod obraz) | ~450 MB w `/opt/data` |
 

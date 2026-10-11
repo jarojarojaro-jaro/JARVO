@@ -64,7 +64,7 @@ CATEGORY_DESCRIPTIONS = {
     "threejs": "Three.js (threejs-skills, MIT): scena, geometria, materiały, światło, shadery, animacja, loadery.",
     "motion": "Ruch w UI (skille Emila Kowalskiego, MIT): krzywe i czasy, przegląd i poprawa animacji, słownik ruchu.",
     "screenwriting": "Warsztat scenarzysty (screenwriting-skills, MIT): premisa, scena, dialog, konflikt; do skilla scenariusz.",
-    "creative": "Kreacja (Hermes, MIT): Manim, infografiki, humanizer, kalendarz social, ideacja, memy, diagramy.",
+    "creative": "Kreacja (Hermes, MIT): Manim (u nas silnik ManimGX), infografiki, humanizer, kalendarz social, ideacja, memy, diagramy.",
     "meta": "Meta-skille: tworzenie i ulepszanie skilli (Anthropic skill-creator, Apache-2.0; mattpocock writing-for-agents, MIT).",
 }
 

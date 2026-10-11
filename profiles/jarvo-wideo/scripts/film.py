@@ -323,9 +323,11 @@ def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -
         start = float(uj.get("od", 0) or 0)
         src_dur = wl.duration(src["plik"])
         short = src_dur - start < dur - 0.05
-        # krótszy klip: stock zapętlamy; animacja z kodu (koniec: stop) trzyma ostatnią klatkę do końca sceny
+        # krótszy klip: stock zapętlamy; animacja z kodu (koniec: stop) trzyma ostatnią klatkę do końca sceny.
+        # Bez pętli zawsze tpad: klip o zmiennym klatkażu (ManimGX: końcowa klatka to jedna długa) po `fps=`
+        # kończyłby się na jej początku, ~1 s przed czasem (wl.stala_klatka); `-t` i tak przycina do sceny
         loop = ["-stream_loop", "-1"] if short and end != "stop" else []
-        hold = f"tpad=stop_mode=clone:stop_duration={dur:.3f}," if short and end == "stop" else ""
+        hold = "" if loop else f"tpad=stop_mode=clone:stop_duration={dur:.3f},"
         fit = fit_filter(w, h, mode)
         chain = f"{hold}{wl.z_sdr(fit, sdr)},fps={wl.FPS},{wl.TV_RANGE},setsar=1"
         if mode == "rozmyte":

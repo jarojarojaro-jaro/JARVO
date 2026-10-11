@@ -121,7 +121,7 @@ elementów, wycinkami i pustą planszą do filmowania; kamera po niej `/_lib/jar
 wycieczka po elementach, lupa, zakreślacz, uderzenie, z kontrolą planu ruchów przed renderem; 11 ujęć z kart video-shotcraft
 w HTML bez Remotion: `/_lib/jarvo/ujecia.js`, np. karty rozdane z talii, licznik bębnowy, reflektor na bohaterze). Mówiąca maskotka-robot z polskim lektorem (`maskotka.py`, domyślnie lokalny Matcha `pl-PL-Matcha-Meski`).
 Syntetyczne SFX, biblioteka inspiracji (prompty twórców i katalog 157 kart ujęć video-shotcraft: `inspiracje.py ujecia`), produkcja etapami, formaty platform z jednego timeline.
-Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo strony (`demo_strony.py`, metoda ECC
+Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim na ManimGX (dodatek `manim`: `inspect` przed renderem, polski tekst krojem Noto Sans, `montaz.py napraw --fps 30` przed sklejaniem scen o zmiennym klatkażu). Demo strony (`demo_strony.py`, metoda ECC
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.
 Film z kodu z lektorem zaczyna się od pliku narracji (`film.py narracja`): zdanie w linii, akapit = ujęcie, pauzy
 z akapitów (0,33 s w akapicie, 1 s między akapitami, 1,5 s przed rozdziałem) i oś czasu `os_czasu.json`, z której

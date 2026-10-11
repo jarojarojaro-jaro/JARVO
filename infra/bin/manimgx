@@ -1,0 +1,22 @@
+#!/bin/sh
+# ManimGX (dodatek obrazu `manim`): komenda na PATH dla Wideografa (skill manim-video, zasady:
+# profiles/jarvo-wideo/skills/wideo/film-z-kodu/references/manimgx.md). Venv z infra/Dockerfile
+# (/opt/jarvo/venvs/manimgx, Python 3.13). Cache układów tekstu i krojów (MANIMGX_CACHE_DIR) w zapisywalnym
+# /opt/data, nie w obrazie tylko do odczytu; poza kontenerem w ~/.cache/manimgx.
+#
+#   manimgx inspect scena.py                         układ i oś czasu bez renderu (~3 s)
+#   manimgx render scena.py -r 1280x720 --fps 30     szkic; finał -r 1920x1080 --fps 30 (domyślnie 60 kl./s)
+v="${JARVO_MANIMGX_VENV:-/opt/jarvo/venvs/manimgx}/bin/manimgx"
+if [ ! -x "$v" ]; then
+  echo "manimgx: brak dodatku obrazu manim (JARVO_EXTRAS=\"manim\" w compose/.env, potem deploy.sh --rebuild)" >&2
+  exit 127
+fi
+if [ -z "${MANIMGX_CACHE_DIR:-}" ]; then
+  if [ -d /opt/data/jarvo ] && [ -w /opt/data/jarvo ]; then
+    MANIMGX_CACHE_DIR=/opt/data/jarvo/cache/manimgx
+  else
+    MANIMGX_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/manimgx"
+  fi
+  export MANIMGX_CACHE_DIR
+fi
+exec "$v" "$@"

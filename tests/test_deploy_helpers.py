@@ -134,6 +134,9 @@ def test_version_range_check():
     assert ok(">=18 <20", "26.5.1") is False
     assert ok("<4.0 >=3.11", "3.12.0") is True
     assert ok(">=3.13", "3.12.0") is False
+    assert ok("!=3.0.*,!=3.1.*,>=2.7".replace(",", " "), "3.13.0") is True
+    assert ok("!=3.14.1 >=3.12", "3.13.0") is True
+    assert ok("!=3.14.1 >=3.12", "3.14.1") is False
 
 
 # ------------------------------------------------------------------ deploy.sh --no-build, sandbox-up.sh

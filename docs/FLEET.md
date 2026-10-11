@@ -283,7 +283,7 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
   rusza, przejście-podpis, wydajność, pułapki) i sceną-wzorem; `malarz.py` daje katalog, galerię 35 kadrów,
   stopklatki wzoru, szkielet filmu (strona w kontrakcie jarvo, tabela odcinków na siatce bitów, kopia sceny-wzoru
   do przerobienia) i wycinanie warstw AI z zielonego tła,
-- **filmy z kodu** (HyperFrames, Manim) i **ujęcia z AI** (`video_generate`, obraz → wideo, rejestr kosztów);
+- **filmy z kodu** (HyperFrames, Manim na silniku ManimGX) i **ujęcia z AI** (`video_generate`, obraz → wideo, rejestr kosztów);
   lektor filmu z kodu z pliku narracji (`film.py narracja`: zdanie w linii, akapit = ujęcie, pauzy 0,33 s / 1 s /
   1,5 s, oś czasu `os_czasu.json` z chwilami po nazwie, które animacja bierze z `/_lib/jarvo/os_czasu.js`, więc nowe
   nagranie lektora jej nie psuje; tekst pisany według zasad narracji: start w sytuacji widza, jedna linia opowieści,
@@ -299,7 +299,7 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 **Skille:** [T] `rodzaje-filmu`, `krotki-film`, `scenariusz`, `material-stock`, `dobor-ujec`, `warianty-ab`, `montaz-nagran`,
 `clipmaker`, `demo-strony`, `napisy`, `typografia-edit`, `lektor-i-dzwiek`, `film-z-kodu`, `style-motion`, `gramatyki-explainera`, `style-malarskie`, `zywy-schemat`, `wideo-ai`, `formaty-wideo`,
 `kontrola-wideo`;
-[H] `manim-video`, `ai-presenter-video`; [Z] `hyperframes` (12 skilli rodziny), marketingskills `video`, GSAP (8),
+[H] `manim-video` (silnik ManimGX, dodatek `manim`), `ai-presenter-video`; [Z] `hyperframes` (12 skilli rodziny), marketingskills `video`, GSAP (8),
 Three.js (10), screenwriting (5), iart (5), motion (3), Remotion, motion-broll, lemo-opuscar, anidoodle, claude-animation,
 bang-motion, pixel2motion, `text-to-lottie`, `slack-gif-creator`, `motion-design` i `video-lessons` (Remocn Studio),
 `live-panel`, wspólne `transkrypcja-filmu`, `hooki`, `izometria` (figura z `demo()` na film przez `html_wideo.py`)

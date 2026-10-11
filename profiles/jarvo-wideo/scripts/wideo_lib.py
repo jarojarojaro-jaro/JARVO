@@ -302,6 +302,13 @@ def z_sdr(chain: str, sdr_vf: str) -> str:
     return ",".join(x for x in (chain, sdr_vf) if x)
 
 
+def stala_klatka(fps: int, sek: float) -> str:
+    """Filtr: stały klatkaż `fps` bez gubienia końca filmu o zmiennym klatkażu (VFR). ManimGX zapisuje MP4 VFR,
+    a klatkę trzymaną na końcu (`self.wait()`) jako jedną długą: sam `fps=` (i sklejanie concat) kończy film
+    na jej początku i gubi ~1 s. tpad dokłada kopie ostatniej klatki; wynik przycina `-t` z długości kontenera."""
+    return f"fps={fps},tpad=stop_mode=clone:stop_duration={max(sek, 1.0):.3f}"
+
+
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".avif", ".bmp"}
 VIDEO_EXT = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".gif"}
 AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
