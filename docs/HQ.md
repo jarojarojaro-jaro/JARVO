@@ -237,6 +237,24 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   przyciemnia ją jak resztę wideo.
   Klucz osi (klipy, przycięcie, tempo, kadr; `edytor.maska_klucz` = `maskaKlucz` w `48-typografia.js`) pilnuje, żeby
   po zmianie klipów nie użyć starych sylwetek: wtedy napis jest po prostu widoczny w całości.
+- **Wirtualna kamera z głębią** (typografia): plan może mieć `typo.kamera` (`styl`: `brak`, `spokojna`, `dynamiczna`;
+  `przyslona` 0–1; `ostrosc`: `napis` albo `osoba`), blok głębię `z` i własny ruch `kamera` (`ruch`: `najazd`,
+  `odjazd`, `przesuniecie`, `brak`; `sila`, `krzywa` `plynnie`/`uderzenie`, `kierunek`, `slowo`, od którego rusza),
+  a słowo własną głębię `z`. Osoba (film) stoi na z = 1, napis przed nią ma z < 1 (bez pola 0,8), za nią z > 1
+  (1,3); słowo z `glebia` ±1 jest 15% bliżej albo dalej niż blok. Kamera ma przejazd w głąb i przesunięcie, punkt
+  na głębokości z widać w skali z / (z − kz), więc przy najeździe bliższy napis rośnie i przesuwa się mocniej niż film
+  (paralaksa), a w spoczynku wszystko stoi tam, gdzie w planie. Styl dobiera ruchy z bloków (za osobą najazd, po
+  najeździe odjazd, uderzenie najazd, co drugi spokojny blok przesunięcie w stronę bloku; `dynamiczna`: szybki najazd
+  od uderzenia i przesunięcie przy każdym spokojnym bloku); ruch bloku ma pierwszeństwo, `brak` go wyłącza. Najdalej
+  ×1,33 w głąb, a przesunięcie zawsze z takim najazdem, żeby film wypełniał kadr. Ostrość jest na najnowszym bloku
+  (przejście 0,3 s) albo na osobie; reszta rozmywa się jak w obiektywie (σ = 13,4·przysłona·|d − df| / d px przy 1080,
+  słowa bez własnej głębi najwyżej 6·przysłona px, żeby zostały czytelne). Ruchy liczą tak samo `48-typografia.js`
+  (napisy w podglądzie, eksporcie i renderze Wideografa) i `edytor.kamera_odcinki` (test pilnuje zgodności): eksport
+  przesuwa film filtrem ffmpeg `perspective` liczonym co klatkę (podpikselowo, bez drgań `zoompan`, tylko tam, gdzie
+  kamera nie stoi w spoczynku), a sylwetkę osoby tym samym filtrem, więc napis „za osobą” zostaje za nią. Podgląd
+  przesuwa warstwy wideo (`.thq-ed-kamera`, `typoKameraCss`), osobę nad napisem i zaznaczenie bloku tą samą kamerą.
+  Podpis klatki eksportu ma stan kamery, więc warstwa napisów rysuje każdą klatkę tylko w czasie ruchu. Plan bez
+  `kamera` rysuje się jak dawniej, piksel w piksel.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
   `volume`, `muted`, `fit`, `transition`, `fadeIn`, `fadeOut`, `color`, `voice`), napisy, audio (także `label`
   i `linked`) i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.

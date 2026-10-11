@@ -257,10 +257,13 @@ function typoUklad(ctx, b, P, W, H) {
 }
 
 // Ramka bloku na kanwie (do trafiania myszą i strzałek w edytorze); bez obrotu i perspektywy.
-function typoRamka(ctx, b, P, W, H) {
+// `now` (opcjonalnie): ramka tam, gdzie blok widać przez kamerę w tej chwili (środek cx, cy i skala s).
+function typoRamka(ctx, b, P, W, H, now) {
   const u = typoUklad(ctx, b, P, W, H);
-  const pad = 12 * u.S;
-  return { x0: u.cx - u.w / 2 - pad, y0: u.cy - u.h / 2 - pad, x1: u.cx + u.w / 2 + pad, y1: u.cy + u.h / 2 + pad, u };
+  const pad = 12 * u.S, k = now === undefined ? null : typoKamera(P, now);
+  let cx = u.cx, cy = u.cy, s = 1;
+  if (k) { const r = typoRzut(k, u.cx / W, u.cy / H, typoZ(b)); cx = r.x * W; cy = r.y * H; s = r.s; }
+  return { x0: cx - (u.w / 2) * s - pad, y0: cy - (u.h / 2) * s - pad, x1: cx + (u.w / 2) * s + pad, y1: cy + (u.h / 2) * s + pad, u, cx, cy, s };
 }
 
 // Stan animacji w chwili now: [słowo widoczne?, postęp wejścia 0–1] i postęp wyjścia bloku. Z tego samego liczy się
@@ -291,7 +294,8 @@ function typoPodpis(P, now, warstwa) {
     const s = typoStan(b, P, now);
     parts.push(`${b.id}:${s.slowa.map((a) => (a < 0 ? "-" : a >= 1 ? "F" : Math.round(a * 1000))).join(",")}:${Math.round(s.e * 1000)}`);
   }
-  return parts.join("|");
+  const k = parts.length ? typoKamera(P, now) : null;     // kamera w ruchu: każda klatka inna (w spoczynku stała)
+  return parts.join("|") + (k ? `~${[k.z, k.x, k.y].map((v) => v.toFixed(5)).join(",")},${k.f.toFixed(4)}` : "");
 }
 // Odcinki osi z tą samą klatką warstwy: [{od, do, podpis}] w numerach klatek (fps), pusty podpis = przezroczysta.
 function typoOdcinki(P, fps, total, warstwa) {
@@ -303,6 +307,164 @@ function typoOdcinki(P, fps, total, warstwa) {
     if (last && last.podpis === sig) last.do = f + 1; else out.push({ od: f, do: f + 1, podpis: sig });
   }
   return out;
+}
+
+// ---------------------------------------------------------------- wirtualna kamera z głębią
+// projekt.typo.kamera = {styl: brak|spokojna|dynamiczna, przyslona 0–1, ostrosc: napis|osoba}; blok.z = głębia bloku,
+// blok.kamera = własny ruch {ruch: najazd|odjazd|przesuniecie|brak, sila 0–1, krzywa: plynnie|uderzenie,
+// kierunek: lewo|prawo|gora|dol, slowo: numer słowa, od którego rusza}; słowo.z = własna głębia słowa.
+// Osoba (film) stoi na z = 1, napis przed nią ma z < 1, za nią z > 1 (bez pola: przód 0,8, za osobą 1,3; słowo z
+// `glebia` ±1 o 15% bliżej albo dalej niż blok). Kamera: przejazd w głąb kz (0 = spoczynek) i przesunięcie kx, ky
+// (część kadru). Punkt w spoczynku (x, y) na głębokości z widać w 0,5 + ((x − 0,5)·z − kx) / (z − kz) w skali
+// z / (z − kz) (za camera-3d-captions, HeyGen, Apache-2.0: screen = C + (ref − C)·D0 / (D0 − cz)): bliższy napis
+// rośnie i przesuwa się mocniej niż film (paralaksa), a w spoczynku wszystko stoi tam, gdzie w planie. Ostrość:
+// płaszczyzna na głębokości najnowszego bloku (napis; zmiana w 0,3 s) albo osoby; rozmycie σ = 13,4·przysłona·|d − df| / d
+// px przy 1080 (przysłona 0,5 = 6,7 jak u nich), dla słów bez własnej głębi najwyżej 6·przysłona px (czytelne).
+// Ruchy ze stylu i odcinki liczy tak samo edytor.py (kamera_ruchy, kamera_odcinki: ten sam ruch filmu w eksporcie
+// przez ffmpeg `perspective`), test pilnuje zgodności. Plan bez kamery rysuje się jak dawniej, piksel w piksel.
+const TYPO_KAMERY = ["brak", "spokojna", "dynamiczna"];
+const TYPO_RUCHY = ["najazd", "odjazd", "przesuniecie", "brak"];
+const TYPO_KIERUNKI = ["lewo", "prawo", "gora", "dol"];
+const TYPO_KRZYWE = ["plynnie", "uderzenie"];
+const TYPO_OSTROSC = ["napis", "osoba"];
+const TYPO_KAMERA = { z: { przod: 0.8, tyl: 1.3 }, zmax: 0.25, sila: { spokojna: 0.35, dynamiczna: 0.6 }, uderzenie: 0.4,
+  minBlok: 0.6, ostrosc: 0.3, rozmycie: 13.4, plaski: 6, wlasne: 12, glebiaSlowa: 0.15 };
+function typoLiczba(v, d) { return v === null || v === undefined || v === "" || typeof v === "boolean" || !Number.isFinite(+v) ? d : +v; }
+function typoZ(b) {                       // głębia bloku: pole z albo domyślna warstwy
+  return b && b.z !== undefined && b.z !== null && b.z !== "" ? typoClamp(typoLiczba(b.z, 1), 0.3, 3) : TYPO_KAMERA.z[b && b.warstwa === "tyl" ? "tyl" : "przod"];
+}
+function typoZSlowa(b, w) {               // głębia słowa: własna albo bloku przesunięta przez `glebia`
+  if (w && w.z !== undefined && w.z !== null && w.z !== "") return typoClamp(typoLiczba(w.z, 1), 0.3, 3);
+  return typoZ(b) * (1 - TYPO_KAMERA.glebiaSlowa * typoClamp(Math.round(+(w && w.glebia) || 0), -1, 1));
+}
+function typoRuch(b) {                    // własny ruch bloku w bezpiecznej postaci (edytor.kamera_ruch_norm) albo null
+  const r = b && b.kamera;
+  if (!r || typeof r !== "object" || !TYPO_RUCHY.includes(r.ruch)) return null;
+  if (r.ruch === "brak") return { ruch: "brak" };
+  const o = { ruch: r.ruch, sila: typoClamp(typoLiczba(r.sila, 0.5), 0.05, 1), krzywa: TYPO_KRZYWE.includes(r.krzywa) ? r.krzywa : "plynnie" };
+  if (r.ruch === "przesuniecie") o.kierunek = TYPO_KIERUNKI.includes(r.kierunek) ? r.kierunek : "prawo";
+  if (Number.isInteger(r.slowo) && r.slowo >= 0 && r.slowo < b.slowa.length) o.slowo = r.slowo;
+  return o;
+}
+// Ruch ze stylu kamery dla bloku bez własnego (edytor.kamera_auto): za osobą najazd, po najeździe odjazd,
+// uderzenie = najazd (dynamiczna: szybki, od słowa), co drugi spokojny blok (dynamiczna: każdy) przesunięcie.
+function typoKameraAuto(b, styl, wcisnieta, spokoj) {
+  if (b.end - b.start < TYPO_KAMERA.minBlok) return [null, spokoj];
+  const sila = TYPO_KAMERA.sila[styl], hit = b.slowa.findIndex((w) => +w.waga === 3);
+  if (b.warstwa === "tyl") return [{ ruch: "najazd", sila, krzywa: "plynnie" }, spokoj];
+  if (wcisnieta) return [{ ruch: "odjazd", sila, krzywa: "plynnie" }, spokoj];
+  if (hit >= 0) return [styl === "dynamiczna" ? { ruch: "najazd", sila, krzywa: "uderzenie", slowo: hit } : { ruch: "najazd", sila, krzywa: "plynnie" }, spokoj];
+  spokoj++;
+  if (styl === "dynamiczna" || spokoj % 2 === 0) return [{ ruch: "przesuniecie", sila, krzywa: "plynnie", kierunek: typoLiczba(b.x, 0.5) >= 0.5 ? "prawo" : "lewo" }, spokoj];
+  return [null, spokoj];
+}
+function typoKameraRuchy(T) {             // [[blok, ruch]] po czasie (edytor.kamera_ruchy)
+  const styl = T.kamera && T.kamera.styl, out = [];
+  let wcisnieta = false, spokoj = 0;
+  for (const b of typoBloki({ typo: T }).slice().sort((a, c) => a.start - c.start)) {
+    let r = typoRuch(b);
+    if (!r && TYPO_KAMERA.sila[styl]) [r, spokoj] = typoKameraAuto(b, styl, wcisnieta, spokoj);
+    if (!r || r.ruch === "brak") continue;
+    out.push([b, r]);
+    wcisnieta = r.ruch === "najazd" || (wcisnieta && r.ruch === "przesuniecie");
+  }
+  return out;
+}
+function typoKrzywa(k, p) { const x = typoClamp(p, 0, 1); return k === "uderzenie" ? 1 - Math.pow(1 - x, 3) : x * x * (3 - 2 * x); }
+function typoKameraStanOdc(odc, t) {      // [kz, kx, ky] w chwili t (edytor.kamera_stan)
+  let s = [0, 0, 0];
+  for (const o of odc) {
+    if (t < o.a) break;
+    const e = typoKrzywa(o.krzywa, o.b <= o.a ? 1 : (Math.min(t, o.c) - o.a) / (o.b - o.a));
+    s = o.s0.map((v, i) => v + (o.s1[i] - v) * e);
+  }
+  return s;
+}
+// Ruchy → odcinki {a, b, c, s0, s1, krzywa} (edytor.kamera_odcinki: te same liczby, więc film i napisy jadą razem).
+function typoKameraOdcinki(T) {
+  const odc = [], r5 = (v) => Math.round(v * 1e5) / 1e5, z2 = (z, v) => typoClamp(v, -z / 2, z / 2);
+  for (const [b, r] of typoKameraRuchy(T)) {
+    let a = b.start;
+    if (r.slowo !== undefined && r.slowo < b.slowa.length) a += Math.max(0, (+b.slowa[r.slowo].t || 0) - TYPO_LEAD);
+    if (odc.length) a = Math.max(a, odc[odc.length - 1].a);
+    let koniec = r.krzywa === "uderzenie" ? Math.min(a + TYPO_KAMERA.uderzenie, b.end) : b.end;
+    koniec = Math.max(koniec, a + 0.1);
+    if (odc.length) odc[odc.length - 1].c = Math.min(odc[odc.length - 1].b, a);
+    let [z0, x0, y0] = typoKameraStanOdc(odc, a), z1, x1, y1;
+    const sila = typoLiczba(r.sila, 0.5), dz = 0.04 + 0.12 * sila, dp = 0.015 + 0.05 * sila;
+    if (r.ruch === "najazd") {
+      z1 = Math.min(TYPO_KAMERA.zmax, z0 + dz);
+      x1 = x0 + (typoLiczba(b.x, 0.5) - 0.5) * dz * 0.5; y1 = y0 + (typoLiczba(b.y, 0.5) - 0.5) * dz * 0.5;
+    } else if (r.ruch === "odjazd") {
+      if (z0 < dz / 2) z0 = Math.min(TYPO_KAMERA.zmax, z0 + dz);   // ze spoczynku: skok w głąb, potem odjazd
+      z1 = 0; x1 = 0; y1 = 0;
+    } else {
+      const k = r.kierunek || "prawo";
+      x1 = k === "lewo" || k === "prawo" ? (k === "prawo" ? dp : -dp) : x0;
+      y1 = k === "gora" || k === "dol" ? (k === "dol" ? dp : -dp) : y0;
+      z1 = Math.min(TYPO_KAMERA.zmax, Math.max(z0, 2 * Math.abs(x1) + 0.01, 2 * Math.abs(y1) + 0.01));
+    }
+    x1 = z2(z1, x1); y1 = z2(z1, y1); x0 = z2(z0, x0); y0 = z2(z0, y0);
+    const r4 = (v) => Math.round(v * 1e4) / 1e4;
+    odc.push({ a: r4(a), b: r4(koniec), c: r4(koniec), krzywa: r.krzywa, s0: [z0, x0, y0].map(r5), s1: [z1, x1, y1].map(r5) });
+  }
+  return odc;
+}
+const TYPO_KAMERA_CACHE = new WeakMap();  // plan → odcinki i bloki (plan w edytorze zmienia się nowym obiektem)
+function typoKameraDane(T) {
+  let d = TYPO_KAMERA_CACHE.get(T);
+  if (!d) {
+    const bloki = typoBloki({ typo: T }).map((b) => ({ ts: b.start + Math.max(0, +b.slowa[0].t || 0) - TYPO_LEAD, z: typoZ(b) }))
+      .sort((a, c) => a.ts - c.ts);
+    d = { odc: typoKameraOdcinki(T), bloki };
+    TYPO_KAMERA_CACHE.set(T, d);
+  }
+  return d;
+}
+function typoOstrosc(d, t) {              // głębia ostrości: najnowszy widoczny blok, przejście w 0,3 s
+  let f = 1, cel = null, od = 0;
+  for (const b of d.bloki) {
+    if (b.ts > t) break;
+    if (cel === null) { f = b.z; cel = b.z; od = b.ts; continue; }
+    f += (cel - f) * typoKrzywa("plynnie", (b.ts - od) / TYPO_KAMERA.ostrosc);
+    cel = b.z; od = b.ts;
+  }
+  return cel === null ? 1 : f + (cel - f) * typoKrzywa("plynnie", (t - od) / TYPO_KAMERA.ostrosc);
+}
+// Kamera w chwili t: {z, x, y (kz, kx, ky), f (głębia ostrości), a (przysłona)} albo null (plan bez kamery).
+function typoKamera(P, t) {
+  const T = P && P.typo, K = T && T.kamera;
+  if (!K || typeof K !== "object") return null;
+  const d = typoKameraDane(T), [z, x, y] = typoKameraStanOdc(d.odc, t);
+  return { z, x, y, f: K.ostrosc === "osoba" ? 1 : typoOstrosc(d, t), a: typoClamp(typoLiczba(K.przyslona, 0.5), 0, 1) };
+}
+// Punkt w spoczynku (x, y: część kadru) na głębokości z → miejsce na ekranie (część kadru) i skala.
+function typoRzut(k, x, y, z) {
+  const d = Math.max(0.05, z - k.z);
+  return { x: 0.5 + ((x - 0.5) * z - k.x) / d, y: 0.5 + ((y - 0.5) * z - k.y) / d, s: z / d };
+}
+// Rozmycie z głębi ostrości (σ w px przy krótszym boku 1080); słowo bez własnej głębi czytelne (limit `plaski`).
+function typoRozmycie(k, z, wlasna) {
+  const d = Math.max(0.05, z - k.z), df = Math.max(0.05, k.f - k.z);
+  return Math.min((wlasna ? TYPO_KAMERA.wlasne : TYPO_KAMERA.plaski) * k.a, TYPO_KAMERA.rozmycie * k.a * Math.abs(d - df) / d);
+}
+function typoKameraSpoczynek(k) { return !k || (Math.abs(k.z) < 1e-6 && Math.abs(k.x) < 1e-6 && Math.abs(k.y) < 1e-6); }
+// Przekształcenie kanwy W×H tak, jak kamera widzi film (z = 1); wołający robi save/restore.
+function typoKameraNa(g, k, W, H) {
+  const s = 1 / Math.max(0.05, 1 - k.z);
+  g.translate(W / 2, H / 2); g.scale(s, s); g.translate(-W / 2 - k.x * W, -H / 2 - k.y * H);
+}
+// Obraz filmu (z = 1) przez kamerę: klatka arkusza, sylwetka osoby; bez kamery zwykłe drawImage.
+function typoKameraObraz(g, img, P, W, H, t) {
+  const k = typoKamera(P, t);
+  if (typoKameraSpoczynek(k)) { g.drawImage(img, 0, 0, W, H); return; }
+  g.save(); typoKameraNa(g, k, W, H); g.drawImage(img, 0, 0, W, H); g.restore();
+}
+// To samo jako CSS transform (podgląd edytora: warstwy wideo, transform-origin na środku).
+function typoKameraCss(k) {
+  if (typoKameraSpoczynek(k)) return "";
+  const s = 1 / Math.max(0.05, 1 - k.z);
+  return `scale(${s.toFixed(5)}) translate(${(-k.x * 100).toFixed(4)}%, ${(-k.y * 100).toFixed(4)}%)`;
 }
 
 let TYPO_SZUM = null;   // tekstura „ulica”: stały szum (deterministyczny), wycinany z liter jak zdarta farba
@@ -343,8 +505,8 @@ function typoCiemniej(hex, k) {
   return `rgb(${typoRgb(hex).map((c) => Math.round(c * k)).join(",")})`;
 }
 
-// Jedno słowo na kanwie bloku (współrzędne bloku), z wejściem a (0–1).
-function typoRysujSlowo(g, s, a, wejscie, m) {
+// Jedno słowo na kanwie bloku (współrzędne bloku), z wejściem a (0–1); `rozm` = rozmycie z głębi ostrości (px kanwy).
+function typoRysujSlowo(g, s, a, wejscie, m, rozm = 0) {
   const px = s.px;
   let tekst = s.tekst;
   if (wejscie === "pisanie" && a < 1) tekst = Array.from(tekst).slice(0, Math.max(1, Math.ceil(Array.from(tekst).length * a))).join("");
@@ -366,7 +528,9 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
     y += (1 - typoEaseOut(a)) * px * 1.1;
   }
   g.globalAlpha = alpha;
-  if (s.glebia < 0) g.filter = `blur(${Math.min(2.5, px * 0.012).toFixed(1)}px)`;   // dalej = lekko miękko, ale czytelnie
+  const miekko = s.glebia < 0 ? Math.min(2.5, px * 0.012) : 0;    // dalej = lekko miękko, ale czytelnie
+  const blur = rozm >= 0.05 ? Math.hypot(miekko, rozm) : miekko;   // plus głębia ostrości kamery
+  if (blur > 0) g.filter = `blur(${blur.toFixed(1)}px)`;
   const fill = s.kolor;
   const konturFaza = wejscie === "kontur" && a < 1;
   const cien = () => { g.shadowColor = "rgba(0,0,0,0.55)"; g.shadowBlur = px * 0.16; g.shadowOffsetY = px * 0.04; };
@@ -439,20 +603,39 @@ function typoRysujSlowo(g, s, a, wejscie, m) {
 
 // Blok na osobnej kanwie (tekstura, perspektywa i smuga działają na całości), potem na kanwę główną z obrotem.
 // `stan` (opcjonalnie) zamiast stanu w chwili now: kontrola rysuje tak pojedyncze słowa bloku.
+// Kamera (plan z `kamera`): blok rysowany od razu w skali, w której go widać (ostre litery przy najeździe), w miejscu
+// z rzutu swojej głębi; słowo z inną głębią niż blok (glebia, z) ma własny rzut (paralaksa w bloku) i rozmycie.
 function typoRysujBlok(ctx, b, P, W, H, now, stan) {
   const m = typoMotyw(P);
   const st = stan || typoStan(b, P, now);
   if (!st.slowa.some((a) => a >= 0)) return null;
   const u = typoUklad(ctx, b, P, W, H);
-  const pad = Math.ceil(Math.max(...u.slowa.map((s) => s.px)) * 0.5);
-  const bw = Math.ceil(u.w + pad * 2), bh = Math.ceil(u.h + pad * 2);
+  const k = typoKamera(P, now), zb = typoZ(b);
+  let cx = u.cx, cy = u.cy, sk = 1;
+  if (k) { const r = typoRzut(k, u.cx / W, u.cy / H, zb); cx = r.x * W; cy = r.y * H; sk = r.s; }
+  const maxPx = Math.max(...u.slowa.map((s) => s.px));
+  const pad = Math.ceil(maxPx * (k ? 0.8 : 0.5) + (k ? 40 * u.S : 0));   // kamera: zapas na paralaksę słów i rozmycie
+  const bw = Math.ceil((u.w + pad * 2) * sk), bh = Math.ceil((u.h + pad * 2) * sk);
   const c = document.createElement("canvas");
   c.width = Math.max(1, bw); c.height = Math.max(1, bh);
   const g = c.getContext("2d");
   g.translate(bw / 2, bh / 2);
-  u.slowa.forEach((s, j) => { if (st.slowa[j] >= 0) typoRysujSlowo(g, s, st.slowa[j], typoWejscie(b, s.src, m), m); });
+  if (sk !== 1) g.scale(sk, sk);
+  u.slowa.forEach((s, j) => {
+    if (st.slowa[j] < 0) return;
+    const wej = typoWejscie(b, s.src, m);
+    if (!k) { typoRysujSlowo(g, s, st.slowa[j], wej, m); return; }
+    const zw = typoZSlowa(b, s.src), wlasna = s.src.z !== undefined && s.src.z !== null && s.src.z !== "";
+    const rozm = typoRozmycie(k, zw, wlasna) * u.S;
+    if (Math.abs(zw - zb) < 1e-4) { typoRysujSlowo(g, s, st.slowa[j], wej, m, rozm); return; }
+    const lx = s.x + s.w / 2, ly = s.y - s.px * 0.35, r = typoRzut(k, (u.cx + lx) / W, (u.cy + ly) / H, zw);
+    const q = r.s / sk;
+    g.save(); g.translate((r.x * W - cx) / sk, (r.y * H - cy) / sk); g.scale(q, q); g.translate(-lx, -ly);
+    typoRysujSlowo(g, s, st.slowa[j], wej, m, rozm);
+    g.restore();
+  });
   ctx.save();
-  ctx.translate(u.cx, u.cy);
+  ctx.translate(cx, cy);
   ctx.rotate(((+b.rot || 0) * Math.PI) / 180);
   let alpha = 1, dx = 0;
   if (st.wy === "zanik") alpha = 1 - st.e;
@@ -602,7 +785,8 @@ async function typoKontrola(P, W, H, opt = {}) {
     for (const b of typoAktywne(P, t)) {
       const st = typoStan(b, P, t);
       if (st.e > 0) { seria.delete(b.id); continue; }          // wyjście (smuga, zanik) może wyjść za kadr
-      const klucz = st.slowa.map((a) => (a < 0 ? "-" : a.toFixed(3))).join(",");
+      const kam = typoKamera(P, t);                            // kamera w ruchu: blok w innym miejscu co krok
+      const klucz = st.slowa.map((a) => (a < 0 ? "-" : a.toFixed(3))).join(",") + (kam ? `~${[kam.z, kam.x, kam.y, kam.f].map((v) => v.toFixed(4)).join(",")}` : "");
       let x = biez.get(b.id);
       if (!x || x.klucz !== klucz) { x = { klucz, ...rysuj(b, t, st) }; biez.set(b.id, x); }
       akt.push([b, x]);

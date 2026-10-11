@@ -1009,3 +1009,275 @@ def test_kontrola_w_przegladarce(tmp_path):
     assert {("poza-kadrem", "b01"), ("bloki-na-sobie", "b03"), ("slowa-sie-stykaja", "b04"),
             ("brak-sylwetek", "b06"), ("strefa", "b07")} <= kody
     assert not any(blok == "b05" for _, blok in kody) and wynik["bloki"] == 7
+
+
+# ---------------------------------------------------------------- wirtualna kamera z głębią (typo.kamera, z)
+
+def _w(t: float, tekst: str, waga: int) -> dict:
+    return {"t": t, "k": round(t + 0.3, 3), "tekst": tekst, "waga": waga, "linia": 0}
+
+
+def _plan_kamery(styl: str = "dynamiczna", **kam) -> dict:
+    return ed.normalize_typo({"motyw": "czysty", "kamera": {"styl": styl, **kam}, "bloki": [
+        {"id": "b1", "start": 0.2, "end": 1.6, "x": 0.7, "slowa": [_w(0, "raz", 1), _w(0.4, "DWA", 3)]},
+        {"id": "b2", "start": 1.7, "end": 3.0, "slowa": [_w(0, "spokojnie", 1)]},
+        {"id": "b3", "start": 3.1, "end": 4.5, "x": 0.3, "slowa": [_w(0, "dalej", 1)]},
+        {"id": "b4", "start": 4.6, "end": 5.0, "slowa": [_w(0, "krótko", 1)]},
+        {"id": "b5", "start": 5.1, "end": 6.4, "uklad": "za", "warstwa": "tyl", "slowa": [_w(0, "ZA", 3)]},
+        {"id": "b6", "start": 6.5, "end": 7.6, "z": 0.6, "slowa": [_w(0, "blisko", 2)],
+         "kamera": {"ruch": "przesuniecie", "kierunek": "gora", "sila": 1}}]}, 8.0)
+
+
+def test_kamera_w_planie_bezpieczna_i_zgodna_wstecz():
+    stary = ed.normalize_typo({"motyw": "czysty", "bloki": [blok([("raz", 1)])]}, 10)
+    assert "kamera" not in stary and "z" not in stary["bloki"][0]           # stary plan: bez kamery i głębi
+    assert ed.kamera_filter(stary, 30) == "" and ed.kamera_odcinki(stary) == []
+    p = ed.normalize_typo({"kamera": {"styl": "lot", "przyslona": 7, "ostrosc": "?"}, "bloki": [
+        {**blok([("a", 1), ("b", 3)]), "z": 9, "kamera": {"ruch": "najazd", "sila": "x", "krzywa": "?", "slowo": 5},
+         "slowa": [{**_w(0, "a", 1), "z": 0.1}, _w(0.4, "b", 3)]},
+        {**blok([("c", 1)], start=3), "id": "b6", "kamera": {"ruch": "wir"}},
+        {**blok([("d", 1)], start=5), "id": "b7", "kamera": {"ruch": "przesuniecie", "kierunek": "skos", "slowo": True}}]}, 10)
+    assert p["kamera"] == {"styl": "brak", "przyslona": 1.0, "ostrosc": "napis"}
+    b1, b6, b7 = p["bloki"]
+    assert b1["z"] == 3.0 and b1["slowa"][0]["z"] == 0.3
+    assert b1["kamera"] == {"ruch": "najazd", "sila": 0.5, "krzywa": "plynnie"}   # słowa 5 nie ma
+    assert "kamera" not in b6 and b7["kamera"] == {"ruch": "przesuniecie", "sila": 0.5, "krzywa": "plynnie", "kierunek": "prawo"}
+    assert ed.kamera_z({"warstwa": "tyl"}) == 1.3 and ed.kamera_z({"warstwa": "przod"}) == 0.8 and ed.kamera_z(b1) == 3.0
+
+
+def test_kamera_ruchy_ze_stylu_i_wlasne():
+    p = _plan_kamery("dynamiczna")
+    ruchy = [(b["id"], r["ruch"], r.get("krzywa"), r.get("kierunek")) for b, r in ed.kamera_ruchy(p)]
+    assert ruchy == [("b1", "najazd", "uderzenie", None),        # uderzenie: szybki najazd od słowa
+                     ("b2", "odjazd", "plynnie", None),           # po najeździe odjazd
+                     ("b3", "przesuniecie", "plynnie", "lewo"),   # spokojny blok po lewej: kamera w lewo, blok do środka
+                     ("b5", "najazd", "plynnie", None),           # b4 za krótki; za osobą: najazd
+                     ("b6", "przesuniecie", "plynnie", "gora")]   # własny ruch bloku
+    spok = [(b["id"], r["ruch"]) for b, r in ed.kamera_ruchy(_plan_kamery("spokojna"))]
+    assert spok == [("b1", "najazd"), ("b2", "odjazd"), ("b5", "najazd"), ("b6", "przesuniecie")]   # co drugi spokojny
+    assert [b["id"] for b, _ in ed.kamera_ruchy(_plan_kamery("brak"))] == ["b6"]    # bez stylu: tylko własne ruchy
+    brak = json.loads(json.dumps(p))
+    brak["bloki"][0]["kamera"] = {"ruch": "brak"}
+    assert [(b["id"], r["ruch"]) for b, r in ed.kamera_ruchy(brak)][:2] == [("b2", "przesuniecie"), ("b3", "przesuniecie")]
+    # „brak” wyłącza ruch bloku, więc kamera nie jest w głębi i następny spokojny blok dostaje przesunięcie
+
+
+def test_kamera_odcinki_film_zawsze_wypelnia_kadr():
+    odc = ed.kamera_odcinki(_plan_kamery("dynamiczna"))
+    assert odc[0]["a"] == pytest.approx(0.2 + 0.4 - ed.TYPO_LEAD) and odc[0]["b"] == pytest.approx(odc[0]["a"] + 0.4)
+    assert all(a["c"] <= b["a"] for a, b in zip(odc, odc[1:]))
+    for t in [i / 20 for i in range(170)]:
+        z, x, y = ed.kamera_stan(odc, t)
+        assert 0 <= z <= ed.KAMERA_ZMAX + 1e-9 and abs(x) <= z / 2 + 1e-9 and abs(y) <= z / 2 + 1e-9, t
+    assert ed.kamera_stan(odc, 0.1) == (0.0, 0.0, 0.0)                              # przed pierwszym ruchem spoczynek
+    assert ed.kamera_stan(odc, 1.2)[0] == pytest.approx(0.04 + 0.12 * 0.6)          # po najeździe stoi w głębi
+    assert ed.kamera_stan(odc, 3.05) == pytest.approx((0.0, 0.0, 0.0), abs=1e-9)    # odjazd do spoczynku
+    z, x, _y = ed.kamera_stan(odc, 4.55)
+    assert x == pytest.approx(-(0.015 + 0.05 * 0.6)) and z >= 2 * abs(x)            # przesunięcie z najazdem
+    pusty = ed.normalize_typo({"kamera": {"styl": "brak"}, "bloki": [{**blok([("a", 1)]), "kamera": {"ruch": "odjazd", "sila": 1}}]}, 10)
+    o = ed.kamera_odcinki(pusty)[0]                                                   # odjazd ze spoczynku: skok, potem odjazd
+    assert o["s0"][0] == pytest.approx(0.16) and o["s1"] == (0.0, 0.0, 0.0)
+    assert ed.kamera_stan([o], o["a"] - 0.01) == (0.0, 0.0, 0.0) and ed.kamera_stan([o], o["a"])[0] == pytest.approx(0.16)
+
+
+def _ewaluuj_ffmpeg(wyr: str, n: int) -> float:
+    """Mały ewaluator wyrażeń z kamera_filter (podzbiór składni ffmpeg: + - * /, gte, clip, min, st/ld, ;)."""
+    toks = re.findall(r"\d+\.\d+|\d+|[a-z]+|[-+*/(),;]", wyr)
+    pos, rej = 0, {}
+
+    def peek():
+        return toks[pos] if pos < len(toks) else None
+
+    def eat(x=None):
+        nonlocal pos
+        t = toks[pos]
+        assert x is None or t == x, (t, x)
+        pos += 1
+        return t
+
+    def seq():
+        v = expr()
+        while peek() == ";":
+            eat(";")
+            v = expr()
+        return v
+
+    def expr():
+        v = term()
+        while peek() in ("+", "-"):
+            v = v + term() if eat() == "+" else v - term()
+        return v
+
+    def term():
+        v = factor()
+        while peek() in ("*", "/"):
+            v = v * factor() if eat() == "*" else v / factor()
+        return v
+
+    def factor():
+        t = peek()
+        if t == "-":
+            eat()
+            return -factor()
+        if t == "(":
+            eat("(")
+            v = seq()
+            eat(")")
+            return v
+        if re.match(r"\d", t):
+            return float(eat())
+        name = eat()
+        if name == "in":
+            return float(n)
+        eat("(")
+        args = [seq()]
+        while peek() == ",":
+            eat(",")
+            args.append(seq())
+        eat(")")
+        if name == "st":
+            rej[int(args[0])] = args[1]
+            return args[1]
+        if name == "ld":
+            return rej[int(args[0])]
+        return {"gte": lambda a, b: float(a >= b), "clip": lambda v, a, b: min(b, max(a, v)), "min": min}[name](*args)
+
+    return seq()
+
+
+def test_kamera_filter_ffmpeg_wyrazenia():
+    """Płaska suma odcinków w wyrażeniu ffmpeg daje w każdej klatce ten sam stan, co kamera_stan (i 48-typografia.js)."""
+    p = _plan_kamery("dynamiczna")
+    f = ed.kamera_filter(p, 30)
+    assert f.startswith("perspective=") and "eval=frame" in f and "enable='between(t," in f and f.count("'") % 2 == 0
+    odc = ed.kamera_odcinki(p)
+    for t in (0.1, 0.7, 1.2, 2.2, 3.8, 5.7, 7.1, 7.9):
+        n = round(t * 30 - 0.5)
+        z, x, y = ed.kamera_stan(odc, (n + 0.5) / 30)
+        for wsp, cel in (((0.5, 1, 0), 0.5 * z + x), ((-0.5, 1, 0), -0.5 * z + x), ((-0.5, 0, 1), -0.5 * z + y)):
+            assert _ewaluuj_ffmpeg(ed._kamera_suma(odc, wsp, 30), n) == pytest.approx(cel, abs=1e-4), (t, wsp)
+
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_kamera_js_i_python_te_same_ruchy():
+    """Odcinki kamery liczy edytor.py (ruch filmu w ffmpeg) i 48-typografia.js (napisy): te same liczby."""
+    for styl in ("spokojna", "dynamiczna"):
+        p = _plan_kamery(styl)
+        chwile = [i / 10 for i in range(80)]
+        o = node(f"const T = {json.dumps(p)};\nconsole.log(JSON.stringify({{odc: typoKameraOdcinki(T), "
+                 f"stan: {json.dumps(chwile)}.map((t) => typoKameraStanOdc(typoKameraOdcinki(T), t))}}));")
+        py = ed.kamera_odcinki(p)
+        assert len(o["odc"]) == len(py)
+        for a, b in zip(o["odc"], py):
+            assert (a["a"], a["b"], a["c"]) == pytest.approx((b["a"], b["b"], b["c"])) and a["krzywa"] == b["krzywa"]
+            assert a["s0"] == pytest.approx(list(b["s0"]), abs=1e-5) and a["s1"] == pytest.approx(list(b["s1"]), abs=1e-5)
+        for t, s in zip(chwile, o["stan"]):
+            assert s == pytest.approx(list(ed.kamera_stan(py, t)), abs=1e-5), (styl, t)
+    stale = re.search(r"const TYPO_KAMERA = \{ z: \{ przod: ([\d.]+), tyl: ([\d.]+) \}, zmax: ([\d.]+), sila: \{ spokojna: ([\d.]+), "
+                      r"dynamiczna: ([\d.]+) \}, uderzenie: ([\d.]+),\s+minBlok: ([\d.]+),", JS)
+    assert tuple(map(float, stale.groups())) == (ed.KAMERA_Z["przod"], ed.KAMERA_Z["tyl"], ed.KAMERA_ZMAX,
+                                                 ed.KAMERA_SILA["spokojna"], ed.KAMERA_SILA["dynamiczna"],
+                                                 ed.KAMERA_UDERZENIE, ed.KAMERA_MIN_BLOK)
+    assert float(re.search(r"const TYPO_LEAD = ([\d.]+);", JS).group(1)) == ed.TYPO_LEAD
+    for nazwa, py in (("TYPO_KAMERY", ed.TYPO_KAMERY), ("TYPO_RUCHY", ed.TYPO_RUCHY), ("TYPO_KIERUNKI", ed.TYPO_KIERUNKI),
+                      ("TYPO_KRZYWE", ed.TYPO_KRZYWE), ("TYPO_OSTROSC", ed.TYPO_OSTROSC)):
+        assert tuple(json.loads(re.search(rf"const {nazwa} = (\[.*?\]);", JS).group(1))) == py
+
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_kamera_js_rzut_ostrosc_i_podpis():
+    """Rzut: w spoczynku napis stoi jak w planie, przy najeździe bliższy rośnie i ucieka od środka bardziej niż film;
+    ostrość idzie za najnowszym blokiem; podpis klatki eksportu zmienia się z kamerą, a bez kamery jest jak dawniej."""
+    p = _plan_kamery("dynamiczna", przyslona=0.5)
+    o = node(f"const P = {{typo: {json.dumps(p)}}};\nconst k0 = {{z: 0, x: 0, y: 0, f: 1, a: 0.5}}, k1 = {{z: 0.2, x: 0, y: 0, f: 0.8, a: 0.5}};"
+             "\nconst ctx = {font: '', measureText(t) { return {width: Array.from(t).length * 30}; }};"
+             "\nconsole.log(JSON.stringify({spoczynek: typoRzut(k0, 0.7, 0.3, 0.8), blisko: typoRzut(k1, 0.7, 0.5, 0.6),"
+             " film: typoRzut(k1, 0.7, 0.5, 1), rozm: [typoRozmycie(k1, 0.8, false), typoRozmycie(k1, 1.3, false), typoRozmycie(k1, 3, true)],"
+             " ostr: [0.1, 0.3, 1.0, 1.8, 2.5].map((t) => typoKamera(P, t).f),"
+             " podpis: [0.7, 0.8, 1.25].map((t) => typoPodpis(P, t, 'przod')), bez: typoKamera({typo: {bloki: []}}, 1),"
+             " css: [typoKameraCss(k0), typoKameraCss(k1)], ramka: typoRamka(ctx, P.typo.bloki[0], P, 1080, 1920, 1.2),"
+             " ramka0: typoRamka(ctx, P.typo.bloki[0], P, 1080, 1920)}));")
+    assert o["spoczynek"]["x"] == pytest.approx(0.7) and o["spoczynek"]["y"] == pytest.approx(0.3) and o["spoczynek"]["s"] == 1
+    assert o["blisko"]["s"] > o["film"]["s"] > 1 and o["blisko"]["x"] > o["film"]["x"] > 0.7      # paralaksa
+    assert o["rozm"][0] == 0 and 0 < o["rozm"][1] <= 6 * 0.5 and o["rozm"][2] > o["rozm"][1]     # ostrość na 0,8
+    f = o["ostr"]
+    assert f[0] == 1 and f[1] == pytest.approx(0.8) and f[3] == pytest.approx(0.8) and f[4] == pytest.approx(0.8)
+    assert o["podpis"][1] != o["podpis"][2] and "~" in o["podpis"][1]           # kamera w ruchu: inna klatka
+    assert o["bez"] is None and o["css"][0] == "" and o["css"][1].startswith("scale(1.25")
+    assert o["ramka"]["s"] > 1 and o["ramka"]["cx"] > o["ramka0"]["cx"] and o["ramka0"]["s"] == 1
+    bez = {**p}
+    bez.pop("kamera")
+    stary = node(f"const P = {{typo: {json.dumps(bez)}}};\nconsole.log(JSON.stringify(typoPodpis(P, 1.2, 'przod')));")
+    assert "~" not in stary                                                         # bez kamery podpis jak dawniej
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_eksport_kamera_przesuwa_film_i_sylwetke(tmp_path):
+    """Przesunięcie kamery w prawo (film: lewa połowa czarna, prawa biała): granica jedzie w lewo; sylwetka osoby
+    jedzie z filmem, więc napis „za osobą” widać tam, gdzie osoby już nie ma."""
+    src, raw = _maska_film(tmp_path, 50)
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=black:s=160x90:r=25:d=2",
+                    "-vf", "drawbox=x=80:y=0:w=80:h=90:color=white:t=fill", "-pix_fmt", "yuv420p", str(src)], check=True)
+    raw["typo"]["kamera"] = {"styl": "brak"}
+    raw["typo"]["bloki"][0]["kamera"] = {"ruch": "przesuniecie", "kierunek": "prawo", "sila": 1}
+    p = ed.normalize(raw, lambda r: Path(r) if Path(r) == src else None)
+    blank = ed.blank_png(tmp_path / "pusty.png", 160, 90)
+    red = _png_rgba(tmp_path / "r.png", 160, 90, (255, 0, 0, 255))
+    tyl = ed.typo_concat([(0.4, None), (1.2, red), (0.4, None)], blank, tmp_path / "tyl.ffconcat")
+    maska = ed.maska_concat(src, raw, p, tmp_path)
+    out = tmp_path / "o.mp4"
+    cmd = ed.build_command(p, {str(src): False}, [], out, typo={"tyl": tyl}, maska=maska)
+    graf = cmd[cmd.index("-filter_complex") + 1]
+    assert graf.count("perspective=") == 2 and "[vc]perspective=" in graf      # film i sylwetka przez tę samą kamerę
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+
+    def kolor(t: float, x: int):
+        return tuple(subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", str(t), "-i", str(out), "-frames:v", "1",
+                                     "-vf", f"crop=4:20:{x}:35,scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                                    capture_output=True, check=True).stdout[:3])
+    assert max(kolor(0.2, 72)) < 60                           # przed ruchem: lewa połowa czarna (osoba, bez napisu)
+    assert kolor(1.5, 72)[0] > 150 and kolor(1.5, 72)[2] < 80  # po przesunięciu tu już nie ma osoby: widać napis za nią
+    assert max(kolor(1.5, 20)) < 60                           # osoba (lewa część filmu) dalej przed napisem
+    assert min(kolor(1.9, 72)) > 200                          # po bloku kamera stoi: tu już prawa (biała) część filmu
+
+
+def test_kamera_w_przegladarce_najazd_i_spoczynek():
+    """Chromium: kamera w spoczynku bez rozmycia rysuje piksel w piksel jak plan bez kamery; najazd powiększa napis
+    (tusz szerszy), a rozmycie z głębi ostrości miękczy słowo daleko od płaszczyzny ostrości."""
+    pytest.importorskip("playwright.sync_api")
+    b = {"id": "b1", "start": 0.0, "end": 2.0, "x": 0.5, "y": 0.5, "w": 0.6, "slowa": [_w(0, "KAMERA", 3)],
+         "kamera": {"ruch": "najazd", "sila": 1, "krzywa": "plynnie"}}
+    bez = ed.normalize_typo({"motyw": "czysty", "bloki": [b]}, 3.0)
+    ostra = ed.normalize_typo({"motyw": "czysty", "kamera": {"styl": "brak", "przyslona": 0}, "bloki": [b]}, 3.0)
+    stoi = ed.normalize_typo({"motyw": "czysty", "kamera": {"styl": "brak", "przyslona": 0},
+                              "bloki": [{**b, "kamera": {"ruch": "brak"}}]}, 3.0)
+    rozm = ed.normalize_typo({"motyw": "czysty", "kamera": {"styl": "brak", "przyslona": 1, "ostrosc": "osoba"},
+                              "bloki": [{**b, "z": 0.5, "kamera": {"ruch": "brak"}}]}, 3.0)
+    js = """async ([plany, t]) => {
+        const out = [];
+        for (const T of plany) {
+            const c = document.createElement("canvas"); c.width = 270; c.height = 480;
+            const g = c.getContext("2d", { willReadFrequently: true });
+            typoRysuj(g, { typo: T }, 270, 480, t);
+            const d = g.getImageData(0, 0, 270, 480).data;
+            let x0 = 270, x1 = -1, ostre = 0, suma = 0;
+            for (let i = 0; i < 270 * 480; i++) {
+                const a = d[i * 4 + 3];
+                if (a >= 160) { const x = i % 270; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+                if (a >= 250) ostre++;
+                suma += d[i * 4] + d[i * 4 + 3];
+            }
+            out.push({ w: x1 - x0, ostre, suma });
+        }
+        return out;
+    }"""
+    try:
+        with ty.pr.strona([{"typo": bez}]) as page:
+            spoczynek = page.evaluate(js, [[bez, stoi, rozm], 1.0])
+            ruch = page.evaluate(js, [[bez, ostra], 1.9])
+    except Exception as exc:  # noqa: BLE001 - brak przeglądarki w tym środowisku
+        pytest.skip(f"przeglądarka niedostępna: {exc}")
+    assert spoczynek[0] == spoczynek[1]                          # w spoczynku i bez rozmycia: jak plan bez kamery
+    assert ruch[1]["w"] > ruch[0]["w"] * 1.1                     # najazd: blok z = 0,8 rośnie (×1,25)
+    assert spoczynek[2]["ostre"] < spoczynek[0]["ostre"] * 0.7   # z = 0,5 przy ostrości na osobie: rozmyte

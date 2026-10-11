@@ -55,6 +55,22 @@ TYPO_KROJE = ("bricolage", "bricolageL", "montserrat", "montserratI", "montserra
               "shrikhand", "bangers", "neon", "grunge", "righteous", "bungee", "monoton", "pixel", "glitch",
               "bubbles", "russo", "blackops", "sigmar", "rammetto", "space", "spaceL", "mono", "audiowide", "chakra",
               "spaceMono", "majorMono")   # te same klucze co TYPO_KROJE w 48-typografia.js
+# Wirtualna kamera z głębią (typo.kamera, blok.z, blok.kamera, słowo.z): te same listy i liczby co TYPO_KAMERA
+# w 48-typografia.js (test pilnuje zgodności). Osoba (film) stoi na głębokości z = 1, napis przed nią ma z < 1,
+# za nią z > 1. Kamera ma przejazd w głąb `z` (0 = spoczynek) i przesunięcie `x`, `y` (część kadru); punkt
+# w spoczynku (x, y) na głębokości z widać w (0,5 + ((x − 0,5)·z − kx) / (z − kz), …) w skali z / (z − kz),
+# więc bliższy napis rośnie i przesuwa się mocniej niż film (paralaksa), a w spoczynku wszystko stoi jak w planie.
+TYPO_KAMERY = ("brak", "spokojna", "dynamiczna")      # styl kamery planu: ruchy dobrane z bloków (kamera_ruchy)
+TYPO_RUCHY = ("najazd", "odjazd", "przesuniecie", "brak")
+TYPO_KIERUNKI = ("lewo", "prawo", "gora", "dol")
+TYPO_KRZYWE = ("plynnie", "uderzenie")
+TYPO_OSTROSC = ("napis", "osoba")
+KAMERA_Z = {"przod": 0.8, "tyl": 1.3}   # głębia bloku bez pola `z` (warstwa przed osobą / za osobą)
+KAMERA_ZMAX = 0.25        # najgłębszy najazd: film ×1,33 (dalej obraz z telefonu robi się miękki)
+KAMERA_SILA = {"spokojna": 0.35, "dynamiczna": 0.6}   # siła ruchów dobranych ze stylu
+KAMERA_UDERZENIE = 0.4    # s: ruch „uderzenie” (szybki start, miękkie lądowanie) od słowa
+KAMERA_MIN_BLOK = 0.6     # s: krótszy blok nie dostaje ruchu ze stylu (oko nie zdąży go zobaczyć)
+TYPO_LEAD = 0.03          # słowo wchodzi tuż przed dźwiękiem (TYPO_LEAD w 48-typografia.js)
 # Przejścia między klipami: klucz = nazwa przejścia xfade w FFmpeg, "blur" = przenikanie z rozmyciem Gaussa (nasze).
 # Te same klucze co ED_PRZEJSCIA w hq/web/src/49-przejscia.js (podgląd rysuje je tymi samymi wzorami).
 PRZEJSCIA = ("fade", "fadeblack", "fadewhite", "blur", "zoomin", "pixelize", "slideleft", "slideright", "slideup",
@@ -266,6 +282,11 @@ def normalize_typo(raw: Any, total: float) -> dict:
         out["paleta"] = paleta
     if raw.get("odstep") == "tusz":                # linie bez stykania (nowe plany); bez pola: układ jak dawniej
         out["odstep"] = "tusz"
+    if isinstance(raw.get("kamera"), dict):        # wirtualna kamera z głębią; bez pola: kadr stoi jak dawniej
+        k = raw["kamera"]
+        out["kamera"] = {"styl": k.get("styl") if k.get("styl") in TYPO_KAMERY else "brak",
+                         "przyslona": round(_num(k.get("przyslona"), 0, 1, 0.5), 3),
+                         "ostrosc": k.get("ostrosc") if k.get("ostrosc") in TYPO_OSTROSC else "napis"}
     bloki = raw.get("bloki") if isinstance(raw.get("bloki"), list) else []
     for b in bloki[:MAX_TYPO]:
         if not isinstance(b, dict) or not isinstance(b.get("slowa"), list):
@@ -297,6 +318,8 @@ def normalize_typo(raw: Any, total: float) -> dict:
                 x["wielkie"] = w["wielkie"]
             if w.get("skala") is not None:
                 x["skala"] = round(_num(w.get("skala"), 0.3, 3, 1), 3)
+            if w.get("z") is not None:             # własna głębia słowa (np. pierścień wokół osoby)
+                x["z"] = round(_num(w.get("z"), 0.3, 3, 1), 3)
             slowa.append(x)
         if not slowa:
             continue
@@ -309,9 +332,180 @@ def normalize_typo(raw: Any, total: float) -> dict:
         for k, ok in (("wejscie", TYPO_WEJSCIA), ("wyjscie", TYPO_WYJSCIA)):
             if b.get(k) in ok:
                 nb[k] = b[k]
+        if b.get("z") is not None:
+            nb["z"] = round(_num(b.get("z"), 0.3, 3, 1), 3)
+        ruch = kamera_ruch_norm(b.get("kamera"), len(slowa))
+        if ruch:
+            nb["kamera"] = ruch
         out["bloki"].append(nb)
     out["bloki"].sort(key=lambda b: b["start"])
     return out
+
+
+# ---------------------------------------------------------------- wirtualna kamera z głębią
+
+def kamera_ruch_norm(raw: Any, n_slow: int) -> dict | None:
+    """Ruch kamery przypięty do bloku (`blok.kamera`) w bezpiecznej postaci; zły albo brak = None (styl decyduje)."""
+    if not isinstance(raw, dict) or raw.get("ruch") not in TYPO_RUCHY:
+        return None
+    r = {"ruch": raw["ruch"]}
+    if r["ruch"] == "brak":
+        return r
+    r["sila"] = round(_num(raw.get("sila"), 0.05, 1, 0.5), 3)
+    r["krzywa"] = raw.get("krzywa") if raw.get("krzywa") in TYPO_KRZYWE else "plynnie"
+    if r["ruch"] == "przesuniecie":
+        r["kierunek"] = raw.get("kierunek") if raw.get("kierunek") in TYPO_KIERUNKI else "prawo"
+    if isinstance(raw.get("slowo"), int) and not isinstance(raw.get("slowo"), bool) and 0 <= raw["slowo"] < n_slow:
+        r["slowo"] = raw["slowo"]
+    return r
+
+
+def kamera_z(b: dict) -> float:
+    """Głębia bloku: pole `z` albo domyślna dla warstwy (przed osobą 0,8, za osobą 1,3)."""
+    z = b.get("z")
+    return float(z) if isinstance(z, (int, float)) and not isinstance(z, bool) else KAMERA_Z["tyl" if b.get("warstwa") == "tyl" else "przod"]
+
+
+def kamera_auto(b: dict, styl: str, wcisnieta: bool, spokoj: int) -> tuple[dict | None, int]:
+    """Ruch ze stylu kamery dla bloku bez własnego: blok za osobą = najazd (osoba rośnie, napis za nią mniej),
+    po najeździe odjazd do spoczynku, uderzenie (waga 3) = najazd (dynamiczna: szybki, od słowa), co drugi
+    spokojny blok (dynamiczna: każdy) = przesunięcie w stronę bloku, który przez to idzie do środka.
+    Zwraca (ruch albo None, licznik spokojnych bloków)."""
+    if b["end"] - b["start"] < KAMERA_MIN_BLOK:
+        return None, spokoj
+    sila = KAMERA_SILA[styl]
+    hit = next((j for j, w in enumerate(b["slowa"]) if w.get("waga") == 3), None)
+    if b.get("warstwa") == "tyl":
+        return {"ruch": "najazd", "sila": sila, "krzywa": "plynnie"}, spokoj
+    if wcisnieta:
+        return {"ruch": "odjazd", "sila": sila, "krzywa": "plynnie"}, spokoj
+    if hit is not None:
+        return ({"ruch": "najazd", "sila": sila, "krzywa": "uderzenie", "slowo": hit} if styl == "dynamiczna"
+                else {"ruch": "najazd", "sila": sila, "krzywa": "plynnie"}), spokoj
+    spokoj += 1
+    if styl == "dynamiczna" or spokoj % 2 == 0:
+        return {"ruch": "przesuniecie", "sila": sila, "krzywa": "plynnie",
+                "kierunek": "prawo" if float(b.get("x", 0.5)) >= 0.5 else "lewo"}, spokoj
+    return None, spokoj
+
+
+def kamera_ruchy(typo: dict) -> list[tuple[dict, dict]]:
+    """[(blok, ruch)] po czasie: własny ruch bloku (`blok.kamera`, także „brak”) albo ruch ze stylu planu."""
+    styl = (typo.get("kamera") or {}).get("styl")
+    out, wcisnieta, spokoj = [], False, 0
+    for b in sorted(typo.get("bloki") or [], key=lambda x: x["start"]):
+        r = b.get("kamera")
+        if r is None and styl in KAMERA_SILA:
+            r, spokoj = kamera_auto(b, styl, wcisnieta, spokoj)
+        if not r or r.get("ruch") == "brak":
+            continue
+        out.append((b, r))
+        wcisnieta = r["ruch"] == "najazd" or (wcisnieta and r["ruch"] == "przesuniecie")
+    return out
+
+
+def kamera_krzywa(krzywa: str, p: float) -> float:
+    """Postęp ruchu 0–1: płynnie = smoothstep (rusza i staje miękko), uderzenie = szybki start, miękkie lądowanie."""
+    p = min(1.0, max(0.0, p))
+    return 1 - (1 - p) ** 3 if krzywa == "uderzenie" else p * p * (3 - 2 * p)
+
+
+def kamera_stan(odc: list[dict], t: float) -> tuple[float, float, float]:
+    """(kz, kx, ky) kamery w chwili t: ostatni rozpoczęty odcinek, ucięty początkiem następnego (`c`)."""
+    stan = (0.0, 0.0, 0.0)
+    for o in odc:
+        if t < o["a"]:
+            break
+        p = 1.0 if o["b"] <= o["a"] else (min(t, o["c"]) - o["a"]) / (o["b"] - o["a"])
+        e = kamera_krzywa(o["krzywa"], p)
+        stan = tuple(s0 + (s1 - s0) * e for s0, s1 in zip(o["s0"], o["s1"]))
+    return stan
+
+
+def kamera_odcinki(typo: dict) -> list[dict]:
+    """Ruchy kamery → odcinki {a, b, c, s0, s1, krzywa} po czasie (stan = (kz, kx, ky)). Odcinek trwa blok (płynnie)
+    albo KAMERA_UDERZENIE od słowa; następny zaczyna się od stanu, w którym kamera akurat jest (c = koniec ucięty
+    jego początkiem). Najazd: o 0,04 + 0,12·siła w głąb i trochę w stronę bloku; odjazd: do spoczynku (ze spoczynku:
+    skok w głąb na początku bloku, potem odjazd); przesunięcie: kamera w bok o 0,015 + 0,05·siła z najazdem, który
+    film zawsze wypełnia kadr (|kx|, |ky| ≤ kz / 2). Najdalej KAMERA_ZMAX w głąb."""
+    odc: list[dict] = []
+    for b, r in kamera_ruchy(typo):
+        a = b["start"]
+        if r.get("slowo") is not None and r["slowo"] < len(b["slowa"]):
+            a += max(0.0, float(b["slowa"][r["slowo"]].get("t") or 0) - TYPO_LEAD)
+        if odc:
+            a = max(a, odc[-1]["a"])
+        koniec = min(a + KAMERA_UDERZENIE, b["end"]) if r["krzywa"] == "uderzenie" else b["end"]
+        koniec = max(koniec, a + 0.1)
+        if odc:
+            odc[-1]["c"] = min(odc[-1]["b"], a)
+        z0, x0, y0 = kamera_stan(odc, a)
+        sila = float(r.get("sila", 0.5))
+        dz, dp = 0.04 + 0.12 * sila, 0.015 + 0.05 * sila
+        if r["ruch"] == "najazd":
+            z1 = min(KAMERA_ZMAX, z0 + dz)
+            x1 = x0 + (float(b.get("x", 0.5)) - 0.5) * dz * 0.5
+            y1 = y0 + (float(b.get("y", 0.5)) - 0.5) * dz * 0.5
+        elif r["ruch"] == "odjazd":
+            if z0 < dz / 2:                        # ze spoczynku: skok w głąb na początku bloku, potem odjazd
+                z0 = min(KAMERA_ZMAX, z0 + dz)
+            z1, x1, y1 = 0.0, 0.0, 0.0
+        else:
+            k = r.get("kierunek", "prawo")
+            x1 = (dp if k == "prawo" else -dp) if k in ("lewo", "prawo") else x0
+            y1 = (dp if k == "dol" else -dp) if k in ("gora", "dol") else y0
+            z1 = min(KAMERA_ZMAX, max(z0, 2 * abs(x1) + 0.01, 2 * abs(y1) + 0.01))
+        x1 = max(-z1 / 2, min(z1 / 2, x1))
+        y1 = max(-z1 / 2, min(z1 / 2, y1))
+        x0, y0 = max(-z0 / 2, min(z0 / 2, x0)), max(-z0 / 2, min(z0 / 2, y0))
+        odc.append({"a": round(a, 4), "b": round(koniec, 4), "c": round(koniec, 4), "krzywa": r["krzywa"],
+                    "s0": tuple(round(v, 5) for v in (z0, x0, y0)), "s1": tuple(round(v, 5) for v in (z1, x1, y1))})
+    return odc
+
+
+def _kamera_suma(odc: list[dict], wsp: tuple[float, float, float], F: float) -> str:
+    """Wyrażenie ffmpeg (numer klatki `in`) dla kombinacji wsp·(kz, kx, ky) stanu kamery: płaska suma skoków
+    i przyrostów odcinków (bez zagnieżdżeń, więc długi film nie przepełnia parsera), czas klatki = (in + 0,5) / F
+    jak w typoOdcinki."""
+    lin = lambda s: sum(w * v for w, v in zip(wsp, s))  # noqa: E731
+    czesci, przed = [], 0.0
+    for o in odc:
+        A = o["a"] * F - 0.5
+        skok = lin(o["s0"]) - przed
+        if abs(skok) > 1e-6:
+            czesci.append(f"{skok:.6f}*gte(in,{A:.3f})")
+        d = lin(o["s1"]) - lin(o["s0"])
+        if o["b"] > o["a"] and abs(d) > 1e-6:
+            p = f"clip((min(in,{o['c'] * F - 0.5:.3f})-{A:.3f})/{(o['b'] - o['a']) * F:.3f},0,1)"
+            e = (f"(st(0,1-{p});1-ld(0)*ld(0)*ld(0))" if o["krzywa"] == "uderzenie"
+                 else f"(st(0,{p});ld(0)*ld(0)*(3-2*ld(0)))")
+            czesci.append(f"{d:.6f}*{e}")
+        p = 1.0 if o["b"] <= o["a"] else (o["c"] - o["a"]) / (o["b"] - o["a"])
+        przed = lin(o["s0"]) + d * kamera_krzywa(o["krzywa"], p)
+    return "+".join(czesci) or "0"
+
+
+def kamera_filter(typo: dict, F: float) -> str:
+    """Kamera na obrazie filmu (eksport): `perspective` liczony co klatkę wycina z kadru prostokąt widziany przez
+    kamerę (film na z = 1 rośnie 1 / (1 − kz) razy, przesuwa się o kx, ky), z podpikselową dokładnością (bez drgań
+    zoompan). Działa tylko tam, gdzie kamera nie stoi w spoczynku (enable); bez ruchów pusty napis."""
+    odc = kamera_odcinki(typo)
+    if not odc:
+        return ""
+    okna, od = [], None
+    for i, o in enumerate(odc):
+        od = o["a"] if od is None else od
+        nast = odc[i + 1]["a"] if i + 1 < len(odc) else None
+        if max(map(abs, kamera_stan(odc, o["c"]))) < 1e-5 and (nast is None or nast > o["c"]):
+            okna.append((od, o["c"]))
+            od = None
+    if od is not None:
+        okna.append((od, MAX_DURATION))
+    pol = lambda wz, wx, wy: _kamera_suma(odc, (wz, wx, wy), F)  # noqa: E731
+    xl, xp, yg, yd = pol(0.5, 1, 0), pol(-0.5, 1, 0), pol(0.5, 0, 1), pol(-0.5, 0, 1)
+    enable = "+".join(f"between(t,{_f(max(0.0, a - 1 / F))},{_f(b + 1 / F)})" for a, b in okna)
+    return (f"perspective=x0='W*({xl})':y0='H*({yg})':x1='W*(1+{xp})':y1='H*({yg})':x2='W*({xl})':y2='H*(1+{yd})'"
+            f":x3='W*(1+{xp})':y3='H*(1+{yd})':interpolation=linear:eval=frame:enable='{enable}'")
 
 
 def typo_concat(segments: list[tuple[float, Path | None]], blank: Path, dest: Path) -> Path | None:
@@ -889,7 +1083,8 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
     `sdr[src]` = łańcuch HDR → zwykły obraz z probe() (film HDR z telefonu); stoi za kadrem, przed korekcją koloru.
     `szum[src]` = tło nagrania w dB (szum_z_logu) pod czysty głos („voice”); brak = GLOS_TLO.
     `typo` = {"tyl": lista concat, "przod": lista concat}: warstwy typografii (z typo_concat) pod tekstami.
-    `maska` = lista concat sylwetek (maska_concat): osoba z filmu wraca nad warstwę „tyl”, więc napis jest za nią."""
+    `maska` = lista concat sylwetek (maska_concat): osoba z filmu wraca nad warstwę „tyl”, więc napis jest za nią.
+    Wirtualna kamera typografii (`p["typo"]["kamera"]`, kamera_filter) przesuwa film i sylwetkę tym samym ruchem."""
     W, H, F = p["canvas"]["w"], p["canvas"]["h"], p["canvas"]["fps"]
     args = [ffmpeg, "-nostdin", "-hide_banner", "-y", "-loglevel", "error", "-progress", "pipe:1", "-nostats"]
     graph: list[str] = []
@@ -956,8 +1151,12 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
         graph += xfade_graph(tr, dlug, F)
 
     vlast, osoba = "vc", None
+    kam = kamera_filter(p.get("typo") or {}, F)     # wirtualna kamera typografii: film (i osoba) na głębokości z = 1
+    if kam:
+        graph.append(f"[vc]{kam}[vkam]")
+        vlast = "vkam"
     if maska and (typo or {}).get("tyl"):
-        graph.append("[vc]split[vcm][vco]")  # kopia klatki: z niej wycinamy osobę według sylwetki
+        graph.append(f"[{vlast}]split[vcm][vco]")  # kopia klatki: z niej wycinamy osobę według sylwetki
         vlast, osoba = "vcm", "vco"
     # Warstwy z listy concat (typografia, maska, karaoke): długi odcinek to jedna klatka, którą `fps` powtarza od razu
     # (np. 3 s × 60 kl.). Konwersja formatu stoi więc PRZED `fps`, a nakładka ma ten sam format (yuv420): powtórzenie
@@ -975,7 +1174,8 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
         if warstwa == "tyl" and osoba:
             args += ["-reinit_filter", "0", "-f", "concat", "-safe", "0", "-i", str(maska)]
             mi = n; n += 1
-            graph.append(f"[{mi}:v]scale={W}:{H}:flags=bicubic,format=rgba,alphaextract,fps={F}[mka]")
+            # sylwetka idzie za kamerą tak samo jak film, więc osoba z kopii klatki trafia w swoje miejsce
+            graph.append(f"[{mi}:v]scale={W}:{H}:flags=bicubic,format=rgba,alphaextract,fps={F}{',' + kam if kam else ''}[mka]")
             graph.append(f"[{osoba}]format=rgba[osb];[osb][mka]alphamerge[osa]")
             graph.append(f"[{vlast}][osa]overlay=0:0:format=yuv420:eof_action=pass[vos]")
             vlast = "vos"

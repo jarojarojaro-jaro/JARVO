@@ -784,6 +784,7 @@ function VideoEditor({ path, onClose }) {
     return () => ro.disconnect();
   }, [!!info, mobile]);
   const stageRef = useRef(null), overlayRef = useRef(null), tlRef = useRef(null), headRef = useRef(null), timeRef = useRef(null);
+  const kameraRef = useRef(null);   // warstwy wideo pod wirtualną kamerą typografii (film na głębokości osoby)
   const tRef = useRef(0);
   const me = useRef({});
 
@@ -978,12 +979,15 @@ function VideoEditor({ path, onClose }) {
     const o = oc.getContext("2d");
     o.globalCompositeOperation = "source-over";
     o.clearRect(0, 0, w, h);
-    const r = fitBox(vw, vh, w, h, seg.c);
+    const r = fitBox(vw, vh, w, h, seg.c), kam = typoKamera(P, now);   // klatka i sylwetka przez kamerę, jak film pod nimi
+    o.save();
+    if (!typoKameraSpoczynek(kam)) typoKameraNa(o, kam, w, h);
     o.filter = kolorFiltr(seg.c) || "none";         // osoba w tym samym kolorze co klip pod napisem
-    try { o.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { o.filter = "none"; return; }
+    try { o.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { o.filter = "none"; o.restore(); return; }
     o.filter = "none";
     o.globalCompositeOperation = "destination-in";
     o.drawImage(bm, 0, 0, w, h);
+    o.restore();
     if (zs.length) {
       o.globalCompositeOperation = "source-atop"; o.fillStyle = cien;
       for (const z of zs) o.fillRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0);
@@ -999,6 +1003,7 @@ function VideoEditor({ path, onClose }) {
     const g = c.getContext("2d");
     g.clearRect(0, 0, w, h);
     const now = tRef.current;
+    if (kameraRef.current) kameraRef.current.style.transform = typoKameraCss(typoKamera(P, now));   // film pod kamerą
     const pf = strefaRef.current, zs = strefyUI(w, h, pf), cien = "rgba(0,0,0,0.38)";
     if (zs.length) {
       // strefy interfejsu platformy: tylko na podglądzie (eksport i kadr dla agenta rysują napisy osobno)
@@ -1021,11 +1026,11 @@ function VideoEditor({ path, onClose }) {
       osobaNaWierzch(g, P, w, h, now, zs, cien);
       typoRysuj(g, P, w, h, now, "przod");
       const s = selRef.current, b = s && s.type === "typo" && typoAktywne(P, now).find((x) => x.id === s.id);
-      if (b) {                                       // zaznaczony blok: ramka w jego obrocie
-        const f = typoRamka(g, b, P, w, h);
-        g.save(); g.translate(f.u.cx, f.u.cy); g.rotate(((+b.rot || 0) * Math.PI) / 180);
+      if (b) {                                       // zaznaczony blok: ramka w jego obrocie (tam, gdzie go widać przez kamerę)
+        const f = typoRamka(g, b, P, w, h, now);
+        g.save(); g.translate(f.cx, f.cy); g.rotate(((+b.rot || 0) * Math.PI) / 180);
         g.strokeStyle = b.warstwa === "tyl" ? "#B78CFF" : "#3BA9FF"; g.lineWidth = Math.max(2, w / 480); g.setLineDash([w / 90, w / 140]);
-        g.strokeRect(f.x0 - f.u.cx, f.y0 - f.u.cy, f.x1 - f.x0, f.y1 - f.y0); g.restore();
+        g.strokeRect(f.x0 - f.cx, f.y0 - f.cy, f.x1 - f.x0, f.y1 - f.y0); g.restore();
       }
     }
     for (const x of P.texts) {
@@ -1093,7 +1098,9 @@ function VideoEditor({ path, onClose }) {
     const now = tRef.current;
     const { el, vw, vh, c: clip } = klatkaPodgladu() || {};
     if (vw && vh) {
-      const kf = kolorFiltr(clip);
+      const kf = kolorFiltr(clip), kam = typoKamera(P, now);
+      g.save();
+      if (!typoKameraSpoczynek(kam)) typoKameraNa(g, kam, W, Hh);   // kadr jak w podglądzie: film pod kamerą
       if (clip.fit === "blur") {
         const s = blurBg(document.createElement("canvas"), el, vw, vh, W, Hh);
         g.save(); g.filter = `${kf ? `${kf} ` : ""}blur(${Math.round(Math.max(W, Hh) / 160)}px) brightness(0.92)`;
@@ -1103,6 +1110,7 @@ function VideoEditor({ path, onClose }) {
       g.filter = kf || "none";
       try { g.drawImage(el, r.x, r.y, r.w, r.h); } catch (_) { /* klatka jeszcze niegotowa: zostaje czarne tło */ }
       g.filter = "none";
+      g.restore();
     }
     for (const x of P.texts) if (now >= x.start && now < x.end) drawText(g, x, W, Hh, karaokeIndex(x, now));
     const r = shotRect(a, b, W, Hh);
@@ -1515,15 +1523,15 @@ function VideoEditor({ path, onClose }) {
   function typoPointer(e, px, py, r) {
     const g = overlayRef.current.getContext("2d"), { w: W, h: Hh } = p.canvas;
     const akt = typoAktywne(p, tRef.current).sort((a, b) => (a.warstwa === "tyl") - (b.warstwa === "tyl"));
-    const hit = akt.find((b) => { const f = typoRamka(g, b, p, W, Hh); return px >= f.x0 && px <= f.x1 && py >= f.y0 && py <= f.y1; });
+    const hit = akt.find((b) => { const f = typoRamka(g, b, p, W, Hh, tRef.current); return px >= f.x0 && px <= f.x1 && py >= f.y0 && py <= f.y1; });
     if (!hit) { setSel(null); return; }
     if (!(sel && sel.type === "typo" && sel.id === hit.id)) setTypoW(null);
     setSel({ type: "typo", id: hit.id });
     selRef.current = { type: "typo", id: hit.id };
     if (!mobileRef.current) setSide("inspect");
-    const sx = hit.x ?? 0.5, sy = hit.y ?? 0.3;
+    const sx = hit.x ?? 0.5, sy = hit.y ?? 0.3, sk = typoRamka(g, hit, p, W, Hh, tRef.current).s;   // najazd: blok większy, ruch myszy mniejszy
     const move = (ev) => {
-      let nx = clamp(sx + (ev.clientX - e.clientX) / r.width, 0, 1), ny = clamp(sy + (ev.clientY - e.clientY) / r.height, 0, 1);
+      let nx = clamp(sx + (ev.clientX - e.clientX) / r.width / sk, 0, 1), ny = clamp(sy + (ev.clientY - e.clientY) / r.height / sk, 0, 1);
       if (Math.abs(nx - 0.5) < 0.015) nx = 0.5;
       if (Math.abs(ny - 0.5) < 0.015) ny = 0.5;
       typoUpd(hit.id, { x: +nx.toFixed(4), y: +ny.toFixed(4) }, true);
@@ -2311,12 +2319,14 @@ function VideoEditor({ path, onClose }) {
   // ---- wspólne elementy: scena, oś czasu
   const stage = html`<div class="thq-ed-fit" ref=${wrapRef}>
     <div class="thq-ed-stage" ref=${stageRef} style=${stageSize}>
+      <div class="thq-ed-kamera" ref=${kameraRef}>
       ${[0, 1].map((k) => html`<div key=${k} ref=${player.layers[k]} class="thq-ed-layer">
         <canvas ref=${player.blurs[k]} class="thq-ed-blur" aria-hidden="true"></canvas>
         <video ref=${player.vids[k]} class="thq-ed-v" playsinline preload="auto" onError=${codecFallback}></video>
         <img ref=${player.imgs[k]} class="thq-ed-v" alt=""/>
       </div>`)}
       <canvas ref=${player.pixRef} class="thq-ed-pix" aria-hidden="true"></canvas>
+      </div>
       ${proxying > 0 && html`<p class="thq-ed-codec is-info"><span class="thq-ed-spin is-small"></span> ${L("Przygotowuję podgląd (kopia WebM na serwerze, raz; film HDR z telefonu po przeliczeniu kolorów)…", "Preparing a preview (one-time WebM copy; phone HDR video with converted colours)…")}</p>`}
       <canvas ref=${overlayRef} class="thq-ed-overlay" onPointerDown=${stagePointer}></canvas>
       ${shot && html`<div class=${cx("thq-ed-shot", shot.a && "is-drag", shot.busy && "is-busy")} onPointerDown=${shot.busy ? null : shotDown}>
@@ -2625,7 +2635,7 @@ function TypoStylKarta({ k, T, probka, klucz, tlo, on, onPick }) {
     if (!c) return undefined;
     let alive = true;
     const [W, H] = TYPO_KARTA;
-    const Pk = { typo: { ...T, motyw: k, bloki: [probka] } };
+    const Pk = { typo: { ...T, kamera: undefined, motyw: k, bloki: [probka] } };   // karta stylu bez kamery
     const draw = () => {
       if (!alive) return;
       if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }

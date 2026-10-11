@@ -1301,12 +1301,12 @@ ARKUSZ_JS = """async ([P, W, H, kadry, cols]) => {
     for (let i = 0; i < kadry.length; i++) {
         const [src, t, maska, , podpis] = kadry[i], Q = plany[i];
         const img = new Image(); img.src = src; await img.decode();
-        g.clearRect(0, 0, W, H); g.drawImage(img, 0, 0, W, H);
+        g.clearRect(0, 0, W, H); typoKameraObraz(g, img, Q, W, H, t);     // film przez wirtualną kamerę planu
         typoRysuj(g, Q, W, H, t, "tyl");
-        if (maska) {          // osoba nad warstwą „za osobą”: klatka przycięta sylwetką
+        if (maska) {          // osoba nad warstwą „za osobą”: klatka przycięta sylwetką (oba przez tę samą kamerę)
             const m = new Image(); m.src = maska; await m.decode();
-            o.globalCompositeOperation = "source-over"; o.clearRect(0, 0, W, H); o.drawImage(img, 0, 0, W, H);
-            o.globalCompositeOperation = "destination-in"; o.drawImage(m, 0, 0, W, H);
+            o.globalCompositeOperation = "source-over"; o.clearRect(0, 0, W, H); typoKameraObraz(o, img, Q, W, H, t);
+            o.globalCompositeOperation = "destination-in"; typoKameraObraz(o, m, Q, W, H, t);
             g.drawImage(oc, 0, 0);
         }
         typoRysuj(g, Q, W, H, t, "przod");
