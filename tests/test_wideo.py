@@ -1547,6 +1547,8 @@ def test_glos_lokalny_w_edytorze_hq():
     sys.path.insert(0, str(REPO / "hq" / "plugin"))
     ed = importlib.import_module("edytor")
     assert "en-US-Paradee" in ed.GLOSY and set(ed.GLOSY_LOKALNE) <= set(ed.GLOSY)
+    assert ed.GLOSY[0] == wl.DEFAULT_VOICE == "pl-PL-Matcha-Meski"              # domyślny lektor HQ = Wideografa
+    assert {"pl-PL-Matcha-Meski", "pl-PL-Matcha-Damski"} <= set(ed.GLOSY_LOKALNE)
     js = (REPO / "hq" / "web" / "src" / "44-audio.js").read_text(encoding="utf-8")
     lista = re.search(r"const AUDIO_GLOSY = \[(.*?)\];", js, re.S).group(1)
     assert sorted(re.findall(r'\["([\w-]+)",', lista)) == sorted(ed.GLOSY)

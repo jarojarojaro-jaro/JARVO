@@ -17,7 +17,7 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py slychac <film> [--json raport.json]          # czy efekty słychać pod głosem i muzyką (po montażu)
     projekt.py slychac [obraz.mp4] --cues cues.json --bed glos.wav [--bed-vol 0.5] [--bed-at 0]   # film z kodu
     projekt.py wyodrebnij <film> (<id klipu> | --plik inny.mp4 [--start S])   # dźwięk z filmu jako osobne audio
-    projekt.py lektor <film> "tekst" [--start S] [--glos pl-PL-MarekNeural] [--tempo +5%]   # Edge TTS jak film.py
+    projekt.py lektor <film> "tekst" [--start S] [--glos pl-PL-MarekNeural] [--tempo +5%]   # lektor jak film.py
     projekt.py dodaj-tekst <film> "tekst" --start S --koniec S [--styl shadow|box|outline|plain] [--kroj Poppins]
                                            [--y 0.78] [--rozmiar 72] [--kolor #FFFFFF] [--tlo #000000]
     projekt.py dodaj-klip <film> <plik> [--od S] [--do S] [--tempo 1] [--pozycja N] [--rozmyte|--dopasuj|--wypelnij --fx X --fy Y --zoom Z]
@@ -1116,7 +1116,7 @@ def cmd_wyodrebnij(film: Path, a) -> int:
 
 
 def cmd_lektor(film: Path, a) -> int:
-    """Lektor Edge TTS (wideo_lib: ten sam co film.py, z cache) → <katalog filmu>/lektor/ → audio od --start."""
+    """Lektor (wideo_lib: ten sam co film.py, z cache; domyślnie lokalny Matcha, Edge TTS do wyboru) → <katalog filmu>/lektor/ → audio od --start."""
     import shutil as _sh
     import wideo_lib as wl
     tekst = " ".join(a.tekst.split())
@@ -1838,10 +1838,10 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("id", nargs="?", help="klip z osi (z `pokaz`): dźwięk zostaje w tym samym miejscu, klip wyciszony")
     sp.add_argument("--plik", help="inny film: jego dźwięk jako audio")
     sp.add_argument("--start", type=float, help="z --plik: od której sekundy osi (domyślnie 0)")
-    sp = film_cmd("lektor", cmd_lektor, "lektor Edge TTS jako audio")
+    sp = film_cmd("lektor", cmd_lektor, "lektor (Matcha lokalnie albo Edge TTS) jako audio")
     sp.add_argument("tekst")
     sp.add_argument("--start", type=float, default=0.0)
-    sp.add_argument("--glos", choices=ed.GLOSY, help="domyślnie pl-PL-MarekNeural")
+    sp.add_argument("--glos", choices=ed.GLOSY, help="domyślnie pl-PL-Matcha-Meski")
     sp.add_argument("--tempo", help="np. +5% albo -10% (od −50% do +50%)")
     sp.add_argument("--narastanie", type=float, help="s")
     sp.add_argument("--wyciszanie", type=float, help="s")

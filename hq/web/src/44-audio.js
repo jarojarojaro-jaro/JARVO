@@ -1,13 +1,16 @@
 // ------------------------------------------------------------------ edytor: menu Audio (jak w CapCut)
 // Efekty i Muzyka z biblioteki CC0 (scripts/dzwieki.py, odsłuch przed dodaniem), muzyka ze skarbca i z katalogu filmu,
-// Wyodrębnij (dźwięk innego filmu), Lektor (Edge TTS albo lokalny Paradee po angielsku, ten sam co film.py Wideografa), Nagraj (mikrofon przez HTTPS;
+// Wyodrębnij (dźwięk innego filmu), Lektor (domyślnie lokalny polski Matcha, do tego Edge TTS i lokalny Paradee po angielsku,
+// ten sam co film.py Wideografa), Nagraj (mikrofon przez HTTPS;
 // bez HTTPS wgranie notatki głosowej). Każda droga kończy się plikiem obok filmu (dzwieki/, lektor/) i wywołaniem
 // onAdd(opis pliku, głośność, start): element audio na osi. Wideograf ma to samo w projekt.py (dzwieki, dodaj-dzwiek,
 // wyodrebnij, lektor), a prośba z edytora („Poproś agenta”) wymienia te polecenia.
 const AUDIO_ZAKLADKI = [["efekty", "Efekty", "Sounds"], ["muzyka", "Muzyka", "Music"], ["wyodrebnij", "Wyodrębnij", "Extract"],
   ["lektor", "Lektor", "Voice"], ["nagraj", "Nagraj", "Record"]];
 // te same głosy co edytor.GLOSY (serwer odrzuca inne)
-const AUDIO_GLOSY = [["pl-PL-MarekNeural", "Marek (PL)", "Marek (PL)"], ["pl-PL-ZofiaNeural", "Zofia (PL)", "Zofia (PL)"],
+const AUDIO_GLOSY = [["pl-PL-Matcha-Meski", "Matcha męski (PL, lokalny)", "Matcha male (PL, local)"],
+  ["pl-PL-Matcha-Damski", "Matcha damski (PL, lokalny)", "Matcha female (PL, local)"],
+  ["pl-PL-MarekNeural", "Marek (PL, Edge)", "Marek (PL, Edge)"], ["pl-PL-ZofiaNeural", "Zofia (PL, Edge)", "Zofia (PL, Edge)"],
   ["en-US-AndrewMultilingualNeural", "Andrew (wielojęzyczny)", "Andrew (multilingual)"],
   ["en-US-AvaMultilingualNeural", "Ava (wielojęzyczna)", "Ava (multilingual)"],
   ["de-DE-SeraphinaMultilingualNeural", "Seraphina (wielojęzyczna)", "Seraphina (multilingual)"],
@@ -133,7 +136,10 @@ function AudioMenu({ path, media, start, onAdd, onUploadAdd, wgrajFilm, top }) {
     <button type="button" class="thq-ed-btn is-main is-wide" disabled=${!!busy || !tekst.trim()}
       onClick=${() => zrob("lektor", async () => onAdd(await api.editLektor(path, tekst, glos, tempo), 1))}>
       ${ED_ICON.speech} ${busy === "lektor" ? L("Tworzę lektora…", "Creating the voice-over…") : L("Utwórz i dodaj od wskaźnika", "Create and add at the playhead")}</button>
-    <p class="thq-ed-note">${glos === "en-US-Paradee"
+    <p class="thq-ed-note">${glos.startsWith("pl-PL-Matcha")
+      ? L("Matcha: lokalny polski lektor bez internetu i limitów; głos syntetyczny, więc w opisie filmu zaznacz, że lektor to głos syntetyczny. Liczby, daty i skróty czyta słowami; angielskie słowo w {klamrach}. Pierwsze użycie trwa dłużej (model mowy do czasów słów).",
+        "Matcha: local Polish voice, no internet or limits; a synthetic voice, so say in the video description that the narrator is synthetic. Numbers, dates and abbreviations are read as words; put an English word in {braces}. The first use takes longer (speech model for word timings).")
+      : glos === "en-US-Paradee"
       ? L("Paradee: lokalny lektor tylko po angielsku, bez internetu. Pierwsze użycie trwa dłużej (model mowy do czasów słów).",
         "Paradee: local English-only voice, no internet. The first use takes longer (speech model for word timings).")
       : L("Ten sam lektor co u Wideografa (Edge TTS, bez klucza). Do napisów: zakładka Napisy rozpozna mowę z nagrania.",

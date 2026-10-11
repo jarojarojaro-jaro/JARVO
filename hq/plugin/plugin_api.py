@@ -486,7 +486,8 @@ async def edit_glos_probka(request: Request):
 
 @router.post("/edit/lektor")
 async def edit_lektor(request: Request):
-    """Tekst na mowę: ten sam lektor co u Wideografa (film.py lektor, Edge TTS, cache) → <katalog filmu>/lektor/."""
+    """Tekst na mowę: ten sam lektor co u Wideografa (film.py lektor: lokalny Matcha/Paradee albo Edge TTS, cache)
+    → <katalog filmu>/lektor/."""
     body = await request.json()
     film = _film(str(body.get("path") or ""))
     tekst = " ".join(str(body.get("text") or "").split())

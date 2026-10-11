@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.13.0
+version: 1.13.1
 author: Jarvo
 license: MIT
 metadata:
@@ -34,12 +34,12 @@ dla platform społecznościowych: −14 LUFS zintegrowane, true peak ≤ −1 dB
 | `en-US-AndrewMultilingualNeural`, `en-US-AvaMultilingualNeural` | wielojęzyczne (czytają PL z lekkim akcentem) | inny charakter, testy A/B |
 | `en-US-Paradee` | angielski, męski, lokalny (model w obrazie, bez sieci i limitów) | film po angielsku; **tylko angielski tekst** |
 
-Głosy lokalne (`pl-PL-Matcha-*`, `en-US-Paradee`) działają jak inne (`--glos`, `glos` w scenie), tempo
+Głosy lokalne (`pl-PL-Matcha-*`, `en-US-Paradee`) działają jak inne (`--glos`, `glos` w scenie, edytor HQ), tempo
 `--tempo` też; `wysokosc` pomijają. Czasy słów daje Parakeet (pierwsze użycie pobiera jego model, ~0,65 GB), bez niego:
 rozłożone w zdaniach. Matcha: liczby, daty, godziny, kwoty, procenty, skróty i skrótowce czyta słowami sam
 („11.10.2026 r.” → „jedenastego października dwa tysiące dwudziestego szóstego roku”, „2,5 mln zł”, „AI” → „ej aj”,
 „PDF” → „pe de ef”); angielskie słowo czyta po polsku, chyba że stoi w klamrach (`{feedback}`, `{Slack}a`: wtedy po
-angielsku). Klamry tylko w tekście lektora (`film.py lektor`, sceny planu); w pliku narracji `{nazwa}` to chwila,
+angielsku). Klamry tylko w tekście lektora (`film.py lektor`, sceny planu, HQ); w pliku narracji `{nazwa}` to chwila,
 więc tam angielski termin zapisz fonetycznie w `--wymowa` („fidbek”). Zdania czyta osobno z pauzą 0,33 s, akapity (pusta linia) z 1 s.
 Tempo: Matcha przy `+0%` ok. 2,9 słowa/s samej mowy (szybciej niż Marek); w spokojnej narracji `--tempo -10%`
 (ok. 2,6). Bez jarvo-tts (poza obrazem) albo przy błędzie polski głos lokalny przechodzi na Edge (Marek, Zofia)

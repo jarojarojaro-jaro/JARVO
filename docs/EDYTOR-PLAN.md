@@ -36,7 +36,7 @@ ma pięć kart. Każdy dodany dźwięk to plik obok filmu (`dzwieki/`, `lektor/`
 | Efekty dźwiękowe | ✅ | Biblioteka CC0 w repo (`hq/web/dzwieki/`, `scripts/dzwieki.py`): 157 efektów w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia, akcja, interfejs, technika, natura, zwierzęta, codzienne, zabawne, gry, dżingle) z Kenney i Freesound (tylko CC0, licencja sprawdzana przy pobraniu), 8,1 MB; szukanie po polsku i angielsku, odsłuch, dodanie we wskaźniku; `projekt.py dzwieki` (z `--rola`; katalog ma rolę, szczyt i flagę „gra” każdego efektu) i `dodaj-dzwiek` (`--na`: szczyt efektu w chwili) |
 | Muzyka | ✅ | 9 podkładów CC0 z biblioteki (do 60 s, z wyciszeniem), muzyka ze skarbca (`wideo/muzyka`, `brands/*/muzyka`), pliki z folderu filmu, wgranie z dysku; bez popularnych utworów; podkład dodaje się ciszej (30%) |
 | Wyodrębnij | ✅ | Dźwięk z innego filmu jako osobne audio, a w panelu klipu „Wyodrębnij dźwięk” jak w CapCut: dźwięk klipu zostaje w tym samym miejscu osi, klip się wycisza (AAC kopiowane bez straty); `projekt.py wyodrebnij` |
-| Lektor | ✅ | Tekst na mowę Edge TTS (ten sam co w `film.py`), 5 głosów i tempo −30…+30%; `projekt.py lektor` (z czasami słów do napisów) |
+| Lektor | ✅ | Tekst na mowę (ten sam co w `film.py`): domyślnie lokalny polski Matcha (męski, damski; głos syntetyczny), Edge TTS (5 głosów), angielski Paradee; tempo −30…+30%; `projekt.py lektor` (z czasami słów do napisów) |
 | Czysty głos | ✅ | Klip i każde audio: Brak / Lekko / Średnio / Mocno (odszumianie z progiem z tła nagrania, ekspander w pauzach, de-esser, kompresor), Auto z pomiaru tła, Odsłuchaj 8 s po czyszczeniu; `projekt.py glos`, `montaz.py glos`, `klipy.py zbuduj --glos` |
 | Nagraj | ✅ | Mikrofon w przeglądarce (MediaRecorder, serwer zapisuje AAC); wymaga HTTPS albo localhost, bez tego wgranie notatki głosowej z telefonu |
 
@@ -70,4 +70,4 @@ Poziom 2 (później): ruch elementów animacji z parametrów (okno ◐ Animacja)
 ## Źródła i licencje
 
 Zaakceptowane przez właściciela: dźwięki CC0 (Kenney, Freesound CC0), Fluent Emoji (MIT), własne naklejki wektorowe,
-Edge TTS jak dotąd. Każde nowe źródło trafia do [SOURCES.md](SOURCES.md) w tym samym commicie co pliki.
+Edge TTS jak dotąd, lokalny lektor Matcha-TTS-PL v2 (CC BY-SA 4.0, decyzja właściciela 2026-10-11). Każde nowe źródło trafia do [SOURCES.md](SOURCES.md) w tym samym commicie co pliki.

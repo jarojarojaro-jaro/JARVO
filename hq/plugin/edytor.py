@@ -1489,10 +1489,13 @@ def tools() -> dict:
 # Biblioteka dźwięków CC0 (scripts/dzwieki.py): hq/web/dzwieki w repo, dzwieki/ obok wtyczki, scripts/dzwieki
 # u Wideografa. Dodanie kopiuje plik obok filmu, więc projekt nie zależy od biblioteki (jak przy wgranym pliku).
 DZWIEKI_DIR = "dzwieki"      # podkatalog katalogu filmu: efekty z biblioteki i dźwięk wyodrębniony z filmów
-LEKTOR_DIR = "lektor"        # podkatalog katalogu filmu: lektor (Edge TTS) i nagrania z mikrofonu
-GLOSY = ("pl-PL-MarekNeural", "pl-PL-ZofiaNeural", "en-US-AndrewMultilingualNeural", "en-US-AvaMultilingualNeural",
-         "de-DE-SeraphinaMultilingualNeural", "en-US-Paradee")
-GLOSY_LOKALNE = ("en-US-Paradee",)  # bez sieci (jarvo-tts w obrazie), tylko angielski; czasy słów z Parakeeta
+LEKTOR_DIR = "lektor"        # podkatalog katalogu filmu: lektor (Matcha, Paradee, Edge TTS) i nagrania z mikrofonu
+# pierwszy = domyślny (lokalny polski Matcha, jak wideo_lib.DEFAULT_VOICE); Edge TTS do wyboru
+GLOSY = ("pl-PL-Matcha-Meski", "pl-PL-Matcha-Damski", "pl-PL-MarekNeural", "pl-PL-ZofiaNeural",
+         "en-US-AndrewMultilingualNeural", "en-US-AvaMultilingualNeural", "de-DE-SeraphinaMultilingualNeural",
+         "en-US-Paradee")
+# bez sieci (jarvo-tts w obrazie): polski Matcha (głos syntetyczny) i angielski Paradee; czasy słów z Parakeeta
+GLOSY_LOKALNE = ("pl-PL-Matcha-Meski", "pl-PL-Matcha-Damski", "en-US-Paradee")
 LEKTOR_MAX = 3000            # znaków tekstu lektora z edytora
 
 
