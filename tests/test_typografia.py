@@ -1070,7 +1070,9 @@ def test_kamera_odcinki_film_zawsze_wypelnia_kadr():
         z, x, y = ed.kamera_stan(odc, t)
         assert 0 <= z <= ed.KAMERA_ZMAX + 1e-9 and abs(x) <= z / 2 + 1e-9 and abs(y) <= z / 2 + 1e-9, t
     assert ed.kamera_stan(odc, 0.1) == (0.0, 0.0, 0.0)                              # przed pierwszym ruchem spoczynek
-    assert ed.kamera_stan(odc, 1.2)[0] == pytest.approx(0.04 + 0.12 * 0.6)          # po najeździe stoi w głębi
+    z_naj = ed.kamera_stan(odc, 1.2)[0]                                               # po najeździe stoi w głębi,
+    assert z_naj == pytest.approx(min(0.04 + 0.12 * 0.6, 0.8 * (1 - 1 / ed.KAMERA_SKALA)), abs=1e-5)   # napis ≤ ×1,15
+    assert 0.8 / (0.8 - z_naj) == pytest.approx(ed.KAMERA_SKALA, abs=1e-4)
     assert ed.kamera_stan(odc, 3.05) == pytest.approx((0.0, 0.0, 0.0), abs=1e-9)    # odjazd do spoczynku
     z, x, _y = ed.kamera_stan(odc, 4.55)
     assert x == pytest.approx(-(0.015 + 0.05 * 0.6)) and z >= 2 * abs(x)            # przesunięcie z najazdem
@@ -1174,10 +1176,10 @@ def test_kamera_js_i_python_te_same_ruchy():
         for t, s in zip(chwile, o["stan"]):
             assert s == pytest.approx(list(ed.kamera_stan(py, t)), abs=1e-5), (styl, t)
     stale = re.search(r"const TYPO_KAMERA = \{ z: \{ przod: ([\d.]+), tyl: ([\d.]+) \}, zmax: ([\d.]+), sila: \{ spokojna: ([\d.]+), "
-                      r"dynamiczna: ([\d.]+) \}, uderzenie: ([\d.]+),\s+minBlok: ([\d.]+), trzymaj: ([\d.]+),", JS)
+                      r"dynamiczna: ([\d.]+) \}, uderzenie: ([\d.]+),\s+minBlok: ([\d.]+), trzymaj: ([\d.]+), skala: ([\d.]+),", JS)
     assert tuple(map(float, stale.groups())) == (ed.KAMERA_Z["przod"], ed.KAMERA_Z["tyl"], ed.KAMERA_ZMAX,
                                                  ed.KAMERA_SILA["spokojna"], ed.KAMERA_SILA["dynamiczna"],
-                                                 ed.KAMERA_UDERZENIE, ed.KAMERA_MIN_BLOK, ed.KAMERA_TRZYMAJ)
+                                                 ed.KAMERA_UDERZENIE, ed.KAMERA_MIN_BLOK, ed.KAMERA_TRZYMAJ, ed.KAMERA_SKALA)
     assert float(re.search(r"const TYPO_LEAD = ([\d.]+);", JS).group(1)) == ed.TYPO_LEAD
     for nazwa, py in (("TYPO_KAMERY", ed.TYPO_KAMERY), ("TYPO_RUCHY", ed.TYPO_RUCHY), ("TYPO_KIERUNKI", ed.TYPO_KIERUNKI),
                       ("TYPO_KRZYWE", ed.TYPO_KRZYWE), ("TYPO_OSTROSC", ed.TYPO_OSTROSC)):
@@ -1363,3 +1365,28 @@ def test_ruch_kamery_przy_cieciu_i_laczeniu(tmp_path):
     assert po["b1"] is None and po["b1b"]["slowo"] == 1
     nowy, _ = ty.zastosuj(nowy, {"bloki": [{"polacz": ["b1", "b1b"]}]}, 3)
     assert nowy["bloki"][0]["kamera"]["slowo"] == 3
+
+
+def test_kontrola_kamery_w_przegladarce(tmp_path):
+    """Kontrola z kamerą (Chromium): blok, który w spoczynku jest w kadrze, a najazd go wypycha (osobny kod), słowa
+    rozmyte głębią ostrości ponad czytelność (błąd) i uderzenie poza ostrością (uwaga); blok w ostrości bez uwag."""
+    pytest.importorskip("playwright.sync_api")
+    plan = ed.normalize_typo({"motyw": "czysty", "kamera": {"styl": "brak", "przyslona": 1, "ostrosc": "osoba"}, "bloki": [
+        {"id": "b1", "start": 0.0, "end": 2.0, "uklad": "srodek", "x": 0.84, "y": 0.5, "w": 0.3, "wyjscie": "ciecie",
+         "slowa": [_w(0, "KRAWĘDŹ", 3)], "kamera": {"ruch": "najazd", "sila": 1}},
+        {"id": "b2", "start": 2.5, "end": 4.0, "uklad": "srodek", "x": 0.5, "y": 0.5, "w": 0.6, "z": 0.95, "wyjscie": "ciecie",
+         "slowa": [_w(0, "środek", 1)], "kamera": {"ruch": "odjazd"}},
+        {"id": "b3", "start": 5.0, "end": 7.0, "uklad": "srodek", "x": 0.5, "y": 0.5, "w": 0.6, "z": 0.35, "wyjscie": "ciecie",
+         "slowa": [{**_w(0, "tu", 0), "z": 0.35}, {**_w(0.1, "jest", 0), "z": 0.35}, {**_w(0.2, "blisko", 0), "z": 0.35}]}]}, 8.0)
+    proj = {"canvas": {"w": 1080, "h": 1920, "fps": 30}, "clips": []}
+    try:
+        wynik = ty.kontrola(tmp_path / "f.mp4", proj, plan, "brak")
+    except Exception as exc:  # noqa: BLE001 - brak przeglądarki w tym środowisku
+        pytest.skip(f"przeglądarka niedostępna: {exc}")
+    kody = {(x["kod"], x["blok"]) for x in wynik["problemy"]}
+    assert {("poza-kadrem-kamera", "b1"), ("uderzenie-rozmyte", "b1"), ("rozmyte", "b3")} <= kody, kody
+    assert ("poza-kadrem", "b1") not in kody and not any(blok == "b2" for _, blok in kody)
+    poziom = {x["kod"]: x["poziom"] for x in wynik["problemy"]}
+    assert poziom["poza-kadrem-kamera"] == poziom["rozmyte"] == "blad" and poziom["uderzenie-rozmyte"] == "uwaga"
+    opis = next(x["opis"][0] for x in wynik["problemy"] if x["kod"] == "poza-kadrem-kamera")
+    assert "najazd z b1" in opis

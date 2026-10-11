@@ -42,3 +42,6 @@
   więcej niż dwa akcenty poza bielą (plus kolor znaczenia), więcej niż jedno uderzenie w bloku, za osobą częściej niż co szósty blok,
   słowo, które wchodzi przed dźwiękiem albo długo po nim; arkusz nieobejrzany; styl niepasujący do rodzaju nagrania
   (tabela w skillu) albo cienki szeryf i neon na jasnym, pstrym tle; styl wybrany przez właściciela w HQ zmieniony.
+- Kamera (plan z `kamera`): blokujące: ruch kamery wypycha napis z kadru albo słowo do przeczytania jest rozmyte
+  w papkę (`sprawdz`: `poza-kadrem-kamera`, `rozmyte`); ważne: ruch na każdym bloku bez powodu w treści, przysłona 1
+  bez prośby, uderzenie poza ostrością bez uzasadnienia, kamera albo ruch ustawione przez właściciela w HQ zmienione.

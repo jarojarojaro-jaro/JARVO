@@ -224,7 +224,9 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   oraz **Kontrola napisów** („Sprawdź napisy”): `typoKontrola` z `48-typografia.js`, ta sama co `typografia.py sprawdz`,
   mierzy tusz liter na kanwie z krótszym bokiem 540 px, ze strefami wybranej platformy i sylwetkami osoby (gdy aktualne):
   napis poza kadrem, bloki na sobie, stykające się litery, napis za osobą nieczytelny albo niezasłonięty, strefy, małe
-  słowa; lista błędów i uwag, klik przenosi wskaźnik do tej chwili i zaznacza blok, a po zmianie planu lista prosi
+  słowa, a z kamerą także blok wypchnięty z kadru przez ruch kamery (`poza-kadrem-kamera`: w spoczynku jest w kadrze;
+  opis mówi, który ruch), słowo rozmyte głębią ostrości ponad 8% wysokości liter przez 1/3 s (`rozmyte`, błąd)
+  i uderzenie poza ostrością, co najmniej 2 px przy 1080 (`uderzenie-rozmyte`, uwaga); lista błędów i uwag, klik przenosi wskaźnik do tej chwili i zaznacza blok, a po zmianie planu lista prosi
   o ponowne sprawdzenie. Nowy plan (reżyser albo pierwszy blok dodany w edytorze) ma `"odstep": "tusz"`: renderer
   rozsuwa słowa w linii i linie bloku, gdy ich litery z obrysem stylu by się stykały (ogonki, kreski nad Ż, Ś, Ć, pochylony krój, obrys, cień 3D); starsze plany rysują się jak dawniej. Kolory palety stoją też pierwsze przy kolorze słowa. Przycięcie, usunięcie, tempo
   i przestawienie klipów przesuwają bloki i czasy słów razem z materiałem (`typoNaOsi` w `remapTimes`
@@ -246,7 +248,8 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   (paralaksa), a w spoczynku wszystko stoi tam, gdzie w planie. Styl dobiera ruchy z bloków: za osobą najazd, uderzenie (waga 3)
   najazd, a kamera w głębi odjeżdża (`spokojna`: po co najmniej 2,5 s, `dynamiczna`: przy następnym bloku);
   co trzeci spokojny blok (`dynamiczna`: każdy) przesuwa kamerę w stronę bloku, a `dynamiczna` najeżdża szybko od
-  uderzenia; ruch bloku ma pierwszeństwo, `brak` go wyłącza. Najdalej
+  uderzenia; ruch bloku ma pierwszeństwo, `brak` go wyłącza. Najazd powiększa napis swojego bloku najwyżej ×1,15
+  (`KAMERA_SKALA`; po przesunięciu kamera nie wjeżdża dalej, więc szeroki blok nie wypada z kadru). Najdalej
   ×1,33 w głąb, a przesunięcie zawsze z takim najazdem, żeby film wypełniał kadr. Ostrość jest na najnowszym bloku
   (przejście 0,3 s) albo na osobie; reszta rozmywa się jak w obiektywie (σ = 13,4·przysłona·|d − df| / d px przy 1080,
   słowa bez własnej głębi najwyżej 6·przysłona px, żeby zostały czytelne). Ruchy liczą tak samo `48-typografia.js`

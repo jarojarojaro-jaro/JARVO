@@ -40,8 +40,10 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
    bloki, które tego potrzebują; poprawek właściciela nie cofam.
 4. **Sprawdzam miarą:** `typografia.py sprawdz <film> --arkusz` (kadr pionowy: `--strefa` platformy, domyślnie
    TikTok). Mierzy tusz liter tym samym rendererem: napis poza kadrem, bloki na sobie, słowa stykające się literami,
-   napis za osobą nieczytelny albo niczym niezasłonięty (błędy, kod 1), blok pod interfejsem platformy i za małe słowo
-   (uwagi). Każdy błąd poprawiam (`popraw`) i sprawdzam znowu; uwagę poprawiam albo uzasadniam w odpowiedzi.
+   napis za osobą nieczytelny albo niczym niezasłonięty, a z kamerą blok wypchnięty z kadru ruchem kamery
+   (`poza-kadrem-kamera`: słabsza siła, blok bliżej środka, większe `z` albo ruch `brak`) i słowo rozmyte głębią
+   ostrości ponad czytelność (`rozmyte`: mniejsza przysłona, ostrość na napisie, `z` bliżej ostrości) (błędy, kod 1),
+   blok pod interfejsem platformy, za małe słowo i uderzenie poza ostrością (uwagi). Każdy błąd poprawiam (`popraw`) i sprawdzam znowu; uwagę poprawiam albo uzasadniam w odpowiedzi.
    Słowa jednego bloku same się nie stykają: nowy plan ma `"odstep": "tusz"`, więc renderer rozsuwa słowa w linii
    i linie, gdy tusz liter z obrysem stylu (ogonki, kreski nad Ż, Ś, Ć, pochylony krój, obrys, cień 3D) wszedłby
    w sąsiednie słowo. Najmniejszy odstęp to 12% mniejszego słowa. Starych planów nie poprawiam
@@ -180,6 +182,7 @@ Miarę (kadr, stykanie, za osobą, strefy) robi `sprawdz`; okiem oceniam to, cze
 
 ## Definition of Done
 - [ ] plan w projekcie (`typo`), poprawki właściciela z HQ nienaruszone, `popraw` bez ostrzeżeń albo z wyjaśnieniem,
-- [ ] `typografia.py sprawdz` bez błędów (uwagi poprawione albo uzasadnione),
+- [ ] `typografia.py sprawdz` bez błędów (uwagi poprawione albo uzasadnione), także z kamerą: żaden ruch nie wypycha
+      napisu z kadru, żadne słowo do przeczytania nie jest rozmyte w papkę,
 - [ ] arkusz obejrzany: lista „Kontrola” spełniona,
 - [ ] render z linią MEDIA: i informacją, że całość poprawi się w edytorze HQ.

@@ -71,6 +71,7 @@ KAMERA_SILA = {"spokojna": 0.35, "dynamiczna": 0.6}   # siła ruchów dobranych 
 KAMERA_UDERZENIE = 0.4    # s: ruch „uderzenie” (szybki start, miękkie lądowanie) od słowa
 KAMERA_MIN_BLOK = 0.6     # s: krótszy blok nie dostaje ruchu ze stylu (oko nie zdąży go zobaczyć)
 KAMERA_TRZYMAJ = 2.5      # s: spokojna kamera trzyma najazd co najmniej tyle, zanim odjedzie
+KAMERA_SKALA = 1.15       # najazd powiększa napis swojego bloku najwyżej tyle (szeroki blok nie wypada z kadru)
 TYPO_LEAD = 0.03          # słowo wchodzi tuż przed dźwiękiem (TYPO_LEAD w 48-typografia.js)
 # Przejścia między klipami: klucz = nazwa przejścia xfade w FFmpeg, "blur" = przenikanie z rozmyciem Gaussa (nasze).
 # Te same klucze co ED_PRZEJSCIA w hq/web/src/49-przejscia.js (podgląd rysuje je tymi samymi wzorami).
@@ -431,7 +432,8 @@ def kamera_stan(odc: list[dict], t: float) -> tuple[float, float, float]:
 def kamera_odcinki(typo: dict) -> list[dict]:
     """Ruchy kamery → odcinki {a, b, c, s0, s1, krzywa} po czasie (stan = (kz, kx, ky)). Odcinek trwa blok (płynnie)
     albo KAMERA_UDERZENIE od słowa; następny zaczyna się od stanu, w którym kamera akurat jest (c = koniec ucięty
-    jego początkiem). Najazd: o 0,04 + 0,12·siła w głąb i trochę w stronę bloku; odjazd: do spoczynku (ze spoczynku:
+    jego początkiem). Najazd: o 0,04 + 0,12·siła w głąb i trochę w stronę bloku, ale napis bloku rośnie najwyżej
+    KAMERA_SKALA razy (najazd po przesunięciu nie wypycha go z kadru); odjazd: do spoczynku (ze spoczynku:
     skok w głąb na początku bloku, potem odjazd); przesunięcie: kamera w bok o 0,015 + 0,05·siła z najazdem, który
     film zawsze wypełnia kadr (|kx|, |ky| ≤ kz / 2). Najdalej KAMERA_ZMAX w głąb."""
     odc: list[dict] = []
@@ -449,7 +451,7 @@ def kamera_odcinki(typo: dict) -> list[dict]:
         sila = float(r.get("sila", 0.5))
         dz, dp = 0.04 + 0.12 * sila, 0.015 + 0.05 * sila
         if r["ruch"] == "najazd":
-            z1 = min(KAMERA_ZMAX, z0 + dz)
+            z1 = min(KAMERA_ZMAX, z0 + dz, max(z0, kamera_z(b) * (1 - 1 / KAMERA_SKALA)))
             x1 = x0 + (float(b.get("x", 0.5)) - 0.5) * dz * 0.5
             y1 = y0 + (float(b.get("y", 0.5)) - 0.5) * dz * 0.5
         elif r["ruch"] == "odjazd":

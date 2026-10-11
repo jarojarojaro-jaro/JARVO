@@ -2189,7 +2189,7 @@ function VideoEditor({ path, onClose }) {
       ${K && K.wynik && K.wynik.problemy.length > 0 && html`<ul class="thq-ed-kontrola-lista">${K.wynik.problemy.map((x, i) => html`<li key=${i}>
         <button type="button" class=${cx(x.poziom === "blad" ? "is-blad" : "is-uwaga")} onClick=${() => { player.seek(x.t); if (x.blok && typoBloki(p).some((b) => b.id === x.blok)) setSel({ type: "typo", id: x.blok }); }}>
           <b>${x.poziom === "blad" ? "✗" : "⚠"} ${fmtT(x.t, true)}</b> ${L(...x.opis)}</button></li>`)}</ul>`}
-      <p class="thq-ed-note">${L("Mierzy litery tak, jak wyjdą w eksporcie: poza kadrem, na sobie, stykające się, za osobą, pod przyciskami platformy.", "Measures the letters as exported: off-frame, overlapping, touching, behind the person, under platform buttons.")}</p>
+      <p class="thq-ed-note">${L("Mierzy litery tak, jak wyjdą w eksporcie: poza kadrem (także przez ruch kamery), na sobie, stykające się, za osobą, rozmyte głębią ostrości, pod przyciskami platformy.", "Measures the letters as exported: off-frame (also from a camera move), overlapping, touching, behind the person, blurred by depth of field, under platform buttons.")}</p>
     </div>`;
   };
 

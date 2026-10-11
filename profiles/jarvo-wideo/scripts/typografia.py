@@ -37,8 +37,10 @@ własny ruch bloku (`kamera` w zmiany.json) ma pierwszeństwo. Napisy jadą z pa
 i osoba tym samym ruchem (edytor.kamera_filter). `kamera` zmienia styl, przysłonę i ostrość na gotowym planie.
 Te same dane rysuje edytor HQ (hq/web/src/48-typografia.js), więc człowiek widzi i poprawia wszystko na osi.
 `sprawdz` mierzy tusz liter tym samym rendererem: napis poza kadrem (1/3 s i dłużej), bloki na sobie, słowa stykające
-się literami, napis za osobą nieczytelny (widać < 60%) albo niczym niezasłonięty (błędy), blok pod interfejsem
-platformy, słowo < 30 px przy 1080 (uwagi); kod wyjścia 1 przy błędzie, `--arkusz` = klatki z problemami do obejrzenia.
+się literami, napis za osobą nieczytelny (widać < 60%) albo niczym niezasłonięty, z kamerą blok wypchnięty z kadru
+przez ruch kamery (`poza-kadrem-kamera`) i słowo rozmyte głębią ostrości ponad 8% wysokości liter (`rozmyte`) (błędy),
+blok pod interfejsem platformy, słowo < 30 px przy 1080, uderzenie poza ostrością ≥ 2 px (uwagi); kod wyjścia 1 przy
+błędzie, `--arkusz` = klatki z problemami do obejrzenia.
 Gotowy plan mógł już poprawić człowiek, więc `plan` go nie nadpisuje: poprawiasz go `popraw`, a od nowa układasz
 tylko na wyraźną prośbę (`--nowy`).
 

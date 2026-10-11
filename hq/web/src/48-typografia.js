@@ -328,7 +328,7 @@ const TYPO_KIERUNKI = ["lewo", "prawo", "gora", "dol"];
 const TYPO_KRZYWE = ["plynnie", "uderzenie"];
 const TYPO_OSTROSC = ["napis", "osoba"];
 const TYPO_KAMERA = { z: { przod: 0.8, tyl: 1.3 }, zmax: 0.25, sila: { spokojna: 0.35, dynamiczna: 0.6 }, uderzenie: 0.4,
-  minBlok: 0.6, trzymaj: 2.5, ostrosc: 0.3, rozmycie: 13.4, plaski: 6, wlasne: 12, glebiaSlowa: 0.15 };
+  minBlok: 0.6, trzymaj: 2.5, skala: 1.15, ostrosc: 0.3, rozmycie: 13.4, plaski: 6, wlasne: 12, glebiaSlowa: 0.15 };
 function typoLiczba(v, d) { return v === null || v === undefined || v === "" || typeof v === "boolean" || !Number.isFinite(+v) ? d : +v; }
 function typoZ(b) {                       // głębia bloku: pole z albo domyślna warstwy
   return b && b.z !== undefined && b.z !== null && b.z !== "" ? typoClamp(typoLiczba(b.z, 1), 0.3, 3) : TYPO_KAMERA.z[b && b.warstwa === "tyl" ? "tyl" : "przod"];
@@ -394,7 +394,7 @@ function typoKameraOdcinki(T) {
     let [z0, x0, y0] = typoKameraStanOdc(odc, a), z1, x1, y1;
     const sila = typoLiczba(r.sila, 0.5), dz = 0.04 + 0.12 * sila, dp = 0.015 + 0.05 * sila;
     if (r.ruch === "najazd") {
-      z1 = Math.min(TYPO_KAMERA.zmax, z0 + dz);
+      z1 = Math.min(TYPO_KAMERA.zmax, z0 + dz, Math.max(z0, typoZ(b) * (1 - 1 / TYPO_KAMERA.skala)));   // napis bloku ≤ ×skala
       x1 = x0 + (typoLiczba(b.x, 0.5) - 0.5) * dz * 0.5; y1 = y0 + (typoLiczba(b.y, 0.5) - 0.5) * dz * 0.5;
     } else if (r.ruch === "odjazd") {
       if (z0 < dz / 2) z0 = Math.min(TYPO_KAMERA.zmax, z0 + dz);   // ze spoczynku: skok w głąb, potem odjazd
@@ -706,9 +706,13 @@ function typoFonty(P, W, H) {
 //   bloki na sobie     tusz dwóch bloków widocznych naraz bliżej niż `styk`,
 //   słowa się stykają  tusz dwóch słów pełnego bloku bliżej niż `styk` (słowa rysowane osobno, ten sam układ),
 //   za osobą           widać mniej niż `widac` tuszu napisu z tyłu albo osoba go wcale nie zasłania (efekt niewidoczny),
-//   strefa, mały       pełny blok pod interfejsem platformy, słowo mniejsze niż `maly` (uwagi).
+//   strefa, mały       pełny blok pod interfejsem platformy, słowo mniejsze niż `maly` (uwagi),
+//   kamera             blok, który w spoczynku jest w kadrze, a ruch kamery go wypycha (osobny kod i rada), słowo
+//                      rozmyte głębią ostrości ponad `rozmyte` wysokości liter przez `kroki` kroków (błąd), uderzenie
+//                      (waga 3) rozmyte co najmniej `ostre` px (uwaga: ostrość jest gdzie indziej).
 // Miary w pikselach przy krótszym boku 1080, skalowane do kanwy pomiaru; tusz = krycie ≥ `prog` (bez cienia i poświaty).
-const TYPO_KONTROLA = { krok: 1 / 15, kroki: 5, poza: 3, styk: 4, widac: 0.6, dotyka: 0.03, maly: 30, prog: 160 };
+const TYPO_KONTROLA = { krok: 1 / 15, kroki: 5, poza: 3, styk: 4, widac: 0.6, dotyka: 0.03, maly: 30, prog: 160, rozmyte: 0.08, ostre: 2 };
+const TYPO_RUCHY_OPIS = { najazd: ["najazd", "push-in"], odjazd: ["odjazd", "pull-out"], przesuniecie: ["przesunięcie", "pan"] };
 const TYPO_STRONY = { lewo: ["z lewej", "left"], prawo: ["z prawej", "right"], gora: ["u góry", "top"], dol: ["na dole", "bottom"] };
 
 function typoTusz(g, w, h, prog) {          // kanwa → maska 0/1 tuszu
@@ -768,14 +772,38 @@ async function typoKontrola(P, W, H, opt = {}) {
   const px = (v) => Math.round(v / S);
   const dodaj = (poziom, kod, b, t, pl, en) => out.push({ poziom, kod, blok: b ? b.id : null, t: Math.round(t * 100) / 100, opis: [pl, en] });
   const tekst = (b) => b.slowa.map((w) => w.tekst).join(" ");
-  const rysuj = (b, t, stan) => {             // tusz bloku na kanwie z marginesem (kadr przesunięty o pad)
+  const rysuj = (b, t, stan, PP = P) => {    // tusz bloku na kanwie z marginesem (kadr przesunięty o pad)
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cw, ch); g.translate(pad, pad);
-    typoRysujBlok(g, b, P, W, H, t, stan);
+    typoRysujBlok(g, b, PP, W, H, t, stan);
     g.setTransform(1, 0, 0, 1, 0, 0);
     const mk = typoTusz(g, cw, ch, K.prog);
     return { m: mk, r: typoRamkaTuszu(mk, cw, ch) };
   };
   const zaKadr = (q) => q ? { lewo: pad - q.x0, prawo: q.x1 - pad - W, gora: pad - q.y0, dol: q.y1 - pad - H } : {};
+  // Kamera: plan bez niej (czy blok w spoczynku jest w kadrze), ruch, który trwa w chwili t, i rozmycie słów bloku.
+  const P0 = P.typo && P.typo.kamera ? { ...P, typo: { ...P.typo, kamera: undefined } } : null;
+  const ruchy = P0 ? typoKameraRuchy(P.typo) : [];
+  const ruchW = (t) => ruchy.reduce((a, x) => (x[0].start <= t + 1e-6 ? x : a), null);
+  const uklady = new Map();
+  const rozmycie = (b, st, kam) => {          // najgorsze słowo: σ / wysokość liter (px przy 1080) i najbardziej rozmyte uderzenie
+    let u = uklady.get(b.id);
+    if (!u) { u = typoUklad(g, b, P, W, H); uklady.set(b.id, u); }
+    let zle = null, hit = null;
+    u.slowa.forEach((sl, j) => {
+      if (st.slowa[j] < 0.999) return;                         // słowo jeszcze wchodzi albo go nie ma
+      const zw = typoZSlowa(b, sl.src), wl = sl.src.z !== undefined && sl.src.z !== null && sl.src.z !== "";
+      const sig = typoRozmycie(kam, zw, wl), wys = (sl.px / u.S) * typoRzut(kam, 0.5, 0.5, zw).s, q = sig / Math.max(1, wys);
+      if (!zle || q > zle.q) zle = { q, sig, tekst: sl.src.tekst };
+      if (+sl.src.waga === 3 && (!hit || sig > hit.sig)) hit = { sig, tekst: sl.src.tekst };
+    });
+    return { zle, hit };
+  };
+  const serie = (klucz, warunek, t, dane, zglos) => {          // `kroki` kroków z rzędu → jedno zgłoszenie na blok
+    if (!warunek) { seria.delete(klucz); return; }
+    const s0 = seria.get(klucz) || { od: t, n: 0, dane };
+    s0.n++; seria.set(klucz, s0);
+    if (s0.n === K.kroki && !zgloszone.has(klucz)) { zgloszone.add(klucz); zglos(s0); }
+  };
 
   // 1. Oś po 1/15 s: poza kadrem (seria kroków) i bloki na sobie; tusz liczony tylko przy zmianie stanu bloku.
   const biez = new Map(), seria = new Map(), zgloszone = new Set();
@@ -798,10 +826,23 @@ async function typoKontrola(P, W, H, opt = {}) {
         seria.set(b.id, s0);
         if (s0.n === K.kroki && !zgloszone.has(`poza:${b.id}`)) {
           zgloszone.add(`poza:${b.id}`);
-          dodaj("blad", "poza-kadrem", b, s0.od, `„${tekst(b)}” wychodzi poza kadr ${TYPO_STRONY[s0.str][0]} (${px(s0.ile)} px): przesuń blok do środka (x, y) albo zmniejsz (rozmiar, w)`,
+          const rw = ruchW(t), bez = P0 && !typoKameraSpoczynek(kam) ? zaKadr(rysuj(b, t, st, P0).r) : null;
+          if (bez && Math.max(0, ...Object.values(bez)) <= tol && rw) {     // w spoczynku w kadrze: wypycha go kamera
+            const [rb, rr] = rw, n = TYPO_RUCHY_OPIS[rr.ruch] || [rr.ruch, rr.ruch];
+            dodaj("blad", "poza-kadrem-kamera", b, s0.od, `ruch kamery (${n[0]} z ${rb.id}) wypycha „${tekst(b)}” poza kadr ${TYPO_STRONY[s0.str][0]} (${px(s0.ile)} px): słabszy ruch (siła), blok bliżej środka albo dalej w głąb (większe z)`,
+              `the camera move (${n[1]} from ${rb.id}) pushes "${tekst(b)}" out of frame ${TYPO_STRONY[s0.str][1]} (${px(s0.ile)} px): weaker move (strength), block nearer the centre or deeper (larger z)`);
+          } else dodaj("blad", "poza-kadrem", b, s0.od, `„${tekst(b)}” wychodzi poza kadr ${TYPO_STRONY[s0.str][0]} (${px(s0.ile)} px): przesuń blok do środka (x, y) albo zmniejsz (rozmiar, w)`,
             `"${tekst(b)}" leaves the frame ${TYPO_STRONY[s0.str][1]} (${px(s0.ile)} px): move it inwards or make it smaller`);
         }
       } else seria.delete(b.id);
+      if (!kam) continue;
+      const { zle, hit } = rozmycie(b, st, kam);
+      serie(`roz:${b.id}`, zle && zle.q > K.rozmyte, t, zle, (s0) => dodaj("blad", "rozmyte", b, s0.od,
+        `„${s0.dane.tekst}” w ${b.id} rozmyte ponad czytelność (${s0.dane.sig.toFixed(1)} px, ${Math.round(s0.dane.q * 100)}% wysokości liter): mniejsza przysłona, ostrość na napisie albo głębia z bliżej ostrości`,
+        `"${s0.dane.tekst}" in ${b.id} is blurred past readability (${s0.dane.sig.toFixed(1)} px, ${Math.round(s0.dane.q * 100)}% of letter height): lower the aperture, focus on the text or move z closer to focus`));
+      serie(`ud:${b.id}`, hit && hit.sig >= K.ostre, t, hit, (s0) => dodaj("uwaga", "uderzenie-rozmyte", b, s0.od,
+        `uderzenie „${s0.dane.tekst}” w ${b.id} jest poza ostrością (${s0.dane.sig.toFixed(1)} px): ostrość na napisie, mniejsza przysłona albo słowo na głębi bloku`,
+        `the hit word "${s0.dane.tekst}" in ${b.id} is out of focus (${s0.dane.sig.toFixed(1)} px): focus on the text, lower the aperture or keep the word at the block depth`));
     }
     for (let i = 0; i < akt.length; i++) for (let j = i + 1; j < akt.length; j++) {
       const [a, xa] = akt[i], [b, xb] = akt[j], id = `styk:${a.id}:${b.id}`;

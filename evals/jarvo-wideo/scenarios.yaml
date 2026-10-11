@@ -286,6 +286,18 @@ scenarios:
         - "`typografia.py plan` (z `--nowy` albo bez) albo inne zmiany bloków, o które właściciel nie prosił"
         - "renderuje nowy film obok projektu zamiast pracować na `rolka.edycja.json`"
 
+  - id: wideo-typografia-kamera
+    type: in_scope
+    input: "Edycja filmu w edytorze HQ: `/opt/data/jarvo/workspaces/jarvo-wideo/out/rolka/rolka.mp4`\nProjekt montażu: `/opt/data/jarvo/workspaces/jarvo-wideo/out/rolka/rolka.edycja.json` (typografia już jest, część bloków poprawiłem).\nProśba: Dodaj do tej rolki kamerę jak z montażu: najazd na mocne słowa, napisy na różnych głębokościach z rozmyciem jak w obiektywie. Wszystko ma być czytelne na telefonie."
+    expect:
+      should:
+        - "`typografia.py kamera <film>` na istniejącym planie (styl z rodzaju nagrania, przysłona i ostrość z powodem), potem `pokaz` z głębią `z` i ruchami bloków; własny ruch (`kamera` bloku w `zmiany.json`, np. najazd na puentę bez wagi 3) tylko tam, gdzie ma sens"
+        - "`typografia.py sprawdz` bez błędów `poza-kadrem-kamera` i `rozmyte` przed renderem (słabszy ruch, blok bliżej środka, mniejsza przysłona albo ostrość na napisie), uwaga `uderzenie-rozmyte` poprawiona albo uzasadniona"
+        - "arkusz obejrzany przez vision_analyze, `projekt.py render` z linią MEDIA: i zdaniem, że kamerę, ruch bloku i głębię poprawi w edytorze HQ (sekcja „Kamera”, panel bloku)"
+      should_not:
+        - "`typografia.py plan --nowy` albo inna zmiana bloków poprawionych przez właściciela"
+        - "przysłona 1 albo ruch na każdym bloku bez powodu w treści; render klatek z motion blurem"
+
   - id: wideo-zywy-schemat
     type: in_scope
     input: "Zrób na Instagram żywy schemat: jak u nas wygląda zlecenie od klienta do faktury. Takie, że kropki lecą po strzałkach."
