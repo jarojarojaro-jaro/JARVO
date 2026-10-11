@@ -147,6 +147,8 @@ spokojny 0,85), blok za osobą 1,3. `pokaz` wypisuje `z` i ruch każdego bloku (
   jest gdzie indziej. Ostrość (`ostrosc: napis`) idzie za najnowszym napisem, `osoba` trzyma ją na osobie.
   `przyslona` 0 = wszystko ostre, 0,5 domyślnie, 1 = mocny bokeh; słowo do przeczytania nie może być rozmyte w papkę.
 - Bez kamery (`kamera: null`, plan sprzed kamery) film stoi, a napisy rysują się jak dawniej.
+- Właściciel ustawia to samo w HQ (sekcja „Kamera” w panelu typografii, „Ruch kamery” i „Głębia z” w panelu bloku);
+  jego kamery i ruchów nie cofam. Cięcie i łączenie bloków (`podziel`, `polacz`) przenoszą ruch same.
 
 ## Format `zmiany.json`
 Pola bloku: `uklad`, `x`, `y` (kotwica 0–1), `w`, `rot`, `tilt`, `warstwa` (`przod`/`tyl`), `rozmiar`, `wejscie`,

@@ -1334,3 +1334,32 @@ def test_polecenie_kamera_i_pokaz(tmp_path, capsys):
     assert "kamera" not in json.loads(ed.project_path(src).read_text(encoding="utf-8"))["typo"]
     assert ty.main(["kamera", str(src)]) == 0                                    # bez opcji: styl z motywu
     assert json.loads(ed.project_path(src).read_text(encoding="utf-8"))["typo"]["kamera"]["styl"] == "spokojna"
+
+
+def test_ruch_kamery_przy_cieciu_i_laczeniu(tmp_path):
+    """Cięcie bloku nie dubluje ruchu kamery: zostaje w części ze słowem startu; łączenie bierze ruch pierwszego,
+    a bez niego drugiego od jego słowa. Ta sama reguła w HQ (typoRuchPodzial, typoRuchPolacz)."""
+    r = {"ruch": "najazd", "sila": 0.5, "krzywa": "uderzenie", "slowo": 3}
+    assert ty.ruch_podzial(r, 2) == (None, {**r, "slowo": 1})
+    assert ty.ruch_podzial(r, 4) == (r, None)
+    assert ty.ruch_podzial({"ruch": "odjazd"}, 1) == ({"ruch": "odjazd"}, None)
+    assert ty.ruch_polacz(None, {"ruch": "przesuniecie", "kierunek": "lewo"}, 3) == {"ruch": "przesuniecie", "kierunek": "lewo", "slowo": 3}
+    assert ty.ruch_polacz(None, {"ruch": "brak"}, 3) is None
+    assert ty.ruch_polacz({"ruch": "odjazd"}, {"ruch": "najazd"}, 3) == {"ruch": "odjazd"}
+    if HAS_NODE:                                         # HQ liczy to samo (funkcje wycięte z 45-edytor.js)
+        src = (ROOT / "hq/web/src/45-edytor.js").read_text(encoding="utf-8")
+        fns = "\n".join(re.search(rf"^function {fn}\(.*?^\}}", src, re.S | re.M).group(0)
+                        for fn in ("typoRuchPodzial", "typoRuchPolacz"))
+        prog = (f"const r = {json.dumps(r)};\nconsole.log(JSON.stringify([typoRuchPodzial(r, 2), typoRuchPodzial(r, 4), "
+                "typoRuchPolacz(undefined, {ruch: 'przesuniecie', kierunek: 'lewo'}, 3), typoRuchPolacz(undefined, {ruch: 'brak'}, 3)]));")
+        out = subprocess.run(["node", "-e", fns + "\n" + prog], capture_output=True, text=True, check=True).stdout
+        assert json.loads(out) == [[None, {**r, "slowo": 1}], [r, None],
+                                   {"ruch": "przesuniecie", "kierunek": "lewo", "slowo": 3}, None]
+    plan = {"bloki": [{"id": "b1", "start": 0, "end": 2, "slowa": [{"tekst": t, "t": k * 0.4, "k": k * 0.4 + 0.3, "linia": 0}
+                                                              for k, t in enumerate("raz dwa trzy cztery".split())],
+                       "kamera": dict(r)}]}
+    nowy, _ = ty.zastosuj(ed.normalize_typo(plan, 3), {"bloki": [{"blok": "b1", "podziel": 2}]}, 3)
+    po = {b["id"]: b.get("kamera") for b in nowy["bloki"]}
+    assert po["b1"] is None and po["b1b"]["slowo"] == 1
+    nowy, _ = ty.zastosuj(nowy, {"bloki": [{"polacz": ["b1", "b1b"]}]}, 3)
+    assert nowy["bloki"][0]["kamera"]["slowo"] == 3

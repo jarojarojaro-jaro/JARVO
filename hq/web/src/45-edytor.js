@@ -125,6 +125,21 @@ const TYPO_WEJSCIA_NAZWY = { ciecie: ["Cięcie", "Cut"], pop: ["Pop", "Pop"], ko
 const TYPO_WYJSCIA_NAZWY = { ciecie: ["Cięcie", "Cut"], zanik: ["Zanik", "Fade"], smuga: ["Smuga", "Smear"] };
 const TYPO_STYLE_NAZWY = { wypelnij: ["Pełny", "Fill"], kontur: ["Kontur", "Outline"], "3d": ["3D", "3D"], blask: ["Blask", "Glow"], tlo: ["Tło", "Box"], obrys: ["Obrys", "Stroke"], show: ["Show", "Show"] };
 const TYPO_WAGI_NAZWY = [["Małe", "Small"], ["Zwykłe", "Normal"], ["Ważne", "Strong"], ["Uderzenie", "Hit"]];
+// wirtualna kamera (48-typografia.js: typoKamera): styl planu, ruch bloku, krzywa, kierunek przesunięcia
+const TYPO_KAMERY_NAZWY = { brak: ["Ręczna", "Manual"], spokojna: ["Spokojna", "Calm"], dynamiczna: ["Dynamiczna", "Dynamic"] };
+const TYPO_RUCHY_NAZWY = { najazd: ["Najazd", "Push in"], odjazd: ["Odjazd", "Pull out"], przesuniecie: ["Przesunięcie", "Pan"], brak: ["Bez ruchu", "None"] };
+const TYPO_KRZYWE_NAZWY = { plynnie: ["Płynnie", "Smooth"], uderzenie: ["Uderzenie", "Snap"] };
+const TYPO_KIERUNKI_NAZWY = { lewo: ["← Lewo", "← Left"], prawo: ["Prawo →", "Right →"], gora: ["↑ Góra", "↑ Up"], dol: ["↓ Dół", "↓ Down"] };
+// Ruch kamery bloku przy cięciu przed słowem j (jak typografia.ruch_podzial): zostaje w części ze słowem startu.
+function typoRuchPodzial(r, j) {
+  if (!r || typeof r !== "object") return [undefined, undefined];
+  return Number.isInteger(r.slowo) && r.slowo >= j ? [undefined, { ...r, slowo: r.slowo - j }] : [r, undefined];
+}
+// ... i przy łączeniu z następnym (n = liczba słów pierwszego): ruch drugiego startuje od swojego słowa w nowym bloku.
+function typoRuchPolacz(a, b, n) {
+  if (a && typeof a === "object") return a;
+  return b && typeof b === "object" ? (b.ruch === "brak" ? undefined : { ...b, slowo: n + (Number.isInteger(b.slowo) ? b.slowo : 0) }) : undefined;
+}
 const typoBez = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== null));
 const typoNoweId = (ids, base) => { let k = 1; while (ids.has(`${base}${String.fromCharCode(97 + k)}`)) k++; return `${base}${String.fromCharCode(97 + k)}`; };
 const typoTekst = (b) => b.slowa.map((w) => w.tekst).join(" ");
@@ -1228,10 +1243,11 @@ function VideoEditor({ path, onClose }) {
     if (j <= 0) return false;
     const d = +b.slowa[j].t || 0, li = Math.round(+b.slowa[j].linia || 0);
     const nid = typoNoweId(new Set(typoBloki(p).map((x) => x.id)), b.id);
+    const [r1, r2] = typoRuchPodzial(b.kamera, j);
     typoApply((T) => ({ bloki: T.bloki.flatMap((x) => (x.id !== b.id ? [x] : [
-      { ...x, slowa: x.slowa.slice(0, j), end: +(x.start + d - 0.02).toFixed(3), wyjscie: "ciecie" },
-      { ...x, id: nid, start: +(x.start + d).toFixed(3), slowa: x.slowa.slice(j).map((w) => ({ ...w, t: +((+w.t || 0) - d).toFixed(3),
-        k: +((+w.k || 0) - d).toFixed(3), linia: Math.max(0, Math.round(+w.linia || 0) - li) })) }])) }));
+      typoBez({ ...x, slowa: x.slowa.slice(0, j), end: +(x.start + d - 0.02).toFixed(3), wyjscie: "ciecie", kamera: r1 }),
+      typoBez({ ...x, id: nid, start: +(x.start + d).toFixed(3), kamera: r2, slowa: x.slowa.slice(j).map((w) => ({ ...w, t: +((+w.t || 0) - d).toFixed(3),
+        k: +((+w.k || 0) - d).toFixed(3), linia: Math.max(0, Math.round(+w.linia || 0) - li) })) })])) }));
     setSel({ type: "typo", id: nid });
     setTypoW(null);
     return true;
@@ -1240,9 +1256,9 @@ function VideoEditor({ path, onClose }) {
     const nast = typoBloki(p).filter((x) => x.id !== b.id && x.start >= b.start).sort((x, y) => x.start - y.start)[0];
     if (!nast) return;
     const d = nast.start - b.start, li = Math.max(...b.slowa.map((w) => Math.round(+w.linia || 0))) + 1;
-    typoApply((T) => ({ bloki: T.bloki.filter((x) => x.id !== nast.id).map((x) => (x.id !== b.id ? x : { ...x, end: Math.max(x.end, nast.end),
-      wyjscie: nast.wyjscie || x.wyjscie, slowa: [...x.slowa, ...nast.slowa.map((w) => ({ ...w, t: +((+w.t || 0) + d).toFixed(3),
-        k: +((+w.k || 0) + d).toFixed(3), linia: Math.round(+w.linia || 0) + li }))] })) }));
+    typoApply((T) => ({ bloki: T.bloki.filter((x) => x.id !== nast.id).map((x) => (x.id !== b.id ? x : typoBez({ ...x, end: Math.max(x.end, nast.end),
+      wyjscie: nast.wyjscie || x.wyjscie, kamera: typoRuchPolacz(x.kamera, nast.kamera, x.slowa.length), slowa: [...x.slowa, ...nast.slowa.map((w) => ({ ...w, t: +((+w.t || 0) + d).toFixed(3),
+        k: +((+w.k || 0) + d).toFixed(3), linia: Math.round(+w.linia || 0) + li }))] }))) }));
   }
   function typoDodaj() {                           // własny blok w miejscu wskaźnika: jedno mocne słowo do wpisania
     const start = clamp(tRef.current, 0, Math.max(0, total - 0.5)), H2 = p.canvas.h > p.canvas.w;
@@ -2194,6 +2210,7 @@ function VideoEditor({ path, onClose }) {
         <p class="thq-ed-note">${L("Wideograf dobrał te kolory do kadru (kontrast z barwami sceny) i rozłożył je na mocne słowa.", "The video agent picked these colors to contrast with the footage and spread them over the strong words.")}</p>`}
         <label>${L("Akcent: kolor uderzenia", "Accent: hit word color")}${swatches(m.akcent, (v, lv) => typoApply(() => ({ akcent: v }), lv), T.paleta)}</label>
         ${T.akcent && html`<button type="button" class="thq-ed-btn is-wide" onClick=${() => typoApply(() => ({ akcent: undefined }))}>${ED_ICON.reset} ${L("Akcent z motywu", "Theme accent")}</button>`}
+        ${kameraPlanTools()}
         <p class="thq-ed-note">${L("Kliknij blok na osi albo na podglądzie, żeby zmienić słowa, układ, głębię i ruch.", "Click a block on the timeline or the preview to change words, layout, depth and motion.")}</p>
         ${kontrolaTools()}
         <div class="thq-ed-acts">
@@ -2206,6 +2223,47 @@ function VideoEditor({ path, onClose }) {
         <button type="button" class="thq-ed-btn is-wide" onClick=${typoDodaj}>${ED_ICON.plus} ${L("Dodaj blok ręcznie", "Add a block by hand")}</button>`}
     </div>`;
   };
+  // wirtualna kamera planu (typo.kamera): Wył. = film stoi; Ręczna = tylko ruchy ustawione w blokach
+  const kameraPlanTools = () => {
+    const K = (p.typo || {}).kamera, styl = K ? (TYPO_KAMERY.includes(K.styl) ? K.styl : "brak") : "";
+    const kp = (patch, lv) => typoApply((T) => ({ kamera: { przyslona: 0.5, ostrosc: "napis", ...(T.kamera || {}), ...patch } }), lv);
+    const przys = typoClamp(typoLiczba(K && K.przyslona, 0.5), 0, 1), n = K ? typoKameraRuchy(p.typo).length : 0;
+    return html`<div class="thq-ed-field thq-ed-kam"><span>${L("Kamera", "Camera")}${K ? ` · ${L(`ruchy ${n}`, `${n} ${n === 1 ? "move" : "moves"}`)}` : ""}</span>
+      ${seg([["", L("Wył.", "Off")], ...TYPO_KAMERY.map((k2) => [k2, L(...TYPO_KAMERY_NAZWY[k2])])], styl,
+        (v) => (v ? kp({ styl: v }) : typoApply(() => ({ kamera: undefined }))))}
+      ${K && html`<label>${L("Rozmycie głębi (przysłona)", "Depth blur (aperture)")} · ${Math.round(przys * 100)}%
+        <input type="range" min="0" max="1" step="0.05" value=${przys} onInput=${(e) => kp({ przyslona: +e.target.value }, true)} onChange=${H.commit}/></label>
+        <label>${L("Ostrość", "Focus")}${seg([["napis", L("Na napisie", "On the text")], ["osoba", L("Na osobie", "On the person")]], K.ostrosc === "osoba" ? "osoba" : "napis", (v) => kp({ ostrosc: v }))}</label>`}
+      <p class="thq-ed-note">${L("Kamera rusza filmem i napisami razem: najazd, odjazd, przesunięcie. Napisy stoją przed osobą albo za nią, a te poza ostrością rozmywają się jak w obiektywie. Spokojna: rzadkie, płynne ruchy; dynamiczna: szybki najazd na uderzeniu; ręczna: tylko ruchy ustawione w blokach.",
+        "The camera moves the footage and captions together: push in, pull out, pan. Captions sit in front of or behind the person, and the ones out of focus blur like a lens. Calm: rare, smooth moves; dynamic: a fast push-in on the hit word; manual: only moves set on blocks.")}</p>
+    </div>`;
+  };
+  // ruch kamery i głębia bloku (widać tylko z kamerą w planie); Auto = ruch dobrany ze stylu kamery
+  const kameraBlokTools = (b, u) => {
+    const K = (p.typo || {}).kamera;
+    if (!K) return null;
+    const wl = typoRuch(b), zst = (typoKameraRuchy(p.typo).find(([x]) => x.id === b.id) || [])[1], rr = wl && wl.ruch !== "brak" ? wl : zst;
+    const ku = (patch, lv) => u((x) => ({ kamera: typoBez({ ...(typoRuch(x) || {}), ...patch }) }), lv);
+    const ruch = (v) => (!v ? u({ kamera: undefined }) : v === "brak" ? u({ kamera: { ruch: "brak" } }) : u({ kamera: typoBez({ ruch: v,
+      sila: (rr && rr.sila) || TYPO_KAMERA.sila[K.styl] || 0.5, krzywa: (rr && rr.krzywa) || "plynnie", slowo: rr ? rr.slowo : undefined,
+      kierunek: v === "przesuniecie" ? (rr && rr.kierunek) || (typoLiczba(b.x, 0.5) >= 0.5 ? "prawo" : "lewo") : undefined }) }));
+    const tyl = b.warstwa === "tyl", z = typoZ(b), [zmin, zmax] = tyl ? [1.05, 3] : [0.3, 0.95];
+    return html`<label>${L("Ruch kamery", "Camera move")}${seg([["", L("Auto", "Auto")], ...TYPO_RUCHY.slice(0, 3).map((k2) => [k2, L(...TYPO_RUCHY_NAZWY[k2])]),
+        ["brak", L(...TYPO_RUCHY_NAZWY.brak)]], wl ? wl.ruch : "", ruch)}</label>
+      ${!wl && html`<p class="thq-ed-note">${zst ? L(`Styl kamery: ${L(...TYPO_RUCHY_NAZWY[zst.ruch])} na tym bloku.`, `Camera style: ${L(...TYPO_RUCHY_NAZWY[zst.ruch])} on this block.`)
+        : L("Styl kamery nie rusza się na tym bloku.", "The camera style does not move on this block.")}</p>`}
+      ${wl && wl.ruch !== "brak" && html`<label>${L("Siła ruchu", "Move strength")} · ${Math.round(wl.sila * 100)}%
+          <input type="range" min="0.05" max="1" step="0.05" value=${wl.sila} onInput=${(e) => ku({ sila: +e.target.value }, true)} onChange=${H.commit}/></label>
+        <label>${L("Krzywa", "Curve")}${seg(TYPO_KRZYWE.map((k2) => [k2, L(...TYPO_KRZYWE_NAZWY[k2])]), wl.krzywa, (v) => ku({ krzywa: v }))}</label>
+        ${wl.ruch === "przesuniecie" && html`<label>${L("Kierunek", "Direction")}${seg(TYPO_KIERUNKI.map((k2) => [k2, L(...TYPO_KIERUNKI_NAZWY[k2])]), wl.kierunek, (v) => ku({ kierunek: v }))}</label>`}
+        <label>${L("Start ruchu", "Move starts")}${seg([["", L("Z blokiem", "With block")], ...b.slowa.map((x, k2) => [k2, x.tekst])], Number.isInteger(wl.slowo) ? wl.slowo : "",
+          (v) => ku({ slowo: v === "" ? undefined : v }))}</label>`}
+      <label>${L("Głębia z", "Depth z")} · ${z.toFixed(2)} ${L(tyl ? "(za osobą: osoba 1)" : "(przed osobą: osoba 1)", tyl ? "(behind: person 1)" : "(in front: person 1)")}
+        <input type="range" min=${zmin} max=${zmax} step="0.01" value=${typoClamp(z, zmin, zmax)} onInput=${(e) => u({ z: +e.target.value }, true)} onChange=${H.commit}/></label>
+      ${b.z !== undefined && html`<button type="button" class="thq-ed-btn is-wide" onClick=${() => u({ z: undefined })}>${ED_ICON.reset} ${L("Głębia z warstwy", "Depth from the layer")}</button>`}
+      <p class="thq-ed-note">${L("Mniejsze z = bliżej kamery: napis rośnie i jedzie mocniej przy ruchu, a gdy ostrość jest gdzie indziej, mocniej się rozmywa.",
+        "Smaller z = closer to the camera: the text grows and moves more with the camera, and blurs more when the focus is elsewhere.")}</p>`;
+  };
   const typoTools = (b) => {
     const m = typoMotyw(p), auto = L("Auto", "Auto");
     const u = (patch, lv) => typoUpd(b.id, patch, lv);
@@ -2214,6 +2272,7 @@ function VideoEditor({ path, onClose }) {
     const w = b.slowa[j], wyg = typoSlowo(w, m, b.uklad);       // wygląd słowa teraz (z motywu albo nadpisany)
     const su = (patch, lv) => slowoUpd(b.id, j, patch, lv);
     const tyl = b.warstwa === "tyl", li = Math.round(+w.linia || 0);
+    const zWarstwy = (v) => (b.z !== undefined && (v === "tyl") === (typoZ(b) > 1) ? b.z : undefined);   // z zgodne z warstwą zostaje
     const suwak = (label, v, min, max, step, fn, fmt) => html`<label>${label} · ${fmt(v)}
       <input type="range" min=${min} max=${max} step=${step} value=${v} onInput=${(e) => fn(+e.target.value, true)} onChange=${H.commit}/></label>`;
     return html`<div class="thq-ed-form">
@@ -2238,12 +2297,13 @@ function VideoEditor({ path, onClose }) {
         ${seg([["gora", L("↑ wyżej", "↑ up")], ["dol", L("↓ niżej", "↓ down")]], null, (v) => su({ linia: Math.max(0, li + (v === "dol" ? 1 : -1)) }))}</div>
 
       <p class="thq-ed-sub">${L("Blok", "Block")}</p>
-      <label>${L("Układ", "Layout")}${seg(TYPO_UKLADY.map((k2) => [k2, L(...TYPO_UKLAD_NAZWY[k2])]), b.uklad, (v) => u(v === "za" ? { uklad: v, warstwa: "tyl", rot: 0, tilt: 0 } : { uklad: v }))}</label>
-      <label>${L("Głębia bloku", "Block depth")}${seg([["przod", L("Przed osobą", "In front")], ["tyl", L("Za osobą", "Behind")]], tyl ? "tyl" : "przod", (v) => u({ warstwa: v }))}</label>
+      <label>${L("Układ", "Layout")}${seg(TYPO_UKLADY.map((k2) => [k2, L(...TYPO_UKLAD_NAZWY[k2])]), b.uklad, (v) => u(v === "za" ? { uklad: v, warstwa: "tyl", rot: 0, tilt: 0, z: zWarstwy("tyl") } : { uklad: v }))}</label>
+      <label>${L("Głębia bloku", "Block depth")}${seg([["przod", L("Przed osobą", "In front")], ["tyl", L("Za osobą", "Behind")]], tyl ? "tyl" : "przod", (v) => u({ warstwa: v, z: zWarstwy(v) }))}</label>
       ${tyl && !maskaBloku(b) && html`<p class="thq-ed-note is-warn">⚠ ${L("Osoba zasłoni ten napis, gdy Wideograf policzy jej sylwetkę w tym fragmencie. Do tego czasu napis widać w całości.",
           "The person will cover this text once the video agent computes their silhouette here. Until then the text is fully visible.")}</p>
         <button type="button" class="thq-ed-btn is-wide" onClick=${() => setAsk({ text: L(`Policz sylwetkę osoby dla bloku typografii „${typoTekst(b)}” (${fmtT(b.start, true)}–${fmtT(b.end, true)}), żeby napis był za osobą.`,
           `Compute the person's silhouette for the typography block "${typoTekst(b)}" (${fmtT(b.start, true)}–${fmtT(b.end, true)}) so the text sits behind them.`), reply: "", busy: false })}>${ED_ICON.spark} ${L("Poproś Wideografa o sylwetkę", "Ask the video agent for the silhouette")}</button>`}
+      ${kameraBlokTools(b, u)}
       ${suwak(L("Rozmiar", "Size"), +b.rozmiar || 1, 0.3, 3, 0.05, (v, lv) => u({ rozmiar: v }, lv), (v) => `${Math.round(v * 100)}%`)}
       ${suwak(L("Szerokość", "Width"), +b.w || 0.62, 0.15, 1, 0.01, (v, lv) => u({ w: v }, lv), (v) => `${Math.round(v * 100)}%`)}
       ${suwak(L("Obrót", "Rotation"), +b.rot || 0, -45, 45, 1, (v, lv) => u({ rot: v }, lv), (v) => `${v}°`)}
@@ -2353,15 +2413,16 @@ function VideoEditor({ path, onClose }) {
     ${mobile && !p.texts.length && html`<button type="button" class="thq-ed-add" style=${{ left: `${t * pps}px` }} onClick=${(e) => { e.stopPropagation(); addText(); setTool("text:tekst"); }}>${ED_ICON.plus}${L("Dodaj tekst", "Add text")}</button>`}
   </div>`;
   const typoLane = {}, tLanes = [];
+  const kamRuch = new Map(p.typo && p.typo.kamera ? typoKameraRuchy(p.typo).map(([x, r]) => [x.id, r]) : []);
   for (const b of typoBloki(p).slice().sort((a, c) => a.start - c.start)) {
     let li = tLanes.findIndex((end) => end <= b.start + 1e-6);
     if (li < 0) { li = tLanes.length; tLanes.push(0); }
     tLanes[li] = b.end; typoLane[b.id] = li;
   }
   const typoTrack = tLanes.length > 0 && html`<div class="thq-ed-track is-typo" style=${{ height: `${tLanes.length * 26 + 6}px` }} onPointerDown=${rulerDown} onClick=${() => mobile && setSel(null)}>
-    ${typoBloki(p).map((b) => html`<div key=${b.id} class=${cx("thq-ed-item is-typo", b.warstwa === "tyl" && "is-tyl", sel && sel.type === "typo" && sel.id === b.id && "is-sel")}
+    ${typoBloki(p).map((b) => html`<div key=${b.id} class=${cx("thq-ed-item is-typo", b.warstwa === "tyl" && "is-tyl", kamRuch.has(b.id) && "is-kam", sel && sel.type === "typo" && sel.id === b.id && "is-sel")}
       style=${{ left: `${b.start * pps}px`, width: `${Math.max(6, (b.end - b.start) * pps)}px`, top: `${3 + typoLane[b.id] * 26}px` }}
-      title=${`${typoTekst(b)}${b.warstwa === "tyl" ? ` · ${L("za osobą", "behind the person")}` : ""}`}
+      title=${`${typoTekst(b)}${b.warstwa === "tyl" ? ` · ${L("za osobą", "behind the person")}` : ""}${kamRuch.has(b.id) ? ` · ${L("kamera", "camera")}: ${L(...TYPO_RUCHY_NAZWY[kamRuch.get(b.id).ruch])}` : ""}`}
       onPointerDown=${(e) => typoDown(e, b)} onClick=${(e) => pick(e, "typo", b.id)}>
       <i class="thq-ed-h is-l" onPointerDown=${(e) => typoDown(e, b, "l")}></i><span>${b.slowa.map((w, k) => html`<b key=${k} class=${`is-w${typoClamp(Math.round(+w.waga || 0), 0, 3)}`}>${w.tekst} </b>`)}</span><i class="thq-ed-h is-r" onPointerDown=${(e) => typoDown(e, b, "r")}></i></div>`)}
   </div>`;

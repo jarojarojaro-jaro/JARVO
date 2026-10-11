@@ -817,6 +817,8 @@ button.thq-out-name:hover { text-decoration: underline; }
 /* typografia: blok przed osobą niebieski, za osobą fioletowy; słowa na osi według wagi (uderzenie najmocniej) */
 .thq-ed-item.is-typo { height: 22px; background: var(--ed-typo); color: #fff; }
 .thq-ed-item.is-typo.is-tyl { background: var(--ed-typo-tyl); }
+.thq-ed-item.is-typo.is-kam { box-shadow: inset 0 -3px 0 #FFD166; }   /* blok z ruchem kamery */
+.thq-ed-item.is-typo.is-kam.is-sel { box-shadow: inset 0 -3px 0 #FFD166, 0 0 0 2px #fff; }
 .thq-ed-item.is-typo b { font-weight: 500; opacity: .75; }
 .thq-ed-item.is-typo b.is-w2 { font-weight: 700; opacity: 1; }
 .thq-ed-item.is-typo b.is-w3 { font-weight: 800; opacity: 1; text-transform: uppercase; }

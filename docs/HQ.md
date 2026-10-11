@@ -256,6 +256,15 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   przesuwa warstwy wideo (`.thq-ed-kamera`, `typoKameraCss`), osobę nad napisem i zaznaczenie bloku tą samą kamerą.
   Podpis klatki eksportu ma stan kamery, więc warstwa napisów rysuje każdą klatkę tylko w czasie ruchu. Plan bez
   `kamera` rysuje się jak dawniej, piksel w piksel.
+  W panelu typografii sekcja **Kamera** (PL/EN): `Wył.` (film stoi), `Ręczna` (tylko ruchy ustawione w blokach),
+  `Spokojna`, `Dynamiczna`, liczba ruchów, suwak „Rozmycie głębi (przysłona)” i ostrość „Na napisie” / „Na osobie”.
+  Z kamerą w planie panel bloku ma „Ruch kamery” (`Auto` = ze stylu, z podpisem, co styl wybrał; `Najazd`, `Odjazd`,
+  `Przesunięcie`, `Bez ruchu`), a przy własnym ruchu siłę, krzywą (`Płynnie`/`Uderzenie`), kierunek przesunięcia
+  i start ruchu (z blokiem albo od słowa), do tego suwak „Głębia z” (przed osobą 0,3–0,95, za nią 1,05–3) i powrót
+  do głębi z warstwy. Zmiana warstwy (także układ „Za osobą”) zostawia `z` tylko zgodne z nową warstwą. Na osi blok
+  z ruchem kamery ma żółty pasek u dołu. Cięcie bloku zostawia ruch w części ze słowem startu, a łączenie bierze ruch
+  pierwszego bloku albo drugiego od jego słowa (`typoRuchPodzial` / `typoRuchPolacz`, w `typografia.py` `podziel` i
+  `polacz` tak samo).
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
   `volume`, `muted`, `fit`, `transition`, `fadeIn`, `fadeOut`, `color`, `voice`), napisy, audio (także `label`
   i `linked`) i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.

@@ -965,6 +965,23 @@ def cmd_pokaz(film: Path, a) -> int:
     return 0
 
 
+def ruch_podzial(r, j: int):
+    """Ruch kamery bloku przy cięciu przed słowem j (jak typoRuchPodzial w HQ): zostaje w części ze słowem startu."""
+    if not isinstance(r, dict):
+        return None, None
+    s = r.get("slowo")
+    return (None, {**r, "slowo": s - j}) if isinstance(s, int) and s >= j else (r, None)
+
+
+def ruch_polacz(a, b, n: int):
+    """Ruch po złączeniu bloków (n = słowa pierwszego): ruch pierwszego, a bez niego drugiego od jego słowa."""
+    if isinstance(a, dict):
+        return a
+    if not isinstance(b, dict) or b.get("ruch") == "brak":
+        return None
+    return {**b, "slowo": n + (b["slowo"] if isinstance(b.get("slowo"), int) else 0)}
+
+
 POLA_BLOKU = ("start", "end", "uklad", "x", "y", "w", "rot", "tilt", "warstwa", "wejscie", "wyjscie", "rozmiar", "z", "kamera")
 POLA_SLOWA = ("tekst", "waga", "linia", "glebia", "kolor", "kroj", "styl", "plyta", "wejscie", "wielkie", "skala", "t", "k", "z")
 POLA_KAMERY = ("styl", "przyslona", "ostrosc")
@@ -995,6 +1012,9 @@ def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
                 continue
             a, b = sorted((po_id[x] for x in ids), key=lambda x: x["start"])
             d, li = b["start"] - a["start"], max(w["linia"] for w in a["slowa"]) + 1
+            ruch = ruch_polacz(a.get("kamera"), b.get("kamera"), len(a["slowa"]))
+            if ruch:
+                a["kamera"] = ruch
             a["slowa"] += [{**w, "t": round(w["t"] + d, 3), "k": round(w["k"] + d, 3), "linia": w["linia"] + li}
                            for w in b["slowa"]]
             a["end"] = max(a["end"], b["end"])
@@ -1020,6 +1040,11 @@ def zastosuj(plan: dict, zmiany: dict, total: float) -> tuple[dict, list[str]]:
                     "slowa": [{**w, "t": round(w["t"] - d, 3), "k": round(w["k"] - d, 3), "linia": max(0, w["linia"] - li)}
                               for w in b["slowa"][j:]]}
             b["slowa"], b["end"] = b["slowa"][:j], round(nowy["start"] - 0.02, 3)
+            for blok, ruch in zip((b, nowy), ruch_podzial(b.get("kamera"), j)):
+                if ruch:
+                    blok["kamera"] = ruch
+                else:
+                    blok.pop("kamera", None)
             plan["bloki"].append(nowy)
             po_id[nid] = nowy
             continue
