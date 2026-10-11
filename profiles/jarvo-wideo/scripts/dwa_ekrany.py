@@ -13,7 +13,7 @@ nagranie (same zdjęcia: 6 s). Dźwięk domyślnie z A (gdy A nie ma, z B).
 przed-po: A (przed) z lewej, B (po) z prawej, kreska jedzie po kadrze; --kreska = punkty „sekunda=udział B”
 (0 = całe A, 1 = całe B), między punktami płynnie; domyślnie A → pół na pół → B.
 telefony: dwa telefony narysowane kodem (ramka, wycięcie na aparat, zaokrąglone rogi) na tle --tlo.
-Na końcu test pauzy (za duo z hyperframes-community-skills): w każdej chwili coś ma się ruszać w co najmniej
+Na końcu test pauzy: w każdej chwili coś ma się ruszać w co najmniej
 jednym oknie; dłuższy bezruch obu okien jest w `uwagi`.
 """
 

@@ -1,7 +1,7 @@
 ---
 name: dwa-ekrany
 description: "Split screen: dwa nagrania w kadrze, przed/po, telefony."
-version: 1.0.0
+version: 1.0.1
 author: Jarvo
 license: MIT
 metadata:
@@ -18,9 +18,7 @@ metadata:
 
 Dwie rzeczy naraz w jednym kadrze: porównanie, przed/po, reakcja, „ja vs kolega”, stara i nowa strona, dwa
 ujęcia tej samej chwili. Narzędzie: `$HERMES_HOME/scripts/dwa_ekrany.py` (FFmpeg, ramki i podpisy rysowane kodem,
-bez cudzych zdjęć i bez sieci). Sposób pracy za skillem `duo` (HeyGen hyperframes-community-skills, Apache-2.0):
-dwa okna, jedna oś czasu, w każdej chwili coś się rusza; samego `duo` nie używamy (cudze zdjęcie bez licencji,
-tylko poziom 4:3).
+bez cudzych zdjęć i bez sieci). Zasada: dwa okna, jedna oś czasu, w każdej chwili coś się rusza.
 
 ## Kiedy użyć
 - „Pokaż obok siebie”, „przed i po”, „porównaj A i B”, „split screen”, „reakcja na nagranie”, „dwa telefony”.
