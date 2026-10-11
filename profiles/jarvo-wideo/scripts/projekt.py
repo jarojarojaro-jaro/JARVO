@@ -1265,7 +1265,7 @@ def typo_warstwy(plan: dict, W: int, H: int, fps: int, total: float, out_dir: Pa
     blank = ed.blank_png(out_dir / "typo-pusty.png", W, H)
     out = {}
     for warstwa in ("tyl", "przod"):
-        if not any((b.get("warstwa") == "tyl") == (warstwa == "tyl") for b in plan["bloki"]):
+        if not any(warstwa in ed.typo_warstwy(b) for b in plan["bloki"]):   # efekt i słowo z głębią: obie warstwy
             continue
         segs = page.evaluate(TYPO_KLATKI_JS, [{"typo": plan}, W, H, fps, total, warstwa, True])
         lista = [((b - a) / fps, _png(png, out_dir / f"typo-{warstwa}-{a:06d}.png") if png else None) for a, b, png in segs]

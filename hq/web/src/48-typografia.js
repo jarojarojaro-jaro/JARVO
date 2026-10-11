@@ -3,8 +3,9 @@
 // i render Wideografa (projekt.py w przeglądarce bez okna). Plan bloków układa typografia.py (reżyser), a człowiek
 // poprawia go w edytorze. Czas słowa liczony od początku bloku: przesunięcie bloku zabiera słowa ze sobą.
 //
-// projekt.typo = {motyw, akcent, paleta, odstep, bloki: [{id, start, end, uklad, x, y, w, rot, tilt, warstwa, wejscie, wyjscie,
-//                 rozmiar, slowa: [{t, k, tekst, waga 0–3, linia, glebia −1|0|1, kolor, kroj, styl, plyta}]}]}
+// projekt.typo = {motyw, akcent, paleta, odstep, kamera, bloki: [{id, start, end, uklad, x, y, w, rot, tilt, warstwa, wejscie,
+//                 wyjscie, rozmiar, z, kamera, efekt, slowa: [{t, k, tekst, waga 0–3, linia, glebia −1|0|1, kolor, kroj, styl,
+//                 plyta, z}]}]}  (kamera i głębia: niżej „wirtualna kamera”; efekt: „efekty”)
 // odstep: "tusz" (nowe plany: reżyser i edytor) = słowa bloku nigdy się nie stykają: odstęp między słowami w linii
 // i między liniami liczony z tuszu liter razem z obrysem stylu (ogonki, kreski nad Ż, Ś, Ć, obrys, cień 3D, płytka),
 // więc małe słowo obok albo nad uderzeniem nie wchodzi w nie literami. Plany bez pola (starsze filmy) rysują się
@@ -257,13 +258,27 @@ function typoUklad(ctx, b, P, W, H) {
 }
 
 // Ramka bloku na kanwie (do trafiania myszą i strzałek w edytorze); bez obrotu i perspektywy.
-// `now` (opcjonalnie): ramka tam, gdzie blok widać przez kamerę w tej chwili (środek cx, cy i skala s).
+// `now` (opcjonalnie): ramka tam, gdzie blok widać przez kamerę w tej chwili (środek cx, cy i skala s), z efektem
+// (przejście jedzie, pierścień idzie za głową); pierścień: całe koło z literami (osoba stoi na z = 1).
 function typoRamka(ctx, b, P, W, H, now) {
-  const u = typoUklad(ctx, b, P, W, H);
-  const pad = 12 * u.S, k = now === undefined ? null : typoKamera(P, now);
-  let cx = u.cx, cy = u.cy, s = 1;
-  if (k) { const r = typoRzut(k, u.cx / W, u.cy / H, typoZ(b)); cx = r.x * W; cy = r.y * H; s = r.s; }
-  return { x0: cx - (u.w / 2) * s - pad, y0: cy - (u.h / 2) * s - pad, x1: cx + (u.w / 2) * s + pad, y1: cy + (u.h / 2) * s + pad, u, cx, cy, s };
+  const e = typoEfekt(b), pier = e && e.rodzaj === "pierscien";
+  const u = pier ? null : typoUklad(ctx, b, P, W, H);
+  const k = now === undefined ? null : typoKamera(P, now);
+  let cx, cy, s = 1, uu = u, z = typoZ(b);
+  if (pier) {
+    const U = typoPierscienUklad(ctx, b, e, P, W, H), Q = typoPierscienStan(b, e, U, W, H, now === undefined ? b.start : now);
+    const maxPx = Math.max(1, ...U.gl.map((q) => q.px)), sn = Math.abs(Math.sin((e.nachylenie * Math.PI) / 180));
+    uu = { slowa: [], w: 2 * (U.R + maxPx * 0.6), h: 2 * (U.R * sn + maxPx * 1.1), S: U.S, pierscien: U };
+    cx = now === undefined ? typoLiczba(b.x, 0.5) * W : Q.cx; cy = now === undefined ? typoLiczba(b.y, 0.3) * H : Q.cy; z = 1;
+  } else if (e && now !== undefined) {
+    const q = typoPrzejscieStan(b, e, u.w, W, now);
+    cx = q.x * W; cy = u.cy + q.dy * H;
+  } else { cx = u.cx; cy = u.cy; }
+  uu.cx = cx; uu.cy = cy;
+  const pad = 12 * uu.S;
+  if (k) { const r = typoRzut(k, cx / W, cy / H, z); cx = r.x * W; cy = r.y * H; s = r.s; }
+  const u2 = uu;
+  return { x0: cx - (u2.w / 2) * s - pad, y0: cy - (u2.h / 2) * s - pad, x1: cx + (u2.w / 2) * s + pad, y1: cy + (u2.h / 2) * s + pad, u: u2, cx, cy, s };
 }
 
 // Stan animacji w chwili now: [słowo widoczne?, postęp wejścia 0–1] i postęp wyjścia bloku. Z tego samego liczy się
@@ -290,9 +305,10 @@ function typoStan(b, P, now) {
 function typoPodpis(P, now, warstwa) {
   const parts = [];
   for (const b of typoAktywne(P, now)) {
-    if (warstwa && (b.warstwa === "tyl" ? "tyl" : "przod") !== warstwa) continue;
+    if (warstwa && !typoWarstwyBloku(b).includes(warstwa)) continue;
     const s = typoStan(b, P, now);
-    parts.push(`${b.id}:${s.slowa.map((a) => (a < 0 ? "-" : a >= 1 ? "F" : Math.round(a * 1000))).join(",")}:${Math.round(s.e * 1000)}`);
+    parts.push(`${b.id}:${s.slowa.map((a) => (a < 0 ? "-" : a >= 1 ? "F" : Math.round(a * 1000))).join(",")}:${Math.round(s.e * 1000)}`
+      + (typoEfekt(b) ? `@${now.toFixed(4)}` : ""));      // efekt rusza się co klatkę (pierścień, przejście)
   }
   const k = parts.length ? typoKamera(P, now) : null;     // kamera w ruchu: każda klatka inna (w spoczynku stała)
   return parts.join("|") + (k ? `~${[k.z, k.x, k.y].map((v) => v.toFixed(5)).join(",")},${k.f.toFixed(4)}` : "");
@@ -468,6 +484,150 @@ function typoKameraCss(k) {
   return `scale(${s.toFixed(5)}) translate(${(-k.x * 100).toFixed(4)}%, ${(-k.y * 100).toFixed(4)}%)`;
 }
 
+// ---------------------------------------------------------------- efekty: pierścień wokół głowy, przejście przez osobę
+// blok.efekt = {rodzaj: pierscien|przejscie, kierunek: lewo|prawo, sledz: [[t, dx, dy]]}, pierścień: predkosc (°/s),
+// nachylenie (°), powtorz (napis dookoła koła, domyślnie tak); przejście: kolejnosc za-przod|przod-za. Normalizuje
+// edytor.efekt_norm (te same listy i liczby, test pilnuje zgodności). `sledz`: przesunięcie środka (część kadru) od
+// początku bloku, za ruchem głowy (typografia.py efekt liczy je z maski osoby). Blok z efektem rysuje się w obu
+// warstwach: część „tyl” idzie pod sylwetkę osoby (maska.py), część „przod” nad nią.
+//   pierścień   napis na poziomym kole wokół głowy: środek koła = x, y bloku, średnica = w · szerokość kadru, litery
+//               ~0,11 średnicy (× rozmiar, waga słowa). Litera na kącie θ stoi na głębi z = 1 − ρ·sin θ (osoba z = 1,
+//               ρ = 0,35 · średnica / szerokość kadru, rzut 1 / z wokół środka koła): przednia połowa (sin θ > 0)
+//               jest bliżej, szersza i większa, w warstwie „przod” (przed twarzą), tylna w „tyl” (osoba ją zasłania).
+//               Litera leży w płaszczyźnie stycznej do koła: z tyłu w lustrze i ciemniej, bokiem do widza znika, więc
+//               zmiana warstwy jest niewidoczna. Koło rozwija się w 0,35 s; `kierunek` lewo = przód jedzie w lewo
+//               (czyta się jak pasek wiadomości), pierwsze słowo zaczyna na środku przodu. Kamera planu działa na
+//               każdą literę (rzut z jej głębi).
+//   przejście   blok jedzie poziomo przez szew (x bloku = środek ciała) w pierwszych 70% swojego czasu, od strony wejścia
+//               do całości po drugiej stronie, i tam zostaje do czytania; po stronie wejścia jest w jednej warstwie,
+//               za szwem w drugiej (za-przod: wchodzi za osobę, wychodzi przed nią).
+const TYPO_EFEKTY = ["pierscien", "przejscie"];
+const TYPO_EFEKT_KIERUNKI = ["lewo", "prawo"];
+const TYPO_EFEKT_KOLEJNOSC = ["za-przod", "przod-za"];
+const TYPO_EFEKT = { predkosc: 40, predkoscMin: 5, predkoscMax: 180, nachylenie: 14, nachylenieMax: 40, sledz: 40,
+  litera: 0.11, glebia: 0.35, rozwin: 0.35, tyl: 0.75, zapas: 0.03, droga: 0.7 };
+const TYPO_EFEKT_WAGA = [0.8, 1, 1.12, 1.25];   // litery pierścienia wg wagi słowa (mniejsza rozpiętość niż w bloku)
+function typoEfekt(b) {                   // efekt bloku w bezpiecznej postaci (edytor.efekt_norm) albo null
+  const e = b && b.efekt;
+  if (!e || typeof e !== "object" || !TYPO_EFEKTY.includes(e.rodzaj)) return null;
+  const E = TYPO_EFEKT, pier = e.rodzaj === "pierscien";
+  const o = { rodzaj: e.rodzaj, kierunek: TYPO_EFEKT_KIERUNKI.includes(e.kierunek) ? e.kierunek : pier ? "lewo" : "prawo" };
+  if (pier) {
+    o.predkosc = typoClamp(typoLiczba(e.predkosc, E.predkosc), E.predkoscMin, E.predkoscMax);
+    o.nachylenie = typoClamp(typoLiczba(e.nachylenie, E.nachylenie), -E.nachylenieMax, E.nachylenieMax);
+    o.powtorz = e.powtorz !== false;
+  } else o.kolejnosc = TYPO_EFEKT_KOLEJNOSC.includes(e.kolejnosc) ? e.kolejnosc : "za-przod";
+  o.sledz = (Array.isArray(e.sledz) ? e.sledz : [])
+    .filter((q) => Array.isArray(q) && q.length === 3 && q.every((v) => typeof v === "number" && Number.isFinite(v)))
+    .sort((a, c) => a[0] - c[0]).slice(0, E.sledz);
+  return o;
+}
+function typoSledz(e, rel) {              // [dx, dy] środka efektu w chwili rel od początku bloku (liniowo między punktami)
+  const s = e && e.sledz;
+  if (!s || !s.length) return [0, 0];
+  if (rel <= s[0][0]) return [s[0][1], s[0][2]];
+  for (let i = 1; i < s.length; i++) {
+    if (rel >= s[i][0]) continue;
+    const [t0, x0, y0] = s[i - 1], [t1, x1, y1] = s[i], f = (rel - t0) / Math.max(1e-6, t1 - t0);
+    return [x0 + (x1 - x0) * f, y0 + (y1 - y0) * f];
+  }
+  const l = s[s.length - 1];
+  return [l[1], l[2]];
+}
+// Warstwa słowa: własna głębia z decyduje (z > 1 = za osobą), bez niej warstwa bloku (edytor.typo_warstwy).
+function typoWarstwaSlowa(b, w) {
+  if (w && w.z !== undefined && w.z !== null && w.z !== "") return typoZSlowa(b, w) > 1 ? "tyl" : "przod";
+  return b.warstwa === "tyl" ? "tyl" : "przod";
+}
+function typoWarstwyBloku(b) {            // warstwy, w których blok coś rysuje: ["tyl"], ["przod"] albo obie
+  if (typoEfekt(b)) return ["tyl", "przod"];
+  const s = new Set(b.slowa.map((w) => typoWarstwaSlowa(b, w)));
+  return ["tyl", "przod"].filter((k) => s.has(k));
+}
+// Przejście w chwili now: szew (x środka ciała, część kadru), środek bloku x, kierunek i średnia prędkość (kadry/s).
+function typoPrzejscieStan(b, e, uw, W, now) {
+  const [dx, dy] = typoSledz(e, now - b.start), szew = typoLiczba(b.x, 0.5) + dx, dir = e.kierunek === "lewo" ? -1 : 1;
+  const pol = uw / 2 / W + TYPO_EFEKT.zapas, dl = Math.max(0.1, (b.end - b.start) * TYPO_EFEKT.droga);
+  const p = typoKrzywa("plynnie", (now - b.start) / dl);
+  return { szew, dy, dir, x: szew + dir * pol * (2 * p - 1), v: (2 * pol) / dl };
+}
+// Układ pierścienia: promień R (px), litery po kolei z pozycją `a` na obwodzie (środek litery, px łuku), słowa (od, do),
+// powtórzenia n i długość łuku na powtórzenie (nadmiar w odstępie z kropką). Napis dłuższy niż obwód: mniejsze litery.
+function typoPierscienUklad(ctx, b, e, P, W, H) {
+  const m = typoMotyw(P), R = (typoClamp(typoLiczba(b.w, 0.5), 0.15, 1) * W) / 2;
+  const baza = TYPO_EFEKT.litera * 2 * R * typoClamp(typoLiczba(b.rozmiar, 1), 0.3, 3);
+  const miara = (s, px, t) => { ctx.font = typoFont(s.kroj, px); return ctx.measureText(t).width; };
+  const zbuduj = (k) => {
+    const gl = [], slowa = [];
+    let x = 0;
+    b.slowa.forEach((w, j) => {
+      const s = typoSlowo(w, m, b.uklad), px = baza * k * TYPO_EFEKT_WAGA[s.waga] * typoClamp(typoLiczba(w.skala, 1), 0.3, 3);
+      if (j) x += miara(s, px, " ");
+      const od = x;
+      for (const ch of Array.from(s.tekst)) { const adv = miara(s, px, ch); gl.push({ ch, j, adv, px, s, src: w, a: x + adv / 2 }); x += adv; }
+      slowa.push({ od, do: x, px, tekst: w.tekst });
+    });
+    const s = typoSlowo({ tekst: "•", waga: 0 }, m, b.uklad), px = baza * k * TYPO_EFEKT_WAGA[0], adv = miara(s, px, "•");
+    return { gl, slowa, dl: x, sep: { ch: "•", j: -1, adv, px, s, src: {} }, odstep: 2 * miara(s, px, " ") + adv };
+  };
+  const obw = 2 * Math.PI * R;
+  let L = zbuduj(1);
+  if (L.dl + (e.powtorz ? L.odstep : 0) > obw * 0.96) L = zbuduj((obw * 0.95) / (L.dl + (e.powtorz ? L.odstep : 0)));
+  const n = e.powtorz ? Math.max(1, Math.floor(obw / (L.dl + L.odstep))) : 1;
+  return { ...L, R, n, krok: obw / n, S: Math.min(W, H) / 1080 };
+}
+let TYPO_PLOTNO = null;                   // wspólna kanwa robocza pierścienia (rysowany litera po literze)
+function typoPlotno(w, h) {
+  const c = TYPO_PLOTNO || (TYPO_PLOTNO = document.createElement("canvas"));
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } else c.getContext("2d").clearRect(0, 0, w, h);
+  return c;
+}
+// Środek pierścienia w chwili now (px, z `sledz`), kąt pierwszej litery i postęp rozwinięcia.
+function typoPierscienStan(b, e, U, W, H, now) {
+  const rel = now - b.start, [dx, dy] = typoSledz(e, rel), w0 = U.slowa.length ? (U.slowa[0].od + U.slowa[0].do) / 2 : 0;
+  return { cx: (typoLiczba(b.x, 0.5) + dx) * W, cy: (typoLiczba(b.y, 0.3) + dy) * H, roz: typoEaseOut(rel / TYPO_EFEKT.rozwin),
+    th0: Math.PI / 2 + w0 / U.R + (e.kierunek === "prawo" ? -1 : 1) * ((e.predkosc * Math.PI) / 180) * rel };
+}
+// Litery pierścienia w chwili now (bez rysowania; test liczy na nich podział warstw): {U, Q, rot, sn, cn, lit: [{q, w
+// (postęp wejścia słowa), s, c (sin i cos kąta), z, warstwa, x, y (px kadru), sc (skala), alfa}]}, tył przed przodem.
+function typoPierscienLitery(ctx, b, e, P, W, H, now, st) {
+  const U = typoPierscienUklad(ctx, b, e, P, W, H), Q = typoPierscienStan(b, e, U, W, H, now);
+  const k = typoKamera(P, now), R = U.R * (0.6 + 0.4 * Q.roz);
+  const nach = (e.nachylenie * Math.PI) / 180, sn = Math.sin(nach), cn = Math.cos(nach);
+  const rot = (typoLiczba(b.rot, 0) * Math.PI) / 180, cr = Math.cos(rot), sr = Math.sin(rot);
+  const rho = TYPO_EFEKT.glebia * ((2 * U.R) / W), wy = st.wy === "zanik" || st.wy === "smuga" ? 1 - st.e : 1;
+  const lit = [];
+  for (let r = 0; r < U.n; r++) {
+    for (const q of U.gl) if (st.slowa[q.j] >= 0) lit.push([r * U.krok + q.a, q, st.slowa[q.j]]);
+    if (e.powtorz) lit.push([r * U.krok + U.dl + (U.krok - U.dl) / 2, U.sep, 1]);
+  }
+  const out = lit.map(([a, q, w]) => {
+    const th = Q.th0 - a / U.R, s = Math.sin(th), c = Math.cos(th);
+    const z = 1 - rho * s, pz = 1 / z;                                   // perspektywa koła: przód szerszy i większy
+    const X0 = R * c * pz, Y0 = R * sn * s * pz;                         // przód (sin θ > 0) niżej przy nachyleniu > 0
+    let x = Q.cx + X0 * cr - Y0 * sr, y = Q.cy + X0 * sr + Y0 * cr, sc = (pz * R) / U.R;   // rozwijanie: litery rosną z kołem
+    if (k) { const p = typoRzut(k, x / W, y / H, z); x = p.x * W; y = p.y * H; sc *= p.s; }
+    const kraw = typoClamp((Math.abs(s) - 0.05) / 0.2, 0, 1);            // bokiem do widza: znika
+    return { q, w, s, c, z, x, y, sc, warstwa: s > 0 ? "przod" : "tyl", alfa: kraw * Q.roz * wy * (s > 0 ? 1 : TYPO_EFEKT.tyl) };
+  }).sort((p1, p2) => p1.s - p2.s);
+  return { U, Q, rot, sn, cn, lit: out };
+}
+function typoRysujPierscien(ctx, b, e, P, W, H, now, st, warstwa) {
+  const m = typoMotyw(P), L = typoPierscienLitery(ctx, b, e, P, W, H, now, st);
+  const M = Math.round(Math.min(W, H) * 0.25), c = typoPlotno(W + 2 * M, H + 2 * M), g = c.getContext("2d");
+  for (const o of L.lit) {
+    if (o.alfa <= 0 || (warstwa && o.warstwa !== warstwa)) continue;
+    const q = o.q, gs = { ...q.s, tekst: q.ch, px: q.px, w: q.adv, x: -q.adv / 2, y: q.px * 0.35, src: q.src, alfa: o.alfa };
+    g.save();       // litera w płaszczyźnie stycznej do koła: oś x wzdłuż obwodu (z tyłu w lustrze), oś y pionowo
+    g.translate(o.x + M, o.y + M); g.rotate(L.rot); g.transform(o.sc * o.s, -o.sc * L.sn * o.c, 0, o.sc * L.cn, 0, 0);
+    typoRysujSlowo(g, gs, o.w, typoWejscie(b, q.src, m), m);
+    g.restore();
+  }
+  ctx.drawImage(c, -M, -M);
+  const maxPx = Math.max(1, ...L.U.gl.map((q) => q.px));
+  return { slowa: [], w: 2 * (L.U.R + maxPx * 0.6), h: 2 * (L.U.R * Math.abs(L.sn) + maxPx * 1.1), cx: L.Q.cx, cy: L.Q.cy, S: L.U.S, pierscien: L.U };
+}
+
 let TYPO_SZUM = null;   // tekstura „ulica”: stały szum (deterministyczny), wycinany z liter jak zdarta farba
 function typoSzum() {
   if (TYPO_SZUM) return TYPO_SZUM;
@@ -514,7 +674,7 @@ function typoRysujSlowo(g, s, a, wejscie, m, rozm = 0) {
   g.save();
   g.font = typoFont(s.kroj, px);
   g.textBaseline = "alphabetic";
-  let x = s.x, y = s.y, alpha = s.glebia < 0 ? 0.8 : 1;
+  let x = s.x, y = s.y, alpha = (s.glebia < 0 ? 0.8 : 1) * (s.alfa ?? 1);   // alfa: krycie litery pierścienia
   if (wejscie === "pop" && a < 1) {
     const k = 1 + 0.38 * (1 - typoEaseBack(a));
     g.translate(x + s.w / 2, y - px * 0.35); g.scale(k, k); g.translate(-(x + s.w / 2), -(y - px * 0.35));
@@ -606,14 +766,19 @@ function typoRysujSlowo(g, s, a, wejscie, m, rozm = 0) {
 // `stan` (opcjonalnie) zamiast stanu w chwili now: kontrola rysuje tak pojedyncze słowa bloku.
 // Kamera (plan z `kamera`): blok rysowany od razu w skali, w której go widać (ostre litery przy najeździe), w miejscu
 // z rzutu swojej głębi; słowo z inną głębią niż blok (glebia, z) ma własny rzut (paralaksa w bloku) i rozmycie.
-function typoRysujBlok(ctx, b, P, W, H, now, stan) {
+// `warstwa` (opcjonalnie, blok w obu warstwach): tylko ta część bloku — słowa tej warstwy, przy przejściu strona
+// szwu, przy pierścieniu połowa koła. Bez niej cały blok (kontrola, karta stylu).
+function typoRysujBlok(ctx, b, P, W, H, now, stan, warstwa) {
   const m = typoMotyw(P);
   const st = stan || typoStan(b, P, now);
   if (!st.slowa.some((a) => a >= 0)) return null;
+  const e = typoEfekt(b);
+  if (e && e.rodzaj === "pierscien") return typoRysujPierscien(ctx, b, e, P, W, H, now, st, warstwa);
   const u = typoUklad(ctx, b, P, W, H);
-  const k = typoKamera(P, now), zb = typoZ(b);
-  let cx = u.cx, cy = u.cy, sk = 1;
-  if (k) { const r = typoRzut(k, u.cx / W, u.cy / H, zb); cx = r.x * W; cy = r.y * H; sk = r.s; }
+  const k = typoKamera(P, now), zb = typoZ(b), prz = e ? typoPrzejscieStan(b, e, u.w, W, now) : null;
+  const bx = prz ? prz.x * W : u.cx, by = prz ? u.cy + prz.dy * H : u.cy;      // środek bloku w spoczynku kamery
+  let cx = bx, cy = by, sk = 1;
+  if (k) { const r = typoRzut(k, bx / W, by / H, zb); cx = r.x * W; cy = r.y * H; sk = r.s; }
   const maxPx = Math.max(...u.slowa.map((s) => s.px));
   const pad = Math.ceil(maxPx * (k ? 0.8 : 0.5) + (k ? 40 * u.S : 0));   // kamera: zapas na paralaksę słów i rozmycie
   const bw = Math.ceil((u.w + pad * 2) * sk), bh = Math.ceil((u.h + pad * 2) * sk);
@@ -624,18 +789,24 @@ function typoRysujBlok(ctx, b, P, W, H, now, stan) {
   if (sk !== 1) g.scale(sk, sk);
   u.slowa.forEach((s, j) => {
     if (st.slowa[j] < 0) return;
+    if (warstwa && !prz && typoWarstwaSlowa(b, s.src) !== warstwa) return;   // słowo z głębią po drugiej stronie osoby
     const wej = typoWejscie(b, s.src, m);
     if (!k) { typoRysujSlowo(g, s, st.slowa[j], wej, m); return; }
     const zw = typoZSlowa(b, s.src), wlasna = s.src.z !== undefined && s.src.z !== null && s.src.z !== "";
     const rozm = typoRozmycie(k, zw, wlasna) * u.S;
     if (Math.abs(zw - zb) < 1e-4) { typoRysujSlowo(g, s, st.slowa[j], wej, m, rozm); return; }
-    const lx = s.x + s.w / 2, ly = s.y - s.px * 0.35, r = typoRzut(k, (u.cx + lx) / W, (u.cy + ly) / H, zw);
+    const lx = s.x + s.w / 2, ly = s.y - s.px * 0.35, r = typoRzut(k, (bx + lx) / W, (by + ly) / H, zw);
     const q = r.s / sk;
     g.save(); g.translate((r.x * W - cx) / sk, (r.y * H - cy) / sk); g.scale(q, q); g.translate(-lx, -ly);
     typoRysujSlowo(g, s, st.slowa[j], wej, m, rozm);
     g.restore();
   });
   ctx.save();
+  if (prz && warstwa) {                    // przejście: po stronie wejścia jedna warstwa, za szwem (środek ciała) druga
+    const wej = e.kolejnosc === "przod-za" ? "przod" : "tyl", sx = (k ? typoRzut(k, prz.szew, by / H, 1).x : prz.szew) * W;
+    const lewa = (warstwa === wej) === (prz.dir > 0), B = 4 * Math.max(W, H);
+    ctx.beginPath(); ctx.rect(lewa ? sx - B : sx, -B, B, 3 * B); ctx.clip();
+  }
   ctx.translate(cx, cy);
   ctx.rotate(((+b.rot || 0) * Math.PI) / 180);
   let alpha = 1, dx = 0;
@@ -665,12 +836,13 @@ function typoPerspektywa(ctx, c, bw, bh, tilt, ox) {
   }
 }
 
-// Wszystkie aktywne bloki (opcjonalnie tylko jedna warstwa: "przod" albo "tyl" = za osobą).
+// Wszystkie aktywne bloki (opcjonalnie tylko jedna warstwa: "przod" albo "tyl" = za osobą, pod sylwetką).
 function typoRysuj(ctx, P, W, H, now, warstwa) {
   const out = [];
   for (const b of typoAktywne(P, now)) {
-    if (warstwa && (b.warstwa === "tyl" ? "tyl" : "przod") !== warstwa) continue;
-    const u = typoRysujBlok(ctx, b, P, W, H, now);
+    const ws = typoWarstwyBloku(b);       // blok z efektem albo słowem z głębią po drugiej stronie osoby: obie warstwy
+    if (warstwa && !ws.includes(warstwa)) continue;
+    const u = typoRysujBlok(ctx, b, P, W, H, now, undefined, warstwa && ws.length > 1 ? warstwa : undefined);
     if (u) out.push([b, u]);
   }
   return out;
@@ -691,8 +863,8 @@ function maskaKlucz(P) {
 function typoFonty(P, W, H) {
   const m = typoMotyw(P);
   const out = new Map();
-  for (const b of typoBloki(P)) for (const w of b.slowa) {
-    const s = typoSlowo(w, m, b.uklad);
+  for (const b of typoBloki(P)) for (const w of [...b.slowa, ...(typoEfekt(b) ? [{ tekst: "•", waga: 0 }] : [])]) {
+    const s = typoSlowo(w, m, b.uklad);               // pierścień: kropka między powtórzeniami krojem małych słów
     const f = typoFont(s.kroj, 64);
     out.set(f, (out.get(f) || "") + s.tekst);
   }
@@ -709,9 +881,14 @@ function typoFonty(P, W, H) {
 //   strefa, mały       pełny blok pod interfejsem platformy, słowo mniejsze niż `maly` (uwagi),
 //   kamera             blok, który w spoczynku jest w kadrze, a ruch kamery go wypycha (osobny kod i rada), słowo
 //                      rozmyte głębią ostrości ponad `rozmyte` wysokości liter przez `kroki` kroków (błąd), uderzenie
-//                      (waga 3) rozmyte co najmniej `ostre` px (uwaga: ostrość jest gdzie indziej).
+//                      (waga 3) rozmyte co najmniej `ostre` px (uwaga: ostrość jest gdzie indziej),
+//   efekty             pierścień szybszy niż `obroty` wysokości liter na sekundę z przodu albo słowo dłuższe niż przód
+//                      koła (łuk 120°: zawija się za głowę), przejście szybsze niż `przejscie` szerokości kadru na
+//                      sekundę (błędy), efekt bez sylwetek osoby (błąd: tył napisu szedłby po twarzy) i efekt obok osoby
+//                      (uwaga: sylwetka nie zasłania nawet `dotyka` tylnej części, więc efektu nie widać).
 // Miary w pikselach przy krótszym boku 1080, skalowane do kanwy pomiaru; tusz = krycie ≥ `prog` (bez cienia i poświaty).
-const TYPO_KONTROLA = { krok: 1 / 15, kroki: 5, poza: 3, styk: 4, widac: 0.6, dotyka: 0.03, maly: 30, prog: 160, rozmyte: 0.08, ostre: 2 };
+const TYPO_KONTROLA = { krok: 1 / 15, kroki: 5, poza: 3, styk: 4, widac: 0.6, dotyka: 0.03, maly: 30, prog: 160, rozmyte: 0.08, ostre: 2,
+  obroty: 6, przejscie: 1 };
 const TYPO_RUCHY_OPIS = { najazd: ["najazd", "push-in"], odjazd: ["odjazd", "pull-out"], przesuniecie: ["przesunięcie", "pan"] };
 const TYPO_STRONY = { lewo: ["z lewej", "left"], prawo: ["z prawej", "right"], gora: ["u góry", "top"], dol: ["na dole", "bottom"] };
 
@@ -772,9 +949,9 @@ async function typoKontrola(P, W, H, opt = {}) {
   const px = (v) => Math.round(v / S);
   const dodaj = (poziom, kod, b, t, pl, en) => out.push({ poziom, kod, blok: b ? b.id : null, t: Math.round(t * 100) / 100, opis: [pl, en] });
   const tekst = (b) => b.slowa.map((w) => w.tekst).join(" ");
-  const rysuj = (b, t, stan, PP = P) => {    // tusz bloku na kanwie z marginesem (kadr przesunięty o pad)
+  const rysuj = (b, t, stan, PP = P, warstwa) => {    // tusz bloku na kanwie z marginesem (kadr przesunięty o pad)
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cw, ch); g.translate(pad, pad);
-    typoRysujBlok(g, b, PP, W, H, t, stan);
+    typoRysujBlok(g, b, PP, W, H, t, stan, warstwa);
     g.setTransform(1, 0, 0, 1, 0, 0);
     const mk = typoTusz(g, cw, ch, K.prog);
     return { m: mk, r: typoRamkaTuszu(mk, cw, ch) };
@@ -814,8 +991,9 @@ async function typoKontrola(P, W, H, opt = {}) {
     for (const b of typoAktywne(P, t)) {
       const st = typoStan(b, P, t);
       if (st.e > 0) { seria.delete(b.id); continue; }          // wyjście (smuga, zanik) może wyjść za kadr
-      const kam = typoKamera(P, t);                            // kamera w ruchu: blok w innym miejscu co krok
-      const klucz = st.slowa.map((a) => (a < 0 ? "-" : a.toFixed(3))).join(",") + (kam ? `~${[kam.z, kam.x, kam.y, kam.f].map((v) => v.toFixed(4)).join(",")}` : "");
+      const kam = typoKamera(P, t), ef = typoEfekt(b);         // kamera w ruchu, efekt: blok w innym miejscu co krok
+      const klucz = st.slowa.map((a) => (a < 0 ? "-" : a.toFixed(3))).join(",") + (kam ? `~${[kam.z, kam.x, kam.y, kam.f].map((v) => v.toFixed(4)).join(",")}` : "")
+        + (ef ? `@${t.toFixed(4)}` : "");
       let x = biez.get(b.id);
       if (!x || x.klucz !== klucz) { x = { klucz, ...rysuj(b, t, st) }; biez.set(b.id, x); }
       akt.push([b, x]);
@@ -835,7 +1013,7 @@ async function typoKontrola(P, W, H, opt = {}) {
             `"${tekst(b)}" leaves the frame ${TYPO_STRONY[s0.str][1]} (${px(s0.ile)} px): move it inwards or make it smaller`);
         }
       } else seria.delete(b.id);
-      if (!kam) continue;
+      if (!kam || (ef && ef.rodzaj === "pierscien")) continue;   // litery pierścienia bez rozmycia głębi
       const { zle, hit } = rozmycie(b, st, kam);
       serie(`roz:${b.id}`, zle && zle.q > K.rozmyte, t, zle, (s0) => dodaj("blad", "rozmyte", b, s0.od,
         `„${s0.dane.tekst}” w ${b.id} rozmyte ponad czytelność (${s0.dane.sig.toFixed(1)} px, ${Math.round(s0.dane.q * 100)}% wysokości liter): mniejsza przysłona, ostrość na napisie albo głębia z bliżej ostrości`,
@@ -854,9 +1032,44 @@ async function typoKontrola(P, W, H, opt = {}) {
     for (const id of [...biez.keys()]) if (!akt.some(([b]) => b.id === id)) biez.delete(id);
   }
 
-  // 2. Pełny blok: słowa się stykają, strefy interfejsu, małe słowa, napis za osobą.
+  // Efekt bloku: czytelna prędkość, słowo na przodzie pierścienia, sylwetki osoby i czy osoba zasłania tylną część.
+  const kontrolaEfektu = async (b, ef) => {
+    const tf = typoChwilaPelna(b, m);
+    if (ef.rodzaj === "pierscien") {
+      const U = typoPierscienUklad(g, b, ef, P, W, H), lit = U.gl.reduce((a, q) => a + q.px, 0) / Math.max(1, U.gl.length);
+      const v = (U.R * ef.predkosc * Math.PI) / 180 / Math.max(1, lit), max = Math.floor((K.obroty * lit * 180) / Math.PI / U.R);
+      if (v > K.obroty) dodaj("blad", "pierscien-szybko", b, b.start, `pierścień „${tekst(b)}” kręci się za szybko: przód jedzie ${v.toFixed(1)} wysokości liter na sekundę (najwyżej ${K.obroty}): prędkość do ${max}°/s albo większe litery`,
+        `the ring "${tekst(b)}" spins too fast: the front moves ${v.toFixed(1)} letter heights per second (max ${K.obroty}): speed up to ${max}°/s or bigger letters`);
+      const luk = ((2 * Math.PI) / 3) * U.R, dl = U.slowa.reduce((a, s) => (s.do - s.od > a.do - a.od ? s : a), U.slowa[0]);
+      if (dl && dl.do - dl.od > luk) dodaj("blad", "pierscien-nieczytelny", b, tf, `w pierścieniu ${b.id} „${dl.tekst}” jest dłuższe niż przód koła (${Math.round(((dl.do - dl.od) / luk) * 100)}%): zawija się za głowę, nie da się go przeczytać: większe koło (szerokość), mniejsze litery (rozmiar) albo krótsze słowo`,
+        `in ring ${b.id} "${dl.tekst}" is longer than the front of the ring (${Math.round(((dl.do - dl.od) / luk) * 100)}%): it wraps behind the head: a bigger ring (width), smaller letters (size) or a shorter word`);
+    } else {
+      const q = typoPrzejscieStan(b, ef, typoUklad(g, b, P, W, H).w, W, b.start), v = q.v * 1.5;   // szczyt płynnego ruchu
+      if (v > K.przejscie) dodaj("blad", "przejscie-szybko", b, b.start, `„${tekst(b)}” przechodzi przez osobę za szybko (${v.toFixed(2)} szerokości kadru na sekundę, najwyżej ${K.przejscie}): dłuższy blok albo węższy napis`,
+        `"${tekst(b)}" crosses the person too fast (${v.toFixed(2)} frame widths per second, max ${K.przejscie}): a longer block or narrower text`);
+    }
+    const nazwa = ef.rodzaj === "pierscien" ? ["pierścień", "the ring"] : ["przejście", "the crossing"];
+    const sc = document.createElement("canvas"); sc.width = cw; sc.height = ch;
+    const sg = sc.getContext("2d", { willReadFrequently: true });
+    let ile = 0, zaslania = 0;
+    const krok = Math.max(0.15, (b.end - b.start) / 8);
+    for (let t = b.start + 0.1; t < b.end - 0.03 && opt.sylwetka && ile < 8; t += krok) {
+      const obraz = await opt.sylwetka(t);
+      if (!obraz) continue;
+      sg.clearRect(0, 0, cw, ch); sg.drawImage(obraz, pad, pad, W, H);
+      const tyl = rysuj(b, t, typoStan(b, P, t), P, "tyl");
+      if (tyl.r) { ile++; zaslania = Math.max(zaslania, typoPokrycie(tyl.m, typoTusz(sg, cw, ch, 128))); }
+    }
+    if (!ile) dodaj("blad", "efekt-bez-sylwetek", b, tf, `${nazwa[0]} ${b.id} („${tekst(b)}”) nie ma sylwetek osoby (typografia.py sylwetki <film>): bez nich tył napisu idzie po twarzy`,
+      `${nazwa[1]} ${b.id} ("${tekst(b)}") has no person silhouettes: without them the back of the text runs over the face`);
+    else if (zaslania < K.dotyka) dodaj("uwaga", "efekt-obok-osoby", b, tf, `${nazwa[0]} ${b.id} („${tekst(b)}”) mija osobę: sylwetka nie zasłania tyłu napisu (ustaw środek na głowie albo ciele: typografia.py efekt)`,
+      `${nazwa[1]} ${b.id} ("${tekst(b)}") misses the person: the silhouette covers no part of the back (centre it on the head or body)`);
+  };
+
+  // 2. Pełny blok: słowa się stykają, strefy interfejsu, małe słowa, efekt, napis za osobą.
   for (const b of bloki) {
-    const tf = typoChwilaPelna(b, m), wy = b.wyjscie || m.wyjscie, n = b.slowa.length;
+    const tf = typoChwilaPelna(b, m), wy = b.wyjscie || m.wyjscie, ef = typoEfekt(b), pier = ef && ef.rodzaj === "pierscien";
+    const n = pier ? 0 : b.slowa.length;                      // pierścień: odstępy liter wyznacza koło
     const pelny = { slowa: b.slowa.map(() => 1), e: 0, wy };
     const slowa = n > 1 ? b.slowa.map((_w, j) => rysuj(b, tf, { slowa: b.slowa.map((_x, i) => (i === j ? 1 : -1)), e: 0, wy })) : [];
     for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
@@ -873,9 +1086,11 @@ async function typoKontrola(P, W, H, opt = {}) {
       if (pod.length) dodaj("uwaga", "strefa", b, tf, `„${tekst(b)}” wchodzi pod interfejs platformy (${pod.map((s) => s.nazwa[0]).join(", ")}): przesuń blok`,
         `"${tekst(b)}" sits under the platform interface (${pod.map((s) => s.nazwa[1]).join(", ")}): move it`);
     }
-    const u = typoUklad(g, b, P, W, H), mini = u.slowa.reduce((a, s) => (s.px < a.px ? s : a), u.slowa[0]);
+    const u = pier ? { slowa: typoPierscienUklad(g, b, ef, P, W, H).gl } : typoUklad(g, b, P, W, H);
+    const mini = u.slowa.reduce((a, s) => (s.px < a.px ? s : a), u.slowa[0]);
     if (mini && px(mini.px) < K.maly) dodaj("uwaga", "male-slowo", b, tf, `„${mini.src.tekst}” w ${b.id} ma tylko ${px(mini.px)} px: na telefonie ledwo widać (powiększ blok albo słowo)`,
       `"${mini.src.tekst}" in ${b.id} is only ${px(mini.px)} px: hard to read on a phone`);
+    if (ef) { await kontrolaEfektu(b, ef); continue; }
     if (b.warstwa !== "tyl" || !opt.sylwetka) continue;
     const sc = document.createElement("canvas"); sc.width = cw; sc.height = ch;
     const sg = sc.getContext("2d", { willReadFrequently: true });

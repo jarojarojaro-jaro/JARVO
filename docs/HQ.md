@@ -268,6 +268,24 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   z ruchem kamery ma żółty pasek u dołu. Cięcie bloku zostawia ruch w części ze słowem startu, a łączenie bierze ruch
   pierwszego bloku albo drugiego od jego słowa (`typoRuchPodzial` / `typoRuchPolacz`, w `typografia.py` `podziel` i
   `polacz` tak samo).
+- **Efekty typografii** (`blok.efekt`, `edytor.efekt_norm` = `typoEfekt` w `48-typografia.js`, test pilnuje list
+  i liczb): `pierscien` (napis krąży pierścieniem wokół głowy) i `przejscie` (napis przechodzi przez osobę). Blok
+  z efektem rysuje się w obu warstwach: część za osobą idzie pod jej sylwetkę (`maska.py`), część przed osobą nad nią
+  (`typoWarstwyBloku` = `edytor.typo_warstwy`: także słowo z własną głębią `z` po drugiej stronie osoby, z > 1 = za
+  nią). **Pierścień:** środek koła to `x`, `y` bloku (głowa), średnica `w` szerokości kadru, litery ~0,11 średnicy
+  (× `rozmiar`, waga słowa); `predkosc` 5–180°/s (domyślnie 40), `nachylenie` ±40° (domyślnie 14: przód niżej),
+  `kierunek` `lewo` (przód jedzie w lewo, czyta się jak pasek) albo `prawo`, `powtorz` (napis dookoła koła z kropką;
+  `false` = raz). Litera na kącie θ stoi na głębi z = 1 − ρ·sin θ (ρ = 0,35 · średnica / szerokość kadru, rzut 1 / z
+  wokół środka koła): przód jest bliżej, szerszy i większy, w warstwie przedniej, tył w `tyl` (osoba go zasłania),
+  w lustrze i ciemniej; litera bokiem do widza znika, więc zmiana warstwy jest niewidoczna. Koło rozwija się w 0,35 s,
+  pierwsze słowo zaczyna na środku przodu, kamera planu działa na każdą literę. **Przejście:** `x` bloku to szew
+  (środek ciała), blok jedzie poziomo przez niego w pierwszych 70% swojego czasu, od całości po stronie wejścia do
+  całości po drugiej stronie, i stoi do czytania; po stronie wejścia jest w jednej warstwie, za szwem w drugiej
+  (`kolejnosc` `za-przod`: wchodzi za osobę, wychodzi przed nią; `przod-za` odwrotnie; `kierunek` `prawo`/`lewo`).
+  `sledz` ([[t, dx, dy]], do 40 punktów) przesuwa środek za ruchem głowy w czasie bloku. Podpis klatki eksportu bloku
+  z efektem ma czas, więc obie warstwy rysują każdą jego klatkę; sylwetki są potrzebne we wszystkich klatkach bloku
+  (`edytor.maska_concat`), a podgląd kładzie osobę nad warstwą `tyl` także przy efekcie. Plan bez `efekt` rysuje się jak
+  dawniej.
 - **Projekt** zapisuje się sam (co ~1 s) jako `<film>.edycja.json` obok filmu: klipy (`src`, `in`, `out`, `speed`,
   `volume`, `muted`, `fit`, `transition`, `fadeIn`, `fadeOut`, `color`, `voice`), napisy, audio (także `label`
   i `linked`) i typografia (`typo`). Po ponownym otwarciu edycja jest tam, gdzie była.

@@ -1390,3 +1390,169 @@ def test_kontrola_kamery_w_przegladarce(tmp_path):
     assert poziom["poza-kadrem-kamera"] == poziom["rozmyte"] == "blad" and poziom["uderzenie-rozmyte"] == "uwaga"
     opis = next(x["opis"][0] for x in wynik["problemy"] if x["kod"] == "poza-kadrem-kamera")
     assert "najazd z b1" in opis
+
+
+# ---------------------------------------------------------------- efekty: pierścień wokół głowy, przejście przez osobę
+
+def _efekt_blok(rodzaj: str, i: str = "b1", start: float = 1.0, end: float = 4.0, **kw) -> dict:
+    return {"id": i, "start": start, "end": end, "uklad": "srodek", "x": 0.5, "y": 0.3, "w": 0.5, "warstwa": "przod",
+            "efekt": {"rodzaj": rodzaj, **kw}, "slowa": [_w(0, "TYLKO", 3), _w(0.4, "dziś", 1)]}
+
+
+def test_efekt_w_planie_bezpieczny_i_zgodny_wstecz():
+    raw = {"bloki": [
+        _efekt_blok("pierscien", "b1", predkosc=900, nachylenie="-80", powtorz=False, kierunek="w-gore",
+                    sledz=[[2.5, 0.1, -0.02], [0.5, 2, 0], ["x", 0, 0], [1, True, 0], [0.1, 0.0, 0.01, 4]]),
+        _efekt_blok("przejscie", "b2", start=5, end=7, kolejnosc="przod-za", kierunek="lewo", predkosc=50),
+        _efekt_blok("wir", "b3", start=8, end=9),
+        {**_efekt_blok("pierscien", "b4", start=9.5, end=11), "efekt": {"rodzaj": "pierscien", "predkosc": True}}]}
+    p = ed.normalize_typo(raw, 12.0)
+    b = {x["id"]: x for x in p["bloki"]}
+    assert b["b1"]["efekt"] == {"rodzaj": "pierscien", "kierunek": "lewo", "predkosc": 180, "nachylenie": -40,
+                                "powtorz": False, "sledz": [[0.5, 1, 0], [2.5, 0.1, -0.02]]}
+    assert b["b2"]["efekt"] == {"rodzaj": "przejscie", "kierunek": "lewo", "kolejnosc": "przod-za"}
+    assert "efekt" not in b["b3"] and ed.typo_warstwy(b["b3"]) == ("przod",)     # nieznany efekt: zwykły blok
+    assert b["b4"]["efekt"]["predkosc"] == 40                                       # prawda to nie liczba: domyślna
+    assert ed.typo_warstwy(b["b1"]) == ed.typo_warstwy(b["b2"]) == ("tyl", "przod")
+    zwykly = ed.normalize_typo({"bloki": [{**_efekt_blok("x"), "efekt": None}]}, 5)["bloki"][0]
+    assert "efekt" not in zwykly                                                     # stary plan bez pola: bez zmian
+    slowa_z = {**zwykly, "slowa": [{**zwykly["slowa"][0], "z": 1.2}, zwykly["slowa"][1]]}
+    assert ed.typo_warstwy(slowa_z) == ("tyl", "przod")                              # słowo z głębią za osobą
+    assert ed.typo_warstwy({**zwykly, "warstwa": "tyl", "uklad": "za"}) == ("tyl",)
+
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_efekt_js_i_python_te_same_listy_liczby_i_warstwy():
+    for nazwa, py in (("TYPO_EFEKTY", ed.TYPO_EFEKTY), ("TYPO_EFEKT_KIERUNKI", ed.EFEKT_KIERUNKI),
+                      ("TYPO_EFEKT_KOLEJNOSC", ed.EFEKT_KOLEJNOSC)):
+        assert tuple(json.loads(re.search(rf"const {nazwa} = (\[.*?\]);", JS).group(1))) == py
+    st = re.search(r"const TYPO_EFEKT = \{ predkosc: ([\d.]+), predkoscMin: ([\d.]+), predkoscMax: ([\d.]+), "
+                   r"nachylenie: ([\d.]+), nachylenieMax: ([\d.]+), sledz: (\d+),", JS)
+    assert tuple(map(float, st.groups())) == (ed.EFEKT_PREDKOSC[1], ed.EFEKT_PREDKOSC[0], ed.EFEKT_PREDKOSC[2],
+                                              ed.EFEKT_NACHYLENIE[1], ed.EFEKT_NACHYLENIE[0], ed.EFEKT_SLEDZ)
+    surowe = [{"rodzaj": "pierscien"}, {"rodzaj": "pierscien", "predkosc": 3, "nachylenie": 99, "kierunek": "prawo",
+                                         "powtorz": False, "sledz": [[1, 0.1, 0], [0.2, 0, 0.05]]},
+              {"rodzaj": "pierscien", "predkosc": "60", "nachylenie": False},
+              {"rodzaj": "przejscie"}, {"rodzaj": "przejscie", "kierunek": "lewo", "kolejnosc": "przod-za"}]
+    bloki = [{**_efekt_blok("x", f"b{i}"), "efekt": e} for i, e in enumerate(surowe)]
+    bloki += [{**_efekt_blok("x", "z1"), "efekt": None, "slowa": [{**_w(0, "a", 1), "z": 1.4}, _w(0.2, "b", 1)]},
+              {**_efekt_blok("x", "z2"), "efekt": None, "warstwa": "tyl", "slowa": [{**_w(0, "a", 1), "z": 0.7}]},
+              {**_efekt_blok("x", "z3"), "efekt": None, "warstwa": "tyl"}]
+    o = node(f"const B = {json.dumps(bloki)};\nconsole.log(JSON.stringify(B.map((b) => [typoEfekt(b), typoWarstwyBloku(b)])));")
+    for b, (e, ws) in zip(bloki, o):
+        py = ed.efekt_norm(b["efekt"], 3.0)
+        if py is None:
+            assert e is None
+        else:
+            assert e["rodzaj"] == py["rodzaj"] and e["kierunek"] == py["kierunek"]
+            assert e.get("predkosc") == py.get("predkosc") and e.get("nachylenie") == py.get("nachylenie")
+            assert e.get("kolejnosc") == py.get("kolejnosc") and e["sledz"] == py.get("sledz", [])
+            assert e.get("powtorz", None) == (py.get("powtorz", True) if py["rodzaj"] == "pierscien" else None)
+        assert tuple(ws) == ed.typo_warstwy(b), b["id"]
+
+
+CTX_MIARA = ("const ctx = { font: '', measureText(t) { const px = parseFloat(this.font.match(/([\\d.]+)px/)[1]); "
+             "return { width: Array.from(t).length * px * 0.55 }; } };")
+
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_pierscien_geometria_i_podzial_warstw():
+    """Pierścień: pierwsze słowo zaczyna na środku przodu, przód (sin θ > 0) w warstwie „przod”, większy (bliżej)
+    i niżej (nachylenie), tył w „tyl”, w lustrze i ciemniej; koło kręci się w lewo; napis powtórzony dookoła, a za
+    długi bez powtórzeń mieści się na obwodzie; podpis klatki zmienia się co klatkę i jest w obu warstwach."""
+    b = ed.normalize_typo({"motyw": "czysty", "bloki": [_efekt_blok("pierscien")]}, 6)["bloki"][0]
+    dlugi = {**b, "id": "b2", "efekt": {"rodzaj": "pierscien", "powtorz": False},
+             "slowa": [_w(0, "Konstantynopolitańczykowianeczka" * 2, 1)]}
+    o = node(CTX_MIARA + f"\nconst b = {json.dumps(b)}, d = {json.dumps(dlugi)}, P = {{typo: {{motyw: 'czysty', bloki: [b]}}}};"
+             "\nconst L = (t) => typoPierscienLitery(ctx, b, typoEfekt(b), P, 1080, 1920, t, typoStan(b, P, t));"
+             "\nconst T = (l) => l.lit.filter((o) => o.q.ch === 'T').reduce((a, o) => (o.s > a.s ? o : a));   // „T” z przodu"
+             "\nconst Ud = typoPierscienUklad(ctx, d, typoEfekt(d), P, 1080, 1920);"
+             "\nconsole.log(JSON.stringify({a: L(1.6), z: L(1.2), U: typoPierscienUklad(ctx, b, typoEfekt(b), P, 1080, 1920),"
+             " t0: T(L(1.0)), t1: T(L(1.6)), t2: T(L(1.8)), dl: [Ud.n, Ud.dl, Ud.R],"
+             " podpis: [1.6, 1.6333].map((t) => typoPodpis(P, t, 'tyl')), przod: typoPodpis(P, 1.6, 'przod')}));")
+    U = o["U"]
+    assert U["R"] == pytest.approx(270) and U["n"] >= 2 and U["krok"] * U["n"] == pytest.approx(2 * 3.14159265 * 270, rel=1e-6)
+    lit = o["a"]["lit"]
+    przod, tyl = [x for x in lit if x["warstwa"] == "przod"], [x for x in lit if x["warstwa"] == "tyl"]
+    assert przod and tyl and all(x["s"] > 0 for x in przod) and all(x["s"] <= 0 for x in tyl)
+    assert min(x["sc"] for x in przod) > 1 > max(x["sc"] for x in tyl)             # przód bliżej (z < 1), tył dalej
+    assert min(x["y"] for x in przod) > o["a"]["Q"]["cy"] > max(x["y"] for x in tyl)   # nachylenie: przód niżej
+    assert all(x["alfa"] <= 0.75 + 1e-9 for x in tyl)                              # tył ciemniej
+    assert o["t0"]["x"] < 540 and abs(o["t0"]["s"]) > 0.95                          # „T” na przodzie od początku
+    assert o["t2"]["x"] < o["t1"]["x"]                                              # kierunek lewo: przód jedzie w lewo
+    assert [x["s"] for x in lit] == sorted(x["s"] for x in lit)                     # tył rysowany pod przodem
+    n, dl, R = o["dl"]
+    assert n == 1 and dl <= 2 * 3.14159265 * R * 0.96 + 1e-6                        # bez powtórzeń: mieści się na kole
+    assert o["podpis"][0] != o["podpis"][1] and o["podpis"][0].startswith("b1:") and o["przod"]
+    assert len(o["z"]["lit"]) < len(o["a"]["lit"])                                 # drugie słowo wchodzi po 0,4 s
+
+
+@pytest.mark.skipif(not HAS_NODE, reason="brak node")
+def test_przejscie_szew_droga_i_warstwy():
+    """Przejście: blok jedzie od strony wejścia przez szew (x bloku) do całości po drugiej stronie w 70% czasu,
+    potem stoi; kierunek lewo odwraca drogę; ramka edytora jedzie razem z blokiem."""
+    b = ed.normalize_typo({"bloki": [_efekt_blok("przejscie", start=1, end=3)]}, 6)["bloki"][0]
+    lewo = {**b, "efekt": {"rodzaj": "przejscie", "kierunek": "lewo"}}
+    o = node(CTX_MIARA + f"\nconst b = {json.dumps(b)}, l = {json.dumps(lewo)}, P = {{typo: {{bloki: [b]}}}};"
+             "\nconst S = (x, t) => typoPrzejscieStan(x, typoEfekt(x), 400, 1080, t);"
+             "\nconsole.log(JSON.stringify({p: [1, 1.7, 2.4, 2.9].map((t) => S(b, t)), l: [1, 2.9].map((t) => S(l, t)),"
+             " r: [1.0, 2.9].map((t) => typoRamka(ctx, b, P, 1080, 1920, t).cx), r0: typoRamka(ctx, b, P, 1080, 1920).cx,"
+             " ws: typoWarstwyBloku(b), pp: [1.5, 1.5333].map((t) => typoPodpis(P, t, 'przod'))}));")
+    p = o["p"]
+    pol = 400 / 2 / 1080 + 0.03
+    assert p[0]["x"] == pytest.approx(0.5 - pol) and p[1]["x"] == pytest.approx(0.5, abs=1e-3)
+    assert p[2]["x"] == pytest.approx(0.5 + pol) and p[3]["x"] == p[2]["x"]          # po drodze stoi do czytania
+    assert p[0]["v"] == pytest.approx(2 * pol / (2 * 0.7))
+    assert o["l"][0]["x"] == pytest.approx(0.5 + pol) and o["l"][1]["x"] == pytest.approx(0.5 - pol)
+    assert o["r"][0] < o["r0"] < o["r"][1] and o["r0"] == pytest.approx(540)
+    assert o["ws"] == ["tyl", "przod"] and o["pp"][0] != o["pp"][1]
+
+
+def test_maska_concat_dla_efektu_i_slowa_za_osoba(tmp_path):
+    src, raw = _maska_film(tmp_path, 50, klatki=list(range(10, 41)))
+    przod = {"id": "b1", "start": 0.4, "end": 1.6, "uklad": "srodek", "warstwa": "przod",
+             "slowa": [{"t": 0, "k": 0.3, "tekst": "PRZÓD", "waga": 3, "linia": 0}]}
+    for blok, jest in ((przod, False), ({**przod, "efekt": {"rodzaj": "pierscien"}}, True),
+                       ({**przod, "efekt": {"rodzaj": "przejscie"}}, True),
+                       ({**przod, "slowa": [{**przod["slowa"][0], "z": 1.2}]}, True)):
+        typo = ed.normalize_typo({"bloki": [blok]}, 2.0)
+        p = {**raw, "duration": 2.0, "typo": typo}
+        assert (ed.maska_concat(src, {**raw, "typo": typo}, p, tmp_path) is not None) is jest, blok
+
+
+def test_efekt_w_przegladarce_warstwy_pierscienia_i_przejscia():
+    """Chromium: przód pierścienia rysuje warstwa „przod”, tył „tyl” (tusz w dolnej i górnej części koła); przejście
+    po stronie wejścia w „tyl”, za szwem w „przod”; obie warstwy razem = cały blok."""
+    pytest.importorskip("playwright.sync_api")
+    pier = ed.normalize_typo({"motyw": "czysty", "bloki": [{**_efekt_blok("pierscien", nachylenie=30), "y": 0.5}]}, 6)
+    prz = ed.normalize_typo({"motyw": "czysty", "bloki": [{**_efekt_blok("przejscie", start=1, end=3), "y": 0.5}]}, 6)
+    js = """async ([plany, t]) => {
+        const out = [];
+        for (const T of plany) {
+            const P = { typo: T }, wynik = {};
+            for (const [f, txt] of typoFonty(P, 270, 480)) await fontLoad(f, txt);
+            for (const w of ["tyl", "przod", null]) {
+                const c = document.createElement("canvas"); c.width = 270; c.height = 480;
+                const g = c.getContext("2d", { willReadFrequently: true });
+                typoRysuj(g, P, 270, 480, t, w || undefined);
+                const d = g.getImageData(0, 0, 270, 480).data;
+                let n = 0, sx = 0, sy = 0;
+                for (let i = 0; i < 270 * 480; i++) if (d[i * 4 + 3] >= 160) { n++; sx += i % 270; sy += Math.floor(i / 270); }
+                wynik[w || "razem"] = { n, x: n ? sx / n : 0, y: n ? sy / n : 0 };
+            }
+            out.push(wynik);
+        }
+        return out;
+    }"""
+    try:
+        with ty.pr.strona([{"typo": pier}, {"typo": prz}]) as page:
+            a = page.evaluate(js, [[pier], 1.6])[0]
+            b = page.evaluate(js, [[prz], 1.7])[0]
+    except Exception as exc:  # noqa: BLE001 - brak przeglądarki w tym środowisku
+        pytest.skip(f"przeglądarka niedostępna: {exc}")
+    assert a["tyl"]["n"] > 50 and a["przod"]["n"] > 50
+    assert a["przod"]["y"] > 240 > a["tyl"]["y"]                       # przód koła niżej, tył wyżej (nachylenie 30°)
+    assert a["tyl"]["n"] + a["przod"]["n"] == pytest.approx(a["razem"]["n"], rel=0.1)
+    assert b["tyl"]["n"] > 20 and b["przod"]["n"] > 20                 # w połowie drogi napis po obu stronach szwu
+    assert b["tyl"]["x"] < 135 < b["przod"]["x"]                       # wejście z lewej (za osobą), wyjście z prawej
+    assert b["tyl"]["n"] + b["przod"]["n"] == pytest.approx(b["razem"]["n"], rel=0.05)

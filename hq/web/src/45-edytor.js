@@ -936,9 +936,9 @@ function VideoEditor({ path, onClose }) {
   // sylwetka osoby (maska.py Wideografa): napis z warstwy „tyl” chowa się za osobą także w podglądzie
   const maskaRef = useRef({ info: null, img: new Map(), oc: null });
   const [maskaV, setMaskaV] = useState(0);     // nowy indeks sylwetek: panel bloku wie, czy osoba zasłoni napis
-  // bloki za osobą (czas): indeks pobieramy po ich zmianie i po wczytaniu projektu (np. Wideograf policzył sylwetki),
-  // a nie przy każdym ruchu suwaka
-  const typoTylKey = p ? typoBloki(p).filter((b) => b.warstwa === "tyl").map((b) => `${b.id}@${b.start}-${b.end}`).join() : "";
+  // bloki z częścią za osobą (warstwa „tyl”, efekt, słowo z głębią za osobą; czas): indeks pobieramy po ich zmianie
+  // i po wczytaniu projektu (np. Wideograf policzył sylwetki), a nie przy każdym ruchu suwaka
+  const typoTylKey = p ? typoBloki(p).filter((b) => typoWarstwyBloku(b).includes("tyl")).map((b) => `${b.id}@${b.start}-${b.end}`).join() : "";
   useEffect(() => {
     if (!typoTylKey || !api.editMaska) { maskaRef.current.info = null; return undefined; }
     let live = true;
@@ -979,7 +979,7 @@ function VideoEditor({ path, onClose }) {
   // w strefach platformy przyciemniona jak reszta wideo pod nimi (zs, cien: te same co w drawOverlay)
   function osobaNaWierzch(g, P, w, h, now, zs, cien) {
     const m = maskaRef.current, inf = m.info;
-    if (!inf || inf.klucz !== maskaKlucz(P) || !typoAktywne(P, now).some((b) => b.warstwa === "tyl")) return;
+    if (!inf || inf.klucz !== maskaKlucz(P) || !typoAktywne(P, now).some((b) => typoWarstwyBloku(b).includes("tyl"))) return;
     const k = Math.floor(now * (+inf.fps || P.canvas.fps || 30) + 1e-6);
     for (let j = 1; j <= 12; j++) maskaKlatka(k + j);     // kolejne klatki z wyprzedzeniem (odtwarzanie)
     const bm = maskaKlatka(k);
@@ -1448,7 +1448,7 @@ function VideoEditor({ path, onClose }) {
       if (typoBloki(p).length) {
         for (const [f, txt] of typoFonty(p, w, h)) await fontLoad(f, txt);
         const fps = p.canvas.fps || 30;
-        const warstwy = ["tyl", "przod"].filter((k) => typoBloki(p).some((b) => (b.warstwa === "tyl" ? "tyl" : "przod") === k));
+        const warstwy = ["tyl", "przod"].filter((k) => typoBloki(p).some((b) => typoWarstwyBloku(b).includes(k)));
         const plan = warstwy.map((k) => [k, typoOdcinki(p, fps, total, k)]);
         const ile = plan.reduce((a, [, segs]) => a + segs.filter((s) => s.podpis).length, 0);
         const c = document.createElement("canvas"); c.width = w; c.height = h;

@@ -73,6 +73,15 @@ KAMERA_MIN_BLOK = 0.6     # s: krótszy blok nie dostaje ruchu ze stylu (oko nie
 KAMERA_TRZYMAJ = 2.5      # s: spokojna kamera trzyma najazd co najmniej tyle, zanim odjedzie
 KAMERA_SKALA = 1.15       # najazd powiększa napis swojego bloku najwyżej tyle (szeroki blok nie wypada z kadru)
 TYPO_LEAD = 0.03          # słowo wchodzi tuż przed dźwiękiem (TYPO_LEAD w 48-typografia.js)
+# Efekty bloku (`blok.efekt`): pierścień wokół głowy i przejście przez osobę. Te same listy i liczby co TYPO_EFEKT
+# w 48-typografia.js (test pilnuje zgodności). Blok z efektem rysuje się w obu warstwach: część za osobą idzie
+# pod jej sylwetkę (maska.py), część przed osobą nad nią.
+TYPO_EFEKTY = ("pierscien", "przejscie")
+EFEKT_KIERUNKI = ("lewo", "prawo")
+EFEKT_KOLEJNOSC = ("za-przod", "przod-za")
+EFEKT_PREDKOSC = (5, 40, 180)    # °/s pierścienia: najmniej, domyślnie, najwięcej
+EFEKT_NACHYLENIE = (40, 14)      # ° pierścienia: ±najwięcej, domyślnie (przód niżej, jak koło widziane z góry)
+EFEKT_SLEDZ = 40                 # najwięcej punktów śledzenia głowy (t, dx, dy) w bloku
 # Przejścia między klipami: klucz = nazwa przejścia xfade w FFmpeg, "blur" = przenikanie z rozmyciem Gaussa (nasze).
 # Te same klucze co ED_PRZEJSCIA w hq/web/src/49-przejscia.js (podgląd rysuje je tymi samymi wzorami).
 PRZEJSCIA = ("fade", "fadeblack", "fadewhite", "blur", "zoomin", "pixelize", "slideleft", "slideright", "slideup",
@@ -339,9 +348,59 @@ def normalize_typo(raw: Any, total: float) -> dict:
         ruch = kamera_ruch_norm(b.get("kamera"), len(slowa))
         if ruch:
             nb["kamera"] = ruch
+        efekt = efekt_norm(b.get("efekt"), e - s)
+        if efekt:
+            nb["efekt"] = efekt
         out["bloki"].append(nb)
     out["bloki"].sort(key=lambda b: b["start"])
     return out
+
+
+# ---------------------------------------------------------------- efekty bloku i warstwy
+
+def _liczba(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def _bez_bool(v: Any) -> Any:
+    """Prawda/fałsz to nie liczba (typoLiczba w JS też je odrzuca)."""
+    return None if isinstance(v, bool) else v
+
+
+def efekt_norm(raw: Any, dlugosc: float) -> dict | None:
+    """Efekt bloku (`blok.efekt`) w bezpiecznej postaci (jak typoEfekt w 48-typografia.js); zły albo brak = None.
+    Pierścień: `kierunek` (lewo = przód jedzie w lewo), `predkosc` °/s, `nachylenie` °, `powtorz` (false = napis raz);
+    przejście: `kierunek` ruchu, `kolejnosc` za-przod / przod-za. `sledz`: [[t, dx, dy]] przesunięcie środka za głową."""
+    if not isinstance(raw, dict) or raw.get("rodzaj") not in TYPO_EFEKTY:
+        return None
+    pier = raw["rodzaj"] == "pierscien"
+    e: dict = {"rodzaj": raw["rodzaj"],
+               "kierunek": raw.get("kierunek") if raw.get("kierunek") in EFEKT_KIERUNKI else "lewo" if pier else "prawo"}
+    if pier:
+        lo, dom, hi = EFEKT_PREDKOSC
+        e["predkosc"] = round(_num(_bez_bool(raw.get("predkosc")), lo, hi, dom), 2)
+        n, dom = EFEKT_NACHYLENIE
+        e["nachylenie"] = round(_num(_bez_bool(raw.get("nachylenie")), -n, n, dom), 2)
+        if raw.get("powtorz") is False:
+            e["powtorz"] = False
+    else:
+        e["kolejnosc"] = raw.get("kolejnosc") if raw.get("kolejnosc") in EFEKT_KOLEJNOSC else "za-przod"
+    sledz = [[round(_num(q[0], 0, dlugosc, 0), 3), round(_num(q[1], -1, 1, 0), 4), round(_num(q[2], -1, 1, 0), 4)]
+             for q in raw.get("sledz") or [] if isinstance(q, (list, tuple)) and len(q) == 3 and all(map(_liczba, q))]
+    if sledz:
+        e["sledz"] = sorted(sledz, key=lambda q: q[0])[:EFEKT_SLEDZ]
+    return e
+
+
+def typo_warstwy(b: dict) -> tuple[str, ...]:
+    """Warstwy, w których blok coś rysuje (typoWarstwyBloku w 48-typografia.js): blok z efektem obie, słowo z własną
+    głębią z w warstwie po swojej stronie osoby (z > 1 = za nią), reszta w warstwie bloku."""
+    if isinstance(b.get("efekt"), dict) and b["efekt"].get("rodzaj") in TYPO_EFEKTY:
+        return ("tyl", "przod")
+    blok = "tyl" if b.get("warstwa") == "tyl" else "przod"
+    ws = {("tyl" if min(3.0, max(0.3, float(w["z"]))) > 1 else "przod") if _liczba(w.get("z")) else blok
+          for w in b.get("slowa") or []}
+    return tuple(k for k in ("tyl", "przod") if k in ws)
 
 
 # ---------------------------------------------------------------- wirtualna kamera z głębią
@@ -1026,9 +1085,10 @@ def maska_indeks(video: Path, raw: dict) -> dict | None:
 
 
 def maska_concat(video: Path, raw: dict, p: dict, tmpdir: Path) -> Path | None:
-    """Warstwa sylwetek pod eksport (lista concat jak typo_concat): klatki bloków „za osobą”, które mają sylwetkę;
-    reszta przezroczysta. Brak bloków za osobą albo nieaktualna maska = None (napis zostaje w całości widoczny)."""
-    tyl = [b for b in (p.get("typo") or {}).get("bloki", []) if b.get("warstwa") == "tyl"]
+    """Warstwa sylwetek pod eksport (lista concat jak typo_concat): klatki bloków z częścią „za osobą” (warstwa „tyl”,
+    efekt, słowo z głębią za osobą), które mają sylwetkę; reszta przezroczysta. Brak takich bloków albo nieaktualna
+    maska = None (napis zostaje w całości widoczny)."""
+    tyl = [b for b in (p.get("typo") or {}).get("bloki", []) if "tyl" in typo_warstwy(b)]
     idx = maska_indeks(video, raw) if tyl else None
     if not idx:
         return None
