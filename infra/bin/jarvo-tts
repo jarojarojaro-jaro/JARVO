@@ -1,18 +1,30 @@
 #!/opt/jarvo/venv/bin/python
-"""Lokalny lektor angielski floty Jarvo: Paradee-8M (Apache-2.0, int8 ONNX, 9 MB) na CPU, bez sieci.
+"""Lokalny lektor floty Jarvo na CPU, bez sieci: polski Matcha-TTS-PL v2 (dwa głosy) i angielski Paradee-8M.
 
-    jarvo-tts "Hello there." -o glos.wav [--szybkosc 1.1]   → WAV 24 kHz mono
-    jarvo-tts --wsad zadania.json                           → wiele tekstów, model ładowany raz
-    jarvo-tts --sprawdz                                     → krótka próba (healthcheck, testy)
+    jarvo-tts "Dzień dobry." -o glos.wav [--glos pl-PL-Matcha-Damski] [--szybkosc 1.1]   → WAV mono
+    jarvo-tts --wsad zadania.json                           → wiele tekstów, każdy model ładowany raz
+    jarvo-tts --sprawdz [GLOS ...]                          → krótka próba mowy (healthcheck, testy; bez głosów: wszystkie)
 
-`zadania.json`: [{"tekst": "...", "wyjscie": "a.wav", "szybkosc": 1.0}, ...]. Na wyjściu (stdout) JSON:
-[{"wyjscie": ..., "sekundy": ..., "zdania": [[start, koniec, "zdanie"], ...]}]; czasy zdań służą
-`wideo_lib.speak_many` do napisów, gdy nie ma czasów słów z Parakeeta.
+Głosy:
+  pl-PL-Matcha-Meski  (domyślny)  Matcha-TTS-PL v2 male_voxcpm_1, syntetyczny głos męski (CC BY-SA 4.0), 22,05 kHz
+  pl-PL-Matcha-Damski             Matcha-TTS-PL v2 female_voxcpm_2, syntetyczny głos żeński (CC BY-SA 4.0), 22,05 kHz
+  en-US-Paradee                   Paradee-8M, angielski (Apache-2.0), 24 kHz; tylko angielski tekst
 
-Tekst → fonemy (misaki, ten sam G2P co Kokoro, na którym uczono model; słowa spoza słownika przez
-espeak-ng) → tokeny → jeden graf ONNX → fala 24 kHz. Długi tekst czytany zdanie po zdaniu, z krótką pauzą.
-Model leży w obrazie ($JARVO_TTS_MODEL_DIR, domyślnie /opt/jarvo/models/paradee). Tylko angielski:
-polski lektor to dalej Edge TTS. Logika wnioskowania jak w paradee/tts.py (github.com/sahilmahendrakar/paradee).
+`zadania.json`: [{"tekst": "...", "wyjscie": "a.wav", "szybkosc": 1.0, "glos": "pl-PL-Matcha-Meski"}, ...]. Na wyjściu
+(stdout) JSON: [{"wyjscie": ..., "sekundy": ..., "zdania": [[start, koniec, "zdanie"], ...]}]; czasy zdań (w pisowni
+oryginału) służą `wideo_lib.speak_many` do napisów, gdy nie ma czasów słów z Parakeeta.
+
+Polski: tekst dzielony na zdania, każde zdanie normalizowane (jarvo_tts_pl.py: liczby, daty, kwoty, skróty,
+skrótowce → słowa), potem fonemy espeak-ng (jarvo_tts_matcha.py, port fonemizera modelu; {słowo} = angielska wstawka)
+→ jeden graf ONNX na głos (model akustyczny + HiFi-GAN) → fala. Zdania sklejane z pauzą 0,33 s, akapity (pusta linia)
+z 1 s, jak pauzy narracji w film.py. Głos jest syntetyczny: film i materiał dla klienta oznaczamy jako mowę
+syntetyczną (karta modelu) i nie udajemy nim prawdziwej osoby.
+
+Angielski: tekst → fonemy (misaki, ten sam G2P co Kokoro, na którym uczono model; słowa spoza słownika przez
+espeak-ng) → tokeny → jeden graf ONNX → fala 24 kHz. Logika jak w paradee/tts.py (github.com/sahilmahendrakar/paradee).
+
+Modele leżą w obrazie: $JARVO_TTS_MODEL_DIR (Paradee, domyślnie /opt/jarvo/models/paradee) i
+$JARVO_TTS_MATCHA_DIR (domyślnie /opt/jarvo/models/matcha-pl: meski/, damski/, LICENSE, ATTRIBUTION.md).
 """
 
 from __future__ import annotations
@@ -25,18 +37,37 @@ import sys
 import wave
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))           # jarvo_tts_pl.py, jarvo_tts_matcha.py obok
+
 MODEL_DIR = Path(os.environ.get("JARVO_TTS_MODEL_DIR", "/opt/jarvo/models/paradee"))
+MATCHA_DIR = Path(os.environ.get("JARVO_TTS_MATCHA_DIR", "/opt/jarvo/models/matcha-pl"))
 THREADS = int(os.environ.get("JARVO_TTS_THREADS", "2"))
-SAMPLE_RATE = 24000
+SAMPLE_RATE = 24000         # Paradee
 MAX_PHONEMES = 510          # 512 pozycji tekstu, dwie na tokeny brzegowe
-PAUZA_S = 0.22              # cisza między zdaniami
+PAUZA_S = 0.22              # cisza między zdaniami (Paradee)
 ZDANIA = re.compile(r"(?<=[.!?…])\s+")
 # po tych skrótach kropka nie kończy zdania (inaczej w środku zdania wypada pauza)
 SKROTY = {"mr", "mrs", "ms", "dr", "prof", "st", "vs", "etc", "e.g", "i.e", "inc", "ltd", "co", "no", "fig", "approx",
           "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec"}
+SKROTY_PL = {"np", "m.in", "tzn", "tj", "tzw", "ok", "ul", "al", "os", "nr", "tel", "dr", "prof", "inż", "mgr", "św",
+             "pt", "zob", "por", "godz", "ds", "im", "ws", "wg", "gen", "płk", "ks", "pn", "tys", "mln", "mld"}
+
+# Matcha-TTS-PL v2: katalog głosu w MATCHA_DIR, tempo domyślne (length_scale z voices_index.json), styl 8 = neutralny
+MATCHA_GLOSY = {
+    "pl-PL-Matcha-Meski": {"katalog": "meski", "tempo": 0.8},       # male_voxcpm_1 (onnx/ w repozytorium modelu)
+    "pl-PL-Matcha-Damski": {"katalog": "damski", "tempo": 0.8},     # female_voxcpm_2 (onnx/female_voxcpm_2/)
+}
+MATCHA_ONNX = "matcha_pl_t2.onnx"   # 2 kroki ODE; t4 (4 kroki) ~10 % wolniej, Parakeet słyszy to samo (Dockerfile)
+MATCHA_RATE = 22050
+MATCHA_STYL = "8"
+MATCHA_TEMPERATURA = 1.0           # domyślna z karty modelu
+MATCHA_MAX_ZNAKOW = 400            # dłuższe zdanie: cięcie na przecinku albo spacji (pamięć rośnie z długością)
+PAUZY_PL = {"zdanie": 0.33, "akapit": 1.0}                         # jak PAUZY w film.py (narracja)
+GLOSY = (*MATCHA_GLOSY, "en-US-Paradee")
+DOMYSLNY_GLOS = "pl-PL-Matcha-Meski"
 
 
-def podziel_zdania(tekst: str) -> list[str]:
+def podziel_zdania(tekst: str, skroty: set[str] = SKROTY) -> list[str]:
     """Tekst → zdania. Nowa linia zawsze kończy zdanie; kropka nie, gdy stoi po skrócie albo inicjale
     lub gdy dalej idzie mała litera albo cyfra."""
     out: list[str] = []
@@ -47,14 +78,34 @@ def podziel_zdania(tekst: str) -> list[str]:
                 continue
             if len(out) > poczatek and out[-1].endswith("."):
                 ost = out[-1].rsplit(None, 1)[-1].rstrip(".").lower()
-                if ost in SKROTY or len(ost) == 1 or kawalek[0].islower() or kawalek[0].isdigit():
+                if ost in skroty or len(ost) == 1 or kawalek[0].islower() or kawalek[0].isdigit():
                     out[-1] += " " + kawalek
                     continue
             out.append(kawalek)
     return out
 
 
+def podziel_akapity(tekst: str) -> list[list[str]]:
+    """Tekst po polsku → akapity (pusta linia) → zdania; skróty polskie nie kończą zdania."""
+    akapity = [podziel_zdania(a, SKROTY | SKROTY_PL) for a in re.split(r"\n\s*\n", tekst)]
+    return [a for a in akapity if a]
+
+
+def _kawalki_tekstu(zdanie: str, limit: int = MATCHA_MAX_ZNAKOW) -> list[str]:
+    """Bardzo długie zdanie → kawałki do `limit` znaków, cięte na przecinku/średniku, a w ostateczności na spacji."""
+    out = []
+    while len(zdanie) > limit:
+        cut = max(zdanie.rfind(z, 0, limit) for z in (", ", "; ", ": ", " – "))
+        cut = cut + 1 if cut > limit // 3 else zdanie.rfind(" ", 0, limit)
+        cut = cut if cut > 0 else limit
+        out.append(zdanie[:cut].strip())
+        zdanie = zdanie[cut:].strip()
+    return out + ([zdanie] if zdanie else [])
+
+
 class Paradee:
+    rate = SAMPLE_RATE
+
     def __init__(self, model_dir: Path = MODEL_DIR, threads: int = THREADS):
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
         import numpy as np  # type: ignore
@@ -106,7 +157,74 @@ class Paradee:
         return (np.concatenate(czesci) if czesci else np.zeros(0, dtype=np.float32)), zdania
 
 
-def zapisz_wav(sciezka: Path, fala) -> None:
+class Matcha:
+    """Polski lektor Matcha-TTS-PL v2 (machinekind, CC BY-SA 4.0): jeden graf ONNX na głos, model akustyczny
+    z HiFi-GAN w środku; wejście: numery fonemów, długość, [temperatura, tempo], wektor mówcy + stylu."""
+    rate = MATCHA_RATE
+
+    def __init__(self, glos: str = DOMYSLNY_GLOS, model_dir: Path = MATCHA_DIR, threads: int = THREADS):
+        import numpy as np  # type: ignore
+        import onnxruntime as ort  # type: ignore
+        import jarvo_tts_matcha  # type: ignore
+        import jarvo_tts_pl  # type: ignore
+
+        self.np, self.fon, self.norm = np, jarvo_tts_matcha, jarvo_tts_pl
+        cfg = MATCHA_GLOSY[glos]
+        d = model_dir / cfg["katalog"]
+        self.tempo = cfg["tempo"]
+        vj = json.loads((d / "voices.json").read_text(encoding="utf-8"))
+        self.spk = (np.array(vj["speakers"]["0"]["emb"], dtype=np.float32)
+                    + np.array(vj["styles"][MATCHA_STYL]["emb"], dtype=np.float32))[None]
+        so = ort.SessionOptions()
+        so.intra_op_num_threads = threads
+        so.inter_op_num_threads = 1
+        self.session = ort.InferenceSession(str(d / MATCHA_ONNX), so, providers=["CPUExecutionProvider"])
+
+    def _fala(self, tekst: str, szybkosc: float):
+        np = self.np
+        ids = self.fon.na_id(self.fon.fonemy(self.norm.normalizuj(tekst)))
+        if len(ids) < 3:
+            return np.zeros(0, dtype=np.float32)
+        x = np.array([ids], dtype=np.int64)
+        feed = {"x": x, "x_lengths": np.array([x.shape[1]], dtype=np.int64),
+                "scales": np.array([MATCHA_TEMPERATURA, self.tempo / szybkosc], dtype=np.float32), "spk_emb": self.spk}
+        wav, n = self.session.run(None, feed)
+        return wav[0, :int(n[0])].astype(np.float32)
+
+    def mow(self, tekst: str, szybkosc: float = 1.0):
+        """→ (fala float32, [(start, koniec, zdanie w pisowni oryginału)])."""
+        np = self.np
+        czesci, zdania, t = [], [], 0.0
+        for a, akapit in enumerate(podziel_akapity(tekst)):
+            for z, zdanie in enumerate(akapit):
+                fala = [self._fala(k, szybkosc) for k in _kawalki_tekstu(zdanie)]
+                fala = np.concatenate(fala) if fala else np.zeros(0, dtype=np.float32)
+                if not len(fala):
+                    continue
+                if czesci:
+                    cisza = np.zeros(int(PAUZY_PL["zdanie" if z else "akapit"] * self.rate), dtype=np.float32)
+                    czesci.append(cisza)
+                    t += len(cisza) / self.rate
+                czesci.append(fala)
+                dl = len(fala) / self.rate
+                zdania.append((round(t, 3), round(t + dl, 3), zdanie))
+                t += dl
+        return (np.concatenate(czesci) if czesci else np.zeros(0, dtype=np.float32)), zdania
+
+
+class Modele:
+    """Silniki ładowane przy pierwszym użyciu głosu (wsad z jednym głosem nie ładuje drugiego modelu)."""
+
+    def __init__(self):
+        self._m: dict = {}
+
+    def __getitem__(self, glos: str):
+        if glos not in self._m:
+            self._m[glos] = Paradee() if glos == "en-US-Paradee" else Matcha(glos)
+        return self._m[glos]
+
+
+def zapisz_wav(sciezka: Path, fala, rate: int = SAMPLE_RATE) -> None:
     import numpy as np  # type: ignore
 
     pcm = (np.clip(fala, -1.0, 1.0) * 32767).astype("<i2")
@@ -114,44 +232,57 @@ def zapisz_wav(sciezka: Path, fala) -> None:
     with wave.open(str(sciezka), "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
-        w.setframerate(SAMPLE_RATE)
+        w.setframerate(rate)
         w.writeframes(pcm.tobytes())
 
 
-def wykonaj(model: Paradee, zadania: list[dict]) -> list[dict]:
+def wykonaj(modele: Modele, zadania: list[dict]) -> list[dict]:
     wynik = []
     for z in zadania:
+        model = modele[z.get("glos") or DOMYSLNY_GLOS]
         fala, zdania = model.mow(str(z["tekst"]), float(z.get("szybkosc", 1.0)))
         out = Path(z["wyjscie"])
-        zapisz_wav(out, fala)
-        wynik.append({"wyjscie": str(out), "sekundy": round(len(fala) / SAMPLE_RATE, 3), "zdania": zdania})
+        zapisz_wav(out, fala, model.rate)
+        wynik.append({"wyjscie": str(out), "sekundy": round(len(fala) / model.rate, 3), "zdania": zdania})
     return wynik
+
+
+PROBY = {"en-US-Paradee": "Jarvo is ready.", "pl-PL-Matcha-Meski": "Jarvo jest gotowy, 11.10.2026 r.",
+         "pl-PL-Matcha-Damski": "Jarvo jest gotowa do pracy z AI."}
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("tekst", nargs="?")
     ap.add_argument("-o", "--wyjscie", type=Path)
+    ap.add_argument("--glos", default=DOMYSLNY_GLOS, choices=GLOSY)
     ap.add_argument("--szybkosc", type=float, default=1.0, help="1.0 = normalnie, 1.2 = szybciej (0.5–2.0)")
-    ap.add_argument("--wsad", type=Path, help="JSON z listą zadań {tekst, wyjscie, szybkosc}")
-    ap.add_argument("--sprawdz", action="store_true", help="próba: krótkie zdanie do pamięci, bez pliku")
+    ap.add_argument("--wsad", type=Path, help="JSON z listą zadań {tekst, wyjscie, szybkosc, glos}")
+    ap.add_argument("--sprawdz", nargs="*", metavar="GLOS", choices=GLOSY,
+                    help="próba: krótkie zdanie do pamięci, bez pliku (bez głosów: wszystkie)")
     a = ap.parse_args(argv)
     if not 0.5 <= a.szybkosc <= 2.0:
         ap.error("--szybkosc: od 0.5 do 2.0")
-    if a.sprawdz:
-        fala, _ = Paradee().mow("Jarvo is ready.")
-        print(json.dumps({"ok": len(fala) > SAMPLE_RATE // 4, "sekundy": round(len(fala) / SAMPLE_RATE, 3)}))
-        return 0 if len(fala) > SAMPLE_RATE // 4 else 1
+    if a.sprawdz is not None:
+        modele, wynik = Modele(), {}
+        for glos in a.sprawdz or GLOSY:
+            m = modele[glos]
+            fala, _ = m.mow(PROBY[glos])
+            wynik[glos] = {"ok": len(fala) > m.rate // 4, "sekundy": round(len(fala) / m.rate, 3)}
+        print(json.dumps({"ok": all(w["ok"] for w in wynik.values()), "glosy": wynik}, ensure_ascii=False))
+        return 0 if all(w["ok"] for w in wynik.values()) else 1
     if a.wsad:
         zadania = json.loads(a.wsad.read_text(encoding="utf-8"))
     elif a.tekst and a.wyjscie:
-        zadania = [{"tekst": a.tekst, "wyjscie": str(a.wyjscie), "szybkosc": a.szybkosc}]
+        zadania = [{"tekst": a.tekst, "wyjscie": str(a.wyjscie), "szybkosc": a.szybkosc, "glos": a.glos}]
     else:
         ap.error("podaj tekst i -o, albo --wsad")
     for z in zadania:
         if not 0.5 <= float(z.get("szybkosc", 1.0)) <= 2.0:
             ap.error("szybkosc w zadaniu: od 0.5 do 2.0")
-    json.dump(wykonaj(Paradee(), zadania), sys.stdout, ensure_ascii=False)
+        if (z.get("glos") or DOMYSLNY_GLOS) not in GLOSY:
+            ap.error(f"nieznany głos {z.get('glos')!r} (są: {', '.join(GLOSY)})")
+    json.dump(wykonaj(Modele(), zadania), sys.stdout, ensure_ascii=False)
     print()
     return 0
 

@@ -9,6 +9,7 @@
 #         do-wdrozenia  = właściciel zatwierdził, wdrażamy
 #         czeka         = przejrzane, czeka na decyzję właściciela
 #         odlozone      = właściciel odłożył; nowości tylko w skrócie
+# repo = GitHub albo model z Hugging Face (huggingface.co/<właściciel>/<model>, sprawdzany tak samo przez ls-remote).
 # przejrzane = ostatni commit, który przejrzeliśmy (pełny SHA); źródło bez repo git (`paczka`: adres archiwum .tar.gz)
 # ma tu SHA-256 przejrzanej paczki. validate.py pilnuje, żeby każde repo z SOURCES.md i skills.lock.yaml było w spisie.
 
@@ -214,6 +215,16 @@ zrodla:
     repo: https://github.com/hexgrad/misaki
     status: uzywane
     przejrzane: fba1236595f2d2bf21d414ba6e57d25256afada3
+  matcha-tts:
+    repo: https://github.com/shivammehta25/Matcha-TTS
+    status: uzywane
+    przejrzane: bd4d90d93214b37f7a159cf205ae85762c2c10aa
+    notatka: "MIT: tablica symboli (matcha/text/symbols.py) w fonemizerze polskiego lektora jarvo_tts_matcha.py"
+  matcha-tts-pl-v2:
+    repo: https://huggingface.co/machinekind/Matcha-TTS-PL-v2
+    status: uzywane
+    przejrzane: 93744740ae645648c003abb09e8c617d9c5e34cd
+    notatka: "CC BY-SA 4.0: polski lektor (jarvo-tts, głosy pl-PL-Matcha-Meski = male_voxcpm_1, pl-PL-Matcha-Damski = female_voxcpm_2), wagi ONNX t2 w obrazie z sha256 w infra/Dockerfile, ATTRIBUTION.md i LICENSE obok; port english/polish_*cleaners.py w jarvo_tts_matcha.py. Repo powstało 2026-10-02, rewizja z 2026-10-10: wyjątek od 14-dniowej kwarantanny, decyzja właściciela 2026-10-11; pliki = same wagi ONNX przypięte sha256"
   modnet:
     repo: https://github.com/ZHKKKe/MODNet
     status: uzywane

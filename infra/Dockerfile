@@ -158,7 +158,7 @@ RUN set -e; case "$(uname -m)" in x86_64) a=x86_64; s="$CAMOUFOX_SHA256_AMD64";;
     HOME="$t" /opt/jarvo/venv/bin/python -c "from camoufox.sync_api import Camoufox; from camoufox import DefaultAddons; c = Camoufox(executable_path='$d/camoufox-bin', ff_version=${CAMOUFOX_VERSION%%.*}, headless=True, os='linux', geoip=False, exclude_addons=[DefaultAddons.UBO], i_know_what_im_doing=True); b = c.__enter__(); p = b.new_page(); p.goto('data:text/html,<title>ok</title>'); assert p.title() == 'ok' and p.evaluate('navigator.webdriver') is False; c.__exit__(None, None, None); print('Camoufox OK')" && \
     rm -rf "$t"
 
-# --- skrypty floty w obrazie (jarvo-stt: rozpoznawanie mowy Parakeet dla Hermesa i napisów)
+# --- skrypty floty w obrazie (jarvo-stt: rozpoznawanie mowy Parakeet dla Hermesa i napisów; jarvo-tts: lektor)
 COPY --chmod=0755 infra/bin/ /opt/jarvo/bin/
 # Wiadomości głosowe: Hermes woła jarvo-stt jako lokalną komendę STT (stt.provider: local_command).
 # Proces żyje tylko na czas transkrypcji; model (~0,65 GB) pobiera się raz do /opt/data/jarvo/models.
@@ -182,7 +182,43 @@ RUN set -e; d=/opt/jarvo/models/paradee; mkdir -p "$d" /tmp/spacy-en && \
       | sha256sum -c - && \
     VIRTUAL_ENV=/opt/jarvo/venv uv pip install --no-deps /tmp/spacy-en/en_core_web_sm-3.8.0-py3-none-any.whl && \
     rm -rf /tmp/spacy-en && \
-    /opt/jarvo/bin/jarvo-tts --sprawdz
+    /opt/jarvo/bin/jarvo-tts --sprawdz en-US-Paradee
+
+# --- polski lektor bez sieci (jarvo-tts, domyślny lektor Wideografa): Matcha-TTS-PL v2 (machinekind, CC BY-SA 4.0),
+#     dwa syntetyczne głosy wybrane przez właściciela: male_voxcpm_1 (onnx/ w repozytorium modelu) → pl-PL-Matcha-Meski
+#     i female_voxcpm_2 → pl-PL-Matcha-Damski. Na głos jeden graf ONNX (model akustyczny + HiFi-GAN, 140 MB), jego
+#     voices.json (wektor mówcy i stylów), do tego LICENSE, ATTRIBUTION.md (źródła danych treningowych) i karta modelu.
+#     Bez .ckpt, próbek i torcha; fonemy daje espeak-ng z koła espeakng-loader, które już jest dla misaki (+0,28 GB).
+#     Wariant t2 (2 kroki ODE) zamiast t4: pomiar na 4-rdzeniowym Xeonie 2,8 GHz, 2 wątki, 27 s polskiej mowy z liczbami,
+#     datą i „AI”: t2 RTF 0,49–0,56, t4 0,55–0,61; Parakeet usłyszał w obu to samo (te same słowa, WER 5–7 % = zapis
+#     cyfr przez rozpoznawanie, nie błędy wymowy), RAM ~0,41 GB na głos w obu. Wolniejszy t4 nic nie daje.
+#     Repozytorium modelu powstało 2026-10-02, przypięta rewizja jest z 2026-10-10: wyjątek od 14-dniowej kwarantanny,
+#     decyzja właściciela 2026-10-11; pliki = same wagi ONNX i JSON-y przypięte sha256 (kod fonemizera jest w repo Jarvo,
+#     jarvo_tts_matcha.py). Na końcu próba mowy obu głosów.
+ARG MATCHA_PL_URL=https://huggingface.co/machinekind/Matcha-TTS-PL-v2/resolve/93744740ae645648c003abb09e8c617d9c5e34cd
+RUN set -e; d=/opt/jarvo/models/matcha-pl; mkdir -p "$d/meski" "$d/damski" && \
+    curl -fsSL --retry 3 "$MATCHA_PL_URL/onnx/matcha_pl_t2.onnx" -o "$d/meski/matcha_pl_t2.onnx" && \
+    curl -fsSL --retry 3 "$MATCHA_PL_URL/onnx/voices.json" -o "$d/meski/voices.json" && \
+    curl -fsSL --retry 3 "$MATCHA_PL_URL/onnx/female_voxcpm_2/matcha_pl_t2.onnx" -o "$d/damski/matcha_pl_t2.onnx" && \
+    curl -fsSL --retry 3 "$MATCHA_PL_URL/onnx/female_voxcpm_2/voices.json" -o "$d/damski/voices.json" && \
+    curl -fsSL --retry 3 "$MATCHA_PL_URL/LICENSE" -o "$d/LICENSE" && \
+    curl -fsSL --retry 3 "$MATCHA_PL_URL/ATTRIBUTION.md" -o "$d/ATTRIBUTION.md" && \
+    curl -fsSL --retry 3 "$MATCHA_PL_URL/README.md" -o "$d/README.md" && \
+    printf '%s\n' \
+      "e2a2ea8bc43fa60ec731299e10dda57459c7375c4f5d40d6506f0514fec2884a  $d/meski/matcha_pl_t2.onnx" \
+      "89dd8a22e99c1a62c14e6c7fce506708812eb1af8391e2862931ba999e3710b7  $d/meski/voices.json" \
+      "1e2281636960b30906d79c90288527efa54f00b7ee1117e22b5d359e60430ba5  $d/damski/matcha_pl_t2.onnx" \
+      "3c5796e3263b1896bab6a480e7f424c746e3fbcc70bb6434339e8272b9812fd3  $d/damski/voices.json" \
+      "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5  $d/LICENSE" \
+      "b661c506b222e914fa03fcdb9a505164f3fcd880983c205c20353381d05bd2c5  $d/ATTRIBUTION.md" \
+      "61363f244e4e85534ef47d0d85e3bedd64f9ac384fbab16bef5fc06dd7daae6f  $d/README.md" \
+      | sha256sum -c - && \
+    printf '%s\n' "Matcha-TTS-PL v2 (machinekind), CC BY-SA 4.0: https://huggingface.co/machinekind/Matcha-TTS-PL-v2" \
+      "Rewizja: ${MATCHA_PL_URL##*/}. Pliki bez zmian: meski/ = onnx/ (male_voxcpm_1)," \
+      "damski/ = onnx/female_voxcpm_2/. Źródła danych treningowych: ATTRIBUTION.md, licencja: LICENSE." \
+      "Głosy są syntetyczne (VoxCPM2, nie nagrania ani klony ludzi): mowę oznaczamy jako syntetyczną." \
+      "Fonemizer (port english/polish_*cleaners.py, CC BY-SA 4.0): /opt/jarvo/bin/jarvo_tts_matcha.py." > "$d/JARVO-ZRODLO.txt" && \
+    /opt/jarvo/bin/jarvo-tts --sprawdz pl-PL-Matcha-Meski pl-PL-Matcha-Damski
 
 # --- claude-seo: runtime skryptów dla skilli SEO (ten sam commit co w vendor/skills.lock.yaml).
 # Playwright przypięty do wersji, której Chromium jest w obrazie (requirements-claude-seo.txt).

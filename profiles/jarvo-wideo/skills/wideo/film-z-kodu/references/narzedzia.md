@@ -12,7 +12,8 @@ wklejaj przypisanie w każdym).
   potem w każdym wywołaniu: `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`.
 - Stan: `narzedzia.py sprawdz` (JSON: przeglądarka, prores_ks, co zainstalowane).
 - Projekt w katalogu karty: `out/wideo/src/<nazwa>/` (małe litery, cyfry, myślniki; bez `#` i `%`).
-- Lektor PL: Edge TTS (`film.py lektor`, `lektor_linie.py`), czasy słów bez whispera; transkrypcja nagrań: Parakeet
+- Lektor PL: lokalny Matcha (domyślny, głos syntetyczny) albo Edge TTS (`film.py lektor`, `lektor_linie.py`), czasy
+  słów bez whispera; transkrypcja nagrań: Parakeet
   (`montaz.py transkrypcja`, `napisy.py`). Nie instaluj faster-whisper.
 - Każdy wynik: `qa_wideo.py` + `kontrola-wideo`, jak każdy film. Silniki składają MP4 z klatek JPEG, więc często
   wychodzi `yuvj420p` (pełny zakres, część telefonów źle odtwarza): `python3 $HERMES_HOME/scripts/montaz.py napraw <film> -o <film-ok>`.

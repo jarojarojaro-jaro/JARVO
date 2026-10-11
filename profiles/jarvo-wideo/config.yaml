@@ -27,7 +27,7 @@ video_gen:
   provider: openrouter          # katalog modeli pobierany na żywo z OpenRouter
 
 # Lektor: Edge TTS (darmowy, bez klucza), polski głos domyślny dla narzędzia text_to_speech.
-# Filmy: scripts/film.py (ten sam silnik, z czasem słów do napisów karaoke).
+# Filmy: scripts/film.py (domyślnie lokalny polski lektor Matcha przez jarvo-tts z obrazu; Edge do wyboru i jako zapas).
 tts:
   provider: edge
   edge:

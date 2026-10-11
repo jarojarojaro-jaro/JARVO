@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.12.0
+version: 1.13.0
 author: Jarvo
 license: MIT
 metadata:
@@ -16,7 +16,8 @@ metadata:
 
 # Lektor i dźwięk
 
-Lektor: Edge TTS (darmowy, bez klucza, neuronowe głosy PL); po angielsku także lokalny Paradee (bez sieci). Muzyka: tylko z prawem użycia. Cel głośności
+Lektor: domyślnie lokalny polski Matcha-TTS-PL v2 (w obrazie, bez sieci i limitów, **głos syntetyczny**); Edge TTS
+(darmowy, bez klucza) do wyboru i jako zapas; po angielsku lokalny Paradee (bez sieci). Muzyka: tylko z prawem użycia. Cel głośności
 dla platform społecznościowych: −14 LUFS zintegrowane, true peak ≤ −1 dBTP.
 
 ## Kiedy użyć
@@ -26,13 +27,28 @@ dla platform społecznościowych: −14 LUFS zintegrowane, true peak ≤ −1 dB
 ## Głosy
 | Głos | Charakter | Dobre do |
 |---|---|---|
-| `pl-PL-MarekNeural` | męski, spokojny, rzeczowy | poradniki, B2B, explainery |
-| `pl-PL-ZofiaNeural` | żeński, ciepły, energiczny | lifestyle, produkt, social |
+| `pl-PL-Matcha-Meski` (domyślny) | męski, młody, energiczny, wyraźny; lokalny, syntetyczny | poradniki, explainery, social, rolki |
+| `pl-PL-Matcha-Damski` | żeński, młody, pewny, średnio-wysoki; lokalny, syntetyczny | produkt, lifestyle, social |
+| `pl-PL-MarekNeural` | męski, spokojny, rzeczowy (Edge, sieć) | poradniki, B2B, explainery |
+| `pl-PL-ZofiaNeural` | żeński, ciepły, energiczny (Edge, sieć) | lifestyle, produkt, social |
 | `en-US-AndrewMultilingualNeural`, `en-US-AvaMultilingualNeural` | wielojęzyczne (czytają PL z lekkim akcentem) | inny charakter, testy A/B |
 | `en-US-Paradee` | angielski, męski, lokalny (model w obrazie, bez sieci i limitów) | film po angielsku; **tylko angielski tekst** |
 
-`en-US-Paradee` działa jak inne głosy (`--glos`, `glos` w scenie, edytor HQ), tempo `--tempo` też; `wysokosc`
-pomija. Czasy słów daje Parakeet (pierwsze użycie pobiera jego model, ~0,65 GB), bez niego: rozłożone w zdaniach.
+Głosy lokalne (`pl-PL-Matcha-*`, `en-US-Paradee`) działają jak inne (`--glos`, `glos` w scenie), tempo
+`--tempo` też; `wysokosc` pomijają. Czasy słów daje Parakeet (pierwsze użycie pobiera jego model, ~0,65 GB), bez niego:
+rozłożone w zdaniach. Matcha: liczby, daty, godziny, kwoty, procenty, skróty i skrótowce czyta słowami sam
+(„11.10.2026 r.” → „jedenastego października dwa tysiące dwudziestego szóstego roku”, „2,5 mln zł”, „AI” → „ej aj”,
+„PDF” → „pe de ef”); angielskie słowo czyta po polsku, chyba że stoi w klamrach (`{feedback}`, `{Slack}a`: wtedy po
+angielsku). Klamry tylko w tekście lektora (`film.py lektor`, sceny planu); w pliku narracji `{nazwa}` to chwila,
+więc tam angielski termin zapisz fonetycznie w `--wymowa` („fidbek”). Zdania czyta osobno z pauzą 0,33 s, akapity (pusta linia) z 1 s.
+Tempo: Matcha przy `+0%` ok. 2,9 słowa/s samej mowy (szybciej niż Marek); w spokojnej narracji `--tempo -10%`
+(ok. 2,6). Bez jarvo-tts (poza obrazem) albo przy błędzie polski głos lokalny przechodzi na Edge (Marek, Zofia)
+z ostrzeżeniem.
+
+**Głos syntetyczny (zasada karty modelu Matcha-TTS-PL):** głosy Matcha są zaprojektowane opisem w VoxCPM2, to nie
+nagrania ani klony ludzi. Film z tym lektorem oznaczasz: w opisie filmu i w RAPORT/przekazaniu klientowi zdanie
+„Lektor: głos syntetyczny (Matcha-TTS-PL v2, machinekind, CC BY-SA 4.0)”. Nigdy nie przedstawiasz go jako prawdziwej
+osoby (ekspert, klient, pracownik marki z imienia) ani nie udajesz nim kogoś istniejącego.
 
 Lista na żywo: `python3 $HERMES_HOME/scripts/film.py glosy`. Tempo: `+0%` spokojnie, `+5…+12%` social,
 powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. Dialog: `glos` w pojedynczej scenie.
@@ -45,7 +61,7 @@ w akapicie, 1 s po akapicie (tu tnie się ujęcie), 1,5 s przed rozdziałem. Fil
 w pauzie, a nie w środku zdania; liczysz ok. 2 słowa na sekundę filmu (60 s ≈ 120 słów, 90 s ≈ 180).
 Jedno zdanie na linię: dwa zdania w linii Edge rozdziela własną, nierówną pauzą (zmierzone: ponad 1 s), więc
 `narracja` o tym ostrzega. Ostrzega też o zdaniu > 20 słów, napisie > 42 znaków, akapicie > 4 zdań, ujęciu < 4 s,
-tempie > 2,7 słowa/s razem z pauzami (Marek przy `+0%` mówi ok. 2,3) i długości poza `--cel`, a z zasad
+tempie > 2,7 słowa/s razem z pauzami (Marek przy `+0%` mówi ok. 2,3, Matcha ok. 2,7, z `-10%` ok. 2,4) i długości poza `--cel`, a z zasad
 narracji (`scenariusz/references/narracja.md`) o powitaniu albo definicji na start, liście zamiast opowieści,
 opisie obrazu i streszczeniu na końcu. `--sprawdz` = sama kontrola tekstu i szacunek, bez syntezy.
 Brief Sherlocka `fakty.json` obok narracji albo katalog wyżej (albo `--fakty`): liczba cyframi z listy niepewnych
@@ -193,6 +209,7 @@ napisy z transkrypcji. Najpierw `montaz.py cisza` i `glosnosc` na nagraniu.
 
 ## Definition of Done
 - [ ] głos dobrany do marki i odbiorcy (uzasadnienie 1 zdanie w RAPORT),
+- [ ] lektor Matcha (głos syntetyczny) oznaczony w opisie filmu i w RAPORT/przekazaniu klientowi; nikogo nie udaje,
 - [ ] wymowa nazw i liczb sprawdzona; tempo 2–3 słowa/s,
 - [ ] −14 LUFS ±2, true peak ≤ −1 dBTP, rozpiętość ≤ 10 LU; muzyka nie zagłusza głosu i ma źródło z licencją,
 - [ ] efekty na swoich klatkach (whoosh ~0,15 s przed szczytem ruchu, pop w klatce pojawienia).

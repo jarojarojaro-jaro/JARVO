@@ -1,6 +1,8 @@
-"""Wspólne klocki skryptów Wideografa: formaty, FFmpeg/ffprobe, lektor (Edge TTS), napisy ASS/SRT, cache.
+"""Wspólne klocki skryptów Wideografa: formaty, FFmpeg/ffprobe, lektor, napisy ASS/SRT, cache.
 
-Bez zależności poza biblioteką standardową, FFmpeg i (tylko dla lektora) edge-tts. Edge TTS jest darmowy
+Lektor domyślnie lokalny: polski Matcha-TTS-PL v2 (`pl-PL-Matcha-Meski`, `pl-PL-Matcha-Damski`) i angielski Paradee
+przez /opt/jarvo/bin/jarvo-tts z obrazu, bez sieci; Edge TTS do wyboru i jako zapas.
+Bez zależności poza biblioteką standardową, FFmpeg i (tylko dla Edge) edge-tts. Edge TTS jest darmowy
 i nie wymaga klucza; pakiet leży w katalogu leniwych instalacji Hermesa (HERMES_LAZY_INSTALL_TARGET),
 a gdy go brak, doinstalowujemy go tym samym mechanizmem, którego używa narzędzie `text_to_speech`.
 """
@@ -45,10 +47,21 @@ TV_RANGE = "scale=out_range=tv,format=yuv420p"
 THREADS = os.environ.get("JARVO_WIDEO_WATKI", "2")
 ENC_LIMITS = ["-threads", THREADS, "-filter_threads", "2", "-x264-params", "rc-lookahead=10"]
 PARALLEL = max(1, int(os.environ.get("JARVO_WIDEO_ROWNOLEGLE", "1")))   # sceny normalizowane naraz
-DEFAULT_VOICE = "pl-PL-MarekNeural"
+# domyślny lektor: polski Matcha-TTS-PL v2 w obrazie (/opt/jarvo/bin/jarvo-tts, bez sieci i limitu, głos syntetyczny);
+# Edge TTS (Marek, Zofia) zostaje do wyboru i jako zapas, gdy lokalnego lektora nie ma albo zawiedzie
+DEFAULT_VOICE = "pl-PL-Matcha-Meski"
 PL_VOICES = {"pl-PL-MarekNeural": "męski, spokojny", "pl-PL-ZofiaNeural": "żeński, ciepły"}
-# lektor angielski bez sieci i bez limitu: Paradee-8M w obrazie (/opt/jarvo/bin/jarvo-tts); czasy słów z Parakeeta
-LOCAL_VOICES = {"en-US-Paradee": "angielski, lokalny (Paradee, bez sieci)"}
+# lektory lokalne (jarvo-tts w obrazie): polski Matcha i angielski Paradee-8M; czasy słów z Parakeeta
+LOCAL_VOICES = {"pl-PL-Matcha-Meski": "polski, męski, lokalny (Matcha, bez sieci, głos syntetyczny)",
+                "pl-PL-Matcha-Damski": "polski, żeński, lokalny (Matcha, bez sieci, głos syntetyczny)",
+                "en-US-Paradee": "angielski, lokalny (Paradee, bez sieci)"}
+# zapas Edge TTS dla polskich lektorów lokalnych (brak jarvo-tts poza obrazem albo błąd syntezy)
+EDGE_FALLBACK = {"pl-PL-Matcha-Meski": "pl-PL-MarekNeural", "pl-PL-Matcha-Damski": "pl-PL-ZofiaNeural"}
+
+
+def bez_klamer(text: str) -> str:
+    """„{feedback}” → „feedback”: klamry to znak dla lektora Matcha (angielska wstawka), nie dla napisów i Edge."""
+    return text.replace("{", "").replace("}", "")
 
 
 def parse_format(fmt: str) -> tuple[int, int]:
@@ -298,7 +311,7 @@ def is_image(path: Path) -> bool:
     return path.suffix.lower() in IMAGE_EXT
 
 
-# ------------------------------------------------------------------ lektor: Edge TTS z czasem słów
+# ------------------------------------------------------------------ lektor: Edge TTS z czasem słów, lokalny jarvo-tts
 
 @dataclass
 class Word:
@@ -471,11 +484,11 @@ def _speak_local(todo: list[tuple]) -> None:
     if not os.path.exists(tts):
         tts = shutil.which("jarvo-tts") or ""
     if not tts:
-        raise SystemExit("Brak jarvo-tts (obraz Jarvo: /opt/jarvo/bin/jarvo-tts); głos en-US-Paradee działa tylko w obrazie.")
+        raise SystemExit("Brak jarvo-tts (obraz Jarvo: /opt/jarvo/bin/jarvo-tts); głosy lokalne działają tylko w obrazie.")
     with tempfile.TemporaryDirectory(prefix="jarvo-tts-") as tmpd:
         tmp = Path(tmpd)
-        jobs = [{"tekst": it["text"], "wyjscie": str(tmp / f"{n}.wav"), "szybkosc": _speed(it.get("rate", "+0%"))}
-                for n, (_, it, _, _, _) in enumerate(todo)]
+        jobs = [{"tekst": it["text"], "wyjscie": str(tmp / f"{n}.wav"), "szybkosc": _speed(it.get("rate", "+0%")),
+                 "glos": it.get("voice")} for n, (_, it, _, _, _) in enumerate(todo)]
         plan = tmp / "zadania.json"
         plan.write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")
         res = subprocess.run([tts, "--wsad", str(plan)], capture_output=True, text=True)
@@ -489,7 +502,7 @@ def _speak_local(todo: list[tuple]) -> None:
             run(["ffmpeg", "-y", "-i", job["wyjscie"], "-af", f"volume={_volume(it.get('volume', '+0%')):.3f}",
                  "-ar", "24000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "128k", str(tmp_mp3)])
             tmp_mp3.replace(mp3)
-            words = time_script_words(it["text"], h, [tuple(z) for z in r["zdania"]])
+            words = time_script_words(bez_klamer(it["text"]), h, [(a, b, bez_klamer(z)) for a, b, z in r["zdania"]])
             dur = duration(mp3)
             meta.write_text(json.dumps({"duration": dur, "words": [w.__dict__ for w in words], "text": it["text"],
                                         "voice": it.get("voice"), "czasy": "parakeet" if h else "zdania"},
@@ -499,23 +512,43 @@ def _speak_local(todo: list[tuple]) -> None:
 
 def speak_many(items: list[dict], concurrency: int = 4) -> list[Speech]:
     """Lektor dla wielu tekstów naraz; wynik w cache (ten sam tekst i głos = zero zapytań).
-    Głosy Edge TTS (sieć, czasy słów z usługi) albo lokalny `en-US-Paradee` (LOCAL_VOICES)."""
+    Głosy lokalne z LOCAL_VOICES (jarvo-tts: domyślny polski `pl-PL-Matcha-Meski`, `pl-PL-Matcha-Damski`,
+    angielski `en-US-Paradee`) albo Edge TTS (sieć, czasy słów z usługi). Polski lektor lokalny bez jarvo-tts albo
+    z błędem → zapas Edge (EDGE_FALLBACK) z ostrzeżeniem; wynik zapasu trafia do cache pod głosem Edge."""
     out: list[Speech | None] = [None] * len(items)
     todo, local = [], []
     for i, it in enumerate(items):
-        key = digest("tts-v1", it["text"], it.get("voice", DEFAULT_VOICE), it.get("rate", "+0%"),
+        it = {**it, "voice": it.get("voice") or DEFAULT_VOICE}
+        key = digest("tts-v1", it["text"], it["voice"], it.get("rate", "+0%"),
                      it.get("volume", "+0%"), it.get("pitch", "+0Hz"))
         mp3 = cache_dir("lektor") / f"{key}.mp3"
         meta = mp3.with_suffix(".json")
         if mp3.exists() and meta.exists() and mp3.stat().st_size > 0:
             m = json.loads(meta.read_text(encoding="utf-8"))
             out[i] = Speech(mp3, m["duration"], [Word(**w) for w in m["words"]])
-        elif it.get("voice") in LOCAL_VOICES:
+        elif it["voice"] in LOCAL_VOICES:
             local.append((i, it, mp3, meta, lambda s, i=i: out.__setitem__(i, s)))
         else:
             todo.append((i, it, mp3, meta))
     if local:
-        _speak_local(local)
+        try:
+            _speak_local(local)
+        except SystemExit as exc:
+            if any(it.get("voice") not in EDGE_FALLBACK for _, it, *_ in local):
+                raise
+            print(f"Uwaga: lektor lokalny nie zadziałał ({str(exc).strip().splitlines()[0]}); zapas: Edge TTS "
+                  f"{', '.join(sorted({EDGE_FALLBACK[it['voice']] for _, it, *_ in local}))}.", file=sys.stderr)
+            for i, it, *_ in local:
+                zapas = {**it, "voice": EDGE_FALLBACK[it["voice"]]}
+                key = digest("tts-v1", zapas["text"], zapas["voice"], zapas.get("rate", "+0%"),
+                             zapas.get("volume", "+0%"), zapas.get("pitch", "+0Hz"))
+                mp3 = cache_dir("lektor") / f"{key}.mp3"
+                meta = mp3.with_suffix(".json")
+                if mp3.exists() and meta.exists() and mp3.stat().st_size > 0:
+                    m = json.loads(meta.read_text(encoding="utf-8"))
+                    out[i] = Speech(mp3, m["duration"], [Word(**w) for w in m["words"]])
+                else:
+                    todo.append((i, zapas, mp3, meta))
     if todo:
         edge_tts = _import_edge_tts()
         _ssl_bundle()
@@ -525,7 +558,8 @@ def speak_many(items: list[dict], concurrency: int = 4) -> list[Speech]:
                 tmp = mp3.with_suffix(".part")
                 for attempt in range(3):
                     try:
-                        words = await _synth(edge_tts, it["text"], it.get("voice", DEFAULT_VOICE), it.get("rate", "+0%"),
+                        words = await _synth(edge_tts, bez_klamer(it["text"]), it.get("voice", DEFAULT_VOICE),
+                                             it.get("rate", "+0%"),
                                              it.get("volume", "+0%"), it.get("pitch", "+0Hz"), tmp)
                         break
                     except Exception as exc:  # noqa: BLE001  (sieć: krótka ponowna próba)
@@ -553,8 +587,8 @@ def _norm(tok: str) -> str:
 
 
 def align_display(words: list[Word], text: str) -> list[Word]:
-    """Słowa z lektora → słowa do napisów w pisowni oryginału (z ? i !, bez przecinków i kropek)."""
-    toks = text.split()
+    """Słowa z lektora → słowa do napisów w pisowni oryginału (z ? i !, bez przecinków i kropek, bez {klamer})."""
+    toks = bez_klamer(text).split()
     j, out = 0, []
     for w in words:
         n, disp = _norm(w.text), w.text

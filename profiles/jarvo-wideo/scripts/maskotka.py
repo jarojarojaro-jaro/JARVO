@@ -5,7 +5,7 @@
     python3 maskotka.py --plik tekst.txt -o film.mp4 [--format 9x16|1x1|16x9] [--glos pl-PL-MarekNeural]
                         [--tlo "#0E121A"] [--akcent "#B8FF3D"] [--bez-napisow] [--fps 30]
 
-Wynik: MP4 z lektorem (Edge TTS, czasy słów), napisami karaoke i plikiem <film>.slowa.json. Film jest renderem
+Wynik: MP4 z lektorem (domyślnie lokalny Matcha, albo Edge TTS; czasy słów), napisami karaoke i plikiem <film>.slowa.json. Film jest renderem
 projektu edytora HQ (`projekt.py z-kodu`): obraz, głos przypięty do obrazu i napisy jako tekst, więc właściciel
 poprawi napis albo utnie zdanie w edytorze. `--bez-napisow`: sam film, bez projektu. Animacja jest czystą funkcją czasu: głośność lektora (obwiednia 100/s) steruje wskaźnikiem głosu
 i poświatą oczu, mrugnięcia mają stałe chwile (powtarzalny render). Robot to prawdziwa grafika marki (pixel art,

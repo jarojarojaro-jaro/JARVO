@@ -1420,7 +1420,7 @@ def test_dwa_ekrany_render_i_test_pauzy(tmp_path):
 
 
 
-# ------------------------------------------------------------------ lektor lokalny (Paradee, jarvo-tts)
+# ------------------------------------------------------------------ lektor lokalny (Matcha PL, Paradee EN, jarvo-tts)
 
 def _jarvo_tts():
     import importlib.machinery
@@ -1451,6 +1451,9 @@ def test_lektor_lokalny_tempo_i_glosnosc():
     assert wl._speed("+300%") == 2.0 and wl._speed("bzdura") == 1.0
     assert wl._volume("-50%") == pytest.approx(0.5) and wl._volume("+0%") == 1.0
     assert "en-US-Paradee" in wl.LOCAL_VOICES
+    assert wl.DEFAULT_VOICE == "pl-PL-Matcha-Meski" and {"pl-PL-Matcha-Meski", "pl-PL-Matcha-Damski"} <= set(wl.LOCAL_VOICES)
+    assert set(wl.EDGE_FALLBACK.values()) == set(wl.PL_VOICES)              # zapas: Marek i Zofia z Edge
+    assert wl.bez_klamer("Po {meeting}u") == "Po meetingu"
 
 
 def test_czasy_slow_z_parakeeta_i_luki():
@@ -1478,7 +1481,7 @@ def test_speak_many_glos_lokalny_przez_jarvo_tts(tmp_path, monkeypatch):
     """Głos en-US-Paradee idzie przez jarvo-tts (atrapa: ton zamiast mowy), bez Parakeeta czasy z podziału na zdania,
     drugi raz z cache."""
     fake = tmp_path / "jarvo-tts"
-    fake.write_text(f"""#!{sys.executable}
+    fake_src = f"""#!{sys.executable}
 import json, math, struct, sys, wave
 jobs = json.load(open(sys.argv[2]))
 out = []
@@ -1489,8 +1492,10 @@ for j in jobs:
         w.writeframes(b"".join(struct.pack("<h", int(8000 * math.sin(i / 9))) for i in range(n)))
     out.append({{"wyjscie": j["wyjscie"], "sekundy": n / 24000, "zdania": [[0.0, n / 24000, j["tekst"]]]}})
 open(sys.argv[2] + ".log", "a").write("x")
+open({str(tmp_path / "glosy.txt")!r}, "a").write(" ".join(j["glos"] for j in jobs) + "\\n")
 print(json.dumps(out))
-""")
+"""
+    fake.write_text(fake_src)
     fake.chmod(0o755)
     monkeypatch.setenv("JARVO_TTS_BIN", str(fake))
     monkeypatch.setenv("JARVO_STT_BIN", str(tmp_path / "brak-stt"))
@@ -1503,8 +1508,38 @@ print(json.dumps(out))
     assert sp[0].duration == pytest.approx(1.0, abs=0.1) and sp[1].duration == pytest.approx(1.5, abs=0.1)
     assert [w.text for w in sp[0].words] == ["Hello", "there", "friend."]
     assert json.loads(sp[0].audio.with_suffix(".json").read_text(encoding="utf-8"))["czasy"] == "zdania"
+    assert (tmp_path / "glosy.txt").read_text() == "en-US-Paradee en-US-Paradee\n"      # głos idzie do jarvo-tts
     fake.unlink()                                                       # drugi raz: cache, bez jarvo-tts
     assert [s.audio for s in wl.speak_many(items)] == [s.audio for s in sp]
+    # domyślny głos (bez „voice”) to polski Matcha, też przez jarvo-tts; {klamry} nie trafiają do słów napisów
+    fake.write_text(fake_src)
+    fake.chmod(0o755)
+    sp = wl.speak_many([{"text": "Dzięki za {feedback} dziś."}])
+    assert (tmp_path / "glosy.txt").read_text().splitlines()[-1] == "pl-PL-Matcha-Meski"
+    assert [w.text for w in sp[0].words] == ["Dzięki", "za", "feedback", "dziś."]
+
+
+def test_lektor_matcha_bez_jarvo_tts_zapas_edge(tmp_path, monkeypatch):
+    """Polski lektor lokalny bez jarvo-tts (poza obrazem) → zapas Edge TTS (Marek/Zofia) z ostrzeżeniem, w cache
+    pod głosem Edge; tekst do Edge bez {klamer}. Angielski Paradee nie ma zapasu: błąd zostaje."""
+    monkeypatch.setenv("JARVO_TTS_BIN", str(tmp_path / "brak-tts"))
+    monkeypatch.setattr(wl.shutil, "which", lambda *_a, **_k: None)
+    monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "cache"))
+    monkeypatch.setattr(wl, "_import_edge_tts", lambda: object())
+    monkeypatch.setattr(wl, "_ssl_bundle", lambda: None)
+    wolane = []
+
+    async def synth(_edge, text, voice, rate, volume, pitch, out):
+        wolane.append((text, voice))
+        out.write_bytes(b"mp3")
+        return [wl.Word(0.0, 0.5, w) for w in text.split()]
+    monkeypatch.setattr(wl, "_synth", synth)
+    monkeypatch.setattr(wl, "duration", lambda _p: 1.0)
+    sp = wl.speak_many([{"text": "Raport {PDF} dziś.", "voice": "pl-PL-Matcha-Damski"}, {"text": "Cześć."}])
+    assert sorted(wolane) == [("Cześć.", "pl-PL-MarekNeural"), ("Raport PDF dziś.", "pl-PL-ZofiaNeural")]
+    assert len(sp) == 2 and json.loads(sp[0].audio.with_suffix(".json").read_text())["voice"] == "pl-PL-ZofiaNeural"
+    with pytest.raises(SystemExit):
+        wl.speak_many([{"text": "Hello.", "voice": "en-US-Paradee"}])
 
 
 def test_glos_lokalny_w_edytorze_hq():

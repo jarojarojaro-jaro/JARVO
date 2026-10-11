@@ -1,7 +1,7 @@
 ---
 name: napisy
 description: "Napisy PL: z lektora albo transkrypcji, korekta, wypalenie."
-version: 1.1.0
+version: 1.1.1
 author: Jarvo
 license: MIT
 metadata:
@@ -17,7 +17,8 @@ metadata:
 # Napisy PL
 
 Większość krótkich filmów oglądana jest bez dźwięku, więc napisy są częścią obrazu, nie dodatkiem.
-Źródła czasu słów: lektor Edge TTS (w `film.py` automatycznie, co do słowa) albo transkrypcja Parakeet (`jarvo-stt`).
+Źródła czasu słów: lektor w `film.py` automatycznie (Edge TTS co do słowa z usługi, lokalny Matcha i Paradee z
+Parakeeta) albo transkrypcja Parakeet (`jarvo-stt`).
 
 ## Kiedy użyć
 - Każdy film z mową. Film z `film.py` ma napisy od razu (`napisy.styl` w planie); ten skill służy nagraniom

@@ -6,7 +6,8 @@
 lines.json jak w lemo-opuscar: [{"id": "l01", "text": "…", "voice": "…", "speed": 0.95}, …]
 (voice z Kokoro, np. af_kore, jest ignorowany: głos PL z --glos albo pola "glos" w linii; speed → tempo).
 Wynik jak w lemo: voices/<id>.wav (24 kHz mono, bez ciszy na brzegach), voices/dur.json i voices/words.json
-({id: [[słowo, start, koniec], …]}): czasy słów prosto z Edge TTS, bez whispera.
+({id: [[słowo, start, koniec], …]}): czasy słów z lektora (Edge TTS: z usługi; lokalny
+pl-PL-Matcha-*, domyślny: z Parakeeta), bez whispera.
 --sprawdz: kontrola wymowy Parakeetem (jarvo-stt), linie rozpoznane inaczej = DIFF (zmień zapis i powtórz).
 Kokoro mówi po angielsku i chińsku; do polskiego filmu zawsze ten skrypt.
 """

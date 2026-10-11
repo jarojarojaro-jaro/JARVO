@@ -6,7 +6,7 @@
     python3 film.py lektor "Tekst lektora." -o lektor.mp3 [--glos pl-PL-ZofiaNeural] [--tempo +5%]
     python3 film.py narracja narracja.txt -o src/lektor.wav [--os src/anim/os_czasu.json] [--cel 60-90] [--sprawdz]
                              [--fakty src/fakty.json] [--wymowa wymowa.json]
-    python3 film.py glosy                                    # polskie głosy Edge TTS
+    python3 film.py glosy                                    # głosy: lokalne (Matcha PL, Paradee EN) i Edge TTS
     python3 film.py cache [--starsze-niz 14]                 # rozmiar cache i sprzątanie
 
 Format planu: skill krotki-film, plik references/plan.md. Każdy etap ma cache (lektor, pobrane ujęcia, sceny
@@ -41,7 +41,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wideo_lib as wl  # noqa: E402
 
-WORDS_PER_SEC = 2.5          # tempo Edge TTS po polsku przy +0% (do szacunku bez syntezy)
+WORDS_PER_SEC = 2.5          # tempo lektora po polsku przy +0%, Edge i Matcha (do szacunku bez syntezy)
 SCENE_GAP = 0.18             # oddech między scenami
 TAIL = 0.6                   # zapas na końcu filmu
 MIN_SCENE = 1.2
@@ -164,7 +164,8 @@ def check_plan(plan: dict, plan_dir: Path) -> dict:
         fmts = ["9:16"]
     voice = voice_cfg(plan)
     if voice and not str(voice["glos"]).lower().startswith("pl-") and not voice.get("plik"):
-        warns.append(f"lektor {voice['glos']}: to nie jest polski głos (pl-PL-MarekNeural / pl-PL-ZofiaNeural)")
+        warns.append(f"lektor {voice['glos']}: to nie jest polski głos (pl-PL-Matcha-Meski / pl-PL-Matcha-Damski, "
+                     "Edge: pl-PL-MarekNeural / pl-PL-ZofiaNeural)")
     if voice and voice.get("plik") and not resolve(voice["plik"], plan_dir).exists():
         errors.append(f"lektor.plik nie istnieje: {voice['plik']}")
     need_stock = False
@@ -1044,13 +1045,13 @@ def cmd_voice(args) -> int:
 
 
 def cmd_voices(_args) -> int:
+    for name, note in wl.LOCAL_VOICES.items():
+        print(f"{name:<28} {'':<7} {note}{' (domyślny)' if name == wl.DEFAULT_VOICE else ''}")
     for v in wl.list_voices("pl-PL"):
         note = wl.PL_VOICES.get(v["ShortName"], "")
         print(f"{v['ShortName']:<28} {v.get('Gender', ''):<7} {note}")
     print("Wielojęzyczne (też czytają po polsku, inna barwa): en-US-AndrewMultilingualNeural, en-US-AvaMultilingualNeural, "
           "de-DE-SeraphinaMultilingualNeural")
-    for name, note in wl.LOCAL_VOICES.items():
-        print(f"{name:<28} {'':<7} {note}")
     return 0
 
 
@@ -1107,7 +1108,7 @@ def main(argv: list[str] | None = None) -> int:
                    "lektora muszą mieć w nim źródło, słowniczek daje wymowę terminów")
     n.add_argument("--wymowa", help='JSON {"Next.js": "nekst dżej es"}: jak lektor ma czytać termin (napis zostaje w pisowni)')
     n.add_argument("--sprawdz", action="store_true", help="tylko kontrola tekstu i szacunek długości, bez syntezy")
-    sub.add_parser("glosy", help="polskie głosy Edge TTS")
+    sub.add_parser("glosy", help="głosy lektora: lokalne i Edge TTS")
     k = sub.add_parser("cache", help="rozmiar cache; --starsze-niz N usuwa pliki starsze niż N dni")
     k.add_argument("--starsze-niz", type=float, default=None)
     args = ap.parse_args(argv)

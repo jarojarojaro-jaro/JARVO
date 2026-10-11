@@ -1,7 +1,7 @@
 ---
 name: krotki-film
 description: "Krótki film z tematu: plan, ujęcia, lektor, napisy, montaż."
-version: 1.0.1
+version: 1.0.2
 author: Jarvo
 license: MIT
 metadata:
@@ -18,7 +18,8 @@ metadata:
 
 Temat albo brief → gotowy film na TikTok, Reels, Shorts (i 16:9, 1:1, 4:5). Pomysł pipeline'u za MoneyPrinterTurbo
 (temat → scenariusz → ujęcia → lektor → napisy → muzyka → montaż), implementacja własna: `$HERMES_HOME/scripts/film.py`
-na FFmpeg i darmowym lektorze Edge TTS. Plik planu opisuje `references/plan.md`.
+na FFmpeg i darmowym lektorze (domyślnie lokalny Matcha, głos syntetyczny; Edge TTS do wyboru). Plik planu opisuje
+`references/plan.md`.
 
 ## Kiedy użyć
 - „zrób reelsa / tiktoka / shorta o…”, film promocyjny z tekstem i lektorem, explainer bez nagrań, film z listą faktów.

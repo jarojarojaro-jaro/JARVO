@@ -25,9 +25,10 @@ nasz): ten sam materiał napisany według tych zasad oceniono na 8,2/10, a uło�
    staniesz w tej kolejce, wiesz, że to nie piekarz jest wolny”). Nigdy „Podsumowując…” i powtórka punktów.
 9. **Rozdział kończy się pytaniem**, na które odpowiada następny (tylko film od 3 min, z rozdziałami `#`).
 
-## Liczby (Edge TTS, `film.py narracja` z domyślnymi pauzami)
+## Liczby (`film.py narracja` z domyślnymi pauzami)
 - Ok. 2 słowa na sekundę gotowego filmu: 60 s ≈ 120 słów, 90 s ≈ 180, 3 min ≈ 360. Zmierzone tempo samego
-  czytania Marka przy `+0%` z pauzami w akapicie: ok. 2,3 słowa/s; powyżej 2,7 widz nie nadąża.
+  czytania z pauzami w akapicie przy `+0%`: Marek (Edge) ok. 2,3 słowa/s, Matcha (domyślny, lokalny) ok. 2,7, więc
+  z Matchą narracja idzie z `--tempo -10%` (ok. 2,4); powyżej 2,7 widz nie nadąża.
 - Zdanie ≤ 20 słów, strona czynna; jedno zdanie w linii pliku narracji.
 - Akapit = ujęcie = jedna myśl obrazu: 2–4 zdania, co najmniej 4 s. Krótszy akapit połącz z sąsiednim.
 - Rozdziały tylko od 3 min: 3–5 min = 3–4 rozdziały po co najmniej 60 s; krótszy film to jedna opowieść.

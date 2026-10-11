@@ -119,7 +119,7 @@ dźwięk), każda min. 8/10, plus lista zakazanych klisz. Prawdziwe assety marki
 (`assety.py`: zrzuty, logo, marka w siedmiu rolach kolorów ze skalą kroju i rogami; `--film`: strona w 2× z mapą
 elementów, wycinkami i pustą planszą do filmowania; kamera po niej `/_lib/jarvo/strona.js`: przewijanie z postojami,
 wycieczka po elementach, lupa, zakreślacz, uderzenie, z kontrolą planu ruchów przed renderem; 11 ujęć z kart video-shotcraft
-w HTML bez Remotion: `/_lib/jarvo/ujecia.js`, np. karty rozdane z talii, licznik bębnowy, reflektor na bohaterze). Mówiąca maskotka-robot z polskim lektorem (`maskotka.py`, Edge TTS pl-PL-MarekNeural).
+w HTML bez Remotion: `/_lib/jarvo/ujecia.js`, np. karty rozdane z talii, licznik bębnowy, reflektor na bohaterze). Mówiąca maskotka-robot z polskim lektorem (`maskotka.py`, domyślnie lokalny Matcha `pl-PL-Matcha-Meski`).
 Syntetyczne SFX, biblioteka inspiracji (prompty twórców i katalog 157 kart ujęć video-shotcraft: `inspiracje.py ujecia`), produkcja etapami, formaty platform z jednego timeline.
 Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim. Demo strony (`demo_strony.py`, metoda ECC
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.
@@ -206,10 +206,10 @@ Cała flota mieści się na **1 VPS: 4 vCPU / 8 GB RAM / 80 GB**. Obraz ~4,8 GB,
 
 **Narzędzia w obrazie:** Lightpanda (lekka przeglądarka headless ~30 MB/sesję) + jedna Chromium z obrazu
 Hermesa (`/usr/local/bin/chromium`: render, PDF, zrzuty, Lighthouse), Parakeet przez `jarvo-stt` (onnx-asr;
-model ~0,65 GB pobierany przy pierwszym użyciu), FFmpeg (z obrazu Hermesa), lektor angielski Paradee przez `jarvo-tts`
-(model 9 MB w obrazie, bez sieci), Camoufox (`/opt/jarvo/camoufox`, Firefox z odciskiem zwykłej przeglądarki,
+model ~0,65 GB pobierany przy pierwszym użyciu), FFmpeg (z obrazu Hermesa), lektor przez `jarvo-tts`: polski Matcha-TTS-PL v2 (dwa głosy syntetyczne,
+2 × 140 MB w obrazie, CC BY-SA 4.0) i angielski Paradee (9 MB), bez sieci, Camoufox (`/opt/jarvo/camoufox`, Firefox z odciskiem zwykłej przeglądarki,
 ~0,35 GB): zapasowa przeglądarka Łowcy i Sherlocka tylko po odmowie strony (`ostrozna.py`, jedna naraz, ~0,8 GB RAM
-na czas jednej strony). Edge TTS (lektor PL) doinstalowuje Hermes przy pierwszym użyciu. Odchudzone: usunięto Gotenberg i Crawl4AI. (W piaskownicy Claude Code osobno:
+na czas jednej strony). Edge TTS (lektor PL do wyboru i zapas) doinstalowuje Hermes przy pierwszym użyciu. Odchudzone: usunięto Gotenberg i Crawl4AI. (W piaskownicy Claude Code osobno:
 Playwright/Chromium w `/opt/pw-browsers`, poza obrazem.)
 
 **Modele:** domyślnie provider `openai-codex` (jeden model `gpt-6-luna`, głębia myślenia per agent

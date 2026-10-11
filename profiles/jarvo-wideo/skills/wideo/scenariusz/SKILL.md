@@ -1,7 +1,7 @@
 ---
 name: scenariusz
 description: "Scenariusz krótkiego wideo: hook, rytm, tekst lektora."
-version: 1.2.0
+version: 1.2.1
 author: Jarvo
 license: MIT
 metadata:
@@ -45,7 +45,7 @@ formie bierz tylko zasady (hak = zwrot wartości, jedna scena = jedna zmiana), n
 
 ## Kroki
 1. **Jedno zdanie przesłania** („Widz ma wyjść z przekonaniem, że…”). Nie da się → temat za szeroki, zawęź.
-2. **Budżet słów:** krótki film (`film.py render`) długość × 2,5 słowa/s (lektor Edge +0%), 30 s ≈ 70 słów;
+2. **Budżet słów:** krótki film (`film.py render`) długość × 2,5 słowa/s (lektor +0%), 30 s ≈ 70 słów;
    film z narracją (`film.py narracja`, pauzy z akapitów) × 2, 60 s ≈ 120 słów. Hook ≤ 12 słów, scena ≤ 22.
 3. **Hook (0–2 s):** wzorzec z `references/hooki.md`, taktyka ze skilla `hooki`; konkret, liczba, konflikt albo
    obietnica; bez „Cześć, dziś…”. Wypisz **trzy warstwy**: obraz pierwszej sekundy, zdanie lektora, tekst ekranowy

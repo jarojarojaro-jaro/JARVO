@@ -284,7 +284,9 @@ ZRODLA_STATUSY = {"uzywane", "do-wdrozenia", "czeka", "odlozone"}
 
 
 def check_zrodla(r: Report) -> None:
-    """vendor/zrodla.yaml: każde repo z docs/SOURCES.md i skills.lock.yaml jest w spisie, z przejrzanym commitem."""
+    """vendor/zrodla.yaml: każde repo z docs/SOURCES.md i skills.lock.yaml jest w spisie, z przejrzanym commitem.
+    Repo z GitHuba albo model z Hugging Face (to też repozytorium: `zrodla.py sprawdz` pyta je tak samo); model ze spisu
+    musi mieć atrybucję w SOURCES.md, ale nie każdy model z SOURCES.md jest w spisie (pobierane w locie trzyma pin)."""
     path = fl.REPO_ROOT / "vendor" / "zrodla.yaml"
     if not path.exists():
         r.err("brak vendor/zrodla.yaml (spis źródeł)")
@@ -305,13 +307,16 @@ def check_zrodla(r: Report) -> None:
             if spec.get("status") not in ZRODLA_STATUSY:
                 r.err(f"zrodla/{name}: status {spec.get('status')!r} spoza {sorted(ZRODLA_STATUSY)}")
             continue
-        m = re.fullmatch(r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", str(spec.get("repo", "")))
+        m = re.fullmatch(r"https://(?:github\.com/|(huggingface\.co/))([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)",
+                         str(spec.get("repo", "")))
+        klucz = ((m.group(1) or "") + m.group(2)).lower() if m else ""      # owner/repo albo huggingface.co/owner/model
         if not m:
-            r.err(f"zrodla/{name}: repo musi być adresem https://github.com/<właściciel>/<repo>")
-        elif m.group(1).lower() in repos:
-            r.err(f"zrodla/{name}: repo już w spisie jako {repos[m.group(1).lower()]}")
+            r.err(f"zrodla/{name}: repo musi być adresem https://github.com/<właściciel>/<repo> "
+                  "albo https://huggingface.co/<właściciel>/<model>")
+        elif klucz in repos:
+            r.err(f"zrodla/{name}: repo już w spisie jako {repos[klucz]}")
         else:
-            repos[m.group(1).lower()] = name
+            repos[klucz] = name
         if spec.get("status") not in ZRODLA_STATUSY:
             r.err(f"zrodla/{name}: status {spec.get('status')!r} spoza {sorted(ZRODLA_STATUSY)}")
         if not re.fullmatch(r"[0-9a-f]{40}", str(spec.get("przejrzane", ""))):
@@ -319,6 +324,8 @@ def check_zrodla(r: Report) -> None:
     sources_md = (fl.REPO_ROOT / "docs" / "SOURCES.md").read_text(encoding="utf-8")
     w_sources = {m.lower().removesuffix(".git").rstrip(".")
                  for m in re.findall(r"github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", sources_md)}
+    w_modele = {"huggingface.co/" + m.lower() for m in
+                re.findall(r"huggingface\.co/(?!datasets/|spaces/)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", sources_md)}
     for repo in sorted(w_sources - set(repos)):
         r.err(f"zrodla: github.com/{repo} (docs/SOURCES.md) nie ma w vendor/zrodla.yaml")
     for name, spec in (fl.load_lock().get("sources") or {}).items():
@@ -328,7 +335,7 @@ def check_zrodla(r: Report) -> None:
     w_lock = {str(s.get("repo", "")).lower().removesuffix(".git").removeprefix("https://github.com/")
               for s in (fl.load_lock().get("sources") or {}).values()}
     for repo, name in repos.items():
-        if zrodla[name].get("status") == "uzywane" and repo not in w_sources | w_lock:
+        if zrodla[name].get("status") == "uzywane" and repo not in w_sources | w_lock | w_modele:
             r.err(f"zrodla/{name}: status uzywane, a repo nie ma w docs/SOURCES.md (licencja i atrybucja)")
 
 

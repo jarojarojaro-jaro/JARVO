@@ -120,6 +120,8 @@ def test_walidacja_spisu(repo_copy):
     tekst = tekst.replace("  anidoodle:\n    repo: https://github.com/alexgreensh/anidoodle\n    status: uzywane\n",
                           "  anidoodle:\n    repo: https://github.com/alexgreensh/anidoodle\n    status: nowe\n")
     tekst = tekst.replace("  htm:\n    repo: https://github.com/developit/htm", "  htm:\n    repo: https://example.com/htm")
+    tekst += ("  model-bez-atrybucji:\n    repo: https://huggingface.co/ktos/model\n    status: uzywane\n"
+              f"    przejrzane: {'a' * 40}\n")                          # model z Hugging Face: dozwolony, ale z atrybucją
     p.write_text(tekst, encoding="utf-8")
     report = validate.Report()
     validate.check_zrodla(report)
@@ -127,3 +129,5 @@ def test_walidacja_spisu(repo_copy):
     assert "anidoodle: status 'nowe'" in bledy
     assert "htm: repo musi być adresem https://github.com/" in bledy
     assert "github.com/developit/htm (docs/SOURCES.md) nie ma w vendor/zrodla.yaml" in bledy
+    assert "model-bez-atrybucji: status uzywane, a repo nie ma w docs/SOURCES.md" in bledy
+    assert "matcha-tts-pl-v2" not in bledy                                       # model z atrybucją w SOURCES.md

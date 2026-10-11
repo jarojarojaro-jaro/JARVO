@@ -1,7 +1,7 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.12.0
+version: 3.12.1
 author: Jarvo
 license: MIT
 metadata:
@@ -123,7 +123,7 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 4. **Look:** jedna–trzy klatki stylu renderowane prawdziwym kodem → obejrzyj (vision), popraw, dopiero potem całość.
    Akceptacja użytkownika tylko przy dużych zleceniach (karta mówi) – inaczej decydujesz sam.
 5. **Budowa i render** wg SKILL.md wybranego silnika (i w lemo: `$LIB/AGENTS.md`, `DIRECTOR.md`, `TECHNIQUE.md`, `STYLE.md`).
-6. **Dźwięk osobno:** lektor PL (Edge TTS), efekty, muzyka (`muzyka.py zrob` zostawia warstwy miksu, lemo `mix.py`
+6. **Dźwięk osobno:** lektor PL (`film.py`: lokalny Matcha albo Edge TTS), efekty, muzyka (`muzyka.py zrob` zostawia warstwy miksu, lemo `mix.py`
    zapisuje `out/sciezki/`, biblioteka); każda warstwa to osobny plik, nie jeden wypalony miks.
 7. **Projekt i napisy:** `projekt.py z-kodu <film> --obraz <obraz bez napisów> --ciecia … --glos/--efekty/--muzyka
    (albo --z-muzyki) --slowa lektor.slowa.json|--napisy film.srt --render` (`references/projekt-edytora.md`); napisy

@@ -8,6 +8,8 @@ onnxruntime==1.29.0
 # lektor angielski bez sieci: Paradee-8M (ONNX, model w obrazie) przez /opt/jarvo/bin/jarvo-tts.
 # misaki bez dodatku [en]: ten ciągnie torch (~5 GB); G2P potrzebuje tylko poniższych. Model spaCy
 # en_core_web_sm (koło z sumą sha256) instaluje infra/Dockerfile.
+# Polski lektor bez sieci (Matcha-TTS-PL v2, głosy pl-PL-Matcha-*) nie ma własnych paczek: fonemy z espeak-ng przez
+# phonemizer-fork + espeakng-loader (poniżej), wnioskowanie przez onnxruntime; wagi ONNX instaluje infra/Dockerfile.
 misaki==0.9.4
 spacy==3.8.16
 espeakng-loader==0.2.4
