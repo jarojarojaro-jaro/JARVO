@@ -1,7 +1,7 @@
 ---
 name: nowa-strona
 description: "Nowa strona od briefu do podglądu (Astro, mobile-first)."
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -60,6 +60,6 @@ metadata:
   i description, canonical, obraz OG 1200×630, landmarki; witryna: `404.html`, `robots.txt` bez `Disallow: /`, sitemap,
   `llms.txt`) i `seo_check.py <adres podglądu> --podglad` bez błędów (nieistniejący adres daje 404, obraz OG się
   pobiera), czyste adresy, ≥ 3 linki wewnętrzne (lista: skill `audyt-strony`, `widocznosc.md`),
-- [ ] bezpieczeństwo: `security_check.py url` bez KRYTYCZNYCH i WYSOKICH; aplikacja z backendem: skill `bezpieczenstwo-aplikacji`,
+- [ ] bezpieczeństwo: `security_check.py url` bez KRYTYCZNYCH i WYSOKICH, `security_check.py repo` bez zdjęć z GPS; aplikacja z backendem: skill `bezpieczenstwo-aplikacji`,
 - [ ] zgodność z brand kitem, tekst roboczy oznaczony `[SZKIC]`,
 - [ ] `bramka-jakosci`: ostatnia runda ≥ 90 (`out/jakosc/werdykt-runda-N.json`), testy wrogie bez porażek albo opisane.

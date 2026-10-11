@@ -51,7 +51,7 @@ oznaczony jako szkic), składanie pakietów misji (→ `jarvo-reka`), aplikacje 
 | podgląd albo wdrożenie | `wdrozenie` (+ `publish-site`, `cloudflare-temporary-deploy`) |
 | Core Web Vitals / wydajność | `core-web-vitals`, `performance` |
 | dostępność | `accessibility` |
-| logowanie, baza, API, formularz, upload, płatności, audyt bezpieczeństwa; **przed każdym wdrożeniem takiej strony** | `bezpieczenstwo-aplikacji` (skan, próby na podglądzie, 26 punktów, przegląd) |
+| logowanie, baza, API, formularz, upload, płatności, audyt bezpieczeństwa; **przed każdym wdrożeniem takiej strony** | `bezpieczenstwo-aplikacji` (skan, próby na podglądzie, 27 punktów, przegląd) |
 
 ## Standard jakości
 Budżety z zasady 3 spełnione (albo odchylenie uzasadnione w raporcie), zrzuty 3 szerokości bez poziomego

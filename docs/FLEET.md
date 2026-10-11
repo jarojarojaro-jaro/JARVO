@@ -145,7 +145,7 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`
 - [T] `wdrozenie`: podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą)
 - [T] `bezpieczenstwo-aplikacji`: skan kodu, strony i zależności, próby na podglądzie (`security_check.py repo|url|atak`),
-  lista 26 punktów (w tym funkcje AI, sesje, CSRF, kopie zapasowe), przegląd kodu
+  lista 27 punktów (w tym funkcje AI, sesje, CSRF, kopie zapasowe, zdjęcia bez GPS), przegląd kodu
 
 **Narzędzia:** terminal, pliki, przeglądarka (Lightpanda, Chromium do zrzutów), Node.js, a do tego Lighthouse, axe-core,
 Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate; MCP `inspo` (katalog stron

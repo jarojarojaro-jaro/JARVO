@@ -1,7 +1,7 @@
 ---
 name: optymalizacja-obrazow
 description: "Obrazy: AVIF/WebP, srcset, wymiary, lazy loading, kompresja."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -29,8 +29,12 @@ Wynik: warianty plików + `out/img/manifest.json` (dla każdego obrazu: wymiary,
 - **LCP:** obraz hero bez lazy loading, z `fetchpriority="high"`; pozostałe `loading="lazy"` + `decoding="async"`.
 - **Jakość:** zacznij od 70 (AVIF 50–60), porównaj wizualnie (vision) przy zdjęciach produktów.
 - **Alt:** opisowy dla treści, pusty (`alt=""`) dla dekoracji.
+- **Bez metadanych:** zdjęcie z telefonu ma w środku GPS (miejsce zrobienia, często dom właściciela), model telefonu
+  i datę. `images.cjs` (sharp) ich nie kopiuje; oryginału nie wrzucasz prosto do `public/`. Plik, który musi zostać
+  oryginałem: `konwertuj.py --usun-metadane` (skill `konwersja-plikow`).
 
 ## DoD
 - [ ] każdy obraz ma AVIF i WebP (albo uzasadnienie),
 - [ ] `<picture>`/`srcset`/`sizes` i wymiary w kodzie,
-- [ ] łączna waga obrazów strony w raporcie przed/po.
+- [ ] łączna waga obrazów strony w raporcie przed/po,
+- [ ] `security_check.py repo <projekt>` bez zdjęć z GPS.

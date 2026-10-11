@@ -1,7 +1,7 @@
 ---
 name: bezpieczenstwo-aplikacji
-description: "Bezpieczeństwo aplikacji: skan, próby, 26 punktów."
-version: 1.2.0
+description: "Bezpieczeństwo aplikacji: skan, próby, 27 punktów."
+version: 1.3.0
 author: "Jarvo (metodyka przeglądu wg anthropics/claude-code-security-review, MIT)"
 license: MIT
 metadata:
@@ -31,7 +31,8 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
    (sekrety w plikach i w **historii gita**, `.env` w repo, `npm audit`, wzorce ryzyka: token w localStorage,
    SQL sklejany z danych, eval, HTML bez oczyszczenia, sekret w zmiennej publicznej frontu, CORS *, debug; niebezpieczne
    ustawienia domyślne: sekret z wartością zapasową, zabezpieczenie wyłączone przy braku konfiguracji, TLS bez weryfikacji,
-   JWT bez podpisu, domyślne hasło, stos błędu w odpowiedzi, introspekcja GraphQL, uprawnienia 777/public-read) oraz
+   JWT bez podpisu, domyślne hasło, stos błędu w odpowiedzi, introspekcja GraphQL, uprawnienia 777/public-read),
+   **zdjęcia z GPS** w plikach projektu (miejsce zrobienia, często dom właściciela) oraz
    **zależności z rejestru** (npm, PyPI): nieistniejąca nazwa (zmyślona przez model), różna jedną literą od popularnej,
    nowa i mało używana. `nie_ocenione` w wyniku to „nie sprawdzono”, nigdy „czysto”.
    KRYTYCZNE (sekret) → najpierw **unieważnij klucz** u dostawcy, potem usuń z kodu i historii. Samo usunięcie nie wystarcza.
@@ -48,7 +49,8 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
    ślady błędów, publiczne `/.env`, `/.git`, kopie zapasowe, **klucze serwerowe w JS wysyłanym do przeglądarki**;
    klucz `anon` Supabase i klucze Google Maps/Firebase są publiczne z założenia, liczy się ich ograniczenie;
    **publiczne mapy źródeł**: `.js.map` z `sourcesContent` odtwarza czytelny kod frontu, bo minifikacja to nie
-   szyfrowanie: ŚREDNIE, a sekret w odzyskanym kodzie KRYTYCZNE). W `repo` także `productionBrowserSourceMaps: true`.
+   szyfrowanie: ŚREDNIE, a sekret w odzyskanym kodzie KRYTYCZNE; **GPS w zdjęciach strony**: do 40 zdjęć z `<img>`,
+   `srcset` i `og:image`, ŚREDNIE z linkiem do mapy, a obrazy z CSS i skryptów są w `nie_ocenione`). W `repo` także `productionBrowserSourceMaps: true`.
 2b. **Próby na działającej aplikacji** (podgląd z backendem): dwa konta testowe (A i B) zakładasz sam na podglądzie,
    ich nagłówki sesji bierzesz z odpowiedzi logowania, potem:
    ```bash
@@ -59,7 +61,7 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
    Sprawdza: trasy bez sesji, cudzy zasób sesją konta B (IDOR), limit prób logowania (12 prób, oczekiwane 429), plik
    HTML udający obrazek w uploadzie, sesję po wylogowaniu; `--limit <trasa>` dla innych tras. `sprawdzone` to dowody do
    listy kontrolnej. Endpointu AI z prawdziwym modelem nie odpytujesz seryjnie (kosztuje): limit z przeglądu kodu.
-3. **Lista kontrolna** `references/lista-kontrolna.md`: 26 punktów + nagłówki (23–25 tylko przy funkcji AI). Każdy punkt: ✓ z dowodem (plik:linia,
+3. **Lista kontrolna** `references/lista-kontrolna.md`: 27 punktów + nagłówki (23–25 tylko przy funkcji AI). Każdy punkt: ✓ z dowodem (plik:linia,
    wynik polecenia) albo ✗ z poprawką, albo „n/d” z powodem (np. brak uploadu). Przepisy per stos: `references/przepisy.md`.
 4. **Przegląd kodu jak security engineer** (`references/przeglad-kodu.md`): kontekst → porównanie z wzorcami
    projektu → śledzenie danych od wejścia do operacji wrażliwych. Tylko ustalenia z pewnością ≥ 0,8 i realnym scenariuszem

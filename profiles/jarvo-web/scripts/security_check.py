@@ -4,7 +4,8 @@
     python3 security_check.py repo <katalog projektu> [--offline] [--json]   # kod: sekrety, .env w gicie, zależności, wzorce ryzyka
     python3 security_check.py url https://strona.pl [--json]                 # działająca strona: nagłówki, ciasteczka, CORS,
                                                                              # wycieki, klucze w JS wysyłanym do przeglądarki,
-                                                                             # publiczne mapy źródeł (.js.map z kodem)
+                                                                             # publiczne mapy źródeł (.js.map z kodem),
+                                                                             # GPS w zdjęciach strony (miejsce zrobienia)
     python3 security_check.py atak http://localhost:4321 [próby…] [--json]    # nieniszczące próby na działającej aplikacji
 
 `atak` (tylko nasz podgląd albo aplikacja użytkownika za jego zgodą: `--zgoda-wlasciciela`), próby wybierasz flagami:
@@ -20,6 +21,8 @@ To nie zastępuje przeglądu kodu (model czyta przepływ danych: skill, referenc
 to, co da się wykryć maszynowo i bez fałszywych alarmów. Każde ustalenie ma wagę: KRYTYCZNE / WYSOKIE / ŚREDNIE / NISKIE.
 Kod wyjścia: 0 = brak KRYTYCZNYCH i WYSOKICH, 1 = są, 2 = złe wejście albo brak zgody. Sieć: badana strona, a w `repo`
 rejestry npm i PyPI (czy zależności istnieją, wiek, pobrania; `--offline` pomija). Bez zależności poza biblioteką standardową.
+`repo` i `url` szukają też współrzędnych GPS w zdjęciach (EXIF w JPEG, PNG, WebP, HEIC, AVIF, TIFF i XMP): zdjęcie
+z telefonu zdradza, gdzie je zrobiono (często dom właściciela).
 """
 from __future__ import annotations
 
@@ -32,6 +35,7 @@ import re
 import secrets
 import shutil
 import ssl
+import struct
 import subprocess
 import sys
 import tomllib
@@ -419,6 +423,171 @@ def skrypty_strony(base: str, html: str) -> list[str]:
     return list(dict.fromkeys(a for a in pelne if urllib.parse.urlsplit(a).netloc == host))[:20]
 
 
+OBRAZY = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".avif", ".tif", ".tiff"}
+MAX_ZDJEC = 40                   # `url`: tyle zdjęć strony sprawdzamy (początek pliku, nie całość)
+POCZATEK = 512_000               # EXIF i XMP leżą na początku pliku
+
+
+def _gps_tiff(t: bytes):
+    """TIFF (EXIF) → (szer, dł) z GPS IFD albo None. Uszkodzony EXIF = brak GPS."""
+    if len(t) < 8 or t[:2] not in (b"II", b"MM"):
+        return None
+    e = "<" if t[:2] == b"II" else ">"
+
+    def ifd(off):
+        if off + 2 > len(t):
+            return {}
+        n = struct.unpack_from(e + "H", t, off)[0]
+        wpisy = {}
+        for i in range(min(n, 200)):
+            o = off + 2 + 12 * i
+            if o + 12 > len(t):
+                break
+            tag, typ, ile = struct.unpack_from(e + "HHI", t, o)
+            wpisy[tag] = (typ, ile, o + 8)
+        return wpisy
+
+    def wart(typ, ile, o):
+        if typ == 2:                                                  # ASCII (N/S/E/W mieści się w polu)
+            return t[o:o + 1].decode("ascii", "ignore")
+        if typ == 5:                                                  # RATIONAL ×3: stopnie, minuty, sekundy
+            p = struct.unpack_from(e + "I", t, o)[0]
+            if p + 8 * ile > len(t):
+                return None
+            liczby = [struct.unpack_from(e + "II", t, p + 8 * k) for k in range(ile)]
+            return [a / b if b else 0.0 for a, b in liczby]
+        return None
+
+    try:
+        gl = ifd(struct.unpack_from(e + "I", t, 4)[0])
+        if 0x8825 not in gl:
+            return None
+        typ, ile, o = gl[0x8825]
+        g = ifd(struct.unpack_from(e + "I", t, o)[0])
+        st = []
+        for ref, val in ((1, 2), (3, 4)):
+            if ref not in g or val not in g:
+                return None
+            r, v = wart(*g[ref]), wart(*g[val])
+            if not v or len(v) < 3:
+                return None
+            x = v[0] + v[1] / 60 + v[2] / 3600
+            st.append(-x if r in ("S", "W") else x)
+    except (struct.error, IndexError, ValueError):
+        return None
+    if abs(st[0]) < 1e-6 and abs(st[1]) < 1e-6 or abs(st[0]) > 90 or abs(st[1]) > 180:
+        return None                                                   # zera = aparat bez pozycji
+    return round(st[0], 5), round(st[1], 5)
+
+
+def _xmp_stopnie(v: str):
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?))?(?:,(\d+(?:\.\d+)?))?([NSEW])", v.strip())
+    if not m:
+        return None
+    x = float(m[1]) + float(m[2] or 0) / 60 + float(m[3] or 0) / 3600
+    return -x if m[4] in "SW" else x
+
+
+def gps_w_obrazie(b: bytes):
+    """Początek pliku obrazu → (szer, dł) albo None. JPEG/HEIC/AVIF: blok `Exif\\0\\0`; PNG: eXIf; WebP: EXIF;
+    TIFF: cały plik; do tego XMP (exif:GPSLatitude)."""
+    kandydaci = []
+    if b[:4] in (b"II*\x00", b"MM\x00*"):
+        kandydaci.append(b)
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        o = 8
+        while o + 8 <= len(b):
+            n, typ = struct.unpack_from(">I4s", b, o)
+            if typ == b"eXIf":
+                kandydaci.append(b[o + 8:o + 8 + n])
+            if typ == b"IDAT":
+                break
+            o += 12 + n
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        o = 12
+        while o + 8 <= len(b):
+            typ, n = struct.unpack_from("<4sI", b, o)
+            if typ == b"EXIF":
+                kawal = b[o + 8:o + 8 + n]
+                kandydaci.append(kawal[6:] if kawal.startswith(b"Exif\x00\x00") else kawal)
+            o += 8 + n + (n & 1)
+    o = b.find(b"Exif\x00\x00")
+    while o != -1 and len(kandydaci) < 8:
+        kandydaci.append(b[o + 6:])
+        o = b.find(b"Exif\x00\x00", o + 6)
+    for k in kandydaci:
+        gps = _gps_tiff(k)
+        if gps:
+            return gps
+    xmp = {}
+    for os_ in ("Latitude", "Longitude"):
+        m = re.search(rb"exif:GPS" + os_.encode() + rb"(?:=\"|>)([^\"<]{2,40})", b)
+        if m:
+            xmp[os_] = _xmp_stopnie(m[1].decode("ascii", "ignore"))
+    if xmp.get("Latitude") is not None and xmp.get("Longitude") is not None:
+        return round(xmp["Latitude"], 5), round(xmp["Longitude"], 5)
+    return None
+
+
+def _gps_ustalenie(gps, gdzie: str, poprawka: str) -> dict:
+    mapa = f"https://www.openstreetmap.org/?mlat={gps[0]}&mlon={gps[1]}#map=17/{gps[0]}/{gps[1]}"
+    return u("ŚREDNIE", f"zdjęcie zdradza miejsce zrobienia (GPS {gps[0]}, {gps[1]}; {mapa})", gdzie, poprawka)
+
+
+USUN_GPS = ("usuń metadane: `konwertuj.py --usun-metadane <plik>` (skill konwersja-plikow) albo przepuść przez "
+            "images.cjs (sharp ich nie kopiuje)")
+
+
+def gps_w_repo(root: Path) -> list[dict]:
+    wyn = []
+    for p in root.rglob("*"):
+        if p.suffix.lower() not in OBRAZY or not p.is_file() \
+                or any(part in POMIN for part in p.relative_to(root).parts):
+            continue
+        try:
+            with p.open("rb") as f:
+                gps = gps_w_obrazie(f.read(POCZATEK))
+        except OSError:
+            continue
+        if gps:
+            wyn.append(_gps_ustalenie(gps, str(p.relative_to(root)), USUN_GPS + "; potem commit (stara wersja "
+                                      "zostaje w historii gita: jeśli to adres prywatny, powiedz właścicielowi)"))
+    return wyn
+
+
+def zdjecia_strony(base: str, html: str) -> list[str]:
+    """Adresy zdjęć z <img src/srcset/data-src>, <source srcset> i og:image (wszystkie hosty, jak w przeglądarce)."""
+    adresy = re.findall(r"<(?:img|source)[^>]+?(?:data-)?src=[\"']([^\"']+)", html, re.I)
+    for zestaw in re.findall(r"<(?:img|source)[^>]+?srcset=[\"']([^\"']+)", html, re.I):
+        adresy += [k.strip().split()[0] for k in zestaw.split(",") if k.strip()]
+    adresy += re.findall(r"<meta[^>]+property=[\"']og:image[\"'][^>]*content=[\"']([^\"']+)", html, re.I)
+    pelne = (urllib.parse.urljoin(base + "/", a.replace("&amp;", "&")) for a in adresy if not a.startswith("data:"))
+    return list(dict.fromkeys(a for a in pelne if a.startswith(("http://", "https://"))
+                              and not urllib.parse.urlsplit(a).path.lower().endswith((".svg", ".ico", ".gif"))))
+
+
+def gps_na_stronie(base: str, html: str) -> list[dict]:
+    adresy = zdjecia_strony(base, html)
+    if not adresy:
+        UWAGI.append("zdjęcia: brak <img> w HTML (obrazy z CSS albo dokładane skryptem nie są sprawdzone)")
+        return []
+    if len(adresy) > MAX_ZDJEC:
+        UWAGI.append(f"zdjęcia: sprawdzono {MAX_ZDJEC} z {len(adresy)} (reszta: `repo` na plikach projektu)")
+    with ThreadPoolExecutor(max_workers=6) as pula:
+        odp = list(pula.map(lambda a: (a, pobierz(a, limit=POCZATEK)), adresy[:MAX_ZDJEC]))
+    wyn, ok = [], 0
+    for adres, (s, _, _, b) in odp:
+        if s != 200 or not b:
+            continue
+        ok += 1
+        gps = gps_w_obrazie(b)
+        if gps:
+            wyn.append(_gps_ustalenie(gps, adres, USUN_GPS + ", podmień plik na serwerze i wyczyść cache CDN"))
+    if ok and not wyn:
+        SPRAWDZONE.append(f"zdjęcia bez GPS ({ok} sprawdzonych)")
+    return wyn
+
+
 def strona(url: str) -> list[dict]:
     wyn = []
     base = url.rstrip("/")
@@ -430,6 +599,8 @@ def strona(url: str) -> list[dict]:
         if s == 200:
             tekst = b.decode("utf-8", "replace")
             wyn += sekrety_w_js(tekst, js) + mapa_zrodel(js, tekst, hjs)
+    if st == 200:
+        wyn += gps_na_stronie(base, html)
     body = body[:3000]
     if base.startswith("http://"):
         wyn.append(u("WYSOKIE", "strona bez HTTPS", base, "certyfikat (Let's Encrypt) i przekierowanie 301 na https"))
@@ -608,7 +779,7 @@ def main(argv=None) -> int:
               "po zgodzie właściciela aplikacji", file=sys.stderr)
         return 2
     if a.tryb == "repo":
-        wyn = repo(Path(a.cel)) + ([] if a.offline else zaleznosci(Path(a.cel)))
+        wyn = repo(Path(a.cel)) + gps_w_repo(Path(a.cel)) + ([] if a.offline else zaleznosci(Path(a.cel)))
     else:
         wyn = strona(a.cel) if a.tryb == "url" else atak(a.cel, a)
     wyn.sort(key=lambda x: WAGI.index(x["waga"]))

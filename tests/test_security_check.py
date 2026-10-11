@@ -200,3 +200,69 @@ def test_dependencies_missing_young_and_lookalike(tmp_path, monkeypatch):
     assert not any("react " in c or "requests " in c for c in co)
     assert sc.UWAGI == ["pypi reqeusts: rejestr nie odpowiedział, nie oceniono"]
     assert sc.odleglosc1("reqeusts", "requests") and not sc.odleglosc1("react", "react")
+
+
+# ------------------------------------------------------------------ GPS w zdjęciach
+
+def _tiff_gps(e="<", szer=(52, 13, 48.5), dl=(21, 0, 36), ns="N", ew="E"):
+    """Minimalny EXIF (TIFF) z GPS IFD: 52°13'48.5"N 21°0'36"E = 52.23014, 21.01."""
+    import struct
+    asc = lambda c: c.encode() + b"\0\0\0"
+    ifd0 = struct.pack(e + "H", 1) + struct.pack(e + "HHII", 0x8825, 4, 1, 26) + struct.pack(e + "I", 0)
+    wpisy = [(1, 2, 2, asc(ns)), (2, 5, 3, struct.pack(e + "I", 80)), (3, 2, 2, asc(ew)), (4, 5, 3, struct.pack(e + "I", 104))]
+    gps = struct.pack(e + "H", 4) + b"".join(struct.pack(e + "HHI", t, ty, n) + v for t, ty, n, v in wpisy) + struct.pack(e + "I", 0)
+    dane = b"".join(struct.pack(e + "II", int(x * 10), 10) for x in (*szer, *dl))
+    return (b"II*\0" if e == "<" else b"MM\0*") + struct.pack(e + "I", 8) + ifd0 + gps + dane
+
+
+def _jpg(tiff=None):
+    import struct
+    app1 = b"\xff\xe1" + struct.pack(">H", len(tiff) + 8) + b"Exif\0\0" + tiff if tiff else b""
+    return b"\xff\xd8" + app1 + b"\xff\xda" + b"\0" * 64 + b"\xff\xd9"
+
+
+def test_gps_in_image_formats():
+    import struct
+    import zlib
+    t = _tiff_gps()
+    assert sc.gps_w_obrazie(_jpg(t)) == (52.23014, 21.01)
+    assert sc.gps_w_obrazie(_tiff_gps(">", ns="S", ew="W")) == (-52.23014, -21.01)
+    chunk = lambda typ, d: struct.pack(">I", len(d)) + typ + d + struct.pack(">I", zlib.crc32(typ + d))
+    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", b"\0" * 13) + chunk(b"eXIf", t) + chunk(b"IDAT", b"x") + chunk(b"IEND", b"")
+    assert sc.gps_w_obrazie(png) == (52.23014, 21.01)
+    exif = b"Exif\0\0" + t
+    webp = b"RIFF" + struct.pack("<I", 0) + b"WEBP" + b"VP8X" + struct.pack("<I", 10) + b"\0" * 10 \
+        + b"EXIF" + struct.pack("<I", len(exif)) + exif
+    assert sc.gps_w_obrazie(webp) == (52.23014, 21.01)
+    xmp = b'<x:xmpmeta><rdf:Description exif:GPSLatitude="50,3.6N" exif:GPSLongitude="19,56.4E"/></x:xmpmeta>'
+    assert sc.gps_w_obrazie(b"\0\0\0\x1cftypheic" + xmp) == (50.06, 19.94)
+    assert sc.gps_w_obrazie(_jpg()) is None                                         # bez EXIF
+    assert sc.gps_w_obrazie(_jpg(_tiff_gps(szer=(0, 0, 0), dl=(0, 0, 0)))) is None   # aparat bez pozycji
+    assert sc.gps_w_obrazie(_jpg(t[:60])) is None                                   # ucięty EXIF: bez wyjątku
+
+
+def test_gps_in_repo_and_on_page(tmp_path, monkeypatch):
+    monkeypatch.setattr(sc, "SPRAWDZONE", [])
+    monkeypatch.setattr(sc, "UWAGI", [])
+    (tmp_path / "public").mkdir()
+    (tmp_path / "public" / "zespol.JPG").write_bytes(_jpg(_tiff_gps()))
+    (tmp_path / "public" / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "node_modules" / "x.jpg").write_bytes(_jpg(_tiff_gps()))
+    wyn = sc.gps_w_repo(tmp_path)
+    assert [(x["waga"], x["gdzie"]) for x in wyn] == [("ŚREDNIE", "public/zespol.JPG")]
+    assert "52.23014, 21.01" in wyn[0]["co"] and "openstreetmap.org/?mlat=52.23014&mlon=21.01" in wyn[0]["co"]
+    assert "--usun-metadane" in wyn[0]["poprawka"]
+
+    html = ('<img src="/img/a.jpg"><img src="data:image/png;base64,AA"><img src="/logo.svg">'
+            '<picture><source srcset="/img/b.webp 480w, /img/c.webp 960w"></picture>'
+            '<meta property="og:image" content="https://cdn.example/og.jpg">')
+    assert sc.zdjecia_strony("https://a.pl", html) == ["https://a.pl/img/a.jpg", "https://a.pl/img/b.webp",
+                                                        "https://a.pl/img/c.webp", "https://cdn.example/og.jpg"]
+    pliki = {"https://a.pl/img/a.jpg": _jpg(), "https://a.pl/img/b.webp": _jpg(), "https://cdn.example/og.jpg": _jpg(_tiff_gps())}
+    monkeypatch.setattr(sc, "pobierz", lambda url, **kw: (200, {}, [], pliki[url]) if url in pliki else (404, {}, [], b""))
+    wyn = sc.gps_na_stronie("https://a.pl", html)
+    assert [x["gdzie"] for x in wyn] == ["https://cdn.example/og.jpg"] and "cache CDN" in wyn[0]["poprawka"]
+    del pliki["https://cdn.example/og.jpg"]
+    assert sc.gps_na_stronie("https://a.pl", html) == [] and sc.SPRAWDZONE == ["zdjęcia bez GPS (2 sprawdzonych)"]
+    assert sc.gps_na_stronie("https://a.pl", "<p>bez zdjęć</p>") == [] and "brak <img>" in sc.UWAGI[0]
