@@ -147,15 +147,14 @@ RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
 #     statyczny x264, dekodery audio ffmpeg LGPL, Mesa MIT, Typst Apache-2.0; fonty manimgx-fonts OFL-1.1), brak
 #     telemetrii i sieci w czasie renderu (sprawdzone bez sieci), koła przypięte sha256, wydanie 2026-10-07. Sieci
 #     używa tylko lektor `self.say()` (fal.ai, FAL_KEY) i `manimgx present` (przeglądarka): u nas zakazane.
-#     uv w /opt/hermes czyta [tool.uv] Hermesa (exclude-newer 14 dni): dokładnie przypięte paczki manimgx zwalniamy
-#     z tego okna jak narzedzia.py. Komenda `manimgx` na PATH: /opt/jarvo/bin/manimgx (cache w /opt/data).
+#     uv z --no-config: bez [tool.uv] Hermesa z /opt/hermes (jego ograniczenia, np. pynacl, i okno exclude-newer),
+#     instaluje dokładnie to, co w pliku z sumami. Komenda `manimgx` na PATH: /opt/jarvo/bin/manimgx (cache w /opt/data).
 #     Na końcu próbny render 1 s 640×360 (polski tekst krojem Noto Sans i wzór).
 RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
     case "$extras" in *" manim "*) ;; *) echo "ManimGX: bez dodatku manim, pomijam"; exit 0;; esac; \
     uv venv /opt/jarvo/venvs/manimgx --python 3.13 && \
-    VIRTUAL_ENV=/opt/jarvo/venvs/manimgx uv pip install --require-hashes --only-binary :all: \
-      --exclude-newer-package manimgx=false --exclude-newer-package manimgx-fonts=false \
-      --exclude-newer-package manimgx-fonts-cjk=false -r /opt/jarvo/python/requirements-manimgx.txt && \
+    VIRTUAL_ENV=/opt/jarvo/venvs/manimgx uv pip install --no-config --require-hashes --only-binary :all: \
+      -r /opt/jarvo/python/requirements-manimgx.txt && \
     t="$(mktemp -d)" && \
     printf '%s\n' 'from manimgx import *' 'class Proba(Scene):' '    def construct(self):' \
       '        self.play(Create(Circle()), FadeIn(Text("Łódź żółć", font="Noto Sans").to_edge(DOWN)), Write(MathTex(r"x^2").to_edge(UP)), run_time=0.5)' \
