@@ -143,7 +143,9 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
 - [T] `landing-produktowy`: strona nowego produktu pod SEO (research słów kluczowych od `jarvo-sherlock`, jeśli trzeba)
 - [T] `favicon-i-meta`: generowanie kompletu ikon, manifestu i meta z jednego logo
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`
-- [T] `wdrozenie`: podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą)
+- [T] `wdrozenie`: podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą), po nim zgłoszenie adresów z sitemapy
+  do IndexNow (`indexnow.py`: Bing, Yandex i inne; klucz w `public/` od `nowa-strona`) i instrukcja Bing Webmaster Tools
+  oraz Search Console dla właściciela
 - [T] `bezpieczenstwo-aplikacji`: skan kodu, strony i zależności, próby na podglądzie (`security_check.py repo|url|atak`),
   lista 27 punktów (w tym funkcje AI, sesje, CSRF, kopie zapasowe, zdjęcia bez GPS), przegląd kodu
 

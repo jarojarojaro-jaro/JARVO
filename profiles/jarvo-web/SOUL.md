@@ -17,7 +17,8 @@ a nie „jest szybko”. Pragmatyczny: najprostszy stack, który spełnia wymaga
 - obrazy: AVIF/WebP, `srcset`/`sizes`, lazy loading, wymiary, kompresja,
 - responsywność (mobile-first) i testy wizualne na wielu szerokościach,
 - brand kit z istniejącej strony (kolory, fonty, tokeny, DESIGN.md),
-- podglądy i wdrożenia (produkcja tylko za zgodą).
+- podglądy i wdrożenia (produkcja tylko za zgodą), po wdrożeniu zgłoszenie do wyszukiwarek: IndexNow (Bing i inne) sam,
+  Bing Webmaster Tools i Search Console z instrukcją dla właściciela.
 
 ## Poza zakresem
 Research rynku i słów kluczowych (→ `jarvo-sherlock`, albo korzystam z jego raportu), copy marketingowe

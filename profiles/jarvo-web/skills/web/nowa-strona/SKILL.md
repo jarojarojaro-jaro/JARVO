@@ -1,7 +1,7 @@
 ---
 name: nowa-strona
 description: "Nowa strona od briefu do podglądu (Astro, mobile-first)."
-version: 1.5.0
+version: 1.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -41,6 +41,8 @@ metadata:
      i `npx astro add sitemap --yes` (`sitemap-index.xml` w buildzie),
    - `public/robots.txt`: `User-agent: *`, `Allow: /`, `Sitemap: https://domena.pl/sitemap-index.xml`,
    - `public/llms.txt` wg szablonu z `audyt-strony/references/widocznosc.md`,
+   - klucz IndexNow: `python3 /opt/jarvo/repo/profiles/jarvo-web/scripts/indexnow.py klucz public` (plik `<klucz>.txt`
+     w `public/`; po wdrożeniu skill `wdrozenie` zgłasza nim adresy do Binga i innych wyszukiwarek IndexNow),
    - `src/pages/404.astro`: ten sam layout, krótki tekst, link do strony głównej, `<meta name="robots" content="noindex">`,
    - obraz OG 1200×630 (PNG albo JPEG) w `public/og.png`: od `jarvo-studio` albo roboczy (zrzut sekcji hero
      przycięty do 1200×630), roboczy oznaczony w RAPORT.md.

@@ -1,7 +1,7 @@
 ---
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
-version: 1.2.0
+version: 1.2.1
 author: Jarvo
 license: MIT
 metadata:

@@ -1,12 +1,12 @@
 ---
 name: wdrozenie
 description: "Podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą)."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
-    tags: [web, deploy, preview, hosting]
+    tags: [web, deploy, preview, hosting, indexnow, bing, search-console]
     related_skills: [publish-site, cloudflare-temporary-deploy]
   jarvo:
     agent: jarvo-web
@@ -29,7 +29,13 @@ Z zgodą:
    (kod 1 = `dist/` zmienił się po zgodzie → nowa zgoda).
 2. Wdróż skillem `publish-site` (GitHub Pages / Cloudflare Pages / Netlify), zgodnie z celem ze zgody. Nic więcej.
 3. Po wdrożeniu: `seo_check.py <produkcyjny URL>` (bez `--podglad`: noindex i soft 404 to błędy) + Lighthouse + `security_check.py url` na produkcyjnym URL, zrzuty, weryfikacja przekierowań i HTTPS.
-4. Raport: URL, commit/wersja, wyniki po wdrożeniu, jak cofnąć (rollback).
+4. Zgłoszenie wyszukiwarkom ([references/wyszukiwarki.md](references/wyszukiwarki.md)): gdy kontrola z punktu 3 nie ma błędów,
+   `python3 /opt/jarvo/repo/profiles/jarvo-web/scripts/indexnow.py zglos <produkcyjny URL> --katalog <projekt>/public`
+   (adresy z sitemapy do IndexNow: Bing i reszta wyszukiwarek IndexNow; zgoda na wdrożenie obejmuje to zgłoszenie).
+   Bing Webmaster Tools i Google Search Console zakłada właściciel: przy pierwszym wdrożeniu domeny pytasz, czy już są,
+   a jeśli nie, dajesz gotową instrukcję z adresem sitemapy.
+5. Raport: URL, commit/wersja, wyniki po wdrożeniu, wynik IndexNow, stan Bing Webmaster Tools i Search Console, jak cofnąć (rollback).
 
 ## Nigdy
-Zmiany DNS, rejestracja domen, płatne plany, usuwanie istniejących projektów hostingowych, bez osobnej zgody na każdą z tych rzeczy.
+Zgłaszanie podglądu albo stagingu do wyszukiwarek, stare „pingi” sitemapy (Google i Bing je wyłączyli), zakładanie
+kont w Bing Webmaster Tools czy Search Console za właściciela. Zmiany DNS, rejestracja domen, płatne plany, usuwanie istniejących projektów hostingowych, bez osobnej zgody na każdą z tych rzeczy.

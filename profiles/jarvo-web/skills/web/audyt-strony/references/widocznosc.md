@@ -6,7 +6,7 @@ reviewed: "2026-10-05"
 
 | # | Punkt | Sprawdza | Dobry stan |
 |---|---|---|---|
-| 1 | sitemap | `seo_check.py` (crawl, `--dir`) | `sitemap.xml` albo `sitemap-index.xml` (`@astrojs/sitemap`), wszystkie kanoniczne strony, zgłoszona w Search Console |
+| 1 | sitemap | `seo_check.py` (crawl, `--dir`) | `sitemap.xml` albo `sitemap-index.xml` (`@astrojs/sitemap`), wszystkie kanoniczne strony, zgłoszona w Search Console i Bing Webmaster Tools, plik klucza IndexNow (`indexnow.py`, skill `wdrozenie`) |
 | 2 | robots.txt | `seo_check.py` | istnieje, **nie** `Disallow: /` dla `*`, wpis `Sitemap:` |
 | 3 | brak noindex | `seo_check.py` (head) | produkcja bez `noindex`; podglądy i staging z `noindex`, sprawdzane z `--podglad` (noindex to wtedy info) |
 | 4 | canonical | `seo_check.py` | bezwzględny URL tej strony na domenie produkcyjnej (`--dir --base-url`: host i ścieżka) |
