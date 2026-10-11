@@ -15,7 +15,7 @@
 # a CI zbuduje nowy obraz floty. HERMES_IMAGE w compose/.env nadpisuje (wtedy obraz buduje się na miejscu).
 ARG HERMES_IMAGE=nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7
 # Lightpanda (AGPL-3.0, niezmodyfikowana binarka): przeglądarka headless dla narzędzi browser_* agentów.
-# Wersja przypięta digestem; wydanie ≥ 14 dni (ta sama kwarantanna co npm/PyPI).
+# Wersja przypięta digestem i przejrzana przed dodaniem (docs/SOURCES.md, „Przegląd przed dodaniem”).
 ARG LIGHTPANDA_IMAGE=lightpanda/browser:0.4.1@sha256:73f67d2dc0bc243f3a8c87065c9871c98b121197baf7b650df5da91b33b98f02
 
 FROM ${LIGHTPANDA_IMAGE} AS lightpanda
@@ -104,7 +104,7 @@ RUN set -e; cd /opt/jarvo/node && \
 # HyperFrames (wideo z HTML + GSAP; skille Wideografa wołają `npx hyperframes`): globalnie w obrazie, bo npx
 # bierze paczkę z globalnego drzewa bez sieci (inaczej ściągał najnowszą przy pierwszym użyciu, a na świeżej
 # instalacji bez sieci healthcheck padał). puppeteer-core w paczce używa Chromium obrazu (PUPPETEER_EXECUTABLE_PATH).
-# Wersja ≥ 14 dni (npm min-release-age obrazu Hermesa), ta sama co skille z vendor/skills.lock.yaml (commit po v0.8.78).
+# Wersja przejrzana, ta sama co skille z vendor/skills.lock.yaml (commit po v0.8.78).
 ARG HYPERFRAMES_VERSION=0.8.78
 RUN set -e; npm install -g --no-audit --no-fund "hyperframes@${HYPERFRAMES_VERSION}" && \
     hyperframes --version && npm cache clean --force && rm -rf /root/.npm/_cacache
@@ -139,7 +139,7 @@ RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
 
 # --- Camoufox (MPL-2.0): Firefox z podmienionym odciskiem przeglądarki, zapasowa przeglądarka Łowcy i Sherlocka
 #     (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`) tylko po odmowie zwykłej przeglądarki. Binarka z wydania
-#     daijro/camoufox przypięta wersją i sumą SHA-256 dla amd64 i arm64 (wydanie ≥ 14 dni). Z paczki (1,3 GB) zostaje
+#     daijro/camoufox przypięta wersją i sumą SHA-256 dla amd64 i arm64 (przejrzana). Z paczki (1,3 GB) zostaje
 #     ~0,35 GB: bez fontów macOS i Windows (~0,9 GB fontów Apple i Microsoft, których nie redystrybuujemy), więc
 #     przeglądarka udaje tylko Linuksa (fonty Linuksa z paczki: Noto, Arimo, Tinos, Cousine; OFL i Apache-2.0).
 #     Na końcu start bez sieci: strona z data: i navigator.webdriver = false.
@@ -192,9 +192,8 @@ RUN set -e; d=/opt/jarvo/models/paradee; mkdir -p "$d" /tmp/spacy-en && \
 #     Wariant t2 (2 kroki ODE) zamiast t4: pomiar na 4-rdzeniowym Xeonie 2,8 GHz, 2 wątki, 27 s polskiej mowy z liczbami,
 #     datą i „AI”: t2 RTF 0,49–0,56, t4 0,55–0,61; Parakeet usłyszał w obu to samo (te same słowa, WER 5–7 % = zapis
 #     cyfr przez rozpoznawanie, nie błędy wymowy), RAM ~0,41 GB na głos w obu. Wolniejszy t4 nic nie daje.
-#     Repozytorium modelu powstało 2026-10-02, przypięta rewizja jest z 2026-10-10: wyjątek od 14-dniowej kwarantanny,
-#     decyzja właściciela 2026-10-11; pliki = same wagi ONNX i JSON-y przypięte sha256 (kod fonemizera jest w repo Jarvo,
-#     jarvo_tts_matcha.py). Na końcu próba mowy obu głosów.
+#     Przegląd 2026-10-11 (repozytorium modelu z 2026-10-02, przypięta rewizja z 2026-10-10): pliki = same wagi ONNX
+#     i JSON-y przypięte sha256 (kod fonemizera jest w repo Jarvo, jarvo_tts_matcha.py). Na końcu próba mowy obu głosów.
 ARG MATCHA_PL_URL=https://huggingface.co/machinekind/Matcha-TTS-PL-v2/resolve/93744740ae645648c003abb09e8c617d9c5e34cd
 RUN set -e; d=/opt/jarvo/models/matcha-pl; mkdir -p "$d/meski" "$d/damski" && \
     curl -fsSL --retry 3 "$MATCHA_PL_URL/onnx/matcha_pl_t2.onnx" -o "$d/meski/matcha_pl_t2.onnx" && \

@@ -1,5 +1,5 @@
 # Narzędzia Pythona floty Jarvo → /opt/jarvo/venv (Python 3.12 przez uv, osobno od środowiska Hermesa).
-# Wersje przypięte (≥ 14 dni od wydania, jak kwarantanna npm w obrazie); aktualizacja = PR + `make pins`.
+# Wersje przypięte i przejrzane przed dodaniem (docs/SOURCES.md); aktualizacja = PR + `make pins`.
 trafilatura==2.2.0
 yt-dlp==2026.8.19
 # rozpoznawanie mowy: Parakeet TDT 0.6B v3 (int8, ONNX) przez /opt/jarvo/bin/jarvo-stt

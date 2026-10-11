@@ -224,7 +224,7 @@ zrodla:
     repo: https://huggingface.co/machinekind/Matcha-TTS-PL-v2
     status: uzywane
     przejrzane: 93744740ae645648c003abb09e8c617d9c5e34cd
-    notatka: "CC BY-SA 4.0: polski lektor (jarvo-tts, głosy pl-PL-Matcha-Meski = male_voxcpm_1, pl-PL-Matcha-Damski = female_voxcpm_2), wagi ONNX t2 w obrazie z sha256 w infra/Dockerfile, ATTRIBUTION.md i LICENSE obok; port english/polish_*cleaners.py w jarvo_tts_matcha.py. Repo powstało 2026-10-02, rewizja z 2026-10-10: wyjątek od 14-dniowej kwarantanny, decyzja właściciela 2026-10-11; pliki = same wagi ONNX przypięte sha256"
+    notatka: "CC BY-SA 4.0: polski lektor (jarvo-tts, głosy pl-PL-Matcha-Meski = male_voxcpm_1, pl-PL-Matcha-Damski = female_voxcpm_2), wagi ONNX t2 w obrazie z sha256 w infra/Dockerfile, ATTRIBUTION.md i LICENSE obok; port english/polish_*cleaners.py w jarvo_tts_matcha.py. Repo z 2026-10-02, rewizja z 2026-10-10; przegląd 2026-10-11; pliki = same wagi ONNX przypięte sha256"
   modnet:
     repo: https://github.com/ZHKKKe/MODNet
     status: uzywane

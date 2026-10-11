@@ -28,7 +28,7 @@ LIMITY_ZWALNIAJ = {"itunes.apple.com"}                         # 403 tu znaczy �
 OZNAKI_BLOKADY = ("_Incapsula_Resource", "cf-chl", "Dostęp zablokowany", "Access Blocked", "Request unsuccessful",
                   "/sorry/index", "unusual traffic")
 CACHE = Path(os.environ.get("MOBILE_CACHE", str(Path.home() / ".cache" / "jarvo-mobile")))
-# jedna wersja EAS CLI dla aplikacja.py, wydanie.py i reszty; ≥ 14 dni od wydania (kwarantanna npm)
+# jedna wersja EAS CLI dla aplikacja.py, wydanie.py i reszty; przypięta i przejrzana przed podbiciem (docs/SOURCES.md)
 EAS_CLI = os.environ.get("JARVO_EAS_CLI", "eas-cli@24.7.0")
 LICZNIK = {"zapytania": 0, "z_pamieci": 0, "bledy": 0}
 DZIS = dt.date.fromisoformat(os.environ["MOBILE_DZIS"]) if os.environ.get("MOBILE_DZIS") else dt.date.today()

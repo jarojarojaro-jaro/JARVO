@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """Sprawdza przypięte pakiety narzędzi obrazu (npm i Python) względem zasad obrazu Hermesa.
 
-    python3 scripts/check-pins.py [--min-age 14] [--node 26.5.1] [--python 3.12]
+    python3 scripts/check-pins.py [--node 26.5.1] [--python 3.12]
 
-Obraz Hermesa ma globalny npmrc z `min-release-age = 14` (kwarantanna łańcucha dostaw) i `engine-strict`:
-wersja opublikowana mniej niż 14 dni temu albo wymagająca innego Node wywraca budowę obrazu na VPS.
-Skrypt pokazuje wiek każdej wersji, najnowszą dopuszczalną i zgodność `engines.node`.
-Piny Pythona (infra/python/requirements-*.txt): czy wersja istnieje na PyPI i obsługuje Pythona venv narzędzi;
-młode wersje są tylko ostrzeżeniem (uv nie ma kwarantanny, ale świeże wydania bywają wycofywane).
+Czy przypięte wersje istnieją i pasują do obrazu: npm `engines.node` względem Node obrazu (`engine-strict` wywraca
+budowę), Python `requires_python` względem venv narzędzi. Wiek wersji to tylko informacja: o dodaniu decyduje
+przegląd źródła (docs/SOURCES.md, „Przegląd przed dodaniem”), nie liczba dni od wydania.
 Kod wyjścia 1 przy problemie. Wymaga dostępu do registry.npmjs.org i pypi.org.
 """
 
@@ -59,7 +57,6 @@ def node_satisfies(spec: str | None, node: str) -> bool | None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--min-age", type=int, default=14)
     ap.add_argument("--node", default="26.5.1", help="wersja Node w obrazie Hermesa (node --version)")
     ap.add_argument("--python", default="3.12", help="Python venv narzędzi (infra/Dockerfile)")
     args = ap.parse_args(argv)
@@ -75,14 +72,9 @@ def main(argv: list[str] | None = None) -> int:
             bad += 1
             continue
         age = (now - parse_ts(published)).days
-        allowed = [(v, t) for v, t in data["time"].items()
-                   if v not in {"created", "modified"} and "-" not in v and (now - parse_ts(t)).days >= args.min_age]
-        newest_ok = max(allowed, key=lambda x: x[1])[0] if allowed else "—"
         engines = (data["versions"].get(ver, {}).get("engines") or {}).get("node")
         eng_ok = node_satisfies(engines, args.node)
         problems = []
-        if age < args.min_age:
-            problems.append(f"za młoda ({age} dni < {args.min_age}); najnowsza dopuszczalna: {newest_ok}")
         if eng_ok is False:
             problems.append(f"engines.node {engines!r} nie obejmuje Node {args.node}")
         mark = "✗" if problems else "✓"
@@ -114,9 +106,7 @@ def check_python(args, now: dt.datetime) -> int:
             if py_ok is False:
                 note.append(f"requires_python {req_py!r} nie obejmuje {args.python}")
                 bad += 1
-            if age < args.min_age:
-                note.append(f"młoda wersja ({age} dni), ostrzeżenie")
-            mark = "✗" if py_ok is False else ("!" if note else "✓")
+            mark = "✗" if py_ok is False else "✓"
             print(f"{mark} {req.name}: {name}=={ver}: {age} dni" + (f"  → {'; '.join(note)}" if note else ""))
     return bad
 

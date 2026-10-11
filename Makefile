@@ -11,7 +11,7 @@ help:
 	@echo "make test               testy (pytest): walidatory, patrol, raporty, skrypty"
 	@echo "make build HERMES_SRC=… build dystrybucji do build/ (wymaga drzewa Hermesa)"
 	@echo "make models             czy modele z fleet.yaml istnieją u wybranego dostawcy"
-	@echo "make pins               czy piny npm spełniają zasady obrazu Hermesa (wiek ≥ 14 dni, engines)"
+	@echo "make pins               czy piny npm i Pythona istnieją i pasują do Node/Pythona obrazu (wiek tylko informacyjnie)"
 	@echo "make zrodla             nowości w repo, z których bierzemy (vendor/zrodla.yaml), do przeglądu"
 	@echo "make hq-demo            Jarvo HQ w trybie demo (symulowana flota) do build/hq-demo"
 	@echo "make deploy             wdrożenie na VPS (scripts/deploy.sh)"

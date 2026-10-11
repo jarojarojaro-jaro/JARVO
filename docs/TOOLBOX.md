@@ -355,8 +355,10 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 | sidecary | sieć `jarvo-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
 
 Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmianą):
-- globalny npmrc obrazu ma `min-release-age = 14` i `engine-strict`: przypinamy wersje npm starsze niż 14 dni
-  i zgodne z Node obrazu; tę samą zasadę stosujemy do pinów Pythona,
+- o dodaniu wersji decyduje przegląd źródła, nie jej wiek ([SOURCES.md](SOURCES.md#przegląd-przed-dodaniem-każde-źródło-osobno));
+  globalny npmrc obrazu ma `min-release-age = 14`, ale npm 11.17 z obrazu instaluje dokładne piny bez względu na wiek
+  (sprawdzone 2026-10-11: `eas-cli@24.12.1` sprzed 3 dni), a uv obrazu (`exclude-newer`) zwalniamy dla dokładnych
+  pinów w `narzedzia.py` i `lemo_wake.py`. Wersje npm muszą być zgodne z Node obrazu (`engine-strict`),
 - interpreter Pythona dla venv pobiera `uv` do `/opt/jarvo/uv-python` (nie do `/root`, niedostępnego dla `hermes`),
 - Camoufox: binarka z wydania przypięta wersją i SHA-256 (amd64, arm64), bez fontów macOS i Windows z paczki (0,9 GB);
   build kończy się startem bez sieci (`navigator.webdriver` = false). Biblioteka `camoufox` dostaje `executable_path`
@@ -372,9 +374,8 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
   (ciągnąłby torch, ~5 GB).
 - lektor polski: ten sam `jarvo-tts` z Matcha-TTS-PL v2 w `/opt/jarvo/models/matcha-pl/` (`meski/`, `damski/`: graf ONNX
   t2 i `voices.json`, obok `LICENSE`, `ATTRIBUTION.md`, karta modelu, `JARVO-ZRODLO.txt`), +0,28 GB; pliki przypięte
-  rewizją i sumą SHA-256, build kończy się próbą mowy obu głosów. Bez `.ckpt`, próbek i torcha. Wyjątek od 14-dniowej
-  kwarantanny: repo modelu powstało 2026-10-02, rewizja z 2026-10-10, decyzja właściciela 2026-10-11 (pliki = same wagi
-  ONNX i JSON-y przypięte sha256). Na 4-rdzeniowym Xeonie 2,8 GHz, 2 wątki (`JARVO_TTS_THREADS`): RTF ~0,5 (4 wątki ~0,3),
+  rewizją i sumą SHA-256, build kończy się próbą mowy obu głosów. Bez `.ckpt`, próbek i torcha. Przegląd 2026-10-11
+  (repo modelu z 2026-10-02, rewizja z 2026-10-10): pliki = same wagi ONNX i JSON-y przypięte sha256. Na 4-rdzeniowym Xeonie 2,8 GHz, 2 wątki (`JARVO_TTS_THREADS`): RTF ~0,5 (4 wątki ~0,3),
   ~0,41 GB RAM na głos na czas syntezy.
 
 Skrypty `.cjs` ładują moduły przez `NODE_PATH`, a ESM-owe pakiety (np. `favicons`) przez `importGlobal()`.

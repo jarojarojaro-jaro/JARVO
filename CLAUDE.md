@@ -7,6 +7,10 @@
 - **Jarvo zawsze nadrzędny.** Z obcych projektów (np. Paperclip, Auto-Company) bierzemy tylko gotowe rozwiązania
   i wzorce, przeniesione do kodu JARVO. Nigdy nie stawiamy nad Jarvem innego systemu sterującego (orkiestratora,
   panelu, pętli agentów). Zanim dodamy coś zapożyczonego, opisujemy właścicielowi, co to zmienia, i czekamy na wybór.
+- **Każde źródło przechodzi przegląd; wiek wydania nie jest kryterium.** Nowe repo, paczka, model albo nowa wersja
+  trafia do floty po przeglądzie z `docs/SOURCES.md` („Przegląd przed dodaniem”: autorzy, licencja, kod instalacji
+  i połączenia z siecią, zależności, próba w kontenerze, przypięcie sumą, zapis w `vendor/zrodla.yaml`). Nie czekamy
+  żadnej liczby dni: wydanie sprzed godziny i sprzed roku przechodzi ten sam przegląd.
 - **Dokumentacja zawsze zgodna z kodem.** Zmiana w kodzie, konfiguracji albo flocie aktualizuje w tym samym commicie
   każdy dokument, który ją opisuje: `README.md`, `docs/*.md` (także `docs/JARVO-CALOSC.md`), README i CHANGELOG profilu.
   Nazwy, liczby (skille, skrypty, evals, ataki red teamu), ścieżki, komendy, flagi i statusy w roadmapie mają odpowiadać repo.

@@ -9,6 +9,27 @@ status i ostatni przejrzany commit. `python3 scripts/zrodla.py sprawdz` pokazuje
 (commity, nowe katalogi i skille, zmiana licencji). Spis trzyma też repo przejrzane, ale jeszcze niewdrożone
 (`czeka`, `odlozone`). Nowej wersji nie bierzemy sama z siebie: aktualizacja przypięcia to decyzja właściciela.
 
+### Przegląd przed dodaniem (każde źródło osobno)
+
+Wiek wydania nie jest kryterium: nowe repo, paczka, model albo nowa wersja trafia do floty po **przeglądzie**, nie po
+odczekaniu określonej liczby dni. Wydanie sprzed godziny i sprzed roku przechodzą ten sam przegląd:
+
+1. **Kto i skąd.** Autorzy i aktywność repo; czy wydanie (koło, paczka npm, binarka, wagi modelu) pochodzi z tego repo
+   i z commitu, który przejrzeliśmy.
+2. **Licencja** kodu, wag, fontów i tego, co paczka ma w środku (np. statycznie dołączone kodeki).
+3. **Kod.** Skrypty instalacyjne (postinstall, `setup.py`, build), połączenia z siecią w czasie działania, odczyt
+   zmiennych środowiska i sekretów, zaciemniony kod, dołączone binarki. Skille dodatkowo `scripts/skan_skilli.py`.
+4. **Zależności przechodnie:** co nowego wciąga i czy da się je przypiąć.
+5. **Próba w kontenerze:** działa, gdzie się da także bez sieci; ile zajmuje w obrazie.
+6. **Przypięcie:** dokładna wersja i suma (SHA-256, digest obrazu albo commit).
+7. **Zapis:** `vendor/zrodla.yaml` (przejrzany commit) i wpis tutaj albo w [TOOLBOX.md](TOOLBOX.md) z datą i wynikiem przeglądu.
+
+Problem znaleziony w przeglądzie = nie bierzemy, chyba że da się go obejść, a obejście jest opisane. Każda nowa wersja
+przypiętego źródła przechodzi przegląd od nowa (różnice od przejrzanego commitu pokazuje `scripts/zrodla.py sprawdz`).
+Obraz Hermesa ma ustawienia świeżych wydań npm i uv (`min-release-age`, `exclude-newer`) dla tego, co agenci
+instalują sami w trakcie pracy, bez wersji. Przejrzanych, dokładnie przypiętych wersji Jarva nie blokują: npm obrazu
+instaluje dokładny pin bez względu na wiek, a z uv zwalniamy je w `narzedzia.py` i `lemo_wake.py`.
+
 ## 1. Platforma
 
 | Projekt | Rola | Licencja |
@@ -29,7 +50,7 @@ Komponenty obrazu `jarvo-hermes` o znaczeniu licencyjnym (pełna lista narzędzi
 | [onnx-asr](https://github.com/istupakov/onnx-asr) + [ONNX Runtime](https://github.com/microsoft/onnxruntime) | uruchamianie modelu mowy na CPU | MIT |
 | [Paradee-8M v1.0](https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0) ([sahilmahendrakar/paradee](https://github.com/sahilmahendrakar/paradee), Sahil Mahendrakar; `paradee_int8.onnx`, SHA-256 `60e8f8a1…698eb`) | lektor angielski bez sieci (`jarvo-tts`, głos `en-US-Paradee`): model **w obrazie** (`/opt/jarvo/models/paradee/` razem z jego `LICENSE`), logika wnioskowania napisana według `paradee/tts.py` | Apache-2.0 |
 | [misaki](https://github.com/hexgrad/misaki) 0.9.4 + [spaCy](https://github.com/explosion/spaCy) 3.8.16 z modelem `en_core_web_sm` 3.8.0 + [espeak-ng](https://github.com/espeak-ng/espeak-ng) przez `espeakng-loader` | tekst → fonemy dla Paradee (ten sam G2P co Kokoro); espeak-ng tylko dla słów spoza słownika | Apache-2.0 / MIT / MIT / GPL-3.0 (espeak-ng, uruchamiany jako biblioteka bez zmian) |
-| [Matcha-TTS-PL v2](https://huggingface.co/machinekind/Matcha-TTS-PL-v2) (machinekind; rewizja `93744740ae645648c003abb09e8c617d9c5e34cd`; głosy `male_voxcpm_1` i `female_voxcpm_2`, `matcha_pl_t2.onnx` z SHA-256 `e2a2ea8b…2884a` i `1e228163…30ba5`) | polski lektor bez sieci, domyślny u Wideografa i w edytorze HQ (`jarvo-tts`, głosy `pl-PL-Matcha-Meski` i `pl-PL-Matcha-Damski`): wagi ONNX **w obrazie** bez zmian (`/opt/jarvo/models/matcha-pl/` razem z `LICENSE`, `ATTRIBUTION.md` ze źródłami danych treningowych, kartą modelu i `JARVO-ZRODLO.txt`). Fonemizer `infra/bin/jarvo_tts_matcha.py` to port `english/polish_cleaners.py` i `polish_mixed_cleaners.py` z tego repo (na tej samej licencji, z atrybucją w pliku). Głosy syntetyczne (zaprojektowane opisem w VoxCPM2, Apache-2.0; nie nagrania ani klony ludzi): mowę oznaczamy jako syntetyczną (skill `lektor-i-dzwiek`). Repo powstało 2026-10-02, rewizja z 2026-10-10: wyjątek od 14-dniowej kwarantanny, decyzja właściciela 2026-10-11; pliki = same wagi ONNX i JSON-y przypięte sha256 | CC-BY-SA-4.0 |
+| [Matcha-TTS-PL v2](https://huggingface.co/machinekind/Matcha-TTS-PL-v2) (machinekind; rewizja `93744740ae645648c003abb09e8c617d9c5e34cd`; głosy `male_voxcpm_1` i `female_voxcpm_2`, `matcha_pl_t2.onnx` z SHA-256 `e2a2ea8b…2884a` i `1e228163…30ba5`) | polski lektor bez sieci, domyślny u Wideografa i w edytorze HQ (`jarvo-tts`, głosy `pl-PL-Matcha-Meski` i `pl-PL-Matcha-Damski`): wagi ONNX **w obrazie** bez zmian (`/opt/jarvo/models/matcha-pl/` razem z `LICENSE`, `ATTRIBUTION.md` ze źródłami danych treningowych, kartą modelu i `JARVO-ZRODLO.txt`). Fonemizer `infra/bin/jarvo_tts_matcha.py` to port `english/polish_cleaners.py` i `polish_mixed_cleaners.py` z tego repo (na tej samej licencji, z atrybucją w pliku). Głosy syntetyczne (zaprojektowane opisem w VoxCPM2, Apache-2.0; nie nagrania ani klony ludzi): mowę oznaczamy jako syntetyczną (skill `lektor-i-dzwiek`). Przegląd 2026-10-11 (repo z 2026-10-02, rewizja z 2026-10-10): pliki = same wagi ONNX i JSON-y przypięte sha256, fonemizer to nasz port w repo Jarvo | CC-BY-SA-4.0 |
 | [Matcha-TTS](https://github.com/shivammehta25/Matcha-TTS) (Shivam Mehta i in.) | architektura modelu; tablica symboli `matcha/text/symbols.py` (z tyldą U+0303 dla nosówek, jak w Matcha-TTS-PL) w `jarvo_tts_matcha.py` | MIT |
 | [Silero VAD](https://github.com/snakers4/silero-vad) | wykrywanie mowy przed Parakeetem w `jarvo-stt` (pobierany przy pierwszym użyciu, nie w repo ani w obrazie) | MIT |
 | [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) (Shiqi Yu, OpenCV Zoo), [opencv/face_detection_yunet](https://huggingface.co/opencv/face_detection_yunet) `3cc26e7` (`face_detection_yunet_2023mar.onnx`, SHA-256 `8f2383e4…52fa4`) | wykrywanie twarzy do kadru rolek clipmakera (`twarze.py`); dekodowanie wyjść napisane od nowa według `cv::FaceDetectorYN`, bez OpenCV; pobierany przy pierwszym użyciu do `/opt/data/jarvo/models/yunet/` z przypiętej wersji i sprawdzany sumą, nie w repo ani w obrazie | MIT |
