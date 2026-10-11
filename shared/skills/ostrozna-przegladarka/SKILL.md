@@ -53,6 +53,7 @@ Kody: 0 strona przeczytana, 1 błąd (sieć, 404), 2 zły adres, **3 blokada**, 
   po stronie: do wielu rekordów służy API albo rozpoznanie źródła (`rozpoznanie-zrodla`) i decyzja człowieka,
 - robots.txt czytany tą samą przeglądarką: zakaz albo robots.txt niedostępny = blokada,
 - tylko http(s) i adresy publiczne; bez logowania, kont, ciasteczek, proxy i haseł z czatu,
+- przeglądarka dostaje tylko ścieżki, język i proxy serwera; bez kluczy API agenta, profil w katalogu skryptu,
 - strona „sprawdzamy, czy jesteś człowiekiem” może sama przepuścić zwykłą przeglądarkę: skrypt czeka do 15 s, ale
   niczego nie klika i nie rozwiązuje captchy. Captcha do kliknięcia albo formularz logowania = blokada.
 - Regulamin serwisu: gdy zabrania automatycznego pobierania, nie czytasz (Łowca: decyzja o regulaminie należy do

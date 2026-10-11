@@ -225,10 +225,24 @@ def wersja_firefoksa(katalog: Path | None = None) -> int:
     return int(m.group(1))
 
 
-def opcje_camoufox(zrzut: bool) -> dict:
+ZMIENNE_PRZEGLADARKI = ("PATH", "LANG", "LC_ALL", "TZ", "TMPDIR", "LD_LIBRARY_PATH",
+                         "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY",
+                         "http_proxy", "https_proxy", "no_proxy", "all_proxy")
+
+
+def srodowisko_przegladarki(dom: Path) -> dict:
+    """Tylko to, czego przeglądarka potrzebuje: bez kluczy API agenta, profil i cache w katalogu skryptu."""
+    env = {k: v for k in ZMIENNE_PRZEGLADARKI if (v := os.environ.get(k))}
+    env["HOME"] = str(dom)
+    env["XDG_CACHE_HOME"] = str(dom / ".cache")
+    return env
+
+
+def opcje_camoufox(zrzut: bool, dom: Path | None = None) -> dict:
     from camoufox import DefaultAddons  # type: ignore
 
     return {
+        "env": srodowisko_przegladarki(dom or STAN / "dom"),
         "executable_path": EXE,
         "ff_version": wersja_firefoksa(),     # zgodna z binarką, więc odcisk pasuje do prawdziwej wersji
         "headless": True,                      # bez Xvfb i bez okna
@@ -249,11 +263,9 @@ def otworz(zrzut: bool = False):
     # pliki przeglądarki (profil Firefoksa, cache fontów, „Downloads”) w katalogu skryptu, nie w katalogu domowym
     dom = STAN / "dom"
     dom.mkdir(parents=True, exist_ok=True)
-    os.environ["HOME"] = str(dom)
-    os.environ["XDG_CACHE_HOME"] = str(dom / ".cache")
     from camoufox.sync_api import Camoufox  # type: ignore
 
-    with Camoufox(**opcje_camoufox(zrzut)) as przegladarka:
+    with Camoufox(**opcje_camoufox(zrzut, dom)) as przegladarka:
         yield przegladarka
 
 

@@ -262,6 +262,15 @@ def test_opcje_bez_proxy_i_dodatkow(tmp_path, monkeypatch):
     assert O.opcje_camoufox(zrzut=True)["block_images"] is False
 
 
+def test_przegladarka_bez_kluczy_agenta(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "nie-dla-przegladarki")
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy:3128")
+    env = O.srodowisko_przegladarki(tmp_path / "dom")
+    assert "OPENROUTER_API_KEY" not in env and env["HTTPS_PROXY"] == "http://proxy:3128"
+    assert env["HOME"] == str(tmp_path / "dom") and env["XDG_CACHE_HOME"] == str(tmp_path / "dom" / ".cache")
+    assert set(env) <= set(O.ZMIENNE_PRZEGLADARKI) | {"HOME", "XDG_CACHE_HOME"}
+
+
 def test_sprawdz(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(O, "ma_camoufox", lambda: True)
     monkeypatch.setattr(O, "EXE", str(tmp_path / "camoufox-bin"))
