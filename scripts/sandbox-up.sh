@@ -4,6 +4,7 @@
 #
 #   JARVO_LOCAL=<scratchpad>/jarvo-local bash scripts/sandbox-up.sh   # dockerd, obrazy, instalacja, deploy
 #   bash scripts/sandbox-up.sh --rebuild                              # wymuś przebudowę obrazów
+#   JARVO_EXTRAS="manim" bash scripts/sandbox-up.sh --rebuild           # obraz z dodatkami (jak JARVO_EXTRAS w compose/.env)
 #   bash scripts/sandbox-up.sh down                                   # zatrzymaj flotę
 #
 # Kroki:
@@ -85,7 +86,7 @@ if [[ -z "$BUILT" ]] || ! git -C "$ROOT" diff --quiet "$BUILT" HEAD -- infra/Doc
 fi
 if [[ $REBUILD -eq 1 ]]; then
   log "jarvo-hermes:local (budowa z proxy, kilkanaście minut za pierwszym razem)"
-  docker build --network host --build-arg HERMES_IMAGE=hermes-ca:test \
+  docker build --network host --build-arg HERMES_IMAGE=hermes-ca:test --build-arg JARVO_EXTRAS="${JARVO_EXTRAS:-}" \
     --build-arg HTTPS_PROXY="$HTTPS_PROXY" --build-arg https_proxy="$HTTPS_PROXY" \
     --build-arg NO_PROXY="${NO_PROXY:-}" --build-arg no_proxy="${NO_PROXY:-}" \
     -t jarvo-hermes:local -f "$ROOT/infra/Dockerfile" "$ROOT"

@@ -325,7 +325,8 @@ SOURCES (licencje).
 - **Piaskownica Claude Code:** `JARVO_LOCAL=<scratchpad>/jarvo-local bash scripts/sandbox-up.sh` robi wszystko:
   `dockerd` (po restarcie piaskownicy usuwa stare pliki pid demona), obraz `hermes-ca:test` (Hermes + certyfikat proxy), `jarvo-hermes:local` przez
   `docker build --network host` (compose nie widzi proxy), instalację w `jarvo-local` i
-  `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` lub `branding/` albo z `--rebuild`.
+  `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` lub `branding/` albo z `--rebuild`; dodatki obrazu
+  przez `JARVO_EXTRAS="manim"` przed poleceniem (z `--rebuild`).
 - Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (na Linuksie sam doinstalowuje pakiety i Docker
   Engine, na macOS Homebrew i Colimę; repo do `~/jarvo`) → `jarvo up` (`bin/jarvo` → `scripts/local-up.sh`) →
   `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`; na macOS dane i build w wolumenach Dockera
