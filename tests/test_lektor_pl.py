@@ -196,3 +196,21 @@ def test_jarvo_tts_nieznany_glos_w_zadaniu(tmp_path):
         t.main(["--wsad", str(plik)])
     with pytest.raises(SystemExit):
         t.main(["Test.", "-o", str(tmp_path / "a.wav"), "--glos", "pl-PL-Nikt"])
+
+
+def test_jarvo_tts_tekst_z_pliku_jak_woła_hermes(tmp_path, monkeypatch, capsys):
+    """Głos floty: Hermes woła `jarvo-tts --plik {input_path} -o {output_path} --glos {voice}` (profiles/_host/config.yaml)."""
+    t = _jarvo_tts()
+    zlecone = []
+    monkeypatch.setattr(t, "Modele", lambda: None)
+    monkeypatch.setattr(t, "wykonaj", lambda modele, zadania: zlecone.extend(zadania) or [])
+    plik = tmp_path / "input.txt"
+    plik.write_text("-5 stopni? Dzień dobry.\n", encoding="utf-8")
+    assert t.main(["--plik", str(plik), "-o", str(tmp_path / "a.wav"), "--glos", "pl-PL-Matcha-Damski"]) == 0
+    assert zlecone == [{"tekst": "-5 stopni? Dzień dobry.", "wyjscie": str(tmp_path / "a.wav"), "szybkosc": 1.0,
+                        "glos": "pl-PL-Matcha-Damski"}]
+    (tmp_path / "pusty.txt").write_text("  \n", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        t.main(["--plik", str(tmp_path / "pusty.txt"), "-o", str(tmp_path / "b.wav")])
+    with pytest.raises(SystemExit):
+        t.main(["Tekst.", "--plik", str(plik), "-o", str(tmp_path / "b.wav")])

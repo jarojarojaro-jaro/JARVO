@@ -26,12 +26,8 @@ image_gen:
 video_gen:
   provider: openrouter          # katalog modeli pobierany na żywo z OpenRouter
 
-# Lektor: Edge TTS (darmowy, bez klucza), polski głos domyślny dla narzędzia text_to_speech.
+# Narzędzie text_to_speech: głos floty z profiles/_host/config.yaml (Matcha przez jarvo-tts, wstawia scripts/build.py).
 # Filmy: scripts/film.py (domyślnie lokalny polski lektor Matcha przez jarvo-tts z obrazu; Edge do wyboru i jako zapas).
-tts:
-  provider: edge
-  edge:
-    voice: pl-PL-MarekNeural
 
 platform_toolsets:
   cli: [terminal, file, web, browser, vision, image_gen, video_gen, tts, delegation, memory, skills, todo, session_search]

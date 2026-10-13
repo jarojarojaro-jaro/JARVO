@@ -27,6 +27,20 @@ stt:
   provider: local_command
   language: pl
 
+# Głos floty (odpowiedzi głosowe na Telegramie, tryb /voice, i narzędzie text_to_speech): lokalny polski
+# Matcha-TTS-PL v2 z obrazu przez jarvo-tts, bez sieci i bez klucza. scripts/build.py kopiuje ten blok do
+# każdego profilu bez własnego `tts`. Głos żeński: voice: pl-PL-Matcha-Damski. WAV → Opus robi Hermes (dymek głosowy).
+tts:
+  provider: matcha
+  providers:
+    matcha:
+      type: command
+      command: /opt/jarvo/bin/jarvo-tts --plik {input_path} -o {output_path} --glos {voice}
+      voice: pl-PL-Matcha-Meski
+      format: wav
+      voice_compatible: true
+      timeout: 180
+
 platforms:
   telegram:
     reply_to_mode: first

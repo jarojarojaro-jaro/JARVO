@@ -6,7 +6,7 @@
 {
   "tytul": "Kawa: 3 mity",
   "formaty": ["9:16"],
-  "lektor": {"glos": "pl-PL-MarekNeural", "tempo": "+5%"},
+  "lektor": {"glos": "pl-PL-Matcha-Meski", "tempo": "+5%"},
   "napisy": {"styl": "karaoke", "akcent": "#FFD400", "font": "Inter", "pozycja": "dol", "wielkie": true},
   "muzyka": {"plik": "losowa", "glosnosc": 0.12},
   "marka": {"nazwa": "ziarno", "logo": "out/wideo/src/logo.png", "pozycja": "gora-prawo"},
@@ -29,7 +29,7 @@
 |---|---|---|
 | `tytul` / `slug` | nazwa filmu (slug = nazwa plików) | `film` |
 | `formaty` | lista z `9:16`, `16:9`, `1:1`, `4:5` | `["9:16"]` |
-| `lektor` | `{glos, tempo, glosnosc, wysokosc}`; `{plik: "nagranie.mp3"}` = własny lektor (napisy z transkrypcji); `false` = bez lektora | Marek, `+0%` |
+| `lektor` | `{glos, tempo, glosnosc, wysokosc}`; `{plik: "nagranie.mp3"}` = własny lektor (napisy z transkrypcji); `false` = bez lektora | Matcha męski (`pl-PL-Matcha-Meski`), `+0%` |
 | `napisy.styl` | `karaoke` (aktywne słowo w kolorze akcentu) · `zwykle` · `brak` | `karaoke` |
 | `napisy` (reszta) | `font`, `font_plik` (TTF/OTF marki), `kolor`, `akcent`, `obrys`, `pozycja` (`dol`/`srodek`/`gora`), `wielkie`, `rozmiar` (mnożnik) | Inter, biały, #FFD400 |
 | `muzyka` | `{plik: ścieżka | "losowa" | "brak", glosnosc: 0–1, katalog}`; „losowa” = biblioteka `@@KNOWLEDGE_DIR@@/wideo/muzyka/` albo `brands/<marka>/muzyka/`, a gdy pusta: podkład CC0 z biblioteki edytora (`projekt.py dzwieki --muzyka`) | brak |

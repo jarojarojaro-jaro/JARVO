@@ -53,6 +53,7 @@ def test_merge_host_config(tmp_path):
         "gateway": {"multiplex_profiles": True, "profile_routes": [{"name": "owner-dm", "chat_id": "1"}]},
         "kanban": {"dispatch_in_gateway": True},
         "platforms": {"telegram": {"require_mention": True}},
+        "tts": {"provider": "matcha", "providers": {"matcha": {"type": "command", "voice": "pl-PL-Matcha-Meski"}}},
     }), encoding="utf-8")
     target.write_text(fl.dump_yaml({
         "model": {"default": "wybrany/w-setupie"},
@@ -60,6 +61,7 @@ def test_merge_host_config(tmp_path):
         "platform_toolsets": {"telegram": ["terminal"], "discord": ["web"]},
         "gateway": {"profile_routes": [{"name": "stara"}], "port": 8080},
         "platforms": {"telegram": {"token_env": "TELEGRAM_BOT_TOKEN"}},
+        "tts": {"provider": "edge", "edge": {"voice": "en-US-AriaNeural"}},
     }), encoding="utf-8")
     merge_host_config.main([str(fleet_cfg), str(target)])
     out = fl.load_yaml(target)
@@ -71,6 +73,8 @@ def test_merge_host_config(tmp_path):
     assert out["platforms"]["telegram"] == {"token_env": "TELEGRAM_BOT_TOKEN", "require_mention": True}
     assert out["kanban"]["dispatch_in_gateway"] is True
     assert out["timezone"] == "Europe/Warsaw"
+    assert out["tts"]["provider"] == "matcha"                       # głos floty wygrywa z domyślnym Edge
+    assert out["tts"]["providers"]["matcha"]["voice"] == "pl-PL-Matcha-Meski"
 
 
 def test_merge_host_config_sets_model_when_missing(tmp_path):

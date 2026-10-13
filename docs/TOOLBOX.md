@@ -142,7 +142,7 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 | [Motion Canvas](https://github.com/motion-canvas/motion-canvas) / [Revideo](https://github.com/redotvideo/revideo) | animacje i render programowy (per projekt) | MIT | 2026-07 | per projekt |
 
 Z Hermesa: `plugins/video_gen/openrouter` i `plugins/image_gen/openrouter` (ujęcia AI, jeden klucz OpenRouter),
-narzędzie `text_to_speech` (Edge, głos pl-PL-MarekNeural w `config.yaml`), skille [H] `manim-video` (silnik ManimGX), `ai-presenter-video`.
+narzędzie `text_to_speech` (głos floty: lokalny Matcha `pl-PL-Matcha-Meski` przez `jarvo-tts`, blok `tts` z `profiles/_host/config.yaml`), skille [H] `manim-video` (silnik ManimGX), `ai-presenter-video`.
 
 Rozważone i odrzucone: [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) (MIT) jako cała aplikacja:
 Streamlit, MoviePy, Redis i drugi silnik transkrypcji (~340 MB repo, dużo RAM) dublowałyby to, co flota już ma.
@@ -383,6 +383,9 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
   renderu (sprawdzone bez sieci), koła przypięte sha256, wydanie 2026-10-07. Instalacja przez `uv pip install --no-config`:
   bez `[tool.uv]` Hermesa z `/opt/hermes` (jego ograniczenia paczek i okno `exclude-newer`), tylko plik z sumami,
 - rozpoznawanie mowy: `/opt/jarvo/bin/jarvo-stt` (Hermes: `HERMES_LOCAL_STT_COMMAND`, `stt.provider: local_command`),
+- głos floty (odpowiedzi głosem na Telegramie w trybie `/voice` i narzędzie `text_to_speech`): `jarvo-tts --plik` jako
+  komenda TTS Hermesa (`tts.providers.matcha` w `profiles/_host/config.yaml`, `scripts/build.py` wstawia ją każdemu profilowi),
+  głos `pl-PL-Matcha-Meski`; WAV na Opus (dymek głosowy) zamienia Hermes,
 - lektor angielski: `/opt/jarvo/bin/jarvo-tts` z modelem Paradee w `/opt/jarvo/models/paradee/`; pliki modelu i koło
   spaCy przypięte sumą SHA-256, a build kończy się próbą mowy (`jarvo-tts --sprawdz en-US-Paradee`). misaki bez dodatku `[en]`
   (ciągnąłby torch, ~5 GB).

@@ -290,6 +290,11 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
 WIEDZA_PLUGIN = "jarvo-wiedza"
 
 
+def glos_floty() -> dict | None:
+    """Blok `tts` z profiles/_host/config.yaml: głos floty (Matcha przez jarvo-tts) dla profili bez własnego."""
+    return fl.load_yaml(fl.REPO_ROOT / "profiles" / "_host" / "config.yaml").get("tts")
+
+
 def build_wiedza_plugin(out: Path) -> Path:
     """Wtyczka skarbca (wiedza/plugin + wiedza.py obok): install-fleet.sh kopiuje ją do <dane>/plugins/ i dowiązuje
     w każdym profilu (dostawcy pamięci są szukani w <HERMES_HOME profilu>/plugins/)."""
@@ -678,11 +683,13 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
             wlasne = list(appr.get("deny") or [])
             appr["deny"] = wlasne + [d for d in fl.load_yaml(deny_src).get("deny", []) if d not in wlasne]
         cfg.setdefault("memory", {})["provider"] = WIEDZA_PLUGIN
+        if "tts" not in cfg and (glos := glos_floty()):
+            cfg["tts"] = glos
         wtyczki = cfg.setdefault("plugins", {})
         wlaczone = list(wtyczki.get("enabled") or [])
         wtyczki["enabled"] = wlaczone + ([WIEDZA_PLUGIN] if WIEDZA_PLUGIN not in wlaczone else [])
         cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("fast")}
-        (dest / "config.yaml").write_text("# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy).\n"
+        (dest / "config.yaml").write_text("# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty).\n"
                                           + fl.dump_yaml(cfg), encoding="utf-8")
     # model zapasowy zestawu: agent nie milknie, gdy główny model odmówi (np. poza planem)
     if fleet.fallback and (dest / "config.yaml").exists():

@@ -2,6 +2,7 @@
 """Lokalny lektor floty Jarvo na CPU, bez sieci: polski Matcha-TTS-PL v2 (dwa głosy) i angielski Paradee-8M.
 
     jarvo-tts "Dzień dobry." -o glos.wav [--glos pl-PL-Matcha-Damski] [--szybkosc 1.1]   → WAV mono
+    jarvo-tts --plik tekst.txt -o glos.wav [--glos ...]       → tekst z pliku UTF-8 (głos Hermesa: tts.providers.matcha)
     jarvo-tts --wsad zadania.json                           → wiele tekstów, każdy model ładowany raz
     jarvo-tts --sprawdz [GLOS ...]                          → krótka próba mowy (healthcheck, testy; bez głosów: wszystkie)
 
@@ -254,6 +255,7 @@ PROBY = {"en-US-Paradee": "Jarvo is ready.", "pl-PL-Matcha-Meski": "Jarvo jest g
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("tekst", nargs="?")
+    ap.add_argument("--plik", type=Path, help="tekst z pliku UTF-8 zamiast argumentu (Hermes: {input_path})")
     ap.add_argument("-o", "--wyjscie", type=Path)
     ap.add_argument("--glos", default=DOMYSLNY_GLOS, choices=GLOSY)
     ap.add_argument("--szybkosc", type=float, default=1.0, help="1.0 = normalnie, 1.2 = szybciej (0.5–2.0)")
@@ -271,6 +273,12 @@ def main(argv: list[str] | None = None) -> int:
             wynik[glos] = {"ok": len(fala) > m.rate // 4, "sekundy": round(len(fala) / m.rate, 3)}
         print(json.dumps({"ok": all(w["ok"] for w in wynik.values()), "glosy": wynik}, ensure_ascii=False))
         return 0 if all(w["ok"] for w in wynik.values()) else 1
+    if a.plik:
+        if a.tekst:
+            ap.error("tekst albo --plik, nie oba")
+        a.tekst = a.plik.read_text(encoding="utf-8").strip()
+        if not a.tekst:
+            ap.error(f"{a.plik}: pusty tekst")
     if a.wsad:
         zadania = json.loads(a.wsad.read_text(encoding="utf-8"))
     elif a.tekst and a.wyjscie:

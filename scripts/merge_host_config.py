@@ -3,7 +3,7 @@
 
     python merge_host_config.py <flota.yaml> <cel.yaml> [--force-model]
 
-Klucze floty wygrywają (gateway, kanban, approvals, memory, stt, platform_toolsets, platforms.telegram,
+Klucze floty wygrywają (gateway, kanban, approvals, memory, stt, tts, platform_toolsets, platforms.telegram,
 timezone). `model` ustawiany tylko wtedy, gdy go brak (nie nadpisuje wyboru z `hermes setup`),
 chyba że podano --force-model: przy pierwszej instalacji obraz Hermesa zasiewa config.yaml
 przykładowym modelem, który trzeba zastąpić modelem floty.
@@ -22,7 +22,7 @@ from fleetlib import rt_yaml  # noqa: E402
 load, dump = rt_yaml()
 
 REPLACE = ["platform_toolsets", "timezone"]
-MERGE = ["gateway", "kanban", "approvals", "memory", "stt", "display"]
+MERGE = ["gateway", "kanban", "approvals", "memory", "stt", "tts", "display"]
 ONLY_IF_MISSING = ["model"]
 
 

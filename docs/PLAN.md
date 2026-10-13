@@ -210,7 +210,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - 🟡 Telegram: „Jarvo HQ”, temat na specjalistę, General dla Jarva.
 - ✅ Jarvo HQ: GUI floty w dashboardzie Hermesa (pokoje agentów, praca na żywo, decyzje, misje, czat), test na prawdziwym Hermesie ([HQ.md](HQ.md)).
 - ⬜ Desktop: Bot Mode (lista botów, awatary, czat grupowy floty).
-- 🟡 Głos: notatki głosowe z Telegrama → Parakeet (`jarvo-stt`, `stt.provider: local_command`), lektor u Wideografa: polski Matcha-TTS-PL v2 i angielski Paradee w obrazie (`jarvo-tts`), Edge TTS do wyboru i jako zapas.
+- 🟡 Głos: notatki głosowe z Telegrama → Parakeet (`jarvo-stt`, `stt.provider: local_command`), odpowiedzi głosem (tryb `/voice`) i narzędzie `text_to_speech` całej floty: lokalny Matcha męski (`tts.providers.matcha`, komenda `jarvo-tts --plik`), lektor u Wideografa: polski Matcha-TTS-PL v2 i angielski Paradee w obrazie (`jarvo-tts`), Edge TTS do wyboru i jako zapas.
 
 ### Faza 3: Pamięć i onboarding
 - ✅ Skill `onboarding-interview`: wywiad startowy → `knowledge/user/USER.md`.

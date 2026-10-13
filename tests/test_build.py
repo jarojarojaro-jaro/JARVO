@@ -203,6 +203,9 @@ def test_wiedza_plugin_wiring(built, tmp_path):
         assert cfg["memory"]["provider"] == "jarvo-wiedza", agent.name
         assert "jarvo-wiedza" in cfg["plugins"]["enabled"], agent.name
         assert cfg["auxiliary"]["jarvo_wiedza"]["model"] == fleet.model_for("fast"), agent.name
+        # głos floty: Matcha przez jarvo-tts z profiles/_host/config.yaml (nie Edge)
+        assert cfg["tts"]["provider"] == "matcha", agent.name
+        assert cfg["tts"]["providers"]["matcha"]["command"].startswith("/opt/jarvo/bin/jarvo-tts --plik {input_path}"), agent.name
     plugin = build.build_wiedza_plugin(tmp_path / "plugins" / "jarvo-wiedza")
     for rel in ("plugin.yaml", "__init__.py", "wiedza.py", "kompilacja.py", "dashboard/manifest.json", "dashboard/plugin_api.py",
                 "dashboard/panel.py", "dashboard/dist/index.js", "dashboard/dist/style.css"):
