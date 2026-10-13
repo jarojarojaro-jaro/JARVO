@@ -145,6 +145,38 @@ def policz(dane: Path, teraz: float, dni: int = 7) -> dict:
     return wynik
 
 
+def evals(path: Path, n: int = 6) -> dict[str, dict]:
+    """Evals ze stagingu (historia.jsonl z scripts/evals-staging.sh, docs/RSI.md) → na agenta: ostatni pełny
+    przebieg (wynik 0..1, zaliczone/n, wynik zbioru odłożonego, alarm kanarka, data, commit, sędzia) i seria
+    wyników z n ostatnich pełnych przebiegów. Przebiegi częściowe (--id, --zbior) pomija. Brak pliku = {}."""
+    try:
+        lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+    per: dict[str, list[dict]] = {}
+    for line in lines:
+        try:
+            w = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(w, dict) and w.get("agent") and not w.get("czesciowy"):
+            per.setdefault(w["agent"], []).append(w)
+    out = {}
+    for agent, wpisy in per.items():
+        wpisy = wpisy[-n:]
+        s = wpisy[-1].get("podsumowanie") or {}
+        razem = s.get("razem") or {}
+        out[agent] = {
+            "score": razem.get("score"), "zaliczone": razem.get("zaliczone"), "n": razem.get("n"),
+            "nieocenione": razem.get("nieocenione", 0),
+            "odlozony": ((s.get("zbiory") or {}).get("odlozony") or {}).get("score"),
+            "kanarek": bool(s.get("kanarek")), "data": wpisy[-1].get("data"),
+            "commit": str(wpisy[-1].get("commit") or "")[:7], "sedzia": wpisy[-1].get("sedzia"),
+            "seria": [((w.get("podsumowanie") or {}).get("razem") or {}).get("score") for w in wpisy],
+        }
+    return out
+
+
 def dane_domyslne() -> Path:
     if os.environ.get("JARVO_DATA_DIR"):
         return Path(os.environ["JARVO_DATA_DIR"])

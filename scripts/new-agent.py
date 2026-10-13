@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import secrets
 import shutil
 import sys
 from pathlib import Path
@@ -64,7 +65,8 @@ def main(argv: list[str] | None = None) -> int:
 
     ev = fl.REPO_ROOT / "evals" / args.name
     ev.mkdir(parents=True, exist_ok=True)
-    (ev / "scenarios.yaml").write_text(f"agent: {args.name}\nscenarios: []\n", encoding="utf-8")
+    kanarek = "JARVO-KANAREK-" + secrets.token_hex(6)   # znacznik-pułapka evals (docs/RSI.md)
+    (ev / "scenarios.yaml").write_text(f'agent: {args.name}\nkanarek: "{kanarek}"\nscenarios: []\n', encoding="utf-8")
 
     fleet_text = fl.FLEET_FILE.read_text(encoding="utf-8")
     oddaj = ("    oddaj_gdy: \"TODO: kiedy Ręka ma oddać zadanie temu agentowi (tabela generowana)\"\n"

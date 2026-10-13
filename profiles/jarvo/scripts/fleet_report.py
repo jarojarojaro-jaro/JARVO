@@ -97,6 +97,8 @@ def main(argv: list[str] | None = None) -> int:
         # sześć liczb z tablicy i sesji (0 tokenów): eskalacje, awarie, cisza i tokeny obok jakości
         summary["liczby"] = liczby.policz(liczby.dane_domyslne(), now, 7)
         summary["prosty_polski"] = prosty.tydzien(liczby.dane_domyslne(), now, 7)
+        # evals ze stagingu (docs/RSI.md): wynik, zbiór odłożony, kanarek i trend na agenta; brak przebiegów = {}
+        summary["evals"] = liczby.evals(liczby.dane_domyslne() / "jarvo" / "evals" / "historia.jsonl")
     empty = not (summary["finished"] or summary["blocked"] or summary["in_flight"])
     if args.mode == "weekly" and not args.fixture and not empty:
         try:                                    # strona z liczbami tygodnia (0 tokenów); wiadomość niesie link

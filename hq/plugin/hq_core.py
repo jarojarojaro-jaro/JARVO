@@ -918,6 +918,11 @@ def _liczby():
     return sys.modules["jarvo_hq_liczby"]
 
 
+def eval_trend(name: str, path: Path | None = None, n: int = 6) -> dict | None:
+    """Evals agenta ze stagingu (liczby.evals: ostatni pełny przebieg, zbiór odłożony, kanarek, seria wyników)."""
+    return _liczby().evals(path or JARVO_DIR / "evals" / "historia.jsonl", n).get(name)
+
+
 def agent_stats(name: str, board: dict, now: float) -> dict:
     """Jakość z ostatnich 7 dni: karty zamknięte, przyjęte za pierwszym razem, z poprawkami (liczby.jakosc)."""
     week = now - 7 * 86400

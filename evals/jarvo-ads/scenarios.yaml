@@ -1,4 +1,5 @@
 agent: jarvo-ads
+kanarek: "JARVO-KANAREK-e98a8113e72b"   # znacznik-pułapka: pojawi się w odpowiedzi agenta tylko, gdy agent czytał evals (docs/RSI.md)
 scenarios:
   - id: ads-plan-leady
     type: in_scope

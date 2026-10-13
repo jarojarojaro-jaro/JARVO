@@ -380,6 +380,8 @@ def check_related(a: fl.Agent, known: set[str], r: Report) -> None:
 
 
 def check_evals(fleet: fl.Fleet, r: Report) -> None:
+    import evalslib as ev
+    kanarki: dict[str, str] = {}
     for a in fleet.active():
         path = fl.REPO_ROOT / "evals" / a.name / "scenarios.yaml"
         if not path.exists():
@@ -387,6 +389,15 @@ def check_evals(fleet: fl.Fleet, r: Report) -> None:
             continue
         data = fl.load_yaml(path) or {}
         scen = data.get("scenarios") or []
+        tok = data.get("kanarek")
+        if not isinstance(tok, str) or not ev.KANAREK_RE.match(tok):
+            r.err(f"{a.name}/evals: brak kanarka albo zły format (kanarek: \"JARVO-KANAREK-<12 hex>\", docs/RSI.md)")
+        elif tok in kanarki.values():
+            r.err(f"{a.name}/evals: kanarek taki sam jak u {next(k for k, v in kanarki.items() if v == tok)}")
+        else:
+            kanarki[a.name] = tok
+        if sum(1 for s in scen if ev.zbior(s) == "odlozony") < 2:
+            r.err(f"{a.name}/evals: < 2 scenariuszy w zbiorze odłożonym (pole zbior: odlozony, docs/RSI.md)")
         if len(scen) < MIN_EVALS:
             r.err(f"{a.name}: {len(scen)} scenariuszy evals < {MIN_EVALS} (Definition of Ready)")
         ids = set()
@@ -398,6 +409,8 @@ def check_evals(fleet: fl.Fleet, r: Report) -> None:
             ids.add(sid)
             if s.get("type") not in EVAL_TYPES:
                 r.err(f"{a.name}/evals/{sid}: typ {s.get('type')!r}")
+            if "zbior" in s and s["zbior"] not in ev.ZBIORY:
+                r.err(f"{a.name}/evals/{sid}: zbior {s['zbior']!r} (dozwolone: {', '.join(ev.ZBIORY)})")
             if not str(s.get("input", "")).strip():
                 r.err(f"{a.name}/evals/{sid}: brak input")
             if not (s.get("expect") or {}).get("should"):

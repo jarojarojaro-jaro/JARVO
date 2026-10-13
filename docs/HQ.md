@@ -22,6 +22,7 @@ Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo bu
 | Mostek Jarva | kanban | ekran „Tablica floty” z prawdziwymi licznikami kolumn; Jarvo-monolit ocenia, gdy w torze review jest karta |
 | Panel agenta: Teraz | sesja pracownika w `state.db` profilu | karta, nad którą pracuje, czas, sygnał życia i oś kroków na żywo (narzędzia, wypowiedzi, błędy) |
 | Panel agenta: Karty | kanban | karty agenta według stanu (7 dni), klik otwiera kartę z historią i komentarzami |
+| Panel agenta: O agencie | `fleet.yaml`, kanban, `/opt/data/jarvo/evals/historia.jsonl` | opis, model, autonomia, karty z 7 dni i przyjęte za 1. razem; **Evals** ze stagingu: zaliczone, wynik, zbiór odłożony, trend kolejnych przebiegów, alarm kanarka ([RSI.md](RSI.md) §4) |
 | Okno karty | kanban + katalog roboczy karty | na wierzchu **cel** (inny kolor), kontekst, **wynik** (pliki z `WYJŚCIA` oznaczone ★) i raport wykonawcy; pełne zlecenie (wejścia, DoD, granice), komentarze i historia zwinięte |
 | Panel agenta: Wyniki | katalogi robocze | pliki z `out/`: miniatury grafik, podgląd tekstu, PDF, wideo (bez katalogów roboczych: `node_modules`, `.git`, sylwetki `<film>.maska/`) |
 | Czat: zdjęcia i pliki | czat HQ + `/opt/data/jarvo/inbox/` | 📎, wklejanie Ctrl+V (zrzut ekranu) i przeciąganie. Plik trafia do `inbox/<data>/`, agent dostaje jego ścieżkę (linia `📎 …`), zdjęcie także jako obraz (model bez widzenia dostaje opis od Hermesa) |

@@ -104,6 +104,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [ADS.md](docs/ADS.md) | projekt agenta reklam płatnych `jarvo-ads` i Skarbca (strażnik budżetu) |
 | [LEADY.md](docs/LEADY.md) | projekt Łowcy leadów: sygnały zakupowe z oficjalnych źródeł → lista firm z „dlaczego teraz” |
 | [WIEDZA.md](docs/WIEDZA.md) | projekt skarbca wiedzy (drugi mózg floty): notatki Markdown z linkami, wtyczka `jarvo-wiedza`, zakładka „Wiedza” z grafem |
+| [RSI.md](docs/RSI.md) | pętla samodoskonalenia floty: research, zasady, etapy R0–R4 (pomiar evals, lekcje, kuźnia skilli), koszty |
 | [RUNBOOK.md](docs/RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [INSTALER.md](docs/INSTALER.md) | instalator jednym poleceniem na Linuksie, macOS i Windowsie: jak działa na każdym systemie, aktualizacje, testy, etapy |
 | [ROZWOJ-FLOTY.md](docs/ROZWOJ-FLOTY.md) | plan dopracowania agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności jako skill Weba |

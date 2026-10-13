@@ -181,6 +181,7 @@ async def agent(name: str):
         "activity": activity, "session_id": session_id,
         "outputs": outputs,
         "stats": core.agent_stats(name, board, now),
+        "evals": await asyncio.to_thread(_cached, f"evals:{name}", 30.0, lambda: core.eval_trend(name)),
         "ts": now,
     }
 

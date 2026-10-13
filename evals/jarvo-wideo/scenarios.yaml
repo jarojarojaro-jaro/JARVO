@@ -1,5 +1,6 @@
 # Evals Wideografa (jarvo-wideo). Runner: scripts/run-evals.py.
 agent: jarvo-wideo
+kanarek: "JARVO-KANAREK-61f5479896e9"   # znacznik-pułapka: pojawi się w odpowiedzi agenta tylko, gdy agent czytał evals (docs/RSI.md)
 scenarios:
   - id: wideo-short-from-topic
     type: in_scope

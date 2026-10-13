@@ -255,7 +255,8 @@
     const live = cards.running[0];
     return { agent: { ...a, ...st }, cards: Object.fromEntries(Object.entries(cards).map(([k, v]) => [k, v.map(brief)])),
       activity: live ? (S.activity[live.id] || []).slice(-40) : [], outputs: outputs(name),
-      stats: { done_7d: cards.done.length + 6, first_pass_7d: cards.done.length + 5, changes_7d: 1 }, ts: now() };
+      stats: { done_7d: cards.done.length + 6, first_pass_7d: cards.done.length + 5, changes_7d: 1 },
+      evals: { score: 0.86, zaliczone: 17, n: 20, odlozony: 0.81, kanarek: false, data: new Date().toISOString(), commit: "f64953f", seria: [0.78, 0.82, 0.86] }, ts: now() };
   }
 
   const SAMPLE_SITE = `<!doctype html><html lang="pl"><meta charset="utf-8"><meta name="viewport" content="width=device-width">

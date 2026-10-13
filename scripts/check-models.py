@@ -4,6 +4,7 @@
     python3 scripts/check-models.py [--json]
     JARVO_MODEL_PROVIDER=commandcode python3 scripts/check-models.py   # inny zestaw z models.presets
 
+Sprawdza też sędziów evals (`evals.judges`, zawsze u OpenRoutera, docs/RSI.md).
 Kod wyjścia 1, gdy któregoś modelu nie ma (np. wycofany): zmień poziom w fleet.yaml przed wdrożeniem.
 """
 
@@ -26,18 +27,28 @@ URLS = {
 }
 
 
+def fetch(url: str) -> dict:
+    req = urllib.request.Request(url, headers={"User-Agent": "jarvo-check-models/1.0", "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 (stałe adresy)
+        return {m["id"]: m for m in json.load(resp)["data"]}
+
+
 def main(argv: list[str]) -> int:
     fleet = fl.load_fleet()
     fleet.apply_model_overrides(dict(os.environ))
     url = URLS.get(fleet.provider)
-    if not url:
-        print(f"· {fleet.provider}: brak publicznej listy modeli, pomijam sprawdzanie")
-        return 0
-    req = urllib.request.Request(url, headers={"User-Agent": "jarvo-check-models/1.0", "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 (stałe adresy)
-        models = {m["id"]: m for m in json.load(resp)["data"]}
+    checks = []                                      # (poziom, model, lista modeli dostawcy)
+    if url:
+        provider_models = fetch(url)
+        checks += [(tier, model, provider_models) for tier, model in fleet.tiers.items()]
+    else:
+        print(f"· {fleet.provider}: brak publicznej listy modeli, pomijam sprawdzanie poziomów")
+    judges = ((fleet.raw.get("evals") or {}).get("judges")) or []
+    if judges:
+        judge_models = provider_models if fleet.provider == "openrouter" and url else fetch(URLS["openrouter"])
+        checks += [("sędzia", model, judge_models) for model in judges]
     report, missing = [], 0
-    for tier, model in fleet.tiers.items():
+    for tier, model, models in checks:
         m = models.get(model)
         ok = m is not None
         missing += 0 if ok else 1

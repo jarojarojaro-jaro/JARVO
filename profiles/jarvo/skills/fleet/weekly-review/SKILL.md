@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: "Przegląd tygodnia: jakość floty, wnioski, propozycje."
-version: 1.3.0
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-10-02"
+    reviewed: "2026-10-13"
 ---
 
 # Przegląd tygodnia
@@ -41,7 +41,14 @@ awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i token
 7. **Styl wiadomości:** `prosty_polski` z danych (skill `prosty-polski`, liczy `prosty.py`): ile Twoich wiadomości do
    właściciela było w normie i co zawodziło najczęściej, w jednej linii. Poniżej 80% w normie → lekcja w księdze
    (`fleet-improvement`) z dwoma przykładami potknięć. Brak wiadomości → pomiń.
-8. **Strona tygodnia:** `strona` z danych (`raport_strona.py`, bez modelu): te same liczby jako strona z kaflami
+8. **Evals (pomiar ze stagingu, docs/RSI.md):** `evals` z danych: na agenta wynik ostatniego pełnego przebiegu
+   (`score` 0..1, `zaliczone`/`n`), wynik zbioru odłożonego (`odlozony`), `seria` z poprzednich przebiegów i `kanarek`.
+   `nieocenione` > 0 albo `score` null = przebieg bez sędziego: to nie pomiar jakości, nie wyciągaj z niego wniosków.
+   Jedna linia: agenci ze spadkiem w `seria` (≥ 0,05) albo `odlozony` niższym o ≥ 0,1 od `score`. Spadek to sygnał
+   do `fleet-improvement` (dowód: daty i commity z `evals`), nie wyrok. `kanarek: true` → osobna linia na górze:
+   „⚠ Alarm kanarka u <agent>: agent czytał pliki evals, wyniki niewiarygodne, sprawdź ślady przebiegu”.
+   Brak `evals` albo pusty → pomiń (evals uruchamia właściciel na stagingu: `scripts/evals-staging.sh`).
+9. **Strona tygodnia:** `strona` z danych (`raport_strona.py`, bez modelu): te same liczby jako strona z kaflami
    i paskami (jakość i tokeny na agenta, zrobione, stoi, w toku). Wiadomość niesie `strona.link` w ostatniej linii;
    wniosków nie przepisuj na stronę, zostają w wiadomości. Brak `strona` albo `strona.blad` → bez linii, błąd w jednym zdaniu.
 
@@ -50,6 +57,7 @@ awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i token
 📊 Tydzień floty
 Zrobione: <2–4 linie>
 Jakość: sherlock 5/6 za 1. razem, web 3/5 (powtarza się: brak zrzutów mobile), studio 4/4
+Evals: web 0,82 (było 0,88, spadek po a1b2c3d), reszta bez zmian
 Skarbiec: +7 notatek, 1 sprzeczność do rozstrzygnięcia (link w zakładce Wiedza)
 Styl: 18/20 wiadomości prostym polskim (najczęściej: za długie zdania)
 Proponuję ulepszyć:

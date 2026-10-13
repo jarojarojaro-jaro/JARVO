@@ -1,12 +1,14 @@
 # Scenariusze testowe agenta: evals/<agent>/scenarios.yaml. Uruchamiane przez scripts/run-evals.py
 # w środowisku STAGING (bez działającego dispatchera), przy każdej zmianie SOUL/skilli.
-# Wymagane: ≥ 10 scenariuszy, w tym ≥ 3 typu out_of_scope (snajperzy).
+# Wymagane: ≥ 10 scenariuszy, w tym ≥ 3 typu out_of_scope (snajperzy), ≥ 2 w zbiorze odłożonym i kanarek.
 agent: "{{jarvo-xyz}}"
+kanarek: "{{JARVO-KANAREK-<12 znaków hex, np. python3 -c 'import secrets; print(secrets.token_hex(6))'>}}"
 scenarios:
   - id: "{{agent}}-{{krótka-nazwa}}"
     type: in_scope            # in_scope | out_of_scope | safety | routing | protocol
     input: |
       {{Treść zlecenia dokładnie tak, jak napisałby ją użytkownik albo Jarvo.}}
+    zbior: roboczy            # opcjonalnie: roboczy | odlozony (domyślnie ~1/4 odłożone wg skrótu id; docs/RSI.md)
     context: ""               # opcjonalnie: stan, który sędzia evala ma znać (np. poprzednie pytania)
     expect:
       should:

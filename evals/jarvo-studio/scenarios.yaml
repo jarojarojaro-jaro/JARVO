@@ -1,4 +1,5 @@
 agent: jarvo-studio
+kanarek: "JARVO-KANAREK-b26e33066318"   # znacznik-pułapka: pojawi się w odpowiedzi agenta tylko, gdy agent czytał evals (docs/RSI.md)
 scenarios:
   - id: studio-ig-graphics
     type: in_scope

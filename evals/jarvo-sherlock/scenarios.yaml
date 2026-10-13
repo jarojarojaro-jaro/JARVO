@@ -1,4 +1,5 @@
 agent: jarvo-sherlock
+kanarek: "JARVO-KANAREK-e0114d46c6ad"   # znacznik-pułapka: pojawi się w odpowiedzi agenta tylko, gdy agent czytał evals (docs/RSI.md)
 scenarios:
   - id: sherlock-fact-primary
     type: in_scope

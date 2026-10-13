@@ -48,6 +48,14 @@ models:
     image: openrouter                       # image_gen.provider (domyślny łańcuch modeli wtyczki)
     video: openrouter                       # video_gen.provider (domyślny model wtyczki)
 
+# Sędziowie evals (OpenRouter, klucz OPENROUTER_API_KEY): scripts/run-evals.py bierze pierwszego z innej rodziny
+# niż model ocenianego agenta, żeby sędzia nie oceniał „swoich” (docs/RSI.md). scripts/check-models.py sprawdza,
+# czy identyfikatory istnieją (zweryfikowane 2026-10-13).
+evals:
+  judges:
+    - anthropic/claude-sonnet-5.5
+    - openai/gpt-6-luna
+
 agents:
   - name: jarvo
     kind: orchestrator

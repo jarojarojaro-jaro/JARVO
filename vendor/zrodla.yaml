@@ -370,3 +370,34 @@ zrodla:
     status: uzywane
     przejrzane: 4cd673df4b7a6a35784a0881df223721789c5e23
     notatka: "licencja niekomercyjna (PolyForm NC): tylko pomysły, zasady i liczby własnym tekstem i kodem; zatwierdzone 2026-10-05; używane: słyszalność efektów (projekt.py slychac)"
+  # — pętla samodoskonalenia (docs/RSI.md): tylko wzorce, kod własny; przegląd 2026-10-13, zgoda właściciela 2026-10-13 —
+  mass:
+    repo: https://github.com/SakanaAI/mass
+    status: uzywane
+    przejrzane: fb403581bed2c974b3f99e7236224169da643079
+    notatka: "Sakana MASS (arXiv 2610.12176), kod BEZ licencji: nic nie kopiujemy, tylko wnioski z artykułu: sędzia inny niż optymalizator (R0), pojedynek kandydat vs mistrz (R2), format rola/kontrakt/kolejność (R3); internalizacja w wagi (LoRA, GPU) odpada"
+  hermes-agent-self-evolution:
+    repo: https://github.com/NousResearch/hermes-agent-self-evolution
+    status: do-wdrozenia
+    przejrzane: 0a929e3aa20e15cf04dc7c28492a7d41a5139125
+    notatka: "MIT, prototyp niedziałający (issue #141: skill bez zmian, metryka z pokrycia słów): bierzemy projekt bramek (benchmark jako bramka, nie cel; limity rozmiaru; tylko przez PR), kod własny w kuźni R2"
+  gepa:
+    repo: https://github.com/gepa-ai/gepa
+    status: do-wdrozenia
+    przejrzane: f1cfdee2856e9dc4b5b4dc5cc2e391d0aa20d819
+    notatka: "MIT: wzorzec refleksji nad śladami i mutacji tekstu skilla (R2), bez paczki w obrazie"
+  ace:
+    repo: https://github.com/ace-agent/ace
+    status: do-wdrozenia
+    przejrzane: 82709de050e1db6e6ef2f07bcb0393560b94992a
+    notatka: "Apache-2.0: playbook z licznikami pomógł/zaszkodził i zmianami przyrostowymi (R1, księga lekcji), kod własny"
+  recuris:
+    repo: https://github.com/Gen-Verse/Recuris
+    status: do-wdrozenia
+    przejrzane: 7d3745ab787b1206ccd981cb1511100476097266
+    notatka: "Apache-2.0 (arXiv 2608.24876): łatka skilla przyjęta tylko po parowanym porównaniu na zbiorze odłożonym (R2), kod własny"
+  rsi-anything:
+    repo: https://github.com/Gen-Verse/RSI-Anything
+    status: odlozone
+    przejrzane: 8ba44cd73ec6f57b151ec06e2f71a0726adfb687
+    notatka: "Apache-2.0: każda ścieżka trenuje małe modele na GPU (JEPA, polityka 4–7B), repo z 2026-10-08; z pomysłów: budżet sprawdzeń i osobne bramki komponentów (docs/RSI.md)"

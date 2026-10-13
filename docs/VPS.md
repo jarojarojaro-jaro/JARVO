@@ -248,7 +248,10 @@ laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: s
 
 **Staging:** `scripts/evals-staging.sh` uruchamia jednorazowy kontener z tym samym obrazem i buildem, ale na
 osobnym katalogu danych (`/srv/jarvo/staging`) i bez gatewaya, więc scenariusze evals nie ruszają produkcyjnej
-tablicy ani Telegrama. Osobny bot testowy dojdzie, gdy będziemy testować routing Telegrama przed zmianą tras.
+tablicy ani Telegrama. Na macOS (wolumeny) skrypt nadpisuje też `JARVO_VOL_HERMES`, żeby staging nie podpiął
+wolumenu produkcji. Historia wyników (`eval-results/`) przeżywa `--reset`, a po przebiegu trafia do działającej floty
+(`/opt/data/jarvo/evals`: HQ i przegląd tygodnia, [RSI.md](RSI.md) §4). Osobny bot testowy dojdzie, gdy będziemy
+testować routing Telegrama przed zmianą tras.
 
 **Wersje:** Hermes przypięty w repo do tagu i digestu (`ARG HERMES_IMAGE` w `infra/Dockerfile`; ta sama wartość
 domyślna w `infra/docker-compose.yml` i `fleet.yaml`, pilnuje tego test). Dawny domyślny `HERMES_IMAGE=…:latest`

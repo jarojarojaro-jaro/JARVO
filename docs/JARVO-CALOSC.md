@@ -290,7 +290,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `vendor/zrodla.yaml` | spis wszystkich repo, z których bierzemy kod, skille albo wzorce (status, ostatni przejrzany commit); `scripts/zrodla.py sprawdz` pokazuje nowości, rutyna pon/śr/pt robi z nich propozycje do zatwierdzenia |
 | `vendor/skan-wyjatki.yaml` | przejrzane fałszywe alarmy skanu skilli zewnętrznych, przypięte do commitu źródła |
 | `evals/<agent>/` | scenariusze testów zachowań (w zakresie, poza zakresem, routing, protokół, bezpieczeństwo) |
-| `scripts/` | build, walidator, deploy, instalacja floty, backupy, evals, migracja, narzędzia |
+| `scripts/` | build, walidator, deploy, instalacja floty, backupy, evals (runner, pomiar `evalslib.py`, `evals-wyniki.py`), migracja, narzędzia |
 | `hq/` | Jarvo HQ (backend, frontend, demo) |
 | `infra/` | obraz jarvo-hermes, docker-compose z sidecarami, szablony env |
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
@@ -357,7 +357,13 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    notatek Markdown z linkami (`knowledge/`), wzorzec LLM Wiki Karpathy'ego; wtyczka Hermesa `jarvo-wiedza` jako dostawca
    pamięci (przypomnienia przed turą, wyciąg po sesji i przed kompresją, 4 narzędzia), kompilacja tanim modelem (jeden
    piszący), orzeczenia z Twoich korekt, lint, punkty zapisu git, zakładka „Wiedza” z grafem w dashboardzie.
-4. **PageIndex (MIT, rozważane):** vectorless RAG do czytania długich dokumentów przez lokalny model
+4. **Pętla samodoskonalenia (RSI), plan w [RSI.md](RSI.md) (zgoda właściciela 2026-10-13):** flota poprawia własne
+   skille i prompty bez uczenia wag, z pomiarem, bramkami i Twoją zgodą na każdą zmianę. R0 pomiar ✅ 2026-10-13:
+   runner evals z sędzią innej rodziny modeli (`fleet.yaml` → `evals.judges`), powtórzeniami, zbiorem odłożonym,
+   kanarkami (znacznik-pułapka w plikach evals), historią i punktem odniesienia (`scripts/evalslib.py`,
+   `scripts/evals-wyniki.py`); wyniki ze stagingu w karcie agenta w HQ i w przeglądzie tygodnia. Dalej: R1 lekcje
+   z licznikami i poczekalnia skilli agentów, R2 kuźnia skilli (propozycja, pojedynek, bramki, raport do decyzji).
+5. **PageIndex (MIT, rozważane):** vectorless RAG do czytania długich dokumentów przez lokalny model
    (litellm → Hermes/GLM). Nie jako osobny agent — jako współdzielona umiejętność „czytania długich
    dokumentów”. Do decyzji: zakres (który agent najpierw) + model do indeksowania.
 

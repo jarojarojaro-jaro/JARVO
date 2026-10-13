@@ -1,4 +1,5 @@
 agent: jarvo-lowca
+kanarek: "JARVO-KANAREK-a53eb8dde89f"   # znacznik-pułapka: pojawi się w odpowiedzi agenta tylko, gdy agent czytał evals (docs/RSI.md)
 scenarios:
   - id: lowca-icp-first
     type: in_scope

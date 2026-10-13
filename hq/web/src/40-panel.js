@@ -284,6 +284,7 @@ function AboutTab({ data, fleetInfo }) {
       <div><dt>${L("Maks. autonomia", "Max autonomy")}</dt><dd>${a.autonomy_max} <span class="thq-muted">${L("(publikacje, wdrożenia i płatności tylko za Twoją zgodą)", "(publishing, deployments and payments only with your approval)")}</span></dd></div>
       ${info.telegram_topic && html`<div><dt>Telegram</dt><dd>${info.telegram_topic === "general" ? L("DM i wątek General w Jarvo HQ", "DM and the General topic in Jarvo HQ") : L(`wątek „${info.telegram_topic}” w Jarvo HQ`, `the “${info.telegram_topic}” topic in Jarvo HQ`)}</dd></div>`}
       <div><dt>${L("7 dni", "7 days")}</dt><dd>${s.done_7d || 0} ${L("zamkniętych kart", "cards closed")}${pct != null ? L(`, ${pct}% przyjętych za pierwszym razem`, `, ${pct}% accepted first time`) : ""}</dd></div>
+      ${data.evals && html`<${EvalFact} ev=${data.evals}/>`}
     </dl>
     ${info.personality && html`<div class="thq-dials">${info.personality.map(([k, v]) => html`<div key=${k} class="thq-dial">
       <span>${k}</span><span class="thq-dial-bar"><span style=${{ width: `${v}%` }}></span></span><strong>${v}%</strong></div>`)}</div>`}
@@ -291,6 +292,22 @@ function AboutTab({ data, fleetInfo }) {
       <div class="thq-tags">${info.skills.map((s) => html`<span key=${s} class="thq-tag">${s}</span>`)}</div></section>`}
     ${info.vendored > 0 && html`<p class="thq-muted">+ ${info.vendored} ${L("skilli zewnętrznych (open source, przypięte wersje).", "external skills (open source, pinned versions).")}</p>`}
   </div>`;
+}
+
+// Evals ze stagingu (docs/RSI.md): ostatni pełny przebieg, zbiór odłożony, trend wyniku, alarm kanarka.
+function EvalFact({ ev }) {
+  const f = (x) => (x == null ? "—" : `${Math.round(100 * x)}%`);
+  const seria = (ev.seria || []).filter((x) => x != null);
+  const zmiana = seria.length > 1 ? seria[seria.length - 1] - seria[0] : null;
+  const strz = zmiana == null ? "" : zmiana > 0.02 ? " ▲" : zmiana < -0.02 ? " ▼" : " ▬";
+  const kiedy = ev.data ? new Date(ev.data).toLocaleDateString() : "";
+  return html`<div><dt>Evals</dt><dd>
+    ${ev.zaliczone}/${ev.n} ${L("zaliczonych", "passed")}, ${L("wynik", "score")} ${f(ev.score)}${strz}
+    ${ev.nieocenione > 0 && html`<span class="thq-muted"> · ${ev.nieocenione} ${L("bez oceny sędziego", "not judged")}</span>`}
+    <span class="thq-muted"> · ${L("odłożone", "held-out")} ${f(ev.odlozony)} · ${kiedy}${ev.commit ? ` · ${ev.commit}` : ""}</span>
+    ${seria.length > 1 && html`<span class="thq-muted" title=${L("Wynik w kolejnych przebiegach", "Score over runs")}> · ${seria.map(f).join(" → ")}</span>`}
+    ${ev.kanarek && html`<strong class="thq-error"> · ${L("ALARM KANARKA: agent czytał evals", "CANARY ALARM: agent read the evals")}</strong>`}
+  </dd></div>`;
 }
 
 // Twórca aplikacji: ekran telefonu testowego (profil compose „android”), gdy działa.

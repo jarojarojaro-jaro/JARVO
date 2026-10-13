@@ -1,4 +1,5 @@
 agent: jarvo-mobile
+kanarek: "JARVO-KANAREK-eba96d381d67"   # znacznik-pułapka: pojawi się w odpowiedzi agenta tylko, gdy agent czytał evals (docs/RSI.md)
 scenarios:
   - id: mobile-audyt-firmy
     type: in_scope

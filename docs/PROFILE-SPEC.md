@@ -200,7 +200,9 @@ Mechanizmy techniczne:
 - **rubryka sędziego:** jak Jarvo ocenia wynik tego agenta (skill `sdlc-review` u Jarva: `references/rubric-<agent>.md` generowane z `quality/rubric.md` agenta),
 - **evals:** `evals/<agent>/*.yaml` (szablon: `shared/templates/eval.template.yaml`), czyli scenariusze
   „zlecenie → oczekiwane zachowanie → kryteria”, uruchamiane ręcznie na stagingu (`scripts/evals-staging.sh`) po zmianie
-  SOUL lub skilli; CI sprawdza tylko ich strukturę (`validate.py`),
+  SOUL lub skilli; CI sprawdza tylko ich strukturę (`validate.py`). Każdy plik ma kanarek (znacznik-pułapka), ≥ 2 scenariusze
+  w zbiorze odłożonym (pole `zbior` albo skrót id), a runner liczy powtórzenia, prowadzi historię i punkt odniesienia
+  (pomiar pętli samodoskonalenia, [RSI.md](RSI.md) §4),
 - **ślady i koszty (planowane, faza 6):** Langfuse (wtyczka Hermesa) ma zbierać przebiegi, koszty i oceny sędziego;
   dziś niewłączony w żadnym profilu,
 - **pętla błędów:** każda poprawka odesłana przez sędziego jest kandydatem na nowy eval albo poprawkę skilla.
