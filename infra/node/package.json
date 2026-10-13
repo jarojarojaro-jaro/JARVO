@@ -14,7 +14,8 @@
     "linkinator": "8.1.0",
     "playwright-core": "1.63.0",
     "sharp": "0.35.4",
-    "svgo": "4.1.0"
+    "svgo": "4.1.0",
+    "three": "0.186.1"
   },
   "overrides": {
     "dembrandt": {

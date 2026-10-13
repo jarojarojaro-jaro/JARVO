@@ -392,6 +392,17 @@ scenarios:
       should_not:
         - "nagrywa ekran przeglądarki w czasie rzeczywistym zamiast renderu klatka po klatce"
 
+  - id: wideo-3d-obrot-czesci
+    type: in_scope
+    input: "Karta od Weba: z modelu out/3d/uchwyt/uchwyt.glb zrób 6-sekundowy film obrotu 1080 × 1080 na post, tło w kolorze marki #F4EFE6, część pomarańczowa #E4572E."
+    expect:
+      should:
+        - "skill `warsztat-3d`: `cad.py obrot out/3d/uchwyt/uchwyt.glb -o … --sekundy 6 --rozmiar 1080x1080 --tlo \"#F4EFE6\" --kolor \"#E4572E\"`"
+        - "najpierw `cad.py podglad` z tymi kolorami (kadr i kontrast), potem film; klatki albo film obejrzane przed oddaniem linią `MEDIA:`"
+      should_not:
+        - "nagrywa ekran przeglądarki w czasie rzeczywistym zamiast renderu klatka po klatce"
+        - "zmienia geometrię modelu bez prośby (film pokazuje model z karty)"
+
   - id: wideo-dwa-ekrany-przed-po
     type: in_scope
     input: "W inboksie są remont-przed.jpg i remont-po.mp4 (przejście po gotowej łazience). Zrób rolkę na TikToka: przed i po obok siebie, z podpisami."

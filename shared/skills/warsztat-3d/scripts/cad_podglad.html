@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Podgląd modelu</title>
+<!-- Podgląd modelu GLB z cad.py (cad_render.cjs serwuje stronę, Three.js z /opt/jarvo/node i model, bez sieci).
+     Opcje w window.__opcje; window.__ustaw(kat) obraca model i rysuje klatkę; window.__ready po wczytaniu. -->
+<style>html,body{margin:0;height:100%;overflow:hidden;background:transparent}canvas{display:block}</style>
+<script type="importmap">{"imports": {"three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/"}}</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const o = Object.assign({ w: 1600, h: 1200, kat: 35, wysokosc: 25, kolor: null, tlo: '#F4F4F2', siatka: false,
+                          krawedzie: true, skala: 1, obrot: false }, window.__opcje || {});
+window.__bledy = [];
+const SZARY = '#9AA4B2', KRAWEDZ = '#1F2933';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: !o.tlo, preserveDrawingBuffer: true });
+renderer.setPixelRatio(o.skala);
+renderer.setSize(o.w, o.h);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = o.tlo ? new THREE.Color(o.tlo) : null;
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.7;
+
+const pivot = new THREE.Group();          // obrót modelu wokół pionowej osi (światło i kamera stoją)
+scene.add(pivot);
+
+const gltf = await new GLTFLoader().loadAsync('/model.glb');
+const model = gltf.scene;
+model.scale.setScalar(1000);              // glTF w metrach → milimetry, jak w CAD
+const maMaterialy = (gltf.parser.json.materials || []).length > 0;
+let trojkaty = 0, siatki = 0;
+model.traverse(m => {
+  if (!m.isMesh) return;
+  siatki += 1;
+  trojkaty += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
+  if (o.kolor || !maMaterialy) {
+    m.material = new THREE.MeshStandardMaterial({ color: o.kolor || SZARY, metalness: 0.05, roughness: 0.55 });
+  }
+  m.castShadow = m.receiveShadow = true;
+  // ściany odsunięte o włos w głąb: krawędzie rysują się czysto, bez przerywanych linii na ścianach
+  m.material.polygonOffset = true;
+  m.material.polygonOffsetFactor = 1;
+  m.material.polygonOffsetUnits = 1;
+  if (o.krawedzie) {
+    const linie = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 25),
+      new THREE.LineBasicMaterial({ color: KRAWEDZ, transparent: true, opacity: 0.55 }));
+    m.add(linie);
+  }
+});
+// model stoi na podłodze (y = 0), środkiem nad osią obrotu
+model.updateMatrixWorld(true);
+const box = new THREE.Box3().setFromObject(model);
+const c = box.getCenter(new THREE.Vector3());
+model.position.set(-c.x, -box.min.y, -c.z);
+pivot.add(model);
+const rozmiar = box.getSize(new THREE.Vector3());
+const kula = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(0, rozmiar.y / 2, 0), rozmiar)
+  .getBoundingSphere(new THREE.Sphere());
+const r = Math.max(kula.radius, 0.5);
+
+// podłoga: sam cień (i siatka co 10 mm na życzenie)
+const podloga = new THREE.Mesh(new THREE.PlaneGeometry(r * 12, r * 12), new THREE.ShadowMaterial({ opacity: 0.16 }));
+podloga.rotation.x = -Math.PI / 2;
+podloga.receiveShadow = true;
+scene.add(podloga);
+if (o.siatka) {
+  const bok = Math.max(20, Math.ceil(Math.max(rozmiar.x, rozmiar.z) * 1.6 / 20) * 20);
+  const siatka = new THREE.GridHelper(bok, bok / 10, 0x8A939F, 0xC9CED6);
+  siatka.position.y = 0.01;
+  scene.add(siatka);
+}
+
+const swiatlo = new THREE.DirectionalLight(0xffffff, 2.0);
+swiatlo.position.set(r * 1.5, r * 3, r * 2);
+swiatlo.castShadow = true;
+swiatlo.shadow.mapSize.set(2048, 2048);
+Object.assign(swiatlo.shadow.camera, { left: -r * 2, right: r * 2, top: r * 2, bottom: -r * 2, near: r * 0.1, far: r * 8 });
+swiatlo.shadow.bias = -0.0005;
+swiatlo.shadow.radius = 4;
+scene.add(swiatlo);
+
+// kamera z przodu, nad podłogą; kadr dopasowany do rogów pudełka modelu (przy filmie: do każdego kąta obrotu)
+const fov = 30;
+const kamera = new THREE.PerspectiveCamera(fov, o.w / o.h, r * 0.02, r * 60);
+const el = THREE.MathUtils.degToRad(o.wysokosc);
+const kierunek = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
+const cel = new THREE.Vector3(0, rozmiar.y / 2, 0);
+const rogi = [];
+for (const x of [-1, 1]) for (const y of [0, 1]) for (const z of [-1, 1])
+  rogi.push(new THREE.Vector3(x * rozmiar.x / 2, y * rozmiar.y, z * rozmiar.z / 2));
+const ZAPAS = 0.84;                        // model zajmuje do 84% kadru
+function zasieg(katy, odl) {
+  kamera.position.copy(cel).addScaledVector(kierunek, odl);
+  kamera.lookAt(cel);
+  kamera.updateMatrixWorld();
+  const m = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const k of katy) {
+    const obrot = new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(-k));
+    for (const p of rogi) {
+      const v = p.clone().applyMatrix4(obrot).project(kamera);
+      m[0] = Math.min(m[0], v.x); m[1] = Math.min(m[1], v.y); m[2] = Math.max(m[2], v.x); m[3] = Math.max(m[3], v.y);
+    }
+  }
+  return m;
+}
+const katy = o.obrot ? Array.from({ length: 24 }, (_, i) => o.kat + i * 15) : [o.kat];
+let odl = r / Math.sin(THREE.MathUtils.degToRad(fov / 2));
+for (let i = 0; i < 6; i++) {
+  const [x0, y0, x1, y1] = zasieg(katy, odl);
+  // środek rzutu na środek kadru (przesunięcie celu w płaszczyźnie ekranu), potem odległość do zapasu
+  const h = odl * Math.tan(THREE.MathUtils.degToRad(fov / 2)), w = h * o.w / o.h;
+  const prawo = new THREE.Vector3().setFromMatrixColumn(kamera.matrixWorld, 0);
+  const gora = new THREE.Vector3().setFromMatrixColumn(kamera.matrixWorld, 1);
+  cel.addScaledVector(prawo, (x0 + x1) / 2 * w).addScaledVector(gora, (y0 + y1) / 2 * h);
+  odl *= Math.max((x1 - x0) / 2, (y1 - y0) / 2) / ZAPAS;
+}
+zasieg(katy, odl);
+
+window.__ustaw = kat => {
+  pivot.rotation.y = THREE.MathUtils.degToRad(-kat);
+  renderer.render(scene, kamera);
+  return true;
+};
+window.__info = { wymiary_mm: [rozmiar.x, rozmiar.z, rozmiar.y].map(v => Math.round(v * 100) / 100),
+                  trojkaty: Math.round(trojkaty), siatki, materialy: maMaterialy };
+window.__ustaw(o.kat);
+window.__ready = true;
+</script>
+</body>
+</html>

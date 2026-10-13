@@ -13,12 +13,12 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 |---|---|---|---|---|---|
 | `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [13 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 2 (`writing-for-agents`, mattpocock; wspólny `konwersja-plikow`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski | [25](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [8 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 17 (Hermes, marketingskills, wspólne `transkrypcja-filmu`, `konwersja-plikow` i `ostrozna-przegladarka`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [16](../evals/jarvo-sherlock/scenarios.yaml) |
-| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 60 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria` i `konwersja-plikow`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [19](../evals/jarvo-web/scenarios.yaml) |
+| `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 61 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria`, `warsztat-3d` i `konwersja-plikow`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [20](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 27 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria` i `konwersja-plikow`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
-| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [21 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 62 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, live-panel, Hermes, wspólne `transkrypcja-filmu`, `hooki`, `izometria`, `konwersja-plikow` i inne) | film, stock, kadry, montaz, dwa_ekrany, napisy, qa_wideo, rytm, muzyka, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, twarze, demo_strony, typografia, maska, zywy_schemat, gramatyka, malarz (+ wideo_lib; moduły JS stron: ruch, kreska, morph, crt, plotno, piksel, os_czasu, strona, ujecia) | [38](../evals/jarvo-wideo/scenarios.yaml) |
+| `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [21 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 63 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, live-panel, Hermes, wspólne `transkrypcja-filmu`, `hooki`, `izometria`, `warsztat-3d`, `konwersja-plikow` i inne) | film, stock, kadry, montaz, dwa_ekrany, napisy, qa_wideo, rytm, muzyka, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, twarze, demo_strony, typografia, maska, zywy_schemat, gramatyka, malarz (+ wideo_lib; moduły JS stron: ruch, kreska, morph, crt, plotno, piksel, os_czasu, strona, ujecia) | [39](../evals/jarvo-wideo/scenarios.yaml) |
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [11 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 7 (marketingskills, wspólne `hooki` i `konwersja-plikow`) | ads, planer, eksperyment, eksport, paczka | [14](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 2 (wspólne `konwersja-plikow` i `ostrozna-przegladarka`) | krs, ceidg, przetargi, strona, leady, zrodlo | [16](../evals/jarvo-lowca/scenarios.yaml) |
-| `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 21 (Expo, React Native, ASO; wspólny `konwersja-plikow`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
+| `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 22 (Expo, React Native, ASO; wspólne `konwersja-plikow` i `warsztat-3d`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 5 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`, `konwersja-plikow`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [14](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -46,7 +46,9 @@ Legenda przy skillach:
 
 Snajperzy nie dzielą pamięci ani workflowów dziedzinowych (wspólne są tylko skille z `shared/skills/`:
 narzędziowe jak `graf-kodu` i `izometria` (figury izometryczne ze świeceniem u Weba, Studia i Wideografa: strona, PNG,
-film; `iso.py flota` rysuje flotę z rejestru, ta sama figura jest w HQ: Centrala → Jak działa usługa) i metodyczne jak `hooki`, oraz te same skille zewnętrzne z locka). Jeden skill ma każdy agent:
+film; `iso.py flota` rysuje flotę z rejestru, ta sama figura jest w HQ: Centrala → Jak działa usługa), `warsztat-3d`
+(u Weba, Wideografa i Mobile: część albo produkt 3D z kodu build123d, pliki STEP, STL, GLB i 3MF, podgląd PNG
+i film obrotu) i metodyczne jak `hooki`, oraz te same skille zewnętrzne z locka). Jeden skill ma każdy agent:
 `konwersja-plikow` (plik → inny format na serwerze: zdjęcia z HEIC, wideo, audio, PDF, Word; usuwa też metadane:
 miejsce GPS, telefon, daty, autor, a z PDF i dokumentów Office także firmę, program i historię zmian; ten sam
 konwerter masz w HQ: Centrala → Konwerter).
@@ -128,7 +130,8 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
   `systematic-debugging` (przyczyna błędu builda albo skryptu, zanim poprawka)
 - [Z] `impeccable`, web-quality-skills (5), claude-seo (13), marketingskills (3), Anthropic (2), GSAP (8), Three.js (10),
   motion Emila Kowalskiego (5), `text-to-lottie`, wspólne `graf-kodu` i `izometria` (`shared/skills/`: klikalna figura
-  izometryczna na stronę klienta, `<iframe>` bez stopki, kolor marki), getsentry `security-review`
+  izometryczna na stronę klienta, `<iframe>` bez stopki, kolor marki), `warsztat-3d` (model produktu albo części
+  z kodu: GLB na stronę, PNG bez studia, STL i 3MF do druku), getsentry `security-review`
   (przegląd kodu wg OWASP), Trail of Bits `supply-chain-risk-auditor` (ryzyko zależności)
 - [T] `brand-z-url`: podajesz stronę, a agent crawluje ją i wyciąga logo, kolory, fonty,
   ton i komponenty do `knowledge/brands/<marka>/` (z `DESIGN.md`)
@@ -304,8 +307,8 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 [H] `manim-video` (silnik ManimGX, dodatek `manim`), `ai-presenter-video`; [Z] `hyperframes` (12 skilli rodziny), marketingskills `video`, GSAP (8),
 Three.js (10), screenwriting (5), iart (5), motion (3), Remotion, motion-broll, lemo-opuscar, anidoodle, claude-animation,
 bang-motion, pixel2motion, `text-to-lottie`, `slack-gif-creator`, `motion-design` i `video-lessons` (Remocn Studio),
-`live-panel`, wspólne `transkrypcja-filmu`, `hooki`, `izometria` (figura z `demo()` na film przez `html_wideo.py`)
-i `konwersja-plikow` (razem 62).
+`live-panel`, wspólne `transkrypcja-filmu`, `hooki`, `izometria` (figura z `demo()` na film przez `html_wideo.py`),
+`warsztat-3d` (film obrotu części, GLB do sceny Three.js) i `konwersja-plikow` (razem 63).
 Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#jarvo-wideo-wideograf).
 
 **Zasada:** **nie publikuje sam** i nie kupuje materiałów; bez deepfake'ów i klonowania głosów realnych osób.
@@ -392,7 +395,8 @@ Każdą nową paczkę npm sprawdza przed instalacją (literówki, podszycia, naz
 werdykt, testy wrogie w przeglądarce, na Androidzie przez adb i w symulatorze iOS w GitHub Actions),
 `pakiet-do-sklepow` (+ metadane i limity, potok zrzutów, mapa 44 punktów), [A2] `wydanie` (+ konta właściciela),
 [T] `odrzucenie` (+ mapa odrzuceń), `aplikacja-ze-strony` (+ funkcje natywne i opisy dla recenzenta),
-[A2] `utrzymanie-aplikacji` (+ opinie w sklepach); 20 skilli zewnętrznych (Expo, Callstack, Vercel, ASO) i wspólny `konwersja-plikow`. Skrypty: `audyt_mobilny.py`, `decyzja.py`, `zgodnosc.py`, `aplikacja.py`,
+[A2] `utrzymanie-aplikacji` (+ opinie w sklepach); 20 skilli zewnętrznych (Expo, Callstack, Vercel, ASO) i wspólne `konwersja-plikow` i `warsztat-3d` (model GLB do aplikacji,
+obraz produktu). Skrypty: `audyt_mobilny.py`, `decyzja.py`, `zgodnosc.py`, `aplikacja.py`,
 `ikony.cjs`, `zrzuty.cjs`, `wrogie.cjs`, `urzadzenie.py`, `ios_ci.py`, `bramka.py`, `sklep_check.py` (44 punkty przed
 wysłaniem i wyuczone z odrzuceń), `pakiet.py` (szkic karty, grafiki, zrzuty), `kadry.cjs`, `wydanie.py` (EAS Build,
 Submit i Metadata za zgodą), `odrzucenie.py` (wytyczne, odpowiedź, nauka), `ze_strony.py` (strona firmy → plan i szkice konfiguracji), `utrzymanie.py`

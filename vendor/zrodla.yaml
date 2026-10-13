@@ -195,6 +195,11 @@ zrodla:
     repo: https://github.com/lightpanda-io/browser
     status: uzywane
     przejrzane: 588f6223b9cae8a2406aeef035ed9363a3e404fd
+  build123d:
+    repo: https://github.com/gumyr/build123d
+    status: uzywane
+    przejrzane: 38effd343e1508964673faf59300a5cc68fbedc1
+    notatka: "build123d 0.13.0 (tag v0.13.0): silnik wspólnego skilla warsztat-3d, venv /opt/jarvo/venvs/cad (Python 3.12), koła przypięte sha256 w infra/python/requirements-cad.txt (--no-deps, bez sympy, mpmath, jedi, parso). Przegląd 2026-10-13 (decyzja właściciela): Apache-2.0, zależności MIT/BSD/Apache; bez telemetrii; sieć tylko w jawnym export_to_pcbway i pobieraniu tekstur threejs_materials, zablokowane w cad_model.py; budowa i eksport sprawdzone bez sieci"
   camoufox:
     repo: https://github.com/daijro/camoufox
     status: uzywane
@@ -234,6 +239,11 @@ zrodla:
     repo: https://github.com/ZHKKKe/MODNet
     status: uzywane
     przejrzane: 28165a451e4610c9d77cfdf925a94610bb2810fb
+  ocp:
+    repo: https://github.com/CadQuery/OCP
+    status: uzywane
+    przejrzane: a6d078cfda3e5e695c68d2bfbfe38e91b0ccb566
+    notatka: "Wiązania Pythona do OpenCascade (OCCT 8.0, LGPL-2.1 z wyjątkiem) z kół cadquery-ocp-novtk 8.0.1.1.0 (tag 8.0.1.1, Apache-2.0): jądro build123d w warsztacie 3D. W kole dołączone biblioteki obrazów (FreeImage, LibRaw, OpenEXR, libtiff i in.) bez zmian. Przegląd 2026-10-13"
   onnx-asr:
     repo: https://github.com/istupakov/onnx-asr
     status: uzywane
@@ -258,6 +268,11 @@ zrodla:
     repo: https://github.com/explosion/spaCy
     status: uzywane
     przejrzane: c2dabfce56ad2991685ec85783cd59637a5d7b8f
+  three-js:
+    repo: https://github.com/mrdoob/three.js
+    status: uzywane
+    przejrzane: 9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8
+    notatka: "three@0.186.1 (npm, gitHead r186): w obrazie (/opt/jarvo/node) do podglądu PNG i filmu obrotu warsztatu 3D (cad_render.cjs, strona z page.route bez sieci); ta sama wersja co /_lib/three Wideografa (narzedzia.py HTML_LIBS). MIT. Przegląd 2026-10-13"
   # — metody i prompty (inspiracja, własny tekst) —
   claude-code-security-review:
     repo: https://github.com/anthropics/claude-code-security-review

@@ -17,6 +17,8 @@ a nie „jest szybko”. Pragmatyczny: najprostszy stack, który spełnia wymaga
 - obrazy: AVIF/WebP, `srcset`/`sizes`, lazy loading, wymiary, kompresja,
 - responsywność (mobile-first) i testy wizualne na wielu szerokościach,
 - brand kit z istniejącej strony (kolory, fonty, tokeny, DESIGN.md),
+- modele 3D z kodu (wspólny skill `warsztat-3d`): części do druku 3D (STL, 3MF), STEP do wyceny, produkt 3D na stronę
+  (GLB) i podgląd PNG; wymiary w mm z raportu, nie z oka,
 - podglądy i wdrożenia (produkcja tylko za zgodą), po wdrożeniu zgłoszenie do wyszukiwarek: IndexNow (Bing i inne) sam,
   Bing Webmaster Tools i Search Console z instrukcją dla właściciela.
 

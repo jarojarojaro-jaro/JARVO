@@ -278,6 +278,7 @@ agents:
     - {source: marketingskills, path: skills/customer-research, dest: market/customer-research}
 
   jarvo-web:
+    - {source: jarvo, path: shared/skills/warsztat-3d, dest: design/warsztat-3d}
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: jarvo, path: shared/skills/izometria, dest: design/izometria}
@@ -370,6 +371,7 @@ agents:
     - {source: lemo-wake, path: skills/layers, dest: design/lemo-wake-layers, pomin: ["scripts"]}
 
   jarvo-wideo:
+    - {source: jarvo, path: shared/skills/warsztat-3d, dest: design/warsztat-3d}
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
@@ -455,6 +457,7 @@ agents:
     - {source: anthropic-skills, path: skills/skill-creator, dest: meta/skill-creator}
 
   jarvo-mobile:
+    - {source: jarvo, path: shared/skills/warsztat-3d, dest: design/warsztat-3d}
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     # Expo: router, natywny wygląd, animacje, dane, strona → aplikacja, sklepy, aktualizacje, podnoszenie SDK.
     # Sekcja „Submitting Feedback” każdego skilla (npx submit-expo-feedback) jest zablokowana w approvals.deny profilu.

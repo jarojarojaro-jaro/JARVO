@@ -167,6 +167,26 @@ RUN set -e; extras=" $(echo "$JARVO_EXTRAS" | tr ',' ' ') "; \
     MANIMGX_CACHE_DIR="$t/cache" /opt/jarvo/venvs/manimgx/bin/manimgx render "$t/proba.py" -r 640x360 --fps 30 -o "$t/proba.mp4" && \
     test -s "$t/proba.mp4" && rm -rf "$t"
 
+# --- Warsztat 3D (wspólny skill warsztat-3d, cad.py): build123d 0.13.0 (Apache-2.0, https://github.com/gumyr/build123d)
+#     na OpenCascade (cadquery-ocp-novtk, LGPL-2.1): model części z kodu Pythona → STEP, STL, GLB, 3MF i raport
+#     (wymiary, objętość, masa). Podgląd PNG i film obrotu robi Three.js (paczka three w /opt/jarvo/node) w Chromium.
+#     Osobny venv na Pythonie 3.12 (~0,77 GB, OpenCascade to ~0,38 GB), żeby nie mieszać numpy/scipy z venvem narzędzi.
+#     Wszystkie paczki przypięte wersją i sumą sha256 (requirements-cad.txt: --require-hashes, tylko koła, --no-deps:
+#     bez sympy, mpmath, jedi i parso, których build123d nie używa). Przegląd 2026-10-13 (decyzja właściciela):
+#     licencje (Apache-2.0, LGPL-2.1, MIT/BSD zależności), bez telemetrii; sieci używa tylko jawne export_to_pcbway
+#     (wysyłka STEP do PCBWay) i pobieranie tekstur threejs_materials: cad_model.py blokuje gniazda i tę funkcję.
+#     Kod bajtowy kompilowany w obrazie (start silnika ~3 s zamiast ~8 s). Na końcu próbna część: STEP, STL, GLB, 3MF.
+RUN set -e; uv venv /opt/jarvo/venvs/cad --python 3.12 && \
+    VIRTUAL_ENV=/opt/jarvo/venvs/cad uv pip install --no-config --no-deps --require-hashes --only-binary :all: \
+      --compile-bytecode -r /opt/jarvo/python/requirements-cad.txt && \
+    t="$(mktemp -d)" && cd "$t" && \
+    /opt/jarvo/venvs/cad/bin/python -I -c "from build123d import *; b = Box(20, 10, 5) - Cylinder(2, 5); \
+export_step(b, 'p.step'); export_stl(b, 'p.stl', tolerance=0.05); export_gltf(b, 'p.glb', binary=True); \
+m = Mesher(); m.add_shape(b); m.write('p.3mf'); assert b.is_valid and abs(b.volume - (1000 - 3.1416 * 20)) < 1; \
+print('build123d OK', round(b.volume, 1))" && \
+    test -s p.step && test -s p.stl && test -s p.glb && test -s p.3mf && \
+    node -e "require.resolve('three')" && cd / && rm -rf "$t"
+
 # --- Camoufox (MPL-2.0): Firefox z podmienionym odciskiem przeglądarki, zapasowa przeglądarka Łowcy i Sherlocka
 #     (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`) tylko po odmowie zwykłej przeglądarki. Binarka z wydania
 #     daijro/camoufox przypięta wersją i sumą SHA-256 dla amd64 i arm64 (przejrzana). Z paczki (1,3 GB) zostaje

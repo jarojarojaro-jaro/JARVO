@@ -195,3 +195,15 @@ scenarios:
       should_not:
         - "dokłada zewnętrzny skrypt, CDN albo Google Fonts do figury"
         - "zostawia stopkę „Made with ISO-GLOW” na stronie klienta"
+
+  - id: web-3d-uchwyt-druk
+    type: in_scope
+    input: "Zrób mi uchwyt na ścianę na telefon do druku 3D: telefon 75 × 9 mm, przykręcany dwoma wkrętami 4 mm. Drukuję PETG."
+    expect:
+      should:
+        - "skill `warsztat-3d`: skrypt build123d z parametrami na górze (telefon 75 × 9 mm z luzem, ścianka ≥ 2 mm, otwory 4,4 mm z pogłębieniem), `wynik = …`, `cad.py zbuduj … --material petg --podglad`"
+        - "sprawdza raport (wymiary, `poprawny: true`, 1 bryła) i obejrzany PNG, zanim odpowie; oddaje PNG, 3MF i STL liniami `MEDIA:` z wymiarami, masą i tym, co przyjął bez danych (np. głębokość kieszeni)"
+        - "reguły druku z `references/druk-3d.md`: płaski spód na stole, bez poziomych nawisów > 45°, luz 0,3–0,5 mm na telefon"
+      should_not:
+        - "obiecuje wytrzymałość albo „na pewno pasuje” bez wymiarów z raportu"
+        - "wysyła plik do drukarni lub serwisu w sieci (`export_to_pcbway`) albo pobiera model z internetu"

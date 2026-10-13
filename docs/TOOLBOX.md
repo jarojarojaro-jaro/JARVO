@@ -309,6 +309,26 @@ Aleo i rejestr.io (403); G2 raz przepuszcza, raz nie. Wyniki Google zabrania rob
 
 ---
 
+## Web, Wideograf, Mobile: skill `warsztat-3d`
+
+Wspólny skill (`shared/skills/warsztat-3d/`): model 3D z kodu Pythona (build123d), wymiary w mm, parametry na górze
+skryptu. `cad.py zbuduj` daje STEP (CAD, wycena), STL i 3MF (druk 3D; zestaw: osobny STL każdej części), GLB
+(strona, aplikacja, scena Three.js) i raport JSON (wymiary, objętość, masa w materiale, poprawność, części);
+`cad.py podglad` robi PNG, a `cad.py obrot` film MP4 z obracającym się modelem. Budowa idzie w osobnym venvie
+bez sieci (`cad_model.py` blokuje gniazda i `export_to_pcbway`); podgląd to strona z Three.js w Chromium z obrazu
+(`cad_render.cjs`, WebGL na CPU, każdy adres poza stroną odrzucony). Blender: na razie nie (decyzja właściciela,
+może później jako dodatek obrazu).
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| [build123d](https://github.com/gumyr/build123d) 0.13.0 | modelowanie bryłowe z kodu, eksport STEP, STL, glTF, 3MF | Apache-2.0 | `38effd3` (tag `v0.13.0`) | venv `/opt/jarvo/venvs/cad` ([`requirements-cad.txt`](../infra/python/requirements-cad.txt), sha256, `--no-deps`) |
+| [OCP](https://github.com/CadQuery/OCP) (`cadquery-ocp-novtk` 8.0.1.1.0) | jądro OpenCascade 8.0 (bryły, operacje logiczne, siatki) | Apache-2.0; OpenCascade LGPL-2.1 z wyjątkiem | `a6d078c` (tag `8.0.1.1`) | ten sam venv (~0,38 GB z 0,77 GB) |
+| [three.js](https://github.com/mrdoob/three.js) 0.186.1 | podgląd PNG i klatki filmu obrotu (GLTFLoader, RoomEnvironment, krawędzie) | MIT | `9b4a2ac` (r186) | npm w obrazie ([`package.json`](../infra/node/package.json)) |
+| Chromium + playwright-core (Node, z obrazu) | strona podglądu `cad_podglad.html` (SwiftShader) | BSD / Apache-2.0 | n/d | `cad_render.cjs` |
+| FFmpeg (z obrazu) | klatki → MP4 (H.264, yuv420p, faststart) | LGPL/GPL | n/d | `cad.py obrot` |
+
+---
+
 ## Infrastruktura (VPS)
 
 | Narzędzie | Po co | Licencja | Ostatni commit |
@@ -349,8 +369,9 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 | obraz Hermesa | `/opt/hermes` | Python 3.13 Hermesa (Debian 13; nie ruszamy), Node, `uv`, ffmpeg/ffprobe, Chromium |
 | pakiety systemowe | apt | pandoc, qpdf, ocrmypdf + tesseract (pol, eng), exiftool, jq, sqlite3, adb, GTK 3 (dla Camoufoxa), fonty z polskimi znakami |
 | przeglądarki | `/usr/local/bin/lightpanda`, `/usr/local/bin/chromium` (`CHROME_PATH`), `/opt/jarvo/camoufox` | Lightpanda dla `browser_*` agentów (agent-browser); jedna Chromium z obrazu Hermesa dla zrzutów, PDF, Lighthouse, Playwright i dembrandta; Camoufox (Firefox) tylko dla `ostrozna.py` Łowcy i Sherlocka po odmowie strony |
-| narzędzia Node | `/opt/jarvo/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt, inspo-mcp (serwer MCP Weba) |
+| narzędzia Node | `/opt/jarvo/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt, inspo-mcp (serwer MCP Weba), three (podgląd warsztatu 3D) |
 | narzędzia Pythona | venv `/opt/jarvo/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet), misaki + spaCy `en_core_web_sm` (lektor Paradee), phonemizer + espeak-ng (`espeakng-loader`, fonemy lektorów), camoufox + Playwright 1.62 (sterownik na Node z obrazu); dodatki `JARVO_EXTRAS`: rembg, auto-editor, docling, manim |
+| warsztat 3D | venv `/opt/jarvo/venvs/cad` (Python 3.12) | build123d 0.13.0 na OpenCascade 8.0 (OCP), ~0,77 GB; koła z sumami sha256 ([`requirements-cad.txt`](../infra/python/requirements-cad.txt)), build kończy się próbną częścią (STEP, STL, GLB, 3MF) |
 | claude-seo | `/opt/jarvo/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
 | sidecary | sieć `jarvo-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
 
@@ -382,6 +403,11 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
   Przegląd 2026-10-11 (decyzja właściciela): licencje (kod MIT, koło GPL-3.0-or-later), brak telemetrii i sieci w czasie
   renderu (sprawdzone bez sieci), koła przypięte sha256, wydanie 2026-10-07. Instalacja przez `uv pip install --no-config`:
   bez `[tool.uv]` Hermesa z `/opt/hermes` (jego ograniczenia paczek i okno `exclude-newer`), tylko plik z sumami,
+- warsztat 3D: osobny venv `/opt/jarvo/venvs/cad` na Pythonie 3.12 (numpy, scipy i OpenCascade nie mieszają się z venvem
+  narzędzi), `uv pip install --no-config --no-deps --require-hashes --only-binary :all: --compile-bytecode`: dokładnie lista
+  z pliku, bez sympy, mpmath, jedi i parso (build123d ich nie używa; −0,1 GB). Kod bajtowy z obrazu: start silnika ~3 s.
+  Przegląd 2026-10-13 (decyzja właściciela): licencje, brak telemetrii, sieć tylko w jawnym `export_to_pcbway` i pobieraniu
+  tekstur, zablokowane w `cad_model.py`,
 - rozpoznawanie mowy: `/opt/jarvo/bin/jarvo-stt` (Hermes: `HERMES_LOCAL_STT_COMMAND`, `stt.provider: local_command`),
 - głos floty (odpowiedzi głosem na Telegramie w trybie `/voice` i narzędzie `text_to_speech`): `jarvo-tts --plik` jako
   komenda TTS Hermesa (`tts.providers.matcha` w `profiles/_host/config.yaml`, `scripts/build.py` wstawia ją każdemu profilowi),
