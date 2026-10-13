@@ -12,8 +12,9 @@ Decyzja właściciela 2026-10-13: robimy R0, R1 i R2. R3 dopiero, gdy R2 sprawdz
 - [2. Research: co wzięliśmy, a czego nie](#2-research-co-wzięliśmy-a-czego-nie)
 - [3. Etapy i stan](#3-etapy-i-stan)
 - [4. R0: pomiar](#4-r0-pomiar)
-- [5. Koszty](#5-koszty)
-- [6. Czego nie robimy](#6-czego-nie-robimy)
+- [5. R1: doświadczenie → lekcje](#5-r1-doświadczenie--lekcje)
+- [6. Koszty](#6-koszty)
+- [7. Czego nie robimy](#7-czego-nie-robimy)
 
 ## 1. Zasady
 
@@ -59,7 +60,7 @@ są w `vendor/zrodla.yaml`, licencje w [SOURCES.md](SOURCES.md).
 | Etap | Co | Stan |
 |---|---|---|
 | R0 | pomiar: sędzia, historia, punkt odniesienia, zbiór odłożony, kanarki, powtórzenia, trend w HQ i w przeglądzie tygodnia | ✅ 2026-10-13 |
-| R1 | doświadczenie → lekcje: liczniki w księdze lekcji, poczekalnia skilli agentów, skan przy zapisie | ⬜ |
+| R1 | doświadczenie → lekcje: liczniki w księdze lekcji, poczekalnia skilli agentów, skan przy zapisie | ✅ 2026-10-13 |
 | R2 | kuźnia skilli: propozycja z nieudanych śladów, pojedynek, bramki, raport do decyzji | ⬜ |
 | R3 | workflowy zespołowe Jarva (`dispatch-playbook`) | ⬜ po R2 |
 | R4 | ewolucja skryptów z twardym sprawdzianem, z limitem kosztu | ⬜ opcjonalnie |
@@ -113,14 +114,53 @@ python3 scripts/evals-wyniki.py --wyniki … porownaj odniesienie <przebieg> --a
   z `JARVO_DATA`;
 - `--reset` stagingu kasował też historię wyników.
 
-## 5. Koszty
+## 5. R1: doświadczenie → lekcje
+
+**Gdzie:** `profiles/jarvo/scripts/lekcje.py` (księga lekcji), `profiles/jarvo/scripts/poczekalnia.py` (poczekalnia
+skilli), `skills.write_approval: true` w `config.yaml` każdego specjalisty, skille Jarva `fleet-improvement` 1.2.0
+i `weekly-review` 1.5.0, `scripts/harvest-skills.sh`.
+
+**Księga lekcji z pomiarem skutku** (za ACE: licznik „pomogło / zaszkodziło” przy każdej regule). Wpis w
+`<skarbiec>/fleet/lekcje.md` to jedna linia z polami po „ · ”: `potwierdzenia`, `karty`, `od`, `ostatnio`, opcjonalnie
+`waga` (bezpieczeństwo, pieniądze, A2), `wdrożone: <data> <commit>` i `powroty` (karty, na których błąd wrócił).
+`lekcje.py` (0 tokenów) dzieli wpisy na:
+- **gotowe** do propozycji: ≥ 3 potwierdzenia z różnych kart albo ≥ 1 przy wadze,
+- **przeterminowane**: bez potwierdzenia od 60 dni (wdrożonych nie przycinamy),
+- **wdrożone** ze skutkiem: wynik evals agenta z ostatniego pełnego przebiegu przed wdrożeniem i z pierwszego po nim;
+  zmiana ≥ +0,03 = pomogło, ≤ −0,03 = zaszkodziło, brak przebiegu po = brak pomiaru. Powroty błędu znaczą,
+  że reguła nie działa, niezależnie od evals.
+
+Przegląd tygodnia dostaje to jako `lekcje`; „zaszkodziło” albo powroty dają propozycję poprawki albo cofnięcia.
+
+**Poczekalnia skilli** (za badaniem misevolution: agenci uczący się bez bramki dopisują sobie szkodliwe skille).
+Specjaliści dalej tworzą skille po zadaniach (`creation_nudge_interval`), ale z `skills.write_approval: true` Hermes
+nie zapisuje ich od razu: każdy zapis `skill_manage` (nowy skill, poprawka, plik pomocniczy) trafia do
+`<profil>/pending/skills/<id>.json`. `validate.py` pilnuje, żeby każdy profil, który sam tworzy skille, miał bramę.
+`poczekalnia.py lista` zbiera wpisy wszystkich profili i skanuje ich treść tymi samymi wzorcami co skille zewnętrzne
+(`scripts/skan_skilli.py`: wstrzyknięcia, sekrety, pobierz-i-uruchom, ukryte znaki, groźny kod). Jarvo pokazuje je
+w przeglądzie tygodnia z odciskiem; właściciel decyduje:
+```bash
+python3 $HERMES_HOME/scripts/poczekalnia.py lista
+python3 $HERMES_HOME/scripts/poczekalnia.py zatwierdz jarvo-web 3f9c0a1b --odcisk 1a2b3c4d5e6f   # po „ok”
+python3 $HERMES_HOME/scripts/poczekalnia.py odrzuc jarvo-web 3f9c0a1b --powod "dubluje nowa-strona"
+```
+- odcisk = SHA-256 agenta, id i treści zmiany: zgoda dotyczy tej wersji, inna treść wymaga nowej zgody,
+- ustalenie skanu `high`/`critical` blokuje zatwierdzenie,
+- zatwierdzenie stosuje zmianę kodem Hermesa (to samo co `/skills approve <id>` w czacie agenta), każda decyzja
+  trafia do `<dane>/jarvo/poczekalnia.jsonl`,
+- `brama_wylaczona`: profil tworzy skille bez bramy (np. ktoś zmienił config na serwerze); wdrożenie przywraca config
+  z repo,
+- zatwierdzony skill działa na serwerze, ale repo jest źródłem prawdy: `harvest-skills.sh` pokazuje go (i wpisy
+  czekające) do przeniesienia do repo.
+
+## 6. Koszty
 
 Sędzia `claude-sonnet-5.5`: ok. 2 $ za 1 mln tokenów wejścia i 10 $ za 1 mln wyjścia (OpenRouter, 2026-10-13).
-Jedna ocena to ok. 8 tys. tokenów wejścia, czyli ok. 0,02 $. Pełny przebieg floty (194 scenariusze) z 3 powtórzeniami
+Jedna ocena to ok. 8 tys. tokenów wejścia, czyli ok. 0,02 $. Pełny przebieg floty (195 scenariuszy) z 3 powtórzeniami
 to ok. 580 ocen, ok. 12 $ za sędziego. Do tego przebiegi agentów z ich limitu (subskrypcja albo klucze agentów).
 Przebieg jednego agenta (14–39 scenariuszy × 3) to ok. 1–2,5 $ za sędziego.
 
-## 6. Czego nie robimy
+## 7. Czego nie robimy
 
 - uczenia wag (druga połowa MASS, RSI-Anything): nie mamy GPU ani własnego modelu;
 - agenta przepisującego własny kod (Darwin Gödel Machine): drogie i oszukuje pomiar;

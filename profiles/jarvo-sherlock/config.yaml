@@ -16,6 +16,7 @@ memory:
 
 skills:
   creation_nudge_interval: 20
+  write_approval: true          # nowy albo zmieniony skill czeka na zgodę właściciela (docs/RSI.md §R1, poczekalnia.py)
 
 web:
   search_backend: searxng        # SEARXNG_URL ustawia docker-compose (własny SearXNG)

@@ -84,6 +84,14 @@ def check_fleet(fleet: fl.Fleet, r: Report) -> None:
             r.err(f"profiles/{d.name}: brak wpisu w fleet.yaml")
 
 
+def check_skill_gate(name: str, cfg: dict, r: Report) -> None:
+    """Agent, który sam tworzy skille, zapisuje je do poczekalni, nie od razu do profilu (docs/RSI.md §R1)."""
+    sk = cfg.get("skills") or {}
+    if int(sk.get("creation_nudge_interval") or 0) > 0 and sk.get("write_approval") is not True:
+        r.err(f"{name}: config.yaml skills.creation_nudge_interval > 0 bez skills.write_approval: true "
+              "(skill agenta ma czekać na zgodę w poczekalni)")
+
+
 def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set[str]:
     d = a.dir
     for rel in REQUIRED_FILES:
@@ -126,6 +134,7 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         r.err(f"{a.name}: config.yaml model.default musi być tokenem @@MODEL@@ (modele zarządza fleet.yaml)")
     if "cli" not in (cfg.get("platform_toolsets") or {}):
         r.err(f"{a.name}: config.yaml bez platform_toolsets.cli (pracownicy kanbana używają cli)")
+    check_skill_gate(a.name, cfg, r)
     toolsets = cfg.get("platform_toolsets") or {}
     # czat Jarvo HQ idzie przez platformę api_server: bez wpisu Hermes daje jej domyślny zestaw (u orkiestratora
     # terminal bez kanbana), więc każdy profil ma ją jawnie, tak jak Telegram

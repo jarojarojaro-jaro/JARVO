@@ -16,7 +16,7 @@ for prof in "$DATA"/profiles/*/; do
   found=0
   while IFS= read -r skill_md; do
     dir="$(dirname "$skill_md")"
-    rel="${dir#$prof/skills/}"
+    rel="${dir#"$prof"/skills/}"
     [[ "$rel" == .* || "$rel" == */.* ]] && continue
     ref="$BUILD/profiles/$agent/skills/$rel"
     if [[ ! -d "$ref" ]]; then
@@ -32,5 +32,14 @@ for prof in "$DATA"/profiles/*/; do
       found=1
     fi
   done < <(find "$prof/skills" -name SKILL.md 2>/dev/null | sort)
+  # poczekalnia (skills.write_approval, docs/RSI.md §R1): zapisy agenta czekające na zgodę właściciela
+  for rec in "$prof"pending/skills/*.json; do
+    [[ -f "$rec" ]] || continue
+    echo "- **w poczekalni** \`$(basename "$rec" .json)\`: $(grep -o '"summary": *"[^"]*"' "$rec" | head -1 | cut -d'"' -f4 | cut -c1-120)"
+    found=1
+  done
   [[ $found -eq 0 ]] && echo "- bez zmian"
 done
+echo
+echo "Wpisy z poczekalni: przegląd i decyzja przez \`poczekalnia.py lista\` (Jarvo, skill fleet-improvement)."
+

@@ -286,7 +286,7 @@ sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh
 | evals: pomiar przed zmianą i po ([RSI.md](RSI.md) §4) | `bash scripts/evals-staging.sh --agent jarvo-web --powtorzenia 3 --ustaw-odniesienie`, potem bez `--ustaw-odniesienie`; trend: `python3 scripts/evals-wyniki.py --wyniki /srv/jarvo/staging/hermes/eval-results trend` |
 | red team (ataki promptfoo, tylko środowisko testowe) | `bash scripts/redteam.sh` albo `bash scripts/redteam.sh --filtr ads` (koszt: tokeny modeli) |
 | nowości w repo, z których bierzemy (skille, style, wzorce) | `make zrodla` (`python3 scripts/zrodla.py sprawdz`): commity od ostatniego przeglądu, nowe katalogi i skille, ⚠ zmiana licencji; spis w [`vendor/zrodla.yaml`](../vendor/zrodla.yaml). Rutyna Claude Code „Źródła Jarva” robi to w poniedziałki, środy i piątki rano i przysyła propozycje; **nic nie wdraża bez Twojej zgody**. Po przeglądzie `zrodla.py przejrzane <nazwa>` |
-| skille, które agenci zmienili sami | `bash scripts/harvest-skills.sh > harvest.md`, przegląd, przeniesienie do repo |
+| skille, które agenci zmienili sami | czekają w poczekalni ([RSI.md](RSI.md) §5): `docker exec -u hermes jarvo-hermes python3 /opt/data/profiles/jarvo/scripts/poczekalnia.py lista`, decyzja przez Jarva w przeglądzie tygodnia (`zatwierdz <agent> <id> --odcisk …` albo `odrzuc`); `bash scripts/harvest-skills.sh > harvest.md` pokazuje zatwierdzone i czekające do przeniesienia do repo |
 | skarbiec wiedzy (drugi mózg floty) | zakładka **Wiedza** (`:9119/wiedza`): graf, notatki, orzeczenia (Twoje korekty), skrzynka szkiców; ręczna kompilacja `docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/wiedza-kompiluj.sh` (`--na-sucho` = podgląd); szczegóły [WIEDZA.md](WIEDZA.md) |
 | nowy agent | lokalnie `make new-agent NAME=jarvo-x TITLE="…"`, uzupełnienie, `make validate`, status `active`, deploy |
 | stan floty | `docker exec -u hermes jarvo-hermes hermes kanban stats`, `… hermes gateway status` |
@@ -295,7 +295,7 @@ sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh
 | koszty | modele `openai-codex`: plan ChatGPT; OpenRouter → Activity (obrazy, wideo, zestaw `openrouter`; per klucz = per agent), dashboard Hermesa |
 
 Zasada: **na serwerze nic nie edytujemy ręcznie** (poza plikami env). Zmiana = commit w repo + `deploy.sh`.
-Wyjątek to skille tworzone przez agentów: zbiera je `harvest-skills.sh`.
+Wyjątek to skille tworzone przez agentów: czekają w poczekalni na Twoją zgodę, potem zbiera je `harvest-skills.sh`.
 
 ### Aktualizacje z panelu
 

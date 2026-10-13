@@ -17,6 +17,7 @@ memory:
 
 skills:
   creation_nudge_interval: 15
+  write_approval: true          # nowy albo zmieniony skill czeka na zgodę właściciela (docs/RSI.md §R1, poczekalnia.py)
   external_dirs:
     - "@@BUILD_DIR@@/profiles/jarvo-sherlock/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-web/skills"

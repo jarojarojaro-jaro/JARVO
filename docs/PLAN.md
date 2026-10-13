@@ -203,7 +203,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 11 skilli dowodzenia ([BOSS.md](BOSS.md)).
 - ✅ `jarvo-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
 - ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
-- ✅ Walidator + testy (`make validate`, `make test`, CI) + 194 scenariuszy evals.
+- ✅ Walidator + testy (`make validate`, `make test`, CI) + 195 scenariuszy evals.
 
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
@@ -260,7 +260,8 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ⬜ Wersjonowanie floty (tagi), changelog wydań.
 - 🟡 Pętla samodoskonalenia z pomiarem ([RSI.md](RSI.md), zgoda właściciela 2026-10-13): R0 pomiar evals ✅ 2026-10-13
   (sędzia z innej rodziny, historia i punkt odniesienia, zbiór odłożony, kanarki, powtórzenia, trend w HQ i w przeglądzie
-  tygodnia); ⬜ R1 lekcje z licznikami i poczekalnia skilli agentów; ⬜ R2 kuźnia skilli; ⬜ R3 workflowy Jarva (po R2).
+  tygodnia); R1 ✅ 2026-10-13 (księga lekcji z pomiarem skutku `lekcje.py`, poczekalnia skilli agentów ze skanem
+  i zgodą przypiętą do odcisku `poczekalnia.py`); ⬜ R2 kuźnia skilli; ⬜ R3 workflowy Jarva (po R2).
 - 🟡 Instalator jednym poleceniem na Linuksie, macOS i Windowsie (Docker, WSL i autostart instalowane same): plan w [INSTALER.md](INSTALER.md);
   etap 1 (Linux: pakiety, Docker Engine, polecenie `jarvo`, autostart, `uninstall`, test od zera w kontenerze) ✅ 2026-09-30;
   etap 2 (gotowy obraz amd64/arm64 w GHCR) i etap 3 (macOS: Homebrew, Colima, wolumeny, LaunchAgent) zbudowane 2026-10-09,

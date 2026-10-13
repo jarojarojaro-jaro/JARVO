@@ -19,7 +19,9 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lekcje  # noqa: E402
 import liczby  # noqa: E402  (ta sama definicja jakości co w Jarvo HQ)
+import poczekalnia  # noqa: E402
 import prosty  # noqa: E402  (prosty polski: wiadomości Jarva do właściciela)
 import raport_strona  # noqa: E402  (przegląd tygodnia jako strona w HQ)
 
@@ -99,6 +101,9 @@ def main(argv: list[str] | None = None) -> int:
         summary["prosty_polski"] = prosty.tydzien(liczby.dane_domyslne(), now, 7)
         # evals ze stagingu (docs/RSI.md): wynik, zbiór odłożony, kanarek i trend na agenta; brak przebiegów = {}
         summary["evals"] = liczby.evals(liczby.dane_domyslne() / "jarvo" / "evals" / "historia.jsonl")
+        # księga lekcji (gotowe, przeterminowane, skutek wdrożonych z evals) i poczekalnia skilli agentów (docs/RSI.md §R1)
+        summary["lekcje"] = lekcje.podsumuj(*lekcje.domyslne())
+        summary["poczekalnia"] = poczekalnia.podsumuj(liczby.dane_domyslne())
     empty = not (summary["finished"] or summary["blocked"] or summary["in_flight"])
     if args.mode == "weekly" and not args.fixture and not empty:
         try:                                    # strona z liczbami tygodnia (0 tokenów); wiadomość niesie link

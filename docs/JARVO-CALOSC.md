@@ -361,8 +361,11 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    skille i prompty bez uczenia wag, z pomiarem, bramkami i Twoją zgodą na każdą zmianę. R0 pomiar ✅ 2026-10-13:
    runner evals z sędzią innej rodziny modeli (`fleet.yaml` → `evals.judges`), powtórzeniami, zbiorem odłożonym,
    kanarkami (znacznik-pułapka w plikach evals), historią i punktem odniesienia (`scripts/evalslib.py`,
-   `scripts/evals-wyniki.py`); wyniki ze stagingu w karcie agenta w HQ i w przeglądzie tygodnia. Dalej: R1 lekcje
-   z licznikami i poczekalnia skilli agentów, R2 kuźnia skilli (propozycja, pojedynek, bramki, raport do decyzji).
+   `scripts/evals-wyniki.py`); wyniki ze stagingu w karcie agenta w HQ i w przeglądzie tygodnia. R1 lekcje ✅ 2026-10-13:
+   księga lekcji z pomiarem skutku wdrożonej reguły (pomogło / zaszkodziło z evals, `lekcje.py`) i poczekalnia skilli:
+   specjaliści mają `skills.write_approval: true`, więc skill, który agent sam sobie dopisze, czeka na Twoją zgodę,
+   skanowany tymi samymi wzorcami co skille zewnętrzne (`poczekalnia.py`, zgoda przypięta do odcisku). Dalej: R2 kuźnia
+   skilli (propozycja, pojedynek, bramki, raport do decyzji).
 5. **PageIndex (MIT, rozważane):** vectorless RAG do czytania długich dokumentów przez lokalny model
    (litellm → Hermes/GLM). Nie jako osobny agent — jako współdzielona umiejętność „czytania długich
    dokumentów”. Do decyzji: zakres (który agent najpierw) + model do indeksowania.
