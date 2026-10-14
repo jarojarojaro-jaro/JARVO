@@ -2,10 +2,10 @@
 source: "OWASP Top 10 (2021), OWASP Top 10 for LLM Applications (2025) i ASVS 4.0; checklisty „vibe-coded app security” (film i lista 30 punktów, wrzesień 2026); MDN Security headers"
 reviewed: "2026-09-30"
 ---
-# Lista kontrolna (27 + nagłówki)
+# Lista kontrolna (28 + nagłówki)
 
 Punkty 1–18: podstawa każdej aplikacji. 19–22: dane i sesje. 23–25: tylko aplikacje z funkcją AI (inaczej „n/d”).
-26: każda aplikacja z bazą. 27: każda strona ze zdjęciami. „Atak” = `security_check.py atak` na podglądzie (krok 2b skilla): dowód działania, nie
+26: każda aplikacja z bazą. 27: każda strona ze zdjęciami. 28: każda aplikacja z logowaniem. „Atak” = `security_check.py atak` na podglądzie (krok 2b skilla): dowód działania, nie
 tylko kod.
 
 | # | Punkt | Jak sprawdzić | Dobry stan |
@@ -37,4 +37,5 @@ tylko kod.
 | 25 | Model z narzędziami i SQL | lista narzędzi, konto bazy modelu | lista dozwolonych narzędzi; SQL tylko do odczytu na osobnym koncie z RLS albo przez widoki; limit kroków, czasu i kosztu; płatność, wysyłka, usuwanie tylko z potwierdzeniem człowieka |
 | 26 | Kopie zapasowe i próba odtworzenia | panel bazy (Supabase: backupy/PITR), skrypt `pg_dump` | automatyczna kopia poza serwerem aplikacji + **odtworzenie na świeżej bazie** z datą ostatniej próby (ustawia i sprawdza człowiek albo `wdrozenie`) |
 | 27 | Zdjęcia bez miejsca zrobienia (GPS) | `security_check.py repo` (pliki projektu) i `url` (zdjęcia strony, do 40) | 0 zdjęć z GPS; zdjęcia od klienta przez `images.cjs` (sharp nie kopiuje metadanych) albo `konwertuj.py --usun-metadane`; zdjęcie z GPS na produkcji: podmiana pliku i czyszczenie cache CDN |
+| 28 | Odpowiedzi zalogowanego poza cache CDN | `security_check.py url` (ciasteczko sesji w odpowiedzi, `cf-cache-status: HIT`) i atak `--sesja-a --zasob-a` (nagłówki odpowiedzi konta A) | `Cache-Control: private, no-store` na każdej odpowiedzi zależnej od użytkownika; bez `public`, `s-maxage` i `CDN-Cache-Control` z czasem; cache CDN tylko dla treści takich samych dla wszystkich. Odpowiedź z cudzą sesją podana z cache: wyczyść cache CDN i unieważnij sesje |
 | N | Nagłówki | `security_check.py url` | HTTPS + HSTS, CSP (`frame-ancestors 'none'`), nosniff, Referrer-Policy, Permissions-Policy |

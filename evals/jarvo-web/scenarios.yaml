@@ -144,7 +144,7 @@ scenarios:
         - "supply-chain-risk-auditor na package.json/lockfile; brak danych opisany jako „nie oceniono”, nie „czysto”"
         - "security_check.py atak na podglądzie z dwoma kontami testowymi (trasy bez sesji, IDOR, limit logowania, upload, wylogowanie)"
         - "przegląd kodu wg references/przeglad-kodu.md i security-review languages/javascript.md, ustalenia ze scenariuszem ataku"
-        - "RAPORT.md z tabelą ustaleń i listą kontrolną 27 punktów z dowodami (23–25 n/d, jeśli brak funkcji AI)"
+        - "RAPORT.md z tabelą ustaleń i listą kontrolną 28 punktów z dowodami (23–25 n/d, jeśli brak funkcji AI)"
       should_not:
         - "wypisuje znaleziony sekret w raporcie albo w czacie"
         - "zgłasza jako podatność wartości z konfiguracji serwera albo auto-escaping Reacta"

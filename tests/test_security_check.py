@@ -44,8 +44,10 @@ def aplikacja(dziurawa: bool):
         def do_GET(self):
             p = self.path
             if p == "/":
+                cache = ({"Set_Cookie": "sid=gosc; Path=/", "Cache_Control": "public, max-age=300"} if dziurawa
+                         else {"Set_Cookie": "sid=gosc; Path=/; Secure; HttpOnly; SameSite=Lax", "Cache_Control": "private, no-store"})
                 return self.odp(200, b'<html><script src="/assets/app.js"></script><script src="https://cdn.obca.pl/x.js">'
-                                     b'</script></html>', "text/html")
+                                     b'</script></html>', "text/html", **cache)
             if p == "/assets/app.js":
                 js = f'const a="{jwt("anon")}";' + (f'const s="{KLUCZ}";const r="{jwt("service_role")}";' if dziurawa else "")
                 js += "\n//# sourceMappingURL=app.js.map" if dziurawa else ""
@@ -59,7 +61,8 @@ def aplikacja(dziurawa: bool):
             if p == "/api/orders/1":
                 s = self.sesja()
                 if dziurawa or s == "A":
-                    return self.odp(200, b'{"id":1,"owner":"A","adres":"ul. Tajna 1"}')
+                    return self.odp(200, b'{"id":1,"owner":"A","adres":"ul. Tajna 1"}',
+                                    Cache_Control="public, s-maxage=60" if dziurawa else "private, no-store")
                 return self.odp(404 if s else 401)
             if p == "/uploads/obrazek.jpg":
                 return self.odp(200, b"<html>x</html>", "text/html")
@@ -109,6 +112,7 @@ def test_atak_finds_holes_in_vulnerable_app(capsys):
     assert "logowanie bez limitu prób" in co
     assert "serwuje go jako stronę" in co and any(x["waga"] == "KRYTYCZNE" for x in out["ustalenia"])
     assert "stara sesja działa po wylogowaniu" in co
+    assert "odpowiedź dla zalogowanego może trafić do cache CDN i do innej osoby (Cache-Control: public, s-maxage=60)" in co
     assert any("/panel" in x and "SPA" in x for x in out["nie_ocenione"])      # widok SPA to nie dziura
 
 
@@ -123,6 +127,7 @@ def test_atak_passes_correct_app(capsys):
     ok = " | ".join(out["sprawdzone"])
     assert "/api/admin bez sesji: 401" in ok and "sesją konta B: 404" in ok and "limit prób działa (429" in ok
     assert "odrzucony (415)" in ok and "po wylogowaniu stara sesja nie działa" in ok
+    assert "/api/orders/1 sesją konta A: private, no-store (poza wspólnym cache)" in ok
 
 
 def test_atak_needs_owner_consent_outside_preview():
@@ -266,3 +271,30 @@ def test_gps_in_repo_and_on_page(tmp_path, monkeypatch):
     del pliki["https://cdn.example/og.jpg"]
     assert sc.gps_na_stronie("https://a.pl", html) == [] and sc.SPRAWDZONE == ["zdjęcia bez GPS (2 sprawdzonych)"]
     assert sc.gps_na_stronie("https://a.pl", "<p>bez zdjęć</p>") == [] and "brak <img>" in sc.UWAGI[0]
+
+
+def test_cache_of_private_responses(monkeypatch, capsys):
+    assert sc.cache_wspolny({"cache-control": "private, max-age=60"}) is None
+    assert sc.cache_wspolny({"cache-control": "no-store"}) is None
+    assert sc.cache_wspolny({"cache-control": "max-age=0, must-revalidate"}) is None
+    assert sc.cache_wspolny({}) is None                                   # brak nagłówka: zależy od CDN, nie zgadujemy
+    assert sc.cache_wspolny({"cache-control": "public"}) == "Cache-Control: public"
+    assert sc.cache_wspolny({"cache-control": "s-maxage=600, stale-while-revalidate"}).startswith("Cache-Control")
+    assert sc.cache_wspolny({"cache-control": "max-age=60"}) == "Cache-Control: max-age=60"
+    # nagłówek tylko dla CDN wygrywa z private w Cache-Control (Vercel, Cloudflare)
+    assert sc.cache_wspolny({"cache-control": "private", "cdn-cache-control": "max-age=3600"}) == "cdn-cache-control: max-age=3600"
+    assert sc.z_cache({"cf-cache-status": "HIT"}) and sc.z_cache({"x-vercel-cache": "STALE"}) and sc.z_cache({"age": "12"})
+    assert not sc.z_cache({"cf-cache-status": "MISS", "age": "0"}) and not sc.z_cache({"cf-cache-status": "DYNAMIC"})
+
+    def strona(naglowki):
+        sc.SPRAWDZONE.clear()
+        monkeypatch.setattr(sc, "pobierz", lambda url, **kw: (200, naglowki, ["session=abc; Secure; HttpOnly; SameSite=Lax"],
+                                                               b"<html></html>") if url == "https://a.pl" else (404, {}, [], b""))
+        return {x["co"]: x["waga"] for x in sc.strona("https://a.pl")}
+
+    co = strona({"cache-control": "public, max-age=300"})
+    assert co["odpowiedź z ciasteczkiem sesji session może trafić do cache CDN (Cache-Control: public, max-age=300)"] == "WYSOKIE"
+    co = strona({"cache-control": "public, max-age=300", "cf-cache-status": "HIT"})
+    assert co["CDN podaje z cache odpowiedź z ciasteczkiem sesji session (każdy dostaje cudzą sesję)"] == "KRYTYCZNE"
+    co = strona({"cache-control": "private, no-store"})
+    assert not [c for c in co if "cache" in c] and "ciasteczko sesji session: odpowiedź poza wspólnym cache" in sc.SPRAWDZONE

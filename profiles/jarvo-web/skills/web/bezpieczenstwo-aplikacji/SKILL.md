@@ -1,7 +1,7 @@
 ---
 name: bezpieczenstwo-aplikacji
-description: "Bezpieczeństwo aplikacji: skan, próby, 27 punktów."
-version: 1.3.1
+description: "Bezpieczeństwo aplikacji: skan, próby, 28 punktów."
+version: 1.4.0
 author: "Jarvo (metodyka przeglądu wg anthropics/claude-code-security-review, MIT)"
 license: MIT
 metadata:
@@ -50,7 +50,8 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
    klucz `anon` Supabase i klucze Google Maps/Firebase są publiczne z założenia, liczy się ich ograniczenie;
    **publiczne mapy źródeł**: `.js.map` z `sourcesContent` odtwarza czytelny kod frontu, bo minifikacja to nie
    szyfrowanie: ŚREDNIE, a sekret w odzyskanym kodzie KRYTYCZNE; **GPS w zdjęciach strony**: do 40 zdjęć z `<img>`,
-   `srcset` i `og:image`, ŚREDNIE z linkiem do mapy, a obrazy z CSS i skryptów są w `nie_ocenione`). W `repo` także `productionBrowserSourceMaps: true`.
+   `srcset` i `og:image`, ŚREDNIE z linkiem do mapy, a obrazy z CSS i skryptów są w `nie_ocenione`; **cache CDN**: ciasteczko
+   sesji w odpowiedzi z `Cache-Control: public`/`s-maxage` WYSOKIE, a podane z cache (`cf-cache-status: HIT`) KRYTYCZNE). W `repo` także `productionBrowserSourceMaps: true`.
 2b. **Próby na działającej aplikacji** (podgląd z backendem): dwa konta testowe (A i B) zakładasz sam na podglądzie,
    ich nagłówki sesji bierzesz z odpowiedzi logowania, potem:
    ```bash
@@ -59,9 +60,10 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
      --logowanie /api/login --upload /api/upload:file --wyloguj /api/logout > out/bezpieczenstwo/atak.json
    ```
    Sprawdza: trasy bez sesji, cudzy zasób sesją konta B (IDOR), limit prób logowania (12 prób, oczekiwane 429), plik
-   HTML udający obrazek w uploadzie, sesję po wylogowaniu; `--limit <trasa>` dla innych tras. `sprawdzone` to dowody do
+   HTML udający obrazek w uploadzie, sesję po wylogowaniu, nagłówki cache odpowiedzi dla konta A (`public`/`s-maxage` to WYSOKIE:
+   CDN może podać cudze dane innej osobie); `--limit <trasa>` dla innych tras. `sprawdzone` to dowody do
    listy kontrolnej. Endpointu AI z prawdziwym modelem nie odpytujesz seryjnie (kosztuje): limit z przeglądu kodu.
-3. **Lista kontrolna** `references/lista-kontrolna.md`: 27 punktów + nagłówki (23–25 tylko przy funkcji AI). Każdy punkt: ✓ z dowodem (plik:linia,
+3. **Lista kontrolna** `references/lista-kontrolna.md`: 28 punktów + nagłówki (23–25 tylko przy funkcji AI). Każdy punkt: ✓ z dowodem (plik:linia,
    wynik polecenia) albo ✗ z poprawką, albo „n/d” z powodem (np. brak uploadu). Przepisy per stos: `references/przepisy.md`.
 4. **Przegląd kodu jak security engineer** (`references/przeglad-kodu.md`): kontekst → porównanie z wzorcami
    projektu → śledzenie danych od wejścia do operacji wrażliwych. Tylko ustalenia z pewnością ≥ 0,8 i realnym scenariuszem

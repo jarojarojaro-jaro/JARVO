@@ -150,7 +150,7 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
   do IndexNow (`indexnow.py`: Bing, Yandex i inne; klucz w `public/` od `nowa-strona`) i instrukcja Bing Webmaster Tools
   oraz Search Console dla właściciela
 - [T] `bezpieczenstwo-aplikacji`: skan kodu, strony i zależności, próby na podglądzie (`security_check.py repo|url|atak`),
-  lista 27 punktów (w tym funkcje AI, sesje, CSRF, kopie zapasowe, zdjęcia bez GPS), przegląd kodu
+  lista 28 punktów (w tym funkcje AI, sesje, CSRF, kopie zapasowe, zdjęcia bez GPS, odpowiedzi zalogowanego poza cache CDN), przegląd kodu
 
 **Narzędzia:** terminal, pliki, przeglądarka (Lightpanda, Chromium do zrzutów), Node.js, a do tego Lighthouse, axe-core,
 Playwright, sharp, favicons, dembrandt (wyciąganie brandu), linkinator, html-validate; MCP `inspo` (katalog stron

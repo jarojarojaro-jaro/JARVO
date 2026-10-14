@@ -5,13 +5,15 @@
     python3 security_check.py url https://strona.pl [--json]                 # działająca strona: nagłówki, ciasteczka, CORS,
                                                                              # wycieki, klucze w JS wysyłanym do przeglądarki,
                                                                              # publiczne mapy źródeł (.js.map z kodem),
-                                                                             # GPS w zdjęciach strony (miejsce zrobienia)
+                                                                             # GPS w zdjęciach strony (miejsce zrobienia),
+                                                                             # ciasteczko sesji w odpowiedzi dla cache CDN
     python3 security_check.py atak http://localhost:4321 [próby…] [--json]    # nieniszczące próby na działającej aplikacji
 
 `atak` (tylko nasz podgląd albo aplikacja użytkownika za jego zgodą: `--zgoda-wlasciciela`), próby wybierasz flagami:
     --chronione /api/orders /admin       trasy, które bez sesji muszą odmówić (401/403/przekierowanie na logowanie)
     --sesja-a "Cookie: sid=…" --sesja-b "Authorization: Bearer …" --zasob-a /api/orders/17
-                                         konto B nie może czytać zasobu konta A (IDOR); nagłówki kont testowych
+                                         konto B nie może czytać zasobu konta A (IDOR); nagłówki kont testowych;
+                                         odpowiedź dla konta A nie może pozwalać na cache CDN (public, s-maxage)
     --logowanie /api/login               12 szybkich prób nieistniejącym kontem: oczekiwane 429 (limit prób)
     --limit /api/search                  12 szybkich żądań GET: oczekiwane 429 (endpointu AI z prawdziwym modelem nie testuj)
     --upload /api/upload[:pole]          plik HTML udający obrazek (z sesją A): oczekiwana odmowa 4xx
@@ -339,6 +341,32 @@ def pobierz(url: str, method="GET", headers=None, timeout=15, limit=3000, dane: 
         return e.code, {k.lower(): v for k, v in e.headers.items()}, e.headers.get_all("Set-Cookie") or [], e.read(limit)
 
 
+CDN_CACHE = ("cdn-cache-control", "surrogate-control", "cloudflare-cdn-cache-control", "vercel-cdn-cache-control")
+POPRAWKA_CACHE = ("odpowiedzi zalogowanego: Cache-Control: private, no-store (Next: dynamic/cookies() bez revalidate, "
+                  "Astro SSR: nagłówek w odpowiedzi); cache CDN tylko dla treści takich samych dla wszystkich")
+
+
+def cache_wspolny(h: dict) -> str | None:
+    """Czy wspólny cache (CDN, proxy) może zapisać tę odpowiedź: zwraca nagłówek, który na to pozwala, albo None."""
+    cc = h.get("cache-control", "").lower()
+    for nag in CDN_CACHE:                                   # nagłówki tylko dla CDN wygrywają z Cache-Control
+        m = re.search(r"(?:s-)?max-age=(\d+)", h.get(nag, "").lower())
+        if m and int(m.group(1)) > 0:
+            return f"{nag}: {h[nag]}"
+    if "private" in cc or "no-store" in cc:
+        return None
+    m = re.search(r"s-maxage=(\d+)", cc) or re.search(r"max-age=(\d+)", cc)
+    if "public" in cc or (m and int(m.group(1)) > 0):
+        return f"Cache-Control: {h['cache-control']}"
+    return None
+
+
+def z_cache(h: dict) -> bool:
+    """Odpowiedź przyszła z cache CDN (trafienie), a nie z serwera aplikacji."""
+    return (h.get("cf-cache-status", "").upper() == "HIT" or h.get("x-vercel-cache", "").upper() in ("HIT", "STALE")
+            or "hit" in h.get("x-cache", "").lower() or int(h.get("age", "0") or 0) > 0)
+
+
 def rola_jwt(token: str) -> str | None:
     """Rola z JWT Supabase (anon jest publiczny z założenia, service_role nigdy)."""
     try:
@@ -617,6 +645,16 @@ def strona(url: str) -> list[dict]:
         brak = [f for f in ("Secure", "HttpOnly", "SameSite") if f.lower() not in c.lower()]
         if brak and re.search(r"(?i)sess|token|auth|sid|jwt", nazwa):
             wyn.append(u("WYSOKIE", f"ciasteczko sesji {nazwa} bez {', '.join(brak)}", base, "Set-Cookie: …; Secure; HttpOnly; SameSite=Lax"))
+    sesyjne = [c.split("=", 1)[0] for c in cookies if re.search(r"(?i)sess|token|auth|sid|jwt", c.split("=", 1)[0])]
+    if sesyjne:                                                  # ciasteczko sesji w odpowiedzi, którą może zapisać CDN
+        if z_cache(h):
+            wyn.append(u("KRYTYCZNE", f"CDN podaje z cache odpowiedź z ciasteczkiem sesji {sesyjne[0]} (każdy dostaje cudzą sesję)",
+                         base, POPRAWKA_CACHE + "; potem wyczyść cache CDN i unieważnij sesje"))
+        elif (zgoda := cache_wspolny(h)):
+            wyn.append(u("WYSOKIE", f"odpowiedź z ciasteczkiem sesji {sesyjne[0]} może trafić do cache CDN ({zgoda})", base,
+                         POPRAWKA_CACHE))
+        else:
+            SPRAWDZONE.append(f"ciasteczko sesji {sesyjne[0]}: odpowiedź poza wspólnym cache")
     st2, h2, _, _ = pobierz(base, headers={"Origin": "https://atak.example"})
     acao = h2.get("access-control-allow-origin", "")
     if acao == "https://atak.example" or (acao == "*" and h2.get("access-control-allow-credentials") == "true"):
@@ -675,10 +713,19 @@ def atak(base: str, a) -> list[dict]:
             UWAGI.append(f"{sciezka} bez sesji: {s}, nie oceniono")
 
     for sciezka in a.zasob_a or []:                                   # 2. cudzy zasób (IDOR)
-        s_a, _, _, b_a = pobierz(url(sciezka), headers=sa, limit=200000, przekierowania=False)
+        s_a, h_a, _, b_a = pobierz(url(sciezka), headers=sa, limit=200000, przekierowania=False)
         if s_a != 200:
             UWAGI.append(f"{sciezka}: konto A dostało {s_a}, a powinno widzieć własny zasób; próba IDOR pominięta")
             continue
+        zgoda = cache_wspolny(h_a)                                    # 2a. odpowiedź zalogowanego a cache CDN
+        if zgoda:
+            wyn.append(u("WYSOKIE", f"odpowiedź dla zalogowanego może trafić do cache CDN i do innej osoby ({zgoda})",
+                         url(sciezka), POPRAWKA_CACHE))
+        elif "cache-control" not in h_a:
+            wyn.append(u("NISKIE", f"odpowiedź dla zalogowanego bez Cache-Control ({sciezka})", url(sciezka),
+                         "jawnie Cache-Control: private, no-store (domyślne zachowanie CDN zależy od dostawcy)"))
+        else:
+            SPRAWDZONE.append(f"{sciezka} sesją konta A: {h_a['cache-control']} (poza wspólnym cache)")
         s_b, h_b, _, b_b = pobierz(url(sciezka), headers=sb, limit=200000, przekierowania=False)
         if s_b == 200 and b_b == b_a:
             wyn.append(u("WYSOKIE", f"konto B czyta zasób konta A ({sciezka})", url(sciezka),
