@@ -187,6 +187,24 @@ def test_host_script_contract():
     r = subprocess.run(["bash", str(REPO / "scripts" / "kuznia.sh"), "--agent", AGENT, "--skill", "../../etc", "--proponuj"],
                        capture_output=True, text=True)
     assert r.returncode == 2
+    r = subprocess.run(["bash", str(REPO / "scripts" / "kuznia.sh"), "--agent", AGENT, "--skill", SKILL, "--proponuj",
+                        "--proponujacy", "x; rm -rf /"], capture_output=True, text=True)
+    assert r.returncode == 2 and "proponującego" in r.stdout
+    assert '-e "JARVO_KUZNIA_MODEL=$PROP_MODEL"' in sh                  # nadpisanie trafia do kontenera kuźni
+
+
+def test_proposer_override(tmp_path, monkeypatch, capsys):
+    """--proponujacy (JARVO_KUZNIA_MODEL): inny proponujący na przebieg; sędzia omija jego rodzinę i rodzinę agenta."""
+    monkeypatch.setenv("JARVO_KUZNIA_MODEL", "anthropic/claude-haiku-5.5")
+    monkeypatch.setenv("JARVO_MODEL_PROVIDER", "openrouter")
+    for tier in ("FRONTIER", "STRONG", "FAST"):
+        monkeypatch.setenv(f"JARVO_MODEL_{tier}", "anthropic/claude-haiku-5.5")
+    assert k.main(["start", "--agent", AGENT, "--skill", SKILL, "--powtorzenia", "1", "--budzet", "50",
+                   "--out", str(tmp_path)]) == 0
+    meta = json.loads((tmp_path / "meta.json").read_text())
+    assert meta["proponujacy"] == "anthropic/claude-haiku-5.5" and meta["agent"] == "anthropic/claude-haiku-5.5"
+    assert meta["sedzia"] == "openai/gpt-6-luna" and meta["rozne_rodziny"]
+    assert capsys.readouterr().out.strip().splitlines()[-1] == "openai/gpt-6-luna"
 
 
 def test_proposer_configured():

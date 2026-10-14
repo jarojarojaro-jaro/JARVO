@@ -4,7 +4,9 @@
 #
 #   bash scripts/kuznia.sh --agent jarvo-web --skill web/nowa-strona --proponuj            # proponuje model (evals.proposer)
 #   bash scripts/kuznia.sh --agent jarvo-web --skill web/nowa-strona --kandydat moj.md     # własna wersja SKILL.md
-#        [--powtorzenia 3] [--budzet 5] [--bez-karty]
+#        [--powtorzenia 3] [--budzet 5] [--bez-karty] [--proponujacy <model OpenRoutera>]
+# --proponujacy zastępuje evals.proposer na ten przebieg (JARVO_KUZNIA_MODEL w kontenerze); sędzia dalej z innej
+# rodziny niż proponujący i agent.
 #
 # Kroki: start (koszt, budżet, sędzia innej rodziny niż proponujący i agent) → [kandydat własny: limity] → evals bazy
 # (obecny build, oba zbiory, powtórzenia) → [--proponuj: propozycja z porażek zbioru roboczego] → limity (przyrost
@@ -20,7 +22,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_DIR="${JARVO_COMPOSE_DIR:-/srv/jarvo/compose}"
 STAGING="${JARVO_STAGING:-/srv/jarvo/staging}"
 BUILD="${JARVO_BUILD:-/srv/jarvo/build}"
-AGENT="" SKILL="" KANDYDAT="" PROPONUJ=0 POWT=3 BUDZET=5 KARTA=1
+AGENT="" SKILL="" KANDYDAT="" PROPONUJ=0 POWT=3 BUDZET=5 KARTA=1 PROP_MODEL=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --agent) AGENT="$2"; shift 2 ;;
@@ -30,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     --powtorzenia) POWT="$2"; shift 2 ;;
     --budzet) BUDZET="$2"; shift 2 ;;
     --bez-karty) KARTA=0; shift ;;
+    --proponujacy) PROP_MODEL="$2"; shift 2 ;;
     *) echo "Nieznana opcja: $1"; exit 2 ;;
   esac
 done
@@ -37,6 +40,7 @@ done
 [[ $PROPONUJ -eq 1 || -n "$KANDYDAT" ]] || { echo "Podaj --proponuj albo --kandydat <SKILL.md>"; exit 2; }
 [[ $PROPONUJ -eq 1 && -n "$KANDYDAT" ]] && { echo "Albo --proponuj, albo --kandydat"; exit 2; }
 [[ "$AGENT" =~ ^[a-z0-9-]+$ && "$SKILL" =~ ^[a-z0-9_/-]+$ && "$SKILL" != *..* ]] || { echo "Zła nazwa agenta albo skilla"; exit 2; }
+[[ -z "$PROP_MODEL" || "$PROP_MODEL" =~ ^[A-Za-z0-9._:-]+/[A-Za-z0-9._:-]+$ ]] || { echo "Zły model proponującego: $PROP_MODEL"; exit 2; }
 [[ -f "$ROOT/profiles/$AGENT/skills/$SKILL/SKILL.md" ]] || { echo "Nie ma skilla profiles/$AGENT/skills/$SKILL"; exit 2; }
 [[ -f "$BUILD/BUILD.json" ]] || { echo "Brak buildu: najpierw scripts/deploy.sh"; exit 2; }
 
@@ -46,6 +50,7 @@ sudo install -d -m 755 -o 10000 -g 10000 "$STAGING/kuznia" "$W" "$W/build" "$W/b
 COMPOSE=(docker compose -f "$ROOT/infra/docker-compose.yml" --env-file "$COMPOSE_DIR/.env")
 PY=/opt/hermes/.venv/bin/python
 ONEOFF=(run --rm --no-deps -T --entrypoint "" -u 10000:10000 -e HOME=/tmp -v "$W:/kuznia")
+[[ -n "$PROP_MODEL" ]] && ONEOFF+=(-e "JARVO_KUZNIA_MODEL=$PROP_MODEL")   # start (wybór sędziego) i proponuj
 kuznia() { "${COMPOSE[@]}" "${ONEOFF[@]}" hermes "$PY" /opt/jarvo/repo/scripts/kuznia.py "$@"; }
 koniec() { echo "Katalog kuźni: $W"; exit "$1"; }
 

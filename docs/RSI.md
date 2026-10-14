@@ -164,8 +164,10 @@ Niczego nie wdraża: wynik to patch, raport i (przy wygranej) karta decyzji dla 
 ```bash
 bash scripts/kuznia.sh --agent jarvo-web --skill web/nowa-strona --proponuj               # poprawkę pisze model
 bash scripts/kuznia.sh --agent jarvo-web --skill web/nowa-strona --kandydat moj-SKILL.md  # własna wersja
-#     [--powtorzenia 3] [--budzet 5] [--bez-karty]
+#     [--powtorzenia 3] [--budzet 5] [--bez-karty] [--proponujacy anthropic/claude-haiku-5.5]
 ```
+`--proponujacy` zastępuje `evals.proposer` na jeden przebieg (w kontenerze `JARVO_KUZNIA_MODEL`); sędzia dalej
+pochodzi z innej rodziny niż proponujący i agent.
 1. **Start:** koszt pojedynku (scenariusze × powtórzenia × 2 przebiegi × ok. 0,02 $ za ocenę) wobec `--budzet`
    (domyślnie 5 $); sędzia z innej rodziny niż agent **i** niż proponujący (`evals.proposer`, dziś
    `openai/gpt-6.1-sol`; sędzia `anthropic/claude-sonnet-5.5`, agenci `deepseek`).
