@@ -268,7 +268,7 @@ Statyczna strona wgrywana na FTP. Ma: `.htaccess` (HSTS, CSP `frame-ancestors 'n
 nosniff, Referrer/Permissions-Policy, redirecty HTTPS i non-www, 404 dla dotfiles), `robots.txt`,
 `sitemap.xml`, `llms.txt`, `site.webmanifest`, favicon; `index.html` z canonical, JSON-LD, opisem
 130 znaków, width/height na obrazach; `app.js` bez innerHTML (DOM/DOMParser).
-Wdrożenie: `bash scripts/deploy-site.sh` (razem z instalatorami: `jarvo.pl/install.sh`, `jarvo.pl/install.ps1`). **Zostało po stronie użytkownika:** wgrać na FTP i sprawdzić
+Wdrożenie: `bash scripts/deploy-site.sh`; `jarvo.pl/install.sh` i `jarvo.pl/install.ps1` przekierowuje `.htaccess` na najnowsze instalatory z publicznego repo. **Zostało po stronie użytkownika:** wgrać na FTP i sprawdzić
 nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-security|x-frame"`.
 
 ---

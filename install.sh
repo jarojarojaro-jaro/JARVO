@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Instalator Jarvo: Linux, WSL2, macOS. Jedno polecenie ze strony:
 #
-#   curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash
+#   curl -fsSL https://jarvo.pl/install.sh | bash
+#   (jarvo.pl przekierowuje na https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh)
 #
 # Linux i WSL: sprawdza sprzęt (procesor, RAM, dysk), doinstalowuje brakujące programy (git, curl, python3,
 # openssl) menedżerem pakietów dystrybucji (apt, dnf/yum, pacman, zypper), instaluje Docker Engine
@@ -23,8 +24,8 @@
 #   JARVO_SETUP_ONLY=1           system, Docker i repo tak, floty nie uruchamiaj (potem: jarvo up)
 #   JARVO_NO_AUTOSTART=1         bez usługi systemd pomocnika aktualizacji
 #   JARVO_FORCE=1                mimo za małego RAM albo dysku
-#   JARVO_TOKEN                  klucz dostępu do prywatnego repo (token GitHub od właściciela); bez niego, gdy
-#                                repo nie da się pobrać anonimowo, instalator o niego zapyta
+#   JARVO_TOKEN                  klucz dostępu do prywatnej kopii repo (token GitHub od właściciela); publiczne
+#                                repo go nie potrzebuje, a gdy repo nie da się pobrać anonimowo, instalator zapyta
 #   JARVO_NO_OPEN=1              nie otwieraj dashboardu na końcu (jarvo update)
 #   JARVO_DRY_RUN=1              tylko pokaż, co by zrobił (nic nie instaluje)
 #
@@ -403,7 +404,7 @@ token_use() {   # klucz dostępu do prywatnego repo: nagłówek dla gita (jak ac
 token_ask() {   # repo nie daje się pobrać anonimowo: pytamy o klucz (tylko w terminalu)
   [[ -z $TOKEN && $DRY != 1 ]] || return 1
   { : < /dev/tty; } 2>/dev/null || return 1
-  warn "Nie mogę pobrać Jarvo bez klucza dostępu (repo jest prywatne)."
+  warn "Nie mogę pobrać Jarvo anonimowo (prywatna kopia repo albo brak dostępu)."
   read -rsp "Wklej klucz dostępu od właściciela (token GitHub; nie będzie widoczny): " TOKEN < /dev/tty; echo
   [[ -n $TOKEN ]] || return 1
   token_use

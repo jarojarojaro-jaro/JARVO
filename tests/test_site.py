@@ -40,6 +40,22 @@ def test_install_commands_point_at_repo_installers():
     assert "install.sh" in (REPO / "install.ps1").read_text(encoding="utf-8")
 
 
+def test_domain_installers_redirect_to_public_repo():
+    """jarvo.pl/install.sh i .ps1: przekierowanie na najnowsze instalatory z main, te same polecenia w docs."""
+    js = (SITE / "app.js").read_text(encoding="utf-8")
+    assert 'const BASE = "https://jarvo.pl"' in js
+    ht = (SITE / ".htaccess").read_text(encoding="utf-8")
+    assert re.search(r"RewriteRule \^install\\\.\(sh\|ps1\)\$ "
+                     r"https://raw\.githubusercontent\.com/jarojarojaro-jaro/JARVO/main/install\.\$1 \[R=302,L\]", ht)
+    # przekierowanie jest w bloku mod_rewrite (RewriteEngine On), a instalatorów nie wgrywamy na FTP
+    blok = ht.split("<IfModule mod_rewrite.c>")[1].split("</IfModule>")[0]
+    assert "RewriteEngine On" in blok and "install" in blok
+    assert '"$ROOT/$f"' not in (REPO / "scripts" / "deploy-site.sh").read_text(encoding="utf-8")
+    for doc in ["README.md", "docs/INSTALER.md"]:
+        t = (REPO / doc).read_text(encoding="utf-8")
+        assert "curl -fsSL https://jarvo.pl/install.sh | bash" in t and "irm https://jarvo.pl/install.ps1 | iex" in t, doc
+
+
 @pytest.mark.skipif(not shutil.which("bash"), reason="brak basha")
 @pytest.mark.parametrize("script", ["install.sh", "scripts/local-up.sh"])
 def test_shell_syntax(script):

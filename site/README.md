@@ -18,7 +18,7 @@ i `assets/` (bez `*.json`), bez `tools/` i README.
 - **Kontakt:** stała `CONTACT` na górze `app.js` (e-mail albo adres strony; pusto = zgłoszenia na GitHubie).
 - **„Start building”** pyta o system (macOS / Linux / Windows, wykrywa go sam) i daje polecenie:
   `curl … | bash` (macOS, Linux, WSL) albo `irm … | iex` (PowerShell). Instalatory to `install.sh`
-  i `install.ps1` w katalogu głównym repo. Adres instalatorów to `BASE` na górze `app.js` (dziś GitHub raw).
-  Żeby serwować je z domeny, zmień tę linię i dopisz `install.sh`, `install.ps1` do listy w `scripts/deploy-site.sh`
-  (dziś ich nie wysyła).
+  i `install.ps1` w katalogu głównym repo. Adres instalatorów to `BASE` na górze `app.js` (`https://jarvo.pl`);
+  `.htaccess` przekierowuje `install.sh` i `install.ps1` na najnowsze wersje z publicznego repo (gałąź `main`),
+  więc `scripts/deploy-site.sh` ich nie wysyła i po zmianie instalatora nic nie trzeba wgrywać.
 - Czcionki: DM Sans i JetBrains Mono (SIL OFL 1.1), serwowane lokalnie.

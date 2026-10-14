@@ -2,8 +2,8 @@
 (() => {
   // Kontakt: adres e-mail (mailto:) albo strona; pusto = zgłoszenia na GitHubie.
   const CONTACT = "";
-  // Skąd instalatory. Po podpięciu domeny wystarczy zmienić tę jedną linię (np. https://jarvo.dev).
-  const BASE = "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main";
+  // Skąd instalatory: domena, a .htaccess przekierowuje install.sh i install.ps1 na najnowsze z publicznego repo.
+  const BASE = "https://jarvo.pl";
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (s, el = document) => el.querySelector(s);
   const root = document.documentElement;

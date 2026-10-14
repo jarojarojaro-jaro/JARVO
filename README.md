@@ -30,13 +30,13 @@ Instalacja lokalna jednym poleceniem (Linux, macOS, Windows; repo do `~/jarvo`, 
 potem http://localhost:9119/base). Instalator sam doinstalowuje wszystko, czego brakuje: na Linuksie
 i w WSL pakiety i Docker Engine, na macOS Homebrew, bash, git, Pythona i Dockera w darmowej Colimie
 (działający Docker Desktop albo OrbStack zostaje), na Windowsie WSL2 (jeden restart, potem dalej sam),
-własną dystrybucję Linuksa `Jarvo` i Dockera w niej. Obraz floty pobiera gotowy z GHCR. Prywatne repo:
-instalator poprosi o klucz dostępu (`JARVO_TOKEN`). Szczegóły: [docs/INSTALER.md](docs/INSTALER.md):
+własną dystrybucję Linuksa `Jarvo` i Dockera w niej. Obraz floty pobiera gotowy z GHCR. Repo jest publiczne,
+więc nie trzeba żadnego klucza. Szczegóły: [docs/INSTALER.md](docs/INSTALER.md):
 
 ```bash
 curl -fsSL https://jarvo.pl/install.sh | bash                 # Linux, macOS (Terminal)
 # Windows (PowerShell, zwykły użytkownik):  irm https://jarvo.pl/install.ps1 | iex
-# z GitHuba (repo publiczne): https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh (i .ps1)
+# jarvo.pl przekierowuje na: https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh (i .ps1)
 # bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
 # potem:      jarvo status | logs | chat | update | down | uninstall      (jarvo help: wszystkie)
 # jarvo update = git pull + ten sam instalator (nowe programy hosta, gdy wersja Jarvo ich wymaga)

@@ -10,10 +10,6 @@
   <FilesMatch "\.(woff2|png|svg|ico)$">
     Header set Cache-Control "public, max-age=2592000"
   </FilesMatch>
-  # instalatory: zawsze najnowsza wersja
-  <FilesMatch "^install\.(sh|ps1)$">
-    Header set Cache-Control "no-cache"
-  </FilesMatch>
 </IfModule>
 
 # HTTPS i bez www
@@ -23,6 +19,9 @@
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
   RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
   RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+  # instalatory jednym poleceniem: zawsze najnowsza wersja z publicznego repo (gałąź main), bez wgrywania po każdej
+  # zmianie; curl -L, wget i irm idą za przekierowaniem, GitHub podaje text/plain; charset=utf-8
+  RewriteRule ^install\.(sh|ps1)$ https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.$1 [R=302,L]
 </IfModule>
 
 # pliki ukryte (.env, .git, …) i narzędzia nigdy nie są publiczne
@@ -32,5 +31,3 @@ Options -Indexes
 
 AddType application/manifest+json .webmanifest
 AddType text/plain .txt
-# instalatory jako tekst UTF-8 (curl | bash, irm | iex w PowerShell 5.1 czyta kodowanie z nagłówka)
-AddType "text/plain; charset=utf-8" .sh .ps1

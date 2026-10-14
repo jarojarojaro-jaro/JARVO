@@ -1,6 +1,7 @@
 # Instalator Jarvo dla Windowsa (PowerShell, zwykły użytkownik). Jedno polecenie ze strony:
 #
-#   irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
+#   irm https://jarvo.pl/install.ps1 | iex
+#   (jarvo.pl przekierowuje na https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1)
 #
 # Jarvo działa w Linuksie (WSL2) z Dockerem w środku. Skrypt robi wszystko sam, każdy krok pomija, gdy jest już
 # zrobiony (drugie uruchomienie = aktualizacja):
@@ -15,7 +16,7 @@
 #   5. autostart: po zalogowaniu do Windowsa ukryty proces trzyma dystrybucję przy życiu (systemd → Docker → flota);
 #   6. otwiera dashboard.
 #
-# Zmienne (opcjonalne): JARVO_TOKEN (klucz dostępu do prywatnego repo), JARVO_PROVIDER, JARVO_KEY, JARVO_YES=1,
+# Zmienne (opcjonalne): JARVO_TOKEN (klucz dostępu do prywatnej kopii repo; publiczne go nie potrzebuje), JARVO_PROVIDER, JARVO_KEY, JARVO_YES=1,
 # JARVO_BRANCH, JARVO_FORCE=1, JARVO_DISTRO (nazwa dystrybucji, domyślnie Jarvo), JARVO_INSTALL_BASE (skąd pobrać
 # install.sh), JARVO_UNINSTALL=1 (usuń dystrybucję Jarvo i autostart), JARVO_DRY_RUN=1 (tylko pokaż kroki).
 # Opis i decyzje: docs/INSTALER.md.
@@ -96,7 +97,7 @@ function SaveToken {
 }
 function AskToken {
   if ($Token -or $Dry -or $Yes) { return $false }
-  Warn "Nie mogę pobrać Jarvo bez klucza dostępu (repo jest prywatne)."
+  Warn "Nie mogę pobrać Jarvo anonimowo (prywatna kopia repo albo brak dostępu)."
   $s = Read-Host "Wklej klucz dostępu od właściciela (token GitHub; nie będzie widoczny)" -AsSecureString
   $script:Token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))
   return [bool]$Token

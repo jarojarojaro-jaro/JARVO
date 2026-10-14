@@ -70,9 +70,10 @@ macOS    curl -fsSL https://jarvo.pl/install.sh | bash
 Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły użytkownik)
 ```
 
-(`jarvo.pl/install.sh` i `jarvo.pl/install.ps1` wgrywa `scripts/deploy-site.sh` razem ze stroną, więc działają
-także przy prywatnym repo; z publicznym repo działa też adres z `README.md`: `…/JARVO/main/install.sh`.
-Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywatnym repo pyta o klucz dostępu.)
+(Repo jest publiczne. `jarvo.pl/install.sh` i `jarvo.pl/install.ps1` to przekierowanie w `site/.htaccess` na
+`https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh` (i `.ps1`), więc domena zawsze podaje
+najnowszy instalator z `main` bez ponownego wgrywania strony; `curl -L`, `wget` i `irm` idą za przekierowaniem.
+Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywatnej kopii repo pyta o klucz dostępu.)
 
 ### Linux (zrobione, §4a)
 1. Menedżer pakietów (`apt`, `dnf`/`yum`, `pacman`, `zypper`) doinstalowuje `git curl python3 openssl`.
@@ -196,7 +197,7 @@ Zbudowane 2026-10-09:
 - **macOS** (§3): `install.sh` z gałęzią macOS (Homebrew, Colima, rozmiar VM, wtyczka compose), `local-up.sh` z trybem
   wolumenów (`JARVO_VOLUMES`), `deploy.sh` nadaje wolumenom właściciela 10000 jednorazowym kontenerem,
   `bin/jarvo` z LaunchAgentem, `pliki` przez `docker cp`, `uninstall --all` usuwa też wolumeny.
-- **Prywatne repo:** `JARVO_TOKEN` (albo pytanie z terminala, ukryte, gdy anonimowy klon się nie uda); klucz trafia
+- **Prywatne repo** (dziś repo jest publiczne; zostaje dla prywatnych kopii): `JARVO_TOKEN` (albo pytanie z terminala, ukryte, gdy anonimowy klon się nie uda); klucz trafia
   tylko do nagłówka git w `.git/config` repo (0600) i do `docker login ghcr.io`, nigdy do logu ani na ekran.
 - **Aktualizacja:** `jarvo update` = `git pull --ff-only` + `exec bash install.sh` (nowa wersja instalatora, bez
   banera i bez otwierania przeglądarki); `sudo` tylko, gdy trzeba coś doinstalować. `install.sh` zapisuje
@@ -257,7 +258,7 @@ Na świeżym koncie użytkownika (albo maszynie wirtualnej), bez Dockera:
 |---|---|---|
 | I1 | Dane na macOS: katalog `~/jarvo-local/data` (jak dziś) czy wolumen Dockera? | **Wolumen** (bez problemów z uid), wyniki przez dashboard i `jarvo pliki` |
 | I2 | Windows: Docker Desktop czy Docker Engine w WSL? | **Engine w WSL**; istniejący Docker Desktop wykrywany i używany |
-| I3 | Obraz: budować lokalnie czy pobierać z GHCR? | **GHCR** (etap 2); wymaga publicznego pakietu w GHCR albo tokenu przy repo prywatnym |
+| I3 | Obraz: budować lokalnie czy pobierać z GHCR? | **GHCR** (etap 2); repo jest publiczne, więc pakiet `jarvo-hermes` w GHCR też ma być publiczny (bez tego instalator buduje obraz na miejscu, kilkanaście minut) |
 | I4 | Autostart po restarcie domyślnie włączony? | **Tak** (flota to usługa, jak na VPS); `jarvo autostart off` wyłącza |
 | I5 | Nazwa polecenia w terminalu | `jarvo` |
 | I6 | Kolejność | Linux → GHCR → macOS → Windows (od najpewniejszego do najtrudniejszego; Windows testujemy na Twoim komputerze) |
