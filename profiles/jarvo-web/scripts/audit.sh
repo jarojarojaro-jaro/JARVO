@@ -57,7 +57,17 @@ for ff in ["mobile", "desktop"]:
         cats = {k: round((v.get("score") or 0) * 100) for k, v in d.get("categories", {}).items()}
         audits = d.get("audits", {})
         vit = {k: audits.get(k, {}).get("displayValue") for k in ["largest-contentful-paint", "cumulative-layout-shift", "total-blocking-time", "first-contentful-paint"]}
-        summary["lighthouse"][ff] = {"scores": cats, "vitals": vit}
+        # skrypty i zasoby firm trzecich (analityka, czaty, piksele, fonty z CDN): waga i czas pracy na wątku głównym;
+        # Lighthouse 13: `third-parties-insight` (mainThreadTime), starsze: `third-party-summary` (blockingTime)
+        tpa = audits.get("third-parties-insight") or audits.get("third-party-summary") or {}
+        tp = (tpa.get("details") or {}).get("items") or []
+        nazwa = lambda e: e.get("text") if isinstance(e, dict) else e
+        firmy = sorted(({"firma": nazwa(i.get("entity")), "kb": round((i.get("transferSize") or 0) / 1024),
+                         "watek_ms": round(i.get("mainThreadTime", i.get("blockingTime")) or 0)} for i in tp),
+                       key=lambda x: (-x["watek_ms"], -x["kb"]))
+        trzecie = {"kb": sum(x["kb"] for x in firmy), "watek_ms": sum(x["watek_ms"] for x in firmy), "firmy": firmy[:5]}
+        summary["lighthouse"][ff] = {"scores": cats, "vitals": vit, "strona_kb": round((audits.get("total-byte-weight", {}).get("numericValue") or 0) / 1024),
+                                     "firmy_trzecie": trzecie}
 for key, name in [("axe", "axe.json"), ("seo", "seo.json"), ("screenshots", "screenshots/screenshots.json")]:
     f = out / name
     if f.exists():

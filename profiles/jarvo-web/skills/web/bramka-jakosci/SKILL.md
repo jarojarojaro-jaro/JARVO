@@ -1,7 +1,7 @@
 ---
 name: bramka-jakosci
 description: "Przed oddaniem strony: rubryka designu 0–100 i testy wrogie."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo (rubryka i werdykt na bazie oh-my-hermes, MIT)"
 license: MIT
 metadata:
@@ -34,7 +34,8 @@ u seniora product designu (klasa Linear / Stripe / Supabase). **Technicznie czys
 2. **Zrzuty.** `node $HERMES_HOME/scripts/screenshots.cjs <url> out/jakosc/runda-N --full` (375/768/1440) plus stany:
    hover, fokus (Tab), formularz z błędem, pusty stan, jeśli strona je ma. Ocena bez świeżych zrzutów nie istnieje.
 3. **Testy wrogie.** `node $HERMES_HOME/scripts/hostile.cjs <url> out/jakosc/wrogie` → `hostile.json`
-   (wolne łącze, brak JS, 320 px, sama klawiatura, długie polskie słowa, reduced motion, konsola).
+   (wolne łącze, słaby telefon: procesor 4× wolniejszy i 4G z klikaniem menu, przycisków i formularza, reakcja
+   ≤ 200 ms jak INP; brak JS, 320 px, sama klawiatura, długie polskie słowa, reduced motion, konsola).
    `offline` (zasoby z innych serwerów) liczy się, gdy DoD mówi „offline”, „jeden plik” albo „bez zależności
    zewnętrznych”. Scenariusz z `not_run` to brak pomiaru, nie zaliczenie.
    **Znaki AI (bez modelu):** `sh $HERMES_HOME/skills/design/impeccable/scripts/impeccable detect <katalog|url> --json`

@@ -143,7 +143,8 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
   (nieruchomości, gabinety, salony, kancelarie…) własna baza w skarbcu `inspiracje/strony/<branża>/`; wnioski w PLAN.md
 - [T] `nowa-strona`: od briefu do wdrożenia (domyślny stack: Astro dla stron marketingowych)
 - [T] `bramka-jakosci`: rubryka designu 10 osi (wynik 0–100, zaliczenie od 90, rundy poprawek) i testy wrogie
-  (`hostile.cjs`: wolne łącze, brak JS, 320 px, klawiatura, długie polskie słowa, reduced motion, zasoby zewnętrzne)
+  (`hostile.cjs`: wolne łącze, słaby telefon z klikaniem i czasem reakcji jak INP, brak JS, 320 px, klawiatura, długie
+  polskie słowa, reduced motion, zasoby zewnętrzne)
 - [T] `landing-produktowy`: strona nowego produktu pod SEO (research słów kluczowych od `jarvo-sherlock`, jeśli trzeba)
 - [T] `favicon-i-meta`: generowanie kompletu ikon, manifestu i meta z jednego logo
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`

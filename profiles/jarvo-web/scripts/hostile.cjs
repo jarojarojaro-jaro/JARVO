@@ -13,6 +13,9 @@
  *   longwords   długie polskie słowa i pełne diakrytyki w nagłówkach i akapitach: czy tekst nie wychodzi poza ekran
  *   reducedmotion  prefers-reduced-motion: czy animacje CSS się wyłączają
  *   console     błędy konsoli i nieudane żądania przy zwykłym wejściu (375 px)
+ *   lowend      słaby telefon w działaniu: procesor 4× wolniejszy, 4G (150 ms, 1,6 Mb/s), 375 px; klika menu, przyciski,
+ *               kotwice, rozwijane sekcje i pisze w polu formularza (bez przechodzenia na inne strony i bez wysyłki),
+ *               mierzy czas reakcji każdej interakcji (Event Timing, jak INP) i długie zadania; porażka: INP > 200 ms
  *
  * Używa playwright-core z Chromium z obrazu (jak screenshots.cjs). Wynik: <outdir>/hostile.json + zrzuty.
  * Strony nie zmienia (longwords podmienia tekst tylko w kopii w przeglądarce).
@@ -21,7 +24,8 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright-core');
 
-const ALL = ['console', 'slow3g', 'offline', 'nojs', 'zoom200', 'keyboard', 'longwords', 'reducedmotion'];
+const ALL = ['console', 'slow3g', 'lowend', 'offline', 'nojs', 'zoom200', 'keyboard', 'longwords', 'reducedmotion'];
+const INP_GOOD = 200;   // ms: próg „dobry” Core Web Vitals
 const LONG_WORD = 'Konstantynopolitańczykowianeczka';
 const DIACRITICS = 'Zażółć gęślą jaźń. ŻÓŁĆ GĘŚLĄ JAŹŃ.';
 
@@ -96,6 +100,78 @@ async function run(browser, name, url, outdir) {
     r.observed = { dom_ready_ms: dcl, text_visible_ms: firstText };
     r.pass = firstText !== null && firstText < 8000;
     r.broken = r.pass ? '' : 'na wolnym łączu treść nie pojawia się w 8 s (blokujące skrypty, fonty bez fallbacku, ciężki hero)';
+    await page.close();
+  } else if (name === 'lowend') {
+    const page = await browser.newPage({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Network.enable');
+    await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 1.6 * 1024 * 1024 / 8, uploadThroughput: 750 * 1024 / 8 });
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    // Event Timing (to samo źródło co INP) i długie zadania, zbierane od pierwszego bajtu strony
+    await page.addInitScript(() => {
+      window.__jarvoEv = []; window.__jarvoLong = [];
+      try {
+        new PerformanceObserver((l) => l.getEntries().forEach((e) => window.__jarvoEv.push({ name: e.name, d: Math.round(e.duration), id: e.interactionId || 0,
+          target: e.target ? e.target.tagName.toLowerCase() + (e.target.id ? '#' + e.target.id : '') : '' })))
+          .observe({ type: 'event', buffered: true, durationThreshold: 16 });
+        new PerformanceObserver((l) => l.getEntries().forEach((e) => window.__jarvoLong.push(Math.round(e.duration)))).observe({ type: 'longtask', buffered: true });
+      } catch (e) { window.__jarvoEv = null; }
+    });
+    // klikamy tylko to, co zostaje na tej stronie: przechodzenie gdzie indziej i wysyłka formularza są zablokowane
+    let zaladowana = false;                           // pierwsze wejście (z przekierowaniami) przechodzi zawsze
+    await page.route('**/*', (route) => {
+      const q = route.request();
+      if (zaladowana && q.isNavigationRequest() && q.frame() === page.mainFrame()) return route.abort();
+      if (q.method() !== 'GET') return route.abort();
+      return route.continue();
+    });
+    const t0 = Date.now();
+    await page.goto(url, { waitUntil: 'load', timeout: 90000 });
+    const loadMs = Date.now() - t0;
+    zaladowana = true;
+    if (await page.evaluate(() => window.__jarvoEv === null)) throw new Error('Chromium bez Event Timing: brak pomiaru');
+    const cele = await page.evaluate(() => {
+      const widoczny = (el) => { const b = el.getBoundingClientRect(); const s = getComputedStyle(el); return b.width > 0 && b.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+      const sel = ['button[aria-expanded]', '[aria-controls]', 'summary', 'a[href^="#"]:not([href="#"])', '[role="tab"]',
+        'button:not([type="submit"])', 'input[type="text"], input[type="email"], input[type="search"], input:not([type]), textarea'];
+      const out = [];
+      for (const s of sel) {
+        for (const el of document.querySelectorAll(s)) {
+          if (out.length >= 8 || !widoczny(el) || el.closest('[aria-hidden="true"]')) continue;
+          if (out.some((o) => o.el === el)) continue;
+          el.setAttribute('data-jarvo-cel', String(out.length));
+          out.push({ el, pisz: el.matches('input, textarea') });
+        }
+      }
+      return out.map((o, i) => ({ i, pisz: o.pisz, opis: o.el.tagName.toLowerCase() + ':' + (o.el.getAttribute('aria-label') || o.el.textContent || o.el.getAttribute('name') || '').trim().slice(0, 30) }));
+    });
+    const klikniete = [];
+    for (const c of cele) {
+      const loc = page.locator(`[data-jarvo-cel="${c.i}"]`);
+      try {
+        if (c.pisz) { await loc.click({ timeout: 3000 }); await loc.pressSequentially('Zażółć', { delay: 60 }); }
+        else await loc.click({ timeout: 3000 });
+        klikniete.push(c.opis);
+        await page.waitForTimeout(400);
+      } catch (e) { /* element zasłonięty albo zniknął po poprzednim kliknięciu: pomijamy */ }
+    }
+    await page.waitForTimeout(800);
+    await shot(page);
+    const m = await page.evaluate(() => ({ ev: window.__jarvoEv || [], longt: window.__jarvoLong || [] }));
+    const wgId = {};
+    m.ev.filter((e) => e.id).forEach((e) => { if (!wgId[e.id] || e.d > wgId[e.id].d) wgId[e.id] = e; });
+    const inter = Object.values(wgId).sort((a, b) => b.d - a.d);
+    const inp = inter.length ? inter[0].d : null;
+    r.observed = { cpu_slowdown: 4, network: '4G (150 ms, 1,6 Mb/s)', load_ms: loadMs, clicked: klikniete, interactions: inter.length,
+      inp_ms: inp, slowest: inter.slice(0, 5).map((e) => `${e.name} ${e.target} ${e.d} ms`),
+      long_tasks: m.longt.length, long_tasks_ms: m.longt.reduce((a, b) => a + b, 0) };
+    if (!cele.length || !inter.length) {
+      r.pass = true;
+      r.observed.note = cele.length ? 'kliknięcia nie dały pomiaru (brak reakcji JS)' : 'brak elementów do kliknięcia na tej stronie (strona bez interakcji)';
+    } else {
+      r.pass = inp <= INP_GOOD;
+    }
+    r.broken = r.pass ? '' : `na słabym telefonie reakcja na kliknięcie trwa ${inp} ms (> ${INP_GOOD} ms): ciężki JS przy interakcji, długie zadania, hydratacja całej strony`;
     await page.close();
   } else if (name === 'offline') {
     // „działa offline / jako jeden plik”: strona nie może niczego ciągnąć z innych serwerów (CDN, fonty, skrypty)

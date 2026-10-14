@@ -16,8 +16,8 @@
 - Nowa strona / landing bez werdyktu `bramka-jakosci` albo z ostatnią rundą < 90 (sędzia ocenia sam tą samą
   rubryką w rundzie 1: hierarchia, typografia, rytm odstępów, kolory, stany, coś własnego, ruch z umiarem,
   polski tekst, bez domyślnego gustu modelu, wybrane a nie odziedziczone; start 100, −8 za oś 1–5, −5 za 6–10).
-- Porażka testu wrogiego (`out/jakosc/wrogie/hostile.json`: konsola, brak JS, 320 px, klawiatura, długie słowa,
-  reduced motion) bez wyjaśnienia; `offline` (zasoby z innych serwerów) blokuje, gdy DoD mówi „offline”,
+- Porażka testu wrogiego (`out/jakosc/wrogie/hostile.json`: konsola, słaby telefon (INP > 200 ms przy procesorze 4× wolniejszym), brak JS, 320 px, klawiatura,
+  długie słowa, reduced motion) bez wyjaśnienia; `offline` (zasoby z innych serwerów) blokuje, gdy DoD mówi „offline”,
   „jeden plik” albo „bez zależności zewnętrznych”.
 
 ## Ważne
