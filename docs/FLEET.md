@@ -136,7 +136,8 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
 - [T] `brand-z-url`: podajesz stronę, a agent crawluje ją i wyciąga logo, kolory, fonty,
   ton i komponenty do `knowledge/brands/<marka>/` (z `DESIGN.md`)
 - [T] `audyt-strony`: Lighthouse, dostępność (axe), SEO, obrazy i responsywność (zrzuty na kilku
-  szerokościach), wynik jako raport z priorytetami
+  szerokościach), wynik jako raport z priorytetami; aplikacja z bazą i API: lista wydajności backendu (11 punktów:
+  indeksy, polityki RLS, N+1, stronicowanie, praca w tle, region serwera przy bazie, cache, strumień odpowiedzi AI)
 - [T] `inspiracje-stron`: przed projektem 3–5 stron referencyjnych z branży klienta: katalog Inspo (MCP `inspo`,
   832 prawdziwe strony ze zrzutami, paletą i układem) według mapy polskich branż, a dla branż słabo pokrytych
   (nieruchomości, gabinety, salony, kancelarie…) własna baza w skarbcu `inspiracje/strony/<branża>/`; wnioski w PLAN.md

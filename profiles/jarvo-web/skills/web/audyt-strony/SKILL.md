@@ -1,7 +1,7 @@
 ---
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
-version: 1.2.1
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A0
-    reviewed: "2026-10-05"
+    reviewed: "2026-10-14"
 ---
 
 # Audyt strony
@@ -34,6 +34,9 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
    Odporność: `node $HERMES_HOME/scripts/hostile.cjs <url> out/audyt/wrogie` (wolne łącze, brak JS, 320 px,
    klawiatura, długie polskie słowa, reduced motion, konsola); porażki trafiają do priorytetów jak inne problemy.
    Karta prosi o ocenę designu → dodaj werdykt z `bramka-jakosci` (bez pętli poprawek: audyt nie zmienia strony).
+   **Aplikacja z backendem** (logowanie, baza, API): lista `references/wydajnosc-aplikacji.md` (11 punktów: indeksy,
+   polityki RLS, N+1, stronicowanie, zapytania równolegle, praca w tle, region serwera przy bazie, cache, treść
+   z serwera, szkielety, strumień odpowiedzi AI) z kodem w ręku i `security_check.py repo` (wolne polityki RLS w `*.sql`).
 3. **Priorytety:**
    - **P0**: blokuje użytkowników albo indeksowanie (noindex przez pomyłkę, błędy 5xx, brak mobile, formularz nie działa),
    - **P1**: duży wpływ (LCP > 4 s, CLS > 0,25, brak title/description na kluczowych stronach, krytyczne a11y),
@@ -47,7 +50,8 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
 - [ ] lista naruszeń axe pogrupowana (krytyczne/poważne),
 - [ ] martwe linki (albo „brak”),
 - [ ] każdy problem ma dowód i konkretną poprawkę,
-- [ ] priorytety P0–P3 i top 3 na górze.
+- [ ] priorytety P0–P3 i top 3 na górze,
+- [ ] aplikacja z backendem: sekcja „Wydajność backendu” z 11 punktami (✓ z dowodem, ✗ z poprawką, n/d z powodem).
 
 ## Uwagi
 - Audytujesz **tylko** wskazane strony. Gdy karta prosi o całą witrynę: weź URL-e z `sitemap.xml`, wybierz

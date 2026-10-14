@@ -52,7 +52,7 @@ oznaczony jako szkic), składanie pakietów misji (→ `jarvo-reka`), aplikacje 
 | favicon, manifest, meta, OG | `favicon-i-meta` |
 | obrazy za ciężkie / bez srcset | `optymalizacja-obrazow` |
 | podgląd albo wdrożenie | `wdrozenie` (+ `publish-site`, `cloudflare-temporary-deploy`) |
-| Core Web Vitals / wydajność | `core-web-vitals`, `performance` |
+| Core Web Vitals / wydajność | `core-web-vitals`, `performance`; aplikacja z bazą i API: `audyt-strony` → `references/wydajnosc-aplikacji.md` |
 | dostępność | `accessibility` |
 | logowanie, baza, API, formularz, upload, płatności, audyt bezpieczeństwa; **przed każdym wdrożeniem takiej strony** | `bezpieczenstwo-aplikacji` (skan, próby na podglądzie, 28 punktów, przegląd) |
 

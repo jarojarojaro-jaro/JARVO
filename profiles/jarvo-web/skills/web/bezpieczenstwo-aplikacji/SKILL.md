@@ -1,7 +1,7 @@
 ---
 name: bezpieczenstwo-aplikacji
 description: "Bezpieczeństwo aplikacji: skan, próby, 28 punktów."
-version: 1.4.0
+version: 1.4.1
 author: "Jarvo (metodyka przeglądu wg anthropics/claude-code-security-review, MIT)"
 license: MIT
 metadata:
@@ -32,7 +32,8 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
    SQL sklejany z danych, eval, HTML bez oczyszczenia, sekret w zmiennej publicznej frontu, CORS *, debug; niebezpieczne
    ustawienia domyślne: sekret z wartością zapasową, zabezpieczenie wyłączone przy braku konfiguracji, TLS bez weryfikacji,
    JWT bez podpisu, domyślne hasło, stos błędu w odpowiedzi, introspekcja GraphQL, uprawnienia 777/public-read),
-   **zdjęcia z GPS** w plikach projektu (miejsce zrobienia, często dom właściciela) oraz
+   **zdjęcia z GPS** w plikach projektu (miejsce zrobienia, często dom właściciela), wolne polityki RLS w `*.sql`
+   (`auth.uid()` bez `select`, NISKIE; wydajność, nie dziura) oraz
    **zależności z rejestru** (npm, PyPI): nieistniejąca nazwa (zmyślona przez model), różna jedną literą od popularnej,
    nowa i mało używana. `nie_ocenione` w wyniku to „nie sprawdzono”, nigdy „czysto”.
    KRYTYCZNE (sekret) → najpierw **unieważnij klucz** u dostawcy, potem usuń z kodu i historii. Samo usunięcie nie wystarcza.

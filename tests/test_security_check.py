@@ -298,3 +298,17 @@ def test_cache_of_private_responses(monkeypatch, capsys):
     assert co["CDN podaje z cache odpowiedź z ciasteczkiem sesji session (każdy dostaje cudzą sesję)"] == "KRYTYCZNE"
     co = strona({"cache-control": "private, no-store"})
     assert not [c for c in co if "cache" in c] and "ciasteczko sesji session: odpowiedź poza wspólnym cache" in sc.SPRAWDZONE
+
+
+def test_rls_policies_in_sql(tmp_path):
+    m = tmp_path / "supabase" / "migrations"
+    m.mkdir(parents=True)
+    (m / "001_zle.sql").write_text("create table orders (id bigint, user_id uuid);\nalter table orders enable row level security;\n"
+                                   "create policy wlasne on orders for select to authenticated\n  using (auth.uid() = user_id);\n"
+                                   "create policy rola on orders using (auth.jwt() ->> 'role' = 'admin');\n")
+    (m / "002_dobre.sql").write_text("create policy wlasne on notes for select to authenticated\n  using ((select auth.uid()) = user_id);\n"
+                                     "create index on notes (user_id);\n")
+    (m / "003_bez_polityk.sql").write_text("select auth.uid();\n")                # funkcja, nie polityka
+    wyn = sc.rls_w_sql(tmp_path)
+    assert [(x["waga"], x["gdzie"]) for x in wyn] == [("NISKIE", "supabase/migrations/001_zle.sql:4")]
+    assert "2× w pliku" in wyn[0]["co"] and "(select auth.uid())" in wyn[0]["poprawka"]

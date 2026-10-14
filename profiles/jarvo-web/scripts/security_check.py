@@ -2,6 +2,7 @@
 """Automatyczne sprawdzenia bezpieczeństwa strony/aplikacji (część mechaniczna skilla bezpieczenstwo-aplikacji).
 
     python3 security_check.py repo <katalog projektu> [--offline] [--json]   # kod: sekrety, .env w gicie, zależności, wzorce ryzyka
+                                                                             # i polityki RLS w *.sql (auth.uid() bez select)
     python3 security_check.py url https://strona.pl [--json]                 # działająca strona: nagłówki, ciasteczka, CORS,
                                                                              # wycieki, klucze w JS wysyłanym do przeglądarki,
                                                                              # publiczne mapy źródeł (.js.map z kodem),
@@ -261,6 +262,28 @@ def _json_z(url: str, timeout=10):
         return e.code, None
     except (urllib.error.URLError, TimeoutError, OSError, ValueError):
         return 0, None
+
+
+AUTH_W_POLITYCE = re.compile(r"(?i)\bauth\.(uid|jwt|role)\(\)")
+
+
+def rls_w_sql(root: Path) -> list[dict]:
+    """Polityki RLS w migracjach SQL: `auth.uid()` bez `select` liczy się dla każdego wiersza (wydajność, Supabase
+    Advisor `auth_rls_initplan`). Jedno ustalenie na plik, z numerem pierwszej linii."""
+    wyn = []
+    for p in pliki(root):
+        if p.suffix.lower() != ".sql":
+            continue
+        txt = p.read_text(encoding="utf-8", errors="ignore")
+        if not re.search(r"(?i)create\s+policy|alter\s+policy", txt):
+            continue
+        zle = [m for m in AUTH_W_POLITYCE.finditer(txt) if not re.search(r"(?i)\(\s*select\s+$", txt[max(0, m.start() - 20):m.start()])]
+        if zle:
+            m = zle[0]
+            wyn.append(u("NISKIE", f"polityka RLS liczy auth.{m.group(1)}() dla każdego wiersza ({len(zle)}× w pliku; wydajność)",
+                         f"{p.relative_to(root)}:{txt.count(chr(10), 0, m.start()) + 1}",
+                         f"(select auth.{m.group(1)}()) zamiast auth.{m.group(1)}() i indeks na kolumnie z polityki (np. user_id)"))
+    return wyn
 
 
 def pakiet(eko: str, nazwa: str) -> dict:
@@ -826,7 +849,7 @@ def main(argv=None) -> int:
               "po zgodzie właściciela aplikacji", file=sys.stderr)
         return 2
     if a.tryb == "repo":
-        wyn = repo(Path(a.cel)) + gps_w_repo(Path(a.cel)) + ([] if a.offline else zaleznosci(Path(a.cel)))
+        wyn = repo(Path(a.cel)) + rls_w_sql(Path(a.cel)) + gps_w_repo(Path(a.cel)) + ([] if a.offline else zaleznosci(Path(a.cel)))
     else:
         wyn = strona(a.cel) if a.tryb == "url" else atak(a.cel, a)
     wyn.sort(key=lambda x: WAGI.index(x["waga"]))
