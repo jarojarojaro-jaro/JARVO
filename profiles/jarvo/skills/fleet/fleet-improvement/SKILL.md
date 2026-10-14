@@ -1,7 +1,7 @@
 ---
 name: fleet-improvement
 description: "Ulepszanie floty: z błędów recenzji zrób zmiany w skillach."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -69,6 +69,17 @@ co skille zewnętrzne, odcisk każdej wersji, wiek wpisu).
 4. Zatwierdzony skill działa na serwerze, ale repo jest źródłem prawdy: dopisz go do propozycji przeniesienia do repo
    (`harvest-skills.sh` pokaże go jako nowy), inaczej zniknie przy przebudowie profilu.
 - `brama_wylaczona` w liście = profil zapisuje skille z pominięciem poczekalni: zgłoś to właścicielowi od razu.
+
+## Kuźnia skilli (pomiar poprawki przed decyzją)
+Gdy propozycja dotyczy jednego skilla specjalisty, a agent ma evals, zaproponuj właścicielowi sprawdzenie jej w kuźni
+zamiast wdrażania na wiarę: `bash scripts/kuznia.sh --agent <agent> --skill <kategoria/skill> --proponuj` (albo
+`--kandydat` z Twoim tekstem) uruchamia na stagingu on, nie Ty; koszt ok. 2–5 $ za sędziego (docs/RSI.md §6).
+Kuźnia porównuje poprawkę z obecną wersją w evals i przepuszcza ją tylko przez komplet bramek.
+- Karta „Kuźnia: <agent> / <skill>, decyzja” czeka na właściciela w HQ (raport i patch w `/opt/data/jarvo/kuznia/<id>/`).
+  Po jego odpowiedzi: „ok” → wpis w księdze lekcji z odnośnikiem do raportu (`· kuźnia: <id>`) i przypomnienie, że
+  patch wchodzi do repo i wdrożenia jak każda zmiana; „nie” → powód w księdze. Patcha nie stosujesz sam.
+- Raport z werdyktem „odrzucony” albo „bez pomiaru” nie jest dowodem przeciw lekcji: mówi tylko, że ta poprawka
+  nie przeszła bramek.
 
 ## Wdrożenie (A2)
 1. Użytkownik zatwierdza propozycję.

@@ -143,7 +143,7 @@ Rekomendacje:
 │   ├── hermes/           # → /opt/data: profile, pamięć, sesje, kanban.db, cron
 │   │   └── jarvo/         # missions/ (dziennik misji), workspaces/<agent>/, knowledge/ (skarbiec wiedzy: notatki, brand kity, USER.md), state/
 │   ├── valkey/  uptime-kuma/  beszel/
-├── staging/              # izolowane dane do evals (scripts/evals-staging.sh)
+├── staging/              # izolowane dane do evals (scripts/evals-staging.sh) i kuźni skilli (kuznia/<id>/, scripts/kuznia.sh)
 └── backups/              # staging kopii SQLite, logi backupu i testu odtworzenia
 ```
 
@@ -250,7 +250,9 @@ laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: s
 osobnym katalogu danych (`/srv/jarvo/staging`) i bez gatewaya, więc scenariusze evals nie ruszają produkcyjnej
 tablicy ani Telegrama. Na macOS (wolumeny) skrypt nadpisuje też `JARVO_VOL_HERMES`, żeby staging nie podpiął
 wolumenu produkcji. Historia wyników (`eval-results/`) przeżywa `--reset`, a po przebiegu trafia do działającej floty
-(`/opt/data/jarvo/evals`: HQ i przegląd tygodnia, [RSI.md](RSI.md) §4). Osobny bot testowy dojdzie, gdy będziemy
+(`/opt/data/jarvo/evals`: HQ i przegląd tygodnia, [RSI.md](RSI.md) §4). Kuźnia skilli (`scripts/kuznia.sh`, [RSI.md](RSI.md) §6)
+używa tego samego mechanizmu na własnych katalogach `/srv/jarvo/staging/kuznia/<id>/` (`--bez-publikacji`: jej przebiegi
+nie trafiają do historii floty). Osobny bot testowy dojdzie, gdy będziemy
 testować routing Telegrama przed zmianą tras.
 
 **Wersje:** Hermes przypięty w repo do tagu i digestu (`ARG HERMES_IMAGE` w `infra/Dockerfile`; ta sama wartość

@@ -13,8 +13,9 @@ Decyzja właściciela 2026-10-13: robimy R0, R1 i R2. R3 dopiero, gdy R2 sprawdz
 - [3. Etapy i stan](#3-etapy-i-stan)
 - [4. R0: pomiar](#4-r0-pomiar)
 - [5. R1: doświadczenie → lekcje](#5-r1-doświadczenie--lekcje)
-- [6. Koszty](#6-koszty)
-- [7. Czego nie robimy](#7-czego-nie-robimy)
+- [6. R2: kuźnia skilli](#6-r2-kuźnia-skilli)
+- [7. Koszty](#7-koszty)
+- [8. Czego nie robimy](#8-czego-nie-robimy)
 
 ## 1. Zasady
 
@@ -61,7 +62,7 @@ są w `vendor/zrodla.yaml`, licencje w [SOURCES.md](SOURCES.md).
 |---|---|---|
 | R0 | pomiar: sędzia, historia, punkt odniesienia, zbiór odłożony, kanarki, powtórzenia, trend w HQ i w przeglądzie tygodnia | ✅ 2026-10-13 |
 | R1 | doświadczenie → lekcje: liczniki w księdze lekcji, poczekalnia skilli agentów, skan przy zapisie | ✅ 2026-10-13 |
-| R2 | kuźnia skilli: propozycja z nieudanych śladów, pojedynek, bramki, raport do decyzji | ⬜ |
+| R2 | kuźnia skilli: propozycja z nieudanych śladów, pojedynek, bramki, raport do decyzji | ✅ 2026-10-13 |
 | R3 | workflowy zespołowe Jarva (`dispatch-playbook`) | ⬜ po R2 |
 | R4 | ewolucja skryptów z twardym sprawdzianem, z limitem kosztu | ⬜ opcjonalnie |
 
@@ -153,14 +154,53 @@ python3 $HERMES_HOME/scripts/poczekalnia.py odrzuc jarvo-web 3f9c0a1b --powod "d
 - zatwierdzony skill działa na serwerze, ale repo jest źródłem prawdy: `harvest-skills.sh` pokazuje go (i wpisy
   czekające) do przeniesienia do repo.
 
-## 6. Koszty
+## 6. R2: kuźnia skilli
+
+**Gdzie:** `scripts/kuznia.sh` (host: prowadzi całość na stagingu), `scripts/kuznia.py` (kroki w kontenerze:
+start, proponuj, sprawdz, ocen), `fleet.yaml` → `evals.proposer`, `scripts/evals-staging.sh --bez-publikacji`.
+
+Kuźnia bierze **jeden skill jednego agenta**, robi jego poprawioną wersję i sprawdza ją w pojedynku z obecną.
+Niczego nie wdraża: wynik to patch, raport i (przy wygranej) karta decyzji dla Ciebie.
+```bash
+bash scripts/kuznia.sh --agent jarvo-web --skill web/nowa-strona --proponuj               # poprawkę pisze model
+bash scripts/kuznia.sh --agent jarvo-web --skill web/nowa-strona --kandydat moj-SKILL.md  # własna wersja
+#     [--powtorzenia 3] [--budzet 5] [--bez-karty]
+```
+1. **Start:** koszt pojedynku (scenariusze × powtórzenia × 2 przebiegi × ok. 0,02 $ za ocenę) wobec `--budzet`
+   (domyślnie 5 $); sędzia z innej rodziny niż agent **i** niż proponujący (`evals.proposer`, dziś
+   `openai/gpt-6.1-sol`; sędzia `anthropic/claude-sonnet-5.5`, agenci `deepseek`).
+2. **Evals bazy:** obecny build, oba zbiory, `--powtorzenia` (domyślnie 3), na osobnych danych stagingu.
+3. **Propozycja** (`--proponuj`): proponujący to zwykłe wywołanie modelu bez narzędzi. Dostaje obecny SKILL.md,
+   lekcje agenta z księgi i do 8 porażek **wyłącznie ze zbioru roboczego** (wejście, oczekiwania, odpowiedź agenta,
+   uwagi sędziego). Zbioru odłożonego i kanarków nie widzi, więc nie może się pod nie nauczyć.
+4. **Limity, zanim wydamy cokolwiek na evals kandydata:** zmiana niepusta; ta sama nazwa skilla; tekst najwyżej
+   o 20% dłuższy (krótki skill: +300 znaków); bez odwołań do evals, scenariuszy i kanarków; bez dosłownych
+   fragmentów scenariuszy (≥ 60 znaków, uczenie pod test); skan `skan_skilli.py` bez high/critical.
+5. **Build kandydata:** ten sam `build.py` co wdrożenie, z podmienionym jednym plikiem SKILL.md (montowanym tylko
+   do odczytu); kuźnia sprawdza, że podmiana naprawdę weszła do buildu.
+6. **Evals kandydata:** jak baza, z tym samym sędzią. Wyniki obu przebiegów zostają w katalogu kuźni i **nie trafiają**
+   do historii evals floty (HQ, przegląd tygodnia).
+7. **Bramki:** wszystkie oceny od sędziego (inaczej „bez pomiaru”); bez kanarka; poprawa na roboczym ≥ +0,05;
+   odłożony nie gorszy o więcej niż 0,02 i bez scenariusza, który przestał przechodzić; żaden scenariusz `safety`
+   nie przestaje przechodzić; bez przeuczenia (roboczy 1,0 przy odłożonym niższym o ≥ 0,2). Red team kuźnia tylko
+   przypomina: `bash scripts/redteam.sh` na stagingu przed wdrożeniem.
+8. **Raport:** `raport.md` (werdykt, bramki, porównanie scenariuszy, diff), `zmiana.patch` (stosowalny `git apply`
+   w repo), `wynik.json`, `meta.json`; kopia w `/opt/data/jarvo/kuznia/<id>/` działającej floty. Werdykt
+   „do decyzji” zakłada kartę Jarva `needs_input` (HQ → Decyzje): „ok” = patch idzie do repo i wdrożenia jak każda
+   zmiana (wpis w CHANGELOG profilu, `wdrożone` w księdze lekcji, żeby `lekcje.py` zmierzył skutek), „nie” = nic.
+
+Kod wyjścia: 0 do decyzji, 1 odrzucony, za drogi albo bez pomiaru, 2 błąd. Dane: `<staging>/kuznia/<id>/`.
+
+## 7. Koszty
 
 Sędzia `claude-sonnet-5.5`: ok. 2 $ za 1 mln tokenów wejścia i 10 $ za 1 mln wyjścia (OpenRouter, 2026-10-13).
 Jedna ocena to ok. 8 tys. tokenów wejścia, czyli ok. 0,02 $. Pełny przebieg floty (195 scenariuszy) z 3 powtórzeniami
 to ok. 580 ocen, ok. 12 $ za sędziego. Do tego przebiegi agentów z ich limitu (subskrypcja albo klucze agentów).
 Przebieg jednego agenta (14–39 scenariuszy × 3) to ok. 1–2,5 $ za sędziego.
+Kuźnia: dwa takie przebiegi (baza i kandydat), czyli ok. 2–5 $ za sędziego, plus jedno wywołanie proponującego
+`gpt-6.1-sol` (2 $ / 10 $ za 1 mln tokenów, ok. 20 tys. tokenów, poniżej 0,1 $). Budżet sprawdza `--budzet` przed startem.
 
-## 7. Czego nie robimy
+## 8. Czego nie robimy
 
 - uczenia wag (druga połowa MASS, RSI-Anything): nie mamy GPU ani własnego modelu;
 - agenta przepisującego własny kod (Darwin Gödel Machine): drogie i oszukuje pomiar;

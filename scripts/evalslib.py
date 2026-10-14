@@ -241,10 +241,16 @@ def rodzina(model: str) -> str:
     return m.split("/", 1)[0] if "/" in m else m
 
 
-def wybierz_sedziego(sedziowie: list[str], model_agenta: str, wymuszony: str | None = None) -> str:
-    """Pierwszy sędzia z listy z innej rodziny niż model agenta (sędzia nie ocenia „swoich”)."""
+def wybierz_sedziego(sedziowie: list[str], model_agenta: str, wymuszony: str | None = None,
+                     unikaj: list[str] | tuple = ()) -> str:
+    """Pierwszy sędzia z listy z innej rodziny niż model agenta (sędzia nie ocenia „swoich”). `unikaj`: modele,
+    których rodziny też omijamy, gdy się da (kuźnia: proponujący zmianę nie może być z rodziny sędziego)."""
     if wymuszony:
         return wymuszony
+    obce = {rodzina(m) for m in unikaj}
+    for s in sedziowie:
+        if rodzina(s) != rodzina(model_agenta) and rodzina(s) not in obce:
+            return s
     for s in sedziowie:
         if rodzina(s) != rodzina(model_agenta):
             return s

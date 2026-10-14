@@ -55,6 +55,8 @@ evals:
   judges:
     - anthropic/claude-sonnet-5.5
     - openai/gpt-6-luna
+  # kuźnia skilli (docs/RSI.md §6): model, który proponuje poprawkę skilla; inna rodzina niż sędzia i agenci
+  proposer: openai/gpt-6.1-sol
 
 agents:
   - name: jarvo

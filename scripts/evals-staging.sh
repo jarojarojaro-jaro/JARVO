@@ -2,23 +2,26 @@
 # Evals floty na IZOLOWANYCH danych (staging): osobny /opt/data, bez gatewaya i dispatchera,
 # więc karty tworzone przez scenariusze nie są wykonywane, a produkcyjna tablica zostaje nietknięta.
 #
-#   bash scripts/evals-staging.sh [--reset] [argumenty run-evals.py, np. --agent jarvo --id jarvo-route-landing]
+#   bash scripts/evals-staging.sh [--reset] [--bez-publikacji] [argumenty run-evals.py, np. --agent jarvo --id …]
 #
 # Używa tego samego obrazu, buildu (/srv/jarvo/build) i sekretów co produkcja (koszty idą z kluczy agentów).
 # Dane stagingu: ${JARVO_STAGING:-/srv/jarvo/staging}/hermes. --reset czyści je przed startem (oprócz wyników).
 # Wyniki: /srv/jarvo/staging/hermes/eval-results/<data>/<agent>.jsonl, historia.jsonl, odniesienie/ (docs/RSI.md).
 # Po przebiegu historia, punkty odniesienia i ostatni przebieg trafiają do działającej floty
 # (/opt/data/jarvo/evals w jarvo-hermes): czyta je HQ (karta agenta) i przegląd tygodnia Jarva.
+# --bez-publikacji: wyniki zostają tylko na stagingu (kuźnia skilli: przebiegi kandydatów to nie pomiar floty).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_DIR="${JARVO_COMPOSE_DIR:-/srv/jarvo/compose}"
 STAGING="${JARVO_STAGING:-/srv/jarvo/staging}"
 RESET=0
+PUBLIKUJ=1
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --reset) RESET=1 ;;
+    --bez-publikacji) PUBLIKUJ=0 ;;
     *) ARGS+=("$arg") ;;
   esac
 done
@@ -51,7 +54,7 @@ RC=0
 
 # wyniki do działającej floty (HQ, przegląd tygodnia): historia, punkty odniesienia, ostatni przebieg
 WYNIKI="$STAGING/hermes/eval-results"
-if docker ps --format '{{.Names}}' | grep -qx jarvo-hermes && sudo test -f "$WYNIKI/historia.jsonl"; then
+if [[ $PUBLIKUJ -eq 1 ]] && docker ps --format '{{.Names}}' | grep -qx jarvo-hermes && sudo test -f "$WYNIKI/historia.jsonl"; then
   CO=(historia.jsonl)
   sudo test -d "$WYNIKI/odniesienie" && CO+=(odniesienie)
   OSTATNI="$(sudo find "$WYNIKI" -mindepth 1 -maxdepth 1 -type d -name '2*' | sort | tail -n 1)"

@@ -4,7 +4,7 @@
     python3 scripts/check-models.py [--json]
     JARVO_MODEL_PROVIDER=commandcode python3 scripts/check-models.py   # inny zestaw z models.presets
 
-Sprawdza też sędziów evals (`evals.judges`, zawsze u OpenRoutera, docs/RSI.md).
+Sprawdza też sędziów evals (`evals.judges`) i model kuźni skilli (`evals.proposer`), zawsze u OpenRoutera (docs/RSI.md).
 Kod wyjścia 1, gdy któregoś modelu nie ma (np. wycofany): zmień poziom w fleet.yaml przed wdrożeniem.
 """
 
@@ -47,6 +47,9 @@ def main(argv: list[str]) -> int:
     if judges:
         judge_models = provider_models if fleet.provider == "openrouter" and url else fetch(URLS["openrouter"])
         checks += [("sędzia", model, judge_models) for model in judges]
+        proposer = (fleet.raw.get("evals") or {}).get("proposer")
+        if proposer:
+            checks.append(("kuźnia", proposer, judge_models))
     report, missing = [], 0
     for tier, model, models in checks:
         m = models.get(model)

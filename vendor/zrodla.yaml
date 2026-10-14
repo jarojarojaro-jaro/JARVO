@@ -378,24 +378,24 @@ zrodla:
     notatka: "Sakana MASS (arXiv 2610.12176), kod BEZ licencji: nic nie kopiujemy, tylko wnioski z artykułu: sędzia inny niż optymalizator (R0), pojedynek kandydat vs mistrz (R2), format rola/kontrakt/kolejność (R3); internalizacja w wagi (LoRA, GPU) odpada"
   hermes-agent-self-evolution:
     repo: https://github.com/NousResearch/hermes-agent-self-evolution
-    status: do-wdrozenia
+    status: uzywane
     przejrzane: 0a929e3aa20e15cf04dc7c28492a7d41a5139125
-    notatka: "MIT, prototyp niedziałający (issue #141: skill bez zmian, metryka z pokrycia słów): bierzemy projekt bramek (benchmark jako bramka, nie cel; limity rozmiaru; tylko przez PR), kod własny w kuźni R2"
+    notatka: "MIT, prototyp niedziałający (issue #141: skill bez zmian, metryka z pokrycia słów): bierzemy projekt bramek (benchmark jako bramka, nie cel; limity rozmiaru; tylko przez PR), kod własny w kuźni R2 (scripts/kuznia.py: limity rozmiaru, bramki, wynik tylko jako patch do decyzji)"
   gepa:
     repo: https://github.com/gepa-ai/gepa
-    status: do-wdrozenia
+    status: uzywane
     przejrzane: f1cfdee2856e9dc4b5b4dc5cc2e391d0aa20d819
-    notatka: "MIT: wzorzec refleksji nad śladami i mutacji tekstu skilla (R2), bez paczki w obrazie"
+    notatka: "MIT: wzorzec refleksji nad śladami i mutacji tekstu skilla (R2: kuznia.py proponuj z porażek zbioru roboczego), bez paczki w obrazie"
   ace:
     repo: https://github.com/ace-agent/ace
-    status: do-wdrozenia
+    status: uzywane
     przejrzane: 82709de050e1db6e6ef2f07bcb0393560b94992a
-    notatka: "Apache-2.0: playbook z licznikami pomógł/zaszkodził i zmianami przyrostowymi (R1, księga lekcji), kod własny"
+    notatka: "Apache-2.0: playbook z licznikami pomógł/zaszkodził i zmianami przyrostowymi (R1, księga lekcji: lekcje.py), kod własny"
   recuris:
     repo: https://github.com/Gen-Verse/Recuris
-    status: do-wdrozenia
+    status: uzywane
     przejrzane: 7d3745ab787b1206ccd981cb1511100476097266
-    notatka: "Apache-2.0 (arXiv 2608.24876): łatka skilla przyjęta tylko po parowanym porównaniu na zbiorze odłożonym (R2), kod własny"
+    notatka: "Apache-2.0 (arXiv 2608.24876): łatka skilla przyjęta tylko po parowanym porównaniu na zbiorze odłożonym (R2: bramki kuznia.py ocen), kod własny"
   rsi-anything:
     repo: https://github.com/Gen-Verse/RSI-Anything
     status: odlozone

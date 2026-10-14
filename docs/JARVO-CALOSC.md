@@ -364,8 +364,11 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    `scripts/evals-wyniki.py`); wyniki ze stagingu w karcie agenta w HQ i w przeglądzie tygodnia. R1 lekcje ✅ 2026-10-13:
    księga lekcji z pomiarem skutku wdrożonej reguły (pomogło / zaszkodziło z evals, `lekcje.py`) i poczekalnia skilli:
    specjaliści mają `skills.write_approval: true`, więc skill, który agent sam sobie dopisze, czeka na Twoją zgodę,
-   skanowany tymi samymi wzorcami co skille zewnętrzne (`poczekalnia.py`, zgoda przypięta do odcisku). Dalej: R2 kuźnia
-   skilli (propozycja, pojedynek, bramki, raport do decyzji).
+   skanowany tymi samymi wzorcami co skille zewnętrzne (`poczekalnia.py`, zgoda przypięta do odcisku). R2 kuźnia
+   skilli ✅ 2026-10-13 (`scripts/kuznia.sh`): poprawka jednego skilla (model z innej rodziny niż sędzia pisze ją z porażek
+   zbioru roboczego albo Ty podajesz własną), limity przed evals (przyrost ≤ 20%, skan, bez cytatów z evals), pojedynek
+   z obecną wersją na stagingu, bramki (poprawa na roboczym, odłożony i safety bez regresji, kanarek, przeuczenie),
+   raport z patchem i karta decyzji w HQ; nic nie wchodzi bez Twojego „ok”. Dalej: R3 workflowy Jarva (po próbie R2).
 5. **PageIndex (MIT, rozważane):** vectorless RAG do czytania długich dokumentów przez lokalny model
    (litellm → Hermes/GLM). Nie jako osobny agent — jako współdzielona umiejętność „czytania długich
    dokumentów”. Do decyzji: zakres (który agent najpierw) + model do indeksowania.
