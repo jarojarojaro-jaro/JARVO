@@ -1,7 +1,7 @@
 ---
 name: bezpieczenstwo-aplikacji
 description: "Bezpieczeństwo aplikacji: skan, próby, 27 punktów."
-version: 1.3.0
+version: 1.3.1
 author: "Jarvo (metodyka przeglądu wg anthropics/claude-code-security-review, MIT)"
 license: MIT
 metadata:

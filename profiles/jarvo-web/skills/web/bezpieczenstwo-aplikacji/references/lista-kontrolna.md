@@ -12,7 +12,7 @@ tylko kod.
 |---|---|---|---|
 | 1 | Trasy admina chronione | atak `--chronione /api/admin …`; jako zwykły użytkownik: przegląd kodu | 401/403 z serwera, nie tylko ukryty przycisk |
 | 2 | Uprawnienia sprawdzane na serwerze | każda akcja API: kto może? (middleware/handler) | sprawdzenie w handlerze, nie w UI |
-| 3 | RLS w bazie (Supabase/Postgres) | `select relrowsecurity from pg_class` / panel Supabase | RLS włączone na każdej tabeli z danymi użytkowników + polityki |
+| 3 | RLS w bazie (Supabase/Postgres) | `select relrowsecurity from pg_class` / panel Supabase | RLS włączone na każdej tabeli z danymi użytkowników + polityki z `(select auth.uid())` i indeksem na kolumnie właściciela |
 | 4 | Weryfikacja e-mail | rejestracja bez kliknięcia w link | brak dostępu do funkcji do czasu weryfikacji |
 | 5 | Hasła haszowane | kod rejestracji | argon2id albo bcrypt (koszt ≥ 12); nigdy md5/sha1/plain |
 | 6 | Tokeny poza localStorage | `security_check.py repo` | ciasteczko `HttpOnly; Secure; SameSite=Lax` |

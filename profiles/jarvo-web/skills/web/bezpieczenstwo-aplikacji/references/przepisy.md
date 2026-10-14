@@ -1,6 +1,6 @@
 ---
 source: "Dokumentacja Astro, Next.js, Supabase, Netlify, Cloudflare Pages, Express (stan wrzesień 2026)"
-reviewed: "2026-09-30"
+reviewed: "2026-10-14"
 ---
 # Przepisy per stos
 
@@ -28,7 +28,11 @@ reviewed: "2026-09-30"
 - `set:html` tylko z oczyszczonym HTML.
 
 ## Supabase
-- RLS na każdej tabeli (`alter table … enable row level security;`) + polityki `auth.uid() = user_id`,
+- RLS na każdej tabeli (`alter table … enable row level security;`) + polityki `(select auth.uid()) = user_id`
+  (z `select`: Postgres liczy `auth.uid()` raz na zapytanie; samo `auth.uid() = user_id` liczy się osobno dla każdego
+  wiersza i przy dużych tabelach spowalnia zapytania wielokrotnie; to samo z `auth.jwt()`), polityka z rolą (`to authenticated`)
+  i indeks na kolumnie z polityki: `create index on <tabela> (user_id);`. Doradca Supabase (Advisors → Performance,
+  `auth_rls_initplan`, `unindexed_foreign_keys`) wyłapuje oba błędy sam,
 - `service_role` wyłącznie na serwerze; front używa `anon`,
 - w Auth: potwierdzanie e-mail włączone, limity prób logowania, własny SMTP.
 
