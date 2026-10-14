@@ -1,6 +1,6 @@
 # Kuźnia skilli: prawdziwy test (jarvo-web / web/nowa-strona)
 
-**Status: w toku — krok: evals bazy** (start 2026-10-14 12:56 UTC)
+**Status: w toku — krok: propozycja zmiany (baza gotowa: 5/20 zaliczonych, ok. 70 min)**
 
 - piaskownica: flota na OpenRouterze, wszyscy agenci `anthropic/claude-haiku-5.5` (dym: jarvo-web odpowiada modelem)
 - proponujący: `anthropic/claude-haiku-5.5`, sędzia: `openai/gpt-6-luna`
