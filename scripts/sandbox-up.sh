@@ -51,6 +51,12 @@ if ! docker info >/dev/null 2>&1; then
     proces="$(ps -p "$(cat "$pid_plik")" -o comm= 2>/dev/null || true)"
     [[ "$proces" == containerd || ( "$pid_plik" == /var/run/docker.pid && "$proces" == dockerd ) ]] || rm -f "$pid_plik"
   done
+  # Bez żywego containerd zostają też zadania i gniazda shimów kontenerów sprzed restartu: containerd łączy się
+  # z każdym martwym shimem i nie mieści się w 15 s, na które czeka dockerd. To tylko stan w /run (kontenery
+  # i obrazy są w /var/lib/docker), więc usuwamy go przed startem.
+  if ! pgrep -x containerd >/dev/null && ! pgrep -f containerd-shim >/dev/null; then
+    rm -rf /var/run/docker/containerd/daemon/io.containerd.runtime.v2.task/moby/* /run/containerd/s/*
+  fi
   nohup dockerd >"$L/dockerd.log" 2>&1 &
   for _ in $(seq 60); do docker info >/dev/null 2>&1 && break; sleep 1; done
   docker info >/dev/null 2>&1 || fail "dockerd nie wstał (log: $L/dockerd.log)"
