@@ -54,6 +54,41 @@ def test_proposer_sees_only_failed_working_set(tmp_path):
     assert STARY.strip()[:200] in p
 
 
+def test_proposer_gets_failures_of_its_skill_first(tmp_path):
+    """Porażki scenariuszy, które dotyczą skilla (nazwa, tagi, opis), idą do proponującego przed resztą."""
+    przebieg = tmp_path / "p.jsonl"
+    przebieg.write_text("\n".join(json.dumps(rek(s, False, 0.1)) for s in SCEN))
+    widziane = {}
+    w = k.proponuj(AGENT, SKILL, przebieg, "m", wywolanie=lambda m, pr: widziane.setdefault("p", pr) and poprawka())
+    nazwa, slowa = k.slowa_skilla(STARY)
+    scen = {s["id"]: s for s in SCEN}
+    swoje = [s["id"] for s in ROBOCZE if "nowa-strona" in json.dumps(s, ensure_ascii=False)]
+    assert swoje and set(swoje[:8]) <= set(w["porazki"])                 # scenariusze „nowa-strona” nie wypadają
+    oceny = [k.trafnosc(scen[i], nazwa, slowa) for i in w["porazki"]]
+    assert oceny == sorted(oceny, reverse=True)
+    assert f"najwyżej {k.limit_znakow(STARY)} znaków" in widziane["p"]
+
+
+def test_proposer_one_form_fix(tmp_path):
+    """Za długa propozycja: jedno ponowne wywołanie z liczbą znaków, bez treści evals; potem decydują limity."""
+    przebieg = tmp_path / "p.jsonl"
+    przebieg.write_text("\n".join(json.dumps(rek(s, False, 0.1)) for s in SCEN))
+    wywolania = []
+
+    def model(m, prompt):
+        wywolania.append(prompt)
+        return poprawka() + ("x" * 5000 if len(wywolania) == 1 else "")
+
+    w = k.proponuj(AGENT, SKILL, przebieg, "m", wywolanie=model)
+    assert len(wywolania) == 2 and "limit to" in wywolania[1] and w["poprawka_formy"]
+    assert w["tekst"] == poprawka().strip() + "\n" and k.sprawdz(AGENT, SKILL, w["tekst"])["ok"]
+    for s in ODLOZONE:
+        assert s["input"][:80] not in wywolania[1]
+    wywolania.clear()
+    w = k.proponuj(AGENT, SKILL, przebieg, "m", wywolanie=lambda m, pr: wywolania.append(pr) or poprawka())
+    assert len(wywolania) == 1 and w["poprawka_formy"] == []            # poprawna od razu: jedno wywołanie
+
+
 def test_proposer_nothing_to_fix(tmp_path):
     przebieg = tmp_path / "p.jsonl"
     przebieg.write_text("\n".join(json.dumps(rek(s, True, 1.0)) for s in SCEN))

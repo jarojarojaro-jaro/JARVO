@@ -49,7 +49,8 @@ w każdym podobnym zadaniu, nie tylko w tych przykładach.
 
 Zasady:
 - mała zmiana: dopisz albo popraw krok, regułę lub kryterium ukończenia; nie przepisuj całości, nie zmieniaj stylu,
-- tekst najwyżej o 20% dłuższy niż obecny; zachowaj nagłówek YAML i `name`, podbij ostatnią cyfrę `version`,
+- obecny ma {znaki} znaków, nowy MUSI mieć najwyżej {limit} znaków (twardy limit, dłuższy zostanie odrzucony);
+  zachowaj nagłówek YAML i `name`, podbij ostatnią cyfrę `version`,
 - reguły ogólne i sprawdzalne, w trybie rozkazującym, po polsku jak reszta skilla,
 - nie cytuj przykładów ani ich treści, nie pisz o testach, ocenach, sędziach ani scenariuszach,
 - nie rozszerzaj uprawnień agenta (żadnych nowych komend sieciowych, instalacji, zapisów poza jego katalogiem),
@@ -89,7 +90,7 @@ def naglowek(tekst: str) -> dict:
 
 # ---------- proponujący ----------
 
-def porazki(rekordy: list[dict], limit: int = 8) -> list[dict]:
+def porazki(rekordy: list[dict], limit: int | None = 8) -> list[dict]:
     """Nieudane scenariusze WYŁĄCZNIE ze zbioru roboczego: proponujący nie widzi odłożonego (bramki)."""
     out = []
     for r in rekordy:
@@ -103,6 +104,27 @@ def porazki(rekordy: list[dict], limit: int = 8) -> list[dict]:
                     "odpowiedz": str(run.get("final") or "")[:1500],
                     "karty": run.get("cards") or []})
     return out[:limit]
+
+
+def trafnosc(scn: dict, nazwa: str, slowa: set[str]) -> int:
+    """Jak bardzo scenariusz dotyczy skilla: nazwa skilla w treści (×3) plus słowa z tagów i opisu.
+    Proponujący dostaje najpierw porażki „swojego” skilla, a nie pierwsze z brzegu (próba 2026-10-14: scenariusz
+    o nowej stronie wypadł poza 8 porażek audytu, favicon i bezpieczeństwa)."""
+    exp = scn.get("expect") or {}
+    t = " ".join([scn.get("input") or "", scn.get("context") or "", *(exp.get("should") or []),
+                  *(exp.get("should_not") or [])]).lower()
+    return 3 * (nazwa.lower() in t) + sum(w in t for w in slowa)
+
+
+def slowa_skilla(tekst: str) -> tuple[str, set[str]]:
+    h = naglowek(tekst)
+    tagi = (((h.get("metadata") or {}).get("hermes") or {}).get("tags")) or []
+    opis = re.findall(r"[\wąćęłńóśźż-]{5,}", str(h.get("description") or "").lower())
+    return str(h.get("name") or ""), {str(x).lower() for x in tagi if len(str(x)) >= 4} | set(opis)
+
+
+def limit_znakow(stary: str) -> int:
+    return int(max(len(stary) * (1 + PRZYROST), len(stary) + PRZYROST_MIN))
 
 
 def opisz_porazki(lista: list[dict], scenariusze: dict[str, dict]) -> str:
@@ -157,13 +179,25 @@ def oczysc(tekst: str) -> str:
 def proponuj(agent: str, skill: str, przebieg: Path, model: str, lekcje: Path | None = None, wywolanie=wywolaj) -> dict:
     obecny = plik_skilla(agent, skill).read_text(encoding="utf-8")
     rekordy = ev.wczytaj_przebieg(przebieg)
-    lista = porazki(rekordy)
+    scen = {s["id"]: s for s in ev.wczytaj(fl.REPO_ROOT, agent).get("scenarios", [])}
+    nazwa, slowa = slowa_skilla(obecny)
+    lista = sorted(porazki(rekordy, limit=None), key=lambda p: -trafnosc(scen.get(p["id"], {}), nazwa, slowa))[:8]
     if not lista:
         return {"ok": False, "powod": "brak nieudanych scenariuszy w zbiorze roboczym: nie ma czego poprawiać"}
-    scen = {s["id"]: s for s in ev.wczytaj(fl.REPO_ROOT, agent).get("scenarios", [])}
+    limit = limit_znakow(obecny)
     prompt = PROMPT.format(agent=agent, skill=skill, obecny=obecny, lekcje=lekcje_agenta(agent, lekcje),
-                           n=len(lista), porazki=opisz_porazki(lista, scen))
-    return {"ok": True, "tekst": oczysc(wywolanie(model, prompt)), "porazki": [p["id"] for p in lista], "model": model}
+                           n=len(lista), porazki=opisz_porazki(lista, scen), znaki=len(obecny), limit=limit)
+    tekst = oczysc(wywolanie(model, prompt))
+    # jedna poprawka formy (długość, nazwa), zanim limity odrzucą kandydata; bez żadnej informacji z evals
+    uwagi = []
+    if len(tekst) > limit:
+        uwagi.append(f"ma {len(tekst)} znaków, a limit to {limit}: skróć, zostaw tylko najważniejszą zmianę")
+    if naglowek(tekst).get("name") != naglowek(obecny).get("name"):
+        uwagi.append(f"nagłówek YAML musi zostać, z `name: {naglowek(obecny).get('name')}`")
+    if uwagi:
+        tekst = oczysc(wywolanie(model, prompt + "\n\nTWOJA POPRZEDNIA WERSJA (do poprawy):\n" + tekst
+                                 + "\n\nPopraw ją: " + "; ".join(uwagi) + ". Zwróć wyłącznie pełny SKILL.md."))
+    return {"ok": True, "tekst": tekst, "porazki": [p["id"] for p in lista], "model": model, "poprawka_formy": uwagi}
 
 
 # ---------- limity (przed wydaniem czegokolwiek na evals) ----------
@@ -202,7 +236,7 @@ def sprawdz(agent: str, skill: str, nowy: str, skan=None) -> dict:
         bledy.append(f"zmieniona nazwa skilla: {hs.get('name')} → {hn.get('name')}")
     if hs.get("version") and hn.get("version") == hs.get("version"):
         uwagi.append("wersja bez zmian (podbij ostatnią cyfrę przy przeniesieniu do repo)")
-    limit = max(len(stary) * (1 + PRZYROST), len(stary) + PRZYROST_MIN)
+    limit = limit_znakow(stary)
     if len(nowy) > limit:
         bledy.append(f"za duża zmiana: {len(stary)} → {len(nowy)} znaków (limit {int(limit)})")
     for m in sorted({m.group(0) for m in ZAKAZANE.finditer(nowy)} - {m.group(0) for m in ZAKAZANE.finditer(stary)}):

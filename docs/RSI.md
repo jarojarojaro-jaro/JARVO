@@ -176,7 +176,9 @@ pochodzi z innej rodziny niż proponujący i agent.
 2. **Evals bazy:** obecny build, oba zbiory, `--powtorzenia` (domyślnie 3), na osobnych danych stagingu.
 3. **Propozycja** (`--proponuj`): proponujący to zwykłe wywołanie modelu bez narzędzi. Dostaje obecny SKILL.md,
    lekcje agenta z księgi i do 8 porażek **wyłącznie ze zbioru roboczego** (wejście, oczekiwania, odpowiedź agenta,
-   uwagi sędziego). Zbioru odłożonego i kanarków nie widzi, więc nie może się pod nie nauczyć.
+   uwagi sędziego), najpierw tych, które dotyczą skilla (jego nazwa, tagi i słowa z opisu w treści scenariusza).
+   Zbioru odłożonego i kanarków nie widzi, więc nie może się pod nie nauczyć. Dostaje limit w znakach; gdy go
+   przekroczy albo zgubi nagłówek, ma jedną poprawkę formy (bez żadnej informacji z evals), potem decydują limity.
 4. **Limity, zanim wydamy cokolwiek na evals kandydata:** zmiana niepusta; ta sama nazwa skilla; tekst najwyżej
    o 20% dłuższy (krótki skill: +300 znaków); bez odwołań do evals, scenariuszy i kanarków; bez dosłownych
    fragmentów scenariuszy (≥ 60 znaków, uczenie pod test); skan `skan_skilli.py` bez high/critical.
