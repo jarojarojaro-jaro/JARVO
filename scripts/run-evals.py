@@ -10,7 +10,8 @@ Dla każdego scenariusza (i każdego powtórzenia):
   1. zapis stanu tablicy (lista kart) przed,
   2. `hermes -p <agent> chat -q <input> --oneshot -Q --format stream-json` (odpowiedź + wywołania narzędzi),
   3. różnica tablicy (utworzone karty, assignee) → sprawdzenia deterministyczne `check` i kanarki,
-  4. ocena LLM-sędziego (OpenRouter, OPENROUTER_API_KEY) wobec expect.should / should_not → PASS/FAIL;
+  4. ocena LLM-sędziego (OpenRouter, OPENROUTER_API_KEY ze środowiska albo z /opt/data/.env)
+     wobec expect.should / should_not → PASS/FAIL;
      sędzia z `fleet.yaml` → `evals.judges`, pierwszy z innej rodziny niż model agenta,
   5. sprzątanie: archiwizacja kart utworzonych przez scenariusz.
 Scenariusz z powtórzeniami jest zaliczony, gdy przeszła większość przebiegów (scripts/evalslib.py).
@@ -85,7 +86,7 @@ def run_agent(agent: str, text: str, timeout: int) -> tuple[str, list[dict], str
 def judge(scn: dict, final: str, events: list[dict], cards: list[dict], model: str) -> dict:
     """Werdykt sędziego. Bez klucza: {"pass": None, "pominiety": True}. Błąd sieci albo nie-JSON po 3 próbach:
     {"pass": None, "blad": …}: przebieg nie liczy się jako zaliczony (zepsuty sędzia nie może podbić wyniku)."""
-    key = os.environ.get("OPENROUTER_API_KEY")
+    key = ev.klucz_openroutera()
     if not key:
         return {"pass": None, "pominiety": True, "notes": "brak OPENROUTER_API_KEY: ocena LLM pominięta"}
     tools = [e for e in events if any(k in e for k in ("tool", "tool_name", "name")) and "tool" in json.dumps(e)[:200]]
@@ -212,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     summary_all = {}
     for agent in agents:
         spec = ev.wczytaj(fl.REPO_ROOT, agent)
-        agent_model = fleet.model_for(fleet.agent(agent).model_tier)
+        agent_model = ev.model_z_buildu(agent) or fleet.model_for(fleet.agent(agent).model_tier)
         model = ev.wybierz_sedziego(judges, agent_model, args.judge_model)
         records = []
         for scn in spec.get("scenarios", []):

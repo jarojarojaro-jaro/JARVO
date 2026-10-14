@@ -276,3 +276,27 @@ def test_staging_isolated_on_volumes():
     assert 'export JARVO_VOL_HERMES="$STAGING/hermes"' in text
     assert "! -name eval-results" in text                   # --reset nie kasuje historii wyników
     assert Path(REPO / "scripts/evals-wyniki.py").is_file()
+
+
+# ---------- klucz i model w jednorazowym kontenerze (staging, kuźnia) ----------
+
+def test_klucz_sedziego_z_env_hosta(tmp_path):
+    """`docker compose run` nie dziedziczy zmiennych hosta: klucz sędziego z .env hosta Hermesa (host.env)."""
+    plik = tmp_path / ".env"
+    plik.write_text("# komentarz\nTELEGRAM_BOT_TOKEN=\nOPENROUTER_API_KEY='sk-or-test'\n", encoding="utf-8")
+    assert ev.klucz_openroutera({}, plik) == "sk-or-test"
+    assert ev.klucz_openroutera({"OPENROUTER_API_KEY": "sk-env"}, plik) == "sk-env"   # środowisko wygrywa
+    assert ev.klucz_openroutera({}, tmp_path / "brak.env") == ""
+
+
+def test_model_agenta_z_buildu(tmp_path):
+    """Model agenta z config.yaml buildu (to, co agent naprawdę uruchamia), nie domyślny z fleet.yaml."""
+    prof = tmp_path / "profiles" / "jarvo-web"
+    prof.mkdir(parents=True)
+    (prof / "config.yaml").write_text("model:\n  provider: openrouter\n  default: anthropic/claude-haiku-5.5\n"
+                                      "agent:\n  reasoning_effort: low\n", encoding="utf-8")
+    assert ev.model_z_buildu("jarvo-web", tmp_path) == "anthropic/claude-haiku-5.5"
+    assert ev.model_z_buildu("jarvo-ads", tmp_path) is None
+    # sędzia z innej rodziny niż prawdziwy model agenta
+    assert ev.wybierz_sedziego(["anthropic/claude-sonnet-5.5", "openai/gpt-6-luna"],
+                               ev.model_z_buildu("jarvo-web", tmp_path)) == "openai/gpt-6-luna"

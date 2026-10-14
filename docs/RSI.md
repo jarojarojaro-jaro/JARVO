@@ -86,7 +86,9 @@ to średnia ocen sędziego (0..1). Sędzia z `evals.judges`, pierwszy z innej ro
 `JARVO_EVAL_JUDGE` wymusza innego. Błąd sędziego (sieć, nie-JSON po 3 próbach) = przebieg niezaliczony bez wyniku.
 Bez `OPENROUTER_API_KEY` scenariusz bez twardego błędu jest **nieoceniony** (nie zaliczony), a taki przebieg nie zmienia
 punktu odniesienia. Pusta odpowiedź agenta to zawsze niezaliczenie. Obie zasady wyszły z próby w piaskownicy bez
-modelu: wcześniej runner pokazał 14/14 z wynikiem 1,00, choć agent nic nie odpowiedział.
+modelu: wcześniej runner pokazał 14/14 z wynikiem 1,00, choć agent nic nie odpowiedział. Na stagingu (jednorazowy kontener bez zmiennych
+hosta) sędzia i kuźnia biorą klucz z `/opt/data/.env`, czyli z `secrets/host.env`, a model agenta (do wyboru sędziego
+i do historii) z `config.yaml` profilu w buildzie, nie z domyślnego zestawu `fleet.yaml`.
 
 **Historia i odniesienie.** Każdy przebieg dopisuje wiersz na agenta do `<wyniki>/historia.jsonl` (data, commit
 z `BUILD.json`, model agenta, sędzia, powtórzenia, podsumowanie razem, per zbiór i per typ). `--ustaw-odniesienie`

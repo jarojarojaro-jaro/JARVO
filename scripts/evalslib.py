@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
 from pathlib import Path
 
@@ -25,6 +26,8 @@ ZBIORY = ("roboczy", "odlozony")
 ODLOZONY_CO = 4                      # co czwarty scenariusz (wg skrótu id) trafia do zbioru odłożonego
 KANAREK_RE = re.compile(r"^JARVO-KANAREK-[0-9a-f]{12}$")
 REMIS = 0.05                         # różnica wyniku scenariusza poniżej tego progu = remis w teście znaków
+ENV_HOSTA = Path("/opt/data/.env")   # secrets/host.env po instalacji (install-fleet.sh); klucz sędziego i kuźni
+BUILD = Path("/opt/jarvo/build")     # build zamontowany w kontenerze (staging: build bazy albo kandydata)
 
 
 # ---------- scenariusze ----------
@@ -239,6 +242,42 @@ def rodzina(model: str) -> str:
         if klucz in m:
             return nazwa
     return m.split("/", 1)[0] if "/" in m else m
+
+
+# ---------- klucz i model w kontenerze ----------
+# Evals i kuźnia działają w jednorazowych kontenerach (`docker compose run`): nie dziedziczą zmiennych hosta ani
+# compose/jarvo.env. Klucz sędziego bierzemy więc z .env hosta Hermesa, a model agenta z buildu, który agent naprawdę
+# uruchamia (fleet.yaml bez JARVO_MODEL_* podałby domyślny model i sędzia mógłby oceniać „swoich”).
+
+def czytaj_env(plik: Path) -> dict[str, str]:
+    out = {}
+    try:
+        linie = Path(plik).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return out
+    for linia in linie:
+        linia = linia.strip()
+        if not linia or linia.startswith("#") or "=" not in linia:
+            continue
+        k, v = linia.removeprefix("export ").split("=", 1)
+        out[k.strip()] = v.strip().strip('"').strip("'")
+    return out
+
+
+def klucz_openroutera(env: dict | None = None, plik: Path = ENV_HOSTA) -> str:
+    """OPENROUTER_API_KEY ze środowiska, a bez niego z .env hosta Hermesa (w kontenerze stagingu i kuźni)."""
+    return (os.environ if env is None else env).get("OPENROUTER_API_KEY") or czytaj_env(plik).get("OPENROUTER_API_KEY", "")
+
+
+def model_z_buildu(agent: str, build: Path = BUILD) -> str | None:
+    """`model.default` z config.yaml profilu w buildzie: model, na którym agent odpowiada w evals."""
+    try:
+        tekst = (Path(build) / "profiles" / agent / "config.yaml").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    m = re.search(r"^model:\s*\n((?:[ \t]+.*\n?)*)", tekst, re.M)
+    d = re.search(r"^[ \t]+default:\s*['\"]?([^'\"\s#]+)", m.group(1), re.M) if m else None
+    return d.group(1) if d else None
 
 
 def wybierz_sedziego(sedziowie: list[str], model_agenta: str, wymuszony: str | None = None,

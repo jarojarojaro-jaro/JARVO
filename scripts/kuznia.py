@@ -129,7 +129,7 @@ def lekcje_agenta(agent: str, plik: Path | None) -> str:
 
 
 def wywolaj(model: str, prompt: str) -> str:
-    key = os.environ.get("OPENROUTER_API_KEY")
+    key = ev.klucz_openroutera()
     if not key:
         raise SystemExit("brak OPENROUTER_API_KEY: proponujący potrzebuje klucza OpenRoutera (albo podaj --kandydat)")
     body = json.dumps({"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}).encode()
@@ -235,7 +235,7 @@ def proponujacy(fleet: fl.Fleet) -> str:
 def sedzia(agent: str) -> dict:
     fleet = fl.load_fleet()
     fleet.apply_model_overrides(dict(os.environ))
-    model_agenta = fleet.model_for(fleet.agent(agent).model_tier)
+    model_agenta = ev.model_z_buildu(agent) or fleet.model_for(fleet.agent(agent).model_tier)
     prop = proponujacy(fleet)
     s = ev.wybierz_sedziego(list((fleet.raw.get("evals") or {}).get("judges") or []), model_agenta, None, [prop])
     return {"sedzia": s, "proponujacy": prop, "agent": model_agenta,
