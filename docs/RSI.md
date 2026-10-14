@@ -189,7 +189,10 @@ bash scripts/kuznia.sh --agent jarvo-web --skill web/nowa-strona --kandydat moj-
    „do decyzji” zakłada kartę Jarva `needs_input` (HQ → Decyzje): „ok” = patch idzie do repo i wdrożenia jak każda
    zmiana (wpis w CHANGELOG profilu, `wdrożone` w księdze lekcji, żeby `lekcje.py` zmierzył skutek), „nie” = nic.
 
-Kod wyjścia: 0 do decyzji, 1 odrzucony, za drogi albo bez pomiaru, 2 błąd. Dane: `<staging>/kuznia/<id>/`.
+Kod wyjścia: 0 do decyzji, 1 odrzucony, za drogi albo bez pomiaru, 2 błąd. Dane: `<staging>/kuznia/<id>/` (po
+przebiegu zostają wyniki evals, patch i raport; build kandydata, ok. 1 GB, i dane stagingu kuźnia usuwa). Kuźnia to
+dwa pełne przebiegi evals agenta: próba w piaskownicy (20 scenariuszy × 1 powtórzenie, agent bez kluczy) trwała
+godzinę, z kluczami i 3 powtórzeniami licz kilka godzin. Uruchamiaj w tle: `nohup bash scripts/kuznia.sh … > kuznia.log 2>&1 &`.
 
 ## 7. Koszty
 

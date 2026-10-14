@@ -286,7 +286,8 @@ def raport(agent: str, skill: str, wynik: dict, limity: dict, meta: dict) -> str
     linie = [f"# Kuźnia: {agent} / {skill}", "",
              f"**Werdykt: {znak} {wynik['werdykt']}**" + (" (nic nie jest wdrożone; decyzja należy do właściciela)"
                                                            if wynik["werdykt"] == "do decyzji" else ""), "",
-             f"- proponujący: {meta.get('proponujacy') or 'ręczny kandydat'}; sędzia: {meta.get('sedzia', '?')}"
+             f"- kandydat: {'ręczny (od właściciela)' if meta.get('reczny') or not meta.get('proponujacy') else 'model ' + meta['proponujacy']}"
+             f"; sędzia: {meta.get('sedzia', '?')}"
              + ("" if meta.get("rozne_rodziny", True) else " (⚠ sędzia z rodziny proponującego albo agenta)"),
              f"- powtórzenia: {meta.get('powtorzenia', '?')}; build bazowy: {meta.get('commit', '?')}",
              f"- zmiana: {limity['znaki'][0]} → {limity['znaki'][1]} znaków, plik `{limity['plik']}`"]
@@ -343,6 +344,7 @@ def main(argv: list[str] | None = None) -> int:
     k.add_argument("--skill", required=True)
     k.add_argument("--powtorzenia", type=int, default=3)
     k.add_argument("--budzet", type=float, default=5.0, help="$ na sędziego za cały pojedynek")
+    k.add_argument("--reczny", action="store_true", help="kandydat od właściciela, nie od modelu proponującego")
     k.add_argument("--out", type=Path, required=True)
     o = sub.add_parser("ocen")
     o.add_argument("--agent", required=True)
@@ -386,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError):
             commit = "?"
         meta = {"agent": args.agent, "skill": args.skill, "powtorzenia": args.powtorzenia, "koszt": k,
-                "budzet": args.budzet, "commit": commit, **s}
+                "budzet": args.budzet, "commit": commit, **s, "reczny": args.reczny}
         args.out.mkdir(parents=True, exist_ok=True)
         (args.out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"Pojedynek: {k['scenariusze']} scenariuszy × {args.powtorzenia} × 2 = {k['oceny']} ocen, ok. {k['usd']} $ "

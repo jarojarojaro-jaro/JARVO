@@ -12,7 +12,8 @@
 # → evals kandydata → bramki → raport. Dane: ${JARVO_STAGING:-/srv/jarvo/staging}/kuznia/<agent>-<skill>-<czas>;
 # wyniki kuźni nie trafiają do historii evals floty. Raport, patch i wynik: /opt/data/jarvo/kuznia/<id> w jarvo-hermes,
 # a przy werdykcie „do decyzji” karta needs_input dla Jarva (decyzja w HQ). Kod wyjścia: 0 do decyzji, 1 odrzucony
-# albo bez pomiaru, 2 błąd.
+# albo bez pomiaru, 2 błąd. Trwa długo (dwa pełne przebiegi evals agenta, z powtórzeniami: od godziny wzwyż), więc
+# uruchamiaj w tle: nohup bash scripts/kuznia.sh … > kuznia.log 2>&1 &
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -49,8 +50,9 @@ kuznia() { "${COMPOSE[@]}" "${ONEOFF[@]}" hermes "$PY" /opt/jarvo/repo/scripts/k
 koniec() { echo "Katalog kuźni: $W"; exit "$1"; }
 
 echo "▶ Kuźnia $ID"
-kuznia start --agent "$AGENT" --skill "$SKILL" --powtorzenia "$POWT" --budzet "$BUDZET" --out /kuznia \
-  | sudo tee "$W/start.txt" || koniec 1
+START=(--agent "$AGENT" --skill "$SKILL" --powtorzenia "$POWT" --budzet "$BUDZET" --out /kuznia)
+[[ -n "$KANDYDAT" ]] && START+=(--reczny)
+kuznia start "${START[@]}" | sudo tee "$W/start.txt" || koniec 1
 SEDZIA="$(sudo tail -n 1 "$W/start.txt")"
 
 if [[ -n "$KANDYDAT" ]]; then
@@ -108,6 +110,9 @@ fi
 echo "▶ Evals kandydata"
 evals "$W/kandydat" "$W/build"
 KAND="$(przebieg kandydat)"
+# sprzątanie: build kandydata (~1 GB z pamięcią źródeł) i dane stagingu; zostają wyniki evals, patch i raport
+sudo rm -rf "$W/build"
+for d in baza kandydat; do sudo find "$W/$d/hermes" -mindepth 1 -maxdepth 1 ! -name eval-results -exec rm -rf {} +; done
 
 echo "▶ Bramki"
 RC=0

@@ -139,6 +139,10 @@ def test_report_and_card(tmp_path):
     assert rc == 0
     rap = (out / "raport.md").read_text()
     assert "do decyzji" in rap and "```diff" in rap and "red team" in rap and "abc1234" in rap
+    assert "kandydat: model openai/gpt-6.1-sol" in rap
+    meta = json.loads((out / "meta.json").read_text())
+    assert "kandydat: ręczny" in k.raport(AGENT, SKILL, k.ocen(_przebieg(0.6, 0.7), _przebieg(0.8, 0.7)),
+                                          json.loads((out / "limity.json").read_text()), {**meta, "reczny": True})
     karta = (out / "karta.md").read_text()
     assert "/opt/data/jarvo/kuznia/x/raport.md" in karta and "Sam niczego nie stosujesz" in karta
     assert json.loads((out / "wynik.json").read_text())["werdykt"] == "do decyzji"
@@ -153,7 +157,7 @@ def test_start_budget_and_judge(tmp_path, capsys):
                    "--out", str(tmp_path)]) == 0
     sedzia = capsys.readouterr().out.strip().splitlines()[-1]
     meta = json.loads((tmp_path / "meta.json").read_text())
-    assert sedzia == meta["sedzia"]
+    assert sedzia == meta["sedzia"] and meta["reczny"] is False
     assert ev.rodzina(meta["sedzia"]) != ev.rodzina(meta["proponujacy"])
     assert meta["koszt"]["oceny"] == len(SCEN) * 3 * 2
 
@@ -171,6 +175,7 @@ def test_judge_avoids_proposer_family():
 def test_host_script_contract():
     sh = (REPO / "scripts" / "kuznia.sh").read_text()
     assert "--bez-publikacji" in sh                                      # przebiegi kuźni nie idą do historii floty
+    assert 'rm -rf "$W/build"' in sh                                     # ~1 GB buildu kandydata nie zostaje na dysku
     assert "SKILL.md:ro" in sh and "build.py" in sh                      # ten sam build, podmieniony jeden plik
     assert "--kind needs_input" in sh and "--initial-status blocked" in sh
     for zakaz in ("$ROOT/scripts/deploy.sh", "git push", "git apply", "skills.write_approval"):
