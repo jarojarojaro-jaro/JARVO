@@ -252,7 +252,7 @@ Shorts i YouTube. Wydzielony ze Studia, bo wideo to osobny warsztat (rytm, dźwi
 
 **Tryby pracy:**
 - **krótki film z tematu** (pomysł z [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo), własna implementacja):
-  scenariusz → ujęcia (stock Pexels/Pixabay, AI, pliki, plansze) → polski lektor (domyślnie lokalny Matcha-TTS-PL v2 bez sieci i limitów, głos syntetyczny oznaczany w opisie filmu;
+  scenariusz → ujęcia (stock Pexels/Pixabay, AI, pliki, plansze), dźwięki spoza biblioteki CC0 z Openverse (Freesound, licencja sprawdzana na stronie pliku) → polski lektor (domyślnie lokalny Matcha-TTS-PL v2 bez sieci i limitów, głos syntetyczny oznaczany w opisie filmu;
   Edge TTS do wyboru i jako zapas; po angielsku lokalny Paradee)
   → napisy karaoke → muzyka ściszana pod głos → montaż FFmpeg w 9:16/16:9/1:1/4:5, z planu `plan.json` (`film.py`),
 - **warianty A/B** z jednego planu (hook, głos, tempo, długość), wspólne sceny z cache,

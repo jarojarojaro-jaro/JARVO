@@ -418,6 +418,68 @@ def test_stock_parses_pexels_and_pixabay(monkeypatch):
     assert "Pexels" in stock.LICENSES["pexels"] and "Pixabay" in stock.LICENSES["pixabay"]
 
 
+def _ov(id_, sek, lic, wer="1.0", source="freesound", url="https://freesound.org/people/a/sounds/1/"):
+    return {"id": id_, "title": f"t-{id_}", "duration": int(sek * 1000), "license": lic, "license_version": wer,
+            "license_url": f"https://creativecommons.org/x/{lic}", "attribution": f'"t-{id_}" by a is licensed under CC {lic}',
+            "creator": "a", "creator_url": "https://freesound.org/people/a", "foreign_landing_url": url, "source": source,
+            "url": f"https://cdn.freesound.org/previews/1/{id_}-hq.mp3", "tags": [{"name": "whoosh"}]}
+
+
+def test_stock_audio_search_filters_and_order(monkeypatch):
+    """Openverse: tylko Freesound, CC0/PDM (domyślnie) albo + CC BY, długość z rodzaju; CC0 przed BY; nigdy NC."""
+    seen = []
+    res = {"results": [_ov("by1", 1.0, "by", "4.0"), _ov("c1", 0.5, "cc0"), _ov("long", 40, "cc0"),
+                       _ov("nc", 1.0, "by-nc"), _ov("p1", 2.0, "pdm")], "page_count": 1}
+    monkeypatch.setattr(stock, "_json", lambda url, headers=None: seen.append(url) or res)
+    items = stock.search_audio("whoosh", "efekt", "by", 8)
+    assert [it["id"] for it in items] == ["openverse:c1", "openverse:p1", "openverse:by1"]   # bez 40 s i bez NC
+    assert "source=freesound" in seen[0] and "license=cc0,pdm,by" in seen[0] and "page_size=20" in seen[0]
+    assert len(seen) == 1                                    # jedna strona wystarczyła: limit 200/dzień oszczędzany
+    stock.search_audio("whoosh", "efekt", "cc0", 8)
+    assert "license=cc0,pdm&" in seen[-1]
+    assert [it["id"] for it in stock.search_audio("rain", "tlo", "cc0", 8)] == ["openverse:long"]
+    assert "podpis autora obowiązkowy" in stock.licencja_audio(items[2]) and "4.0" in stock.licencja_audio(items[2])
+
+
+def test_stock_audio_download_checks_page(monkeypatch, tmp_path):
+    """Usunięty dźwięk, inna licencja na stronie, źródło spoza Freesound albo NC: odmowa; dobry plik: .json z licencją."""
+    monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "cache"))
+    detal = {"d": _ov("d", 1.0, "cc0"), "z": _ov("z", 1.0, "by", "4.0"), "w": _ov("w", 1.0, "cc0", source="wikimedia_audio",
+             url="https://commons.wikimedia.org/w/index.php?curid=1"), "n": _ov("n", 1.0, "by-nc", "4.0"), "ok": _ov("ok", 1.0, "by", "4.0")}
+    monkeypatch.setattr(stock, "_json", lambda url, headers=None: detal[url.rstrip("/").rsplit("/", 1)[1]])
+    strony = {"d": "<title>Freesound - Deleted sound</title>", "z": "creativecommons.org/publicdomain/zero/1.0",
+              "ok": "<title>Freesound - ok</title> creativecommons.org/licenses/by/4.0/"}
+    biezacy = {}
+
+    def get(url, headers=None, timeout=30):
+        if "cdn.freesound.org" in url:
+            return b"ID3fake"
+        return strony[biezacy["id"]].encode()
+    monkeypatch.setattr(stock, "_get", get)
+    monkeypatch.setattr(stock, "szczyt", lambda p: 0.12)
+    for id_, msg in [("d", "usunął"), ("z", "nie pokazuje licencji"), ("w", "tylko Freesound"), ("n", "nie nadaje się")]:
+        biezacy["id"] = id_
+        with pytest.raises(stock.StockError, match=msg):
+            stock.download_audio(f"openverse:{id_}")
+    with pytest.raises(stock.StockError, match="zły identyfikator"):
+        stock.download_audio("openverse:../../etc")
+    biezacy["id"] = "ok"
+    path, meta = stock.download_audio("openverse:ok", tmp_path / "sfx")
+    assert path == tmp_path / "sfx" / "openverse-ok.mp3" and path.read_bytes() == b"ID3fake"
+    assert meta["podpis_wymagany"] and meta["atrybucja"].startswith('"t-ok"') and meta["szczyt"] == 0.12
+    assert json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))["licencja"].startswith("CC BY 4.0")
+    monkeypatch.setattr(stock, "_json", lambda *a, **k: pytest.fail("drugie pobranie bez zapytania do API"))
+    assert stock.download_audio("openverse:ok")[0].name == "openverse-ok.mp3"
+
+
+def test_stock_audio_rate_limit_message(monkeypatch):
+    def limit(url, headers=None):
+        raise stock.StockError("api.openverse.org: limit zapytań (429), spróbuj za chwilę")
+    monkeypatch.setattr(stock, "_json", limit)
+    with pytest.raises(stock.StockError, match="200 na dzień"):
+        stock.search_audio("whoosh")
+
+
 def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
     import yaml

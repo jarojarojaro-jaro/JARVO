@@ -1,7 +1,7 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.13.1
+version: 1.14.0
 author: Jarvo
 license: MIT
 metadata:
@@ -154,7 +154,16 @@ Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność
    drip, boing, riser, splash, click, step, fall, chime, chirp, burner (+ `vol`, `pan`, `pitch` 0,9–1,3, żeby się nie powtarzały).
    Czasy: zdarzenia w obrazie (klik, zmiana stanu, cięcie) i bity z `rytm.py`; cue **~0,03 s przed** klatką zdarzenia.
    Bez ciągłego „skrobania” pod rysowaniem: dźwięk mają kontakty, nie rysowanie.
-3. **Brak w bibliotece:** biblioteka marki, `@@KNOWLEDGE_DIR@@/wideo/sfx/`, potem Mixkit i Pixabay, ale **tylko
+3. **Brak w bibliotece:** biblioteka marki, `@@KNOWLEDGE_DIR@@/wideo/sfx/`, potem **Openverse** (Freesound, bez klucza,
+   bez przeglądarki): `python3 $HERMES_HOME/scripts/stock.py szukaj "whoosh" --typ dzwiek --arkusz out/wideo/fale.png`
+   (`--rodzaj efekt|tlo|muzyka`; zapytanie prostym słowem po angielsku: whoosh, click, rain, crowd, door). Arkusz fal
+   oglądasz `vision_analyze` (ostre uderzenie, narastanie, ciągłe tło), potem `stock.py pobierz openverse:<id>
+   --typ dzwiek --do out/wideo/src/sfx`: pobranie sprawdza licencję na stronie pliku i odrzuca dźwięki usunięte przez
+   autora. Domyślnie tylko CC0 (bez podpisu); `--licencja by` dokłada CC BY, a wtedy **podpis z pola `atrybucja`**
+   (plik `.json` obok dźwięku) idzie do opisu posta i RAPORT. `.json` ma `szczyt`: efekt kładziesz
+   `projekt.py dodaj-audio <film> <plik> --start <T − szczyt>`. Limit bez klucza: 200 zapytań dziennie, więc szukasz
+   celnie (jedno zapytanie na zdarzenie), a pobrane pliki leżą w cache. Muzyka: najpierw biblioteka i `muzyka.py`;
+   utwór z Openverse tylko z RAPORT o możliwym Content ID. Na końcu Mixkit i Pixabay, ale **tylko
    pliki z darmową licencją sprawdzoną na stronie tego pliku**: Mixkit „Free License” (nie „Restricted”), Pixabay
    „Content License” (bez sponsorowanych wyników iStock w wyszukiwarce: są płatne). Do RAPORT: link do strony pliku
    i nazwa licencji. Plik żyje tylko w filmie: nie oddajesz go klientowi osobno ani w paczce plików.

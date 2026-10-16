@@ -1,9 +1,22 @@
 #!/usr/bin/env python3
-"""Darmowe ujęcia i zdjęcia z Pexels i Pixabay: szukanie, arkusz podglądów do oceny okiem, pobieranie z licencją.
+"""Darmowe ujęcia i zdjęcia z Pexels i Pixabay oraz dźwięki z Openverse: szukanie, arkusz do oceny okiem, pobieranie
+z licencją.
 
     python3 stock.py szukaj "ziarna kawy makro" [--format 9:16] [--typ wideo|zdjecie] [--ile 8] [--min-sek 4]
                             [--arkusz out/wideo/arkusz.jpg] [--json]
     python3 stock.py pobierz pexels:123456 [--format 9:16] [--typ wideo|zdjecie] [--do out/wideo/src]
+    python3 stock.py szukaj "whoosh" --typ dzwiek [--rodzaj efekt|tlo|muzyka] [--licencja cc0|by] [--arkusz fale.png]
+    python3 stock.py pobierz openverse:<id> --typ dzwiek [--do out/wideo/src/sfx]
+
+Dźwięki: Openverse (api.openverse.org, bez klucza) i z niego tylko Freesound. Wikimedia w Openverse to głównie
+nagrania wymowy słów (hasło „thunder” daje słowo „thunder”), a strony utworów Jamendo nie dają się sprawdzić (404).
+Domyślnie tylko CC0 i domena publiczna (bez podpisu); `--licencja by` dokłada CC BY (podpis autora obowiązkowy:
+`atrybucja` w pliku `.json`). Nigdy NC (bez użytku komercyjnego), ND ani SA (cały film musiałby mieć tę licencję).
+`pobierz` czyta stronę pliku na Freesound: dźwięk usunięty przez autora (Openverse wciąż go pokazuje) albo z inną
+licencją niż w indeksie = odmowa. Plik `.json` obok dźwięku ma też `szczyt` (s od początku do najgłośniejszych
+10 ms), więc efekt kładziesz szczytem w chwili T: `projekt.py dodaj-audio <film> <plik> --start <T − szczyt>`.
+Bez klucza Openverse daje 20 zapytań na minutę i 200 na dzień (wyniki w cache 24 h, pobranie pliku nie zużywa
+limitu); więcej po bezpłatnej rejestracji aplikacji: OPENVERSE_CLIENT_ID i OPENVERSE_CLIENT_SECRET.
 
 Klucze (darmowe): PEXELS_API_KEY (pexels.com/api), PIXABAY_API_KEY (pixabay.com/api/docs). Wystarczy jeden;
 dodaj w dashboardzie Keys (profil główny), Jarvo rozda go agentom. Zapytanie może być po polsku (locale pl-PL),
@@ -14,8 +27,10 @@ a obok pliku `.json` z autorem, adresem strony i licencją (do RAPORT.md i opisu
 from __future__ import annotations
 
 import argparse
+import array
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import urllib.error
@@ -128,6 +143,176 @@ def search_pixabay(key: str, query: str, kind: str, fmt: str, n: int) -> list[di
 
 
 PROVIDERS = {"pexels": search_pexels, "pixabay": search_pixabay}
+
+
+# ------------------------------------------------------------------ dźwięki: Openverse (tylko Freesound)
+
+OPENVERSE = "https://api.openverse.org/v1"
+OV_ZRODLA = "freesound"
+OV_LICENCJE = {"cc0": "cc0,pdm", "by": "cc0,pdm,by"}           # nigdy NC, ND, SA
+OV_NA_STRONIE = {"cc0": "creativecommons.org/publicdomain/zero/1.0", "pdm": "creativecommons.org/publicdomain/mark/1.0",
+                 "by": "creativecommons.org/licenses/by/{wersja}"}
+OV_NAZWY = {"cc0": "CC0 1.0 (domena publiczna): bez podpisu, także komercyjnie",
+            "pdm": "Public Domain Mark (domena publiczna): bez podpisu, także komercyjnie",
+            "by": "CC BY {wersja}: także komercyjnie, podpis autora obowiązkowy (opis posta albo RAPORT/napisy końcowe)"}
+RODZAJE = {"efekt": (0.05, 15.0), "tlo": (10.0, 600.0), "muzyka": (20.0, 600.0)}   # długość w sekundach
+
+
+def _ov_naglowki() -> dict:
+    """Token aplikacji Openverse (OPENVERSE_CLIENT_ID/SECRET, wyższe limity); bez nich zapytania anonimowe."""
+    cid, sec = os.environ.get("OPENVERSE_CLIENT_ID", "").strip(), os.environ.get("OPENVERSE_CLIENT_SECRET", "").strip()
+    if not (cid and sec):
+        return {}
+    plik = wl.cache_dir("stock") / "openverse-token.json"
+    teraz = __import__("time").time()
+    try:
+        t = json.loads(plik.read_text(encoding="utf-8"))
+        if t.get("id") == cid and t.get("do", 0) > teraz + 60:
+            return {"Authorization": f"Bearer {t['token']}"}
+    except (OSError, ValueError, KeyError):
+        pass
+    dane = urllib.parse.urlencode({"grant_type": "client_credentials", "client_id": cid, "client_secret": sec}).encode()
+    req = urllib.request.Request(f"{OPENVERSE}/auth_tokens/token/", data=dane, headers={"User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            odp = json.loads(r.read())
+    except (urllib.error.URLError, ValueError) as exc:
+        print(f"ℹ Openverse: token aplikacji nieudany ({exc}), szukam bez klucza.", file=sys.stderr)
+        return {}
+    plik.write_text(json.dumps({"id": cid, "token": odp["access_token"], "do": teraz + float(odp.get("expires_in", 3600))}),
+                    encoding="utf-8")
+    plik.chmod(0o600)
+    return {"Authorization": f"Bearer {odp['access_token']}"}
+
+
+def _ov_json(url: str) -> dict:
+    try:
+        return _json(url, _ov_naglowki())
+    except StockError as exc:
+        if "429" in str(exc):
+            raise StockError("Openverse: limit zapytań bez klucza (20 na minutę, 200 na dzień). Spróbuj później albo dodaj "
+                             "OPENVERSE_CLIENT_ID i OPENVERSE_CLIENT_SECRET (bezpłatna rejestracja aplikacji).") from exc
+        raise
+
+
+def _ov_item(r: dict) -> dict:
+    lic, wer = (r.get("license") or "").lower(), r.get("license_version") or ""
+    return {"id": f"openverse:{r['id']}", "zrodlo": "openverse", "typ": "dzwiek", "tytul": r.get("title"),
+            "sek": round((r.get("duration") or 0) / 1000, 2), "licencja_kod": lic, "licencja_wersja": wer,
+            "licencja_url": r.get("license_url"), "atrybucja": r.get("attribution"), "autor": r.get("creator"),
+            "autor_url": r.get("creator_url"), "strona": r.get("foreign_landing_url"), "serwis": r.get("source"),
+            "podglad": r.get("url"), "tagi": [t.get("name") for t in (r.get("tags") or []) if t.get("name")][:8],
+            "pliki": [{"url": r.get("url")}]}
+
+
+def search_audio(query: str, rodzaj: str = "efekt", licencja: str = "cc0", n: int = 8) -> list[dict]:
+    """Dźwięki z Openverse (Freesound): długość z rodzaju (filtr API `length` nie działa), CC0 przed CC BY."""
+    lo, hi = RODZAJE[rodzaj]
+    q = urllib.parse.quote(query)
+    out: list[dict] = []
+    for strona in (1, 2):                          # strona = 1 zapytanie z limitu; druga tylko, gdy po filtrze za mało
+        data = _ov_json(f"{OPENVERSE}/audio/?q={q}&license={OV_LICENCJE[licencja]}&source={OV_ZRODLA}"
+                        f"&mature=false&page_size=20&page={strona}")
+        for r in data.get("results", []):
+            it = _ov_item(r)
+            if it["licencja_kod"] in OV_NA_STRONIE and lo <= it["sek"] <= hi and it["podglad"]:
+                out.append(it)
+        if len(out) >= n or strona >= (data.get("page_count") or 1):
+            break
+    out.sort(key=lambda it: it["licencja_kod"] == "by")     # stabilnie: CC0 i PDM przed CC BY, dalej trafność API
+    return out[:n]
+
+
+def licencja_audio(it: dict) -> str:
+    return OV_NAZWY[it["licencja_kod"]].format(wersja=it.get("licencja_wersja") or "")
+
+
+def sprawdz_strone(it: dict) -> None:
+    """Strona pliku na Freesound: dźwięk istnieje i ma tę samą licencję co w indeksie Openverse."""
+    url = it.get("strona") or ""
+    if urllib.parse.urlparse(url).netloc not in ("freesound.org", "www.freesound.org"):
+        raise StockError(f"{it['id']}: strona pliku spoza Freesound ({url or 'brak'}), licencji nie sprawdzę")
+    html = _get(url, timeout=30).decode("utf-8", "replace")
+    if "Deleted sound" in html[:4000]:
+        raise StockError(f"{it['id']}: autor usunął dźwięk z Freesound (Openverse wciąż go pokazuje), nie bierzemy")
+    znak = OV_NA_STRONIE[it["licencja_kod"]].format(wersja=it.get("licencja_wersja") or "")
+    if znak not in html:
+        raise StockError(f"{it['id']}: strona pliku nie pokazuje licencji {it['licencja_kod'].upper()} "
+                         f"{it.get('licencja_wersja') or ''} (mogła się zmienić), nie bierzemy")
+
+
+def szczyt(path: Path) -> float | None:
+    """Sekunda najgłośniejszych 10 ms (start efektu = chwila zdarzenia − szczyt); bez FFmpeg: None."""
+    if not __import__("shutil").which("ffmpeg"):
+        return None
+    res = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-i", str(path), "-ac", "1",
+                          "-ar", "8000", "-f", "s16le", "-"], capture_output=True)
+    if res.returncode != 0 or not res.stdout:
+        return None
+    a = array.array("h")
+    a.frombytes(res.stdout[: len(res.stdout) // 2 * 2])
+    okno, best, gdzie = 80, -1, 0
+    for i in range(0, len(a), okno):
+        m = max((abs(x) for x in a[i:i + okno]), default=0)
+        if m > best:
+            best, gdzie = m, i
+    return round(gdzie / 8000, 2)
+
+
+def download_audio(item_id: str, dest: Path | None = None) -> tuple[Path, dict]:
+    raw = item_id.partition(":")[2]
+    if not raw or not all(c.isalnum() or c == "-" for c in raw):
+        raise StockError(f"{item_id}: zły identyfikator (openverse:<id> z `szukaj --typ dzwiek`)")
+    path = wl.cache_dir("stock", "pliki") / f"openverse-{raw}.mp3"
+    if path.exists() and path.stat().st_size and path.with_suffix(".json").exists():
+        return _deliver(path, json.loads(path.with_suffix(".json").read_text(encoding="utf-8")), dest)
+    it = _ov_item(_ov_json(f"{OPENVERSE}/audio/{raw}/"))
+    if it["licencja_kod"] not in OV_NA_STRONIE:
+        raise StockError(f"{item_id}: licencja {it['licencja_kod'].upper()} nie nadaje się do filmów (bierzemy CC0, PDM, CC BY)")
+    if it["serwis"] != OV_ZRODLA:
+        raise StockError(f"{item_id}: źródło {it['serwis']}, bierzemy tylko Freesound")
+    sprawdz_strone(it)
+    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False, suffix=".mp3") as tmp:
+        tmp.write(_get(it["podglad"], timeout=120))
+    Path(tmp.name).replace(path)
+    meta = {k: it.get(k) for k in ("id", "zrodlo", "typ", "tytul", "sek", "autor", "autor_url", "strona", "serwis",
+                                   "licencja_url", "atrybucja")}
+    meta.update({"plik": path.name, "licencja": licencja_audio(it), "podpis_wymagany": it["licencja_kod"] == "by",
+                 "szczyt": szczyt(path), "sprawdzono": __import__("datetime").date.today().isoformat()})
+    wl.write_json(path.with_suffix(".json"), meta)
+    return _deliver(path, meta, dest)
+
+
+def fale_arkusz(items: list[dict], out: Path, cols: int = 2) -> Path | None:
+    """Siatka ponumerowanych fal dźwięku (kształt: uderzenie, narastanie, ciągłe tło) do oceny vision_analyze.
+    Podglądy idą z CDN Freesound, nie z API, więc arkusz nie zużywa limitu Openverse."""
+    cells = []
+    with tempfile.TemporaryDirectory(prefix="jarvo-fale-") as tmp:
+        tdir = Path(tmp)
+        for i, it in enumerate(items, 1):
+            src = tdir / f"src{i}.mp3"
+            try:
+                src.write_bytes(_get(it["podglad"], timeout=60))
+            except StockError:
+                continue
+            cell = tdir / f"cell{len(cells):02d}.png"
+            # ciemne tło pod falą (sama fala ma przezroczyste), skala pierwiastkowa: ciche dźwięki też widać
+            fala = ("color=c=0x15171C:s=560x150[t];[0:a]showwavespic=s=560x150:split_channels=0:scale=sqrt:"
+                    "colors=0x4FD1C5[f];[t][f]overlay=format=auto,pad=580:190:10:34:color=0x15171C")
+            opis = f"{i}  {it['sek']} s  {it['licencja_kod'].upper()}"
+            try:
+                wl.run(["ffmpeg", "-y", "-i", str(src), "-filter_complex",
+                        fala + f",drawtext=text='{opis}':x=10:y=6:fontsize=22:fontcolor=white", "-frames:v", "1", str(cell)])
+            except wl.FFError:   # FFmpeg bez fontconfig: numeracja wg kolejności (od lewej, rzędami)
+                wl.run(["ffmpeg", "-y", "-i", str(src), "-filter_complex", fala, "-frames:v", "1", str(cell)])
+            cells.append(cell)
+        if not cells:
+            return None
+        rows = (len(cells) + cols - 1) // cols
+        out.parent.mkdir(parents=True, exist_ok=True)
+        wl.run(["ffmpeg", "-y", "-framerate", "1", "-i", str(tdir / "cell%02d.png"),
+                "-vf", f"tile={min(cols, len(cells))}x{rows}:padding=4:color=0x0B0D12", "-frames:v", "1", str(out)])
+    return out
 
 
 def score(item: dict, fmt: str, min_sec: float) -> float:
@@ -286,18 +471,37 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("szukaj", help="szukaj ujęć/zdjęć")
     s.add_argument("zapytanie")
     s.add_argument("--format", default="9:16")
-    s.add_argument("--typ", choices=["wideo", "zdjecie"], default="wideo")
+    s.add_argument("--typ", choices=["wideo", "zdjecie", "dzwiek"], default="wideo")
+    s.add_argument("--rodzaj", choices=sorted(RODZAJE), default="efekt", help="dźwięk: efekt (≤ 15 s), tlo, muzyka")
+    s.add_argument("--licencja", choices=sorted(OV_LICENCJE), default="cc0", help="dźwięk: cc0 (bez podpisu) albo by (+ CC BY)")
     s.add_argument("--ile", type=int, default=8)
     s.add_argument("--min-sek", type=float, default=4.0)
     s.add_argument("--arkusz", help="zapisz siatkę ponumerowanych podglądów (JPG) do oceny okiem")
     s.add_argument("--json", action="store_true")
-    p = sub.add_parser("pobierz", help="pobierz ujęcie po id (pexels:123 / pixabay:456)")
+    p = sub.add_parser("pobierz", help="pobierz ujęcie albo dźwięk po id (pexels:123 / pixabay:456 / openverse:<id>)")
     p.add_argument("id", nargs="+")
     p.add_argument("--format", default="9:16")
-    p.add_argument("--typ", choices=["wideo", "zdjecie"], default="wideo")
+    p.add_argument("--typ", choices=["wideo", "zdjecie", "dzwiek"], default="wideo")
     p.add_argument("--do", help="katalog docelowy (np. out/wideo/src); domyślnie tylko cache")
     args = ap.parse_args(argv)
     try:
+        if args.cmd == "szukaj" and args.typ == "dzwiek":
+            items = search_audio(args.zapytanie, args.rodzaj, args.licencja, args.ile)
+            sheet = fale_arkusz(items, Path(args.arkusz)) if args.arkusz else None
+            if args.json:
+                print(json.dumps({"wyniki": [{k: v for k, v in it.items() if k != "pliki"} for it in items],
+                                  "arkusz": str(sheet) if sheet else None}, ensure_ascii=False, indent=1))
+            else:
+                for i, it in enumerate(items, 1):
+                    print(f"{i:>2}. {it['id']:<48} {it['sek']:>6.2f} s  {it['licencja_kod'].upper():<4} "
+                          f"{(it.get('tytul') or '')[:40]}  ({it.get('autor') or '?'})")
+                if sheet:
+                    print(f"Arkusz fal: {sheet}  (numery = kolejność powyżej)")
+                if not items:
+                    print("Brak wyników: proste słowo po angielsku (whoosh, click, rain, crowd), inny --rodzaj albo --licencja by.")
+                elif any(it["licencja_kod"] == "by" for it in items):
+                    print("CC BY: podpis autora obowiązkowy (pole `atrybucja` w .json po pobraniu).")
+            return 0
         if args.cmd == "szukaj":
             items = search(args.zapytanie, args.typ, args.format, args.ile, args.min_sek)
             sheet = contact_sheet(items, Path(args.arkusz)) if args.arkusz else None
@@ -314,6 +518,11 @@ def main(argv: list[str] | None = None) -> int:
                     print("Brak wyników: spróbuj prostszego zapytania po angielsku (np. 'coffee beans').")
             return 0
         for item_id in args.id:
+            if args.typ == "dzwiek" or item_id.startswith("openverse:"):
+                path, meta = download_audio(item_id, Path(args.do) if args.do else None)
+                print(f"{path}  ({meta.get('autor') or '?'}, {meta.get('licencja')}; szczyt {meta.get('szczyt')} s)"
+                      + (f"\n  podpis: {meta.get('atrybucja')}" if meta.get("podpis_wymagany") else ""))
+                continue
             path, meta = download(item_id, args.format, args.typ, Path(args.do) if args.do else None)
             print(f"{path}  ({meta.get('autor') or '?'}, {meta.get('zrodlo')})")
         return 0

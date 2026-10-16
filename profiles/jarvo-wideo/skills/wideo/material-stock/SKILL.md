@@ -1,12 +1,12 @@
 ---
 name: material-stock
-description: "Darmowe ujęcia i zdjęcia stock (Pexels, Pixabay) z licencją."
-version: 1.1.0
+description: "Ujęcia, zdjęcia i dźwięki stock z licencją."
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
-    tags: [video, stock, pexels, pixabay, footage, license]
+    tags: [video, stock, pexels, pixabay, openverse, sound, footage, license]
     related_skills: [krotki-film, dobor-ujec, wideo-ai]
   jarvo:
     agent: jarvo-wideo
@@ -14,7 +14,7 @@ metadata:
     reviewed: "2026-10-05"
 ---
 
-# Materiał stock (Pexels, Pixabay)
+# Materiał stock (Pexels, Pixabay, Openverse)
 
 Darmowe ujęcia wideo i zdjęcia do scen: `$HERMES_HOME/scripts/stock.py`. Klucz: `PEXELS_API_KEY` albo `PIXABAY_API_KEY`
 (darmowy, dashboard → Keys przy profilu głównym). Wyniki i pliki trafiają do wspólnego cache, drugi raz bez pobierania.
@@ -49,8 +49,14 @@ Darmowe ujęcia wideo i zdjęcia do scen: `$HERMES_HOME/scripts/stock.py`. Klucz
   wprowadzać w błąd. Prawa osób trzecich w kadrze (logo, budynek, dzieło sztuki) sprawdzasz sam.
 - Rozpoznawalna twarz w centrum reklamy produktu → wybierz inne ujęcie albo kadr bez twarzy.
 
+## Dźwięki (Openverse)
+`stock.py szukaj "<słowo>" --typ dzwiek` szuka efektów, tła i muzyki w Openverse (bez klucza; z indeksu tylko
+Freesound, bo Wikimedia to głównie nagrania wymowy słów). Domyślnie CC0, `--licencja by` dokłada CC BY z podpisem
+(`atrybucja` w `.json`); NC, ND i SA nigdy. `pobierz openverse:<id> --typ dzwiek` czyta stronę pliku: usunięty
+dźwięk albo inna licencja = odmowa. Kolejność i zasady dźwięku: skill `lektor-i-dzwiek` (najpierw biblioteka CC0).
+
 ## Pułapki poza `stock.py`
-`stock.py` (API) zwraca tylko darmowy materiał Pexels i Pixabay. Gdy szukasz w przeglądarce albo właściciel
+`stock.py` (API) zwraca tylko darmowy materiał Pexels i Pixabay oraz dźwięki Freesound z Openverse. Gdy szukasz w przeglądarce albo właściciel
 podsyła link, licencję czytasz na stronie tego konkretnego pliku, nie z pamięci, i zapisujesz link oraz nazwę
 licencji w RAPORT:
 - **Pixabay:** pierwsze wyniki wyszukiwarki to sponsorowane zdjęcia iStock (płatne, inna licencja). Bierzesz tylko
@@ -70,5 +76,5 @@ licencji w RAPORT:
 ## Definition of Done
 - [ ] każde ujęcie stock obejrzane (arkusz) i dobrane do zdania sceny,
 - [ ] bez znaków wodnych, obcych logo, cudzego tekstu i przypadkowych twarzy w centrum,
-- [ ] autor, strona i licencja każdego ujęcia w `film.json` i RAPORT.md,
+- [ ] autor, strona i licencja każdego ujęcia w `film.json` i RAPORT.md (dźwięk CC BY: podpis z `atrybucja` także w opisie posta),
 - [ ] materiał spoza `stock.py`: licencja odczytana na stronie pliku, link i jej nazwa w RAPORT.md.

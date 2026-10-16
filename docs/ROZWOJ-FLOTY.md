@@ -182,7 +182,7 @@ zasobu, karuzela jako PDF dla LinkedIna i PNG dla Instagrama.
 | 2 | `brand_lint.py` | kontrast WCAG AA, strefy bezpieczne 9:16, dozwolone fonty; polska typografia: twarda spacja po „w, z, i, o, u, a”, cudzysłowy „”, półpauzy | S |
 | 3 | `copy_check.py` | sito frazesów AI (dziś tylko w prompcie), limity znaków platform, długość hooka | S |
 | 4 | Biblioteka 8–10 szablonów | karuzela, PDF na LinkedIn, promocja, miniatura; sprawdzenie układu przy renderze (przepełnienie, minimalny font) | S–M |
-| 5 | Zasoby z licencją i oznaczenie AI | [Openverse](https://api.openverse.org/v1/) i Pexels; IPTC `DigitalSourceType=trainedAlgorithmicMedia` w obrazach AI (exiftool), bo od 2.08.2026 obowiązuje art. 50 AI Act | S |
+| 5 | Zasoby z licencją i oznaczenie AI | [Openverse](https://api.openverse.org/v1/) i Pexels (dźwięki z Openverse ma już Wideograf: `stock.py --typ dzwiek`); IPTC `DigitalSourceType=trainedAlgorithmicMedia` w obrazach AI (exiftool), bo od 2.08.2026 obowiązuje art. 50 AI Act | S |
 | 6 | (opcjonalnie) LanguageTool po polsku | własna instancja, 0,5–1 GB RAM: sieć na literówki i gramatykę, nie ocena stylu; tylko po pomiarze | M |
 | 7 | Publikacja | Postiz poza VPS (osobny mały serwer albo Postiz Cloud) albo eksport ICS/CSV do ręcznego importu | S |
 
