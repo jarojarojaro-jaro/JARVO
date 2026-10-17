@@ -42,7 +42,7 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 - **Wspólne:** wiedza o Tobie (USER.md), brand kity (`knowledge/brands`) i **skarbiec wiedzy** (`knowledge/`, [WIEDZA.md](WIEDZA.md):
   notatki z linkami, orzeczenia z Twoich korekt, wyciągi z rozmów i kart; wtyczka `jarvo-wiedza` daje każdemu agentowi
   przypomnienia przed turą i narzędzia `wiedza_*`). Pamięć i skille są per agent
-  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format albo bez metadanych) u wszystkich, `ostrozna-przegladarka` (jedna próba Camoufoxem po odmowie strony) u Łowcy i Sherlocka; Ręka czyta skille wszystkich).
+  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format albo bez metadanych) i `odczyt-ekranu` (tekst ze zrzutu ekranu, skanu albo PDF: Indra OCR, zapas Tesseract) u wszystkich, `ostrozna-przegladarka` (jedna próba Camoufoxem po odmowie strony) u Łowcy i Sherlocka; Ręka czyta skille wszystkich).
 - **Nadzór bez palenia tokenów:** dispatcher kanbana i patrol (skrypt bez modelu) pilnują floty
   i budzą Jarva tylko przy anomaliach albo gdy trzeba Twojej decyzji.
 
@@ -282,7 +282,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `profiles/_host/` | profil hosta: gateway z multipleksacją, trasy Telegrama, dispatcher kanbana |
 | `shared/protocol/` | kontrakt zlecenia (17 zasad) wstrzykiwany do każdego SOUL |
 | `shared/security/deny.yaml` | reguły blokad dla całej floty |
-| `shared/skills/` | skille wspólne (`graf-kodu`; `transkrypcja-filmu`: link do filmu → tekst mowy; `hooki`: trzy warstwy hooka, 18 taktyk; `izometria`: figury izometryczne ze świeceniem na stronę, PNG i film; `warsztat-3d`: model 3D z kodu build123d → STEP, STL, GLB, 3MF, podgląd PNG i film obrotu; `konwersja-plikow`: plik → inny format albo bez metadanych u każdego agenta; `ostrozna-przegladarka`: zapasowa przeglądarka Camoufox Łowcy i Sherlocka po odmowie strony) |
+| `shared/skills/` | skille wspólne (`graf-kodu`; `transkrypcja-filmu`: link do filmu → tekst mowy; `hooki`: trzy warstwy hooka, 18 taktyk; `izometria`: figury izometryczne ze świeceniem na stronę, PNG i film; `warsztat-3d`: model 3D z kodu build123d → STEP, STL, GLB, 3MF, podgląd PNG i film obrotu; `konwersja-plikow`: plik → inny format albo bez metadanych u każdego agenta; `odczyt-ekranu`: tekst ze zrzutu ekranu, skanu, PDF albo klatki filmu (Indra OCR, zapas Tesseract) u każdego agenta; `ostrozna-przegladarka`: zapasowa przeglądarka Camoufox Łowcy i Sherlocka po odmowie strony) |
 | `shared/calibration/` | kalibracja SOUL pod rodzinę modelu przy buildzie |
 | `shared/templates/` | szablony SOUL, skilla, evals i toolboxa (`make new-agent`) |
 | `security/redteam/` | promptfoo: prowider, config, scenariusze ataków |

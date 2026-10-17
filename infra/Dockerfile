@@ -187,6 +187,53 @@ print('build123d OK', round(b.volume, 1))" && \
     test -s p.step && test -s p.stl && test -s p.glb && test -s p.3mf && \
     node -e "require.resolve('three')" && cd / && rm -rf "$t"
 
+# --- Odczyt ekranu (wspólny skill odczyt-ekranu, ocr.py): Indra OCR 0.3.2 (datalab-to, https://github.com/datalab-to/indra-ocr)
+#     jako główny silnik OCR, Tesseract (apt, wyżej) w zapasie. Szybki OCR na CPU: zrzut ekranu ~0,3–0,5 s, polski
+#     dokument ~0,4 s (Tesseract 1,1–1,9 s), czyta też obrócone strony, kolumny, tabele i chińskie znaki.
+#     Osobny venv na Pythonie 3.12 (~0,25 GB: onnxruntime, opencv-headless, pypdfium2, numpy), --no-deps bez
+#     huggingface_hub: Indra pobiera nim modele i raz na dobę pyta Hub o zmiany, u nas modele leżą w obrazie
+#     (INDRA_OCR_MODEL_DIR), więc kod pobierania nie jest zainstalowany, a ocr.py dodatkowo blokuje gniazda.
+#     Modele ONNX (~37 MB) z przypiętej rewizji repo datalab-to/indra-ocr (tag v3.1.1, ta sama co HF_REVISION paczki),
+#     każdy plik sprawdzany sha256. Licencja modeli: zmodyfikowana OpenRAIL-M (bez opłat do 20 mln USD przychodu
+#     albo finansowania i bez produktu konkurującego z Datalab). Przegląd 2026-10-17: właściciel potwierdził, że
+#     Jarvo nie jest sprzedawany ani nie konkuruje z Datalab (vendor/zrodla.yaml). Na końcu próbny odczyt bez sieci.
+ARG INDRA_OCR_URL=https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8
+RUN set -e; uv venv /opt/jarvo/venvs/ocr --python 3.12 && \
+    VIRTUAL_ENV=/opt/jarvo/venvs/ocr uv pip install --no-config --no-deps --require-hashes --only-binary :all: \
+      --compile-bytecode -r /opt/jarvo/python/requirements-ocr.txt && \
+    d=/opt/jarvo/models/indra-ocr; mkdir -p "$d" && \
+    for f in det.onnx rec.onnx rec_cjk.onnx order.onnx orient.onnx script.onnx meta.json config.json \
+             mathcls.onnx math_enc.onnx math_dec_init.onnx math_dec_step.onnx math_meta.json LICENSE README.md; do \
+      curl -fsSL --retry 3 "$INDRA_OCR_URL/$f" -o "$d/$f"; done && \
+    printf '%s\n' \
+      "46b0050ce4c4692f887a1a9c038480223af1c7a91b3fcced2657d9cf00290dc4  $d/det.onnx" \
+      "e243be069b357e56a0e867a21d7482e498df42fb19678bfb67a25f48b1f06151  $d/rec.onnx" \
+      "4cec840b55e1bb7f375daf30a2975404a867a71ac1a5bc5b1629c4909ce16baa  $d/rec_cjk.onnx" \
+      "23635dd2324b4ccc00c408af961273a2dedd2e4f0386bc54dba678c41bcf6b46  $d/order.onnx" \
+      "8d7bfce5d08bcad55955f41ca494a7f9d9d3ed5d5b6da1f6f276d5c509590729  $d/orient.onnx" \
+      "5ba37030e817affede0097a7503b6829624104166c6e0b6aacecacf919fc7d11  $d/script.onnx" \
+      "ff6ec58f91c93a475ae9505ad21c73c3ecda0b378f1d889dd83408e10832d1bb  $d/meta.json" \
+      "cd143c66015620865d9d8361b1bb6f9781363b8e010d78c49b10d69009807d1d  $d/config.json" \
+      "818b1556e9ef337958db6be0c9791299d3f74a4575586b0cd469aaae9534ff96  $d/mathcls.onnx" \
+      "d4e4a6c40dad1ee988d32c6403b1590ca42864d4483bbe1e671c5dbb999a5a97  $d/math_enc.onnx" \
+      "919417fde9962c3318aeb478c1fe3955dd2bb8cd34476c68debed2ba39e5dcd6  $d/math_dec_init.onnx" \
+      "5ff6e6cbaf0dea70314f66222a1469736a8c5e7994fab06a5b4e53c90469239f  $d/math_dec_step.onnx" \
+      "85d9715fb8a77791b55ef89f57fb41e72eb3170ec58a7c3bee3b394268bf2b10  $d/math_meta.json" \
+      "50c88a018a7ee322e89f6b09401b237beb0cd331685879405b3db48993950a5f  $d/LICENSE" \
+      "8e3ca98438d183f40efc036c45b82e8e775f2c04e798ae86c1509d0560a8be8f  $d/README.md" \
+      | sha256sum -c - && \
+    printf '%s\n' "Indra OCR (datalab-to), modele: https://huggingface.co/datalab-to/indra-ocr, rewizja ${INDRA_OCR_URL##*/} (tag v3.1.1)." \
+      "Licencja modeli: LICENSE (zmodyfikowana OpenRAIL-M): bez opłat do 20 mln USD przychodu albo finansowania" \
+      "i bez produktu konkurującego z Datalab. Kod paczki indra-ocr: Apache-2.0. Przegląd: vendor/zrodla.yaml." \
+      "Pliki bez zmian; skill odczyt-ekranu (ocr.py) czyta je przez INDRA_OCR_MODEL_DIR, bez sieci." > "$d/JARVO-ZRODLO.txt" && \
+    t="$(mktemp -d)" && \
+    HF_HUB_OFFLINE=1 INDRA_OCR_MODEL_DIR="$d" /opt/jarvo/venvs/ocr/bin/python -I -c "import cv2, numpy as np, indra_ocr; \
+im = np.full((160, 900), 255, np.uint8); cv2.putText(im, 'Jarvo OCR 2026', (30, 100), cv2.FONT_HERSHEY_SIMPLEX, 2.2, 0, 4); \
+cv2.imwrite('$t/p.png', im); c = indra_ocr.load(threads=2); t = ' '.join(p.text for _, p in c.convert('$t/p.png')); \
+print('Indra OCR:', t); assert 'Jarvo' in t and '2026' in t" && \
+    rm -rf "$t"
+ENV INDRA_OCR_MODEL_DIR=/opt/jarvo/models/indra-ocr
+
 # --- Camoufox (MPL-2.0): Firefox z podmienionym odciskiem przeglądarki, zapasowa przeglądarka Łowcy i Sherlocka
 #     (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`) tylko po odmowie zwykłej przeglądarki. Binarka z wydania
 #     daijro/camoufox przypięta wersją i sumą SHA-256 dla amd64 i arm64 (przejrzana). Z paczki (1,3 GB) zostaje

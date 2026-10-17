@@ -203,7 +203,7 @@ godzinę, z kluczami i 3 powtórzeniami licz kilka godzin. Uruchamiaj w tle: `no
 ## 7. Koszty
 
 Sędzia `claude-sonnet-5.5`: ok. 2 $ za 1 mln tokenów wejścia i 10 $ za 1 mln wyjścia (OpenRouter, 2026-10-13).
-Jedna ocena to ok. 8 tys. tokenów wejścia, czyli ok. 0,02 $. Pełny przebieg floty (195 scenariuszy) z 3 powtórzeniami
+Jedna ocena to ok. 8 tys. tokenów wejścia, czyli ok. 0,02 $. Pełny przebieg floty (196 scenariuszy) z 3 powtórzeniami
 to ok. 580 ocen, ok. 12 $ za sędziego. Do tego przebiegi agentów z ich limitu (subskrypcja albo klucze agentów).
 Przebieg jednego agenta (14–39 scenariuszy × 3) to ok. 1–2,5 $ za sędziego.
 Kuźnia: dwa takie przebiegi (baza i kandydat), czyli ok. 2–5 $ za sędziego, plus jedno wywołanie proponującego

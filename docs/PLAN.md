@@ -203,7 +203,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 11 skilli dowodzenia ([BOSS.md](BOSS.md)).
 - ✅ `jarvo-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
 - ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
-- ✅ Walidator + testy (`make validate`, `make test`, CI) + 195 scenariuszy evals.
+- ✅ Walidator + testy (`make validate`, `make test`, CI) + 196 scenariuszy evals.
 
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
@@ -283,6 +283,8 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
   (OmniParser + PP-OCR, na CPU, bez sieci), klik wskazuje ID regionu związane z konkretnym zrzutem
   (`capture_id`, wygasa po 60 s, bez klikania w gołe współrzędne), więc poradzą sobie modele bez „celowania”.
   Uwaga: OmniParser w Perception jest na **AGPL-3.0** (tylko użytek prywatny, bez udostępniania innym).
+  Sam odczyt tekstu z pikseli flota już ma: wspólny skill `odczyt-ekranu` (Indra OCR, 2026-10-17) daje tekst
+  i ramkę napisu ze zrzutu (`ocr.py --szukaj`), więc z Perception zostałoby tylko rozpoznawanie ikon i przycisków.
   Kandydat: Ręka z własnym pulpitem XFCE w kontenerze uruchamianym na żądanie (zmierzyć RAM na VPS 8 GB),
   sterowanie Twoim Windowsem tylko za zgodą (A2). Chmura Cua Fleets jest płatna: pomijamy.
 - **„Drugi mózg” (analiza 8 repo, 2026-09-28):** Jarvo działa na Hermesie, który już ma pamięć, `session_search`,

@@ -68,6 +68,7 @@ tools:
     used_by_skills: [weryfikacja-faktow]
     healthcheck: "exiftool -ver"
     autonomy: A0
+  - {name: indra-ocr, source: https://github.com/datalab-to/indra, license: "Apache-2.0 (kod); modele: zmodyfikowana OpenRAIL-M (do 20 mln USD, bez produktu konkurującego z Datalab)", version: "0.3.2 (modele v3.1.1)", install: {method: image, spec: "venv /opt/jarvo/venvs/ocr (Python 3.12), infra/python/requirements-ocr.txt (sha256, --require-hashes, --no-deps, bez huggingface_hub); modele /opt/jarvo/models/indra-ocr (sha256)"}, integration: skill-script, used_by_skills: [odczyt-ekranu], healthcheck: "python3 /opt/jarvo/repo/shared/skills/odczyt-ekranu/scripts/ocr.py --stan", autonomy: A0, notes: "Wspólny odczyt ekranu (decyzja właściciela 2026-10-17): zrzut ekranu, skan, PDF, klatka filmu → tekst, ramki, --szukaj; bez sieci (modele w obrazie, gniazda zablokowane). Zapas: Tesseract pol+eng."}
 
 sidecars:
   - name: searxng

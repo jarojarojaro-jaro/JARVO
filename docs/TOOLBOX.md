@@ -267,6 +267,25 @@ z nazwiskami skrypt tylko wskazuje.
 
 ---
 
+## Wszyscy agenci: skill `odczyt-ekranu`
+
+Wspólny skill floty (`shared/skills/odczyt-ekranu/`, decyzja właściciela 2026-10-17): `ocr.py` czyta tekst ze zrzutu
+ekranu, skanu, zdjęcia, PDF albo klatki filmu (`--czas`) na serwerze, bez sieci i bez tokenów modelu. Wynik: sam tekst,
+`--format json` (linie z ramką w pikselach i pewnością), `--format md` (Markdown z układu strony) albo `--szukaj`
+(gdzie jest napis: ramka i środek do kliknięcia, bez wielkości liter i ogonków). Zwykły `python3` sam przechodzi do
+venvu OCR; gniazda są zablokowane w czasie odczytu. Pomiar w kontenerze (4 rdzenie): polski dokument 0,4 s Indra
+wobec 1,9 s Tesseracta przy tych samych polskich znakach, ciemne zrzuty ekranu 0,3–0,5 s wobec 1,1–1,9 s,
+chiński tekst czyta tylko Indra.
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| [Indra OCR](https://github.com/datalab-to/indra) 0.3.2 (datalab-to) | główny silnik: wykrycie linii, rozpoznanie, kolejność czytania, Markdown z układu, obrót strony, pismo łacińskie, cyrylica, greka, dewanagari, chińskie | kod Apache-2.0; modele zmodyfikowana OpenRAIL-M (do 20 mln USD przychodu, bez produktu konkurującego z Datalab) | modele `ed345c7` (tag `v3.1.1`) | venv `/opt/jarvo/venvs/ocr` ([`requirements-ocr.txt`](../infra/python/requirements-ocr.txt), sha256, `--no-deps` bez `huggingface_hub`), modele `/opt/jarvo/models/indra-ocr` (`INDRA_OCR_MODEL_DIR`) |
+| onnxruntime 1.31.0, opencv-python-headless, pypdfium2, numpy | wnioskowanie modeli na CPU, obraz, PDF | MIT / Apache-2.0 / BSD | n/d | ten sam venv (~0,25 GB) |
+| [Tesseract](https://github.com/tesseract-ocr/tesseract) (apt, pol + eng) | zapas, gdy Indry brak albo padnie, i `--silnik tesseract` | Apache-2.0 | n/d | CLI (`tsv`) |
+| FFmpeg, Ghostscript, qpdf (z obrazu) | klatka filmu; strony PDF dla Tesseracta | LGPL/GPL, AGPL-3.0, Apache-2.0 | n/d | CLI |
+
+---
+
 ## Web, Studio, Wideograf: skill `izometria`
 
 Wspólny skill (`shared/skills/izometria/`): klikalne figury izometryczne ze świeceniem w jednym pliku HTML (czysty SVG,
@@ -373,6 +392,7 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 | narzędzia Node | `/opt/jarvo/node/node_modules` (`NODE_PATH`, `.bin` w `PATH`) | agent-browser, lighthouse, axe-core, playwright-core, sharp, svgo, favicons, linkinator, html-validate, dembrandt, inspo-mcp (serwer MCP Weba), three (podgląd warsztatu 3D) |
 | narzędzia Pythona | venv `/opt/jarvo/venv` (Python 3.12, na końcu `PATH`) | trafilatura, yt-dlp, onnx-asr (Parakeet), misaki + spaCy `en_core_web_sm` (lektor Paradee), phonemizer + espeak-ng (`espeakng-loader`, fonemy lektorów), camoufox + Playwright 1.62 (sterownik na Node z obrazu); dodatki `JARVO_EXTRAS`: rembg, auto-editor, docling, manim |
 | warsztat 3D | venv `/opt/jarvo/venvs/cad` (Python 3.12) | build123d 0.13.0 na OpenCascade 8.0 (OCP), ~0,77 GB; koła z sumami sha256 ([`requirements-cad.txt`](../infra/python/requirements-cad.txt)), build kończy się próbną częścią (STEP, STL, GLB, 3MF) |
+| odczyt ekranu (OCR) | venv `/opt/jarvo/venvs/ocr` (Python 3.12), modele `/opt/jarvo/models/indra-ocr` | Indra OCR 0.3.2 (onnxruntime, opencv-headless, pypdfium2), ~0,25 GB + modele ONNX ~37 MB; koła z sumami sha256 ([`requirements-ocr.txt`](../infra/python/requirements-ocr.txt), bez `huggingface_hub`), modele z sumami sha256 z przypiętej rewizji, build kończy się próbnym odczytem bez sieci |
 | claude-seo | `/opt/jarvo/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
 | sidecary | sieć `jarvo-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
 

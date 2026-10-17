@@ -200,6 +200,16 @@ zrodla:
     status: uzywane
     przejrzane: 38effd343e1508964673faf59300a5cc68fbedc1
     notatka: "build123d 0.13.0 (tag v0.13.0): silnik wspólnego skilla warsztat-3d, venv /opt/jarvo/venvs/cad (Python 3.12), koła przypięte sha256 w infra/python/requirements-cad.txt (--no-deps, bez sympy, mpmath, jedi, parso). Przegląd 2026-10-13 (decyzja właściciela): Apache-2.0, zależności MIT/BSD/Apache; bez telemetrii; sieć tylko w jawnym export_to_pcbway i pobieraniu tekstur threejs_materials, zablokowane w cad_model.py; budowa i eksport sprawdzone bez sieci"
+  indra:
+    repo: https://github.com/datalab-to/indra
+    status: uzywane
+    przejrzane: 3d773aeedc5d79d1d0a2a04007a9075cd71a59f4
+    notatka: "Indra OCR 0.3.2 (tag v0.3.2; kod koła z PyPI identyczny z tagiem): główny silnik wspólnego skilla odczyt-ekranu (ocr.py, Tesseract w zapasie), venv /opt/jarvo/venvs/ocr (Python 3.12), koła przypięte sha256 w infra/python/requirements-ocr.txt (--no-deps, bez huggingface_hub: kodu pobierania modeli i dobowego pytania Huba nie ma w obrazie). Kod Apache-2.0. Przegląd 2026-10-17 (decyzja właściciela): autorzy datalab-to (Vik Paruchuri, Surya, Marker), bez telemetrii; sieć tylko w pobieraniu modeli z Hugging Face (u nas modele w obrazie, INDRA_OCR_MODEL_DIR, gniazda zablokowane w ocr.py); przeglądarka wyników `indra_ocr.viewer` ładuje Google Fonts, nie używamy jej. Próba w kontenerze: polski dokument 0,4 s / 98,9 % (Tesseract 1,9 s / 99,4 %, polskie znaki 85/85 w obu), ciemne zrzuty ekranu 0,3–0,5 s (Tesseract 1,1–1,9 s), chiński tylko Indra"
+  indra-ocr-modele:
+    repo: https://huggingface.co/datalab-to/indra-ocr
+    status: uzywane
+    przejrzane: ed345c7f158eddbc7dee0c6a7269afb75a94f7e8
+    notatka: "Modele ONNX Indry (tag v3.1.1 = HF_REVISION paczki 0.3.2), ~37 MB w obrazie (/opt/jarvo/models/indra-ocr, każdy plik sha256 w infra/Dockerfile, LICENSE i karta modelu obok, JARVO-ZRODLO.txt). Licencja: zmodyfikowana OpenRAIL-M: bez opłat do 20 mln USD przychodu albo finansowania i bez produktu konkurującego z Datalab (OCR, parsowanie dokumentów jako usługa); ograniczenia użycia OpenRAIL przechodzą na każdego, komu dajemy modele. Właściciel 2026-10-17: Jarvo nie jest sprzedawany i nie konkuruje z Datalab. Przy zmianie (sprzedaż Jarva albo usługi OCR, przychód lub finansowanie powyżej progu) wraca do przeglądu"
   camoufox:
     repo: https://github.com/daijro/camoufox
     status: uzywane
