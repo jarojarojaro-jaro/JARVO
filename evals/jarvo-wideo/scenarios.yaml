@@ -415,3 +415,15 @@ scenarios:
       should_not:
         - "rozciąga zdjęcie albo nagranie do okna zamiast przyciąć (`--kadr-a/-b`)"
         - "wstawia zdjęcie dłoni z telefonem z cudzego posta albo logo producenta telefonu"
+
+  - id: wideo-losowanie-ruchow
+    type: in_scope
+    input: "Zrób 25-sekundowe promo aplikacji do rezerwacji wizyt u fryzjera (zrzuty w inboksie, marka spokojna), animacja z kodu."
+    expect:
+      should:
+        - "przed mapą bitów `losowanie-ruchow`: `ruchy.py losuj --rodzaj promo --sekundy 25 --energia spokojna --json out/wideo/src/ruchy.json`; ziarno i wylosowane ruchy w `BRIEF.md`"
+        - "każdy wylosowany ruch postawiony w mapie bitów albo odrzucony jednym zdaniem; ponowne losowanie slotu `--kategoria … --bez <id>` najwyżej 2 razy"
+        - "przepisy zbudowane na `/_lib/jarvo/tokeny.js` (krzywe `E`, czas w sekundach `f(n)`), bez motion bluru (smugi z `ruch.js`)"
+      should_not:
+        - "projektuje ruchy z głowy przed losowaniem albo dodaje ruch, którego losowanie nie dało"
+        - "kopiuje kolory, kroje albo tekst z przepisu zamiast z marki klienta"

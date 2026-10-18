@@ -1,13 +1,13 @@
 ---
 name: rodzaje-filmu
 description: "Rodzaj filmu → jeden plik: silnik, struktura, rzemiosło."
-version: 1.8.1
+version: 1.9.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [video, explainer, motion-graphics, 3d, product, typography, data, logo, story]
-    related_skills: [krotki-film, film-z-kodu, style-motion, gramatyki-explainera, style-malarskie, montaz-nagran, clipmaker, scenariusz, formaty-wideo, kontrola-wideo]
+    related_skills: [krotki-film, film-z-kodu, losowanie-ruchow, style-motion, gramatyki-explainera, style-malarskie, montaz-nagran, clipmaker, scenariusz, formaty-wideo, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
@@ -48,10 +48,10 @@ opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprz
    czego nie ma być, charakter ruchu z marki), **struktura** (mapa bitów: sekunda → scena → ruch → dźwięk), **budowa** (silnik, format, fps),
    **pułapki**, **start** (pierwszy krok). Szablon pól z pliku rodzaju. Brak wejścia: karta → brand kit → rozsądna
    domyślna nazwana w RAPORT; pytasz tylko o to, bez czego film będzie zły.
+   **Ruchy losujesz przed mapą bitów** (skill `losowanie-ruchow`): `ruchy.py losuj --rodzaj promo|funkcja|aplikacja|logo|petla|pion --sekundy <s> --json out/wideo/src/ruchy.json` (explainer, dane, typografia, historia: `--kategoria … --ile 1–3`); ziarno i ruchy w „strukturze”, każdy na swojej sekundzie albo odrzucony z powodem; ruchu spoza losowania nie dodajesz.
    Muzyka: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3` → BPM, takty, drop, perkusja; cięcia na taktach, po renderze `rytm.py sprawdz`.
 3. Inspiracje tylko, gdy brief nie ma pomysłu na formę:
-   `python3 $HERMES_HOME/scripts/inspiracje.py <rodzaj> --ile 3` (prompty twórców filmów Opus 5.5 z dwóch list, pobierane w locie); `inspiracje.py --drogi` pokazuje, jak naprawdę powstały opisane filmy (droga produkcji z dowodem): sprawdź, zanim obiecasz „jeden prompt”. Pojedyncze ujęcie (wejście UI, kamera, liczby, przejście, finał): `inspiracje.py ujecia --kategoria <…>` (157 kart video-shotcraft z naszym odpowiednikiem).
-   Bierzesz strukturę i chwyty, nie tekst; zainspirowało → autor i link w RAPORT.
+   `python3 $HERMES_HOME/scripts/inspiracje.py <rodzaj> --ile 3` (prompty twórców filmów Opus 5.5 z dwóch list, pobierane w locie); `inspiracje.py --drogi` pokazuje, jak naprawdę powstały opisane filmy (droga produkcji z dowodem): sprawdź, zanim obiecasz „jeden prompt”. Pojedyncze ujęcie (wejście UI, kamera, liczby, przejście, finał): `inspiracje.py ujecia --kategoria <…>` (157 kart video-shotcraft z naszym odpowiednikiem). Bierzesz strukturę i chwyty, nie tekst; zainspirowało → autor i link w RAPORT.
 4. Scenariusz i lektor (`scenariusz`), silnik z pliku rodzaju (komendy: `film-z-kodu`). **Mapa bitów + 4 kadry
    kluczowe** (arkusz) do oceny, zanim wyrenderujesz całość; potem 2–3 rundy uwag „jak reżyser”, nie od zera.
 5. Kontrola z pliku rodzaju, `qa_wideo.py`, `kontrola-wideo` (≥ 85).
@@ -66,5 +66,5 @@ opowiedzieć → historia. Nadal niejasne: jedno pytanie („ma wyjaśnić, sprz
 
 ## Definition of Done
 - [ ] rodzaj nazwany w RAPORT z uzasadnieniem; przeczytany tylko jego plik (plus kontrakt HTML, gdy dotyczy),
-- [ ] `BRIEF.md` wypełniony (z charakterem ruchu), wynik zgodny z sekcją „Wynik” pliku rodzaju,
+- [ ] `BRIEF.md` wypełniony (z charakterem ruchu i ziarnem losowania ruchów), wynik zgodny z sekcją „Wynik” pliku rodzaju,
 - [ ] kontrola rodzaju odhaczona, `qa_wideo.py` bez błędów, `kontrola-wideo` ≥ 85.

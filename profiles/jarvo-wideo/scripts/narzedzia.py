@@ -113,7 +113,7 @@ HTML_LIBS = ["three@0.186.1", "gsap@3.15.0", "p5@2.3.4"]   # p5: algorithmic-art
 # z node_modules obce katalogi; html_wideo.py i podgląd HQ serwują ją pod /_lib/jarvo/
 JARVO_JS = ROOT / "jarvo-js"
 JARVO_JS_PLIKI = ["ruch.js", "kreska.js", "morph.js", "crt.js", "plotno.js", "piksel.js", "os_czasu.js", "strona.js", "ujecia.js",
-                  "huashu_pl.js"]
+                  "tokeny.js", "huashu_pl.js"]
 PY_BASE = ["numpy", "pillow"]
 PY_HTML = [f"playwright=={PW_VERSION}", "imageio"]   # imageio: slack-gif-creator (GIF przez Pillow)
 PY_MODULES = {"pillow": "PIL", "kokoro-onnx": "kokoro_onnx", "faster-whisper": "faster_whisper"}

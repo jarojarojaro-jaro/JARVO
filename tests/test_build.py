@@ -232,7 +232,7 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     assert "ruch-i-kompozycja" in rodzaje["references"]
     malarskie = next(s for s in wideo["skills"] if s["name"] == "style-malarskie")
     assert {"wybor", "style/09_postimp"} <= set(malarskie["references"])     # karty stylów z podkatalogu też w skarbcu
-    assert any(z["name"] == "cinetic" and z["status"] == "odlozone" for z in dane["zrodla"])
+    assert any(z["name"] == "agency-agents" and z["status"] == "odlozone" for z in dane["zrodla"])
     # skarbiec idzie za kodem: ostatnie zmiany z CHANGELOG-u profilu i skrypty wspólne repo (lint nieaktualnych notatek)
     assert web["changes_section"] == "Niewydane" and web["changes"] and all(len(z) <= 280 for z in web["changes"])
     assert "odcisk.py" in dane["repo_scripts"] and "build.py" in dane["repo_scripts"]
@@ -270,7 +270,7 @@ def test_repo_do_skarbca_zasady_zmiany_materialy_zrodla(built, tmp_path):
                 "profiles/jarvo-wideo/skills/wideo/rodzaje-filmu/references/ruch-i-kompozycja.md"):
         assert (cel / rel).is_file(), rel
     zrodla = (cel / "vendor/zrodla.md").read_text(encoding="utf-8")
-    assert "| [cinetic](https://github.com/Leonxlnx/cinetic) | odlozone |" in zrodla
+    assert "| [agency-agents](https://github.com/msitarzewski/agency-agents) | odlozone |" in zrodla
 
 
 def test_generalist_handoff_table_covers_every_specialist(built):
