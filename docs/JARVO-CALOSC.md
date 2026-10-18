@@ -124,6 +124,8 @@ Najpierw losowanie, potem projekt: plan ruchów filmu losowany z biblioteki 273 
 (`ruchy.py losuj`, skill `losowanie-ruchow`; przepisy na tokenach `/_lib/jarvo/tokeny.js`), żeby filmy nie zbiegały się do tych samych ruchów.
 Gotowy film przechodzi kontrolę klatek (`qa_wideo.py`, wzorce za cinetic): duch (klatka z plamą, której nie ma obok), zamrożona
 klatka w ruchu, skok elementu w 1–2 klatkach, drgania powolnego ruchu schodkami pikseli, pasy na gładkim przejściu, szew pętli.
+Krytyk szuka w katalogu tanich chwytów (`kontrola-wideo/references/tanie-chwyty.md`, 12 grup z ID i poprawką, za cinetic,
+bez zakazów kolorów i krojów: te wybiera marka) i zaczyna każdy problem od ID chwytu, z priorytetem P0–P2.
 Syntetyczne SFX, biblioteka inspiracji (prompty twórców i katalog 157 kart ujęć video-shotcraft: `inspiracje.py ujecia`), produkcja etapami, formaty platform z jednego timeline.
 Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim na ManimGX (dodatek `manim`: `inspect` przed renderem, polski tekst krojem Noto Sans, `montaz.py napraw --fps 30` przed sklejaniem scen o zmiennym klatkażu). Demo strony (`demo_strony.py`, metoda ECC
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.

@@ -174,3 +174,23 @@ def test_losowanie_nie_zalezy_od_globalnego_random():
     a = [t["id"] for t in rc.losuj(T, "feature", "medium", ziarno=5)["ruchy"]]
     random.seed(2)
     assert a == [t["id"] for t in rc.losuj(T, "feature", "medium", ziarno=5)["ruchy"]]
+
+
+def test_katalog_tanich_chwytow_bez_zakazow_koloru_i_kroju():
+    """Katalog dla krytyka (za cinetic taste-and-slop): ID jednoznaczne w 12 grupach, podpięty w kontroli,
+    a zakazy kolorów i krojów biblioteki tylko w akapicie „Czego tu nie ma”."""
+    import re
+    kw = REPO / "profiles/jarvo-wideo/skills/wideo/kontrola-wideo"
+    tekst = (kw / "references/tanie-chwyty.md").read_text(encoding="utf-8")
+    ids = re.findall(r"^- \*\*([A-L]\d+) ", tekst, flags=re.M)
+    assert len(ids) == len(set(ids)) >= 90 and {i[0] for i in ids} == set("ABCDEFGHIJKL")
+    for grupa in "ABCDEFGHIJKL":                                          # numeracja w grupie bez dziur
+        nr = [int(i[1:]) for i in ids if i[0] == grupa]
+        assert nr == list(range(1, len(nr) + 1)), grupa
+    poza = tekst.split("**Czego tu nie ma (świadomie):**")
+    assert len(poza) == 2
+    reszta = poza[0] + poza[1].split("\n\n", 1)[1]
+    for zakaz in ("szeryf", "kursyw", "pomarańcz", "fiolet", "neon", "beż", "szkło"):
+        assert zakaz not in reszta.lower(), zakaz
+    skill = (kw / "SKILL.md").read_text(encoding="utf-8")
+    assert "references/tanie-chwyty.md" in skill and "tanie-chwyty.md" in (kw / "references/zakazane.md").read_text(encoding="utf-8")

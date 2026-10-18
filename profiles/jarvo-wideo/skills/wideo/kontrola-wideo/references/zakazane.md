@@ -6,6 +6,7 @@ reviewed: "2026-09-29"
 
 Model bez referencji wraca do tych samych chwytów. Każdy z nich w filmie = problem w osi **kompozycja**
 (maks. 6/10), chyba że karta albo brand kit wprost go zamawia (wtedy wpis w RAPORT.md: „celowo, bo …”).
+Pełny katalog z ID do przeszukiwania w każdej rundzie krytyki: `tanie-chwyty.md`.
 
 | Chwyt | Dlaczego zdradza | Zamiast |
 |---|---|---|

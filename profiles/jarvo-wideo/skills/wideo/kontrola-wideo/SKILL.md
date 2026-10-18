@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.8.0
+version: 1.9.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-06"
+    reviewed: "2026-10-18"
 ---
 
 # Kontrola wideo (bramka jakości)
@@ -89,6 +89,11 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    co 2–4 s), kompozycja (zero chwytów z `references/zakazane.md`), marka, dźwięk (zdarzenia na bitach).
    Poluj konkretnie na: tekst nachodzący na siebie przy zmianie, przejazd zamiast wyhamowania, napisy w rogach
    i ramki, tytuł na gradiencie, rozmyty skalowany tekst, martwy takt, szarpnięcie na szwie pętli.
+   **Katalog tanich chwytów** `references/tanie-chwyty.md` (12 grup: pomysł, tekst, litery, kolor, kadr, ruch,
+   przejścia, kamera, interfejs, dźwięk, tempo, wykończenie; za cinetic, bez zakazów kolorów i krojów): najpierw
+   oglądasz arkusze i zapisujesz wrażenia, potem najsłabsze 3 sekundy, potem szukasz w katalogu. Problem pasujący
+   do chwytu zaczyna się od jego ID (`"F4: wyjście tytułu na E.out"`), z priorytetem P0 (kluczowa chwila albo
+   historia), P1 (widać przy oglądaniu), P2 (tylko na pauzie).
    Zapisz w `kontrola.json` pola `osie` (7 liczb) i `problemy` (3 najgorsze, każdy z `t` w sekundach i poprawką).
    Popraw 3 najgorsze, wyrenderuj ponownie tylko te sekundy (gdy silnik pozwala), nowa runda.
    - **Niezależny recenzent:** film z wielu odcinków albo dłuższy niż 60 s ogląda też podagent (`delegate_task`),
@@ -119,4 +124,5 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 - [ ] animacja HTML: `html_wideo.py aktualny` = 0 (pomiar pełny, aktualny, bez błędów; wyjątki z powodem w raporcie),
 - [ ] `kontrola.json` z wynikiem ≥ 85 i PASS albo nazwane braki po 2 rundach,
 - [ ] każda różnica ma najmniejszą poprawkę; wynik nie jest zawyżany,
-- [ ] film z kodu / animacja: `krytyka.py ocena` = 0 (7 osi ≥ 8) albo nazwane braki po 3 rundach, zero chwytów z `zakazane.md` bez uzasadnienia.
+- [ ] film z kodu / animacja: `krytyka.py ocena` = 0 (7 osi ≥ 8) albo nazwane braki po 3 rundach, zero chwytów z `zakazane.md` bez uzasadnienia,
+- [ ] problemy krytyki z ID z `tanie-chwyty.md`, gdy pasują do chwytu (powtórki tego samego ID widać w `krytyka.md`).
