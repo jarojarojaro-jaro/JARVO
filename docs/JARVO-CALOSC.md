@@ -122,6 +122,8 @@ wycieczka po elementach, lupa, zakreślacz, uderzenie, z kontrolą planu ruchów
 w HTML bez Remotion: `/_lib/jarvo/ujecia.js`, np. karty rozdane z talii, licznik bębnowy, reflektor na bohaterze). Mówiąca maskotka-robot z polskim lektorem (`maskotka.py`, domyślnie lokalny Matcha `pl-PL-Matcha-Meski`).
 Najpierw losowanie, potem projekt: plan ruchów filmu losowany z biblioteki 273 technik cinetic (MIT) pod rodzaj i energię
 (`ruchy.py losuj`, skill `losowanie-ruchow`; przepisy na tokenach `/_lib/jarvo/tokeny.js`), żeby filmy nie zbiegały się do tych samych ruchów.
+Gotowy film przechodzi kontrolę klatek (`qa_wideo.py`, wzorce za cinetic): duch (klatka z plamą, której nie ma obok), zamrożona
+klatka w ruchu, skok elementu w 1–2 klatkach, drgania powolnego ruchu schodkami pikseli, pasy na gładkim przejściu, szew pętli.
 Syntetyczne SFX, biblioteka inspiracji (prompty twórców i katalog 157 kart ujęć video-shotcraft: `inspiracje.py ujecia`), produkcja etapami, formaty platform z jednego timeline.
 Silniki: claude-animation (MIT), HyperFrames check przed renderem, Manim na ManimGX (dodatek `manim`: `inspect` przed renderem, polski tekst krojem Noto Sans, `montaz.py napraw --fps 30` przed sklejaniem scen o zmiennym klatkażu). Demo strony (`demo_strony.py`, metoda ECC
 `ui-demo`): rozpoznanie → próba → nagranie z kursorem i napisami kroków, tylko nasz podgląd albo strona użytkownika.

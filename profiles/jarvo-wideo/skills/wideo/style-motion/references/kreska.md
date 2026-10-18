@@ -81,7 +81,7 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/05-cel-boil/in
 - Ziarno wrzenia = numer klatki (szum zamiast rysunku) albo ruch postaci z `t` zamiast `R.t` (filtr, nie animacja).
 - Prompt chce papieru 10–15%, kod przyciemnia o kilka procent: zostań przy kodzie (mocny papier brudzi kolory marki).
 - Błysk, klatki uderzenia i wstrząs to uderzenia całego kadru: najwyżej 3 na film (`pomiar`: `uderzenia_kadru`);
-  `qa_wideo.py` może zgłosić klatkę uderzenia jako „mrugnięcie”: zamierzone, wpisz do RAPORT.
+  `qa_wideo.py` zgłosi klatkę uderzenia jako ducha: zamierzona, podaj jej chwilę w `--ciecia` i wpisz do RAPORT.
 - Układ wzoru na sztywno 1920×1080 (`STAGE`, `CLOSE`, `C0`): przenosisz funkcje, nie współrzędne. CPU: na dwójkach
   dwie klatki mają ten sam rysunek, więc gotową warstwę postaci trzymaj w `Map` po `R.id`.
 - Szkielety liter wzoru to tylko H, A, N, D, M, E (+ F, R, B, Y): polskie litery dorysowujesz sam.

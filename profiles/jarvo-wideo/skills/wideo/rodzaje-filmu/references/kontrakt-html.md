@@ -128,7 +128,7 @@ Wiedza o GSAP: `gsap-timeline` (osie, etykiety), `gsap-plugins` (SplitText, Morp
 - `backdrop-filter: url()` źle czyta mapy przesunięć w Chromium: „szkło” = klon sceny pod elementem + filtr SVG.
 - Szybki ruch: smuga, duchy albo rozciągnięcie z `ruch.js` (motion blur z `--subklatki` wydłuża render N razy:
   tylko na prośbę właściciela) i trochę wolniej; potem klatka po klatce przez szybkie chwile
-  i `qa_wideo.py` (wykrywa pojedyncze „mrugnięcia”).
+  i `qa_wideo.py` (duchy, skoki, zamrożone klatki, drgania, pasy; pętla z `--petla`).
 - Dźwięk: prawdziwy efekt na każde zdarzenie, położony wg szczytu (`rytm.py efekt.wav --szczyt`), całość −14 LUFS;
   duża chwila = zdanie dźwiękowe (narastanie → uderzenie → błysk), seria elementów = dwa efekty na zmianę, coraz ciszej;
   czasy efektów z tych samych stałych co animacja (zasady w `lektor-i-dzwiek`).

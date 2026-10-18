@@ -144,6 +144,7 @@ def test_montaz_i_kontrola(monkeypatch, tmp_path):
     monkeypatch.setattr(qa_wideo, "analyze", lambda p, a: {"czarne": [], "zamrozone": [], "cisze": [], "lufs": -14.0,
                                                            "true_peak": -2.0, "lra": 5.0})
     monkeypatch.setattr(qa_wideo, "gray_frames", lambda p: ([], 30.0))
+    monkeypatch.setattr(qa_wideo, "numpy_jest", lambda: False)
     monkeypatch.setattr(qa_wideo, "moov_first", lambda p: True)
     wynik = qa_wideo.check(tmp_path / "o.mp4", None, None, False, None)
     assert not wynik["ok"] and any("film w HDR (HLG)" in e for e in wynik["bledy"])

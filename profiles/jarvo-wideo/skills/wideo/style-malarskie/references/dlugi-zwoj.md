@@ -78,7 +78,7 @@ prędkość `v`. Bohater startuje w x = 320 pierwszego świata (cały widoczny o
    `postacie.md`). Wrzuć je do `frames/<key>/` i napisz `meta.json`.
 3. Dopisz `<id>` do `FILM_ORDER` w `eras.js`.
 4. Zrób stopklatki po obu stronach każdej granicy; potem `python3 $HERMES_HOME/scripts/krytyka.py determinizm`
-   na stronie filmu: deterministyczność musi przejść. Po renderze `qa_wideo.py` (mrugnięcia, zamrożony obraz).
+   na stronie filmu: deterministyczność musi przejść. Po renderze `qa_wideo.py` (duchy, skoki, zamrożone klatki).
 
 ## Ustalenia stałe (wspólne dla filmu, wpisane w szkielet)
 

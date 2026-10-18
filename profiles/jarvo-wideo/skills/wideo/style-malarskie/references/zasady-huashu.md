@@ -127,7 +127,7 @@ G3: gramatyki nauki i finansów). `qa.py` źródła odpowiada u nas zestaw: `kry
 - Dowód: `qa.py` w 40 s mierzy 16 odcinków (obszar ruchu, statyczne pary klatek, skoki, prawdziwy czas z wymuszonym
   GPU flush, deterministyczność); sama różnica początku i końca przeoczy zacięcie (A: Klimt zmienia się w 33%, a 14
   z 48 par klatek stoi), a sam czas JS daje fałszywe 1 ms (B).
-- Kiedy: każdy odcinek. U nas `krytyka.py determinizm`, `qa_wideo.py` (mrugnięcia, zamrożony obraz),
+- Kiedy: każdy odcinek. U nas `krytyka.py determinizm`, `qa_wideo.py` (duchy, skoki, zamrożone klatki),
   `krytyka.py martwe` i `puls`, `html_wideo.py pomiar`; czas klatki mierzysz prawdziwym renderem.
 
 **18. Każdy los z ziarnem; ta sama chwila dwa razy = identyczne piksele.**

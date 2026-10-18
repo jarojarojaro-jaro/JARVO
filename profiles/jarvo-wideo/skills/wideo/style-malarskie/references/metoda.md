@@ -385,7 +385,7 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki out/wideo/src/film/index.html 
 python3 $HERMES_HOME/scripts/malarz.py wzor <id> --czasy 0.4,0.6,0.8,1.0 --arkusz out/wideo/wzor-<id>.jpg
 # deterministyczność: ta sama klatka 2× = ten sam obraz
 python3 $HERMES_HOME/scripts/krytyka.py determinizm out/wideo/src/film/index.html --czasy 1.3,4.2 --preset jarvo
-# liczby: błędy JS, kroje zastępcze, martwe odcinki; po renderze „mrugnięcia” i zamrożony obraz
+# liczby: błędy JS, kroje zastępcze, martwe odcinki; po renderze duchy, skoki i zamrożone klatki
 python3 $HERMES_HOME/scripts/html_wideo.py pomiar out/wideo/src/film/index.html --preset jarvo --dlugosc <s>
 python3 $HERMES_HOME/scripts/qa_wideo.py out/wideo/film.mp4 --json
 ```

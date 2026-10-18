@@ -1,7 +1,7 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.7.0
+version: 1.8.0
 author: Jarvo
 license: MIT
 metadata:
@@ -25,7 +25,11 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 ## Kroki
 1. **Technika:** `python3 $HERMES_HOME/scripts/qa_wideo.py <film.mp4> --platforma <tiktok|ig-reel|…> --lektor
    --arkusz out/wideo/<film>/qa.jpg --json`.
-   Sprawdza też pojedyncze „mrugnięcia” (jedna klatka inna niż obie sąsiednie): obejrzyj te chwile i popraw scenę.
+   Sprawdza też klatki: **duch** (jedna klatka z plamą, której nie ma obok: zgubiony stan, słowo napisów na 1 klatkę)
+   i **szew pętli** (`--petla`) to błąd, **zamrożona klatka w ruchu** błąd w filmie z kodu (`--z-kodu`); **skok**
+   (element przeskakuje zamiast wejść), **drgania** (powolny ruch schodkami całych pikseli: przesuwaj przez
+   `transform`) i **pasy** na gładkim przejściu (dodaj ziarno 1–2%) to ostrzeżenia. Zamierzone cięcie albo błysk:
+   `--ciecia 3.2,7.5-7.8`. Obejrzyj podane chwile (`html_wideo.py klatki --czasy`) i popraw scenę.
    Błąd (`bledy`) = poprawka przed oceną; typowe: głośność → `montaz.py glosnosc`, format → ponowny render,
    czarny początek → pierwsza scena z obrazem, film w HDR → `montaz.py napraw` (przelicza na zwykły obraz).
    - ✅ Punkt kontrolny: `ok: true`.
