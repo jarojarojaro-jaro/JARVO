@@ -132,7 +132,8 @@ Fakty do explainera daje Sherlock w briefie `fakty.json` (liczby z przeczytanego
 analogie z miejscem, w którym kłamią, słowniczek z wymową, lista niepewnych; `fakty.py sprawdz`). Lektor i pomiar
 animacji sprawdzają z nim każdą liczbę: z listy niepewnych zatrzymuje, bez źródła ostrzega.
 Animacja z kodu ma twardy pomiar przed oddaniem (`html_wideo.py pomiar`: czas czytania, kadr i strefy UI platformy,
-kontrast, napisy na sobie, tekst w pasie napisów lektora, czarne przerwy, martwe odcinki, rytm, pusta scena, oddech,
+kontrast, napisy na sobie, tekst w pasie napisów lektora, tekst w kawałkach (≤ 5 słów naraz, ≤ 10 w klatce, obraz bez słów
+między kawałkami), czarne przerwy, martwe odcinki, rytm, pusta scena, oddech,
 uderzenia kadru, liczby kontra `fakty.json`;
 „gotowe” tylko z pełnym i aktualnym raportem), ruch z charakterem marki (`/_lib/jarvo/ruch.js`: 6 charakterów,
 smugi zamiast motion bluru) i parametry

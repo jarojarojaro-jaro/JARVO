@@ -25,9 +25,10 @@ w pętli) i do renderu klatka po klatce: `html_wideo.py --preset jarvo` woła `w
    pierwszej klatki wyjdzie innym krojem. Przed `__ready` każdy krój kanwy z próbką:
    `await document.fonts.load('64px "Anton"', 'ąćęłńóśźżĄĆĘŁŃÓŚŹŻ')`.
 6. **Tekst na kanwie podajesz pomiarowi:** `window.__teksty = () => [...]` zwraca teksty bieżącej klatki
-   `{tekst, x, y, w, h, kolor, rozmiar, krycie, widoczny?, id?}` (prostokąt w pikselach kadru, `widoczny` = odsłonięta
+   `{tekst, x, y, w, h, kolor, rozmiar, krycie, widoczny?, id?, ui?}` (prostokąt w pikselach kadru, `widoczny` = odsłonięta
    część przy pisaniu). Tekst w DOM (HTML, SVG) `pomiar` czyta sam; bez `__teksty` tekst z `fillText` jest dla niego
-   niewidoczny (zostają tylko kontrole obrazu).
+   niewidoczny (zostają tylko kontrole obrazu). Napisy samego produktu (etykiety UI, nazwa pliku, wpisywana komenda)
+   oznaczasz `data-ui` na elemencie (na kanwie `ui: true`): nie liczą się do tekstu filmu, tylko do limitu słów naraz.
 7. **Parametry do strojenia** (HQ: przycisk **◐ Animacja**, podgląd na żywo z suwakami): to, co właściciel może chcieć
    zmienić bez Ciebie (kolory, teksty, tempo, krzywe wejścia, włącz/wyłącz element), trzymasz w `parametry.json` obok
    strony i czytasz przy starcie do `window.__params`; każda klatka bierze wartości z tego obiektu (nie kopiuj ich do
@@ -186,7 +187,9 @@ python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 -
   czytelnika, ostrzeżenie poniżej spokojnego czytania: znaki bez spacji / 15 + 1,5 s), tekst poza kadrem i pod UI platformy, kontrast,
   dwa różne napisy na sobie (≥ 30% mniejszego przez ≥ 0,3 s), tekst w pasie napisów lektora (sam, gdy obok strony
   leży lektor: `os_czasu.json`, `*.slowa.json`, `*.srt`, `lektor*.wav`; ręcznie `--napisy tak|nie`), kroje zastępcze, czarne przerwy, martwe odcinki, rytm, błędy JS i zasobów; ostrzeżenia kompozycji: pusta scena,
-  brak oddechu przed cięciem i na końcu, > 3 uderzenia całego kadru. Tekst w oknie z `overflow` (licznik bębnowy, pasek
+  brak oddechu przed cięciem i na końcu, > 3 uderzenia całego kadru; tekst w kawałkach (`ruch-i-kompozycja.md`,
+  rozdz. 2): > 5 słów wchodzi razem, > 10 słów w klatce, > 10 nowych słów w 5 s, czytany tekst za szybki, bez lektora
+  tekst przez > 80% filmu albo 10 s bez 1,5 s samego obrazu. Tekst w oknie z `overflow` (licznik bębnowy, pasek
   cyfr) liczy się tylko w widocznej części, a czas czytania tylko w końcowym postoju. W trakcie poprawek `--tryb szybki`;
   film oddajesz tylko z pełnym i aktualnym raportem bez błędów (`html_wideo.py aktualny <strona>` = 0). Świadomy
   wyjątek z powodem: `--wyjatek "czas_czytania@Logo=znak marki, nie tekst do czytania"`.

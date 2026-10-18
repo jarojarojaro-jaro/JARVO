@@ -49,6 +49,13 @@ akcentu i kroju nagłówka, dowód w `dlaczego`). Sprawdzian: opisz ruch gotoweg
   albo luka obrazu > 6 s pod mową; poprawka przed oddaniem. Puszczasz na animaticu albo szkicu, nie dopiero na finale.
   Progi z pomiaru: „Młyn” (za wolny w ocenie właściciela) miał przestoje 2,2–3,6 s, dobre filmy żadnego.
 
+- **Tekst w kawałkach** (za cinetic, MIT): zdanie nigdy nie ląduje blokiem. Kawałek = 1–5 słów (najlepiej 2–3) wchodzących
+  razem; dłuższa myśl to łańcuch 2–4 kawałków (najwyżej 12 słów) z obrazem między nimi, w trybie „dopisz” (kawałki
+  dochodzą do jednej linii, ≤ 10 słów naraz) albo „podmień” (każdy schodzi, następny wchodzi na to samo miejsce).
+  Dziel na granicy gramatyki, nigdy liczby od jednostki („2184 linii”) ani nazwy. Animacja jest czasownikiem: słowa
+  przed i po pokazie, nie opis tego, co widać. Po przeczytaniu kawałka nic nowego nie startuje, dopóki trwa czytanie;
+  czytany tekst nie jedzie szybciej niż ~1200 px/s (przy 1080); tekst bez sprężyny i przestrzelenia. Bez lektora
+  obraz dostaje chwile bez słów: ≥ 1,5 s w każdych 10 s, tekst na ≤ 80% filmu. Najwyżej ~10 nowych słów na 5 s.
 - **Ważne rzeczy stoją po wylądowaniu.** Logo, liczba, hasło: po ostatnim ruchu co najmniej 1 s bez ruchu, zanim
   zniknie ujęcie. Logo na otwarciu i na końcu tak samo. Po serii szybkich cięć dłuższa pauza.
 - **Koniec ujęcia:** ostatni element wylądował → 1–1,5 s spokoju (bez nowych elementów, bez ruchu kamery; trwająca
@@ -158,6 +165,9 @@ Nigdy na tekście, który widz ma przeczytać.
 `krytyka.py tempo` (zasada tempa, rozdz. 2) blokuje: przestój ≥ 2 s albo luka obrazu > 6 s pod mową to poprawka.
 `html_wideo.py pomiar` (ostrzeżenia, nie blokują): `pusta_scena` (największy obiekt < 15% krótszego boku
 dłużej niż 1,5 s), `bez_oddechu` (ujęcie ≥ 2 s ma < 0,8 s spokoju przed przejściem; wyjście starego i wejście
-nowego do 1,2 s się nie liczą; koniec filmu stoi < 0,8 s, film w pętli pomijany), `uderzenia_kadru` (> 3 uderzenia całego kadru). To przybliżenia z małych klatek: zanim
+nowego do 1,2 s się nie liczą; koniec filmu stoi < 0,8 s, film w pętli pomijany), `uderzenia_kadru` (> 3 uderzenia całego kadru),
+tekst w kawałkach (rozdz. 2): `kawalek` (> 5 słów wchodzi razem), `slow_naraz` (> 10 słów filmu w klatce, z napisami
+produktu `data-ui` > 14), `tempo_slow` (> 10 nowych słów w 5 s), `tekst_szybki` (czytelny tekst > 1200 px/s przez
+≥ 0,3 s), bez lektora `tekst_caly_czas` (> 80% filmu) i `bez_przerwy_od_tekstu` (10 s bez 1,5 s samego obrazu). To przybliżenia z małych klatek: zanim
 poprawisz, obejrzyj klatki z podanych sekund; świadomy wyjątek opisujesz `--wyjatek` z powodem.
 Na arkuszu klatek sprawdzasz sam: jeden bohater w każdym ujęciu, światło tylko na nim, jeden charakter ruchu.

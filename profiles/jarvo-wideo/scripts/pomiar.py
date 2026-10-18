@@ -20,6 +20,12 @@ z przeglądarki teksty (widoczna część, granice glifów, krycie, kolor, rozmi
                           i wejście do 1,2 s się nie liczą) albo koniec filmu stoi < 0,8 s (logo, puenta:
                           ≥ 1 s); film w pętli bez kontroli końca
     uderzenia_kadru       więcej niż 3 uderzenia całego kadru (błysk, wstrząs, pompa skali)         ostrzeżenie
+    kawalek               więcej niż 5 słów wchodzi razem (tekst w kawałkach, za cinetic, MIT)        ostrzeżenie
+    slow_naraz            więcej niż 10 słów filmu czytelnych w klatce (z napisami UI `data-ui`: 14) ostrzeżenie
+    tempo_slow            więcej niż 10 nowych słów w dowolnych 5 s                                  ostrzeżenie
+    tekst_szybki          czytelny tekst jedzie szybciej niż 1200 px/s (przy 1080) ≥ 0,3 s          ostrzeżenie
+    tekst_caly_czas       bez lektora: tekst filmu na ekranie przez ponad 80% filmu (≥ 8 s)          ostrzeżenie
+    bez_przerwy_od_tekstu bez lektora: w 10 s filmu ani 1,5 s samego obrazu                          ostrzeżenie
     liczba_niepewna       liczba na ekranie (≥ 0,5 s) z listy niepewnych w fakty.json               błąd
     liczba_bez_zrodla     liczba na ekranie (≥ 0,5 s) bez pokrycia w fakty.json (oś, numer kroku:   ostrzeżenie
                           wyjątek z powodem); liczby 0–3 i klatki licznika w ruchu pomijane
@@ -66,6 +72,16 @@ PRZEJSCIE = 1.2                 # s na wyjście starego ujęcia i wejście noweg
 NA_SOBIE = 0.3                  # część mniejszego napisu przykryta drugim = napisy na sobie
 TRWALE = 0.3                    # s: krócej to klatki ruchu (napis wjeżdża, drugi odjeżdża), nie usterka
 LEKTOR_OBOK = ("os_czasu.json", "*.slowa.json", "*.srt", "lektor*.wav")
+# Tekst w kawałkach (za cinetic, MIT, `copy-and-type.md` i `grid-check`; liczby z profilu „crisp”, bo nasze tempo
+# jest żywe): kawałek = 1–5 słów wchodzących razem, dłuższa myśl to łańcuch kawałków z obrazem między nimi.
+KAWALEK_SLOW = 5                # nowych słów, które wchodzą razem (odstęp < KAWALEK_PRZERWA), więcej = ściana tekstu
+KAWALEK_PRZERWA = 0.35          # s: dłuższa przerwa między słowami = następny kawałek
+NARAZ_SLOW = 10                 # słów tekstu filmu czytelnych w jednej klatce (z tekstem UI produktu: NARAZ_Z_UI)
+NARAZ_Z_UI = 14
+SLOW_NA_5S = 10                 # nowych słów w dowolnych 5 s
+TEKST_UDZIAL = 0.8              # część filmu z tekstem filmu na ekranie (bez lektora; film ≥ 8 s)
+PRZERWA_OD_TEKSTU = 1.5         # s obrazu bez tekstu w każdych 10 s (bez lektora; film ≥ 10 s)
+TEKST_PREDKOSC = 1200           # px/s przy krótszym boku 1080 (20 px/kl. przy 60 kl./s): szybciej tekstu nie przeczytasz
 GENERYCZNE = {"serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-serif", "ui-sans-serif",
               "ui-monospace", "ui-rounded", "emoji", "math", "fangsong", "inherit", "initial", "-apple-system",
               "blinkmacsystemfont"}
@@ -126,7 +142,8 @@ SONDA_JS = r"""() => {
     if (!x) { const s = getComputedStyle(n.parentElement);
       x = { id, full: "", seen: "", a: 0, x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9, color: s.color, size: parseFloat(s.fontSize),
             weight: parseInt(s.fontWeight, 10) || 400, family: s.fontFamily, shadow: s.textShadow !== "none" ? s.textShadow : "",
-            stroke: parseFloat(s.webkitTextStrokeWidth || "0") > 0 ? s.webkitTextStrokeColor : "" };
+            stroke: parseFloat(s.webkitTextStrokeWidth || "0") > 0 ? s.webkitTextStrokeColor : "",
+            ui: !!n.parentElement.closest("[data-ui]") };
       blocks.set(id, x); }
     x.full += txt;
     if (ciety) x.okno = true;
@@ -144,7 +161,7 @@ SONDA_JS = r"""() => {
         const full = String(q.tekst).trim();
         teksty.push({ id: "c:" + (q.id || full), full, seen: String(q.widoczny ?? full).trim(), a: q.krycie ?? 1,
           x0: q.x, y0: q.y, x1: q.x + q.w, y1: q.y + q.h, color: q.kolor || "rgb(255, 255, 255)", size: q.rozmiar || 40,
-          weight: q.waga || 700, family: q.font || "system-ui", shadow: q.cien || "", stroke: q.obrys || "" });
+          weight: q.waga || 700, family: q.font || "system-ui", shadow: q.cien || "", stroke: q.obrys || "", ui: !!q.ui });
       }
     } catch (e) { /* błąd w __teksty nie zatrzymuje pomiaru; zobaczy go blad_js w konsoli */ }
   }
@@ -406,7 +423,128 @@ def analiza(probki: list[dict], dlugosc: float, hz: float, platforma: str | None
                                   "zróżnicuj długość ujęć: krótsze przy akcji, dłuższe przy puencie; jeden mocny akcent",
                                   szczyty[0], szczyty[-1]))
     out += nakladanie(probki, dt)
+    out += kawalki(probki, dt, lektor=napisy)
     out += kompozycja(probki, dt)
+    return out
+
+
+SLOWO = re.compile(r"[\w\d]+(?:[-'’.,][\w\d]+)*")
+
+
+def _slowa(tekst: str) -> int:
+    return len(SLOWO.findall(tekst or ""))
+
+
+def _czytelny(x: dict, W: float, H: float) -> bool:
+    """Tekst filmu (nie licznik w oknie), widoczny i choć trochę w kadrze."""
+    return (x["a"] >= 0.6 and not x.get("okno") and x["x1"] > x["x0"]
+            and _przeciecie((x["x0"], x["y0"], x["x1"], x["y1"]), (0, 0, W, H)) > 0)
+
+
+def kawalki(probki: list[dict], dt: float, lektor: bool = False) -> list[dict]:
+    """Tekst w kawałkach i tempo czytania (za cinetic, MIT): słowa wchodzące razem, słowa naraz w klatce, nowe słowa
+    w 5 s, szybkość czytelnego tekstu, a bez lektora także udział tekstu i przerwy z samym obrazem. Tekst z `data-ui`
+    (albo `ui: true` w `__teksty`) to napisy produktu: liczą się tylko do limitu słów naraz razem z UI."""
+    out: list[dict] = []
+    if not probki:
+        return out
+    W, H = probki[0]["W"], probki[0]["H"]
+    skala = 1080 / max(1.0, min(W, H))
+    poprz: dict = {}                 # id → (seen, liczba słów) w poprzedniej próbce
+    przyjscia: list[tuple[float, int, str]] = []
+    naraz_film, naraz_ui = (0, 0.0), (0, 0.0)     # (najwięcej słów, chwila): sam tekst filmu, tekst filmu + UI
+    z_tekstem: list[bool] = []
+    pozycje: dict = {}               # id → [(t, środek x, środek y)] gdy cały tekst czytelny
+    for p in probki:
+        film = ui = 0
+        teraz = {}
+        for x in p.get("teksty") or []:
+            if not _czytelny(x, W, H):
+                continue
+            n = _slowa(x["seen"])
+            if x.get("ui"):
+                ui += n
+                continue
+            film += n
+            teraz[x["id"]] = (x["seen"], n)
+            stary, m = poprz.get(x["id"], ("", 0))
+            nowe = n - m if x["seen"].startswith(stary) else n
+            if nowe > 0:
+                przyjscia.append((p["t"], nowe, x["full"]))
+            if len(x["seen"]) >= len(x["full"]) * 0.98:
+                pozycje.setdefault(x["id"], []).append((p["t"], (x["x0"] + x["x1"]) / 2, (x["y0"] + x["y1"]) / 2, x["full"]))
+        poprz = teraz
+        z_tekstem.append(film > 0)
+        naraz_film = max(naraz_film, (film, p["t"]), key=lambda v: v[0])
+        naraz_ui = max(naraz_ui, (film + ui, p["t"]), key=lambda v: v[0])
+    # kawałki: słowa wchodzące razem
+    przerwa = max(KAWALEK_PRZERWA, 1.5 * dt)
+    grupy: list[list] = []
+    for t, n, tekst in sorted(przyjscia):
+        if grupy and t - grupy[-1][-1][0] <= przerwa:
+            grupy[-1].append((t, n, tekst))
+        else:
+            grupy.append([(t, n, tekst)])
+    for g in grupy:
+        slow = sum(n for _, n, _ in g)
+        if slow > KAWALEK_SLOW:
+            tekst = " / ".join(dict.fromkeys(tx for _, _, tx in g))
+            krotki = tekst if len(tekst) <= 60 else tekst[:57] + "…"
+            out.append(_ustalenie("kawalek", "ostrz", f"{slow} słów wchodzi naraz: „{krotki}”",
+                                  f"podziel na kawałki po 1–{KAWALEK_SLOW} słów z obrazem między nimi (łańcuch: dopisz do linii "
+                                  "albo podmień na tym samym miejscu)", g[0][0], g[-1][0] + dt, tekst=tekst, slow=slow))
+    if naraz_film[0] > NARAZ_SLOW or naraz_ui[0] > NARAZ_Z_UI:
+        _, t = naraz_film if naraz_film[0] > NARAZ_SLOW else naraz_ui
+        opis = f"{naraz_film[0]} słów tekstu filmu naraz" if naraz_film[0] > NARAZ_SLOW else \
+            f"{naraz_ui[0]} słów naraz razem z napisami UI"
+        out.append(_ustalenie("slow_naraz", "ostrz", opis + f" w {t:.1f} s",
+                              f"najwyżej {NARAZ_SLOW} słów filmu (z UI {NARAZ_Z_UI}) w klatce: zdejmij przeczytane, zanim "
+                              "wejdą nowe", t, t + dt, slow=naraz_film[0], z_ui=naraz_ui[0]))
+    # tempo: nowe słowa w dowolnych 5 s
+    ts = sorted(przyjscia)
+    naj, od = 0, 0.0
+    for i, (t0, _, _) in enumerate(ts):
+        suma = sum(n for t, n, _ in ts[i:] if t < t0 + 5.0)
+        if suma > naj:
+            naj, od = suma, t0
+    if naj > SLOW_NA_5S:
+        out.append(_ustalenie("tempo_slow", "ostrz", f"{naj} nowych słów w 5 s od {od:.1f} s (widz czyta ok. 2 słowa/s, "
+                              "patrząc też na ruch)", f"najwyżej {SLOW_NA_5S} słów na 5 s: skróć tekst albo daj obrazowi "
+                              "przerwę między kawałkami", od, od + 5.0, slow=naj))
+    # szybkość czytelnego tekstu (wjazd i zjazd krótsze niż 0,3 s się nie liczą)
+    for tid, ciag in pozycje.items():
+        szybkie = [ciag[i][0] for i in range(1, len(ciag)) if ciag[i][0] - ciag[i - 1][0] <= dt * 1.5
+                   and ((ciag[i][1] - ciag[i - 1][1]) ** 2 + (ciag[i][2] - ciag[i - 1][2]) ** 2) ** 0.5 * skala
+                   / (ciag[i][0] - ciag[i - 1][0]) > TEKST_PREDKOSC]
+        for s0, s1 in _serie(szybkie, dt):
+            if s1 - s0 >= TRWALE - 1e-9:
+                krotki = ciag[0][3] if len(ciag[0][3]) <= 60 else ciag[0][3][:57] + "…"
+                out.append(_ustalenie("tekst_szybki", "ostrz", f"„{krotki}” jedzie szybciej niż {TEKST_PREDKOSC} px/s "
+                                      f"(przy 1080) przez {s1 - s0:.1f} s, a jest czytelny",
+                                      "zwolnij ruch tekstu do czytania albo pokaż go w miejscu (szybko tylko wjazd i zjazd)",
+                                      s0, s1, tekst=ciag[0][3]))
+                break
+    # bez lektora: obraz musi mieć chwile bez tekstu
+    dlugosc = len(probki) * dt
+    if not lektor and dlugosc >= 8.0 and z_tekstem:
+        udzial = sum(z_tekstem) / len(z_tekstem)
+        if udzial > TEKST_UDZIAL:
+            out.append(_ustalenie("tekst_caly_czas", "ostrz", f"tekst na ekranie przez {udzial:.0%} filmu",
+                                  f"najwyżej {TEKST_UDZIAL:.0%}: tekst i główna akcja na zmianę, obraz bez słów między "
+                                  "kawałkami", 0.0, dlugosc, udzial=round(udzial, 2)))
+        if dlugosc >= 10.0:
+            okno, wolne = int(round(10.0 / dt)), int(round(PRZERWA_OD_TEKSTU / dt))
+            for i in range(0, len(z_tekstem) - okno + 1, max(1, okno // 4)):
+                naj_wolny = ciag_ = 0
+                for z in z_tekstem[i:i + okno]:
+                    ciag_ = 0 if z else ciag_ + 1
+                    naj_wolny = max(naj_wolny, ciag_)
+                if naj_wolny < wolne:
+                    t0 = probki[i]["t"]
+                    out.append(_ustalenie("bez_przerwy_od_tekstu", "ostrz", f"od {t0:.1f} s przez 10 s ani {PRZERWA_OD_TEKSTU:g} s "
+                                          "samego obrazu", "daj obrazowi chwilę bez słów (≥ 1,5 s) w każdych 10 s",
+                                          t0, t0 + 10.0))
+                    break
     return out
 
 

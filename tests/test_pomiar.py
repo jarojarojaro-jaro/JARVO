@@ -371,3 +371,71 @@ def test_napisy_auto(tmp_path):
     assert not pm.napisy_auto(tmp_path)
     (tmp_path / "lektor.slowa.json").write_text("[]", encoding="utf-8")
     assert pm.napisy_auto(tmp_path)
+
+
+# ---------------------------------------------------------------- tekst w kawałkach (za cinetic, MIT)
+
+def _kawalki(p, lektor=False):
+    return [u for u in pm.kawalki(p, 1 / HZ, lektor) if u["kod"] in
+            {"kawalek", "slow_naraz", "tempo_slow", "tekst_szybki", "tekst_caly_czas", "bez_przerwy_od_tekstu"}]
+
+
+def test_lancuch_kawalkow_bez_uwag_a_sciana_tekstu_z_uwaga():
+    zdanie = "Twój tydzień się nie mieści w kalendarzu od rana"           # 9 słów
+    slowa = zdanie.split()
+    # łańcuch: 3 słowa, 1,2 s obrazu, 3 słowa, 1,2 s obrazu, 3 słowa (dopisywane do jednej linii, słowa co 0,2 s)
+    def lancuch(t):
+        n = 0
+        for start in (0.5, 2.5, 4.5):
+            n += sum(1 for k in range(3) if t >= start + 0.2 * k)
+        return [tekst(1, zdanie, seen=" ".join(slowa[:n]))] if n else []
+    p = probki(7, lancuch)
+    assert _kawalki(p, lektor=True) == []
+    # całe zdanie naraz
+    u = _kawalki(probki(7, lambda t: [tekst(1, zdanie)] if 0.5 <= t < 4 else []), lektor=True)
+    assert [x["kod"] for x in u] == ["kawalek"] and u[0]["slow"] == 9 and u[0]["od"] == 0.5
+
+
+def test_slowa_naraz_z_ui_i_tempo():
+    dlugi = "jeden dwa trzy cztery pięć"
+    def tt(t):
+        out = []
+        for i in range(3):                              # trzy kawałki po 5 słów co 1 s → 15 w klatce, 15 w 5 s
+            if t >= 0.5 + i:
+                out.append(tekst(10 + i, dlugi, y0=200 + 120 * i, y1=280 + 120 * i))
+        return out
+    kod = {u["kod"]: u for u in _kawalki(probki(6, tt), lektor=True)}
+    assert set(kod) == {"slow_naraz", "tempo_slow"} and kod["slow_naraz"]["slow"] == 15 and kod["tempo_slow"]["slow"] == 15
+    # napisy produktu (data-ui) nie są tekstem filmu: 5 słów filmu + 9 słów UI = bez uwag
+    def ui(t):
+        return [tekst(1, dlugi), {**tekst(2, "Plik raport_2026.pdf zapisany w folderze Dokumenty o 12 30", y0=900, y1=960),
+                                  "ui": True}]
+    assert _kawalki(probki(4, ui), lektor=True) == []
+    def ui_duzo(t):
+        return ui(t) + [{**tekst(3, "Anuluj Zapisz Wyślij", y0=1100, y1=1160), "ui": True}]
+    u = _kawalki(probki(4, ui_duzo), lektor=True)
+    assert [x["kod"] for x in u] == ["slow_naraz"] and u[0]["z_ui"] == 17 and u[0]["slow"] == 5
+
+
+def test_tekst_szybki_tylko_gdy_jedzie_dlugo():
+    # przejazd 2000 px/s przez 1 s (czytelny) → uwaga; zjazd 0,2 s → nic
+    def jedzie(t):
+        x = 100 + 2000 * max(0.0, t - 1.0) * (1 if t < 2.0 else 0) + (2000 if t >= 2.0 else 0)
+        return [tekst(1, "Szybki napis", x0=x, x1=x + 300)] if t >= 0.5 else []
+    u = _kawalki(probki(3, jedzie), lektor=True)
+    assert [x["kod"] for x in u] == ["tekst_szybki"] and u[0]["od"] == pytest.approx(1.1, abs=0.11)
+    def zjazd(t):
+        x = 100 + (3000 * (t - 2.0) if t >= 2.0 else 0)
+        return [tekst(1, "Napis", x0=x, x1=x + 200)] if 0.5 <= t < 2.2 else []
+    assert _kawalki(probki(3, zjazd), lektor=True) == []
+
+
+def test_bez_lektora_obraz_potrzebuje_przerw_od_tekstu():
+    stale = lambda t: [tekst(1, "Kawa z palarni")]                   # noqa: E731
+    kody_ = {u["kod"] for u in _kawalki(probki(12, stale))}
+    assert kody_ == {"tekst_caly_czas", "bez_przerwy_od_tekstu"}
+    assert _kawalki(probki(12, stale), lektor=True) == []             # z lektorem tekst towarzyszy mowie
+    # tekst na zmianę z obrazem: 2 s tekstu, 2 s obrazu
+    naprzemian = lambda t: [tekst(1, "Kawa z palarni")] if int(t) % 4 < 2 else []   # noqa: E731
+    assert _kawalki(probki(12, naprzemian)) == []
+    assert _kawalki(probki(6, stale)) == []                           # krótki film: bez tych dwóch kontroli
