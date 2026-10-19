@@ -154,12 +154,16 @@ else
   echo $! > "$L/updater.pid"
 fi
 
-PASS="$(grep '^DASHBOARD_PASSWORD=' "$L/compose/.env" | cut -d= -f2)"
 JARVO=jarvo; command -v jarvo >/dev/null 2>&1 || JARVO="bash $ROOT/bin/jarvo"
 cat <<EOF
 
 ✅ Flota działa.
-   Jarvo HQ:   http://localhost:9119/base   login: jarvo   hasło: $PASS
+   Jarvo HQ:   http://localhost:9119/base   login i hasło: $JARVO haslo
    polecenia:  $JARVO status | logs | chat | update | down   ($JARVO help: wszystkie)
    RAM:        docker stats
 EOF
+# hasło tylko na ekran: wyjście instalatora idzie też do install.log (tee), a log bywa załącznikiem zgłoszenia
+if { : > /dev/tty; } 2>/dev/null; then
+  printf '   login: %s   hasło: %s\n' "$(sed -n 's/^DASHBOARD_USER=//p' "$L/compose/.env" | tail -1)" \
+    "$(sed -n 's/^DASHBOARD_PASSWORD=//p' "$L/compose/.env" | tail -1)" > /dev/tty
+fi

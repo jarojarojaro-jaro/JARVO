@@ -372,3 +372,21 @@ def test_obraz_own_hermes_builds_locally(tmp_path):
                        capture_output=True, text=True)
     assert r.returncode == 1 and "Własny HERMES_IMAGE" in r.stdout
     assert not (tmp_path / "log").exists()
+
+
+@pytest.mark.skipif(shutil.which("script") is None, reason="brak script (util-linux) do udawania terminala")
+def test_dashboard_password_on_screen_not_in_install_log(tmp_path):
+    """Koniec local-up.sh: hasło do HQ idzie na terminal, a install.log (tee) dostaje tylko `jarvo haslo`."""
+    text = LOCAL_UP.read_text(encoding="utf-8")
+    blok = text[text.index("JARVO=jarvo; command -v jarvo"):]
+    (tmp_path / "L/compose").mkdir(parents=True)
+    (tmp_path / "L/compose/.env").write_text("DASHBOARD_USER=jarvo\nDASHBOARD_PASSWORD=sekret123xyz\n", encoding="utf-8")
+    (tmp_path / "blok.sh").write_text(blok, encoding="utf-8")
+    log = tmp_path / "install.log"
+    (tmp_path / "run.sh").write_text(
+        f'L={tmp_path}/L ROOT={ROOT}\nexec > >(tee -a {log}) 2>&1\nsource {tmp_path}/blok.sh\nsleep 0.2\n', encoding="utf-8")
+    ekran = tmp_path / "ekran.txt"
+    subprocess.run(["script", "-qc", f"bash {tmp_path}/run.sh", str(ekran)], capture_output=True, timeout=30)
+    assert "jarvo haslo" in log.read_text(encoding="utf-8")
+    assert "sekret123xyz" not in log.read_text(encoding="utf-8")
+    assert "sekret123xyz" in ekran.read_text(encoding="utf-8", errors="replace")

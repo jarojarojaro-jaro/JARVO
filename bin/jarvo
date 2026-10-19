@@ -9,6 +9,7 @@
 #   jarvo update              pobierz nową wersję i zainstaluj ją tym samym instalatorem (programy na komputerze też)
 #   jarvo chat [profil]       czat z agentem w terminalu (domyślnie jarvo)
 #   jarvo open                otwórz dashboard w przeglądarce
+#   jarvo haslo               login i hasło do Jarvo HQ (nie zapisujemy ich w logu instalacji)
 #   jarvo pliki               otwórz katalog z wynikami agentów (macOS: kopia w ~/Jarvo)
 #   jarvo autostart on|off|status   start floty i pomocnika aktualizacji po restarcie (systemd użytkownika; macOS: LaunchAgent)
 #   jarvo uninstall [--yes] [--all] usuń flotę (kontenery, obraz, usługę, polecenie); --all także dane, klucze i repo
@@ -139,6 +140,12 @@ cmd_version() {
   printf '%s %s\n' "$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)" "$(git -C "$ROOT" log -1 --format='%h (%cs)')"
 }
 cmd_open() { echo "$URL"; open_path "$URL" || true; }
+cmd_haslo() {
+  installed || die "Flota nie jest zainstalowana (jarvo up)."
+  echo "Jarvo HQ: $URL"
+  echo "login:    $(envval DASHBOARD_USER)"
+  echo "hasło:    $(envval DASHBOARD_PASSWORD)"
+}
 cmd_pliki() {
   if volumes; then   # dane w wolumenie Dockera (macOS): świeża kopia wyników w ~/Jarvo
     local out="$HOME/Jarvo"
@@ -161,7 +168,7 @@ cmd_status() {
   ensure_docker
   compose ps
   echo
-  echo "dashboard:             $URL   (login jarvo, hasło: DASHBOARD_PASSWORD w $L/compose/.env)"
+  echo "dashboard:             $URL   (login i hasło: jarvo haslo)"
   if unit_enabled; then echo "pomocnik aktualizacji: usługa systemd ($(systemctl --user is-active jarvo-updater.service 2>/dev/null || echo '?'))"
   elif agent_loaded; then echo "pomocnik aktualizacji: LaunchAgent pl.jarvo.updater"
   elif updater_pid_alive; then echo "pomocnik aktualizacji: w tle (pid $(cat "$L/updater.pid"), do wylogowania)"
@@ -510,6 +517,7 @@ case "$cmd" in
   update) cmd_update ;;
   chat) cmd_chat "$@" ;;
   open) cmd_open ;;
+  haslo|password) cmd_haslo ;;
   pliki|files) cmd_pliki ;;
   autostart) cmd_autostart "$@" ;;
   uninstall) cmd_uninstall "$@" ;;

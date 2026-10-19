@@ -176,11 +176,10 @@ FLAGS=(--no-pull --no-build)
 JARVO_COMPOSE_DIR="$L/compose" JARVO_BUILD="$L/build" bash "$ROOT/scripts/deploy.sh" "${FLAGS[@]}"
 touch "$L/.installed"
 
-PASS="$(grep '^DASHBOARD_PASSWORD=' "$L/compose/.env" | cut -d= -f2)"
 cat <<EOF
 
 ✅ Flota działa w piaskownicy.
-   Jarvo HQ:   http://localhost:9119/base   login: jarvo   hasło: $PASS
+   Jarvo HQ:   http://localhost:9119/base   login: jarvo   hasło: DASHBOARD_PASSWORD w $L/compose/.env
    komenda:    docker exec -u hermes jarvo-hermes <polecenie>   (PATH obrazu ma już Hermesa i narzędzia; bez bash -l)
    ponownie:   JARVO_LOCAL=$L bash scripts/sandbox-up.sh   (przebudowa obrazu tylko po zmianie infra/)
    stop:       JARVO_LOCAL=$L bash scripts/sandbox-up.sh down

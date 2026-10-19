@@ -39,7 +39,7 @@ curl -fsSL https://jarvo.pl/install.sh | bash                 # Linux, macOS (Te
 # Windows (PowerShell, zwykły użytkownik):  irm https://jarvo.pl/install.ps1 | iex
 # jarvo.pl przekierowuje na: https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh (i .ps1)
 # bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
-# potem:      jarvo status | logs | chat | update | down | uninstall      (jarvo help: wszystkie)
+# potem:      jarvo haslo | status | logs | chat | update | down | uninstall   (jarvo help: wszystkie)
 # jarvo update = git pull + ten sam instalator (nowe programy hosta, gdy wersja Jarvo ich wymaga)
 # z klonu:    bash bin/jarvo up   (stop: bash bin/jarvo down)
 ```
