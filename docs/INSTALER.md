@@ -162,8 +162,8 @@ i checklistę, Ty wklejasz polecenie i przysyłasz log).
 
 Zbudowane 2026-09-30 (pliki w §1):
 - `install.sh` od nowa: całość w `main()` (bash wykonuje dopiero po pobraniu w całości), wykrywanie systemu,
-  procesora i dystrybucji, sprawdzenie RAM (minimum 4 GB, polecane 8) i dysku (minimum 20 GB, polecane 30;
-  `JARVO_FORCE=1` wymusza), doinstalowanie brakujących programów, Docker Engine + start demona (systemd,
+  procesora i dystrybucji, sprawdzenie RAM (minimum 4 GB, polecane 8; `MemTotal` zaokrąglony, bo „4 GB” to ok. 3,8 GB) i dysku
+  (minimum 20 GB, polecane 30; `JARVO_FORCE=1` wymusza; przy aktualizacji istniejącej floty tylko ostrzeżenie), doinstalowanie brakujących programów, Docker Engine + start demona (systemd,
   `service`, w ostateczności `dockerd` w tle; WSL bez systemd dostaje `iptables-legacy`), grupa `docker`,
   wolny port 9119, klon albo aktualizacja repo (`fetch` + `checkout` + `merge --ff-only`; lokalne zmiany
   zatrzymują), `/usr/local/bin/jarvo` (albo `~/.local/bin`), log `~/jarvo-local/install.log` bez kluczy i bez hasła do HQ (hasło tylko na ekran i w `jarvo haslo`),

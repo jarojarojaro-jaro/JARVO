@@ -239,6 +239,23 @@ def test_low_ram_refuses_unless_forced(tmp_path):
     assert res.returncode == 0, res.stdout + res.stderr
 
 
+def test_four_gb_machine_counts_as_four_and_update_only_warns(tmp_path):
+    """MemTotal „4 GB” maszyny to ok. 3,8 GB (jądro rezerwuje część); aktualizacja istniejącej floty nie przerywa."""
+    meminfo = tmp_path / "meminfo"
+    meminfo.write_text("MemTotal:        3900000 kB\n", encoding="utf-8")
+    res = _dry(tmp_path / "1", _os_release(tmp_path, "ubuntu"), JARVO_MEMINFO=str(meminfo))
+    assert res.returncode == 0 and "RAM: 4 GB" in res.stdout and "Polecamy 8 GB RAM" in res.stdout
+    # jarvo update na maszynie, której zabrakło miejsca i RAM: tylko ostrzeżenia, aktualizacja idzie dalej
+    lokal = tmp_path / "lokal"
+    lokal.mkdir()
+    (lokal / ".installed").write_text("", encoding="utf-8")
+    meminfo.write_text("MemTotal:        2000000 kB\n", encoding="utf-8")
+    res = _dry(tmp_path / "2", _os_release(tmp_path, "ubuntu"), JARVO_MEMINFO=str(meminfo), JARVO_DISK_GB="7",
+               JARVO_LOCAL=str(lokal))
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "Za mało RAM (2 GB)" in res.stdout and "Za mało miejsca (7 GB)" in res.stdout and "JARVO_FORCE" not in res.stdout
+
+
 def test_setup_only_and_no_secrets_in_output(tmp_path):
     res = _dry(tmp_path, _os_release(tmp_path, "ubuntu"), JARVO_SETUP_ONLY="1", JARVO_KEY="sk-tajny-klucz-123")
     assert res.returncode == 0, res.stdout + res.stderr

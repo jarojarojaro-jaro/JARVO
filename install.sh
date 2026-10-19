@@ -160,17 +160,23 @@ pkg_install() {   # pkg_install nazwa...
 pkg_name() { if [[ $1 == python3 && $PKG == pacman ]]; then echo python; else echo "$1"; fi; }
 
 hw_check() {
-  local ram disk
+  local ram disk msg soft="$FORCE"
+  # aktualizacja (jarvo update): flota już stoi na tym sprzęcie, a obraz zajmuje już swoje miejsce na dysku,
+  # więc za mało RAM albo dysku tylko ostrzega zamiast przerywać
+  [[ -f "$L/.installed" ]] && soft=1
   if [[ $OS == macos ]]; then ram=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))
-  else ram="$(awk '/^MemTotal:/ {print int($2/1024/1024)}' "$MEMINFO" 2>/dev/null || true)"; fi
+  # MemTotal jest mniejszy od kupionej pamięci (jądro rezerwuje część): „4 GB” to ok. 3,8 GB, więc zaokrąglamy
+  else ram="$(awk '/^MemTotal:/ {print int($2/1048576 + 0.5)}' "$MEMINFO" 2>/dev/null || true)"; fi
   ram="${ram:-0}"
   disk="${JARVO_DISK_GB:-$(df -Pk "$HOME" 2>/dev/null | awk 'NR==2 {print int($4/1024/1024)}' || true)}"   # testy: udawany dysk
   say "RAM: ${ram} GB, wolne miejsce w $HOME: ${disk:-?} GB"
   if (( ram > 0 && ram < MIN_RAM_GB )); then
-    [[ $FORCE == 1 ]] || die "Za mało RAM (${ram} GB): flota potrzebuje ${REC_RAM_GB} GB (minimum ${MIN_RAM_GB}). JARVO_FORCE=1 wymusza."
+    msg="Za mało RAM (${ram} GB): flota potrzebuje ${REC_RAM_GB} GB (minimum ${MIN_RAM_GB})."
+    if [[ $soft == 1 ]]; then warn "$msg"; else die "$msg JARVO_FORCE=1 wymusza."; fi
   elif (( ram > 0 && ram < REC_RAM_GB )); then warn "Polecamy ${REC_RAM_GB} GB RAM (masz ${ram} GB): agenci mogą działać wolniej."; fi
   if [[ -n $disk ]] && (( disk < MIN_DISK_GB )); then
-    [[ $FORCE == 1 ]] || die "Za mało miejsca (${disk} GB): obraz i dane floty potrzebują ${REC_DISK_GB} GB (minimum ${MIN_DISK_GB}). JARVO_FORCE=1 wymusza."
+    msg="Za mało miejsca (${disk} GB): obraz i dane floty potrzebują ${REC_DISK_GB} GB (minimum ${MIN_DISK_GB})."
+    if [[ $soft == 1 ]]; then warn "$msg"; else die "$msg JARVO_FORCE=1 wymusza."; fi
   elif [[ -n $disk ]] && (( disk < REC_DISK_GB )); then warn "Polecamy ${REC_DISK_GB} GB wolnego miejsca (masz ${disk} GB)."; fi
 }
 

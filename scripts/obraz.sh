@@ -35,10 +35,15 @@ case "${1:-}" in
     k="$(klucz)"; img="$REPO_IMG:src-$k"
     echo "▶ Pobieram gotowy obraz floty ($img)"
     # rejestr prywatnego repo: jednorazowe logowanie kluczem dostępu z instalatora (zostaje w ~/.docker/config.json)
-    if ! docker pull -q "$img" >/dev/null 2>&1 && ! { [[ -n "${JARVO_TOKEN:-}" ]] \
+    if ! blad="$(docker pull -q "$img" 2>&1 >/dev/null)" && ! { [[ -n "${JARVO_TOKEN:-}" ]] \
          && printf '%s' "$JARVO_TOKEN" | docker login "${REPO_IMG%%/*}" -u jarvo --password-stdin >/dev/null 2>&1 \
          && docker pull -q "$img" >/dev/null 2>&1; }; then
-      echo "ℹ Brak gotowego obrazu dla tej wersji (CI jeszcze buduje albo brak dostępu do rejestru): buduję na miejscu."
+      # odmowa (pakiet w rejestrze nie jest publiczny) to co innego niż brak obrazu (CI jeszcze buduje)
+      if grep -qiE 'denied|unauthorized|authentication required' <<<"$blad"; then
+        echo "ℹ Rejestr odmówił pobrania $img (pakiet nie jest publiczny): buduję na miejscu."
+      else
+        echo "ℹ Brak gotowego obrazu dla tej wersji (CI jeszcze buduje albo brak sieci): buduję na miejscu."
+      fi
       exit 1
     fi
     docker tag "$img" jarvo-hermes:local
