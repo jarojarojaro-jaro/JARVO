@@ -10,7 +10,6 @@
 ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 FROM ${DEBIAN_IMAGE} AS sterownik
-ARG TARGETARCH
 # cua-driver-rs 0.21.0 (tag cua-driver-rs-v0.21.0 = commit 70db98d1): ta wersja działa z przypiętym Hermesem
 # (nowsze zmieniają argumenty kliknięcia, docs/KOMPUTER.md §8); sumy archiwów -binary z wydania i locka Hermesa
 ARG CUA_DRIVER_VERSION=0.21.0
@@ -18,10 +17,11 @@ ARG CUA_DRIVER_SHA256_AMD64=cf29bfaad16737e31e72f38dad2a6424f24b21a4ac2edea885e8
 ARG CUA_DRIVER_SHA256_ARM64=6b3a308c6741dd8291aad22a308bd2ec8eb52eab64687be007ac86ceaf7e3307
 RUN set -eux; \
     apt-get update; apt-get install -y --no-install-recommends ca-certificates curl; \
-    case "${TARGETARCH:-amd64}" in \
+    # architektura z samego obrazu bazowego (TARGETARCH bywa pusty bez BuildKit: Mac M dostałby sterownik x86_64)
+    case "$(dpkg --print-architecture)" in \
       amd64) arch=linux-x86_64; sum="$CUA_DRIVER_SHA256_AMD64" ;; \
       arm64) arch=linux-arm64;  sum="$CUA_DRIVER_SHA256_ARM64" ;; \
-      *) echo "Komputer Jarva: brak cua-driver dla architektury ${TARGETARCH}" >&2; exit 1 ;; \
+      *) echo "Komputer Jarva: brak cua-driver dla architektury $(dpkg --print-architecture)" >&2; exit 1 ;; \
     esac; \
     curl -fsSL --retry 3 -o /tmp/cua.tgz \
       "https://github.com/trycua/cua/releases/download/cua-driver-rs-v${CUA_DRIVER_VERSION}/cua-driver-rs-${CUA_DRIVER_VERSION}-${arch}-binary.tar.gz"; \

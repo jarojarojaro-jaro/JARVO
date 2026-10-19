@@ -305,7 +305,7 @@ u innych agentów.
 
 | Źródło | Licencja | Stan |
 |---|---|---|
-| `cua-driver` (trycua/cua, `cua-driver-rs` 0.21.0, później 0.36) | MIT | w obrazie `jarvo-komputer` (K1): przegląd, próba w kontenerze, sumy SHA-256 dla amd64 i arm64 w `vendor/zrodla.yaml`; 0.21.0, bo z nią działa przypięty Hermes (nowsze zmieniają argumenty kliknięcia); telemetrię i sprawdzanie aktualizacji wyłączają zmienne, pliki konfiguracji i bramka |
+| `cua-driver` (trycua/cua, `cua-driver-rs` 0.21.0, później 0.36) | MIT | w obrazie `jarvo-komputer` (K1): przegląd, próba w kontenerze, sumy SHA-256 dla amd64 i arm64 w `vendor/zrodla.yaml` (architekturę wybiera `dpkg --print-architecture` obrazu bazowego, nie `TARGETARCH`, który bez BuildKit jest pusty); 0.21.0, bo z nią działa przypięty Hermes (nowsze zmieniają argumenty kliknięcia); telemetrię i sprawdzanie aktualizacji wyłączają zmienne, pliki konfiguracji i bramka |
 | Codex Computer Use (OpenAI) | zamknięte | tylko wzorce zachowania z materiałów publicznych; kodu nie bierzemy |
 | Pakiety Debiana w obrazie (TigerVNC, xfwm4, Chromium, D-Bus, AT-SPI, `python3-gi` z `gir1.2-atspi-2.0`, iptables) | GPL-2.0, BSD, LGPL i inne | `docs/SOURCES.md`, tabela komponentów obrazu `jarvo-komputer` |
 | LCU (amontlabs/lcu) | MIT | odrzucone (uruchamia zamknięty program OpenAI); wzorce: zgoda na aplikację, dziennik bez treści, sprzątanie po turze |
