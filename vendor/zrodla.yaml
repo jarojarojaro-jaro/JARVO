@@ -214,6 +214,11 @@ zrodla:
     repo: https://github.com/daijro/camoufox
     status: uzywane
     przejrzane: 5d06ec1629ac7843508f1e683f83e404fde8db76
+  cua:
+    repo: https://github.com/trycua/cua
+    status: uzywane
+    przejrzane: 70db98d1bcd92890d778f4978e0eb107a4b66c1b
+    notatka: "cua-driver-rs 0.21.0 (tag cua-driver-rs-v0.21.0 = commit 70db98d): sterownik ekranu Komputera Jarva (computer use, docs/KOMPUTER.md), tylko program cua-driver z archiwum -binary, w obrazie jarvo-komputer (/opt/cua/0.21.0). Sumy archiwów sprawdzane sha256sum -c w infra/komputer/Dockerfile: linux-x86_64 cf29bfaad16737e31e72f38dad2a6424f24b21a4ac2edea885e83cb9d5034135, linux-arm64 6b3a308c6741dd8291aad22a308bd2ec8eb52eab64687be007ac86ceaf7e3307 (te same w locku przypiętego Hermesa). MIT (Cua AI, Inc.), LICENSE w infra/komputer/LICENSE-cua-driver.md (archiwum -binary go nie ma). Przegląd 2026-10-19: telemetria PostHog i sprawdzanie aktualizacji domyślnie włączone, w Komputerze wyłączone zmiennymi i configiem (0 połączeń w 29 uruchomieniach), bramka komputer/jarvo_cua.py odmawia check-update, update, install i serve; instalator curl|bash nieużywany. Nowsze wersje (0.31+, 0.35+) zmieniają argumenty kliknięcia i format drzewa: podbicie dopiero z adapterem (K6), hosty tylko z podpisaną wersją 0.36+"
   espeak-ng:
     repo: https://github.com/espeak-ng/espeak-ng
     status: uzywane

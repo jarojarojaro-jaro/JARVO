@@ -77,7 +77,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`security/redteam/`](security/redteam) | red team na promptfoo: ataki na agentów (`scripts/redteam.sh`) |
 | [`scripts/`](scripts) | build dystrybucji, walidator, deploy, instalacja floty, backupy, evals, narzędzia |
 | [`hq/`](hq) | Jarvo HQ: plugin dashboardu (backend, frontend, demo) |
-| [`infra/`](infra) | obraz `jarvo-hermes` (Hermes + narzędzia), docker compose z sidecarami, szablony env |
+| [`infra/`](infra) | obraz `jarvo-hermes` (Hermes + narzędzia), obraz Komputera Jarva (`infra/komputer`: pulpit z Chromium dla computer use), docker compose z sidecarami, szablony env |
 | [`knowledge/`](knowledge) | szablon brand kitu kopiowany na serwer |
 | [`branding/`](branding) | skórka Jarvo: terminal, favicon, motyw i tłumaczenie dashboardu |
 | [`site/`](site) | landing jarvo.pl (`scripts/deploy-site.sh`) |
@@ -85,7 +85,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`bin/jarvo`](bin/jarvo) | polecenie użytkownika po instalacji: `up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall` |
 | [`requirements-dev.txt`](requirements-dev.txt) | zależności testów i walidacji (`make dev-deps`) |
 | [`tests/`](tests) | testy pytest |
-| [`komputer/`](komputer) | computer use: bramka sterownika ekranu `jarvo_cua.py` (Hermes woła ją zamiast `cua-driver`), projekt w [docs/KOMPUTER.md](docs/KOMPUTER.md) |
+| [`komputer/`](komputer) | computer use: bramka sterownika ekranu `jarvo_cua.py` (Hermes woła ją zamiast `cua-driver`); pulpit włączasz `jarvo komputer on`; projekt w [docs/KOMPUTER.md](docs/KOMPUTER.md) |
 | [`wiedza/`](wiedza) | skarbiec wiedzy floty (drugi mózg): `wiedza.py` i `SCHEMA.md`, projekt w [docs/WIEDZA.md](docs/WIEDZA.md) |
 | [`docs/`](docs) | dokumentacja (niżej) |
 

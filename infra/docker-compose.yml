@@ -15,6 +15,8 @@
 #               w jądrze hosta) + ws-scrcpy (ekran w przeglądarce); ~2,3 GB RAM w pracy
 #   android-kvm to samo z oficjalnym emulatorem Androida 13 (z usługami Google) tam, gdzie jest /dev/kvm (serwer
 #               z KVM, WSL2 z Docker Engine); ~4 GB RAM. Oba włącza `jarvo android on` (wybiera sam), adres ten sam.
+#   komputer    Komputer Jarva (docs/KOMPUTER.md): pulpit Linux z Chromium i sterownikiem ekranu dla computer use,
+#               bez portów i bez kluczy floty; ~0,3 GB w spoczynku, do 2 GB w pracy. Włącza `jarvo komputer on`.
 
 name: jarvo
 
@@ -59,6 +61,8 @@ services:
       - ${JARVO_REPO:-/srv/jarvo/repo}:/opt/jarvo/repo:ro
       - ${JARVO_BUILD:-/srv/jarvo/build}:/opt/jarvo/build:ro
       - ${JARVO_SECRETS:-/srv/jarvo/secrets}:/opt/jarvo/secrets:ro
+      # gniazda Komputera Jarva (ekran RFB, kanał sterownika); pusty wolumen, gdy Komputer jest wyłączony
+      - komputer-gniazda:/opt/jarvo/komputer
     ports:
       - "${JARVO_BIND_IP:-127.0.0.1}:9119:9119"     # dashboard + Hermes Desktop (Remote Gateway)
       - "${JARVO_BIND_IP:-127.0.0.1}:9120:9120"     # Jarvo HQ „Odpal”: podgląd stron agentów (link z tokenem)
@@ -207,8 +211,44 @@ services:
         limits: {memory: 256m}
     networks: [jarvo-net]
 
+  # Komputer Jarva (docs/KOMPUTER.md): pulpit, na którym agent klika i pisze. Bez portów, bez kluczy floty i poza siecią
+  # floty: jarvo-hermes rozmawia z nim przez gniazda unix we wspólnym wolumenie (tu /run/jarvo-komputer, w hermesie
+  # /opt/jarvo/komputer). start.sh blokuje ruch do sieci lokalnej, adresów chmury i hosta (zostaje internet) i bez
+  # działającego filtra nie startuje; potem wszystko na ekranie działa jako użytkownik pulpit, bez nowych uprawnień.
+  komputer:
+    <<: *restart
+    profiles: [komputer]
+    build:
+      context: ./komputer
+    image: jarvo-komputer:local
+    container_name: jarvo-komputer
+    hostname: komputer
+    environment:
+      TZ: ${TZ:-Europe/Warsaw}
+      KOMPUTER_EKRAN: ${KOMPUTER_EKRAN:-1440x900}
+      # publiczne adresy hosta (VPS), których Komputer też nie może odpytać; uzupełnia `jarvo komputer on` i deploy.sh
+      KOMPUTER_BLOKADA: ${KOMPUTER_BLOKADA:-}
+    volumes:
+      - komputer-gniazda:/run/jarvo-komputer
+      - komputer-dom:/home                           # stan przeglądarki; `jarvo komputer wyczysc` kasuje
+    # filtr ruchu (NET_ADMIN, zdejmowany zaraz po ustawieniu), katalogi i zrzucenie uprawnień do użytkownika pulpit
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, KILL, NET_ADMIN, SETGID, SETPCAP, SETUID]
+    security_opt: [no-new-privileges:true]
+    shm_size: "1gb"                                  # Chromium
+    deploy:
+      resources:
+        limits:
+          memory: ${KOMPUTER_MEM_LIMIT:-2g}
+          cpus: "${KOMPUTER_CPUS:-2}"
+          pids: 2048
+    networks: [jarvo-komputer-net]
+
 networks:
   jarvo-net:
+    driver: bridge
+  # tylko wyjście do internetu (filtr w start.sh); bez trasy do jarvo-net
+  jarvo-komputer-net:
     driver: bridge
 
 # używane tylko, gdy JARVO_VOL_* / JARVO_BUILD wskazują te nazwy (macOS); stałe nazwy bez prefiksu projektu
@@ -216,3 +256,6 @@ volumes:
   jarvo-hermes-data: {name: jarvo-hermes-data}
   jarvo-valkey-data: {name: jarvo-valkey-data}
   jarvo-build: {name: jarvo-build}
+  # Komputer Jarva: gniazda (wspólne z jarvo-hermes) i katalogi domowe pulpitu na każdym systemie
+  komputer-gniazda: {name: jarvo-komputer-gniazda}
+  komputer-dom: {name: jarvo-komputer-dom}

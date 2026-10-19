@@ -5,6 +5,7 @@
 #   JARVO_LOCAL=<scratchpad>/jarvo-local bash scripts/sandbox-up.sh   # dockerd, obrazy, instalacja, deploy
 #   bash scripts/sandbox-up.sh --rebuild                              # wymuś przebudowę obrazów
 #   JARVO_EXTRAS="manim" bash scripts/sandbox-up.sh --rebuild           # obraz z dodatkami (jak JARVO_EXTRAS w compose/.env)
+#   JARVO_KOMPUTER=1 bash scripts/sandbox-up.sh                       # z Komputerem Jarva (profil komputer, docs/KOMPUTER.md)
 #   bash scripts/sandbox-up.sh down                                   # zatrzymaj flotę
 #
 # Kroki:
@@ -17,7 +18,10 @@
 #   5. certyfikat proxy w magazynie NSS hermesa ($JARVO_LOCAL/data/hermes/.pki/nssdb): Chromium (Lighthouse, axe,
 #      zrzuty, Playwright) nie czyta magazynu systemowego i bez tego każda strona z internetu kończy się
 #      ERR_CERT_AUTHORITY_INVALID; odtwarzany tylko po zmianie certyfikatu,
-#   6. scripts/deploy.sh --no-pull --no-build (pierwszy raz z --first-run): walidacja, build dystrybucji,
+#   6. Komputer Jarva (JARVO_KOMPUTER=1 albo profil komputer w compose/.env): komputer-ca:test = baza Debiana z obrazu
+#      Komputera + certyfikat proxy (curl po sterownik, Chromium przez start.sh), na niej jarvo-komputer:local;
+#      przebudowa po zmianie infra/komputer/ (.komputer-tree), tak samo jak w deploy.sh i `jarvo komputer on`,
+#   7. scripts/deploy.sh --no-pull --no-build (pierwszy raz z --first-run): walidacja, build dystrybucji,
 #      instalacja profili, healthchecki.
 #
 # Tylko do piaskownicy. Na VPS: scripts/deploy.sh, na własnym komputerze: scripts/local-up.sh.
@@ -131,6 +135,35 @@ if [[ "$(cat "$NSS/.ca-sha" 2>/dev/null)" != "$CA_SHA" ]]; then
   rm -rf "$tmp"
   echo "$CA_SHA" > "$NSS/.ca-sha"
 fi
+if [[ "${JARVO_KOMPUTER:-0}" == 1 ]] && ! grep -qE '^COMPOSE_PROFILES=(.*,)?komputer(,|$)' "$L/compose/.env"; then
+  prof="$(sed -n 's/^COMPOSE_PROFILES=//p' "$L/compose/.env" | tail -1)"
+  tmp="$(mktemp)"; grep -v '^COMPOSE_PROFILES=' "$L/compose/.env" > "$tmp" || true
+  echo "COMPOSE_PROFILES=${prof:+$prof,}komputer" >> "$tmp"; cat "$tmp" > "$L/compose/.env"; rm -f "$tmp"
+fi
+if grep -qE '^COMPOSE_PROFILES=(.*,)?komputer(,|$)' "$L/compose/.env"; then
+  KBASE="$(sed -n 's/^ARG DEBIAN_IMAGE=//p' "$ROOT/infra/komputer/Dockerfile")"
+  KTREE="$(git -C "$ROOT" rev-parse HEAD:infra/komputer 2>/dev/null || echo brak)"
+  if [[ $REBUILD -eq 1 ]] || ! docker image inspect komputer-ca:test >/dev/null 2>&1 \
+     || [[ "$(docker image inspect -f '{{index .Config.Labels "pl.jarvo.baza"}}' komputer-ca:test 2>/dev/null)" != "$KBASE $CA_SHA" ]]; then
+    log "komputer-ca:test (baza Komputera + certyfikat proxy)"
+    kctx="$(mktemp -d)"
+    csplit -s -z -f "$kctx/proxy-ca-" "$CA" '/-----BEGIN CERTIFICATE-----/' '{*}'
+    for c in "$kctx"/proxy-ca-*; do mv "$c" "$c.crt"; done
+    printf '%s\n' 'ARG DEBIAN_IMAGE' 'FROM ${DEBIAN_IMAGE}' 'ARG BAZA' 'LABEL pl.jarvo.baza=$BAZA' \
+      'RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*' \
+      'COPY proxy-ca-*.crt /usr/local/share/ca-certificates/' 'RUN update-ca-certificates' > "$kctx/Dockerfile"
+    docker build -q --build-arg DEBIAN_IMAGE="$KBASE" --build-arg BAZA="$KBASE $CA_SHA" -t komputer-ca:test "$kctx" >/dev/null
+    rm -rf "$kctx"
+    rm -f "$L/compose/.komputer-tree"
+  fi
+  if [[ "$(cat "$L/compose/.komputer-tree" 2>/dev/null)" != "$KTREE" ]] || ! docker image inspect jarvo-komputer:local >/dev/null 2>&1; then
+    log "jarvo-komputer:local (pulpit, Chromium, cua-driver; kilka minut za pierwszym razem)"
+    docker build --build-arg DEBIAN_IMAGE=komputer-ca:test -t jarvo-komputer:local "$ROOT/infra/komputer"
+    echo "$KTREE" > "$L/compose/.komputer-tree"
+    docker image prune -f >/dev/null || true
+  fi
+fi
+
 # kontener pracuje jako hermes (uid 10000); przy działającej flocie pliki -wal/-shm SQLite potrafią zniknąć w trakcie
 # przechodzenia katalogu, więc jedna powtórka (druga porażka to już prawdziwy błąd)
 chown -R 10000:10000 "$L/build" "$L/data" 2>/dev/null || chown -R 10000:10000 "$L/build" "$L/data"

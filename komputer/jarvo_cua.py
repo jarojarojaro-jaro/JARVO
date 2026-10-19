@@ -18,9 +18,12 @@ import os
 import sys
 
 WERSJA_STEROWNIKA = "0.21.0"          # cua-driver-rs w obrazie jarvo-komputer (infra/komputer, vendor/zrodla.yaml)
-GNIAZDO = os.environ.get("JARVO_KOMPUTER_GNIAZDO", "/run/jarvo-komputer/cua.sock")
+GNIAZDO = os.environ.get("JARVO_KOMPUTER_GNIAZDO", "/opt/jarvo/komputer/cua.sock")   # wolumen gniazd Komputera
+EKRAN = os.path.join(os.path.dirname(GNIAZDO), "rfb.sock")                             # ekran Komputera (Xvnc)
 WYLACZONY = ("Komputer Jarva jest wyłączony albo jeszcze startuje. Włącz go na komputerze z Jarvem: "
              "jarvo komputer on (docs/KOMPUTER.md).")
+BEZ_KANALU = ("Komputer Jarva działa, ale kanał sterownika ekranu jeszcze nie jest gotowy "
+              "(etap K2, docs/KOMPUTER.md).")
 KOD_ODMOWY = 64                        # EX_USAGE: czasownik zablokowany przez bramkę
 KOD_BRAK_KOMPUTERA = 69                # EX_UNAVAILABLE
 
@@ -48,19 +51,28 @@ def manifest() -> dict:
             "subcommands": [{"name": n, "args": [{"name": f} for f in f_]} for n, f_ in flagi.items()]}
 
 
-def komputer_dostepny() -> bool:
+def odpowiada(sciezka: str) -> bool:
     import socket
-    if not os.path.exists(GNIAZDO):
+    if not os.path.exists(sciezka):
         return False
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(3)
     try:
-        s.connect(GNIAZDO)
+        s.connect(sciezka)
         return True
     except OSError:
         return False
     finally:
         s.close()
+
+
+def komputer_dostepny() -> bool:
+    return odpowiada(GNIAZDO)
+
+
+def powod_braku() -> str:
+    """Wyłączony Komputer albo działający pulpit bez kanału sterownika: różne rady dla właściciela."""
+    return BEZ_KANALU if odpowiada(EKRAN) else WYLACZONY
 
 
 def main(argv: list[str]) -> int:
@@ -78,11 +90,11 @@ def main(argv: list[str]) -> int:
         if komputer_dostepny():
             print("Komputer Jarva odpowiada.")
             return 0
-        print(WYLACZONY, file=sys.stderr)
+        print(powod_braku(), file=sys.stderr)
         return 1
     if czas == "mcp":
         if not komputer_dostepny():
-            print(WYLACZONY, file=sys.stderr)
+            print(powod_braku(), file=sys.stderr)
             return KOD_BRAK_KOMPUTERA
         print("Kanał do Komputera Jarva jeszcze nie działa (etap K2, docs/KOMPUTER.md).", file=sys.stderr)
         return KOD_BRAK_KOMPUTERA

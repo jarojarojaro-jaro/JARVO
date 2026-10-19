@@ -49,4 +49,4 @@ deny:
   - "*computer-use install*"
   - "*trycua/cua*"
   - "*cua-driver*"
-  - "*/run/jarvo-komputer*"
+  - "*/opt/jarvo/komputer*"

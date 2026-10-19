@@ -254,10 +254,14 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   (`--password`, `password-stdin`), logowania w cudze konta (accounts.google.com, YouTube Studio,
   login.live.com, facebook.com/login), obchodzenia wykrywania automatu (`--user-agent`,
   `navigator.webdriver`, `xvfb-run`, `Xvfb`) i instalacji albo aktualizacji sterownika ekranu w locie
-  (`computer-use install`, `trycua/cua`, `cua-driver`, gniazda `/run/jarvo-komputer`).
+  (`computer-use install`, `trycua/cua`, `cua-driver`, gniazda `/opt/jarvo/komputer`).
 - **Computer use** (`docs/KOMPUTER.md`): Hermes woła sterownik ekranu tylko przez bramkę `komputer/jarvo_cua.py`
   (`HERMES_CUA_DRIVER_CMD`), która odmawia aktualizacji, instalacji i trybu bez ograniczeń; walidator pozwala na
   `computer_use` i klucze `cua:*` tylko agentowi z `komputer: true` i zabrania `approvals.mode: off`.
+  Komputer Jarva (`infra/komputer`, profil compose `komputer`, `jarvo komputer on|off|status|wyczysc|odswiez`):
+  pulpit Xvnc z Chromium i drzewem dostępności w osobnym kontenerze bez kluczy floty i bez portów; ekran i sterownik
+  tylko przez gniazda unix w wolumenie `jarvo-komputer-gniazda` (w `jarvo-hermes` `/opt/jarvo/komputer`); filtr
+  ruchu przed pulpitem: internet tak, sieć lokalna, metadane chmury, adresy hosta i port 25 nie.
 - **Skan skilli z cudzych repo** (`scripts/skan_skilli.py`, przy każdym buildzie): skaner Hermesa + wzorce
   getsentry `skill-scanner` i ECC (wstrzyknięcia, `curl|sh`, sekrety, ukryte znaki, hooki, `postinstall`).
   High/critical bez przejrzanego wyjątku (`vendor/skan-wyjatki.yaml`, przypięty do commitu) zatrzymuje wdrożenie.
@@ -303,7 +307,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `evals/<agent>/` | scenariusze testów zachowań (w zakresie, poza zakresem, routing, protokół, bezpieczeństwo) |
 | `scripts/` | build, walidator, deploy, instalacja floty, backupy, evals (runner, pomiar `evalslib.py`, `evals-wyniki.py`), migracja, narzędzia |
 | `hq/` | Jarvo HQ (backend, frontend, demo) |
-| `infra/` | obraz jarvo-hermes, docker-compose z sidecarami, szablony env |
+| `infra/` | obraz jarvo-hermes, obraz Komputera Jarva (`infra/komputer`), docker-compose z sidecarami, szablony env |
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
 | `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
@@ -339,7 +343,8 @@ SOURCES (licencje).
   `dockerd` (po restarcie piaskownicy usuwa stare pliki pid demona), obraz `hermes-ca:test` (Hermes + certyfikat proxy), `jarvo-hermes:local` przez
   `docker build --network host` (compose nie widzi proxy), instalację w `jarvo-local` i
   `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` lub `branding/` albo z `--rebuild`; dodatki obrazu
-  przez `JARVO_EXTRAS="manim"` przed poleceniem (z `--rebuild`).
+  przez `JARVO_EXTRAS="manim"` przed poleceniem (z `--rebuild`); Komputer Jarva przez `JARVO_KOMPUTER=1` (obraz
+  `komputer-ca:test` = Debian + certyfikat proxy, `jarvo-komputer:local` po zmianie `infra/komputer/`).
 - Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (na Linuksie sam doinstalowuje pakiety i Docker
   Engine, na macOS Homebrew i Colimę; repo do `~/jarvo`) → `jarvo up` (`bin/jarvo` → `scripts/local-up.sh`) →
   `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`; na macOS dane i build w wolumenach Dockera

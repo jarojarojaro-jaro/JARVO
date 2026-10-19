@@ -61,6 +61,26 @@ def test_bez_komputera_mcp_i_status_mowia_jak_wlaczyc():
         assert r.returncode == kod and "jarvo komputer on" in r.stderr
 
 
+def test_pulpit_bez_kanalu_sterownika_nie_udaje_wylaczonego():
+    """Działa ekran Komputera (rfb.sock), ale nie ma jeszcze gniazda sterownika: rada inna niż „włącz”."""
+    import socket
+    import tempfile
+    katalog = tempfile.mkdtemp(prefix="jk")          # krótka ścieżka: gniazdo unix ma limit ~100 znaków
+    ekran = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        ekran.bind(os.path.join(katalog, "rfb.sock"))
+        ekran.listen(4)
+        for czas, kod in (("mcp", jarvo_cua.KOD_BRAK_KOMPUTERA), ("status", 1)):
+            r = uruchom(czas, gniazdo=os.path.join(katalog, "cua.sock"))
+            assert r.returncode == kod and "kanał sterownika ekranu" in r.stderr
+            assert "jarvo komputer on" not in r.stderr
+    finally:
+        ekran.close()
+        for nazwa in os.listdir(katalog):
+            os.unlink(os.path.join(katalog, nazwa))
+        os.rmdir(katalog)
+
+
 def test_bramka_nie_importuje_sieci():
     """Bramka nie łączy się z internetem: tylko gniazdo unix (socket), bez http, urllib, ssl, requests."""
     tekst = BRAMKA.read_text(encoding="utf-8")
@@ -111,5 +131,5 @@ def test_agent_z_komputerem_bez_lokalnego_terminala(repo_copy):
 
 def test_deny_blokuje_instalacje_sterownika():
     deny = (REPO / "shared/security/deny.yaml").read_text(encoding="utf-8")
-    for wzor in ("*computer-use install*", "*trycua/cua*", "*cua-driver*", "*/run/jarvo-komputer*"):
+    for wzor in ("*computer-use install*", "*trycua/cua*", "*cua-driver*", "*/opt/jarvo/komputer*"):
         assert f'"{wzor}"' in deny

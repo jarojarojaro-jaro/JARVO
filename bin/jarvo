@@ -13,6 +13,7 @@
 #   jarvo autostart on|off|status   start floty i pomocnika aktualizacji po restarcie (systemd użytkownika; macOS: LaunchAgent)
 #   jarvo uninstall [--yes] [--all] usuń flotę (kontenery, obraz, usługę, polecenie); --all także dane, klucze i repo
 #   jarvo android on|off|status     telefon testowy Twórcy aplikacji (emulator przy KVM, Redroid przy binderze; ekran w HQ)
+#   jarvo komputer on|off|status|wyczysc|odswiez   Komputer Jarva: pulpit z Chromium dla computer use (docs/KOMPUTER.md)
 #   jarvo version             gałąź, commit i data repo
 #
 # Zmienne: JARVO_LOCAL (katalog instalacji: ~/jarvo-local albo zapisany w ~/jarvo/.jarvo-local), JARVO_YES=1
@@ -216,7 +217,7 @@ cmd_uninstall() {
   confirm "Usunąć flotę Jarvo (kontenery, obraz, usługę aktualizacji, polecenie jarvo)?" || { echo "Anulowano."; return 0; }
   if installed && ensure_docker soft; then
     compose down --remove-orphans >/dev/null 2>&1 || true
-    docker image rm -f jarvo-hermes:local >/dev/null 2>&1 || true
+    docker image rm -f jarvo-hermes:local jarvo-komputer:local >/dev/null 2>&1 || true
     # obraz pobrany z rejestru (scripts/obraz.sh): jego tagi src-*
     # (grep bez trafień = kod 1, a pipefail przerwałby uninstall: obrazu z rejestru może nie być)
     docker images --format '{{.Repository}}:{{.Tag}}' | { grep '/jarvo-hermes:src-' || true; } | while read -r img; do
@@ -237,6 +238,10 @@ cmd_uninstall() {
     if volumes && ensure_docker soft; then
       docker volume rm jarvo-hermes-data jarvo-valkey-data jarvo-build >/dev/null 2>&1 || true
       say "Usunięto wolumeny danych floty"
+    fi
+    # Komputer Jarva ma wolumeny na każdym systemie (stan przeglądarki, gniazda)
+    if ensure_docker soft; then
+      docker volume rm jarvo-komputer-dom jarvo-komputer-gniazda >/dev/null 2>&1 || true
     fi
     [[ -n $L && $L != / && -d $L ]] && $SUDO rm -rf "$L" && say "Usunięto $L"
   else echo "Dane zostają: $L"; fi
@@ -344,6 +349,98 @@ cmd_android() {
     *) die "jarvo android on [--emulator|--redroid] | off | status" ;;
   esac
 }
+# Komputer Jarva (docs/KOMPUTER.md): pulpit Linux z Chromium i sterownikiem ekranu w osobnym kontenerze jarvo-komputer
+# (profil compose komputer, zapisany w COMPOSE_PROFILES jak telefon testowy). Obraz budujemy na miejscu
+# (infra/komputer, kilka minut za pierwszym razem) i od nowa po zmianie infra/komputer/ (.komputer-tree).
+komputer_tree() { git -C "$ROOT" rev-parse HEAD:infra/komputer 2>/dev/null || echo brak; }
+komputer_obraz() {   # komputer_obraz [--od-nowa]: zbuduj obraz, gdy go nie ma albo zmieniło się infra/komputer/
+  local tree; tree="$(komputer_tree)"
+  if [[ "${1:-}" == --od-nowa ]]; then
+    say "Buduję Komputer od nowa z bieżącymi poprawkami Debiana i Chromium (kilka minut)"
+    compose --profile komputer build --pull --no-cache komputer
+  elif [[ "$(cat "$L/compose/.komputer-tree" 2>/dev/null)" != "$tree" ]] \
+       || ! docker image inspect jarvo-komputer:local >/dev/null 2>&1; then
+    say "Buduję obraz Komputera Jarva (pierwszy raz kilka minut, ok. 400 MB pobrania)"
+    compose --profile komputer build komputer
+  else return 0; fi
+  echo "$tree" > "$L/compose/.komputer-tree"
+  docker image prune -f >/dev/null 2>&1 || true
+}
+set_envval() {   # set_envval KLUCZ wartość (w compose/.env, bez zmiany uprawnień pliku)
+  local f="$L/compose/.env" tmp
+  tmp="$(mktemp)"; grep -vE "^$1=" "$f" > "$tmp" || true
+  echo "$1=$2" >> "$tmp"
+  cat "$tmp" > "$f"; rm -f "$tmp"
+}
+# publiczne adresy IPv4 tego komputera (VPS): Komputer nie może ich odpytać (porty floty, SSH hosta); prywatne
+# zakresy blokuje sam start.sh. Na macOS i w WSL host jest za maszyną wirtualną, więc nic tu nie dopisujemy.
+host_publiczne() {
+  [[ $OS == linux ]] || return 0
+  { hostname -I 2>/dev/null || ip -4 -o addr show scope global 2>/dev/null | awk '{sub("/.*", "", $4); print $4}'; } \
+    | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' \
+    | grep -vE '^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)' \
+    | sort -u | paste -sd, - || true
+}
+komputer_zdrowy() { docker exec jarvo-komputer /opt/jarvo-komputer/zdrowie.sh >/dev/null 2>&1; }
+cmd_komputer() {
+  installed || die "Flota nie jest zainstalowana (jarvo up)."
+  local prof rest mem bylo
+  prof="$(env_profiles)"
+  case "${1:-status}" in
+    on)
+      ensure_docker
+      mem="$(docker info --format '{{.MemTotal}}' 2>/dev/null | awk '{print int($1/1073741824 + 0.5)}')"
+      if (( ${mem:-0} > 0 && mem < 4 )); then
+        die "Docker ma ${mem} GB pamięci, a Komputer Jarva bierze w pracy do 2 GB obok floty. Potrzeba co najmniej 4 GB$([[ $OS == macos ]] && echo " (Colima: colima stop; colima start --memory 8)")."
+      elif (( ${mem:-0} > 0 && mem < 8 )); then
+        warn "Docker ma ${mem} GB pamięci; Komputer bierze ok. 0,3 GB w spoczynku i do 2 GB w pracy (limit KOMPUTER_MEM_LIMIT w $L/compose/.env)."
+      fi
+      komputer_obraz
+      set_envval KOMPUTER_BLOKADA "$(host_publiczne)"
+      rest="$(tr ',' '\n' <<<"$prof" | { grep -vx komputer || true; } | paste -sd, -)"
+      set_profiles "${rest:+$rest,}komputer"
+      say "Startuję Komputer Jarva"
+      compose --profile komputer up -d komputer
+      for _ in $(seq 1 45); do komputer_zdrowy && break; sleep 2; done
+      komputer_zdrowy || die "Komputer nie wstał w 90 s: jarvo logs komputer"
+      say "Komputer Jarva działa: pulpit z Chromium, ruch tylko do internetu (bez sieci lokalnej i adresów hosta)."
+      echo "  Agent Operator, kanał sterownika i podgląd ekranu w HQ dochodzą w kolejnych etapach (docs/KOMPUTER.md §2)." ;;
+    off)
+      ensure_docker
+      compose stop komputer >/dev/null 2>&1 || true
+      compose rm -f komputer >/dev/null 2>&1 || true
+      set_profiles "$(tr ',' '\n' <<<"$prof" | { grep -vx komputer || true; } | paste -sd, -)"
+      say "Komputer Jarva wyłączony. Stan przeglądarki zostaje (jarvo komputer wyczysc go kasuje)." ;;
+    wyczysc|clean)
+      ensure_docker
+      confirm "Skasować stan Komputera Jarva (przeglądarka: zalogowania, ciasteczka, historia, pobrane pliki)?" \
+        || { echo "Anulowano."; return 0; }
+      bylo=0; docker ps --format '{{.Names}}' | grep -qx jarvo-komputer && bylo=1
+      compose stop komputer >/dev/null 2>&1 || true
+      compose rm -f komputer >/dev/null 2>&1 || true
+      docker volume rm jarvo-komputer-dom >/dev/null 2>&1 || true
+      say "Stan Komputera skasowany."
+      [[ $bylo == 1 ]] && cmd_komputer on
+      return 0 ;;
+    odswiez|refresh)
+      ensure_docker
+      komputer_obraz --od-nowa
+      if [[ ",$prof," == *,komputer,* ]]; then compose --profile komputer up -d komputer; say "Komputer Jarva działa na nowym obrazie."; fi ;;
+    status)
+      case ",$prof," in
+        *,komputer,*) echo "Komputer Jarva:  włączony (COMPOSE_PROFILES w $L/compose/.env)" ;;
+        *) echo "Komputer Jarva:  wyłączony (jarvo komputer on)" ;;
+      esac
+      if ensure_docker soft && docker ps --format '{{.Names}}' | grep -qx jarvo-komputer; then
+        if komputer_zdrowy; then echo "pulpit:          działa ($(docker exec jarvo-komputer cua-driver --version 2>/dev/null | head -1))"
+        else echo "pulpit:          startuje albo nie odpowiada (jarvo logs komputer)"; fi
+        echo "pamięć:          $(docker stats --no-stream --format '{{.MemUsage}}' jarvo-komputer 2>/dev/null)"
+        if docker exec jarvo-hermes test -S /opt/jarvo/komputer/rfb.sock 2>/dev/null; then echo "flota widzi ekran: tak"
+        else echo "flota widzi ekran: nie (jarvo up)"; fi
+      else echo "pulpit:          nie działa"; fi ;;
+    *) die "jarvo komputer on | off | status | wyczysc | odswiez" ;;
+  esac
+}
 usage() { grep -E '^#   jarvo ' "$SELF" | sed 's/^#   //'; }
 
 cmd="${1:-help}"; shift || true
@@ -359,6 +456,7 @@ case "$cmd" in
   autostart) cmd_autostart "$@" ;;
   uninstall) cmd_uninstall "$@" ;;
   android) cmd_android "$@" ;;
+  komputer|computer) cmd_komputer "$@" ;;
   version) cmd_version ;;
   updater) cmd_updater ;;
   help|-h|--help) usage ;;

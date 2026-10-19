@@ -268,6 +268,14 @@ sudo crontab -e
 Androida i ekran, czeka na start systemu i wypisuje link do ekranu (`http://<ip-tailscale>:9122/<token>/`, 12 h; w HQ
 przycisk 📱 w panelu Twórcy aplikacji). Wyłączenie zwalnia RAM: `bin/jarvo android off`; stan: `bin/jarvo android status`.
 
+**Komputer Jarva (opcjonalnie, computer use):** `JARVO_LOCAL=/srv/jarvo bash bin/jarvo komputer on` buduje obraz
+`jarvo-komputer:local` z `infra/komputer/`, zapisuje profil `komputer` w `COMPOSE_PROFILES` i publiczne adresy serwera
+w `KOMPUTER_BLOKADA` (Komputer nie sięga do nich ani do sieci lokalnej), startuje pulpit i czeka na healthcheck.
+Bierze ok. 0,3 GB w spoczynku, do 2 GB w pracy (`KOMPUTER_MEM_LIMIT`). Stan: `bin/jarvo komputer status`;
+wyłączenie: `bin/jarvo komputer off`; skasowanie zalogowań i historii: `bin/jarvo komputer wyczysc`; świeże poprawki
+Debiana i Chromium: `bin/jarvo komputer odswiez`. Gdy nie wstaje: `bin/jarvo logs komputer` (start pokazuje wynik
+próby filtra ruchu). Szczegóły: [KOMPUTER.md §5](KOMPUTER.md#5-komputer-jarva-infrakomputer-k1).
+
 **SSH tylko przez Tailscale** (gdy `ssh jarvo@<ip-tailscale>` działa):
 ```bash
 sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh

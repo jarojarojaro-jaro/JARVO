@@ -51,7 +51,7 @@ fi
 # z 2 CPU); inaczej Docker odmawia startu: "range of CPUs is from 0.01 to 2.00"
 ncpu="$(docker info --format '{{.NCPU}}' 2>/dev/null || true)"
 if [[ "$ncpu" =~ ^[1-9][0-9]*$ ]]; then
-  for v in HERMES_CPUS=4 ANDROID_CPUS=2; do
+  for v in HERMES_CPUS=4 ANDROID_CPUS=2 KOMPUTER_CPUS=2; do
     cur="$(sed -n "s/^${v%=*}=//p" "$COMPOSE_DIR/.env" | tail -1)"; cur="${cur:-${v#*=}}"
     if awk -v c="$cur" -v n="$ncpu" 'BEGIN { exit !(c + 0 > n + 0) }'; then
       log "${v%=*}=$cur, a Docker ma $ncpu procesory: ustawiam ${v%=*}=$ncpu"
@@ -111,6 +111,29 @@ if [[ $NOBUILD -eq 0 ]] && "${COMPOSE[@]}" config --services 2>/dev/null | grep 
   fi
 fi
 
+# Komputer Jarva włączony (profil komputer, docs/KOMPUTER.md): obraz budujemy na miejscu przy pierwszym razie i po zmianie
+# infra/komputer/ (ten sam plik .komputer-tree co `jarvo komputer on`); publiczne adresy tego serwera dopisujemy do
+# KOMPUTER_BLOKADA, żeby przeglądarka w Komputerze nie sięgała do portów floty i SSH hosta (prywatne blokuje start.sh)
+KOMPUTER=0
+"${COMPOSE[@]}" config --services 2>/dev/null | grep -qx komputer && KOMPUTER=1
+if [[ $KOMPUTER -eq 1 && $NOBUILD -eq 0 ]]; then
+  komputer_tree="$(git -C "$ROOT" rev-parse HEAD:infra/komputer 2>/dev/null || echo brak)"
+  if [[ "$(cat "$COMPOSE_DIR/.komputer-tree" 2>/dev/null)" != "$komputer_tree" ]] \
+     || ! docker image inspect jarvo-komputer:local >/dev/null 2>&1; then
+    log "Budowa obrazu Komputera Jarva (pulpit, Chromium, sterownik ekranu)"
+    "${COMPOSE[@]}" build komputer && echo "$komputer_tree" > "$COMPOSE_DIR/.komputer-tree"
+  fi
+fi
+if [[ $KOMPUTER -eq 1 && "$(uname -s)" == Linux ]] && ! grep -qi microsoft /proc/version 2>/dev/null; then
+  publiczne="$({ hostname -I 2>/dev/null || true; } | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' \
+    | grep -vE '^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)' \
+    | sort -u | paste -sd, - || true)"
+  if [[ "$(sed -n 's/^KOMPUTER_BLOKADA=//p' "$COMPOSE_DIR/.env" | tail -1)" != "$publiczne" ]]; then
+    tmp="$(mktemp)"; grep -v '^KOMPUTER_BLOKADA=' "$COMPOSE_DIR/.env" > "$tmp" || true
+    echo "KOMPUTER_BLOKADA=$publiczne" >> "$tmp"; cat "$tmp" > "$COMPOSE_DIR/.env"; rm -f "$tmp"
+  fi
+fi
+
 # dane i build w wolumenach Dockera (macOS): nowy wolumen należy do roota, a kontener pracuje jako hermes (10000)
 if grep -q '^JARVO_VOL_HERMES=.' "$COMPOSE_DIR/.env"; then
   "${COMPOSE[@]}" run --rm --no-deps -T --entrypoint "" -u 0 -v "${JARVO_BUILD:-jarvo-build}:/out" hermes \
@@ -151,6 +174,15 @@ docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/install-fleet.sh
 
 log "Healthchecki narzędzi"
 docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/healthcheck.sh || echo "(są ostrzeżenia, patrz wyżej)"
+if [[ $KOMPUTER -eq 1 ]]; then
+  for _ in $(seq 1 45); do docker exec jarvo-komputer /opt/jarvo-komputer/zdrowie.sh >/dev/null 2>&1 && break; sleep 2; done
+  if docker exec jarvo-komputer /opt/jarvo-komputer/zdrowie.sh >/dev/null 2>&1 \
+     && docker exec jarvo-hermes test -S /opt/jarvo/komputer/rfb.sock; then
+    echo "✓ Komputer Jarva: pulpit działa, flota widzi gniazdo ekranu"
+  else
+    echo "⚠ Komputer Jarva nie odpowiada (docker logs jarvo-komputer)"
+  fi
+fi
 
 log "Stan"
 docker exec -u hermes jarvo-hermes hermes profile list || true

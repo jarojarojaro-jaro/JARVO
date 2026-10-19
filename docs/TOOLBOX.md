@@ -360,6 +360,8 @@ może później jako dodatek obrazu).
 | [Uptime Kuma](https://github.com/louislam/uptime-kuma) | healthchecki i alerty | MIT | 2026-09 |
 | [Beszel](https://github.com/henrygd/beszel) | monitoring zasobów | MIT | 2026-09 |
 | [CrowdSec](https://github.com/crowdsecurity/crowdsec) | ochrona przed atakami | MIT | 2026-09 |
+| [cua-driver](https://github.com/trycua/cua) 0.21.0 (`cua-driver-rs`) | sterownik ekranu Komputera Jarva dla narzędzia `computer_use` (drzewo dostępności, zrzuty, klik, pisanie); sumy SHA-256 w `infra/komputer/Dockerfile` | MIT | 2026-10 |
+| [TigerVNC](https://github.com/TigerVNC/tigervnc) Xvnc + xfwm4 + Chromium (pakiety Debiana) | pulpit Komputera Jarva (`infra/komputer`, `jarvo komputer on`): ekran tylko na gnieździe unix, filtr ruchu do sieci lokalnej | GPL-2.0 / BSD-3 | 2026-10 |
 
 ---
 
