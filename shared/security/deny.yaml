@@ -44,3 +44,9 @@ deny:
   - "*--user-agent*"
   - "*xvfb-run*"
   - "*Xvfb *"
+  # sterownik ekranu (computer_use) tylko przez bramkę Jarva i Komputer Jarva (docs/KOMPUTER.md): bez instalacji
+  # i aktualizacji w locie (instalator pobiera curl|bash z gałęzi main) i bez sięgania do gniazd Komputera z terminala
+  - "*computer-use install*"
+  - "*trycua/cua*"
+  - "*cua-driver*"
+  - "*/run/jarvo-komputer*"

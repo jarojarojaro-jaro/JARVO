@@ -189,7 +189,10 @@ Mechanizmy techniczne:
 - **zatwierdzanie komend:** Hermes pyta o ryzykowne komendy, więc nie wyłączamy tego; pracownicy bez człowieka
   (`cron_mode`, `single_query_mode`, `unattended_mode`) mają `deny`,
 - **wspólne zakazy floty:** `shared/security/deny.yaml` (zmiana konfiguracji Hermesa, `rm -r` danych floty, eksfiltracja,
-  czytanie `.env`, logowanie w cudze konta) build dopina do `approvals.deny` każdego profilu,
+  czytanie `.env`, logowanie w cudze konta, instalacja sterownika ekranu w locie) build dopina do `approvals.deny`
+  każdego profilu,
+- **ekran (computer_use):** tylko agent z `komputer: true` we `fleet.yaml`, bez lokalnego terminala i `code_execution`,
+  ze stałymi zgodami w `command_allowlist` w postaci `cua:<akcja>:<background|foreground>` (docs/KOMPUTER.md),
 - **workspace:** każdy agent ma własny katalog roboczy (`terminal.cwd`), a wyniki oddaje przez kanban (załączniki).
 
 ---

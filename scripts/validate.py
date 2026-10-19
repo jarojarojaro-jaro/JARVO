@@ -155,6 +155,7 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
     for key in ("cron_mode", "single_query_mode", "unattended_mode"):
         if appr.get(key) != "deny":
             r.err(f"{a.name}: approvals.{key} musi być 'deny' (pracownicy bez człowieka nie zatwierdzają A2)")
+    check_komputer(a, cfg, r)
 
     names: set[str] = set()
     for skill_md in fl.iter_skill_files(d / "skills"):
@@ -204,6 +205,53 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
             r.err(f"{a.name}: odwołanie do nieistniejącego skryptu scripts/{ref}")
     return names
 
+
+
+# computer_use (docs/KOMPUTER.md): klucze zgód Hermesa `cua:<akcja>:<background|foreground>`, porównywane dokładnie
+# (bez gwiazdek); akcje zmieniające ekran z tools/computer_use/tool.py przypiętego Hermesa + zasięg bring_to_front
+CUA_AKCJE = {"click", "double_click", "right_click", "middle_click", "drag", "scroll", "type", "key", "set_value",
+             "focus_app", "bring_to_front"}
+CUA_KLUCZ = re.compile(r"^cua:([a-z_]+):(background|foreground)$")
+
+
+def check_komputer(a: fl.Agent, cfg: dict, r: Report) -> None:
+    """Ekran sterują tylko agenci z `komputer: true` we fleet.yaml, bez lokalnego terminala i bez trybów, które
+    wyłączają zgody (`approvals.mode: off` i /yolo przełączają sterownik w tryb bez ograniczeń)."""
+    toolsets = cfg.get("platform_toolsets") or {}
+    plats = sorted(p for p, ts in toolsets.items() if "computer_use" in (ts or []))
+    if plats and not a.komputer:
+        r.err(f"{a.name}: toolset computer_use na {', '.join(plats)} bez `komputer: true` we fleet.yaml")
+    appr = cfg.get("approvals") or {}
+    if appr.get("mode") is False or str(appr.get("mode", "")).lower() == "off":     # YAML 1.1: `off` = False
+        r.err(f"{a.name}: approvals.mode: off wyłącza wszystkie zgody (także computer_use); zostaw smart albo manual")
+    lista = cfg.get("command_allowlist") or []
+    if "allowlist" in appr:
+        r.err(f"{a.name}: approvals.allowlist nie istnieje w Hermesie; stałe zgody to command_allowlist na górze configu")
+    for wpis in lista:
+        wpis = str(wpis)
+        if "*" in wpis or "?" in wpis:
+            r.err(f"{a.name}: command_allowlist {wpis!r}: Hermes porównuje klucze dokładnie, gwiazdki nic nie znaczą")
+        if wpis.startswith("cua:"):
+            m = CUA_KLUCZ.match(wpis)
+            if not a.komputer:
+                r.err(f"{a.name}: command_allowlist {wpis!r} bez `komputer: true` we fleet.yaml")
+            elif not m or m.group(1) not in CUA_AKCJE:
+                r.err(f"{a.name}: command_allowlist {wpis!r}: zły klucz, wzór cua:<akcja>:<background|foreground>")
+        if wpis.startswith("plugin_rule:komputer"):
+            r.err(f"{a.name}: command_allowlist {wpis!r}: zgody na Twój komputer daje tylko człowiek, nie config")
+    if (cfg.get("bot_desktop") or {}).get("auto_start"):
+        r.err(f"{a.name}: bot_desktop.auto_start: ekran agenta to Komputer Jarva (docs/KOMPUTER.md), nie pulpit Hermesa")
+    if a.komputer:
+        terminal = cfg.get("terminal") or {}
+        for plat, ts in toolsets.items():
+            ts = ts or []
+            if "code_execution" in ts:
+                r.err(f"{a.name}: agent z computer_use nie może mieć code_execution (na {plat}): kod działałby obok kluczy floty")
+            if "terminal" in ts and str(terminal.get("backend", "local")) == "local":
+                r.err(f"{a.name}: agent z computer_use nie ma lokalnego terminala (na {plat}); terminal tylko w Komputerze Jarva")
+        if "terminal" in {t for ts in toolsets.values() for t in (ts or [])} and terminal.get("sync_back_max_bytes") != 0:
+            r.err(f"{a.name}: terminal w Komputerze Jarva wymaga terminal.sync_back_max_bytes: 0 "
+                  "(zdalny katalog nie wraca do profilu)")
 
 CALIBRATION_FAMILIES = ("gpt", "claude", "deepseek", "kimi", "generic")
 CALIBRATION_MAX_RULES = 3   # reguł na sekcję: każda nowa wypiera inną (shared/calibration/README.md)

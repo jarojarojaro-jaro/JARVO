@@ -85,6 +85,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`bin/jarvo`](bin/jarvo) | polecenie użytkownika po instalacji: `up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall` |
 | [`requirements-dev.txt`](requirements-dev.txt) | zależności testów i walidacji (`make dev-deps`) |
 | [`tests/`](tests) | testy pytest |
+| [`komputer/`](komputer) | computer use: bramka sterownika ekranu `jarvo_cua.py` (Hermes woła ją zamiast `cua-driver`), projekt w [docs/KOMPUTER.md](docs/KOMPUTER.md) |
 | [`wiedza/`](wiedza) | skarbiec wiedzy floty (drugi mózg): `wiedza.py` i `SCHEMA.md`, projekt w [docs/WIEDZA.md](docs/WIEDZA.md) |
 | [`docs/`](docs) | dokumentacja (niżej) |
 
@@ -108,6 +109,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [RUNBOOK.md](docs/RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [INSTALER.md](docs/INSTALER.md) | instalator jednym poleceniem na Linuksie, macOS i Windowsie: jak działa na każdym systemie, aktualizacje, testy, etapy |
 | [ROZWOJ-FLOTY.md](docs/ROZWOJ-FLOTY.md) | plan dopracowania agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności jako skill Weba |
+| [KOMPUTER.md](docs/KOMPUTER.md) | computer use i server use: Komputer Jarva (pulpit w osobnym kontenerze), agent Operator, Ekran w HQ, terminal i serwery, Ręce na Twoim komputerze; bramka sterownika, zasady bezpieczeństwa, etapy K0–K6 |
 | [MOBILE.md](docs/MOBILE.md) | projekt Twórcy aplikacji `jarvo-mobile`: pełny proces od pomysłu do sklepu (darmowy audyt mobilny, prototyp Expo na telefonie, Android w dashboardzie i iOS w chmurze, bramka aplikacji, lista kontrolna sklepów, zrzuty, odrzucenia, aplikacja ze strony, utrzymanie); etapy i stan w §16 |
 | [SOURCES.md](docs/SOURCES.md) | źródła, atrybucje i licencje |
 | [JARVO-CALOSC.md](docs/JARVO-CALOSC.md) | całość od A do Z w jednym pliku (kontekst na start sesji) |

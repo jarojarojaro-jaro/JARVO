@@ -252,8 +252,12 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   własnej konfiguracji (`hermes config set/...`), kasowania danych floty (`rm -r /opt/data/...`),
   czytania sekretów (cat/less/base64 na `.env`), wysyłki na zewnątrz (webhook.site itp.), haseł
   (`--password`, `password-stdin`), logowania w cudze konta (accounts.google.com, YouTube Studio,
-  login.live.com, facebook.com/login) i obchodzenia wykrywania automatu (`--user-agent`,
-  `navigator.webdriver`, `xvfb-run`, `Xvfb`).
+  login.live.com, facebook.com/login), obchodzenia wykrywania automatu (`--user-agent`,
+  `navigator.webdriver`, `xvfb-run`, `Xvfb`) i instalacji albo aktualizacji sterownika ekranu w locie
+  (`computer-use install`, `trycua/cua`, `cua-driver`, gniazda `/run/jarvo-komputer`).
+- **Computer use** (`docs/KOMPUTER.md`): Hermes woła sterownik ekranu tylko przez bramkę `komputer/jarvo_cua.py`
+  (`HERMES_CUA_DRIVER_CMD`), która odmawia aktualizacji, instalacji i trybu bez ograniczeń; walidator pozwala na
+  `computer_use` i klucze `cua:*` tylko agentowi z `komputer: true` i zabrania `approvals.mode: off`.
 - **Skan skilli z cudzych repo** (`scripts/skan_skilli.py`, przy każdym buildzie): skaner Hermesa + wzorce
   getsentry `skill-scanner` i ECC (wstrzyknięcia, `curl|sh`, sekrety, ukryte znaki, hooki, `postinstall`).
   High/critical bez przejrzanego wyjątku (`vendor/skan-wyjatki.yaml`, przypięty do commitu) zatrzymuje wdrożenie.
@@ -301,6 +305,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `hq/` | Jarvo HQ (backend, frontend, demo) |
 | `infra/` | obraz jarvo-hermes, docker-compose z sidecarami, szablony env |
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
+| `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo) |
 | `site/` | landing jarvo.pl |
@@ -312,6 +317,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 agentów), PROFILE-SPEC (anatomia agenta: 10 warstw), TOOLBOX (narzędzia open-source), VPS (infra),
 HQ (dashboard), ADS (projekt agenta reklam + Skarbiec), LEADY (Łowca leadów), KLIPY (clipmaker),
 WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku), INSTALER (plan instalatora jednym poleceniem na trzy systemy), ROZWOJ-FLOTY (plan dopracowania agentów), MOBILE (projekt Twórcy aplikacji),
+KOMPUTER (computer use i server use: Komputer Jarva, Operator, Ekran w HQ, Ręce; etapy K0–K6),
 SOURCES (licencje).
 
 ---

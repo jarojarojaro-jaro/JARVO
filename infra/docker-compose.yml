@@ -50,6 +50,8 @@ services:
       JARVO_ANDROID_SCREEN_URL: http://${JARVO_BIND_IP:-127.0.0.1}:9122
       # dodatki także w działającym kontenerze: „lemo” (sample, głos Kokoro) instaluje narzedzia.py w czasie pracy
       JARVO_EXTRAS: ${JARVO_EXTRAS:-}
+      # computer_use: sterownik ekranu tylko przez bramkę Jarva (bez pobierania i aktualizacji w locie, docs/KOMPUTER.md)
+      HERMES_CUA_DRIVER_CMD: /opt/jarvo/repo/komputer/jarvo_cua.py
     volumes:
       # macOS (i JARVO_VOLUMES=1): wolumeny Dockera zamiast katalogów hosta, bo maszyna wirtualna Dockera
       # nie odda kontenerowi (uid 10000) plików hosta; local-up.sh ustawia JARVO_VOL_* i JARVO_BUILD=jarvo-build
