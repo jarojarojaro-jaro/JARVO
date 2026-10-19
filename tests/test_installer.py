@@ -92,7 +92,7 @@ def test_dry_run_fresh_ubuntu_installs_tools_and_docker(tmp_path):
     assert res.returncode == 0, res.stdout + res.stderr
     out = res.stdout
     assert "System: linux" in out and "pakiety: apt" in out
-    assert "apt-get install -y -q git curl python3 openssl ca-certificates" in out
+    assert "apt-get -o DPkg::Lock::Timeout=600 install -y -q git curl python3 openssl ca-certificates" in out
     assert "get.docker.com" in out and "$ sudo env" in out and " sh /" in out
     assert "$ sudo -v" in out and out.index("$ sudo -v") < out.index("apt-get")   # hasło raz, przed pierwszym sudo
     assert "git clone -q --depth 50 -b main https://github.com/jarojarojaro-jaro/JARVO.git" in out
@@ -112,6 +112,32 @@ def test_dry_run_fedora_and_arch(tmp_path):
     assert arch.returncode == 0, arch.stdout + arch.stderr
     assert "pacman -Sy --noconfirm --needed git curl python openssl" in arch.stdout
     assert "pacman -Sy --noconfirm --needed docker docker-compose docker-buildx" in arch.stdout
+
+
+def test_dry_run_rhel_likes_outside_get_docker_com(tmp_path):
+    """get.docker.com zna tylko centos, rhel, rocky i fedorę: AlmaLinux i Oracle Linux biorą repo Dockera dla CentOS."""
+    for d in ("a", "z", "u"):
+        (tmp_path / d).mkdir()
+    alma = _dry(tmp_path / "a", _os_release(tmp_path / "a", "almalinux", "rhel centos fedora"))
+    assert alma.returncode == 0, alma.stdout + alma.stderr
+    assert "download.docker.com/linux/centos/docker-ce.repo" in alma.stdout and "get.docker.com" not in alma.stdout
+    assert "docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" in alma.stdout
+    amzn = _dry(tmp_path / "z", _os_release(tmp_path / "z", "amzn", "fedora"))
+    assert amzn.returncode == 1 and "Amazon Linux" in amzn.stderr
+    # apt-get w get.docker.com czeka na blokadę dpkg (aktualizacje w tle świeżego Ubuntu)
+    ubuntu = _dry(tmp_path / "u", _os_release(tmp_path / "u", "ubuntu", "debian"))
+    assert "APT_CONFIG=" in ubuntu.stdout
+
+
+def test_rootless_docker_refused_early(tmp_path):
+    bin_dir = tmp_path / "shims"
+    bin_dir.mkdir()
+    _shim(bin_dir, "docker", 'case "$1 $2" in "info -f") echo "[name=seccomp,profile=builtin name=rootless name=cgroupns]";; '
+                             '"compose version"|"info ") exit 0;; version*) echo 29.0;; esac\n')
+    hide = ("git", "curl", "python3", "openssl")
+    res = _dry(tmp_path, _os_release(tmp_path, "debian"), hide=hide,
+               PATH=str(bin_dir) + ":" + str(_bare_path(tmp_path / "p", hide=hide)))
+    assert res.returncode == 1 and "rootless" in res.stderr
 
 
 def test_dry_run_unknown_distro_stops_with_instructions(tmp_path):
@@ -141,7 +167,7 @@ def test_dry_run_docker_without_buildx_gets_plugin(tmp_path):
     res = _dry(tmp_path, _os_release(tmp_path, "ubuntu", "debian"), hide=hide,
                PATH=str(bin_dir) + ":" + str(_bare_path(tmp_path / "p", hide=hide)))
     assert res.returncode == 0, res.stdout + res.stderr
-    assert "apt-get install -y -q docker-buildx-plugin" in res.stdout and "get.docker.com" not in res.stdout
+    assert "apt-get -o DPkg::Lock::Timeout=600 install -y -q docker-buildx-plugin" in res.stdout and "get.docker.com" not in res.stdout
 
 
 def _mac_shims(tmp_path: Path, ram_gb: int = 16, ver: str = "14.5", arch: str = "arm64") -> Path:
@@ -423,3 +449,11 @@ def test_dashboard_password_on_screen_not_in_install_log(tmp_path):
     assert "jarvo haslo" in log.read_text(encoding="utf-8")
     assert "sekret123xyz" not in log.read_text(encoding="utf-8")
     assert "sekret123xyz" in ekran.read_text(encoding="utf-8", errors="replace")
+
+
+def test_local_up_prepare_without_terminal(tmp_path):
+    """ssh 'curl | bash', cloud-init, Ansible: bez terminala read zwraca EOF; wybór domyślny zamiast cichego wyjścia."""
+    res = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                         timeout=60, env={**os.environ, "JARVO_LOCAL": str(tmp_path / "L")})
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "Bez terminala" in res.stdout and (tmp_path / "L/compose/.env").exists()

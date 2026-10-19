@@ -47,6 +47,8 @@ MEMINFO="${JARVO_MEMINFO:-/proc/meminfo}"             # testy: udawany RAM
 MIN_RAM_GB=4; REC_RAM_GB=8; MIN_DISK_GB=20; REC_DISK_GB=30
 PORT=9119
 DOCKER_SCRIPT="https://get.docker.com"
+DOCKER_RPM_REPO="https://download.docker.com/linux/centos/docker-ce.repo"
+DISTRO=""
 BREW_SCRIPT="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
 # wersja wymagań hosta (programy poza obrazem floty: Docker, Colima, git, Python…). Zmiana tego, co ten skrypt
 # instaluje na komputerze = +1; deploy.sh porównuje ją z zapisaną przy instalacji i prosi o `jarvo update`.
@@ -132,7 +134,7 @@ detect_os() {
 detect_pkg() {
   local ID="" ID_LIKE=""
   if [[ -r $OS_RELEASE ]]; then
-    ID="$(sed -n 's/^ID=//p' "$OS_RELEASE" | tr -d '"')"
+    ID="$(sed -n 's/^ID=//p' "$OS_RELEASE" | tr -d '"')"; DISTRO="$ID"
     ID_LIKE="$(sed -n 's/^ID_LIKE=//p' "$OS_RELEASE" | tr -d '"')"
   fi
   case " $ID $ID_LIKE " in
@@ -147,8 +149,9 @@ detect_pkg() {
 
 pkg_install() {   # pkg_install nazwa...
   case "$PKG" in
-    apt) penv DEBIAN_FRONTEND=noninteractive apt-get update -q
-         penv DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$@" ;;
+    # świeży Ubuntu w pierwszych minutach robi aktualizacje w tle (unattended-upgrades): czekamy na blokadę dpkg
+    apt) penv DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 update -q
+         penv DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -q "$@" ;;
     dnf|yum) penv "$PKG" install -y "$@" ;;
     pacman) penv pacman -Sy --noconfirm --needed "$@" ;;
     zypper) penv zypper -n install "$@" ;;
@@ -335,16 +338,31 @@ docker_wait() {   # docker_wait [sekundy]: demon gotowy? (jako root: grupa docke
   return 1
 }
 
+rpm_docker() {   # AlmaLinux, Oracle Linux: repo Dockera dla CentOS (get.docker.com zna tylko centos, rhel, rocky, fedora)
+  say "Instaluję Docker Engine (repo download.docker.com dla CentOS)…"
+  pkg_install dnf-plugins-core
+  penv dnf config-manager --add-repo "$DOCKER_RPM_REPO" 2>/dev/null \
+    || penv dnf config-manager addrepo --from-repofile="$DOCKER_RPM_REPO"   # dnf5
+  pkg_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+}
+
 docker_install() {
-  local tmp
+  local tmp apt_cfg
+  case "$DISTRO" in
+    almalinux|ol) rpm_docker; return ;;
+    amzn) die "Amazon Linux: zainstaluj Dockera sam (sudo dnf install -y docker) z wtyczkami compose i buildx (https://docs.docker.com/compose/install/linux/) i uruchom polecenie ponownie. Prościej: serwer z Ubuntu 24.04." ;;
+  esac
   say "Instaluję Docker Engine ($( [[ $PKG == pacman || $PKG == zypper ]] && echo "pakiety $PKG" || echo "get.docker.com" ))…"
   case "$PKG" in
     apt|dnf|yum)
-      tmp="$(mktemp)"
+      tmp="$(mktemp)"; apt_cfg="$(mktemp)"
       if [[ $DRY == 1 ]]; then printf '%s  $ curl -fsSL %s -o %s%s\n' "$D" "$DOCKER_SCRIPT" "$tmp" "$N"
       else curl -fsSL "$DOCKER_SCRIPT" -o "$tmp" || die "Nie udało się pobrać $DOCKER_SCRIPT."; fi
-      penv sh "$tmp"
-      rm -f "$tmp" ;;
+      # apt-get w skrypcie Dockera też czeka na blokadę dpkg (aktualizacje w tle świeżego systemu)
+      printf 'DPkg::Lock::Timeout "600";\n' > "$apt_cfg"; chmod 644 "$apt_cfg"
+      penv APT_CONFIG="$apt_cfg" sh "$tmp" \
+        || die "Instalacja Dockera skryptem get.docker.com się nie udała (log wyżej). Zainstaluj Dockera według https://docs.docker.com/engine/install/ i uruchom polecenie ponownie."
+      rm -f "$tmp" "$apt_cfg" ;;
     pacman) pkg_install docker docker-compose docker-buildx ;;
     zypper) pkg_install docker docker-compose ;;
     *) die "Nie umiem zainstalować Dockera na tej dystrybucji. Zainstaluj sam: https://docs.docker.com/engine/install/ i uruchom polecenie ponownie." ;;
@@ -354,7 +372,9 @@ docker_install() {
 compose_install() {
   say "Doinstalowuję docker compose v2…"
   case "$PKG" in
-    apt|dnf|yum) pkg_install docker-compose-plugin ;;
+    # repo Dockera (docker-ce) ma docker-compose-plugin; Docker z dystrybucji: Ubuntu/Debian docker-compose-v2, Fedora docker-compose
+    apt) pkg_install docker-compose-plugin || pkg_install docker-compose-v2 ;;
+    dnf|yum) pkg_install docker-compose-plugin || pkg_install docker-compose ;;
     pacman|zypper) pkg_install docker-compose ;;
     *) die "Brak docker compose v2. Zaktualizuj Dockera: https://docs.docker.com/compose/install/" ;;
   esac
@@ -392,6 +412,11 @@ docker_check() {
   if [[ $OS == macos ]]; then mac_docker; return; fi
   # Docker już działa jako Ty (Docker Desktop z integracją WSL, wcześniejsza instalacja): nic do roboty, zero sudo
   if have docker && docker info >/dev/null 2>&1; then
+    # Docker bez roota (rootless, userns-remap): uid 10000 w kontenerze to inny uid na dysku, a dane floty
+    # i klucze należą do uid 10000 hosta, więc flota nie zapisze danych; mówimy to od razu, nie w połowie
+    if docker info -f '{{.SecurityOptions}}' 2>/dev/null | grep -qE 'rootless|userns'; then
+      die "Docker działa bez roota (rootless albo userns-remap): flota go nie obsługuje (dane należą do uid 10000). Użyj zwykłego Dockera (https://docs.docker.com/engine/install/) i uruchom polecenie ponownie."
+    fi
     docker compose version >/dev/null 2>&1 || compose_install
     docker buildx version >/dev/null 2>&1 || buildx_install
     say "Docker: $(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok)"
@@ -421,9 +446,12 @@ port_check() {
   # własny kontener na tym porcie to nie konflikt (ponowna instalacja = aktualizacja)
   if docker info >/dev/null 2>&1; then docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx jarvo-hermes && return 0
   elif [[ -n $SUDO ]]; then need_root; $SUDO docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx jarvo-hermes && return 0; fi
-  if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then
-    die "Port $PORT jest zajęty przez inny program. Zwolnij go (ss -ltnp | grep $PORT) i uruchom polecenie ponownie."
-  fi
+  local p
+  for p in "$PORT" 9120 9122; do   # dashboard, podgląd stron agentów, ekran telefonu testowego (docker-compose.yml)
+    if (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; then
+      die "Port $p jest zajęty przez inny program. Zwolnij go ($( [[ $OS == macos ]] && echo "lsof -i :$p" || echo "ss -ltnp | grep $p" )) i uruchom polecenie ponownie."
+    fi
+  done
   return 0
 }
 

@@ -57,7 +57,7 @@ if [[ ! -f "$L/compose/.env" ]]; then
         echo "  2) CommandCode: modele Claude"
         echo "  3) CommandCode: modele otwarte (DeepSeek, Kimi)"
         echo "  4) OpenAI: logowanie ChatGPT (bez klucza; zaloguj się w dashboardzie: Models → Login)"
-        read -rp "Wybór [1]: " CHOICE
+        read -rp "Wybór [1]: " CHOICE || { CHOICE=1; echo; echo "ℹ Bez terminala (ssh, cloud-init): OpenRouter, klucz dodasz w dashboardzie (Keys)."; }
       fi ;;
     *) echo "Nieznany JARVO_PROVIDER: $CHOICE (openrouter, commandcode-anthropic, commandcode, openai-codex)"; exit 2 ;;
   esac
@@ -68,7 +68,7 @@ if [[ ! -f "$L/compose/.env" ]]; then
     *) PROVIDER=openrouter; KEYVAR=OPENROUTER_API_KEY ;;
   esac
   KEY="${JARVO_KEY:-}"
-  if [[ -n $KEYVAR && -z $KEY && "${JARVO_YES:-0}" != 1 ]]; then read -rsp "Klucz $KEYVAR (Enter = pomiń): " KEY; echo; fi
+  if [[ -n $KEYVAR && -z $KEY && "${JARVO_YES:-0}" != 1 ]]; then read -rsp "Klucz $KEYVAR (Enter = pomiń): " KEY || KEY=; echo; fi
   [[ -n $KEYVAR && -z $KEY ]] && echo "ℹ Bez klucza: GUI i narzędzia działają, agenci odpowiedzą po dodaniu klucza w dashboardzie (Keys)."
   PASS="$(openssl rand -hex 12)"
   sed -e "s#^JARVO_DATA=.*#JARVO_DATA=$L/data#" -e "s#^JARVO_REPO=.*#JARVO_REPO=$ROOT#" \

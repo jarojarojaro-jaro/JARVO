@@ -79,8 +79,10 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
 
 ### Linux (zrobione, §4a)
 1. Menedżer pakietów (`apt`, `dnf`/`yum`, `pacman`, `zypper`) doinstalowuje `git curl python3 openssl`.
-2. Docker Engine z oficjalnego skryptu (`get.docker.com`; Arch i openSUSE z pakietów), `docker compose` v2
-   i wtyczka `docker buildx` (Docker z pakietów dystrybucji, np. `docker.io`, bywa bez niej, a `docker compose build`
+2. Docker Engine z oficjalnego skryptu (`get.docker.com`; Arch i openSUSE z pakietów; AlmaLinux i Oracle Linux
+   z repo Dockera dla CentOS, bo skrypt ich nie zna; Amazon Linux: komunikat, co zainstalować), `apt-get` czeka do
+   10 minut na blokadę dpkg (świeży Ubuntu robi aktualizacje w tle), `docker compose` v2 (Docker z dystrybucji:
+   `docker-compose-v2` albo `docker-compose`) i wtyczka `docker buildx` (Docker z pakietów dystrybucji, np. `docker.io`, bywa bez niej, a `docker compose build`
    obrazu Komputera bez niej nie ruszy), użytkownik do grupy `docker`; do ponownego zalogowania polecenie `jarvo` samo uruchamia się przez
    `sg docker`, więc instalacja nie czeka na wylogowanie.
 3. `jarvo up` (`local-up.sh`) jak dotąd. Autostart: kontenery wstają same z Dockerem
@@ -165,7 +167,7 @@ Zbudowane 2026-09-30 (pliki w §1):
   procesora i dystrybucji, sprawdzenie RAM (minimum 4 GB, polecane 8; `MemTotal` zaokrąglony, bo „4 GB” to ok. 3,8 GB) i dysku
   (minimum 20 GB, polecane 30; `JARVO_FORCE=1` wymusza; przy aktualizacji istniejącej floty tylko ostrzeżenie), doinstalowanie brakujących programów, Docker Engine + start demona (systemd,
   `service`, w ostateczności `dockerd` w tle; WSL bez systemd dostaje `iptables-legacy`), grupa `docker`,
-  wolny port 9119, klon albo aktualizacja repo (`fetch` + `checkout` + `merge --ff-only`; lokalne zmiany
+  wolne porty 9119, 9120 i 9122, Docker bez roota (rootless, userns-remap) odrzucony od razu z wyjaśnieniem, klon albo aktualizacja repo (`fetch` + `checkout` + `merge --ff-only`; lokalne zmiany
   zatrzymują), `/usr/local/bin/jarvo` (albo `~/.local/bin`), log `~/jarvo-local/install.log` bez kluczy i bez hasła do HQ (hasło tylko na ekran i w `jarvo haslo`),
   proxy z środowiska przekazywane pod `sudo`; wejście przepięte na terminal (`curl | bash` daje potok, więc hasło
   `sudo` i odpowiedzi muszą iść z `/dev/tty`), hasło `sudo` raz na początku (`sudo -v`), Docker działający już
