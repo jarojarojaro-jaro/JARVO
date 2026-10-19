@@ -129,6 +129,30 @@ def test_agent_z_komputerem_bez_lokalnego_terminala(repo_copy):
     assert _blad(raport, r"jarvo-ads: command_allowlist 'cua:clik:background': zły klucz")
 
 
+def test_operator_stale_zgody_bez_okna_na_wierzch(repo_copy):
+    """Operator (jedyny z `komputer: true`) ma w repo stałe zgody na działania w tle i na działania wejścia na wierzchu
+    (wejście Komputera przepuszcza je tylko w aktywnym oknie); okna na wierzch nie dostanie."""
+    fleet = validate.fl.load_fleet()
+    assert [a.name for a in fleet.active() if a.komputer] == ["jarvo-operator"]
+    cfg = validate.fl.load_yaml(REPO / "profiles/jarvo-operator/config.yaml")
+    klucze = cfg["command_allowlist"]
+    assert klucze and all(k.startswith("cua:") for k in klucze)
+    tlo = {k.split(":")[1] for k in klucze if k.endswith(":background")}
+    wierzch = {k.split(":")[1] for k in klucze if k.endswith(":foreground")}
+    assert tlo == validate.CUA_AKCJE - {"bring_to_front"}
+    assert wierzch == validate.CUA_NA_WIERZCHU and len(tlo) + len(wierzch) == len(klucze)
+    for plat, ts in cfg["platform_toolsets"].items():
+        assert not {"terminal", "code_execution", "browser", "delegation"} & set(ts), plat
+    assert cfg["computer_use"]["permission_mode"] == "standard" and cfg["computer_use"]["cua_telemetry"] is False
+    plik = repo_copy / "profiles/jarvo-operator/config.yaml"
+    plik.write_text(plik.read_text(encoding="utf-8").replace('  - "cua:key:background"\n',
+                    '  - "cua:key:background"\n  - "cua:set_value:foreground"\n  - "cua:bring_to_front:foreground"\n'),
+                    encoding="utf-8")
+    raport = validate.run()
+    assert _blad(raport, r"jarvo-operator: command_allowlist 'cua:set_value:foreground': na wierzchu tylko działania")
+    assert _blad(raport, r"jarvo-operator: command_allowlist 'cua:bring_to_front:foreground': okno na wierzch")
+
+
 def test_deny_blokuje_instalacje_sterownika():
     deny = (REPO / "shared/security/deny.yaml").read_text(encoding="utf-8")
     for wzor in ("*computer-use install*", "*trycua/cua*", "*cua-driver*", "*/opt/jarvo/komputer*"):

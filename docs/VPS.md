@@ -64,7 +64,7 @@ Kluczowe decyzje:
 Bez GPU. Generowanie obrazów i wideo AI idzie przez API (OpenRouter), a lokalnie liczymy tylko
 rendering kodu (FFmpeg, HyperFrames), przeglądarki, transkrypcję i usługi.
 
-**Cel: VPS 4 vCPU / 8 GB RAM / 80 GB NVMe dla całej floty (9 agentów).**
+**Cel: VPS 4 vCPU / 8 GB RAM / 80 GB NVMe dla całej floty (10 agentów).**
 
 | | Zmierzone (Docker, Hermes 0.21.5) |
 |---|---|
@@ -94,10 +94,10 @@ Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników 
 
 | Etap | CPU | RAM | Dysk | Co działa |
 |---|---|---|---|---|
-| Flota v1 (cała) | 4 vCPU | **8 GB** | 80 GB NVMe | 9 agentów, SearXNG, Lighthouse, PDF, transkrypcja, render wideo (FFmpeg, chwilowo 0,5–0,65 GB); monitoring (+0,2 GB) |
+| Flota v1 (cała) | 4 vCPU | **8 GB** | 80 GB NVMe | 10 agentów, SearXNG, Lighthouse, PDF, transkrypcja, render wideo (FFmpeg, chwilowo 0,5–0,65 GB); monitoring (+0,2 GB) |
 | + dodatki obrazu | 4 vCPU | 8 GB | 80 GB | `JARVO_EXTRAS` (niżej): zwiększa dysk, nie RAM w spoczynku |
 | + telefon testowy (Twórca aplikacji) | 4 vCPU | 8 GB | +3 GB | Redroid do 2 GB + ekran 0,25 GB, włączany na czas testów (`jarvo android on`, moduł `binder_linux`); serwer z KVM: emulator Google do 4 GB, wtedy wygodniej 12–16 GB |
-| + Komputer Jarva (computer use) | 4 vCPU | 8 GB | +1,5 GB | pulpit z Chromium ok. 0,3 GB w spoczynku, do 2 GB w pracy (`KOMPUTER_MEM_LIMIT`), włączany `jarvo komputer on` |
+| + Komputer Jarva (computer use) | 4 vCPU | 8 GB | +1,5 GB | pulpit z Chromium ok. 0,3 GB w spoczynku, do 2 GB w pracy (`KOMPUTER_MEM_LIMIT`), włączany `jarvo komputer on`; pracuje na nim Operator (`jarvo-operator`) |
 | + Langfuse / Honcho | 8 vCPU | 16 GB | 160 GB+ | self-hostowane ślady i pamięć (ClickHouse i Postgres są pamięciożerne) |
 
 **Dodatki obrazu** (`JARVO_EXTRAS` w `compose/.env`, potem `deploy.sh --rebuild`), domyślnie wyłączone:

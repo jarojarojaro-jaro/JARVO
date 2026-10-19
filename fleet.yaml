@@ -24,7 +24,7 @@ models:
   provider: openai-codex                    # OpenAI przez logowanie ChatGPT (OAuth, Models → Login)
   tiers:                                    # jeden model, głębia myślenia per agent (reasoning_effort w config.yaml)
     frontier: gpt-6-luna                    # Jarvo: effort high
-    strong: gpt-6-luna                      # specjaliści: effort low
+    strong: gpt-6-luna                      # specjaliści: effort low (Operator: medium)
     fast: gpt-6-luna                        # subagenci i rutyny
   presets:                                  # nazwa zestawu = dostawca Hermesa (zweryfikowane 2026-09-27)
     openrouter:                             # OpenRouter (klucz OPENROUTER_API_KEY)
@@ -71,7 +71,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: general       # wątek ogólny grupy „Jarvo HQ” + Twój DM
-    hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Mostek dowodzenia"
     hq_short: "Jarvo"
     en:
@@ -95,7 +95,7 @@ agents:
     autonomy_max: A1
     telegram_topic: sherlock
     pin_skills: [metoda-sherlocka]
-    hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Gabinet śledczy"
     hq_short: "Sherlock"
     en:
@@ -119,7 +119,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: web
-    hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Pracownia webowa"
     hq_short: "Web"
     en:
@@ -142,7 +142,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: studio
-    hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Atelier kreatywne"
     hq_short: "Studio"
     en:
@@ -169,7 +169,7 @@ agents:
     autonomy_max: A1
     telegram_topic: wideo
     pin_skills: [krotki-film]
-    hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Studio filmowe"
     hq_short: "Wideograf"
     en:
@@ -194,7 +194,7 @@ agents:
     autonomy_max: A1
     telegram_topic: ads
     pin_skills: [plan-kampanii]
-    hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Sala operacyjna"
     hq_short: "Ads"
     en:
@@ -219,7 +219,7 @@ agents:
     autonomy_max: A1
     telegram_topic: lowca
     pin_skills: [profil-klienta]
-    hq_room: radar    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_room: radar    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Radar sprzedaży"
     hq_short: "Łowca"
     en:
@@ -247,7 +247,7 @@ agents:
     autonomy_max: A1
     telegram_topic: mobile
     pin_skills: [natywna-czy-pwa]
-    hq_room: apps    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_room: apps    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Pracownia aplikacji"
     hq_short: "Aplikacje"
     en:
@@ -256,6 +256,33 @@ agents:
       description: >-
         Mobile apps for small businesses: an honest "native or PWA" decision with costs and app-store rejection risk (website, PWA, Wallet pass, an existing platform or an App Store and Google Play app) and a free mobile audit of any company: apps in the stores (freshness, ratings, Polish listing, privacy, EU trader status), App Store reviews, website-to-app links (Universal Links, App Links), smart banner and PWA. Expo (React Native) apps from a template with store compliance built in from the plan: prototype, checks, preview in HQ and on the owner's phone in Expo Go. Accounts always belong to the owner.
     oddaj_gdy: "aplikacja mobilna: czy firmie potrzebna (natywna, PWA, Wallet), prototyp i budowa aplikacji, podgląd na telefonie, audyt aplikacji w App Store i Google Play"
+    status: active
+
+  - name: jarvo-operator
+    kind: specialist
+    title: "Operator"
+    emoji: "🖥️"
+    description: >-
+      Computer use: praca na Komputerze Jarva (osobny pulpit z Chromium, który widzisz i przejmujesz) tam, gdzie
+      nie ma API ani zwykłego pobrania strony: panele www i programy w przeglądarce, formularze, przeklikanie ścieżki
+      na stronie jak klient, dane przepisane z ekranu do pliku, zrzuty jako dowód. Najpierw droga bez ekranu, potem
+      drzewo dostępności, zrzut tylko gdy trzeba; jedno działanie, sprawdzenie, następne. Nie loguje się, nie płaci,
+      nie wysyła i nie publikuje: te kroki oddaje właścicielowi z dokładną prośbą.
+    model_tier: strong
+    delegation_tier: fast
+    autonomy_max: A1
+    telegram_topic: operator
+    pin_skills: [praca-na-ekranie]
+    hq_room: control    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
+    hq_label: "Sterownia"
+    hq_short: "Operator"
+    komputer: true      # computer_use na Komputerze Jarva, wtyczka jarvo-komputer, bez terminala (docs/KOMPUTER.md)
+    en:
+      title: "Operator"
+      hq_label: "Control room"
+      description: >-
+        Computer use: works on the Jarvo Computer (a separate desktop with Chromium that you watch and can take over) where there is no API and a plain page fetch is not enough: web panels and browser apps, forms, clicking through a site like a customer, data copied from the screen into a file, screenshots as proof. No-screen route first, then the accessibility tree, a screenshot only when needed; one action, check, next. Never logs in, pays, sends or publishes: hands those steps to the owner with an exact request.
+    oddaj_gdy: "trzeba coś zrobić na ekranie: kliknąć w panelu www albo programie w przeglądarce, wypełnić formularz, przejść ścieżkę na stronie jak klient, przepisać dane z ekranu, gdzie nie ma API"
     status: active
 
   - name: jarvo-reka
@@ -270,7 +297,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: reka
-    hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps
+    hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Warsztat"
     hq_short: "Ręka"
     en:

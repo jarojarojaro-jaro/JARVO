@@ -1,0 +1,92 @@
+# jarvo-operator: computer use na Komputerze Jarva (docs/KOMPUTER.md). Tokeny @@...@@ podstawia scripts/build.py.
+# Ekran tylko przez computer_use (bramka komputer/jarvo_cua.py → wejście z twardymi zasadami w Komputerze).
+# Bez terminala, code_execution, przeglądarki floty i delegacji: walidator pilnuje tego dla `komputer: true`.
+model:
+  provider: "@@PROVIDER@@"
+  default: "@@MODEL@@"
+
+agent:
+  reasoning_effort: medium      # praca na ekranie: każdy krok to ocena stanu ekranu (reszta specjalistów: low)
+  max_turns: 250
+
+timezone: "@@TIMEZONE@@"
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  nudge_interval: 12
+
+skills:
+  creation_nudge_interval: 20
+  write_approval: true          # nowy albo zmieniony skill czeka na zgodę właściciela (docs/RSI.md §R1, poczekalnia.py)
+
+web:
+  search_backend: searxng
+
+platform_toolsets:
+  cli: [computer_use, komputer, file, web, memory, skills, todo, session_search]
+  telegram: [computer_use, komputer, file, web, memory, skills, todo, session_search, clarify]
+  api_server: [computer_use, komputer, file, web, memory, skills, todo, session_search]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
+  cron: [file, memory, skills]
+
+# Pliki (out/, RAPORT.md) w workspace Operatora; narzędzia terminala Operator nie ma.
+terminal:
+  backend: local
+  cwd: "@@WORKSPACES_DIR@@/jarvo-operator"
+  timeout: 300
+
+computer_use:
+  permission_mode: standard     # bounded wymaga polecenia `serve` sterownika, którego bramka nie przepuszcza
+  capture_after_mode: ax        # sprawdzenie po działaniu z drzewa dostępności (bez obrazu); zrzut, gdy trzeba
+  ax_max_elements: 300          # strony sklepów i paneli mają setki elementów; 300 to ~1 s na zrzut drzewa
+  max_image_dimension: 1456
+  cua_telemetry: false
+
+# Stałe zgody na Komputerze Jarva (klucze dokładne, bez gwiazdek): działania w tle i działania wejścia na wierzchu.
+# Na pulpicie X11 Komputera pisanie, klawisze, przewijanie, przeciąganie i podwójny klik działają tylko na wierzchu,
+# a wejście Komputera przepuszcza je tylko w oknie, które już jest aktywne (docs/KOMPUTER.md §6). Okno na wierzch
+# (`bring_to_front`, `raise_window`) zawsze zatwierdza człowiek. Płatność, logowanie i wysyłkę zatrzymuje wejście
+# Komputera, a nie ta lista. Bez człowieka (kanban, cron) wszystko spoza listy kończy się odmową.
+command_allowlist:
+  - "cua:click:background"
+  - "cua:double_click:background"
+  - "cua:right_click:background"
+  - "cua:middle_click:background"
+  - "cua:drag:background"
+  - "cua:scroll:background"
+  - "cua:type:background"
+  - "cua:key:background"
+  - "cua:set_value:background"
+  - "cua:focus_app:background"
+  - "cua:click:foreground"
+  - "cua:double_click:foreground"
+  - "cua:right_click:foreground"
+  - "cua:middle_click:foreground"
+  - "cua:drag:foreground"
+  - "cua:scroll:foreground"
+  - "cua:type:foreground"
+  - "cua:key:foreground"
+
+stt:
+  provider: local_command
+  language: pl
+
+approvals:
+  mode: smart
+  timeout: 300
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+  smart_policy: >-
+    Always ESCALATE: logging into any website or app, payments, purchases, sending or publishing anything,
+    accepting terms or consents, changing account settings, solving CAPTCHAs, typing passwords, card numbers or codes.
+  deny:
+    - "rm -rf /*"
+    - "* | sh"
+    - "* | bash"
+
+security:
+  protected_instruction_files: true
+
+display:
+  skin: jarvo

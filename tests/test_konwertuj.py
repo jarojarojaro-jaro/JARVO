@@ -365,7 +365,9 @@ def test_cli(silniki, monkeypatch, tmp_path, capsys):
 def test_skill_jest_u_calej_floty():
     import fleetlib as fl
     lock = fl.load_lock()["agents"]
-    agenci = [a.name for a in fl.load_fleet().active()]
+    # skrypt wymaga terminala: Operator (computer use, bez terminala) nie dostaje skilli plikowych
+    agenci = [a.name for a in fl.load_fleet().active() if not a.komputer]
+    assert len(agenci) >= 9
     for a in agenci:
         wpisy = [x for x in lock.get(a) or [] if x.get("path") == "shared/skills/konwersja-plikow"]
         assert wpisy == [{"source": "jarvo", "path": "shared/skills/konwersja-plikow", "dest": "pliki/konwersja-plikow"}], a

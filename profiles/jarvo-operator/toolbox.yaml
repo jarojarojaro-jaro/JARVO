@@ -1,0 +1,30 @@
+agent: jarvo-operator
+
+tools:
+  - name: komputer-jarva
+    source: "własny (infra/komputer: pulpit Xvnc, Chromium, wejście z twardymi zasadami; komputer/jarvo_cua.py: bramka)"
+    license: MIT
+    version: "obraz jarvo-komputer (K2)"
+    install: {method: image, spec: "usługa compose `komputer` (profil komputer), włącza właściciel: jarvo komputer on"}
+    integration: hermes-plugin
+    used_by_skills: [praca-na-ekranie, formularze, dane-z-ekranu, przejscie-strony, oddaj-ekran]
+    healthcheck: "python3 /opt/jarvo/repo/komputer/plugin/__init__.py stan"
+    autonomy: A1
+    optional: true
+    notes: "computer_use Hermesa → bramka jarvo_cua.py → cua.sock → wejście (twarde zasady, ukrywanie sekretów, dziennik) → cua-driver. Wtyczka jarvo-komputer: stan, dziennik, oddanie ekranu właścicielowi. Bez włączonego Komputera Operator nie ma ekranu (healthcheck opcjonalny)."
+  - name: cua-driver
+    source: https://github.com/trycua/cua
+    license: MIT
+    version: "cua-driver-rs 0.21.0 (SHA-256 w infra/komputer/Dockerfile, vendor/zrodla.yaml)"
+    install: {method: binary, spec: "w obrazie jarvo-komputer, telemetria i aktualizacje wyłączone"}
+    integration: hermes-plugin
+    used_by_skills: [praca-na-ekranie]
+    autonomy: A1
+    optional: true
+    notes: "Sterownik ekranu (AT-SPI, zrzuty, wejście w tle i na wierzchu w aktywnym oknie). Działa tylko w Komputerze Jarva, nie w jarvo-hermes."
+
+sidecars: []
+hermes_skills: []
+hermes_plugins: [jarvo-komputer]
+mcp_servers: []
+env_requires: []

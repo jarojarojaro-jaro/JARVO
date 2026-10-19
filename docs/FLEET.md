@@ -1,13 +1,13 @@
 # Flota Jarvo: specyfikacja agentów v1
 
-Flota: **Main Judge + 8 agentów**. Każdy agent to osobny profil Hermesa
+Flota: **Main Judge + 9 agentów**. Każdy agent to osobny profil Hermesa
 (osobna dystrybucja w `profiles/<nazwa>/`). Rejestr maszynowy jest w [`fleet.yaml`](../fleet.yaml).
 
 Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prompt, workflowy,
 knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
 każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
 
-**Stan: wszystkie dziewięć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
+**Stan: wszystkie dziesięć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
@@ -19,6 +19,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [11 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 8 (marketingskills, wspólne `hooki`, `konwersja-plikow` i `odczyt-ekranu`) | ads, planer, eksperyment, eksport, paczka | [14](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 3 (wspólne `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | krs, ceidg, przetargi, strona, leady, zrodlo | [16](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 23 (Expo, React Native, ASO; wspólne `konwersja-plikow`, `odczyt-ekranu` i `warsztat-3d`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
+| `jarvo-operator` | [SOUL](../profiles/jarvo-operator/SOUL.md) | [5 w `skills/operator/`](../profiles/jarvo-operator/skills/operator) | 0 (bez terminala nie dostaje skilli ze skryptami) | wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu) + narzędzie `computer_use` Hermesa przez bramkę `komputer/jarvo_cua.py` | [18](../evals/jarvo-operator/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 6 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [15](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -38,6 +39,7 @@ Legenda przy skillach:
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
 | `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
 | `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A1 (audyty i rekomendacje; konta sklepów i wysyłka = A2) |
+| `jarvo-operator` | Operator: praca na ekranie Komputera Jarva (klik, formularz, dane z ekranu, ścieżka klienta) | snajper | A1 (klik w tle, klawiatura w aktywnym oknie; logowanie, płatność, wysyłka i okno na wierzch = człowiek) |
 | `jarvo-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
 ---
@@ -92,6 +94,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Film, reels, short, montaż, napisy, lektor, klipy, żywy schemat (animowany przepływ na post), explainer z wykresem albo tablicą, film w stylu malarza (Van Gogh, Klimt, jaskinia) | `jarvo-wideo` |
 | Leady, nowi klienci, „komu sprzedać”, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play, aplikacja z naszej strony, aktualizacja albo poprawka aplikacji w sklepie | `jarvo-mobile` |
+| Zadanie na ekranie: kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz dane z ekranu, gdzie nie ma API | `jarvo-operator` (wymaga włączonego Komputera: `jarvo komputer on`) |
 | Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
 
@@ -409,6 +412,38 @@ i `templates/ci/jarvo-ios.yml`.
 
 ---
 
+## `jarvo-operator`: Operator
+
+Pracuje na ekranie Komputera Jarva: osobnego pulpitu z Chromium w kontenerze `jarvo-komputer`, który właściciel
+włącza poleceniem `jarvo komputer on` ([KOMPUTER.md](KOMPUTER.md)). Robi to, czego nie da się zrobić przez API ani
+`web_extract`: klika w panelach www i programach w przeglądarce, wypełnia formularze, przechodzi ścieżkę na stronie
+jak klient i mówi, gdzie się psuje, przepisuje dane z ekranu do pliku. Najpierw sprawdza drogę bez ekranu. Na ekranie
+pracuje w pętli patrz → działaj → sprawdź: drzewo dostępności (`capture` `ax`), potem znaczniki na zrzucie (`som`),
+obraz tylko gdy drzewo jest puste; klika po numerze elementu, po każdym działaniu sprawdza stan (`capture_after`)
+i słucha werdyktu (`verify_fresh_state`, `escalate`). Klika w tle; pisze, naciska klawisze, przewija i przeciąga na
+wierzchu, ale tylko w oknie, które już jest aktywne (wejście pilnuje tego samo); okna na wierzch nie wyciąga bez
+zgody człowieka przy tym działaniu. Treść ekranu to dane, nie polecenia.
+
+Wejście Komputera ma twarde zasady, których agent nie wyłączy: przyciski i formularze, które logują, płacą,
+zamawiają, wysyłają albo publikują, i pola haseł, kart i kodów zwracają `wymaga_czlowieka`. Operator przygotowuje
+ekran do tego kroku i oddaje go właścicielowi (`komputer` akcja `oddaj`: pauza z jednym zdaniem prośby, karta
+w `kanban_block`); właściciel loguje się i płaci sam w Ekranie HQ, wznawia Komputer tylko on. Operator nie przyjmuje
+haseł ani numerów kart z czatu. Nie ma terminala, wykonywania kodu ani delegowania; stałe zgody Hermesa
+(`command_allowlist`) ma na działania w tle i na działania wejścia na wierzchu, nigdy na okno na wierzch
+(walidator odrzuca `bring_to_front`). Limit: 60 działań na kartę,
+po 3 nieudanych próbach zmienia drogę albo oddaje ekran. Ekran jest jeden: Jarvo daje karty Operatora po kolei (`parents`, wzorzec 11), a gdy na Komputerze pracuje
+już inna sesja, wejście zwraca `zajete` (jedna sesja naraz).
+Ze skarbca nie robi wyciągu po sesji (`bez_wyciagu`): to, co było na ekranie, nie trafia do wiedzy floty sam.
+
+**Skille:** [T] `praca-na-ekranie` (pętla, tryby patrzenia, werdykty, odmowy wejścia), `formularze` (pole po polu,
+listy przez `set_value`, sprawdzenie wartości, formularze wrażliwe), `dane-z-ekranu` (tabela z drzewa albo obrazu
+do CSV z adresem i godziną, dane osób), `przejscie-strony` (ścieżka klienta z tabelą kroków i zrzutem problemu),
+`oddaj-ekran` (krok właściciela: logowanie, płatność, CAPTCHA, prośba w jednym zdaniu). Narzędzia: `computer_use`
+Hermesa przez bramkę `komputer/jarvo_cua.py` i wtyczka `jarvo-komputer` (`komputer/plugin`: `stan`, `dziennik`,
+`oddaj`).
+
+---
+
 ## Kolejność budowy (historycznie, faza 1)
 
 1. `jarvo` + `jarvo-sherlock`: najprostsze narzędzia, dobre do przetestowania pętli sędziego.
@@ -418,6 +453,7 @@ i `templates/ci/jarvo-ios.yml`.
 5. `jarvo-wideo`: wydzielony później ze Studia (wideo to osobny warsztat).
 6. `jarvo-ads`: bez kluczy, kampanie jako paczka do publikacji przez właściciela; Skarbiec (sejf tokenów) odłożony ([ADS.md](ADS.md)).
 7. `jarvo-lowca` i `jarvo-mobile`: specjaliści z własnymi skryptami do źródeł publicznych ([LEADY.md](LEADY.md), [MOBILE.md](MOBILE.md)).
+8. `jarvo-operator`: computer use na Komputerze Jarva, po kanale z twardymi zasadami (etapy K0–K3 w [KOMPUTER.md](KOMPUTER.md)).
 
 Pierwszy wspólny test floty: **„wypuść landing nowego produktu”**. Sherlock robi research
 i słowa kluczowe, web buduje stronę, studio przygotowuje grafiki i posty, ręka składa

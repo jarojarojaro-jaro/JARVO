@@ -212,6 +212,21 @@ Wszystkie źródła bez kluczy. Odmowa źródła = blokada, bez obchodzenia; opi
 
 ---
 
+## `jarvo-operator`: Operator
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| `computer_use` Hermesa | patrzenie (`capture`: drzewo dostępności, znaczniki na zrzucie, obraz) i działania na ekranie (klik, pisanie, klawisze, przewijanie, `set_value`) z werdyktem po działaniu | MIT | n/d | toolset `computer_use`; sterownik przez `HERMES_CUA_DRIVER_CMD` = bramka `komputer/jarvo_cua.py` |
+| Komputer Jarva (`infra/komputer`) | osobny pulpit Xvnc z Chromium w kontenerze bez kluczy floty; wejście z twardymi zasadami (logowanie, płatność, wysyłka, pola haseł i kart = człowiek), ukrywanie sekretów, dziennik | własny kod (MIT) | n/d | usługa compose `komputer`, włącza właściciel: `jarvo komputer on` |
+| [cua-driver](https://github.com/trycua/cua) 0.21.0 | sterownik ekranu w Komputerze (AT-SPI, zrzuty, wejście w tle); telemetria i aktualizacje wyłączone, suma SHA-256 w `vendor/zrodla.yaml` | MIT | 2026-10 | binarka w obrazie `jarvo-komputer` |
+| wtyczka `jarvo-komputer` (`komputer/plugin`) | narzędzie `komputer`: `stan` (czy Komputer działa, pauza, kto steruje), `dziennik` (ostatnie działania bez treści), `oddaj` (prośba do właściciela jako pauza z powodem); wznowić nie umie | własny kod (MIT) | n/d | wtyczka Hermesa, healthcheck `komputer/plugin/__init__.py stan` (opcjonalny) |
+
+Bez terminala, wykonywania kodu, przeglądarki Hermesa i delegowania. Stałe zgody na działania w tle
+(`cua:<działanie>:background`) i na działania wejścia na wierzchu w aktywnym oknie (`cua:<działanie>:foreground`);
+okno na wierzch zatwierdza człowiek. Szczegóły: [KOMPUTER.md](KOMPUTER.md).
+
+---
+
 ## `jarvo-reka`: Prawa ręka
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |

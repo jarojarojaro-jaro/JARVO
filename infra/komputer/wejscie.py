@@ -441,6 +441,29 @@ class KontekstSesji:
         except OSError:
             return ""
 
+    @staticmethod
+    def _xprop(*args: str) -> str:
+        try:
+            return subprocess.run(["xprop", *args], capture_output=True, text=True, timeout=2, check=False).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            return ""
+
+    def aktywne_okno(self) -> int | None:
+        """Okno z fokusem pulpitu (_NET_ACTIVE_WINDOW z xfwm4); numer jest ten sam co window_id sterownika."""
+        _, _, numer = self._xprop("-root", "_NET_ACTIVE_WINDOW").rpartition("#")
+        try:
+            okno = int(numer.strip().split(",")[0], 16)
+        except ValueError:
+            return None
+        return okno or None
+
+    def pid_okna(self, okno: int) -> int | None:
+        _, _, pid = self._xprop("-id", str(int(okno)), "_NET_WM_PID").rpartition("=")
+        try:
+            return int(pid.strip())
+        except ValueError:
+            return None
+
 
 class Sesja:
     """Jedno połączenie z cua.sock: agent ↔ wejście ↔ cua-driver mcp."""

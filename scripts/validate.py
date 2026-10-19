@@ -211,6 +211,9 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
 # (bez gwiazdek); akcje zmieniające ekran z tools/computer_use/tool.py przypiętego Hermesa + zasięg bring_to_front
 CUA_AKCJE = {"click", "double_click", "right_click", "middle_click", "drag", "scroll", "type", "key", "set_value",
              "focus_app", "bring_to_front"}
+# działania wejścia, które Hermes wysyła z delivery_mode; na pulpicie X11 klawiatura, przewijanie i przeciąganie
+# działają tylko na wierzchu, a wejście Komputera przepuszcza je tylko w oknie już aktywnym (docs/KOMPUTER.md §6)
+CUA_NA_WIERZCHU = {"click", "double_click", "right_click", "middle_click", "drag", "scroll", "type", "key"}
 CUA_KLUCZ = re.compile(r"^cua:([a-z_]+):(background|foreground)$")
 
 
@@ -237,6 +240,12 @@ def check_komputer(a: fl.Agent, cfg: dict, r: Report) -> None:
                 r.err(f"{a.name}: command_allowlist {wpis!r} bez `komputer: true` we fleet.yaml")
             elif not m or m.group(1) not in CUA_AKCJE:
                 r.err(f"{a.name}: command_allowlist {wpis!r}: zły klucz, wzór cua:<akcja>:<background|foreground>")
+            elif m.group(1) == "bring_to_front":
+                r.err(f"{a.name}: command_allowlist {wpis!r}: okno na wierzch zatwierdza człowiek przy każdym "
+                      "działaniu, nie stała zgoda (docs/KOMPUTER.md §8)")
+            elif m.group(2) == "foreground" and m.group(1) not in CUA_NA_WIERZCHU:
+                r.err(f"{a.name}: command_allowlist {wpis!r}: na wierzchu tylko działania wejścia "
+                      f"({', '.join(sorted(CUA_NA_WIERZCHU))})")
         if wpis.startswith("plugin_rule:komputer"):
             r.err(f"{a.name}: command_allowlist {wpis!r}: zgody na Twój komputer daje tylko człowiek, nie config")
     if (cfg.get("bot_desktop") or {}).get("auto_start"):

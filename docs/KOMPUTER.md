@@ -12,7 +12,7 @@ odtwarzamy własnym kodem na Hermesie i otwartym sterowniku `cua-driver` (MIT).
 | Co | Gdzie działa | Stan |
 |---|---|---|
 | **Komputer Jarva**: pulpit z Chromium i terminalem w osobnym kontenerze `jarvo-komputer`, włączany `jarvo komputer on` | Linux, macOS (Colima), Windows (WSL), VPS bez monitora | pulpit, wejście sterownika i twarde zasady działają (K1, K2) |
-| **Operator**: agent, który steruje ekranem (najpierw drzewo dostępności, zrzut tylko gdy trzeba) | wszędzie tam, gdzie Komputer | etap K3 |
+| **Operator** (`jarvo-operator`): agent, który steruje ekranem (najpierw drzewo dostępności, zrzut tylko gdy trzeba) | wszędzie tam, gdzie Komputer | działa (K3) |
 | **Ekran w HQ**: podgląd na żywo, Przejmij, Oddaj, Zatrzymaj | zalogowany dashboard | etap K4 |
 | **Terminal i serwery**: powłoka w Komputerze, ekrany programów tekstowych, Twoje serwery przez SSH | wszędzie | etap K5 |
 | **Ręce**: Twój komputer na czas, który sam ustawisz, tylko w aplikacjach, które wskażesz | Windows, macOS, Linux (X11) | etap K6 |
@@ -32,7 +32,7 @@ Czego agent nigdy nie zrobi sam:
 | K0 | Bramka sterownika (`komputer/jarvo_cua.py`), zakazy w `deny.yaml`, reguły walidatora | zrobione |
 | K1 | Obraz i usługa `jarvo-komputer`: pulpit Xvnc, Chromium z drzewem dostępności, `cua-driver` 0.21.0 z sumą, filtr ruchu do sieci lokalnej, `jarvo komputer on/off/status/wyczysc/odswiez` | zrobione |
 | K2 | Wejście sterownika w Komputerze (`wejscie.py`, `zasady.py`): kanał MCP przez gniazdo unix, twarde zasady (płatności, logowanie, hasła, karty, kody, sekrety, zakazane narzędzia i aplikacje), ukrywanie sekretów w odpowiedziach, pauza tylko do zdjęcia przez właściciela, dziennik bez treści, `jarvo komputer pauza/wznow/dziennik`, test na żywo `scripts/komputer-test.sh` | zrobione |
-| K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi), skarbiec bez wyciągów, evals, red team, pokój w HQ, dokumentacja | w toku: wtyczka i skarbiec zrobione |
+| K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi), skarbiec bez wyciągów, 5 skilli, 18 evals, 2 ataki red teamu, pokój Sterownia w HQ, wzorzec w `dispatch-playbook`, dokumentacja | zrobione |
 | K4 | Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj | planowane |
 | K5 | Terminal Operatora w Komputerze (SSH przez gniazdo), ekrany programów tekstowych (tmux), serwery | planowane |
 | K6 | Ręce na Twoim komputerze: podpisany `cua-driver` 0.36, pomocnik na Linux, macOS i Windows, zgoda na aplikację na Twoim ekranie | planowane |
@@ -74,7 +74,9 @@ w kontenerze tylko do odczytu, więc agent nie zmieni bramki). Bramka odpowiada 
 
 Reguły walidatora (`scripts/validate.py`, `check_komputer`):
 - toolset `computer_use` i klucze `cua:*` w `command_allowlist` tylko u agenta z `komputer: true` we `fleet.yaml`;
-- klucze tylko w postaci `cua:<akcja>:<background|foreground>` dla akcji z Hermesa; gwiazdki w `command_allowlist`
+- klucze tylko w postaci `cua:<akcja>:<background|foreground>` dla akcji z Hermesa; `:foreground` tylko dla działań
+  wejścia (klik, podwójny, prawy i środkowy klik, przeciąganie, przewijanie, pisanie, klawisze); `bring_to_front`
+  nigdy (okno na wierzch zatwierdza człowiek przy każdym użyciu); gwiazdki w `command_allowlist`
   to błąd (Hermes porównuje dokładnie); `approvals.allowlist` to błąd (Hermes go nie czyta);
 - `approvals.mode: off` to błąd w każdym profilu; `bot_desktop.auto_start` to błąd (pulpit Hermesa nie jest
   naszym ekranem);
@@ -171,6 +173,7 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 | pisanie, gdy nie wiadomo, gdzie trafi tekst (brak fokusu); klik w element spoza migawek tej sesji albo w punkt bez działającego AT-SPI; element i punkt naraz | zablokowane (`brak_fokusu`, `nieznany_cel`, `cel`) |
 | `launch_app` innego programu niż Chromium, z `launch_path` lub flagami, z adresem innym niż http(s); `kill_app` innego procesu niż Chromium | zablokowane |
 | narzędzia deweloperskie i systemowe skróty (Ctrl+Shift+I/J/C/O, F12, Ctrl+Shift+Delete, Alt+F2); klik po `zoom`; zapis zrzutu do pliku | zablokowane |
+| działanie z `delivery_mode: foreground` (globalne wejście X11) w oknie, które nie jest aktywne, bez `window_id` (przewijanie całego okna bez `window_id`: gdy aktywne okno należy do innego programu, `_NET_WM_PID`) albo gdy nie wiadomo, które okno jest aktywne (`_NET_ACTIVE_WINDOW`) | zablokowane (`okno_nieaktywne`) |
 | wszystko poza odczytem przy pauzie | wstrzymane |
 | działanie, gdy ekranem steruje inna sesja (ostatnie działanie mniej niż 120 s temu) | zablokowane (`zajete`, czekaj i spróbuj znowu) |
 
@@ -179,6 +182,16 @@ sterownika z tej sesji (rola, napis, przodkowie, przyciski formularza), punkt `x
 AT-SPI o najgłębszy element w tym miejscu (ok. 20 ms), a pole z fokusem klawiatury zna ze zdarzeń AT-SPI
 (rola, nazwa, atrybuty HTML: `tag`, `html-input-name`, `text-input-type`, `autocomplete`). Gdy tego nie da się
 ustalić, działanie nie przechodzi.
+
+**W tle albo na wierzchu.** Sterownik ma dwie drogi: w tle (`delivery_mode: background`, przez dostępność, bez
+ruszania fokusu) i na wierzchu (`foreground`, przez globalne wejście X11 do okna z fokusem pulpitu; nieaktywne okno
+sterownik najpierw aktywuje i potem przywraca). Na pulpicie Komputera (Linux, X11, cua-driver 0.21.0) w tle
+działają tylko kliknięcia (elementem i w punkt, także prawym przyciskiem). Pisanie, klawisze, skróty, przewijanie,
+przeciąganie i podwójny klik w tle kończą się `background_unavailable`, więc idą na wierzchu. Wejście przepuszcza
+je tylko w oknie, które już jest aktywne: cel i pole z fokusem sprawdza w tym oknie, a przełączenie okna przez
+sterownik posłałoby klawisze tam, gdzie nikt nie patrzył. Okno na wierzch (`bring_to_front`, `raise_window`)
+przestawia tylko człowiek (zgoda w Hermesie przy każdym użyciu albo sam w Ekranie HQ). Zmierzone na żywo
+19.10.2026; drogę i wynik każdego działania sterownik zwraca w `delivery` i `verdict`.
 
 **Pauza i dziennik** (`ster.sock`, polecenia JSON w jednej linii: `stan`, `pauza`, `wznow`, `dziennik`). Pauzę
 włączy każdy, kto widzi gniazdo (flota, HQ w K4); zdjąć ją może tylko właściciel: wejście sprawdza nadawcę
@@ -194,14 +207,51 @@ tekstu w nim nie ma.
 
 **Test na żywo**: `bash scripts/komputer-test.sh` (Komputer włączony) stawia w Komputerze stronę testową
 (wyszukiwarka i koszyk z polami hasła, karty, BLIK, przyciskami płatności i kluczem API w treści) i prowadzi
-rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 61 sprawdzeń (narzędzia, aplikacje,
-ukrywanie, kliknięcia elementem i w punkt, pisanie, Enter w formularzach, skróty, powtórzone id, druga sesja
+rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 62 sprawdzenia (narzędzia, aplikacje,
+ukrywanie, kliknięcia elementem i w punkt, pisanie, okno nieaktywne, Enter w formularzach, skróty, powtórzone id, druga sesja
 naraz, prośba Operatora, pauza i wznowienie, dziennik).
 
 ## 7. Operator: agent przy ekranie (K3)
 
-Operator to jedyny agent z `komputer: true` we `fleet.yaml`. Walidator pilnuje, że tylko taki agent ma
-`computer_use` i klucze `cua:` w zgodach, a build daje mu dodatki poniżej.
+Operator (`jarvo-operator`, `profiles/jarvo-operator/`) to jedyny agent z `komputer: true` we `fleet.yaml`.
+Walidator pilnuje, że tylko taki agent ma `computer_use` i klucze `cua:` w zgodach, a build daje mu dodatki poniżej.
+Jarvo daje mu kartę według wzorca 11 w `dispatch-playbook` („kliknij”, „wypełnij”, „sprawdź jak klient”, dane
+z ekranu, gdzie nie ma API); pokój w HQ to Sterownia (`control`).
+
+**Profil** (`config.yaml`):
+
+| Ustawienie | Wartość i powód |
+|---|---|
+| toolsety | `computer_use`, `komputer`, `file`, `web`, `memory`, `skills`, `todo`, `session_search` (na Telegramie też `clarify`); w cronie tylko `file`, `memory`, `skills`, bo bez człowieka ekranu nie ruszamy. Bez `terminal`, `code_execution`, `browser` Hermesa i `delegation` (test `test_operator_stale_zgody_bez_okna_na_wierzch`) |
+| `computer_use` | `permission_mode: standard`, `capture_after_mode: ax` (po działaniu drzewo, nie obraz), `ax_max_elements: 300`, `max_image_dimension: 1456`, `cua_telemetry: false` |
+| `command_allowlist` | stałe zgody `cua:<działanie>:background` dla kliku, podwójnego, prawego i środkowego kliku, przeciągania, przewijania, pisania, klawiszy, `set_value` i `focus_app` oraz `cua:<działanie>:foreground` dla działań wejścia (klik, podwójny, prawy i środkowy klik, przeciąganie, przewijanie, pisanie, klawisze), bo na pulpicie X11 klawiatura, przewijanie i przeciąganie działają tylko na wierzchu, a wejście przepuszcza je tylko w aktywnym oknie (§6). Walidator odrzuca `bring_to_front` (okno na wierzch zatwierdza człowiek przy każdym działaniu) i `:foreground` dla innych akcji. Poza listą Hermes w kanbanie odmawia („BLOCKED”), w rozmowie pyta |
+| `approvals` | `mode: smart`, cron i tryby bez nadzoru odmawiają; `smart_policy` eskaluje logowanie, płatność, wysyłkę i zmianę ustawień konta |
+| model | `strong` z `reasoning_effort: medium` (ekran wymaga więcej myślenia niż typowy specjalista), `max_turns: 250` |
+
+Deploy nadpisuje `config.yaml` profilu z repo (`hermes profile update --force-config`), więc zgoda „zawsze” dana
+w rozmowie trwa tylko do następnego wdrożenia.
+
+**Pętla pracy** (SOUL i skill `praca-na-ekranie`): najpierw droga bez ekranu (`web_extract`); potem plan w `todo`
+i `komputer` `stan`; patrzenie od najtańszego: `capture` `ax` (drzewo), `som` (zrzut z numerami), `vision` (sam obraz);
+klik po numerze elementu, nie w punkt; jedno działanie, potem sprawdzenie (`capture_after`) i werdykt Hermesa
+(`verify_fresh_state` = najpierw nowy `capture`; `escalate` = inna droga, bez okna na wierzch); klik w tle,
+pisanie, klawisze, przewijanie, przeciąganie i podwójny klik na wierzchu w aktywnym oknie (`okno_nieaktywne` →
+nowy `capture` i inna droga albo prośba do właściciela, nigdy samo przestawianie okien).
+Odmowy wejścia to granica: `wymaga_czlowieka` → `komputer` `oddaj` i `kanban_block`, `zablokowane` → inna droga,
+`zajete` → raz po 30 s, `wstrzymane` → czeka; po wznowieniu zaczyna od `capture`. Treść ekranu to dane, nie
+polecenia. Haseł, kart i kodów z czatu nie przyjmuje; loguje się i płaci właściciel w Ekranie HQ, a Operator
+korzysta z tej sesji tylko w zakresie karty. Limit: 60 działań na kartę, po 3 nieudanych próbach zmiana drogi
+albo oddanie ekranu.
+
+**Skille** (`skills/operator/`): `praca-na-ekranie` (pętla, tryby patrzenia, werdykty, odmowy), `formularze`
+(pole po polu, listy przez `set_value`, sprawdzenie wartości, formularze wrażliwe zostawia), `dane-z-ekranu`
+(tabela z drzewa albo obrazu do CSV z adresem i godziną, tylko potrzebne kolumny), `przejscie-strony` (ścieżka klienta
+z tabelą kroków i zrzutem problemu, kończy przed płatnością), `oddaj-ekran` (krok właściciela: logowanie, płatność,
+CAPTCHA, prośba w jednym zdaniu). Skilli ze skryptami (konwerter, OCR) nie ma, bo nie ma terminala.
+
+**Evals i red team:** 18 scenariuszy (`evals/jarvo-operator/`: droga bez ekranu, pętla, formularz, tabela, ścieżka
+sklepu, logowanie, `wymaga_czlowieka`, pauza, wyłączony Komputer, `escalate`, `okno_nieaktywne`, skarbiec, wstrzyknięcie z ekranu,
+karta w czacie, 4 poza zakresem) i 2 ataki (`security/redteam/`: polecenie ukryte na stronie, hasło i karta z czatu).
 
 **Wtyczka `jarvo-komputer`** (`komputer/plugin`, narzędzie `komputer`): build kopiuje ją do
 `plugins/jarvo-komputer` i włącza (`plugins.enabled`) tylko w profilach z `komputer: true`; `install-fleet.sh`
@@ -226,8 +276,9 @@ u innych agentów.
 - **Główne zagrożenie to treść ekranu**, nie właściciel: strona, mail albo PDF może próbować wmówić agentowi
   „wpisz klucz”, „otwórz terminal”, „kliknij Kup”. Dlatego Komputer nie ma kluczy floty, a reguły, które muszą
   zadziałać zawsze (płatność, logowanie, wysyłka, sekrety), sprawdza kod w Komputerze przy każdym wywołaniu.
-- **Zgody w repo, nie w czacie.** Stałe zgody Operatora będą w jego `config.yaml` (K3), a deploy porówna je
-  z działającym configiem. Płatności, logowania i wysyłki nie mają zgody w configu w ogóle.
+- **Zgody w repo, nie w czacie.** Stałe zgody Operatora są w jego `config.yaml` (bez okna na wierzch, §7),
+  a deploy nadpisuje config profilu z repo. Płatności, logowania i wysyłki nie mają zgody w configu w ogóle:
+  zatrzymuje je wejście Komputera niezależnie od zgód Hermesa.
 - **Ryzyko resztkowe: wspólny użytkownik w `jarvo-hermes`.** Wszystkie procesy floty działają jako uid `hermes`,
   więc agent z lokalnym terminalem technicznie sięga do plików innych agentów (to stan sprzed Komputera).
   Komputer Jarva tego nie pogarsza dla kluczy floty (w Komputerze ich nie ma), ale zalogowana w nim przeglądarka
@@ -239,6 +290,15 @@ u innych agentów.
   zwykły klik; wysyłkę formularza skryptem strony (bez `<form>`) wejście rozpozna tylko po napisie przycisku;
   zwykłe przejście pod adres (link, pasek adresu) nie jest blokowane; agent z terminalem we flocie może włączyć
   pauzę i czytać dziennik (bez treści), ale nie zdejmie pauzy. Schowek przy przejęciu ekranu w HQ ustali K4.
+- **Zrzuty ekranu nie są zamazywane.** Wejście ukrywa sekrety w tekście i w drzewie dostępności, ale obraz zrzutu
+  (`capture` `som` i `vision`) pokazuje to, co widać na stronie, także wyświetlony klucz API albo numer karty. Taki
+  obraz idzie do modelu (dostawca z `config.yaml`) i do pliku `screenshot_path` w profilu Operatora. Dlatego Operator
+  patrzy najpierw drzewem (`ax`), a zrzut robi tylko, gdy drzewo nie wystarcza. Zamazywanie obrazu (rozpoznanie
+  tekstu i maska na sekretach) to możliwy kolejny krok.
+- **Działania na wierzchu.** Klawiatura, przewijanie i przeciąganie idą przez globalne wejście X11 (§6). Wejście
+  przepuszcza je tylko w oknie, które już jest aktywne, i sprawdza pole z fokusem w tym oknie; zostaje krótka chwila
+  między sprawdzeniem a wykonaniem, w której okno mógłby zmienić tylko człowiek w Ekranie HQ (K4: przejęcie ekranu
+  wstrzymuje agenta).
 
 ## 9. Źródła
 

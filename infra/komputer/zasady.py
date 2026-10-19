@@ -11,6 +11,9 @@ Decyzje:
   wstrzymane  Komputer zatrzymany (właściciel: jarvo komputer pauza; Operator: czeka na właściciela);
               patrzeć wolno, działać nie, wznawia tylko właściciel.
 Przy dwóch sesjach naraz zmieniać ekran może jedna (odmowa `zajete`, wejscie.py: Ekran.zajmij).
+Działanie z delivery_mode foreground (klawiatura, przewijanie, przeciąganie i podwójny klik na pulpicie X11 mają tylko
+tę drogę) przechodzi tylko w oknie, które już jest aktywne: wejście sprawdza cel i pole z fokusem w tym oknie,
+a przełączenie okna przez sterownik posłałoby klawisze tam, gdzie nikt nie patrzył.
 
 Cel działania (pole, przycisk) opisuje słownik z wejscie.py: rola i nazwa z drzewa dostępności, atrybuty HTML
 z AT-SPI (tag, html-input-name, text-input-type), przodkowie (rola, nazwa) do kilku poziomów w górę i przy polach
@@ -153,6 +156,12 @@ class Kontekst(Protocol):
 
     def program(self, pid: int) -> str:
         """Ścieżka programu procesu (do kill_app)."""
+
+    def aktywne_okno(self) -> Optional[int]:
+        """Okno z fokusem systemu (X11 _NET_ACTIVE_WINDOW, ten sam numer co window_id sterownika), None gdy nieznane."""
+
+    def pid_okna(self, okno: int) -> Optional[int]:
+        """Proces, do którego należy okno (X11 _NET_WM_PID), None gdy nieznany."""
 
 
 def luhn(cyfry: str) -> bool:
@@ -357,6 +366,35 @@ def _adresowanie(nazwa: str, args: dict) -> Optional[Werdykt]:
     return None
 
 
+def _na_wierzchu(nazwa: str, args: dict, ctx: Kontekst) -> Optional[Werdykt]:
+    """delivery_mode foreground: sterownik wysyła działanie przez globalne wejście (XTest) do okna z fokusem
+    systemu, a nieaktywne okno najpierw aktywuje. Wolno tylko w oknie, które już jest aktywne."""
+    tryb = args.get("delivery_mode")
+    if tryb in (None, "", "background"):
+        return None
+    if tryb != "foreground":
+        return _odmowa("tryb", f"{nazwa}: delivery_mode tylko background albo foreground")
+    aktywne = ctx.aktywne_okno()
+    if aktywne is None:
+        return _odmowa("okno_nieaktywne", "nie wiem, które okno jest aktywne; działaj w tle albo zrób nowy capture")
+    if args.get("window_id") is None and nazwa == "scroll":
+        # przewijanie całego okna (Hermes wysyła wtedy samo pid): nic nie uruchamia, wystarczy, że aktywne okno
+        # należy do tego programu
+        if not isinstance(args.get("pid"), int) or ctx.pid_okna(aktywne) != args["pid"]:
+            return _odmowa("okno_nieaktywne", "scroll z delivery_mode foreground tylko w programie, którego okno "
+                           "jest aktywne")
+        return None
+    try:
+        okno = int(args.get("window_id"))
+    except (TypeError, ValueError):
+        return _odmowa("okno_nieaktywne", f"{nazwa} z delivery_mode foreground wymaga window_id okna, w którym "
+                       "działasz (zrób capture tego okna)")
+    if okno != aktywne:
+        return _odmowa("okno_nieaktywne", f"{nazwa} z delivery_mode foreground tylko w oknie, które już jest "
+                       "aktywne (to okno nie jest); działaj w tle albo poproś właściciela o okno na wierzchu")
+    return None
+
+
 def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
     """Decyzja dla jednego wywołania narzędzia sterownika."""
     args = args if isinstance(args, dict) else {}
@@ -377,7 +415,7 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
     if nazwa in SESJA:
         return Werdykt(TAK)
 
-    zle = _adresowanie(nazwa, args)
+    zle = _na_wierzchu(nazwa, args, ctx) or _adresowanie(nazwa, args)
     if zle:
         return zle
 

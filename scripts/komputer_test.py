@@ -190,6 +190,9 @@ def main() -> int:
     sprawdz(kod(klik("Szukaj w sklepie")) == "ok", "klik w wyszukiwarkę: przechodzi")
     time.sleep(0.5)
     sprawdz(kod(k.narzedzie("type_text", {**pisz, "text": "perfumy"})) == "ok", "pisanie w wyszukiwarce: przechodzi")
+    w = k.narzedzie("type_text", {**pisz, "window_id": wid + 1, "text": "perfumy"})
+    sprawdz(zasada(w) == "okno_nieaktywne", "pisanie na wierzchu w oknie, które nie jest aktywne: zablokowane",
+            tekst(w))
     w = k.narzedzie("press_key", {**pisz, "key": "Return"})
     sprawdz(kod(w) == "ok", "Enter w wyszukiwarce (formularz bez płatności): przechodzi", tekst(w))
     sprawdz(kod(klik("Hasło")) == "ok", "klik w pole hasła: przechodzi (klik niczego nie wysyła)")

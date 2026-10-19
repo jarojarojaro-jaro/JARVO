@@ -1,0 +1,9 @@
+name: jarvo-operator
+version: 0.1.0
+description: "Operator: computer use na Komputerze Jarva (strony, panele www, formularze, dane z ekranu), bez terminala."
+author: "Jarvo fleet"
+license: MIT
+env_requires:
+  - name: OPENROUTER_API_KEY
+    description: "Klucz modelu dla Operatora (osobny klucz z limitem kredytów)"
+    required: false

@@ -1,7 +1,7 @@
 ---
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
-version: 1.1.1
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -79,6 +79,7 @@ kanban_create(
 | **Leady** | lowca (ICP → sygnały → ranking z kontaktem) → [decyzja użytkownika, do kogo] → studio (szkic wiadomości, opcjonalnie) |
 | **Aplikacja mobilna** | mobile (natywna czy PWA, koszty) → [decyzja użytkownika] → web (strona, PWA) albo mobile (Wallet, aplikacja) |
 | **Audyt mobilny** | mobile (audyt: sklepy, linki, PWA, opinie) → [decyzja użytkownika] → web ∥ studio (poprawki) |
+| **Zadanie na ekranie** | [droga bez ekranu: sherlock albo web] → operator (jedna karta naraz; logowanie, płatność i wysyłka: blokada z prośbą do właściciela) |
 
 **Karta „złożenie”** (dla misji z ≥2 agentami): `assignee="jarvo-reka"`, `parents` = wszystkie karty merytoryczne,
 cel: jeden pakiet w `@@MISSIONS_DIR@@/<MISJA>/zlozenie/out/` (INDEX.md z opisem i ścieżkami, bez przerabiania treści).

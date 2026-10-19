@@ -42,7 +42,7 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 - **Wspólne:** wiedza o Tobie (USER.md), brand kity (`knowledge/brands`) i **skarbiec wiedzy** (`knowledge/`, [WIEDZA.md](WIEDZA.md):
   notatki z linkami, orzeczenia z Twoich korekt, wyciągi z rozmów i kart; wtyczka `jarvo-wiedza` daje każdemu agentowi
   przypomnienia przed turą i narzędzia `wiedza_*`). Pamięć i skille są per agent
-  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format albo bez metadanych) i `odczyt-ekranu` (tekst ze zrzutu ekranu, skanu albo PDF: Indra OCR, zapas Tesseract) u wszystkich, `ostrozna-przegladarka` (jedna próba Camoufoxem po odmowie strony) u Łowcy i Sherlocka; Ręka czyta skille wszystkich).
+  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format albo bez metadanych) i `odczyt-ekranu` (tekst ze zrzutu ekranu, skanu albo PDF: Indra OCR, zapas Tesseract) u wszystkich poza Operatorem (nie ma terminala), `ostrozna-przegladarka` (jedna próba Camoufoxem po odmowie strony) u Łowcy i Sherlocka; Ręka czyta skille wszystkich).
 - **Nadzór bez palenia tokenów:** dispatcher kanbana i patrol (skrypt bez modelu) pilnują floty
   i budzą Jarva tylko przy anomaliach albo gdy trzeba Twojej decyzji.
 
@@ -51,7 +51,7 @@ Poziomy autonomii: **A0** odczyt · **A1** szkice we własnym workspace · **A2*
 
 ---
 
-## 2. Flota agentów (9 profili)
+## 2. Flota agentów (10 profili)
 
 Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady), `config.yaml`
 (model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja.
@@ -66,9 +66,27 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę, publikujesz Ty | Sala operacyjna (`office`) | ads | 11 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 7 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 10 |
+| 🖥️ `jarvo-operator` | **Operator** — praca na ekranie Komputera Jarva (computer use): klik w panelach i programach w przeglądarce, formularze, dane z ekranu do pliku, ścieżka klienta na stronie; klik w tle, klawiatura w aktywnym oknie, logowanie, płatność i wysyłkę oddaje właścicielowi | Sterownia (`control`) | operator | 5 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | Warsztat (`workshop`) | reka | 4 |
 
-### 2a. jarvo-mobile — szczegóły (najnowszy)
+### 2a°. jarvo-operator — szczegóły (najnowszy)
+Operator ekranu, etap K3 z [KOMPUTER.md](KOMPUTER.md). Narzędzie `computer_use` Hermesa idzie przez bramkę
+`komputer/jarvo_cua.py` do wejścia Komputera Jarva (twarde zasady, ukrywanie sekretów, dziennik); wtyczka
+`jarvo-komputer` daje narzędzie `komputer` (`stan`, `dziennik`, `oddaj`: prośba do właściciela jako pauza z powodem).
+Pętla z `praca-na-ekranie`: najpierw droga bez ekranu (`web_extract`), potem `capture` `ax` → `som` → `vision`, klik
+po numerze elementu, `capture_after` po każdym działaniu i werdykt (`verify_fresh_state`, `escalate`). Skille:
+`praca-na-ekranie`, `formularze`, `dane-z-ekranu`, `przejscie-strony`, `oddaj-ekran`. Konfiguracja: toolsety
+`computer_use`, `komputer`, `file`, `web`, `memory`, `skills`, `todo`, `session_search` (na Telegramie też `clarify`;
+w cronie bez ekranu), bez terminala, wykonywania kodu, przeglądarki Hermesa i delegowania; `computer_use`:
+`permission_mode: standard`, `capture_after_mode: ax`, telemetria wyłączona; stałe zgody (`command_allowlist`)
+`cua:<działanie>:background` i `cua:<działanie>:foreground` dla działań wejścia (na pulpicie X11 klawiatura,
+przewijanie i przeciąganie działają tylko na wierzchu; wejście przepuszcza je tylko w aktywnym oknie, odmowa
+`okno_nieaktywne`), walidator odrzuca `bring_to_front`, tryby cron i bez nadzoru odmawiają.
+Logowanie, płatność, CAPTCHA i wysyłkę robi właściciel w Ekranie HQ; Operator nie przyjmuje haseł ani kart z czatu.
+Bez wyciągu rozmów do skarbca (`bez_wyciagu`). 18 evals, 2 ataki red teamu (wstrzyknięcie z ekranu, karta i hasło
+na ekranie), pokój Sterownia w HQ. Wzorzec 11 w `dispatch-playbook` mówi Jarvowi, kiedy dać kartę Operatorowi.
+
+### 2a. jarvo-mobile — szczegóły
 Twórca aplikacji, etap 1 z [MOBILE.md](MOBILE.md): `natywna-czy-pwa` (`decyzja.py`: potrzeby → strona, PWA, karta
 w Wallet, platforma albo aplikacja w sklepach; 19 funkcji, koszty licencji, ryzyko odrzucenia 4.2, opcje „blisko”)
 i `audyt-mobilny` (`audyt_mobilny.py`: iTunes API z polską kartą, status przedsiębiorcy DSA i etykiety prywatności
@@ -245,7 +263,7 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
 
 ## 6. Bezpieczeństwo (Skarbiec-design + red team)
 
-- **Red team na promptfoo** (`security/redteam/`): 21 ataków na agentów (w tym orzeczenie wstrzyknięte przez treść strony, klucz do zapisania w skarbcu wiedzy, paczka-literówka i sekret w kodzie aplikacji mobilnej), świeża sesja per atak,
+- **Red team na promptfoo** (`security/redteam/`): 23 ataki na agentów (w tym orzeczenie wstrzyknięte przez treść strony, klucz do zapisania w skarbcu wiedzy, paczka-literówka i sekret w kodzie aplikacji mobilnej, polecenie ukryte na ekranie Komputera i karta z czatu do wpisania na ekranie), świeża sesja per atak,
   wykrywanie wycieków. Ostatni zapisany przebieg objął 12 ówczesnych ataków: **12/12 odpartych** po uszczelnieniu;
   dla 9 dodanych później repo nie ma jeszcze wyniku (przebieg wymaga działającej floty z kluczem modelu).
 - **Deny dla całej floty** (`shared/security/deny.yaml`, mergowane do każdego profilu): blokada zmiany

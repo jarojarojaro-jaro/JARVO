@@ -79,6 +79,17 @@ możesz sam zaproponować film jednym zdaniem; zlecasz dopiero po „tak”.
    - GRANICE: A1, bez płatnej generacji AI (`video_generate`, `image_generate`), bez publikacji, budżet 30 min.
 Po akceptacji wyślij ścieżkę pliku i jedno zdanie, czego film uczy.
 
-## 11. Szybkie zadanie (pojedyncze)
+## 11. Zadanie na ekranie („kliknij”, „wypełnij”, „sprawdź jak klient”)
+Gdy trzeba coś zrobić w panelu www albo programie w przeglądarce, wypełnić formularz, przejść ścieżkę na stronie
+jak klient albo przepisać dane z ekranu, a nie ma API ani zwykłego pobrania strony.
+1. Najpierw droga bez ekranu: sama treść strony → `jarvo-sherlock`; strona do zbudowania albo poprawy → `jarvo-web`.
+2. `jarvo-operator` / `ekran`: jedna karta, w KONTEKST adres strony i co ma być na końcu widać; w DoD wynik
+   na ekranie (zrzut) i plik w `out/`, gdy są dane. Komputer musi być włączony (`jarvo komputer on`).
+3. Logowanie, płatność, zakup, wysyłka, publikacja i CAPTCHA robi właściciel: Operator przygotowuje i blokuje kartę
+   z dokładną prośbą (`needs_input`), Ty przekazujesz ją właścicielowi jednym zdaniem; po jego „gotowe” `kanban_unblock`.
+Jedna karta Operatora naraz (jeden ekran); kolejne zlecenia ustaw jako `parents`. Do kart Operatora nie wpisuj haseł
+ani kodów, nawet gdy właściciel je poda: poproś, żeby zalogował się sam w Komputerze.
+
+## 12. Szybkie zadanie (pojedyncze)
 Jedna karta dla właściwego agenta, bez MISSION.md (tylko wpis w INDEX.md z ID `Z-…`).
 Przykłady: „zrób favicon z tego logo”, „sprawdź, czy ta informacja jest prawdziwa”, „przerób ten PDF na DOCX”.

@@ -109,3 +109,13 @@ def obsluz(args: Dict[str, Any], **_: Any) -> str:
 def register(ctx) -> None:
     ctx.register_tool(name="komputer", toolset="komputer", schema=SCHEMAT, handler=obsluz, emoji="🖥️",
                       description="Komputer Jarva: stan, dziennik twardych zasad, oddanie ekranu właścicielowi")
+
+
+if __name__ == "__main__":       # healthcheck toolboxa Operatora: python3 komputer/plugin/__init__.py stan
+    import sys
+    akcja = sys.argv[1] if len(sys.argv) > 1 else "stan"
+    if akcja not in {"stan", "dziennik"}:       # z wiersza poleceń tylko odczyt, bez prośby do właściciela
+        sys.exit("użycie: __init__.py stan|dziennik")
+    wynik = json.loads(obsluz({"akcja": akcja}))
+    print(json.dumps(wynik, ensure_ascii=False, indent=1))
+    sys.exit(0 if wynik.get("ok") else 1)

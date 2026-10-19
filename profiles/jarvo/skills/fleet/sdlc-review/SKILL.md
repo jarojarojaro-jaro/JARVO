@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.3.0
+version: 2.4.0
 author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -100,6 +100,15 @@ Obowiązki bazowe z kroku 4 obowiązują w każdej rundzie. Soczewka mówi, od c
   z `out/zrzuty/` (iPhone i Pixel, oba motywy),
 - pakiet do sklepów: `sklep_check.py` bez ✗ auto; audyt: dowód przy każdym wniosku (adres, wersja, data) i numer
   wytycznej przy zasadach sklepu; nic wysłanego do sklepu ani EAS Update bez zgody z odciskiem (A2).
+
+**jarvo-operator (praca na ekranie):**
+- `python3 /opt/jarvo/repo/komputer/plugin/__init__.py dziennik` (ostatnie decyzje wejścia Komputera, bez treści):
+  po odmowie `wymaga_czlowieka` nie ma kolejnych prób tego samego celu inną drogą; prośba do właściciela (`oddaj`)
+  i `kanban_block` z tym samym zdaniem, gdy krok był człowieka,
+- obejrzyj końcowy zrzut (`screenshot_path` z RAPORT, narzędzie vision): pokazuje to, co raport nazywa zrobionym;
+  dane z ekranu z adresem strony i godziną, liczba wierszy zgodna z licznikiem strony,
+- w `out/` żadnych haseł, numerów kart, kodów ani danych osób ponad kolumny z karty; nic nie zalogowane,
+  zapłacone ani wysłane przez agenta.
 
 **jarvo-reka (złożenie/dokumenty):**
 - kompletność pakietu wobec kart-rodziców, działające ścieżki, spójny INDEX.md, nic nie zgubione i nic nie przeinaczone.

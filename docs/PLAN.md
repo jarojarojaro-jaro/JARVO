@@ -238,6 +238,11 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
   (10 skilli własnych + 20 zewnętrznych, szablon Expo SDK 57, 34 scenariusze evals, 5 ataków red teamu, pokój „Pracownia
   aplikacji”); etapy 3 i 5 gotowe w kodzie, czekają na telefon testowy (KVM albo binder), pierwszy przebieg iOS w GitHub
   Actions i pierwszą aplikację na kontach właściciela ([MOBILE.md](MOBILE.md) §16).
+- 🟡 **Computer use i server use** ([KOMPUTER.md](KOMPUTER.md)): Komputer Jarva (pulpit z Chromium w osobnym kontenerze,
+  `jarvo komputer on`), kanał z twardymi zasadami (logowanie, płatność, wysyłka, hasła i karty = człowiek) i agent
+  **Operator** `jarvo-operator` (5 skilli, 18 scenariuszy evals, 2 ataki red teamu, pokój „Sterownia”): etapy K0–K3 gotowe;
+  K4 (Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj), K5 (terminal i serwery) i K6 (Ręce: Twój komputer z Linuksem,
+  macOS albo Windows) w kolejce.
 - 🟡 Dopracowanie słabszych agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności (cookies, zgody, Omnibus)
   jako skill Weba: plan w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md); naprawy z §3 (ocena leadów, tabela Ręki, martwe ścieżki Ads)
   zrobione 2026-10-01. Nowi specjaliści: na razie żadni (dwie rundy propozycji odłożone, [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md) §6).
@@ -250,7 +255,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Evals na stagingu (`scripts/evals-staging.sh`), sędzia LLM + sprawdzenia deterministyczne.
 - ✅ Koszty: poziomy modeli w `fleet.yaml` i `reasoning_effort` per agent; przy presecie `openrouter` osobny klucz z limitem na agenta.
 - ✅ Bezpieczeństwo: zgody (A2 tylko z człowiekiem, praca bez nadzoru = odmowa), sekrety tylko w `.env`, Tailscale.
-- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 21 ataków) i wspólne zakazy floty
+- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 23 ataki) i wspólne zakazy floty
   (`shared/security/deny.yaml`).
 - ⬜ Przegląd kosztów po 2 tygodniach, korekta poziomów modeli.
 

@@ -121,6 +121,7 @@ const ROOMS = {
   office:   { fig: [54, 44], bubble: "left", wall: "#26303F", wall2: "#212A38", side: "#1C2430", ceil: "#171E28", floor: "#333C4A", floor2: "#2D3542", trim: "#12171F", wallType: "panels", floorType: "grid" },
   radar:    { fig: [60, 44], bubble: "left", wall: "#1B2E2C", wall2: "#203634", side: "#162624", ceil: "#11201E", floor: "#2E3D3B", floor2: "#283634", trim: "#0D1816", wallType: "panels", floorType: "grid" },
   apps:     { fig: [60, 44], bubble: "left", wall: "#2E2A52", wall2: "#352F5E", side: "#26224A", ceil: "#1F1C3E", floor: "#D6D9E0", floor2: "#CBCED6", trim: "#1A1736", wallType: "panels", floorType: "checker" },
+  control:  { fig: [60, 44], bubble: "left", wall: "#1C3346", wall2: "#172B3C", side: "#152839", ceil: "#10202E", floor: "#3B4654", floor2: "#343E4B", trim: "#0C1824", wallType: "ribs", floorType: "grid" },
 };
 const STORAGE = { wall: "#3A414C", wall2: "#343B45", side: "#2E343D", ceil: "#272C34", floor: "#5A6068", floor2: "#535960", trim: "#22272E", wallType: "panels", floorType: "concrete" };
 
@@ -135,6 +136,7 @@ const LOOKS = {
   office:   { coat: "#5A6472", coat2: "#454E5A", pants: "#2E3440", shoes: "#15171C", hair: "#6B4226", hairStyle: "short", outfit: "tie", tie: "#2C6ED5", shirt: "#F1F3F5" },
   radar:    { coat: "#4B5B34", coat2: "#3A4728", pants: "#2E3440", shoes: "#15171C", hair: "#5A3A22", hat: "cap", hatC: "#F26B1D", hatC2: "#C9540F", outfit: "vest", vest: "#F26B1D", vest2: "#C9540F", phones: "#1FB6A6" },
   apps:     { coat: "#5B3FA8", coat2: "#45308A", pants: "#2B2F36", shoes: "#EDEFF2", hair: "#2A1C14", hairStyle: "messy", outfit: "hoodie", phones: "#B48CFF" },
+  control:  { coat: "#22345A", coat2: "#182746", pants: "#2E3440", shoes: "#15171C", hair: "#3A2418", hairStyle: "short", outfit: "tie", tie: "#22345A", shirt: "#3A5A8C", phones: "#C9D3DE" },
 };
 
 const STATUS_PX = { working: "#3DDC84", judging: "#3DDC84", blocked: "#FF4D3D", review: "#FFC53D", queued: "#5AA9FF", idle: "#56606E", offline: "#3A414C" };
@@ -579,6 +581,78 @@ function roomApps(L, a, queue) {
   const c = L.get("chair"); c.r(70, 46, 13, 9, "#2D3440"); c.r(75, 55, 3, 4, "#555E6B"); c.r(70, 59, 13, 1, "#555E6B");
 }
 
+// Sterownia (Operator): Komputer Jarva na żywo. Duży ekran z pulpitem (przeglądarka i okno terminala; przy pracy kursor
+// myszy klika przycisk strony), monitor terminala z zielonym tekstem, neon LIVE, bursztynowa lampa „oddaj ekran” (świeci,
+// gdy Operator czeka na właściciela: logowanie, płatność; wtedy w przeglądarce formularz z kłódką), komputer z diodami,
+// pulpit z klawiaturą, myszą, stosem kart (kolejka) i dużym czerwonym STOP.
+function roomControl(L, a, queue) {
+  const g = L.get("props"), st = a.status, on = isBusy(st), hand = st === "blocked", live = on || hand;
+  // monitor terminala na ramieniu (lewa ściana)
+  g.r(12, 13, 24, 17, "#1D232C"); g.r(13, 14, 22, 15, "#050B08"); g.r(13, 14, 22, 2, "#2B313A");
+  g.p(14, 14, "#FF5F57").p(16, 14, "#FFBD2E").p(18, 14, "#28C840"); g.r(22, 30, 4, 2, "#2B313A");
+  const term = [[0, 3, "#7CF0B4"], [4, 12, "#3DDC84"], [0, 9, "#3DDC84"], [2, 15, "#9BE3A7"], [0, 6, "#3DDC84"]];
+  const t1 = L.get("ctl-term1", on ? "thq-px-f1" : "thq-px-off", { "--thq-d": "1.2s" }), t2 = on ? L.get("ctl-term2", "thq-px-f2", { "--thq-d": "1.2s" }) : null;
+  term.forEach(([ix, w, c], i) => t1.r(15 + ix, 18 + i * 2, w, 1, c));
+  if (t2) term.forEach(([ix, w], i) => t2.r(15 + ((ix + 2 + i) % 5), 18 + i * 2, Math.min(w + 3 - i, 17), 1, term[(i + 1) % 5][2]));
+  if (on) L.get("ctl-caret", "thq-px-blink").r(22, 26, 2, 1, "#E8FFF2");
+  // duży ekran: pulpit Komputera Jarva; przy oddaniu ekranu bursztynowa ramka
+  g.r(40, 9, 58, 26, hand ? "#FFB020" : "#1D232C"); g.r(41, 10, 56, 24, "#0B0F15"); g.r(68, 35, 2, 2, "#2B313A");
+  if (live) {
+    g.r(41, 10, 56, 24, "#2D6E8E"); g.r(41, 26, 56, 6, "#286380"); g.r(41, 32, 56, 2, "#141B26");
+    g.r(42, 32, 2, 2, "#5AA9FF"); g.r(46, 32, 6, 1, "#3A4452"); g.r(53, 32, 6, 1, "#3A4452"); g.r(91, 32, 5, 1, "#8A94A3");
+    // okno przeglądarki: pasek z kropkami i adresem, strona (albo formularz logowania przy oddaniu ekranu)
+    g.r(44, 12, 34, 18, "#F4F7FA"); g.r(44, 12, 34, 3, "#C9D3DE");
+    g.p(45, 13, "#FF5F57").p(47, 13, "#FFBD2E").p(49, 13, "#28C840"); g.r(52, 13, 24, 1, "#FFFFFF");
+    if (hand) {
+      g.r(52, 16, 18, 13, "#FFFFFF"); g.r(52, 16, 18, 1, "#C9D3DE"); g.r(52, 28, 18, 1, "#C9D3DE");
+      g.r(59, 18, 4, 2, "#8A94A3"); g.r(58, 20, 6, 3, "#FFB020"); g.p(60, 21, "#6E4A10");
+      g.r(54, 23, 14, 1, "#AEB7C2"); g.r(54, 25, 14, 1, "#AEB7C2"); g.r(58, 27, 6, 1, "#2C6ED5");
+    } else {
+      g.r(46, 16, 30, 3, "#2C6ED5"); g.r(46, 20, 20, 1, "#AEB7C2"); g.r(46, 22, 26, 1, "#AEB7C2"); g.r(46, 24, 16, 1, "#AEB7C2");
+      g.r(46, 26, 10, 3, "#3DDC84"); g.r(66, 25, 9, 4, "#DCE6F3");
+    }
+    // okno terminala na pulpicie
+    g.r(81, 14, 14, 12, "#0B0F15"); g.r(81, 14, 14, 2, "#3A4452");
+    [[0, 4], [2, 8], [0, 10], [2, 6]].forEach(([ix, w], i) => g.r(82 + ix, 17 + i * 2, w, 1, i % 2 ? "#9BE3A7" : "#3DDC84"));
+  }
+  // kursor myszy: przy pracy stoi na przycisku strony i klika (migający błysk), przy oddaniu ekranu czeka na polu formularza
+  const arrow = (x, y) => {
+    g.r(x, y, 1, 7, INK).p(x + 1, y + 1, INK).p(x + 2, y + 2, INK).p(x + 3, y + 3, INK).p(x + 4, y + 4, INK).r(x + 2, y + 5, 3, 1, INK).p(x + 1, y + 6, INK);
+    g.r(x + 1, y + 2, 1, 4, "#FFFFFF").r(x + 2, y + 3, 1, 2, "#FFFFFF").p(x + 3, y + 4, "#FFFFFF");
+  };
+  if (on) {
+    L.get("ctl-click", "thq-px-led1").p(45, 25, "#FFFFFF").p(56, 25, "#FFFFFF").p(45, 29, "#FFFFFF").p(56, 29, "#FFFFFF").p(50, 25, "#FFFFFF");
+    arrow(52, 27);
+  } else if (hand) arrow(66, 24);
+  // neon LIVE (właściciel patrzy na żywo) i bursztynowa lampa „oddaj ekran” (kopuła z kratką na wsporniku)
+  g.r(100, 9, 18, 8, "#1D232C"); g.r(101, 10, 16, 6, "#0B0F15");
+  L.get("ctl-live", cx("thq-px-neon", live && "is-on")).text(102, 11, "LIVE", "#FF4D3D");
+  const amber = hand ? "#FFB020" : "#5C4A22";
+  g.r(108, 30, 3, 2, "#2B313A"); g.r(105, 28, 9, 2, "#3A424D"); g.r(105, 28, 9, 1, "#5A6472");
+  g.r(106, 22, 7, 6, amber); g.r(107, 21, 5, 1, amber); g.r(106, 24, 7, 1, "#2B313A"); g.r(106, 26, 7, 1, "#2B313A");
+  g.r(107, 22, 2, 2, hand ? "#FFE7A8" : "#75602E");
+  if (hand) L.get("ctl-hand", "thq-px-blink").r(101, 25, 3, 1, "#FFB020").r(115, 25, 3, 1, "#FFB020").r(109, 18, 1, 2, "#FFB020").p(103, 21, "#FFB020").p(115, 21, "#FFB020");
+  // Komputer Jarva: obudowa z diodami (pracuje, gdy ekran żyje)
+  g.r(25, 38, 10, 20, "#20252D"); g.r(25, 38, 10, 1, "#3A424D"); g.r(34, 39, 1, 19, "#161A20");
+  for (let yy = 46; yy < 56; yy += 2) g.r(27, yy, 6, 1, "#12161C");
+  L.get("ctl-pc", live ? "" : "thq-px-off").p(32, 40, "#3DDC84");
+  const led1 = L.get("ctl-led1", live ? "thq-px-led1" : "thq-px-off"), led2 = L.get("ctl-led2", live ? "thq-px-led2" : "thq-px-off");
+  led1.p(27, 40, "#5AA9FF"); led2.p(27, 42, "#3DDC84"); led1.p(29, 42, "#FFC53D");
+  // roślina
+  g.r(13, 52, 6, 6, "#C8693C"); g.r(13, 52, 6, 1, "#A8552C"); g.r(12, 45, 3, 7, "#2F8F4E"); g.r(16, 42, 3, 10, "#3AA85C"); g.r(19, 46, 2, 6, "#2F8F4E");
+  // pulpit: blat, panel z napisem STOP, nogi; klawiatura, mysz, stos kart, grzyb STOP
+  g.r(46, 44, 70, 2, "#5A6472"); g.r(46, 44, 70, 1, "#7C8692"); g.r(46, 46, 70, 6, "#2A313B"); g.r(46, 51, 70, 1, "#1F252E");
+  g.r(48, 52, 2, 6, "#20262F"); g.r(112, 52, 2, 6, "#20262F");
+  L.get("ctl-stop-txt", cx("thq-px-neon", on && "is-on")).text(98, 47, "STOP", "#FF4D3D");
+  g.r(63, 42, 26, 2, "#3A424D"); for (let x = 64; x < 88; x += 2) g.p(x, 42, "#8A94A3");
+  g.r(90, 43, 7, 1, "#1D3A52"); g.r(92, 41, 3, 2, "#E9EDF2"); g.p(93, 41, "#8A94A3");
+  for (let i = 0; i < Math.min(queue, 6); i++) g.r(98, 43 - i, 7, 1, i % 2 ? "#F4EEDC" : "#FFFFFF");
+  g.r(106, 41, 9, 3, "#F2B01E"); g.r(106, 43, 9, 1, "#C98E0E"); g.r(107, 38, 7, 3, "#D62D20"); g.r(108, 37, 5, 1, "#FF3B30"); g.p(108, 38, "#FF8A7A");
+  const lookup = { working: { pose: "type" }, judging: { pose: "type" }, review: { pose: "hold", item: "clipboard" }, blocked: { pose: "raise", alert: true, worried: true } };
+  drawFigure(L, "fig", 76, 60, "control", { facing: "back", legs: false, busy: on, sleep: st === "idle", ...(lookup[st] || {}) });
+  const c = L.get("chair"); c.r(70, 46, 13, 9, "#2D3440"); c.r(75, 55, 3, 4, "#555E6B"); c.r(70, 59, 13, 1, "#555E6B");
+}
+
 // Studio filmowe (Wideograf): zielone tło z softboxem, kamera na statywie z lampką REC, stół montażowy
 // z osią czasu (głowica przesuwa się, gdy agent pracuje), klaps i szpula na ścianie.
 function roomFilmstudio(L, a) {
@@ -659,11 +733,11 @@ function roomBridge(L, a, board, crew, box) {
     for (let j = 0; j < Math.min(n, 5); j++) g.r(x0, 28 + j * 4, 12, 3, color);
     if (n > 5) g.r(x0 + 5, 48, 3, 1, color);
   });
-  // panel załogi: lampka statusu każdego agenta (8 wierszy na całą wysokość ściany; między pulpitem szefa a robotem,
-  // bo pulpit zasłania ścianę do x≈177 od y≈56, a robot zaczyna się na x≈233)
-  frame(180, 2, 50, 56);
+  // panel załogi: lampka statusu każdego agenta (9 wierszy na całą wysokość ściany, do listwy nad podłogą; między
+  // pulpitem szefa a robotem, bo pulpit zasłania ścianę do x≈179 od y≈58, a robot zaczyna się na x≈232)
+  frame(180, 2, 50, 64);
   g.text(183, 4, txt("ZALOGA", "CREW"), "#8FA3B8");
-  crew.slice(0, 8).forEach((c, i) => {
+  crew.slice(0, 9).forEach((c, i) => {
     const color = STATUS_PX[c.status] || STATUS_PX.idle;
     (c.status === "blocked" ? L.get("crew-alarm", "thq-px-blink") : g).r(183, 12 + i * 6, 3, 3, color);
     g.text(189, 11 + i * 6, String(c.short || c.name).slice(0, 10), c.status === "idle" ? "#6E7A8A" : "#C9D3DE");
@@ -699,7 +773,7 @@ function roomBridge(L, a, board, crew, box) {
   holo.circle(120, 44, 3, "rgba(120,240,255,.45)");
 }
 
-const ROOM_DRAW = { study: roomStudy, devlab: roomDevlab, atelier: roomAtelier, filmstudio: roomFilmstudio, workshop: roomWorkshop, office: roomOffice, radar: roomRadar, apps: roomApps };
+const ROOM_DRAW = { study: roomStudy, devlab: roomDevlab, atelier: roomAtelier, filmstudio: roomFilmstudio, workshop: roomWorkshop, office: roomOffice, radar: roomRadar, apps: roomApps, control: roomControl };
 
 function PixRoom({ box, agent, board, crew }) {
   const kind = agent.room === "bridge" ? "bridge" : ROOM_DRAW[agent.room] ? agent.room : "office";

@@ -24,7 +24,7 @@ E = []
 # tytuł
 E.append({"type": "text", "x": 65, "y": 148, "w": 950, "align": "center", "size": 44, "b": 1, "c": "ink", "t": "Jak działa flota Jarva"})
 E.append({"type": "text", "x": 65, "y": 192, "w": 950, "align": "center", "size": 18, "c": "dim",
-          "t": "9 agentów: Jarvo prowadzi, 8 specjalistów robi"})
+          "t": "10 agentów: Jarvo prowadzi, 9 specjalistów robi"})
 
 def box(x, y, w, h, color, fill, lines, when=None, glow=None, pad=(8, 8, 8), align="center", **kw):
     b = {"type": "box", "x": x, "y": y, "w": w, "h": h, "color": color, "fill": fill, "pad": list(pad), "align": align,
@@ -74,15 +74,16 @@ E.append(box(825, 326, 190, 100, "yl", "ylf", [{"t": "📋 Kanban", "size": 16, 
 E.append(path([[780, 376], [825, 376]], when=seq(0), head=9))
 FLOWS.append(flow([[780, 376], [825, 376]], when=seq(0), period=0.9, offsets=(0.3,)))
 
-# specjaliści: 8 w rzędzie
+# specjaliści: 9 w rzędzie
 AG = [("🔎", "Sherlock", "research", "bl", "blf"), ("🌐", "Web", "strony", "tl", "tlf"), ("🎬", "Studio", "posty, copy", "or", "orf"),
       ("🎥", "Wideograf", "filmy", "pu", "puf"), ("📈", "Ads", "reklamy", "yl", "ylf"), ("🎯", "Łowca", "leady", "gn", "gnf"),
-      ("📱", "Aplikacje", "mobilne", "mc", "mcf"), ("🦾", "Prawa ręka", "zadania", "gy", "gyf")]
+      ("📱", "Aplikacje", "mobilne", "mc", "mcf"), ("🖥️", "Operator", "na ekranie", "rd", "rdf"),
+      ("🦾", "Prawa ręka", "zadania", "gy", "gyf")]
 KROK_AGENT = {1: 0, 2: 2, 3: 3, 4: 1, 5: 4}          # krok misji → agent
 AGENT_KROK = {a: k for k, a in KROK_AGENT.items()}
-BW, GAP, X0, Y_TOP, Y_BOT = 110, 10, 65, 498, 598
+BW, GAP, X0, Y_TOP, Y_BOT = 98, 8, 67, 498, 598
 BUS1, BUS2, REC_Y = 462, 628, 664
-cx = [X0 + i * (BW + GAP) + BW // 2 for i in range(8)]
+cx = [X0 + i * (BW + GAP) + BW // 2 for i in range(len(AG))]
 E.append(path([[CX, 426], [CX, BUS1]], arrow=False))
 E.append(path([[cx[0], BUS1], [cx[-1], BUS1]], arrow=False))
 E.append(path([[cx[0], BUS2], [cx[-1], BUS2]], arrow=False))
@@ -132,7 +133,7 @@ E.append({"type": "text", "x": 65, "y": 1166, "w": 950, "align": "center", "size
 cfg = {"meta": {"title": "Jak działa flota Jarva", "lang": "pl"},
        "canvas": {"preset": "ig", "duration": 28, "fps": 30},
        "theme": {"preset": "jarvo-jasny"},
-       "credit": {"text": "Misja i kolejność poglądowe · flota JARVO: 9 agentów (fleet.yaml) · ruch: live-panel (MIT)", "y": 1204, "size": 13},
+       "credit": {"text": "Misja i kolejność poglądowe · flota JARVO: 10 agentów (fleet.yaml) · ruch: live-panel (MIT)", "y": 1204, "size": 13},
        "machines": {"seq": {"type": "cycle", "period": 3.5, "t0": 0,
                             "values": ["plan", "sherlock", "studio", "wideograf", "web", "ads", "recenzja", "wynik"]}},
        "elements": E + FLOWS}

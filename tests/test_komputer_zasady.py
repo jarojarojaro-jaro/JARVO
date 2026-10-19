@@ -23,8 +23,9 @@ def el(rola: str, nazwa: str = "", **kw) -> dict:
 class Ctx:
     """Udawany Kontekst: cel (element albo funkcja argumentów) i fokus podane z góry."""
 
-    def __init__(self, cel=None, fokus=None, wstrzymane=False, program=""):
+    def __init__(self, cel=None, fokus=None, wstrzymane=False, program="", aktywne=None, pid_okna=None):
         self._cel, self._fokus, self.wstrzymane, self._program = cel, fokus, wstrzymane, program
+        self._aktywne, self._pid_okna = aktywne, pid_okna
         self.pytania: list[tuple] = []
 
     def cel(self, nazwa, args):
@@ -37,6 +38,13 @@ class Ctx:
 
     def program(self, pid):
         return self._program
+
+    def aktywne_okno(self):
+        self.pytania.append(("aktywne",))
+        return self._aktywne
+
+    def pid_okna(self, okno):
+        return self._pid_okna
 
 
 def decyzja(nazwa: str, args: dict | None = None, **ctx) -> str:
@@ -75,6 +83,67 @@ def test_pauza_wstrzymuje_dzialania_ale_nie_sesje():
     assert decyzja("bring_to_front", {"pid": 1}, wstrzymane=True) == WSTRZYMANE
     assert decyzja("end_session", {"session": "a"}, wstrzymane=True) == TAK
     assert decyzja("set_agent_cursor_enabled", {"enabled": True}, wstrzymane=True) == TAK
+
+
+# --- delivery_mode foreground: tylko w oknie, które już jest aktywne
+
+POLE_ADRESU = {"rola": "entry", "nazwa": "Pasek adresu i wyszukiwania"}
+NA_WIERZCHU = [
+    ("type_text", {"text": "allegro.pl"}),
+    ("press_key", {"key": "Return"}),
+    ("hotkey", {"keys": ["ctrl", "a"]}),
+    ("scroll", {"direction": "down", "x": 10, "y": 10}),
+    ("double_click", {"x": 10, "y": 10}),
+    ("drag", {"from_x": 1, "from_y": 1, "to_x": 5, "to_y": 5}),
+    ("click", {"element_token": "s1:4"}),
+]
+
+
+@pytest.mark.parametrize("nazwa,args", NA_WIERZCHU)
+def test_na_wierzchu_w_aktywnym_oknie_jak_w_tle(nazwa, args):
+    a = {"pid": 7, "window_id": 6291459, "delivery_mode": "foreground", **args}
+    assert decyzja(nazwa, a, cel=POLE_ADRESU, fokus=POLE_ADRESU, aktywne=6291459) == TAK
+
+
+@pytest.mark.parametrize("nazwa,args", NA_WIERZCHU)
+def test_na_wierzchu_w_nieaktywnym_oknie_odmowa(nazwa, args):
+    a = {"pid": 7, "window_id": 6291459, "delivery_mode": "foreground", **args}
+    for aktywne in (6291460, None):
+        w = ocen(nazwa, a, Ctx(cel=POLE_ADRESU, fokus=POLE_ADRESU, aktywne=aktywne))
+        assert w.decyzja == ODMOWA and w.kod == "okno_nieaktywne", aktywne
+
+
+def test_na_wierzchu_bez_okna_i_zly_tryb():
+    assert kod("type_text", {"pid": 7, "text": "a", "delivery_mode": "foreground"}, fokus=POLE_ADRESU,
+               aktywne=1) == "okno_nieaktywne"
+    assert kod("click", {"pid": 7, "x": 1, "y": 1, "delivery_mode": "foreground"}, aktywne=1) == "okno_nieaktywne"
+    assert kod("click", {"pid": 7, "window_id": 1, "x": 1, "y": 1, "delivery_mode": "global"}, aktywne=1) == "tryb"
+
+
+def test_przewijanie_calego_okna_na_wierzchu_tylko_w_aktywnym_programie():
+    a = {"pid": 7, "direction": "down", "delivery_mode": "foreground"}
+    assert decyzja("scroll", a, aktywne=1, pid_okna=7) == TAK
+    assert kod("scroll", a, aktywne=1, pid_okna=8) == "okno_nieaktywne"
+    assert kod("scroll", a, aktywne=1, pid_okna=None) == "okno_nieaktywne"
+    assert kod("scroll", a, aktywne=None, pid_okna=7) == "okno_nieaktywne"
+    assert kod("scroll", {"direction": "down", "delivery_mode": "foreground"}, aktywne=1, pid_okna=7) == \
+        "okno_nieaktywne"
+
+
+def test_w_tle_okno_aktywne_bez_znaczenia():
+    ctx = Ctx(cel=POLE_ADRESU, fokus=POLE_ADRESU, aktywne=None)
+    for tryb in (None, "background"):
+        a = {"pid": 7, "window_id": 5, "element_token": "s1:4", **({"delivery_mode": tryb} if tryb else {})}
+        assert ocen("click", a, ctx).decyzja == TAK
+    assert ("aktywne",) not in ctx.pytania
+
+
+def test_na_wierzchu_nie_zdejmuje_innych_zasad():
+    a = {"pid": 7, "window_id": 3, "delivery_mode": "foreground"}
+    assert decyzja("click", {**a, "element_token": "s1:9"}, cel=PRZYCISK_ZAPLAC, aktywne=3) == CZLOWIEK
+    haslo = el("password text", "Hasło")
+    assert kod("type_text", {**a, "text": "Lato2026!"}, fokus=haslo, aktywne=3) == "pole_wrazliwe"
+    assert decyzja("press_key", {**a, "key": "Return"}, wstrzymane=True, aktywne=3) == WSTRZYMANE
 
 
 def test_set_config_tylko_dozwolone_klucze():
