@@ -140,7 +140,7 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 
 - **sprawdza każde `tools/call` w `zasady.ocen`, zanim dostanie je sterownik.** Odmowa wraca do agenta jako wynik
   narzędzia z `isError` i `structuredContent`: `code` (`wymaga_czlowieka`, `wstrzymane`, `zablokowane`),
-  `rule` (zasada), `decision` i `next_step` (`ask_owner`, `wait_for_owner`, `choose_another_way`);
+  `rule` (zasada), `decision` i `next_step` (`ask_owner`, `wait_for_owner`, `wait_and_retry`, `choose_another_way`);
 - **pokazuje tylko dopuszczone narzędzia** (`tools/list`): odczyt (stan okna, drzewo, zrzut, okna, aplikacje),
   sesja (kursor, `set_config` tylko dla `capture_scope`, `capture_mode`, `max_image_dimension`, okno na wierzch)
   i działania (klik, podwójny i prawy klik, przeciąganie, przewijanie, pisanie, klawisze, `set_value`,
@@ -149,12 +149,15 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 - **dopisuje zasady do instrukcji serwera** (`initialize`), po polsku i po angielsku;
 - **ukrywa sekrety w każdej odpowiedzi** (tekst, drzewo dostępności, komunikaty błędów, także odpowiedzi bez
   znanego id): klucze API i tokeny (OpenAI, Anthropic, OpenRouter, GitHub, GitLab, AWS, Slack, Google,
-  Hugging Face, npm, Stripe), JWT, klucze prywatne, numery kart (z sumą Luhna) i wartości pól haseł zastępuje
+  Hugging Face, npm, Stripe, token bota Telegrama), JWT, klucze prywatne, numery kart (z sumą Luhna) i wartości pól haseł zastępuje
   znacznik `[ukryte przez Komputer Jarva]`;
 - **pilnuje protokołu**: tylko pojedyncze wiadomości (bez batch), tylko `initialize`, `ping`, `tools/list`,
   `tools/call` (argumenty jako obiekt) i powiadomienia; sterownik dostaje wiadomość zapisaną od nowa z tego,
   co ocenił, a nie surowe bajty agenta; id żądania w toku nie da się użyć drugi raz (odpowiedź zawsze trafia do swojego
-  wywołania); do 1 MB na wiadomość, do 4 sesji naraz, do 120 działań na minutę.
+  wywołania); do 1 MB na wiadomość, do 4 sesji naraz, do 120 działań na minutę;
+- **daje ekran jednej sesji naraz** (K3): patrzeć może każda, ale klikać, pisać i przestawiać okna tylko ta,
+  która działała ostatnio. Druga sesja Operatora (np. druga karta kanbana albo rozmowa w HQ w trakcie karty)
+  dostaje odmowę `zajete` z `next_step: wait_and_retry`. Ekran zwalnia koniec tamtej sesji albo 120 s bez jej działań.
 
 **Twarde zasady** (`infra/komputer/zasady.py`, czyste funkcje, testy w `tests/test_komputer_zasady.py`):
 
@@ -169,6 +172,7 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 | `launch_app` innego programu niż Chromium, z `launch_path` lub flagami, z adresem innym niż http(s); `kill_app` innego procesu niż Chromium | zablokowane |
 | narzędzia deweloperskie i systemowe skróty (Ctrl+Shift+I/J/C/O, F12, Ctrl+Shift+Delete, Alt+F2); klik po `zoom`; zapis zrzutu do pliku | zablokowane |
 | wszystko poza odczytem przy pauzie | wstrzymane |
+| działanie, gdy ekranem steruje inna sesja (ostatnie działanie mniej niż 120 s temu) | zablokowane (`zajete`, czekaj i spróbuj znowu) |
 
 **Skąd wejście wie, w co trafi działanie.** Nie z deklaracji agenta: element ze `element_token` bierze z migawek
 sterownika z tej sesji (rola, napis, przodkowie, przyciski formularza), punkt `x, y` przelicza na ekran i pyta
@@ -179,16 +183,20 @@ ustalić, działanie nie przechodzi.
 **Pauza i dziennik** (`ster.sock`, polecenia JSON w jednej linii: `stan`, `pauza`, `wznow`, `dziennik`). Pauzę
 włączy każdy, kto widzi gniazdo (flota, HQ w K4); zdjąć ją może tylko właściciel: wejście sprawdza nadawcę
 (`SO_PEERCRED`) i przepuszcza tylko proces pulpitu albo root w kontenerze Komputera, czyli `jarvo komputer wznow`.
-Pauza jest zapisana w `~/.jarvo/pauza` i trwa po restarcie. Dziennik `~/.jarvo/dziennik.jsonl` (wolumen
+Pauza ma autora i powód (`{"polecenie": "pauza", "powod": "…"}`): pauza od floty to **prośba Operatora do
+właściciela** („Operator czeka na właściciela: zaloguj się do panelu sklepu”), pauza od właściciela to
+„właściciel zatrzymał Komputer”. Prośba floty nie nadpisze pauzy właściciela. Powód (jedna linia, do 300 znaków,
+bez sekretów) widać w `jarvo komputer status` i w odmowie `wstrzymane`, którą dostaje agent; do dziennika nie trafia.
+Pauza jest zapisana w `~/.jarvo/pauza` (JSON: kto, od kiedy, powód) i trwa po restarcie. Dziennik `~/.jarvo/dziennik.jsonl` (wolumen
 `jarvo-komputer-dom`, 2 MB i jedna kopia) ma każde działanie i każdą odmowę: czas, sesja, narzędzie, decyzja,
 zasada, cel (rola i napis), liczba wpisanych znaków albo naciśnięte klawisze, liczba ukrytych sekretów. Wpisanego
 tekstu w nim nie ma.
 
 **Test na żywo**: `bash scripts/komputer-test.sh` (Komputer włączony) stawia w Komputerze stronę testową
 (wyszukiwarka i koszyk z polami hasła, karty, BLIK, przyciskami płatności i kluczem API w treści) i prowadzi
-rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 58 sprawdzeń (narzędzia, aplikacje,
-ukrywanie, kliknięcia elementem i w punkt, pisanie, Enter w formularzach, skróty, powtórzone id, pauza
-i wznowienie, dziennik).
+rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 61 sprawdzeń (narzędzia, aplikacje,
+ukrywanie, kliknięcia elementem i w punkt, pisanie, Enter w formularzach, skróty, powtórzone id, druga sesja
+naraz, prośba Operatora, pauza i wznowienie, dziennik).
 
 ## 7. Bezpieczeństwo: zasady i ryzyka
 

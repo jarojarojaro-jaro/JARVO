@@ -408,8 +408,9 @@ if "wpisy" in o:
         print("%s  %-16s %-10s %s" % (t, w.get("narzedzie", ""), w.get("decyzja", ""),
               " ".join(str(w[k]) for k in ("zasada", "cel", "powod") if w.get(k))))
 elif o.get("ok"):
+    pauza = "tak (%s)" % o["pauza"]["opis"] if (o.get("pauza") or {}).get("opis") else tak[bool(o["wstrzymane"])]
     print("pauza: %s, sesje agentów: %s, drzewo dostępności (AT-SPI): %s"
-          % (tak[bool(o["wstrzymane"])], o["sesje"], tak[bool(o["atspi"])]))
+          % (pauza, o["sesje"], tak[bool(o["atspi"])]))
 else:
     sys.exit(o.get("blad", "wejście odmówiło"))
 ' "$1" "${2:-30}"

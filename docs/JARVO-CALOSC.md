@@ -266,8 +266,9 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   dostanie je sterownik: płatności, zakupy, logowanie, wysyłkę, publikację, Enter w takim formularzu i wpisywanie
   haseł, kart, BLIK i kodów zostawia właścicielowi, sekretów nie wpisuje i ukrywa je w odpowiedziach, wyłącza
   JavaScript, schowek i DevTools, uruchamia tylko Chromium; cel działania zna z migawek sterownika i z AT-SPI.
-  Pauzę włączy każdy, zdejmie tylko właściciel (`SO_PEERCRED`); dziennik bez treści. Test na żywo:
-  `scripts/komputer-test.sh`.
+  Pauzę włączy każdy, zdejmie tylko właściciel (`SO_PEERCRED`); pauza od floty to prośba Operatora do właściciela
+  z powodem (widać ją w `jarvo komputer status`); ekranem steruje jedna sesja naraz (`zajete`); dziennik bez treści.
+  Test na żywo: `scripts/komputer-test.sh`.
 - **Skan skilli z cudzych repo** (`scripts/skan_skilli.py`, przy każdym buildzie): skaner Hermesa + wzorce
   getsentry `skill-scanner` i ECC (wstrzyknięcia, `curl|sh`, sekrety, ukryte znaki, hooki, `postinstall`).
   High/critical bez przejrzanego wyjątku (`vendor/skan-wyjatki.yaml`, przypięty do commitu) zatrzymuje wdrożenie.

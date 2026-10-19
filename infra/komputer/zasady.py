@@ -8,7 +8,9 @@ Decyzje:
   odmowa      zakazane zawsze (narzędzie wyłączone, sekret w tekście, zła aplikacja),
   czlowiek    to kliknięcie albo wpis robi właściciel w Ekranie HQ (płatność, zakup, logowanie, wysyłka,
               publikacja, hasło, karta, BLIK, kod 2FA),
-  wstrzymane  właściciel zatrzymał Komputer; patrzeć wolno, działać nie.
+  wstrzymane  Komputer zatrzymany (właściciel: jarvo komputer pauza; Operator: czeka na właściciela);
+              patrzeć wolno, działać nie, wznawia tylko właściciel.
+Przy dwóch sesjach naraz zmieniać ekran może jedna (odmowa `zajete`, wejscie.py: Ekran.zajmij).
 
 Cel działania (pole, przycisk) opisuje słownik z wejscie.py: rola i nazwa z drzewa dostępności, atrybuty HTML
 z AT-SPI (tag, html-input-name, text-input-type), przodkowie (rola, nazwa) do kilku poziomów w górę i przy polach
@@ -46,6 +48,11 @@ DOSTEPNE = ODCZYT | SESJA | DZIALANIA
 # zmieniają tylko stan sesji sterownika, nie ekran: wolno je też przy pauzie
 SESJA_BEZ_EKRANU = frozenset({"start_session", "end_session", "escalate_session", "set_config",
                               "set_agent_cursor_enabled", "set_agent_cursor_motion", "set_agent_cursor_theme"})
+
+# zmieniają ekran: przy dwóch sesjach naraz działa tylko jedna (wejscie.py, Ekran.zajmij)
+ZMIANY_EKRANU = DZIALANIA | (SESJA - SESJA_BEZ_EKRANU)
+# odmowy, po których agent czeka i próbuje znowu (nie szuka innej drogi)
+CZEKAJ = frozenset({"zajete", "limit"})
 
 KLUCZE_KONFIGURACJI = frozenset({"capture_scope", "capture_mode", "max_image_dimension"})
 PRZEGLADARKA = re.compile(r"^(chromium|chromium[- ]browser|chromium web browser|chromium\.desktop)$", re.I)
@@ -102,6 +109,7 @@ SEKRETY = re.compile("|".join([
     r"\bAKIA[0-9A-Z]{16}\b", r"\bASIA[0-9A-Z]{16}\b", r"\bxox[abprs]-[A-Za-z0-9-]{10,}",
     r"\bAIza[0-9A-Za-z_-]{35}\b", r"\bhf_[A-Za-z0-9]{30,}", r"\bnpm_[A-Za-z0-9]{36}\b",
     r"\b(?:rk|sk|pk)_live_[A-Za-z0-9]{20,}", r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}",
+    r"\b\d{6,12}:AA[A-Za-z0-9_-]{30,}",                     # token bota Telegrama (klucz floty)
 ]))
 KARTA = re.compile(r"(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])")
 ZNACZNIK = "[ukryte przez Komputer Jarva]"
@@ -135,6 +143,7 @@ class Werdykt:
 class Kontekst(Protocol):
     """To, co wejscie.py wie o ekranie w chwili wywołania."""
     wstrzymane: bool
+    powod_pauzy: str                  # kto i dlaczego wstrzymał (np. Operator czeka na właściciela)
 
     def cel(self, nazwa: str, args: dict) -> Optional[dict]:
         """Element, w który trafi działanie (z migawki sterownika albo z AT-SPI w punkcie), None gdy nieznany."""
@@ -358,7 +367,8 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
             return _odmowa("plik", "zapis zrzutu do pliku jest wyłączony; zrzut wraca w odpowiedzi")
         return Werdykt(TAK)
     if ctx.wstrzymane and nazwa not in SESJA_BEZ_EKRANU:
-        return Werdykt(WSTRZYMANE, "wstrzymane", "właściciel zatrzymał Komputer; patrzeć wolno, działać nie")
+        powod = getattr(ctx, "powod_pauzy", "") or "właściciel zatrzymał Komputer"
+        return Werdykt(WSTRZYMANE, "wstrzymane", f"{powod}; patrzeć wolno, działać nie")
     if nazwa == "set_config":
         klucze = {args.get("key")} if "key" in args else set(args) - {"session"}
         if not klucze or not klucze <= KLUCZE_KONFIGURACJI:
@@ -497,6 +507,9 @@ def wynik_odmowy(w: Werdykt) -> dict:
     elif w.decyzja == WSTRZYMANE:
         tekst = f"Komputer Jarva jest wstrzymany: {w.powod}. Poczekaj, aż właściciel go wznowi."
         dalej = "wait_for_owner"
+    elif w.kod in CZEKAJ:
+        tekst = f"Komputer Jarva: {w.powod}."
+        dalej = "wait_and_retry"
     else:
         tekst = f"Zablokowane przez Komputer Jarva: {w.powod}."
         dalej = "choose_another_way"

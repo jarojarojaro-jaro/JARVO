@@ -220,6 +220,7 @@ def test_tekst_z_sekretem_karta_i_zlym_adresem():
     assert kod("type_text", {"text": "zobacz chrome://flags"}, fokus=pole) == "adres"
     # sekret blokujemy także bez znanego pola
     assert kod("type_text", {"text": "AKIA" + "A" * 16}, fokus=None) == "sekret"
+    assert kod("type_text", {"text": "bot 123456789:AA" + "h" * 33}, fokus=None) == "sekret"
 
 
 def test_pisanie_na_przycisku_z_fokusem_to_jego_uruchomienie():
@@ -354,6 +355,13 @@ def test_wynik_odmowy_mowi_co_dalej():
     assert r["structuredContent"]["code"] == "wstrzymane" and r["structuredContent"]["next_step"] == "wait_for_owner"
     r = zasady.wynik_odmowy(ocen("page", {}, Ctx()))
     assert r["structuredContent"]["code"] == "zablokowane" and r["structuredContent"]["rule"] == "narzedzie"
+    ctx = Ctx(wstrzymane=True)
+    ctx.powod_pauzy = "Operator czeka na właściciela: zaloguj się do panelu"
+    r = zasady.wynik_odmowy(ocen("type_text", {"pid": 1, "text": "a"}, ctx))
+    assert "zaloguj się do panelu" in r["content"][0]["text"]
+    r = zasady.wynik_odmowy(zasady.Werdykt(zasady.ODMOWA, "zajete", "ekranem steruje inna sesja"))
+    assert r["structuredContent"]["next_step"] == "wait_and_retry"
+    assert zasady.ZMIANY_EKRANU >= zasady.DZIALANIA and not zasady.ZMIANY_EKRANU & zasady.SESJA_BEZ_EKRANU
 
 
 def test_zle_argumenty_nie_przepuszczaja():

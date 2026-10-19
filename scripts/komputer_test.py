@@ -244,6 +244,29 @@ def main() -> int:
     if xvnc:
         sprawdz(kod(k.narzedzie("kill_app", {"pid": xvnc[0]["pid"]})) == "zablokowane", "kill_app Xvnc: zablokowane")
 
+    # druga sesja (np. druga karta Operatora): patrzy, ale ekranem steruje ta, która działała ostatnio
+    k2 = Klient()
+    k2.rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
+                          "clientInfo": {"name": "komputer-test-2", "version": "1"}})
+    k2.rpc("notifications/initialized", powiadomienie=True)
+    el2 = {}
+    for e in (k2.narzedzie("get_window_state", {"pid": pid, "window_id": wid}).get("structuredContent") or {}).get(
+            "elements") or []:
+        if e.get("in_web_content") and e.get("label"):
+            el2.setdefault(e["label"], e)
+    w = k2.narzedzie("click", {"pid": pid, "window_id": wid,
+                               "element_token": (el2.get("Dodaj do koszyka") or {}).get("element_token")})
+    sprawdz(zasada(w) == "zajete" and (w.get("structuredContent") or {}).get("next_step") == "wait_and_retry",
+            "druga sesja: patrzy, ale klik dostaje „zajęte” (jedna sesja naraz)", tekst(w))
+    k2.zamknij()
+
+    # prośba Operatora do właściciela: pauza od floty z powodem
+    odp = ster("pauza", powod="Zaloguj się do sklepu testowego")
+    sprawdz((odp.get("pauza") or {}).get("kto") == "flota", "ster.sock: prośba Operatora (pauza od floty z powodem)")
+    w = klik("Dodaj do koszyka")
+    sprawdz(kod(w) == "wstrzymane" and "Zaloguj się do sklepu testowego" in tekst(w),
+            "klik przy prośbie: wstrzymane z powodem prośby", tekst(w))
+
     # pauza z HQ (ster.sock)
     sprawdz(ster("pauza").get("wstrzymane") is True, "ster.sock: pauza")
     sprawdz(kod(klik("Dodaj do koszyka")) == "wstrzymane", "klik przy pauzie: wstrzymane")
@@ -261,8 +284,8 @@ def main() -> int:
 
     dziennik = json.dumps(ster("dziennik", n=200), ensure_ascii=False)
     sprawdz('"czlowiek"' in dziennik and '"wstrzymane"' in dziennik, "dziennik ma decyzje człowiek i pauzę")
-    sprawdz("tajne-haslo" not in dziennik and "4111" not in dziennik and "Proszę o fakturę" not in dziennik,
-            "dziennik bez wpisywanych treści")
+    sprawdz("tajne-haslo" not in dziennik and "4111" not in dziennik and "Proszę o fakturę" not in dziennik
+            and "sklepu testowego" not in dziennik, "dziennik bez wpisywanych treści i bez treści prośby")
 
     k.narzedzie("end_session", {"session": "komputer-test"})
     k.zamknij()

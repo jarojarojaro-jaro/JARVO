@@ -48,6 +48,8 @@ MAKS_DZIENNIK = 2 << 20
 ROLE_PRZYCISKOW = {"push button", "button"}
 PISANIE = {"type_text", "set_value", "press_key", "hotkey"}   # cel tych narzędzi dostaje też przyciski formularza
 MAKS_FORMULARZ = 300            # elementów formularza przeglądanych przy Enterze (przyciski wysyłki)
+ZAJETE_S = 120                  # tyle sekund po ostatnim działaniu ekran należy do sesji, która działała
+MAKS_POWOD = 300                # znaków powodu pauzy (prośba Operatora do właściciela)
 
 
 def wolno_wznowic(uid: int) -> bool:
@@ -234,25 +236,82 @@ class Dostepnosc:
         return self._w_glib(szukaj) if Atspi else None
 
 
+def czysty_powod(tekst) -> str:
+    """Powód pauzy od agenta: jedna linia bez znaków sterujących, najwyżej MAKS_POWOD znaków, bez sekretów."""
+    if not isinstance(tekst, str):
+        return ""
+    tekst = "".join(z if z.isprintable() else " " for z in tekst)
+    tekst, _ = zasady.ukryj_sekrety(" ".join(tekst.split()))
+    return tekst[:MAKS_POWOD]
+
+
 class Ekran:
-    """Wspólny stan dla zasad: pauza, migawki sterownika, AT-SPI, limit działań."""
+    """Wspólny stan dla zasad: pauza (z powodem), sesja, która zajmuje ekran, AT-SPI, limit działań."""
 
     def __init__(self, dostepnosc: Dostepnosc) -> None:
         self.dostepnosc = dostepnosc
-        self.wstrzymane = os.path.exists(PAUZA)
+        self.pauza: dict | None = self._wczytaj_pauze()
         self._dzialania: deque = deque()
+        self._zajete: tuple[int, float] | None = None     # (nr sesji, czas ostatniego działania)
         self._lock = threading.Lock()
 
-    def ustaw_pauze(self, tak: bool) -> None:
-        self.wstrzymane = tak
+    @staticmethod
+    def _wczytaj_pauze() -> dict | None:
+        try:
+            with open(PAUZA, encoding="utf-8") as f:
+                tresc = f.read()
+        except FileNotFoundError:
+            return None
+        except OSError:
+            return {"kto": "wlasciciel", "powod": ""}     # nieczytelny plik pauzy: dalej pauza
+        try:
+            stan = json.loads(tresc)
+        except json.JSONDecodeError:
+            stan = None
+        if not isinstance(stan, dict):                    # stary zapis K2: sama data
+            return {"kto": "wlasciciel", "od": tresc.strip(), "powod": ""}
+        return {"kto": str(stan.get("kto") or "wlasciciel"), "od": str(stan.get("od") or ""),
+                "powod": czysty_powod(stan.get("powod"))}
+
+    @property
+    def wstrzymane(self) -> bool:
+        return self.pauza is not None
+
+    @property
+    def powod_pauzy(self) -> str:
+        if self.pauza is None:
+            return ""
+        if self.pauza["kto"] == "flota":
+            return "Operator czeka na właściciela: " + (self.pauza["powod"] or "bez opisu")
+        return "właściciel zatrzymał Komputer" + (f": {self.pauza['powod']}" if self.pauza["powod"] else "")
+
+    def ustaw_pauze(self, tak: bool, powod: str = "", kto: str = "wlasciciel") -> None:
         if tak:
+            stan = {"kto": kto, "od": datetime.now(timezone.utc).isoformat(), "powod": czysty_powod(powod)}
             with open(PAUZA, "w", encoding="utf-8") as f:
-                f.write(datetime.now(timezone.utc).isoformat() + "\n")
+                f.write(json.dumps(stan, ensure_ascii=False) + "\n")
+            self.pauza = stan
         else:
             try:
                 os.unlink(PAUZA)
             except FileNotFoundError:
                 pass
+            self.pauza = None
+
+    def zajmij(self, nr: int) -> float | None:
+        """Sesja `nr` chce zmienić ekran: None, gdy wolno (ekran jest odtąd jej), albo ile sekund temu działała
+        sesja, która go zajmuje. Ekran zwalnia koniec tamtej sesji albo ZAJETE_S bez jej działań."""
+        teraz = time.monotonic()
+        with self._lock:
+            if self._zajete and self._zajete[0] != nr and teraz - self._zajete[1] < ZAJETE_S:
+                return teraz - self._zajete[1]
+            self._zajete = (nr, teraz)
+            return None
+
+    def zwolnij(self, nr: int) -> None:
+        with self._lock:
+            if self._zajete and self._zajete[0] == nr:
+                self._zajete = None
 
     def limit(self) -> bool:
         """True, gdy w ostatniej minucie było już LIMIT_DZIALAN działań."""
@@ -277,6 +336,10 @@ class KontekstSesji:
     @property
     def wstrzymane(self) -> bool:
         return self.ekran.wstrzymane
+
+    @property
+    def powod_pauzy(self) -> str:
+        return self.ekran.powod_pauzy
 
     def zapamietaj(self, args: dict, sc: dict) -> None:
         sid = sc.get("snapshot_id")
@@ -487,6 +550,12 @@ class Sesja:
         except Exception as e:  # noqa: BLE001 - błąd zasady to odmowa, nigdy przepuszczenie
             log(f"sesja {self.nr}: błąd zasady dla {nazwa}: {e!r}")
             return zasady.Werdykt(zasady.ODMOWA, "blad_zasady", "wewnętrzny błąd zasad; działanie wstrzymane")
+        if w.wolno and nazwa in zasady.ZMIANY_EKRANU:
+            temu = self.wejscie.ekran.zajmij(self.nr)
+            if temu is not None:
+                return zasady.Werdykt(zasady.ODMOWA, "zajete",
+                                      f"ekranem steruje teraz inna sesja Operatora (działała {int(temu)} s temu); "
+                                      f"poczekaj, aż skończy (ekran zwalnia się po {ZAJETE_S} s bez jej działań)")
         if w.wolno and nazwa in zasady.DZIALANIA and self.wejscie.ekran.limit():
             return zasady.Werdykt(zasady.ODMOWA, "limit", f"ponad {LIMIT_DZIALAN} działań na minutę; zwolnij")
         return w
@@ -500,7 +569,7 @@ class Sesja:
         if w.cel:
             wpis["cel"] = w.cel[:100]
         wpis.update(w.dane)
-        if w.decyzja != zasady.TAK:
+        if w.decyzja not in (zasady.TAK, zasady.WSTRZYMANE):    # powód pauzy to prośba Operatora: tylko w stanie
             wpis["powod"] = w.powod[:200]
         self.wejscie.dziennik.zapisz(wpis)
 
@@ -593,6 +662,7 @@ class Wejscie:
                                DO_NOT_TRACK="1", CUA_DRIVER_RS_UPDATE_CHECK="false", RUST_LOG="error")
 
     def koniec_sesji(self, sesja: Sesja) -> None:
+        self.ekran.zwolnij(sesja.nr)
         with self._lock:
             if sesja in self.sesje:
                 self.sesje.discard(sesja)
@@ -653,14 +723,20 @@ class Wejscie:
                                            ensure_ascii=False) + "\n").encode())
                 return
             if co == "pauza":
-                self.ekran.ustaw_pauze(True)
-                self.dziennik.zapisz({"narzedzie": "ster", "decyzja": "pauza"})
+                # pauza od floty to prośba Operatora do właściciela (powód widać w stanie, nie w dzienniku);
+                # pauzy właściciela flota nie nadpisze swoją
+                kto = "wlasciciel" if wolno_wznowic(uid) else "flota"
+                if not (kto == "flota" and self.ekran.pauza and self.ekran.pauza["kto"] == "wlasciciel"):
+                    self.ekran.ustaw_pauze(True, polecenie.get("powod", ""), kto)
+                self.dziennik.zapisz({"narzedzie": "ster", "decyzja": "pauza", "kto": kto})
             elif co == "wznow":
                 self.ekran.ustaw_pauze(False)
                 self.dziennik.zapisz({"narzedzie": "ster", "decyzja": "wznow"})
             if co in {"stan", "pauza", "wznow"}:
                 odp = {"ok": True, "wstrzymane": self.ekran.wstrzymane, "sesje": len(self.sesje),
                        "atspi": self.ekran.dostepnosc.dziala}
+                if self.ekran.pauza:
+                    odp["pauza"] = dict(self.ekran.pauza, opis=self.ekran.powod_pauzy)
             elif co == "dziennik":
                 n = polecenie.get("n", 50)
                 n = n if isinstance(n, int) and 0 < n <= 200 else 50

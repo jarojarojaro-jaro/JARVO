@@ -135,6 +135,7 @@ class Klient:
         return self.rpc("tools/call", {"name": nazwa, "arguments": args})["result"]
 
     def zamknij(self) -> None:
+        self.f.close()                  # makefile trzyma deskryptor: bez tego wejście nie zobaczy końca połączenia
         self.s.close()
 
 
@@ -239,8 +240,10 @@ def test_pauza_limit_i_dziennik(komputer, monkeypatch):
     k = Klient(wejscie.CUA)
     k.rpc("initialize")
     k.narzedzie("get_window_state", {"pid": 7, "window_id": 3})
-    assert ster(wejscie.STER, "pauza") == {"ok": True, "wstrzymane": True, "sesje": 1, "atspi": False}
+    odp = ster(wejscie.STER, "pauza")
+    assert (odp["ok"], odp["wstrzymane"], odp["sesje"], odp["pauza"]["kto"]) == (True, True, 1, "wlasciciel")
     assert os.path.exists(wejscie.PAUZA)                       # pauza przetrwa restart wejścia
+    assert wejscie.Ekran(Dostepnosc()).wstrzymane
     assert kod(k.narzedzie("click", {"element_token": "s1:2"})) == "wstrzymane"
     assert kod(k.narzedzie("get_window_state", {"pid": 7, "window_id": 3})) == "ok"
     # agent floty (inny uid) pauzy nie zdejmie
@@ -285,3 +288,58 @@ def test_bramka_floty_pompuje_do_wejscia(komputer):
     assert p.returncode == 0
     assert "Komputer Jarva" in odp[1]["result"]["instructions"]
     assert odp[2]["result"]["structuredContent"]["code"] == "zablokowane"
+
+
+def test_prosba_operatora_to_pauza_z_powodem(komputer, monkeypatch):
+    """Operator oddaje ekran właścicielowi: pauza od floty z powodem; wznawia tylko właściciel."""
+    k = Klient(wejscie.CUA)
+    k.rpc("initialize")
+    k.narzedzie("get_window_state", {"pid": 7, "window_id": 3})
+    with monkeypatch.context() as m:
+        m.setattr(wejscie, "wolno_wznowic", lambda uid: False)
+        odp = ster(wejscie.STER, "pauza", powod="Zaloguj się do panelu\nsklepu, klucz " + KLUCZ)
+        assert odp["pauza"]["kto"] == "flota" and "\n" not in odp["pauza"]["powod"]
+        assert KLUCZ not in json.dumps(odp) and odp["pauza"]["opis"].startswith("Operator czeka na właściciela: Zaloguj")
+        w = k.narzedzie("click", {"element_token": "s1:2"})
+        assert kod(w) == "wstrzymane" and "Zaloguj się do panelu" in w["content"][0]["text"]
+        assert w["structuredContent"]["next_step"] == "wait_for_owner"
+        assert ster(wejscie.STER, "wznow")["wstrzymane"] is True
+    assert "Zaloguj" not in open(wejscie.DZIENNIK, encoding="utf-8").read()       # powód tylko w stanie, nie w dzienniku
+    # pauzy właściciela flota nie nadpisze swoją prośbą
+    ster(wejscie.STER, "pauza", powod="przerwa")
+    with monkeypatch.context() as m:
+        m.setattr(wejscie, "wolno_wznowic", lambda uid: False)
+        assert ster(wejscie.STER, "pauza", powod="inna prośba")["pauza"]["kto"] == "wlasciciel"
+    assert ster(wejscie.STER, "stan")["pauza"]["opis"] == "właściciel zatrzymał Komputer: przerwa"
+    assert ster(wejscie.STER, "wznow")["wstrzymane"] is False and "pauza" not in ster(wejscie.STER, "stan")
+    # stary plik pauzy z K2 (sama data) dalej wstrzymuje
+    with open(wejscie.PAUZA, "w", encoding="utf-8") as f:
+        f.write("2026-10-19T10:00:00+00:00\n")
+    assert wejscie.Ekran(Dostepnosc()).powod_pauzy == "właściciel zatrzymał Komputer"
+    k.zamknij()
+
+
+def test_ekranem_steruje_jedna_sesja_naraz(komputer, monkeypatch):
+    a, b = Klient(wejscie.CUA), Klient(wejscie.CUA)
+    for k in (a, b):
+        k.rpc("initialize")
+        k.narzedzie("get_window_state", {"pid": 7, "window_id": 3})          # patrzeć wolno obu
+    assert kod(a.narzedzie("click", {"element_token": "s1:2"})) == "ok"
+    w = b.narzedzie("click", {"element_token": "s1:2"})
+    assert zasada(w) == "zajete" and w["structuredContent"]["next_step"] == "wait_and_retry"
+    assert kod(b.narzedzie("get_window_state", {"pid": 7, "window_id": 3})) == "ok"
+    assert kod(a.narzedzie("click", {"element_token": "s1:2"})) == "ok"
+    a.zamknij()                                                             # koniec sesji zwalnia ekran
+    for _ in range(300):
+        if len(komputer.wejscie.sesje) == 1:
+            break
+        time.sleep(0.02)
+    assert kod(b.narzedzie("click", {"element_token": "s1:2"})) == "ok"
+    c = Klient(wejscie.CUA)
+    c.rpc("initialize")
+    c.narzedzie("get_window_state", {"pid": 7, "window_id": 3})
+    assert zasada(c.narzedzie("click", {"element_token": "s1:2"})) == "zajete"
+    monkeypatch.setattr(wejscie, "ZAJETE_S", 0)                             # sesja bez działań oddaje ekran
+    assert kod(c.narzedzie("click", {"element_token": "s1:2"})) == "ok"
+    b.zamknij()
+    c.zamknij()
