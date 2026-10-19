@@ -89,6 +89,7 @@ if [[ $REBUILD -eq 1 ]] && bash "$ROOT/scripts/obraz.sh" pobierz "$COMPOSE_DIR";
 fi
 if [[ $REBUILD -eq 1 ]]; then
   log "Budowa obrazu jarvo-hermes (narzędzia agentów)"
+  docker buildx version >/dev/null 2>&1 || fail "Brak wtyczki docker buildx: docker compose build bez niej nie ruszy. Uruchom jarvo update (instalator ją doinstaluje)."
   BUILD_ARGS=(); [[ $PULLBASE -eq 1 ]] && BUILD_ARGS+=(--pull)
   "${COMPOSE[@]}" build "${BUILD_ARGS[@]}" hermes
   # z której wersji infra/ zbudowano obraz (local-up przebudowuje tylko, gdy się zmieniła)
@@ -121,6 +122,7 @@ if [[ $KOMPUTER -eq 1 && $NOBUILD -eq 0 ]]; then
   if [[ "$(cat "$COMPOSE_DIR/.komputer-tree" 2>/dev/null)" != "$komputer_tree" ]] \
      || ! docker image inspect jarvo-komputer:local >/dev/null 2>&1; then
     log "Budowa obrazu Komputera Jarva (pulpit, Chromium, sterownik ekranu)"
+    docker buildx version >/dev/null 2>&1 || fail "Brak wtyczki docker buildx (budowa obrazu Komputera). Uruchom jarvo update."
     "${COMPOSE[@]}" build komputer && echo "$komputer_tree" > "$COMPOSE_DIR/.komputer-tree"
   fi
 fi

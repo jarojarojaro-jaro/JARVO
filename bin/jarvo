@@ -356,6 +356,11 @@ cmd_android() {
 komputer_tree() { git -C "$ROOT" rev-parse HEAD:infra/komputer 2>/dev/null || echo brak; }
 komputer_obraz() {   # komputer_obraz [--od-nowa]: zbuduj obraz, gdy go nie ma albo zmieniło się infra/komputer/
   local tree; tree="$(komputer_tree)"
+  if [[ "${1:-}" == --od-nowa ]] || [[ "$(cat "$L/compose/.komputer-tree" 2>/dev/null)" != "$tree" ]] \
+     || ! docker image inspect jarvo-komputer:local >/dev/null 2>&1; then
+    docker buildx version >/dev/null 2>&1 \
+      || die "Brak wtyczki docker buildx (budowa obrazu Komputera). Uruchom jarvo update: instalator ją doinstaluje."
+  fi
   if [[ "${1:-}" == --od-nowa ]]; then
     say "Buduję Komputer od nowa z bieżącymi poprawkami Debiana i Chromium (kilka minut)"
     compose --profile komputer build --pull --no-cache komputer

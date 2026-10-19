@@ -77,8 +77,9 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
 
 ### Linux (zrobione, §4a)
 1. Menedżer pakietów (`apt`, `dnf`/`yum`, `pacman`, `zypper`) doinstalowuje `git curl python3 openssl`.
-2. Docker Engine z oficjalnego skryptu (`get.docker.com`; Arch i openSUSE z pakietów), `docker compose` v2,
-   użytkownik do grupy `docker`; do ponownego zalogowania polecenie `jarvo` samo uruchamia się przez
+2. Docker Engine z oficjalnego skryptu (`get.docker.com`; Arch i openSUSE z pakietów), `docker compose` v2
+   i wtyczka `docker buildx` (Docker z pakietów dystrybucji, np. `docker.io`, bywa bez niej, a `docker compose build`
+   obrazu Komputera bez niej nie ruszy), użytkownik do grupy `docker`; do ponownego zalogowania polecenie `jarvo` samo uruchamia się przez
    `sg docker`, więc instalacja nie czeka na wylogowanie.
 3. `jarvo up` (`local-up.sh`) jak dotąd. Autostart: kontenery wstają same z Dockerem
    (`restart: unless-stopped`), a pomocnik aktualizacji jako usługa `systemd --user`
@@ -89,10 +90,11 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
    jedno hasło `sudo`), potem `brew install bash git python openssl@3` i `brew shellenv` w `~/.zprofile`.
    macOS starszy niż 12 kończy się komunikatem (Homebrew i Colima go nie wspierają); instalacja jako root odmawia.
 2. Runtime Dockera: **jeśli `docker info` już działa** (Docker Desktop, OrbStack, Colima), używamy go; jest
-   Docker Desktop, ale wyłączony → `open -a Docker`. Inaczej **Colima** (`brew install colima docker docker-compose`,
+   Docker Desktop, ale wyłączony → `open -a Docker`. Inaczej **Colima** (`brew install colima docker docker-compose docker-buildx`,
    `colima start --cpu N --memory M --disk 60 --vm-type vz --mount-type virtiofs`; macOS 12: `qemu`):
    darmowa, bez klikania, bez licencji. Rozmiar VM z maszyny: procesory połowa (2–6), RAM 8 GB przy ≥16 GB,
-   6 GB przy ≥12 GB, inaczej 5 GB. Wtyczka `docker compose` z Homebrew dopisana do `~/.docker/config.json`.
+   6 GB przy ≥12 GB, inaczej 5 GB. Wtyczki `docker compose` i `docker buildx` z Homebrew dopisane do
+   `~/.docker/config.json` (`cliPluginsExtraDirs`); działający Docker bez którejś z nich dostaje ją z Homebrew.
 3. Dane floty w **nazwanych wolumenach Dockera** (`jarvo-hermes-data`, `jarvo-valkey-data`, `jarvo-build`) zamiast
    katalogów `~/jarvo-local/data` (decyzja I1): znika problem uid 10000 między macOS a VM. Ten sam
    `docker-compose.yml` (`${JARVO_VOL_HERMES:-…}`); wybór przy pierwszym `jarvo up` (`JARVO_VOLUMES=1`, na macOS

@@ -111,7 +111,7 @@ def test_dry_run_fedora_and_arch(tmp_path):
     arch = _dry(tmp_path / "a", _os_release(tmp_path, "manjaro", "arch"))
     assert arch.returncode == 0, arch.stdout + arch.stderr
     assert "pacman -Sy --noconfirm --needed git curl python openssl" in arch.stdout
-    assert "pacman -Sy --noconfirm --needed docker docker-compose" in arch.stdout
+    assert "pacman -Sy --noconfirm --needed docker docker-compose docker-buildx" in arch.stdout
 
 
 def test_dry_run_unknown_distro_stops_with_instructions(tmp_path):
@@ -130,6 +130,18 @@ def test_dry_run_with_docker_present_skips_install(tmp_path):
     assert res.returncode == 0, res.stdout + res.stderr
     assert "get.docker.com" not in res.stdout and "Docker: 29.0" in res.stdout
     assert "usermod" not in res.stdout and "groupadd" not in res.stdout   # Docker działa jako użytkownik: bez grupy i sudo do Dockera
+
+
+def test_dry_run_docker_without_buildx_gets_plugin(tmp_path):
+    """Docker z pakietów dystrybucji (docker.io) bywa bez buildx: doinstalowujemy, bo compose build go wymaga."""
+    bin_dir = tmp_path / "shims"
+    bin_dir.mkdir()
+    _shim(bin_dir, "docker", 'case "$1 $2" in "compose version"|"info ") exit 0;; "buildx version") exit 1;; version*) echo 29.0;; esac\n')
+    hide = ("git", "curl", "python3", "openssl")
+    res = _dry(tmp_path, _os_release(tmp_path, "ubuntu", "debian"), hide=hide,
+               PATH=str(bin_dir) + ":" + str(_bare_path(tmp_path / "p", hide=hide)))
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "apt-get install -y -q docker-buildx-plugin" in res.stdout and "get.docker.com" not in res.stdout
 
 
 def _mac_shims(tmp_path: Path, ram_gb: int = 16, ver: str = "14.5") -> Path:
@@ -160,7 +172,7 @@ def test_dry_run_macos_installs_brew_and_colima(tmp_path):
     # hasło raz, przed instalatorem Homebrew (tryb bez pytań wymaga zapamiętanego sudo)
     assert "$ sudo -v" in out and out.index("$ sudo -v") < out.index("Homebrew/install")
     assert "brew install -q bash git python openssl@3" in out
-    assert "brew install -q colima docker docker-compose" in out
+    assert "brew install -q colima docker docker-compose docker-buildx" in out   # buildx: jarvo komputer on
     # połowa procesorów, 8 GB przy 16 GB RAM, Virtualization.framework
     assert "colima start --cpu 4 --memory 8 --disk 60 --vm-type vz --mount-type virtiofs" in out
     assert "git clone -q --depth 50 -b main" in out and "bin/jarvo up" in out
@@ -172,7 +184,7 @@ def test_dry_run_macos_small_and_old(tmp_path):
     res = _dry_mac(tmp_path, ram_gb=8, ver="12.7")
     assert res.returncode == 0, res.stdout + res.stderr
     # macOS 12: bez vz, QEMU z Homebrew; 8 GB RAM: maszyna wirtualna 5 GB
-    assert "colima docker docker-compose qemu" in res.stdout
+    assert "colima docker docker-compose docker-buildx qemu" in res.stdout
     assert "--memory 5 --disk 60 --vm-type qemu" in res.stdout
     res = _dry_mac(tmp_path / "s", ver="11.7")
     assert res.returncode == 1 and "macOS 12" in res.stderr
@@ -187,6 +199,12 @@ def test_dry_run_macos_docker_running_keeps_it(tmp_path):
     assert res.returncode == 0, res.stdout + res.stderr
     assert "Docker: 28.1 (już działa: desktop-linux)" in res.stdout
     assert "colima" not in res.stdout and "Homebrew/install" not in res.stdout
+    assert "install -q docker-buildx" not in res.stdout
+    # Colima z wcześniejszej instalacji bez buildx: doinstalowana wtyczka i katalog wtyczek w ~/.docker/config.json
+    _shim(shims, "docker", 'case "$1 $2" in "compose version"|"info ") exit 0;; "buildx version") exit 1;; version*) echo 28.1;; context*) echo colima;; esac\n')
+    res = _dry_mac(tmp_path / "bez-buildx", extra_shims=shims)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "brew install -q docker-buildx" in res.stdout and "colima start" not in res.stdout
 
 
 def test_token_never_printed_and_used_for_git(tmp_path):

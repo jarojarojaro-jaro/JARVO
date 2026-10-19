@@ -48,7 +48,7 @@ DOCKER_SCRIPT="https://get.docker.com"
 BREW_SCRIPT="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
 # wersja wymagań hosta (programy poza obrazem floty: Docker, Colima, git, Python…). Zmiana tego, co ten skrypt
 # instaluje na komputerze = +1; deploy.sh porównuje ją z zapisaną przy instalacji i prosi o `jarvo update`.
-HOST_VERSION=2
+HOST_VERSION=3
 TOKEN="${JARVO_TOKEN:-}"
 
 if [[ -t 1 ]]; then R=$'\e[38;2;212;33;61m'; W=$'\e[1;38;2;242;241;232m'; G=$'\e[38;2;184;255;61m'; Y=$'\e[33m'; D=$'\e[2m'; N=$'\e[0m'
@@ -229,7 +229,7 @@ mac_vm_size() {   # procesory i pamięć dla maszyny wirtualnej Colimy: połowa 
   if (( ram >= 16 )); then COLIMA_MEM=8; elif (( ram >= 12 )); then COLIMA_MEM=6; else COLIMA_MEM=5; fi
 }
 
-mac_compose_plugin() {   # docker compose z Homebrew to wtyczka CLI: Docker musi wiedzieć, gdzie jej szukać
+mac_compose_plugin() {   # docker compose i buildx z Homebrew to wtyczki CLI: Docker musi wiedzieć, gdzie ich szukać
   local cfg="$HOME/.docker/config.json" dir
   dir="$("$BREW" --prefix 2>/dev/null || echo /opt/homebrew)/lib/docker/cli-plugins"
   [[ $DRY == 1 ]] && { run python3 - "$cfg" "$dir"; return; }
@@ -247,7 +247,10 @@ PY
 
 mac_docker() {
   if have docker && docker info >/dev/null 2>&1; then
-    docker compose version >/dev/null 2>&1 || { run "$BREW" install -q docker-compose; mac_compose_plugin; }
+    local brak=()
+    docker compose version >/dev/null 2>&1 || brak+=(docker-compose)
+    docker buildx version >/dev/null 2>&1 || brak+=(docker-buildx)   # Colima postawiona wcześniej bez buildx
+    if (( ${#brak[@]} )); then run "$BREW" install -q "${brak[@]}"; mac_compose_plugin; fi
     say "Docker: $(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok) (już działa: $(docker context show 2>/dev/null || echo domyślny))"
     return
   fi
@@ -262,7 +265,8 @@ mac_docker() {
     fi
   fi
   local need=() f
-  for f in colima docker docker-compose; do
+  # docker-buildx: docker compose build (Komputer Jarva, obraz floty bez rejestru) bez tej wtyczki nie ruszy
+  for f in colima docker docker-compose docker-buildx; do
     if [[ $DRY == 1 ]] || ! "$BREW" list --formula "$f" >/dev/null 2>&1; then need+=("$f"); fi
   done
   # Virtualization.framework (vz) jest od macOS 13; starszy system potrzebuje QEMU
@@ -285,6 +289,7 @@ mac_docker() {
     for _ in $(seq 30); do docker info >/dev/null 2>&1 && break; sleep 1; done
     docker info >/dev/null 2>&1 || die "Docker w Colimie nie odpowiada (colima status, docker context ls)."
     docker compose version >/dev/null 2>&1 || die "Brak docker compose (brew install docker-compose; ~/.docker/config.json: cliPluginsExtraDirs)."
+    docker buildx version >/dev/null 2>&1 || die "Brak docker buildx (brew install docker-buildx; ~/.docker/config.json: cliPluginsExtraDirs)."
     [[ -d $L ]] && touch "$L/.colima"   # instalator postawił Colimę: jarvo uninstall --all może ją zatrzymać
   fi
   say "Docker: Colima ($(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok))"
@@ -325,7 +330,7 @@ docker_install() {
       else curl -fsSL "$DOCKER_SCRIPT" -o "$tmp" || die "Nie udało się pobrać $DOCKER_SCRIPT."; fi
       penv sh "$tmp"
       rm -f "$tmp" ;;
-    pacman) pkg_install docker docker-compose ;;
+    pacman) pkg_install docker docker-compose docker-buildx ;;
     zypper) pkg_install docker docker-compose ;;
     *) die "Nie umiem zainstalować Dockera na tej dystrybucji. Zainstaluj sam: https://docs.docker.com/engine/install/ i uruchom polecenie ponownie." ;;
   esac
@@ -338,6 +343,15 @@ compose_install() {
     pacman|zypper) pkg_install docker-compose ;;
     *) die "Brak docker compose v2. Zaktualizuj Dockera: https://docs.docker.com/compose/install/" ;;
   esac
+}
+
+buildx_install() {   # wtyczka buildx: bez niej docker compose build (Komputer Jarva, obraz floty bez rejestru) nie ruszy
+  say "Doinstalowuję docker buildx (budowa obrazów)…"
+  case "$PKG" in
+    apt|dnf|yum) pkg_install docker-buildx-plugin || pkg_install docker-buildx ;;   # repo Dockera albo pakiet dystrybucji
+    pacman|zypper) pkg_install docker-buildx ;;
+    *) false ;;
+  esac || warn "Bez docker buildx: obraz floty pobierzesz z rejestru, ale budowa na miejscu (jarvo komputer on) nie ruszy. Zainstaluj pakiet docker-buildx i uruchom polecenie ponownie."
 }
 
 docker_group() {   # użytkownik bez roota dostaje grupę docker; ta sesja logowania jeszcze jej nie ma (jarvo radzi sobie przez sg)
@@ -364,6 +378,7 @@ docker_check() {
   # Docker już działa jako Ty (Docker Desktop z integracją WSL, wcześniejsza instalacja): nic do roboty, zero sudo
   if have docker && docker info >/dev/null 2>&1; then
     docker compose version >/dev/null 2>&1 || compose_install
+    docker buildx version >/dev/null 2>&1 || buildx_install
     say "Docker: $(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok)"
     return
   fi
@@ -372,6 +387,7 @@ docker_check() {
     [[ $DRY == 1 ]] && return
   fi
   docker compose version >/dev/null 2>&1 || compose_install
+  docker buildx version >/dev/null 2>&1 || buildx_install
   docker_group
   if ! docker_wait 3; then
     docker_start
