@@ -70,7 +70,9 @@ macOS    curl -fsSL https://jarvo.pl/install.sh | bash
 Windows  irm https://jarvo.pl/install.ps1 | iex        (PowerShell, jako zwykły użytkownik)
 ```
 
-(Repo jest publiczne. `jarvo.pl/install.sh` i `jarvo.pl/install.ps1` to przekierowanie w `site/.htaccess` na
+(Repo jest publiczne. Dopóki strona nie jest wgrana (`scripts/deploy-site.sh`), działa pełny adres
+`https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh` (i `.ps1`), podany w README.
+`jarvo.pl/install.sh` i `jarvo.pl/install.ps1` to przekierowanie w `site/.htaccess` na
 `https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh` (i `.ps1`), więc domena zawsze podaje
 najnowszy instalator z `main` bez ponownego wgrywania strony; `curl -L`, `wget` i `irm` idą za przekierowaniem.
 Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywatnej kopii repo pyta o klucz dostępu.)
@@ -89,6 +91,8 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
 1. Homebrew, gdy brak (oficjalny skrypt w trybie `NONINTERACTIVE=1`; sam instaluje narzędzia Xcode bez okna;
    jedno hasło `sudo`), potem `brew install bash git python openssl@3` i `brew shellenv` w `~/.zprofile`.
    macOS starszy niż 12 kończy się komunikatem (Homebrew i Colima go nie wspierają); instalacja jako root odmawia.
+   Mac z Intelem i macOS 12–14 dostają ostrzeżenie: od 09.2026 Homebrew ma gotowe paczki tylko dla Apple Silicon
+   z macOS 15+ (Tier 1), reszta kompiluje się na miejscu (dłużej; na Intelu krócej z Docker Desktop albo OrbStack).
 2. Runtime Dockera: **jeśli `docker info` już działa** (Docker Desktop, OrbStack, Colima), używamy go; jest
    Docker Desktop, ale wyłączony → `open -a Docker`. Inaczej **Colima** (`brew install colima docker docker-compose docker-buildx`,
    `colima start --cpu N --memory M --disk 60 --vm-type vz --mount-type virtiofs`; macOS 12: `qemu`):
@@ -158,7 +162,7 @@ i checklistę, Ty wklejasz polecenie i przysyłasz log).
 
 Zbudowane 2026-09-30 (pliki w §1):
 - `install.sh` od nowa: całość w `main()` (bash wykonuje dopiero po pobraniu w całości), wykrywanie systemu,
-  procesora i dystrybucji, sprawdzenie RAM (minimum 4 GB, polecane 8) i dysku (minimum 10 GB, polecane 20;
+  procesora i dystrybucji, sprawdzenie RAM (minimum 4 GB, polecane 8) i dysku (minimum 20 GB, polecane 30;
   `JARVO_FORCE=1` wymusza), doinstalowanie brakujących programów, Docker Engine + start demona (systemd,
   `service`, w ostateczności `dockerd` w tle; WSL bez systemd dostaje `iptables-legacy`), grupa `docker`,
   wolny port 9119, klon albo aktualizacja repo (`fetch` + `checkout` + `merge --ff-only`; lokalne zmiany
@@ -239,7 +243,8 @@ Czego nie sprawdzono: prawdziwego `wsl.exe`, UAC, restartu i Windows PowerShell 
   restartu na Windowsie, wpisania klucza do modelu (albo logowania do ChatGPT w dashboardzie).
   Wszystko inne da się zautomatyzować.
 
-Wymagania sprzętowe pozostają: 8 GB RAM (kontener ma limit 5 GB), 20 GB dysku (obraz 4,8 GB + dane),
+Wymagania sprzętowe pozostają: 8 GB RAM (kontener ma limit 5 GB), 30 GB dysku (obraz floty 2,5 GB do pobrania,
+7,3 GB po rozpakowaniu, a z magazynem obrazów containerd, domyślnym od Dockera 29, 9,8 GB; Komputer Jarva 1,6 GB; dane),
 procesor x86_64 albo arm64. Na słabszej maszynie instalator ma to powiedzieć na starcie, nie po
 20 minutach. Sufit CPU kontenerów (`HERMES_CPUS`, `ANDROID_CPUS`) `deploy.sh` obniża do liczby procesorów,
 które widzi Docker (laptop z 2 rdzeniami, mały VPS, Colima z 2 CPU), bo większego Docker nie uruchomi.

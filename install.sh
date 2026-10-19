@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Instalator Jarvo: Linux, WSL2, macOS. Jedno polecenie ze strony:
 #
-#   curl -fsSL https://jarvo.pl/install.sh | bash
-#   (jarvo.pl przekierowuje na https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh)
+#   curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash   (albo jarvo.pl/install.sh)
+#   (jarvo.pl/install.sh przekierowuje na ten adres, gdy strona jest wgrana: site/.htaccess)
 #
 # Linux i WSL: sprawdza sprzęt (procesor, RAM, dysk), doinstalowuje brakujące programy (git, curl, python3,
 # openssl) menedżerem pakietów dystrybucji (apt, dnf/yum, pacman, zypper), instaluje Docker Engine
@@ -42,7 +42,9 @@ DRY="${JARVO_DRY_RUN:-0}"
 FORCE="${JARVO_FORCE:-0}"
 OS_RELEASE="${JARVO_OS_RELEASE:-/etc/os-release}"   # testy: udawana dystrybucja
 MEMINFO="${JARVO_MEMINFO:-/proc/meminfo}"             # testy: udawany RAM
-MIN_RAM_GB=4; REC_RAM_GB=8; MIN_DISK_GB=10; REC_DISK_GB=20
+# dysk: obraz floty 2,5 GB pobrania, 7,3 GB po rozpakowaniu (magazyn containerd z Dockera 29 trzyma też spakowane
+# warstwy: 9,8 GB), Komputer Jarva 1,6 GB, dane; budowa na miejscu (bez rejestru) dokłada ok. 8 GB cache
+MIN_RAM_GB=4; REC_RAM_GB=8; MIN_DISK_GB=20; REC_DISK_GB=30
 PORT=9119
 DOCKER_SCRIPT="https://get.docker.com"
 BREW_SCRIPT="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
@@ -104,6 +106,13 @@ detect_os() {
     MACVER="$( (sw_vers -productVersion 2>/dev/null || echo 0) | cut -d. -f1)"
     say "System: macOS $(sw_vers -productVersion 2>/dev/null || echo '?') ($ARCH)"
     (( MACVER == 0 || MACVER >= 12 )) || die "Potrzebny macOS 12 albo nowszy (masz $(sw_vers -productVersion)): Homebrew i Colima nie wspierają starszych."
+    # Homebrew (docs.brew.sh/Support-Tiers, od 09.2026): gotowe paczki tylko dla Apple Silicon z macOS 15+;
+    # Intel i macOS 12–14 to Tier 3, więc część programów kompiluje się na miejscu
+    if [[ $ARCH == x86_64 ]]; then
+      warn "Mac z Intelem: Homebrew nie buduje już dla niego gotowych paczek, część programów skompiluje się na miejscu (dłużej, czasem z błędem). Krócej z działającym Docker Desktop albo OrbStack."
+    elif (( MACVER > 0 && MACVER < 15 )); then
+      warn "macOS $MACVER: Homebrew ma gotowe paczki dla macOS 15 i nowszego, część programów skompiluje się na miejscu (dłużej). Polecamy aktualizację macOS."
+    fi
     # Homebrew, tymczasowe uprawnienia dla sekretów floty (grupa 10000) i polecenie jarvo potrzebują administratora
     [[ $(id -u) -eq 0 ]] && die "Na macOS uruchom instalator jako zwykły użytkownik (bez sudo): Homebrew odmawia pracy jako root."
     SUDO=sudo

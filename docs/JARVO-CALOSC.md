@@ -219,7 +219,7 @@ odrzuconą stronę publiczną zapasową przeglądarką Camoufox, skill `ostrozna
 
 ## 4. Infrastruktura (VPS)
 
-Cała flota mieści się na **1 VPS: 4 vCPU / 8 GB RAM / 80 GB**. Obraz ~4,8 GB, w spoczynku ~0,7 GB RAM.
+Cała flota mieści się na **1 VPS: 4 vCPU / 8 GB RAM / 80 GB**. Obraz ~2,5 GB do pobrania, ~7,3 GB po rozpakowaniu; w spoczynku ~0,7 GB RAM.
 
 **Obraz `jarvo-hermes`** = Hermes Agent + dobrane narzędzia. **Sidecary (docker compose):**
 - `hermes` — silnik agentów,

@@ -35,9 +35,10 @@ własną dystrybucję Linuksa `Jarvo` i Dockera w niej. Obraz floty pobiera goto
 więc nie trzeba żadnego klucza. Szczegóły: [docs/INSTALER.md](docs/INSTALER.md):
 
 ```bash
-curl -fsSL https://jarvo.pl/install.sh | bash                 # Linux, macOS (Terminal)
-# Windows (PowerShell, zwykły użytkownik):  irm https://jarvo.pl/install.ps1 | iex
-# jarvo.pl przekierowuje na: https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh (i .ps1)
+curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash   # Linux, macOS (Terminal)
+# Windows (PowerShell, zwykły użytkownik):
+#   irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
+# krótszy adres po wgraniu strony (scripts/deploy-site.sh): https://jarvo.pl/install.sh i https://jarvo.pl/install.ps1
 # bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
 # potem:      jarvo haslo | status | logs | chat | update | down | uninstall   (jarvo help: wszystkie)
 # jarvo update = git pull + ten sam instalator (nowe programy hosta, gdy wersja Jarvo ich wymaga)
@@ -57,7 +58,7 @@ Piaskownica Claude Code (kontener za proxy): `JARVO_LOCAL=<scratchpad>/jarvo-loc
 
 Wdrożenie na VPS krok po kroku: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** (bootstrap serwera, Telegram,
 sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mieści się na VPS
-**4 vCPU / 8 GB RAM / 80 GB**: obraz 4,8 GB, w spoczynku ok. 0,7 GB RAM (pomiary: [VPS.md §2](docs/VPS.md#2-rozmiar-serwera)).
+**4 vCPU / 8 GB RAM / 80 GB**: obraz 2,5 GB do pobrania (7,3 GB po rozpakowaniu), w spoczynku ok. 0,7 GB RAM (pomiary: [VPS.md §2](docs/VPS.md#2-rozmiar-serwera)).
 
 ## Mapa repo
 

@@ -455,7 +455,8 @@ cmd_komputer() {
       komputer_zdrowy || die "Komputer nie wstał w 90 s: jarvo logs komputer"
       say "Komputer Jarva działa: pulpit z Chromium, ruch tylko do internetu (bez sieci lokalnej i adresów hosta)."
       echo "  Twarde zasady działają: płatności, logowanie, hasła i kody robisz Ty; jarvo komputer pauza zatrzymuje agenta."
-      echo "  Agent Operator, podgląd ekranu w HQ i terminal dochodzą w kolejnych etapach (docs/KOMPUTER.md §2)." ;;
+      echo "  Pracuje na nim agent Operator: jarvo chat jarvo-operator (pokój Sterownia w HQ)."
+      echo "  Podgląd ekranu w HQ i terminal dochodzą w kolejnych etapach (docs/KOMPUTER.md §2)." ;;
     pauza|stop)
       ensure_docker; komputer_dziala || die "Komputer Jarva nie działa (jarvo komputer on)."
       komputer_ster pauza >/dev/null

@@ -68,8 +68,8 @@ rendering kodu (FFmpeg, HyperFrames), przeglądarki, transkrypcję i usługi.
 
 | | Zmierzone (Docker, Hermes 0.21.5) |
 |---|---|
-| obraz `jarvo-hermes` | **4,8 GB** (z tego 2,7 GB to sam obraz Hermesa; Camoufox od 2026-10 dokłada 0,4 GB: przeglądarka 0,34 GB, GTK 0,06 GB, Python 0,03 GB) + SearXNG 0,26 GB + Valkey 0,04 GB |
-| dysk na start | ok. **6,5 GB**: obrazy + model mowy 0,65 GB (pobierany przy pierwszej wiadomości głosowej) |
+| obraz `jarvo-hermes` | **2,5 GB do pobrania, 7,3 GB po rozpakowaniu** (pomiar 2026-10-19; magazyn obrazów containerd, domyślny od Dockera 29, trzyma też spakowane warstwy: 9,8 GB na dysku; z tego ok. 3 GB to sam obraz Hermesa; Camoufox od 2026-10 dokłada 0,4 GB: przeglądarka 0,34 GB, GTK 0,06 GB, Python 0,03 GB) + SearXNG 0,26 GB + Valkey 0,04 GB |
+| dysk na start | ok. **9 GB** (z magazynem containerd ok. 11,5 GB): obrazy + model mowy 0,65 GB (pobierany przy pierwszej wiadomości głosowej); Komputer Jarva +1,6 GB |
 | RAM w spoczynku | **ok. 0,7 GB**: gateway 350 MB, dashboard 185 MB, SearXNG 130 MB, Valkey 6 MB |
 
 RAM narzędzi zmierzony w kontenerze (szczyt, proces żyje tylko na czas zadania):

@@ -51,9 +51,14 @@ def test_domain_installers_redirect_to_public_repo():
     blok = ht.split("<IfModule mod_rewrite.c>")[1].split("</IfModule>")[0]
     assert "RewriteEngine On" in blok and "install" in blok
     assert '"$ROOT/$f"' not in (REPO / "scripts" / "deploy-site.sh").read_text(encoding="utf-8")
-    for doc in ["README.md", "docs/INSTALER.md"]:
-        t = (REPO / doc).read_text(encoding="utf-8")
-        assert "curl -fsSL https://jarvo.pl/install.sh | bash" in t and "irm https://jarvo.pl/install.ps1 | iex" in t, doc
+    # README podaje pełny adres (działa też przed wgraniem strony), INSTALER.md docelowy krótki
+    raw = "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install"
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    assert f"curl -fsSL {raw}.sh | bash" in readme and f"irm {raw}.ps1 | iex" in readme
+    assert "jarvo.pl/install.sh" in readme
+    t = (REPO / "docs/INSTALER.md").read_text(encoding="utf-8")
+    assert "curl -fsSL https://jarvo.pl/install.sh | bash" in t and "irm https://jarvo.pl/install.ps1 | iex" in t
+    assert f"{raw}.sh" in t
 
 
 @pytest.mark.skipif(not shutil.which("bash"), reason="brak basha")

@@ -98,7 +98,7 @@ if [[ $REBUILD -eq 1 ]]; then
   # z której wersji infra/ zbudowano obraz (local-up przebudowuje tylko, gdy się zmieniła)
   git -C "$ROOT" rev-parse HEAD:infra > "$COMPOSE_DIR/.infra-tree" 2>/dev/null || true
   git -C "$ROOT" rev-parse HEAD > "$COMPOSE_DIR/.image-src" 2>/dev/null || true
-  # poprzedni obraz jarvo-hermes (~4,4 GB) zostaje bez nazwy, a cache budowania rośnie z każdą wersją:
+  # poprzedni obraz jarvo-hermes (~7 GB) zostaje bez nazwy, a cache budowania rośnie z każdą wersją:
   # sprzątamy, żeby dysk VPS nie puchł (cache z ostatnich 7 dni zostaje dla szybkich przebudów)
   docker image prune -f >/dev/null || true
   docker builder prune -f --filter until=168h >/dev/null || true

@@ -144,11 +144,11 @@ def test_dry_run_docker_without_buildx_gets_plugin(tmp_path):
     assert "apt-get install -y -q docker-buildx-plugin" in res.stdout and "get.docker.com" not in res.stdout
 
 
-def _mac_shims(tmp_path: Path, ram_gb: int = 16, ver: str = "14.5") -> Path:
-    """Udawany macOS na Linuksie: uname, sw_vers, sysctl (procesor Apple, RAM)."""
+def _mac_shims(tmp_path: Path, ram_gb: int = 16, ver: str = "14.5", arch: str = "arm64") -> Path:
+    """Udawany macOS na Linuksie: uname, sw_vers, sysctl (procesor Apple albo Intel, RAM)."""
     d = tmp_path / "mac"
     d.mkdir(parents=True)
-    _shim(d, "uname", 'case "$1" in -s) echo Darwin;; -m) echo arm64;; *) echo Darwin;; esac\n')
+    _shim(d, "uname", f'case "$1" in -s) echo Darwin;; -m) echo {arch};; *) echo Darwin;; esac\n')
     _shim(d, "sw_vers", f'echo {ver}\n')
     _shim(d, "sysctl", f'case "$2" in hw.memsize) echo {ram_gb * 1024 ** 3};; hw.ncpu) echo 8;; esac\n')
     _shim(d, "id", 'case "$1" in -u) echo 501;; -un) echo tester;; *) echo 501;; esac\n')
@@ -157,7 +157,7 @@ def _mac_shims(tmp_path: Path, ram_gb: int = 16, ver: str = "14.5") -> Path:
 
 def _dry_mac(tmp_path: Path, extra_shims: Path | None = None, **extra) -> subprocess.CompletedProcess:
     hide = TOOLS + ("brew", "colima")
-    path = [str(_mac_shims(tmp_path, **{k: extra.pop(k) for k in ("ram_gb", "ver") if k in extra}))]
+    path = [str(_mac_shims(tmp_path, **{k: extra.pop(k) for k in ("ram_gb", "ver", "arch") if k in extra}))]
     if extra_shims:
         path.insert(0, str(extra_shims))
     path.append(str(_bare_path(tmp_path / "p", hide)))
@@ -178,6 +178,22 @@ def test_dry_run_macos_installs_brew_and_colima(tmp_path):
     assert "git clone -q --depth 50 -b main" in out and "bin/jarvo up" in out
     assert "/opt/homebrew/bin/jarvo" in out   # polecenie w katalogu Homebrew: bez sudo
     assert "apt-get" not in out and "get.docker.com" not in out
+
+
+def test_dry_run_macos_homebrew_tier3_warning(tmp_path):
+    """Homebrew ma gotowe paczki tylko dla Apple Silicon z macOS 15+; Intel i macOS 12–14 kompilują na miejscu."""
+    assert "macOS 14: Homebrew ma gotowe paczki dla macOS 15" in _dry_mac(tmp_path / "a").stdout
+    assert "Homebrew" not in _dry_mac(tmp_path / "b", ver="15.4").stdout.split("Instaluję Homebrew")[0]
+    intel = _dry_mac(tmp_path / "c", ver="15.4", arch="x86_64")
+    assert intel.returncode == 0 and "Mac z Intelem" in intel.stdout and "System: macOS 15.4 (x86_64)" in intel.stdout
+
+
+def test_disk_thresholds(tmp_path):
+    """Obraz floty po rozpakowaniu ma ok. 7 GB (z warstwami spakowanymi 9,8 GB): minimum 20 GB, polecane 30."""
+    low = _dry(tmp_path / "a", _os_release(tmp_path, "ubuntu"), JARVO_DISK_GB="15")
+    assert low.returncode == 1 and "Za mało miejsca (15 GB)" in low.stderr
+    mid = _dry(tmp_path / "b", _os_release(tmp_path, "ubuntu"), JARVO_DISK_GB="25")
+    assert mid.returncode == 0 and "Polecamy 30 GB wolnego miejsca" in mid.stdout
 
 
 def test_dry_run_macos_small_and_old(tmp_path):

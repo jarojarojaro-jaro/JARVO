@@ -1,7 +1,7 @@
 # Instalator Jarvo dla Windowsa (PowerShell, zwykły użytkownik). Jedno polecenie ze strony:
 #
-#   irm https://jarvo.pl/install.ps1 | iex
-#   (jarvo.pl przekierowuje na https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1)
+#   irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex   (albo jarvo.pl/install.ps1)
+#   (jarvo.pl/install.ps1 przekierowuje na ten adres, gdy strona jest wgrana: site/.htaccess)
 #
 # Jarvo działa w Linuksie (WSL2) z Dockerem w środku. Skrypt robi wszystko sam, każdy krok pomija, gdy jest już
 # zrobiony (drugie uruchomienie = aktualizacja):
@@ -141,7 +141,8 @@ function CheckSystem {
   Say "System: Windows (kompilacja $build, $Arch), RAM $ram GB, wolne miejsce $disk GB"
   if ($ram -gt 0 -and $ram -lt 4 -and -not $Force) { Die "Za mało RAM ($ram GB): flota potrzebuje 8 GB (minimum 4). JARVO_FORCE=1 wymusza." }
   if ($ram -gt 0 -and $ram -lt 8) { Warn "Polecamy 8 GB RAM (masz $ram GB): agenci mogą działać wolniej." }
-  if ($disk -gt 0 -and $disk -lt 15 -and -not $Force) { Die "Za mało miejsca ($disk GB): Linux, obraz i dane floty potrzebują ~20 GB (minimum 15). JARVO_FORCE=1 wymusza." }
+  if ($disk -gt 0 -and $disk -lt 20 -and -not $Force) { Die "Za mało miejsca ($disk GB): Linux, obraz i dane floty potrzebują ~30 GB (minimum 20). JARVO_FORCE=1 wymusza." }
+  if ($disk -gt 0 -and $disk -lt 30) { Warn "Polecamy 30 GB wolnego miejsca (masz $disk GB): obraz floty po rozpakowaniu ma ok. 7 GB, Komputer Jarva 1,6 GB." }
 }
 
 # ---------------------------------------------------------------- WSL
