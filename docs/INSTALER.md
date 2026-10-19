@@ -243,6 +243,12 @@ Wymagania sprzętowe pozostają: 8 GB RAM (kontener ma limit 5 GB), 20 GB dysku 
 procesor x86_64 albo arm64. Na słabszej maszynie instalator ma to powiedzieć na starcie, nie po
 20 minutach. Sufit CPU kontenerów (`HERMES_CPUS`, `ANDROID_CPUS`) `deploy.sh` obniża do liczby procesorów,
 które widzi Docker (laptop z 2 rdzeniami, mały VPS, Colima z 2 CPU), bo większego Docker nie uruchomi.
+Sufit pamięci dobiera `scripts/limity.py` (przy każdym wdrożeniu i po `jarvo komputer|android on|off`): suma limitów
+włączonych kontenerów (Hermes 5 GB, Komputer 2 GB, telefon testowy 2–4 GB) mieści się w pamięci Dockera minus zapas
+na system i małe usługi; inaczej przy pełnej pracy brak pamięci kładzie całą maszynę wirtualną (dockerd i flotę),
+a nie jeden kontener. Mac z 8 GB (Colima 5 GB) z Komputerem: Hermes 2,6 GB i Komputer 1 GB; Mac z 16 GB (Colima
+8 GB): 4,7 GB i 1,9 GB. Dobrane wartości są w `compose/.env` i `compose/.limity-auto`; po zmianie pamięci Dockera
+albo wyłączeniu Komputera liczą się od nowa. Limit wpisany ręcznie (inny niż domyślny) zostaje, z ostrzeżeniem.
 
 ## 6. Protokół testu ręcznego (macOS, Windows)
 

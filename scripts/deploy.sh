@@ -64,6 +64,9 @@ if [[ "$ncpu" =~ ^[1-9][0-9]*$ ]]; then
   done
 fi
 
+# sufit pamięci: suma limitów włączonych usług mieści się w pamięci Dockera (Mac z 8 GB, mały VPS); scripts/limity.py
+python3 "$ROOT/scripts/limity.py" --compose "$COMPOSE_DIR" || true
+
 if [[ $PULL -eq 1 ]]; then
   log "git pull"
   before="$(git rev-parse HEAD)"

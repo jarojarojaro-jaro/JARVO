@@ -111,7 +111,8 @@ Nowe pliki w tym katalogu dziedziczą grupę (setgid), a przy ręcznym kopiowani
 JARVO_BIND_IP=100.101.102.103      # IP Tailscale: dashboard i panele tylko w Twojej sieci
 SEARXNG_SECRET=…                  # wygenerowany przez bootstrap, zostaw
 DASHBOARD_PASSWORD=…              # hasło do dashboardu (użytkownik: jarvo), wygenerowane przez bootstrap
-HERMES_MEM_LIMIT=5g               # sufit RAM kontenera Hermesa (VPS 8 GB); przy 16 GB można 10g
+HERMES_MEM_LIMIT=5g               # sufit RAM kontenera Hermesa (VPS 8 GB); przy 16 GB można 10g; mniej pamięci
+                                  # w Dockerze → scripts/limity.py obniża sumę limitów (compose/.limity-auto)
 HERMES_CPUS=4                      # sufit CPU; deploy.sh obniża go do liczby procesorów maszyny
 JARVO_EXTRAS=                      # opcjonalnie: rembg media office docling manim (więcej dysku, nie RAM); Wideograf: lemo mgaudio
 ```

@@ -130,7 +130,8 @@ filtr przepuści, albo iptables nie działa, Komputer nie wstaje. Potem `start.s
 `NET_ADMIN`, więc nic w kontenerze filtra już nie zmieni. Komputer ma własną sieć `jarvo-komputer-net`, bez floty.
 
 **Zasoby** (zmierzone w piaskownicy): ok. 0,25–0,3 GB pamięci w spoczynku, ok. 0,66 GB z pięcioma otwartymi
-stronami (szczyt 0,83 GB). Limity w `compose/.env`: `KOMPUTER_MEM_LIMIT` (domyślnie 2g), `KOMPUTER_CPUS`
+stronami (szczyt 0,83 GB). Limity w `compose/.env`: `KOMPUTER_MEM_LIMIT` (domyślnie 2g; gdy Docker ma mało pamięci, np. Colima 5 GB
+na Macu z 8 GB, `scripts/limity.py` dzieli ją z Hermesem: 1 GB), `KOMPUTER_CPUS`
 (2, deploy przycina do liczby rdzeni), 2048 procesów, 1 GB `/dev/shm`. Uprawnienia kontenera: wszystkie zdjęte,
 dodane tylko te do filtra, katalogów i zmiany użytkownika; `no-new-privileges`.
 

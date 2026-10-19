@@ -261,6 +261,8 @@ kvm_ok() { [[ -e /dev/kvm ]]; }
 # czy Docker naprawdę przekaże /dev/kvm kontenerowi (Docker Engine w WSL tak, Docker Desktop zależnie od wersji):
 # próbny kontener z obrazu floty, bez pobierania czegokolwiek
 kvm_docker() { docker run --rm --entrypoint "" --device /dev/kvm jarvo-hermes:local test -c /dev/kvm >/dev/null 2>&1; }
+# limity pamięci kontenerów dopasowane do pamięci Dockera po zmianie profili (scripts/limity.py); działającym od razu
+limity() { python3 "$ROOT/scripts/limity.py" --compose "$L/compose" --na-zywo || true; }
 env_profiles() { grep -E '^COMPOSE_PROFILES=' "$L/compose/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'"'" || true; }
 set_profiles() {   # set_profiles <lista po przecinku, może być pusta>
   local f="$L/compose/.env" tmp
@@ -317,6 +319,7 @@ cmd_android() {
       compose rm -f android android-emulator >/dev/null 2>&1 || true
       rest="$(without_android "$prof")"
       set_profiles "${rest:+$rest,}$profile"
+      limity
       say "Startuję telefon testowy: $kind (pierwszy raz pobranie Androida 1,5–2,7 GB i budowa ekranu, kilka minut)"
       compose --profile "$profile" up -d "$service" android-ekran
       say "Czekam, aż Android wstanie (do 4 minut)"
@@ -333,6 +336,7 @@ cmd_android() {
       compose stop android android-emulator android-ekran >/dev/null 2>&1 || true
       compose rm -f android android-emulator android-ekran >/dev/null 2>&1 || true
       set_profiles "$(without_android "$prof")"
+      limity
       say "Telefon testowy wyłączony. Zainstalowane aplikacje zostają w $L/data/android* (jarvo android on wraca do nich)." ;;
     status)
       if kvm_ok; then echo "KVM (/dev/kvm):        tak"; else echo "KVM (/dev/kvm):        nie"; fi
@@ -431,12 +435,13 @@ cmd_komputer() {
       if (( ${mem:-0} > 0 && mem < 4 )); then
         die "Docker ma ${mem} GB pamięci, a Komputer Jarva bierze w pracy do 2 GB obok floty. Potrzeba co najmniej 4 GB$([[ $OS == macos ]] && echo " (Colima: colima stop; colima start --memory 8)")."
       elif (( ${mem:-0} > 0 && mem < 8 )); then
-        warn "Docker ma ${mem} GB pamięci; Komputer bierze ok. 0,3 GB w spoczynku i do 2 GB w pracy (limit KOMPUTER_MEM_LIMIT w $L/compose/.env)."
+        warn "Docker ma ${mem} GB pamięci; Komputer bierze ok. 0,3 GB w spoczynku i do 2 GB w pracy. Limity kontenerów dopasuję do pamięci Dockera (KOMPUTER_MEM_LIMIT, HERMES_MEM_LIMIT w $L/compose/.env)."
       fi
       komputer_obraz
       set_envval KOMPUTER_BLOKADA "$(host_publiczne)"
       rest="$(tr ',' '\n' <<<"$prof" | { grep -vx komputer || true; } | paste -sd, -)"
       set_profiles "${rest:+$rest,}komputer"
+      limity
       say "Startuję Komputer Jarva"
       compose --profile komputer up -d komputer
       for _ in $(seq 1 45); do komputer_zdrowy && break; sleep 2; done
@@ -461,6 +466,7 @@ cmd_komputer() {
       compose stop komputer >/dev/null 2>&1 || true
       compose rm -f komputer >/dev/null 2>&1 || true
       set_profiles "$(tr ',' '\n' <<<"$prof" | { grep -vx komputer || true; } | paste -sd, -)"
+      limity
       say "Komputer Jarva wyłączony. Stan przeglądarki zostaje (jarvo komputer wyczysc go kasuje)." ;;
     wyczysc|clean)
       ensure_docker
