@@ -20,7 +20,8 @@
 #      ERR_CERT_AUTHORITY_INVALID; odtwarzany tylko po zmianie certyfikatu,
 #   6. Komputer Jarva (JARVO_KOMPUTER=1 albo profil komputer w compose/.env): komputer-ca:test = baza Debiana z obrazu
 #      Komputera + certyfikat proxy (curl po sterownik, Chromium przez start.sh), na niej jarvo-komputer:local;
-#      przebudowa po zmianie infra/komputer/ (.komputer-tree), tak samo jak w deploy.sh i `jarvo komputer on`,
+#      przebudowa po zmianie plików infra/komputer/ na dysku, także przed commitem (.komputer-pliki; deploy.sh
+#      i `jarvo komputer on` patrzą na commit w .komputer-tree),
 #   7. scripts/deploy.sh --no-pull --no-build (pierwszy raz z --first-run): walidacja, build dystrybucji,
 #      instalacja profili, healthchecki.
 #
@@ -142,7 +143,9 @@ if [[ "${JARVO_KOMPUTER:-0}" == 1 ]] && ! grep -qE '^COMPOSE_PROFILES=(.*,)?komp
 fi
 if grep -qE '^COMPOSE_PROFILES=(.*,)?komputer(,|$)' "$L/compose/.env"; then
   KBASE="$(sed -n 's/^ARG DEBIAN_IMAGE=//p' "$ROOT/infra/komputer/Dockerfile")"
-  KTREE="$(git -C "$ROOT" rev-parse HEAD:infra/komputer 2>/dev/null || echo brak)"
+  # pliki na dysku, nie commit: w piaskownicy testujemy zmiany w infra/komputer przed commitem
+  KTREE="$(cd "$ROOT" && git ls-files -co --exclude-standard -- infra/komputer | sort | xargs -r sha256sum 2>/dev/null \
+    | sha256sum | cut -c1-64)"
   if [[ $REBUILD -eq 1 ]] || ! docker image inspect komputer-ca:test >/dev/null 2>&1 \
      || [[ "$(docker image inspect -f '{{index .Config.Labels "pl.jarvo.baza"}}' komputer-ca:test 2>/dev/null)" != "$KBASE $CA_SHA" ]]; then
     log "komputer-ca:test (baza Komputera + certyfikat proxy)"
@@ -154,12 +157,12 @@ if grep -qE '^COMPOSE_PROFILES=(.*,)?komputer(,|$)' "$L/compose/.env"; then
       'COPY proxy-ca-*.crt /usr/local/share/ca-certificates/' 'RUN update-ca-certificates' > "$kctx/Dockerfile"
     docker build -q --build-arg DEBIAN_IMAGE="$KBASE" --build-arg BAZA="$KBASE $CA_SHA" -t komputer-ca:test "$kctx" >/dev/null
     rm -rf "$kctx"
-    rm -f "$L/compose/.komputer-tree"
+    rm -f "$L/compose/.komputer-pliki"
   fi
-  if [[ "$(cat "$L/compose/.komputer-tree" 2>/dev/null)" != "$KTREE" ]] || ! docker image inspect jarvo-komputer:local >/dev/null 2>&1; then
+  if [[ "$(cat "$L/compose/.komputer-pliki" 2>/dev/null)" != "$KTREE" ]] || ! docker image inspect jarvo-komputer:local >/dev/null 2>&1; then
     log "jarvo-komputer:local (pulpit, Chromium, cua-driver; kilka minut za pierwszym razem)"
     docker build --build-arg DEBIAN_IMAGE=komputer-ca:test -t jarvo-komputer:local "$ROOT/infra/komputer"
-    echo "$KTREE" > "$L/compose/.komputer-tree"
+    echo "$KTREE" > "$L/compose/.komputer-pliki"
     docker image prune -f >/dev/null || true
   fi
 fi
