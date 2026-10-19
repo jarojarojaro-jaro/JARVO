@@ -7,8 +7,10 @@
 #   2. gniazda w /run/jarvo-komputer (wolumen wspólny z jarvo-hermes, tam /opt/jarvo/komputer): katalog pulpit:10000
 #      2750, gniazda 0660 dla grupy 10000 (hermes); stare gniazda usuwamy;
 #   3. pulpit: Xvnc (RFB tylko na gnieździe unix, X tylko z ciasteczkiem, bez TCP i bez gniazda abstrakcyjnego),
-#      sesyjny D-Bus z AT-SPI włączonym przed Chromium, xfwm4 z kompozytorem, Chromium z drzewem dostępności
-#      (wraca po zamknięciu). Gdy padnie Xvnc, D-Bus albo xfwm4, kontener kończy się i Docker go podnosi.
+#      sesyjny D-Bus z AT-SPI włączonym przed Chromium, xfwm4 z kompozytorem;
+#   4. wejście sterownika (wejscie.py: cua.sock z twardymi zasadami, ster.sock dla HQ) i Chromium z drzewem
+#      dostępności; oba wracają po zakończeniu. Gdy padnie Xvnc, D-Bus albo xfwm4, kontener kończy się i Docker go
+#      podnosi.
 set -euo pipefail
 
 GNIAZDA=/run/jarvo-komputer
@@ -165,19 +167,34 @@ jako_pulpit xfwm4 --compositor=on --sm-client-disable &
 WM=$!
 for _ in $(seq 1 50); do jako_pulpit xprop -root _NET_SUPPORTING_WM_CHECK >/dev/null 2>&1 && break; sleep 0.1; done
 
+# 4. wejście sterownika (cua.sock, ster.sock): przed Chromium, żeby śledzenie fokusu (AT-SPI) widziało każde pole
+wejscie() {
+  while :; do
+    jako_pulpit python3 -I /opt/jarvo-komputer/wejscie.py || true
+    log "wejście sterownika zakończyło się; start ponownie za 2 s"
+    sleep 2
+  done
+}
+wejscie &
+for _ in $(seq 1 100); do [[ -S $GNIAZDA/cua.sock ]] && break; sleep 0.1; done
+[[ -S $GNIAZDA/cua.sock ]] || log "wejście sterownika jeszcze nie wstało (cua.sock)"
+
+# flagi przeglądarki w /etc/chromium.d/jarvo (infra/komputer/chromium-flagi)
 przegladarka() {
+  local pref="$DOM/.config/chromium/Default/Preferences"
   while :; do
     rm -f "$DOM"/.config/chromium/Singleton*
-    jako_pulpit chromium --no-sandbox --test-type --force-renderer-accessibility --no-first-run \
-      --no-default-browser-check --password-store=basic --disable-gpu --lang=pl --accept-lang=pl-PL,pl,en-US,en \
-      --start-maximized --user-data-dir="$DOM/.config/chromium" >/dev/null 2>&1 || true
+    # po restarcie kontenera bez dymka „Przywrócić strony?” (Chromium zamknięty przez Dockera, nie przez awarię)
+    [[ -f $pref ]] && jako_pulpit sed -i -e 's/"exit_type":"Crashed"/"exit_type":"Normal"/' \
+      -e 's/"exited_cleanly":false/"exited_cleanly":true/' "$pref"
+    jako_pulpit chromium --start-maximized >/dev/null 2>&1 || true
     sleep 2
   done
 }
 przegladarka &
 
 touch "$GOTOWY"
-log "pulpit gotowy: ekran $EKRAN, gniazdo $GNIAZDA/rfb.sock, cua-driver $(readlink /usr/local/bin/cua-driver | cut -d/ -f4)"
+log "pulpit gotowy: ekran $EKRAN, gniazda $GNIAZDA/rfb.sock i cua.sock, cua-driver $(readlink /usr/local/bin/cua-driver | cut -d/ -f4)"
 wait -n "$XVNC" "$DBUS" "$WM" || true
 rm -f "$GOTOWY"
 die "Xvnc, D-Bus albo xfwm4 się zakończył: kontener startuje od nowa"

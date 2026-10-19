@@ -19,7 +19,8 @@
   "PromptForDownloadLocation": false,
   "DownloadRestrictions": 1,
   "AutoOpenFileTypes": [],
-  "URLBlocklist": ["file://*", "javascript://*", "chrome://settings/passwords", "chrome://password-manager"],
+  "URLBlocklist": ["file://*", "javascript://*", "chrome://settings/passwords", "chrome://password-manager",
+                   "chrome://flags", "chrome://inspect", "devtools://*"],
   "RestoreOnStartup": 5,
   "WebRtcIPHandling": "default_public_interface_only"
 }

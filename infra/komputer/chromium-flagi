@@ -1,0 +1,11 @@
+# Flagi Chromium w Komputerze Jarva (Dockerfile → /etc/chromium.d/jarvo; czyta je /usr/bin/chromium przy każdym
+# uruchomieniu, także z launch_app sterownika, więc kolejne okno trafia do działającej przeglądarki):
+#   --no-sandbox --test-type  piaskownica Chromium wymaga przestrzeni nazw użytkownika albo programu setuid, a kontener
+#                             ma no-new-privileges i domyślny seccomp Dockera; granicą jest kontener (pulpit bez
+#                             uprawnień, filtr ruchu, bez kluczy floty), docs/KOMPUTER.md §7;
+#   --force-renderer-accessibility  pełne drzewo dostępności stron dla sterownika i twardych zasad wejścia;
+#   LANGUAGE=pl               polski interfejs (na Linuksie Chromium bierze język z otoczenia, --lang nie działa).
+export LANGUAGE=pl
+export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --no-sandbox --test-type --force-renderer-accessibility --no-first-run"
+export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --no-default-browser-check --password-store=basic --disable-gpu"
+export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --lang=pl --accept-lang=pl-PL,pl,en-US,en"

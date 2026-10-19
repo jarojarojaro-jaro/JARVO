@@ -4,7 +4,9 @@
 Hermes woła „cua-driver” z kilkoma czasownikami. Bramka przepuszcza tylko te, których potrzebuje narzędzie
 computer_use, i niczego nie pobiera:
   --help, --version, manifest   odpowiedzi stałe (wersja sterownika z obrazu Komputera Jarva),
-  mcp [--no-overlay]            rozmowa MCP ze sterownikiem w Komputerze Jarva (gniazdo unix, docs/KOMPUTER.md),
+  mcp [--no-overlay]            rozmowa MCP ze sterownikiem w Komputerze Jarva: bramka tylko przepuszcza bajty
+                                między Hermesem a gniazdem cua.sock; zasady sprawdza wejście w Komputerze
+                                (infra/komputer/wejscie.py, docs/KOMPUTER.md §6),
   status                        czy Komputer Jarva odpowiada.
 Odmawia wszystkiego innego, m.in. check-update i update (sterownik nie aktualizuje się sam ani nie łączy z GitHubem),
 serve (tryb bez ograniczeń: /yolo i approvals.mode off zamykają computer_use zamiast go otwierać) oraz install.
@@ -22,8 +24,8 @@ GNIAZDO = os.environ.get("JARVO_KOMPUTER_GNIAZDO", "/opt/jarvo/komputer/cua.sock
 EKRAN = os.path.join(os.path.dirname(GNIAZDO), "rfb.sock")                             # ekran Komputera (Xvnc)
 WYLACZONY = ("Komputer Jarva jest wyłączony albo jeszcze startuje. Włącz go na komputerze z Jarvem: "
              "jarvo komputer on (docs/KOMPUTER.md).")
-BEZ_KANALU = ("Komputer Jarva działa, ale kanał sterownika ekranu jeszcze nie jest gotowy "
-              "(etap K2, docs/KOMPUTER.md).")
+BEZ_KANALU = ("Komputer Jarva działa, ale wejście sterownika (cua.sock) nie odpowiada: "
+              "jarvo komputer status, jarvo logs komputer (docs/KOMPUTER.md).")
 KOD_ODMOWY = 64                        # EX_USAGE: czasownik zablokowany przez bramkę
 KOD_BRAK_KOMPUTERA = 69                # EX_UNAVAILABLE
 
@@ -70,8 +72,44 @@ def komputer_dostepny() -> bool:
     return odpowiada(GNIAZDO)
 
 
+def pompuj(sciezka: str) -> int:
+    """MCP na stdin/stdout ↔ gniazdo wejścia Komputera, bajt w bajt, aż jedna strona zamknie połączenie."""
+    import socket
+    import threading
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.connect(sciezka)
+    except OSError as e:
+        print(f"{powod_braku()} ({e.strerror})", file=sys.stderr)
+        return KOD_BRAK_KOMPUTERA
+
+    def do_komputera() -> None:
+        try:
+            while dane := os.read(0, 1 << 16):
+                s.sendall(dane)
+        except OSError:
+            pass
+        finally:
+            try:
+                s.shutdown(socket.SHUT_WR)          # koniec rozmowy: wejście zamyka sterownik i gniazdo
+            except OSError:
+                pass
+
+    threading.Thread(target=do_komputera, daemon=True).start()
+    try:
+        while dane := s.recv(1 << 16):
+            widok = memoryview(dane)
+            while widok:
+                widok = widok[os.write(1, widok):]
+    except (BrokenPipeError, ConnectionResetError):
+        pass
+    finally:
+        s.close()
+    return 0
+
+
 def powod_braku() -> str:
-    """Wyłączony Komputer albo działający pulpit bez kanału sterownika: różne rady dla właściciela."""
+    """Wyłączony Komputer albo działający pulpit bez odpowiadającego wejścia sterownika: różne rady dla właściciela."""
     return BEZ_KANALU if odpowiada(EKRAN) else WYLACZONY
 
 
@@ -93,11 +131,10 @@ def main(argv: list[str]) -> int:
         print(powod_braku(), file=sys.stderr)
         return 1
     if czas == "mcp":
-        if not komputer_dostepny():
+        if not os.path.exists(GNIAZDO):
             print(powod_braku(), file=sys.stderr)
             return KOD_BRAK_KOMPUTERA
-        print("Kanał do Komputera Jarva jeszcze nie działa (etap K2, docs/KOMPUTER.md).", file=sys.stderr)
-        return KOD_BRAK_KOMPUTERA
+        return pompuj(GNIAZDO)
     print(f"cua-driver {czas}: wyłączone w bramce Jarvo. Sterownik nie aktualizuje się ani nie instaluje sam; "
           "nową wersję wprowadza przegląd źródła (docs/SOURCES.md).", file=sys.stderr)
     return KOD_ODMOWY

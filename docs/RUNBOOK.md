@@ -274,7 +274,11 @@ w `KOMPUTER_BLOKADA` (Komputer nie sięga do nich ani do sieci lokalnej), startu
 Bierze ok. 0,3 GB w spoczynku, do 2 GB w pracy (`KOMPUTER_MEM_LIMIT`). Stan: `bin/jarvo komputer status`;
 wyłączenie: `bin/jarvo komputer off`; skasowanie zalogowań i historii: `bin/jarvo komputer wyczysc`; świeże poprawki
 Debiana i Chromium: `bin/jarvo komputer odswiez`. Gdy nie wstaje: `bin/jarvo logs komputer` (start pokazuje wynik
-próby filtra ruchu). Szczegóły: [KOMPUTER.md §5](KOMPUTER.md#5-komputer-jarva-infrakomputer-k1).
+próby filtra ruchu). Zatrzymanie agenta od razu: `bin/jarvo komputer pauza` (patrzeć może, działać nie), wznowienie
+tylko przez Ciebie: `bin/jarvo komputer wznow`; decyzje twardych zasad: `bin/jarvo komputer dziennik 50`. Test
+całej drogi flota → wejście → sterownik → Chromium po zmianie w `infra/komputer/`: `bash scripts/komputer-test.sh`
+(58 sprawdzeń, kod 0 tylko przy komplecie). Szczegóły: [KOMPUTER.md §5](KOMPUTER.md#5-komputer-jarva-infrakomputer-k1)
+i [§6](KOMPUTER.md#6-wejście-sterownika-i-twarde-zasady-infrakomputerwejsciepy-zasadypy-k2).
 
 **SSH tylko przez Tailscale** (gdy `ssh jarvo@<ip-tailscale>` działa):
 ```bash

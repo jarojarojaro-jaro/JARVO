@@ -177,8 +177,9 @@ docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/healthcheck.sh |
 if [[ $KOMPUTER -eq 1 ]]; then
   for _ in $(seq 1 45); do docker exec jarvo-komputer /opt/jarvo-komputer/zdrowie.sh >/dev/null 2>&1 && break; sleep 2; done
   if docker exec jarvo-komputer /opt/jarvo-komputer/zdrowie.sh >/dev/null 2>&1 \
-     && docker exec jarvo-hermes test -S /opt/jarvo/komputer/rfb.sock; then
-    echo "✓ Komputer Jarva: pulpit działa, flota widzi gniazdo ekranu"
+     && docker exec jarvo-hermes test -S /opt/jarvo/komputer/rfb.sock \
+     && docker exec jarvo-hermes test -S /opt/jarvo/komputer/cua.sock; then
+    echo "✓ Komputer Jarva: pulpit i wejście sterownika działają, flota widzi gniazda ekranu i wejścia"
   else
     echo "⚠ Komputer Jarva nie odpowiada (docker logs jarvo-komputer)"
   fi

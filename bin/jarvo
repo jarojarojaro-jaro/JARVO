@@ -14,6 +14,7 @@
 #   jarvo uninstall [--yes] [--all] usuń flotę (kontenery, obraz, usługę, polecenie); --all także dane, klucze i repo
 #   jarvo android on|off|status     telefon testowy Twórcy aplikacji (emulator przy KVM, Redroid przy binderze; ekran w HQ)
 #   jarvo komputer on|off|status|wyczysc|odswiez   Komputer Jarva: pulpit z Chromium dla computer use (docs/KOMPUTER.md)
+#   jarvo komputer pauza|wznow|dziennik [N]         zatrzymaj i wznów działania agenta, pokaż dziennik decyzji
 #   jarvo version             gałąź, commit i data repo
 #
 # Zmienne: JARVO_LOCAL (katalog instalacji: ~/jarvo-local albo zapisany w ~/jarvo/.jarvo-local), JARVO_YES=1
@@ -382,6 +383,37 @@ host_publiczne() {
     | sort -u | paste -sd, - || true
 }
 komputer_zdrowy() { docker exec jarvo-komputer /opt/jarvo-komputer/zdrowie.sh >/dev/null 2>&1; }
+komputer_dziala() { docker ps --format '{{.Names}}' | grep -qx jarvo-komputer; }
+# polecenie do wejścia sterownika (ster.sock): stan, pauza, wznow, dziennik. Jako pulpit, więc wznowienie przechodzi
+# (agentom floty wejście go odmawia); wynik od razu w czytelnej postaci.
+komputer_ster() {
+  docker exec -u pulpit jarvo-komputer python3 -I -c '
+import json, socket, sys
+from datetime import datetime
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(5)
+s.connect("/run/jarvo-komputer/ster.sock")
+s.sendall((json.dumps({"polecenie": sys.argv[1], "n": int(sys.argv[2])}) + "\n").encode())
+d = b""
+while not d.endswith(b"\n"):
+    k = s.recv(65536)
+    if not k:
+        break
+    d += k
+o = json.loads(d)
+tak = {True: "tak", False: "nie"}
+if "wpisy" in o:
+    for w in o["wpisy"]:
+        t = datetime.fromisoformat(w["t"]).astimezone().strftime("%d.%m %H:%M:%S") if w.get("t") else ""
+        print("%s  %-16s %-10s %s" % (t, w.get("narzedzie", ""), w.get("decyzja", ""),
+              " ".join(str(w[k]) for k in ("zasada", "cel", "powod") if w.get(k))))
+elif o.get("ok"):
+    print("pauza: %s, sesje agentów: %s, drzewo dostępności (AT-SPI): %s"
+          % (tak[bool(o["wstrzymane"])], o["sesje"], tak[bool(o["atspi"])]))
+else:
+    sys.exit(o.get("blad", "wejście odmówiło"))
+' "$1" "${2:-30}"
+}
 cmd_komputer() {
   installed || die "Flota nie jest zainstalowana (jarvo up)."
   local prof rest mem bylo
@@ -404,7 +436,20 @@ cmd_komputer() {
       for _ in $(seq 1 45); do komputer_zdrowy && break; sleep 2; done
       komputer_zdrowy || die "Komputer nie wstał w 90 s: jarvo logs komputer"
       say "Komputer Jarva działa: pulpit z Chromium, ruch tylko do internetu (bez sieci lokalnej i adresów hosta)."
-      echo "  Agent Operator, kanał sterownika i podgląd ekranu w HQ dochodzą w kolejnych etapach (docs/KOMPUTER.md §2)." ;;
+      echo "  Twarde zasady działają: płatności, logowanie, hasła i kody robisz Ty; jarvo komputer pauza zatrzymuje agenta."
+      echo "  Agent Operator, podgląd ekranu w HQ i terminal dochodzą w kolejnych etapach (docs/KOMPUTER.md §2)." ;;
+    pauza|stop)
+      ensure_docker; komputer_dziala || die "Komputer Jarva nie działa (jarvo komputer on)."
+      komputer_ster pauza >/dev/null
+      say "Komputer Jarva wstrzymany: agent widzi ekran, ale niczego nie kliknie ani nie wpisze (jarvo komputer wznow)." ;;
+    wznow|resume)
+      ensure_docker; komputer_dziala || die "Komputer Jarva nie działa (jarvo komputer on)."
+      komputer_ster wznow >/dev/null
+      say "Komputer Jarva wznowiony: agent znów może działać w granicach twardych zasad." ;;
+    dziennik|log)
+      ensure_docker; komputer_dziala || die "Komputer Jarva nie działa (jarvo komputer on)."
+      [[ ${2:-30} =~ ^[0-9]+$ ]] || die "jarvo komputer dziennik [liczba wpisów, 1–200]"
+      komputer_ster dziennik "${2:-30}" ;;
     off)
       ensure_docker
       compose stop komputer >/dev/null 2>&1 || true
@@ -431,12 +476,13 @@ cmd_komputer() {
         *,komputer,*) echo "Komputer Jarva:  włączony (COMPOSE_PROFILES w $L/compose/.env)" ;;
         *) echo "Komputer Jarva:  wyłączony (jarvo komputer on)" ;;
       esac
-      if ensure_docker soft && docker ps --format '{{.Names}}' | grep -qx jarvo-komputer; then
+      if ensure_docker soft && komputer_dziala; then
         if komputer_zdrowy; then echo "pulpit:          działa ($(docker exec jarvo-komputer cua-driver --version 2>/dev/null | head -1))"
         else echo "pulpit:          startuje albo nie odpowiada (jarvo logs komputer)"; fi
+        echo "wejście:         $(komputer_ster stan 2>/dev/null || echo "nie odpowiada (jarvo logs komputer)")"
         echo "pamięć:          $(docker stats --no-stream --format '{{.MemUsage}}' jarvo-komputer 2>/dev/null)"
-        if docker exec jarvo-hermes test -S /opt/jarvo/komputer/rfb.sock 2>/dev/null; then echo "flota widzi ekran: tak"
-        else echo "flota widzi ekran: nie (jarvo up)"; fi
+        if docker exec jarvo-hermes test -S /opt/jarvo/komputer/cua.sock 2>/dev/null; then echo "flota widzi Komputer: tak"
+        else echo "flota widzi Komputer: nie (jarvo up)"; fi
       else echo "pulpit:          nie działa"; fi ;;
     *) die "jarvo komputer on | off | status | wyczysc | odswiez" ;;
   esac

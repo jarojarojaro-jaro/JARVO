@@ -163,7 +163,7 @@ Rekomendacje:
 | `uptime-kuma` | healthchecki i alerty | MIT | ✅ profil `monitoring` |
 | `beszel` (+ agent) | CPU/RAM/dysk, alerty | MIT | ✅ profil `monitoring` |
 | `android` (Redroid) / `android-emulator` (emulator Google, KVM) + `android-ekran` (ws-scrcpy) | telefon testowy Twórcy aplikacji: adb w sieci floty, ekran w HQ przez proxy `:9122` z tokenem | Apache-2.0 / MIT / MIT | ✅ profile `android` i `android-kvm` (`jarvo android on`) |
-| `komputer` (Xvnc, xfwm4, Chromium, `cua-driver`) | Komputer Jarva dla computer use: pulpit bez portów, ekran i sterownik tylko przez gniazda unix we wspólnym wolumenie, własna sieć z filtrem (internet tak, sieć lokalna i adresy serwera nie) | GPL-2.0 / BSD-3-Clause / MIT | ✅ profil `komputer` (`jarvo komputer on`, [KOMPUTER.md](KOMPUTER.md)) |
+| `komputer` (Xvnc, xfwm4, Chromium, `cua-driver`) | Komputer Jarva dla computer use: pulpit bez portów, ekran i wejście sterownika z twardymi zasadami tylko przez gniazda unix we wspólnym wolumenie, własna sieć z filtrem (internet tak, sieć lokalna i adresy serwera nie) | GPL-2.0 / BSD-3-Clause / MIT | ✅ profil `komputer` (`jarvo komputer on`, [KOMPUTER.md](KOMPUTER.md)) |
 | `honcho` (+ postgres/pgvector) | wspólna pamięć o Tobie | AGPL-3.0 | ⬜ faza 3, jeśli MVP pamięci nie wystarczy |
 | `postiz` (+ postgres, redis) | kolejka publikacji social media po Twojej akceptacji | AGPL-3.0 | ⬜ gdy Studio zacznie publikować |
 | `langfuse` | ślady, koszty, oceny sędziego | MIT (core) | ⬜ faza 6 |

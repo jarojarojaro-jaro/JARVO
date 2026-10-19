@@ -362,6 +362,7 @@ może później jako dodatek obrazu).
 | [CrowdSec](https://github.com/crowdsecurity/crowdsec) | ochrona przed atakami | MIT | 2026-09 |
 | [cua-driver](https://github.com/trycua/cua) 0.21.0 (`cua-driver-rs`) | sterownik ekranu Komputera Jarva dla narzędzia `computer_use` (drzewo dostępności, zrzuty, klik, pisanie); sumy SHA-256 w `infra/komputer/Dockerfile` | MIT | 2026-10 |
 | [TigerVNC](https://github.com/TigerVNC/tigervnc) Xvnc + xfwm4 + Chromium (pakiety Debiana) | pulpit Komputera Jarva (`infra/komputer`, `jarvo komputer on`): ekran tylko na gnieździe unix, filtr ruchu do sieci lokalnej | GPL-2.0 / BSD-3 | 2026-10 |
+| [PyGObject](https://gitlab.gnome.org/GNOME/pygobject) `python3-gi` + `gir1.2-atspi-2.0` (pakiety Debiana) | wejście sterownika Komputera (`infra/komputer/wejscie.py`): fokus klawiatury i element w punkcie z AT-SPI dla twardych zasad | LGPL-2.1+ | 2026-10 |
 
 ---
 

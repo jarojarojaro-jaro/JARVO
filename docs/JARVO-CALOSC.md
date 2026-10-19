@@ -258,10 +258,16 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
 - **Computer use** (`docs/KOMPUTER.md`): Hermes woła sterownik ekranu tylko przez bramkę `komputer/jarvo_cua.py`
   (`HERMES_CUA_DRIVER_CMD`), która odmawia aktualizacji, instalacji i trybu bez ograniczeń; walidator pozwala na
   `computer_use` i klucze `cua:*` tylko agentowi z `komputer: true` i zabrania `approvals.mode: off`.
-  Komputer Jarva (`infra/komputer`, profil compose `komputer`, `jarvo komputer on|off|status|wyczysc|odswiez`):
-  pulpit Xvnc z Chromium i drzewem dostępności w osobnym kontenerze bez kluczy floty i bez portów; ekran i sterownik
-  tylko przez gniazda unix w wolumenie `jarvo-komputer-gniazda` (w `jarvo-hermes` `/opt/jarvo/komputer`); filtr
-  ruchu przed pulpitem: internet tak, sieć lokalna, metadane chmury, adresy hosta i port 25 nie.
+  Komputer Jarva (`infra/komputer`, profil compose `komputer`, `jarvo komputer on|off|status|wyczysc|odswiez`
+  i `pauza|wznow|dziennik`): pulpit Xvnc z Chromium i drzewem dostępności w osobnym kontenerze bez kluczy floty
+  i bez portów; ekran i sterownik tylko przez gniazda unix w wolumenie `jarvo-komputer-gniazda` (w `jarvo-hermes`
+  `/opt/jarvo/komputer`); filtr ruchu przed pulpitem: internet tak, sieć lokalna, metadane chmury, adresy hosta
+  i port 25 nie. Wejście sterownika (`infra/komputer/wejscie.py`, `zasady.py`) sprawdza każde wywołanie, zanim
+  dostanie je sterownik: płatności, zakupy, logowanie, wysyłkę, publikację, Enter w takim formularzu i wpisywanie
+  haseł, kart, BLIK i kodów zostawia właścicielowi, sekretów nie wpisuje i ukrywa je w odpowiedziach, wyłącza
+  JavaScript, schowek i DevTools, uruchamia tylko Chromium; cel działania zna z migawek sterownika i z AT-SPI.
+  Pauzę włączy każdy, zdejmie tylko właściciel (`SO_PEERCRED`); dziennik bez treści. Test na żywo:
+  `scripts/komputer-test.sh`.
 - **Skan skilli z cudzych repo** (`scripts/skan_skilli.py`, przy każdym buildzie): skaner Hermesa + wzorce
   getsentry `skill-scanner` i ECC (wstrzyknięcia, `curl|sh`, sekrety, ukryte znaki, hooki, `postinstall`).
   High/critical bez przejrzanego wyjątku (`vendor/skan-wyjatki.yaml`, przypięty do commitu) zatrzymuje wdrożenie.
@@ -344,7 +350,8 @@ SOURCES (licencje).
   `docker build --network host` (compose nie widzi proxy), instalację w `jarvo-local` i
   `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` lub `branding/` albo z `--rebuild`; dodatki obrazu
   przez `JARVO_EXTRAS="manim"` przed poleceniem (z `--rebuild`); Komputer Jarva przez `JARVO_KOMPUTER=1` (obraz
-  `komputer-ca:test` = Debian + certyfikat proxy, `jarvo-komputer:local` po zmianie `infra/komputer/`).
+  `komputer-ca:test` = Debian + certyfikat proxy, `jarvo-komputer:local` po zmianie `infra/komputer/`), a potem
+  test twardych zasad na żywo `scripts/komputer-test.sh`.
 - Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (na Linuksie sam doinstalowuje pakiety i Docker
   Engine, na macOS Homebrew i Colimę; repo do `~/jarvo`) → `jarvo up` (`bin/jarvo` → `scripts/local-up.sh`) →
   `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`; na macOS dane i build w wolumenach Dockera

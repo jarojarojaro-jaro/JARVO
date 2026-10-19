@@ -1,4 +1,5 @@
-"""Komputer Jarva, etap K1 (docs/KOMPUTER.md): obraz infra/komputer, usługa compose, filtr ruchu, polecenie jarvo."""
+"""Komputer Jarva, etapy K1 i K2 (docs/KOMPUTER.md): obraz infra/komputer, usługa compose, filtr ruchu, wejście
+sterownika w obrazie, polecenie jarvo."""
 
 from __future__ import annotations
 
@@ -76,7 +77,8 @@ def test_ekran_tylko_na_gniezdzie_z_ciasteczkiem():
     xvnc = xvnc[:xvnc.index("XVNC=$!")]
     for flaga in ("-rfbport -1", "-rfbunixpath", "-rfbunixmode 0660", "-nolisten tcp", "-nolisten local", "-auth"):
         assert flaga in xvnc
-    assert "--force-renderer-accessibility" in s and "--remote-debugging" not in s
+    flagi = _tekst("chromium-flagi")
+    assert "--force-renderer-accessibility" in flagi and "--remote-debugging" not in flagi + s
     # drzewo dostępności: szyna AT-SPI włączona, zanim wystartuje Chromium (inaczej sterownik widzi samo okno)
     assert s.index("ScreenReaderEnabled") < s.index("przegladarka &")
     # wszystko na ekranie jako pulpit, bez nowych uprawnień
@@ -99,8 +101,26 @@ def test_polityka_chromium():
     assert p["PasswordManagerEnabled"] is False and p["AutofillCreditCardEnabled"] is False
     assert p["SyncDisabled"] is True and p["BrowserSignin"] == 0
     assert p["ExtensionInstallBlocklist"] == ["*"]
-    assert "file://*" in p["URLBlocklist"]
+    for adres in ("file://*", "chrome://flags", "chrome://inspect", "devtools://*"):
+        assert adres in p["URLBlocklist"]
     assert p["DownloadDirectory"].startswith("/home/pulpit/")
+
+
+def test_wejscie_sterownika_w_obrazie():
+    d = _tekst("Dockerfile")
+    assert "python3-gi gir1.2-atspi-2.0" in d                     # fokus i element w punkcie z AT-SPI
+    assert "COPY start.sh zdrowie.sh wejscie.py zasady.py /opt/jarvo-komputer/" in d
+    assert "COPY chromium-flagi /etc/chromium.d/jarvo" in d
+    s = _tekst("start.sh")
+    # wejście jako pulpit, wznawiane po awarii, przed Chromium (fokus każdego pola już śledzony)
+    assert "jako_pulpit python3 -I /opt/jarvo-komputer/wejscie.py" in s
+    assert s.index("\nwejscie &") < s.index("\nprzegladarka &")
+    assert '"exit_type":"Normal"' in s                            # bez dymka „Przywrócić strony?” po restarcie
+    assert "cua.sock" in _tekst("zdrowie.sh")
+    flagi = _tekst("chromium-flagi")
+    assert "export LANGUAGE=pl" in flagi and "--no-sandbox" in flagi
+    w = _tekst("wejscie.py")
+    assert w.startswith("#!/usr/bin/python3 -I") and 'STEROWNIK = ["cua-driver", "mcp"]' in w
 
 
 def test_polecenie_jarvo_komputer():
@@ -122,6 +142,7 @@ def test_deploy_i_piaskownica_buduja_komputer():
 
 @pytest.mark.skipif(shutil.which("shellcheck") is None, reason="brak shellcheck (make dev-deps)")
 def test_shellcheck_skryptow_komputera():
-    res = subprocess.run(["shellcheck", "-S", "warning", str(KOMP / "start.sh"), str(KOMP / "zdrowie.sh")],
+    res = subprocess.run(["shellcheck", "-S", "warning", str(KOMP / "start.sh"), str(KOMP / "zdrowie.sh"),
+                          str(REPO / "scripts" / "komputer-test.sh")],
                          capture_output=True, text=True)
     assert res.returncode == 0, res.stdout

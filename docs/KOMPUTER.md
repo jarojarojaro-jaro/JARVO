@@ -11,7 +11,7 @@ odtwarzamy własnym kodem na Hermesie i otwartym sterowniku `cua-driver` (MIT).
 
 | Co | Gdzie działa | Stan |
 |---|---|---|
-| **Komputer Jarva**: pulpit z Chromium i terminalem w osobnym kontenerze `jarvo-komputer`, włączany `jarvo komputer on` | Linux, macOS (Colima), Windows (WSL), VPS bez monitora | pulpit działa (K1), kanał sterownika w K2 |
+| **Komputer Jarva**: pulpit z Chromium i terminalem w osobnym kontenerze `jarvo-komputer`, włączany `jarvo komputer on` | Linux, macOS (Colima), Windows (WSL), VPS bez monitora | pulpit, wejście sterownika i twarde zasady działają (K1, K2) |
 | **Operator**: agent, który steruje ekranem (najpierw drzewo dostępności, zrzut tylko gdy trzeba) | wszędzie tam, gdzie Komputer | etap K3 |
 | **Ekran w HQ**: podgląd na żywo, Przejmij, Oddaj, Zatrzymaj | zalogowany dashboard | etap K4 |
 | **Terminal i serwery**: powłoka w Komputerze, ekrany programów tekstowych, Twoje serwery przez SSH | wszędzie | etap K5 |
@@ -21,6 +21,7 @@ Czego agent nigdy nie zrobi sam:
 - nie zapłaci, nie kupi, nie zaloguje się, nie wyśle i nie opublikuje: te kliknięcia zostawia Tobie
   w Ekranie HQ (twarda reguła w Komputerze, nie tylko w poleceniach dla modelu);
 - nie wpisze hasła, numeru karty, kodu BLIK ani kodu 2FA;
+- nie zdejmie sobie pauzy: `jarvo komputer pauza` zatrzymuje go od razu, wznawiasz tylko Ty;
 - nie włączy sobie Twojego komputera: robisz to tylko Ty, na swoim komputerze;
 - nie zaktualizuje sam sterownika: każda wersja przechodzi przegląd i ma przypiętą sumę.
 
@@ -30,7 +31,7 @@ Czego agent nigdy nie zrobi sam:
 |---|---|---|
 | K0 | Bramka sterownika (`komputer/jarvo_cua.py`), zakazy w `deny.yaml`, reguły walidatora | zrobione |
 | K1 | Obraz i usługa `jarvo-komputer`: pulpit Xvnc, Chromium z drzewem dostępności, `cua-driver` 0.21.0 z sumą, filtr ruchu do sieci lokalnej, `jarvo komputer on/off/status/wyczysc/odswiez` | zrobione |
-| K2 | Kanał Hermes ↔ Komputer przez gniazdo unix i twarde zasady po stronie Komputera (sekrety, płatności, logowanie, zakazane aplikacje, dziennik) | planowane |
+| K2 | Wejście sterownika w Komputerze (`wejscie.py`, `zasady.py`): kanał MCP przez gniazdo unix, twarde zasady (płatności, logowanie, hasła, karty, kody, sekrety, zakazane narzędzia i aplikacje), ukrywanie sekretów w odpowiedziach, pauza tylko do zdjęcia przez właściciela, dziennik bez treści, `jarvo komputer pauza/wznow/dziennik`, test na żywo `scripts/komputer-test.sh` | zrobione |
 | K3 | Agent Operator: profil, wtyczka z podpowiedziami, evals, red team, pokój w HQ, dokumentacja | planowane |
 | K4 | Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj | planowane |
 | K5 | Terminal Operatora w Komputerze (SSH przez gniazdo), ekrany programów tekstowych (tmux), serwery | planowane |
@@ -49,7 +50,8 @@ Czego agent nigdy nie zrobi sam:
 ```
 
 Wolumen `jarvo-komputer-gniazda` jest w `jarvo-hermes` pod `/opt/jarvo/komputer`, a w Komputerze pod
-`/run/jarvo-komputer`. Leżą w nim tylko gniazda: `rfb.sock` (ekran, K1), `cua.sock` (sterownik, K2).
+`/run/jarvo-komputer`. Leżą w nim tylko gniazda: `rfb.sock` (ekran, K1), `cua.sock` (wejście sterownika, K2)
+i `ster.sock` (pauza, stan i dziennik wejścia, K2).
 Kontenery nie mają wspólnej sieci, więc poza gniazdami nie widzą się wcale.
 
 - Narzędzie `computer_use` jest w Hermesie: zrzut i drzewo dostępności (`capture` w trybie `ax`, `som`, `vision`),
@@ -66,7 +68,7 @@ w kontenerze tylko do odczytu, więc agent nie zmieni bramki). Bramka odpowiada 
 | Czasownik | Co robi |
 |---|---|
 | `--help`, `--version`, `manifest` | stałe odpowiedzi z wersją sterownika z obrazu Komputera (kontrakt Hermesa 0.20) |
-| `mcp [--no-overlay]` | rozmowa MCP ze sterownikiem w Komputerze; gdy Komputer jest wyłączony: komunikat „jarvo komputer on” i kod 69; gdy pulpit działa, ale nie ma jeszcze kanału sterownika (`cua.sock`, K2): komunikat o etapie K2 i kod 69 |
+| `mcp [--no-overlay]` | przepuszcza rozmowę MCP (bajty w obie strony) do wejścia w Komputerze na `cua.sock`; zasady sprawdza wejście (§6), bramka nie zna treści. Gdy Komputer jest wyłączony: komunikat „jarvo komputer on” i kod 69; gdy pulpit działa, ale wejście nie odpowiada: komunikat z `jarvo komputer status` i `jarvo logs komputer` i kod 69 |
 | `status` | 0, gdy sterownik w Komputerze odpowiada; inaczej 1 i ten sam komunikat co `mcp` |
 | wszystko inne | odmowa i kod 64: `check-update` i `update` (sterownik nie łączy się z GitHubem), `serve` (tryb bez ograniczeń, więc `/yolo` i `approvals.mode: off` zamykają computer_use zamiast go otwierać), `install`, `skills`, `extension` |
 
@@ -81,7 +83,7 @@ Reguły walidatora (`scripts/validate.py`, `check_komputer`):
 
 `shared/security/deny.yaml` blokuje w terminalach floty instalację i aktualizację sterownika
 (`computer-use install`, `trycua/cua`, `cua-driver`) i sięganie do gniazd Komputera (`/opt/jarvo/komputer`).
-To podpowiedź dla modelu, nie granica bezpieczeństwa: granicą są twarde zasady po stronie Komputera (K2).
+To podpowiedź dla modelu, nie granica bezpieczeństwa: granicą są twarde zasady po stronie Komputera (§6).
 
 ## 5. Komputer Jarva (`infra/komputer`, K1)
 
@@ -91,16 +93,21 @@ Komputer jest profilem compose `komputer`: nie działa, dopóki go nie włączys
 |---|---|
 | `jarvo komputer on` | buduje obraz `jarvo-komputer:local` (pierwszy raz kilka minut, ok. 400 MB pobrania), dopisuje profil do `COMPOSE_PROFILES` i czeka, aż pulpit będzie zdrowy; potem ok. 3 s. Odmawia, gdy Docker ma mniej niż 4 GB pamięci (na macOS podpowiada `colima start --memory 8`) |
 | `jarvo komputer off` | zatrzymuje Komputer i zdejmuje profil; stan przeglądarki zostaje |
-| `jarvo komputer status` | włączony czy nie, zdrowie pulpitu, wersja sterownika, pamięć, czy flota widzi gniazdo ekranu |
+| `jarvo komputer status` | włączony czy nie, zdrowie pulpitu, wersja sterownika, stan wejścia (pauza, sesje agentów, AT-SPI), pamięć, czy flota widzi gniazdo Komputera |
+| `jarvo komputer pauza` | zatrzymuje agenta od razu: patrzeć może, klikać i pisać nie; pauza trwa także po restarcie |
+| `jarvo komputer wznow` | zdejmuje pauzę; robi to tylko właściciel (agent floty dostaje odmowę) |
+| `jarvo komputer dziennik [N]` | ostatnie N decyzji wejścia (domyślnie 30): narzędzie, decyzja, zasada, cel, bez wpisywanych treści |
 | `jarvo komputer wyczysc` | po potwierdzeniu kasuje stan pulpitu (wolumen `jarvo-komputer-dom`: zalogowania, ciasteczka, historia, pobrane pliki) |
 | `jarvo komputer odswiez` | buduje obraz od nowa z bieżącymi poprawkami Debiana i Chromium |
 
 `scripts/deploy.sh` (a więc `jarvo update`) przebudowuje obraz po zmianie `infra/komputer/` i po healthcheckach
-sprawdza, czy pulpit działa i czy flota widzi `rfb.sock`. `jarvo uninstall` usuwa obraz, a `--all` także wolumeny.
+sprawdza, czy pulpit i wejście działają i czy flota widzi `rfb.sock` i `cua.sock`. `jarvo uninstall` usuwa obraz, a `--all` także wolumeny.
 
 **Co jest w środku** (Debian trixie-slim przypięty sumą): Xvnc (TigerVNC) 1440×900 (`KOMPUTER_EKRAN`), xfwm4
-z kompozytorem, sesyjny D-Bus z włączonym AT-SPI, Chromium z polskim interfejsem i drzewem dostępności
-(`--force-renderer-accessibility`), `cua-driver` 0.21.0 z GitHuba sprawdzany sumą SHA-256 przy budowie. Procesy
+z kompozytorem, sesyjny D-Bus z włączonym AT-SPI, Chromium z polskim interfejsem (`LANGUAGE=pl`) i drzewem
+dostępności (flagi w `/etc/chromium.d/jarvo` z `infra/komputer/chromium-flagi`, także dla okien otwieranych przez
+sterownik), `cua-driver` 0.21.0 z GitHuba sprawdzany sumą SHA-256 przy budowie, wejście sterownika (`wejscie.py`,
+`zasady.py`, Python z `python3-gi` do AT-SPI). Po restarcie kontenera Chromium nie pyta o przywrócenie kart. Procesy
 pulpitu działają jako użytkownik `pulpit` (uid 10101), bez uprawnień i bez nowych uprawnień (`setpriv`), a PID 1
 to `tini`. Telemetria i sprawdzanie aktualizacji sterownika są wyłączone zmiennymi i plikami konfiguracji.
 
@@ -109,7 +116,7 @@ to `tini`. Telemetria i sprawdzanie aktualizacji sterownika są wyłączone zmie
 
 **Chromium** ma politykę `/etc/chromium/policies/managed/jarvo.json` (`infra/komputer/chromium.json`): bez
 menedżera haseł, autouzupełniania kart i adresów, logowania do przeglądarki i synchronizacji, rozszerzeń
-i narzędzi deweloperskich; bez `file://` i `javascript:`; pobrane pliki tylko do `~/Pobrane`, bez pytania
+i narzędzi deweloperskich; bez `file://`, `javascript:`, `chrome://flags`, `chrome://inspect` i `devtools://`; pobrane pliki tylko do `~/Pobrane`, bez pytania
 i bez automatycznego otwierania; WebRTC tylko przez publiczny interfejs. Okno wraca po zamknięciu.
 
 **Filtr ruchu** (iptables w przestrzeni sieci kontenera, ustawiany przed pulpitem): internet tak; nie wolno
@@ -125,7 +132,65 @@ stronami (szczyt 0,83 GB). Limity w `compose/.env`: `KOMPUTER_MEM_LIMIT` (domyś
 (2, deploy przycina do liczby rdzeni), 2048 procesów, 1 GB `/dev/shm`. Uprawnienia kontenera: wszystkie zdjęte,
 dodane tylko te do filtra, katalogów i zmiany użytkownika; `no-new-privileges`.
 
-## 6. Bezpieczeństwo: zasady i ryzyka
+## 6. Wejście sterownika i twarde zasady (`infra/komputer/wejscie.py`, `zasady.py`, K2)
+
+Flota nie rozmawia ze sterownikiem bezpośrednio. Każde połączenie z `cua.sock` to jedna sesja MCP w procesie
+wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamiany przed Chromium). Wejście startuje
+`cua-driver mcp` dopiero przy pierwszej wiadomości, przepuszcza rozmowę w obie strony i po drodze:
+
+- **sprawdza każde `tools/call` w `zasady.ocen`, zanim dostanie je sterownik.** Odmowa wraca do agenta jako wynik
+  narzędzia z `isError` i `structuredContent`: `code` (`wymaga_czlowieka`, `wstrzymane`, `zablokowane`),
+  `rule` (zasada), `decision` i `next_step` (`ask_owner`, `wait_for_owner`, `choose_another_way`);
+- **pokazuje tylko dopuszczone narzędzia** (`tools/list`): odczyt (stan okna, drzewo, zrzut, okna, aplikacje),
+  sesja (kursor, `set_config` tylko dla `capture_scope`, `capture_mode`, `max_image_dimension`, okno na wierzch)
+  i działania (klik, podwójny i prawy klik, przeciąganie, przewijanie, pisanie, klawisze, `set_value`,
+  `launch_app`, `kill_app`, menu). Bez `page` i `browser_*` (JavaScript, DevTools), schowka, `mouse_button_*`
+  i `mouse_drag`, nagrywania i odtwarzania, aktualizacji oraz każdego nowego narzędzia, dopóki go nie przejrzymy;
+- **dopisuje zasady do instrukcji serwera** (`initialize`), po polsku i po angielsku;
+- **ukrywa sekrety w każdej odpowiedzi** (tekst, drzewo dostępności, komunikaty błędów, także odpowiedzi bez
+  znanego id): klucze API i tokeny (OpenAI, Anthropic, OpenRouter, GitHub, GitLab, AWS, Slack, Google,
+  Hugging Face, npm, Stripe), JWT, klucze prywatne, numery kart (z sumą Luhna) i wartości pól haseł zastępuje
+  znacznik `[ukryte przez Komputer Jarva]`;
+- **pilnuje protokołu**: tylko pojedyncze wiadomości (bez batch), tylko `initialize`, `ping`, `tools/list`,
+  `tools/call` (argumenty jako obiekt) i powiadomienia; sterownik dostaje wiadomość zapisaną od nowa z tego,
+  co ocenił, a nie surowe bajty agenta; id żądania w toku nie da się użyć drugi raz (odpowiedź zawsze trafia do swojego
+  wywołania); do 1 MB na wiadomość, do 4 sesji naraz, do 120 działań na minutę.
+
+**Twarde zasady** (`infra/komputer/zasady.py`, czyste funkcje, testy w `tests/test_komputer_zasady.py`):
+
+| Zasada | Decyzja |
+|---|---|
+| klik, podwójny klik, przeciągnięcie zaczęte albo skończone na przycisku, Enter, spacja albo pisanie na przycisku z fokusem, gdy przycisk lub link to „Kup”, „Zamów”, „Zapłać”, „BLIK”, „Przelew”, „Subskrybuj”, „Zaloguj”, „Zarejestruj”, „Utwórz konto”, „Autoryzuj”, „Wyślij”, „Opublikuj”, „Udostępnij”, „Usuń konto” (i angielskie odpowiedniki), także na tekście wewnątrz takiego przycisku; zgoda „Zezwól” / „Allow” jako cały napis. Napisy porównujemy po normalizacji NFKC, bez znaków niewidocznych | robi właściciel (`przycisk_wrazliwy`) |
+| Enter w polu formularza, w którym jest taki przycisk (wysłałby formularz), poza polem wieloliniowym | robi właściciel (`formularz_wrazliwy`) |
+| pisanie, wklejanie i Enter w polu hasła, karty, CVV, BLIK, PIN, kodu SMS, 2FA, jednorazowego, tokenu | robi właściciel (`pole_wrazliwe`) |
+| numer karty w dowolnym tekście | robi właściciel (`karta`) |
+| klucz, token albo klucz prywatny w tekście; adres `javascript:`, `data:`, `file:`, `chrome:`, `devtools:`, `view-source:` | zablokowane |
+| pisanie, gdy nie wiadomo, gdzie trafi tekst (brak fokusu); klik w element spoza migawek tej sesji albo w punkt bez działającego AT-SPI; element i punkt naraz | zablokowane (`brak_fokusu`, `nieznany_cel`, `cel`) |
+| `launch_app` innego programu niż Chromium, z `launch_path` lub flagami, z adresem innym niż http(s); `kill_app` innego procesu niż Chromium | zablokowane |
+| narzędzia deweloperskie i systemowe skróty (Ctrl+Shift+I/J/C/O, F12, Ctrl+Shift+Delete, Alt+F2); klik po `zoom`; zapis zrzutu do pliku | zablokowane |
+| wszystko poza odczytem przy pauzie | wstrzymane |
+
+**Skąd wejście wie, w co trafi działanie.** Nie z deklaracji agenta: element ze `element_token` bierze z migawek
+sterownika z tej sesji (rola, napis, przodkowie, przyciski formularza), punkt `x, y` przelicza na ekran i pyta
+AT-SPI o najgłębszy element w tym miejscu (ok. 20 ms), a pole z fokusem klawiatury zna ze zdarzeń AT-SPI
+(rola, nazwa, atrybuty HTML: `tag`, `html-input-name`, `text-input-type`, `autocomplete`). Gdy tego nie da się
+ustalić, działanie nie przechodzi.
+
+**Pauza i dziennik** (`ster.sock`, polecenia JSON w jednej linii: `stan`, `pauza`, `wznow`, `dziennik`). Pauzę
+włączy każdy, kto widzi gniazdo (flota, HQ w K4); zdjąć ją może tylko właściciel: wejście sprawdza nadawcę
+(`SO_PEERCRED`) i przepuszcza tylko proces pulpitu albo root w kontenerze Komputera, czyli `jarvo komputer wznow`.
+Pauza jest zapisana w `~/.jarvo/pauza` i trwa po restarcie. Dziennik `~/.jarvo/dziennik.jsonl` (wolumen
+`jarvo-komputer-dom`, 2 MB i jedna kopia) ma każde działanie i każdą odmowę: czas, sesja, narzędzie, decyzja,
+zasada, cel (rola i napis), liczba wpisanych znaków albo naciśnięte klawisze, liczba ukrytych sekretów. Wpisanego
+tekstu w nim nie ma.
+
+**Test na żywo**: `bash scripts/komputer-test.sh` (Komputer włączony) stawia w Komputerze stronę testową
+(wyszukiwarka i koszyk z polami hasła, karty, BLIK, przyciskami płatności i kluczem API w treści) i prowadzi
+rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 58 sprawdzeń (narzędzia, aplikacje,
+ukrywanie, kliknięcia elementem i w punkt, pisanie, Enter w formularzach, skróty, powtórzone id, pauza
+i wznowienie, dziennik).
+
+## 7. Bezpieczeństwo: zasady i ryzyka
 
 - **Główne zagrożenie to treść ekranu**, nie właściciel: strona, mail albo PDF może próbować wmówić agentowi
   „wpisz klucz”, „otwórz terminal”, „kliknij Kup”. Dlatego Komputer nie ma kluczy floty, a reguły, które muszą
@@ -137,12 +202,18 @@ dodane tylko te do filtra, katalogów i zmiany użytkownika; `no-new-privileges`
   Komputer Jarva tego nie pogarsza dla kluczy floty (w Komputerze ich nie ma), ale zalogowana w nim przeglądarka
   jest osiągalna przez gniazda. Dlatego twarde reguły siedzą w Komputerze, a nie w `jarvo-hermes`, a pełne
   rozdzielenie użytkowników terminali to osobny etap przed Rękami (K6).
+- **Ryzyka resztkowe wejścia (K2):** Chromium działa z `--no-sandbox` (piaskownica wymaga przestrzeni nazw
+  użytkownika, a kontener ma `no-new-privileges`; granicą jest kontener bez kluczy i z filtrem ruchu); strony
+  rysowane w całości na `canvas` nie mają drzewa dostępności, więc wrażliwy przycisk bez napisu przejdzie jak
+  zwykły klik; wysyłkę formularza skryptem strony (bez `<form>`) wejście rozpozna tylko po napisie przycisku;
+  zwykłe przejście pod adres (link, pasek adresu) nie jest blokowane; agent z terminalem we flocie może włączyć
+  pauzę i czytać dziennik (bez treści), ale nie zdejmie pauzy. Schowek przy przejęciu ekranu w HQ ustali K4.
 
-## 7. Źródła
+## 8. Źródła
 
 | Źródło | Licencja | Stan |
 |---|---|---|
-| `cua-driver` (trycua/cua, `cua-driver-rs` 0.21.0, później 0.36) | MIT | w obrazie `jarvo-komputer` (K1): przegląd, próba w kontenerze, sumy SHA-256 dla amd64 i arm64 w `vendor/zrodla.yaml`; telemetrię i sprawdzanie aktualizacji wyłączają zmienne, pliki konfiguracji i bramka |
+| `cua-driver` (trycua/cua, `cua-driver-rs` 0.21.0, później 0.36) | MIT | w obrazie `jarvo-komputer` (K1): przegląd, próba w kontenerze, sumy SHA-256 dla amd64 i arm64 w `vendor/zrodla.yaml`; 0.21.0, bo z nią działa przypięty Hermes (nowsze zmieniają argumenty kliknięcia); telemetrię i sprawdzanie aktualizacji wyłączają zmienne, pliki konfiguracji i bramka |
 | Codex Computer Use (OpenAI) | zamknięte | tylko wzorce zachowania z materiałów publicznych; kodu nie bierzemy |
-| Pakiety Debiana w obrazie (TigerVNC, xfwm4, Chromium, D-Bus, AT-SPI, iptables) | GPL-2.0, BSD, LGPL i inne | `docs/SOURCES.md`, tabela komponentów obrazu `jarvo-komputer` |
+| Pakiety Debiana w obrazie (TigerVNC, xfwm4, Chromium, D-Bus, AT-SPI, `python3-gi` z `gir1.2-atspi-2.0`, iptables) | GPL-2.0, BSD, LGPL i inne | `docs/SOURCES.md`, tabela komponentów obrazu `jarvo-komputer` |
 | LCU (amontlabs/lcu) | MIT | odrzucone (uruchamia zamknięty program OpenAI); wzorce: zgoda na aplikację, dziennik bez treści, sprzątanie po turze |

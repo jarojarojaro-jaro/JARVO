@@ -62,7 +62,7 @@ def test_bez_komputera_mcp_i_status_mowia_jak_wlaczyc():
 
 
 def test_pulpit_bez_kanalu_sterownika_nie_udaje_wylaczonego():
-    """Działa ekran Komputera (rfb.sock), ale nie ma jeszcze gniazda sterownika: rada inna niż „włącz”."""
+    """Działa ekran Komputera (rfb.sock), ale wejście sterownika (cua.sock) nie odpowiada: rada inna niż „włącz”."""
     import socket
     import tempfile
     katalog = tempfile.mkdtemp(prefix="jk")          # krótka ścieżka: gniazdo unix ma limit ~100 znaków
@@ -72,7 +72,7 @@ def test_pulpit_bez_kanalu_sterownika_nie_udaje_wylaczonego():
         ekran.listen(4)
         for czas, kod in (("mcp", jarvo_cua.KOD_BRAK_KOMPUTERA), ("status", 1)):
             r = uruchom(czas, gniazdo=os.path.join(katalog, "cua.sock"))
-            assert r.returncode == kod and "kanał sterownika ekranu" in r.stderr
+            assert r.returncode == kod and "wejście sterownika (cua.sock) nie odpowiada" in r.stderr
             assert "jarvo komputer on" not in r.stderr
     finally:
         ekran.close()

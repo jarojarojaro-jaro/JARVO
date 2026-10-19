@@ -1,6 +1,7 @@
 # Komputer Jarva (docs/KOMPUTER.md): pulpit Linux, na którym agent Operator klika i pisze. Osobny kontener bez
 # kluczy floty: Xvnc tylko na gnieździe unix, xfwm4 z kompozytorem (bez niego zrzuty zasłoniętych okien są czarne),
-# Chromium z drzewem dostępności, sterownik ekranu cua-driver (MIT, wersja i sumy z vendor/zrodla.yaml).
+# Chromium z drzewem dostępności, sterownik ekranu cua-driver (MIT, wersja i sumy z vendor/zrodla.yaml) i wejście
+# sterownika z twardymi zasadami (wejscie.py, zasady.py: flota sięga do sterownika tylko przez nie).
 # Bez sudo, bez kompilatorów, bez serwera X na TCP. Buduje go deploy.sh i `jarvo komputer on` (obraz lokalny
 # jarvo-komputer:local, przebudowa po zmianie infra/komputer/).
 #
@@ -11,7 +12,7 @@ ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef0621
 FROM ${DEBIAN_IMAGE} AS sterownik
 ARG TARGETARCH
 # cua-driver-rs 0.21.0 (tag cua-driver-rs-v0.21.0 = commit 70db98d1): ta wersja działa z przypiętym Hermesem
-# (nowsze zmieniają argumenty kliknięcia, docs/KOMPUTER.md §6); sumy archiwów -binary z wydania i locka Hermesa
+# (nowsze zmieniają argumenty kliknięcia, docs/KOMPUTER.md §8); sumy archiwów -binary z wydania i locka Hermesa
 ARG CUA_DRIVER_VERSION=0.21.0
 ARG CUA_DRIVER_SHA256_AMD64=cf29bfaad16737e31e72f38dad2a6424f24b21a4ac2edea885e83cb9d5034135
 ARG CUA_DRIVER_SHA256_ARM64=6b3a308c6741dd8291aad22a308bd2ec8eb52eab64687be007ac86ceaf7e3307
@@ -58,6 +59,13 @@ RUN set -eux; \
       fonts-dejavu-core fonts-liberation2 fonts-noto-color-emoji; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
+# AT-SPI z Pythona dla wejścia sterownika (wejscie.py: pole z fokusem i element w punkcie przy każdym działaniu);
+# osobna warstwa, żeby zmiana tu nie budowała od nowa Chromium
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends python3-gi gir1.2-atspi-2.0; \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+
 # pulpit: ekran, aplikacje i sterownik (jedyny z ciasteczkiem X); agent: przyszła powłoka (K5), bez dostępu do ekranu;
 # grupa gniazda ma ten sam numer co hermes w jarvo-hermes (10000), więc tylko flota sięga do gniazd Komputera
 RUN set -eux; \
@@ -70,8 +78,10 @@ COPY --from=sterownik /opt/cua /opt/cua
 RUN ln -s "/opt/cua/${CUA_DRIVER_VERSION}/cua-driver" /usr/local/bin/cua-driver
 COPY LICENSE-cua-driver.md /opt/cua/LICENSE.md
 COPY chromium.json /etc/chromium/policies/managed/jarvo.json
-COPY start.sh zdrowie.sh /opt/jarvo-komputer/
-RUN chmod 0755 /opt/jarvo-komputer/start.sh /opt/jarvo-komputer/zdrowie.sh
+COPY chromium-flagi /etc/chromium.d/jarvo
+COPY start.sh zdrowie.sh wejscie.py zasady.py /opt/jarvo-komputer/
+RUN chmod 0644 /etc/chromium.d/jarvo /opt/jarvo-komputer/zasady.py; \
+    chmod 0755 /opt/jarvo-komputer/start.sh /opt/jarvo-komputer/zdrowie.sh /opt/jarvo-komputer/wejscie.py
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 CMD ["/opt/jarvo-komputer/zdrowie.sh"]
 ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/opt/jarvo-komputer/start.sh"]
