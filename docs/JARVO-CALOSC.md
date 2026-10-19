@@ -269,6 +269,8 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   Pauzę włączy każdy, zdejmie tylko właściciel (`SO_PEERCRED`); pauza od floty to prośba Operatora do właściciela
   z powodem (widać ją w `jarvo komputer status`); ekranem steruje jedna sesja naraz (`zajete`); dziennik bez treści.
   Test na żywo: `scripts/komputer-test.sh`.
+  Agent z `komputer: true` dostaje wtyczkę `jarvo-komputer` (narzędzie `komputer`: stan, dziennik, prośba do
+  właściciela jako pauza z powodem; wznowić nie umie) i nie ma wyciągów rozmów do skarbca (treść ekranu).
 - **Skan skilli z cudzych repo** (`scripts/skan_skilli.py`, przy każdym buildzie): skaner Hermesa + wzorce
   getsentry `skill-scanner` i ECC (wstrzyknięcia, `curl|sh`, sekrety, ukryte znaki, hooki, `postinstall`).
   High/critical bez przejrzanego wyjątku (`vendor/skan-wyjatki.yaml`, przypięty do commitu) zatrzymuje wdrożenie.
@@ -316,7 +318,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `hq/` | Jarvo HQ (backend, frontend, demo) |
 | `infra/` | obraz jarvo-hermes, obraz Komputera Jarva (`infra/komputer`), docker-compose z sidecarami, szablony env |
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
-| `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
+| `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`), wtyczka Operatora `plugin/` (narzędzie `komputer`); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo) |
 | `site/` | landing jarvo.pl |

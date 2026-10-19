@@ -569,6 +569,8 @@ class SkarbiecProvider(MemoryProvider):
         return raport
 
     def _wyciag(self, messages: List[Dict[str, Any]], sid: str, *, od_tury: int, powod: str) -> Optional[Dict[str, Any]]:
+        if (self._meta.get(self._agent) or {}).get("bez_wyciagu"):
+            return None                     # agent z Komputerem Jarva: wyniki narzędzi to treść ekranu (docs/KOMPUTER.md §7)
         sk = self._sk()
         if sk is None:
             return None

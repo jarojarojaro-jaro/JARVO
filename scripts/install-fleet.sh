@@ -142,6 +142,21 @@ if [[ -d "$BUILD/plugins/jarvo-wiedza" ]]; then
   hermes plugins enable jarvo-wiedza >/dev/null 2>&1 || $PY "$REPO/scripts/enable_plugin.py" "$DATA/config.yaml" jarvo-wiedza
 fi
 
+# 3c''. Komputer Jarva (docs/KOMPUTER.md §7): wtyczka jarvo-komputer (narzędzie `komputer`) tylko w profilach,
+# które ją włączają (agenci z `komputer: true` we fleet.yaml); w pozostałych dowiązanie znika
+if [[ -d "$BUILD/plugins/jarvo-komputer" ]]; then
+  log "Wtyczka jarvo-komputer (Komputer Jarva)"
+  put_plugin jarvo-komputer
+  for a in $AGENTS; do
+    if grep -q "jarvo-komputer" "$BUILD/profiles/$a/config.yaml" 2>/dev/null; then
+      mkdir -p "$DATA/profiles/$a/plugins"
+      ln -sfn "$DATA/plugins/jarvo-komputer" "$DATA/profiles/$a/plugins/jarvo-komputer"
+    else
+      rm -f "$DATA/profiles/$a/plugins/jarvo-komputer"
+    fi
+  done
+fi
+
 # 3d. branding terminala: skórka "jarvo" dla hosta i każdego profilu (display.skin w config.yaml)
 if [[ -f "$REPO/branding/skin-jarvo.yaml" ]]; then
   for home in "$DATA" "$DATA"/profiles/*/; do

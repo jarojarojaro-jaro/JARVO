@@ -252,6 +252,33 @@ def test_wiedza_plugin_wiring(built, tmp_path):
     assert {"konwertuj.py", "transkrybuj.py"} <= set(build.wiedza_fleet(fleet, dist)["repo_scripts"])
 
 
+def test_komputer_plugin_tylko_u_agentow_z_komputerem(built, tmp_path):
+    """Komputer Jarva (docs/KOMPUTER.md §7): wtyczka jarvo-komputer włączona tylko w profilach z `komputer: true`,
+    hub w skarbcu wie, kto ma Komputer (bez wyciągów z rozmów)."""
+    import dataclasses
+    fleet, out = built
+    for agent in fleet.active():
+        cfg = fl.load_yaml(out / agent.name / "config.yaml")
+        assert ("jarvo-komputer" in cfg["plugins"]["enabled"]) == agent.komputer, agent.name
+    for rel in ("plugin.yaml", "__init__.py"):
+        assert (fl.REPO_ROOT / "komputer" / "plugin" / rel).exists(), rel
+    assert fl.load_yaml(fl.REPO_ROOT / "komputer" / "plugin" / "plugin.yaml")["provides_tools"] == ["komputer"]
+    web = next(a for a in fleet.active() if a.name == "jarvo-web")
+    protocol = (fl.REPO_ROOT / fleet.raw["shared"]["protocol"]).read_text(encoding="utf-8")
+    resolver = build.SourceResolver(EMPTY_LOCK, None, tmp_path / ".cache", {})
+    original = build.build_cron
+    build.build_cron = lambda *a, **k: 0
+    try:
+        build.build_agent(fleet, dataclasses.replace(web, komputer=True), tmp_path, EMPTY_LOCK, resolver, protocol,
+                          "/opt/jarvo/build", ENV, None, [])
+    finally:
+        build.build_cron = original
+    wlaczone = fl.load_yaml(tmp_path / "jarvo-web" / "config.yaml")["plugins"]["enabled"]
+    assert wlaczone.count("jarvo-komputer") == 1 and "jarvo-wiedza" in wlaczone
+    assert all(a["komputer"] == next(x for x in fleet.active() if x.name == a["name"]).komputer
+               for a in build.wiedza_fleet(fleet, out)["agents"])
+
+
 def test_changelog_punkty_lamane_w_kilku_liniach(tmp_path):
     ch = tmp_path / "CHANGELOG.md"
     ch.write_text("# Changelog\n\n## Niewydane\n- Pierwszy punkt\n  złamany na dwie linie.\n- Drugi.\n\n"

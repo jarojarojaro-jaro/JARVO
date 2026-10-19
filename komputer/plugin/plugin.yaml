@@ -1,0 +1,6 @@
+name: jarvo-komputer
+version: 0.1.0
+description: "Komputer Jarva dla Operatora: stan Komputera, dziennik twardych zasad i oddanie ekranu właścicielowi (docs/KOMPUTER.md §7)."
+author: "Jarvo fleet"
+provides_tools:
+  - komputer

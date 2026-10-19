@@ -709,6 +709,8 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             opis = " ".join(a.get("description", "").split())
             agenci_meta[a["name"]] = {"hub": rel, "orzeczenia": orz, "short": a.get("short") or krotki, "title": a.get("title", ""),
                                       "opis": opis}
+            if a.get("komputer"):           # rozmowa agenta z ekranem to treść ekranu (dane osób): bez wyciągu do skarbca
+                agenci_meta[a["name"]]["bez_wyciagu"] = True
             if not sk.istnieje(rel):
                 body = (f"# {a.get('emoji', '')} {a.get('title', a['name'])} ({a['name']})\n\n**{a.get('description', '').strip()}**\n\n"
                         f"## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n- [[{orz}|Orzeczenia: {a.get('short') or krotki}]]\n"

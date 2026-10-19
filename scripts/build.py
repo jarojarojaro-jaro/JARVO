@@ -288,6 +288,7 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
 
 
 WIEDZA_PLUGIN = "jarvo-wiedza"
+KOMPUTER_PLUGIN = "jarvo-komputer"     # narzędzie `komputer` (komputer/plugin) dla agentów z `komputer: true`
 
 
 def glos_floty() -> dict | None:
@@ -475,7 +476,8 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
         sekcja, zmiany = ostatnie_zmiany(a.dir / "CHANGELOG.md")
         agents.append({"name": a.name, "short": a.hq_short or a.title, "title": a.title, "emoji": a.emoji, "kind": a.kind,
                        "description": a.description, "room": a.hq_room, "label": a.hq_label or a.title,
-                       "telegram_topic": a.telegram_topic, "autonomy_max": a.autonomy_max, "skills": skills,
+                       "telegram_topic": a.telegram_topic, "autonomy_max": a.autonomy_max, "komputer": a.komputer,
+                       "skills": skills,
                        "shared_skills": [opis_skilla(fl.SHARED_DIR / "skills" / n / "SKILL.md", znane) for n in wspolne],
                        "external_skills": [n for n in obce if n not in wspolne], "scripts": skrypty,
                        "mcp": serwery_mcp(a.dir / "config.yaml"), "env": zmienne_srodowiska(a.dir),
@@ -687,7 +689,8 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
             cfg["tts"] = glos
         wtyczki = cfg.setdefault("plugins", {})
         wlaczone = list(wtyczki.get("enabled") or [])
-        wtyczki["enabled"] = wlaczone + ([WIEDZA_PLUGIN] if WIEDZA_PLUGIN not in wlaczone else [])
+        wtyczki["enabled"] = wlaczone + [w for w in [WIEDZA_PLUGIN] + ([KOMPUTER_PLUGIN] if agent.komputer else [])
+                                         if w not in wlaczone]
         cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("fast")}
         (dest / "config.yaml").write_text("# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty).\n"
                                           + fl.dump_yaml(cfg), encoding="utf-8")
@@ -792,6 +795,12 @@ def main(argv: list[str] | None = None) -> int:
     n_repo = repo_do_skarbca(fleet, out / "wiedza" / "repo", dane_wiedzy)
     build_wiedza_plugin(out / "plugins" / WIEDZA_PLUGIN)
     print(f"✓ skarbiec wiedzy: wiedza/fleet.json, wiedza/repo ({n_repo} plików), plugins/{WIEDZA_PLUGIN}")
+    # Komputer Jarva (docs/KOMPUTER.md §7): wtyczka z narzędziem `komputer`; install-fleet.sh dowiązuje ją tam, gdzie włączona
+    kp = out / "plugins" / KOMPUTER_PLUGIN
+    if kp.exists():
+        remove_tree(kp)
+    shutil.copytree(fl.REPO_ROOT / "komputer" / "plugin", kp, ignore=COPY_IGNORE)
+    print(f"✓ plugins/{KOMPUTER_PLUGIN}: agenci z Komputerem: {', '.join(a.name for a in fleet.active() if a.komputer) or 'brak'}")
 
     notes = build_host(fleet, out / "host", env)
     for note in notes:
@@ -805,7 +814,7 @@ def main(argv: list[str] | None = None) -> int:
         "built_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "repo_rev": repo_rev,
         "agents": summary,
-        "plugins": ["jarvo-hq", WIEDZA_PLUGIN],
+        "plugins": ["jarvo-hq", WIEDZA_PLUGIN, KOMPUTER_PLUGIN],
         "vendored": report,
         "skan_skilli": skan,
         "notes": notes,

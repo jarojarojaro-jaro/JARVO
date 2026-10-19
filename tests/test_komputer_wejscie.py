@@ -343,3 +343,44 @@ def test_ekranem_steruje_jedna_sesja_naraz(komputer, monkeypatch):
     assert kod(c.narzedzie("click", {"element_token": "s1:2"})) == "ok"
     b.zamknij()
     c.zamknij()
+
+
+def test_wtyczka_operatora_przez_ster(komputer, monkeypatch):
+    """Wtyczka jarvo-komputer (komputer/plugin, docs/KOMPUTER.md §7): stan, dziennik i prośba do właściciela
+    przez prawdziwe wejście; wznowić nie umie, bez gniazda mówi, jak włączyć Komputer."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("jarvo_komputer_plugin", REPO / "komputer" / "plugin" / "__init__.py")
+    pl = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pl)
+    monkeypatch.setattr(pl, "STER", wejscie.STER)
+    monkeypatch.setattr(wejscie, "wolno_wznowic", lambda uid: False)         # agent we flocie, nie właściciel
+    narzedzia = []
+
+    class Ctx:
+        def register_tool(self, **kw):
+            narzedzia.append(kw)
+
+    pl.register(Ctx())
+    assert [n["name"] for n in narzedzia] == ["komputer"] and narzedzia[0]["toolset"] == "komputer"
+    assert narzedzia[0]["schema"]["parameters"]["properties"]["akcja"]["enum"] == ["stan", "dziennik", "oddaj"]
+    obsluz = narzedzia[0]["handler"]
+    stan = json.loads(obsluz({"akcja": "stan"}))
+    assert stan["ok"] and stan["dziala"] and not stan["wstrzymane"] and "pauza" not in stan
+    assert not stan["drzewo_dostepnosci"] and "som" in stan["uwaga"]
+    assert "blad" in json.loads(obsluz({"akcja": "oddaj", "prosba": "zrób"}))     # prośba bez treści
+    assert "blad" in json.loads(obsluz({"akcja": "wznow"}))
+    odp = json.loads(obsluz({"akcja": "oddaj", "prosba": "Zaloguj się do panelu sklepu,\nkliknij Dalej"}))
+    assert odp["wstrzymane"] and odp["kto_wstrzymal"].startswith("Operator") and "capture" in odp["dalej"]
+    assert odp["pauza"] == "Operator czeka na właściciela: Zaloguj się do panelu sklepu, kliknij Dalej"
+    assert ster(wejscie.STER, "stan")["wstrzymane"] is True                   # narzędzie nie wysyła wznow
+    wpisy = json.loads(obsluz({"akcja": "dziennik", "n": 5}))["wpisy"]
+    assert wpisy and wpisy[-1]["decyzja"] == "pauza" and wpisy[-1]["kto"] == "flota" and len(wpisy) <= 5
+    assert json.loads(obsluz({"akcja": "dziennik", "n": True}))["ok"]            # zła liczba → domyślne 20
+    monkeypatch.setattr(wejscie, "wolno_wznowic", lambda uid: True)
+    ster(wejscie.STER, "pauza", powod="przerwa")                               # właściciel zatrzymał wcześniej
+    monkeypatch.setattr(wejscie, "wolno_wznowic", lambda uid: False)
+    odp = json.loads(obsluz({"akcja": "oddaj", "prosba": "kliknij Zapłać w Ekranie HQ"}))
+    assert odp["kto_wstrzymal"] == "właściciel" and odp["dalej"].startswith("Właściciel już wstrzymał")
+    monkeypatch.setattr(pl, "STER", os.path.join(komputer.sciezka, "brak.sock"))
+    wyl = json.loads(obsluz({"akcja": "stan"}))
+    assert wyl["ok"] is False and wyl["dziala"] is False and "jarvo komputer on" in wyl["blad"]

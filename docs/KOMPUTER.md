@@ -32,7 +32,7 @@ Czego agent nigdy nie zrobi sam:
 | K0 | Bramka sterownika (`komputer/jarvo_cua.py`), zakazy w `deny.yaml`, reguły walidatora | zrobione |
 | K1 | Obraz i usługa `jarvo-komputer`: pulpit Xvnc, Chromium z drzewem dostępności, `cua-driver` 0.21.0 z sumą, filtr ruchu do sieci lokalnej, `jarvo komputer on/off/status/wyczysc/odswiez` | zrobione |
 | K2 | Wejście sterownika w Komputerze (`wejscie.py`, `zasady.py`): kanał MCP przez gniazdo unix, twarde zasady (płatności, logowanie, hasła, karty, kody, sekrety, zakazane narzędzia i aplikacje), ukrywanie sekretów w odpowiedziach, pauza tylko do zdjęcia przez właściciela, dziennik bez treści, `jarvo komputer pauza/wznow/dziennik`, test na żywo `scripts/komputer-test.sh` | zrobione |
-| K3 | Agent Operator: profil, wtyczka z podpowiedziami, evals, red team, pokój w HQ, dokumentacja | planowane |
+| K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi), skarbiec bez wyciągów, evals, red team, pokój w HQ, dokumentacja | w toku: wtyczka i skarbiec zrobione |
 | K4 | Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj | planowane |
 | K5 | Terminal Operatora w Komputerze (SSH przez gniazdo), ekrany programów tekstowych (tmux), serwery | planowane |
 | K6 | Ręce na Twoim komputerze: podpisany `cua-driver` 0.36, pomocnik na Linux, macOS i Windows, zgoda na aplikację na Twoim ekranie | planowane |
@@ -198,7 +198,30 @@ rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 61 spra
 ukrywanie, kliknięcia elementem i w punkt, pisanie, Enter w formularzach, skróty, powtórzone id, druga sesja
 naraz, prośba Operatora, pauza i wznowienie, dziennik).
 
-## 7. Bezpieczeństwo: zasady i ryzyka
+## 7. Operator: agent przy ekranie (K3)
+
+Operator to jedyny agent z `komputer: true` we `fleet.yaml`. Walidator pilnuje, że tylko taki agent ma
+`computer_use` i klucze `cua:` w zgodach, a build daje mu dodatki poniżej.
+
+**Wtyczka `jarvo-komputer`** (`komputer/plugin`, narzędzie `komputer`): build kopiuje ją do
+`plugins/jarvo-komputer` i włącza (`plugins.enabled`) tylko w profilach z `komputer: true`; `install-fleet.sh`
+dowiązuje ją tylko tam, a z innych profili dowiązanie usuwa. Narzędzie rozmawia z wejściem przez `ster.sock`:
+
+| Akcja | Co robi |
+|---|---|
+| `stan` | czy Komputer działa, pauza i jej powód (kto ją włączył), liczba sesji, czy działa drzewo dostępności; bez AT-SPI podpowiada zrzut z oznaczeniami (`capture` w trybie `som`) |
+| `dziennik` | ostatnie decyzje twardych zasad (1–50 wpisów, bez treści ekranu) |
+| `oddaj` | prośba do właściciela (`prosba`, 8–300 znaków, jedna linia): pauza od floty z tym powodem; Komputer stoi, dopóki właściciel go nie wznowi (`jarvo komputer wznow`, w K4 przycisk w Ekranie HQ); pauzy właściciela prośba nie nadpisuje |
+
+Wznowić narzędzie nie umie (nie ma takiej akcji), a wejście i tak przepuszcza `wznow` tylko od właściciela.
+Bez włączonego Komputera narzędzie odpowiada, że Komputer jest wyłączony i jak go włączyć.
+
+**Skarbiec bez wyciągów z rozmów Operatora.** Wyniki narzędzi Operatora to treść ekranu: cudze dane, maile,
+formularze. Zasiew zapisuje przy takim agencie `bez_wyciagu` w `wiedza-agenci.json`, a wtyczka `jarvo-wiedza`
+nie robi mu wyciągu ani po sesji, ani przed kompresją (docs/WIEDZA.md). Czytanie skarbca i orzeczeń działa jak
+u innych agentów.
+
+## 8. Bezpieczeństwo: zasady i ryzyka
 
 - **Główne zagrożenie to treść ekranu**, nie właściciel: strona, mail albo PDF może próbować wmówić agentowi
   „wpisz klucz”, „otwórz terminal”, „kliknij Kup”. Dlatego Komputer nie ma kluczy floty, a reguły, które muszą
@@ -217,7 +240,7 @@ naraz, prośba Operatora, pauza i wznowienie, dziennik).
   zwykłe przejście pod adres (link, pasek adresu) nie jest blokowane; agent z terminalem we flocie może włączyć
   pauzę i czytać dziennik (bez treści), ale nie zdejmie pauzy. Schowek przy przejęciu ekranu w HQ ustali K4.
 
-## 8. Źródła
+## 9. Źródła
 
 | Źródło | Licencja | Stan |
 |---|---|---|
