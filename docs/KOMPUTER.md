@@ -41,13 +41,17 @@ Czego agent nigdy nie zrobi sam:
 
 ```
  jarvo-hermes (flota, klucze, HQ)                    jarvo-komputer (bez kluczy floty)
- ┌──────────────────────────────────┐   gniazda unix  ┌───────────────────────────────────┐
- │ Operator → computer_use (Hermes)  │  w wolumenie    │ Xvnc + xfwm4 + Chromium + tmux     │
- │   HERMES_CUA_DRIVER_CMD =          │ ─────────────▶ │ wejście: twarde zasady + dziennik  │
- │   komputer/jarvo_cua.py (bramka)   │ jarvo-komputer- │ cua-driver (sterownik ekranu)      │
- │ HQ Ekran (podgląd, Przejmij)       │   gniazda       │ sieć: internet tak, sieć lokalna nie│
- └──────────────────────────────────┘                 └───────────────────────────────────┘
+ ┌──────────────────────────────────┐                ┌───────────────────────────────────┐
+ │ Operator → computer_use (Hermes) │  gniazda unix  │ Xvnc + xfwm4 + Chromium           │
+ │   HERMES_CUA_DRIVER_CMD =        │  w wolumenie   │ wejście: twarde zasady + dziennik │
+ │   komputer/jarvo_cua.py (bramka) │──────────────▶ │ cua-driver (sterownik ekranu)     │
+ │ HQ Ekran: podgląd, Przejmij (K4) │ jarvo-komputer-│ sieć: internet tak, lokalna nie   │
+ │                                  │   gniazda      │ terminal i tmux (K5)              │
+ └──────────────────────────────────┘                └───────────────────────────────────┘
 ```
+
+Części z dopiskiem K4 i K5 są jeszcze w planie (§2): dziś Komputer nie ma terminala ani tmux, a ekran widać
+przez `rfb.sock` tylko do podglądu.
 
 Wolumen `jarvo-komputer-gniazda` jest w `jarvo-hermes` pod `/opt/jarvo/komputer`, a w Komputerze pod
 `/run/jarvo-komputer`. Leżą w nim tylko gniazda: `rfb.sock` (ekran, K1), `cua.sock` (wejście sterownika, K2)
