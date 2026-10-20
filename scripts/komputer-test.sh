@@ -36,7 +36,8 @@ docker exec -i -u pulpit jarvo-komputer bash -c 'mkdir -p /tmp/jarvo-test && cat
 <p><label>Uwagi <textarea name="uwagi"></textarea></label></p>
 <button type="button" accesskey="k">Kup teraz</button> <button type="button">Dodaj do koszyka</button> <a href="#x">Zaloguj się</a>
 <input type="submit" value="Zapłać 129 zł"></form>
-<p><button type="button" onclick="window.open('okno.html','okno','popup,left=520,top=320,width=420,height=320')">Pokaż szczegóły</button></p>
+<p><button type="button" onclick="window.open('okno.html','okno','popup,left=520,top=320,width=420,height=320')">Pokaż szczegóły</button>
+<button type="button" onclick="document.forms[1].insertAdjacentHTML('afterbegin','<p><button type=button>Baner</button></p>')">Pokaż baner</button></p>
 <p>Klucz API: sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX1234567890</p></body></html>
 HTML
 docker exec -i -u pulpit jarvo-komputer bash -c 'cat > /tmp/jarvo-test/okno.html' <<'HTML'

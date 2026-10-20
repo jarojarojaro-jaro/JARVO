@@ -42,6 +42,9 @@ zawężasz widok (przewiń, `app`). Zrzut z obrazem ma `screenshot_path`: to Tw�
   świeżego zrzutu `som`. Nigdy element i punkt naraz.
 - Adres strony: klik w pasek adresu (element „Pasek adresu i wyszukiwania”), `type` z adresem, `key` `return`.
 - Przewijanie: `scroll` `direction` + `amount`; po przewinięciu nowy `capture` (numery elementów się zmieniają).
+- Odmowa `element_zmieniony`: wejście sprawdziło numer w świeżym drzewie i leży pod nim już inny element (strona
+  coś dodała, usunęła albo zmieniła od Twojego `capture`). Nowy `capture` i ten sam element po nowym numerze; nie
+  klikaj w punkt, żeby to ominąć.
 - Klik po `element` (także prawy) w tle, bez `delivery_mode`. Klik w punkt (`coordinate`) tylko z
   `delivery_mode: foreground`: w tle sterownik klika wtedy najmniejszy element programu w tym miejscu okna, także
   niewidoczny albo w innym oknie, więc wejście go odrzuca (`punkt_w_tle`). `type`, `key`, `scroll`, `drag`

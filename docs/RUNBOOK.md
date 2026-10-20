@@ -281,7 +281,7 @@ próby filtra ruchu). Zatrzymanie agenta od razu: `bin/jarvo komputer pauza` (pa
 tylko przez Ciebie: `bin/jarvo komputer wznow` (także gdy Operator czeka na Ciebie: `status` pokazuje jego prośbę,
 np. „zaloguj się do panelu”); decyzje twardych zasad: `bin/jarvo komputer dziennik 50`. Test
 całej drogi flota → wejście → sterownik → Chromium po zmianie w `infra/komputer/`: `bash scripts/komputer-test.sh`
-(76 sprawdzeń, kod 0 tylko przy komplecie). Szczegóły: [KOMPUTER.md §5](KOMPUTER.md#5-komputer-jarva-infrakomputer-k1)
+(79 sprawdzeń, kod 0 tylko przy komplecie). Szczegóły: [KOMPUTER.md §5](KOMPUTER.md#5-komputer-jarva-infrakomputer-k1)
 i [§6](KOMPUTER.md#6-wejście-sterownika-i-twarde-zasady-infrakomputerwejsciepy-zasadypy-k2).
 
 **SSH tylko przez Tailscale** (gdy `ssh jarvo@<ip-tailscale>` działa):

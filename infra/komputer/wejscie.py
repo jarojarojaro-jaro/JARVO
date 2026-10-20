@@ -8,7 +8,9 @@ uruchamia `cua-driver mcp` dopiero przy pierwszej wiadomości i przepuszcza rozm
   - tools/list pokazuje tylko narzędzia dopuszczone, a initialize dopisuje zasady do instrukcji serwera,
   - odpowiedzi tracą sekrety (klucze, tokeny, numery kart) w tekście i w drzewie dostępności,
   - cel kliknięcia i pole z fokusem bierzemy z migawek sterownika i na żywo z AT-SPI (zdarzenia fokusu,
-    element w punkcie), nie z deklaracji agenta.
+    element w punkcie), nie z deklaracji agenta,
+  - działanie na element numerem z migawki idzie dalej dopiero po sprawdzeniu tego numeru w świeżej migawce okna
+    (sterownik szuka elementu po numerze w drzewie z chwili działania).
 Na gnieździe ster.sock polecenia JSON: stan, pauza, wznow, dziennik. Pauzę włączy każdy, kto widzi gniazdo
 (flota, HQ), wznowić może tylko właściciel: proces pulpitu albo root w tym kontenerze (jarvo komputer wznow),
 sprawdzane po SO_PEERCRED, więc agent z terminalem we flocie nie zdejmie sobie pauzy. Dziennik
@@ -58,6 +60,8 @@ ZAJETE_S = 120                  # tyle sekund po ostatnim działaniu ekran nale�
 MAKS_POWOD = 300                # znaków powodu pauzy (prośba Operatora do właściciela)
 PROBY_TRAFIENIA = 3             # zapytań o element w punkcie: dwa zgodne z rzędu albo cel nieznany
 PAUZA_TRAFIENIA = 0.12          # s między nimi: Chromium najpierw zgaduje z drzewa, potem pyta silnik strony
+WEWNETRZNE = "jarvo-wejscie:"   # id zapytań wejścia do sterownika (świeża migawka); agentowi zastrzeżone
+CZAS_MIGAWKI = 30               # s na świeżą migawkę (sterownik sam kończy przejście drzewa po 25 s)
 
 
 def wolno_wznowic(uid: int) -> bool:
@@ -449,6 +453,40 @@ class KontekstSesji:
         else:
             self.skale.pop(pid, None)
 
+    def element_celu(self, args: dict) -> tuple[dict, int] | None:
+        """Migawka tej sesji i numer elementu, w który celuje działanie (element_token albo snapshot_id
+        z element_index); None, gdy działanie nie celuje elementem z migawki tej sesji."""
+        cel = args.get("target") if isinstance(args.get("target"), dict) else {}
+        token = args.get("element_token") or cel.get("element_token")
+        if token:
+            sid, _, indeks = str(token).rpartition(":")
+        else:
+            sid, indeks = args.get("snapshot_id") or cel.get("snapshot_id"), args.get("element_index",
+                                                                                     cel.get("element_index"))
+        m = self.migawki.get(sid) if isinstance(sid, str) else None
+        try:
+            indeks = int(indeks)
+        except (TypeError, ValueError):
+            return None
+        return (m, indeks) if m and indeks in m["elementy"] else None
+
+    @staticmethod
+    def ten_sam(stare: dict, nowe: dict, indeks: int) -> bool:
+        """Czy pod numerem `indeks` świeżej migawki leży ten sam element co w migawce agenta: rola, napis, głębokość
+        i przodkowie pod tymi samymi numerami (tak daleko, jak sięga migawka agenta)."""
+        def znak(e: dict) -> tuple:
+            return e.get("role"), e.get("label") or "", e.get("depth"), e.get("parent_index")
+        a, b = stare.get(indeks), nowe.get(indeks)
+        for _ in range(MAKS_PRZODKOWIE):
+            if a is None:
+                return True                         # dalej migawka agenta nie sięga (query, max_elements)
+            if b is None or znak(a) != znak(b):
+                return False
+            if a.get("parent_index") is None:
+                return True
+            a, b = stare.get(a["parent_index"]), nowe.get(a["parent_index"])
+        return False
+
     def _z_migawki(self, sid: str | None, indeks) -> dict | None:
         m = self.migawki.get(sid or "")
         if not m:
@@ -608,6 +646,9 @@ class Sesja:
         self._pisz = threading.Lock()
         self._wywolania: dict = {}                    # id żądania -> (narzędzie, args)
         self._koniec = threading.Event()
+        self._wewn: dict[str, list] = {}              # id zapytania wejścia -> [zdarzenie, odpowiedź]
+        self._wewn_n = 0
+        self._wewn_lock = threading.Lock()
 
     # --- wysyłanie
     def do_agenta(self, wiadomosc: dict) -> None:
@@ -677,6 +718,9 @@ class Sesja:
             # odpowiedź sterownika musi trafić do właściwego wywołania (ukrywanie sekretów, migawki okien)
             self._blad_rpc(ident, -32600, "id żądania jest już w toku")
             return
+        if isinstance(ident, str) and ident.startswith(WEWNETRZNE):
+            self._blad_rpc(ident, -32600, "id zastrzeżone dla wejścia Komputera")
+            return
         if metoda == "tools/call":
             params = msg.get("params") if isinstance(msg.get("params"), dict) else {}
             nazwa, args = str(params.get("name", "")), params.get("arguments") or {}
@@ -684,6 +728,10 @@ class Sesja:
                 self._blad_rpc(ident, -32602, "arguments musi być obiektem")
                 return
             w = self._ocen(nazwa, args)
+            if w.wolno and nazwa in zasady.DZIALANIA:
+                w, swieze = self._swiezy_element(args, w)
+                if swieze is not args:
+                    args, msg = swieze, {**msg, "params": {**params, "arguments": swieze}}
             self._zapisz(nazwa, args, w)
             if not w.wolno:
                 if ident is not None:
@@ -711,6 +759,72 @@ class Sesja:
             return zasady.Werdykt(zasady.ODMOWA, "limit", f"ponad {LIMIT_DZIALAN} działań na minutę; zwolnij")
         return w
 
+    def _swiezy_element(self, args: dict, w: zasady.Werdykt) -> tuple[zasady.Werdykt, dict]:
+        """Sterownik szuka elementu po numerze w drzewie z chwili działania, a strona zmieniona od migawki agenta
+        (element dodany albo usunięty wcześniej w drzewie) przesuwa numery: działanie trafiłoby w inny element niż
+        sprawdzony. Wejście robi więc świeżą migawkę tego okna (bez zrzutu), porównuje element pod tym numerem
+        i jego przodków, a sterownik dostaje token świeżej migawki (nowa migawka okna unieważnia starszą). Inny
+        element albo brak odpowiedzi: odmowa `element_zmieniony`."""
+        cel = self.ctx.element_celu(args)
+        if cel is None:
+            if not any(isinstance(d, dict) and (d.get("element_token") or d.get("element_index") is not None)
+                       for d in (args, args.get("target"))):
+                return w, args
+            return zasady.Werdykt(zasady.ODMOWA, "nieznany_cel", "elementu nie ma w migawkach tej sesji; zrób "
+                                  "get_window_state i wybierz element z niej", cel=w.cel), args
+        m, indeks = cel
+        pid, okno = m["okno"]
+        zapytanie = {"pid": pid, "window_id": okno, "include_screenshot": False}
+        if isinstance(args.get("session"), str):
+            zapytanie["session"] = args["session"]
+        wynik = (self._zapytaj_sterownik("get_window_state", zapytanie) or {}).get("result")
+        sc = wynik.get("structuredContent") if isinstance(wynik, dict) and not wynik.get("isError") else None
+        sid = sc.get("snapshot_id") if isinstance(sc, dict) else None
+        if not isinstance(sid, str) or not isinstance(sc.get("elements"), list):
+            return zasady.Werdykt(zasady.ODMOWA, "element_zmieniony",
+                                  "nie udało się sprawdzić elementu w świeżym drzewie okna (okno zniknęło albo "
+                                  "sterownik nie odpowiedział); zrób get_window_state jeszcze raz",
+                                  cel=w.cel), args
+        nowe = {e.get("element_index"): e for e in sc["elements"] if isinstance(e, dict)}
+        if not KontekstSesji.ten_sam(m["elementy"], nowe, indeks):
+            def opis(e: dict) -> str:
+                tekst, _ = zasady.ukryj_sekrety(f"{e.get('role') or '?'} „{(e.get('label') or '')[:60]}”")
+                return tekst
+            teraz = nowe.get(indeks)
+            return zasady.Werdykt(zasady.ODMOWA, "element_zmieniony",
+                                  f"strona zmieniła się od migawki: pod numerem {indeks} jest teraz "
+                                  f"{opis(teraz) if teraz else 'inny element'} zamiast "
+                                  f"{opis(m['elementy'][indeks])}; zrób get_window_state jeszcze raz i wybierz "
+                                  f"element z nowej migawki", cel=w.cel), args
+        token = (nowe[indeks].get("element_token") if isinstance(nowe[indeks].get("element_token"), str)
+                 else f"{sid}:{indeks}")
+        swieze = dict(args)
+        if isinstance(args.get("target"), dict):
+            swieze["target"] = dict(args["target"])
+        for d in (swieze, swieze.get("target")):
+            if isinstance(d, dict):
+                if d.get("element_token"):
+                    d["element_token"] = token
+                if d.get("snapshot_id"):
+                    d["snapshot_id"] = sid
+        return w, swieze
+
+    def _zapytaj_sterownik(self, nazwa: str, args: dict) -> dict | None:
+        """Wywołanie narzędzia sterownika przez samo wejście, w tej sesji; agent go nie widzi. Odpowiedź albo None
+        (po CZAS_MIGAWKI s albo gdy sesja się kończy)."""
+        with self._wewn_lock:
+            self._wewn_n += 1
+            ident = f"{WEWNETRZNE}{self._wewn_n}"
+            gotowe = threading.Event()
+            self._wewn[ident] = [gotowe, None]
+        self.do_sterownika({"jsonrpc": "2.0", "id": ident, "method": "tools/call",
+                            "params": {"name": nazwa, "arguments": args}})
+        koniec = time.monotonic() + CZAS_MIGAWKI
+        while not gotowe.wait(0.2) and not self._koniec.is_set() and time.monotonic() < koniec:
+            pass
+        with self._wewn_lock:
+            return self._wewn.pop(ident, [None, None])[1]
+
     def _zapisz(self, nazwa: str, args, w: zasady.Werdykt) -> None:
         if nazwa in zasady.ODCZYT and w.wolno:
             return                                  # odczyty nie zapychają dziennika
@@ -734,6 +848,14 @@ class Sesja:
                 try:
                     msg = json.loads(linia)
                 except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if (isinstance(msg, dict) and isinstance(msg.get("id"), str) and msg["id"].startswith(WEWNETRZNE)
+                        and ("result" in msg or "error" in msg)):
+                    with self._wewn_lock:                 # odpowiedź na zapytanie wejścia: nie do agenta
+                        czeka = self._wewn.get(msg["id"])
+                        if czeka is not None:
+                            czeka[1] = msg
+                            czeka[0].set()
                     continue
                 if isinstance(msg, dict) and "id" in msg and ("result" in msg or "error" in msg):
                     msg = self._po_odpowiedzi(msg)

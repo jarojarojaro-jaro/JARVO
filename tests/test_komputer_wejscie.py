@@ -23,7 +23,7 @@ import wejscie  # noqa: E402
 
 KLUCZ = "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX1234567890"
 STEROWNIK = textwrap.dedent('''
-    import json, sys
+    import json, os, sys, time
     log = open(sys.argv[1], "a")
     KLUCZ = "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX1234567890"
     STAN = {"snapshot_id": "s1", "pid": 7, "window_id": 3, "screenshot_width": 800, "elements": [
@@ -51,8 +51,18 @@ STEROWNIK = textwrap.dedent('''
             pisz({"jsonrpc": "2.0", "id": "obce", "result": {"content": [{"type": "text", "text": KLUCZ}]}})
             pisz({"jsonrpc": "2.0", "id": i, "error": {"code": 1, "message": "zły klucz " + KLUCZ}})
         elif metoda == "tools/call":
-            nazwa = m["params"]["name"]
+            nazwa, a = m["params"]["name"], m["params"].get("arguments") or {}
             sc = STAN if nazwa == "get_window_state" else {"ok": True}
+            if nazwa == "get_window_state" and a.get("include_screenshot") is False:   # świeża migawka wejścia
+                if os.path.exists(sys.argv[1] + ".cisza"):
+                    continue
+                sc = dict(STAN, snapshot_id="s9")
+                if os.path.exists(sys.argv[1] + ".zmiana"):   # strona dodała przycisk na początku formularza
+                    p = lambda e: e.get("parent_index") and e["parent_index"] + 1 or e.get("parent_index")
+                    sc["elements"] = [STAN["elements"][0], {"element_index": 1, "parent_index": 5,
+                                      "role": "push button", "label": "Baner"}] + [
+                        {**e, "element_index": e["element_index"] + 1, "parent_index": p(e)}
+                        for e in STAN["elements"][1:]]
             pisz({"jsonrpc": "2.0", "id": i, "result": {
                 "content": [{"type": "text", "text": f"{nazwa} gotowe, {KLUCZ}"}], "structuredContent": sc}})
 ''')
@@ -205,6 +215,60 @@ def test_rozmowa_mcp_odmowy_i_ukrywanie(komputer):
     assert kod(w) == "ok" and KLUCZ not in json.dumps(w)
     assert komputer.do_sterownika()[-1]["params"]["name"] == "click"
     k.zamknij()
+
+
+def test_element_sprawdzany_w_swiezej_migawce(komputer, monkeypatch):
+    """Sterownik szuka elementu po numerze w drzewie z chwili działania: wejście porównuje element pod tym numerem
+    w świeżej migawce (bez zrzutu) i podaje sterownikowi jej token; strona zmieniona od migawki agenta to odmowa."""
+    k = Klient(wejscie.CUA)
+    k.rpc("initialize")
+    k.narzedzie("get_window_state", {"pid": 7, "window_id": 3})
+    w = k.narzedzie("click", {"pid": 7, "window_id": 3, "element_token": "s1:2"})
+    assert kod(w) == "ok"
+    sprawdzenie, klik = komputer.do_sterownika()[-2:]
+    assert sprawdzenie["params"] == {"name": "get_window_state",
+                                     "arguments": {"pid": 7, "window_id": 3, "include_screenshot": False}}
+    assert sprawdzenie["id"].startswith(wejscie.WEWNETRZNE)
+    assert klik["params"]["arguments"]["element_token"] == "s9:2"         # token świeżej migawki
+    # numer w target i snapshot_id z numerem też dostają świeżą migawkę
+    k.narzedzie("click", {"pid": 7, "target": {"snapshot_id": "s1", "element_index": 2}})
+    assert komputer.do_sterownika()[-1]["params"]["arguments"]["target"] == {"snapshot_id": "s9", "element_index": 2}
+    # strona dodała przycisk wyżej w drzewie: pod numerem 2 jest teraz pole E-mail, nie „Dodaj do koszyka”
+    open(os.path.join(komputer.sciezka, "wywolania.jsonl.zmiana"), "w").close()
+    w = k.narzedzie("click", {"pid": 7, "window_id": 3, "element_token": "s1:2"})
+    assert zasada(w) == "element_zmieniony"
+    tekst = w["content"][0]["text"]
+    assert "pod numerem 2 jest teraz entry „E-mail” zamiast push button „Dodaj do koszyka”" in tekst
+    assert komputer.do_sterownika()[-1]["params"]["name"] == "get_window_state"   # klik nie doszedł
+    # sterownik nie odpowiada na świeżą migawkę: odmowa po czasie, nie przepuszczenie
+    monkeypatch.setattr(wejscie, "CZAS_MIGAWKI", 0.5)
+    open(os.path.join(komputer.sciezka, "wywolania.jsonl.cisza"), "w").close()
+    w = k.narzedzie("set_value", {"pid": 7, "window_id": 3, "element_token": "s1:1", "value": "a@b.pl"})
+    assert zasada(w) == "element_zmieniony" and "nie udało się sprawdzić" in w["content"][0]["text"]
+    assert komputer.do_sterownika()[-1]["params"]["name"] == "get_window_state"
+    # element spoza migawek tej sesji nie idzie do sterownika bez sprawdzenia (także przy działaniu, którego
+    # zasady nie pytają o cel); działanie bez elementu przechodzi bez świeżej migawki
+    s = wejscie.Sesja.__new__(wejscie.Sesja)
+    s.ctx = wejscie.KontekstSesji(None)
+    tak = wejscie.zasady.Werdykt(wejscie.zasady.TAK)
+    for args in ({"element_token": "s7:2"}, {"target": {"snapshot_id": "s7", "element_index": 0}}):
+        assert s._swiezy_element(args, tak)[0].kod == "nieznany_cel"
+    assert s._swiezy_element({"pid": 7, "direction": "down"}, tak) == (tak, {"pid": 7, "direction": "down"})
+    # id zapytań wejścia są agentowi zastrzeżone (odpowiedź sterownika na nie nie trafia do agenta)
+    k.wyslij({"jsonrpc": "2.0", "id": wejscie.WEWNETRZNE + "1", "method": "ping"})
+    assert k.czytaj()["error"]["code"] == -32600
+    k.zamknij()
+
+
+def test_ten_sam_element():
+    stare = {2: {"role": "push button", "label": "Dalej", "depth": 3, "parent_index": 1},
+             1: {"role": "form", "label": "", "depth": 2, "parent_index": 0}}
+    nowe = {**stare, 0: {"role": "document web", "label": "Sklep", "depth": 1}}
+    assert wejscie.KontekstSesji.ten_sam(stare, nowe, 2)            # migawka agenta bez korzenia (query)
+    assert not wejscie.KontekstSesji.ten_sam(stare, {**nowe, 2: {**stare[2], "label": "Kup teraz"}}, 2)
+    assert not wejscie.KontekstSesji.ten_sam(stare, {**nowe, 1: {**stare[1], "role": "section"}}, 2)
+    assert not wejscie.KontekstSesji.ten_sam(stare, {**nowe, 2: {**stare[2], "parent_index": 0}}, 2)
+    assert not wejscie.KontekstSesji.ten_sam(stare, {1: stare[1]}, 2)
 
 
 def test_protokol_tylko_pojedyncze_znane_wiadomosci(komputer):

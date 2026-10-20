@@ -256,6 +256,19 @@ def main() -> int:
     w = k.narzedzie("hotkey", {**pisz, "keys": ["option", "shift", "k"]})
     sprawdz(zasada(w) == "accesskey", "Alt+Shift+K (accesskey przycisku „Kup teraz”): zablokowane", tekst(w))
 
+    # strona zmieniona od migawki: przycisk dodany na początku koszyka przesuwa numery elementów, a sterownik szuka
+    # elementu po numerze w drzewie z chwili kliknięcia; wejście porównuje go w świeżej migawce
+    w, el = stan()
+    stary = el["Dodaj do koszyka"]["element_token"]
+    sprawdz(kod(klik("Pokaż baner")) == "ok", "klik „Pokaż baner” (token świeżej migawki od wejścia): przechodzi")
+    time.sleep(0.5)
+    w = k.narzedzie("click", {"pid": pid, "window_id": wid, "element_token": stary})
+    sprawdz(zasada(w) == "element_zmieniony" and "„Dodaj do koszyka”; zrób" in tekst(w),
+            "klik „Dodaj do koszyka” numerem sprzed zmiany strony (pod nim jest już inny element): zablokowany",
+            tekst(w))
+    w, el = stan()
+    sprawdz(kod(klik("Dodaj do koszyka")) == "ok", "ten sam klik z nowej migawki: przechodzi")
+
     # okno podręczne w innym miejscu ekranu (window.open): klik w punkt sprawdzany w tym oknie, nie w oknie pod nim
     sprawdz(kod(klik("Pokaż szczegóły")) == "ok", "klik „Pokaż szczegóły” (otwiera okno podręczne): przechodzi")
     okno2 = None

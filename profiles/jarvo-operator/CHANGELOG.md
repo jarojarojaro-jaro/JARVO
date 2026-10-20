@@ -1,6 +1,11 @@
 # Changelog: jarvo-operator
 
 ## Niewydane
+- Wejście Komputera (KS3, docs/KOMPUTER.md §6): przed działaniem na element numerem z migawki wejście robi świeżą
+  migawkę okna bez zrzutu i porównuje element pod tym numerem (rola, napis, głębokość, przodkowie); strona zmieniona
+  od `capture` to odmowa `element_zmieniony` (nowy `capture`, element z nowej migawki), a ten sam element idzie do
+  sterownika z tokenem świeżej migawki. Działanie na element trwa ok. 0,7 s dłużej. SOUL (pkt 5), skill
+  `praca-na-ekranie` i eval `operator-element-zmieniony`.
 - Wejście Komputera, twarde zasady (KS2, docs/KOMPUTER.md §6): klik w punkt tylko z `delivery_mode: foreground`
   w aktywnym oknie (w tle cua-driver 0.21.0 klika najmniejszy element programu w tym miejscu okna, także niewidoczny
   albo w innym oknie: odmowa `punkt_w_tle`); klik w punkt sprawdzany w oknie, które naprawdę dostanie kliknięcie

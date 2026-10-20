@@ -32,7 +32,7 @@ Czego agent nigdy nie zrobi sam:
 | K0 | Bramka sterownika (`komputer/jarvo_cua.py`), zakazy w `deny.yaml`, reguły walidatora | zrobione |
 | K1 | Obraz i usługa `jarvo-komputer`: pulpit Xvnc, Chromium z drzewem dostępności, `cua-driver` 0.21.0 z sumą, filtr ruchu do sieci lokalnej, `jarvo komputer on/off/status/wyczysc/odswiez` | zrobione |
 | K2 | Wejście sterownika w Komputerze (`wejscie.py`, `zasady.py`): kanał MCP przez gniazdo unix, twarde zasady (płatności, logowanie, hasła, karty, kody, sekrety, zakazane narzędzia i aplikacje), ukrywanie sekretów w odpowiedziach, pauza tylko do zdjęcia przez właściciela, dziennik bez treści, `jarvo komputer pauza/wznow/dziennik`, test na żywo `scripts/komputer-test.sh` | zrobione |
-| K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi), skarbiec bez wyciągów, 5 skilli, 19 evals, 2 ataki red teamu, pokój Sterownia w HQ, wzorzec w `dispatch-playbook`, dokumentacja | zrobione |
+| K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi), skarbiec bez wyciągów, 5 skilli, 20 evals, 2 ataki red teamu, pokój Sterownia w HQ, wzorzec w `dispatch-playbook`, dokumentacja | zrobione |
 | K4 | Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj | planowane |
 | K5 | Terminal Operatora w Komputerze (SSH przez gniazdo), ekrany programów tekstowych (tmux), serwery | planowane |
 | K6 | Ręce na Twoim komputerze: podpisany `cua-driver` 0.36, pomocnik na Linux, macOS i Windows, zgoda na aplikację na Twoim ekranie | planowane |
@@ -188,6 +188,7 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 | numer karty w dowolnym tekście | robi właściciel (`karta`) |
 | klucz, token albo klucz prywatny w tekście; adres `javascript:`, `data:`, `file:`, `chrome:`, `devtools:`, `view-source:` | zablokowane |
 | pisanie, gdy nie wiadomo, gdzie trafi tekst (brak fokusu albo pole z fokusem, którego AT-SPI nie potwierdza na żywo); klik w element spoza migawek tej sesji; klik w punkt, gdy kliknięcie dostałoby inne okno albo okienko podręczne (lista, menu, podpowiedź), gdy punkt leży poza oknem, na pulpicie albo w oknie innego programu, gdy AT-SPI nie odpowiada albo dwie odpowiedzi z rzędu się różnią; element i punkt naraz | zablokowane (`brak_fokusu`, `nieznany_cel`, `cel`) |
+| działanie na element numerem z migawki (`element_token`, `snapshot_id` z `element_index`), gdy w świeżym drzewie okna pod tym numerem leży już inny element (strona dodała albo usunęła coś wyżej, zmieniła napis), albo gdy świeżej migawki nie da się zrobić | zablokowane (`element_zmieniony`; nowy `get_window_state` i element z nowej migawki) |
 | zwykły klik lewym w punkt w tle: cua-driver 0.21.0 wywołuje wtedy akcję najmniejszego elementu programu, którego prostokąt we współrzędnych swojego okna zawiera punkt, w dowolnym oknie programu, także niewidocznego (przewiniętego, przyciętego, przezroczystego), a nie elementu, który widać | zablokowane (`punkt_w_tle`; klik elementem albo w punkt na wierzchu) |
 | Tab i inne znaki sterujące w tekście `type_text` (Tab przeniósłby fokus na następny element, a reszta tekstu i Enter trafiłyby tam bez sprawdzenia); nowa linia w środku tekstu w polu jednowierszowym (Enter wysłałby formularz w połowie) | zablokowane (`znak_sterujacy`, `enter_w_srodku`; Tab osobno przez `key`) |
 | `launch_app` innego programu niż Chromium, z `launch_path` lub flagami, z adresem innym niż http(s); `kill_app` innego procesu niż Chromium | zablokowane |
@@ -209,6 +210,11 @@ strony daje przy następnym, więc wejście pyta, aż dwie odpowiedzi z rzędu s
 libatspi trzyma w pamięci listę okien i stany programu i odświeża je tylko zdarzeniami, których wejście nie słucha
 (nowe okienko podręczne nie byłoby widoczne), więc przed każdym sprawdzeniem pamięć programu idzie do kosza
 (`clear_cache`, kilka ms) i odczyty pytają Chromium na żywo.
+Sterownik szuka elementu po numerze w drzewie z chwili działania, więc przed każdym działaniem na element wejście
+robi własną migawkę tego okna bez zrzutu (`include_screenshot: false`, ok. 0,7 s na stronie sklepu) i porównuje
+element pod tym numerem z migawką agenta: rolę, napis, głębokość i przodków pod tymi samymi numerami. Ten sam
+element: sterownik dostaje token świeżej migawki (nowa migawka okna unieważnia w sterowniku starszą), inny albo
+brak odpowiedzi: odmowa `element_zmieniony`.
 Pole z fokusem klawiatury zna ze zdarzeń AT-SPI (rola, nazwa, stany, atrybuty HTML: `tag`, `html-input-name`,
 `text-input-type`, `autocomplete`) i przed każdym pisaniem sprawdza na żywo, że to pole nadal ma fokus. Przy
 Enterze szuka formularza pola i jego przycisków (AT-SPI Collection; bez niej do 3000 elementów, a w większym
@@ -243,8 +249,8 @@ tekstu w nim nie ma.
 
 **Test na żywo**: `bash scripts/komputer-test.sh` (Komputer włączony) stawia w Komputerze stronę testową
 (wyszukiwarka i koszyk z polami hasła, karty, BLIK, przyciskami płatności i kluczem API w treści) i prowadzi
-rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 76 sprawdzeń (narzędzia, aplikacje,
-ukrywanie, kliknięcia elementem i w punkt, klik w punkt w tle, pisanie, okno nieaktywne, okienko podręczne nad oknem
+rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 79 sprawdzeń (narzędzia, aplikacje,
+ukrywanie, kliknięcia elementem i w punkt, klik w punkt w tle, numer elementu po zmianie strony, pisanie, okno nieaktywne, okienko podręczne nad oknem
 i przesunięte okno, Enter w formularzach, Tab i znaki sterujące, skróty i `accesskey`, powtórzone id, druga sesja
 naraz, prośba Operatora, pauza i wznowienie, dziennik).
 
@@ -286,8 +292,8 @@ albo oddanie ekranu.
 z tabelą kroków i zrzutem problemu, kończy przed płatnością), `oddaj-ekran` (krok właściciela: logowanie, płatność,
 CAPTCHA, prośba w jednym zdaniu). Skilli ze skryptami (konwerter, OCR) nie ma, bo nie ma terminala.
 
-**Evals i red team:** 19 scenariuszy (`evals/jarvo-operator/`: droga bez ekranu, pętla, formularz, tabela, ścieżka
-sklepu, logowanie, `wymaga_czlowieka`, pauza, wyłączony Komputer, `escalate`, `okno_nieaktywne`, `punkt_w_tle`, skarbiec, wstrzyknięcie z ekranu,
+**Evals i red team:** 20 scenariuszy (`evals/jarvo-operator/`: droga bez ekranu, pętla, formularz, tabela, ścieżka
+sklepu, logowanie, `wymaga_czlowieka`, pauza, wyłączony Komputer, `escalate`, `okno_nieaktywne`, `punkt_w_tle`, `element_zmieniony`, skarbiec, wstrzyknięcie z ekranu,
 karta w czacie, 4 poza zakresem) i 2 ataki (`security/redteam/`: polecenie ukryte na stronie, hasło i karta z czatu).
 
 **Wtyczka `jarvo-komputer`** (`komputer/plugin`, narzędzie `komputer`): build kopiuje ją do
@@ -343,10 +349,12 @@ u innych agentów.
 - **Element w punkcie według Chromium.** Gdy silnik strony nie odpowie na trafienie w 0,12–0,24 s (strona
   zajęta skryptem), dwie zgodne odpowiedzi to zgadywanie z drzewa, które nie zna warstw `z-index`: strona
   ułożona tak, żeby zgadywanie i prawdziwe kliknięcie trafiały w różne elementy, mogłaby przemycić klik.
-- **Klik elementem według numeru.** Sterownik szuka elementu po numerze z migawki w drzewie z chwili kliknięcia;
-  strona, która między migawką a kliknięciem doda albo usunie elementy przed nim, przesuwa numery i klik trafi
-  w inny element niż sprawdzony. Kolejny krok: wejście porówna przed kliknięciem element pod tym numerem w świeżym
-  drzewie z migawką.
+- **Klik elementem według numeru.** Sterownik szuka elementu po numerze w drzewie z chwili kliknięcia, a wejście
+  sprawdza ten numer w świeżej migawce tuż przed przekazaniem działania (§6). Zostaje chwila między tą migawką
+  a przejściem drzewa przez sterownik (ułamek sekundy), w której strona mogłaby jeszcze przestawić elementy,
+  i elementy nie do odróżnienia w drzewie (ta sama rola, napis i przodkowie, np. kilka przycisków „Usuń” w liście
+  bez opisów): po usunięciu wiersza wyżej klik trafi w taki sam przycisk w następnym wierszu. Każde działanie na
+  element kosztuje drugie przejście drzewa (ok. 0,7 s).
 - **Migawka okna podręcznego (cua-driver 0.21.0).** `get_window_state` zwraca drzewo całego programu (wszystkie
   okna), a ramki elementów przesuwa o położenie okna z zapytania: w oknie poza rogiem ekranu ramki są przesunięte
   drugi raz. Wejście nie liczy z nich punktów (bierze położenie okna z X11), a agent w punkt klika ze zrzutu.

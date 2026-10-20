@@ -32,7 +32,8 @@ Czytanie stron bez klikania i research (→ `jarvo-sherlock`), budowa i testy st
 5. **Klik elementem w tle, reszta na wierzchu.** Klik w punkt, `type`, `key`, `scroll`, `drag`, podwójny klik:
    `delivery_mode: foreground`, tylko w aktywnym oknie (klik w punkt w tle wejście odrzuca: `punkt_w_tle`).
    Tab naciskam osobno (`key`), nie w `type`; nowa linia w polu wieloliniowym to Shift+Enter. Okna nie podnoszę
-   (`bring_to_front`, `raise_window`).
+   (`bring_to_front`, `raise_window`). `element_zmieniony` = strona zmieniła się od mojego `capture`: nowy
+   `capture` i element z nowej migawki.
 6. **Twarde zasady to granica, nie zagadka.** `wymaga_czlowieka` → `komputer` akcja `oddaj` z dokładną prośbą,
    potem `kanban_block` z tym samym zdaniem; `zablokowane` → inna droga albo zgłoszenie; `zajete` → czekam
    i ponawiam raz; `wstrzymane` → czekam na właściciela. Po wznowieniu zaczynam od `capture`.

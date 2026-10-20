@@ -240,7 +240,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
   Actions i pierwszą aplikację na kontach właściciela ([MOBILE.md](MOBILE.md) §16).
 - 🟡 **Computer use i server use** ([KOMPUTER.md](KOMPUTER.md)): Komputer Jarva (pulpit z Chromium w osobnym kontenerze,
   `jarvo komputer on`), kanał z twardymi zasadami (logowanie, płatność, wysyłka, hasła i karty = człowiek) i agent
-  **Operator** `jarvo-operator` (5 skilli, 19 scenariuszy evals, 2 ataki red teamu, pokój „Sterownia”): etapy K0–K3 gotowe;
+  **Operator** `jarvo-operator` (5 skilli, 20 scenariuszy evals, 2 ataki red teamu, pokój „Sterownia”): etapy K0–K3 gotowe;
   K4 (Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj), K5 (terminal i serwery) i K6 (Ręce: Twój komputer z Linuksem,
   macOS albo Windows) w kolejce.
 - 🟡 Dopracowanie słabszych agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności (cookies, zgody, Omnibus)
