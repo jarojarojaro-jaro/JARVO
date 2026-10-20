@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.machinery
 import importlib.util
+import json
 import os
 import re
 import sys
@@ -197,6 +198,23 @@ def test_lightpanda_version_in_docs_matches_image_pin():
     toolbox = yaml.safe_load((REPO / "profiles" / "jarvo-sherlock" / "toolbox.yaml").read_text(encoding="utf-8"))
     lp = next(t for t in toolbox["tools"] if t["name"] == "lightpanda")
     assert str(lp["version"]) == pin
+
+
+def test_browser_versions_in_docs_match_pins_and_source_registry():
+    """Wersja w SOURCES.md = pin w obrazie, a commit przy niej = przejrzane w vendor/zrodla.yaml (spis nie opisuje
+    innej wersji niż ta, którą flota naprawdę ma)."""
+    docker = (REPO / "infra" / "Dockerfile").read_text(encoding="utf-8")
+    pkg = json.loads((REPO / "infra" / "node" / "package.json").read_text(encoding="utf-8"))
+    sources = (REPO / "docs" / "SOURCES.md").read_text(encoding="utf-8")
+    zrodla = yaml.safe_load((REPO / "vendor" / "zrodla.yaml").read_text(encoding="utf-8"))["zrodla"]
+    piny = {"browser": ("https://github.com/lightpanda-io/browser",
+                        re.search(r"^ARG LIGHTPANDA_IMAGE=lightpanda/browser:([\d.]+)@", docker, re.M).group(1)),
+            "agent-browser": ("https://github.com/vercel-labs/agent-browser", pkg["dependencies"]["agent-browser"])}
+    for nazwa, (repo, pin) in piny.items():
+        wiersz = re.search(rf"^\| \[[^]]+\]\({re.escape(repo)}\) ([\d.]+) \|.*?commit `([0-9a-f]{{7,40}})`", sources, re.M)
+        assert wiersz, nazwa
+        assert wiersz.group(1) == pin, nazwa
+        assert zrodla[nazwa]["repo"] == repo and zrodla[nazwa]["przejrzane"].startswith(wiersz.group(2)), nazwa
 
 
 def test_camoufox_pinned_and_lean():

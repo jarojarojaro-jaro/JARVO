@@ -190,7 +190,8 @@ zrodla:
   agent-browser:
     repo: https://github.com/vercel-labs/agent-browser
     status: uzywane
-    przejrzane: 526157cfd4ec64f45939f9ba0f10d5936aa7ac33
+    przejrzane: aff6125c023b810ea3f2e5deec5379e9a4270bdc
+    notatka: "agent-browser 0.38.1 (paczka npm przypięta w infra/node/package.json; tag v0.38.1 = commit aff6125, atestacja SLSA paczki npm wskazuje ten sam commit): sterownik narzędzi browser_* Hermesa, w obrazie tylko natywna binarka tej platformy, postinstall zablokowany. Przegląd 2026-10-11. Wcześniej spis miał tu commit 526157c z gałęzi main (po v0.38.2), a nie wersję z obrazu. Nowsze wydania (0.38.2, 0.39.0, 0.39.1) czekają na decyzję właściciela"
   browser:
     repo: https://github.com/lightpanda-io/browser
     status: uzywane
