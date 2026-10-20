@@ -14,7 +14,8 @@
 #
 # Zmienne: JARVO_IMAGE_REPO (domyślnie ghcr.io/jarojarojaro-jaro/jarvo-hermes),
 #          JARVO_BUILD_IMAGE=1 (zawsze buduj na miejscu: `pobierz` od razu zwraca 1; tak samo przy własnym
-#          HERMES_IMAGE w <katalog>/.env, bo obraz z rejestru ma Hermesa przypiętego w infra/Dockerfile),
+#          HERMES_IMAGE w <katalog>/.env, bo obraz z rejestru ma Hermesa przypiętego w infra/Dockerfile,
+#          i przy dodatkach obrazu w JARVO_EXTRAS (zmienna albo <katalog>/.env), bo CI buduje obraz bez nich),
 #          JARVO_TOKEN (klucz dostępu z instalatora: logowanie do rejestru, gdy obraz nie jest publiczny),
 #          JARVO_IMAGE_WAIT (ile sekund czekać na obraz budowany przez CI, domyślnie 1200; 0 = od razu buduj),
 #          JARVO_IMAGE_POLL (co ile sekund pytać rejestr, domyślnie 30).
@@ -35,6 +36,13 @@ case "${1:-}" in
     if [[ -n "${2:-}" ]] && grep -q '^HERMES_IMAGE=.' "$2/.env" 2>/dev/null; then
       echo "ℹ Własny HERMES_IMAGE w $2/.env: buduję obraz na miejscu."; exit 1
     fi
+    # dodatki obrazu (JARVO_EXTRAS, jak czyta je compose: zmienna przed compose/.env): obraz z rejestru ich nie ma
+    ex="${JARVO_EXTRAS:-}"
+    [[ -z "$ex" && -n "${2:-}" && -f "$2/.env" ]] && ex="$(sed -n 's/^JARVO_EXTRAS=//p' "$2/.env" | tail -1)"
+    ex=" ${ex//[,\"\']/ } "
+    for x in rembg media docling manim office; do   # te, które infra/Dockerfile instaluje przy budowie
+      if [[ "$ex" == *" $x "* ]]; then echo "ℹ Dodatek obrazu $x (JARVO_EXTRAS): buduję obraz na miejscu."; exit 1; fi
+    done
     k="$(klucz)"; img="$REPO_IMG:src-$k"
     echo "▶ Pobieram gotowy obraz floty ($img, ok. 2,5 GB)"
     blad=""

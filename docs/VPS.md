@@ -100,7 +100,9 @@ Bezpieczniki: `kanban.max_in_progress: 3` (bez tego Hermes liczy 8 pracowników 
 | + Komputer Jarva (computer use) | 4 vCPU | 8 GB | +1,5 GB | pulpit z Chromium ok. 0,3 GB w spoczynku, do 2 GB w pracy (`KOMPUTER_MEM_LIMIT`), włączany `jarvo komputer on`; pracuje na nim Operator (`jarvo-operator`) |
 | + Langfuse / Honcho | 8 vCPU | 16 GB | 160 GB+ | self-hostowane ślady i pamięć (ClickHouse i Postgres są pamięciożerne) |
 
-**Dodatki obrazu** (`JARVO_EXTRAS` w `compose/.env`, potem `deploy.sh --rebuild`), domyślnie wyłączone:
+**Dodatki obrazu** (`JARVO_EXTRAS` w `compose/.env`, potem `deploy.sh --rebuild`), domyślnie wyłączone. Gotowy obraz
+z rejestru ich nie ma, więc z `rembg`, `media`, `office`, `docling` albo `manim` obraz buduje się na miejscu
+(kilkanaście minut, 8 GB RAM); `lemo` i `mgaudio` instalują się w działającym kontenerze i obrazu nie zmieniają:
 
 | Dodatek | Co daje | Dysk |
 |---|---|---|

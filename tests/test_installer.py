@@ -557,6 +557,36 @@ def test_obraz_own_hermes_builds_locally(tmp_path):
     assert not (tmp_path / "log").exists()
 
 
+
+def test_obraz_image_extras_build_locally(tmp_path):
+    """Dodatki obrazu w JARVO_EXTRAS: CI buduje obraz bez nich, więc pobranie dałoby obraz bez dodatków (kod 1, bez
+    docker pull); lemo i mgaudio instalują się w działającym kontenerze, więc z nimi obraz dalej się pobiera."""
+    bin_ = tmp_path / "bin"; bin_.mkdir()
+    _shim(bin_, "docker", 'echo "docker $*" >> "$LOG"; exit 0')
+    log = tmp_path / "log"
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "LOG": str(log)}
+    env.pop("JARVO_EXTRAS", None); env.pop("JARVO_TOKEN", None)
+    for wpis, zmienna, dodatek in [('JARVO_EXTRAS="lemo,manim"\n', None, "manim"), ("JARVO_EXTRAS=office\n", None, "office"),
+                                   ("JARVO_EXTRAS=\n", "lemo docling", "docling")]:
+        (tmp_path / ".env").write_text(wpis)
+        r = subprocess.run(["bash", str(ROOT / "scripts/obraz.sh"), "pobierz", str(tmp_path)], capture_output=True,
+                           text=True, env=env if zmienna is None else {**env, "JARVO_EXTRAS": zmienna})
+        assert r.returncode == 1 and f"Dodatek obrazu {dodatek}" in r.stdout, r.stdout + r.stderr
+    assert not log.exists()
+    (tmp_path / ".env").write_text("JARVO_EXTRAS=lemo mgaudio\n")
+    r = subprocess.run(["bash", str(ROOT / "scripts/obraz.sh"), "pobierz", str(tmp_path)], capture_output=True,
+                       text=True, env=env)
+    assert r.returncode == 0 and "docker pull" in log.read_text(), r.stdout + r.stderr
+
+
+def test_obraz_extras_match_dockerfile():
+    """Lista dodatków, przy których obraz.sh buduje na miejscu = dodatki, które infra/Dockerfile instaluje przy budowie."""
+    import re
+    df = (ROOT / "infra/Dockerfile").read_text(encoding="utf-8")
+    w_obrazie = set(re.findall(r'\*" (\w+) "\*', df)) | set(re.search(r"for x in ([\w ]+); do", df).group(1).split())
+    sh = (ROOT / "scripts/obraz.sh").read_text(encoding="utf-8")
+    assert set(re.search(r"for x in ([\w ]+); do   # te, które infra/Dockerfile", sh).group(1).split()) == w_obrazie
+
 def _obraz(tmp_path: Path, docker: str, **env_extra) -> tuple[subprocess.CompletedProcess, str]:
     """obraz.sh pobierz w małym repo z świeżą zmianą infra/ (klucz i wiek zmiany jak w prawdziwym repo)."""
     repo = tmp_path / "repo"
