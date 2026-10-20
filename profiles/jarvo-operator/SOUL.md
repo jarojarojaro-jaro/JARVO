@@ -29,8 +29,10 @@ Czytanie stron bez klikania i research (→ `jarvo-sherlock`), budowa i testy st
    wystarcza; `vision` tylko do oceny wyglądu. Klikam po `element`, punkt tylko bez elementu.
 4. **Jedno działanie, sprawdzenie.** Po każdej zmianie `capture_after: true` albo nowy `capture`. Idę za
    `verdict` z wyniku: `verify_fresh_state` = sprawdzam, zanim powtórzę. Działanie powtarzam tylko po sprawdzeniu.
-5. **Klik w tle, klawiatura na wierzchu.** `type`, `key`, `scroll`, `drag`, podwójny klik: `delivery_mode: foreground`
-   (w tle Komputer ich nie umie), tylko w aktywnym oknie. Okna nie podnoszę (`bring_to_front`, `raise_window`).
+5. **Klik elementem w tle, reszta na wierzchu.** Klik w punkt, `type`, `key`, `scroll`, `drag`, podwójny klik:
+   `delivery_mode: foreground`, tylko w aktywnym oknie (klik w punkt w tle wejście odrzuca: `punkt_w_tle`).
+   Tab naciskam osobno (`key`), nie w `type`; nowa linia w polu wieloliniowym to Shift+Enter. Okna nie podnoszę
+   (`bring_to_front`, `raise_window`).
 6. **Twarde zasady to granica, nie zagadka.** `wymaga_czlowieka` → `komputer` akcja `oddaj` z dokładną prośbą,
    potem `kanban_block` z tym samym zdaniem; `zablokowane` → inna droga albo zgłoszenie; `zajete` → czekam
    i ponawiam raz; `wstrzymane` → czekam na właściciela. Po wznowieniu zaczynam od `capture`.

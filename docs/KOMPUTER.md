@@ -32,7 +32,7 @@ Czego agent nigdy nie zrobi sam:
 | K0 | Bramka sterownika (`komputer/jarvo_cua.py`), zakazy w `deny.yaml`, reguły walidatora | zrobione |
 | K1 | Obraz i usługa `jarvo-komputer`: pulpit Xvnc, Chromium z drzewem dostępności, `cua-driver` 0.21.0 z sumą, filtr ruchu do sieci lokalnej, `jarvo komputer on/off/status/wyczysc/odswiez` | zrobione |
 | K2 | Wejście sterownika w Komputerze (`wejscie.py`, `zasady.py`): kanał MCP przez gniazdo unix, twarde zasady (płatności, logowanie, hasła, karty, kody, sekrety, zakazane narzędzia i aplikacje), ukrywanie sekretów w odpowiedziach, pauza tylko do zdjęcia przez właściciela, dziennik bez treści, `jarvo komputer pauza/wznow/dziennik`, test na żywo `scripts/komputer-test.sh` | zrobione |
-| K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi), skarbiec bez wyciągów, 5 skilli, 18 evals, 2 ataki red teamu, pokój Sterownia w HQ, wzorzec w `dispatch-playbook`, dokumentacja | zrobione |
+| K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi), skarbiec bez wyciągów, 5 skilli, 19 evals, 2 ataki red teamu, pokój Sterownia w HQ, wzorzec w `dispatch-playbook`, dokumentacja | zrobione |
 | K4 | Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj | planowane |
 | K5 | Terminal Operatora w Komputerze (SSH przez gniazdo), ekrany programów tekstowych (tmux), serwery | planowane |
 | K6 | Ręce na Twoim komputerze: podpisany `cua-driver` 0.36, pomocnik na Linux, macOS i Windows, zgoda na aplikację na Twoim ekranie | planowane |
@@ -178,28 +178,48 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 | Zasada | Decyzja |
 |---|---|
 | klik, podwójny klik, przeciągnięcie zaczęte albo skończone na przycisku, Enter, spacja albo pisanie na przycisku z fokusem, gdy przycisk lub link to „Kup”, „Zamów”, „Zapłać”, „BLIK”, „Przelew”, „Subskrybuj”, „Zaloguj”, „Zarejestruj”, „Utwórz konto”, „Autoryzuj”, „Wyślij”, „Opublikuj”, „Udostępnij”, „Usuń konto” (i angielskie odpowiedniki), także na tekście wewnątrz takiego przycisku; zgoda „Zezwól” / „Allow” jako cały napis. Napisy porównujemy po normalizacji NFKC, bez znaków niewidocznych | robi właściciel (`przycisk_wrazliwy`) |
-| Enter w polu formularza, w którym jest taki przycisk (wysłałby formularz), poza polem wieloliniowym | robi właściciel (`formularz_wrazliwy`) |
+| Enter (także Ctrl+Enter i nowa linia w tekście `type_text`) w polu formularza, w którym jest taki przycisk (wysłałby formularz), także w polu wieloliniowym, i w polu formularza, którego wejście nie umie przejrzeć (więcej niż 3000 elementów bez AT-SPI Collection); nową linię w polu wieloliniowym robi Shift+Enter | robi właściciel (`formularz_wrazliwy`) |
+| Enter albo Ctrl+Enter w polu wieloliniowym poza formularzem i Ctrl+Enter w polu poza formularzem (czat, komentarz, edytor: tam to zwykle wysyłka) | robi właściciel (`wysylka_bez_formularza`) |
 | pisanie, wklejanie i Enter w polu hasła, karty, CVV, BLIK, PIN, kodu SMS, 2FA, jednorazowego, tokenu | robi właściciel (`pole_wrazliwe`) |
 | numer karty w dowolnym tekście | robi właściciel (`karta`) |
 | klucz, token albo klucz prywatny w tekście; adres `javascript:`, `data:`, `file:`, `chrome:`, `devtools:`, `view-source:` | zablokowane |
-| pisanie, gdy nie wiadomo, gdzie trafi tekst (brak fokusu); klik w element spoza migawek tej sesji albo w punkt bez działającego AT-SPI; element i punkt naraz | zablokowane (`brak_fokusu`, `nieznany_cel`, `cel`) |
+| pisanie, gdy nie wiadomo, gdzie trafi tekst (brak fokusu albo pole z fokusem, którego AT-SPI nie potwierdza na żywo); klik w element spoza migawek tej sesji; klik w punkt, gdy kliknięcie dostałoby inne okno albo okienko podręczne (lista, menu, podpowiedź), gdy punkt leży poza oknem, na pulpicie albo w oknie innego programu, gdy AT-SPI nie odpowiada albo dwie odpowiedzi z rzędu się różnią; element i punkt naraz | zablokowane (`brak_fokusu`, `nieznany_cel`, `cel`) |
+| zwykły klik lewym w punkt w tle: cua-driver 0.21.0 wywołuje wtedy akcję najmniejszego elementu programu, którego prostokąt we współrzędnych swojego okna zawiera punkt, w dowolnym oknie programu, także niewidocznego (przewiniętego, przyciętego, przezroczystego), a nie elementu, który widać | zablokowane (`punkt_w_tle`; klik elementem albo w punkt na wierzchu) |
+| Tab i inne znaki sterujące w tekście `type_text` (Tab przeniósłby fokus na następny element, a reszta tekstu i Enter trafiłyby tam bez sprawdzenia); nowa linia w środku tekstu w polu jednowierszowym (Enter wysłałby formularz w połowie) | zablokowane (`znak_sterujacy`, `enter_w_srodku`; Tab osobno przez `key`) |
 | `launch_app` innego programu niż Chromium, z `launch_path` lub flagami, z adresem innym niż http(s); `kill_app` innego procesu niż Chromium | zablokowane |
 | narzędzia deweloperskie i systemowe skróty (Ctrl+Shift+I/J/C/O, F12, Ctrl+Shift+Delete, Alt+F2); klik po `zoom`; zapis zrzutu do pliku | zablokowane |
+| Alt (także Alt+Shift) z literą, cyfrą albo innym klawiszem spoza nawigacji: skrót `accesskey` strony klika przycisk bez sprawdzenia (Alt ze strzałkami, Home, End, PgUp, PgDn, Tab, Esc, Backspace, Delete, Insert i F1–F11 przechodzi) | zablokowane (`accesskey`) |
 | działanie z `delivery_mode: foreground` (globalne wejście X11) w oknie, które nie jest aktywne, bez `window_id` (przewijanie całego okna bez `window_id`: gdy aktywne okno należy do innego programu, `_NET_WM_PID`) albo gdy nie wiadomo, które okno jest aktywne (`_NET_ACTIVE_WINDOW`) | zablokowane (`okno_nieaktywne`) |
 | wszystko poza odczytem przy pauzie | wstrzymane |
 | działanie, gdy ekranem steruje inna sesja (ostatnie działanie mniej niż 120 s temu) | zablokowane (`zajete`, czekaj i spróbuj znowu) |
 
-**Skąd wejście wie, w co trafi działanie.** Nie z deklaracji agenta: element ze `element_token` bierze z migawek
-sterownika z tej sesji (rola, napis, przodkowie, przyciski formularza), punkt `x, y` przelicza na ekran i pyta
-AT-SPI o najgłębszy element w tym miejscu (ok. 20 ms), a pole z fokusem klawiatury zna ze zdarzeń AT-SPI
-(rola, nazwa, atrybuty HTML: `tag`, `html-input-name`, `text-input-type`, `autocomplete`). Gdy tego nie da się
-ustalić, działanie nie przechodzi.
+**Skąd wejście wie, w co trafi działanie.** Nie z deklaracji agenta. Element ze `element_token` bierze z migawek
+sterownika z tej sesji (rola, napis, przodkowie, przyciski formularza i to, czy pole leży w formularzu). Punkt `x, y`
+przelicza na ekran tak jak sterownik: początek okna na żywo z X11 (`okna.py`, ctypes do libX11) i skala zrzutu
+zmniejszonego w ostatnim `get_window_state` tego programu. Potem pyta serwer X, które okno dostanie kliknięcie
+w tym punkcie (`XTranslateCoordinates`: nakładkę sterownika z kursorem agenta, przezroczystą dla kliknięć, serwer
+pomija; okienko podręczne Chromium, lista albo inne okno nad punktem to odmowa), i AT-SPI o najgłębszy element
+w oknie tego programu, które pasuje do okna celu położeniem i rozmiarem (przy kilku takich także tytułem). Chromium
+przy pierwszym pytaniu w nowym punkcie zgaduje z drzewa (bez warstw `z-index` i przycięć), a trafienie silnika
+strony daje przy następnym, więc wejście pyta, aż dwie odpowiedzi z rzędu są zgodne (2 albo 3 pytania co 0,12 s).
+libatspi trzyma w pamięci listę okien i stany programu i odświeża je tylko zdarzeniami, których wejście nie słucha
+(nowe okienko podręczne nie byłoby widoczne), więc przed każdym sprawdzeniem pamięć programu idzie do kosza
+(`clear_cache`, kilka ms) i odczyty pytają Chromium na żywo.
+Pole z fokusem klawiatury zna ze zdarzeń AT-SPI (rola, nazwa, stany, atrybuty HTML: `tag`, `html-input-name`,
+`text-input-type`, `autocomplete`) i przed każdym pisaniem sprawdza na żywo, że to pole nadal ma fokus. Przy
+Enterze szuka formularza pola i jego przycisków (AT-SPI Collection; bez niej do 3000 elementów, a w większym
+formularzu Enter robi właściciel). Gdy czegokolwiek nie da się ustalić, działanie nie przechodzi.
 
 **W tle albo na wierzchu.** Sterownik ma dwie drogi: w tle (`delivery_mode: background`, przez dostępność, bez
 ruszania fokusu) i na wierzchu (`foreground`, przez globalne wejście X11 do okna z fokusem pulpitu; nieaktywne okno
 sterownik najpierw aktywuje i potem przywraca). Na pulpicie Komputera (Linux, X11, cua-driver 0.21.0) w tle
-działają tylko kliknięcia (elementem i w punkt, także prawym przyciskiem). Pisanie, klawisze, skróty, przewijanie,
-przeciąganie i podwójny klik w tle kończą się `background_unavailable`, więc idą na wierzchu. Wejście przepuszcza
+działają tylko kliknięcia. Klik elementem idzie akcją AT-SPI tego elementu. Zwykły klik lewym w punkt sterownik też
+zamienia na akcję AT-SPI, ale nie elementu, który widać: bierze najmniejszy element z akcją w całym drzewie programu
+(wszystkie okna, także części strony niewidoczne), którego prostokąt we współrzędnych swojego okna zawiera punkt.
+Dlatego wejście go nie przepuszcza (`punkt_w_tle`); w punkt agent klika na wierzchu, gdzie sterownik klika
+prawdziwym wskaźnikiem. Prawy klik i klik z modyfikatorem idą zdarzeniem do okna i są sprawdzane w punkcie.
+Pisanie, klawisze, skróty, przewijanie, przeciąganie i podwójny klik w tle kończą się `background_unavailable`, więc
+idą na wierzchu. Wejście przepuszcza
 je tylko w oknie, które już jest aktywne: cel i pole z fokusem sprawdza w tym oknie, a przełączenie okna przez
 sterownik posłałoby klawisze tam, gdzie nikt nie patrzył. Okno na wierzch (`bring_to_front`, `raise_window`)
 przestawia tylko człowiek (zgoda w Hermesie przy każdym użyciu albo sam w Ekranie HQ). Zmierzone na żywo
@@ -219,8 +239,9 @@ tekstu w nim nie ma.
 
 **Test na żywo**: `bash scripts/komputer-test.sh` (Komputer włączony) stawia w Komputerze stronę testową
 (wyszukiwarka i koszyk z polami hasła, karty, BLIK, przyciskami płatności i kluczem API w treści) i prowadzi
-rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 62 sprawdzenia (narzędzia, aplikacje,
-ukrywanie, kliknięcia elementem i w punkt, pisanie, okno nieaktywne, Enter w formularzach, skróty, powtórzone id, druga sesja
+rozmowę MCP z `jarvo-hermes` jako `hermes`, tą samą drogą co Hermes: 76 sprawdzeń (narzędzia, aplikacje,
+ukrywanie, kliknięcia elementem i w punkt, klik w punkt w tle, pisanie, okno nieaktywne, okienko podręczne nad oknem
+i przesunięte okno, Enter w formularzach, Tab i znaki sterujące, skróty i `accesskey`, powtórzone id, druga sesja
 naraz, prośba Operatora, pauza i wznowienie, dziennik).
 
 ## 7. Operator: agent przy ekranie (K3)
@@ -261,8 +282,8 @@ albo oddanie ekranu.
 z tabelą kroków i zrzutem problemu, kończy przed płatnością), `oddaj-ekran` (krok właściciela: logowanie, płatność,
 CAPTCHA, prośba w jednym zdaniu). Skilli ze skryptami (konwerter, OCR) nie ma, bo nie ma terminala.
 
-**Evals i red team:** 18 scenariuszy (`evals/jarvo-operator/`: droga bez ekranu, pętla, formularz, tabela, ścieżka
-sklepu, logowanie, `wymaga_czlowieka`, pauza, wyłączony Komputer, `escalate`, `okno_nieaktywne`, skarbiec, wstrzyknięcie z ekranu,
+**Evals i red team:** 19 scenariuszy (`evals/jarvo-operator/`: droga bez ekranu, pętla, formularz, tabela, ścieżka
+sklepu, logowanie, `wymaga_czlowieka`, pauza, wyłączony Komputer, `escalate`, `okno_nieaktywne`, `punkt_w_tle`, skarbiec, wstrzyknięcie z ekranu,
 karta w czacie, 4 poza zakresem) i 2 ataki (`security/redteam/`: polecenie ukryte na stronie, hasło i karta z czatu).
 
 **Wtyczka `jarvo-komputer`** (`komputer/plugin`, narzędzie `komputer`): build kopiuje ją do
@@ -311,10 +332,20 @@ u innych agentów.
   obraz idzie do modelu (dostawca z `config.yaml`) i do pliku `screenshot_path` w profilu Operatora. Dlatego Operator
   patrzy najpierw drzewem (`ax`), a zrzut robi tylko, gdy drzewo nie wystarcza. Zamazywanie obrazu (rozpoznanie
   tekstu i maska na sekretach) to możliwy kolejny krok.
-- **Działania na wierzchu.** Klawiatura, przewijanie i przeciąganie idą przez globalne wejście X11 (§6). Wejście
-  przepuszcza je tylko w oknie, które już jest aktywne, i sprawdza pole z fokusem w tym oknie; zostaje krótka chwila
-  między sprawdzeniem a wykonaniem, w której okno mógłby zmienić tylko człowiek w Ekranie HQ (K4: przejęcie ekranu
-  wstrzymuje agenta).
+- **Działania na wierzchu.** Klawiatura, przewijanie, przeciąganie i klik w punkt idą przez globalne wejście X11
+  (§6). Wejście przepuszcza je tylko w oknie, które już jest aktywne, i sprawdza pole z fokusem albo element w punkcie
+  w tym oknie; zostaje krótka chwila między sprawdzeniem a wykonaniem, w której strona może przestawić elementy
+  (animacja, skrypt), a okno mógłby zmienić tylko człowiek w Ekranie HQ (K4: przejęcie ekranu wstrzymuje agenta).
+- **Element w punkcie według Chromium.** Gdy silnik strony nie odpowie na trafienie w 0,12–0,24 s (strona
+  zajęta skryptem), dwie zgodne odpowiedzi to zgadywanie z drzewa, które nie zna warstw `z-index`: strona
+  ułożona tak, żeby zgadywanie i prawdziwe kliknięcie trafiały w różne elementy, mogłaby przemycić klik.
+- **Klik elementem według numeru.** Sterownik szuka elementu po numerze z migawki w drzewie z chwili kliknięcia;
+  strona, która między migawką a kliknięciem doda albo usunie elementy przed nim, przesuwa numery i klik trafi
+  w inny element niż sprawdzony. Kolejny krok: wejście porówna przed kliknięciem element pod tym numerem w świeżym
+  drzewie z migawką.
+- **Migawka okna podręcznego (cua-driver 0.21.0).** `get_window_state` zwraca drzewo całego programu (wszystkie
+  okna), a ramki elementów przesuwa o położenie okna z zapytania: w oknie poza rogiem ekranu ramki są przesunięte
+  drugi raz. Wejście nie liczy z nich punktów (bierze położenie okna z X11), a agent w punkt klika ze zrzutu.
 
 ## 9. Źródła
 

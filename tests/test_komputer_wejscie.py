@@ -188,7 +188,8 @@ def test_rozmowa_mcp_odmowy_i_ukrywanie(komputer):
     assert kod(k.narzedzie("page", {"action": "execute_javascript"})) == "zablokowane"
     assert kod(k.narzedzie("click", {"pid": 7, "window_id": 3, "element_token": "s1:3"})) == "wymaga_czlowieka"
     assert zasada(k.narzedzie("click", {"element_token": "obca:3"})) == "nieznany_cel"
-    assert zasada(k.narzedzie("click", {"pid": 7, "x": 10, "y": 10})) == "nieznany_cel"   # punkt bez AT-SPI
+    assert zasada(k.narzedzie("click", {"pid": 7, "x": 10, "y": 10})) == "punkt_w_tle"
+    assert zasada(k.narzedzie("double_click", {"pid": 7, "x": 10, "y": 10})) == "nieznany_cel"   # punkt bez AT-SPI
     w = k.narzedzie("type_text", {"pid": 7, "window_id": 3, "element_token": "s1:1", "text": "a@b.pl\n"})
     assert zasada(w) == "formularz_wrazliwy"                     # Enter w polu formularza z „Zapłać”
     assert zasada(k.narzedzie("type_text", {"pid": 7, "text": "abc"})) == "brak_fokusu"
@@ -384,3 +385,362 @@ def test_wtyczka_operatora_przez_ster(komputer, monkeypatch):
     monkeypatch.setattr(pl, "STER", os.path.join(komputer.sciezka, "brak.sock"))
     wyl = json.loads(obsluz({"akcja": "stan"}))
     assert wyl["ok"] is False and wyl["dziala"] is False and "jarvo komputer on" in wyl["blad"]
+
+
+# --- AT-SPI i okna X11 bez pulpitu: udawane obiekty
+
+
+class _Stany:
+    def __init__(self, stany):
+        self.stany = set(stany)
+
+    def contains(self, s):
+        return s in self.stany
+
+    def get_states(self):
+        return [type("S", (), {"value_nick": s})() for s in self.stany]
+
+
+class Acc:
+    """Udawany element AT-SPI: rola, nazwa, dzieci, stany, prostokąt na ekranie."""
+
+    def __init__(self, rola, nazwa="", dzieci=(), stany=("showing",), ramka=(0, 0, 0, 0), pid=7, tag=""):
+        self.rola, self.nazwa, self.dzieci, self.rodzic = rola, nazwa, list(dzieci), None
+        self.stany, self.ramka, self.pid, self.tag = set(stany), ramka, pid, tag
+        for d in self.dzieci:
+            d.rodzic = self
+
+    def get_role_name(self):
+        return self.rola
+
+    def get_name(self):
+        return self.nazwa
+
+    def get_parent(self):
+        return self.rodzic
+
+    def get_child_count(self):
+        return len(self.dzieci)
+
+    def get_child_at_index(self, i):
+        return self.dzieci[i]
+
+    def get_state_set(self):
+        return _Stany(self.stany)
+
+    def get_attributes(self):
+        return {"tag": self.tag} if self.tag else {}
+
+    def get_process_id(self):
+        return self.pid
+
+    def get_extents(self, _uklad):
+        return type("R", (), dict(zip(("x", "y", "width", "height"), self.ramka)))()
+
+    def get_accessible_at_point(self, x, y, _uklad):
+        for d in self.dzieci:
+            rx, ry, rw, rh = d.ramka
+            if rx <= x < rx + rw and ry <= y < ry + rh:
+                return d
+        return None
+
+    def get_application(self):
+        a = self
+        while a is not None and a.rola != "application":
+            a = a.rodzic
+        return a
+
+    def clear_cache(self):
+        self.wyczyszczone = getattr(self, "wyczyszczone", 0) + 1
+
+
+class _Atspi:
+    class StateType:
+        FOCUSED, SHOWING = "focused", "showing"
+
+    class CoordType:
+        SCREEN = 0
+
+    pulpit = None
+
+    @classmethod
+    def get_desktop(cls, _i):
+        return cls.pulpit
+
+
+class _GLib:
+    PRIORITY_HIGH = 0
+    zawies = False
+
+    @classmethod
+    def idle_add(cls, fn, priority=None):
+        if not cls.zawies:
+            fn()
+
+
+def _dostepnosc(pulpit=None, zawies=False):
+    d = wejscie.Dostepnosc.__new__(wejscie.Dostepnosc)
+    d.dziala, d._fokus, d._lock = True, {}, threading.Lock()
+    _Atspi.pulpit, _GLib.zawies = pulpit, zawies
+    d.Atspi, d.GLib = _Atspi, _GLib
+    return d
+
+
+def _w_formularzu(pole, *, przyciski=("Zapłać 129 zł",), glebokosc=1, wypelniacz=0):
+    zagniezdzone = pole
+    for _ in range(glebokosc - 1):
+        zagniezdzone = Acc("section", dzieci=[zagniezdzone])
+    reszta = [Acc("section", dzieci=[Acc("paragraph") for _ in range(100)]) for _ in range(wypelniacz // 100)]
+    forma = Acc("form", dzieci=[zagniezdzone, *reszta, *(Acc("push button", n) for n in przyciski)])
+    return Acc("document web", dzieci=[forma])
+
+
+def test_formularz_przeszukany_do_konca_albo_nieznany(monkeypatch):
+    d = _dostepnosc()
+    pole = Acc("entry", "E-mail")
+    _w_formularzu(pole, glebokosc=13, wypelniacz=600)    # dawniej: 12 poziomów i 300 elementów, potem „bez formularza”
+    assert d._formularz(pole) == {"w_formularzu": True, "formularz": [{"rola": "push button", "nazwa": "Zapłać 129 zł"}]}
+    szukaj = Acc("entry", "Szukaj")
+    Acc("document web", dzieci=[Acc("section", dzieci=[szukaj])])
+    assert d._formularz(szukaj) == {"w_formularzu": False, "formularz": []}
+    # przegląd ucięty limitem: formularz nieznany (Enter sprawdzi właściciel), nie „bez przycisków”
+    monkeypatch.setattr(wejscie, "MAKS_FORMULARZ", 50)
+    assert d._formularz(pole) is None
+    monkeypatch.setattr(wejscie, "MAKS_FORMULARZ", 3000)
+    monkeypatch.setattr(wejscie, "MAKS_DZIECI", 50)
+    assert d._formularz(pole) is None
+    monkeypatch.setattr(wejscie, "MAKS_PRZODKOWIE", 5)
+    assert d._formularz(pole) is None
+
+
+def test_formularz_przez_collection_jednym_zapytaniem():
+    d = _dostepnosc()
+
+    class Regula:
+        @staticmethod
+        def new(*a):
+            return "regula"
+
+    d.Atspi = type("A", (_Atspi,), {"MatchRule": Regula, "StateSet": type("SS", (), {"new": staticmethod(list)}),
+                                     "CollectionMatchType": type("M", (), {"ALL": 0, "ANY": 1}),
+                                     "Role": type("R", (), {"PUSH_BUTTON": 42}),
+                                     "CollectionSortOrder": type("O", (), {"CANONICAL": 0})})
+    pole = Acc("entry", "E-mail")
+    dok = _w_formularzu(pole, przyciski=())
+    forma = dok.dzieci[0]
+    forma.get_matches = lambda regula, porz, ile, wglab: [Acc("push button", "Kup teraz"), Acc("push button", "")]
+    assert d._formularz(pole)["formularz"] == [{"rola": "push button", "nazwa": "Kup teraz"}]
+
+
+def test_fokus_sprawdzany_na_zywo():
+    d = _dostepnosc()
+    pole = Acc("entry", "Uwagi", stany=("showing", "focused", "multi-line", "editable"), tag="textarea")
+    app = Acc("application", "Chromium", dzieci=[_w_formularzu(pole)])
+    d._fokus[7] = (d._opis(pole), pole)
+    f = d.fokus(7)
+    assert f["nazwa"] == "Uwagi" and f["w_formularzu"] and f["stany"] == ["editable", "multi-line"]
+    assert app.wyczyszczone == 1                     # stany czytane od programu, nie z pamięci libatspi
+    # Tab przeniósł fokus, zanim doszło zdarzenie: pole już nie ma stanu focused, więc fokus nieznany
+    pole.stany.discard("focused")
+    assert d.fokus(7) is wejscie.zasady.NIEZNANY
+    # utrata fokusu (zdarzenie z detail1=0) czyści pamięć tego programu
+    zdarzenie = type("E", (), {"detail1": 0, "source": pole})()
+    d._zdarzenie(zdarzenie)
+    assert d.fokus(7) is None
+
+
+def test_atspi_bez_odpowiedzi_albo_z_bledem_to_cel_nieznany():
+    d = _dostepnosc(zawies=True)
+    assert d._w_glib(lambda: {"ok": 1}, czas=0.05) is wejscie.BLAD
+    d = _dostepnosc()
+    assert d._w_glib(lambda: 1 / 0) is wejscie.BLAD
+    d.dziala = False
+    assert d._w_glib(lambda: {"ok": 1}) is wejscie.BLAD
+    d = _dostepnosc(zawies=True)
+    pole = Acc("entry", "E-mail", stany=("showing", "focused"))
+    d._fokus[7] = (d._opis(pole), pole)
+    assert d.fokus(7) is wejscie.zasady.NIEZNANY
+
+
+def test_w_punkcie_tylko_w_oknie_celu():
+    zaplac = Acc("push button", "Zapłać", ramka=(600, 400, 100, 30))
+    popup = Acc("frame", "Płatność – Chromium", dzieci=[zaplac], ramka=(500, 300, 400, 300))
+    glowne = Acc("frame", "Sklep – Chromium", dzieci=[Acc("paragraph", "Opis", ramka=(0, 0, 1440, 900))],
+                 ramka=(0, 0, 1440, 900))
+    ukryte = Acc("frame", "", ramka=(500, 300, 400, 300), stany=())
+    app = Acc("application", "Chromium", dzieci=[glowne, popup, ukryte])
+    d = _dostepnosc(Acc("desktop", dzieci=[app]))
+    # punkt (620, 410) leży w obu oknach: liczy się okno celu, nie pierwsze z listy
+    assert d.w_punkcie(7, 620, 410, (500, 300, 400, 300))["nazwa"] == "Zapłać"
+    assert d.w_punkcie(7, 620, 410, (0, 0, 1440, 900))["nazwa"] == "Opis"
+    assert d.w_punkcie(8, 620, 410, (500, 300, 400, 300)) is None           # inny proces
+    assert d.w_punkcie(7, 620, 410, (10, 10, 400, 300)) is None             # żadne okno nie pasuje
+    drugie = Acc("frame", "Drugie – Chromium", ramka=(500, 300, 400, 300))
+    app.dzieci.append(drugie)
+    assert d.w_punkcie(7, 620, 410, (500, 300, 400, 300)) is None           # dwa pasujące, bez tytułu
+    assert d.w_punkcie(7, 620, 410, (500, 300, 400, 300), "Płatność – Chromium")["nazwa"] == "Zapłać"
+    # libatspi nie widzi nowych okien bez zdarzeń: pamięć programu czyszczona przy każdym pytaniu
+    assert app.wyczyszczone == 5                     # wszystkie pytania o program 7 (bez pytania o 8)
+
+
+class _X11:
+    def __init__(self, geometria=(500, 300, 800, 600), wierzch=True):
+        self.g, self.wierzch, self.pytania = geometria, wierzch, []
+
+    def geometria(self, okno):
+        return self.g
+
+    def ekran(self):
+        return (1440, 900)
+
+    def na_wierzchu(self, x, y, okno):
+        self.pytania.append((x, y, okno))
+        return self.wierzch
+
+
+class _DostepnoscPunkt:
+    dziala = True
+
+    def __init__(self, wynik=None, kolejne=None):
+        self.wynik = wynik if wynik is not None else {"rola": "push button", "nazwa": "Zapłać 129 zł"}
+        self.kolejne = list(kolejne or [])            # odpowiedzi po kolei (Chromium: zgadywanie, potem trafienie)
+        self.pytania = []
+
+    def w_punkcie(self, pid, x, y, ramka, tytul="", formularz=False):
+        self.pytania.append((pid, x, y, ramka, tytul))
+        return self.kolejne.pop(0) if self.kolejne else self.wynik
+
+
+def _kontekst(monkeypatch, x11=None, dostepnosc=None, pid_okna=7):
+    ekran = type("E", (), {})()
+    ekran.x11, ekran.dostepnosc = x11 or _X11(), dostepnosc or _DostepnoscPunkt()
+    ekran.wstrzymane, ekran.powod_pauzy = False, ""
+    ctx = wejscie.KontekstSesji(ekran)
+    monkeypatch.setattr(ctx, "pid_okna", lambda okno: pid_okna)
+    monkeypatch.setattr(ctx, "_tytul", lambda okno: "Sklep – Chromium")
+    monkeypatch.setattr(ctx, "aktywne_okno", lambda: 3)
+    monkeypatch.setattr(wejscie.time, "sleep", lambda s: None)
+    return ctx
+
+
+NA_WIERZCHU = {"pid": 7, "window_id": 3, "delivery_mode": "foreground"}   # klik w punkt w aktywnym oknie 3
+
+
+def test_klik_w_punkt_sprawdzany_tam_gdzie_kliknie_sterownik(monkeypatch):
+    ctx = _kontekst(monkeypatch)
+    args = {**NA_WIERZCHU, "x": 100, "y": 50}
+    assert ctx.cel("click", args)["nazwa"] == "Zapłać 129 zł"
+    # początek okna na żywo z X11 (okno nie w rogu ekranu), nie z elementu 0 migawki
+    assert ctx.ekran.dostepnosc.pytania[-1] == (7, 600.0, 350.0, (500, 300, 800, 600), "Sklep – Chromium")
+    assert wejscie.zasady.ocen("click", args, ctx).decyzja == wejscie.zasady.CZLOWIEK
+    # zrzut zmniejszony (800 → 400 px): sterownik mnoży x i y przez 2 dla tego procesu
+    ctx.zapamietaj("get_window_state", {"pid": 7, "window_id": 3}, {"pid": 7, "window_id": 3, "screenshot_width": 400})
+    ctx.cel("click", args)
+    assert ctx.ekran.dostepnosc.pytania[-1][1:3] == (700.0, 400.0)
+    ctx.zapamietaj("get_window_state", {"pid": 7, "window_id": 3}, {"pid": 7, "window_id": 3, "screenshot_width": 800})
+    ctx.cel("click", args)
+    assert ctx.ekran.dostepnosc.pytania[-1][1:3] == (600.0, 350.0)
+
+
+@pytest.mark.parametrize("przypadek", ["inny_proces", "poza_oknem", "przykryte", "okienko_nieznane",
+                                       "pulpit", "bez_okna", "atspi_nic", "brak_geometrii"])
+def test_klik_w_punkt_niepewny_to_odmowa(monkeypatch, przypadek):
+    x11 = _X11(wierzch={"przykryte": False, "okienko_nieznane": None}.get(przypadek, True),
+               geometria=None if przypadek == "brak_geometrii" else (500, 300, 800, 600))
+    dost = _DostepnoscPunkt()
+    if przypadek == "atspi_nic":
+        dost.w_punkcie = lambda *a, **k: None
+    ctx = _kontekst(monkeypatch, x11=x11, dostepnosc=dost, pid_okna=8 if przypadek == "inny_proces" else 7)
+    args = {"pid": 7, "window_id": 3, "x": 900 if przypadek == "poza_oknem" else 100, "y": 50}
+    if przypadek == "pulpit":
+        args["scope"] = "desktop"
+    if przypadek == "bez_okna":
+        del args["window_id"]
+    assert ctx.cel("click", args) is wejscie.zasady.NIEZNANY
+    # podwójny klik idzie zdarzeniem do okna: też sprawdzany w punkcie
+    w = wejscie.zasady.ocen("double_click", args, ctx)
+    assert w.decyzja == wejscie.zasady.ODMOWA and w.kod == "nieznany_cel"
+
+
+def test_element_w_punkcie_dopiero_po_dwoch_zgodnych_odpowiedziach(monkeypatch):
+    """Chromium najpierw zgaduje z drzewa (bez warstw), a trafienie silnika strony daje przy następnym pytaniu."""
+    tekst, zaplac = {"rola": "document web", "nazwa": "Sklep"}, {"rola": "push button", "nazwa": "Zapłać teraz"}
+    dost = _DostepnoscPunkt(kolejne=[tekst, zaplac, zaplac])
+    ctx = _kontekst(monkeypatch, dostepnosc=dost)
+    args = {**NA_WIERZCHU, "x": 100, "y": 50}
+    assert ctx.cel("click", args) == zaplac and len(dost.pytania) == 3
+    assert wejscie.zasady.ocen("click", args, _kontekst(monkeypatch, dostepnosc=_DostepnoscPunkt(
+        kolejne=[tekst, zaplac, zaplac]))).kod == "przycisk_wrazliwy"
+    # zgodne od razu: dwa pytania
+    dost = _DostepnoscPunkt()
+    assert _kontekst(monkeypatch, dostepnosc=dost).cel("click", args)["nazwa"] == "Zapłać 129 zł"
+    assert len(dost.pytania) == 2
+    # trzy różne odpowiedzi: cel nieznany
+    dost = _DostepnoscPunkt(kolejne=[tekst, zaplac, {"rola": "link", "nazwa": "Regulamin"}])
+    assert _kontekst(monkeypatch, dostepnosc=dost).cel("click", args) is wejscie.zasady.NIEZNANY
+
+
+def test_migawka_mowi_czy_pole_jest_w_formularzu(monkeypatch):
+    ctx = _kontekst(monkeypatch)
+    ctx.zapamietaj("get_window_state", {"pid": 7, "window_id": 3}, {"snapshot_id": "s", "pid": 7, "window_id": 3, "elements": [
+        {"element_index": 0, "role": "document web"},
+        {"element_index": 1, "parent_index": 0, "role": "form"},
+        {"element_index": 2, "parent_index": 1, "role": "entry", "label": "E-mail"},
+        {"element_index": 3, "parent_index": 1, "role": "push button", "label": "Zapłać"},
+        {"element_index": 4, "parent_index": 0, "role": "entry", "label": "Szukaj"},
+        {"element_index": 5, "parent_index": 99, "role": "entry", "label": "Sierota"}]})
+    assert ctx.cel("type_text", {"element_token": "s:2"})["w_formularzu"] is True
+    assert ctx.cel("type_text", {"element_token": "s:4"})["w_formularzu"] is False
+    assert ctx.cel("type_text", {"element_token": "s:5"}).get("formularz_nieznany") is True
+
+
+class _Xlib:
+    """Udawany libX11 dla okna.X11: drzewo okien (rodzice) i okno, które serwer X wskazuje w punkcie."""
+
+    KORZEN = 1
+
+    def __init__(self, rodzice, w_punkcie, podreczne=(), niewidoczne=()):
+        self.rodzice, self.w_punkcie = rodzice, w_punkcie
+        self.podreczne, self.niewidoczne, self.punkty = set(podreczne), set(niewidoczne), []
+
+    def XQueryTree(self, d, okno, korzen, rodzic, dzieci, n):
+        if okno not in self.rodzice:
+            return 0
+        rodzic._obj.value, n._obj.value = self.rodzice[okno], 0
+        return 1
+
+    def XTranslateCoordinates(self, d, z, do, x, y, gx, gy, dziecko):
+        assert z == do == self.KORZEN
+        self.punkty.append((x, y))
+        dziecko._obj.value = self.w_punkcie(x, y)
+        return 1
+
+    def XGetWindowAttributes(self, d, okno, a):
+        a._obj.map_state = 0 if okno in self.niewidoczne else wejscie.okna.MAPA_WIDOCZNE
+        a._obj.override_redirect = int(okno in self.podreczne)
+        return 1
+
+    def XFree(self, p):
+        pass
+
+
+def _x11(xlib):
+    x = wejscie.okna.X11.__new__(wejscie.okna.X11)
+    x._zapytaj = lambda fn: fn(xlib, 0, _Xlib.KORZEN)
+    return x
+
+
+def test_okno_na_wierzchu_tak_jak_widzi_je_serwer_x():
+    # klient 30 w ramce menedżera okien 20; w punkcie (100, 100) jest ta ramka, w (700, 500) okienko podręczne 40,
+    # a nakładka sterownika z kursorem agenta (przezroczysta dla kliknięć) nie pojawia się w odpowiedzi serwera
+    rodzice = {30: 20, 20: 1, 40: 1, 50: 1}
+    xlib = _Xlib(rodzice, lambda x, y: 40 if x > 600 else 20, podreczne={40})
+    x = _x11(xlib)
+    assert x.na_wierzchu(100.7, 100.2, 30) is True and xlib.punkty[-1] == (100, 100)
+    assert x.na_wierzchu(700, 500, 30) is False
+    # inne zwykłe okno nad punktem
+    assert _x11(_Xlib(rodzice, lambda x, y: 50)).na_wierzchu(100, 100, 30) is False
+    # okna nie ma (zamknięte) albo jest samo okienkiem podręcznym albo niewidoczne
+    assert _x11(_Xlib(rodzice, lambda x, y: 20)).na_wierzchu(100, 100, 99) is None
+    assert _x11(_Xlib(rodzice, lambda x, y: 40, podreczne={40})).na_wierzchu(700, 500, 40) is False
+    assert _x11(_Xlib(rodzice, lambda x, y: 20, niewidoczne={20})).na_wierzchu(100, 100, 30) is False

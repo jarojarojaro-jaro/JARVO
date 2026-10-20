@@ -83,7 +83,7 @@ w cronie bez ekranu), bez terminala, wykonywania kodu, przeglądarki Hermesa i d
 przewijanie i przeciąganie działają tylko na wierzchu; wejście przepuszcza je tylko w aktywnym oknie, odmowa
 `okno_nieaktywne`), walidator odrzuca `bring_to_front`, tryby cron i bez nadzoru odmawiają.
 Logowanie, płatność, CAPTCHA i wysyłkę robi właściciel w Ekranie HQ; Operator nie przyjmuje haseł ani kart z czatu.
-Bez wyciągu rozmów do skarbca (`bez_wyciagu`). 18 evals, 2 ataki red teamu (wstrzyknięcie z ekranu, karta i hasło
+Bez wyciągu rozmów do skarbca (`bez_wyciagu`). 19 evals, 2 ataki red teamu (wstrzyknięcie z ekranu, karta i hasło
 na ekranie), pokój Sterownia w HQ. Wzorzec 11 w `dispatch-playbook` mówi Jarvowi, kiedy dać kartę Operatorowi.
 
 ### 2a. jarvo-mobile — szczegóły

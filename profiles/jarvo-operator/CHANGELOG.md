@@ -1,6 +1,16 @@
 # Changelog: jarvo-operator
 
 ## Niewydane
+- Wejście Komputera, twarde zasady (KS2, docs/KOMPUTER.md §6): klik w punkt tylko z `delivery_mode: foreground`
+  w aktywnym oknie (w tle cua-driver 0.21.0 klika najmniejszy element programu w tym miejscu okna, także niewidoczny
+  albo w innym oknie: odmowa `punkt_w_tle`); klik w punkt sprawdzany w oknie, które naprawdę dostanie kliknięcie
+  (serwer X; okienko podręczne albo inne okno nad punktem to `nieznany_cel`), a element w punkcie po dwóch zgodnych
+  odpowiedziach AT-SPI; Tab i znaki sterujące w `type` odrzucone (`znak_sterujacy`), Enter w środku tekstu tylko
+  w polu wieloliniowym (`enter_w_srodku`); w polu wieloliniowym nowa linia to Shift+Enter, a Enter i Ctrl+Enter
+  w formularzu z płatnością albo poza formularzem (czat, komentarz) robi właściciel (`formularz_wrazliwy`,
+  `wysylka_bez_formularza`); Alt+litera (accesskey strony) odrzucone (`accesskey`); pole z fokusem sprawdzane na
+  żywo przed pisaniem, a gdy AT-SPI nie odpowiada albo formularza nie da się przejrzeć, działanie nie przechodzi.
+  SOUL (pkt 5) i skille `praca-na-ekranie` i `formularze` mówią to samo.
 - Nowy agent (etap K3 Komputera Jarva, docs/KOMPUTER.md §7): computer use na osobnym pulpicie z Chromium w kontenerze
   `jarvo-komputer`. Narzędzia: `computer_use` Hermesa przez bramkę `komputer/jarvo_cua.py` i wejście z twardymi
   zasadami, wtyczka `jarvo-komputer` (narzędzie `komputer`: stan Komputera, dziennik twardych zasad, oddanie ekranu

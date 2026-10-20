@@ -127,7 +127,15 @@ SKROTY_ZAKAZANE = frozenset({
     ("ctrl", "shift", "o"), ("alt", "f2"),
 })
 MODYFIKATORY = {"control": "ctrl", "ctl": "ctrl", "ctrl": "ctrl", "shift": "shift", "alt": "alt", "option": "alt",
-                "meta": "super", "cmd": "super", "command": "super", "super": "super", "win": "super"}
+                "meta": "super", "cmd": "super", "command": "super", "super": "super", "win": "super",
+                "control_l": "ctrl", "control_r": "ctrl", "shift_l": "shift", "shift_r": "shift", "alt_l": "alt",
+                "alt_r": "alt", "super_l": "super", "super_r": "super", "meta_l": "super", "meta_r": "super"}
+MODY = frozenset({"ctrl", "shift", "alt", "super"})
+# Alt (bez Ctrl i Super) z literą, cyfrą albo znakiem to w Chromium accesskey strony: klik przycisku (np. Wyślij,
+# Opublikuj) bez sprawdzenia jego napisu, a Blink pomija przy tym Shift. Z Altem wolno więc tylko klawisze nawigacji.
+ALT_DOZWOLONE = frozenset({"left", "right", "up", "down", "home", "end", "page_up", "page_down", "pageup", "pagedown",
+                           "prior", "next", "tab", "escape", "esc", "backspace", "delete", "insert"}
+                          | {f"f{i}" for i in range(1, 12)})
 
 
 @dataclass
@@ -306,12 +314,31 @@ def _sprawdz_tekst(tekst: str, pole: Optional[dict]) -> Optional[Werdykt]:
     return None
 
 
+def wieloliniowe(el: Optional[dict]) -> bool:
+    """Pole, w którym zwykły Enter ma być nową linią: textarea, pole multi-line albo edytowalny element strony
+    (contenteditable: czaty, komentarze, edytory). Takie pola często wysyłają wiadomość Enterem albo Ctrl+Enter."""
+    if not el:
+        return False
+    tag = str((el.get("atrybuty") or {}).get("tag", "")).lower()
+    stany = {str(s).lower() for s in el.get("stany") or []}
+    return tag == "textarea" or "multi-line" in stany or ("editable" in stany and tag not in ("", "input"))
+
+
+def w_formularzu(el: Optional[dict]) -> Optional[bool]:
+    """Czy pole leży w formularzu (role form): True, False albo None, gdy Komputer nie umie tego sprawdzić."""
+    if not el or el.get("formularz_nieznany"):
+        return None
+    if "w_formularzu" in el:
+        return bool(el["w_formularzu"])
+    return bool(el.get("formularz"))
+
+
 def formularz_wrazliwy(el: Optional[dict]) -> Optional[str]:
     """Enter w polu formularza wysyła formularz: etykieta wrażliwego przycisku tego formularza (Zapłać, Zaloguj,
-    Wyślij), albo None. W polu wieloliniowym (textarea) Enter to nowa linia."""
-    if not el or str((el.get("atrybuty") or {}).get("tag", "")).lower() == "textarea":
+    Wyślij), opis, gdy formularza nie da się sprawdzić, albo None."""
+    if not el:
         return None
-    if el.get("formularz_nieznany"):
+    if w_formularzu(el) is None:
         return "formularz, którego Komputer nie umie sprawdzić"
     for p in el.get("formularz") or []:
         rola = str(p.get("rola") or p.get("role") or "").lower()
@@ -320,14 +347,27 @@ def formularz_wrazliwy(el: Optional[dict]) -> Optional[str]:
     return None
 
 
-def _sprawdz_enter(el: Optional[dict]) -> Optional[Werdykt]:
+def _sprawdz_enter(el: Optional[dict], mody: frozenset = frozenset()) -> Optional[Werdykt]:
+    """Enter (także z modyfikatorami i jako nowa linia w type_text) w elemencie z fokusem albo w celu.
+    W polu wieloliniowym Shift+Enter to zawsze nowa linia; zwykły Enter i Ctrl/Super+Enter traktujemy jak wysyłkę:
+    w formularzu z przyciskiem płatności, logowania albo wysyłki i w polu poza formularzem (czat, komentarz) robi to
+    właściciel. W polu jednowierszowym poza formularzem (wyszukiwarka) Enter przechodzi."""
     zly = _sprawdz_aktywacje(el, "Enter na")
     if zly:
         return zly
+    wiele = wieloliniowe(el)
+    wysylka = bool(mody & {"ctrl", "super"})
+    if wiele and "shift" in mody and not wysylka:
+        return None
+    klawisz = "+".join(sorted(mody) + ["Enter"])
+    nowa_linia = " (nową linię zrób Shift+Enter)" if wiele else ""
     etykieta = formularz_wrazliwy(el)
     if etykieta:
-        return _czlowiek("formularz_wrazliwy", f"Enter w {opis(el)} wysyła formularz z przyciskiem "
-                         f"„{etykieta[:60]}” (płatność, logowanie, wysyłka): to robi właściciel", opis(el))
+        return _czlowiek("formularz_wrazliwy", f"{klawisz} w {opis(el)} wysyła formularz z przyciskiem "
+                         f"„{etykieta[:60]}” (płatność, logowanie, wysyłka): to robi właściciel{nowa_linia}", opis(el))
+    if w_formularzu(el) is False and (wiele or wysylka):
+        return _czlowiek("wysylka_bez_formularza", f"{klawisz} w {opis(el)} poza formularzem (czat, komentarz, "
+                         f"edytor) zwykle wysyła wiadomość: to robi właściciel{nowa_linia}", opis(el))
     return None
 
 
@@ -345,6 +385,26 @@ def _sprawdz_aktywacje(el: Optional[dict], jak: str) -> Optional[Werdykt]:
 
 def _wspolrzedne(args: dict) -> bool:
     return args.get("x") is not None and args.get("y") is not None
+
+
+def _punkt(args: dict) -> bool:
+    cel = args.get("target") if isinstance(args.get("target"), dict) else {}
+    return _wspolrzedne(args) or (cel.get("x") is not None and cel.get("y") is not None)
+
+
+def _klik_w_punkt_w_tle(nazwa: str, args: dict) -> bool:
+    """Zwykły klik lewym w punkt w tle. cua-driver 0.21.0 (X11) nie klika wtedy w okno: szuka w całym drzewie
+    programu (wszystkie okna, także elementy niewidoczne, przewinięte i przycięte) najmniejszego elementu z akcją,
+    którego prostokąt we współrzędnych swojego okna zawiera punkt, i wywołuje jego akcję. To może być inny element
+    niż ten, który widać w tym punkcie. Klik z modyfikatorem, prawym i podwójny idzie zdarzeniem do okna."""
+    if nazwa != "click" or not _punkt(args) or args.get("delivery_mode") == "foreground":
+        return False
+    try:
+        raz = int(args.get("count") or 1) == 1
+    except (TypeError, ValueError):
+        raz = False
+    return raz and str(args.get("button") or "left").lower() == "left" and not args.get("modifier") \
+        and args.get("scope") != "desktop"
 
 
 def _celowane(args: dict) -> bool:
@@ -454,6 +514,11 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
             return _odmowa("cel", f"{nazwa} wymaga elementu (element_token) albo punktu (x, y)")
         if nazwa == "click" and str(args.get("button") or "left").lower() == "right":
             return Werdykt(TAK, cel=opis(ctx.cel(nazwa, args)))
+        if _klik_w_punkt_w_tle(nazwa, args):
+            return _odmowa("punkt_w_tle", "klik w punkt w tle sterownik oddaje najmniejszemu elementowi programu "
+                           "w tym miejscu okna, także w innym oknie albo niewidocznemu, a nie temu, co widać; "
+                           "kliknij elementem (element_token z get_window_state) albo w punkt z delivery_mode "
+                           "foreground w aktywnym oknie")
         el = ctx.cel(nazwa, args)
         return _sprawdz_aktywacje(el, "kliknięcie") or Werdykt(TAK, cel=opis(el))
 
@@ -480,8 +545,16 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
     if nazwa in {"type_text", "set_value"}:
         tekst = args.get("text") if nazwa == "type_text" else args.get("value")
         tekst = "" if tekst is None else str(tekst)
+        if nazwa == "type_text" and any(unicodedata.category(z) == "Cc" and z not in "\n\r" for z in tekst):
+            # sterownik pisze \t jako Tab: fokus przeszedłby na następny element (np. „Kup teraz”), a reszta tekstu
+            # i Enter trafiłyby tam bez sprawdzenia
+            return _odmowa("znak_sterujacy", "Tab i inne znaki sterujące naciśnij osobno (press_key), potem zrób "
+                           "nowy stan okna: Tab przenosi fokus na inne pole albo przycisk")
         celowane = nazwa == "set_value" or _celowane(args)
         pole = ctx.cel(nazwa, args) if celowane else ctx.fokus(args)
+        if pole is not None and pole.get("nieznany") and tekst:
+            return _odmowa("nieznany_cel", "nie wiem, w które pole trafi tekst (fokus się zmienił albo drzewo "
+                           "dostępności nie odpowiedziało); zrób get_window_state, kliknij pole i pisz")
         if nazwa == "type_text" and (celowane or str((pole or {}).get("rola") or "").lower() in ROLE_DZIALANIA):
             # pisanie w cel to najpierw klik; spacja albo Enter na przycisku z fokusem go uruchamia
             zly = _sprawdz_aktywacje(pole, "kliknięcie przed pisaniem w" if celowane else "pisanie na")
@@ -496,6 +569,10 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
         if zly:
             return zly
         if nazwa == "type_text" and ("\n" in tekst or "\r" in tekst):
+            srodek = tekst.rstrip("\r\n")
+            if ("\n" in srodek or "\r" in srodek) and not wieloliniowe(pole):
+                return _odmowa("enter_w_srodku", "w polu jednowierszowym Enter tylko na końcu tekstu: po Enterze "
+                               "strona i fokus mogą się zmienić; resztę napisz po nowym stanie okna")
             zly = _sprawdz_enter(pole)
             if zly:
                 return zly
@@ -509,6 +586,12 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
             return _odmowa("klawisz", f"{nazwa}: brak klawisza")
         if skrot in SKROTY_ZAKAZANE or skrot[-1:] == ("f12",):
             return _odmowa("skrot", f"skrót {'+'.join(skrot)} jest wyłączony (narzędzia deweloperskie, systemowe)")
+        mody = frozenset(k for k in skrot if k in MODY)
+        if "alt" in mody and not mody & {"ctrl", "super"} and any(
+                k not in MODY and k not in ALT_DOZWOLONE and k not in KLAWISZE_AKTYWUJACE for k in skrot):
+            return _odmowa("accesskey", f"{'+'.join(skrot)}: Alt z literą, cyfrą albo znakiem uruchamia skrót strony "
+                           "(accesskey), np. Wyślij albo Opublikuj, bez sprawdzenia przycisku; kliknij element z "
+                           "migawki albo użyj klawiszy nawigacji")
         celowane = _celowane(args)
         if celowane:
             zly = _sprawdz_aktywacje(ctx.cel(nazwa, args), "kliknięcie przed klawiszem na")
@@ -519,15 +602,17 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
             if el is None:
                 return _odmowa("brak_fokusu", f"nie wiem, gdzie trafi {'+'.join(skrot)}; kliknij najpierw pole "
                                "albo przycisk, potem naciśnij klawisz")
-            if skrot[-1] in KLAWISZE_ENTER and pole_wrazliwe(el):
+            if skrot[-1] in KLAWISZE_ENTER and not el.get("nieznany") and pole_wrazliwe(el):
                 return _czlowiek("pole_wrazliwe", f"Enter w {pole_wrazliwe(el)} wysyła dane logowania albo "
                                  "płatności: to robi właściciel", opis(el))
-            zly = _sprawdz_enter(el) if skrot[-1] in KLAWISZE_ENTER else _sprawdz_aktywacje(el, "spacja na")
+            zly = _sprawdz_enter(el, mody) if skrot[-1] in KLAWISZE_ENTER else _sprawdz_aktywacje(el, "spacja na")
             if zly:
                 return zly
             return Werdykt(TAK, cel=opis(el), dane={"klawisze": "+".join(skrot)})
         if skrot[-1] in {"v", "insert"} and ("ctrl" in skrot or "shift" in skrot):
             el = ctx.cel(nazwa, args) if celowane else ctx.fokus(args)
+            if el is None:
+                return _odmowa("brak_fokusu", "nie wiem, gdzie trafi wklejenie; kliknij najpierw pole")
             powod = pole_wrazliwe(el)
             if powod:
                 return _czlowiek("pole_wrazliwe", f"wklejanie w {powod} robi właściciel", opis(el))
@@ -562,7 +647,10 @@ INSTRUKCJE = (
     "zgody na dostęp, wysyłkę i publikację oraz wpisywanie haseł, numerów kart, kodów BLIK i 2FA robi właściciel. "
     "Takie wywołanie wraca z code=wymaga_czlowieka (decision=czlowiek): powiedz właścicielowi, co ma kliknąć w Ekranie "
     "HQ, i poczekaj. Sekretów nie wpisujesz, a w drzewie i tekście są ukryte. Narzędzia page, browser_*, clipboard_*, "
-    "mouse_button_*, nagrywanie i aktualizacje są wyłączone; uruchamiasz tylko Chromium z adresami http i https.\n"
+    "mouse_button_*, nagrywanie i aktualizacje są wyłączone; uruchamiasz tylko Chromium z adresami http i https. "
+    "Tab naciskasz osobno (nie w type_text), nową linię w polu wieloliniowym robisz Shift+Enter, skrótów Alt+litera "
+    "(accesskey) nie ma. Klikasz elementem; klik w punkt tylko z delivery_mode foreground w aktywnym oknie, gdy to "
+    "okno, a nie okienko podręczne, leży w tym punkcie na wierzchu.\n"
     "Jarvo Computer hard rules: payments, purchases, sign-in, sign-up, access grants, sending, publishing and typing "
     "passwords, card numbers or one-time codes are left to the owner (decision=czlowiek)."
 )

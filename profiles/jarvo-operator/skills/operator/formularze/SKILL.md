@@ -36,7 +36,12 @@ w takim formularzu (`formularz_wrazliwy`).
 - Pole z podpowiedziami (adres, miasto): `type`, `wait` 1 s, `capture`, klik w właściwą podpowiedź.
 - Pole daty: najpierw spróbuj `type` w formacie strony (np. `19.10.2026`); kalendarz klikasz tylko, gdy pole nie
   przyjmuje tekstu.
-- Pole wieloliniowe: Enter robi nową linię, nie wysyła.
+- Pole wieloliniowe: nowa linia to Shift+Enter (`key` `shift+return` albo `\n` w środku tekstu `type`). Zwykły Enter i Ctrl+Enter traktuj jak wysyłkę: w formularzu z przyciskiem płatności, logowania albo
+  wysyłki i w polu poza formularzem (czat, komentarz) robi to właściciel (`formularz_wrazliwy`,
+  `wysylka_bez_formularza`).
+- Kolejne pole: `key` `tab` osobno albo klik w pole. Tab i inne znaki sterujące w tekście `type` wejście odrzuca
+  (`znak_sterujacy`), a Enter w środku tekstu pola jednowierszowego też (`enter_w_srodku`).
+- Skrótów Alt+litera (accesskey strony) nie używasz: wejście je odrzuca (`accesskey`); klikasz przycisk elementem.
 - Zgody i regulaminy (`check box` z „Akceptuję”, „Zgadzam się”): zaznacza właściciel, chyba że karta wprost mówi
   inaczej dla tej jednej zgody; zgody marketingowe zawsze zostawiasz puste.
 

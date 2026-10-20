@@ -144,14 +144,26 @@ def main() -> int:
                 po_nazwie.setdefault(e["label"], e)
         return w, po_nazwie
 
-    def srodek(e: dict) -> tuple[float, float]:
+    def ramka(w: dict, tytul: str) -> dict:
+        """Ramka okna `tytul` z tej samej migawki. cua-driver 0.21.0 daje w migawce drzewo całego programu, a ramki
+        przesuwa o położenie okna z zapytania (okno poza rogiem ekranu ma je przesunięte drugi raz), więc punkt
+        w oknie to różnica ramek elementu i okna."""
+        for e in (w.get("structuredContent") or {}).get("elements", []):
+            if e.get("role") == "frame" and str(e.get("label") or "").startswith(tytul) and e.get("frame"):
+                return e["frame"]
+        return {}
+
+    def srodek(e: dict, r: dict) -> tuple[float, float]:
+        """Środek elementu we współrzędnych zrzutu okna o ramce `r`."""
         f = e["frame"]
-        return f["x"] + f["w"] / 2, f["y"] + f["h"] / 2
+        return f["x"] + f["w"] / 2 - r.get("x", 0), f["y"] + f["h"] / 2 - r.get("y", 0)
 
     w, el = stan()
+    sklep = ramka(w, "Sklep testowy Jarvo")
+    sprawdz(bool(sklep), "migawka ma ramkę okna sklepu")
     calosc = json.dumps(w, ensure_ascii=False)
     for etykieta in ("Szukaj w sklepie", "Szukaj", "E-mail", "Hasło", "Numer karty", "Kod BLIK", "Uwagi", "Kup teraz", "Dodaj do koszyka",
-                     "Zaloguj się", "Zapłać 129 zł"):
+                     "Zaloguj się", "Zapłać 129 zł", "Pokaż szczegóły"):
         if not sprawdz(etykieta in el, f"drzewo dostępności ma „{etykieta}”"):
             return 1
     sprawdz(KLUCZ not in calosc and "[ukryte przez Komputer Jarva]" in calosc,
@@ -166,10 +178,14 @@ def main() -> int:
     w, el = stan()
     for etykieta in ("Kup teraz", "Zaloguj się", "Zapłać 129 zł"):
         sprawdz(kod(klik(etykieta)) == "wymaga_czlowieka", f"klik „{etykieta}” elementem: wymaga człowieka")
-    x, y = srodek(el["Zapłać 129 zł"])
+    x, y = srodek(el["Zapłać 129 zł"], sklep)
     w = k.narzedzie("click", {"pid": pid, "window_id": wid, "x": x, "y": y})
-    sprawdz(kod(w) == "wymaga_czlowieka", "klik „Zapłać” w punkt (AT-SPI na żywo): wymaga człowieka", tekst(w))
-    x, y = srodek(el["Kup teraz"])
+    sprawdz(zasada(w) == "punkt_w_tle", "klik w punkt w tle (sterownik klika najmniejszy element programu w tym "
+            "miejscu, nie to, co widać): zablokowany", tekst(w))
+    w = k.narzedzie("click", {"pid": pid, "window_id": wid, "x": x, "y": y, "delivery_mode": "foreground"})
+    sprawdz(kod(w) == "wymaga_czlowieka", "klik „Zapłać” w punkt na wierzchu (AT-SPI na żywo): wymaga człowieka",
+            tekst(w))
+    x, y = srodek(el["Kup teraz"], sklep)
     sprawdz(kod(k.narzedzie("drag", {"pid": pid, "window_id": wid, "from_x": x, "from_y": y, "to_x": x + 2,
                                      "to_y": y})) == "wymaga_czlowieka",
             "przeciągnięcie w miejscu na „Kup teraz”: wymaga człowieka")
@@ -225,6 +241,56 @@ def main() -> int:
     time.sleep(0.5)
     w = k.narzedzie("press_key", {**pisz, "key": "Return"})
     sprawdz(kod(w) == "wymaga_czlowieka", "Tab na „Kup teraz” i Enter (fokus z AT-SPI): wymaga człowieka", tekst(w))
+    klik("Uwagi")
+    time.sleep(0.5)
+    for znaki, opis in (("\t ", "Tab i spacja"), ("\t\n", "Tab i Enter")):
+        w = k.narzedzie("type_text", {**pisz, "text": znaki})
+        sprawdz(zasada(w) == "znak_sterujacy", f"{opis} w type_text w „Uwagi” (fokus przeskoczyłby na „Kup teraz”): "
+                "zablokowane", tekst(w))
+    w = k.narzedzie("type_text", {**pisz, "text": "linia\nlinia"})
+    sprawdz(zasada(w) == "formularz_wrazliwy", "Enter w „Uwagi” (formularz z „Zapłać”): wymaga człowieka", tekst(w))
+    w = k.narzedzie("press_key", {**pisz, "key": "Return", "modifiers": ["shift"]})
+    sprawdz(kod(w) == "ok", "Shift+Enter w „Uwagi” (nowa linia): przechodzi", tekst(w))
+    w = k.narzedzie("hotkey", {**pisz, "keys": ["ctrl", "Return"]})
+    sprawdz(zasada(w) == "formularz_wrazliwy", "Ctrl+Enter w „Uwagi”: wymaga człowieka", tekst(w))
+    w = k.narzedzie("hotkey", {**pisz, "keys": ["option", "shift", "k"]})
+    sprawdz(zasada(w) == "accesskey", "Alt+Shift+K (accesskey przycisku „Kup teraz”): zablokowane", tekst(w))
+
+    # okno podręczne w innym miejscu ekranu (window.open): klik w punkt sprawdzany w tym oknie, nie w oknie pod nim
+    sprawdz(kod(klik("Pokaż szczegóły")) == "ok", "klik „Pokaż szczegóły” (otwiera okno podręczne): przechodzi")
+    okno2 = None
+    for _ in range(30):
+        for o in (k.narzedzie("list_windows", {"on_screen_only": True}).get("structuredContent") or {}).get(
+                "windows", []):
+            if "Okno testowe Jarvo" in str(o.get("title")):
+                okno2 = o
+        if okno2:
+            break
+        time.sleep(0.5)
+    if sprawdz(okno2 is not None and (okno2.get("bounds") or {}).get("x", 0) > 0,
+               "okno podręczne z przesunięciem widać w list_windows", json.dumps(okno2)):
+        zaplac, w2 = None, {}
+        for _ in range(20):
+            w2 = k.narzedzie("get_window_state", {"pid": okno2["pid"], "window_id": okno2["window_id"]})
+            for e in (w2.get("structuredContent") or {}).get("elements", []):
+                if e.get("label") == "Zapłać teraz" and e.get("frame"):
+                    zaplac = e
+            if zaplac:
+                break
+            time.sleep(0.5)
+        r2 = ramka(w2, "Okno testowe Jarvo")
+        if sprawdz(zaplac is not None and bool(r2), "drzewo okna podręcznego ma „Zapłać teraz” i ramkę okna"):
+            # podwójny klik idzie zdarzeniem do okna (w tle, bez akcji AT-SPI): sprawdzany w punkcie tego okna
+            x, y = srodek(zaplac, r2)
+            w = k.narzedzie("double_click", {"pid": okno2["pid"], "window_id": okno2["window_id"], "x": x, "y": y})
+            sprawdz(kod(w) == "wymaga_czlowieka", "podwójny klik w punkt „Zapłać teraz” w przesuniętym oknie "
+                    "podręcznym: wymaga człowieka", tekst(w))
+            # ten sam punkt ekranu w oknie sklepu pod okienkiem: kliknięcie dostałoby okienko, nie sklep
+            b1, b2 = okno.get("bounds") or {}, okno2["bounds"]
+            w = k.narzedzie("double_click", {"pid": pid, "window_id": wid, "x": b2["x"] + x - b1.get("x", 0),
+                                             "y": b2["y"] + y - b1.get("y", 0)})
+            sprawdz(zasada(w) == "nieznany_cel", "klik w punkt okna sklepu przykrytego oknem podręcznym: zablokowany",
+                    tekst(w))
 
     # dwa żądania z tym samym id: drugie odrzucone, odpowiedź pierwszego nadal bez sekretów
     k.n += 1

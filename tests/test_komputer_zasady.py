@@ -210,18 +210,39 @@ def test_zwykle_przyciski_przechodza(etykieta):
     assert decyzja("click", {"element_token": "s1:5"}, cel=el("link", etykieta)) == TAK
 
 
+PUNKT = {"window_id": 5, "delivery_mode": "foreground"}   # klik w punkt na wierzchu w aktywnym oknie 5
+
+
 def test_klik_w_tekst_wewnatrz_przycisku_patrzy_na_przodkow():
     cel = el("text", "129 zł", przodkowie=[{"rola": "push button", "nazwa": "Zapłać 129 zł"},
                                           {"rola": "form", "nazwa": ""}])
-    assert decyzja("click", {"x": 10, "y": 10}, cel=cel) == CZLOWIEK
+    assert decyzja("click", {**PUNKT, "x": 10, "y": 10}, cel=cel, aktywne=5) == CZLOWIEK
     # przodek bez roli działania (nagłówek sekcji) nie blokuje
     cel = el("text", "Opis", przodkowie=[{"rola": "section", "nazwa": "Kup teraz"}])
-    assert decyzja("click", {"x": 10, "y": 10}, cel=cel) == TAK
+    assert decyzja("click", {**PUNKT, "x": 10, "y": 10}, cel=cel, aktywne=5) == TAK
 
 
 def test_nieznany_cel_to_odmowa_a_pusty_punkt_przechodzi():
     assert kod("click", {"element_token": "obcy:1"}, cel=NIEZNANY) == "nieznany_cel"
-    assert decyzja("click", {"x": 5, "y": 5}, cel=None) == TAK
+    assert kod("click", {**PUNKT, "x": 5, "y": 5}, cel=NIEZNANY, aktywne=5) == "nieznany_cel"
+    assert decyzja("click", {**PUNKT, "x": 5, "y": 5}, cel=None, aktywne=5) == TAK
+
+
+def test_klik_w_punkt_w_tle_odrzucony():
+    """cua-driver 0.21.0 robi zwykły klik w punkt w tle akcją najmniejszego elementu programu w tym miejscu okna
+    (dowolne okno, także element niewidoczny), więc wejście nie wie, w co trafi: tylko elementem albo na wierzchu."""
+    nic = el("text", "Opis")
+    for args in ({"x": 5, "y": 5}, {"x": 5, "y": 5, "delivery_mode": "background"}, {"x": 5, "y": 5, "count": 1},
+                 {"x": 5, "y": 5, "button": "left"}, {"target": {"x": 5, "y": 5}}):
+        assert kod("click", {"pid": 7, "window_id": 5, **args}, cel=nic) == "punkt_w_tle", args
+    # zdarzenie do okna (prawy, podwójny, z modyfikatorem) i klik na wierzchu sprawdzane w punkcie jak dotąd
+    assert decyzja("click", {"pid": 7, "window_id": 5, "x": 5, "y": 5, "button": "right"}, cel=nic) == TAK
+    for args in ({"count": 2}, {"modifier": ["shift"]}, {"delivery_mode": "foreground"}):
+        assert decyzja("click", {"pid": 7, "window_id": 5, "x": 5, "y": 5, **args}, cel=nic, aktywne=5) == TAK, args
+        assert kod("click", {"pid": 7, "window_id": 5, "x": 5, "y": 5, **args}, aktywne=5,
+                   cel=el("push button", "Kup teraz")) == "przycisk_wrazliwy", args
+    # elementem w tle bez zmian
+    assert decyzja("click", {"pid": 7, "window_id": 5, "element_token": "s:1"}, cel=nic) == TAK
 
 
 def test_prawy_klik_i_przewijanie_przechodza():
@@ -267,11 +288,19 @@ def test_pisanie_w_zwykle_pole():
     el("entry", "Kod SMS"),
     el("entry", "PIN"),
     el("entry", "API token"),
-    NIEZNANY,
 ])
 def test_pisanie_w_pola_wrazliwe_robi_wlasciciel(pole):
     w = ocen("type_text", {"pid": 1, "text": "x"}, Ctx(fokus=pole))
     assert w.decyzja == CZLOWIEK and w.kod == "pole_wrazliwe"
+
+
+def test_pisanie_gdy_fokusu_nie_da_sie_sprawdzic_to_odmowa():
+    # fokus przeniesiony (np. Tab chwilę wcześniej) albo AT-SPI bez odpowiedzi: nowy stan, klik w pole, pisanie
+    assert kod("type_text", {"pid": 1, "text": "x"}, fokus=NIEZNANY) == "nieznany_cel"
+    assert kod("press_key", {"pid": 1, "key": "Return"}, fokus=NIEZNANY) == "nieznany_cel"
+    assert kod("press_key", {"pid": 1, "key": "space"}, fokus=NIEZNANY) == "nieznany_cel"
+    assert decyzja("hotkey", {"pid": 1, "keys": ["ctrl", "v"]}, fokus=NIEZNANY) == CZLOWIEK
+    assert kod("hotkey", {"pid": 1, "keys": ["ctrl", "v"]}, fokus=None) == "brak_fokusu"
 
 
 def test_pisanie_bez_znanego_pola_to_odmowa():
@@ -338,8 +367,14 @@ def test_enter_w_formularzu_platnosci_robi_wlasciciel():
 def test_enter_w_formularzu_bez_platnosci_i_w_textarea():
     szukaj = el("entry", "Szukaj w sklepie", formularz=[{"rola": "push button", "nazwa": "Szukaj"}])
     assert decyzja("press_key", {"pid": 1, "key": "Return"}, fokus=szukaj) == TAK
+    # textarea w formularzu bez płatności: nowa linia; w formularzu z „Zapłać” zwykły Enter mógłby wysłać
+    # (strona przechwytuje Enter), więc nowa linia tylko Shift+Enter
+    opinia = el("entry", "Opinia", atrybuty={"tag": "textarea"}, formularz=[{"rola": "push button", "nazwa": "Dalej"}])
+    assert decyzja("type_text", {"pid": 1, "text": "linia\nlinia"}, fokus=opinia) == TAK
     uwagi = el("entry", "Uwagi", atrybuty={"tag": "textarea"}, formularz=[PRZYCISK_ZAPLAC])
-    assert decyzja("type_text", {"pid": 1, "text": "linia\nlinia"}, fokus=uwagi) == TAK
+    w = ocen("type_text", {"pid": 1, "text": "linia\nlinia"}, Ctx(fokus=uwagi))
+    assert w.decyzja == CZLOWIEK and w.kod == "formularz_wrazliwy" and "Shift+Enter" in w.powod
+    assert decyzja("press_key", {"pid": 1, "key": "Return", "modifiers": ["shift"]}, fokus=uwagi) == TAK
     # link w formularzu nie wysyła go Enterem
     pole = el("entry", "E-mail", formularz=[{"rola": "link", "nazwa": "Zaloguj się"}])
     assert decyzja("press_key", {"pid": 1, "key": "Return"}, fokus=pole) == TAK
@@ -353,7 +388,83 @@ def test_enter_gdy_formularza_nie_da_sie_sprawdzic():
     assert kod("press_key", {"pid": 1, "key": "Return"}, fokus=pole) == "formularz_wrazliwy"
 
 
+def test_tab_i_znaki_sterujace_w_pisaniu_odrzucone():
+    """\t w type_text to Tab: fokus przeskoczyłby z „Uwagi” na „Kup teraz”, a reszta tekstu albo Enter by go kliknęła."""
+    uwagi = el("entry", "Uwagi", atrybuty={"tag": "textarea"}, formularz=[PRZYCISK_ZAPLAC])
+    for tekst in ("\t ", "\t\n", "perfumy\t ", "a\x1bb", "\x08"):
+        assert kod("type_text", {"pid": 1, "text": tekst}, fokus=uwagi) == "znak_sterujacy", repr(tekst)
+    assert kod("type_text", {"pid": 1, "text": "\t"}, fokus=el("entry", "Szukaj")) == "znak_sterujacy"
+    # set_value nie naciska klawiszy
+    assert decyzja("set_value", {"element_token": "s:2", "value": "a\tb"}, cel=el("entry", "Uwagi")) == TAK
+
+
+def test_enter_w_srodku_tekstu_tylko_w_polu_wieloliniowym():
+    szukaj = el("entry", "Szukaj", formularz=[{"rola": "push button", "nazwa": "Szukaj"}])
+    assert kod("type_text", {"pid": 1, "text": "perfumy\nKup"}, fokus=szukaj) == "enter_w_srodku"
+    assert decyzja("type_text", {"pid": 1, "text": "perfumy\n"}, fokus=szukaj) == TAK
+
+
+@pytest.mark.parametrize("pole", [
+    el("section", "Napisz wiadomość", atrybuty={"tag": "div"}, stany=["editable", "multi-line"], w_formularzu=False),
+    el("entry", "Komentarz", atrybuty={"tag": "textarea"}, w_formularzu=False),
+    el("paragraph", "", atrybuty={"tag": "p"}, stany=["editable"], w_formularzu=False),
+])
+def test_enter_w_polu_wieloliniowym_bez_formularza_robi_wlasciciel(pole):
+    """Czat, komentarz, edytor bez <form>: Enter zwykle wysyła wiadomość; nowa linia Shift+Enter."""
+    w = ocen("press_key", {"pid": 1, "key": "Return"}, Ctx(fokus=pole))
+    assert w.decyzja == CZLOWIEK and w.kod == "wysylka_bez_formularza"
+    assert decyzja("type_text", {"pid": 1, "text": "Dzień dobry\n"}, fokus=pole) == CZLOWIEK
+    assert decyzja("press_key", {"pid": 1, "key": "Return", "modifiers": ["shift"]}, fokus=pole) == TAK
+    assert decyzja("type_text", {"pid": 1, "text": "Dzień dobry"}, fokus=pole) == TAK
+
+
+def test_wyszukiwarka_bez_formularza_enter_przechodzi():
+    szukaj = el("entry", "Szukaj", atrybuty={"tag": "input"}, stany=["editable", "single-line"], w_formularzu=False)
+    assert decyzja("press_key", {"pid": 1, "key": "Return"}, fokus=szukaj) == TAK
+    assert decyzja("press_key", {"pid": 1, "key": "Return", "modifiers": ["ctrl"]}, fokus=szukaj) == CZLOWIEK
+
+
+@pytest.mark.parametrize("klawisze", [["ctrl", "Return"], ["super", "Return"], ["Control_L", "KP_Enter"],
+                                      ["ctrl", "shift", "Return"]])
+def test_ctrl_enter_wysyla_takze_z_textarea(klawisze):
+    uwagi = el("entry", "Wiadomość", atrybuty={"tag": "textarea"},
+               formularz=[{"rola": "push button", "nazwa": "Wyślij"}])
+    w = ocen("hotkey", {"pid": 1, "keys": klawisze}, Ctx(fokus=uwagi))
+    assert w.decyzja == CZLOWIEK and w.kod == "formularz_wrazliwy"
+    # formularz bez wysyłki: Ctrl+Enter wolno
+    notatka = el("entry", "Notatka", atrybuty={"tag": "textarea"}, formularz=[{"rola": "push button", "nazwa": "Dalej"}])
+    assert decyzja("hotkey", {"pid": 1, "keys": klawisze}, fokus=notatka) == TAK
+
+
+def test_textarea_gdy_formularza_nie_da_sie_sprawdzic():
+    uwagi = el("entry", "Uwagi", atrybuty={"tag": "textarea"}, formularz=[], formularz_nieznany=True)
+    assert kod("type_text", {"pid": 1, "text": "a\nb"}, fokus=uwagi) == "formularz_wrazliwy"
+    assert decyzja("press_key", {"pid": 1, "key": "Return", "modifiers": ["shift"]}, fokus=uwagi) == TAK
+
+
 # --- klawisze
+
+
+@pytest.mark.parametrize("args", [
+    {"keys": ["option", "shift", "s"]}, {"keys": ["alt", "s"]}, {"keys": ["Alt_L", "p"]}, {"keys": ["alt", "1"]},
+    {"keys": ["alt", "comma"]}, {"keys": ["alt", "shift", "period"]}, {"keys": ["alt", "ś"]},
+])
+def test_alt_z_litera_to_accesskey_odrzucony(args):
+    assert kod("hotkey", {"pid": 1, **args}, fokus=el("entry", "x")) == "accesskey"
+
+
+def test_alt_z_litera_przez_press_key_tez():
+    assert kod("press_key", {"pid": 1, "key": "s", "modifiers": ["alt"]}, fokus=el("entry", "x")) == "accesskey"
+
+
+@pytest.mark.parametrize("keys", [["alt", "Left"], ["alt", "Right"], ["alt", "Home"], ["alt", "Tab"],
+                                  ["alt", "F4"], ["ctrl", "alt", "s"], ["alt"], ["alt", "shift"]])
+def test_alt_z_nawigacja_przechodzi(keys):
+    assert decyzja("hotkey", {"pid": 1, "keys": keys}, fokus=el("entry", "x")) == TAK
+
+
+def test_alt_enter_sprawdza_fokus_jak_enter():
+    assert decyzja("hotkey", {"pid": 1, "keys": ["alt", "Return"]}, fokus=el("push button", "Kup teraz")) == CZLOWIEK
 
 
 @pytest.mark.parametrize("args", [

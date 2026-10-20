@@ -42,9 +42,12 @@ zawężasz widok (przewiń, `app`). Zrzut z obrazem ma `screenshot_path`: to Tw�
   świeżego zrzutu `som`. Nigdy element i punkt naraz.
 - Adres strony: klik w pasek adresu (element „Pasek adresu i wyszukiwania”), `type` z adresem, `key` `return`.
 - Przewijanie: `scroll` `direction` + `amount`; po przewinięciu nowy `capture` (numery elementów się zmieniają).
-- Klik (także prawy) w tle, bez `delivery_mode`. `type`, `key`, `scroll`, `drag` i podwójny klik z
-  `delivery_mode: foreground`: na pulpicie Komputera w tle nie działają (`background_unavailable`), a wejście
-  przepuszcza je tylko w oknie, które już jest aktywne. Odmowa `okno_nieaktywne` → nowy `capture` (okienko, nowa
+- Klik po `element` (także prawy) w tle, bez `delivery_mode`. Klik w punkt (`coordinate`) tylko z
+  `delivery_mode: foreground`: w tle sterownik klika wtedy najmniejszy element programu w tym miejscu okna, także
+  niewidoczny albo w innym oknie, więc wejście go odrzuca (`punkt_w_tle`). `type`, `key`, `scroll`, `drag`
+  i podwójny klik z `delivery_mode: foreground`: na pulpicie Komputera w tle nie działają (`background_unavailable`),
+  a wejście przepuszcza je tylko w oknie, które już jest aktywne. Odmowa `nieznany_cel` przy kliku w punkt: nad
+  punktem jest okienko podręczne (lista, menu, podpowiedź) albo inne okno; nowy `capture` i klik elementem. Odmowa `okno_nieaktywne` → nowy `capture` (okienko, nowa
   karta?), działaj w aktywnym oknie albo poproś właściciela. Okna nie podnosisz (`bring_to_front`, `raise_window`
   to zgoda człowieka; bez niego odmowa).
 - `wait` (do 30 s) zamiast powtarzania, gdy strona się ładuje.
@@ -55,7 +58,8 @@ nowy `capture`. Wynik ma `verdict.decision`:
 - `done`: efekt potwierdzony, idziesz dalej.
 - `verify_fresh_state`: wejście doszło, efekt nieznany. **Najpierw `capture`**, porównaj z oczekiwanym stanem,
   dopiero potem ewentualnie powtórz. Nie powtarzaj pisania ani kliknięcia „na wszelki wypadek”.
-- `escalate`: działanie chyba nie trafiło. `recommended: px` → raz klik w punkt ze świeżego zrzutu `som`.
+- `escalate`: działanie chyba nie trafiło. `recommended: px` → raz klik w punkt ze świeżego zrzutu `som`
+  z `delivery_mode: foreground` w aktywnym oknie.
   `recommended: foreground` → raz to samo z `delivery_mode: foreground` w tym samym, aktywnym oknie (bez
   `bring_to_front`); dalej nic → inna droga: klawiatura (`key` `tab`, `return`), `set_value`, inny element. Po 3 nieudanych próbach tego samego kroku zmień drogę albo oddaj ekran.
 

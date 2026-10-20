@@ -30,6 +30,7 @@ from collections import deque
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import okna  # noqa: E402
 import zasady  # noqa: E402
 
 GNIAZDA = os.environ.get("KOMPUTER_GNIAZDA", "/run/jarvo-komputer")
@@ -47,9 +48,16 @@ LIMIT_DZIALAN = 120             # działań na minutę, ponad to odmowa (zapętl
 MAKS_DZIENNIK = 2 << 20
 ROLE_PRZYCISKOW = {"push button", "button"}
 PISANIE = {"type_text", "set_value", "press_key", "hotkey"}   # cel tych narzędzi dostaje też przyciski formularza
-MAKS_FORMULARZ = 300            # elementów formularza przeglądanych przy Enterze (przyciski wysyłki)
+MAKS_FORMULARZ = 3000           # elementów formularza przeglądanych przy Enterze, gdy AT-SPI nie ma Collection
+MAKS_DZIECI = 500               # dzieci jednego elementu w tym samym przeglądzie; więcej = formularz nieznany
+MAKS_PRZODKOWIE = 200           # poziomów w górę od pola do dokumentu (szukanie <form>); więcej = formularz nieznany
+ROLE_DOKUMENTU = {"document web", "document frame"}
+STANY_POLA = {"editable", "multi-line", "single-line"}
+BLAD = object()                 # AT-SPI nie odpowiedział albo rzucił wyjątek: cel nieznany, działanie nie przechodzi
 ZAJETE_S = 120                  # tyle sekund po ostatnim działaniu ekran należy do sesji, która działała
 MAKS_POWOD = 300                # znaków powodu pauzy (prośba Operatora do właściciela)
+PROBY_TRAFIENIA = 3             # zapytań o element w punkcie: dwa zgodne z rzędu albo cel nieznany
+PAUZA_TRAFIENIA = 0.12          # s między nimi: Chromium najpierw zgaduje z drzewa, potem pyta silnik strony
 
 
 def wolno_wznowic(uid: int) -> bool:
@@ -130,6 +138,10 @@ class Dostepnosc:
             pass
         el = {"rola": acc.get_role_name(), "nazwa": acc.get_name() or "", "atrybuty": atr, "zrodlo": "atspi",
               "przodkowie": []}
+        try:
+            el["stany"] = sorted(s.value_nick for s in acc.get_state_set().get_states() if s.value_nick in STANY_POLA)
+        except Exception:  # noqa: BLE001
+            pass
         p = acc
         for _ in range(przodkowie):
             try:
@@ -141,34 +153,58 @@ class Dostepnosc:
             el["przodkowie"].append({"rola": p.get_role_name(), "nazwa": p.get_name() or ""})
         return el
 
-    def _formularz(self, acc) -> list[dict]:
-        """Przyciski formularza (role form), w którym leży element: Enter w polu wysyła ten formularz."""
+    def _formularz(self, acc) -> dict | None:
+        """Formularz (role form), w którym leży element: {"w_formularzu", "formularz": przyciski}. Enter w polu
+        wysyła ten formularz. None, gdy tego nie da się ustalić do końca (drzewo za głębokie albo za duże): wtedy
+        Enter w tym polu sprawdza właściciel. Formularz nie wychodzi poza swój dokument (ramka iframe ma własny)."""
         p = acc
-        for _ in range(12):
+        for _ in range(MAKS_PRZODKOWIE):
             p = p.get_parent()
-            if p is None:
-                return []
+            if p is None or p.get_role_name() in ROLE_DOKUMENTU:
+                return {"w_formularzu": False, "formularz": []}
             if p.get_role_name() == "form":
-                break
-        else:
-            return []
-        wynik, kolejka, widziane = [], [p], 0
-        while kolejka and widziane < MAKS_FORMULARZ:
-            el = kolejka.pop(0)
+                przyciski = self._przyciski(p)
+                return None if przyciski is None else {"w_formularzu": True, "formularz": przyciski}
+        return None
+
+    def _przyciski(self, forma) -> list[dict] | None:
+        """Przyciski z napisem w formularzu: jednym zapytaniem AT-SPI Collection (przegląda most dostępności
+        w przeglądarce, bez limitów), a bez niego przeglądem drzewa; ucięty przegląd to None."""
+        try:
+            Atspi = self.Atspi
+            regula = Atspi.MatchRule.new(Atspi.StateSet.new([]), Atspi.CollectionMatchType.ALL, {},
+                                         Atspi.CollectionMatchType.ALL, [Atspi.Role.PUSH_BUTTON],
+                                         Atspi.CollectionMatchType.ANY, [], Atspi.CollectionMatchType.ALL, False)
+            znalezione = forma.get_matches(regula, Atspi.CollectionSortOrder.CANONICAL, 0, True)
+        except Exception:  # noqa: BLE001 - brak Collection: przegląd drzewa
+            znalezione = None
+        if znalezione is not None:
+            return [{"rola": e.get_role_name(), "nazwa": e.get_name()} for e in znalezione if e.get_name()]
+        wynik, kolejka, widziane = [], deque([forma]), 0
+        while kolejka:
+            if widziane >= MAKS_FORMULARZ:
+                return None
+            el = kolejka.popleft()
             widziane += 1
             if el.get_role_name() in ROLE_PRZYCISKOW and el.get_name():
                 wynik.append({"rola": el.get_role_name(), "nazwa": el.get_name()})
-            for i in range(min(el.get_child_count(), 64)):
+            n = el.get_child_count()
+            if n > MAKS_DZIECI:
+                return None
+            for i in range(n):
                 dziecko = el.get_child_at_index(i)
                 if dziecko is not None:
                     kolejka.append(dziecko)
         return wynik
 
     def _zdarzenie(self, ev) -> None:
-        if ev.detail1 != 1:
-            return
         try:
             pid = ev.source.get_process_id()
+            if ev.detail1 != 1:                     # element stracił fokus: zapomnij go, jeśli to on był ostatni
+                with self._lock:
+                    if pid in self._fokus and self._fokus[pid][1] == ev.source:
+                        del self._fokus[pid]
+                return
             opis = self._opis(ev.source)
         except Exception:  # noqa: BLE001 - element zniknął w trakcie
             return
@@ -176,8 +212,9 @@ class Dostepnosc:
             self._fokus[pid] = (opis, ev.source)
 
     def _w_glib(self, fn, czas: float = 3.0):
+        """Wynik fn() z wątku AT-SPI albo BLAD (brak AT-SPI, wyjątek, brak odpowiedzi w `czas` sekund)."""
         if not self.dziala:
-            return None
+            return BLAD
         wynik: dict = {}
         koniec = threading.Event()
 
@@ -189,51 +226,82 @@ class Dostepnosc:
             koniec.set()
             return False
 
-        self.GLib.idle_add(zadanie)
+        self.GLib.idle_add(zadanie, priority=self.GLib.PRIORITY_HIGH)
         if not koniec.wait(czas):
-            return None
+            log(f"AT-SPI nie odpowiedział w {czas:g} s: cel nieznany")
+            return BLAD
+        if "e" in wynik:
+            log("AT-SPI:", repr(wynik["e"])[:200])
+            return BLAD
         return wynik.get("w")
 
+    @staticmethod
+    def _swieze(app) -> None:
+        """libatspi z działającą pętlą zdarzeń trzyma w pamięci drzewo programu (okna, stany) i odświeża je tylko
+        zdarzeniami, których wejście nie słucha: nowe okno podręczne albo zmieniony stan nie byłyby widoczne. Przed
+        każdym sprawdzeniem pamięć programu idzie do kosza (kilka ms), a odczyty pytają program na żywo."""
+        if app is not None:
+            app.clear_cache()
+
     def fokus(self, pid: int | None) -> dict | None:
+        """Pole z fokusem klawiatury w programie `pid`: ostatnie zdarzenie fokusu, sprawdzone na żywo (stan
+        FOCUSED), z formularzem. None bez znanego fokusu; zasady.NIEZNANY, gdy fokus właśnie przeszedł gdzie indziej
+        (np. Tab chwilę temu, zanim doszło zdarzenie) albo AT-SPI nie odpowiedział."""
         with self._lock:
             wpis = self._fokus.get(pid) if pid is not None else None
         if wpis is None:
             return None
         opis, acc = wpis
-        przyciski = self._w_glib(lambda: self._formularz(acc))
-        if przyciski is None:                       # AT-SPI nie odpowiedział: Enter w tym polu sprawdzi człowiek
-            return {**opis, "formularz": [], "formularz_nieznany": True}
-        return {**opis, "formularz": przyciski}
 
-    def w_punkcie(self, pid: int | None, x: float, y: float, formularz: bool = False) -> dict | None:
-        Atspi = self.Atspi if self.dziala else None
+        def sprawdz():
+            self._swieze(acc.get_application())
+            if not acc.get_state_set().contains(self.Atspi.StateType.FOCUSED):
+                return None
+            return self._formularz(acc) or {"formularz": [], "formularz_nieznany": True}
 
+        wynik = self._w_glib(sprawdz)
+        if wynik is BLAD or wynik is None:
+            return zasady.NIEZNANY
+        return {**opis, **wynik}
+
+    def w_punkcie(self, pid: int, x: float, y: float, ramka: tuple, tytul: str = "",
+                  formularz: bool = False) -> dict | None:
+        """Element w punkcie ekranu, szukany tylko w oknie AT-SPI programu `pid`, które pasuje położeniem
+        i rozmiarem do okna X11 celu (`ramka`; przy kilku takich także tytułem). None, gdy takiego okna nie ma albo
+        jest ich kilka, i gdy AT-SPI nie odpowiedział."""
         def szukaj():
+            Atspi = self.Atspi
             pulpit = Atspi.get_desktop(0)
+            pasujace = []
             for i in range(pulpit.get_child_count()):
                 app = pulpit.get_child_at_index(i)
-                if app is None or (pid is not None and app.get_process_id() != pid):
+                if app is None or app.get_process_id() != pid:
                     continue
+                self._swieze(app)
                 for j in range(app.get_child_count()):
                     okno = app.get_child_at_index(j)
                     if okno is None or not okno.get_state_set().contains(Atspi.StateType.SHOWING):
                         continue
                     r = okno.get_extents(Atspi.CoordType.SCREEN)
-                    if not (r.x <= x < r.x + r.width and r.y <= y < r.y + r.height):
-                        continue
-                    acc = okno
-                    for _ in range(64):
-                        nast = acc.get_accessible_at_point(int(x), int(y), Atspi.CoordType.SCREEN)
-                        if nast is None or nast == acc:
-                            break
-                        acc = nast
-                    opis = self._opis(acc)
-                    if formularz:
-                        opis["formularz"] = self._formularz(acc)
-                    return opis
-            return None
+                    if all(abs(a - b) <= 2 for a, b in zip((r.x, r.y, r.width, r.height), ramka)):
+                        pasujace.append(okno)
+            if len(pasujace) > 1 and tytul:
+                pasujace = [o for o in pasujace if (o.get_name() or "") == tytul]
+            if len(pasujace) != 1:
+                return None
+            acc = pasujace[0]
+            for _ in range(64):
+                nast = acc.get_accessible_at_point(int(x), int(y), Atspi.CoordType.SCREEN)
+                if nast is None or nast == acc:
+                    break
+                acc = nast
+            opis = self._opis(acc)
+            if formularz:
+                opis.update(self._formularz(acc) or {"formularz": [], "formularz_nieznany": True})
+            return opis
 
-        return self._w_glib(szukaj) if Atspi else None
+        wynik = self._w_glib(szukaj)
+        return wynik if isinstance(wynik, dict) else None
 
 
 def czysty_powod(tekst) -> str:
@@ -250,6 +318,7 @@ class Ekran:
 
     def __init__(self, dostepnosc: Dostepnosc) -> None:
         self.dostepnosc = dostepnosc
+        self.x11 = okna.X11()
         self.pauza: dict | None = self._wczytaj_pauze()
         self._dzialania: deque = deque()
         self._zajete: tuple[int, float] | None = None     # (nr sesji, czas ostatniego działania)
@@ -331,7 +400,8 @@ class KontekstSesji:
     def __init__(self, ekran: Ekran) -> None:
         self.ekran = ekran
         self.migawki: dict[str, dict] = {}            # snapshot_id -> {"okno": (pid, wid), "elementy": {...}, ...}
-        self.okna: dict[tuple, dict] = {}              # (pid, window_id) -> ostatnia migawka
+        self.skale: dict[int, float] = {}              # pid -> skala zrzutu, jak resize_registry sterownika
+        self.zakres = "window"                         # capture_scope z set_config tej sesji
 
     @property
     def wstrzymane(self) -> bool:
@@ -341,20 +411,43 @@ class KontekstSesji:
     def powod_pauzy(self) -> str:
         return self.ekran.powod_pauzy
 
-    def zapamietaj(self, args: dict, sc: dict) -> None:
+    def zapamietaj(self, nazwa: str, args: dict, sc: dict) -> None:
+        if nazwa == "set_config":
+            zakres = args.get("value") if args.get("key") == "capture_scope" else args.get("capture_scope")
+            if zakres in ("window", "desktop"):
+                self.zakres = zakres
+        if nazwa == "get_window_state":
+            self._skala(args, sc)
         sid = sc.get("snapshot_id")
         elementy = sc.get("elements")
         if not isinstance(sid, str) or not isinstance(elementy, list):
             return
         po_indeksie = {e.get("element_index"): e for e in elementy if isinstance(e, dict)}
-        korzen = po_indeksie.get(0, {}).get("frame") or {}
         m = {"okno": (sc.get("pid", args.get("pid")), sc.get("window_id", args.get("window_id"))),
-             "elementy": po_indeksie, "korzen": korzen, "szer": sc.get("screenshot_width"), "czas": time.monotonic()}
+             "elementy": po_indeksie, "czas": time.monotonic()}
         self.migawki[sid] = m
-        self.okna[m["okno"]] = m
         if len(self.migawki) > 8:
             for stary in sorted(self.migawki, key=lambda k: self.migawki[k]["czas"])[:-8]:
                 del self.migawki[stary]
+
+    def _skala(self, args: dict, sc: dict) -> None:
+        """Skala zrzutu jak w sterowniku (cua-driver 0.21.0, get_window_state): gdy zrzut był zmniejszony
+        (max_image_dimension), x i y kliknięć w punkt sterownik mnoży przez szerokość oryginału / szerokość zrzutu,
+        osobno dla każdego procesu, aż do następnego zrzutu tego procesu."""
+        szer, pid = sc.get("screenshot_width"), sc.get("pid", args.get("pid"))
+        if args.get("_observation_only") is True or not isinstance(szer, int) or szer <= 0 or not isinstance(pid, int):
+            return
+        if self.zakres == "desktop":
+            oryginal = (self.ekran.x11.ekran() or (0, 0))[0]
+        else:
+            try:
+                oryginal = (self.ekran.x11.geometria(int(sc.get("window_id", args.get("window_id")))) or (0, 0, 0))[2]
+            except (TypeError, ValueError):
+                oryginal = 0
+        if oryginal > szer:
+            self.skale[pid] = oryginal / szer
+        else:
+            self.skale.pop(pid, None)
 
     def _z_migawki(self, sid: str | None, indeks) -> dict | None:
         m = self.migawki.get(sid or "")
@@ -368,18 +461,29 @@ class KontekstSesji:
             return None
         wynik = {"rola": el.get("role"), "nazwa": el.get("label") or "", "atrybuty": {}, "zrodlo": "migawka",
                  "przodkowie": []}
-        rodzic, formularz = el.get("parent_index"), None
-        for krok in range(12):
-            p = m["elementy"].get(rodzic) if rodzic is not None else None
-            if not p:
+        rodzic, formularz, koniec = el.get("parent_index"), None, False
+        for krok in range(MAKS_PRZODKOWIE):
+            if rodzic is None:
+                koniec = True
+                break
+            p = m["elementy"].get(rodzic)
+            if not p:                               # rodzica nie ma w migawce: drzewo niepełne
                 break
             if krok < 5:
                 wynik["przodkowie"].append({"rola": p.get("role"), "nazwa": p.get("label") or ""})
             if p.get("role") == "form":
                 formularz = rodzic
                 break
+            if p.get("role") in ROLE_DOKUMENTU:
+                koniec = True
+                break
             rodzic = p.get("parent_index")
-        wynik["formularz"] = self._przyciski_formularza(m, formularz) if formularz is not None else []
+        if formularz is not None:
+            wynik.update(w_formularzu=True, formularz=self._przyciski_formularza(m, formularz))
+        elif koniec:
+            wynik.update(w_formularzu=False, formularz=[])
+        else:
+            wynik.update(formularz=[], formularz_nieznany=True)
         return wynik
 
     @staticmethod
@@ -397,20 +501,51 @@ class KontekstSesji:
                 wynik.append({"rola": e.get("role"), "nazwa": e.get("label")})
         return wynik
 
-    def _punkt_ekranu(self, args: dict, x: float, y: float) -> tuple[float, float]:
-        """Współrzędne zrzutu okna (window-local, ewentualnie przeskalowane) na współrzędne ekranu."""
-        if args.get("scope") == "desktop":
-            return x, y
-        m = self.okna.get((args.get("pid"), args.get("window_id")))
-        if not m:
-            return x, y
-        k = m["korzen"]
-        skala = (k.get("w") / m["szer"]) if k.get("w") and m.get("szer") else 1.0
-        return k.get("x", 0) + x * skala, k.get("y", 0) + y * skala
+    def _tytul(self, okno: int) -> str:
+        _, _, tytul = self._xprop("-id", str(int(okno)), "_NET_WM_NAME").partition(" = ")
+        return tytul.strip().removeprefix('"').removesuffix('"')
+
+    def _w_punkcie(self, nazwa: str, args: dict, x, y) -> dict:
+        """Element pod kliknięciem w punkt okna: tam, gdzie kliknie sterownik (początek okna na żywo, skala zrzutu),
+        tylko gdy kliknięcie w tym punkcie dostanie to okno i AT-SPI dwa razy z rzędu pokazuje ten sam jego element.
+        Każda niepewność (punkt pulpitu bez okna, okno innego procesu, punkt poza oknem, inne okno albo okienko
+        podręczne nad punktem, brak odpowiedzi AT-SPI, odpowiedzi niezgodne) daje zasady.NIEZNANY, czyli odmowę."""
+        if not self.ekran.dostepnosc.dziala or args.get("scope") == "desktop":
+            return zasady.NIEZNANY
+        pid = args.get("pid")
+        try:
+            fx, fy, okno = float(x), float(y), int(args.get("window_id"))
+        except (TypeError, ValueError):
+            return zasady.NIEZNANY
+        if not isinstance(pid, int) or self.pid_okna(okno) != pid:
+            return zasady.NIEZNANY
+        g = self.ekran.x11.geometria(okno)
+        if g is None:
+            return zasady.NIEZNANY
+        skala = self.skale.get(pid, 1.0)
+        sx, sy = g[0] + fx * skala, g[1] + fy * skala
+        if not (g[0] <= sx < g[0] + g[2] and g[1] <= sy < g[1] + g[3]):
+            return zasady.NIEZNANY
+        if self.ekran.x11.na_wierzchu(sx, sy, okno) is not True:
+            return zasady.NIEZNANY
+        # Chromium odpowiada od razu z pamięci ostatniego trafienia albo zgaduje z drzewa (bez warstw z-index
+        # i przycięć) i w tle zleca trafienie silnikowi strony; kolejne pytanie w tym punkcie dostaje już jego wynik.
+        # Dlatego pytamy, aż dwie odpowiedzi z rzędu są zgodne.
+        tytul, poprzedni = self._tytul(okno), None
+        for proba in range(PROBY_TRAFIENIA):
+            if proba:
+                time.sleep(PAUZA_TRAFIENIA)
+            wynik = self.ekran.dostepnosc.w_punkcie(pid, sx, sy, g, tytul, formularz=nazwa in PISANIE)
+            if wynik is None:
+                return zasady.NIEZNANY
+            if wynik == poprzedni:
+                return wynik
+            poprzedni = wynik
+        return zasady.NIEZNANY
 
     def cel(self, nazwa: str, args: dict) -> dict | None:
-        """Element pod działaniem. Token albo indeks spoza migawek tej sesji i punkt bez działającego AT-SPI
-        dają zasady.NIEZNANY (odmowa), pusty punkt na ekranie daje None (nic do sprawdzenia)."""
+        """Element pod działaniem: z migawki tej sesji (token, indeks) albo w punkcie okna (_w_punkcie). Czego nie
+        da się sprawdzić, to zasady.NIEZNANY (odmowa); None tylko bez wskazanego celu."""
         cel = args.get("target") if isinstance(args.get("target"), dict) else {}
         token = args.get("element_token") or cel.get("element_token")
         if token:
@@ -421,14 +556,7 @@ class KontekstSesji:
             return self._z_migawki(args.get("snapshot_id") or cel.get("snapshot_id"), indeks) or zasady.NIEZNANY
         x, y = args.get("x", cel.get("x")), args.get("y", cel.get("y"))
         if x is not None and y is not None:
-            if not self.ekran.dostepnosc.dziala:
-                return zasady.NIEZNANY
-            try:
-                sx, sy = self._punkt_ekranu(args, float(x), float(y))
-            except (TypeError, ValueError):
-                return zasady.NIEZNANY
-            pid = args.get("pid") if isinstance(args.get("pid"), int) else None
-            return self.ekran.dostepnosc.w_punkcie(pid, sx, sy, formularz=nazwa in PISANIE)
+            return self._w_punkcie(nazwa, args, x, y)
         return None
 
     def fokus(self, args: dict) -> dict | None:
@@ -632,8 +760,8 @@ class Sesja:
             wynik["tools"] = [t for t in wynik.get("tools") or [] if t.get("name") in zasady.DOSTEPNE]
         else:                                       # każda inna odpowiedź traci sekrety, także bez znanego id
             sc = wynik.get("structuredContent")
-            if nazwa in zasady.DOSTEPNE and isinstance(sc, dict):
-                self.ctx.zapamietaj(args, sc)
+            if nazwa in zasady.DOSTEPNE and not wynik.get("isError"):
+                self.ctx.zapamietaj(nazwa, args, sc if isinstance(sc, dict) else {})
             ukryte = 0
             for c in wynik.get("content") or []:
                 if isinstance(c, dict) and c.get("type") == "text" and isinstance(c.get("text"), str):

@@ -145,7 +145,7 @@ def test_polityka_chromium():
 def test_wejscie_sterownika_w_obrazie():
     d = _tekst("Dockerfile")
     assert "python3-gi gir1.2-atspi-2.0" in d                     # fokus i element w punkcie z AT-SPI
-    assert "COPY start.sh zdrowie.sh wejscie.py zasady.py /opt/jarvo-komputer/" in d
+    assert "COPY start.sh zdrowie.sh wejscie.py zasady.py okna.py /opt/jarvo-komputer/" in d
     assert "COPY chromium-flagi /etc/chromium.d/jarvo" in d
     s = _tekst("start.sh")
     # wejście jako pulpit, wznawiane po awarii, przed Chromium (fokus każdego pola już śledzony)

@@ -1,7 +1,7 @@
 # Komputer Jarva (docs/KOMPUTER.md): pulpit Linux, na którym agent Operator klika i pisze. Osobny kontener bez
 # kluczy floty: Xvnc tylko na gnieździe unix, xfwm4 z kompozytorem (bez niego zrzuty zasłoniętych okien są czarne),
 # Chromium z drzewem dostępności, sterownik ekranu cua-driver (MIT, wersja i sumy z vendor/zrodla.yaml) i wejście
-# sterownika z twardymi zasadami (wejscie.py, zasady.py: flota sięga do sterownika tylko przez nie).
+# sterownika z twardymi zasadami (wejscie.py, zasady.py, okna.py: flota sięga do sterownika tylko przez nie).
 # Bez sudo, bez kompilatorów, bez serwera X na TCP. Buduje go deploy.sh i `jarvo komputer on` (obraz lokalny
 # jarvo-komputer:local, przebudowa po zmianie infra/komputer/).
 #
@@ -83,8 +83,8 @@ RUN ln -s "/opt/cua/${CUA_DRIVER_VERSION}/cua-driver" /usr/local/bin/cua-driver
 COPY LICENSE-cua-driver.md /opt/cua/LICENSE.md
 COPY chromium.json /etc/chromium/policies/managed/jarvo.json
 COPY chromium-flagi /etc/chromium.d/jarvo
-COPY start.sh zdrowie.sh wejscie.py zasady.py /opt/jarvo-komputer/
-RUN chmod 0644 /etc/chromium.d/jarvo /opt/jarvo-komputer/zasady.py; \
+COPY start.sh zdrowie.sh wejscie.py zasady.py okna.py /opt/jarvo-komputer/
+RUN chmod 0644 /etc/chromium.d/jarvo /opt/jarvo-komputer/zasady.py /opt/jarvo-komputer/okna.py; \
     chmod 0755 /opt/jarvo-komputer/start.sh /opt/jarvo-komputer/zdrowie.sh /opt/jarvo-komputer/wejscie.py
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 CMD ["/opt/jarvo-komputer/zdrowie.sh"]
