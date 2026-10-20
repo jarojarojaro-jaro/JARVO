@@ -23,10 +23,14 @@
 # sesja logowania jeszcze o tym nie wie (świeża instalacja), jarvo uruchamia się ponownie przez `sg docker`.
 set -euo pipefail
 
-# macOS ma basha 3.2; skrypty floty potrzebują 4+ (Homebrew)
-if (( BASH_VERSINFO[0] < 4 )); then
-  for b in /opt/homebrew/bin/bash /usr/local/bin/bash; do [[ -x $b ]] && exec "$b" "$0" "$@"; done
+# macOS ma basha 3.2; skrypty floty potrzebują 4+ (Homebrew). Raz: stary bash pod /usr/local/bin nie zapętli exec
+if (( BASH_VERSINFO[0] < 4 )) && [[ -z ${JARVO_BASH_REEXEC:-} ]]; then
+  for b in /opt/homebrew/bin/bash /usr/local/bin/bash; do [[ -x $b ]] && JARVO_BASH_REEXEC=1 exec "$b" "$0" "$@"; done
 fi
+unset JARVO_BASH_REEXEC
+# local-up.sh, deploy.sh i pomocnik aktualizacji wołają `bash`: gdy pierwszy w PATH jest /bin/bash 3.2 (macOS
+# bez Homebrew w PATH), stawiamy przed nim katalog basha, w którym działamy
+if [[ $(uname -s) == Darwin ]] && ! bash -c '(( BASH_VERSINFO[0] >= 4 ))' 2>/dev/null; then export PATH="${BASH%/*}:$PATH"; fi
 
 resolve() {   # ścieżka bez dowiązań (readlink -f nie ma na starszym macOS)
   local p="$1" d
@@ -65,9 +69,12 @@ envval() { sed -n "s/^$1=//p" "$L/compose/.env" 2>/dev/null | tail -1; }
 volumes() { [[ -n "$(envval JARVO_VOL_HERMES)" ]]; }   # dane floty w wolumenach Dockera (macOS)
 build_dir() { local b; b="$(envval JARVO_BUILD)"; echo "${b:-$L/build}"; }
 
-mac_docker_start() {   # macOS: Docker wyłączony po restarcie albo zatrzymany ręcznie: Colima albo Docker Desktop
+mac_docker_start() {   # macOS: Docker wyłączony po restarcie albo zatrzymany ręcznie: Colima, OrbStack albo Docker Desktop
   if have colima; then
     say "Uruchamiam Colimę (Docker)…"; colima start >/dev/null 2>&1 || return 1
+  elif [[ -d /Applications/OrbStack.app ]]; then
+    say "Uruchamiam OrbStack…"; open -a OrbStack || return 1
+    [[ -x $HOME/.orbstack/bin/docker ]] && PATH="$HOME/.orbstack/bin:$PATH"
   elif [[ -d /Applications/Docker.app ]]; then
     say "Uruchamiam Docker Desktop…"; open -a Docker || return 1
   else return 1; fi
@@ -99,10 +106,13 @@ ensure_docker() {   # ensure_docker [soft]: soft zwraca 1 zamiast kończyć
 updater_pid_alive() { local p; p="$(cat "$L/updater.pid" 2>/dev/null || true)"; [[ -n $p ]] && kill -0 "$p" 2>/dev/null; }
 unit_usable() { [[ $OS != macos && -d /run/systemd/system ]] && systemctl --user show-environment >/dev/null 2>&1; }
 agent_loaded() { [[ $OS == macos ]] && launchctl print "gui/$(id -u)/pl.jarvo.updater" >/dev/null 2>&1; }
-agent_text() {
-  local brewbin; brewbin="$(dirname "$(command -v brew 2>/dev/null || echo /opt/homebrew/bin/brew)")"
+agent_text() {   # PATH: Homebrew (bash, colima), docker tam, gdzie jest teraz (OrbStack, Docker Desktop), systemowe
+  local brewbin dockerbin
+  brewbin="$(dirname "$(command -v brew 2>/dev/null || echo /opt/homebrew/bin/brew)")"
+  dockerbin="$(dirname "$(command -v docker 2>/dev/null || echo /usr/local/bin/docker)")"
   sed -e "s#@JARVO@#$SELF#g" -e "s#@LOCAL@#$L#g" -e "s#@AUTO@#${JARVO_AUTO_UPDATE:-0}#g" \
-      -e "s#@PATH@#$brewbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin#g" -e "s#@LOG@#$L/updater.log#g" \
+      -e "s#@PATH@#$brewbin:$dockerbin:$HOME/.orbstack/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin#g" \
+      -e "s#@LOG@#$L/updater.log#g" \
       "$ROOT/infra/autostart/pl.jarvo.updater.plist"
 }
 unit_enabled() { [[ -f $UNIT ]] && systemctl --user is-enabled jarvo-updater.service >/dev/null 2>&1; }
@@ -217,6 +227,19 @@ cmd_autostart() {
     *) die "jarvo autostart on|off|status" ;;
   esac
 }
+# macOS: Colimę postawił instalator (znacznik $L/.colima): po usunięciu danych zwalniamy jej maszynę wirtualną
+# (pamięć i dysk do 60 GB). Gdy są w niej inne kontenery albo wolumeny niż floty, tylko podpowiadamy.
+colima_usun() {
+  [[ $OS == macos && -f $L/.colima ]] && have colima || return 0
+  docker info >/dev/null 2>&1 || { echo "Colima zostaje (Docker nie odpowiada; colima delete, gdy już niepotrzebna)."; return 0; }
+  local inne
+  inne="$( { docker ps -aq 2>/dev/null; docker volume ls -q 2>/dev/null | grep -v '^jarvo-'; } | head -1 || true)"
+  if [[ -n $inne ]]; then
+    echo "Colima zostaje: są w niej inne kontenery albo wolumeny (colima stop; colima delete, gdy już niepotrzebna)."
+  elif colima delete -f >/dev/null 2>&1; then
+    say "Usunięto maszynę wirtualną Colimy (programy zostają: brew uninstall colima lima docker docker-compose docker-buildx)"
+  else warn "Colimy nie udało się usunąć (colima delete)."; fi
+}
 cmd_uninstall() {
   local all=0 a link
   for a in "$@"; do
@@ -236,7 +259,9 @@ cmd_uninstall() {
   fi
   cmd_autostart off >/dev/null 2>&1 || true
   if updater_pid_alive; then kill "$(cat "$L/updater.pid")" 2>/dev/null || true; fi
-  for link in /usr/local/bin/jarvo "$HOME/.local/bin/jarvo"; do
+  # dowiązania z install.sh (link_cli): /usr/local/bin, ~/.local/bin, katalog bin Homebrew (Apple Silicon: /opt/homebrew)
+  local brewbin=/opt/homebrew/bin; have brew && brewbin="$(brew --prefix 2>/dev/null)/bin"
+  for link in /usr/local/bin/jarvo "$HOME/.local/bin/jarvo" "$brewbin/jarvo"; do
     if [[ -L $link && "$(resolve "$link")" == "$SELF" ]]; then rm -f "$link" 2>/dev/null || $SUDO rm -f "$link"; fi
   done
   say "Flota usunięta."
@@ -251,6 +276,7 @@ cmd_uninstall() {
     if ensure_docker soft; then
       docker volume rm jarvo-komputer-dom jarvo-komputer-gniazda >/dev/null 2>&1 || true
     fi
+    colima_usun
     [[ -n $L && $L != / && -d $L ]] && $SUDO rm -rf "$L" && say "Usunięto $L"
   else echo "Dane zostają: $L"; fi
   if [[ $ask == yes ]] || { [[ $ask == pytaj ]] && confirm "Usunąć repo ($ROOT)?"; }; then

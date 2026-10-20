@@ -18,6 +18,9 @@
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>30</integer>
+  <!-- praca w tle: macOS daje pomocnikowi niższy priorytet procesora i dysku niż programom, których używasz -->
+  <key>ProcessType</key><string>Background</string>
+  <key>LowPriorityIO</key><true/>
   <key>StandardOutPath</key><string>@LOG@</string>
   <key>StandardErrorPath</key><string>@LOG@</string>
 </dict>

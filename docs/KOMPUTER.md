@@ -11,7 +11,7 @@ odtwarzamy własnym kodem na Hermesie i otwartym sterowniku `cua-driver` (MIT).
 
 | Co | Gdzie działa | Stan |
 |---|---|---|
-| **Komputer Jarva**: pulpit z Chromium i terminalem w osobnym kontenerze `jarvo-komputer`, włączany `jarvo komputer on` | Linux, macOS (Colima), Windows (WSL), VPS bez monitora | pulpit, wejście sterownika i twarde zasady działają (K1, K2) |
+| **Komputer Jarva**: pulpit z Chromium i terminalem w osobnym kontenerze `jarvo-komputer`, włączany `jarvo komputer on` | Linux, macOS (Colima), Windows (WSL), VPS bez monitora | pulpit, wejście sterownika i twarde zasady działają (K1, K2); sprawdzone na Linuksie amd64, macOS i arm64 czekają na pierwszą próbę na prawdziwym sprzęcie |
 | **Operator** (`jarvo-operator`): agent, który steruje ekranem (najpierw drzewo dostępności, zrzut tylko gdy trzeba) | wszędzie tam, gdzie Komputer | działa (K3) |
 | **Ekran w HQ**: podgląd na żywo, Przejmij, Oddaj, Zatrzymaj | zalogowany dashboard | etap K4 |
 | **Terminal i serwery**: powłoka w Komputerze, ekrany programów tekstowych, Twoje serwery przez SSH | wszędzie | etap K5 |

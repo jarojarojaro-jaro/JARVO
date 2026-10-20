@@ -40,8 +40,8 @@ fail() { printf '\n\033[31m✗ %s\033[0m\n' "$*"; exit 1; }
 
 cd "$ROOT"
 [[ -f "$COMPOSE_DIR/.env" ]] || fail "Brak $COMPOSE_DIR/.env (skopiuj infra/env/compose.env.example)."
-grep -q '^SEARXNG_SECRET=.\+' "$COMPOSE_DIR/.env" || fail "Ustaw SEARXNG_SECRET w $COMPOSE_DIR/.env"
-grep -q '^DASHBOARD_PASSWORD=.\+' "$COMPOSE_DIR/.env" || fail "Ustaw DASHBOARD_PASSWORD w $COMPOSE_DIR/.env (openssl rand -hex 16)"
+grep -q '^SEARXNG_SECRET=..*' "$COMPOSE_DIR/.env" || fail "Ustaw SEARXNG_SECRET w $COMPOSE_DIR/.env"
+grep -q '^DASHBOARD_PASSWORD=..*' "$COMPOSE_DIR/.env" || fail "Ustaw DASHBOARD_PASSWORD w $COMPOSE_DIR/.env (openssl rand -hex 16)"
 # dawny domyślny HERMES_IMAGE (ruchomy latest) → wersja przypięta w repo (infra/Dockerfile) i gotowy obraz z rejestru
 if grep -qx 'HERMES_IMAGE=nousresearch/hermes-agent:latest' "$COMPOSE_DIR/.env"; then
   sed -i.bak 's#^HERMES_IMAGE=nousresearch/hermes-agent:latest$#HERMES_IMAGE=#' "$COMPOSE_DIR/.env" && rm -f "$COMPOSE_DIR/.env.bak"
@@ -94,7 +94,7 @@ if [[ $REBUILD -eq 1 ]]; then
   log "Budowa obrazu jarvo-hermes (narzędzia agentów)"
   docker buildx version >/dev/null 2>&1 || fail "Brak wtyczki docker buildx: docker compose build bez niej nie ruszy. Uruchom jarvo update (instalator ją doinstaluje)."
   BUILD_ARGS=(); [[ $PULLBASE -eq 1 ]] && BUILD_ARGS+=(--pull)
-  "${COMPOSE[@]}" build "${BUILD_ARGS[@]}" hermes
+  "${COMPOSE[@]}" build ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} hermes
   # z której wersji infra/ zbudowano obraz (local-up przebudowuje tylko, gdy się zmieniła)
   git -C "$ROOT" rev-parse HEAD:infra > "$COMPOSE_DIR/.infra-tree" 2>/dev/null || true
   git -C "$ROOT" rev-parse HEAD > "$COMPOSE_DIR/.image-src" 2>/dev/null || true
@@ -154,7 +154,7 @@ if [[ -f "$COMPOSE_DIR/.host-version" ]]; then
 fi
 
 log "Start usług"
-"${COMPOSE[@]}" "${PROFILES[@]}" up -d
+"${COMPOSE[@]}" ${PROFILES[@]+"${PROFILES[@]}"} up -d
 
 PY=/opt/hermes/.venv/bin/python
 # Jednorazowe kroki bez init-a s6 (--entrypoint ""): na wspólnym wolumenie danych init wznowiłby
@@ -175,7 +175,7 @@ log "Instalacja/aktualizacja floty w kontenerze"
 EXTRA=()
 [[ $RESUME_CRON -eq 1 ]] && EXTRA+=(--resume-cron)
 [[ $FIRST -eq 1 ]] && EXTRA+=(--first-run)
-docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/install-fleet.sh "${EXTRA[@]}"
+docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/install-fleet.sh ${EXTRA[@]+"${EXTRA[@]}"}
 
 log "Healthchecki narzędzi"
 docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/healthcheck.sh || echo "(są ostrzeżenia, patrz wyżej)"

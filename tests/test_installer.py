@@ -318,6 +318,120 @@ def test_jarvo_uninstall_without_registry_image(tmp_path):
     assert (flota / "compose/.env").exists()
 
 
+def _mac_repo(tmp_path: Path) -> Path:
+    """Kopia bin/ i szablonów autostartu bez .git: uninstall --all nie ma czego (prawdziwego repo) usunąć."""
+    repo = tmp_path / "repo"
+    shutil.copytree(ROOT / "bin", repo / "bin")
+    shutil.copytree(ROOT / "infra/autostart", repo / "infra/autostart")
+    return repo
+
+
+def _uninstall_mac(tmp_path: Path, inne_kontenery: str = "") -> tuple[subprocess.CompletedProcess, str, Path]:
+    repo = _mac_repo(tmp_path)
+    mac = _mac_shims(tmp_path)
+    _shim(mac, "sudo", 'exec "$@"\n')
+    _shim(mac, "docker", 'echo "docker $*" >> "$LOG"\n'
+          f'case "$1 $2" in "ps -aq") echo "{inne_kontenery}";; "volume ls") echo jarvo-hermes-data;; esac\nexit 0\n')
+    _shim(mac, "colima", 'echo "colima $*" >> "$LOG"\n')
+    brew = tmp_path / "brew"
+    (brew / "bin").mkdir(parents=True)
+    _shim(mac, "brew", f'case "$1" in --prefix) echo {brew};; esac\n')
+    (brew / "bin/jarvo").symlink_to(repo / "bin/jarvo")   # link_cli na Apple Silicon: /opt/homebrew/bin/jarvo
+    flota = tmp_path / "flota"
+    (flota / "compose").mkdir(parents=True)
+    (flota / "compose/.env").write_text("DASHBOARD_PASSWORD=x\nJARVO_VOL_HERMES=jarvo-hermes-data\n", encoding="utf-8")
+    (flota / ".colima").write_text("", encoding="utf-8")   # Colimę postawił instalator
+    log = tmp_path / "log"
+    res = subprocess.run(["bash", str(repo / "bin/jarvo"), "uninstall", "--yes", "--all"], capture_output=True, text=True,
+                         timeout=30, env={**os.environ, "PATH": f"{mac}:{os.environ['PATH']}", "HOME": str(tmp_path),
+                                          "JARVO_LOCAL": str(flota), "LOG": str(log)})
+    return res, log.read_text(encoding="utf-8") if log.exists() else "", brew / "bin/jarvo"
+
+
+def test_jarvo_uninstall_macos_removes_homebrew_link_and_colima(tmp_path):
+    """Apple Silicon: polecenie jarvo leży w /opt/homebrew/bin; --all zwalnia maszynę wirtualną Colimy instalatora."""
+    res, log, link = _uninstall_mac(tmp_path)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert not link.is_symlink() and "colima delete -f" in log
+    assert "Usunięto maszynę wirtualną Colimy" in res.stdout and not (tmp_path / "flota").exists()
+    # w Colimie są cudze kontenery: zostaje, tylko podpowiedź
+    res, log, _link = _uninstall_mac(tmp_path / "inne", inne_kontenery="abc123")
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "colima delete" not in log and "Colima zostaje" in res.stdout
+
+
+def _install_fn(name: str) -> str:
+    """Jedna funkcja z install.sh (bez uruchamiania całego instalatora)."""
+    text = INSTALL.read_text(encoding="utf-8")
+    start = text.index(f"\n{name}() {{") + 1
+    return text[start:text.index("\n}\n", start) + 3]
+
+
+def test_brew_shellenv_keeps_existing_profile(tmp_path):
+    """bash przy logowaniu czyta tylko pierwszy z .bash_profile/.bash_login/.profile: nowy .bash_profile ukryłby .profile."""
+    brew = tmp_path / "brew"
+    brew.write_text("#!/bin/sh\necho 'export HOMEBREW_PREFIX=/opt/homebrew'\n", encoding="utf-8")
+    brew.chmod(0o755)
+
+    def shellenv(home: Path) -> None:
+        script = _install_fn("brew_shellenv") + f'DRY=0; BREW={brew}; HOME={home}; brew_shellenv\n'
+        res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+        assert res.returncode == 0, res.stderr
+
+    a = tmp_path / "a"; a.mkdir()
+    (a / ".profile").write_text("export X=1\n", encoding="utf-8")
+    shellenv(a)
+    shellenv(a)   # drugi raz bez powtórki
+    assert not (a / ".bash_profile").exists() and (a / ".profile").read_text().count("eval ") == 1
+    assert "shellenv" in (a / ".zprofile").read_text()
+    b = tmp_path / "b"; b.mkdir()
+    (b / ".bash_profile").write_text("# moje\n", encoding="utf-8")
+    shellenv(b)
+    assert "shellenv" in (b / ".bash_profile").read_text() and not (b / ".profile").exists()
+
+
+def test_mac_compose_plugin_drops_stale_docker_desktop_creds(tmp_path):
+    """Po odinstalowanym Docker Desktop zostaje credsStore "desktop": docker pull w Colimie by się wywracał."""
+    import json
+    (tmp_path / ".docker").mkdir()
+    cfg = tmp_path / ".docker/config.json"
+    shims = tmp_path / "shims"; shims.mkdir()
+    _shim(shims, "brew", f'echo {tmp_path}/brew\n')
+
+    def run(extra_path: str = "") -> dict:
+        cfg.write_text(json.dumps({"credsStore": "desktop", "auths": {}}), encoding="utf-8")
+        script = _install_fn("mac_compose_plugin") + f'DRY=0; BREW={shims}/brew; HOME={tmp_path}; mac_compose_plugin\n'
+        res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30,
+                             env={**os.environ, "PATH": f"{extra_path}{shims}:{os.environ['PATH']}"})
+        assert res.returncode == 0, res.stderr
+        return json.loads(cfg.read_text(encoding="utf-8"))
+
+    c = run()
+    assert "credsStore" not in c and c["cliPluginsExtraDirs"] == [f"{tmp_path}/brew/lib/docker/cli-plugins"]
+    helper = tmp_path / "helper"; helper.mkdir()
+    _shim(helper, "docker-credential-desktop", "exit 0\n")
+    assert run(f"{helper}:")["credsStore"] == "desktop"   # Docker Desktop dalej jest: zostaje
+
+
+def test_jarvo_old_bash_does_not_loop(tmp_path):
+    """Stary bash pod /usr/local/bin (nie z Homebrew) nie może zapętlić exec w bin/jarvo: jeden skok i dalej."""
+    text = JARVO.read_text(encoding="utf-8")
+    assert "JARVO_BASH_REEXEC=1 exec" in text and "[[ -z ${JARVO_BASH_REEXEC:-} ]]" in text
+    # skrypty wołane przez jarvo dostają bash 4+ także wtedy, gdy pierwszy w PATH jest /bin/bash 3.2
+    assert "BASH_VERSINFO[0] >= 4" in text and 'export PATH="${BASH%/*}:$PATH"' in text
+
+
+def test_launchagent_runs_in_background(tmp_path):
+    import plistlib
+    res = subprocess.run(["bash", str(_mac_repo(tmp_path) / "bin/jarvo"), "autostart", "print"], capture_output=True,
+                         text=True, timeout=30, env={**os.environ, "JARVO_LOCAL": str(tmp_path / "flota"),
+                                                     "PATH": f"{_mac_shims(tmp_path)}:{os.environ['PATH']}"})
+    assert res.returncode == 0, res.stderr
+    plist = plistlib.loads(res.stdout.encode())
+    assert plist["ProcessType"] == "Background" and plist["LowPriorityIO"] is True
+    assert ".orbstack/bin" in plist["EnvironmentVariables"]["PATH"]
+
+
 def test_jarvo_unit_rendering(tmp_path):
     res = _jarvo("autostart", "print", JARVO_LOCAL=str(tmp_path / "flota"), JARVO_AUTO_UPDATE="1")
     assert res.returncode == 0, res.stderr

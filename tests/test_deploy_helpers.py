@@ -167,9 +167,11 @@ def _fake_docker(tmp_path, image_exists: bool, ncpu: int = 8):
 
 
 def _deploy(env, *flags):
+    """JARVO_TEST_BASH=/bin/bash na macOS (CI): ten sam test pod bashem 3.2 (puste tablice przy set -u)."""
+    import os
     import subprocess
-    return subprocess.run(["bash", str(fl.REPO_ROOT / "scripts/deploy.sh"), *flags], env=env,
-                          capture_output=True, text=True, timeout=60)
+    return subprocess.run([os.environ.get("JARVO_TEST_BASH", "bash"), str(fl.REPO_ROOT / "scripts/deploy.sh"), *flags],
+                          env=env, capture_output=True, text=True, timeout=60)
 
 
 def test_deploy_no_build_never_builds_even_on_first_run(tmp_path):

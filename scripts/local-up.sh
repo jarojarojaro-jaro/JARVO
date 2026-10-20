@@ -93,7 +93,10 @@ if [[ ! -f "$L/compose/.env" ]]; then
   # klucz innego dostawcy: do głównego .env (host), skąd trafia do wszystkich agentów (scripts/share_keys.py)
   [[ $KEYVAR != OPENROUTER_API_KEY && -n $KEY ]] && echo "$KEYVAR=$KEY" >> "$L/secrets/host.env"
   # sekrety czyta tylko użytkownik hermes w kontenerze (uid/gid 10000)
-  $SUDO chgrp -R 10000 "$L/secrets" && $SUDO chmod 2750 "$L/secrets" && $SUDO chmod 640 "$L"/secrets/*.env
+  if ! { $SUDO chgrp -R 10000 "$L/secrets" && $SUDO chmod 2750 "$L/secrets" && $SUDO chmod 640 "$L"/secrets/*.env; }; then
+    echo "⚠ Bez sudo pliki z kluczami czyta każdy użytkownik tego komputera. Popraw: sudo chgrp -R 10000 $L/secrets &&" \
+         "sudo chmod 2750 $L/secrets && sudo chmod 640 $L/secrets/*.env"
+  fi
   chmod 600 "$L/compose/.env"
 fi
 # zmiana dostawcy w istniejącej instalacji: JARVO_MODEL_PROVIDER=... bash scripts/local-up.sh

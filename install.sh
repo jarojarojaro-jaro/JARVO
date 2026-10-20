@@ -208,7 +208,10 @@ brew_shellenv() {   # brew, bash, git, python z Homebrew w PATH tej sesji i każ
   line="eval \"\$($BREW shellenv)\""
   [[ $DRY == 1 ]] && return 0
   grep -qsF "$line" "$rc" || printf '\n# Homebrew (dodane przez instalator Jarvo)\n%s\n' "$line" >> "$rc"
-  grep -qsF "$line" "$HOME/.bash_profile" 2>/dev/null || printf '\n%s\n' "$line" >> "$HOME/.bash_profile"
+  # bash czyta przy logowaniu pierwszy istniejący z .bash_profile, .bash_login, .profile: nowy .bash_profile
+  # przesłoniłby czyjś .profile, więc dopisujemy do tego, który już jest
+  rc="$HOME/.profile"; [[ -f $HOME/.bash_profile ]] && rc="$HOME/.bash_profile"
+  grep -qsF "$line" "$rc" || printf '\n%s\n' "$line" >> "$rc"
 }
 
 mac_tools() {   # Homebrew (z narzędziami Xcode), bash 4+, git, Python 3, openssl
@@ -254,11 +257,15 @@ mac_compose_plugin() {   # docker compose i buildx z Homebrew to wtyczki CLI: Do
   mkdir -p "$HOME/.docker"
   python3 - "$cfg" "$dir" <<'PY'
 import json, sys, pathlib
+import shutil
 p, d = pathlib.Path(sys.argv[1]), sys.argv[2]
 c = json.loads(p.read_text() or "{}") if p.exists() else {}
 dirs = c.setdefault("cliPluginsExtraDirs", [])
 if d not in dirs:
     dirs.append(d)
+# po odinstalowanym Docker Desktop zostaje credsStore "desktop": bez jego programu docker pull kończy się błędem
+if c.get("credsStore") == "desktop" and not shutil.which("docker-credential-desktop"):
+    del c["credsStore"]
 p.write_text(json.dumps(c, indent=2) + "\n")
 PY
 }
@@ -272,27 +279,42 @@ mac_docker() {
     say "Docker: $(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok) (już działa: $(docker context show 2>/dev/null || echo domyślny))"
     return
   fi
-  # Docker Desktop zainstalowany, ale wyłączony: uruchamiamy go zamiast stawiać drugi silnik
-  if [[ -d /Applications/Docker.app ]] && ! have colima; then
-    say "Uruchamiam Docker Desktop…"
-    run open -a Docker
+  # OrbStack albo Docker Desktop zainstalowany, ale wyłączony: uruchamiamy go zamiast stawiać drugi silnik
+  local app nazwa
+  for app in OrbStack Docker; do
+    [[ -d /Applications/$app.app ]] && ! have colima || continue
+    nazwa=$app; [[ $app == Docker ]] && nazwa="Docker Desktop"
+    say "Uruchamiam $nazwa…"
+    run open -a "$app"
+    [[ $app == OrbStack && -x $HOME/.orbstack/bin/docker ]] && PATH="$HOME/.orbstack/bin:$PATH"
     if [[ $DRY != 1 ]]; then
       for _ in $(seq 90); do docker info >/dev/null 2>&1 && break; sleep 2; done
-      docker info >/dev/null 2>&1 && { say "Docker: Docker Desktop"; return; }
-      warn "Docker Desktop nie wstał w 3 minuty (pierwsze uruchomienie czeka na akceptację licencji w jego oknie). Instaluję Colimę."
+      if docker info >/dev/null 2>&1; then
+        say "Docker: $nazwa"
+        docker buildx version >/dev/null 2>&1 || warn "$nazwa bez docker buildx: zaktualizuj $nazwa (budowa Komputera Jarva go wymaga)."
+        return
+      fi
+      warn "$nazwa nie wstał w 3 minuty (pierwsze uruchomienie czeka na akceptację licencji w jego oknie). Instaluję Colimę."
     fi
-  fi
-  local need=() f
+    break
+  done
+  local need=() f nowa=0
   # docker-buildx: docker compose build (Komputer Jarva, obraz floty bez rejestru) bez tej wtyczki nie ruszy
   for f in colima docker docker-compose docker-buildx; do
-    if [[ $DRY == 1 ]] || ! "$BREW" list --formula "$f" >/dev/null 2>&1; then need+=("$f"); fi
+    # polecenie docker z Docker Desktop (/usr/local/bin/docker na Macu z Intelem): brew go nie nadpisze, więc zostaje
+    [[ $f == docker && $DRY != 1 ]] && have docker && continue
+    if [[ $DRY == 1 ]] || ! "$BREW" list --formula "$f" >/dev/null 2>&1; then
+      need+=("$f"); [[ $f == colima ]] && nowa=1
+    fi
   done
   # Virtualization.framework (vz) jest od macOS 13; starszy system potrzebuje QEMU
   local vm=(--vm-type vz --mount-type virtiofs)
   if (( MACVER > 0 && MACVER < 13 )); then vm=(--vm-type qemu); need+=(qemu); fi
   if (( ${#need[@]} )); then
     say "Instaluję Docker bez Docker Desktop: ${need[*]} (Colima: darmowa maszyna wirtualna z Dockerem)…"
+    # po Docker Desktop zostają jego dowiązania w /usr/local/bin (docker-compose…): brew instaluje, ale nie podlinkuje
     run env HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 "$BREW" install -q "${need[@]}" \
+      || run "$BREW" link --overwrite "${need[@]}" \
       || die "brew install ${need[*]} się nie udało."
   fi
   mac_compose_plugin
@@ -308,7 +330,8 @@ mac_docker() {
     docker info >/dev/null 2>&1 || die "Docker w Colimie nie odpowiada (colima status, docker context ls)."
     docker compose version >/dev/null 2>&1 || die "Brak docker compose (brew install docker-compose; ~/.docker/config.json: cliPluginsExtraDirs)."
     docker buildx version >/dev/null 2>&1 || die "Brak docker buildx (brew install docker-buildx; ~/.docker/config.json: cliPluginsExtraDirs)."
-    [[ -d $L ]] && touch "$L/.colima"   # instalator postawił Colimę: jarvo uninstall --all może ją zatrzymać
+    # Colimę zainstalował instalator: jarvo uninstall --all może usunąć jej maszynę wirtualną (colima_usun w bin/jarvo)
+    [[ $nowa == 1 && -d $L ]] && touch "$L/.colima"
   fi
   say "Docker: Colima ($(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok))"
 }
@@ -531,13 +554,19 @@ fleet_up() {
   if [[ $DRY == 1 ]]; then run "$jarvo" up; return; fi
   # wymagania hosta są już spełnione: zapis przed `jarvo up`, żeby deploy.sh nie prosił o jarvo update
   mkdir -p "$L/compose" && printf '%s\n' "$HOST_VERSION" > "$L/compose/.host-version"
-  if [[ -f "$L/.installed" ]]; then say "Aktualizuję flotę…"; else say "Stawiam flotę (pierwszy raz kilka–kilkanaście minut: budowa obrazu)…"; fi
+  if [[ -f "$L/.installed" ]]; then say "Aktualizuję flotę…"; else
+    say "Stawiam flotę (pierwszy raz kilka–kilkanaście minut: budowa obrazu)…"
+    # local-up.sh nadaje plikom z kluczami grupę kontenera (sudo): hasło sprawdzamy teraz, nie w połowie
+    # (sudo pamięta je kilka minut, a Homebrew, Colima i Docker trwają dłużej)
+    SUDO_ASKED=0; need_root
+  fi
   # pytania instalatora czytamy z terminala, nie z potoku curl | bash; jarvo sam sięga po grupę docker (sg)
   # klucz dostępu trafia do jarvo up tylko jako zmienna: obraz z prywatnego rejestru (scripts/obraz.sh)
   JARVO_TOKEN="$TOKEN" JARVO_LOCAL="$L" "${NEWBASH:-bash}" "$jarvo" up < "$TTY"
   if [[ "${JARVO_NO_AUTOSTART:-0}" != 1 ]]; then
     "${NEWBASH:-bash}" "$jarvo" autostart on 2>/dev/null \
-      || warn "Bez autostartu (brak usług systemd użytkownika): pomocnik aktualizacji działa w tle do wylogowania (jarvo autostart on, gdy zechcesz)."
+      || if [[ $OS == macos ]]; then warn "LaunchAgent się nie włączył (launchctl): flota działa, ale po restarcie Maca uruchom ją: jarvo up (albo jarvo autostart on)."
+         else warn "Bez autostartu (brak usług systemd użytkownika): pomocnik aktualizacji działa w tle do wylogowania (jarvo autostart on, gdy zechcesz)."; fi
   fi
   [[ "${JARVO_NO_OPEN:-0}" == 1 ]] || "${NEWBASH:-bash}" "$jarvo" open >/dev/null 2>&1 || true
 }

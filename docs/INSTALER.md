@@ -91,23 +91,37 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
 
 ### macOS (zbudowane, §4b)
 1. Homebrew, gdy brak (oficjalny skrypt w trybie `NONINTERACTIVE=1`; sam instaluje narzędzia Xcode bez okna;
-   jedno hasło `sudo`), potem `brew install bash git python openssl@3` i `brew shellenv` w `~/.zprofile`.
+   jedno hasło `sudo`), potem `brew install bash git python openssl@3` i `brew shellenv` w `~/.zprofile` oraz
+   w `~/.bash_profile`, gdy już jest (inaczej w `~/.profile`: nowy `.bash_profile` ukryłby czyjś `.profile`).
    macOS starszy niż 12 kończy się komunikatem (Homebrew i Colima go nie wspierają); instalacja jako root odmawia.
    Mac z Intelem i macOS 12–14 dostają ostrzeżenie: od 09.2026 Homebrew ma gotowe paczki tylko dla Apple Silicon
    z macOS 15+ (Tier 1), reszta kompiluje się na miejscu (dłużej; na Intelu krócej z Docker Desktop albo OrbStack).
 2. Runtime Dockera: **jeśli `docker info` już działa** (Docker Desktop, OrbStack, Colima), używamy go; jest
-   Docker Desktop, ale wyłączony → `open -a Docker`. Inaczej **Colima** (`brew install colima docker docker-compose docker-buildx`,
+   OrbStack albo Docker Desktop, ale wyłączony → `open -a OrbStack` / `open -a Docker`. Inaczej **Colima**
+   (`brew install colima docker docker-compose docker-buildx`; polecenie `docker` z Docker Desktop zostaje,
+   a gdy jego dowiązania blokują Homebrew, `brew link --overwrite`;
    `colima start --cpu N --memory M --disk 60 --vm-type vz --mount-type virtiofs`; macOS 12: `qemu`):
    darmowa, bez klikania, bez licencji. Rozmiar VM z maszyny: procesory połowa (2–6), RAM 8 GB przy ≥16 GB,
    6 GB przy ≥12 GB, inaczej 5 GB. Wtyczki `docker compose` i `docker buildx` z Homebrew dopisane do
    `~/.docker/config.json` (`cliPluginsExtraDirs`); działający Docker bez którejś z nich dostaje ją z Homebrew.
+   Po odinstalowanym Docker Desktop znika z tego pliku `credsStore: desktop` (bez jego programu `docker pull` pada).
+   Instalator zapisuje znacznik `~/jarvo-local/.colima`, gdy to on zainstalował Colimę: `jarvo uninstall --all`
+   usuwa wtedy jej maszynę wirtualną (pamięć i dysk do 60 GB), chyba że są w niej inne kontenery lub wolumeny.
 3. Dane floty w **nazwanych wolumenach Dockera** (`jarvo-hermes-data`, `jarvo-valkey-data`, `jarvo-build`) zamiast
    katalogów `~/jarvo-local/data` (decyzja I1): znika problem uid 10000 między macOS a VM. Ten sam
    `docker-compose.yml` (`${JARVO_VOL_HERMES:-…}`); wybór przy pierwszym `jarvo up` (`JARVO_VOLUMES=1`, na macOS
    domyślnie). Wyniki agentów: dashboard albo `jarvo pliki` (`docker cp` do `~/Jarvo`).
 4. Autostart: LaunchAgent `~/Library/LaunchAgents/pl.jarvo.updater.plist` (`jarvo autostart on|off|status`):
-   przy logowaniu `jarvo updater` stawia Dockera (Colima / Docker Desktop) i pomocnika aktualizacji;
-   kontenery wstają z Dockerem same.
+   przy logowaniu `jarvo updater` stawia Dockera (Colima / OrbStack / Docker Desktop) i pomocnika aktualizacji;
+   kontenery wstają z Dockerem same. Pomocnik działa jako zadanie w tle (`ProcessType Background`,
+   `LowPriorityIO`): niższy priorytet procesora i dysku niż programy, których używasz. PATH agenta ma Homebrew,
+   katalog polecenia `docker` (OrbStack, Docker Desktop) i `~/.orbstack/bin`.
+5. bash: macOS ma basha 3.2. `bin/jarvo` przechodzi na basha z Homebrew (raz; stary bash pod `/usr/local/bin`
+   nie zapętla exec) i stawia jego katalog w PATH, gdy pierwszy `bash` w PATH jest stary, więc `local-up.sh`,
+   `deploy.sh` i pomocnik aktualizacji też dostają 4+. `deploy.sh` działa także pod 3.2 (puste tablice przy
+   `set -u`; sprawdzone w kontenerze `bash:3.2`, a testy `deploy.sh` przyjmują `JARVO_TEST_BASH`).
+6. Pierwsze `jarvo up` nadaje plikom z kluczami grupę kontenera (`sudo`): instalator sprawdza hasło tuż przed nim,
+   a nie w połowie budowy (macOS pamięta je kilka minut); bez `sudo` `local-up.sh` mówi, co poprawić ręcznie.
 
 ### Windows (zbudowane, §4c)
 1. `install.ps1` jako zwykły użytkownik: Windows 10 2004+ (kompilacja 19041) albo 11, x64 lub ARM64, RAM i dysk.
@@ -174,8 +188,9 @@ Zbudowane 2026-09-30 (pliki w §1):
   jako użytkownik (Docker Desktop w WSL) nie wymaga ani `sudo`, ani grupy. Zmienne: `JARVO_PROVIDER`, `JARVO_KEY`, `JARVO_YES=1`,
   `JARVO_SETUP_ONLY=1`, `JARVO_NO_AUTOSTART=1`, `JARVO_FORCE=1`, `JARVO_DRY_RUN=1`, `JARVO_DIR`, `JARVO_LOCAL`,
   `JARVO_REPO`, `JARVO_BRANCH`.
-- `bin/jarvo` (lista poleceń w §1); `uninstall` usuwa kontenery, obraz, usługę i polecenie, o dane, klucze
-  i repo pyta osobno (`--all` usuwa też je; samo `--yes` ich nie rusza).
+- `bin/jarvo` (lista poleceń w §1); `uninstall` usuwa kontenery, obraz, usługę i polecenie (także dowiązanie
+  w katalogu Homebrew, na Apple Silicon `/opt/homebrew/bin/jarvo`), o dane, klucze i repo pyta osobno (`--all`
+  usuwa też je i maszynę wirtualną Colimy postawionej przez instalator; samo `--yes` ich nie rusza).
 - `scripts/local-up.sh`: dostawca i klucz z env, `--prepare`, `JARVO_NO_BUILD=1`, `JARVO_RESUME_CRON=1` (rutyny Jarva), bez `sudo` u roota,
   restart usługi `jarvo-updater` zamiast procesu w tle, gdy usługa jest włączona.
 - macOS bez regresji: te same sprawdzenia co wcześniej (git, Docker, bash 4+), `bin/jarvo` sam przechodzi
