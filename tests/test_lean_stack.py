@@ -220,6 +220,24 @@ def test_browser_versions_in_docs_match_pins_and_source_registry():
         assert zrodla[nazwa]["repo"] == repo and zrodla[nazwa]["przejrzane"].startswith(wiersz.group(2)), nazwa
 
 
+def test_compose_service_images_pinned_and_reviewed():
+    """Obrazy usług w compose: wersja i digest (bez ruchomych tagów), wersja w SOURCES.md, digest w notatce spisu
+    źródeł (nowy digest bez przeglądu nie przejdzie); compose.env.example ich nie zasłania."""
+    compose = (REPO / "infra" / "docker-compose.yml").read_text(encoding="utf-8")
+    sources = (REPO / "docs" / "SOURCES.md").read_text(encoding="utf-8")
+    spis = (REPO / "vendor" / "zrodla.yaml").read_text(encoding="utf-8")
+    obrazy = [o for o in re.findall(r"^ +image: (\S+)$", compose, re.M) if not o.endswith(":local")]
+    assert len(obrazy) == 7, obrazy
+    for o in obrazy:
+        m = re.fullmatch(r"\$\{IMAGE_[A-Z_]+:-([a-z0-9/._-]+):([\w.-]+)@sha256:([0-9a-f]{64})\}", o)
+        assert m and m.group(2) != "latest", o
+        assert f"`{m.group(1)}" in sources and m.group(2).removesuffix("-alpine") in sources, o
+        assert f"{m.group(3)[:8]}…" in spis, o
+    example = (REPO / "infra" / "env" / "compose.env.example").read_text(encoding="utf-8")
+    assert not re.search(r"^IMAGE_", example, re.M)
+    assert not (REPO / "scripts" / "pin-images.sh").exists()
+
+
 def test_camoufox_pinned_and_lean():
     """Zapasowa przeglądarka: wersja + SHA-256 dla obu architektur, bez fontów Apple/Microsoft, bez systemd."""
     docker = (REPO / "infra" / "Dockerfile").read_text(encoding="utf-8")

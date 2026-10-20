@@ -73,6 +73,7 @@ tools:
 sidecars:
   - name: searxng
     image: searxng/searxng
+    version: "2026.10.19-81371861f (tag i digest w infra/docker-compose.yml)"
     license: AGPL-3.0
     url_env: SEARXNG_URL
     healthcheck: "curl -fsS \"$SEARXNG_URL/search?q=test&format=json\" >/dev/null"

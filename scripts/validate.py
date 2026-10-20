@@ -387,6 +387,8 @@ def check_zrodla(r: Report) -> None:
             r.err(f"zrodla/{name}: status {spec.get('status')!r} spoza {sorted(ZRODLA_STATUSY)}")
         if not re.fullmatch(r"[0-9a-f]{40}", str(spec.get("przejrzane", ""))):
             r.err(f"zrodla/{name}: przejrzane musi być pełnym SHA commitu")
+        if "galaz" in spec and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", str(spec["galaz"] or "")):
+            r.err(f"zrodla/{name}: galaz to nazwa gałęzi wydań (np. 8.1), bez refs/heads/")
     sources_md = (fl.REPO_ROOT / "docs" / "SOURCES.md").read_text(encoding="utf-8")
     w_sources = {m.lower().removesuffix(".git").rstrip(".")
                  for m in re.findall(r"github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", sources_md)}

@@ -200,11 +200,10 @@ Co się dzieje (i co powinieneś zobaczyć):
 
 Przed pierwszym wdrożeniem zaloguj się do Docker Hub (`docker login`), żeby nie trafić na limit pobrań.
 
-Po udanym wdrożeniu przypnij obrazy do digestów (powtarzalne wdrożenia):
-
-```bash
-bash scripts/pin-images.sh      # zapisuje digesty usług w /srv/jarvo/compose/.env (Hermesa przypina repo)
-```
+Wersje obrazów przypina repo, nic nie trzeba przypinać ręcznie: Hermesa `ARG HERMES_IMAGE` w `infra/Dockerfile`,
+usługi (SearXNG, Valkey, monitoring, telefon testowy) tag i digest w `infra/docker-compose.yml`
+([SOURCES.md](SOURCES.md#1-platforma)). Nowa wersja przychodzi z aktualizacją repo po przeglądzie; dawne `IMAGE_*`
+z ruchomym tagiem albo z digestem z usuniętego `pin-images.sh` `deploy.sh` czyści w `compose/.env` sam.
 
 Uruchom też pomocnika aktualizacji (przycisk „Aktualizuj” w dashboardzie; bootstrap tylko go włączył):
 

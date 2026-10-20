@@ -11,7 +11,8 @@
 #         odlozone      = właściciel odłożył; nowości tylko w skrócie
 # repo = GitHub albo model z Hugging Face (huggingface.co/<właściciel>/<model>, sprawdzany tak samo przez ls-remote).
 # przejrzane = ostatni commit, który przejrzeliśmy (pełny SHA); źródło bez repo git (`paczka`: adres archiwum .tar.gz)
-# ma tu SHA-256 przejrzanej paczki. validate.py pilnuje, żeby każde repo z SOURCES.md i skills.lock.yaml było w spisie.
+# ma tu SHA-256 przejrzanej paczki. galaz = gałąź wydań, którą śledzimy zamiast domyślnej (np. valkey 8.1).
+# validate.py pilnuje, żeby każde repo z SOURCES.md i skills.lock.yaml było w spisie.
 
 version: 1
 
@@ -289,6 +290,39 @@ zrodla:
     status: uzywane
     przejrzane: 9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8
     notatka: "three@0.186.1 (npm, gitHead r186): w obrazie (/opt/jarvo/node) do podglądu PNG i filmu obrotu warsztatu 3D (cad_render.cjs, strona z page.route bez sieci); ta sama wersja co /_lib/three Wideografa (narzedzia.py HTML_LIBS). MIT. Przegląd 2026-10-13"
+  # — usługi obok floty (obrazy przypięte wersją i digestem w infra/docker-compose.yml) —
+  searxng:
+    repo: https://github.com/searxng/searxng
+    status: uzywane
+    przejrzane: 81371861f67226091d1c4df2e3908a11d3b54eb9
+    notatka: "SearXNG 2026.10.19-81371861f (obraz searxng/searxng, digest indeksu 5ed0323b… dla amd64, arm64, arm/v7; etykieta revision obrazu = commit 81371861f): wyszukiwarka Sherlocka i Jarva, bez zmian w programie. AGPL-3.0-or-later. Przegląd 2026-10-20: bez telemetrii i sprawdzania aktualizacji; przy starcie wtyczka tracker_url_remover (domyślnie włączona) pobiera reguły ClearURLs (cdn.jsdelivr.net, zapas rules*.clearurls.xyz), silnik radio_browser pyta DNS all.api.radio-browser.info. Wcześniej ruchomy tag latest"
+  valkey:
+    repo: https://github.com/valkey-io/valkey
+    galaz: "8.1"
+    status: uzywane
+    przejrzane: 55a542671762eaddff979f78dc6a3d1414ce1d75
+    notatka: "Valkey 8.1.10 (obraz valkey/valkey:8.1.10-alpine, digest indeksu 081c2f5c…, ten sam co dotychczasowy tag 8-alpine; tag 8.1.10 = commit 55a5426 na gałęzi wydań 8.1): magazyn SearXNG (cache, limiter), tylko w sieci floty. BSD-3-Clause. Przegląd 2026-10-20"
+  uptime-kuma:
+    repo: https://github.com/louislam/uptime-kuma
+    galaz: "2.5.X"
+    status: uzywane
+    przejrzane: 7ca4a3debd76443d8452da95d4040200a1479af4
+    notatka: "Uptime Kuma 2.5.6 (obraz louislam/uptime-kuma:2.5.6, digest indeksu 9912da7d…, ten sam co dotychczasowy tag 2; tag 2.5.6 = commit 7ca4a3d, gałąź wydań 2.5.X): monitoring dostępności, profil compose monitoring. MIT. Przegląd 2026-10-20: przy starcie i co 48 h pyta https://uptime.kuma.pet/version o nową wersję, dopóki w panelu nie wyłączy się „Show update if available” (zmiennej nie ma)"
+  beszel:
+    repo: https://github.com/henrygd/beszel
+    status: uzywane
+    przejrzane: ec96c134660c998f7eb044e349e3715b65733fe1
+    notatka: "Beszel 0.21.0 (obrazy henrygd/beszel i henrygd/beszel-agent 0.21.0, digesty indeksów 6b39a8b6… i f27b1aa2…; tag v0.21.0 = commit ec96c13): monitoring zasobów, profil compose monitoring. MIT. Przegląd 2026-10-20: hub pyta GitHuba o aktualizacje tylko z CHECK_UPDATES=true, heartbeat tylko z HEARTBEAT_URL (u nas żadnego). Wcześniej ruchomy tag latest"
+  redroid:
+    repo: https://github.com/remote-android/redroid-doc
+    status: uzywane
+    przejrzane: eba9a489990f3f558b7115f25fdc782d610ee8ad
+    notatka: "Redroid 14.0.0 (obraz redroid/redroid:14.0.0_64only-240527, digest indeksu 0a611199… dla amd64 i arm64, ten sam co dotychczasowy tag 14.0.0_64only-latest z 2024-05-28; repo to dokumentacja, obraz powstaje z AOSP): telefon testowy bez KVM, profil compose android. Apache-2.0. Przegląd 2026-10-20"
+  docker-android:
+    repo: https://github.com/HQarroum/docker-android
+    status: uzywane
+    przejrzane: f569246983ee994aed06517bf8e06a3f10547b6d
+    notatka: "docker-android api-33 (obraz halimqarroum/docker-android:api-33, digest 0804f0c3…, tylko amd64, wypchnięty 2026-05-07): telefon testowy przy KVM (emulator Google), profil compose android-kvm. MIT. Przegląd 2026-10-20"
   # — metody i prompty (inspiracja, własny tekst) —
   claude-code-security-review:
     repo: https://github.com/anthropics/claude-code-security-review

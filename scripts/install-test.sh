@@ -125,7 +125,15 @@ if [[ $PULL == 1 ]]; then
 else
   log "2/6 obrazy z zewnętrznego dockera (bez budowy)"
   NB="JARVO_NO_BUILD=1"
-  docker save jarvo-hermes:local searxng/searxng:latest valkey/valkey:8-alpine | docker exec -i "$NAME" docker load >/dev/null
+  # obrazy SearXNG i Valkey jak w infra/docker-compose.yml (tag@digest), zapisane pod nazwą z tagiem: z samym
+  # digestem docker load nie przywraca nazwy, a z nazwą tego repo compose znajduje digest bez pobierania
+  uslugi=()
+  for r in $(sed -nE 's/^ +image: \$\{IMAGE_(SEARXNG|VALKEY):-([^}]+)\}$/\2/p' "$ROOT/infra/docker-compose.yml"); do
+    docker image inspect "$r" >/dev/null 2>&1 || docker pull -q "$r" >/dev/null
+    docker tag "$r" "${r%@*}"; uslugi+=("${r%@*}")
+  done
+  [[ ${#uslugi[@]} == 2 ]] || fail "Nie znalazłem obrazów SearXNG i Valkey w infra/docker-compose.yml"
+  docker save jarvo-hermes:local "${uslugi[@]}" | docker exec -i "$NAME" docker load >/dev/null
   R "docker image inspect jarvo-hermes:local >/dev/null"
 fi
 

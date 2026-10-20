@@ -121,7 +121,9 @@ def test_walidacja_spisu(repo_copy):
                           "  anidoodle:\n    repo: https://github.com/alexgreensh/anidoodle\n    status: nowe\n")
     tekst = tekst.replace("  htm:\n    repo: https://github.com/developit/htm", "  htm:\n    repo: https://example.com/htm")
     tekst += ("  model-bez-atrybucji:\n    repo: https://huggingface.co/ktos/model\n    status: uzywane\n"
-              f"    przejrzane: {'a' * 40}\n")                          # model z Hugging Face: dozwolony, ale z atrybucją
+              f"    przejrzane: {'a' * 40}\n"                           # model z Hugging Face: dozwolony, ale z atrybucją
+              "  zla-galaz:\n    repo: https://github.com/ktos/zla\n    galaz: \"refs heads\"\n    status: czeka\n"
+              f"    przejrzane: {'b' * 40}\n")
     p.write_text(tekst, encoding="utf-8")
     report = validate.Report()
     validate.check_zrodla(report)
@@ -130,4 +132,25 @@ def test_walidacja_spisu(repo_copy):
     assert "htm: repo musi być adresem https://github.com/" in bledy
     assert "github.com/developit/htm (docs/SOURCES.md) nie ma w vendor/zrodla.yaml" in bledy
     assert "model-bez-atrybucji: status uzywane, a repo nie ma w docs/SOURCES.md" in bledy
+    assert "zla-galaz: galaz to nazwa gałęzi wydań" in bledy
     assert "matcha-tts-pl-v2" not in bledy                                       # model z atrybucją w SOURCES.md
+
+
+def test_galaz_wydan_zamiast_domyslnej(upstream, tmp_path):
+    """Źródło przypięte do wydania z gałęzi wydań (np. valkey 8.1): nowości z tej gałęzi, nie z domyślnej."""
+    repo, a = upstream
+    sh(repo, "branch", "8.1")
+    commit(repo, {"nowa-wersja.md": "9"}, "main: następna wersja")
+    sh(repo, "checkout", "-q", "8.1")
+    b = commit(repo, {"poprawka.md": "p"}, "8.1: poprawka bezpieczeństwa")
+    sh(repo, "checkout", "-q", "main")
+    p = spis(tmp_path, f"file://{repo}", a)
+    p.write_text(p.read_text(encoding="utf-8").replace("    status: uzywane", "    galaz: \"8.1\"\n    status: uzywane", 1),
+                 encoding="utf-8")
+    w = zrodla.sprawdz(zrodla.wczytaj(p), ["lemo"])[0]
+    assert w["galaz"] == "8.1" and w["glowa"] == b and not w["przepisana"]
+    assert [c["tytul"] for c in w["commity"]] == ["8.1: poprawka bezpieczeństwa"]
+    assert zrodla.main(["--spis", str(p), "przejrzane", "lemo"]) == 0
+    assert f"przejrzane: {b}\n  inne" in p.read_text(encoding="utf-8")
+    p.write_text(p.read_text(encoding="utf-8").replace('galaz: "8.1"', 'galaz: "9.9"'), encoding="utf-8")
+    assert zrodla.sprawdz(zrodla.wczytaj(p), ["lemo"])[0]["blad"].startswith("niedostępne: repo bez gałęzi 9.9")

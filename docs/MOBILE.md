@@ -139,7 +139,8 @@ echo binder_linux | sudo tee /etc/modules-load.d/jarvo-android.conf
 sudo modprobe binder_linux devices=binder,hwbinder,vndbinder
 # urządzenie tylko w sieci floty, port 5555 nie wychodzi na zewnątrz (compose: usługa android)
 docker run -d --name jarvo-android --privileged --network jarvo_jarvo-net --memory 2g --cpus 2 \
-  -v /srv/jarvo/data/android:/data redroid/redroid:14.0.0_64only-latest \
+  -v /srv/jarvo/data/android:/data \
+  redroid/redroid:14.0.0_64only-240527@sha256:0a611199ba2e0b5d60af39b3327a517f6407231f4352114ed3bd3cbfe2be69aa \
   androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest \
   androidboot.redroid_width=1080 androidboot.redroid_height=2340 androidboot.redroid_dpi=420
 # w kontenerze agenta

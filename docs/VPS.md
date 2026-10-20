@@ -262,7 +262,9 @@ testować routing Telegrama przed zmianą tras.
 **Wersje:** Hermes przypięty w repo do tagu i digestu (`ARG HERMES_IMAGE` w `infra/Dockerfile`; ta sama wartość
 domyślna w `infra/docker-compose.yml` i `fleet.yaml`, pilnuje tego test). Dawny domyślny `HERMES_IMAGE=…:latest`
 w `compose/.env` `deploy.sh` czyści sam. Aktualizacja Hermesa to świadoma decyzja (np. raz w miesiącu): najpierw
-`HERMES_IMAGE` w `compose/.env` na stagingu, potem zmiana w repo. Rollback: poprzedni tag repo + `deploy.sh --no-pull --rebuild`
+`HERMES_IMAGE` w `compose/.env` na stagingu, potem zmiana w repo. Obrazy usług (SearXNG, Valkey, Uptime Kuma, Beszel,
+telefon testowy) repo przypina tak samo, tagiem i digestem w `infra/docker-compose.yml`; nowe wersje po przeglądzie
+z [SOURCES.md](SOURCES.md#1-platforma). Rollback: poprzedni tag repo + `deploy.sh --no-pull --rebuild`
 (poprzedni obraz `jarvo-hermes` przebudowa usuwa).
 
 ---

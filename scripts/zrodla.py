@@ -9,7 +9,7 @@
 `sprawdz` pyta każde repo o obecny commit (git ls-remote, równolegle) i dla tych, które zmieniły się od
 `przejrzane`, pobiera tylko historię od tamtej chwili (bez plików, same drzewa): liczba i tytuły commitów,
 pliki dodane / zmienione / usunięte, nowe katalogi (do 2 poziomów), nowe i zmienione SKILL.md, zmiana pliku
-licencji (⚠). Źródło bez repo git (`paczka`: adres archiwum .tar.gz, np. iso-glow) ma w `przejrzane` SHA-256
+licencji (⚠). Źródło z `galaz` (gałąź wydań, np. valkey 8.1) śledzimy na tej gałęzi zamiast domyślnej. Źródło bez repo git (`paczka`: adres archiwum .tar.gz, np. iso-glow) ma w `przejrzane` SHA-256
 paczki: inna suma = nowa wersja, a pliki paczki porównujemy z naszą kopią w repo (`kopia`, `nazwy`). Raport jest po polsku w Markdownie (albo JSON); z niego rutyna pon/śr/pt robi propozycje dla
 właściciela. Skrypt niczego nie wdraża: `przejrzane` i `status` zmieniają tylko spis, a wersja kopiowana do
 floty (`rev` w skills.lock.yaml, stałe w narzędziach) zmienia się osobno, po zgodzie właściciela.
@@ -66,8 +66,13 @@ def git(*args: str, cwd: Path | None = None, timeout: int = 300) -> str:
     return p.stdout
 
 
-def glowa(url: str) -> tuple[str, str]:
-    """(gałąź domyślna, commit) z `git ls-remote --symref`."""
+def glowa(url: str, galaz: str = "") -> tuple[str, str]:
+    """(gałąź, commit): gałąź ze spisu (`galaz`, np. gałąź wydań 8.1) albo domyślna z `git ls-remote --symref`."""
+    if galaz:
+        sha = git("ls-remote", url, f"refs/heads/{galaz}", timeout=60).split("\t", 1)[0]
+        if not SHA.fullmatch(sha):
+            raise RuntimeError(f"repo bez gałęzi {galaz}")
+        return galaz, sha
     out = git("ls-remote", "--symref", url, "HEAD", timeout=60)
     galaz = sha = ""
     for line in out.splitlines():
@@ -211,7 +216,7 @@ def sprawdz_jedno(nazwa: str, spec: dict, piny: dict[str, str], robocze: Path) -
     w = {"nazwa": nazwa, "repo": url, "status": spec.get("status"), "przejrzane": spec.get("przejrzane"),
          "pin": piny.get(url.lower().removesuffix(".git"))}
     try:
-        w["galaz"], w["glowa"] = glowa(url)
+        w["galaz"], w["glowa"] = glowa(url, str(spec.get("galaz") or ""))
     except (RuntimeError, subprocess.TimeoutExpired) as e:
         w["blad"] = f"niedostępne: {e}"
         return w
@@ -380,7 +385,7 @@ def main(argv: list[str] | None = None) -> int:
             if not SHA256.fullmatch(sha):
                 raise BladSpisu("podaj SHA-256 paczki (64 znaki)")
         else:
-            sha = a.commit or glowa(str(zrodla[a.nazwa]["repo"]))[1]
+            sha = a.commit or glowa(str(zrodla[a.nazwa]["repo"]), str(zrodla[a.nazwa].get("galaz") or ""))[1]
             if not SHA.fullmatch(sha):
                 raise BladSpisu("podaj pełny SHA commitu (40 znaków)")
         ustaw(a.spis, a.nazwa, "przejrzane", sha)

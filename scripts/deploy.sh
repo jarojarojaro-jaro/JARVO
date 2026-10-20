@@ -47,6 +47,17 @@ if grep -qx 'HERMES_IMAGE=nousresearch/hermes-agent:latest' "$COMPOSE_DIR/.env";
   sed -i.bak 's#^HERMES_IMAGE=nousresearch/hermes-agent:latest$#HERMES_IMAGE=#' "$COMPOSE_DIR/.env" && rm -f "$COMPOSE_DIR/.env.bak"
   REBUILD=1
 fi
+# obrazy usług przypina repo (wersja i digest w infra/docker-compose.yml); dawne ruchome tagi z compose.env.example
+# i digesty z dawnego scripts/pin-images.sh zasłaniałyby wersje z repo, więc je czyścimy (inny własny obraz zostaje)
+for v in IMAGE_SEARXNG=searxng/searxng:latest IMAGE_VALKEY=valkey/valkey:8-alpine \
+         IMAGE_REDROID=redroid/redroid:14.0.0_64only-latest IMAGE_ANDROID_EMULATOR=halimqarroum/docker-android:api-33; do
+  n="${v%%=*}"; stary="${v#*=}"; re="^${stary%%:*}@sha256:[0-9a-f]{64}\$"
+  cur="$(sed -n "s#^$n=##p" "$COMPOSE_DIR/.env" | tail -1)"
+  if [[ -n "$cur" && ( "$cur" == "$stary" || "$cur" =~ $re ) ]]; then
+    sed -i.bak "s#^$n=.*#$n=#" "$COMPOSE_DIR/.env" && rm -f "$COMPOSE_DIR/.env.bak"
+    log "$n: wersja przypięta w repo zamiast $cur"
+  fi
+done
 # sufit CPU kontenerów najwyżej tyle, ile procesorów widzi Docker (laptop z 2 rdzeniami, mały VPS, Colima
 # z 2 CPU); inaczej Docker odmawia startu: "range of CPUs is from 0.01 to 2.00"
 ncpu="$(docker info --format '{{.NCPU}}' 2>/dev/null || true)"

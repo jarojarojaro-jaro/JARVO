@@ -67,6 +67,19 @@ Komponenty obrazu `jarvo-komputer` (Komputer Jarva, [KOMPUTER.md](KOMPUTER.md)),
 | [cua-driver](https://github.com/trycua/cua) 0.21.0 (Cua AI; `cua-driver-rs`, tag `cua-driver-rs-v0.21.0`, commit `70db98d`; archiwum `-binary` dla amd64 i arm64, SHA-256 w `infra/komputer/Dockerfile`, z archiwum tylko program `cua-driver`) | sterownik ekranu dla narzędzia `computer_use` Hermesa: drzewo dostępności (AT-SPI), zrzuty, klik, pisanie, klawisze. Przegląd 2026-10-19: telemetria (PostHog) i sprawdzanie aktualizacji domyślnie włączone, w Komputerze wyłączone zmiennymi i configiem; instalatora `curl\|bash` nie używamy; wersję przypina obraz i bramka `komputer/jarvo_cua.py` | MIT (`/opt/cua/LICENSE.md`) |
 | [Debian](https://www.debian.org/) 13 `trixie-slim` (digest indeksu amd64 + arm64 w `infra/komputer/Dockerfile`) z pakietami TigerVNC (Xvnc), xfwm4, D-Bus, at-spi2-core, Chromium z `chromium-l10n`, iptables, tini, Python 3 z `python3-gi` i `gir1.2-atspi-2.0` (wejście sterownika: AT-SPI dla twardych zasad), fonty DejaVu, Liberation i Noto Color Emoji | system pulpitu; pakiety bez przypinania wersji, a warstwę z nimi co tydzień unieważnia argument budowy `KOMPUTER_POPRAWKI` (tydzień roku), więc wdrożenie w nowym tygodniu bierze poprawki bezpieczeństwa Debiana i Chromium (`jarvo komputer odswiez` buduje od nowa od razu) | GPL-2.0 (TigerVNC, xfwm4, iptables), BSD-3-Clause (Chromium), LGPL-2.1 (at-spi2-core), LGPL-2.1+ (PyGObject `python3-gi`), MIT (tini), PSF (Python), OFL-1.1 (Liberation, Noto), licencja Bitstream Vera (DejaVu) |
 
+Usługi obok floty w `infra/docker-compose.yml`: oficjalne obrazy uruchamiane bez zmian, przypięte wersją i digestem
+indeksu (`tag@sha256`), więc wdrożenie bierze zawsze ten sam obraz, a nowa wersja przychodzi z repo po przeglądzie
+(`vendor/zrodla.yaml`, rutyna pon/śr/pt). Dawne ruchome tagi i digesty z usuniętego `pin-images.sh` w `compose/.env` `deploy.sh` czyści sam:
+
+| Projekt | Rola | Licencja |
+|---|---|---|
+| [SearXNG](https://github.com/searxng/searxng) 2026.10.19-81371861f (obraz `searxng/searxng`, commit `81371861f`) | wyszukiwarka Sherlocka i Jarva (sidecar `searxng`). Przegląd 2026-10-20: bez telemetrii i sprawdzania aktualizacji; przy starcie pobiera reguły ClearURLs (wtyczka `tracker_url_remover`, cdn.jsdelivr.net) | AGPL-3.0-or-later |
+| [Valkey](https://github.com/valkey-io/valkey) 8.1.10 (obraz `valkey/valkey:8.1.10-alpine`, tag `8.1.10`, commit `55a5426`) | magazyn SearXNG (cache, limiter), tylko w sieci floty | BSD-3-Clause |
+| [Uptime Kuma](https://github.com/louislam/uptime-kuma) 2.5.6 (obraz `louislam/uptime-kuma:2.5.6`, tag `2.5.6`, commit `7ca4a3d`) | monitoring dostępności (profil `monitoring`). Przegląd 2026-10-20: co 48 h pyta `uptime.kuma.pet` o nową wersję, dopóki w panelu nie wyłączy się „Show update if available” | MIT |
+| [Beszel](https://github.com/henrygd/beszel) 0.21.0 (obrazy `henrygd/beszel` i `henrygd/beszel-agent`, tag `v0.21.0`, commit `ec96c13`) | monitoring zasobów (profil `monitoring`). Przegląd 2026-10-20: aktualizacje i heartbeat tylko po ustawieniu `CHECK_UPDATES` / `HEARTBEAT_URL` (u nas nie) | MIT |
+| [Redroid](https://github.com/remote-android/redroid-doc) 14.0.0 (obraz `redroid/redroid:14.0.0_64only-240527`, amd64 i arm64) | telefon testowy bez KVM (profil `android`, [MOBILE.md](MOBILE.md)) | Apache-2.0 |
+| [docker-android](https://github.com/HQarroum/docker-android) `api-33` (obraz `halimqarroum/docker-android:api-33`, tylko amd64) | telefon testowy przy KVM: emulator Google (profil `android-kvm`) | MIT |
+
 ## 2. Skille dołączane do agentów (vendoring)
 
 Kopiowane przy buildzie z przypiętych commitów zapisanych w [`vendor/skills.lock.yaml`](../vendor/skills.lock.yaml).

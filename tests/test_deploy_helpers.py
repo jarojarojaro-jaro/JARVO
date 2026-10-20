@@ -207,6 +207,21 @@ def test_deploy_keeps_cpus_that_fit(tmp_path):
     assert "HERMES_CPUS=6\n" in dot.read_text(encoding="utf-8")
 
 
+def test_deploy_clears_old_service_image_pins(tmp_path):
+    """Dawne IMAGE_* z compose.env.example i digesty z pin-images.sh nie zasłaniają wersji przypiętych w repo."""
+    env, _log = _fake_docker(tmp_path, image_exists=True)
+    dot = tmp_path / "compose" / ".env"
+    wlasny = "IMAGE_REDROID=redroid/redroid:13.0.0-latest\n"
+    dot.write_text(dot.read_text(encoding="utf-8") + "IMAGE_SEARXNG=searxng/searxng:latest\n"
+                   f"IMAGE_VALKEY=valkey/valkey@sha256:{'a' * 64}\n" + wlasny
+                   + "IMAGE_ANDROID_EMULATOR=halimqarroum/docker-android:api-33\n", encoding="utf-8")
+    res = _deploy(env, "--no-pull", "--no-build")
+    assert res.returncode == 0, res.stdout + res.stderr
+    text = dot.read_text(encoding="utf-8")
+    assert "IMAGE_SEARXNG=\n" in text and "IMAGE_VALKEY=\n" in text and "IMAGE_ANDROID_EMULATOR=\n" in text
+    assert wlasny in text and "IMAGE_VALKEY: wersja przypięta w repo" in res.stdout
+
+
 def test_deploy_no_build_requires_existing_image(tmp_path):
     env, log = _fake_docker(tmp_path, image_exists=False)
     res = _deploy(env, "--no-pull", "--no-build")

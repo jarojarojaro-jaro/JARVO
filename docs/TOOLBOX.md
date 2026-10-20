@@ -57,7 +57,7 @@ własną przeglądarkę i ~0,3 GB; całą witrynę audytujemy `audit.sh` po kole
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
-| [SearXNG](https://github.com/searxng/searxng) | własna metawyszukiwarka (70+ silników), bez kluczy i limitów | AGPL-3.0 | 2026-09 | sidecar + dostawca `searxng` |
+| [SearXNG](https://github.com/searxng/searxng) 2026.10.19-81371861f | własna metawyszukiwarka (70+ silników), bez kluczy i limitów; obraz przypięty wersją i digestem w `infra/docker-compose.yml` | AGPL-3.0 | 2026-10 | sidecar + dostawca `searxng` |
 | [trafilatura](https://github.com/adbar/trafilatura) | czysta treść artykułów, metadane, daty publikacji (`extract.py`) | Apache-2.0 | 2026-09 | skrypt |
 | [Lightpanda](https://github.com/lightpanda-io/browser) | strony z JS do Markdown bez Chromium: `lightpanda fetch --dump markdown <url>`; silnik `browser_*` | AGPL-3.0 (osobny program) | 2026-10 | CLI + Hermes |
 | [Camoufox](https://github.com/daijro/camoufox) 152.0.4-beta.30 + biblioteka `camoufox` 0.5.6 | zapasowa przeglądarka tylko po odmowie strony (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`, [niżej](#łowca-i-sherlock-skill-ostrozna-przegladarka)) | MPL-2.0 (przeglądarka), MIT (biblioteka) | 2026-10 | skrypt |
@@ -202,7 +202,7 @@ API rejestrów (KRS, CEIDG, BZP, TED) go nie dostają.
 | [expo-doctor](https://github.com/expo/expo/tree/main/packages/expo-doctor) 1.21.1 | konfiguracja i zależności projektu (`aplikacja.py sprawdz`) | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
 | [eas-cli](https://github.com/expo/eas-cli) 24.7.0 | projekt w organizacji właściciela i EAS Update do podglądu w Expo Go (`aplikacja.py expo-go`, token robota `EXPO_TOKEN`); wersja w `mobile_lib.EAS_CLI` dla wszystkich skryptów, nadpisywana przez `JARVO_EAS_CLI` | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
 | [adb](https://developer.android.com/tools/adb) (pakiet Debiana) | Android przez adb: instalacja, zrzuty, logi, testy wrogie (`urzadzenie.py`) | Apache-2.0 | 2026-09 | obraz floty |
-| [Redroid](https://github.com/remote-android/redroid-doc) 14.0.0 | telefon testowy na serwerze bez KVM (Android 14 w kontenerze, moduł `binder_linux`) | Apache-2.0 | 2026-10 | usługa `android` (`jarvo android on`) |
+| [Redroid](https://github.com/remote-android/redroid-doc) 14.0.0 (`14.0.0_64only-240527`) | telefon testowy na serwerze bez KVM (Android 14 w kontenerze, moduł `binder_linux`) | Apache-2.0 | 2026-10 | usługa `android` (`jarvo android on`) |
 | [docker-android](https://github.com/HQarroum/docker-android) `api-33` | telefon testowy przy KVM: oficjalny emulator Google z usługami Google | MIT | 2026-10 | usługa `android-emulator` (`jarvo android on`) |
 | [ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) (commit `cd6cea6`) | ekran telefonu testowego w przeglądarce (podgląd, klikanie), za proxy HQ `:9122` z tokenem | MIT | 2026-10 | usługa `android-ekran` (`infra/android/`) |
 | [GitHub Actions `macos-26`](https://github.com/actions/runner-images) | symulator iOS: zrzuty jasny / ciemny / duża czcionka, logi (`ios_ci.py`, `templates/ci/jarvo-ios.yml`) | usługa GitHub | 2026-09 | workflow w repo aplikacji właściciela |
@@ -372,8 +372,8 @@ może później jako dodatek obrazu).
 | [Caddy](https://github.com/caddyserver/caddy) | HTTPS reverse proxy (tylko gdy potrzebny) | Apache-2.0 | 2026-09 |
 | [Tailscale](https://github.com/tailscale/tailscale) | prywatny dostęp do VPS | BSD-3 | 2026-09 |
 | [restic](https://github.com/restic/restic) | szyfrowane backupy | BSD-2 | 2026-09 |
-| [Uptime Kuma](https://github.com/louislam/uptime-kuma) | healthchecki i alerty | MIT | 2026-09 |
-| [Beszel](https://github.com/henrygd/beszel) | monitoring zasobów | MIT | 2026-09 |
+| [Uptime Kuma](https://github.com/louislam/uptime-kuma) 2.5.6 | healthchecki i alerty | MIT | 2026-10 |
+| [Beszel](https://github.com/henrygd/beszel) 0.21.0 | monitoring zasobów | MIT | 2026-10 |
 | [CrowdSec](https://github.com/crowdsecurity/crowdsec) | ochrona przed atakami | MIT | 2026-09 |
 | [cua-driver](https://github.com/trycua/cua) 0.21.0 (`cua-driver-rs`) | sterownik ekranu Komputera Jarva dla narzędzia `computer_use` (drzewo dostępności, zrzuty, klik, pisanie); sumy SHA-256 w `infra/komputer/Dockerfile` | MIT | 2026-10 |
 | [TigerVNC](https://github.com/TigerVNC/tigervnc) Xvnc + xfwm4 + Chromium (pakiety Debiana) | pulpit Komputera Jarva (`infra/komputer`, `jarvo komputer on`): ekran tylko na gnieździe unix, filtr ruchu do sieci lokalnej | GPL-2.0 / BSD-3 | 2026-10 |
@@ -412,7 +412,7 @@ w ciągu 12 miesięcy albo świadomy wyjątek), przypięta wersja i healthcheck.
 | warsztat 3D | venv `/opt/jarvo/venvs/cad` (Python 3.12) | build123d 0.13.0 na OpenCascade 8.0 (OCP), ~0,77 GB; koła z sumami sha256 ([`requirements-cad.txt`](../infra/python/requirements-cad.txt)), build kończy się próbną częścią (STEP, STL, GLB, 3MF) |
 | odczyt ekranu (OCR) | venv `/opt/jarvo/venvs/ocr` (Python 3.12), modele `/opt/jarvo/models/indra-ocr` | Indra OCR 0.3.2 (onnxruntime, opencv-headless, pypdfium2), ~0,25 GB + modele ONNX ~37 MB; koła z sumami sha256 ([`requirements-ocr.txt`](../infra/python/requirements-ocr.txt), bez `huggingface_hub`), modele z sumami sha256 z przypiętej rewizji, build kończy się próbnym odczytem bez sieci |
 | claude-seo | `/opt/jarvo/vendor/claude-seo` (`CLAUDE_PLUGIN_ROOT`, własny venv) | skrypty skilli SEO, ten sam commit co w locku skilli |
-| sidecary | sieć `jarvo-net` | SearXNG (`SEARXNG_URL`) + Valkey; nic więcej (reszta działa w obrazie na żądanie) |
+| sidecary | sieć `jarvo-net` | SearXNG (`SEARXNG_URL`) + Valkey 8.1.10 (obrazy przypięte wersją i digestem w `infra/docker-compose.yml`, [SOURCES.md](SOURCES.md#1-platforma)); nic więcej (reszta działa w obrazie na żądanie) |
 
 Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmianą):
 - o dodaniu wersji decyduje przegląd źródła, nie jej wiek ([SOURCES.md](SOURCES.md#przegląd-przed-dodaniem-każde-źródło-osobno));
