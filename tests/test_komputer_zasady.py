@@ -548,3 +548,30 @@ def test_zle_argumenty_nie_przepuszczaja():
     assert decyzja("click", None) == ODMOWA
     assert decyzja("type_text", {"text": None}, fokus=None) == TAK          # pusty tekst nic nie wpisuje
     assert kod("drag", {"from_x": "a", "from_y": 1, "to_x": 1, "to_y": 1}) == "cel"
+
+
+# --- sekrety z ekranu w powodach i dzienniku
+
+
+KLUCZ = "sk-ant-api03-" + "A1b2C3d4" * 6
+
+
+@pytest.mark.parametrize("nazwa, args, ctx", [
+    ("click", {"element_index": 1}, {"cel": el("push button", f"Kup teraz {KLUCZ}")}),
+    ("click", {"element_index": 1}, {"cel": el("push button", f"Pokaż szczegóły zamówienia nr 12 {KLUCZ}")}),
+    ("invoke_menu", {"path": ["Plik", f"Eksport {KLUCZ}"]}, {}),
+    ("invoke_menu", {"path": ["Plik", f"Zapłać {KLUCZ}"]}, {}),
+    ("launch_app", {"bundle_id": "chromium", "urls": [f"file:///{KLUCZ}"]}, {"program": "chromium"}),
+])
+def test_sekret_z_etykiety_nie_trafia_do_powodu_ani_celu(nazwa, args, ctx):
+    """Nazwa elementu albo pozycja menu z kluczem: powód (do agenta) i cel (do dziennika) mają znacznik zamiast
+    klucza, także gdy etykietę tniemy do 60/80 znaków (ucięty klucz nie pasowałby już do wzorca)."""
+    w = ocen(nazwa, args, Ctx(**ctx))
+    for napis in (w.powod, w.cel, str(zasady.wynik_odmowy(w)) if not w.wolno else ""):
+        assert "A1b2C3d4" not in napis, (w.decyzja, napis)
+    assert "[ukryte" in w.powod + w.cel
+
+
+def test_pokaz_ukrywa_przed_przycieciem():
+    tekst = "x" * 50 + " " + KLUCZ
+    assert "A1b2" in tekst[:70] and "A1b2" not in zasady._pokaz(tekst, 70)

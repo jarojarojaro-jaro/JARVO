@@ -146,6 +146,11 @@ class Werdykt:
     cel: str = ""                       # opis celu do dziennika (rola i nazwa), bez wpisywanego tekstu
     dane: dict = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        # powód trafia do agenta, cel i powód do dziennika: napisy z ekranu (nazwy, adresy) bez sekretów
+        self.powod = ukryj_sekrety(self.powod)[0]
+        self.cel = ukryj_sekrety(self.cel)[0]
+
     @property
     def wolno(self) -> bool:
         return self.decyzja == TAK
@@ -241,10 +246,15 @@ def _etykieta(el: Optional[dict]) -> str:
     return _napis(str(el.get("nazwa") or el.get("label") or ""))
 
 
+def _pokaz(tekst: str, n: int) -> str:
+    """Napis z ekranu do powodu albo dziennika: sekrety ukryte przed przycięciem (ucięty klucz nie pasuje do wzorca)."""
+    return ukryj_sekrety(tekst)[0][:n]
+
+
 def opis(el: Optional[dict]) -> str:
     if not el:
         return "nieznany cel"
-    return f"{el.get('rola') or el.get('role') or '?'} „{_etykieta(el)[:60]}”"
+    return f"{el.get('rola') or el.get('role') or '?'} „{_pokaz(_etykieta(el), 60)}”"
 
 
 def _wrazliwa_etykieta(tekst: str) -> bool:
@@ -279,7 +289,7 @@ def pole_wrazliwe(el: Optional[dict]) -> Optional[str]:
                   str(atr.get("placeholder-text", ""))):
         tekst = _napis(tekst)
         if tekst and POLE_WRAZLIWE.search(tekst.replace("_", " ")):
-            return f"pole „{tekst[:40]}”"
+            return f"pole „{_pokaz(tekst, 40)}”"
     return None
 
 
@@ -364,7 +374,7 @@ def _sprawdz_enter(el: Optional[dict], mody: frozenset = frozenset()) -> Optiona
     etykieta = formularz_wrazliwy(el)
     if etykieta:
         return _czlowiek("formularz_wrazliwy", f"{klawisz} w {opis(el)} wysyła formularz z przyciskiem "
-                         f"„{etykieta[:60]}” (płatność, logowanie, wysyłka): to robi właściciel{nowa_linia}", opis(el))
+                         f"„{_pokaz(etykieta, 60)}” (płatność, logowanie, wysyłka): to robi właściciel{nowa_linia}", opis(el))
     if w_formularzu(el) is False and (wiele or wysylka):
         return _czlowiek("wysylka_bez_formularza", f"{klawisz} w {opis(el)} poza formularzem (czat, komentarz, "
                          f"edytor) zwykle wysyła wiadomość: to robi właściciel{nowa_linia}", opis(el))
@@ -378,7 +388,7 @@ def _sprawdz_aktywacje(el: Optional[dict], jak: str) -> Optional[Werdykt]:
                        "okna (get_window_state) i wskaż element z niego")
     etykieta = przycisk_wrazliwy(el)
     if etykieta:
-        return _czlowiek("przycisk_wrazliwy", f"{jak} „{etykieta[:60]}” (płatność, zakup, logowanie, wysyłka "
+        return _czlowiek("przycisk_wrazliwy", f"{jak} „{_pokaz(etykieta, 60)}” (płatność, zakup, logowanie, wysyłka "
                          "albo publikacja) robi właściciel", opis(el))
     return None
 
@@ -487,7 +497,7 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
         for u in args.get("urls") or []:
             czesci = urlsplit(str(u))
             if czesci.scheme not in {"http", "https"} or not czesci.netloc:
-                return _odmowa("adres", f"launch_app: tylko adresy http i https, nie {str(u)[:40]}")
+                return _odmowa("adres", f"launch_app: tylko adresy http i https, nie {_pokaz(str(u), 40)}")
         return Werdykt(TAK, cel=", ".join(urlsplit(str(u)).netloc for u in args.get("urls") or []))
 
     if nazwa == "kill_app":
@@ -503,8 +513,8 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
         sciezka = [str(p) for p in args.get("path") or []]
         for p in sciezka:
             if _wrazliwa_etykieta(p):
-                return _czlowiek("menu_wrazliwe", f"pozycję menu „{p[:60]}” wybiera właściciel", " › ".join(sciezka))
-        return Werdykt(TAK, cel=" › ".join(sciezka)[:80])
+                return _czlowiek("menu_wrazliwe", f"pozycję menu „{_pokaz(p, 60)}” wybiera właściciel", " › ".join(sciezka))
+        return Werdykt(TAK, cel=_pokaz(" › ".join(sciezka), 80))
 
     if nazwa in {"scroll", "right_click"}:
         return Werdykt(TAK, cel=opis(ctx.cel(nazwa, args)) if nazwa == "right_click" else "")

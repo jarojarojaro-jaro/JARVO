@@ -1,6 +1,9 @@
 # Changelog: jarvo-operator
 
 ## Niewydane
+- Wejście Komputera (KS4, docs/KOMPUTER.md §6): napis z ekranu w powodzie odmowy i w dzienniku (nazwa przycisku albo
+  pola, pozycja menu, adres) ma sekrety ukryte znacznikiem `[ukryte przez Komputer Jarva]`, zanim zostanie przycięty;
+  wcześniej klucz w nazwie elementu szedł do odmowy i do `dziennik.jsonl` w całości.
 - Wejście Komputera (KS3, docs/KOMPUTER.md §6): przed działaniem na element numerem z migawki wejście robi świeżą
   migawkę okna bez zrzutu i porównuje element pod tym numerem (rola, napis, głębokość, przodkowie); strona zmieniona
   od `capture` to odmowa `element_zmieniony` (nowy `capture`, element z nowej migawki), a ten sam element idzie do

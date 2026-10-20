@@ -1,7 +1,7 @@
 """Klient testu Komputera Jarva (scripts/komputer-test.sh): rozmowa MCP przez bramkę floty, jak Hermes.
 
 Uruchamiany w jarvo-hermes jako hermes (`python3 -I -`). Strona testowa (wyszukiwarka i koszyk z polem hasła,
-karty, BLIK, przyciskami Kup teraz, Zapłać, Zaloguj się i kluczem API w treści) działa w Komputerze na
+karty, BLIK, przyciskami Kup teraz, Zapłać, Zaloguj się, kluczem API w treści i w nazwie przycisku) działa w Komputerze na
 127.0.0.1:8765.
 Wznowienie po pauzie robi właściciel: klient wypisuje `@@wznow`, a komputer-test.sh wznawia jako pulpit.
 Każdy krok sprawdza decyzję wejścia: co przechodzi do sterownika, co wraca z wymaga_czlowieka, co jest
@@ -21,6 +21,7 @@ BRAMKA = os.environ.get("JARVO_BRAMKA", "/opt/jarvo/repo/komputer/jarvo_cua.py")
 STER = os.environ.get("JARVO_KOMPUTER_STER", "/opt/jarvo/komputer/ster.sock")
 STRONA = "http://127.0.0.1:8765/sklep.html"
 KLUCZ = "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX1234567890"
+KLUCZ_PRZYCISK = "sk-proj-ZYXWVUTSRQPONMLKJIHGFEDCBA0987654321"
 
 wyniki: list[tuple[bool, str]] = []
 
@@ -178,6 +179,12 @@ def main() -> int:
     w, el = stan()
     for etykieta in ("Kup teraz", "Zaloguj się", "Zapłać 129 zł"):
         sprawdz(kod(klik(etykieta)) == "wymaga_czlowieka", f"klik „{etykieta}” elementem: wymaga człowieka")
+    z_kluczem = "Zapłać kluczem [ukryte przez Komputer Jarva]"     # nazwa przycisku w drzewie, już bez klucza
+    if sprawdz(z_kluczem in el, f"drzewo dostępności ma „{z_kluczem}”"):
+        w = klik(z_kluczem)
+        sprawdz(kod(w) == "wymaga_czlowieka" and KLUCZ_PRZYCISK[8:20] not in json.dumps(w, ensure_ascii=False)
+                and "[ukryte" in tekst(w), "klik przycisku z kluczem w nazwie: wymaga człowieka, klucz ukryty w odmowie",
+                tekst(w))
     x, y = srodek(el["Zapłać 129 zł"], sklep)
     w = k.narzedzie("click", {"pid": pid, "window_id": wid, "x": x, "y": y})
     sprawdz(zasada(w) == "punkt_w_tle", "klik w punkt w tle (sterownik klika najmniejszy element programu w tym "
@@ -367,7 +374,8 @@ def main() -> int:
     dziennik = json.dumps(ster("dziennik", n=200), ensure_ascii=False)
     sprawdz('"czlowiek"' in dziennik and '"wstrzymane"' in dziennik, "dziennik ma decyzje człowiek i pauzę")
     sprawdz("tajne-haslo" not in dziennik and "4111" not in dziennik and "Proszę o fakturę" not in dziennik
-            and "sklepu testowego" not in dziennik, "dziennik bez wpisywanych treści i bez treści prośby")
+            and "sklepu testowego" not in dziennik and KLUCZ_PRZYCISK[8:20] not in dziennik,
+            "dziennik bez wpisywanych treści, bez treści prośby i bez klucza z nazwy przycisku")
 
     k.narzedzie("end_session", {"session": "komputer-test"})
     k.zamknij()

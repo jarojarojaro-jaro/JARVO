@@ -2,7 +2,7 @@
 # Test Komputera Jarva na żywo (docs/KOMPUTER.md §6): bramka floty → wejście → sterownik → Chromium.
 #   bash scripts/komputer-test.sh        (Komputer włączony: jarvo komputer on)
 # Stawia w Komputerze stronę testową (wyszukiwarka i koszyk z polem hasła, karty, BLIK, przyciskami płatności
-# i kluczem API w treści) na 127.0.0.1:8765 i uruchamia klienta MCP (scripts/komputer_test.py) w jarvo-hermes jako hermes,
+# i kluczem API w treści i w nazwie przycisku) na 127.0.0.1:8765 i uruchamia klienta MCP (scripts/komputer_test.py) w jarvo-hermes jako hermes,
 # dokładnie tą drogą, którą idzie Hermes. Przed testem i po nim sprząta stronę i zamyka jej karty i okna.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,6 +38,7 @@ docker exec -i -u pulpit jarvo-komputer bash -c 'mkdir -p /tmp/jarvo-test && cat
 <input type="submit" value="Zapłać 129 zł"></form>
 <p><button type="button" onclick="window.open('okno.html','okno','popup,left=520,top=320,width=420,height=320')">Pokaż szczegóły</button>
 <button type="button" onclick="document.forms[1].insertAdjacentHTML('afterbegin','<p><button type=button>Baner</button></p>')">Pokaż baner</button></p>
+<p><button type="button">Zapłać kluczem sk-proj-ZYXWVUTSRQPONMLKJIHGFEDCBA0987654321</button></p>
 <p>Klucz API: sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX1234567890</p></body></html>
 HTML
 docker exec -i -u pulpit jarvo-komputer bash -c 'cat > /tmp/jarvo-test/okno.html' <<'HTML'

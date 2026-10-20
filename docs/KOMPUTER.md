@@ -168,7 +168,8 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 - **ukrywa sekrety w każdej odpowiedzi** (tekst, drzewo dostępności, komunikaty błędów, także odpowiedzi bez
   znanego id): klucze API i tokeny (OpenAI, Anthropic, OpenRouter, GitHub, GitLab, AWS, Slack, Google,
   Hugging Face, npm, Stripe, token bota Telegrama), JWT, klucze prywatne, numery kart (z sumą Luhna) i wartości pól haseł zastępuje
-  znacznik `[ukryte przez Komputer Jarva]`;
+  znacznik `[ukryte przez Komputer Jarva]`; tak samo w powodach odmów i w dzienniku, gdzie trafia napis z ekranu (nazwa
+  przycisku, pozycja menu, adres), zanim napis zostanie przycięty;
 - **pilnuje protokołu**: tylko pojedyncze wiadomości (bez batch), tylko `initialize`, `ping`, `tools/list`,
   `tools/call` (argumenty jako obiekt) i powiadomienia; sterownik dostaje wiadomość zapisaną od nowa z tego,
   co ocenił, a nie surowe bajty agenta; id żądania w toku nie da się użyć drugi raz (odpowiedź zawsze trafia do swojego
@@ -244,8 +245,8 @@ właściciela** („Operator czeka na właściciela: zaloguj się do panelu skle
 bez sekretów) widać w `jarvo komputer status` i w odmowie `wstrzymane`, którą dostaje agent; do dziennika nie trafia.
 Pauza jest zapisana w `~/.jarvo/pauza` (JSON: kto, od kiedy, powód) i trwa po restarcie. Dziennik `~/.jarvo/dziennik.jsonl` (wolumen
 `jarvo-komputer-dom`, 2 MB i jedna kopia) ma każde działanie i każdą odmowę: czas, sesja, narzędzie, decyzja,
-zasada, cel (rola i napis), liczba wpisanych znaków albo naciśnięte klawisze, liczba ukrytych sekretów. Wpisanego
-tekstu w nim nie ma.
+zasada, cel (rola i napis, sekrety ukryte), liczba wpisanych znaków albo naciśnięte klawisze, liczba ukrytych
+sekretów. Wpisanego tekstu w nim nie ma.
 
 **Test na żywo**: `bash scripts/komputer-test.sh` (Komputer włączony) stawia w Komputerze stronę testową
 (wyszukiwarka i koszyk z polami hasła, karty, BLIK, przyciskami płatności i kluczem API w treści) i prowadzi
