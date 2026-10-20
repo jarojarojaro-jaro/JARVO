@@ -260,8 +260,11 @@ sudo crontab -e
 ```
 
 **Monitoring (opcjonalnie):** `bash scripts/deploy.sh --no-pull --monitoring`, potem Uptime Kuma
-`http://<ip-tailscale>:3001` (monitory: dashboard 9119, SearXNG) i Beszel `http://<ip-tailscale>:8090`
-(klucz agenta z panelu → `BESZEL_AGENT_KEY` w `compose/.env` → ponownie `--monitoring`).
+`http://<ip-tailscale>:3001` (monitory: dashboard 9119, SearXNG; w Settings → About wyłącz „Show update if available”,
+inaczej co 48 h pyta `uptime.kuma.pet` o nową wersję, a zmiennej na to nie ma) i Beszel `http://<ip-tailscale>:8090`
+(klucz agenta z panelu → `BESZEL_AGENT_KEY` w `compose/.env` → ponownie `--monitoring`; system dodaj z hostem
+`/beszel_socket/beszel.sock`: agent słucha na gnieździe unix wspólnym z hubem, bez portu na hoście, i nie pyta
+rejestrów o nowe obrazy, `DOCKER_IMAGE_CHECK=false`).
 
 **Telefon testowy Twórcy aplikacji (opcjonalnie):** `JARVO_LOCAL=/srv/jarvo bash bin/jarvo android on` sprawdza jądro
 (`/dev/kvm` → emulator Google, inaczej moduł `binder_linux` → Redroid, w razie potrzeby doinstalowuje

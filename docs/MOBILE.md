@@ -154,7 +154,9 @@ Na VPS 8 GB cały zestaw (Redroid, Metro, Maestro, ws-scrcpy) zajmuje szacunkowo
 na czas testów i gaśnie po nich. Ryzyka Redroida: `--privileged` to praktycznie root na hoście (izolacja sieci, żadnych
 portów na zewnątrz), projekt jest słabo utrzymywany (ostatni obraz 09.2025), nowsze jądra z binderem w Ruście
 mają zgłoszone awarie (niepotwierdzone dla Ubuntu). Dlatego Redroid to opcja, a nie fundament: przy KVM wybieramy
-oficjalny emulator.
+oficjalny emulator. Ani Redroid, ani emulator nie pytają o klucz adb: obraz docker-android ma wbudowaną parę kluczy
+z publicznego repo (`keys/adbkey`) i domyślnie `SKIP_AUTH=true`, więc adb chroni tylko sieć: urządzenie słucha
+wyłącznie w `jarvo-net` (bez portów na hoście), a Komputer Jarva, który otwiera dowolne strony, jest w osobnej sieci.
 
 **Telefon właściciela z Androidem:** Expo Go ze Sklepu Play działa dziś bez logowania (Expo zapowiada logowanie także
 na Androidzie, bez daty), plik APK z buildu `preview` przez link EAS albo kod QR. Bot Telegrama wysyła pliki do 50 MB,

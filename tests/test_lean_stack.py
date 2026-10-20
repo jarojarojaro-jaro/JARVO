@@ -220,6 +220,20 @@ def test_browser_versions_in_docs_match_pins_and_source_registry():
         assert zrodla[nazwa]["repo"] == repo and zrodla[nazwa]["przejrzane"].startswith(wiersz.group(2)), nazwa
 
 
+def test_monitoring_and_phone_open_no_host_ports_or_phone_home():
+    """Agent Beszela na gnieździe unix wspólnym z hubem (nie port 45876 na każdym interfejsie hosta), bez cogodzinnego
+    pytania rejestrów o obrazy; emulator bez statystyk użycia i tylko w sieci floty (adb bez klucza)."""
+    services = yaml.safe_load((REPO / "infra" / "docker-compose.yml").read_text(encoding="utf-8"))["services"]
+    agent, hub = services["beszel-agent"], services["beszel"]
+    gniazdo = agent["environment"]["LISTEN"]
+    assert gniazdo == "/beszel_socket/beszel.sock" and agent["environment"]["DOCKER_IMAGE_CHECK"] == "false"
+    assert "beszel-gniazdo:/beszel_socket" in agent["volumes"] and "beszel-gniazdo:/beszel_socket" in hub["volumes"]
+    assert agent["network_mode"] == "host" and "ports" not in agent
+    emu = services["android-emulator"]
+    assert "-no-metrics" in emu["environment"]["EXTRA_FLAGS"] and "ports" not in emu
+    assert emu["networks"] == ["jarvo-net"] and services["komputer"]["networks"] == ["jarvo-komputer-net"]
+
+
 def test_compose_service_images_pinned_and_reviewed():
     """Obrazy usług w compose: wersja i digest (bez ruchomych tagów), wersja w SOURCES.md, digest w notatce spisu
     źródeł (nowy digest bez przeglądu nie przejdzie); compose.env.example ich nie zasłania."""

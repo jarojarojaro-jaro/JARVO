@@ -222,7 +222,7 @@ zmodyfikowanych wersji). Szczegóły: [TOOLBOX.md](TOOLBOX.md#polityka-licencji)
 
 ## 7. Monitoring i koszty
 
-- **Beszel:** zasoby serwera, alert przy dysku > 80% i RAM > 90%,
+- **Beszel:** zasoby serwera, alert przy dysku > 80% i RAM > 90% (agent rozmawia z hubem przez gniazdo unix, bez otwartego portu),
 - **Uptime Kuma:** monitory dashboardu (9119) i SearXNG; „heartbeat” z crona Hermesa (brak sygnału = alert) jeszcze nie jest zbudowany,
 - **Hermes:** `hermes doctor`, `hermes logs --follow`, `/usage`, `/insights`,
 - **koszty:** plan ChatGPT (domyślne modele `openai-codex`), limity na kluczach OpenRouter (obrazy, wideo, zestaw

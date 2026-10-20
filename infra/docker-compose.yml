@@ -141,6 +141,7 @@ services:
     container_name: jarvo-beszel
     volumes:
       - ${JARVO_DATA:-/srv/jarvo/data}/beszel:/beszel_data
+      - beszel-gniazdo:/beszel_socket                # agent z tego hosta: gniazdo unix, nie port
     ports:
       - "${JARVO_BIND_IP:-127.0.0.1}:8090:8090"
     deploy:
@@ -153,12 +154,17 @@ services:
     profiles: [monitoring]
     image: ${IMAGE_BESZEL_AGENT:-henrygd/beszel-agent:0.21.0@sha256:f27b1aa2c68404bc5b9e1a2ab36653bd9b4ee14f6299862f09cd5051a4134767}
     container_name: jarvo-beszel-agent
-    network_mode: host
+    network_mode: host                               # statystyki sieci i dysków hosta; portu nie otwiera
     volumes:
+      - beszel-gniazdo:/beszel_socket
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      LISTEN: "45876"
+      # gniazdo unix we wspólnym wolumenie z hubem (wzór Beszela same-system) zamiast portu 45876 na wszystkich
+      # interfejsach hosta; w panelu system dodajemy z hostem /beszel_socket/beszel.sock
+      LISTEN: /beszel_socket/beszel.sock
       KEY: ${BESZEL_AGENT_KEY:-}
+      # bez cogodzinnego pytania rejestrów o każdy obraz bez digestu (także lokalne jarvo-*:local do Docker Huba)
+      DOCKER_IMAGE_CHECK: "false"
     deploy:
       resources:
         limits: {memory: 64m}
@@ -197,7 +203,9 @@ services:
     environment:
       MEMORY: ${ANDROID_EMU_MEMORY:-3072}
       CORES: ${ANDROID_CPUS:-2}
+      # adb bez klucza: obraz ma stałą parę kluczy z publicznego repo, więc chroni tylko sieć floty (docs/MOBILE.md)
       SKIP_AUTH: "true"
+      EXTRA_FLAGS: "-no-metrics"                     # bez statystyk użycia emulatora (jak w przykładzie docker-android)
     volumes:
       - ${JARVO_DATA:-/srv/jarvo/data}/android-emulator:/data
     deploy:
@@ -273,3 +281,5 @@ volumes:
   # Komputer Jarva: gniazda (wspólne z jarvo-hermes) i katalogi domowe pulpitu na każdym systemie
   komputer-gniazda: {name: jarvo-komputer-gniazda}
   komputer-dom: {name: jarvo-komputer-dom}
+  # Beszel: gniazdo agenta wspólne z hubem
+  beszel-gniazdo: {name: jarvo-beszel-gniazdo}

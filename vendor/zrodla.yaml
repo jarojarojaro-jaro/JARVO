@@ -312,7 +312,7 @@ zrodla:
     repo: https://github.com/henrygd/beszel
     status: uzywane
     przejrzane: ec96c134660c998f7eb044e349e3715b65733fe1
-    notatka: "Beszel 0.21.0 (obrazy henrygd/beszel i henrygd/beszel-agent 0.21.0, digesty indeksów 6b39a8b6… i f27b1aa2…; tag v0.21.0 = commit ec96c13): monitoring zasobów, profil compose monitoring. MIT. Przegląd 2026-10-20: hub pyta GitHuba o aktualizacje tylko z CHECK_UPDATES=true, heartbeat tylko z HEARTBEAT_URL (u nas żadnego). Wcześniej ruchomy tag latest"
+    notatka: "Beszel 0.21.0 (obrazy henrygd/beszel i henrygd/beszel-agent 0.21.0, digesty indeksów 6b39a8b6… i f27b1aa2…; tag v0.21.0 = commit ec96c13): monitoring zasobów, profil compose monitoring. MIT. Przegląd 2026-10-20: hub pyta GitHuba o aktualizacje tylko z CHECK_UPDATES=true, heartbeat tylko z HEARTBEAT_URL (u nas żadnego); agent co godzinę pyta rejestry o każdy obraz kontenera bez digestu (u nas DOCKER_IMAGE_CHECK=false) i domyślnie słucha na porcie 45876 wszystkich interfejsów (u nas LISTEN na gnieździe unix wspólnym z hubem, wzór supplemental/docker/same-system). Wcześniej ruchomy tag latest"
   redroid:
     repo: https://github.com/remote-android/redroid-doc
     status: uzywane
@@ -322,7 +322,7 @@ zrodla:
     repo: https://github.com/HQarroum/docker-android
     status: uzywane
     przejrzane: f569246983ee994aed06517bf8e06a3f10547b6d
-    notatka: "docker-android api-33 (obraz halimqarroum/docker-android:api-33, digest 0804f0c3…, tylko amd64, wypchnięty 2026-05-07): telefon testowy przy KVM (emulator Google), profil compose android-kvm. MIT. Przegląd 2026-10-20"
+    notatka: "docker-android api-33 (obraz halimqarroum/docker-android:api-33, digest 0804f0c3…, tylko amd64, wypchnięty 2026-05-07): telefon testowy przy KVM (emulator Google), profil compose android-kvm. MIT. Przegląd 2026-10-20: obraz ma wbudowaną parę kluczy adb z repo (keys/adbkey, Dockerfile COPY keys/*) i domyślnie SKIP_AUTH=true (-skip-adb-auth), więc adb chroni tylko sieć floty; statystyki użycia emulatora wyłącza u nas EXTRA_FLAGS=-no-metrics (w obrazie domyślnie nie)"
   # — metody i prompty (inspiracja, własny tekst) —
   claude-code-security-review:
     repo: https://github.com/anthropics/claude-code-security-review
