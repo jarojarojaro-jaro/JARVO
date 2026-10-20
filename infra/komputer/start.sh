@@ -6,7 +6,8 @@
 #      Potem start.sh uruchamia się ponownie bez NET_ADMIN w zbiorze uprawnień, więc nic w kontenerze filtra nie zmieni;
 #   2. gniazda w /run/jarvo-komputer (wolumen wspólny z jarvo-hermes, tam /opt/jarvo/komputer): katalog pulpit:10000
 #      2750, gniazda 0660 dla grupy 10000 (hermes); stare gniazda usuwamy;
-#   3. pulpit: Xvnc (RFB tylko na gnieździe unix, X tylko z ciasteczkiem, bez TCP i bez gniazda abstrakcyjnego),
+#   3. pulpit: Xvnc (RFB tylko na gnieździe unix i tylko do podglądu: bez klawiatury, myszy i schowka, więc flota
+#      nie ominie nim twardych zasad ani pauzy; X tylko z ciasteczkiem, bez TCP i bez gniazda abstrakcyjnego),
 #      sesyjny D-Bus z AT-SPI włączonym przed Chromium, xfwm4 z kompozytorem;
 #   4. wejście sterownika (wejscie.py: cua.sock z twardymi zasadami, ster.sock dla HQ) i Chromium z drzewem
 #      dostępności; oba wracają po zakończeniu. Gdy padnie Xvnc, D-Bus albo xfwm4, kontener kończy się i Docker go
@@ -95,17 +96,6 @@ find "$GNIAZDA" -mindepth 1 -maxdepth 1 \( -type s -o -type l \) -delete
 install -d -m 0755 -o root -g root /run/user
 install -d -m 0700 -o pulpit -g pulpit "$RUNDIR"
 install -d -m 1777 -o root -g root /tmp/.X11-unix
-# /home to wolumen (stan przeglądarki przetrwa restart, `jarvo komputer wyczysc` go kasuje)
-install -d -m 0700 -o pulpit -g pulpit "$DOM"
-install -d -m 0700 -o agent -g agent /home/agent
-for d in Pobrane .config .config/chromium .cua-driver .cua .pki .pki/nssdb; do
-  install -d -m 0700 -o pulpit -g pulpit "$DOM/$d"
-done
-printf '{"telemetry_enabled": false, "update_check_enabled": false}\n' > "$DOM/.cua-driver/config.json"
-printf '[telemetry]\nenabled = "off"\n' > "$DOM/.cua/config.toml"
-chown pulpit:pulpit "$DOM/.cua-driver/config.json" "$DOM/.cua/config.toml"
-rm -f "$DOM"/.config/chromium/Singleton*
-
 jako_pulpit() {
   setpriv --reuid=pulpit --regid=pulpit --init-groups --no-new-privs --inh-caps=-all --bounding-set=-all -- \
     env -i HOME="$DOM" USER=pulpit LOGNAME=pulpit SHELL=/bin/bash PATH=/usr/local/bin:/usr/bin:/bin \
@@ -115,12 +105,24 @@ jako_pulpit() {
     CUA_DRIVER_RS_UPDATE_CHECK=false "$@"
 }
 
+# /home to wolumen (stan przeglądarki przetrwa restart, `jarvo komputer wyczysc` go kasuje). Root zakłada tylko
+# katalogi domowe w /home (należy do roota); w środku wszystko robi sam pulpit: przeglądarka (bez piaskownicy) pracuje
+# jako pulpit i mogłaby podmienić ścieżkę na dowiązanie, za którym root zmieniłby właściciela pliku systemowego
+install -d -m 0700 -o pulpit -g pulpit "$DOM"
+install -d -m 0700 -o agent -g agent /home/agent
+jako_pulpit sh -c 'set -e; cd "$HOME"
+  for d in Pobrane .config .config/chromium .cua-driver .cua .pki .pki/nssdb; do mkdir -p -m 0700 "$d"; done
+  rm -f .cua-driver/config.json .cua/config.toml
+  printf "{\"telemetry_enabled\": false, \"update_check_enabled\": false}\n" > .cua-driver/config.json
+  printf "[telemetry]\nenabled = \"off\"\n" > .cua/config.toml
+  rm -f .config/chromium/Singleton*'
+
 # certyfikaty własnego proxy (firma, piaskownica) z magazynu systemowego także dla Chromium (NSS pulpitu)
 shopt -s nullglob
 certy=(/usr/local/share/ca-certificates/*.crt)
 suma="$(cat "${certy[@]}" /dev/null | sha256sum | cut -c1-64)"
-if (( ${#certy[@]} )) && [[ "$(cat "$DOM/.pki/nssdb/.jarvo-ca" 2>/dev/null)" != "$suma" ]]; then
-  rm -f "$DOM"/.pki/nssdb/*.db
+if (( ${#certy[@]} )) && [[ "$(jako_pulpit cat "$DOM/.pki/nssdb/.jarvo-ca" 2>/dev/null)" != "$suma" ]]; then
+  jako_pulpit sh -c 'rm -f "$HOME"/.pki/nssdb/*.db'
   jako_pulpit certutil -N -d "sql:$DOM/.pki/nssdb" --empty-password
   i=0
   for c in "${certy[@]}"; do
@@ -128,13 +130,14 @@ if (( ${#certy[@]} )) && [[ "$(cat "$DOM/.pki/nssdb/.jarvo-ca" 2>/dev/null)" != 
     jako_pulpit certutil -A -d "sql:$DOM/.pki/nssdb" -t "C,," -n "lokalny-$i" -i "$c" \
       || log "certyfikat $c: nie dodany do Chromium"
   done
-  echo "$suma" > "$DOM/.pki/nssdb/.jarvo-ca"
+  # rm: plik po starszym starcie bywa roota (pulpit może go usunąć ze swojego katalogu, nadpisać nie)
+  jako_pulpit sh -c 'rm -f "$HOME/.pki/nssdb/.jarvo-ca"; echo "$1" > "$HOME/.pki/nssdb/.jarvo-ca"' _ "$suma"
 fi
 shopt -u nullglob
 
 # 3. pulpit
 cookie="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
-install -m 0600 -o pulpit -g pulpit /dev/null "$DOM/.Xauthority"
+jako_pulpit sh -c 'rm -f "$HOME/.Xauthority"; umask 077; : > "$HOME/.Xauthority"'
 jako_pulpit xauth -q -f "$DOM/.Xauthority" add :1 . "$cookie"
 unset cookie
 
@@ -142,7 +145,8 @@ trap 'trap - TERM INT; log "zatrzymanie"; rm -f "$GOTOWY"; kill 0 2>/dev/null; e
 
 jako_pulpit Xvnc :1 -geometry "$EKRAN" -depth 24 -dpi 96 -desktop "Komputer Jarva" \
   -rfbport -1 -rfbunixpath "$GNIAZDA/rfb.sock" -rfbunixmode 0660 -SecurityTypes None -AlwaysShared \
-  -nolisten tcp -nolisten local -auth "$DOM/.Xauthority" -SendCutText=0 &
+  -nolisten tcp -nolisten local -auth "$DOM/.Xauthority" -SendCutText=0 \
+  -AcceptKeyEvents=0 -AcceptPointerEvents=0 -AcceptCutText=0 -AcceptSetDesktopSize=0 &
 XVNC=$!
 for _ in $(seq 1 100); do jako_pulpit xdpyinfo >/dev/null 2>&1 && break; sleep 0.1; done
 jako_pulpit xdpyinfo >/dev/null 2>&1 || die "Xvnc nie wstał"
@@ -183,7 +187,7 @@ for _ in $(seq 1 100); do [[ -S $GNIAZDA/cua.sock ]] && break; sleep 0.1; done
 przegladarka() {
   local pref="$DOM/.config/chromium/Default/Preferences"
   while :; do
-    rm -f "$DOM"/.config/chromium/Singleton*
+    jako_pulpit sh -c 'rm -f "$HOME"/.config/chromium/Singleton*'
     # po restarcie kontenera bez dymka „Przywrócić strony?” (Chromium zamknięty przez Dockera, nie przez awarię)
     [[ -f $pref ]] && jako_pulpit sed -i -e 's/"exit_type":"Crashed"/"exit_type":"Normal"/' \
       -e 's/"exited_cleanly":false/"exited_cleanly":true/' "$pref"

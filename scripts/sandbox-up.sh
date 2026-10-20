@@ -145,7 +145,7 @@ if grep -qE '^COMPOSE_PROFILES=(.*,)?komputer(,|$)' "$L/compose/.env"; then
   KBASE="$(sed -n 's/^ARG DEBIAN_IMAGE=//p' "$ROOT/infra/komputer/Dockerfile")"
   # pliki na dysku, nie commit: w piaskownicy testujemy zmiany w infra/komputer przed commitem
   KTREE="$(cd "$ROOT" && git ls-files -co --exclude-standard -- infra/komputer | sort | xargs -r sha256sum 2>/dev/null \
-    | sha256sum | cut -c1-64)"
+    | sha256sum | cut -c1-64) $(date -u +%G-%V)"
   if [[ $REBUILD -eq 1 ]] || ! docker image inspect komputer-ca:test >/dev/null 2>&1 \
      || [[ "$(docker image inspect -f '{{index .Config.Labels "pl.jarvo.baza"}}' komputer-ca:test 2>/dev/null)" != "$KBASE $CA_SHA" ]]; then
     log "komputer-ca:test (baza Komputera + certyfikat proxy)"
@@ -161,7 +161,8 @@ if grep -qE '^COMPOSE_PROFILES=(.*,)?komputer(,|$)' "$L/compose/.env"; then
   fi
   if [[ "$(cat "$L/compose/.komputer-pliki" 2>/dev/null)" != "$KTREE" ]] || ! docker image inspect jarvo-komputer:local >/dev/null 2>&1; then
     log "jarvo-komputer:local (pulpit, Chromium, cua-driver; kilka minut za pierwszym razem)"
-    docker build --build-arg DEBIAN_IMAGE=komputer-ca:test -t jarvo-komputer:local "$ROOT/infra/komputer"
+    docker build --build-arg DEBIAN_IMAGE=komputer-ca:test --build-arg KOMPUTER_POPRAWKI="${KTREE##* }" \
+      -t jarvo-komputer:local "$ROOT/infra/komputer"
     echo "$KTREE" > "$L/compose/.komputer-pliki"
     docker image prune -f >/dev/null || true
   fi

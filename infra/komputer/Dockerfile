@@ -5,8 +5,10 @@
 # Bez sudo, bez kompilatorów, bez serwera X na TCP. Buduje go deploy.sh i `jarvo komputer on` (obraz lokalny
 # jarvo-komputer:local, przebudowa po zmianie infra/komputer/).
 #
-# Baza przypięta digestem indeksu (amd64 + arm64). Pakiety Debiana bez przypinania wersji, jak w infra/Dockerfile:
-# każda budowa bierze bieżące poprawki bezpieczeństwa (Chromium!), a `jarvo komputer odswiez` buduje od nowa.
+# Baza przypięta digestem indeksu (amd64 + arm64). Pakiety Debiana bez przypinania wersji, a warstwę z nimi
+# unieważnia KOMPUTER_POPRAWKI (tydzień roku, podaje deploy.sh i `jarvo komputer on`): zwykła budowa z cache
+# brałaby Chromium z dnia pierwszej budowy, więc co tydzień przy wdrożeniu przychodzą poprawki bezpieczeństwa
+# Debiana i Chromium. `jarvo komputer odswiez` buduje od nowa od razu.
 ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 FROM ${DEBIAN_IMAGE} AS sterownik
@@ -48,7 +50,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # xsetroot, xauth, xdotool do puszczania klawiszy po turze), Chromium z polskim interfejsem, fonty z polskimi
 # znakami i emoji, iptables (filtr ruchu do sieci lokalnej), tini (PID 1 sprząta procesy), python3 (kanał K2),
 # certutil (certyfikaty firmowego proxy z /usr/local/share/ca-certificates także w Chromium)
+ARG KOMPUTER_POPRAWKI=0
 RUN set -eux; \
+    echo "poprawki: ${KOMPUTER_POPRAWKI}"; \
     apt-get update; \
     apt-get upgrade -y; \
     apt-get install -y --no-install-recommends \

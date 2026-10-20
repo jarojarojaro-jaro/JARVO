@@ -77,12 +77,48 @@ def test_ekran_tylko_na_gniezdzie_z_ciasteczkiem():
     xvnc = xvnc[:xvnc.index("XVNC=$!")]
     for flaga in ("-rfbport -1", "-rfbunixpath", "-rfbunixmode 0660", "-nolisten tcp", "-nolisten local", "-auth"):
         assert flaga in xvnc
+    # do K4 (Przejmij w HQ) RFB tylko do podglądu: klient VNC z floty nie ominie wejścia i twardych zasad
+    for flaga in ("-AcceptKeyEvents=0", "-AcceptPointerEvents=0", "-AcceptCutText=0", "-AcceptSetDesktopSize=0"):
+        assert flaga in xvnc
     flagi = _tekst("chromium-flagi")
     assert "--force-renderer-accessibility" in flagi and "--remote-debugging" not in flagi + s
     # drzewo dostępności: szyna AT-SPI włączona, zanim wystartuje Chromium (inaczej sterownik widzi samo okno)
     assert s.index("ScreenReaderEnabled") < s.index("przegladarka &")
     # wszystko na ekranie jako pulpit, bez nowych uprawnień
     assert "--no-new-privs" in s and "--bounding-set=-all" in s
+
+
+def test_root_nie_pisze_w_katalogu_domowym_pulpitu():
+    """Wolumen komputer-dom zapisuje pulpit: root nie może podążyć za podłożonym dowiązaniem (np. do /etc)."""
+    s = _tekst("start.sh")
+    zapis = re.compile(r"^\s*(install|mkdir|chown|chmod|rm|cp|mv|ln|touch|printf|echo|sed|certutil|xauth)\b.*\$DOM\"?/")
+    for linia in s.splitlines():
+        kod = linia.split("#", 1)[0]
+        assert not zapis.search(kod), linia
+        assert not re.search(r">>?\s*\"?\$DOM", kod) or kod.lstrip().startswith("jako_pulpit"), linia
+    # root zakłada tylko sam katalog domowy; pliki w środku i Singleton* Chromium usuwa pulpit
+    assert 'install -d -m 0700 -o pulpit -g pulpit "$DOM"\n' in s
+    blok = s[s.index("jako_pulpit sh -c 'set -e; cd \"$HOME\""):]
+    blok = blok[:blok.index("'\n")]
+    for plik in (".cua-driver/config.json", ".cua/config.toml", "Singleton*"):
+        assert plik in blok
+    assert "jako_pulpit sh -c 'rm -f \"$HOME/.pki/nssdb/.jarvo-ca\"; echo \"$1\" > \"$HOME/.pki/nssdb/.jarvo-ca\"'" in s
+    assert "jako_pulpit sh -c 'rm -f \"$HOME/.Xauthority\"; umask 077" in s
+    assert s.index("jako_pulpit() {") < s.index('install -d -m 0700 -o pulpit -g pulpit "$DOM"')
+
+
+def test_cotygodniowe_poprawki_chromium():
+    d = _tekst("Dockerfile")
+    arg = d.index("ARG KOMPUTER_POPRAWKI=0")
+    # ARG tuż przed warstwą z pakietami i użyty w niej: nowa wartość unieważnia cache tej warstwy
+    run = d[arg:d.index("rm -rf /var/lib/apt/lists", arg)]
+    assert "${KOMPUTER_POPRAWKI}" in run and "apt-get upgrade" in run and "chromium" in run
+    assert _compose()["services"]["komputer"]["build"]["args"]["KOMPUTER_POPRAWKI"] == "${KOMPUTER_POPRAWKI:-0}"
+    for skrypt in (REPO / "scripts" / "deploy.sh", REPO / "bin" / "jarvo"):
+        t = skrypt.read_text(encoding="utf-8")
+        assert 'KOMPUTER_POPRAWKI="$(date -u +%G-%V)"' in t and "export KOMPUTER_POPRAWKI" in t
+    j = (REPO / "bin" / "jarvo").read_text(encoding="utf-8")
+    assert "dpkg-query -W -f '${Version}' chromium" in j and "dni > 14" in j
 
 
 def test_filtr_ruchu_przed_pulpitem_i_bez_powrotu():

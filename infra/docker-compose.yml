@@ -227,6 +227,9 @@ services:
     profiles: [komputer]
     build:
       context: ./komputer
+      args:
+        # tydzień roku (deploy.sh, `jarvo komputer on`): co tydzień świeże pakiety Debiana i Chromium
+        KOMPUTER_POPRAWKI: ${KOMPUTER_POPRAWKI:-0}
     image: jarvo-komputer:local
     container_name: jarvo-komputer
     hostname: komputer

@@ -395,8 +395,10 @@ cmd_android() {
 }
 # Komputer Jarva (docs/KOMPUTER.md): pulpit Linux z Chromium i sterownikiem ekranu w osobnym kontenerze jarvo-komputer
 # (profil compose komputer, zapisany w COMPOSE_PROFILES jak telefon testowy). Obraz budujemy na miejscu
-# (infra/komputer, kilka minut za pierwszym razem) i od nowa po zmianie infra/komputer/ (.komputer-tree).
-komputer_tree() { git -C "$ROOT" rev-parse HEAD:infra/komputer 2>/dev/null || echo brak; }
+# (infra/komputer, kilka minut za pierwszym razem) i od nowa po zmianie infra/komputer/ albo co tydzień (.komputer-tree).
+# drzewo infra/komputer i tydzień roku: co tydzień budowa bierze świeże pakiety Debiana i Chromium (KOMPUTER_POPRAWKI)
+komputer_tree() { echo "$(git -C "$ROOT" rev-parse HEAD:infra/komputer 2>/dev/null || echo brak) $KOMPUTER_POPRAWKI"; }
+export KOMPUTER_POPRAWKI; KOMPUTER_POPRAWKI="$(date -u +%G-%V)"
 komputer_obraz() {   # komputer_obraz [--od-nowa]: zbuduj obraz, gdy go nie ma albo zmieniło się infra/komputer/
   local tree; tree="$(komputer_tree)"
   if [[ "${1:-}" == --od-nowa ]] || [[ "$(cat "$L/compose/.komputer-tree" 2>/dev/null)" != "$tree" ]] \
@@ -414,6 +416,17 @@ komputer_obraz() {   # komputer_obraz [--od-nowa]: zbuduj obraz, gdy go nie ma a
   else return 0; fi
   echo "$tree" > "$L/compose/.komputer-tree"
   docker image prune -f >/dev/null 2>&1 || true
+}
+komputer_wiek() {   # wersja Chromium i wiek obrazu; po 14 dniach bez poprawek ostrzeżenie
+  local chromium utworzony dni
+  chromium="$(docker exec jarvo-komputer dpkg-query -W -f '${Version}' chromium 2>/dev/null || echo '?')"
+  utworzony="$(docker image inspect -f '{{.Created}}' jarvo-komputer:local 2>/dev/null | cut -c1-10)"
+  dni="$(python3 -c 'import datetime,sys; print((datetime.date.today()-datetime.date.fromisoformat(sys.argv[1])).days)' \
+    "$utworzony" 2>/dev/null || echo 0)"
+  echo "Chromium:        $chromium (obraz z $utworzony)"
+  if (( dni > 14 )); then
+    warn "Obraz Komputera ma $dni dni: przeglądarka bez nowych poprawek bezpieczeństwa. jarvo komputer odswiez (albo jarvo update)."
+  fi
 }
 set_envval() {   # set_envval KLUCZ wartość (w compose/.env, bez zmiany uprawnień pliku)
   local f="$L/compose/.env" tmp
@@ -532,6 +545,7 @@ cmd_komputer() {
       if ensure_docker soft && komputer_dziala; then
         if komputer_zdrowy; then echo "pulpit:          działa ($(docker exec jarvo-komputer cua-driver --version 2>/dev/null | head -1))"
         else echo "pulpit:          startuje albo nie odpowiada (jarvo logs komputer)"; fi
+        komputer_wiek
         echo "wejście:         $(komputer_ster stan 2>/dev/null || echo "nie odpowiada (jarvo logs komputer)")"
         echo "pamięć:          $(docker stats --no-stream --format '{{.MemUsage}}' jarvo-komputer 2>/dev/null)"
         if docker exec jarvo-hermes test -S /opt/jarvo/komputer/cua.sock 2>/dev/null; then echo "flota widzi Komputer: tak"

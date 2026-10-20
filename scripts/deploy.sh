@@ -116,12 +116,14 @@ if [[ $NOBUILD -eq 0 ]] && "${COMPOSE[@]}" config --services 2>/dev/null | grep 
 fi
 
 # Komputer Jarva włączony (profil komputer, docs/KOMPUTER.md): obraz budujemy na miejscu przy pierwszym razie i po zmianie
-# infra/komputer/ (ten sam plik .komputer-tree co `jarvo komputer on`); publiczne adresy tego serwera dopisujemy do
+# infra/komputer/ albo co tydzień (ten sam plik .komputer-tree co `jarvo komputer on`); publiczne adresy tego serwera dopisujemy do
 # KOMPUTER_BLOKADA, żeby przeglądarka w Komputerze nie sięgała do portów floty i SSH hosta (prywatne blokuje start.sh)
 KOMPUTER=0
 "${COMPOSE[@]}" config --services 2>/dev/null | grep -qx komputer && KOMPUTER=1
 if [[ $KOMPUTER -eq 1 && $NOBUILD -eq 0 ]]; then
-  komputer_tree="$(git -C "$ROOT" rev-parse HEAD:infra/komputer 2>/dev/null || echo brak)"
+  # drzewo infra/komputer i tydzień roku: nowy tydzień = przebudowa warstwy z pakietami (poprawki Chromium)
+  export KOMPUTER_POPRAWKI; KOMPUTER_POPRAWKI="$(date -u +%G-%V)"
+  komputer_tree="$(git -C "$ROOT" rev-parse HEAD:infra/komputer 2>/dev/null || echo brak) $KOMPUTER_POPRAWKI"
   if [[ "$(cat "$COMPOSE_DIR/.komputer-tree" 2>/dev/null)" != "$komputer_tree" ]] \
      || ! docker image inspect jarvo-komputer:local >/dev/null 2>&1; then
     log "Budowa obrazu Komputera Jarva (pulpit, Chromium, sterownik ekranu)"

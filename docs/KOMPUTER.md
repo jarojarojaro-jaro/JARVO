@@ -95,14 +95,16 @@ Komputer jest profilem compose `komputer`: nie działa, dopóki go nie włączys
 |---|---|
 | `jarvo komputer on` | buduje obraz `jarvo-komputer:local` (pierwszy raz kilka minut, ok. 400 MB pobrania), dopisuje profil do `COMPOSE_PROFILES` i czeka, aż pulpit będzie zdrowy; potem ok. 3 s. Odmawia, gdy Docker ma mniej niż 4 GB pamięci (na macOS podpowiada `colima start --memory 8`) |
 | `jarvo komputer off` | zatrzymuje Komputer i zdejmuje profil; stan przeglądarki zostaje |
-| `jarvo komputer status` | włączony czy nie, zdrowie pulpitu, wersja sterownika, stan wejścia (pauza, sesje agentów, AT-SPI), pamięć, czy flota widzi gniazdo Komputera |
+| `jarvo komputer status` | włączony czy nie, zdrowie pulpitu, wersja sterownika, wersja Chromium i data obrazu (ostrzeżenie, gdy obraz ma ponad 14 dni), stan wejścia (pauza, sesje agentów, AT-SPI), pamięć, czy flota widzi gniazdo Komputera |
 | `jarvo komputer pauza` | zatrzymuje agenta od razu: patrzeć może, klikać i pisać nie; pauza trwa także po restarcie |
 | `jarvo komputer wznow` | zdejmuje pauzę; robi to tylko właściciel (agent floty dostaje odmowę) |
 | `jarvo komputer dziennik [N]` | ostatnie N decyzji wejścia (domyślnie 30): narzędzie, decyzja, zasada, cel, bez wpisywanych treści |
 | `jarvo komputer wyczysc` | po potwierdzeniu kasuje stan pulpitu (wolumen `jarvo-komputer-dom`: zalogowania, ciasteczka, historia, pobrane pliki) |
 | `jarvo komputer odswiez` | buduje obraz od nowa z bieżącymi poprawkami Debiana i Chromium |
 
-`scripts/deploy.sh` (a więc `jarvo update`) przebudowuje obraz po zmianie `infra/komputer/` i po healthcheckach
+`scripts/deploy.sh` (a więc `jarvo update`) przebudowuje obraz po zmianie `infra/komputer/` i raz w tygodniu: argument
+budowy `KOMPUTER_POPRAWKI` (tydzień roku) unieważnia warstwę z pakietami, więc wdrożenie w nowym tygodniu bierze bieżące
+poprawki bezpieczeństwa Debiana i Chromium (sam cache Dockera trzymałby Chromium z dnia pierwszej budowy). Po healthcheckach
 sprawdza, czy pulpit i wejście działają i czy flota widzi `rfb.sock` i `cua.sock`. `jarvo uninstall` usuwa obraz, a `--all` także wolumeny.
 
 **Co jest w środku** (Debian trixie-slim przypięty sumą): Xvnc (TigerVNC) 1440×900 (`KOMPUTER_EKRAN`), xfwm4
@@ -115,6 +117,14 @@ to `tini`. Telemetria i sprawdzanie aktualizacji sterownika są wyłączone zmie
 
 **Ekran tylko przez gniazdo.** Xvnc nie słucha na TCP ani na abstrakcyjnym gnieździe X; RFB jest na
 `rfb.sock` (0660, grupa 10000, czyli `hermes`), a X wymaga ciasteczka z `~/.Xauthority`. Kontener nie ma portów.
+Do czasu Przejmij w HQ Ekran (K4) RFB jest **tylko do podglądu**: Xvnc odrzuca klawiaturę, mysz, schowek i zmianę
+rozmiaru ekranu (`-AcceptKeyEvents=0 -AcceptPointerEvents=0 -AcceptCutText=0 -AcceptSetDesktopSize=0`), więc
+klient VNC z floty nie ominie wejścia i jego twardych zasad.
+
+**Katalog domowy pulpitu** (wolumen `jarvo-komputer-dom`) przygotowuje przy starcie sam użytkownik `pulpit`, nie
+root: katalogi, konfiguracje sterownika, baza certyfikatów i czyszczenie blokad Chromium idą przez `setpriv`.
+Dowiązanie symboliczne podłożone w wolumenie (np. `.cua-driver/config.json` → `/etc/...`) nie da więc zapisu
+z uprawnieniami roota; root zakłada tylko sam katalog domowy.
 
 **Chromium** ma politykę `/etc/chromium/policies/managed/jarvo.json` (`infra/komputer/chromium.json`): bez
 menedżera haseł, autouzupełniania kart i adresów, logowania do przeglądarki i synchronizacji, rozszerzeń
@@ -291,7 +301,11 @@ u innych agentów.
   rysowane w całości na `canvas` nie mają drzewa dostępności, więc wrażliwy przycisk bez napisu przejdzie jak
   zwykły klik; wysyłkę formularza skryptem strony (bez `<form>`) wejście rozpozna tylko po napisie przycisku;
   zwykłe przejście pod adres (link, pasek adresu) nie jest blokowane; agent z terminalem we flocie może włączyć
-  pauzę i czytać dziennik (bez treści), ale nie zdejmie pauzy. Schowek przy przejęciu ekranu w HQ ustali K4.
+  pauzę i czytać dziennik (bez treści), ale nie zdejmie pauzy; przez `rfb.sock` widzi ekran (bez zamazanych
+  sekretów, jak zrzut), ale nim nie steruje: Xvnc odrzuca klawiaturę, mysz i schowek. Kod, który przejąłby
+  przeglądarkę (pulpit, uid 10101), nie dostanie przez katalog domowy uprawnień roota: start przygotowuje go jako
+  pulpit (§5). Schowek i wejście przy przejęciu ekranu w HQ ustali K4 (przez osobny serwer ekranu z tokenem
+  właściciela, nie przez gniazdo, które widzi flota).
 - **Zrzuty ekranu nie są zamazywane.** Wejście ukrywa sekrety w tekście i w drzewie dostępności, ale obraz zrzutu
   (`capture` `som` i `vision`) pokazuje to, co widać na stronie, także wyświetlony klucz API albo numer karty. Taki
   obraz idzie do modelu (dostawca z `config.yaml`) i do pliku `screenshot_path` w profilu Operatora. Dlatego Operator

@@ -278,8 +278,9 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   `computer_use` i klucze `cua:*` tylko agentowi z `komputer: true` i zabrania `approvals.mode: off`.
   Komputer Jarva (`infra/komputer`, profil compose `komputer`, `jarvo komputer on|off|status|wyczysc|odswiez`
   i `pauza|wznow|dziennik`): pulpit Xvnc z Chromium i drzewem dostępności w osobnym kontenerze bez kluczy floty
-  i bez portów; ekran i sterownik tylko przez gniazda unix w wolumenie `jarvo-komputer-gniazda` (w `jarvo-hermes`
-  `/opt/jarvo/komputer`); filtr ruchu przed pulpitem: internet tak, sieć lokalna, metadane chmury, adresy hosta
+  i bez portów; ekran (do K4 tylko podgląd: Xvnc odrzuca klawiaturę, mysz i schowek) i sterownik tylko przez gniazda
+  unix w wolumenie `jarvo-komputer-gniazda` (w `jarvo-hermes` `/opt/jarvo/komputer`); obraz co tydzień z bieżącymi
+  poprawkami Chromium (`KOMPUTER_POPRAWKI` przy wdrożeniu); filtr ruchu przed pulpitem: internet tak, sieć lokalna, metadane chmury, adresy hosta
   i port 25 nie. Wejście sterownika (`infra/komputer/wejscie.py`, `zasady.py`) sprawdza każde wywołanie, zanim
   dostanie je sterownik: płatności, zakupy, logowanie, wysyłkę, publikację, Enter w takim formularzu i wpisywanie
   haseł, kart, BLIK i kodów zostawia właścicielowi, sekretów nie wpisuje i ukrywa je w odpowiedziach, wyłącza
