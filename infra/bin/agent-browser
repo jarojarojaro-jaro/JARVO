@@ -1,0 +1,90 @@
+#!/bin/bash
+# agent-browser bez serwera podglądu (docs/TOOLBOX.md, „agent-browser bez serwera podglądu”).
+#
+# Demon agent-browsera (0.38.1, tak samo 0.39.1) przy starcie każdej sesji zawsze otwiera na 127.0.0.1 serwer
+# WebSocket/HTTP bez hasła: obraz strony, każde polecenie z wynikiem (także wpisywane wartości), wstrzykiwanie
+# myszy i klawiatury, zakładanie nowych sesji. Strona otwarta w przeglądarce agenta (np. podgląd serwera
+# deweloperskiego na localhost) mogłaby go znaleźć. Zmienną ani flagą się go nie wyłączy, tylko poleceniem
+# `stream disable` do działającego demona. Nakładka wysyła je przed każdym poleceniem z tymi samymi flagami
+# globalnymi: gdy demona jeszcze nie ma, startuje bez serwera podglądu, zanim otworzy jakąkolwiek stronę.
+# Gdy wyłączyć się nie da, polecenie nie idzie dalej. `stream enable`, `dashboard` i `mcp` (otwierają serwery
+# albo demony z pominięciem nakładki) odrzuca. Hermes znajduje nakładkę pierwszą w PATH (/opt/jarvo/bin).
+set -uo pipefail
+shopt -s nullglob
+# JARVO_AGENT_BROWSER_BIN tylko dla testów nakładki (tests/test_agent_browser_nakladka.py)
+bin=("${JARVO_AGENT_BROWSER_BIN:-}")
+[[ -n ${bin[0]} ]] || bin=(/opt/jarvo/node/node_modules/agent-browser/bin/agent-browser-linux-*)
+if (( ${#bin[@]} != 1 )); then
+  echo "agent-browser: brak natywnej binarki w /opt/jarvo/node/node_modules/agent-browser/bin" >&2
+  exit 127
+fi
+AB=${bin[0]}
+[[ -n ${AGENT_BROWSER_DAEMON-} ]] && exec "$AB" "$@"
+
+# flagi globalne jak w agent-browser 0.38.1 (cli/src/flags.rs, clean_args): z wartością i bez
+Z_WARTOSCIA=" --session --restore-save --restore-check-url --restore-check-text --restore-check-fn --namespace
+ --headers --executable-path --cdp --extension --init-script --enable --profile --state --proxy --proxy-bypass
+ --args --user-agent -p --provider --device --session-name --color-scheme --download-path --max-output
+ --allowed-domains --action-policy --confirm-actions --config --engine --input-mode --screenshot-dir
+ --screenshot-quality --screenshot-format --idle-timeout --ca-cert --model "
+BEZ_WARTOSCI=" --json --headed --webgpu --no-webmcp --debug --ignore-https-errors --allow-file-access
+ --hide-scrollbars --auto-connect --pin-tab --no-pin-tab --no-ca-cert --annotate --content-boundaries
+ --confirm-interactive --no-auto-dialog -v --verbose -q --quiet --offline --quick --fix "
+Z_WARTOSCIA=${Z_WARTOSCIA//$'\n'/ }
+BEZ_WARTOSCI=${BEZ_WARTOSCI//$'\n'/ }
+
+args=("$@")
+globalne=()
+polecenie=()
+json=0
+i=0
+while (( i < ${#args[@]} )); do
+  a=${args[i]}
+  case "$a" in
+    --version|-V|--help|-h) exec "$AB" "$@" ;;
+  esac
+  if [[ $Z_WARTOSCIA == *" $a "* ]]; then
+    globalne+=("$a" "${args[i+1]-}")
+    i=$((i + 2))
+  elif [[ $BEZ_WARTOSCI == *" $a "* ]]; then
+    globalne+=("$a")
+    [[ $a == --json ]] && json=1
+    if [[ ${args[i+1]-} == true || ${args[i+1]-} == false ]]; then
+      globalne+=("${args[i+1]}")
+      i=$((i + 1))
+    fi
+    i=$((i + 1))
+  elif [[ $a == --restore || $a == --restore=* ]]; then
+    globalne+=("$a")
+    i=$((i + 1))
+  else
+    polecenie+=("$a")
+    i=$((i + 1))
+  fi
+done
+
+odmowa() {
+  if (( json )); then
+    printf '{"success":false,"data":null,"error":"%s"}\n' "$1"
+  else
+    echo "agent-browser: $1" >&2
+  fi
+  exit 1
+}
+
+case "${polecenie[0]-} ${polecenie[1]-}" in
+  "stream enable"*) odmowa "serwer podglądu agent-browsera jest w Jarvie wyłączony (bez hasła, na 127.0.0.1)" ;;
+  "dashboard "*) odmowa "panel agent-browsera jest w Jarvie wyłączony (serwer bez hasła)" ;;
+  "mcp "*) odmowa "serwer MCP agent-browsera nie jest w Jarvie używany (otwierałby sesje z serwerem podglądu)" ;;
+esac
+
+# polecenia, które nie uruchamiają demona (agent-browser 0.38.1, cli/src/main.rs), idą prosto do binarki
+case "${polecenie[0]-}" in
+  ""|help|install|upgrade|doctor|profiles|skills|plugin|plugins|session|chat) exec "$AB" "$@" ;;
+esac
+
+wynik=$("$AB" "${globalne[@]}" --json stream disable </dev/null 2>&1)
+if [[ $wynik != *'"success":true'* && $wynik != *"Streaming is not enabled"* ]]; then
+  odmowa "nie udało się wyłączyć serwera podglądu agent-browsera, więc polecenie nie poszło dalej"
+fi
+exec "$AB" "$@"

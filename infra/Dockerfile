@@ -93,10 +93,11 @@ RUN set -e; cd /opt/jarvo/node && \
     find node_modules/agent-browser/bin -name 'agent-browser-*' ! -name "agent-browser-$ab" -delete && \
     # bit wykonywania nadaje postinstall paczki, a ten jest zablokowany (allowScripts); paczka arm64 przychodzi bez niego
     chmod 0755 node_modules/agent-browser/bin/agent-browser-$ab && \
-    # na PATH natywna binarka zamiast nakładki w Node (jak robi postinstall przy instalacji globalnej)
+    # natywna binarka zamiast nakładki w Node (jak robi postinstall przy instalacji globalnej); na PATH pierwsza
+    # jest nakładka Jarva /opt/jarvo/bin/agent-browser (infra/bin: demon bez serwera podglądu), także w /usr/local/bin
     ln -sf ../agent-browser/bin/agent-browser-$ab node_modules/.bin/agent-browser && \
-    ln -sf /opt/jarvo/node/node_modules/agent-browser/bin/agent-browser-$ab /usr/local/bin/agent-browser && \
-    agent-browser --version && \
+    ln -sf /opt/jarvo/bin/agent-browser /usr/local/bin/agent-browser && \
+    node_modules/.bin/agent-browser --version && \
     # jedna Chromium dla wszystkich: playwright-core musi trafić w rewizję chrome-headless-shell z obrazu Hermesa
     # (v2026.9.24: rewizja 1243 dla amd64 i arm64), a /usr/local/bin/chromium wskazywać tę samą binarkę.
     # Bez dociągania: Playwright nie sprawdza sumy pobranej przeglądarki, więc brak tej rewizji zatrzymuje build
@@ -257,7 +258,8 @@ RUN set -e; case "$(uname -m)" in x86_64) a=x86_64; s="$CAMOUFOX_SHA256_AMD64";;
     HOME="$t" /opt/jarvo/venv/bin/python -c "from camoufox.sync_api import Camoufox; from camoufox import DefaultAddons; c = Camoufox(executable_path='$d/camoufox-bin', ff_version=${CAMOUFOX_VERSION%%.*}, headless=True, os='linux', geoip=False, exclude_addons=[DefaultAddons.UBO], i_know_what_im_doing=True); b = c.__enter__(); p = b.new_page(); p.goto('data:text/html,<title>ok</title>'); assert p.title() == 'ok' and p.evaluate('navigator.webdriver') is False; c.__exit__(None, None, None); print('Camoufox OK')" && \
     rm -rf "$t"
 
-# --- skrypty floty w obrazie (jarvo-stt: rozpoznawanie mowy Parakeet dla Hermesa i napisów; jarvo-tts: lektor)
+# --- skrypty floty w obrazie (jarvo-stt: rozpoznawanie mowy Parakeet dla Hermesa i napisów; jarvo-tts: lektor;
+#     agent-browser: nakładka, która wyłącza serwer podglądu demona przed pierwszym poleceniem)
 COPY --chmod=0755 infra/bin/ /opt/jarvo/bin/
 # Wiadomości głosowe: Hermes woła jarvo-stt jako lokalną komendę STT (stt.provider: local_command).
 # Proces żyje tylko na czas transkrypcji; model (~0,65 GB) pobiera się raz do /opt/data/jarvo/models.

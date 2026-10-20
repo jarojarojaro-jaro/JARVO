@@ -428,6 +428,15 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
   Dockerfile sprawdza, że ta rewizja jest w obrazie, a `/usr/local/bin/chromium` wskazuje tę samą binarkę, i uruchamia
   ją testowo. Niczego nie dociąga: Playwright nie sprawdza sumy pobranej przeglądarki, więc brak rewizji zatrzymuje build,
 - `AGENT_BROWSER_EXECUTABLE_PATH` celowo nieustawione: agent-browser użyłby go też dla silnika lightpanda,
+- agent-browser bez serwera podglądu: demon agent-browsera (0.38.1, tak samo 0.39.1) przy starcie każdej sesji otwiera
+  na 127.0.0.1 serwer WebSocket/HTTP bez hasła (obraz strony, polecenia z wynikami i wpisywanymi wartościami,
+  wstrzykiwanie myszy i klawiatury, zakładanie sesji), a strona otwarta w przeglądarce agenta mogłaby go znaleźć.
+  Zmienną ani flagą się go nie wyłączy. Nakładka [`/opt/jarvo/bin/agent-browser`](../infra/bin/agent-browser), pierwsza
+  w PATH (Hermes bierze ją dla `browser_*`, `/usr/local/bin/agent-browser` też na nią wskazuje), przed każdym
+  poleceniem wysyła `stream disable` z tymi samymi flagami globalnymi: nowy demon startuje bez serwera, zanim
+  otworzy stronę (~0,2 s przy starcie sesji, ~10 ms na kolejne polecenie). Gdy wyłączyć się nie da, polecenie nie
+  idzie dalej; `stream enable`, `dashboard` i `mcp` odrzuca. Zostaje rzadki przypadek demona uruchomionego od nowa
+  w trakcie jednego polecenia: ma serwer do następnego polecenia, które go wyłącza,
 - Lightpanda (1.0.0, przegląd 2026-10-11): obraz `lightpanda/browser` przypięty digestem indeksu (amd64 + arm64),
   z niego tylko binarka po `strip` (74 MB). Lightpanda domyślnie wysyła telemetrię (identyfikator instalacji i liczniki
   do `telemetry.lightpanda.io`) i raporty awarii (`curl` do `crash.lightpanda.io`); obraz ustawia
