@@ -663,3 +663,43 @@ def test_local_up_prepare_without_terminal(tmp_path):
                          timeout=60, env={**os.environ, "JARVO_LOCAL": str(tmp_path / "L")})
     assert res.returncode == 0, res.stdout + res.stderr
     assert "Bez terminala" in res.stdout and (tmp_path / "L/compose/.env").exists()
+
+
+def _repo_sync(tmp_path: Path, bledy: list[str]) -> tuple[subprocess.CompletedProcess, str]:
+    """repo_sync z install.sh na udawanym gicie: kolejne wywołania kończą się błędami z listy, potem sukcesem."""
+    bin_dir = tmp_path / "bin"; bin_dir.mkdir()
+    log = tmp_path / "git.log"
+    for i, b in enumerate(bledy):
+        (tmp_path / f"blad{i}").write_text(b, encoding="utf-8")
+    (bin_dir / "git").write_text(
+        "#!/bin/bash\n"
+        f'echo "git $*" >> {log}\n'
+        'case "$*" in *" fetch "*) ;; *" clone "*) ;; *) exit 0 ;; esac\n'
+        f'n=$(grep -cE " (fetch|clone) " {log}); f={tmp_path}/blad$((n-1))\n'
+        'if [[ -f $f ]]; then cat "$f" >&2; exit 128; fi\n'
+        'exit 0\n', encoding="utf-8")
+    (bin_dir / "git").chmod(0o755)
+    text = INSTALL.read_text(encoding="utf-8").rstrip().splitlines()
+    (tmp_path / "fn.sh").write_text("\n".join(text[:-1]) + "\n", encoding="utf-8")   # bez main
+    repo = tmp_path / "jarvo"; (repo / ".git").mkdir(parents=True)
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "JARVO_GIT_PAUSE": "0", "JARVO_DIR": str(repo)}
+    r = subprocess.run(["bash", "-c", f'source {tmp_path}/fn.sh; DIR={repo}; BRANCH=main; repo_sync; echo KONIEC'],
+                       env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
+    return r, log.read_text(encoding="utf-8")
+
+
+def test_repo_sync_retries_transient_git_error_without_token_prompt(tmp_path):
+    """Równoległy git fetch pomocnika aktualizacji (updater.py) starej instalacji: chwilowy błąd refów, nie brak dostępu."""
+    r, log = _repo_sync(tmp_path, ["error: fetching ref refs/remotes/origin/main failed: incorrect old value provided\n"])
+    assert "KONIEC" in r.stdout, r.stdout + r.stderr
+    assert log.count(" fetch ") == 2 and "klucz dostępu" not in r.stdout + r.stderr
+    assert "próbuję jeszcze raz" in r.stdout + r.stderr
+
+
+def test_repo_sync_access_denied_no_retry_and_clear_error(tmp_path):
+    """Odmowa dostępu: bez ponawiania; bez terminala nie pytamy o klucz, tylko kończymy z treścią błędu gita."""
+    blad = "fatal: could not read Username for 'https://github.com': terminal prompts disabled\n"
+    r, log = _repo_sync(tmp_path, [blad, blad, blad])
+    assert r.returncode == 1 and "KONIEC" not in r.stdout
+    assert log.count(" fetch ") == 1
+    assert "terminal prompts disabled" in r.stderr

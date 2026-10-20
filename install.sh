@@ -497,6 +497,25 @@ token_save() {   # aktualizacje (jarvo update, przycisk w dashboardzie) pobieraj
   chmod 600 "$DIR/.git/config"
 }
 git_auth() { GIT_TERMINAL_PROMPT=0 git ${GITAUTH[@]+"${GITAUTH[@]}"} "$@"; }
+GIT_ERR=""
+git_try() {   # git_try polecenie…: do 3 prób. Chwilowy błąd (sieć, równoległy git fetch pomocnika aktualizacji
+  # updater.py starej instalacji: „incorrect old value provided”, „cannot lock ref”) mija; odmowa dostępu nie, więc bez ponawiania
+  local i
+  for i in 1 2 3; do
+    GIT_ERR="$("$@" 2>&1 >/dev/null)" && return 0
+    git_auth_error && return 1
+    if [[ $i != 3 ]]; then warn "Git: chwilowy błąd ($(git_err)), próbuję jeszcze raz…"; sleep "${JARVO_GIT_PAUSE:-3}"; fi
+  done
+  return 1
+}
+git_auth_error() {   # GitHub odmówił dostępu (prywatna kopia repo, zły klucz): tylko wtedy pytamy o klucz
+  case "$GIT_ERR" in
+    *"could not read Username"*|*"Authentication failed"*|*"Repository not found"*|*"returned error: 401"*|*"returned error: 403"*) return 0 ;;
+  esac
+  return 1
+}
+git_err() { printf '%s\n' "$GIT_ERR" | sed '/^[[:space:]]*$/d' | tail -1; }
+repo_clone() { rm -rf "$DIR"; git_auth clone -q --depth 50 "$@" "$REPO" "$DIR"; }
 
 repo_sync() {
   token_use
@@ -507,8 +526,10 @@ repo_sync() {
       die "W $DIR są lokalne zmiany. Zapisz je (git -C $DIR stash) albo ustaw JARVO_DIR=inny/katalog."
     fi
     token_save
-    if ! run git_auth -C "$DIR" fetch -q origin "$BRANCH"; then
-      token_ask && token_save && run git_auth -C "$DIR" fetch -q origin "$BRANCH" || die "Nie udało się pobrać $REPO ($BRANCH)."
+    if [[ $DRY == 1 ]]; then run git_auth -C "$DIR" fetch -q origin "$BRANCH"
+    elif ! git_try git_auth -C "$DIR" fetch -q origin "$BRANCH"; then
+      { git_auth_error && token_ask && token_save && git_try git_auth -C "$DIR" fetch -q origin "$BRANCH"; } \
+        || die "Nie udało się pobrać $REPO ($BRANCH): $(git_err)"
     fi
     run git -C "$DIR" checkout -q "$BRANCH" || die "Nie udało się przełączyć na gałąź $BRANCH."
     run git -C "$DIR" merge -q --ff-only "origin/$BRANCH" || die "Nie udało się zaktualizować $DIR (git -C $DIR status)."
@@ -516,10 +537,10 @@ repo_sync() {
     [[ -e "$DIR" ]] && die "$DIR istnieje i nie jest repozytorium Jarvo. Ustaw JARVO_DIR=inny/katalog."
     say "Pobieram Jarvo do $DIR${BRANCH:+ (gałąź $BRANCH)}"
     local b=(); [[ -n $BRANCH ]] && b=(-b "$BRANCH")
-    if ! run git_auth clone -q --depth 50 ${b[@]+"${b[@]}"} "$REPO" "$DIR"; then
-      rm -rf "$DIR"
-      token_ask && run git_auth clone -q --depth 50 ${b[@]+"${b[@]}"} "$REPO" "$DIR" \
-        || die "Nie udało się pobrać $REPO${BRANCH:+ ($BRANCH)}. Sprawdź internet albo klucz dostępu (JARVO_TOKEN)."
+    if [[ $DRY == 1 ]]; then run git_auth clone -q --depth 50 ${b[@]+"${b[@]}"} "$REPO" "$DIR"
+    elif ! git_try repo_clone ${b[@]+"${b[@]}"}; then
+      { git_auth_error && token_ask && git_try repo_clone ${b[@]+"${b[@]}"}; } \
+        || { rm -rf "$DIR"; die "Nie udało się pobrać $REPO${BRANCH:+ ($BRANCH)}: $(git_err). Sprawdź internet albo klucz dostępu (JARVO_TOKEN)."; }
     fi
     token_save
   fi
