@@ -97,12 +97,14 @@ RUN set -e; cd /opt/jarvo/node && \
     ln -sf ../agent-browser/bin/agent-browser-$ab node_modules/.bin/agent-browser && \
     ln -sf /opt/jarvo/node/node_modules/agent-browser/bin/agent-browser-$ab /usr/local/bin/agent-browser && \
     agent-browser --version && \
-    # jedna Chromium dla wszystkich: playwright-core musi trafić w rewizję przeglądarki z obrazu Hermesa.
-    # Obraz Hermesa dla arm64 (Mac z Apple Silicon) ma tylko pełną Chromium starszej rewizji: wtedy dociągamy
-    # chrome-headless-shell dokładnie tej wersji, której oczekuje playwright-core (~100 MB, tylko arm64)
-    exp="$(node -e "process.stdout.write(require('playwright-core').chromium.executablePath())")" && \
-    if [ ! -x "$exp" ]; then echo "Brak $exp: pobieram chrome-headless-shell dla playwright-core"; \
-      PLAYWRIGHT_SKIP_BROWSER_GC=1 node node_modules/playwright-core/cli.js install --only-shell chromium; fi && \
+    # jedna Chromium dla wszystkich: playwright-core musi trafić w rewizję chrome-headless-shell z obrazu Hermesa
+    # (v2026.9.24: rewizja 1243 dla amd64 i arm64), a /usr/local/bin/chromium wskazywać tę samą binarkę.
+    # Bez dociągania: Playwright nie sprawdza sumy pobranej przeglądarki, więc brak tej rewizji zatrzymuje build
+    # (wtedy przypnij playwright-core do wersji przeglądarki z obrazu Hermesa)
+    rev="$(node -p "JSON.parse(require('fs').readFileSync('node_modules/playwright-core/browsers.json', 'utf8')).browsers.find(b => b.name === 'chromium-headless-shell').revision")" && \
+    hs="${PLAYWRIGHT_BROWSERS_PATH:-/opt/hermes/.playwright}/chromium_headless_shell-$rev" && \
+    { [ -f "$hs/INSTALLATION_COMPLETE" ] || { echo "Brak $hs: obraz Hermesa nie ma chrome-headless-shell rewizji $rev, której oczekuje playwright-core" >&2; exit 1; }; } && \
+    case "$(readlink -f /usr/local/bin/chromium)" in "$hs"/*) ;; *) echo "/usr/local/bin/chromium nie wskazuje $hs" >&2; exit 1;; esac && \
     node -e "require('playwright-core').chromium.launch().then(b => b.close()).then(() => console.log('playwright-core → Chromium OK'))" && \
     npm cache clean --force && rm -rf /root/.npm/_cacache
 # HyperFrames (wideo z HTML + GSAP; skille Wideografa wołają `npx hyperframes`): globalnie w obrazie, bo npx

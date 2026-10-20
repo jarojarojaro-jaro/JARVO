@@ -185,6 +185,9 @@ def test_dockerfile_hygiene():
     assert "UV_NO_CACHE=1" in code                       # cache uv (~1,9 GB) nie trafia do warstw
     assert not re.search(r"chmod\s+-R\b", code)          # chmod -R kopiuje cały katalog do nowej warstwy
     assert "install-browser" not in code                 # bez drugiej Chromium dla dembrandta
+    # Playwright pobiera przeglądarki bez sprawdzania sumy: obraz bierze tylko tę z obrazu Hermesa (sprawdza rewizję)
+    assert not re.search(r"cli\.js install|playwright install", code)
+    assert "chromium_headless_shell-$rev" in code and "INSTALLATION_COMPLETE" in code
     assert "AGENT_BROWSER_EXECUTABLE_PATH" not in code   # przejąłby też silnik lightpanda
     assert re.search(r"LIGHTPANDA_IMAGE=lightpanda/browser:[\d.]+@sha256:[0-9a-f]{64}", code)
     assert "LIGHTPANDA_DISABLE_TELEMETRY=1" in code       # Lightpanda bez telemetrii i raportów awarii

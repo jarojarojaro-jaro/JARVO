@@ -424,7 +424,9 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
   build kończy się startem bez sieci (`navigator.webdriver` = false). Biblioteka `camoufox` dostaje `executable_path`
   i `ff_version`, więc niczego nie pobiera przy starcie (dodatek uBlock wyłączony, GeoIP wyłączone),
 - jedna Chromium: `playwright-core` (także dembrandta, przez `overrides`) i Playwright claude-seo są przypięte do wersji,
-  której przeglądarka jest w obrazie Hermesa; Dockerfile uruchamia ją testowo i zatrzyma build przy niezgodności,
+  której przeglądarka jest w obrazie Hermesa (chrome-headless-shell rewizji 1243, Chromium 153, na amd64 i arm64);
+  Dockerfile sprawdza, że ta rewizja jest w obrazie, a `/usr/local/bin/chromium` wskazuje tę samą binarkę, i uruchamia
+  ją testowo. Niczego nie dociąga: Playwright nie sprawdza sumy pobranej przeglądarki, więc brak rewizji zatrzymuje build,
 - `AGENT_BROWSER_EXECUTABLE_PATH` celowo nieustawione: agent-browser użyłby go też dla silnika lightpanda,
 - Lightpanda (1.0.0, przegląd 2026-10-11): obraz `lightpanda/browser` przypięty digestem indeksu (amd64 + arm64),
   z niego tylko binarka po `strip` (74 MB). Lightpanda domyślnie wysyła telemetrię (identyfikator instalacji i liczniki
