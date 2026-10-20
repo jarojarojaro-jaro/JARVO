@@ -215,6 +215,34 @@ def test_deploy_no_build_requires_existing_image(tmp_path):
     assert " up -d" not in log.read_text(encoding="utf-8")
 
 
+def test_deploy_komputer_blocks_public_ips_without_hostname_i(tmp_path):
+    """Komputer na VPS: publiczne adresy hosta w KOMPUTER_BLOKADA także bez `hostname -I` (Arch, busybox: przez ip),
+    a pusty wynik (adresów nie znaleziono) nie zdejmuje poprzedniej blokady."""
+    env, _log = _fake_docker(tmp_path, image_exists=True)
+    bindir = tmp_path / "bin"
+    (bindir / "docker").write_text(
+        (bindir / "docker").read_text(encoding="utf-8").replace(
+            "exit 0\n", 'case "$*" in *"config --services"*) printf "hermes\\nkomputer\\n";; esac\nexit 0\n', 1),
+        encoding="utf-8")
+    for name, body in {"hostname": "exit 1\n", "uname": "echo Linux\n",
+                       "ip": 'cat "$IP_OUT" 2>/dev/null\n'}.items():
+        (bindir / name).write_text("#!/usr/bin/env bash\n" + body, encoding="utf-8")
+        (bindir / name).chmod(0o755)
+    ip_out = tmp_path / "ip.txt"
+    ip_out.write_text("2: eth0    inet 203.0.113.5/24 brd 203.0.113.255 scope global eth0\n"
+                      "3: docker0    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0\n", encoding="utf-8")
+    env = {**env, "IP_OUT": str(ip_out)}
+    dot = tmp_path / "compose" / ".env"
+    if "microsoft" in open("/proc/version", encoding="utf-8").read().lower():
+        return   # WSL: blokada dotyczy tylko zwykłego Linuksa
+    assert _deploy(env, "--no-pull", "--no-build").returncode == 0
+    assert "KOMPUTER_BLOKADA=203.0.113.5\n" in dot.read_text(encoding="utf-8")
+    ip_out.write_text("", encoding="utf-8")
+    res = _deploy(env, "--no-pull", "--no-build")
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "KOMPUTER_BLOKADA=203.0.113.5\n" in dot.read_text(encoding="utf-8")
+
+
 def test_sandbox_up_refuses_outside_sandbox(tmp_path):
     import os
     import subprocess

@@ -310,7 +310,13 @@ android_kind() {   # android_kind [--emulator|--redroid] → emulator albo redro
   local want="${1:-}"
   [[ -z $want || $want == --emulator || $want == --redroid ]] || die "jarvo android on [--emulator|--redroid]"
   [[ $OS == macos ]] && die "Telefon testowy działa na Linuksie i w WSL2: Docker na macOS nie daje kontenerom ani KVM, ani sterownika binder. Zamiast niego podłącz prawdziwy telefon: docs/MOBILE.md §5."
-  if [[ $want != --redroid ]] && kvm_ok; then
+  # obraz emulatora jest tylko dla procesorów x86_64; na ARM (serwery Ampere, Raspberry Pi, Windows na ARM) Redroid
+  local arm=0; case "$(uname -m)" in aarch64|arm64) arm=1 ;; esac
+  if [[ $arm == 1 ]]; then
+    [[ $want == --emulator ]] && die "Emulator Androida (obraz x86_64) nie działa na procesorze ARM: jarvo android on --redroid albo prawdziwy telefon (docs/MOBILE.md §5)."
+    [[ $OS == wsl ]] && die "Windows na ARM: telefon testowy w WSL2 nie działa (emulator jest tylko dla x86_64). Zostaje prawdziwy telefon: docs/MOBILE.md §5."
+  fi
+  if [[ $want != --redroid && $arm == 0 ]] && kvm_ok; then
     kvm_docker && { echo emulator; return; }
     [[ $want == --emulator ]] && die "Docker nie przekazuje kontenerom /dev/kvm (Docker Desktop?). Emulator działa z Docker Engine zainstalowanym w samym Linuksie albo WSL (install.sh robi to domyślnie)."
   fi
@@ -471,7 +477,8 @@ cmd_komputer() {
         warn "Docker ma ${mem} GB pamięci; Komputer bierze ok. 0,3 GB w spoczynku i do 2 GB w pracy. Limity kontenerów dopasuję do pamięci Dockera (KOMPUTER_MEM_LIMIT, HERMES_MEM_LIMIT w $L/compose/.env)."
       fi
       komputer_obraz
-      set_envval KOMPUTER_BLOKADA "$(host_publiczne)"
+      # brak znalezionych adresów nie zdejmuje poprzedniej blokady (tak samo deploy.sh)
+      local pub; pub="$(host_publiczne)"; [[ -z $pub ]] || set_envval KOMPUTER_BLOKADA "$pub"
       rest="$(tr ',' '\n' <<<"$prof" | { grep -vx komputer || true; } | paste -sd, -)"
       set_profiles "${rest:+$rest,}komputer"
       limity

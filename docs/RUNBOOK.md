@@ -306,7 +306,7 @@ sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh
 | skarbiec wiedzy (drugi mózg floty) | zakładka **Wiedza** (`:9119/wiedza`): graf, notatki, orzeczenia (Twoje korekty), skrzynka szkiców; ręczna kompilacja `docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/wiedza-kompiluj.sh` (`--na-sucho` = podgląd); szczegóły [WIEDZA.md](WIEDZA.md) |
 | nowy agent | lokalnie `make new-agent NAME=jarvo-x TITLE="…"`, uzupełnienie, `make validate`, status `active`, deploy |
 | stan floty | `docker exec -u hermes jarvo-hermes hermes kanban stats`, `… hermes gateway status` |
-| logi | `docker logs -f jarvo-hermes`, `/srv/jarvo/data/hermes/logs/` |
+| logi | `docker logs -f jarvo-hermes`, `/srv/jarvo/data/hermes/logs/`; logi kontenerów mają rotację (sterownik `local`, do 3 × 10 MB na kontener, `infra/docker-compose.yml`), więc nie zapychają dysku |
 | wycofanie zmiany | `git checkout <tag-albo-commit> && bash scripts/deploy.sh --no-pull` (z `--rebuild`, gdy różni się `infra/` albo `branding/`) |
 | koszty | modele `openai-codex`: plan ChatGPT; OpenRouter → Activity (obrazy, wideo, zestaw `openrouter`; per klucz = per agent), dashboard Hermesa |
 

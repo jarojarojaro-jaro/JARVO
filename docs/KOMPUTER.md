@@ -124,7 +124,8 @@ i bez automatycznego otwierania; WebRTC tylko przez publiczny interfejs. Okno wr
 **Filtr ruchu** (iptables w przestrzeni sieci kontenera, ustawiany przed pulpitem): internet tak; nie wolno
 do zakresów prywatnych (RFC 1918), link-local z metadanymi chmury (`169.254.169.254`), CGNAT i Tailscale
 (`100.64.0.0/10`), pętli zwrotnej poza samym kontenerem, zakresów specjalnych i multicastu, do publicznych adresów
-hosta (`KOMPUTER_BLOKADA`, uzupełniane przez `jarvo komputer on` i deploy na Linuksie) ani na port 25. IPv6
+hosta (`KOMPUTER_BLOKADA`, uzupełniane przez `jarvo komputer on` i deploy na Linuksie z `hostname -I` albo `ip`;
+gdy żadnego adresu nie znajdzie, poprzednia blokada zostaje) ani na port 25. IPv6
 działa tylko lokalnie. Start sam próbuje połączyć się z metadanymi chmury i z hostem (porty 9119 i 22); jeśli
 filtr przepuści, albo iptables nie działa, Komputer nie wstaje. Potem `start.sh` uruchamia się ponownie bez
 `NET_ADMIN`, więc nic w kontenerze filtra już nie zmieni. Komputer ma własną sieć `jarvo-komputer-net`, bez floty.

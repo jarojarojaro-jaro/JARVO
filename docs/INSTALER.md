@@ -30,8 +30,10 @@ Polecenia ze strony: `curl -fsSL …/install.sh | bash` oraz `irm …/install.ps
 Windows (etap 4: WSL, Linux i Docker). Człowiek potrzebny jest tylko do hasła / zgody administratora i restartu
 Windowsa po włączeniu WSL.
 
-Obraz `jarvo-hermes:local` instalator pobiera gotowy z GHCR (etap 2, amd64 i arm64, ~2–3 minuty);
-buduje na miejscu tylko, gdy obrazu dla tej wersji jeszcze nie ma (kilka–kilkanaście minut, 8 GB RAM).
+Obraz `jarvo-hermes:local` instalator pobiera gotowy z GHCR (etap 2, amd64 i arm64, ok. 2,5 GB, ~2–3 minuty;
+na ekranie licznik pobranych warstw, zerwane pobieranie ponawia raz). Gdy obrazu tej wersji jeszcze nie ma, a `infra/`
+albo `branding/` zmieniły się w ostatniej godzinie (CI właśnie go buduje), `scripts/obraz.sh` czeka na niego do
+20 minut (`JARVO_IMAGE_WAIT`, 0 = nie czekaj); dopiero potem buduje na miejscu (kilka–kilkanaście minut, 8 GB RAM).
 Obraz arm64 (Apple Silicon, Windows na ARM) buduje i uruchamia CI na natywnym runnerze arm64.
 
 **Aktualizacje i nowe zależności.** Każda nowa zależność floty trafia do obrazu (`infra/Dockerfile`,

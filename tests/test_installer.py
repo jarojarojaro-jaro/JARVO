@@ -360,6 +360,16 @@ def test_jarvo_uninstall_macos_removes_homebrew_link_and_colima(tmp_path):
     assert "colima delete" not in log and "Colima zostaje" in res.stdout
 
 
+def test_jarvo_android_on_arm_skips_x86_emulator(tmp_path):
+    """Obraz emulatora jest tylko dla x86_64: na ARM (Ampere, Graviton, Raspberry Pi) od razu jasna odmowa."""
+    bin_ = tmp_path / "bin"; bin_.mkdir()
+    _shim(bin_, "uname", 'case "$1" in -m) echo aarch64;; *) echo Linux;; esac\n')
+    flota = tmp_path / "flota"; (flota / "compose").mkdir(parents=True)
+    (flota / "compose/.env").write_text("DASHBOARD_PASSWORD=x\n", encoding="utf-8")
+    res = _jarvo("android", "on", "--emulator", JARVO_LOCAL=str(flota), PATH=f"{bin_}:{os.environ['PATH']}")
+    assert res.returncode == 1 and "nie działa na procesorze ARM" in res.stderr
+
+
 def _install_fn(name: str) -> str:
     """Jedna funkcja z install.sh (bez uruchamiania całego instalatora)."""
     text = INSTALL.read_text(encoding="utf-8")
@@ -545,6 +555,58 @@ def test_obraz_own_hermes_builds_locally(tmp_path):
                        capture_output=True, text=True)
     assert r.returncode == 1 and "Własny HERMES_IMAGE" in r.stdout
     assert not (tmp_path / "log").exists()
+
+
+def _obraz(tmp_path: Path, docker: str, **env_extra) -> tuple[subprocess.CompletedProcess, str]:
+    """obraz.sh pobierz w małym repo z świeżą zmianą infra/ (klucz i wiek zmiany jak w prawdziwym repo)."""
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    (repo / "infra").mkdir()
+    shutil.copy(ROOT / "scripts/obraz.sh", repo / "scripts/obraz.sh")
+    (repo / "infra/Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+    git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "x"], check=True)
+    bin_ = tmp_path / "bin"; bin_.mkdir()
+    _shim(bin_, "docker", 'echo "docker $*" >> "$LOG"\n' + docker)
+    (tmp_path / "compose").mkdir()
+    log = tmp_path / "log"
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "LOG": str(log), "JARVO_IMAGE_POLL": "0",
+           "STAN": str(tmp_path / "stan"), **env_extra}
+    env.pop("JARVO_TOKEN", None)
+    r = subprocess.run(["bash", str(repo / "scripts/obraz.sh"), "pobierz", str(tmp_path / "compose")], env=env,
+                       capture_output=True, text=True, timeout=60)
+    return r, log.read_text(encoding="utf-8") if log.exists() else ""
+
+
+# drugi `docker pull` (po manifeście albo ponownej próbie) się udaje; pierwszy zwraca błąd z $BLAD
+_PULL_DRUGI = ('case "$1" in\n'
+               '  pull) if [ -f "$STAN" ]; then echo "a: Pulling fs layer"; echo "a: Pull complete"; exit 0; fi\n'
+               '        touch "$STAN"; echo "$BLAD" >&2; exit 1;;\n'
+               '  manifest) exit 0;;\n'
+               'esac\nexit 0\n')
+
+
+def test_obraz_waits_for_ci_build_of_fresh_change(tmp_path):
+    """Świeża zmiana infra/: obrazu jeszcze nie ma (CI buduje) → czekamy na manifest zamiast budować na miejscu."""
+    r, log = _obraz(tmp_path, _PULL_DRUGI, BLAD="manifest unknown: not found")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "GitHub Actions jeszcze buduje" in r.stdout and "pobrane warstwy: 1/1" in r.stdout
+    assert "docker manifest inspect" in log and "docker tag" in log
+    assert (tmp_path / "compose/.image-key").exists()
+    # JARVO_IMAGE_WAIT=0: bez czekania, od razu budowa na miejscu
+    r, log = _obraz(tmp_path / "bez", _PULL_DRUGI, BLAD="not found", JARVO_IMAGE_WAIT="0")
+    assert r.returncode == 1 and "Brak gotowego obrazu" in r.stdout and "manifest inspect" not in log
+
+
+def test_obraz_retries_broken_download_but_not_denied(tmp_path):
+    r, log = _obraz(tmp_path, _PULL_DRUGI, BLAD="read: connection reset by peer")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "próbuję jeszcze raz" in r.stdout and log.count("docker pull") == 2
+    # pakiet prywatny bez klucza: jedna próba, jasny komunikat, budowa na miejscu
+    r, log = _obraz(tmp_path / "prywatny", _PULL_DRUGI, BLAD="denied: denied")
+    assert r.returncode == 1 and "Rejestr odmówił" in r.stdout and log.count("docker pull") == 1
 
 
 @pytest.mark.skipif(shutil.which("script") is None, reason="brak script (util-linux) do udawania terminala")

@@ -22,6 +22,13 @@ name: jarvo
 
 x-restart: &restart
   restart: unless-stopped
+  # logi z rotacją (do 3 × 10 MB na kontener, kompresja): domyślny json-file rośnie bez końca i zapycha dysk
+  # VPS-a i maszyny wirtualnej Dockera na Macu; docker logs i jarvo logs działają tak samo
+  logging:
+    driver: local
+    options:
+      max-size: 10m
+      max-file: "3"
 
 services:
   hermes:

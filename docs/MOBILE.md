@@ -104,6 +104,7 @@ telefon właściciela przez Expo Go albo TestFlight i wynajęty na minuty Mac w 
 | **Windows 11 (WSL2)** | ten sam emulator w Docker Engine **wewnątrz** dystrybucji WSL (zagnieżdżona wirtualizacja jest domyślnie włączona, [wsl-config](https://learn.microsoft.com/en-us/windows/wsl/wsl-config)) | Docker Desktop może nie przekazać kontenerom KVM, dlatego `jarvo android on` sprawdza to próbnym kontenerem zamiast zgadywać; Redroid w WSL wymaga własnego jądra, więc odpada |
 | **Serwer Ubuntu bez KVM, VPS 8 GB** | **[Redroid](https://github.com/remote-android/redroid-doc)** (Android 14 w kontenerze, bez wirtualizacji), moduł jądra `binder_linux` z pakietu `linux-modules-extra` | ok. 1,5–2 GB RAM; obraz `14.0.0` (15 i 16 mają znany błąd bindera); kontener `--privileged`; grafika programowa (ok. 15 kl./s); **bez usług Google** |
 | VPS bez możliwości ładowania modułów (OpenVZ, LXC) | brak urządzenia lokalnie | telefon właściciela + chmura (§5.4) |
+| **Serwer z procesorem ARM** (Ampere, Graviton, Raspberry Pi) | Redroid (obraz jest też dla arm64) | obraz emulatora jest tylko dla x86_64, więc `jarvo android on` na ARM od razu wybiera Redroid (`--emulator` odmawia); Windows na ARM (WSL2): prawdziwy telefon |
 
 **Włączenie jednym poleceniem:** `jarvo android on` wybiera wariant sam: `/dev/kvm` dostępne dla Dockera → emulator
 (profil compose `android-kvm`), inaczej binder w jądrze → Redroid (profil `android`; brakujący moduł `binder_linux`

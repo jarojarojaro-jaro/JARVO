@@ -130,10 +130,14 @@ if [[ $KOMPUTER -eq 1 && $NOBUILD -eq 0 ]]; then
   fi
 fi
 if [[ $KOMPUTER -eq 1 && "$(uname -s)" == Linux ]] && ! grep -qi microsoft /proc/version 2>/dev/null; then
-  publiczne="$({ hostname -I 2>/dev/null || true; } | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' \
+  # hostname -I nie ma wszędzie (Arch bez inetutils, busybox): wtedy adresy z ip
+  publiczne="$({ hostname -I 2>/dev/null || ip -o -4 addr show scope global 2>/dev/null | awk '{sub(/\/.*/, "", $4); print $4}' \
+    || true; } | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' \
     | grep -vE '^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)' \
     | sort -u | paste -sd, - || true)"
-  if [[ "$(sed -n 's/^KOMPUTER_BLOKADA=//p' "$COMPOSE_DIR/.env" | tail -1)" != "$publiczne" ]]; then
+  obecna="$(sed -n 's/^KOMPUTER_BLOKADA=//p' "$COMPOSE_DIR/.env" | tail -1)"
+  # nie znaleźliśmy żadnego adresu: zostaje poprzednia blokada (pusty wynik mógłby ją zdjąć)
+  if [[ -n $publiczne && "$obecna" != "$publiczne" ]]; then
     tmp="$(mktemp)"; grep -v '^KOMPUTER_BLOKADA=' "$COMPOSE_DIR/.env" > "$tmp" || true
     echo "KOMPUTER_BLOKADA=$publiczne" >> "$tmp"; cat "$tmp" > "$COMPOSE_DIR/.env"; rm -f "$tmp"
   fi
