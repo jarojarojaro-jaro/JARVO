@@ -64,6 +64,14 @@ def test_fleet_json_niesie_uchwyt_i_aliasy():
     assert all(re.fullmatch(r"[a-z][a-z0-9]{1,15}", a["handle"]) for a in dane["agents"])
 
 
+def test_fleet_json_niesie_krotka_role():
+    dane = hqbuild.fleet_json()
+    assert len(dane["agents"]) >= 10
+    for a in dane["agents"]:
+        assert a["rola"] and len(a["rola"].split()) <= 8, a["name"]
+        assert a["en"]["rola"] and len(a["en"]["rola"].split()) <= 8, a["name"]
+
+
 def test_nowy_agent_dostaje_uchwyt():
     tekst = (REPO / "scripts" / "new-agent.py").read_text(encoding="utf-8")
     assert "handle: {uchwyt}" in tekst

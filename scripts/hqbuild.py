@@ -6,7 +6,7 @@
 
 Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, ochrona.py, edytor.py, animacja.py, rozmowy.py, czytnik.py,
 wzmianki.py, kontekst.py, agenci.py, brama.py, strumien.py, przebiegi.py, scalanie.py, budzenia.py, prace.py, obserwator.py,
-silnik.py, trasy_rozmow.py, pomiar.py, liczby.py,
+silnik.py, trasy_rozmow.py, aplikacja.py, podpowiedzi.py, trasy_aplikacji.py, pomiar.py, liczby.py,
 konwertuj.py, izometria/, fleet.json, dzwieki/, dist/index.js, dist/zasoby/, dist/fonts/}.
 Pakiet aplikacji to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku; trafia do
 dist/zasoby/app-<sha256[:12]>.js (z bliźniakiem .gz), style do app-<h>.css, kroje aplikacji do zasoby/kroje/.
@@ -32,9 +32,10 @@ HQ = fl.REPO_ROOT / "hq"
 PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "edytor.py", "animacja.py",
                 # silnik rozmów aplikacji (docs/HQ.md „Rozmowy”): magazyn rozmowy.db, czytnik sesji Hermesa, wzmianki,
                 # blok kontekstu, lista agentów, klient bramy, strumień SSE, rejestr przebiegów, oś czasu, budzenia,
-                # praca floty, obserwator, wątek silnika i trasy
+                # praca floty, obserwator, wątek silnika i trasy; start aplikacji (gotowość, podpowiedzi N0, GET /app)
                 "rozmowy.py", "czytnik.py", "wzmianki.py", "kontekst.py", "agenci.py", "brama.py", "strumien.py",
-                "przebiegi.py", "scalanie.py", "budzenia.py", "prace.py", "obserwator.py", "silnik.py", "trasy_rozmow.py")
+                "przebiegi.py", "scalanie.py", "budzenia.py", "prace.py", "obserwator.py", "silnik.py", "trasy_rozmow.py",
+                "aplikacja.py", "podpowiedzi.py", "trasy_aplikacji.py")
 
 
 def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.") -> str:
@@ -79,7 +80,7 @@ def fleet_json(fleet: fl.Fleet | None = None) -> dict:
         soul = (a.dir / "SOUL.md").read_text(encoding="utf-8") if (a.dir / "SOUL.md").exists() else ""
         agents.append({
             "name": a.name, "title": a.title, "emoji": a.emoji, "kind": a.kind,
-            "room": a.hq_room, "label": a.hq_label or a.title, "short": a.hq_short,
+            "room": a.hq_room, "label": a.hq_label or a.title, "short": a.hq_short, "rola": a.rola,
             "handle": a.handle, "aliasy": a.aliasy,   # uchwyt @… i złożone aliasy wzmianki (hq/plugin/wzmianki.py)
             "description": a.description, "model_tier": a.model_tier, "model": fleet.model_for(a.model_tier),
             "autonomy_max": a.autonomy_max, "telegram_topic": a.telegram_topic,
@@ -87,7 +88,7 @@ def fleet_json(fleet: fl.Fleet | None = None) -> dict:
             "vendored": len((lock.get("agents") or {}).get(a.name) or []),
             "personality": personality(soul),
             "en": {"title": a.en.get("title") or a.title, "label": a.en.get("hq_label") or a.hq_label or a.title,
-                   "description": a.en.get("description") or a.description,
+                   "description": a.en.get("description") or a.description, "rola": a.en.get("rola") or a.rola,
                    "personality": [[TRAITS_EN.get(k, k), v] for k, v in personality(soul)]},
         })
     return {"orchestrator": fleet.orchestrator, "agents": agents}

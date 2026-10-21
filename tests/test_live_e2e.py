@@ -1,4 +1,4 @@
-"""Test aplikacji Jarvo na żywo (scripts/jarvo-e2e.sh, tests/live/jarvo_e2e.cjs; docs/HQ.md §2c) z poziomu pytest.
+"""Test aplikacji Jarvo na żywo (scripts/jarvo-e2e.sh, tests/live/jarvo_e2e.cjs; docs/HQ.md §2c, „Aplikacja”) z pytest.
 
 Tylko na życzenie: z JARVO_E2E=1 w env pytest. W kontenerze jarvo-hermes (jako hermes) uruchamia skrypt wprost,
 na komputerze z piaskownicą przez `docker exec -u hermes jarvo-hermes` (kontener musi działać z JARVO_E2E=1, który
@@ -41,14 +41,22 @@ def _polecenie(etap: str) -> list[str] | str:
             f"bash /opt/jarvo/repo/{SKRYPT} {etap}"]
 
 
-@pytest.mark.parametrize("etap", ["etap1"])
+# etap1: punkty 1–9; etap3: 3a (1–9), 3b (10–13: kompozytor, Markdown, adresat, zgoda) i 3c (14–23: start, gotowość,
+# bez przyklejania, załączniki, Stop i Ponów, odświeżenie, 5 kart, aktualizacja, wylogowanie, klawiatura) w kolejności
+# przebiegu; etap2: 1–16, osobno
+PUNKTY = {"etap1": [str(i) for i in range(1, 10)],
+          "etap3": ["1", "2", "3", "4", "14", "15", "10", "11", "12", "16", "13", "17", "18", "19", "5", "6", "23", "7",
+                    "20", "21", "22", "8", "9"]}
+
+
+@pytest.mark.parametrize("etap", ["etap1", "etap3"])
 def test_aplikacja_na_zywo(etap):
     polecenie = _polecenie(etap)
     if isinstance(polecenie, str):
         pytest.skip(polecenie)
-    r = subprocess.run(polecenie, capture_output=True, text=True, timeout=900)
+    r = subprocess.run(polecenie, capture_output=True, text=True, timeout=1800)
     assert "{" in r.stdout, r.stderr[-2000:]
     raport = json.loads(r.stdout[r.stdout.index("{"):])
     nieudane = [f"{w['id']} {w['nazwa']}: {w.get('blad', '')}" for w in raport["wyniki"] if not w["ok"]]
     assert r.returncode == 0 and raport["ok"] is True, "\n".join(nieudane) or r.stderr[-2000:]
-    assert raport["etap"] == etap and [w["id"] for w in raport["wyniki"]] == [str(i) for i in range(1, 10)]
+    assert raport["etap"] == etap and [w["id"] for w in raport["wyniki"]] == PUNKTY[etap]

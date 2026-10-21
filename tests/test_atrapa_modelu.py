@@ -39,6 +39,14 @@ def test_odpowiedz_polecenia_specjalne():
     assert am.odpowiedz([{"role": "user", "content": tresc}], "m")["tekst"].endswith("z obrazem")
 
 
+def test_gotowe_odpowiedzi_z_pliku(monkeypatch):
+    monkeypatch.setattr(am, "GOTOWE", {"plan strony": "## Plan\n\n1. Start"})
+    w = [{"role": "user", "content": "Kontekst…\n\nZrób plan strony dla piekarni [wolno:2]"}]
+    plan = am.odpowiedz(w, "m")
+    assert plan["tekst"] == "## Plan\n\n1. Start" and plan["wolno_s"] == 2
+    assert am.odpowiedz([{"role": "user", "content": "co innego"}], "m")["tekst"].startswith("Atrapa (m)")
+
+
 def test_wolno_z_czasem_i_plik():
     plan = am.odpowiedz([{"role": "user", "content": "raport [wolno:5] [plik:/opt/data/jarvo/a b.html] [plik:/tmp/c.pdf]"}], "m")
     assert plan["tekst"] == "Atrapa (m): raport\nPlik: /opt/data/jarvo/a b.html\nPlik: /tmp/c.pdf"
@@ -48,6 +56,10 @@ def test_wolno_z_czasem_i_plik():
     assert abs(pauza * len(czesci) - 5.0) < 1e-9
     assert am.odpowiedz([{"role": "user", "content": "x [wolno:2,5]"}], "m")["wolno_s"] == 2.5
     assert am.odpowiedz([{"role": "user", "content": "x [wolno:99999]"}], "m")["wolno_s"] == am.WOLNO_MAKS
+    # po znaku, ale żaden kawałek nie zaczyna się od „:” (Hermes trzymałby go do końca linii jak komentarz SSE)
+    krotkie, _ = am.kawalki(am.odpowiedz([{"role": "user", "content": "[wolno:15] raz dwa"}], "atrapa"))
+    assert "".join(krotkie) == "Atrapa (atrapa): raz dwa" and "):" in krotkie
+    assert not any(k.startswith(":") for k in krotkie) and len(krotkie) == len("Atrapa (atrapa): raz dwa") - 1
     zwykle = am.odpowiedz([{"role": "user", "content": "x [wolno]"}], "m")
     assert "wolno_s" not in zwykle and am.kawalki(zwykle)[1] == 0.4
     assert am.kawalki(am.odpowiedz([{"role": "user", "content": "x"}], "m"))[1] == 0.02
@@ -110,9 +122,12 @@ def test_serwer_wolno_dziennik_i_plik(serwer, tmp_path):
     kawalki = [json.loads(l[6:]) for l in surowe.splitlines() if l.startswith("data: {")]
     tekst = "".join(k["choices"][0]["delta"].get("content", "") for k in kawalki)
     assert tekst == "Atrapa (atrapa): zażółć\nPlik: /opt/data/x.png"
-    _post(serwer + "/chat/completions", zapytania[1])
+    # dowolna ścieżka przed /chat/completions (base_url profilu testu): dziennik zapisuje ją w _sciezka
+    _post(serwer.replace("/v1", "/p/test-e2e-j/v1") + "/chat/completions", zapytania[1])
     dziennik = tmp_path / "atrapa.jsonl"
     linie = dziennik.read_text(encoding="utf-8").splitlines()
-    assert [json.loads(l) for l in linie] == zapytania
+    wpisy = [json.loads(l) for l in linie]
+    assert [{k: v for k, v in w.items() if k != "_sciezka"} for w in wpisy] == zapytania
+    assert [w["_sciezka"] for w in wpisy] == ["/v1/chat/completions", "/p/test-e2e-j/v1/chat/completions"]
     assert "zażółć" in linie[0]                       # bez ucieczek \uXXXX: grep po polsku działa
     assert dziennik.stat().st_mode & 0o777 == 0o600

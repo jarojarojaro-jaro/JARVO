@@ -11,6 +11,9 @@ same `os.stat`, SQL tylko dla ścieżek, które się zmieniły. Etap 2:
 - Co minutę ponowne przypięcie sesji członków w Hermesie (`sesje.przypieta = 0`), raz na dobę `sprzataj`
   (kosz po 30 dniach; sesje usuniętych wątków odpinane): osobnym zadaniem, najwyżej jednym naraz, żeby wolna brama
   nie zatrzymała patrzenia na pliki; `praca.json` przy każdej zmianie i co minutę.
+- **Aktualizacja po pracy** („Zaktualizuj, gdy skończą”, docs/HQ.md „Aktualizacja”): przy meta
+  `aktualizacja_po_pracy` w rozmowy.db plik `update-request` powstaje dopiero po 30 s bez pracy (N = 0 w praca.json);
+  potem meta znika i idzie zdarzenie `aktualizacja`. Gdy aktualizacja już trwa, prośby nie piszemy.
 - Nasz dopisek (`steer`) w state.db to nie „wiadomość spoza aplikacji”: Hermes zapisuje go jako wiersz `steer` owinięty
   znacznikiem, więc porównujemy całe linie tekstu z dopiskami członka w wątku, nie skrót.
 Obserwator kanbana (karty wątku, decyzje), indeks sesji listy i spool przekazań przyjdą w etapach 4, 4b i 6.
@@ -29,6 +32,14 @@ PRZYPINANIE_S = 60.0
 SPRZATANIE_S = 86400.0
 PRACA_ODSWIEZ_S = 60.0
 DZIERZAWY_S = 10.0
+PO_PRACY_CISZA_S = 30.0
+
+
+def _zapisz_prosbe(plik: Path) -> None:
+    plik.parent.mkdir(parents=True, exist_ok=True)
+    tmp = plik.with_name(plik.name + ".tmp")
+    tmp.write_text("update", encoding="utf-8")
+    tmp.replace(plik)
 
 
 def _syg(p: Path) -> tuple:
@@ -65,6 +76,8 @@ class Obserwator:
         self._dzierzawy_at = 0.0
         self._praca: tuple | None = None
         self._praca_at = 0.0
+        self._zero_od: float | None = None
+        self.ostatnia_praca: dict = {"aktywne": 0, "opis": []}
         self._przypinanie_at = 0.0
         self._porzadki: asyncio.Task | None = None
         self.cykl_ms = 0
@@ -230,6 +243,31 @@ class Obserwator:
             except OSError as exc:
                 self.log(f"jarvo-hq: praca.json: {type(exc).__name__}")
         self.ostatnia_praca = dane
+        await self._aktualizacja_po_pracy(teraz, int(dane["aktywne"]))
+
+    async def _aktualizacja_po_pracy(self, teraz: float, aktywne: int) -> None:
+        if not self.db.meta("aktualizacja_po_pracy"):
+            self._zero_od = None
+            return
+        if aktywne:
+            self._zero_od = None
+            return
+        if self._zero_od is None:
+            self._zero_od = teraz
+        if teraz - self._zero_od < PO_PRACY_CISZA_S:
+            return
+        self._zero_od = None
+        stan = self.stan_aktualizacji() or {}
+        if stan.get("state") != "updating":
+            prosba = self.jarvo_dir / "state" / "update-request"
+            try:
+                await asyncio.to_thread(_zapisz_prosbe, prosba)
+            except OSError as exc:
+                self.log(f"jarvo-hq: aktualizacja po pracy: {type(exc).__name__}")
+                return
+            self.log("jarvo-hq: aktualizacja po pracy: prośba zapisana (30 s bez pracy)")
+        self.db.usun_meta("aktualizacja_po_pracy")
+        self.hub.nadaj("aktualizacja", self.stan_aktualizacji() or {})
 
     # ------------------------------------------------------------------------------------------- przypinanie, sprzątanie
     async def _przypnij(self) -> None:

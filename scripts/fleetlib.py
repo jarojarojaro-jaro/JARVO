@@ -43,7 +43,7 @@ SKILL_PROMPT_DESC_LIMIT = 60
 # krój figur skilla `izometria` (JetBrains Mono, OFL, z krojów HQ): build skilla i plugin HQ kładą go obok iso.py
 ISO_KROJE = ("jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono-latin-ext-wght-normal.woff2", "OFL-JetBrainsMono.txt")
 # Budżet main promptu (SOUL.md) w przybliżonych tokenach (~3.5 znaku/token dla PL/EN).
-SOUL_TOKEN_BUDGET = 3200
+SOUL_TOKEN_BUDGET = 3300
 
 
 # --------------------------------------------------------------------------- YAML
@@ -144,6 +144,7 @@ class Agent:
     hq_room: str = "office"
     hq_label: str = ""
     hq_short: str = ""
+    rola: str = ""                            # krótka rola w aplikacji (do 8 słów), docs/FLEET.md „Pola agenta”
     handle: str = ""                          # uchwyt w rozmowie aplikacji (`@web`), docs/FLEET.md „Uchwyty”
     aliasy_extra: list[str] = field(default_factory=list)   # dodatkowe aliasy wzmianki (pole `aliasy` we fleet.yaml)
     en: dict = field(default_factory=dict)   # angielskie title / hq_label / description (HQ po angielsku)
@@ -249,6 +250,7 @@ def load_fleet(path: Path | None = None) -> Fleet:
                 hq_room=entry.get("hq_room", "office"),
                 hq_label=entry.get("hq_label", "") or entry.get("title", ""),
                 hq_short=entry.get("hq_short", "") or entry["name"].removeprefix("jarvo-").capitalize(),
+                rola=" ".join(str(entry.get("rola", "") or "").split()),
                 handle=str(entry.get("handle", "") or ""),
                 aliasy_extra=[str(x) for x in (entry.get("aliasy") or [])],
                 en={k: " ".join(str(v).split()) for k, v in (entry.get("en") or {}).items() if v},

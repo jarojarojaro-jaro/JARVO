@@ -272,7 +272,11 @@ class Silnik:
         return bool(st.get("online") and st.get("state") == "updating")
 
     def _brama_mloda(self) -> bool:
-        return time.time() - self.start_at < 120
+        """Silnik albo brama wstała mniej niż 2 min temu (ostatni start w `gateway-starts.log`, aplikacja.py)."""
+        if time.time() - self.start_at < 120:
+            return True
+        apl = getattr(self.m, "aplikacja", None)
+        return bool(apl and apl.brama_mloda(self.home))
 
     def _obrazy_wprost(self) -> bool:
         if os.environ.get("JARVO_HQ_OBRAZY_WPROST") == "0":

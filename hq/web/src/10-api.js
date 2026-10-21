@@ -193,6 +193,126 @@ const liveApi = {
   },
 };
 
+// ---- klient silnika rozmów (docs/HQ.md „Rozmowy” i „Aplikacja”) ----------------------------------------------------
+// Błąd trasy: {"blad": {kod, komunikat, komunikat_en, ...dane}}. kod "siec" = brak połączenia, "http_<status>" = odpowiedź
+// bez opisu. 429 niesie ponow_za_s, 409 praca_trwa {przebiegi, karty}, 413 za_duze, 507 dysk, 503 silnik.
+class BladApi extends Error {
+  constructor(status, cialo) {
+    const b = (cialo && cialo.blad) || {};
+    super(b.komunikat || `HTTP ${status}`);
+    this.status = status;
+    this.kod = b.kod || (status ? `http_${status}` : "siec");
+    this.komunikat = b.komunikat || "";
+    this.komunikat_en = b.komunikat_en || "";
+    this.dane = b;
+    this.ponow_za_s = b.ponow_za_s || null;
+  }
+  // tekst dla właściciela w bieżącym języku: z serwera, a bez opisu ogólny z słownika
+  tekst() {
+    const t = isPL() ? this.komunikat : this.komunikat_en || this.komunikat;
+    return t || T(this.kod === "siec" ? "blad.siec" : "blad.ogolny");
+  }
+}
+
+// 401: sesja wygasła albo wylogowano w innej karcie. Hash zostaje w sessionStorage i wraca po zalogowaniu.
+// Tylko jedno przejście: kilka zapytań z 401 naraz (lista, strumień, subskrypcje) dałoby kilka location.assign,
+// a każde następne przerywa poprzednie; powrót z bfcache (pageshow) znów pozwala przejść.
+let wLogowaniu = false;
+function naLogowanie() {
+  if (wLogowaniu) return;
+  wLogowaniu = true;
+  Trasa.zapamietaj();
+  location.assign(`${basePath()}/login?next=${encodeURIComponent(basePath() + "/jarvo")}`);
+}
+if (typeof window !== "undefined") window.addEventListener("pageshow", (e) => { if (e.persisted) wLogowaniu = false; });
+
+// JSON w obie strony. Zapisy niosą X-Jarvo-Request (authHeaders). `ponawiaj`: 429 czeka ponow_za_s i próbuje
+// najwyżej dwa razy (tylko żądania z kluczem, które serwer rozpoznaje jako powtórkę).
+async function zadanie(metoda, sciezka, cialo, { ponawiaj = false, bez401 = false } = {}) {
+  const init = { method: metoda, credentials: "include", cache: "no-store",
+    headers: authHeaders(cialo === undefined ? null : { "Content-Type": "application/json" }) };
+  if (cialo !== undefined) init.body = JSON.stringify(cialo);
+  for (let proba = 0; ; proba++) {
+    let r;
+    try { r = await fetch(`${basePath()}${API_ROOT}${sciezka}`, init); } catch (_) { throw new BladApi(0, null); }
+    if (r.status === 204) return null;
+    let d = null;
+    try { d = await r.json(); } catch (_) { /* puste albo nie-JSON */ }
+    if (r.ok) return d;
+    if (r.status === 401 && !bez401) naLogowanie();
+    const b = new BladApi(r.status, d);
+    if (r.status === 429 && ponawiaj && proba < 2) {
+      await new Promise((ok) => setTimeout(ok, Math.min(10, Math.max(1, b.ponow_za_s || 1)) * 1000));
+      continue;
+    }
+    throw b;
+  }
+}
+
+const zapytanieUrl = (p) => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(p || {})) if (v != null && v !== "") q.set(k, v);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+};
+const kodujUrl = encodeURIComponent;
+
+Object.assign(liveApi, {
+  rozmowy: {
+    lista: (p) => zadanie("GET", `/rozmowy${zapytanieUrl(p)}`),                 // {filtr, q, limit, przed}
+    utworz: (cialo) => zadanie("POST", "/rozmowy", cialo, { ponawiaj: !!cialo.wiadomosc }),   // {tytul, koordynator, wiadomosc?}
+    wez: (id) => zadanie("GET", `/rozmowy/${kodujUrl(id)}`),
+    zmien: (id, zmiana) => zadanie("PATCH", `/rozmowy/${kodujUrl(id)}`, zmiana),   // {tytul?, przypiety?, archiwum?, praca?}
+    usun: (id, { trwale = false, praca } = {}) => zadanie("DELETE", `/rozmowy/${kodujUrl(id)}${zapytanieUrl({ trwale: trwale ? 1 : 0, praca })}`),
+    przywroc: (id) => zadanie("POST", `/rozmowy/${kodujUrl(id)}/przywroc`),
+    przeczytane: (id, doAt) => zadanie("POST", `/rozmowy/${kodujUrl(id)}/przeczytane`, { do_at: doAt }),
+    os: (id, p) => zadanie("GET", `/rozmowy/${kodujUrl(id)}/os${zapytanieUrl(p)}`),   // {przed, po, limit}
+    wyslij: (id, cialo) => zadanie("POST", `/rozmowy/${kodujUrl(id)}/wiadomosci`, cialo, { ponawiaj: true }),
+    eksportUrl: (id) => `${basePath()}${API_ROOT}/rozmowy/${kodujUrl(id)}/eksport`,
+    // plik Markdown całej rozmowy: {blob, nazwa} (pobranie przez <a download>, nazwa z Content-Disposition)
+    async eksport(id) {
+      let r;
+      try { r = await fetch(liveApi.rozmowy.eksportUrl(id), { credentials: "include", cache: "no-store", headers: authHeaders() }); } catch (_) { throw new BladApi(0, null); }
+      if (!r.ok) { let d = null; try { d = await r.json(); } catch (_) { /* nie-JSON */ } if (r.status === 401) naLogowanie(); throw new BladApi(r.status, d); }
+      const m = /filename="([^"]+)"/.exec(r.headers.get("content-disposition") || "");
+      return { blob: await r.blob(), nazwa: m ? m[1] : "rozmowa.md" };
+    },
+  },
+  przebiegi: {
+    wez: (id) => zadanie("GET", `/przebiegi/${kodujUrl(id)}`),
+    stop: (id) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/stop`),
+    anuluj: (id) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/anuluj`),
+    wyslijTeraz: (id) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/wyslij`),
+    zgoda: (id, wybor, requestId) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/zgoda`, { wybor, request_id: requestId }),
+    dopisz: (id, tekst, klucz) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/dopisz`, { tekst, klucz }, { ponawiaj: !!klucz }),
+    ponow: (id) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/ponow`),
+    nadzor: (id) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/nadzor`),
+  },
+  // trasy z kolejnych etapów (§6.3): klient gotowy, serwer odpowie 404, dopóki ich nie ma
+  sesje: {
+    os: (profil, id, p) => zadanie("GET", `/sesje/${kodujUrl(profil)}/${kodujUrl(id)}/os${zapytanieUrl(p)}`),
+    kontynuuj: (profil, id, wiadomosc) => zadanie("POST", `/sesje/${kodujUrl(profil)}/${kodujUrl(id)}/kontynuuj`, { wiadomosc }),
+    kopiuj: (profil, id) => zadanie("POST", `/sesje/${kodujUrl(profil)}/${kodujUrl(id)}/kopiuj`, {}),
+  },
+  efekty: { lista: (p) => zadanie("GET", `/efekty${zapytanieUrl(p)}`) },
+  aplikacja: () => zadanie("GET", "/app"),
+  agenci: () => zadanie("GET", "/agenci"),
+  flotaAgenci: () => zadanie("GET", "/fleet"),
+  aktualizacjaStan: () => zadanie("GET", "/update"),
+  // {action: update|cancel|check, gdy: teraz|wolne} (§15.3): „wolne” = po końcu pracy agentów
+  aktualizacja: (action, gdy) => zadanie("POST", "/update", gdy ? { action, gdy } : { action }),
+  podpowiedzi: (miejsce = "start") => zadanie("GET", `/podpowiedzi${zapytanieUrl({ miejsce })}`),
+  reakcja: (id, rodzaj, klucz) => zadanie("POST", `/podpowiedzi/${kodujUrl(id)}/reakcja`, klucz ? { rodzaj, klucz } : { rodzaj }),
+  subskrypcje: (klient, cialo) => zadanie("POST", `/strumien/${kodujUrl(klient)}/subskrypcje`, cialo),
+  // jak AuthWidget Hermesa: POST /auth/logout; pozostałe karty dostają „wyloguj” przez BroadcastChannel i idą na
+  // logowanie z next=/jarvo (hash zostaje w sessionStorage każdej karty), ta karta też
+  async wyloguj() {
+    try { await fetch(`${basePath()}/auth/logout`, { method: "POST", credentials: "include" }); } catch (_) { /* i tak na logowanie */ }
+    try { const k = new BroadcastChannel("jarvo"); k.postMessage({ t: "wyloguj" }); k.close(); } catch (_) { /* bez kanału: karty pójdą na 401 */ }
+    naLogowanie();
+  },
+});
+
 const api = window.JARVO_HQ_MOCK || liveApi;
 
 // Obiekt URL dla podglądu pliku (pobierany z autoryzacją, więc działa w każdym trybie logowania).
@@ -251,13 +371,21 @@ async function openTokenLink(get) {
 }
 
 async function downloadFile(file) {
-  const b = await api.fileBlob(file.path);
+  pobierzBlob(await api.fileBlob(file.path), file.name);
+}
+
+// blob tylko jako <a download> (docs/HQ.md „Aplikacja”, bezpieczeństwo: blob nigdy nie staje się stroną)
+function pobierzBlob(b, nazwa) {
   const u = URL.createObjectURL(b);
   const a = document.createElement("a");
-  a.href = u; a.download = file.name;
+  a.href = u; a.download = nazwa || "plik";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(u), 5000);
 }
+
+// adres pliku floty na /file (CSP sandbox, nosniff, HTML jako tekst): „Otwórz w nowej karcie”, SVG w <img>, PDF
+// w <iframe sandbox>. Dashboard z logowaniem rozpoznaje sesję po ciasteczku, więc zwykły adres działa.
+const urlPliku = (path, pobierz) => `${basePath()}${API_ROOT}/file?path=${encodeURIComponent(path)}${pobierz ? "&download=1" : ""}`;
 
 // Ścieżka do wklejenia w Eksploratorze/terminalu: po stronie Windows (WSL), hosta albo kontenera.
 function hostPathOf(path, host) {

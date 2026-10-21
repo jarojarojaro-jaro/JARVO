@@ -8,6 +8,10 @@ Tylko do testów (piaskownica, CI): nie ma w obrazie żadnego profilu, który by
     python3 scripts/atrapa_modelu.py --port 9199          # http://127.0.0.1:9199/v1
     python3 scripts/atrapa_modelu.py --port 9199 --dziennik /tmp/jarvo-e2e/atrapa.jsonl
                                                           # każde ciało zapytania jako jedna linia JSON (test E2E)
+                                                          # z adresem zapytania w polu „_sciezka”
+
+Ścieżka przed /chat/completions jest dowolna, więc każdy profil testu może mieć własny adres
+(`base_url: http://127.0.0.1:9197/p/<profil>/v1`), a dziennik pokazuje, do którego profilu poszła tura.
 
 Polecenia w treści ostatniej wiadomości właściciela (w nawiasach kwadratowych, reszta tekstu wraca w odpowiedzi):
     [narzedzie:NAZWA {"arg": 1}]   wywołaj narzędzie NAZWA z argumentami (JSON); po wyniku krótkie podsumowanie
@@ -17,6 +21,10 @@ Polecenia w treści ostatniej wiadomości właściciela (w nawiasach kwadratowyc
     [plik:<ścieżka>]               linia „Plik: <ścieżka>” w odpowiedzi (karta pliku); można kilka
     [blad]                         HTTP 500 od „dostawcy”
     [dlugo]                        długa odpowiedź z nagłówkami, listą, tabelą i kodem (test renderowania)
+
+Gotowe odpowiedzi (zrzuty ekranu z prawdziwą treścią zamiast echa): `--odpowiedzi PLIK.json` z mapą
+{"fragment wiadomości właściciela": "odpowiedź (Markdown)"}; pierwsza wiadomość, która zawiera fragment, dostaje tę
+odpowiedź (z `[wolno:<s>]` też strumieniem). Reszta działa jak wyżej.
 """
 from __future__ import annotations
 
@@ -62,6 +70,9 @@ def _tekst(tresc: Any) -> str:
     return ""
 
 
+GOTOWE: dict[str, str] = {}          # --odpowiedzi: fragment wiadomości właściciela → odpowiedź
+
+
 def odpowiedz(wiadomosci: list[dict], model: str) -> dict:
     """Co atrapa „powie”: {'tekst': str} albo {'narzedzie': (nazwa, argumenty)}; także {'blad': True},
     {'wolno': True} (z `[wolno:<s>]` dodatkowo {'wolno_s': s}: cały strumień trwa s sekund)."""
@@ -81,6 +92,9 @@ def odpowiedz(wiadomosci: list[dict], model: str) -> dict:
         return {"narzedzie": (m.group(1), argumenty)}
     if "[dlugo]" in tekst:
         return {"tekst": DLUGI_TEKST}
+    gotowa = next((v for k, v in GOTOWE.items() if k and k in tekst), None)
+    if gotowa is not None:
+        return _wolno({"tekst": gotowa, "wolno": False}, tekst)
     czysty = POLECENIE.sub("", tekst).strip()
     odp = f"Atrapa ({model}): {czysty[:400] or 'gotowe.'}"
     for sciezka in POLECENIE_PLIK.findall(tekst):
@@ -100,12 +114,14 @@ def _wolno(plan: dict[str, Any], tekst: str) -> dict[str, Any]:
 
 def kawalki(plan: dict) -> tuple[list[str], float]:
     """Kawałki strumienia i pauza po każdym. `[wolno:<s>]`: razem s sekund, co najmniej 2 kawałki na sekundę,
-    gdy tekst na to pozwala (krótkie echo idzie wtedy po znaku); `[wolno]`: po słowie co 0,4 s; inaczej 0,02 s."""
+    gdy tekst na to pozwala (krótkie echo idzie wtedy po znaku, a dwukropek razem ze znakiem przed nim: kawałek
+    zaczęty od „:” Hermes trzyma do końca linii jako możliwy komentarz SSE); `[wolno]`: po słowie co 0,4 s;
+    inaczej 0,02 s."""
     tekst = plan.get("tekst") or ""
     slowa = re.findall(r"\S+\s*|\s+", tekst)
     if plan.get("wolno_s"):
         s = float(plan["wolno_s"])
-        czesci = slowa if len(slowa) >= s * 2 else list(tekst)
+        czesci = slowa if len(slowa) >= s * 2 else re.findall(r".:*", tekst, re.S)
         return czesci, s / max(1, len(czesci))
     return slowa, (0.4 if plan.get("wolno") else 0.02)
 
@@ -142,7 +158,7 @@ class Obsluga(BaseHTTPRequestHandler):
         except ValueError:
             self._json(400, {"error": {"message": "zły JSON"}})
             return
-        self._zapisz(zapytanie)
+        self._zapisz(zapytanie, self.path)
         model = str(zapytanie.get("model") or "atrapa")
         plan = odpowiedz(zapytanie.get("messages") or [], model)
         if plan.get("blad"):
@@ -154,11 +170,13 @@ class Obsluga(BaseHTTPRequestHandler):
         else:
             self._json(200, _cala(ident, model, plan))
 
-    def _zapisz(self, zapytanie: Any) -> None:
-        """Jedna linia JSON na zapytanie (plik 0600, dopisywany pod zamkiem: serwer jest wielowątkowy)."""
+    def _zapisz(self, zapytanie: Any, sciezka: str = "") -> None:
+        """Jedna linia JSON na zapytanie (plik 0600, dopisywany pod zamkiem: serwer jest wielowątkowy); ciało z polem
+        `_sciezka` = adres zapytania (profil testu po `base_url`)."""
         if not self.dziennik:
             return
-        linia = json.dumps(zapytanie, ensure_ascii=False) + "\n"
+        wpis = {**zapytanie, "_sciezka": sciezka} if isinstance(zapytanie, dict) else zapytanie
+        linia = json.dumps(wpis, ensure_ascii=False) + "\n"
         with self._zamek:
             fd = os.open(self.dziennik, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
             with os.fdopen(fd, "a", encoding="utf-8") as f:
@@ -216,8 +234,13 @@ def main() -> None:
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=9199)
     ap.add_argument("--dziennik", metavar="PLIK", help="dopisuj każde ciało zapytania jako jedną linię JSON")
+    ap.add_argument("--odpowiedzi", metavar="PLIK", help="JSON {fragment wiadomości: gotowa odpowiedź} (zrzuty ekranu)")
     a = ap.parse_args()
     Obsluga.dziennik = a.dziennik
+    if a.odpowiedzi:
+        with open(a.odpowiedzi, encoding="utf-8") as f:
+            dane = json.load(f)
+        GOTOWE.update({str(k): str(v) for k, v in dane.items()} if isinstance(dane, dict) else {})
     ThreadingHTTPServer((a.host, a.port), Obsluga).serve_forever()
 
 

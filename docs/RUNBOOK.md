@@ -221,10 +221,12 @@ sudo systemctl start jarvo-updater
    docker exec -u hermes jarvo-hermes hermes kanban list
    ```
    Po kilku–kilkunastu minutach: recenzja Jarva (status `review` → `done` albo prośba o poprawki) i raport w DM.
-4. **Jarvo HQ:** `http://<ip-tailscale>:9119/jarvo` (zakładka **Jarvo**, pierwsza w menu, nad CHAT; adres `/` prowadzi tam sam; obok **Wiedza** z grafem skarbca: po wdrożeniu
+4. **Aplikacja Jarvo:** `http://<ip-tailscale>:9119/jarvo` (zakładka **Jarvo**, pierwsza w menu, nad CHAT; adres `/` prowadzi tam sam; obok **Wiedza** z grafem skarbca: po wdrożeniu
    widać huby 10 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
-   z `compose/.env`. To budynek floty: pokoje agentów z podglądem pracy, decyzje, misje i czat ([HQ.md](HQ.md)).
-   Pozostałe zakładki dashboardu Hermesa (sesje, cron, logi, konfiguracja) zostają w menu.
+   z `compose/.env`. To aplikacja czatu: ekran startu (powitanie, jedno zdanie gotowości, gdy brakuje modelu albo profilu
+   właściciela), rozmowy z Jarvem i agentami, ustawienia w szufladzie (koło zębate); budynek floty z pokojami agentów,
+   decyzjami i misjami jest w **Ustawienia › Stara Baza** ([HQ.md](HQ.md)). Na `/jarvo` menu Hermesa jest schowane;
+   pozostałe strony dashboardu (sesje, cron, logi, konfiguracja) otwiera **Ustawienia › Konto › Klasyczny panel**.
    Kontrola: `/api/plugins/jarvo-hq/health` po zalogowaniu pokazuje klucze API profili i dostępność gatewaya.
    Zapisy wtyczek (`POST` do `/api/plugins/…`) skryptem lub `curl` wymagają nagłówka `X-Jarvo-Request: 1` (ochrona
    zapisu, [HQ.md §3](HQ.md#3-bezpieczeństwo)); bez niego 403 `{"blad": {"kod": "csrf"}}`.
@@ -340,11 +342,16 @@ Wyjątek to skille tworzone przez agentów: czekają w poczekalni na Twoją zgod
 
 ### Aktualizacje z panelu
 
-Gdy na GitHubie jest nowsza wersja, w menu bocznym dashboardu pojawia się **„⬆ Aktualizacja (n)”** (od chwili,
-gdy zakładka Jarvo wczytała się w tej karcie przeglądarki; `/` sam na nią prowadzi, a pozycja zostaje przy
-przejściach do innych stron dashboardu; strona otwarta wprost, np. `/sessions`, jej nie ma):
-klik pokazuje listę zmian, **„Aktualizuj teraz”** robi `git pull` i wdrożenie (z przebudową obrazu, gdy
-trzeba), a na koniec strona sama się odświeża. Pomocnik sprawdza GitHuba co minutę; z `JARVO_AUTO_UPDATE=1`
+Gdy na GitHubie jest nowsza wersja, w aplikacji Jarvo na dole paska rozmów pojawia się odznaka **⬆ N** (N = liczba
+nowych zmian). Otwiera **Ustawienia › System › Aktualizacja**: **Aktualizuj** robi `git pull` i wdrożenie
+(z przebudową obrazu, gdy trzeba). Gdy agenci akurat pracują (`/opt/data/jarvo/state/praca.json`), aplikacja
+najpierw pyta: **Zaktualizuj, gdy skończą** (domyślnie: prośba do pomocnika idzie 30 s po końcu pracy; do tego
+czasu w Systemie są **Aktualizuj teraz** i **Nie aktualizuj**, a po 2 h jedno przypomnienie), **Aktualizuj teraz**
+(przerywa pracę; przerwane tury wznawia **Ponów**) albo **Anuluj**. Po wdrożeniu karta z niedokończonym szkicem
+albo widoczna pokazuje pasek „Nowa wersja Jarva” z **Odśwież**, a schowana i bezczynna odświeża się sama.
+Na klasycznych stronach dashboardu w menu bocznym jest nadal **„⬆ Aktualizacja (n)”** (od chwili, gdy zakładka
+Jarvo wczytała się w tej karcie przeglądarki): klik pokazuje listę zmian, **„Aktualizuj teraz”** wdraża, a na koniec
+pokazuje **„Odśwież stronę”** (bez samodzielnego odświeżenia, żeby nie przepadł szkic ani praca w toku). Pomocnik sprawdza GitHuba co minutę; z `JARVO_AUTO_UPDATE=1`
 (lokalnie: `JARVO_AUTO_UPDATE=1 jarvo autostart on` albo `JARVO_AUTO_UPDATE=1 jarvo up`) instaluje nowe wersje sam, bez klikania. Robi to pomocnik na hoście
 (`scripts/updater.py`), bo kontener celowo nie ma dostępu do Dockera: panel może tylko poprosić o
 sprawdzenie albo aktualizację tej samej gałęzi. Na VPS działa jako usługa `jarvo-updater` (start: §5;
@@ -356,7 +363,7 @@ Gdy nie działa, pozycja w menu się nie pojawia.
 
 ### Wyniki agentów w przeglądarce
 Flota działa w kontenerze, więc serwer uruchomiony przez agenta (`localhost:8000`, `npm run dev`) jest dla
-przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w Jarvo HQ albo link, który agent robi poleceniem
+przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** (w aplikacji Jarvo **Odpal** na karcie pliku) albo link, który agent robi poleceniem
 `python3 /opt/jarvo/repo/scripts/jarvo_link.py <plik albo katalog>` (serwer podglądu na porcie 9120, ten sam
 `JARVO_BIND_IP` co dashboard; link ważny 7 dni). Pliki wysłane w czacie HQ leżą w `/opt/data/jarvo/inbox/<data>/`.
 
@@ -383,6 +390,10 @@ przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w Jarvo HQ albo link, 
 | aplikacja: przebieg stoi w `przyjety` albo `pracuje` bez tekstu | stan w `/api/plugins/jarvo-hq/przebiegi/<id>` (zalogowana przeglądarka): `czeka_na_zgode` = agent czeka na decyzję (po `approvals.timeout` profilu zgoda wygasa i polecenie się nie wykona), `odlaczony: true` = po restarcie dashboardu przebieg jest odpytywany co 2 s. Przejścia są w `jarvo-hq.log` (`grep <id przebiegu>`). Strażnik pyta bramę po 90 s ciszy; `zgubione` dopiero, gdy brama nie zna przebiegu i 10 min nic nie przybyło. Zawsze można **Zatrzymaj**, potem **Ponów** |
 | aplikacja: przebieg kończy się `blad` z kodem `klucz` | profil nie ma `API_SERVER_KEY` w `.env` (`/srv/jarvo/data/hermes/profiles/<agent>/.env`) albo klucz się rozjechał z bramą; `deploy.sh --no-pull` dopisuje brakujący klucz (`install-fleet.sh`, krok 3b), potem **Ponów** |
 | aplikacja: przebiegi czekają w kolejce z powodem `brama` | brama Hermesa nie odpowiada: `docker exec -u hermes jarvo-hermes hermes gateway status`; po 2 min bez bramy przebieg kończy się błędem (bez limitu w trakcie aktualizacji). Restart bramy przerywa trwające tury: `install-fleet.sh` ostrzega przed nim („trwa praca agentów”), a przerwaną turę wznawia **Ponów** |
+| aplikacja: ekran startu stoi na „Jarvo się uruchamia…”, po 2 min „Jarvo chwilowo nie odpowiada” | brama Hermesa nie odpowiada na `/health` (stan z `GET /api/plugins/jarvo-hq/app`, pole `gotowosc.brama`): `docker exec -u hermes jarvo-hermes hermes gateway status`, log `/opt/data/logs/gateway.log`. Wiadomości wysłane w tym czasie czekają w kolejce |
+| aplikacja: ekran startu mówi „Połącz model…”, choć klucz jest | gotowość czyta status logowania Hermesa dla profilu Jarva (wynik w pamięci 30 s): dostawca na klucz potrzebuje niepustej zmiennej klucza w `.env` profilu `jarvo` (albo w środowisku), dostawca OAuth zalogowania w **Ustawienia › Połączenia › Modele**, dostawca `custom` adresu `model.base_url`. Odśwież stronę po minucie |
+| aplikacja: aktualizacja „czeka na koniec pracy” bez końca | agenci dalej pracują (`praca.json`: `aktywne` > 0, także karty kanbana w `running` i tury z innych kanałów). **Ustawienia › System**: **Aktualizuj teraz** (przerywa pracę) albo **Nie aktualizuj** |
+| aplikacja: System › Aktualizacja „pomocnik nie działa” (503 `pomocnik`) | pomocnik hosta `scripts/updater.py` nie odezwał się od 5 min: lokalnie `jarvo up` (albo `bash scripts/local-up.sh`), na VPS `sudo systemctl status jarvo-updater` |
 | `/health`: `schemat_hermesa: zmieniony` po aktualizacji Hermesa | czytnik sesji nie znalazł kolumn, których potrzebuje; oś czasu pomija tych agentów (żółta linia „niedostępni”). Zrzuć schemat na nowo i popraw `SCHEMAT_WYMAGANY` ([HQ.md §2d](HQ.md#2d-rozmowy-magazyn-czytnik-wzmianki-kontekst), „Czytnik sesji”) |
 | `/health`: `silnik: awaria` (aplikacja pokazuje „Odśwież”) | wątek silnika rozmów padł 3 razy z rzędu; przyczyna w `jarvo-hq.log` („silnik padł …”). Restart samego dashboardu (tak jak `install-fleet.sh`): `docker exec jarvo-hermes sh -c '/command/s6-svc -wd -T 40000 -d /run/service/dashboard; /command/s6-svc -u /run/service/dashboard'`; przebiegi w toku wracają same (`odlaczony`), kolejka rusza bez otwartej karty |
 | dużo sesji Hermesa przypiętych (`pinned`) | aplikacja przypina sesje swoich rozmów, żeby automatyczne sprzątanie Hermesa ich nie usunęło; usunięcie rozmowy w aplikacji (kosz, po 30 dniach na stałe) je odpina. Miejsce na dysku odzyskujesz, usuwając stare rozmowy w aplikacji |

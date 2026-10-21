@@ -772,6 +772,16 @@ class Rozmowy:
             return self._przebiegi(f"watek_id = ? AND stan IN ({', '.join('?' * len(STANY_AKTYWNE))})", (wid, *STANY_AKTYWNE))
         return self._przebiegi("watek_id = ?", (wid,))
 
+    def przebiegi_do_ponowienia(self, wid: str, *, limit: int = 5) -> list[dict]:
+        """Nieudane, przerwane, zgubione i zatrzymane przebiegi rozmowy wątku, po których ten agent nie pracował już
+        w tym wątku (ta sama zasada co „Czeka na Ciebie”): migawka wątku niesie je, żeby karta z „Ponów” przetrwała
+        przeładowanie strony. Najnowsze, najwyżej `limit`."""
+        return self._przebiegi(
+            "id IN (SELECT p.id FROM przebiegi p WHERE p.watek_id = ? AND p.rola = 'rozmowa' AND COALESCE(p.zrodlo, '') != 'nadzor' "
+            "AND p.stan IN ('blad', 'przerwane', 'zgubione', 'zatrzymane') AND NOT EXISTS (SELECT 1 FROM przebiegi n "
+            "WHERE n.watek_id = p.watek_id AND n.agent = p.agent AND n.rola = 'rozmowa' AND n.utworzony_at > p.utworzony_at) "
+            "ORDER BY p.utworzony_at DESC LIMIT ?)", (wid, max(1, min(int(limit), 20))))
+
     def przebiegi_lancucha(self, lancuch_id: str) -> list[dict]:
         return self._przebiegi("lancuch_id = ?", (lancuch_id,))
 
@@ -834,6 +844,28 @@ class Rozmowy:
         with self._tx() as c:
             c.execute("INSERT INTO meta (klucz, wartosc) VALUES (?, ?) ON CONFLICT(klucz) DO UPDATE SET wartosc = excluded.wartosc",
                       (klucz, str(wartosc)))
+
+    def usun_meta(self, klucz: str) -> bool:
+        with self._tx() as c:
+            return c.execute("DELETE FROM meta WHERE klucz = ?", (klucz,)).rowcount == 1
+
+    def czeka_na_wlasciciela(self, *, limit: int = 4, od: float | None = None) -> list[dict]:
+        """„Czeka na Ciebie” na ekranie startu (docs/HQ.md „Ekran startu”): zgody w toku i nieudane przebiegi z ostatniej
+        doby, po których ten agent nie pracował już w tym wątku (Ponów zakłada nowy przebieg), tylko z wątków na
+        liście (bez archiwum, kosza i prób agenta). Zgody najpierw, potem najnowsze. Bez treści rozmowy."""
+        od = self.zegar() - 86400 if od is None else od
+        with self._odczyt() as c:
+            rows = c.execute(
+                "SELECT p.id, p.agent, p.stan, p.watek_id, w.tytul, "
+                "COALESCE(p.zakonczony_at, p.ostatnie_zdarzenie_at, p.utworzony_at) AS at FROM przebiegi p "
+                "JOIN watki w ON w.id = p.watek_id "
+                "WHERE w.usuniety_at IS NULL AND w.archiwum = 0 AND w.rodzaj != 'test' AND p.rola = 'rozmowa' AND ("
+                "p.stan = 'czeka_na_zgode' OR (p.stan = 'blad' AND COALESCE(p.zakonczony_at, p.utworzony_at) >= ? "
+                "AND NOT EXISTS (SELECT 1 FROM przebiegi n WHERE n.watek_id = p.watek_id AND n.agent = p.agent "
+                "AND n.rola = 'rozmowa' AND n.utworzony_at > p.utworzony_at))) "
+                "ORDER BY p.stan = 'czeka_na_zgode' DESC, at DESC LIMIT ?", (od, max(1, min(int(limit), 20)))).fetchall()
+        return [{"rodzaj": "zgoda" if r["stan"] == "czeka_na_zgode" else "blad", "przebieg": r["id"], "agent": r["agent"],
+                 "watek": r["watek_id"], "tytul": r["tytul"], "at": r["at"]} for r in rows]
 
     # ------------------------------------------------------------------------------------------- sprzątanie, zdrowie
     def sprzataj(self) -> dict:

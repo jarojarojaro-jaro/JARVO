@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /* Test aplikacji Jarvo na żywo w przeglądarce (docs/HQ.md §2c, etap 2: §2e). Uruchamia go scripts/jarvo-e2e.sh
    w kontenerze jarvo-hermes jako hermes; sam: node tests/live/jarvo_e2e.cjs etap1 (z JARVO_E2E_DIR, JARVO_E2E_INBOX)
-   albo etap2 (profile testowe, atrapa modelu i JARVO_E2E_ATRAPA_DZIENNIK przygotowuje jarvo-e2e.sh).
+   albo etap2 / etap3 (profile testowe, atrapa modelu i JARVO_E2E_ATRAPA_DZIENNIK przygotowuje jarvo-e2e.sh).
+   Etap 3 (aplikacja, docs/HQ.md „Aplikacja”): powłoka, jeden strumień, lista i wątek na żywo, szuflada, klawiatura.
 
    Przeglądarka: playwright-core z /opt/jarvo/node/node_modules i /usr/local/bin/chromium. Logowanie loginem
    i hasłem dashboardu z env kontenera (HERMES_DASHBOARD_BASIC_AUTH_*); hasła i ciasteczek nigdy nie wypisujemy.
@@ -39,7 +40,11 @@ const bezHasla = (s) => {                                              // hasło
 const czysc = (s) => bezHasla(s).slice(0, 800);
 function musi(warunek, opis) { if (!warunek) throw new Error(opis); }
 
+// JARVO_E2E_PUNKTY=14,15: tylko te punkty (i zawsze 1 z logowaniem); do pracy nad testem, pełny przebieg bez zmiennej
+const TYLKO = (process.env.JARVO_E2E_PUNKTY || "").split(",").map((x) => x.trim()).filter(Boolean);
+
 async function krok(id, nazwa, fn) {
+  if (TYLKO.length && id !== "1" && !TYLKO.includes(id)) return;
   const t0 = Date.now();
   try {
     const szczegoly = await fn();
@@ -224,51 +229,39 @@ async function etap1(browser) {
     return { przekierowania_bez_wtyczki: sciezki, zasłona_bez_wtyczki_ms: zaslonaBezWtyczkiMs, bez_skryptu: bezSkryptu };
   });
 
-  await krok("4", "stara Baza na /jarvo z menu Hermesa; zasady chowania powłoki; /sessions z Jarvo na górze menu", async () => {
+  await krok("4", "aplikacja na /jarvo chowa powłokę Hermesa (zasady powloka.json, inert, Tab); /sessions z Jarvo na górze menu", async () => {
     await page.goto(BASE + "/jarvo", { waitUntil: "domcontentloaded" });
     await czekajGotowe(page);
     const zaslonaMs = Math.round(await page.evaluate(() => performance.now()));
-    await page.waitForSelector(".thq-root", { state: "visible", timeout: 15000 });
+    await page.waitForSelector("[data-jarvo-korzen] .j-uklad", { state: "visible", timeout: 15000 });
     musi(zaslonaMs <= 2000, `zasłona zeszła po ${zaslonaMs} ms (limit 2000)`);
-    musi(await pasekWidoczny(page), "menu Hermesa niewidoczne na /jarvo");
     const atr = await atrybuty(page);
-    musi(!atr.includes("data-jarvo-app"), `stara Baza chowa powłokę: ${atr}`);
-    await page.waitForFunction(() => !!document.querySelector("#app-sidebar .thq-upd, aside.fixed .thq-upd"), null, { timeout: 6000 });
-    const sprawdz = () => page.evaluate((sel) => {
-      const d = document.documentElement;
-      const thq = document.querySelector(".thq-root");
-      const host = thq ? thq.parentElement : document.body;
-      const wyswietlanie = () => sel.map((s) => [...document.querySelectorAll(s)].map((e) => getComputedStyle(e).display));
-      const przed = wyswietlanie();
-      d.setAttribute("data-jarvo-app", "");
-      if (thq) thq.style.display = "none";
-      const k = document.createElement("div");
-      k.id = "jarvo-e2e-korzen";
-      k.setAttribute("data-jarvo-korzen", "");          // korzeń aplikacji: reszta strony dostaje inert (powłoka)
-      k.style.cssText = "position:fixed;inset:0;z-index:30;background:#202024";
-      for (const n of ["a", "b"]) { const b = document.createElement("button"); b.id = `e2e-${n}`; b.textContent = n; k.appendChild(b); }
-      host.appendChild(k);
-      const po = wyswietlanie();
+    musi(atr.includes("data-jarvo-app"), `aplikacja nie chowa powłoki: ${atr}`);
+    musi(!(await pasekWidoczny(page)), "menu Hermesa widoczne obok aplikacji");
+    // pomiar z aplikacją (po) i bez niej (przed: atrybut zdjęty, korzeń schowany, jak klasyczna strona)
+    const wyswietlanie = () => page.evaluate((sel) => sel.map((s) => [...document.querySelectorAll(s)]
+      .map((e) => getComputedStyle(e).display)), SELEKTORY);
+    const pomiar = () => page.evaluate((sel) => {
+      const k = document.querySelector("[data-jarvo-korzen]");
       const W = innerWidth, H = innerHeight, punkty = [];
       for (const fx of [0.02, 0.5, 0.98]) for (const fy of [0.02, 0.5, 0.98]) {
         const e = document.elementFromPoint(fx * W, fy * H);
         punkty.push(!!e && k.contains(e) ? 1 : (e ? (e.id || e.tagName) : "brak"));
       }
-      return { przed, po, punkty };
+      return { po: sel.map((s) => [...document.querySelectorAll(s)].map((e) => getComputedStyle(e).display)), punkty };
     }, SELEKTORY);
-    const sprzataj = () => page.evaluate(() => {
-      document.documentElement.removeAttribute("data-jarvo-app");
-      const k = document.getElementById("jarvo-e2e-korzen"); if (k) k.remove();
-      const thq = document.querySelector(".thq-root"); if (thq) thq.style.display = "";
-    });
+    const bezAplikacji = (tak) => page.evaluate((t) => {
+      const d = document.documentElement, k = document.querySelector("[data-jarvo-korzen]");
+      if (t) { d.removeAttribute("data-jarvo-app"); k.style.display = "none"; } else { d.setAttribute("data-jarvo-app", ""); k.style.display = ""; }
+    }, tak);
     const uspione = () => page.evaluate(() => document.querySelectorAll("[inert]").length);
-    const biurko = await sprawdz();
+    const biurko = await pomiar();
     const tab = [];
-    await page.focus("#e2e-a");
-    for (let i = 0; i < 8; i++) {
+    await page.focus("[data-jarvo-korzen] .j-nowa");
+    for (let i = 0; i < 12; i++) {
       await page.keyboard.press("Tab");
       tab.push(await page.evaluate((sel) => {
-        const a = document.activeElement, k = document.getElementById("jarvo-e2e-korzen");
+        const a = document.activeElement, k = document.querySelector("[data-jarvo-korzen]");
         if (!a || a === document.body) return "body";
         if (k.contains(a)) return "app";
         const opis = `${a.tagName.toLowerCase()}${a.id ? "#" + a.id : ""} „${(a.textContent || "").trim().slice(0, 20)}”`;
@@ -276,19 +269,29 @@ async function etap1(browser) {
       }, SELEKTORY));
     }
     const inertZApp = await uspione();
-    await sprzataj();
+    await bezAplikacji(true);
     await page.waitForTimeout(100);
     const inertPo = await uspione();
+    biurko.przed = await wyswietlanie();
+    await bezAplikacji(false);
+    await page.waitForTimeout(100);
+    const inertZnowu = await uspione();
     // telefon: z otwartym menu Hermesa (wtedy jest zasłona menu, czwarty selektor)
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(300);
-    const telefonZamkniete = await sprawdz();
-    await sprzataj();
+    const telefonZamkniete = await pomiar();
+    await bezAplikacji(true);
+    telefonZamkniete.przed = await wyswietlanie();
     await page.click("header.lg\\:hidden.fixed.top-0 button");
     await page.waitForTimeout(300);
-    const telefon = await sprawdz();
-    await sprzataj();
+    const przedMenu = await wyswietlanie();
+    await bezAplikacji(false);
+    await page.waitForTimeout(100);
+    const telefon = { ...(await pomiar()), przed: przedMenu };
+    await bezAplikacji(true);
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    await bezAplikacji(false);
     await page.setViewportSize({ width: 1280, height: 800 });
     // na każdym ekranie: każdy selektor pasuje do najwyżej jednego elementu i z data-jarvo-app jest ukryty
     const stany = [["biurko", biurko], ["telefon", telefonZamkniete], ["telefon z menu", telefon]];
@@ -301,11 +304,11 @@ async function etap1(browser) {
     }
     // każdy selektor z powloka.json trafia dokładnie jeden element przynajmniej w jednym stanie (inaczej zły selektor)
     SELEKTORY.forEach((s, i) => musi(stany.some(([, w]) => w.przed[i].length === 1), `${s}: nie trafia żadnego elementu w DOM`));
-    musi(telefon.przed[1].some((x) => x !== "none"), "telefon: nagłówek Hermesa nie był widoczny przed data-jarvo-app (zły selektor?)");
+    musi(telefon.przed[1].some((x) => x !== "none"), "telefon: nagłówek Hermesa nie był widoczny bez data-jarvo-app (zły selektor?)");
     musi(telefon.przed[2].some((x) => x !== "none"), "telefon: zasłona menu niewidoczna przy otwartym menu (zły selektor?)");
     // Tab zostaje w aplikacji (najwyżej wychodzi z dokumentu): reszta strony ma inert, a po zejściu data-jarvo-app go nie ma
     musi(tab.every((x) => x === "app" || x === "body"), `Tab wychodzi poza aplikację: ${JSON.stringify(tab)}`);
-    musi(inertZApp > 0 && inertPo === 0, `inert: z aplikacją ${inertZApp}, po zejściu ${inertPo}`);
+    musi(inertZApp > 0 && inertPo === 0 && inertZnowu > 0, `inert: z aplikacją ${inertZApp}, po zejściu ${inertPo}, znowu ${inertZnowu}`);
     // /sessions: menu Hermesa z Jarvo na pierwszym miejscu
     await page.goto(BASE + "/sessions");
     await page.waitForSelector("#app-sidebar nav a", { timeout: 15000 });
@@ -338,7 +341,7 @@ async function etap1(browser) {
     await ps.route(/\/api\/plugins\/jarvo-hq\/zasoby\/app-[0-9a-f]{12}\.css$/, () => {});
     const tCss = Date.now();
     await ps.goto(BASE + "/jarvo", { waitUntil: "domcontentloaded" });
-    await ps.waitForSelector(".thq-root", { state: "visible", timeout: 8000 });
+    await ps.waitForSelector("[data-jarvo-korzen]", { state: "visible", timeout: 8000 });
     const bezStyluMs = Date.now() - tCss;
     await ps.close();
     // a') pakiet nie istnieje (błąd sieci): ekran błędu od razu
@@ -352,7 +355,7 @@ async function etap1(browser) {
     await p1.click("#app-sidebar a[href$='/sessions']");
     await czekajNa(p1, "/sessions");
     await p1.click("#app-sidebar a[href$='/jarvo']");
-    await p1.waitForSelector(".thq-root", { state: "visible", timeout: 15000 });
+    await p1.waitForSelector("[data-jarvo-korzen]", { state: "visible", timeout: 15000 });
     musi(zadaniaPakietu === 2, `ponowna próba: pakiet pobrany ${zadaniaPakietu} raz(y)`);
     await p1.close();
     // b) pakiet rzuca przy renderze: osłona błędów, ekran z Odśwież i klasycznym panelem, powłoka wraca
@@ -510,9 +513,10 @@ async function etap1(browser) {
     return { proby: statusy, z_panelu: zPanelu, curl, bez_sesji: bezSesji.status };
   });
 
-  await krok("9", "stara Baza działa: panel agenta, cele konwertera, podgląd pliku", async () => {
-    await page.goto(BASE + "/jarvo");
-    await page.waitForSelector(".thq-room", { timeout: 20000 });
+  await krok("9", "Stara Baza z ustawień działa: panel agenta, cele konwertera, podgląd pliku", async () => {
+    await page.goto(BASE + "/jarvo#/?u=stara-baza");
+    await page.click("[data-region=szuflada] .j-btn-mocny", { timeout: 20000 });
+    await page.waitForSelector(".j-stara .thq-room", { timeout: 20000 });
     const pokoj = page.locator(".thq-room").first();
     await pokoj.click();
     const panel = await page.waitForSelector("aside.thq-panel", { state: "visible", timeout: 10000 });
@@ -531,6 +535,8 @@ async function etap1(browser) {
     await page.click(".thq-konw-wynik .thq-link");
     await page.waitForSelector(".thq-preview-img", { state: "visible", timeout: 15000 });
     await page.keyboard.press("Escape");
+    await page.click(".j-stara-g .j-btn");                      // „Wróć do Jarva”
+    await page.waitForSelector(".j-stara", { state: "detached", timeout: 5000 });
     return { panel: agent, cele_konwertera: celeKonw.slice(0, 8), podglad: "obraz" };
   });
   return ctx;
@@ -563,13 +569,15 @@ function pomoc(...arg) {
   return JSON.parse(out.trim().split("\n").pop());
 }
 
-// dziennik atrapy: [{i, model, m: messages, glowne}]; glowne = tura agenta (strumień), nie wywołanie pomocnicze
-// Hermesa (tytuł sesji ze schematem JSON, opis obrazu dla modelu bez obsługi obrazów)
+// dziennik atrapy: [{i, model, m: messages, glowne, profil}]; glowne = tura agenta (strumień), nie wywołanie
+// pomocnicze Hermesa (tytuł sesji ze schematem JSON, opis obrazu dla modelu bez obsługi obrazów); profil z adresu
+// zapytania (każdy profil testu ma base_url …/p/<profil>/v1, tests/live/jarvo_e2e_etap2.py)
 function dziennik() {
   if (!DZIENNIK || !fs.existsSync(DZIENNIK)) return [];
   return fs.readFileSync(DZIENNIK, "utf8").split("\n").filter(Boolean).map((l, i) => {
     const z = JSON.parse(l);
-    return { i, model: z.model || "atrapa", m: z.messages || [], glowne: z.stream === true };
+    const p = /\/p\/([a-z0-9][a-z0-9-]*)\/v1\//.exec(z._sciezka || "");
+    return { i, model: z.model || "atrapa", m: z.messages || [], glowne: z.stream === true, profil: p ? p[1] : null };
   });
 }
 const tekstCz = (c) => (typeof c === "string" ? c : Array.isArray(c)
@@ -1252,10 +1260,1272 @@ async function etap2(browser) {
   return ctx;
 }
 
+// ------------------------------------------------------------------------------------------------ etap 3
+/* Aplikacja, etap 3 (docs/HQ.md „Aplikacja”). 3a: powłoka i własny wygląd, jeden strumień na przeglądarkę (zamek Web
+   Locks i BroadcastChannel), lista i wątek na żywo z atrapą modelu, szuflada ustawień, klawiatura, telefon i powrót po
+   wygaśnięciu sesji. 3b (punkty 10–13): kompozytor (Enter, Shift+Enter, szkic wątku), odpowiedź strumieniem, Markdown
+   odpowiedzi i echo HTML/javascript: jako tekst, adresat na jedną wiadomość, „Odpowiedz: <agent>”, wzmianka w środku
+   zdania, karta zgody (wybory z wydarzenia, odliczanie, Odmów, „Czas minął” i „Poproś ponownie”). Zrzut rozmowy z punktu 10 trafia do JARVO_E2E_DIR (po sukcesie usuwany), a z JARVO_E2E_ZRZUT=<plik.png>
+   także tam (do obejrzenia). Te same profile test-e2e-* i atrapa co etap 2 (zakłada i sprząta scripts/jarvo-e2e.sh
+   etap3); wątki [E2E] test usuwa sam. Zapytania samego testu niosą X-E2E-Test i nie liczą się do sprawdzeń aplikacji. */
+
+const STRUMIEN = /\/api\/plugins\/jarvo-hq\/strumien\?/;
+const PNG_MALY = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+const PDF_MALY = "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+  + "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n";
+
+// otwarte połączenia TCP przeglądarki testu z dashboardem: wiersze ESTABLISHED z /proc/net/tcp{,6} do portu dashboardu,
+// których gniazdo trzyma proces Chromium (test działa w kontenerze jako hermes, tak jak przeglądarka)
+function polaczeniaPrzegladarki(base) {
+  const port = Number(new URL(base).port || 80).toString(16).toUpperCase().padStart(4, "0");
+  const inody = new Set();
+  for (const plik of ["/proc/net/tcp", "/proc/net/tcp6"]) {
+    let t = "";
+    try { t = fs.readFileSync(plik, "utf8"); } catch (_) { continue; }
+    for (const l of t.split("\n").slice(1)) {
+      const c = l.trim().split(/\s+/);
+      if (c.length > 9 && c[2].split(":").pop() === port && c[3] === "01") inody.add(c[9]);
+    }
+  }
+  const nasze = new Set();
+  for (const pid of fs.readdirSync("/proc").filter((x) => /^\d+$/.test(x))) {
+    let cmd = "";
+    try { cmd = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8"); } catch (_) { continue; }
+    if (!/chrom/i.test(cmd)) continue;
+    let fds = [];
+    try { fds = fs.readdirSync(`/proc/${pid}/fd`); } catch (_) { continue; }
+    for (const fd of fds) {
+      try {
+        const m = /^socket:\[(\d+)\]$/.exec(fs.readlinkSync(`/proc/${pid}/fd/${fd}`));
+        if (m && inody.has(m[1])) nasze.add(m[1]);
+      } catch (_) { /* fd zamknięty w międzyczasie */ }
+    }
+  }
+  return nasze.size;
+}
+
+async function etap3(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: "pl-PL", colorScheme: "dark" });
+  const strumienie = [];                                    // EventSource aplikacji: {url, strona}
+  const zapisy = [];                                        // zapisy aplikacji do jarvo-hq: [metoda, ścieżka, X-Jarvo-Request]
+  const bledy = [];                                         // błędy JS stron aplikacji
+  ctx.on("request", (r) => {
+    const u = r.url(), h = r.headers();
+    if (STRUMIEN.test(u)) {
+      let strona = null;
+      try { strona = r.frame().page(); } catch (_) { /* zapytanie spoza ramki strony */ }
+      strumienie.push({ url: u, strona });
+    }
+    if (/\/api\/plugins\/jarvo-hq\//.test(u) && !["GET", "HEAD"].includes(r.method()) && !h["x-e2e-test"]) {
+      zapisy.push([r.method(), new URL(u).pathname, h["x-jarvo-request"] || ""]);
+    }
+  });
+  // Szum Chromium, nie aplikacji: dashboard Hermesa włącza przejścia widoku między dokumentami (@view-transition),
+  // a strona /login ich nie ma, więc każde przejście strony na /login (także z /sessions, bez aplikacji) zgłasza
+  // „Transition was aborted … ViewTransition opt-in disabled”; obsłużenie pageswap/pagereveal tego nie ucisza.
+  const SZUM = /ViewTransition opt-in disabled/;
+  const pilnuj = (p) => {                                   // błąd z numerem punktu i ścieżką strony
+    p.on("pageerror", (e) => SZUM.test(String(e)) || bledy.push(`punkt ${wyniki.length + 1} ${new URL(p.url()).pathname}: ${czysc(String(e)).slice(0, 200)}`));
+    return p;
+  };
+  // ekran startu wysyła do koordynatora testu (funkcje.e2e + localStorage), nie do prawdziwego Jarva: żadnej tury
+  // u dostawcy; schowek dla „Kopiuj ścieżkę”
+  await ctx.addInitScript((j) => { try { localStorage.setItem("jarvo.e2e.koordynator", j); } catch (_) { /* inna strona */ } }, J);
+  await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
+  let page = pilnuj(await ctx.newPage());
+  aktywna = page;
+  const watki = [];
+  const apiT = (metoda, sciezka, body) => page.evaluate(async ([m, u, b]) => {
+    const h = { "X-Jarvo-Request": "1", "X-E2E-Test": "1" };
+    if (b !== null) h["Content-Type"] = "application/json";
+    const r = await fetch(u, { method: m, headers: h, body: b !== null ? JSON.stringify(b) : undefined });
+    const t = await r.text();
+    let d = null;
+    try { d = JSON.parse(t); } catch (_) { d = t.slice(0, 300); }
+    return { s: r.status, d };
+  }, [metoda, P + sciezka, body === undefined ? null : body]);
+  const nowyW = async (tytul) => {
+    const r = await apiT("POST", "/rozmowy", { tytul: `[E2E] ${tytul}`, koordynator: J });
+    musi(r.s === 201 && r.d && r.d.watek, `POST /rozmowy: ${r.s} ${JSON.stringify(r.d).slice(0, 200)}`);
+    watki.push(r.d.watek.id);
+    return r.d.watek.id;
+  };
+  const korzen = (f) => page.evaluate(f);
+  let csrf0 = null;
+
+  // zestaw zrzutów dla właściciela (kryterium „Live” etapu 3): JARVO_E2E_ZRZUTY=<katalog> → <katalog>/<motyw>-<szerokość>.jpg
+  // (jasny i ciemny, 1440 i 390 px, JPEG 80); w każdym obok siebie ekran startu i podany wątek z odpowiedzią atrapy.
+  // Nowe konteksty z sesją testu, motyw aplikacji „Jak w systemie” (rozstrzyga colorScheme). Bez zmiennej nic nie robi.
+  const zestawZrzutow = async (watek) => {
+    const kat = process.env.JARVO_E2E_ZRZUTY;
+    if (!kat) return null;
+    fs.mkdirSync(kat, { recursive: true });
+    const stan = await ctx.storageState();
+    for (const o of stan.origins || []) o.localStorage = (o.localStorage || []).filter((x) => x.name !== "jarvo.ustawienia.v1");
+    const pliki = [];
+    for (const [motyw, schemat] of [["jasny", "light"], ["ciemny", "dark"]]) {
+      for (const [w, h] of [[1440, 900], [390, 844]]) {
+        const c = await browser.newContext({ viewport: { width: w, height: h }, locale: "pl-PL", colorScheme: schemat, storageState: stan });
+        try {
+          const p = await c.newPage();
+          await p.goto(`${BASE}/jarvo#/`);
+          await p.waitForSelector("[data-jarvo-korzen] .j-witaj", { timeout: 15000 });
+          await p.waitForTimeout(1500);
+          const start = await p.screenshot({ type: "png" });
+          await p.evaluate((x) => { location.hash = `#/r/${x}`; }, watek);
+          await p.waitForSelector(".j-msg-ag .j-md-tab", { timeout: 15000 });
+          await p.waitForTimeout(1000);
+          const rozmowa = await p.screenshot({ type: "png" });
+          await p.goto("about:blank");                      // bez CSP dashboardu (obrazy data:)
+          await p.setViewportSize({ width: 2 * w + 16, height: h });
+          await p.setContent(`<body style="margin:0;display:flex;gap:16px;background:${schemat === "dark" ? "#000" : "#d8d8de"}">${
+            [start, rozmowa].map((b) => `<img src="data:image/png;base64,${b.toString("base64")}" width="${w}" height="${h}">`).join("")}</body>`);
+          const plik = path.join(kat, `${motyw}-${w}.jpg`);
+          await p.screenshot({ path: plik, type: "jpeg", quality: 80 });
+          pliki.push(path.basename(plik));
+        } finally {
+          await c.close().catch(() => {});
+        }
+      }
+    }
+    return pliki;
+  };
+
+  await krok("1", "aplikacja na /jarvo: korzeń, powłoka schowana, własny wygląd bez motywu dashboardu, kroje lokalne", async () => {
+    await zaloguj(page);
+    await czekajGotowe(page);
+    await page.waitForSelector("[data-jarvo-korzen] .j-uklad", { state: "visible", timeout: 15000 });
+    const s = await korzen(async () => {
+      const k = document.querySelector("[data-jarvo-korzen]"), cs = getComputedStyle(k), po = getComputedStyle(document.body, "::after");
+      const kroje = await document.fonts.load('600 15px "Jarvo UI"', "Zażółć");
+      return { app: document.documentElement.hasAttribute("data-jarvo-app"), motyw: k.getAttribute("data-motyw"),
+        lang: k.getAttribute("lang"), kroj: cs.fontFamily.split(",")[0], kroje: kroje.length, cien: cs.textShadow,
+        linie_skanowania: po.content !== "none" && po.display !== "none", poziomo: document.documentElement.scrollWidth > innerWidth,
+        witaj: (document.querySelector(".j-witaj") || {}).textContent || "", tlo: cs.backgroundColor };
+    });
+    musi(s.app && !(await pasekWidoczny(page)), `powłoka Hermesa widoczna (data-jarvo-app: ${s.app})`);
+    musi(s.motyw === "ciemny" && s.lang === "pl", `motyw ${s.motyw}, język ${s.lang} (system ciemny, pl)`);
+    musi(/Jarvo UI/.test(s.kroj) && s.kroje > 0, `krój ${s.kroj}, wczytane ${s.kroje}`);
+    musi(s.cien === "none" && !s.linie_skanowania, `motyw dashboardu sięga aplikacji: cień ${s.cien}, linie ${s.linie_skanowania}`);
+    musi(!s.poziomo && s.witaj.length > 0, `start: ${JSON.stringify(s)}`);
+    csrf0 = (await zdrowie(page)).csrf_odmowy;
+    return s;
+  });
+  if (!wyniki[wyniki.length - 1].ok) return ctx;
+
+  await krok("2", "jeden strumień na przeglądarkę: druga karta bez własnego, po zamknięciu lidera przejmuje z ?od=", async () => {
+    await czekaj(() => strumienie.length >= 1, 10000, "strumień pierwszej karty");
+    await page.waitForSelector(".j-zdrowie.is-ok", { timeout: 15000 });
+    const n0 = strumienie.length;
+    const druga = pilnuj(await ctx.newPage());
+    await druga.goto(BASE + "/jarvo");
+    await druga.waitForSelector("[data-jarvo-korzen] .j-zdrowie.is-ok", { timeout: 15000 });
+    await spij(2500);
+    const n1 = strumienie.length;
+    musi(n1 === n0, `druga karta otworzyła własny strumień (${n0} → ${n1})`);
+    await page.close();                                     // karta lidera
+    page = aktywna = druga;
+    await czekaj(() => strumienie.length > n1, 10000, "nowy lider otwiera strumień");
+    const nowy = strumienie[strumienie.length - 1];
+    musi(nowy.strona === druga, "strumień otworzyła inna karta niż pozostała");
+    musi(/[?&]od=/.test(nowy.url), `nowy lider bez ?od=: ${nowy.url.replace(/klient=[^&]+/, "klient=…")}`);
+    await druga.waitForSelector(".j-zdrowie.is-ok", { timeout: 15000 });
+    return { strumienie_lidera: n0, po_drugiej_karcie: n1, przejecie: new URL(nowy.url).search.replace(/klient=[^&]+/, "klient=…") };
+  });
+
+  await krok("3", "lista na żywo: wątek [E2E] z API pojawia się w pasku, zmiana tytułu i usunięcie też, bez odświeżania", async () => {
+    const wid = await nowyW("etap 3 · lista");
+    const wiersz = `.j-wiersz-w[data-watek="${wid}"]`;
+    const t0 = Date.now();
+    await page.waitForSelector(wiersz, { timeout: 5000 });
+    const pojawilSieMs = Date.now() - t0;
+    const pierwszy = await korzen(() => (document.querySelector(".j-wiersz-w") || { dataset: {} }).dataset.watek);
+    musi(pierwszy === wid, `nowy wątek nie jest na górze listy (${pierwszy})`);
+    const r = await apiT("PATCH", `/rozmowy/${wid}`, { tytul: "[E2E] etap 3 · nowy tytuł" });
+    musi(r.s === 200, `PATCH: ${r.s} ${JSON.stringify(r.d).slice(0, 200)}`);
+    await page.waitForFunction((s) => /nowy tytuł/.test((document.querySelector(s) || {}).textContent || ""), wiersz, { timeout: 5000 });
+    const d = await apiT("DELETE", `/rozmowy/${wid}?trwale=1&praca=zatrzymaj`);
+    musi(d.s === 204, `DELETE: ${d.s}`);
+    watki.splice(watki.indexOf(wid), 1);
+    await page.waitForSelector(wiersz, { state: "detached", timeout: 5000 });
+    return { pojawil_sie_ms: pojawilSieMs, tytul: "zmieniony na żywo", usuniecie: "znika na żywo" };
+  });
+
+  await krok("4", "wątek w widoku: wiadomość właściciela i odpowiedź atrapy na żywo, jedna odpowiedź po końcu przebiegu", async () => {
+    const wid = await nowyW("etap 3 · wątek");
+    await page.click(`.j-wiersz-w[data-watek="${wid}"]`, { timeout: 5000 });
+    await page.waitForFunction((w) => location.hash === `#/r/${w}`, wid, { timeout: 5000 });
+    await page.waitForSelector(`.j-wiersz-w[data-watek="${wid}"][aria-current=page]`, { timeout: 5000 });
+    await page.waitForSelector(".j-os", { timeout: 10000 });
+    const z = `etap3-${los()}`;
+    const t0 = Date.now();
+    const w = await apiT("POST", `/rozmowy/${wid}/wiadomosci`, { tekst: z, klucz: "e2e-" + los() + los() });
+    musi(w.s === 202, `wysyłka: ${w.s} ${JSON.stringify(w.d).slice(0, 200)}`);
+    await page.waitForFunction((z) => [...document.querySelectorAll(".j-babel")].some((e) => e.textContent.includes(z)), z, { timeout: 10000 });
+    const babelMs = Date.now() - t0;
+    const odp = (z) => [...document.querySelectorAll(".j-msg-ag .j-msg-t")].filter((e) => e.textContent.includes(`Atrapa (`) && e.textContent.includes(z)).length;
+    await page.waitForFunction(odp, z, { timeout: 60000 });
+    const odpowiedzMs = Date.now() - t0;
+    await page.waitForFunction((z) => [...document.querySelectorAll(".j-msg-ag .j-msg-t")]
+      .filter((e) => e.textContent.includes(z)).length === 1 && !document.querySelector('.j-msg-ag.is-zywy[aria-busy="true"]'), z, { timeout: 30000 });
+    const s = await korzen(() => ({ tytul: document.querySelector(".j-gora-t").textContent, babelki: document.querySelectorAll(".j-babel").length,
+      odpowiedzi: document.querySelectorAll(".j-msg-ag").length }));
+    musi(s.tytul === "[E2E] etap 3 · wątek" && s.babelki === 1 && s.odpowiedzi === 1, `widok: ${JSON.stringify(s)}`);
+    return { babel_ms: babelMs, odpowiedz_ms: odpowiedzMs, ...s };
+  });
+
+  const POLE = "[data-kompozytor]";
+  const koniecPracy = (ms = 30000) => page.waitForFunction(() => !document.querySelector(".j-msg-ag.is-zywy[aria-busy=true]")
+    && !document.querySelector(".j-zywo"), null, { timeout: ms });
+  const odpowiedzZ = (z, agent) => page.waitForFunction(([z, a]) => [...document.querySelectorAll(`.j-msg-ag${a ? `[data-agent="${a}"]` : ""} .j-msg-t`)]
+    .some((e) => e.textContent.includes("Atrapa (") && e.textContent.includes(z)), [z, agent || null], { timeout: 60000 });
+  let wK = null;
+  // dodatkowe zrzuty do obejrzenia (JARVO_E2E_ZRZUT=/tmp/x.png → /tmp/x-<nazwa>.png); bez zmiennej nic nie zapisuje
+  const zrzutDodatkowy = (nazwa) => (process.env.JARVO_E2E_ZRZUT
+    ? page.screenshot({ path: process.env.JARVO_E2E_ZRZUT.replace(/\.png$/, "") + `-${nazwa}.png` }).catch(() => {}) : null);
+
+  // ---- 3c (punkty 14–23): ekran startu, stany, szuflada minimalna, bezpieczna aktualizacja, wiele kart, klawiatura
+  // start z koordynatorem testu: funkcje.e2e przychodzą z GET /app (po odświeżeniu gotowość bywa liczona kilka sekund),
+  // a do tego czasu start mówi „Do: Jarvo”; nic nie wysyłamy, zanim kompozytor nie pokaże test-e2e-j
+  const koordynatorStartu = () => page.waitForSelector(`.j-do-b[data-agent="${J}"]`, { timeout: 20000 });
+  const naStart = async () => {
+    await page.evaluate(() => { location.hash = "#/"; });
+    await page.waitForSelector(".j-witaj", { timeout: 5000 });
+    await koordynatorStartu();
+  };
+  const doWatku = async (wid) => {
+    await page.evaluate((w) => { location.hash = `#/r/${w}`; }, wid);
+    await page.waitForSelector(`.j-wiersz-w[data-watek="${wid}"][aria-current=page]`, { timeout: 5000 });
+    await page.waitForSelector(POLE, { timeout: 10000 });
+  };
+  // wątek, który aplikacja założyła ze startu (akcje.wyslij bez wątku → #/r/<id>)
+  const nowyZeStartu = async (ms = 15000) => {
+    await page.waitForFunction(() => /^#\/r\/w_/.test(location.hash), null, { timeout: ms });
+    const wid = await page.evaluate(() => location.hash.slice(4).split(/[/?]/)[0]);
+    if (!watki.includes(wid)) watki.push(wid);
+    return wid;
+  };
+  const przeladuj = async (p = page) => {
+    await p.reload();
+    await czekajGotowe(p);
+    await p.waitForSelector("[data-jarvo-korzen] .j-uklad", { state: "visible", timeout: 15000 });
+  };
+  const ZYWY = '.j-msg-ag.is-zywy[aria-busy="true"] .j-msg-t';
+  const strumieniuje = (ms = 30000) => page.waitForFunction((s) => [...document.querySelectorAll(s)]
+    .some((e) => e.textContent.startsWith("Atrapa")), ZYWY, { timeout: ms, polling: 100 });
+  const ileOd = (a) => page.evaluate((a) => document.querySelectorAll(`.j-msg-ag[data-agent="${a}"] .j-msg-t`).length, a);
+  const wiecejOd = (a, n, ms = 60000) => page.waitForFunction(([a, n]) => document.querySelectorAll(`.j-msg-ag[data-agent="${a}"] .j-msg-t`).length > n,
+    [a, n], { timeout: ms });
+
+  await krok("14", "ekran startu: jedna linia gotowości (Połącz → Klucze/Modele, Poznajmy się → koordynator), powitanie z USER.md, młoda brama „Jarvo się uruchamia…” bez czerwonego paska", async () => {
+    await naStart();
+    const app = await apiT("GET", "/app");
+    musi(app.s === 200 && app.d && app.d.gotowosc && app.d.funkcje && app.d.funkcje.e2e, `GET /app: ${app.s} ${JSON.stringify(app.d).slice(0, 200)}`);
+    const got = app.d.gotowosc;
+    // same nazwy i wartości logiczne (spec §13.10): model = {dostawca, polaczony, sposob}, nic więcej
+    const pola = Object.keys(got.model || {}).sort().join(",");
+    musi(pola === "dostawca,polaczony,sposob" && typeof got.model.polaczony === "boolean", `gotowosc.model: ${pola}`);
+    // spokojny start: najwyżej jedna linia gotowości (brama, potem model, potem „Poznajmy się”) i jeden link
+    const linie = await korzen(() => [...document.querySelectorAll("p.j-gotowosc[data-gotowosc]")].map((e) => e.dataset.gotowosc));
+    const out = { model: { ...got.model }, brama: got.brama, profil_wlasciciela: got.profil_wlasciciela, linie };
+    musi(linie.length <= 1, `więcej niż jedna linia gotowości: ${linie}`);
+    if (!got.model.polaczony) {
+      const cel = got.model.sposob === "oauth" ? "/models" : "/env";
+      musi(linie[0] === "model", `bez modelu nie ma linii „Połącz model”: ${linie}`);
+      musi(!(await korzen(() => !!document.querySelector(".j-podp"))), "bez modelu widać startery");
+      await page.click('.j-gotowosc[data-gotowosc="model"] .j-got-b');
+      const f = await (await page.waitForSelector("[data-region=szuflada] iframe.j-osadzona", { timeout: 5000 })).contentFrame();
+      await f.waitForSelector("#app-sidebar", { state: "attached", timeout: 15000 });
+      out.polacz_model = await f.evaluate(() => location.pathname);
+      musi(out.polacz_model === cel, `„Połącz model” otworzył ${out.polacz_model}, a nie ${cel} (${got.model.sposob})`);
+      await page.click("[data-region=szuflada] .j-sz-x");
+      await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 5000 });
+    }
+    if (!got.profil_wlasciciela && got.model.polaczony) {
+      musi(linie[0] === "poznajmy", `bez USER.md nie ma linii „Poznajmy się”: ${linie}`);
+      const t = "Poznajmy się. Zadaj mi pytania o moją firmę.";
+      await koordynatorStartu();
+      await page.click('.j-gotowosc[data-gotowosc="poznajmy"] .j-got-b');
+      await page.waitForFunction((t) => [...document.querySelectorAll(".j-babel")].some((e) => e.textContent.trim() === t), t, { timeout: 5000 });
+      const wid = await nowyZeStartu();
+      await odpowiedzZ("Poznajmy się", J);
+      await koniecPracy();
+      const w = await apiT("GET", `/rozmowy/${wid}`);
+      const zap = zapytaniaZ("Poznajmy się. Zadaj mi pytania");
+      musi(w.s === 200 && w.d.watek.koordynator === J, `wątek „Poznajmy się”: ${w.s} koordynator ${w.d && w.d.watek && w.d.watek.koordynator}`);
+      musi(zap.length >= 1 && zap.every((z) => z.profil === J), `atrapa: „Poznajmy się” poszło do ${zap.map((z) => z.profil)}`);
+      out.poznajmy = { koordynator: J, atrapa: [...new Set(zap.map((z) => `/p/${z.profil}/`))] };
+      await naStart();
+    }
+    // powitanie z USER.md (imię i firma); plik wraca do poprzedniej treści
+    const userMd = path.join(KNOWLEDGE, "user", "USER.md");
+    let staryUser = null;
+    try { staryUser = fs.readFileSync(userMd, "utf8"); } catch (_) { /* brak pliku */ }
+    try {
+      const szablon = staryUser && /Imię \/ jak się zwracać:/.test(staryUser) && /Firma \/ marki/.test(staryUser) ? staryUser
+        : "# Profil użytkownika\n\n## Kim jestem\n- Imię / jak się zwracać:\n- Firma / marki (nazwa → strona → brand kit):\n";
+      fs.mkdirSync(path.dirname(userMd), { recursive: true });
+      fs.writeFileSync(userMd, szablon.replace(/^(- Imię \/ jak się zwracać:).*$/m, "$1 Ola (E2E)")
+        .replace(/^(- Firma \/ marki[^:\n]*:).*$/m, "$1 Piekarnia Testowa → https://example.pl"));
+      await przeladuj();
+      await page.waitForSelector(".j-witaj", { timeout: 10000 });
+      out.powitanie = await korzen(() => ({ tytul: document.querySelector(".j-witaj").textContent.trim(),
+        pod: ((document.querySelector(".j-start-p") || {}).textContent || "").trim(), poznajmy: !!document.querySelector('[data-gotowosc="poznajmy"]') }));
+      musi(/Ola/.test(out.powitanie.tytul) && !/E2E/.test(out.powitanie.tytul) && /Piekarnia Testowa/.test(out.powitanie.pod)
+        && !/example/.test(out.powitanie.pod) && !out.powitanie.poznajmy, `powitanie z USER.md: ${JSON.stringify(out.powitanie)}`);
+    } finally {
+      if (staryUser != null) fs.writeFileSync(userMd, staryUser); else fs.rmSync(userMd, { force: true });
+    }
+    // brama młodsza niż 2 min (wymuszona trasą testu): linia „Jarvo się uruchamia…”, bez czerwonego paska i podpowiedzi
+    const g = await apiT("POST", "/e2e/gotowosc", { brama: "startuje" });
+    musi(g.s === 200 && g.d.brama === "startuje", `POST /e2e/gotowosc: ${g.s} ${JSON.stringify(g.d)}`);
+    try {
+      await przeladuj();
+      await page.waitForSelector('.j-gotowosc[data-gotowosc="startuje"]', { timeout: 10000 });
+      await spij(1500);
+      out.brama_mloda = await korzen(() => ({ stan: document.querySelector(".j-gotowosc").textContent.trim(),
+        rola: document.querySelector(".j-gotowosc").getAttribute("role"),
+        kreci: !!document.querySelector(".j-gotowosc .j-spin"), pasy: [...document.querySelectorAll(".j-pas")].map((e) => e.dataset.pas),
+        pod: ((document.querySelector(".j-komp-pod") || {}).textContent || "").trim() }));
+      await zrzutDodatkowy("start-brama");
+      musi(/Jarvo się uruchamia/.test(out.brama_mloda.stan) && out.brama_mloda.kreci && out.brama_mloda.rola === "status"
+        && !out.brama_mloda.pasy.length && !out.brama_mloda.pod,
+        `młoda brama: ${JSON.stringify(out.brama_mloda)}`);
+    } finally {
+      await apiT("POST", "/e2e/gotowosc", { brama: null }).catch(() => {});
+    }
+    await przeladuj();
+    return out;
+  });
+
+  await krok("15", "nowy wątek ze startu: „Hej” Enterem → wątek z koordynatorem test-e2e-j (atrapa: /p/test-e2e-j/), dymek od razu, odpowiedź strumieniem", async () => {
+    await naStart();
+    const adresat = await page.getAttribute(".j-do-b", "data-agent");
+    const z = `hej-${los()}`;
+    const tekst = `Hej [wolno:3] ${z}`;
+    await page.click(POLE);
+    await page.keyboard.type(tekst);
+    const t0 = Date.now();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction((z) => [...document.querySelectorAll(".j-babel")].some((e) => e.textContent.includes(z)), z, { timeout: 3000 });
+    const babelMs = Date.now() - t0;
+    const wid = await nowyZeStartu();
+    // strumień: tekst atrapy w żywym dymku, zanim przebieg się skończy (część odpowiedzi)
+    await strumieniuje();
+    const czesc = await page.evaluate((s) => (document.querySelector(s) || {}).textContent || "", ZYWY);
+    await odpowiedzZ(z, J);
+    const odpowiedzMs = Date.now() - t0;
+    await koniecPracy();
+    const w = await apiT("GET", `/rozmowy/${wid}`);
+    const zap = zapytaniaZ(z);
+    const oczek = echoAtrapy(tekst, zap.length ? zap[0].model : "atrapa");
+    const koniec = await page.evaluate((z) => [...document.querySelectorAll(".j-msg-ag .j-msg-t")].filter((e) => e.textContent.includes(z)).map((e) => e.textContent.trim()), z);
+    musi(adresat === J, `Do: ${adresat} na starcie (koordynator testu ${J})`);
+    musi(babelMs < 1500, `dymek właściciela po ${babelMs} ms`);
+    musi(w.s === 200 && w.d.watek.koordynator === J, `nowy wątek: ${w.s} koordynator ${w.d && w.d.watek && w.d.watek.koordynator}`);
+    musi(zap.length === 1 && zap[0].profil === J, `atrapa: ${zap.length} tur, profile ${zap.map((x) => x.profil)}`);
+    musi(czesc.length > 0 && czesc.length < oczek.length && oczek.startsWith(czesc.trim()), `część w trakcie: ${JSON.stringify(czesc)} / ${oczek.length}`);
+    musi(koniec.length === 1 && koniec[0] === oczek, `odpowiedź: ${JSON.stringify(koniec)} ≠ ${JSON.stringify(oczek)}`);
+    return { babel_ms: babelMs, odpowiedz_ms: odpowiedzMs, koordynator: J, atrapa: `/p/${zap[0].profil}/`, w_trakcie_znakow: czesc.length, razem: oczek.length };
+  });
+
+  await krok("10", "kompozytor: „Hej” Enterem do wątku z test-e2e-j, dymek od razu, odpowiedź strumieniem; Shift+Enter, szkic wątku", async () => {
+    wK = await nowyW("etap 3 · kompozytor");
+    await page.click(`.j-wiersz-w[data-watek="${wK}"]`, { timeout: 5000 });
+    await page.waitForSelector(`.j-wiersz-w[data-watek="${wK}"][aria-current=page]`, { timeout: 5000 });
+    await page.waitForSelector(POLE, { timeout: 10000 });
+    const adresat = await page.getAttribute(".j-do-b", "data-agent");
+    await page.click(POLE);
+    await page.keyboard.type("Hej");
+    await page.keyboard.press("Shift+Enter");
+    const zNowaLinia = await page.inputValue(POLE);
+    await page.keyboard.press("Backspace");
+    const t0 = Date.now();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => [...document.querySelectorAll(".j-babel")].some((e) => e.textContent.trim() === "Hej"), null, { timeout: 3000 });
+    const babelMs = Date.now() - t0;
+    const poWysylce = await page.inputValue(POLE);
+    // strumień: tekst atrapy widać w żywym dymku przed końcem przebiegu albo od razu w odpowiedzi
+    await odpowiedzZ("Hej", J);
+    const odpowiedzMs = Date.now() - t0;
+    await koniecPracy();
+    const s = await korzen(() => ({ babelki: document.querySelectorAll(".j-babel").length, odpowiedzi: document.querySelectorAll(".j-msg-ag").length,
+      wyslij_wylaczony: document.querySelector(".j-wyslij").disabled, fokus_w_polu: document.activeElement === document.querySelector("[data-kompozytor]"),
+      md: !!document.querySelector(".j-msg-ag .j-msg-t.j-md p") }));
+    const plik = path.join(DIR, "etap3-rozmowa.png");
+    await page.screenshot({ path: plik });
+    if (process.env.JARVO_E2E_ZRZUT) fs.copyFileSync(plik, process.env.JARVO_E2E_ZRZUT);
+    // szkic zostaje przy wątku: wyjście na start i powrót
+    await page.fill(POLE, "szkic etapu 3");
+    await page.evaluate(() => { location.hash = "#/"; });
+    await page.waitForSelector(".j-witaj", { timeout: 5000 });
+    const naStarcie = await page.inputValue(POLE);
+    await page.evaluate((w) => { location.hash = `#/r/${w}`; }, wK);
+    await page.waitForSelector(`.j-wiersz-w[data-watek="${wK}"][aria-current=page]`, { timeout: 5000 });
+    await page.waitForSelector(POLE, { timeout: 5000 });
+    const szkic = await page.inputValue(POLE);
+    await page.fill(POLE, "");
+    musi(adresat === J, `Do: ${adresat} (koordynator wątku ${J})`);
+    musi(zNowaLinia === "Hej\n", `Shift+Enter: ${JSON.stringify(zNowaLinia)}`);
+    musi(poWysylce === "" && babelMs < 1500, `po Enter pole „${poWysylce}”, dymek po ${babelMs} ms`);
+    musi(s.babelki === 1 && s.odpowiedzi === 1 && s.wyslij_wylaczony && s.md, `widok: ${JSON.stringify(s)}`);
+    musi(naStarcie === "" && szkic === "szkic etapu 3", `szkic: start „${naStarcie}”, wątek „${szkic}”`);
+    return { babel_ms: babelMs, odpowiedz_ms: odpowiedzMs, ...s, szkic: "wraca z wątkiem", zrzut: process.env.JARVO_E2E_ZRZUT ? "zapisany" : "w katalogu testu" };
+  });
+
+  await krok("11", "Markdown odpowiedzi ([dlugo]: nagłówek, lista, tabela, kod); echo <img onerror>, javascript: i <script> zostaje tekstem", async () => {
+    musi(wK, "brak wątku z punktu 10");
+    await page.fill(POLE, "[dlugo]");
+    await page.press(POLE, "Enter");
+    await page.waitForFunction(() => [...document.querySelectorAll(".j-msg-ag .j-msg-t")].some((e) => e.querySelector(".j-md-tab")), null, { timeout: 60000 });
+    await koniecPracy();
+    let zrzuty = null;
+    try { zrzuty = await zestawZrzutow(wK); } catch (e) { zrzuty = `nieudane: ${czysc(e && e.message ? e.message : e).slice(0, 200)}`; }
+    const md = await korzen(() => {
+      const o = [...document.querySelectorAll(".j-msg-ag .j-msg-t")].find((e) => e.querySelector(".j-md-tab"));
+      return { naglowek: (o.querySelector(".j-md-h2") || {}).textContent || "", lista: o.querySelectorAll("ol > li").length,
+        komorki: o.querySelectorAll(".j-md-tab td").length, kod: (o.querySelector(".j-md-kod pre") || {}).textContent || "",
+        pogrubione: o.querySelectorAll("strong").length,
+        // numery listy widać (reset Hermesa zdejmuje znaczniki list; .j-md przywraca decimal i disc)
+        znaczniki: [...o.querySelectorAll("ol, ul")].map((l) => getComputedStyle(l).listStyleType) };
+    });
+    const z = `md-${los()}`;
+    const zly = `<img src=x onerror="window.jarvoXss=1"> <script>window.jarvoXss=3</script> [Kliknij](javascript:window.jarvoXss=2) **gruby** ${z}`;
+    await page.fill(POLE, zly);
+    await page.press(POLE, "Enter");
+    await odpowiedzZ(z, J);
+    await koniecPracy();
+    const x = await page.evaluate((z) => {
+      const o = [...document.querySelectorAll(".j-msg-ag .j-msg-t")].find((e) => e.textContent.includes(z));
+      if (!o) return { brak: [...document.querySelectorAll(".j-os > *")].slice(-4).map((e) => `${e.className}: ${e.textContent.slice(-90)}`) };
+      return { img: document.querySelectorAll('.j-os img[src="x"], .j-os img[onerror]').length, skrypt: document.querySelectorAll(".j-os script").length,
+        js: document.querySelectorAll('.j-os a[href^="javascript"], .j-os a[href^=" javascript"]').length,
+        gruby: (o.querySelector("strong") || {}).textContent || "", tekst: o.textContent.includes("<img src=x") && o.textContent.includes("Kliknij"),
+        xss: window.jarvoXss || null, babel: [...document.querySelectorAll(".j-babel")].some((b) => b.textContent.includes('<img src=x onerror="window.jarvoXss=1">')) };
+    }, z);
+    if (x.brak) {
+      const os = await apiT("GET", `/rozmowy/${wK}/os`);
+      const poz = ((os.d && os.d.pozycje) || []).slice(-3).map((p) => `${p.rodzaj}/${p.przebieg_id || "-"}/${p.w_toku ? "w_toku" : ""}: ${String(p.tekst || "").slice(-90)}`);
+      musi(false, `odpowiedź z ${z} zniknęła po końcu przebiegu; DOM: ${JSON.stringify(x.brak)}; oś: ${JSON.stringify(poz)}`);
+    }
+    musi(md.naglowek === "Plan strony" && md.lista === 3 && md.komorki === 4 && /<h1>Piekarnia/.test(md.kod) && md.pogrubione === 3
+      && md.znaczniki.includes("decimal") && md.znaczniki.every((t) => t === "decimal" || t === "disc" || t === "circle"), `Markdown: ${JSON.stringify(md)}`);
+    musi(!x.img && !x.skrypt && !x.js && x.xss === null, `HTML z echa wykonany: ${JSON.stringify(x)}`);
+    musi(x.gruby === "gruby" && x.tekst && x.babel, `echo jako tekst: ${JSON.stringify(x)}`);
+    return { markdown: md, xss: "tekst, bez img/script/javascript:", ...(zrzuty ? { zrzuty } : {}) };
+  });
+
+  await krok("12", "adresat na jedną wiadomość (lista Do:), potem znów koordynator; „Odpowiedz: <agent>”, Esc anuluje; @agent na początku i w środku zdania; powyżej 3 adresatów pytanie", async () => {
+    musi(wK, "brak wątku z punktu 10");
+    await page.click(".j-do-b");
+    await page.waitForSelector(".j-lista-ag", { timeout: 3000 });
+    const opcje = await korzen(() => [...document.querySelectorAll(".j-lista-ag [data-agent]")].map((e) => e.dataset.agent));
+    await page.click(`.j-lista-ag [data-agent="${A}"]`);
+    await page.waitForSelector(`.j-do.is-jeden .j-do-b[data-agent="${A}"]`, { timeout: 3000 });
+    const z = `jedna-${los()}`;
+    // agent spoza sesji koordynatora dostaje blok kontekstu przed treścią (atrapa widzi w nim [dlugo] z punktu 11
+    // i odpowiada długim tekstem, a echo i tak nie sięgnęłoby z): czekamy na nową odpowiedź od A
+    const ileA = await page.evaluate((a) => document.querySelectorAll(`.j-msg-ag[data-agent="${a}"]`).length, A);
+    await page.fill(POLE, `pierwsza ${z}`);
+    await page.press(POLE, "Enter");
+    await page.waitForSelector(`.j-do:not(.is-jeden) .j-do-b[data-agent="${J}"]`, { timeout: 3000 });
+    await page.waitForFunction(([a, n]) => document.querySelectorAll(`.j-msg-ag[data-agent="${a}"] .j-msg-t`).length > n, [A, ileA], { timeout: 60000 });
+    await koniecPracy();
+    const s = await page.evaluate(([z, a]) => {
+      const ja = [...document.querySelectorAll(".j-msg-ja")].find((e) => e.textContent.includes(z));
+      const ag = [...document.querySelectorAll(`.j-msg-ag[data-agent="${a}"]`)].pop();
+      return { tag_wlasciciela: !!(ja && ja.querySelector(".j-msg-tag")), tag_agenta: !!(ag && ag.querySelector(".j-msg-g .j-tag")) };
+    }, [z, A]);
+    // „Odpowiedz: <agent>” pod jego wiadomością: wybór na jedną wiadomość i fokus w polu; Esc go anuluje
+    const art = page.locator(`.j-msg-ag[data-agent="${A}"]`).last();
+    await art.hover();
+    await art.locator(".j-msg-odp").click();
+    await page.waitForSelector(`.j-do.is-jeden .j-do-b[data-agent="${A}"]`, { timeout: 3000 });
+    const fokus = await korzen(() => document.activeElement === document.querySelector("[data-kompozytor]"));
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(`.j-do:not(.is-jeden) .j-do-b[data-agent="${J}"]`, { timeout: 3000 });
+    // wzmianka: na początku = adresat tej wiadomości; w środku zdania = podpowiedź, wiadomość idzie do koordynatora
+    await page.fill(POLE, "@teste2eb hej");
+    await page.waitForSelector(`.j-do.is-jeden .j-do-b[data-agent="${B}"]`, { timeout: 3000 });
+    await page.fill(POLE, "zapytaj @teste2eb o to");
+    await page.waitForSelector(`.j-do:not(.is-jeden) .j-do-b[data-agent="${J}"]`, { timeout: 3000 });
+    await page.waitForFunction(() => (document.querySelector(".j-komp-pod") || {}).textContent, null, { timeout: 3000 });
+    const srodek = await korzen(() => document.querySelector(".j-komp-pod").textContent);
+    // powyżej 3 adresatów: pytanie przed wysłaniem; Anuluj nic nie wysyła i zostawia tekst w polu (bez prawdziwej pracy)
+    const lista = await apiT("GET", "/agenci");
+    const uchwyt = (a) => a.handle || (a.aliasy && a.aliasy[0]);
+    const inni = ((lista.d && lista.d.agenci) || []).filter((a) => a && a.name !== J && a.stan !== "archiwum" && uchwyt(a)).map(uchwyt);
+    musi(inni.length >= 4, `za mało agentów do pytania o wielu: ${inni.length}`);
+    const wieluTekst = `${inni.slice(0, 4).map((u) => "@" + u).join(" ")} wielu-${los()}`;
+    const ileJaW = await korzen(() => document.querySelectorAll(".j-msg-ja").length);
+    await page.fill(POLE, wieluTekst);
+    await page.press(POLE, "Enter");
+    await page.waitForSelector(".j-okno[role=dialog]", { timeout: 3000 });
+    const wielu = await korzen(() => document.querySelector(".j-okno[role=dialog] h2").textContent);
+    await page.locator(".j-okno[role=dialog] .j-okno-s .j-btn", { hasText: "Anuluj" }).click();
+    await page.waitForSelector(".j-okno[role=dialog]", { state: "detached", timeout: 3000 });
+    const poAnuluj = await page.evaluate(([t, n]) => ({ pole: document.querySelector("[data-kompozytor]").value === t,
+      wyslane: document.querySelectorAll(".j-msg-ja").length > n }), [wieluTekst, ileJaW]);
+    musi(/4/.test(wielu) && poAnuluj.pole && !poAnuluj.wyslane, `pytanie o wielu: ${wielu} ${JSON.stringify(poAnuluj)}`);
+    await page.fill(POLE, "@tes");
+    await page.waitForSelector(".j-wzm [data-agent]", { timeout: 3000 });
+    const podpowiedzi = await korzen(() => [...document.querySelectorAll(".j-wzm [data-agent]")].map((e) => e.dataset.agent));
+    await page.press(POLE, "Escape");
+    await page.fill(POLE, "");
+    musi(opcje[0] === J && opcje.includes(A) && opcje.includes(B), `lista Do: ${opcje}`);
+    musi(s.tag_wlasciciela && s.tag_agenta, `bezpośrednio: ${JSON.stringify(s)}`);
+    musi(fokus, "„Odpowiedz” bez fokusu w polu");
+    musi(srodek.length > 0 && !/koordynator/i.test(srodek), `wzmianka w środku zdania: „${srodek}”`);
+    musi([A, B, J].every((n) => podpowiedzi.includes(n)), `podpowiedzi @tes: ${podpowiedzi}`);
+    return { lista_do: opcje.length, ...s, odpowiedz: "jedna wiadomość, Esc anuluje", srodek_zdania: srodek.slice(0, 80), podpowiedzi,
+      wielu: `${wielu} · Anuluj zostawia tekst` };
+  });
+
+  await krok("16", "bez przyklejania (W2): @teste2ea x → „tylko ta wiadomość” i „bezpośrednio”, następna bez @ do test-e2e-j (atrapa), wybór z klawiatury na jedną wiadomość, × i Esc; wzmianka w środku zdania → koordynator", async () => {
+    const wid = await nowyW("etap 3 · bez przyklejania");
+    await doWatku(wid);
+    const z1 = `wprost-${los()}`, z2 = `potem-${los()}`, z3 = `klawisze-${los()}`, z4 = `srodek-${los()}`;
+    const chipTekst = () => page.evaluate(() => document.querySelector(".j-do-b").textContent.replace(/\s+/g, " ").trim());
+    // 1. @teste2ea na początku: adresat tylko tej wiadomości, po wysłaniu znowu koordynator
+    await page.fill(POLE, `@teste2ea ${z1}`);
+    await page.waitForSelector(`.j-do.is-jeden .j-do-b[data-agent="${A}"]`, { timeout: 3000 });
+    const chip = await chipTekst();
+    await page.press(POLE, "Enter");
+    await page.waitForSelector(`.j-do:not(.is-jeden) .j-do-b[data-agent="${J}"]`, { timeout: 3000 });
+    const chipPo = await chipTekst();
+    await odpowiedzZ(z1, A);
+    await koniecPracy();
+    const tag = await page.evaluate((z) => {
+      const m = [...document.querySelectorAll(".j-msg-ja")].find((e) => e.textContent.includes(z));
+      const t = m && m.querySelector(".j-msg-tag");
+      return t ? t.textContent.replace(/\s+/g, " ").trim() : "";
+    }, z1);
+    // 2. następna bez @ idzie do koordynatora (blok kontekstu z odpowiedzią A przed treścią, więc liczymy odpowiedzi)
+    const [a0, j0] = [await ileOd(A), await ileOd(J)];
+    await page.fill(POLE, `a teraz ${z2}`);
+    await page.press(POLE, "Enter");
+    await wiecejOd(J, j0);
+    await koniecPracy();
+    const a1 = await ileOd(A);
+    const zap2 = zapytaniaZ(z2);
+    // 3. lista Do: z klawiatury (Enter, strzałki, Enter) też na jedną wiadomość
+    await page.focus(".j-do-b");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".j-lista-ag", { timeout: 3000 });
+    for (let i = 0; i < 12 && (await page.getAttribute(".j-lista-ag .is-aktywna", "data-agent")) !== A; i++) await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(`.j-do.is-jeden .j-do-b[data-agent="${A}"]`, { timeout: 3000 });
+    const fokusPoWyborze = await page.waitForFunction(() => !!document.activeElement && document.activeElement.hasAttribute("data-kompozytor"),
+      null, { timeout: 3000 }).then(() => true, () => false);
+    const a2 = await ileOd(A);
+    await page.keyboard.type(`z klawiatury ${z3}`);
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(`.j-do:not(.is-jeden) .j-do-b[data-agent="${J}"]`, { timeout: 3000 });
+    await wiecejOd(A, a2);
+    await koniecPracy();
+    const zap3 = zapytaniaZ(z3);
+    // × i Esc anulują wybór (wraca „Do: <koordynator>”)
+    await page.click(".j-do-b");
+    await page.click(`.j-lista-ag [data-agent="${A}"]`);
+    await page.waitForSelector(`.j-do.is-jeden .j-do-b[data-agent="${A}"]`, { timeout: 3000 });
+    await page.click(".j-do-x");
+    await page.waitForSelector(`.j-do:not(.is-jeden) .j-do-b[data-agent="${J}"]`, { timeout: 3000 });
+    await page.click(".j-do-b");
+    await page.click(`.j-lista-ag [data-agent="${B}"]`);
+    await page.waitForSelector(`.j-do.is-jeden .j-do-b[data-agent="${B}"]`, { timeout: 3000 });
+    await page.focus(POLE);
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(`.j-do:not(.is-jeden) .j-do-b[data-agent="${J}"]`, { timeout: 3000 });
+    // 4. wzmianka w środku zdania: podpowiedź pod polem, wiadomość do koordynatora, B nic nie dostaje
+    const [b0, j1] = [await ileOd(B), await ileOd(J)];
+    await page.fill(POLE, `zapytaj @teste2eb o ${z4}`);
+    await page.waitForFunction(() => ((document.querySelector(".j-komp-pod") || {}).textContent || "").trim().length > 0, null, { timeout: 3000 });
+    const podpowiedz = (await page.textContent(".j-komp-pod")).trim();
+    const chipSrodek = await page.getAttribute(".j-do-b", "data-agent");
+    await page.press(POLE, "Enter");
+    await wiecejOd(J, j1);
+    await koniecPracy();
+    const b1 = await ileOd(B);
+    const zap4 = zapytaniaZ(z4);
+    const profile = (l) => [...new Set(l.map((x) => x.profil))];
+    musi(/^Do:/.test(chip) && /tylko ta wiadomość$/.test(chip), `chip: ${chip}`);
+    musi(/^Do:/.test(chipPo) && !/tylko ta/.test(chipPo), `chip po wysłaniu: ${chipPo}`);
+    musi(/^bezpośrednio · ./.test(tag), `znacznik wiadomości: ${tag}`);
+    musi(a1 === a0 && zap2.length >= 1 && zap2.every((z) => z.profil === J), `następna bez @: A ${a0}→${a1}, atrapa ${profile(zap2)}`);
+    musi(fokusPoWyborze && zap3.length >= 1 && zap3.every((z) => z.profil === A), `wybór z klawiatury: fokus ${fokusPoWyborze}, atrapa ${profile(zap3)}`);
+    musi(chipSrodek === J && podpowiedz.length > 0, `środek zdania: Do ${chipSrodek}, podpowiedź „${podpowiedz}”`);
+    musi(b1 === b0 && zap4.length >= 1 && zap4.every((z) => z.profil === J), `środek zdania: B ${b0}→${b1}, atrapa ${profile(zap4)}`);
+    return { chip, chip_po: chipPo, znacznik: tag, nastepna: `/p/${J}/`, klawiatura: `/p/${A}/, potem znowu ${J}`, anuluj: "× i Esc",
+             srodek_zdania: { podpowiedz: podpowiedz.slice(0, 80), atrapa: `/p/${J}/` } };
+  });
+
+  await krok("13", "zgoda w wątku (@teste2ea, terminal): wybory z wydarzenia (Zawsze tylko w Więcej), odliczanie, polecenie; Odmów; po 20 s „Czas minął” i „Poproś ponownie”", async () => {
+    musi(wK, "brak wątku z punktu 10");
+    // terminal ma test-e2e-a (koordynator test-e2e-j go nie ma): wiadomości z wiodącą wzmianką
+    const kat = "/tmp/jarvo-e2e-zgoda-ui", kat2 = "/tmp/jarvo-e2e-zgoda-ui-2";
+    fs.mkdirSync(kat, { recursive: true }); fs.mkdirSync(kat2, { recursive: true });
+    const z = `zgoda-${los()}`;
+    await page.fill(POLE, `@teste2ea [narzedzie:terminal {"command": "rm -rf ${kat}"}] ${z}`);
+    await page.press(POLE, "Enter");
+    await page.waitForSelector(".j-zgoda:not(.is-wygasla) .j-zgoda-b", { timeout: 60000 });
+    const karta = await korzen(() => {
+      const k = document.querySelector(".j-zgoda:not(.is-wygasla)");
+      return { przyciski: [...k.querySelectorAll(".j-zgoda-b .j-btn")].map((b) => b.textContent.trim()),
+        czas: (k.querySelector(".j-zgoda-czas[role=timer]") || {}).textContent || "", ryzyko: (k.querySelector(".j-zgoda-q") || {}).textContent || "",
+        naglowek: (k.querySelector(".j-zgoda-h") || {}).textContent || "" };
+    });
+    await page.click(".j-zgoda:not(.is-wygasla) .j-zgoda-b .j-link");
+    const polecenie = await page.textContent(".j-zgoda:not(.is-wygasla) .j-zgoda-pol");
+    await zrzutDodatkowy("zgoda");
+    await page.locator(".j-zgoda:not(.is-wygasla) .j-zgoda-b .j-btn", { hasText: "Odmów" }).click();
+    await page.waitForSelector(".j-zgoda:not(.is-wygasla)", { state: "detached", timeout: 15000 });
+    await koniecPracy();
+    // druga prośba bez odpowiedzi: po 20 s karta „Czas minął” zostaje pod odpowiedzią także po końcu przebiegu
+    const z2 = `wygasa-${los()}`;
+    await page.fill(POLE, `@teste2ea [narzedzie:terminal {"command": "rm -rf ${kat2}"}] ${z2}`);
+    await page.press(POLE, "Enter");
+    await page.waitForSelector(".j-zgoda:not(.is-wygasla) .j-zgoda-b", { timeout: 60000 });
+    const t0 = Date.now();
+    await page.waitForSelector(".j-zgoda.is-wygasla", { timeout: 45000 });
+    const wygaslaPoMs = Date.now() - t0;
+    await koniecPracy(60000);
+    const poKoncu = await korzen(() => ({ karty: document.querySelectorAll(".j-zgoda.is-wygasla").length,
+      tekst: (document.querySelector(".j-zgoda.is-wygasla .j-zgoda-h") || {}).textContent || "" }));
+    const ileJa = await korzen(() => document.querySelectorAll(".j-msg-ja").length);
+    const ileA = await page.evaluate((a) => document.querySelectorAll(`.j-msg-ag[data-agent="${a}"] .j-msg-t`).length, A);
+    await page.locator(".j-zgoda.is-wygasla .j-btn", { hasText: "Poproś ponownie" }).last().click();
+    await page.waitForSelector(".j-zgoda.is-wygasla .j-zgoda-odp", { timeout: 5000 });
+    await page.waitForFunction((n) => document.querySelectorAll(".j-msg-ja").length > n, ileJa, { timeout: 5000 });
+    const prosba = await korzen(() => {
+      const m = [...document.querySelectorAll(".j-msg-ja")].pop();
+      return { tekst: m.querySelector(".j-babel").textContent, tag: (m.querySelector(".j-msg-tag") || {}).textContent || "" };
+    });
+    await page.waitForFunction(([a, n]) => document.querySelectorAll(`.j-msg-ag[data-agent="${a}"] .j-msg-t`).length > n, [A, ileA], { timeout: 60000 });
+    await koniecPracy();
+    musi(karta.przyciski.includes("Zezwól raz") && karta.przyciski.includes("Odmów") && !karta.przyciski.includes("Zawsze"), `przyciski: ${karta.przyciski}`);
+    musi(/^\d+:\d\d$/.test(karta.czas) && karta.ryzyko.length > 0 && /zgod/.test(karta.naglowek), `karta: ${JSON.stringify(karta)}`);
+    musi(polecenie.includes(`rm -rf ${kat}`), `polecenie: ${polecenie}`);
+    musi(fs.existsSync(kat) && fs.existsSync(kat2), "katalog usunięty mimo odmowy albo wygaśnięcia");
+    musi(poKoncu.karty >= 1 && /Czas minął/.test(poKoncu.tekst), `po końcu przebiegu: ${JSON.stringify(poKoncu)}`);
+    musi(/Ponów to polecenie/.test(prosba.tekst) && prosba.tag.length > 0, `Poproś ponownie wysłał: ${JSON.stringify(prosba)} (do tego agenta, bezpośrednio)`);
+    return { ...karta, polecenie: "pokazane", odmowa: "katalog został", wygasla_po_ms: wygaslaPoMs, po_koncu: poKoncu.tekst, ponownie: "wysłane do tego agenta" };
+  });
+
+  await krok("17", "załączniki: wklejony obraz i upuszczony PDF jako chipy, wysyłka; karty plików z [plik:…]: Podgląd, Pobierz, Kopiuj ścieżkę, Odpal; SVG w nowej karcie z /file, nigdy blob:", async () => {
+    musi(INBOX, "brak JARVO_E2E_INBOX");
+    fs.mkdirSync(INBOX, { recursive: true });
+    const pdf = path.join(INBOX, "e2e.pdf"), htmlP = path.join(INBOX, "e2e.html"), svg = path.join(INBOX, "e2e.svg");
+    fs.writeFileSync(pdf, PDF_MALY);
+    fs.writeFileSync(htmlP, '<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Strona E2E</title></head><body><h1>Strona E2E</h1></body></html>');
+    fs.writeFileSync(svg, '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#3a7"/></svg>');
+    const wid = await nowyW("etap 3 · załączniki");
+    await doWatku(wid);
+    // wklejenie obrazu (schowek z plikiem) i upuszczenie PDF na kompozytor: chipy, PDF przez /upload
+    await page.evaluate(([png, pdfB64]) => {
+      const bajty = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+      const wklej = new DataTransfer();
+      wklej.items.add(new File([bajty(png)], "jarvo-e2e-wklejony.png", { type: "image/png" }));
+      document.querySelector("[data-kompozytor]").dispatchEvent(new ClipboardEvent("paste", { clipboardData: wklej, bubbles: true, cancelable: true }));
+      const upusc = new DataTransfer();
+      upusc.items.add(new File([bajty(pdfB64)], "jarvo-e2e-upuszczony.pdf", { type: "application/pdf" }));
+      const cel = document.querySelector(".j-komp-w");
+      cel.dispatchEvent(new DragEvent("dragover", { dataTransfer: upusc, bubbles: true, cancelable: true }));
+      cel.dispatchEvent(new DragEvent("drop", { dataTransfer: upusc, bubbles: true, cancelable: true }));
+    }, [PNG_MALY, Buffer.from(PDF_MALY).toString("base64")]);
+    await page.waitForSelector(".j-zal-p.is-obraz", { timeout: 5000 });
+    await page.waitForFunction(() => [...document.querySelectorAll(".j-zal-p .j-zal-n")].some((e) => e.textContent.includes("upuszczony"))
+      && !document.querySelector(".j-zal-p.is-wgrywa"), null, { timeout: 15000 });
+    const chipy = await korzen(() => [...document.querySelectorAll(".j-zal-p")].map((e) => (e.classList.contains("is-obraz") ? "obraz:" : "plik:") + e.querySelector(".j-zal-n").textContent));
+    const z = `pliki-${los()}`;
+    await page.fill(POLE, `[plik:${pdf}] [plik:${htmlP}] [plik:${svg}] ${z}`);
+    await page.press(POLE, "Enter");
+    await odpowiedzZ(z, J);
+    await koniecPracy();
+    const zap = zapytaniaZ(z);
+    const obrazDoModelu = zap.some((x) => { const c = (ostatniUzytkownika(x.m) || {}).content; return Array.isArray(c) && c.some((y) => y && y.type === "image_url"); });
+    const wlasciciel = await page.evaluate((z) => {
+      const m = [...document.querySelectorAll(".j-msg-ja")].find((e) => e.textContent.includes(z));
+      return m ? [...m.querySelectorAll(".j-msg-pliki > .j-plik, .j-msg-pliki > img")].map((e) => e.getAttribute("data-plik") || "img") : null;
+    }, z);
+    const karta = (p) => `.j-msg-ag[data-agent="${J}"] .j-pliki .j-plik[data-plik="${p}"]`;
+    for (const p of [pdf, htmlP, svg]) await page.waitForSelector(karta(p), { timeout: 5000 });
+    // Podgląd PDF: ramka sandbox z /file
+    await page.click(`${karta(pdf)} .j-plik-otworz`);
+    await page.waitForSelector(".j-podglad-pdf", { timeout: 5000 });
+    const podglad = await korzen(() => ({ src: document.querySelector(".j-podglad-pdf").getAttribute("src"), sandbox: document.querySelector(".j-podglad-pdf").getAttribute("sandbox") }));
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(".j-podglad-pdf", { state: "detached", timeout: 5000 });
+    // Pobierz (główna akcja PDF): plik przez <a download>
+    const [pobrany] = await Promise.all([page.waitForEvent("download", { timeout: 10000 }), page.locator(`${karta(pdf)} .j-plik-akcje .j-btn`).first().click()]);
+    const pobranyNazwa = pobrany.suggestedFilename();
+    await pobrany.delete().catch(() => {});
+    // Kopiuj ścieżkę (menu karty): komunikat i schowek
+    await page.locator(`${karta(pdf)} .j-plik-akcje .j-btn`).nth(1).click();
+    await page.locator(".j-menu [role=menuitem]", { hasText: "Kopiuj ścieżkę" }).click();
+    await page.waitForSelector(`${karta(pdf)} .j-plik-uwaga`, { timeout: 5000 });
+    const kopiuj = await page.evaluate(async (s) => ({ uwaga: document.querySelector(s).textContent, zle: document.querySelector(s).classList.contains("is-zle"),
+      schowek: await navigator.clipboard.readText().catch((e) => `!${e.name}`) }), `${karta(pdf)} .j-plik-uwaga`);
+    // Odpal (główna akcja HTML): nowa karta z linkiem serwera podglądu
+    const [odpal] = await Promise.all([ctx.waitForEvent("page", { timeout: 10000 }), page.locator(`${karta(htmlP)} .j-plik-akcje .j-btn`).first().click()]);
+    await odpal.waitForURL((u) => u.port === new URL(PODGLAD).port, { timeout: 15000 });
+    await odpal.waitForSelector("h1", { timeout: 10000 });
+    const odpalono = { port: new URL(odpal.url()).port, h1: await odpal.textContent("h1") };
+    await odpal.close();
+    // SVG: miniatura i „Otwórz w nowej karcie” z /file (CSP sandbox), nigdy blob:
+    const miniatura = await page.getAttribute(`${karta(svg)} img`, "src");
+    await page.locator(`${karta(svg)} .j-plik-akcje .j-btn`).nth(1).click();
+    const [nowa] = await Promise.all([ctx.waitForEvent("page", { timeout: 10000 }), page.locator(".j-menu [role=menuitem]", { hasText: "Otwórz w nowej karcie" }).click()]);
+    await nowa.waitForLoadState("domcontentloaded").catch(() => {});
+    const svgUrl = nowa.url();
+    await nowa.close();
+    const bloby = await korzen(() => [...document.querySelectorAll("img")].filter((i) => /\.svg/.test(i.closest("[data-plik]") ? i.closest("[data-plik]").dataset.plik : "") && i.src.startsWith("blob:")).length);
+    musi(chipy.some((c) => c.startsWith("obraz:")) && chipy.some((c) => /^plik:.*upuszczony\.pdf$/.test(c)), `chipy: ${chipy}`);
+    musi(zap.length === 1 && zap[0].profil === J && obrazDoModelu, `atrapa: ${zap.length} tur, ${zap.map((x) => x.profil)}, obraz ${obrazDoModelu}`);
+    musi(wlasciciel && wlasciciel.length >= 2 && wlasciciel.some((p) => /upuszczony\.pdf$/.test(p)), `załączniki w wiadomości: ${JSON.stringify(wlasciciel)}`);
+    musi(/\/file\?path=/.test(podglad.src) && podglad.sandbox === "", `podgląd PDF: ${JSON.stringify(podglad)}`);
+    musi(pobranyNazwa === "e2e.pdf", `pobrany: ${pobranyNazwa}`);
+    musi(!kopiuj.zle && /e2e\.pdf$/.test(kopiuj.schowek), `kopiuj ścieżkę: ${JSON.stringify(kopiuj)}`);
+    musi(odpalono.h1 === "Strona E2E", `Odpal: ${JSON.stringify(odpalono)}`);
+    musi(/\/api\/plugins\/jarvo-hq\/file\?path=/.test(miniatura) && /\/api\/plugins\/jarvo-hq\/file\?path=.*e2e\.svg/.test(decodeURIComponent(svgUrl))
+      && !/^blob:/.test(svgUrl) && bloby === 0, `SVG: miniatura ${miniatura}, nowa karta ${svgUrl}, blob ${bloby}`);
+    return { chipy, w_wiadomosci: wlasciciel.length, atrapa: { profil: `/p/${zap[0].profil}/`, obraz: obrazDoModelu },
+             karty: ["pdf", "html", "svg"], podglad: "iframe sandbox z /file", pobierz: pobranyNazwa, kopiuj: kopiuj.uwaga,
+             odpal: `:${odpalono.port}`, svg: "z /file, bez blob:" };
+  });
+
+  await krok("18", "Zatrzymaj w pasku pracy i Esc Esc w polu ([wolno:20]); błąd dostawcy ([blad]) z „Ponów”, Ponów wysyła turę jeszcze raz", async () => {
+    const wid = await nowyW("etap 3 · stop");
+    await doWatku(wid);
+    const zatrzymane = () => page.evaluate(() => [...document.querySelectorAll(".j-msg-ag .j-msg-meta")].filter((e) => /Zatrzymane/.test(e.textContent)).length);
+    // Zatrzymaj
+    const z1 = `stop-${los()}`;
+    await page.fill(POLE, `[wolno:20] ${z1}`);
+    await page.press(POLE, "Enter");
+    await strumieniuje();
+    await page.waitForSelector(".j-zywo .j-btn", { timeout: 5000 });
+    const t1 = Date.now();
+    await page.click(".j-zywo .j-btn");
+    await page.waitForFunction(() => [...document.querySelectorAll(".j-msg-ag .j-msg-meta")].some((e) => /Zatrzymane/.test(e.textContent)), null, { timeout: 20000 });
+    const stopMs = Date.now() - t1;
+    await page.waitForSelector(".j-zywo", { state: "detached", timeout: 10000 });
+    // Esc Esc w polu wiadomości
+    const z2 = `esc-${los()}`;
+    await page.fill(POLE, `[wolno:20] ${z2}`);
+    await page.press(POLE, "Enter");
+    await strumieniuje();
+    await page.focus(POLE);
+    await page.keyboard.press("Escape");
+    const pierwszyEsc = (await page.textContent(".j-komp-pod")).trim();
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => [...document.querySelectorAll(".j-msg-ag .j-msg-meta")].filter((e) => /Zatrzymane/.test(e.textContent)).length >= 2, null, { timeout: 20000 });
+    await page.waitForSelector(".j-zywo", { state: "detached", timeout: 10000 });
+    const poStop = await zatrzymane();
+    // [blad]: HTTP 500 atrapy → błąd przebiegu z „Ponów”
+    const z3 = `blad-${los()}`;
+    await page.fill(POLE, `[blad] ${z3}`);
+    await page.press(POLE, "Enter");
+    await page.waitForSelector(".j-blad-p", { timeout: 60000 });
+    await koniecPracy(30000);
+    const blad = await korzen(() => ({ tekst: document.querySelector(".j-blad-p .j-blad-t").textContent.trim(),
+      szczegoly: !!document.querySelector(".j-blad-p details.j-blad-sz"),
+      ponow: [...document.querySelectorAll(".j-blad-p .j-btn")].some((b) => /Ponów/.test(b.textContent)) }));
+    // karta z „Ponów” przetrwa przeładowanie (migawka wątku: przebiegi_do_ponowienia)
+    await przeladuj();
+    await page.waitForSelector(".j-blad-p", { timeout: 15000 });
+    blad.po_przeladowaniu = await korzen(() => [...document.querySelectorAll(".j-blad-p .j-btn")].some((b) => /Ponów/.test(b.textContent)));
+    const przed = dziennik().filter((x) => x.glowne && x.profil === J).length;
+    await page.locator(".j-blad-p .j-btn", { hasText: "Ponów" }).last().click();
+    await czekaj(() => dziennik().filter((x) => x.glowne && x.profil === J).length > przed, 60000, "Ponów nie wysłał tury do atrapy");
+    await koniecPracy(180000);
+    const poPonow = dziennik().filter((x) => x.glowne && x.profil === J).length - przed;
+    musi(stopMs < 10000, `Zatrzymaj po ${stopMs} ms`);
+    musi(/Esc/.test(pierwszyEsc) && poStop >= 2, `Esc Esc: „${pierwszyEsc}”, zatrzymanych ${poStop}`);
+    // krótko po polsku dla właściciela, surowy błąd tylko w „Szczegóły”
+    musi(blad.ponow && blad.po_przeladowaniu && /^[A-ZŁŚŻŹĆ]/.test(blad.tekst) && !/error|exception|traceback|http/i.test(blad.tekst),
+      `błąd: ${JSON.stringify(blad)}`);
+    musi(poPonow >= 1, `Ponów: ${poPonow} nowych tur`);
+    return { zatrzymaj_ms: stopMs, esc: pierwszyEsc, zatrzymane: poStop, blad: blad.tekst.slice(0, 80), ponow_tur: poPonow };
+  });
+
+  await krok("19", "odświeżenie w trakcie strumienia ([wolno:15]): dymek z tekst_dotad bez rozdarć i powtórek, rośnie dalej, koniec = echo atrapy", async () => {
+    const wid = await nowyW("etap 3 · odświeżenie");
+    await doWatku(wid);
+    const z = `odsw-${los()}`;
+    const tekst = `[wolno:15] ${z} raz dwa trzy cztery pięć sześć siedem osiem dziewięć dziesięć`;
+    await page.fill(POLE, tekst);
+    await page.press(POLE, "Enter");
+    const stany = [];
+    for (let t0 = Date.now(); ; await spij(100)) {
+      const st = await page.evaluate((s) => { const e = document.querySelector(s); const z = document.querySelector(".j-msg-ag.is-zywy");
+        return { t: e ? e.textContent : null, v: document.visibilityState,
+          z: z ? `${z.getAttribute("aria-busy")} ${(z.querySelector(".j-msg-meta") || {}).textContent || ""}`.slice(0, 80) : null }; }, ZYWY);
+      if (st.t && st.t.length > 30) break;
+      const pid = await page.evaluate(() => { const z = document.querySelector(".j-msg-ag.is-zywy"); return z ? z.getAttribute("data-przebieg") : null; });
+      if (pid) { const r = await api("GET", `/przebiegi/${pid}`, undefined, page); st.serwer = r && r.d ? ((r.d.przebieg || r.d).tekst_dotad || "").length : JSON.stringify(r).slice(0, 80); }
+      if (!stany.length || JSON.stringify(stany[stany.length - 1].st) !== JSON.stringify(st)) stany.push({ ms: Date.now() - t0, st });
+      musi(Date.now() - t0 < 30000, `brak tekstu na żywo > 30 znaków: ${JSON.stringify(stany.slice(-6))}`);
+    }
+    const przed = await page.evaluate((s) => document.querySelector(s).textContent, ZYWY);
+    await page.reload();
+    await czekajGotowe(page);
+    await page.waitForSelector(ZYWY, { timeout: 15000 });
+    const probki = [];
+    for (let i = 0; i < 120; i++) {
+      const t = await page.evaluate((s) => { const e = document.querySelector(s); return e ? e.textContent : null; }, ZYWY);
+      if (t === null) break;
+      probki.push(t);
+      await spij(250);
+    }
+    await koniecPracy(60000);
+    const zap = zapytaniaZ(z);
+    const oczek = echoAtrapy(tekst, zap.length ? zap[0].model : "atrapa");
+    const koniec = await page.evaluate((z) => [...document.querySelectorAll(".j-msg-ag .j-msg-t")].filter((e) => e.textContent.includes(z)).map((e) => e.textContent.trim()), z);
+    const zle = probki.filter((t) => !oczek.startsWith(t.replace(/\s+$/, "")));
+    const maleje = probki.some((t, i) => i > 0 && t.length < probki[i - 1].length);
+    musi(probki.length > 0 && probki[0].length >= przed.trim().length, `po odświeżeniu: ${JSON.stringify(probki[0])} krótsze niż przed (${przed.length})`);
+    musi(!zle.length && !maleje, `rozdarty albo zdublowany tekst: ${JSON.stringify(zle.slice(0, 2))}, maleje ${maleje}`);
+    musi(probki.length > 1 && probki[probki.length - 1].length > probki[0].length, `po odświeżeniu nie rósł: ${probki.length} próbek`);
+    musi(zap.length === 1 && koniec.length === 1 && koniec[0] === oczek, `koniec: ${JSON.stringify(koniec)} ≠ ${JSON.stringify(oczek)} (tur ${zap.length})`);
+    return { przed_znakow: przed.length, po_odswiezeniu_znakow: probki[0].length, probek: probki.length, koniec_znakow: oczek.length, tur_atrapy: zap.length };
+  });
+
+  await krok("19b", "wyjście z wątku w trakcie pracy ([wolno:5]) i powrót po jej końcu: żaden dymek nie kręci się dalej, pasek pracy znika", async () => {
+    const wid = await nowyW("etap 3 · powrót");
+    await doWatku(wid);
+    const z = `powrot-${los()}`;
+    await page.fill(POLE, `[wolno:5] ${z}`);
+    await page.press(POLE, "Enter");
+    await page.waitForSelector(".j-zywo", { timeout: 15000 });
+    await naStart();
+    // praca kończy się, gdy karta pokazuje start (strumień tej karty nie słucha już tego wątku)
+    await czekaj(() => zapytaniaZ(z).length >= 1, 30000, "atrapa nie dostała tury");
+    await spij(9000);
+    await doWatku(wid);
+    await odpowiedzZ(z, J);
+    await spij(1500);
+    const stan = await korzen(() => ({ zywe: document.querySelectorAll(".j-msg-ag.is-zywy").length,
+      kreci: document.querySelectorAll('.j-msg-ag[aria-busy="true"]').length, pasek: !!document.querySelector(".j-zywo") }));
+    musi(!stan.zywe && !stan.kreci && !stan.pasek, `po powrocie praca wygląda na trwającą: ${JSON.stringify(stan)}`);
+    return stan;
+  });
+
+  await krok("5", "szuflada: Połączenia (Klucze, Modele w ramce bez menu Hermesa), Wygląd, Konto (język PL/EN także dla stron Hermesa, wylogowanie, klasyczny panel), System › Aktualizacja, Stara Baza na cały ekran; Esc oddaje fokus", async () => {
+    const zebatka = ".j-stopka .j-btn[aria-label]";
+    const szuflada = "[data-region=szuflada]";
+    const sekcja = async (id) => {
+      await page.click(`${szuflada} [data-sekcja="${id}"]`);
+      await page.waitForSelector(`${szuflada} [data-sekcja="${id}"][aria-current=true]`, { timeout: 3000 });
+    };
+    await page.click(zebatka);
+    await page.waitForSelector(szuflada, { timeout: 5000 });
+    musi(await korzen(() => document.querySelector("[data-region=szuflada]").contains(document.activeElement)), "fokus poza szufladą");
+    const sekcje = await korzen(() => [...document.querySelectorAll("[data-region=szuflada] [data-sekcja]")].map((e) => e.dataset.sekcja));
+    // Połączenia: Klucze i Modele jako strony Hermesa w ramce, bez jego menu
+    const ramki = {};
+    await sekcja("polaczenia");
+    for (const [i, adres] of [[0, "/env"], [1, "/models"]]) {
+      await page.locator(`${szuflada} .j-karta .j-wiersz`).nth(i).locator(".j-btn").click();
+      const f = await (await page.waitForSelector(`${szuflada} iframe.j-osadzona`, { timeout: 5000 })).contentFrame();
+      await f.waitForSelector("#app-sidebar", { state: "attached", timeout: 15000 });
+      ramki[adres] = await f.evaluate(() => ({ sciezka: location.pathname, embed: document.documentElement.hasAttribute("data-jarvo-embed"),
+        menu: getComputedStyle(document.getElementById("app-sidebar")).display }));
+      musi(ramki[adres].sciezka === adres && ramki[adres].embed && ramki[adres].menu === "none", `ramka ${adres}: ${JSON.stringify(ramki[adres])}`);
+      await page.click(`${szuflada} .j-sz-pasek .j-link >> nth=0`);
+      await page.waitForSelector(`${szuflada} iframe`, { state: "detached", timeout: 5000 });
+    }
+    // Wygląd: motyw jasny / ciemny / jak w systemie
+    await sekcja("wyglad");
+    const motyw = () => page.getAttribute("[data-jarvo-korzen]", "data-motyw");
+    const wybor = (grupa, i) => page.locator(`${szuflada} .j-wybor`).nth(grupa).locator("button").nth(i).click();
+    await wybor(0, 1); const jasny = await motyw();
+    await wybor(0, 2); const ciemny = await motyw();
+    await wybor(0, 0); const system = await motyw();
+    musi(jasny === "jasny" && ciemny === "ciemny" && system === "ciemny", `motywy: ${jasny}, ${ciemny}, ${system}`);
+    // Konto: język EN (aplikacja i strony Hermesa przez hermes-locale) i z powrotem, wylogowanie, klasyczny panel, wersja, skróty
+    await sekcja("konto");
+    await wybor(0, 1);
+    await page.waitForFunction(() => document.querySelector("[data-jarvo-korzen]").getAttribute("lang") === "en", null, { timeout: 15000 });
+    await page.waitForSelector(szuflada, { timeout: 15000 });
+    const poAngielsku = await korzen(() => document.querySelector("[data-region=szuflada] .j-sz-gora h2").textContent);
+    const klasyczna = pilnuj(await ctx.newPage());
+    await klasyczna.goto(BASE + "/sessions");
+    await klasyczna.waitForSelector("#app-sidebar", { state: "attached", timeout: 15000 });
+    await klasyczna.waitForFunction(() => /Sessions/.test(document.getElementById("app-sidebar").textContent), null, { timeout: 10000 }).catch(() => {});
+    const hermesEn = await klasyczna.evaluate(() => ({ locale: localStorage.getItem("hermes-locale"), sesje: /Sessions/.test(document.getElementById("app-sidebar").textContent) }));
+    await klasyczna.close();
+    if (!(await page.$(`${szuflada} [data-sekcja="konto"][aria-current=true]`))) await sekcja("konto");
+    await wybor(0, 0);
+    await page.waitForFunction(() => document.querySelector("[data-jarvo-korzen]").getAttribute("lang") === "pl", null, { timeout: 15000 });
+    await page.waitForSelector(szuflada, { timeout: 15000 });
+    const locPl = await korzen(() => localStorage.getItem("hermes-locale"));
+    musi(poAngielsku === "Settings", `tytuł szuflady po angielsku: ${poAngielsku}`);
+    musi(hermesEn.locale === "en" && hermesEn.sesje && locPl === "pl", `strony Hermesa: ${JSON.stringify(hermesEn)}, po powrocie ${locPl}`);
+    if (!(await page.$(`${szuflada} [data-sekcja="konto"][aria-current=true]`))) await sekcja("konto");
+    const konto = await korzen(() => ({ skroty: document.querySelectorAll(".j-skrot").length,
+      klasyczny: (document.querySelector('[data-region=szuflada] [data-akcja="klasyczny"]') || {}).href || "",
+      wyloguj: !!document.querySelector('[data-region=szuflada] [data-akcja="wyloguj"]'),
+      wersja: ((document.querySelector("[data-region=szuflada] .j-sz-kod") || {}).textContent || "").trim(),
+      wersja_pelna: ((document.querySelector("[data-region=szuflada] .j-sz-kod") || {}).title || "").trim(),
+      skroty_zwiniete: !!document.querySelector("[data-region=szuflada] details.j-sz-det:not([open]) .j-skrot") }));
+    // skróty schowane pod „Pokaż skróty…”, wersja skrócona do 10 znaków (pełna w podpowiedzi)
+    musi(konto.skroty >= 8 && konto.skroty_zwiniete && /\/sessions$/.test(konto.klasyczny) && konto.wyloguj && /^[0-9a-f]{10}$/.test(konto.wersja)
+      && konto.wersja_pelna.startsWith(konto.wersja), `konto: ${JSON.stringify(konto)}`);
+    // System › Aktualizacja: stan pomocnika (w piaskownicy bez pomocnika: „nie działa”)
+    await sekcja("system");
+    await page.waitForSelector(`${szuflada} .j-akt[data-stan] .j-akt-stan`, { timeout: 5000 });
+    const aktualizacja = await korzen(() => ({ stan: document.querySelector("[data-region=szuflada] .j-akt").dataset.stan,
+      tekst: document.querySelector("[data-region=szuflada] .j-akt-stan").textContent.trim().slice(0, 80) }));
+    // Stara Baza: cała, na cały ekran nad aplikacją, z powrotem do Jarva
+    await sekcja("stara-baza");
+    await page.click(`${szuflada} .j-btn-mocny`);
+    await page.waitForSelector(".j-stara .thq-root", { state: "visible", timeout: 15000 });
+    const stara = await korzen(() => { const r = document.querySelector(".j-stara").getBoundingClientRect();
+      return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height), vw: innerWidth, vh: innerHeight }; });
+    await page.click(".j-stara-g .j-btn");
+    await page.waitForSelector(".j-stara", { state: "detached", timeout: 5000 });
+    musi(stara.x === 0 && stara.y === 0 && stara.w === stara.vw && stara.h === stara.vh, `Stara Baza nie na cały ekran: ${JSON.stringify(stara)}`);
+    // Esc zamyka szufladę i oddaje fokus kołu zębatemu
+    await page.click(zebatka);
+    await page.waitForSelector(szuflada, { timeout: 5000 });
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(szuflada, { state: "detached", timeout: 5000 });
+    const fokus = await korzen(() => document.activeElement && document.activeElement.closest(".j-stopka") && document.activeElement.getAttribute("aria-label"));
+    musi(JSON.stringify(sekcje) === JSON.stringify(["polaczenia", "zespol", "wyglad", "konto", "system", "stara-baza"]), `sekcje: ${sekcje}`);
+    musi(!!fokus, `fokus po Esc: ${fokus}`);
+    return { sekcje, ramki, motywy: [jasny, ciemny, system], jezyk: { aplikacja: poAngielsku, hermes: hermesEn.locale }, konto,
+             aktualizacja, stara_baza: `${stara.w}×${stara.h}`, fokus_po_esc: fokus };
+  });
+
+  await krok("6", "klawiatura: Ctrl+, i Esc, Ctrl+Shift+S zwija pasek, / do pola wiadomości, F6 między regionami, Ctrl+Shift+O start", async () => {
+    await korzen(() => document.activeElement && document.activeElement.blur());
+    await page.keyboard.press("Control+Comma");
+    await page.waitForSelector("[data-region=szuflada]", { timeout: 3000 });
+    await page.keyboard.press("Escape");
+    await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 3000 });
+    await page.keyboard.press("Control+Shift+KeyS");
+    await page.waitForSelector(".j-uklad.is-zwiniety", { timeout: 3000 });
+    await page.keyboard.press("Control+Shift+KeyS");
+    await page.waitForSelector(".j-uklad:not(.is-zwiniety)", { timeout: 3000 });
+    await korzen(() => document.activeElement && document.activeElement.blur());
+    await page.keyboard.press("Slash");
+    const pisz = await korzen(() => document.activeElement && document.activeElement.hasAttribute("data-kompozytor"));
+    const ukosnik = await korzen(() => document.activeElement.value);
+    const regiony = [];
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press("F6");
+      regiony.push(await korzen(() => { const r = document.activeElement && document.activeElement.closest("[data-region]"); return r ? r.getAttribute("data-region") : "brak"; }));
+    }
+    await page.keyboard.press("Control+Shift+KeyO");
+    await page.waitForFunction(() => location.hash === "#/" || location.hash === "", null, { timeout: 3000 });
+    await page.waitForSelector(".j-witaj", { timeout: 3000 });
+    musi(pisz && ukosnik === "", `/ nie przeniósł do pola wiadomości (fokus: ${pisz}, pole: ${JSON.stringify(ukosnik)})`);
+    musi(JSON.stringify(regiony) === JSON.stringify(["pasek", "glowna", "pasek"]), `F6: ${regiony}`);
+    return { pisz, f6: regiony };
+  });
+
+  await krok("23", "tylko klawiatura: Ctrl+Shift+O, / do pola, Enter zakłada wątek i wysyła, Ctrl+, otwiera szufladę, Esc zamyka i oddaje fokus polu", async () => {
+    await korzen(() => document.activeElement && document.activeElement.blur());
+    await page.keyboard.press("Control+Shift+KeyO");
+    await page.waitForSelector(".j-witaj", { timeout: 3000 });
+    await koordynatorStartu();
+    await page.keyboard.press("Slash");
+    const wPolu = await korzen(() => !!document.activeElement && document.activeElement.hasAttribute("data-kompozytor"));
+    const z = `klaw-${los()}`;
+    await page.keyboard.type(`Klawiatura ${z}`);
+    await page.keyboard.press("Enter");
+    const wid = await nowyZeStartu();
+    await odpowiedzZ(z, J);
+    await koniecPracy();
+    // wysłanie ze startu zostawia fokus w polu nowego wątku (Fokus.odloz), bez ponownego „/”
+    const przed = await page.waitForFunction(() => !!document.activeElement && document.activeElement.hasAttribute("data-kompozytor"),
+      null, { timeout: 3000 }).then(() => true, () => false);
+    await page.keyboard.press("Control+Comma");
+    await page.waitForSelector("[data-region=szuflada]", { timeout: 3000 });
+    const wSzufladzie = await korzen(() => document.querySelector("[data-region=szuflada]").contains(document.activeElement));
+    await page.keyboard.press("Tab");
+    const tab = await korzen(() => document.querySelector("[data-region=szuflada]").contains(document.activeElement));
+    await page.keyboard.press("Escape");
+    await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 3000 });
+    const fokus = await korzen(() => !!document.activeElement && document.activeElement.hasAttribute("data-kompozytor"));
+    const zap = zapytaniaZ(z);
+    musi(wPolu, "„/” nie przeniósł do pola wiadomości na starcie");
+    musi(zap.length === 1 && zap[0].profil === J && watki.includes(wid), `wątek z klawiatury: ${zap.map((x) => x.profil)}`);
+    musi(przed && wSzufladzie && tab, `szuflada z klawiatury: pole ${przed}, fokus w szufladzie ${wSzufladzie}, Tab w środku ${tab}`);
+    musi(fokus, "po Esc fokus nie wrócił do pola wiadomości");
+    return { watek: "założony Enterem", atrapa: `/p/${J}/`, szuflada: "Ctrl+, i Esc", fokus: "wraca do pola" };
+  });
+
+  await krok("7", "telefon 390 px: pasek wysuwany z menu, szuflada lista → sekcja → Wróć, cel dotyku ≥ 40 px, bez przewijania w bok", async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(300);
+    await zrzutDodatkowy("telefon");
+    const ukryty = await korzen(() => getComputedStyle(document.querySelector(".j-pasek")).visibility);
+    await page.click(".j-menu-btn");
+    await page.waitForSelector(".j-uklad.is-wysuniety", { timeout: 3000 });
+    await page.waitForTimeout(300);
+    const wysuniety = await korzen(() => getComputedStyle(document.querySelector(".j-pasek")).visibility);
+    await page.click(".j-zamknij-pasek");
+    await page.waitForSelector(".j-uklad:not(.is-wysuniety)", { timeout: 3000 });
+    // w wątku telefon ma Ustawienia w menu ⋯ nagłówka (mniej ikon), na starcie koło zębate
+    const wWatku = await page.locator(".j-gora.is-watek").count() > 0;
+    if (wWatku) {
+      await page.click(".j-gora [aria-haspopup=menu]");
+      await page.locator(".j-menu [role=menuitem]", { hasText: "Ustawienia" }).click();
+    } else await page.click(".j-gora-ust");
+    const widok = () => page.getAttribute("[data-region=szuflada]", "data-widok");
+    await page.waitForSelector("[data-region=szuflada]", { timeout: 3000 });
+    const w1 = await widok();
+    const cel = await korzen(() => Math.round(document.querySelector("[data-region=szuflada] .j-sz-p").getBoundingClientRect().height));
+    await page.locator("[data-region=szuflada] .j-sz-p").nth(1).click();
+    const w2 = await widok();
+    await page.click("[data-region=szuflada] .j-sz-wroc");
+    const w3 = await widok();
+    const poziomo = await korzen(() => document.documentElement.scrollWidth > innerWidth);
+    // figurki w wątku zostają małe także na telefonie (awatar bez pozycji oddawał figurkę całemu dymkowi)
+    const figurka = await korzen(() => Math.max(0, ...[...document.querySelectorAll(".j-os .j-awatar-f")].map((f) => Math.round(f.getBoundingClientRect().width))));
+    await page.click("[data-region=szuflada] .j-sz-gora .j-btn");
+    await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 3000 });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    musi(ukryty === "hidden" && wysuniety === "visible", `pasek: ${ukryty} → ${wysuniety}`);
+    musi(w1 === "lista" && w2 === "sekcja" && w3 === "lista", `szuflada: ${w1} → ${w2} → ${w3}`);
+    musi(cel >= 40 && !poziomo, `cel dotyku ${cel} px, przewijanie w bok: ${poziomo}`);
+    musi(figurka <= 40, `figurka w wątku ${figurka} px`);
+    return { pasek: [ukryty, wysuniety], szuflada: [w1, w2, w3], cel_dotyku_px: cel, figurka_px: figurka, ustawienia_z: wWatku ? "menu wątku" : "koło zębate" };
+  });
+
+  await krok("20", "5 kart: w spoczynku najwyżej 3 połączenia przeglądarki z dashboardem i jeden EventSource; 6. karta od razu ładuje /login i /sessions; po zamknięciu lidera strumień w innej karcie w ≤ 2 s, bez zgubionego zdarzenia", async () => {
+    await naStart();
+    const karty = [page];
+    for (let i = 0; i < 4; i++) {
+      const k = pilnuj(await ctx.newPage());
+      await k.goto(BASE + "/jarvo");
+      await k.waitForSelector("[data-jarvo-korzen] .j-zdrowie.is-ok", { timeout: 15000 });
+      karty.push(k);
+    }
+    const n0 = strumienie.length;
+    await spij(8000);                                   // w spoczynku: połączenia keep-alive po wczytaniu wygasają
+    const probki = [];
+    for (let i = 0; i < 8; i++) { probki.push(polaczeniaPrzegladarki(BASE)); await spij(500); }
+    const sse = ((await zdrowie(page)).strumien || {}).polaczenia;
+    // nowe karty nie otwierają strumienia (są obserwatorami lidera); wznowienie strumienia w karcie, która już go
+    // prowadziła (np. po ponowieniu z poprzedniego punktu), nie jest drugim EventSource
+    const noweStrumienie = strumienie.slice(n0);
+    const nowychStrumieni = noweStrumienie.filter((s) => karty.slice(1).includes(s.strona)).length;
+    // 6. karta: logowanie i klasyczny panel bez czekania na wolne połączenie
+    const szosta = pilnuj(await ctx.newPage());
+    let t0 = Date.now();
+    const rl = await szosta.goto(BASE + "/login", { waitUntil: "domcontentloaded", timeout: 10000 });
+    const loginMs = Date.now() - t0;
+    t0 = Date.now();
+    const rs = await szosta.goto(BASE + "/sessions", { waitUntil: "domcontentloaded", timeout: 10000 });
+    await szosta.waitForSelector("#app-sidebar", { state: "attached", timeout: 10000 });
+    const sesjeMs = Date.now() - t0;
+    await szosta.close();
+    // zamknięcie lidera: zdarzenie z chwili bez lidera dociera do wszystkich kart (nowy lider wznawia z ?od=)
+    const lider = [...strumienie].reverse().find((s) => karty.includes(s.strona) && !s.strona.isClosed());
+    musi(lider, "nie wiem, która karta prowadzi strumień");
+    const reszta = karty.filter((k) => k !== lider.strona);
+    const n1 = strumienie.length;
+    const tz = Date.now();
+    await lider.strona.close();
+    page = aktywna = reszta[0];
+    const tytul = `[E2E] etap 3 · po liderze ${los()}`;
+    const nw = await apiT("POST", "/rozmowy", { tytul, koordynator: J });
+    musi(nw.s === 201, `POST /rozmowy: ${nw.s}`);
+    watki.push(nw.d.watek.id);
+    await czekaj(() => strumienie.length > n1, 5000, "nowy lider nie otworzył strumienia");
+    const przejecieMs = Date.now() - tz;
+    const nowy = strumienie[strumienie.length - 1];
+    for (const k of reszta) await k.waitForSelector(`.j-wiersz-w[data-watek="${nw.d.watek.id}"]`, { timeout: 10000 });
+    for (const k of reszta.slice(1)) await k.close();
+    musi(Math.max(...probki) <= 3, `połączenia z :${new URL(BASE).port} w spoczynku: ${probki}`);
+    musi(sse === 1 && nowychStrumieni === 0, `EventSource: serwer ${sse}, nowe strumienie w 4 kartach ${nowychStrumieni} (wszystkie nowe: ${noweStrumienie.map((s) => `${karty.indexOf(s.strona)}:${s.url.replace(/^.*\/strumien/, "")}`).join(", ")})`);
+    musi(rl.status() < 400 && rs.status() < 400 && loginMs < 5000 && sesjeMs < 5000, `6. karta: /login ${rl.status()} ${loginMs} ms, /sessions ${rs.status()} ${sesjeMs} ms`);
+    musi(reszta.includes(nowy.strona) && /[?&]od=/.test(nowy.url) && przejecieMs <= 2000, `przejęcie: ${przejecieMs} ms, od= ${/[?&]od=/.test(nowy.url)}`);
+    return { polaczenia: probki, eventsource_serwer: sse, strumienie_nowych_kart: nowychStrumieni,
+             wznowienia_lidera: noweStrumienie.length - nowychStrumieni, login_ms: loginMs, sessions_ms: sesjeMs,
+             przejecie_ms: przejecieMs, zdarzenie: "nowy wątek w 4 kartach" };
+  });
+
+  await krok("21", "aktualizacja (§15.3): odznaka „⬆ N”; przy [wolno:20] „Aktualizuj” pyta (N = 1), „Zaktualizuj, gdy skończą” = update-request dopiero 30 s po końcu pracy; nowa wersja: karta ze szkicem ma pasek „Odśwież”, bezczynna schowana odświeża się sama", async () => {
+    const STAN = path.join(path.dirname(KNOWLEDGE), "state");
+    const UPD = path.join(STAN, "update.json"), PROSBA = path.join(STAN, "update-request");
+    let kopia = null;
+    try { kopia = fs.readFileSync(UPD, "utf8"); } catch (_) { /* brak pliku: pomocnik nie działa */ }
+    if (kopia) {
+      let d = {};
+      try { d = JSON.parse(kopia); } catch (_) { /* zły plik */ }
+      musi(d.jarvo_e2e || Date.now() / 1000 - Math.max(d.beat || 0, d.checked_at || 0) > 300,
+        "pomocnik aktualizacji działa (świeży update.json): test nie pisze update-request na prawdziwej instalacji");
+    }
+    musi(!fs.existsSync(PROSBA), "update-request już jest (czeka prawdziwa prośba)");
+    const zapiszUpd = (d) => {
+      const tmp = `${UPD}.e2e.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify({ jarvo_e2e: ZNACZNIK, state: "idle", behind: 2, branch: "main", current: "aaaaaaa", latest: "bbbbbbb",
+        checked_at: Date.now() / 1000, beat: Date.now() / 1000, ...d }));
+      fs.renameSync(tmp, UPD);
+    };
+    const out = {};
+    let druga = null;
+    try {
+      zapiszUpd({});
+      // obserwator widzi update.json (zdarzenie „aktualizacja”): odznaka w pasku bez odświeżania
+      await page.waitForSelector('[data-odznaka="aktualizacja"]', { timeout: 15000 });
+      out.odznaka = (await page.textContent('[data-odznaka="aktualizacja"]')).replace(/\s+/g, " ").trim();
+      musi(/⬆\s*2/.test(out.odznaka), `odznaka: ${out.odznaka}`);
+      // praca w toku: [wolno:20] w nowym wątku
+      const wid = await nowyW("etap 3 · aktualizacja");
+      await doWatku(wid);
+      const z = `akt-${los()}`;
+      await page.fill(POLE, `[wolno:20] ${z}`);
+      await page.press(POLE, "Enter");
+      await strumieniuje();
+      await spij(1500);                                  // praca.json silnika (przy każdej zmianie)
+      await page.click('[data-odznaka="aktualizacja"]');
+      await page.waitForSelector('[data-region=szuflada] .j-akt [data-akcja="aktualizuj"]', { timeout: 5000 });
+      await page.click('[data-region=szuflada] .j-akt [data-akcja="aktualizuj"]');
+      await page.waitForSelector(".j-okno-akt", { timeout: 5000 });
+      out.okno = await korzen(() => ({ n: document.querySelector(".j-okno-akt [data-praca]").dataset.praca,
+        tekst: document.querySelector(".j-okno-akt [data-praca]").textContent.trim(),
+        przyciski: [...document.querySelectorAll(".j-okno-akt .j-btn")].map((b) => b.textContent.trim()).filter(Boolean),
+        fokus: document.activeElement && document.activeElement.dataset.akcja }));
+      musi(out.okno.n === "1" && out.okno.fokus === "wolne", `okno aktualizacji: ${JSON.stringify(out.okno)}`);
+      await page.click('.j-okno-akt [data-akcja="wolne"]');
+      await page.waitForSelector('.j-akt[data-stan="czeka"]', { timeout: 5000 });
+      out.czeka = (await page.textContent(".j-akt .j-akt-stan")).trim();
+      // w trakcie pracy żadnej prośby; po końcu jeszcze 30 s ciszy
+      let wTrakcie = false;
+      for (;;) {
+        if (fs.existsSync(PROSBA)) { wTrakcie = true; break; }
+        const trwa = await korzen(() => !!document.querySelector('.j-msg-ag.is-zywy[aria-busy="true"]') || !!document.querySelector(".j-zywo"));
+        if (!trwa) break;
+        await spij(200);
+      }
+      const tKoniec = Date.now();
+      musi(!wTrakcie, "update-request zapisany w trakcie pracy");
+      let tProsba = null;
+      while (Date.now() - tKoniec < 75000) {
+        if (fs.existsSync(PROSBA)) { tProsba = Date.now(); break; }
+        await spij(200);
+      }
+      const tresc = tProsba ? fs.readFileSync(PROSBA, "utf8").trim() : null;
+      fs.rmSync(PROSBA, { force: true });
+      out.prosba_po_ms = tProsba ? tProsba - tKoniec : null;
+      musi(tProsba && out.prosba_po_ms >= 27000 && tresc === "update", `update-request po ${out.prosba_po_ms} ms od końca pracy (${tresc})`);
+      await page.keyboard.press("Escape");
+      await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 5000 }).catch(() => {});
+      // nowa wersja: karta ze szkicem zostaje (pasek „Odśwież”), druga bezczynna i schowana odświeża się sama
+      druga = pilnuj(await ctx.newPage());
+      await druga.goto(BASE + "/jarvo");
+      await druga.waitForSelector("[data-jarvo-korzen] .j-zdrowie.is-ok", { timeout: 15000 });
+      await page.fill(POLE, "szkic przy nowej wersji");
+      const ukryj = (p) => p.evaluate(() => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+        Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+        window.__e2eZnacznik = 1;
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await ukryj(page);
+      await ukryj(druga);
+      const przeladowana = druga.waitForEvent("load", { timeout: 30000 });
+      const w = await apiT("POST", "/e2e/wersja", { wersja: `e2e-${los()}` });
+      musi(w.s === 200 && w.d.rozlaczone >= 1, `POST /e2e/wersja: ${w.s} ${JSON.stringify(w.d)}`);
+      await page.waitForSelector('[data-pas="wersja"]', { timeout: 20000 });
+      out.pasek = (await page.textContent('[data-pas="wersja"]')).replace(/\s+/g, " ").trim();
+      await przeladowana;
+      await czekajGotowe(druga);
+      out.druga_odswiezona = await druga.evaluate(() => !window.__e2eZnacznik);
+      await spij(4000);
+      out.szkic_zostal = await page.evaluate(() => window.__e2eZnacznik === 1 && document.querySelector("[data-kompozytor]").value === "szkic przy nowej wersji");
+      musi(/Nowa wersja Jarva/.test(out.pasek) && /Odśwież/.test(out.pasek), `pasek: ${out.pasek}`);
+      musi(out.druga_odswiezona && out.szkic_zostal, `bezczynna odświeżona ${out.druga_odswiezona}, karta ze szkicem bez odświeżenia ${out.szkic_zostal}`);
+    } finally {
+      fs.rmSync(PROSBA, { force: true });
+      if (kopia != null) fs.writeFileSync(UPD, kopia); else fs.rmSync(UPD, { force: true });
+      await apiT("POST", "/update", { action: "cancel" }).catch(() => {});
+      await apiT("POST", "/e2e/wersja", { wersja: null }).catch(() => {});
+      if (druga) await druga.close().catch(() => {});
+    }
+    await page.fill(POLE, "").catch(() => {});
+    await przeladuj();
+    await page.waitForSelector('[data-pas="wersja"]', { state: "detached", timeout: 15000 });
+    return out;
+  });
+
+  await krok("22", "wylogowanie w karcie A (Konto › Wyloguj) → karta B na /login?next=%2Fjarvo, po zalogowaniu ten sam wątek", async () => {
+    const wid = await nowyW("etap 3 · wylogowanie");
+    const b = pilnuj(await ctx.newPage());
+    await b.goto(BASE + `/jarvo#/r/${wid}`);
+    await b.waitForSelector(`.j-wiersz-w[data-watek="${wid}"][aria-current=page]`, { timeout: 15000 });
+    await page.keyboard.press("Control+Comma");
+    await page.waitForSelector("[data-region=szuflada]", { timeout: 5000 });
+    await page.click('[data-region=szuflada] [data-sekcja="konto"]');
+    await page.click('[data-region=szuflada] [data-akcja="wyloguj"]');
+    await page.waitForURL((u) => u.pathname === "/login", { timeout: 15000 });
+    await b.waitForURL((u) => u.pathname === "/login", { timeout: 15000 });
+    const a = new URL(page.url()), u = new URL(b.url());
+    const form = "form.provider-form:has(input[name=password])";
+    await b.waitForSelector(form, { timeout: 20000 });
+    await b.fill(`${form} input[name=username]`, USER);
+    await b.fill(`${form} input[name=password]`, PASS);
+    await b.click(`${form} button[type=submit]`);
+    await b.waitForFunction((w) => location.pathname === "/jarvo" && location.hash === `#/r/${w}`, wid, { timeout: 20000 });
+    await b.waitForSelector(`.j-wiersz-w[data-watek="${wid}"][aria-current=page]`, { timeout: 15000 });
+    await b.close();
+    await page.goto(BASE + "/jarvo");
+    await czekajGotowe(page);
+    await page.waitForSelector("[data-jarvo-korzen] .j-uklad", { state: "visible", timeout: 15000 });
+    musi(u.search.includes("next=%2Fjarvo") && u.searchParams.get("next") === "/jarvo", `karta B: ${u.pathname}${u.search}`);
+    musi(a.searchParams.get("next") === "/jarvo", `karta A: ${a.pathname}${a.search}`);
+    return { karta_a: a.pathname + a.search, karta_b: u.pathname + u.search, po_zalogowaniu: `#/r/${wid}` };
+  });
+
+  await krok("8", "wygasła sesja: zapytanie aplikacji → logowanie z next=/jarvo, po zalogowaniu ten sam wątek; link do wątku po wczytaniu", async () => {
+    const wid = watki[watki.length - 1];
+    await page.evaluate((w) => { location.hash = `#/r/${w}`; }, wid);
+    await page.waitForSelector(`.j-wiersz-w[data-watek="${wid}"][aria-current=page]`, { timeout: 5000 });
+    await ctx.clearCookies();
+    await page.fill("[data-szukaj]", "e2e");
+    await page.waitForURL((u) => u.pathname === "/login", { timeout: 15000 });
+    const logowanie = new URL(page.url());
+    musi(logowanie.searchParams.get("next") === "/jarvo", `next: ${logowanie.search}`);
+    const form = "form.provider-form:has(input[name=password])";
+    await page.waitForSelector(form, { timeout: 20000 });
+    await page.fill(`${form} input[name=username]`, USER);
+    await page.fill(`${form} input[name=password]`, PASS);
+    await page.click(`${form} button[type=submit]`);
+    await page.waitForFunction((w) => location.pathname === "/jarvo" && location.hash === `#/r/${w}`, wid, { timeout: 20000 });
+    await page.waitForSelector(`.j-wiersz-w[data-watek="${wid}"][aria-current=page]`, { timeout: 15000 });
+    // link prosto do wątku przy wczytaniu strony: Hermes gubi hash (dopisuje ?profile=), aplikacja go odtwarza
+    await page.goto(BASE + "/sessions");
+    await page.goto(BASE + `/jarvo#/r/${wid}`);
+    await page.waitForSelector(`.j-wiersz-w[data-watek="${wid}"][aria-current=page]`, { timeout: 15000 });
+    const link = await page.evaluate(() => location.pathname + location.hash);
+    musi(link === `/jarvo#/r/${wid}`, `link do wątku po wczytaniu: ${link}`);
+    return { logowanie: logowanie.pathname + logowanie.search, powrot: `#/r/${wid}`, link_po_wczytaniu: "ten sam wątek" };
+  });
+
+  await krok("9", "porządek: zapisy aplikacji z X-Jarvo-Request, bez błędów JS i odmów CSRF, wątki [E2E] usunięte", async () => {
+    const bez = zapisy.filter(([, , h]) => h !== "1");
+    musi(zapisy.length > 0 && bez.length === 0, `zapisy bez X-Jarvo-Request: ${JSON.stringify(bez.slice(0, 5))}`);
+    musi(bledy.length === 0, `błędy JS: ${bledy.slice(0, 3).join(" | ")}`);
+    const h = await zdrowie(page);
+    musi(csrf0 === null || h.csrf_odmowy === csrf0, `odmowy CSRF w trakcie testu: ${csrf0} → ${h.csrf_odmowy}`);
+    const usuniete = [];
+    for (const w of watki.splice(0)) usuniete.push((await apiT("DELETE", `/rozmowy/${w}?trwale=1&praca=zatrzymaj`)).s);
+    musi(usuniete.every((s) => s === 204), `usuwanie wątków: ${usuniete}`);
+    return { zapisy: zapisy.length, rodzaje_zapisow: [...new Set(zapisy.map(([m, u]) => `${m} ${u.replace(/w_[0-9a-f]{21}/, "<w>").replace(/k_[a-z0-9]+/, "<k>")}`))],
+             watki_usuniete: usuniete.length };
+  });
+  // wątki z przerwanych punktów: usunięte także wtedy, gdy punkt 9 się nie wykonał
+  for (const w of watki.splice(0)) await apiT("DELETE", `/rozmowy/${w}?trwale=1&praca=zatrzymaj`).catch(() => {});
+  return ctx;
+}
+
 // ------------------------------------------------------------------------------------------------ start
 
 (async () => {
-  const etapy = { etap1, etap2 };
+  const etapy = { etap1, etap2, etap3 };
   if (!etapy[ETAP]) { console.error(`nieznany etap ${ETAP} (są: ${Object.keys(etapy)})`); process.exit(2); }
   fs.mkdirSync(DIR, { recursive: true });
   const browser = await chromium.launch({ executablePath: PRZEGLADARKA, args: ["--no-sandbox"] });

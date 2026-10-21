@@ -283,7 +283,7 @@ def test_hq_plugin_build(tmp_path):
     js = app[0].read_text(encoding="utf-8")
     for src in sorted((Path(hqbuild.HQ) / "web" / "src").glob("*.js")):
         assert f"// ---- {src.name}" in js
-    assert "window.__JARVO_APP__ = { App, wersja: 1 }" in js and "__HERMES_PLUGINS__.register(" not in js
+    assert "window.__JARVO_APP__ = { App: AppJarvo, StaraBaza, wersja: 2 }" in js and "__HERMES_PLUGINS__.register(" not in js
     if shutil.which("node"):
         for f in (dash / "dist" / "index.js", app[0]):
             assert subprocess.run(["node", "--check", str(f)], capture_output=True).returncode == 0, f
@@ -645,6 +645,47 @@ def test_update_state_stalled_when_helper_silent(tmp_path, monkeypatch):
     upd.write_text(json.dumps({"state": "idle", "checked_at": now - 3600}), encoding="utf-8")
     (tmp_path / "update-request").write_text("update", encoding="utf-8")
     assert api._update_state()["state"] == "stalled"           # prośba czeka na nieobecnego pomocnika
+
+
+def test_update_gdy_wolne_i_praca(tmp_path, monkeypatch):
+    """POST /update `{action, gdy}` (docs/HQ.md „Aktualizacja”): stan ma pracę floty z praca.json, `gdy: wolne` bez
+    silnika = 503 `silnik`, zła treść = 422/400 w kształcie `blad`, `cancel` zawsze 200, zwykłe `update` pisze prośbę."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    import time
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("JARVO_HQ_SILNIK", "0")
+    api = load_script("hq/plugin/plugin_api.py", "jarvo_hq_plugin_api_upd_gdy")
+    upd, req, praca = tmp_path / "update.json", tmp_path / "update-request", tmp_path / "praca.json"
+    monkeypatch.setattr(api, "UPDATE_FILE", upd)
+    monkeypatch.setattr(api, "UPDATE_REQUEST", req)
+    monkeypatch.setattr(api, "PRACA_FILE", praca)
+    now = time.time()
+    praca.write_text(json.dumps({"aktywne": 2, "opis": ["Web: karta „Stopka”", "Studio: rozmowa"], "at": now}))
+    upd.write_text(json.dumps({"state": "behind", "behind": 3, "checked_at": now - 10}), encoding="utf-8")
+    st = api._update_state()
+    assert st["praca"] == {"aktywne": 2, "opis": ["Web: karta „Stopka”", "Studio: rozmowa"]} and st["po_pracy"] is None
+    praca.write_text(json.dumps({"aktywne": 2, "opis": [], "at": now - 600}))
+    assert api._update_state()["praca"]["aktywne"] == 0                      # stary plik = brak wiedzy o pracy
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api/plugins/jarvo-hq")
+    k = TestClient(app, headers={"X-Jarvo-Request": "1"})
+    u = "/api/plugins/jarvo-hq/update"
+    assert k.post(u, json={"action": "update", "gdy": "wolne"}).json()["blad"]["kod"] == "silnik"
+    assert not req.exists()
+    assert k.post(u, json={"action": "x"}).status_code == 400
+    r = k.post(u, content=b"[1]", headers={"Content-Type": "application/json"})
+    assert r.status_code == 422 and r.json()["blad"]["kod"] == "zle_dane"
+    assert k.post(u, json={"action": "cancel"}).status_code == 200
+    r = k.post(u, json={"action": "update"})
+    assert r.status_code == 202 and req.read_text() == "update"
+    upd.write_text(json.dumps({"state": "updating", "beat": time.time()}), encoding="utf-8")
+    r = k.post(u, json={"action": "update"})
+    assert r.status_code == 409 and r.json()["detail"] == "Aktualizacja już trwa."
+    upd.write_text(json.dumps({"state": "idle", "checked_at": now - 3600}), encoding="utf-8")
+    assert k.post(u, json={"action": "check"}).json()["blad"]["kod"] == "pomocnik"
 
 
 def test_updater_heartbeat_and_timeout(tmp_path, monkeypatch):

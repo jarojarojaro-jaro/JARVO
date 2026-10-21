@@ -65,7 +65,6 @@
   }
 
   function render() {
-    if (justUpdated() && !window.__jarvoReloading) { window.__jarvoReloading = true; setTimeout(() => location.reload(), 3000); }
     const l = label();
     item.hidden = !l;
     if (l) { item.textContent = l[0]; item.className = `thq-upd ${l[1]}`.trim(); }
@@ -76,9 +75,9 @@
     head.append(el("h2", null, L("Aktualizacja Jarvo", "Jarvo update")), btn("×", "thq-upd-x", () => { open = false; render(); }));
     panel.append(head);
     if (justUpdated()) {
-      // nowa wersja panelu jest już na serwerze: wczytujemy ją sami
-      if (!window.__jarvoReloading) { window.__jarvoReloading = true; setTimeout(() => location.reload(), 3000); }
-      panel.append(el("p", null, L(`Zaktualizowano do ${st.current}. Za chwilę strona odświeży się sama.`, `Updated to ${st.current}. The page will reload itself in a moment.`)));
+      // nowa wersja panelu jest już na serwerze; bez samodzielnego odświeżenia (szkic albo praca w toku by przepadły,
+      // spec §15.3): aplikacja /jarvo pokazuje „Nowa wersja Jarva — Odśwież”, tu przycisk
+      panel.append(el("p", null, L(`Zaktualizowano do ${st.current}. Odśwież stronę, gdy skończysz.`, `Updated to ${st.current}. Reload the page when you are done.`)));
       const done = el("div", "thq-upd-actions");
       done.append(btn(L("Odśwież stronę", "Reload page"), "thq-upd-go", () => location.reload()));
       panel.append(done);

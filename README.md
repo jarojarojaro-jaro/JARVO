@@ -18,11 +18,19 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 | 🖥️ `jarvo-operator` | operator ekranu: klika, wypełnia i przepisuje w przeglądarce na Komputerze Jarva (osobny pulpit w kontenerze), gdzie nie ma API; logowanie, płatność i wysyłkę oddaje Tobie w Ekranie HQ |
 | 🦾 `jarvo-reka` | prawa ręka: generalista ze wszystkimi skillami, składa pakiety misji, dokumenty, prototypy |
 
-## Jarvo HQ
+## Aplikacja Jarvo
 
-Dashboard floty w przeglądarce: budynek z pokojami agentów, dymki z tym, co każdy robi teraz, podgląd pracy
-na żywo, wyniki, decyzje, czat z Jarvem albo dowolnym agentem i konwerter plików (zdjęcie, film, dźwięk, PDF, Word
-→ inny format na serwerze). Szczegóły: [docs/HQ.md](docs/HQ.md).
+Jarvo w przeglądarce (`/jarvo`): spokojny ekran z jedną rozmową, rozmowy po lewej, ustawienia w szufladzie z prawej,
+bez menu Hermesa. Na starcie Jarvo wita Cię po imieniu (z profilu właściciela), a gdy czegoś brakuje, mówi to jednym
+zdaniem z jednym przyciskiem (połącz model albo poznajmy się); opis zespołu jest w Ustawieniach › Zespół. Pod polem wiadomości są sprawy, które czekają na Ciebie,
+i kilka podpowiedzi na początek. Piszesz do Jarva; `@agent` na początku wiadomości kieruje tylko tę jedną wiadomość
+wprost do agenta, bez karty (tryb „bezpośrednio”), a następna znów idzie do Jarva. Odpowiedź pojawia się na żywo,
+zgody na ryzykowne polecenia zatwierdzasz w rozmowie, pliki od agentów otwierasz w podglądzie, a rozmowę możesz
+wyeksportować do Markdown. W Ustawieniach: klucze i modele, motyw, język (także dla stron Hermesa), wylogowanie,
+klasyczny panel i **System › Aktualizacja** (gdy agenci pracują, Jarvo pyta, czy zaktualizować po ich pracy).
+Jest tam też **Stara Baza**: budynek z pokojami agentów, dymki z tym, co każdy robi teraz, podgląd pracy na żywo,
+wyniki, decyzje, czat z dowolnym agentem i konwerter plików (zdjęcie, film, dźwięk, PDF, Word → inny format na
+serwerze). Szczegóły: [docs/HQ.md](docs/HQ.md).
 Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
 
 ## Szybki start
@@ -78,7 +86,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`evals/<agent>/`](evals) | scenariusze testowe zachowań (w zakresie, poza zakresem, routing, protokół, bezpieczeństwo) |
 | [`security/redteam/`](security/redteam) | red team na promptfoo: ataki na agentów (`scripts/redteam.sh`) |
 | [`scripts/`](scripts) | build dystrybucji, walidator, deploy, instalacja floty, backupy, evals, narzędzia |
-| [`hq/`](hq) | Jarvo HQ: plugin dashboardu (backend, frontend, demo) |
+| [`hq/`](hq) | aplikacja Jarvo (HQ): plugin dashboardu (backend, frontend, demo) |
 | [`infra/`](infra) | obraz `jarvo-hermes` (Hermes + narzędzia), obraz Komputera Jarva (`infra/komputer`: pulpit z Chromium dla computer use), docker compose z sidecarami, szablony env |
 | [`knowledge/`](knowledge) | szablon brand kitu kopiowany na serwer |
 | [`branding/`](branding) | skórka Jarvo: terminal, favicon, motyw i tłumaczenie dashboardu, łatka powłoki `/jarvo` (`powloka.json`, `powloka.js`) |
@@ -101,7 +109,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [PROFILE-SPEC.md](docs/PROFILE-SPEC.md) | anatomia agenta: 10 warstw, kontrakt zlecenia, Definition of Ready |
 | [TOOLBOX.md](docs/TOOLBOX.md) | narzędzia open-source per agent i stan instalacji w obrazie |
 | [VPS.md](docs/VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring |
-| [HQ.md](docs/HQ.md) | Jarvo HQ: GUI floty, architektura, bezpieczeństwo, pokoje |
+| [HQ.md](docs/HQ.md) | aplikacja Jarvo na `/jarvo` (ekran startu z gotowością, rozmowa, pasek rozmów, szuflada ustawień z aktualizacją, strumień), Stara Baza (GUI floty), architektura, bezpieczeństwo, pokoje |
 | [EDYTOR-PLAN.md](docs/EDYTOR-PLAN.md) | plan edytora filmów HQ jak CapCut: przejścia, szybkie cięcie, audio (efekty, lektor, nagranie), kolor, naklejki, animacje klipów; stan kroków |
 | [KLIPY.md](docs/KLIPY.md) | projekt clipmakera Wideografa: długie nagranie → edytowalne rolki 9:16 z napisami karaoke |
 | [ADS.md](docs/ADS.md) | projekt agenta reklam płatnych `jarvo-ads` i Skarbca (strażnik budżetu) |
@@ -119,7 +127,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 ## Jak to działa w skrócie
 
 ```
-Ty (Telegram DM / "Jarvo HQ")
+Ty (Telegram DM / aplikacja Jarvo)
  └─ gateway Hermesa (multipleks profili) ─┬─ DM, wątek General → jarvo (Main Judge)
                                           └─ wątki Sherlock / Web / Studio / Wideo / Ads / Łowca / Ręka → snajper
 jarvo: intake → MISSION.md → karty kanban (CEL, DoD, GRANICE) → snajperzy pracują w swoich katalogach

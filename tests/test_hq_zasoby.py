@@ -265,7 +265,7 @@ def test_loader_bez_pustego_pola(hqbuild, tmp_path):
 
 def test_pakiet_rejestruje_aplikacje_nie_zakladke(hqbuild):
     js = hqbuild.bundle_js()
-    assert "window.__JARVO_APP__ = { App, wersja: 1 };" in js
+    assert "window.__JARVO_APP__ = { App: AppJarvo, StaraBaza, wersja: 2 };" in js
     assert not re.search(r"__HERMES_PLUGINS__\.register\(", js)
     manifest = json.loads((REPO / "hq" / "plugin" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["entry"] == "dist/index.js" and "css" not in manifest

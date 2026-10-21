@@ -74,9 +74,11 @@ agents:
     hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Mostek dowodzenia"
     hq_short: "Jarvo"
+    rola: "prowadzi rozmowę i pilnuje wyników"        # krótka rola (do 8 słów) w aplikacji: wybór adresata, zespół, wiadomości
     handle: jarvo            # @uchwyt w rozmowie aplikacji: ASCII, unikalny (aliasy: nazwa profilu, hq_short bez polskich znaków)
     en:
       title: "Main Judge"
+      rola: "runs the conversation and checks results"
       hq_label: "Command bridge"
       description: >-
         The fleet's Main Judge. Takes requests, opens missions, splits them into kanban cards for the specialists, reviews results against the Definition of Done and reports. Does no domain work itself.
@@ -99,9 +101,11 @@ agents:
     hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Gabinet śledczy"
     hq_short: "Sherlock"
+    rola: "research i fakty"
     handle: sherlock
     en:
       title: "Research detective"
+      rola: "research and facts"
       hq_label: "Investigation office"
       description: >-
         Multi-source research and fact-checking: splits a question into threads, checks primary sources, cross-confirms claims and delivers a report with citations and confidence levels. Market, competitor, product and keyword research, monitoring.
@@ -124,9 +128,11 @@ agents:
     hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Pracownia webowa"
     hq_short: "Web"
+    rola: "strony internetowe"
     handle: web
     en:
       title: "Web Senior Dev"
+      rola: "websites"
       hq_label: "Web studio"
       description: >-
         Websites end to end: new sites and product landing pages, improving existing ones, technical SEO, favicons and meta, image optimisation, responsiveness, performance (Core Web Vitals), accessibility, deployment. Learns the brand from the existing site.
@@ -148,9 +154,11 @@ agents:
     hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Atelier kreatywne"
     hq_short: "Studio"
+    rola: "grafiki i posty"
     handle: studio
     en:
       title: "Marketing & creative"
+      rola: "graphics and posts"
       hq_label: "Creative atelier"
       description: >-
         Promo graphics, social media posts, living photos (loops and PSD layers), copy, campaigns and publishing calendars, all on brand. Orders videos from the Videographer. Prepares packages; never publishes without approval.
@@ -176,9 +184,11 @@ agents:
     hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Studio filmowe"
     hq_short: "Wideograf"
+    rola: "krótkie filmy"
     handle: wideo
     en:
       title: "Videographer"
+      rola: "short videos"
       hq_label: "Film studio"
       description: >-
         Video end to end: short films for TikTok, Reels and Shorts from a topic (script, stock, AI or own footage, Polish voice-over, karaoke captions, music, editing), A/B variants, editing the user's recordings, reels from long recordings (clipmaker: editable in HQ, karaoke captions), videos from code (HyperFrames, Manim), AI video, Polish captions, platform formats, quality control. Prepares files; never publishes without approval.
@@ -202,9 +212,11 @@ agents:
     hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Sala operacyjna"
     hq_short: "Ads"
+    rola: "reklamy Meta i Google"
     handle: ads
     en:
       title: "Ads specialist"
+      rola: "Meta and Google ads"
       hq_label: "Operations room"
       description: >-
         Paid ads on Meta Ads (Facebook, Instagram) and Google Ads end to end: campaign planning, structure, audiences, keywords, budgets, A/B/C tests, performance reports and learnings for creatives. Hands over each campaign as a ready-to-publish package with step-by-step instructions; the user publishes it and spends the money. No access to ad accounts.
@@ -228,9 +240,11 @@ agents:
     hq_room: radar    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Radar sprzedaży"
     hq_short: "Łowca"
+    rola: "nowi klienci z KRS i CEIDG"
     handle: lowca
     en:
       title: "Lead hunter"
+      rola: "new clients from Polish registries"
       hq_label: "Sales radar"
       description: >-
         Finds B2B leads from buying signals in official sources: new companies in the KRS register and new sole proprietorships in CEIDG, public tenders (e-Zamówienia, TED) and their winners, job ads, technology and changes on company websites, news. Ideal customer profile, qualification, a ranked list of companies with "why now", contacts the company published itself (with the source), monitoring for new leads. Never sends anything.
@@ -257,9 +271,11 @@ agents:
     hq_room: apps    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Pracownia aplikacji"
     hq_short: "Aplikacje"
+    rola: "aplikacje na telefon"
     handle: mobile
     en:
       title: "App maker"
+      rola: "phone apps"
       hq_label: "App lab"
       description: >-
         Mobile apps for small businesses: an honest "native or PWA" decision with costs and app-store rejection risk (website, PWA, Wallet pass, an existing platform or an App Store and Google Play app) and a free mobile audit of any company: apps in the stores (freshness, ratings, Polish listing, privacy, EU trader status), App Store reviews, website-to-app links (Universal Links, App Links), smart banner and PWA. Expo (React Native) apps from a template with store compliance built in from the plan: prototype, checks, preview in HQ and on the owner's phone in Expo Go. Accounts always belong to the owner.
@@ -284,10 +300,12 @@ agents:
     hq_room: control    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Sterownia"
     hq_short: "Operator"
+    rola: "pracuje na Komputerze Jarva"
     handle: operator
     komputer: true      # computer_use na Komputerze Jarva, wtyczka jarvo-komputer, bez terminala (docs/KOMPUTER.md)
     en:
       title: "Operator"
+      rola: "works on Jarvo's Computer"
       hq_label: "Control room"
       description: >-
         Computer use: works on the Jarvo Computer (a separate desktop with Chromium that you watch and can take over) where there is no API and a plain page fetch is not enough: web panels and browser apps, forms, clicking through a site like a customer, data copied from the screen into a file, screenshots as proof. No-screen route first, then the accessibility tree, a screenshot only when needed; one action, check, next. Never logs in, pays, sends or publishes: hands those steps to the owner with an exact request.
@@ -309,9 +327,11 @@ agents:
     hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Warsztat"
     hq_short: "Ręka"
+    rola: "dokumenty i szybkie sprawy"
     handle: reka
     en:
       title: "Right hand"
+      rola: "documents and quick tasks"
       hq_label: "Workshop"
       description: >-
         Hands-on generalist: quick tasks, documents and conversions, prototypes, organisation, assembling the specialists' results into the final mission package. Knows every agent's skills (read-only), without their depth or memory.

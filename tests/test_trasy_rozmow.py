@@ -490,3 +490,43 @@ def test_upload_przy_wiszacym_dowiazaniu(api, tmp_path):
     wynik = asyncio.run(api._przyjmij(_Zadanie("raport.txt", [b"abc"]), 10_000))
     assert Path(wynik["path"]).name == "raport-2.txt" and Path(wynik["path"]).read_bytes() == b"abc"
     assert not (dzien / "nie-ma").exists()
+
+
+# ----------------------------------------------------------------------------------------------- eksport i agenci
+
+def test_eksport_rozmowy_markdown(swiat):
+    out = swiat.nowy("@teste2ea pierwsza prośba z kluczem sk-ant-api03-" + "x" * 40)
+    wid = out["watek"]["id"]
+    swiat.do_stanu(out["przebiegi"][0]["id"], "gotowe")
+    r = swiat.k.get(f"{P}/rozmowy/{wid}/eksport")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/markdown")
+    assert r.headers["content-disposition"].startswith('attachment; filename="rozmowa-')
+    assert r.headers["x-content-type-options"] == "nosniff" and r.headers["cache-control"] == "no-store"
+    t = r.text
+    assert t.startswith("# ") and "**Ty** ·" in t and "· bezpośrednio" in t
+    assert "**Test A** ·" in t and "Odpowiedź: pierwsza prośba" in t
+    assert "sk-ant-api03-" + "x" * 40 not in t                    # sekret z treści nie wychodzi w pliku
+    assert swiat.k.get(f"{P}/rozmowy/{wid}/eksport", headers={"sec-fetch-site": "cross-site"}).status_code == 403
+    assert swiat.k.get(f"{P}/rozmowy/w_{'0' * 21}/eksport").status_code == 404
+
+
+def test_eksport_md_czysty():
+    tr = T.trasy
+    poz = [{"rodzaj": "wlasciciel", "ts": 0, "tekst": "Hej", "tryb": "bezposrednio",
+            "pliki": [{"path": "/opt/data/jarvo/inbox/a.pdf"}]},
+           {"rodzaj": "kroki", "kroki": [{"verb": f"Krok {i}"} for i in range(14)]},
+           {"rodzaj": "agent", "agent": "jarvo-web", "ts": 0, "tekst": "Gotowe"},
+           {"rodzaj": "luka", "tekst": "Starsza część rozmowy została usunięta przez Hermesa"}]
+    t = tr.eksport_md("Strona  dla piekarni", poz, {"jarvo-web": "Web"}, teraz=0)
+    assert t.startswith("# Strona dla piekarni\n") and "📎 /opt/data/jarvo/inbox/a.pdf" in t
+    assert "**Web** ·" in t and "i 2 więcej_" in t and "_Starsza część rozmowy" in t
+    assert tr.nazwa_pliku_eksportu("Strona dla piekarni Złoty Kłos!") == "rozmowa-strona-dla-piekarni-zloty-klos.md"
+    assert tr.nazwa_pliku_eksportu("„…”") == "rozmowa.md"
+
+
+def test_agenci_z_uchwytami_i_testowymi(swiat):
+    r = swiat.k.get(f"{P}/agenci")
+    assert r.status_code == 200
+    a = {x["name"]: x for x in r.json()["agenci"]}
+    assert a["jarvo"]["handle"] == "jarvo" and a["test-e2e-a"]["handle"] == "teste2ea" and a["test-e2e-a"]["test"] is True
+    assert swiat.k.get(f"{P}/agenci", headers={"sec-fetch-site": "cross-site"}).status_code == 403

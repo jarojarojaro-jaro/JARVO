@@ -75,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
     uchwyt = (re.sub(r"[^a-z0-9]", "", fl.zloz(slug)) or "agent")[:16]
     entry = (f"\n  - name: {args.name}\n    kind: {args.kind}\n    title: \"{args.title}\"\n    emoji: \"\"\n"
              f"    handle: {uchwyt}\n"
+             f"    rola: \"TODO: krótka rola w aplikacji, do 8 słów\"\n"
              f"    description: >-\n      TODO: jedno-dwa zdania o zakresie (routing kanbana).\n"
              f"{oddaj}"
              f"    model_tier: {args.tier}\n    delegation_tier: fast\n    autonomy_max: A1\n"
@@ -82,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     fleet_text = fleet_text.replace("\nshared:", entry + "\nshared:", 1)
     fl.FLEET_FILE.write_text(fleet_text, encoding="utf-8")
     print(f"✓ Szkielet: {dest}\n✓ evals/{args.name}/scenarios.yaml\n✓ wpis w fleet.yaml (status: planned)")
-    print("Dalej: uzupełnij SOUL, skille, rubrykę, evals, `oddaj_gdy` w fleet.yaml i wzorzec misji Jarva "
+    print("Dalej: uzupełnij SOUL, skille, rubrykę, evals, `oddaj_gdy` i `rola` (+ `en.rola`) w fleet.yaml i wzorzec misji Jarva "
           "(profiles/jarvo/skills/fleet/dispatch-playbook/references/patterns.md); `make validate`; status → active "
           "(Definition of Ready). Walidator nie przepuści aktywnego specjalisty bez `oddaj_gdy` i wzorca misji.")
     return 0

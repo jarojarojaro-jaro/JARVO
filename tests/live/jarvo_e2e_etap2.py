@@ -6,8 +6,10 @@ z /opt/hermes/.venv: yaml, Hermes). Każda komenda drukuje jeden JSON na stdout.
 Klucze `API_SERVER_KEY` profili testowych powstają tu i czyta je tylko ten proces: nigdy nie trafiają na stdout,
 do wyjątku ani do dziennika (błędy drukujemy jako nazwę typu, bez treści).
 
-    przygotuj --atrapa URL           profile test-e2e-a/b/j (atrapa modelu z obsługą obrazów, zgody ręczne 20 s, świeży klucz),
-                                     wpisy "test": true w agenci.json
+    przygotuj --atrapa URL           profile test-e2e-a/b/j (atrapa modelu z obsługą obrazów, zgody ręczne 20 s, świeży klucz,
+                                     błąd dostawcy bez ponowień: agent.api_max_retries 1, auto_recovery_cycles 0),
+                                     wpisy "test": true w agenci.json; każdy profil ma własny adres atrapy
+                                     (…/p/<profil>/v1), więc dziennik atrapy (_sciezka) mówi, do kogo poszła tura
     brama-gotowa [--czekaj S]        czy brama obsługuje nowe profile bez restartu (/p/<profil>/v1/capabilities)
     sprzataj                         profile, wpisy w agenci.json, tablica kanbana testu, resztki wątków [E2E],
                                      nagrobki sesji profili testu, dzienniki ich bram, nadzorcy s6 bez katalogu usługi
@@ -101,6 +103,15 @@ def zadanie(profil: str, metoda: str, sciezka: str, dane=None, *, czas: float = 
 
 # ----------------------------------------------------------------------------------------------- profile
 
+def adres_atrapy(atrapa: str, profil: str) -> str:
+    """http://127.0.0.1:9197/v1 → http://127.0.0.1:9197/p/<profil>/v1 (atrapa przyjmuje dowolną ścieżkę przed
+    /chat/completions i zapisuje ją w dzienniku)."""
+    baza = atrapa.rstrip("/")
+    if baza.endswith("/v1"):
+        baza = baza[: -len("/v1")]
+    return f"{baza}/p/{profil}/v1"
+
+
 def przygotuj(a) -> None:
     import yaml  # noqa: PLC0415 (Python Hermesa)
 
@@ -114,8 +125,11 @@ def przygotuj(a) -> None:
         p = PROFILE / profil
         cfg = yaml.safe_load((p / "config.yaml").read_text(encoding="utf-8")) or {}
         # supports_vision: Hermes podaje obrazy modelowi wprost (bez tego opisuje je modelem pomocniczym)
-        cfg["model"] = {"provider": "custom", "base_url": a.atrapa, "default": "atrapa", "supports_vision": True}
+        cfg["model"] = {"provider": "custom", "base_url": adres_atrapy(a.atrapa, profil), "default": "atrapa",
+                        "supports_vision": True}
         cfg["approvals"] = {**(cfg.get("approvals") or {}), "mode": "manual", "timeout": 20}
+        # błąd atrapy ([blad], HTTP 500) kończy turę od razu: bez ponowień Hermesa i bez cykli auto-naprawy (15–60 s)
+        cfg["agent"] = {**(cfg.get("agent") or {}), "api_max_retries": 1, "auto_recovery_cycles": 0}
         cfg["platform_toolsets"] = {**(cfg.get("platform_toolsets") or {}), "api_server": narzedzia}
         (p / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
         env = p / ".env"

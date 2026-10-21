@@ -172,7 +172,10 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         "/konwerter/cele", "/konwerter/job/{jid}", "/flota", "/health", "/update", "/zasoby/{nazwa:path}",
         # rozmowy (trasy_rozmow.py): odczyt rozmowy.db i state.db profili tylko do odczytu; strumień trzyma
         # w pamięci procesu połączenie i jego subskrypcje
-        "/rozmowy", "/rozmowy/{wid}", "/rozmowy/{wid}/os", "/przebiegi/{pid}", "/strumien"}
+        "/rozmowy", "/rozmowy/{wid}", "/rozmowy/{wid}/os", "/rozmowy/{wid}/eksport", "/przebiegi/{pid}", "/strumien",
+        "/agenci",
+        # start aplikacji (trasy_aplikacji.py): USER.md, config i .env profilu Jarva tylko po nazwach, nawyki.db mode=ro
+        "/app", "/podpowiedzi"}
     zapis = {t.path for t in _trasy(api.router) if "POST" in t.methods}
     assert "/anim/info" in zapis
 

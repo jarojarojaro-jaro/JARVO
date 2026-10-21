@@ -1,22 +1,39 @@
-# Jarvo HQ: kwatera floty (GUI)
+# Aplikacja Jarvo (HQ): rozmowa z flotą (GUI)
 
-Jarvo HQ to zakładka **Jarvo** w menu dashboardu Hermesa, pierwsza w menu, nad CHAT (`http://<ip-tailscale>:9119/jarvo`,
-logowanie jak do dashboardu). Adres główny `/`, stary adres Bazy i nieznane adresy prowadzą tam same
-(sekcja [2c](#2c-powłoka-jarvo-osadzanie-zasoby)). To jeszcze stara Baza (wieża, Centrala, dock czatu) z widocznym
-menu Hermesa; nowa aplikacja z rozmową w miejscu wieży przyjdzie kolejnymi etapami.
-Obok niej jest zakładka **WIEDZA** (`/wiedza`): skarbiec wiedzy floty z grafem notatek, orzeczeniami i skrzynką szkiców
+Aplikacja Jarvo to zakładka **Jarvo** w menu dashboardu Hermesa, pierwsza w menu, nad CHAT
+(`http://<ip-tailscale>:9119/jarvo`, logowanie jak do dashboardu). Adres główny `/`, stary adres Bazy i nieznane
+adresy prowadzą tam same (sekcja [2c](#2c-powłoka-jarvo-osadzanie-zasoby)). Od etapu 3 to spokojny ekran z jedną
+rozmową: rozmowy po lewej, ustawienia w szufladzie z prawej, bez menu Hermesa (sekcja [2f](#2f-aplikacja-rozmowa-pasek-szuflada)).
+Piszesz do Jarva; `@uchwyt` na początku wiadomości kieruje ją wprost do agenta (jedna wiadomość, bez karty). W kodzie
+i ścieżkach zostaje nazwa „HQ” (`hq/`, wtyczka `jarvo-hq`). Stara Baza (wieża floty, Centrala, dock czatu,
+sekcja [1.1](#11-stara-baza)) jest w **Ustawienia › Stara Baza**.
+Obok jest zakładka **WIEDZA** (`/wiedza`): skarbiec wiedzy floty z grafem notatek, orzeczeniami i skrzynką szkiców
 (osobna wtyczka `jarvo-wiedza`, opis w [WIEDZA.md §8](WIEDZA.md#8-zakładka-wiedza-w-dashboardzie-i-obsidian)).
-Pokazuje flotę jako budynek z klocków. Na górze jest mostek Jarva, pod nim piętra z pokojami snajperów (po dwa na piętro). Każdy
-agent ma swój pokój, swoją minifigurkę i dymek z tym, co robi w tej chwili. Kliknięcie pokoju otwiera panel
-z podglądem pracy na żywo, kartami, wynikami i czatem. Na dole jest rozmowa: domyślnie z Jarvem, jednym
-kliknięciem z dowolnym agentem.
 
-Tryb demo (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo build/hq-demo`, potem otwórz
-`build/hq-demo/index.html` przez dowolny serwer statyczny.
+Tryb demo Starej Bazy (symulowana flota, bez serwera): `python3 scripts/hqbuild.py --demo build/hq-demo`, potem
+otwórz `build/hq-demo/index.html` przez dowolny serwer statyczny.
 
 ---
 
 ## 1. Co widać
+
+Aplikacja (szczegóły: sekcja [2f](#2f-aplikacja-rozmowa-pasek-szuflada)):
+
+| Element | Skąd dane | Co pokazuje |
+|---|---|---|
+| Ekran startu (`#/`) | `GET /app` (właściciel z `USER.md`, gotowość), `GET /podpowiedzi` | figurka Jarva i powitanie po imieniu („Dzień dobry, Ania”, pod spodem firma); bez imienia „Cześć, jestem Jarvo”. Jedno zdanie gotowości z najwyżej jednym przyciskiem, tylko gdy czegoś brakuje: **Połącz** (Klucze albo Modele w szufladzie), **Poznajmy się** (pierwsza wiadomość do Jarva); brama, która wstaje, = „Jarvo się uruchamia…” bez czerwonego paska. Pole wiadomości zakłada nową rozmowę; pod nim najwyżej 4 rzeczy: **Czeka na Ciebie** (zgody, pytania zespołu, nieudana praca) i **Na początek** (startery tylko z połączonym modelem; × ukrywa, potem „Nie pokazuj tego więcej”) |
+| Pasek rozmów | `rozmowy.db` (`GET /rozmowy`) + strumień | **Nowa rozmowa**, szukaj, wątki w grupach (Przypięte, Dziś, Wczoraj, …), menu wiersza, Archiwum i Kosz; stopka: właściciel (Konto), kropka połączenia, odznaka **⬆ N** (dostępna aktualizacja), koło zębate (Ustawienia) |
+| Rozmowa (`#/r/<wątek>`) | oś czasu wątku (`rozmowy.db` + `state.db` agentów) | wiadomości z Markdownem, żywy dymek pracy agenta (tekst na bieżąco, kroki, czas, **Zatrzymaj**), zgody z odliczaniem, karty plików (Podgląd, Pobierz, Kopiuj ścieżkę, Odpal), błąd z **Ponów**, znacznik „bezpośrednio” |
+| Pole wiadomości | wybór adresata, załączniki, szkic | „Do: Jarvo”; `@uchwyt` na początku albo lista **Do:** = tylko ta wiadomość wprost do agenta, potem znów Jarvo; zdjęcia (wklejenie, przeciągnięcie) i pliki; szkic na wątek |
+| Szuflada ustawień (koło zębate, Ctrl/⌘+,) | strony Hermesa w ramce, `GET/POST /update` | **Połączenia** (Klucze, Modele), **Wygląd** (motyw), **Konto** (język PL/EN także dla stron Hermesa, Wyloguj, klasyczny panel, skróty), **System › Aktualizacja** (bezpieczna aktualizacja: przy pracy agentów pytanie „Zaktualizuj, gdy skończą”), **Stara Baza** |
+| Paski stanu | strumień, `GET /app`, `GET /update` | „Łączę ponownie…”, aktualizacja w toku, awaria silnika, nieudane wczytanie z **Ponów**, „Nowa wersja Jarva” z **Odśwież**, kilka kart bez zamka |
+
+### 1.1 Stara Baza
+
+Stara Baza (Ustawienia › Stara Baza, na cały ekran nad aplikacją, z **Wróć do Jarva**) pokazuje flotę jako budynek
+z klocków. Na górze jest mostek Jarva, pod nim piętra z pokojami snajperów (po dwa na piętro). Każdy agent ma swój
+pokój, swoją minifigurkę i dymek z tym, co robi w tej chwili. Kliknięcie pokoju otwiera panel z podglądem pracy na
+żywo, kartami, wynikami i czatem. Na dole jest rozmowa: domyślnie z Jarvem, jednym kliknięciem z dowolnym agentem.
 
 | Element | Skąd dane | Co pokazuje |
 |---|---|---|
@@ -79,9 +96,14 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ GET  /api/plugins/jarvo-hq/anim/check  czy plik HTML to animacja z kontraktem (przycisk „◐ Animacja”)
         ├─ POST /api/plugins/jarvo-hq/anim/info   link podglądu z mostkiem ─► :9120, parametry, stan pomiaru (sekcja 2b)
         ├─ POST /api/plugins/jarvo-hq/anim/params nowe wartości ─► parametry.json obok strony
-        ├─ GET/POST /api/plugins/jarvo-hq/update  stan i prośba o sprawdzenie/aktualizację (pomocnik hosta scripts/updater.py)
+        ├─ GET/POST /api/plugins/jarvo-hq/update  stan i prośba o sprawdzenie/aktualizację (pomocnik hosta scripts/updater.py;
+        │                                          gdy: wolne = po końcu pracy agentów, sekcja 2f)
+        ├─ GET  /api/plugins/jarvo-hq/app         start aplikacji: agenci, właściciel, gotowość, funkcje, aktualizacja
+        ├─ GET/POST /api/plugins/jarvo-hq/podpowiedzi…  „Czeka na Ciebie”, startery N0 i reakcje na nie (sekcja 2f)
         ├─ POST /api/plugins/jarvo-hq/csrf-proba   tylko z JARVO_E2E=1: trasa bez skutków dla testu ochrony zapisu
         ├─ POST /api/plugins/jarvo-hq/e2e/limit    tylko z JARVO_E2E=1: limit przebiegów silnika na czas testu (sekcja 2e)
+        ├─ POST /api/plugins/jarvo-hq/e2e/gotowosc, /e2e/wersja  tylko z JARVO_E2E=1: stan bramy w gotowości i nowa
+        │                                          wersja w hello na czas testu (sekcja 2f)
         ├─ GET/POST/PATCH/DELETE /api/plugins/jarvo-hq/rozmowy/…  wątki nowej aplikacji: lista, wątek, oś czasu
         │                                          (os), wysyłka (wiadomosci), przywróć, przeczytane (sekcja 2e)
         ├─ GET/POST /api/plugins/jarvo-hq/przebiegi/<id>/…  stan tury agenta, stop, anuluj, wyślij teraz, zgoda,
@@ -108,10 +130,12 @@ Pliki w repo:
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu i planu typografii, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`, `tests/test_typografia.py`) |
 | `hq/plugin/rozmowy.py`, `czytnik.py`, `wzmianki.py`, `kontekst.py`, `agenci.py` | silnik rozmów nowej aplikacji, etap 2a: magazyn `rozmowy.db`, czytnik sesji Hermesa, parser `@uchwyt` (bliźniak przeglądarki `hq/web/src/12-wzmianki.js`), blok kontekstu i raport nadzoru, lista agentów (sekcja 2d; testy: `tests/test_rozmowy_db.py`, `test_czytnik.py`, `test_wzmianki.py`, `test_kontekst.py`, `test_agenci.py`) |
 | `hq/plugin/silnik.py`, `przebiegi.py`, `brama.py`, `strumien.py`, `scalanie.py`, `budzenia.py`, `prace.py`, `obserwator.py`, `trasy_rozmow.py` | silnik rozmów, etap 2b: wątek silnika, maszyna stanów przebiegów, klient `/v1/runs` bramy, strumień SSE aplikacji, oś czasu wątku, wiersze budzenia kanbana, `praca.json`, obserwator plików, trasy `/rozmowy`, `/przebiegi`, `/strumien` (sekcja 2e; testy: `tests/test_silnik_rozmow.py` z atrapą bramy `tests/atrapa_bramy.py`, `test_brama.py`, `test_strumien.py`, `test_scalanie.py`, `test_budzenia.py`) |
+| `hq/plugin/aplikacja.py`, `podpowiedzi.py`, `trasy_aplikacji.py` | start aplikacji, etap 3c: właściciel z `USER.md` i gotowość (model, brama, profil właściciela; same nazwy i wartości logiczne), podpowiedzi startu N0 z rankingiem w `nawyki.db`, trasy `GET /app`, `/podpowiedzi` (sekcja 2f; testy: `tests/test_aplikacja.py`) |
 | `hq/plugin/animacja.py` | animacja HTML: schemat i zapis `parametry.json`, stan pomiaru, mostek podglądu (testy: `tests/test_animacja.py`); build dokłada do pluginu `pomiar.py` Wideografa (odcisk i aktualność raportu) |
 | `shared/skills/konwersja-plikow/scripts/konwertuj.py` (kopiowany do pluginu) | konwerter plików karty Konwerter w Centrali, ten sam co skill floty (testy: `tests/test_konwertuj.py`, `tests/test_hq_core.py`) |
 | `shared/skills/izometria/` (kopiowany do pluginu jako `izometria/`, bez przykładów, z krojem OFL) | figura floty w Centrali: `iso.py flota` z `fleet.json` pluginu, ten sam co skill floty (testy: `tests/test_iso.py`, `tests/test_hq_core.py`) |
-| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, konwerter plików (`55-konwerter.js`), figura floty (`56-flota.js`), HUD, aplikacja, widżet aktualizacji |
+| `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, konwerter plików (`55-konwerter.js`), figura floty (`56-flota.js`), HUD, Stara Baza (`89-baza.js`), widżet aktualizacji |
+| `hq/web/src/02-sklep.js` … `21-ikony.js`, `30-pasek.js` … `34-pliki.js`, `38-start.js`, `61-szuflada.js`, `90-app.js` | nowa aplikacja, etap 3 (3a–3c): ekran startu (`38-start.js`), sklep, trasa, słownik PL/EN, skróty, motyw, klient API i strumień, wzmianki (`12-wzmianki.js`), bezpieczny Markdown (`13-markdown.js`), czas, oś, akcje, prymitywy UI, ikony, pasek rozmów, widok wątku (`31-watek.js`), wiadomości, kroki i zgody (`32-wiadomosc.js`), kompozytor (`33-kompozytor.js`), karty plików i podgląd (`34-pliki.js`), szuflada ustawień i powłoka `AppJarvo` (sekcja 2f; testy: `tests/js/hq_front.test.cjs` w node, `tests/test_hq_front.py`) |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność; edytor i okno animacji z własnymi tokenami) |
 | `hq/web/dzwieki/` | biblioteka dźwięków CC0 menu Audio i Wideografa (157 efektów w 13 kategoriach, 9 podkładów; `katalog.json` z rolą, szczytem i flagą „gra” każdego efektu, `LICENCJE.md` z autorem i źródłem każdego pliku), budowana przez `scripts/dzwieki.py` (`pobierz`, `zbuduj`, `zmierz`, `sprawdz`; test `tests/test_dzwieki.py`) |
 | `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto; `kroje/`: kroje napisów i typografii (OFL, `scripts/kroje.py`) |
@@ -518,11 +542,15 @@ Jak Jarvo wchodzi w dashboard Hermesa. Kod Hermesa zostaje bez zmian poza łatka
   zasłonę i chowanie powłoki: widać menu Hermesa, nigdy pusty ekran.
 - **Osłona błędów.** Błąd przy renderze aplikacji albo pakiet, który się nie wczytał, pokazuje ekran „Coś poszło nie tak
   przy otwieraniu Jarva” z **Odśwież** i **Otwórz klasyczny panel** (`/sessions`), a powłoka Hermesa wraca.
-- **Stara Baza.** Pakiet to dziś stara Baza (`window.__JARVO_APP__ = { App, wersja: 1 }`): menu Hermesa zostaje
-  widoczne (Klucze, Modele, wylogowanie). Widżet aktualizacji (`95-update.js`) jest w pakiecie, więc pozycja
-  „⬆ Aktualizacja” pojawia się w menu, gdy zakładka Jarvo raz wczytała się w tej karcie (`/` sam tam prowadzi),
-  i zostaje przy przejściach do innych stron; w etapie 5 przechodzi do szuflady ustawień. Atrybut `data-jarvo-app`
-  (powłoka schowana, aplikacja na cały ekran) ustawi dopiero nowa aplikacja (wersja 2 i wyżej).
+- **Aplikacja i Stara Baza.** Pakiet eksportuje `window.__JARVO_APP__ = { App: AppJarvo, StaraBaza, wersja: 2 }`.
+  Wersja 2 sama stawia na `<html>` `data-jarvo-app` (powłoka Hermesa schowana, aplikacja na cały ekran) i
+  `data-jarvo-gotowe`, a `data-jarvo-wstepnie` zdejmuje po 200 ms (sekcja 2f). Klucze, Modele i wylogowanie są
+  w szufladzie ustawień aplikacji; stara Baza (`StaraBaza` z `89-baza.js`, wcześniej `App`) otwiera się w niej
+  na cały ekran (Ustawienia › Stara Baza), a demo (`hq/web/demo/`) pokazuje ją wprost. Widżet aktualizacji
+  (`95-update.js`) jest w pakiecie: pozycja „⬆ Aktualizacja” pojawia się w menu Hermesa na innych stronach, gdy
+  zakładka Jarvo raz wczytała się w tej karcie; po aktualizacji pokazuje „Odśwież stronę” i sama już nie odświeża
+  (szkic albo praca w toku by przepadły). W aplikacji aktualizacja jest w Ustawieniach › System (sekcja 2f); pełny
+  widżet w szufladzie i usunięcie `95-update.js` z menu Hermesa to etap 5.
 - **Tab i czytnik ekranu w aplikacji.** Przy `data-jarvo-app` skrypt powłoki daje atrybut `inert` wszystkiemu poza
   korzeniem aplikacji (element z `data-jarvo-korzen`): rodzeństwu każdego przodka korzenia aż do `<body>`, także temu,
   co Hermes dołoży później (banery, okna). Elementy pod warstwą aplikacji nie łapią więc fokusu Tab ani czytnika
@@ -541,7 +569,8 @@ Jak Jarvo wchodzi w dashboard Hermesa. Kod Hermesa zostaje bez zmian poza łatka
   `__JARVO_CEL__`, zasłona bez wtyczki, poprawki cofniętego przekierowania i bezpiecznika, `inert` poza korzeniem
   aplikacji, restart `-d`/`-u` w `install-fleet.sh`), `tests/test_hq_zasoby.py` (nazwy, gzip, nagłówki, biała lista,
   loader w node: błąd, 7 s, wiszący arkusz, ponowna próba), `tests/test_csrf.py` (sekcja 3) i na żywo w piaskownicy
-  `scripts/jarvo-e2e.sh etap1` (Playwright w kontenerze, raport JSON; trasy testowe tylko z `JARVO_E2E=1`, które
+  `scripts/jarvo-e2e.sh etap1` (Playwright w kontenerze, raport JSON; w punktach 4, 5 i 9 już na nowej aplikacji:
+  powłoka schowana, `inert` i Tab w aplikacji, Stara Baza z ustawień; trasy testowe tylko z `JARVO_E2E=1`, które
   `sandbox-up.sh` wpisuje do `compose/.env`); `JARVO_E2E=1 python3 -m pytest tests/test_live_e2e.py` na komputerze
   z piaskownicą uruchamia go przez `docker exec -u hermes jarvo-hermes` (bez `JARVO_E2E=1` albo bez działającego
   kontenera test jest pomijany).
@@ -649,12 +678,13 @@ i FastAPI), więc testy idą na hoście. Front aplikacji, który z nich korzysta
   i `KARTA` z `infra/komputer/zasady.py`, test pilnuje zgodności) i numery kart z sumą Luhna → `[ukryte]`.
 - **Atrapa modelu do testów** (`scripts/atrapa_modelu.py`, docs/JARVO-CALOSC.md): `[wolno:<s>]` rozkłada strumień na
   `<s>` sekund, `[plik:<ścieżka>]` dokłada w odpowiedzi linię `Plik: <ścieżka>`, `--dziennik <plik>` zapisuje każde
-  ciało zapytania jako linię JSON (test E2E sprawdza z niego, co dostał agent).
+  ciało zapytania jako linię JSON (test E2E sprawdza z niego, co dostał agent); `--odpowiedzi <plik.json>` (`{fragment: odpowiedź}`) daje gotowe odpowiedzi do zrzutów ekranu
+  z realistyczną treścią (pierwszy fragment znaleziony w wiadomości wygrywa).
 - **Kopia zapasowa:** `rozmowy.db` kopiujemy przez `sqlite3 .backup`, nie `cp` (WAL); docs/RUNBOOK.md.
 
 ## 2e. Rozmowy: silnik, przebiegi, strumień, trasy
 
-Etap 2b: silnik rozmów działa w procesie dashboardu i ma trasy HTTP. Aplikacja (front czatu) przychodzi w etapie 3,
+Etap 2b: silnik rozmów działa w procesie dashboardu i ma trasy HTTP. Aplikacja (front czatu) to etap 3 (sekcja 2f),
 więc dziś z silnika korzystają testy i `curl`. Wszystkie trasy są pod `/api/plugins/jarvo-hq/`, za logowaniem
 dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sekcja 3).
 
@@ -834,6 +864,8 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
   | `POST /rozmowy/<id>/przywroc`, `/przeczytane` | z kosza; licznik nieprzeczytanych |
   | `GET /rozmowy/<id>/os` | oś czasu (wyżej) |
   | `POST /rozmowy/<id>/wiadomosci {tekst, klucz, zalaczniki, obrazy, adresaci?, tryb_kolejki?}` | wysyłka (202): wpis właściciela i przebieg na adresata; ten sam `klucz` = ten sam wpis; wątek w koszu = 409 `w_koszu`, usunięty = 404, także gdy DELETE przyszedł w trakcie sprawdzania wysyłki (silnik czyta wątek na nowo przed zapisem obrazów, steerem i wpisem) |
+  | `GET /rozmowy/<id>/eksport` | cała rozmowa jako plik Markdown do pobrania (`rozmowa-<tytuł ASCII>.md`, `Content-Disposition: attachment`): teksty, ścieżki plików, kroki w jednej linii, notatki kursywą; całość przez `ochrona.utajnij`, najwyżej 100 stron osi |
+  | `GET /agenci` | agenci aplikacji: nazwa, uchwyt, aliasy wzmianek, opis (z `JARVO_E2E=1` także testowi); źródło listy „Do:” i podpowiedzi `@` |
   | `GET /przebiegi/<id>`, `POST …/stop`, `…/anuluj`, `…/wyslij-teraz`, `…/zgoda {wybor, request_id}`, `…/dopisz {tekst, klucz?}`, `…/ponow` | przebieg i sterowanie nim |
   | `GET /strumien`, `POST /strumien/<klient>/subskrypcje` | SSE (wyżej) |
 
@@ -918,11 +950,304 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
   wątków `[E2E]`, nagrobki sesji profili testu w `rozmowy.db` (`Rozmowy.usun_nagrobki`), dzienniki ich bram
   (`/opt/data/logs/gateways/test-e2e-*`) i, gdy wolno, nadzorców s6 po usuniętych katalogach usług
   (`s6-svscanctl -an /run/service`; jako hermes zwykle brak uprawnień, raport mówi `s6: brak_uprawnien`). Wiadomość
-  próbna przez prawdziwy model i klucz do profilu `jarvo` przechodzi do testu etapu 3 (front): w piaskownicy nie ma
-  klucza dostawcy, a test etapu 2 nie wydaje kredytów. Profile testu mają stałe nazwy (spec), więc ścieżkę „bez
+  próbna przez prawdziwy model i klucz do profilu `jarvo` zostaje ręcznym sprawdzeniem z kluczem dostawcy: w piaskownicy
+  nie ma klucza, a testy na żywo (etap 2 i etap 3, sekcja 2f) nie wydają kredytów, rozmawiają z atrapą. Profile testu mają stałe nazwy (spec), więc ścieżkę „bez
   restartu bramy” sprawdza tylko pierwszy przebieg po restarcie bramy (gdy brama musiała wstać od nowa, raport ma
   ten punkt w `niedowiedzione`); to samo dotyczy etapu 8 (usunięty i ponownie
   założony agent o tej samej nazwie potrzebuje restartu bramy).
+
+## 2f. Aplikacja: rozmowa, pasek, szuflada
+
+Nowa aplikacja na `/jarvo` (etap 3; wygląd z makiety „V2 · Spokojny”): jeden czat na pierwszym planie, rozmowy po
+lewej, ustawienia w szufladzie z prawej, mało opcji. Etap 3a to fundament: powłoka, pasek rozmów, szuflada
+ustawień, strumień i klient API. Etap 3b to sama rozmowa: widok wątku, wiadomości z bezpiecznym Markdownem, kroki
+pracy, zgody, kompozytor z adresatem na jedną wiadomość, pliki z podglądem, menu wiersza, Archiwum i Kosz, eksport.
+Etap 3c domyka etap 3: ekran startu z gotowością i starterami (`38-start.js`, `GET /app`, `GET /podpowiedzi`),
+stany (spec §13.12: nowa wersja, sama się odświeża tylko bezczynna schowana karta), szuflada w wersji minimalnej
+z **System › Aktualizacja** i językiem w Konto, odznaka **⬆ N**, tryb „bezpośrednio” w SOUL i protokole floty.
+Obecność agentów w pasku i karty kanbana w rozmowie to etap 4, widok nadzoru etap 4b, jednolita lista z sesjami
+innych kanałów etap 6.
+
+- **Układ.** Korzeń `.jarvo-app` z `data-jarvo-korzen` leży nad dashboardem (`position: fixed`, `z-index: 60`,
+  wysokość `--j-vh` z `visualViewport` na telefonie) i jest kontenerem zapytań (`container: app`). Siatka
+  `.j-uklad`: pasek 280 px (do 1279 px: 248 px, zwijany Ctrl/⌘+Shift+S) i główna kolumna z nagłówkiem (tytuł wątku).
+  Poniżej 1024 px pasek wysuwa się z lewej (przycisk menu w nagłówku; zamyka go zasłona, ✕ albo wybór wątku), poniżej
+  640 px szuflada zajmuje cały ekran: lista sekcji, potem sekcja z **Wróć**; cele dotyku ≥ 40 px. Pod szufladą
+  i Starą Bazą układ dostaje `inert` (Tab i czytnik zostają w warstwie), a zamknięta warstwa oddaje fokus temu,
+  co ją otworzyło.
+- **Pasek** (`30-pasek.js`): marka, **Nowa rozmowa**, szukaj (z opóźnieniem 250 ms, nowsze zapytanie wygrywa),
+  lista wątków w grupach Przypięte, Dziś, Wczoraj, Ten tydzień, Wcześniej (`Czas.grupa`, granice dni w strefie
+  przeglądarki), wiersz z ikoną źródła, tytułem i znakiem stanu (z tekstem dla czytnika), **Więcej** dla następnej
+  strony; stopka: właściciel (otwiera Konto), kropka połączenia (`polaczenie.*`), koło zębate (Ustawienia).
+  Lista żyje ze strumienia: `watek.zmiana` wstawia, aktualizuje albo usuwa wiersz zależnie od filtra,
+  `watek.usuniety` usuwa. Pokazuje tylko wątki aplikacji; wiersz idzie przez `WierszListy` (typ elementu), gotowy na
+  jednolitą listę z sesjami innych kanałów (etap 6). Menu wiersza ⋯ (Zmień nazwę w miejscu, Przypnij/Odepnij,
+  Archiwizuj, Usuń; w Koszu Przywróć i Usuń na zawsze z pytaniem) jest widoczne po najechaniu, na dotyku zawsze,
+  otwiera się też długim przytrzymaniem (500 ms) i prawym przyciskiem; Archiwum i Kosz to filtry pod listą. Archiwum
+  i kosz wątku z pracą w toku pytają: zatrzymać ją czy pozwolić skończyć (409 `praca_trwa`). Lista dłuższa niż 120
+  wierszy rysuje tylko widoczne wiersze (stała wysokość grupy i wiersza mierzonego z pierwszego). Menu (`Menu`
+  w `20-ui.js`) przy dolnej krawędzi otwiera się nad przyciskiem.
+- **Ekran startu** (`38-start.js`, `#/` i `#/nowa/<agent>`; makieta V2): figurka Jarva, powitanie z porą dnia
+  i imieniem z `USER.md` („Dzień dobry, {imie}”, pod spodem „{firma} · w czym mogę pomóc?”); bez imienia „Cześć,
+  jestem Jarvo” i „Prowadzę zespół N agentów”. Kompozytor nowej rozmowy, a pod nim najwyżej 4 rzeczy: **Czeka na
+  Ciebie** (zgody w toku i nieudana praca z `rozmowy.db`, klik otwiera wątek; pytania zespołu z kanbana: jedno
+  „Pytanie od zespołu · <agent>”, kilka jednym wierszem „N pytania od zespołu”, klik otwiera decyzje w Starej Bazie) i **Na początek** (startery N0:
+  klik wpisuje prośbę do pola, bez wysyłki; × ukrywa, potem „Nie pokazuj tego więcej”; „pokazana” raz dziennie na
+  starter). Lista odświeża się po `watek.zmiana`, `watek.usuniety` i `reset` (zebrane po 1,5 s). **Linia
+  gotowości** (spec §13.10, `p.j-gotowosc[data-gotowosc]`) to jedno zdanie pod powitaniem z najwyżej jednym
+  przyciskiem, tylko gdy czegoś brakuje; kolejność: brama, model, profil właściciela. „Połącz model, żeby zespół mógł
+  odpowiadać.” z **Połącz** otwiera w szufladzie Klucze (dostawca na klucz) albo Modele (OAuth); bez modelu startery
+  się nie pokazują (obiecywałyby pracę, której nikt nie zrobi). Z modelem i bez profilu właściciela: „Opowiedz mi
+  o swojej firmie…” z **Poznajmy się**, które wysyła Jarvowi „Poznajmy się. Zadaj mi pytania o moją firmę.” (wywiad
+  `onboarding-interview`). Brama, która wstaje = „Jarvo się uruchamia…” ze wskaźnikiem (`role=status`), dłużej bez
+  odpowiedzi = „Jarvo chwilowo nie odpowiada. Spróbuję ponownie.”; czerwonego paska nie ma. Opis zespołu i lista
+  agentów są w Ustawieniach › Zespół, nie na starcie. Wiadomość wysłana ze startu, zanim brama wstanie, czeka w kolejce. Koordynator nowej rozmowy to Jarvo; tylko
+  w instalacji testu (`funkcje.e2e`) test podmienia go na `test-e2e-j` (`localStorage` `jarvo.e2e.koordynator`).
+  - `GET /app` (`hq/plugin/trasy_aplikacji.py`, `aplikacja.py`): `wersja`, `silnik`, `agenci` (z krótką `rola`
+    i `pokoj` z `fleet.yaml`), `wlasciciel {imie, firma}`, `gotowosc {model {dostawca, polaczony, sposob}, brama
+    ok|startuje|niedostepna, profil_wlasciciela}`, `ustawienia` (limity wysyłki), `funkcje`, `decyzje` (liczba pytań
+    zespołu), `aktualizacja`. Języka serwer nie podaje: wybiera go przełącznik dashboardu w przeglądarce. Gotowość
+    niesie same nazwy i wartości logiczne: status logowania Hermesa liczy osobny proces z `HERMES_HOME` profilu Jarva
+    (drukuje tylko dwie wartości logiczne, wynik w pamięci 30 s; po tym czasie zapytanie dostaje od razu stary wynik,
+    a nowy liczy się w tle, więc `/app` nie czeka na proces). Brama = `startuje`, gdy jest młodsza niż 2 min (ostatnia
+    linia `gateway-starts.log`), gdy ostatnia udana próba `/health` była mniej niż 60 s temu (chwilowa czkawka nie
+    straszy właściciela) albo gdy `gateway_state.json` Hermesa mówi `starting`/`restarting` lub świeżo zapisane
+    `desired_state: running`; inaczej bez odpowiedzi = `niedostepna`.
+    Bez trasy `/app` (stary plugin w trakcie aktualizacji) aplikacja bierze agentów z `/agenci` albo `/fleet`
+    i stan z `/update`; inny błąd = pasek „Nie udało się wczytać Jarva” z **Ponów** i ponowieniem po 2–30 s.
+  - `GET /podpowiedzi?miejsce=start` i `POST /podpowiedzi/<id>/reakcja {rodzaj, klucz?}`
+    (`hq/plugin/podpowiedzi.py`, warstwa nauki N0): budżet 4 (najpierw „Czeka na Ciebie”, potem do 3 starterów),
+    starter na specjalistę z floty, PL i EN, reakcje `pokazana`, `kliknieta`, `odrzucona`, `nigdy` w `nawyki.db`
+    (idempotentne po `klucz`), kolejność z rankingu Beta; starter odrzucony 2 razy śpi 14 dni, 3 razy = wyłączony.
+- **Aktualizacja** (spec §15.3; Ustawienia › System, `SekcjaSystem` w `61-szuflada.js`): stan z `GET /update` (co minutę,
+  co 5 s w trakcie i przy czekaniu na koniec pracy; `online` = pomocnik hosta odezwał się w ciągu 5 min, `praca` =
+  `praca.json`, `po_pracy` = czas prośby). **Aktualizuj** najpierw odświeża stan; przy pracy agentów okno „Agenci
+  pracują” z listą prac: **Zaktualizuj, gdy skończą** (domyślny fokus; `POST /update {action: update, gdy: wolne}`
+  = 202 i meta `aktualizacja_po_pracy` w `rozmowy.db`, obserwator pisze `state/update-request` dopiero po 30 s bez
+  pracy), **Aktualizuj teraz** albo **Anuluj**. Czekająca aktualizacja ma **Aktualizuj teraz** i **Nie
+  aktualizuj** (`cancel` kasuje prośbę); po 2 h czekania jedno przypomnienie. Pomocnik nie działa = 503
+  `pomocnik`, aktualizacja trwa = 409 `trwa`. Odznaka **⬆ N** w stopce paska (liczba nowych zmian; w trakcie wskaźnik, przy
+  czekaniu na koniec pracy i przy kłopocie inny kolor) otwiera tę sekcję.
+- **Stany** (`Pasy` w `90-app.js`, spec §13.12, każdy pasek z `data-pas`): `aktualizacja` (neutralnie, bez czerwieni),
+  `polaczenie` („Łączę ponownie…” po 5 s przerwy; pisać można dalej), `silnik` (awaria silnika z **Odśwież**),
+  `aplikacja` (nieudane `GET /app` z **Ponów**), `wersja` („Nowa wersja Jarva” z **Odśwież**), `karty` (kilka kart
+  bez Web Locks). Nowa wersja (`hello.wersja` ≠ pakiet karty): karta schowana, bez szkicu, bez wiadomości w drodze
+  i bez pracy w toku odświeża się sama po drugim sprawdzeniu 2 s później (sprawdzenie przy zmianie, przy schowaniu
+  i co 30 s; jedno samodzielne odświeżenie na wersję, `sessionStorage` `jarvo.odswiezono_dla`); karta ze szkiciem
+  albo widoczna zostaje z paskiem.
+- **Wątek** (`31-watek.js`): oś czasu jako `role=log`, „Nowe od tąd” (stała granica z liczby nieprzeczytanych
+  przy otwarciu, przewinięta na jedną trzecią wysokości), przyklejenie do dołu przy nowych treściach
+  (`ResizeObserver`) i **Przewiń na dół**, gdy czytasz wyżej; starsze wiadomości przewijaniem w górę albo
+  przyciskiem, bez skoku pozycji. Odczyt (`POST /przeczytane`) idzie, gdy karta jest widoczna. Nagłówek: tytuł do
+  zmiany w miejscu (Enter zapisuje, Esc wraca, pusty nie przechodzi) i menu (Zmień nazwę, Przypnij, Pokaż szczegóły
+  pracy / Pokaż pracę prosto, Eksportuj (Markdown), Archiwizuj, Usuń). Komunikaty dla czytnika: najwyżej jeden na
+  3 s. Okno pytań (`sklep.pytanie`, `akcje.zapytaj` zwraca obietnicę): praca w toku, trwałe usunięcie i wysyłka
+  do więcej niż 3 agentów. Przeciągnięty plik nad wątkiem dostaje przerywaną ramkę i trafia do kompozytora.
+- **Wiadomości** (`32-wiadomosc.js`): dymek właściciela pojawia się od razu, zanim serwer odpowie (`sklep.wysylane`;
+  „Wysyłam…” dopiero po chwili, nieudana wysyłka z **Spróbuj ponownie** i **Usuń**). Wiadomość agenta: awatar
+  (pikselowa figurka agenta z makiety V2, `22-figurka.js`),
+  nazwa, czas, Markdown, karty plików, pod nią **Kopiuj** i **Odpowiedz: <agent>** (po najechaniu i przy fokusie, na
+  dotyku zawsze); znacznik „bezpośrednio” przy wiadomości z pominięciem koordynatora. Trwająca praca to jeden żywy
+  dymek: tekst z delt (po przeładowaniu z `tekst_dotad` migawki, bez rwania), kropki pisania i kroki. Stan, czas
+  i **Zatrzymaj** pokazuje raz pasek nad kompozytorem; pod dymkiem zostaje tylko to, czego pasek nie mówi (powód
+  kolejki z jej przyciskami, „trwa dłużej niż zwykle”, „Zatrzymane · Ponów”). Kroki: w trybie Prosty jedna linia
+  „12 kroków · 2:05” do rozwinięcia, w Szczegółach lista z podglądem wyników (`ustawienia.szczegoly`). Błąd tury
+  jednym zdaniem po polsku z wielkiej litery (`blad.komunikat` z przebiegu: znana przyczyna, np. „Model przestał
+  odpowiadać”, inaczej „Praca się nie udała”), surowy komunikat zwinięty pod **Szczegóły** (`blad.szczegoly`),
+  przyciski **Ponów** (`POST /przebiegi/<id>/ponow`) i, gdy to wina klucza albo modelu, Klucze/Modele. Karta błędu
+  przeżywa przeładowanie: `GET /rozmowy/<id>` niesie `przebiegi_do_ponowienia` (ostatnie nieudane przebiegi
+  wątku, po których ten agent już w nim nie pracował, do 5), a po **Ponów** lista jest pusta. Po odpowiedzi na zgodę fokus idzie na
+  zdanie z wynikiem pod kartą (`[data-zgoda-po]`), gdy był w karcie.
+- **Zgoda** (`Zgoda` w `32-wiadomosc.js`): karta w wątku pokazuje dokładnie wybory z wydarzenia `przebieg.zgoda`:
+  **Zezwól raz**, **Zezwól do końca tej odpowiedzi** (`session`), **Odmów**, a **Zawsze** tylko pod **Więcej**.
+  Nagłówek z agentem i odliczaniem (`role=timer`), ryzyko prostymi słowami (`Os.ryzyko`: usuwa pliki, uprawnienia
+  administratora, wysyła na zewnątrz, sieć, restart, inne), **Pokaż polecenie** w bloku kodu. Po czasie karta
+  zostaje jako „Czas minął — polecenie nie zostało wykonane” także po końcu przebiegu, z **Poproś ponownie** (jedna
+  wiadomość do tego samego agenta).
+- **Kompozytor** (`33-kompozytor.js`): pole rośnie z treścią, Enter wysyła, Shift+Enter to nowa linia, ↑ w pustym
+  polu przywołuje ostatnią własną wiadomość. Adresat: domyślnie „Do: <koordynator>”; wybór z listy **Do:**
+  (klawiatura: strzałki, Enter) albo `@agent` na początku wiadomości kieruje do niego tylko następną wiadomość
+  („tylko ta wiadomość”), po wysłaniu wraca koordynator, × i Esc anulują wybór. Wzmianka w środku zdania nie zmienia
+  adresata: podpowiedź pod polem mówi, że wiadomość dostanie koordynator. `@` otwiera podpowiedzi agentów (listbox,
+  strzałki, Enter/Tab, Esc; koordynator pierwszy, bez archiwalnych). Więcej niż 3 adresatów (`WIELU`, ten sam próg
+  co `wzmianki.py`) = pytanie przed wysłaniem; Anuluj zostawia tekst w polu. Załączniki: przycisk, wklejenie
+  i przeciągnięcie; obrazy idą jako data URL (do 4), reszta przez `/upload`. Szkic na wątek (`sklep.szkice`,
+  `localStorage` po 500 ms). Gdy brama startuje albo nie odpowiada, pod polem stoi „wiadomość poczeka w kolejce”.
+  Nad polem pasek trwającej pracy (agent, stan, czas) z **Zatrzymaj**; Esc Esc zatrzymuje wszystkie prace wątku.
+  PageUp/PageDown w polu przewijają rozmowę. Lista **Do:** zamyka się po Tab i po wyjściu fokusu poza nią. Po
+  wysłaniu z nowego wątku fokus zostaje w polu nowej rozmowy.
+- **Pliki** (`34-pliki.js`): karta pliku z miniaturą, nazwą i główną akcją (**Pobierz**, dla HTML **Odpal**), w menu
+  Podgląd, Kopiuj ścieżkę, Otwórz w nowej karcie, Kopiuj obraz, Pokaż w folderze. Podgląd w oknie
+  (`sklep.podglad`): obraz, wideo, dźwięk, PDF (w `<iframe sandbox>` z `/file`, z linkiem zapasowym), tekst i kod
+  (HTML jako tekst, bez wykonywania). Blob tylko jako źródło obrazu, wideo i dźwięku albo `<a download>`; SVG nigdy
+  jako blob (zawsze adres `/file` z CSP sandbox), „Otwórz w nowej karcie” zawsze na `/file`. Ścieżka floty w tekście
+  otwiera podgląd.
+- **Markdown** (`13-markdown.js`): czysty tokenizer `Md.parsuj` (akapity, nagłówki 1–4, listy do 3 poziomów
+  z zadaniami, cytaty, bloki kodu, tabele GFM, linie, pliki `MEDIA:`/📎) i `Md.inline` (pogrubienie, kursywa,
+  przekreślenie, kod, linki, gołe adresy, ścieżki floty, obrazy `data:image`). Render tylko przez React, surowy HTML ze
+  źródła zostaje tekstem; linki tylko http(s), `mailto:` i `#/`, obrazy tylko `data:image` (png, jpeg, gif, webp)
+  i pliki floty. Bez wyrażeń z zagnieżdżonymi kwantyfikatorami: czas liniowy także dla złośliwego wejścia. Tabela
+  ma najwyżej 50 kolumn (szersza zostaje tekstem) i 10 000 komórek (najwyżej 500 wierszy; dalsze linie idą zwykłym tekstem).
+  Listy numerowane i punktowane mają własne znaczniki (liczby, kropki, kółka na drugim poziomie).
+  Wiadomość dłuższa niż 200 KB idzie zwykłym tekstem. Przy strumieniu stały początek (do ostatniej pustej linii poza
+  kodem) jest parsowany raz, ogon co klatkę animacji (`useKlatka`: najwyżej jedno odświeżenie na klatkę, z zapasem
+  `setTimeout` 100 ms, bo schowana karta wstrzymuje `requestAnimationFrame` i tekst stałby w miejscu). Bloki kodu z **Kopiuj**; globalny styl `code` Hermesa jest
+  zresetowany pod `.jarvo-app`.
+- **Eksport**: menu wątku → **Eksportuj (Markdown)** pobiera `GET /rozmowy/<id>/eksport` (sekcja 2e) jako plik.
+- **Szuflada ustawień** (`61-szuflada.js`, adres `#/…?u=<sekcja>[/<pod>]`, Ctrl/⌘+,; wersja minimalna ze spec §15.1, żeby
+  po schowaniu menu Hermesa nic nie zostało bez wejścia): **Połączenia** (Klucze `/env` i Modele `/models` Hermesa
+  w ramce z `data-jarvo-embed`, bez menu Hermesa, z **Otwórz w pełnym oknie**; Esc w ramce zamyka szufladę),
+  **Zespół** (jak działa rozmowa z Jarvem, `@uchwyt` na jedną wiadomość, zgody; lista agentów z figurką, krótką
+  rolą z `fleet.yaml` i **Napisz**), **Wygląd** (motyw Jak w systemie, Jasny, Ciemny), **Konto** (język
+  Polski/English przez `setLocale` Hermesa, a bez niego klucz `hermes-locale` w `localStorage` i odświeżenie, więc
+  strony Hermesa mówią tym samym językiem; **Wyloguj**, klasyczny panel `/sessions`, wersja pakietu skrócona do
+  10 znaków (pełna w podpowiedzi), skróty zwinięte pod **Pokaż skróty klawiszowe**), **System › Aktualizacja** (wyżej)
+  i **Stara Baza** (cała stara Baza na ekranie nad aplikacją, z **Wróć do Jarva**; jej skróty działają, skróty
+  aplikacji milkną; zamknięcie oddaje fokus temu, co ją otworzyło). Całość działa z samej klawiatury. Na
+  telefonie wybór sekcji przenosi fokus na jej nagłówek, a **Wróć** na przycisk tej sekcji w liście.
+- **Trasa** (`03-trasa.js`, hash): `#/` start, `#/nowa/<agent>`, `#/r/<wątek>[/m/<pozycja>]`, `#/s/<profil>/<sesja>`,
+  parametry `u` (szuflada) oraz `n`, `p` (narzędzia: edytor, animacja, konwerter, wiedza, w kolejnych częściach).
+  Każda część ma swój wzorzec (id wątku `w_` + 21 znaków hex, profil, sesja); reszta to start. Przed przejściem na
+  logowanie hash trafia do `sessionStorage` (`jarvo.po_logowaniu`) i wraca po zalogowaniu. Hermes przy wczytaniu
+  strony dopisuje `?profile=` i gubi hash, więc pierwszy widok dokumentu wczytanego na `/jarvo` bierze hash z adresu
+  wczytania (Navigation Timing): link `/jarvo#/r/<wątek>` albo `/jarvo#/?u=konto` otwiera to, co wskazuje.
+- **Sklep** (`02-sklep.js`): jeden obiekt stanu, `useSklep(wybór, równość)` na `useSyncExternalStore`, `plytko`
+  do wyborów zwracających nowe obiekty. Gałęzie: `gotowe`, `wersja`, `silnik`, `agenci`, `kolejnosc`, `wlasciciel`,
+  `gotowosc`, `lista` (`porzadek`, `wg_klucza` „w:<id>”, `filtr`, `q`, `dalej`, `laduje`, `blad`, `wczytana`),
+  `adresaci` (`<panel>:<wątek|nowa>` → wybór na jedną wiadomość), `os` (wątek → pozycje, `przed`, `po`), `watki`,
+  `przebiegi` (id → przebieg z tekstem, krokami, komentarzami, `_kursor` migawki), `wysylane` (dymki w drodze),
+  `podglad` (otwarty plik), `pytanie` (okno pytania z `odpowiedz`), `karty`, `decyzje`, `strumien` (`stan`,
+  `epoka`, `lider`, `wielokarty`, `nowa_wersja`), `podzial`, `ustawienia` (`motyw`, `szczegoly`, `gestosc`,
+  `dzwiek`, `powiadomienia`), `szkice`, `pasek` (`otwarty`, `zwiniety`), `toasty`, `aktualizacja`, `stara_baza`. Do `localStorage` idą tylko
+  `ustawienia`, `podzial`, `szkice` (po 500 ms), zwinięty pasek i ostatni otwarty wątek (`Pamiec`, odporna na
+  zablokowany storage).
+- **Strumień** (`11-strumien.js`): jeden `EventSource` na przeglądarkę. Kartę-lidera wybiera zamek Web Locks
+  `jarvo-strumien`; lider rozsyła ramki przez `BroadcastChannel("jarvo")`, pozostałe karty zgłaszają swoje wątki
+  (`sub`), a lider łączy je w jedną subskrypcję (`POST /strumien/<klient>/subskrypcje`). Każda karta pamięta kursor
+  `<epoka>.<seq>` ostatniej ramki (też z ramki `kursor`) i odrzuca powtórki; lider podaje kursor innym kartom, więc
+  nowy lider (zamknięta karta lidera) otwiera strumień z `?od=`. Pies ciszy: 30 s bez ramki = nowe połączenie
+  z `?od=`; błąd połączenia = ponowienie po 1, 2, 4, 8, 15 s i pasek „Połączenie przerwane — wznawiam…” po 5 s; 401 = logowanie
+  (`/login?next=%2Fjarvo`, hash zachowany, inne karty dostają `wyloguj`). Bez Web Locks albo BroadcastChannel każda
+  karta ma własny strumień (bez Web Locks z paskiem „Jarvo jest otwarty w kilku kartach”). Karty zgłaszają swoje
+  wątki ponownie co 20 s, a lider zapomina wątki karty, która nie odezwała się 60 s (zamknięta albo zamrożona
+  karta nie trzyma subskrypcji); karta przywrócona z pamięci podręcznej przeglądarki (`pageshow` z `persisted`)
+  wita się od nowa. Lider rozsyła wersję serwera, a każda karta sama porównuje ją ze swoim pakietem (karta
+  wczytana już po aktualizacji nie dostaje paska od starszej). `hello` z inną `wersja`
+  niż skrót pakietu = pasek „Nowa wersja Jarva” z **Odśwież** (bezczynna schowana karta odświeża się sama, wyżej „Stany”); `silnik: "awaria"` = pasek awarii. Migawka przebiegu (GET z `seq`) nie rwie
+  tekstu: ramki z czasu pobierania czekają w buforze i wchodzą tylko te późniejsze niż `seq`. Obsługiwane
+  zdarzenia: `hello`, `reset`, `kursor`, `watek.zmiana`, `watek.usuniety`, `watek.wpis`, `watek.os`, `przebieg.*`
+  (stan, delta, komentarz, mysl, narzedzie, podagent, zgoda, koniec, nadzor), `decyzje.zmiana`, `aktualizacja`,
+  `agenci.zmiana`; pozostałe (`karta.zmiana`, `flota.stan`, `lista.zmiana`, `sesja.os`, `misje.zmiana`,
+  `efekty.zmiana`) są zarejestrowane dla kolejnych części.
+- **Klient API** (`10-api.js`): `api.rozmowy.*`, `api.przebiegi.*`, `api.sesje.*`, `api.efekty.lista`,
+  `api.aplikacja` (`GET /app`), `api.aktualizacjaStan` i `api.aktualizacja(action, gdy)` (`/update`),
+  `api.podpowiedzi` i `api.reakcja` (`/podpowiedzi`), `api.subskrypcje`, `api.wyloguj`. Każde zapytanie niesie `X-Jarvo-Request: 1` (ochrona zapisu, sekcja 3) i, na dashboardzie bez
+  logowania, `X-Hermes-Session-Token`. Błąd to `BladApi` (`status`, `kod`, `komunikat` PL/EN, `ponow_za_s` przy 429;
+  409 z kodem, np. `praca_trwa`, 413 `za_duze`, 507 `dysk`, 503 `silnik`); 429 przy zapytaniu z kluczem ponawia
+  najwyżej dwa razy po `ponow_za_s`. 401 prowadzi na logowanie jeden raz (kilka zapytań z 401 naraz nie przerywa
+  przejścia).
+- **Oś i przebiegi** (`15-os.js`, czyste reduktory): strony osi scalane po stałym `id` pozycji, `watek.wpis`
+  dokłada wiadomość, `przebieg.*` buduje przebieg (delty i kroki tylko po kursorze migawki). Widok: w trybie
+  Prosty kolejne grupy kroków jednego agenta sklejone; trwająca tura jest jednym żywym dymkiem za wiadomością,
+  na którą odpowiada, a jej pozycje `w_toku` są schowane; dymek znika, gdy oś ma już skończoną odpowiedź z tym
+  `przebieg_id` (bez mrugnięcia między końcem przebiegu a wpisem osi). Przebieg zatrzymany (Stop), po którym oś ma
+  już odpowiedź agenta, nie zostawia drugiego dymka: ostatnia jego pozycja agenta dostaje `zatrzymany` i pod
+  wiadomością stoi linia stanu „Zatrzymane” z **Ponów** (przebieg ponowiony albo ukryty jej nie dostaje). Teksty agentów, tytuły i nazwy plików idą
+  zawsze jako węzły tekstowe (bez `innerHTML`, sekcja 2e). Pomocnicze: `Os.noweOdTad`, `ryzyko`, `wyboryZgody`,
+  `krokiPodsumowanie`, `doZatrzymania`, `klasaBledu`; adresat i podpowiedzi kompozytora w `Pisanie` (ten sam plik).
+- **Wygląd** (`06-tokeny.js`, `style.css` od „Aplikacja Jarvo”): tokeny `--j-*` w dwóch motywach (`data-motyw`
+  `ciemny`/`jasny` na korzeniu, „Jak w systemie” z `prefers-color-scheme`): tła, linie, teksty, akcent karmazynowy,
+  fokus, uwaga, ok, błąd, cienie. Kontrast par tekst/tło ≥ 4,5:1 i elementów UI ≥ 3:1 w obu motywach pilnuje test.
+  Awatary agentów to pikselowe figurki z makiety V2 (`22-figurka.js`: ściana pokoju `hq_room` z floty i postać z wieży).
+  Kroje lokalne „Jarvo UI” (Inter) i „Jarvo Mono” (JetBrains Mono) z `zasoby/kroje/`. Cały styl aplikacji jest pod
+  `.jarvo-app` (klasy `j-*`), więc nie dotyka Hermesa ani Starej Bazy; tarcza przed motywem Fosfor (linie
+  skanowania `body::after`, poświata `text-shadow`, kwadratowe przyciski, tła pól, krój nagłówka) działa tylko przy
+  `data-jarvo-app`. Ruch krótki (`--j-ease`), przy `prefers-reduced-motion` bez animacji i bez płynnego
+  przewijania (`Ruch.zachowanie()`).
+- **Fokus** (`Fokus` w `20-ui.js`): `Fokus.odloz(cel)` ustawia fokus po zmianie widoku (kompozytor albo selektor,
+  ponawia do 1,5 s; element bez fokusu dostaje `tabindex=-1`). Zamknięta warstwa (szuflada, okno, menu) oddaje
+  fokus temu, co ją otworzyło, tylko gdy fokus był w warstwie albo spadł na `<body>`. Usunięcie wątku z listy
+  przenosi fokus na sąsiedni wiersz (otwarty wątek: na pole nowej rozmowy). Oś rozmowy jest w kolejności Tab
+  (przewijanie strzałkami), pole wiadomości ma pierścień fokusu na całej ramce kompozytora.
+- **Język** (`04-i18n.js`): `T(klucz, {n, …})` ze słownika PL i EN (325 kluczy w każdym), liczba mnoga po polsku
+  (`one`, `few`, `many`, `other`) i angielsku (`one`, `other`), język z Hermesa (`useI18n`), nazwy agentów bez odmiany
+  w szablonach. `validate.py` sprawdza, że oba słowniki mają te same klucze i komplet form.
+- **Skróty** (`05-skroty.js`, lista w Konto): Ctrl/⌘+Shift+O nowa rozmowa, Ctrl/⌘+Shift+S pasek, Ctrl/⌘+,
+  ustawienia, Ctrl/⌘+/ skróty, Alt+↑/↓ poprzedni i następny wątek, F6 i Shift+F6 między regionami (pasek, główna,
+  szuflada), `/` do pola wiadomości (bez kompozytora na ekranie: szukaj). W polach tekstowych działają tylko skróty
+  z Ctrl/⌘ albo Alt i F6.
+- **Testy.** `tests/js/hq_front.test.cjs` (node, bez zależności: czyste moduły 02, 03, 04, 05, 06, 12, 13, 14 i 15
+  w `vm`; `TZ=Europe/Warsaw node tests/js/hq_front.test.cjs`, też z pytest przez `tests/test_hq_front.py`): liczba
+  mnoga, grupy dni ze zmianą czasu, trasa tam i z powrotem, skróty, motyw, sklep, reduktory listy, osi i przebiegów,
+  widok osi (dymek do skończonej odpowiedzi, przebieg zatrzymany bez drugiego dymka, „Nowe od tąd”, ryzyko i wybory
+  zgody, kroki), adresat kompozytora
+  (wiodąca wzmianka, wybór na jedną wiadomość, środek zdania, próg pytania o wielu adresatów), podpowiedzi `@`,
+  Markdown (bloki, tabele, listy, kod, linki) i jego bezpieczeństwo: ładunki XSS (`<script>`, `onerror`,
+  `javascript:`, `data:text/html`, `vbscript:`, encje i znaki sterujące w adresie) zostają tekstem, a złośliwe wejście
+  mieści się w 250 ms. `tests/test_hq_front.py`: nazwy najwyższego poziomu w `src/*.js` jednoznaczne (pakiet to jeden IIFE), bez
+  `innerHTML`, każdy klucz `T("…")` w obu słownikach, te same tokeny w obu motywach i ich kontrast, każda klasa
+  `j-*` z kodu ma styl, CSS aplikacji tylko pod `.jarvo-app`, pakiet przechodzi `node --check`. `validate.py`
+  sprawdza przy każdym przebiegu jednoznaczność nazw, zgodność słowników, sekcje minimum szuflady (Połączenia,
+  Konto, System, Stara Baza, każda z nazwą w słowniku; Klucze i Modele w ramce), zasadę trybu „bezpośrednio”
+  w `docs/BOSS.md` i w SOUL Jarva oraz znaczniki bloku kontekstu w każdym złożonym SOUL i w `kontekst.py`. `tests/test_aplikacja.py` (14 testów):
+  właściciel z `USER.md`, model OAuth, na klucz (sama nazwa zmiennej, wartość nie wychodzi) i własny, brama
+  z dziennika startów, cała gotowość bez sekretów, startery (zimny start, budżet, kolejność, odrzucenie, „nigdy”,
+  rozpad wag), `GET /app` jednym zapytaniem, „Czeka na Ciebie” i reakcje, aktualizacja po pracy dopiero po 30 s
+  ciszy. `tests/test_atrapa_modelu.py`: kawałki atrapy (dwukropek zostaje przy poprzednim znaku, niżej).
+- **Test na żywo (etap 3)**: `scripts/jarvo-e2e.sh etap3` w kontenerze jako hermes (te same profile `test-e2e-*`,
+  atrapa na 9197 i sprzątanie co etap 2; wątki `[E2E]` test usuwa sam), punkty 1–9: powłoka schowana i własny wygląd
+  bez motywu dashboardu, kroje lokalne; jeden strumień na dwie karty i przejęcie z `?od=` po zamknięciu lidera; lista
+  na żywo (nowy wątek, zmiana tytułu, usunięcie); wątek z wiadomością i odpowiedzią atrapy na żywo, jedna odpowiedź
+  po końcu przebiegu; szuflada (Klucze i Modele w ramce bez menu Hermesa, motywy, język EN i z powrotem, Konto,
+  Stara Baza, Esc oddaje fokus); klawiatura; telefon 390 px; wygasła sesja → `/login?next=%2Fjarvo` i powrót do tego
+  samego wątku, link do wątku przy wczytaniu strony; na końcu każdy zapis aplikacji z `X-Jarvo-Request`, bez błędów
+  JS i bez odmów CSRF. Punkty 10–13 (etap 3b, idą po 4): nowy wątek z J, „Hej” przez kompozytor (Shift+Enter =
+  nowa linia, dymek od razu, odpowiedź na żywo, jeden dymek i jedna odpowiedź, szkic przeżywa wyjście z wątku);
+  `[dlugo]` jako Markdown (nagłówek, lista, pogrubienia, tabela, blok kodu) i echo ładunku XSS, który zostaje tekstem;
+  adresat na jedną wiadomość z listy **Do:** i powrót do J, znaczniki „bezpośrednio”, **Odpowiedz: <agent>** z fokusem
+  i Esc, `@agent` na początku i w środku zdania, podpowiedzi `@tes`, pytanie przy 4 adresatach (Anuluj nic nie
+  wysyła); zgoda `rm -rf` u `test-e2e-a`: przyciski z wydarzenia, odliczanie 0:20, ryzyko, **Pokaż polecenie**,
+  **Odmów** (katalog zostaje), druga prośba wygasa po ok. 20 s z „Czas minął” i **Poproś ponownie**.
+  Punkty 14–23 (etap 3c, kryteria akceptacji etapu 3): ekran startu (linia gotowości bez modelu: **Połącz**
+  otwiera Klucze albo Modele, **Poznajmy się** wysyła do koordynatora; `USER.md` z imieniem i firmą = powitanie;
+  brama „startuje” przez `POST /e2e/gotowosc` = „Jarvo się uruchamia…” bez czerwonego paska); nowy wątek ze startu
+  („Hej” Enterem, dymek od razu, odpowiedź strumieniem, tura w dzienniku atrapy pod `/p/test-e2e-j/`); bez
+  przyklejania adresata (`@teste2ea x` = „tylko ta wiadomość” i „bezpośrednio”, następna bez @ do `test-e2e-j`,
+  żadna do `test-e2e-a`; wybór z klawiatury, × i Esc; wzmianka w środku zdania); załączniki (wklejony obraz,
+  upuszczony PDF) i karty plików z `[plik:…]` (Podgląd, Pobierz, Kopiuj ścieżkę, Odpal; SVG w nowej karcie z `/file`,
+  nigdy `blob:`); **Zatrzymaj**, Esc Esc i **Ponów** po `[blad]`; odświeżenie w trakcie `[wolno:15]` (dymek
+  z `tekst_dotad` bez rozdarć i powtórek); 5 kart (najwyżej 3 połączenia z dashboardem i jeden `EventSource`
+  w spoczynku, 6. karta od razu ładuje `/login` i `/sessions`, po zamknięciu lidera strumień w innej karcie w ≤ 2 s
+  bez zgubionego zdarzenia); aktualizacja (spec §15.3: odznaka, pytanie przy pracy, „Zaktualizuj, gdy skończą” =
+  `update-request` dopiero 30 s po końcu pracy; nowa wersja przez `POST /e2e/wersja`: karta ze szkicem ma pasek
+  „Odśwież”, bezczynna schowana odświeża się sama); wylogowanie w karcie A przenosi kartę B na
+  `/login?next=%2Fjarvo` z zachowanym wątkiem; tylko klawiatura (Ctrl+Shift+O, `/`, Enter, Ctrl+,, Esc oddaje fokus).
+  Do tego (poprawki po przeglądzie etapu 3): linia gotowości ma najwyżej jedną linię i jeden przycisk, bez modelu
+  nie ma starterów, **Poznajmy się** tylko z połączonym modelem; podpowiedź przy wzmiance w środku zdania nie mówi
+  „koordynator”; karta błędu po `[blad]` zaczyna się wielką literą, nie ma w niej słów technicznych („error”,
+  „traceback”, „http”) poza zwiniętymi **Szczegółami** i przeżywa przeładowanie; wersja w Konto ma 10 znaków,
+  skróty są zwinięte; listy Markdown mają liczby, kropki i kółka. Punkt 19b: `[wolno:5]` w nowym wątku, wyjście na
+  start do końca tury i powrót: żaden dymek nie zostaje „żywy” (`aria-busy`, pasek pracy). Dwa testy naraz nie
+  ruszą (`flock` na `/tmp/jarvo-e2e.lock`), a etap 3 kopiuje `nawyki.db` przed startem (kopia SQLite przez API
+  kopii zapasowej) i przywraca ją przy sprzątaniu, więc reakcje na startery z testu nie zostają u właściciela.
+  Punkt 5 sprawdza też język EN na stronach Hermesa (`hermes-locale`) i System › Aktualizacja w szufladzie.
+  Test podmienia `USER.md` i `update.json` (ze znacznikiem `jarvo_e2e`) i przywraca je po swoim punkcie, a pułapka
+  usuwa testowy `update.json`, gdy test nie dożył przywrócenia. Trasy `POST /e2e/gotowosc {brama}` i
+  `POST /e2e/wersja {wersja}` (ta rozłącza strumienie, żeby `hello` niosło nową wersję) są tylko z `JARVO_E2E=1`.
+  Każdy profil testu ma własny adres atrapy (`…/p/<profil>/v1`), a dziennik atrapy zapisuje go w polu `_sciezka`, więc
+  test widzi, do kogo poszła tura. Profile testu mają `agent.api_max_retries: 1` i `agent.auto_recovery_cycles: 0`,
+  żeby `[blad]` kończył turę od razu. Atrapa w trybie po znaku trzyma dwukropek przy poprzednim znaku: Hermes
+  wstrzymuje deltę zaczynającą się od „:” (może to być komentarz SSE) do końca linii, więc tekst stałby w miejscu.
+  `JARVO_E2E_PUNKTY=14,15` uruchamia tylko wybrane punkty (i 1).
+  `JARVO_E2E_ZRZUT=<plik.png>` zapisuje zrzut rozmowy (i obok `-zgoda`, `-telefon`, `-start-brama`), a
+  `JARVO_E2E_ZRZUTY=<katalog>` zestaw dla właściciela z punktu 11: `jasny-1440.jpg`, `ciemny-1440.jpg`, `jasny-390.jpg`,
+  `ciemny-390.jpg` (JPEG 80, w każdym ekran startu obok wątku z odpowiedzią atrapy, motyw „Jak w systemie”). Jedyny
+  pomijany błąd strony to komunikat Chromium „ViewTransition opt-in disabled”: dashboard Hermesa włącza przejścia
+  widoku między dokumentami, a strona `/login` nie, więc każde przejście na logowanie (także z `/sessions`) go zgłasza.
+- **Rozmiar.** Pakiet 3c po poprawkach przeglądu: JS ok. 826 KB (262 KB gzip, +8 KB gzip względem 3c: figurki,
+  linia gotowości, Zespół, fokus), CSS ok. 157 KB (31,9 KB gzip, +1 KB), loader 3,9 KB (limit 4 KB). Budżet
+  specyfikacji dla etapów 3–6 to 190 KB gzip JS: przekroczony o ok. 72 KB, bo w pakiecie jest jeszcze cała Stara Baza; podział na pakiet aplikacji i Starą Bazę ładowaną na żądanie
+  (etap 7) albo usuwanie komentarzy w `hqbuild.py` to zejdą.
 
 ## 3. Bezpieczeństwo
 
@@ -1039,8 +1364,9 @@ Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zost
 ## 6. Język: polski i angielski
 
 Dashboard ma pełny polski (tłumaczenie `branding/i18n/pl.json`, ~750 tekstów i całe menu) i jest domyślnie po
-polsku. Język zmienia przełącznik w lewym dolnym rogu (**POLSKI** / **EN** / …). Jarvo HQ idzie za nim: po polsku
-albo po angielsku (każdy inny język = angielskie HQ); nazwy pokoi, role i opisy agentów po angielsku są w
+polsku. Na klasycznych stronach język zmienia przełącznik w lewym dolnym rogu (**POLSKI** / **EN** / …), w aplikacji
+Jarvo **Ustawienia › Konto › Język** (ten sam klucz `hermes-locale`, więc strony Hermesa idą za wyborem). Aplikacja
+i Stara Baza mówią po polsku albo po angielsku (każdy inny język = angielski); nazwy pokoi, role i opisy agentów po angielsku są w
 `fleet.yaml` (`en:`). Tłumaczenie wstrzykuje `branding/patch_dashboard.py` przy budowie obrazu (brakujący klucz =
 tekst angielski), więc zmiana `branding/` przebudowuje tylko ostatnią warstwę obrazu (sekundy, ta sama wersja
 Hermesa). Etykiety wpisane w kod po angielsku na stronie Sesje (liczniki, „Import sessions”) tłumaczy łatka
@@ -1067,5 +1393,8 @@ Agenci rozmawiają po polsku niezależnie od języka panelu (SOUL).
 | zapis z panelu albo `curl`: 403 `{"blad": {"kod": "csrf"}}` | ochrona zapisu: żądanie nie przyszło z panelu. Skrypt z `curl` dodaje `-H 'X-Jarvo-Request: 1'` (i ciasteczko sesji); powód odmowy jest w dzienniku dashboardu (`jarvo: odrzucony zapis (csrf) …`) |
 | aplikacja: przebieg długo w `przyjety` albo `pracuje` bez tekstu | `GET /api/plugins/jarvo-hq/przebiegi/<id>`: `czeka_na_ture` = sesję trzyma inna tura (ruszy sama); `czeka_na_zgode` = agent czeka na Twoją decyzję (po `approvals.timeout` zgoda wygasa, polecenie się nie wykona); `odlaczony: true` = po restarcie dashboardu silnik odpytuje bramę co 2 s. Strażnik pyta bramę po 90 s ciszy, `zgubione` dopiero po 10 min bez śladu. **Stop**, potem **Ponów** |
 | aplikacja: pierwsza wiadomość nowego wątku długo w `kolejka(brama)`, gdy agenci mają dużo pracy naraz | brama wykonuje tury `/v1/runs`, budzenia z kanbana, operacje na bazie sesji i streszczenia kompresji w tej samej puli wątków (rdzenie + 4, przy 4 rdzeniach 8). Silnik puszcza domyślnie o 3 przebiegi mniej (przy 4 rdzeniach 5), ale tury budzone z kanbana zajmują tę samą pulę (tury Telegrama mają własną). Gdy wszystkie wątki zajmują tury, założenie sesji członka (`POST /api/sessions`) czeka na wolny wątek; po 15 s silnik uznaje bramę za chwilowo niedostępną i ponawia (1, 2, 4… s). Rusza sama, gdy któraś tura się skończy; jeśli przez 2 min żadna się nie skończy, przebieg kończy się `blad(brama_niedostepna)` i wystarczy **Ponów**. Brama odpowiada 429 (→ `kolejka(limit)`) dopiero przy 10 przebiegach naraz; poniżej tego pełna pula widać tylko jako dłuższe `kolejka(brama)`. Przy słabej maszynie można zmniejszyć `JARVO_HQ_MAX_PRZEBIEGOW` |
+| aplikacja: ekran startu długo „Jarvo się uruchamia…”, potem „Jarvo chwilowo nie odpowiada” | brama nie odpowiada na `/health` (`GET /api/plugins/jarvo-hq/app` → `gotowosc.brama`): `hermes gateway status`, `/opt/data/logs/gateway.log`; wiadomości czekają w kolejce |
+| aplikacja: ekran startu mówi „Połącz model…”, choć klucz jest | status logowania profilu `jarvo` (wynik w pamięci 30 s): na klucz = niepusta zmienna klucza w `.env` profilu, OAuth = zalogowanie w Modele, `custom` = `model.base_url`; odśwież po minucie |
+| aplikacja: System › Aktualizacja czeka na koniec pracy | agenci pracują (`praca.json` `aktywne` > 0); **Aktualizuj teraz** albo **Nie aktualizuj**; prośba do pomocnika idzie sama 30 s po końcu pracy |
 | aplikacja: przebieg `przerwane` po aktualizacji | restart bramy przerwał turę; **Ponów** wysyła krótkie „Poprzednia tura nie dokończyła się…”, bez powtarzania wiadomości |
 | aplikacja: każda tura jednego agenta kończy się `blad` z „state.db was replaced underneath the gateway” | profil usunięto i założono od nowa pod tą samą nazwą (albo podmieniono jego `state.db`) przy działającej bramie, a brama trzyma stary plik otwarty do końca życia procesu. `hermes gateway restart` (w kontenerze jako hermes); `GET /p/<profil>/api/sessions` z kluczem profilu daje wtedy 200 zamiast 500 |

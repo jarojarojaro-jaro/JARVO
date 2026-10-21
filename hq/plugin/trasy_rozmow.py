@@ -3,6 +3,7 @@ więc każda trasa zapisu dostaje ochronę CSRF z `ochrona.Trasa`).
 
 - Wątki: `GET/POST /rozmowy`, `GET/PATCH/DELETE /rozmowy/{id}`, `POST /rozmowy/{id}/przywroc`, `/przeczytane`.
 - Oś czasu: `GET /rozmowy/{id}/os` (scalanie wpisów aplikacji z sesjami członków w state.db, kursor nieprzezroczysty).
+- Eksport: `GET /rozmowy/{id}/eksport` (cała oś jako plik Markdown, przez `ochrona.utajnij`); agenci: `GET /agenci`.
 - Wysyłka: `POST /rozmowy/{id}/wiadomosci` (wzmianki, załączniki przez `safe_path`, obrazy sprawdzane po magicznych
   bajtach i limit 7 000 000 bajtów zakodowanych data URL → 413 `za_duze` zanim cokolwiek pójdzie do bramy).
 - Przebiegi: `GET /przebiegi/{id}`, `POST …/stop` (i `…/zatrzymaj`), `…/anuluj`, `…/wyslij` (i `…/wyslij-teraz`),
@@ -164,6 +165,52 @@ async def czytaj_cialo(request: Request, model: type[_Model], *, maks: int = CIA
                         pole=pole) from None
 
 
+# ----------------------------------------------------------------------------------------------- eksport
+
+EKSPORT_STRON = 100                # najwyżej 100 stron osi po 200 pozycji (20 000 pozycji)
+_ETYKIETY_EKSPORTU = {"system": "", "kompresja": "", "luka": "", "dostawa": "Wynik w tle: ", "budzenie": "Powrót z pracą: ",
+                      "dopisano": "Dopisane do trwającej pracy: ", "obca": "Wiadomość spoza aplikacji: ",
+                      "blad_tury": "Tura się nie udała: ", "przekazanie": "Przekazanie: "}
+
+
+def nazwa_pliku_eksportu(tytul: str) -> str:
+    """„Strona dla piekarni Złoty Kłos” → „rozmowa-strona-dla-piekarni-zloty-klos.md” (ASCII, do 60 znaków)."""
+    s = unicodedata.normalize("NFKD", (tytul or "").replace("ł", "l").replace("Ł", "L"))
+    s = "".join(c for c in s if not unicodedata.combining(c)).encode("ascii", "ignore").decode().lower()
+    s = "-".join("".join(c if c.isalnum() else " " for c in s).split())[:60].strip("-")
+    return f"rozmowa-{s}.md" if s else "rozmowa.md"
+
+
+def eksport_md(tytul: str, pozycje: list[dict], nazwy: dict[str, str], *, teraz: float,
+               utajnij: Callable[[str], str] = lambda t: t) -> str:
+    """Oś czasu wątku jako Markdown: teksty właściciela i agentów, pliki (ścieżki), kroki w jednej linii, notatki
+    systemowe kursywą. Całość przez `utajnij` (sekrety z treści i podglądów nie wychodzą w pliku)."""
+    def kiedy(ts: float) -> str:
+        return time.strftime("%Y-%m-%d %H:%M", time.localtime(float(ts or 0)))
+
+    linie = [f"# {' '.join((tytul or 'Rozmowa').split())}", "", f"Eksport rozmowy z Jarva · {kiedy(teraz)}", ""]
+    for p in pozycje:
+        rodzaj, tekst = p.get("rodzaj"), (p.get("tekst") or "").strip()
+        if rodzaj in ("wlasciciel", "agent"):
+            kto = "Ty" if rodzaj == "wlasciciel" else nazwy.get(p.get("agent") or "", p.get("agent") or "Agent")
+            tryb = " · bezpośrednio" if p.get("tryb") == "bezposrednio" else ""
+            linie += ["---", "", f"**{kto}** · {kiedy(p.get('ts'))}{tryb}", ""]
+            if tekst:
+                linie += [tekst, ""]
+            if rodzaj == "wlasciciel":
+                linie += [f"📎 {f.get('path')}" for f in p.get("pliki") or [] if f.get("path")]
+                if p.get("pliki"):
+                    linie.append("")
+        elif rodzaj == "kroki":
+            kroki = [k.get("verb") or k.get("narzedzie") or "" for k in p.get("kroki") or []]
+            if kroki:
+                reszta = f" i {len(kroki) - 12} więcej" if len(kroki) > 12 else ""
+                linie += [f"_Kroki: {' · '.join(x for x in kroki[:12] if x)}{reszta}_", ""]
+        elif tekst:
+            linie += [f"_{_ETYKIETY_EKSPORTU.get(rodzaj, '')}{' '.join(tekst.split())[:2000]}_", ""]
+    return utajnij("\n".join(linie).rstrip() + "\n")
+
+
 # ----------------------------------------------------------------------------------------------- trasy
 
 def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci, inbox: Path | str,
@@ -273,7 +320,7 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             return None
 
     def watek_pelny(sil, w: dict) -> dict:
-        """Watek (pełny) = WatekKrotki + członkowie z sesjami, aktywne przebiegi i karty."""
+        """Watek (pełny) = WatekKrotki + członkowie z sesjami, aktywne przebiegi, nieudane do ponowienia i karty."""
         db, rej = sil.db, sil.rejestr
         d = przebiegi.watek_krotki(w)
         d.update(utworzony_at=w.get("utworzony_at"), tytul_zrodlo=w.get("tytul_zrodlo"),
@@ -281,6 +328,7 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
                                    for c in db.czlonkowie(w["id"], rola="rozmowa")],
                  przebiegi_aktywne=[rej.widok(p, tekst=False) for p in db.przebiegi_watku(w["id"], aktywne=True)
                                     if p.get("zrodlo") != "nadzor"],
+                 przebiegi_do_ponowienia=[rej.widok(p, tekst=False) for p in db.przebiegi_do_ponowienia(w["id"])],
                  karty=db.karty_watku(w["id"]))
         return d
 
@@ -753,6 +801,40 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
                 budzenia=m.budzenia, etykieta=core.tool_label, utajnij=ochrona.utajnij, plik=plik)
         except ValueError:
             raise BladTrasy(422, "zly_kursor", "Zły kursor osi czasu.", "Bad timeline cursor.") from None
+
+    @trasa("GET", "/rozmowy/{wid}/eksport")
+    @obsluga
+    async def eksport_rozmowy(wid: str, request: Request):
+        """Cała rozmowa jako plik Markdown do pobrania (strony osi od najnowszej wstecz)."""
+        tylko_ta_strona(request)
+        sil = s()
+        w = await watek_lub_404(sil, wid)
+
+        def zbierz() -> str:
+            strony, przed = [], None
+            for _ in range(EKSPORT_STRON):
+                o = m.scalanie.os_watku(sil.db, sil.czytnik, w["id"], przed=przed, limit=m.scalanie.LIMIT_MAKS,
+                                        budzenia=m.budzenia, etykieta=core.tool_label, utajnij=ochrona.utajnij,
+                                        plik=plik)
+                strony.append(o["pozycje"])
+                przed = o.get("przed")
+                if not przed or o.get("pelny"):
+                    break
+            pozycje = [p for strona in reversed(strony) for p in strona]
+            return eksport_md(w.get("tytul") or "", pozycje, nazwy(), teraz=zegar(), utajnij=ochrona.utajnij)
+
+        tresc = await asyncio.to_thread(zbierz)
+        nazwa = nazwa_pliku_eksportu(w.get("tytul") or "")
+        return Response(tresc.encode("utf-8"), media_type="text/markdown; charset=utf-8", headers={
+            "Content-Disposition": f'attachment; filename="{nazwa}"',
+            "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+    @trasa("GET", "/agenci")
+    @obsluga
+    async def lista_agentow(request: Request):
+        """Agenci aplikacji (flota, z `JARVO_E2E=1` także testowi): nazwy, uchwyty i aliasy wzmianek, opisy."""
+        tylko_ta_strona(request)
+        return {"agenci": await asyncio.to_thread(agenci.lista)}
 
     @trasa("POST", "/rozmowy/{wid}/wiadomosci", status_code=202)
     @obsluga

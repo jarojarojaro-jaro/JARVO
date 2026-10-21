@@ -1848,42 +1848,102 @@ async def health():
 UPDATE_FILE = core.JARVO_DIR / "state" / "update.json"
 UPDATE_REQUEST = core.JARVO_DIR / "state" / "update-request"
 UPDATER_STALE = 5 * 60  # pomocnik sprawdza co minutę; dłuższa cisza = nie działa
+PRACA_FILE = core.JARVO_DIR / "state" / "praca.json"
+PRACA_STALE = 2 * 60     # silnik odświeża praca.json co minutę
+
+
+def _praca() -> dict:
+    """Praca floty z praca.json silnika (spec §15.3): {aktywne, opis}; stary albo brak pliku = 0."""
+    try:
+        d = json.loads(PRACA_FILE.read_text(encoding="utf-8"))
+        if time.time() - float(d.get("at") or 0) < PRACA_STALE:
+            return {"aktywne": int(d.get("aktywne") or 0), "opis": [str(x)[:120] for x in (d.get("opis") or [])][:12]}
+    except (OSError, ValueError, TypeError):
+        pass
+    return {"aktywne": 0, "opis": []}
+
+
+def _po_pracy() -> float | None:
+    """Czas prośby „Zaktualizuj, gdy skończą” (meta silnika `aktualizacja_po_pracy`); None = nie czeka."""
+    s = _silnik()
+    if s is None or s.db is None:
+        return None
+    try:
+        v = s.db.meta("aktualizacja_po_pracy")
+        return float(v) if v else None
+    except Exception:
+        return None
 
 
 def _update_state() -> dict:
     try:
         state = json.loads(UPDATE_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {"online": False, "state": "unknown", "behind": 0}
-    last = max(state.get(k) or 0 for k in ("checked_at", "started_at", "finished_at", "beat"))
-    state["online"] = time.time() - last < UPDATER_STALE
-    state["pending"] = UPDATE_REQUEST.exists()
-    state["silent_for"] = int(time.time() - last) if last else None
-    # pomocnik zniknął w trakcie (zamknięty WSL, restart, zawieszony deploy): nie udajemy, że trwa
-    if not state["online"] and (state.get("state") == "updating" or state["pending"]):
-        state["state"] = "stalled"
+        state = {"online": False, "state": "unknown", "behind": 0}
+    else:
+        last = max(state.get(k) or 0 for k in ("checked_at", "started_at", "finished_at", "beat"))
+        state["online"] = time.time() - last < UPDATER_STALE
+        state["pending"] = UPDATE_REQUEST.exists()
+        state["silent_for"] = int(time.time() - last) if last else None
+        # pomocnik zniknął w trakcie (zamknięty WSL, restart, zawieszony deploy): nie udajemy, że trwa
+        if not state["online"] and (state.get("state") == "updating" or state["pending"]):
+            state["state"] = "stalled"
+    state["praca"] = _praca()
+    state["po_pracy"] = _po_pracy()
     return state
 
 
 @router.get("/update")
 async def update_status():
-    return _update_state()
+    return await asyncio.to_thread(_update_state)
+
+
+def _blad_update(status: int, kod: str, pl: str, en: str) -> JSONResponse:
+    # `detail` zostaje dla starego widżetu (95-update.js czyta detail), `blad` dla aplikacji
+    return JSONResponse({"detail": pl, "blad": {"kod": kod, "komunikat": pl, "komunikat_en": en}}, status_code=status)
 
 
 @router.post("/update")
 async def update_request(request: Request):
-    body = await request.json()
-    action = body.get("action")
-    if action not in ("check", "update"):
-        raise HTTPException(400, "action: check albo update")
-    state = _update_state()
+    """`{action: check|update|cancel, gdy?: teraz|wolne}` (spec §15.3). `gdy: wolne` zapisuje w rozmowy.db prośbę
+    „Zaktualizuj, gdy skończą”: plik update-request pisze silnik po 30 s bez pracy. `cancel` ją kasuje."""
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        return _blad_update(422, "zle_dane", "Treść musi być obiektem JSON.", "The body must be a JSON object.")
+    action, gdy = body.get("action"), body.get("gdy") or "teraz"
+    if action not in ("check", "update", "cancel") or gdy not in ("teraz", "wolne"):
+        return _blad_update(400, "zle_dane", "action: check, update albo cancel; gdy: teraz albo wolne.",
+                            "action: check, update or cancel; gdy: teraz or wolne.")
+    if action == "cancel":
+        s = _silnik()
+        if s is not None and s.dziala():
+            await s.wykonaj_fn(s.db.usun_meta, "aktualizacja_po_pracy")
+        HUB.nadaj("aktualizacja", await asyncio.to_thread(_update_state))
+        return JSONResponse({"ok": True, "action": action}, status_code=200)
+    state = await asyncio.to_thread(_update_state)
     if not state.get("online"):
-        raise HTTPException(503, "Pomocnik aktualizacji nie działa. Lokalnie: bash scripts/local-up.sh, "
-                                 "na serwerze: sudo systemctl start jarvo-updater.")
+        return _blad_update(503, "pomocnik", "Pomocnik aktualizacji nie działa. Lokalnie: bash scripts/local-up.sh, "
+                                             "na serwerze: sudo systemctl start jarvo-updater.",
+                            "The update helper is not running.")
     if state.get("state") == "updating":
-        raise HTTPException(409, "Aktualizacja już trwa.")
+        return _blad_update(409, "trwa", "Aktualizacja już trwa.", "An update is already running.")
+    if action == "update" and gdy == "wolne":
+        s = _silnik()
+        if s is None or not s.dziala():
+            return _blad_update(503, "silnik", "Silnik rozmów nie działa — nie mogę poczekać na koniec pracy.",
+                                "The conversation engine is not running — cannot wait for work to finish.")
+        await s.wykonaj_fn(s.db.ustaw_meta, "aktualizacja_po_pracy", repr(time.time()))
+        HUB.nadaj("aktualizacja", await asyncio.to_thread(_update_state))
+        return JSONResponse({"ok": True, "action": action, "gdy": gdy}, status_code=202)
     UPDATE_REQUEST.parent.mkdir(parents=True, exist_ok=True)
     UPDATE_REQUEST.write_text(action, encoding="utf-8")
+    if action == "update":
+        s = _silnik()
+        if s is not None and s.dziala():
+            await s.wykonaj_fn(s.db.usun_meta, "aktualizacja_po_pracy")
     return JSONResponse({"ok": True, "action": action}, status_code=202)
 
 
@@ -1929,9 +1989,10 @@ from types import SimpleNamespace  # noqa: E402
 
 roz = SimpleNamespace(hq_core=core, ochrona=ochrona)
 for _nazwa in ("agenci", "rozmowy", "czytnik", "kontekst", "wzmianki", "budzenia", "scalanie", "brama", "strumien",
-               "przebiegi", "prace", "obserwator", "silnik"):
+               "przebiegi", "prace", "obserwator", "aplikacja", "podpowiedzi", "silnik"):
     setattr(roz, _nazwa, _load(f"jarvo_hq_{_nazwa}", f"{_nazwa}.py"))
 trasy_rozmow = _load("jarvo_hq_trasy_rozmow", "trasy_rozmow.py")
+trasy_aplikacji = _load("jarvo_hq_trasy_aplikacji", "trasy_aplikacji.py")
 _dziennik_hq = roz.silnik.ustaw_dziennik(HOME / "logs" / "jarvo-hq.log"
                                          if os.environ.get("JARVO_HQ_SILNIK", "1") != "0" else None)
 AGENCI = roz.agenci.Agenci(FLEET_FILE, core.JARVO_DIR / "state" / "agenci.json")
@@ -1952,6 +2013,7 @@ def _wersja_paczki() -> str:
 
 
 WERSJA = _wersja_paczki()
+_WERSJA_E2E: list[str] = []          # tylko test E2E nowej wersji (POST /e2e/wersja): wersja w hello zamiast WERSJA
 
 
 def _silnik():
@@ -1966,7 +2028,7 @@ def _hello() -> dict:
         stan = "wylaczony" if os.environ.get("JARVO_HQ_SILNIK", "1") == "0" else "awaria"
     else:
         stan = "ok" if s.dziala() else ("awaria" if s.stan == "awaria" else "start")
-    return {"wersja": WERSJA, "silnik": stan}
+    return {"wersja": _WERSJA_E2E[-1] if _WERSJA_E2E else WERSJA, "silnik": stan}
 
 
 def _start_silnika():
@@ -1988,6 +2050,18 @@ def _start_silnika():
 
 HUB = _start_silnika()
 trasy_rozmow.dolacz(router, m=roz, silnik=_silnik, hub=HUB, agenci=AGENCI, inbox=core.JARVO_DIR / "inbox", log=_log_hq)
+# start aplikacji (GET /app, podpowiedzi N0): gotowość bez sekretów (aplikacja.py), nawyki.db (podpowiedzi.py)
+GOTOWOSC = roz.aplikacja.Gotowosc(home=HOME, profil=HOME / "profiles" / "jarvo",
+                                  user_md=core.JARVO_DIR / "knowledge" / "user" / "USER.md", api_base=API_BASE)
+NAWYKI = roz.podpowiedzi.Nawyki(core.JARVO_DIR / "state" / "nawyki.db")
+def _decyzje() -> list[dict]:
+    """Pytania zespołu (zablokowane karty kanbana, jak Centrala Starej Bazy) dla „Czeka na Ciebie” w aplikacji."""
+    now = time.time()
+    return _cached("decyzje", 5.0, lambda: core.build_state(_fleet(), _board(now), _index_md(), now, {}).get("decisions") or [])
+
+
+trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci=AGENCI, gotowosc=GOTOWOSC,
+                       nawyki=NAWYKI, stan_aktualizacji=_update_state, hello=_hello, decyzje=_decyzje, log=_log_hq)
 
 
 async def _zdrowie_rozmow() -> dict:
@@ -2047,3 +2121,28 @@ if os.environ.get("JARVO_E2E") == "1":
             return stary
 
         return {"limit": limit, "poprzedni": await s.wykonaj_fn(_ustaw)}
+
+    @router.post("/e2e/gotowosc")
+    async def e2e_gotowosc(request: Request):
+        """Test ekranu startu (scripts/jarvo-e2e.sh etap3): `{"brama": "startuje"|null}` wymusza stan bramy w gotowości
+        (młoda brama bez restartu), każde wywołanie czyści pamięć gotowości (model, brama); tylko z JARVO_E2E=1."""
+        try:
+            brama = (await request.json()).get("brama")
+        except (ValueError, AttributeError):
+            brama = None
+        GOTOWOSC.brama_wymuszona = brama if brama in ("startuje", "niedostepna") else None
+        GOTOWOSC.odswiez()
+        return {"brama": GOTOWOSC.brama_wymuszona}
+
+    @router.post("/e2e/wersja")
+    async def e2e_wersja(request: Request):
+        """Test „Nowa wersja Jarva” (etap3): `{"wersja": "<napis>"|null}` podmienia wersję w hello i rozłącza każdy
+        strumień (jak restart dashboardu po aktualizacji, bez restartu); null wraca do wersji paczki; tylko z JARVO_E2E=1."""
+        try:
+            w = (await request.json()).get("wersja")
+        except (ValueError, AttributeError):
+            w = None
+        _WERSJA_E2E.clear()
+        if isinstance(w, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,40}", w):
+            _WERSJA_E2E.append(w)
+        return {"wersja": _hello()["wersja"], "rozlaczone": HUB.rozlacz_wszystkie()}

@@ -3,7 +3,8 @@
 
 Sprawdza: fleet.yaml ↔ profile, kompletność profilu (anatomia z docs/PROFILE-SPEC.md), budżet SOUL,
 frontmatter i opisy skilli (≤ 60 znaków, bo tyle widzi model w indeksie), plik blokady skilli,
-definicje crona, evals, składnię skryptów, przypadkowe sekrety w repo i zgodność dokumentacji z kodem
+definicje crona, evals, składnię skryptów, pakiet aplikacji HQ (jednoznaczne nazwy globalne w hq/web/src, te same
+klucze tekstów PL/EN), przypadkowe sekrety w repo i zgodność dokumentacji z kodem
 (linki i kotwice w *.md, pełna lista floty w dokumentach przeglądowych, liczby skilli i evals w tabelach).
 Kod wyjścia 1 przy błędach; ostrzeżenia nie blokują.
 """
@@ -24,6 +25,15 @@ import fleetlib as fl  # noqa: E402
 REQUIRED_FILES = ["SOUL.md", "config.yaml", "distribution.yaml", "toolbox.yaml",
                   "quality/rubric.md", "README.md", "CHANGELOG.md"]
 SOUL_REQUIRED = ["## Misja", "## Osobowość"]
+# zasada bloku kontekstu (protokół floty, zasada 8; docs/HQ.md „Aplikacja”): każdy złożony SOUL nazywa znaczniki,
+# które składa hq/plugin/kontekst.py
+SOUL_KONTEKST = ["[Jarvo · kontekst rozmowy <kod>]", "[koniec kontekstu <kod>]", "[Wiadomość właściciela <kod>]"]
+# tryb „bezpośrednio” (aplikacja Jarvo, docs/HQ.md §2f): @uchwyt kieruje do agenta tylko jedną wiadomość; ta sama zasada
+# w BOSS.md (zasada 6) i w SOUL Jarva, bo inaczej szef i Jarvo opisują aplikację inaczej
+TRYB_BEZPOSREDNI = {"docs/BOSS.md": "@ działa na jedną wiadomość: następna bez @ idzie znowu do Jarva.",
+                    "profiles/jarvo/SOUL.md": "@ działa na jedną wiadomość."}
+# szuflada w wersji minimalnej (spec §15.1): po schowaniu menu Hermesa każda z tych sekcji ma wejście w aplikacji
+SZUFLADA_MINIMUM = ("polaczenia", "konto", "system", "stara-baza")
 EVAL_TYPES = {"in_scope", "out_of_scope", "safety", "routing", "protocol"}
 MIN_EVALS = 10
 SECRET_PATTERNS = [
@@ -79,6 +89,13 @@ def check_fleet(fleet: fl.Fleet, r: Report) -> None:
             r.err(f"{a.name}: hq_room {a.hq_room!r} spoza {sorted(fl.HQ_ROOMS)}")
         if len(a.description) < 40:
             r.warn(f"{a.name}: krótki opis (routing kanbana opiera się na opisie)")
+        # krótka rola w aplikacji (Ustawienia › Zespół, podpowiedź kompozytora): po polsku i po angielsku, do 8 słów
+        if a.status == "active":
+            for jez, rola in (("rola", a.rola), ("en.rola", a.en.get("rola", ""))):
+                if not rola:
+                    r.err(f"{a.name}: brak pola {jez} (krótka rola w aplikacji, docs/FLEET.md)")
+                elif len(rola.split()) > 8:
+                    r.err(f"{a.name}: {jez} ma {len(rola.split())} słów (najwyżej 8)")
     check_uchwyty(fleet, r)
     for d in fl.PROFILES_DIR.iterdir():
         if d.is_dir() and not d.name.startswith("_") and d.name not in names:
@@ -137,6 +154,10 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
     for h in SOUL_REQUIRED:
         if h not in soul:
             r.err(f"{a.name}: SOUL.md bez sekcji {h!r}")
+    zlozony = soul.replace(fl.PROTOCOL_MARKER, fl.protocol_for(protocol, a.name == fleet.orchestrator))
+    for znacznik in SOUL_KONTEKST:
+        if znacznik not in zlozony:
+            r.err(f"{a.name}: SOUL z protokołem bez zasady bloku kontekstu (brak {znacznik!r}; protokół, zasada 8)")
     if a.name == fleet.orchestrator and fl.ROSTER_MARKER not in soul:
         r.err(f"{a.name}: SOUL.md orkiestratora bez {fl.ROSTER_MARKER}")
     # budżet z najdłuższą kalibracją, jaką agent może dostać (zmiana dostawcy albo modelu w panelu)
@@ -548,6 +569,86 @@ def check_secrets(r: Report) -> None:
                 r.err(f"{path.relative_to(fl.REPO_ROOT)}: wygląda na {label}")
 
 
+# pakiet aplikacji to sklejone hq/web/src/*.js w jednym IIFE: nazwy z najwyższego poziomu muszą być jednoznaczne
+# (dwie funkcje o tej samej nazwie nie wywracają składni, druga po cichu zastępuje pierwszą)
+NAZWA_GLOBALNA = re.compile(r"^(?:async\s+)?(?:function\*?|class|const|let|var)\s+([A-Za-z_$][\w$]*)", re.M)
+DESTRUKTURYZACJA = re.compile(r"^(?:const|let|var)\s*[{\[]([^=]*?)[}\]]\s*=", re.M)
+
+
+def nazwy_globalne_js(tekst: str) -> list[str]:
+    """Nazwy deklarowane w kolumnie 0 pliku źródłowego pakietu (także z destrukturyzacji `const { a, b: c } = …`)."""
+    nazwy = NAZWA_GLOBALNA.findall(tekst)
+    for wnetrze in DESTRUKTURYZACJA.findall(tekst):
+        for cz in wnetrze.split(","):
+            nazwa = cz.strip().removeprefix("...").split(":")[-1].split("=")[0].strip()
+            if re.fullmatch(r"[A-Za-z_$][\w$]*", nazwa):
+                nazwy.append(nazwa)
+    return nazwy
+
+
+def slownik_i18n(tekst: str) -> dict[str, dict[str, set[str] | None]]:
+    """SLOWNIK z hq/web/src/04-i18n.js: {"pl"|"en": {klucz: formy liczby mnogiej albo None}}."""
+    napis = r'"(?:[^"\\]|\\.)*"'
+    wpis = re.compile(rf'"([a-z0-9_.-]+)":\s*(\{{(?:[^{{}}"]|{napis})*\}}|{napis})')
+    pl = tekst.split("\n  pl: {", 1)[1].split("\n  en: {", 1)[0]
+    en = tekst.split("\n  en: {", 1)[1].split("\n};", 1)[0]
+    return {j: {k: (set(re.findall(r"(\w+):\s*\"", v)) if v.startswith("{") else None) for k, v in wpis.findall(blok)}
+            for j, blok in (("pl", pl), ("en", en))}
+
+
+FORMY_MNOGIE = {"pl": {"one", "few", "many", "other"}, "en": {"one", "other"}}
+
+
+def check_hq_pakiet(r: Report) -> None:
+    """Pakiet aplikacji (docs/HQ.md „Aplikacja”): jednoznaczne nazwy globalne i te same klucze tekstów PL/EN."""
+    src = fl.REPO_ROOT / "hq" / "web" / "src"
+    gdzie: dict[str, str] = {}
+    for f in sorted(src.glob("*.js")):
+        for nazwa in nazwy_globalne_js(f.read_text(encoding="utf-8")):
+            if nazwa in gdzie:
+                r.err(f"hq/web/src/{f.name}: nazwa {nazwa!r} jest już w {gdzie[nazwa]} (pakiet to jeden zakres)")
+            else:
+                gdzie[nazwa] = f.name
+    i18n = src / "04-i18n.js"
+    if not i18n.exists():
+        return
+    try:
+        sl = slownik_i18n(i18n.read_text(encoding="utf-8"))
+    except IndexError:
+        r.err("hq/web/src/04-i18n.js: brak bloków pl / en w SLOWNIK")
+        return
+    for brak, jest, jezyk in ((set(sl["pl"]) - set(sl["en"]), "pl", "en"), (set(sl["en"]) - set(sl["pl"]), "en", "pl")):
+        for k in sorted(brak):
+            r.err(f"hq/web/src/04-i18n.js: klucz {k!r} jest w {jest}, brak w {jezyk}")
+    for jezyk, wpisy in sl.items():
+        for k, formy in wpisy.items():
+            inny = sl["en" if jezyk == "pl" else "pl"].get(k, formy)
+            if (formy is None) != (inny is None):
+                r.err(f"hq/web/src/04-i18n.js: {k!r} ma liczbę mnogą tylko w jednym języku")
+            elif formy is not None and not FORMY_MNOGIE[jezyk] <= formy:
+                r.err(f"hq/web/src/04-i18n.js: {jezyk} {k!r} bez form {sorted(FORMY_MNOGIE[jezyk] - formy)}")
+    # szuflada (61-szuflada.js): sekcje minimum z §15.1, każda z nazwą w słowniku; Klucze i Modele osadzone
+    szuflada = src / "61-szuflada.js"
+    if szuflada.exists():
+        kod = szuflada.read_text(encoding="utf-8")
+        blok = kod.split("const SEKCJE_SZUFLADY = [", 1)[-1].split("];", 1)[0]
+        sekcje = re.findall(r'id:\s*"([a-z-]+)"', blok)
+        for brak in [x for x in SZUFLADA_MINIMUM if x not in sekcje]:
+            r.err(f"hq/web/src/61-szuflada.js: brak sekcji {brak!r} w SEKCJE_SZUFLADY (spec §15.1: nic bez wejścia)")
+        for sid in sekcje:
+            if f"szuflada.{sid}" not in sl["pl"]:
+                r.err(f"hq/web/src/04-i18n.js: brak klucza 'szuflada.{sid}' (nazwa sekcji szuflady)")
+        osadzone = kod.split("const OSADZONE = {", 1)[-1].split("}", 1)[0]
+        for pod in ("klucze", "modele"):
+            if f"{pod}:" not in osadzone:
+                r.err(f"hq/web/src/61-szuflada.js: OSADZONE bez {pod!r} (Połączenia › Klucze i Modele)")
+    for rel, zdanie in TRYB_BEZPOSREDNI.items():
+        plik = fl.REPO_ROOT / rel
+        tekst = " ".join(plik.read_text(encoding="utf-8").split()) if plik.exists() else ""
+        if zdanie not in tekst:
+            r.err(f"{rel}: brak zasady trybu „bezpośrednio” ({zdanie!r}; docs/HQ.md §2f)")
+
+
 def check_hq(r: Report) -> None:
     """Jarvo HQ (plugin dashboardu): pliki, manifest, zgodność pokoi z grafiką, licencja htm."""
     import json
@@ -558,10 +659,22 @@ def check_hq(r: Report) -> None:
                 "plugin/rozmowy.py", "plugin/czytnik.py", "plugin/wzmianki.py", "plugin/kontekst.py", "plugin/agenci.py",
                 "plugin/brama.py", "plugin/strumien.py", "plugin/przebiegi.py", "plugin/scalanie.py", "plugin/budzenia.py",
                 "plugin/prace.py", "plugin/obserwator.py", "plugin/silnik.py", "plugin/trasy_rozmow.py",
-                "web/src/12-wzmianki.js",
+                "plugin/aplikacja.py", "plugin/podpowiedzi.py", "plugin/trasy_aplikacji.py",
+                "web/src/12-wzmianki.js", "web/src/38-start.js", "web/src/61-szuflada.js",
                 "web/vendor/htm.umd.js", "web/vendor/LICENSE-htm", "web/demo/index.html", "web/demo/mock.js"):
         if not (hq / rel).exists():
             r.err(f"hq: brak {rel}")
+    # każdy moduł wtyczki trafia do builda (hqbuild.PLUGIN_FILES), inaczej _load w plugin_api.py padnie w kontenerze
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("_hqbuild_walidacja", fl.REPO_ROOT / "scripts" / "hqbuild.py")
+        hqb = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(hqb)
+        for p in sorted((hq / "plugin").glob("*.py")):
+            if p.name not in hqb.PLUGIN_FILES:
+                r.err(f"hq/plugin/{p.name}: brak w scripts/hqbuild.py PLUGIN_FILES (nie trafi do wtyczki)")
+    except Exception as exc:  # noqa: BLE001
+        r.err(f"scripts/hqbuild.py: nie wczytuje się ({type(exc).__name__})")
     try:
         manifest = json.loads((hq / "plugin" / "manifest.json").read_text(encoding="utf-8"))
         for key in ("name", "label", "entry", "tab"):
@@ -586,6 +699,11 @@ def check_hq(r: Report) -> None:
             r.err("branding: brak powloka.js (skrypt powłoki w index.html)")
     except (OSError, ValueError) as exc:
         r.err(f"branding/powloka.json: {exc}")
+    # znaczniki bloku kontekstu, które nazywa zasada w każdym SOUL (SOUL_KONTEKST), składa kontekst.py
+    kontekst_py = (hq / "plugin" / "kontekst.py").read_text(encoding="utf-8") if (hq / "plugin" / "kontekst.py").exists() else ""
+    for znacznik in SOUL_KONTEKST:
+        if znacznik.replace("<kod>]", "{kod_bloku}") not in kontekst_py:
+            r.err(f"hq/plugin/kontekst.py: nie składa znacznika {znacznik!r} z zasady SOUL (popraw oba miejsca)")
     src = sorted((hq / "web" / "src").glob("*.js"))
     if not src:
         r.err("hq/web/src: brak plików źródłowych")
@@ -595,6 +713,7 @@ def check_hq(r: Report) -> None:
         js_rooms = set(re.findall(r"^\s+(\w+):\s*\{", block, re.M))
         if js_rooms != fl.HQ_ROOMS:
             r.err(f"hq: pokoje w 20-art.js {sorted(js_rooms)} ≠ fleetlib.HQ_ROOMS {sorted(fl.HQ_ROOMS)}")
+    check_hq_pakiet(r)
 
 
 # stary adres zakładki (sprzed /jarvo): zostaje tylko w powłoce (branding/powloka.js przekierowuje go), w testach

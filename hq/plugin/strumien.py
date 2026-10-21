@@ -321,6 +321,15 @@ class Hub:
         trwalo = time.monotonic() - obecne.otwarte_at
         self.log(f"jarvo-hq: strumień {klient} rozłączony po {trwalo:.1f} s ({powod or 'koniec'})")
 
+    def rozlacz_wszystkie(self) -> int:
+        """Każdy otwarty strumień kończy się teraz, nowe przyjmujemy dalej (klient łączy się ponownie i dostaje świeże
+        `hello`). Tylko trasa testu E2E nowej wersji (`POST /e2e/wersja`)."""
+        with self._lock:
+            wszystkie = list(self._polaczenia.values())
+        for p in wszystkie:
+            p.zamknij()
+        return len(wszystkie)
+
     def zamknij_wszystkie(self) -> None:
         """Wyłączanie procesu: każdy strumień kończy się od razu, nowe kończą się zaraz po hello."""
         with self._lock:

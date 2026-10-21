@@ -72,6 +72,6 @@
 <script src="mock.js"></script>
 <script src="app.js"></script>
 <script>
-  // pakiet aplikacji wystawia window.__JARVO_APP__ (w dashboardzie renderuje go loader zakładki /jarvo)
-  ReactDOM.createRoot(document.getElementById("hq")).render(React.createElement(window.__JARVO_APP__.App));
+  // pakiet wystawia window.__JARVO_APP__ = { App (aplikacja Jarvo), StaraBaza, wersja }; demo na makiecie API pokazuje Starą Bazę
+  ReactDOM.createRoot(document.getElementById("hq")).render(React.createElement(window.__JARVO_APP__.StaraBaza || window.__JARVO_APP__.App));
 </script>

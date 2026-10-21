@@ -17,7 +17,7 @@ Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa 
 | [PROFILE-SPEC.md](PROFILE-SPEC.md) | anatomia agenta: 10 warstw, kontrakt zlecenia, Definition of Ready |
 | [TOOLBOX.md](TOOLBOX.md) | zweryfikowane narzędzia open-source per agent + polityka licencji |
 | [BOSS.md](BOSS.md) | mechanika Main Judge'a: misje, kolejka decyzji, patrol, sędziowanie, eskalacje |
-| [HQ.md](HQ.md) | Jarvo HQ: GUI floty (pokoje agentów, praca na żywo, czat) |
+| [HQ.md](HQ.md) | aplikacja Jarvo (czat z flotą na `/jarvo`) i Stara Baza: GUI floty (pokoje agentów, praca na żywo, czat) |
 | [ADS.md](ADS.md) | projekt agenta reklam płatnych `jarvo-ads` i Skarbca (strażnik budżetu) |
 | [LEADY.md](LEADY.md) | projekt Łowcy leadów: sygnały zakupowe z oficjalnych źródeł → lista firm z „dlaczego teraz” |
 | [WIEDZA.md](WIEDZA.md) | projekt skarbca wiedzy (drugi mózg floty): LLM Wiki w plikach Markdown, wtyczka `jarvo-wiedza`, zakładka „Wiedza” z grafem |
@@ -208,7 +208,8 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
 - 🟡 Telegram: „Jarvo HQ”, temat na specjalistę, General dla Jarva.
-- ✅ Jarvo HQ: GUI floty w dashboardzie Hermesa (pokoje agentów, praca na żywo, decyzje, misje, czat), test na prawdziwym Hermesie ([HQ.md](HQ.md)).
+- ✅ Jarvo HQ: GUI floty w dashboardzie Hermesa (pokoje agentów, praca na żywo, decyzje, misje, czat), test na prawdziwym Hermesie ([HQ.md](HQ.md)); dziś Stara Baza w Ustawieniach aplikacji.
+- 🟡 Aplikacja Jarvo (czat z flotą na `/jarvo`, [HQ.md §2f](HQ.md#2f-aplikacja-rozmowa-pasek-szuflada)): etapy 1–3 zbudowane (powłoka i ochrona zapisu, silnik rozmów, aplikacja czatu: ekran startu z gotowością, rozmowa, `@agent` na jedną wiadomość, szuflada z bezpieczną aktualizacją), test na żywo `jarvo-e2e.sh etap1|etap2|etap3`; przed nami praca floty w rozmowie (etap 4), przekazania i nadzór (4b), nauka (4c), pełne ustawienia (5), jednolita lista i podział ekranu (6), porządki (7).
 - ⬜ Desktop: Bot Mode (lista botów, awatary, czat grupowy floty).
 - 🟡 Głos: notatki głosowe z Telegrama → Parakeet (`jarvo-stt`, `stt.provider: local_command`), odpowiedzi głosem (tryb `/voice`) i narzędzie `text_to_speech` całej floty: lokalny Matcha męski (`tts.providers.matcha`, komenda `jarvo-tts --plik`), lektor u Wideografa: polski Matcha-TTS-PL v2 i angielski Paradee w obrazie (`jarvo-tts`), Edge TTS do wyboru i jako zapas.
 

@@ -24,6 +24,7 @@ FLEET_JSON = Path(__file__).with_name("fleet.json")
 PROFIL_RE = re.compile(r"^[a-z0-9-]+$")
 UCHWYT_RE = re.compile(r"^[a-z][a-z0-9]{1,15}$")
 TEST_RE = re.compile(r"^test-e2e-[a-z0-9]{1,12}$")       # tylko takie profile mogą być agentami testowymi
+POKOJE = {"bridge", "study", "devlab", "atelier", "filmstudio", "workshop", "office", "radar", "apps", "control"}   # = fleetlib.HQ_ROOMS
 
 
 def e2e() -> bool:
@@ -48,7 +49,8 @@ def z_floty(dane: object) -> list[dict]:
             "name": a["name"], "handle": a.get("handle") or "", "aliasy": list(a.get("aliasy") or []),
             "nazwa": a.get("short") or a.get("title") or a["name"], "nazwa_en": en.get("title") or a.get("short") or "",
             "emoji": a.get("emoji") or "", "rodzaj": a.get("kind") or "", "opis": a.get("description") or "",
-            "opis_en": en.get("description") or "", "model": a.get("model") or "", "autonomia": a.get("autonomy_max") or "",
+            "opis_en": en.get("description") or "", "rola": a.get("rola") or "", "rola_en": en.get("rola") or "",
+            "pokoj": a.get("room") or "", "model": a.get("model") or "", "autonomia": a.get("autonomy_max") or "",
             "temat_tg": a.get("telegram_topic"), "wlasny": False, "test": False, "stan": "aktywny",
         })
     return out
@@ -71,6 +73,8 @@ def testowi(dane: object, zajete: set[str]) -> list[dict]:
             "name": nazwa_profilu, "handle": uchwyt, "aliasy": [uchwyt, nazwa_profilu],
             "nazwa": str(w.get("nazwa") or nazwa_profilu), "nazwa_en": str(w.get("nazwa") or nazwa_profilu),
             "emoji": "🧪", "rodzaj": "test", "opis": str(w.get("opis") or "Agent testowy E2E"), "opis_en": "E2E test agent",
+            "rola": str(w.get("rola") or "")[:80], "rola_en": "",
+            "pokoj": str(w.get("pokoj")) if w.get("pokoj") in POKOJE else "",
             "model": "", "autonomia": "", "temat_tg": None, "wlasny": False, "test": True, "stan": "aktywny",
         })
     return out

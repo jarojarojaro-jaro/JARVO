@@ -18,8 +18,8 @@ def pliki(tmp_path):
     fleet.write_text(json.dumps(hqbuild.fleet_json()), encoding="utf-8")
     agenci = tmp_path / "agenci.json"
     agenci.write_text(json.dumps({
-        "test-e2e-a": {"handle": "teste2ea", "nazwa": "Test A", "test": True},
-        "test-e2e-j": {"handle": "teste2ej", "nazwa": "Test Jarvo", "test": True},
+        "test-e2e-a": {"handle": "teste2ea", "nazwa": "Test A", "test": True, "rola": "strony " * 30, "pokoj": "devlab"},
+        "test-e2e-j": {"handle": "teste2ej", "nazwa": "Test Jarvo", "test": True, "pokoj": "../x"},
         "test-e2e-x": {"handle": "web", "nazwa": "Kolizja", "test": True},           # uchwyt floty: odpada
         "wlasny-ksiegowa": {"handle": "ksiegowa", "nazwa": "Księgowa", "stan": "aktywny"},   # etap 8: jeszcze nie
         "jarvo-zly": {"handle": "zly", "test": True},                                 # nie test-e2e-*: odpada
@@ -34,6 +34,8 @@ def test_bez_e2e_tylko_flota(pliki):
     web = a.agent("jarvo-web")
     assert web["handle"] == "web" and web["aliasy"] == ["web", "jarvo-web"] and web["nazwa"] == "Web"
     assert web["stan"] == "aktywny" and web["wlasny"] is False and web["test"] is False
+    assert web["rola"] == "strony internetowe" and web["rola_en"] == "websites" and web["pokoj"] == "devlab"
+    assert all(x["rola"] and len(x["rola"].split()) <= 8 for x in a.lista())         # krótka rola każdego agenta
     with pytest.raises(ValueError):
         a.profil("test-e2e-a")
     assert not a.moze_koordynowac("test-e2e-j") and a.moze_koordynowac("jarvo")
@@ -45,6 +47,8 @@ def test_z_e2e_agenci_testowi(pliki):
     assert [x["name"] for x in testowi] == ["test-e2e-a", "test-e2e-j"]
     assert a.profil("test-e2e-a") == "test-e2e-a" and a.moze_koordynowac("test-e2e-j")
     assert a.nazwy_wyswietlane()["test-e2e-a"] == "Test A"
+    ta, tj = testowi
+    assert len(ta["rola"]) == 80 and ta["pokoj"] == "devlab" and tj["pokoj"] == "" and tj["rola"] == ""
     mapa = wz.mapa_aliasow(a.lista())
     assert mapa["teste2ea"] == "test-e2e-a" and mapa["web"] == "jarvo-web" and "ksiegowa" not in mapa
     for zly in ("../x", "Test", "wlasny-ksiegowa", "jarvo-zly"):

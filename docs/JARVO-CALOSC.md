@@ -193,7 +193,7 @@ z osi filmu, efekty w tych samych chwilach, −14 LUFS i kontrola słyszalności
 ## 3. Jak to jest spięte (przepływ)
 
 ```
-Ty (Telegram DM / "Jarvo HQ" / CLI / Desktop)
+Ty (Telegram DM / aplikacja Jarvo / CLI / Desktop)
  └─ gateway Hermesa (multipleks profili)
       ├─ DM + wątek "general" → jarvo (Main Judge)
       └─ wątki sherlock/web/studio/wideo/ads/reka → dany snajper
@@ -247,18 +247,35 @@ przez `JARVO_MODEL_PROVIDER` + `JARVO_MODEL_FRONTIER/STRONG/FAST` (i `JARVO_MODE
 
 ---
 
-## 5. Jarvo HQ (dashboard w przeglądarce)
+## 5. Aplikacja Jarvo (dashboard w przeglądarce)
 
 Plugin dashboardu Hermesa (`hq/`), zakładka **Jarvo** pod `/jarvo` (pierwsza w menu; `/` i stary adres Bazy prowadzą tam
 same, łatka powłoki `branding/powloka.json` + `powloka.js`, loader ≤ 4 KB, pakiet z `/zasoby` tylko na `/jarvo`,
-ochrona zapisu `hq/plugin/ochrona.py` w obu wtyczkach; [HQ.md §2c](HQ.md#2c-powłoka-jarvo-osadzanie-zasoby)): budynek z pokojami agentów (pixel art), minifigurki, dymki
+ochrona zapisu `hq/plugin/ochrona.py` w obu wtyczkach; [HQ.md §2c](HQ.md#2c-powłoka-jarvo-osadzanie-zasoby)).
+Od etapu 3 to **aplikacja czatu** (makieta „V2 · Spokojny”): jedna rozmowa na pierwszym planie, rozmowy po lewej
+z listą na żywo, szuflada ustawień z prawej (Klucze i Modele Hermesa w ramce, motyw jasny/ciemny, język, konto),
+menu Hermesa schowane, jeden strumień SSE na przeglądarkę, skróty klawiszowe, telefon; etap 3a to fundament
+(sklep, trasa, słownik PL/EN, motyw, klient API i strumień, pasek, szuflada), etap 3b sama rozmowa: wiadomości
+z bezpiecznym Markdownem, odpowiedź pisana na żywo, kroki pracy (Prosty/Szczegóły), zgody w wątku z odliczaniem,
+**Zatrzymaj** i Esc Esc, **Ponów** po błędzie, kompozytor (Enter wysyła, szkic na wątek, załączniki, `@agent`
+albo lista **Do:** na jedną wiadomość, pytanie przy więcej niż 3 adresatach), karty plików z podglądem, menu wiersza,
+Archiwum i Kosz, eksport rozmowy do Markdown; etap 3c domyka całość: ekran startu (powitanie po imieniu z `USER.md`,
+jedno zdanie gotowości z jednym przyciskiem tylko gdy czegoś brakuje: Połącz albo Poznajmy się, a gdy brama wstaje
+„Jarvo się uruchamia…” bez czerwonego paska; pod polem „Czeka na Ciebie” (zgody, pytania zespołu, nieudana praca)
+i startery „Na początek” z warstwy nauki N0 (tylko z połączonym modelem),
+`GET /app`, `GET /podpowiedzi`, `nawyki.db`), paski stanu (nowa wersja z **Odśwież**, sama odświeża się tylko
+schowana bezczynna karta), szuflada minimalna z **System › Aktualizacja** (przy pracy agentów „Zaktualizuj, gdy
+skończą”: prośba do pomocnika 30 s po końcu pracy) i językiem w Konto (`hermes-locale`), odznaka **⬆ N** oraz tryb
+„bezpośrednio” w SOUL i protokole: `@uchwyt` na początku wiadomości = jedna wiadomość wprost do agenta, bez karty
+([HQ.md §2f](HQ.md#2f-aplikacja-rozmowa-pasek-szuflada)).
+**Stara Baza** (Ustawienia › Stara Baza): budynek z pokojami agentów (pixel art), minifigurki, dymki
 „co każdy robi teraz”, podgląd pracy na żywo, wyniki, decyzje i czat z Jarvem albo dowolnym agentem.
 Pokoje: bridge, study, devlab, atelier, filmstudio, workshop, office, radar. Sesje klikalne (Historia
 domyślnie). Czat obsługuje zdjęcia i pliki w obie strony. Linki „Odpal” (podgląd) i „Pokaż w folderze”.
 W Centrali **Konwerter**: plik → inny format na serwerze albo ten sam plik bez metadanych (GPS, telefon, daty, autor i firma w PDF i Wordzie; ten sam `konwertuj.py` co skill floty `konwersja-plikow`). **Jak działa usługa**: flota jako klikalna figura izometryczna (wieża z Jarvem i pokojami agentów, demo = droga zlecenia; `iso.py flota` ze skilla `izometria`).
 Edytor filmów w stylu CapCut (przejścia między klipami, które nie skracają filmu, kolor klipu ze stylami i Auto, menu Audio z biblioteką efektów i podkładów CC0, lektorem, nagraniem z mikrofonu i wyodrębnianiem dźwięku, uwagi na osi z kadrem dla Wideografa, typografia słowo po słowie z napisem za osobą: maska MODNet) i podgląd animacji z kodu na żywo z suwakami
 parametrów ([HQ.md §2a–2b](HQ.md#2a-edytor-filmów), plan rozbudowy: [EDYTOR-PLAN.md](EDYTOR-PLAN.md)). Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
-Pod nową aplikacją czatu (rozmowy zamiast budynku; front w budowie) działa już **silnik rozmów** w procesie
+Pod aplikacją czatu działa **silnik rozmów** w procesie
 dashboardu: wątki w `/opt/data/jarvo/state/rozmowy.db`, tury agentów przez `/v1/runs` bramy z kolejką, zgodami,
 dopiskiem, stopem i ponowieniem, strumień zdarzeń SSE z wznowieniem od kursora, oś czasu scalona z sesji Hermesa,
 `praca.json` (ostrzeżenie `install-fleet.sh` przed restartem bramy w trakcie pracy) i dziennik
@@ -341,7 +358,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `vendor/skan-wyjatki.yaml` | przejrzane fałszywe alarmy skanu skilli zewnętrznych, przypięte do commitu źródła |
 | `evals/<agent>/` | scenariusze testów zachowań (w zakresie, poza zakresem, routing, protokół, bezpieczeństwo) |
 | `scripts/` | build, walidator, deploy, instalacja floty, backupy, evals (runner, pomiar `evalslib.py`, `evals-wyniki.py`), migracja, narzędzia |
-| `hq/` | Jarvo HQ (backend, frontend, demo) |
+| `hq/` | aplikacja Jarvo, HQ (backend, frontend, demo) |
 | `infra/` | obraz jarvo-hermes, obraz Komputera Jarva (`infra/komputer`), docker-compose z sidecarami, szablony env |
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
 | `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`), wtyczka Operatora `plugin/` (narzędzie `komputer`); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
@@ -384,12 +401,25 @@ SOURCES (licencje).
   wtyczek), a test aplikacji w przeglądarce na żywo to `bash /opt/jarvo/repo/scripts/jarvo-e2e.sh etap1` w kontenerze
   (Playwright i Chromium z obrazu, logowanie hasłem z env kontenera, raport JSON, sprzątanie przy każdym wyjściu);
   `… etap2` sprawdza silnik rozmów: własna atrapa modelu na `127.0.0.1:9197` z `--dziennik`, profile jednorazowe
-  `test-e2e-a`, `test-e2e-b`, `test-e2e-j` usuwane przy każdym wyjściu, punkty 1–15 etapu 2 (docs/HQ.md §2e).
+  `test-e2e-a`, `test-e2e-b`, `test-e2e-j` usuwane przy każdym wyjściu, punkty 1–15 etapu 2 (docs/HQ.md §2e);
+  `… etap3` sprawdza aplikację z tą samą atrapą i profilami: powłoka, jeden strumień na dwie karty, lista i wątek
+  na żywo, szuflada, klawiatura, telefon, wygasła sesja (punkty 1–9) i rozmowę etapu 3b: „Hej” przez kompozytor
+  z odpowiedzią na żywo, Markdown i ładunek XSS jako tekst, adresat na jedną wiadomość i pytanie przy 4 adresatach,
+  zgoda z odliczaniem, Odmów, „Czas minął” i Poproś ponownie (punkty 10–13) oraz kryteria etapu 3c: ekran startu
+  z kartą gotowości i powitaniem z `USER.md`, nowy wątek ze startu, bez przyklejania adresata, załączniki i karty
+  plików, Zatrzymaj / Esc Esc / Ponów, odświeżenie w trakcie strumienia, 5 kart i połączenia, bezpieczna aktualizacja
+  i nowa wersja, wylogowanie między kartami, tylko klawiatura (punkty 14–23, docs/HQ.md §2f;
+  `JARVO_E2E_ZRZUT=<plik.png>` zapisuje zrzuty, `JARVO_E2E_ZRZUTY=<katalog>` zestaw jasny/ciemny × 1440/390 px dla
+  właściciela, `JARVO_E2E_PUNKTY=14,15` uruchamia wybrane punkty). Testy czystych modułów frontu
+  w node: `TZ=Europe/Warsaw node tests/js/hq_front.test.cjs` (też w `tests/test_hq_front.py`).
 - **Rozmowa bez klucza dostawcy (piaskownica, CI):** `scripts/atrapa_modelu.py --port 9199` to atrapa modelu zgodna
   z OpenAI (strumień, wywołanie narzędzia `[narzedzie:NAZWA {…}]`, `[wolno]`, `[wolno:<s>]` = strumień rozłożony na
   `<s>` sekund (razem z `[narzedzie:…]`: odpowiedź po wyniku narzędzia), `[plik:<ścieżka>]` = linia `Plik: <ścieżka>` w odpowiedzi (karta pliku), `[blad]`, `[dlugo]`;
-  `--dziennik <plik>` zapisuje każde ciało zapytania jako jedną linię JSON, z której test E2E sprawdza, co dostał
-  agent). Profil testowy
+  `--dziennik <plik>` zapisuje każde ciało zapytania jako jedną linię JSON z adresem zapytania w polu `_sciezka`,
+  z której test E2E sprawdza, co dostał agent i do którego profilu poszło (profil testu ma adres `…/p/<profil>/v1`).
+  `--odpowiedzi <plik.json>` (`{fragment: odpowiedź}`) daje gotowe odpowiedzi (zrzuty ekranu z realistyczną treścią).
+  Strumień po znaku trzyma dwukropek przy poprzednim znaku, bo Hermes wstrzymuje deltę zaczynającą się od „:”
+  do końca linii). Profil testowy
   w kontenerze dostaje w `config.yaml` `model: {provider: custom, base_url: http://127.0.0.1:9199/v1, default: atrapa}`,
   więc całą drogę wiadomości (gateway, `/v1/runs`, czat w dashboardzie) da się sprawdzić bez prawdziwego modelu.
   Żaden profil w obrazie z niej nie korzysta.

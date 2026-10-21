@@ -128,7 +128,7 @@ PRZERWA_429_S = 60.0             # 429 po dłuższym czekaniu z innego powodu (t
 DLUGO_S = float(os.environ.get("JARVO_HQ_DLUGO_S") or 7200)
 OKNO_SHA = 2.0
 KONTYNUACJA = "Poprzednia tura nie dokończyła się ({powod}). Odpowiedz jeszcze raz na moją ostatnią wiadomość."
-PRZYCZYNY = {      # turn_exit_reason → krótka przyczyna po polsku (nieznana: „Nieznana przyczyna”)
+PRZYCZYNY = {      # turn_exit_reason → krótka przyczyna po polsku (nieznana: „Praca się nie udała” + szczegóły)
     "max_iterations": "Skończył się limit kroków", "iteration_budget": "Skończył się limit kroków",
     "iteration_budget_exhausted": "Skończył się limit kroków", "budget_exhausted": "Skończył się limit kroków",
     "provider_error": "Model przestał odpowiadać", "model_error": "Model przestał odpowiadać",
@@ -1212,9 +1212,14 @@ class Rejestr:
         elif status == "failed":
             stan = "blad"
             powod = st.get("turn_exit_reason")
-            blad = {"kod": "model", "komunikat": przyczyna(powod) if powod else
-                    (self.utajnij(str(st.get("error") or ""))[:300] or "Nieznana przyczyna"),
-                    "powod_hermesa": powod}
+            # właściciel czyta krótkie zdanie po polsku; surowy błąd Hermesa (bez sekretów) idzie do „Szczegóły”
+            surowy = self.utajnij(str(st.get("error") or ""))[:300]
+            if powod and str(powod) in PRZYCZYNY:
+                blad = {"kod": "model", "komunikat": przyczyna(powod), "szczegoly": surowy}
+            else:
+                blad = {"kod": "model", "komunikat": "Praca się nie udała", "komunikat_en": "The work failed",
+                        "szczegoly": " · ".join(x for x in (str(powod or ""), surowy) if x)}
+            blad["powod_hermesa"] = powod
         elif status == "cancelled":
             stan = "zatrzymane" if p.get("stop_lokalny") else "przerwane"
         elif status == "interrupted":

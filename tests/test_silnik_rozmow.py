@@ -290,6 +290,34 @@ def test_przerwane_ponow_wysyla_krotka_kontynuacje(swiat):
     assert p["blad"] is None
 
 
+def test_blad_z_przyczyna_szczegolami_i_karta_do_ponowienia(swiat):
+    out = swiat.nowy("@teste2ea [blad] zadanie Z")
+    wid, pid = out["watek"]["id"], out["przebiegi"][0]["id"]
+    swiat.do_stanu(pid, "blad")
+    b = swiat.p(pid)["blad"]
+    # krótka przyczyna po polsku dla właściciela, surowy błąd Hermesa w „Szczegóły”
+    assert b["komunikat"] == "Model przestał odpowiadać" and b["szczegoly"] == "model error"
+    assert b["powod_hermesa"] == "model_error"
+    # migawka wątku niesie nieudany przebieg: karta z „Ponów” przetrwa przeładowanie strony
+    w = swiat.k.get(f"{P}/rozmowy/{wid}").json()["watek"]
+    assert [x["id"] for x in w["przebiegi_do_ponowienia"]] == [pid]
+    q = swiat.k.post(f"{P}/przebiegi/{pid}/ponow").json()["przebieg"]
+    assert q["ponowienie_z"] == pid
+    w = swiat.k.get(f"{P}/rozmowy/{wid}").json()["watek"]
+    assert w["przebiegi_do_ponowienia"] == []           # ponowiony: karta „Ponów” znika po przeładowaniu
+
+
+def test_blad_nieznanej_przyczyny_mowi_prosto(swiat):
+    out = swiat.nowy("@teste2ea [czekaj] zadanie N")
+    pid = out["przebiegi"][0]["id"]
+    swiat.do_stanu(pid, "przyjety")
+    swiat.sil.rejestr._koniec_ze_statusu(swiat.p(pid), {"status": "failed", "turn_exit_reason": "cos_nowego",
+                                                          "error": "boom"})
+    b = swiat.p(pid)["blad"]
+    assert b["komunikat"] == "Praca się nie udała" and b["komunikat_en"] == "The work failed"
+    assert b["szczegoly"] == "cos_nowego · boom" and b["powod_hermesa"] == "cos_nowego"
+
+
 def test_ponow_bez_zapisanej_tury_wysyla_calosc(swiat):
     out = swiat.nowy("@teste2ea [czekaj] zadanie Y")
     pid = out["przebiegi"][0]["id"]

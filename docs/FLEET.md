@@ -53,18 +53,22 @@ Każdy agent ma we `fleet.yaml` pole `handle`: uchwyt `@…`, którym właścici
 bez polskich znaków (`@łowca` = `@lowca`) i opcjonalne pole `aliasy` (lista). `scripts/validate.py` pilnuje, żeby
 żaden alias nie wskazywał dwóch agentów.
 
-| Agent | Uchwyt |
-|---|---|
-| `jarvo` | `@jarvo` |
-| `jarvo-sherlock` | `@sherlock` |
-| `jarvo-web` | `@web` |
-| `jarvo-studio` | `@studio` |
-| `jarvo-wideo` | `@wideo` |
-| `jarvo-ads` | `@ads` |
-| `jarvo-lowca` | `@lowca` |
-| `jarvo-mobile` | `@mobile` |
-| `jarvo-operator` | `@operator` |
-| `jarvo-reka` | `@reka` |
+| Agent | Uchwyt | Rola w aplikacji (`rola`) |
+|---|---|---|
+| `jarvo` | `@jarvo` | prowadzi rozmowę i pilnuje wyników |
+| `jarvo-sherlock` | `@sherlock` | research i fakty |
+| `jarvo-web` | `@web` | strony internetowe |
+| `jarvo-studio` | `@studio` | grafiki i posty |
+| `jarvo-wideo` | `@wideo` | krótkie filmy |
+| `jarvo-ads` | `@ads` | reklamy Meta i Google |
+| `jarvo-lowca` | `@lowca` | nowi klienci z KRS i CEIDG |
+| `jarvo-mobile` | `@mobile` | aplikacje na telefon |
+| `jarvo-operator` | `@operator` | pracuje na Komputerze Jarva |
+| `jarvo-reka` | `@reka` | dokumenty i szybkie sprawy |
+
+Pole `rola` (i `en.rola`) to krótka rola agenta, najwyżej 8 słów: aplikacja pokazuje ją w Ustawieniach › Zespół
+i w podpowiedzi kompozytora po wyborze adresata. `scripts/validate.py` pilnuje, żeby każdy aktywny agent miał
+obie wersje. Figurkę agenta w aplikacji wyznacza `hq_room` (ściana pokoju i postać z wieży, [HQ.md](HQ.md)).
 
 ## Warstwa wspólna: wiedza o Tobie i Twoich markach
 
