@@ -678,7 +678,8 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
             p.write_text(render_tokens(p.read_text(encoding="utf-8"), tokens), encoding="utf-8")
     # wspólne zakazy floty (shared/security/deny.yaml) → approvals.deny każdego profilu;
     # skarbiec wiedzy (docs/WIEDZA.md): dostawca pamięci jarvo-wiedza u każdego agenta, wtyczka włączona,
-    # zadanie pomocnicze jarvo_wiedza (wyciągi z rozmów, kompilacja) na modelu poziomu fast
+    # zadanie pomocnicze jarvo_wiedza (wyciągi z rozmów, kompilacja) na głównym modelu (poziom frontier, jak Jarvo):
+    # do skarbca trafia najważniejsza wiedza floty, więc nie oszczędzamy na niej na tanim modelu (decyzja właściciela)
     deny_src = fl.REPO_ROOT / "shared" / "security" / "deny.yaml"
     if (dest / "config.yaml").exists():
         cfg = fl.load_yaml(dest / "config.yaml")
@@ -693,7 +694,7 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         wlaczone = list(wtyczki.get("enabled") or [])
         wtyczki["enabled"] = wlaczone + [w for w in [WIEDZA_PLUGIN] + ([KOMPUTER_PLUGIN] if agent.komputer else [])
                                          if w not in wlaczone]
-        cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("fast")}
+        cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("frontier")}
         (dest / "config.yaml").write_text("# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty).\n"
                                           + fl.dump_yaml(cfg), encoding="utf-8")
     # model zapasowy zestawu: agent nie milknie, gdy główny model odmówi (np. poza planem)

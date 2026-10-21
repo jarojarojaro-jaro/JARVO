@@ -196,14 +196,14 @@ def test_full_orchestrator_build_with_cron(tmp_path, monkeypatch):
 
 
 def test_wiedza_plugin_wiring(built, tmp_path):
-    """Skarbiec wiedzy (docs/WIEDZA.md): każdy profil ma dostawcę pamięci jarvo-wiedza, włączoną wtyczkę i tani model
-    zadania pomocniczego; wtyczka z obiema częściami (agent + dashboard) buduje się z repo."""
+    """Skarbiec wiedzy (docs/WIEDZA.md): każdy profil ma dostawcę pamięci jarvo-wiedza, włączoną wtyczkę i główny model
+    (frontier) zadania pomocniczego; wtyczka z obiema częściami (agent + dashboard) buduje się z repo."""
     fleet, out = built
     for agent in fleet.active():
         cfg = fl.load_yaml(out / agent.name / "config.yaml")
         assert cfg["memory"]["provider"] == "jarvo-wiedza", agent.name
         assert "jarvo-wiedza" in cfg["plugins"]["enabled"], agent.name
-        assert cfg["auxiliary"]["jarvo_wiedza"]["model"] == fleet.model_for("fast"), agent.name
+        assert cfg["auxiliary"]["jarvo_wiedza"]["model"] == fleet.model_for("frontier"), agent.name
         # głos floty: Matcha przez jarvo-tts z profiles/_host/config.yaml (nie Edge)
         assert cfg["tts"]["provider"] == "matcha", agent.name
         assert cfg["tts"]["providers"]["matcha"]["command"].startswith("/opt/jarvo/bin/jarvo-tts --plik {input_path}"), agent.name

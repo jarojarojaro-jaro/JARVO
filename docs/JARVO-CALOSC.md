@@ -428,7 +428,7 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    skarbiec zasiewany przy wdrożeniu, `wiedza.py`, wtyczka `jarvo-wiedza` u każdego agenta, kompilacja `kompilacja.py`,
    zakładka „Wiedza”, synteza w przeglądzie tygodnia, red team, evals; **na VPS zostaje pierwsza kompilacja z modelem**):** jeden folder
    notatek Markdown z linkami (`knowledge/`), wzorzec LLM Wiki Karpathy'ego; wtyczka Hermesa `jarvo-wiedza` jako dostawca
-   pamięci (przypomnienia przed turą, wyciąg po sesji i przed kompresją, 4 narzędzia), kompilacja tanim modelem (jeden
+   pamięci (przypomnienia przed turą, wyciąg po sesji i przed kompresją, 4 narzędzia), kompilacja głównym modelem (jeden
    piszący), orzeczenia z Twoich korekt, lint, punkty zapisu git, zakładka „Wiedza” z grafem w dashboardzie.
 4. **Pętla samodoskonalenia (RSI), plan w [RSI.md](RSI.md) (zgoda właściciela 2026-10-13):** flota poprawia własne
    skille i prompty bez uczenia wag, z pomiarem, bramkami i Twoją zgodą na każdą zmianę. R0 pomiar ✅ 2026-10-13:

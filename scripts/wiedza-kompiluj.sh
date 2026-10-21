@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ręczna kompilacja skarbca wiedzy (docs/WIEDZA.md §6): szkice ze skrzynki → notatki, tanim modelem (auxiliary.jarvo_wiedza).
+# Ręczna kompilacja skarbca wiedzy (docs/WIEDZA.md §6): szkice ze skrzynki → notatki, głównym modelem (auxiliary.jarvo_wiedza, poziom frontier).
 # Uruchamiane WEWNĄTRZ kontenera jarvo-hermes jako hermes, z profilem jarvo (jego config ma model zadania pomocniczego):
 #   docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/wiedza-kompiluj.sh [--na-sucho] [--limit N] [--json]
 # Normalnie kompilację odpala sama wtyczka jarvo-wiedza (raz na godzinę przy szkicach i co noc o 03:10).

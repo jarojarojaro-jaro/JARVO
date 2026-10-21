@@ -7,7 +7,7 @@ profilu ma `memory.provider: jarvo-wiedza`). Co robi:
   - 4 narzędzia: wiedza_szukaj, wiedza_czytaj, wiedza_zapisz (szkic do skrzynki), wiedza_orzeczenie (tylko ze słowami
     użytkownika z tej tury),
   - lustro wpisów `memory` (MEMORY.md/USER.md) do skrzynki,
-  - wyciąg z rozmowy tanim modelem (zadanie pomocnicze `jarvo_wiedza`, model poziomu fast) na koniec sesji, przed
+  - wyciąg z rozmowy głównym modelem (zadanie pomocnicze `jarvo_wiedza`, model poziomu frontier) na koniec sesji, przed
     kompresją i po 30 minutach ciszy; wynik: zrodla/rozmowy/ (surowy wyciąg) + szkic w skrzynce,
   - hak `kanban_task_completed`: raporty z out/ zamkniętej karty do zrodla/karty/ i szkic (0 tokenów),
   - narzędzie `schemat` (schemat.py) tylko dla agentów z SCHEMAT_DLA (Jarvo, rozmowa z właścicielem): SVG → PNG w rozmowie.
@@ -37,7 +37,7 @@ _HERE = Path(__file__).resolve().parent
 # narzędzie `schemat` (SVG → PNG w rozmowie) mają tylko ci agenci: Jarvo rozmawia z właścicielem, wykonawcy robią grafiki sami
 SCHEMAT_DLA = {"jarvo"}
 NAZWA = "jarvo-wiedza"
-ZADANIE_AUX = "jarvo_wiedza"          # auxiliary.jarvo_wiedza.model = poziom fast (scripts/build.py)
+ZADANIE_AUX = "jarvo_wiedza"          # auxiliary.jarvo_wiedza.model = poziom frontier (scripts/build.py)
 MIN_TUR = 4                           # wyciąg dopiero, gdy użytkownik napisał tyle razy
 CISZA_S = 30 * 60                     # wyciąg po tylu sekundach ciszy w sesji
 MAX_ZNAKOW_ROZMOWY = 24_000
@@ -139,7 +139,7 @@ def _tresc_odpowiedzi(resp: Any) -> str:
 
 
 def wywolaj_model(system: str, user: str, max_tokens: int = 1200) -> str:
-    """Tani model przez zadanie pomocnicze Hermesa (auxiliary.jarvo_wiedza); testy podmieniają tę funkcję."""
+    """Główny model przez zadanie pomocnicze Hermesa (auxiliary.jarvo_wiedza); testy podmieniają tę funkcję."""
     from agent.auxiliary_client import call_llm   # lazy: ciężki import, a testy go nie mają
     resp = call_llm(task=ZADANIE_AUX, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
                     max_tokens=max_tokens, temperature=0.2)
@@ -556,7 +556,7 @@ class SkarbiecProvider(MemoryProvider):
         return noc <= teraz < noc + 600 and ostatnia < noc
 
     def kompiluj(self, powod: str = "ręcznie") -> Dict[str, Any]:
-        """Przebieg kompilacji skrzynki tanim modelem (wiedza/kompilacja.py); zwraca raport."""
+        """Przebieg kompilacji skrzynki głównym modelem (wiedza/kompilacja.py); zwraca raport."""
         sk = self._sk()
         if sk is None:
             return {"error": "brak skarbca"}
@@ -757,6 +757,6 @@ def register(ctx) -> None:
     except Exception as e:
         logger.debug("jarvo-wiedza: strażnik narzędzi nie zarejestrowany: %s", e)
     try:
-        ctx.register_auxiliary_task(ZADANIE_AUX, display_name="Skarbiec wiedzy", description="wyciągi z rozmów i kompilacja skarbca (tani model)")
+        ctx.register_auxiliary_task(ZADANIE_AUX, display_name="Skarbiec wiedzy", description="wyciągi z rozmów i kompilacja skarbca (główny model)")
     except Exception as e:
         logger.debug("jarvo-wiedza: zadanie pomocnicze: %s", e)

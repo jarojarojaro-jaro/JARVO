@@ -216,7 +216,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Skill `onboarding-interview`: wywiad startowy → `knowledge/user/USER.md`.
 - ✅ MVP pamięci o Tobie: USER.md + pamięć użytkownika Jarva, kontekst przekazywany w kartach.
 - 🟡 **Skarbiec wiedzy (drugi mózg floty):** zbudowany według [WIEDZA.md](WIEDZA.md) (2026-09-30): wzorzec LLM Wiki,
-  wtyczka `jarvo-wiedza` jako dostawca pamięci u wszystkich agentów, kompilacja tanim modelem, zakładka „Wiedza” z grafem,
+  wtyczka `jarvo-wiedza` jako dostawca pamięci u wszystkich agentów, kompilacja głównym modelem, zakładka „Wiedza” z grafem,
   synteza tygodnia, red team, evals; czeka na pierwszą kompilację z prawdziwym modelem na VPS.
 - ⬜ Wspólny provider pamięci (Honcho self-host) tylko jeśli skarbiec wiedzy okaże się za mały na wiedzę o Tobie.
 - ⬜ Zasady prywatności: co gdzie leży, co nigdy nie opuszcza serwera.

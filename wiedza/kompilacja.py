@@ -2,14 +2,14 @@
 """Kompilacja skarbca wiedzy: jedyny piszący notatek (docs/WIEDZA.md §6).
 
 Czyta szkice ze `skrzynka/` (od agentów, z wyciągów rozmów, z kart, z lustra pamięci), dla każdego szuka istniejących
-notatek-kandydatów (FTS5) i pyta tani model o decyzję: nowa notatka, aktualizacja, sprzeczność (obie wersje zostają)
+notatek-kandydatów (FTS5) i pyta główny model o decyzję: nowa notatka, aktualizacja, sprzeczność (obie wersje zostają)
 albo odrzucenie. Notatki pisze według schematu (frontmatter, streszczenie, linki: hub + sąsiedzi + inny folder; linki tylko
 do istniejących ścieżek), dopisuje LOG.md, przenosi szkic do `skrzynka/zrobione/`, odświeża INDEX i huby, robi punkt zapisu
 git. Całość pod blokadą `state/wiedza.lock`. Limity na przebieg: 40 szkiców, 60 dotkniętych notatek.
 
 Uruchomienie: wątek wtyczki jarvo-wiedza (co godzinę przy szkicach, co noc) albo ręcznie w kontenerze:
   scripts/wiedza-kompiluj.sh [--na-sucho] [--limit N]
-Model: zadanie pomocnicze Hermesa `jarvo_wiedza` (auxiliary.jarvo_wiedza.model, poziom fast); testy podstawiają funkcję.
+Model: zadanie pomocnicze Hermesa `jarvo_wiedza` (auxiliary.jarvo_wiedza.model, poziom frontier); testy podstawiają funkcję.
 """
 from __future__ import annotations
 
@@ -420,7 +420,7 @@ class Kompilacja:
 
 
 def model_hermes(max_tokens: int = 2000) -> Callable[[str, str], str]:
-    """Tani model przez zadanie pomocnicze Hermesa `jarvo_wiedza` (wymaga środowiska Hermesa: HERMES_HOME profilu, /opt/hermes)."""
+    """Główny model przez zadanie pomocnicze Hermesa `jarvo_wiedza` (wymaga środowiska Hermesa: HERMES_HOME profilu, /opt/hermes)."""
     from agent.auxiliary_client import call_llm
 
     def f(system: str, user: str) -> str:
