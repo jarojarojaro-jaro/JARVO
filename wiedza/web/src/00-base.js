@@ -76,8 +76,9 @@ function usePoll(fn, ms, deps) {
   return [data, error, () => setTick((t) => t + 1)];
 }
 
+// zapis tylko z nagłówkiem panelu: ochrona zapisu wtyczki (ochrona.py, wspólna z jarvo-hq) odrzuca resztę
 const post = (path, body) => SDK.fetchJSON(`${API_ROOT}${path}`, {
-  method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}),
+  method: "POST", headers: { "Content-Type": "application/json", "X-Jarvo-Request": "1" }, body: JSON.stringify(body || {}),
 });
 const api = {
   overview: () => SDK.fetchJSON(`${API_ROOT}/overview`),

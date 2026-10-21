@@ -63,6 +63,8 @@ services:
       JARVO_ANDROID_SCREEN_URL: http://${JARVO_BIND_IP:-127.0.0.1}:9122
       # dodatki także w działającym kontenerze: „lemo” (sample, głos Kokoro) instaluje narzedzia.py w czasie pracy
       JARVO_EXTRAS: ${JARVO_EXTRAS:-}
+      # tylko piaskownica i testy na żywo (scripts/jarvo-e2e.sh): trasy testowe wtyczki jarvo-hq, np. POST /csrf-proba
+      JARVO_E2E: ${JARVO_E2E:-}
       # computer_use: sterownik ekranu tylko przez bramkę Jarva (bez pobierania i aktualizacji w locie, docs/KOMPUTER.md)
       HERMES_CUA_DRIVER_CMD: /opt/jarvo/repo/komputer/jarvo_cua.py
     volumes:

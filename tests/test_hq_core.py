@@ -262,8 +262,10 @@ def test_hq_plugin_build(tmp_path):
     import hqbuild
 
     dash = hqbuild.build_plugin(tmp_path / "jarvo-hq")
-    for rel in ("manifest.json", "plugin_api.py", "hq_core.py", "animacja.py", "pomiar.py", "konwertuj.py", "fleet.json", "dist/index.js", "dist/style.css", "dist/LICENSE-htm"):
+    for rel in ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "animacja.py", "pomiar.py", "konwertuj.py", "fleet.json",
+                "dist/index.js", "dist/LICENSE-htm", "dist/fonts/fosfor.css"):
         assert (dash / rel).exists(), rel
+    assert not (dash / "dist" / "style.css").exists()        # style tylko na /jarvo, przez loader (zasoby/app-<h>.css)
     # figura floty: iso.py ze szablonem, licencją iso-glow i krojem OFL (bez przykładów)
     iso = dash / "izometria"
     for rel in ("scripts/iso.py", "scripts/iso_flota.js", "scripts/iso_jarvo.js", "assets/iso-glow/LICENSE",
@@ -271,13 +273,20 @@ def test_hq_plugin_build(tmp_path):
         assert (iso / rel).exists(), rel
     assert not (iso / "assets" / "przyklady").exists() and not list(iso.rglob("__pycache__"))
     manifest = json.loads((dash / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["name"] == "jarvo-hq" and manifest["api"] == "plugin_api.py" and manifest["tab"]["path"] == "/base" and manifest["tab"]["position"] == "before:chat"
-    js = (dash / "dist" / "index.js").read_text(encoding="utf-8")
+    assert manifest["name"] == "jarvo-hq" and manifest["api"] == "plugin_api.py" and manifest["tab"]["path"] == "/jarvo" and manifest["tab"]["position"] == "before:chat"
+    assert manifest["label"] == "Jarvo" and "css" not in manifest
+    # dist/index.js to mały loader; pakiet aplikacji leży w zasoby/app-<hash>.js i wystawia window.__JARVO_APP__
+    loader = (dash / "dist" / "index.js").read_text(encoding="utf-8")
+    assert len(loader.encode("utf-8")) <= hqbuild.LOADER_MAX and '__HERMES_PLUGINS__.register("jarvo-hq", Jarvo)' in loader
+    app = sorted((dash / "dist" / "zasoby").glob("app-*.js"))
+    assert len(app) == 1 and app[0].name in loader
+    js = app[0].read_text(encoding="utf-8")
     for src in sorted((Path(hqbuild.HQ) / "web" / "src").glob("*.js")):
         assert f"// ---- {src.name}" in js
-    assert "__HERMES_PLUGINS__.register(PLUGIN, App)" in js
+    assert "window.__JARVO_APP__ = { App, wersja: 1 }" in js and "__HERMES_PLUGINS__.register(" not in js
     if shutil.which("node"):
-        assert subprocess.run(["node", "--check", str(dash / "dist" / "index.js")], capture_output=True).returncode == 0
+        for f in (dash / "dist" / "index.js", app[0]):
+            assert subprocess.run(["node", "--check", str(f)], capture_output=True).returncode == 0, f
     fleet = json.loads((dash / "fleet.json").read_text(encoding="utf-8"))
     names = [a["name"] for a in fleet["agents"]]
     assert names[0] == fleet["orchestrator"] == "jarvo"

@@ -7,12 +7,19 @@ function basePath() {
   return raw.endsWith("/") ? raw.slice(0, -1) : raw;
 }
 
+// Dashboard z logowaniem rozpoznaje sesję po ciasteczku (credentials: "include"); bez logowania (tylko 127.0.0.1)
+// Hermes wstrzykuje token sesji, którego wymaga każda trasa /api/. Nagłówek X-Jarvo-Request mówi ochronie zapisu
+// (hq/plugin/ochrona.py), że żądanie przyszło z panelu: strona z innego pochodzenia nie może go dodać bez zapytania
+// wstępnego CORS, którego dashboard z ciasteczkiem nie przepuści.
 function authHeaders(extra) {
-  const h = Object.assign({}, extra || {});
+  const h = Object.assign({ "X-Jarvo-Request": "1" }, extra || {});
   const token = window.__HERMES_SESSION_TOKEN__;
   if (token) h["X-Hermes-Session-Token"] = token;
   return h;
 }
+
+// SDK.fetchJSON (JSON z obsługą wylogowania) z nagłówkiem panelu; tym idą wszystkie trasy JSON pluginu
+const jsonFetch = (url, init) => SDK.fetchJSON(url, { ...(init || {}), headers: authHeaders(init && init.headers) });
 
 async function rawFetch(path, init) {
   const res = await fetch(`${basePath()}${path}`, {
@@ -24,7 +31,7 @@ async function rawFetch(path, init) {
     let msg = `HTTP ${res.status}`;
     try {
       const body = await res.json();
-      msg = body.detail || body.error || msg;
+      msg = (body.blad && body.blad.komunikat) || body.detail || body.error || msg;
     } catch (_) { /* nie-JSON */ }
     throw new Error(msg);
   }
@@ -56,13 +63,13 @@ async function* readSSE(res) {
 }
 
 const liveApi = {
-  state: () => SDK.fetchJSON(`${API_ROOT}/state`),
-  fleet: () => SDK.fetchJSON(`${API_ROOT}/fleet`),
-  agent: (name) => SDK.fetchJSON(`${API_ROOT}/agent/${encodeURIComponent(name)}`),
-  task: (id) => SDK.fetchJSON(`${API_ROOT}/task/${encodeURIComponent(id)}`),
-  history: (name) => SDK.fetchJSON(`${API_ROOT}/chat/${encodeURIComponent(name)}/history`),
-  reset: (name) => SDK.fetchJSON(`${API_ROOT}/chat/${encodeURIComponent(name)}/reset`, { method: "POST" }),
-  retry: (id) => SDK.fetchJSON(`${API_ROOT}/task/${encodeURIComponent(id)}/retry`, { method: "POST" }),
+  state: () => jsonFetch(`${API_ROOT}/state`),
+  fleet: () => jsonFetch(`${API_ROOT}/fleet`),
+  agent: (name) => jsonFetch(`${API_ROOT}/agent/${encodeURIComponent(name)}`),
+  task: (id) => jsonFetch(`${API_ROOT}/task/${encodeURIComponent(id)}`),
+  history: (name) => jsonFetch(`${API_ROOT}/chat/${encodeURIComponent(name)}/history`),
+  reset: (name) => jsonFetch(`${API_ROOT}/chat/${encodeURIComponent(name)}/reset`, { method: "POST" }),
+  retry: (id) => jsonFetch(`${API_ROOT}/task/${encodeURIComponent(id)}/retry`, { method: "POST" }),
   async upload(file) {
     const res = await rawFetch(`${API_ROOT}/upload`, {
       method: "POST", headers: { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name || "plik") }, body: file,
@@ -100,26 +107,26 @@ const liveApi = {
     const res = await rawFetch(`${API_ROOT}/konwerter/job/${encodeURIComponent(id)}`);
     return res.json();
   },
-  site: (path) => SDK.fetchJSON(`${API_ROOT}/site`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
-  android: () => SDK.fetchJSON(`${API_ROOT}/android`, { method: "POST" }),
-  flota: () => SDK.fetchJSON(`${API_ROOT}/flota`),       // figura floty w Centrali: {port, path} serwera podglądu
-  reveal: (path) => SDK.fetchJSON(`${API_ROOT}/reveal`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
-  host: () => SDK.fetchJSON(`${API_ROOT}/host`),
+  site: (path) => jsonFetch(`${API_ROOT}/site`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
+  android: () => jsonFetch(`${API_ROOT}/android`, { method: "POST" }),
+  flota: () => jsonFetch(`${API_ROOT}/flota`),       // figura floty w Centrali: {port, path} serwera podglądu
+  reveal: (path) => jsonFetch(`${API_ROOT}/reveal`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
+  host: () => jsonFetch(`${API_ROOT}/host`),
   async fileBlob(path) {
     const res = await rawFetch(`${API_ROOT}/file?path=${encodeURIComponent(path)}`);
     return res.blob();
   },
-  editInfo: (path) => SDK.fetchJSON(`${API_ROOT}/edit/info?path=${encodeURIComponent(path)}`),
-  editMedia: (path) => SDK.fetchJSON(`${API_ROOT}/edit/media?path=${encodeURIComponent(path)}`),
-  editMaska: (path) => SDK.fetchJSON(`${API_ROOT}/edit/maska?path=${encodeURIComponent(path)}`),
+  editInfo: (path) => jsonFetch(`${API_ROOT}/edit/info?path=${encodeURIComponent(path)}`),
+  editMedia: (path) => jsonFetch(`${API_ROOT}/edit/media?path=${encodeURIComponent(path)}`),
+  editMaska: (path) => jsonFetch(`${API_ROOT}/edit/maska?path=${encodeURIComponent(path)}`),
   // menu Audio: biblioteka CC0, muzyka ze skarbca, wyodrębnienie, lektor, nagranie (każde zwraca opis pliku obok filmu)
-  editDzwieki: () => SDK.fetchJSON(`${API_ROOT}/edit/dzwieki`),
+  editDzwieki: () => jsonFetch(`${API_ROOT}/edit/dzwieki`),
   async dzwiekBlob(id) {
     const res = await rawFetch(`${API_ROOT}/edit/dzwiek-plik?id=${encodeURIComponent(id)}`);
     return res.blob();
   },
-  editDzwiek: (path, id) => SDK.fetchJSON(`${API_ROOT}/edit/dzwiek`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, id }) }),
-  editMuzyka: () => SDK.fetchJSON(`${API_ROOT}/edit/muzyka`),
+  editDzwiek: (path, id) => jsonFetch(`${API_ROOT}/edit/dzwiek`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, id }) }),
+  editMuzyka: () => jsonFetch(`${API_ROOT}/edit/muzyka`),
   async editWyodrebnij(path, src) {
     const res = await rawFetch(`${API_ROOT}/edit/wyodrebnij`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, src }) });
     return res.json();
@@ -152,29 +159,30 @@ const liveApi = {
     if (!res.ok) { let m = `HTTP ${res.status}`; try { m = (await res.json()).detail || m; } catch (_) { /* nie-JSON */ } throw new Error(m); }
     return res.json();
   },
-  editStamp: (path) => SDK.fetchJSON(`${API_ROOT}/edit/stamp?path=${encodeURIComponent(path)}`),
+  editStamp: (path) => jsonFetch(`${API_ROOT}/edit/stamp?path=${encodeURIComponent(path)}`),
   async editExport(path, project, texts, karaoke, typo) {
     const res = await rawFetch(`${API_ROOT}/edit/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, project, texts, karaoke: karaoke || {}, typo: typo || {} }) });
     return res.json();
   },
-  editSrt: (path) => SDK.fetchJSON(`${API_ROOT}/edit/srt?path=${encodeURIComponent(path)}`),
-  editSpeechGet: (src) => SDK.fetchJSON(`${API_ROOT}/edit/speech?src=${encodeURIComponent(src)}`),
-  editSpeech: (src, force) => SDK.fetchJSON(`${API_ROOT}/edit/speech`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src, force: !!force }) }),
-  editProxy: (src) => SDK.fetchJSON(`${API_ROOT}/edit/proxy`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src }) }),
+  editSrt: (path) => jsonFetch(`${API_ROOT}/edit/srt?path=${encodeURIComponent(path)}`),
+  editSpeechGet: (src) => jsonFetch(`${API_ROOT}/edit/speech?src=${encodeURIComponent(src)}`),
+  editSpeech: (src, force) => jsonFetch(`${API_ROOT}/edit/speech`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src, force: !!force }) }),
+  editProxy: (src) => jsonFetch(`${API_ROOT}/edit/proxy`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src }) }),
   async proxyBlob(src) {
     const res = await rawFetch(`${API_ROOT}/edit/proxy-file?src=${encodeURIComponent(src)}`);
     return res.blob();
   },
-  editJob: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}`),
-  animInfo: (path) => SDK.fetchJSON(`${API_ROOT}/anim/info?path=${encodeURIComponent(path)}`),
-  animCheck: (path) => SDK.fetchJSON(`${API_ROOT}/anim/check?path=${encodeURIComponent(path)}`),
+  editJob: (id) => jsonFetch(`${API_ROOT}/edit/job/${encodeURIComponent(id)}`),
+  // POST: wydaje link podglądu z tokenem (zapis w state/preview-links.json), więc idzie przez ochronę zapisu
+  animInfo: (path) => jsonFetch(`${API_ROOT}/anim/info`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
+  animCheck: (path) => jsonFetch(`${API_ROOT}/anim/check?path=${encodeURIComponent(path)}`),
   async animParams(path, wartosci) {
     const res = await fetch(`${basePath()}${API_ROOT}/anim/params`, { method: "POST", credentials: "include",
       headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ path, wartosci }) });
     if (!res.ok) { let m = `HTTP ${res.status}`; try { m = (await res.json()).detail || m; } catch (_) { /* nie-JSON */ } throw new Error(m); }
     return res.json();
   },
-  editCancel: (id) => SDK.fetchJSON(`${API_ROOT}/edit/job/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
+  editCancel: (id) => jsonFetch(`${API_ROOT}/edit/job/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   async *send(name, message, extra) {
     const res = await rawFetch(`${API_ROOT}/chat/${encodeURIComponent(name)}/send`, {
       method: "POST",

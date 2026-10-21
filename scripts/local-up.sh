@@ -161,7 +161,7 @@ JARVO=jarvo; command -v jarvo >/dev/null 2>&1 || JARVO="bash $ROOT/bin/jarvo"
 cat <<EOF
 
 ✅ Flota działa.
-   Jarvo HQ:   http://localhost:9119/base   login i hasło: $JARVO haslo
+   Jarvo:      http://localhost:9119/jarvo  login i hasło: $JARVO haslo
    polecenia:  $JARVO status | logs | chat | update | down   ($JARVO help: wszystkie)
    RAM:        docker stats
 EOF

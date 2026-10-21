@@ -146,7 +146,7 @@
       `Install and start <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener">Docker Desktop</a>.`,
       `Open <b>Terminal</b>, paste the command and press Enter.`,
       `Pick your model provider and paste its key when asked.`,
-      `Open <a href="http://localhost:9119/base">localhost:9119</a>. Your team is ready.`,
+      `Open <a href="http://localhost:9119/jarvo">localhost:9119</a>. Your team is ready.`,
     ] },
     linux: { label: "LINUX", tabs: {
       CURL: `curl -fsSL ${BASE}/install.sh | bash`,
@@ -155,7 +155,7 @@
       `Install <a href="https://docs.docker.com/engine/install/" target="_blank" rel="noopener">Docker Engine</a> with the compose plugin, plus <code>git</code>.`,
       `Paste the command into your terminal and press Enter.`,
       `Pick your model provider and paste its key when asked.`,
-      `Open <a href="http://localhost:9119/base">localhost:9119</a>. Your team is ready.`,
+      `Open <a href="http://localhost:9119/jarvo">localhost:9119</a>. Your team is ready.`,
     ] },
     windows: { label: "WINDOWS", tabs: {
       PS1: `irm ${BASE}/install.ps1 | iex`,
@@ -164,7 +164,7 @@
       `Install <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener">Docker Desktop</a> and turn on <b>Settings → Resources → WSL integration</b>.`,
       `PS1: open <b>PowerShell</b> and paste the command. It sets up WSL if needed. WSL: paste it in your Ubuntu terminal.`,
       `Pick your model provider and paste its key when asked.`,
-      `Open <a href="http://localhost:9119/base">localhost:9119</a>. Your team is ready.`,
+      `Open <a href="http://localhost:9119/jarvo">localhost:9119</a>. Your team is ready.`,
     ] },
   };
   function detect() {

@@ -249,14 +249,16 @@ przez `JARVO_MODEL_PROVIDER` + `JARVO_MODEL_FRONTIER/STRONG/FAST` (i `JARVO_MODE
 
 ## 5. Jarvo HQ (dashboard w przeglądarce)
 
-Plugin dashboardu Hermesa (`hq/`): budynek z pokojami agentów (pixel art), minifigurki, dymki
+Plugin dashboardu Hermesa (`hq/`), zakładka **Jarvo** pod `/jarvo` (pierwsza w menu; `/` i stary adres Bazy prowadzą tam
+same, łatka powłoki `branding/powloka.json` + `powloka.js`, loader ≤ 4 KB, pakiet z `/zasoby` tylko na `/jarvo`,
+ochrona zapisu `hq/plugin/ochrona.py` w obu wtyczkach; [HQ.md §2c](HQ.md#2c-powłoka-jarvo-osadzanie-zasoby)): budynek z pokojami agentów (pixel art), minifigurki, dymki
 „co każdy robi teraz”, podgląd pracy na żywo, wyniki, decyzje i czat z Jarvem albo dowolnym agentem.
 Pokoje: bridge, study, devlab, atelier, filmstudio, workshop, office, radar. Sesje klikalne (Historia
 domyślnie). Czat obsługuje zdjęcia i pliki w obie strony. Linki „Odpal” (podgląd) i „Pokaż w folderze”.
 W Centrali **Konwerter**: plik → inny format na serwerze albo ten sam plik bez metadanych (GPS, telefon, daty, autor i firma w PDF i Wordzie; ten sam `konwertuj.py` co skill floty `konwersja-plikow`). **Jak działa usługa**: flota jako klikalna figura izometryczna (wieża z Jarvem i pokojami agentów, demo = droga zlecenia; `iso.py flota` ze skilla `izometria`).
 Edytor filmów w stylu CapCut (przejścia między klipami, które nie skracają filmu, kolor klipu ze stylami i Auto, menu Audio z biblioteką efektów i podkładów CC0, lektorem, nagraniem z mikrofonu i wyodrębnianiem dźwięku, uwagi na osi z kadrem dla Wideografa, typografia słowo po słowie z napisem za osobą: maska MODNet) i podgląd animacji z kodu na żywo z suwakami
 parametrów ([HQ.md §2a–2b](HQ.md#2a-edytor-filmów), plan rozbudowy: [EDYTOR-PLAN.md](EDYTOR-PLAN.md)). Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
-Obok BASE zakładka **Wiedza** (`/wiedza`, wtyczka `jarvo-wiedza`): graf skarbca wiedzy, foldery i notatki, szukanie, orzeczenia
+Obok niej zakładka **Wiedza** (`/wiedza`, wtyczka `jarvo-wiedza`): graf skarbca wiedzy, foldery i notatki, szukanie, orzeczenia
 z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIEDZA.md)).
 
 ---
@@ -339,11 +341,11 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
 | `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`), wtyczka Operatora `plugin/` (narzędzie `komputer`); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
-| `branding/` | skórka Jarvo (banner, logo) |
+| `branding/` | skórka Jarvo (banner, logo, motyw i tłumaczenie dashboardu), łatka powłoki `/jarvo` (`powloka.json`, `powloka.js`) |
 | `site/` | landing jarvo.pl |
 | `install.sh`, `install.ps1`, `bin/jarvo` | instalator jednym poleceniem (Linux/WSL2: sam instaluje pakiety i Docker Engine; macOS: Homebrew, Colima, dane w wolumenach Dockera, LaunchAgent; Windows: WSL2 z restartem i dalszym ciągiem, własna dystrybucja `Jarvo`, Docker Engine w niej, autostart): repo do `~/jarvo`, gotowy obraz z GHCR, klucz dostępu do prywatnego repo (`JARVO_TOKEN`), polecenie `jarvo` (`up`, `status`, `update` = `git pull` + instalator, `uninstall`…); opis i plan w [INSTALER.md](INSTALER.md) |
 | `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`: pytest, pyyaml, shellcheck) |
-| `tests/`, `docs/` | testy pytest, dokumentacja |
+| `tests/`, `docs/` | testy pytest (w `tests/live/` test aplikacji w przeglądarce dla `scripts/jarvo-e2e.sh`), dokumentacja |
 
 **Dokumenty:** PLAN (wizja/architektura/roadmapa), BOSS (mechanika Main Judge'a), FLEET (specyfikacja
 agentów), PROFILE-SPEC (anatomia agenta: 10 warstw), TOOLBOX (narzędzia open-source), VPS (infra),
@@ -373,7 +375,9 @@ SOURCES (licencje).
   `deploy.sh --no-pull --no-build`. Obraz przebudowuje się tylko po zmianie `infra/` lub `branding/` albo z `--rebuild`; dodatki obrazu
   przez `JARVO_EXTRAS="manim"` przed poleceniem (z `--rebuild`); Komputer Jarva przez `JARVO_KOMPUTER=1` (obraz
   `komputer-ca:test` = Debian + certyfikat proxy, `jarvo-komputer:local` po zmianie `infra/komputer/`), a potem
-  test twardych zasad na żywo `scripts/komputer-test.sh`.
+  test twardych zasad na żywo `scripts/komputer-test.sh`. Piaskownica ma w `compose/.env` `JARVO_E2E=1` (trasy testowe
+  wtyczek), a test aplikacji w przeglądarce na żywo to `bash /opt/jarvo/repo/scripts/jarvo-e2e.sh etap1` w kontenerze
+  (Playwright i Chromium z obrazu, logowanie hasłem z env kontenera, raport JSON, sprzątanie przy każdym wyjściu).
 - **Rozmowa bez klucza dostawcy (piaskownica, CI):** `scripts/atrapa_modelu.py --port 9199` to atrapa modelu zgodna
   z OpenAI (strumień, wywołanie narzędzia `[narzedzie:NAZWA {…}]`, `[wolno]`, `[blad]`, `[dlugo]`). Profil testowy
   w kontenerze dostaje w `config.yaml` `model: {provider: custom, base_url: http://127.0.0.1:9199/v1, default: atrapa}`,

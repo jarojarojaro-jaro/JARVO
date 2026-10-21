@@ -136,6 +136,8 @@ if [[ "$(cat "$NSS/.ca-sha" 2>/dev/null)" != "$CA_SHA" ]]; then
   rm -rf "$tmp"
   echo "$CA_SHA" > "$NSS/.ca-sha"
 fi
+# piaskownica = testy na żywo: trasy testowe (np. POST /csrf-proba) i agenci testowi scripts/jarvo-e2e.sh
+grep -q '^JARVO_E2E=' "$L/compose/.env" || echo 'JARVO_E2E=1' >> "$L/compose/.env"
 if [[ "${JARVO_KOMPUTER:-0}" == 1 ]] && ! grep -qE '^COMPOSE_PROFILES=(.*,)?komputer(,|$)' "$L/compose/.env"; then
   prof="$(sed -n 's/^COMPOSE_PROFILES=//p' "$L/compose/.env" | tail -1)"
   tmp="$(mktemp)"; grep -v '^COMPOSE_PROFILES=' "$L/compose/.env" > "$tmp" || true
@@ -180,7 +182,7 @@ touch "$L/.installed"
 cat <<EOF
 
 ✅ Flota działa w piaskownicy.
-   Jarvo HQ:   http://localhost:9119/base   login: jarvo   hasło: DASHBOARD_PASSWORD w $L/compose/.env
+   Jarvo:      http://localhost:9119/jarvo  login: jarvo   hasło: DASHBOARD_PASSWORD w $L/compose/.env
    komenda:    docker exec -u hermes jarvo-hermes <polecenie>   (PATH obrazu ma już Hermesa i narzędzia; bez bash -l)
    ponownie:   JARVO_LOCAL=$L bash scripts/sandbox-up.sh   (przebudowa obrazu tylko po zmianie infra/)
    stop:       JARVO_LOCAL=$L bash scripts/sandbox-up.sh down

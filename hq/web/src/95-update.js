@@ -1,4 +1,6 @@
-// Aktualizacje: pozycja w menu bocznym dashboardu (na każdej stronie), gdy na GitHubie jest nowsza wersja.
+// Aktualizacje: pozycja w menu bocznym dashboardu, gdy na GitHubie jest nowsza wersja. Ten plik jest w pakiecie aplikacji,
+// który loader wczytuje dopiero na /jarvo: pozycja pojawia się, gdy zakładka Jarvo raz wczytała się w tej karcie ("/" sam
+// tam prowadzi), i zostaje przy przejściach do innych stron dashboardu. W etapie 5 przechodzi do szuflady ustawień.
 // Stan i samą aktualizację robi pomocnik na hoście (scripts/updater.py); tu tylko pokazujemy i prosimy.
 
 (function updateWidget() {

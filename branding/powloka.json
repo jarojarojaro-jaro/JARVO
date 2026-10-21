@@ -1,0 +1,46 @@
+{
+ "_opis": "Powłoka /jarvo w dashboardzie Hermesa (branding/patch_dashboard.py, docs/HQ.md „Powłoka”). js: podmiany w dist z dokładną liczbą trafień (inna liczba = budowa obrazu staje); gotowe = ślad już wykonanej podmiany. css: elementy powłoki, które chowa data-jarvo-app i data-jarvo-embed; dowod = napis w dist, liczony tak samo. Nawigacji Hermesa na /sessions po restarcie gatewaya i aktualizacji nie zmieniamy: tam jest dziennik akcji.",
+ "wersja": 1,
+ "js": [
+  {
+   "nazwa": "nav_glowna",
+   "wzor": "(function [\\w$]+\\(e,t\\)\\{let n=[\\w$]+\\(e,t\\),r=new Set\\()e\\.map\\(e=>e\\.path\\)(\\))",
+   "zamiana": "\\1[...e.map(e=>e.path),\"/jarvo\"]\\2",
+   "ile": 1,
+   "gotowe": "new Set\\(\\[\\.\\.\\.e\\.map\\(e=>e\\.path\\),\"/jarvo\"\\]\\)"
+  },
+  {
+   "nazwa": "przekierowania",
+   "wzor": "(\\(0,[\\w$]+\\.jsx\\)\\([\\w$]+,\\{to:)`/sessions`(,replace:!0\\}\\))",
+   "zamiana": "\\1(typeof window.__JARVO_CEL__==\"function\"?window.__JARVO_CEL__:function(){return\"/sessions\"})()\\2",
+   "ile": 2,
+   "gotowe": "\\{to:\\(typeof window\\.__JARVO_CEL__==\"function\"\\?"
+  }
+ ],
+ "css": [
+  {
+   "nazwa": "pasek",
+   "selektor": "#app-sidebar",
+   "dowod": "id:`app-sidebar`",
+   "ile": 1
+  },
+  {
+   "nazwa": "nagl_mobil",
+   "selektor": "header.lg\\:hidden.fixed.top-0",
+   "dowod": "lg:hidden fixed top-0 left-0 right-0 z-40 min-h-14",
+   "ile": 1
+  },
+  {
+   "nazwa": "zaslona",
+   "selektor": "button.lg\\:hidden.fixed.inset-0",
+   "dowod": "lg:hidden fixed inset-0 z-40 p-0 block",
+   "ile": 1
+  },
+  {
+   "nazwa": "odstep",
+   "selektor": "div.h-14.shrink-0.lg\\:hidden",
+   "dowod": "h-14 shrink-0 lg:hidden",
+   "ile": 1
+  }
+ ]
+}

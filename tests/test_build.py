@@ -209,10 +209,12 @@ def test_wiedza_plugin_wiring(built, tmp_path):
         assert cfg["tts"]["providers"]["matcha"]["command"].startswith("/opt/jarvo/bin/jarvo-tts --plik {input_path}"), agent.name
     plugin = build.build_wiedza_plugin(tmp_path / "plugins" / "jarvo-wiedza")
     for rel in ("plugin.yaml", "__init__.py", "wiedza.py", "kompilacja.py", "dashboard/manifest.json", "dashboard/plugin_api.py",
-                "dashboard/panel.py", "dashboard/dist/index.js", "dashboard/dist/style.css"):
+                "dashboard/panel.py", "dashboard/ochrona.py", "dashboard/dist/index.js", "dashboard/dist/style.css"):
         assert (plugin / rel).exists(), rel
     manifest = json.loads((plugin / "dashboard" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["name"] == "jarvo-wiedza" and manifest["tab"]["path"] == "/wiedza"
+    # ochrona zapisu (CSRF): ta sama kopia co w jarvo-hq
+    assert (plugin / "dashboard" / "ochrona.py").read_bytes() == (fl.REPO_ROOT / "hq" / "plugin" / "ochrona.py").read_bytes()
     js = (plugin / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8")
     assert js.count('window.__HERMES_PLUGINS__.register(PLUGIN, App)') == 1
     assert not re.search(r"\.innerHTML\s*=|dangerouslySetInnerHTML", js)          # treść notatek renderowana elementami, nie HTML-em

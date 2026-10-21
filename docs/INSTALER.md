@@ -44,6 +44,13 @@ instalator, a `deploy.sh` przypomina „uruchom jarvo update”, gdy `compose/.h
 `jarvo update` w Linuksie odświeża wszystko poza samym Windowsem; zmiana w `install.ps1` (WSL, autostart) wymaga
 ponownego `irm https://jarvo.pl/install.ps1 | iex` (drugie uruchomienie = aktualizacja).
 
+**`HOST_VERSION` 4:** adres dashboardu to `/jarvo` (zakładka Jarvo, [HQ.md §2c](HQ.md#2c-powłoka-jarvo-osadzanie-zasoby)).
+Na komputerze nic nowego do zainstalowania: `jarvo open` i `jarvo haslo` podają nowy adres już po samym `git pull`
+(polecenie `jarvo` to dowiązanie do repo), a `install.sh` zmienia tylko końcowy komunikat. Po aktualizacji `deploy.sh`
+raz poprosi o `jarvo update` (zapisana wersja instalatora jest starsza); ono niczego nie doinstalowuje, tylko zapisuje
+`compose/.host-version` 4. Na Windowsie strona otwierana na końcu `install.ps1` to `/jarvo` przy następnym uruchomieniu
+instalatora. Stare zakładki przeglądarki z adresem Bazy działają dalej (przekierowanie w dashboardzie).
+
 ## 2. Diagnoza: co przeszkadza na każdym systemie
 
 | | Linux | macOS | Windows |
@@ -199,7 +206,7 @@ Zbudowane 2026-09-30 (pliki w §1):
   na basha z Homebrew.
 
 Sprawdzone:
-- `tests/test_installer.py` (13 testów): składnia, shellcheck bez ostrzeżeń, próby na sucho na udawanych
+- `tests/test_installer.py`: składnia, shellcheck bez ostrzeżeń, próby na sucho na udawanych
   dystrybucjach (Ubuntu, Fedora, Arch, nieznana), obecny Docker pomijany, za mało RAM, `JARVO_SETUP_ONLY`,
   klucz nigdy w wyjściu, `jarvo help/version/autostart print`, katalog z `.jarvo-local`,
   `local-up.sh --prepare` bez pytań (env, sekrety 640/gid 10000, dane uid 10000).

@@ -9,7 +9,7 @@
 #   jarvo update              pobierz nową wersję i zainstaluj ją tym samym instalatorem (programy na komputerze też)
 #   jarvo chat [profil]       czat z agentem w terminalu (domyślnie jarvo)
 #   jarvo open                otwórz dashboard w przeglądarce
-#   jarvo haslo               login i hasło do Jarvo HQ (nie zapisujemy ich w logu instalacji)
+#   jarvo haslo               login i hasło do dashboardu Jarvo (nie zapisujemy ich w logu instalacji)
 #   jarvo pliki               otwórz katalog z wynikami agentów (macOS: kopia w ~/Jarvo)
 #   jarvo autostart on|off|status   start floty i pomocnika aktualizacji po restarcie (systemd użytkownika; macOS: LaunchAgent)
 #   jarvo uninstall [--yes] [--all] usuń flotę (kontenery, obraz, usługę, polecenie); --all także dane, klucze i repo
@@ -45,7 +45,7 @@ L="${JARVO_LOCAL:-}"
 [[ -n $L ]] || L="$(cat "$ROOT/.jarvo-local" 2>/dev/null || true)"
 [[ -n $L ]] || L="$HOME/jarvo-local"
 export JARVO_LOCAL="$L"
-PORT=9119; URL="http://localhost:$PORT/base"
+PORT=9119; URL="http://localhost:$PORT/jarvo"
 UNIT_DIR="$HOME/.config/systemd/user"; UNIT="$UNIT_DIR/jarvo-updater.service"
 AGENT="$HOME/Library/LaunchAgents/pl.jarvo.updater.plist"   # macOS
 ME="$(id -un)"
@@ -152,7 +152,7 @@ cmd_version() {
 cmd_open() { echo "$URL"; open_path "$URL" || true; }
 cmd_haslo() {
   installed || die "Flota nie jest zainstalowana (jarvo up)."
-  echo "Jarvo HQ: $URL"
+  echo "Jarvo:    $URL"
   echo "login:    $(envval DASHBOARD_USER)"
   echo "hasło:    $(envval DASHBOARD_PASSWORD)"
 }

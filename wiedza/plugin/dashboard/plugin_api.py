@@ -2,7 +2,8 @@
 
 Działa w procesie dashboardu (za jego logowaniem). Logika w panel.py (bez FastAPI), skarbiec przez wiedza.py obok.
 Odczyt: overview, tree, note, graph, search, inbox, log, lint, rulings. Zapis tylko: POST rulings (orzeczenie od człowieka),
-POST remark (uwaga do notatki = szkic), POST compile (kompilacja jako osobny proces), POST reindex.
+POST remark (uwaga do notatki = szkic), POST compile (kompilacja jako osobny proces), POST reindex. Każdy zapis przechodzi
+ochrona.wymagaj_zapisu (ten sam plik co w jarvo-hq): tylko z panelu albo z nagłówkiem X-Jarvo-Request: 1.
 """
 from __future__ import annotations
 
@@ -29,12 +30,15 @@ def _load(name: str, plik: str):
 
 
 panel_mod = _load("jarvo_wiedza_panel", "panel.py")
+# ochrona zapisu (CSRF) wspólna z jarvo-hq: scripts/build.py kopiuje hq/plugin/ochrona.py obok; w repo czytamy oryginał
+ochrona = _load("jarvo_wiedza_ochrona", str(next(p for p in (_HERE / "ochrona.py", _HERE.parents[2] / "hq" / "plugin" / "ochrona.py")
+                                                 if p.is_file())))
 HOME = panel_mod.korzen_danych(os.environ.get("HERMES_HOME", "/opt/data"))
 JARVO_DIR = Path(os.environ.get("JARVO_DATA_DIR", str(HOME / "jarvo")))
 PANEL = panel_mod.Panel(os.environ.get("JARVO_KNOWLEDGE_DIR") or JARVO_DIR / "knowledge",
                         os.environ.get("JARVO_STATE_DIR") or JARVO_DIR / "state",
                         os.environ.get("JARVO_REPO_DIR", "/opt/jarvo/repo"))
-router = APIRouter()
+router = APIRouter(route_class=ochrona.Trasa)   # każda trasa POST: ochrona.wymagaj_zapisu
 
 
 def _blad(e: Exception) -> HTTPException:

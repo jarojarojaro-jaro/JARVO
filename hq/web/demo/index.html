@@ -67,12 +67,11 @@
     components: {},
     fetchJSON: function () { return Promise.reject(new Error("Brak backendu w trybie demo")); },
   };
-  window.__HERMES_PLUGINS__ = {
-    register: function (name, Component) {
-      ReactDOM.createRoot(document.getElementById("hq")).render(React.createElement(Component));
-    },
-  };
 </script>
 <script src="fleet.js"></script>
 <script src="mock.js"></script>
 <script src="app.js"></script>
+<script>
+  // pakiet aplikacji wystawia window.__JARVO_APP__ (w dashboardzie renderuje go loader zakładki /jarvo)
+  ReactDOM.createRoot(document.getElementById("hq")).render(React.createElement(window.__JARVO_APP__.App));
+</script>

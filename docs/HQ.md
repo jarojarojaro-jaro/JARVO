@@ -1,6 +1,9 @@
 # Jarvo HQ: kwatera floty (GUI)
 
-Jarvo HQ to zakładka **BASE** w menu dashboardu Hermesa, nad CHAT (`http://<ip-tailscale>:9119/base`, logowanie jak do dashboardu).
+Jarvo HQ to zakładka **Jarvo** w menu dashboardu Hermesa, pierwsza w menu, nad CHAT (`http://<ip-tailscale>:9119/jarvo`,
+logowanie jak do dashboardu). Adres główny `/`, stary adres Bazy i nieznane adresy prowadzą tam same
+(sekcja [2c](#2c-powłoka-jarvo-osadzanie-zasoby)). To jeszcze stara Baza (wieża, Centrala, dock czatu) z widocznym
+menu Hermesa; nowa aplikacja z rozmową w miejscu wieży przyjdzie kolejnymi etapami.
 Obok niej jest zakładka **WIEDZA** (`/wiedza`): skarbiec wiedzy floty z grafem notatek, orzeczeniami i skrzynką szkiców
 (osobna wtyczka `jarvo-wiedza`, opis w [WIEDZA.md §8](WIEDZA.md#8-zakładka-wiedza-w-dashboardzie-i-obsidian)).
 Pokazuje flotę jako budynek z klocków. Na górze jest mostek Jarva, pod nim piętra z pokojami snajperów (po dwa na piętro). Każdy
@@ -47,7 +50,9 @@ po błędach bezpośrednio (`hermes kanban unblock`), bo tu nie ma czego rozstrz
 
 ```
 przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
-   └─ zakładka „/base” = plugin jarvo-hq (React z SDK dashboardu + htm, bez kroku budowania po stronie serwera)
+   └─ zakładka „/jarvo” = plugin jarvo-hq (React z SDK dashboardu + htm, bez kroku budowania po stronie serwera):
+      loader dist/index.js (≤ 4 KB, na każdej stronie) wczytuje pakiet z /zasoby dopiero na /jarvo (sekcja 2c)
+        ├─ GET  /api/plugins/jarvo-hq/zasoby/<plik> pakiet aplikacji app-<skrót>.js/.css i kroje (gzip, cache na rok)
         ├─ GET  /api/plugins/jarvo-hq/state        co 3 s (ukryta karta: co 12 s): agenci, tablica, decyzje, misje, zdarzenia
         ├─ GET  /api/plugins/jarvo-hq/fleet        opis floty (fleet.json)
         ├─ GET  /api/plugins/jarvo-hq/agent/<a>    co 2,5 s przy otwartym panelu: karty, oś kroków, wyniki (pliki co 10 s)
@@ -72,11 +77,13 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         │                                          proxy-file, maska, glos-tlo, glos-probka, export,
         │                                          job/<id>[/cancel] (sekcja 2a)
         ├─ GET  /api/plugins/jarvo-hq/anim/check  czy plik HTML to animacja z kontraktem (przycisk „◐ Animacja”)
-        ├─ GET  /api/plugins/jarvo-hq/anim/info   link podglądu z mostkiem ─► :9120, parametry, stan pomiaru (sekcja 2b)
+        ├─ POST /api/plugins/jarvo-hq/anim/info   link podglądu z mostkiem ─► :9120, parametry, stan pomiaru (sekcja 2b)
         ├─ POST /api/plugins/jarvo-hq/anim/params nowe wartości ─► parametry.json obok strony
         ├─ GET/POST /api/plugins/jarvo-hq/update  stan i prośba o sprawdzenie/aktualizację (pomocnik hosta scripts/updater.py)
+        ├─ POST /api/plugins/jarvo-hq/csrf-proba   tylko z JARVO_E2E=1: trasa bez skutków dla testu ochrony zapisu
         └─ GET  /api/plugins/jarvo-hq/health       klucze API profili i dostępność gatewaya
 backend pluginu (plugin_api.py, w procesie dashboardu)
+   ├─ ochrona.py: każda trasa zapisu (POST) obu wtyczek tylko z panelu (ochrona CSRF, sekcja 3)
    ├─ hq_core.py: odczyt kanban.db i state.db profili w trybie tylko do odczytu, wyliczenie stanu
    └─ klient API gatewaya z kluczem profilu czytanym z jego .env (przeglądarka nigdy go nie widzi)
 ```
@@ -85,7 +92,9 @@ Pliki w repo:
 
 | Ścieżka | Rola |
 |---|---|
-| `hq/plugin/manifest.json` | manifest pluginu dashboardu (zakładka BASE w menu, przed CHAT) |
+| `hq/plugin/manifest.json` | manifest pluginu dashboardu (zakładka **Jarvo** `/jarvo` w menu, przed CHAT, ikona `MessageSquare`; bez `css`: styl wczytuje loader) |
+| `hq/plugin/ochrona.py` | ochrona zapisu (CSRF) obu wtyczek: `Trasa` dokłada `wymagaj_zapisu` każdej trasie POST (testy: `tests/test_csrf.py`); `scripts/build.py` kopiuje ten sam plik do `jarvo-wiedza` |
+| `branding/powloka.json`, `branding/powloka.js` | łatka powłoki dashboardu: wpis `/jarvo` w menu, przekierowania Hermesa na `__JARVO_CEL__`, styl i skrypt w `index.html` (sekcja 2c; testy: `tests/test_powloka.py`) |
 | `hq/plugin/plugin_api.py` | trasy FastAPI, proxy czatu do gatewaya |
 | `hq/plugin/hq_core.py` | logika stanu (bez FastAPI, testowana w `tests/test_hq_core.py`) |
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu i planu typografii, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`, `tests/test_typografia.py`) |
@@ -99,7 +108,7 @@ Pliki w repo:
 | `branding/fonts/` | kroje motywu Fosfor (VT323, IBM Plex Mono, OFL) i `fosfor.css`; te same pliki na stronie logowania |
 | `hq/web/vendor/htm.umd.js` | htm 3.1.1 (Apache-2.0): składnia podobna do JSX bez kompilacji |
 | `hq/web/demo/` | strona demo i symulator floty |
-| `scripts/hqbuild.py` | build pluginu (sklejenie JS, `fleet.json` z fleet.yaml i SOUL) i demo |
+| `scripts/hqbuild.py` | build pluginu (sklejenie JS w `dist/zasoby/app-<skrót>.js` i `.css` z bliźniakami `.gz`, loader `dist/index.js`, `fleet.json` z fleet.yaml i SOUL) i demo (testy: `tests/test_hq_zasoby.py`) |
 | `scripts/share_keys.py` (kopiowany do pluginu) | wspólne klucze floty na żywo: klucz dostawcy z głównego `.env` trafia do `.env` agentów |
 
 Wdrożenie jest częścią zwykłego `deploy.sh`: `build.py` buduje plugin do `build/plugins/jarvo-hq`,
@@ -460,9 +469,87 @@ przy każdym pliku HTML, który ma obok `parametry.json` albo `__seek` w kodzie 
 - Logika serwera: `hq/plugin/animacja.py` (bez FastAPI), frontend: `hq/web/src/47-animacja.js`, testy:
   `tests/test_animacja.py`.
 
+## 2c. Powłoka: /jarvo, osadzanie, zasoby
+
+Jak Jarvo wchodzi w dashboard Hermesa. Kod Hermesa zostaje bez zmian poza łatkami przy budowie obrazu
+(`branding/patch_dashboard.py`).
+
+- **Adres.** Zakładka pluginu `jarvo-hq` to `/jarvo`, pierwsza pozycja menu. Skrypt powłoki (`branding/powloka.js`,
+  wklejany do `index.html` jako pierwsze dziecko `<body>`) jeszcze przed startem aplikacji Hermesa zamienia adres `/`
+  i stary adres Bazy na `/jarvo` (`history.replaceState`, bez przeładowania). Przekierowania Hermesa (start z `/`
+  i nieznany adres) pytają `window.__JARVO_CEL__()`: zwykle `/jarvo`, a na samym `/jarvo` (plugin się nie wczytał)
+  `/sessions`, więc nie ma pętli; wtedy skrypt od razu zdejmuje też zasłonę startową, żeby nie zakrywała `/sessions`.
+  Wywołanie jest strzeżone (`typeof window.__JARVO_CEL__ == "function"`): bez skryptu powłoki, albo gdy element strony
+  przesłoni tę nazwę, zostaje `/sessions` Hermesa (z `/` czysty Hermes 0.21.5 i tak cofa się potem na
+  `/?profile=default`; to jego zachowanie bez Jarva). Hermes 0.21.5 potrafi przekierowanie cofnąć w tej samej klatce
+  (dopisuje `?profile=` do adresu sprzed przekierowania, np. `/nieznane?profile=default`, i strona zostaje pusta);
+  dlatego `__JARVO_CEL__` sprawdza po 150 ms, czy adres nadal jest stary, i wtedy sam powtarza przejście z zachowanym
+  `?profile=` (`history.replaceState` + `popstate`), a po 1 s pełnym `location.replace`. Po **Restart gatewaya**
+  i **Aktualizuj Hermesa** Hermes przechodzi na `/sessions`, bo tam pokazuje dziennik akcji; łatka tego nie zmienia.
+- **Łatka i jej kontrola.** `branding/powloka.json` opisuje każdą zmianę w pakiecie Hermesa wzorcem i dokładną liczbą
+  trafień (menu: 1, przekierowania: 2), a selektory powłoki, które aplikacja chowa (`#app-sidebar`, nagłówek i zasłona
+  menu na telefonie, odstęp pod nagłówkiem), dowodem w kodzie Hermesa. Inna liczba trafień = `patch_dashboard.py`
+  kończy się kodem 1 i build obrazu staje: nowa wersja Hermesa wymaga przeglądu łatki. Druga łatka na tym samym
+  pakiecie niczego nie zmienia (wzorce „gotowe”).
+- **Loader i zasoby.** `dist/index.js` pluginu (najwyżej 4 KB, pilnuje tego `hqbuild.py`) ładuje się na każdej stronie
+  dashboardu, ale pakiet aplikacji (`app-<skrót>.js`, `app-<skrót>.css`, kroje) pobiera dopiero na `/jarvo`, z trasy
+  `/api/plugins/jarvo-hq/zasoby/` (za logowaniem). Nazwa zawiera skrót sha256 treści, obok leży bliźniak `.gz`
+  (wysyłany, gdy przeglądarka przyjmuje gzip), nagłówek `Cache-Control: private, max-age=31536000, immutable`. Nowy
+  build = nowa nazwa w loaderze, więc przeglądarka nie trzyma starej wersji. Trasa podaje tylko nazwy z białej listy.
+  Arkusz stylów, który nie odpowiada, wstrzymuje aplikację najwyżej 3 s (działa i bez stylów). Pakiet, którego po 7 s
+  nadal nie ma, daje ekran błędu (poniżej); gdy dojdzie później, aplikacja go zastępuje. Po nieudanym wczytaniu
+  następne wejście na `/jarvo` (także w tej samej karcie) próbuje od nowa. Dashboard bez logowania (sam Hermes na
+  127.0.0.1; Jarvo zawsze wdraża go z logowaniem) wpuszcza `/api/` tylko z tokenem w nagłówku, którego `<script>` nie
+  wyśle: tam loader bierze tę samą kopię ze statycznego `/dashboard-plugins/jarvo-hq/dist/zasoby/`, a panel dokłada
+  token (`X-Hermes-Session-Token`) do swoich zapytań.
+- **Zasłona i bezpiecznik.** Na `/jarvo` skrypt powłoki stawia na `<html>` atrybut `data-jarvo-wstepnie` (ekran
+  startowy ze stylu w `index.html`, w kolorze tła aktywnego motywu dashboardu, `--background-base`). Loader zdejmuje
+  go, gdy aplikacja się pokaże (`data-jarvo-gotowe`). Gdy po 8 s nadal nie ma gotowego widoku, skrypt sam zdejmuje
+  zasłonę i chowanie powłoki: widać menu Hermesa, nigdy pusty ekran.
+- **Osłona błędów.** Błąd przy renderze aplikacji albo pakiet, który się nie wczytał, pokazuje ekran „Coś poszło nie tak
+  przy otwieraniu Jarva” z **Odśwież** i **Otwórz klasyczny panel** (`/sessions`), a powłoka Hermesa wraca.
+- **Stara Baza.** Pakiet to dziś stara Baza (`window.__JARVO_APP__ = { App, wersja: 1 }`): menu Hermesa zostaje
+  widoczne (Klucze, Modele, wylogowanie). Widżet aktualizacji (`95-update.js`) jest w pakiecie, więc pozycja
+  „⬆ Aktualizacja” pojawia się w menu, gdy zakładka Jarvo raz wczytała się w tej karcie (`/` sam tam prowadzi),
+  i zostaje przy przejściach do innych stron; w etapie 5 przechodzi do szuflady ustawień. Atrybut `data-jarvo-app`
+  (powłoka schowana, aplikacja na cały ekran) ustawi dopiero nowa aplikacja (wersja 2 i wyżej).
+- **Tab i czytnik ekranu w aplikacji.** Przy `data-jarvo-app` skrypt powłoki daje atrybut `inert` wszystkiemu poza
+  korzeniem aplikacji (element z `data-jarvo-korzen`): rodzeństwu każdego przodka korzenia aż do `<body>`, także temu,
+  co Hermes dołoży później (banery, okna). Elementy pod warstwą aplikacji nie łapią więc fokusu Tab ani czytnika
+  ekranu. Bez `data-jarvo-app` atrybuty znikają; `inert` ustawionego przez kogoś innego skrypt nie rusza.
+- **Osadzanie.** Strona dashboardu w ramce z atrybutem `data-jarvo-embed` (albo, do ręcznych prób, w ramce
+  z `?jarvo-embed=1`) dostaje `data-jarvo-embed`: bez menu i nagłówka Hermesa (np. Logi w szufladzie przyszłej
+  aplikacji), także po przejściu na inną stronę w tej ramce; przekierowania w ramce idą na `/sessions`, a Jarvo się
+  w niej nie wczytuje. `?jarvo-embed=1` w zwykłej karcie nic nie zmienia. Ramka na stronie z innego pochodzenia (np.
+  strona agenta z :9120) dostaje `data-jarvo-zablokuj`, więc dashboard się w niej nie pokazuje (ochrona przed
+  clickjackingiem).
+- **Restart dashboardu.** Obraz dokłada usłudze s6 `dashboard` limit `timeout-kill` 30 s
+  (`/etc/s6-overlay/s6-rc.d/dashboard/timeout-kill`). s6 stosuje go tylko przy zatrzymaniu (`s6-svc -d`), nie przy
+  `s6-svc -r`, więc `install-fleet.sh` restartuje dashboard jako `-d` (czeka najwyżej 40 s, potem `-k`) i `-u`:
+  otwarte połączenia przeglądarek nie wstrzymają restartu po wdrożeniu dłużej niż 30 s.
+- **Testy.** `tests/test_powloka.py` (łatka na pakiecie testowym: liczby trafień, kod 1, druga łatka, logika
+  `__JARVO_CEL__`, zasłona bez wtyczki, poprawki cofniętego przekierowania i bezpiecznika, `inert` poza korzeniem
+  aplikacji, restart `-d`/`-u` w `install-fleet.sh`), `tests/test_hq_zasoby.py` (nazwy, gzip, nagłówki, biała lista,
+  loader w node: błąd, 7 s, wiszący arkusz, ponowna próba), `tests/test_csrf.py` (sekcja 3) i na żywo w piaskownicy
+  `scripts/jarvo-e2e.sh etap1` (Playwright w kontenerze, raport JSON; trasy testowe tylko z `JARVO_E2E=1`, które
+  `sandbox-up.sh` wpisuje do `compose/.env`); `JARVO_E2E=1 python3 -m pytest tests/test_live_e2e.py` na komputerze
+  z piaskownicą uruchamia go przez `docker exec -u hermes jarvo-hermes` (bez `JARVO_E2E=1` albo bez działającego
+  kontenera test jest pomijany).
+
 ## 3. Bezpieczeństwo
 
 - Wszystkie trasy pluginu są za logowaniem dashboardu (bez sesji: `401 unauthenticated`).
+- **Ochrona zapisu (CSRF).** Strony agentów na :9120 i serwery deweloperskie na innych portach `localhost` są dla
+  przeglądarki tą samą witryną co dashboard, więc ciasteczko logowania (`SameSite=Lax`) mogłoby jechać z ich
+  formularzami. Każda trasa zapisu obu wtyczek (`jarvo-hq`, `jarvo-wiedza`) przechodzi `ochrona.wymagaj_zapisu`
+  (`hq/plugin/ochrona.py`): `Sec-Fetch-Site: same-origin` albo `Origin` równy `Host`, a bez obu nagłówek
+  `X-Jarvo-Request: 1`; do tego treść `application/json` albo ten nagłówek. Panel wysyła `X-Jarvo-Request: 1` przy
+  każdym zapytaniu (także przy wysyłce plików). Odmowa: 403 `{"blad": {"kod": "csrf", …}}`, w dzienniku dashboardu
+  metoda, ścieżka i powód (nigdy treść). Routery obu wtyczek tworzą trasy klasą `ochrona.Trasa`, więc nowa trasa POST
+  dostaje ochronę sama; `tests/test_csrf.py` przechodzi oba routery (każda trasa ma być `Trasa`, a lista tras GET obu
+  wtyczek jest przypięta: trasa GET niczego nie zapisuje, dlatego link podglądu animacji wydaje `POST /anim/info`).
+  Ochrona obejmuje trasy wtyczek Jarvo, nie własne trasy zapisu Hermesa (`/api/gateway/…`, `/api/cron/…` itd.):
+  te chroni tylko logowanie i CORS Hermesa. Szersza ochrona całego dashboardu czeka na decyzję właściciela.
 - Dashboard nasłuchuje tylko na IP Tailscale (`JARVO_BIND_IP`), hasło generuje bootstrap.
 - Klucze API profili zostają na serwerze. Backend pluginu czyta je z `.env` profilu przy każdym wywołaniu.
 - Podgląd plików tylko z `/opt/data/jarvo/{workspaces,missions,knowledge,inbox}` (inbox: pliki wysłane w czacie HQ),
@@ -577,7 +664,7 @@ Agenci rozmawiają po polsku niezależnie od języka panelu (SOUL).
 
 | Objaw | Przyczyna i naprawa |
 |---|---|
-| brak zakładki BASE albo WIEDZA w menu | plugin nie jest włączony albo dashboard nie wstał po instalacji: `docker exec -u hermes jarvo-hermes /command/s6-svc -r /run/service/dashboard` |
+| brak zakładki Jarvo albo Wiedza w menu | plugin nie jest włączony albo dashboard nie wstał po instalacji: `docker exec -u hermes jarvo-hermes sh -c '/command/s6-svc -wd -T 40000 -d /run/service/dashboard; /command/s6-svc -u /run/service/dashboard'` (zatrzymanie z limitem 30 s i start, sekcja 2c) |
 | czat: „Profil … nie ma API_SERVER_KEY” | uruchom deploy ponownie (instalator generuje klucze) |
 | czat: „Gateway odrzucił klucz” | klucz w `.env` profilu zmieniony bez restartu gatewaya: `hermes gateway restart` |
 | czat: „No LLM provider configured” | profil nie ma `OPENROUTER_API_KEY` w `/srv/jarvo/secrets/<agent>.env` |
@@ -588,3 +675,5 @@ Agenci rozmawiają po polsku niezależnie od języka panelu (SOUL).
 | ekran telefonu: „Telefon testowy jest wyłączony” (503) | kontener `jarvo-android-ekran` nie działa: `jarvo android on`; pusta lista urządzeń w ws-scrcpy = Android jeszcze startuje (do 4 min) |
 | brak „Pokaż w folderze”, jest „Kopiuj ścieżkę” | pomocnik hosta nie działa albo to nie WSL: `bash scripts/local-up.sh` (uruchamia `scripts/updater.py`) |
 | `/api/plugins/jarvo-hq/health` | pokazuje, czy każdy profil ma klucz i czy gateway odpowiada na `/p/<agent>` |
+| `/jarvo`: „Coś poszło nie tak przy otwieraniu Jarva” | pakiet aplikacji rzucił błąd przy starcie albo nie wczytał się w 7 s (osłona loadera; sieć, stary plugin w pamięci przeglądarki). **Odśwież** wczytuje go jeszcze raz, **Otwórz klasyczny panel** prowadzi do Sesji; menu Hermesa wraca najpóźniej po 8 s. Błąd jest w konsoli przeglądarki; gdy powtarza się po odświeżeniu, `deploy.sh` (nowy build pluginu) |
+| zapis z panelu albo `curl`: 403 `{"blad": {"kod": "csrf"}}` | ochrona zapisu: żądanie nie przyszło z panelu. Skrypt z `curl` dodaje `-H 'X-Jarvo-Request: 1'` (i ciasteczko sesji); powód odmowy jest w dzienniku dashboardu (`jarvo: odrzucony zapis (csrf) …`) |

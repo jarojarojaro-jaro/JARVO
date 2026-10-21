@@ -530,7 +530,7 @@ def check_hq(r: Report) -> None:
     hq = fl.REPO_ROOT / "hq"
     if not hq.exists():
         return
-    for rel in ("plugin/manifest.json", "plugin/plugin_api.py", "plugin/hq_core.py", "web/style.css",
+    for rel in ("plugin/manifest.json", "plugin/plugin_api.py", "plugin/hq_core.py", "plugin/ochrona.py", "web/style.css",
                 "web/vendor/htm.umd.js", "web/vendor/LICENSE-htm", "web/demo/index.html", "web/demo/mock.js"):
         if not (hq / rel).exists():
             r.err(f"hq: brak {rel}")
@@ -539,8 +539,25 @@ def check_hq(r: Report) -> None:
         for key in ("name", "label", "entry", "tab"):
             if not manifest.get(key):
                 r.err(f"hq/manifest.json: brak pola {key}")
+        # zakładka /jarvo (powłoka w branding/powloka.js przekierowuje tam "/"); styl ładuje loader, nie manifest
+        if (manifest.get("tab") or {}).get("path") != "/jarvo" or manifest.get("label") != "Jarvo":
+            r.err("hq/manifest.json: zakładka ma mieć path /jarvo i label Jarvo (docs/HQ.md „Powłoka”)")
+        if "css" in manifest:
+            r.err("hq/manifest.json: bez klucza css (styl wczytuje loader dopiero na /jarvo)")
     except (OSError, ValueError) as exc:
         r.err(f"hq/manifest.json: {exc}")
+    # łatka powłoki dashboardu: każdy wpis z dokładną liczbą trafień (patch_dashboard.py wywraca build przy innej)
+    try:
+        powloka = json.loads((fl.REPO_ROOT / "branding" / "powloka.json").read_text(encoding="utf-8"))
+        for grupa, klucze in (("js", ("nazwa", "wzor", "zamiana", "ile", "gotowe")), ("css", ("nazwa", "selektor", "dowod", "ile"))):
+            for wpis in powloka.get(grupa) or []:
+                brak = [k for k in klucze if k not in wpis]
+                if brak or not isinstance(wpis.get("ile"), int) or wpis["ile"] < 1:
+                    r.err(f"branding/powloka.json: {grupa} {wpis.get('nazwa', '?')}: brak {brak or 'ile ≥ 1'}")
+        if not (fl.REPO_ROOT / "branding" / "powloka.js").exists():
+            r.err("branding: brak powloka.js (skrypt powłoki w index.html)")
+    except (OSError, ValueError) as exc:
+        r.err(f"branding/powloka.json: {exc}")
     src = sorted((hq / "web" / "src").glob("*.js"))
     if not src:
         r.err("hq/web/src: brak plików źródłowych")
@@ -550,6 +567,40 @@ def check_hq(r: Report) -> None:
         js_rooms = set(re.findall(r"^\s+(\w+):\s*\{", block, re.M))
         if js_rooms != fl.HQ_ROOMS:
             r.err(f"hq: pokoje w 20-art.js {sorted(js_rooms)} ≠ fleetlib.HQ_ROOMS {sorted(fl.HQ_ROOMS)}")
+
+
+# stary adres zakładki (sprzed /jarvo): zostaje tylko w powłoce (branding/powloka.js przekierowuje go), w testach
+# przekierowania i w CHANGELOG-ach. „/base” jako część nazwy pliku (templates/base.html) to nie adres.
+STARY_ADRES = re.compile(r"/base(?![\w.-])")
+BEZ_BASE_POMIN = {"CHANGELOG.md"}
+BEZ_BASE_KATALOGI = ("site", "hq", "knowledge", "profiles", "shared", "wiedza", "komputer", "infra", "scripts")
+
+
+def check_bez_base(r: Report) -> None:
+    """Adres dashboardu to /jarvo: instalatory, CLI, skrypty, strona, pluginy, profile i dokumenty nie podają starego."""
+    root = fl.REPO_ROOT
+    pliki = [root / "install.sh", root / "install.ps1", root / "bin" / "jarvo", root / "README.md"]
+    pliki += sorted((root / "docs").glob("*.md"))
+    for katalog in BEZ_BASE_KATALOGI:
+        pliki += sorted(p for p in (root / katalog).rglob("*")
+                        if p.is_file() and p.suffix in (".md", ".js", ".cjs", ".html", ".json", ".py", ".sh", ".css", ".yaml", ".yml", ".txt")
+                        and p.name not in BEZ_BASE_POMIN and p != Path(__file__).resolve()
+                        and not {"node_modules", "vendor", "__pycache__"} & set(p.parts))
+    for p in pliki:
+        try:
+            tekst = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for m in STARY_ADRES.finditer(tekst):
+            nr = tekst.count("\n", 0, m.start()) + 1
+            r.err(f"{p.relative_to(root)}:{nr}: stary adres zakładki zamiast /jarvo (docs/HQ.md „Powłoka”)")
+    # wersja instalatora hosta: docs/INSTALER.md opisuje bieżącą (co zmienia dla komputera)
+    skrypt, opis = root / "install.sh", root / "docs" / "INSTALER.md"
+    if not (skrypt.is_file() and opis.is_file()):
+        return
+    m = re.search(r"^HOST_VERSION=(\d+)$", skrypt.read_text(encoding="utf-8"), re.M)
+    if not m or f"`HOST_VERSION` {m.group(1)}" not in opis.read_text(encoding="utf-8"):
+        r.err(f"docs/INSTALER.md: brak opisu `HOST_VERSION` {m.group(1) if m else '?'} z install.sh")
 
 
 def md_slug(heading: str) -> str:
@@ -685,6 +736,7 @@ def run() -> Report:
     check_evals(fleet, r)
     check_calibration(r)
     check_hq(r)
+    check_bez_base(r)
     check_docs(fleet, r)
     check_scripts(r)
     check_secrets(r)

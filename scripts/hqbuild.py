@@ -4,14 +4,19 @@
     python3 scripts/hqbuild.py --out build/plugins/jarvo-hq     # plugin (wołane też przez scripts/build.py)
     python3 scripts/hqbuild.py --demo build/hq-demo            # samodzielne demo z symulacją floty
 
-Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, edytor.py, animacja.py, pomiar.py, liczby.py, konwertuj.py, izometria/,
-fleet.json, dzwieki/, dist/index.js, dist/style.css}.
-dist/index.js to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku.
+Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, ochrona.py, edytor.py, animacja.py, pomiar.py, liczby.py,
+konwertuj.py, izometria/, fleet.json, dzwieki/, dist/index.js, dist/zasoby/, dist/fonts/}.
+Pakiet aplikacji to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku; trafia do
+dist/zasoby/app-<sha256[:12]>.js (z bliźniakiem .gz), style do app-<h>.css, kroje aplikacji do zasoby/kroje/.
+dist/index.js to mały loader (≤ 4 KB, dashboard serwuje go na każdej stronie): rejestruje zakładkę /jarvo i dopiero
+na niej wczytuje pakiet przez trasę /api/plugins/jarvo-hq/zasoby/ (cache na rok, gzip), z osłoną błędów.
 """
 
 from __future__ import annotations
 
 import argparse
+import gzip
+import hashlib
 import json
 import re
 import shutil
@@ -22,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fleetlib as fl  # noqa: E402
 
 HQ = fl.REPO_ROOT / "hq"
-PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "edytor.py", "animacja.py")
+PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "edytor.py", "animacja.py")
 
 
 def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.") -> str:
@@ -80,15 +85,128 @@ def fleet_json(fleet: fl.Fleet | None = None) -> dict:
     return {"orchestrator": fleet.orchestrator, "agents": agents}
 
 
+# Loader zakładki /jarvo (dist/index.js). Dashboard wczytuje go na każdej stronie (no-store), więc jest mały
+# i bez skutków ubocznych: rejestruje komponent synchronicznie (inaczej Hermes zgłasza brak register()), a pakiet
+# aplikacji i style pobiera dopiero, gdy /jarvo naprawdę się renderuje. Błąd wczytania albo renderu i pakiet, którego
+# po 7 s nadal nie ma, dają ekran błędu z „Odśwież” i „Otwórz klasyczny panel”, nigdy pustą stronę (Hermes nie owija
+# stron pluginów w osłonę błędów); wiszący arkusz stylów czeka najwyżej 3 s, a po błędzie następne wejście na /jarvo
+# próbuje od nowa. Pakiet idzie trasą /api/plugins/jarvo-hq/zasoby/ (gzip, cache na rok); dashboard bez logowania
+# (tylko 127.0.0.1, __HERMES_AUTH_REQUIRED__ false) wpuszcza /api/ wyłącznie z nagłówkiem tokenu, którego <script>
+# nie wyśle, więc tam loader bierze tę samą kopię ze statycznego /dashboard-plugins/jarvo-hq/dist/zasoby/.
+# Atrybuty <html>: data-jarvo-wstepnie (zasłona startowa, ustawia skrypt powłoki z branding/powloka.js),
+# data-jarvo-gotowe (zasłona znika), data-jarvo-app (ukryta powłoka Hermesa; tylko aplikacja w wersji ≥ 2),
+# data-jarvo-embed (strona w ramce szuflady: sam loader, bez aplikacji). Osłona błędów to klasa przez prototyp (bez
+# składni class), stara Baza (wersja < 2) nie chowa powłoki, tylko zdejmuje zasłonę (jej przejście trwa 0,15 s).
+# Komentarze są tu, nie w loaderze: każdy bajt loadera idzie z każdą stroną dashboardu.
+LOADER = """/* Jarvo: loader zakładki /jarvo. Plik generowany przez scripts/hqbuild.py. */
+(function () {
+  var SDK = window.__HERMES_PLUGIN_SDK__, R = SDK.React, h = R.createElement, d = document.documentElement;
+  var B = (window.__HERMES_BASE_PATH__ || "").replace(/\\/+$/, "");
+  var Z = B + (window.__HERMES_AUTH_REQUIRED__ === false ? "/dashboard-plugins/jarvo-hq/dist/zasoby/" : "/api/plugins/jarvo-hq/zasoby/");
+  var JS = Z + "@@JS@@", CSS = Z + "@@CSS@@", obietnica = null;
+  var pl = true;
+  try { pl = /^pl/i.test(localStorage.getItem("hermes-locale") || "pl"); } catch (e) {}
+  function T(a, b) { return pl ? a : b; }
+  function laduj() {
+    if (obietnica) return obietnica;
+    var l = document.createElement("link"), s = document.createElement("script");
+    obietnica = Promise.all([new Promise(function (ok) {
+      l.rel = "stylesheet"; l.href = CSS;
+      l.onload = l.onerror = function () { ok(); };
+      setTimeout(ok, 3000);
+      document.head.appendChild(l);
+    }), new Promise(function (ok, nie) {
+      s.src = JS; s.async = true;
+      s.onload = function () { window.__JARVO_APP__ ? ok() : nie(new Error("brak __JARVO_APP__")); };
+      s.onerror = function () { nie(new Error("nie wczytano " + JS)); };
+      document.body.appendChild(s);
+    })]).catch(function (e) { obietnica = null; l.remove(); s.remove(); throw e; });
+    return obietnica;
+  }
+  function gotowe() {
+    d.setAttribute("data-jarvo-gotowe", "");
+    setTimeout(function () { if (d.hasAttribute("data-jarvo-gotowe")) d.removeAttribute("data-jarvo-wstepnie"); }, 200);
+  }
+  function sprzatnij() { ["data-jarvo-app", "data-jarvo-wstepnie", "data-jarvo-gotowe"].forEach(function (a) { d.removeAttribute(a); }); }
+  function Blad() {
+    R.useEffect(gotowe, []);
+    return h("div", {className: "jarvo-blad-ladowania", role: "alert", style: {padding: "2rem 1.5rem", maxWidth: "40rem", lineHeight: 1.5}},
+      h("p", {style: {fontSize: "1.1rem", margin: "0 0 .75rem"}}, T("Coś poszło nie tak przy otwieraniu Jarva.", "Something went wrong while opening Jarvo.")),
+      h("p", {style: {margin: 0}},
+        h("a", {href: location.href, onClick: function (e) { e.preventDefault(); location.reload(); }}, T("Odśwież", "Reload")), " · ",
+        h("a", {href: B + "/sessions"}, T("Otwórz klasyczny panel", "Open the classic dashboard"))));
+  }
+  function Oslona(p) { R.Component.call(this, p); this.state = {blad: false}; }
+  Oslona.prototype = Object.create(R.Component.prototype);
+  Oslona.prototype.constructor = Oslona;
+  Oslona.getDerivedStateFromError = function () { return {blad: true}; };
+  Oslona.prototype.componentDidCatch = function (e) { d.removeAttribute("data-jarvo-app"); console.error("Jarvo:", e); };
+  Oslona.prototype.render = function () { return this.state.blad ? h(Blad) : this.props.children; };
+  function Jarvo(props) {
+    var osadzony = d.hasAttribute("data-jarvo-embed");
+    var st = R.useState(window.__JARVO_APP__ ? 1 : 0), stan = st[0], ustaw = st[1];
+    R.useEffect(function () {
+      var t = setTimeout(function () { ustaw(function (x) { return x || 2; }); }, 7000);
+      if (!stan && !osadzony) laduj().then(function () { ustaw(1); }, function (e) { console.error("Jarvo:", e); ustaw(2); });
+      return function () { clearTimeout(t); sprzatnij(); };
+    }, []);
+    R.useEffect(function () {
+      if (stan === 1 && !(window.__JARVO_APP__.wersja >= 2)) gotowe();
+    }, [stan]);
+    if (osadzony) return h("p", {style: {padding: "1.5rem"}}, T("Jarvo jest otwarty w głównym oknie.", "Jarvo is open in the main window."));
+    if (stan === 1) return h(Oslona, null, h(window.__JARVO_APP__.App, props));
+    if (stan === 2) return h(Blad);
+    return h("div", {className: "jarvo-splash", role: "status", "aria-label": "Jarvo"});
+  }
+  window.__HERMES_PLUGINS__.register("jarvo-hq", Jarvo);
+})();
+"""
+LOADER_MAX = 4096
+# kroje nowej aplikacji (Inter, JetBrains Mono, Bricolage Grotesque; OFL) i Inter edytora: serwowane z /zasoby/kroje/
+KROJE_APLIKACJI = ("inter-latin-wght-normal.woff2", "inter-latin-ext-wght-normal.woff2",
+                   "jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono-latin-ext-wght-normal.woff2",
+                   "bricolage-grotesque-latin-wght-normal.woff2", "bricolage-grotesque-latin-ext-wght-normal.woff2")
+# style leżą pod /api/plugins/jarvo-hq/zasoby/, a pełna biblioteka krojów edytora (kroje.css i ~150 plików) zostaje
+# w dist/fonts/ pluginu: względny adres z czterema „..” trafia tam także za proxy z prefiksem ścieżki
+DO_DIST = "../../../../dashboard-plugins/jarvo-hq/dist/"
+
+
+def zasob(katalog: Path, prefiks: str, dane: bytes, rozszerzenie: str) -> str:
+    """Zapis zasobu pod nazwą z hashem treści i bliźniaka .gz (poziom 9, mtime 0: build jest powtarzalny)."""
+    nazwa = f"{prefiks}-{hashlib.sha256(dane).hexdigest()[:12]}.{rozszerzenie}"
+    (katalog / nazwa).write_bytes(dane)
+    (katalog / (nazwa + ".gz")).write_bytes(gzip.compress(dane, compresslevel=9, mtime=0))
+    return nazwa
+
+
+def style_aplikacji(css: str) -> str:
+    """hq/web/style.css z adresami poprawionymi pod /zasoby/: Inter edytora z kroje/, biblioteka krojów z dist/fonts/."""
+    css = re.sub(r"url\((['\"]?)fonts/(Inter-latin(?:-ext)?\.woff2)\1\)", r"url(\1kroje/\2\1)", css)
+    return re.sub(r"url\((['\"]?)fonts/", lambda m: f"url({m.group(1)}{DO_DIST}fonts/", css)
+
+
+def loader_js(js: str, css: str) -> str:
+    out = LOADER.replace("@@JS@@", js).replace("@@CSS@@", css)
+    if len(out.encode("utf-8")) > LOADER_MAX:
+        raise SystemExit(f"loader dist/index.js ma {len(out.encode())} B, limit {LOADER_MAX} B (każda strona dashboardu go pobiera)")
+    return out
+
+
 def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     dash = out / "dashboard"
     if out.exists():
         shutil.rmtree(out)
-    (dash / "dist").mkdir(parents=True)
+    zasoby = dash / "dist" / "zasoby"
+    (zasoby / "kroje").mkdir(parents=True)
     for name in PLUGIN_FILES:
         shutil.copy2(HQ / "plugin" / name, dash / name)
-    (dash / "dist" / "index.js").write_text(bundle_js(), encoding="utf-8")
-    shutil.copy2(HQ / "web" / "style.css", dash / "dist" / "style.css")
+    js = zasob(zasoby, "app", bundle_js().encode("utf-8"), "js")
+    css = zasob(zasoby, "app", style_aplikacji((HQ / "web" / "style.css").read_text(encoding="utf-8")).encode("utf-8"), "css")
+    (dash / "dist" / "index.js").write_text(loader_js(js, css), encoding="utf-8")
+    for k in KROJE_APLIKACJI:
+        shutil.copy2(HQ / "web" / "fonts" / "kroje" / k, zasoby / "kroje" / k)
+    for k in ("Inter-latin.woff2", "Inter-latin-ext.woff2"):
+        shutil.copy2(HQ / "web" / "fonts" / k, zasoby / "kroje" / k)
     shutil.copy2(HQ / "web" / "vendor" / "LICENSE-htm", dash / "dist" / "LICENSE-htm")
     # czcionki motywu Fosfor (VT323, IBM Plex Mono; OFL): serwowane lokalnie, bez Google Fonts;
     # te same pliki trafiają na stronę logowania (branding/patch_dashboard.py)

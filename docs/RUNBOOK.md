@@ -221,11 +221,13 @@ sudo systemctl start jarvo-updater
    docker exec -u hermes jarvo-hermes hermes kanban list
    ```
    Po kilku–kilkunastu minutach: recenzja Jarva (status `review` → `done` albo prośba o poprawki) i raport w DM.
-4. **Jarvo HQ:** `http://<ip-tailscale>:9119/base` (zakładka **BASE** nad CHAT; obok **WIEDZA** z grafem skarbca: po wdrożeniu
+4. **Jarvo HQ:** `http://<ip-tailscale>:9119/jarvo` (zakładka **Jarvo**, pierwsza w menu, nad CHAT; adres `/` prowadzi tam sam; obok **Wiedza** z grafem skarbca: po wdrożeniu
    widać huby 10 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
    z `compose/.env`. To budynek floty: pokoje agentów z podglądem pracy, decyzje, misje i czat ([HQ.md](HQ.md)).
    Pozostałe zakładki dashboardu Hermesa (sesje, cron, logi, konfiguracja) zostają w menu.
    Kontrola: `/api/plugins/jarvo-hq/health` po zalogowaniu pokazuje klucze API profili i dostępność gatewaya.
+   Zapisy wtyczek (`POST` do `/api/plugins/…`) skryptem lub `curl` wymagają nagłówka `X-Jarvo-Request: 1` (ochrona
+   zapisu, [HQ.md §3](HQ.md#3-bezpieczeństwo)); bez niego 403 `{"blad": {"kod": "csrf"}}`.
 
 ## 7. Włączenie rutyn i onboarding
 
@@ -318,7 +320,9 @@ Wyjątek to skille tworzone przez agentów: czekają w poczekalni na Twoją zgod
 
 ### Aktualizacje z panelu
 
-Gdy na GitHubie jest nowsza wersja, w menu bocznym dashboardu pojawia się **„⬆ Aktualizacja (n)”**:
+Gdy na GitHubie jest nowsza wersja, w menu bocznym dashboardu pojawia się **„⬆ Aktualizacja (n)”** (od chwili,
+gdy zakładka Jarvo wczytała się w tej karcie przeglądarki; `/` sam na nią prowadzi, a pozycja zostaje przy
+przejściach do innych stron dashboardu; strona otwarta wprost, np. `/sessions`, jej nie ma):
 klik pokazuje listę zmian, **„Aktualizuj teraz”** robi `git pull` i wdrożenie (z przebudową obrazu, gdy
 trzeba), a na koniec strona sama się odświeża. Pomocnik sprawdza GitHuba co minutę; z `JARVO_AUTO_UPDATE=1`
 (lokalnie: `JARVO_AUTO_UPDATE=1 jarvo autostart on` albo `JARVO_AUTO_UPDATE=1 jarvo up`) instaluje nowe wersje sam, bez klikania. Robi to pomocnik na hoście

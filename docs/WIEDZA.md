@@ -293,7 +293,7 @@ czyli grosze na modelach z poziomu `fast`; kontekst agentów rośnie o ≤ 800 t
 
 ## 8. Zakładka „Wiedza” w dashboardzie i Obsidian
 
-Nowa zakładka w menu dashboardu Hermesa (`/wiedza`, obok BASE), druga wtyczka dashboardu obok Jarvo HQ, budowana tym samym
+Nowa zakładka w menu dashboardu Hermesa (`/wiedza`, obok zakładki Jarvo), druga wtyczka dashboardu obok Jarvo HQ, budowana tym samym
 sposobem (`scripts/build.py` → `build/plugins/jarvo-wiedza/dashboard/`, sklejone `wiedza/web/src/*.js` + htm tym samym
 pakowaczem co HQ, bez kroku budowania po stronie serwera; `install-fleet.sh` kopiuje i włącza). Jedna wtyczka `jarvo-wiedza`
 ma obie części: `plugin.yaml` + `__init__.py` (dostawca pamięci, narzędzia, hak kanbana) i `dashboard/` (manifest, trasy
@@ -321,7 +321,9 @@ Co widać:
 Trasy backendu (`/api/plugins/jarvo-wiedza/…`): `overview`, `tree`, `note?path=`, `graph`, `search?q=`, `inbox`, `log`, `recall`, `lint`,
 `rulings`, `compile`; `POST rulings`, `POST remark` (uwaga do notatki), `POST compile`, `POST reindex`. Wszystko za logowaniem dashboardu; odczyt
 plików tylko spod `knowledge/` po rozwiązaniu symlinków, zapis tylko orzeczeń i szkiców (tak jak HQ zapisuje tylko wybrane
-pliki, [HQ.md §3](HQ.md#3-bezpieczeństwo)). Dwujęzyczność jak w HQ (etykieta `plugin_jarvo-wiedza` w `pl.json`).
+pliki, [HQ.md §3](HQ.md#3-bezpieczeństwo)). Każda trasa `POST` przechodzi tę samą ochronę zapisu co HQ (`ochrona.py`, kopia z
+`hq/plugin/` w `dashboard/`): zakładka wysyła nagłówek `X-Jarvo-Request: 1`, a kto pisze do tych tras skryptem albo `curl`,
+dodaje go sam (`-H 'X-Jarvo-Request: 1'` i ciasteczko sesji); bez niego 403 `{"blad": {"kod": "csrf"}}`. Dwujęzyczność jak w HQ (etykieta `plugin_jarvo-wiedza` w `pl.json`).
 
 **Obsidian.** Skarbiec to zwykły folder, więc Obsidian otwiera go bez wtyczek: w instalacji lokalnej (WSL) jako
 `\\wsl$\<dystrybucja>\home\<user>\jarvo-local\data\hermes\jarvo\knowledge`, na VPS przez `rsync` w jedną stronę (podgląd)

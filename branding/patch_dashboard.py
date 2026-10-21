@@ -3,22 +3,30 @@
 
     python3 patch_dashboard.py <katalog-z-favicon>
 
-Zmienia wyłącznie teksty i ikony widoczne dla użytkownika (tytuł karty, logo w menu, nazwę marki,
-etykiety motywów, stronę logowania). Kod Hermesa zostaje bez zmian; licencja MIT i autorzy:
-docs/SOURCES.md. Każda podmiana jest opcjonalna: nowa wersja Hermesa z innym układem plików
-nie wywraca budowy, tylko wypisuje, czego nie znalazła (wyjątek: tytuł karty, bo to podstawa).
+Zmienia teksty i ikony widoczne dla użytkownika (tytuł karty, logo w menu, nazwę marki, etykiety motywów,
+stronę logowania) i zakłada powłokę /jarvo (branding/powloka.json, docs/HQ.md „Powłoka”): Jarvo pierwszy w menu,
+przekierowania Hermesa ("/" i nieznany adres) do /jarvo, w index.html krytyczny CSS i skrypt powłoki
+(branding/powloka.js). Przejścia na /sessions po restarcie gatewaya i aktualizacji zostają (tam Hermes pokazuje
+dziennik akcji). Licencja MIT i autorzy Hermesa: docs/SOURCES.md.
+
+Podmiany tekstów są opcjonalne: nowa wersja Hermesa z innym układem plików nie wywraca budowy, tylko wypisuje,
+czego nie znalazła. Powłoka jest ścisła: każdy wzór z powloka.json musi trafić dokładnie tyle razy, ile zapisano,
+inaczej skrypt kończy się kodem 1 i budowa obrazu staje (tak samo brak tytułu karty).
+
+    JARVO_HERMES_DIR=<katalog>   inny katalog Hermesa niż /opt/hermes (testy na dist z próbki)
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import sys
 from pathlib import Path
 
-HERMES = Path("/opt/hermes")
+HERMES = Path(os.environ.get("JARVO_HERMES_DIR") or "/opt/hermes")
 WEB = HERMES / "hermes_cli" / "web_dist"
 
 
@@ -35,6 +43,84 @@ def sub_all(files, pattern: str, repl: str, label: str, flags=0) -> int:
             CHANGED.add(f)
             n += k
     print(f"  {'✓' if n else '·'} {label}: {n}")
+    return n
+
+
+def stop(msg: str) -> None:
+    """Powłoka /jarvo nie pasuje do tego dista Hermesa: budowa obrazu ma stanąć, nie przejść po cichu."""
+    print(f"✗ powłoka Jarvo: {msg}\n  Popraw wzory w branding/powloka.json pod nową wersję Hermesa (docs/HQ.md „Powłoka”).",
+          file=sys.stderr)
+    sys.exit(1)
+
+
+def sub_exact(files, wzor: str, zamiana: str, ile: int, nazwa: str, gotowe: str | None = None) -> int:
+    """Podmiana z dokładną liczbą trafień we wszystkich plikach razem (inna liczba = stop). Gdy wzór nie trafia,
+    a ślad podmiany (`gotowe`) jest dokładnie `ile` razy, dist jest już zmieniony i nic nie robimy."""
+    rx = re.compile(wzor)
+    teksty = {f: f.read_text(encoding="utf-8") for f in files}
+    n = sum(len(rx.findall(t)) for t in teksty.values())
+    if n == 0 and gotowe and sum(len(re.findall(gotowe, t)) for t in teksty.values()) == ile:
+        print(f"  · {nazwa}: już jest")
+        return 0
+    if n != ile:
+        stop(f"wzór „{nazwa}” trafia {n} raz(y), oczekiwane {ile}")
+    for f, t in teksty.items():
+        new, k = rx.subn(zamiana, t)
+        if k:
+            f.write_text(new, encoding="utf-8")
+            CHANGED.add(f)
+    print(f"  ✓ {nazwa}: {n}")
+    return n
+
+
+# Krytyczny CSS powłoki (<style id="jarvo-powloka"> w index.html). Selektory chowanych elementów pochodzą
+# z powloka.json („css”), reszta jest stała. Trzy atrybuty <html>: data-jarvo-wstepnie (zasłona startowa,
+# skrypt powłoki), data-jarvo-app (powłoka Hermesa ukryta, aplikacja w wersji ≥ 2), data-jarvo-gotowe (zasłona znika).
+# Zasłona ma tło aktywnego motywu dashboardu (--background-base z bootstrapu motywu Hermesa w <head>), nie motywu
+# systemu: stara Baza i menu Hermesa rysują się w motywie dashboardu, więc start nie błyska innym kolorem.
+POWLOKA_CSS = """@@APP@@ { display: none !important; }
+html[data-jarvo-app], html[data-jarvo-app] body { overflow: hidden; background: #111113; }
+@media (prefers-color-scheme: light) { html[data-jarvo-app], html[data-jarvo-app] body { background: #FBFBFA; } }
+html[data-jarvo-wstepnie] body::before { content: ""; position: fixed; inset: 0; z-index: 2147483000;
+  background: var(--background-base, #111113); pointer-events: none; transition: opacity .15s; }
+html[data-jarvo-wstepnie][data-jarvo-gotowe] body::before { opacity: 0; }
+@@EMBED@@ { display: none !important; }
+html[data-jarvo-zablokuj] body { display: none !important; }"""
+
+
+def powloka_css(dane: dict) -> str:
+    sel = [c["selektor"] for c in dane["css"]]
+    return (POWLOKA_CSS.replace("@@APP@@", ",\n".join(f"html[data-jarvo-app] {x}" for x in sel))
+            .replace("@@EMBED@@", ",\n".join(f"html[data-jarvo-embed] {x}" for x in sel)))
+
+
+def patch_powloka(assets: list[Path], index: Path, brand: Path) -> int:
+    """Powłoka /jarvo: menu, przekierowania i dowody selektorów w dist (ściśle), CSS i skrypt w index.html (raz)."""
+    dane = json.loads((brand / "powloka.json").read_text(encoding="utf-8"))
+    n = 0
+    for w in dane["js"]:
+        n += sub_exact(assets, w["wzor"], w["zamiana"], w["ile"], f"powłoka: {w['nazwa']}", w.get("gotowe"))
+    teksty = [f.read_text(encoding="utf-8") for f in assets]
+    for c in dane["css"]:
+        k = sum(t.count(c["dowod"]) for t in teksty)
+        if k != c["ile"]:
+            stop(f"element „{c['nazwa']}” ({c['selektor']}): dowód „{c['dowod']}” jest {k} raz(y), oczekiwane {c['ile']}")
+    print(f"  ✓ powłoka: elementy do ukrycia w dist: {len(dane['css'])}")
+    html = index.read_text(encoding="utf-8")
+    if 'id="jarvo-powloka"' not in html:
+        if "</head>" not in html:
+            stop("index.html bez </head>")
+        html = html.replace("</head>", f'<style id="jarvo-powloka">\n{powloka_css(dane)}\n</style>\n  </head>', 1)
+        n += 1
+    if 'id="jarvo-powloka-js"' not in html:
+        js = (brand / "powloka.js").read_text(encoding="utf-8").strip()
+        m = re.search(r"<body[^>]*>", html)
+        if not m or "</script" in js.lower():
+            stop("index.html bez <body> albo skrypt powłoki z </script>")
+        html = html[:m.end()] + f'\n    <script id="jarvo-powloka-js">\n{js}\n</script>' + html[m.end():]
+        n += 1
+    index.write_text(html, encoding="utf-8")
+    print("  ✓ powłoka: CSS i skrypt w index.html")
     return n
 
 
@@ -164,7 +250,7 @@ LOGIN_TEXTS = [
     (r'<html lang="en">', '<html lang="pl">', "język"),
     (r"<title>Sign in — Jarvo</title>", "<title>Logowanie — Jarvo</title>", "tytuł karty"),
     (r"<h1>Sign in</h1>", "<h1>Zaloguj się</h1>", "nagłówek"),
-    (r"Choose a sign-in method to continue to Jarvo HQ\.", "Wejście do Jarvo HQ: Twojej floty agentów.", "opis"),
+    (r"Choose a sign-in method to continue to Jarvo(?: HQ)?\.", "Wejście do Jarvo: Twojej floty agentów.", "opis"),
     (r"Public bind &middot; Auth required", "Dostęp tylko po zalogowaniu", "stopka"),
     (r"f'Sign in with \{", "f'Zaloguj przez {", "przycisk dostawcy"),
     (r"Sign in with \{plabel\}", "Nazwa użytkownika i hasło", "tytuł formularza"),
@@ -280,9 +366,8 @@ def main(argv: list[str]) -> int:
     # logo w menu: dwie linie "Hermes" / "Agent" → jedno słowo "Jarvo"
     sub_all(assets, r"children:\[`Hermes`,(\(0,[\w$]+\.jsx\)\(`br`,\{\}\)),`Agent`\]",
             r"children:[`Jarvo`]", "logo w menu")
-    # zakładka BASE (plugin Jarvo HQ) w głównym menu nad CHAT, nie w sekcji „Plugins” na dole
-    sub_all(assets, r"(function [\w$]+\(e,t\)\{let n=[\w$]+\(e,t\),r=new Set\()e\.map\(e=>e\.path\)(\))",
-            r'\1[...e.map(e=>e.path),"/base"]\2', "BASE w głównym menu")
+    # powłoka /jarvo: zakładka Jarvo w głównym menu nad CHAT (nie w sekcji „Plugins”), przekierowania, index.html
+    patch_powloka(assets, index[0], brand)
     sub_all(assets, r"brand:`Hermes Agent`,brandShort:`HA`", "brand:`Jarvo`,brandShort:`J`", "nazwa marki (i18n)")
     sub_all(assets, r"label:`Hermes Teal", "label:`Jarvo Teal", "etykiety motywów")
     # stopka menu: marka Jarvo i silnik (Hermes Agent, MIT) zamiast nazwy firmy Nous Research (wszystkie języki)
@@ -300,7 +385,7 @@ def main(argv: list[str]) -> int:
                     "kolory terminala w motywach")
     login = HERMES / "hermes_cli" / "dashboard_auth" / "login_page.py"
     if login.is_file():
-        sub_all([login], r"the Hermes Agent dashboard", "Jarvo HQ", "strona logowania (opis)")
+        sub_all([login], r"the Hermes Agent dashboard", "Jarvo", "strona logowania (opis)")
         sub_all([login], r" — Hermes Agent<", " — Jarvo<", "strona logowania (tytuł)")
         patch_login(login, brand)
     bust_cache(WEB / "assets", WEB / "index.html")

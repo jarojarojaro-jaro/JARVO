@@ -102,7 +102,7 @@ def test_dry_wsl_ready_imports_own_distro(tmp_path):
     assert re.search(r"wsl\.exe --import Jarvo \S+ \S+amd64-wsl\.rootfs\.tar\.gz --version 2", out)
     assert "wsl.exe -d Jarvo -u root -e bash" in out and "wsl.exe --terminate Jarvo" in out
     assert "wsl.exe -d Jarvo -u jarvo --cd ~ -e bash" in out
-    assert "Jarvo.vbs" in out and "Start-Process http://localhost:9119/base" in out
+    assert "Jarvo.vbs" in out and "Start-Process http://localhost:9119/jarvo" in out
     assert out.index("--import") < out.index("-u jarvo --cd")
     assert "RunOnce" not in out and "Docker Desktop" not in out
 

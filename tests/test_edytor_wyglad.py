@@ -31,6 +31,21 @@ def test_kroj_edytora_w_pluginie_i_demo(tmp_path):
             assert (base / u).stat().st_size > 40_000, (base, u)
         assert "SIL Open Font License" in (base / "fonts" / "LICENSE-Inter.txt").read_text(encoding="utf-8")
     assert (dist / "fonts" / "fosfor.css").is_file()                       # kroje motywu Fosfor zostają obok
+    # w pluginie style leżą pod /api/plugins/jarvo-hq/zasoby/ (loader): każdy względny url() ma wskazać plik z builda
+    from posixpath import normpath
+    from urllib.parse import urljoin
+    baza = "http://x/api/plugins/jarvo-hq/zasoby/"
+    app_css = next((dist / "zasoby").glob("app-*.css")).read_text(encoding="utf-8")
+    adresy = [u for u in re.findall(r'url\(["\']?([^)"\']+)', app_css) if not u.startswith(("http", "data:"))]
+    assert "kroje/Inter-latin.woff2" in adresy and any(u.endswith("fonts/kroje/kroje.css") for u in adresy)
+    for u in adresy:
+        sciezka = normpath(urljoin(baza, u)[len("http://x"):])
+        if sciezka.startswith("/api/plugins/jarvo-hq/zasoby/"):
+            plik = dist / "zasoby" / sciezka[len("/api/plugins/jarvo-hq/zasoby/"):]
+        else:
+            assert sciezka.startswith("/dashboard-plugins/jarvo-hq/dist/"), (u, sciezka)
+            plik = dist / sciezka[len("/dashboard-plugins/jarvo-hq/dist/"):]
+        assert plik.is_file(), (u, plik)
     assert '"Inter Jarvo"' in css.split(".thq-ed {", 1)[1].split("}", 1)[0]   # krój zapasowy w stosie edytora
 
 

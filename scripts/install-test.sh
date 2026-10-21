@@ -143,8 +143,9 @@ U "JARVO_YES=1 $NB jarvo up"
 [[ $PULL == 1 ]] && { U "test -s ~/jarvo-local/compose/.image-key" || fail "jarvo up zbudował obraz zamiast pobrać go z GHCR"; }
 status="$(U "jarvo status")"; echo "$status"
 grep -q "jarvo-hermes" <<<"$status" || fail "jarvo status nie widzi kontenera"
-code="$(R "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9119/base")"
-[[ $code == 200 || $code == 30? ]] || fail "Dashboard nie odpowiada (HTTP $code)"
+# /jarvo bez logowania: przekierowanie do strony logowania (302 /login?next=%2Fjarvo)
+code="$(R "curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://127.0.0.1:9119/jarvo")"
+[[ $code == "302 "*"/login?next=%2Fjarvo" ]] || fail "Dashboard nie odpowiada jak trzeba na /jarvo (HTTP $code)"
 U "test -f ~/jarvo-local/updater.pid && kill -0 \$(cat ~/jarvo-local/updater.pid)" || fail "Pomocnik aktualizacji nie działa"
 U "jarvo autostart on" && fail "autostart on bez systemd powinien się nie udać" || true
 U "jarvo open | grep -q 9119 && jarvo pliki | grep -q jarvo-local/data" || fail "jarvo open/pliki"

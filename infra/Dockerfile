@@ -337,6 +337,12 @@ ENV CLAUDE_SEO_PYTHON=/opt/jarvo/venvs/claude-seo/bin/python
 COPY branding/ /tmp/jarvo-brand/
 RUN python3 /tmp/jarvo-brand/patch_dashboard.py /tmp/jarvo-brand && rm -rf /tmp/jarvo-brand
 
+# --- usługa s6 `dashboard` (katalog źródłowy obrazu Hermesa): twardy limit zatrzymania 30 s. Bez niego s6 czeka,
+#     aż proces sam się zamknie, a otwarte strumienie przeglądarki potrafią wstrzymać restart dashboardu
+#     (docs/HQ.md „Powłoka”). Brak katalogu = inny układ obrazu bazowego: build ma się wtedy wywrócić.
+RUN test -f /etc/s6-overlay/s6-rc.d/dashboard/run && \
+    printf '30000\n' > /etc/s6-overlay/s6-rc.d/dashboard/timeout-kill
+
 # --- katalogi punktów montowania (zawartość z wolumenów). Bez `chmod -R`: przepisałby cały
 #     /opt/jarvo do nowej warstwy (+2,7 GB); instalatory i tak zostawiają pliki czytelne dla wszystkich.
 RUN mkdir -p /opt/jarvo/repo /opt/jarvo/build /opt/jarvo/secrets && \

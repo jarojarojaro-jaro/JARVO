@@ -312,6 +312,8 @@ def build_wiedza_plugin(out: Path) -> Path:
                                                              "Jarvo Wiedza: zakładka dashboardu Hermesa. Plik generowany przez scripts/build.py z wiedza/web/src/."), encoding="utf-8")
     shutil.copy2(fl.REPO_ROOT / "wiedza" / "web" / "style.css", dash / "dist" / "style.css")
     shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "vendor" / "LICENSE-htm", dash / "dist" / "LICENSE-htm")
+    # ochrona zapisu (CSRF): ten sam plik co w jarvo-hq, żeby obie wtyczki miały jedne reguły (tests/test_csrf.py)
+    shutil.copy2(fl.REPO_ROOT / "hq" / "plugin" / "ochrona.py", dash / "ochrona.py")
     return out
 
 

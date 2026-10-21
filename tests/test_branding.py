@@ -85,7 +85,7 @@ def test_polish_translation_covers_dashboard_sections():
     pl = json.loads((REPO / "branding" / "i18n" / "pl.json").read_text(encoding="utf-8"))
     for section in ("common", "app", "status", "sessions", "cron", "config", "env", "kanban", "achievements"):
         assert section in pl
-    assert pl["app"]["nav"]["plugin_jarvo-hq"] == "Baza"
+    assert pl["app"]["nav"]["plugin_jarvo-hq"] == "Jarvo"
     # placeholdery zostają jak w oryginale
     assert "{count}" in pl["sessions"]["selectedCount"] and "{what}" in pl["common"]["loadFailed"]
 

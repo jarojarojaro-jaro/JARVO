@@ -52,7 +52,7 @@ DISTRO=""
 BREW_SCRIPT="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
 # wersja wymagań hosta (programy poza obrazem floty: Docker, Colima, git, Python…). Zmiana tego, co ten skrypt
 # instaluje na komputerze = +1; deploy.sh porównuje ją z zapisaną przy instalacji i prosi o `jarvo update`.
-HOST_VERSION=3
+HOST_VERSION=4
 TOKEN="${JARVO_TOKEN:-}"
 
 if [[ -t 1 ]]; then R=$'\e[38;2;212;33;61m'; W=$'\e[1;38;2;242;241;232m'; G=$'\e[38;2;184;255;61m'; Y=$'\e[33m'; D=$'\e[2m'; N=$'\e[0m'
@@ -614,7 +614,7 @@ main() {
   link_cli
   fleet_up
   if [[ $DRY == 1 ]]; then say "Koniec próby na sucho."; return; fi
-  printf '\n%s▌%s Gotowe. Dashboard: %shttp://localhost:%s/base%s   (polecenia: jarvo help)\n' "$G" "$N" "$W" "$PORT" "$N"
+  printf '\n%s▌%s Gotowe. Dashboard: %shttp://localhost:%s/jarvo%s   (polecenia: jarvo help)\n' "$G" "$N" "$W" "$PORT" "$N"
   [[ $NEED_GROUP == 1 ]] && warn "Docker bez sudo w nowych terminalach zadziała po ponownym zalogowaniu (jarvo radzi sobie już teraz)."
   sleep 0.2   # tee ma zdążyć wypisać ostatnie linie
 }

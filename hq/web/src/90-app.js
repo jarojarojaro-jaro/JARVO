@@ -86,6 +86,6 @@ function App() {
   </div></${AnimCtx.Provider}></${EditCtx.Provider}></${FileCtx.Provider}>`;
 }
 
-if (window.__HERMES_PLUGINS__ && window.__HERMES_PLUGINS__.register) {
-  window.__HERMES_PLUGINS__.register(PLUGIN, App);
-}
+// Zakładkę /jarvo rejestruje loader (dist/index.js ze scripts/hqbuild.py): wczytuje ten pakiet dopiero na /jarvo,
+// owija App w osłonę błędów i zdejmuje zasłonę startową. Wersja 1 = stara Baza, powłoka Hermesa zostaje widoczna.
+window.__JARVO_APP__ = { App, wersja: 1 };

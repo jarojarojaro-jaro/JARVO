@@ -1,14 +1,13 @@
 {
   "name": "jarvo-hq",
-  "label": "Base",
-  "description": "Kwatera floty Jarvo: pokoje agentów z podglądem pracy na żywo, misje, decyzje i czat z szefem albo dowolnym agentem.",
-  "icon": "Shield",
-  "version": "0.1.0",
+  "label": "Jarvo",
+  "description": "Rozmowy z Jarvem i flotą: dziś kwatera floty (pokoje agentów, misje, decyzje, czat), a wkrótce jedna rozmowa z Jarvem i agentami.",
+  "icon": "MessageSquare",
+  "version": "0.2.0",
   "tab": {
-    "path": "/base",
+    "path": "/jarvo",
     "position": "before:chat"
   },
   "entry": "dist/index.js",
-  "css": "dist/style.css",
   "api": "plugin_api.py"
 }

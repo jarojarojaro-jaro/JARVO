@@ -12,6 +12,7 @@ import importlib.util
 import json
 import math
 import os
+import re
 import sys
 import shutil
 import time
@@ -34,7 +35,10 @@ def _load(name: str, file: str):
 
 
 core = _load("jarvo_hq_core", "hq_core.py")
-router = APIRouter()
+# ochrona zapisu (CSRF): każda trasa POST tego routera dostaje ochrona.wymagaj_zapisu (ochrona.Trasa);
+# ten sam plik jedzie do wtyczki jarvo-wiedza (scripts/build.py)
+ochrona = _load("jarvo_hq_ochrona", "ochrona.py")
+router = APIRouter(route_class=ochrona.Trasa)
 
 
 def _start_key_sharing() -> None:
@@ -1104,10 +1108,12 @@ async def anim_check(path: str):
     return {"anim": bool(p) and await asyncio.to_thread(anim.to_animacja, p)}
 
 
-@router.get("/anim/info")
-async def anim_info(path: str):
-    """Link podglądu (mostek przez postMessage, bez pętli podglądu strony), parametry ze schematu i stan pomiaru."""
-    p = core.safe_path(path, ROOTS)
+@router.post("/anim/info")
+async def anim_info(request: Request):
+    """Link podglądu (mostek przez postMessage, bez pętli podglądu strony), parametry ze schematu i stan pomiaru.
+    POST, bo wydaje token podglądu (zapis w state/preview-links.json): trasy GET niczego nie zapisują (ochrona.py)."""
+    body = await request.json()
+    p = core.safe_path(str(body.get("path") or ""), ROOTS)
     if p is None or not anim.to_animacja(p):
         raise HTTPException(404, "To nie animacja z kontraktem __seek (kontrakt-html.md) albo plik poza katalogami floty")
     if not getattr(_preview, "server", None):
@@ -1863,3 +1869,44 @@ async def update_request(request: Request):
     UPDATE_REQUEST.parent.mkdir(parents=True, exist_ok=True)
     UPDATE_REQUEST.write_text(action, encoding="utf-8")
     return JSONResponse({"ok": True, "action": action}, status_code=202)
+
+
+# ------------------------------------------------------- powłoka /jarvo: zasoby aplikacji, próba ochrony zapisu
+# Loader dist/index.js (scripts/hqbuild.py) wczytuje pakiet aplikacji dopiero na /jarvo, stąd: nazwy z hashem treści,
+# bliźniak .gz i cache na rok (pliki pluginu dashboard serwuje z no-store). Tylko nazwy z białej listy.
+ZASOBY = _HERE / "dist" / "zasoby"
+ZASOB_WZOR = re.compile(r"^(?:(?:app|narzedzia)-[0-9a-f]{12}\.(?:js|css)|kroje/[A-Za-z0-9_.-]+\.(?:woff2|ttf))$")
+ZASOB_TYPY = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+              ".woff2": "font/woff2", ".ttf": "font/ttf"}
+ZASOB_NAGLOWKI = {"Cache-Control": "private, max-age=31536000, immutable", "Vary": "Accept-Encoding",
+                  "X-Content-Type-Options": "nosniff"}
+
+
+def _zasob(nazwa: str, gzip_ok: bool) -> tuple[Path, dict] | None:
+    """Plik zasobu do wysłania i nagłówki (gzip, gdy przeglądarka go przyjmuje i jest bliźniak .gz); None = 404."""
+    if not ZASOB_WZOR.match(nazwa or ""):
+        return None
+    p = ZASOBY / nazwa
+    if not core._within(p.resolve(), ZASOBY.resolve()):
+        return None
+    naglowki = dict(ZASOB_NAGLOWKI)
+    gz = p.with_name(p.name + ".gz")
+    if gzip_ok and gz.is_file():
+        naglowki["Content-Encoding"] = "gzip"
+        return gz, naglowki
+    return (p, naglowki) if p.is_file() else None
+
+
+@router.get("/zasoby/{nazwa:path}")
+async def zasoby(nazwa: str, request: Request):
+    hit = _zasob(nazwa, "gzip" in request.headers.get("accept-encoding", "").lower())
+    if hit is None:
+        raise HTTPException(404, "Nie ma takiego zasobu")
+    return FileResponse(hit[0], media_type=ZASOB_TYPY[Path(nazwa).suffix], headers=hit[1])
+
+
+if os.environ.get("JARVO_E2E") == "1":
+    @router.post("/csrf-proba")
+    async def csrf_proba():
+        """Trasa zapisu bez skutków ubocznych dla testu ochrony zapisu (scripts/jarvo-e2e.sh); tylko z JARVO_E2E=1."""
+        return {"ok": True}

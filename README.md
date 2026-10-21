@@ -28,7 +28,7 @@ Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
 ## Szybki start
 
 Instalacja lokalna jednym poleceniem (Linux, macOS, Windows; repo do `~/jarvo`, flota w `~/jarvo-local`,
-potem http://localhost:9119/base). Instalator sam doinstalowuje wszystko, czego brakuje: na Linuksie
+potem http://localhost:9119/jarvo). Instalator sam doinstalowuje wszystko, czego brakuje: na Linuksie
 i w WSL pakiety i Docker Engine, na macOS Homebrew, bash, git, Pythona i Dockera w darmowej Colimie
 (działający Docker Desktop albo OrbStack zostaje), na Windowsie WSL2 (jeden restart, potem dalej sam),
 własną dystrybucję Linuksa `Jarvo` i Dockera w niej. Obraz floty pobiera gotowy z GHCR. Repo jest publiczne,
@@ -81,12 +81,12 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`hq/`](hq) | Jarvo HQ: plugin dashboardu (backend, frontend, demo) |
 | [`infra/`](infra) | obraz `jarvo-hermes` (Hermes + narzędzia), obraz Komputera Jarva (`infra/komputer`: pulpit z Chromium dla computer use), docker compose z sidecarami, szablony env |
 | [`knowledge/`](knowledge) | szablon brand kitu kopiowany na serwer |
-| [`branding/`](branding) | skórka Jarvo: terminal, favicon, motyw i tłumaczenie dashboardu |
+| [`branding/`](branding) | skórka Jarvo: terminal, favicon, motyw i tłumaczenie dashboardu, łatka powłoki `/jarvo` (`powloka.json`, `powloka.js`) |
 | [`site/`](site) | landing jarvo.pl (`scripts/deploy-site.sh`) |
 | [`install.sh`](install.sh), [`install.ps1`](install.ps1) | instalator jednym poleceniem: Linux/WSL2 (pakiety, Docker Engine), macOS (Homebrew, Colima), Windows (WSL2, dystrybucja `Jarvo`, Docker w niej) |
 | [`bin/jarvo`](bin/jarvo) | polecenie użytkownika po instalacji: `up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall` |
 | [`requirements-dev.txt`](requirements-dev.txt) | zależności testów i walidacji (`make dev-deps`) |
-| [`tests/`](tests) | testy pytest |
+| [`tests/`](tests) | testy pytest (w `tests/live/` test aplikacji w przeglądarce dla `scripts/jarvo-e2e.sh`) |
 | [`komputer/`](komputer) | computer use: bramka sterownika ekranu `jarvo_cua.py` (Hermes woła ją zamiast `cua-driver`); pulpit włączasz `jarvo komputer on`; projekt w [docs/KOMPUTER.md](docs/KOMPUTER.md) |
 | [`wiedza/`](wiedza) | skarbiec wiedzy floty (drugi mózg): `wiedza.py` i `SCHEMA.md`, projekt w [docs/WIEDZA.md](docs/WIEDZA.md) |
 | [`docs/`](docs) | dokumentacja (niżej) |

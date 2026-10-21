@@ -121,7 +121,7 @@ odcisk_wtyczek() {
   (cd "$DATA/plugins" && find "${dirs[@]}" -type f ! -path '*/__pycache__/*' -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16)
 }
 
-# 3c. Jarvo HQ: plugin dashboardu (zakładka BASE, :9119/base)
+# 3c. Jarvo HQ: plugin dashboardu (zakładka Jarvo, :9119/jarvo; "/" i stare adresy przekierowuje tam powłoka)
 if [[ -d "$BUILD/plugins/jarvo-hq" ]]; then
   log "Jarvo HQ (plugin dashboardu)"
   put_plugin jarvo-hq
@@ -191,12 +191,15 @@ fi
 if [[ $RESTART -eq 1 ]]; then
   log "Restart gatewaya"
   hermes gateway restart || echo "  ! restart gatewaya nieudany: sprawdź 'hermes gateway status'"
-  # Dashboard czyta listę wtyczek (zakładki Baza, Wiedza) i montuje ich backendy raz, przy starcie procesu. Restart, gdy
+  # Dashboard czyta listę wtyczek (zakładki Jarvo, Wiedza) i montuje ich backendy raz, przy starcie procesu. Restart, gdy
   # wtyczki na dysku różnią się od tych, z którymi był ostatnio restartowany, także gdy poprzednia instalacja skopiowała
   # wtyczkę i nie dotarła do restartu. Te same wtyczki: bez restartu, otwarty panel się nie rozłącza.
+  # Zatrzymanie i start (-d, potem -u), nie `s6-svc -r`: tylko -d uzbraja timeout-kill usługi (30 s, infra/Dockerfile),
+  # więc otwarte strumienie przeglądarek nie wstrzymają restartu bez końca; po limicie s6 wysyła SIGKILL.
   ODCISK="$(odcisk_wtyczek)"
   if [[ -n "$ODCISK" && -d /run/service/dashboard && "$ODCISK" != "$(cat "$DATA/plugins/.odcisk-panelu" 2>/dev/null || true)" ]]; then
-    if /command/s6-svc -r /run/service/dashboard 2>/dev/null; then
+    if { /command/s6-svc -wd -T 40000 -d /run/service/dashboard || /command/s6-svc -k /run/service/dashboard; } 2>/dev/null \
+       && /command/s6-svc -u /run/service/dashboard 2>/dev/null; then
       echo "$ODCISK" > "$DATA/plugins/.odcisk-panelu"; echo "  ↻ dashboard (wtyczki Jarvo HQ i Wiedza)"
     else
       echo "  ! restart dashboardu nieudany"
