@@ -88,7 +88,7 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
 
 ### Linux (zrobione, §4a)
 1. Menedżer pakietów (`apt`, `dnf`/`yum`, `pacman`, `zypper`) doinstalowuje `git curl python3 openssl`.
-2. Docker Engine z oficjalnego skryptu (`get.docker.com`; Arch i openSUSE z pakietów; AlmaLinux i Oracle Linux
+2. Docker Engine z oficjalnego skryptu (`get.docker.com`, przy chwilowym błędzie sieci pobieranie ponawia do 3 razy; Arch i openSUSE z pakietów; AlmaLinux i Oracle Linux
    z repo Dockera dla CentOS, bo skrypt ich nie zna; Amazon Linux: komunikat, co zainstalować), `apt-get` czeka do
    10 minut na blokadę dpkg (świeży Ubuntu robi aktualizacje w tle), `docker compose` v2 (Docker z dystrybucji:
    `docker-compose-v2` albo `docker-compose`) i wtyczka `docker buildx` (Docker z pakietów dystrybucji, np. `docker.io`, bywa bez niej, a `docker compose build`
@@ -99,7 +99,7 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
    `jarvo-updater` z `loginctl enable-linger` (`jarvo autostart on|off|status`).
 
 ### macOS (zbudowane, §4b)
-1. Homebrew, gdy brak (oficjalny skrypt w trybie `NONINTERACTIVE=1`; sam instaluje narzędzia Xcode bez okna;
+1. Homebrew, gdy brak (oficjalny skrypt w trybie `NONINTERACTIVE=1`, pobranie ponawiane do 3 razy; sam instaluje narzędzia Xcode bez okna;
    jedno hasło `sudo`), potem `brew install bash git python openssl@3` i `brew shellenv` w `~/.zprofile` oraz
    w `~/.bash_profile`, gdy już jest (inaczej w `~/.profile`: nowy `.bash_profile` ukryłby czyjś `.profile`).
    macOS starszy niż 12 kończy się komunikatem (Homebrew i Colima go nie wspierają); instalacja jako root odmawia.

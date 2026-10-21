@@ -61,6 +61,16 @@ say() { printf '%s▌%s %s\n' "$R" "$N" "$*"; }
 warn() { printf '%s!%s %s\n' "$Y" "$N" "$*"; }
 die() { printf '%s✗%s %s\n' "$R" "$N" "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+# pobranie z ponawianiem: chwilowy błąd sieci (zerwane połączenie, DNS, sieć nieosiągalna) nie przerywa instalacji;
+# pętla w powłoce, bo --retry curla nie ponawia każdego błędu połączenia, a --retry-all-errors nie zna curl < 7.71
+pobierz() {   # pobierz URL PLIK
+  local i
+  for i in 1 2 3 4; do
+    curl -fsSL --retry 2 "$1" -o "$2" && return 0
+    [[ $i == 4 ]] || { warn "Nie udało się pobrać $1, ponawiam ($i/3)…"; sleep $((i * 3)); }
+  done
+  return 1
+}
 # na sucho: pokaż polecenie zamiast je wykonać
 run() { if [[ $DRY == 1 ]]; then printf '%s  $ %s%s\n' "$D" "${*/#git_auth/git}" "$N"; else "$@"; fi; }
 as_root() { if [[ -n $SUDO ]]; then need_root; run $SUDO "$@"; else run "$@"; fi; }
@@ -215,13 +225,17 @@ brew_shellenv() {   # brew, bash, git, python z Homebrew w PATH tej sesji i każ
 }
 
 mac_tools() {   # Homebrew (z narzędziami Xcode), bash 4+, git, Python 3, openssl
+  local tmp
   if ! brew_find; then
     say "Instaluję Homebrew (menedżer programów macOS; dociąga narzędzia Xcode, kilka minut)…"
     need_root   # instalator Homebrew w trybie bez pytań wymaga zapamiętanego hasła sudo
     if [[ $DRY == 1 ]]; then run env NONINTERACTIVE=1 /bin/bash -c "\$(curl -fsSL $BREW_SCRIPT)"; BREW=/opt/homebrew/bin/brew
     else
-      NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL "$BREW_SCRIPT")" < /dev/null \
+      tmp="$(mktemp)"
+      pobierz "$BREW_SCRIPT" "$tmp" || die "Nie udało się pobrać $BREW_SCRIPT (sieć). Uruchom polecenie ponownie."
+      NONINTERACTIVE=1 /bin/bash -c "$(cat "$tmp")" < /dev/null \
         || die "Instalacja Homebrew się nie udała (log wyżej). Spróbuj ręcznie: https://brew.sh i uruchom polecenie ponownie."
+      rm -f "$tmp"
       brew_find || die "Homebrew zainstalowany, ale nie widzę polecenia brew (/opt/homebrew/bin/brew)."
     fi
   fi
@@ -380,7 +394,7 @@ docker_install() {
     apt|dnf|yum)
       tmp="$(mktemp)"; apt_cfg="$(mktemp)"
       if [[ $DRY == 1 ]]; then printf '%s  $ curl -fsSL %s -o %s%s\n' "$D" "$DOCKER_SCRIPT" "$tmp" "$N"
-      else curl -fsSL "$DOCKER_SCRIPT" -o "$tmp" || die "Nie udało się pobrać $DOCKER_SCRIPT."; fi
+      else pobierz "$DOCKER_SCRIPT" "$tmp" || die "Nie udało się pobrać $DOCKER_SCRIPT (sieć). Uruchom polecenie ponownie."; fi
       # apt-get w skrypcie Dockera też czeka na blokadę dpkg (aktualizacje w tle świeżego systemu)
       printf 'DPkg::Lock::Timeout "600";\n' > "$apt_cfg"; chmod 644 "$apt_cfg"
       penv APT_CONFIG="$apt_cfg" sh "$tmp" \

@@ -400,6 +400,27 @@ def test_brew_shellenv_keeps_existing_profile(tmp_path):
     assert "shellenv" in (b / ".bash_profile").read_text() and not (b / ".profile").exists()
 
 
+
+def test_pobierz_retries_transient_network_error(tmp_path):
+    """curl: (7) Failed to connect (sieć runnera, chwilowa awaria) nie kończy instalacji: pobierz() ponawia do 3 razy."""
+    bin_dir = tmp_path / "bin"; bin_dir.mkdir()
+    licznik = tmp_path / "proby"
+    _shim(bin_dir, "sleep", "exit 0\n")
+    _shim(bin_dir, "curl", f'echo x >> {licznik}\n[ "$(wc -l < {licznik})" -ge "${{UDANA:-9}}" ] || exit 7\n'
+                           'while [ $# -gt 1 ]; do shift; done; echo skrypt > "$1"\n')
+
+    def pobierz(udana: str) -> subprocess.CompletedProcess:
+        licznik.unlink(missing_ok=True)
+        script = 'warn() { echo "W: $*"; }\n' + _install_fn("pobierz") + f'pobierz https://get.docker.com {tmp_path}/out\n'
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "UDANA": udana}
+        return subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30, env=env)
+
+    res = pobierz("3")
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert (tmp_path / "out").read_text() == "skrypt\n" and res.stdout.count("ponawiam") == 2
+    res = pobierz("9")
+    assert res.returncode == 1 and licznik.read_text().count("x") == 4 and "ponawiam (3/3)" in res.stdout
+
 def test_mac_compose_plugin_drops_stale_docker_desktop_creds(tmp_path):
     """Po odinstalowanym Docker Desktop zostaje credsStore "desktop": docker pull w Colimie by się wywracał."""
     import json
