@@ -79,9 +79,33 @@ def check_fleet(fleet: fl.Fleet, r: Report) -> None:
             r.err(f"{a.name}: hq_room {a.hq_room!r} spoza {sorted(fl.HQ_ROOMS)}")
         if len(a.description) < 40:
             r.warn(f"{a.name}: krótki opis (routing kanbana opiera się na opisie)")
+    check_uchwyty(fleet, r)
     for d in fl.PROFILES_DIR.iterdir():
         if d.is_dir() and not d.name.startswith("_") and d.name not in names:
             r.err(f"profiles/{d.name}: brak wpisu w fleet.yaml")
+
+
+def check_uchwyty(fleet: fl.Fleet, r: Report) -> None:
+    """Uchwyty `@…` rozmowy aplikacji (docs/FLEET.md „Uchwyty”): każdy aktywny agent ma swój, ASCII
+    `^[a-z][a-z0-9]{1,15}$`, unikalny, nie słowo zarezerwowane, a żaden alias (uchwyt, nazwa profilu, hq_short
+    i `aliasy` po złożeniu) nie wskazuje dwóch agentów: inaczej `@łowca` mógłby trafić nie tam."""
+    wlasciciel: dict[str, str] = {}
+    for a in fleet.agents:
+        if a.status != "active" and not a.handle:
+            continue
+        if not a.handle:
+            r.err(f"{a.name}: brak `handle` we fleet.yaml (uchwyt @… w rozmowie aplikacji)")
+            continue
+        if not fl.UCHWYT_RE.fullmatch(a.handle):
+            r.err(f"{a.name}: handle {a.handle!r} musi pasować do {fl.UCHWYT_RE.pattern} (ASCII, 2–16 znaków)")
+        if a.handle in fl.UCHWYTY_ZAREZERWOWANE:
+            r.err(f"{a.name}: handle {a.handle!r} to słowo zarezerwowane ({', '.join(sorted(fl.UCHWYTY_ZAREZERWOWANE))})")
+        for alias in a.aliasy:
+            if alias in fl.UCHWYTY_ZAREZERWOWANE and alias != a.handle:
+                r.err(f"{a.name}: alias {alias!r} to słowo zarezerwowane (zmień hq_short albo `aliasy`)")
+            inny = wlasciciel.setdefault(alias, a.name)
+            if inny != a.name:
+                r.err(f"{a.name}: alias {alias!r} należy już do {inny} (uchwyty i aliasy muszą być jednoznaczne)")
 
 
 def check_skill_gate(name: str, cfg: dict, r: Report) -> None:
@@ -531,6 +555,10 @@ def check_hq(r: Report) -> None:
     if not hq.exists():
         return
     for rel in ("plugin/manifest.json", "plugin/plugin_api.py", "plugin/hq_core.py", "plugin/ochrona.py", "web/style.css",
+                "plugin/rozmowy.py", "plugin/czytnik.py", "plugin/wzmianki.py", "plugin/kontekst.py", "plugin/agenci.py",
+                "plugin/brama.py", "plugin/strumien.py", "plugin/przebiegi.py", "plugin/scalanie.py", "plugin/budzenia.py",
+                "plugin/prace.py", "plugin/obserwator.py", "plugin/silnik.py", "plugin/trasy_rozmow.py",
+                "web/src/12-wzmianki.js",
                 "web/vendor/htm.umd.js", "web/vendor/LICENSE-htm", "web/demo/index.html", "web/demo/mock.js"):
         if not (hq / rel).exists():
             r.err(f"hq: brak {rel}")
@@ -657,8 +685,17 @@ def check_docs(fleet: fl.Fleet, r: Report) -> None:
         scen = fl.load_yaml(root / "evals" / a.name / "scenarios.yaml") if (root / "evals" / a.name).exists() else {}
         counts[a.name] = {"skille": len(list((a.dir / "skills").rglob("SKILL.md"))),
                           "evals": len((scen or {}).get("scenarios") or [])}
+    uchwyty = {a.name: a.handle for a in fleet.active()}
     for doc in docs:
         for table in md_tables(md_without_code(doc.read_text(encoding="utf-8"))):
+            # kolumna „Uchwyt”: `@handle` z fleet.yaml (docs/FLEET.md „Uchwyty”)
+            kol_uchwytu = next((i for i, h in enumerate(table[0]) if h.lower() == "uchwyt"), None)
+            for row in table[2:] if kol_uchwytu is not None else []:
+                agent = re.search(r"`(jarvo[a-z0-9-]*)`", row[0])
+                if agent and agent.group(1) in uchwyty and kol_uchwytu < len(row) \
+                        and not re.search(rf"@{re.escape(uchwyty[agent.group(1)])}(?![a-z0-9_-])", row[kol_uchwytu]):
+                    r.err(f"{doc.relative_to(root)}: {agent.group(1)} ma uchwyt @{uchwyty[agent.group(1)]}, "
+                          f"a tabela podaje {row[kol_uchwytu]!r}")
             cols = {i: DOC_COUNT_COLUMNS[h.lower()] for i, h in enumerate(table[0]) if h.lower() in DOC_COUNT_COLUMNS}
             for row in table[2:] if cols else []:
                 agent = re.search(r"`(jarvo[a-z0-9-]*)`", row[0])

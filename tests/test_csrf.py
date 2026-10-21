@@ -169,7 +169,10 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         "/state", "/fleet", "/agent/{name}", "/task/{task_id}", "/file", "/edit/info", "/edit/maska", "/edit/media",
         "/edit/dzwieki", "/edit/dzwiek-plik", "/edit/muzyka", "/edit/stamp", "/edit/srt", "/edit/speech",
         "/edit/proxy-file", "/edit/job/{jid}", "/anim/check", "/host", "/chat/{name}/history",
-        "/konwerter/cele", "/konwerter/job/{jid}", "/flota", "/health", "/update", "/zasoby/{nazwa:path}"}
+        "/konwerter/cele", "/konwerter/job/{jid}", "/flota", "/health", "/update", "/zasoby/{nazwa:path}",
+        # rozmowy (trasy_rozmow.py): odczyt rozmowy.db i state.db profili tylko do odczytu; strumień trzyma
+        # w pamięci procesu połączenie i jego subskrypcje
+        "/rozmowy", "/rozmowy/{wid}", "/rozmowy/{wid}/os", "/przebiegi/{pid}", "/strumien"}
     zapis = {t.path for t in _trasy(api.router) if "POST" in t.methods}
     assert "/anim/info" in zapis
 
@@ -220,7 +223,9 @@ def test_odpowiedz_403_i_trasa_testowa(monkeypatch, capsys):
     u = "/api/plugins/jarvo-hq/csrf-proba"
     r = k.post(u, content="x=1", headers={"Content-Type": "text/plain"})
     assert r.status_code == 403 and r.json() == api.ochrona.ODPOWIEDZ
-    assert "odrzucony zapis (csrf) POST /api/plugins/jarvo-hq/csrf-proba" in capsys.readouterr().err
+    wyjscie = capsys.readouterr()          # dziennik jarvo.hq (stdout dashboardu) albo stderr, gdy go nie ma
+    assert "odrzucony zapis (csrf) POST /api/plugins/jarvo-hq/csrf-proba" in wyjscie.out + wyjscie.err
+    assert api.ochrona.ODMOWY["razem"] >= 1
     r = k.post(u, content="x", headers={"Sec-Fetch-Site": "same-site", "Origin": "http://localhost:9120",
                                        "Content-Type": "text/plain"})
     assert r.status_code == 403

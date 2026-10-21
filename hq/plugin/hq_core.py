@@ -604,14 +604,16 @@ def safe_upload_name(raw: str | None) -> str:
 
 
 def upload_target(inbox: Path, raw_name: str | None, now: float) -> Path:
-    """Wolna ścieżka w inbox/<data>/ (plik.png, plik-2.png…)."""
+    """Wolna ścieżka w inbox/<data>/ (plik.png, plik-2.png…). Wiszące dowiązanie też zajmuje nazwę (`lexists`):
+    `exists()` widzi je jako wolne, a `open(O_CREAT | O_EXCL)` i tak go nie otworzy, więc każda próba wracałaby
+    do tej samej nazwy."""
     day = inbox / time.strftime("%Y-%m-%d", time.localtime(now))
     name = safe_upload_name(raw_name)
     stem, dot, ext = name.rpartition(".")
     if not dot:
         stem, ext = name, ""
     p, n = day / name, 1
-    while p.exists():
+    while os.path.lexists(p):
         n += 1
         p = day / (f"{stem}-{n}.{ext}" if ext else f"{stem}-{n}")
     return p

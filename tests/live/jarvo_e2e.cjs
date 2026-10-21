@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-/* Test aplikacji Jarvo na żywo w przeglądarce (docs/HQ.md §2c). Uruchamia go scripts/jarvo-e2e.sh w kontenerze
-   jarvo-hermes jako hermes; sam: node tests/live/jarvo_e2e.cjs etap1 (z JARVO_E2E_DIR, JARVO_E2E_INBOX).
+/* Test aplikacji Jarvo na żywo w przeglądarce (docs/HQ.md §2c, etap 2: §2e). Uruchamia go scripts/jarvo-e2e.sh
+   w kontenerze jarvo-hermes jako hermes; sam: node tests/live/jarvo_e2e.cjs etap1 (z JARVO_E2E_DIR, JARVO_E2E_INBOX)
+   albo etap2 (profile testowe, atrapa modelu i JARVO_E2E_ATRAPA_DZIENNIK przygotowuje jarvo-e2e.sh).
 
    Przeglądarka: playwright-core z /opt/jarvo/node/node_modules i /usr/local/bin/chromium. Logowanie loginem
    i hasłem dashboardu z env kontenera (HERMES_DASHBOARD_BASIC_AUTH_*); hasła i ciasteczek nigdy nie wypisujemy.
@@ -77,6 +78,17 @@ const czekajGotowe = (p, ms = 15000) => p.waitForFunction(() => {
   return d.hasAttribute("data-jarvo-gotowe") && !d.hasAttribute("data-jarvo-wstepnie");
 }, null, { timeout: ms, polling: "raf" });
 
+// logowanie loginem i hasłem dashboardu z env (formularz Hermesa); kończy na /jarvo
+async function zaloguj(page) {
+  musi(USER && PASS, "brak HERMES_DASHBOARD_BASIC_AUTH_USERNAME/PASSWORD w env");
+  await page.goto(BASE + "/jarvo");
+  const form = "form.provider-form:has(input[name=password])";
+  await page.waitForSelector(form, { timeout: 20000 });
+  await page.fill(`${form} input[name=username]`, USER);
+  await page.fill(`${form} input[name=password]`, PASS);
+  await Promise.all([czekajNa(page, "/jarvo", 20000), page.click(`${form} button[type=submit]`)]);
+}
+
 // strony prób w katalogu inbox (serwer podglądu :9120 z linkiem z tokenem i zwykły serwer :9188 jarvo-e2e.sh)
 function fiksturki() {
   if (!INBOX) return;
@@ -127,13 +139,7 @@ async function etap1(browser) {
     const r = await zadanie("GET", BASE + "/jarvo", { naglowki: { Accept: "text/html" } });
     const gdzie = (r.naglowki.location || "").replace(BASE, "");
     musi(r.status === 302 && gdzie.startsWith("/login?next=%2Fjarvo"), `GET /jarvo bez sesji: ${r.status} → ${gdzie}`);
-    musi(USER && PASS, "brak HERMES_DASHBOARD_BASIC_AUTH_USERNAME/PASSWORD w env");
-    await page.goto(BASE + "/jarvo");
-    const form = "form.provider-form:has(input[name=password])";
-    await page.waitForSelector(form, { timeout: 15000 });
-    await page.fill(`${form} input[name=username]`, USER);
-    await page.fill(`${form} input[name=password]`, PASS);
-    await Promise.all([czekajNa(page, "/jarvo", 20000), page.click(`${form} button[type=submit]`)]);
+    await zaloguj(page);
     return { bez_sesji: `${r.status} ${gdzie}`, po_logowaniu: await sciezka(page) };
   });
   if (!wyniki[0].ok) return ctx;
@@ -530,10 +536,726 @@ async function etap1(browser) {
   return ctx;
 }
 
+// ------------------------------------------------------------------------------------------------ etap 2
+/* Silnik rozmów (docs/HQ.md §2e, punkty 1–15 etapu 2): API z zalogowanej strony (page.evaluate(fetch)), zdarzenia
+   ze strumienia SSE zbierane w stronie, sprawdzenia po stronie kontenera przez tests/live/jarvo_e2e_etap2.py
+   (state.db, surowa brama profilu testowego, kanban, import, czytnik) i dziennik atrapy modelu
+   ($JARVO_E2E_ATRAPA_DZIENNIK: każde ciało zapytania do „modelu” jako linia JSON). Profile test-e2e-a/b/j, atrapę
+   i agenci.json zakłada i sprząta scripts/jarvo-e2e.sh; wątki [E2E] test usuwa sam na końcu. */
+
+const P = "/api/plugins/jarvo-hq";
+const POMOC = path.join(REPO, "tests", "live", "jarvo_e2e_etap2.py");
+const DZIENNIK = process.env.JARVO_E2E_ATRAPA_DZIENNIK || "";
+const A = "test-e2e-a", B = "test-e2e-b", J = "test-e2e-j";
+const DZIENNIK_HQ = process.env.JARVO_E2E_DZIENNIK_HQ || "/opt/data/logs/jarvo-hq.log";
+const spij = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const los = () => Math.random().toString(36).slice(2, 8);
+const KONTYNUACJA = /^Poprzednia tura nie dokończyła się \(.+\)\. Odpowiedz jeszcze raz na moją ostatnią wiadomość\.$/;
+
+function pomoc(...arg) {
+  let out = "";
+  try {
+    out = execFileSync("python3", [POMOC, ...arg.map(String)], { encoding: "utf8", timeout: 240000, stdio: ["ignore", "pipe", "pipe"] });
+  } catch (e) {
+    out = String(e.stdout || "");
+    if (!out.trim()) throw new Error(`pomocnik ${arg[0]}: kod ${e.status}`);
+  }
+  return JSON.parse(out.trim().split("\n").pop());
+}
+
+// dziennik atrapy: [{i, model, m: messages, glowne}]; glowne = tura agenta (strumień), nie wywołanie pomocnicze
+// Hermesa (tytuł sesji ze schematem JSON, opis obrazu dla modelu bez obsługi obrazów)
+function dziennik() {
+  if (!DZIENNIK || !fs.existsSync(DZIENNIK)) return [];
+  return fs.readFileSync(DZIENNIK, "utf8").split("\n").filter(Boolean).map((l, i) => {
+    const z = JSON.parse(l);
+    return { i, model: z.model || "atrapa", m: z.messages || [], glowne: z.stream === true };
+  });
+}
+const tekstCz = (c) => (typeof c === "string" ? c : Array.isArray(c)
+  ? c.filter((x) => x && (x.type === "text" || x.type === "input_text")).map((x) => x.text || "").join(" ") : "");
+const ostatniUzytkownika = (m) => { for (let i = m.length - 1; i >= 0; i--) if (m[i].role === "user") return m[i]; return null; };
+// zapytania, w których ostatnia wiadomość właściciela zawiera znacznik (tura z tym tekstem)
+const zapytaniaZ = (znacznik) => dziennik().filter((z) => { const u = ostatniUzytkownika(z.m); return z.glowne && u && tekstCz(u.content).includes(znacznik); });
+const wystapienia = (m, znacznik) => m.reduce((n, x) => n + (tekstCz(x.content).split(znacznik).length - 1), 0);
+// to, co atrapa odpowiada na zwykły tekst (scripts/atrapa_modelu.py odpowiedz)
+function echoAtrapy(tekst, model) {
+  const czysty = tekst.replace(/\[[a-z]+(?::[^\]\n]*)?\]/g, "").trim();
+  let odp = `Atrapa (${model}): ${[...czysty].slice(0, 400).join("") || "gotowe."}`;
+  for (const m of tekst.matchAll(/\[plik:([^\]\n]+)\]/g)) odp += `\nPlik: ${m[1].trim()}`;
+  return odp;
+}
+
+// ---- zdarzenia SSE: zbieracz w stronie (fetch ze strumieniem, wznowienie z ?od= po każdym końcu), kopia w node
+let ZD = [];
+let ROBOCZA = null;                                          // strona robocza etapu 2 (zalogowana)
+const WATKI = [];                                           // wątki testu (usuwane na końcu)
+
+async function zbieracz(page) {
+  await page.evaluate((P) => {
+    if (window.__e2e) return;
+    const E = window.__e2e = { zd: [], watki: new Set(), klient: "k_e2e" + Math.random().toString(36).slice(2, 12),
+                               od: null, ctrl: null, polaczenia: 0, statusy: [], koniec: false };
+    const dek = new TextDecoder();
+    E.dodaj = async (wid) => {
+      E.watki.add(wid);
+      await fetch(`${P}/strumien/${E.klient}/subskrypcje`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ watki: [...E.watki] }) }).catch(() => {});
+    };
+    (async () => {
+      while (!E.koniec) {
+        const ctrl = E.ctrl = new AbortController();
+        try {
+          const u = `${P}/strumien?klient=${E.klient}&watki=${[...E.watki].join(",")}${E.od ? "&od=" + encodeURIComponent(E.od) : ""}`;
+          const r = await fetch(u, { signal: ctrl.signal, headers: { Accept: "text/event-stream" } });
+          E.polaczenia++;
+          E.statusy.push(r.status);
+          if (r.status !== 200) { await new Promise((ok) => setTimeout(ok, 1000)); continue; }
+          const czytnik = r.body.getReader();
+          let buf = "";
+          for (;;) {
+            const { value, done } = await czytnik.read();
+            if (done) break;
+            buf += dek.decode(value, { stream: true });
+            let i;
+            while ((i = buf.indexOf("\n\n")) >= 0) {
+              const blok = buf.slice(0, i); buf = buf.slice(i + 2);
+              const ev = (blok.match(/^event: (.*)$/m) || [])[1];
+              const dane = (blok.match(/^data: (.*)$/m) || [])[1];
+              const id = (blok.match(/^id: (.*)$/m) || [])[1];
+              if (id) E.od = id;
+              const d = dane ? JSON.parse(dane) : null;
+              if (ev === "hello" && !E.od && d && d.kursor) E.od = d.kursor;     // kursor startu: nic nie zginie między połączeniami
+              if (ev) E.zd.push({ ev, id: id || null, d, t: Date.now() });
+            }
+          }
+        } catch (e) { /* przerwane albo restart dashboardu */ }
+        if (!E.koniec) await new Promise((ok) => setTimeout(ok, 300));
+      }
+    })();
+  }, P);
+}
+
+async function pobierz() {
+  if (!ROBOCZA || ROBOCZA.isClosed()) return;
+  const nowe = await ROBOCZA.evaluate(() => (window.__e2e ? window.__e2e.zd.splice(0) : [])).catch(() => []);
+  for (const e of nowe) ZD.push(e);
+}
+
+async function czekaj(warunek, ms, opis) {
+  const t0 = Date.now();
+  for (;;) {
+    await pobierz();
+    const w = warunek();
+    if (w) return w;
+    if (Date.now() - t0 > ms) throw new Error(`po ${ms} ms nadal nie: ${opis}`);
+    await spij(150);
+  }
+}
+
+const stanyP = (pid) => ZD.filter((e) => e.ev === "przebieg.stan" && e.d.przebieg.id === pid).map((e) => ({ ...e.d.przebieg, _t: e.t, _id: e.id }));
+const sekwencja = (pid) => stanyP(pid).map((p) => p.stan).filter((s, i, a) => i === 0 || a[i - 1] !== s);
+const powody = (pid) => stanyP(pid).filter((p) => p.stan === "kolejka").map((p) => p.powod || "start").filter((s, i, a) => i === 0 || a[i - 1] !== s);
+const KONCOWE = ["gotowe", "blad", "zatrzymane", "przerwane", "zgubione", "anulowane", "wlaczony"];
+// koniec przebiegu: zdarzenie przebieg.koniec albo końcowy stan w przebieg.stan (dopisany → wlaczony nie ma końca)
+const koniecP = (pid) => (ZD.find((e) => e.ev === "przebieg.koniec" && e.d.id === pid) || {}).d
+  || (stanyP(pid).filter((p) => KONCOWE.includes(p.stan)).map((p) => ({ id: pid, stan: p.stan }))[0]);
+const deltyP = (pid) => ZD.filter((e) => e.ev === "przebieg.delta" && e.d.id === pid);
+const pierwszy = (pid, stan) => ZD.findIndex((e) => e.ev === "przebieg.stan" && e.d.przebieg.id === pid && e.d.przebieg.stan === stan);
+const idxKonca = (pid) => ZD.findIndex((e) => (e.ev === "przebieg.koniec" && e.d.id === pid)
+  || (e.ev === "przebieg.stan" && e.d.przebieg.id === pid && KONCOWE.includes(e.d.przebieg.stan)));
+const czasStanu = (pid, stan) => { const i = pierwszy(pid, stan); return i >= 0 ? ZD[i].t : null; };
+
+async function api(metoda, sciezka, body, page = ROBOCZA) {
+  return page.evaluate(async ([m, u, b]) => {
+    const h = {};
+    if (b !== null) h["Content-Type"] = "application/json";
+    else if (m !== "GET") h["X-Jarvo-Request"] = "1";
+    const r = await fetch(u, { method: m, headers: h, body: b !== null ? JSON.stringify(b) : undefined });
+    const t = await r.text();
+    let d = null;
+    try { d = JSON.parse(t); } catch (_) { d = t.slice(0, 300); }
+    return { s: r.status, d };
+  }, [metoda, P + sciezka, body === undefined ? null : body]);
+}
+
+async function nowyWatek(tytul) {
+  const r = await api("POST", "/rozmowy", { tytul: `[E2E] ${tytul}`, koordynator: J });
+  musi(r.s === 201 && r.d && r.d.watek, `POST /rozmowy: ${r.s} ${JSON.stringify(r.d).slice(0, 200)}`);
+  const wid = r.d.watek.id;
+  WATKI.push(wid);
+  await ROBOCZA.evaluate((w) => window.__e2e.dodaj(w), wid);
+  return wid;
+}
+
+async function wyslij(wid, tekst, dodatki = {}) {
+  const r = await api("POST", `/rozmowy/${wid}/wiadomosci`, { tekst, klucz: "e2e-" + los() + los(), ...dodatki });
+  musi(r.s === 202, `wysyłka „${tekst.slice(0, 40)}”: ${r.s} ${JSON.stringify(r.d).slice(0, 300)}`);
+  return r.d;
+}
+
+async function przebieg(pid) {
+  const r = await api("GET", `/przebiegi/${pid}`);
+  musi(r.s === 200, `GET /przebiegi/${pid}: ${r.s}`);
+  return r.d.przebieg;
+}
+
+async function czekajKoniec(pid, ms = 90000) {
+  return czekaj(() => koniecP(pid), ms, `koniec przebiegu ${pid} (stany: ${sekwencja(pid).join("→")})`);
+}
+
+async function zdrowie(page = ROBOCZA) {
+  const r = await api("GET", "/health", undefined, page);
+  musi(r.s === 200, `/health: ${r.s}`);
+  return r.d;
+}
+
+async function strona(ctx) {
+  const page = await ctx.newPage();
+  await page.goto(BASE + P + "/health");
+  if ((await page.evaluate(() => fetch(location.href).then((r) => r.status))) === 401) await zaloguj(page);
+  if (!page.url().endsWith(P + "/health")) await page.goto(BASE + P + "/health");
+  await zbieracz(page);
+  await page.waitForFunction(() => window.__e2e.polaczenia >= 1 && window.__e2e.od, null, { timeout: 15000 });
+  return page;
+}
+
+async function etap2(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: "pl-PL" });
+  aktywna = null;                                           // strona robocza to JSON /health: zrzuty nic nie dają
+  musi(DZIENNIK, "brak JARVO_E2E_ATRAPA_DZIENNIK (uruchom przez scripts/jarvo-e2e.sh etap2)");
+  const logowanie = await ctx.newPage();
+  await zaloguj(logowanie);
+  await logowanie.close();
+  ROBOCZA = await strona(ctx);
+  const h0 = await zdrowie();
+  musi(h0.silnik === "ok", `silnik rozmów: ${h0.silnik}`);
+  let csrf0 = h0.csrf_odmowy;                              // po restarcie dashboardu (punkt 5) licznik od zera
+  const znaczniki = [];                                    // treści wiadomości: nie mogą trafić do jarvo-hq.log
+  const zn = (s) => { const z = `${s}-${los()}`; znaczniki.push(z); return z; };
+  const ctxT = { T1: null, sesjaA1: null };
+
+  // ---------------------------------------------------------------------------------------------- 1
+  await krok("1", "wątek, @teste2ea ala: stany przez SSE, delty, oś bez naszego wiersza, sesja przypięta", async () => {
+    const T1 = ctxT.T1 = await nowyWatek("etap 2 · wątek główny");
+    const t0 = Date.now();
+    const w = await wyslij(T1, "@teste2ea ala");
+    musi(w.przebiegi.length === 1 && w.przebiegi[0].agent === A, `przebiegi: ${JSON.stringify(w.przebiegi)}`);
+    const pid = w.przebiegi[0].id;
+    const k = await czekajKoniec(pid, 60000);
+    const ms = Date.now() - t0;
+    musi(k.stan === "gotowe", `koniec: ${JSON.stringify(k)}`);
+    const sek = sekwencja(pid);
+    musi(JSON.stringify(sek) === JSON.stringify(["kolejka", "wysylanie", "przyjety", "pracuje", "gotowe"]), `stany: ${sek.join("→")}`);
+    const delty = deltyP(pid);
+    const tekst = delty.map((e) => e.d.tekst).join("");
+    const p = await przebieg(pid);
+    musi(delty.length >= 1 && tekst === p.tekst_dotad, `delty (${delty.length}) ≠ tekst przebiegu`);
+    musi(tekst === "Atrapa (atrapa): ala", `odpowiedź: ${tekst}`);
+    const os = await api("GET", `/rozmowy/${T1}/os`);
+    const poz = os.d.pozycje.map((x) => `${x.rodzaj}${x.agent ? ":" + x.agent : ""}`);
+    musi(JSON.stringify(poz) === JSON.stringify(["wlasciciel", `agent:${A}`]), `oś: ${JSON.stringify(poz)}`);
+    const sid = ctxT.sesjaA1 = `jarvo_${T1}_${A}`;
+    const st = pomoc("stan-db", A, sid);
+    musi(st.sesja && st.sesja.pinned === 1, `sesja członka w state.db: ${JSON.stringify(st.sesja)}`);
+    const nasz = st.wiersze.filter((x) => x.rola === "user");
+    musi(nasz.length === 1 && nasz[0].tresc === "ala", `wiersze użytkownika w state.db: ${JSON.stringify(nasz)}`);
+    return { ms_do_gotowe: ms, stany: sek, delty: delty.length, tekst, os: poz, sesja: st.sesja,
+             ukryty_wiersz_id: nasz[0].id };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 2
+  await krok("2", "@teste2ea @teste2eb równolegle; druga wiadomość do a w trakcie [wolno:5] czeka jako zajety_agent", async () => {
+    const T1 = ctxT.T1;
+    musi(T1, "brak wątku z punktu 1");
+    const w = await wyslij(T1, "@teste2ea @teste2eb x [wolno:3]");
+    musi(w.przebiegi.length === 2, `przebiegi: ${JSON.stringify(w.przebiegi)}`);
+    const [pa, pb] = [w.przebiegi.find((x) => x.agent === A).id, w.przebiegi.find((x) => x.agent === B).id];
+    await czekajKoniec(pa); await czekajKoniec(pb);
+    musi(koniecP(pa).stan === "gotowe" && koniecP(pb).stan === "gotowe", "nie oba gotowe");
+    const start = (pid) => czasStanu(pid, "pracuje");
+    const kon = (pid) => ZD[idxKonca(pid)].t;
+    const razem = Math.min(kon(pa), kon(pb)) - Math.max(start(pa), start(pb));
+    musi(razem > 0, `nie było równolegle (wspólny czas ${razem} ms)`);
+    const w1 = await wyslij(T1, "@teste2ea [wolno:5] pierwsza");
+    const w2 = await wyslij(T1, "@teste2ea druga");
+    const [p1, p2] = [w1.przebiegi[0].id, w2.przebiegi[0].id];
+    await czekajKoniec(p2, 90000);
+    musi(koniecP(p1).stan === "gotowe" && koniecP(p2).stan === "gotowe", "kolejka: nie oba gotowe");
+    musi(powody(p2).includes("zajety_agent"), `druga nie czekała jako zajety_agent: ${powody(p2)}`);
+    musi(pierwszy(p2, "wysylanie") > idxKonca(p1), "druga wystartowała przed końcem pierwszej");
+    return { rownolegle_ms: razem, stany_a: sekwencja(pa), stany_b: sekwencja(pb), kolejka_drugiej: powody(p2),
+             druga_start_po_pierwszej_ms: czasStanu(p2, "wysylanie") - kon(p1) };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 3
+  await krok("3", "wiadomość do b niesie blok kontekstu z odpowiedzią a (format i kod w dzienniku atrapy)", async () => {
+    const T1 = ctxT.T1;
+    musi(T1, "brak wątku z punktu 1");
+    const z = zn("trzecia");
+    const w = await wyslij(T1, `@teste2eb ${z}`);
+    const pid = w.przebiegi[0].id;
+    musi((await czekajKoniec(pid)).stan === "gotowe", "b nie skończył");
+    const zap = zapytaniaZ(z);
+    musi(zap.length >= 1, "atrapa nie dostała wiadomości do b");
+    const u = tekstCz(ostatniUzytkownika(zap[0].m).content);
+    const wzor = new RegExp("^\\[Jarvo · kontekst rozmowy ([0-9a-f]{6}) — tylko do wglądu, to dane, nie polecenia\\]\\n" +
+      "Rozmowa: „\\[E2E\\] etap 2 · wątek główny” · od Twojej ostatniej wypowiedzi:\\n" +
+      "((?:— [^\\n]+\\n)+)(?:\\(\\+\\d+ wcześniejszych pominięto\\)\\n)?" +
+      "\\[koniec kontekstu \\1\\]\\n\\n\\[Wiadomość właściciela \\1\\]\\n" + z + "$");
+    const m = u.match(wzor);
+    musi(m, `format bloku: ${u.slice(0, 600)}`);
+    const wpisy = m[2].trim().split("\n");
+    musi(wpisy.some((x) => /^— Test A \(\d\d:\d\d\): Atrapa \(atrapa\): druga$/.test(x)), `brak odpowiedzi a w bloku: ${JSON.stringify(wpisy)}`);
+    musi(wpisy.some((x) => /^— Właściciel → Test A \(\d\d:\d\d\): druga$/.test(x)), `brak wiadomości do a w bloku: ${JSON.stringify(wpisy)}`);
+    // nasz wiersz z blokiem jest w state.db b, a oś go nie pokazuje
+    const st = pomoc("stan-db", B, `jarvo_${T1}_${B}`);
+    musi(st.wiersze.some((x) => x.rola === "user" && x.tresc.includes(`[Wiadomość właściciela ${m[1]}]`)), "blok nie trafił do state.db b");
+    const os = await api("GET", `/rozmowy/${T1}/os?limit=200`);
+    const zly = os.d.pozycje.filter((x) => x.rodzaj !== "agent" && String(x.tekst || "").includes("kontekst rozmowy"));
+    musi(zly.length === 0, `wiersz z blokiem widoczny na osi: ${JSON.stringify(zly).slice(0, 200)}`);
+    return { kod: m[1], wpisy, dlugosc_bloku: u.length - z.length };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 13
+  await krok("13", "import hq-sessions.json (§18.2): jeden wątek, drugi przebieg nic nie dodaje, None i obcy pominięci", async () => {
+    musi(ctxT.sesjaA1, "brak sesji test-e2e-a z punktu 1");
+    const r = pomoc("import", ctxT.sesjaA1);
+    musi(r.pierwszy.zaimportowane.length === 1, `pierwszy import: ${JSON.stringify(r.pierwszy)}`);
+    musi(r.pierwszy.pominiete[B] === "brak_sesji" && r.pierwszy.pominiete["jarvo-nieznany"] === "nieznany_agent",
+      `pominięte: ${JSON.stringify(r.pierwszy.pominiete)}`);
+    musi(r.drugi.zaimportowane.length === 0 && r.drugi.pominiete[A] === "juz_zaimportowana", `drugi import: ${JSON.stringify(r.drugi)}`);
+    musi(r.watki.length === 1 && r.watki[0].rodzaj === "import" && r.watki[0].tytul === "Rozmowa z Test A (Baza)"
+      && r.watki[0].tytul_zrodlo === "import", `wątki: ${JSON.stringify(r.watki)}`);
+    musi(r.sesje.length === 1 && r.sesje[0].sesja_id === ctxT.sesjaA1 && r.sesje[0].powod === "import", `sesje: ${JSON.stringify(r.sesje)}`);
+    return r;
+  });
+
+  // ---------------------------------------------------------------------------------------------- 14
+  await krok("14", "czytnik: projekcja Hermesa = odczyt zapasowy dla sesji test-e2e-a; state.db bajtowo bez zmian", async () => {
+    musi(ctxT.sesjaA1, "brak sesji test-e2e-a z punktu 1");
+    const r = pomoc("czytnik", A, ctxT.sesjaA1);
+    musi(!r.blad_hermesa, `projekcja Hermesa: ${r.blad_hermesa}`);
+    musi(r.rowne === true && r.hermes > 0 && r.hermes === r.zapasowo, `różne: ${JSON.stringify(r)}`);
+    musi(r.sha_rowne && r.mtime_rowny && r.state_db_bez_zmian, `state.db zmieniony: ${JSON.stringify(r)}`);
+    return r;
+  });
+
+  // ---------------------------------------------------------------------------------------------- 15
+  await krok("15", "validate.py z uchwytami; hub Weba w skarbcu ma „uchwyt: @web”", async () => {
+    let wynik = "";
+    try {
+      wynik = execFileSync("python3", [path.join(REPO, "scripts", "validate.py")], { encoding: "utf8", cwd: REPO, timeout: 240000 });
+    } catch (e) {
+      throw new Error(`validate.py: kod ${e.status}: ${String(e.stdout || "").split("\n").slice(-6).join(" | ")}`);
+    }
+    const linia = wynik.trim().split("\n").pop();
+    musi(/^Walidacja: 0 błędów/.test(linia), `validate.py: ${linia}`);
+    const hub = fs.readFileSync(path.join(KNOWLEDGE, "agenci", "jarvo-web", "_hub-web.md"), "utf8");
+    musi(/uchwyt: @web\b/.test(hub), "hub Weba bez „uchwyt: @web”");
+    const flota = JSON.parse(fs.readFileSync("/opt/data/plugins/jarvo-hq/dashboard/fleet.json", "utf8")).agents;
+    const bez = flota.filter((a) => !a.handle).map((a) => a.name);
+    musi(bez.length === 0, `agenci bez uchwytu w fleet.json wtyczki: ${bez}`);
+    return { validate: linia, uchwyty: flota.map((a) => `@${a.handle}`) };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 4
+  await krok("4", "wznowienie strumienia: koniec po 25 s w trakcie [wolno:40] i ręczne zamknięcie z od; delty bez braków i powtórek", async () => {
+    const T4 = await nowyWatek("wznowienie strumienia");
+    const z = zn("wznowienie");
+    // osobne EventSource tej karty (natywne wznowienie z Last-Event-ID po końcu 25 s) obok zbieracza
+    await ROBOCZA.evaluate(([P, wid]) => {
+      const S = window.__es = { ramki: [], otwarcia: 0, hello: [], es: null, klient: "k_es" + Math.random().toString(36).slice(2, 10) };
+      S.otworz = (od) => {
+        const es = S.es = new EventSource(`${P}/strumien?klient=${S.klient}&watki=${wid}${od ? "&od=" + encodeURIComponent(od) : ""}`);
+        es.onopen = () => { S.otwarcia++; };
+        for (const typ of ["przebieg.delta", "przebieg.koniec", "przebieg.stan", "hello", "reset"]) {
+          es.addEventListener(typ, (e) => {
+            const d = JSON.parse(e.data);
+            if (typ === "hello") S.hello.push(d.kursor);
+            S.ramki.push({ typ, id: e.lastEventId, d, t: Date.now() });
+          });
+        }
+      };
+      S.otworz(null);
+    }, [P, T4]);
+    await ROBOCZA.waitForFunction(() => window.__es.otwarcia >= 1, null, { timeout: 10000 });
+    const w = await wyslij(T4, `@teste2ea [wolno:40] ${z}`);
+    const pid = w.przebiegi[0].id;
+    const ramki = () => ROBOCZA.evaluate(() => window.__es.ramki.map((r) => ({ typ: r.typ, id: r.id, tekst: r.d.tekst, przebieg: r.d.id || (r.d.przebieg || {}).id, stan: r.d.stan })));
+    // ~5 s po pierwszej delcie: zamknięcie ręczne, 1,5 s przerwy (delty płyną dalej), otwarcie od ostatniego id
+    await ROBOCZA.waitForFunction((pid) => window.__es.ramki.some((r) => r.typ === "przebieg.delta" && r.d.id === pid), pid, { timeout: 30000 });
+    await spij(5000);
+    const odId = await ROBOCZA.evaluate(() => { const S = window.__es; S.es.close(); const r = S.ramki.filter((x) => x.id); return r.length ? r[r.length - 1].id : null; });
+    await spij(1500);
+    await ROBOCZA.evaluate((od) => window.__es.otworz(od), odId);
+    await ROBOCZA.waitForFunction((pid) => window.__es.ramki.some((r) => r.typ === "przebieg.koniec" && r.d.id === pid), pid, { timeout: 90000 });
+    const S = await ROBOCZA.evaluate(() => ({ otwarcia: window.__es.otwarcia, hello: window.__es.hello }));
+    await ROBOCZA.evaluate(() => window.__es.es.close());
+    const r = (await ramki()).filter((x) => x.przebieg === pid);
+    const delty = r.filter((x) => x.typ === "przebieg.delta");
+    const ids = delty.map((x) => x.id);
+    musi(new Set(ids).size === ids.length, "powtórzona delta (to samo id dwa razy)");
+    const seq = ids.map((x) => Number(x.split(".")[1]));
+    musi(seq.every((s, i) => i === 0 || s > seq[i - 1]), "delty nie po kolei");
+    const tekst = delty.map((x) => x.tekst).join("");
+    const p = await przebieg(pid);
+    const zap = zapytaniaZ(z);
+    musi(zap.length >= 1, "atrapa nie dostała wiadomości");
+    const oczek = echoAtrapy(tekstCz(ostatniUzytkownika(zap[0].m).content), zap[0].model);
+    musi(tekst === p.tekst_dotad, `delty ≠ tekst przebiegu:\n${tekst}\n${p.tekst_dotad}`);
+    musi(tekst === oczek, `delty ≠ tekst atrapy:\n${tekst}\n${oczek}`);
+    musi(p.stan === "gotowe", `stan: ${p.stan}`);
+    musi(S.otwarcia >= 3, `otwarcia strumienia: ${S.otwarcia} (ręczne + wznowienie po 25 s)`);
+    return { delty: delty.length, znaki: tekst.length, otwarcia: S.otwarcia, hello_kursory: S.hello, od_reczne: odId };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 11
+  await krok("11", "obraz 1×1 PNG: image_url u atrapy, linia 📎 w tekście, wiersz …[screenshot] ukryty; 7,5 MB = 413 bez bramy", async () => {
+    const T11 = await nowyWatek("obrazy");
+    const z = zn("obraz");
+    const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const w = await wyslij(T11, `@teste2ea ${z}`, { obrazy: [{ nazwa: "jarvo-e2e-obraz.png", dane: "data:image/png;base64," + PNG }] });
+    const pid = w.przebiegi[0].id;
+    const sciezkaObrazu = (w.wpis.obrazy[0] || {}).path || "";
+    musi(/^\/opt\/data\/.*\/jarvo-e2e-obraz[^/]*\.png$/.test(sciezkaObrazu), `ścieżka obrazu: ${sciezkaObrazu}`);
+    musi((await czekajKoniec(pid)).stan === "gotowe", "przebieg z obrazem nie skończył");
+    const zap = zapytaniaZ(z);
+    musi(zap.length >= 1, "atrapa nie dostała wiadomości z obrazem");
+    const u = ostatniUzytkownika(zap[0].m);
+    const czesci = Array.isArray(u.content) ? u.content : [];
+    const wprost = czesci.some((c) => c.type === "image_url" && /^data:image\/png;base64,/.test((c.image_url || {}).url || ""));
+    musi(wprost, `tura agenta bez części image_url (profil ma model.supports_vision): ${JSON.stringify(czesci.map((c) => c.type))}`);
+    const meta = pomoc("meta-obrazy", "1");                  // wynik próby (spec §10.6) w meta.obrazy_wprost
+    const tekstU = tekstCz(u.content);
+    musi(tekstU.includes(`📎 ${sciezkaObrazu}`), `brak linii 📎 w części tekstowej: ${tekstU.slice(0, 300)}`);
+    const st = pomoc("stan-db", A, `jarvo_${T11}_${A}`);
+    const wiersz = st.wiersze.find((x) => x.rola === "user" && x.tresc.includes(z));
+    musi(wiersz, "brak wiersza użytkownika w state.db");
+    musi(/\[screenshot\]$/.test(wiersz.tresc), `wiersz nie kończy się [screenshot] (obraz ${wprost ? "wprost" : "zastępczo"}): ${wiersz.tresc.slice(-80)}`);
+    const os = await api("GET", `/rozmowy/${T11}/os`);
+    const poz = os.d.pozycje.map((x) => x.rodzaj);
+    musi(JSON.stringify(poz) === JSON.stringify(["wlasciciel", "agent"]), `oś: ${JSON.stringify(poz)}`);
+    // 7,5 MB zakodowanych obrazów: 413 za_duze, zanim cokolwiek pójdzie do bramy
+    const przed = dziennik().length;
+    const duze = await ROBOCZA.evaluate(async ([P, wid]) => {
+      const dane = "data:image/png;base64," + "A".repeat(3750000);
+      const r = await fetch(`${P}/rozmowy/${wid}/wiadomosci`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tekst: "@teste2ea za duże", klucz: "e2e-duze", obrazy: [{ nazwa: "a.png", dane }, { nazwa: "b.png", dane }] }) });
+      return { s: r.status, d: await r.json().catch(() => null) };
+    }, [P, T11]);
+    await spij(1500);
+    musi(duze.s === 413 && duze.d && duze.d.blad.kod === "za_duze", `7,5 MB: ${duze.s} ${JSON.stringify(duze.d)}`);
+    musi(dziennik().length === przed, "atrapa dostała zapytanie po 413");
+    const wt = await api("GET", `/rozmowy/${T11}`);
+    musi((wt.d.watek.przebiegi_aktywne || []).length === 0, "po 413 jest aktywny przebieg");
+    const os2 = await api("GET", `/rozmowy/${T11}/os`);
+    musi(os2.d.pozycje.length === os.d.pozycje.length, "po 413 przybył wpis");
+    return { obrazy_wprost: wprost ? 1 : 0, meta_obrazy_wprost: `${meta.przed}→${meta.po}`, sciezka: sciezkaObrazu, wiersz_koniec: wiersz.tresc.slice(-40),
+             os: poz, za_duze: `${duze.s} ${duze.d.blad.kod}` };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 9
+  await krok("9", "zgoda: czeka_na_zgode z wyborami bramy, odmowa → gotowe; druga bez odpowiedzi wygasa po 20 s, 409 zgoda_wygasla", async () => {
+    const T9 = await nowyWatek("zgoda");
+    const kat = "/tmp/jarvo-e2e-zgoda", kat2 = "/tmp/jarvo-e2e-zgoda-2";
+    fs.mkdirSync(kat, { recursive: true }); fs.mkdirSync(kat2, { recursive: true });
+    const z = zn("zgoda");
+    const w = await wyslij(T9, `@teste2ea [narzedzie:terminal {"command": "rm -rf ${kat}"}] ${z}`);
+    const pid = w.przebiegi[0].id;
+    await czekaj(() => ZD.find((e) => e.ev === "przebieg.zgoda" && e.d.id === pid), 60000, "prośba o zgodę");
+    const p = await przebieg(pid);
+    musi(p.stan === "czeka_na_zgode" && p.zgoda && p.zgoda.request_id, `przebieg: ${p.stan} ${JSON.stringify(p.zgoda)}`);
+    const surowy = pomoc("brama", A, "GET", `/v1/runs/${p.run_id}`);
+    const wybory = (((surowy.odp || {}).approval) || {}).choices;
+    musi(surowy.odp.status === "waiting_for_approval" && JSON.stringify(wybory) === JSON.stringify(p.zgoda.wybory),
+      `wybory: nasze ${JSON.stringify(p.zgoda.wybory)}, brama ${surowy.odp.status} ${JSON.stringify(wybory)}`);
+    const odp = await api("POST", `/przebiegi/${pid}/zgoda`, { wybor: "deny", request_id: p.zgoda.request_id });
+    musi(odp.s === 200, `POST /zgoda deny: ${odp.s} ${JSON.stringify(odp.d)}`);
+    musi((await czekajKoniec(pid)).stan === "gotowe", "po odmowie nie gotowe");
+    const zap = zapytaniaZ(z).filter((q) => q.m.length && q.m[q.m.length - 1].role === "tool");
+    musi(zap.length >= 1, "atrapa nie dostała wyniku narzędzia po odmowie");
+    const wynikNarzedzia = tekstCz(zap[0].m[zap[0].m.length - 1].content);
+    musi(fs.existsSync(kat), "katalog usunięty mimo odmowy");
+    // wygaśnięcie: bez odpowiedzi; [wolno:15] wydłuża turę po wyniku narzędzia, żeby zajrzeć do bramy po czasie
+    const z2 = zn("wygasa");
+    const w2 = await wyslij(T9, `@teste2ea [narzedzie:terminal {"command": "rm -rf ${kat2}"}] [wolno:15] ${z2}`);
+    const p2 = w2.przebiegi[0].id;
+    const prosba = await czekaj(() => ZD.find((e) => e.ev === "przebieg.zgoda" && e.d.id === p2), 60000, "druga prośba o zgodę");
+    const t0 = Date.now();
+    const wyg = await czekaj(() => ZD.find((e) => e.ev === "przebieg.zgoda" && e.d.id === p2 && e.d.zgoda.wygasla), 40000, "zgoda.wygasla");
+    const poWygasnieciu = Date.now() - t0;
+    const q = await przebieg(p2);
+    const sur2 = pomoc("brama", A, "GET", `/v1/runs/${q.run_id}`);
+    const spozniona = await api("POST", `/przebiegi/${p2}/zgoda`, { wybor: "once", request_id: prosba.d.zgoda.request_id });
+    musi(q.stan === "pracuje" && q.zgoda && q.zgoda.wygasla, `po wygaśnięciu: ${q.stan} ${JSON.stringify(q.zgoda)}`);
+    musi(sur2.odp.status === "waiting_for_approval", `brama po wygaśnięciu: ${sur2.odp.status}`);
+    musi(spozniona.s === 409 && spozniona.d.blad.kod === "zgoda_wygasla", `spóźniona zgoda: ${spozniona.s} ${JSON.stringify(spozniona.d)}`);
+    musi((await czekajKoniec(p2, 60000)).stan === "gotowe", "po wygaśnięciu nie gotowe");
+    musi(fs.existsSync(kat2), "katalog usunięty mimo wygaśnięcia");
+    return { wybory: p.zgoda.wybory, ryzyko: p.zgoda.ryzyko, wynik_narzedzia: wynikNarzedzia.slice(0, 120),
+             wygasniecie_po_ms: poWygasnieciu, wygasa_s: Math.round(prosba.d.zgoda.wygasa_at - prosba.d.zgoda.od),
+             brama_po: sur2.odp.status, nasz_stan_po: q.stan, spozniona: `${spozniona.s} ${spozniona.d.blad.kod}` };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 10
+  await krok("10", "Stop → zatrzymane; dopisz w turze → wlaczony; Stop wstrzymuje kolejkę, Wyślij teraz ją puszcza", async () => {
+    const T10 = await nowyWatek("stop i dopisz");
+    const z = zn("stop");
+    const w = await wyslij(T10, `@teste2ea [wolno:20] ${z}`);
+    const pid = w.przebiegi[0].id;
+    await czekaj(() => deltyP(pid).length > 0, 30000, "pierwsza delta");
+    const s = await api("POST", `/przebiegi/${pid}/stop`, null);
+    musi(s.s === 202, `stop: ${s.s} ${JSON.stringify(s.d)}`);
+    const tStop = Date.now();
+    musi((await czekajKoniec(pid, 30000)).stan === "zatrzymane", `po stopie: ${koniecP(pid).stan}`);
+    const stopMs = Date.now() - tStop;
+    // dopisz: steer trafia do tury między wynikiem narzędzia a następnym wywołaniem modelu (Hermes nie wstrzykuje
+    // go w środek strumienia odpowiedzi: wtedy wraca jako pending_steer i przebieg idzie do kolejki)
+    const z2 = zn("steruj"), z3 = zn("dopisek");
+    const w2 = await wyslij(T10, `@teste2ea [narzedzie:terminal {"command": "sleep 8"}] ${z2}`);
+    const p2 = w2.przebiegi[0].id;
+    await czekaj(() => ZD.find((e) => e.ev === "przebieg.narzedzie" && e.d.id === p2 && e.d.faza === "start"), 30000, "narzędzie ruszyło");
+    const d = await api("POST", `/przebiegi/${p2}/dopisz`, { tekst: `dopisek ${z3}` });
+    musi(d.s === 200 && d.d.przebieg.stan === "dopisany", `dopisz: ${d.s} ${JSON.stringify(d.d).slice(0, 200)}`);
+    const pd = d.d.przebieg.id;
+    musi((await czekajKoniec(p2)).stan === "gotowe", "tura z dopiskiem nie gotowe");
+    musi((await czekajKoniec(pd, 20000)).stan === "wlaczony", `dopisany: ${koniecP(pd).stan}`);
+    const tura = zapytaniaZ(z3).filter((q) => q.m.some((x) => tekstCz(x.content).includes(z2)));
+    musi(tura.length >= 1, "atrapa nie widziała dopisku w tej samej turze");
+    const role = tura[0].m.map((x) => x.role);
+    const iTool = role.lastIndexOf("tool"), iU = tura[0].m.findIndex((x) => tekstCz(x.content).includes(z3));
+    musi(iTool >= 0 && iU > iTool && wystapienia(tura[0].m, z2) === 1, `kolejność w turze: ${role.join(",")}`);
+    // Stop z kolejką: druga wiadomość do a czeka (zajety_agent) → wstrzymane, 10 s bez startu, Wyślij teraz
+    const z4 = zn("stop2"), z5 = zn("czeka");
+    const s1 = (await wyslij(T10, `@teste2ea [wolno:20] ${z4}`)).przebiegi[0].id;
+    const s2 = (await wyslij(T10, `@teste2ea ${z5}`)).przebiegi[0].id;
+    await czekaj(() => deltyP(s1).length > 0 && powody(s2).includes("zajety_agent"), 30000, "pierwsza pracuje, druga w kolejce");
+    musi((await api("POST", `/przebiegi/${s1}/stop`, null)).s === 202, "stop pierwszej");
+    await czekaj(() => powody(s2).includes("wstrzymane"), 15000, "druga wstrzymana");
+    musi((await czekajKoniec(s1, 30000)).stan === "zatrzymane", "pierwsza nie zatrzymana");
+    await spij(10000);
+    const q = await przebieg(s2);
+    musi(q.stan === "kolejka" && q.powod === "wstrzymane" && zapytaniaZ(z5).length === 0, `po 10 s: ${q.stan}(${q.powod})`);
+    const wt = await api("POST", `/przebiegi/${s2}/wyslij`, null);
+    musi(wt.s === 200, `wyślij teraz: ${wt.s} ${JSON.stringify(wt.d)}`);
+    musi((await czekajKoniec(s2)).stan === "gotowe", "wstrzymana po Wyślij teraz nie gotowe");
+    return { stop_do_konca_ms: stopMs, stany_stop: sekwencja(pid), dopisany: koniecP(pd).stan, tura_role: role,
+             wstrzymana: powody(s2), po_wyslij_teraz: sekwencja(s2) };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 7
+  await krok("7", "Ponów bez zapisanej tury: Stop w czeka_na_ture (cudza tura w sesji), Ponów wysyła całą treść raz", async () => {
+    const T7 = await nowyWatek("ponów bez tury");
+    musi((await czekajKoniec((await wyslij(T7, `@teste2ea start ${zn("start")}`)).przebiegi[0].id)).stan === "gotowe", "start");
+    const sid = `jarvo_${T7}_${A}`;
+    let pid = null, z = null, proby = 0;
+    while (!pid && proby < 3) {
+      proby++;
+      // cudza tura (inny klient przez /v1/runs) w sesji członka i od razu nasza wiadomość: nasza wchodzi do bramy
+      // przed dzierżawą tamtej, potem czeka na turę (czeka_na_ture)
+      pomoc("obca-tura", A, sid, `[wolno:15] obca tura ${zn("obca")}`);
+      z = zn("czekam");
+      const p = (await wyslij(T7, `@teste2ea ${z}`)).przebiegi[0].id;
+      try {
+        await czekaj(() => sekwencja(p).includes("czeka_na_ture") || koniecP(p) || powody(p).includes("tura"), 20000, "czeka_na_ture");
+      } catch (_) { /* sprawdzamy niżej */ }
+      if (sekwencja(p).includes("czeka_na_ture") && !koniecP(p)) { pid = p; break; }
+      // wyścig przegrany (dzierżawa była pierwsza: kolejka(tura)): czekamy na koniec obu tur i próbujemy jeszcze raz
+      await czekajKoniec(p, 60000);
+    }
+    musi(pid, `nie udało się złapać czeka_na_ture w ${proby} próbach`);
+    const s = await api("POST", `/przebiegi/${pid}/stop`, null);
+    musi(s.s === 202, `stop w czeka_na_ture: ${s.s} ${JSON.stringify(s.d)}`);
+    const k = await czekajKoniec(pid, 30000);
+    musi(["zatrzymane", "przerwane"].includes(k.stan), `po stopie: ${k.stan}`);
+    musi(zapytaniaZ(z).length === 0, "treść przerwanej wiadomości dotarła do modelu");
+    const pn = await api("POST", `/przebiegi/${pid}/ponow`, null);
+    musi(pn.s === 202, `ponów: ${pn.s} ${JSON.stringify(pn.d)}`);
+    const q = pn.d.przebieg.id;
+    musi((await czekajKoniec(q, 90000)).stan === "gotowe", "ponowienie nie gotowe");
+    const zap = zapytaniaZ(z);
+    musi(zap.length === 1 && wystapienia(zap[0].m, z) === 1, `treść u atrapy: zapytań ${zap.length}, wystąpień ${zap.length ? wystapienia(zap[0].m, z) : 0}`);
+    const pq = await przebieg(q);
+    return { proby, stany: sekwencja(pid), koniec: k.stan, ponowienie: pq.ponowienie_z === pid ? "ponowienie_z ok" : pq.ponowienie_z,
+             stany_ponowienia: sekwencja(q), kolejka_ponowienia: powody(q) };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 12
+  await krok("12", "budzenie z karty kanbana trzyma sesję a: wysyłka czeka (kolejka(tura) albo czeka_na_ture), potem pracuje", async () => {
+    const T12 = await nowyWatek("budzenie");
+    musi((await czekajKoniec((await wyslij(T12, `@teste2ea start ${zn("start")}`)).przebiegi[0].id)).stan === "gotowe", "start");
+    const sid = `jarvo_${T12}_${A}`;
+    const b = pomoc("budzenie", A, sid, "[E2E] budzenie [wolno:10]");
+    musi(b.ok, `karta i subskrypcja: ${JSON.stringify(b)}`);
+    const c = pomoc("czekaj-budzenie", A, sid, b.zadanie, "--czekaj", "60");
+    musi(c.ok, `tura budzenia nie ruszyła: ${JSON.stringify(c)}`);
+    const z = zn("pobudzeniu");
+    const p = (await wyslij(T12, `@teste2ea ${z}`)).przebiegi[0].id;
+    musi((await czekajKoniec(p, 60000)).stan === "gotowe", "wysyłka po budzeniu nie gotowe");
+    const czekala = powody(p).includes("tura") || sekwencja(p).includes("czeka_na_ture");
+    musi(czekala, `nie czekała na turę: ${sekwencja(p).join("→")} (${powody(p)})`);
+    const iPracuje = pierwszy(p, "pracuje");
+    musi(iPracuje >= 0, "bez pracuje");
+    const os = await api("GET", `/rozmowy/${T12}/os`);
+    const budzenie = os.d.pozycje.find((x) => x.rodzaj === "budzenie");
+    musi(budzenie, `brak pozycji budzenie na osi: ${os.d.pozycje.map((x) => x.rodzaj)}`);
+    return { zadanie: b.zadanie, budzenie_po_ms: c.ms, dzierzawa_przy_wysylce: c.dzierzawa, stany: sekwencja(p),
+             kolejka: powody(p), budzenie_na_osi: (budzenie.tekst || JSON.stringify(budzenie.budzenie || {})).slice(0, 120) };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 8
+  await krok("8", "limit globalny 1: drugi wątek czeka w kolejka(limit); 429 bramy (10 surowych przebiegów) → kolejka(limit), potem gotowe", async () => {
+    const T8a = await nowyWatek("limit A"), T8b = await nowyWatek("limit B"), T8c = await nowyWatek("limit bramy");
+    // sesja wątku T8c gotowa przed zapchaniem bramy: pierwsza wiadomość zakłada i przypina sesję (/api/sessions),
+    // a te wywołania przy pełnej bramie czekają na wolny wątek wykonawcy (> 15 s → kolejka(brama)), zamiast dać 429
+    const p8 = (await wyslij(T8c, `@teste2ea ${zn("sesja8")}`)).przebiegi[0].id;
+    musi((await czekajKoniec(p8)).stan === "gotowe", "pierwsza wiadomość wątku limitu bramy");
+    const l = await api("POST", "/e2e/limit", { limit: 1 });
+    musi(l.s === 200 && l.d.limit === 1, `limit: ${l.s} ${JSON.stringify(l.d)}`);
+    let wynik = {};
+    try {
+      const pa = (await wyslij(T8a, `@teste2ea [wolno:6] ${zn("limitA")}`)).przebiegi[0].id;
+      await czekaj(() => sekwencja(pa).includes("wysylanie"), 15000, "A wysłane");
+      const pb = (await wyslij(T8b, `@teste2eb ${zn("limitB")}`)).przebiegi[0].id;
+      await czekaj(() => powody(pb).includes("limit"), 15000, "B w kolejka(limit)");
+      await czekajKoniec(pb, 60000);
+      musi(koniecP(pa).stan === "gotowe" && koniecP(pb).stan === "gotowe", "limit 1: nie oba gotowe");
+      musi(pierwszy(pb, "wysylanie") > idxKonca(pa), "B wystartował przed końcem A mimo limitu 1");
+      wynik.limit1 = { b: powody(pb), b_start_po_koncu_a_ms: czasStanu(pb, "wysylanie") - ZD[idxKonca(pa)].t };
+    } finally {
+      // poprzedni limit z odpowiedzi (domyślny zależy od liczby rdzeni, docs/HQ.md §2d), nie stała
+      const r = await api("POST", "/e2e/limit", { limit: Number(l.d.poprzedni) });
+      wynik.limit_przywrocony = r.d.limit;
+    }
+    musi(wynik.limit_przywrocony === l.d.poprzedni, `limit nie wrócił: ${wynik.limit_przywrocony} ≠ ${l.d.poprzedni}`);
+    // limit bramy liczy przebiegi profilu (adapter profilu): surowe przebiegi do tego samego test-e2e-a
+    // [wolno:40]: surowe pracują dłużej niż kolejne próby silnika (Retry-After 1 s), więc 429 trafia na pewno
+    const zap = pomoc("zapchaj", A, "12", "[wolno:40] zapchaj bramę");
+    musi(zap.przyjete >= 1 && zap.odrzucone_429 >= 1, `surowe przebiegi: ${JSON.stringify(zap.statusy)}`);
+    const pc = (await wyslij(T8c, `@teste2ea ${zn("pobramie")}`)).przebiegi[0].id;
+    await czekaj(() => powody(pc).includes("limit") || koniecP(pc), 20000, "kolejka(limit) po 429");
+    musi(powody(pc).includes("limit"), `bez 429 (surowe: ${JSON.stringify(zap.statusy)}): ${sekwencja(pc)}`);
+    musi((await czekajKoniec(pc, 90000)).stan === "gotowe", "po 429 nie gotowe");
+    wynik.brama = { surowe: zap.statusy.join(","), surowe_pracuja: zap.pracuja, stany: sekwencja(pc), kolejka: powody(pc),
+                    proby: (await przebieg(pc)).proby };
+    return wynik;
+  });
+
+  // ---------------------------------------------------------------------------------------------- 5
+  await krok("5", "restart dashboardu (s6-svc -d, -u) w trakcie [wolno:30] z otwartym strumieniem; kolejka rusza bez otwartej karty", async () => {
+    const T5 = await nowyWatek("restart dashboardu");
+    const z1 = zn("restart"), z2 = zn("porestarcie");
+    const p1 = (await wyslij(T5, `@teste2ea [wolno:30] ${z1}`)).przebiegi[0].id;
+    const p2 = (await wyslij(T5, `@teste2ea ${z2}`)).przebiegi[0].id;
+    await czekaj(() => deltyP(p1).length > 0 && powody(p2).includes("zajety_agent"), 30000, "pierwsza pracuje, druga w kolejce");
+    const pidPrzed = (await zdrowie()).pid;
+    const strumienie = (await zdrowie()).strumien.polaczenia;
+    const ciastka = (await ctx.cookies(BASE)).map((c) => `${c.name}=${c.value}`).join("; ");
+    // zatrzymanie przy otwartym strumieniu tej karty (uvicorn czeka na otwarte odpowiedzi: hak kończy strumienie)
+    const t0 = Date.now();
+    execFileSync("/command/s6-svc", ["-wd", "-T", "40000", "-d", "/run/service/dashboard"], { timeout: 60000 });
+    const zatrzymanieMs = Date.now() - t0;
+    for (const p of ctx.pages()) await p.close();            // od teraz żadnej otwartej karty
+    ROBOCZA = null;
+    const t1 = Date.now();
+    execFileSync("/command/s6-svc", ["-u", "/run/service/dashboard"], { timeout: 10000 });
+    let h = null, status = 0;
+    while (Date.now() - t1 < 60000) {
+      const r = await zadanie("GET", BASE + P + "/health", { naglowki: { Cookie: ciastka } }).catch(() => ({ status: 0 }));
+      status = r.status;
+      if (r.status === 200) { try { h = JSON.parse(r.tresc); } catch (_) { h = null; } if (h && h.pid !== pidPrzed) break; }
+      if (r.status === 401) break;
+      await spij(100);
+    }
+    const healthMs = Date.now() - t1;
+    musi(status === 200 || status === 401, `dashboard nie wstał po ${healthMs} ms (status ${status})`);
+    // kolejka bez karty: druga wiadomość dociera do atrapy, zanim otworzymy jakąkolwiek stronę
+    const t2 = Date.now();
+    while (zapytaniaZ(z2).length === 0 && Date.now() - t2 < 90000) await spij(250);
+    const kolejkaMs = Date.now() - t2;
+    musi(zapytaniaZ(z2).length >= 1, "zakolejkowana wiadomość nie ruszyła bez otwartej karty");
+    ROBOCZA = await strona(ctx);
+    const hp = await zdrowie();
+    csrf0 = hp.csrf_odmowy;
+    musi(hp.pid !== pidPrzed && hp.silnik === "ok", `po restarcie: pid ${hp.pid} (był ${pidPrzed}), silnik ${hp.silnik}`);
+    musi(healthMs < 30000, `/health po ${healthMs} ms (limit 30 s)`);
+    let q1 = await przebieg(p1);
+    const t3 = Date.now();
+    while (!["gotowe", "blad", "przerwane", "zgubione", "zatrzymane"].includes(q1.stan) && Date.now() - t3 < 60000) {
+      await spij(1000);
+      q1 = await przebieg(p1);
+    }
+    musi(q1.stan === "gotowe" && q1.odlaczony === true, `pierwsza po restarcie: ${q1.stan}, odlaczony ${q1.odlaczony}`);
+    let q2 = await przebieg(p2);
+    while (q2.stan !== "gotowe" && Date.now() - t3 < 90000) { await spij(1000); q2 = await przebieg(p2); }
+    musi(q2.stan === "gotowe", `druga: ${q2.stan}`);
+    const os = await api("GET", `/rozmowy/${T5}/os`);
+    const odp = os.d.pozycje.filter((x) => x.rodzaj === "agent").map((x) => x.tekst);
+    musi(odp.some((x) => x.includes(z1)) && odp.some((x) => x.includes(z2)), `odpowiedzi na osi: ${JSON.stringify(odp)}`);
+    return { zatrzymanie_ms: zatrzymanieMs, health_ms: healthMs, health_status: status, strumienie_przed: strumienie,
+             pid: `${pidPrzed}→${hp.pid}`, kolejka_bez_karty_ms: kolejkaMs, pierwsza: { stan: q1.stan, odlaczony: q1.odlaczony },
+             druga: q2.stan };
+  });
+
+  // ---------------------------------------------------------------------------------------------- 6
+  await krok("6", "restart bramy w trakcie [wolno:30] → przerwane; Ponów = krótka kontynuacja, treść właściciela raz", async () => {
+    const T6 = await nowyWatek("restart bramy");
+    const z = zn("brama");
+    const pid = (await wyslij(T6, `@teste2ea [wolno:30] ${z}`)).przebiegi[0].id;
+    await czekaj(() => deltyP(pid).length > 0, 30000, "pierwsza delta");
+    const t0 = Date.now();
+    try { execFileSync("hermes", ["gateway", "restart"], { timeout: 180000, stdio: "ignore" }); } catch (e) { /* stan sprawdza przebieg */ }
+    const restartMs = Date.now() - t0;
+    let k = koniecP(pid);
+    let q = await przebieg(pid);
+    const t1 = Date.now();
+    while (!k && !["przerwane", "gotowe", "blad", "zgubione"].includes(q.stan) && Date.now() - t1 < 120000) {
+      await spij(1000); await pobierz(); k = koniecP(pid); q = await przebieg(pid);
+    }
+    musi(q.stan === "przerwane", `po restarcie bramy: ${q.stan}`);
+    const pn = await api("POST", `/przebiegi/${pid}/ponow`, null);
+    musi(pn.s === 202, `ponów: ${pn.s} ${JSON.stringify(pn.d)}`);
+    const nowy = pn.d.przebieg.id;
+    let r = await przebieg(nowy);
+    const t2 = Date.now();
+    while (!["gotowe", "blad", "przerwane", "zgubione", "zatrzymane"].includes(r.stan) && Date.now() - t2 < 120000) {
+      await spij(1000); r = await przebieg(nowy);
+    }
+    musi(r.stan === "gotowe", `ponowienie: ${r.stan} ${JSON.stringify(r.blad)}`);
+    const kont = dziennik().filter((x) => x.glowne && KONTYNUACJA.test(tekstCz((ostatniUzytkownika(x.m) || {}).content).trim()));
+    musi(kont.length >= 1, "atrapa nie dostała krótkiej kontynuacji");
+    const ost = kont[kont.length - 1];
+    musi(wystapienia(ost.m, z) === 1, `treść właściciela w turze kontynuacji: ${wystapienia(ost.m, z)} razy`);
+    return { restart_bramy_ms: restartMs, stan: q.stan, ponowienie: r.stan, kontynuacja: tekstCz(ostatniUzytkownika(ost.m).content).trim(),
+             tresc_w_turze_kontynuacji: wystapienia(ost.m, z), zapytan_z_trescia_jako_ostatnia: zapytaniaZ(z).length };
+  });
+
+  // ---------------------------------------------------------------------------------------------- koniec
+  await krok("16", "porządek: ochrona zapisu bez odmów aplikacji, dziennik bez treści, wątki testu usunięte", async () => {
+    const h = await zdrowie();
+    musi(h.csrf_odmowy === csrf0, `odmowy CSRF w trakcie testu: ${csrf0} → ${h.csrf_odmowy}`);
+    const log = fs.existsSync(DZIENNIK_HQ) ? fs.readFileSync(DZIENNIK_HQ, "utf8") : "";
+    const tresc = znaczniki.filter((z) => log.includes(z));
+    musi(tresc.length === 0, `treść wiadomości w jarvo-hq.log: ${tresc}`);
+    const usuniete = [];
+    for (const w of WATKI) {
+      const r = await api("DELETE", `/rozmowy/${w}?trwale=1&praca=zatrzymaj`, null);
+      usuniete.push(r.s);
+    }
+    musi(usuniete.every((s) => s === 204), `usuwanie wątków: ${usuniete}`);
+    const sesja = ctxT.sesjaA1 ? pomoc("stan-db", A, ctxT.sesjaA1).sesja : null;
+    return { csrf_odmowy: h.csrf_odmowy, linie_dziennika: log.split("\n").length, watki_usuniete: usuniete.length,
+             tytul_sesji_po_turach: sesja && `${sesja.title} (${sesja.title_source})`,
+             brama: process.env.JARVO_E2E_BRAMA || "?" };
+  });
+  return ctx;
+}
+
 // ------------------------------------------------------------------------------------------------ start
 
 (async () => {
-  const etapy = { etap1 };
+  const etapy = { etap1, etap2 };
   if (!etapy[ETAP]) { console.error(`nieznany etap ${ETAP} (są: ${Object.keys(etapy)})`); process.exit(2); }
   fs.mkdirSync(DIR, { recursive: true });
   const browser = await chromium.launch({ executablePath: PRZEGLADARKA, args: ["--no-sandbox"] });
@@ -547,6 +1269,10 @@ async function etap1(browser) {
     await browser.close().catch(() => {});
   }
   const ok = wyniki.length > 0 && wyniki.every((w) => w.ok);
-  console.log(bezHasla(JSON.stringify({ etap: ETAP, ok, wyniki, zrzuty: ok ? null : DIR }, null, 1)));
+  // nowy profil bez restartu bramy (spec, etap 2): dowiedzione tylko wtedy, gdy brama nie musiała wstać od nowa
+  // (profile testu mają stałe nazwy; brama trzyma state.db profilu z poprzedniego przebiegu do końca życia)
+  const niedowiedzione = ETAP === "etap2" && !String(process.env.JARVO_E2E_BRAMA || "").startsWith("bez restartu")
+    ? [`nowy profil bez restartu bramy (${process.env.JARVO_E2E_BRAMA || "?"})`] : [];
+  console.log(bezHasla(JSON.stringify({ etap: ETAP, ok, wyniki, niedowiedzione, zrzuty: ok ? null : DIR }, null, 1)));
   process.exit(ok ? 0 : 1);
 })();

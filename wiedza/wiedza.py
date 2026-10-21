@@ -749,8 +749,9 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             zmiany = "".join(f"\n  - {z}" for z in a.get("changes") or [])
             zmiany_linia = (f"\n- ostatnie zmiany (CHANGELOG profilu, {a.get('changes_section') or 'najnowsze'}):{zmiany}"
                             if zmiany else "")
+            uchwyt = f"uchwyt: @{a['handle']} · " if a.get("handle") else ""   # @… w rozmowie aplikacji Jarvo
             gen = (f"## Z rejestru floty (fleet.yaml)\n- rola: {a.get('kind', '')} · autonomia: {a.get('autonomy_max', '')} · "
-                   f"pokój HQ: {a.get('label', a.get('room', ''))} (`{a.get('room', '')}`) · temat Telegrama: `{a.get('telegram_topic', '')}`\n"
+                   f"{uchwyt}pokój HQ: {a.get('label', a.get('room', ''))} (`{a.get('room', '')}`) · temat Telegrama: `{a.get('telegram_topic', '')}`\n"
                    f"- skille ({len(a.get('skills', []))}):\n{skille}{zewn_linia}\n- skrypty: {skrypty}{mcp_linia}{zmiany_linia}")
             pl = sk.plik(rel)
             tekst = pl.read_text(encoding="utf-8")

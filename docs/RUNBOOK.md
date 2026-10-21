@@ -261,6 +261,25 @@ sudo crontab -e
 # 40 4 1 * * /srv/jarvo/repo/scripts/restore-test.sh >> /srv/jarvo/backups/restore-test.log 2>&1
 ```
 
+Bazy SQLite (`state.db` i `kanban.db` profili, rozmowy aplikacji `jarvo/state/rozmowy.db`) `backup.sh` kopiuje przez
+`sqlite3 .backup`, bez zatrzymywania floty; zwykłe `cp` samego pliku gubi zapisy, które są jeszcze w `-wal`. Ręczna
+kopia rozmów (`umask 077`, bo kopia ma treść rozmów i nie może być czytelna dla innych):
+`(umask 077; sqlite3 /srv/jarvo/data/hermes/jarvo/state/rozmowy.db ".backup '/srv/jarvo/backups/rozmowy.db'")`.
+Obok leżą kopie sprzed migracji schematu (`rozmowy.db.bak-v<wersja>`, dwie ostatnie) i `agenci.json` (agenci testowi
+E2E). Przywrócenie rozmów z kopii: zatrzymaj sam dashboard (silnik rozmów działa w jego procesie), podmień plik
+i usuń `-wal`/`-shm` starej bazy, uruchom dashboard:
+
+```bash
+docker exec jarvo-hermes /command/s6-svc -wd -T 40000 -d /run/service/dashboard
+cd /srv/jarvo/data/hermes/jarvo/state && rm -f rozmowy.db-wal rozmowy.db-shm \
+  && cp /srv/jarvo/backups/rozmowy.db rozmowy.db      # cp na istniejący plik: zostają właściciel i prawa
+docker exec jarvo-hermes /command/s6-svc -u /run/service/dashboard
+```
+
+Wpisy i przebiegi nowsze niż kopia znikają z aplikacji; odpowiedzi agentów z tego czasu zostają w `state.db` profili
+i oś czasu pokaże je jako pozycje spoza aplikacji. Sesje Hermesa należące do rozmów aplikacji nie są usuwane razem z rozmową: rozmowa z kosza znika po 30 dniach,
+a jej sesje zostają w `state.db` profilu ([HQ.md §2d](HQ.md#2d-rozmowy-magazyn-czytnik-wzmianki-kontekst)).
+
 **Monitoring (opcjonalnie):** `bash scripts/deploy.sh --no-pull --monitoring`, potem Uptime Kuma
 `http://<ip-tailscale>:3001` (monitory: dashboard 9119, SearXNG; w Settings → About wyłącz „Show update if available”,
 inaczej co 48 h pyta `uptime.kuma.pet` o nową wersję, a zmiennej na to nie ma) i Beszel `http://<ip-tailscale>:8090`
@@ -311,7 +330,8 @@ sudo bash /srv/jarvo/repo/scripts/bootstrap-vps.sh --lock-ssh
 | skarbiec wiedzy (drugi mózg floty) | zakładka **Wiedza** (`:9119/wiedza`): graf, notatki, orzeczenia (Twoje korekty), skrzynka szkiców; ręczna kompilacja `docker exec -u hermes jarvo-hermes bash /opt/jarvo/repo/scripts/wiedza-kompiluj.sh` (`--na-sucho` = podgląd); szczegóły [WIEDZA.md](WIEDZA.md) |
 | nowy agent | lokalnie `make new-agent NAME=jarvo-x TITLE="…"`, uzupełnienie, `make validate`, status `active`, deploy |
 | stan floty | `docker exec -u hermes jarvo-hermes hermes kanban stats`, `… hermes gateway status` |
-| logi | `docker logs -f jarvo-hermes`, `/srv/jarvo/data/hermes/logs/`; logi kontenerów mają rotację (sterownik `local`, do 3 × 10 MB na kontener, `infra/docker-compose.yml`), więc nie zapychają dysku |
+| logi | `docker logs -f jarvo-hermes`, `/srv/jarvo/data/hermes/logs/`; logi kontenerów mają rotację (sterownik `local`, do 3 × 10 MB na kontener, `infra/docker-compose.yml`), więc nie zapychają dysku. Silnik rozmów aplikacji pisze też do `/srv/jarvo/data/hermes/logs/jarvo-hq.log` (5 × 2 MB, tylko właściciel pliku; przejścia przebiegów, połączenia strumienia, odmowy ochrony zapisu, bez treści rozmów) |
+| stan silnika rozmów aplikacji | `curl -s -b <ciasteczko logowania> http://127.0.0.1:9119/api/plugins/jarvo-hq/health` (zalogowana przeglądarka: ta sama ścieżka): `silnik` (`ok`, `start`, `awaria` po 3 restartach, `zamkniety`, `wylaczony`; poza `ok` też `silnik_blad` z nazwą typu wyjątku), `rozmowy` (aktywne przebiegi, kolejka, limit: domyślnie z liczby rdzeni, 5 przy 4 rdzeniach, nadpisuje `JARVO_HQ_MAX_PRZEBIEGOW` w `compose/.env`), `strumien`, `obserwator`, `schemat_hermesa`, `sesje_nieprzypiete`, `csrf_odmowy` |
 | wycofanie zmiany | `git checkout <tag-albo-commit> && bash scripts/deploy.sh --no-pull` (z `--rebuild`, gdy różni się `infra/` albo `branding/`) |
 | koszty | modele `openai-codex`: plan ChatGPT; OpenRouter → Activity (obrazy, wideo, zestaw `openrouter`; per klucz = per agent), dashboard Hermesa |
 
@@ -359,4 +379,11 @@ przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** w Jarvo HQ albo link, 
 | pierwsza wiadomość głosowa długo się przetwarza | pobiera się model Parakeet (0,65 GB) do `/srv/jarvo/data/hermes/jarvo/models`; raz. Z góry: `docker exec -u hermes jarvo-hermes jarvo-stt --prefetch` |
 | typografia bez napisu za osobą, w logu „maska osoby niedostępna” | model MODNet (26 MB) pobiera się przy pierwszym planie do `/srv/jarvo/data/hermes/jarvo/models/modnet`; bez sieci plan idzie bez maski. Z góry: `docker exec -u hermes jarvo-hermes /opt/jarvo/venv/bin/python /opt/data/profiles/jarvo-wideo/scripts/maska.py model` |
 | rolka z clipmakera skadrowana na środek, w logu „wykrywanie twarzy niedostępne” | model YuNet (230 KB) pobiera się przy pierwszym `klipy.py zbuduj` do `/srv/jarvo/data/hermes/jarvo/models/yunet`; bez sieci kadr idzie z planu albo ze środka, a rolka nie ma okładki ani sprawdzenia pierwszej klatki. Z góry: `docker exec -u hermes jarvo-hermes /opt/jarvo/venv/bin/python /opt/data/profiles/jarvo-wideo/scripts/twarze.py model` |
+| aplikacja: tura agenta stoi na „czeka na swoją kolej” (`czeka_na_ture`) | sesję tego agenta zajmuje inna tura (budzenie po karcie kanbana, Telegram, cron); przebieg ruszy sam, gdy ona się skończy. Długo trwa: **Zatrzymaj** w aplikacji albo poczekaj; przebieg, który pracuje ponad 2 h, ma w `/przebiegi/<id>` znacznik `dlugo` (`JARVO_HQ_DLUGO_S`) |
+| aplikacja: przebieg stoi w `przyjety` albo `pracuje` bez tekstu | stan w `/api/plugins/jarvo-hq/przebiegi/<id>` (zalogowana przeglądarka): `czeka_na_zgode` = agent czeka na decyzję (po `approvals.timeout` profilu zgoda wygasa i polecenie się nie wykona), `odlaczony: true` = po restarcie dashboardu przebieg jest odpytywany co 2 s. Przejścia są w `jarvo-hq.log` (`grep <id przebiegu>`). Strażnik pyta bramę po 90 s ciszy; `zgubione` dopiero, gdy brama nie zna przebiegu i 10 min nic nie przybyło. Zawsze można **Zatrzymaj**, potem **Ponów** |
+| aplikacja: przebieg kończy się `blad` z kodem `klucz` | profil nie ma `API_SERVER_KEY` w `.env` (`/srv/jarvo/data/hermes/profiles/<agent>/.env`) albo klucz się rozjechał z bramą; `deploy.sh --no-pull` dopisuje brakujący klucz (`install-fleet.sh`, krok 3b), potem **Ponów** |
+| aplikacja: przebiegi czekają w kolejce z powodem `brama` | brama Hermesa nie odpowiada: `docker exec -u hermes jarvo-hermes hermes gateway status`; po 2 min bez bramy przebieg kończy się błędem (bez limitu w trakcie aktualizacji). Restart bramy przerywa trwające tury: `install-fleet.sh` ostrzega przed nim („trwa praca agentów”), a przerwaną turę wznawia **Ponów** |
+| `/health`: `schemat_hermesa: zmieniony` po aktualizacji Hermesa | czytnik sesji nie znalazł kolumn, których potrzebuje; oś czasu pomija tych agentów (żółta linia „niedostępni”). Zrzuć schemat na nowo i popraw `SCHEMAT_WYMAGANY` ([HQ.md §2d](HQ.md#2d-rozmowy-magazyn-czytnik-wzmianki-kontekst), „Czytnik sesji”) |
+| `/health`: `silnik: awaria` (aplikacja pokazuje „Odśwież”) | wątek silnika rozmów padł 3 razy z rzędu; przyczyna w `jarvo-hq.log` („silnik padł …”). Restart samego dashboardu (tak jak `install-fleet.sh`): `docker exec jarvo-hermes sh -c '/command/s6-svc -wd -T 40000 -d /run/service/dashboard; /command/s6-svc -u /run/service/dashboard'`; przebiegi w toku wracają same (`odlaczony`), kolejka rusza bez otwartej karty |
+| dużo sesji Hermesa przypiętych (`pinned`) | aplikacja przypina sesje swoich rozmów, żeby automatyczne sprzątanie Hermesa ich nie usunęło; usunięcie rozmowy w aplikacji (kosz, po 30 dniach na stałe) je odpina. Miejsce na dysku odzyskujesz, usuwając stare rozmowy w aplikacji |
 | przeglądarka agenta nie widzi strony (pusta treść) | Lightpanda nie obsługuje wszystkiego; Hermes sam przełącza na Chromium przy zrzutach i błędach. Gdy strona uparcie nie działa: `browser.engine: chrome` w `profiles/<agent>/config.yaml` |

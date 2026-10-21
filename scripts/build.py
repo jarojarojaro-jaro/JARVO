@@ -476,7 +476,7 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
         obce = sorted(wszystkie - {p.parent.name for p in wlasne.values()})
         wspolne = [n for n in obce if (fl.SHARED_DIR / "skills" / n / "SKILL.md").is_file()]
         sekcja, zmiany = ostatnie_zmiany(a.dir / "CHANGELOG.md")
-        agents.append({"name": a.name, "short": a.hq_short or a.title, "title": a.title, "emoji": a.emoji, "kind": a.kind,
+        agents.append({"name": a.name, "short": a.hq_short or a.title, "handle": a.handle, "title": a.title, "emoji": a.emoji, "kind": a.kind,
                        "description": a.description, "room": a.hq_room, "label": a.hq_label or a.title,
                        "telegram_topic": a.telegram_topic, "autonomy_max": a.autonomy_max, "komputer": a.komputer,
                        "skills": skills,

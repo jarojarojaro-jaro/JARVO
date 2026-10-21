@@ -19,7 +19,7 @@ i po karcie ustalenia wracają do skarbca jako szkice, które nocna kompilacja w
 w zakładce **Wiedza** dashboardu (albo w Obsidianie: to ten sam folder).
 
 **Na przykładzie Weba.** W skarbcu jest gałąź `agenci/jarvo-web/`: hub „Web” (rola, 10 skilli z jednym zdaniem każdy, skrypty,
-narzędzia, pokój w HQ; generowany z `fleet.yaml`), a pod nim notatki: „bramka jakości blokuje przy KRYTYCZNE/WYSOKIE”, „Lightpanda
+narzędzia, uchwyt `@web` w rozmowie aplikacji, pokój w HQ; generowany z `fleet.yaml`), a pod nim notatki: „bramka jakości blokuje przy KRYTYCZNE/WYSOKIE”, „Lightpanda
 nie renderuje three.js: zrzuty przez Chromium”, „strona M&W: audyt 2026-09-30, LCP 22,5 s, brak kontaktu” (projekt), „orzeczenie:
 w stronach użytkownika nigdy `innerHTML`”. Gdy piszesz do Weba „zrób landing dla marki X”, przed pierwszą turą Web dostaje: hub
 marki X (kolory, ton), orzeczenia Weba, notatkę o poprzednim landingu tej marki i lekcję o zrzutach mobile. Po oddaniu karty

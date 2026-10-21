@@ -190,6 +190,21 @@ fi
 # 6. restart gatewaya (nowe trasy, profile, skille, klucze API od nowej sesji); w kontenerze przez s6
 if [[ $RESTART -eq 1 ]]; then
   log "Restart gatewaya"
+  # Praca w toku (praca.json silnika rozmów aplikacji, docs/HQ.md „Rozmowy”): restart bramy przerwie te tury, a
+  # aplikacja pokaże je jako „Praca przerwana — możesz ponowić”. Tylko ostrzeżenie: instalacja nie czeka.
+  $PY - "$DATA/jarvo/state/praca.json" <<'PRACA' || true
+import json, sys, time
+try:
+    p = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, ValueError):
+    sys.exit(0)
+def czysta(x):  # opis to tekst z rozmów: bez znaków sterujących terminala (ESC, CR), najwyżej 120 znaków
+    return "".join(c for c in str(x) if c.isprintable())[:120]
+if int(p.get("aktywne") or 0) > 0 and time.time() - float(p.get("at") or 0) < 120:
+    print(f"  ! trwa praca agentów ({czysta(p['aktywne'])}); restart bramy ją przerwie (w aplikacji: Ponów)")
+    for linia in (p.get("opis") or [])[:12]:
+        print(f"    - {czysta(linia)}")
+PRACA
   hermes gateway restart || echo "  ! restart gatewaya nieudany: sprawdź 'hermes gateway status'"
   # Dashboard czyta listę wtyczek (zakładki Jarvo, Wiedza) i montuje ich backendy raz, przy starcie procesu. Restart, gdy
   # wtyczki na dysku różnią się od tych, z którymi był ostatnio restartowany, także gdy poprzednia instalacja skopiowała

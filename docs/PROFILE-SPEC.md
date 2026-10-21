@@ -309,7 +309,7 @@ shared/protocol/kontrakt-zlecenia.md   # protokół (wklejany do SOUL)
 shared/calibration/<rodzina>.md        # kalibracja pod model (za protokołem)
 shared/security/deny.yaml              # wspólne zakazy → approvals.deny
 shared/skills/                         # wspólne skille własne (np. graf-kodu), przypisywane w locku
-fleet.yaml (wpis agenta)               # kind, model_tier, autonomy_max, telegram_topic, hq_room, pin_skills, description, oddaj_gdy
+fleet.yaml (wpis agenta)               # kind, handle (+ aliasy), model_tier, autonomy_max, telegram_topic, hq_room, pin_skills, description, oddaj_gdy
 ```
 
 Build (`scripts/build.py`) dokłada do kopii profilu: `profile.yaml` (opis z `fleet.yaml` do routingu kanbana),

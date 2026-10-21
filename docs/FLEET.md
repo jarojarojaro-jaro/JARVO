@@ -44,6 +44,28 @@ Legenda przy skillach:
 
 ---
 
+## Uchwyty
+
+Każdy agent ma we `fleet.yaml` pole `handle`: uchwyt `@…`, którym właściciel pisze do niego w rozmowie aplikacji
+(`@web popraw stopkę`, [HQ.md §2d](HQ.md#2d-rozmowy-magazyn-czytnik-wzmianki-kontekst)). Uchwyt to ASCII
+`^[a-z][a-z0-9]{1,15}$`, unikalny i nie słowo zarezerwowane (`all`, `everyone`, `wszyscy`, `here`, `diff`, `staged`,
+`file`, `folder`, `git`, `url`). Wzmianka działa też przez aliasy: nazwę profilu (`@jarvo-web`), krótką nazwę z HQ
+bez polskich znaków (`@łowca` = `@lowca`) i opcjonalne pole `aliasy` (lista). `scripts/validate.py` pilnuje, żeby
+żaden alias nie wskazywał dwóch agentów.
+
+| Agent | Uchwyt |
+|---|---|
+| `jarvo` | `@jarvo` |
+| `jarvo-sherlock` | `@sherlock` |
+| `jarvo-web` | `@web` |
+| `jarvo-studio` | `@studio` |
+| `jarvo-wideo` | `@wideo` |
+| `jarvo-ads` | `@ads` |
+| `jarvo-lowca` | `@lowca` |
+| `jarvo-mobile` | `@mobile` |
+| `jarvo-operator` | `@operator` |
+| `jarvo-reka` | `@reka` |
+
 ## Warstwa wspólna: wiedza o Tobie i Twoich markach
 
 Snajperzy nie dzielą pamięci ani workflowów dziedzinowych (wspólne są tylko skille z `shared/skills/`:

@@ -10,6 +10,7 @@ import io
 import json
 import re
 import shutil
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,10 @@ ODDAJ_MARKER = "<!-- Jarvo:ODDAJ -->"
 COMPOSE_FILE = Path(__file__).resolve().parent.parent / "infra" / "docker-compose.yml"
 AGENT_KINDS = {"orchestrator", "specialist", "generalist"}
 AUTONOMY_LEVELS = {"A0", "A1", "A2", "A3"}
+# uchwyt agenta w rozmowie aplikacji (`@web`): ASCII, unikalny, nie słowo zarezerwowane (te same zasady co
+# hq/plugin/wzmianki.py, którego aliasy porównujemy po złożeniu: bez polskich znaków, małe litery)
+UCHWYT_RE = re.compile(r"^[a-z][a-z0-9]{1,15}$")
+UCHWYTY_ZAREZERWOWANE = frozenset({"all", "everyone", "wszyscy", "here", "diff", "staged", "file", "folder", "git", "url"})
 HQ_ROOMS = {"bridge", "study", "devlab", "atelier", "filmstudio", "workshop", "office", "radar", "apps", "control"}   # pokoje w Jarvo HQ (hq/web/src/20-art.js)
 # Hermes ucina opis skilla w indeksie promptu do 60 znaków (agent/skill_utils.py).
 SKILL_PROMPT_DESC_LIMIT = 60
@@ -139,6 +144,8 @@ class Agent:
     hq_room: str = "office"
     hq_label: str = ""
     hq_short: str = ""
+    handle: str = ""                          # uchwyt w rozmowie aplikacji (`@web`), docs/FLEET.md „Uchwyty”
+    aliasy_extra: list[str] = field(default_factory=list)   # dodatkowe aliasy wzmianki (pole `aliasy` we fleet.yaml)
     en: dict = field(default_factory=dict)   # angielskie title / hq_label / description (HQ po angielsku)
     oddaj_gdy: str = ""                       # kiedy generalista (Ręka) ma oddać zadanie temu agentowi; tabela generowana
     komputer: bool = False                    # agent z narzędziem computer_use (Komputer Jarva, docs/KOMPUTER.md)
@@ -146,6 +153,13 @@ class Agent:
     @property
     def dir(self) -> Path:
         return PROFILES_DIR / self.name
+
+    @property
+    def aliasy(self) -> list[str]:
+        """Złożone aliasy wzmianki `@…`: uchwyt, nazwa profilu, krótka nazwa z HQ i pole `aliasy` (bez powtórek,
+        tylko znaki, które da się wpisać po `@`). fleet.json niesie je do aplikacji i parsera (wzmianki.py)."""
+        surowe = [self.handle, self.name, self.hq_short, *self.aliasy_extra]
+        return list(dict.fromkeys(a for a in (zloz(x) for x in surowe) if a and re.fullmatch(r"[\w-]+", a)))
 
 
 @dataclass
@@ -235,12 +249,22 @@ def load_fleet(path: Path | None = None) -> Fleet:
                 hq_room=entry.get("hq_room", "office"),
                 hq_label=entry.get("hq_label", "") or entry.get("title", ""),
                 hq_short=entry.get("hq_short", "") or entry["name"].removeprefix("jarvo-").capitalize(),
+                handle=str(entry.get("handle", "") or ""),
+                aliasy_extra=[str(x) for x in (entry.get("aliasy") or [])],
                 en={k: " ".join(str(v).split()) for k, v in (entry.get("en") or {}).items() if v},
                 oddaj_gdy=" ".join(str(entry.get("oddaj_gdy", "") or "").split()),
                 komputer=entry.get("komputer") is True,
             )
         )
     return Fleet(raw=raw, agents=agents)
+
+
+def zloz(s: str) -> str:
+    """Postać do porównań uchwytów i aliasów: NFKD bez znaków łączących, ł→l, małe litery („Łowca” → „lowca”).
+    Ta sama funkcja co hq/plugin/wzmianki.py `zloz` (tests/test_wzmianki.py pilnuje zgodności)."""
+    s = unicodedata.normalize("NFKD", str(s or ""))
+    s = "".join(c for c in s if not unicodedata.category(c).startswith("M"))
+    return s.replace("ł", "l").replace("Ł", "L").lower()
 
 
 def load_lock(path: Path | None = None) -> dict:

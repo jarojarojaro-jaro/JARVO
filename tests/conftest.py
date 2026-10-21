@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -11,6 +12,9 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
+# import wtyczki HQ w testach nie startuje silnika rozmów (wątek tła, rozmowy.db w /opt/data, dziennik w pliku);
+# testy silnika budują go same na katalogu tymczasowym (tests/test_silnik_rozmow.py)
+os.environ.setdefault("JARVO_HQ_SILNIK", "0")
 
 
 def load_script(rel: str, name: str | None = None):

@@ -537,6 +537,8 @@ def test_upload_names_and_targets(tmp_path):
     t1.parent.mkdir(parents=True)
     t1.write_bytes(b"x")
     assert core.upload_target(tmp_path, "foto.png", NOW).name == "foto-2.png"
+    (t1.parent / "foto-2.png").symlink_to(tmp_path / "nie-ma")              # wiszące dowiązanie też zajmuje nazwę
+    assert core.upload_target(tmp_path, "foto.png", NOW).name == "foto-3.png"
 
 
 def test_konwerter_katalog_zip_i_opcje(tmp_path):

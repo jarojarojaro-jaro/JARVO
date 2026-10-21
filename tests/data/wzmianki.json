@@ -1,0 +1,676 @@
+{
+ "opis": "Wektory parsera wzmianek (docs/HQ.md „Rozmowy”): hq/plugin/wzmianki.py i hq/web/src/12-wzmianki.js muszą dać ten sam wynik (tests/test_wzmianki.py). Parser jest bezstanowy: `sekwencja` to kolejne wiadomości jednego wątku i nic nie przechodzi z jednej na drugą. `agenci` = aktywna flota z fleet.yaml (test pilnuje zgodności), `dodatkowi` dochodzą w danym wektorze.",
+ "koordynator": "jarvo",
+ "agenci": [
+  {
+   "name": "jarvo",
+   "handle": "jarvo",
+   "aliasy": [
+    "jarvo"
+   ],
+   "nazwa": "Jarvo"
+  },
+  {
+   "name": "jarvo-sherlock",
+   "handle": "sherlock",
+   "aliasy": [
+    "sherlock",
+    "jarvo-sherlock"
+   ],
+   "nazwa": "Sherlock"
+  },
+  {
+   "name": "jarvo-web",
+   "handle": "web",
+   "aliasy": [
+    "web",
+    "jarvo-web"
+   ],
+   "nazwa": "Web"
+  },
+  {
+   "name": "jarvo-studio",
+   "handle": "studio",
+   "aliasy": [
+    "studio",
+    "jarvo-studio"
+   ],
+   "nazwa": "Studio"
+  },
+  {
+   "name": "jarvo-wideo",
+   "handle": "wideo",
+   "aliasy": [
+    "wideo",
+    "jarvo-wideo",
+    "wideograf"
+   ],
+   "nazwa": "Wideograf"
+  },
+  {
+   "name": "jarvo-ads",
+   "handle": "ads",
+   "aliasy": [
+    "ads",
+    "jarvo-ads"
+   ],
+   "nazwa": "Ads"
+  },
+  {
+   "name": "jarvo-lowca",
+   "handle": "lowca",
+   "aliasy": [
+    "lowca",
+    "jarvo-lowca"
+   ],
+   "nazwa": "Łowca"
+  },
+  {
+   "name": "jarvo-mobile",
+   "handle": "mobile",
+   "aliasy": [
+    "mobile",
+    "jarvo-mobile",
+    "aplikacje"
+   ],
+   "nazwa": "Aplikacje"
+  },
+  {
+   "name": "jarvo-operator",
+   "handle": "operator",
+   "aliasy": [
+    "operator",
+    "jarvo-operator"
+   ],
+   "nazwa": "Operator"
+  },
+  {
+   "name": "jarvo-reka",
+   "handle": "reka",
+   "aliasy": [
+    "reka",
+    "jarvo-reka"
+   ],
+   "nazwa": "Ręka"
+  }
+ ],
+ "wektory": [
+  {
+   "nr": 1,
+   "tekst": "Zrób stronę",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "Zrób stronę",
+   "wiodace": false,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 2,
+   "tekst": "@web popraw stopkę",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "popraw stopkę",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 3,
+   "tekst": "@Web, @studio: zróbcie baner",
+   "adresaci": [
+    "jarvo-web",
+    "jarvo-studio"
+   ],
+   "bezposrednio": [
+    "jarvo-web",
+    "jarvo-studio"
+   ],
+   "tresc": "zróbcie baner",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 4,
+   "tekst": "@łowca znajdź 10 firm",
+   "adresaci": [
+    "jarvo-lowca"
+   ],
+   "bezposrednio": [
+    "jarvo-lowca"
+   ],
+   "tresc": "znajdź 10 firm",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 5,
+   "tekst": "@reka @Ręka sprawdź",
+   "adresaci": [
+    "jarvo-reka"
+   ],
+   "bezposrednio": [
+    "jarvo-reka"
+   ],
+   "tresc": "sprawdź",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 6,
+   "tekst": "Napisz do jan@web.pl",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "Napisz do jan@web.pl",
+   "wiodace": false,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 7,
+   "tekst": "Zapytaj @web o stopkę",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "Zapytaj @web o stopkę",
+   "wiodace": false,
+   "ostrzezenia": [
+    "srodek:jarvo-web"
+   ]
+  },
+  {
+   "nr": 8,
+   "tekst": "@file:src/a.py co tu jest",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "@file:src/a.py co tu jest",
+   "wiodace": false,
+   "ostrzezenia": [
+    "zarezerwowane:file"
+   ]
+  },
+  {
+   "nr": 9,
+   "tekst": "@nieznany zrób",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "@nieznany zrób",
+   "wiodace": false,
+   "ostrzezenia": [
+    "nieznany:nieznany"
+   ]
+  },
+  {
+   "nr": 10,
+   "uwaga": "UI: wybór adresata ustawiony na Web tylko dla następnej wiadomości; nic nie wychodzi",
+   "tekst": "@web",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "",
+   "wiodace": true,
+   "ostrzezenia": [
+    "pusta_tresc"
+   ]
+  },
+  {
+   "nr": 11,
+   "tekst": "   @web   zrób",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "zrób",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 12,
+   "tekst": "@jarvo-web zrób",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "zrób",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 13,
+   "tekst": "@wideograf zmontuj",
+   "adresaci": [
+    "jarvo-wideo"
+   ],
+   "bezposrednio": [
+    "jarvo-wideo"
+   ],
+   "tresc": "zmontuj",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 14,
+   "tekst": "@aplikacje zbuduj",
+   "adresaci": [
+    "jarvo-mobile"
+   ],
+   "bezposrednio": [
+    "jarvo-mobile"
+   ],
+   "tresc": "zbuduj",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 15,
+   "tekst": "@web:popraw",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "popraw",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 16,
+   "tekst": "@jarvo zaplanuj",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "zaplanuj",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 17,
+   "tekst": "@jarvo @web zróbcie",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "zróbcie\n\n(Właściciel chce w tym udziału: Web.)",
+   "wiodace": true,
+   "ostrzezenia": [
+    "koordynuje:jarvo-web"
+   ]
+  },
+  {
+   "nr": 18,
+   "uwaga": "brak przyklejonego adresata: druga wiadomość idzie do Jarva (może przekazać Webowi)",
+   "sekwencja": [
+    {
+     "tekst": "@web popraw",
+     "adresaci": [
+      "jarvo-web"
+     ],
+     "bezposrednio": [
+      "jarvo-web"
+     ],
+     "tresc": "popraw",
+     "wiodace": true,
+     "ostrzezenia": []
+    },
+    {
+     "tekst": "zrób",
+     "adresaci": [
+      "jarvo"
+     ],
+     "bezposrednio": [],
+     "tresc": "zrób",
+     "wiodace": false,
+     "ostrzezenia": []
+    }
+   ]
+  },
+  {
+   "nr": 19,
+   "sekwencja": [
+    {
+     "tekst": "@web popraw",
+     "adresaci": [
+      "jarvo-web"
+     ],
+     "bezposrednio": [
+      "jarvo-web"
+     ],
+     "tresc": "popraw",
+     "wiodace": true,
+     "ostrzezenia": []
+    },
+    {
+     "tekst": "@studio zrób",
+     "adresaci": [
+      "jarvo-studio"
+     ],
+     "bezposrednio": [
+      "jarvo-studio"
+     ],
+     "tresc": "zrób",
+     "wiodace": true,
+     "ostrzezenia": []
+    }
+   ]
+  },
+  {
+   "nr": 20,
+   "tekst": "@all zrób",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "@all zrób",
+   "wiodace": false,
+   "ostrzezenia": [
+    "zarezerwowane:all"
+   ]
+  },
+  {
+   "nr": 21,
+   "tekst": "@web\nzrób to",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "zrób to",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 22,
+   "tekst": "@WEB zrób",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "zrób",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 23,
+   "tekst": "@web,zrób",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "zrób",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 24,
+   "tekst": "(@web) zrób",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "(@web) zrób",
+   "wiodace": false,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 25,
+   "tekst": "@web @nieznany zrób",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "@nieznany zrób",
+   "wiodace": true,
+   "ostrzezenia": [
+    "nieznany:nieznany"
+   ]
+  },
+  {
+   "nr": 26,
+   "tekst": "@web.pl jest fajne",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "@web.pl jest fajne",
+   "wiodace": false,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 27,
+   "tekst": "@web sprawdź @studio:baner",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "sprawdź @studio: baner",
+   "wiodace": true,
+   "ostrzezenia": [
+    "srodek:jarvo-studio"
+   ]
+  },
+  {
+   "nr": 28,
+   "uwaga": "małpa pełnej szerokości (U+FF20) to nie wzmianka",
+   "tekst": "＠web zrób",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "＠web zrób",
+   "wiodace": false,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 29,
+   "tekst": "@web @studio @ads @lowca zróbcie",
+   "adresaci": [
+    "jarvo-web",
+    "jarvo-studio",
+    "jarvo-ads",
+    "jarvo-lowca"
+   ],
+   "bezposrednio": [
+    "jarvo-web",
+    "jarvo-studio",
+    "jarvo-ads",
+    "jarvo-lowca"
+   ],
+   "tresc": "zróbcie",
+   "wiodace": true,
+   "ostrzezenia": [
+    "wielu:4"
+   ]
+  },
+  {
+   "nr": 30,
+   "uwaga": "UI: po @web wybór adresata ustawiony; @jarvo przywraca Jarva, nic nie wychodzi",
+   "sekwencja": [
+    {
+     "tekst": "@web",
+     "adresaci": [
+      "jarvo-web"
+     ],
+     "bezposrednio": [
+      "jarvo-web"
+     ],
+     "tresc": "",
+     "wiodace": true,
+     "ostrzezenia": [
+      "pusta_tresc"
+     ]
+    },
+    {
+     "tekst": "@jarvo",
+     "adresaci": [
+      "jarvo"
+     ],
+     "bezposrednio": [],
+     "tresc": "",
+     "wiodace": true,
+     "ostrzezenia": [
+      "pusta_tresc"
+     ]
+    }
+   ]
+  },
+  {
+   "nr": 31,
+   "sekwencja": [
+    {
+     "tekst": "@web @studio zróbcie",
+     "adresaci": [
+      "jarvo-web",
+      "jarvo-studio"
+     ],
+     "bezposrednio": [
+      "jarvo-web",
+      "jarvo-studio"
+     ],
+     "tresc": "zróbcie",
+     "wiodace": true,
+     "ostrzezenia": []
+    },
+    {
+     "tekst": "popraw",
+     "adresaci": [
+      "jarvo"
+     ],
+     "bezposrednio": [],
+     "tresc": "popraw",
+     "wiodace": false,
+     "ostrzezenia": []
+    }
+   ]
+  },
+  {
+   "nr": 32,
+   "uwaga": "agent właściciela (etap 8) w mapie aliasów z agenci.json",
+   "dodatkowi": [
+    {
+     "name": "wlasny-nowyagent",
+     "handle": "nowyagent",
+     "nazwa": "Nowy agent"
+    }
+   ],
+   "tekst": "@nowyagent zrób",
+   "adresaci": [
+    "wlasny-nowyagent"
+   ],
+   "bezposrednio": [
+    "wlasny-nowyagent"
+   ],
+   "tresc": "zrób",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 33,
+   "uwaga": "koordynator wątku testowego E2E (koordynator: test-e2e-j)",
+   "koordynator": "test-e2e-j",
+   "dodatkowi": [
+    {
+     "name": "test-e2e-a",
+     "handle": "teste2ea",
+     "nazwa": "Test A"
+    },
+    {
+     "name": "test-e2e-j",
+     "handle": "teste2ej",
+     "nazwa": "Test J"
+    }
+   ],
+   "sekwencja": [
+    {
+     "tekst": "@teste2ea ala",
+     "adresaci": [
+      "test-e2e-a"
+     ],
+     "bezposrednio": [
+      "test-e2e-a"
+     ],
+     "tresc": "ala",
+     "wiodace": true,
+     "ostrzezenia": []
+    },
+    {
+     "tekst": "dalej",
+     "adresaci": [
+      "test-e2e-j"
+     ],
+     "bezposrednio": [],
+     "tresc": "dalej",
+     "wiodace": false,
+     "ostrzezenia": []
+    },
+    {
+     "tekst": "@teste2ej @teste2ea razem",
+     "adresaci": [
+      "test-e2e-j"
+     ],
+     "bezposrednio": [],
+     "tresc": "razem\n\n(Właściciel chce w tym udziału: Test A.)",
+     "wiodace": true,
+     "ostrzezenia": [
+      "koordynuje:test-e2e-a"
+     ]
+    }
+   ]
+  },
+  {
+   "nr": 34,
+   "uwaga": "wzmianka adresata w treści nie daje ostrzeżenia; dwukropek dostaje spację",
+   "tekst": "@web popraw, @web:sprawdź",
+   "adresaci": [
+    "jarvo-web"
+   ],
+   "bezposrednio": [
+    "jarvo-web"
+   ],
+   "tresc": "popraw, @web: sprawdź",
+   "wiodace": true,
+   "ostrzezenia": []
+  },
+  {
+   "nr": 35,
+   "tekst": "@file:x @web zrób",
+   "adresaci": [
+    "jarvo"
+   ],
+   "bezposrednio": [],
+   "tresc": "@file:x @web zrób",
+   "wiodace": false,
+   "ostrzezenia": [
+    "zarezerwowane:file",
+    "srodek:jarvo-web"
+   ]
+  }
+ ]
+}

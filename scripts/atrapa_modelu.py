@@ -6,10 +6,15 @@ całą drogę wiadomości: strumień tekstu, wywołanie narzędzia i wynik, bł�
 Tylko do testów (piaskownica, CI): nie ma w obrazie żadnego profilu, który by z niej korzystał.
 
     python3 scripts/atrapa_modelu.py --port 9199          # http://127.0.0.1:9199/v1
+    python3 scripts/atrapa_modelu.py --port 9199 --dziennik /tmp/jarvo-e2e/atrapa.jsonl
+                                                          # każde ciało zapytania jako jedna linia JSON (test E2E)
 
 Polecenia w treści ostatniej wiadomości właściciela (w nawiasach kwadratowych, reszta tekstu wraca w odpowiedzi):
     [narzedzie:NAZWA {"arg": 1}]   wywołaj narzędzie NAZWA z argumentami (JSON); po wyniku krótkie podsumowanie
     [wolno]                        strumień po słowie co 0,4 s (test „Zatrzymaj”)
+    [wolno:<s>]                    strumień rozłożony na <s> sekund (test Stop, dopisz, wznowienia strumienia);
+                                   z [narzedzie:…] dotyczy odpowiedzi po wyniku narzędzia (tura trwa dłużej)
+    [plik:<ścieżka>]               linia „Plik: <ścieżka>” w odpowiedzi (karta pliku); można kilka
     [blad]                         HTTP 500 od „dostawcy”
     [dlugo]                        długa odpowiedź z nagłówkami, listą, tabelą i kodem (test renderowania)
 """
@@ -17,12 +22,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 POLECENIE_NARZEDZIA = re.compile(r"\[narzedzie:([A-Za-z0-9_.-]+)\s*(\{.*?\})?\]", re.S)
+POLECENIE_WOLNO = re.compile(r"\[wolno(?::(\d+(?:[.,]\d+)?))?\]")
+POLECENIE_PLIK = re.compile(r"\[plik:([^\]\n]+)\]")
+POLECENIE = re.compile(r"\[[a-z]+(?::[^\]\n]*)?\]")      # do wycięcia z echa: [wolno], [wolno:5], [plik:/x]
+WOLNO_MAKS = 600.0
 DLUGI_TEKST = """## Plan strony
 
 Zrobię to w trzech krokach:
@@ -52,12 +63,13 @@ def _tekst(tresc: Any) -> str:
 
 
 def odpowiedz(wiadomosci: list[dict], model: str) -> dict:
-    """Co atrapa „powie”: {'tekst': str} albo {'narzedzie': (nazwa, argumenty)}; także {'blad': True}, {'wolno': True}."""
+    """Co atrapa „powie”: {'tekst': str} albo {'narzedzie': (nazwa, argumenty)}; także {'blad': True},
+    {'wolno': True} (z `[wolno:<s>]` dodatkowo {'wolno_s': s}: cały strumień trwa s sekund)."""
     ostatnia = wiadomosci[-1] if wiadomosci else {}
+    tekst = next((_tekst(w.get("content")) for w in reversed(wiadomosci) if w.get("role") == "user"), "")
     if ostatnia.get("role") == "tool":
         wynik = _tekst(ostatnia.get("content"))[:300]
-        return {"tekst": f"Narzędzie zwróciło: {wynik}"}
-    tekst = next((_tekst(w.get("content")) for w in reversed(wiadomosci) if w.get("role") == "user"), "")
+        return _wolno({"tekst": f"Narzędzie zwróciło: {wynik}", "wolno": False}, tekst)
     if "[blad]" in tekst:
         return {"blad": True}
     m = POLECENIE_NARZEDZIA.search(tekst)
@@ -69,12 +81,39 @@ def odpowiedz(wiadomosci: list[dict], model: str) -> dict:
         return {"narzedzie": (m.group(1), argumenty)}
     if "[dlugo]" in tekst:
         return {"tekst": DLUGI_TEKST}
-    czysty = re.sub(r"\[[a-z]+\]", "", tekst).strip()
-    return {"tekst": f"Atrapa ({model}): {czysty[:400] or 'gotowe.'}", "wolno": "[wolno]" in tekst}
+    czysty = POLECENIE.sub("", tekst).strip()
+    odp = f"Atrapa ({model}): {czysty[:400] or 'gotowe.'}"
+    for sciezka in POLECENIE_PLIK.findall(tekst):
+        odp += f"\nPlik: {sciezka.strip()}"
+    return _wolno({"tekst": odp, "wolno": False}, tekst)
+
+
+def _wolno(plan: dict[str, Any], tekst: str) -> dict[str, Any]:
+    """`[wolno]` / `[wolno:<s>]` z wiadomości właściciela: tempo odpowiedzi (także tej po wyniku narzędzia)."""
+    w = POLECENIE_WOLNO.search(tekst)
+    if w:
+        plan["wolno"] = True
+        if w.group(1):
+            plan["wolno_s"] = min(WOLNO_MAKS, float(w.group(1).replace(",", ".")))
+    return plan
+
+
+def kawalki(plan: dict) -> tuple[list[str], float]:
+    """Kawałki strumienia i pauza po każdym. `[wolno:<s>]`: razem s sekund, co najmniej 2 kawałki na sekundę,
+    gdy tekst na to pozwala (krótkie echo idzie wtedy po znaku); `[wolno]`: po słowie co 0,4 s; inaczej 0,02 s."""
+    tekst = plan.get("tekst") or ""
+    slowa = re.findall(r"\S+\s*|\s+", tekst)
+    if plan.get("wolno_s"):
+        s = float(plan["wolno_s"])
+        czesci = slowa if len(slowa) >= s * 2 else list(tekst)
+        return czesci, s / max(1, len(czesci))
+    return slowa, (0.4 if plan.get("wolno") else 0.02)
 
 
 class Obsluga(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    dziennik: str | None = None          # --dziennik: plik JSONL z ciałami zapytań
+    _zamek = threading.Lock()
 
     def log_message(self, *_: Any) -> None:    # cicho: testy czytają tylko odpowiedzi
         pass
@@ -103,6 +142,7 @@ class Obsluga(BaseHTTPRequestHandler):
         except ValueError:
             self._json(400, {"error": {"message": "zły JSON"}})
             return
+        self._zapisz(zapytanie)
         model = str(zapytanie.get("model") or "atrapa")
         plan = odpowiedz(zapytanie.get("messages") or [], model)
         if plan.get("blad"):
@@ -113,6 +153,16 @@ class Obsluga(BaseHTTPRequestHandler):
             self._strumien(ident, model, plan)
         else:
             self._json(200, _cala(ident, model, plan))
+
+    def _zapisz(self, zapytanie: Any) -> None:
+        """Jedna linia JSON na zapytanie (plik 0600, dopisywany pod zamkiem: serwer jest wielowątkowy)."""
+        if not self.dziennik:
+            return
+        linia = json.dumps(zapytanie, ensure_ascii=False) + "\n"
+        with self._zamek:
+            fd = os.open(self.dziennik, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+            with os.fdopen(fd, "a", encoding="utf-8") as f:
+                f.write(linia)
 
     def _strumien(self, ident: str, model: str, plan: dict) -> None:
         self.send_response(200)
@@ -135,9 +185,9 @@ class Obsluga(BaseHTTPRequestHandler):
                                         "function": {"name": nazwa, "arguments": json.dumps(argumenty, ensure_ascii=False)}}]})
                 wyslij({}, "tool_calls")
             else:
-                pauza = 0.4 if plan.get("wolno") else 0.02
-                for slowo in re.findall(r"\S+\s*|\s+", plan["tekst"]):
-                    wyslij({"content": slowo})
+                czesci, pauza = kawalki(plan)
+                for czesc in czesci:
+                    wyslij({"content": czesc})
                     time.sleep(pauza)
                 wyslij({}, "stop")
             self.wfile.write(b"data: [DONE]\n\n")
@@ -165,7 +215,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Atrapa modelu zgodna z OpenAI (tylko testy)")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=9199)
+    ap.add_argument("--dziennik", metavar="PLIK", help="dopisuj każde ciało zapytania jako jedną linię JSON")
     a = ap.parse_args()
+    Obsluga.dziennik = a.dziennik
     ThreadingHTTPServer((a.host, a.port), Obsluga).serve_forever()
 
 

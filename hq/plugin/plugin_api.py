@@ -1565,13 +1565,19 @@ async def chat_send(name: str, request: Request):
 
 
 async def _przyjmij(request: Request, limit: int) -> dict:
-    """Plik z przeglądarki strumieniem → /opt/data/jarvo/inbox/<data>/<nazwa> (nazwa z X-File-Name, oczyszczona)."""
+    """Plik z przeglądarki strumieniem → /opt/data/jarvo/inbox/<data>/<nazwa> (nazwa z X-File-Name, oczyszczona).
+    Strumień idzie do pliku tymczasowego o losowej nazwie; docelowa nazwa jest rezerwowana atomowo (`O_EXCL`, jak
+    obrazy rozmów w trasy_rozmow.py) dopiero po odebraniu całości, więc dwie równoczesne wysyłki o tej samej nazwie
+    (albo wysyłka i obraz z wiadomości) nie nadpiszą sobie plików."""
+    import secrets
     from urllib.parse import unquote
 
     inbox = core.JARVO_DIR / "inbox"
-    target = core.upload_target(inbox, unquote(request.headers.get("X-File-Name", "")), time.time())
+    nazwa = unquote(request.headers.get("X-File-Name", ""))
+    teraz = time.time()                         # jedna data katalogu (wysyłka przez północ: katalog już istnieje)
+    target = core.upload_target(inbox, nazwa, teraz)
     target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_name(f".{target.name}.part")
+    tmp = target.parent / f".{secrets.token_hex(8)}.part"
     size = 0
     try:
         with tmp.open("wb") as f:
@@ -1582,7 +1588,16 @@ async def _przyjmij(request: Request, limit: int) -> dict:
                 f.write(chunk)
         if not size:
             raise HTTPException(400, "Pusty plik")
-        tmp.replace(target)
+        for _proba in range(100):
+            try:
+                os.close(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644))
+            except FileExistsError:
+                target = core.upload_target(inbox, nazwa, teraz)
+                continue
+            break
+        else:
+            raise HTTPException(409, "Nie da się zapisać pliku — spróbuj jeszcze raz")
+        tmp.replace(target)                     # nadpisuje tylko własną, pustą rezerwację
     finally:
         tmp.unlink(missing_ok=True)
     return core.file_entry(target, inbox)
@@ -1823,6 +1838,7 @@ async def health():
                 except httpx.HTTPError as exc:
                     entry["api"] = f"błąd: {exc.__class__.__name__}"
             report["agents"][a["name"]] = entry
+    report.update(await _zdrowie_rozmow())
     return report
 
 
@@ -1905,8 +1921,129 @@ async def zasoby(nazwa: str, request: Request):
     return FileResponse(hit[0], media_type=ZASOB_TYPY[Path(nazwa).suffix], headers=hit[1])
 
 
+# ----------------------------------------------------------------------------- rozmowy: silnik i trasy
+# Silnik rozmów aplikacji (docs/HQ.md „Rozmowy”): wątek tła startowany przy imporcie wtyczki (aplikacja dashboardu
+# ma lifespan, więc on_startup routera się nie wykona), jeden na proces; trasy w trasy_rozmow.py na tym routerze
+# (ochrona CSRF z ochrona.Trasa). JARVO_HQ_SILNIK=0 wyłącza silnik (testy), trasy odpowiadają wtedy 503 `silnik`.
+from types import SimpleNamespace  # noqa: E402
+
+roz = SimpleNamespace(hq_core=core, ochrona=ochrona)
+for _nazwa in ("agenci", "rozmowy", "czytnik", "kontekst", "wzmianki", "budzenia", "scalanie", "brama", "strumien",
+               "przebiegi", "prace", "obserwator", "silnik"):
+    setattr(roz, _nazwa, _load(f"jarvo_hq_{_nazwa}", f"{_nazwa}.py"))
+trasy_rozmow = _load("jarvo_hq_trasy_rozmow", "trasy_rozmow.py")
+_dziennik_hq = roz.silnik.ustaw_dziennik(HOME / "logs" / "jarvo-hq.log"
+                                         if os.environ.get("JARVO_HQ_SILNIK", "1") != "0" else None)
+AGENCI = roz.agenci.Agenci(FLEET_FILE, core.JARVO_DIR / "state" / "agenci.json")
+
+
+def _log_hq(linia: str) -> None:
+    _dziennik_hq.info(linia)
+
+
+def _wersja_paczki() -> str:
+    """Wersja do `hello` strumienia: skrót paczki aplikacji (zmienia się po każdej aktualizacji)."""
+    for p in sorted(ZASOBY.glob("app-*.js")):
+        return p.stem.split("-", 1)[1]
+    try:
+        return json.loads((_HERE / "manifest.json").read_text(encoding="utf-8")).get("version", "")
+    except (OSError, ValueError):
+        return ""
+
+
+WERSJA = _wersja_paczki()
+
+
+def _silnik():
+    return roz.silnik.instancja()
+
+
+def _hello() -> dict:
+    """Stan silnika w `hello` strumienia, tak samo jak w /health (`_zdrowie_rozmow`): brak instancji przy
+    włączonym silniku = start się nie udał (`awaria`), przy JARVO_HQ_SILNIK=0 = `wylaczony`."""
+    s = _silnik()
+    if s is None:
+        stan = "wylaczony" if os.environ.get("JARVO_HQ_SILNIK", "1") == "0" else "awaria"
+    else:
+        stan = "ok" if s.dziala() else ("awaria" if s.stan == "awaria" else "start")
+    return {"wersja": WERSJA, "silnik": stan}
+
+
+def _start_silnika():
+    stary = roz.silnik.instancja()
+    if stary is not None:                     # drugi import wtyczki w tym samym procesie: ten sam silnik i hub
+        return stary.hub
+    hub = roz.strumien.Hub(log=_log_hq, hello=_hello)
+    if os.environ.get("JARVO_HQ_SILNIK", "1") == "0":
+        return hub
+    try:
+        s = roz.silnik.Silnik(moduly=roz, home=HOME, jarvo_dir=core.JARVO_DIR, api_base=API_BASE, agenci=AGENCI,
+                              hub=hub, log=_log_hq, stan_aktualizacji=_update_state)
+        roz.silnik.zarejestruj(s).start(czekaj=2.0)
+        roz.silnik.zahacz_uvicorn(hub.zamknij_wszystkie)
+    except Exception as exc:  # wtyczka działa dalej (stare trasy), /health i hello mówią „awaria”
+        _log_hq(f"jarvo-hq: silnik rozmów nie wystartował ({type(exc).__name__})")
+    return hub
+
+
+HUB = _start_silnika()
+trasy_rozmow.dolacz(router, m=roz, silnik=_silnik, hub=HUB, agenci=AGENCI, inbox=core.JARVO_DIR / "inbox", log=_log_hq)
+
+
+async def _zdrowie_rozmow() -> dict:
+    """Część /health silnika rozmów (docs/HQ.md „Rozmowy”): bez treści, same liczby i stany."""
+    s = _silnik()
+    if s is None:
+        return {"silnik": "wylaczony" if os.environ.get("JARVO_HQ_SILNIK", "1") == "0" else "awaria",
+                "pid": os.getpid(), "strumien": {"polaczenia": HUB.liczba_polaczen()},
+                "csrf_odmowy": ochrona.ODMOWY["razem"]}
+    out = s.zdrowie()
+    if s.db is not None:
+        db = await asyncio.to_thread(s.db.zdrowie)
+        out["rozmowy"] = {k: db.get(k) for k in ("db_ok", "wersja", "watki", "przebiegi_aktywne", "kolejka")}
+        out["rozmowy"]["limit"] = s.limit
+        out["sesje_nieprzypiete"] = db.get("sesje_nieprzypiete", 0)
+
+    def _schemat() -> str:
+        try:
+            braki = [b for a in AGENCI.nazwy() if (HOME / "profiles" / a / "state.db").exists()
+                     for b in s.czytnik.schemat(a)]
+        except Exception:
+            return "nieznany"
+        return "zmieniony" if braki else "ok"
+
+    out["schemat_hermesa"] = await asyncio.to_thread(_schemat)
+    out["csrf_odmowy"] = ochrona.ODMOWY["razem"]
+    return out
+
+
 if os.environ.get("JARVO_E2E") == "1":
     @router.post("/csrf-proba")
     async def csrf_proba():
         """Trasa zapisu bez skutków ubocznych dla testu ochrony zapisu (scripts/jarvo-e2e.sh); tylko z JARVO_E2E=1."""
         return {"ok": True}
+
+    @router.post("/e2e/limit")
+    async def e2e_limit(request: Request):
+        """Limit przebiegów silnika na czas testu E2E (to samo co JARVO_HQ_MAX_PRZEBIEGOW, bez restartu dashboardu;
+        restart wraca do wartości z env); tylko z JARVO_E2E=1. Treść `{"limit": 1..50}`, odpowiedź z poprzednim."""
+        try:
+            limit = int((await request.json()).get("limit"))
+        except (ValueError, TypeError, AttributeError):
+            return JSONResponse({"blad": {"kod": "zle_dane", "komunikat": "Podaj limit 1–50.",
+                                          "komunikat_en": "Give a limit 1–50."}}, status_code=422)
+        s = _silnik()
+        if s is None or not s.dziala() or not 1 <= limit <= 50:
+            return JSONResponse({"blad": {"kod": "zle_dane" if s is not None and s.dziala() else "silnik",
+                                          "komunikat": "Limit 1–50 przy działającym silniku.",
+                                          "komunikat_en": "Limit 1–50 with the engine running."}},
+                                status_code=422 if s is not None and s.dziala() else 503)
+
+        def _ustaw() -> int:
+            stary = s.rejestr.limit
+            s.rejestr.limit = s.limit = limit
+            s.rejestr.zmiana_stanu()          # dyspozytor od razu sprawdza kolejkę z nowym limitem
+            _log_hq(f"jarvo-hq: limit przebiegów {stary}→{limit} (test E2E)")
+            return stary
+
+        return {"limit": limit, "poprzedni": await s.wykonaj_fn(_ustaw)}

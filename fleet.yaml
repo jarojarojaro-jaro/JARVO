@@ -74,6 +74,7 @@ agents:
     hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Mostek dowodzenia"
     hq_short: "Jarvo"
+    handle: jarvo            # @uchwyt w rozmowie aplikacji: ASCII, unikalny (aliasy: nazwa profilu, hq_short bez polskich znaków)
     en:
       title: "Main Judge"
       hq_label: "Command bridge"
@@ -98,6 +99,7 @@ agents:
     hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Gabinet śledczy"
     hq_short: "Sherlock"
+    handle: sherlock
     en:
       title: "Research detective"
       hq_label: "Investigation office"
@@ -122,6 +124,7 @@ agents:
     hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Pracownia webowa"
     hq_short: "Web"
+    handle: web
     en:
       title: "Web Senior Dev"
       hq_label: "Web studio"
@@ -145,6 +148,7 @@ agents:
     hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Atelier kreatywne"
     hq_short: "Studio"
+    handle: studio
     en:
       title: "Marketing & creative"
       hq_label: "Creative atelier"
@@ -172,6 +176,7 @@ agents:
     hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Studio filmowe"
     hq_short: "Wideograf"
+    handle: wideo
     en:
       title: "Videographer"
       hq_label: "Film studio"
@@ -197,6 +202,7 @@ agents:
     hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Sala operacyjna"
     hq_short: "Ads"
+    handle: ads
     en:
       title: "Ads specialist"
       hq_label: "Operations room"
@@ -222,6 +228,7 @@ agents:
     hq_room: radar    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Radar sprzedaży"
     hq_short: "Łowca"
+    handle: lowca
     en:
       title: "Lead hunter"
       hq_label: "Sales radar"
@@ -250,6 +257,7 @@ agents:
     hq_room: apps    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Pracownia aplikacji"
     hq_short: "Aplikacje"
+    handle: mobile
     en:
       title: "App maker"
       hq_label: "App lab"
@@ -276,6 +284,7 @@ agents:
     hq_room: control    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Sterownia"
     hq_short: "Operator"
+    handle: operator
     komputer: true      # computer_use na Komputerze Jarva, wtyczka jarvo-komputer, bez terminala (docs/KOMPUTER.md)
     en:
       title: "Operator"
@@ -300,6 +309,7 @@ agents:
     hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Warsztat"
     hq_short: "Ręka"
+    handle: reka
     en:
       title: "Right hand"
       hq_label: "Workshop"

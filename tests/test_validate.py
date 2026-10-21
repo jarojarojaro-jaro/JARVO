@@ -113,6 +113,12 @@ def test_docs_count_must_match_repo(repo_copy):
     assert errors_matching(validate.run(), r"docs/FLEET.md: jarvo-studio ma 6 \(skille\), a tabela podaje 7")
 
 
+def test_docs_handle_column_must_match_fleet(repo_copy):
+    doc = repo_copy / "docs/JARVO-CALOSC.md"
+    doc.write_text(doc.read_text(encoding="utf-8").replace("| `@web` |", "| `@webb` |", 1), encoding="utf-8")
+    assert errors_matching(validate.run(), r"docs/JARVO-CALOSC.md: jarvo-web ma uchwyt @web, a tabela podaje")
+
+
 def test_docs_must_list_whole_fleet(repo_copy):
     readme = repo_copy / "README.md"
     readme.write_text(readme.read_text(encoding="utf-8").replace("`jarvo-reka`", "jarvo-reka"), encoding="utf-8")

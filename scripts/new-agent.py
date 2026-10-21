@@ -71,7 +71,10 @@ def main(argv: list[str] | None = None) -> int:
     fleet_text = fl.FLEET_FILE.read_text(encoding="utf-8")
     oddaj = ("    oddaj_gdy: \"TODO: kiedy Ręka ma oddać zadanie temu agentowi (tabela generowana)\"\n"
              if args.kind == "specialist" else "")
+    # uchwyt `@…` w rozmowie aplikacji: ze slugu, sama ASCII (walidator sprawdza unikalność i kolizje z aliasami)
+    uchwyt = (re.sub(r"[^a-z0-9]", "", fl.zloz(slug)) or "agent")[:16]
     entry = (f"\n  - name: {args.name}\n    kind: {args.kind}\n    title: \"{args.title}\"\n    emoji: \"\"\n"
+             f"    handle: {uchwyt}\n"
              f"    description: >-\n      TODO: jedno-dwa zdania o zakresie (routing kanbana).\n"
              f"{oddaj}"
              f"    model_tier: {args.tier}\n    delegation_tier: fast\n    autonomy_max: A1\n"

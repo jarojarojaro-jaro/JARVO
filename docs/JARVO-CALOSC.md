@@ -56,18 +56,18 @@ Poziomy autonomii: **A0** odczyt · **A1** szkice we własnym workspace · **A2*
 Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady), `config.yaml`
 (model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja.
 
-| Agent | Rola | Pokój HQ | Temat Telegram | Skille |
-|---|---|---|---|---|
-| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol | Mostek dowodzenia (`bridge`) | general | 13 |
-| 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | Gabinet śledczy (`study`) | sherlock | 8 |
-| 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | Pracownia webowa (`devlab`) | web | 10 |
-| 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | Atelier kreatywne (`atelier`) | studio | 7 |
-| 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, dwa ekrany (split screen), typografia jak z montażu, filmy z kodu, 15 stylów motion design, 8 gramatyk explainera, 35 stylów malarskich, losowanie ruchów z biblioteki 273 technik, żywe schematy, maskotka | Studio filmowe (`filmstudio`) | wideo | 22 |
-| 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę, publikujesz Ty | Sala operacyjna (`office`) | ads | 11 |
-| 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | Radar sprzedaży (`radar`) | lowca | 7 |
-| 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | Pracownia aplikacji (`apps`) | mobile | 10 |
-| 🖥️ `jarvo-operator` | **Operator** — praca na ekranie Komputera Jarva (computer use): klik w panelach i programach w przeglądarce, formularze, dane z ekranu do pliku, ścieżka klienta na stronie; klik w tle, klawiatura w aktywnym oknie, logowanie, płatność i wysyłkę oddaje właścicielowi | Sterownia (`control`) | operator | 5 |
-| 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | Warsztat (`workshop`) | reka | 4 |
+| Agent | Rola | Uchwyt | Pokój HQ | Temat Telegram | Skille |
+|---|---|---|---|---|---|
+| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 13 |
+| 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | `@sherlock` | Gabinet śledczy (`study`) | sherlock | 8 |
+| 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | `@web` | Pracownia webowa (`devlab`) | web | 10 |
+| 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | `@studio` | Atelier kreatywne (`atelier`) | studio | 7 |
+| 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, dwa ekrany (split screen), typografia jak z montażu, filmy z kodu, 15 stylów motion design, 8 gramatyk explainera, 35 stylów malarskich, losowanie ruchów z biblioteki 273 technik, żywe schematy, maskotka | `@wideo` | Studio filmowe (`filmstudio`) | wideo | 22 |
+| 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę, publikujesz Ty | `@ads` | Sala operacyjna (`office`) | ads | 11 |
+| 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | `@lowca` | Radar sprzedaży (`radar`) | lowca | 7 |
+| 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | `@mobile` | Pracownia aplikacji (`apps`) | mobile | 10 |
+| 🖥️ `jarvo-operator` | **Operator** — praca na ekranie Komputera Jarva (computer use): klik w panelach i programach w przeglądarce, formularze, dane z ekranu do pliku, ścieżka klienta na stronie; klik w tle, klawiatura w aktywnym oknie, logowanie, płatność i wysyłkę oddaje właścicielowi | `@operator` | Sterownia (`control`) | operator | 5 |
+| 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | `@reka` | Warsztat (`workshop`) | reka | 4 |
 
 ### 2a°. jarvo-operator — szczegóły (najnowszy)
 Operator ekranu, etap K3 z [KOMPUTER.md](KOMPUTER.md). Narzędzie `computer_use` Hermesa idzie przez bramkę
@@ -258,6 +258,11 @@ domyślnie). Czat obsługuje zdjęcia i pliki w obie strony. Linki „Odpal” (
 W Centrali **Konwerter**: plik → inny format na serwerze albo ten sam plik bez metadanych (GPS, telefon, daty, autor i firma w PDF i Wordzie; ten sam `konwertuj.py` co skill floty `konwersja-plikow`). **Jak działa usługa**: flota jako klikalna figura izometryczna (wieża z Jarvem i pokojami agentów, demo = droga zlecenia; `iso.py flota` ze skilla `izometria`).
 Edytor filmów w stylu CapCut (przejścia między klipami, które nie skracają filmu, kolor klipu ze stylami i Auto, menu Audio z biblioteką efektów i podkładów CC0, lektorem, nagraniem z mikrofonu i wyodrębnianiem dźwięku, uwagi na osi z kadrem dla Wideografa, typografia słowo po słowie z napisem za osobą: maska MODNet) i podgląd animacji z kodu na żywo z suwakami
 parametrów ([HQ.md §2a–2b](HQ.md#2a-edytor-filmów), plan rozbudowy: [EDYTOR-PLAN.md](EDYTOR-PLAN.md)). Dwujęzyczność PL/EN. Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
+Pod nową aplikacją czatu (rozmowy zamiast budynku; front w budowie) działa już **silnik rozmów** w procesie
+dashboardu: wątki w `/opt/data/jarvo/state/rozmowy.db`, tury agentów przez `/v1/runs` bramy z kolejką, zgodami,
+dopiskiem, stopem i ponowieniem, strumień zdarzeń SSE z wznowieniem od kursora, oś czasu scalona z sesji Hermesa,
+`praca.json` (ostrzeżenie `install-fleet.sh` przed restartem bramy w trakcie pracy) i dziennik
+`/opt/data/logs/jarvo-hq.log` bez treści rozmów ([HQ.md §2d–2e](HQ.md#2e-rozmowy-silnik-przebiegi-strumień-trasy)).
 Obok niej zakładka **Wiedza** (`/wiedza`, wtyczka `jarvo-wiedza`): graf skarbca wiedzy, foldery i notatki, szukanie, orzeczenia
 z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIEDZA.md)).
 
@@ -377,12 +382,24 @@ SOURCES (licencje).
   `komputer-ca:test` = Debian + certyfikat proxy, `jarvo-komputer:local` po zmianie `infra/komputer/`), a potem
   test twardych zasad na żywo `scripts/komputer-test.sh`. Piaskownica ma w `compose/.env` `JARVO_E2E=1` (trasy testowe
   wtyczek), a test aplikacji w przeglądarce na żywo to `bash /opt/jarvo/repo/scripts/jarvo-e2e.sh etap1` w kontenerze
-  (Playwright i Chromium z obrazu, logowanie hasłem z env kontenera, raport JSON, sprzątanie przy każdym wyjściu).
+  (Playwright i Chromium z obrazu, logowanie hasłem z env kontenera, raport JSON, sprzątanie przy każdym wyjściu);
+  `… etap2` sprawdza silnik rozmów: własna atrapa modelu na `127.0.0.1:9197` z `--dziennik`, profile jednorazowe
+  `test-e2e-a`, `test-e2e-b`, `test-e2e-j` usuwane przy każdym wyjściu, punkty 1–15 etapu 2 (docs/HQ.md §2e).
 - **Rozmowa bez klucza dostawcy (piaskownica, CI):** `scripts/atrapa_modelu.py --port 9199` to atrapa modelu zgodna
-  z OpenAI (strumień, wywołanie narzędzia `[narzedzie:NAZWA {…}]`, `[wolno]`, `[blad]`, `[dlugo]`). Profil testowy
+  z OpenAI (strumień, wywołanie narzędzia `[narzedzie:NAZWA {…}]`, `[wolno]`, `[wolno:<s>]` = strumień rozłożony na
+  `<s>` sekund (razem z `[narzedzie:…]`: odpowiedź po wyniku narzędzia), `[plik:<ścieżka>]` = linia `Plik: <ścieżka>` w odpowiedzi (karta pliku), `[blad]`, `[dlugo]`;
+  `--dziennik <plik>` zapisuje każde ciało zapytania jako jedną linię JSON, z której test E2E sprawdza, co dostał
+  agent). Profil testowy
   w kontenerze dostaje w `config.yaml` `model: {provider: custom, base_url: http://127.0.0.1:9199/v1, default: atrapa}`,
   więc całą drogę wiadomości (gateway, `/v1/runs`, czat w dashboardzie) da się sprawdzić bez prawdziwego modelu.
   Żaden profil w obrazie z niej nie korzysta.
+- **Silnik rozmów bez kontenera:** `tests/test_silnik_rozmow.py` uruchamia prawdziwy wątek silnika i trasy FastAPI
+  z atrapą bramy Hermesa `tests/atrapa_bramy.py` (`/v1/runs` z idempotencją, zdarzenia, zgody, steer jak w Hermesie:
+  wiersz `steer` ze znacznikiem `[OUT-OF-BAND USER MESSAGE …]` i `pending_steer` jako jeden tekst, stop, dzierżawy
+  tury, state.db ze schematem z obrazu); przeploty z przeglądu (Stop, dopisz, Ponów, 429, zgody, strumień) sprawdza
+  `tests/test_silnik_wyscigi.py`, trasy i ścieżki `tests/test_trasy_rozmow.py`; znaczniki w treści sterują atrapą (`[wolno:<s>]`, `[zgoda]`,
+  `[blad]`, `[przerwij]`, `[urwij]`, `[czekaj]`; z `czas_zgody` atrapa sama odmawia zgody po tylu sekundach, jak
+  Hermes po `approvals.timeout`). Na hoście potrzebuje FastAPI i httpx, bez nich test jest pomijany.
 - Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (na Linuksie sam doinstalowuje pakiety i Docker
   Engine, na macOS Homebrew i Colimę; repo do `~/jarvo`) → `jarvo up` (`bin/jarvo` → `scripts/local-up.sh`) →
   `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`; na macOS dane i build w wolumenach Dockera
