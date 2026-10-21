@@ -374,6 +374,11 @@ SOURCES (licencje).
   przez `JARVO_EXTRAS="manim"` przed poleceniem (z `--rebuild`); Komputer Jarva przez `JARVO_KOMPUTER=1` (obraz
   `komputer-ca:test` = Debian + certyfikat proxy, `jarvo-komputer:local` po zmianie `infra/komputer/`), a potem
   test twardych zasad na żywo `scripts/komputer-test.sh`.
+- **Rozmowa bez klucza dostawcy (piaskownica, CI):** `scripts/atrapa_modelu.py --port 9199` to atrapa modelu zgodna
+  z OpenAI (strumień, wywołanie narzędzia `[narzedzie:NAZWA {…}]`, `[wolno]`, `[blad]`, `[dlugo]`). Profil testowy
+  w kontenerze dostaje w `config.yaml` `model: {provider: custom, base_url: http://127.0.0.1:9199/v1, default: atrapa}`,
+  więc całą drogę wiadomości (gateway, `/v1/runs`, czat w dashboardzie) da się sprawdzić bez prawdziwego modelu.
+  Żaden profil w obrazie z niej nie korzysta.
 - Instalacja lokalna użytkownika (Linux/WSL2, macOS): `install.sh` (na Linuksie sam doinstalowuje pakiety i Docker
   Engine, na macOS Homebrew i Colimę; repo do `~/jarvo`) → `jarvo up` (`bin/jarvo` → `scripts/local-up.sh`) →
   `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`; na macOS dane i build w wolumenach Dockera
