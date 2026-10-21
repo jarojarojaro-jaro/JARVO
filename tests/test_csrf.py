@@ -8,6 +8,7 @@ testowa /csrf-proba tylko z JARVO_E2E=1.
 from __future__ import annotations
 
 import ast
+import re
 import importlib.util
 import sys
 
@@ -183,14 +184,25 @@ def test_odczyty_wiedzy_bez_skutkow(tmp_path, monkeypatch):
 
 
 def test_ochrona_przezywa_include_router(monkeypatch):
-    """Dashboard montuje router przez app.include_router: trasy powstają od nowa i dalej mają jedną ochronę."""
+    """Dashboard montuje router przez app.include_router. Starsze FastAPI (np. 0.133 z obrazu Hermesa) tworzy przy tym
+    trasy od nowa, nowsze (0.156+) dołącza router bez kopiowania tras, więc sprawdzamy zachowanie, nie wnętrze
+    FastAPI: każda trasa zapisu po dołączeniu odrzuca zwykły formularz 403 csrf, a ochrona jest jedna, nie podwójna."""
     fastapi = pytest.importorskip("fastapi")
     api = _api_hq(monkeypatch, e2e=True)
+    prefiks = "/api/plugins/jarvo-hq"
+    k = _klient(api, prefiks)
+    zapis = [t for t in _trasy(api.router) if set(t.methods) & api.ochrona.METODY_ZAPISU]
+    assert zapis
+    for t in zapis:
+        sciezka = re.sub(r"\{([^}:]+)(:[^}]*)?\}", "x", t.path)
+        for metoda in sorted(set(t.methods) & api.ochrona.METODY_ZAPISU):
+            r = k.request(metoda, prefiks + sciezka, content="x=1", headers={"Content-Type": "text/plain"})
+            assert r.status_code == 403 and r.json()["blad"]["kod"] == "csrf", (metoda, t.path, r.status_code)
     app = fastapi.FastAPI()
-    app.include_router(api.router, prefix="/api/plugins/jarvo-hq")
-    trasy = [t for t in app.routes if hasattr(t, "dependant") and set(t.methods) & {"POST"}]
-    assert trasy and all(type(t) is api.ochrona.Trasa for t in trasy)
-    for t in trasy:
+    app.include_router(api.router, prefix=prefiks)
+    stare = [t for t in app.routes if hasattr(t, "dependant") and set(t.methods) & {"POST"}]
+    for t in stare:   # starsze FastAPI: trasa skopiowana przez include_router ma dalej dokładnie jedną ochronę
+        assert type(t) is api.ochrona.Trasa, t.path
         assert sum(getattr(d, "call", None) is api.ochrona.wymagaj_zapisu for d in t.dependant.dependencies) == 1, t.path
 
 
