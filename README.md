@@ -50,6 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/instal
 # bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
 # potem:      jarvo open (wejście bez hasła) | haslo | status | logs | chat | update | down   (jarvo help: wszystkie)
 # jarvo update = git pull + ten sam instalator (nowe programy hosta, gdy wersja Jarvo ich wymaga)
+# Windows: jarvo działa wprost w PowerShellu (jarvo.cmd przekazuje do Linuksa); nowy install.ps1 = ten sam irm … | iex
 # z klonu:    bash bin/jarvo up   (stop: bash bin/jarvo down)
 ```
 

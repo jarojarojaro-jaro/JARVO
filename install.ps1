@@ -299,12 +299,39 @@ function Autostart([string]$Target) {   # ukryty proces po zalogowaniu trzyma dy
   Say "Autostart: $vbs"
 }
 
+# polecenie jarvo w PowerShellu i cmd: %LOCALAPPDATA%\Jarvo\bin\jarvo.cmd przekazuje wszystko do jarvo w Linuksie
+$CmdDir = Join-Path $JarvoDir "bin"
+$EnvKey = "HKCU:\Environment"
+function UserPath {   # surowa wartość (bez rozwijania %USERPROFILE%), żeby zapis nie zepsuł cudzych wpisów
+  if ($Dry) { return (EnvOr "JARVO_FAKE_USER_PATH" "") }
+  return (Get-Item $EnvKey).GetValue("Path", "", [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+}
+function SetUserPath([string]$Value) {
+  if ($Dry) { Show "PATH użytkownika = $Value"; return }
+  New-ItemProperty -Path $EnvKey -Name Path -Value $Value -PropertyType ExpandString -Force | Out-Null
+  # zapis do rejestru nie ogłasza zmiany: zapis zmiennej przez .NET ją ogłasza (nowe okna widzą nowy PATH)
+  [Environment]::SetEnvironmentVariable("JarvoPathTick", "1", "User")
+  [Environment]::SetEnvironmentVariable("JarvoPathTick", $null, "User")
+}
+function WindowsCommand([string]$Target, [string]$User) {
+  $cmd = Join-Path $CmdDir "jarvo.cmd"
+  $run = ('wsl.exe -d @D@ -u @U@ --cd ~ -e bash -c "export PATH=${PATH}:${HOME}/.local/bin:${HOME}/jarvo/bin; exec jarvo \"$@\"" jarvo %*' -replace "@D@", $Target) -replace "@U@", $User
+  if ($Dry) { Show "jarvo.cmd: $run" }
+  WriteText $cmd ("@echo off`r`nrem Jarvo (install.ps1): jarvo in Windows runs jarvo in Linux ($Target).`r`n" + $run + "`r`n") $false
+  $now = UserPath
+  if (-not (@($now -split ";") -contains $CmdDir)) { SetUserPath ((@($now, $CmdDir) | Where-Object { $_ }) -join ";") }
+  if (-not (@($env:Path -split ";") -contains $CmdDir)) { $env:Path = "$env:Path;$CmdDir" }   # to okno też
+  Say "Polecenie jarvo w PowerShellu: $cmd"
+}
+
 function Uninstall {
   Say "Usuwam dystrybucję $Distro (flota, dane i klucze w niej) i autostart."
   if (-not (Ask "Na pewno?")) { return }
   Wsl --unregister $Distro
   $vbs = StartupVbs
   if ($Dry) { Show "Remove-Item $vbs, $JarvoDir" } else { Remove-Item $vbs, $JarvoDir -Recurse -Force -ErrorAction SilentlyContinue }
+  $now = UserPath
+  if (@($now -split ";") -contains $CmdDir) { SetUserPath ((@($now -split ";") | Where-Object { $_ -and $_ -ne $CmdDir }) -join ";") }
   Say "Gotowe. Inne dystrybucje WSL zostały bez zmian."
 }
 
@@ -373,13 +400,14 @@ function Main {
   if ($code -ne 0) { Die "Instalacja w Linuksie się nie udała (log wyżej; pełny: ~/jarvo-local/install.log w dystrybucji $target, otwórz: wsl -d $target)." }
 
   Autostart $target
+  WindowsCommand $target $user
   # przeglądarka od razu zalogowana: klucz jednorazowy z floty (jarvo link, 15 min); bez niego zwykła strona logowania
   $open = $Url
   $link = WslOut -d $target -u $user --cd "~" -e bash -c 'jarvo link 2>/dev/null || ~/jarvo/bin/jarvo link'
   if ($link -match '(?m)^(http://localhost:\d+/jarvo#klucz=JRV(-[0-9A-Z]{4}){3})$') { $open = $Matches[1] }
   if ($Dry) { Show "Start-Process $Url" } else { Start-Process $open }
   Write-Host ""
-  Say "Gotowe. Dashboard: $Url   (polecenia w Linuksie: wsl -d $target, potem jarvo help)"
+  Say "Gotowe. Dashboard: $Url   (polecenia: jarvo help, w PowerShellu albo w Linuksie: wsl -d $target)"
 }
 
 $JarvoFailed = $false

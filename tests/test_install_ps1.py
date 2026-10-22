@@ -105,6 +105,29 @@ def test_dry_wsl_ready_imports_own_distro(tmp_path):
     assert "Jarvo.vbs" in out and "Start-Process http://localhost:9119/jarvo" in out
     assert out.index("--import") < out.index("-u jarvo --cd")
     assert "RunOnce" not in out and "Docker Desktop" not in out
+    # polecenie jarvo w PowerShellu: jarvo.cmd w %LOCALAPPDATA%\Jarvo\bin, dopisany do PATH użytkownika
+    assert re.search(r'jarvo\.cmd: wsl\.exe -d Jarvo -u jarvo --cd ~ -e bash -c "export PATH=\$\{PATH\}:\$\{HOME\}/\.local/bin:'
+                     r'\$\{HOME\}/jarvo/bin; exec jarvo \\"\$@\\"" jarvo %\*', out)
+    assert re.search(r"PATH użytkownika = \S*Jarvo[/\\]bin$", out, re.M) and "Polecenie jarvo w PowerShellu" in out
+    assert "polecenia: jarvo help" in out
+
+
+def test_dry_jarvo_command_keeps_user_path(tmp_path):
+    r = _dry(tmp_path, JARVO_FAKE_USER_PATH=r"C:\Narzedzia;%USERPROFILE%\bin")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert re.search(r"PATH użytkownika = C:\\Narzedzia;%USERPROFILE%\\bin;\S*Jarvo[/\\]bin$", r.stdout, re.M)
+
+
+def test_dry_jarvo_command_already_in_path(tmp_path):
+    jarvo_bin = str(tmp_path / "Jarvo" / "bin")
+    r = _dry(tmp_path, LOCALAPPDATA=str(tmp_path), JARVO_FAKE_USER_PATH=r"C:\Narzedzia;" + jarvo_bin)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "PATH użytkownika" not in r.stdout and "jarvo.cmd: wsl.exe" in r.stdout
+
+
+def test_dry_existing_distro_command_uses_its_user(tmp_path):
+    r = _dry(tmp_path, JARVO_FAKE_DISTROS="Ubuntu", JARVO_FAKE_EXISTING="Ubuntu")
+    assert r.returncode == 0 and "jarvo.cmd: wsl.exe -d Ubuntu -u uzytkownik --cd ~" in r.stdout
 
 
 def test_dry_arm64_uses_arm_rootfs(tmp_path):
@@ -151,6 +174,9 @@ def test_token_never_printed(tmp_path):
 def test_dry_uninstall(tmp_path):
     r = _dry(tmp_path, JARVO_UNINSTALL="1")
     assert r.returncode == 0 and "wsl.exe --unregister Jarvo" in r.stdout and "--import" not in r.stdout
+    jarvo_bin = str(tmp_path / "Jarvo" / "bin")
+    r = _dry(tmp_path, JARVO_UNINSTALL="1", LOCALAPPDATA=str(tmp_path), JARVO_FAKE_USER_PATH=r"C:\Narzedzia;" + jarvo_bin)
+    assert re.search(r"PATH użytkownika = C:\\Narzedzia$", r.stdout, re.M), r.stdout
 
 
 def test_irm_iex_keeps_session(tmp_path):

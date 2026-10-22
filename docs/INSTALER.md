@@ -58,6 +58,12 @@ strona logowania. `jarvo open` loguje tak samo przy każdym kolejnym otwarciu, h
 Bez nowego `HOST_VERSION`: kod jest w repo i w obrazie, więc wystarczy `jarvo update`; na Windowsie nowe
 `install.ps1` (otwarcie z kluczem) działa przy następnym uruchomieniu instalatora.
 
+**`jarvo` w PowerShellu (2026-10-22):** wcześniej na Windowsie `jarvo` było tylko w Linuksie (WSL), a PowerShell
+odpowiadał „The term 'jarvo' is not recognized”. `install.ps1` zakłada teraz `jarvo.cmd` w PATH użytkownika (§3
+Windows, pkt 6). Bez nowego `HOST_VERSION` (zmiana tylko na Windowsie): istniejąca instalacja dostaje polecenie po
+ponownym `irm https://jarvo.pl/install.ps1 | iex` (to zarazem aktualizacja całej floty); do tego czasu działa
+`wsl -d Jarvo -- jarvo update`.
+
 ## 2. Diagnoza: co przeszkadza na każdym systemie
 
 | | Linux | macOS | Windows |
@@ -160,8 +166,14 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
    do Linuksa przez `WSLENV`, nie przez wiersz poleceń. Dashboard pod `http://localhost:9119` (WSL przekazuje porty).
 5. Autostart: `Jarvo.vbs` w folderze Autostart uruchamia ukryty `wsl.exe -d Jarvo -u root -e sleep infinity`,
    który trzyma dystrybucję przy życiu; systemd w niej stawia Dockera, kontenery i pomocnika aktualizacji.
-6. `JARVO_UNINSTALL=1` usuwa dystrybucję `Jarvo`, autostart i `%LOCALAPPDATA%\Jarvo`; `JARVO_DRY_RUN=1` pokazuje kroki.
-7. PowerShell 5.1: plik bez BOM (BOM psuje `irm | iex`), w kodzie tylko ASCII (PowerShell czyta „ ” jak cudzysłów),
+6. Polecenie `jarvo` w PowerShellu i cmd: `%LOCALAPPDATA%\Jarvo\bin\jarvo.cmd` (dopisany do PATH użytkownika
+   i od razu do bieżącego okna) przekazuje wszystko do `jarvo` w Linuksie:
+   `wsl.exe -d <dystrybucja> -u <użytkownik> --cd ~ -e bash -c "…; exec jarvo \"$@\"" jarvo %*`. Więc `jarvo update`,
+   `jarvo open`, `jarvo status`, `jarvo haslo` działają wprost z PowerShella, bez `wsl -d Jarvo`. PATH czytany
+   z rejestru bez rozwijania (`%USERPROFILE%` w cudzych wpisach zostaje), drugi raz nie dopisuje.
+7. `JARVO_UNINSTALL=1` usuwa dystrybucję `Jarvo`, autostart, `%LOCALAPPDATA%\Jarvo` i wpis w PATH; `JARVO_DRY_RUN=1`
+   pokazuje kroki.
+8. PowerShell 5.1: plik bez BOM (BOM psuje `irm | iex`), w kodzie tylko ASCII (PowerShell czyta „ ” jak cudzysłów),
    programy (`wsl.exe`, `curl.exe`) z `ErrorActionPreference=Continue` (stderr nie przerywa), błąd przy `irm | iex`
    nie zamyka okna, a ustawienia sesji wracają po instalacji.
 
