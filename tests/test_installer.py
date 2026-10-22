@@ -296,6 +296,19 @@ def _jarvo(*args, **env_extra) -> subprocess.CompletedProcess:
     return subprocess.run(["bash", str(JARVO), *args], env=env, capture_output=True, text=True, timeout=30)
 
 
+def test_jarvo_update_without_network_says_so(tmp_path):
+    """Brak sieci (WSL po uśpieniu, VPN): komunikat mówi o sieci, a nie o „lokalnych zmianach” w repo."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    (bindir / "git").write_text("#!/usr/bin/env bash\n"
+                                'case " $* " in *" rev-parse "*) echo main ;; *) exit 128 ;; esac\n', encoding="utf-8")
+    (bindir / "git").chmod(0o755)
+    res = _jarvo("update", PATH=f"{bindir}:{os.environ['PATH']}")
+    assert res.returncode != 0
+    out = res.stdout + res.stderr
+    assert "lokalne zmiany" not in out and ("internetu" in out or "połączenia z GitHubem" in out)
+
+
 def test_jarvo_help_version_and_unknown():
     assert _jarvo("help").returncode == 0
     assert "jarvo uninstall" in _jarvo("help").stdout

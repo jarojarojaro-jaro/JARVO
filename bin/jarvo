@@ -141,7 +141,16 @@ cmd_update() {
   local branch
   branch="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
   say "Aktualizacja ($ROOT, gałąź $branch)"
-  git -C "$ROOT" pull -q --ff-only || die "Aktualizacja repo nie powiodła się (lokalne zmiany? git -C $ROOT status)."
+  if ! git -C "$ROOT" pull -q --ff-only; then
+    # brak sieci to najczęstsza przyczyna (WSL po uśpieniu Windowsa, VPN), a nie lokalne zmiany
+    if ! git -C "$ROOT" ls-remote -q origin HEAD >/dev/null 2>&1; then
+      if grep -qi microsoft /proc/version 2>/dev/null; then
+        die "Linux w WSL nie ma internetu. W PowerShellu: wsl --shutdown, odczekaj 10 s i uruchom aktualizację jeszcze raz (VPN potrafi blokować sieć WSL)."
+      fi
+      die "Brak połączenia z GitHubem (internet, VPN, zapora). Sprawdź sieć i uruchom jarvo update jeszcze raz."
+    fi
+    die "Aktualizacja repo nie powiodła się: lokalne zmiany w $ROOT (git -C $ROOT status)."
+  fi
   # exec: nowy install.sh (z nowymi wymaganiami), a ten plik, właśnie podmieniony przez git, nie jest już czytany
   JARVO_DIR="$ROOT" JARVO_LOCAL="$L" JARVO_BRANCH="$branch" JARVO_NO_OPEN=1 JARVO_NO_BANNER=1 exec bash "$ROOT/install.sh"
 }
