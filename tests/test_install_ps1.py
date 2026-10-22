@@ -163,6 +163,19 @@ def test_dry_refuses_unsupported(tmp_path, fake, msg):
     assert "wsl.exe" not in r.stdout
 
 
+def test_dry_update_needs_less_disk(tmp_path):
+    """Aktualizacja istniejącej instalacji: Linux i obraz już są na dysku, próg 5 GB zamiast 20."""
+    r = _dry(tmp_path, JARVO_FAKE_INSTALLED="1", JARVO_FAKE_DISK_GB="17", JARVO_FAKE_DISTROS="Jarvo")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "Za mało miejsca" not in r.stdout + r.stderr and "Dystrybucja Jarvo: jest" in r.stdout
+    r = _dry(tmp_path, JARVO_FAKE_INSTALLED="1", JARVO_FAKE_DISK_GB="7", JARVO_FAKE_DISTROS="Jarvo")
+    assert r.returncode == 0 and "na aktualizację wystarczy" in r.stdout
+    r = _dry(tmp_path, JARVO_FAKE_INSTALLED="1", JARVO_FAKE_DISK_GB="3", JARVO_FAKE_DISTROS="Jarvo")
+    assert r.returncode != 0 and "Za mało miejsca na aktualizację" in r.stdout + r.stderr
+    r = _dry(tmp_path, JARVO_FAKE_DISK_GB="17")   # nowa instalacja: dalej 20 GB
+    assert r.returncode != 0 and "minimum 20" in r.stdout + r.stderr
+
+
 def test_token_never_printed(tmp_path):
     secret = "github_pat_TAJNY0123456789"
     r = _dry(tmp_path, JARVO_TOKEN=secret, JARVO_FAKE_WSL="brak")

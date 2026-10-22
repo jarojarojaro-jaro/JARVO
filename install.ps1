@@ -148,6 +148,15 @@ function CheckSystem {
   Say "System: Windows (kompilacja $build, $Arch), RAM $ram GB, wolne miejsce $disk GB"
   if ($ram -gt 0 -and $ram -lt 4 -and -not $Force) { Die "Za mało RAM ($ram GB): flota potrzebuje 8 GB (minimum 4). JARVO_FORCE=1 wymusza." }
   if ($ram -gt 0 -and $ram -lt 8) { Warn "Polecamy 8 GB RAM (masz $ram GB): agenci mogą działać wolniej." }
+  # aktualizacja: Linux, obraz i dane już są na dysku (dysk dystrybucji Jarvo albo autostart z poprzedniej instalacji),
+  # nowa wersja obrazu dokłada najwyżej kilka GB
+  $installed = (Test-Path (Join-Path $JarvoDir "wsl\ext4.vhdx")) -or (Test-Path (StartupVbs))
+  if ($Dry) { $installed = (EnvOr "JARVO_FAKE_INSTALLED" "0") -eq "1" }
+  if ($installed) {
+    if ($disk -gt 0 -and $disk -lt 5 -and -not $Force) { Die "Za mało miejsca na aktualizację ($disk GB): nowa wersja obrazu floty potrzebuje do ~5 GB. Zwolnij miejsce na dysku C: albo JARVO_FORCE=1 wymusza." }
+    if ($disk -gt 0 -and $disk -lt 10) { Warn "Masz $disk GB wolnego miejsca: na aktualizację wystarczy, ale na projekty i filmy zostanie mało." }
+    return
+  }
   if ($disk -gt 0 -and $disk -lt 20 -and -not $Force) { Die "Za mało miejsca ($disk GB): Linux, obraz i dane floty potrzebują ~30 GB (minimum 20). JARVO_FORCE=1 wymusza." }
   if ($disk -gt 0 -and $disk -lt 30) { Warn "Masz $disk GB wolnego miejsca: wystarczy, Jarvo zajmie ok. 15 GB (Linux, obraz floty ok. 7 GB po rozpakowaniu, Komputer Jarva 1,6 GB). 30 GB polecamy jako zapas na projekty, filmy i aktualizacje." }
 }

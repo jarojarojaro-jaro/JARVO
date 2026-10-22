@@ -159,6 +159,9 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
    `wsl --update` ma limit 3 minut (potem idzie dalej), sprawdzanie każdej innej dystrybucji 1 minutę (zawieszona
    jest pomijana). Przy 20–30 GB wolnego miejsca tylko informacja, że wystarczy: Jarvo zajmie ok. 15 GB
    (obraz z magazynem containerd 9,8 GB, Komputer Jarva 1,6 GB, Linux), a 30 GB to zapas na projekty i filmy.
+   Aktualizacja (jest już `%LOCALAPPDATA%\Jarvo\wsl\ext4.vhdx` albo `Jarvo.vbs` w Autostarcie): Linux i obraz są
+   już na dysku, więc próg to 5 GB (nowa wersja obrazu), poniżej 10 GB tylko ostrzeżenie; wcześniej aktualizacja
+   przy 17 GB wolnego kończyła się „Za mało miejsca”.
 3. **Docker Engine wewnątrz WSL** zamiast Docker Desktop (decyzja I2): `install.sh` jak na Linuksie,
    zero klikania, zero licencji. Jarvo zainstalowane już w innej dystrybucji (np. Ubuntu z Docker Desktop):
    aktualizacja tam, z tymczasowym sudo bez hasła (`/etc/sudoers.d/zz-jarvo-install`, usuwane na końcu).
