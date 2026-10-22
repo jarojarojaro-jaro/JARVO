@@ -222,6 +222,26 @@ def test_deploy_clears_old_service_image_pins(tmp_path):
     assert wlasny in text and "IMAGE_VALKEY: wersja przypięta w repo" in res.stdout
 
 
+def test_deploy_points_container_at_this_repo(tmp_path):
+    """Stara instalacja z JARVO_REPO na dawnym katalogu (~/TARS): lokalnie deploy.sh poprawia ścieżkę na repo,
+    z którego wdraża (inaczej build w kontenerze idzie ze starego kodu), a na serwerze zatrzymuje się z komunikatem."""
+    env, log = _fake_docker(tmp_path, image_exists=True)
+    dot = tmp_path / "compose" / ".env"
+    stare = tmp_path / "TARS"
+    stare.mkdir()
+    dot.write_text(dot.read_text(encoding="utf-8") + f"JARVO_REPO={stare}\n", encoding="utf-8")
+    res = _deploy(env, "--no-pull", "--no-build")
+    assert res.returncode == 1 and "Popraw JARVO_REPO" in res.stdout
+    assert " up -d" not in log.read_text(encoding="utf-8")
+    res = _deploy({**env, "JARVO_LOCAL_INSTALL": "1"}, "--no-pull", "--no-build")
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert f"JARVO_REPO={fl.REPO_ROOT}\n" in dot.read_text(encoding="utf-8")
+    assert "kontener czytał stary kod" in res.stdout
+    # ścieżka już dobra: bez zmian i bez komunikatu
+    res = _deploy(env, "--no-pull", "--no-build")
+    assert res.returncode == 0 and "JARVO_REPO" not in res.stdout
+
+
 def test_deploy_no_build_requires_existing_image(tmp_path):
     env, log = _fake_docker(tmp_path, image_exists=False)
     res = _deploy(env, "--no-pull", "--no-build")

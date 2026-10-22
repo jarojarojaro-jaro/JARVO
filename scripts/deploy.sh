@@ -58,6 +58,17 @@ for v in IMAGE_SEARXNG=searxng/searxng:latest IMAGE_VALKEY=valkey/valkey:8-alpin
     log "$n: wersja przypięta w repo zamiast $cur"
   fi
 done
+# kontener ma widzieć repo, z którego wdrażamy. Stara instalacja mogła wskazywać inny katalog (np. ~/TARS sprzed
+# zmiany nazwy): host aktualizował nowe repo, a build i install-fleet w kontenerze szły ze starego kodu
+repo_env="$(sed -n 's/^JARVO_REPO=//p' "$COMPOSE_DIR/.env" | tail -1)"
+if [[ -n "$repo_env" && "$(cd "$repo_env" 2>/dev/null && pwd -P || echo "$repo_env")" != "$(pwd -P)" ]]; then
+  if [[ "${JARVO_LOCAL_INSTALL:-0}" == 1 ]]; then
+    sed -i.bak "s#^JARVO_REPO=.*#JARVO_REPO=$ROOT#" "$COMPOSE_DIR/.env" && rm -f "$COMPOSE_DIR/.env.bak"
+    log "JARVO_REPO: $ROOT zamiast $repo_env (kontener czytał stary kod)"
+  else
+    fail "JARVO_REPO w $COMPOSE_DIR/.env to $repo_env, a wdrażasz z $ROOT: kontener dostałby inny kod. Popraw JARVO_REPO."
+  fi
+fi
 # sufit CPU kontenerów najwyżej tyle, ile procesorów widzi Docker (laptop z 2 rdzeniami, mały VPS, Colima
 # z 2 CPU); inaczej Docker odmawia startu: "range of CPUs is from 0.01 to 2.00"
 ncpu="$(docker info --format '{{.NCPU}}' 2>/dev/null || true)"

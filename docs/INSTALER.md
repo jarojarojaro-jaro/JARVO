@@ -237,6 +237,9 @@ Zbudowane 2026-10-09:
 - **Aktualizacja:** `jarvo update` = `git pull --ff-only` + `exec bash install.sh` (nowa wersja instalatora, bez
   banera i bez otwierania przeglądarki); `sudo` tylko, gdy trzeba coś doinstalować. `install.sh` zapisuje
   `HOST_VERSION` w `compose/.host-version`; starsza wersja → `deploy.sh` prosi o `jarvo update`.
+  `JARVO_REPO` w `compose/.env` musi wskazywać repo, z którego idzie wdrożenie (kontener czyta z niego build
+  i `install-fleet.sh`): przy instalacji lokalnej `deploy.sh` sam poprawia starą ścieżkę (np. `~/TARS` sprzed zmiany
+  nazwy, wtedy panel zostawał na starej wtyczce sprzed aplikacji Jarvo), na serwerze zatrzymuje się z komunikatem.
 
 Sprawdzone: `tests/test_installer.py` (Homebrew przed Colimą, `sudo -v` przed Homebrew, mała maszyna i macOS 12 → qemu
 i 5 GB, macOS 11 → odmowa, działający Docker zostaje, klucz nigdy w wyjściu i użyty do gita, `local-up.sh --prepare`
