@@ -57,6 +57,7 @@ function stanPoczatkowy() {
     toasty: [], aktualizacja: null, stara_baza: false,
     funkcje: {}, blad_aplikacji: false,
     podpowiedzi: null,  // ekran startu: {tryb, podpowiedzi, czeka, wersja} z GET /podpowiedzi
+    poznanie: null,     // „trwa”: pierwsze spotkanie otwarte (37-poznajmy.js) do „Do pracy”, „Pomiń” albo „Zrobię to później”
   };
 }
 

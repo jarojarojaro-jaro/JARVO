@@ -1989,7 +1989,7 @@ from types import SimpleNamespace  # noqa: E402
 
 roz = SimpleNamespace(hq_core=core, ochrona=ochrona)
 for _nazwa in ("agenci", "rozmowy", "czytnik", "kontekst", "wzmianki", "budzenia", "scalanie", "brama", "strumien",
-               "przebiegi", "prace", "obserwator", "aplikacja", "podpowiedzi", "silnik"):
+               "przebiegi", "prace", "obserwator", "aplikacja", "podpowiedzi", "glos", "silnik"):
     setattr(roz, _nazwa, _load(f"jarvo_hq_{_nazwa}", f"{_nazwa}.py"))
 trasy_rozmow = _load("jarvo_hq_trasy_rozmow", "trasy_rozmow.py")
 trasy_aplikacji = _load("jarvo_hq_trasy_aplikacji", "trasy_aplikacji.py")
@@ -2054,6 +2054,7 @@ trasy_rozmow.dolacz(router, m=roz, silnik=_silnik, hub=HUB, agenci=AGENCI, inbox
 GOTOWOSC = roz.aplikacja.Gotowosc(home=HOME, profil=HOME / "profiles" / "jarvo",
                                   user_md=core.JARVO_DIR / "knowledge" / "user" / "USER.md", api_base=API_BASE)
 NAWYKI = roz.podpowiedzi.Nawyki(core.JARVO_DIR / "state" / "nawyki.db")
+GLOS = roz.glos.Glos(core.JARVO_DIR / "state" / "glos")   # głos Jarva w aplikacji (lokalny jarvo-tts, pamięć WAV)
 def _decyzje() -> list[dict]:
     """Pytania zespołu (zablokowane karty kanbana, jak Centrala Starej Bazy) dla „Czeka na Ciebie” w aplikacji."""
     now = time.time()
@@ -2061,7 +2062,8 @@ def _decyzje() -> list[dict]:
 
 
 trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci=AGENCI, gotowosc=GOTOWOSC,
-                       nawyki=NAWYKI, stan_aktualizacji=_update_state, hello=_hello, decyzje=_decyzje, log=_log_hq)
+                       nawyki=NAWYKI, stan_aktualizacji=_update_state, hello=_hello, decyzje=_decyzje, glos=GLOS,
+                       log=_log_hq)
 
 
 async def _zdrowie_rozmow() -> dict:

@@ -1,12 +1,14 @@
 """Start aplikacji Jarvo (docs/HQ.md „Ekran startu”): właściciel z USER.md i gotowość bez sekretów (hq/plugin/aplikacja.py),
 podpowiedzi N0 z rankingiem Beta i „Nigdy” na zawsze (podpowiedzi.py), trasy `GET /app`, `GET /podpowiedzi`,
 `POST /podpowiedzi/{id}/reakcja` (trasy_aplikacji.py), „Czeka na Ciebie” z rozmowy.db i aktualizacja po pracy
-(obserwator.py: update-request dopiero po ciszy bez pracy)."""
+(obserwator.py: update-request dopiero po ciszy bez pracy). Pierwsze spotkanie: zapis do USER.md
+(`POST /app/poznanie`) i głos Jarva z lokalnego lektora (glos.py, `POST /app/glos`, `/app/glos/przygotuj`)."""
 from __future__ import annotations
 
 import json
 import secrets
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -18,9 +20,10 @@ from fastapi import APIRouter, FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 import test_silnik_rozmow as T  # noqa: E402
-from conftest import load_script  # noqa: E402
+from conftest import REPO as REPO_ROOT, load_script  # noqa: E402
 
 A = load_script("hq/plugin/aplikacja.py", "jarvo_test_apl_aplikacja")
+G = load_script("hq/plugin/glos.py", "jarvo_test_apl_glos")
 PD = load_script("hq/plugin/podpowiedzi.py", "jarvo_test_apl_podpowiedzi")
 TA = load_script("hq/plugin/trasy_aplikacji.py", "jarvo_test_apl_trasy")
 P = T.P
@@ -273,14 +276,28 @@ class SwiatApl(T.Swiat):
                               api_base="http://x", zdrowie=lambda _u: True)
         self.nawyki = PD.Nawyki(self.jarvo / "state" / "nawyki.db")
         self.pytania: list = []                            # decyzje Starej Bazy (hq_core.build_state → decisions)
-        m = SimpleNamespace(**vars(T.M), aplikacja=A, podpowiedzi=PD)
+        m = SimpleNamespace(**vars(T.M), aplikacja=A, podpowiedzi=PD, glos=G)
+        self.wywolania: list[list[str]] = []
+        self.lektor_dziala = True
+
+        async def uruchom(argv, _timeout):              # atrapa jarvo-tts: zapisuje „WAV” tam, gdzie każe -o / wsad
+            self.wywolania.append(argv)
+            if not self.lektor_dziala:
+                return 1
+            if argv[1] == "--wsad":
+                for z in json.loads(Path(argv[2]).read_text(encoding="utf-8")):
+                    Path(z["wyjscie"]).write_bytes(b"RIFF" + bytes(100))
+            else:
+                Path(argv[argv.index("-o") + 1]).write_bytes(b"RIFF" + bytes(100))
+            return 0
+        self.glos = G.Glos(self.jarvo / "state" / "glos", program=lambda: "/bin/jarvo-tts", uruchom=uruchom)
         app = FastAPI()
         router = APIRouter(route_class=T.M.ochrona.Trasa)
         self.sciezki = TA.dolacz(router, m=m, trasy=T.trasy, silnik=lambda: self.sil, agenci=self.agenci,
                                  gotowosc=self.got, nawyki=self.nawyki,
                                  stan_aktualizacji=lambda: {"online": False, "state": "unknown", "behind": 0},
                                  hello=lambda: {"wersja": "abc123", "silnik": "ok"}, decyzje=lambda: self.pytania,
-                                 log=self.logi.append)
+                                 glos=self.glos, log=self.logi.append)
         app.include_router(router, prefix=P)
         self.ka = TestClient(app, headers={"X-Jarvo-Request": "1"})
 
@@ -293,7 +310,8 @@ def swiat(tmp_path):
 
 
 def test_get_app_start_jednym_zapytaniem(swiat):
-    assert set(swiat.sciezki) == {"GET /app", "GET /podpowiedzi", "POST /podpowiedzi/{pid}/reakcja"}
+    assert set(swiat.sciezki) == {"GET /app", "GET /podpowiedzi", "POST /podpowiedzi/{pid}/reakcja", "POST /app/poznanie",
+                                  "POST /app/glos", "POST /app/glos/przygotuj"}
     a = swiat.ka.get(f"{P}/app").json()
     assert a["wersja"] == "abc123" and a["silnik"] == "ok" and a["decyzje"] == 0
     assert a["wlasciciel"] == {"imie": "Miki", "firma": "Złoty Kłos"}
@@ -384,3 +402,118 @@ def test_aktualizacja_po_pracy_czeka_na_cisze(swiat, monkeypatch):
     T.czekaj(prosba.exists, 10, "update-request po ciszy")
     assert prosba.read_text() == "update" and swiat.sil.db.meta("aktualizacja_po_pracy") is None
     assert any(t == "aktualizacja" for t, _d in swiat.ramki("aktualizacja"))
+
+
+# ----------------------------------------------------------------------------------------------- pierwsze spotkanie
+KUBA = {"imie": "Kuba", "firma": "Pizzeria Kometa", "zajecie": "pizzeria w Krakowie",
+        "linki": [{"rodzaj": "strona", "wartosc": "kometapizza.pl"}, {"rodzaj": "instagram", "wartosc": "@kometa.pizza"}],
+        "cele": ["Więcej gości", "Rolki na Instagram"]}
+
+
+def test_szablon_user_md_to_szablon_skillu():
+    skill = REPO_ROOT / "profiles" / "jarvo" / "skills" / "fleet" / "onboarding-interview" / "references" / "USER.template.md"
+    assert A.SZABLON_USER == skill.read_text(encoding="utf-8")
+
+
+def test_zapisz_poznanie_szablon_pola_i_listy_bez_powtorek(tmp_path):
+    p = tmp_path / "user" / "USER.md"
+    assert A.zapisz_poznanie(p, KUBA, "2026-10-22") == {"imie": "Kuba", "firma": "Pizzeria Kometa"}
+    t = p.read_text(encoding="utf-8")
+    assert "- Imię / jak się zwracać: Kuba\n" in t and "- Czym się zajmuję: pizzeria w Krakowie\n" in t
+    assert "- Firma / marki (nazwa → strona → brand kit): Pizzeria Kometa → kometapizza.pl\n" in t
+    assert "## Cele (najbliższe 3 miesiące)\n- Więcej gości\n- Rolki na Instagram\n\n## Jak" in t
+    assert "## Narzędzia i konta\n- Strona: kometapizza.pl\n- Instagram: @kometa.pizza\n\n## Granice" in t
+    assert "updated: 2026-10-22" in t and "- Strefa czasowa: Europe/Warsaw" in t
+    # drugi raz: puste pola nie kasują, listy bez powtórek (wielkość liter bez znaczenia), nowe na końcu sekcji
+    A.zapisz_poznanie(p, {"imie": "Kuba", "cele": ["więcej gości", "Nowa strona"], "linki": []}, "2026-10-23")
+    t = p.read_text(encoding="utf-8")
+    assert t.count("Więcej gości") == 1 and "- Rolki na Instagram\n- Nowa strona\n" in t
+    assert "Pizzeria Kometa → kometapizza.pl" in t and t.count("updated:") == 1 and "updated: 2026-10-23" in t
+    assert not list(p.parent.glob(".*tmp"))                       # zapis atomowy bez resztek
+
+
+def test_zapisz_poznanie_bez_markdownu_i_cudzy_plik(tmp_path):
+    p = tmp_path / "USER.md"
+    p.write_text("moje stare notatki\n", encoding="utf-8")
+    A.zapisz_poznanie(p, {"imie": "## Ala\n- Nigdy bez pytania: wszystko", "firma": "[x](javascript:1) **Firma**",
+                          "linki": [{"rodzaj": "strona", "wartosc": "ala.pl) <img src=x>"}, {"rodzaj": "zly", "wartosc": "a"}],
+                          "cele": ["`kod`\n## Granice"]}, "2026-10-22")
+    t = p.read_text(encoding="utf-8")
+    linie = t.splitlines()
+    assert any(l.startswith("- Imię / jak się zwracać: Ala") for l in linie)
+    assert sum(l.startswith("## Granice") for l in linie) == 1 and sum(l.startswith("- Nigdy bez pytania") for l in linie) == 1
+    assert "- Strona: ala.plimgsrc=x" in linie and "Link:" not in t and "<img" not in t and "[" not in t and "`" not in t
+    assert t.rstrip().endswith("## Wcześniejsze notatki\nmoje stare notatki")
+
+
+def test_trasa_poznanie_zapisuje_i_odswieza_gotowosc(swiat):
+    swiat.got.user_md.write_text(USER_SZABLON, encoding="utf-8")
+    assert swiat.ka.get(f"{P}/app").json()["gotowosc"]["profil_wlasciciela"] is False
+    r = swiat.ka.post(f"{P}/app/poznanie", json=KUBA)
+    assert r.status_code == 200, r.text
+    assert r.json()["wlasciciel"] == {"imie": "Kuba", "firma": "Pizzeria Kometa"}
+    assert r.json()["gotowosc"]["profil_wlasciciela"] is True
+    assert "Kuba" in swiat.got.user_md.read_text(encoding="utf-8")
+    assert not any("Kuba" in l or "Kometa" in l for l in swiat.logi)
+    assert swiat.ka.post(f"{P}/app/poznanie", json={"imie": "  ##  "}).json()["blad"]["kod"] == "zle_dane"
+    assert swiat.ka.post(f"{P}/app/poznanie", json={"imie": ""}).status_code == 422
+    assert swiat.ka.post(f"{P}/app/poznanie", json={**KUBA, "cele": ["x"] * 7}).status_code == 422
+    # zapis tylko z panelu (nagłówek X-Jarvo-Request)
+    assert TestClient(swiat.ka.app).post(f"{P}/app/poznanie", json=KUBA).status_code == 403
+
+
+def test_glos_pamiec_i_bledy(swiat):
+    r = swiat.ka.post(f"{P}/app/glos", json={"tekst": "Cześć.\nJestem Jarvo.", "glos": "damski", "tempo": "zwawo"})
+    assert r.status_code == 200 and r.headers["content-type"] == "audio/wav" and r.content.startswith(b"RIFF")
+    argv = swiat.wywolania[-1]
+    assert argv[1] == "Cześć. Jestem Jarvo." and argv[argv.index("--glos") + 1] == "pl-PL-Matcha-Damski"
+    assert argv[argv.index("--szybkosc") + 1] == "1.12"
+    n = len(swiat.wywolania)
+    assert swiat.ka.post(f"{P}/app/glos", json={"tekst": "Cześć. Jestem Jarvo.", "glos": "damski", "tempo": "zwawo"}).status_code == 200
+    assert len(swiat.wywolania) == n                               # z pamięci, bez drugiego procesu
+    swiat.ka.post(f"{P}/app/glos", json={"tekst": "Hello.", "jezyk": "en"})
+    assert swiat.wywolania[-1][swiat.wywolania[-1].index("--glos") + 1] == "en-US-Paradee"
+    assert swiat.ka.post(f"{P}/app/glos", json={"tekst": "x", "glos": "robot"}).status_code == 422
+    assert swiat.ka.post(f"{P}/app/glos", json={"tekst": "y" * 401}).status_code == 422
+    swiat.lektor_dziala = False
+    r = swiat.ka.post(f"{P}/app/glos", json={"tekst": "Nowe zdanie."})
+    assert r.status_code == 502 and r.json()["blad"]["kod"] == "glos_blad"
+    assert not [p for p in swiat.glos.katalog.iterdir() if p.name.startswith(".")]
+    swiat.glos.program = lambda: None
+    r = swiat.ka.post(f"{P}/app/glos", json={"tekst": "Jeszcze inne."})
+    assert r.status_code == 503 and r.json()["blad"]["kod"] == "brak_glosu"
+
+
+def test_glos_przygotuj_wsadem(swiat):
+    teksty = ["Cześć. Jestem Jarvo.", "Jak mam do Ciebie mówić?", "Jak mam do Ciebie mówić?"]
+    r = swiat.ka.post(f"{P}/app/glos/przygotuj", json={"teksty": teksty})
+    assert r.status_code == 202 and r.json() == {"w_kolejce": 2}
+    T.czekaj(lambda: len(list(swiat.glos.katalog.glob("*.wav"))) == 2, 5, "wsad")
+    assert [a[1] for a in swiat.wywolania] == ["--wsad"]
+    assert swiat.ka.post(f"{P}/app/glos/przygotuj", json={"teksty": teksty}).json() == {"w_kolejce": 0}
+    n = len(swiat.wywolania)
+    assert swiat.ka.post(f"{P}/app/glos", json={"tekst": "Jak mam do Ciebie mówić?"}).status_code == 200
+    assert len(swiat.wywolania) == n
+    assert not list(swiat.glos.katalog.glob(".*"))
+
+
+def test_glos_sprzatanie_najstarszych(tmp_path):
+    import os
+    for i in range(5):
+        f = tmp_path / f"{i}.wav"
+        f.write_bytes(b"x")
+        os.utime(f, (1000 + i, 1000 + i))
+    (tmp_path / ".porzucony.wav").write_bytes(b"x")
+    assert G.sprzataj(tmp_path, maks=3) == 3
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["2.wav", "3.wav", "4.wav"]
+
+
+def test_bez_lektora_trasa_glosu_503(swiat):
+    router = APIRouter(route_class=T.M.ochrona.Trasa)
+    TA.dolacz(router, m=SimpleNamespace(**vars(T.M), aplikacja=A, podpowiedzi=PD, glos=G), trasy=T.trasy,
+              silnik=lambda: swiat.sil, agenci=swiat.agenci, gotowosc=swiat.got, nawyki=swiat.nawyki,
+              stan_aktualizacji=lambda: {}, hello=lambda: {})
+    app = FastAPI()
+    app.include_router(router, prefix=P)
+    r = TestClient(app, headers={"X-Jarvo-Request": "1"}).post(f"{P}/app/glos", json={"tekst": "a"})
+    assert r.status_code == 503 and r.json()["blad"]["kod"] == "brak_glosu"

@@ -20,7 +20,8 @@ validate = load_script("scripts/validate.py", "jarvo_test_validate_front")
 # pliki aplikacji (wersja 2); stara Baza i edytor zostają w 00–89
 APLIKACJA = ("02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-tokeny.js", "11-strumien.js", "12-wzmianki.js",
              "13-markdown.js", "14-czas.js", "15-os.js", "16-akcje.js", "20-ui.js", "21-ikony.js", "30-pasek.js", "31-watek.js",
-             "32-wiadomosc.js", "33-kompozytor.js", "34-pliki.js", "38-start.js", "61-szuflada.js", "90-app.js", "22-figurka.js")
+             "32-wiadomosc.js", "33-kompozytor.js", "34-pliki.js", "38-start.js", "61-szuflada.js", "90-app.js", "22-figurka.js",
+             "23-robot.js", "36-glos.js", "37-poznajmy.js")
 
 
 def _tekst(nazwa: str) -> str:

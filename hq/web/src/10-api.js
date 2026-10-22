@@ -303,6 +303,19 @@ Object.assign(liveApi, {
   aktualizacja: (action, gdy) => zadanie("POST", "/update", gdy ? { action, gdy } : { action }),
   podpowiedzi: (miejsce = "start") => zadanie("GET", `/podpowiedzi${zapytanieUrl({ miejsce })}`),
   reakcja: (id, rodzaj, klucz) => zadanie("POST", `/podpowiedzi/${kodujUrl(id)}/reakcja`, klucz ? { rodzaj, klucz } : { rodzaj }),
+  // pierwsze spotkanie (37-poznajmy.js): {imie, firma, zajecie, linki: [{rodzaj, wartosc}], cele} → USER.md
+  poznanie: (cialo) => zadanie("POST", "/app/poznanie", cialo),
+  // głos Jarva (36-glos.js): {tekst, glos, tempo, jezyk} → WAV (ArrayBuffer); 503 = instalacja bez lektora
+  async glos(cialo) {
+    let r;
+    try {
+      r = await fetch(`${basePath()}${API_ROOT}/app/glos`, { method: "POST", credentials: "include", cache: "no-store",
+        headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(cialo) });
+    } catch (_) { throw new BladApi(0, null); }
+    if (!r.ok) { let d = null; try { d = await r.json(); } catch (_) { /* nie-JSON */ } if (r.status === 401) naLogowanie(); throw new BladApi(r.status, d); }
+    return r.arrayBuffer();
+  },
+  glosPrzygotuj: (cialo) => zadanie("POST", "/app/glos/przygotuj", cialo),
   subskrypcje: (klient, cialo) => zadanie("POST", `/strumien/${kodujUrl(klient)}/subskrypcje`, cialo),
   // jak AuthWidget Hermesa: POST /auth/logout; pozostałe karty dostają „wyloguj” przez BroadcastChannel i idą na
   // logowanie z next=/jarvo (hash zostaje w sessionStorage każdej karty), ta karta też

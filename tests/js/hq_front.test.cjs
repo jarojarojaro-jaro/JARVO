@@ -1,5 +1,5 @@
 // Testy jednostkowe czystych modułów aplikacji Jarvo (hq/web/src): teksty i liczba mnoga, czas, trasy, skróty, motyw,
-// sklep, reduktory osi i listy, bezpieczny Markdown (wektory XSS, drzewo, budżet czasu) i pomocniki kompozytora. Bez przeglądarki i bez Reacta: pliki źródłowe sklejone jak w pakiecie i uruchomione
+// sklep, reduktory osi i listy, bezpieczny Markdown (wektory XSS, drzewo, budżet czasu), pomocniki kompozytora i pierwszego spotkania. Bez przeglądarki i bez Reacta: pliki źródłowe sklejone jak w pakiecie i uruchomione
 // w osobnym kontekście node:vm. Uruchomienie: `TZ=Europe/Warsaw node tests/js/hq_front.test.cjs` (pytest woła to samo
 // w tests/test_hq_front.py). Wynik: „ok <liczba>” albo błąd z nazwą przypadku.
 "use strict";
@@ -11,15 +11,15 @@ const assert = require("assert");
 
 const SRC = path.join(__dirname, "..", "..", "hq", "web", "src");
 const PLIKI = ["02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-tokeny.js", "12-wzmianki.js", "13-markdown.js",
-  "14-czas.js", "15-os.js"];
+  "14-czas.js", "15-os.js", "37-poznajmy.js"];
 const PRZED = `const React = {}; const useMemo = (f) => f(); const useRef = (v) => ({ current: v }); const useEffect = () => {};
 let HQ_LANG = null; const isPL = () => T.wymus !== "en";\n`;
-const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE });";
+const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania });";
 const kod = PRZED + PLIKI.map((f) => `// ---- ${f}\n` + fs.readFileSync(path.join(SRC, f), "utf8")).join("\n") + PO;
 const kontekst = vm.createContext({ Intl, Date, Math, JSON, URLSearchParams, setTimeout, clearTimeout, console, Set, Map,
   encodeURIComponent, decodeURIComponent, Number, String, Object, Array, RegExp });
 const M = vm.runInContext(kod, kontekst, { filename: "hq-front.js" });
-const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko } = M;
+const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania } = M;
 
 let ile = 0;
 function test(nazwa, f) {
@@ -184,7 +184,7 @@ test("plytko", () => {
 });
 test("stanPoczatkowy: kształt sklepu", () => {
   eq(Object.keys(stanPoczatkowy()).sort(), ["adresaci", "agenci", "aktualizacja", "blad_aplikacji", "decyzje", "funkcje", "gotowe",
-    "gotowosc", "karty", "kolejnosc", "lista", "os", "pasek", "podglad", "podpowiedzi", "podzial", "przebiegi", "pytanie", "silnik",
+    "gotowosc", "karty", "kolejnosc", "lista", "os", "pasek", "podglad", "podpowiedzi", "podzial", "poznanie", "przebiegi", "pytanie", "silnik",
     "stara_baza", "strumien", "szkice", "toasty", "ustawienia", "watki", "wersja", "wlasciciel", "wysylane"]);
   eq(stanPoczatkowy().lista.filtr, "rozmowy");
   eq(stanPoczatkowy().ustawienia.motyw, "system");
@@ -524,6 +524,59 @@ test("Md.granica: stały początek do ostatniej pustej linii poza blokiem kodu",
   eq(Md.granica("a\n\nb"), 3);
   eq(Md.granica("a\n\nb\n\n```\nx\n\ny"), 6);
   eq(Md.granica("bez pustej linii"), 0);
+});
+
+// ------------------------------------------------------------------------------------------------ pierwsze spotkanie
+test("Poznanie.link: rodzaj linku z wpisu", () => {
+  eq(Poznanie.link("@kometa.pizza"), { rodzaj: "instagram", wartosc: "@kometa.pizza" });
+  eq(Poznanie.link("https://www.instagram.com/kometa.pizza/"), { rodzaj: "instagram", wartosc: "@kometa.pizza" });
+  eq(Poznanie.link("tiktok.com/@kometa"), { rodzaj: "tiktok", wartosc: "@kometa" });
+  eq(Poznanie.link("https://kometapizza.pl/"), { rodzaj: "strona", wartosc: "kometapizza.pl" });
+  eq(Poznanie.link("kometapizza.pl,"), { rodzaj: "strona", wartosc: "kometapizza.pl" });
+  eq(Poznanie.link("https://maps.app.goo.gl/AbC123"), { rodzaj: "mapy", wartosc: "maps.app.goo.gl/AbC123" });
+  eq(Poznanie.link("google.com/maps/place/Kometa"), { rodzaj: "mapy", wartosc: "google.com/maps/place/Kometa" });
+  eq(Poznanie.link("google.com/search?q=x"), { rodzaj: "strona", wartosc: "google.com/search?q=x" });
+  eq(Poznanie.link("facebook.com/kometapizza"), { rodzaj: "facebook", wartosc: "facebook.com/kometapizza" });
+  eq(Poznanie.link("pizzeria"), null);
+  eq(Poznanie.link("a b.pl"), null);
+  eq(Poznanie.link(""), null);
+});
+
+test("Poznanie.linki: z tekstu, bez powtórek, najwyżej 6", () => {
+  eq(Poznanie.linki("kometapizza.pl, @kometa.pizza\nKometapizza.pl i coś").map((l) => l.wartosc), ["kometapizza.pl", "@kometa.pizza"]);
+  eq(Poznanie.linki(Array.from({ length: 9 }, (_, i) => `s${i}.pl`).join(" ")).length, 6);
+});
+
+test("Poznanie.zdanie: rośnie z odpowiedzi, notki pod podkreśleniami", () => {
+  eq(Poznanie.zdanie({ imie: "" }), []);
+  const tekst = (k) => k.map((x) => x.t).join("");
+  eq(tekst(Poznanie.zdanie({ imie: "Kuba" })), "Cześć, jestem Kuba.");
+  const pelne = Poznanie.zdanie({ imie: "Kuba", firma: "Pizzeria Kometa", zajecie: "pizzeria w Krakowie",
+    linki: [{ rodzaj: "strona", wartosc: "kometapizza.pl" }, { rodzaj: "instagram", wartosc: "@kometa.pizza" }],
+    cele: ["Więcej klientów", "Rolki i filmy", "Nowa strona"] });
+  eq(tekst(pelne), "Cześć, jestem Kuba. Mam firmę Pizzeria Kometa: pizzeria w Krakowie. Znajdziesz mnie tu: kometapizza.pl i "
+    + "@kometa.pizza. Zależy mi na: Więcej klientów, Rolki i filmy i Nowa strona.");
+  eq(pelne.filter((x) => x.notka).map((x) => x.notka), ["imie", "firma", "zajecie", "strona", "instagram", "cel", "cel", "cel"]);
+  eq(tekst(Poznanie.zdanie({ imie: "Ola", zajecie: "fotografia" }, false)), "Hi, I'm Ola. What I do: fotografia.");
+  eq(Poznanie.imie("  Kuba!  "), "Kuba");
+  eq(Poznanie.pole("a\u0000b\n  c", 80), "a b c");
+});
+
+test("kwestiePoznania: każdy krok ma tekst w obu językach, notki mają klucze", () => {
+  for (const jezyk of ["pl", "en"]) {
+    T.wymus = jezyk;
+    for (const k of ["witaj", "imie", "firma", "linki", "cele", "mozg"]) {
+      for (const model of [true, false]) {
+        const z = kwestiePoznania(k, { imie: "Kuba", model }, 9);
+        assert.ok(z.length && z.every((x) => x && !/^poz\./.test(x) && !/\{/.test(x)), `${jezyk} ${k}: ${z}`);
+      }
+    }
+    for (const n of ["imie", "firma", "zajecie", "strona", "instagram", "facebook", "tiktok", "youtube", "linkedin", "mapy", "inne", "cel"])
+      assert.ok(!/^poz\./.test(T(`poz.notka.${n}`)), n);
+    for (const c of ["klienci", "rolki", "strona", "reklamy", "papiery"]) assert.ok(!/^poz\./.test(T(`poz.cel.${c}`)), c);
+  }
+  T.wymus = "pl";
+  eq(kwestiePoznania("witaj", {}, 9)[1].startsWith("Szefuję zespołowi 9 agentów."), true);
 });
 
 console.log(`ok ${ile}`);

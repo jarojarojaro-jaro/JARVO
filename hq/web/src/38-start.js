@@ -1,28 +1,8 @@
-// Ekran startu (docs/HQ.md „Ekran startu”, makieta V2 · Spokojny): figurka Jarva, powitanie z USER.md, kompozytor
+// Ekran startu (docs/HQ.md „Ekran startu”, makieta V2 · Spokojny): robot Jarva, powitanie z USER.md, kompozytor
 // nowej rozmowy i pod nim najwyżej 4 rzeczy: „Czeka na Ciebie” (zgody, nieudana praca, pytania zespołu) i startery
 // „Na początek” (warstwa nauki N0, hq/plugin/podpowiedzi.py). Pod powitaniem jedna linia gotowości tylko wtedy, gdy
 // czegoś brakuje (brama, model, poznajmy się); młoda brama to „Jarvo się uruchamia…”, bez czerwonego paska.
-
-// figurka Jarva 24×32 (te same piksele co w makiecie V2): warstwy [klasa, [[kolor, ścieżka], …]]; „lid” = mrugnięcie
-const FIGURA_JARVA = [
-  ["", [["rgba(0,0,0,.35)", "M5 31h14v1h-14z"], ["#1D2129", "M7 23h10v2h-10zM7 25h4v5h-4zM13 25h4v5h-4z"], ["#16191f", "M15 25h1v5h-1z"],
-    ["#08090B", "M7 30h4v1h-4zM13 30h4v1h-4z"], ["#1D2129", "M7 14h10v9h-10z"], ["#111419", "M16 14h1v9h-1z"],
-    ["#F1F3F5", "M10 14h4v2h-4zM11 16h2v2h-2z"], ["#951e1e", "M11 14h2v1h-2z"], ["#C62828", "M11 15h2v6h-2z"],
-    ["#111419", "M9 15h1v1h-1zM14 15h1v1h-1z"], ["#F1F3F5", "M15 17h1v1h-1z"], ["#111419", "M9 20h1v1h-1zM9 18h1v1h-1z"],
-    ["#D9B21E", "M11 13h2v1h-2z"]]],
-  ["", [["#F2CD37", "M8 5h8v8h-8z"], ["#D9B21E", "M15 5h1v8h-1zM10 4h4v1h-4z"],
-    ["#15171C", "M10 8h1v1h-1zM13 8h1v1h-1zM10 10h1v1h-1zM11 11h2v1h-2zM13 10h1v1h-1z"],
-    ["#17120E", "M8 4h8v2h-8zM8 6h1v2h-1zM15 6h1v1h-1z"], ["#5d5956", "M11 4h1v1h-1z"], ["#17120E", "M9 3h6v1h-6z"]]],
-  ["lid", [["#F2CD37", "M10 8h1v1h-1zM13 8h1v1h-1z"]]],
-  ["", [["#1D2129", "M5 14h2v7h-2z"], ["#F2CD37", "M5 21h2v2h-2z"]]],
-  ["", [["#1D2129", "M17 14h2v7h-2z"], ["#111419", "M18 14h1v7h-1z"], ["#F2CD37", "M17 21h2v2h-2z"]]],
-];
-
-function FiguraJarva({ skala = 2.5 }) {
-  return html`<span class="j-fig" aria-hidden="true"><svg viewBox="0 0 24 32" width=${24 * skala} height=${32 * skala} focusable="false">
-    ${FIGURA_JARVA.map(([kl, warstwy], i) => html`<g key=${i} class=${kl ? `j-fig-${kl}` : undefined}>
-      ${warstwy.map(([kolor, d], j) => html`<path key=${j} fill=${kolor} d=${d}/>`)}</g>`)}</svg></span>`;
-}
+// Bez imienia w USER.md (i bez „Pomiń”) zamiast startu jest pierwsze spotkanie (37-poznajmy.js).
 
 // pora dnia z godziny: rano 5–11, dzień 12–17, wieczór 18–4 (PL: „Dzień dobry” do 18, potem „Dobry wieczór”)
 const poraDnia = (h) => (h >= 5 && h < 12 ? "rano" : h >= 12 && h < 18 ? "dzien" : "wieczor");
@@ -40,7 +20,8 @@ function useKoordynatorStartu() {
 const agentWg = (agenci, nazwa) => agenci[nazwa] || { name: nazwa };
 
 // ---- linia gotowości (§13.10): jedno zdanie pod powitaniem i najwyżej jeden przycisk, tylko gdy czegoś brakuje.
-// Kolejność: brama (uruchamia się / nie odpowiada), potem model, a gdy model działa: „Poznajmy się” (profil właściciela).
+// Kolejność: brama (uruchamia się / nie odpowiada), potem model, a gdy model działa: „Poznajmy się” (profil właściciela;
+// otwiera pierwsze spotkanie, które nie potrzebuje modelu).
 // „Jak działa zespół” jest w Ustawieniach › Zespół, nie na starcie.
 function stanGotowosci(got) {
   if (!got) return null;
@@ -50,13 +31,13 @@ function stanGotowosci(got) {
   return null;
 }
 
-function LiniaGotowosci({ got, koordynator }) {
+function LiniaGotowosci({ got }) {
   const klucz = stanGotowosci(got);
   if (!klucz) return null;
   const model = got.model || {};
   const akcja = {
     model: [T("gotowosc.polacz"), () => Trasa.idz({ u: "polaczenia", pod: model.sposob === "oauth" ? "modele" : "klucze" }, { scal: true })],
-    poznajmy: [T("gotowosc.zacznij"), () => akcje.wyslij({ tekst: T("gotowosc.poznajmy_tekst"), koordynator })],
+    poznajmy: [T("gotowosc.zacznij"), () => sklep.ustaw({ poznanie: "trwa" })],
   }[klucz];
   const ikona = klucz === "startuje" ? html`<${Spinner}/>` : html`<${Ikona} n=${klucz === "model" ? "plug" : klucz === "poznajmy" ? "msg" : "alert"} r=${16}/>`;
   return html`<p class="j-gotowosc" data-gotowosc=${klucz} data-brama=${got.brama || ""}
@@ -152,6 +133,7 @@ function EkranStartu({ agent }) {
   const podp = useSklep((s) => s.podpowiedzi);
   const oczekujace = useSklep((s) => s.wysylane.nowa);
   const koordynator = useKoordynatorStartu();
+  const poznanie = useSklep((s) => s.poznanie);
   const [godzina] = useState(() => new Date().getHours());
   // #/nowa/<agent>: ten agent dostaje pierwszą wiadomość (wybór na jedną wiadomość, jak „Napisz do Web”)
   useEffect(() => {
@@ -166,6 +148,9 @@ function EkranStartu({ agent }) {
       Strumien.naZdarzenie("reset", odswiez)];
     return () => { clearTimeout(t); usun.forEach((f) => f()); };
   }, []);
+  if (poznanie === "trwa" || poznanieOtwarte(got)) {
+    return html`<div class="j-start j-start-poz"><${Poznajmy} koniec=${() => sklep.ustaw({ poznanie: null })}/></div>`;
+  }
   const imie = wlasciciel && wlasciciel.imie, firma = wlasciciel && wlasciciel.firma;
   const pora = poraDnia(godzina);
   const nowy = !imie && !!got && !got.profil_wlasciciela;
@@ -178,10 +163,10 @@ function EkranStartu({ agent }) {
   return html`<div class="j-start">
     <div class="j-start-in">
       <div class="j-start-hero">
-        <${FiguraJarva}/>
+        <${Robot} r=${64}/>
         <h1 class="j-witaj">${tytul}</h1>
         ${podtytul && html`<p class="j-start-p">${podtytul}</p>`}
-        ${got && html`<${LiniaGotowosci} got=${got} koordynator=${koordynator}/>`}
+        ${got && html`<${LiniaGotowosci} got=${got}/>`}
       </div>
       ${pozycje.length > 0 && html`<div class="j-start-os">${pozycje.map((x) => html`<${WiadomoscWlasciciela} key=${x.id} x=${x} k="nowa"/>`)}</div>`}
       <${Kompozytor} key=${agent || "nowa"} start=${true} koordynator=${koordynator}/>

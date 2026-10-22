@@ -35,7 +35,7 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 # praca floty, obserwator, wątek silnika i trasy; start aplikacji (gotowość, podpowiedzi N0, GET /app)
                 "rozmowy.py", "czytnik.py", "wzmianki.py", "kontekst.py", "agenci.py", "brama.py", "strumien.py",
                 "przebiegi.py", "scalanie.py", "budzenia.py", "prace.py", "obserwator.py", "silnik.py", "trasy_rozmow.py",
-                "aplikacja.py", "podpowiedzi.py", "trasy_aplikacji.py")
+                "aplikacja.py", "podpowiedzi.py", "glos.py", "trasy_aplikacji.py")
 
 
 def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.") -> str:

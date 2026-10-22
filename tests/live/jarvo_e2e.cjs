@@ -1329,8 +1329,15 @@ async function etap3(browser) {
     return p;
   };
   // ekran startu wysyła do koordynatora testu (funkcje.e2e + localStorage), nie do prawdziwego Jarva: żadnej tury
-  // u dostawcy; schowek dla „Kopiuj ścieżkę”
-  await ctx.addInitScript((j) => { try { localStorage.setItem("jarvo.e2e.koordynator", j); } catch (_) { /* inna strona */ } }, J);
+  // u dostawcy; schowek dla „Kopiuj ścieżkę”. Pierwsze spotkanie pominięte i głos wyciszony (bez lektora w tle),
+  // chyba że krok 14 ustawi w sessionStorage „jarvo.e2e.poznanie” i sam przejdzie rozmowę.
+  await ctx.addInitScript((j) => {
+    try {
+      localStorage.setItem("jarvo.e2e.koordynator", j);
+      localStorage.setItem("jarvo.glos.v1", JSON.stringify({ glos: "meski", tempo: "normalnie", cisza: true }));
+      if (!sessionStorage.getItem("jarvo.e2e.poznanie")) localStorage.setItem("jarvo.poznanie.pominiete.v1", "true");
+    } catch (_) { /* inna strona */ }
+  }, J);
   await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
   let page = pilnuj(await ctx.newPage());
   aktywna = page;
@@ -1517,7 +1524,7 @@ async function etap3(browser) {
   const wiecejOd = (a, n, ms = 60000) => page.waitForFunction(([a, n]) => document.querySelectorAll(`.j-msg-ag[data-agent="${a}"] .j-msg-t`).length > n,
     [a, n], { timeout: ms });
 
-  await krok("14", "ekran startu: jedna linia gotowości (Połącz → Klucze/Modele, Poznajmy się → koordynator), powitanie z USER.md, młoda brama „Jarvo się uruchamia…” bez czerwonego paska", async () => {
+  await krok("14", "ekran startu: jedna linia gotowości (Połącz → Klucze/Modele, Poznajmy się → pierwsze spotkanie), głos Jarva, pierwsze spotkanie → USER.md, powitanie z USER.md, młoda brama „Jarvo się uruchamia…” bez czerwonego paska", async () => {
     await naStart();
     const app = await apiT("GET", "/app");
     musi(app.s === 200 && app.d && app.d.gotowosc && app.d.funkcje && app.d.funkcje.e2e, `GET /app: ${app.s} ${JSON.stringify(app.d).slice(0, 200)}`);
@@ -1542,24 +1549,69 @@ async function etap3(browser) {
       await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 5000 });
     }
     if (!got.profil_wlasciciela && got.model.polaczony) {
+      // linia „Poznajmy się” otwiera pierwsze spotkanie (37-poznajmy.js), „Pomiń” wraca na start
       musi(linie[0] === "poznajmy", `bez USER.md nie ma linii „Poznajmy się”: ${linie}`);
-      const t = "Poznajmy się. Zadaj mi pytania o moją firmę.";
-      await koordynatorStartu();
       await page.click('.j-gotowosc[data-gotowosc="poznajmy"] .j-got-b');
-      await page.waitForFunction((t) => [...document.querySelectorAll(".j-babel")].some((e) => e.textContent.trim() === t), t, { timeout: 5000 });
-      const wid = await nowyZeStartu();
-      await odpowiedzZ("Poznajmy się", J);
-      await koniecPracy();
-      const w = await apiT("GET", `/rozmowy/${wid}`);
-      const zap = zapytaniaZ("Poznajmy się. Zadaj mi pytania");
-      musi(w.s === 200 && w.d.watek.koordynator === J, `wątek „Poznajmy się”: ${w.s} koordynator ${w.d && w.d.watek && w.d.watek.koordynator}`);
-      musi(zap.length >= 1 && zap.every((z) => z.profil === J), `atrapa: „Poznajmy się” poszło do ${zap.map((z) => z.profil)}`);
-      out.poznajmy = { koordynator: J, atrapa: [...new Set(zap.map((z) => `/p/${z.profil}/`))] };
-      await naStart();
+      await page.waitForSelector('.j-poz[data-krok="witaj"]', { timeout: 5000 });
+      await page.click(".j-poz-pomin");
+      await page.waitForSelector(".j-witaj", { timeout: 5000 });
+      out.poznajmy_linia = "j-poz";
     }
-    // powitanie z USER.md (imię i firma); plik wraca do poprzedniej treści
+    // głos Jarva: lokalny lektor (WAV) albo 503 brak_glosu na obrazie bez lektora; nic innego
+    out.glos = await page.evaluate(async () => {
+      const r = await fetch("/api/plugins/jarvo-hq/app/glos", { method: "POST",
+        headers: { "X-Jarvo-Request": "1", "Content-Type": "application/json" }, body: JSON.stringify({ tekst: "Test głosu.", glos: "meski", tempo: "normalnie", jezyk: "pl" }) });
+      const b = new Uint8Array(await r.arrayBuffer());
+      return { s: r.status, typ: r.headers.get("content-type") || "", riff: String.fromCharCode(...b.slice(0, 4)), bajty: b.length };
+    });
+    musi((out.glos.s === 200 && /audio\/wav/.test(out.glos.typ) && out.glos.riff === "RIFF" && out.glos.bajty > 1000) || out.glos.s === 503,
+      `POST /app/glos: ${JSON.stringify(out.glos)}`);
+    // pierwsze spotkanie bez modelu: USER.md bez imienia → rozmowa (imię, firma, linki, cele) → pola w USER.md →
+    // „Brakuje mi tylko mózgu” (albo „Do pracy”) → start z imieniem; plik wraca do poprzedniej treści
     const userMd = path.join(KNOWLEDGE, "user", "USER.md");
     let staryUser = null;
+    try { staryUser = fs.readFileSync(userMd, "utf8"); } catch (_) { /* brak pliku */ }
+    try {
+      fs.mkdirSync(path.dirname(userMd), { recursive: true });
+      fs.writeFileSync(userMd, "# Profil użytkownika\n\n## Kim jestem\n- Imię / jak się zwracać:\n- Czym się zajmuję:\n"
+        + "- Firma / marki (nazwa → strona → brand kit):\n");
+      await page.evaluate(() => { sessionStorage.setItem("jarvo.e2e.poznanie", "1"); localStorage.removeItem("jarvo.poznanie.pominiete.v1"); });
+      await przeladuj();
+      await page.waitForSelector('.j-poz[data-krok="witaj"]', { timeout: 10000 });
+      await page.click('.j-poz button[type="submit"]');
+      await page.waitForSelector('.j-poz[data-krok="imie"]', { timeout: 5000 });
+      await page.fill(".j-poz-pole input", "Ola");
+      await page.keyboard.press("Enter");
+      await page.waitForSelector('.j-poz[data-krok="firma"]', { timeout: 5000 });
+      await page.locator(".j-poz-pole input").nth(0).fill("Piekarnia Testowa");
+      await page.locator(".j-poz-pole input").nth(1).fill("chleb na zakwasie");
+      await page.click('.j-poz button[type="submit"]');
+      await page.waitForSelector('.j-poz[data-krok="linki"]', { timeout: 5000 });
+      await page.fill(".j-poz-pole textarea", "piekarnia-testowa.pl @piekarnia.testowa");
+      await page.waitForSelector(".j-poz-znacznik", { timeout: 5000 });
+      await page.keyboard.press("Enter");
+      await page.waitForSelector('.j-poz[data-krok="cele"]', { timeout: 5000 });
+      await page.click(".j-poz-cel >> nth=0");
+      await page.click('.j-poz button[type="submit"]');
+      await page.waitForSelector('.j-poz[data-krok="mozg"]', { timeout: 10000 });
+      out.poznanie = await korzen(() => ({ zdanie: document.querySelector(".j-poz-zd").textContent,
+        mowa: document.querySelector(".j-poz-mowa").textContent, kupony: document.querySelectorAll(".j-poz-kupon").length }));
+      const plik = fs.readFileSync(userMd, "utf8");
+      out.user_md = ["Imię / jak się zwracać: Ola", "Czym się zajmuję: chleb na zakwasie", "Piekarnia Testowa → piekarnia-testowa.pl",
+        "- Strona: piekarnia-testowa.pl", "- Instagram: @piekarnia.testowa"].filter((f) => !plik.includes(f));
+      musi(!out.user_md.length && /\n## Cele[^\n]*\n- \S/.test(plik), `USER.md po pierwszym spotkaniu bez: ${out.user_md}`);
+      musi(/Piekarnia Testowa/.test(out.poznanie.zdanie) && /chleb na zakwasie/.test(out.poznanie.zdanie)
+        && (got.model.polaczony || (/mózgu/.test(out.poznanie.mowa) && out.poznanie.kupony === 2)), `ekran „mózg”: ${JSON.stringify(out.poznanie)}`);
+      await page.click(got.model.polaczony ? ".j-poz .j-btn-glowny" : ".j-poz-pozniej");
+      await page.waitForSelector(".j-witaj", { timeout: 10000 });
+      out.poznanie.start = await korzen(() => document.querySelector(".j-witaj").textContent.trim());
+      musi(/Ola/.test(out.poznanie.start), `start po pierwszym spotkaniu: ${out.poznanie.start}`);
+    } finally {
+      await page.evaluate(() => { sessionStorage.removeItem("jarvo.e2e.poznanie"); }).catch(() => {});
+      if (staryUser != null) fs.writeFileSync(userMd, staryUser); else fs.rmSync(userMd, { force: true });
+    }
+    // powitanie z USER.md wpisanego ręcznie (imię i firma); plik wraca do poprzedniej treści
+    staryUser = null;
     try { staryUser = fs.readFileSync(userMd, "utf8"); } catch (_) { /* brak pliku */ }
     try {
       const szablon = staryUser && /Imię \/ jak się zwracać:/.test(staryUser) && /Firma \/ marki/.test(staryUser) ? staryUser

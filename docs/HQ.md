@@ -21,7 +21,7 @@ Aplikacja (szczegóły: sekcja [2f](#2f-aplikacja-rozmowa-pasek-szuflada)):
 
 | Element | Skąd dane | Co pokazuje |
 |---|---|---|
-| Ekran startu (`#/`) | `GET /app` (właściciel z `USER.md`, gotowość), `GET /podpowiedzi` | figurka Jarva i powitanie po imieniu („Dzień dobry, Ania”, pod spodem firma); bez imienia „Cześć, jestem Jarvo”. Jedno zdanie gotowości z najwyżej jednym przyciskiem, tylko gdy czegoś brakuje: **Połącz** (Klucze albo Modele w szufladzie), **Poznajmy się** (pierwsza wiadomość do Jarva); brama, która wstaje, = „Jarvo się uruchamia…” bez czerwonego paska. Pole wiadomości zakłada nową rozmowę; pod nim najwyżej 4 rzeczy: **Czeka na Ciebie** (zgody, pytania zespołu, nieudana praca) i **Na początek** (startery tylko z połączonym modelem; × ukrywa, potem „Nie pokazuj tego więcej”) |
+| Ekran startu (`#/`) | `GET /app` (właściciel z `USER.md`, gotowość), `GET /podpowiedzi` | robot Jarva (CRT) i powitanie po imieniu („Dzień dobry, Ania”, pod spodem firma); bez imienia w `USER.md` zamiast startu **pierwsze spotkanie** (rozmowa bez modelu, głos Jarva, zapis do `USER.md`; `POST /app/poznanie`, `POST /app/glos`). Jedno zdanie gotowości z najwyżej jednym przyciskiem, tylko gdy czegoś brakuje: **Połącz** (Klucze albo Modele w szufladzie), **Poznajmy się** (otwiera pierwsze spotkanie po „Pomiń”); brama, która wstaje, = „Jarvo się uruchamia…” bez czerwonego paska. Pole wiadomości zakłada nową rozmowę; pod nim najwyżej 4 rzeczy: **Czeka na Ciebie** (zgody, pytania zespołu, nieudana praca) i **Na początek** (startery tylko z połączonym modelem; × ukrywa, potem „Nie pokazuj tego więcej”) |
 | Pasek rozmów | `rozmowy.db` (`GET /rozmowy`) + strumień | **Nowa rozmowa**, szukaj, wątki w grupach (Przypięte, Dziś, Wczoraj, …), menu wiersza, Archiwum i Kosz; stopka: właściciel (Konto), kropka połączenia, odznaka **⬆ N** (dostępna aktualizacja), koło zębate (Ustawienia) |
 | Rozmowa (`#/r/<wątek>`) | oś czasu wątku (`rozmowy.db` + `state.db` agentów) | wiadomości z Markdownem, żywy dymek pracy agenta (tekst na bieżąco, kroki, czas, **Zatrzymaj**), zgody z odliczaniem, karty plików (Podgląd, Pobierz, Kopiuj ścieżkę, Odpal), błąd z **Ponów**, znacznik „bezpośrednio” |
 | Pole wiadomości | wybór adresata, załączniki, szkic | „Do: Jarvo”; `@uchwyt` na początku albo lista **Do:** = tylko ta wiadomość wprost do agenta, potem znów Jarvo; zdjęcia (wklejenie, przeciągnięcie) i pliki; szkic na wątek |
@@ -987,7 +987,7 @@ innych kanałów etap 6.
   i kosz wątku z pracą w toku pytają: zatrzymać ją czy pozwolić skończyć (409 `praca_trwa`). Lista dłuższa niż 120
   wierszy rysuje tylko widoczne wiersze (stała wysokość grupy i wiersza mierzonego z pierwszego). Menu (`Menu`
   w `20-ui.js`) przy dolnej krawędzi otwiera się nad przyciskiem.
-- **Ekran startu** (`38-start.js`, `#/` i `#/nowa/<agent>`; makieta V2): figurka Jarva, powitanie z porą dnia
+- **Ekran startu** (`38-start.js`, `#/` i `#/nowa/<agent>`; makieta V2): robot Jarva (`23-robot.js`, ikona CRT ze strony logowania), powitanie z porą dnia
   i imieniem z `USER.md` („Dzień dobry, {imie}”, pod spodem „{firma} · w czym mogę pomóc?”); bez imienia „Cześć,
   jestem Jarvo” i „Prowadzę zespół N agentów”. Kompozytor nowej rozmowy, a pod nim najwyżej 4 rzeczy: **Czeka na
   Ciebie** (zgody w toku i nieudana praca z `rozmowy.db`, klik otwiera wątek; pytania zespołu z kanbana: jedno
@@ -997,9 +997,8 @@ innych kanałów etap 6.
   gotowości** (spec §13.10, `p.j-gotowosc[data-gotowosc]`) to jedno zdanie pod powitaniem z najwyżej jednym
   przyciskiem, tylko gdy czegoś brakuje; kolejność: brama, model, profil właściciela. „Połącz model, żeby zespół mógł
   odpowiadać.” z **Połącz** otwiera w szufladzie Klucze (dostawca na klucz) albo Modele (OAuth); bez modelu startery
-  się nie pokazują (obiecywałyby pracę, której nikt nie zrobi). Z modelem i bez profilu właściciela: „Opowiedz mi
-  o swojej firmie…” z **Poznajmy się**, które wysyła Jarvowi „Poznajmy się. Zadaj mi pytania o moją firmę.” (wywiad
-  `onboarding-interview`). Brama, która wstaje = „Jarvo się uruchamia…” ze wskaźnikiem (`role=status`), dłużej bez
+  się nie pokazują (obiecywałyby pracę, której nikt nie zrobi). Bez profilu właściciela start ustępuje
+  **pierwszemu spotkaniu** (niżej); po „Pomiń” zostaje linia z **Poznajmy się**, która je otwiera. Brama, która wstaje = „Jarvo się uruchamia…” ze wskaźnikiem (`role=status`), dłużej bez
   odpowiedzi = „Jarvo chwilowo nie odpowiada. Spróbuję ponownie.”; czerwonego paska nie ma. Opis zespołu i lista
   agentów są w Ustawieniach › Zespół, nie na starcie. Wiadomość wysłana ze startu, zanim brama wstanie, czeka w kolejce. Koordynator nowej rozmowy to Jarvo; tylko
   w instalacji testu (`funkcje.e2e`) test podmienia go na `test-e2e-j` (`localStorage` `jarvo.e2e.koordynator`).
@@ -1019,6 +1018,33 @@ innych kanałów etap 6.
     (`hq/plugin/podpowiedzi.py`, warstwa nauki N0): budżet 4 (najpierw „Czeka na Ciebie”, potem do 3 starterów),
     starter na specjalistę z floty, PL i EN, reakcje `pokazana`, `kliknieta`, `odrzucona`, `nigdy` w `nawyki.db`
     (idempotentne po `klucz`), kolejność z rankingu Beta; starter odrzucony 2 razy śpi 14 dni, 3 razy = wyłączony.
+- **Pierwsze spotkanie** (`37-poznajmy.js`, głos `36-glos.js`, robot `23-robot.js`; kierunek „arkusz”): gdy w `USER.md`
+  nie ma imienia (`gotowosc.profil_wlasciciela` = false) i właściciel nie kliknął **Pomiń** (`localStorage`
+  `jarvo.poznanie.pominiete.v1`), aplikacja zamiast startu prowadzi krótką rozmowę **bez modelu**, 6 kroków: powitanie
+  („Cześć. Jestem Jarvo.”, zespół N agentów), imię („Jak mam do Ciebie mówić?”), firma i czym się zajmuje, strony
+  i konta (jedno pole; adres, `@konto`, Instagram, Facebook, TikTok, YouTube, LinkedIn i Mapy Google rozpoznane
+  od razu, znaczniki pod polem), cele (5 gotowych i „coś innego”), mózg. Po lewej rośnie zdanie „Bohater: Kuba.”
+  i „Cześć, jestem Kuba. Mam firmę…”: każda odpowiedź podkreślona z odręczną notką (imię, firma, strona…). Każdy
+  krok ma **Pomiń to pytanie**; na końcu „Zapisałem. Teraz wiem, dla kogo pracuję.” i bez modelu „Brakuje mi tylko
+  mózgu…” z dwoma kuponami (**Zaloguj się kontem ChatGPT** → Modele, **Wklej klucz API** → Klucze) i **Zrobię to
+  później**; aplikacja co 5 s sprawdza gotowość i po podłączeniu modelu mówi „Mam już mózg. Możemy zaczynać.” z **Do pracy**.
+  - `POST /app/poznanie {imie, firma?, zajecie?, linki?: [{rodzaj, wartosc}], cele?}` (`aplikacja.zapisz_poznanie`)
+    zapisuje `USER.md` w skarbcu w układzie szablonu `onboarding-interview` (`SZABLON_USER`, test pilnuje zgodności):
+    Imię, Czym się zajmuję, Firma / marki (`firma → strona`), listy Cele i „Narzędzia i konta” (bez powtórek),
+    `updated:`. Puste pole nie nadpisuje pliku; plik w innym układzie dostaje szablon, a stara treść idzie pod
+    „Wcześniejsze notatki”. Wartości jedną linią bez Markdownu (bez `#`, `*`, `[`, `<`, `|`…), linki tylko znakami
+    adresu; zapis atomowy (plik tymczasowy + `os.replace`); treści właściciela nie ma w logach. Odpowiedź:
+    `{wlasciciel, gotowosc}`; puste imię po czyszczeniu = 422 `zle_dane`, błąd zapisu = 500 `zapis`.
+  - **Głos Jarva** (`hq/plugin/glos.py`): `POST /app/glos {tekst ≤ 400, glos: meski|damski, tempo:
+    spokojnie|normalnie|zwawo, jezyk: pl|en}` = `audio/wav` z lokalnego lektora `jarvo-tts` z obrazu (Matcha
+    `pl-PL-Matcha-Meski` / `pl-PL-Matcha-Damski`, po angielsku `en-US-Paradee`; bez sieci i klucza). Pliki w
+    `state/glos/` (nazwa = skrót głosu, tempa i tekstu; najwyżej 200, najstarsze idą pierwsze), jeden render naraz.
+    `POST /app/glos/przygotuj {teksty ≤ 12, …}` = 202: stałe kwestie rozmowy robią się jednym wsadem (`--wsad`) w tle,
+    zanim padną. Obraz bez lektora = 503 `brak_glosu` i wtedy mówi głos przeglądarki (`speechSynthesis`), błąd
+    lektora = 502 `glos_blad`. Przeglądarka gra przez Web Audio z analizatorem: fala przy imieniu i antena robota
+    idą za prawdziwym dźwiękiem; przed pierwszym kliknięciem przeglądarka nie gra, wtedy przycisk **Włącz głos**.
+    **Zmień mój głos**: Męski / Damski, Spokojnie / Normalnie / Żwawo, Wycisz (`localStorage` `jarvo.glos.v1`),
+    po zmianie Jarvo mówi próbkę nowym głosem.
 - **Aktualizacja** (spec §15.3; Ustawienia › System, `SekcjaSystem` w `61-szuflada.js`): stan z `GET /update` (co minutę,
   co 5 s w trakcie i przy czekaniu na koniec pracy; `online` = pomocnik hosta odezwał się w ciągu 5 min, `praca` =
   `praca.json`, `po_pracy` = czas prośby). **Aktualizuj** najpierw odświeża stan; przy pracy agentów okno „Agenci
@@ -1209,7 +1235,9 @@ innych kanałów etap 6.
   wysyła); zgoda `rm -rf` u `test-e2e-a`: przyciski z wydarzenia, odliczanie 0:20, ryzyko, **Pokaż polecenie**,
   **Odmów** (katalog zostaje), druga prośba wygasa po ok. 20 s z „Czas minął” i **Poproś ponownie**.
   Punkty 14–23 (etap 3c, kryteria akceptacji etapu 3): ekran startu (linia gotowości bez modelu: **Połącz**
-  otwiera Klucze albo Modele, **Poznajmy się** wysyła do koordynatora; `USER.md` z imieniem i firmą = powitanie;
+  otwiera Klucze albo Modele, **Poznajmy się** otwiera pierwsze spotkanie; `POST /app/glos` = WAV albo 503; pierwsze
+  spotkanie od pustego `USER.md` (imię, firma, linki, cel → pola w `USER.md`, ekran „mózg”, start z imieniem);
+  `USER.md` z imieniem i firmą = powitanie;
   brama „startuje” przez `POST /e2e/gotowosc` = „Jarvo się uruchamia…” bez czerwonego paska); nowy wątek ze startu
   („Hej” Enterem, dymek od razu, odpowiedź strumieniem, tura w dzienniku atrapy pod `/p/test-e2e-j/`); bez
   przyklejania adresata (`@teste2ea x` = „tylko ta wiadomość” i „bezpośrednio”, następna bez @ do `test-e2e-j`,

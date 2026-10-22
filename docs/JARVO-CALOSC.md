@@ -252,6 +252,11 @@ przez `JARVO_MODEL_PROVIDER` + `JARVO_MODEL_FRONTIER/STRONG/FAST` (i `JARVO_MODE
 Przed dashboardem **strona logowania** jak strona tytułowa magazynu: winieta „Jarvo” z robotem CRT, dymek, wejście.
 Instalator i `jarvo open` otwierają ją z **kluczem jednorazowym** w adresie (15 min, jedno użycie, w kontenerze tylko
 skrót): klucz wpisuje się sam i użytkownik od razu jest w środku ([HQ.md §5](HQ.md#5-motyw-fosfor-wygląd-całego-dashboardu)).
+Przy pierwszym wejściu (w `USER.md` nie ma imienia) czeka **pierwsze spotkanie**: robot Jarvo mówi lokalnym głosem
+(Matcha męski albo damski, „Zmień mój głos”), pyta bez modelu o imię, firmę, strony i konta oraz cele, a po lewej
+rośnie zdanie „Bohater: Kuba.” z podkreślonymi odpowiedziami. Odpowiedzi idą do `USER.md` w skarbcu (pola szablonu
+`onboarding-interview`), na końcu „Brakuje mi tylko mózgu” z dwoma kuponami: konto ChatGPT albo klucz API
+([HQ.md §2f](HQ.md#2f-aplikacja-rozmowa-pasek-szuflada)).
 Plugin dashboardu Hermesa (`hq/`), zakładka **Jarvo** pod `/jarvo` (pierwsza w menu; `/` i stary adres Bazy prowadzą tam
 same, łatka powłoki `branding/powloka.json` + `powloka.js`, loader ≤ 4 KB, pakiet z `/zasoby` tylko na `/jarvo`,
 ochrona zapisu `hq/plugin/ochrona.py` w obu wtyczkach; [HQ.md §2c](HQ.md#2c-powłoka-jarvo-osadzanie-zasoby)).
@@ -263,7 +268,8 @@ z bezpiecznym Markdownem, odpowiedź pisana na żywo, kroki pracy (Prosty/Szczeg
 **Zatrzymaj** i Esc Esc, **Ponów** po błędzie, kompozytor (Enter wysyła, szkic na wątek, załączniki, `@agent`
 albo lista **Do:** na jedną wiadomość, pytanie przy więcej niż 3 adresatach), karty plików z podglądem, menu wiersza,
 Archiwum i Kosz, eksport rozmowy do Markdown; etap 3c domyka całość: ekran startu (powitanie po imieniu z `USER.md`,
-jedno zdanie gotowości z jednym przyciskiem tylko gdy czegoś brakuje: Połącz albo Poznajmy się, a gdy brama wstaje
+jedno zdanie gotowości z jednym przyciskiem tylko gdy czegoś brakuje: Połącz albo Poznajmy się (otwiera pierwsze
+spotkanie), a gdy brama wstaje
 „Jarvo się uruchamia…” bez czerwonego paska; pod polem „Czeka na Ciebie” (zgody, pytania zespołu, nieudana praca)
 i startery „Na początek” z warstwy nauki N0 (tylko z połączonym modelem),
 `GET /app`, `GET /podpowiedzi`, `nawyki.db`), paski stanu (nowa wersja z **Odśwież**, sama odświeża się tylko

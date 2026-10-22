@@ -659,7 +659,7 @@ def check_hq(r: Report) -> None:
                 "plugin/rozmowy.py", "plugin/czytnik.py", "plugin/wzmianki.py", "plugin/kontekst.py", "plugin/agenci.py",
                 "plugin/brama.py", "plugin/strumien.py", "plugin/przebiegi.py", "plugin/scalanie.py", "plugin/budzenia.py",
                 "plugin/prace.py", "plugin/obserwator.py", "plugin/silnik.py", "plugin/trasy_rozmow.py",
-                "plugin/aplikacja.py", "plugin/podpowiedzi.py", "plugin/trasy_aplikacji.py",
+                "plugin/aplikacja.py", "plugin/podpowiedzi.py", "plugin/glos.py", "plugin/trasy_aplikacji.py",
                 "web/src/12-wzmianki.js", "web/src/38-start.js", "web/src/61-szuflada.js",
                 "web/vendor/htm.umd.js", "web/vendor/LICENSE-htm", "web/demo/index.html", "web/demo/mock.js"):
         if not (hq / rel).exists():

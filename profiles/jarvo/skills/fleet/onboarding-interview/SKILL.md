@@ -1,7 +1,7 @@
 ---
 name: onboarding-interview
 description: "Wywiad startowy: poznaj użytkownika, zapisz jego profil."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,13 +11,19 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-09-26"
+    reviewed: "2026-10-22"
 ---
 
 # Wywiad startowy
 
 Używaj przy pierwszej rozmowie (pusty profil użytkownika) albo gdy użytkownik powie „poznajmy się”
 lub „zaktualizuj, co o mnie wiesz”. Cel: flota zna użytkownika od pierwszego dnia i nie pyta w kółko o to samo.
+
+Profil często zaczyna się już w aplikacji Jarvo: **pierwsze spotkanie** (rozmowa bez modelu przy pierwszym
+otwarciu) zapisuje do `USER.md` imię, firmę ze stroną, czym się zajmuje, strony i konta („Narzędzia i konta”) i cele.
+Najpierw przeczytaj `USER.md`: tego, co już tam jest, nie pytasz od nowa, tylko krótko potwierdzasz i idziesz dalej
+(najczęściej zostają styl pracy, strefa czasowa, granice i budżety). Treść spod „Wcześniejsze notatki” to stary plik
+w innym układzie: przenieś z niego, co pasuje, a nagłówek usuń.
 
 ## Przebieg (rozmowa, nie formularz)
 Maksymalnie 3 pytania w jednej wiadomości, w 3–4 rundach. Każdą rundę zaczynasz od krótkiego podsumowania tego, co już wiesz.

@@ -1312,16 +1312,22 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-akt-opis { margin: 10px 0 0; padding-left: 20px; font-size: 13.5px; color: var(--j-tekst-2); display: grid; gap: 3px; }
 .j-okno-akt .j-okno-s { flex-wrap: wrap; }
 
-/* ---- start (38-start.js, makieta V2 · Spokojny): figurka i powitanie, karta gotowości, kompozytor, pod nim
+/* ---- start (38-start.js, makieta V2 · Spokojny): robot i powitanie, karta gotowości, kompozytor, pod nim
    „Czeka na Ciebie” i startery „Na początek” (najwyżej 4 rzeczy) */
 .j-start { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 40px 28px; }
 .j-start-in { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 724px; margin: auto 0; }
 .j-start-hero { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.j-fig { position: relative; width: 60px; height: 80px; display: block; }
-.j-fig svg { display: block; shape-rendering: crispEdges; animation: j-fig-bob 6s steps(1) infinite; }
-.j-fig-lid { opacity: 0; animation: j-fig-lid 4.3s steps(1) infinite; }
-@keyframes j-fig-bob { 0%, 46% { transform: translateY(0); } 47%, 53% { transform: translateY(-3px); } 54%, 100% { transform: translateY(0); } }
-@keyframes j-fig-lid { 0%, 94% { opacity: 0; } 95%, 100% { opacity: 1; } }
+/* robot Jarva (23-robot.js, ikona CRT jak na stronie logowania): oczy mrugają, antena pulsuje, gdy Jarvo mówi */
+.j-robot { display: block; flex: none; line-height: 0; }
+.j-robot svg { display: block; shape-rendering: crispEdges; overflow: visible; }
+.j-robot-oczy { transform-box: fill-box; transform-origin: 50% 50%; animation: j-robot-mrug 5.2s steps(1) infinite; }
+.j-robot-antena { animation: j-robot-antena 2.8s ease-in-out infinite; }
+.j-robot.is-mowi .j-robot-antena { animation: j-robot-mowi .5s ease-in-out infinite alternate; }
+.j-robot-ekran { transition: fill .3s var(--j-ease); }
+.j-robot.is-mowi .j-robot-ekran { fill: #141A12; }
+@keyframes j-robot-mrug { 0%, 93% { transform: scaleY(1); } 94%, 96% { transform: scaleY(.12); } 97%, 100% { transform: scaleY(1); } }
+@keyframes j-robot-antena { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@keyframes j-robot-mowi { from { opacity: .45; } to { opacity: 1; } }
 .j-witaj { font-size: 32px; line-height: 1.15; font-weight: 620; letter-spacing: -.025em; margin-top: 12px; }
 .j-start-p { margin-top: 9px; font-size: 13.5px; color: var(--j-tekst-3); }
 .j-start-os { width: 100%; margin-top: 18px; }
@@ -1342,6 +1348,74 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-zespol-l b small { display: inline; font-weight: 400; font-size: 12.5px; color: var(--j-tekst-3); }
 .j-zespol-t > small { display: block; font-size: 12.5px; color: var(--j-tekst-3); line-height: 1.45; }
 .j-start-pod { width: 100%; margin-top: 24px; display: flex; flex-direction: column; gap: 18px; }
+/* ---- pierwsze spotkanie (37-poznajmy.js): papier, robot z falą głosu, arkusz „Bohater:” z rosnącym zdaniem
+   (czerwone podkreślenia i notki pisane ręcznie) i rozmowa z Jarvem obok; na wąskim ekranie jedno pod drugim */
+.j-start-poz { align-items: stretch; padding: 0; background: var(--j-papier); color: var(--j-papier-tekst); }
+.j-poz { flex: 1; display: flex; flex-direction: column; min-height: 100%; width: 100%; padding: 22px 36px 28px;
+  background-image: repeating-linear-gradient(0deg, transparent 0 31px, var(--j-papier-linia) 31px 32px); }
+.j-poz-gora { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 2px solid var(--j-papier-tekst); }
+.j-poz-kto { display: flex; flex-direction: column; gap: 4px; margin-right: auto; }
+.j-poz-kto b { font-family: "Instrument Serif", Georgia, serif; font-size: 26px; font-weight: 400; line-height: 1; letter-spacing: -.01em; }
+.j-poz-pomin { color: inherit; opacity: .7; }
+.j-fala { display: inline-flex; align-items: center; gap: 3px; height: 16px; }
+.j-fala i { display: block; width: 3px; height: 16px; border-radius: 2px; background: currentColor; opacity: .35; transform: scaleY(.18);
+  transform-origin: 50% 50%; transition: transform .08s linear; }
+.j-fala.is-mowi i { background: var(--j-akcent); opacity: 1; }
+.j-glos { position: relative; display: flex; align-items: center; gap: 8px; }
+.j-glos-b { color: inherit; }
+.j-glos-wlacz { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; --j-r: 999px;
+  background: var(--j-akcent); color: var(--j-akcent-na); font-size: 13px; font-weight: 600; }
+.j-glos-p { position: absolute; z-index: 5; top: calc(100% + 8px); right: 0; width: 280px; padding: 14px; display: flex; flex-direction: column;
+  gap: 12px; align-items: flex-start; border-radius: 12px; --j-r: 12px; background: var(--j-tlo-pop); color: var(--j-tekst); box-shadow: var(--j-cien-2); }
+.j-glos-w { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.j-glos-e { width: 100%; font-size: 12px; color: var(--j-tekst-3); }
+.j-glos-o { height: 30px; padding: 0 12px; border-radius: 999px; --j-r: 999px; border: 1px solid var(--j-linia-2); font-size: 13px; color: var(--j-tekst-2); }
+.j-glos-o.is-wybrany { border-color: var(--j-akcent); background: var(--j-akcent); color: var(--j-akcent-na); }
+.j-glos-i { font-size: 12px; line-height: 1.45; color: var(--j-tekst-3); }
+.j-poz-in { flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 48px; padding-top: 30px; align-items: start; }
+.j-poz-arkusz { min-width: 0; padding-top: 6px; }
+.j-poz-kicker { font-family: var(--j-font-mono); font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--j-akcent); }
+.j-poz-boh { margin-top: 10px; font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: clamp(44px, 6.2vw, 84px);
+  line-height: .98; letter-spacing: -.02em; }
+.j-poz-boh em { font-style: italic; color: var(--j-akcent); }
+.j-poz-boh em.is-puste { display: inline-block; width: 3.2em; border-bottom: 3px solid currentColor; vertical-align: -.08em; }
+.j-poz-zd { margin-top: 26px; font-family: "Instrument Serif", Georgia, serif; font-size: clamp(22px, 2.3vw, 31px); line-height: 1.9; }
+.j-poz-zd.is-puste { opacity: .5; font-style: italic; }
+.j-poz-u { position: relative; display: inline-block; font-style: italic; text-decoration: underline; text-decoration-color: var(--j-akcent);
+  text-decoration-thickness: 2px; text-underline-offset: 5px; animation: j-poz-wpis .45s var(--j-ease) both; }
+.j-poz-u small { position: absolute; left: 0; top: calc(100% - 4px); font-family: "Caveat", cursive; font-style: normal; font-size: 17px;
+  line-height: 1; color: var(--j-akcent); white-space: nowrap; transform: rotate(-2deg); }
+@keyframes j-poz-wpis { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.j-poz-rozm { display: flex; flex-direction: column; gap: 16px; padding: 22px 24px 18px; border: 2px solid var(--j-papier-tekst);
+  border-radius: 4px; --j-r: 4px; background: var(--j-papier); box-shadow: 6px 6px 0 var(--j-papier-tekst); }
+.j-poz-mowa { display: flex; flex-direction: column; gap: 6px; font-family: "Instrument Serif", Georgia, serif; font-size: 22px; line-height: 1.3; }
+.j-poz-mowa p { opacity: .72; }
+.j-poz-mowa p.is-pytanie { opacity: 1; font-size: 27px; font-style: italic; }
+.j-poz-pole { display: flex; flex-direction: column; gap: 5px; }
+.j-poz-e { font-size: 12px; font-family: var(--j-font-mono); letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
+.j-poz-pole :is(input, textarea) { width: 100%; padding: 8px 2px; border: 0; border-bottom: 2px solid var(--j-papier-tekst); border-radius: 0;
+  --j-r: 0; background: transparent; color: inherit; font-size: 19px; resize: none; font-family: inherit; }
+.j-poz-pole :is(input, textarea):focus { border-bottom-color: var(--j-akcent); }
+.j-poz-pole :is(input, textarea)::placeholder { color: inherit; opacity: .45; }
+.j-poz-rozpoznane { display: flex; flex-wrap: wrap; gap: 6px; }
+.j-poz-znacznik { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: 999px; --j-r: 999px;
+  border: 1px solid var(--j-akcent); color: var(--j-akcent); font-size: 12.5px; }
+.j-poz-cele { display: flex; flex-wrap: wrap; gap: 8px; }
+.j-poz-cel { height: 36px; padding: 0 15px; border-radius: 999px; --j-r: 999px; border: 1.5px solid var(--j-papier-tekst); color: inherit; font-size: 14.5px; }
+.j-poz-cel.is-wybrany { background: var(--j-akcent); border-color: var(--j-akcent); color: var(--j-akcent-na); }
+.j-poz-akcje { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.j-poz-akcje .j-link { color: inherit; opacity: .75; }
+.j-poz-kupony { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.j-poz-kupon { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px; text-align: left; color: inherit;
+  border: 2px dashed var(--j-papier-tekst); border-radius: 6px; --j-r: 6px; transition: transform .15s var(--j-ease), border-color .15s; }
+.j-poz-kupon:hover { transform: rotate(-1deg) translateY(-2px); border-color: var(--j-akcent); }
+.j-poz-kupon b { font-family: "Instrument Serif", Georgia, serif; font-size: 22px; font-weight: 400; line-height: 1.1; }
+.j-poz-kupon small { font-size: 13px; line-height: 1.4; opacity: .75; }
+.j-poz-pozniej { grid-column: 1 / -1; justify-self: start; color: inherit; opacity: .7; }
+.j-poz-blad { font-size: 13.5px; color: var(--j-akcent); }
+.j-poz-kroki { display: flex; gap: 10px; margin-top: 4px; list-style: none; font-family: var(--j-font-mono); font-size: 11.5px; opacity: .55; }
+.j-poz-kroki li.is-zrobiony { text-decoration: line-through; }
+.j-poz-kroki li.is-teraz { color: var(--j-akcent); opacity: 1; font-weight: 700; }
 .j-czeka, .j-podp { min-width: 0; }
 .j-lbl { font-size: 13px; font-weight: 500; color: var(--j-tekst-3); margin: 0 0 6px 12px; }
 .j-czeka-l { border: 1px solid var(--j-uwaga-linia); background: var(--j-uwaga-tlo); border-radius: 14px; overflow: hidden; }
@@ -1678,6 +1752,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 @container app (max-width: 1279px) { .j-uklad { --j-pasek-w: 248px; } .j-os { padding-left: 24px; padding-right: 24px; } .j-dok { padding-left: 24px; padding-right: 24px; } }
 @container app (max-width: 1023px) {
   .j-uklad, .j-uklad.is-zwiniety { grid-template-columns: minmax(0, 1fr); }
+  .j-poz-in { grid-template-columns: minmax(0, 1fr); }
+  .j-poz-rozm { order: -1; }
   .j-pasek { position: absolute; left: 0; top: 0; bottom: 0; width: min(304px, 86%); z-index: 40; transform: translateX(-102%); visibility: hidden;
     transition: transform .22s var(--j-ease), visibility 0s .22s; box-shadow: var(--j-cien-2); }
   .j-uklad.is-wysuniety .j-pasek { transform: none; visibility: visible; transition: transform .22s var(--j-ease); }
@@ -1710,7 +1786,12 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-wiersz-m { width: 40px; height: 40px; }
   .j-okno.j-podglad { width: 100%; height: 100%; }
   .j-witaj { font-size: 27px; }
-  .j-fig { transform: scale(.75); transform-origin: 50% 100%; margin-top: -20px; }
+  .j-poz { padding: 16px 16px 22px; }
+  .j-poz-in { gap: 26px; padding-top: 20px; }
+  .j-poz-rozm { padding: 18px 16px 16px; box-shadow: 4px 4px 0 var(--j-papier-tekst); }
+  .j-poz-kupony { grid-template-columns: minmax(0, 1fr); }
+  .j-poz-cel { height: 40px; }
+  .j-glos-p { right: auto; left: 0; width: min(280px, calc(100vw - 32px)); }
   .j-got-w .j-btn { height: 40px; }
   .j-podp-x { width: 40px; height: 40px; opacity: 1; }
   .j-odznaka { height: 32px; }

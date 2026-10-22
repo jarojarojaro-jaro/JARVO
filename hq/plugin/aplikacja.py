@@ -18,6 +18,10 @@
     albo `gateway_state.json` mówi „ma działać” (`desired_state: running`) i zmienił się mniej niż 2 min temu, albo
     stan to `starting`/`restarting`; w pozostałych przypadkach `niedostepna`.
   - `profil_wlasciciela`: w USER.md jest imię.
+- **Pierwsze spotkanie** (`zapisz_poznanie`, trasa `POST /app/poznanie`): imię, firma, czym się zajmuje, linki i cele
+  z rozmowy w aplikacji (bez modelu) trafiają do tych samych pól USER.md, które wypełnia skill `onboarding-interview`.
+  Brak pliku = szablon skillu. Pola wpisujemy jedną linią (bez znaków Markdownu), listy „Cele” i „Narzędzia i konta”
+  dopisujemy bez powtórek, reszta pliku zostaje. Zapis atomowy (plik obok + rename).
 Testy: tests/test_aplikacja.py.
 """
 
@@ -106,6 +110,131 @@ def wlasciciel(sciezka: Path | str) -> dict:
         firma = _pole(tekst, "Firma / marki") or ""
     firma = _czysty(re.split(r"\s*(?:→|->|\||;)\s*", firma)[0], FIRMA_MAKS)
     return {"imie": imie, "firma": firma}
+
+
+# ----------------------------------------------------------------------------------------------- pierwsze spotkanie
+# szablon skillu onboarding-interview (profiles/jarvo/skills/fleet/onboarding-interview/references/USER.template.md;
+# test pilnuje, że to ten sam tekst)
+SZABLON_USER = """# Profil użytkownika (wspólny dla floty)
+
+<!-- Czytają go wszyscy agenci. Tylko informacje przydatne w pracy. Bez haseł, numerów dokumentów, danych o zdrowiu. -->
+updated: <RRRR-MM-DD>
+
+## Kim jestem
+- Imię / jak się zwracać:
+- Czym się zajmuję:
+- Firma / marki (nazwa → strona → brand kit):
+- Strefa czasowa: Europe/Warsaw
+
+## Cele (najbliższe 3 miesiące)
+-
+
+## Jak ze mną pracować
+- Długość odpowiedzi:
+- Ton:
+- Kiedy przeszkadzać / godziny ciszy:
+- Język: polski
+
+## Narzędzia i konta
+-
+
+## Granice
+- Nigdy bez pytania:
+- Budżety:
+"""
+# rodzaj linku z aplikacji → etykieta w „Narzędzia i konta”
+LINKI = {"strona": "Strona", "instagram": "Instagram", "facebook": "Facebook", "tiktok": "TikTok", "youtube": "YouTube",
+         "linkedin": "LinkedIn", "mapy": "Mapy Google", "inne": "Link"}
+POZNANIE_POLE_MAKS = 120
+POZNANIE_LINK_MAKS = 200
+POZNANIE_LISTA_MAKS = 6
+
+
+def wiersz_poznania(s: object, maks: int = POZNANIE_POLE_MAKS) -> str:
+    """Jedna linia do USER.md: bez znaków sterujących i Markdownu (nagłówki, listy, linki, kod), skrócona."""
+    s = re.sub(r"[\x00-\x1f\x7f]", " ", str(s or ""))
+    s = re.sub(r"[`<>\[\]*_#|→]", "", s)
+    return " ".join(s.split()).strip(" -.,;:")[:maks].strip()
+
+
+def link_poznania(s: object) -> str:
+    """Adres albo @konto: same znaki adresu (bez spacji, nawiasów, cudzysłowów i znaków Markdownu poza `_`)."""
+    s = re.sub(r"[^A-Za-z0-9@._~:/?#&=%+\-ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]", "", str(s or ""))
+    return s.strip(".,;:")[:POZNANIE_LINK_MAKS]
+
+
+def _ustaw_pole(linie: list[str], etykieta: str, wartosc: str) -> bool:
+    """„- <etykieta…>: wartość” (etykieta z pliku zostaje, np. pełna „Firma / marki (nazwa → strona → brand kit)”)."""
+    for i, linia in enumerate(linie):
+        s = linia.strip()
+        if s.startswith("-") and s[1:].lstrip().lower().startswith(etykieta.lower()):
+            pelna = s[1:].lstrip().split(":", 1)[0].rstrip()
+            linie[i] = f"- {pelna}: {wartosc}"
+            return True
+    return False
+
+
+def _dopisz_liste(linie: list[str], naglowek: str, pozycje: list[str]) -> None:
+    """Pozycje pod „## <naglowek…>” bez powtórek; puste „-” z szablonu znikają. Brak sekcji = nowa na końcu."""
+    start = next((i for i, l in enumerate(linie) if l.strip().lower().startswith(f"## {naglowek.lower()}")), None)
+    if start is None:
+        linie += ["", f"## {naglowek}"]
+        start = len(linie) - 1
+    koniec = next((i for i in range(start + 1, len(linie)) if linie[i].startswith("## ")), len(linie))
+    sekcja = linie[start + 1:koniec]
+    jest = {l.strip()[1:].strip().lower() for l in sekcja if l.strip().startswith("-")}
+    sekcja = [l for l in sekcja if l.strip() not in ("-",)]
+    while sekcja and not sekcja[-1].strip():
+        sekcja.pop()
+    nowe = []
+    for p in pozycje:
+        if p and p.lower() not in jest:
+            jest.add(p.lower())
+            nowe.append(f"- {p}")
+    linie[start + 1:koniec] = sekcja + nowe + ([""] if koniec < len(linie) else [])
+
+
+def zapisz_poznanie(sciezka: Path | str, dane: dict, dzis: str) -> dict:
+    """Wynik pierwszego spotkania → USER.md (pola skillu onboarding-interview); zwraca {imie, firma} jak `wlasciciel`.
+    `dane`: {imie, firma, zajecie, linki: [{rodzaj, wartosc}], cele: [str]}; puste pole nie nadpisuje pliku."""
+    p = Path(sciezka)
+    try:
+        tekst = p.read_text(encoding="utf-8", errors="replace")
+    except FileNotFoundError:
+        tekst = ""
+    if "Imię / jak się zwracać" not in tekst:          # brak pliku albo cudzy układ: szablon skillu, stara treść niżej
+        tekst = SZABLON_USER + (f"\n## Wcześniejsze notatki\n{tekst.strip()}\n" if tekst.strip() else "")
+    linie = tekst.splitlines()
+    imie = wiersz_poznania(dane.get("imie"), IMIE_MAKS)
+    firma = wiersz_poznania(dane.get("firma"), FIRMA_MAKS)
+    zajecie = wiersz_poznania(dane.get("zajecie"))
+    linki = []
+    for l in list(dane.get("linki") or [])[:POZNANIE_LISTA_MAKS]:
+        rodzaj = str((l or {}).get("rodzaj") or "")
+        wartosc = link_poznania((l or {}).get("wartosc"))
+        if rodzaj in LINKI and wartosc:
+            linki.append((rodzaj, wartosc))
+    cele = [c for c in (wiersz_poznania(c) for c in list(dane.get("cele") or [])[:POZNANIE_LISTA_MAKS]) if c]
+    if imie:
+        _ustaw_pole(linie, "Imię / jak się zwracać", imie)
+    if zajecie:
+        _ustaw_pole(linie, "Czym się zajmuję", zajecie)
+    if firma:
+        strona = next((w for r, w in linki if r == "strona"), "")
+        _ustaw_pole(linie, "Firma / marki", f"{firma} → {strona}" if strona else firma)
+    if cele:
+        _dopisz_liste(linie, "Cele", cele)
+    if linki:
+        _dopisz_liste(linie, "Narzędzia i konta", [f"{LINKI[r]}: {w}" for r, w in linki])
+    for i, linia in enumerate(linie):
+        if linia.startswith("updated:"):
+            linie[i] = f"updated: {dzis}"
+            break
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(f".{p.name}.{os.getpid()}.tmp")
+    tmp.write_text("\n".join(linie).rstrip("\n") + "\n", encoding="utf-8")
+    os.replace(tmp, p)
+    return wlasciciel(p)
 
 
 # ----------------------------------------------------------------------------------------------- model
@@ -305,6 +434,9 @@ class Gotowosc:
 
     def wlasciciel(self) -> dict:
         return wlasciciel(self.user_md)
+
+    def zapisz_poznanie(self, dane: dict) -> dict:
+        return zapisz_poznanie(self.user_md, dane, time.strftime("%Y-%m-%d", time.localtime(self.zegar())))
 
     def calosc(self) -> tuple[dict, dict]:
         """(wlasciciel, gotowosc)."""
