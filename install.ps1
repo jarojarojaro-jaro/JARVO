@@ -55,6 +55,13 @@ function Native([scriptblock]$Block) {
   $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
   try { & $Block } finally { $ErrorActionPreference = $old }
 }
+# wsl.exe z limitem czasu (aktualizacja WSL, sprawdzanie innych dystrybucji): -1, gdy nie skończył w porę (proces ubity)
+function WslTimed([string]$ArgLine, [int]$Seconds) {
+  $p = Start-Process wsl.exe -ArgumentList $ArgLine -WindowStyle Hidden -PassThru
+  $null = $p.Handle   # bez tego ExitCode bywa pusty po WaitForExit(ms)
+  if (-not $p.WaitForExit($Seconds * 1000)) { try { $p.Kill() } catch { $null = $_ }; return -1 }
+  return $p.ExitCode
+}
 # wsl.exe przez jedną funkcję: na sucho tylko pokazujemy polecenie
 function Wsl {
   if ($Dry) { Show ("wsl.exe " + ($args -join " ")); $global:LASTEXITCODE = 0; return }
@@ -142,7 +149,7 @@ function CheckSystem {
   if ($ram -gt 0 -and $ram -lt 4 -and -not $Force) { Die "Za mało RAM ($ram GB): flota potrzebuje 8 GB (minimum 4). JARVO_FORCE=1 wymusza." }
   if ($ram -gt 0 -and $ram -lt 8) { Warn "Polecamy 8 GB RAM (masz $ram GB): agenci mogą działać wolniej." }
   if ($disk -gt 0 -and $disk -lt 20 -and -not $Force) { Die "Za mało miejsca ($disk GB): Linux, obraz i dane floty potrzebują ~30 GB (minimum 20). JARVO_FORCE=1 wymusza." }
-  if ($disk -gt 0 -and $disk -lt 30) { Warn "Polecamy 30 GB wolnego miejsca (masz $disk GB): obraz floty po rozpakowaniu ma ok. 7 GB, Komputer Jarva 1,6 GB." }
+  if ($disk -gt 0 -and $disk -lt 30) { Warn "Masz $disk GB wolnego miejsca: wystarczy, Jarvo zajmie ok. 15 GB (Linux, obraz floty ok. 7 GB po rozpakowaniu, Komputer Jarva 1,6 GB). 30 GB polecamy jako zapas na projekty, filmy i aktualizacje." }
 }
 
 # ---------------------------------------------------------------- WSL
@@ -204,11 +211,13 @@ function Distros {
 
 function ExistingInstall([string[]]$List) {   # Jarvo już stoi w innej dystrybucji (np. Ubuntu z Docker Desktop)?
   if ($Dry) { return (EnvOr "JARVO_FAKE_EXISTING" "") }
-  foreach ($d in $List) {
-    if ($d -eq $Distro) { continue }
-    # bez cudzysłowów w argumencie: PowerShell 5.1 nie przekazuje ich poprawnie do programów
-    Native { & wsl.exe -d $d -e sh -c 'test -f $HOME/jarvo-local/compose/.env' *> $null }
-    if ($LASTEXITCODE -eq 0) { return $d }
+  $others = @($List | Where-Object { $_ -ne $Distro })
+  if ($others.Count -gt 0) { Say "Szukam wcześniejszej instalacji Jarvo w innych dystrybucjach WSL ($($others.Count))…" }
+  foreach ($d in $others) {
+    # jeden wiersz poleceń dla wsl.exe; $HOME rozwija sh w Linuksie. Zawieszona dystrybucja nie blokuje instalacji.
+    $code = WslTimed ('-d "' + $d + '" -e sh -c "test -f $HOME/jarvo-local/compose/.env"') 60
+    if ($code -eq -1) { Warn "Dystrybucja $d nie odpowiada od minuty: pomijam ją." }
+    if ($code -eq 0) { return $d }
   }
   return ""
 }
@@ -319,7 +328,10 @@ function Main {
   if (-not (WslReady)) { InstallWsl; return }
   if (-not $Dry) { Remove-Item (Join-Path $JarvoDir "po-restarcie") -Force -ErrorAction SilentlyContinue }
   Say "WSL: jest"
-  if (-not $Dry) { Native { & wsl.exe --update *> $null } }   # nowszy WSL (systemd, sieć); bez internetu nic się nie dzieje
+  if (-not $Dry) {   # nowszy WSL (systemd, sieć); bez internetu nic się nie dzieje
+    Say "Sprawdzam aktualizację WSL (zwykle kilka sekund, najwyżej 3 minuty)…"
+    if ((WslTimed "--update" 180) -eq -1) { Warn "Aktualizacja WSL trwa za długo: pomijam ją, instalacja idzie dalej." }
+  }
 
   $list = Distros
   $target = ExistingInstall $list
