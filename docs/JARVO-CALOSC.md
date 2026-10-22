@@ -249,6 +249,9 @@ przez `JARVO_MODEL_PROVIDER` + `JARVO_MODEL_FRONTIER/STRONG/FAST` (i `JARVO_MODE
 
 ## 5. Aplikacja Jarvo (dashboard w przeglądarce)
 
+Przed dashboardem **strona logowania** jak strona tytułowa magazynu: winieta „Jarvo” z robotem CRT, dymek, wejście.
+Instalator i `jarvo open` otwierają ją z **kluczem jednorazowym** w adresie (15 min, jedno użycie, w kontenerze tylko
+skrót): klucz wpisuje się sam i użytkownik od razu jest w środku ([HQ.md §5](HQ.md#5-motyw-fosfor-wygląd-całego-dashboardu)).
 Plugin dashboardu Hermesa (`hq/`), zakładka **Jarvo** pod `/jarvo` (pierwsza w menu; `/` i stary adres Bazy prowadzą tam
 same, łatka powłoki `branding/powloka.json` + `powloka.js`, loader ≤ 4 KB, pakiet z `/zasoby` tylko na `/jarvo`,
 ochrona zapisu `hq/plugin/ochrona.py` w obu wtyczkach; [HQ.md §2c](HQ.md#2c-powłoka-jarvo-osadzanie-zasoby)).

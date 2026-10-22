@@ -1,0 +1,77 @@
+#!/opt/jarvo/venv/bin/python
+"""Klucz jednorazowy do dashboardu: wejście bez wpisywania hasła (instalator i `jarvo open`).
+
+    jarvo-klucz nowy [--ttl 900]   → wypisuje klucz JRV-XXXX-XXXX-XXXX (tylko na stdout, nigdzie nie zapisany jawnie)
+
+Na dysku zostaje sam skrót SHA-256 klucza z czasem wygaśnięcia (/opt/data/jarvo/wejscie, katalog 700, pliki 600).
+Dostawca logowania Hermesa (łatka w branding/patch_dashboard.py) przyjmuje klucz zamiast hasła jeden raz: plik
+skrótu jest przenoszony atomowo przy pierwszej próbie, więc drugi raz ten sam klucz nie przejdzie, nawet po błędzie.
+Strona logowania czyta klucz z części adresu po # (nie trafia do serwera ani logów dostępu) i od razu ją czyści.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import secrets
+import sys
+import time
+from pathlib import Path
+
+KATALOG = Path(os.environ.get("JARVO_WEJSCIE_DIR") or "/opt/data/jarvo/wejscie")
+ZNAKI = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"   # Crockford: bez I, L, O, U (nie mylą się z 1 i 0)
+NAJWIECEJ = 5                                # tyle naraz ważnych kluczy (kilka razy `jarvo open`)
+
+
+def nowy_kod() -> str:
+    return "JRV-" + "-".join("".join(secrets.choice(ZNAKI) for _ in range(4)) for _ in range(3))
+
+
+def skrot(kod: str) -> str:
+    return hashlib.sha256(kod.strip().upper().encode()).hexdigest()
+
+
+def sprzataj(teraz: float) -> None:
+    """Usuwa wygasłe i zużyte wpisy, a z ważnych zostawia NAJWIECEJ - 1 najnowszych (miejsce na nowy)."""
+    wazne = []
+    for p in KATALOG.iterdir():
+        try:
+            wygasa = int(json.loads(p.read_text(encoding="utf-8")).get("wygasa", 0))
+        except (OSError, ValueError, AttributeError):
+            wygasa = 0
+        if p.name.endswith(".zuzyty") or wygasa <= teraz:
+            p.unlink(missing_ok=True)
+        else:
+            wazne.append((wygasa, p))
+    for _, p in sorted(wazne)[:max(0, len(wazne) - (NAJWIECEJ - 1))]:
+        p.unlink(missing_ok=True)
+
+
+def zapisz(kod: str, ttl: int) -> None:
+    KATALOG.mkdir(parents=True, exist_ok=True)
+    os.chmod(KATALOG, 0o700)
+    teraz = time.time()
+    sprzataj(teraz)
+    sciezka = KATALOG / skrot(kod)
+    fd = os.open(sciezka, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump({"wygasa": int(teraz) + ttl}, f)
+
+
+def main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(prog="jarvo-klucz", description=__doc__.splitlines()[0])
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    n = sub.add_parser("nowy", help="nowy klucz jednorazowy na stdout")
+    n.add_argument("--ttl", type=int, default=900, help="ważność w sekundach (60–3600, domyślnie 900)")
+    a = ap.parse_args(argv)
+    ttl = min(3600, max(60, a.ttl))
+    kod = nowy_kod()
+    zapisz(kod, ttl)
+    print(kod)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

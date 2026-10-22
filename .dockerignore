@@ -1,5 +1,11 @@
-# Kontekst budowy obrazu jarvo-hermes (compose: context ..). Dockerfile kopiuje tylko infra/ i branding/;
+# Kontekst budowy obrazu jarvo-hermes (compose: context ..). Dockerfile kopiuje tylko infra/, branding/ i kroje
+# strony logowania (branding/logowanie, patch_dashboard.py KROJE_LOGOWANIA);
 # reszta repo (z .git ~27 MB) nie leci do demona przy każdej budowie.
 *
 !infra
 !branding
+!hq/web/fonts/kroje/kroje.css
+!hq/web/fonts/kroje/instrument-serif-*.woff2
+!hq/web/fonts/kroje/inter-*.woff2
+!hq/web/fonts/kroje/jetbrains-mono-*.woff2
+!hq/web/fonts/kroje/caveat-latin*.woff2

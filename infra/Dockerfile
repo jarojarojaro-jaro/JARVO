@@ -333,8 +333,11 @@ ENV CLAUDE_PLUGIN_ROOT=/opt/jarvo/vendor/claude-seo
 ENV CLAUDE_SEO_PYTHON=/opt/jarvo/venvs/claude-seo/bin/python
 
 # --- branding Jarvo w dashboardzie Hermesa (MIT; licencja i autorzy: docs/SOURCES.md):
-#     favicon, tytuł karty i nazwa w menu. Kod Hermesa bez zmian, tylko statyczne zasoby.
+#     favicon, tytuł karty, nazwa w menu, powłoka /jarvo, strona logowania (kroje OFL z hq/web/fonts/kroje)
+#     i klucz jednorazowy w dostawcy logowania „basic” (infra/bin/jarvo-klucz, docs/HQ.md §5).
 COPY branding/ /tmp/jarvo-brand/
+COPY hq/web/fonts/kroje/kroje.css hq/web/fonts/kroje/instrument-serif-*.woff2 hq/web/fonts/kroje/inter-*.woff2 \
+     hq/web/fonts/kroje/jetbrains-mono-*.woff2 hq/web/fonts/kroje/caveat-latin*.woff2 /tmp/jarvo-brand/kroje/
 RUN python3 /tmp/jarvo-brand/patch_dashboard.py /tmp/jarvo-brand && rm -rf /tmp/jarvo-brand
 
 # --- usługa s6 `dashboard` (katalog źródłowy obrazu Hermesa): twardy limit zatrzymania 30 s. Bez niego s6 czeka,

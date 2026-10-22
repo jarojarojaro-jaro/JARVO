@@ -373,7 +373,11 @@ function Main {
   if ($code -ne 0) { Die "Instalacja w Linuksie się nie udała (log wyżej; pełny: ~/jarvo-local/install.log w dystrybucji $target, otwórz: wsl -d $target)." }
 
   Autostart $target
-  if ($Dry) { Show "Start-Process $Url" } else { Start-Process $Url }
+  # przeglądarka od razu zalogowana: klucz jednorazowy z floty (jarvo link, 15 min); bez niego zwykła strona logowania
+  $open = $Url
+  $link = WslOut -d $target -u $user --cd "~" -e bash -c 'jarvo link 2>/dev/null || ~/jarvo/bin/jarvo link'
+  if ($link -match '(?m)^(http://localhost:\d+/jarvo#klucz=JRV(-[0-9A-Z]{4}){3})$') { $open = $Matches[1] }
+  if ($Dry) { Show "Start-Process $Url" } else { Start-Process $open }
   Write-Host ""
   Say "Gotowe. Dashboard: $Url   (polecenia w Linuksie: wsl -d $target, potem jarvo help)"
 }

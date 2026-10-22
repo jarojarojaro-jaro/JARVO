@@ -1357,9 +1357,24 @@ Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zost
   i wdroż. Wybór zrobiony w dashboardzie przetrwa wdrożenia.
 - Kolory terminala czatu idą z motywu (łatka w `branding/patch_dashboard.py`), skórka TUI jest biało-czerwona
   (`branding/skin-jarvo.yaml`).
-- **Strona logowania** (`/login`, przed dashboardem) ma markę Jarvo: logo, biel i czerwień, VT323 / IBM Plex Mono,
-  linie CRT i polskie napisy (łatka `patch_login` w `branding/patch_dashboard.py`). Fonty kopiuje do publicznego
-  `/fonts/` dashboardu, bo pliki pluginu HQ są za logowaniem. Stopka menu: „Jarvo · Hermes Agent”.
+- **Strona logowania** (`/login`, przed dashboardem) to strona tytułowa Jarvo z `branding/logowanie/` (`strona.html`,
+  `strona.css`, `strona.js`, `robot.svg`): kremowy papier, winieta „Jarvo” z robotem CRT (maskotka z `favicon.svg`,
+  mruga i świeci anteną) zamiast kropki, dymek z powitaniem, trzy kolumny (powitanie, wejście, „Na start”) i taśma
+  na dole; na telefonie wejście jest pierwsze. Łatka `patch_login` w `branding/patch_dashboard.py` podmienia CSS
+  i `<body>` szablonu Hermesa; formularz i skrypt hasła Hermesa zostają, więc logowanie hasłem działa jak dotąd.
+  Kroje Instrument Serif, Inter, JetBrains Mono i Caveat (OFL, `hq/web/fonts/kroje`, w obrazie przez `.dockerignore`
+  i `COPY` w `infra/Dockerfile`) oraz fonty Fosforu (strona „brak metod logowania”) idą do publicznego `/fonts/`
+  dashboardu, bo pliki pluginu HQ są za logowaniem. Stopka menu: „Jarvo · Hermes Agent”.
+- **Klucz jednorazowy (wejście bez hasła).** `jarvo open` (też na końcu `install.sh`) i `jarvo link` (koniec
+  `install.ps1`) proszą kontener o klucz `JRV-XXXX-XXXX-XXXX` (`/opt/jarvo/bin/jarvo-klucz nowy`, z `infra/bin/`:
+  ważny 15 min, najwyżej 5 naraz) i otwierają `http://localhost:9119/jarvo#klucz=…`. Strona logowania czyta klucz
+  z części adresu po `#` (nie idzie do serwera w adresie i znika z historii), sama go wpisuje, wchodzi i stawia
+  pieczątkę „Przyjęto”; zły albo zużyty klucz wraca do zwykłego formularza z podpowiedzią. Na dysku leży tylko skrót
+  SHA-256 z czasem wygaśnięcia (`/opt/data/jarvo/wejscie`, katalog 700, pliki 600). Dostawca logowania `basic`
+  Hermesa dostaje łatkę `patch_klucz`: klucz zamiast hasła działa raz (plik skrótu przenoszony atomowo przy pierwszej
+  próbie, także nieudanej), hasło działa jak dotąd, limit prób Hermesa obejmuje też klucze. Bez łatki budowa obrazu
+  staje. `jarvo open` wypisuje na ekran (i do `install.log`) zwykły adres, klucz trafia tylko do przeglądarki.
+  Testy: `tests/test_klucz_wejscia.py`, `tests/test_branding.py`.
 
 ## 6. Język: polski i angielski
 

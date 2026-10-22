@@ -48,7 +48,7 @@ curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/instal
 #   irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
 # krótszy adres po wgraniu strony (scripts/deploy-site.sh): https://jarvo.pl/install.sh i https://jarvo.pl/install.ps1
 # bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
-# potem:      jarvo haslo | status | logs | chat | update | down | uninstall   (jarvo help: wszystkie)
+# potem:      jarvo open (wejście bez hasła) | haslo | status | logs | chat | update | down   (jarvo help: wszystkie)
 # jarvo update = git pull + ten sam instalator (nowe programy hosta, gdy wersja Jarvo ich wymaga)
 # z klonu:    bash bin/jarvo up   (stop: bash bin/jarvo down)
 ```

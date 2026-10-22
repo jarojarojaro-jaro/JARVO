@@ -137,17 +137,21 @@ def test_login_page_gets_jarvo_brand_polish_and_fonts(tmp_path):
     pd.patch_login(login, REPO / "branding")
     pd.patch_login(login, REPO / "branding")                      # drugi raz nic nie dokleja
     text = login.read_text(encoding="utf-8")
-    assert text.count("---- Jarvo: biel i czerwień") == 2         # szablon logowania i strona „brak metod”
+    assert text.count("---- Jarvo: strona tytułowa logowania") == 1   # szablon logowania
+    assert text.count("---- Jarvo: biel i czerwień") == 1             # strona „brak metod”
     for word in ("Nous", "Sign in", "Public bind", "Username", ">Password<", 'lang="en"'):
         assert word not in text, word
-    for word in ("Zaloguj się", "Zaloguj</button>", "Dostęp tylko po zalogowaniu", "Użytkownik", "Hasło",
-                 "Logowanie niedostępne", '<span class="tagline">from idea to reality.</span>'):
+    for word in ("Zaloguj</button>", "Użytkownik", "Hasło", "Logowanie niedostępne", "from idea to reality.",
+                 "Twój zespół agentów już czeka.", "klucz=", "Klucz jednorazowy", "j-robot-oczy"):
         assert word in text, word
-    assert "/fonts/VT323-400-latin.woff2" in text
-    assert (pd.WEB / "fonts" / "VT323-400-latin.woff2").is_file()
+    for font in ("VT323-400-latin.woff2", "instrument-serif-latin-400-normal.woff2", "inter-latin-wght-normal.woff2",
+                 "jetbrains-mono-latin-wght-normal.woff2", "caveat-latin-wght-normal.woff2"):
+        assert (pd.WEB / "fonts" / font).is_file(), font
+    assert "url('/fonts/instrument-serif-latin-400-normal.woff2')" in text
     # szablon Hermesa to str.format: po łatce musi się formatować, a strona „brak metod” zostaje zwykłym CSS
     ns: dict = {}
     exec(compile(text, "login_page.py", "exec"), ns)
-    html = ns["_LOGIN_HTML_TEMPLATE"].format(provider_buttons=ns["_password_form"]("Jarvo"), password_script="")
-    assert "--midground: #D4213D;" in html and '<svg class="logo"' in html and "{{" not in html
+    html = ns["_LOGIN_HTML_TEMPLATE"].format(provider_buttons=ns["_password_form"]("Jarvo"), password_script="<!--hasło-->")
+    assert '<body class="j">' in html and 'class="j-robot"' in html and "{{" not in html and "@@" not in html
+    assert html.index('<div class="form-title">') < html.index("<!--hasło-->") < html.index("klucz=([A-Za-z0-9-]")
     assert "--midground: #D4213D;" in ns["_EMPTY_HTML"] and "{{" not in ns["_EMPTY_HTML"]

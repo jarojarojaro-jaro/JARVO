@@ -1,0 +1,125 @@
+/* ---- Jarvo: strona tytułowa logowania (branding/logowanie, wstawia branding/patch_dashboard.py) ---- */
+@@FONTS@@
+:root {
+  --papier: #F1E9DA; --papier-2: #E7DCC6; --druk: #17140F; --szary: #5B534A; --blady: #A3988A;
+  --czerwien: #D4213D; --czerwien-2: #B81D36; --limonka: #B8FF3D;
+  --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+  --reka: Caveat, "Segoe Print", cursive;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; min-height: 100%; }
+body.j {
+  overflow-x: hidden; display: flex; flex-direction: column; min-height: 100vh;
+  background: var(--papier); color: var(--druk); font-family: var(--sans); font-size: 16px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(255, 255, 255, .55), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgba(120, 90, 50, .10), transparent 60%);
+}
+body.j::after {   /* ziarno papieru */
+  content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .35; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .38 0 0 0 0 .3 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.j-arkusz { overflow-x: clip; width: 100%; max-width: 1320px; margin: 0 auto; padding: clamp(16px, 3.2vw, 44px) clamp(16px, 4vw, 56px) 0; flex: 1;
+  display: flex; flex-direction: column; }
+.j-glowa { display: flex; align-items: center; gap: clamp(10px, 2vw, 28px); }
+.j-pagina { display: flex; justify-content: space-between; gap: 16px; font: 600 11px/1 var(--mono); letter-spacing: .16em;
+  text-transform: uppercase; color: var(--szary); border-bottom: 1px solid var(--druk); padding-bottom: 10px;
+  animation: j-wjazd .5s .05s both; }
+.j-winieta { margin: clamp(4px, 1vw, 12px) 0 0; font: 400 clamp(96px, 21vw, 300px)/.86 var(--serif); letter-spacing: -.045em;
+  display: flex; align-items: flex-end; white-space: nowrap; }
+.j-l { display: inline-block; transform-origin: 50% 100%; animation: j-litera .9s calc(.18s + var(--i) * .07s) both;
+  animation-timing-function: cubic-bezier(.2, 1.5, .4, 1); }
+.j-kropka { display: inline-block; width: .3em; margin: 0 0 .07em .06em; animation: j-pieczec .8s .75s both;
+  animation-timing-function: cubic-bezier(.2, 1.6, .4, 1); }
+.j-robot { display: block; width: 100%; height: auto; overflow: visible; }
+.j-robot .j-robot-ekran { fill: #10131C; }
+.j-robot .j-robot-oczy { transform-box: fill-box; transform-origin: 50% 50%; animation: j-mrug 5.2s 2.2s infinite; }
+.j-robot .j-robot-antena { animation: j-antena 1.6s 1.4s infinite; }
+.j-podtytul { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; margin-top: clamp(14px, 3.4vw, 46px);
+  font: 400 15px/1.4 var(--sans); color: var(--szary); animation: j-wjazd .6s .9s both; }
+.j-haslo { font: italic 400 clamp(22px, 2.4vw, 30px)/1 var(--serif); color: var(--czerwien); }
+.j-linie { margin: 16px 0 0; height: 6px; border-top: 3px solid var(--druk); border-bottom: 1px solid var(--druk);
+  transform-origin: 0 50%; animation: j-linia .8s .5s both cubic-bezier(.65, 0, .35, 1); }
+.j-kolumny { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: clamp(20px, 3vw, 48px); padding: clamp(18px, 3vw, 36px) 0; flex: 1; }
+.j-kolumny > section { animation: j-wjazd .6s both; }
+.j-kolumny > section:nth-child(1) { animation-delay: 1.05s; }
+.j-kolumny > section:nth-child(2) { animation-delay: 1.15s; }
+.j-kolumny > section:nth-child(3) { animation-delay: 1.25s; }
+.j-kicker { margin: 0 0 12px; font: 700 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--czerwien); }
+.j-lead h2 { margin: 0 0 14px; font: 400 clamp(34px, 3.4vw, 50px)/1.02 var(--serif); letter-spacing: -.01em; }
+.j-lead p:not(.j-kicker) { margin: 0; color: var(--szary); font-size: 16px; max-width: 34ch; }
+.j-wejscie { position: relative; border-left: 1px solid var(--druk); border-right: 1px solid var(--druk); padding: 0 clamp(18px, 2.4vw, 34px); }
+.j-spis ol { list-style: none; margin: 0; padding: 0; }
+.j-spis li { display: grid; grid-template-columns: 52px 1fr; gap: 8px; padding: 10px 0; border-bottom: 1px solid rgba(23, 20, 15, .18); }
+.j-spis li b { font: 400 34px/1 var(--serif); color: var(--czerwien); }
+.j-spis li span { font-size: 15px; line-height: 1.4; }
+
+/* formularz Hermesa (klasy z login_page.py) w stylu strony */
+.provider-list { display: block; }
+.provider-form { display: flex; flex-direction: column; gap: 16px; margin: 0; }
+.form-title { display: none; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field-label { font: 700 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--szary); transition: color .2s; }
+.field-input { width: 100%; border: 0; border-bottom: 2px solid var(--druk); border-radius: 0; background: transparent; color: var(--druk);
+  font: 500 20px/1.4 var(--mono); letter-spacing: .06em; padding: 6px 0; outline: none; transition: border-color .2s; }
+.field-input:focus-visible { border-bottom-color: var(--czerwien); box-shadow: 0 2px 0 0 var(--czerwien); }
+.provider-btn { align-self: flex-start; margin-top: 6px; border: 2px solid var(--czerwien); border-radius: 999px; background: var(--czerwien);
+  color: #FFF8EE; font: 700 13px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; padding: 14px 28px; cursor: pointer;
+  box-shadow: 0 3px 0 var(--czerwien-2); transform: rotate(-1.5deg); transition: transform .12s, box-shadow .12s, background .12s; text-decoration: none; }
+.provider-btn:hover { background: var(--czerwien-2); }
+.provider-btn:active, .provider-btn.j-wcisniety { transform: rotate(-1.5deg) translateY(3px); box-shadow: 0 0 0 var(--czerwien-2); }
+.provider-btn:focus-visible { outline: 2px solid var(--druk); outline-offset: 3px; }
+.provider-btn:disabled { cursor: progress; }
+.form-error { color: var(--czerwien-2); font-size: 14px; font-weight: 600; }
+.j-notka { margin: 22px 0 6px; font: 600 21px/1.15 var(--reka); color: var(--czerwien); transform: rotate(-1deg); }
+.j-przypis { margin: 0; font-size: 13px; color: var(--szary); }
+.j-przypis code { font: 600 12px var(--mono); background: var(--papier-2); padding: 1px 5px; border-radius: 4px; color: var(--druk); }
+
+.j-dymek { position: relative; margin: 0 0 6% 0; max-width: 15em; padding: 14px 20px 12px; border: 2px solid var(--czerwien);
+  border-radius: 18px 18px 18px 4px; font: 600 clamp(22px, 2.3vw, 32px)/1.1 var(--reka); color: var(--czerwien); background: rgba(255, 255, 255, .35);
+  transform: rotate(-2deg); transform-origin: 0 100%; animation: j-dymek .5s 1.4s both cubic-bezier(.2, 1.5, .4, 1); }
+.j-dymek::before { content: ""; position: absolute; left: -14px; bottom: 10px; border: 7px solid transparent; border-right: 9px solid var(--czerwien); }
+
+/* klucz jednorazowy: etykieta, znaki opadające jak czcionki, pieczątka */
+body.j-klucz .field:has(input[name=username]) { display: none; }
+body.j-klucz .field-label { color: var(--czerwien); }
+body.j-klucz .field-input { border-bottom-color: var(--czerwien); }
+.j-czcionki { display: flex; gap: .06em; min-height: 1.4em; font: 600 22px/1.4 var(--mono); letter-spacing: .02em;
+  border-bottom: 2px solid var(--czerwien); padding: 6px 0; }
+.j-czcionki span { display: inline-block; animation: j-czcionka .32s both cubic-bezier(.2, 1.4, .4, 1); }
+.j-czcionki span.j-kreska { color: var(--blady); }
+.j-pieczatka { position: absolute; right: clamp(8px, 2vw, 26px); top: 28px; padding: 10px 18px; border: 4px solid var(--czerwien);
+  border-radius: 10px; color: var(--czerwien); font: 800 26px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase;
+  opacity: 0; transform: rotate(-12deg) scale(1.6); pointer-events: none; mix-blend-mode: multiply; }
+.j-pieczatka.j-pokaz { animation: j-stempel .45s both cubic-bezier(.2, 1.6, .4, 1); }
+
+.j-tasma { background: var(--druk); color: var(--papier); overflow: hidden; white-space: nowrap;
+  font: 700 12px/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; padding: 12px 0; }
+.j-tasma-tor { display: inline-flex; animation: j-tasma 38s linear infinite; }
+.j-tasma-tor span { padding-right: .4em; }
+
+@keyframes j-wjazd { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes j-litera { 0% { opacity: 0; transform: translateY(-70%) rotateX(70deg); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes j-pieczec { 0% { opacity: 0; transform: scale(2.2) rotate(-18deg); } 100% { opacity: 1; transform: none; } }
+@keyframes j-linia { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes j-mrug { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes j-antena { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes j-czcionka { 0% { opacity: 0; transform: translateY(-120%) scale(1.3); } 100% { opacity: 1; transform: none; } }
+@keyframes j-stempel { 0% { opacity: 0; transform: rotate(-12deg) scale(1.8); } 100% { opacity: .92; transform: rotate(-12deg) scale(1); } }
+@keyframes j-dymek { 0% { opacity: 0; transform: rotate(-2deg) scale(.4); } 100% { opacity: 1; transform: rotate(-2deg) scale(1); } }
+@keyframes j-tasma { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+@media (max-width: 900px) {
+  .j-kolumny { grid-template-columns: 1fr; }
+  .j-wejscie { border: 0; border-top: 1px solid var(--druk); border-bottom: 1px solid var(--druk); padding: 20px 0; order: -1; }
+  .j-podtytul { flex-direction: column; gap: 6px; }
+  .j-pagina span:nth-child(3) { display: none; }
+  .j-dymek { font-size: 17px; padding: 8px 12px 6px; max-width: 9em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .j-pieczatka.j-pokaz { opacity: .92; transform: rotate(-12deg); }
+}

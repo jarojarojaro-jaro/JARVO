@@ -8,7 +8,8 @@
 #   jarvo logs [usługa]       logi na żywo (domyślnie hermes; Ctrl+C kończy)
 #   jarvo update              pobierz nową wersję i zainstaluj ją tym samym instalatorem (programy na komputerze też)
 #   jarvo chat [profil]       czat z agentem w terminalu (domyślnie jarvo)
-#   jarvo open                otwórz dashboard w przeglądarce
+#   jarvo open                otwórz dashboard w przeglądarce, od razu zalogowany (klucz jednorazowy, 15 min)
+#   jarvo link                wypisz jednorazowy adres wejścia bez hasła (instalator Windows, inny komputer w sieci)
 #   jarvo haslo               login i hasło do dashboardu Jarvo (nie zapisujemy ich w logu instalacji)
 #   jarvo pliki               otwórz katalog z wynikami agentów (macOS: kopia w ~/Jarvo)
 #   jarvo autostart on|off|status   start floty i pomocnika aktualizacji po restarcie (systemd użytkownika; macOS: LaunchAgent)
@@ -158,7 +159,23 @@ cmd_version() {
   git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "? (brak repo git w $ROOT)"; return; }
   printf '%s %s\n' "$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)" "$(git -C "$ROOT" log -1 --format='%h (%cs)')"
 }
-cmd_open() { echo "$URL"; open_path "$URL" || true; }
+klucz_url() {   # adres z kluczem jednorazowym (infra/bin/jarvo-klucz w kontenerze); bez działającej floty: kod 1
+  local k
+  ensure_docker soft || return 1
+  k="$(docker exec -u hermes jarvo-hermes /opt/jarvo/bin/jarvo-klucz nowy 2>/dev/null)" || return 1
+  [[ $k =~ ^JRV(-[0-9A-Z]{4}){3}$ ]] || return 1
+  printf '%s#klucz=%s\n' "$URL" "$k"
+}
+cmd_open() {   # klucz tylko w przeglądarce: na ekran (i do install.log) idzie zwykły adres
+  local u
+  echo "$URL"
+  u="$(klucz_url)" || u="$URL"
+  open_path "$u" || true
+}
+cmd_link() {
+  installed || die "Flota nie jest zainstalowana (jarvo up)."
+  klucz_url || die "Flota nie działa albo jest starsza niż klucz jednorazowy (jarvo status, jarvo update)."
+}
 cmd_haslo() {
   installed || die "Flota nie jest zainstalowana (jarvo up)."
   echo "Jarvo:    $URL"
@@ -574,6 +591,7 @@ case "$cmd" in
   update) cmd_update ;;
   chat) cmd_chat "$@" ;;
   open) cmd_open ;;
+  link) cmd_link ;;
   haslo|password) cmd_haslo ;;
   pliki|files) cmd_pliki ;;
   autostart) cmd_autostart "$@" ;;

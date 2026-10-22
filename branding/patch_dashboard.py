@@ -322,32 +322,118 @@ def login_fonts_css(brand: Path) -> str:
     return re.sub(r"url\(([\w.-]+\.woff2)\)", r"url('/fonts/\1')", css).strip()
 
 
+KROJE_LOGOWANIA = ("Instrument Serif", "Inter", "JetBrains Mono", "Caveat")
+
+
+def kroje_dir(brand: Path) -> Path:
+    """Kroje strony logowania: w obrazie obok brandingu (Dockerfile), w repo z hq/web/fonts/kroje."""
+    return brand / "kroje" if (brand / "kroje").is_dir() else brand.parent / "hq" / "web" / "fonts" / "kroje"
+
+
+def logowanie_fonts_css(brand: Path) -> tuple[str, list[Path]]:
+    """@font-face krojów strony tytułowej z kroje.css, z adresami /fonts/… (publiczne, jak fonty Fosforu)."""
+    src = kroje_dir(brand)
+    css, pliki = [], []
+    for linia in (src / "kroje.css").read_text(encoding="utf-8").splitlines():
+        m = re.search(r'font-family: "([^"]+)";.*?url\(([\w.-]+\.woff2)\)', linia)
+        if m and m.group(1) in KROJE_LOGOWANIA:
+            css.append(linia.replace(f"url({m.group(2)})", f"url('/fonts/{m.group(2)}')"))
+            pliki.append(src / m.group(2))
+    if {re.search(r'"([^"]+)"', c).group(1) for c in css} != set(KROJE_LOGOWANIA):
+        stop(f"strona logowania: brak któregoś z krojów {KROJE_LOGOWANIA} w {src / 'kroje.css'}")
+    return "\n".join(css), pliki
+
+
+def strona_logowania(brand: Path) -> tuple[str, str, list[Path]]:
+    """(CSS, <body>) strony tytułowej logowania gotowe do szablonu str.format Hermesa (klamry podwojone,
+    poza {provider_buttons} i {password_script}) i lista plików krojów do /fonts/."""
+    d = brand / "logowanie"
+    fonts, pliki = logowanie_fonts_css(brand)
+    css = (d / "strona.css").read_text(encoding="utf-8").replace("@@FONTS@@", fonts)
+    robot = (d / "robot.svg").read_text(encoding="utf-8").strip()
+    body = (d / "strona.html").read_text(encoding="utf-8").replace("@@ROBOT@@", robot) \
+        .replace("@@SKRYPT@@", "<script>\n" + (d / "strona.js").read_text(encoding="utf-8").strip() + "\n</script>")
+    dwa = lambda t: t.replace("{", "{{").replace("}", "}}")
+    body = dwa(body).replace("{{provider_buttons}}", "{provider_buttons}").replace("{{password_script}}", "{password_script}")
+    return dwa(css), body.strip(), pliki
+
+
 def patch_login(login: Path, brand: Path) -> None:
+    css, body, kroje = strona_logowania(brand)
     for d in (WEB / "fonts", HERMES / "web" / "public" / "fonts"):
         if d.parent.is_dir():
             d.mkdir(exist_ok=True)
-            for f in (brand / "fonts").glob("*.woff2"):
+            for f in [*(brand / "fonts").glob("*.woff2"), *kroje]:
                 shutil.copy(f, d / f.name)
     for pat, repl, label in LOGIN_TEXTS:
         sub_all([login], pat, repl, f"logowanie: {label}")
-    svg = (brand / "favicon.svg").read_text(encoding="utf-8")
-    svg = svg[svg.index("<svg"):].replace("<svg ", '<svg class="logo" aria-hidden="true" ', 1)
-    svg = re.sub(r"<title.*?</desc>", "", svg, flags=re.S)
-    assert "{" not in svg and "}" not in svg, "logo SVG nie może mieć klamer (szablon str.format)"
-    sub_all([login], r'<div class="brand">Nous<span class="dot"></span>Research</div>',
-            lambda m: f'<div class="brand">{svg}<span>Jarvo</span><span class="tagline">from idea to reality.</span></div>',
-            "logowanie: marka i logo")
-    css = LOGIN_CSS.replace("@@FONTS@@", login_fonts_css(brand))
     text = login.read_text(encoding="utf-8")
-    if "---- Jarvo: biel i czerwień" in text:
-        print("  · logowanie: kolory i fonty (już są)")
+    if "---- Jarvo: strona tytułowa logowania" in text:
+        print("  · logowanie: strona tytułowa (już jest)")
         return
     head, sep, tail = text.partition("_EMPTY_HTML = ")
-    doubled = css.replace("{", "{{").replace("}", "}}")
-    head = head.replace("</style>", doubled + "</style>", 1)
-    tail = tail.replace("</style>", css + "</style>", 1)
+    # szablon logowania: własny CSS i <body> (strona tytułowa, branding/logowanie); formularz i skrypt hasła Hermesa
+    # zostają ({provider_buttons}, {password_script}), więc logowanie hasłem działa jak dotąd
+    t0 = head.index("_LOGIN_HTML_TEMPLATE")
+    szablon = head[t0:]
+    if len(re.findall(r"<style>.*?</style>", szablon, flags=re.S)) < 1 or szablon.count("<body>") != 1:
+        stop("strona logowania: szablon Hermesa bez <style> albo <body> (zmień branding/patch_dashboard.py)")
+    szablon = re.sub(r"<style>.*?</style>", lambda m: "<style>\n" + css + "</style>", szablon, count=1, flags=re.S)
+    szablon = re.sub(r"<body>.*?</body>", lambda m: body, szablon, count=1, flags=re.S)
+    if "{provider_buttons}" not in szablon or "{password_script}" not in szablon:
+        stop("strona logowania: po podmianie brak {provider_buttons} albo {password_script}")
+    head = head[:t0] + szablon
+    # strona „brak metod logowania”: dawny styl Fosforu (zwykły CSS, klamry pojedyncze)
+    tail = tail.replace("</style>", LOGIN_CSS.replace("@@FONTS@@", login_fonts_css(brand)) + "</style>", 1)
     login.write_text(head + sep + tail, encoding="utf-8")
-    print("  ✓ logowanie: kolory i fonty: 2")
+    print("  ✓ logowanie: strona tytułowa i styl strony bez metod: 2")
+
+
+# Klucz jednorazowy (infra/bin/jarvo-klucz): dostawca „basic” przyjmuje go zamiast hasła jeden raz. Plik ze skrótem
+# klucza przenosimy atomowo przed odczytem, więc dwa równoległe wejścia tym samym kluczem nie przejdą oba.
+KLUCZ_FUNKCJA = '''
+
+def _jarvo_klucz(haslo: str) -> bool:
+    """Jarvo: klucz jednorazowy z instalatora albo `jarvo open` (infra/bin/jarvo-klucz, branding/patch_dashboard.py)."""
+    import re as _re
+    kod = (haslo or "").strip().upper()
+    if not _re.fullmatch(r"JRV(-[0-9A-HJKMNP-TV-Z]{4}){3}", kod):
+        return False
+    plik = os.path.join(os.environ.get("JARVO_WEJSCIE_DIR") or "/opt/data/jarvo/wejscie",
+                        hashlib.sha256(kod.encode()).hexdigest())
+    zuzyty = plik + ".zuzyty"
+    try:
+        os.rename(plik, zuzyty)
+    except OSError:
+        return False
+    try:
+        with open(zuzyty, encoding="utf-8") as f:
+            wygasa = int(json.load(f).get("wygasa", 0))
+    except (OSError, ValueError, TypeError, AttributeError):
+        wygasa = 0
+    finally:
+        try:
+            os.unlink(zuzyty)
+        except OSError:
+            pass
+    return wygasa > time.time()
+
+
+class BasicAuthProvider('''
+
+
+def patch_klucz(basic: Path) -> None:
+    """Ścisła łatka: bez niej instalator otwierałby stronę z kluczem, który nie działa (budowa ma stanąć)."""
+    tekst = basic.read_text(encoding="utf-8")
+    if "def _jarvo_klucz(" in tekst and "if _jarvo_klucz(password)" in tekst:
+        print("  · logowanie: klucz jednorazowy (już jest)")
+        return
+    sub_exact([basic], r"\n\nclass BasicAuthProvider\(", lambda m: KLUCZ_FUNKCJA, 1,
+              "logowanie: funkcja klucza jednorazowego", gotowe=r"def _jarvo_klucz\(")
+    sub_exact([basic], r"(\n(\s+)def complete_password_login\(self, \*, username: str, password: str\) -> Session:\n)",
+              lambda m: (m.group(1) + f"{m.group(2)}    if _jarvo_klucz(password):   # Jarvo: klucz jednorazowy\n"
+                         f"{m.group(2)}        return self._mint_session(self._username)\n"),
+              1, "logowanie: klucz jednorazowy zamiast hasła", gotowe=r"if _jarvo_klucz\(password\)")
 
 
 def main(argv: list[str]) -> int:
@@ -388,6 +474,10 @@ def main(argv: list[str]) -> int:
         sub_all([login], r"the Hermes Agent dashboard", "Jarvo", "strona logowania (opis)")
         sub_all([login], r" — Hermes Agent<", " — Jarvo<", "strona logowania (tytuł)")
         patch_login(login, brand)
+        basic = HERMES / "plugins" / "dashboard_auth" / "basic" / "__init__.py"
+        if not basic.is_file():
+            stop(f"brak dostawcy logowania {basic} (klucz jednorazowy)")
+        patch_klucz(basic)
     bust_cache(WEB / "assets", WEB / "index.html")
     return 0
 

@@ -51,6 +51,13 @@ raz poprosi o `jarvo update` (zapisana wersja instalatora jest starsza); ono nic
 `compose/.host-version` 4. Na Windowsie strona otwierana na końcu `install.ps1` to `/jarvo` przy następnym uruchomieniu
 instalatora. Stare zakładki przeglądarki z adresem Bazy działają dalej (przekierowanie w dashboardzie).
 
+**Wejście bez hasła (2026-10-22):** na końcu instalacji przeglądarka otwiera się od razu zalogowana: `install.sh`
+woła `jarvo open`, `install.ps1` bierze adres z `jarvo link` (w Linuksie WSL). Adres niesie klucz jednorazowy
+(15 min, jedno użycie, [HQ.md §5](HQ.md#5-motyw-fosfor-wygląd-całego-dashboardu)); bez działającej floty otwiera się zwykła
+strona logowania. `jarvo open` loguje tak samo przy każdym kolejnym otwarciu, hasło dalej pokazuje `jarvo haslo`.
+Bez nowego `HOST_VERSION`: kod jest w repo i w obrazie, więc wystarczy `jarvo update`; na Windowsie nowe
+`install.ps1` (otwarcie z kluczem) działa przy następnym uruchomieniu instalatora.
+
 ## 2. Diagnoza: co przeszkadza na każdym systemie
 
 | | Linux | macOS | Windows |
