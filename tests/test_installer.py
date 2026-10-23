@@ -101,6 +101,73 @@ def test_dry_run_fresh_ubuntu_installs_tools_and_docker(tmp_path):
     assert not (tmp_path / "home/jarvo").exists() and not (tmp_path / "home/jarvo-local").exists()
 
 
+def _wsl_shims(bin_dir: Path, log: Path, app: str = r"C:\Users\tester\AppData\Local") -> None:
+    """Udawany Windows z WSL: cmd.exe podaje LOCALAPPDATA, wslpath tłumaczy ścieżkę, powershell.exe zapisuje polecenie."""
+    (bin_dir / "localappdata.txt").write_text(app + "\r\n", encoding="utf-8")
+    _shim(bin_dir, "cmd.exe", f'cat "{bin_dir}/localappdata.txt"\n')
+    _shim(bin_dir, "wslpath", f'echo "{log.parent}/win"\n')
+    _shim(bin_dir, "powershell.exe", f'printf "%s\\n" "$@" > "{log}"\n')
+
+
+def test_dry_run_wsl_makes_windows_jarvo_command(tmp_path):
+    """jarvo update w Linuksie WSL zakłada też jarvo w PowerShellu (ten sam jarvo.cmd co install.ps1)."""
+    proc = tmp_path / "version"
+    proc.write_text("Linux version 6.6.87.2-microsoft-standard-WSL2\n", encoding="utf-8")
+    bin_dir = tmp_path / "bin"
+    res0 = _dry(tmp_path, _os_release(tmp_path, "ubuntu", "debian"))   # tworzy bin z PATH testu
+    assert res0.returncode == 0, res0.stdout + res0.stderr
+    assert "jarvo.cmd" not in res0.stdout   # zwykły Linux: nic dla Windowsa
+    _wsl_shims(bin_dir, tmp_path / "ps.log")
+    env = {"PATH": str(bin_dir), "HOME": str(tmp_path / "home"), "LANG": "C.UTF-8", "JARVO_DRY_RUN": "1",
+           "JARVO_DISK_GB": "100", "JARVO_DIR": str(tmp_path / "home/jarvo"),
+           "JARVO_OS_RELEASE": str(_os_release(tmp_path, "ubuntu", "debian")), "JARVO_PROC_VERSION": str(proc),
+           "WSL_DISTRO_NAME": "Ubuntu"}
+    res = subprocess.run(["bash", str(INSTALL)], env=env, capture_output=True, text=True, timeout=60)
+    assert res.returncode == 0, res.stdout + res.stderr
+    out = res.stdout
+    assert "System: wsl" in out
+    assert r"jarvo.cmd (C:\Users\tester\AppData\Local\Jarvo\bin): wsl.exe -d Ubuntu -u tester --cd ~" in out
+    assert out.index("jarvo.cmd") < out.index("bin/jarvo up")   # przed flotą: jest nawet, gdy flota padnie
+    assert not (tmp_path / "win").exists() and not (tmp_path / "ps.log").exists()   # na sucho nic nie zapisuje
+
+
+def _windows_cli(tmp_path: Path, **env) -> subprocess.CompletedProcess:
+    """Sama funkcja windows_cli z install.sh (bez main), naprawdę zapisuje plik, z udawanym Windowsem."""
+    body = INSTALL.read_text(encoding="utf-8")
+    fn = body[body.index("windows_cli() {"):body.index("\n}\n", body.index("windows_cli() {")) + 3]
+    script = ("say() { echo \"SAY $*\"; }\nwarn() { echo \"WARN $*\"; }\nOS=wsl\nDRY=0\n" + fn + "windows_cli\n")
+    full = {"PATH": f"{tmp_path / 'bin'}:/usr/bin:/bin", "HOME": str(tmp_path), "WSL_DISTRO_NAME": "Ubuntu"}
+    full.update(env)
+    return subprocess.run(["bash", "-c", script], env=full, capture_output=True, text=True, timeout=30)
+
+
+def test_wsl_windows_cli_writes_cmd_and_path(tmp_path):
+    (tmp_path / "bin").mkdir()
+    _wsl_shims(tmp_path / "bin", tmp_path / "ps.log", app=r"C:\Users\O'Neil\AppData\Local")
+    res = _windows_cli(tmp_path)
+    assert res.returncode == 0 and "WARN" not in res.stdout, res.stdout + res.stderr
+    cmd = (tmp_path / "win/Jarvo/bin/jarvo.cmd").read_bytes().decode()
+    assert cmd.startswith("@echo off\r\n") and cmd.endswith("jarvo %*\r\n")
+    # ta sama linia co WindowsCommand w install.ps1: ${PATH} i ${HOME} dla basha w Linuksie, %* dla cmd
+    assert ('wsl.exe -d Ubuntu -u ' in cmd and ' --cd ~ -e bash -c "export PATH=${PATH}:${HOME}/.local/bin:'
+            '${HOME}/jarvo/bin; exec jarvo \\"$@\\"" jarvo %*' in cmd)
+    ps = (tmp_path / "ps.log").read_text()
+    assert "-NoProfile" in ps and "HKCU:\\Environment" in ps and "DoNotExpandEnvironmentNames" in ps
+    assert r"$d='C:\Users\O''Neil\AppData\Local\Jarvo\bin'" in ps   # apostrof w nazwie użytkownika
+    assert "SAY Polecenie jarvo w PowerShellu" in res.stdout
+
+
+def test_wsl_windows_cli_without_interop_only_warns(tmp_path):
+    (tmp_path / "bin").mkdir()
+    res = _windows_cli(tmp_path, PATH=str(tmp_path / "bin") + ":/usr/bin:/bin")   # brak cmd.exe (interop wyłączony)
+    assert res.returncode == 0 and "WARN Polecenie jarvo w PowerShellu" in res.stdout and "wsl -d Ubuntu -- jarvo" in res.stdout
+    _wsl_shims(tmp_path / "bin", tmp_path / "ps.log")
+    (tmp_path / "bin/powershell.exe").write_text("#!/bin/sh\nexit 1\n")   # PATH się nie zapisał
+    res = _windows_cli(tmp_path)
+    assert res.returncode == 0 and (tmp_path / "win/Jarvo/bin/jarvo.cmd").exists()
+    assert "WARN jarvo.cmd jest w" in res.stdout
+
+
 def test_dry_run_fedora_and_arch(tmp_path):
     fedora = _dry(tmp_path / "f", _os_release(tmp_path, "fedora"), JARVO_BRANCH="wydanie-1")
     assert fedora.returncode == 0, fedora.stdout + fedora.stderr

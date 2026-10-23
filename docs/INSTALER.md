@@ -41,7 +41,8 @@ Obraz arm64 (Apple Silicon, Windows na ARM) buduje i uruchamia CI na natywnym ru
 nie robi nic. Zmiana tego, co musi być na komputerze (program hosta, wersja Dockera, autostart), idzie do
 `install.sh` / `install.ps1` z podbiciem `HOST_VERSION` w `install.sh`: `jarvo update` uruchamia nowy
 instalator, a `deploy.sh` przypomina „uruchom jarvo update”, gdy `compose/.host-version` jest starsza. Na Windowsie
-`jarvo update` w Linuksie odświeża wszystko poza samym Windowsem; zmiana w `install.ps1` (WSL, autostart) wymaga
+`jarvo update` w Linuksie odświeża wszystko poza samym Windowsem, z wyjątkiem polecenia `jarvo` w PowerShellu
+(`install.sh` zakłada je z WSL, `HOST_VERSION` 5); zmiana w `install.ps1` (WSL, autostart) wymaga
 ponownego `irm https://jarvo.pl/install.ps1 | iex` (drugie uruchomienie = aktualizacja).
 
 **`HOST_VERSION` 4:** adres dashboardu to `/jarvo` (zakładka Jarvo, [HQ.md §2c](HQ.md#2c-powłoka-jarvo-osadzanie-zasoby)).
@@ -63,6 +64,14 @@ odpowiadał „The term 'jarvo' is not recognized”. `install.ps1` zakłada ter
 Windows, pkt 6). Bez nowego `HOST_VERSION` (zmiana tylko na Windowsie): istniejąca instalacja dostaje polecenie po
 ponownym `irm https://jarvo.pl/install.ps1 | iex` (to zarazem aktualizacja całej floty); do tego czasu działa
 `wsl -d Jarvo -- jarvo update`.
+
+**`HOST_VERSION` 5 (2026-10-23): `jarvo` w PowerShellu także z `jarvo update`.** Kto zaktualizował Jarvo tylko z Linuksu
+(`wsl -d Ubuntu -- jarvo update`), dalej nie miał `jarvo` w PowerShellu, bo zakładał je tylko `install.ps1`. Teraz
+`install.sh` na WSL (krok `windows_cli`, przed uruchomieniem floty) zapisuje ten sam `%LOCALAPPDATA%\Jarvo\bin\jarvo.cmd`
+dla swojej dystrybucji (`WSL_DISTRO_NAME`) i swojego użytkownika, a PATH użytkownika dopisuje przez `powershell.exe`
+(rejestr bez rozwijania, raz). Ścieżkę Windows podaje `cmd.exe` (`%LOCALAPPDATA%`), `wslpath` tłumaczy ją dla Linuksa.
+Bez połączenia z Windowsem (interop WSL wyłączony) jest tylko ostrzeżenie z poleceniem `wsl -d <dystrybucja> -- jarvo …`;
+instalacja idzie dalej. Wystarczy raz `wsl -d <dystrybucja> -- jarvo update`, potem nowe okno PowerShella.
 
 ## 2. Diagnoza: co przeszkadza na każdym systemie
 
@@ -172,7 +181,8 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
    do Linuksa przez `WSLENV`, nie przez wiersz poleceń. Dashboard pod `http://localhost:9119` (WSL przekazuje porty).
 5. Autostart: `Jarvo.vbs` w folderze Autostart uruchamia ukryty `wsl.exe -d Jarvo -u root -e sleep infinity`,
    który trzyma dystrybucję przy życiu; systemd w niej stawia Dockera, kontenery i pomocnika aktualizacji.
-6. Polecenie `jarvo` w PowerShellu i cmd (zakładane przed instalacją w Linuksie, więc jest też po jej błędzie):
+6. Polecenie `jarvo` w PowerShellu i cmd (zakładane przed instalacją w Linuksie, więc jest też po jej błędzie;
+   to samo robi `install.sh` na WSL przy każdym `jarvo update`):
    `%LOCALAPPDATA%\Jarvo\bin\jarvo.cmd` (dopisany do PATH użytkownika
    i od razu do bieżącego okna) przekazuje wszystko do `jarvo` w Linuksie:
    `wsl.exe -d <dystrybucja> -u <użytkownik> --cd ~ -e bash -c "…; exec jarvo \"$@\"" jarvo %*`. Więc `jarvo update`,

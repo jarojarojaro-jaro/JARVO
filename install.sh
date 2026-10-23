@@ -52,7 +52,7 @@ DISTRO=""
 BREW_SCRIPT="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
 # wersja wymagań hosta (programy poza obrazem floty: Docker, Colima, git, Python…). Zmiana tego, co ten skrypt
 # instaluje na komputerze = +1; deploy.sh porównuje ją z zapisaną przy instalacji i prosi o `jarvo update`.
-HOST_VERSION=4
+HOST_VERSION=5
 TOKEN="${JARVO_TOKEN:-}"
 
 if [[ -t 1 ]]; then R=$'\e[38;2;212;33;61m'; W=$'\e[1;38;2;242;241;232m'; G=$'\e[38;2;184;255;61m'; Y=$'\e[33m'; D=$'\e[2m'; N=$'\e[0m'
@@ -105,7 +105,7 @@ sudo_check() {   # hasło administratora raz, na początku; kolejne sudo (pakiet
 detect_os() {
   case "$(uname -s)" in
     Darwin) OS=macos ;;
-    Linux) OS=linux; grep -qi microsoft /proc/version 2>/dev/null && OS=wsl ;;
+    Linux) OS=linux; grep -qi microsoft "${JARVO_PROC_VERSION:-/proc/version}" 2>/dev/null && OS=wsl ;;
     *) die "Nieobsługiwany system: $(uname -s). Na Windowsie uruchom polecenie PowerShell ze strony." ;;
   esac
   ARCH="$(uname -m)"
@@ -580,6 +580,37 @@ link_cli() {
   fi
 }
 
+# WSL: polecenie jarvo także w PowerShellu. Ten sam jarvo.cmd w %LOCALAPPDATA%\Jarvo\bin i wpis w PATH użytkownika
+# co w install.ps1 (WindowsCommand), żeby jarvo update w Linuksie naprawiał też Windows, bez ponownego irm … | iex.
+# Bez połączenia z Windowsem (interop WSL wyłączony) tylko ostrzeżenie: Jarvo działa dalej przez wsl -d <dystrybucja>.
+windows_cli() {
+  [[ $OS == wsl ]] || return 0
+  local distro="${WSL_DISTRO_NAME:-}" app dir win line ps
+  if [[ -z $distro ]] || ! command -v cmd.exe >/dev/null 2>&1 || ! command -v wslpath >/dev/null 2>&1; then
+    warn "Polecenie jarvo w PowerShellu: brak połączenia z Windowsem z WSL. W PowerShellu działa: wsl -d ${distro:-Ubuntu} -- jarvo …"
+    return 0
+  fi
+  app="$(cd /mnt/c 2>/dev/null; timeout 30 cmd.exe /d /c 'echo %LOCALAPPDATA%' 2>/dev/null | tr -d '\r' | tail -1)"
+  if [[ -z $app || $app == *%* ]] || ! dir="$(wslpath -u "$app" 2>/dev/null)"; then
+    warn "Polecenie jarvo w PowerShellu: Windows nie podał katalogu LOCALAPPDATA. W PowerShellu działa: wsl -d $distro -- jarvo …"
+    return 0
+  fi
+  win="$app\\Jarvo\\bin"; dir="$dir/Jarvo/bin"
+  # ${PATH} i ${HOME} rozwija bash w Linuksie, nie Windows (apostrofy)
+  line='wsl.exe -d '"$distro"' -u '"$(id -un)"' --cd ~ -e bash -c "export PATH=${PATH}:${HOME}/.local/bin:${HOME}/jarvo/bin; exec jarvo \"$@\"" jarvo %*'
+  if [[ $DRY == 1 ]]; then say "jarvo.cmd ($win): $line"; return 0; fi
+  if ! { mkdir -p "$dir" && printf '@echo off\r\nrem Jarvo (install.sh): jarvo in Windows runs jarvo in Linux (%s).\r\n%s\r\n' "$distro" "$line" > "$dir/jarvo.cmd"; }; then
+    warn "Nie zapisałem $win\\jarvo.cmd. W PowerShellu działa: wsl -d $distro -- jarvo …"; return 0
+  fi
+  # PATH użytkownika z rejestru bez rozwijania %ZMIENNYCH%, dopisany raz; JarvoPathTick rozgłasza zmianę do nowych okien
+  ps="\$k='HKCU:\\Environment'; \$d='${win//\'/\'\'}'; \$p=(Get-Item \$k).GetValue('Path','',[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames); if (-not (@(\$p -split ';') -contains \$d)) { New-ItemProperty -Path \$k -Name Path -Value ((@(\$p,\$d) | Where-Object { \$_ }) -join ';') -PropertyType ExpandString -Force | Out-Null; [Environment]::SetEnvironmentVariable('JarvoPathTick','1','User'); [Environment]::SetEnvironmentVariable('JarvoPathTick',\$null,'User') }"
+  if (cd /mnt/c 2>/dev/null; timeout 60 powershell.exe -NoProfile -NonInteractive -Command "$ps" >/dev/null 2>&1); then
+    say "Polecenie jarvo w PowerShellu: $win\\jarvo.cmd (w nowym oknie PowerShella)"
+  else
+    warn "jarvo.cmd jest w $win, ale nie dopisałem go do PATH. W PowerShellu działa: wsl -d $distro -- jarvo …"
+  fi
+}
+
 fleet_up() {
   local jarvo="$DIR/bin/jarvo" TTY=/dev/null
   if { : < /dev/tty; } 2>/dev/null; then TTY=/dev/tty; fi
@@ -626,6 +657,7 @@ main() {
   port_check
   repo_sync
   link_cli
+  windows_cli
   fleet_up
   if [[ $DRY == 1 ]]; then say "Koniec próby na sucho."; return; fi
   printf '\n%s▌%s Gotowe. Dashboard: %shttp://localhost:%s/jarvo%s   (polecenia: jarvo help)\n' "$G" "$N" "$W" "$PORT" "$N"
