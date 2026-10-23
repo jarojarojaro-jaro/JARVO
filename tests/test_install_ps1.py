@@ -146,6 +146,20 @@ def test_dry_existing_install_updates_that_distro(tmp_path):
     assert "wsl.exe -d Ubuntu -u uzytkownik --cd ~ -e bash" in out
 
 
+def test_dry_existing_install_found_from_autostart(tmp_path):
+    """Jarvo.vbs z poprzedniej instalacji wskazuje dystrybucję: bez pytania jej (po wsl --update wstaje długo)."""
+    (tmp_path / "Autostart").mkdir()
+    (tmp_path / "Autostart" / "Jarvo.vbs").write_text(
+        'CreateObject("WScript.Shell").Run "wsl.exe -d Ubuntu -u root -e sleep infinity", 0, False\r\n', encoding="utf-8")
+    r = _dry(tmp_path, JARVO_FAKE_DISTROS="Ubuntu")
+    out = r.stdout
+    assert r.returncode == 0, out + r.stderr
+    assert "Poprzednia instalacja Jarvo: dystrybucja Ubuntu (z autostartu)" in out and "--import" not in out
+    assert "jarvo.cmd: wsl.exe -d Ubuntu" in out
+    # polecenie jarvo powstaje przed instalacją w Linuksie (jest, nawet gdy ona padnie)
+    assert out.index("Polecenie jarvo w PowerShellu") < out.index("Uruchamiam instalator w Linuksie")
+
+
 def test_dry_own_distro_present_is_update(tmp_path):
     r = _dry(tmp_path, JARVO_FAKE_DISTROS="Jarvo,Ubuntu")
     assert r.returncode == 0 and "Dystrybucja Jarvo: jest" in r.stdout and "--import" not in r.stdout

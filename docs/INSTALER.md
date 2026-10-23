@@ -155,7 +155,10 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
    (`cloud-images.ubuntu.com/wsl/releases/24.04/current`, suma z `SHA256SUMS`), `wsl --import`, użytkownik `jarvo`
    z sudo bez hasła (Windows i tak wchodzi do WSL jako root, a hasła Linuksa ludzie zapominają), `/etc/wsl.conf`
    z `systemd=true` i `default=jarvo`. Wyłączona wirtualizacja (`0x80370102`) → komunikat, co włączyć w BIOS.
-   Inne dystrybucje użytkownika zostają nietknięte. Po „WSL: jest” instalator mówi, co robi, i nie wisi bez końca:
+   Inne dystrybucje użytkownika zostają nietknięte. Poprzednią instalację instalator najpierw rozpoznaje po `Jarvo.vbs` w Autostarcie
+   (`wsl.exe -d <dystrybucja>`), bez pytania samej dystrybucji: po `wsl --update` Ubuntu z flotą potrafi wstawać
+   kilka minut, a wcześniej nieodpowiadająca dystrybucja była pomijana i powstawała druga instalacja w `Jarvo`, która
+   padała na zajętym porcie 9119. Dopiero bez autostartu pyta dystrybucje (każdą najwyżej 3 minuty). Po „WSL: jest” instalator mówi, co robi, i nie wisi bez końca:
    `wsl --update` ma limit 3 minut (potem idzie dalej), sprawdzanie każdej innej dystrybucji 1 minutę (zawieszona
    jest pomijana). Przy 20–30 GB wolnego miejsca tylko informacja, że wystarczy: Jarvo zajmie ok. 15 GB
    (obraz z magazynem containerd 9,8 GB, Komputer Jarva 1,6 GB, Linux), a 30 GB to zapas na projekty i filmy.
@@ -169,7 +172,8 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
    do Linuksa przez `WSLENV`, nie przez wiersz poleceń. Dashboard pod `http://localhost:9119` (WSL przekazuje porty).
 5. Autostart: `Jarvo.vbs` w folderze Autostart uruchamia ukryty `wsl.exe -d Jarvo -u root -e sleep infinity`,
    który trzyma dystrybucję przy życiu; systemd w niej stawia Dockera, kontenery i pomocnika aktualizacji.
-6. Polecenie `jarvo` w PowerShellu i cmd: `%LOCALAPPDATA%\Jarvo\bin\jarvo.cmd` (dopisany do PATH użytkownika
+6. Polecenie `jarvo` w PowerShellu i cmd (zakładane przed instalacją w Linuksie, więc jest też po jej błędzie):
+   `%LOCALAPPDATA%\Jarvo\bin\jarvo.cmd` (dopisany do PATH użytkownika
    i od razu do bieżącego okna) przekazuje wszystko do `jarvo` w Linuksie:
    `wsl.exe -d <dystrybucja> -u <użytkownik> --cd ~ -e bash -c "…; exec jarvo \"$@\"" jarvo %*`. Więc `jarvo update`,
    `jarvo open`, `jarvo status`, `jarvo haslo` działają wprost z PowerShella, bez `wsl -d Jarvo`. PATH czytany

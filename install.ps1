@@ -219,13 +219,23 @@ function Distros {
 }
 
 function ExistingInstall([string[]]$List) {   # Jarvo już stoi w innej dystrybucji (np. Ubuntu z Docker Desktop)?
+  # autostart z poprzedniej instalacji mówi wprost, gdzie jest Jarvo: bez pytania dystrybucji, która po
+  # aktualizacji WSL potrafi wstawać kilka minut (wtedy nie odpowiadała i powstawała druga instalacja)
+  $vbs = StartupVbs
+  if (Test-Path $vbs) {
+    $m = [regex]::Match((Get-Content -Raw $vbs), 'wsl\.exe -d (\S+) ')
+    if ($m.Success -and $m.Groups[1].Value -ne $Distro -and ($List -contains $m.Groups[1].Value)) {
+      Say "Poprzednia instalacja Jarvo: dystrybucja $($m.Groups[1].Value) (z autostartu)."
+      return $m.Groups[1].Value
+    }
+  }
   if ($Dry) { return (EnvOr "JARVO_FAKE_EXISTING" "") }
   $others = @($List | Where-Object { $_ -ne $Distro })
   if ($others.Count -gt 0) { Say "Szukam wcześniejszej instalacji Jarvo w innych dystrybucjach WSL ($($others.Count))…" }
   foreach ($d in $others) {
     # jeden wiersz poleceń dla wsl.exe; $HOME rozwija sh w Linuksie. Zawieszona dystrybucja nie blokuje instalacji.
-    $code = WslTimed ('-d "' + $d + '" -e sh -c "test -f $HOME/jarvo-local/compose/.env"') 60
-    if ($code -eq -1) { Warn "Dystrybucja $d nie odpowiada od minuty: pomijam ją." }
+    $code = WslTimed ('-d "' + $d + '" -e sh -c "test -f $HOME/jarvo-local/compose/.env"') 180
+    if ($code -eq -1) { Warn "Dystrybucja $d nie odpowiada od 3 minut: pomijam ją." }
     if ($code -eq 0) { return $d }
   }
   return ""
@@ -390,6 +400,7 @@ function Main {
     $temp = ($LASTEXITCODE -eq 0)
   }
 
+  WindowsCommand $target $user   # przed instalacją w Linuksie: polecenie jarvo jest, nawet gdy ona się nie uda
   $sh = GetInstallFile "install.sh"
   SaveToken
   # zmienne instalatora przechodzą do Linuksa przez WSLENV (klucze nie trafiają do wiersza poleceń)
@@ -409,7 +420,6 @@ function Main {
   if ($code -ne 0) { Die "Instalacja w Linuksie się nie udała (log wyżej; pełny: ~/jarvo-local/install.log w dystrybucji $target, otwórz: wsl -d $target)." }
 
   Autostart $target
-  WindowsCommand $target $user
   # przeglądarka od razu zalogowana: klucz jednorazowy z floty (jarvo link, 15 min); bez niego zwykła strona logowania
   $open = $Url
   $link = WslOut -d $target -u $user --cd "~" -e bash -c 'jarvo link 2>/dev/null || ~/jarvo/bin/jarvo link'
