@@ -15,6 +15,14 @@ from conftest import load_script
 rz = load_script("hq/plugin/rozmowy.py", "jarvo_test_rozmowy")
 
 
+def _tylko_wlasciciel(plik):
+    """Baza i kopie tylko dla właściciela: na POSIX tryb 0600, na Windows ACL (os.chmod niczego tam nie chroni)."""
+    if os.name == "nt":
+        assert rz._przenosne().tylko_dla_wlasciciela(plik), plik
+    else:
+        assert stat.S_IMODE(os.stat(plik).st_mode) == 0o600
+
+
 class Zegar:
     def __init__(self, t=1_000_000.0):
         self.t = t
@@ -65,7 +73,7 @@ def test_migracja_1_ma_pelny_schemat(db):
     assert c.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
     assert [r[0] for r in c.execute("SELECT wersja FROM migracje")] == [1]
     c.close()
-    assert stat.S_IMODE(os.stat(db.sciezka).st_mode) == 0o600
+    _tylko_wlasciciel(db.sciezka)
     assert db.meta("utworzono") is not None
 
 
@@ -98,7 +106,7 @@ def test_kopia_przed_migracja_zostaja_dwie(tmp_path, zegar, monkeypatch):
     assert stara.execute("PRAGMA user_version").fetchone()[0] == 3
     assert stara.execute("SELECT tytul FROM watki WHERE id = ?", (w["id"],)).fetchone()[0] == "Stary"
     stara.close()
-    assert stat.S_IMODE(os.stat(tmp_path / "r.db.bak-v3").st_mode) == 0o600
+    _tylko_wlasciciel(tmp_path / "r.db.bak-v3")
     d.zamknij()
 
 

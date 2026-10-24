@@ -234,7 +234,7 @@ def zapisz_poznanie(sciezka: Path | str, dane: dict, dzis: str) -> dict:
             break
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(f".{p.name}.{os.getpid()}.tmp")
-    tmp.write_text("\n".join(linie).rstrip("\n") + "\n", encoding="utf-8")
+    tmp.write_text("\n".join(linie).rstrip("\n") + "\n", encoding="utf-8", newline="\n")   # skarbiec: „\n” też na Windows
     os.replace(tmp, p)
     return wlasciciel(p)
 
@@ -285,7 +285,8 @@ def status_hermesa(profil: Path | str, dostawca_: str, *, python: str | None = N
     env["HERMES_HOME"] = str(profil)
     try:
         r = subprocess.run([python or sys.executable, "-I", "-c", SKRYPT_STATUSU, dostawca_], capture_output=True,
-                           text=True, timeout=timeout, env=env, cwd=str(profil) if Path(profil).is_dir() else None)
+                           text=True, encoding="utf-8", errors="replace", timeout=timeout, env=env,
+                           cwd=str(profil) if Path(profil).is_dir() else None)
         out = json.loads((r.stdout or "").strip().splitlines()[-1])
     except (OSError, subprocess.SubprocessError, ValueError, IndexError):
         return None

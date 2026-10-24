@@ -2823,7 +2823,8 @@ function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen, notes, addNot
     addNote(text, ask.shot && ask.shot.path);
     setAsk((a) => ({ ...a, text: "", shot: null }));
   };
-  const vids = [...new Set(((ask.reply || "").match(/\/opt\/data\/jarvo\/(?:workspaces|missions|knowledge|inbox)\/[^\s`'"<>()]+\.(?:mp4|webm|mov)/g) || []))];
+  const vids = [...new Set(((ask.reply || "").match(Sciezki.wzor("edytor.filmy", ({ poczatek }) =>
+    new RegExp(`${poczatek}[^\\s\`'"<>()]+\\.(?:mp4|webm|mov)`, "g"))) || []))];
   const sorted = [...(notes || [])].sort((a, b) => a.t - b.t);
   return html`<div class="thq-ed-ask">
     <header class="thq-ed-pop-head"><strong>${ED_ICON.spark}${L("Poproś Wideografa", "Ask the video agent")}</strong>
@@ -2851,6 +2852,6 @@ function AskAgent({ ask, setAsk, path, saveNow, time, sel, onOpen, notes, addNot
     </div>
     ${(ask.reply || ask.busy) && html`<div class="thq-ed-reply"><${Markdown} text=${ask.reply || L("Wideograf pracuje…", "Working…")}/></div>`}
     ${ask.error && html`<p class="thq-ed-bad">${ask.error}</p>`}
-    ${vids.map((v) => html`<button key=${v} type="button" class="thq-ed-btn" onClick=${() => onOpen(fileFromPath(v))}>${ED_ICON.film}${v.split("/").pop()}</button>`)}
+    ${vids.map((v) => html`<button key=${v} type="button" class="thq-ed-btn" onClick=${() => onOpen(fileFromPath(v))}>${ED_ICON.film}${Sciezki.nazwa(v)}</button>`)}
   </div>`;
 }

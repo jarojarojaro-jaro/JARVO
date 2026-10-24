@@ -2,7 +2,8 @@
 
 - `GET /app`: start aplikacji jednym zapytaniem: wersja paczki, stan silnika, agenci (jak `GET /agenci`), właściciel
   z USER.md, gotowość (model, brama, profil właściciela; same nazwy i wartości logiczne, aplikacja.py), limity
-  wysyłki, funkcje instalacji, liczba pytań zespołu (decyzje Starej Bazy) i stan aktualizacji (jak `GET /update`).
+  wysyłki, funkcje instalacji, liczba pytań zespołu (decyzje Starej Bazy), stan aktualizacji (jak `GET /update`)
+  i korzeń danych `katalog_danych` (ścieżki floty w tekście: /opt/data albo korzeń instalacji natywnej).
 - `GET /podpowiedzi?miejsce=start`: „Czeka na Ciebie” (zgody, pytania zespołu jednym wierszem, nieudana praca) i startery „Na początek”
   (nawyki.db, podpowiedzi.py) w budżecie 4 rzeczy.
 - `POST /podpowiedzi/{id}/reakcja` `{rodzaj, klucz}`: pokazana / kliknieta / odrzucona / nigdy; 204, idempotentne po
@@ -153,6 +154,8 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, gotowosc, naw
                         "telefon": bool(os.environ.get("JARVO_ANDROID_SCREEN_URL")), "agenci_wlasni": False,
                         "e2e": os.environ.get("JARVO_E2E") == "1"},
             "decyzje": len(pytania), "aktualizacja": aktual,
+            # korzeń danych z „/”: przeglądarka rozpoznaje po nim ścieżki floty w tekście (hq/web/src/07-sciezki.js)
+            "katalog_danych": m.hq_core.sciezki.jako_tekst(m.hq_core.HOME),
         }
 
     @trasa("GET", "/podpowiedzi")

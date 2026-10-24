@@ -58,6 +58,7 @@ const akcje = {
     try {
       const a = await api.aplikacja();
       akcje._appProba = 0;
+      if (a.katalog_danych) Sciezki.ustaw(a.katalog_danych);      // ścieżki floty w tekście (07-sciezki.js)
       akcje.ustawAgentow(a.agenci);
       sklep.ustaw({ wlasciciel: a.wlasciciel || null, gotowosc: a.gotowosc || null, aktualizacja: a.aktualizacja || null,
         decyzje: { liczba: a.decyzje || 0 }, funkcje: a.funkcje || {}, wersja: a.wersja || null, blad_aplikacji: false });

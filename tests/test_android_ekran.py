@@ -242,6 +242,16 @@ def _jarvo_android(tmp_path, *args, profile_line: str | None = None) -> tuple[su
     return r, env_file
 
 
+def _binder() -> bool:
+    """Czy jądro ma binder (Redroid); bez /proc (macOS, Windows) nie ma."""
+    try:
+        return Path("/dev/binder").exists() or "binder" in Path("/proc/filesystems").read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
+# `jarvo android` (bin/jarvo w bashu) steruje kontenerami docker compose i sprawdza KVM/binder: kod tylko kontenerowy
+@pytest.mark.linux_only
 def test_jarvo_android_status_i_off(tmp_path):
     r, env_file = _jarvo_android(tmp_path, "status", profile_line="COMPOSE_PROFILES=monitoring,android")
     assert r.returncode == 0, r.stderr
@@ -260,6 +270,7 @@ def test_jarvo_android_status_i_off(tmp_path):
     assert "telefon testowy:       wyłączony" in r.stdout
 
 
+@pytest.mark.linux_only            # bin/jarvo android: kod tylko kontenerowy (docker compose)
 def test_jarvo_android_zle_uzycie_i_brak_instalacji(tmp_path):
     r, _ = _jarvo_android(tmp_path, "byle")
     assert r.returncode == 1 and "jarvo android on [--emulator|--redroid] | off | status" in r.stderr
@@ -270,6 +281,7 @@ def test_jarvo_android_zle_uzycie_i_brak_instalacji(tmp_path):
     assert r.returncode == 1 and "nie jest zainstalowana" in r.stderr
 
 
+@pytest.mark.linux_only            # bin/jarvo android: kod tylko kontenerowy (docker compose); macOS udaje atrapa uname
 def test_jarvo_android_on_na_macos(tmp_path):
     shims = tmp_path / "shims"
     shims.mkdir()
@@ -279,6 +291,7 @@ def test_jarvo_android_on_na_macos(tmp_path):
     assert "COMPOSE_PROFILES" not in env_file.read_text(encoding="utf-8")   # nic nie zmienione
 
 
+@pytest.mark.linux_only            # bin/jarvo android: kod tylko kontenerowy (docker compose, /dev/kvm)
 @pytest.mark.skipif(Path("/dev/kvm").exists(), reason="ten host ma KVM: ścieżka bez wirtualizacji nie do sprawdzenia")
 def test_jarvo_android_emulator_bez_kvm(tmp_path):
     r, env_file = _jarvo_android(tmp_path, "on", "--emulator")
@@ -286,8 +299,8 @@ def test_jarvo_android_emulator_bez_kvm(tmp_path):
     assert "COMPOSE_PROFILES" not in env_file.read_text(encoding="utf-8")
 
 
-@pytest.mark.skipif(Path("/dev/binder").exists() or "binder" in Path("/proc/filesystems").read_text(),
-                    reason="ten host ma binder: ścieżka bez sterownika nie do sprawdzenia")
+@pytest.mark.linux_only            # bin/jarvo android: kod tylko kontenerowy (docker compose, moduł binder_linux)
+@pytest.mark.skipif(_binder(), reason="ten host ma binder: ścieżka bez sterownika nie do sprawdzenia")
 def test_jarvo_android_redroid_bez_bindera(tmp_path):
     shims = tmp_path / "shims"
     shims.mkdir()

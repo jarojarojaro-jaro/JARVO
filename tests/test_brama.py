@@ -130,7 +130,11 @@ def test_hak_uvicorn_i_dziennik_0600(tmp_path, monkeypatch):
     sil.ustaw_dziennik(plik)
     try:
         log.info("jarvo-hq: test")
-        assert stat.S_IMODE(os.stat(plik).st_mode) == 0o600 and "jarvo-hq: test" in plik.read_text()
+        assert "jarvo-hq: test" in plik.read_text(encoding="utf-8")
+        if os.name == "nt":                                  # os.chmod niczego tam nie chroni: ACL tylko dla właściciela
+            assert sil._przenosne().tylko_dla_wlasciciela(plik)
+        else:
+            assert stat.S_IMODE(os.stat(plik).st_mode) == 0o600
         assert sil.ustaw_dziennik(plik) is log and len(log.handlers) == 2
     finally:
         for h in log.handlers:

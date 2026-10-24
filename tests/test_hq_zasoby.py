@@ -18,7 +18,7 @@ import subprocess
 
 import pytest
 
-from conftest import REPO, load_script
+from conftest import REPO, load_script, symlinki
 
 NODE = shutil.which("node")
 
@@ -75,7 +75,8 @@ def trasa(tmp_path, monkeypatch):
     nazwa = load_script("scripts/hqbuild.py", "jarvo_test_hqbuild_trasa").zasob(zasoby, "app", dane, "js")
     (zasoby / "kroje" / "Inter-latin.woff2").write_bytes(b"wOF2" + b"\0" * 40)
     (tmp_path / "tajne.woff2").write_bytes(b"sekret")
-    os.symlink(tmp_path / "tajne.woff2", zasoby / "kroje" / "obcy.woff2")
+    if symlinki():                    # Windows bez trybu dewelopera: bez dowiązania (jego przypadek ma wymaga_symlinku)
+        os.symlink(tmp_path / "tajne.woff2", zasoby / "kroje" / "obcy.woff2")
     monkeypatch.setattr(api, "ZASOBY", zasoby)
     app = fastapi.FastAPI()
     app.include_router(api.router, prefix="/api/plugins/jarvo-hq")
@@ -99,7 +100,7 @@ def test_trasa_gzip_i_cache(trasa):
 
 @pytest.mark.parametrize("nazwa", [
     "index.js", "app-XYZ.js", "app-0123456789ab.js", "app-{h}.js.gz", "app-{h}.map", "style.css",
-    "kroje/obcy.woff2",                      # dowiązanie poza katalog zasobów
+    pytest.param("kroje/obcy.woff2", marks=pytest.mark.wymaga_symlinku),     # dowiązanie poza katalog zasobów
 ])
 def test_trasa_biala_lista(trasa, nazwa):
     api, k, h, _ = trasa

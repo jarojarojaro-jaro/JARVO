@@ -586,7 +586,7 @@ def typo_concat(segments: list[tuple[float, Path | None]], blank: Path, dest: Pa
         if dur >= 0.0005:
             lines.extend([f"file '{png or blank}'", f"duration {dur:.4f}"])
     lines.append(f"file '{blank}'")
-    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")   # lista ffconcat: „\n” też na Windows
     return dest
 
 
@@ -798,7 +798,7 @@ def karaoke_concat(p: dict, pngs: dict[int, list[Path]], blank: Path, dest: Path
         t = b
     add(blank, max(0.0, p["duration"] - t))
     lines.append(f"file '{blank}'")        # demuxer concat potrzebuje ostatniego pliku jeszcze raz
-    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")   # lista ffconcat: „\n” też na Windows
     return dest
 
 
@@ -1371,7 +1371,8 @@ def probe(path: Path, ffprobe: str = "ffprobe") -> dict:
         r = subprocess.run([ffprobe, "-v", "error", "-show_entries",
                             f"format=duration:stream=codec_type,codec_name,width,height,r_frame_rate,{PROBE_KOLOR}"
                             f":stream_side_data={PROBE_SIDE}:stream_tags=rotate",
-                            "-of", "json", str(path)], capture_output=True, text=True, timeout=20)
+                            "-of", "json", str(path)], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=20)
         data = json.loads(r.stdout or "{}")
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
         return {"ok": False}

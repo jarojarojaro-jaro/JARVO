@@ -18,10 +18,12 @@ Testy: tests/test_mozg.py.
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import json
 import os
 import re
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -85,14 +87,27 @@ def sprawdz(dostawca: str, klucz: str, *, get: Callable[[str, dict], int] = _htt
     return "siec"
 
 
+def _przenosne():
+    """przenosne.py wtyczki (załadowany przez plugin_api jako jarvo_hq_przenosne albo z pliku obok)."""
+    mod = sys.modules.get("jarvo_hq_przenosne")
+    if mod is None:
+        spec = importlib.util.spec_from_file_location("jarvo_hq_przenosne", Path(__file__).with_name("przenosne.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["jarvo_hq_przenosne"] = mod
+        spec.loader.exec_module(mod)
+    return mod
+
+
 def _zapisz_atomowo(sciezka: Path, tekst: str, tryb: int) -> None:
+    """Zapis przez plik tymczasowy obok i rename; końce linii „\\n” także na Windows (plik czyta Hermes), tryb
+    przez przenosne.tryb_pliku (0600 na Windows = ACL tylko dla właściciela)."""
     sciezka.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=str(sciezka.parent), prefix=f".{sciezka.name}.")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(tekst)
-        os.chmod(tmp, tryb)
-        os.replace(tmp, sciezka)
+        _przenosne().tryb_pliku(tmp, tryb)
+        _przenosne().zastap(tmp, sciezka)      # .env czyta co chwilę wątek wspólnych kluczy (share_keys.py)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
         raise

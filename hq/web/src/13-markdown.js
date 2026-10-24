@@ -11,9 +11,10 @@ const Md = (() => {
   const GLEBOKOSC = 6;                           // zagnieżdżenie bloków (cytat, lista)
   const GLEBOKOSC_INLINE = 4;                    // zagnieżdżenie wyróżnień i etykiet linków
   const ESC = new Set("\\`*_{}[]()#+-.!|~<>\"'".split(""));
-  const PLIK_LINIA = /^\s*(?:MEDIA:\s*|📎\s*)["'`]?(\/[^\s"'`]+?)["'`]?[.,;]?\s*$/u;
-  const FLOTA = /^\/opt\/data\/jarvo\/(?:workspaces|missions|knowledge|inbox)\/[^\s`'"<>()]+$/;
-  const W_TEKSCIE = /https?:\/\/[^\s<>()`"'\]\[]+|\/opt\/data\/jarvo\/(?:workspaces|missions|knowledge|inbox)\/[^\s`'"<>()\]\[]+/g;
+  // linie plików i ścieżki floty: /opt/data i korzeń instalacji natywnej (07-sciezki.js), składane raz na korzeń
+  const plikLinia = () => Sciezki.linia();
+  const wTekscie = () => Sciezki.wzor("md.tekst", ({ poczatek }) =>
+    new RegExp(`https?:\\/\\/[^\\s<>()\`"'\\]\\[]+|${poczatek}[^\\s\`'"<>()\\]\\[]+`, "g"));
   const OBRAZ_DATA = /^data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/;
   const KONCOWKA = /[.,;:!?…*_)\]]+$/;
 
@@ -31,7 +32,7 @@ const Md = (() => {
     if (schemat === "mailto") return /^mailto:[^\s@]+@[^\s@]+$/i.test(s) ? s : null;
     return null;
   }
-  const sciezkaFloty = (s) => FLOTA.test(String(s || ""));
+  const sciezkaFloty = (s) => Sciezki.flota(s);
   const obrazData = (s) => OBRAZ_DATA.test(String(s || ""));
 
   // szukanie z pamięcią: pozycje zapytań rosną, więc każde indexOf przechodzi nowy fragment tekstu tylko raz
@@ -54,18 +55,19 @@ const Md = (() => {
   function tekstZLinkami(t, out, bezLinkow) {
     if (bezLinkow) { out.push({ t: "tekst", v: t }); return; }
     let ost = 0;
-    W_TEKSCIE.lastIndex = 0;
-    for (let m = W_TEKSCIE.exec(t); m; m = W_TEKSCIE.exec(t)) {
+    const re = wTekscie();
+    re.lastIndex = 0;
+    for (let m = re.exec(t); m; m = re.exec(t)) {
       let v = m[0];
       const ogon = KONCOWKA.exec(v);
       if (ogon) v = v.slice(0, v.length - ogon[0].length);
       if (!v) continue;
       if (m.index > ost) out.push({ t: "tekst", v: t.slice(ost, m.index) });
-      if (v.startsWith("/")) out.push({ t: "sciezka", v });
+      if (!/^https?:\/\//.test(v)) out.push({ t: "sciezka", v });          // druga gałąź wyrażenia: ścieżka floty
       else if (bezpiecznyUrl(v)) out.push({ t: "url", href: v });
       else out.push({ t: "tekst", v });
       ost = m.index + v.length;
-      W_TEKSCIE.lastIndex = ost;
+      re.lastIndex = ost;
     }
     if (ost < t.length) out.push({ t: "tekst", v: t.slice(ost) });
   }
@@ -89,10 +91,12 @@ const Md = (() => {
     return a < tab.length ? tab[a] : -1;
   }
 
-  const ZNACZACE = /[\\`*_~[!\n]|https?:|\/opt\/data\//;
+  // szybkie sito: tekst bez tych znaków (i bez początku ścieżki floty) to sam tekst
+  const znaczace = () => Sciezki.wzor("md.znaczace", ({ korzen: z }) =>
+    new RegExp("[\\\\`*_~[!\\n]|https?:|\\/opt\\/data\\/" + (z ? `|${z}` : "")));
   function inline(s, gl = 0, bezLinkow = false) {
     s = String(s == null ? "" : s);
-    if (!ZNACZACE.test(s)) return s ? [{ t: "tekst", v: s }] : [];
+    if (!znaczace().test(s)) return s ? [{ t: "tekst", v: s }] : [];
     const out = [], n = s.length, szukaj = szukacz(s), zamkniecia = new Map();
     let tekst = "";
     const zrzuc = () => { if (tekst) { tekstZLinkami(tekst, out, bezLinkow); tekst = ""; } };
@@ -209,7 +213,7 @@ const Md = (() => {
     && SEP_TABELI.test(linie[i + 1]) && komorki(linie[i + 1]).length === komorki(linie[i]).length && komorki(linie[i]).length <= TAB_KOLUMNY;
   const zaczynaBlok = (linie, i) => {
     const l = linie[i];
-    return !!plot(l) || !!naglowek(l) || CYTAT.test(l) || linia(l) || PLIK_LINIA.test(l) || tabelaOd(linie, i);
+    return !!plot(l) || !!naglowek(l) || CYTAT.test(l) || linia(l) || plikLinia().test(l) || tabelaOd(linie, i);
   };
 
   // komórki wiersza tabeli: | poza `kodem` i bez \|
@@ -265,14 +269,14 @@ const Md = (() => {
         continue;
       }
       if (linia(l)) { zamknijAkapit(); out.push({ t: "hr" }); i++; continue; }
-      if (PLIK_LINIA.test(l)) {
+      if (plikLinia().test(l)) {
         zamknijAkapit();
         const sciezki = [];
-        while (i < n && PLIK_LINIA.test(linie[i])) { sciezki.push(PLIK_LINIA.exec(linie[i])[1]); i++; }
+        while (i < n && plikLinia().test(linie[i])) { sciezki.push(plikLinia().exec(linie[i])[1]); i++; }
         out.push({ t: "pliki", sciezki });
         continue;
       }
-      if (/^Załączniki \(pliki na dysku floty\):\s*$/.test(l.trim()) && i + 1 < n && PLIK_LINIA.test(linie[i + 1])) { i++; continue; }
+      if (/^Załączniki \(pliki na dysku floty\):\s*$/.test(l.trim()) && i + 1 < n && plikLinia().test(linie[i + 1])) { i++; continue; }
       if (CYTAT.test(l) && gl < GLEBOKOSC) {
         zamknijAkapit();
         const wew = [];
@@ -381,7 +385,7 @@ const Md = (() => {
     return (w || []).map((x) => (x.t === "br" ? "\n" : x.v != null && !x.d ? x.v : x.href && !x.d ? x.href : tekstWezlow(x.d))).join("");
   }
 
-  return { MAKS, parsuj, inline, granica, bezpiecznyUrl, sciezkaFloty, obrazData, tekstWezlow, PLIK_LINIA };
+  return { MAKS, parsuj, inline, granica, bezpiecznyUrl, sciezkaFloty, obrazData, tekstWezlow, plikLinia };
 })();
 
 // ------------------------------------------------------------------------------------------------- render

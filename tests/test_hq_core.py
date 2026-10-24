@@ -5,12 +5,15 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import stat
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 import fleetlib as fl
-from conftest import load_script
+from conftest import REPO, load_script
 
 core = load_script("hq/plugin/hq_core.py", "jarvo_hq_core_test")
 
@@ -206,7 +209,7 @@ def test_tool_label_fallbacks():
     assert core.tool_label("web_search", "nie-json")["detail"] == "nie-json"
 
 
-def test_safe_path_and_outputs(tmp_path):
+def _wyniki_i_sekret(tmp_path):
     jarvo = tmp_path / "jarvo"
     out = jarvo / "workspaces" / "jarvo-web" / "out"
     out.mkdir(parents=True)
@@ -217,20 +220,49 @@ def test_safe_path_and_outputs(tmp_path):
     secret = tmp_path / "profiles" / ".env"
     secret.parent.mkdir()
     secret.write_text("KEY=1", encoding="utf-8")
-    link = out / "link.env"
-    os.symlink(secret, link)
+    return jarvo, out, secret
+
+
+def test_safe_path_and_outputs(tmp_path):
+    jarvo, out, _secret = _wyniki_i_sekret(tmp_path)
     roots = core.Roots(jarvo_dir=jarvo)
 
     assert core.safe_path(str(out / "hero.png"), roots) == (out / "hero.png").resolve()
     assert core.safe_path(str(out / ".." / ".." / ".." / ".." / "profiles" / ".env"), roots) is None
-    assert core.safe_path(str(link), roots) is None              # symlink na zewnątrz nie przejdzie
     assert core.safe_path(str(jarvo / "workspaces"), roots) is None   # katalog to nie plik
     assert core.safe_path("", roots) is None
 
     files = core.list_outputs([jarvo / "workspaces" / "jarvo-web", tmp_path / "profiles"], roots)
     names = {f["name"] for f in files}
     assert {"hero.png", "RAPORT.md"} <= names and "x.js" not in names and ".env" not in names
-    assert next(f for f in files if f["name"] == "hero.png")["kind"] == "image"
+    hero = next(f for f in files if f["name"] == "hero.png")
+    assert hero["kind"] == "image" and hero["rel"] == "out/hero.png"          # dla przeglądarki zawsze z „/”
+    assert hero["path"] == (out / "hero.png").resolve().as_posix() and "\\" not in hero["path"]
+
+
+@pytest.mark.wymaga_symlinku
+def test_safe_path_symlink_na_zewnatrz(tmp_path):
+    jarvo, out, secret = _wyniki_i_sekret(tmp_path)
+    link = out / "link.env"
+    os.symlink(secret, link)
+    assert core.safe_path(str(link), core.Roots(jarvo_dir=jarvo)) is None    # symlink na zewnątrz nie przejdzie
+
+
+def test_safe_path_alias_opt_data_i_git_bash(tmp_path):
+    """Instalacja natywna: stare ścieżki /opt/data/… (rozmowy sprzed przejścia) wskazują pod faktyczny korzeń danych,
+    a na korzeniu z literą dysku także zapis Git Bash /c/…; poza katalogi floty dalej nic nie wychodzi."""
+    jarvo, out, _secret = _wyniki_i_sekret(tmp_path)
+    roots = core.Roots(jarvo_dir=jarvo, korzen=tmp_path)
+    hero = (out / "hero.png").resolve()
+    assert core.safe_path("/opt/data/jarvo/workspaces/jarvo-web/out/hero.png", roots) == hero
+    assert core.safe_path("/opt/data/profiles/.env", roots) is None
+    assert core.safe_path("/opt/data/jarvo/workspaces/../../profiles/.env", roots) is None
+    assert core.sciezki.na_dysk("/opt/data/jarvo/x", "/opt/data") == "/opt/data/jarvo/x"      # kontener: bez zmian
+    assert core.sciezki.na_dysk("/c/Users/ja/x.png", "C:/Users/ja/dane") == "C:/Users/ja/x.png"
+    assert core.sciezki.na_dysk("/c/Users/ja/x.png", "/home/ja/dane") == "/c/Users/ja/x.png"
+    if os.name == "nt":
+        msys = "/" + hero.drive[0].lower() + hero.as_posix()[2:]
+        assert core.safe_path(msys, core.Roots(jarvo_dir=jarvo, korzen=tmp_path)) == hero
 
 
 def test_agent_stats(home):
@@ -496,9 +528,8 @@ def test_task_outputs_marks_expected_file(tmp_path):
     assert core.task_outputs({"workspace_path": None, "body": ZIARNO_BRIEF}, core.Roots(jarvo_dir=jarvo)) == []
 
 
-def test_site_root_and_file(tmp_path):
+def _strona(tmp_path):
     jarvo = tmp_path / "jarvo"
-    roots = core.Roots(jarvo_dir=jarvo)
     ws = jarvo / "missions" / "M-1" / "web"
     (ws / "out" / "img").mkdir(parents=True)
     (ws / "out" / "index.html").write_text("<h1>x</h1>", encoding="utf-8")
@@ -508,7 +539,19 @@ def test_site_root_and_file(tmp_path):
     (ws / "site" / "dist" / "blog" / "index.html").write_text("post", encoding="utf-8")
     (ws / "notes.html").write_text("n", encoding="utf-8")
     (tmp_path / "secret.txt").write_text("s", encoding="utf-8")
+    return core.Roots(jarvo_dir=jarvo), ws
+
+
+@pytest.mark.wymaga_symlinku
+def test_site_file_symlink_na_zewnatrz(tmp_path):
+    roots, ws = _strona(tmp_path)
     (ws / "out" / "leak").symlink_to(tmp_path / "secret.txt")
+    root = core.site_root((ws / "out" / "index.html").resolve(), roots)
+    assert core.site_file(root, "leak", roots) is None                                   # symlink na zewnątrz
+
+
+def test_site_root_and_file(tmp_path):
+    roots, ws = _strona(tmp_path)
 
     root = core.site_root((ws / "out" / "index.html").resolve(), roots)
     assert root == (ws / "out").resolve()
@@ -521,7 +564,6 @@ def test_site_root_and_file(tmp_path):
     assert core.site_file(root, "img/logo.png", roots) == (ws / "out" / "img" / "logo.png").resolve()
     assert core.site_file(root, "../notes.html", roots) is None                          # poza stroną
     assert core.site_file(root, ".env", roots) is None                                   # ukryte pliki
-    assert core.site_file(root, "leak", roots) is None                                   # symlink na zewnątrz
     assert core.site_file(root, "img/..%2f..%2fnotes.html", roots) is None
 
 
@@ -537,6 +579,13 @@ def test_upload_names_and_targets(tmp_path):
     t1.parent.mkdir(parents=True)
     t1.write_bytes(b"x")
     assert core.upload_target(tmp_path, "foto.png", NOW).name == "foto-2.png"
+
+
+@pytest.mark.wymaga_symlinku
+def test_upload_target_wiszace_dowiazanie_zajmuje_nazwe(tmp_path):
+    t1 = core.upload_target(tmp_path, "foto.png", NOW)
+    t1.parent.mkdir(parents=True)
+    t1.write_bytes(b"x")
     (t1.parent / "foto-2.png").symlink_to(tmp_path / "nie-ma")              # wiszące dowiązanie też zajmuje nazwę
     assert core.upload_target(tmp_path, "foto.png", NOW).name == "foto-3.png"
 
@@ -624,6 +673,152 @@ def test_preview_links_shared_file(tmp_path):
     assert core.link_root(links, "zly-token", NOW) is None
     t2 = core.link_for(links, site, NOW + core.LINK_TTL * 0.6)           # mniej niż pół terminu → nowy
     assert t2 != t1
+    assert json.loads(links.read_text(encoding="utf-8"))[t1]["root"] == site.as_posix()   # katalog zawsze z „/”
+
+
+# --------------------------------------------------------------------------- przenośne pomocniki (przenosne.py)
+PRZENOSNE = REPO / "hq" / "plugin" / "przenosne.py"
+DRUGI_PROCES = """import importlib.util, sys
+spec = importlib.util.spec_from_file_location("p", sys.argv[1])
+p = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(p)
+try:
+    with p.zamek(sys.argv[2], czekaj=False):
+        print("wolna")
+except BlockingIOError:
+    print("zajeta")
+"""
+
+
+def test_zamek_miedzy_procesami_i_czekanie(tmp_path):
+    """Blokada pliku linków (fcntl na POSIX, msvcrt na Windows): drugi proces nie wejdzie, póki pierwszy trzyma;
+    `czekaj=True` czeka na zwolnienie, także w tym samym procesie (osobne otwarcie pliku)."""
+    import threading
+    import time
+    plik = tmp_path / "linki.lock"
+
+    def drugi() -> str:
+        return subprocess.run([sys.executable, "-c", DRUGI_PROCES, str(PRZENOSNE), str(plik)], capture_output=True,
+                              text=True, encoding="utf-8", timeout=60).stdout.strip()
+
+    wejscie = []
+
+    def watek():
+        with core.przenosne.zamek(plik):
+            wejscie.append(time.monotonic())
+
+    with core.przenosne.zamek(plik):
+        assert drugi() == "zajeta"
+        w = threading.Thread(target=watek)
+        start = time.monotonic()
+        w.start()
+        time.sleep(0.4)
+        assert not wejscie                                                  # czeka
+    w.join(10)
+    assert wejscie and wejscie[0] - start >= 0.3
+    assert plik.exists()
+
+
+def test_zastap_czeka_na_czytajacego(tmp_path):
+    """Zapis atomowy (plik linków, .env): na Windows plik otwarty właśnie do czytania nie da się podmienić
+    (WinError 5/32), więc `zastap` ponawia, aż czytający go zamknie; na POSIX podmiana idzie od razu."""
+    import threading
+    cel, nowy = tmp_path / "preview-links.json", tmp_path / "preview-links.tmp"
+    cel.write_text("stary", encoding="utf-8")
+    nowy.write_text("nowy", encoding="utf-8")
+    czytany = open(cel, "rb")
+    threading.Timer(0.3, czytany.close).start()
+    core.przenosne.zastap(nowy, cel)
+    czytany.close()
+    assert cel.read_text(encoding="utf-8") == "nowy" and not nowy.exists()
+
+
+def test_uruchom_w_watku_wynik_linie_limit_i_anulowanie():
+    """Podprocesy tras w wątkach (dashboard na Windows nie ma podprocesów asyncio): kod i wyjście, stdout linia po
+    linii, limit czasu zabija program i kończy się asyncio.TimeoutError, anulowane zadanie też zabija program."""
+    import asyncio
+    import time
+    p = core.przenosne
+    kod, out, err = asyncio.run(p.uruchom([sys.executable, "-c", "import sys; print('ok'); print('blad', file=sys.stderr); sys.exit(3)"]))
+    assert (kod, out.strip(), err.strip()) == (3, b"ok", b"blad")
+    petla = asyncio.SelectorEventLoop()         # pętla dashboardu Hermesa na Windows: tam asyncio nie ma podprocesów
+    try:
+        assert petla.run_until_complete(p.uruchom([sys.executable, "-c", "print('selektor')"]))[1].strip() == b"selektor"
+    finally:
+        petla.close()
+    linie = []
+    kod, out, err = asyncio.run(p.uruchom([sys.executable, "-c", "print('a'); print('b'); print('c')"], na_linie=linie.append))
+    assert kod == 0 and out == b"" and [x.strip() for x in linie] == [b"a", b"b", b"c"]
+    kod, out, _ = asyncio.run(p.uruchom([sys.executable, "-c", "import sys; print('x', file=sys.stderr)"], stderr=p.STDOUT))
+    assert kod == 0 and out.strip() == b"x"
+
+    procesy = []
+    start = time.monotonic()
+    with pytest.raises(asyncio.TimeoutError):
+        asyncio.run(p.uruchom([sys.executable, "-c", "import time; time.sleep(60)"], timeout=0.5, przy_starcie=procesy.append))
+    assert time.monotonic() - start < 30 and procesy[0].poll() is not None    # zabity i skończony przed wyjątkiem
+
+    async def anuluj():
+        zadanie = asyncio.create_task(p.uruchom([sys.executable, "-c", "import time; time.sleep(60)"],
+                                                przy_starcie=procesy.append))
+        await asyncio.sleep(0.5)
+        zadanie.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await zadanie
+    asyncio.run(anuluj())
+    assert procesy[1].wait(timeout=30) is not None
+    with pytest.raises(OSError):                                            # brak programu: od razu, jak przy asyncio
+        asyncio.run(p.uruchom([str(Path(sys.executable).with_name("nie-ma-takiego-programu"))]))
+
+
+def test_tryb_pliku_tylko_dla_wlasciciela(tmp_path):
+    """Sekret (.env, rozmowy.db, dziennik HQ): na POSIX chmod 0600; na Windows ACL bez wpisów dziedziczonych
+    i z pełnym dostępem właściciela (icacls), bo os.chmod ustawia tam tylko „tylko do odczytu”."""
+    p = core.przenosne
+    katalog = tmp_path / "sekrety"
+    katalog.mkdir()
+    if os.name == "nt":           # wpis dziedziczony dla Wszystkich: plik w katalogu go dostaje, ochrona ma go zdjąć
+        r = subprocess.run([p._system32("icacls.exe"), str(katalog), "/grant", "*S-1-1-0:(OI)(CI)R"], capture_output=True)
+        assert r.returncode == 0, r.stdout
+    plik = katalog / ".env"
+    plik.write_text("KLUCZ=x\n", encoding="utf-8")
+    os.chmod(plik, 0o644)
+    assert not p.tylko_dla_wlasciciela(plik)
+    assert p.tryb_pliku(plik, 0o600) and p.tylko_dla_wlasciciela(plik)
+    assert plik.read_text(encoding="utf-8") == "KLUCZ=x\n"                 # właściciel dalej czyta i pisze
+    plik.write_text("KLUCZ=y\n", encoding="utf-8")
+    if os.name != "nt":
+        assert stat.S_IMODE(plik.stat().st_mode) == 0o600
+    jawny = katalog / "stan.json"                                           # tryb z prawami innych: bez ACL
+    jawny.write_text("{}", encoding="utf-8")
+    assert p.tryb_pliku(jawny, 0o644) and not p.tylko_dla_wlasciciela(jawny)
+
+
+# --------------------------------------------------------------------------- ścieżki danych (sciezki.py)
+WIN = "C:/Users/Michał Żółć/AppData/Local/Jarvo/dane"
+
+
+def test_sciezki_wzorzec_alias_i_korzen_natywny():
+    """Ścieżki danych w tekście: /opt/data zawsze (stare rozmowy), korzeń natywny z literą dysku (dowolna wielkość,
+    „\\” i „/”, Git Bash), spacje tylko w korzeniu; w kontenerze (korzeń = alias) to samo wyrażenie co dawniej."""
+    s = core.sciezki
+    reszta = r"[^\s,;\"'<>()\[\]{}]+"
+    assert s.wzorzec(reszta, "/opt/data").pattern == f"(?:/opt/data/{reszta})"
+    assert s.wzorzec(reszta, None).pattern == s.wzorzec(reszta, "/opt/data/").pattern
+    w = s.wzorzec(reszta, WIN.replace("/", "\\"))
+    tekst = (f"zapisane: {WIN}/jarvo/workspaces/web/a.html, c:\\Users\\Michał Żółć\\AppData\\Local\\Jarvo\\dane\\jarvo\\inbox\\b.png "
+             "i /c/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/missions/M-1/RAPORT.md; stare /opt/data/jarvo/x.txt "
+             "obok D:/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/c.png i C:/Users/Michał/d.png")
+    assert w.findall(tekst) == [f"{WIN}/jarvo/workspaces/web/a.html",
+                                "c:\\Users\\Michał Żółć\\AppData\\Local\\Jarvo\\dane\\jarvo\\inbox\\b.png",
+                                "/c/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/missions/M-1/RAPORT.md",
+                                "/opt/data/jarvo/x.txt"]
+    posix = s.wzorzec(reszta, "/home/ola/.jarvo/dane")                     # macOS i Linux: separator tylko „/”
+    assert posix.findall("/home/ola/.jarvo/dane/jarvo/a.png i /home/ola/.jarvo/dane\\jarvo\\b.png") == [
+        "/home/ola/.jarvo/dane/jarvo/a.png"]
+    assert s.korzen_danych("/x/dane/profiles/jarvo-web") == Path("/x/dane") and s.jako_tekst("C:\\x\\dane\\") == "C:/x/dane"
+    assert s.na_dysk("/opt/data/jarvo/inbox/a.png", WIN) == f"{WIN}/jarvo/inbox/a.png"
+    assert s.na_dysk("/opt/database/x", WIN) == "/opt/database/x" and s.na_dysk("C:/x", WIN) == "C:/x"
 
 
 def test_update_state_stalled_when_helper_silent(tmp_path, monkeypatch):
@@ -688,6 +883,8 @@ def test_update_gdy_wolne_i_praca(tmp_path, monkeypatch):
     assert k.post(u, json={"action": "check"}).json()["blad"]["kod"] == "pomocnik"
 
 
+# scripts/updater.py to pomocnik hosta instalacji z Dockerem (deploy.sh w bashu, grupa procesów): kod tylko kontenerowy
+@pytest.mark.posix_only
 def test_updater_heartbeat_and_timeout(tmp_path, monkeypatch):
     up = load_script("scripts/updater.py", "jarvo_updater_test")
     (tmp_path / "scripts").mkdir()

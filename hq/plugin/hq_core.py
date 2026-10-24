@@ -23,11 +23,28 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+
+def _modul(nazwa: str):
+    """Moduł wtyczki obok (sciezki.py, przenosne.py): załadowany przez plugin_api jako jarvo_hq_<nazwa> albo z pliku
+    obok (scripts/jarvo_link.py i testy ładują sam hq_core.py)."""
+    klucz = f"jarvo_hq_{nazwa}"
+    mod = sys.modules.get(klucz)
+    if mod is None:
+        spec = importlib.util.spec_from_file_location(klucz, Path(__file__).with_name(f"{nazwa}.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[klucz] = mod
+        spec.loader.exec_module(mod)
+    return mod
+
+
+sciezki = _modul("sciezki")
+przenosne = _modul("przenosne")
+
+
 def _hermes_root(home: str) -> Path:
     """Korzeń danych Hermesa. Wykonawca karty działa z HERMES_HOME profilu (`<root>/profiles/<agent>`), a dane floty
     leżą w `<root>/jarvo`: bez tego jarvo_link.py uruchomiony przez agenta szukałby ich w katalogu profilu."""
-    h = Path(home)
-    return h.parent.parent if h.parent.name == "profiles" else h
+    return sciezki.korzen_danych(home)
 
 
 HOME = _hermes_root(os.environ.get("HERMES_HOME", "/opt/data"))
@@ -68,7 +85,9 @@ def load_fleet(path: Path) -> list[dict]:
 def _connect_ro(path: Path) -> sqlite3.Connection | None:
     if not path.exists():
         return None
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=2)
+    # `as_uri()` koduje `?`, `#`, `%` i spacje w ścieżce (katalog `x#mode=rw` nie zdejmie trybu ro) i daje
+    # file:///C:/… na Windows
+    conn = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -513,17 +532,19 @@ def build_state(fleet: list[dict], board: dict, index_md: str, now: float,
 @dataclass
 class Roots:
     jarvo_dir: Path = JARVO_DIR
+    korzen: Path = HOME           # korzeń danych: stare ścieżki /opt/data/… wskazują pod niego (sciezki.na_dysk)
 
     def allowed(self) -> list[Path]:
         return [(self.jarvo_dir / r).resolve() for r in PREVIEW_ROOTS]
 
 
 def safe_path(raw: str, roots: Roots) -> Path | None:
-    """Ścieżka pliku do podglądu, tylko wewnątrz dozwolonych katalogów (bez ../ i symlinków na zewnątrz)."""
+    """Ścieżka pliku do podglądu, tylko wewnątrz dozwolonych katalogów (bez ../ i symlinków na zewnątrz). Przyjmuje
+    też alias /opt/data/… starych rozmów i zapis Git Bash /c/… (sciezki.na_dysk); sprawdzana jest ścieżka po zamianie."""
     if not raw or "\x00" in raw:
         return None
     try:
-        p = Path(raw).resolve(strict=True)
+        p = Path(sciezki.na_dysk(raw, getattr(roots, "korzen", HOME))).resolve(strict=True)
     except (OSError, RuntimeError):
         return None
     for root in roots.allowed():
@@ -572,7 +593,8 @@ def list_outputs(dirs: Iterable[Path], roots: Roots, limit: int = OUTPUT_LIMIT) 
                 except OSError:
                     continue
                 rel = p.relative_to(d)
-                files.append({"path": str(p), "name": n, "rel": str(rel), "size": st.st_size,
+                # ścieżki dla przeglądarki zawsze z „/” (na Windows też): front dzieli je po „/”
+                files.append({"path": p.as_posix(), "name": n, "rel": rel.as_posix(), "size": st.st_size,
                               "mtime": st.st_mtime, "kind": KIND_BY_EXT.get(p.suffix.lower(), "other"),
                               "in_out": "out" in rel.parts})
     files.sort(key=lambda f: (not f["in_out"], -f["mtime"]))
@@ -683,7 +705,7 @@ def konwerter_blad(msg: str) -> str:
 def file_entry(p: Path, base: Path | None = None) -> dict:
     st = p.stat()
     kind = KIND_BY_EXT.get(p.suffix.lower(), "other")
-    e = {"path": str(p), "name": p.name, "rel": str(p.relative_to(base)) if base else p.name, "size": st.st_size,
+    e = {"path": p.as_posix(), "name": p.name, "rel": p.relative_to(base).as_posix() if base else p.name, "size": st.st_size,
          "mtime": st.st_mtime, "kind": kind, "in_out": False}
     if kind == "html" and is_animation(p):
         e["anim"] = True
@@ -860,26 +882,24 @@ def links_load(path: Path) -> dict:
 
 
 def link_for(path: Path, root: Path, now: float, ttl: float = LINK_TTL) -> str:
-    """Token dla katalogu strony (ten sam, póki ważny jeszcze co najmniej pół terminu). Zapis pod blokadą,
-    bo dashboard i agenci dopisują do tego samego pliku."""
-    import fcntl
+    """Token dla katalogu strony (ten sam, póki ważny jeszcze co najmniej pół terminu). Zapis pod blokadą
+    (przenosne.zamek: fcntl albo msvcrt), bo dashboard i agenci dopisują do tego samego pliku; katalog zapisany z „/”."""
     import secrets
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path.with_suffix(".lock"), "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with przenosne.zamek(path.with_suffix(".lock")):
         data = {t: v for t, v in links_load(path).items()
                 if isinstance(v, dict) and float(v.get("exp", 0)) > now}
         for tok, v in data.items():
-            if v.get("root") == str(root) and float(v["exp"]) - now > ttl / 2:
+            if v.get("root") == root.as_posix() and float(v["exp"]) - now > ttl / 2:
                 return tok
         tok = secrets.token_urlsafe(18)
-        data[tok] = {"root": str(root), "exp": now + ttl}
+        data[tok] = {"root": root.as_posix(), "exp": now + ttl}
         if len(data) > LINKS_MAX:   # najstarsze wypadają
             data = dict(sorted(data.items(), key=lambda kv: kv[1]["exp"])[-LINKS_MAX:])
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data), encoding="utf-8")
-        tmp.replace(path)
+        przenosne.zastap(tmp, path)          # serwer podglądu czyta ten plik przy każdym żądaniu
     return tok
 
 

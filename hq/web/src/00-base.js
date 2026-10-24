@@ -103,11 +103,11 @@ const KIND_BY_EXT = {
   html: "html", htm: "html", zip: "archive", docx: "doc", xlsx: "doc", pptx: "doc",
 };
 const kindOf = (path) => KIND_BY_EXT[String(path).split(".").pop().toLowerCase()] || "other";
-const fileFromPath = (path) => ({ path, name: String(path).split("/").pop(), rel: String(path).split("/").pop(), kind: kindOf(path) });
+// nazwa: ostatni człon ścieżki (Sciezki.nazwa: przy korzeniu z literą dysku także po „\”)
+const fileFromPath = (path) => ({ path, name: Sciezki.nazwa(path), rel: Sciezki.nazwa(path), kind: kindOf(path) });
 
 // Otwieranie plików floty z dowolnego miejsca (czat, karta): App podaje funkcję przez kontekst.
 const FileCtx = React.createContext(null);
-const FLEET_PATH = /^\/opt\/data\/jarvo\/(?:workspaces|missions|knowledge|inbox)\/[^\s`'"<>()]+/;
 
 function PathLink({ path }) {
   const open = React.useContext(FileCtx);
@@ -115,14 +115,17 @@ function PathLink({ path }) {
   const tail = path.slice(clean.length);
   if (!open) return html`<code>${path}</code>`;
   return html`<span><button type="button" class="thq-pathlink" onClick=${() => open(fileFromPath(clean))}
-    title=${L("Otwórz podgląd", "Open preview")}>${clean.replace(/^\/opt\/data\/jarvo\//, "")}</button>${tail}</span>`;
+    title=${L("Otwórz podgląd", "Open preview")}>${Sciezki.krotka(clean)}</button>${tail}</span>`;
 }
 
 // Minimalny, bezpieczny markdown dla odpowiedzi agentów: akapity, listy, **pogrubienie**, `kod`, linki,
 // gołe adresy http(s), ścieżki plików floty (klik = podgląd) i obrazy data:image (z odpowiedzi gatewaya).
+// FLOTA w wzorze = początek ścieżki floty: /opt/data i korzeń instalacji natywnej (Sciezki.wzor, 07-sciezki.js).
+const WZOR_LINII_BAZY = /(!\[[^\]]*\]\((data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+)\)|\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\((https?:\/\/[^)\s]+)\)|https?:\/\/[^\s<>()`]+[^\s<>()`.,;:!?'"]|FLOTA[^\s`'"<>()]+)/.source;
+
 function renderInline(text, keyBase) {
   const out = [];
-  const re = /(!\[[^\]]*\]\((data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+)\)|\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\((https?:\/\/[^)\s]+)\)|https?:\/\/[^\s<>()`]+[^\s<>()`.,;:!?'"]|\/opt\/data\/jarvo\/(?:workspaces|missions|knowledge|inbox)\/[^\s`'"<>()]+)/g;
+  const re = new RegExp(Sciezki.wzor("baza.linia", ({ poczatek }) => WZOR_LINII_BAZY.replace("FLOTA", () => poczatek)), "g");
   let last = 0, m, i = 0;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
@@ -132,7 +135,7 @@ function renderInline(text, keyBase) {
     else if (tok.startsWith("**")) out.push(html`<strong key=${k}>${tok.slice(2, -2)}</strong>`);
     else if (tok.startsWith("`")) {
       const inner = tok.slice(1, -1);
-      out.push(FLEET_PATH.test(inner) ? html`<${PathLink} key=${k} path=${inner}/>` : html`<code key=${k}>${inner}</code>`);
+      out.push(Sciezki.flota(inner, false) ? html`<${PathLink} key=${k} path=${inner}/>` : html`<code key=${k}>${inner}</code>`);
     } else if (tok.startsWith("[")) {
       const label = tok.slice(1, tok.indexOf("]"));
       out.push(html`<a key=${k} href=${m[3]} target="_blank" rel="noopener noreferrer">${label}</a>`);
@@ -145,10 +148,9 @@ function renderInline(text, keyBase) {
   return out;
 }
 
-// Linia „MEDIA:/ścieżka” (plik od agenta, konwencja Hermesa) albo „📎 /ścieżka” (załącznik od Ciebie).
-const MEDIA_LINE = /^\s*(?:MEDIA:\s*|📎\s*)["'`]?(\/[^\s"'`]+?)["'`]?[.,;]?\s*$/;
-
+// Linia „MEDIA:/ścieżka” (plik od agenta, konwencja Hermesa) albo „📎 /ścieżka” (załącznik od Ciebie): Sciezki.linia.
 function Markdown({ text }) {
+  const MEDIA_LINE = Sciezki.linia();
   const blocks = String(text || "").replace(/\r/g, "").split(/\n{2,}/);
   return html`<div class="thq-md">${blocks.map((b, bi) => {
     const lines = b.split("\n").filter((l) => l.trim());

@@ -23,6 +23,7 @@ Wyłączenie (testy, diagnoza): `JARVO_HQ_SILNIK=0`.
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import logging
 import logging.handlers
 import os
@@ -55,6 +56,17 @@ class _Stdout(logging.StreamHandler):
         pass
 
 
+def _przenosne():
+    """przenosne.py wtyczki (załadowany przez plugin_api jako jarvo_hq_przenosne albo z pliku obok)."""
+    mod = sys.modules.get("jarvo_hq_przenosne")
+    if mod is None:
+        spec = importlib.util.spec_from_file_location("jarvo_hq_przenosne", Path(__file__).with_name("przenosne.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["jarvo_hq_przenosne"] = mod
+        spec.loader.exec_module(mod)
+    return mod
+
+
 def ustaw_dziennik(plik: Path | str | None) -> logging.Logger:
     """Logger `jarvo.hq`: stdout i plik rotowany (5 × 2 MB, 0600). Bez pliku, gdy katalogu nie da się utworzyć."""
     log = logging.getLogger("jarvo.hq")
@@ -73,7 +85,7 @@ def ustaw_dziennik(plik: Path | str | None) -> logging.Logger:
             if not p.exists():
                 fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
                 os.close(fd)
-            os.chmod(p, 0o600)
+            _przenosne().tryb_pliku(p, 0o600)            # na Windows ACL tylko dla właściciela
             fh = logging.handlers.RotatingFileHandler(p, maxBytes=DZIENNIK_MAKS, backupCount=DZIENNIK_KOPIE,
                                                       encoding="utf-8")
             fh.setFormatter(fmt)

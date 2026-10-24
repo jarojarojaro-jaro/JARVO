@@ -356,11 +356,13 @@ function useBlobUrl(path) {
   return url;
 }
 
-// Co umie host (Eksplorator w WSL, podgląd stron): pytamy raz na pół minuty, wszystkie okna dzielą wynik.
+// Co umie host (Eksplorator w WSL, podgląd stron, korzeń danych): pytamy raz na pół minuty, wszystkie okna dzielą
+// wynik. Korzeń danych (`katalog_danych`) trafia do Sciezki: po nim rozpoznajemy ścieżki floty w tekście.
 let hostCache = { at: 0, p: null };
 function hostInfo() {
   if (!hostCache.p || Date.now() - hostCache.at > 30000) {
-    hostCache = { at: Date.now(), p: api.host().catch(() => ({})) };
+    hostCache = { at: Date.now(), p: api.host().then((h) => { if (h && h.katalog_danych) Sciezki.ustaw(h.katalog_danych); return h; })
+      .catch(() => ({})) };
   }
   return hostCache.p;
 }
@@ -412,12 +414,13 @@ function pobierzBlob(b, nazwa) {
 // w <iframe sandbox>. Dashboard z logowaniem rozpoznaje sesję po ciasteczku, więc zwykły adres działa.
 const urlPliku = (path, pobierz) => `${basePath()}${API_ROOT}/file?path=${encodeURIComponent(path)}${pobierz ? "&download=1" : ""}`;
 
-// Ścieżka do wklejenia w Eksploratorze/terminalu: po stronie Windows (WSL), hosta albo kontenera.
+// Ścieżka do wklejenia w Eksploratorze/terminalu: po stronie Windows (WSL), hosta albo kontenera; w instalacji
+// natywnej ścieżka na tym komputerze (stare /opt/data/… pod faktycznym korzeniem, na dysku Windows z „\”).
 function hostPathOf(path, host) {
   const rest = path.startsWith("/opt/data/") ? path.slice("/opt/data/".length) : null;
   if (rest != null && host.data_win) return `${host.data_win.replace(/\\$/, "")}\\${rest.split("/").join("\\")}`;
   if (rest != null && host.data_host) return `${host.data_host.replace(/\/$/, "")}/${rest}`;
-  return path;
+  return Sciezki.doSystemu(Sciezki.naDysk(path));
 }
 
 // Schowek: na http (np. adres Tailscale) przeglądarka nie daje navigator.clipboard, stąd zapas dla tekstu.

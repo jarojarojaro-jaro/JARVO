@@ -4,6 +4,7 @@ w fleet.json wtyczki (hqbuild.fleet_json). Trasy: tests/test_aplikacja.py."""
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 import pytest
@@ -75,7 +76,11 @@ def test_ustaw_zmienna_zamienia_dopisuje_i_chmod(tmp_path):
     env.write_text("# nagłówek\nA=1\nOPENROUTER_API_KEY=stary\nexport OPENROUTER_API_KEY=drugi\nB=2\n", encoding="utf-8")
     MZ.ustaw_zmienna(env, "OPENROUTER_API_KEY", "nowy")
     assert env.read_text(encoding="utf-8") == "# nagłówek\nA=1\nOPENROUTER_API_KEY=nowy\nB=2\n"
-    assert env.stat().st_mode & 0o777 == 0o600
+    assert b"\r" not in env.read_bytes()                     # Hermes czyta .env: „\n” także na Windows
+    if os.name == "nt":                                      # os.chmod niczego tam nie chroni: ACL tylko dla właściciela
+        assert MZ._przenosne().tylko_dla_wlasciciela(env)
+    else:
+        assert env.stat().st_mode & 0o777 == 0o600
     MZ.ustaw_zmienna(tmp_path / "brak" / ".env", "X", "y")
     assert (tmp_path / "brak" / ".env").read_text(encoding="utf-8") == "X=y\n"
 

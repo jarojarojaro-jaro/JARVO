@@ -16,11 +16,13 @@ Czysty Python (sqlite3), bez Hermesa i FastAPI: testy na hoście (tests/test_roz
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
 import secrets
 import sqlite3
+import sys
 import threading
 import time
 import unicodedata
@@ -320,6 +322,22 @@ def _like(q: str) -> str:
 
 # ----------------------------------------------------------------------------------------------- magazyn
 
+def _przenosne():
+    """przenosne.py wtyczki (załadowany przez plugin_api jako jarvo_hq_przenosne albo z pliku obok)."""
+    mod = sys.modules.get("jarvo_hq_przenosne")
+    if mod is None:
+        spec = importlib.util.spec_from_file_location("jarvo_hq_przenosne", Path(__file__).with_name("przenosne.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["jarvo_hq_przenosne"] = mod
+        spec.loader.exec_module(mod)
+    return mod
+
+
+def _tryb_0600(sciezka: Path) -> None:
+    """Plik tylko dla właściciela: chmod 0600, na Windows ACL (przenosne.tryb_pliku)."""
+    _przenosne().tryb_pliku(sciezka, 0o600)
+
+
 def _plik_0600(sciezka: Path) -> None:
     """Pusty plik z trybem 0600, zanim sqlite go otworzy (bez okna z trybem z umask); istniejący zostaje."""
     try:
@@ -329,7 +347,7 @@ def _plik_0600(sciezka: Path) -> None:
     except OSError:
         pass
     try:
-        os.chmod(sciezka, 0o600)
+        _tryb_0600(sciezka)
     except OSError:
         pass
 
@@ -429,7 +447,7 @@ class Rozmowy:
         finally:
             dst.close()
         try:
-            os.chmod(cel, 0o600)
+            _tryb_0600(cel)
         except OSError:
             pass
         kopie = sorted(self.sciezka.parent.glob(self.sciezka.name + ".bak-v*"),

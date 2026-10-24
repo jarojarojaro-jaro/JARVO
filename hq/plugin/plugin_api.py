@@ -34,6 +34,10 @@ def _load(name: str, file: str):
     return mod
 
 
+# przenośne pomocniki (podprocesy w wątkach, blokada, ACL) i ścieżki danych (alias /opt/data) przed hq_core,
+# który z nich korzysta; reszta modułów bierze te same z sys.modules
+przenosne = _load("jarvo_hq_przenosne", "przenosne.py")
+sciezki = _load("jarvo_hq_sciezki", "sciezki.py")
 core = _load("jarvo_hq_core", "hq_core.py")
 # ochrona zapisu (CSRF): każda trasa POST tego routera dostaje ochrona.wymagaj_zapisu (ochrona.Trasa);
 # ten sam plik jedzie do wtyczki jarvo-wiedza (scripts/build.py)
@@ -267,7 +271,7 @@ async def _tlo(src: Path, a: float = 0.0, d: float = ed.SZUM_MAX) -> float | Non
 
 def _media_entry(p: Path) -> dict:
     info = _probe(p)
-    return {"path": str(p), "name": p.name, "kind": ed.media_kind(p), "size": p.stat().st_size,
+    return {"path": p.as_posix(), "name": p.name, "kind": ed.media_kind(p), "size": p.stat().st_size,
             "mtime": p.stat().st_mtime, **{k: info.get(k) for k in ("duration", "w", "h", "fps", "audio", "vcodec", "hdr")}}
 
 
@@ -293,7 +297,7 @@ async def edit_info(path: str):
                 proj = json.loads(pp.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 proj = None
-        subs = sorted((str(x) for x in p.parent.glob("*.srt") if x.is_file()), key=lambda x: x.lower())[:30]
+        subs = sorted((x.as_posix() for x in p.parent.glob("*.srt") if x.is_file()), key=lambda x: x.lower())[:30]
         return {"file": _media_entry(p), "media": media, "project": proj, "ffmpeg": bool(t["ffmpeg"]),
                 "stt": bool(t["stt"]), "subs": subs, "project_mtime": mtime}
 
@@ -568,9 +572,9 @@ async def edit_save(request: Request):
     if base is not None and not body.get("force") and target.is_file() and target.stat().st_mtime > float(base) + 1e-3:
         raise HTTPException(409, "Projekt zmienił się poza edytorem")
     tmp = target.with_name(f".{target.name}.part")
-    tmp.write_text(raw, encoding="utf-8")
+    tmp.write_text(raw, encoding="utf-8", newline="\n")     # projekt czyta też Wideograf (projekt.py)
     tmp.replace(target)
-    return {"ok": True, "path": str(target), "ts": time.time(), "mtime": target.stat().st_mtime}
+    return {"ok": True, "path": target.as_posix(), "ts": time.time(), "mtime": target.stat().st_mtime}
 
 
 _stamp_cache: dict[str, tuple[float, str | None]] = {}
@@ -609,13 +613,12 @@ async def edit_srt(path: str):
 
 
 async def _proc(*args: str, timeout: float = 3600) -> tuple[int, str]:
-    proc = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    """Program (ffmpeg, jarvo-stt, film.py) w wątku (przenosne.uruchom: także na Windows) → (kod, stderr)."""
     try:
-        _out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        code, _out, err = await przenosne.uruchom(args, timeout=timeout)
     except asyncio.TimeoutError:
-        proc.kill()
-        raise RuntimeError("Przekroczony czas")
-    return proc.returncode, err.decode("utf-8", "replace")
+        raise RuntimeError("Przekroczony czas") from None
+    return code, err.decode("utf-8", "replace")
 
 
 async def _run_speech(job: dict, src: Path) -> None:
@@ -640,7 +643,7 @@ async def _run_speech(job: dict, src: Path) -> None:
         data = ed.speech_data(words, silences, info.get("duration"))
         ed.speech_path(src).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         if data["lines"]:   # napisy także jako .srt: widzi je agent i inne narzędzia
-            ed.auto_srt_path(src).write_text(ed.to_srt(data["lines"]), encoding="utf-8")
+            ed.auto_srt_path(src).write_text(ed.to_srt(data["lines"]), encoding="utf-8", newline="\n")
         job.update(state="done", progress=1.0, speech=data)
     except Exception as exc:
         job.update(state="error", error=str(exc)[:400])
@@ -722,13 +725,13 @@ async def edit_proxy(request: Request):
     if src is None or ed.media_kind(src) != "video":
         raise HTTPException(404, "Film poza katalogami floty")
     running = next((j for j in _edit.jobs.values()
-                    if j.get("kind") == "proxy" and j.get("src") == str(src) and j.get("state") == "running"), None)
+                    if j.get("kind") == "proxy" and j.get("src") == src.as_posix() and j.get("state") == "running"), None)
     if running:
         return _job_view(running)
     out = _proxy_file(src)
     jid = uuid.uuid4().hex[:12]
     if out.is_file():
-        job = {"id": jid, "kind": "proxy", "src": str(src), "state": "done", "progress": 1.0, "ended": time.time()}
+        job = {"id": jid, "kind": "proxy", "src": src.as_posix(), "state": "done", "progress": 1.0, "ended": time.time()}
     else:
         if not ed.tools()["ffmpeg"]:
             raise HTTPException(503, "Brak ffmpeg w kontenerze")
@@ -736,7 +739,7 @@ async def edit_proxy(request: Request):
         for old in out.parent.glob("*.webm"):     # stare kopie (ponad 7 dni) sprzątamy przy okazji
             if time.time() - old.stat().st_mtime > 7 * 86400:
                 old.unlink(missing_ok=True)
-        job = {"id": jid, "kind": "proxy", "src": str(src), "state": "running", "progress": 0.0, "started": time.time()}
+        job = {"id": jid, "kind": "proxy", "src": src.as_posix(), "state": "running", "progress": 0.0, "started": time.time()}
         job["task"] = asyncio.create_task(_run_proxy(job, src, out))
     _edit.jobs[jid] = job
     return _job_view(job)
@@ -822,30 +825,27 @@ def _typo_warstwy(raw, proj: dict, tmpdir: Path) -> dict:
 async def _run_export(job: dict, cmd: list[str], total: float, tmpdir: Path, out: Path) -> None:
     part = out.with_name(f".{out.stem}.part.mp4")
     cmd = cmd[:-1] + [str(part)]
+    buf = ""
+
+    def postep(line: bytes) -> None:          # w wątku programu (przenosne.uruchom): blok `-progress` ffmpeg
+        nonlocal buf
+        buf += line.decode("utf-8", "replace").replace("\r\n", "\n")
+        if buf.endswith("progress=continue\n") or buf.endswith("progress=end\n"):
+            sec = ed.parse_progress(buf)
+            if sec is not None and total > 0:
+                job["progress"] = min(0.999, sec / total)
+            buf = ""
+
     try:
-        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        job["proc"] = proc
-        err_task = asyncio.create_task(proc.stderr.read())
-        buf = ""
-        while True:
-            line = await proc.stdout.readline()
-            if not line:
-                break
-            buf += line.decode("utf-8", "replace")
-            if buf.endswith("progress=continue\n") or buf.endswith("progress=end\n"):
-                sec = ed.parse_progress(buf)
-                if sec is not None and total > 0:
-                    job["progress"] = min(0.999, sec / total)
-                buf = ""
-        code = await proc.wait()
-        err = (await err_task).decode("utf-8", "replace").strip()
+        code, _out, err = await przenosne.uruchom(cmd, na_linie=postep, przy_starcie=lambda p: job.update(proc=p))
+        err = err.decode("utf-8", "replace").strip()
         if job.get("state") == "cancelled":
             return
         if code != 0 or not part.is_file():
             job.update(state="error", error=(err.splitlines() or [f"ffmpeg zakończył się kodem {code}"])[-1][:400])
             return
         part.replace(out)
-        job.update(state="done", progress=1.0, out=str(out), size=out.stat().st_size)
+        job.update(state="done", progress=1.0, out=out.as_posix(), size=out.stat().st_size)
     except Exception as exc:  # zadanie ma skończyć się stanem, nie wiszącym „w toku”
         job.update(state="error", error=str(exc)[:400])
     finally:
@@ -916,7 +916,7 @@ async def edit_export(request: Request):
     for jid in [k for k, j in _edit.jobs.items() if j.get("ended") and time.time() - j["ended"] > 3600]:
         _edit.jobs.pop(jid, None)
     jid = uuid.uuid4().hex[:12]
-    job = {"id": jid, "state": "running", "progress": 0.0, "started": time.time(), "duration": proj["duration"], "target": str(out)}
+    job = {"id": jid, "state": "running", "progress": 0.0, "started": time.time(), "duration": proj["duration"], "target": out.as_posix()}
     _edit.jobs[jid] = job
     job["task"] = asyncio.create_task(_run_export(job, cmd, proj["duration"], tmpdir, out))
     return _job_view(job)
@@ -942,8 +942,8 @@ async def edit_cancel(jid: str):
     if job.get("state") == "running":
         job["state"] = "cancelled"
         proc = job.get("proc")
-        if proc and proc.returncode is None:
-            proc.kill()
+        if proc is not None:
+            przenosne.zabij(proc)
     return _job_view(job)
 
 
@@ -952,6 +952,9 @@ async def edit_cancel(jid: str):
 # tokenem (wydaje go zalogowany dashboard albo agent przez scripts/jarvo_link.py; wspólny plik linków). Nagłówek CSP sandbox daje jej nieprzezroczyste
 # pochodzenie: skrypty strony działają, ale nie widzą sesji dashboardu i nie wyślą do niego ciasteczek.
 PREVIEW_PORT = int(os.environ.get("JARVO_PREVIEW_PORT", "9120"))
+# adres nasłuchu podglądu i proxy ekranu: w kontenerze wszystkie interfejsy (port wystawia compose na JARVO_BIND_IP),
+# na Windows (tylko natywnie) sam komputer: 0.0.0.0 otworzyłoby okno zapory i port w sieci lokalnej
+PREVIEW_BIND = os.environ.get("JARVO_PREVIEW_BIND") or ("127.0.0.1" if os.name == "nt" else "0.0.0.0")
 # adres, pod którym przeglądarka widzi serwer podglądu (compose: IP z JARVO_BIND_IP); agenci biorą go
 # z env albo z pliku state/preview.json, który zapisujemy przy starcie
 PREVIEW_URL = os.environ.get("JARVO_PREVIEW_URL") or f"http://localhost:{PREVIEW_PORT}"
@@ -1063,7 +1066,7 @@ def _start_preview() -> None:
     from http.server import ThreadingHTTPServer
 
     try:
-        srv = ThreadingHTTPServer(("0.0.0.0", PREVIEW_PORT), _preview_handler())
+        srv = ThreadingHTTPServer((PREVIEW_BIND, PREVIEW_PORT), _preview_handler())
     except OSError as exc:
         _preview.error = f"port {PREVIEW_PORT} zajęty ({exc.strerror})"
         return
@@ -1120,7 +1123,7 @@ async def anim_info(request: Request):
         raise HTTPException(503, f"Podgląd stron nie działa: {_preview.error or 'serwer nie wystartował'}")
     root = p.parent
     token = await asyncio.to_thread(core.link_for, core.LINKS_FILE, root, time.time())
-    return {"plik": str(p), "podglad": {"port": PREVIEW_PORT, "path": f"/{token}/{p.name}?render=1&jarvo-podglad=1"},
+    return {"plik": p.as_posix(), "podglad": {"port": PREVIEW_PORT, "path": f"/{token}/{p.name}?render=1&jarvo-podglad=1"},
             "parametry": await asyncio.to_thread(anim.wczytaj, p), "pomiar": await asyncio.to_thread(anim.pomiar, p)}
 
 
@@ -1280,7 +1283,7 @@ def _start_screen() -> None:
         daemon_threads = True
 
     try:
-        srv = Server(("0.0.0.0", SCREEN_PORT), _screen_handler())
+        srv = Server((PREVIEW_BIND, SCREEN_PORT), _screen_handler())
     except OSError as exc:
         _screen.error = f"port {SCREEN_PORT} zajęty ({exc.strerror})"
         return
@@ -1341,13 +1344,14 @@ async def reveal(request: Request):
 @router.get("/host")
 async def host_info():
     """Co umie host: otwieranie folderów (WSL), ścieżka danych po stronie Windows, port podglądu,
-    telefon testowy (włączony profil android i działające proxy ekranu)."""
+    telefon testowy (włączony profil android i działające proxy ekranu), korzeń danych (`katalog_danych`, z „/”:
+    przeglądarka rozpoznaje po nim ścieżki floty w tekście, hq/web/src/07-sciezki.js)."""
     st = _update_state()
     h = st.get("host") or {}
     android = bool(getattr(_screen, "server", None)) and await asyncio.to_thread(_screen_online)
     return {"explorer": bool(st.get("online") and h.get("explorer")), "data_win": h.get("data_win"),
             "data_host": h.get("data_host"), "preview": bool(getattr(_preview, "server", None)),
-            "preview_port": PREVIEW_PORT, "android": android}
+            "preview_port": PREVIEW_PORT, "android": android, "katalog_danych": sciezki.jako_tekst(HOME)}
 
 
 # --------------------------------------------------------------------------- czat
@@ -1493,7 +1497,7 @@ async def chat_send(name: str, request: Request):
         p = core.safe_path(str(raw), ROOTS)
         if p is None:
             raise HTTPException(400, f"Załącznik poza katalogami floty albo nie istnieje: {raw}")
-        attachments.append(str(p))
+        attachments.append(p.as_posix())
     message = core.compose_message(str(body.get("message") or ""), attachments)
     if not message:
         raise HTTPException(400, "Pusta wiadomość")
@@ -1590,6 +1594,8 @@ async def _przyjmij(request: Request, limit: int) -> dict:
             raise HTTPException(400, "Pusty plik")
         for _proba in range(100):
             try:
+                if os.path.lexists(target):     # Windows: O_EXCL przechodzi przez wiszące dowiązanie i tworzy jego cel
+                    raise FileExistsError(target)
                 os.close(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644))
             except FileExistsError:
                 target = core.upload_target(inbox, nazwa, teraz)
@@ -1670,7 +1676,7 @@ async def konwerter_cele(path: str):
     except k.Blad as exc:
         raise HTTPException(400, core.konwerter_blad(str(exc)))
     meta = await asyncio.to_thread(_konw_meta, k, p, fmt)
-    return {"path": str(p), "name": p.name, "size": p.stat().st_size, "format": fmt, "nazwa": k.FORMATY[fmt][1],
+    return {"path": p.as_posix(), "name": p.name, "size": p.stat().st_size, "format": fmt, "nazwa": k.FORMATY[fmt][1],
             "grupa": k.FORMATY[fmt][0], "cele": cele, "metadane": meta and meta["wrazliwe"],
             "uwagi": meta["uwagi"] if meta else [], "czysc": meta is not None}
 
@@ -1810,16 +1816,29 @@ async def chat_reset(name: str):
 
 # ------------------------------------------------------------------------ diagnoza
 
+HERMES_OBRAZU = "/opt/hermes/.venv/bin/hermes"
+
+
+def _hermes() -> list[str]:
+    """Polecenie Hermesa: JARVO_HERMES_BIN, potem Hermes z obrazu, `hermes` z PATH, a natywnie (bez `hermes` w PATH)
+    Python dashboardu z `-m hermes_cli.main` (docs/NATYWNIE.md W16)."""
+    jawny = os.environ.get("JARVO_HERMES_BIN")
+    if jawny:
+        return [jawny]
+    if Path(HERMES_OBRAZU).exists():
+        return [HERMES_OBRAZU]
+    w_path = shutil.which("hermes")
+    return [w_path] if w_path else [sys.executable, "-m", "hermes_cli.main"]
+
+
 @router.post("/task/{task_id}/retry")
 async def task_retry(task_id: str):
     """Ponowienie karty porzuconej po błędach (hermes kanban unblock → dispatcher uruchomi ją znowu)."""
     if not task_id.replace("_", "").isalnum():
         raise HTTPException(400, "Zły identyfikator karty")
-    hermes = os.environ.get("JARVO_HERMES_BIN") or "/opt/hermes/.venv/bin/hermes"
-    proc = await asyncio.create_subprocess_exec(hermes, "kanban", "unblock", task_id,
-                                                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-    out, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
-    if proc.returncode != 0:
+    code, out, _ = await przenosne.uruchom([*_hermes(), "kanban", "unblock", task_id], timeout=60,
+                                           stderr=przenosne.STDOUT)
+    if code != 0:
         raise HTTPException(500, f"Nie udało się ponowić karty: {out.decode(errors='replace')[-300:]}")
     return {"ok": True}
 
@@ -2074,7 +2093,8 @@ def _rozdaj_klucze(home: Path) -> None:
 # mózg z aplikacji (mozg.py): klucz API albo ChatGPT w pierwszym spotkaniu przełącza flotę; fleet.json czytany na
 # nowo przy każdym wywołaniu (po aktualizacji floty ma nowe zestawy), wybór dla buildu w state/dostawca-modeli.json
 MOZG = {"home": HOME, "flota": lambda: json.loads(FLEET_FILE.read_text(encoding="utf-8")),
-        "stan": core.JARVO_DIR / "state" / "dostawca-modeli.json", "build_json": Path("/opt/jarvo/build/BUILD.json"),
+        "stan": core.JARVO_DIR / "state" / "dostawca-modeli.json",
+        "build_json": Path(os.environ.get("JARVO_BUILD_DIR") or "/opt/jarvo/build") / "BUILD.json",
         "rozdaj": _rozdaj_klucze, "status": roz.aplikacja.status_hermesa}
 trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci=AGENCI, gotowosc=GOTOWOSC,
                        nawyki=NAWYKI, stan_aktualizacji=_update_state, hello=_hello, decyzje=_decyzje, glos=GLOS,

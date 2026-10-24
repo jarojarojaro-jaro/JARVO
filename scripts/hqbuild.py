@@ -4,10 +4,11 @@
     python3 scripts/hqbuild.py --out build/plugins/jarvo-hq     # plugin (wołane też przez scripts/build.py)
     python3 scripts/hqbuild.py --demo build/hq-demo            # samodzielne demo z symulacją floty
 
-Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, ochrona.py, edytor.py, animacja.py, rozmowy.py, czytnik.py,
-wzmianki.py, kontekst.py, agenci.py, brama.py, strumien.py, przebiegi.py, scalanie.py, budzenia.py, prace.py, obserwator.py,
-silnik.py, trasy_rozmow.py, aplikacja.py, podpowiedzi.py, glos.py, mozg.py, trasy_aplikacji.py, pomiar.py, liczby.py,
-konwertuj.py, izometria/, fleet.json, dzwieki/, dist/index.js, dist/zasoby/, dist/fonts/}.
+Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, przenosne.py, sciezki.py, ochrona.py, edytor.py,
+animacja.py, rozmowy.py, czytnik.py, wzmianki.py, kontekst.py, agenci.py, brama.py, strumien.py, przebiegi.py, scalanie.py,
+budzenia.py, prace.py, obserwator.py, silnik.py, trasy_rozmow.py, aplikacja.py, podpowiedzi.py, glos.py, mozg.py,
+trasy_aplikacji.py, pomiar.py, liczby.py, konwertuj.py, izometria/, fleet.json, dzwieki/, dist/index.js, dist/zasoby/,
+dist/fonts/}. Pakiet, loader i pliki demo mają końce linii „\\n” także na Windows (te same bajty na każdym systemie).
 Pakiet aplikacji to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku; trafia do
 dist/zasoby/app-<sha256[:12]>.js (z bliźniakiem .gz), style do app-<h>.css, kroje aplikacji do zasoby/kroje/.
 dist/index.js to mały loader (≤ 4 KB, dashboard serwuje go na każdej stronie): rejestruje zakładkę /jarvo i dopiero
@@ -30,6 +31,8 @@ import fleetlib as fl  # noqa: E402
 
 HQ = fl.REPO_ROOT / "hq"
 PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "edytor.py", "animacja.py",
+                # przenośne pomocniki (podprocesy w wątkach, blokada, ACL) i ścieżki danych (alias /opt/data)
+                "przenosne.py", "sciezki.py",
                 # silnik rozmów aplikacji (docs/HQ.md „Rozmowy”): magazyn rozmowy.db, czytnik sesji Hermesa, wzmianki,
                 # blok kontekstu, lista agentów, klient bramy, strumień SSE, rejestr przebiegów, oś czasu, budzenia,
                 # praca floty, obserwator, wątek silnika i trasy; start aplikacji (gotowość, podpowiedzi N0, GET /app)
@@ -217,7 +220,7 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
         shutil.copy2(HQ / "plugin" / name, dash / name)
     js = zasob(zasoby, "app", bundle_js().encode("utf-8"), "js")
     css = zasob(zasoby, "app", style_aplikacji((HQ / "web" / "style.css").read_text(encoding="utf-8")).encode("utf-8"), "css")
-    (dash / "dist" / "index.js").write_text(loader_js(js, css), encoding="utf-8")
+    (dash / "dist" / "index.js").write_text(loader_js(js, css), encoding="utf-8", newline="\n")
     for k in KROJE_APLIKACJI:
         shutil.copy2(HQ / "web" / "fonts" / "kroje" / k, zasoby / "kroje" / k)
     for k in ("Inter-latin.woff2", "Inter-latin-ext.woff2"):
@@ -251,13 +254,13 @@ def build_demo(out: Path) -> Path:
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
-    (out / "app.js").write_text(bundle_js(), encoding="utf-8")
+    (out / "app.js").write_text(bundle_js(), encoding="utf-8", newline="\n")
     shutil.copy2(HQ / "web" / "style.css", out / "style.css")
     shutil.copytree(HQ / "web" / "fonts", out / "fonts")
     shutil.copy2(HQ / "web" / "demo" / "mock.js", out / "mock.js")
     shutil.copy2(HQ / "web" / "demo" / "index.html", out / "index.html")
     (out / "fleet.js").write_text("window.JARVO_HQ_FLEET = " + json.dumps(fleet_json(), ensure_ascii=False, indent=1) + ";\n",
-                                  encoding="utf-8")
+                                  encoding="utf-8", newline="\n")
     return out
 
 

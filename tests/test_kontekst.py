@@ -150,6 +150,35 @@ def test_godzina_z_data_gdy_nie_dzis():
     assert kt.godzina(1792512300.0, DANE["teraz"]) == "20.10 18:05"
 
 
+def test_godzina_bez_bazy_stref_regula_ue(monkeypatch):
+    """Windows bez paczki tzdata (ZoneInfo nie zna Europe/Warsaw): ta sama godzina z reguły UE (CET, a od ostatniej
+    niedzieli marca do ostatniej niedzieli października CEST; zmiana o 1:00 UTC), nie czas lokalny maszyny."""
+    monkeypatch.setattr(kt, "STREFA", None)
+    assert kt.godzina(1792584120.0, DANE["teraz"]) == "14:02"
+    assert kt.godzina(1792512300.0, DANE["teraz"]) == "20.10 18:05"
+    # 2026: CEST od 29.03 01:00 UTC do 25.10 01:00 UTC (godzina 02:00–02:59 dwa razy)
+    for ts, czas in ((1774745999, "29.03 01:59"), (1774746000, "29.03 03:00"), (1792886400, "25.10 02:00"),
+                     (1792889999, "25.10 02:59"), (1792890000, "25.10 02:00"), (1767225600, "01.01 01:00"),
+                     (1782907200, "01.07 14:00")):
+        assert kt.godzina(ts, 0) == czas, ts
+
+
+def test_sciezki_floty_przy_korzeniu_natywnym(monkeypatch):
+    """Instalacja natywna (HERMES_HOME z literą dysku i spacją w nazwie użytkownika): ścieżki w tekście z „\\” i „/”,
+    w zapisie Git Bash i stare /opt/data; w kontenerze (domyślny korzeń) tylko /opt/data, jak dawniej."""
+    assert kt.sciezki("plik C:/Users/x/dane/jarvo/a.png i /opt/data/jarvo/b.png.") == ["/opt/data/jarvo/b.png"]
+    k = "C:\\Users\\Michał Żółć\\AppData\\Local\\Jarvo\\dane"
+    monkeypatch.setenv("HERMES_HOME", k)
+    nat = load_script("hq/plugin/kontekst.py", "jarvo_test_kontekst_natywny")
+    tekst = (f"Gotowe: {k}\\jarvo\\workspaces\\web\\out\\index.html, podgląd C:/Users/Michał Żółć/AppData/Local/Jarvo/dane/"
+             "jarvo/inbox/a.png; z basha /c/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/missions/M-1/RAPORT.md. "
+             "Stary: /opt/data/jarvo/workspaces/web/stary.html")
+    assert nat.sciezki(tekst) == [f"{k}\\jarvo\\workspaces\\web\\out\\index.html",
+                                  "C:/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/inbox/a.png",
+                                  "/c/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/missions/M-1/RAPORT.md",
+                                  "/opt/data/jarvo/workspaces/web/stary.html"]
+
+
 def test_utajnij_domyslne_z_pliku_obok():
     assert kt._czysc(f"x {KLUCZ}", None) == "x [ukryte]"
 

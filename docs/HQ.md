@@ -82,7 +82,7 @@ przeglądarka (Tailscale) ── :9119 dashboard Hermesa (logowanie hasłem)
         ├─ POST /api/plugins/jarvo-hq/android     link „📱 Ekran telefonu” (token) ─► :9122 proxy ekranu w pluginie
         │                                          ─► jarvo-android-ekran:8000 (ws-scrcpy, HTTP i WebSocket)
         ├─ GET  /api/plugins/jarvo-hq/host        czy działa „Pokaż w folderze” (WSL), ścieżki hosta, port podglądu,
-        │                                          czy działa telefon testowy
+        │                                          czy działa telefon testowy, korzeń danych (`katalog_danych`)
         ├─ GET  /api/plugins/jarvo-hq/chat/<a>/history
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/send ─► gateway :8642 /p/<agent>/api/sessions/<id>/chat/stream (SSE)
         ├─ POST /api/plugins/jarvo-hq/chat/<a>/reset
@@ -127,6 +127,7 @@ Pliki w repo:
 | `branding/powloka.json`, `branding/powloka.js` | łatka powłoki dashboardu: wpis `/jarvo` w menu, przekierowania Hermesa na `__JARVO_CEL__`, styl i skrypt w `index.html` (sekcja 2c; testy: `tests/test_powloka.py`) |
 | `hq/plugin/plugin_api.py` | trasy FastAPI, proxy czatu do gatewaya |
 | `hq/plugin/hq_core.py` | logika stanu (bez FastAPI, testowana w `tests/test_hq_core.py`) |
+| `hq/plugin/przenosne.py`, `sciezki.py` | przenośne pomocniki (etap E1 z `docs/NATYWNIE.md`): podprocesy tras w wątkach (`uruchom`: ffmpeg, jarvo-stt, lektor, `hermes kanban unblock`; na Windows pętla dashboardu nie ma podprocesów asyncio), blokada pliku linków (fcntl albo msvcrt), podmiana pliku z ponawianiem na Windows (czytany plik daje tam WinError 5/32), plik tylko dla właściciela (chmod 0600, na Windows ACL przez `icacls`); ścieżki danych: alias `/opt/data` starych rozmów pod faktycznym korzeniem (`HERMES_HOME`) i ścieżki w tekście z literą dysku, „\” i spacjami w korzeniu (bliźniak przeglądarki `hq/web/src/07-sciezki.js`; testy: `tests/test_hq_core.py`, `test_kontekst.py`, `test_scalanie.py`, `tests/js/hq_front.test.cjs`) |
 | `hq/plugin/edytor.py` | edytor filmów: walidacja projektu i planu typografii, polecenie ffmpeg, ffprobe (testy: `tests/test_edytor.py`, `tests/test_typografia.py`) |
 | `hq/plugin/rozmowy.py`, `czytnik.py`, `wzmianki.py`, `kontekst.py`, `agenci.py` | silnik rozmów nowej aplikacji, etap 2a: magazyn `rozmowy.db`, czytnik sesji Hermesa, parser `@uchwyt` (bliźniak przeglądarki `hq/web/src/12-wzmianki.js`), blok kontekstu i raport nadzoru, lista agentów (sekcja 2d; testy: `tests/test_rozmowy_db.py`, `test_czytnik.py`, `test_wzmianki.py`, `test_kontekst.py`, `test_agenci.py`) |
 | `hq/plugin/silnik.py`, `przebiegi.py`, `brama.py`, `strumien.py`, `scalanie.py`, `budzenia.py`, `prace.py`, `obserwator.py`, `trasy_rozmow.py` | silnik rozmów, etap 2b: wątek silnika, maszyna stanów przebiegów, klient `/v1/runs` bramy, strumień SSE aplikacji, oś czasu wątku, wiersze budzenia kanbana, `praca.json`, obserwator plików, trasy `/rozmowy`, `/przebiegi`, `/strumien` (sekcja 2e; testy: `tests/test_silnik_rozmow.py` z atrapą bramy `tests/atrapa_bramy.py`, `test_brama.py`, `test_strumien.py`, `test_scalanie.py`, `test_budzenia.py`) |
@@ -135,7 +136,7 @@ Pliki w repo:
 | `shared/skills/konwersja-plikow/scripts/konwertuj.py` (kopiowany do pluginu) | konwerter plików karty Konwerter w Centrali, ten sam co skill floty (testy: `tests/test_konwertuj.py`, `tests/test_hq_core.py`) |
 | `shared/skills/izometria/` (kopiowany do pluginu jako `izometria/`, bez przykładów, z krojem OFL) | figura floty w Centrali: `iso.py flota` z `fleet.json` pluginu, ten sam co skill floty (testy: `tests/test_iso.py`, `tests/test_hq_core.py`) |
 | `hq/web/src/*.js` | frontend: podstawy, API, grafika pokoi, budynek, panel, napisy, typografia (`48-typografia.js`), edytor filmów i jego uwagi z kadrami, podgląd animacji z parametrami, czat, konwerter plików (`55-konwerter.js`), figura floty (`56-flota.js`), HUD, Stara Baza (`89-baza.js`), widżet aktualizacji |
-| `hq/web/src/02-sklep.js` … `21-ikony.js`, `30-pasek.js` … `34-pliki.js`, `38-start.js`, `61-szuflada.js`, `90-app.js` | nowa aplikacja, etap 3 (3a–3c): ekran startu (`38-start.js`), sklep, trasa, słownik PL/EN, skróty, motyw, klient API i strumień, wzmianki (`12-wzmianki.js`), bezpieczny Markdown (`13-markdown.js`), czas, oś, akcje, prymitywy UI, ikony, pasek rozmów, widok wątku (`31-watek.js`), wiadomości, kroki i zgody (`32-wiadomosc.js`), kompozytor (`33-kompozytor.js`), karty plików i podgląd (`34-pliki.js`), szuflada ustawień i powłoka `AppJarvo` (sekcja 2f; testy: `tests/js/hq_front.test.cjs` w node, `tests/test_hq_front.py`) |
+| `hq/web/src/02-sklep.js` … `21-ikony.js`, `30-pasek.js` … `34-pliki.js`, `38-start.js`, `61-szuflada.js`, `90-app.js` | nowa aplikacja, etap 3 (3a–3c): ekran startu (`38-start.js`), sklep, trasa, słownik PL/EN, skróty, motyw, ścieżki floty (`07-sciezki.js`), klient API i strumień, wzmianki (`12-wzmianki.js`), bezpieczny Markdown (`13-markdown.js`), czas, oś, akcje, prymitywy UI, ikony, pasek rozmów, widok wątku (`31-watek.js`), wiadomości, kroki i zgody (`32-wiadomosc.js`), kompozytor (`33-kompozytor.js`), karty plików i podgląd (`34-pliki.js`), szuflada ustawień i powłoka `AppJarvo` (sekcja 2f; testy: `tests/js/hq_front.test.cjs` w node, `tests/test_hq_front.py`) |
 | `hq/web/style.css` | styl (tokeny motywu dashboardu, animacje, responsywność; edytor i okno animacji z własnymi tokenami) |
 | `hq/web/dzwieki/` | biblioteka dźwięków CC0 menu Audio i Wideografa (157 efektów w 13 kategoriach, 9 podkładów; `katalog.json` z rolą, szczytem i flagą „gra” każdego efektu, `LICENCJE.md` z autorem i źródłem każdego pliku), budowana przez `scripts/dzwieki.py` (`pobierz`, `zbuduj`, `zmierz`, `sprawdz`; test `tests/test_dzwieki.py`) |
 | `hq/web/fonts/` | Inter (OFL, `LICENSE-Inter.txt`): krój zapasowy edytora, gdy system nie ma SF Pro, Segoe UI ani Roboto; `kroje/`: kroje napisów i typografii (OFL, `scripts/kroje.py`) |
@@ -1005,7 +1006,8 @@ innych kanałów etap 6.
   - `GET /app` (`hq/plugin/trasy_aplikacji.py`, `aplikacja.py`): `wersja`, `silnik`, `agenci` (z krótką `rola`
     i `pokoj` z `fleet.yaml`), `wlasciciel {imie, firma}`, `gotowosc {model {dostawca, polaczony, sposob}, brama
     ok|startuje|niedostepna, profil_wlasciciela}`, `ustawienia` (limity wysyłki), `funkcje`, `decyzje` (liczba pytań
-    zespołu), `aktualizacja`. Języka serwer nie podaje: wybiera go przełącznik dashboardu w przeglądarce. Gotowość
+    zespołu), `aktualizacja`, `katalog_danych` (korzeń danych z „/”: w kontenerze `/opt/data`, natywnie korzeń
+    instalacji; po nim `07-sciezki.js` rozpoznaje ścieżki floty w tekście). Języka serwer nie podaje: wybiera go przełącznik dashboardu w przeglądarce. Gotowość
     niesie same nazwy i wartości logiczne: status logowania Hermesa liczy osobny proces z `HERMES_HOME` profilu Jarva
     (drukuje tylko dwie wartości logiczne, wynik w pamięci 30 s; po tym czasie zapytanie dostaje od razu stary wynik,
     a nowy liczy się w tle, więc `/app` nie czeka na proces). Brama = `startuje`, gdy jest młodsza niż 2 min (ostatnia
@@ -1136,7 +1138,10 @@ innych kanałów etap 6.
   (`sklep.podglad`): obraz, wideo, dźwięk, PDF (w `<iframe sandbox>` z `/file`, z linkiem zapasowym), tekst i kod
   (HTML jako tekst, bez wykonywania). Blob tylko jako źródło obrazu, wideo i dźwięku albo `<a download>`; SVG nigdy
   jako blob (zawsze adres `/file` z CSP sandbox), „Otwórz w nowej karcie” zawsze na `/file`. Ścieżka floty w tekście
-  otwiera podgląd.
+  otwiera podgląd: `/opt/data/jarvo/…` (stare rozmowy) i ścieżka pod korzeniem instalacji natywnej (`katalog_danych`
+  z `GET /app`: litera dysku dowolnej wielkości, „/” albo „\”, zapis Git Bash `/c/…`, spacje tylko w korzeniu;
+  `07-sciezki.js`). Serwer przyjmuje alias `/opt/data/…` i zapis Git Bash także w `/file` i trasach edytora
+  (`hq_core.safe_path` → `sciezki.na_dysk`), a ścieżki w odpowiedziach API zawsze z „/”.
 - **Markdown** (`13-markdown.js`): czysty tokenizer `Md.parsuj` (akapity, nagłówki 1–4, listy do 3 poziomów
   z zadaniami, cytaty, bloki kodu, tabele GFM, linie, pliki `MEDIA:`/📎) i `Md.inline` (pogrubienie, kursywa,
   przekreślenie, kod, linki, gołe adresy, ścieżki floty, obrazy `data:image`). Render tylko przez React, surowy HTML ze
@@ -1326,7 +1331,8 @@ innych kanałów etap 6.
   po rozwiązaniu symlinków.
   Pliki wysyłane z nagłówkiem `Content-Security-Policy: sandbox` i `nosniff`, HTML jako zwykły tekst:
   strona wygenerowana przez agenta nie wykona skryptu w sesji dashboardu.
-- **▶ Odpal**: strona agenta idzie z osobnego portu 9120 (ten sam `JARVO_BIND_IP`), tylko pod adresem z losowym
+- **▶ Odpal**: strona agenta idzie z osobnego portu 9120 (ten sam `JARVO_BIND_IP`; serwer podglądu i proxy ekranu
+  słuchają w kontenerze na wszystkich interfejsach, na Windows tylko na 127.0.0.1, zmiana: `JARVO_PREVIEW_BIND`), tylko pod adresem z losowym
   tokenem, który wydaje zalogowany dashboard albo agent (`scripts/jarvo_link.py`; wspólny plik
   `state/preview-links.json`, ważny 7 dni, przetrwa restart). Wykonawca karty działa z `HERMES_HOME` swojego profilu
   (`/opt/data/profiles/<agent>`), więc `hq_core` wylicza z niego korzeń danych (`/opt/data/jarvo`). Nagłówek `CSP: sandbox` bez

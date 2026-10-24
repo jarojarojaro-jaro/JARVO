@@ -28,9 +28,12 @@ from __future__ import annotations
 import base64
 import hashlib
 import heapq
+import importlib.util
 import json
 import re
 import sqlite3
+import sys
+from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
 LIMIT = 80
@@ -279,7 +282,19 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
     return out, {"koniec": i, "od_ponownie": od_ponownie, "skompaktowane": skompaktowane}
 
 
-SCIEZKA_RE = re.compile(r"/opt/data/[^\s,;\"'<>()\[\]{}`]+")
+def _sciezki():
+    """sciezki.py wtyczki (załadowany przez plugin_api jako jarvo_hq_sciezki albo z pliku obok)."""
+    mod = sys.modules.get("jarvo_hq_sciezki")
+    if mod is None:
+        spec = importlib.util.spec_from_file_location("jarvo_hq_sciezki", Path(__file__).with_name("sciezki.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["jarvo_hq_sciezki"] = mod
+        spec.loader.exec_module(mod)
+    return mod
+
+
+# ścieżki floty w odpowiedzi agenta: /opt/data/… (stare rozmowy) i faktyczny korzeń danych (HERMES_HOME)
+SCIEZKA_RE = _sciezki().wzorzec(r"[^\s,;\"'<>()\[\]{}`]+", _sciezki().korzen_danych())
 
 
 def _pliki(tekst: str, plik: Callable[[str], dict | None] | None) -> list[dict]:

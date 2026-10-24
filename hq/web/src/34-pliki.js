@@ -5,7 +5,7 @@
 // na /file; PDF w <iframe sandbox> z /file, z linkiem zapasowym, gdy przeglądarka nie pokaże PDF w ramce.
 
 const jestSvg = (path) => /\.svg$/i.test(String(path || ""));
-const krotkaSciezka = (path) => String(path || "").replace(/^\/opt\/data\/jarvo\//, "");
+const krotkaSciezka = (path) => Sciezki.krotka(path);
 
 // obraz z dysku floty: SVG z /file (bez bloba), reszta przez blob z autoryzacją (działa też bez logowania)
 function useObrazPliku(path) {

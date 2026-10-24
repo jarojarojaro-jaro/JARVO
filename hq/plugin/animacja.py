@@ -135,7 +135,7 @@ def zapisz(anim: Path, wartosci: dict) -> list[dict]:
         if surowe.get("klucz") in nowe:
             surowe["wartosc"] = nowe[surowe["klucz"]]
     tmp = f.with_name(f".{f.name}.part")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
     tmp.replace(f)
     return schemat(data)
 

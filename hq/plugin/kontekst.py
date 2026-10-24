@@ -27,15 +27,28 @@ import secrets
 import sys
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
 
 try:
     from zoneinfo import ZoneInfo
     STREFA = ZoneInfo("Europe/Warsaw")
-except Exception:  # pragma: no cover - brak bazy stref: czas lokalny kontenera (TZ=Europe/Warsaw)
+except Exception:  # brak bazy stref (Windows bez paczki tzdata): reguła UE w _czas_warszawy
     STREFA = None
+
+
+def _modul(nazwa: str):
+    """Moduł wtyczki (ochrona.py, sciezki.py): załadowany przez plugin_api jako jarvo_hq_<nazwa> albo z pliku obok."""
+    klucz = f"jarvo_hq_{nazwa}"
+    mod = sys.modules.get(klucz)
+    if mod is None:
+        spec = importlib.util.spec_from_file_location(klucz, Path(__file__).with_name(f"{nazwa}.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[klucz] = mod
+        spec.loader.exec_module(mod)
+    return mod
+
 
 KOORDYNATOR = "jarvo"
 LIMIT_WPISOW = 12
@@ -56,7 +69,8 @@ ZGODA_TEKST = 300
 PODOBNE = ("[jarvo", "[koniec", "[wiadomosc", "[zlecenie", "[odpowiedz na pytanie")   # po złożeniu (zloz)
 OTWARCIA = "[【〚⟦〔⁅﹝❲"                    # `[` i nawiasy, które model może wziąć za `[` znacznika
 NIEWIDOCZNE = frozenset("\u115f\u1160\u3164\uffa0\u2800")   # wypełniacze hangul i pusty znak Braille'a (Lo/So)
-SCIEZKA_RE = re.compile(r"/opt/data/[^\s,;\"'<>()\[\]{}]+")
+# ścieżki floty w tekście: /opt/data/… (stare rozmowy) i faktyczny korzeń danych (HERMES_HOME, sciezki.py)
+SCIEZKA_RE = _modul("sciezki").wzorzec(r"[^\s,;\"'<>()\[\]{}]+", _modul("sciezki").korzen_danych())
 POMIJANE = frozenset({"kroki", "kompresja", "obca"})
 TRYBY = {"bezposrednio": "bezpośrednio", "jarvo": "przez Jarva", "przekaz": "przekazane przez Jarva",
          "nadzor": "poprawka z nadzoru"}
@@ -145,13 +159,26 @@ def koniec_tekstu(tekst: str, maks: int) -> str:
     return "…" + ogon.lstrip()
 
 
+def _czas_warszawy(ts: float) -> datetime:
+    """Czas w Warszawie bez bazy stref: CET (UTC+1), a od ostatniej niedzieli marca do ostatniej niedzieli
+    października (zmiana o 1:00 UTC) CEST (UTC+2); reguła UE od 1996 roku."""
+    utc = datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=None)
+
+    def ostatnia_niedziela(miesiac: int) -> datetime:          # marzec i październik mają po 31 dni
+        d = datetime(utc.year, miesiac, 31, 1)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+
+    lato = ostatnia_niedziela(3) <= utc < ostatnia_niedziela(10)
+    return datetime.fromtimestamp(ts, timezone(timedelta(hours=2 if lato else 1)))
+
+
 def godzina(ts: float, teraz: float | None = None) -> str:
     """HH:MM w Europe/Warsaw; z datą `DD.MM` przed godziną, gdy nie dziś."""
     teraz = time.time() if teraz is None else teraz
     if STREFA is not None:
         d, dzis = datetime.fromtimestamp(ts, STREFA), datetime.fromtimestamp(teraz, STREFA)
-    else:  # pragma: no cover
-        d, dzis = datetime.fromtimestamp(ts), datetime.fromtimestamp(teraz)
+    else:
+        d, dzis = _czas_warszawy(ts), _czas_warszawy(teraz)
     return d.strftime("%H:%M") if d.date() == dzis.date() else d.strftime("%d.%m %H:%M")
 
 
@@ -165,14 +192,7 @@ def nazwa(agent: str, nazwy: Mapping[str, str] | None) -> str:
 
 def _utajnij_domyslnie() -> Callable[[str], str]:
     """`ochrona.utajnij` wtyczki (załadowany przez plugin_api jako jarvo_hq_ochrona albo z pliku obok)."""
-    mod = sys.modules.get("jarvo_hq_ochrona")
-    if mod is None:
-        sciezka = Path(__file__).with_name("ochrona.py")
-        spec = importlib.util.spec_from_file_location("jarvo_hq_ochrona", sciezka)
-        mod = importlib.util.module_from_spec(spec)
-        sys.modules["jarvo_hq_ochrona"] = mod
-        spec.loader.exec_module(mod)
-    return mod.utajnij
+    return _modul("ochrona").utajnij
 
 
 def _czysc(tekst: str, utajnij: Callable[[str], str] | None) -> str:

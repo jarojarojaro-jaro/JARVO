@@ -128,6 +128,22 @@ def test_rodzaje_pozycji_i_ukrywanie_naszych():
     assert sc.ostatnia_praca(wynik["pozycje"], "jarvo") == {"agent": "web", "tryb": "bezposrednio", "ts": 104.0}
 
 
+def test_pliki_z_odpowiedzi_przy_korzeniu_natywnym(monkeypatch):
+    """Instalacja natywna: karty plików z odpowiedzi agenta także dla ścieżek pod faktycznym korzeniem (litera dysku,
+    „\\” albo „/”, spacja w nazwie użytkownika, `kod` w backtickach) i dla starych /opt/data; reszta tekstu nie."""
+    korzen = "C:\\Users\\Michał Żółć\\AppData\\Local\\Jarvo\\dane"
+    monkeypatch.setenv("HERMES_HOME", korzen)
+    nat = load_script("hq/plugin/scalanie.py", "jarvo_test_scalanie_natywny")
+    widziane = []
+    plik = lambda s: widziane.append(s) or {"path": s}                       # noqa: E731
+    tekst = (f"Gotowe: `{korzen}\\jarvo\\workspaces\\web\\out\\index.html` i C:/Users/Michał Żółć/AppData/Local/Jarvo/"
+             "dane/jarvo/inbox/a.png. Stary: /opt/data/jarvo/x.txt, obcy: C:/Windows/win.ini")
+    assert [p["path"] for p in nat._pliki(tekst, plik)] == [
+        f"{korzen}\\jarvo\\workspaces\\web\\out\\index.html",
+        "C:/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/inbox/a.png", "/opt/data/jarvo/x.txt"]
+    assert sc._pliki(tekst, plik) == [{"path": "/opt/data/jarvo/x.txt"}]        # kontener: tylko /opt/data
+
+
 def test_tura_w_toku_wraca_po_kursorze():
     p1 = przebieg("p_1", stan="pracuje", user_msg_id=1)
     wiersze = [wiersz(1, "user", "zrób"), wiersz(2, "assistant", "", tool_calls=[{"id": "c1", "name": "read_file"}])]

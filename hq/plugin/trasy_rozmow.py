@@ -417,6 +417,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
                 for _proba in range(100):
                     cel = core.upload_target(inbox, rdzen + ochrona.OBRAZY[mime], teraz)
                     cel.parent.mkdir(parents=True, exist_ok=True)
+                    if os.path.lexists(cel):      # Windows: O_EXCL przechodzi przez wiszące dowiązanie i tworzy jego cel
+                        continue
                     try:
                         fd = os.open(cel, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                     except FileExistsError:
@@ -431,7 +433,7 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
                 except OSError:
                     cel.unlink(missing_ok=True)
                     raise
-                out.append({"path": str(cel), "name": cel.name, "size": len(dane), "mime": mime})
+                out.append({"path": cel.as_posix(), "name": cel.name, "size": len(dane), "mime": mime})
         except OSError:
             usun_obrazy(out)
             raise BladTrasy(507, "dysk", "Nie da się zapisać obrazu na dysku — sprawdź wolne miejsce.",

@@ -16,10 +16,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import importlib.util
 import json
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Awaitable, Callable
 
@@ -89,15 +91,26 @@ def sprzataj(katalog: Path | str, maks: int = PLIKI_MAKS) -> int:
     return usuniete
 
 
+def _przenosne():
+    """przenosne.py wtyczki (załadowany przez plugin_api jako jarvo_hq_przenosne albo z pliku obok)."""
+    mod = sys.modules.get("jarvo_hq_przenosne")
+    if mod is None:
+        spec = importlib.util.spec_from_file_location("jarvo_hq_przenosne", Path(__file__).with_name("przenosne.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["jarvo_hq_przenosne"] = mod
+        spec.loader.exec_module(mod)
+    return mod
+
+
 async def _uruchom(argv: list[str], timeout: float) -> int:
-    proc = await asyncio.create_subprocess_exec(*argv, stdin=asyncio.subprocess.DEVNULL,
-                                                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+    """Lektor w wątku (przenosne.uruchom: także na Windows, gdzie pętla dashboardu nie ma podprocesów asyncio);
+    po limicie czasu program jest zabity i skończony."""
+    p = _przenosne()
     try:
-        return await asyncio.wait_for(proc.wait(), timeout)
+        kod, _out, _err = await p.uruchom(argv, timeout=timeout, stdin=p.DEVNULL, stdout=p.DEVNULL, stderr=p.DEVNULL)
     except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
         raise BladGlosu("limit czasu") from None
+    return kod
 
 
 class Glos:

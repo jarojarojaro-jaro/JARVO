@@ -10,16 +10,16 @@ const vm = require("vm");
 const assert = require("assert");
 
 const SRC = path.join(__dirname, "..", "..", "hq", "web", "src");
-const PLIKI = ["02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-tokeny.js", "12-wzmianki.js", "13-markdown.js",
-  "14-czas.js", "15-os.js", "37-poznajmy.js"];
+const PLIKI = ["02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-tokeny.js", "07-sciezki.js", "12-wzmianki.js",
+  "13-markdown.js", "14-czas.js", "15-os.js", "37-poznajmy.js"];
 const PRZED = `const React = {}; const useMemo = (f) => f(); const useRef = (v) => ({ current: v }); const useEffect = () => {};
 let HQ_LANG = null; const isPL = () => T.wymus !== "en";\n`;
-const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania });";
+const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki });";
 const kod = PRZED + PLIKI.map((f) => `// ---- ${f}\n` + fs.readFileSync(path.join(SRC, f), "utf8")).join("\n") + PO;
 const kontekst = vm.createContext({ Intl, Date, Math, JSON, URLSearchParams, setTimeout, clearTimeout, console, Set, Map,
   encodeURIComponent, decodeURIComponent, Number, String, Object, Array, RegExp });
 const M = vm.runInContext(kod, kontekst, { filename: "hq-front.js" });
-const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania } = M;
+const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki } = M;
 
 let ile = 0;
 function test(nazwa, f) {
@@ -477,6 +477,36 @@ test("Md: ścieżki floty, MEDIA i 📎 jako karty plików, obraz z dysku floty"
   eq(MD("MEDIA:/opt/data/jarvo/inbox/a.pdf\n📎 /opt/data/jarvo/inbox/b.png"), [{ t: "pliki", sciezki: ["/opt/data/jarvo/inbox/a.pdf", "/opt/data/jarvo/inbox/b.png"] }]);
   assert.ok(!wezly(MD("/etc/passwd i /opt/data/jarvo/../../etc/passwd")).some((x) => x.t === "sciezka"));
   assert.ok(wezly(MD("![x](/opt/data/jarvo/inbox/a.png)")).some((x) => x.t === "obraz_plik"));
+});
+test("Sciezki: korzeń natywny Windows (litera dysku, „\\” i „/”, spacje, Git Bash) i alias /opt/data", () => {
+  const K = "C:/Users/Michał Żółć/AppData/Local/Jarvo/dane";
+  const sciezki = (t) => wezly(MD(t)).filter((x) => x.t === "sciezka").map((x) => x.v);
+  try {
+    eq(sciezki(`zobacz ${K}/jarvo/workspaces/web/a.html`), []);                // bez korzenia z serwera: tylko alias
+    Sciezki.ustaw("C:\\Users\\Michał Żółć\\AppData\\Local\\Jarvo\\dane\\");
+    eq(Sciezki.korzen(), K);
+    eq(sciezki(`zobacz ${K}/jarvo/workspaces/web/a.html.`), [`${K}/jarvo/workspaces/web/a.html`]);
+    const ukosniki = "c:\\Users\\Michał Żółć\\AppData\\Local\\Jarvo\\dane\\jarvo\\inbox\\2026-10-24\\foto.png";
+    eq(sciezki(`plik: \`${ukosniki}\``), [ukosniki]);
+    eq(sciezki("w Git Bash: /c/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/missions/M-1/RAPORT.md"),
+      ["/c/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/missions/M-1/RAPORT.md"]);
+    eq(sciezki("stara rozmowa: /opt/data/jarvo/workspaces/web/a.html"), ["/opt/data/jarvo/workspaces/web/a.html"]);
+    eq(sciezki(`${K}/jarvo/../profiles/.env i D:/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/inbox/x.png`), []);
+    eq(MD(`MEDIA:${K}/jarvo/workspaces/wideo/film-końcowy.mp4\n📎 C:\\Users\\inny\\x.pdf`),     // spacja tylko w korzeniu
+      [{ t: "pliki", sciezki: [`${K}/jarvo/workspaces/wideo/film-końcowy.mp4`, "C:\\Users\\inny\\x.pdf"] }]);
+    eq(Sciezki.krotka(`${K}/jarvo/workspaces/web/a.html`), "workspaces/web/a.html");
+    eq(Sciezki.krotka("C:\\Users\\Michał Żółć\\AppData\\Local\\Jarvo\\dane\\jarvo\\inbox\\a.png"), "inbox\\a.png");
+    eq(Sciezki.nazwa("C:\\x\\y\\plik.png"), "plik.png");
+    eq(Sciezki.naDysk("/opt/data/jarvo/inbox/a.png"), `${K}/jarvo/inbox/a.png`);
+    eq(Sciezki.naDysk("/c/Users/x"), "C:/Users/x");
+    eq(Sciezki.doSystemu(`${K}/jarvo/inbox/a.png`), "C:\\Users\\Michał Żółć\\AppData\\Local\\Jarvo\\dane\\jarvo\\inbox\\a.png");
+    Sciezki.ustaw("/home/ola/.jarvo/dane");                                 // macOS i Linux: bez „\” i bez liter dysku
+    eq(sciezki("/home/ola/.jarvo/dane/jarvo/inbox/a.png i C:/x/jarvo/inbox/b.png"), ["/home/ola/.jarvo/dane/jarvo/inbox/a.png"]);
+    eq([Sciezki.nazwa("/home/ola/a\\b.png"), Sciezki.naDysk("/c/x")], ["a\\b.png", "/c/x"]);
+  } finally {
+    Sciezki.ustaw(null);
+  }
+  eq([Sciezki.korzen(), Sciezki.nazwa("C:\\x\\a.png"), Sciezki.krotka("/opt/data/jarvo/inbox/a.png")], [null, "C:\\x\\a.png", "inbox/a.png"]);
 });
 test("Md: wektory XSS (linki, obrazy, surowy HTML, encje, rozbite schematy)", () => {
   const zle = ["javascript:alert(1)", "JaVaScRiPt:alert(1)", " javascript:alert(1)", "java\tscript:alert(1)", "data:text/html,<script>alert(1)</script>",

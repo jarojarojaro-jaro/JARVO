@@ -342,8 +342,19 @@ def test_js_i_python_te_same_listy():
             assert k in ed.TYPO_KROJE, (motyw, k)
 
 
+def node_plik(kod: str) -> subprocess.CompletedProcess:
+    """Program node z pliku tymczasowego: `node -e` z całym 48-typografia.js (80 KB) przekracza na Windows limit
+    wiersza poleceń (WinError 206)."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        plik = Path(d) / "prog.js"
+        plik.write_text(kod, encoding="utf-8")
+        return subprocess.run([shutil.which("node") or "node", str(plik)], capture_output=True, text=True,
+                              encoding="utf-8")
+
+
 def node(prog: str):
-    r = subprocess.run(["node", "-e", JS + "\n" + prog], capture_output=True, text=True)
+    r = node_plik(JS + "\n" + prog)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
@@ -1355,7 +1366,9 @@ def test_ruch_kamery_przy_cieciu_i_laczeniu(tmp_path):
                         for fn in ("typoRuchPodzial", "typoRuchPolacz"))
         prog = (f"const r = {json.dumps(r)};\nconsole.log(JSON.stringify([typoRuchPodzial(r, 2), typoRuchPodzial(r, 4), "
                 "typoRuchPolacz(undefined, {ruch: 'przesuniecie', kierunek: 'lewo'}, 3), typoRuchPolacz(undefined, {ruch: 'brak'}, 3)]));")
-        out = subprocess.run(["node", "-e", fns + "\n" + prog], capture_output=True, text=True, check=True).stdout
+        wynik = node_plik(fns + "\n" + prog)
+        assert wynik.returncode == 0, wynik.stderr
+        out = wynik.stdout
         assert json.loads(out) == [[None, {**r, "slowo": 1}], [r, None],
                                    {"ruch": "przesuniecie", "kierunek": "lewo", "slowo": 3}, None]
     plan = {"bloki": [{"id": "b1", "start": 0, "end": 2, "slowa": [{"tekst": t, "t": k * 0.4, "k": k * 0.4 + 0.3, "linia": 0}

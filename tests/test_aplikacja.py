@@ -5,7 +5,9 @@ podpowiedzi N0 z rankingiem Beta i „Nigdy” na zawsze (podpowiedzi.py), trasy
 (`POST /app/poznanie`) i głos Jarva z lokalnego lektora (glos.py, `POST /app/glos`, `/app/glos/przygotuj`)."""
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 import secrets
 import time
 from pathlib import Path
@@ -415,7 +417,10 @@ def test_aktualizacja_po_pracy_czeka_na_cisze(swiat, monkeypatch):
     zg = swiat.nowy("@teste2ea [zgoda] praca w toku")
     pid = zg["przebiegi"][0]["id"]
     swiat.do_stanu(pid, "czeka_na_zgode")
-    swiat.sil.wykonaj_fn(swiat.sil.db.ustaw_meta, "aktualizacja_po_pracy", repr(time.time()))
+
+    async def po_pracy():                 # zapis na wątku silnika; test nie ma własnej pętli (wykonaj_fn jej wymaga)
+        swiat.sil.db.ustaw_meta("aktualizacja_po_pracy", repr(time.time()))
+    asyncio.run_coroutine_threadsafe(po_pracy(), swiat.sil.loop).result(10)
     time.sleep(1.5)
     assert not prosba.exists()                                         # praca trwa (czeka na zgodę): bez prośby
     z = swiat.k.get(f"{P}/przebiegi/{pid}").json()["przebieg"]["zgoda"]
@@ -530,6 +535,26 @@ def test_glos_sprzatanie_najstarszych(tmp_path):
     assert sorted(p.name for p in tmp_path.iterdir()) == ["2.wav", "3.wav", "4.wav"]
 
 
+def test_glos_prawdziwy_proces_w_watku_i_limit(tmp_path, monkeypatch):
+    """Lektor przez przenosne.uruchom (podproces w wątku: działa też na Windows, gdzie pętla dashboardu nie ma
+    podprocesów asyncio): atrapa jarvo-tts zapisuje WAV, a zawieszona kończy się limitem czasu (BladGlosu)."""
+    import atrapy
+    tts = atrapy.program(tmp_path / "bin", "jarvo-tts", (      # na Windows .cmd: limit zabija cmd.exe, Python za nim
+        "import sys, time\n"                                    # kończy się sam po 15 s, nic nie zapisując
+        "if 'zawies' in sys.argv[1]:\n"
+        "    time.sleep(15)\n"
+        "    sys.exit(1)\n"
+        "open(sys.argv[sys.argv.index('-o') + 1], 'wb').write(b'RIFF' + bytes(100))\n"))
+    monkeypatch.setenv("JARVO_TTS", str(tts))
+    assert G.program_glosu() == str(tts)
+    glos = G.Glos(tmp_path / "glos", timeout=3)
+    wav = asyncio.run(glos.mow("Cześć, tu Jarvo."))
+    assert wav.read_bytes().startswith(b"RIFF") and wav.parent == tmp_path / "glos"
+    with pytest.raises(G.BladGlosu, match="limit czasu"):
+        asyncio.run(glos.mow("zawies się"))
+    assert not [p for p in (tmp_path / "glos").iterdir() if p.name.startswith(".")]   # plik roboczy sprzątnięty
+
+
 def test_bez_lektora_trasa_glosu_503(swiat):
     router = APIRouter(route_class=T.M.ochrona.Trasa)
     TA.dolacz(router, m=SimpleNamespace(**vars(T.M), aplikacja=A, podpowiedzi=PD, glos=G), trasy=T.trasy,
@@ -553,7 +578,11 @@ def test_klucz_api_podlacza_flote_bez_klucza_w_odpowiedzi_i_dzienniku(swiat):
     url, nagl = swiat.zapytania[-1]
     assert url == "https://openrouter.ai/api/v1/key" and nagl["Authorization"] == f"Bearer {KLUCZ_OR}"
     env = (swiat.home / ".env").read_text(encoding="utf-8")
-    assert f"OPENROUTER_API_KEY={KLUCZ_OR}" in env and (swiat.home / ".env").stat().st_mode & 0o777 == 0o600
+    assert f"OPENROUTER_API_KEY={KLUCZ_OR}" in env
+    if os.name == "nt":                                      # os.chmod niczego tam nie chroni: ACL tylko dla właściciela
+        assert MZ._przenosne().tylko_dla_wlasciciela(swiat.home / ".env")
+    else:
+        assert (swiat.home / ".env").stat().st_mode & 0o777 == 0o600
     assert swiat.rozdane == [swiat.home]
     cfg = (swiat.home / "profiles" / "jarvo" / "config.yaml").read_text(encoding="utf-8")
     assert "provider: openrouter" in cfg and "default: o-f" in cfg and "base_url" not in cfg
