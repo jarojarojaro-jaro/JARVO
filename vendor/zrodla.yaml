@@ -229,6 +229,7 @@ zrodla:
     repo: https://github.com/NousResearch/hermes-agent
     status: uzywane
     przejrzane: 7157422022ff06f3e632d1dd394ee1253b17ad37
+    notatka: "MIT. Pin instalacji: obraz v2026.9.24 (infra/Dockerfile) i natywnie ten sam tag = commit f97608f (vendor/natywne.yaml, przegląd kodu instalatorów, zgód i dashboardu 2026-10-24 w docs/NATYWNIE.md); przejrzane = ostatni przejrzany main (śledzenie nowości)"
   inspo:
     repo: https://github.com/Nutlope/inspo
     status: uzywane

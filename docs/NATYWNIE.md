@@ -558,7 +558,8 @@ Testy (etap E4): każdy tryb na atrapie modelu, zgoda i odmowa, zapis w folderze
 
 **Stan (2026-10-24):** E0 🟡 (adres Matcha ✅, `.gitattributes` ✅, reszta ⬜); E1 🟡 w toku (znaczniki systemów i atrapy
 w testach, bash tylko z Git Bash ✅); E2 🟡 (manifest `vendor/natywne.yaml`, pobieracz `jarvo/pobieracz.py`: uv 0.12.13
-i Python 3.13.17 / 3.12.15 sprawdzone na Windows 11 ✅; pozostałe narzędzia ⬜); E3–E14 ⬜.
+i Python 3.13.17 / 3.12.15 sprawdzone na Windows 11 ✅; pozostałe narzędzia ⬜); E3 🟡 (Hermes natywnie na Windows 11
+sprawdzony ręcznie, sekcja (l); pin Hermesa w `vendor/natywne.yaml` ✅; nadzorca, polecenia i instalator ⬜); E4–E14 ⬜.
 
 Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z dokumentami i skarbcem w tym samym commicie (zasady CLAUDE.md). Nowa ścieżka żyje za flagą `JARVO_NATYWNIE=1`, aż do etapu E13. Do tego czasu ludzie dostają dzisiejszą instalację.
 
@@ -956,6 +957,8 @@ Po rozpoznaniu sprawdziłem ponownie te ustalenia, od których zależą decyzje.
 | tirith | pobierany z `releases/latest`, bez pinu | tools/tirith_security.py w f97608f |
 | Błąd WAL-reset w SQLite | Hermes uznaje za naprawione 3.51.3+, 3.50.7 i 3.44.6 | hermes_cli/doctor_platform.py w f97608f |
 | uv w CI Hermesa | tests.yml 0.12.13, pozostałe workflowy 0.9.28 | .github/workflows w f97608f |
+| Hermes f97608f natywnie na Windows 11 (próba w osobnym katalogu na drugim dysku) | klon gita bez blobów 433 MB; `uv sync --locked` z dodatkami all, messaging, otlp, anthropic, bedrock, azure-identity, google-chat: 21 s, venv 327 MB; front z `web/` (`npm ci --ignore-scripts`, `npm run build`, 30 s) do `hermes_cli/web_dist`; `dashboard --host 127.0.0.1 --port 19119 --no-open --skip-build` odpowiada 200, `/api/status` podaje 0.21.5 | uv 0.12.13 i Python 3.13.17 z pobieracza Jarva |
+| Wnioski z próby | Hermes pokazuje „Update available … run 'hermes update'” (H16: wyłączyć i ukryć). Na Windows `Scripts\python.exe` venvu uruchamia proces potomny z bazowego `python.exe`, więc nadzorca zatrzymuje całe drzewo procesów, nie sam launcher | próba |
 | Runnery GitHub | są windows-2025, windows-11-arm, macos-15 i macos-26 (arm64), macos-15-intel i macos-26-intel (x64), ubuntu-24.04 i ubuntu-24.04-arm | README actions/runner-images |
 
 ### Kiedy całość jest gotowa

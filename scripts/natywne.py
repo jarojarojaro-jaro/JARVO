@@ -19,6 +19,7 @@ import fleetlib as fl  # noqa: E402
 MANIFEST = fl.REPO_ROOT / "vendor" / "natywne.yaml"
 LOCK = fl.REPO_ROOT / "vendor" / "natywne.lock.json"
 ZRODLA = fl.REPO_ROOT / "vendor" / "zrodla.yaml"
+DOCKERFILE = fl.REPO_ROOT / "infra" / "Dockerfile"
 PLATFORMY = ("windows-x64", "windows-arm64", "macos-arm64", "linux-x64", "linux-arm64")
 FORMATY = {"zip", "tar.gz", "tar.xz", "tar.bz2", "plik"}
 KIEDY = {"instalacja", "przy-uzyciu", "dodatek"}
@@ -36,6 +37,19 @@ def bledy(dane: dict, zrodla: dict | None = None) -> list[str]:
     wynik: list[str] = []
     if dane.get("version") != 1:
         wynik.append("natywne.yaml: version musi być 1")
+    h = dane.get("hermes") or {}
+    if not re.match(r"^https://github\.com/[\w.-]+/[\w.-]+$", str(h.get("repo") or "")):
+        wynik.append("natywne.yaml/hermes: repo musi być adresem https://github.com/<właściciel>/<repo>")
+    if not re.match(r"^[0-9a-f]{40}$", str(h.get("commit") or "")):
+        wynik.append("natywne.yaml/hermes: commit musi być pełnym SHA (40 znaków)")
+    if not str(h.get("tag") or "").strip() or not str(h.get("wersja") or "").strip():
+        wynik.append("natywne.yaml/hermes: brak tagu albo wersji")
+    if not isinstance(h.get("dodatki"), list) or not all(isinstance(x, str) for x in h["dodatki"]):
+        wynik.append("natywne.yaml/hermes: dodatki to lista nazw extras z pyproject.toml Hermesa")
+    obraz = DOCKERFILE.read_text(encoding="utf-8") if DOCKERFILE.is_file() else ""
+    m = re.search(r"^ARG HERMES_IMAGE=[^:\s]+:([^@\s]+)", obraz, re.M)
+    if m and h.get("tag") and m.group(1) != h["tag"]:
+        wynik.append(f"natywne.yaml/hermes: tag {h['tag']} różni się od obrazu VPS ({m.group(1)} w infra/Dockerfile)")
     narzedzia = dane.get("narzedzia") or {}
     if not isinstance(narzedzia, dict) or not narzedzia:
         return wynik + ["natywne.yaml: brak sekcji narzedzia"]
@@ -97,7 +111,9 @@ def lock(dane: dict) -> dict:
             pliki[platforma] = {k: p[k] for k in sorted(p)}
         out[nazwa] = {"wersja": str(w["wersja"]), "kiedy": w.get("kiedy") or "instalacja",
                       "licencja": str(w["licencja"]), "zrodlo": str(w["zrodlo"]), "pliki": pliki}
-    return {"version": 1, "narzedzia": out}
+    h = dane.get("hermes") or {}
+    hermes = {k: h[k] for k in ("repo", "tag", "commit", "wersja", "dodatki") if k in h}
+    return {"version": 1, "hermes": hermes, "narzedzia": out}
 
 
 def tekst_locka(dane: dict) -> str:

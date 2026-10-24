@@ -39,8 +39,24 @@ def test_manifest_kompletny_i_lock_aktualny():
             assert p["url"].startswith("https://") and len(p["sha256"]) == 64
 
 
+HERMES_OK = {"repo": "https://github.com/NousResearch/hermes-agent", "tag": "v2026.9.24", "wersja": "0.21.5",
+             "commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f", "dodatki": ["all"]}
+
+
+def test_manifest_hermes_przypiety_w_jednym_miejscu():
+    dane = natywne.wczytaj()
+    assert dane["hermes"]["commit"] == "f97608f178d1ffeca59860195ab7da295f7c8e5f"
+    assert manifest.hermes(REPO)["tag"] == dane["hermes"]["tag"]
+    b = "\n".join(natywne.bledy({"version": 1, "hermes": {"repo": "http://x", "commit": "f97608f", "dodatki": "all"},
+                                 "narzedzia": {}}))
+    assert "repo musi" in b and "pełnym SHA" in b and "brak tagu" in b and "dodatki to lista" in b
+    b = "\n".join(natywne.bledy({"version": 1, "hermes": dict(HERMES_OK, tag="v2099.1.1"), "narzedzia": {}}))
+    assert "różni się od obrazu VPS" in b
+
+
 def test_manifest_lapie_braki():
-    zly = {"version": 1, "narzedzia": {"Zle_Nazwa": {"zrodlo": "nie-ma", "wersja": "1", "licencja": "MIT", "rola": "x",
+    zly = {"version": 1, "hermes": HERMES_OK,
+           "narzedzia": {"Zle_Nazwa": {"zrodlo": "nie-ma", "wersja": "1", "licencja": "MIT", "rola": "x",
                                                      "pliki": {"windows-x64": {"url": "http://x/latest/a.zip",
                                                                                "sha256": "abc", "format": "rar"}}}}}
     b = "\n".join(natywne.bledy(zly, {"uv": {}}))
@@ -48,7 +64,7 @@ def test_manifest_lapie_braki():
                      "rozmiar", "format spoza", "macos-arm64: brak pliku"):
         assert fragment in b
     dobry_brak = {"brak": "Lightpanda nie wydaje wersji na Windows", "zamiast": "chrome"}
-    assert not [x for x in natywne.bledy({"version": 1, "narzedzia": {"a": {
+    assert not [x for x in natywne.bledy({"version": 1, "hermes": HERMES_OK, "narzedzia": {"a": {
         "zrodlo": "uv", "wersja": "1", "licencja": "MIT", "rola": "x",
         "pliki": {p: dobry_brak for p in natywne.PLATFORMY}}}}, {"uv": {}}) if "brak" in x]
 

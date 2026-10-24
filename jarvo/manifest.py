@@ -23,6 +23,11 @@ def wczytaj(app: Path) -> dict:
     return dane["narzedzia"]
 
 
+def hermes(app: Path) -> dict:
+    """Przypięcie Hermesa: {"repo", "tag", "commit", "wersja", "dodatki"} (jedno miejsce: vendor/natywne.yaml)."""
+    return json.loads((Path(app) / LOCK).read_text(encoding="utf-8"))["hermes"]
+
+
 def plik(narzedzia: dict, nazwa: str, platforma: str) -> dict:
     """Wpis pliku narzędzia dla platformy; BrakNarzedzia, gdy narzędzia nie ma albo platforma ma `brak`."""
     wpis = narzedzia.get(nazwa)

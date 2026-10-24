@@ -1,5 +1,20 @@
 {
  "version": 1,
+ "hermes": {
+  "repo": "https://github.com/NousResearch/hermes-agent",
+  "tag": "v2026.9.24",
+  "commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "wersja": "0.21.5",
+  "dodatki": [
+   "all",
+   "messaging",
+   "otlp",
+   "anthropic",
+   "bedrock",
+   "azure-identity",
+   "google-chat"
+  ]
+ },
  "narzedzia": {
   "python312": {
    "wersja": "3.12.15+20261021",
