@@ -37,23 +37,31 @@ ZNACZNIKI = {
 
 @lru_cache(maxsize=1)
 def bash() -> str | None:
-    """Ścieżka prawdziwego basha albo None. Na Windows tylko Git Bash (obok git.exe albo ze standardowej instalacji):
-    `bash` z PATH bywa System32\\bash.exe, a ten uruchamia WSL (u właściciela budzi to starą flotę)."""
-    if not WINDOWS:
-        return shutil.which("bash")
-    kandydaci = []
-    git = shutil.which("git")
-    if git:                                     # Git\cmd\git.exe albo Git\mingw64\bin\git.exe
-        for przodek in list(Path(git).resolve().parents)[:3]:
-            kandydaci += [przodek / "bin" / "bash.exe", przodek / "usr" / "bin" / "bash.exe"]
-    for zmienna in ("ProgramFiles", "ProgramW6432", "LOCALAPPDATA"):
-        if os.environ.get(zmienna):
-            kandydaci.append(Path(os.environ[zmienna]) / ("Programs/Git" if zmienna == "LOCALAPPDATA" else "Git")
-                             / "bin" / "bash.exe")
-    for k in kandydaci:
-        if k.is_file() and "system32" not in str(k).lower():
-            return str(k)
-    return None
+    """Ścieżka prawdziwego basha albo None (fleetlib.bash: na Windows tylko Git Bash, nigdy WSL)."""
+    import fleetlib
+    return fleetlib.bash()
+
+
+if WINDOWS:
+    # Goły `bash` w argv trafia na Windows do System32\bash.exe (CreateProcess szuka w System32 przed PATH), czyli
+    # do WSL: u właściciela uruchamiało to Ubuntu ze starą flotą. W testach podmieniamy go na Git Bash, a `wsl`
+    # blokujemy. Kod pod testem i tak ma brać basha z fleetlib.bash().
+    _popen_init = subprocess.Popen.__init__
+
+    def _bez_wsl(self, args, *a, **kw):
+        if isinstance(args, (list, tuple)) and args:
+            pierwszy = os.path.basename(str(args[0])).lower()
+            if pierwszy in ("wsl", "wsl.exe"):
+                raise FileNotFoundError("testy nie uruchamiają WSL (docs/NATYWNIE.md f2)")
+            if pierwszy in ("bash", "bash.exe") and (os.path.dirname(str(args[0])) == ""
+                                                     or "system32" in str(args[0]).lower()):
+                b = bash()
+                if b is None:
+                    raise FileNotFoundError("bash: na Windows tylko Git Bash (System32\\bash.exe to WSL)")
+                args = [b, *args[1:]]
+        _popen_init(self, args, *a, **kw)
+
+    subprocess.Popen.__init__ = _bez_wsl
 
 
 @lru_cache(maxsize=1)

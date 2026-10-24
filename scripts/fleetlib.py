@@ -277,6 +277,27 @@ def load_fleet(path: Path | None = None) -> Fleet:
     return Fleet(raw=raw, agents=agents)
 
 
+def bash() -> str | None:
+    """Ścieżka prawdziwego basha albo None. Na POSIX `bash` z PATH. Na Windows tylko Git Bash (obok git.exe albo
+    w standardowym katalogu instalacji): goły `bash` trafia tam do System32\\bash.exe, a ten uruchamia WSL
+    (u właściciela budzi to starą flotę w Ubuntu, docs/NATYWNIE.md f2)."""
+    import os
+    if os.name != "nt":
+        return shutil.which("bash")
+    kandydaci = []
+    git = shutil.which("git")
+    if git:                                     # Git\cmd\git.exe albo Git\mingw64\bin\git.exe
+        for przodek in list(Path(git).resolve().parents)[:3]:
+            kandydaci += [przodek / "bin" / "bash.exe", przodek / "usr" / "bin" / "bash.exe"]
+    for zmienna, podkatalog in (("ProgramFiles", "Git"), ("ProgramW6432", "Git"), ("LOCALAPPDATA", "Programs/Git")):
+        if os.environ.get(zmienna):
+            kandydaci.append(Path(os.environ[zmienna]) / podkatalog / "bin" / "bash.exe")
+    for k in kandydaci:
+        if k.is_file() and "system32" not in str(k).lower():
+            return str(k)
+    return None
+
+
 def zloz(s: str) -> str:
     """Postać do porównań uchwytów i aliasów: NFKD bez znaków łączących, ł→l, małe litery („Łowca” → „lowca”).
     Ta sama funkcja co hq/plugin/wzmianki.py `zloz` (tests/test_wzmianki.py pilnuje zgodności)."""

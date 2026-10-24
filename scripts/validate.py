@@ -534,6 +534,8 @@ def check_evals(fleet: fl.Fleet, r: Report) -> None:
 
 
 def check_scripts(r: Report) -> None:
+    bash = fl.bash()                # na Windows Git Bash, nigdy System32\bash.exe (WSL)
+    bez_basha = 0
     for path in sorted(fl.REPO_ROOT.rglob("*")):
         if any(p in SKIP_DIRS for p in path.parts) or not path.is_file():
             continue
@@ -544,13 +546,20 @@ def check_scripts(r: Report) -> None:
             except SyntaxError as exc:
                 r.err(f"{path.relative_to(fl.REPO_ROOT)}: błąd składni Pythona: {exc.msg} (linia {exc.lineno})")
         elif path.suffix == ".sh":
-            res = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True)
+            if bash is None:
+                bez_basha += 1
+                continue
+            res = subprocess.run([bash, "-n", str(path)], capture_output=True, text=True, encoding="utf-8",
+                                 errors="replace")
             if res.returncode:
                 r.err(f"{path.relative_to(fl.REPO_ROOT)}: błąd składni bash: {res.stderr.strip()[:200]}")
         elif path.suffix in {".cjs", ".mjs", ".js"} and shutil.which("node"):
-            res = subprocess.run(["node", "--check", str(path)], capture_output=True, text=True)
+            res = subprocess.run([shutil.which("node"), "--check", str(path)], capture_output=True, text=True,
+                                 encoding="utf-8", errors="replace")
             if res.returncode:
                 r.err(f"{path.relative_to(fl.REPO_ROOT)}: błąd składni JS: {res.stderr.strip()[:200]}")
+    if bez_basha:
+        r.warn(f"składnia {bez_basha} skryptów .sh niesprawdzona: brak basha (na Windows potrzebny Git Bash)")
 
 
 def check_secrets(r: Report) -> None:
