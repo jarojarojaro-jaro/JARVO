@@ -90,7 +90,6 @@ def _profile(tmp_path):
 
 
 def test_przelacz_flote(tmp_path):
-    pytest.importorskip("ruamel.yaml")
     import yaml
     _profile(tmp_path)
     assert MZ.przelacz(tmp_path, FLOTA, "openrouter") == ["jarvo", "jarvo-web", "default"]
@@ -98,11 +97,10 @@ def test_przelacz_flote(tmp_path):
     assert j["model"] == {"provider": "openrouter", "default": "o-f"}
     assert j["delegation"] == {"model": "o-q", "provider": "openrouter", "max_concurrent_children": 3}
     assert j["auxiliary"]["jarvo_wiedza"]["model"] == "o-f" and "fallback_providers" not in j
-    assert "# config profilu" in (tmp_path / "profiles" / "jarvo" / "config.yaml").read_text(encoding="utf-8")
     w = yaml.safe_load((tmp_path / "profiles" / "jarvo-web" / "config.yaml").read_text(encoding="utf-8"))
     assert w["model"]["default"] == "o-s"
-    h = (tmp_path / "config.yaml").read_text(encoding="utf-8")
-    assert "provider: openrouter" in h and "default: o-q" in h and "# domyślny" in h
+    h = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
+    assert h["model"] == {"provider": "openrouter", "default": "o-q"}
     # z powrotem na ChatGPT: model zapasowy zestawu wraca
     MZ.przelacz(tmp_path, FLOTA, "openai-codex")
     j = yaml.safe_load((tmp_path / "profiles" / "jarvo" / "config.yaml").read_text(encoding="utf-8"))
@@ -111,8 +109,17 @@ def test_przelacz_flote(tmp_path):
         MZ.przelacz(tmp_path, FLOTA, "anthropic")
 
 
-def test_podlacz_klucz_calosc_i_wybor_z_buildu(tmp_path):
+def test_przelacz_flote_zachowuje_komentarze_z_ruamel(tmp_path):
+    # środowisko Hermesa ma ruamel: komentarze configów zostają (bez ruamel PyYAML je gubi, reszta działa tak samo)
     pytest.importorskip("ruamel.yaml")
+    _profile(tmp_path)
+    MZ.przelacz(tmp_path, FLOTA, "openrouter")
+    assert "# config profilu" in (tmp_path / "profiles" / "jarvo" / "config.yaml").read_text(encoding="utf-8")
+    h = (tmp_path / "config.yaml").read_text(encoding="utf-8")
+    assert "provider: openrouter" in h and "default: o-q" in h and "# domyślny" in h
+
+
+def test_podlacz_klucz_calosc_i_wybor_z_buildu(tmp_path):
     _profile(tmp_path)
     build = tmp_path / "BUILD.json"
     build.write_text(json.dumps({"modele": {"env": "", "dostawca": "openai-codex"}}), encoding="utf-8")

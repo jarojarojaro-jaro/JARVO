@@ -9,7 +9,7 @@
 - **Przełączenie floty.** Każdy profil floty (fleet.json wtyczki) dostaje zestaw dostawcy z `fleet.yaml` (`modele`):
   `model.provider/default` (poziom agenta), `delegation.provider/model` (poziom delegacji), model kompilacji skarbca
   (`auxiliary.jarvo_wiedza`) i `fallback_providers` zestawu (brak = bez zapasowego); profil główny dostaje model `fast`.
-  ruamel zachowuje komentarze; zapis atomowy.
+  ruamel zachowuje komentarze (bez ruamel PyYAML, jak fleetlib.rt_yaml); zapis atomowy.
 - **Trwałość.** Wybór ląduje w `/opt/data/jarvo/state/dostawca-modeli.json` razem z `JARVO_MODEL_PROVIDER` ostatniego
   buildu (`nad`, z BUILD.json); build przy każdej aktualizacji stosuje go, dopóki jarvo.env się nie zmieni
   (fleetlib.Fleet.apply_app_choice). Kalibracja SOUL pod rodzinę modelu dochodzi przy najbliższej aktualizacji.
@@ -18,6 +18,7 @@ Testy: tests/test_mozg.py.
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
@@ -119,19 +120,31 @@ def ustaw_zmienna(env: Path | str, nazwa: str, wartosc: str) -> None:
     _zapisz_atomowo(env, "\n".join(wynik) + "\n", 0o600)
 
 
-def _yaml():
-    from ruamel.yaml import YAML
+def _yaml() -> tuple[Callable[[str], object], Callable[[object], str]]:
+    """(load, dump) tekstu YAML: ruamel zachowuje komentarze i cudzysłowy (środowisko Hermesa), bez niego PyYAML
+    (jak fleetlib.rt_yaml)."""
+    try:
+        from ruamel.yaml import YAML
+    except ImportError:
+        import yaml
+
+        return yaml.safe_load, lambda dane: yaml.safe_dump(dane, allow_unicode=True, sort_keys=False)
     y = YAML()
     y.preserve_quotes = True
     y.width = 4096
-    return y
+
+    def dump(dane) -> str:
+        buf = io.StringIO()
+        y.dump(dane, buf)
+        return buf.getvalue()
+    return y.load, dump
 
 
 def _ustaw_profil(cfg_path: Path, dostawca: str, zestaw: dict, poziom: str, poziom_delegacji: str | None,
                   zapasowy: dict | None, *, glowny: bool = False) -> bool:
-    y = _yaml()
+    load, dump = _yaml()
     try:
-        cfg = y.load(cfg_path.read_text(encoding="utf-8"))
+        cfg = load(cfg_path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return False
     if not isinstance(cfg, dict):
@@ -156,11 +169,8 @@ def _ustaw_profil(cfg_path: Path, dostawca: str, zestaw: dict, poziom: str, pozi
             cfg["fallback_providers"] = [{"provider": zapasowy["provider"], "model": zapasowy["model"]}]
         else:
             cfg.pop("fallback_providers", None)
-    import io
-    buf = io.StringIO()
-    y.dump(cfg, buf)
     tryb = cfg_path.stat().st_mode & 0o777
-    _zapisz_atomowo(cfg_path, buf.getvalue(), tryb)
+    _zapisz_atomowo(cfg_path, dump(cfg), tryb)
     return True
 
 
