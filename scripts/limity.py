@@ -68,7 +68,8 @@ def ustaw_env(sciezka: Path, zmiany: dict[str, str | None]) -> None:
 
 def pamiec_dockera() -> int | None:
     try:
-        r = subprocess.run(["docker", "info", "--format", "{{.MemTotal}}"], capture_output=True, text=True, timeout=20)
+        r = subprocess.run(["docker", "info", "--format", "{{.MemTotal}}"], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=20)
         return int(r.stdout.strip()) // 1048576 if r.returncode == 0 else None
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return None

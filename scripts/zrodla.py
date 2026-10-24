@@ -38,7 +38,8 @@ SHA = re.compile(r"[0-9a-f]{40}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 PACZKA_MAX = 50 * 1024 * 1024
 LICENCJA = re.compile(r"(LICEN[CS]E|COPYING|NOTICE)(\.[A-Za-z]+)?$", re.I)
-GIT_ENV = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "true", "LC_ALL": "C"}
+# GCM_INTERACTIVE: Git dla Windows pyta o hasło okienkiem Git Credential Managera (repo prywatne albo usunięte)
+GIT_ENV = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "true", "GCM_INTERACTIVE": "never", "LC_ALL": "C"}
 POKAZ_COMMITOW = 12
 POKAZ_POZYCJI = 15
 
@@ -59,7 +60,8 @@ def wczytaj(path: Path = SPIS) -> dict[str, dict]:
 
 
 def git(*args: str, cwd: Path | None = None, timeout: int = 300) -> str:
-    p = subprocess.run(["git", *args], cwd=cwd, env=GIT_ENV, capture_output=True, text=True, timeout=timeout)
+    p = subprocess.run(["git", *args], cwd=cwd, env=GIT_ENV, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=timeout)
     if p.returncode:
         raise RuntimeError((p.stderr or p.stdout).strip().splitlines()[-1] if (p.stderr or p.stdout).strip()
                            else f"git {args[0]}: kod {p.returncode}")
@@ -337,7 +339,7 @@ def ustaw(path: Path, nazwa: str, klucz: str, wartosc: str) -> None:
         if lines[i].startswith(f"    {klucz}:"):
             reszta = re.sub(r"^\s*[^#\s]+", "", lines[i].split(":", 1)[1], count=1)
             lines[i] = f"    {klucz}: {wartosc}{reszta if reszta.strip() else chr(10)}"
-            path.write_text("".join(lines), encoding="utf-8")
+            path.write_text("".join(lines), encoding="utf-8", newline="\n")   # spis w repo zostaje z LF
             return
     raise BladSpisu(f"{nazwa}: brak pola {klucz}")
 

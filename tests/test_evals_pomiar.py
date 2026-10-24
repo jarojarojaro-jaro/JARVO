@@ -140,7 +140,7 @@ def test_runner_history_baseline_and_compare(fake, capsys):
     assert len(recs) == len(ev.wczytaj(REPO, "jarvo-web")["scenarios"])
     assert {r["zbior"] for r in recs} == {"roboczy", "odlozony"}
     assert all(r["judge_model"] == "anthropic/claude-sonnet-5.5" for r in recs)   # agent na gpt-6-luna
-    summary = json.loads((runs[0] / "podsumowanie.json").read_text())
+    summary = json.loads((runs[0] / "podsumowanie.json").read_text(encoding="utf-8"))
     assert summary["agenci"]["jarvo-web"]["razem"]["score"] == 1.0
     assert ev.odniesienie_path(out, "jarvo-web").is_file()
     hist = ev.historia(out, "jarvo-web")

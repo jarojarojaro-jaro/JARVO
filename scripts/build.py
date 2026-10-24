@@ -71,6 +71,11 @@ CATEGORY_DESCRIPTIONS = {
 
 # ----------------------------------------------------------------------------- env
 
+def zapisz(path: Path, tekst: str) -> None:
+    """Plik dystrybucji z LF na każdym systemie: Hermes, skarbiec i sumy plików widzą te same bajty co z Linuksa."""
+    path.write_text(tekst, encoding="utf-8", newline="\n")
+
+
 def read_env_file(path: Path | None) -> dict[str, str]:
     env: dict[str, str] = {}
     if path and path.exists():
@@ -158,7 +163,8 @@ class SourceResolver:
 
 
 def _git(args: list[str], cwd: Path | None = None) -> str:
-    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True, encoding="utf-8",
+                          errors="replace").stdout
 
 
 def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceResolver, report: list,
@@ -187,7 +193,7 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
         elif spec.get("license_file"):
             shutil.copy2(src_root / spec["license_file"], dest / "LICENSE-UPSTREAM")
         elif spec.get("notice") and spec["type"] in ("git", "repo-tree"):
-            (dest / "LICENSE-UPSTREAM").write_text(spec["notice"] + "\n", encoding="utf-8")
+            zapisz(dest / "LICENSE-UPSTREAM", spec["notice"] + "\n")
         elif spec["type"] == "hermes-tree":
             hermes_license = src_root / "LICENSE"
             if hermes_license.exists():
@@ -217,7 +223,7 @@ def _hermes_rev(root: Path) -> str:
     stamp = root / "install-stamp.json"
     if stamp.exists():
         try:
-            return json.loads(stamp.read_text())["commit"]
+            return json.loads(stamp.read_text(encoding="utf-8"))["commit"]
         except Exception:
             pass
     try:
@@ -233,7 +239,7 @@ def write_category_descriptions(skills_root: Path) -> None:
             continue
         desc = CATEGORY_DESCRIPTIONS.get(cat_dir.name)
         if desc:
-            desc_file.write_text(f"---\ndescription: {json.dumps(desc, ensure_ascii=False)}\n---\n", encoding="utf-8")
+            zapisz(desc_file, f"---\ndescription: {json.dumps(desc, ensure_ascii=False)}\n---\n")
 
 
 # ---------------------------------------------------------------- generated (Jarvo)
@@ -308,8 +314,8 @@ def build_wiedza_plugin(out: Path) -> Path:
     import hqbuild
     dash = out / "dashboard"
     (dash / "dist").mkdir(parents=True, exist_ok=True)
-    (dash / "dist" / "index.js").write_text(hqbuild.bundle_js(fl.REPO_ROOT / "wiedza" / "web" / "src",
-                                                             "Jarvo Wiedza: zakładka dashboardu Hermesa. Plik generowany przez scripts/build.py z wiedza/web/src/."), encoding="utf-8")
+    zapisz(dash / "dist" / "index.js", hqbuild.bundle_js(fl.REPO_ROOT / "wiedza" / "web" / "src",
+                                                          "Jarvo Wiedza: zakładka dashboardu Hermesa. Plik generowany przez scripts/build.py z wiedza/web/src/."))
     shutil.copy2(fl.REPO_ROOT / "wiedza" / "web" / "style.css", dash / "dist" / "style.css")
     shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "vendor" / "LICENSE-htm", dash / "dist" / "LICENSE-htm")
     # ochrona zapisu (CSRF): ten sam plik co w jarvo-hq, żeby obie wtyczki miały jedne reguły (tests/test_csrf.py)
@@ -429,7 +435,7 @@ def repo_do_skarbca(fleet: fl.Fleet, out: Path, dane: dict) -> int:
             return
         cel = out / rel
         cel.parent.mkdir(parents=True, exist_ok=True)
-        cel.write_text(tekst if tekst is not None else src.read_text(encoding="utf-8"), encoding="utf-8")
+        zapisz(cel, tekst if tekst is not None else src.read_text(encoding="utf-8"))
         pliki += 1
 
     for a in fleet.active():
@@ -551,7 +557,8 @@ def build_cron(agent_dir: Path, out_dir: Path, tokens: dict[str, str], hermes_sr
         env = dict(os.environ, HERMES_HOME=tmp, JARVO_CRON_JOBS=payload, JARVO_CRON_OUT=str(out_dir / "cron" / "jobs.json"))
         env["PYTHONPATH"] = os.pathsep.join([str(hermes_src), env.get("PYTHONPATH", "")])
         python = os.environ.get("JARVO_HERMES_PYTHON") or sys.executable
-        res = subprocess.run([python, "-c", code], env=env, capture_output=True, text=True)
+        res = subprocess.run([python, "-c", code], env=env, capture_output=True, text=True, encoding="utf-8",
+                             errors="replace")
         if res.returncode != 0:
             raise SystemExit(f"Budowa crona dla {agent_dir.name} nie powiodła się:\n{res.stdout}\n{res.stderr}")
     return len(jobs)
@@ -622,7 +629,7 @@ def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str]) -> list[str]:
     config["model"] = {"provider": fleet.provider, "default": fleet.model_for("fast")}
     out.mkdir(parents=True, exist_ok=True)
     header = "# Wygenerowane przez scripts/build.py z profiles/_host/config.yaml + fleet.yaml. Nie edytuj na serwerze.\n"
-    (out / "config.yaml").write_text(header + fl.dump_yaml(config), encoding="utf-8")
+    zapisz(out / "config.yaml", header + fl.dump_yaml(config))
     shutil.copy2(fl.REPO_ROOT / "profiles" / "_host" / "SOUL.md", out / "SOUL.md")
     return notes
 
@@ -662,20 +669,20 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         soul = soul.replace(fl.ROSTER_MARKER, render_roster_summary(fleet))
     if pominiete:
         soul = soul.rstrip() + "\n\n" + fl.missing_section(pominiete, fleet)
-    soul_path.write_text(render_tokens(soul, tokens), encoding="utf-8")
+    zapisz(soul_path, render_tokens(soul, tokens))
 
     # profile.yaml
-    (dest / "profile.yaml").write_text(fl.dump_yaml({
+    zapisz(dest / "profile.yaml", fl.dump_yaml({
         "description": agent.description,
         "description_auto": False,
         "display_name": f"{agent.emoji} {agent.title}".strip(),
-    }), encoding="utf-8")
+    }))
 
     # config.yaml i skrypty: tokeny
     for rel in ["config.yaml", "distribution.yaml"]:
         p = dest / rel
         if p.exists():
-            p.write_text(render_tokens(p.read_text(encoding="utf-8"), tokens), encoding="utf-8")
+            zapisz(p, render_tokens(p.read_text(encoding="utf-8"), tokens))
     # wspólne zakazy floty (shared/security/deny.yaml) → approvals.deny każdego profilu;
     # skarbiec wiedzy (docs/WIEDZA.md): dostawca pamięci jarvo-wiedza u każdego agenta, wtyczka włączona,
     # zadanie pomocnicze jarvo_wiedza (wyciągi z rozmów, kompilacja) na głównym modelu (poziom frontier, jak Jarvo):
@@ -695,12 +702,12 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         wtyczki["enabled"] = wlaczone + [w for w in [WIEDZA_PLUGIN] + ([KOMPUTER_PLUGIN] if agent.komputer else [])
                                          if w not in wlaczone]
         cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("frontier")}
-        (dest / "config.yaml").write_text("# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty).\n"
-                                          + fl.dump_yaml(cfg), encoding="utf-8")
+        zapisz(dest / "config.yaml", "# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty).\n"
+               + fl.dump_yaml(cfg))
     # model zapasowy zestawu: agent nie milknie, gdy główny model odmówi (np. poza planem)
     if fleet.fallback and (dest / "config.yaml").exists():
         fb = fleet.fallback
-        with (dest / "config.yaml").open("a", encoding="utf-8") as f:
+        with (dest / "config.yaml").open("a", encoding="utf-8", newline="\n") as f:
             f.write(f'\nfallback_providers:\n  - provider: "{fb["provider"]}"\n    model: "{fb["model"]}"\n')
 
     # skille własne → tokeny w SKILL.md i references; tabela „komu oddać” z fleet.yaml
@@ -708,13 +715,13 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         tekst = md.read_text(encoding="utf-8")
         if fl.ODDAJ_MARKER in tekst:
             tekst = tekst.replace(fl.ODDAJ_MARKER, render_handoff_table(fleet, agent))
-        md.write_text(render_tokens(tekst, tokens), encoding="utf-8")
+        zapisz(md, render_tokens(tekst, tokens))
 
     # Jarvo: roster + rubryki
     if agent.name == fleet.orchestrator:
         roster = dest / "skills" / "fleet" / "roster" / "SKILL.md"
         roster.parent.mkdir(parents=True, exist_ok=True)
-        roster.write_text(render_roster_skill(fleet), encoding="utf-8")
+        zapisz(roster, render_roster_skill(fleet))
         copy_rubrics(fleet, dest / "skills" / "fleet" / "sdlc-review" / "references")
 
     # skille zewnętrzne
@@ -802,7 +809,7 @@ def main(argv: list[str] | None = None) -> int:
 
     import hqbuild  # Jarvo HQ: plugin dashboardu (pokoje agentów, czat, decyzje)
     hq_dir = hqbuild.build_plugin(out / "plugins" / "jarvo-hq", fleet)
-    print(f"✓ Jarvo HQ: {hq_dir.relative_to(out)}")
+    print(f"✓ Jarvo HQ: {hq_dir.relative_to(out).as_posix()}")
 
     # skarbiec wiedzy (docs/WIEDZA.md): huby agentów zasiewa install-fleet.sh z tego pliku (wiedza/wiedza.py zasiej)
     dane_wiedzy = wiedza_fleet(fleet, profiles_out)

@@ -28,6 +28,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -61,14 +62,20 @@ TRANSKRYPCJA (odpowiedź i wywołania narzędzi, skrócona):
 """
 
 
+def hermes() -> str:
+    """Polecenie Hermesa: pełna ścieżka z PATH (na Windows także hermes.exe albo .cmd), inaczej nazwa jak podana."""
+    return shutil.which(HERMES) or HERMES
+
+
 def board() -> dict[str, dict]:
-    out = subprocess.run([HERMES, "kanban", "list", "--json"], capture_output=True, text=True)
+    out = subprocess.run([hermes(), "kanban", "list", "--json"], capture_output=True, text=True, encoding="utf-8",
+                         errors="replace")
     return {t["id"]: t for t in json.loads(out.stdout or "[]")} if out.returncode == 0 else {}
 
 
 def run_agent(agent: str, text: str, timeout: int) -> tuple[str, list[dict], str]:
-    cmd = [HERMES, "-p", agent, "chat", "-q", text, "--oneshot", "-Q", "--format", "stream-json", "--source", "eval"]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    cmd = [hermes(), "-p", agent, "chat", "-q", text, "--oneshot", "-Q", "--format", "stream-json", "--source", "eval"]
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
     events, final = [], ""
     for line in res.stdout.splitlines():
         try:
@@ -162,7 +169,7 @@ def run_once(agent: str, scn: dict, model: str, timeout: int, tokens) -> dict:
     verdict = judge(scn, final, events, cards, model) if not canary else {"pass": False, "notes": "kanarek"}
     ok, score = ev.ocena_przebiegu(det, verdict)
     for c in cards:  # sprzątanie po scenariuszu
-        subprocess.run([HERMES, "kanban", "archive", c["id"]], capture_output=True)
+        subprocess.run([hermes(), "kanban", "archive", c["id"]], capture_output=True)
     return {"pass": ok, "score": score, "deterministic_fails": det, "kanarek": canary, "judge": verdict,
             "final": final[:4000], "cards": [{"assignee": c.get("assignee"), "title": c.get("title")} for c in cards],
             "sekundy": round((dt.datetime.now() - started).total_seconds(), 1), "stderr_tail": err[-500:]}
@@ -174,7 +181,8 @@ def build_commit() -> str:
             return json.loads(path.read_text(encoding="utf-8")).get("repo_rev", "")
         except (OSError, json.JSONDecodeError):
             continue
-    res = subprocess.run(["git", "-C", str(fl.REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True)
+    res = subprocess.run(["git", "-C", str(fl.REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
     return res.stdout.strip()
 
 
@@ -234,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
             alarm |= bool(rec["kanarek"])
             records.append(rec)
             out_dir.mkdir(parents=True, exist_ok=True)
-            with (out_dir / f"{agent}.jsonl").open("a", encoding="utf-8") as f:
+            with (out_dir / f"{agent}.jsonl").open("a", encoding="utf-8", newline="\n") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             fails = sorted({x for r in runs for x in r["deterministic_fails"]} |
                            {x for r in runs for x in (r["judge"].get("failed") or [])})
@@ -271,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
     if summary_all:
         (out_dir / "podsumowanie.json").write_text(
             json.dumps({"przebieg": stamp, "commit": commit, "powtorzenia": args.powtorzenia, "agenci": summary_all},
-                       ensure_ascii=False, indent=1), encoding="utf-8")
+                       ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")
     print(f"Wynik: {passed}/{total} zaliczonych · szczegóły: {out_dir}")
     if unjudged:
         print(f"! {unjudged} scenariuszy nieocenionych: brak OPENROUTER_API_KEY, sędzia pominięty (liczą się tylko "

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import stat
 import sys
 
@@ -63,7 +64,8 @@ def test_main_zapisuje_env_i_wraca_do_domyslnych(tmp_path):
     assert limity.main(["--compose", str(tmp_path), "--pamiec-mib", "4915"]) == 0
     tekst = env.read_text(encoding="utf-8")
     assert "DASHBOARD_PASSWORD=x" in tekst and "HERMES_MEM_LIMIT=2688m" in tekst and "KOMPUTER_MEM_LIMIT=1024m" in tekst
-    assert stat.S_IMODE(env.stat().st_mode) == 0o600
+    if os.name != "nt":                   # limity.py to kod kontenerowy (host z Dockerem); tryb pliku tylko na POSIX
+        assert stat.S_IMODE(env.stat().st_mode) == 0o600
     assert "HERMES_MEM_LIMIT=2688m" in (tmp_path / ".limity-auto").read_text(encoding="utf-8")
     # drugie wdrożenie bez zmian: nic się nie zmienia
     limity.main(["--compose", str(tmp_path), "--pamiec-mib", "4915"])

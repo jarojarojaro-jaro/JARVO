@@ -23,6 +23,11 @@ import fleetlib as fl  # noqa: E402
 T = fl.SHARED_DIR / "templates"
 
 
+def zapisz(path: Path, tekst: str) -> None:
+    """Plik w repo z LF także na Windows (repo trzyma LF, .gitattributes)."""
+    path.write_text(tekst, encoding="utf-8", newline="\n")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", required=True)
@@ -43,30 +48,30 @@ def main(argv: list[str] | None = None) -> int:
     soul = (T / "SOUL.template.md").read_text(encoding="utf-8")
     soul = soul.replace("{{NAZWA}}", slug.capitalize()).replace("{{TYTUŁ}}", args.title)
     soul = soul.replace("{{Wklejane automatycznie z shared/protocol/ przez generator. Nie edytować ręcznie.}}", fl.PROTOCOL_MARKER)
-    (dest / "SOUL.md").write_text(soul, encoding="utf-8")
+    zapisz(dest / "SOUL.md", soul)
 
     skill = (T / "SKILL.template.md").read_text(encoding="utf-8")
     skill = skill.replace("{{nazwa-workflowu}}", f"{slug}-workflow").replace("{{jarvo-xyz}}", args.name)
-    (dest / "skills" / slug / f"{slug}-workflow" / "SKILL.md").write_text(skill, encoding="utf-8")
+    zapisz(dest / "skills" / slug / f"{slug}-workflow" / "SKILL.md", skill)
 
     shutil.copy2(fl.PROFILES_DIR / "jarvo-sherlock" / "config.yaml", dest / "config.yaml")
     cfg = (dest / "config.yaml").read_text(encoding="utf-8").replace("jarvo-sherlock", args.name)
-    (dest / "config.yaml").write_text(cfg, encoding="utf-8")
-    (dest / "distribution.yaml").write_text(
-        f"name: {args.name}\nversion: 0.0.1\ndescription: \"{args.title}\"\nauthor: \"Jarvo fleet\"\nlicense: MIT\n"
-        "env_requires:\n  - name: OPENROUTER_API_KEY\n    description: \"Osobny klucz OpenRouter z limitem\"\n    required: true\n",
-        encoding="utf-8")
+    zapisz(dest / "config.yaml", cfg)
+    zapisz(dest / "distribution.yaml",
+           f"name: {args.name}\nversion: 0.0.1\ndescription: \"{args.title}\"\nauthor: \"Jarvo fleet\"\nlicense: MIT\n"
+           "env_requires:\n  - name: OPENROUTER_API_KEY\n    description: \"Osobny klucz OpenRouter z limitem\"\n    required: true\n")
     shutil.copy2(T / "toolbox.template.yaml", dest / "toolbox.yaml")
-    (dest / "toolbox.yaml").write_text((dest / "toolbox.yaml").read_text().replace("jarvo-xyz", args.name), encoding="utf-8")
-    (dest / "quality" / "rubric.md").write_text(f"# Rubryka: {args.name}\n\n## Blokujące\n- TODO\n\n## Ważne\n- TODO\n\n## Uwagi (nie blokują)\n- TODO\n", encoding="utf-8")
-    (dest / "README.md").write_text(f"# {args.name}: {args.title}\n\nTODO: opis profilu.\n", encoding="utf-8")
-    (dest / "CHANGELOG.md").write_text(f"# Changelog: {args.name}\n\n## 0.0.1\n- Szkielet.\n", encoding="utf-8")
-    (dest / ".no-bundled-skills").write_text("Jarvo sniper profile: only its own and vendored skills.\n", encoding="utf-8")
+    zapisz(dest / "toolbox.yaml", (dest / "toolbox.yaml").read_text(encoding="utf-8").replace("jarvo-xyz", args.name))
+    zapisz(dest / "quality" / "rubric.md",
+           f"# Rubryka: {args.name}\n\n## Blokujące\n- TODO\n\n## Ważne\n- TODO\n\n## Uwagi (nie blokują)\n- TODO\n")
+    zapisz(dest / "README.md", f"# {args.name}: {args.title}\n\nTODO: opis profilu.\n")
+    zapisz(dest / "CHANGELOG.md", f"# Changelog: {args.name}\n\n## 0.0.1\n- Szkielet.\n")
+    zapisz(dest / ".no-bundled-skills", "Jarvo sniper profile: only its own and vendored skills.\n")
 
     ev = fl.REPO_ROOT / "evals" / args.name
     ev.mkdir(parents=True, exist_ok=True)
     kanarek = "JARVO-KANAREK-" + secrets.token_hex(6)   # znacznik-pułapka evals (docs/RSI.md)
-    (ev / "scenarios.yaml").write_text(f'agent: {args.name}\nkanarek: "{kanarek}"\nscenarios: []\n', encoding="utf-8")
+    zapisz(ev / "scenarios.yaml", f'agent: {args.name}\nkanarek: "{kanarek}"\nscenarios: []\n')
 
     fleet_text = fl.FLEET_FILE.read_text(encoding="utf-8")
     oddaj = ("    oddaj_gdy: \"TODO: kiedy Ręka ma oddać zadanie temu agentowi (tabela generowana)\"\n"
@@ -81,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
              f"    model_tier: {args.tier}\n    delegation_tier: fast\n    autonomy_max: A1\n"
              f"    telegram_topic: {slug}\n    status: planned\n")
     fleet_text = fleet_text.replace("\nshared:", entry + "\nshared:", 1)
-    fl.FLEET_FILE.write_text(fleet_text, encoding="utf-8")
+    zapisz(fl.FLEET_FILE, fleet_text)
     print(f"✓ Szkielet: {dest}\n✓ evals/{args.name}/scenarios.yaml\n✓ wpis w fleet.yaml (status: planned)")
     print("Dalej: uzupełnij SOUL, skille, rubrykę, evals, `oddaj_gdy` i `rola` (+ `en.rola`) w fleet.yaml i wzorzec misji Jarva "
           "(profiles/jarvo/skills/fleet/dispatch-playbook/references/patterns.md); `make validate`; status → active "

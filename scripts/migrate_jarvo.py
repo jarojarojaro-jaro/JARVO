@@ -88,7 +88,7 @@ def rewrite_env_file(path: Path, old_root: Path | None = None, new_root: Path | 
 
 
 def run(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 # ------------------------------------------------------------------------------------------ host
@@ -107,7 +107,7 @@ def stop_old_stack() -> None:
 def stop_old_updater(root: Path) -> None:
     pid_file = root / "updater.pid"
     try:
-        pid = int(pid_file.read_text().strip())
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
         os.kill(pid, signal.SIGTERM)
         log(f"zatrzymany stary pomocnik aktualizacji (PID {pid})")
     except (OSError, ValueError):

@@ -12,6 +12,8 @@ Trzy warstwy:
 Ustalenie `critical`/`high` blokuje build, chyba że jest na liście wyjątków `vendor/skan-wyjatki.yaml`.
 Wyjątek jest przypięty do źródła i commitu: po zmianie `rev` w locku ustalenie wraca jako błąd i trzeba
 je przejrzeć na nowo. `medium`/`low` to ostrzeżenia w raporcie.
+Ścieżki plików w ustaleniach są względne i z „/”, a wzorce (wyjątki, pliki testów) rozróżniają wielkość liter na
+każdym systemie: ten sam skill daje ten sam wynik na Linuksie, macOS i Windows.
 
 Ręcznie (np. przed dodaniem nowego źródła do locka):
   python3 scripts/skan_skilli.py <katalog skilla albo katalog z wieloma skillami> [--hermes-src /opt/hermes] [--json]
@@ -24,6 +26,7 @@ import fnmatch
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import struct
 import sys
@@ -188,7 +191,7 @@ def skanuj_strukture(katalog: Path) -> list[Ustalenie]:
             out.append(Ustalenie("polecenie-przy-ladowaniu", "high", "SKILL.md", n,
                                  "składnia !`polecenie` wykonuje się przy ładowaniu skilla", m.group(0)[:120]))
     for p in sorted(katalog.rglob("*")):
-        rel = str(p.relative_to(katalog))
+        rel = p.relative_to(katalog).as_posix()
         if p.is_symlink():
             cel = p.resolve()
             poza = not cel.is_relative_to(root)
@@ -197,7 +200,7 @@ def skanuj_strukture(katalog: Path) -> list[Ustalenie]:
             continue
         if not p.is_file():
             continue
-        if any(fnmatch.fnmatch(p.name, w) for w in PLIKI_TESTOW):
+        if any(fnmatch.fnmatchcase(p.name, w) for w in PLIKI_TESTOW):
             out.append(Ustalenie("plik-testow", "medium", rel, 0,
                                  "plik testów uruchamia się przy pytest/npm test; w katalogu skilli ich nie uruchamiamy"))
         if p.name == "package.json":
@@ -231,8 +234,13 @@ def skanuj_hermesem(katalog: Path, hermes_src: Path | None) -> list[Ustalenie]:
         sys.modules["_jarvo_skills_guard"] = mod
         spec.loader.exec_module(mod)
     wynik = mod.scan_skill(katalog, source="community")
-    return [Ustalenie(f"hermes:{f.pattern_id}", f.severity, f.file, f.line, f.description, (f.match or "")[:160])
-            for f in wynik.findings]
+    return [Ustalenie(f"hermes:{f.pattern_id}", f.severity, _z_ukosnikiem(f.file), f.line, f.description,
+                      (f.match or "")[:160]) for f in wynik.findings]
+
+
+def _z_ukosnikiem(sciezka):
+    """Ścieżka z ustalenia skanera Hermesa z „/” (na Windows podaje „\\”, a wyjątki piszemy z „/”); na POSIX bez zmian."""
+    return sciezka.replace("\\", "/") if os.name == "nt" and isinstance(sciezka, str) else sciezka
 
 
 def skanuj(katalog: Path, hermes_src: Path | None = None) -> list[Ustalenie]:
@@ -245,7 +253,7 @@ def skanuj(katalog: Path, hermes_src: Path | None = None) -> list[Ustalenie]:
             tekst = p.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-        out.extend(skanuj_tekst(tekst, str(p.relative_to(katalog))))
+        out.extend(skanuj_tekst(tekst, p.relative_to(katalog).as_posix()))
     out.extend(skanuj_hermesem(katalog, hermes_src))
     return out
 
@@ -266,7 +274,8 @@ def _pasuje(w: dict, zrodlo: str, rev: str, sciezka: str, u: Ustalenie) -> bool:
         return False
     reguly = w.get("regula") or []
     reguly = [reguly] if isinstance(reguly, str) else reguly
-    return any(fnmatch.fnmatch(u.regula, r) for r in reguly) and fnmatch.fnmatch(u.plik, str(w.get("plik") or "*"))
+    return (any(fnmatch.fnmatchcase(u.regula, r) for r in reguly)
+            and fnmatch.fnmatchcase(u.plik, str(w.get("plik") or "*")))
 
 
 def ocen(ustalenia: list[Ustalenie], zrodlo: str, rev: str, sciezka: str, wyjatki: list[dict]):
@@ -294,7 +303,7 @@ def _odcisk(katalog: Path, hermes_src: Path | None) -> str:
         h.update(guard.read_bytes())
     h.update(Path(__file__).read_bytes())
     for p in sorted(katalog.rglob("*")):
-        h.update(str(p.relative_to(katalog)).encode())
+        h.update(p.relative_to(katalog).as_posix().encode())
         if p.is_symlink():
             h.update(str(p.readlink()).encode())
         elif p.is_file():
@@ -378,8 +387,8 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     root = Path(a.katalog)
     skille = [root] if (root / "SKILL.md").is_file() else sorted(p.parent for p in root.rglob("SKILL.md"))
-    wyniki = {str(s.relative_to(root)) if s != root else s.name: skanuj(s, Path(a.hermes_src) if a.hermes_src else None)
-              for s in skille}
+    hermes = Path(a.hermes_src) if a.hermes_src else None
+    wyniki = {s.relative_to(root).as_posix() if s != root else s.name: skanuj(s, hermes) for s in skille}
     if a.json:
         print(json.dumps({k: [asdict(u) for u in v] for k, v in wyniki.items()}, ensure_ascii=False, indent=1))
     else:

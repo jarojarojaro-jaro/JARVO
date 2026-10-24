@@ -46,7 +46,7 @@ REVEAL_ROOTS = ("jarvo/workspaces", "jarvo/missions", "jarvo/knowledge", "jarvo/
 
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", **kw)
 
 
 def git(*args: str) -> str:
@@ -146,7 +146,8 @@ def update(args, state: dict) -> dict:
     lines: list[str] = []
     started = time.time()
     proc = subprocess.Popen(["bash", str(ROOT / "scripts" / "deploy.sh")], cwd=ROOT, env=env,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                            errors="replace", start_new_session=True)
     done = threading.Event()
 
     def beat() -> None:

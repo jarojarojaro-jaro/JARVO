@@ -64,7 +64,7 @@ def test_dodanie_kopiuje_plik_obok_filmu(tmp_path):
 def test_katalog_nie_wychodzi_poza_biblioteke(tmp_path):
     (tmp_path / "lib").mkdir()
     (tmp_path / "tajne.mp3").write_bytes(b"x")
-    (tmp_path / "lib" / "katalog.json").write_text(json.dumps({"dzwieki": [{"id": "zly", "plik": "../tajne.mp3"}]}))
+    (tmp_path / "lib" / "katalog.json").write_text(json.dumps({"dzwieki": [{"id": "zly", "plik": "../tajne.mp3"}]}), encoding="utf-8")
     assert ed.dzwiek_plik(tmp_path / "lib", "zly") is None
 
 
@@ -228,7 +228,7 @@ def test_slychac_cues_filmu_z_kodu(tmp_path, capsys):
         " for (const c of cues) { const v = c.vol ?? .5, i0 = Math.round(c.t * 48000);"
         " for (let i = 0; i < 9600 && i0 + i < n; i++) { L[i0 + i] += v * Math.sin(i / 3); R[i0 + i] += v * Math.sin(i / 3); } }"
         " return [L, R]; }\n", encoding="utf-8")
-    (tmp_path / "cues.json").write_text(json.dumps([{"sfx": "pop", "t": 0.5}, {"sfx": "whoosh", "t": 1.2, "vol": 0.01}]))
+    (tmp_path / "cues.json").write_text(json.dumps([{"sfx": "pop", "t": 0.5}, {"sfx": "whoosh", "t": 1.2, "vol": 0.01}]), encoding="utf-8")
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=f=300:d=2", str(tmp_path / "bed.wav")], check=True)
     raport = tmp_path / "r.json"
     pr.main(["slychac", "--cues", str(tmp_path / "cues.json"), "--bed", str(tmp_path / "bed.wav"),

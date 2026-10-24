@@ -53,6 +53,11 @@ DOC_COUNT_COLUMNS = {"skille": "skille", "workflowy własne": "skille", "evals":
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 
 
+def w_repo(path: Path) -> str:
+    """Ścieżka względem repo w komunikatach: z „/” na każdym systemie, tak jak w dokumentach i testach."""
+    return path.relative_to(fl.REPO_ROOT).as_posix()
+
+
 class Report:
     def __init__(self):
         self.errors: list[str] = []
@@ -204,7 +209,7 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
 
     names: set[str] = set()
     for skill_md in fl.iter_skill_files(d / "skills"):
-        rel = skill_md.parent.relative_to(d / "skills")
+        rel = skill_md.parent.relative_to(d / "skills").as_posix()
         try:
             fm, body = fl.read_skill(skill_md)
         except Exception as exc:
@@ -318,7 +323,7 @@ def check_calibration(r: Report) -> None:
     for fam in CALIBRATION_FAMILIES:
         path = fl.CALIBRATION_DIR / f"{fam}.md"
         if not path.exists():
-            r.err(f"calibration: brak {path.relative_to(fl.REPO_ROOT)}")
+            r.err(f"calibration: brak {w_repo(path)}")
             continue
         text = _re.sub(r"<!--.*?-->", "", path.read_text(encoding="utf-8"), flags=_re.S)
         parts = {p.partition("\n")[0].strip(): p.partition("\n")[2] for p in _re.split(r"^### ", text, flags=_re.M)[1:]}
@@ -544,7 +549,7 @@ def check_scripts(r: Report) -> None:
             try:
                 compile(path.read_text(encoding="utf-8"), str(path), "exec", dont_inherit=True)
             except SyntaxError as exc:
-                r.err(f"{path.relative_to(fl.REPO_ROOT)}: błąd składni Pythona: {exc.msg} (linia {exc.lineno})")
+                r.err(f"{w_repo(path)}: błąd składni Pythona: {exc.msg} (linia {exc.lineno})")
         elif path.suffix == ".sh":
             if bash is None:
                 bez_basha += 1
@@ -552,12 +557,12 @@ def check_scripts(r: Report) -> None:
             res = subprocess.run([bash, "-n", str(path)], capture_output=True, text=True, encoding="utf-8",
                                  errors="replace")
             if res.returncode:
-                r.err(f"{path.relative_to(fl.REPO_ROOT)}: błąd składni bash: {res.stderr.strip()[:200]}")
+                r.err(f"{w_repo(path)}: błąd składni bash: {res.stderr.strip()[:200]}")
         elif path.suffix in {".cjs", ".mjs", ".js"} and shutil.which("node"):
             res = subprocess.run([shutil.which("node"), "--check", str(path)], capture_output=True, text=True,
                                  encoding="utf-8", errors="replace")
             if res.returncode:
-                r.err(f"{path.relative_to(fl.REPO_ROOT)}: błąd składni JS: {res.stderr.strip()[:200]}")
+                r.err(f"{w_repo(path)}: błąd składni JS: {res.stderr.strip()[:200]}")
     if bez_basha:
         r.warn(f"składnia {bez_basha} skryptów .sh niesprawdzona: brak basha (na Windows potrzebny Git Bash)")
 
@@ -567,7 +572,7 @@ def check_secrets(r: Report) -> None:
         if any(p in SKIP_DIRS for p in path.parts) or not path.is_file() or path.stat().st_size > 2_000_000:
             continue
         if path.name == ".env" or (path.suffix == ".env" and not path.name.endswith(".example")):
-            r.err(f"{path.relative_to(fl.REPO_ROOT)}: plik .env nie może być w repo")
+            r.err(f"{w_repo(path)}: plik .env nie może być w repo")
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -575,7 +580,7 @@ def check_secrets(r: Report) -> None:
             continue
         for pattern, label in SECRET_PATTERNS:
             if pattern.search(text):
-                r.err(f"{path.relative_to(fl.REPO_ROOT)}: wygląda na {label}")
+                r.err(f"{w_repo(path)}: wygląda na {label}")
 
 
 # pakiet aplikacji to sklejone hq/web/src/*.js w jednym IIFE: nazwy z najwyższego poziomu muszą być jednoznaczne
@@ -749,7 +754,7 @@ def check_bez_base(r: Report) -> None:
             continue
         for m in STARY_ADRES.finditer(tekst):
             nr = tekst.count("\n", 0, m.start()) + 1
-            r.err(f"{p.relative_to(root)}:{nr}: stary adres zakładki zamiast /jarvo (docs/HQ.md „Powłoka”)")
+            r.err(f"{w_repo(p)}:{nr}: stary adres zakładki zamiast /jarvo (docs/HQ.md „Powłoka”)")
     # wersja instalatora hosta: docs/INSTALER.md opisuje bieżącą (co zmienia dla komputera)
     skrypt, opis = root / "install.sh", root / "docs" / "INSTALER.md"
     if not (skrypt.is_file() and opis.is_file()):
@@ -791,7 +796,7 @@ def check_docs(fleet: fl.Fleet, r: Report) -> None:
                 continue
             path, _, anchor = url.partition("#")
             target = (doc.parent / path).resolve() if path else doc
-            rel = doc.relative_to(root)
+            rel = w_repo(doc)
             if not target.exists():
                 r.err(f"{rel}: link do nieistniejącego {url}")
             elif anchor and target.suffix == ".md":
@@ -799,7 +804,7 @@ def check_docs(fleet: fl.Fleet, r: Report) -> None:
                     body = md_without_code(target.read_text(encoding="utf-8"))
                     anchors[target] = {md_slug(h) for h in re.findall(r"^#{1,6}\s+(.+)$", body, re.M)}
                 if anchor not in anchors[target]:
-                    r.err(f"{rel}: kotwica #{anchor} nie istnieje w {path or rel.name}")
+                    r.err(f"{rel}: kotwica #{anchor} nie istnieje w {path or doc.name}")
     for rel in DOCS_WITH_FLEET:
         path = root / rel
         if not path.exists():
@@ -822,7 +827,7 @@ def check_docs(fleet: fl.Fleet, r: Report) -> None:
                 agent = re.search(r"`(jarvo[a-z0-9-]*)`", row[0])
                 if agent and agent.group(1) in uchwyty and kol_uchwytu < len(row) \
                         and not re.search(rf"@{re.escape(uchwyty[agent.group(1)])}(?![a-z0-9_-])", row[kol_uchwytu]):
-                    r.err(f"{doc.relative_to(root)}: {agent.group(1)} ma uchwyt @{uchwyty[agent.group(1)]}, "
+                    r.err(f"{w_repo(doc)}: {agent.group(1)} ma uchwyt @{uchwyty[agent.group(1)]}, "
                           f"a tabela podaje {row[kol_uchwytu]!r}")
             cols = {i: DOC_COUNT_COLUMNS[h.lower()] for i, h in enumerate(table[0]) if h.lower() in DOC_COUNT_COLUMNS}
             for row in table[2:] if cols else []:
@@ -833,7 +838,7 @@ def check_docs(fleet: fl.Fleet, r: Report) -> None:
                     num = re.search(r"\d+", row[i]) if i < len(row) else None
                     real = counts[agent.group(1)][kind]
                     if num and int(num.group()) != real:
-                        r.err(f"{doc.relative_to(root)}: {agent.group(1)} ma {real} ({kind}), "
+                        r.err(f"{w_repo(doc)}: {agent.group(1)} ma {real} ({kind}), "
                               f"a tabela podaje {num.group()}")
 
 

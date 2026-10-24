@@ -207,8 +207,8 @@ def pobierz() -> int:
         if not dest.exists():
             dest.write_bytes(_get(f"{CDN}/{k['pkg']}@{k['ver']}/LICENSE"))
         sumy.setdefault(dest.name, hashlib.sha256(dest.read_bytes()).hexdigest())
-    SUMY.write_text(json.dumps(dict(sorted(sumy.items())), indent=1) + "\n", encoding="utf-8")
-    (DIR / "kroje.css").write_text(css(), encoding="utf-8")
+    SUMY.write_text(json.dumps(dict(sorted(sumy.items())), indent=1) + "\n", encoding="utf-8", newline="\n")
+    (DIR / "kroje.css").write_text(css(), encoding="utf-8", newline="\n")
     return sprawdz()
 
 
@@ -245,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "pobierz":
         return pobierz()
     if cmd == "css":
-        (DIR / "kroje.css").write_text(css(), encoding="utf-8")
+        (DIR / "kroje.css").write_text(css(), encoding="utf-8", newline="\n")   # pliki w repo z LF także na Windows
         return sprawdz()
     if cmd == "sprawdz":
         return sprawdz()

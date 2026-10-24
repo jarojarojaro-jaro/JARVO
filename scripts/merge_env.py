@@ -6,15 +6,17 @@
 - klucz z niepustą wartością w źródle nadpisuje cel,
 - pusta wartość w źródle NIE kasuje istniejącej w celu (szablon nie zeruje kluczy),
 - pozostałe linie celu (komentarze, klucze dopisane przez Hermesa) zostają,
-- plik docelowy ma uprawnienia 0600. Wartości nigdy nie są wypisywane.
+- plik docelowy jest tylko dla właściciela (POSIX: 0600, Windows: ACL). Wartości nigdy nie są wypisywane.
 """
 
 from __future__ import annotations
 
-import os
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from share_keys import tylko_dla_wlasciciela  # noqa: E402  (ta sama ochrona .env co przy kluczach wspólnych)
 
 LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
 
@@ -43,8 +45,8 @@ def main(argv: list[str]) -> int:
         if k not in seen:
             lines.append(f"{k}={v}")
     dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    os.chmod(dst, 0o600)
+    dst.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    tylko_dla_wlasciciela(dst)
     print(f"{dst}: ustawiono {len(updates)} kluczy ({', '.join(sorted(updates))})")
     return 0
 

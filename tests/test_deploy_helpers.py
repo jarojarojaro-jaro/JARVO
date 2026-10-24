@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
+import os
 import stat
+import subprocess
+from pathlib import Path
+
+import pytest
 
 import enable_plugin
 import fleetlib as fl
 import merge_env
 import merge_host_config
 import prune_skills
+
+
+def acl(path: Path) -> list[str]:
+    """Wpisy ACL pliku według wbudowanego icacls (Windows), bez ścieżki i podsumowania."""
+    icacls = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "icacls.exe"
+    out = subprocess.run([str(icacls), str(path)], capture_output=True, encoding="oem", errors="replace").stdout
+    wpisy = [w.strip() for w in out.strip().split("\n\n")[0].splitlines()]
+    return [wpisy[0].replace(str(path), "", 1).strip(), *wpisy[1:]] if wpisy else []
 
 
 # ------------------------------------------------------------------ merge_env
@@ -29,7 +42,12 @@ def test_merge_env_updates_keeps_and_protects(tmp_path, capsys):
     assert "PUSTY_W_ZRODLE=istniejacy" in lines           # pusta wartość w szablonie nie zeruje
     assert 'NOWY="x y"' in lines and "EXPORTED=1" in lines
     assert not any(line.startswith("KOMENTARZ") for line in lines)
-    assert stat.S_IMODE(dst.stat().st_mode) == 0o600
+    if os.name == "nt":       # Windows: tryb pliku nic nie chroni, więc ACL z jednym wpisem właściciela
+        wpisy = acl(dst)
+        assert len(wpisy) == 1 and wpisy[0].lower().endswith(f"\\{os.environ['USERNAME'].lower()}:(f)"), wpisy
+    else:
+        assert stat.S_IMODE(dst.stat().st_mode) == 0o600
+    assert b"\r\n" not in dst.read_bytes()
     out = capsys.readouterr().out
     assert "nowy" not in out and "OPENROUTER_API_KEY" in out   # nazwy kluczy tak, wartości nigdy
 
@@ -144,6 +162,8 @@ def test_version_range_check():
 
 
 # ------------------------------------------------------------------ deploy.sh --no-build, sandbox-up.sh
+# deploy.sh i sandbox-up.sh to kod kontenerowy: działają na hoście Linux albo macOS (na Windows deploy.sh tylko w WSL),
+# nie w Git Bash, więc ich testy mają znacznik posix_only (docs/NATYWNIE.md, S05 i S13)
 
 def _fake_docker(tmp_path, image_exists: bool, ncpu: int = 8):
     """Atrapa `docker`: zapisuje wywołania; `image inspect` zwraca 0 albo 1 (czy obraz jest), `info` liczbę CPU."""
@@ -171,9 +191,10 @@ def _deploy(env, *flags):
     import os
     import subprocess
     return subprocess.run([os.environ.get("JARVO_TEST_BASH", "bash"), str(fl.REPO_ROOT / "scripts/deploy.sh"), *flags],
-                          env=env, capture_output=True, text=True, timeout=60)
+                          env=env, capture_output=True, text=True, timeout=60, encoding="utf-8")
 
 
+@pytest.mark.posix_only
 def test_deploy_no_build_never_builds_even_on_first_run(tmp_path):
     env, log = _fake_docker(tmp_path, image_exists=True)
     res = _deploy(env, "--no-pull", "--no-build", "--first-run")
@@ -182,6 +203,7 @@ def test_deploy_no_build_never_builds_even_on_first_run(tmp_path):
     assert " up -d" in calls and " build " not in calls and "Budowa obrazu" not in res.stdout
 
 
+@pytest.mark.posix_only
 def test_deploy_caps_cpus_to_docker(tmp_path):
     """Laptop z 2 rdzeniami (CI na GitHubie też): domyślne HERMES_CPUS=4 Docker by odrzucił przy starcie."""
     env, _log = _fake_docker(tmp_path, image_exists=True, ncpu=2)
@@ -199,6 +221,7 @@ def test_deploy_caps_cpus_to_docker(tmp_path):
     assert "HERMES_CPUS=1\n" in text and "ANDROID_CPUS=1\n" in text
 
 
+@pytest.mark.posix_only
 def test_deploy_keeps_cpus_that_fit(tmp_path):
     env, _log = _fake_docker(tmp_path, image_exists=True, ncpu=8)
     dot = tmp_path / "compose" / ".env"
@@ -207,6 +230,7 @@ def test_deploy_keeps_cpus_that_fit(tmp_path):
     assert "HERMES_CPUS=6\n" in dot.read_text(encoding="utf-8")
 
 
+@pytest.mark.posix_only
 def test_deploy_clears_old_service_image_pins(tmp_path):
     """Dawne IMAGE_* z compose.env.example i digesty z pin-images.sh nie zasłaniają wersji przypiętych w repo."""
     env, _log = _fake_docker(tmp_path, image_exists=True)
@@ -222,6 +246,7 @@ def test_deploy_clears_old_service_image_pins(tmp_path):
     assert wlasny in text and "IMAGE_VALKEY: wersja przypięta w repo" in res.stdout
 
 
+@pytest.mark.posix_only
 def test_deploy_points_container_at_this_repo(tmp_path):
     """Stara instalacja z JARVO_REPO na dawnym katalogu (~/TARS): lokalnie deploy.sh poprawia ścieżkę na repo,
     z którego wdraża (inaczej build w kontenerze idzie ze starego kodu), a na serwerze zatrzymuje się z komunikatem."""
@@ -242,6 +267,7 @@ def test_deploy_points_container_at_this_repo(tmp_path):
     assert res.returncode == 0 and "JARVO_REPO" not in res.stdout
 
 
+@pytest.mark.posix_only
 def test_deploy_no_build_requires_existing_image(tmp_path):
     env, log = _fake_docker(tmp_path, image_exists=False)
     res = _deploy(env, "--no-pull", "--no-build")
@@ -250,6 +276,7 @@ def test_deploy_no_build_requires_existing_image(tmp_path):
     assert " up -d" not in log.read_text(encoding="utf-8")
 
 
+@pytest.mark.posix_only
 def test_deploy_komputer_blocks_public_ips_without_hostname_i(tmp_path):
     """Komputer na VPS: publiczne adresy hosta w KOMPUTER_BLOKADA także bez `hostname -I` (Arch, busybox: przez ip),
     a pusty wynik (adresów nie znaleziono) nie zdejmuje poprzedniej blokady."""
@@ -268,7 +295,8 @@ def test_deploy_komputer_blocks_public_ips_without_hostname_i(tmp_path):
                       "3: docker0    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0\n", encoding="utf-8")
     env = {**env, "IP_OUT": str(ip_out)}
     dot = tmp_path / "compose" / ".env"
-    if "microsoft" in open("/proc/version", encoding="utf-8").read().lower():
+    wersja = Path("/proc/version")                 # tylko na Linuksie (na macOS nie ma /proc), jak w deploy.sh
+    if wersja.exists() and "microsoft" in wersja.read_text(encoding="utf-8").lower():
         return   # WSL: blokada dotyczy tylko zwykłego Linuksa
     assert _deploy(env, "--no-pull", "--no-build").returncode == 0
     assert "KOMPUTER_BLOKADA=203.0.113.5\n" in dot.read_text(encoding="utf-8")
@@ -278,13 +306,14 @@ def test_deploy_komputer_blocks_public_ips_without_hostname_i(tmp_path):
     assert "KOMPUTER_BLOKADA=203.0.113.5\n" in dot.read_text(encoding="utf-8")
 
 
+@pytest.mark.posix_only
 def test_sandbox_up_refuses_outside_sandbox(tmp_path):
     import os
     import subprocess
     env = {k: v for k, v in os.environ.items() if k.upper() != "HTTPS_PROXY"}
     env["JARVO_LOCAL"] = str(tmp_path / "local")
     res = subprocess.run(["bash", str(fl.REPO_ROOT / "scripts/sandbox-up.sh")], env=env,
-                         capture_output=True, text=True, timeout=30)
+                         capture_output=True, text=True, timeout=30, encoding="utf-8")
     assert res.returncode == 1 and "to nie piaskownica" in res.stdout
     assert not (tmp_path / "local").exists()
 
@@ -304,6 +333,7 @@ def test_enable_plugin_keeps_comments_and_removes_from_disabled(tmp_path):
 
 
 # ------------------------------------------------- deploy.sh: start usług przy porcie zwalnianym z opóźnieniem
+# pętla startu z deploy.sh (kod kontenerowy, jak wyżej): testy tylko na POSIX
 
 def _start_uslug(tmp_path, bledy: int, komunikat: str):
     """Pętla startu z deploy.sh z udawanym compose: pierwsze `bledy` prób kończy się `komunikat`, potem sukces."""
@@ -317,10 +347,11 @@ def _start_uslug(tmp_path, bledy: int, komunikat: str):
             f'if (( n <= {bledy} )); then echo "{komunikat}"; return 1; fi; echo "Container jarvo-hermes Started"; }}\n')
     script = ("set -euo pipefail\nsleep() { :; }\nfail() { echo \"FAIL $*\"; exit 1; }\n" + fake
               + "COMPOSE=(compose)\nPROFILES=()\n" + body[a:b] + "echo GOTOWE\n")
-    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
-    return res, int(licznik.read_text())
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30, encoding="utf-8")
+    return res, int(licznik.read_text(encoding="utf-8"))
 
 
+@pytest.mark.posix_only
 def test_deploy_retries_port_released_late(tmp_path):
     port = ("Error response from daemon: ports are not available: exposing port TCP 127.0.0.1:9120 -> 127.0.0.1:0: "
             "/forwards/expose returned unexpected status: 500")
@@ -331,6 +362,7 @@ def test_deploy_retries_port_released_late(tmp_path):
     assert res.returncode == 1 and n == 4 and "FAIL Port floty" in res.stdout and "wsl --shutdown" in res.stdout
 
 
+@pytest.mark.posix_only
 def test_deploy_other_start_error_fails_at_once(tmp_path):
     res, n = _start_uslug(tmp_path, 1, "Error response from daemon: no such image")
     assert res.returncode == 1 and n == 1 and "FAIL Usługi nie wystartowały" in res.stdout

@@ -338,8 +338,14 @@ def pobierz(cache: Path) -> int:
 
 # ---------------------------------------------------------------- przygotowanie (ffmpeg)
 
+def _program(nazwa: str) -> str:
+    """Pełna ścieżka programu z PATH (na Windows także .exe i .cmd), inaczej sama nazwa."""
+    return shutil.which(nazwa) or nazwa
+
+
 def _ff(*args: str) -> str:
-    r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", *args], capture_output=True, text=True)
+    r = subprocess.run([_program("ffmpeg"), "-nostdin", "-hide_banner", *args], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     if r.returncode != 0:
         raise SystemExit((r.stderr.strip().splitlines() or ["ffmpeg: błąd"])[-1])
     return r.stderr
@@ -378,8 +384,8 @@ def przygotuj(src: Path, dest: Path, muzyka: bool) -> None:
 
 
 def _probe(path: Path) -> dict:
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=channels", "-of", "json", str(path)],
-                       capture_output=True, text=True, check=True)
+    r = subprocess.run([_program("ffprobe"), "-v", "error", "-show_entries", "format=duration:stream=channels", "-of", "json",
+                        str(path)], capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
     return json.loads(r.stdout)
 
 
@@ -411,14 +417,14 @@ def zbuduj(cache: Path) -> int:
     for stary in DIR.glob("*/*.mp3"):
         if stary.relative_to(DIR).as_posix() not in {plik_wzgl(d) for d in DZWIEKI}:
             stary.unlink()
-    KATALOG.write_text(json.dumps(katalog(wpisy), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    (DIR / "LICENCJE.md").write_text(licencje(), encoding="utf-8")
+    KATALOG.write_text(json.dumps(katalog(wpisy), ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
+    (DIR / "LICENCJE.md").write_text(licencje(), encoding="utf-8", newline="\n")
     return sprawdz()
 
 
 def szczyt(path: Path) -> float:
     """Sekunda najgłośniejszych 10 ms pliku (mono 8 kHz, jak `rytm.py --szczyt`): tu efekt ma trafić w zdarzenie."""
-    r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-i", str(path), "-ac", "1",
+    r = subprocess.run([_program("ffmpeg"), "-nostdin", "-hide_banner", "-loglevel", "error", "-i", str(path), "-ac", "1",
                         "-ar", "8000", "-f", "s16le", "-"], capture_output=True, check=True)
     a = array.array("h")
     a.frombytes(r.stdout[:len(r.stdout) // 2 * 2])
@@ -452,7 +458,7 @@ def zmierz() -> int:
         for k in ("szczyt", "rola", "gra"):
             w.pop(k, None)
         w.update(cechy(po_id[w["id"]], DIR / w["plik"]))
-    KATALOG.write_text(json.dumps(kat, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    KATALOG.write_text(json.dumps(kat, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
     return sprawdz()
 
 

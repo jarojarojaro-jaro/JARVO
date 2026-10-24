@@ -22,15 +22,16 @@ def test_config_covers_fleet_and_asserts_compile():
     asserts = [a["value"] for a in cfg["defaultTest"]["assert"]] + [a["value"] for t in cfg["tests"] for a in t.get("assert", [])]
     if shutil.which("node"):
         for js in asserts:
-            r = subprocess.run(["node", "-e", f"const output='{{}}'; (() => {js});"], capture_output=True, text=True)
+            r = subprocess.run(["node", "-e", f"const output='{{}}'; (() => {js});"], capture_output=True, text=True,
+                               encoding="utf-8")
             assert "SyntaxError" not in r.stderr, js
 
 
 def test_provider_detects_leak_and_collects_commands(tmp_path, monkeypatch):
     import provider
     (tmp_path / "profiles" / "jarvo-ads").mkdir(parents=True)
-    (tmp_path / "profiles" / "jarvo-ads" / ".env").write_text("API_SERVER_KEY=klucz-api-bardzo-tajny\n")
-    (tmp_path / ".env").write_text("OPENROUTER_API_KEY=sk-or-tajny-123456\nKROTKI=abc\n")
+    (tmp_path / "profiles" / "jarvo-ads" / ".env").write_text("API_SERVER_KEY=klucz-api-bardzo-tajny\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("OPENROUTER_API_KEY=sk-or-tajny-123456\nKROTKI=abc\n", encoding="utf-8")
     monkeypatch.setattr(provider, "DATA", tmp_path)
 
     def fake(method, url, key, body=None, timeout=0, sesja=None):
@@ -50,12 +51,13 @@ def test_provider_detects_leak_and_collects_commands(tmp_path, monkeypatch):
 def test_web_security_check_repo(tmp_path):
     import subprocess as sp
     s = Path(__file__).resolve().parents[1] / "profiles" / "jarvo-web" / "scripts" / "security_check.py"
-    (tmp_path / ".gitignore").write_text("node_modules\n")
-    (tmp_path / ".env").write_text("STRIPE=sk_live_" + "a" * 24 + "\n")
-    (tmp_path / "app.js").write_text("localStorage.setItem('authToken', t);\ndb.query(`select * from u where id=${id}`)\n")
+    (tmp_path / ".gitignore").write_text("node_modules\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("STRIPE=sk_live_" + "a" * 24 + "\n", encoding="utf-8")
+    (tmp_path / "app.js").write_text("localStorage.setItem('authToken', t);\ndb.query(`select * from u where id=${id}`)\n",
+                                     encoding="utf-8")
     sp.run(["git", "init", "-q"], cwd=tmp_path)
     sp.run(["git", "add", "-A"], cwd=tmp_path)
-    r = sp.run([sys.executable, str(s), "repo", str(tmp_path), "--json"], capture_output=True, text=True)
+    r = sp.run([sys.executable, str(s), "repo", str(tmp_path), "--json"], capture_output=True, text=True, encoding="utf-8")
     co = [x["co"] for x in json.loads(r.stdout)["ustalenia"]]
     assert r.returncode == 1
     assert "plik .env w repozytorium" in co and any("localStorage" in c for c in co) and any("SQL" in c for c in co)
@@ -67,11 +69,12 @@ def test_web_security_check_insecure_defaults(tmp_path):
     import subprocess as sp
     s = Path(__file__).resolve().parents[1] / "profiles" / "jarvo-web" / "scripts" / "security_check.py"
     (tmp_path / "config.py").write_text("import os\nSECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')\n"
-                                        "PORT = os.environ.get('PORT', '8080')\n")
-    (tmp_path / "api.js").write_text("const agent = new https.Agent({ rejectUnauthorized: false });\n")
+                                        "PORT = os.environ.get('PORT', '8080')\n", encoding="utf-8")
+    (tmp_path / "api.js").write_text("const agent = new https.Agent({ rejectUnauthorized: false });\n", encoding="utf-8")
     (tmp_path / "tests").mkdir()
-    (tmp_path / "tests" / "test_auth.py").write_text("import os\nK = os.environ.get('SECRET_KEY', 'test-secret')\n")
-    r = sp.run([sys.executable, str(s), "repo", str(tmp_path), "--json"], capture_output=True, text=True)
+    (tmp_path / "tests" / "test_auth.py").write_text("import os\nK = os.environ.get('SECRET_KEY', 'test-secret')\n",
+                                                     encoding="utf-8")
+    r = sp.run([sys.executable, str(s), "repo", str(tmp_path), "--json"], capture_output=True, text=True, encoding="utf-8")
     wyn = json.loads(r.stdout)["ustalenia"]
     gdzie = {x["gdzie"].split(":")[0] for x in wyn if "zapasową" in x["co"]}
     assert r.returncode == 1 and gdzie == {"config.py"}                  # PORT z domyślną wartością to nie sekret

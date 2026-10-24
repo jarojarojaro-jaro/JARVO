@@ -14,7 +14,7 @@ import zrodla
 def sh(cwd: Path, *args: str) -> str:
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True,
                           env={**zrodla.GIT_ENV, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-                               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}).stdout.strip()
+                               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}, encoding="utf-8").stdout.strip()
 
 
 def commit(repo: Path, pliki: dict[str, str | None], tytul: str) -> str:
@@ -103,6 +103,7 @@ def test_przejrzane_i_status_zmieniaja_tylko_jedno_pole(upstream, tmp_path, caps
     po = p.read_text(encoding="utf-8")
     assert po == przed.replace(f"przejrzane: {a}\n  inne", f"przejrzane: {b}\n  inne", 1).replace(
         "status: uzywane   # notatka", "status: do-wdrozenia   # notatka")
+    assert b"\r\n" not in p.read_bytes()                                 # spis w repo z LF także po zapisie na Windows
     assert zrodla.main(["--spis", str(p), "przejrzane", "lemo", "abc1234"]) == 1
     assert zrodla.main(["--spis", str(p), "przejrzane", "brak"]) == 1
     assert "pełny SHA" in capsys.readouterr().err

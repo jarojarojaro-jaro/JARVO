@@ -78,6 +78,11 @@ def plik_skilla(agent: str, skill: str, repo: Path = fl.REPO_ROOT) -> Path:
     return p
 
 
+def zapisz(plik: Path, tekst: str) -> None:
+    """Wyniki kuźni z LF na każdym systemie: patch idzie do `git apply`, raport i karta do HQ."""
+    plik.write_text(tekst, encoding="utf-8", newline="\n")
+
+
 def naglowek(tekst: str) -> dict:
     m = re.match(r"^---\r?\n(.*?)\r?\n---", tekst, re.S)
     if not m:
@@ -396,18 +401,18 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("fleet.yaml: brak evals.proposer")
         w = proponuj(args.agent, args.skill, args.przebieg, model, args.lekcje)
         if w["ok"]:
-            args.out.write_text(w.pop("tekst"), encoding="utf-8")
+            zapisz(args.out, w.pop("tekst"))
         print(json.dumps(w, ensure_ascii=False))
         return 0 if w["ok"] else 1
     if args.cmd == "sprawdz":
         w = sprawdz(args.agent, args.skill, args.kandydat.read_text(encoding="utf-8"))
         args.out.mkdir(parents=True, exist_ok=True)
-        (args.out / "zmiana.patch").write_text(w["patch"], encoding="utf-8")
-        (args.out / "limity.json").write_text(json.dumps(w, ensure_ascii=False, indent=1), encoding="utf-8")
+        zapisz(args.out / "zmiana.patch", w["patch"])
+        zapisz(args.out / "limity.json", json.dumps(w, ensure_ascii=False, indent=1))
         if not w["ok"]:
-            (args.out / "raport.md").write_text(
-                f"# Kuźnia: {args.agent} / {args.skill}\n\n**Werdykt: ✗ odrzucony przez limity** (evals nie uruchomione)\n\n"
-                + "".join(f"- {b}\n" for b in w["bledy"]) + "\n```diff\n" + w["patch"].rstrip() + "\n```\n", encoding="utf-8")
+            zapisz(args.out / "raport.md",
+                   f"# Kuźnia: {args.agent} / {args.skill}\n\n**Werdykt: ✗ odrzucony przez limity** (evals nie uruchomione)\n\n"
+                   + "".join(f"- {b}\n" for b in w["bledy"]) + "\n```diff\n" + w["patch"].rstrip() + "\n```\n")
         for b in w["bledy"]:
             print(f"✗ {b}")
         for u in w["uwagi"]:
@@ -424,7 +429,7 @@ def main(argv: list[str] | None = None) -> int:
         meta = {"agent": args.agent, "skill": args.skill, "powtorzenia": args.powtorzenia, "koszt": k,
                 "budzet": args.budzet, "commit": commit, **s, "reczny": args.reczny}
         args.out.mkdir(parents=True, exist_ok=True)
-        (args.out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+        zapisz(args.out / "meta.json", json.dumps(meta, ensure_ascii=False, indent=1))
         print(f"Pojedynek: {k['scenariusze']} scenariuszy × {args.powtorzenia} × 2 = {k['oceny']} ocen, ok. {k['usd']} $ "
               f"za sędziego (budżet {args.budzet} $); sędzia {s['sedzia']}, proponujący {s['proponujacy'] or '—'}")
         if k["usd"] > args.budzet:
@@ -436,11 +441,10 @@ def main(argv: list[str] | None = None) -> int:
     limity = json.loads((args.out / "limity.json").read_text(encoding="utf-8"))
     meta = json.loads((args.out / "meta.json").read_text(encoding="utf-8")) if (args.out / "meta.json").is_file() else {}
     wynik = ocen(ev.wczytaj_przebieg(args.baza), ev.wczytaj_przebieg(args.kandydat_wyniki))
-    (args.out / "wynik.json").write_text(json.dumps({**wynik, "meta": meta}, ensure_ascii=False, indent=1), encoding="utf-8")
-    (args.out / "raport.md").write_text(raport(args.agent, args.skill, wynik, limity, meta), encoding="utf-8")
+    zapisz(args.out / "wynik.json", json.dumps({**wynik, "meta": meta}, ensure_ascii=False, indent=1))
+    zapisz(args.out / "raport.md", raport(args.agent, args.skill, wynik, limity, meta))
     if wynik["werdykt"] == "do decyzji":
-        (args.out / "karta.md").write_text(karta(args.agent, args.skill, args.katalog_prod or str(args.out), wynik),
-                                           encoding="utf-8")
+        zapisz(args.out / "karta.md", karta(args.agent, args.skill, args.katalog_prod or str(args.out), wynik))
     for b in wynik["bramki"]:
         print(f"{'✓' if b['ok'] else '✗'} {b['nazwa']}: {b['opis']}")
     print(json.dumps({"werdykt": wynik["werdykt"]}, ensure_ascii=False))

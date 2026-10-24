@@ -41,7 +41,7 @@ def main(argv: list[str]) -> int:
         if not managed(skill_dir):
             continue
         if not (build_root / rel / "SKILL.md").exists():
-            removed.append(str(rel))
+            removed.append(rel.as_posix())           # w komunikacie z „/” także na Windows
             if not dry:
                 shutil.rmtree(skill_dir)
     if removed:

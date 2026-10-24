@@ -147,10 +147,14 @@ def set_default_theme(config: Path, name: str, switch_from: tuple[str, ...] = ()
         y = YAML()
         y.preserve_quotes = True
         data = y.load(config.read_text(encoding="utf-8")) or {}
-        dump = lambda d: y.dump(d, config.open("w", encoding="utf-8"))  # noqa: E731
+
+        def dump(d) -> None:
+            with config.open("w", encoding="utf-8", newline="\n") as f:    # LF i zamknięty plik także na Windows
+                y.dump(d, f)
     except ImportError:  # pragma: no cover
         data = yaml.safe_load(config.read_text(encoding="utf-8")) or {}
-        dump = lambda d: config.write_text(yaml.safe_dump(d, allow_unicode=True, sort_keys=False), encoding="utf-8")  # noqa: E731
+        dump = lambda d: config.write_text(yaml.safe_dump(d, allow_unicode=True, sort_keys=False), encoding="utf-8",  # noqa: E731
+                                           newline="\n")
     dash = data.get("dashboard")
     if not isinstance(dash, dict):
         dash = {}
@@ -173,7 +177,7 @@ def main(argv: list[str]) -> int:
     out.mkdir(parents=True, exist_ok=True)
     for entry in spec["themes"]:
         body = yaml.safe_dump(theme(entry, css), allow_unicode=True, sort_keys=False, width=1000)
-        (out / f"{entry['name']}.yaml").write_text(body, encoding="utf-8")
+        (out / f"{entry['name']}.yaml").write_text(body, encoding="utf-8", newline="\n")
     marker = out / BRAND_SWITCH
     old = tuple(e["name"] for e in spec["themes"] if e["name"].startswith("fosfor")) if not marker.exists() else ()
     changed = set_default_theme(home / "config.yaml", spec["default"], old)

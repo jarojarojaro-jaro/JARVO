@@ -39,7 +39,7 @@ def recalibrate(prof: Path, model_id: str | None) -> None:
 
         new = fleetlib.recalibrate_soul(soul_path.read_text(encoding="utf-8"), model_id)
         if new is not None:
-            soul_path.write_text(new, encoding="utf-8")
+            soul_path.write_text(new, encoding="utf-8", newline="\n")
             print(f"  kalibracja SOUL pod {model_id}: {fleetlib.model_family(model_id)}")
     except Exception as exc:  # noqa: BLE001
         print(f"  ! kalibracja SOUL pominięta: {exc}")

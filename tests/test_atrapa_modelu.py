@@ -1,5 +1,6 @@
 """Atrapa modelu (scripts/atrapa_modelu.py): przewidywalne odpowiedzi i zgodność z OpenAI Chat Completions."""
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -73,16 +74,24 @@ def _wolny_port() -> int:
 
 @pytest.fixture()
 def serwer(tmp_path):
+    """Atrapa w osobnym procesie; gotowa, gdy odpowie na GET /models (pełne zapytanie, nie samo połączenie TCP).
+    Proces, który padł albo nie wstał w 30 s, kończy test komunikatem zamiast przekroczenia czasu w zapytaniu."""
     port = _wolny_port()
     p = subprocess.Popen([sys.executable, str(ROOT / "scripts" / "atrapa_modelu.py"), "--port", str(port),
                           "--dziennik", str(tmp_path / "atrapa.jsonl")])
-    for _ in range(50):
+    adres = f"http://127.0.0.1:{port}/v1"
+    koniec = time.monotonic() + 30
+    while True:
         try:
-            socket.create_connection(("127.0.0.1", port), timeout=0.1).close()
-            break
-        except OSError:
+            with urllib.request.urlopen(adres + "/models", timeout=2):
+                break
+        except OSError:                                  # także URLError: jeszcze nie słucha
+            if p.poll() is not None or time.monotonic() > koniec:
+                p.kill()
+                p.wait(timeout=5)
+                pytest.fail(f"atrapa modelu nie wstała na porcie {port} (kod {p.returncode})")
             time.sleep(0.1)
-    yield f"http://127.0.0.1:{port}/v1"
+    yield adres
     p.terminate()
     p.wait(timeout=5)
 
@@ -130,4 +139,5 @@ def test_serwer_wolno_dziennik_i_plik(serwer, tmp_path):
     assert [{k: v for k, v in w.items() if k != "_sciezka"} for w in wpisy] == zapytania
     assert [w["_sciezka"] for w in wpisy] == ["/v1/chat/completions", "/p/test-e2e-j/v1/chat/completions"]
     assert "zażółć" in linie[0]                       # bez ucieczek \uXXXX: grep po polsku działa
-    assert dziennik.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":                               # tryb pliku chroni tylko na POSIX (Windows: os.open go pomija)
+        assert dziennik.stat().st_mode & 0o777 == 0o600

@@ -88,8 +88,17 @@ def test_kroje_css_z_data_url():
     assert ed.kroje_css(kroje.DIR, set()).count("@font-face") == 0
 
 
+def _node(tmp_path: Path, kod: str) -> str:
+    """Program node z pliku (nie `node -e`: kod z dwóch plików źródłowych przekracza limit wiersza poleceń Windows,
+    WinError 206); wynik ze stdout."""
+    plik = tmp_path / "program.cjs"
+    plik.write_text(kod, encoding="utf-8")
+    return subprocess.run([shutil.which("node"), str(plik)], capture_output=True, text=True, encoding="utf-8",
+                          check=True).stdout
+
+
 @pytest.mark.skipif(not shutil.which("node"), reason="brak node")
-def test_render_wybiera_kroje_projektu():
+def test_render_wybiera_kroje_projektu(tmp_path):
     """RODZINY_JS (projekt.strona) liczy rodziny tą samą funkcją wyboru kroju co rysowanie: napisy i typografia."""
     src = (ROOT / "profiles" / "jarvo-wideo" / "scripts" / "projekt.py").read_text(encoding="utf-8")
     rodziny_js = re.search(r'RODZINY_JS = """(.*?)"""', src, re.S).group(1)
@@ -97,9 +106,8 @@ def test_render_wybiera_kroje_projektu():
     plany = [{"texts": [{"text": "Zażółć", "font": "'Bungee', Impact, sans-serif"}, {"text": "x"}]},
              {"typo": {"motyw": "podcast", "bloki": [{"id": "b1", "start": 0, "end": 1, "slowa": [
                  {"t": 0, "tekst": "a", "waga": 1}, {"t": 0, "tekst": "b", "waga": 0}, {"t": 0, "tekst": "c", "waga": 1, "kroj": "bubbles"}]}]}}]
-    r = subprocess.run(["node", "-e", js + f"\nconsole.log(JSON.stringify(({rodziny_js})({json.dumps(plany)}).sort()));"],
-                       capture_output=True, text=True, check=True)
-    assert json.loads(r.stdout) == ["Bungee", "Montserrat", "Rubik Bubbles", "system-ui"]
+    wynik = _node(tmp_path, js + f"\nconsole.log(JSON.stringify(({rodziny_js})({json.dumps(plany)}).sort()));")
+    assert json.loads(wynik) == ["Bungee", "Montserrat", "Rubik Bubbles", "system-ui"]
 
 
 def test_render_agenta_bez_google_fonts():
@@ -156,7 +164,7 @@ console.log(JSON.stringify(wynik));
 @pytest.mark.skipif(not shutil.which("node"), reason="brak node")
 def test_kazdy_kroj_ma_polskie_glify():
     pliki = [kroje.DIR / name for _k, name, *_ in kroje.pliki()]
-    r = subprocess.run(["node", "-e", CMAP_JS, *map(str, pliki)], capture_output=True, text=True, check=True)
+    r = subprocess.run(["node", "-e", CMAP_JS, *map(str, pliki)], capture_output=True, text=True, check=True, encoding="utf-8")
     mapy = json.loads(r.stdout)
     for k in kroje.KROJE:
         for stem, _w, _st in k["faces"]:
@@ -166,11 +174,10 @@ def test_kazdy_kroj_ma_polskie_glify():
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="brak node")
-def test_napis_bierze_grubosc_z_listy_krojow():
+def test_napis_bierze_grubosc_z_listy_krojow(tmp_path):
     js = (ROOT / "hq" / "web" / "src" / "44-napisy.js").read_text(encoding="utf-8")
     prog = js + """
 const f = (font, bold) => textFont({ font, bold, size: 64 }, 1920, 1080).font.split(" ")[0];
 console.log(JSON.stringify([f("'Anton', Impact, sans-serif"), f("'Anton', Impact, sans-serif", false),
   f("'Barlow Condensed', 'Arial Narrow', sans-serif", false), f("'Nowy Krój', serif"), f("'Nowy Krój', serif", false), f(undefined)]));"""
-    r = subprocess.run(["node", "-e", prog], capture_output=True, text=True, check=True)
-    assert json.loads(r.stdout) == ["400", "400", "600", "800", "500", "800"]
+    assert json.loads(_node(tmp_path, prog)) == ["400", "400", "600", "800", "500", "800"]

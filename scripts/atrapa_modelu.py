@@ -32,6 +32,7 @@ import argparse
 import json
 import os
 import re
+import socketserver
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -171,8 +172,8 @@ class Obsluga(BaseHTTPRequestHandler):
             self._json(200, _cala(ident, model, plan))
 
     def _zapisz(self, zapytanie: Any, sciezka: str = "") -> None:
-        """Jedna linia JSON na zapytanie (plik 0600, dopisywany pod zamkiem: serwer jest wielowątkowy); ciało z polem
-        `_sciezka` = adres zapytania (profil testu po `base_url`)."""
+        """Jedna linia JSON na zapytanie (plik 0600 na POSIX, dopisywany pod zamkiem: serwer jest wielowątkowy);
+        ciało z polem `_sciezka` = adres zapytania (profil testu po `base_url`)."""
         if not self.dziennik:
             return
         wpis = {**zapytanie, "_sciezka": sciezka} if isinstance(zapytanie, dict) else zapytanie
@@ -215,6 +216,16 @@ class Obsluga(BaseHTTPRequestHandler):
         self.close_connection = True
 
 
+class Serwer(ThreadingHTTPServer):
+    """ThreadingHTTPServer bez odwrotnego DNS przy starcie: HTTPServer.server_bind woła socket.getfqdn między bind
+    a listen, przy wolnym DNS to sekundy, a port przez ten czas nie przyjmuje połączeń. Nazwy serwera atrapa
+    nie używa."""
+
+    def server_bind(self) -> None:
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = str(self.server_address[0]), self.server_address[1]
+
+
 def _cala(ident: str, model: str, plan: dict) -> dict:
     wiadomosc: dict[str, Any] = {"role": "assistant", "content": plan.get("tekst")}
     koniec = "stop"
@@ -241,7 +252,7 @@ def main() -> None:
         with open(a.odpowiedzi, encoding="utf-8") as f:
             dane = json.load(f)
         GOTOWE.update({str(k): str(v) for k, v in dane.items()} if isinstance(dane, dict) else {})
-    ThreadingHTTPServer((a.host, a.port), Obsluga).serve_forever()
+    Serwer((a.host, a.port), Obsluga).serve_forever()
 
 
 if __name__ == "__main__":

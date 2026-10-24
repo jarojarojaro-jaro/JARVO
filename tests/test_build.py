@@ -57,6 +57,15 @@ def test_no_secrets_or_sources_in_dist(built):
     assert bad == []
 
 
+def test_dist_text_files_have_lf(built):
+    """Dystrybucja z LF na każdym systemie: build na Windows nie zamienia końców linii, więc Hermes i skarbiec
+    dostają te same bajty co z Linuksa."""
+    _, out = built
+    crlf = [p.relative_to(out).as_posix() for p in out.rglob("*")
+            if p.is_file() and p.suffix in {".md", ".yaml", ".yml"} and b"\r\n" in p.read_bytes()]
+    assert crlf == []
+
+
 def test_models_and_profile_metadata(built):
     fleet, out = built
     for a in fleet.active():

@@ -133,7 +133,7 @@ def wczytaj_przebieg(path: Path) -> list[dict]:
 
 def dopisz_historie(wyniki: Path, wpis: dict) -> None:
     wyniki.mkdir(parents=True, exist_ok=True)
-    with (wyniki / "historia.jsonl").open("a", encoding="utf-8") as f:
+    with (wyniki / "historia.jsonl").open("a", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(wpis, ensure_ascii=False) + "\n")
 
 
@@ -164,7 +164,7 @@ def ustaw_odniesienie(wyniki: Path, agent: str, przebieg: Path) -> Path:
     dst = odniesienie_path(wyniki, agent)
     dst.parent.mkdir(parents=True, exist_ok=True)
     tmp = dst.with_suffix(".tmp")
-    tmp.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    tmp.write_text(src.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     tmp.replace(dst)
     meta = dst.with_suffix(".json")
     meta.write_text(json.dumps({"agent": agent, "przebieg": przebieg.name}, ensure_ascii=False), encoding="utf-8")
