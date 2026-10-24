@@ -73,6 +73,12 @@ dla swojej dystrybucji (`WSL_DISTRO_NAME`) i swojego użytkownika, a PATH użytk
 Bez połączenia z Windowsem (interop WSL wyłączony) jest tylko ostrzeżenie z poleceniem `wsl -d <dystrybucja> -- jarvo …`;
 instalacja idzie dalej. Wystarczy raz `wsl -d <dystrybucja> -- jarvo update`, potem nowe okno PowerShella.
 
+**Port zwalniany z opóźnieniem (2026-10-24).** Docker Desktop na Windowsie (integracja WSL) i Macu odtwarza kontener
+szybciej, niż zwalnia jego port: `jarvo update` kończył się „ports are not available: exposing port TCP 127.0.0.1:9120 …
+/forwards/expose returned unexpected status: 500” i flota stała. `deploy.sh` ponawia teraz start usług do 4 razy
+(po 5, 10 i 20 s), gdy Docker zgłasza zajęty port; po czwartej porażce kończy się radą (`wsl --shutdown`, 10 s,
+`jarvo up` albo restart Docker Desktop; inny program na porcie: zamknąć go). Inne błędy startu przerywają od razu.
+
 ## 2. Diagnoza: co przeszkadza na każdym systemie
 
 | | Linux | macOS | Windows |

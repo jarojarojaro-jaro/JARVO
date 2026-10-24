@@ -182,7 +182,22 @@ if [[ -f "$COMPOSE_DIR/.host-version" ]]; then
 fi
 
 log "Start usług"
-"${COMPOSE[@]}" ${PROFILES[@]+"${PROFILES[@]}"} up -d
+# Docker Desktop (Windows, Mac) zwalnia port starego kontenera z opóźnieniem: „ports are not available …
+# /forwards/expose returned unexpected status: 500” przy odtwarzaniu kontenera. Ponawiamy do 4 razy (5, 10, 20 s);
+# port trzymany przez inny program zostaje błędem, z radą.
+up_out="$(mktemp)"; proba=1; czekaj=5
+until "${COMPOSE[@]}" ${PROFILES[@]+"${PROFILES[@]}"} up -d 2>&1 | tee "$up_out"; [[ ${PIPESTATUS[0]} -eq 0 ]]; do
+  if ! grep -qiE "ports are not available|address already in use|port is already allocated" "$up_out"; then
+    rm -f "$up_out"; fail "Usługi nie wystartowały (komunikat Dockera wyżej)."
+  fi
+  if (( proba >= 4 )); then
+    rm -f "$up_out"
+    fail "Port floty (9119, 9120 albo 9122) dalej zajęty. Na Windowsie: wsl --shutdown, odczekaj 10 s, jarvo up (albo restart Docker Desktop). Inny program na tym porcie: zamknij go i uruchom jarvo up."
+  fi
+  echo "ℹ Port jeszcze zajęty (Docker zwalnia go z opóźnieniem): ponawiam za $czekaj s (próba $((proba + 1))/4)"
+  sleep "$czekaj"; proba=$((proba + 1)); czekaj=$((czekaj * 2))
+done
+rm -f "$up_out"
 
 PY=/opt/hermes/.venv/bin/python
 # Jednorazowe kroki bez init-a s6 (--entrypoint ""): na wspólnym wolumenie danych init wznowiłby

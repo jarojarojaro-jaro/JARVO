@@ -301,3 +301,36 @@ def test_enable_plugin_keeps_comments_and_removes_from_disabled(tmp_path):
     assert data["plugins"]["enabled"] == ["inny", "jarvo-hq"] and data["plugins"]["disabled"] == ["stary"]
     load, _dump = fl.rt_yaml()
     assert load(tmp_path / "brak.yaml") is None and data["model"] == "x"
+
+
+# ------------------------------------------------- deploy.sh: start usług przy porcie zwalnianym z opóźnieniem
+
+def _start_uslug(tmp_path, bledy: int, komunikat: str):
+    """Pętla startu z deploy.sh z udawanym compose: pierwsze `bledy` prób kończy się `komunikat`, potem sukces."""
+    import subprocess
+    body = (fl.REPO_ROOT / "scripts/deploy.sh").read_text(encoding="utf-8")
+    a = body.index('up_out="$(mktemp)"')
+    b = body.index('rm -f "$up_out"\n', body.index("\ndone\n", a)) + len('rm -f "$up_out"\n')
+    licznik = tmp_path / "proby"
+    licznik.write_text("0", encoding="utf-8")
+    fake = (f'compose() {{ n=$(( $(cat {licznik}) + 1 )); echo $n > {licznik}; '
+            f'if (( n <= {bledy} )); then echo "{komunikat}"; return 1; fi; echo "Container jarvo-hermes Started"; }}\n')
+    script = ("set -euo pipefail\nsleep() { :; }\nfail() { echo \"FAIL $*\"; exit 1; }\n" + fake
+              + "COMPOSE=(compose)\nPROFILES=()\n" + body[a:b] + "echo GOTOWE\n")
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+    return res, int(licznik.read_text())
+
+
+def test_deploy_retries_port_released_late(tmp_path):
+    port = ("Error response from daemon: ports are not available: exposing port TCP 127.0.0.1:9120 -> 127.0.0.1:0: "
+            "/forwards/expose returned unexpected status: 500")
+    res, n = _start_uslug(tmp_path, 2, port)
+    assert res.returncode == 0 and "GOTOWE" in res.stdout and n == 3, res.stdout + res.stderr
+    assert "ponawiam za 5 s (próba 2/4)" in res.stdout and "ponawiam za 10 s (próba 3/4)" in res.stdout
+    res, n = _start_uslug(tmp_path, 9, port)   # dalej zajęty po 4 próbach: błąd z radą
+    assert res.returncode == 1 and n == 4 and "FAIL Port floty" in res.stdout and "wsl --shutdown" in res.stdout
+
+
+def test_deploy_other_start_error_fails_at_once(tmp_path):
+    res, n = _start_uslug(tmp_path, 1, "Error response from daemon: no such image")
+    assert res.returncode == 1 and n == 1 and "FAIL Usługi nie wystartowały" in res.stdout
