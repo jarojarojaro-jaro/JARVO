@@ -20,14 +20,14 @@ ustalenia sprawdziłem jeszcze raz na żywo: lista jest w sekcji (l).
   z [SOURCES.md](SOURCES.md), w etapie, który ich używa.
 - `<root>`, `<program>`, `<dane>`, `<stan>` to katalogi z sekcji (c1). `<profil>` to katalog profilu agenta w `<dane>`.
 - Kod wiersza (np. **H04**) to numer pozycji mapy. Etapy w (g) i ryzyka w (h) odwołują się do tych kodów.
-- Skróty platform: W = Windows 10/11 x64 (arm64 przez emulację x64, jeśli nie napisano inaczej); mac = macOS arm64 i x64;
+- Skróty platform: W = Windows 10/11 x64 (arm64 przez emulację x64, jeśli nie napisano inaczej); mac = macOS arm64 (Apple Silicon; Intel nie jest wspierany, decyzja I06);
   Linux = x64 i arm64.
 
 ## (a) Cel i zasady
 
 **Cel.** Jarvo instaluje się jednym poleceniem i działa natywnie.
 - Windows 10/11: `irm https://jarvo.pl/install.ps1 | iex` w PowerShellu. Bez WSL, bez Dockera, bez admina, bez restartu.
-- macOS arm64 (Apple Silicon): `curl -fsSL https://jarvo.pl/install.sh | bash`. Bez Homebrew i bez Colimy. macOS x64 (Intel): decyzja I06.
+- macOS arm64 (Apple Silicon): `curl -fsSL https://jarvo.pl/install.sh | bash`. Bez Homebrew i bez Colimy. macOS x64 (Intel) nie jest wspierany (decyzja I06): instalator mówi to wprost i kończy pracę.
 - Linux x64 i arm64: to samo polecenie, bez Docker Engine. sudo najwyżej raz, na biblioteki Chromium, jeśli ich brak.
 
 Ma działać wszystko, co działa dziś: czat w terminalu z trybami zgód, pierwsze uruchomienie (mózg, pierwsze spotkanie, pierwsza sesja), cała flota i zlecanie pracy specjalistom, panel w przeglądarce, skarbiec, rutyny, Telegram, ciężkie narzędzia, Komputer Jarva, polecenia `jarvo` i migracja ze starej instalacji.
@@ -40,7 +40,7 @@ Ma działać wszystko, co działa dziś: czat w terminalu z trybami zgód, pierw
 5. Jarvo zostaje nadrzędny. Procesy nadzoruje nasz `jarvo serwis` (Python), a uruchamia go mechanizm systemu. Nie dokładamy NSSM, WinSW ani supervisord.
 6. Jarvo nie miesza się z prywatnym Hermesem właściciela. Ma własny HERMES_HOME i własny katalog blokad bramy. `hermes` nie trafia do globalnego PATH. Nie ustawiamy zmiennych użytkownika.
 7. Każde nowe źródło i każda nowa platforma starego źródła przechodzi przegląd z docs/SOURCES.md (rozszerzenie w R13).
-8. Każdy etap to osobny commit z testem w CI na 6 runnerach i próbą w prawdziwej instalacji.
+8. Każdy etap to osobny commit z testem w CI na 5 runnerach i próbą w prawdziwej instalacji.
 9. Mówimy uczciwie: natywnie nie ma izolacji kontenera. Terminal agenta działa z prawami właściciela. Zastępują ją tryby zgód i ograniczenia z sekcji (d).
 
 ## (b) Mapa: co dziś robi kontener → czym zastępujemy
@@ -200,7 +200,7 @@ Ma działać wszystko, co działa dziś: czat w terminalu z trybami zgód, pierw
 | **S12** Branding dashboardu | patch_dashboard.py łata /opt/hermes przy budowie obrazu (web_dist i 3 pliki Pythona), timeout-kill s6 30 s | CI łata kopię web_dist dla przypiętego commitu i publikuje ją z sha256; dashboard dostaje HERMES_WEB_DIST i `--skip-build`; łatki Pythona na loopback zbędne, w trybie LAN jako wtyczka | to samo | to samo | checkout Hermesa zostaje czysty; ścisłe wzory powloka.json mają zatrzymać CI, nie instalację u użytkownika |
 | **S13** VPS, piaskownica, reszta infra | bootstrap-vps.sh, backup.sh (restic, sqlite3), restore-test.sh, sandbox-up.sh (dockerd) | nie dotyczy | nie dotyczy | VPS: na razie Docker (zamrożony), potem natywny Linux; piaskownica Claude Code: natywna instalacja | sekcja (j) |
 | **S14** validate.py i zrodla.py | `bash -n` przez CreateProcess (na Windows trafia w WSL); `paczka` tylko tar do 50 MB | jawny Git Bash albo pominięcie z ostrzeżeniem; parsowanie .ps1; nowe reguły: `pliki` per platforma, zgodność manifestu, brak poleceń kontenerowych w dokumentach; zrodla.py: zip, sha256 strumieniowo, tryb wydań (tagi) | to samo | to samo | Node dla macOS ma 58–60 MB, więc limit 50 MB nie wystarczy |
-| **S15** vendor/zrodla.yaml | `repo` albo `paczka` + `przejrzane`; sumy per platforma w notatkach i w Dockerfile | nowe pola `wydanie` i `pliki` z kluczami windows-x64, windows-arm64, macos-arm64, macos-x64, linux-x64, linux-arm64 (url, sha256, rozmiar albo `brak:` z powodem); z nich `natywne.lock.json` | to samo | to samo | jedno repo = jeden wpis; dziś pola spoza listy przechodzą walidację bez kontroli |
+| **S15** vendor/zrodla.yaml | `repo` albo `paczka` + `przejrzane`; sumy per platforma w notatkach i w Dockerfile | nowe pola `wydanie` i `pliki` z kluczami windows-x64, windows-arm64, macos-arm64, linux-x64, linux-arm64 (url, sha256, rozmiar albo `brak:` z powodem); z nich `natywne.lock.json` | to samo | to samo | jedno repo = jeden wpis; dziś pola spoza listy przechodzą walidację bez kontroli |
 | **S16** Pozostałe skrypty kontenerowe | sandbox-up.sh, install-test.sh, jarvo-e2e.sh, komputer-test.sh, evals-staging.sh, kuznia.sh, redteam.sh, wiedza-kompiluj.sh, backup.sh, restore-test.sh | wersje w Pythonie: `jarvo e2e`, staging w osobnym HERMES_HOME, `jarvo wiedza kompiluj`, kopia przez sqlite3.backup | to samo | to samo | |
 
 ### Wtyczki i panel
@@ -558,9 +558,9 @@ Testy (etap E4): każdy tryb na atrapie modelu, zgoda i odmowa, zapis w folderze
 
 Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z dokumentami i skarbcem w tym samym commicie (zasady CLAUDE.md). Nowa ścieżka żyje za flagą `JARVO_NATYWNIE=1`, aż do etapu E13. Do tego czasu ludzie dostają dzisiejszą instalację.
 
-**Runnery CI.** W64 = windows-2025 (PowerShell 5.1 i 7), WARM = windows-11-arm, MARM = macos-15 (arm64), MX64 = macos-26-intel (Tier 2, `continue-on-error`; GitHub zapowiedział koniec Intela po wycofaniu obrazu macOS 15 jesienią 2027, a macos-26-intel nie ma ogłoszonej daty końca; zapowiedzi są sprzeczne), L64 = ubuntu-24.04 (+ kontener debian:13 jako czysty system), LARM = ubuntu-24.04-arm.
+**Runnery CI.** W64 = windows-2025 (PowerShell 5.1 i 7), WARM = windows-11-arm, MARM = macos-15 (arm64), L64 = ubuntu-24.04 (+ kontener debian:13 jako czysty system), LARM = ubuntu-24.04-arm.
 
-**Kiedy co biegnie.** Szybki CI na każdy push i PR: L64 pełny pytest i validate, W64 i MARM testy jednostkowe z markerami. Pełna macierz (6 nóg, instalacja od zera, E2E) przy `workflow_dispatch`, przy pushu do main w plikach instalatora i manifestu, nocą i przy tagach `v*`. Repo jest publiczne, więc standardowe runnery są darmowe; w prywatnym ostatnie 4 tygodnie kosztowałyby ok. 3316 min, czyli więcej niż plan Free (2000) i Pro (3000).
+**Kiedy co biegnie.** Szybki CI na każdy push i PR: L64 pełny pytest i validate, W64 i MARM testy jednostkowe z markerami. Pełna macierz (5 nóg, instalacja od zera, E2E) przy `workflow_dispatch`, przy pushu do main w plikach instalatora i manifestu, nocą i przy tagach `v*`. Repo jest publiczne, więc standardowe runnery są darmowe; w prywatnym ostatnie 4 tygodnie kosztowałyby ok. 3316 min, czyli więcej niż plan Free (2000) i Pro (3000).
 
 ### E0. Pilne poprawki w dzisiejszej instalacji (bez natywności)
 - **Co:** każda pozycja osobnym commitem.
@@ -587,22 +587,22 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 
 ### E2. Manifest i pobieracz
 - **Co:** pola `wydanie` i `pliki` w vendor/zrodla.yaml, generator `natywne.lock.json`, nowe reguły validate.py, `zrodla.py sumy` (strumieniowo, zip, tryb wydań), `jarvo narzedzia instaluj` (stdlib, pasek, wznawianie, suma przed rozpakowaniem). Pierwsze wpisy: uv, lista PBS, Node, PortableGit, ripgrep.
-- **CI:** 6 nóg: pobranie, kontrola sum i `--version` każdego narzędzia; na W64 skan Defenderem każdej binarki; test „zmieniony bajt zatrzymuje instalację”.
+- **CI:** 5 nóg: pobranie, kontrola sum i `--version` każdego narzędzia; na W64 skan Defenderem każdej binarki; test „zmieniony bajt zatrzymuje instalację”.
 - **Gotowe, gdy:** każdy wpis ma sumę zgodną z plikiem, a brak platformy jest jawnym `brak:`.
 
 ### E3. Hermes natywnie, nadzorca i panel podstawowy
 - **Co:** nowe install.ps1 i install.sh (za flagą), checkout f97608f i `uv sync --locked`, katalogi z (c1), HERMES_GATEWAY_LOCK_DIR, `jarvo serwis` z autostartem per system, web_dist z CI (S12), runtime VC++ na Windows (B11), `jarvo status`, `jarvo panel`, `jarvo doctor` w wersji podstawowej, klucze API (H05).
-- **CI:** 6 nóg, instalacja od zera: http://127.0.0.1:9119/jarvo odpowiada; `hermes gateway status`; zabicie bramy → nadzorca ją podnosi; kod 78 → postój; na W64 zadanie Harmonogramu ma baterie wyłączone, PT0S i stan Running; na MARM LaunchAgent, na L64 systemd --user; drugi przebieg instalatora niczego nie zmienia; na W64 skan zamknięcia DLL.
+- **CI:** 5 nóg, instalacja od zera: http://127.0.0.1:9119/jarvo odpowiada; `hermes gateway status`; zabicie bramy → nadzorca ją podnosi; kod 78 → postój; na W64 zadanie Harmonogramu ma baterie wyłączone, PT0S i stan Running; na MARM LaunchAgent, na L64 systemd --user; drugi przebieg instalatora niczego nie zmienia; na W64 skan zamknięcia DLL.
 - **Gotowe, gdy:** świeży runner ma działający panel po jednym poleceniu.
 
 ### E4. Flota natywnie, czat i zgody
 - **Co:** build.py z tokenami i wartościami per system (S06), install_fleet.py (S07), wtyczki jako kopie albo junction (H27), healthchecki argv i `jarvo doctor` (S02), wtyczka zgód z trzema trybami (sekcja d), home_mode, zakazy per system (F15), kwarantanna paczek (H25), shim python3 (F12), Git Bash (B04).
-- **CI:** atrapa modelu (scripts/atrapa_modelu.py): `jarvo chat` w trzech trybach (zgoda, odmowa, zapis w folderze i poza nim); karta kanbana do agenta, która przeżywa restart bramy; jednorazowa rutyna; delegate_task. W logach pracowników nie może być „runs without a user present”. 6 nóg.
+- **CI:** atrapa modelu (scripts/atrapa_modelu.py): `jarvo chat` w trzech trybach (zgoda, odmowa, zapis w folderze i poza nim); karta kanbana do agenta, która przeżywa restart bramy; jednorazowa rutyna; delegate_task. W logach pracowników nie może być „runs without a user present”. 5 nóg.
 - **Gotowe, gdy:** 10 agentów zainstalowanych, healthchecki zielone (poza jawnymi brakami platform).
 
 ### E5. Przeglądarki i wyszukiwarka (potrzebne do pierwszej sesji)
 - **Co:** C01–C07, nakładka agent-browsera w Pythonie, audit.py i brand_extract.py (F02), wyszukiwarka z U01 i search_fanout.py (F03), har.cjs i Łowca (F04), MCP inspo (P06), Lighthouse.
-- **CI:** browser_* na `chrome` (W) i `lightpanda` (mac, Linux); audyt strony testowej; Camoufox startuje (pobranie leniwe); inspo-mcp odpowiada na JSON-RPC; 6 nóg.
+- **CI:** browser_* na `chrome` (W) i `lightpanda` (mac, Linux); audyt strony testowej; Camoufox startuje (pobranie leniwe); inspo-mcp odpowiada na JSON-RPC; 5 nóg.
 - **Gotowe, gdy:** Web, Sherlock i Łowca wykonują swoje karty z pierwszej sesji na atrapie modelu.
 
 ### E6. Panel pełny i pierwsze uruchomienie
@@ -618,12 +618,12 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 
 ### E8. Dokumenty i OCR
 - **Co:** E01–E07, E09, E10; pypdfium2 i pikepdf zamiast Ghostscriptu; pixi dla Tesseracta; LibreOffice przy pierwszym użyciu.
-- **CI:** test_konwertuj i test_ocr z prawdziwymi binarkami na 6 nogach; plik „faktura_październik.png” w katalogu „Michał Żółć”.
+- **CI:** test_konwertuj i test_ocr z prawdziwymi binarkami na 5 nogach; plik „faktura_październik.png” w katalogu „Michał Żółć”.
 - **Gotowe, gdy:** konwerter i OCR działają na trzech systemach.
 
 ### E9. Media, głos, edytor
 - **Co:** M01–M12, V01–V11, fonty (M03), runtime VC++ (B11), zasada ścieżek ASCII (B13), HyperFrames, edytor HQ.
-- **CI:** krótki film (render, napisy ass z fontsdir), `jarvo-tts --sprawdz` dla trzech głosów, STT na nagraniu z polską nazwą pliku, eksport z edytora; na W64 skan zamknięcia DLL; 6 nóg (Intel z listą wyłączeń).
+- **CI:** krótki film (render, napisy ass z fontsdir), `jarvo-tts --sprawdz` dla trzech głosów, STT na nagraniu z polską nazwą pliku, eksport z edytora; na W64 skan zamknięcia DLL; 5 nóg.
 - **Gotowe, gdy:** skill krotki-film i edytor działają na trzech systemach.
 
 ### E10. Komputer Jarva (przeglądarka Jarva)
@@ -643,11 +643,11 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 
 ### E13. Przełączenie
 - **Co:** install.ps1 i install.sh domyślnie natywne; CLAUDE.md i dokumenty (R01–R21); `jarvo uninstall` z dziennikiem zmian hosta; obraz już tylko dla VPS.
-- **CI:** migawka systemu przed instalacją i po `uninstall --all --yes` na 6 nogach (różnica pusta poza listą wyjątków); w trakcie każde gniazdo nasłuchu tylko na 127.0.0.1 albo ::1.
+- **CI:** migawka systemu przed instalacją i po `uninstall --all --yes` na 5 nogach (różnica pusta poza listą wyjątków); w trakcie każde gniazdo nasłuchu tylko na 127.0.0.1 albo ::1.
 - **Gotowe, gdy:** właściciel przeszedł migrację na swoim komputerze i zatwierdził sprzątanie.
 
 ### E14. Później
-- Ekran właściciela (J14, J15), macOS Intel jako Tier 2 z kołem cryptography z CI (I06), podpisywanie binarek dla Smart App Control (I26), VPS na natywnym Linuksie (j), emulator Androida.
+- Ekran właściciela (J14, J15), podpisywanie binarek dla Smart App Control (I26), VPS na natywnym Linuksie (j), emulator Androida.
 
 ### Zmiany w testach i CI
 
@@ -660,14 +660,14 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 | **T05** Testy node | `node -e` z 79 014 znakami (WinError 206), ESM ze str(ścieżki) | program w pliku tymczasowym; Path.as_uri() | |
 | **T06** Lint powłoki | `bash -n` w validate.py i drugi raz w ci.yml | tylko dla skryptów, które zostają (install.sh, shim jarvo); shellcheck z przypiętej binarki | |
 | **T07** PowerShell | testy install.ps1 na sucho wokół WSL; PSScriptAnalyzer 1.24.0 bez sumy | testy nowego install.ps1 w PS 5.1 i 7 na W64 i WARM; PSScriptAnalyzer z nupkg z sumą | |
-| **T08** Testy instalatora | Docker w Dockerze (install-test.sh), macOS tylko na sucho, Windows tylko na sucho | prawdziwa instalacja od zera na 6 nogach (fazy: przygotowanie, instalacja, aktualizacja, odinstalowanie); próby JARVO_FAKE_* zostają jako jednostkowe | wzór: install-e2e*.yml Hermesa |
+| **T08** Testy instalatora | Docker w Dockerze (install-test.sh), macOS tylko na sucho, Windows tylko na sucho | prawdziwa instalacja od zera na 5 nogach (fazy: przygotowanie, instalacja, aktualizacja, odinstalowanie); próby JARVO_FAKE_* zostają jako jednostkowe | wzór: install-e2e*.yml Hermesa |
 | **T09** Atrapy programów | pliki `#!/bin/sh` i PATH sklejany przez „:” | tests/atrapy.py (Python + .cmd, os.pathsep); w kodzie jawne ścieżki narzędzi | na Windows env nie zmienia PATH dla CreateProcess |
 | **T10** Uprawnienia w testach | 26 plików sprawdza tryby 0600/0700 | wspólna funkcja ochrony + test DACL (windows_only) | |
 | **T11** Symlinki w testach | 7 plików tworzy symlinki | marker `wymaga_symlinku`; nowe przypadki: C: i D:, UNC, strumienie ADS, 8.3, CON, wielkość liter | runner działa jako admin, więc nie wykryje błędów zwykłego użytkownika |
 | **T12** IPC i blokady w testach | AF_UNIX i fcntl w testach | testy per system dla potoków i zamków | |
 | **T13** Strefa czasowa | ZoneInfo bez tzdata na Windows | tzdata w venvie i locku testów | |
 | **T14** Test aplikacji na żywo (Playwright) | tylko przez docker exec w jarvo-hermes (s6, /opt, /usr/local/bin/chromium) | `jarvo e2e <etap>` w Pythonie na instalacji natywnej | |
-| **T15** Macierz runnerów | ubuntu, macos-15, macos-15-intel (na żądanie), windows-latest (na sucho) | 6 nóg z przypiętymi obrazami; `*-latest` tylko jako noga ostrzegawcza | |
+| **T15** Macierz runnerów | ubuntu, macos-15, macos-15-intel (na żądanie), windows-latest (na sucho) | 5 nóg z przypiętymi obrazami (bez Intela, I06); `*-latest` tylko jako noga ostrzegawcza | |
 | **T16** Minuty i koszty | repo publiczne, więc 0 | pełna macierz tylko na etapach; pomiar `gh api /users/.../settings/billing/usage` wymaga zakresu `user` | |
 | **T17** Akcje GitHub | tagi (checkout@v4, setup-python@v5…) | pełne SHA po przeglądzie: checkout v7.0.1, setup-python v7.1.0, setup-node v7.1.0, upload-artifact v7.0.2, download-artifact v8.0.2 | Node 20 w akcjach znika jesienią 2026 |
 | **T18** Artefakty | tylko digest obrazu | zrzuty, trace Playwrighta, raport, log instalatora, `jarvo doctor --json`, zawsze (`if: always()`), retencja 14 dni, skan sekretów przed wysyłką | logi repo publicznego widzi każdy |
@@ -685,7 +685,7 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 | Nr | Bloker | Plan |
 |---|---|---|
 | Z01 | Lightpanda nie ma wydania na Windows (1.0.0–1.0.2 tylko Linux i macOS) | na Windows `browser.engine: chrome` z CfT; mniej sesji naraz, bo Chromium bierze ok. 10× więcej RAM |
-| Z02 | macOS Intel: Hermes v2026.9.24 ma go na liście „Unsupported”; cryptography 50 bez koła x86_64; onnxruntime od 1.24, pikepdf od 10.14 i numba od 0.63 bez kół; docling niemożliwy; buildy ffmpeg Riedla dla Intela do I 2027; runnery Intel znikają około jesieni 2027 | decyzja I06: Tier 2 z zamrożonymi wersjami i listą wyłączeń albo rezygnacja; minimum macOS 14 (OCRmyPDF: 15) |
+| Z02 | macOS Intel: Hermes v2026.9.24 ma go na liście „Unsupported”; cryptography 50 bez koła x86_64; onnxruntime od 1.24, pikepdf od 10.14 i numba od 0.63 bez kół; docling niemożliwy; buildy ffmpeg Riedla dla Intela do I 2027; runnery Intel znikają około jesieni 2027 | decyzja I06: rezygnacja; instalator na x86_64 kończy pracę z jasnym komunikatem; minimum macOS 14 |
 | Z03 | Smart App Control na Windows 11 blokuje niepodpisane pliki: python.exe z PBS, trampoliny uv, cv2.pyd, ffmpeg z BtbN | teraz: doctor wykrywa SAC i mówi wprost; później podpisywanie (I26); Hermes ma ten sam problem |
 | Z04 | Natywnie nie ma izolacji kontenera: terminal agenta działa z prawami właściciela | tryby zgód (d), home_mode profile, HERMES_WRITE_SAFE_ROOT, zakazy per system; pełna izolacja tylko przez osobne konto (I09); dokumenty mówią to wprost |
 | Z05 | Komputer Jarva traci iptables, osobny uid, Xvnc i SO_PEERCRED | proxy filtrujące + sterownik CDP + named pipe z DACL; kontener jako opcja tylko na Linuksie i VPS (I18) |
@@ -717,7 +717,7 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 | Z26 | Inne wersje narzędzi niż w kontenerze (ffmpeg 7.1 → 9.0, pandoc 3.1 → 3.12, LibreOffice 25.2 → 26.8, Node, Python 3.12 → 3.13 dla Hermesa) | testy floty i evals na każdej zmianie; obraz VPS na tych samych pinach |
 | Z27 | Ślady po odinstalowaniu (cache, PATH, linger, reguły zapory, zgody TCC) | dziennik zmian hosta, zmienne cache tylko w procesach Jarva, test migawki w CI |
 | Z28 | Rozjazd pinów między Dockerfile (VPS) a manifestem | jeden manifest dla obu |
-| Z29 | Koszt CI, gdyby repo było prywatne; koniec runnerów Intel | pełna macierz tylko na etapach; MX64 jako Tier 2 |
+| Z29 | Koszt CI, gdyby repo było prywatne; koniec runnerów Intel | pełna macierz tylko na etapach; bez Intela (I06) |
 | Z30 | Prywatna kopia: zasoby wydań tylko przez API z tokenem; token może przeczytać każdy proces właściciela | magazyn systemu, mały klucz (jedno repo, Contents: read, data ważności), przekierowanie bez nagłówka (I34) |
 | Z31 | Rozmiar i czas pierwszej instalacji (ok. 1,5–2 GB, 34 repo skilli klonowane przez build.py) | dodatki leniwie, cache pobrań po sumie, pasek postępu; opcja: gotowy pakiet skilli z CI |
 | Z32 | ddgs to skrobanie wyszukiwarek (CAPTCHA, regulaminy) | przegląd źródła; alternatywa openai-native przy mózgu ChatGPT; SearXNG na VPS |
@@ -725,9 +725,23 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 | Z34 | Migracja: zgubiony plik -wal, ścieżki /opt w bazach, stary deinstalator kasujący `%LOCALAPPDATA%\Jarvo` | skrypt z próbą na kopii, przepisanie w transakcjach, stary deinstalator nieużywany (f1) |
 | Z35 | Dokumentacja Hermesa dla Windows jest częściowo nieaktualna (uv, Node, /chat) | opieramy się na kodzie przypiętego commitu i na testach, nie na dokumentach |
 
-## (i) Decyzje do podjęcia (z rekomendacją)
+## (i) Decyzje
 
 Wszystko, co bierzemy z Hermesa albo z obcych projektów, wymaga zgody właściciela przed kodem (zasada CLAUDE.md). Zebrane w I40.
+
+**Decyzje właściciela z 2026-10-24:**
+- **I40, zapożyczenia:** zgoda na całą listę. Każde źródło i tak przechodzi przegląd z [SOURCES.md](SOURCES.md)
+  w etapie, który go używa.
+- **I06, macOS Intel:** rezygnujemy. Instalator na Macu z Intelem kończy pracę z jasnym komunikatem, a w CI nie ma
+  nogi z Intelem. Dopiski „Intel” w mapie zostają jako wiedza, ale ich nie realizujemy.
+- **I08, zgody:** domyślny tryb `jarvo` to „projekt”. Tryb pełny zawsze tylko na jedną sesję.
+- **I14, wyszukiwarka:** „najlepsza dostępna opcja”. Profile przestają wymuszać `web.search_backend: searxng`,
+  a wybiera autodetekcja Hermesa (tools/web_tools.py w f97608f) w kolejności: wyszukiwarka z kluczem API, jeśli
+  właściciel go poda (Tavily, Perplexity, Exa, Parallel, Keenable, Firecrawl, Brave), potem SearXNG, gdy jest
+  `SEARXNG_URL` (VPS), potem ddgs (instalujemy z sumą), na końcu darmowy pierścień Hermesa. Przy mózgu ChatGPT
+  dochodzi wyszukiwarka modelu (`openai-native`), ale tylko jeśli test w E5 pokaże, że przejście na model
+  zapasowy innego dostawcy nie psuje wyszukiwania.
+- Reszta tabeli idzie według rekomendacji, dopóki właściciel nie zdecyduje inaczej.
 
 | Nr | Decyzja | Rekomendacja | Alternatywa |
 |---|---|---|---|
@@ -736,15 +750,15 @@ Wszystko, co bierzemy z Hermesa albo z obcych projektów, wymaga zgody właścic
 | **I03** | uv, Python | uv 0.12.13 + własna lista PBS 20261021 (UV_PYTHON_DOWNLOADS_JSON_URL); Hermes i wtyczki na 3.13.17; narzędzia, OCR, CAD i SEO na 3.12.15; ManimGX na 3.13.17 | uv 0.13.5 (ma 20261021 wbudowany, ale nikt nie sprawdzał go z lockiem Hermesa); Hermes na 3.11.17 jak upstream |
 | **I04** | Node | 26.x (dziś 26.12.1) po przeglądzie; npm co najmniej 11.17 | 26.5.1 jak w obrazie; 24.22.1 LTS |
 | **I05** | Git na Windows | zawsze własny PortableGit 2.54.0.windows.1 (ta sama wersja co u Hermesa) | systemowy Git, gdy działa (mniej przewidywalne) |
-| **I06** | macOS Intel | Tier 2 „bez gwarancji” do ok. IX 2027: koło cryptography z CI, onnxruntime 1.23.2, numba 0.62.1, OCRmyPDF 17.12.1, bez docling i lemo-wake, ffmpeg Riedla do I 2027 | rezygnacja: instalator odmawia na x86_64 z jasnym komunikatem (mniej pracy) |
+| **I06** | macOS Intel | **decyzja: rezygnacja**; instalator na x86_64 kończy pracę z jasnym komunikatem, CI bez nogi Intela | Tier 2 „bez gwarancji” do ok. IX 2027 (odrzucone: starsze paczki, bez docling i lemo-wake) |
 | **I07** | Minimalny macOS | 14 (Sonoma); OCRmyPDF na Intelu tylko macOS 15 | 13 bez lokalnego głosu i OCR (tylko głos przeglądarki) |
-| **I08** | Zgody: domyślny tryb i approvals.mode | domyślnie „projekt”; „pełny” tylko na sesję; profil czatu z `approvals.mode: manual` | smart (czasem dwa pytania); tryby także w HQ i Telegramie albo tylko w terminalu |
+| **I08** | Zgody: domyślny tryb i approvals.mode | **decyzja: „projekt”**; „pełny” tylko na sesję; profil czatu z `approvals.mode: manual` | smart (czasem dwa pytania); tryby także w HQ i Telegramie albo tylko w terminalu |
 | **I09** | Izolacja | na start tryby zgód i ograniczenia z (d); osobne konto systemowe dla bramy później, najpierw na Linuksie i macOS | osobne konto od razu (na Windows drogie, niesprawdzone) |
 | **I10** | Nadzór procesów | własny `jarvo serwis` na wszystkich systemach, z autostartem systemu | `hermes gateway install` na macOS i Linuksie + własny nadzór tylko na Windows (dwa modele) |
 | **I11** | Logowanie do panelu | loopback bez hasła; tryb LAN (Tailscale, telefon) z bramką Hermesa i dostawcą Jarva (klucz jednorazowy) | wymuszać logowanie także lokalnie (przez `dashboard.public_url`, niesprawdzone w przeglądarkach) |
 | **I12** | web_dist dashboardu | dist łatany w CI dla przypiętego commitu, z sha256, przez HERMES_WEB_DIST | budowa npm/vite u użytkownika (sieć, Node, kilka minut) |
 | **I13** | Bezpieczne ustawienia Hermesa | `tirith_enabled: false`, `allow_lazy_installs: false`, `adopt_external_logins: false`, `home_mode: profile` we wszystkich profilach, także w kontenerze | zostawić domyślne (pobieranie bez pinów, podgląd kluczy właściciela) |
-| **I14** | Wyszukiwarka natywnie | ddgs 9.16.1 + primp 2.0.1 z sumami jako domyślna; SearXNG tylko na VPS | openai-native przy mózgu ChatGPT (bez klucza, ale tylko z tym mózgiem); keenable; SearXNG natywnie na Linuksie |
+| **I14** | Wyszukiwarka natywnie | **decyzja: najlepsza dostępna**, czyli autodetekcja Hermesa (klucz API → SearXNG na VPS → ddgs 9.16.1 z primp 2.0.1 → darmowy pierścień); `openai-native` przy ChatGPT po teście w E5 | na sztywno ddgs; na sztywno openai-native (tylko z mózgiem ChatGPT) |
 | **I15** | Valkey | usunąć wszędzie, od razu (limiter SearXNG jest wyłączony) | zostawić na VPS |
 | **I16** | Silnik browser_* | Windows `chrome`; macOS i Linux `lightpanda` | Chromium wszędzie (prościej, więcej RAM) |
 | **I17** | Piny Chromium | dwa: headless shell zgodny z Playwright 1.63 (153.0.8010.12) dla skryptów; pełny CfT Stable z cotygodniowym podbiciem dla Komputera | jeden pin 153 dla wszystkiego (mniej pobierania, starsze łatki w przeglądarce z kontami właściciela) |
@@ -770,7 +784,7 @@ Wszystko, co bierzemy z Hermesa albo z obcych projektów, wymaga zgody właścic
 | **I37** | Monitoring | tylko VPS | Beszel na komputerze (zbędne) |
 | **I38** | Sufit pamięci | limity współbieżności (przebiegi HQ, pracownicy kanbana, jedna Chromium); max_in_progress z RAM | Job Object i cgroups po pomiarach |
 | **I39** | Modele | pobierane u źródła (HF, rewizja + suma), bez naszej redystrybucji; SOURCES §5 przepisać | własne kopie (zostają obowiązki CC BY-SA i OpenRAIL-M) |
-| **I40** | Zapożyczenia do zatwierdzenia | lista: własny nadzorca zamiast usług Hermesa, Priority 5 i zapasowe wyzwalacze, wtyczka zgód wzorowana na Claude Code, ukrycie przycisków Hermesa, wersje obok siebie (podwójne miejsce w czasie aktualizacji), ddgs, pixi, CfT, cua-driver | — |
+| **I40** | Zapożyczenia do zatwierdzenia | **decyzja: zgoda na całą listę**: własny nadzorca zamiast usług Hermesa, Priority 5 i zapasowe wyzwalacze, wtyczka zgód wzorowana na Claude Code, ukrycie przycisków Hermesa, wersje obok siebie (podwójne miejsce w czasie aktualizacji), ddgs, pixi, CfT, cua-driver | — |
 | **I41** | Linux bez roota | instalator raz pyta o sudo na biblioteki Chromium i profil AppArmor; bez zgody `--no-sandbox` z ostrzeżeniem | odmowa instalacji bez sudo |
 
 ### Sprzeczności z rozpoznania i jak je rozstrzygnąłem
@@ -829,20 +843,20 @@ Cel końcowy: VPS na natywnym Linuksie (jednostka systemowa, użytkownik `jarvo`
 
 | Element | Dziś | Po zmianie | Uwagi |
 |---|---|---|---|
-| **R01** CLAUDE.md:10-13, przegląd źródeł | „próba w kontenerze”, jedna suma na źródło | próba na każdym systemie docelowym (6 runnerów, także bez sieci), sumy per platforma albo `brak:`, podpis i notaryzacja w punkcie „Kod” | ta sama zmiana w SOURCES.md, TOOLBOX.md:394-395 i JARVO-CALOSC §9 |
+| **R01** CLAUDE.md:10-13, przegląd źródeł | „próba w kontenerze”, jedna suma na źródło | próba na każdym systemie docelowym (5 runnerów, także bez sieci), sumy per platforma albo `brak:`, podpis i notaryzacja w punkcie „Kod” | ta sama zmiana w SOURCES.md, TOOLBOX.md:394-395 i JARVO-CALOSC §9 |
 | **R02** CLAUDE.md:20-31, skarbiec | /opt/data/jarvo/knowledge, grep w kontenerze | `<dane>/jarvo/knowledge`; sprawdzenie przez `jarvo doctor` i `wiedza.py lint` | tokeny KNOWLEDGE_DIR rozwiązywane na maszynie użytkownika |
 | **R03** CLAUDE.md:32-36, instalacja jednym poleceniem | zależność do obrazu, HOST_VERSION, ARG HERMES_IMAGE | zależność = wpis w manifeście z sumą dla każdej platformy; Hermes = tag + commit; bez HOST_VERSION | validate.py:745-750 wymaga dziś napisu „`HOST_VERSION` N” |
 | **R04** CLAUDE.md:37-39, przed commitem | python3, make dev-deps, „na czystym kontenerze” | polecenia per system (`py -3` na Windows), `scripts/dev.py deps/test/validate`, requirements-dev.lock z sumami | make nie istnieje na zwykłym Windows |
 | **R05** CLAUDE.md:40-43, test po każdym dodaniu | wdrożenie i test w jarvo-hermes jako hermes | test w instalacji natywnej (osobny `<dane>` testowy, żeby nie ruszać działającej floty) + zielona macierz CI | |
 | **R06** CLAUDE.md, pozostałe zasady | commity, autor, „Jarvo nadrzędny”, dokumentacja zgodna z kodem, filmy | bez zmian; dopisać nowe kontrole validate.py; zapożyczenia z Hermesa opisujemy właścicielowi (I40) | zasada o filmach nie zależy od kontenera |
 | **R07** README.md | szybki start z Dockerem, WSL i Colimą; `jarvo update` opisane jako `git pull` | szybki start natywny dla 3 systemów, polecenia `jarvo`, uczciwie o Intelu i /chat | tests/test_site.py pilnuje dokładnych poleceń instalacji |
-| **R08** docs/JARVO-CALOSC.md | §4 obraz i sidecary, §5–§6 ścieżki /opt, §9 kopia zasad CLAUDE.md | §4 „Instalacja natywna” z tabelą 6 platform; §9 w tym samym commicie co CLAUDE.md | kontekst startowy każdej sesji |
+| **R08** docs/JARVO-CALOSC.md | §4 obraz i sidecary, §5–§6 ścieżki /opt, §9 kopia zasad CLAUDE.md | §4 „Instalacja natywna” z tabelą 5 platform; §9 w tym samym commicie co CLAUDE.md | kontekst startowy każdej sesji |
 | **R09** docs/INSTALER.md | cały dokument o WSL, Dockerze, Colimie, GHCR, HOST_VERSION | nowy opis per system, migracja, odinstalowanie, lista śladów; etapy z 2026-09/10 do historii | zachować napisy sprawdzane przez testy albo zmienić testy w tym samym commicie |
 | **R10** docs/RUNBOOK.md | VPS z Dockerem, 18 poleceń docker exec (lustro w skarbcu!) | rozdzielić „serwer z Dockerem” i komputer właściciela; polecenia `jarvo` | agenci czytają lustro i mogą powtarzać stare polecenia |
 | **R11** docs/VPS.md | topologia na kontenerach, „kontener jest sandboxem” | najpierw opis zamrożonej ścieżki Docker, potem natywny Linux; uczciwie o braku sandboxu | kotwice §2 i §5 używane w innych dokumentach |
 | **R12** docs/SOURCES.md §1, §2, §5 | „komponenty obrazu”, obowiązki licencyjne przez redystrybucję obrazu | „komponenty instalacji natywnej” z kolumną platform; obowiązki zależne od I21 i I39 | każdy nowy link GitHub wymaga wpisu w zrodla.yaml |
 | **R13** docs/SOURCES.md:12-31, procedura przeglądu | 7 kroków, próba w kontenerze | te same kroki, a przy każdym: pochodzenie pliku dla platformy, podpis Authenticode lub notaryzacja, instalatory .exe/.msi/.7z.exe, glibc i biblioteki, próba na 6 runnerach, sumy per platforma, skan Defenderem | |
-| **R14** docs/TOOLBOX.md | „Stan instalacji w obrazie”, ścieżki /opt/jarvo | „Stan instalacji natywnej”: narzędzie × 6 platform, źródło pliku, suma albo `brak:` z zamiennikiem | kotwica z SOURCES.md:45-46 |
+| **R14** docs/TOOLBOX.md | „Stan instalacji w obrazie”, ścieżki /opt/jarvo | „Stan instalacji natywnej”: narzędzie × 5 platform, źródło pliku, suma albo `brak:` z zamiennikiem | kotwica z SOURCES.md:45-46 |
 | **R15** docs/HQ.md | łatki w obrazie, s6, logowanie kluczem przez kontener, „Pokaż w folderze” przez WSL | łatki dista w CI, restart przez nadzorcę, loopback bez hasła, tryb LAN, Eksplorator lokalnie | |
 | **R16** docs/KOMPUTER.md | Komputer jako osobny kontener (Xvnc, iptables, gniazda w wolumenie) | przeglądarka Jarva na CDP z proxy, K6 przez cua-driver 0.38, uczciwie o słabszej izolacji; kontener jako opcja | największa zmiana obietnic bezpieczeństwa |
 | **R17** docs/PROFILE-SPEC.md i docs/PLAN.md | §9 „sandbox w kontenerze”; roadmapa z Dockerem; stare liczby agentów | §9 tryby zgód; nowa pozycja roadmapy „Jarvo natywnie”; liczby z fleet.yaml | |

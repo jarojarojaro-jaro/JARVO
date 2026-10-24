@@ -276,7 +276,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
   macOS czeka na próbę na prawdziwym Macu; etap 4 (Windows: WSL2, restart i dalszy ciąg, dystrybucja `Jarvo`, autostart)
   zbudowany 2026-10-09, czeka na próbę na prawdziwym Windowsie.
 - ⬜ Jarvo natywnie na Windows, macOS i Linuksie (bez Dockera i WSL, każda funkcja, jedno polecenie instalacji, macierz CI
-  na 6 runnerach): plan w [NATYWNIE.md](NATYWNIE.md) z 2026-10-24; etapy E0–E14, przed kodem decyzje właściciela (§ (i)).
+  na 6 runnerach): plan w [NATYWNIE.md](NATYWNIE.md) z 2026-10-24; etapy E0–E14; decyzje właściciela z 2026-10-24 w § (i) (bez macOS Intel, domyślne zgody „projekt”).
 
 ### Faza ∞
 Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…

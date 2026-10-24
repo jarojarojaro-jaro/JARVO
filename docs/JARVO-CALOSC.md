@@ -490,7 +490,8 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
 6. **Jarvo natywnie (kierunek od 2026-10-24), plan w [NATYWNIE.md](NATYWNIE.md):** Jarvo bez Dockera i WSL na Windows,
    macOS i Linuksie, z każdą funkcją (czat w terminalu ze zgodami jak w Claude Code, flota, panel, skarbiec, rutyny,
    Telegram, filmy, lektor, OCR, Komputer Jarva, migracja ze starej instalacji). Hermes z przypiętego commitu przez uv,
-   narzędzia z wydań u źródła z sumą sha256, własny nadzorca procesów. Etapy E0–E14; przed kodem decyzje właściciela.
+   narzędzia z wydań u źródła z sumą sha256, własny nadzorca procesów. Etapy E0–E14; decyzje właściciela z 2026-10-24 w planie (bez macOS Intel, domyślne zgody „projekt”,
+   wyszukiwarka: najlepsza dostępna).
 
 **Odrzucone (nie wpinamy):** RedAmon (offensive pentest — za ciężki, ryzyko prawne),
 terminal-browser (ciężka przeglądarka desktopowa, nie dla agentów na VPS),
