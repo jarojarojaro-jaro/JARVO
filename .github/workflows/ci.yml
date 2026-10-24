@@ -29,3 +29,28 @@ jobs:
       - name: Składnia skryptów powłoki
         run: |
           for f in scripts/*.sh profiles/*/scripts/*.sh; do bash -n "$f"; done
+
+  # Jarvo natywnie (docs/NATYWNIE.md, etap E1): te same testy na Windows i macOS. Na razie tylko pomiar
+  # (continue-on-error), dopóki kod przenośny nie przejdzie; potem ta noga staje się wymagana.
+  testy-systemy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Zależności testów
+        run: pip install pyyaml pytest fastapi httpx
+      - name: Testy
+        run: python -m pytest -q -rfE -p no:cacheprovider --continue-on-collection-errors tests
