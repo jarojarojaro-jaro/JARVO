@@ -140,6 +140,8 @@ def photo_warnings(i: int, path: Path, ruch: str, fmts: list[str]) -> list[str]:
         iw, ih = int(v["width"]), int(v["height"])
     except (Exception, SystemExit):            # brak ffprobe albo uszkodzony plik: render powie więcej
         return []
+    if iw <= 0 or ih <= 0:                     # uszkodzony plik, który ffprobe 8 opisuje jako 0×0 bez błędu
+        return []
     out = []
     for f in fmts:
         w, h = wl.FORMATS[f]
@@ -498,7 +500,7 @@ def render_variant(plan: dict, name: str, suffix: str, fmts: list[str], draft: b
 
     result = {"tytul": plan.get("tytul"), "wariant": name, "szkic": draft, "sek": round(total, 2),
               "lektor": voice and {k: voice[k] for k in ("glos", "tempo") if k in voice} or None,
-              "muzyka": str(music) if music else None, "pliki": {}, "sceny": [], "ostrzezenia": warns}
+              "muzyka": music.as_posix() if music else None, "pliki": {}, "sceny": [], "ostrzezenia": warns}
     if words:
         srt = target / f"{slug}{suffix}.srt"
         srt.write_text(wl.build_srt(words), encoding="utf-8")
@@ -522,7 +524,7 @@ def render_variant(plan: dict, name: str, suffix: str, fmts: list[str], draft: b
         out = target / f"{slug}{suffix}-{wl.fmt_slug(fmt)}{'-szkic' if draft else ''}.mp4"
         log(f"▶ {fmt}: montaż → {out}")
         assemble(clips, durs, total, w, h, build, out, audio, ass, logo, marka.get("pozycja", "gora-prawo"), fade, draft)
-        info = {"plik": str(out), "rozdzielczosc": f"{w}x{h}", "sek": round(wl.duration(out), 2),
+        info = {"plik": out.as_posix(), "rozdzielczosc": f"{w}x{h}", "sek": round(wl.duration(out), 2),
                 "mb": round(out.stat().st_size / 1048576, 2)}
         if not draft:
             thumb = target / f"{slug}{suffix}-{wl.fmt_slug(fmt)}-miniatura.jpg"
@@ -994,7 +996,7 @@ def cmd_narration(args) -> int:
     raport = {"ok": not narr["bledy"], "bledy": narr["bledy"], "ostrzezenia": list(narr["ostrzezenia"]),
               "zdania": len(linie), "slowa": sum(len(ln["slowa"]) for ln in linie),
               "ujecia": len({ln["ujecie"] for ln in linie}), "rozdzialy": len(narr["rozdzialy"]),
-              "fakty": str(sciezka_fakty) if sciezka_fakty else None,
+              "fakty": sciezka_fakty.as_posix() if sciezka_fakty else None,
               "wymowa": sorted({t for ln in linie for t in ln["wymowa"]}),
               "szacunek_s": round(szac, 1)}
     if narr["bledy"] or args.sprawdz:
@@ -1020,12 +1022,13 @@ def cmd_narration(args) -> int:
     wl.write_json(slowa_json, [{"start": w.start, "end": w.end, "text": w.text, **({"podzial": True} if w.podzial else {})}
                                for w in slowa])
     srt.write_text(wl.build_srt(slowa), encoding="utf-8")
-    os_ = {"wersja": 1, "zrodlo": str(zrodlo), "lektor": str(out), "glos": args.glos, "tempo": args.tempo, **os_}
+    os_ = {"wersja": 1, "zrodlo": zrodlo.as_posix(), "lektor": out.as_posix(), "glos": args.glos, "tempo": args.tempo, **os_}
     wl.write_json(sciezka_os, os_)
     raport["ostrzezenia"] += kontrola_osi(os_, cel)
     raport.update({"dlugosc_s": os_["dlugosc"], "mowa_s": os_["mowa_s"],
                    "tempo_slow_s": round(tempo_narracji(os_), 2),
-                   "pliki": {"lektor": str(out), "os_czasu": str(sciezka_os), "slowa": str(slowa_json), "srt": str(srt)},
+                   "pliki": {"lektor": out.as_posix(), "os_czasu": sciezka_os.as_posix(), "slowa": slowa_json.as_posix(),
+                             "srt": srt.as_posix()},
                    "render": f"html_wideo.py wideo <strona> --preset jarvo --dlugosc {os_['dlugosc']:g}"})
     raport.pop("szacunek_s")
     print(json.dumps(raport, ensure_ascii=False, indent=1))
@@ -1041,8 +1044,8 @@ def cmd_voice(args) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(sp.audio, out)
     wl.write_json(out.with_suffix(".slowa.json"), [w.__dict__ for w in sp.words])
-    print(json.dumps({"plik": str(out), "sek": round(sp.duration, 2), "slowa": len(sp.words),
-                      "slowa_json": str(out.with_suffix(".slowa.json"))}, ensure_ascii=False))
+    print(json.dumps({"plik": out.as_posix(), "sek": round(sp.duration, 2), "slowa": len(sp.words),
+                      "slowa_json": out.with_suffix(".slowa.json").as_posix()}, ensure_ascii=False))
     return 0
 
 
@@ -1074,7 +1077,7 @@ def cmd_cache(args) -> int:
     for d in sorted((d for d in root.rglob("*") if d.is_dir()), key=lambda d: -len(d.parts)):
         if not any(d.iterdir()):
             d.rmdir()
-    print(json.dumps({"cache": str(root), "mb": round(total / 1048576, 1), "usuniete_mb": round(removed / 1048576, 1)},
+    print(json.dumps({"cache": root.as_posix(), "mb": round(total / 1048576, 1), "usuniete_mb": round(removed / 1048576, 1)},
                      ensure_ascii=False))
     return 0
 

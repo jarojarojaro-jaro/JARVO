@@ -53,9 +53,9 @@ def test_loop_seam(tmp_path):
 def test_round_scoring(tmp_path):
     k = tmp_path / "k.json"
     k.write_text(json.dumps({"runda": 1, "osie": {o: 8 for o in krytyka.OSIE},
-                             "problemy": [{"t": 1.0, "problem": "x", "poprawka": "y"}]}))
+                             "problemy": [{"t": 1.0, "problem": "x", "poprawka": "y"}]}), encoding="utf-8")
     assert krytyka.ocena(k)["ok"]
-    k.write_text(json.dumps({"runda": 2, "osie": {**{o: 9 for o in krytyka.OSIE}, "kompozycja": 6}, "problemy": [{"problem": "bez czasu"}]}))
+    k.write_text(json.dumps({"runda": 2, "osie": {**{o: 9 for o in krytyka.OSIE}, "kompozycja": 6}, "problemy": [{"problem": "bez czasu"}]}), encoding="utf-8")
     r = krytyka.ocena(k)
     assert not r["ok"] and r["ponizej_8"] == {"kompozycja": 6} and r["problemy_bez_czasu"] == 1
 
@@ -110,7 +110,7 @@ def test_ciecia_z_projektu(tmp_path):
     a, b = tmp_path / "a.mp4", tmp_path / "b.mp4"
     for f in (a, b):
         f.write_bytes(b"x")
-    (tmp_path / "a.mowa.json").write_text(json.dumps({"words": [[1.0, 1.5, "dzień"], [3.9, 4.2, "dobry"]]}))
+    (tmp_path / "a.mowa.json").write_text(json.dumps({"words": [[1.0, 1.5, "dzień"], [3.9, 4.2, "dobry"]]}), encoding="utf-8")
     proj = {"canvas": {"w": 320, "h": 240, "fps": 25},
             "clips": [{"id": "c1", "src": str(a), "in": 0, "out": 2}, {"id": "c2", "src": str(a), "in": 2, "out": 4},
                       {"id": "c3", "src": str(b), "in": 0, "out": 2, "transition": {"type": "fade", "dur": 0.4}},
@@ -195,9 +195,9 @@ def test_mowa_z_srt_i_json(tmp_path):
                    encoding="utf-8")
     assert krytyka.mowa_z_pliku(srt) == [(0.8, 6.0)]               # przerwa 0,1 s to dalej mowa
     js = tmp_path / "m.json"
-    js.write_text(json.dumps({"slowa": [[0.0, 0.4, "Ala"], [0.5, 0.9, "ma"], [2.0, 2.5, "kota"]]}))
+    js.write_text(json.dumps({"slowa": [[0.0, 0.4, "Ala"], [0.5, 0.9, "ma"], [2.0, 2.5, "kota"]]}), encoding="utf-8")
     assert krytyka.mowa_z_pliku(js) == [(0.0, 0.9), (2.0, 2.5)]
-    js.write_text(json.dumps([{"start": 1, "end": 2}, {"od": 3, "do": 4}]))
+    js.write_text(json.dumps([{"start": 1, "end": 2}, {"od": 3, "do": 4}]), encoding="utf-8")
     assert krytyka.mowa_z_pliku(js) == [(1.0, 2.0), (3.0, 4.0)]
 
 

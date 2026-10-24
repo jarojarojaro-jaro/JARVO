@@ -4,6 +4,7 @@
     python3 lemo_wake.py sprawdz        # co gotowe (JSON): biblioteka, Python, playwright, przeglądarka, modele, zgoda
     python3 lemo_wake.py instaluj       # raz: klon na przypiętym commicie + pakiety (ok. 350 MB, bez modeli)
     python3 lemo_wake.py env            # eval "$(python3 lemo_wake.py env)": LW, LW_WARSTWY, LW_PY, LEMO_WAKE_MODELS, LW_HISTORIA
+    python3 lemo_wake.py uruchom -- <polecenie> [argumenty]   # to samo bez eval; {LW}, {LW_PY}… w argumentach
 
 Biblioteka to sam skill z github.com/lemomo-ai/lemo-wake (wake + layers, bez upload: publikuje w cudzej galerii),
 na tym samym commicie co kopia skilla w profilu (vendor/skills.lock.yaml → lemo-wake). Zasady jak narzedzia.py
@@ -12,6 +13,8 @@ Python z przypiętymi pakietami zamiast `uv run --script` (ten bierze najnowsze 
 Modele ONNX (ok. 600 MB z Hugging Face) pobierają same skrypty skilla dopiero po zgodzie właściciela
 (`models.py consent yes`); trzymamy je poza klonem, więc aktualizacja biblioteki ich nie rusza.
 Licencja CC BY-NC 4.0: użycie komercyjne tylko za zgodą autora (skill `zywy-obraz`).
+Linux, macOS i Windows: venv w bin/ albo Scripts\\, npm (.cmd) przez PATH, `env` na Windows ze ścieżkami
+dla Git Bash (z „/”), `uruchom` bez powłoki.
 """
 
 from __future__ import annotations
@@ -24,6 +27,8 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+WINDOWS = os.name == "nt"
 
 ROOT = Path(os.environ.get("JARVO_NARZEDZIA", "/opt/data/jarvo/narzedzia" if Path("/opt/data/jarvo").is_dir()
                            else str(Path.home() / ".cache" / "jarvo-narzedzia")))
@@ -39,6 +44,11 @@ PY_PAKIETY = ["numpy==2.5.3", "pillow==12.3.0", "pillow-heif==1.8.0", "psd-tools
               "opencv-python-headless==4.14.0.94", "onnxruntime==1.30.0"]
 SKRYPTY = LIB / "skills" / "wake" / "scripts"
 PW_VERSION = "1.63.0"                   # = package-lock.json skilla = Chromium headless z obrazu Hermesa
+# przeglądarka w PLAYWRIGHT_BROWSERS_PATH: katalog i plik jak w rejestrze playwright (jak narzedzia.py Wideografa)
+POWLOKA = {"darwin": [("chrome-headless-shell-mac-arm64", "chrome-headless-shell"),
+                      ("chrome-headless-shell-mac-x64", "chrome-headless-shell")],
+           "win32": [("chrome-headless-shell-win64", "chrome-headless-shell.exe")]}.get(
+    sys.platform, [("chrome-headless-shell-linux64", "chrome-headless-shell")])
 # pliki modeli jak w _models.py skilla (nazwa: pliki)
 MODELE = {
     "depth": ["depth_anything_v2_small.onnx"],
@@ -49,13 +59,27 @@ MODELE = {
 }
 
 
+def program(nazwa: str, path: str | None = None) -> str:
+    """Program do argv: na Windows pełna ścieżka z PATH (npm to plik .cmd, którego CreateProcess nie znajdzie
+    po gołej nazwie); na POSIX nazwa bez zmian."""
+    if not WINDOWS or os.path.dirname(nazwa):
+        return nazwa
+    return shutil.which(nazwa, path=path) or nazwa
+
+
+def venv_python(venv: Path) -> Path:
+    """Python w venvie: bin/python na POSIX, Scripts\\python.exe na Windows."""
+    return venv / "Scripts" / "python.exe" if WINDOWS else venv / "bin" / "python"
+
+
 def run(cmd: list[str], cwd: Path | None = None) -> None:
     print("▶", " ".join(cmd), flush=True)
-    subprocess.run(cmd, cwd=cwd, check=True)
+    subprocess.run([program(cmd[0]), *cmd[1:]], cwd=cwd, check=True)
 
 
 def git_head(dest: Path) -> str:
-    return subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    return subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace").stdout.strip()
 
 
 def klon(repo: str = REPO, rev: str = REV, dest: Path = LIB, pomin: list[str] = POMIN) -> None:
@@ -67,7 +91,8 @@ def klon(repo: str = REPO, rev: str = REV, dest: Path = LIB, pomin: list[str] = 
         dest.parent.mkdir(parents=True, exist_ok=True)
         run(["git", "clone", "--quiet", "--filter=blob:none", "--sparse", "--no-checkout", repo, str(dest)])
     wzorce = ["/*", *[f"!{p}" for p in pomin]]
-    lista = subprocess.run(["git", "-C", str(dest), "sparse-checkout", "list"], capture_output=True, text=True).stdout
+    lista = subprocess.run(["git", "-C", str(dest), "sparse-checkout", "list"], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace").stdout
     if git_head(dest) == rev and lista.splitlines() == wzorce:
         return
     run(["git", "-C", str(dest), "sparse-checkout", "set", "--no-cone", *wzorce])
@@ -87,7 +112,7 @@ def znacznik_node() -> Path:
 
 
 def python_gotowy() -> bool:
-    return (VENV / "bin" / "python").exists() and _czytaj(znacznik_py()) == podpis(*PY_PAKIETY)
+    return venv_python(VENV).exists() and _czytaj(znacznik_py()) == podpis(*PY_PAKIETY)
 
 
 def node_gotowy() -> bool:
@@ -112,7 +137,7 @@ def uv_zwolnienia(pakiety: list[str]) -> list[str]:
 
 
 def instaluj_python() -> None:
-    python = VENV / "bin" / "python"
+    python = venv_python(VENV)
     if not python.exists():
         run(["uv", "venv", "--quiet", "--python", "3.12", str(VENV)] if shutil.which("uv")
             else [sys.executable, "-m", "venv", str(VENV)])
@@ -147,9 +172,10 @@ def instaluj() -> None:
 def przegladarka() -> str | None:
     base = Path(os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "/opt/hermes/.playwright"))
     for d in sorted(base.glob("chromium_headless_shell-*"), key=lambda p: int(re.sub(r"\D", "", p.name) or 0), reverse=True):
-        exe = d / "chrome-headless-shell-linux64" / "chrome-headless-shell"
-        if exe.exists():
-            return str(exe)
+        for katalog, plik in POWLOKA:
+            exe = d / katalog / plik
+            if exe.exists():
+                return str(exe)
     return None
 
 
@@ -172,7 +198,7 @@ def status() -> dict:
         "ffmpeg": bool(shutil.which("ffmpeg") and shutil.which("ffprobe")),
         "modele": {k: all((modele / f).exists() for f in pliki) for k, pliki in MODELE.items()},
         "zgoda_na_modele": zgoda(),
-        "katalog": str(LIB),
+        "katalog": LIB.as_posix(),
     }
 
 
@@ -180,7 +206,7 @@ def env() -> dict[str, str]:
     out = {
         "LW": str(LIB / "skills" / "wake"),
         "LW_WARSTWY": str(LIB / "skills" / "layers"),
-        "LW_PY": str(VENV / "bin" / "python"),
+        "LW_PY": str(venv_python(VENV)),
         "LEMO_WAKE_MODELS": str(DANE / "models"),
         "LW_HISTORIA": str(DANE / "history.jsonl"),
     }
@@ -188,6 +214,20 @@ def env() -> dict[str, str]:
     if chrome:
         out["CHROME"] = chrome
     return out
+
+
+def dla_powloki(wartosc: str) -> str:
+    """Ścieżka do `export` w bashu: na POSIX bez zmian, na Windows z „/” (Git Bash; programy Windows też ją rozumieją)."""
+    return wartosc.replace("\\", "/") if WINDOWS else wartosc
+
+
+def uruchom(polecenie: list[str]) -> int:
+    """Polecenie ze zmiennymi lemo-wake (env()) bez `eval` w powłoce; `{LW}`, `{LW_PY}`… w argumentach to ich wartości
+    (powłoka rozwija `$LW`, zanim zmienna istnieje). Kod wyjścia polecenia."""
+    zmienne = env()
+    srodowisko = {**os.environ, **zmienne}
+    argv = [re.sub(r"\{([A-Z_][A-Z0-9_]*)\}", lambda m: zmienne.get(m.group(1), m.group(0)), a) for a in polecenie]
+    return subprocess.run([program(argv[0], srodowisko.get("PATH")), *argv[1:]], env=srodowisko).returncode
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -198,7 +238,12 @@ def main(argv: list[str] | None = None) -> int:
     elif cmd == "instaluj":
         instaluj()
     elif cmd == "env":
-        print("\n".join(f"export {k}={json.dumps(v)}" for k, v in env().items()))
+        print("\n".join(f"export {k}={json.dumps(dla_powloki(v), ensure_ascii=False)}" for k, v in env().items()))
+    elif cmd == "uruchom":
+        polecenie = argv[2:] if argv[1:2] == ["--"] else argv[1:]
+        if not polecenie:
+            raise SystemExit("uruchom -- <polecenie> [argumenty]")
+        return uruchom(polecenie)
     else:
         print(__doc__)
         return 2

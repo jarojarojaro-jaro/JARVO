@@ -177,7 +177,8 @@ def opis_koloru(k: dict | None) -> str:
 def kolor_auto(c: dict) -> dict:
     """Pomiar klatek klipu jak „Auto” w edytorze HQ (edytor.kolor_pomiar_cmd → kolor_z_pomiaru)."""
     r = subprocess.run(ed.kolor_pomiar_cmd(Path(c["src"]), float(c.get("in", 0)), float(c.get("out", 0)), ed.tools()["ffmpeg"] or "ffmpeg",
-                                           sdr=ed.probe(Path(c["src"])).get("sdr", "")), capture_output=True, text=True)
+                                           sdr=ed.probe(Path(c["src"])).get("sdr", "")), capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     wynik = ed.kolor_z_pomiaru(r.stderr) if r.returncode == 0 else None
     if not wynik:
         raise SystemExit(f"nie udało się zmierzyć klatek klipu {c.get('id')}: {(r.stderr.strip().splitlines() or [''])[-1][:200]}")
@@ -189,7 +190,8 @@ def kolor_auto(c: dict) -> dict:
 def tlo_nagrania(src: Path, a: float, b: float) -> float | None:
     """Tło nagrania (dB) wokół odcinka źródła, jak „Auto” czystego głosu w edytorze (edytor.szum_cmd)."""
     od = max(0.0, a - 30)
-    r = subprocess.run(ed.szum_cmd(src, ed.tools()["ffmpeg"] or "ffmpeg", od, b - od + 30), capture_output=True, text=True)
+    r = subprocess.run(ed.szum_cmd(src, ed.tools()["ffmpeg"] or "ffmpeg", od, b - od + 30), capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     return ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
 
 
@@ -229,7 +231,8 @@ def cmd_glos(film: Path, a) -> int:
         out = film.with_name(f"{film.stem}.glos-{x.get('id')}.mp3")
         d = min(8.0, float(x["out"]) - float(x["in"]))
         r = subprocess.run(ed.glos_probka_cmd(src, float(x["in"]), d, x["voice"], tla.get(str(src)), out,
-                                              ed.tools()["ffmpeg"] or "ffmpeg"), capture_output=True, text=True)
+                                              ed.tools()["ffmpeg"] or "ffmpeg"), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
         if r.returncode != 0:
             raise SystemExit(f"próbka się nie udała: {r.stderr.strip()[-300:]}")
         print(f"Próbka {d:.0f} s po czyszczeniu (do odsłuchu dla właściciela): {out}")
@@ -248,7 +251,7 @@ def kolor_podglad(film: Path, c: dict) -> Path:
     r = subprocess.run([ed.tools()["ffmpeg"] or "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", *wej, "-i", str(c["src"]),
                         "-frames:v", "1", "-filter_complex",
                         f"[0:v]scale=-2:540,{sdr + ',' if sdr else ''}format=rgb24,split[a][b];[b]{kol},format=rgb24[k];[a][k]hstack",
-                        "-q:v", "3", str(out)], capture_output=True, text=True)
+                        "-q:v", "3", str(out)], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode:
         raise SystemExit(f"podgląd koloru: {r.stderr.strip()[-300:]}")
     return out
@@ -683,7 +686,9 @@ def dodaj_plik_audio(film: Path, proj: dict, src: Path, start: float, glosnosc: 
                      do: float | None = None) -> dict:
     dur = ed.probe(src).get("duration") or 0
     do = dur if do is None else do
-    if do - od <= 0.05:
+    # fragment krótszy niż 50 ms to pusty dźwięk, chyba że cały plik jest tak krótki: ffmpeg ≥ 8 liczy długość MP3
+    # bez wypełnienia kodera, więc kliki z biblioteki mają tam 7–48 ms (ffmpeg 7 w obrazie: 52–78 ms)
+    if do - od <= (0.05 if dur > 0.05 else 0.0):
         raise SystemExit(f"pusty dźwięk: {src}")
     item = {"id": new_id("a"), "src": str(src), "start": max(0.0, start), "in": od, "out": do,
             "volume": max(0.0, min(2.0, glosnosc)), **zanik_z_arg(a, do - od)}
@@ -960,14 +965,15 @@ def tlo_projektu(film: Path, proj: dict, efekty_src: set[str]) -> list[float]:
     info = {str(c["src"]): ed.probe(c["src"]) for c in p["clips"] if c["kind"] == "video"}
     szum = {}
     for src, (od, dl) in ed.szum_zakresy(p).items():
-        r = subprocess.run(ed.szum_cmd(Path(src), ed.tools()["ffmpeg"] or "ffmpeg", od, dl), capture_output=True, text=True)
+        r = subprocess.run(ed.szum_cmd(Path(src), ed.tools()["ffmpeg"] or "ffmpeg", od, dl), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
         szum[src] = ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
     with tempfile.TemporaryDirectory(prefix="slychac-") as tmp:
         out = Path(tmp) / "tlo.mov"
         cmd = ed.build_command(p, {k: v.get("audio", False) for k, v in info.items()}, [], out, szum=szum)
         i = cmd.index("-c:a")
         cmd[i + 1:i + 4] = ["pcm_s16le"]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if r.returncode != 0:
             raise SystemExit(f"ffmpeg (tło bez efektów): {(r.stderr.strip().splitlines() or ['błąd'])[-1]}")
         return obwiednia_db(pcm_mono(out), SLUCH_SR)
@@ -1000,6 +1006,7 @@ def zdarzenia_cues(cues: Path, sound: Path) -> list[dict]:
               "const m = new Float32Array(L.length); for (let k = 0; k < L.length; k++) m[k] = (L[k] + R[k]) / 2;"
               "fs.writeFileSync(`${process.env.OUT}/c${i}.f32`, Buffer.from(m.buffer)); });")
         r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace",
                            env={**os.environ, "CUES": str(cues), "OUT": tmp})
         if r.returncode != 0:
             raise SystemExit(f"node sound.mjs: {(r.stderr.strip().splitlines() or ['błąd'])[-1]}")
@@ -1075,7 +1082,8 @@ def wyodrebnij_plik(film: Path, src: Path) -> Path:
     dest = ed.wyodrebnij_cel(film, src)
     if not dest.is_file() or dest.stat().st_mtime < src.stat().st_mtime:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        r = subprocess.run(ed.wyodrebnij_cmd(src, dest, info.get("acodec")), capture_output=True, text=True)
+        r = subprocess.run(ed.wyodrebnij_cmd(src, dest, info.get("acodec")), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
         if r.returncode != 0:
             raise SystemExit(f"ffmpeg: {(r.stderr.strip().splitlines() or ['błąd'])[-1]}")
     return dest
@@ -1378,12 +1386,13 @@ def cmd_render(film: Path, a) -> int:
         maska = ed.maska_concat(film, proj, p, Path(tmp)) if typo.get("tyl") else None   # osoba nad napisem „za”
         szum = {}                                              # czysty głos: tło nagrania pod próg odszumiania
         for s, (od, dl) in ed.szum_zakresy(p).items():
-            r = subprocess.run(ed.szum_cmd(Path(s), ed.tools()["ffmpeg"] or "ffmpeg", od, dl), capture_output=True, text=True)
+            r = subprocess.run(ed.szum_cmd(Path(s), ed.tools()["ffmpeg"] or "ffmpeg", od, dl), capture_output=True, text=True,
+                               encoding="utf-8", errors="replace")
             szum[s] = ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
             print(f"  czysty głos: {Path(s).name}, tło {'?' if szum[s] is None else f'{szum[s]:.0f}'} dB")
         cmd = ed.build_command(p, has_audio, pngs, out, karaoke=layer, typo=typo, maska=maska, sdr=sdr, szum=szum)
         t0 = time.time()
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         print(r.stderr.strip()[-1500:], file=sys.stderr)
         return 1
@@ -1488,7 +1497,7 @@ def linie_napisow(srt: Path | None, slowa: list[list] | None, pion_: bool, karao
 
 def _ebur(args: list[str]) -> tuple[float | None, float | None]:
     """(LUFS, szczyt próbki dBFS) z podsumowania ebur128 polecenia ffmpeg."""
-    r = subprocess.run(args, capture_output=True, text=True)
+    r = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace")
     s = r.stderr.split("Summary:")[-1]
     m, pk = re.search(r"I:\s+(-?[\d.]+) LUFS", s), re.search(r"Peak:\s+(-?[\d.]+|-inf) dBFS", s)
     return (float(m.group(1)) if m and r.returncode == 0 else None,
@@ -1507,7 +1516,7 @@ def kopia_dzwieku(src: Path, dest: Path, dl: float | None = None, wzmocnienie: f
     r = subprocess.run([ff, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-map", "0:a:0",
                         *(["-t", ed._f(dl)] if dl else []),
                         *(["-af", f"volume={k:.6f}"] if abs(k - 1) > 1e-4 else []), "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le",
-                        str(dest)], capture_output=True, text=True)
+                        str(dest)], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         raise SystemExit(f"nie umiem skopiować dźwięku {src}: {r.stderr.strip()[-300:]}")
     return wzmocnienie / k
@@ -1597,7 +1606,7 @@ def projekt_z_kodu(film: Path, a) -> dict:
     if obraz != cel:
         r = subprocess.run([ff, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(obraz), "-map", "0:v:0",
                             "-c:v", "copy", "-an", *(["-movflags", "+faststart"] if cel.suffix in (".mp4", ".mov", ".m4v") else []),
-                            str(cel)], capture_output=True, text=True)
+                            str(cel)], capture_output=True, text=True, encoding="utf-8", errors="replace")
         if r.returncode != 0:
             raise SystemExit(f"nie umiem skopiować obrazu: {r.stderr.strip()[-300:]}")
     w, h = ed.kadr_eksportu(even(info.get("w") or 1920), even(info.get("h") or 1080))

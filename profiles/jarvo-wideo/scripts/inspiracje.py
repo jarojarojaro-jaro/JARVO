@@ -165,7 +165,7 @@ def katalog_ujec(root: Path | None = None) -> list[dict]:
             "energia": c.get("energy") or fm.get("能量", ""), "poziom": energia_poziom(c.get("energy") or fm.get("能量", "")),
             "czas": c.get("duration") or fm.get("时长", ""), "opis": c.get("summary") or fm.get("一句话", ""),
             "kiedy": c.get("use") or fm.get("适用", ""), "zamiar": c.get("intention", ""),
-            "karta": str(plik), "demo": str(root / demo.group(1)) if demo else None,
+            "karta": plik.as_posix(), "demo": (root / demo.group(1)).as_posix() if demo else None,
             "style": [st.get("key") for st in c.get("styles", [])],
             "tylko_technika": (oryginal.group(1).strip() if oryginal else None) or obce.get(c["name"]),
             "u_nas": NASZE.get(c["name"]),

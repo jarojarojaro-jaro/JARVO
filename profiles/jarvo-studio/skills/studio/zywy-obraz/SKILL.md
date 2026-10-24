@@ -52,6 +52,7 @@ lemo-wake ma licencję CC BY-NC 4.0, czyli wolno go używać tylko niekomercyjni
 python3 $HERMES_HOME/scripts/lemo_wake.py sprawdz        # JSON: biblioteka, python, playwright, przeglądarka, modele, zgoda
 python3 $HERMES_HOME/scripts/lemo_wake.py instaluj       # raz (ok. 350 MB, ok. minuty); też gdy "biblioteka": false
 eval "$(python3 $HERMES_HOME/scripts/lemo_wake.py env)"  # na początku KAŻDEGO polecenia: zmienne nie przeżywają między poleceniami
+# bez eval: python3 $HERMES_HOME/scripts/lemo_wake.py uruchom -- <polecenie>   ({LW}, {LW_PY}… w argumentach)
 ```
 
 ## Różnice wobec instrukcji lemo-wake

@@ -4,6 +4,7 @@
     python3 narzedzia.py sprawdz                 # co jest gotowe, czego brak (JSON)
     python3 narzedzia.py instaluj [motion|lemo|anidoodle|animacja|remotion|shotcraft|html|lottie|mg|mgaudio|huashu|wszystko]
     python3 narzedzia.py env <narzedzie>         # zmienne środowiska do wklejenia: eval "$(python3 narzedzia.py env motion)"
+    python3 narzedzia.py uruchom <narzedzie> -- <polecenie> [argumenty]   # to samo bez eval (każda powłoka i system)
     python3 narzedzia.py link <katalog>          # <katalog>/node_modules → wspólne (skrypty .mjs nie czytają NODE_PATH)
     python3 narzedzia.py kroje <katalog>         # brakujące kroje z <katalog>/fonts.css: google/fonts (OFL) + polskie znaki
 
@@ -27,6 +28,8 @@ Zasady (VPS 8 GB, bez dubli):
   huashu-art-motion bez assets/ (filmy pokazowe, plansze, rysunki postaci autora) i danych kresek kroju AR PL (Arphic);
   HDRI do stylów 3D lemo (~12 MB) zawsze; ciężkie assety lemo (głos Kokoro ~340 MB, sample ~1,4 GB) tylko
   z JARVO_EXTRAS „lemo”; mgaudio w `wszystko` tylko z JARVO_EXTRAS „mgaudio” (osobno: `instaluj mgaudio`).
+- Linux, macOS i Windows: venv w bin/ albo Scripts\\, programy .cmd (npm) przez PATH, node_modules projektu jako
+  dowiązanie (na Windows junction), `env` na Windows wypisuje ścieżki dla Git Bash; `uruchom` działa wszędzie.
 """
 
 from __future__ import annotations
@@ -35,11 +38,16 @@ import json
 import os
 import re
 import shutil
+import stat
 import struct
 import subprocess
 import sys
 import tempfile
+import time
+import zlib
 from pathlib import Path
+
+WINDOWS = os.name == "nt"
 
 ROOT = Path(os.environ.get("JARVO_NARZEDZIA", "/opt/data/jarvo/narzedzia" if Path("/opt/data/jarvo").is_dir()
                            else str(Path.home() / ".cache" / "jarvo-narzedzia")))
@@ -126,12 +134,70 @@ CHROME_WRAPPER_SH = """#!/bin/sh
 exec "${JARVO_CHROME_REAL:?brak JARVO_CHROME_REAL: najpierw eval narzedzia.py env html}" --no-sandbox "$@"
 """
 
-# układy katalogów przeglądarki w PLAYWRIGHT_BROWSERS_PATH (nowy: chrome-headless-shell, starszy: headless_shell)
+# układy katalogów przeglądarki w PLAYWRIGHT_BROWSERS_PATH (nowy: chrome-headless-shell, starszy: headless_shell),
+# jak w rejestrze playwright dla każdego systemu
 SHELL_LAYOUTS = (("chrome-headless-shell-linux64", "chrome-headless-shell"), ("chrome-linux", "headless_shell"))
+if sys.platform == "darwin":
+    SHELL_LAYOUTS = (("chrome-headless-shell-mac-arm64", "chrome-headless-shell"),
+                     ("chrome-headless-shell-mac-x64", "chrome-headless-shell"), ("chrome-mac", "headless_shell"))
+elif WINDOWS:
+    SHELL_LAYOUTS = (("chrome-headless-shell-win64", "chrome-headless-shell.exe"), ("chrome-win", "headless_shell.exe"))
 
 
 def browsers_path() -> str:
     return os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "/opt/hermes/.playwright")
+
+
+def venv_bin(venv: Path) -> Path:
+    """Katalog programów venva: bin/ na POSIX, Scripts\\ na Windows."""
+    return venv / ("Scripts" if WINDOWS else "bin")
+
+
+def venv_python(venv: Path) -> Path:
+    return venv_bin(venv) / ("python.exe" if WINDOWS else "python")
+
+
+def site_packages(venv: Path) -> list[Path]:
+    """site-packages venva: lib/python3.X/site-packages na POSIX, Lib\\site-packages na Windows."""
+    if WINDOWS:
+        return [venv / "Lib" / "site-packages"]
+    return sorted((venv / "lib").glob("python3*/site-packages"))
+
+
+def bash() -> str | None:
+    """Prawdziwy bash (skrypty sh bibliotek, np. fetch.sh lemo): na POSIX z PATH, na Windows tylko Git Bash, jak
+    fleetlib.bash w repo; goły `bash` to tam System32\\bash.exe, czyli WSL."""
+    if not WINDOWS:
+        return shutil.which("bash")
+    kandydaci = []
+    git = shutil.which("git")
+    if git:                                     # Git\cmd\git.exe albo Git\mingw64\bin\git.exe
+        for przodek in list(Path(git).resolve().parents)[:3]:
+            kandydaci += [przodek / "bin" / "bash.exe", przodek / "usr" / "bin" / "bash.exe"]
+    for zmienna, podkatalog in (("ProgramFiles", "Git"), ("ProgramW6432", "Git"), ("LOCALAPPDATA", "Programs/Git")):
+        if os.environ.get(zmienna):
+            kandydaci.append(Path(os.environ[zmienna]) / podkatalog / "bin" / "bash.exe")
+    return next((str(k) for k in kandydaci if k.is_file() and "system32" not in str(k).lower()), None)
+
+
+def sh() -> str:
+    """Powłoka do skryptów .sh bibliotek: `sh` na POSIX (jak dotąd), Git Bash na Windows."""
+    if not WINDOWS:
+        return "sh"
+    b = bash()
+    if not b:
+        raise SystemExit("brak Git Bash: skrypty .sh bibliotek (np. fetch.sh lemo) potrzebują go na Windows")
+    return b
+
+
+def program(nazwa: str, path: str | None = None) -> str:
+    """Program do argv: na Windows pełna ścieżka z PATH (npm i npx to pliki .cmd, których CreateProcess nie znajdzie
+    po gołej nazwie), a `bash` tylko z Git Bash; na POSIX nazwa bez zmian."""
+    if not WINDOWS or os.path.dirname(nazwa):
+        return nazwa
+    if nazwa.lower() in ("bash", "bash.exe", "sh", "sh.exe"):
+        return sh()
+    return shutil.which(nazwa, path=path) or nazwa
 
 
 def _build_no(d: Path) -> int:
@@ -159,11 +225,23 @@ def full_extras() -> bool:
 
 def run(cmd: list[str], cwd: Path | None = None, env: dict | None = None) -> None:
     print("▶", " ".join(cmd), flush=True)
-    subprocess.run(cmd, cwd=cwd, check=True, env={**os.environ, **(env or {})})
+    subprocess.run([program(cmd[0]), *cmd[1:]], cwd=cwd, check=True, env={**os.environ, **(env or {})})
 
 
 def py() -> str:
-    return str(VENV / "bin" / "python")
+    return str(venv_python(VENV))
+
+
+def od_nowa(python: Path | str, skrypt: str) -> None:
+    """Ten sam skrypt z tymi samymi argumentami innym Pythonem (venv z paczkami). Na POSIX os.execv, jak dotąd;
+    na Windows podproces i jego kod wyjścia, bo execv odpina tam nowy proces od rodzica (agent dostałby wynik,
+    zanim skrypt skończy)."""
+    argv = [str(python), str(Path(skrypt).resolve()), *sys.argv[1:]]
+    if not WINDOWS:
+        os.execv(argv[0], argv)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    raise SystemExit(subprocess.run(argv).returncode)
 
 
 def wymagaj_playwright(skrypt: str, flaga: str, komunikat: str = "brak playwright w Pythonie", dopisek: str = "") -> None:
@@ -178,7 +256,7 @@ def wymagaj_playwright(skrypt: str, flaga: str, komunikat: str = "brak playwrigh
     wprost = Path(sys.argv[0]).resolve() == Path(skrypt).resolve()    # import z innego skryptu: jego argv nie pasuje
     if wprost and venv_py.exists() and Path(sys.prefix).resolve() != VENV.resolve() and not os.environ.get(flaga):
         os.environ[flaga] = "1"
-        os.execv(str(venv_py), [str(venv_py), str(Path(skrypt).resolve()), *sys.argv[1:]])
+        od_nowa(venv_py, skrypt)
     raise SystemExit(f"{komunikat}: python3 $HERMES_HOME/scripts/narzedzia.py instaluj html{dopisek}")
 
 
@@ -195,7 +273,7 @@ def wymagaj_modulow(skrypt: str, flaga: str, moduly: tuple[str, ...] = ("numpy",
     wprost = Path(sys.argv[0]).resolve() == Path(skrypt).resolve()
     if wprost and venv_py.exists() and Path(sys.prefix).resolve() != VENV.resolve() and not os.environ.get(flaga):
         os.environ[flaga] = "1"
-        os.execv(str(venv_py), [str(venv_py), str(Path(skrypt).resolve()), *sys.argv[1:]])
+        od_nowa(venv_py, skrypt)
     return False
 
 
@@ -233,13 +311,13 @@ def py_ma(python: Path, spec: str) -> bool:
     """Paczka jest w tym Pythonie; przy pinie (==X.Y.Z) dokładnie w tej wersji (zmiana pinu = doinstaluj)."""
     if "==" in spec:
         kod = f"import importlib.metadata as m; print(m.version({py_name(spec)!r}))"
-        p = subprocess.run([str(python), "-c", kod], capture_output=True, text=True)
+        p = subprocess.run([str(python), "-c", kod], capture_output=True, text=True, encoding="utf-8", errors="replace")
         return p.returncode == 0 and p.stdout.strip() == spec.split("==", 1)[1]
     return subprocess.run([str(python), "-c", f"import {py_module(spec)}"], capture_output=True).returncode == 0
 
 
 def ensure_venv(pkgs: list[str], venv: Path = VENV) -> None:
-    python = venv / "bin" / "python"
+    python = venv_python(venv)
     if not python.exists():
         if shutil.which("uv"):
             run(["uv", "venv", "--quiet", "--python", "3.12", str(venv)])
@@ -282,7 +360,14 @@ def ensure_node(pkgs: list[str]) -> None:
 
 
 def git_head(dest: Path) -> str:
-    return subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    return subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace").stdout.strip()
+
+
+def git_sparse(dest: Path) -> str:
+    """Lista wzorców sparse-checkout klonu (`git sparse-checkout list`)."""
+    return subprocess.run(["git", "-C", str(dest), "sparse-checkout", "list"], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace").stdout
 
 
 def clone_pinned(repo: str, rev: str, dest: Path, exclude: list[str], keep: re.Pattern | None = None) -> None:
@@ -295,7 +380,7 @@ def clone_pinned(repo: str, rev: str, dest: Path, exclude: list[str], keep: re.P
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
         run(["git", "clone", "--quiet", "--filter=blob:none", "--sparse", "--no-checkout", repo, str(dest)])
-    lista = subprocess.run(["git", "-C", str(dest), "sparse-checkout", "list"], capture_output=True, text=True).stdout
+    lista = git_sparse(dest)
     dodane = [w for w in lista.splitlines() if keep and keep.fullmatch(w)]
     wzorce = ["/*", *[f"!{e}" for e in exclude], *dodane]
     if git_head(dest) == rev and lista.splitlines() == wzorce:
@@ -309,10 +394,14 @@ def install_motion() -> None:
     ensure_venv(PY_BASE)
 
 
-def ensure_chrome_wrapper() -> Path:
+def ensure_chrome_wrapper() -> Path | None:
+    """Nakładka --no-sandbox (sh) dla puppeteer i CHROME_BIN. Na Windows jej nie ma (None): tam Chromium nie działa
+    jako root, a pliku sh CreateProcess nie uruchomi, więc env_for podaje przeglądarkę wprost."""
+    if WINDOWS:
+        return None
     CHROME_WRAPPER.parent.mkdir(parents=True, exist_ok=True)
     if not CHROME_WRAPPER.exists() or CHROME_WRAPPER.read_text(encoding="utf-8") != CHROME_WRAPPER_SH:
-        CHROME_WRAPPER.write_text(CHROME_WRAPPER_SH, encoding="utf-8")
+        CHROME_WRAPPER.write_text(CHROME_WRAPPER_SH, encoding="utf-8", newline="\n")
     CHROME_WRAPPER.chmod(0o755)
     return CHROME_WRAPPER
 
@@ -324,6 +413,24 @@ def install_html() -> None:
     sync_jarvo_js()
 
 
+def _zastap(tmp: str, cel: Path, tresc: bytes) -> None:
+    """os.replace z ponowieniem: na Windows plik celu otwarty przez inny wątek albo proces (serwer renderu, druga
+    przeglądarka) daje chwilowo PermissionError. Gdy ktoś inny zdążył zapisać tę samą treść, nasza kopia jest zbędna."""
+    for proba in range(50):
+        try:
+            os.replace(tmp, cel)
+            return
+        except PermissionError:
+            try:
+                if cel.read_bytes() == tresc:
+                    return
+            except OSError:
+                pass
+            if proba == 49:
+                raise
+            time.sleep(0.02)
+
+
 def sync_jarvo_js() -> Path:
     """Moduły JS Jarva (JARVO_JS_PLIKI ze scripts/) do JARVO_JS, gdy ich tam nie ma albo się zmieniły."""
     JARVO_JS.mkdir(parents=True, exist_ok=True)
@@ -333,25 +440,44 @@ def sync_jarvo_js() -> Path:
         if not cel.exists() or cel.read_bytes() != tresc:
             # własny plik tymczasowy: kilka przeglądarek renderu naraz synchronizuje ten sam moduł
             fd, tmp = tempfile.mkstemp(dir=JARVO_JS, prefix=f".{nazwa}.")
-            with os.fdopen(fd, "wb") as f:
-                f.write(tresc)
-            os.chmod(tmp, 0o644)
-            os.replace(tmp, cel)
+            try:
+                with os.fdopen(fd, "wb") as f:
+                    f.write(tresc)
+                os.chmod(tmp, 0o644)
+                _zastap(tmp, cel, tresc)
+            finally:
+                if os.path.exists(tmp):             # nieudana zamiana (albo zbędna kopia): bez resztek w katalogu
+                    os.unlink(tmp)
     return JARVO_JS
 
 
+_ODWROC_BITY = bytes(int(f"{b:08b}"[::-1], 2) for b in range(256))
+
+
+def cksum(dane: bytes) -> int:
+    """Suma jak `cksum` z POSIX (CRC-32 od najstarszego bitu, wielomian 0x04C11DB7, długość danych na końcu, wynik
+    zanegowany), bez powłoki. zlib liczy ten sam CRC na bitach w odwrotnej kolejności: odwracamy bajty wejścia
+    i 32 bity wyniku (sprawdzone z `cksum` z coreutils)."""
+    n, dlugosc = len(dane), bytearray()
+    while n:
+        dlugosc.append(n & 0xFF)
+        n >>= 8
+    crc = zlib.crc32((dane + bytes(dlugosc)).translate(_ODWROC_BITY), 0xFFFFFFFF)
+    return int(f"{crc:032b}"[::-1], 2)
+
+
 def lemo_sig(*files: Path) -> str:
-    """Suma plików jak `sig` w setup.sh skilla (cat | cksum): te same znaczniki = setup.sh uznaje pakiety za gotowe."""
-    out = subprocess.run(["sh", "-c", 'cat "$@" 2>/dev/null | cksum | cut -d" " -f1', "sh", *map(str, files)],
-                         capture_output=True, text=True).stdout
-    return out.strip()
+    """Suma plików jak `sig` w setup.sh skilla (cat | cksum, brakujące pliki pominięte): te same znaczniki = setup.sh
+    uznaje pakiety za gotowe."""
+    return str(cksum(b"".join(f.read_bytes() for f in files if f.is_file())))
 
 
 def lemo_znacznik(poziom: str | None) -> tuple[Path, str]:
     """(plik znacznika, oczekiwana treść): None = pakiety npm, inaczej poziom Pythona (suma pliku + wersja Pythona)."""
     if poziom is None:
         return LEMO / "node_modules" / ".lemo-ok", lemo_sig(LEMO / "package.json", LEMO / "package-lock.json")
-    p = subprocess.run([str(LEMO / ".venv" / "bin" / "python"), "-V"], capture_output=True, text=True)
+    p = subprocess.run([str(venv_python(LEMO / ".venv")), "-V"], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
     wersja = ".".join((p.stdout or p.stderr).strip().split(".")[:2])          # „Python 3.12”, jak `cut -d. -f1,2`
     return LEMO / ".venv" / f".lemo-{poziom}", f"{lemo_sig(LEMO / LEMO_POZIOMY[poziom])}-{wersja}"
 
@@ -376,20 +502,20 @@ def install_lemo() -> None:
         plik, tresc = lemo_znacznik(None)
         plik.write_text(tresc + "\n", encoding="utf-8")
     lemo_venv = LEMO / ".venv"
-    if not (lemo_venv / "bin" / "python").exists():
+    if not venv_python(lemo_venv).exists():
         run(["uv", "venv", "--quiet", "--python", "3.12", str(lemo_venv)] if shutil.which("uv")
             else [sys.executable, "-m", "venv", str(lemo_venv)])
     for poziom in lemo_poziomy():
         if not lemo_gotowe(poziom):
-            pip_install(str(lemo_venv / "bin" / "python"), ["-r", str(LEMO / LEMO_POZIOMY[poziom])])
+            pip_install(str(venv_python(lemo_venv)), ["-r", str(LEMO / LEMO_POZIOMY[poziom])])
             plik, tresc = lemo_znacznik(poziom)
             plik.write_text(tresc + "\n", encoding="utf-8")
     # HDRI (Poly Haven, CC0, ~12 MB): światło i odbicia w stylach 3D (brick-toy, paper-popup, paper-lantern…) – zawsze
     if not (LEMO / "core" / "assets" / "polyhaven").is_dir() or not any((LEMO / "core" / "assets" / "polyhaven").glob("*.hdr")):
-        run(["sh", "tools/fetch.sh", "hdri"], cwd=LEMO)
+        run([sh(), "tools/fetch.sh", "hdri"], cwd=LEMO)
     if full_extras():
         for what in (["voice"], ["instruments", "all"]):
-            run(["sh", "tools/fetch.sh", *what], cwd=LEMO)
+            run([sh(), "tools/fetch.sh", *what], cwd=LEMO)
 
 
 def install_remotion() -> None:
@@ -466,13 +592,13 @@ def mgaudio_gotowe() -> bool:
     pakiety = ("numba", "scipy", "pedalboard", "pyloudnorm", "soundfile")
     return ((MGSTYLES / ".git").exists() and git_head(MGSTYLES) == MGSTYLES_REV
             and (MGSTYLES / "lib/audio/mgaudio/__init__.py").exists() and indeks_sampli_zgodny()
-            and (MGAUDIO_VENV / "bin" / "python").exists()
-            and all(any((MGAUDIO_VENV / "lib").glob(f"python3*/site-packages/{m}*")) for m in pakiety))
+            and venv_python(MGAUDIO_VENV).exists()
+            and all(any(any(sp.glob(f"{m}*")) for sp in site_packages(MGAUDIO_VENV)) for m in pakiety))
 
 
 def install_mgaudio() -> None:
     clone_pinned(MGSTYLES_REPO, MGSTYLES_REV, MGSTYLES, MGSTYLES_POMIN, keep=MG_DODANE)
-    lista = subprocess.run(["git", "-C", str(MGSTYLES), "sparse-checkout", "list"], capture_output=True, text=True).stdout
+    lista = git_sparse(MGSTYLES)
     if MG_SAMPLE not in lista.splitlines():
         run(["git", "-C", str(MGSTYLES), "sparse-checkout", "add", MG_SAMPLE])
     napraw_indeks_sampli()
@@ -508,19 +634,27 @@ def canvaskit_dir() -> Path:
 
 
 def venv_has(module: str) -> bool:
-    return any((VENV / "lib").glob(f"python3*/site-packages/{module}/__init__.py")) if (VENV / "lib").is_dir() else False
+    return any((sp / module / "__init__.py").exists() for sp in site_packages(VENV))
+
+
+def _wyjscie(cmd: list[str]) -> str:
+    """stdout programu (UTF-8) albo "", gdy go nie ma w PATH."""
+    exe = shutil.which(cmd[0])
+    return subprocess.run([exe, *cmd[1:]], capture_output=True, text=True, encoding="utf-8",
+                          errors="replace").stdout if exe else ""
 
 
 def status() -> dict:
-    ff = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True).stdout if shutil.which("ffmpeg") else ""
-    node_v = subprocess.run(["node", "--version"], capture_output=True, text=True).stdout.strip() if shutil.which("node") else None
+    ff = _wyjscie(["ffmpeg", "-hide_banner", "-encoders"])
+    node_v = _wyjscie(["node", "--version"]).strip() if shutil.which("node") else None
     hdri = LEMO / "core" / "assets" / "polyhaven"
     instruments = LEMO / "core" / "audio" / "instruments"
+    shell = headless_shell()
     return {
-        "katalog": str(ROOT), "node": node_v, "ffmpeg": bool(ff), "prores_ks": "prores_ks" in ff,
-        "przegladarka": headless_shell(), "playwright": (NODE / "node_modules" / "playwright").exists(),
-        "venv": (VENV / "bin" / "python").exists(),
-        "motion": (NODE / "node_modules" / "playwright").exists() and (VENV / "bin" / "python").exists(),
+        "katalog": ROOT.as_posix(), "node": node_v, "ffmpeg": bool(ff), "prores_ks": "prores_ks" in ff,
+        "przegladarka": shell and Path(shell).as_posix(), "playwright": (NODE / "node_modules" / "playwright").exists(),
+        "venv": venv_python(VENV).exists(),
+        "motion": (NODE / "node_modules" / "playwright").exists() and venv_python(VENV).exists(),
         "html": venv_has("playwright") and venv_has("PIL"),
         "html_biblioteki": all(npm_installed(p, NODE / "node_modules") for p in HTML_LIBS)
                            and all((JARVO_JS / n).exists() for n in JARVO_JS_PLIKI),
@@ -551,14 +685,20 @@ def status() -> dict:
 TOOLS = ("motion", "lemo", "anidoodle", "animacja", "remotion", "shotcraft", "html", "lottie", "mg", "mgaudio", "huashu")
 
 
+def _path_z_venv() -> str:
+    """PATH z programami venva narzędzi na początku (separator systemu: „:” albo „;”)."""
+    return os.pathsep.join([str(venv_bin(VENV)), os.environ.get("PATH", "")])
+
+
 def env_for(tool: str) -> dict:
+    """Zmienne środowiska narzędzia w postaci systemu (na Windows ścieżki z „\\”, PATH z separatorem „;”);
+    `env` przerabia je na zapis dla powłoki, `uruchom` przekazuje wprost."""
     base = {"PLAYWRIGHT_BROWSERS_PATH": browsers_path(), **NO_DOWNLOAD}
     shell = headless_shell() or ""
     chrome = str(CHROME_WRAPPER) if shell and CHROME_WRAPPER.exists() else shell     # dla puppeteer i CHROME_BIN
     real = {"JARVO_CHROME_REAL": shell} if shell else {}
     if tool in ("motion", "html", "mg", "huashu"):
-        env = {**base, "NODE_PATH": str(NODE / "node_modules"), "PYTHON": py(),
-               "PATH": f"{VENV / 'bin'}:{os.environ.get('PATH', '')}"}
+        env = {**base, "NODE_PATH": str(NODE / "node_modules"), "PYTHON": py(), "PATH": _path_z_venv()}
         if tool == "motion":
             return env
         env = {**env, **real, "CHROME_BIN": chrome, "PUPPETEER_EXECUTABLE_PATH": chrome}
@@ -579,22 +719,42 @@ def env_for(tool: str) -> dict:
                "REMOTION_BROWSER_EXECUTABLE": shell, "npm_config_prefer_offline": "true"}
         return {**env, "SHOTCRAFT": str(SHOTCRAFT)} if tool == "shotcraft" else env
     if tool == "lottie":
-        return {**base, "LOTTIE_PLAYER": str(LOTTIE), "PYTHON": py(), **real, "CHROME_BIN": chrome,
-                "PATH": f"{VENV / 'bin'}:{os.environ.get('PATH', '')}"}
+        return {**base, "LOTTIE_PLAYER": str(LOTTIE), "PYTHON": py(), **real, "CHROME_BIN": chrome, "PATH": _path_z_venv()}
     if tool == "mgaudio":
         # muzyka.py sama przechodzi na ten Python; MGAUDIO = katalog do sys.path przy własnym kodzie z mgaudio
-        return {"MGAUDIO": str(MGSTYLES / "lib" / "audio"), "MGAUDIO_PY": str(MGAUDIO_VENV / "bin" / "python")}
+        return {"MGAUDIO": str(MGSTYLES / "lib" / "audio"), "MGAUDIO_PY": str(venv_python(MGAUDIO_VENV))}
     raise SystemExit(f"nieznane narzędzie: {tool!r} ({' | '.join(TOOLS)})")
+
+
+def jest_dowiazaniem(p: Path) -> bool:
+    """Symlink albo (Windows) junction: dowiązanie, które można usunąć bez ruszania celu."""
+    if p.is_symlink():
+        return True
+    try:
+        return WINDOWS and os.lstat(p).st_reparse_tag == stat.IO_REPARSE_TAG_MOUNT_POINT
+    except (OSError, AttributeError):
+        return False
+
+
+def dowiaz_katalog(link_: Path, cel: Path) -> None:
+    """Dowiązanie katalogu `link_` → `cel`: symlink na POSIX, junction na Windows (zwykły użytkownik nie tworzy tam
+    symlinków; junction ich nie wymaga, ale cel musi już istnieć)."""
+    if not WINDOWS:
+        link_.symlink_to(cel, target_is_directory=True)
+        return
+    import _winapi
+    cel.mkdir(parents=True, exist_ok=True)
+    _winapi.CreateJunction(str(cel.resolve()), str(link_))
 
 
 def link(target: Path) -> Path:
     """<katalog>/node_modules → wspólne node_modules (import w .mjs szuka pakietów obok pliku, nie w NODE_PATH)."""
     target.mkdir(parents=True, exist_ok=True)
     nm = target / "node_modules"
-    if nm.is_symlink() or not nm.exists():
-        if nm.is_symlink():
+    if jest_dowiazaniem(nm) or not nm.exists():
+        if jest_dowiazaniem(nm):
             nm.unlink()
-        nm.symlink_to(NODE / "node_modules", target_is_directory=True)
+        dowiaz_katalog(nm, NODE / "node_modules")
     return nm
 
 
@@ -751,13 +911,45 @@ def kroje_mg(mg: Path, zrodlo: GoogleFonts | None = None) -> list[str]:
                 (cel.parent / nazwa_lic).write_bytes(zrodlo.plik(rodzina, lic, licencja))
             print(f"↓ {sciezka} ← google/fonts {licencja}/{rodzina}/{wybor}", flush=True)
         elif grupa == "cjk" and (mg / MG_CJK).exists():
-            cel.symlink_to(os.path.relpath(mg / MG_CJK, cel.parent))
+            if WINDOWS:            # bez uprawnień do symlinków: twarde dowiązanie (ten sam dysk), a gdy nie wyjdzie, kopia
+                try:
+                    os.link(mg / MG_CJK, cel)
+                except OSError:
+                    shutil.copy2(mg / MG_CJK, cel)
+            else:
+                cel.symlink_to(os.path.relpath(mg / MG_CJK, cel.parent))
             zastepcze.append(cel.name)
         else:
             uwagi.append(f"{sciezka}: nie ma go w google/fonts; wzór narysuje go krojem zastępczym albo nie wystartuje")
     if zastepcze:
         print(f"↪ Noto Sans SC zamiast: {', '.join(zastepcze)}", flush=True)
     return uwagi
+
+
+def msys(sciezka: str) -> str:
+    """Ścieżka Windows w zapisie Git Bash (MSYS): C:\\Users\\x → /c/Users/x."""
+    m = re.match(r"([A-Za-z]):[\\/]?(.*)", sciezka)
+    return (f"/{m.group(1).lower()}/{m.group(2)}" if m else sciezka).replace("\\", "/")
+
+
+def dla_powloki(nazwa: str, wartosc: str) -> str:
+    """Wartość zmiennej do `export` w bashu: na POSIX bez zmian; na Windows (Git Bash) ścieżki z „/”, a PATH w zapisie
+    MSYS z „:”, bo bash nie rozumie „C:\\…;…”."""
+    if not WINDOWS:
+        return wartosc
+    if nazwa == "PATH":
+        return ":".join(msys(c) for c in wartosc.split(os.pathsep) if c)
+    return wartosc.replace("\\", "/")
+
+
+def uruchom(tool: str, polecenie: list[str]) -> int:
+    """Polecenie ze zmiennymi narzędzia (env_for) bez `eval` w powłoce: tak samo w bashu, Git Bash, PowerShellu i cmd.
+    `{NAZWA}` w argumentach (np. `{ANIM}/render.mjs`) to wartość zmiennej narzędzia, bo powłoka rozwija `$NAZWA`,
+    zanim ta zmienna istnieje. Program z PATH tego środowiska (na Windows także .cmd i .exe); kod wyjścia polecenia."""
+    zmienne = env_for(tool)
+    env = {**os.environ, **zmienne}
+    argv = [re.sub(r"\{([A-Z_][A-Z0-9_]*)\}", lambda m: zmienne.get(m.group(1), m.group(0)), a) for a in polecenie]
+    return subprocess.run([program(argv[0], env.get("PATH")), *argv[1:]], env=env).returncode
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -771,8 +963,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "env":
         for k, v in env_for(args[1] if len(args) > 1 else "").items():
-            print(f"export {k}={json.dumps(v)}")
+            print(f"export {k}={json.dumps(dla_powloki(k, v), ensure_ascii=False)}")
         return 0
+    if cmd == "uruchom":
+        narz, _, polecenie = args[1:2], args[2:3], args[3:]
+        if args[2:3] != ["--"]:                              # bez „--”: wszystko po nazwie narzędzia to polecenie
+            polecenie = args[2:]
+        if not narz or not polecenie:
+            raise SystemExit("uruchom <narzędzie> -- <polecenie> [argumenty]")
+        return uruchom(narz[0], polecenie)
     if cmd == "kroje":
         if len(args) < 2:
             raise SystemExit("kroje <katalog z fonts.css>")
@@ -786,7 +985,7 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "link":
         if len(args) < 2:
             raise SystemExit("link <katalog>")
-        print(link(Path(args[1])))
+        print(link(Path(args[1])).as_posix())
         return 0
     if cmd == "instaluj":
         what = args[1] if len(args) > 1 else "wszystko"

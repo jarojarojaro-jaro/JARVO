@@ -82,7 +82,7 @@ def analyze(path: Path, has_audio: bool) -> dict:
         args += ["-filter_complex", f"{vf};[0:a]ebur128=peak=true,silencedetect=noise=-45dB:d=1.5[a]", "-map", "[v]", "-map", "[a]"]
     else:
         args += ["-filter_complex", vf, "-map", "[v]"]
-    res = subprocess.run(args + ["-f", "null", "-"], capture_output=True, text=True)
+    res = subprocess.run(args + ["-f", "null", "-"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     log = res.stderr
     out: dict = {"czarne": [], "zamrozone": [], "cisze": []}
     for m in re.finditer(r"black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)", log):
@@ -126,7 +126,7 @@ def sheet(path: Path, dur: float, w: int, h: int, out: Path, marks: bool, platfo
             cell = Path(tmp) / f"c{i:02d}.png"
             try:
                 wl.run(["ffmpeg", "-y", "-ss", f"{t:.2f}", "-i", str(path), "-frames:v", "1", "-vf",
-                        base + f",drawtext=text='{label}':x=6:y=6:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=4",
+                        base + f",drawtext=text='{label}'{wl.drawtext_kroj()}:x=6:y=6:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=4",
                         str(cell)])
             except wl.FFError:
                 wl.run(["ffmpeg", "-y", "-ss", f"{t:.2f}", "-i", str(path), "-frames:v", "1", "-vf", base, str(cell)])
@@ -504,7 +504,8 @@ def wymagaj_numpy(skrypt: str) -> None:
     if (not numpy_jest() and venv.exists() and Path(sys.argv[0]).resolve() == Path(skrypt).resolve()
             and not os.environ.get("JARVO_QA_REEXEC")):
         os.environ["JARVO_QA_REEXEC"] = "1"
-        os.execv(str(venv), [str(venv), str(Path(skrypt).resolve()), *sys.argv[1:]])
+        import narzedzia as nz                  # noqa: PLC0415  (execv na POSIX, podproces na Windows)
+        nz.od_nowa(venv, skrypt)
 
 
 def projekt_z_kodu(path: Path, dur: float, wymagany: bool) -> tuple[list[str], list[str]]:
@@ -543,7 +544,7 @@ def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkus
     v, a = info["video"], info["audio"]
     dur = info["duration"]
     if not v:
-        return {"plik": str(path), "ok": False, "bledy": ["brak ścieżki wideo"], "ostrzezenia": []}
+        return {"plik": Path(path).as_posix(), "ok": False, "bledy": ["brak ścieżki wideo"], "ostrzezenia": []}
     if platform:
         pf, max_s, (lo, hi) = PLATFORMS[platform]
         fmt = fmt or pf
@@ -611,7 +612,7 @@ def check(path: Path, platform: str | None, fmt: str | None, voiced: bool, arkus
     e_, w_ = projekt_z_kodu(path, dur, z_kodu)
     errors += e_
     warns += w_
-    res = {"plik": str(path), "ok": not errors, "bledy": errors, "ostrzezenia": warns,
+    res = {"plik": Path(path).as_posix(), "ok": not errors, "bledy": errors, "ostrzezenia": warns,
            "metryki": {"sek": round(dur, 2), "rozdzielczosc": f"{v['width']}x{v['height']}", "fps": v["fps"],
                        "wideo": v["codec"], "audio": a and a["codec"], "mb": round(info["size"] / 1048576, 2),
                        "lufs": an["lufs"], "true_peak": an["true_peak"], "lra": an.get("lra")}}

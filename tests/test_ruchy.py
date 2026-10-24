@@ -135,8 +135,8 @@ def test_skill_przypiety_w_rodzajach_i_module_serwowanym():
 # ------------------------------------------------------------------ tokeny.js w node
 
 def node(kod: str):
-    skrypt = f"import * as K from {json.dumps(str(TOKENY))};\n{kod}"
-    w = subprocess.run(["node", "--input-type=module", "-e", skrypt], capture_output=True, text=True)
+    skrypt = f"import * as K from {json.dumps(TOKENY.as_uri())};\n{kod}"
+    w = subprocess.run(["node", "--input-type=module", "-e", skrypt], capture_output=True, text=True, encoding="utf-8")
     assert w.returncode == 0, w.stderr
     return json.loads(w.stdout)
 

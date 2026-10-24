@@ -133,13 +133,13 @@ def main(argv: list[str] | None = None) -> int:
     if not a.bez_napisow:                 # film = render projektu edytora: napisy karaoke jako tekst, głos osobno
         r = subprocess.run([sys.executable, str(Path(__file__).with_name("projekt.py")), "z-kodu", str(out), "--obraz",
                             str(surowy), "--glos", str(mowa.audio), "--slowa", f"{slowa}@0", "--karaoke", a.akcent,
-                            "--render"], capture_output=True, text=True)
+                            "--render"], capture_output=True, text=True, encoding="utf-8", errors="replace")
         if r.returncode or not out.exists():
             print(f"✗ projekt filmu: {(r.stderr or r.stdout)[-300:]}", file=sys.stderr)
             return 2
         surowy.unlink(missing_ok=True)    # obraz jest już w <film>-sciezki/
-    print(json.dumps({"film": str(out), "sek": round(dur, 2), "slowa": str(slowa), "format": a.format, "glos": a.glos,
-                      **({} if a.bez_napisow else {"projekt": str(out.with_name(f"{out.stem}.edycja.json"))})},
+    print(json.dumps({"film": out.as_posix(), "sek": round(dur, 2), "slowa": Path(slowa).as_posix(), "format": a.format, "glos": a.glos,
+                      **({} if a.bez_napisow else {"projekt": out.with_name(f"{out.stem}.edycja.json").as_posix()})},
                      ensure_ascii=False))
     return 0
 

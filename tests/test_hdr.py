@@ -29,7 +29,7 @@ DV = {**HLG, "side_data_list": [{"side_data_type": "DOVI configuration record", 
 def _ff_zscale() -> bool:
     if not (shutil.which("ffmpeg") and shutil.which("ffprobe")):
         return False
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True)
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True, encoding="utf-8")
     return " zscale " in r.stdout and " tonemap " in r.stdout
 
 
@@ -156,7 +156,7 @@ def test_hlg_po_montazu_ma_kolor(tmp_path):
     przeliczeniu nasycenie wraca blisko oryginału."""
     def sat(plik: Path) -> float:
         r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(plik), "-vf", "signalstats,metadata=print:file=-",
-                            "-frames:v", "1", "-f", "null", "-"], capture_output=True, text=True)
+                            "-frames:v", "1", "-f", "null", "-"], capture_output=True, text=True, encoding="utf-8")
         return float(re.search(r"SATAVG=([\d.]+)", r.stdout).group(1))
     sdr = tmp_path / "sdr.mp4"
     subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=1",

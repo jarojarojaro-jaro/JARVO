@@ -484,10 +484,14 @@ def aliasy(o: dict) -> dict[str, Path]:
 
 
 def serve(root: Path, lib: bool = False, alias: dict[str, Path] | None = None) -> http.server.ThreadingHTTPServer:
-    handler = (type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules", "jarvo_root": nz.sync_jarvo_js(),
-                                        "kroje_root": KROJE, "huashu_root": nz.HUASHU / "scripts" / "engine",
-                                        "aliasy": alias or {}})
-               if lib else _Quiet)
+    """Serwer plików `root` na 127.0.0.1 (losowy port). `lib`: /_lib/ = wspólne node_modules narzędzi i nasze moduły;
+    `alias`: prefiks ścieżki URL → katalog spoza `root` (zamiast dowiązań, których Windows bez uprawnień nie tworzy)."""
+    if lib:
+        handler = type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules", "jarvo_root": nz.sync_jarvo_js(),
+                                           "kroje_root": KROJE, "huashu_root": nz.HUASHU / "scripts" / "engine",
+                                           "aliasy": alias or {}})
+    else:
+        handler = type("_Alias", (_Quiet,), {"aliasy": alias}) if alias else _Quiet
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(handler, directory=str(root)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd
@@ -510,12 +514,12 @@ def lottie_render(src: Path, frames_sel: list[float] | None, fps_out: float | No
     tmp = Path(tempfile.mkdtemp(prefix="jarvo-lottie-"))
     httpd = None
     try:
-        (tmp / "ck").symlink_to(ck, target_is_directory=True)
-        (tmp / "scene").symlink_to(scene, target_is_directory=True)
         html = (LOTTIE_PAGE.replace("__BG__", "transparent" if alfa else bg).replace("__NAME__", json.dumps(src.name))
                 .replace("__ASSETS__", json.dumps(assets)).replace("__SCALE__", f"{scale:g}"))
         (tmp / "index.html").write_text(html, encoding="utf-8")
-        httpd = serve(tmp)
+        # player i scena pod /ck/ i /scene/ jako aliasy serwera (nie dowiązania w katalogu tymczasowym: te na Windows
+        # wymagają uprawnień administratora)
+        httpd = serve(tmp, alias={"/ck/": ck, "/scene/": scene})
         url = f"http://127.0.0.1:{httpd.server_address[1]}/index.html"
         out_dir.mkdir(parents=True, exist_ok=True)
         errors: list[str] = []
@@ -658,7 +662,7 @@ def raport_pomiaru(anim: Path, wynik: dict, ustawienia: dict, tryb: str, hz: flo
                     "od": 0.0, "do": ustawienia["dlugosc"]})
     pm.zastosuj_wyjatki(ust, wyjatki_)
     import datetime as _dt
-    return {"plik": str(anim), "kiedy": _dt.datetime.now().isoformat(timespec="seconds"), "ustawienia": ustawienia,
+    return {"plik": anim.as_posix(), "kiedy": _dt.datetime.now().isoformat(timespec="seconds"), "ustawienia": ustawienia,
             "odcisk": pm.odcisk(anim, ustawienia), "rozmiar": wynik["rozmiar"],
             "pokrycie": {"tryb": tryb, "hz": hz, "probek": len(probki), "od": 0.0, "do": ustawienia["dlugosc"], "pelne": tryb == "pelny"},
             "teksty": len({x["id"] for p in probki for x in p["teksty"]}), "czcionki_brak": wynik["czcionki"]["brak"],
@@ -747,13 +751,13 @@ def main(argv: list[str] | None = None) -> int:
         if a.arkusz:
             pick = frames if a.klatki else frames[:: max(1, len(frames) // 12)]
             lab = labels if a.klatki else labels[:: max(1, len(frames) // 12)]
-            result["arkusz"] = str(sheet(pick, lab, Path(a.arkusz)))
+            result["arkusz"] = sheet(pick, lab, Path(a.arkusz)).as_posix()
         if a.wyjscie:
-            result["film"] = str(encode(work, a.fps or info["fps"], Path(a.wyjscie), a.alfa))
+            result["film"] = encode(work, a.fps or info["fps"], Path(a.wyjscie), a.alfa).as_posix()
         if not a.klatki:
             shutil.rmtree(work, ignore_errors=True)
         else:
-            result["katalog"] = str(work)
+            result["katalog"] = work.as_posix()
         print(json.dumps(result, ensure_ascii=False))
         return 0
 
@@ -765,9 +769,9 @@ def main(argv: list[str] | None = None) -> int:
         times = parse_times(a.czasy)
         names = [f"t{t:08.3f}.png" for t in times]
         frames = capture(a.zrodlo, times, names, Path(a.out), o, a.fps, size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj)
-        result = {"klatki": [str(f) for f in frames]}
+        result = {"klatki": [f.as_posix() for f in frames]}
         if a.arkusz:
-            result["arkusz"] = str(sheet(frames, [f"t={t:g}s" for t in times], Path(a.arkusz)))
+            result["arkusz"] = sheet(frames, [f"t={t:g}s" for t in times], Path(a.arkusz)).as_posix()
         print(json.dumps(result, ensure_ascii=False))
         return 0
 
@@ -789,13 +793,13 @@ def main(argv: list[str] | None = None) -> int:
                                       o, a.fps, size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj, przegladarki)
             frames = [blend(subs[i * n:(i + 1) * n], work / f"f{i:05d}.png", a.alfa) for i in range(len(times))]
         out = encode(work, a.fps, Path(a.wyjscie), a.alfa)
-    result = {"film": str(out), "klatek": len(frames), "fps": a.fps, "przegladarki": przegladarki,
+    result = {"film": out.as_posix(), "klatek": len(frames), "fps": a.fps, "przegladarki": przegladarki,
               **({"subklatki": n} if n > 1 else {})}
     if a.arkusz:
         step = max(1, len(frames) // 12)
-        result["arkusz"] = str(sheet(frames[::step], [f"t={t:.2f}s" for t in times[::step]], Path(a.arkusz)))
+        result["arkusz"] = sheet(frames[::step], [f"t={t:.2f}s" for t in times[::step]], Path(a.arkusz)).as_posix()
     if a.zostaw_klatki:
-        result["katalog_klatek"] = str(work)
+        result["katalog_klatek"] = work.as_posix()
     else:
         shutil.rmtree(work, ignore_errors=True)
     print(json.dumps(result, ensure_ascii=False))

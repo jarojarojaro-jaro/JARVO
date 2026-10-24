@@ -92,7 +92,7 @@ def analiza_mowy(src: Path, od_nowa: bool) -> dict:
     info = ed.probe(src)
     r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(src), "-vn", "-af",
                         f"silencedetect=noise={ed.SILENCE_DB}dB:d={ed.SILENCE_MIN}", "-f", "null", "-"],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode:
         raise SystemExit(f"ffmpeg nie przeanalizował dźwięku: {r.stderr.strip()[-300:]}")
     silences = ed.parse_silences(r.stderr, info.get("duration"))
@@ -101,7 +101,8 @@ def analiza_mowy(src: Path, od_nowa: bool) -> dict:
         raise SystemExit("brak jarvo-stt (rozpoznawanie mowy): bez słów nie wybierzesz fragmentów")
     with tempfile.TemporaryDirectory() as t:
         out = Path(t) / "slowa.json"
-        r = subprocess.run([stt, str(src), "--json", str(out)], capture_output=True, text=True)
+        r = subprocess.run([stt, str(src), "--json", str(out)], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
         if r.returncode or not out.is_file():
             raise SystemExit(f"jarvo-stt: {r.stderr.strip()[-300:]}")
         words = json.loads(out.read_text(encoding="utf-8")).get("words") or []
@@ -115,7 +116,8 @@ def analiza_mowy(src: Path, od_nowa: bool) -> dict:
 def sceny(src: Path, prog: float = 0.35) -> list[float]:
     """Cięcia ujęć (zmniejszony obraz: szybko także dla godzinnego nagrania)."""
     r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(src), "-an", "-vf",
-                        f"scale=320:-2,select='gt(scene,{prog})',showinfo", "-f", "null", "-"], capture_output=True, text=True)
+                        f"scale=320:-2,select='gt(scene,{prog})',showinfo", "-f", "null", "-"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     return [round(float(t), 2) for t in re.findall(r"pts_time:([\d.]+)", r.stderr)]
 
 
@@ -124,6 +126,7 @@ def arkusze(src: Path, dur: float, out: Path, na_arkusz: int = 24, kolumny: int 
     co = max(5.0, dur / 72)
     n = max(1, int(dur / co))
     out.mkdir(parents=True, exist_ok=True)
+    import wideo_lib as wl                     # noqa: PLC0415  (krój do drawtext poza Linuksem)
     sdr = ed.probe(src).get("sdr", "")         # nagranie HDR z telefonu: klatki po przeliczeniu, jak w rolce
     wynik = []
     for k, first in enumerate(range(0, n, na_arkusz)):
@@ -131,14 +134,14 @@ def arkusze(src: Path, dur: float, out: Path, na_arkusz: int = 24, kolumny: int 
         dest = out / f"arkusz-{k + 1}.jpg"
         t0 = first * co
         base = f"fps=1/{co:.3f},scale=320:-2{',' + sdr if sdr else ''}"
-        label = (f",drawtext=text='%{{pts\\:hms\\:{t0:.3f}}}':x=4:y=4:fontsize=16:fontcolor=white:"
+        label = (f",drawtext=text='%{{pts\\:hms\\:{t0:.3f}}}'{wl.drawtext_kroj()}:x=4:y=4:fontsize=16:fontcolor=white:"
                  "box=1:boxcolor=black@0.7:boxborderw=3")
         tile = f",tile={kolumny}x{(cnt + kolumny - 1) // kolumny}:padding=4:color=0x0B0D12"
         cmd = ["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-ss", f"{t0:.3f}", "-t", f"{cnt * co:.3f}", "-i", str(src)]
         r = subprocess.run(cmd + ["-vf", base + label + tile, "-frames:v", "1", "-q:v", "3", str(dest)], capture_output=True)
         if r.returncode:   # bez fontu do drawtext: arkusz bez czasu (kolejność × co od t0)
             subprocess.run(cmd + ["-vf", base + tile, "-frames:v", "1", "-q:v", "3", str(dest)], check=True, capture_output=True)
-        wynik.append({"plik": str(dest), "od": round(t0, 1), "do": round(t0 + cnt * co, 1), "co_s": round(co, 1)})
+        wynik.append({"plik": dest.as_posix(), "od": round(t0, 1), "do": round(t0 + cnt * co, 1), "co_s": round(co, 1)})
     return wynik
 
 
@@ -201,9 +204,9 @@ def cmd_przygotuj(a) -> int:
             lines += ([""] if o["n"] > 1 else []) + [f"## Okno {o['n']} [{mmss(o['od'])}–{mmss(o['do'])}]"]
         lines.append(f"[{mmss(z['od'])}–{mmss(z['do'])}] {z['tekst']}")
     (out / "transkrypcja.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    res = {"zrodlo": str(src), "sek": round(dur, 2), "w": info.get("w"), "h": info.get("h"), "fps": info.get("fps"),
+    res = {"zrodlo": src.as_posix(), "sek": round(dur, 2), "w": info.get("w"), "h": info.get("h"), "fps": info.get("fps"),
            "slowa": len(d["words"]), "zdania": len(zd), "okna": ok, "ciecia_ujec": cuts, "arkusze": sheets,
-           "mowa": str(ed.speech_path(src)), "transkrypcja": str(out / "transkrypcja.txt")}
+           "mowa": ed.speech_path(src).as_posix(), "transkrypcja": (out / "transkrypcja.txt").as_posix()}
     (out / "analiza.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"✓ {out / 'transkrypcja.txt'} ({len(zd)} zdań, {len(ok)} okien) · {len(sheets)} arkuszy klatek · {out / 'analiza.json'}")
     print("Dalej: master prompt (skill clipmaker) → plan.json → klipy.py sprawdz → klipy.py zbuduj")
@@ -422,7 +425,7 @@ def twarze_zrodla(src: Path, odcinki: list[tuple[float, float]], polecenie: str 
            else ["--odcinki", ",".join(f"{a:.3f}-{b:.3f}" for a, b in odcinki)])
     try:
         r = subprocess.run([py, str(HERE / "twarze.py"), polecenie, str(src), *arg], capture_output=True,
-                           text=True, timeout=3600)
+                           text=True, encoding="utf-8", errors="replace", timeout=3600)
         if r.returncode == 0:
             return json.loads(r.stdout)
         powod = (r.stderr or r.stdout).strip()[-240:]
@@ -917,7 +920,7 @@ def glosnosc_zrodla(src: Path, odcinki: list[tuple[float, float]], glos: str = "
            "-vn", "-af", f"aselect={wybor},asetpts=N/SR/TB,{glos + ',' if glos else ''}aresample=48000,"   # jak eksport: mono → stereo −3 dB
            "aformat=sample_fmts=fltp:channel_layouts=stereo,ebur128=peak=true", "-f", "null", "-"]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     except OSError:
         return None
     summary = r.stderr[r.stderr.rfind("Summary:"):]
@@ -1039,7 +1042,8 @@ def cmd_zbuduj(a) -> int:
         if seg:
             od = max(0.0, min(x for x, _ in seg) - 30)
             try:
-                r = subprocess.run(ed.szum_cmd(ctx["src"], "ffmpeg", od, max(y for _, y in seg) - od + 30), capture_output=True, text=True)
+                r = subprocess.run(ed.szum_cmd(ctx["src"], "ffmpeg", od, max(y for _, y in seg) - od + 30), capture_output=True, text=True,
+                                   encoding="utf-8", errors="replace")
                 tlo = ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
             except OSError:
                 tlo = None

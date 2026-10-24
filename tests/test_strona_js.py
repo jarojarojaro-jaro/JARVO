@@ -28,8 +28,8 @@ UKLAD = {"url": "http://127.0.0.1:8765/", "strony": {"start": {
 
 
 def node(kod: str) -> dict:
-    skrypt = f"import * as S from {json.dumps(str(MODUL))};\nconst uklad = {json.dumps(UKLAD)};\n{kod}"
-    wynik = subprocess.run(["node", "--input-type=module", "-e", skrypt], capture_output=True, text=True)
+    skrypt = f"import * as S from {json.dumps(MODUL.as_uri())};\nconst uklad = {json.dumps(UKLAD)};\n{kod}"
+    wynik = subprocess.run(["node", "--input-type=module", "-e", skrypt], capture_output=True, text=True, encoding="utf-8")
     assert wynik.returncode == 0, wynik.stderr
     return json.loads(wynik.stdout)
 

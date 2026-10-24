@@ -76,12 +76,7 @@ def okna(uklad: str, w: int, h: int) -> list[tuple[int, int, int, int]]:
 
 
 def _font(rozmiar: int):
-    from PIL import ImageFont
-    for p in ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
-              "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"):
-        if Path(p).exists():
-            return ImageFont.truetype(p, rozmiar)
-    return wl.czcionka(rozmiar)
+    return wl.czcionka(rozmiar, gruby=True)  # DejaVu Bold z obrazu, poza Linuksem pogrubiony krój systemu
 
 
 def _podpis(d, tekst: str, x: float, y: float, rozmiar: int, kotwica: str = "lt") -> None:
@@ -209,7 +204,7 @@ def bezruchy(plik: Path, sloty, sek: float, prog: float) -> list[tuple[float, fl
     for (x, y, sw, sh) in sloty:
         r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(plik), "-vf",
                             f"crop={sw}:{sh}:{x}:{y},scale=320:-2,freezedetect=n=0.002:d={prog:.2f}", "-an", "-f", "null", "-"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
         st = [float(v) for v in re.findall(r"freeze_start: ([\d.]+)", r.stderr)]
         en = [float(v) for v in re.findall(r"freeze_end: ([\d.]+)", r.stderr)]
         okresy.append([(a, en[i] if i < len(en) else sek) for i, a in enumerate(st)])
@@ -318,7 +313,7 @@ def main(argv: list[str] | None = None) -> int:
     except wl.FFError as exc:
         print(f"✗ {exc}", file=sys.stderr)
         return 1
-    print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
+    print(json.dumps({"plik": out.as_posix(), **stats}, ensure_ascii=False))
     return 0
 
 

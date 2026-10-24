@@ -9,7 +9,9 @@ wklejaj przypisanie w każdym).
 ## Wspólne
 - **Nie instaluj przeglądarki ani playwrighta sam** (`npx playwright install`, `setup.sh` z repo): obraz ma
   Chromium headless pasujący do playwright 1.63. Raz: `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <narzędzie>`,
-  potem w każdym wywołaniu: `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`.
+  potem w każdym wywołaniu: `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`. Bez `eval`
+  (to samo w każdej powłoce): `narzedzia.py uruchom <narzędzie> -- <polecenie>`; `{NAZWA}` w argumentach to zmienna
+  narzędzia (np. `{PYTHON}`, `{ANIM}`), bo `$NAZWA` powłoka rozwinie, zanim zmienna istnieje.
 - Stan: `narzedzia.py sprawdz` (JSON: przeglądarka, prores_ks, co zainstalowane).
 - Projekt w katalogu karty: `out/wideo/src/<nazwa>/` (małe litery, cyfry, myślniki; bez `#` i `%`).
 - Lektor PL: lokalny Matcha (domyślny, głos syntetyczny) albo Edge TTS (`film.py lektor`, `lektor_linie.py`), czasy

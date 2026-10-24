@@ -16,8 +16,8 @@ KL = 1 / 30
 
 
 def node(kod: str) -> dict:
-    skrypt = f"import * as U from {json.dumps(str(MODUL))};\n{kod}"
-    wynik = subprocess.run(["node", "--input-type=module", "-e", skrypt], capture_output=True, text=True)
+    skrypt = f"import * as U from {json.dumps(MODUL.as_uri())};\n{kod}"
+    wynik = subprocess.run(["node", "--input-type=module", "-e", skrypt], capture_output=True, text=True, encoding="utf-8")
     assert wynik.returncode == 0, wynik.stderr
     return json.loads(wynik.stdout)
 

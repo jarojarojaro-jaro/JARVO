@@ -10,10 +10,12 @@ import shutil
 import struct
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
-from conftest import REPO, load_script
+import atrapy
+from conftest import REPO, load_script, uruchom_bash
 
 wl = load_script("profiles/jarvo-wideo/scripts/wideo_lib.py", "wideo_lib")
 film = load_script("profiles/jarvo-wideo/scripts/film.py")
@@ -301,7 +303,7 @@ def test_montaz_stabilizuj_nagranie_z_reki(tmp_path):
     assert montaz.main(["stabilizuj", str(src), "-o", str(out), "--sila", "srednia"]) == 0
     info = montaz.wl.probe(out)
     assert abs(info["duration"] - 3.0) < 0.2 and info["audio"] and info["video"]["pix_fmt"] == "yuv420p"
-    if sys.platform.startswith("linux"):
+    if sys.platform.startswith("linux") or montaz.trf_ascii():   # nowsze vid.stab: ruch zapisany na prośbę jako ASCII
         przed, po = montaz.drzenie(src), montaz.drzenie(out)
         assert przed > 0.3 and po < przed / 2
 
@@ -335,7 +337,7 @@ def test_montaz_napraw_fps_pads_video_to_container(tmp_path):
     assert montaz.main(["napraw", str(src), "-o", str(out), "--fps", "30"]) == 0
     res = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries",
                           "stream=nb_read_frames,r_frame_rate,avg_frame_rate", "-of", "json", str(out)],
-                         capture_output=True, text=True, check=True)
+                         capture_output=True, text=True, encoding="utf-8", check=True)
     v = json.loads(res.stdout)["streams"][0]
     assert abs(int(v["nb_read_frames"]) - 75) <= 1 and v["r_frame_rate"] == v["avg_frame_rate"] == "30/1"
     assert abs(montaz.wl.duration(out) - 2.5) < 0.1
@@ -488,11 +490,11 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     dests = {e["dest"] for e in lock["agents"]["jarvo-wideo"]}
     assert {"video/motion-broll", "video/lemo-opuscar", "video/anidoodle"} <= dests
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
-    shell = tmp_path / "chromium_headless_shell-1243" / "chrome-headless-shell-linux64" / "chrome-headless-shell"
+    shell = tmp_path / "chromium_headless_shell-1243" / Path(*nz.SHELL_LAYOUTS[0])   # układ przeglądarki tego systemu
     shell.parent.mkdir(parents=True)
-    shell.write_text("")
+    shell.write_text("", encoding="utf-8")
     assert nz.env_for("lemo")["PLAYWRIGHT_CHROME"] == str(shell)
-    assert nz.env_for("motion")["NODE_PATH"].endswith("node/node_modules")
+    assert Path(nz.env_for("motion")["NODE_PATH"]).parts[-2:] == ("node", "node_modules")
     assert lock["sources"]["video-shotcraft"]["rev"] == nz.SHOTCRAFT_REV
     assert lock["sources"]["lottie"]["rev"] == nz.LOTTIE_REV                # player = ten sam commit co skill
     assert lock["sources"]["mg-styles-15"]["rev"] == nz.MGSTYLES_REV        # wzory stylów motion design
@@ -513,15 +515,21 @@ def test_code_tools_pinned_and_env(monkeypatch, tmp_path):
     assert nz.env_for("html")["CHROME_BIN"] == str(shell)
     # z nakładką (--no-sandbox dla puppeteer i CHROME_BIN); Remotion i playwright dostają przeglądarkę wprost
     wrapper = nz.ensure_chrome_wrapper()
-    assert wrapper.stat().st_mode & 0o111 and "--no-sandbox" in wrapper.read_text(encoding="utf-8")
+    if os.name == "nt":            # Windows: bez nakładki sh (CreateProcess jej nie uruchomi, Chromium nie jest tam rootem)
+        assert wrapper is None and not nz.CHROME_WRAPPER.exists()
+        chrome = str(shell)
+    else:
+        assert wrapper.stat().st_mode & 0o111 and "--no-sandbox" in wrapper.read_text(encoding="utf-8")
+        chrome = str(wrapper)
     html = nz.env_for("html")
-    assert html["PUPPETEER_EXECUTABLE_PATH"] == html["CHROME_BIN"] == str(wrapper) and html["JARVO_CHROME_REAL"] == str(shell)
+    assert html["PUPPETEER_EXECUTABLE_PATH"] == html["CHROME_BIN"] == chrome and html["JARVO_CHROME_REAL"] == str(shell)
+    assert html["PATH"].split(os.pathsep)[0] == str(nz.venv_bin(nz.VENV))     # programy venva narzędzi pierwsze
     assert nz.env_for("remotion")["REMOTION_BROWSER_EXECUTABLE"] == str(shell)
     assert nz.env_for("lottie")["LOTTIE_PLAYER"].endswith("lottie-player")
     mg = nz.env_for("mg")
-    assert mg["MGSTYLES"].endswith("mg-styles-15") and mg["CHROME_BIN"] == str(wrapper)
+    assert mg["MGSTYLES"].endswith("mg-styles-15") and mg["CHROME_BIN"] == chrome
     hs = nz.env_for("huashu")
-    assert hs["HUASHU"].endswith("huashu-art-motion") and hs["CHROME_BIN"] == str(wrapper) and "MGSTYLES" not in hs
+    assert hs["HUASHU"].endswith("huashu-art-motion") and hs["CHROME_BIN"] == chrome and "MGSTYLES" not in hs
     with pytest.raises(SystemExit):
         nz.env_for("puppeteer-core")
     monkeypatch.setenv("JARVO_EXTRAS", "media lemo")
@@ -535,13 +543,13 @@ def test_pinned_clone_upgrades_and_keeps_demos(tmp_path):
     up = tmp_path / "up"
 
     def git(*a, cwd=up):
-        return subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True, text=True,
+        return subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True, text=True, encoding="utf-8",
                               env={**__import__("os").environ, **env}).stdout.strip()
 
     def commit(files: dict[str, str]) -> str:
         for rel, body in files.items():
             (up / rel).parent.mkdir(parents=True, exist_ok=True)
-            (up / rel).write_text(body)
+            (up / rel).write_text(body, encoding="utf-8")
         git("add", "-A")
         git("commit", "-q", "-m", "c")
         return git("rev-parse", "HEAD")
@@ -560,15 +568,15 @@ def test_pinned_clone_upgrades_and_keeps_demos(tmp_path):
     assert not (dest / "styles/ink/poster.jpg").exists()
     git("sparse-checkout", "add", "/styles/ink/demo/", cwd=dest)                    # jak `setup.sh demo ink`
     nz.clone_pinned(f"file://{up}", b, dest, nz.LEMO_POMIN, keep=nz.LEMO_DODANE)
-    assert nz.git_head(dest) == b and (dest / "AGENTS.md").read_text() == "v2"
+    assert nz.git_head(dest) == b and (dest / "AGENTS.md").read_text(encoding="utf-8") == "v2"
     assert (dest / "styles/ink/demo/d.js").exists() and not (dest / "styles/engraving/demo").exists()
-    (dest / "AGENTS.md").write_text("lokalnie")
+    (dest / "AGENTS.md").write_text("lokalnie", encoding="utf-8")
     nz.clone_pinned(f"file://{up}", b, dest, nz.LEMO_POMIN, keep=nz.LEMO_DODANE)  # ten sam commit i lista: nic
-    assert (dest / "AGENTS.md").read_text() == "lokalnie"
+    assert (dest / "AGENTS.md").read_text(encoding="utf-8") == "lokalnie"
     # ten sam commit, krótsza lista wykluczeń (jak SHOTCRAFT_POMIN zamiast całej galerii): plik wraca, demo zostaje
     nz.clone_pinned(f"file://{up}", b, dest, [e for e in nz.LEMO_POMIN if e != "/styleboard/"], keep=nz.LEMO_DODANE)
     assert (dest / "styleboard/x.html").exists() and (dest / "styles/ink/demo/d.js").exists()
-    assert (dest / "AGENTS.md").read_text() == "v2" and not (dest / "styles/engraving/demo").exists()
+    assert (dest / "AGENTS.md").read_text(encoding="utf-8") == "v2" and not (dest / "styles/engraving/demo").exists()
 
 
 def test_shotcraft_keeps_card_index_but_not_media_or_editor():
@@ -582,29 +590,37 @@ def test_lemo_markers_match_skill_setup(monkeypatch, tmp_path):
     """Znaczniki pakietów mają treść, którą liczy setup.sh skilla (cksum plików + wersja Pythona venv)."""
     nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
     monkeypatch.setattr(nz, "LEMO", tmp_path)
-    (tmp_path / "package.json").write_text("{}\n")
-    (tmp_path / "package-lock.json").write_text("{\"lockfileVersion\": 3}\n")
-    (tmp_path / "requirements.txt").write_text("numpy\nscipy\n")
+    (tmp_path / "package.json").write_bytes(b"{}\n")
+    (tmp_path / "package-lock.json").write_bytes(b'{"lockfileVersion": 3}\n')
+    (tmp_path / "requirements.txt").write_bytes(b"numpy\nscipy\n")
     (tmp_path / "node_modules").mkdir()
-    py = tmp_path / ".venv" / "bin" / "python"
-    py.parent.mkdir(parents=True)
-    py.write_text("#!/bin/sh\necho 'Python 3.12.7'\n")
-    py.chmod(0o755)
-    sig = 'sig() { cat "$@" 2>/dev/null | cksum | cut -d" " -f1; }; '
-    node = subprocess.run(["sh", "-c", sig + "sig package.json package-lock.json"], cwd=tmp_path,
-                          capture_output=True, text=True).stdout.strip()
-    core = subprocess.run(["sh", "-c", sig + 'echo "$(sig requirements.txt)-$(.venv/bin/python -V 2>&1 | cut -d. -f1,2)"'],
-                          cwd=tmp_path, capture_output=True, text=True).stdout.strip()
+    py = atrapy.program(nz.venv_bin(tmp_path / ".venv"), "python", "print('Python 3.12.7')")
+    if os.name == "nt":                                   # atrapa to python.cmd, a venv na Windows ma python.exe
+        monkeypatch.setattr(nz, "venv_python", lambda venv: py)
+    # `sig` z setup.sh (cat pliki | cksum): liczby z prawdziwego cksum dla tych treści (test niżej porównuje na żywo)
+    node, core = "1592544134", "3800650272-Python 3.12"
     assert nz.lemo_znacznik(None) == (tmp_path / "node_modules" / ".lemo-ok", node)
     assert nz.lemo_znacznik("core") == (tmp_path / ".venv" / ".lemo-core", core) and core.endswith("-Python 3.12")
     assert not nz.lemo_gotowe("core")
-    (tmp_path / ".venv" / ".lemo-core").write_text(core + "\n")
+    (tmp_path / ".venv" / ".lemo-core").write_text(core + "\n", encoding="utf-8")
     assert nz.lemo_gotowe("core")
-    (tmp_path / "requirements.txt").write_text("numpy\n")                        # zmiana wymagań = instalacja od nowa
+    (tmp_path / "requirements.txt").write_text("numpy\n", encoding="utf-8")      # zmiana wymagań = instalacja od nowa
     assert not nz.lemo_gotowe("core")
     assert nz.lemo_poziomy() == ["core", "music"]
     monkeypatch.setenv("JARVO_EXTRAS", "lemo")
     assert nz.lemo_poziomy() == ["core", "music", "voice"]
+
+
+@pytest.mark.wymaga_bash
+def test_cksum_jak_coreutils(tmp_path):
+    """cksum w Pythonie (bez powłoki, także na Windows) daje to samo co `cat … | cksum` z setup.sh skilla lemo."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    for dane in (b"", b"a", b"{}\n", b'{}\n{"lockfileVersion": 3}\n', b"numpy\nscipy\n", bytes(range(256)) * 300):
+        wynik = uruchom_bash("-c", "cksum | cut -d' ' -f1", input=dane, text=False)
+        assert int(wynik.stdout.decode().strip()) == nz.cksum(dane), len(dane)
+    (tmp_path / "a").write_bytes(b"{}\n")
+    (tmp_path / "b").write_bytes(b'{"lockfileVersion": 3}\n')
+    assert nz.lemo_sig(tmp_path / "a", tmp_path / "brak", tmp_path / "b") == "1592544134"   # brakujący plik pominięty
 
 
 def _zapisz(p, dane: bytes):
@@ -659,7 +675,8 @@ def test_kroje_from_google_fonts_and_polish_letters(tmp_path, capsys):
     zrodlo = Zrodlo()
     uwagi = nz.kroje(fonts, zrodlo)
     assert (fonts / "Lato-Regular.ttf").read_bytes() == pl and (fonts / "Jost.ttf").read_bytes() == pl
-    assert (fonts / "OFL-lato.txt").exists() and not (fonts / "OFL-jost.txt").exists()
+    assert "OFL-lato.txt" in os.listdir(fonts) and "OFL-jost.txt" not in os.listdir(fonts)   # macOS i Windows: bez
+    # rozróżniania wielkości liter `exists()` znalazłoby OFL-Jost.txt, więc patrzymy na nazwy w katalogu
     assert sorted(zrodlo.pytania) == ["jost", "lato", "nieznany", "oleoscript"]   # każda rodzina raz, bez ../
     assert len(uwagi) == 2 and "OleoScript-Regular.ttf: brak polskich znaków ąćęłńśźż" in uwagi[0]
     assert "Nieznany-Regular.ttf: nie ma go w google/fonts" in uwagi[1]
@@ -708,7 +725,10 @@ def test_kroje_mg_from_google_fonts_and_cjk_substitute(tmp_path, capsys):
     assert (dafoe / "MrDafoe-Regular.ttf").read_bytes() == b"dafoe" and (dafoe / "OFL-mrdafoe.txt").exists()
     for zastepczy in ("cjk/alibabapuhuiti3/AlibabaPuHuiTi-3-85-Bold.ttf", "cjk/notoserifsc/NotoSerifSC-VF.ttf"):
         p = f / zastepczy
-        assert p.is_symlink() and p.read_bytes() == b"noto" and not os.path.isabs(os.readlink(p))
+        if os.name == "nt":                         # bez uprawnień do symlinków: twarde dowiązanie albo kopia
+            assert p.read_bytes() == b"noto" and not p.is_symlink()
+        else:
+            assert p.is_symlink() and p.read_bytes() == b"noto" and not os.path.isabs(os.readlink(p))
     assert ("ofl", "notoserifsc") not in zrodlo.pytania                       # 25 MB: nie pyta, od razu zastępczy
     assert uwagi == ["/assets/fonts/latin/brak/Brak-Bold.ttf: nie ma go w google/fonts; "
                      "wzór narysuje go krojem zastępczym albo nie wystartuje"]
@@ -722,11 +742,11 @@ def test_code_tools_helpers(monkeypatch, tmp_path):
     # starszy układ przeglądarki (chrome-linux/headless_shell) i wybór najnowszego buildu po numerze, nie alfabetycznie
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
     assert nz.headless_shell() is None
-    old = tmp_path / "chromium_headless_shell-999" / "chrome-linux" / "headless_shell"
-    new = tmp_path / "chromium_headless_shell-1200" / "chrome-headless-shell-linux64" / "chrome-headless-shell"
+    old = tmp_path / "chromium_headless_shell-999" / Path(*nz.SHELL_LAYOUTS[-1])
+    new = tmp_path / "chromium_headless_shell-1200" / Path(*nz.SHELL_LAYOUTS[0])
     for p in (old, new):
         p.parent.mkdir(parents=True)
-        p.write_text("")
+        p.write_text("", encoding="utf-8")
     assert nz.headless_shell() == str(new)
     new.unlink()
     assert nz.headless_shell() == str(old)
@@ -737,8 +757,98 @@ def test_code_tools_helpers(monkeypatch, tmp_path):
     assert nz.py_module("faster-whisper") == "faster_whisper"
     monkeypatch.setattr(nz, "NODE", tmp_path / "node")
     link = nz.link(tmp_path / "projekt")
-    assert link.is_symlink() and link.resolve() == (tmp_path / "node" / "node_modules").resolve()
+    assert nz.jest_dowiazaniem(link) and link.resolve() == (tmp_path / "node" / "node_modules").resolve()
+    assert link.is_symlink() == (os.name != "nt")                          # na Windows junction (bez uprawnień admina)
     assert nz.link(tmp_path / "projekt") == link                           # drugi raz bez błędu
+    (tmp_path / "node" / "node_modules" / "pakiet").mkdir()
+    assert (link / "pakiet").is_dir()                                      # przez dowiązanie widać wspólne pakiety
+
+
+def test_narzedzia_env_dla_powloki_i_uruchom(monkeypatch, tmp_path, capfd):
+    """`uruchom` daje programowi zmienne narzędzia bez eval (program z PATH venva narzędzi, także .cmd na Windows)
+    i podstawia {NAZWA} w argumentach; `env` wypisuje export dla basha: na Windows ścieżki z „/” i PATH Git Basha."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    monkeypatch.setattr(nz, "VENV", tmp_path / "narzedzia z spacja" / "venv")   # .cmd atrapy: tylko ASCII w ścieżce
+    monkeypatch.setattr(nz, "MGSTYLES", tmp_path / "mg styles")
+    atrapy.program(nz.venv_bin(nz.VENV), "narzedzie-testowe",
+                   "import os, sys; print(os.environ['PYTHON'], *sys.argv[1:], sep='|')")
+    capfd.readouterr()
+    assert nz.main(["uruchom", "html", "--", "narzedzie-testowe", "{PYTHON}", "{NIEZNANA}", "x"]) == 0
+    assert capfd.readouterr().out.strip() == "|".join([nz.py()] * 2 + ["{NIEZNANA}", "x"])
+    assert nz.main(["uruchom", "mgaudio", sys.executable, "-c", "import sys; sys.exit(3)"]) == 3   # kod wyjścia polecenia
+    with pytest.raises(SystemExit):
+        nz.main(["uruchom", "html", "--"])
+    assert nz.msys(r"C:\Users\Michał Żółć\x") == "/c/Users/Michał Żółć/x" and nz.msys("/usr/bin") == "/usr/bin"
+    if os.name == "nt":
+        assert nz.dla_powloki("PATH", r"C:\a b;D:\c") == "/c/a b:/d/c" and nz.dla_powloki("MGAUDIO", r"C:\a\b") == "C:/a/b"
+    else:
+        assert nz.dla_powloki("PATH", "/a:/b") == "/a:/b" and nz.dla_powloki("MGAUDIO", "/a/b") == "/a/b"
+    assert nz.main(["env", "mgaudio"]) == 0
+    out = capfd.readouterr().out
+    assert 'export MGAUDIO="' in out and "mg styles" in out
+
+
+@pytest.mark.wymaga_bash
+def test_narzedzia_env_do_eval_w_powloce(monkeypatch, tmp_path, capsys):
+    """`eval "$(narzedzia.py env …)"` w prawdziwym bashu (na Windows Git Bash): ścieżka ze spacją i polskimi
+    literami przechodzi cała, a programy venva narzędzi są pierwsze w PATH (na Windows w zapisie Git Basha)."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    monkeypatch.setattr(nz, "VENV", tmp_path / "narzędzia z ąę" / "venv")
+    monkeypatch.setattr(nz, "LOTTIE", tmp_path / "narzędzia z ąę" / "lottie-player")
+    assert nz.main(["env", "lottie"]) == 0
+    wynik = uruchom_bash("-c", 'eval "$(cat)"; printf "%s\\n" "$LOTTIE_PLAYER" "${PATH%%:*}"', input=capsys.readouterr().out)
+    assert wynik.returncode == 0, wynik.stderr
+    assert wynik.stdout.splitlines() == [nz.dla_powloki("LOTTIE_PLAYER", str(nz.LOTTIE)),
+                                         nz.dla_powloki("PATH", str(nz.venv_bin(nz.VENV)))]
+
+
+@pytest.mark.parametrize("windows", [False, True])
+def test_od_nowa_execv_na_posix_podproces_na_windows(monkeypatch, windows):
+    """Skrypt rusza od nowa Pythonem venva z tymi samymi argumentami: na POSIX os.execv (ten sam proces, jak dotąd),
+    na Windows podproces i jego kod wyjścia (execv odpiąłby nowy proces od agenta, który czeka na wynik)."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    monkeypatch.setattr(nz, "WINDOWS", windows)
+    monkeypatch.setattr(sys, "argv", ["film.py", "render", "plan.json"])
+    wywolane = []
+
+    def execv(prog, args):
+        wywolane.append(("execv", prog, args))
+        raise RuntimeError("execv")
+    monkeypatch.setattr(nz.os, "execv", execv)
+    monkeypatch.setattr(nz.subprocess, "run", lambda args, **kw: wywolane.append(("run", args)) or
+                        subprocess.CompletedProcess(args, 7))
+    skrypt = REPO / "profiles/jarvo-wideo/scripts/film.py"
+    argv = ["/venv/python", str(skrypt.resolve()), "render", "plan.json"]
+    if windows:
+        with pytest.raises(SystemExit) as e:
+            nz.od_nowa("/venv/python", str(skrypt))
+        assert e.value.code == 7 and wywolane == [("run", argv)]
+    else:
+        with pytest.raises(RuntimeError):
+            nz.od_nowa("/venv/python", str(skrypt))
+        assert wywolane == [("execv", "/venv/python", argv)]
+
+
+def test_kroje_podpisow_i_drawtext_poza_linuksem(monkeypatch, tmp_path):
+    """Podpisy arkuszy (Pillow) i drawtext biorą krój z polskimi znakami z katalogu systemu: DejaVu na Linuksie
+    (drawtext bez fontfile, jak dotąd), Segoe UI/Arial na Windows, Arial na macOS; drawtext z fontfile w apostrofach
+    i z zabezpieczonym dwukropkiem po literze dysku."""
+    kroje = wl.pliki_krojow()
+    if sys.platform.startswith("linux"):
+        assert kroje[0] == Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf") and wl.drawtext_kroj() == ""
+        assert wl.pliki_krojow(gruby=True)[0].name == "DejaVuSans-Bold.ttf"
+        return
+    assert all(p.suffix == ".ttf" for p in kroje) and wl.pliki_krojow(gruby=True)[0] not in kroje
+    kroj = tmp_path / "Fonts" / "segoeui.ttf"
+    kroj.parent.mkdir()
+    kroj.write_bytes(b"ttf")
+    monkeypatch.setattr(wl, "pliki_krojow", lambda gruby=False: [tmp_path / "brak.ttf", kroj])
+    tekst = wl.drawtext_kroj()
+    assert tekst.startswith(":fontfile='") and tekst.endswith("segoeui.ttf'") and "\\" not in tekst.replace("\\:", "")
+    if os.name == "nt":
+        assert tekst == ":fontfile='" + kroj.as_posix().replace(":", "\\:") + "'" and "\\:/" in tekst
+    monkeypatch.setattr(wl, "pliki_krojow", lambda gruby=False: [tmp_path / "brak.ttf"])
+    assert wl.drawtext_kroj() == ""                                       # bez kroju: drawtext spróbuje sam
 
 
 # ------------------------------------------------------------------ html_wideo (animacja HTML / Lottie → wideo)
@@ -765,7 +875,7 @@ def test_html_time_values_and_urls(tmp_path):
     assert hw.frame_times(1, 4) == [0, .25, .5, .75] and hw.frame_times(0, 30) == [0]
     assert hw.parse_times("0, 1.5;3") == [0, 1.5, 3] and hw.parse_size("1080x1920") == (1080, 1920)
     page = tmp_path / "anim.html"
-    page.write_text("<p>x</p>")
+    page.write_text("<p>x</p>", encoding="utf-8")
     url = hw.page_url(str(page), {"t": "1.5", "clean": 1})
     assert url.startswith("file://") and url.endswith("anim.html?t=1.5&clean=1")
     assert hw.page_url("http://127.0.0.1:3030/p/scene-1?frame=2", {"frame": 5}) == "http://127.0.0.1:3030/p/scene-1?frame=5"
@@ -851,14 +961,14 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
     monkeypatch.setattr(nz_mod, "JARVO_JS", tmp_path / "jarvo-js")
     monkeypatch.setattr(nz_mod, "HUASHU", tmp_path / "huashu")
     (tmp_path / "huashu" / "scripts" / "engine" / "clips").mkdir(parents=True)
-    (tmp_path / "huashu" / "scripts" / "engine" / "clips" / "y2_vox.js").write_text("CLIPS.y2_vox = {};")
+    (tmp_path / "huashu" / "scripts" / "engine" / "clips" / "y2_vox.js").write_text("CLIPS.y2_vox = {};", encoding="utf-8")
     lib = tmp_path / "node" / "node_modules" / "three" / "build"
     lib.mkdir(parents=True)
-    (lib / "three.module.js").write_text("export const ok = 1;")
-    (tmp_path / "sekret.txt").write_text("nie")
+    (lib / "three.module.js").write_text("export const ok = 1;", encoding="utf-8")
+    (tmp_path / "sekret.txt").write_text("nie", encoding="utf-8")
     site = tmp_path / "site"
     site.mkdir()
-    (site / "index.html").write_text("<p>ok</p>")
+    (site / "index.html").write_text("<p>ok</p>", encoding="utf-8")
     httpd = hw.serve(site, lib=True)
     base = f"http://127.0.0.1:{httpd.server_address[1]}"
     try:
@@ -886,7 +996,7 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
     (tmp_path / "mg" / "assets" / "textures").mkdir(parents=True)
     (tmp_path / "mg" / "assets" / "textures" / "grain.png").write_bytes(b"png")
     (tmp_path / "mg" / "demos" / "01").mkdir(parents=True)
-    (tmp_path / "mg" / "demos" / "01" / "film.js").write_text("export const f = 1;")
+    (tmp_path / "mg" / "demos" / "01" / "film.js").write_text("export const f = 1;", encoding="utf-8")
     o = hw.resolve_opts("mg")
     assert o["serwer"] and "renderAt" in o["seek"] and "getAnimations" in o["seek"] and "DEMO" in o["rozmiar_js"]
     assert hw.aliasy(hw.resolve_opts("jarvo")) == {}
@@ -904,7 +1014,7 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
         httpd.shutdown()
     # stara kopia + kilka przeglądarek renderu naraz: na końcu cały plik, bez resztek plików tymczasowych
     import threading
-    (tmp_path / "jarvo-js" / "ruch.js").write_text("stare")
+    (tmp_path / "jarvo-js" / "ruch.js").write_text("stare", encoding="utf-8")
     watki = [threading.Thread(target=nz_mod.sync_jarvo_js) for _ in range(8)]
     [w.start() for w in watki]
     [w.join() for w in watki]
@@ -912,6 +1022,34 @@ def test_html_server_maps_lib_and_blocks_escape(tmp_path, monkeypatch):
     assert sorted(x.name for x in (tmp_path / "jarvo-js").iterdir()) == sorted(nz_mod.JARVO_JS_PLIKI)
     for nazwa in nz_mod.JARVO_JS_PLIKI:                                         # każdy moduł Jarva = kopia ze scripts/
         assert (tmp_path / "jarvo-js" / nazwa).read_bytes() == (REPO / "profiles/jarvo-wideo/scripts" / nazwa).read_bytes()
+
+
+def test_lottie_player_i_scena_przez_aliasy_serwera(tmp_path):
+    """Strona Lottie bierze player spod /ck/ i scenę spod /scene/ jako aliasy serwera (bez dowiązań w katalogu
+    tymczasowym, których Windows bez uprawnień nie tworzy); poza katalogi aliasów nie wychodzi."""
+    import urllib.error
+    import urllib.request
+    ck, scena, strona = tmp_path / "ck", tmp_path / "scena z ąę", tmp_path / "strona"
+    for d in (ck, scena, strona):
+        d.mkdir()
+    (ck / "canvaskit.js").write_text("var CanvasKitInit;", encoding="utf-8")
+    (scena / "lottie.json").write_text('{"v": "5"}', encoding="utf-8")
+    (scena / "obraz 1.png").write_bytes(b"png")
+    (tmp_path / "sekret.txt").write_text("nie", encoding="utf-8")
+    (strona / "index.html").write_text("<p>lottie</p>", encoding="utf-8")
+    httpd = hw.serve(strona, alias={"/ck/": ck, "/scene/": scena})
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    try:
+        for url, tresc in (("/index.html", b"lottie"), ("/ck/canvaskit.js", b"CanvasKitInit"), ("/scene/lottie.json", b'"v"'),
+                           ("/scene/" + hw.quote("obraz 1.png"), b"png")):
+            with urllib.request.urlopen(base + url) as r:
+                assert tresc in r.read(), url
+        for zle in ("/ck/../sekret.txt", "/scene/../../sekret.txt", "/scene/", "/ck/brak.js"):
+            with pytest.raises(urllib.error.HTTPError):
+                urllib.request.urlopen(base + zle)
+    finally:
+        httpd.shutdown()
+    assert "symlink" not in __import__("inspect").getsource(hw.lottie_render)
 
 
 def test_html_parallel_browsers_split_the_timeline(monkeypatch, tmp_path):
@@ -979,14 +1117,15 @@ def test_render_slots_limit_and_memory_gate(monkeypatch, tmp_path):
     monkeypatch.setenv("JARVO_RENDER_KATALOG", str(tmp_path))
     monkeypatch.setenv("JARVO_RENDER_MIEJSCA", "2")
     monkeypatch.delenv("JARVO_RENDER_ZAJETE", raising=False)
-    trzymaj = ("import fcntl, sys, time; f = open(sys.argv[1], 'a+'); fcntl.flock(f, fcntl.LOCK_EX); "
-               "print('ok', flush=True); time.sleep(30)")
-    inny = subprocess.Popen([sys.executable, "-c", trzymaj, str(tmp_path / "miejsce0")], stdout=subprocess.PIPE, text=True)
+    trzymaj = ("import sys, time; sys.path.insert(0, sys.argv[2]); import wideo_lib as wl; "
+               "f = open(sys.argv[1], 'a+', encoding='utf-8'); wl.zablokuj(f); print('ok', flush=True); time.sleep(30)")
+    inny = subprocess.Popen([sys.executable, "-c", trzymaj, str(tmp_path / "miejsce0"), str(REPO / "profiles/jarvo-wideo/scripts")],
+                            stdout=subprocess.PIPE, text=True, encoding="utf-8")
     try:
         assert inny.stdout.readline().strip() == "ok"                           # ktoś renderuje w miejscu 0
         monkeypatch.setattr(wl, "wolna_pamiec", lambda: (55.0, 4.0))
         with wl.miejsce_renderu("test"):
-            assert os.environ["JARVO_RENDER_ZAJETE"] == "1" and (tmp_path / "miejsce1").read_text().startswith(str(os.getpid()))
+            assert os.environ["JARVO_RENDER_ZAJETE"] == "1" and (tmp_path / "miejsce1").read_text(encoding="utf-8").startswith(str(os.getpid()))
             with wl.miejsce_renderu("w środku"):                                # render z renderu nie zajmuje drugiego
                 pass
         assert "JARVO_RENDER_ZAJETE" not in os.environ
@@ -999,6 +1138,51 @@ def test_render_slots_limit_and_memory_gate(monkeypatch, tmp_path):
     finally:
         inny.kill()
         inny.wait()
+
+
+def test_blokada_pliku_i_wolna_pamiec_na_kazdym_systemie(tmp_path):
+    """zablokuj/odblokuj (flock, na Windows msvcrt): drugi uchwyt czeka albo od razu słyszy „zajęte”, a treść pliku
+    miejsca (pid) da się czytać przy trzymanej blokadzie. Wolna pamięć bez /proc też z prawdziwych liczb."""
+    plik = tmp_path / "miejsce0"
+    with open(plik, "a+", encoding="utf-8") as a, open(plik, "a+", encoding="utf-8") as b:
+        assert wl.zablokuj(a, czekaj=False) and not wl.zablokuj(b, czekaj=False)
+        a.seek(0)
+        a.truncate()
+        a.write("123 test\n")
+        a.flush()
+        assert plik.read_text(encoding="utf-8") == "123 test\n"
+        wl.odblokuj(a)
+        assert wl.zablokuj(b, czekaj=False)
+        wl.odblokuj(b)
+    procent, gb = wl.wolna_pamiec()
+    assert 0 <= procent <= 100 and gb > 0
+    if os.name == "nt":                                                   # bez /proc i cgroup: GlobalMemoryStatusEx
+        assert wl._pamiec_windows() is not None and wl._pamiec_windows()[1] > 0
+    assert wl._uzytkownik() == (str(os.getuid()) if hasattr(os, "getuid") else __import__("getpass").getuser())
+
+
+def test_sekret_tylko_dla_wlasciciela(tmp_path):
+    """Token Openverse w cache: chmod 600 na POSIX; na Windows ACL bez dziedziczenia, z kontem właściciela (wpis
+    „Wszyscy” odziedziczony po katalogu znika)."""
+    katalog = tmp_path / "cache"
+    katalog.mkdir()
+    if os.name == "nt":                                    # Wszyscy (S-1-1-0): odczyt dziedziczony przez pliki katalogu
+        subprocess.run(["icacls", str(katalog), "/grant", "*S-1-1-0:(OI)(R)"], check=True, capture_output=True)
+    plik = katalog / "openverse-token.json"
+    plik.write_text("{}", encoding="utf-8")
+
+    def acl() -> list[str]:
+        out = subprocess.run(["icacls", str(plik)], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
+        return [w.strip() for w in out.replace(str(plik), "").splitlines() if ":(" in w]
+    if os.name == "nt":
+        assert any("(I)" in w for w in acl())                          # przed: wpisy dziedziczone, w tym Wszyscy
+    wl.tylko_dla_wlasciciela(plik)
+    if os.name != "nt":
+        assert plik.stat().st_mode & 0o777 == 0o600
+        return
+    po = acl()
+    assert not any("(I)" in w for w in po), po                         # SYSTEM i Administratorzy zostają, gdy nadane wprost
+    assert any(w.lower().endswith("\\" + wl._uzytkownik().lower() + ":(f)") for w in po), po
 
 
 # ------------------------------------------------------------------ rodzaje filmu i inspiracje
@@ -1054,11 +1238,11 @@ def test_inspiracje_cache_used_when_offline(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         insp.load()                                                        # bez cache: jasny komunikat, nie traceback
     cached = wl.cache_dir("inspiracje") / f"videos-{insp.REV[:12]}.json"
-    cached.write_text(json.dumps([{"slug": "x"}]))
+    cached.write_text(json.dumps([{"slug": "x"}]), encoding="utf-8")
     assert [it["slug"] for it in insp.load()] == ["x"]                     # drugie źródło bez cache: pominięte
     aim = wl.cache_dir("inspiracje") / f"aim-{insp.AIM_REV[:12]}.json"
     aim.write_text(json.dumps({"cases": [{"id": "1", "category": "产品宣传", "author": {"handle": "a"},
-                                          "prompt": {"status": "original", "text": "launch film"}, "source": {"url": "u"}}]}))
+                                          "prompt": {"status": "original", "text": "launch film"}, "source": {"url": "u"}}]}), encoding="utf-8")
     got = insp.load()
     assert [it["slug"] for it in got] == ["x", "aim-1"] and got[1]["category"] == "product" and not got[1]["prompt_partial"]
 
@@ -1254,8 +1438,9 @@ const stoi = R.smuga(g, () => [5, 5], 1, 10, '#ff3300');
 let blad = '';
 try { R.ladowanie(0, 0, 'nerwowy'); } catch (e) { blad = String(e.message); }
 console.log(JSON.stringify({out, ops, ruch, stoi, blad, rozc: R.rozciagniecie(0)}));
-""" % json.dumps(str(REPO / "profiles/jarvo-wideo/scripts/ruch.js")))
-    wynik = json.loads(subprocess.run(["node", str(skrypt)], capture_output=True, text=True, check=True).stdout)
+""" % json.dumps((REPO / "profiles/jarvo-wideo/scripts/ruch.js").as_uri()), encoding="utf-8")
+    wynik = json.loads(subprocess.run(["node", str(skrypt)], capture_output=True, text=True, encoding="utf-8",
+                                      check=True).stdout)
     out = wynik["out"]
     assert list(out) == ["zaufanie", "luksus", "odwazny", "zabawny", "spokojny", "przyjazny"]
     for n, w in out.items():
@@ -1304,8 +1489,8 @@ console.log(JSON.stringify({
   bayer: [0, 1, 2, 3].flatMap((y) => [0, 1, 2, 3].map((x) => X.bayer(x, y))).filter((v) => v < 0.5).length,
   tryby: Object.keys(C.TRYBY), wl: [C.wlaczanie(0, 0), C.wlaczanie(1, 0), C.wylaczanie(0.1, 0)],
 }));
-""" % tuple(json.dumps(str(d / n)) for n in ("kreska.js", "morph.js", "crt.js", "plotno.js", "piksel.js")))
-    w = json.loads(subprocess.run(["node", str(skrypt)], capture_output=True, text=True, check=True).stdout)
+""" % tuple(json.dumps((d / n).as_uri()) for n in ("kreska.js", "morph.js", "crt.js", "plotno.js", "piksel.js")), encoding="utf-8")
+    w = json.loads(subprocess.run(["node", str(skrypt)], capture_output=True, text=True, encoding="utf-8", check=True).stdout)
     assert w["ten_sam"] and 1.0 < w["wrzenie"] < 3.0                     # amp 2,2 px: widać, ale linia ta sama
     assert w["eksp"] == [[0, 0, 2], [6, 3, 2], [8, 4, 1], [23, 19, 1], [24, 20, 2], [26, 21, 2]]
     assert w["rys"]["t"] == 1 and w["rys"]["krok"] == 2 and w["rys"]["id"] == 12
@@ -1577,10 +1762,8 @@ def test_czasy_slow_bez_parakeeta_z_podzialu_na_zdania():
 def test_speak_many_glos_lokalny_przez_jarvo_tts(tmp_path, monkeypatch):
     """Głos en-US-Paradee idzie przez jarvo-tts (atrapa: ton zamiast mowy), bez Parakeeta czasy z podziału na zdania,
     drugi raz z cache."""
-    fake = tmp_path / "jarvo-tts"
-    fake_src = f"""#!{sys.executable}
-import json, math, struct, sys, wave
-jobs = json.load(open(sys.argv[2]))
+    fake_src = f"""import json, math, struct, sys, wave
+jobs = json.load(open(sys.argv[2], encoding="utf-8"))
 out = []
 for j in jobs:
     n = int(24000 * 1.5 / j["szybkosc"])
@@ -1588,12 +1771,11 @@ for j in jobs:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000)
         w.writeframes(b"".join(struct.pack("<h", int(8000 * math.sin(i / 9))) for i in range(n)))
     out.append({{"wyjscie": j["wyjscie"], "sekundy": n / 24000, "zdania": [[0.0, n / 24000, j["tekst"]]]}})
-open(sys.argv[2] + ".log", "a").write("x")
-open({str(tmp_path / "glosy.txt")!r}, "a").write(" ".join(j["glos"] for j in jobs) + "\\n")
+open(sys.argv[2] + ".log", "a", encoding="utf-8").write("x")
+open({str(tmp_path / "glosy.txt")!r}, "a", encoding="utf-8").write(" ".join(j["glos"] for j in jobs) + "\\n")
 print(json.dumps(out))
 """
-    fake.write_text(fake_src)
-    fake.chmod(0o755)
+    fake = atrapy.program(tmp_path, "jarvo-tts", fake_src)          # na Windows .cmd (CreateProcess nie zna shebangu)
     monkeypatch.setenv("JARVO_TTS_BIN", str(fake))
     monkeypatch.setenv("JARVO_STT_BIN", str(tmp_path / "brak-stt"))
     monkeypatch.setattr(wl.shutil, "which", lambda *_a, **_k: None)
@@ -1605,14 +1787,13 @@ print(json.dumps(out))
     assert sp[0].duration == pytest.approx(1.0, abs=0.1) and sp[1].duration == pytest.approx(1.5, abs=0.1)
     assert [w.text for w in sp[0].words] == ["Hello", "there", "friend."]
     assert json.loads(sp[0].audio.with_suffix(".json").read_text(encoding="utf-8"))["czasy"] == "zdania"
-    assert (tmp_path / "glosy.txt").read_text() == "en-US-Paradee en-US-Paradee\n"      # głos idzie do jarvo-tts
+    assert (tmp_path / "glosy.txt").read_text(encoding="utf-8") == "en-US-Paradee en-US-Paradee\n"   # głos do jarvo-tts
     fake.unlink()                                                       # drugi raz: cache, bez jarvo-tts
     assert [s.audio for s in wl.speak_many(items)] == [s.audio for s in sp]
     # domyślny głos (bez „voice”) to polski Matcha, też przez jarvo-tts; {klamry} nie trafiają do słów napisów
-    fake.write_text(fake_src)
-    fake.chmod(0o755)
+    atrapy.program(tmp_path, "jarvo-tts", fake_src)
     sp = wl.speak_many([{"text": "Dzięki za {feedback} dziś."}])
-    assert (tmp_path / "glosy.txt").read_text().splitlines()[-1] == "pl-PL-Matcha-Meski"
+    assert (tmp_path / "glosy.txt").read_text(encoding="utf-8").splitlines()[-1] == "pl-PL-Matcha-Meski"
     assert [w.text for w in sp[0].words] == ["Dzięki", "za", "feedback", "dziś."]
 
 
@@ -1634,7 +1815,7 @@ def test_lektor_matcha_bez_jarvo_tts_zapas_edge(tmp_path, monkeypatch):
     monkeypatch.setattr(wl, "duration", lambda _p: 1.0)
     sp = wl.speak_many([{"text": "Raport {PDF} dziś.", "voice": "pl-PL-Matcha-Damski"}, {"text": "Cześć."}])
     assert sorted(wolane) == [("Cześć.", "pl-PL-MarekNeural"), ("Raport PDF dziś.", "pl-PL-ZofiaNeural")]
-    assert len(sp) == 2 and json.loads(sp[0].audio.with_suffix(".json").read_text())["voice"] == "pl-PL-ZofiaNeural"
+    assert len(sp) == 2 and json.loads(sp[0].audio.with_suffix(".json").read_text(encoding="utf-8"))["voice"] == "pl-PL-ZofiaNeural"
     with pytest.raises(SystemExit):
         wl.speak_many([{"text": "Hello.", "voice": "en-US-Paradee"}])
 

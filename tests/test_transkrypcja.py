@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-import os
 
+import atrapy
 from conftest import load_script
 
 T = load_script("shared/skills/transkrypcja-filmu/scripts/transkrybuj.py")
@@ -38,11 +38,9 @@ def test_auto_captions_are_deduplicated_and_timed():
 def test_local_file_goes_straight_to_speech(tmp_path, monkeypatch):
     """Plik lokalny: bez yt-dlp, od razu Parakeet; wynik to sam tekst (bez analizy obrazu)."""
     b = tmp_path / "bin"
-    b.mkdir()
-    (b / "jarvo-stt").write_text('#!/usr/bin/env bash\nprintf "1\\n00:00:00,000 --> 00:00:02,500\\n'
-                                 'Make no mistakes.\\n" > "$3"\n', encoding="utf-8")
-    (b / "jarvo-stt").chmod(0o755)
-    monkeypatch.setenv("PATH", f"{b}:{os.environ['PATH']}")
+    atrapy.program(b, "jarvo-stt", "import sys; open(sys.argv[3], 'w', encoding='utf-8').write("
+                                   "'1\\n00:00:00,000 --> 00:00:02,500\\nMake no mistakes.\\n')")
+    monkeypatch.setenv("PATH", atrapy.sciezka(b))
     film = tmp_path / "film.mp4"
     film.write_bytes(b"\0")
     out = tmp_path / "out"

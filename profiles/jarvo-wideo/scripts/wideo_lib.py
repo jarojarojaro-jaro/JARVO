@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import getpass
 import hashlib
 import json
 import os
@@ -102,58 +103,142 @@ RENDER_MIEJSCA = 2          # pełnych renderów naraz na maszynie (JARVO_RENDER
 RENDER_WOLNA = 30.0         # % wolnej pamięci, przy którym kolejny render rusza obok trwającego (JARVO_RENDER_WOLNA)
 
 
+def _pamiec_windows() -> tuple[float, float] | None:
+    """(procent, GB) dostępnej pamięci z GlobalMemoryStatusEx (ctypes, bez dodatkowych paczek); None poza Windows."""
+    if os.name != "nt":
+        return None
+    import ctypes
+
+    class Stan(ctypes.Structure):
+        _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                    *((n, ctypes.c_ulonglong) for n in ("ullTotalPhys", "ullAvailPhys", "ullTotalPageFile",
+                                                        "ullAvailPageFile", "ullTotalVirtual", "ullAvailVirtual",
+                                                        "ullAvailExtendedVirtual"))]
+    stan = Stan()
+    stan.dwLength = ctypes.sizeof(Stan)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stan)) or not stan.ullTotalPhys:
+        return None
+    return 100.0 * stan.ullAvailPhys / stan.ullTotalPhys, stan.ullAvailPhys / 2 ** 30
+
+
 def wolna_pamiec() -> tuple[float, float]:
-    """(procent, GB) dostępnej pamięci: limit kontenera (cgroup v2), gdy jest, a inaczej /proc/meminfo; bez nich (100, 8)."""
+    """(procent, GB) dostępnej pamięci: limit kontenera (cgroup v2), gdy jest, a inaczej /proc/meminfo; bez /proc
+    (macOS, Windows) psutil, gdy jest w środowisku, a na Windows GlobalMemoryStatusEx; bez nich (100, 8)."""
     try:
         cg = Path("/sys/fs/cgroup")
-        limit = (cg / "memory.max").read_text().strip()
+        limit = (cg / "memory.max").read_text(encoding="utf-8").strip()
         if limit.isdigit():
-            wolne = int(limit) - int((cg / "memory.current").read_text().strip())
+            wolne = int(limit) - int((cg / "memory.current").read_text(encoding="utf-8").strip())
             return 100.0 * wolne / int(limit), wolne / 2 ** 30
     except (OSError, ValueError):
         pass
     try:
-        info = dict(line.split(":", 1) for line in Path("/proc/meminfo").read_text().splitlines() if ":" in line)
+        info = dict(line.split(":", 1) for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines() if ":" in line)
         avail, total = (int(info[k].split()[0]) for k in ("MemAvailable", "MemTotal"))
         return 100.0 * avail / total, avail / 2 ** 20
     except (OSError, KeyError, ValueError, ZeroDivisionError):
+        pass
+    try:
+        import psutil  # type: ignore  # noqa: PLC0415  (nie ma go w każdym środowisku: wtedy dalej)
+        vm = psutil.virtual_memory()
+        return 100.0 * vm.available / vm.total, vm.available / 2 ** 30
+    except (ImportError, OSError, AttributeError, ZeroDivisionError):
+        pass
+    try:
+        return _pamiec_windows() or (100.0, 8.0)
+    except (OSError, AttributeError):
         return 100.0, 8.0
+
+
+# ------------------------------------------------------------------ blokada pliku (POSIX i Windows)
+
+BAJT_BLOKADY = 1 << 20      # Windows: blokujemy bajt daleko za treścią, więc pid w pliku miejsca da się przeczytać
+
+
+def _msvcrt_bajt(f, tryb: int) -> None:
+    """msvcrt.locking jednego bajtu BAJT_BLOKADY (za końcem pliku wolno), potem plik z powrotem na początku."""
+    import msvcrt
+    f.flush()
+    os.lseek(f.fileno(), BAJT_BLOKADY, os.SEEK_SET)
+    try:
+        msvcrt.locking(f.fileno(), tryb, 1)
+    finally:
+        f.seek(0)
+
+
+def zablokuj(f, czekaj: bool = True) -> bool:
+    """Wyłączna blokada otwartego pliku `f`: fcntl.flock na POSIX, msvcrt.locking na Windows. Padnięty proces zwalnia
+    ją sam (system zamyka jego pliki). czekaj=False: od razu False, gdy trzyma ją ktoś inny."""
+    if os.name == "nt":
+        import msvcrt
+        while True:
+            try:
+                _msvcrt_bajt(f, msvcrt.LK_NBLCK)
+                return True
+            except OSError:
+                if not czekaj:
+                    return False
+                time.sleep(0.1)
+    import fcntl
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | (0 if czekaj else fcntl.LOCK_NB))
+    except BlockingIOError:
+        return False
+    return True
+
+
+def odblokuj(f) -> None:
+    """Zwalnia blokadę z `zablokuj` (plik zostaje otwarty)."""
+    if os.name == "nt":
+        import msvcrt
+        _msvcrt_bajt(f, msvcrt.LK_UNLCK)
+        return
+    import fcntl
+    fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def _uzytkownik() -> str:
+    """Do nazwy katalogu miejsc renderu: uid na POSIX (jak dotąd), nazwa konta na Windows (tam nie ma uid)."""
+    if hasattr(os, "getuid"):
+        return str(os.getuid())
+    try:
+        return getpass.getuser()
+    except Exception:  # noqa: BLE001  (bez USERNAME i LOGNAME w środowisku)
+        return "uzytkownik"
 
 
 @contextlib.contextmanager
 def miejsce_renderu(co: str = "render", czekaj_s: float = 2.0):
     """Najwyżej JARVO_RENDER_MIEJSCA (domyślnie 2) pełnych renderów naraz na tej maszynie, a kolejny obok trwającego
     rusza tylko przy wolnej pamięci ≥ JARVO_RENDER_WOLNA % (domyślnie 30); pierwszy rusza zawsze. Pomysł i liczby
-    z lemo-opuscar (`core/render/slot.mjs`, MIT), u nas blokada `flock` na pliku miejsca, więc padnięty proces
-    zwalnia miejsce sam. Render uruchomiony z renderu (JARVO_RENDER_ZAJETE=1) nie zajmuje drugiego miejsca."""
+    z lemo-opuscar (`core/render/slot.mjs`, MIT), u nas blokada pliku miejsca (`zablokuj`: flock, na Windows
+    msvcrt), więc padnięty proces zwalnia miejsce sam. Render uruchomiony z renderu (JARVO_RENDER_ZAJETE=1)
+    nie zajmuje drugiego miejsca."""
     if os.environ.get("JARVO_RENDER_ZAJETE") == "1":
         yield
         return
-    import fcntl
     miejsca = max(1, int(os.environ.get("JARVO_RENDER_MIEJSCA") or RENDER_MIEJSCA))
     prog = float(os.environ.get("JARVO_RENDER_WOLNA") or RENDER_WOLNA)
-    katalog = Path(os.environ.get("JARVO_RENDER_KATALOG") or Path(tempfile.gettempdir()) / f"jarvo-render-{os.getuid()}")
+    katalog = Path(os.environ.get("JARVO_RENDER_KATALOG") or Path(tempfile.gettempdir()) / f"jarvo-render-{_uzytkownik()}")
     katalog.mkdir(parents=True, exist_ok=True)
     start, nastepny_komunikat = time.monotonic(), 0.0
     while True:
         moje, zajete = None, 0
         for i in range(miejsca):
-            f = open(katalog / f"miejsce{i}", "a+")
-            try:
-                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
+            f = open(katalog / f"miejsce{i}", "a+", encoding="utf-8")
+            if not zablokuj(f, czekaj=False):
                 zajete += 1
                 f.close()
                 continue
             if moje is None:
                 moje = f
             else:
-                fcntl.flock(f, fcntl.LOCK_UN)
+                odblokuj(f)
                 f.close()
         if moje is not None and (zajete == 0 or wolna_pamiec()[0] >= prog):
             break
         if moje is not None:
-            fcntl.flock(moje, fcntl.LOCK_UN)
+            odblokuj(moje)
             moje.close()
         czekam = time.monotonic() - start
         if czekam >= nastepny_komunikat:
@@ -174,7 +259,7 @@ def miejsce_renderu(co: str = "render", czekaj_s: float = 2.0):
             os.environ.pop("JARVO_RENDER_ZAJETE", None)
         else:
             os.environ["JARVO_RENDER_ZAJETE"] = stare
-        fcntl.flock(moje, fcntl.LOCK_UN)
+        odblokuj(moje)
         moje.close()
 
 
@@ -215,7 +300,7 @@ def run(cmd: list[str], cwd: Path | None = None, quiet: bool = True) -> subproce
     """Uruchom FFmpeg/ffprobe; przy błędzie pokaż ogon stderr (sam komunikat, bez całego logu)."""
     if cmd and cmd[0] == "ffmpeg":
         cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error" if quiet else "info", *cmd[1:]]
-    res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         lines = (res.stderr or res.stdout or "").strip().splitlines()
         # pierwsza przyczyna bywa na początku (filtr), a na końcu tylko skutki (koder bez danych)
@@ -284,17 +369,42 @@ def sdr(path: Path) -> str:
     return v.get("sdr") or ""
 
 
-def czcionka(rozmiar: int):
-    """Krój z polskimi znakami do podpisów na arkuszach (Pillow)."""
+def pliki_krojow(gruby: bool = False) -> list[Path]:
+    """Kroje z polskimi znakami do podpisów (Pillow, drawtext), po kolei, bez pobierania: DejaVu z obrazu (Linux),
+    Arial Unicode i Arial z katalogu systemu (macOS), Segoe UI i Arial z katalogu Fonts (Windows)."""
+    if sys.platform == "darwin":
+        sup = Path("/System/Library/Fonts/Supplemental")
+        return [*([sup / "Arial Bold.ttf"] if gruby else []), Path("/Library/Fonts/Arial Unicode.ttf"),
+                sup / "Arial Unicode.ttf", sup / "Arial.ttf"]
+    if os.name == "nt":
+        fonts = Path(os.environ.get("WINDIR") or "C:/Windows") / "Fonts"
+        return [fonts / n for n in (*(("segoeuib.ttf", "arialbd.ttf") if gruby else ()), "segoeui.ttf", "arial.ttf")]
+    return [Path(d) / ("DejaVuSans-Bold.ttf" if gruby else "DejaVuSans.ttf")
+            for d in ("/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/TTF", "/usr/share/fonts/dejavu")]
+
+
+def czcionka(rozmiar: int, gruby: bool = False):
+    """Krój z polskimi znakami do podpisów na arkuszach (Pillow); `gruby`: pogrubiony, a gdy go brak, zwykły."""
     from PIL import ImageFont
-    for p in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf",
-              "/usr/share/fonts/dejavu/DejaVuSans.ttf", "/Library/Fonts/Arial Unicode.ttf"):
-        if Path(p).exists():
-            return ImageFont.truetype(p, rozmiar)
+    for p in [*(pliki_krojow(gruby=True) if gruby else []), *pliki_krojow()]:
+        if p.exists():
+            return ImageFont.truetype(str(p), rozmiar)
     try:
         return ImageFont.load_default(size=rozmiar)
     except TypeError:
         return ImageFont.load_default()
+
+
+def drawtext_kroj() -> str:
+    """`:fontfile='…'` do filtra drawtext poza Linuksem: ffmpeg z paczki (Windows, macOS) bez fonts.conf nie znajduje
+    kroju sam. Ścieżka z „/” w apostrofach, dwukropek po literze dysku zabezpieczony (`C\\:/…`). Na Linuksie ""
+    (krój z fontconfig obrazu, jak dotąd); bez kroju systemu też "" (drawtext spróbuje sam)."""
+    if sys.platform.startswith("linux"):
+        return ""
+    p = next((p for p in pliki_krojow() if p.exists()), None)
+    if p is None or "'" in str(p):
+        return ""
+    return ":fontfile='" + p.as_posix().replace(":", "\\:") + "'"
 
 
 def z_sdr(chain: str, sdr_vf: str) -> str:
@@ -352,7 +462,7 @@ def _import_edge_tts():
     hermes_py = Path("/opt/hermes/.venv/bin/python")
     if hermes_py.exists():  # ten sam instalator, którego używa narzędzie text_to_speech Hermesa
         subprocess.run([str(hermes_py), "-c", "from tools.lazy_deps import ensure; ensure('tts.edge', prompt=False)"],
-                       cwd="/opt/hermes", capture_output=True, text=True, timeout=300)
+                       cwd="/opt/hermes", capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
         if target not in sys.path:
             sys.path.insert(0, target)
         try:
@@ -498,7 +608,7 @@ def _speak_local(todo: list[tuple]) -> None:
                  "glos": it.get("voice")} for n, (_, it, _, _, _) in enumerate(todo)]
         plan = tmp / "zadania.json"
         plan.write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")
-        res = subprocess.run([tts, "--wsad", str(plan)], capture_output=True, text=True)
+        res = subprocess.run([tts, "--wsad", str(plan)], capture_output=True, text=True, encoding="utf-8", errors="replace")
         if res.returncode != 0:
             tail = "\n".join((res.stderr or res.stdout or "").strip().splitlines()[-6:])
             raise SystemExit(f"Lektor lokalny (jarvo-tts) nie powiódł się:\n{tail}")
@@ -841,7 +951,8 @@ def transcribe_words(media: Path) -> list[Word]:
     tmp = cache_dir("transkrypcje") / f"{digest('stt-v1', file_key(media))}.srt"
     if not tmp.exists():
         part = tmp.with_suffix(".part.srt")
-        res = subprocess.run([stt, str(media), "--srt", str(part), "--max-chars", "1"], capture_output=True, text=True)
+        res = subprocess.run([stt, str(media), "--srt", str(part), "--max-chars", "1"], capture_output=True, text=True,
+                             encoding="utf-8", errors="replace")
         if res.returncode != 0 or not part.exists():
             tail = "\n".join((res.stderr or res.stdout or "").strip().splitlines()[-6:])
             raise SystemExit(f"Transkrypcja (jarvo-stt) nie powiodła się:\n{tail}")
@@ -852,6 +963,21 @@ def transcribe_words(media: Path) -> list[Word]:
 def write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+
+
+def tylko_dla_wlasciciela(plik: Path) -> None:
+    """Plik z sekretem (np. token Openverse) tylko dla właściciela: chmod 600 na POSIX, jak dotąd. Na Windows chmod
+    niczego nie chroni, więc ACL bez dziedziczenia z pełnym dostępem tylko dla bieżącego konta (icacls, część systemu);
+    nieudana zmiana ACL nie przerywa pracy (plik i tak leży w profilu użytkownika)."""
+    if os.name != "nt":
+        Path(plik).chmod(0o600)
+        return
+    icacls = shutil.which("icacls") or str(Path(os.environ.get("SystemRoot") or "C:/Windows") / "System32" / "icacls.exe")
+    try:
+        subprocess.run([icacls, str(plik), "/inheritance:r", "/grant:r", f"{_uzytkownik()}:F"], capture_output=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except OSError:
+        pass
 
 
 # ------------------------------------------------------------------ fakty do filmu (brief Sherlocka: fakty.json)

@@ -1075,6 +1075,7 @@ def maska(film: Path, *args: str) -> str | None:
     py = "/opt/jarvo/venv/bin/python" if Path("/opt/jarvo/venv/bin/python").exists() else sys.executable
     try:
         r = subprocess.run([py, str(HERE / "maska.py"), args[0], str(film), *args[1:]], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace",
                            timeout=1800)
     except (OSError, subprocess.TimeoutExpired) as exc:
         print(f"uwaga: maska osoby niedostępna ({exc}); typografia bez niej", file=sys.stderr)

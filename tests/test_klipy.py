@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+import atrapy
 from conftest import load_script
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -179,9 +180,8 @@ def test_real_prepare_without_speech_model(tmp_path, monkeypatch):
     src = tmp_path / "rozmowa.mp4"
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x180:r=25:d=12",
                     "-f", "lavfi", "-i", "sine=d=12", "-shortest", "-pix_fmt", "yuv420p", str(src)], check=True)
-    stt = tmp_path / "stt"
-    stt.write_text('#!/usr/bin/env bash\necho \'{"words": [[0.5, 1.0, "Cześć."], [2.0, 2.4, "Test."]]}\' > "$3"\n')
-    stt.chmod(0o755)
+    stt = atrapy.program(tmp_path, "stt", "import json, sys; open(sys.argv[3], 'w', encoding='utf-8').write(json.dumps("
+                                          "{'words': [[0.5, 1.0, 'Cześć.'], [2.0, 2.4, 'Test.']]}, ensure_ascii=False))")
     monkeypatch.setenv("JARVO_STT_BIN", str(stt))
     out = tmp_path / "klipy"
     assert K.main(["przygotuj", str(src), "-o", str(out)]) == 0
@@ -399,6 +399,6 @@ def test_cover_file_is_frame_in_clip_framing(tmp_path):
     plik = tmp_path / "klip-1-x-okladka.jpg"
     assert K.zapisz_okladke(src, {"fx": 0.3, "fy": 0.4, "zoom": 1.12}, 1.5, 1080, 1920, plik)
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0", str(plik)],
-                       capture_output=True, text=True, check=True)
+                       capture_output=True, text=True, encoding="utf-8", check=True)
     assert r.stdout.strip() == "1080,1920"
     assert not K.zapisz_okladke(tmp_path / "brak.mp4", {}, 1.0, 1080, 1920, tmp_path / "nie.jpg")

@@ -22,7 +22,7 @@ const ctx = {{}}; ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync({json.dumps(str(MODUL))}, 'utf8'), ctx);
 const H = ctx.HUASHU_PL;
 {kod}"""
-    wynik = subprocess.run(["node", "-e", skrypt], capture_output=True, text=True)
+    wynik = subprocess.run(["node", "-e", skrypt], capture_output=True, text=True, encoding="utf-8")
     assert wynik.returncode == 0, wynik.stderr
     return json.loads(wynik.stdout)
 

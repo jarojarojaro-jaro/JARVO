@@ -254,7 +254,7 @@ def test_cmd_narracja_z_faktami_i_wymowa(tmp_path, monkeypatch, capsys):
     src.write_text(NARRACJA, encoding="utf-8")
     assert film.main(["narracja", str(src), "--sprawdz"]) == 0
     r = json.loads(capsys.readouterr().out)
-    assert r["fakty"] == str(tmp_path / "fakty.json") and r["wymowa"] == ["bochenków"]
+    assert r["fakty"] == (tmp_path / "fakty.json").as_posix() and r["wymowa"] == ["bochenków"]   # ścieżka z „/”
     assert not any("bez źródła" in o for o in r["ostrzezenia"])       # 2024 i 3,5 mln są w faktach
     teksty = []
 
@@ -325,8 +325,8 @@ console.log(JSON.stringify({
   ujecie: [O.ujecie(1).id, O.ujecie(4).id, O.ujecie(99).id], napis: [O.napis(5)?.tekst, O.napis(1)],
   uzyte: O.uzyte().sort(), dl: O.dlugosc,
 }));
-""" % (json.dumps(str(REPO / "profiles/jarvo-wideo/scripts/os_czasu.js")), json.dumps(dane)))
-    w = json.loads(subprocess.run(["node", str(skrypt)], capture_output=True, text=True, check=True).stdout)
+""" % (json.dumps((REPO / "profiles/jarvo-wideo/scripts/os_czasu.js").as_uri()), json.dumps(dane)), encoding="utf-8")
+    w = json.loads(subprocess.run(["node", str(skrypt)], capture_output=True, text=True, encoding="utf-8", check=True).stdout)
     assert w["bit"] == [4.5, pytest.approx(5.9)] and w["dl"] == 10
     assert "nieznana chwila „u2.z9”" in w["blad"] and "u2.z1" in w["blad"]
     assert "film.py narracja" in w["pusty"]

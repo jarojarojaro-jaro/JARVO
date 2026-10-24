@@ -29,6 +29,7 @@ transkrypcja: Parakeet (jarvo-stt) → słowa z czasem (JSON) + tekst z czasami 
 from __future__ import annotations
 
 import argparse
+import functools
 import itertools
 import json
 import math
@@ -122,7 +123,8 @@ def reframe(src: Path, out: Path, fmt: str, x: float, mode: str) -> Path:
 
 def silences(src: Path, thresh_db: float, min_len: float) -> list[tuple[float, float]]:
     res = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(src), "-vn", "-af",
-                          f"silencedetect=noise={thresh_db}dB:d={min_len}", "-f", "null", "-"], capture_output=True, text=True)
+                          f"silencedetect=noise={thresh_db}dB:d={min_len}", "-f", "null", "-"], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
     ss = [float(x) for x in re.findall(r"silence_start: (-?[\d.]+)", res.stderr)]
     se = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", res.stderr)]
     dur = wl.duration(src)
@@ -153,7 +155,7 @@ def remove_silence(src: Path, out: Path, thresh_db: float, min_len: float, pad: 
 def loudness(src: Path, out: Path, target: float) -> tuple[Path, dict]:
     first = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(src), "-vn", "-af",
                             f"loudnorm=I={target}:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     m = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", first.stderr, re.S)
     if not m:
         raise SystemExit("Pomiar głośności nie powiódł się (brak dźwięku?).")
@@ -175,7 +177,7 @@ def voice(src: Path, out: Path, poziom: str) -> tuple[Path, dict]:
     if not has_audio(src):
         raise SystemExit("Nagranie nie ma dźwięku.")
     dur = wl.duration(src)
-    r = subprocess.run(ed.szum_cmd(src), capture_output=True, text=True)
+    r = subprocess.run(ed.szum_cmd(src), capture_output=True, text=True, encoding="utf-8", errors="replace")
     tlo = ed.szum_z_logu(r.stderr) if r.returncode == 0 else None
     poziom = ed.glos_auto(tlo) if poziom == "auto" else poziom
     wej, chain = ed.glos_wejscie(0.0, dur, poziom, tlo)      # bez opóźnienia afftdn: usta zgodne z obrazem
@@ -210,8 +212,18 @@ ODSTRZ = "unsharp=5:5:0.8:3:3:0.4"  # powiększenie kadru zmiękcza obraz (dwuli
 
 
 def ma_vidstab() -> bool:
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True)
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     return "vidstabdetect" in r.stdout and "vidstabtransform" in r.stdout
+
+
+@functools.lru_cache(maxsize=1)
+def trf_ascii() -> str:
+    """`:fileformat=ascii` dla vidstabdetect, który domyślnie zapisuje ruch binarnie (nowsze vid.stab, np. ffmpeg 8
+    z paczki na Windows); starszy (ffmpeg z Debiana w obrazie) pisze zawsze ASCII i tej opcji nie zna: wtedy ""."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-h", "filter=vidstabdetect"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    return ":fileformat=ascii" if "fileformat" in r.stdout else ""
 
 
 def ruch_z_trf(tekst: str) -> list[tuple[float, float]]:
@@ -247,9 +259,10 @@ def drzenie(path: Path) -> float:
     """Drżenie nagrania (`drzenie_z_ruchu`) z vidstabdetect na kopii szerokości POMIAR_SZER."""
     with tempfile.TemporaryDirectory() as tmp:     # plik ruchu w katalogu roboczym: ścieżka bez cytowania w filtrze
         wl.run(["ffmpeg", "-i", str(Path(path).resolve()), "-vf",
-                f"scale={POMIAR_SZER}:-2,vidstabdetect=shakiness=8:result=ruch.trf", "-an", "-f", "null", "-"],
+                f"scale={POMIAR_SZER}:-2,vidstabdetect=shakiness=8:result=ruch.trf{trf_ascii()}", "-an", "-f", "null", "-"],
                cwd=Path(tmp))
-        return drzenie_z_ruchu(ruch_z_trf((Path(tmp) / "ruch.trf").read_text()), POMIAR_SZER)
+        return drzenie_z_ruchu(ruch_z_trf((Path(tmp) / "ruch.trf").read_text(encoding="utf-8", errors="replace")),
+                               POMIAR_SZER)
 
 
 def rada_drzenia(proc: float) -> str:
@@ -320,7 +333,8 @@ def transcript(src: Path, outbase: Path, every: float) -> dict:
     if cur and t0 is not None:
         lines.append(f"[{int(t0 // 60)}:{t0 % 60:05.2f}] {' '.join(cur)}")
     outbase.with_suffix(".txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return {"slowa": len(words), "slowa_json": str(outbase.with_suffix(".slowa.json")), "tekst": str(outbase.with_suffix(".txt"))}
+    return {"slowa": len(words), "slowa_json": outbase.with_suffix(".slowa.json").as_posix(),
+            "tekst": outbase.with_suffix(".txt").as_posix()}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -378,34 +392,34 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "wytnij":
             zakresy = parse_ranges(args.zakresy)
             out = cut(src, zakresy, Path(args.o))
-            print(json.dumps({"plik": str(out), "sek": round(wl.duration(out), 2), "ciecia": pozycje_ciec(zakresy)},
+            print(json.dumps({"plik": out.as_posix(), "sek": round(wl.duration(out), 2), "ciecia": pozycje_ciec(zakresy)},
                              ensure_ascii=False))
         elif args.cmd == "kadr":
             out = reframe(src, Path(args.o), args.format, args.x, args.tryb)
-            print(json.dumps({"plik": str(out), "format": args.format}, ensure_ascii=False))
+            print(json.dumps({"plik": out.as_posix(), "format": args.format}, ensure_ascii=False))
         elif args.cmd == "cisza":
             out, stats = remove_silence(src, Path(args.o), args.prog, args.min, args.zapas)
-            print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
+            print(json.dumps({"plik": out.as_posix(), **stats}, ensure_ascii=False))
         elif args.cmd == "glosnosc":
             out, stats = loudness(src, Path(args.o), args.lufs)
-            print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
+            print(json.dumps({"plik": out.as_posix(), **stats}, ensure_ascii=False))
         elif args.cmd == "glos":
             out, stats = voice(src, Path(args.o), args.poziom)
-            print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
+            print(json.dumps({"plik": out.as_posix(), **stats}, ensure_ascii=False))
         elif args.cmd == "stabilizuj":
             if args.tylko_pomiar:
                 if not ma_vidstab():
                     raise SystemExit("FFmpeg bez vidstab: pomiar drżenia niedostępny.")
                 proc = drzenie(src)
-                print(json.dumps({"plik": str(src), "drzenie_proc": proc, "rada": rada_drzenia(proc)}, ensure_ascii=False))
+                print(json.dumps({"plik": src.as_posix(), "drzenie_proc": proc, "rada": rada_drzenia(proc)}, ensure_ascii=False))
                 return 0
             if not args.o:
                 raise SystemExit("Podaj -o <wynik> (albo --tylko-pomiar).")
             out, stats = stabilize(src, Path(args.o), args.sila, args.statyw, max(0.0, args.zoom), not args.bez_pomiaru)
-            print(json.dumps({"plik": str(out), **stats}, ensure_ascii=False))
+            print(json.dumps({"plik": out.as_posix(), **stats}, ensure_ascii=False))
         elif args.cmd == "napraw":
             out = fix(src, Path(args.o), args.fps)
-            print(json.dumps({"plik": str(out), **({"fps": args.fps, "sek": round(wl.duration(out), 3)} if args.fps else {})},
+            print(json.dumps({"plik": out.as_posix(), **({"fps": args.fps, "sek": round(wl.duration(out), 3)} if args.fps else {})},
                              ensure_ascii=False))
         else:
             base = Path(args.o) if args.o else src.with_suffix("")

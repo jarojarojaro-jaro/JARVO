@@ -597,7 +597,7 @@ def fakty_info(sciezka: Path | None) -> dict | None:
     """Ścieżka i skrót fakty.json do ustawień pomiaru (zmiana briefu = raport nieaktualny)."""
     if not sciezka:
         return None
-    return {"plik": str(sciezka), "sha": hashlib.sha256(sciezka.read_bytes()).hexdigest()[:16]}
+    return {"plik": sciezka.as_posix(), "sha": hashlib.sha256(sciezka.read_bytes()).hexdigest()[:16]}
 
 
 def kompozycja(probki: list[dict], dt: float) -> list[dict]:
@@ -804,7 +804,7 @@ def odcisk(anim: Path, ustawienia: dict) -> str:
         if not p.is_file() or any(part in POMIN_W_ODCISKU for part in rel.parts[:-1]) or p.suffix.lower() in WYJSCIA_EXT \
                 or re.match(r"pomiar.*\.(json|md)$", p.name) or p.stat().st_size > 50_000_000:
             continue
-        h.update(str(rel).encode())
+        h.update(rel.as_posix().encode())                  # ten sam odcisk na każdym systemie
         h.update(hashlib.sha256(p.read_bytes()).digest())
     h.update(json.dumps(ustawienia, sort_keys=True, ensure_ascii=False).encode())
     return h.hexdigest()

@@ -31,7 +31,7 @@ MEDIA_EXT = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".mp4", ".mov", 
 def probe(path: Path) -> dict:
     cmd = ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,codec_name,width,height,r_frame_rate:format=duration,size",
            "-of", "json", str(path)]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         raise RuntimeError(res.stderr.strip()[:200] or "ffprobe error")
     data = json.loads(res.stdout)

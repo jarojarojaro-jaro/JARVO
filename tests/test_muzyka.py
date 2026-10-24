@@ -119,7 +119,7 @@ def test_dodatek_mgaudio_doklada_sample_do_klonu_wzorow(tmp_path, monkeypatch):
     up.mkdir()
 
     def git(*a, cwd=up):
-        return subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True, text=True,
+        return subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True, text=True, encoding="utf-8",
                               env={**__import__("os").environ, **env}).stdout.strip()
 
     git("init", "-q", "-b", "main")
@@ -131,7 +131,7 @@ def test_dodatek_mgaudio_doklada_sample_do_klonu_wzorow(tmp_path, monkeypatch):
                                                          "kalimba": [{"file": "kalimba/k.flac"}]})}
     for rel, tresc in pliki.items():
         (up / rel).parent.mkdir(parents=True, exist_ok=True)
-        (up / rel).write_text(tresc)
+        (up / rel).write_text(tresc, encoding="utf-8")
     git("add", "-A")
     git("commit", "-q", "-m", "c")
     rev = git("rev-parse", "HEAD")
@@ -150,7 +150,8 @@ def test_dodatek_mgaudio_doklada_sample_do_klonu_wzorow(tmp_path, monkeypatch):
     nz.clone_pinned(nz.MGSTYLES_REPO, rev, mg, nz.MGSTYLES_POMIN, keep=nz.MG_DODANE)
     assert (mg / "lib/audio/samples/piano/a.flac").exists() and not (mg / "videos/a.mp4").exists()
     mga = nz.env_for("mgaudio")
-    assert mga["MGAUDIO"] == str(mg / "lib" / "audio") and mga["MGAUDIO_PY"].endswith("venv-mgaudio/bin/python")
+    assert mga["MGAUDIO"] == str(mg / "lib" / "audio") and mga["MGAUDIO_PY"] == str(nz.venv_python(nz.MGAUDIO_VENV))
+    assert Path(mga["MGAUDIO_PY"]).parent.parent.name == "venv-mgaudio"
     assert not nz.mgaudio_gotowe()                              # bez venv dodatku jeszcze niegotowe
 
 

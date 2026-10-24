@@ -37,7 +37,7 @@ def narzedzie(nazwa: str) -> str:
 
 
 def uruchom(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def czas(s: float) -> str:

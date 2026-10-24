@@ -181,7 +181,7 @@ def _ov_naglowki() -> dict:
         return {}
     plik.write_text(json.dumps({"id": cid, "token": odp["access_token"], "do": teraz + float(odp.get("expires_in", 3600))}),
                     encoding="utf-8")
-    plik.chmod(0o600)
+    wl.tylko_dla_wlasciciela(plik)          # chmod 600, na Windows ACL tylko dla konta właściciela
     return {"Authorization": f"Bearer {odp['access_token']}"}
 
 
@@ -302,7 +302,7 @@ def fale_arkusz(items: list[dict], out: Path, cols: int = 2) -> Path | None:
             opis = f"{i}  {it['sek']} s  {it['licencja_kod'].upper()}"
             try:
                 wl.run(["ffmpeg", "-y", "-i", str(src), "-filter_complex",
-                        fala + f",drawtext=text='{opis}':x=10:y=6:fontsize=22:fontcolor=white", "-frames:v", "1", str(cell)])
+                        fala + f",drawtext=text='{opis}'{wl.drawtext_kroj()}:x=10:y=6:fontsize=22:fontcolor=white", "-frames:v", "1", str(cell)])
             except wl.FFError:   # FFmpeg bez fontconfig: numeracja wg kolejności (od lewej, rzędami)
                 wl.run(["ffmpeg", "-y", "-i", str(src), "-filter_complex", fala, "-frames:v", "1", str(cell)])
             cells.append(cell)
@@ -449,7 +449,7 @@ def contact_sheet(items: list[dict], out: Path, cols: int = 4) -> Path | None:
             base = ("scale=360:360:force_original_aspect_ratio=decrease,pad=380:400:(ow-iw)/2:(oh-ih)/2+14:color=0x15171C")
             try:
                 wl.run(["ffmpeg", "-y", "-i", str(src), "-vf",
-                        base + f",drawtext=text='{label}':x=10:y=4:fontsize=26:fontcolor=white:box=1:boxcolor=0xD62D20:boxborderw=6",
+                        base + f",drawtext=text='{label}'{wl.drawtext_kroj()}:x=10:y=4:fontsize=26:fontcolor=white:box=1:boxcolor=0xD62D20:boxborderw=6",
                         "-frames:v", "1", str(cell)])
             except wl.FFError:   # FFmpeg bez fontconfig: numeracja wg kolejności (od lewej, rzędami)
                 wl.run(["ffmpeg", "-y", "-i", str(src), "-vf", base, "-frames:v", "1", str(cell)])
@@ -490,7 +490,7 @@ def main(argv: list[str] | None = None) -> int:
             sheet = fale_arkusz(items, Path(args.arkusz)) if args.arkusz else None
             if args.json:
                 print(json.dumps({"wyniki": [{k: v for k, v in it.items() if k != "pliki"} for it in items],
-                                  "arkusz": str(sheet) if sheet else None}, ensure_ascii=False, indent=1))
+                                  "arkusz": Path(sheet).as_posix() if sheet else None}, ensure_ascii=False, indent=1))
             else:
                 for i, it in enumerate(items, 1):
                     print(f"{i:>2}. {it['id']:<48} {it['sek']:>6.2f} s  {it['licencja_kod'].upper():<4} "
@@ -507,7 +507,7 @@ def main(argv: list[str] | None = None) -> int:
             sheet = contact_sheet(items, Path(args.arkusz)) if args.arkusz else None
             if args.json:
                 print(json.dumps({"wyniki": [{k: v for k, v in it.items() if k != "pliki"} for it in items],
-                                  "arkusz": str(sheet) if sheet else None}, ensure_ascii=False, indent=1))
+                                  "arkusz": Path(sheet).as_posix() if sheet else None}, ensure_ascii=False, indent=1))
             else:
                 for i, it in enumerate(items, 1):
                     dur = f" {it['sek']}s" if it.get("sek") else ""

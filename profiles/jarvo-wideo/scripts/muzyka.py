@@ -253,7 +253,7 @@ def wybierz_przepis(a) -> tuple[str, dict, str | None]:
 
 def dlugosc_filmu(path: Path) -> float:
     out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8", errors="replace")
     try:
         return float(out.stdout.strip())
     except ValueError:
@@ -262,14 +262,15 @@ def dlugosc_filmu(path: Path) -> float:
 
 def ma_dzwiek(path: Path) -> bool:
     out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0",
-                          str(path)], capture_output=True, text=True)
+                          str(path)], capture_output=True, text=True, encoding="utf-8", errors="replace")
     return bool(out.stdout.strip())
 
 
 def glosnosc_pliku(path: Path) -> dict:
     """LUFS i szczyt prawdziwy ścieżki dźwięku (ffmpeg ebur128, ten sam pomiar co qa_wideo.py)."""
     log = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-map", "0:a:0",
-                          "-af", "ebur128=peak=true", "-f", "null", "-"], capture_output=True, text=True).stderr
+                          "-af", "ebur128=peak=true", "-f", "null", "-"], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace").stderr
     s = log.split("Summary:")[-1]
     m = re.search(r"I:\s+(-?[\d.]+) LUFS", s)
     p = re.search(r"Peak:\s+(-?[\d.]+|-inf) dBFS", s)
@@ -354,7 +355,7 @@ def proporcje_lektora(glos: list[float], muzyka: list[float], segmenty: list[tup
 
 def mgaudio() -> SimpleNamespace:
     """Import mgaudio z klonu wzorów; spoza venv dodatku skrypt uruchamia się od nowa jego Pythonem."""
-    venv_py = nz.MGAUDIO_VENV / "bin" / "python"
+    venv_py = nz.venv_python(nz.MGAUDIO_VENV)
     if not venv_py.exists() or not (nz.MGSTYLES / "lib/audio/mgaudio").is_dir():
         raise SystemExit("brak mgaudio: python3 $HERMES_HOME/scripts/narzedzia.py instaluj mgaudio "
                          "(raz, pakiety ok. 390 MB i sample 56 MB)")
@@ -362,7 +363,7 @@ def mgaudio() -> SimpleNamespace:
         if os.environ.get("JARVO_MUZYKA_VENV"):
             raise SystemExit(f"Python {venv_py} nie widzi pakietów mgaudio: narzedzia.py instaluj mgaudio")
         os.environ["JARVO_MUZYKA_VENV"] = "1"
-        os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
+        nz.od_nowa(venv_py, __file__)
     if not nz.indeks_sampli_zgodny():
         nz.napraw_indeks_sampli()
     sys.path.insert(0, str(nz.MGSTYLES / "lib" / "audio"))
@@ -550,11 +551,11 @@ def cmd_zrob(a) -> int:
         "skad": plan["zrodla"], "akordy": fs["chords"], "akord_koncowy": fs["final"], "takty": takty,
         "siatka": {"zdarzenia": len(siatka), "w_klatce": na_siatce, "najwiekszy_blad_s": fs["hit_fit_err"], "lista": siatka},
         "efekty": umieszczone, "kontrola": kontrola,
-        **({"lektor": {"plik": str(lektor), "od": a.lektor_od, "mowa_s": lektor_info["mowa_s"],
+        **({"lektor": {"plik": Path(lektor).as_posix(), "od": a.lektor_od, "mowa_s": lektor_info["mowa_s"],
                        "odcinki": [list(x) for x in lektor_info["segmenty"]],
                        "glos_nad_muzyka_db": GLOS_NAD_MUZYKA, "sciszenie_db": SCISZENIE_POD_GLOSEM,
                        "efekty_pod_glosem_db": EFEKTY_POD_GLOSEM}} if lektor_info else {}),
-        "pliki": {"wav": str(wav), **({"mp4": str(wynik)} if obraz else {})},
+        "pliki": {"wav": Path(wav).as_posix(), **({"mp4": Path(wynik).as_posix()} if obraz else {})},
         "sciezki": sciezki,
     }
     plan_json = Path(a.json).resolve() if a.json else (wynik.with_suffix(".muzyka.json"))

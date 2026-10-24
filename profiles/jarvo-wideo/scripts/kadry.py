@@ -60,7 +60,7 @@ def contact_rows(videos: list[Path], per: int, out: Path, cell_w: int = 240) -> 
                 seek = [] if wl.is_image(video) else ["-ss", f"{t:.2f}"]
                 try:
                     wl.run(["ffmpeg", "-y", *seek, "-i", str(video), "-frames:v", "1", "-vf",
-                            base + f",drawtext=text='{label}':x=6:y=6:fontsize=16:fontcolor=white:box=1:boxcolor=0xD62D20:boxborderw=4",
+                            base + f",drawtext=text='{label}'{wl.drawtext_kroj()}:x=6:y=6:fontsize=16:fontcolor=white:box=1:boxcolor=0xD62D20:boxborderw=4",
                             str(cell)])
                 except wl.FFError:
                     wl.run(["ffmpeg", "-y", *seek, "-i", str(video), "-frames:v", "1", "-vf", base, str(cell)])
@@ -73,7 +73,8 @@ def contact_rows(videos: list[Path], per: int, out: Path, cell_w: int = 240) -> 
 
 def scene_changes(video: Path, threshold: float) -> list[float]:
     res = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(video), "-an", "-vf",
-                          f"select='gt(scene,{threshold})',showinfo", "-f", "null", "-"], capture_output=True, text=True)
+                          f"select='gt(scene,{threshold})',showinfo", "-f", "null", "-"], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
     return [round(float(t), 2) for t in re.findall(r"pts_time:([\d.]+)", res.stderr)]
 
 
@@ -370,15 +371,16 @@ def reference(video: Path, fps: float, out_dir: Path, per_sheet: int = 40, cols:
         rows = (cnt + cols - 1) // cols
         dest = out_dir / f"wzor-{k + 1}.jpg"
         base = wl.z_sdr(f"fps={fps},scale={cw}:{ch}", v.get("sdr") or "")    # wzór w HDR: klatki po przeliczeniu
-        label = f",drawtext=text='%{{pts\\:hms\\:{first / fps:.3f}}}':x=4:y=4:fontsize=14:fontcolor=white:box=1:boxcolor=black@0.7:boxborderw=3"
+        label = (f",drawtext=text='%{{pts\\:hms\\:{first / fps:.3f}}}'{wl.drawtext_kroj()}:x=4:y=4:fontsize=14:"
+                 "fontcolor=white:box=1:boxcolor=black@0.7:boxborderw=3")
         tile = f",tile={cols}x{rows}:padding=4:color=0x0B0D12"
         common = ["ffmpeg", "-y", "-ss", f"{first / fps:.3f}", "-t", f"{cnt / fps:.3f}", "-i", str(video), "-frames:v", "1", "-q:v", "3"]
         try:
             wl.run(common[:-4] + ["-vf", base + label + tile] + common[-4:] + [str(dest)])
         except wl.FFError:   # bez fontu do drawtext: arkusz bez czasu (czas = kolejność × 1/fps od początku arkusza)
             wl.run(common[:-4] + ["-vf", base + tile] + common[-4:] + [str(dest)])
-        sheets.append({"plik": str(dest), "od": round(first / fps, 2), "do": round((first + cnt) / fps, 2)})
-    res = {"film": str(video), "sek": round(dur, 2), "co_s": round(1 / fps, 3), "arkusze": sheets,
+        sheets.append({"plik": dest.as_posix(), "od": round(first / fps, 2), "do": round((first + cnt) / fps, 2)})
+    res = {"film": Path(video).as_posix(), "sek": round(dur, 2), "co_s": round(1 / fps, 3), "arkusze": sheets,
            "ciecia": scene_changes(video, 0.35)}
     if info.get("audio"):
         try:

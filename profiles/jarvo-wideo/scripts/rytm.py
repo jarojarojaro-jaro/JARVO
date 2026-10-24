@@ -175,7 +175,7 @@ def peak(path: Path) -> dict:
     env = envelope(path) if path.stat().st_size else []
     top = max(range(len(env)), key=lambda i: env[i])
     start = next(i for i, v in enumerate(env) if v >= 0.2 * env[top])
-    return {"plik": str(path), "szczyt": round(top / ENV_SR, 3), "poczatek": round(start / ENV_SR, 3), "dlugosc": round(len(env) / ENV_SR, 3)}
+    return {"plik": Path(path).as_posix(), "szczyt": round(top / ENV_SR, 3), "poczatek": round(start / ENV_SR, 3), "dlugosc": round(len(env) / ENV_SR, 3)}
 
 
 def piki(on: list[float], odstep: float = 0.08) -> list[tuple[float, float]]:
@@ -377,7 +377,7 @@ def analyze(path: Path, start: float = 0.0, end: float | None = None) -> dict:
     db = downbeat(on, rel)
     bars = beats[db::4]
     d = drop(env, [b - start for b in bars])
-    return {"plik": str(path), "bpm": bpm, "bit_s": round(period, 4), "pierwszy_bit": beats[0] if beats else None,
+    return {"plik": Path(path).as_posix(), "bpm": bpm, "bit_s": round(period, 4), "pierwszy_bit": beats[0] if beats else None,
             "bity": beats, "takty": bars, "drop": round(start + d, 3) if d is not None else None,
             "ciecia": {"co_takt": bars, "co_2_bity": beats[db::2]}, "dlugosc": round(dur, 2), "siatka": siatka,
             "uderzenia": uderzenia, "najmocniejsze": najmocniejsze(uderzenia, beats, period),
@@ -389,13 +389,14 @@ def analyze(path: Path, start: float = 0.0, end: float | None = None) -> dict:
 def ciecia_obrazu(film: Path, prog: float = 0.3) -> list[float]:
     """Cięcia w gotowym filmie (zmiana sceny w zmniejszonym obrazie): czas pierwszej klatki nowego ujęcia."""
     r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", str(film), "-an", "-vf",
-                        f"scale=320:-2,select='gt(scene,{prog})',showinfo", "-f", "null", "-"], capture_output=True, text=True)
+                        f"scale=320:-2,select='gt(scene,{prog})',showinfo", "-f", "null", "-"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     return [round(float(t), 3) for t in re.findall(r"pts_time:([\d.]+)", r.stderr)]
 
 
 def fps_filmu(film: Path) -> float:
     r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate",
-                        "-of", "csv=p=0", str(film)], capture_output=True, text=True)
+                        "-of", "csv=p=0", str(film)], capture_output=True, text=True, encoding="utf-8", errors="replace")
     try:
         n, _, d = r.stdout.strip().partition("/")
         return float(n) / float(d or 1)
@@ -461,7 +462,7 @@ def sprawdz(film: Path, czasy: list[float], fps: float, start: float = 0.0, end:
         jeden_znak = all(e > 0 for e in blisko) or all(e < 0 for e in blisko)
         if jeden_znak and abs(sr) * fps >= 1 and odch * fps <= 0.5:
             wspolne = round(sr * 1000, 1)
-    return {"film": str(film), "fps": round(fps, 3), "bpm": r["bpm"], "siatka": r["siatka"], "ciecia": wiersze,
+    return {"film": Path(film).as_posix(), "fps": round(fps, 3), "bpm": r["bpm"], "siatka": r["siatka"], "ciecia": wiersze,
             "popraw": sum(1 for w in wiersze if w["ocena"] == "popraw"), "wspolne_przesuniecie_ms": wspolne}
 
 

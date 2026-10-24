@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import symlinki
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -116,7 +118,8 @@ def test_biblioteki_lib_tylko_z_node_modules(tmp_path):
     (nm / ".bin").mkdir()
     (nm / ".bin" / "x").write_text("x", encoding="utf-8")
     (tmp_path / "sekret.txt").write_text("tajne", encoding="utf-8")
-    (nm / "link").symlink_to(tmp_path / "sekret.txt")
+    if symlinki():                          # Windows bez trybu dewelopera nie utworzy dowiązania: „link” po prostu nie istnieje
+        (nm / "link").symlink_to(tmp_path / "sekret.txt")
     assert core.lib_file("gsap/dist/gsap.min.js", nm) == (nm / "gsap" / "dist" / "gsap.min.js").resolve()
     for zle in ("../sekret.txt", ".bin/x", "link", "gsap", "", "gsap/dist/brak.js"):
         assert core.lib_file(zle, nm) is None, zle

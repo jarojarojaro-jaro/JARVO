@@ -373,7 +373,8 @@ def rozwiaz(spec: dict, plik: Path, os_cli: str | None = None, fakty_cli: str | 
                     f"liczba „{zapis}” " + ("jest na liście niepewnych w fakty.json" if rodzaj == "niepewna"
                                             else "bez źródła w fakty.json") + f" („{t[:40]}”)")
     return {"spec": out, "gramatyka": nazwa, "bledy": bledy, "ostrzezenia": ostrz, "od": od,
-            "os": str(os_path) if os_path else None, "os_dane": os_, "fakty": str(fakty_path) if fakty_path else None,
+            "os": Path(os_path).as_posix() if os_path else None, "os_dane": os_,
+            "fakty": Path(fakty_path).as_posix() if fakty_path else None,
             "dane_przykladowe": przykladowe,
             "cue": [{"kind": q.get("kind"), "at": q.get("at"), **({"slowo": c["slowo"]} if "slowo" in c else {})}
                     for q, c in zip(nowe, [c for c in cues if isinstance(c, dict)])]}
@@ -462,7 +463,7 @@ def wymagaj_silnika() -> None:
 
 def raport_sprawdzenia(plik: Path, r: dict) -> dict:
     s = r["spec"]
-    return {"ok": not r["bledy"], "spec": str(plik), "gramatyka": r["gramatyka"], "id": s.get("grammar"),
+    return {"ok": not r["bledy"], "spec": Path(plik).as_posix(), "gramatyka": r["gramatyka"], "id": s.get("grammar"),
             "dlugosc": s.get("duration"), "fps": s.get("fps", 30), "rozmiar": [s.get("width", 1920), s.get("height", 1080)],
             "od": r["od"], "os": r["os"], "fakty": r["fakty"], "dane_przykladowe": r["dane_przykladowe"], "cue": r["cue"],
             "bledy": r["bledy"], "ostrzezenia": r["ostrzezenia"]}
@@ -501,9 +502,9 @@ def cmd_szablon(a) -> int:
     if out.exists() and not a.nadpisz:
         raise SystemExit(f"✗ {out} już jest (--nadpisz)")
     wl.write_json(out, spec)
-    print(json.dumps({"spec": str(out), "gramatyka": nazwa, "dalej": [
+    print(json.dumps({"spec": Path(out).as_posix(), "gramatyka": nazwa, "dalej": [
         "teksty po polsku; cue przypnij do słów lektora: \"slowo\" (+ \"nth\", \"offset\") zamiast \"at\"",
-        f"gramatyka.py sprawdz {out}", f"gramatyka.py render {out} --klatki 0.5,2,4"]}, ensure_ascii=False, indent=1))
+        f"gramatyka.py sprawdz {Path(out).as_posix()}", f"gramatyka.py render {Path(out).as_posix()} --klatki 0.5,2,4"]}, ensure_ascii=False, indent=1))
     return 0
 
 
@@ -518,7 +519,7 @@ def cmd_strona(a) -> int:
     wymagaj_silnika()
     plik, r = przygotuj(a)
     out = strona(plik, r, a.alfa)
-    print(json.dumps({"strona": str(out), "cue": r["cue"], "vo_env": bool(r.get("vo_env"))}, ensure_ascii=False))
+    print(json.dumps({"strona": Path(out).as_posix(), "cue": r["cue"], "vo_env": bool(r.get("vo_env"))}, ensure_ascii=False))
     return 0
 
 

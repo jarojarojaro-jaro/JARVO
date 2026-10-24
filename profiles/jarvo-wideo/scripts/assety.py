@@ -589,7 +589,7 @@ def zbierz(url: str, out: Path, podstrony: list[str]) -> dict:
     (out / "marka.css").write_text(marka_css(m), encoding="utf-8")
     wynik.update(tytul=info["tytul"], opis=info["opis"], paleta=paleta[:10],
                  fonty=[{"font": f, "uzycia": n} for f, n in info["fonty"]], logo=logo_pliki,
-                 marka={"plik": str(out / "marka.json"), "css": str(out / "marka.css"), "kolory": m["kolory"],
+                 marka={"plik": (out / "marka.json").as_posix(), "css": (out / "marka.css").as_posix(), "kolory": m["kolory"],
                         "charakter": m["charakter"]},
                  braki=[x for x, ok in (("logo", logo_pliki), ("paleta", paleta), ("fonty", info["fonty"])) if not ok])
     (out / "assety.json").write_text(json.dumps(wynik, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -642,10 +642,10 @@ def main(argv: list[str] | None = None) -> int:
     w = zbierz(a.url, Path(a.out), podstrony)
     wynik = {k: w[k] for k in ("tytul", "paleta", "fonty", "logo", "braki")} | {
         "marka": {"kolory": w["marka"]["kolory"], "charakter": w["marka"]["charakter"], "css": w["marka"]["css"]},
-        "zrzutow": len(w["zrzuty"]), "plik": str(Path(a.out) / "assety.json")}
+        "zrzutow": len(w["zrzuty"]), "plik": (Path(a.out) / "assety.json").as_posix()}
     if a.film:
         uklad = film(a.url, Path(a.out) / "film", podstrony, a.wysokosc_max, wlasne)
-        wynik["film"] = {"uklad": str(Path(a.out) / "film" / "uklad.json"), **podsumowanie_filmu(uklad)}
+        wynik["film"] = {"uklad": (Path(a.out) / "film" / "uklad.json").as_posix(), **podsumowanie_filmu(uklad)}
     print(json.dumps(wynik, ensure_ascii=False, indent=2))
     return 0
 

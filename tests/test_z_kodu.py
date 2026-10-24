@@ -32,10 +32,10 @@ def test_ciecia_z_listy_lemo_i_osi_czasu(tmp_path):
     assert pr.ciecia_z("5.4, 9.6,0.05,26.95", 27.0) == [5.4, 9.6]          # przy brzegu filmu odpada
     ev = tmp_path / "events.json"
     ev.write_text(json.dumps({"dur": 27, "ev": [{"t": 0.9, "type": "vo"}, {"t": 14.4, "type": "cut", "shot": 4},
-                                                  {"t": 5.4, "type": "cut", "shot": 2}]}))
+                                                  {"t": 5.4, "type": "cut", "shot": 2}]}), encoding="utf-8")
     assert pr.ciecia_z(str(ev), 27.0) == [5.4, 14.4]
     os_ = tmp_path / "os_czasu.json"
-    os_.write_text(json.dumps({"ujecia": [{"start": 0.0, "koniec": 3.1}, {"start": 3.1, "koniec": 7.0}, {"start": 7.0}]}))
+    os_.write_text(json.dumps({"ujecia": [{"start": 0.0, "koniec": 3.1}, {"start": 3.1, "koniec": 7.0}, {"start": 7.0}]}), encoding="utf-8")
     assert pr.ciecia_z(str(os_), 9.0) == [3.1, 7.0]
     assert pr.ciecia_z(None, 9.0) == []
     with pytest.raises(SystemExit, match="--ciecia"):
@@ -44,13 +44,13 @@ def test_ciecia_z_listy_lemo_i_osi_czasu(tmp_path):
 
 def test_slowa_z_pliku_trzy_formaty(tmp_path):
     a = tmp_path / "lektor.slowa.json"
-    a.write_text(json.dumps([{"start": 1.0, "end": 1.4, "text": "Druga"}, {"start": 0.2, "end": 0.6, "text": "Pierwsza", "podzial": True}]))
+    a.write_text(json.dumps([{"start": 1.0, "end": 1.4, "text": "Druga"}, {"start": 0.2, "end": 0.6, "text": "Pierwsza", "podzial": True}]), encoding="utf-8")
     assert pr.slowa_z_pliku(a) == [[0.2, 0.6, "Pierwsza", True], [1.0, 1.4, "Druga", False]]
     b = tmp_path / "film.mowa.json"
-    b.write_text(json.dumps({"words": [[0.1, 0.3, "raz"], [0.4, 0.5, " "]]}))
+    b.write_text(json.dumps({"words": [[0.1, 0.3, "raz"], [0.4, 0.5, " "]]}), encoding="utf-8")
     assert pr.slowa_z_pliku(b) == [[0.1, 0.3, "raz", False]]
     c = tmp_path / "puste.json"
-    c.write_text("[]")
+    c.write_text("[]", encoding="utf-8")
     with pytest.raises(SystemExit, match="brak słów"):
         pr.slowa_z_pliku(c)
 
@@ -173,7 +173,7 @@ def test_z_kodu_nie_nadpisuje_projektu_po_edycji(tmp_path, czesci):
 
 def test_z_kodu_slowa_karaoke_i_bez_glosnosci(tmp_path, czesci):
     slowa = czesci / "lektor.slowa.json"
-    slowa.write_text(json.dumps([{"start": 1.0, "end": 1.4, "text": "Młyn"}, {"start": 1.4, "end": 1.9, "text": "Zawada."}]))
+    slowa.write_text(json.dumps([{"start": 1.0, "end": 1.4, "text": "Młyn"}, {"start": 1.4, "end": 1.9, "text": "Zawada."}]), encoding="utf-8")
     film = tmp_path / "film.mp4"
     assert pr.main(["z-kodu", str(film), "--obraz", str(czesci / "obraz24.mp4"), "--slowa", str(slowa), "--karaoke"]) == 0
     p = json.loads(ed.project_path(film).read_text(encoding="utf-8"))
@@ -190,9 +190,9 @@ def test_z_kodu_z_planu_muzyki_slowa_od_lektora(tmp_path, czesci):
     plan = czesci / "final.muzyka.json"
     plan.write_text(json.dumps({"lektor": {"plik": "lektor.wav", "od": 0.5},
                                 "sciezki": {"muzyka": str(kat / "muzyka.wav"), "efekty": "final.muzyka.sciezki/efekty.wav",
-                                            "glos": str(kat / "glos.wav")}}))
+                                            "glos": str(kat / "glos.wav")}}), encoding="utf-8")
     slowa = czesci / "lektor.slowa.json"
-    slowa.write_text(json.dumps([{"start": 1.0, "end": 1.4, "text": "Młyn"}, {"start": 1.4, "end": 1.9, "text": "Zawada."}]))
+    slowa.write_text(json.dumps([{"start": 1.0, "end": 1.4, "text": "Młyn"}, {"start": 1.4, "end": 1.9, "text": "Zawada."}]), encoding="utf-8")
     film = tmp_path / "final.mp4"
     assert pr.main(["z-kodu", str(film), "--obraz", str(czesci / "obraz24.mp4"), "--z-muzyki", str(plan),
                     "--muzyka", str(czesci / "music.wav"), "--slowa", str(slowa), "--karaoke"]) == 0
@@ -208,7 +208,7 @@ def test_z_kodu_z_planu_muzyki_slowa_od_lektora(tmp_path, czesci):
                     "--slowa", f"{slowa}@0"]) == 0                     # własne @od słów wygrywa z głosem
     (cap,) = json.loads(ed.project_path(film).read_text(encoding="utf-8"))["texts"]
     assert (cap["start"], cap["end"]) == (1.0, 1.9)
-    plan.write_text(json.dumps({"pliki": {"wav": "x.wav"}}))
+    plan.write_text(json.dumps({"pliki": {"wav": "x.wav"}}), encoding="utf-8")
     with pytest.raises(SystemExit, match="nie ma ścieżek"):
         pr.main(["z-kodu", str(film), "--obraz", str(czesci / "obraz24.mp4"), "--z-muzyki", str(plan)])
 
@@ -225,8 +225,8 @@ def test_z_kodu_zle_wejscie(tmp_path, czesci):
 @pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
 def test_kopia_i_glosnosc_sumy_z_ffmpeg(tmp_path):
     """Miks ponad 0 dBFS (float) ściszony w pliku, różnica w głośności elementu; suma dwóch ścieżek mierzona jak eksport."""
-    import numpy as np
-    import soundfile as sf
+    np = pytest.importorskip("numpy")                       # paczki venv narzędzi: bez nich (np. CI) test pominięty
+    sf = pytest.importorskip("soundfile")
     sr = 48000
     t = np.arange(sr * 2) / sr
     sf.write(tmp_path / "glosny.wav", (1.6 * np.sin(2 * np.pi * 220 * t)).astype(np.float32), sr, subtype="FLOAT")
@@ -255,9 +255,9 @@ def test_qa_wideo_film_z_kodu_ma_projekt_i_jest_jego_renderem(tmp_path):
     pp = tmp_path / "mlyn.edycja.json"
     proj = {"clips": [{"src": str(obraz), "in": 0, "out": 13.5}, {"src": str(obraz), "in": 13.5, "out": 27, "speed": 1}],
             "audio": [{"src": str(tmp_path / "mlyn-sciezki" / "glos.wav")}], "zKodu": {}}
-    pp.write_text(json.dumps({k: v for k, v in proj.items() if k != "zKodu"}))
+    pp.write_text(json.dumps({k: v for k, v in proj.items() if k != "zKodu"}), encoding="utf-8")
     assert "brak zKodu" in qa.projekt_z_kodu(film, 27.0, wymagany=True)[0][0]
-    pp.write_text(json.dumps(proj))
+    pp.write_text(json.dumps(proj), encoding="utf-8")
     e, _ = qa.projekt_z_kodu(film, 27.0, wymagany=False)                       # projekt z-kodu sprawdzany zawsze
     assert len(e) == 1 and "glos.wav" in e[0]
     (tmp_path / "mlyn-sciezki" / "glos.wav").write_bytes(b"a")
@@ -273,18 +273,18 @@ def test_playwright_z_innego_skryptu_bez_podmiany_argumentow(tmp_path, monkeypat
     """projekt.py wołany z innego skryptu (np. maskotka.py) nie może się uruchomić od nowa z cudzymi argumentami."""
     import sys as _sys
     nz = pr.nz if hasattr(pr, "nz") else load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
-    venv_py = tmp_path / "bin" / "python"
+    venv_py = nz.venv_python(tmp_path)
     venv_py.parent.mkdir()
-    venv_py.write_text("")
+    venv_py.write_text("", encoding="utf-8")
     monkeypatch.setattr(nz, "py", lambda: str(venv_py))
     monkeypatch.setattr(nz, "VENV", tmp_path)
     monkeypatch.delenv("JARVO_TEST_PW", raising=False)
     wywolane = []
 
-    def execv(prog, args):
-        wywolane.append(args)
+    def od_nowa(python, skrypt):                  # na POSIX os.execv, na Windows podproces (test_od_nowa_* w test_wideo)
+        wywolane.append([str(python), str(Path(skrypt).resolve()), *_sys.argv[1:]])
         raise RuntimeError("execv")
-    monkeypatch.setattr(nz.os, "execv", execv)
+    monkeypatch.setattr(nz, "od_nowa", od_nowa)
     monkeypatch.setitem(_sys.modules, "playwright", None)              # brak playwright w tym Pythonie
     projekt = str(REPO / "profiles/jarvo-wideo/scripts/projekt.py")
     monkeypatch.setattr(_sys, "argv", ["maskotka.py", "Cześć, jestem Jarvo."])

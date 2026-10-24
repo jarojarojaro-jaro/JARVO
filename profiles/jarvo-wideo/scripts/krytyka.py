@@ -43,7 +43,7 @@ OSIE = ["hook", "telefon", "ruch", "roznorodnosc", "kompozycja", "marka", "dzwie
 
 def ff(args: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run([wl.need("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", *args],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def telefon(film: Path, out: Path) -> dict:
@@ -52,7 +52,7 @@ def telefon(film: Path, out: Path) -> dict:
     r = ff(["-i", str(film), "-vf", f"fps=1,scale=360:-2,tile=5x{rows}:padding=6:color=0x202020", "-frames:v", "1", str(out)])
     if r.returncode:
         raise SystemExit(f"✗ ffmpeg: {r.stderr.strip()[:300]}")
-    return {"arkusz": str(out), "klatek": int(dur), "pytanie": "czy każdy tekst da się przeczytać na tym rozmiarze?"}
+    return {"arkusz": out.as_posix(), "klatek": int(dur), "pytanie": "czy każdy tekst da się przeczytać na tym rozmiarze?"}
 
 
 def pasek(film: Path, t: float, n: int, out: Path) -> dict:
@@ -62,7 +62,7 @@ def pasek(film: Path, t: float, n: int, out: Path) -> dict:
             "-frames:v", "1", str(out)])
     if r.returncode:
         raise SystemExit(f"✗ ffmpeg: {r.stderr.strip()[:300]}")
-    return {"pasek": str(out), "od": round(start, 3), "klatek": n,
+    return {"pasek": out.as_posix(), "od": round(start, 3), "klatek": n,
             "szukaj": "wyskoki (pop), nachodzący tekst, przejazd bez wyhamowania, zła strona ruchu"}
 
 
@@ -321,7 +321,8 @@ def ciecia_projektu(proj: dict) -> tuple[list[dict], list[list]]:
 def sceny(film: Path, prog: float = 0.3) -> list[float]:
     """Zmiany ujęcia w obrazie (filtr scene ffmpeg): czas pierwszej klatki nowego ujęcia."""
     r = subprocess.run([wl.need("ffmpeg"), "-hide_banner", "-nostdin", "-i", str(film), "-an", "-vf",
-                        f"select='gt(scene,{prog})',showinfo", "-f", "null", "-"], capture_output=True, text=True)
+                        f"select='gt(scene,{prog})',showinfo", "-f", "null", "-"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     return [round(float(x), 3) for x in re.findall(r"pts_time:([\d.]+)", r.stderr)]
 
 
@@ -341,15 +342,7 @@ def roznica(a, b) -> float:
 
 
 def _czcionka(rozmiar: int):
-    from PIL import ImageFont
-    for p in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf",
-              "/usr/share/fonts/dejavu/DejaVuSans.ttf"):
-        if Path(p).exists():
-            return ImageFont.truetype(p, rozmiar)
-    try:
-        return ImageFont.load_default(size=rozmiar)
-    except TypeError:
-        return ImageFont.load_default()
+    return wl.czcionka(rozmiar)              # DejaVu z obrazu, poza Linuksem krój systemu (wl.pliki_krojow)
 
 
 def obraz_ciecia(film: Path, a: array, c: dict, okno: float, fps: float, dl: float, slowa: list, out: Path,
@@ -517,7 +510,7 @@ def ciecia(film: Path, katalog: Path, czasy: list[float] | None = None, projekt:
                  else "zmiana ujęcia")
         wyniki.append(c)
     problemy = sum(len(c["problemy"]) for c in wyniki)
-    return {"film": str(film), "zrodlo_ciec": zrodlo, "ciec": len(lista), "katalog": str(katalog), "ciecia": wyniki,
+    return {"film": film.as_posix(), "zrodlo_ciec": zrodlo, "ciec": len(lista), "katalog": katalog.as_posix(), "ciecia": wyniki,
             "problemy": problemy, "uwagi": sum(len(c["uwagi"]) for c in wyniki), **({"uwaga": uwaga_filmu} if uwaga_filmu else {}),
             **({"info": info} if info else {}),
             "ok": problemy == 0 and not uwaga_filmu,
@@ -530,7 +523,8 @@ def determinizm(src: str, czasy: str, preset: str) -> dict:
     for _ in range(2):
         with tempfile.TemporaryDirectory() as tmp:
             r = subprocess.run([sys.executable, str(Path(__file__).with_name("html_wideo.py")), "klatki", src,
-                                "--czasy", czasy, "--preset", preset, "--out", tmp], capture_output=True, text=True)
+                                "--czasy", czasy, "--preset", preset, "--out", tmp], capture_output=True, text=True,
+                               encoding="utf-8", errors="replace")
             if r.returncode:
                 raise SystemExit(f"✗ html_wideo: {(r.stderr or r.stdout).strip()[-400:]}")
             hashes.append([hashlib.sha256(p.read_bytes()).hexdigest()[:16] for p in sorted(Path(tmp).glob("*.png"))])

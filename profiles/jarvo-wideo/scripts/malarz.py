@@ -193,7 +193,8 @@ def html_wideo(*args: str) -> int:
 
 
 def html_wideo_json(*args: str) -> dict:
-    r = subprocess.run([sys.executable, str(HERE / "html_wideo.py"), *args], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, str(HERE / "html_wideo.py"), *args], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     if r.stderr:
         print(r.stderr.rstrip(), file=sys.stderr)
     if r.returncode:
@@ -269,10 +270,10 @@ def cmd_galeria(a) -> int:
     klatki = [Path(p) for p in r["klatki"]]
     podpisy = [f"{i} · {nazwy.get(i, '?')}" for i in ids]
     arkusz_galerii(klatki, podpisy, out)
-    (out.with_suffix(".json")).write_text(json.dumps([{"id": i, "nazwa": nazwy.get(i), "klatka": str(k)}
+    (out.with_suffix(".json")).write_text(json.dumps([{"id": i, "nazwa": nazwy.get(i), "klatka": Path(k).as_posix()}
                                                        for i, k in zip(ids, klatki)], ensure_ascii=False, indent=1),
                                           encoding="utf-8")
-    print(json.dumps({"arkusz": str(out), "stylow": len(ids), "klatki": str(katalog_klatek)}, ensure_ascii=False))
+    print(json.dumps({"arkusz": out.as_posix(), "stylow": len(ids), "klatki": katalog_klatek.as_posix()}, ensure_ascii=False))
     return 0
 
 
@@ -304,10 +305,10 @@ def cmd_nowy(a) -> int:
         glowa = NAGLOWEK_SCENY.format(id=i, rev=nz.HUASHU_REV[:7], karta=k["karta"]) + (UWAGA_2026 if i == "16_2026" else "")
         (kat / "sceny" / f"{i}.js").write_text(glowa + kod, encoding="utf-8")
     dlugosc = len(ids) * a.osemki * 30 / a.bpm
-    print(json.dumps({"strona": str(kat / "index.html"), "odcinki": ids, "dlugosc": round(dlugosc, 3),
-                      "dalej": [f"python3 $HERMES_HOME/scripts/html_wideo.py klatki {kat}/index.html --preset jarvo "
+    print(json.dumps({"strona": (kat / "index.html").as_posix(), "odcinki": ids, "dlugosc": round(dlugosc, 3),
+                      "dalej": [f"python3 $HERMES_HOME/scripts/html_wideo.py klatki {kat.as_posix()}/index.html --preset jarvo "
                                 f"--czasy 0.5,1.5 --arkusz out/wideo/klatki-{kat.name}.jpg",
-                                f"python3 $HERMES_HOME/scripts/html_wideo.py wideo {kat}/index.html --preset jarvo "
+                                f"python3 $HERMES_HOME/scripts/html_wideo.py wideo {kat.as_posix()}/index.html --preset jarvo "
                                 f"--dlugosc {dlugosc:g} -o out/wideo/{kat.name}.mp4"]}, ensure_ascii=False, indent=1))
     return 0
 
@@ -376,7 +377,7 @@ def potnij(plik: Path, przedrostek: Path, pick: int | None = None, biale: bool =
         y0, y1 = int(ys.min()), int(ys.max()) + 1
         nazwa = f"{przedrostek.name}.png" if pick is not None else f"{przedrostek.name}_{k}.png"
         Image.fromarray(obraz[y0:y1, x0:x1]).save(przedrostek.parent / nazwa)
-        wynik.append({"plik": str(przedrostek.parent / nazwa), "x0": x0, "x1": x1, "y0": y0, "y1": y1})
+        wynik.append({"plik": (przedrostek.parent / nazwa).as_posix(), "x0": x0, "x1": x1, "y0": y0, "y1": y1})
     return wynik
 
 
@@ -386,7 +387,7 @@ def cmd_wytnij(a) -> int:
     if brak:
         raise SystemExit(f"✗ brak plików: {', '.join(brak)}")
     meta = wytnij([Path(p) for p in a.pliki], Path(a.out), a.soft, a.hard, a.pad)
-    print(json.dumps({"sprites": str(Path(a.out) / "sprites.json"), "warstwy": meta}, ensure_ascii=False, indent=1))
+    print(json.dumps({"sprites": (Path(a.out) / "sprites.json").as_posix(), "warstwy": meta}, ensure_ascii=False, indent=1))
     return 0
 
 

@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
                         wielkie=not args.male, rozmiar=args.rozmiar)
     ass = video.with_suffix(".ass")
     ass.write_text(wl.build_ass(w, h, words, style), encoding="utf-8")
-    result = {"srt": str(srt_out), "ass": str(ass), "slowa": len(words)}
+    result = {"srt": Path(srt_out).as_posix(), "ass": Path(ass).as_posix(), "slowa": len(words)}
     if args.wypal:
         out = video.with_name(video.stem + ".napisy.mp4")
         with tempfile.TemporaryDirectory(prefix="jarvo-napisy-") as tmp:
