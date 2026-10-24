@@ -804,3 +804,28 @@ def test_repo_sync_access_denied_no_retry_and_clear_error(tmp_path):
     assert r.returncode == 1 and "KONIEC" not in r.stdout
     assert log.count(" fetch ") == 1
     assert "terminal prompts disabled" in r.stderr
+
+
+def test_jarvo_update_ignores_broken_branch_config(tmp_path):
+    """jarvo update pobiera swoją gałąź wprost (fetch + FETCH_HEAD): git pull padał u właściciela na
+    „Cannot fast-forward to multiple branches” (dwa wpisy branch.main.merge) mimo czystego repo."""
+    def git(*a, cwd=tmp_path):
+        subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True,
+                       env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+                            "GIT_COMMITTER_EMAIL": "t@t"})
+    up, cl = tmp_path / "up", tmp_path / "cl"
+    git("init", "-q", "-b", "main", str(up))
+    (up / "bin").mkdir()
+    shutil.copy2(JARVO, up / "bin/jarvo")
+    (up / "install.sh").write_text('echo "INSTALL $JARVO_BRANCH"\n', encoding="utf-8")
+    git("add", "-A", cwd=up); git("commit", "-q", "-m", "a", cwd=up)
+    git("branch", "-q", "inna", cwd=up)
+    git("clone", "-q", f"file://{up}", str(cl))
+    git("commit", "-q", "--allow-empty", "-m", "nowa wersja", cwd=up)
+    git("config", "--add", "branch.main.merge", "refs/heads/inna", cwd=cl)
+    git("config", "--add", "remote.origin.fetch", "+refs/heads/inna:refs/remotes/origin/inna", cwd=cl)
+    res = subprocess.run(["bash", str(cl / "bin/jarvo"), "update"], capture_output=True, text=True, timeout=60,
+                         env={"PATH": os.environ["PATH"], "HOME": str(tmp_path), "JARVO_LOCAL": str(tmp_path / "local")})
+    assert res.returncode == 0 and "INSTALL main" in res.stdout, res.stdout + res.stderr
+    log = subprocess.run(["git", "-C", str(cl), "log", "--oneline", "-1"], capture_output=True, text=True).stdout
+    assert "nowa wersja" in log

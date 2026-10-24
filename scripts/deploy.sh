@@ -92,7 +92,8 @@ python3 "$ROOT/scripts/limity.py" --compose "$COMPOSE_DIR" || true
 if [[ $PULL -eq 1 ]]; then
   log "git pull"
   before="$(git rev-parse HEAD)"
-  git pull --ff-only
+  # jawna gałąź i FETCH_HEAD: bez zależności od configu gałęzi (jak jarvo update)
+  git fetch -q origin "$(git rev-parse --abbrev-ref HEAD)" && git merge -q --ff-only FETCH_HEAD
   after="$(git rev-parse HEAD)"
   if [[ "$before" != "$after" ]]; then
     changed="$(git diff --name-only "$before" "$after")"

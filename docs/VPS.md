@@ -240,7 +240,7 @@ laptop / sesja dev ──git push──► GitHub ──git pull──► VPS: s
 ```
 
 `scripts/deploy.sh` (idempotentny; szczegóły w [RUNBOOK.md](RUNBOOK.md)):
-1. `git pull --ff-only` w `/srv/jarvo/repo`,
+1. `git fetch origin <gałąź>` + `git merge --ff-only FETCH_HEAD` w `/srv/jarvo/repo`,
 2. przebudowa obrazu, gdy zmienił się `infra/Dockerfile`, `infra/node/`, `infra/python/` albo `infra/bin/` (wtedy też
    z pobraniem nowego obrazu bazowego) lub `branding/` (albo `--rebuild`),
 3. `docker compose up -d`,

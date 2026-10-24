@@ -276,7 +276,7 @@ Zbudowane 2026-10-09:
   `bin/jarvo` z LaunchAgentem, `pliki` przez `docker cp`, `uninstall --all` usuwa też wolumeny.
 - **Prywatne repo** (dziś repo jest publiczne; zostaje dla prywatnych kopii): `JARVO_TOKEN` (albo pytanie z terminala, ukryte, gdy anonimowy klon się nie uda); klucz trafia
   tylko do nagłówka git w `.git/config` repo (0600) i do `docker login ghcr.io`, nigdy do logu ani na ekran.
-- **Aktualizacja:** `jarvo update` = `git pull --ff-only` + `exec bash install.sh` (nowa wersja instalatora, bez
+- **Aktualizacja:** `jarvo update` = `git fetch origin <gałąź>` + `git merge --ff-only FETCH_HEAD` (bez `git pull`, który zależy od configu gałęzi) + `exec bash install.sh` (nowa wersja instalatora, bez
   banera i bez otwierania przeglądarki); `sudo` tylko, gdy trzeba coś doinstalować. `install.sh` zapisuje
   `HOST_VERSION` w `compose/.host-version`; starsza wersja → `deploy.sh` prosi o `jarvo update`.
   `JARVO_REPO` w `compose/.env` musi wskazywać repo, z którego idzie wdrożenie (kontener czyta z niego build
