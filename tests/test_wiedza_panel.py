@@ -1,6 +1,6 @@
 """Zakładka „Wiedza”: logika panelu (wiedza/plugin/dashboard/panel.py) bez FastAPI: przegląd, drzewo, notatka z linkami
 w obie strony i historią, szukanie, skrzynka, dziennik, lint z pamięcią podręczną, orzeczenia (lista i dodanie),
-uwaga do notatki jako szkic, reindeks, kompilacja jako osobny proces."""
+uwaga do notatki jako szkic, reindeks, kompilacja jako osobny proces (w kontenerze skrypt bash, na Windows kompilacja.py)."""
 import importlib.util
 import json
 import os
@@ -43,6 +43,7 @@ def panel(tmp_path, monkeypatch):
 def test_overview_tree_note_search(panel):
     ov = panel.overview()
     assert ov["notatek"] >= 14 and ov["wg_folderu"]["pojecia"] == 2 and ov["szkice"] == 0 and ov["git"] == GIT
+    assert ov["skarbiec"] == panel.sk.root.as_posix()                           # ścieżka dla UI zawsze z „/”
     assert ov["lint"]["bledy"] == 1 and ov["dziennik"][0]["rodzaj"] in ("orzeczenie", "zasiew")
     tree = panel.tree()
     foldery = {f["folder"]: f for f in tree["foldery"]}
@@ -94,6 +95,25 @@ def test_lint_cache_rulings_remark_inbox_log(panel, monkeypatch):
     assert [w["agent"] for w in panel.recall_log()] == ["jarvo", "jarvo-web"]
 
 
+def _czekaj_na_kompilacje(panel) -> dict:
+    for _ in range(300):
+        if not panel.compile_status()["trwa"]:
+            break
+        time.sleep(0.1)
+    return panel.compile_status()
+
+
+def test_historia_notatki_z_polskimi_znakami(panel):
+    """Historia notatki z gita dekodowana w UTF-8 (dawniej błąd 500 na „Ł” przy kodowaniu cp1250 na Windows)."""
+    if not GIT:
+        pytest.skip("brak git")
+    w.dodaj_orzeczenie(panel.sk, "marki/Łódź Żółć", "Logo zawsze na białym tle", "test")
+    historia = panel.note("orzeczenia/marki/łódź-żółć")["historia"]
+    assert historia[0]["opis"] == "orzeczenie: łódź żółć" and len(historia) == 1
+
+
+# kontener: przycisk woła scripts/wiedza-kompiluj.sh bashem; na Windows bash z Pythona to WSL (test niżej)
+@pytest.mark.posix_only
 def test_compile_process(panel, tmp_path):
     assert panel.compile_command() is None
     assert panel.compile_start()["blad"].startswith("brak scripts/wiedza-kompiluj.sh")
@@ -116,3 +136,41 @@ def test_compile_process(panel, tmp_path):
             break
         time.sleep(0.1)
     assert panel.compile_status()["blad"] == "zła odpowiedź"
+
+
+# atrapa Hermesa dla procesu kompilacji: agent.auxiliary_client.call_llm sprawdza profil i odrzuca szkic
+ATRAPA_HERMESA = """import json, os
+def call_llm(task, messages, max_tokens, temperature):
+    assert task == "jarvo_wiedza", task
+    assert os.path.basename(os.environ["HERMES_HOME"]) == "jarvo", os.environ["HERMES_HOME"]
+    return {"choices": [{"message": {"content": json.dumps({"wyniki": [{"decyzja": "odrzuc", "powod": "atrapa"}]})}}]}
+"""
+
+
+@pytest.mark.windows_only
+def test_compile_process_windows(panel, tmp_path, monkeypatch):
+    """Windows: przycisk nigdy nie woła basha (bash z Pythona to WSL), tylko kompilacja.py Pythonem dashboardu,
+    z HERMES_HOME profilu jarvo i wyjściem w UTF-8; wynik to cały JSON z --json."""
+    skrypt = tmp_path / "repo" / "scripts" / "wiedza-kompiluj.sh"            # nawet gdy skrypt kontenera jest obok
+    skrypt.parent.mkdir(parents=True)
+    skrypt.write_text("exit 99\n", encoding="utf-8")
+    (tmp_path / "dane" / "profiles" / "jarvo").mkdir(parents=True)
+    p = pm.Panel(panel.sk.root, panel.sk.stan, repo=tmp_path / "repo", dane=tmp_path / "dane")
+    cmd = p.compile_command()
+    assert cmd[0] == sys.executable and Path(cmd[1]).name == "kompilacja.py" and "--json" in cmd
+    assert not [x for x in cmd if "bash" in x.lower() or x.endswith(".sh")]
+    hermes = tmp_path / "hermes"
+    (hermes / "agent").mkdir(parents=True)
+    (hermes / "agent" / "__init__.py").write_text("", encoding="utf-8")
+    (hermes / "agent" / "auxiliary_client.py").write_text(ATRAPA_HERMESA, encoding="utf-8")
+    monkeypatch.setenv("HERMES_SRC", str(hermes))
+    w.zapisz_szkic(p.sk, "fakt", "Fakt z zakładki", "Treść faktu do kompilacji.", "karta t_1", "jarvo-web")
+    assert p.compile_start()["trwa"] is True
+    st = _czekaj_na_kompilacje(p)
+    assert st["blad"] == "" and st["wynik"]["szkice"] == 1 and st["wynik"]["odrzucone"] == 1 and st["wynik"]["bledy"] == 0
+    assert not list((p.sk.root / "skrzynka").glob("*.md"))
+    monkeypatch.setenv("HERMES_SRC", str(tmp_path / "nie-ma"))               # bez Hermesa: komunikat z ogonkami w UTF-8
+    p.compile_start()
+    assert "brak dostępu do modelu Hermesa" in _czekaj_na_kompilacje(p)["blad"]
+    monkeypatch.setattr(p, "_kompilacja_py", lambda: None)                    # wtyczka bez kompilacja.py obok wiedza.py
+    assert p.compile_command() is None and p.compile_start()["blad"] == "brak kompilacja.py obok wiedza.py"

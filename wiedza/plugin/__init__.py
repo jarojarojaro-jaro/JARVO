@@ -16,6 +16,7 @@ Agenci nie piszą notatek: notatki, INDEX i huby pisze kompilacja (etap 4) i `wi
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import logging
@@ -101,6 +102,17 @@ def _schemat_schema() -> List[Dict[str, Any]]:
     except Exception as exc:
         logger.warning("jarvo-wiedza: narzędzie schemat niedostępne: %s", exc)
         return []
+
+
+def _hermes_home() -> str:
+    """HERMES_HOME procesu; bez zmiennej katalog domowy Hermesa (hermes_constants), poza Hermesem /opt/data (kontener)."""
+    if os.environ.get("HERMES_HOME"):
+        return os.environ["HERMES_HOME"]
+    try:
+        from hermes_constants import get_hermes_home
+        return str(get_hermes_home())
+    except Exception:
+        return "/opt/data"
 
 
 def _korzen(hermes_home: str) -> Path:
@@ -325,8 +337,8 @@ class SkarbiecProvider(MemoryProvider):
             with self._lock:
                 if plik.exists() and plik.stat().st_size > DZIENNIK_MAX_B:
                     linie = plik.read_text(encoding="utf-8", errors="replace").splitlines()[-2000:]
-                    plik.write_text("\n".join(linie) + "\n", encoding="utf-8")
-                with plik.open("a", encoding="utf-8") as f:
+                    plik.write_text("\n".join(linie) + "\n", encoding="utf-8", newline="\n")
+                with plik.open("a", encoding="utf-8", newline="\n") as f:
                     f.write(json.dumps(wpis, ensure_ascii=False) + "\n")
         except Exception as e:
             logger.debug("jarvo-wiedza: dziennik przypomnień: %s", e)
@@ -473,7 +485,7 @@ class SkarbiecProvider(MemoryProvider):
                           "zrodlo": f"pamięć (memory) agenta {self._agent}", "utworzono": lib.dzis(), "skad": "lustro memory", "tagi": ["pamiec"], "linki": []}
                     sk.zapisz_plik(rel, lib.sklej(fm, f"# Pamięć agenta {self._agent}: wpisy\n\nWpisy `memory` (MEMORY.md/USER.md) w kolejności zapisu; kompilacja robi z nich notatki.\n"))
                 p = sk.plik(rel)
-                with p.open("a", encoding="utf-8") as f:
+                with p.open("a", encoding="utf-8", newline="\n") as f:
                     f.write(f"- {lib.dzis()} · {action} {target}: {' '.join(content.split())[:500]}\n")
         except Exception as e:
             logger.debug("jarvo-wiedza: lustro pamięci: %s", e)
@@ -647,8 +659,8 @@ def karta_zamknieta(task_id: str = "", profile_name: str = "", board: str = "", 
 def _karta_z_bazy(db: Path, task_id: str) -> Dict[str, Any]:
     if not db.exists() or not task_id:
         return {}
-    try:
-        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=2)
+    try:   # adres file: z Path.as_uri(): litera dysku, spacje, „#” i polskie znaki w ścieżce danych
+        conn = sqlite3.connect(Path(os.path.abspath(db)).as_uri() + "?mode=ro", uri=True, timeout=2)
         conn.row_factory = sqlite3.Row
         try:
             cols = {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}
@@ -669,6 +681,7 @@ def _karta_z_bazy(db: Path, task_id: str) -> Dict[str, Any]:
 #    z czatu);
 # 2) płatna generacja AI (`video_generate`, `image_generate`) ma twardy limit na kartę; ponad limit = zgoda człowieka
 #    (A2: wydatek), a bez człowieka (karta, cron) Hermes odmawia, więc agent musi zapytać przez blokadę karty.
+#    Licznik (state/generacje-ai.json) liczą brama i pracownicy kanbana, osobne procesy: pod blokadą generacje-ai.lock.
 LIMITY_GENERACJI = {"video_generate": ("JARVO_LIMIT_WIDEO_AI", 3), "image_generate": ("JARVO_LIMIT_OBRAZY_AI", 12)}
 _LOGOWANIE_RE = re.compile(r"(?i)\b(has[łl]o|password|passwd|pin)\b(?:\s+[^\s\d!@#$%^&*]{1,12}){0,3}?\s*(?:[:=]|to\b|jest\b)?"
                            r"\s*\S*[\d!@#$%^&*]\S*")
@@ -695,6 +708,65 @@ def _teksty_pamieci(args: Dict[str, Any]) -> List[str]:
     return [str(o.get(k) or "") for o in ops if isinstance(o, dict) for k in ("content", "new_text")]
 
 
+def _sprobuj_zamek(f) -> Optional[bool]:
+    """Jedna próba blokady bez czekania: True wzięta, False zajęta przez inny proces, None system plików bez blokad."""
+    try:
+        if os.name == "nt":
+            import msvcrt
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except (BlockingIOError, PermissionError):     # POSIX: EWOULDBLOCK, Windows: EACCES
+        return False
+    except OSError:
+        return None
+
+
+@contextlib.contextmanager
+def _zamek(plik: Path, czekaj_s: float = 10.0):
+    """Blokada międzyprocesowa na pliku (brama i pracownicy kanbana to osobne procesy): fcntl.flock na POSIX,
+    msvcrt.locking na Windows, próby co 50 ms (czekaj_s=0: bez czekania). Daje True, gdy wzięta; gdy nie (zajęta dłużej
+    niż czekaj_s albo system plików bez blokad), praca idzie dalej bez niej, jak przed blokadą. Celowo bez wiedza.py:
+    limit wydatków ma działać także wtedy, gdy moduł skarbca się nie wczyta."""
+    try:
+        plik.parent.mkdir(parents=True, exist_ok=True)
+        f = open(plik, "a+b")
+    except OSError:                                    # stan tylko do odczytu: limit sprawdzany dalej, bez blokady
+        yield False
+        return
+    with f:
+        koniec = time.monotonic() + czekaj_s
+        wzieta = _sprobuj_zamek(f)
+        while wzieta is False and time.monotonic() < koniec:
+            time.sleep(0.05)
+            wzieta = _sprobuj_zamek(f)
+        try:
+            yield bool(wzieta)
+        finally:
+            if wzieta and os.name == "nt":            # POSIX: zamknięcie pliku zwalnia flock
+                import msvcrt
+                try:
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
+
+
+def _zamien(tmp: Path, plik: Path) -> None:
+    """os.replace ponawiane, gdy na Windows plik trzyma inny proces (WinError 5, 32, 33); na POSIX zwykłe os.replace."""
+    for proba in range(10):
+        try:
+            os.replace(tmp, plik)
+            return
+        except PermissionError as e:
+            if getattr(e, "winerror", None) not in (5, 32, 33) or proba == 9:
+                raise
+            time.sleep(0.05 * (proba + 1))
+
+
 def _limit_generacji(tool_name: str, task_id: str, session_id: str) -> Optional[Dict[str, Any]]:
     zmienna, domyslny = LIMITY_GENERACJI[tool_name]
     try:
@@ -702,9 +774,11 @@ def _limit_generacji(tool_name: str, task_id: str, session_id: str) -> Optional[
     except ValueError:
         limit = domyslny
     klucz = os.environ.get("HERMES_KANBAN_TASK") or task_id or session_id or "bez-karty"
-    _, stan = _sciezki(os.environ.get("HERMES_HOME", "/opt/data"))
+    _, stan = _sciezki(_hermes_home())
     plik = stan / "generacje-ai.json"
-    with _generacje_lock:
+    with _generacje_lock, _zamek(stan / "generacje-ai.lock") as wzieta:
+        if not wzieta:
+            logger.debug("jarvo-wiedza: licznik generacji bez blokady międzyprocesowej (%s)", stan)
         try:
             liczniki = json.loads(plik.read_text(encoding="utf-8")) if plik.exists() else {}
         except (OSError, ValueError):
@@ -716,10 +790,9 @@ def _limit_generacji(tool_name: str, task_id: str, session_id: str) -> Optional[
                                "(A2): potrzebna zgoda człowieka. Bez niej zgłoś blokadę z liczbą generacji, której potrzebujesz."}
         liczniki.setdefault(klucz, {})[tool_name] = n + 1
         try:
-            stan.mkdir(parents=True, exist_ok=True)
             tmp = plik.with_name(plik.name + ".tmp")
-            tmp.write_text(json.dumps(liczniki, ensure_ascii=False), encoding="utf-8")
-            os.replace(tmp, plik)
+            tmp.write_text(json.dumps(liczniki, ensure_ascii=False), encoding="utf-8", newline="\n")
+            _zamien(tmp, plik)
         except OSError as e:
             logger.debug("jarvo-wiedza: licznik generacji: %s", e)
     return None

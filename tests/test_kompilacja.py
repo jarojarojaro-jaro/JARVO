@@ -1,10 +1,13 @@
 """Kompilacja skarbca (wiedza/kompilacja.py) z podstawionym modelem: nowa notatka, aktualizacja, sprzeczność, odrzucenie,
 błędny JSON (ponowienie, licznik prób), linki tylko do istniejących ścieżek (hub, sąsiad, inny folder), limity, blokada,
-LOG, punkt zapisu git, na sucho."""
+LOG, punkt zapisu git, na sucho, kolejność szkiców (mtime, potem nazwa)."""
+import itertools
 import json
+import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -42,8 +45,16 @@ def sk(tmp_path, monkeypatch):
     return sk
 
 
+_KOLEJNY = itertools.count()
+
+
 def szkic(sk, typ, tytul, tresc, zrodlo="karta t_9", agent="jarvo-web"):
-    return w.zapisz_szkic(sk, typ, tytul, tresc, zrodlo, agent, ["web"], skad="test")
+    """Szkic z mtime rosnącym w kolejności zapisu: kompilacja bierze szkice po mtime, a zegar NTFS (Windows) tyka
+    co ok. 16 ms, więc szkice zapisane jeden po drugim miałyby ten sam czas."""
+    rel = w.zapisz_szkic(sk, typ, tytul, tresc, zrodlo, agent, ["web"], skad="test")
+    t = time.time() - 3600 + next(_KOLEJNY)
+    os.utime(sk.root / f"{rel}.md", (t, t))
+    return rel
 
 
 def model_z(odpowiedzi):
@@ -170,8 +181,34 @@ def test_cli_na_sucho(sk, capsys):
     assert k._json_z_odpowiedzi("Oto wynik: {\"wyniki\": []} dziękuję") == {"wyniki": []} and k._json_z_odpowiedzi("nic") is None
 
 
+def test_kolejnosc_szkicow_mtime_potem_nazwa(sk):
+    """Równy mtime (szkice z jednej chwili na NTFS) rozstrzyga nazwa, a nie kolejność katalogu na dysku."""
+    rels = [w.zapisz_szkic(sk, "fakt", tytul, "Treść.", "karta t_1", "jarvo-web") for tytul in ("Zeta", "Alfa", "Mi")]
+    teraz = time.time() - 60
+    for rel in rels:
+        os.utime(sk.root / f"{rel}.md", (teraz, teraz))
+    os.utime(sk.root / f"{rels[0]}.md", (teraz - 10, teraz - 10))                  # najstarszy idzie pierwszy
+    assert [p.name for p in k.Kompilacja(sk, None).szkice()] == [Path(rels[i]).name + ".md" for i in (0, 1, 2)]
+
+
+def test_zrobione_po_zajetym_pliku(sk, monkeypatch):
+    """Szkic przenoszony do zrobione/ mimo chwilowej blokady pliku na Windows (antywirus, indeksowanie: WinError 32)."""
+    szkic(sk, "fakt", "Coś", "Treść.")
+    prawdziwy, proby = os.replace, []
+
+    def zajety(a, b):
+        proby.append(a)
+        if len(proby) < 3:
+            e = PermissionError(13, "plik używany przez inny proces")
+            e.winerror = 32
+            raise e
+        prawdziwy(a, b)
+    monkeypatch.setattr(os, "replace", zajety)
+    r = k.Kompilacja(sk, model_z([{"wyniki": [{"decyzja": "odrzuc", "powod": "test"}]}])).uruchom()
+    assert r["odrzucone"] == 1 and not list((sk.root / "skrzynka").glob("*.md")) and len(proby) >= 3
+
+
 def test_sprzatanie_zrobione_po_30_dniach(sk):
-    import os, time
     kat = sk.root / "skrzynka" / "zrobione"
     kat.mkdir(parents=True, exist_ok=True)
     stary, nowy = kat / "stary.md", kat / "nowy.md"

@@ -9,6 +9,7 @@ git. Całość pod blokadą `state/wiedza.lock`. Limity na przebieg: 40 szkiców
 
 Uruchomienie: wątek wtyczki jarvo-wiedza (co godzinę przy szkicach, co noc) albo ręcznie w kontenerze:
   scripts/wiedza-kompiluj.sh [--na-sucho] [--limit N]
+Na Windows przycisk w zakładce Wiedza woła ten plik wprost Pythonem z venvu Hermesa (bash z Pythona to tam WSL).
 Model: zadanie pomocnicze Hermesa `jarvo_wiedza` (auxiliary.jarvo_wiedza.model, poziom frontier); testy podstawiają funkcję.
 """
 from __future__ import annotations
@@ -109,10 +110,11 @@ class Kompilacja:
             return {}
 
     def szkice(self) -> List[Path]:
+        """Szkice w kolejności zapisu; przy równym mtime (zegar NTFS tyka co ok. 16 ms) po nazwie, a nie w kolejności dysku."""
         kat = self.sk.root / "skrzynka"
         if not kat.is_dir():
             return []
-        return sorted((p for p in kat.glob("*.md") if p.is_file()), key=lambda p: p.stat().st_mtime)
+        return sorted((p for p in kat.glob("*.md") if p.is_file()), key=lambda p: (p.stat().st_mtime, p.name))
 
     def _blokada(self) -> bool:
         p = self.sk.stan / "wiedza.lock"
@@ -120,7 +122,7 @@ class Kompilacja:
             if p.exists() and time.time() - p.stat().st_mtime < BLOKADA_STARA_S:
                 return False
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(f"{os.getpid()} {int(time.time())}\n", encoding="utf-8")
+            p.write_text(f"{os.getpid()} {int(time.time())}\n", encoding="utf-8", newline="\n")
             return True
         except OSError:
             return False
@@ -322,7 +324,7 @@ class Kompilacja:
     def _zrobione(self, p: Path) -> None:
         cel = p.parent / "zrobione" / p.name
         cel.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(p, cel)
+        self.lib.zamien_plik(p, cel)
 
     def sprzatnij_zrobione(self) -> int:
         """Szkice po kompilacji starsze niż ZROBIONE_DNI znikają (ich treść jest w notatkach i LOG.md, źródła w zrodla/)."""
@@ -342,7 +344,7 @@ class Kompilacja:
     def _oznacz_probe(self, p: Path, szkic: dict) -> None:
         fm = dict(szkic["fm"])
         fm["proby"] = szkic["proby"] + 1
-        p.write_text(self.lib.sklej(fm, szkic["body"]), encoding="utf-8")
+        p.write_text(self.lib.sklej(fm, szkic["body"]), encoding="utf-8", newline="\n")
 
     # ---- przebieg
     def uruchom(self) -> Dict[str, Any]:
@@ -413,7 +415,7 @@ class Kompilacja:
                                              "\n".join(f"- {w}" for w in wpisy))
             r["git"] = self.sk.punkt_zapisu(f"kompilacja: {r['nowe']} nowych, {r['aktualizacje']} aktualizacji, {r['sprzeczne']} sprzecznych")
             try:
-                (self.sk.stan / "wiedza-kompilacja.json").write_text(json.dumps({"ostatnia": time.time(), "data": lib.dzis(), "raport": {k: v for k, v in r.items() if k != "wpisy"}}, ensure_ascii=False, indent=1), encoding="utf-8")
+                (self.sk.stan / "wiedza-kompilacja.json").write_text(json.dumps({"ostatnia": time.time(), "data": lib.dzis(), "raport": {k: v for k, v in r.items() if k != "wpisy"}}, ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")
             except OSError:
                 pass
         return self.raport
@@ -438,6 +440,7 @@ def model_hermes(max_tokens: int = 2000) -> Callable[[str, str], str]:
 
 def main(argv: Optional[List[str]] = None) -> int:
     lib = _lib()
+    lib.utf8_wyjscie()
     ap = argparse.ArgumentParser(description="Kompilacja skarbca wiedzy (jeden piszący)")
     ap.add_argument("--skarbiec", default=lib.DOMYSLNY_SKARBIEC)
     ap.add_argument("--stan", default=None)
@@ -457,7 +460,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         try:
             model = model_hermes()
         except Exception as e:
-            print(f"✗ brak dostępu do modelu Hermesa ({e}); uruchom w kontenerze przez scripts/wiedza-kompiluj.sh albo użyj --na-sucho", file=sys.stderr)
+            gdzie = ("uruchom Pythonem z venvu Hermesa z HERMES_HOME profilu jarvo" if lib.WINDOWS
+                     else "uruchom w kontenerze przez scripts/wiedza-kompiluj.sh")
+            print(f"✗ brak dostępu do modelu Hermesa ({e}); {gdzie} albo użyj --na-sucho", file=sys.stderr)
             return 2
     r = Kompilacja(sk, model, limit_szkicow=a.limit, na_sucho=a.na_sucho).uruchom()
     if a.json:

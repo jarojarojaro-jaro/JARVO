@@ -31,7 +31,7 @@ def test_inline_konczy_sie_i_tokenizuje(tmp_path, tekst):
     src = (REPO / "wiedza" / "web" / "src" / "20-markdown.js").read_text(encoding="utf-8")
     skrypt = tmp_path / "t.js"
     skrypt.write_text(STUB % src, encoding="utf-8")
-    r = subprocess.run([NODE, str(skrypt), tekst], capture_output=True, text=True, timeout=10)
+    r = subprocess.run([NODE, str(skrypt), tekst], capture_output=True, text=True, encoding="utf-8", timeout=10)
     assert r.returncode == 0, r.stderr
     wynik = json.loads(r.stdout.strip())
     tekst_plaski = json.dumps(wynik, ensure_ascii=False)

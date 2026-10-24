@@ -15,7 +15,10 @@ Skarbiec to katalog zwykłych plików Markdown (projekt: docs/WIEDZA.md). Ten sk
   status      liczby
 
 Używane przez wtyczkę jarvo-wiedza (import), rutyny (CLI), testy (tests/test_wiedza.py).
-Domyślne ścieżki: JARVO_KNOWLEDGE_DIR (albo /opt/data/jarvo/knowledge) i JARVO_STATE_DIR (albo <skarbiec>/../state).
+Domyślne ścieżki: JARVO_KNOWLEDGE_DIR (albo /opt/data/jarvo/knowledge w kontenerze, a na Windows i macOS
+<dane>/jarvo/knowledge, docs/NATYWNIE.md c1) i JARVO_STATE_DIR (albo <skarbiec>/../state).
+Przenośność (docs/NATYWNIE.md K01): notatki zawsze z LF, git w UTF-8 bez zamiany końców linii, zamiana pliku
+ponawiana, gdy na Windows trzyma go inny program, na Windows nazwy bez „:” i „\\”, na macOS ścieżki w NFC.
 """
 from __future__ import annotations
 
@@ -29,11 +32,33 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import time
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DOMYSLNY_SKARBIEC = os.environ.get("JARVO_KNOWLEDGE_DIR", "/opt/data/jarvo/knowledge")
+WINDOWS = os.name == "nt"
+MACOS = sys.platform == "darwin"
+
+
+def _domyslny_skarbiec() -> str:
+    """JARVO_KNOWLEDGE_DIR; bez niej w kontenerze /opt/data/jarvo/knowledge, a na Windows i macOS <dane>/jarvo/knowledge,
+    gdzie <dane> to HERMES_HOME (profil: dwa katalogi wyżej), domyślnie %LOCALAPPDATA%\\Jarvo\\dane albo ~/.jarvo/dane."""
+    if not (WINDOWS or MACOS):
+        return os.environ.get("JARVO_KNOWLEDGE_DIR", "/opt/data/jarvo/knowledge")
+    if os.environ.get("JARVO_KNOWLEDGE_DIR"):
+        return os.environ["JARVO_KNOWLEDGE_DIR"]
+    if os.environ.get("HERMES_HOME"):
+        dane = Path(os.environ["HERMES_HOME"])
+        dane = dane.parent.parent if dane.parent.name == "profiles" else dane
+    elif WINDOWS:
+        dane = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "Jarvo" / "dane"
+    else:
+        dane = Path.home() / ".jarvo" / "dane"
+    return str(dane / "jarvo" / "knowledge")
+
+
+DOMYSLNY_SKARBIEC = _domyslny_skarbiec()
 
 FOLDERY = ("zrodla/rozmowy", "zrodla/karty", "zrodla/pliki", "zrodla/jarvo-repo", "skrzynka/zrobione", "agenci",
            "projekty", "brands", "inspiracje/strony", "user", "podmioty", "pojecia", "orzeczenia/marki", "rozmowy", "fleet")
@@ -93,10 +118,41 @@ SEKRETY = [
     ("klucz API w tekście", re.compile(r"(?i)\b(api[_ -]?key|secret|token)\s*[:=]\s*[A-Za-z0-9_\-]{16,}")),
 ]
 GIT_TOZSAMOSC = ["-c", "user.name=Jarvo", "-c", "user.email=jarvo@localhost", "-c", "commit.gpgsign=false"]
+# pliki w historii bajt w bajt jak na dysku (bez CRLF z core.autocrlf=true Git for Windows), długie ścieżki na Windows
+GIT_PRZENOSNIE = ["-c", "core.autocrlf=false", "-c", "core.longpaths=true"]
+# .gitignore skarbca: *.tmp (zapis atomowy) i śmieci menedżera plików tego systemu (Finder, Eksplorator)
+GITIGNORE_SYSTEMU = (".DS_Store",) if MACOS else ("Thumbs.db", "desktop.ini") if WINDOWS else ()
+BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0)            # Windows: git bez migającego okna konsoli
+ZAJETY_PLIK = (5, 32, 33)          # WinError: odmowa dostępu, plik otwarty przez inny proces, zablokowany fragment
+PROBY_ZAMIANY = 10
 
 
 def dzis() -> str:
     return os.environ.get("WIEDZA_DZIS") or dt.date.today().isoformat()
+
+
+def zamien_plik(zrodlo: str | Path, cel: str | Path) -> None:
+    """os.replace, ponawiane przez ok. 2 s, gdy na Windows plik trzyma inny program (Obsidian, antywirus, indeksowanie:
+    WinError 5, 32, 33). Na POSIX takiego błędu nie ma, więc to zwykłe os.replace."""
+    for proba in range(PROBY_ZAMIANY):
+        try:
+            os.replace(zrodlo, cel)
+            return
+        except PermissionError as e:
+            if getattr(e, "winerror", None) not in ZAJETY_PLIK or proba == PROBY_ZAMIANY - 1:
+                raise
+            time.sleep(0.05 * (proba + 1))
+
+
+def utf8_wyjscie() -> None:
+    """Na Windows stdout i stderr w UTF-8 (✓, ✗, ogonki), także gdy wyjście idzie do pliku albo potoku, a nie do konsoli."""
+    if not WINDOWS:
+        return
+    for strumien in (sys.stdout, sys.stderr):
+        try:
+            strumien.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
 
 
 # ------------------------------------------------------------------------------------------------ frontmatter i tekst
@@ -148,6 +204,12 @@ def sklej(fm: dict, tresc: str) -> str:
 
 def bez_ogonkow(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c)).replace("ł", "l").replace("Ł", "L")
+
+
+def _nfc(rel: str) -> str:
+    """Ścieżka z dysku w NFC na macOS: nazwa zapisana w NFD (stare HFS+, niektóre programy) ma pasować do linków w notatkach.
+    APFS szuka plików bez względu na normalizację; na Linuksie i Windows NFC i NFD to różne nazwy, więc bez zmian."""
+    return unicodedata.normalize("NFC", rel) if MACOS else rel
 
 
 def nazwa_pliku(tytul: str) -> str:
@@ -226,8 +288,11 @@ class Skarbiec:
 
     # ---- ścieżki
     def plik(self, rel: str) -> Path:
-        """Bezpieczna ścieżka w skarbcu (bez `..`, bez symlinków na zewnątrz); `.md` dopisywane, gdy brak."""
+        """Bezpieczna ścieżka w skarbcu (bez `..`, bez symlinków na zewnątrz); `.md` dopisywane, gdy brak.
+        Na Windows bez „:” (litera dysku, strumień NTFS zamiast pliku) i „\\” (drugi separator ścieżki)."""
         rel = rel.strip().lstrip("/")
+        if WINDOWS and (":" in rel or "\\" in rel):
+            raise ValueError(f"nazwa z „:” albo „\\” (Windows jej nie przyjmie): {rel}")
         if not rel.endswith(".md"):
             rel += ".md"
         p = (self.root / rel).resolve()
@@ -236,7 +301,7 @@ class Skarbiec:
         return p
 
     def rel(self, p: Path) -> str:
-        return p.relative_to(self.root).as_posix()[:-3]
+        return _nfc(p.relative_to(self.root).as_posix()[:-3])
 
     def pliki(self) -> list[str]:
         """Wszystkie notatki (bez katalogów z kropką i plików specjalnych), ścieżki bez `.md`."""
@@ -247,7 +312,7 @@ class Skarbiec:
                 continue
             if len(r.parts) == 1 and r.name in PLIKI_SPECJALNE:
                 continue
-            out.append(r.as_posix()[:-3])
+            out.append(_nfc(r.as_posix()[:-3]))
         return sorted(out)
 
     def istnieje(self, rel: str) -> bool:
@@ -320,32 +385,49 @@ class Skarbiec:
         p = self.plik(rel)
         p.parent.mkdir(parents=True, exist_ok=True)
         tmp = p.with_name(p.name + ".tmp")
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, p)
+        tmp.write_text(text, encoding="utf-8", newline="\n")      # LF także na Windows (Obsidian, git, sumy)
+        zamien_plik(tmp, p)
         return p
 
     def dopisz_log(self, rodzaj: str, tresc: str) -> None:
         p = self.root / "LOG.md"
         if not p.exists():
-            p.write_text("# Dziennik skarbca\n\nTylko dopisywanie. Format: `## [data] rodzaj | co się stało`.\n", encoding="utf-8")
-        with p.open("a", encoding="utf-8") as f:
+            p.write_text("# Dziennik skarbca\n\nTylko dopisywanie. Format: `## [data] rodzaj | co się stało`.\n",
+                         encoding="utf-8", newline="\n")
+        with p.open("a", encoding="utf-8", newline="\n") as f:
             f.write(f"\n## [{dzis()}] {rodzaj} | {tresc.strip()}\n")
 
     # ---- git (punkty zapisu)
     def git(self, *args: str) -> subprocess.CompletedProcess | None:
+        """git w skarbcu; wyjście zawsze w UTF-8 (opisy z polskimi znakami, także na Windows z kodowaniem cp1250)."""
         try:
-            return subprocess.run(["git", *GIT_TOZSAMOSC, "-C", str(self.root), *args], capture_output=True, text=True)
+            return subprocess.run([shutil.which("git") or "git", *GIT_TOZSAMOSC, *GIT_PRZENOSNIE, "-C", str(self.root), *args],
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=BEZ_OKNA)
         except FileNotFoundError:
             return None
 
     def git_init(self) -> bool:
         if (self.root / ".git").exists():
+            self._gitignore_systemu()
             return True
         r = self.git("init", "-q")
         if r is None or r.returncode != 0:
             return False
-        (self.root / ".gitignore").write_text("*.tmp\n", encoding="utf-8")
+        (self.root / ".gitignore").write_text("\n".join(("*.tmp", *GITIGNORE_SYSTEMU)) + "\n", encoding="utf-8", newline="\n")
         return True
+
+    def _gitignore_systemu(self) -> None:
+        """Skarbiec z innego systemu (np. przeniesiony z kontenera na Windows): brakujące śmieci tego systemu do .gitignore.
+        Na Linuksie lista jest pusta, więc plik zostaje taki, jak go zostawił `git init`."""
+        p = self.root / ".gitignore"
+        try:
+            stary = p.read_text(encoding="utf-8") if p.exists() else ""
+            brak = [w for w in GITIGNORE_SYSTEMU if w not in stary.splitlines()]
+            if brak:
+                p.write_text(stary + ("" if not stary or stary.endswith("\n") else "\n") + "\n".join(brak) + "\n",
+                             encoding="utf-8", newline="\n")
+        except OSError:
+            pass
 
     def punkt_zapisu(self, komunikat: str) -> bool:
         if not (self.root / ".git").exists():
@@ -406,7 +488,7 @@ class Indeks:
             if pelny:                                    # DELETE po kolumnie UNINDEXED skanuje całe FTS: przy przebudowie raz
                 self.db.execute("DELETE FROM fts")
             for rel in pliki:
-                p = self.sk.plik(rel)
+                p = self.sk.root / f"{rel}.md"           # z pliki(), więc w skarbcu: bez resolve() (na Windows otwiera plik)
                 st = p.stat()
                 if not pelny and rel in stare and stare[rel] == (st.st_mtime, st.st_size):
                     continue
@@ -765,10 +847,12 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                                           f"# Orzeczenia: {a.get('short') or krotki}\n\n**Korekty od użytkownika dla `{a['name']}`, jedna datowana linia każda; agent czyta je przed każdą turą.**\n\n"
                                           f"## Powiązane\n- hub: [[orzeczenia/_hub-orzeczenia|Orzeczenia]]\n- [[{rel}|{a.get('short') or krotki}]]\n\n## Linie\n"))
         (sk.stan).mkdir(parents=True, exist_ok=True)
-        (sk.stan / "wiedza-agenci.json").write_text(json.dumps(agenci_meta, ensure_ascii=False, indent=1), encoding="utf-8")
+        (sk.stan / "wiedza-agenci.json").write_text(json.dumps(agenci_meta, ensure_ascii=False, indent=1), encoding="utf-8",
+                                                    newline="\n")
         # skrypty, które naprawdę są w repo: lint wskazuje notatki floty odwołujące się do nieistniejących
         znane_skrypty = sorted({s for a in fleet.get("agents", []) for s in a.get("scripts", [])} | set(fleet.get("repo_scripts") or []))
-        (sk.stan / "wiedza-kod.json").write_text(json.dumps({"skrypty": znane_skrypty}, ensure_ascii=False, indent=1), encoding="utf-8")
+        (sk.stan / "wiedza-kod.json").write_text(json.dumps({"skrypty": znane_skrypty}, ensure_ascii=False, indent=1), encoding="utf-8",
+                                                 newline="\n")
         raport["skille"] = zasiej_skille(sk, skille_floty, w_lustrze)
     if not sk.istnieje("orzeczenia/wszyscy"):
         sk.zapisz_plik("orzeczenia/wszyscy", sklej(_hub_frontmatter("orzeczenia", "człowiek"),
@@ -798,9 +882,11 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
         sk.zapisz_plik(HUBY[""][0], zastap_blok(p.read_text(encoding="utf-8"), "repo",
                                                 "## Z repo (kopia przy wdrożeniu)\n" + "\n".join(linie_repo)))
     if not (sk.root / "INDEX.md").exists():
-        (sk.root / "INDEX.md").write_text("# Indeks skarbca\n\n_Pusty do pierwszego `wiedza.py indeksuj`._\n", encoding="utf-8")
+        (sk.root / "INDEX.md").write_text("# Indeks skarbca\n\n_Pusty do pierwszego `wiedza.py indeksuj`._\n", encoding="utf-8",
+                                          newline="\n")
     if not (sk.root / "LINT.md").exists():
-        (sk.root / "LINT.md").write_text("# Lint skarbca\n\n_Jeszcze nie uruchomiono `wiedza.py lint`._\n", encoding="utf-8")
+        (sk.root / "LINT.md").write_text("# Lint skarbca\n\n_Jeszcze nie uruchomiono `wiedza.py lint`._\n", encoding="utf-8",
+                                         newline="\n")
     sk.dopisz_log("zasiew", f"huby: {raport['huby']} folderów, {raport['agenci']} agentów; skille: {raport['skille']} zmienionych; "
                             f"docs repo: {raport['docs']} plików; pliki profili: {raport['repo']} zmienionych")
     raport["git"] = sk.git_init() and sk.punkt_zapisu("zasiew skarbca")
@@ -975,7 +1061,7 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
     linie = [f"# Lint skarbca ({dzis()})", "", f"Notatek: {raport['notatek']} · błędy: {len(bledy)} · ostrzeżenia: {len(ostrz)} · informacje: {len(info)}", ""]
     for naglowek, lista in (("Błędy", bledy), ("Ostrzeżenia", ostrz), ("Informacje", info)):
         linie += [f"## {naglowek}", ""] + ([f"- {x}" for x in lista] or ["- brak"]) + [""]
-    (sk.root / "LINT.md").write_text("\n".join(linie), encoding="utf-8")
+    (sk.root / "LINT.md").write_text("\n".join(linie), encoding="utf-8", newline="\n")
     return raport
 
 
@@ -992,7 +1078,7 @@ def status(sk: Skarbiec, ix: Indeks) -> dict:
     if log.exists():
         wpisy = re.findall(r"^## \[(\d{4}-\d{2}-\d{2})\] (\w+)", log.read_text(encoding="utf-8"), re.M)
         ostatni = " ".join(wpisy[-1]) if wpisy else ""
-    return {"skarbiec": str(sk.root), "indeks": str(sk.stan / "wiedza.db"), "wg_folderu": wg_folderu, "szkice": szkice,
+    return {"skarbiec": sk.root.as_posix(), "indeks": (sk.stan / "wiedza.db").as_posix(), "wg_folderu": wg_folderu, "szkice": szkice,
             "linki": ix.db.execute("SELECT COUNT(*) FROM linki WHERE rozwiazany = 1").fetchone()[0],
             "git": (sk.root / ".git").exists(), "ostatni_wpis": ostatni}
 
@@ -1000,6 +1086,7 @@ def status(sk: Skarbiec, ix: Indeks) -> dict:
 # ------------------------------------------------------------------------------------------------ CLI
 
 def main(argv: list[str] | None = None) -> int:
+    utf8_wyjscie()
     ap = argparse.ArgumentParser(description="Skarbiec wiedzy floty Jarvo (docs/WIEDZA.md)")
     ap.add_argument("--skarbiec", default=DOMYSLNY_SKARBIEC, help="katalog skarbca (JARVO_KNOWLEDGE_DIR)")
     ap.add_argument("--stan", default=None, help="katalog na indeks (JARVO_STATE_DIR, domyślnie <skarbiec>/../state)")

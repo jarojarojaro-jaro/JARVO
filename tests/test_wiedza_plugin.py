@@ -4,6 +4,7 @@ import importlib.util
 import json
 import sqlite3
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -89,6 +90,7 @@ def test_blok_promptu_i_przypomnienie(srodowisko):
     r2 = p.prefetch("jakie kolory ma marka Acme?")
     assert "brands/acme/BRAND" in r2 and "[acme] Przyciski zaokrąglone" in r2
     dziennik = (root / "jarvo" / "state" / "wiedza-przypomnienia.jsonl").read_text(encoding="utf-8").splitlines()
+    assert b"\r" not in (root / "jarvo" / "state" / "wiedza-przypomnienia.jsonl").read_bytes()      # LF także na Windows
     wpis = json.loads(dziennik[-1])
     assert wpis["agent"] == "jarvo-web" and wpis["zapytanie"] == "jakie kolory ma marka Acme?" and "brands/acme/BRAND" in wpis["notatki"]
     assert wpis["orzeczen"] >= 3 and wpis["sesja"] == "sesja-123" and wpis["znakow"] == len(r2)
@@ -135,6 +137,7 @@ def test_lustro_pamieci_i_wyciag(srodowisko, monkeypatch):
     p.on_memory_write("remove", "memory", "cokolwiek")
     lustro = (sk.root / "skrzynka/pamiec-jarvo-web.md").read_text(encoding="utf-8")
     assert "- 2026-09-30 · add user: Użytkownik prowadzi agencję" in lustro and "tajne123" not in lustro and "remove" not in lustro
+    assert b"\r" not in (sk.root / "skrzynka/pamiec-jarvo-web.md").read_bytes()
     wywolania = []
 
     def falszywy_model(system, user, max_tokens=1200):
@@ -223,6 +226,20 @@ def test_hak_kanbana(srodowisko, monkeypatch):
     assert len(list((sk.root / "skrzynka").glob("*karta-karta-nie-ma*"))) == 1
 
 
+def test_karta_z_bazy_w_katalogu_ze_znakami(tmp_path):
+    """Baza kanbana czytana przez adres file: z Path.as_uri(): spacja, „#”, „%” i polskie znaki (np. C:\\Users\\Michał Żółć)
+    nie psują adresu, a tryb tylko do odczytu zostaje."""
+    db = tmp_path / "Michał Żółć #1 100%" / "kanban.db"
+    db.parent.mkdir()
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE tasks(id TEXT PRIMARY KEY, title TEXT, workspace_path TEXT)")
+    conn.execute("INSERT INTO tasks VALUES ('t_1', 'Łąka', 'C:/x')")
+    conn.commit()
+    conn.close()
+    assert pl._karta_z_bazy(db, "t_1") == {"title": "Łąka", "workspace_path": "C:/x"}
+    assert pl._karta_z_bazy(db, "t_2") == {} and pl._karta_z_bazy(tmp_path / "nie-ma.db", "t_1") == {}
+
+
 def test_straznik_pamieci_bez_danych_logowania():
     """Red team: Wideograf zapisał login z czatu w pamięci. Hak pre_tool_call odrzuca to u każdego agenta."""
     for tekst in ("Login do YouTube Studio: jan@firma.pl", "hasło Wiosna2026!", "klucz sk_live_JarvoRedTeam_fake_0000",
@@ -251,6 +268,31 @@ def test_straznik_limit_generacji_na_karte(tmp_path, monkeypatch):
     assert pl.straznik(tool_name="video_generate", args={}) is None                           # licznik na kartę
     stan = json.loads((tmp_path / "state" / "generacje-ai.json").read_text(encoding="utf-8"))
     assert stan == {"t_film": {"video_generate": 2, "image_generate": 1}, "t_inna": {"video_generate": 1}}
+
+
+def test_licznik_generacji_pod_blokada_miedzyprocesowa(tmp_path, monkeypatch):
+    """Brama i pracownicy kanbana to osobne procesy: licznik czyta i pisze pod blokadą pliku (fcntl / msvcrt).
+    Zajęta blokada: bez czekania od razu „nie”, z czekaniem po czasie praca idzie dalej bez niej, jak dawniej."""
+    zamek = tmp_path / "state" / "generacje-ai.lock"
+    with pl._zamek(zamek) as wzieta:
+        assert wzieta is True
+        with pl._zamek(zamek, czekaj_s=0) as druga:                              # drugi uchwyt = jak drugi proces
+            assert druga is False
+        t0 = time.monotonic()
+        with pl._zamek(zamek, czekaj_s=0.3) as trzecia:
+            assert trzecia is False and time.monotonic() - t0 >= 0.25
+    with pl._zamek(zamek, czekaj_s=0) as po_zwolnieniu:
+        assert po_zwolnieniu is True
+    # bez HERMES_HOME i JARVO_STATE_DIR: katalog domowy Hermesa (hermes_constants), nie /opt/data
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.delenv("JARVO_STATE_DIR", raising=False)
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_dom")
+    stale = types.ModuleType("hermes_constants")
+    stale.get_hermes_home = lambda: tmp_path / "dom-hermesa"
+    monkeypatch.setitem(sys.modules, "hermes_constants", stale)
+    assert pl.straznik(tool_name="image_generate", args={}) is None
+    stan = json.loads((tmp_path / "dom-hermesa" / "jarvo" / "state" / "generacje-ai.json").read_text(encoding="utf-8"))
+    assert stan == {"t_dom": {"image_generate": 1}}
 
 
 def test_schemat_tylko_dla_jarva(srodowisko, tmp_path, monkeypatch):
@@ -283,7 +325,7 @@ def test_awaria_schematu_nie_zabiera_skarbca(srodowisko, tmp_path, monkeypatch):
     assert "wyniki" in json.loads(j.handle_tool_call("wiedza_szukaj", {"zapytanie": "marka"}))
     # nieudany import nie zostaje w sys.modules jako pusty moduł
     zly = tmp_path / "zly.py"
-    zly.write_text("raise RuntimeError('x')\n")
+    zly.write_text("raise RuntimeError('x')\n", encoding="utf-8")
     monkeypatch.setattr(pl, "_HERE", tmp_path)
     with pytest.raises(RuntimeError):
         pl._modul("jarvo_zly_test", "zly.py")

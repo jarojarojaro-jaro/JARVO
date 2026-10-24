@@ -29,15 +29,26 @@ def _load(name: str, plik: str):
     return mod
 
 
+def _hermes_home() -> str:
+    """HERMES_HOME dashboardu; bez zmiennej katalog domowy Hermesa (hermes_constants), poza Hermesem /opt/data (kontener)."""
+    if os.environ.get("HERMES_HOME"):
+        return os.environ["HERMES_HOME"]
+    try:
+        from hermes_constants import get_hermes_home
+        return str(get_hermes_home())
+    except Exception:
+        return "/opt/data"
+
+
 panel_mod = _load("jarvo_wiedza_panel", "panel.py")
 # ochrona zapisu (CSRF) wspólna z jarvo-hq: scripts/build.py kopiuje hq/plugin/ochrona.py obok; w repo czytamy oryginał
 ochrona = _load("jarvo_wiedza_ochrona", str(next(p for p in (_HERE / "ochrona.py", _HERE.parents[2] / "hq" / "plugin" / "ochrona.py")
                                                  if p.is_file())))
-HOME = panel_mod.korzen_danych(os.environ.get("HERMES_HOME", "/opt/data"))
+HOME = panel_mod.korzen_danych(_hermes_home())
 JARVO_DIR = Path(os.environ.get("JARVO_DATA_DIR", str(HOME / "jarvo")))
 PANEL = panel_mod.Panel(os.environ.get("JARVO_KNOWLEDGE_DIR") or JARVO_DIR / "knowledge",
                         os.environ.get("JARVO_STATE_DIR") or JARVO_DIR / "state",
-                        os.environ.get("JARVO_REPO_DIR", "/opt/jarvo/repo"))
+                        os.environ.get("JARVO_REPO_DIR", "/opt/jarvo/repo"), dane=HOME)
 router = APIRouter(route_class=ochrona.Trasa)   # każda trasa POST: ochrona.wymagaj_zapisu
 
 

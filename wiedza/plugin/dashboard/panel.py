@@ -2,7 +2,8 @@
 
 Czyta skarbiec przez wiedza.py (indeks FTS5, notatki, linki, lint, graf, LOG). Zapisuje tylko: orzeczenia (formularz),
 uwagi do notatek (szkic w skrzynce), a kompilację i reindeks uruchamia jako osobne procesy/wywołania. Ścieżki notatek
-przechodzą przez Skarbiec.plik() (nic spoza skarbca).
+przechodzą przez Skarbiec.plik() (nic spoza skarbca). Kompilacja: w kontenerze scripts/wiedza-kompiluj.sh, na Windows
+kompilacja.py wprost (bash z Pythona to tam WSL, docs/NATYWNIE.md K03).
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from typing import Any, Dict, List, Optional
 
 _HERE = Path(__file__).resolve().parent
 LOG_RE = re.compile(r"^## \[(\d{4}-\d{2}-\d{2})\] (\w+) \| (.*)$")
+WINDOWS = os.name == "nt"
 
 
 def _lib():
@@ -41,11 +43,13 @@ def korzen_danych(hermes_home: str) -> Path:
 
 
 class Panel:
-    def __init__(self, skarbiec: str | Path, stan: str | Path, repo: str | Path = "/opt/jarvo/repo", profil_kompilacji: str = "jarvo"):
+    def __init__(self, skarbiec: str | Path, stan: str | Path, repo: str | Path = "/opt/jarvo/repo", profil_kompilacji: str = "jarvo",
+                 dane: str | Path | None = None):
         self.lib = _lib()
         self.sk = self.lib.Skarbiec(skarbiec, stan)
         self.repo = Path(repo)
         self.profil = profil_kompilacji
+        self.dane = Path(dane) if dane else None          # korzeń danych (HERMES_HOME dashboardu): profil kompilacji na Windows
         self._lint_cache: tuple[float, dict] = (0.0, {})
         self._kompilacja: Dict[str, Any] = {"trwa": False, "start": 0.0, "koniec": 0.0, "wynik": None, "blad": ""}
         self._lock = threading.Lock()
@@ -93,7 +97,7 @@ class Panel:
         szkice = len(list((self.sk.root / "skrzynka").glob("*.md"))) if (self.sk.root / "skrzynka").is_dir() else 0
         lint = self.lint()
         komp = self._ostatnia_kompilacja()
-        return {"skarbiec": str(self.sk.root), "notatek": sum(wg.values()), "wg_folderu": wg, "statusy": statusy, "linki": linki,
+        return {"skarbiec": self.sk.root.as_posix(), "notatek": sum(wg.values()), "wg_folderu": wg, "statusy": statusy, "linki": linki,
                 "szkice": szkice, "lint": {"bledy": len(lint.get("bledy") or []), "ostrzezenia": len(lint.get("ostrzezenia") or []),
                                            "informacje": len(lint.get("informacje") or [])},
                 "kompilacja": {"ostatnia": komp.get("ostatnia") or 0, "data": komp.get("data") or "", "raport": komp.get("raport") or {},
@@ -253,8 +257,16 @@ class Panel:
         self._lint_cache = (0.0, {})
         return {**r, "index": n, "huby": h}
 
-    # ---- kompilacja jako osobny proces (model z profilu `jarvo`: scripts/wiedza-kompiluj.sh)
+    # ---- kompilacja jako osobny proces (model z profilu `jarvo`: scripts/wiedza-kompiluj.sh, na Windows kompilacja.py)
+    def _kompilacja_py(self) -> Optional[Path]:
+        """kompilacja.py obok wiedza.py (build kopiuje oba do katalogu wtyczki, w repo leżą w wiedza/)."""
+        p = Path(self.lib.__file__).with_name("kompilacja.py")
+        return p if p.is_file() else None
+
     def compile_command(self) -> Optional[List[str]]:
+        if WINDOWS:                # bash z Pythona na Windows to WSL: kompilacja.py Pythonem dashboardu (venv Hermesa)
+            k = self._kompilacja_py()
+            return [sys.executable, str(k), "--skarbiec", str(self.sk.root), "--stan", str(self.sk.stan), "--json"] if k else None
         skrypt = self.repo / "scripts" / "wiedza-kompiluj.sh"
         if skrypt.exists():
             return ["bash", str(skrypt), "--json"]
@@ -266,20 +278,32 @@ class Panel:
                 return {"trwa": True, "start": self._kompilacja["start"]}
             cmd = self.compile_command()
             if not cmd:
-                return {"trwa": False, "blad": "brak scripts/wiedza-kompiluj.sh (repo poza kontenerem?)"}
+                return {"trwa": False, "blad": "brak kompilacja.py obok wiedza.py" if WINDOWS
+                        else "brak scripts/wiedza-kompiluj.sh (repo poza kontenerem?)"}
             self._kompilacja.update({"trwa": True, "start": time.time(), "koniec": 0.0, "wynik": None, "blad": ""})
             threading.Thread(target=self._compile_run, args=(cmd,), name="jarvo-wiedza-kompilacja", daemon=True).start()
             return {"trwa": True, "start": self._kompilacja["start"]}
 
+    def _srodowisko_kompilacji(self) -> Dict[str, str]:
+        env = {**os.environ, "JARVO_WIEDZA_PROFIL": self.profil}
+        if WINDOWS:                # to, co w kontenerze ustawia wiedza-kompiluj.sh: profil z modelem zadania jarvo_wiedza
+            profil = self.dane / "profiles" / self.profil if self.dane else None
+            if profil is not None and profil.is_dir():
+                env["HERMES_HOME"] = str(profil)
+            env.update({"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"})
+        return env
+
     def _compile_run(self, cmd: List[str]) -> None:
         try:
-            env = {**os.environ, "JARVO_WIEDZA_PROFIL": self.profil}
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env=env)
+            r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3600,
+                               env=self._srodowisko_kompilacji(), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             wynik = None
-            try:
-                wynik = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else None
-            except (ValueError, IndexError):
-                wynik = None
+            for kandydat in (r.stdout, (r.stdout.strip().splitlines() or [""])[-1]):   # cały JSON (--json z wcięciami) albo ostatnia linia
+                try:
+                    wynik = json.loads(kandydat) if kandydat.strip() else None
+                    break
+                except ValueError:
+                    continue
             blad = "" if r.returncode == 0 else (r.stderr.strip().splitlines()[-1] if r.stderr.strip() else f"kod {r.returncode}")
             self._kompilacja.update({"wynik": wynik, "blad": blad[:300]})
         except Exception as e:

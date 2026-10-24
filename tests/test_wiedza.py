@@ -1,10 +1,12 @@
 """Skarbiec wiedzy (wiedza/wiedza.py): zasiew z fleet.json, indeks FTS5 po polsku, linki, lint, szkice, orzeczenia,
-punkty zapisu git, bezpieczeństwo ścieżek, graf."""
+punkty zapisu git, bezpieczeństwo ścieżek, graf, przenośność (LF, UTF-8, zajęte pliki, nazwy na Windows, NFC na macOS)."""
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -321,10 +323,14 @@ def test_orzeczenie_mapuje_profil_i_zapisuje_punkt(skarbiec):
         w.dodaj_orzeczenie(sk, "web", "token: " + "a1b2c3d4" * 3, "")
     assert "## [2026-09-30] orzeczenie | orzeczenia/web" in (sk.root / "LOG.md").read_text(encoding="utf-8")
     if GIT:
-        log = subprocess.run(["git", "-C", str(sk.root), "log", "--format=%s"], capture_output=True, text=True).stdout
+        log = subprocess.run(["git", "-C", str(sk.root), "log", "--format=%s"], capture_output=True, text=True,
+                             encoding="utf-8").stdout
         assert log.splitlines()[0] == "orzeczenie: acme" and "zasiew skarbca" in log
         assert sk.cofnij().startswith("cofnięto punkt zapisu: orzeczenie: acme")
         assert not (sk.root / "orzeczenia/marki/acme.md").exists()
+        w.dodaj_orzeczenie(sk, "jarvo-lowca", "Leady tylko z KRS", "rozmowa")      # opis z „ł” wraca z gita bez zmian
+        assert sk.git("log", "-1", "--format=%s").stdout.strip() == "orzeczenie: łowca"
+        assert sk.cofnij() == "cofnięto punkt zapisu: orzeczenie: łowca"
 
 
 def test_czytaj_tylko_w_skarbcu(skarbiec, capsys):
@@ -412,3 +418,156 @@ def test_skille_floty_to_wezly_grafu(skarbiec, tmp_path):
     fleet["agents"][0]["skills"] = fleet["agents"][0]["skills"][:1]
     assert w.zasiej(sk, fleet, None, None)["skille"] == 2                 # intake bez linku do schematu + schemat usunięty
     assert not sk.istnieje("fleet/skille/schemat") and "fleet/skille/schemat" not in sk.wczytaj("fleet/skille/intake").tresc
+
+
+# ------------------------------------------------------------------------------------------------ przenośność (docs/NATYWNIE.md K01)
+
+def test_pliki_skarbca_zawsze_z_lf(skarbiec, tmp_path):
+    """Notatki, LOG, INDEX, LINT, .gitignore i pliki stanu z LF także na Windows (tryb tekstowy zamieniałby „\\n” na CRLF)."""
+    sk = skarbiec
+    notatka(sk, "pojecia/audyt strony", "Audyt strony", "Audyt to Lighthouse.", typ="pojecie", linki=["pojecia/_hub-pojecia"])
+    w.dodaj_orzeczenie(sk, "wszyscy", "Odpowiadaj po polsku", "człowiek")
+    ix = w.Indeks(sk)
+    try:
+        w.lint(sk, ix)
+    finally:
+        ix.zamknij()
+    pliki = [sk.root / "pojecia/audyt strony.md", sk.root / "LOG.md", sk.root / "INDEX.md", sk.root / "LINT.md",
+             sk.root / "orzeczenia/wszyscy.md", sk.root / "agenci/jarvo-web/_hub-web.md", tmp_path / "state" / "wiedza-agenci.json"]
+    for p in pliki + ([sk.root / ".gitignore"] if GIT else []):
+        assert b"\r" not in p.read_bytes(), p
+
+
+def test_zamiana_pliku_ponawiana_gdy_zajety(skarbiec, monkeypatch):
+    """Na Windows os.replace pada z WinError 5/32/33, gdy plik trzyma inny program: zapis ponawia; inne błędy od razu."""
+    sk = skarbiec
+    prawdziwy, proby = os.replace, []
+
+    def zajety(a, b):
+        proby.append(a)
+        if len(proby) < 3:
+            e = PermissionError(13, "plik używany przez inny proces")
+            e.winerror = 32
+            raise e
+        prawdziwy(a, b)
+    monkeypatch.setattr(os, "replace", zajety)
+    sk.zapisz_plik("pojecia/zajety", "# Zajęty\n")
+    assert len(proby) == 3 and (sk.root / "pojecia/zajety.md").read_text(encoding="utf-8") == "# Zajęty\n"
+
+    def odmowa(a, b):
+        raise PermissionError(13, "brak uprawnień")                     # bez kodu „plik zajęty”: bez ponawiania
+    monkeypatch.setattr(os, "replace", odmowa)
+    with pytest.raises(PermissionError):
+        sk.zapisz_plik("pojecia/zajety", "# Inny\n")
+
+
+@pytest.mark.windows_only
+def test_nazwy_z_dwukropkiem_i_backslashem_odrzucone_na_windows(skarbiec):
+    """Windows: „:” to litera dysku albo strumień NTFS (notatka zniknęłaby w strumieniu pliku), „\\” to drugi separator."""
+    sk = skarbiec
+    for rel in ("pojecia/a:b", "C:/Windows/win", "pojecia\\..\\..\\x", "pojecia\\audyt"):
+        with pytest.raises(ValueError, match="Windows"):
+            sk.plik(rel)
+        assert not sk.istnieje(rel)
+    with pytest.raises(ValueError):
+        sk.zapisz_plik("pojecia/notatka:strumien", "# x\n")
+    assert not list((sk.root / "pojecia").glob("notatka*"))
+    assert w.main(["--skarbiec", str(sk.root), "--stan", str(sk.stan), "czytaj", "orzeczenia/web:x"]) == 2
+
+
+@pytest.mark.posix_only
+def test_nazwy_z_dwukropkiem_na_posix_bez_zmian(skarbiec):
+    """Linux i macOS: „:” w nazwie to zwykły znak, jak dotąd w kontenerze (lint i tak zgłasza go jako zakazany)."""
+    sk = skarbiec
+    sk.zapisz_plik("pojecia/a:b", "# A:B\n")
+    assert sk.istnieje("pojecia/a:b") and sk.plik("pojecia/a:b").name == "a:b.md"
+
+
+def test_gitignore_ze_smieciami_systemu(skarbiec):
+    """.gitignore: *.tmp i śmieci menedżera plików tego systemu; skarbiec z innego systemu dostaje brakujące wpisy
+    (na Linuksie lista jest pusta, więc plik zostaje bez zmian)."""
+    if not GIT:
+        pytest.skip("brak git")
+    sk = skarbiec
+    linie = (sk.root / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert linie == ["*.tmp", *w.GITIGNORE_SYSTEMU]
+    assert ("Thumbs.db" in linie) == (os.name == "nt") and (".DS_Store" in linie) == (sys.platform == "darwin")
+    (sk.root / ".gitignore").write_text("*.tmp\n", encoding="utf-8", newline="\n")      # skarbiec przeniesiony z kontenera
+    assert sk.git_init()
+    assert (sk.root / ".gitignore").read_text(encoding="utf-8").splitlines() == ["*.tmp", *w.GITIGNORE_SYSTEMU]
+
+
+def test_sciezki_nfc_na_macos(skarbiec):
+    """Nazwa pliku w NFD (stare HFS+, niektóre programy): na macOS ścieżka w NFC, jak linki w notatkach; na Linuksie
+    i Windows NFC i NFD to różne nazwy, więc ścieżka zostaje taka jak na dysku."""
+    sk = skarbiec
+    nfd = unicodedata.normalize("NFD", "pojecia/żółć")
+    (sk.root / f"{nfd}.md").write_text("# Żółć\n\n**Notatka z nazwą w NFD.**\n", encoding="utf-8", newline="\n")
+    oczekiwana = unicodedata.normalize("NFC", nfd) if sys.platform == "darwin" else nfd
+    assert oczekiwana in sk.pliki()
+    assert sk.rel(sk.plik(oczekiwana)) == oczekiwana and sk.wczytaj(oczekiwana).tytul == "Żółć"
+
+
+def test_domyslny_skarbiec(monkeypatch, tmp_path):
+    """Bez --skarbiec: JARVO_KNOWLEDGE_DIR; w kontenerze (Linux) /opt/data/jarvo/knowledge jak dotąd; na Windows i macOS
+    <dane>/jarvo/knowledge z HERMES_HOME (profil: dwa katalogi wyżej) albo z domyślnego korzenia Jarva."""
+    monkeypatch.setenv("JARVO_KNOWLEDGE_DIR", str(tmp_path / "k"))
+    assert w._domyslny_skarbiec() == str(tmp_path / "k")
+    monkeypatch.delenv("JARVO_KNOWLEDGE_DIR")
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "dane" / "profiles" / "jarvo"))
+    if os.name == "nt" or sys.platform == "darwin":
+        assert Path(w._domyslny_skarbiec()) == tmp_path / "dane" / "jarvo" / "knowledge"
+        monkeypatch.delenv("HERMES_HOME")
+        korzen = Path(os.environ["LOCALAPPDATA"]) / "Jarvo" if os.name == "nt" else Path.home() / ".jarvo"
+        assert Path(w._domyslny_skarbiec()) == korzen / "dane" / "jarvo" / "knowledge"
+    else:
+        assert w._domyslny_skarbiec() == "/opt/data/jarvo/knowledge"
+
+
+def test_odswiezenie_bez_zmian_nie_rozwiazuje_sciezek(skarbiec, monkeypatch):
+    """Odświeżenie indeksu przed każdą turą agenta: pliki z pliki() bez Skarbiec.plik() i resolve() (na Windows resolve
+    otwiera każdy plik)."""
+    sk = skarbiec
+    ix = w.Indeks(sk)
+    try:
+        ix.odswiez()
+
+        def nie_wolno(rel):
+            raise AssertionError(f"plik({rel}) przy odświeżeniu bez zmian")
+        monkeypatch.setattr(sk, "plik", nie_wolno)
+        assert ix.odswiez() == {"pliki": len(sk.pliki()), "nowe": 0, "zmienione": 0, "usuniete": 0}
+    finally:
+        ix.zamknij()
+
+
+def test_skarbiec_w_katalogu_ze_spacja_i_ogonkami(tmp_path, monkeypatch):
+    """Katalog danych ze spacją, „#” i polskimi znakami (np. C:\\Users\\Michał Żółć\\…): zasiew, indeks, szukanie, lint, git."""
+    monkeypatch.setenv("WIEDZA_DZIS", "2026-09-30")
+    root = tmp_path / "Michał Żółć #1" / "jarvo" / "knowledge"
+    stan = root.parent / "state"
+    fleet = tmp_path / "fleet.json"
+    fleet.write_text(json.dumps(FLEET, ensure_ascii=False), encoding="utf-8")
+    assert w.main(["--skarbiec", str(root), "--stan", str(stan), "zasiej", "--fleet", str(fleet)]) == 0
+    sk = w.Skarbiec(root, stan)
+    notatka(sk, "pojecia/łódź żółć", "Łódź żółć", "Notatka z ogonkami w nazwie pliku.", typ="pojecie",
+            linki=["pojecia/_hub-pojecia", "agenci/jarvo-web/_hub-web"])
+    ix = w.Indeks(sk)
+    try:
+        ix.odswiez()
+        assert [r["sciezka"] for r in ix.szukaj("ogonkami w nazwie")] == ["pojecia/łódź żółć"]
+        assert w.lint(sk, ix)["bledy"] == []
+    finally:
+        ix.zamknij()
+    if GIT:
+        assert sk.punkt_zapisu("notatka: łódź żółć") and sk.git("log", "-1", "--format=%s").stdout.strip() == "notatka: łódź żółć"
+
+
+def test_cli_pisze_utf8_takze_do_potoku(tmp_path):
+    """Wyjście CLI w UTF-8 także do potoku: na Windows bez trybu UTF-8 Pythona stdout ma stronę kodową (cp1250),
+    w której „✓” się nie mieści, a wywołujący (panel, instalator) czyta UTF-8."""
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONUTF8", "PYTHONIOENCODING")}
+    env.update(PYTHONUTF8="0", WIEDZA_DZIS="2026-09-30")
+    r = subprocess.run([sys.executable, str(Path(w.__file__)), "--skarbiec", str(tmp_path / "k"), "--stan", str(tmp_path / "s"),
+                        "zasiej"], capture_output=True, env=env, timeout=120)
+    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
+    assert r.stdout.decode("utf-8").startswith("✓ zasiew:")
