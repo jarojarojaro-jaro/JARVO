@@ -230,3 +230,26 @@ def test_chron_tylko_wlasciciel(tmp_path):
     else:
         assert p.stat().st_mode & 0o777 == 0o600
     assert p.read_text(encoding="utf-8") == "A=1\n"
+
+
+def test_modele_w_manifescie_i_instalacja(serwer, tmp_path):
+    www, adres = serwer
+    (www / "w.onnx").write_bytes(b"wagi")
+    rew = "9" * 40
+    m = {"zrodlo": "uv", "rewizja": rew, "licencja": "MIT", "rola": "x", "katalog": "glos",
+         "pliki": [{"cel": "meski/w.onnx", "url": f"https://huggingface.co/a/b/resolve/{rew}/w.onnx",
+                    "sha256": _sha(b"wagi"), "rozmiar": 4}]}
+    assert natywne.bledy({"version": 1, "hermes": HERMES_OK, "narzedzia": {}, "modele": {"glos": m}}, {"uv": {}}) \
+        == ["natywne.yaml: brak sekcji narzedzia"]
+    zle = dict(m, rewizja="v1.0", katalog="../x", pliki=[{"cel": "../poza", "url": "https://huggingface.co/a/b/resolve/main/w",
+                                                          "sha256": "x", "rozmiar": 0}])
+    b = "\n".join(natywne.bledy({"version": 1, "hermes": HERMES_OK, "narzedzia": {}, "modele": {"glos": zle}}, {"uv": {}}))
+    for fragment in ("pełnym commitem", "katalog to jedna nazwa", "ścieżka względna", "z rewizją modelu", "64 znaki",
+                     "rozmiar"):
+        assert fragment in b
+    lokalny = dict(m, pliki=[dict(m["pliki"][0], url=f"{adres}/w.onnx")])
+    kat = pobieracz.zainstaluj_model("glos", lokalny, tmp_path / "models", pasek=False)
+    assert (kat / "meski" / "w.onnx").read_bytes() == b"wagi"
+    with pytest.raises(pobieracz.BladPobierania, match="poza katalog"):
+        pobieracz.zainstaluj_model("glos", dict(lokalny, pliki=[dict(lokalny["pliki"][0], cel="../poza.onnx")]),
+                                   tmp_path / "models", pasek=False)

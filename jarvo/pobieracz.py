@@ -217,3 +217,16 @@ def zainstaluj(nazwa: str, wersja: str, plik: dict, katalog_narzedzi: Path, pobr
         shutil.rmtree(stary, ignore_errors=True)
     os.replace(nowy, docelowy)
     return docelowy
+
+
+def zainstaluj_model(nazwa: str, model: dict, katalog_modeli: Path, *, pasek: bool = True, wyjscie=None) -> Path:
+    """Wszystkie pliki modelu z manifestu do `katalog_modeli/<katalog>/<cel>`, każdy ze sprawdzoną sumą. Plik już
+    obecny z dobrą sumą zostaje (bez sieci). Zwraca katalog modelu."""
+    katalog = Path(katalog_modeli) / model["katalog"]
+    katalog.mkdir(parents=True, exist_ok=True)
+    baza = katalog.resolve()
+    for p in model["pliki"]:
+        cel = _w_srodku(baza, p["cel"])          # cel z manifestu nie wyjdzie poza katalog modelu
+        pobierz(p["url"], cel, p["sha256"], p.get("rozmiar"), nazwa=f"{nazwa}: {p['cel']}", pasek=pasek,
+                wyjscie=wyjscie)
+    return katalog

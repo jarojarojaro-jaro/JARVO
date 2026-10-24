@@ -11,6 +11,10 @@
 #   względem katalogu narzędzia), env (zmienne procesów Jarva; {katalog} = katalog narzędzia)
 #   albo `brak: <powód>` (np. brak wydania na tę platformę) i opcjonalnie `zamiast: <inne narzędzie>`.
 # kiedy: instalacja (domyślnie) | przy-uzyciu (pobierane leniwie, z paskiem i pytaniem) | dodatek (na życzenie)
+#
+# modele.<nazwa>: pliki niezależne od platformy (wagi, słowniki) do <dane>/jarvo/models/<katalog>: zrodlo, rewizja (pełny
+#   commit repo modelu, nigdy tag), licencja, rola, kiedy, katalog, pliki: lista {cel (ścieżka względna w katalogu
+#   modelu), url (https, z rewizją w adresie), sha256, rozmiar}.
 
 version: 1
 

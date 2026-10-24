@@ -28,6 +28,12 @@ def hermes(app: Path) -> dict:
     return json.loads((Path(app) / LOCK).read_text(encoding="utf-8"))["hermes"]
 
 
+def modele(app: Path) -> dict:
+    """Modele niezależne od platformy: {nazwa: {"rewizja", "katalog", "kiedy", "pliki": [{"cel", "url", "sha256",
+    "rozmiar"}]}}."""
+    return json.loads((Path(app) / LOCK).read_text(encoding="utf-8")).get("modele") or {}
+
+
 def plik(narzedzia: dict, nazwa: str, platforma: str) -> dict:
     """Wpis pliku narzędzia dla platformy; BrakNarzedzia, gdy narzędzia nie ma albo platforma ma `brak`."""
     wpis = narzedzia.get(nazwa)

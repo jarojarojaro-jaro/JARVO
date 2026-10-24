@@ -24,6 +24,7 @@ PLATFORMY = ("windows-x64", "windows-arm64", "macos-arm64", "linux-x64", "linux-
 FORMATY = {"zip", "tar.gz", "tar.xz", "tar.bz2", "plik"}
 KIEDY = {"instalacja", "przy-uzyciu", "dodatek"}
 POLA_PLIKU = {"url", "sha256", "rozmiar", "format", "usun_poziom", "bin", "env", "nazwa_pliku", "brak", "zamiast"}
+POLA_MODELU = {"zrodlo", "rewizja", "licencja", "rola", "kiedy", "katalog", "pliki"}
 NAZWA = re.compile(r"^[a-z][a-z0-9-]*$")
 SHA = re.compile(r"^[0-9a-f]{64}$")
 
@@ -52,7 +53,8 @@ def bledy(dane: dict, zrodla: dict | None = None) -> list[str]:
         wynik.append(f"natywne.yaml/hermes: tag {h['tag']} różni się od obrazu VPS ({m.group(1)} w infra/Dockerfile)")
     narzedzia = dane.get("narzedzia") or {}
     if not isinstance(narzedzia, dict) or not narzedzia:
-        return wynik + ["natywne.yaml: brak sekcji narzedzia"]
+        wynik.append("natywne.yaml: brak sekcji narzedzia")
+        narzedzia = {}
     for nazwa, wpis in narzedzia.items():
         gdzie = f"natywne.yaml/{nazwa}"
         if not NAZWA.match(str(nazwa)):
@@ -97,6 +99,43 @@ def bledy(dane: dict, zrodla: dict | None = None) -> list[str]:
                     wynik.append(f"{gp}: bin {k!r} ma być ścieżką względną w katalogu narzędzia")
         for platforma in set(pliki) - set(PLATFORMY):
             wynik.append(f"{gdzie}: nieznana platforma {platforma}")
+    for nazwa, m in (dane.get("modele") or {}).items():
+        gdzie = f"natywne.yaml/modele/{nazwa}"
+        if not NAZWA.match(str(nazwa)) or not isinstance(m, dict):
+            wynik.append(f"{gdzie}: nazwa z małych liter i myślników, wpis jako słownik")
+            continue
+        if set(m) - POLA_MODELU:
+            wynik.append(f"{gdzie}: nieznane pola {sorted(set(m) - POLA_MODELU)}")
+        for pole in ("zrodlo", "licencja", "rola", "katalog"):
+            if not str(m.get(pole) or "").strip():
+                wynik.append(f"{gdzie}: brak pola {pole}")
+        if zrodla is not None and m.get("zrodlo") and m["zrodlo"] not in zrodla:
+            wynik.append(f"{gdzie}: źródła {m['zrodlo']!r} nie ma w vendor/zrodla.yaml")
+        if not re.match(r"^[0-9a-f]{40}$", str(m.get("rewizja") or "")):
+            wynik.append(f"{gdzie}: rewizja musi być pełnym commitem repo modelu (40 znaków), nie tagiem")
+        if (m.get("kiedy") or "instalacja") not in KIEDY:
+            wynik.append(f"{gdzie}: kiedy spoza {sorted(KIEDY)}")
+        if not re.match(r"^[a-z0-9][a-z0-9._-]*$", str(m.get("katalog") or "")):
+            wynik.append(f"{gdzie}: katalog to jedna nazwa (małe litery, cyfry, . _ -)")
+        cele = set()
+        for i, p in enumerate(m.get("pliki") or []):
+            gp = f"{gdzie}/pliki[{i}]"
+            cel = str((p or {}).get("cel") or "")
+            if not cel or cel.startswith(("/", "\\")) or ".." in cel.replace("\\", "/").split("/"):
+                wynik.append(f"{gp}: cel to ścieżka względna w katalogu modelu")
+            if cel in cele:
+                wynik.append(f"{gp}: cel {cel} powtórzony")
+            cele.add(cel)
+            url = str((p or {}).get("url") or "")
+            if not url.startswith("https://") or (m.get("rewizja") and str(m["rewizja"]) not in url
+                                                  and "huggingface.co" in url):
+                wynik.append(f"{gp}: url https z rewizją modelu w adresie")
+            if not SHA.match(str((p or {}).get("sha256") or "")):
+                wynik.append(f"{gp}: sha256 musi mieć 64 znaki hex")
+            if not isinstance((p or {}).get("rozmiar"), int) or p["rozmiar"] <= 0:
+                wynik.append(f"{gp}: rozmiar w bajtach (liczba)")
+        if not m.get("pliki"):
+            wynik.append(f"{gdzie}: brak plików")
     return wynik
 
 
@@ -113,7 +152,13 @@ def lock(dane: dict) -> dict:
                       "licencja": str(w["licencja"]), "zrodlo": str(w["zrodlo"]), "pliki": pliki}
     h = dane.get("hermes") or {}
     hermes = {k: h[k] for k in ("repo", "tag", "commit", "wersja", "dodatki") if k in h}
-    return {"version": 1, "hermes": hermes, "narzedzia": out}
+    modele = {}
+    for nazwa in sorted(dane.get("modele") or {}):
+        m = dane["modele"][nazwa]
+        modele[nazwa] = {"rewizja": str(m["rewizja"]), "kiedy": m.get("kiedy") or "instalacja",
+                         "licencja": str(m["licencja"]), "zrodlo": str(m["zrodlo"]), "katalog": str(m["katalog"]),
+                         "pliki": [{k: p[k] for k in ("cel", "url", "sha256", "rozmiar")} for p in m.get("pliki") or []]}
+    return {"version": 1, "hermes": hermes, "narzedzia": out, "modele": modele}
 
 
 def tekst_locka(dane: dict) -> str:
@@ -131,7 +176,8 @@ def main(argv: list[str]) -> int:
         return 1
     if polecenie == "generuj":
         LOCK.write_text(tekst_locka(dane), encoding="utf-8", newline="\n")
-        print(f"✓ {LOCK.relative_to(fl.REPO_ROOT).as_posix()}: {len(dane['narzedzia'])} narzędzi")
+        print(f"✓ {LOCK.relative_to(fl.REPO_ROOT).as_posix()}: {len(dane['narzedzia'])} narzędzi, "
+              f"{len(dane.get('modele') or {})} modeli")
         return 0
     if polecenie == "sprawdz":
         aktualny = LOCK.is_file() and LOCK.read_text(encoding="utf-8") == tekst_locka(dane)
