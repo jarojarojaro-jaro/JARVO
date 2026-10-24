@@ -1,0 +1,24 @@
+# Końce linii: w repo i po checkoucie zawsze LF, także na Windows z core.autocrlf=true (dawało CRLF w ~990 plikach:
+# inne sumy plików i pakietu HQ, błędy $'\r' w bashu). Pliki wsadowe cmd.exe tylko z CRLF (etykiety i goto z LF się
+# psują). Binaria rozpoznaje git sam (text=auto); niżej typy, które zawsze są binarne.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp3 binary
+*.mp4 binary
+*.wav binary
+*.webm binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.onnx binary
