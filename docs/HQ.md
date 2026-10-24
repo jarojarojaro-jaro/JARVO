@@ -21,7 +21,7 @@ Aplikacja (szczegóły: sekcja [2f](#2f-aplikacja-rozmowa-pasek-szuflada)):
 
 | Element | Skąd dane | Co pokazuje |
 |---|---|---|
-| Ekran startu (`#/`) | `GET /app` (właściciel z `USER.md`, gotowość), `GET /podpowiedzi` | robot Jarva (CRT) i powitanie po imieniu („Dzień dobry, Ania”, pod spodem firma); bez imienia w `USER.md` zamiast startu **pierwsze spotkanie** (rozmowa bez modelu, głos Jarva, zapis do `USER.md`; `POST /app/poznanie`, `POST /app/glos`). Jedno zdanie gotowości z najwyżej jednym przyciskiem, tylko gdy czegoś brakuje: **Połącz** (Klucze albo Modele w szufladzie), **Poznajmy się** (otwiera pierwsze spotkanie po „Pomiń”); brama, która wstaje, = „Jarvo się uruchamia…” bez czerwonego paska. Pole wiadomości zakłada nową rozmowę; pod nim najwyżej 4 rzeczy: **Czeka na Ciebie** (zgody, pytania zespołu, nieudana praca) i **Na początek** (startery tylko z połączonym modelem; × ukrywa, potem „Nie pokazuj tego więcej”) |
+| Ekran startu (`#/`) | `GET /app` (właściciel z `USER.md`, gotowość), `GET /podpowiedzi` | robot Jarva (CRT) i powitanie po imieniu („Dzień dobry, Ania”, pod spodem firma); bez imienia w `USER.md` zamiast startu **pierwsze spotkanie** na całym ekranie (rozmowa bez modelu, głos Jarva, zapis do `USER.md`, mózg na miejscu, potem wątek „Pierwsza sesja”; `POST /app/poznanie`, `POST /app/glos`, `POST /app/klucz`, `POST /app/mozg/chatgpt`, `POST /app/pierwsza-sesja`). Jedno zdanie gotowości z najwyżej jednym przyciskiem, tylko gdy czegoś brakuje: **Podłącz** („Podłącz mózg, a zacznę pierwszą sesję.”; otwiera kartę mózgu pierwszego spotkania), **Poznajmy się** (otwiera pierwsze spotkanie po „Pomiń”), **Zacznij pierwszą sesję** (profil i mózg są, sesji jeszcze nie było; × = „Nie teraz”, `localStorage` `jarvo.pierwsza.odrzucona.v1`); brama, która wstaje, = „Jarvo się uruchamia…” bez czerwonego paska. Pole wiadomości zakłada nową rozmowę; pod nim najwyżej 4 rzeczy: **Czeka na Ciebie** (zgody, pytania zespołu, nieudana praca) i **Na początek** (startery tylko z połączonym modelem; × ukrywa, potem „Nie pokazuj tego więcej”) |
 | Pasek rozmów | `rozmowy.db` (`GET /rozmowy`) + strumień | **Nowa rozmowa**, szukaj, wątki w grupach (Przypięte, Dziś, Wczoraj, …), menu wiersza, Archiwum i Kosz; stopka: właściciel (Konto), kropka połączenia, odznaka **⬆ N** (dostępna aktualizacja), koło zębate (Ustawienia) |
 | Rozmowa (`#/r/<wątek>`) | oś czasu wątku (`rozmowy.db` + `state.db` agentów) | wiadomości z Markdownem, żywy dymek pracy agenta (tekst na bieżąco, kroki, czas, **Zatrzymaj**), zgody z odliczaniem, karty plików (Podgląd, Pobierz, Kopiuj ścieżkę, Odpal), błąd z **Ponów**, znacznik „bezpośrednio” |
 | Pole wiadomości | wybór adresata, załączniki, szkic | „Do: Jarvo”; `@uchwyt` na początku albo lista **Do:** = tylko ta wiadomość wprost do agenta, potem znów Jarvo; zdjęcia (wklejenie, przeciągnięcie) i pliki; szkic na wątek |
@@ -1020,14 +1020,28 @@ innych kanałów etap 6.
     (idempotentne po `klucz`), kolejność z rankingu Beta; starter odrzucony 2 razy śpi 14 dni, 3 razy = wyłączony.
 - **Pierwsze spotkanie** (`37-poznajmy.js`, głos `36-glos.js`, robot `23-robot.js`; kierunek „arkusz”): gdy w `USER.md`
   nie ma imienia (`gotowosc.profil_wlasciciela` = false) i właściciel nie kliknął **Pomiń** (`localStorage`
-  `jarvo.poznanie.pominiete.v1`), aplikacja zamiast startu prowadzi krótką rozmowę **bez modelu**, 6 kroków: powitanie
+  `jarvo.poznanie.pominiete.v1`), aplikacja zamiast startu prowadzi na całym ekranie (bez paska rozmów i górnej belki;
+  zasłona startowa schodzi dopiero po wczytaniu gotowości, najpóźniej po 2,5 s, więc pasek nie mignie) krótką rozmowę
+  **bez modelu**, 6 kroków: powitanie
   („Cześć. Jestem Jarvo.”, zespół N agentów), imię („Jak mam do Ciebie mówić?”), firma i czym się zajmuje, strony
   i konta (jedno pole; adres, `@konto`, Instagram, Facebook, TikTok, YouTube, LinkedIn i Mapy Google rozpoznane
   od razu, znaczniki pod polem), cele (5 gotowych i „coś innego”), mózg. Po lewej rośnie zdanie „Bohater: Kuba.”
   i „Cześć, jestem Kuba. Mam firmę…”: każda odpowiedź podkreślona z odręczną notką (imię, firma, strona…). Każdy
   krok ma **Pomiń to pytanie**; na końcu „Zapisałem. Teraz wiem, dla kogo pracuję.” i bez modelu „Brakuje mi tylko
-  mózgu…” z dwoma kuponami (**Zaloguj się kontem ChatGPT** → Modele, **Wklej klucz API** → Klucze) i **Zrobię to
-  później**; aplikacja co 5 s sprawdza gotowość i po podłączeniu modelu mówi „Mam już mózg. Możemy zaczynać.” z **Do pracy**.
+  mózgu…” z kartą mózgu w tym samym miejscu (dwa kupony i **Zrobię to później**):
+  - **Zaloguj się kontem ChatGPT**: kod urządzenia przez trasy Hermesa (`POST /api/providers/oauth/openai-codex/start`,
+    odpytanie `…/poll/{sid}` co `poll_interval`, najmniej 3 s; wyjście z karty = `DELETE …/sessions/{sid}`). Karta
+    otwiera stronę OpenAI w nowej karcie i pokazuje duży kod z **Kopiuj**; po zalogowaniu `POST /app/mozg/chatgpt`
+    przełącza flotę na `openai-codex`. Kod wygasł albo błąd = komunikat i **Spróbuj jeszcze raz**.
+  - **Wklej klucz API**: pole hasła (bez podpowiedzi przeglądarki), dostawca rozpoznany od razu po przedrostku
+    (`sk-or-` OpenRouter, `sk-ant-` Anthropic, inne `sk-` OpenAI; ten sam wzór co `mozg.rozpoznaj`), **Podłącz** =
+    `POST /app/klucz` („Sprawdzam klucz u OpenRouter…”); odrzucony klucz, brak sieci albo nieznany przedrostek =
+    komunikat pod polem. Klucz nie zostaje w stanie strony po wysłaniu.
+  - W chwili podłączenia (którąkolwiek drogą, też w innej karcie: gotowość co 5 s) Jarvo mówi „Mam mózg. Zaczynam
+    pierwszą sesję.”, po 1,6 s `POST /app/pierwsza-sesja` i aplikacja przechodzi do wątku **Pierwsza sesja** (po lewej
+    w pasku rozmów). Mózg podłączony już wcześniej: to samo od razu po zapisie profilu. Bez profilu (spotkanie
+    pominięte, mózg z linii gotowości) sesji nie ma, zostaje **Do pracy**. Mózg podłączony poza spotkaniem (szuflada
+    Połączeń) przy gotowym profilu też zaczyna sesję sam, raz.
   - `POST /app/poznanie {imie, firma?, zajecie?, linki?: [{rodzaj, wartosc}], cele?}` (`aplikacja.zapisz_poznanie`)
     zapisuje `USER.md` w skarbcu w układzie szablonu `onboarding-interview` (`SZABLON_USER`, test pilnuje zgodności):
     Imię, Czym się zajmuję, Firma / marki (`firma → strona`), listy Cele i „Narzędzia i konta” (bez powtórek),
@@ -1035,6 +1049,21 @@ innych kanałów etap 6.
     „Wcześniejsze notatki”. Wartości jedną linią bez Markdownu (bez `#`, `*`, `[`, `<`, `|`…), linki tylko znakami
     adresu; zapis atomowy (plik tymczasowy + `os.replace`); treści właściciela nie ma w logach. Odpowiedź:
     `{wlasciciel, gotowosc}`; puste imię po czyszczeniu = 422 `zle_dane`, błąd zapisu = 500 `zapis`.
+  - `POST /app/klucz {klucz ≤ 400}` (`hq/plugin/mozg.py`, jeden naraz): rozpoznanie dostawcy, jedno zapytanie do
+    niego (200/429 = działa, 401/403 = zły), zapis do głównego `.env` (600), rozdanie agentom (`share_keys.sync`),
+    przełączenie profili floty na zestaw dostawcy z `fleet.yaml` (`modele`: `anthropic`, `openai-api`, `openrouter`;
+    poziom agenta, delegacja, model kompilacji skarbca, zapasowy) i trwały wybór w `state/dostawca-modeli.json`,
+    który build stosuje przy aktualizacjach, dopóki `jarvo.env` się nie zmieni (`fleetlib.Fleet.apply_app_choice`).
+    Odpowiedź `{dostawca, nazwa, gotowosc}`; błędy 422 `nieznany_klucz` i `klucz_odrzucony`, 503 `brak_polaczenia`,
+    409 `brak_zestawu`, 500 `zapis`. Klucza nie ma w odpowiedzi, dzienniku ani wyjątku.
+  - `POST /app/mozg/chatgpt` (po zalogowaniu kodem urządzenia): status logowania `openai-codex` w Hermesie, potem
+    flota na zestaw `openai-codex`; bez zalogowania 409 `brak_logowania`.
+  - `POST /app/pierwsza-sesja {jezyk: pl|en}` (raz na instalację, `state/pierwsza-sesja.json`, w gotowości
+    `pierwsza_sesja` = id wątku albo ""): wątek „Pierwsza sesja” z koordynatorem Jarvo, wpis systemowy „Mózg
+    podłączony. Jarvo zaczyna pierwszą sesję.” i przebieg Jarva bez wpisu właściciela (`zrodlo: system`) z prośbą
+    `[Pierwsza sesja]` (skill `pierwsza-sesja`: Web szybki audyt strony, Sherlock 3 konkurentów, Łowca 10 firm
+    z okolicy, potem 3 najważniejsze ruchy na ten tydzień). Druga prośba = ten sam wątek (`nowa: false`); bez modelu
+    409 `brak_modelu`, bez imienia w `USER.md` 409 `brak_profilu`.
   - **Głos Jarva** (`hq/plugin/glos.py`): `POST /app/glos {tekst ≤ 400, glos: meski|damski, tempo:
     spokojnie|normalnie|zwawo, jezyk: pl|en}` = `audio/wav` z lokalnego lektora `jarvo-tts` z obrazu (Matcha
     `pl-PL-Matcha-Meski` / `pl-PL-Matcha-Damski`, po angielsku `en-US-Paradee`; bez sieci i klucza). Pliki w

@@ -23,6 +23,7 @@ import test_silnik_rozmow as T  # noqa: E402
 from conftest import REPO as REPO_ROOT, load_script  # noqa: E402
 
 A = load_script("hq/plugin/aplikacja.py", "jarvo_test_apl_aplikacja")
+MZ = load_script("hq/plugin/mozg.py", "jarvo_test_apl_mozg")
 G = load_script("hq/plugin/glos.py", "jarvo_test_apl_glos")
 PD = load_script("hq/plugin/podpowiedzi.py", "jarvo_test_apl_podpowiedzi")
 TA = load_script("hq/plugin/trasy_aplikacji.py", "jarvo_test_apl_trasy")
@@ -200,7 +201,7 @@ def test_gotowosc_calosc_bez_sekretow(tmp_path):
     w, got = g.calosc()
     assert w == {"imie": "Miki", "firma": "Złoty Kłos"}
     assert got == {"model": {"dostawca": "openrouter", "polaczony": True, "sposob": "klucz"}, "brama": "ok",
-                   "profil_wlasciciela": True}
+                   "profil_wlasciciela": True, "pierwsza_sesja": ""}
     assert sekret not in json.dumps([w, got])
 
 
@@ -276,7 +277,7 @@ class SwiatApl(T.Swiat):
                               api_base="http://x", zdrowie=lambda _u: True)
         self.nawyki = PD.Nawyki(self.jarvo / "state" / "nawyki.db")
         self.pytania: list = []                            # decyzje Starej Bazy (hq_core.build_state → decisions)
-        m = SimpleNamespace(**vars(T.M), aplikacja=A, podpowiedzi=PD, glos=G)
+        m = SimpleNamespace(**vars(T.M), aplikacja=A, podpowiedzi=PD, glos=G, mozg=MZ)
         self.wywolania: list[list[str]] = []
         self.lektor_dziala = True
 
@@ -291,13 +292,33 @@ class SwiatApl(T.Swiat):
                 Path(argv[argv.index("-o") + 1]).write_bytes(b"RIFF" + bytes(100))
             return 0
         self.glos = G.Glos(self.jarvo / "state" / "glos", program=lambda: "/bin/jarvo-tts", uruchom=uruchom)
+        self.flota = {"agents": [{"name": "jarvo", "model_tier": "frontier", "delegation_tier": "fast"}],
+                      "modele": {"domyslny": "openai-codex", "zapasowe": {},
+                                 "zestawy": {"openai-codex": {"frontier": "g6", "strong": "g6", "fast": "g6"},
+                                             "openrouter": {"frontier": "o-f", "strong": "o-s", "fast": "o-q"}}}}
+        self.zapytania: list[tuple[str, dict]] = []
+        self.odpowiedz_dostawcy = 200
+        self.zalogowany = False
+
+        def get(url, naglowki):                             # atrapa dostawcy modeli: kod odpowiedzi na klucz
+            self.zapytania.append((url, naglowki))
+            if isinstance(self.odpowiedz_dostawcy, Exception):
+                raise self.odpowiedz_dostawcy
+            return self.odpowiedz_dostawcy
+        mz = SimpleNamespace(**{k: getattr(MZ, k) for k in dir(MZ) if not k.startswith("__")})
+        mz.podlacz_klucz = lambda klucz, **kw: MZ.podlacz_klucz(klucz, get=get, **kw)
+        m.mozg = mz
+        self.rozdane: list[Path] = []
+        self.mozg = {"home": self.home, "flota": lambda: self.flota, "stan": self.jarvo / "state" / "dostawca-modeli.json",
+                     "build_json": None, "rozdaj": self.rozdane.append,
+                     "status": lambda _h, _d: {"polaczony": self.zalogowany}}
         app = FastAPI()
         router = APIRouter(route_class=T.M.ochrona.Trasa)
         self.sciezki = TA.dolacz(router, m=m, trasy=T.trasy, silnik=lambda: self.sil, agenci=self.agenci,
                                  gotowosc=self.got, nawyki=self.nawyki,
                                  stan_aktualizacji=lambda: {"online": False, "state": "unknown", "behind": 0},
                                  hello=lambda: {"wersja": "abc123", "silnik": "ok"}, decyzje=lambda: self.pytania,
-                                 glos=self.glos, log=self.logi.append)
+                                 glos=self.glos, mozg=self.mozg, log=self.logi.append)
         app.include_router(router, prefix=P)
         self.ka = TestClient(app, headers={"X-Jarvo-Request": "1"})
 
@@ -311,12 +332,13 @@ def swiat(tmp_path):
 
 def test_get_app_start_jednym_zapytaniem(swiat):
     assert set(swiat.sciezki) == {"GET /app", "GET /podpowiedzi", "POST /podpowiedzi/{pid}/reakcja", "POST /app/poznanie",
-                                  "POST /app/glos", "POST /app/glos/przygotuj"}
+                                  "POST /app/glos", "POST /app/glos/przygotuj", "POST /app/klucz",
+                                  "POST /app/mozg/chatgpt", "POST /app/pierwsza-sesja"}
     a = swiat.ka.get(f"{P}/app").json()
     assert a["wersja"] == "abc123" and a["silnik"] == "ok" and a["decyzje"] == 0
     assert a["wlasciciel"] == {"imie": "Miki", "firma": "Złoty Kłos"}
     assert a["gotowosc"] == {"model": {"dostawca": "custom", "polaczony": True, "sposob": "klucz"}, "brama": "ok",
-                             "profil_wlasciciela": True}
+                             "profil_wlasciciela": True, "pierwsza_sesja": ""}
     assert {x["name"] for x in a["agenci"]} >= {"jarvo", "test-e2e-a"}
     assert a["ustawienia"]["obrazy_max"] == 4 and a["ustawienia"]["limit_przebiegow"] == swiat.limit
     assert set(a["funkcje"]) == {"obrazy_wprost", "komputer", "telefon", "agenci_wlasni", "e2e"}
@@ -517,3 +539,78 @@ def test_bez_lektora_trasa_glosu_503(swiat):
     app.include_router(router, prefix=P)
     r = TestClient(app, headers={"X-Jarvo-Request": "1"}).post(f"{P}/app/glos", json={"tekst": "a"})
     assert r.status_code == 503 and r.json()["blad"]["kod"] == "brak_glosu"
+
+
+# ----------------------------------------------------------------------------------------------- mózg i pierwsza sesja
+KLUCZ_OR = "sk-or-v1-" + "a1b2c3d4" * 6
+
+
+def test_klucz_api_podlacza_flote_bez_klucza_w_odpowiedzi_i_dzienniku(swiat):
+    r = swiat.ka.post(f"{P}/app/klucz", json={"klucz": "  " + KLUCZ_OR + "\n"})
+    assert r.status_code == 200, r.text
+    assert r.json()["dostawca"] == "openrouter" and r.json()["nazwa"] == "OpenRouter"
+    assert KLUCZ_OR not in r.text and not any(KLUCZ_OR in l for l in swiat.logi)
+    url, nagl = swiat.zapytania[-1]
+    assert url == "https://openrouter.ai/api/v1/key" and nagl["Authorization"] == f"Bearer {KLUCZ_OR}"
+    env = (swiat.home / ".env").read_text(encoding="utf-8")
+    assert f"OPENROUTER_API_KEY={KLUCZ_OR}" in env and (swiat.home / ".env").stat().st_mode & 0o777 == 0o600
+    assert swiat.rozdane == [swiat.home]
+    cfg = (swiat.home / "profiles" / "jarvo" / "config.yaml").read_text(encoding="utf-8")
+    assert "provider: openrouter" in cfg and "default: o-f" in cfg and "base_url" not in cfg
+    wybor = json.loads((swiat.jarvo / "state" / "dostawca-modeli.json").read_text(encoding="utf-8"))
+    assert wybor["dostawca"] == "openrouter" and wybor["nad"] is None
+
+
+def test_klucz_api_bledy(swiat):
+    def blad(klucz):
+        r = swiat.ka.post(f"{P}/app/klucz", json={"klucz": klucz})
+        assert klucz not in r.text
+        return r.status_code, r.json()["blad"]["kod"]
+    assert blad("abc") == (422, "nieznany_klucz")
+    assert blad("pk-" + "x" * 30) == (422, "nieznany_klucz")
+    swiat.odpowiedz_dostawcy = 401
+    assert blad(KLUCZ_OR) == (422, "klucz_odrzucony")
+    swiat.odpowiedz_dostawcy = OSError("brak sieci " + KLUCZ_OR)
+    assert blad(KLUCZ_OR) == (503, "brak_polaczenia")
+    swiat.odpowiedz_dostawcy = 200
+    assert blad("sk-ant-" + "b" * 40) == (409, "brak_zestawu")      # zestawu anthropic nie ma w tej flocie
+    assert not (swiat.home / ".env").exists()
+    assert not any(KLUCZ_OR in l for l in swiat.logi)
+    assert TestClient(swiat.ka.app).post(f"{P}/app/klucz", json={"klucz": KLUCZ_OR}).status_code == 403
+
+
+def test_chatgpt_tylko_po_zalogowaniu(swiat):
+    r = swiat.ka.post(f"{P}/app/mozg/chatgpt", json={})
+    assert r.status_code == 409 and r.json()["blad"]["kod"] == "brak_logowania"
+    swiat.zalogowany = True
+    r = swiat.ka.post(f"{P}/app/mozg/chatgpt", json={})
+    assert r.status_code == 200 and r.json()["dostawca"] == "openai-codex"
+    assert "provider: openai-codex" in (swiat.home / "profiles" / "jarvo" / "config.yaml").read_text(encoding="utf-8")
+
+
+def test_pierwsza_sesja_raz_na_instalacje(swiat):
+    swiat.got.user_md.write_text(USER_SZABLON, encoding="utf-8")
+    r = swiat.ka.post(f"{P}/app/pierwsza-sesja", json={})
+    assert r.status_code == 409 and r.json()["blad"]["kod"] == "brak_profilu"
+    swiat.got.user_md.write_text(USER_PELNY, encoding="utf-8")
+    r = swiat.ka.post(f"{P}/app/pierwsza-sesja", json={"jezyk": "pl"})
+    assert r.status_code == 200, r.text
+    wid = r.json()["watek_id"]
+    assert r.json()["nowa"] is True
+    w = swiat.sil.db.watek(wid)
+    assert w["tytul"] == "Pierwsza sesja" and w["koordynator"] == "jarvo"
+    prz = swiat.sil.db.przebiegi_watku(wid)
+    assert [(p["agent"], p["zrodlo"]) for p in prz] == [("jarvo", "system")]
+    assert prz[0]["payload"]["prosba"].startswith("[Pierwsza sesja]")
+    assert swiat.ka.get(f"{P}/app").json()["gotowosc"]["pierwsza_sesja"] == wid
+    # druga próba: ten sam wątek, bez nowego przebiegu
+    r = swiat.ka.post(f"{P}/app/pierwsza-sesja", json={})
+    assert r.json() == {"watek_id": wid, "nowa": False}
+    assert len(swiat.sil.db.przebiegi_watku(wid)) == 1
+
+
+def test_pierwsza_sesja_bez_modelu(swiat):
+    (swiat.home / "profiles" / "jarvo" / "config.yaml").write_text("model:\n  provider: custom\n", encoding="utf-8")
+    r = swiat.ka.post(f"{P}/app/pierwsza-sesja", json={})
+    assert r.status_code == 409 and r.json()["blad"]["kod"] == "brak_modelu"
+    assert A.pierwsza_sesja(swiat.got.pierwsza) is None

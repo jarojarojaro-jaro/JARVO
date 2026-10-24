@@ -58,7 +58,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 
 | Agent | Rola | Uchwyt | Pokój HQ | Temat Telegram | Skille |
 |---|---|---|---|---|---|
-| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 13 |
+| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 14 |
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | `@sherlock` | Gabinet śledczy (`study`) | sherlock | 8 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | `@web` | Pracownia webowa (`devlab`) | web | 10 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | `@studio` | Atelier kreatywne (`atelier`) | studio | 7 |
@@ -252,11 +252,14 @@ przez `JARVO_MODEL_PROVIDER` + `JARVO_MODEL_FRONTIER/STRONG/FAST` (i `JARVO_MODE
 Przed dashboardem **strona logowania** jak strona tytułowa magazynu: winieta „Jarvo” z robotem CRT, dymek, wejście.
 Instalator i `jarvo open` otwierają ją z **kluczem jednorazowym** w adresie (15 min, jedno użycie, w kontenerze tylko
 skrót): klucz wpisuje się sam i użytkownik od razu jest w środku ([HQ.md §5](HQ.md#5-motyw-fosfor-wygląd-całego-dashboardu)).
-Przy pierwszym wejściu (w `USER.md` nie ma imienia) czeka **pierwsze spotkanie**: robot Jarvo mówi lokalnym głosem
+Przy pierwszym wejściu (w `USER.md` nie ma imienia) czeka **pierwsze spotkanie** na całym ekranie: robot Jarvo mówi lokalnym głosem
 (Matcha męski albo damski, „Zmień mój głos”), pyta bez modelu o imię, firmę, strony i konta oraz cele, a po lewej
 rośnie zdanie „Bohater: Kuba.” z podkreślonymi odpowiedziami. Odpowiedzi idą do `USER.md` w skarbcu (pola szablonu
-`onboarding-interview`), na końcu „Brakuje mi tylko mózgu” z dwoma kuponami: konto ChatGPT albo klucz API
-([HQ.md §2f](HQ.md#2f-aplikacja-rozmowa-pasek-szuflada)).
+`onboarding-interview`), na końcu „Brakuje mi tylko mózgu” z kartą na miejscu: konto ChatGPT (kod urządzenia) albo
+klucz API (dostawca po przedrostku, sprawdzony u dostawcy; cała flota przechodzi na zestaw modeli tego dostawcy,
+`hq/plugin/mozg.py`). W chwili podłączenia Jarvo mówi „Mam mózg. Zaczynam pierwszą sesję.” i otwiera wątek
+**Pierwsza sesja** (raz na instalację, skill `pierwsza-sesja`): Web szybki audyt strony, Sherlock 3 konkurentów,
+Łowca 10 firm z okolicy, potem 3 najważniejsze ruchy na ten tydzień ([HQ.md §2f](HQ.md#2f-aplikacja-rozmowa-pasek-szuflada)).
 Plugin dashboardu Hermesa (`hq/`), zakładka **Jarvo** pod `/jarvo` (pierwsza w menu; `/` i stary adres Bazy prowadzą tam
 same, łatka powłoki `branding/powloka.json` + `powloka.js`, loader ≤ 4 KB, pakiet z `/zasoby` tylko na `/jarvo`,
 ochrona zapisu `hq/plugin/ochrona.py` w obu wtyczkach; [HQ.md §2c](HQ.md#2c-powłoka-jarvo-osadzanie-zasoby)).

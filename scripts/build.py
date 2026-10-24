@@ -742,6 +742,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--local-src", action="append", default=[],
                     help="nazwa=ścieżka: użyj lokalnego klonu źródła (musi być na commicie z locka)")
     ap.add_argument("--env-file", default=None, help="plik z TELEGRAM_OWNER_ID, TELEGRAM_HQ_CHAT_ID, TELEGRAM_TOPIC_*")
+    ap.add_argument("--wybor-modelu", default=None,
+                    help="dostawca wybrany w aplikacji (/opt/data/jarvo/state/dostawca-modeli.json, hq/plugin/mozg.py)")
     ap.add_argument("--runtime-build-dir", default="/opt/jarvo/build",
                     help="ścieżka, pod którą build będzie widoczny w kontenerze (external_dirs prawej ręki)")
     ap.add_argument("--agent", action="append", default=[], help="buduj tylko wskazanych agentów")
@@ -757,6 +759,16 @@ def main(argv: list[str] | None = None) -> int:
         name, _, path = item.partition("=")
         local_src[name] = Path(path).resolve()
     env = read_env_file(Path(args.env_file) if args.env_file else None)
+    provider_env = (env.get("JARVO_MODEL_PROVIDER") or "").strip()
+    wybor = None
+    if args.wybor_modelu and Path(args.wybor_modelu).is_file():
+        try:
+            wybor = json.loads(Path(args.wybor_modelu).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            print(f"! wybór modelu z aplikacji nieczytelny ({args.wybor_modelu}): pomijam")
+    z_aplikacji = fleet.apply_app_choice(env, wybor)
+    if z_aplikacji:
+        print(f"Dostawca z aplikacji: {env['JARVO_MODEL_PROVIDER']}")
     fleet.apply_model_overrides(env)
     print(f"Modele: {fleet.provider} · " + ", ".join(f"{t}={m}" for t, m in fleet.tiers.items()))
     protocol = (fl.REPO_ROOT / fleet.raw["shared"]["protocol"]).read_text(encoding="utf-8")
@@ -817,6 +829,8 @@ def main(argv: list[str] | None = None) -> int:
         "built_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "repo_rev": repo_rev,
         "agents": summary,
+        # JARVO_MODEL_PROVIDER z jarvo.env przy tym buildzie: aplikacja zapisuje go jako `nad` przy wyborze dostawcy
+        "modele": {"env": provider_env, "dostawca": fleet.provider, "z_aplikacji": z_aplikacji},
         "plugins": ["jarvo-hq", WIEDZA_PLUGIN, KOMPUTER_PLUGIN],
         "vendored": report,
         "skan_skilli": skan,

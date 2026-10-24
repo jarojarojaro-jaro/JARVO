@@ -217,6 +217,22 @@ class Fleet:
                 prov = (table.get(models["provider"]) or {}).get("provider") or models["provider"]
                 table[models["provider"]] = {"provider": prov, "model": fb}
 
+    def apply_app_choice(self, env: dict[str, str], choice: dict | None) -> bool:
+        """Dostawca wybrany w aplikacji (klucz API albo ChatGPT w pierwszym spotkaniu, hq/plugin/mozg.py) trafia do
+        `env` jako JARVO_MODEL_PROVIDER, jeśli JARVO_MODEL_PROVIDER w jarvo.env jest taki sam jak przy wyborze (`nad`);
+        zmiana w jarvo.env po wyborze (local-up.sh) wygrywa. Nieznany zestaw albo zły plik = bez zmian. True = użyty."""
+        if not isinstance(choice, dict):
+            return False
+        chosen = str(choice.get("dostawca") or "").strip()
+        models = self.raw["models"]
+        if not chosen or (chosen != models["provider"] and chosen not in (models.get("presets") or {})):
+            return False
+        nad = choice.get("nad")
+        if nad is not None and str(nad).strip() != (env.get("JARVO_MODEL_PROVIDER") or "").strip():
+            return False
+        env["JARVO_MODEL_PROVIDER"] = chosen
+        return True
+
     def agent(self, name: str) -> Agent:
         for a in self.agents:
             if a.name == name:

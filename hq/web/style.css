@@ -1350,7 +1350,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-start-pod { width: 100%; margin-top: 24px; display: flex; flex-direction: column; gap: 18px; }
 /* ---- pierwsze spotkanie (37-poznajmy.js): papier, robot z falą głosu, arkusz „Bohater:” z rosnącym zdaniem
    (czerwone podkreślenia i notki pisane ręcznie) i rozmowa z Jarvem obok; na wąskim ekranie jedno pod drugim */
-.j-start-poz { align-items: stretch; padding: 0; background: var(--j-papier); color: var(--j-papier-tekst); }
+.j-poz-ekran { display: flex; height: 100%; overflow: auto; background: var(--j-papier); color: var(--j-papier-tekst); outline: 0; }
 .j-poz { flex: 1; display: flex; flex-direction: column; min-height: 100%; width: 100%; padding: 22px 36px 28px;
   background-image: repeating-linear-gradient(0deg, transparent 0 31px, var(--j-papier-linia) 31px 32px); }
 .j-poz-gora { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 2px solid var(--j-papier-tekst); }
@@ -1413,6 +1413,23 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-poz-kupon small { font-size: 13px; line-height: 1.4; opacity: .75; }
 .j-poz-pozniej { grid-column: 1 / -1; justify-self: start; color: inherit; opacity: .7; }
 .j-poz-blad { font-size: 13.5px; color: var(--j-akcent); }
+/* karta „Mózg”: dwa kupony (ChatGPT, klucz API), pod wybranym jego treść; kod urządzenia duży, mono, do przepisania */
+.j-mozg { display: flex; flex-direction: column; gap: 14px; }
+.j-mozg .j-poz-pozniej { align-self: flex-start; }
+.j-poz-kupon.is-wybrany { border-style: solid; border-color: var(--j-akcent); box-shadow: 4px 4px 0 var(--j-akcent); }
+.j-mozg-tresc { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding-top: 4px; animation: j-poz-wpis .3s var(--j-ease) both; }
+.j-mozg-tresc .j-poz-pole { align-self: stretch; }
+.j-mozg-o { font-size: 13.5px; line-height: 1.45; opacity: .8; }
+.j-mozg-o a { color: var(--j-akcent); }
+.j-mozg-kroki { display: flex; flex-direction: column; gap: 14px; align-self: stretch; list-style: none; padding: 0; margin: 0; }
+.j-mozg-kroki li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.j-mozg-kroki li > span:first-child { flex-basis: 100%; font-size: 14px; opacity: .8; }
+.j-mozg-kod { font-family: var(--j-font-mono); font-size: 30px; font-weight: 700; letter-spacing: .12em; padding: 6px 14px;
+  border: 2px solid var(--j-papier-tekst); border-radius: 4px; background: var(--j-papier); user-select: all; }
+.j-mozg-czeka { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.j-mozg-czeka .j-spin { width: 14px; height: 14px; color: var(--j-akcent); }
+.jarvo-app .j-got-x { width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 8px; --j-r: 8px; color: var(--j-tekst-3); }
+.jarvo-app .j-got-x:hover { background: var(--j-tlo-hover); color: var(--j-tekst); }
 .j-poz-kroki { display: flex; gap: 10px; margin-top: 4px; list-style: none; font-family: var(--j-font-mono); font-size: 11.5px; opacity: .55; }
 .j-poz-kroki li.is-zrobiony { text-decoration: line-through; }
 .j-poz-kroki li.is-teraz { color: var(--j-akcent); opacity: 1; font-weight: 700; }

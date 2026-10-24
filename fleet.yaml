@@ -18,7 +18,9 @@ reviewer: jarvo            # recenzent kart: snajperzy wołają kanban_request_r
 # Dostawca modeli i modele na poziomach. Domyślnie openai-codex (logowanie ChatGPT); inny dostawca bez edycji repo:
 # w compose/jarvo.env ustaw JARVO_MODEL_PROVIDER=<nazwa zestawu z `presets`> (klucz dostawcy dodaj
 # w dashboardzie Keys przy profilu „default”: trafi do wszystkich agentów). Pojedynczy model można
-# nadpisać przez JARVO_MODEL_FRONTIER / JARVO_MODEL_STRONG / JARVO_MODEL_FAST.
+# nadpisać przez JARVO_MODEL_FRONTIER / JARVO_MODEL_STRONG / JARVO_MODEL_FAST. Klucz wklejony w pierwszym spotkaniu
+# aplikacji (hq/plugin/mozg.py) przełącza flotę na zestaw dostawcy od razu i zapisuje wybór w
+# /opt/data/jarvo/state/dostawca-modeli.json; build go stosuje, dopóki JARVO_MODEL_PROVIDER się nie zmieni.
 # scripts/check-models.py sprawdza przed wdrożeniem, czy identyfikatory istnieją u dostawcy.
 models:
   provider: openai-codex                    # OpenAI przez logowanie ChatGPT (OAuth, Models → Login)
@@ -39,6 +41,14 @@ models:
       frontier: claude-opus-5-5
       strong: claude-sonnet-5
       fast: claude-haiku-4-5-20251001
+    anthropic:                              # Anthropic wprost (klucz ANTHROPIC_API_KEY, np. wklejony w aplikacji)
+      frontier: claude-opus-5-5
+      strong: claude-sonnet-5-5
+      fast: claude-haiku-5-5
+    openai-api:                             # OpenAI wprost (klucz OPENAI_API_KEY, np. wklejony w aplikacji)
+      frontier: gpt-6-luna
+      strong: gpt-6-luna
+      fast: gpt-6-luna
   # model zapasowy, gdy główny odmówi (np. „model poza planem”); klucz: nazwa zestawu
   fallback:
     openai-codex: {provider: commandcode, model: deepseek/deepseek-v4-pro}

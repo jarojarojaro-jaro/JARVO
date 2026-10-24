@@ -33,6 +33,24 @@ const akcje = {
     sklep.ustaw({ agenci, kolejnosc: (lista || []).map((a) => a.name) });
   },
 
+  // pierwsza sesja (docs/HQ.md „Pierwsze spotkanie”): serwer zakłada ją raz na instalację; tu jedno żądanie naraz,
+  // potem start aplikacji odświeżony (gotowosc.pierwsza_sesja) i przejście do wątku. Błąd idzie do wołającego.
+  zacznijPierwszaSesje() {
+    if (akcje._pierwsza) return akcje._pierwsza;
+    akcje._pierwsza = (async () => {
+      try {
+        const r = await api.pierwszaSesja(isPL() ? "pl" : "en");
+        sklep.ustaw({ poznanie: null });
+        akcje.wczytajAplikacje();
+        if (r && r.watek_id) Trasa.idz({ widok: "watek", watek: r.watek_id });
+        return r;
+      } finally {
+        akcje._pierwsza = null;
+      }
+    })();
+    return akcje._pierwsza;
+  },
+
   // start aplikacji: GET /app (agenci, właściciel, gotowość, funkcje); bez tej trasy (404) agenci z /fleet i stan
   // aktualizacji. Inny błąd: pasek „Nie udało się wczytać Jarva” z ponowieniem i samo ponowienie po 2, 4, 8, 15, 30 s.
   async wczytajAplikacje() {

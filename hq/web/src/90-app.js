@@ -185,6 +185,8 @@ function AppJarvo() {
   const motyw = useMotyw(useSklep((s) => s.ustawienia.motyw));
   const pasek = useSklep((s) => s.pasek, plytko);
   const staraBaza = useSklep((s) => s.stara_baza);
+  const got = useSklep((s) => s.gotowosc);
+  const poznanie = useSklep((s) => s.poznanie);
   const korzen = useRef(null), uklad = useRef(null);
   useWidokTelefonu(korzen);
   useSkrotyAplikacji();
@@ -195,7 +197,6 @@ function AppJarvo() {
     const d = document.documentElement;
     d.setAttribute("data-jarvo-app", "");
     d.setAttribute("data-jarvo-gotowe", "");
-    const t = setTimeout(() => d.removeAttribute("data-jarvo-wstepnie"), 200);
     if (window.performance && performance.mark) performance.mark("jarvo:gotowe");
     Trasa.przywroc();
     Strumien.start();
@@ -206,12 +207,33 @@ function AppJarvo() {
       Strumien.naZdarzenie("agenci.zmiana", () => akcje.wczytajAplikacje()),
     ];
     return () => {
-      clearTimeout(t);
       haki.forEach((f) => f());
       Strumien.stop();
       ["data-jarvo-app", "data-jarvo-gotowe", "data-jarvo-wstepnie"].forEach((a) => d.removeAttribute(a));
     };
   }, []);
+
+  // zasłona startowa schodzi, gdy wiadomo, co pokazać (gotowość wczytana: pierwsze spotkanie na całym ekranie albo
+  // układ z paskiem), najpóźniej po 2,5 s; bez tego nowa instalacja mignęłaby paskiem rozmów przed pytaniami
+  const znanyStart = got !== null;
+  useEffect(() => {
+    const d = document.documentElement;
+    const t = setTimeout(() => d.removeAttribute("data-jarvo-wstepnie"), znanyStart ? 200 : 2500);
+    return () => clearTimeout(t);
+  }, [znanyStart]);
+
+  // mózg podłączony poza pierwszym spotkaniem (Ustawienia › Połączenia, druga karta): profil jest, pierwszej sesji
+  // jeszcze nie było, więc zaczyna się sama (raz na instalację pilnuje serwer)
+  const polaczony = !!(got && got.model && got.model.polaczony);
+  const bylPolaczony = useRef(null);
+  useEffect(() => {
+    if (!got) return;
+    const przed = bylPolaczony.current;
+    bylPolaczony.current = polaczony;
+    if (przed === false && polaczony && got.profil_wlasciciela && got.pierwsza_sesja === "" && !poznanie) {
+      akcje.zacznijPierwszaSesje().catch(() => {});
+    }
+  }, [polaczony]);
 
   // przejście w inne miejsce zamyka wysunięty pasek (telefon); ostatni wątek zostaje w pamięci przeglądarki
   useEffect(() => {
@@ -248,6 +270,18 @@ function AppJarvo() {
     return () => m.removeAttribute("role");
   }, []);
 
+  // pierwsze spotkanie na całym ekranie: same pytania, bez paska rozmów i górnej belki
+  if (trasa.widok !== "watek" && trasa.widok !== "sesja" && (poznanie === "trwa" || poznanie === "mozg" || poznanieOtwarte(got))) {
+    return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
+      <main class="j-poz-ekran" data-region="glowna" tabIndex="-1" aria-label=${T("poz.etykieta")}>
+        <${Poznajmy} key=${poznanie === "mozg" ? "mozg" : "poz"} poczatek=${poznanie === "mozg" ? "mozg" : "witaj"}
+          koniec=${() => sklep.ustaw({ poznanie: null })}/>
+      </main>
+      ${trasa.u && html`<${Szuflada} trasa=${trasa}/>`}
+      <${Pasy}/>
+      <${Toasty}/>
+    </div>`;
+  }
   const widok = trasa.widok === "watek" ? html`<${Watek} key=${trasa.watek} id=${trasa.watek}/>`
     : trasa.widok === "sesja" ? html`<${Pusto} ikona="msg" tytul=${T("sesja.wkrotce")}/>`
       : html`<${EkranStartu} key=${trasa.agent || "start"} agent=${trasa.widok === "nowa" ? trasa.agent : null}/>`;

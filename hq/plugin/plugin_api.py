@@ -1989,7 +1989,7 @@ from types import SimpleNamespace  # noqa: E402
 
 roz = SimpleNamespace(hq_core=core, ochrona=ochrona)
 for _nazwa in ("agenci", "rozmowy", "czytnik", "kontekst", "wzmianki", "budzenia", "scalanie", "brama", "strumien",
-               "przebiegi", "prace", "obserwator", "aplikacja", "podpowiedzi", "glos", "silnik"):
+               "przebiegi", "prace", "obserwator", "aplikacja", "podpowiedzi", "glos", "mozg", "silnik"):
     setattr(roz, _nazwa, _load(f"jarvo_hq_{_nazwa}", f"{_nazwa}.py"))
 trasy_rozmow = _load("jarvo_hq_trasy_rozmow", "trasy_rozmow.py")
 trasy_aplikacji = _load("jarvo_hq_trasy_aplikacji", "trasy_aplikacji.py")
@@ -2061,9 +2061,24 @@ def _decyzje() -> list[dict]:
     return _cached("decyzje", 5.0, lambda: core.build_state(_fleet(), _board(now), _index_md(), now, {}).get("decisions") or [])
 
 
+
+
+def _rozdaj_klucze(home: Path) -> None:
+    """Klucz wklejony w aplikacji od razu u wszystkich agentów (share_keys.sync; wątek wtyczki zrobiłby to za ~3 s)."""
+    spec = importlib.util.spec_from_file_location("jarvo_share_keys_sync", _HERE / "share_keys.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.sync(home)
+
+
+# mózg z aplikacji (mozg.py): klucz API albo ChatGPT w pierwszym spotkaniu przełącza flotę; fleet.json czytany na
+# nowo przy każdym wywołaniu (po aktualizacji floty ma nowe zestawy), wybór dla buildu w state/dostawca-modeli.json
+MOZG = {"home": HOME, "flota": lambda: json.loads(FLEET_FILE.read_text(encoding="utf-8")),
+        "stan": core.JARVO_DIR / "state" / "dostawca-modeli.json", "build_json": Path("/opt/jarvo/build/BUILD.json"),
+        "rozdaj": _rozdaj_klucze, "status": roz.aplikacja.status_hermesa}
 trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci=AGENCI, gotowosc=GOTOWOSC,
                        nawyki=NAWYKI, stan_aktualizacji=_update_state, hello=_hello, decyzje=_decyzje, glos=GLOS,
-                       log=_log_hq)
+                       mozg=MOZG, log=_log_hq)
 
 
 async def _zdrowie_rozmow() -> dict:

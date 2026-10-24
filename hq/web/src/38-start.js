@@ -1,8 +1,9 @@
 // Ekran startu (docs/HQ.md „Ekran startu”, makieta V2 · Spokojny): robot Jarva, powitanie z USER.md, kompozytor
 // nowej rozmowy i pod nim najwyżej 4 rzeczy: „Czeka na Ciebie” (zgody, nieudana praca, pytania zespołu) i startery
 // „Na początek” (warstwa nauki N0, hq/plugin/podpowiedzi.py). Pod powitaniem jedna linia gotowości tylko wtedy, gdy
-// czegoś brakuje (brama, model, poznajmy się); młoda brama to „Jarvo się uruchamia…”, bez czerwonego paska.
-// Bez imienia w USER.md (i bez „Pomiń”) zamiast startu jest pierwsze spotkanie (37-poznajmy.js).
+// czegoś brakuje (brama, model, poznajmy się, pierwsza sesja); młoda brama to „Jarvo się uruchamia…”, bez czerwonego
+// paska. Bez imienia w USER.md (i bez „Pomiń”) zamiast startu jest pierwsze spotkanie na całym ekranie (37-poznajmy.js,
+// przełącza 90-app.js).
 
 // pora dnia z godziny: rano 5–11, dzień 12–17, wieczór 18–4 (PL: „Dzień dobry” do 18, potem „Dobry wieczór”)
 const poraDnia = (h) => (h >= 5 && h < 12 ? "rano" : h >= 12 && h < 18 ? "dzien" : "wieczor");
@@ -20,30 +21,43 @@ function useKoordynatorStartu() {
 const agentWg = (agenci, nazwa) => agenci[nazwa] || { name: nazwa };
 
 // ---- linia gotowości (§13.10): jedno zdanie pod powitaniem i najwyżej jeden przycisk, tylko gdy czegoś brakuje.
-// Kolejność: brama (uruchamia się / nie odpowiada), potem model, a gdy model działa: „Poznajmy się” (profil właściciela;
-// otwiera pierwsze spotkanie, które nie potrzebuje modelu).
+// Kolejność: brama (uruchamia się / nie odpowiada), potem model („Podłącz mózg” otwiera kartę mózgu pierwszego
+// spotkania), a gdy model działa: „Poznajmy się” (profil właściciela; pierwsze spotkanie nie potrzebuje modelu)
+// i „Pierwsza sesja” (instalacja sprzed tej funkcji albo mózg podłączony obok spotkania; raz, do „×”).
 // „Jak działa zespół” jest w Ustawieniach › Zespół, nie na starcie.
 function stanGotowosci(got) {
   if (!got) return null;
   if (got.brama === "startuje" || got.brama === "niedostepna") return got.brama;
   if (!(got.model || {}).polaczony) return "model";
   if (!got.profil_wlasciciela) return "poznajmy";
+  if (got.pierwsza_sesja === "" && !Pamiec.wez(PIERWSZA_ODRZUCONA, false)) return "pierwsza";
   return null;
 }
+const PIERWSZA_ODRZUCONA = "jarvo.pierwsza.odrzucona.v1";
 
 function LiniaGotowosci({ got }) {
+  const [, odswiez] = useState(0);
+  const [blad, setBlad] = useState(null);
   const klucz = stanGotowosci(got);
   if (!klucz) return null;
-  const model = got.model || {};
+  const sesja = !!got.profil_wlasciciela && got.pierwsza_sesja === "";
   const akcja = {
-    model: [T("gotowosc.polacz"), () => Trasa.idz({ u: "polaczenia", pod: model.sposob === "oauth" ? "modele" : "klucze" }, { scal: true })],
+    model: [T("gotowosc.polacz"), () => sklep.ustaw({ poznanie: "mozg" })],
     poznajmy: [T("gotowosc.zacznij"), () => sklep.ustaw({ poznanie: "trwa" })],
+    pierwsza: [T("gotowosc.pierwsza_zacznij"), () => {
+      setBlad(null);
+      akcje.zacznijPierwszaSesje().catch((e) => setBlad(e.status ? e.tekst() : T("blad.siec")));
+    }],
   }[klucz];
-  const ikona = klucz === "startuje" ? html`<${Spinner}/>` : html`<${Ikona} n=${klucz === "model" ? "plug" : klucz === "poznajmy" ? "msg" : "alert"} r=${16}/>`;
+  const ikona = klucz === "startuje" ? html`<${Spinner}/>`
+    : html`<${Ikona} n=${klucz === "model" ? "plug" : klucz === "poznajmy" ? "msg" : klucz === "pierwsza" ? "spark" : "alert"} r=${16}/>`;
+  const tekst = klucz === "model" && sesja ? T("gotowosc.model_sesja") : T(`gotowosc.${klucz}`);
   return html`<p class="j-gotowosc" data-gotowosc=${klucz} data-brama=${got.brama || ""}
       role=${klucz === "startuje" || klucz === "niedostepna" ? "status" : undefined}>
-    ${ikona}<span>${T(`gotowosc.${klucz}`)}</span>
-    ${akcja && html`<button type="button" class="j-link j-got-b" onClick=${akcja[1]}>${akcja[0]}</button>`}</p>`;
+    ${ikona}<span>${blad || tekst}</span>
+    ${akcja && html`<button type="button" class="j-link j-got-b" onClick=${akcja[1]}>${akcja[0]}</button>`}
+    ${klucz === "pierwsza" && html`<button type="button" class="j-got-x" aria-label=${T("gotowosc.pierwsza_nie")} title=${T("gotowosc.pierwsza_nie")}
+      onClick=${() => { Pamiec.daj(PIERWSZA_ODRZUCONA, true); odswiez((n) => n + 1); }}><${Ikona} n="x" r=${14}/></button>`}</p>`;
 }
 
 // ---- „Czeka na Ciebie”: zgody, pytania zespołu i nieudana praca (najwyżej 4). Zgoda i błąd otwierają wątek,
@@ -133,7 +147,6 @@ function EkranStartu({ agent }) {
   const podp = useSklep((s) => s.podpowiedzi);
   const oczekujace = useSklep((s) => s.wysylane.nowa);
   const koordynator = useKoordynatorStartu();
-  const poznanie = useSklep((s) => s.poznanie);
   const [godzina] = useState(() => new Date().getHours());
   // #/nowa/<agent>: ten agent dostaje pierwszą wiadomość (wybór na jedną wiadomość, jak „Napisz do Web”)
   useEffect(() => {
@@ -148,9 +161,6 @@ function EkranStartu({ agent }) {
       Strumien.naZdarzenie("reset", odswiez)];
     return () => { clearTimeout(t); usun.forEach((f) => f()); };
   }, []);
-  if (poznanie === "trwa" || poznanieOtwarte(got)) {
-    return html`<div class="j-start j-start-poz"><${Poznajmy} koniec=${() => sklep.ustaw({ poznanie: null })}/></div>`;
-  }
   const imie = wlasciciel && wlasciciel.imie, firma = wlasciciel && wlasciciel.firma;
   const pora = poraDnia(godzina);
   const nowy = !imie && !!got && !got.profil_wlasciciela;

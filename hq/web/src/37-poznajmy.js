@@ -1,8 +1,11 @@
-// Pierwsze spotkanie (docs/HQ.md „Pierwsze spotkanie”): rozmowa z Jarvem bez modelu, zaraz po instalacji. Jarvo mówi
-// (36-glos.js), pyta o imię, firmę, linki i cel, a z odpowiedzi rośnie zdanie z czerwonymi podkreśleniami i notkami
-// („Bohater: Kuba.”). Zapis: POST /app/poznanie → USER.md (pola skillu onboarding-interview), więc cała flota wie,
-// dla kogo pracuje. Potem „Brakuje mi tylko mózgu”: konto ChatGPT albo klucz API (Ustawienia › Połączenia); gdy model
-// już działa, od razu „Do pracy”. Pokazuje się sam, dopóki USER.md nie ma imienia i właściciel nie kliknął „Pomiń”.
+// Pierwsze spotkanie (docs/HQ.md „Pierwsze spotkanie”): rozmowa z Jarvem bez modelu, zaraz po instalacji, na całym
+// ekranie (bez paska rozmów i górnej belki, 90-app.js). Jarvo mówi (36-glos.js), pyta o imię, firmę, linki i cel,
+// a z odpowiedzi rośnie zdanie z czerwonymi podkreśleniami i notkami („Bohater: Kuba.”). Zapis: POST /app/poznanie →
+// USER.md (pola skillu onboarding-interview), więc cała flota wie, dla kogo pracuje. Potem „Brakuje mi tylko mózgu”
+// w tej samej karcie: konto ChatGPT (kod urządzenia przez trasy Hermesa) albo klucz API (POST /app/klucz, dostawca
+// po przedrostku). W chwili podłączenia: „Mam mózg. Zaczynam pierwszą sesję.” i przejście do wątku „Pierwsza sesja”
+// (POST /app/pierwsza-sesja, raz na instalację). Pokazuje się sam, dopóki USER.md nie ma imienia i właściciel nie
+// kliknął „Pomiń”; z linii gotowości na starcie otwiera się od razu na kroku „mózg” (sklep.poznanie = "mozg").
 
 const POZNANIE_KROKI = ["witaj", "imie", "firma", "linki", "cele", "mozg"];
 const POZNANIE_CELE = ["klienci", "rolki", "strona", "reklamy", "papiery"];
@@ -39,6 +42,15 @@ const Poznanie = {
       if (out.length >= 6) break;
     }
     return out;
+  },
+  // dostawca klucza API po przedrostku (jak hq/plugin/mozg.py rozpoznaj): nazwa do pokazania albo null
+  dostawca(klucz) {
+    const k = String(klucz || "").trim();
+    if (!/^[A-Za-z0-9_.-]{20,300}$/.test(k)) return null;
+    if (k.startsWith("sk-or-")) return "OpenRouter";
+    if (k.startsWith("sk-ant-")) return "Anthropic";
+    if (k.startsWith("sk-")) return "OpenAI";
+    return null;
   },
   // jedna linia: bez znaków sterujących, spacje złączone, przycięta
   pole(s, maks = 80) { return String(s || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, maks).trim(); },
@@ -82,8 +94,130 @@ function kwestiePoznania(krok, d, n) {
   if (krok === "firma") return [T("poz.milo", { imie: d.imie }), T("poz.firma")];
   if (krok === "linki") return [T("poz.linki")];
   if (krok === "cele") return [T("poz.cele")];
-  if (krok === "mozg") return d.model ? [T("poz.zapisane"), T("poz.gotowe")] : [T("poz.zapisane"), T("poz.mozg")];
+  if (krok === "mozg") {
+    if (d.start) return [T("poz.mam_mozg")];
+    if (d.model) return [T("poz.gotowe")];
+    return d.zapisane ? [T("poz.zapisane"), T("poz.mozg")] : [T("poz.mozg")];
+  }
   return [];
+}
+
+// ---- karta „Mózg”: konto ChatGPT (kod urządzenia: otwórz stronę, wpisz kod, czekamy na zalogowanie) albo klucz API.
+// Klucz idzie tylko do POST /app/klucz (pole hasła, bez podpowiedzi przeglądarki) i nie zostaje w stanie po wysłaniu.
+function MozgChatgpt({ gotowe, wejscie }) {
+  const [st, setSt] = useState({ etap: "start", kod: "", url: "", sid: "", co: 5, blad: null });
+  const [skopiowane, setSkopiowane] = useState(false);
+  const sid = useRef("");
+  useEffect(() => () => { if (sid.current) api.chatgpt.anuluj(sid.current).catch(() => {}); }, []);
+  // czekamy na zalogowanie: odpytanie co `poll_interval` s; zatwierdzone = flota na ChatGPT, potem pierwsza sesja
+  useEffect(() => {
+    if (st.etap !== "czeka") return undefined;
+    let stop = false, t = 0;
+    const krok = async () => {
+      if (stop) return;
+      try {
+        const r = await api.chatgpt.stan(st.sid);
+        if (stop) return;
+        if (r.status === "approved") {
+          sid.current = "";
+          setSt((x) => ({ ...x, etap: "laczy" }));
+          await api.mozgChatgpt();
+          if (!stop) gotowe("ChatGPT");
+          return;
+        }
+        if (r.status !== "pending") { sid.current = ""; setSt((x) => ({ ...x, etap: "blad", blad: T(r.status === "expired" ? "poz.chatgpt_wygasl" : "poz.chatgpt_blad") })); return; }
+      } catch (e) {
+        if (stop) return;
+        if (e.status === 404) { sid.current = ""; setSt((x) => ({ ...x, etap: "blad", blad: T("poz.chatgpt_wygasl") })); return; }
+        if (e.status && e.status !== 0) { setSt((x) => ({ ...x, etap: "blad", blad: e.tekst() })); return; }
+      }
+      t = setTimeout(krok, Math.max(3, st.co) * 1000);
+    };
+    t = setTimeout(krok, Math.max(3, st.co) * 1000);
+    return () => { stop = true; clearTimeout(t); };
+  }, [st.etap, st.sid]);
+  const zacznij = async () => {
+    setSt({ etap: "startuje", kod: "", url: "", sid: "", co: 5, blad: null });
+    try {
+      const r = await api.chatgpt.start();
+      sid.current = r.session_id;
+      setSt({ etap: "czeka", kod: r.user_code, url: r.verification_url, sid: r.session_id, co: r.poll_interval || 5, blad: null });
+      try { window.open(r.verification_url, "_blank", "noopener"); } catch (_) { /* blokada okien: zostaje przycisk */ }
+    } catch (e) {
+      setSt({ etap: "blad", kod: "", url: "", sid: "", co: 5, blad: e.status ? e.tekst() : T("blad.siec") });
+    }
+  };
+  const kopiuj = () => {
+    try { navigator.clipboard.writeText(st.kod).then(() => { setSkopiowane(true); setTimeout(() => setSkopiowane(false), 2000); }); } catch (_) { /* brak schowka */ }
+  };
+  if (st.etap === "start" || st.etap === "startuje") {
+    return html`<div class="j-mozg-tresc"><button type="button" class="j-btn j-btn-glowny" ref=${wejscie} onClick=${zacznij}
+        disabled=${st.etap === "startuje"}>${st.etap === "startuje" ? html`<${Spinner}/>` : null}${T("poz.chatgpt_zaloguj")}<${Ikona} n="right" r=${16}/></button>
+      <p class="j-mozg-o">${T("poz.chatgpt_jak")}</p></div>`;
+  }
+  if (st.etap === "blad") {
+    return html`<div class="j-mozg-tresc"><p class="j-poz-blad" role="alert">${st.blad}</p>
+      <button type="button" class="j-btn" ref=${wejscie} onClick=${zacznij}>${T("poz.ponow")}</button></div>`;
+  }
+  return html`<div class="j-mozg-tresc">
+    <ol class="j-mozg-kroki">
+      <li><span>${T("poz.chatgpt_krok1")}</span>
+        <a class="j-btn" href=${st.url} target="_blank" rel="noopener noreferrer">${T("poz.chatgpt_otworz")}<${Ikona} n="ext" r=${14}/></a></li>
+      <li><span>${T("poz.chatgpt_krok2")}</span>
+        <span class="j-mozg-kod" data-kod="">${st.kod}</span>
+        <button type="button" class="j-btn" onClick=${kopiuj}>${skopiowane ? T("poz.chatgpt_skopiowane") : T("poz.chatgpt_kopiuj")}</button></li>
+    </ol>
+    <p class="j-mozg-czeka" role="status"><${Spinner}/>${st.etap === "laczy" ? T("poz.chatgpt_laczy") : T("poz.chatgpt_czekam")}</p>
+  </div>`;
+}
+
+function MozgKlucz({ gotowe, wejscie }) {
+  const [klucz, setKlucz] = useState("");
+  const [st, setSt] = useState({ trwa: false, blad: null });
+  const nazwa = Poznanie.dostawca(klucz);
+  // bez własnego <form>: karta siedzi w formularzu rozmowy, a zagnieżdżony formularz nie wysyła się w React;
+  // Enter w polu robi to samo co „Podłącz” i nie wysyła formularza rozmowy
+  const wyslij = async (e) => {
+    if (e) e.preventDefault();
+    if (!nazwa || st.trwa) return;
+    setSt({ trwa: true, blad: null });
+    try {
+      const r = await api.klucz(klucz.trim());
+      setKlucz("");
+      gotowe(r.nazwa || nazwa);
+    } catch (err) {
+      setSt({ trwa: false, blad: err.status ? err.tekst() : T("blad.siec") });
+    }
+  };
+  return html`<div class="j-mozg-tresc">
+    <label class="j-poz-pole"><span class="j-poz-e">${T("poz.klucz_etykieta")}</span>
+      <input ref=${wejscie} type="password" value=${klucz} maxLength="400" autoComplete="off" spellCheck="false"
+        autoCapitalize="off" placeholder=${T("poz.klucz_przyklad")} data-klucz="" disabled=${st.trwa}
+        onInput=${(e) => { setKlucz(e.target.value); setSt({ trwa: false, blad: null }); }}
+        onKeyDown=${(e) => { if (e.key === "Enter") wyslij(e); }}/></label>
+    <p class="j-mozg-o" aria-live="polite">${klucz.trim()
+      ? (nazwa ? html`<span class="j-poz-znacznik"><${Ikona} n="check" r=${13}/>${nazwa}</span>` : T("poz.klucz_nieznany"))
+      : html`${T("poz.klucz_brak")} <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a>`}</p>
+    ${st.blad && html`<p class="j-poz-blad" role="alert">${st.blad}</p>`}
+    <div class="j-poz-akcje"><button type="button" class="j-btn j-btn-glowny" disabled=${!nazwa || st.trwa} onClick=${wyslij}>
+      ${st.trwa ? html`<${Spinner}/>${T("poz.klucz_sprawdzam", { nazwa })}` : T("poz.klucz_podlacz")}${st.trwa ? null : html`<${Ikona} n="right" r=${16}/>`}</button></div>
+  </div>`;
+}
+
+function KartaMozgu({ gotowe, pozniej, wejscie }) {
+  const [tryb, setTryb] = useState(null);
+  const opcja = (t, tytul, opis) => html`<button type="button" class=${cx("j-poz-kupon", tryb === t && "is-wybrany")}
+      aria-pressed=${tryb === t} ref=${t === "chatgpt" && !tryb ? wejscie : undefined} onClick=${() => setTryb(t)}>
+    <b>${tytul}</b><small>${opis}</small></button>`;
+  return html`<div class="j-mozg" data-tryb=${tryb || ""}>
+    <div class="j-poz-kupony" role="group" aria-label=${T("poz.mozg_wybor")}>
+      ${opcja("chatgpt", T("poz.kupon_chatgpt"), T("poz.kupon_chatgpt_o"))}
+      ${opcja("klucz", T("poz.kupon_klucz"), T("poz.kupon_klucz_o"))}
+    </div>
+    ${tryb === "chatgpt" && html`<${MozgChatgpt} gotowe=${gotowe} wejscie=${wejscie}/>`}
+    ${tryb === "klucz" && html`<${MozgKlucz} gotowe=${gotowe} wejscie=${wejscie}/>`}
+    <button type="button" class="j-link j-poz-pozniej" onClick=${pozniej}>${T("poz.pozniej")}</button>
+  </div>`;
 }
 
 function ZdaniePoznania({ d }) {
@@ -94,25 +228,30 @@ function ZdaniePoznania({ d }) {
     : html`<span key=${i}>${x.t}</span>`))}</p>`;
 }
 
-function Poznajmy({ koniec }) {
+function Poznajmy({ koniec, poczatek = "witaj" }) {
   const got = useSklep((s) => s.gotowosc);
+  const wlasciciel = useSklep((s) => s.wlasciciel);
   const ileAgentow = useSklep((s) => s.kolejnosc.filter((n) => n !== "jarvo").length);
   const { mowi } = useGlos();
-  const [krok, setKrok] = useState("witaj");
-  const [d, setD] = useState({ imie: "", firma: "", zajecie: "", linki: [], cele: [] });
+  const [krok, setKrok] = useState(poczatek);
+  const [d, setD] = useState(() => ({ imie: (poczatek === "mozg" && wlasciciel && wlasciciel.imie) || "",
+    firma: (poczatek === "mozg" && wlasciciel && wlasciciel.firma) || "", zajecie: "", linki: [], cele: [] }));
+  const [zapisane, setZapisane] = useState(false);
+  const [sesja, setSesja] = useState({ start: false, blad: null });   // „Mam mózg. Zaczynam pierwszą sesję.”
   const [pole, setPole] = useState("");
   const [pole2, setPole2] = useState("");
   const [inny, setInny] = useState("");
   const [zapis, setZapis] = useState({ trwa: false, blad: null });
   const wejscie = useRef(null);
   const model = !!(got && got.model && got.model.polaczony);
-  const kwestie = kwestiePoznania(krok, { ...d, model }, ileAgentow || 9);
+  const bylaSesja = !!(got && got.pierwsza_sesja);
+  const kwestie = kwestiePoznania(krok, { ...d, model, zapisane, start: sesja.start }, ileAgentow || 9);
 
   // stałe kwestie do lektora od razu (wsad w tle), żeby grały bez czekania
   useEffect(() => {
-    sklep.ustaw({ poznanie: "trwa" });
+    if (poczatek !== "mozg") sklep.ustaw({ poznanie: "trwa" });
     Glos.przygotuj([T("poz.witaj1"), T("poz.witaj2", { n: ileAgentow || 9 }), T("poz.imie"), T("poz.firma"), T("poz.linki"),
-      T("poz.cele"), T("poz.zapisane"), model ? T("poz.gotowe") : T("poz.mozg")]);
+      T("poz.cele"), T("poz.zapisane"), T("poz.mozg"), T("poz.mam_mozg")]);
     return () => Glos.ucisz();
   }, []);
   // każdy krok: Jarvo mówi, fokus na polu odpowiedzi
@@ -133,13 +272,29 @@ function Poznajmy({ koniec }) {
     const t = setTimeout(() => Glos.pobierz(T("poz.milo", { imie })).catch(() => {}), 700);
     return () => clearTimeout(t);
   }, [pole, krok]);
-  // „Brakuje mi tylko mózgu”: po powrocie z Połączeń gotowość odświeżana, aż model zadziała
+  // „Brakuje mi tylko mózgu”: gotowość odświeżana co 5 s (model mógł zostać podłączony w innej karcie albo w panelu)
   useEffect(() => {
     if (krok !== "mozg" || model) return undefined;
     const t = setInterval(() => { if (document.visibilityState !== "hidden") akcje.wczytajAplikacje(); }, 5000);
     return () => clearInterval(t);
   }, [krok, model]);
-  useEffect(() => { if (krok === "mozg" && model) Glos.powiedz([T("poz.gotowe")]); }, [model]);
+  // mózg jest, a pierwszej sesji jeszcze nie było: Jarvo mówi „Mam mózg. Zaczynam pierwszą sesję.” i po chwili
+  // (lektor zaczyna mówić) przechodzi do wątku; błąd zostawia „Do pracy”. Bez profilu (spotkanie pominięte, mózg
+// z linii gotowości) sesji nie ma: serwer chce imienia z USER.md, więc zostaje „Do pracy”.
+  const profil = !!(got && got.profil_wlasciciela);
+  const zacznijSesje = () => {
+    if (sesja.start || !profil) return;
+    setSesja({ start: true, blad: null });
+    setTimeout(() => {
+      akcje.zacznijPierwszaSesje().catch((e) => setSesja({ start: false, blad: e.status ? e.tekst() : T("blad.siec") }));
+    }, 1600);
+  };
+  useEffect(() => {
+    if (krok !== "mozg" || !model) return;
+    if (!bylaSesja && !sesja.blad) zacznijSesje();
+  }, [krok, model, profil]);
+  useEffect(() => { if (sesja.start) Glos.powiedz([T("poz.mam_mozg")]); }, [sesja.start]);
+  const podlaczony = () => { akcje.wczytajAplikacje(); zacznijSesje(); };
 
   const dalej = (nastepny, zmiana) => {
     Glos.odblokuj();
@@ -155,6 +310,7 @@ function Poznajmy({ koniec }) {
       sklep.ustaw({ wlasciciel: w.wlasciciel || null, gotowosc: w.gotowosc || got });
       setZapis({ trwa: false, blad: null });
       setD(dane);
+      setZapisane(true);
       setKrok("mozg");
     } catch (e) {
       setZapis({ trwa: false, blad: e.status ? T("poz.blad_zapisu") : T("blad.siec") });
@@ -215,16 +371,12 @@ function Poznajmy({ koniec }) {
           </div>
           <label class="j-poz-pole"><span class="j-poz-e">${T("poz.cel_inny")}</span>
             <input value=${inny} maxLength="80" placeholder=${T("poz.cel_inny_przyklad")} onInput=${(e) => setInny(e.target.value)}/></label>`}
-        ${krok === "mozg" && (model
-          ? html`<div class="j-poz-akcje"><button type="button" class="j-btn j-btn-glowny" ref=${wejscie} onClick=${() => koniec()}>${T("poz.do_pracy")}<${Ikona} n="right" r=${16}/></button></div>`
-          : html`<div class="j-poz-kupony">
-              <button type="button" class="j-poz-kupon" ref=${wejscie}
-                onClick=${() => Trasa.idz({ u: "polaczenia", pod: "modele" }, { scal: true })}>
-                <b>${T("poz.kupon_chatgpt")}</b><small>${T("poz.kupon_chatgpt_o")}</small></button>
-              <button type="button" class="j-poz-kupon" onClick=${() => Trasa.idz({ u: "polaczenia", pod: "klucze" }, { scal: true })}>
-                <b>${T("poz.kupon_klucz")}</b><small>${T("poz.kupon_klucz_o")}</small></button>
-              <button type="button" class="j-link j-poz-pozniej" onClick=${() => koniec()}>${T("poz.pozniej")}</button>
-            </div>`)}
+        ${krok === "mozg" && (sesja.start
+          ? html`<p class="j-mozg-czeka" role="status"><${Spinner}/>${T("poz.otwieram")}</p>`
+          : model || sesja.blad
+            ? html`${sesja.blad && html`<p class="j-poz-blad" role="alert">${sesja.blad}</p>`}
+                <div class="j-poz-akcje"><button type="button" class="j-btn j-btn-glowny" ref=${wejscie} onClick=${() => koniec()}>${T("poz.do_pracy")}<${Ikona} n="right" r=${16}/></button></div>`
+            : html`<${KartaMozgu} gotowe=${podlaczony} pozniej=${() => koniec()} wejscie=${wejscie}/>`)}
         ${zapis.blad && html`<p class="j-poz-blad" role="alert">${zapis.blad}</p>`}
         ${krok !== "mozg" && html`<div class="j-poz-akcje">
           ${krok === "witaj"

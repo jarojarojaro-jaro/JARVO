@@ -12,6 +12,16 @@
 - `POST /app/glos` `{tekst, glos, tempo, jezyk}` → `audio/wav` z lokalnego lektora (glos.py); 503 `brak_glosu`, gdy
   w instalacji nie ma `jarvo-tts`, 502 `glos_blad`, gdy lektor nie zrobił pliku.
 - `POST /app/glos/przygotuj` `{teksty, glos, tempo, jezyk}` → 202 `{w_kolejce}`: stałe kwestie rozmowy w tle.
+- `POST /app/klucz` `{klucz}`: mózg z karty „Mózg” pierwszego spotkania (mozg.py): rozpoznanie dostawcy po
+  przedrostku, sprawdzenie u dostawcy, zapis do głównego `.env`, rozdanie agentom, przełączenie floty na zestaw
+  dostawcy; odpowiedź `{dostawca, nazwa, gotowosc}`. Błędy: 422 `nieznany_klucz` / `klucz_odrzucony`, 503
+  `brak_polaczenia`, 409 `brak_zestawu`, 500 `zapis`. Klucz nie wraca w odpowiedzi ani w dzienniku.
+- `POST /app/mozg/chatgpt`: po zalogowaniu ChatGPT w karcie (Hermes: `/api/providers/oauth/openai-codex/start` i
+  `/poll`, kod urządzenia) flota przechodzi na `openai-codex`; bez zalogowania 409 `brak_logowania`.
+- `POST /app/pierwsza-sesja` `{jezyk}`: raz na instalację wątek „Pierwsza sesja” z wpisem systemowym i przebiegiem
+  Jarva (skill `pierwsza-sesja`, treść `aplikacja.PIERWSZA_PROSBA`, bez wiadomości właściciela); odpowiedź
+  `{watek_id, nowa}`. Druga próba zwraca ten sam wątek (`nowa: false`; pusty `watek_id`, gdy wątek usunięto).
+  Bez podłączonego modelu 409 `brak_modelu`, bez imienia w USER.md 409 `brak_profilu`.
 GET tylko z karty panelu (`Sec-Fetch-Site` same-origin/none), błędy w kształcie `{"blad": {kod, komunikat, …}}`.
 Testy: tests/test_aplikacja.py.
 """
@@ -33,11 +43,12 @@ UPLOAD_MAX = 52_428_800
 
 def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, gotowosc, nawyki, stan_aktualizacji: Callable[[], dict],
            hello: Callable[[], dict], decyzje: Callable[[], list] | None = None, glos=None,
-           log: Callable[[str], None] | None = None) -> list[str]:
+           mozg: dict | None = None, log: Callable[[str], None] | None = None) -> list[str]:
     """Rejestruje trasy startu. `trasy`: moduł trasy_rozmow (BladTrasy, blad, czytaj_cialo, _Model, ODCZYT_ZRODLA).
     `decyzje`: pytania zespołu ze Starej Bazy (hq_core.build_state → decisions). Języka nie podajemy: wybiera go
     przełącznik dashboardu w przeglądarce (localStorage), serwer go nie zna. `glos`: lektor aplikacji (glos.Glos);
-    None = trasy głosu odpowiadają 503 `brak_glosu`."""
+    None = trasy głosu odpowiadają 503 `brak_glosu`. `mozg`: {home, flota (wywołanie → fleet.json), stan, build_json,
+    rozdaj, status} dla tras mózgu; None = 503 `brak_mozgu`."""
     log = log or (lambda _m: None)
     decyzje = decyzje or (lambda: [])
     sciezki: list[str] = []
@@ -61,6 +72,12 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, gotowosc, naw
         tekst: str = Field(..., min_length=1, max_length=400)
         glos: Literal["meski", "damski"] = "meski"
         tempo: Literal["spokojnie", "normalnie", "zwawo"] = "normalnie"
+        jezyk: Literal["pl", "en"] = "pl"
+
+    class KluczBody(trasy._Model):
+        klucz: str = Field(..., min_length=1, max_length=400)
+
+    class PierwszaBody(trasy._Model):
         jezyk: Literal["pl", "en"] = "pl"
 
     class PrzygotujBody(trasy._Model):
@@ -211,5 +228,122 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, gotowosc, naw
         except m.glos.BrakGlosu:
             raise trasy.BladTrasy(503, "brak_glosu", "Głos Jarva nie jest zainstalowany.", "Jarvo's voice is not installed.") from None
         return {"w_kolejce": n}
+
+    # ------------------------------------------------------------------------------------------- mózg
+    BLEDY_MOZGU = {
+        "nieznany_klucz": (422, "Nie rozpoznaję tego klucza. Wklej klucz OpenRouter (sk-or-…), Anthropic (sk-ant-…) "
+                                "albo OpenAI (sk-…).",
+                           "I don't recognise this key. Paste an OpenRouter (sk-or-…), Anthropic (sk-ant-…) or OpenAI "
+                           "(sk-…) key."),
+        "klucz_odrzucony": (422, "{nazwa} nie przyjął tego klucza. Sprawdź, czy wkleiłeś go w całości i czy jest aktywny.",
+                            "{nazwa} did not accept this key. Check that you pasted all of it and that it is active."),
+        "brak_polaczenia": (503, "Nie mogę teraz sprawdzić klucza u {nazwa}. Sprawdź internet i spróbuj za chwilę.",
+                            "I can't check the key with {nazwa} right now. Check the internet and try again."),
+        "brak_zestawu": (409, "Ta wersja Jarva nie zna jeszcze tego dostawcy. Zaktualizuj Jarva (jarvo update).",
+                         "This Jarvo version doesn't know this provider yet. Update Jarvo (jarvo update)."),
+        "zapis": (500, "Nie udało się zapisać klucza. Spróbuj jeszcze raz.", "Could not save the key. Try again."),
+    }
+    zamek_mozgu = asyncio.Lock()
+
+    def _mozg() -> dict:
+        if mozg is None:
+            raise trasy.BladTrasy(503, "brak_mozgu", "Podłączanie mózgu w aplikacji jest niedostępne.",
+                                  "Connecting the brain in the app is unavailable.")
+        return mozg
+
+    def _blad_mozgu(kod: str, nazwa: str = "") -> trasy.BladTrasy:
+        status, pl, en = BLEDY_MOZGU.get(kod, BLEDY_MOZGU["zapis"])
+        return trasy.BladTrasy(status, kod, pl.format(nazwa=nazwa or "dostawca"), en.format(nazwa=nazwa or "the provider"))
+
+    def _wywolaj_mozg(fn, **kw):
+        k = _mozg()
+        return fn(home=k["home"], flota=k["flota"](), stan=k["stan"], build_json=k.get("build_json"), **kw)
+
+    @trasa("POST", "/app/klucz")
+    @obsluga
+    async def klucz(request: Request):
+        body = await trasy.czytaj_cialo(request, KluczBody, maks=2048)
+        k = _mozg()
+        dostawca = m.mozg.rozpoznaj(body.klucz)
+        nazwa = m.mozg.DOSTAWCY[dostawca]["nazwa"] if dostawca else ""
+        async with zamek_mozgu:
+            try:
+                wynik = await asyncio.to_thread(_wywolaj_mozg, m.mozg.podlacz_klucz, klucz=body.klucz,
+                                                rozdaj=k.get("rozdaj"))
+            except m.mozg.BladMozgu as e:
+                log(f"jarvo-hq: mózg: klucz {dostawca or 'nieznany'}: {e.kod}")
+                raise _blad_mozgu(e.kod, nazwa) from None
+        log(f"jarvo-hq: mózg: {wynik['dostawca']} podłączony ({len(wynik['profile'])} profili)")
+        gotowosc.odswiez()
+        _w, got = await asyncio.to_thread(gotowosc.calosc)
+        return {"dostawca": wynik["dostawca"], "nazwa": wynik["nazwa"], "gotowosc": got}
+
+    @trasa("POST", "/app/mozg/chatgpt")
+    @obsluga
+    async def chatgpt(request: Request):
+        await trasy.czytaj_cialo(request, trasy._Model, maks=256)
+        k = _mozg()
+        stan = await asyncio.to_thread(k["status"], k["home"], m.mozg.CHATGPT)
+        if not (stan and stan.get("polaczony")):
+            raise trasy.BladTrasy(409, "brak_logowania", "Najpierw zaloguj się kontem ChatGPT.",
+                                  "Sign in with your ChatGPT account first.")
+        async with zamek_mozgu:
+            try:
+                wynik = await asyncio.to_thread(_wywolaj_mozg, m.mozg.podlacz_chatgpt)
+            except m.mozg.BladMozgu as e:
+                log(f"jarvo-hq: mózg: chatgpt: {e.kod}")
+                raise _blad_mozgu(e.kod, "ChatGPT") from None
+        log(f"jarvo-hq: mózg: chatgpt podłączony ({len(wynik['profile'])} profili)")
+        gotowosc.odswiez()
+        _w, got = await asyncio.to_thread(gotowosc.calosc)
+        return {"dostawca": wynik["dostawca"], "nazwa": wynik["nazwa"], "gotowosc": got}
+
+    # ------------------------------------------------------------------------------------------- pierwsza sesja
+    def _istniejacy(sil, wid: str) -> str:
+        w = sil.db.watek(wid)
+        return wid if w and not w.get("usuniety_at") else ""
+
+    @trasa("POST", "/app/pierwsza-sesja")
+    @obsluga
+    async def pierwsza(request: Request):
+        body = await trasy.czytaj_cialo(request, PierwszaBody, maks=256)
+        sil = _sil()
+        if sil is None or sil.db is None or sil.rejestr is None:
+            raise trasy.BladTrasy(503, "silnik", "Rozmowy jeszcze startują. Spróbuj za chwilę.",
+                                  "Conversations are still starting. Try again in a moment.")
+        jest = m.aplikacja.pierwsza_sesja(gotowosc.pierwsza)
+        if jest:
+            return {"watek_id": await asyncio.to_thread(_istniejacy, sil, jest["watek_id"]), "nowa": False}
+        gotowosc.odswiez()
+        model = await asyncio.to_thread(gotowosc.model)
+        if not model.get("polaczony"):
+            raise trasy.BladTrasy(409, "brak_modelu", "Najpierw podłącz mózg.", "Connect the brain first.")
+        if not (await asyncio.to_thread(gotowosc.wlasciciel)).get("imie"):
+            raise trasy.BladTrasy(409, "brak_profilu", "Najpierw się poznajmy.", "Let's get to know each other first.")
+        jezyk = body.jezyk
+
+        async def _r():
+            jest = m.aplikacja.pierwsza_sesja(gotowosc.pierwsza)    # dwa żądania naraz: drugie widzi zapis pierwszego
+            if jest:
+                return {"watek_id": _istniejacy(sil, jest["watek_id"]), "nowa": False}
+            db, rej, hub = sil.db, sil.rejestr, sil.hub
+            tekst = m.aplikacja.PIERWSZA_SYSTEM[jezyk]
+            w = db.utworz_watek(tytul=m.aplikacja.PIERWSZA_TYTUL[jezyk], koordynator="jarvo", tytul_zrodlo="wlasciciel")
+            wpis = db.dodaj_wpis(w["id"], rodzaj="system", tekst=tekst, dane={"typ": "pierwsza_sesja"})
+            m.aplikacja.zapisz_pierwsza_sesja(gotowosc.pierwsza, w["id"], wpis["utworzony_at"])
+            hub.nadaj("watek.wpis", {"watek_id": w["id"], "wpis": wpis}, watek_id=w["id"])
+            db.zapewnij_czlonka(w["id"], "jarvo")
+            p = rej.zlec(watek_id=w["id"], wpis_id=wpis["id"], agent="jarvo", prosba=m.aplikacja.PIERWSZA_PROSBA,
+                         zrodlo="system", lancuch_id=wpis["id"])
+            db.aktywnosc(w["id"], at=wpis["utworzony_at"], podglad=tekst)
+            hub.nadaj("watek.zmiana", {"watek": m.przebiegi.watek_krotki(db.watek(w["id"]) or w)})
+            log(f"jarvo-hq: pierwsza sesja: wątek {w['id']}, przebieg {p['id']}")
+            return {"watek_id": w["id"], "nowa": True}
+
+        try:
+            return await sil.wykonaj(_r())
+        except OSError as exc:
+            log(f"jarvo-hq: pierwsza sesja: {type(exc).__name__}")
+            raise trasy.BladTrasy(500, "zapis", "Nie udało się zacząć sesji.", "Could not start the session.") from None
 
     return sciezki

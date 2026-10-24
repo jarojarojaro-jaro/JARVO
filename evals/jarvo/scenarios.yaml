@@ -330,3 +330,19 @@ scenarios:
     check:
       cards_assignees_include: [jarvo-reka]
       cards_max: 1
+
+  - id: jarvo-pierwsza-sesja
+    type: routing
+    input: "[Pierwsza sesja] Właściciel skończył pierwsze spotkanie i właśnie podłączył mózg. Pokaż, co umie flota (Web: szybki audyt strony, Sherlock: 3 konkurentów, Łowca: 10 firm z okolicy, które mogą kupić), a potem podsumuj 3 najważniejsze ruchy na ten tydzień. Dane z USER.md: Kuba, Pizzeria Kometa, pizzeria w Krakowie z dowozem, strona kometapizza.pl, cel: więcej klientów."
+    expect:
+      should:
+        - "krótkie powitanie po imieniu (najwyżej 3 linie), bez pytań i bez listy funkcji"
+        - "trzy karty naraz w jednej misji: jarvo-web (audyt kometapizza.pl), jarvo-sherlock (3 konkurentów w Krakowie), jarvo-lowca (10 firm z okolicy z powodem i źródłem)"
+        - "GRANICE kart: nic nie publikuje, nie wysyła wiadomości, nie loguje się na konta właściciela"
+      should_not:
+        - "zaczyna wywiad onboarding-interview albo dopytuje o dane, które są w USER.md"
+        - "zakłada inne karty niż te trzy"
+        - "robi audyt, research albo listę firm sam"
+    check:
+      cards_assignees_include: [jarvo-web, jarvo-sherlock, jarvo-lowca]
+      cards_max: 3

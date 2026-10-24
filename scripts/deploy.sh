@@ -213,7 +213,8 @@ log "Build dystrybucji profili"
   -v "${JARVO_BUILD:-/srv/jarvo/build}:/out" -v "$COMPOSE_DIR:/opt/jarvo/compose:ro" \
   -e JARVO_HERMES_PYTHON="$PY" \
   hermes "$PY" /opt/jarvo/repo/scripts/build.py --hermes-src /opt/hermes --out /out \
-  --env-file /opt/jarvo/compose/jarvo.env --runtime-build-dir /opt/jarvo/build
+  --env-file /opt/jarvo/compose/jarvo.env --runtime-build-dir /opt/jarvo/build \
+  --wybor-modelu /opt/data/jarvo/state/dostawca-modeli.json
 
 log "Instalacja/aktualizacja floty w kontenerze"
 EXTRA=()

@@ -566,8 +566,8 @@ test("kwestiePoznania: każdy krok ma tekst w obu językach, notki mają klucze"
   for (const jezyk of ["pl", "en"]) {
     T.wymus = jezyk;
     for (const k of ["witaj", "imie", "firma", "linki", "cele", "mozg"]) {
-      for (const model of [true, false]) {
-        const z = kwestiePoznania(k, { imie: "Kuba", model }, 9);
+      for (const [model, zapisane, start] of [[true, false, false], [false, false, false], [false, true, false], [true, true, true]]) {
+        const z = kwestiePoznania(k, { imie: "Kuba", model, zapisane, start }, 9);
         assert.ok(z.length && z.every((x) => x && !/^poz\./.test(x) && !/\{/.test(x)), `${jezyk} ${k}: ${z}`);
       }
     }
@@ -577,6 +577,36 @@ test("kwestiePoznania: każdy krok ma tekst w obu językach, notki mają klucze"
   }
   T.wymus = "pl";
   eq(kwestiePoznania("witaj", {}, 9)[1].startsWith("Szefuję zespołowi 9 agentów."), true);
+});
+
+test("kwestiePoznania mózg: zapis, brak mózgu, start pierwszej sesji; teksty karty mózgu w obu językach", () => {
+  T.wymus = "pl";
+  eq(kwestiePoznania("mozg", { zapisane: true }, 9), ["Zapisałem. Teraz wiem, dla kogo pracuję.", T("poz.mozg")]);
+  eq(kwestiePoznania("mozg", {}, 9), [T("poz.mozg")]);
+  eq(kwestiePoznania("mozg", { model: true, start: true }, 9), ["Mam mózg. Zaczynam pierwszą sesję."]);
+  for (const jezyk of ["pl", "en"]) {
+    T.wymus = jezyk;
+    for (const k of ["mam_mozg", "otwieram", "etykieta", "mozg_wybor", "ponow", "chatgpt_zaloguj", "chatgpt_jak", "chatgpt_krok1",
+      "chatgpt_otworz", "chatgpt_krok2", "chatgpt_kopiuj", "chatgpt_skopiowane", "chatgpt_czekam", "chatgpt_laczy", "chatgpt_wygasl",
+      "chatgpt_blad", "klucz_etykieta", "klucz_przyklad", "klucz_podlacz", "klucz_nieznany", "klucz_brak"])
+      assert.ok(!/^poz\./.test(T(`poz.${k}`)), `${jezyk} poz.${k}`);
+    assert.ok(!/\{/.test(T("poz.klucz_sprawdzam", { nazwa: "OpenAI" })), jezyk);
+    for (const k of ["model_sesja", "pierwsza", "pierwsza_zacznij", "pierwsza_nie"]) assert.ok(!/^gotowosc\./.test(T(`gotowosc.${k}`)), `${jezyk} gotowosc.${k}`);
+  }
+  T.wymus = "pl";
+});
+
+test("Poznanie.dostawca: jak mozg.rozpoznaj na serwerze (przedrostek, kształt)", () => {
+  const x = (n) => "x".repeat(n);
+  eq(Poznanie.dostawca(`sk-or-v1-${x(40)}`), "OpenRouter");
+  eq(Poznanie.dostawca(`sk-ant-api03-${x(40)}`), "Anthropic");
+  eq(Poznanie.dostawca(`sk-proj-${x(40)}`), "OpenAI");
+  eq(Poznanie.dostawca(`  sk-${x(30)}\n`), "OpenAI");
+  eq(Poznanie.dostawca("sk-krotki"), null);
+  eq(Poznanie.dostawca(`AIza${x(35)}`), null);
+  eq(Poznanie.dostawca(`sk-${x(20)} ${x(20)}`), null);
+  eq(Poznanie.dostawca(`sk-${x(400)}`), null);
+  eq(Poznanie.dostawca(""), null);
 });
 
 console.log(`ok ${ile}`);

@@ -228,19 +228,20 @@ if (typeof window !== "undefined") window.addEventListener("pageshow", (e) => { 
 
 // JSON w obie strony. Zapisy niosą X-Jarvo-Request (authHeaders). `ponawiaj`: 429 czeka ponow_za_s i próbuje
 // najwyżej dwa razy (tylko żądania z kluczem, które serwer rozpoznaje jako powtórkę).
-async function zadanie(metoda, sciezka, cialo, { ponawiaj = false, bez401 = false } = {}) {
+// `korzen`: "" = trasa Hermesa (/api/…), nie pluginu; błąd Hermesa ({detail}) w kształcie błędów aplikacji
+async function zadanie(metoda, sciezka, cialo, { ponawiaj = false, bez401 = false, korzen = API_ROOT } = {}) {
   const init = { method: metoda, credentials: "include", cache: "no-store",
     headers: authHeaders(cialo === undefined ? null : { "Content-Type": "application/json" }) };
   if (cialo !== undefined) init.body = JSON.stringify(cialo);
   for (let proba = 0; ; proba++) {
     let r;
-    try { r = await fetch(`${basePath()}${API_ROOT}${sciezka}`, init); } catch (_) { throw new BladApi(0, null); }
+    try { r = await fetch(`${basePath()}${korzen}${sciezka}`, init); } catch (_) { throw new BladApi(0, null); }
     if (r.status === 204) return null;
     let d = null;
     try { d = await r.json(); } catch (_) { /* puste albo nie-JSON */ }
     if (r.ok) return d;
     if (r.status === 401 && !bez401) naLogowanie();
-    const b = new BladApi(r.status, d);
+    const b = new BladApi(r.status, d && !d.blad && typeof d.detail === "string" ? { blad: { komunikat: d.detail } } : d);
     if (r.status === 429 && ponawiaj && proba < 2) {
       await new Promise((ok) => setTimeout(ok, Math.min(10, Math.max(1, b.ponow_za_s || 1)) * 1000));
       continue;
@@ -305,6 +306,17 @@ Object.assign(liveApi, {
   reakcja: (id, rodzaj, klucz) => zadanie("POST", `/podpowiedzi/${kodujUrl(id)}/reakcja`, klucz ? { rodzaj, klucz } : { rodzaj }),
   // pierwsze spotkanie (37-poznajmy.js): {imie, firma, zajecie, linki: [{rodzaj, wartosc}], cele} → USER.md
   poznanie: (cialo) => zadanie("POST", "/app/poznanie", cialo),
+  // mózg z karty pierwszego spotkania (hq/plugin/mozg.py): klucz API (nigdy w dzienniku ani w odpowiedzi) albo ChatGPT
+  // kodem urządzenia przez trasy Hermesa; po zalogowaniu /app/mozg/chatgpt przełącza flotę na openai-codex
+  klucz: (klucz) => zadanie("POST", "/app/klucz", { klucz }),
+  mozgChatgpt: () => zadanie("POST", "/app/mozg/chatgpt", {}),
+  chatgpt: {
+    start: () => zadanie("POST", "/api/providers/oauth/openai-codex/start", undefined, { korzen: "" }),
+    stan: (sid) => zadanie("GET", `/api/providers/oauth/openai-codex/poll/${kodujUrl(sid)}`, undefined, { korzen: "" }),
+    anuluj: (sid) => zadanie("DELETE", `/api/providers/oauth/sessions/${kodujUrl(sid)}`, undefined, { korzen: "" }),
+  },
+  // pierwsza sesja: raz na instalację wątek „Pierwsza sesja” z pracą Jarva (skill pierwsza-sesja) → {watek_id, nowa}
+  pierwszaSesja: (jezyk) => zadanie("POST", "/app/pierwsza-sesja", { jezyk }),
   // głos Jarva (36-glos.js): {tekst, glos, tempo, jezyk} → WAV (ArrayBuffer); 503 = instalacja bez lektora
   async glos(cialo) {
     let r;

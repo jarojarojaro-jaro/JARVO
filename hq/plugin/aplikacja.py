@@ -18,6 +18,8 @@
     albo `gateway_state.json` mówi „ma działać” (`desired_state: running`) i zmienił się mniej niż 2 min temu, albo
     stan to `starting`/`restarting`; w pozostałych przypadkach `niedostepna`.
   - `profil_wlasciciela`: w USER.md jest imię.
+  - `pierwsza_sesja`: id wątku „Pierwsza sesja” albo pusty napis (sesji jeszcze nie było); plik
+    `/opt/data/jarvo/state/pierwsza-sesja.json`, zapisuje go trasa `POST /app/pierwsza-sesja` (raz na instalację).
 - **Pierwsze spotkanie** (`zapisz_poznanie`, trasa `POST /app/poznanie`): imię, firma, czym się zajmuje, linki i cele
   z rozmowy w aplikacji (bez modelu) trafiają do tych samych pól USER.md, które wypełnia skill `onboarding-interview`.
   Brak pliku = szablon skillu. Pola wpisujemy jedną linią (bez znaków Markdownu), listy „Cele” i „Narzędzia i konta”
@@ -311,6 +313,36 @@ def stan_modelu(profil: Path | str, *, status: Callable[[Path, str], dict | None
     return {"dostawca": d, "polaczony": polaczony, "sposob": "klucz"}
 
 
+# ----------------------------------------------------------------------------------------------- pierwsza sesja
+PIERWSZA_TYTUL = {"pl": "Pierwsza sesja", "en": "First session"}
+# treść pisze aplikacja, nie właściciel; dane firmy Jarvo bierze z USER.md (skill `pierwsza-sesja`)
+PIERWSZA_PROSBA = ("[Pierwsza sesja] Właściciel skończył pierwsze spotkanie w aplikacji i właśnie podłączył mózg. "
+                   "Użyj skilla `pierwsza-sesja`: przeczytaj USER.md, przywitaj się krótko, załóż trzy karty naraz "
+                   "(Web: szybki audyt strony, Sherlock: 3 konkurentów, Łowca: 10 firm z okolicy, które mogą kupić), "
+                   "a po wynikach podsumuj 3 najważniejsze ruchy na ten tydzień.")
+PIERWSZA_SYSTEM = {"pl": "Mózg podłączony. Jarvo zaczyna pierwszą sesję.",
+                   "en": "Brain connected. Jarvo is starting the first session."}
+
+
+def pierwsza_sesja(sciezka: Path | str) -> dict | None:
+    """{watek_id, at} z pliku stanu albo None (sesji jeszcze nie było; zły plik = jak brak)."""
+    try:
+        d = json.loads(Path(sciezka).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(d, dict) or not isinstance(d.get("watek_id"), str):
+        return None
+    return {"watek_id": d["watek_id"], "at": d.get("at")}
+
+
+def zapisz_pierwsza_sesja(sciezka: Path | str, watek_id: str, at: float) -> None:
+    p = Path(sciezka)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(json.dumps({"watek_id": watek_id, "at": at}), encoding="utf-8")
+    os.replace(tmp, p)
+
+
 # ----------------------------------------------------------------------------------------------- brama
 def wiek_bramy(home: Path | str, teraz: float | None = None) -> float | None:
     """Sekundy od ostatniego startu bramy (ostatnia liczba w `gateway-starts.log`); None = nie wiadomo."""
@@ -369,8 +401,10 @@ class Gotowosc:
 
     def __init__(self, *, home: Path | str, profil: Path | str, user_md: Path | str, api_base: str,
                  status: Callable[[Path, str], dict | None] = status_hermesa,
-                 zdrowie: Callable[[str], bool] = zdrowie_bramy, zegar: Callable[[], float] = time.time):
+                 zdrowie: Callable[[str], bool] = zdrowie_bramy, zegar: Callable[[], float] = time.time,
+                 pierwsza: Path | str | None = None):
         self.home, self.profil, self.user_md, self.api_base = Path(home), Path(profil), Path(user_md), api_base
+        self.pierwsza = Path(pierwsza) if pierwsza else self.home / "jarvo" / "state" / "pierwsza-sesja.json"
         self.status, self.zdrowie, self.zegar = status, zdrowie, zegar
         self._lock = threading.Lock()
         self._model: tuple[float, dict] | None = None
@@ -441,4 +475,6 @@ class Gotowosc:
     def calosc(self) -> tuple[dict, dict]:
         """(wlasciciel, gotowosc)."""
         w = self.wlasciciel()
-        return w, {"model": self.model(), "brama": self.brama(), "profil_wlasciciela": bool(w["imie"])}
+        ps = pierwsza_sesja(self.pierwsza)
+        return w, {"model": self.model(), "brama": self.brama(), "profil_wlasciciela": bool(w["imie"]),
+                   "pierwsza_sesja": ps["watek_id"] if ps else ""}

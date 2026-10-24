@@ -6,7 +6,7 @@
 
 Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, ochrona.py, edytor.py, animacja.py, rozmowy.py, czytnik.py,
 wzmianki.py, kontekst.py, agenci.py, brama.py, strumien.py, przebiegi.py, scalanie.py, budzenia.py, prace.py, obserwator.py,
-silnik.py, trasy_rozmow.py, aplikacja.py, podpowiedzi.py, trasy_aplikacji.py, pomiar.py, liczby.py,
+silnik.py, trasy_rozmow.py, aplikacja.py, podpowiedzi.py, glos.py, mozg.py, trasy_aplikacji.py, pomiar.py, liczby.py,
 konwertuj.py, izometria/, fleet.json, dzwieki/, dist/index.js, dist/zasoby/, dist/fonts/}.
 Pakiet aplikacji to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku; trafia do
 dist/zasoby/app-<sha256[:12]>.js (z bliźniakiem .gz), style do app-<h>.css, kroje aplikacji do zasoby/kroje/.
@@ -35,7 +35,7 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 # praca floty, obserwator, wątek silnika i trasy; start aplikacji (gotowość, podpowiedzi N0, GET /app)
                 "rozmowy.py", "czytnik.py", "wzmianki.py", "kontekst.py", "agenci.py", "brama.py", "strumien.py",
                 "przebiegi.py", "scalanie.py", "budzenia.py", "prace.py", "obserwator.py", "silnik.py", "trasy_rozmow.py",
-                "aplikacja.py", "podpowiedzi.py", "glos.py", "trasy_aplikacji.py")
+                "aplikacja.py", "podpowiedzi.py", "glos.py", "mozg.py", "trasy_aplikacji.py")
 
 
 def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.") -> str:
@@ -83,6 +83,7 @@ def fleet_json(fleet: fl.Fleet | None = None) -> dict:
             "room": a.hq_room, "label": a.hq_label or a.title, "short": a.hq_short, "rola": a.rola,
             "handle": a.handle, "aliasy": a.aliasy,   # uchwyt @… i złożone aliasy wzmianki (hq/plugin/wzmianki.py)
             "description": a.description, "model_tier": a.model_tier, "model": fleet.model_for(a.model_tier),
+            "delegation_tier": a.delegation_tier,
             "autonomy_max": a.autonomy_max, "telegram_topic": a.telegram_topic,
             "skills": sorted(fl.skill_names(a.dir / "skills").keys()),
             "vendored": len((lock.get("agents") or {}).get(a.name) or []),
@@ -91,7 +92,12 @@ def fleet_json(fleet: fl.Fleet | None = None) -> dict:
                    "description": a.en.get("description") or a.description, "rola": a.en.get("rola") or a.rola,
                    "personality": [[TRAITS_EN.get(k, k), v] for k, v in personality(soul)]},
         })
-    return {"orchestrator": fleet.orchestrator, "agents": agents}
+    # katalog modeli dla mózgu z aplikacji (hq/plugin/mozg.py): zestawy poziomów każdego dostawcy i modele zapasowe
+    m = fleet.raw["models"]
+    zestawy = {m["provider"]: dict(m["tiers"]), **{k: dict(v) for k, v in (m.get("presets") or {}).items()}}
+    zapasowe = {k: dict(v) for k, v in (m.get("fallback") or {}).items() if isinstance(v, dict)}
+    return {"orchestrator": fleet.orchestrator, "agents": agents,
+            "modele": {"domyslny": m["provider"], "zestawy": zestawy, "zapasowe": zapasowe}}
 
 
 # Loader zakładki /jarvo (dist/index.js). Dashboard wczytuje go na każdej stronie (no-store), więc jest mały
