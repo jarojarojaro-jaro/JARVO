@@ -2,8 +2,11 @@
 name: ci
 
 on:
+  # gałąź robocza dostaje te same commity co main (push main i main:claude/...), więc testujemy raz, na main
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
