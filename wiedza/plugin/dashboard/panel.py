@@ -264,7 +264,9 @@ class Panel:
         return p if p.is_file() else None
 
     def compile_command(self) -> Optional[List[str]]:
-        if WINDOWS:                # bash z Pythona na Windows to WSL: kompilacja.py Pythonem dashboardu (venv Hermesa)
+        # skrypt bash zna tylko układ kontenera (/opt/data, /opt/hermes); natywnie (Windows, macOS, Linux bez
+        # kontenera) kompilacja.py Pythonem dashboardu (venv Hermesa); na Windows bash z Pythona to i tak WSL
+        if WINDOWS or not Path("/opt/hermes/.venv").is_dir():
             k = self._kompilacja_py()
             return [sys.executable, str(k), "--skarbiec", str(self.sk.root), "--stan", str(self.sk.stan), "--json"] if k else None
         skrypt = self.repo / "scripts" / "wiedza-kompiluj.sh"

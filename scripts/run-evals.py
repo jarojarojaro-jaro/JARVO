@@ -64,7 +64,11 @@ TRANSKRYPCJA (odpowiedź i wywołania narzędzi, skrócona):
 
 def hermes() -> str:
     """Polecenie Hermesa: pełna ścieżka z PATH (na Windows także hermes.exe albo .cmd), inaczej nazwa jak podana."""
-    return shutil.which(HERMES) or HERMES
+    p = shutil.which(HERMES) or HERMES
+    if os.name == "nt" and p.lower().endswith((".cmd", ".bat")):
+        # plik wsadowy przepuszcza argumenty przez cmd.exe (BatBadBut): tu idą tylko stałe argumenty bez znaków cmd
+        print(f"! {p}: Hermes jako plik wsadowy; lepiej hermes.exe z venvu (JARVO_HERMES_BIN)", file=sys.stderr)
+    return p
 
 
 def board() -> dict[str, dict]:

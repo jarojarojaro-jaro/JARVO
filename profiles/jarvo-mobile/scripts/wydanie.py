@@ -134,7 +134,7 @@ def zapisz_zgode(kat: Path, krok: str, zgoda: str, szczegoly: dict) -> dict:
 def _eas(args: list[str], kat: Path, timeout: int = 1800) -> subprocess.CompletedProcess:
     if not os.environ.get("EXPO_TOKEN"):
         raise BrakKonta("brak EXPO_TOKEN (token robota organizacji Expo właściciela, .env profilu jarvo-mobile)")
-    return subprocess.run([ml.program("npx"), "--yes", EAS, *args], cwd=kat, capture_output=True, text=True, encoding="utf-8",
+    return subprocess.run(ml.polecenie(["npx", "--yes", EAS, *args]), cwd=kat, capture_output=True, text=True, encoding="utf-8",
                           errors="replace", timeout=timeout, env={**os.environ, "CI": "1", "EAS_NO_VCS": "1", "EXPO_NO_TELEMETRY": "1"})
 
 

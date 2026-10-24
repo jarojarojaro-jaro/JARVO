@@ -40,6 +40,25 @@ def program(nazwa: str) -> str:
     pliki .cmd: CreateProcess nie znajdzie ich po gołej nazwie z listy argumentów (WinError 2)."""
     return shutil.which(nazwa) or nazwa
 
+# Znaki, które cmd.exe interpretuje w argumentach pliku wsadowego (.cmd, .bat, np. npm.cmd i npx.cmd na Windows).
+# Python ich tam nie cytuje (klasa BatBadBut), więc taki argument odrzucamy, zamiast ryzykować cudze polecenie.
+ZNAKI_CMD = frozenset('&|<>^%!"' + chr(13) + chr(10))
+
+
+def bez_wsadu(argv: list[str]) -> list[str]:
+    """argv bez zmian; na Windows błąd, gdy program to plik wsadowy, a argument ma znaki interpretowane przez cmd.exe."""
+    if os.name == "nt" and argv and str(argv[0]).lower().endswith((".cmd", ".bat")):
+        zle = next((a for a in argv[1:] if ZNAKI_CMD & set(str(a))), None)
+        if zle is not None:
+            raise SystemExit(f"✗ {Path(str(argv[0])).name} to plik wsadowy cmd.exe, a argument {str(zle)[:60]!r} ma znaki, "
+                             "które cmd.exe wykonałby jako polecenie (& | < > ^ % ! \"). Podaj go bez nich (np. w pliku).")
+    return argv
+
+
+def polecenie(argv: list[str]) -> list[str]:
+    """argv do subprocess: program z PATH (program()) i straż plików wsadowych (bez_wsadu())."""
+    return bez_wsadu([program(argv[0]), *argv[1:]])
+
 
 def czytaj_json(p: Path) -> dict:
     """Plik JSON albo {} (brak pliku, zły JSON)."""

@@ -74,7 +74,11 @@ def srodowisko(u: Uklad, baza: dict | None = None, *, biez: dict | None = None,
         "PIP_CACHE_DIR": str(u.cache / "pip"),
         "HF_HOME": str(u.cache / "huggingface"),
     })
-    if not WINDOWS:
+    if WINDOWS:
+        # shutil.which i cmd.exe szukają programu najpierw w bieżącym katalogu: obcy git.bat w projekcie wygrałby
+        # z prawdziwym gitem; ta zmienna wyłącza to w Pythonie 3.12+ i w cmd.exe
+        env["NoDefaultCurrentDirectoryInExePath"] = "1"
+    else:
         env["XDG_CACHE_HOME"] = str(u.cache / "xdg")
     if biez.get("app"):
         env["JARVO_REPO"] = str(biez["app"])

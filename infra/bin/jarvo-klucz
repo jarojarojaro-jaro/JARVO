@@ -62,8 +62,9 @@ def tylko_dla_wlasciciela(katalog: Path) -> None:
     icacls = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "icacls.exe")
     r = subprocess.run([icacls, str(katalog), "/inheritance:r", "/grant:r", f"{getpass.getuser()}:(OI)(CI)F"],
                        capture_output=True)
-    if r.returncode:
-        print(f"jarvo-klucz: nie ustawiłem uprawnień katalogu {katalog} (icacls, kod {r.returncode})", file=sys.stderr)
+    if r.returncode:                    # jak błąd chmod na POSIX: bez ochrony katalogu klucza nie wydajemy
+        raise SystemExit(f"jarvo-klucz: nie ustawiłem uprawnień katalogu {katalog} (icacls, kod {r.returncode}); "
+                         "klucza nie wydaję")
 
 
 def zapisz(kod: str, ttl: int) -> None:

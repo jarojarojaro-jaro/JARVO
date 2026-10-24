@@ -192,7 +192,7 @@ def jarvo_app(a: dict, kz: dict) -> dict:
 
 
 def _uruchom(cmd: list[str], cwd: Path, env: dict | None = None, timeout: int = 1200) -> subprocess.CompletedProcess:
-    return subprocess.run([ml.program(cmd[0]), *cmd[1:]], cwd=cwd,
+    return subprocess.run(ml.polecenie(cmd), cwd=cwd,
                           env={**os.environ, "CI": "1", "EXPO_NO_TELEMETRY": "1", **(env or {})},
                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 

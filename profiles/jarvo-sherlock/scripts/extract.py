@@ -37,12 +37,14 @@ TOOLS_PY = "/opt/jarvo/venv/bin/python"
 
 
 def _reexec_in_tools_venv() -> None:
-    """trafilatura żyje w /opt/jarvo/venv; jeśli uruchomiono nas innym Pythonem, przełącz się: ten sam skrypt
-    w nowym procesie, jego kod wyjścia jest nasz (os.execv na Windows odpina proces od rodzica)."""
+    """trafilatura żyje w /opt/jarvo/venv; jeśli uruchomiono nas innym Pythonem, przełącz się. Na POSIX os.execv
+    jak dotąd (ten sam proces); na Windows nowy proces i jego kod wyjścia, bo execv odpina tam proces od rodzica."""
     import os
     import subprocess
 
     if os.path.exists(TOOLS_PY) and os.path.realpath(sys.executable) != os.path.realpath(TOOLS_PY):
+        if os.name != "nt":
+            os.execv(TOOLS_PY, [TOOLS_PY, *sys.argv])
         sys.exit(subprocess.run([TOOLS_PY, *sys.argv]).returncode)
 
 

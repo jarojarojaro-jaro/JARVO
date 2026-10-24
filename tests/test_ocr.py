@@ -106,8 +106,29 @@ def test_siec_zablokowana_w_czasie_odczytu():
     assert out.startswith("blokada") and "bez sieci" in out
 
 
+@pytest.mark.posix_only
+def test_przejscie_do_venvu_ocr_na_posix_przez_execv(tmp_path, monkeypatch):
+    """POSIX: przeskok do venvu OCR jak dotąd przez os.execv (ten sam proces), bez -X utf8."""
+    import atrapy
+    py = atrapy.program(tmp_path, "ocr-python", "pass" + chr(10))
+    monkeypatch.setattr(ocr, "_indra", lambda: None)
+    monkeypatch.setenv("JARVO_OCR_PYTHON", str(py))
+    wolania = []
+
+    def execv(p, argv):
+        wolania.append((p, argv))
+        raise SystemExit(0)
+    monkeypatch.setattr(ocr.os, "execv", execv)
+    with pytest.raises(SystemExit):
+        ocr._do_venvu(["zrzut.png", "--szukaj", "Zapisz"])
+    p, argv = wolania[0]
+    assert p == str(py) and argv[:2] == [str(py), "-I"] and argv[2].endswith("ocr.py")
+    assert argv[3:] == ["zrzut.png", "--szukaj", "Zapisz"]
+
+
+@pytest.mark.windows_only
 def test_przejscie_do_venvu_ocr_oddaje_kod_i_wyjscie(tmp_path, monkeypatch, capfd):
-    """Zwykły python3 bez Indry: ten sam skrypt w venvie OCR w nowym procesie (bez os.execv), z jego kodem wyjścia."""
+    """Windows: ten sam skrypt w venvie OCR w nowym procesie (execv odpina tam proces), z jego kodem wyjścia."""
     import atrapy
     py = atrapy.program(tmp_path, "ocr-python", "import sys\nprint('venv', *sys.argv[1:])\nsys.exit(5)\n")
     monkeypatch.setattr(ocr, "_indra", lambda: None)
@@ -117,7 +138,7 @@ def test_przejscie_do_venvu_ocr_oddaje_kod_i_wyjscie(tmp_path, monkeypatch, capf
     assert e.value.code == 5
     out = capfd.readouterr().out
     assert out.split()[:2] == ["venv", "-I"] and "ocr.py" in out and "zrzut.png --szukaj Zapisz" in out
-    assert ("-X utf8" in out) == (sys.platform == "win32")       # Windows: wynik w UTF-8 mimo -I
+    assert "-X utf8" in out                                      # Windows: wynik w UTF-8 mimo -I
     monkeypatch.setenv("JARVO_OCR_PYTHON", sys.executable)        # już w venvie: bez przeskoku i bez pętli
     ocr._do_venvu(["zrzut.png"])
 

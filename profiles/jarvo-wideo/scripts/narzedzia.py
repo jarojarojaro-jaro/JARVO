@@ -190,6 +190,21 @@ def sh() -> str:
     return b
 
 
+# Znaki, które cmd.exe interpretuje w argumentach pliku wsadowego (.cmd, .bat, np. npm.cmd i npx.cmd na Windows).
+# Python ich tam nie cytuje (klasa BatBadBut), więc taki argument odrzucamy, zamiast ryzykować cudze polecenie.
+ZNAKI_CMD = frozenset('&|<>^%!"' + chr(13) + chr(10))
+
+
+def bez_wsadu(argv: list[str]) -> list[str]:
+    """argv bez zmian; na Windows błąd, gdy program to plik wsadowy, a argument ma znaki interpretowane przez cmd.exe."""
+    if os.name == "nt" and argv and str(argv[0]).lower().endswith((".cmd", ".bat")):
+        zle = next((a for a in argv[1:] if ZNAKI_CMD & set(str(a))), None)
+        if zle is not None:
+            raise SystemExit(f"✗ {Path(str(argv[0])).name} to plik wsadowy cmd.exe, a argument {str(zle)[:60]!r} ma znaki, "
+                             "które cmd.exe wykonałby jako polecenie (& | < > ^ % ! \"). Podaj go bez nich (np. w pliku).")
+    return argv
+
+
 def program(nazwa: str, path: str | None = None) -> str:
     """Program do argv: na Windows pełna ścieżka z PATH (npm i npx to pliki .cmd, których CreateProcess nie znajdzie
     po gołej nazwie), a `bash` tylko z Git Bash; na POSIX nazwa bez zmian."""
@@ -225,7 +240,7 @@ def full_extras() -> bool:
 
 def run(cmd: list[str], cwd: Path | None = None, env: dict | None = None) -> None:
     print("▶", " ".join(cmd), flush=True)
-    subprocess.run([program(cmd[0]), *cmd[1:]], cwd=cwd, check=True, env={**os.environ, **(env or {})})
+    subprocess.run(bez_wsadu([program(cmd[0]), *cmd[1:]]), cwd=cwd, check=True, env={**os.environ, **(env or {})})
 
 
 def py() -> str:
@@ -949,7 +964,7 @@ def uruchom(tool: str, polecenie: list[str]) -> int:
     zmienne = env_for(tool)
     env = {**os.environ, **zmienne}
     argv = [re.sub(r"\{([A-Z_][A-Z0-9_]*)\}", lambda m: zmienne.get(m.group(1), m.group(0)), a) for a in polecenie]
-    return subprocess.run([program(argv[0], env.get("PATH")), *argv[1:]], env=env).returncode
+    return subprocess.run(bez_wsadu([program(argv[0], env.get("PATH")), *argv[1:]]), env=env).returncode
 
 
 def main(argv: list[str] | None = None) -> int:

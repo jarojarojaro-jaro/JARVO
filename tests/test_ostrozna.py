@@ -328,8 +328,28 @@ def test_sprawdz(tmp_path, monkeypatch, capsys):
     assert O.sprawdz() == 0
 
 
+@pytest.mark.posix_only
+def test_przejscie_do_venvu_narzedzi_na_posix_przez_execv(tmp_path, monkeypatch):
+    """POSIX: przeskok do venvu narzędzi jak dotąd przez os.execv (ten sam proces)."""
+    import atrapy
+    py = atrapy.program(tmp_path, "venv-python", "pass" + chr(10))
+    monkeypatch.setattr(O, "TOOLS_PY", str(py))
+    monkeypatch.setattr(sys, "argv", ["ostrozna.py", "https://firma.pl/"])
+    wolania = []
+
+    def execv(p, argv):
+        wolania.append((p, argv))
+        raise SystemExit(0)
+    monkeypatch.setattr(O.os, "execv", execv)
+    with pytest.raises(SystemExit):
+        O._przelacz_na_venv_narzedzi()
+    assert wolania[0][0] == str(py) and wolania[0][1][1].endswith("ostrozna.py")
+    assert wolania[0][1][2:] == ["https://firma.pl/"]
+
+
+@pytest.mark.windows_only
 def test_przejscie_do_venvu_narzedzi_oddaje_kod_i_wyjscie(tmp_path, monkeypatch, capfd):
-    """Inny Python niż venv narzędzi: skrypt w nowym procesie (bez os.execv), kod wyjścia i wyjście dziecka są nasze."""
+    """Windows: skrypt w nowym procesie (execv odpina tam proces), kod wyjścia i wyjście dziecka są nasze."""
     import atrapy
     py = atrapy.program(tmp_path, "venv-python", "import sys\nprint('dziecko', *sys.argv[1:])\nsys.exit(7)\n")
     monkeypatch.setattr(O, "TOOLS_PY", str(py))

@@ -54,6 +54,6 @@ jobs:
         with:
           node-version: "22"
       - name: Zależności testów
-        run: pip install pyyaml pytest fastapi httpx
+        run: pip install pyyaml pytest fastapi httpx tzdata
       - name: Testy
         run: python -m pytest -q -rfE -p no:cacheprovider --continue-on-collection-errors tests

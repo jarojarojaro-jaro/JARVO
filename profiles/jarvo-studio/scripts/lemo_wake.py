@@ -59,11 +59,44 @@ MODELE = {
 }
 
 
+# Znaki, które cmd.exe interpretuje w argumentach pliku wsadowego (.cmd, .bat, np. npm.cmd i npx.cmd na Windows).
+# Python ich tam nie cytuje (klasa BatBadBut), więc taki argument odrzucamy, zamiast ryzykować cudze polecenie.
+ZNAKI_CMD = frozenset('&|<>^%!"' + chr(13) + chr(10))
+
+
+def bez_wsadu(argv: list[str]) -> list[str]:
+    """argv bez zmian; na Windows błąd, gdy program to plik wsadowy, a argument ma znaki interpretowane przez cmd.exe."""
+    if os.name == "nt" and argv and str(argv[0]).lower().endswith((".cmd", ".bat")):
+        zle = next((a for a in argv[1:] if ZNAKI_CMD & set(str(a))), None)
+        if zle is not None:
+            raise SystemExit(f"✗ {Path(str(argv[0])).name} to plik wsadowy cmd.exe, a argument {str(zle)[:60]!r} ma znaki, "
+                             "które cmd.exe wykonałby jako polecenie (& | < > ^ % ! \"). Podaj go bez nich (np. w pliku).")
+    return argv
+
+
+def git_bash() -> str | None:
+    """Git Bash na Windows (obok git.exe albo w standardowym katalogu); nigdy System32\bash.exe, który uruchamia WSL."""
+    kandydaci = []
+    git = shutil.which("git")
+    if git:                                     # Git\cmd\git.exe albo Git\mingw64\bin\git.exe
+        for przodek in list(Path(git).resolve().parents)[:3]:
+            kandydaci += [przodek / "bin" / "bash.exe", przodek / "usr" / "bin" / "bash.exe"]
+    for zmienna, podkatalog in (("ProgramFiles", "Git"), ("ProgramW6432", "Git"), ("LOCALAPPDATA", "Programs/Git")):
+        if os.environ.get(zmienna):
+            kandydaci.append(Path(os.environ[zmienna]) / podkatalog / "bin" / "bash.exe")
+    return next((str(k) for k in kandydaci if k.is_file() and "system32" not in str(k).lower()), None)
+
+
 def program(nazwa: str, path: str | None = None) -> str:
     """Program do argv: na Windows pełna ścieżka z PATH (npm to plik .cmd, którego CreateProcess nie znajdzie
-    po gołej nazwie); na POSIX nazwa bez zmian."""
+    po gołej nazwie), a `bash` i `sh` tylko z Git Bash; na POSIX nazwa bez zmian."""
     if not WINDOWS or os.path.dirname(nazwa):
         return nazwa
+    if nazwa.lower() in ("bash", "bash.exe", "sh", "sh.exe"):
+        b = git_bash()
+        if not b:
+            raise SystemExit("brak Git Bash: na Windows polecenia bash potrzebują Git for Windows (bash z System32 to WSL)")
+        return b
     return shutil.which(nazwa, path=path) or nazwa
 
 
@@ -227,7 +260,7 @@ def uruchom(polecenie: list[str]) -> int:
     zmienne = env()
     srodowisko = {**os.environ, **zmienne}
     argv = [re.sub(r"\{([A-Z_][A-Z0-9_]*)\}", lambda m: zmienne.get(m.group(1), m.group(0)), a) for a in polecenie]
-    return subprocess.run([program(argv[0], srodowisko.get("PATH")), *argv[1:]], env=srodowisko).returncode
+    return subprocess.run(bez_wsadu([program(argv[0], srodowisko.get("PATH")), *argv[1:]]), env=srodowisko).returncode
 
 
 def main(argv: list[str] | None = None) -> int:

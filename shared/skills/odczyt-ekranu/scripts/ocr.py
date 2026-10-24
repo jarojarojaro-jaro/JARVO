@@ -72,8 +72,9 @@ def _do_venvu(argv: list[str]) -> None:
     py = os.environ.get("JARVO_OCR_PYTHON") or OCR_PYTHON
     if not os.access(py, os.X_OK) or Path(sys.executable).resolve() == Path(py).resolve():
         return
-    utf8 = ["-X", "utf8"] if os.name == "nt" else []
-    sys.exit(subprocess.run([py, "-I", *utf8, str(Path(__file__).resolve()), *argv]).returncode)
+    if os.name != "nt":                              # POSIX: jak dotąd ten sam proces
+        os.execv(py, [py, "-I", str(Path(__file__).resolve()), *argv])
+    sys.exit(subprocess.run([py, "-I", "-X", "utf8", str(Path(__file__).resolve()), *argv]).returncode)
 
 
 def katalog_modeli() -> Path | None:

@@ -240,10 +240,13 @@ def ma_camoufox() -> bool:
 
 
 def _przelacz_na_venv_narzedzi() -> None:
-    """camoufox i trafilatura żyją w /opt/jarvo/venv; uruchomieni innym Pythonem przełączamy się: ten sam skrypt
-    w nowym procesie, jego kod wyjścia jest nasz (os.execv na Windows odpina proces od rodzica)."""
+    """camoufox i trafilatura żyją w /opt/jarvo/venv; uruchomieni innym Pythonem przełączamy się. Na POSIX os.execv
+    jak dotąd; na Windows nowy proces i jego kod wyjścia (execv odpina tam proces od rodzica)."""
     if os.path.exists(TOOLS_PY) and os.path.realpath(sys.executable) != os.path.realpath(TOOLS_PY):
-        sys.exit(subprocess.run([TOOLS_PY, os.path.abspath(__file__), *sys.argv[1:]]).returncode)
+        argv = [TOOLS_PY, os.path.abspath(__file__), *sys.argv[1:]]
+        if os.name != "nt":
+            os.execv(TOOLS_PY, argv)
+        sys.exit(subprocess.run(argv).returncode)
 
 
 def wersja_firefoksa(katalog: Path | None = None) -> int:

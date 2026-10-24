@@ -332,7 +332,7 @@ def konfiguracja(kat: Path) -> dict:
     if (kat / "node_modules" / "expo").exists():
         out = {}
         for typ in ("public", "introspect"):
-            r = subprocess.run([ml.program("npx"), "expo", "config", "--type", typ, "--json"], cwd=kat, capture_output=True,
+            r = subprocess.run(ml.polecenie(["npx", "expo", "config", "--type", typ, "--json"]), cwd=kat, capture_output=True,
                                text=True, encoding="utf-8", errors="replace", timeout=180,
                                env={**os.environ, "CI": "1", "EXPO_NO_TELEMETRY": "1"})
             if r.returncode != 0:
