@@ -367,6 +367,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `security/redteam/` | promptfoo: prowider, config, scenariusze ataków |
 | `vendor/skills.lock.yaml` | skille zewnętrzne przypięte do commitów (licencje w docs/SOURCES.md) |
 | `vendor/zrodla.yaml` | spis wszystkich repo, z których bierzemy kod, skille albo wzorce (status, ostatni przejrzany commit); `scripts/zrodla.py sprawdz` pokazuje nowości, rutyna pon/śr/pt robi z nich propozycje do zatwierdzenia |
+| `vendor/natywne.yaml` | narzędzia instalacji natywnej: wersja i plik z sumą sha256 na każdą platformę (lock `vendor/natywne.lock.json` z `scripts/natywne.py generuj`) |
 | `vendor/skan-wyjatki.yaml` | przejrzane fałszywe alarmy skanu skilli zewnętrznych, przypięte do commitu źródła |
 | `evals/<agent>/` | scenariusze testów zachowań (w zakresie, poza zakresem, routing, protokół, bezpieczeństwo) |
 | `scripts/` | build, walidator, deploy, instalacja floty, backupy, evals (runner, pomiar `evalslib.py`, `evals-wyniki.py`), migracja, narzędzia |
@@ -377,6 +378,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo, motyw i tłumaczenie dashboardu), łatka powłoki `/jarvo` (`powloka.json`, `powloka.js`) |
 | `site/` | landing jarvo.pl |
+| `jarvo/` | Jarvo natywnie, w budowie ([NATYWNIE.md](NATYWNIE.md)): katalogi (`sciezki.py`), środowisko procesów (`srodowisko.py`), manifest i pobieracz z sumą i paskiem (`manifest.py`, `pobieracz.py`), przenośne blokady i zapisy (`przenosne.py`) |
 | `install.sh`, `install.ps1`, `bin/jarvo` | instalator jednym poleceniem (Linux/WSL2: sam instaluje pakiety i Docker Engine; macOS: Homebrew, Colima, dane w wolumenach Dockera, LaunchAgent; Windows: WSL2 z restartem i dalszym ciągiem, własna dystrybucja `Jarvo`, Docker Engine w niej, autostart): repo do `~/jarvo`, gotowy obraz z GHCR, klucz dostępu do prywatnego repo (`JARVO_TOKEN`), polecenie `jarvo` (`up`, `status`, `update` = `git pull` + instalator, `uninstall`…); opis i plan w [INSTALER.md](INSTALER.md) |
 | `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`: pytest, pyyaml, shellcheck) |
 | `tests/`, `docs/` | testy pytest (w `tests/live/` test aplikacji w przeglądarce dla `scripts/jarvo-e2e.sh`), dokumentacja |

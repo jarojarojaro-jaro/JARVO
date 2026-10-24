@@ -83,6 +83,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`shared/templates/`](shared/templates) | szablony SOUL, skilla, evals i toolboxa (`make new-agent`) |
 | [`vendor/skills.lock.yaml`](vendor/skills.lock.yaml) | skille zewnętrzne przypięte do commitów (licencje w [docs/SOURCES.md](docs/SOURCES.md)) |
 | [`vendor/zrodla.yaml`](vendor/zrodla.yaml) | spis wszystkich repo, z których bierzemy kod, skille albo wzorce, i obserwowanych: status i ostatni przejrzany commit; nowości pokazuje `scripts/zrodla.py sprawdz`, wdrożenie tylko po zgodzie właściciela |
+| [`vendor/natywne.yaml`](vendor/natywne.yaml) | narzędzia instalacji natywnej: jedna wersja na narzędzie i plik z sumą sha256 dla każdej platformy (lock `vendor/natywne.lock.json` z `scripts/natywne.py generuj`); plan w [docs/NATYWNIE.md](docs/NATYWNIE.md) |
 | [`vendor/skan-wyjatki.yaml`](vendor/skan-wyjatki.yaml) | przejrzane fałszywe alarmy skanu skilli zewnętrznych (`scripts/skan_skilli.py`), przypięte do commitu źródła |
 | [`evals/<agent>/`](evals) | scenariusze testowe zachowań (w zakresie, poza zakresem, routing, protokół, bezpieczeństwo) |
 | [`security/redteam/`](security/redteam) | red team na promptfoo: ataki na agentów (`scripts/redteam.sh`) |
@@ -93,6 +94,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`branding/`](branding) | skórka Jarvo: terminal, favicon, motyw i tłumaczenie dashboardu, łatka powłoki `/jarvo` (`powloka.json`, `powloka.js`) |
 | [`site/`](site) | landing jarvo.pl (`scripts/deploy-site.sh`) |
 | [`install.sh`](install.sh), [`install.ps1`](install.ps1) | instalator jednym poleceniem: Linux/WSL2 (pakiety, Docker Engine), macOS (Homebrew, Colima), Windows (WSL2, dystrybucja `Jarvo`, Docker w niej) |
+| [`jarvo/`](jarvo) | Jarvo natywnie, w budowie ([docs/NATYWNIE.md](docs/NATYWNIE.md)): katalogi na trzy systemy (`sciezki.py`), środowisko procesów (`srodowisko.py`), manifest i pobieracz z sumą sha256 i paskiem (`manifest.py`, `pobieracz.py`), przenośne blokady, zapisy i ochrona sekretów (`przenosne.py`) |
 | [`bin/jarvo`](bin/jarvo) | polecenie użytkownika po instalacji: `up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall` |
 | [`requirements-dev.txt`](requirements-dev.txt) | zależności testów i walidacji (`make dev-deps`) |
 | [`tests/`](tests) | testy pytest (w `tests/live/` test aplikacji w przeglądarce dla `scripts/jarvo-e2e.sh`) |

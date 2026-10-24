@@ -452,3 +452,15 @@ zrodla:
     status: odlozone
     przejrzane: 8ba44cd73ec6f57b151ec06e2f71a0726adfb687
     notatka: "Apache-2.0: każda ścieżka trenuje małe modele na GPU (JEPA, polityka 4–7B), repo z 2026-10-08; z pomysłów: budżet sprawdzeń i osobne bramki komponentów (docs/RSI.md)"
+  # — instalacja natywna (docs/NATYWNIE.md; pliki per platforma z sumami w vendor/natywne.yaml), zgoda właściciela
+  #   na listę zapożyczeń 2026-10-24 (I40) —
+  uv:
+    repo: https://github.com/astral-sh/uv
+    status: do-wdrozenia
+    przejrzane: 0ebbd9274a55a8a53a13970be3b97e4209598e17
+    notatka: "Apache-2.0 OR MIT (Astral): uv 0.12.13 (tag = ten commit, wydanie 2026-09-10), tej wersji używa tests.yml Hermesa v2026.9.24. Przegląd 2026-10-24: binarki z wydania, sumy z plików .sha256 zgodne z digestami GitHuba; sieć tylko przy pobieraniu paczek i Pythona na polecenie (bez telemetrii); używamy uv sync --locked i uv pip install --require-hashes, nigdy instalatora astral.sh"
+  python-build-standalone:
+    repo: https://github.com/astral-sh/python-build-standalone
+    status: do-wdrozenia
+    przejrzane: 0c5e581b54a4736cdbbe68bdd6d7e571a1dca11e
+    notatka: "MPL-2.0 (skrypty budowy) + PSF-2.0 (CPython) + licencje bibliotek w paczce (OpenSSL, SQLite, libffi, Tcl/Tk…): wydanie 20261021 (tag = ten commit), CPython 3.13.17 i 3.12.15, SQLite 3.53.1 (bez błędu WAL-reset). Przegląd 2026-10-24: pliki install_only_stripped, sumy z digestów GitHuba zgodne z rozpoznaniem; bez sieci w czasie działania; na Windows arm64 build x64 (I27)"

@@ -556,6 +556,10 @@ Testy (etap E4): każdy tryb na atrapie modelu, zgoda i odmowa, zapis w folderze
 
 ## (g) Etapy wdrożenia
 
+**Stan (2026-10-24):** E0 🟡 (adres Matcha ✅, `.gitattributes` ✅, reszta ⬜); E1 🟡 w toku (znaczniki systemów i atrapy
+w testach, bash tylko z Git Bash ✅); E2 🟡 (manifest `vendor/natywne.yaml`, pobieracz `jarvo/pobieracz.py`: uv 0.12.13
+i Python 3.13.17 / 3.12.15 sprawdzone na Windows 11 ✅; pozostałe narzędzia ⬜); E3–E14 ⬜.
+
 Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z dokumentami i skarbcem w tym samym commicie (zasady CLAUDE.md). Nowa ścieżka żyje za flagą `JARVO_NATYWNIE=1`, aż do etapu E13. Do tego czasu ludzie dostają dzisiejszą instalację.
 
 **Runnery CI.** W64 = windows-2025 (PowerShell 5.1 i 7), WARM = windows-11-arm, MARM = macos-15 (arm64), L64 = ubuntu-24.04 (+ kontener debian:13 jako czysty system), LARM = ubuntu-24.04-arm.
