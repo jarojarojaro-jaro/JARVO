@@ -9,6 +9,8 @@ from __future__ import annotations
 import importlib.machinery
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -191,7 +193,8 @@ def test_jarvo_tts_dlugie_zdanie_w_kawalkach():
 def test_jarvo_tts_nieznany_glos_w_zadaniu(tmp_path):
     t = _jarvo_tts()
     plik = tmp_path / "z.json"
-    plik.write_text(json.dumps([{"tekst": "Test.", "wyjscie": str(tmp_path / "a.wav"), "glos": "pl-PL-Nikt"}]))
+    plik.write_text(json.dumps([{"tekst": "Test.", "wyjscie": str(tmp_path / "a.wav"), "glos": "pl-PL-Nikt"}]),
+                    encoding="utf-8")
     with pytest.raises(SystemExit):
         t.main(["--wsad", str(plik)])
     with pytest.raises(SystemExit):
@@ -214,3 +217,28 @@ def test_jarvo_tts_tekst_z_pliku_jak_woła_hermes(tmp_path, monkeypatch, capsys)
         t.main(["--plik", str(tmp_path / "pusty.txt"), "-o", str(tmp_path / "b.wav")])
     with pytest.raises(SystemExit):
         t.main(["Tekst.", "--plik", str(plik), "-o", str(tmp_path / "b.wav")])
+
+
+def test_jarvo_tts_wynik_wsadu_ze_sciezka_przez_ukosnik(tmp_path, monkeypatch):
+    """JSON wsadu podaje ścieżkę wyjścia z „/” na każdym systemie (jak inne ścieżki w JSON-ie floty)."""
+    t = _jarvo_tts()
+
+    class Model:
+        rate = 22050
+
+        def mow(self, tekst, szybkosc):
+            return [0.0] * 2205, [(0.0, 0.1, tekst)]
+
+    monkeypatch.setattr(t, "zapisz_wav", lambda sciezka, fala, rate: None)
+    wynik = t.wykonaj({"pl-PL-Matcha-Meski": Model()}, [{"tekst": "Dzień dobry.", "wyjscie": str(tmp_path / "a.wav")}])
+    assert wynik == [{"wyjscie": (tmp_path / "a.wav").as_posix(), "sekundy": 0.1, "zdania": [(0.0, 0.1, "Dzień dobry.")]}]
+
+
+def test_jarvo_tts_wyjscie_w_utf8_takze_bez_trybu_utf8():
+    """Pomoc (i JSON wsadu) w UTF-8 także bez PYTHONUTF8: na Windows potok dostaje wtedy stronę kodową ANSI."""
+    env = {**os.environ, "PYTHONUTF8": "0"}
+    env.pop("PYTHONIOENCODING", None)
+    r = subprocess.run([sys.executable, str(BIN / "jarvo-tts"), "--help"], capture_output=True, env=env, timeout=60)
+    assert r.returncode == 0
+    pomoc = r.stdout.decode("utf-8")
+    assert "Głosy:" in pomoc and "syntetyczny głos żeński" in pomoc

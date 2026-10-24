@@ -32,6 +32,16 @@ def test_bust_cache_renames_changed_files_and_importers(tmp_path):
     assert "vendor-CCCC33.js" in (assets / new_index).read_text(encoding="utf-8")
 
 
+def test_patch_pisze_konce_linii_lf_na_kazdym_systemie(tmp_path):
+    """Łatki dista i plików Hermesa zapisują „\\n” także na Windows: te same bajty co w obrazie."""
+    pd = load_script("branding/patch_dashboard.py")
+    index = tmp_path / "index.html"
+    index.write_bytes(b"<html>\n<head><title>Hermes Agent</title></head>\n</html>\n")
+    pd.CHANGED.clear()
+    assert pd.sub_all([index], r"<title>[^<]*</title>", "<title>Jarvo</title>", "tytuł karty") == 1
+    assert index.read_bytes() == b"<html>\n<head><title>Jarvo</title></head>\n</html>\n"
+
+
 def test_skin_and_profiles_use_jarvo_branding():
     skin = yaml.safe_load((REPO / "branding" / "skin-jarvo.yaml").read_text(encoding="utf-8"))
     assert skin["name"] == "jarvo" and skin["branding"]["agent_name"] == "Jarvo"
@@ -75,7 +85,7 @@ def test_add_polish_injects_locale_and_defaults(tmp_path):
         f'import{{TR,initial}}from"./{chunk.name}";globalThis.localStorage={{getItem:()=>null}};'
         "console.log(JSON.stringify([TR.pl.common.save,TR.pl.common.cancel,TR.pl.app.nav.sessions,Object.keys(TR)[1],initial()]))",
         encoding="utf-8")
-    out = subprocess.run(["node", str(probe)], capture_output=True, text=True, check=True).stdout
+    out = subprocess.run(["node", str(probe)], capture_output=True, text=True, encoding="utf-8", check=True).stdout
     assert json.loads(out) == ["Zapisz", "Cancel", "Sesje", "pl", "pl"]
 
 

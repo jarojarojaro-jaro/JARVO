@@ -39,7 +39,7 @@ def sub_all(files, pattern: str, repl: str, label: str, flags=0) -> int:
         text = f.read_text(encoding="utf-8")
         new, k = re.subn(pattern, repl, text, flags=flags)
         if k:
-            f.write_text(new, encoding="utf-8")
+            f.write_text(new, encoding="utf-8", newline="\n")      # „\n” także na Windows: te same bajty co w obrazie
             CHANGED.add(f)
             n += k
     print(f"  {'✓' if n else '·'} {label}: {n}")
@@ -67,7 +67,7 @@ def sub_exact(files, wzor: str, zamiana: str, ile: int, nazwa: str, gotowe: str 
     for f, t in teksty.items():
         new, k = rx.subn(zamiana, t)
         if k:
-            f.write_text(new, encoding="utf-8")
+            f.write_text(new, encoding="utf-8", newline="\n")
             CHANGED.add(f)
     print(f"  ✓ {nazwa}: {n}")
     return n
@@ -119,7 +119,7 @@ def patch_powloka(assets: list[Path], index: Path, brand: Path) -> int:
             stop("index.html bez <body> albo skrypt powłoki z </script>")
         html = html[:m.end()] + f'\n    <script id="jarvo-powloka-js">\n{js}\n</script>' + html[m.end():]
         n += 1
-    index.write_text(html, encoding="utf-8")
+    index.write_text(html, encoding="utf-8", newline="\n")
     print("  ✓ powłoka: CSS i skrypt w index.html")
     return n
 
@@ -150,11 +150,11 @@ def bust_cache(assets_dir: Path, index: Path) -> int:
     for f in files:
         new = pattern.sub(lambda m: rename[m.group(0)], texts[f])
         target = assets_dir / rename.get(f.name, f.name)
-        target.write_text(new, encoding="utf-8")
+        target.write_text(new, encoding="utf-8", newline="\n")
         if target != f:
             f.unlink()
     html = index.read_text(encoding="utf-8")
-    index.write_text(pattern.sub(lambda m: rename[m.group(0)], html), encoding="utf-8")
+    index.write_text(pattern.sub(lambda m: rename[m.group(0)], html), encoding="utf-8", newline="\n")
     print(f"  ✓ nowe nazwy plików (bez starej wersji w cache przeglądarki): {len(rename)}")
     return len(rename)
 
@@ -188,7 +188,7 @@ def add_polish(assets: list[Path], index: Path, pl_json: Path) -> int:
         if not (k1 and k2):
             print(f"  · polski: nie rozpoznano układu pliku języków (mapa {k1}, nazwy {k2})")
             return 0
-        f.write_text(new, encoding="utf-8")
+        f.write_text(new, encoding="utf-8", newline="\n")
         CHANGED.add(f)
         done = 1
         print(f"  ✓ polski: tłumaczenie, przełącznik, domyślny ({'tak' if k3 else 'nie znaleziono'})")
@@ -385,7 +385,7 @@ def patch_login(login: Path, brand: Path) -> None:
     head = head[:t0] + szablon
     # strona „brak metod logowania”: dawny styl Fosforu (zwykły CSS, klamry pojedyncze)
     tail = tail.replace("</style>", LOGIN_CSS.replace("@@FONTS@@", login_fonts_css(brand)) + "</style>", 1)
-    login.write_text(head + sep + tail, encoding="utf-8")
+    login.write_text(head + sep + tail, encoding="utf-8", newline="\n")
     print("  ✓ logowanie: strona tytułowa i styl strony bez metod: 2")
 
 
@@ -482,5 +482,15 @@ def main(argv: list[str]) -> int:
     return 0
 
 
+def wyjscie_utf8() -> None:
+    """Windows: stdout i stderr w UTF-8 (potok dostaje tam stronę kodową ANSI, w której nie ma „✓” i „✗”);
+    na Linuksie i macOS wyjście już jest w UTF-8."""
+    if os.name == "nt":
+        for strumien in (sys.stdout, sys.stderr):
+            if hasattr(strumien, "reconfigure"):
+                strumien.reconfigure(encoding="utf-8", errors=strumien.errors)
+
+
 if __name__ == "__main__":
+    wyjscie_utf8()
     sys.exit(main(sys.argv[1:]))

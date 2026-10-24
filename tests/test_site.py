@@ -61,7 +61,10 @@ def test_domain_installers_redirect_to_public_repo():
     assert f"{raw}.sh" in t
 
 
-@pytest.mark.skipif(not shutil.which("bash"), reason="brak basha")
+# install.sh i local-up.sh stawiają starą flotę w kontenerze (docs/NATYWNIE.md E1); na Windows instaluje install.ps1,
+# więc testy, które uruchamiają te skrypty bashem, biegną tylko na Linuksie i macOS
+@pytest.mark.posix_only
+@pytest.mark.wymaga_bash
 @pytest.mark.parametrize("script", ["install.sh", "scripts/local-up.sh"])
 def test_shell_syntax(script):
     subprocess.run(["bash", "-n", str(REPO / script)], check=True)
@@ -87,7 +90,8 @@ def test_seo_and_security_files_are_deployed():
     assert all(" width=" in tag for tag in __import__("re").findall(r"<img [^>]*>", html))
 
 
-@pytest.mark.skipif(not shutil.which("bash"), reason="brak basha")
+@pytest.mark.posix_only           # local-up.sh: instalator starej floty w kontenerze (jak wyżej)
+@pytest.mark.wymaga_bash
 @pytest.mark.parametrize("choice, provider, key_in", [
     ("1", "openrouter", "agents"),                 # OpenRouter: klucz do sekretów każdego agenta
     ("2", "commandcode-anthropic", "host"),        # CommandCode: klucz do host.env (share_keys.py)
@@ -111,7 +115,7 @@ def test_local_up_provider_choice(tmp_path, choice, provider, key_in):
     env = {**os.environ, "HOME": str(tmp_path), "JARVO_LOCAL": str(local), "PATH": f"{bindir}:{os.environ['PATH']}"}
     env.pop("JARVO_MODEL_PROVIDER", None)
     res = subprocess.run(["bash", str(root / "scripts" / "local-up.sh")], input=f"{choice}\nklucz-testowy\n",
-                         env=env, capture_output=True, text=True, timeout=60)
+                         env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert res.returncode == 0, res.stdout + res.stderr
     jarvo_env = (local / "compose" / "jarvo.env").read_text(encoding="utf-8")
     assert re.search(rf"^JARVO_MODEL_PROVIDER={provider}$", jarvo_env, re.M)

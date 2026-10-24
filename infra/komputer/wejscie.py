@@ -610,7 +610,8 @@ class KontekstSesji:
     @staticmethod
     def _xprop(*args: str) -> str:
         try:
-            return subprocess.run(["xprop", *args], capture_output=True, text=True, timeout=2, check=False).stdout
+            return subprocess.run(["xprop", *args], capture_output=True, text=True, encoding="utf-8", timeout=2,
+                                  check=False).stdout
         except (OSError, subprocess.TimeoutExpired):
             return ""
 

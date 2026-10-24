@@ -1,5 +1,10 @@
 """Wejście Komputera Jarva (infra/komputer/wejscie.py, docs/KOMPUTER.md §6) z udawanym sterownikiem ekranu:
-rozmowa MCP przez cua.sock (i przez bramkę floty), odmowy przed sterownikiem, ukrywanie sekretów, ster.sock."""
+rozmowa MCP przez cua.sock (i przez bramkę floty), odmowy przed sterownikiem, ukrywanie sekretów, ster.sock.
+
+Wejście to proces kontenera Komputera (gniazda unix, X11, AT-SPI); natywny Komputer to etap E10 (docs/NATYWNIE.md).
+Testy z gniazdami mają `posix_only` (Python na Windows nie ma AF_UNIX), a te ze ster.sock `linux_only`: wejście
+sprawdza tam nadawcę przez SO_PEERCRED, którego macOS nie ma. Zasady, AT-SPI i X11 na atrapach biegną wszędzie.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +29,7 @@ import wejscie  # noqa: E402
 KLUCZ = "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX1234567890"
 STEROWNIK = textwrap.dedent('''
     import json, os, sys, time
-    log = open(sys.argv[1], "a")
+    log = open(sys.argv[1], "a", encoding="utf-8")
     KLUCZ = "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX1234567890"
     STAN = {"snapshot_id": "s1", "pid": 7, "window_id": 3, "screenshot_width": 800, "elements": [
         {"element_index": 0, "role": "document web", "label": "Sklep", "frame": {"x": 0, "y": 0, "w": 800, "h": 600}},
@@ -172,6 +177,7 @@ def zasada(wynik: dict) -> str:
     return str((wynik.get("structuredContent") or {}).get("rule") or "")
 
 
+@pytest.mark.posix_only
 def test_gniazda_tylko_dla_grupy():
     katalog = tempfile.mkdtemp(prefix="jw")
     try:
@@ -182,6 +188,7 @@ def test_gniazda_tylko_dla_grupy():
         shutil.rmtree(katalog)
 
 
+@pytest.mark.posix_only
 def test_rozmowa_mcp_odmowy_i_ukrywanie(komputer):
     k = Klient(wejscie.CUA)
     init = k.rpc("initialize", {"protocolVersion": "2025-06-18"})
@@ -217,6 +224,7 @@ def test_rozmowa_mcp_odmowy_i_ukrywanie(komputer):
     k.zamknij()
 
 
+@pytest.mark.posix_only
 def test_element_sprawdzany_w_swiezej_migawce(komputer, monkeypatch):
     """Sterownik szuka elementu po numerze w drzewie z chwili działania: wejście porównuje element pod tym numerem
     w świeżej migawce (bez zrzutu) i podaje sterownikowi jej token; strona zmieniona od migawki agenta to odmowa."""
@@ -234,7 +242,7 @@ def test_element_sprawdzany_w_swiezej_migawce(komputer, monkeypatch):
     k.narzedzie("click", {"pid": 7, "target": {"snapshot_id": "s1", "element_index": 2}})
     assert komputer.do_sterownika()[-1]["params"]["arguments"]["target"] == {"snapshot_id": "s9", "element_index": 2}
     # strona dodała przycisk wyżej w drzewie: pod numerem 2 jest teraz pole E-mail, nie „Dodaj do koszyka”
-    open(os.path.join(komputer.sciezka, "wywolania.jsonl.zmiana"), "w").close()
+    open(os.path.join(komputer.sciezka, "wywolania.jsonl.zmiana"), "w", encoding="utf-8").close()
     w = k.narzedzie("click", {"pid": 7, "window_id": 3, "element_token": "s1:2"})
     assert zasada(w) == "element_zmieniony"
     tekst = w["content"][0]["text"]
@@ -242,7 +250,7 @@ def test_element_sprawdzany_w_swiezej_migawce(komputer, monkeypatch):
     assert komputer.do_sterownika()[-1]["params"]["name"] == "get_window_state"   # klik nie doszedł
     # sterownik nie odpowiada na świeżą migawkę: odmowa po czasie, nie przepuszczenie
     monkeypatch.setattr(wejscie, "CZAS_MIGAWKI", 0.5)
-    open(os.path.join(komputer.sciezka, "wywolania.jsonl.cisza"), "w").close()
+    open(os.path.join(komputer.sciezka, "wywolania.jsonl.cisza"), "w", encoding="utf-8").close()
     w = k.narzedzie("set_value", {"pid": 7, "window_id": 3, "element_token": "s1:1", "value": "a@b.pl"})
     assert zasada(w) == "element_zmieniony" and "nie udało się sprawdzić" in w["content"][0]["text"]
     assert komputer.do_sterownika()[-1]["params"]["name"] == "get_window_state"
@@ -271,6 +279,7 @@ def test_ten_sam_element():
     assert not wejscie.KontekstSesji.ten_sam(stare, {1: stare[1]}, 2)
 
 
+@pytest.mark.posix_only
 def test_protokol_tylko_pojedyncze_znane_wiadomosci(komputer):
     k = Klient(wejscie.CUA)
     k.wyslij(b"{nie json")
@@ -287,6 +296,7 @@ def test_protokol_tylko_pojedyncze_znane_wiadomosci(komputer):
     k.zamknij()
 
 
+@pytest.mark.posix_only
 def test_powtorzone_id_odrzucone(komputer):
     k = Klient(wejscie.CUA)
     k.rpc("initialize")
@@ -301,6 +311,7 @@ def test_powtorzone_id_odrzucone(komputer):
     k.zamknij()
 
 
+@pytest.mark.linux_only
 def test_pauza_limit_i_dziennik(komputer, monkeypatch):
     k = Klient(wejscie.CUA)
     k.rpc("initialize")
@@ -336,6 +347,7 @@ def test_pauza_limit_i_dziennik(komputer, monkeypatch):
     assert len(wejscie.Dziennik().ostatnie) == len(open(wejscie.DZIENNIK, encoding="utf-8").readlines())
 
 
+@pytest.mark.posix_only
 def test_bramka_floty_pompuje_do_wejscia(komputer):
     """Hermes woła `jarvo_cua.py mcp`: bramka przepuszcza bajty do cua.sock i z powrotem."""
     p = subprocess.Popen([sys.executable, "-I", str(REPO / "komputer" / "jarvo_cua.py"), "mcp"],
@@ -355,6 +367,7 @@ def test_bramka_floty_pompuje_do_wejscia(komputer):
     assert odp[2]["result"]["structuredContent"]["code"] == "zablokowane"
 
 
+@pytest.mark.linux_only
 def test_prosba_operatora_to_pauza_z_powodem(komputer, monkeypatch):
     """Operator oddaje ekran właścicielowi: pauza od floty z powodem; wznawia tylko właściciel."""
     k = Klient(wejscie.CUA)
@@ -384,6 +397,7 @@ def test_prosba_operatora_to_pauza_z_powodem(komputer, monkeypatch):
     k.zamknij()
 
 
+@pytest.mark.posix_only
 def test_ekranem_steruje_jedna_sesja_naraz(komputer, monkeypatch):
     a, b = Klient(wejscie.CUA), Klient(wejscie.CUA)
     for k in (a, b):
@@ -410,6 +424,7 @@ def test_ekranem_steruje_jedna_sesja_naraz(komputer, monkeypatch):
     c.zamknij()
 
 
+@pytest.mark.linux_only
 def test_wtyczka_operatora_przez_ster(komputer, monkeypatch):
     """Wtyczka jarvo-komputer (komputer/plugin, docs/KOMPUTER.md §7): stan, dziennik i prośba do właściciela
     przez prawdziwe wejście; wznowić nie umie, bez gniazda mówi, jak włączyć Komputer."""

@@ -1,9 +1,10 @@
 """Instalator Windows (install.ps1): składnia, PSScriptAnalyzer i próby na sucho na udawanym Windowsie.
 
-PowerShell 7 z `make dev-pwsh` (.tools/pwsh) albo z PATH; bez niego testy są pomijane. JARVO_TEST_PWSH=powershell
-(CI na Windowsie) uruchamia je w Windows PowerShell 5.1, tym samym, którego używa większość ludzi. Próba na sucho
-(JARVO_DRY_RUN=1) tylko wypisuje kroki; stan Windowsa udają zmienne JARVO_FAKE_* (WSL, dystrybucje,
-kompilacja, procesor, RAM, dysk, folder Autostart).
+PowerShell 7 z `make dev-pwsh` (.tools/pwsh) albo z PATH; bez niego testy, które uruchamiają PowerShell (_ps, _dry),
+są pomijane, a sprawdzenie samej treści pliku biegnie zawsze. JARVO_TEST_PWSH=powershell (CI na Windowsie) uruchamia
+je w Windows PowerShell 5.1, tym samym, którego używa większość ludzi. Próba na sucho (JARVO_DRY_RUN=1) tylko
+wypisuje kroki; stan Windowsa udają zmienne JARVO_FAKE_* (WSL, dystrybucje, kompilacja, procesor, RAM, dysk,
+folder Autostart).
 """
 import os
 import re
@@ -18,17 +19,23 @@ PS1 = ROOT / "install.ps1"
 LOCAL = ROOT / ".tools/pwsh/pwsh"
 PWSH = os.environ.get("JARVO_TEST_PWSH") or (str(LOCAL) if LOCAL.exists() else shutil.which("pwsh"))
 WINPS = Path(PWSH or "").stem.lower() == "powershell"   # Windows PowerShell 5.1
-pytestmark = pytest.mark.skipif(not PWSH, reason="brak pwsh (make dev-pwsh)")
 UTF8 = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; "
 
 
+def _wymaga_pwsh() -> None:
+    if not PWSH:
+        pytest.skip("brak pwsh (make dev-pwsh)")
+
+
 def _ps(command: str, **env) -> subprocess.CompletedProcess:
+    _wymaga_pwsh()
     return subprocess.run([PWSH, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", UTF8 + command],
                           env={**os.environ, **env}, capture_output=True, encoding="utf-8", errors="replace",
                           timeout=180)
 
 
 def _dry(tmp_path: Path, **fake) -> subprocess.CompletedProcess:
+    _wymaga_pwsh()
     env = {k: v for k, v in os.environ.items() if not k.startswith("JARVO_")}
     env.update({"HOME": str(tmp_path), "LANG": "C.UTF-8", "JARVO_DRY_RUN": "1",
                 "JARVO_FAKE_BUILD": "22631", "JARVO_FAKE_ARCH": "AMD64", "JARVO_FAKE_RAM_GB": "16",

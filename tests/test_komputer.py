@@ -8,6 +8,8 @@ import re
 import subprocess
 import sys
 
+import pytest
+
 from conftest import REPO
 
 import validate
@@ -19,8 +21,9 @@ import jarvo_cua  # noqa: E402
 
 def uruchom(*args: str, gniazdo: str = "/nie/ma/takiego.sock") -> subprocess.CompletedProcess:
     env = {**os.environ, "JARVO_KOMPUTER_GNIAZDO": gniazdo}
-    return subprocess.run([sys.executable, "-I", str(BRAMKA), *args], capture_output=True, text=True, env=env,
-                          timeout=20)
+    # -I pomija PYTHONUTF8: na Windows UTF-8 na wyjściu zapewnia sama bramka (wyjscie_utf8)
+    return subprocess.run([sys.executable, "-I", str(BRAMKA), *args], capture_output=True, text=True,
+                          encoding="utf-8", env=env, timeout=20)
 
 
 def test_bramka_jest_wykonywalna_i_w_compose():
@@ -61,6 +64,7 @@ def test_bez_komputera_mcp_i_status_mowia_jak_wlaczyc():
         assert r.returncode == kod and "jarvo komputer on" in r.stderr
 
 
+@pytest.mark.posix_only     # gniazda unix Komputera w kontenerze; natywny Komputer (potoki) to etap E10
 def test_pulpit_bez_kanalu_sterownika_nie_udaje_wylaczonego():
     """Działa ekran Komputera (rfb.sock), ale wejście sterownika (cua.sock) nie odpowiada: rada inna niż „włącz”."""
     import socket

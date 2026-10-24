@@ -140,5 +140,15 @@ def main(argv: list[str]) -> int:
     return KOD_ODMOWY
 
 
+def wyjscie_utf8() -> None:
+    """Windows: stdout i stderr w UTF-8 (potok dostaje tam stronę kodową ANSI, a Hermes czyta pomoc, manifest
+    i odmowy jako UTF-8); na Linuksie i macOS wyjście już jest w UTF-8. Rozmowa MCP idzie bajtami (os.write)."""
+    if os.name == "nt":
+        for strumien in (sys.stdout, sys.stderr):
+            if hasattr(strumien, "reconfigure"):
+                strumien.reconfigure(encoding="utf-8", errors=strumien.errors)
+
+
 if __name__ == "__main__":
+    wyjscie_utf8()
     sys.exit(main(sys.argv[1:]))

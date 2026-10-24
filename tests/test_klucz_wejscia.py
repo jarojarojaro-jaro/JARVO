@@ -5,8 +5,11 @@ from __future__ import annotations
 import importlib.machinery
 import importlib.util
 import json
+import os
 import re
 import stat
+import subprocess
+import tempfile
 import time
 
 import pytest
@@ -88,8 +91,43 @@ def test_nowy_klucz_zapisuje_tylko_skrot(dostawca, capsys):
     pliki = list(katalog.iterdir())
     assert [p.name for p in pliki] == [klucz.skrot(kod)]
     assert kod not in pliki[0].read_text(encoding="utf-8")
-    assert stat.S_IMODE(katalog.stat().st_mode) == 0o700 and stat.S_IMODE(pliki[0].stat().st_mode) == 0o600
-    assert 890 <= json.loads(pliki[0].read_text())["wygasa"] - time.time() <= 900
+    if os.name != "nt":                # na Windows tryb pliku nic nie chroni: ACL sprawdza test niżej
+        assert stat.S_IMODE(katalog.stat().st_mode) == 0o700 and stat.S_IMODE(pliki[0].stat().st_mode) == 0o600
+    assert 890 <= json.loads(pliki[0].read_text(encoding="utf-8"))["wygasa"] - time.time() <= 900
+
+
+def _dacl(sciezka) -> tuple[str, set[str]]:
+    """Flagi DACL i komu wpisy pozwalają (SID albo skrót SDDL): z `icacls /save`, niezależnie od języka Windows."""
+    with tempfile.TemporaryDirectory() as d:
+        zapis = os.path.join(d, "acl.txt")
+        subprocess.run(["icacls", str(sciezka), "/save", zapis], check=True, capture_output=True)
+        with open(zapis, "rb") as f:
+            sddl = f.read().decode("utf-16-le").splitlines()[1]
+    dacl = sddl[sddl.index("D:") + 2:]
+    wpisy = [w.split(";") for w in re.findall(r"\(([^)]*)\)", dacl)]
+    return dacl.split("(", 1)[0], {w[5] for w in wpisy if w[0] == "A"}
+
+
+@pytest.mark.windows_only
+@pytest.mark.parametrize("istnieje", [False, True])
+def test_katalog_kluczy_tylko_dla_wlasciciela_na_windows(tmp_path, monkeypatch, capsys, istnieje):
+    """Katalog wyżej daje grupie Użytkownicy (BU) zapis dziedziczony w dół: katalog skrótów go nie dziedziczy, czy
+    powstaje teraz, czy został po starszej wersji; pliki skrótów mają tylko wpisy właściciela, SYSTEM i administratorów."""
+    sid = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, check=True, text=True,
+                         encoding="utf-8", errors="replace").stdout.strip().split(",")[-1].strip('"')
+    dozwoleni = {sid, "SY", "BA", "OW"}                     # właściciel, SYSTEM, Administratorzy, prawa właściciela
+    dane = tmp_path / "dane"
+    dane.mkdir()
+    subprocess.run(["icacls", str(dane), "/grant", "*S-1-5-32-545:(OI)(CI)M"], check=True, capture_output=True)
+    katalog = dane / "wejscie"
+    if istnieje:
+        katalog.mkdir()
+        assert "BU" in _dacl(katalog)[1]
+    klucz = _klucz_mod(katalog, monkeypatch)
+    kod = _nowy(klucz, capsys)
+    flagi, kto = _dacl(katalog)
+    assert "P" in flagi and sid in kto and kto <= dozwoleni, (flagi, kto)
+    assert _dacl(katalog / klucz.skrot(kod))[1] <= dozwoleni
 
 
 def test_klucz_wchodzi_raz_bez_hasla(dostawca, capsys):
@@ -106,7 +144,7 @@ def test_wygasly_i_obcy_klucz_nie_wchodzi(dostawca, capsys):
     klucz, p, Invalid, katalog = dostawca
     kod = _nowy(klucz, capsys)
     sciezka = katalog / klucz.skrot(kod)
-    sciezka.write_text(json.dumps({"wygasa": int(time.time()) - 1}))
+    sciezka.write_text(json.dumps({"wygasa": int(time.time()) - 1}), encoding="utf-8")
     with pytest.raises(Invalid):
         p.complete_password_login(username="jarvo", password=kod)
     assert not sciezka.exists()                             # nieudana próba też zużywa klucz
@@ -121,7 +159,7 @@ def test_najwyzej_piec_waznych_kluczy_i_sprzatanie(dostawca, capsys):
     kody = [_nowy(klucz, capsys) for _ in range(7)]
     assert len(list(katalog.iterdir())) == klucz.NAJWIECEJ
     for f in katalog.iterdir():                             # wygasłe znikają przy następnym kluczu
-        f.write_text(json.dumps({"wygasa": 1}))
+        f.write_text(json.dumps({"wygasa": 1}), encoding="utf-8")
     ostatni = _nowy(klucz, capsys)
     assert [f.name for f in katalog.iterdir()] == [klucz.skrot(ostatni)]
     assert p.complete_password_login(username="x", password=ostatni)["user"] == "jarvo"
@@ -131,7 +169,7 @@ def test_najwyzej_piec_waznych_kluczy_i_sprzatanie(dostawca, capsys):
 def test_ttl_ograniczony(dostawca, capsys):
     klucz, _, _, katalog = dostawca
     kod = _nowy(klucz, capsys, ttl=999999)
-    assert json.loads((katalog / klucz.skrot(kod)).read_text())["wygasa"] - time.time() <= 3600
+    assert json.loads((katalog / klucz.skrot(kod)).read_text(encoding="utf-8"))["wygasa"] - time.time() <= 3600
 
 
 def test_jarvo_open_i_link_nie_wypisuja_klucza_do_logu():

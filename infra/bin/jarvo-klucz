@@ -3,19 +3,22 @@
 
     jarvo-klucz nowy [--ttl 900]   → wypisuje klucz JRV-XXXX-XXXX-XXXX (tylko na stdout, nigdzie nie zapisany jawnie)
 
-Na dysku zostaje sam skrót SHA-256 klucza z czasem wygaśnięcia (/opt/data/jarvo/wejscie, katalog 700, pliki 600).
-Dostawca logowania Hermesa (łatka w branding/patch_dashboard.py) przyjmuje klucz zamiast hasła jeden raz: plik
-skrótu jest przenoszony atomowo przy pierwszej próbie, więc drugi raz ten sam klucz nie przejdzie, nawet po błędzie.
+Na dysku zostaje sam skrót SHA-256 klucza z czasem wygaśnięcia (/opt/data/jarvo/wejscie, katalog 700, pliki 600;
+na Windows ACL tylko dla właściciela). Dostawca logowania Hermesa (łatka w branding/patch_dashboard.py) przyjmuje klucz
+zamiast hasła jeden raz: plik skrótu jest przenoszony atomowo przy pierwszej próbie, więc drugi raz ten sam klucz
+nie przejdzie, nawet po błędzie.
 Strona logowania czyta klucz z części adresu po # (nie trafia do serwera ani logów dostępu) i od razu ją czyści.
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import hashlib
 import json
 import os
 import secrets
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -49,9 +52,23 @@ def sprzataj(teraz: float) -> None:
         p.unlink(missing_ok=True)
 
 
+def tylko_dla_wlasciciela(katalog: Path) -> None:
+    """Katalog skrótów tylko dla właściciela (cudzy plik skrótu w nim to wejście bez hasła). POSIX: tryb 700.
+    Windows: chmod niczego tam nie chroni, więc ACL wbudowanym icacls: bez wpisów dziedziczonych z katalogu wyżej
+    (np. grupy Użytkownicy), pełne prawa właściciela dziedziczone przez pliki w środku."""
+    if os.name != "nt":
+        os.chmod(katalog, 0o700)
+        return
+    icacls = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "icacls.exe")
+    r = subprocess.run([icacls, str(katalog), "/inheritance:r", "/grant:r", f"{getpass.getuser()}:(OI)(CI)F"],
+                       capture_output=True)
+    if r.returncode:
+        print(f"jarvo-klucz: nie ustawiłem uprawnień katalogu {katalog} (icacls, kod {r.returncode})", file=sys.stderr)
+
+
 def zapisz(kod: str, ttl: int) -> None:
-    KATALOG.mkdir(parents=True, exist_ok=True)
-    os.chmod(KATALOG, 0o700)
+    KATALOG.mkdir(mode=0o700, parents=True, exist_ok=True)     # Windows (Python 3.12.4+): od razu ACL właściciela
+    tylko_dla_wlasciciela(KATALOG)
     teraz = time.time()
     sprzataj(teraz)
     sciezka = KATALOG / skrot(kod)
@@ -73,5 +90,15 @@ def main(argv: list[str]) -> int:
     return 0
 
 
+def wyjscie_utf8() -> None:
+    """Windows: stdout i stderr w UTF-8 (potok dostaje tam stronę kodową ANSI, a pomoc i błędy są po polsku);
+    na Linuksie i macOS wyjście już jest w UTF-8."""
+    if os.name == "nt":
+        for strumien in (sys.stdout, sys.stderr):
+            if hasattr(strumien, "reconfigure"):
+                strumien.reconfigure(encoding="utf-8", errors=strumien.errors)
+
+
 if __name__ == "__main__":
+    wyjscie_utf8()
     sys.exit(main(sys.argv[1:]))

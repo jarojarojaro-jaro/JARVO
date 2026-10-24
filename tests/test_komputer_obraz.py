@@ -180,5 +180,5 @@ def test_deploy_i_piaskownica_buduja_komputer():
 def test_shellcheck_skryptow_komputera():
     res = subprocess.run(["shellcheck", "-S", "warning", str(KOMP / "start.sh"), str(KOMP / "zdrowie.sh"),
                           str(REPO / "scripts" / "komputer-test.sh")],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     assert res.returncode == 0, res.stdout

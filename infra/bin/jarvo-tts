@@ -244,7 +244,7 @@ def wykonaj(modele: Modele, zadania: list[dict]) -> list[dict]:
         fala, zdania = model.mow(str(z["tekst"]), float(z.get("szybkosc", 1.0)))
         out = Path(z["wyjscie"])
         zapisz_wav(out, fala, model.rate)
-        wynik.append({"wyjscie": str(out), "sekundy": round(len(fala) / model.rate, 3), "zdania": zdania})
+        wynik.append({"wyjscie": out.as_posix(), "sekundy": round(len(fala) / model.rate, 3), "zdania": zdania})
     return wynik
 
 
@@ -295,5 +295,15 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def wyjscie_utf8() -> None:
+    """Windows: stdout i stderr w UTF-8. Potok dostaje tam stronę kodową ANSI (np. cp1250), a wideo_lib, HQ i Hermes
+    czytają JSON i komunikaty jako UTF-8; na Linuksie i macOS wyjście już jest w UTF-8."""
+    if os.name == "nt":
+        for strumien in (sys.stdout, sys.stderr):
+            if hasattr(strumien, "reconfigure"):
+                strumien.reconfigure(encoding="utf-8", errors=strumien.errors)
+
+
 if __name__ == "__main__":
+    wyjscie_utf8()
     sys.exit(main())

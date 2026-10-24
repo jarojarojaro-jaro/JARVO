@@ -7,7 +7,9 @@ import importlib.util
 import json
 import os
 import re
+import subprocess
 import sys
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -78,6 +80,76 @@ def test_stt_command_template_matches_image_env(tmp_path, monkeypatch):
     argv = tpl.format(input_path=str(tmp_path / "brak.ogg"), output_dir=str(tmp_path), language="pl",
                       model="base").split()[1:]
     assert stt.main(argv) == 2
+
+
+def test_stt_jedna_transkrypcja_naraz(tmp_path):
+    """Druga transkrypcja czeka na koniec pierwszej (RAM): blokada pliku fcntl na Linuksie i macOS, msvcrt na Windows."""
+    stt = load_stt()
+    zamek = tmp_path / "jarvo-stt.lock"
+    kolejnosc: list[str] = []
+
+    def druga():
+        with stt.jedna_naraz(zamek):
+            kolejnosc.append("druga")
+
+    with stt.jedna_naraz(zamek):
+        w = threading.Thread(target=druga)
+        w.start()
+        w.join(0.5)                       # bez blokady druga weszłaby od razu
+        kolejnosc.append("pierwsza")
+    w.join(30)
+    assert kolejnosc == ["pierwsza", "druga"]
+    with stt.jedna_naraz(zamek):          # zwolniona po wyjściu: kolejna wchodzi od razu
+        pass
+
+
+@pytest.mark.windows_only
+def test_stt_blokada_czeka_dluzej_niz_proby_msvcrt(tmp_path, monkeypatch):
+    """msvcrt.LK_LOCK poddaje się po ok. 10 s (EDEADLOCK): blokada czeka dalej, zamiast ruszać drugą transkrypcję;
+    inny błąd nie jest czekaniem."""
+    import errno
+    import msvcrt
+    stt = load_stt()
+    prawdziwe, proby = msvcrt.locking, []
+
+    def locking(fd, tryb, n, blad=errno.EDEADLK):
+        if tryb == msvcrt.LK_LOCK and len(proby) < 2:
+            proby.append(tryb)
+            raise OSError(blad, "zajęte")
+        return prawdziwe(fd, tryb, n)
+
+    monkeypatch.setattr(msvcrt, "locking", locking)
+    with stt.jedna_naraz(tmp_path / "jarvo-stt.lock"):
+        assert len(proby) == 2
+    proby.clear()
+    monkeypatch.setattr(msvcrt, "locking", lambda fd, tryb, n: locking(fd, tryb, n, blad=errno.EBADF))
+    with pytest.raises(OSError):
+        with stt.jedna_naraz(tmp_path / "jarvo-stt.lock"):
+            pass
+
+
+def test_stt_blokada_wspolna_dla_wszystkich_wywolan(monkeypatch):
+    """Ten sam plik blokady bez względu na TMPDIR wołającego: /tmp jak w obrazie, na Windows katalog tymczasowy."""
+    import tempfile
+    monkeypatch.delenv("JARVO_STT_LOCK", raising=False)
+    monkeypatch.setenv("TMPDIR", "/gdzie/indziej")
+    stt = load_stt()
+    if os.name == "nt":
+        assert stt.LOCK == Path(tempfile.gettempdir()) / "jarvo-stt.lock"
+    else:
+        assert stt.LOCK == Path("/tmp/jarvo-stt.lock")
+
+
+def test_stt_wyjscie_w_utf8_takze_bez_trybu_utf8(tmp_path):
+    """Komunikat z polską nazwą pliku dochodzi w UTF-8 także bez PYTHONUTF8: na Windows potok dostaje wtedy stronę
+    kodową ANSI (cp1250), a Hermes, HQ i napisy czytają wyjście jako UTF-8."""
+    env = {**os.environ, "PYTHONUTF8": "0"}
+    env.pop("PYTHONIOENCODING", None)
+    r = subprocess.run([sys.executable, str(REPO / "infra" / "bin" / "jarvo-stt"),
+                        str(tmp_path / "nagranie_październik.ogg")], capture_output=True, env=env, timeout=60)
+    assert r.returncode == 2
+    blad = r.stderr.decode("utf-8")
+    assert "Brak pliku" in blad and "nagranie_październik.ogg" in blad
 
 
 # ------------------------------------------------------------------ to_pdf

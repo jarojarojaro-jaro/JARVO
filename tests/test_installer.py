@@ -11,7 +11,6 @@ import os
 import shutil
 import stat
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -23,9 +22,10 @@ INSTALL = ROOT / "install.sh"
 JARVO = ROOT / "bin/jarvo"
 LOCAL_UP = ROOT / "scripts/local-up.sh"
 SCRIPTS = [INSTALL, JARVO, LOCAL_UP]
-# próby na sucho udają Linuksa i macOS podmienionymi programami (uname, sw_vers, sysctl) na Linuksie; na prawdziwym
-# macOS wygrywa systemowy uname i Homebrew, więc tam CI (installer.yml) sprawdza install.sh i jarvo na żywo
-pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="testy instalatora udają systemy na Linuksie")
+# Próby na sucho udają Linuksa i macOS podmienionymi programami (uname, sw_vers, sysctl) na Linuksie; na prawdziwym
+# macOS wygrywa systemowy uname i Homebrew, więc tam CI (installer.yml) sprawdza install.sh i jarvo na żywo. Dlatego
+# każdy test, który uruchamia bash, docker albo shellcheck, ma `linux_only` (instalator bash i jarvo to droga starej
+# instalacji z kontenerem, docs/NATYWNIE.md E1); testy samej treści plików biegną na każdym systemie.
 # programy, których instalator ma doinstalować, gdy ich brak (poza PATH testu)
 TOOLS = ("git", "curl", "python3", "openssl", "docker")
 
@@ -66,11 +66,12 @@ def _dry(tmp_path: Path, os_release: Path, hide=TOOLS, **extra) -> subprocess.Co
            "JARVO_DRY_RUN": "1", "JARVO_DISK_GB": "100", "JARVO_DIR": str(tmp_path / "home/jarvo"), "JARVO_OS_RELEASE": str(os_release)}
     env.update(extra)
     (tmp_path / "home").mkdir(parents=True, exist_ok=True)
-    return subprocess.run(["bash", str(INSTALL)], env=env, capture_output=True, text=True, timeout=60)
+    return subprocess.run(["bash", str(INSTALL)], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
 
 
 # ---------------------------------------------------------------- składnia i lint
 
+@pytest.mark.linux_only
 def test_scripts_parse():
     for s in SCRIPTS:
         assert subprocess.run(["bash", "-n", str(s)], capture_output=True).returncode == 0, s
@@ -79,14 +80,17 @@ def test_scripts_parse():
     assert (ROOT / "infra/autostart/jarvo-updater.service").exists()
 
 
+@pytest.mark.linux_only
 @pytest.mark.skipif(shutil.which("shellcheck") is None, reason="brak shellcheck (make dev-deps)")
 def test_shellcheck_clean():
-    res = subprocess.run(["shellcheck", "-S", "warning", *map(str, SCRIPTS)], capture_output=True, text=True)
+    res = subprocess.run(["shellcheck", "-S", "warning", *map(str, SCRIPTS)], capture_output=True, text=True,
+                         encoding="utf-8")
     assert res.returncode == 0, res.stdout
 
 
 # ---------------------------------------------------------------- próby na sucho
 
+@pytest.mark.linux_only
 def test_dry_run_fresh_ubuntu_installs_tools_and_docker(tmp_path):
     res = _dry(tmp_path, _os_release(tmp_path, "ubuntu", "debian"))
     assert res.returncode == 0, res.stdout + res.stderr
@@ -109,6 +113,7 @@ def _wsl_shims(bin_dir: Path, log: Path, app: str = r"C:\Users\tester\AppData\Lo
     _shim(bin_dir, "powershell.exe", f'printf "%s\\n" "$@" > "{log}"\n')
 
 
+@pytest.mark.linux_only
 def test_dry_run_wsl_makes_windows_jarvo_command(tmp_path):
     """jarvo update w Linuksie WSL zakłada też jarvo w PowerShellu (ten sam jarvo.cmd co install.ps1)."""
     proc = tmp_path / "version"
@@ -122,7 +127,7 @@ def test_dry_run_wsl_makes_windows_jarvo_command(tmp_path):
            "JARVO_DISK_GB": "100", "JARVO_DIR": str(tmp_path / "home/jarvo"),
            "JARVO_OS_RELEASE": str(_os_release(tmp_path, "ubuntu", "debian")), "JARVO_PROC_VERSION": str(proc),
            "WSL_DISTRO_NAME": "Ubuntu"}
-    res = subprocess.run(["bash", str(INSTALL)], env=env, capture_output=True, text=True, timeout=60)
+    res = subprocess.run(["bash", str(INSTALL)], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert res.returncode == 0, res.stdout + res.stderr
     out = res.stdout
     assert "System: wsl" in out
@@ -138,9 +143,10 @@ def _windows_cli(tmp_path: Path, **env) -> subprocess.CompletedProcess:
     script = ("say() { echo \"SAY $*\"; }\nwarn() { echo \"WARN $*\"; }\nOS=wsl\nDRY=0\n" + fn + "windows_cli\n")
     full = {"PATH": f"{tmp_path / 'bin'}:/usr/bin:/bin", "HOME": str(tmp_path), "WSL_DISTRO_NAME": "Ubuntu"}
     full.update(env)
-    return subprocess.run(["bash", "-c", script], env=full, capture_output=True, text=True, timeout=30)
+    return subprocess.run(["bash", "-c", script], env=full, capture_output=True, text=True, encoding="utf-8", timeout=30)
 
 
+@pytest.mark.linux_only
 def test_wsl_windows_cli_writes_cmd_and_path(tmp_path):
     (tmp_path / "bin").mkdir()
     _wsl_shims(tmp_path / "bin", tmp_path / "ps.log", app=r"C:\Users\O'Neil\AppData\Local")
@@ -151,23 +157,25 @@ def test_wsl_windows_cli_writes_cmd_and_path(tmp_path):
     # ta sama linia co WindowsCommand w install.ps1: ${PATH} i ${HOME} dla basha w Linuksie, %* dla cmd
     assert ('wsl.exe -d Ubuntu -u ' in cmd and ' --cd ~ -e bash -c "export PATH=${PATH}:${HOME}/.local/bin:'
             '${HOME}/jarvo/bin; exec jarvo \\"$@\\"" jarvo %*' in cmd)
-    ps = (tmp_path / "ps.log").read_text()
+    ps = (tmp_path / "ps.log").read_text(encoding="utf-8")
     assert "-NoProfile" in ps and "HKCU:\\Environment" in ps and "DoNotExpandEnvironmentNames" in ps
     assert r"$d='C:\Users\O''Neil\AppData\Local\Jarvo\bin'" in ps   # apostrof w nazwie użytkownika
     assert "SAY Polecenie jarvo w PowerShellu" in res.stdout
 
 
+@pytest.mark.linux_only
 def test_wsl_windows_cli_without_interop_only_warns(tmp_path):
     (tmp_path / "bin").mkdir()
     res = _windows_cli(tmp_path, PATH=str(tmp_path / "bin") + ":/usr/bin:/bin")   # brak cmd.exe (interop wyłączony)
     assert res.returncode == 0 and "WARN Polecenie jarvo w PowerShellu" in res.stdout and "wsl -d Ubuntu -- jarvo" in res.stdout
     _wsl_shims(tmp_path / "bin", tmp_path / "ps.log")
-    (tmp_path / "bin/powershell.exe").write_text("#!/bin/sh\nexit 1\n")   # PATH się nie zapisał
+    (tmp_path / "bin/powershell.exe").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")   # PATH się nie zapisał
     res = _windows_cli(tmp_path)
     assert res.returncode == 0 and (tmp_path / "win/Jarvo/bin/jarvo.cmd").exists()
     assert "WARN jarvo.cmd jest w" in res.stdout
 
 
+@pytest.mark.linux_only
 def test_dry_run_fedora_and_arch(tmp_path):
     fedora = _dry(tmp_path / "f", _os_release(tmp_path, "fedora"), JARVO_BRANCH="wydanie-1")
     assert fedora.returncode == 0, fedora.stdout + fedora.stderr
@@ -181,6 +189,7 @@ def test_dry_run_fedora_and_arch(tmp_path):
     assert "pacman -Sy --noconfirm --needed docker docker-compose docker-buildx" in arch.stdout
 
 
+@pytest.mark.linux_only
 def test_dry_run_rhel_likes_outside_get_docker_com(tmp_path):
     """get.docker.com zna tylko centos, rhel, rocky i fedorę: AlmaLinux i Oracle Linux biorą repo Dockera dla CentOS."""
     for d in ("a", "z", "u"):
@@ -196,6 +205,7 @@ def test_dry_run_rhel_likes_outside_get_docker_com(tmp_path):
     assert "APT_CONFIG=" in ubuntu.stdout
 
 
+@pytest.mark.linux_only
 def test_rootless_docker_refused_early(tmp_path):
     bin_dir = tmp_path / "shims"
     bin_dir.mkdir()
@@ -207,12 +217,14 @@ def test_rootless_docker_refused_early(tmp_path):
     assert res.returncode == 1 and "rootless" in res.stderr
 
 
+@pytest.mark.linux_only
 def test_dry_run_unknown_distro_stops_with_instructions(tmp_path):
     res = _dry(tmp_path, _os_release(tmp_path, "gentoo"))
     assert res.returncode == 1
     assert "Nieznana dystrybucja" in res.stderr and "docs.docker.com" in res.stderr
 
 
+@pytest.mark.linux_only
 def test_dry_run_with_docker_present_skips_install(tmp_path):
     bin_dir = tmp_path / "shims"
     bin_dir.mkdir()
@@ -225,6 +237,7 @@ def test_dry_run_with_docker_present_skips_install(tmp_path):
     assert "usermod" not in res.stdout and "groupadd" not in res.stdout   # Docker działa jako użytkownik: bez grupy i sudo do Dockera
 
 
+@pytest.mark.linux_only
 def test_dry_run_docker_without_buildx_gets_plugin(tmp_path):
     """Docker z pakietów dystrybucji (docker.io) bywa bez buildx: doinstalowujemy, bo compose build go wymaga."""
     bin_dir = tmp_path / "shims"
@@ -257,6 +270,7 @@ def _dry_mac(tmp_path: Path, extra_shims: Path | None = None, **extra) -> subpro
     return _dry(tmp_path, _os_release(tmp_path, "nieistotne"), PATH=":".join(path), **extra)
 
 
+@pytest.mark.linux_only
 def test_dry_run_macos_installs_brew_and_colima(tmp_path):
     res = _dry_mac(tmp_path)
     assert res.returncode == 0, res.stdout + res.stderr
@@ -273,6 +287,7 @@ def test_dry_run_macos_installs_brew_and_colima(tmp_path):
     assert "apt-get" not in out and "get.docker.com" not in out
 
 
+@pytest.mark.linux_only
 def test_dry_run_macos_homebrew_tier3_warning(tmp_path):
     """Homebrew ma gotowe paczki tylko dla Apple Silicon z macOS 15+; Intel i macOS 12–14 kompilują na miejscu."""
     assert "macOS 14: Homebrew ma gotowe paczki dla macOS 15" in _dry_mac(tmp_path / "a").stdout
@@ -281,6 +296,7 @@ def test_dry_run_macos_homebrew_tier3_warning(tmp_path):
     assert intel.returncode == 0 and "Mac z Intelem" in intel.stdout and "System: macOS 15.4 (x86_64)" in intel.stdout
 
 
+@pytest.mark.linux_only
 def test_disk_thresholds(tmp_path):
     """Obraz floty po rozpakowaniu ma ok. 7 GB (z warstwami spakowanymi 9,8 GB): minimum 20 GB, polecane 30."""
     low = _dry(tmp_path / "a", _os_release(tmp_path, "ubuntu"), JARVO_DISK_GB="15")
@@ -289,6 +305,7 @@ def test_disk_thresholds(tmp_path):
     assert mid.returncode == 0 and "Polecamy 30 GB wolnego miejsca" in mid.stdout
 
 
+@pytest.mark.linux_only
 def test_dry_run_macos_small_and_old(tmp_path):
     res = _dry_mac(tmp_path, ram_gb=8, ver="12.7")
     assert res.returncode == 0, res.stdout + res.stderr
@@ -299,6 +316,7 @@ def test_dry_run_macos_small_and_old(tmp_path):
     assert res.returncode == 1 and "macOS 12" in res.stderr
 
 
+@pytest.mark.linux_only
 def test_dry_run_macos_docker_running_keeps_it(tmp_path):
     shims = tmp_path / "dk"
     shims.mkdir()
@@ -316,6 +334,7 @@ def test_dry_run_macos_docker_running_keeps_it(tmp_path):
     assert "brew install -q docker-buildx" in res.stdout and "colima start" not in res.stdout
 
 
+@pytest.mark.linux_only
 def test_token_never_printed_and_used_for_git(tmp_path):
     res = _dry(tmp_path, _os_release(tmp_path, "ubuntu"), JARVO_TOKEN="ghp_tajnytoken123")
     assert res.returncode == 0, res.stdout + res.stderr
@@ -323,6 +342,7 @@ def test_token_never_printed_and_used_for_git(tmp_path):
     assert "git clone -q --depth 50 -b main" in res.stdout
 
 
+@pytest.mark.linux_only
 def test_low_ram_refuses_unless_forced(tmp_path):
     meminfo = tmp_path / "meminfo"
     meminfo.write_text("MemTotal:        2000000 kB\n", encoding="utf-8")
@@ -332,6 +352,7 @@ def test_low_ram_refuses_unless_forced(tmp_path):
     assert res.returncode == 0, res.stdout + res.stderr
 
 
+@pytest.mark.linux_only
 def test_four_gb_machine_counts_as_four_and_update_only_warns(tmp_path):
     """MemTotal „4 GB” maszyny to ok. 3,8 GB (jądro rezerwuje część); aktualizacja istniejącej floty nie przerywa."""
     meminfo = tmp_path / "meminfo"
@@ -349,6 +370,7 @@ def test_four_gb_machine_counts_as_four_and_update_only_warns(tmp_path):
     assert "Za mało RAM (2 GB)" in res.stdout and "Za mało miejsca (7 GB)" in res.stdout and "JARVO_FORCE" not in res.stdout
 
 
+@pytest.mark.linux_only
 def test_setup_only_and_no_secrets_in_output(tmp_path):
     res = _dry(tmp_path, _os_release(tmp_path, "ubuntu"), JARVO_SETUP_ONLY="1", JARVO_KEY="sk-tajny-klucz-123")
     assert res.returncode == 0, res.stdout + res.stderr
@@ -360,9 +382,10 @@ def test_setup_only_and_no_secrets_in_output(tmp_path):
 
 def _jarvo(*args, **env_extra) -> subprocess.CompletedProcess:
     env = {**os.environ, **env_extra}
-    return subprocess.run(["bash", str(JARVO), *args], env=env, capture_output=True, text=True, timeout=30)
+    return subprocess.run(["bash", str(JARVO), *args], env=env, capture_output=True, text=True, encoding="utf-8", timeout=30)
 
 
+@pytest.mark.linux_only
 def test_jarvo_update_without_network_says_so(tmp_path):
     """Brak sieci (WSL po uśpieniu, VPN): komunikat mówi o sieci, a nie o „lokalnych zmianach” w repo."""
     bindir = tmp_path / "bin"
@@ -376,6 +399,7 @@ def test_jarvo_update_without_network_says_so(tmp_path):
     assert "lokalne zmiany" not in out and ("internetu" in out or "połączenia z GitHubem" in out)
 
 
+@pytest.mark.linux_only
 def test_jarvo_help_version_and_unknown():
     assert _jarvo("help").returncode == 0
     assert "jarvo uninstall" in _jarvo("help").stdout
@@ -383,18 +407,19 @@ def test_jarvo_help_version_and_unknown():
     assert _jarvo("version").returncode == 0
 
 
+@pytest.mark.linux_only
 def test_jarvo_uninstall_without_registry_image(tmp_path):
     """uninstall --yes przy obrazie zbudowanym na miejscu (brak tagów src-* z rejestru) kończy się sukcesem."""
     bin_ = tmp_path / "bin"; bin_.mkdir()
     _shim(bin_, "docker", 'echo "docker $*" >> "$LOG"\n'
           'case "$1" in images) echo jarvo-hermes:local;; esac\nexit 0\n')
     flota = tmp_path / "flota"; (flota / "compose").mkdir(parents=True)
-    (flota / "compose/.env").write_text("DASHBOARD_PASSWORD=x\n")
+    (flota / "compose/.env").write_text("DASHBOARD_PASSWORD=x\n", encoding="utf-8")
     res = _jarvo("uninstall", "--yes", JARVO_LOCAL=str(flota), LOG=str(tmp_path / "log"),
                  PATH=f"{bin_}:{os.environ['PATH']}", HOME=str(tmp_path))
     assert res.returncode == 0, res.stdout + res.stderr
     assert "Flota usunięta" in res.stdout and "Dane zostają" in res.stdout
-    assert "docker image rm -f jarvo-hermes:local" in (tmp_path / "log").read_text()
+    assert "docker image rm -f jarvo-hermes:local" in (tmp_path / "log").read_text(encoding="utf-8")
     assert (flota / "compose/.env").exists()
 
 
@@ -423,11 +448,13 @@ def _uninstall_mac(tmp_path: Path, inne_kontenery: str = "") -> tuple[subprocess
     (flota / ".colima").write_text("", encoding="utf-8")   # Colimę postawił instalator
     log = tmp_path / "log"
     res = subprocess.run(["bash", str(repo / "bin/jarvo"), "uninstall", "--yes", "--all"], capture_output=True, text=True,
-                         timeout=30, env={**os.environ, "PATH": f"{mac}:{os.environ['PATH']}", "HOME": str(tmp_path),
+                         encoding="utf-8", timeout=30,
+                         env={**os.environ, "PATH": f"{mac}:{os.environ['PATH']}", "HOME": str(tmp_path),
                                           "JARVO_LOCAL": str(flota), "LOG": str(log)})
     return res, log.read_text(encoding="utf-8") if log.exists() else "", brew / "bin/jarvo"
 
 
+@pytest.mark.linux_only
 def test_jarvo_uninstall_macos_removes_homebrew_link_and_colima(tmp_path):
     """Apple Silicon: polecenie jarvo leży w /opt/homebrew/bin; --all zwalnia maszynę wirtualną Colimy instalatora."""
     res, log, link = _uninstall_mac(tmp_path)
@@ -440,6 +467,7 @@ def test_jarvo_uninstall_macos_removes_homebrew_link_and_colima(tmp_path):
     assert "colima delete" not in log and "Colima zostaje" in res.stdout
 
 
+@pytest.mark.linux_only
 def test_jarvo_android_on_arm_skips_x86_emulator(tmp_path):
     """Obraz emulatora jest tylko dla x86_64: na ARM (Ampere, Graviton, Raspberry Pi) od razu jasna odmowa."""
     bin_ = tmp_path / "bin"; bin_.mkdir()
@@ -457,6 +485,7 @@ def _install_fn(name: str) -> str:
     return text[start:text.index("\n}\n", start) + 3]
 
 
+@pytest.mark.linux_only
 def test_brew_shellenv_keeps_existing_profile(tmp_path):
     """bash przy logowaniu czyta tylko pierwszy z .bash_profile/.bash_login/.profile: nowy .bash_profile ukryłby .profile."""
     brew = tmp_path / "brew"
@@ -465,22 +494,23 @@ def test_brew_shellenv_keeps_existing_profile(tmp_path):
 
     def shellenv(home: Path) -> None:
         script = _install_fn("brew_shellenv") + f'DRY=0; BREW={brew}; HOME={home}; brew_shellenv\n'
-        res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+        res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, encoding="utf-8", timeout=30)
         assert res.returncode == 0, res.stderr
 
     a = tmp_path / "a"; a.mkdir()
     (a / ".profile").write_text("export X=1\n", encoding="utf-8")
     shellenv(a)
     shellenv(a)   # drugi raz bez powtórki
-    assert not (a / ".bash_profile").exists() and (a / ".profile").read_text().count("eval ") == 1
-    assert "shellenv" in (a / ".zprofile").read_text()
+    assert not (a / ".bash_profile").exists() and (a / ".profile").read_text(encoding="utf-8").count("eval ") == 1
+    assert "shellenv" in (a / ".zprofile").read_text(encoding="utf-8")
     b = tmp_path / "b"; b.mkdir()
     (b / ".bash_profile").write_text("# moje\n", encoding="utf-8")
     shellenv(b)
-    assert "shellenv" in (b / ".bash_profile").read_text() and not (b / ".profile").exists()
+    assert "shellenv" in (b / ".bash_profile").read_text(encoding="utf-8") and not (b / ".profile").exists()
 
 
 
+@pytest.mark.linux_only
 def test_pobierz_retries_transient_network_error(tmp_path):
     """curl: (7) Failed to connect (sieć runnera, chwilowa awaria) nie kończy instalacji: pobierz() ponawia do 3 razy."""
     bin_dir = tmp_path / "bin"; bin_dir.mkdir()
@@ -493,14 +523,15 @@ def test_pobierz_retries_transient_network_error(tmp_path):
         licznik.unlink(missing_ok=True)
         script = 'warn() { echo "W: $*"; }\n' + _install_fn("pobierz") + f'pobierz https://get.docker.com {tmp_path}/out\n'
         env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "UDANA": udana}
-        return subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30, env=env)
+        return subprocess.run(["bash", "-c", script], capture_output=True, text=True, encoding="utf-8", timeout=30, env=env)
 
     res = pobierz("3")
     assert res.returncode == 0, res.stdout + res.stderr
-    assert (tmp_path / "out").read_text() == "skrypt\n" and res.stdout.count("ponawiam") == 2
+    assert (tmp_path / "out").read_text(encoding="utf-8") == "skrypt\n" and res.stdout.count("ponawiam") == 2
     res = pobierz("9")
-    assert res.returncode == 1 and licznik.read_text().count("x") == 4 and "ponawiam (3/3)" in res.stdout
+    assert res.returncode == 1 and licznik.read_text(encoding="utf-8").count("x") == 4 and "ponawiam (3/3)" in res.stdout
 
+@pytest.mark.linux_only
 def test_mac_compose_plugin_drops_stale_docker_desktop_creds(tmp_path):
     """Po odinstalowanym Docker Desktop zostaje credsStore "desktop": docker pull w Colimie by się wywracał."""
     import json
@@ -512,7 +543,7 @@ def test_mac_compose_plugin_drops_stale_docker_desktop_creds(tmp_path):
     def run(extra_path: str = "") -> dict:
         cfg.write_text(json.dumps({"credsStore": "desktop", "auths": {}}), encoding="utf-8")
         script = _install_fn("mac_compose_plugin") + f'DRY=0; BREW={shims}/brew; HOME={tmp_path}; mac_compose_plugin\n'
-        res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30,
+        res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, encoding="utf-8", timeout=30,
                              env={**os.environ, "PATH": f"{extra_path}{shims}:{os.environ['PATH']}"})
         assert res.returncode == 0, res.stderr
         return json.loads(cfg.read_text(encoding="utf-8"))
@@ -532,10 +563,11 @@ def test_jarvo_old_bash_does_not_loop(tmp_path):
     assert "BASH_VERSINFO[0] >= 4" in text and 'export PATH="${BASH%/*}:$PATH"' in text
 
 
+@pytest.mark.linux_only
 def test_launchagent_runs_in_background(tmp_path):
     import plistlib
     res = subprocess.run(["bash", str(_mac_repo(tmp_path) / "bin/jarvo"), "autostart", "print"], capture_output=True,
-                         text=True, timeout=30, env={**os.environ, "JARVO_LOCAL": str(tmp_path / "flota"),
+                         text=True, encoding="utf-8", timeout=30, env={**os.environ, "JARVO_LOCAL": str(tmp_path / "flota"),
                                                      "PATH": f"{_mac_shims(tmp_path)}:{os.environ['PATH']}"})
     assert res.returncode == 0, res.stderr
     plist = plistlib.loads(res.stdout.encode())
@@ -543,6 +575,7 @@ def test_launchagent_runs_in_background(tmp_path):
     assert ".orbstack/bin" in plist["EnvironmentVariables"]["PATH"]
 
 
+@pytest.mark.linux_only
 def test_jarvo_unit_rendering(tmp_path):
     res = _jarvo("autostart", "print", JARVO_LOCAL=str(tmp_path / "flota"), JARVO_AUTO_UPDATE="1")
     assert res.returncode == 0, res.stderr
@@ -552,6 +585,7 @@ def test_jarvo_unit_rendering(tmp_path):
     assert "WantedBy=default.target" in unit and "#" not in unit
 
 
+@pytest.mark.linux_only
 def test_jarvo_reads_local_dir_from_marker(tmp_path):
     repo = tmp_path / "repo"
     shutil.copytree(ROOT / "bin", repo / "bin")
@@ -559,11 +593,12 @@ def test_jarvo_reads_local_dir_from_marker(tmp_path):
     (repo / ".jarvo-local").write_text(str(tmp_path / "moja-flota") + "\n", encoding="utf-8")
     res = subprocess.run(["bash", str(repo / "bin/jarvo"), "autostart", "print"],
                          env={k: v for k, v in os.environ.items() if k != "JARVO_LOCAL"},
-                         capture_output=True, text=True, timeout=30)
+                         capture_output=True, text=True, encoding="utf-8", timeout=30)
     assert res.returncode == 0, res.stderr
     assert f"JARVO_LOCAL={tmp_path / 'moja-flota'}" in res.stdout
 
 
+@pytest.mark.linux_only
 def test_jarvo_needs_installed_fleet(tmp_path):
     res = _jarvo("status", JARVO_LOCAL=str(tmp_path / "nic"))
     assert res.returncode == 1 and "nie jest zainstalowana" in res.stderr
@@ -571,7 +606,9 @@ def test_jarvo_needs_installed_fleet(tmp_path):
 
 # ---------------------------------------------------------------- local-up.sh --prepare
 
-@pytest.mark.skipif(os.geteuid() != 0, reason="chgrp/chown na uid 10000 wymaga roota (w piaskownce jesteśmy rootem)")
+@pytest.mark.linux_only
+@pytest.mark.skipif(getattr(os, "geteuid", lambda: -1)() != 0,
+                    reason="chgrp/chown na uid 10000 wymaga roota (w piaskownce jesteśmy rootem)")
 def test_local_up_prepare_without_questions(tmp_path):
     bin_dir = tmp_path / "shims"
     bin_dir.mkdir()
@@ -579,7 +616,7 @@ def test_local_up_prepare_without_questions(tmp_path):
     local = tmp_path / "flota"
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "JARVO_LOCAL": str(local),
            "JARVO_PROVIDER": "commandcode-anthropic", "JARVO_KEY": "cc-tajny-klucz", "JARVO_YES": "1"}
-    res = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], env=env, capture_output=True, text=True,
+    res = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], env=env, capture_output=True, text=True, encoding="utf-8",
                          timeout=60, stdin=subprocess.DEVNULL)
     assert res.returncode == 0, res.stdout + res.stderr
     assert "cc-tajny-klucz" not in res.stdout + res.stderr
@@ -593,10 +630,11 @@ def test_local_up_prepare_without_questions(tmp_path):
     assert (local / "data").stat().st_uid == 10000 and not (local / ".installed").exists()
 
     bad = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], env={**env, "JARVO_LOCAL": str(tmp_path / "x"),
-                         "JARVO_PROVIDER": "nieznany"}, capture_output=True, text=True, timeout=60)
+                         "JARVO_PROVIDER": "nieznany"}, capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert bad.returncode == 2 and "Nieznany JARVO_PROVIDER" in bad.stdout
 
 
+@pytest.mark.linux_only
 def test_local_up_prepare_volumes_mode(tmp_path):
     """macOS (tu JARVO_VOLUMES=1): dane i build w wolumenach Dockera, bez chown katalogów hosta."""
     bin_dir = tmp_path / "shims"
@@ -605,7 +643,7 @@ def test_local_up_prepare_volumes_mode(tmp_path):
     local = tmp_path / "flota"
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "JARVO_LOCAL": str(local),
            "JARVO_YES": "1", "JARVO_VOLUMES": "1"}
-    res = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], env=env, capture_output=True, text=True,
+    res = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], env=env, capture_output=True, text=True, encoding="utf-8",
                          timeout=60, stdin=subprocess.DEVNULL)
     assert res.returncode == 0, res.stdout + res.stderr
     dot_env = (local / "compose/.env").read_text(encoding="utf-8")
@@ -614,6 +652,7 @@ def test_local_up_prepare_volumes_mode(tmp_path):
     assert (local / "data").stat().st_uid != 10000   # wolumeny: katalogów hosta nie przejmujemy
 
 
+@pytest.mark.linux_only
 def test_compose_volumes_interpolation(tmp_path):
     """Ten sam docker-compose.yml: katalogi hosta (Linux) albo wolumeny o stałych nazwach (macOS)."""
     if shutil.which("docker") is None or subprocess.run(["docker", "compose", "version"], capture_output=True).returncode:
@@ -624,7 +663,7 @@ def test_compose_volumes_interpolation(tmp_path):
 
     def cfg(**extra):
         r = subprocess.run(["docker", "compose", "-f", str(compose), "config", "--format", "json"],
-                           env={**os.environ, **base, **extra}, capture_output=True, text=True, timeout=60)
+                           env={**os.environ, **base, **extra}, capture_output=True, text=True, encoding="utf-8", timeout=60)
         assert r.returncode == 0, r.stderr
         import json
         return {v["target"]: v for v in json.loads(r.stdout)["services"]["hermes"]["volumes"]}
@@ -639,26 +678,28 @@ def test_compose_volumes_interpolation(tmp_path):
 def test_hermes_pinned_everywhere():
     """Jedna wersja Hermesa: ARG w Dockerfile = domyślna w compose = fleet.yaml (klucz obrazu w GHCR jej dotyczy)."""
     import re
-    pin = re.search(r"^ARG HERMES_IMAGE=(\S+)$", (ROOT / "infra/Dockerfile").read_text(), re.M).group(1)
+    pin = re.search(r"^ARG HERMES_IMAGE=(\S+)$", (ROOT / "infra/Dockerfile").read_text(encoding="utf-8"), re.M).group(1)
     assert re.fullmatch(r"nousresearch/hermes-agent:[\w.-]+@sha256:[0-9a-f]{64}", pin), pin
-    assert "HERMES_IMAGE: ${HERMES_IMAGE:-" + pin + "}" in (ROOT / "infra/docker-compose.yml").read_text()
-    assert f"hermes_image: {pin} " in (ROOT / "fleet.yaml").read_text()
-    assert re.search(r"^HERMES_IMAGE=$", (ROOT / "infra/env/compose.env.example").read_text(), re.M)
+    assert "HERMES_IMAGE: ${HERMES_IMAGE:-" + pin + "}" in (ROOT / "infra/docker-compose.yml").read_text(encoding="utf-8")
+    assert f"hermes_image: {pin} " in (ROOT / "fleet.yaml").read_text(encoding="utf-8")
+    assert re.search(r"^HERMES_IMAGE=$", (ROOT / "infra/env/compose.env.example").read_text(encoding="utf-8"), re.M)
 
 
+@pytest.mark.linux_only
 def test_obraz_own_hermes_builds_locally(tmp_path):
     """Własny HERMES_IMAGE w compose/.env: obraz z rejestru nie pasuje, więc budowa na miejscu (kod 1, bez docker pull)."""
-    (tmp_path / ".env").write_text("HERMES_IMAGE=hermes-ca:test\n")
+    (tmp_path / ".env").write_text("HERMES_IMAGE=hermes-ca:test\n", encoding="utf-8")
     bin_ = tmp_path / "bin"; bin_.mkdir()
     _shim(bin_, "docker", 'echo "docker $*" >> "$LOG"; exit 0')
     env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "LOG": str(tmp_path / "log")}
     r = subprocess.run(["bash", str(ROOT / "scripts/obraz.sh"), "pobierz", str(tmp_path)], env=env,
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 1 and "Własny HERMES_IMAGE" in r.stdout
     assert not (tmp_path / "log").exists()
 
 
 
+@pytest.mark.linux_only
 def test_obraz_image_extras_build_locally(tmp_path):
     """Dodatki obrazu w JARVO_EXTRAS: CI buduje obraz bez nich, więc pobranie dałoby obraz bez dodatków (kod 1, bez
     docker pull); lemo i mgaudio instalują się w działającym kontenerze, więc z nimi obraz dalej się pobiera."""
@@ -669,15 +710,15 @@ def test_obraz_image_extras_build_locally(tmp_path):
     env.pop("JARVO_EXTRAS", None); env.pop("JARVO_TOKEN", None)
     for wpis, zmienna, dodatek in [('JARVO_EXTRAS="lemo,manim"\n', None, "manim"), ("JARVO_EXTRAS=office\n", None, "office"),
                                    ("JARVO_EXTRAS=\n", "lemo docling", "docling")]:
-        (tmp_path / ".env").write_text(wpis)
+        (tmp_path / ".env").write_text(wpis, encoding="utf-8")
         r = subprocess.run(["bash", str(ROOT / "scripts/obraz.sh"), "pobierz", str(tmp_path)], capture_output=True,
-                           text=True, env=env if zmienna is None else {**env, "JARVO_EXTRAS": zmienna})
+                           text=True, encoding="utf-8", env=env if zmienna is None else {**env, "JARVO_EXTRAS": zmienna})
         assert r.returncode == 1 and f"Dodatek obrazu {dodatek}" in r.stdout, r.stdout + r.stderr
     assert not log.exists()
-    (tmp_path / ".env").write_text("JARVO_EXTRAS=lemo mgaudio\n")
+    (tmp_path / ".env").write_text("JARVO_EXTRAS=lemo mgaudio\n", encoding="utf-8")
     r = subprocess.run(["bash", str(ROOT / "scripts/obraz.sh"), "pobierz", str(tmp_path)], capture_output=True,
-                       text=True, env=env)
-    assert r.returncode == 0 and "docker pull" in log.read_text(), r.stdout + r.stderr
+                       text=True, encoding="utf-8", env=env)
+    assert r.returncode == 0 and "docker pull" in log.read_text(encoding="utf-8"), r.stdout + r.stderr
 
 
 def test_obraz_extras_match_dockerfile():
@@ -707,7 +748,7 @@ def _obraz(tmp_path: Path, docker: str, **env_extra) -> tuple[subprocess.Complet
            "STAN": str(tmp_path / "stan"), **env_extra}
     env.pop("JARVO_TOKEN", None)
     r = subprocess.run(["bash", str(repo / "scripts/obraz.sh"), "pobierz", str(tmp_path / "compose")], env=env,
-                       capture_output=True, text=True, timeout=60)
+                       capture_output=True, text=True, encoding="utf-8", timeout=60)
     return r, log.read_text(encoding="utf-8") if log.exists() else ""
 
 
@@ -719,6 +760,7 @@ _PULL_DRUGI = ('case "$1" in\n'
                'esac\nexit 0\n')
 
 
+@pytest.mark.linux_only
 def test_obraz_waits_for_ci_build_of_fresh_change(tmp_path):
     """Świeża zmiana infra/: obrazu jeszcze nie ma (CI buduje) → czekamy na manifest zamiast budować na miejscu."""
     r, log = _obraz(tmp_path, _PULL_DRUGI, BLAD="manifest unknown: not found")
@@ -731,6 +773,7 @@ def test_obraz_waits_for_ci_build_of_fresh_change(tmp_path):
     assert r.returncode == 1 and "Brak gotowego obrazu" in r.stdout and "manifest inspect" not in log
 
 
+@pytest.mark.linux_only
 def test_obraz_retries_broken_download_but_not_denied(tmp_path):
     r, log = _obraz(tmp_path, _PULL_DRUGI, BLAD="read: connection reset by peer")
     assert r.returncode == 0, r.stdout + r.stderr
@@ -740,6 +783,7 @@ def test_obraz_retries_broken_download_but_not_denied(tmp_path):
     assert r.returncode == 1 and "Rejestr odmówił" in r.stdout and log.count("docker pull") == 1
 
 
+@pytest.mark.linux_only
 @pytest.mark.skipif(shutil.which("script") is None, reason="brak script (util-linux) do udawania terminala")
 def test_dashboard_password_on_screen_not_in_install_log(tmp_path):
     """Koniec local-up.sh: hasło do HQ idzie na terminal, a install.log (tee) dostaje tylko `jarvo haslo`."""
@@ -758,10 +802,11 @@ def test_dashboard_password_on_screen_not_in_install_log(tmp_path):
     assert "sekret123xyz" in ekran.read_text(encoding="utf-8", errors="replace")
 
 
+@pytest.mark.linux_only
 def test_local_up_prepare_without_terminal(tmp_path):
     """ssh 'curl | bash', cloud-init, Ansible: bez terminala read zwraca EOF; wybór domyślny zamiast cichego wyjścia."""
     res = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                         timeout=60, env={**os.environ, "JARVO_LOCAL": str(tmp_path / "L")})
+                         encoding="utf-8", timeout=60, env={**os.environ, "JARVO_LOCAL": str(tmp_path / "L")})
     assert res.returncode == 0, res.stdout + res.stderr
     assert "Bez terminala" in res.stdout and (tmp_path / "L/compose/.env").exists()
 
@@ -785,10 +830,11 @@ def _repo_sync(tmp_path: Path, bledy: list[str]) -> tuple[subprocess.CompletedPr
     repo = tmp_path / "jarvo"; (repo / ".git").mkdir(parents=True)
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "JARVO_GIT_PAUSE": "0", "JARVO_DIR": str(repo)}
     r = subprocess.run(["bash", "-c", f'source {tmp_path}/fn.sh; DIR={repo}; BRANCH=main; repo_sync; echo KONIEC'],
-                       env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
+                       env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", timeout=60)
     return r, log.read_text(encoding="utf-8")
 
 
+@pytest.mark.linux_only
 def test_repo_sync_retries_transient_git_error_without_token_prompt(tmp_path):
     """Równoległy git fetch pomocnika aktualizacji (updater.py) starej instalacji: chwilowy błąd refów, nie brak dostępu."""
     r, log = _repo_sync(tmp_path, ["error: fetching ref refs/remotes/origin/main failed: incorrect old value provided\n"])
@@ -797,6 +843,7 @@ def test_repo_sync_retries_transient_git_error_without_token_prompt(tmp_path):
     assert "próbuję jeszcze raz" in r.stdout + r.stderr
 
 
+@pytest.mark.linux_only
 def test_repo_sync_access_denied_no_retry_and_clear_error(tmp_path):
     """Odmowa dostępu: bez ponawiania; bez terminala nie pytamy o klucz, tylko kończymy z treścią błędu gita."""
     blad = "fatal: could not read Username for 'https://github.com': terminal prompts disabled\n"
@@ -806,6 +853,7 @@ def test_repo_sync_access_denied_no_retry_and_clear_error(tmp_path):
     assert "terminal prompts disabled" in r.stderr
 
 
+@pytest.mark.linux_only
 def test_jarvo_update_ignores_broken_branch_config(tmp_path):
     """jarvo update pobiera swoją gałąź wprost (fetch + FETCH_HEAD): git pull padał u właściciela na
     „Cannot fast-forward to multiple branches” (dwa wpisy branch.main.merge) mimo czystego repo."""
@@ -824,8 +872,10 @@ def test_jarvo_update_ignores_broken_branch_config(tmp_path):
     git("commit", "-q", "--allow-empty", "-m", "nowa wersja", cwd=up)
     git("config", "--add", "branch.main.merge", "refs/heads/inna", cwd=cl)
     git("config", "--add", "remote.origin.fetch", "+refs/heads/inna:refs/remotes/origin/inna", cwd=cl)
-    res = subprocess.run(["bash", str(cl / "bin/jarvo"), "update"], capture_output=True, text=True, timeout=60,
-                         env={"PATH": os.environ["PATH"], "HOME": str(tmp_path), "JARVO_LOCAL": str(tmp_path / "local")})
+    res = subprocess.run(["bash", str(cl / "bin/jarvo"), "update"], capture_output=True, text=True, encoding="utf-8",
+                         timeout=60, env={"PATH": os.environ["PATH"], "HOME": str(tmp_path),
+                                          "JARVO_LOCAL": str(tmp_path / "local")})
     assert res.returncode == 0 and "INSTALL main" in res.stdout, res.stdout + res.stderr
-    log = subprocess.run(["git", "-C", str(cl), "log", "--oneline", "-1"], capture_output=True, text=True).stdout
+    log = subprocess.run(["git", "-C", str(cl), "log", "--oneline", "-1"], capture_output=True, text=True,
+                         encoding="utf-8").stdout
     assert "nowa wersja" in log
