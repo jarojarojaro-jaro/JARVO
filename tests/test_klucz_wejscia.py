@@ -115,7 +115,8 @@ def test_katalog_kluczy_tylko_dla_wlasciciela_na_windows(tmp_path, monkeypatch, 
     powstaje teraz, czy został po starszej wersji; pliki skrótów mają tylko wpisy właściciela, SYSTEM i administratorów."""
     sid = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, check=True, text=True,
                          encoding="utf-8", errors="replace").stdout.strip().split(",")[-1].strip('"')
-    dozwoleni = {sid, "SY", "BA", "OW"}                     # właściciel, SYSTEM, Administratorzy, prawa właściciela
+    ja = {sid} | ({"LA"} if sid.endswith("-500") else set())   # wbudowany Administrator (runner CI): SDDL „LA”
+    dozwoleni = ja | {"SY", "BA", "OW"}                     # właściciel, SYSTEM, Administratorzy, prawa właściciela
     dane = tmp_path / "dane"
     dane.mkdir()
     subprocess.run(["icacls", str(dane), "/grant", "*S-1-5-32-545:(OI)(CI)M"], check=True, capture_output=True)
@@ -126,7 +127,7 @@ def test_katalog_kluczy_tylko_dla_wlasciciela_na_windows(tmp_path, monkeypatch, 
     klucz = _klucz_mod(katalog, monkeypatch)
     kod = _nowy(klucz, capsys)
     flagi, kto = _dacl(katalog)
-    assert "P" in flagi and sid in kto and kto <= dozwoleni, (flagi, kto)
+    assert "P" in flagi and ja & kto and kto <= dozwoleni, (flagi, kto)
     assert _dacl(katalog / klucz.skrot(kod))[1] <= dozwoleni
 
 

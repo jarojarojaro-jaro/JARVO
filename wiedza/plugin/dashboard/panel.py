@@ -42,6 +42,12 @@ def korzen_danych(hermes_home: str) -> Path:
     return h.parent.parent if h.parent.name == "profiles" else h
 
 
+
+
+def w_kontenerze() -> bool:
+    """Czy dashboard działa w obrazie jarvo-hermes (układ /opt/hermes); natywnie (docs/NATYWNIE.md) nie."""
+    return Path("/opt/hermes/.venv").is_dir()
+
 class Panel:
     def __init__(self, skarbiec: str | Path, stan: str | Path, repo: str | Path = "/opt/jarvo/repo", profil_kompilacji: str = "jarvo",
                  dane: str | Path | None = None):
@@ -266,7 +272,7 @@ class Panel:
     def compile_command(self) -> Optional[List[str]]:
         # skrypt bash zna tylko układ kontenera (/opt/data, /opt/hermes); natywnie (Windows, macOS, Linux bez
         # kontenera) kompilacja.py Pythonem dashboardu (venv Hermesa); na Windows bash z Pythona to i tak WSL
-        if WINDOWS or not Path("/opt/hermes/.venv").is_dir():
+        if WINDOWS or not w_kontenerze():
             k = self._kompilacja_py()
             return [sys.executable, str(k), "--skarbiec", str(self.sk.root), "--stan", str(self.sk.stan), "--json"] if k else None
         skrypt = self.repo / "scripts" / "wiedza-kompiluj.sh"

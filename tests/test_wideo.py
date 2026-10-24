@@ -760,7 +760,7 @@ def test_code_tools_helpers(monkeypatch, tmp_path):
     assert nz.jest_dowiazaniem(link) and link.resolve() == (tmp_path / "node" / "node_modules").resolve()
     assert link.is_symlink() == (os.name != "nt")                          # na Windows junction (bez uprawnień admina)
     assert nz.link(tmp_path / "projekt") == link                           # drugi raz bez błędu
-    (tmp_path / "node" / "node_modules" / "pakiet").mkdir()
+    (tmp_path / "node" / "node_modules" / "pakiet").mkdir(parents=True)   # cel może jeszcze nie istnieć (npm go założy)
     assert (link / "pakiet").is_dir()                                      # przez dowiązanie widać wspólne pakiety
 
 

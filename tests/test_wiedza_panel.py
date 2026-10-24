@@ -114,7 +114,10 @@ def test_historia_notatki_z_polskimi_znakami(panel):
 
 # kontener: przycisk woła scripts/wiedza-kompiluj.sh bashem; na Windows bash z Pythona to WSL (test niżej)
 @pytest.mark.posix_only
-def test_compile_process(panel, tmp_path):
+def test_compile_process(panel, tmp_path, monkeypatch):
+    """Kontener (obraz jarvo-hermes): przycisk woła scripts/wiedza-kompiluj.sh; bez skryptu kompilacji nie ma."""
+    monkeypatch.setattr(pm, "WINDOWS", False)
+    monkeypatch.setattr(pm, "w_kontenerze", lambda: True)
     assert panel.compile_command() is None
     assert panel.compile_start()["blad"].startswith("brak scripts/wiedza-kompiluj.sh")
     skrypt = tmp_path / "repo" / "scripts" / "wiedza-kompiluj.sh"
