@@ -13,6 +13,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const sharp = require('sharp');
 const { chromium } = require('playwright-core');
 
@@ -38,7 +39,8 @@ function browserPath() {
       } else {
         if (!browser) browser = await chromium.launch({ executablePath: browserPath(), args: ['--no-sandbox', '--allow-file-access-from-files'] });
         const page = await browser.newPage({ viewport: { width: z.w, height: z.h }, deviceScaleFactor: 1 });
-        await page.goto('file://' + z.html, { waitUntil: 'load', timeout: 60000 });
+        // pathToFileURL: na Windows 'file://' + 'C:\\…' nie jest adresem (litera dysku, „\”, spacje)
+        await page.goto(pathToFileURL(z.html).href, { waitUntil: 'load', timeout: 60000 });
         await page.waitForFunction(() => [...document.images].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 30000 });
         await page.waitForFunction(() => window.KADR_GOTOWY !== false, null, { timeout: 10000 }).catch(() => {});
         await page.evaluate(() => document.fonts.ready);

@@ -239,7 +239,7 @@ def sprawdz(fakty: dict, rejestr: Path | None = None, dlugosc: float | None = No
     return {"ok": not bledy, "bledy": bledy, "ostrzezenia": ostrz, "liczby": len(lista),
             "zakres_liczb": f"{zakres[0]}–{zakres[1]}" if zakres else None, "analogie": len(analogie),
             "slowniczek": len(slownik), "wymowa": sum(1 for t in slownik if str(t.get("wymowa") or "").strip()),
-            "niepewne": len(fakty.get("niepewne") or []), "rejestr": str(rejestr) if rejestr else None}
+            "niepewne": len(fakty.get("niepewne") or []), "rejestr": rejestr.as_posix() if rejestr else None}
 
 
 def main(argv: list[str] | None = None) -> int:

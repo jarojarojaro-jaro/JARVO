@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -30,8 +31,10 @@ DAY = 86400
 
 
 def _hermes(*args: str) -> str:
-    res = subprocess.run([os.environ.get("JARVO_HERMES_BIN", "hermes"), *args],
-                         capture_output=True, text=True, timeout=120)
+    prog = os.environ.get("JARVO_HERMES_BIN", "hermes")
+    # pełna ścieżka z PATH: na Windows nakładka hermes bywa plikiem .cmd, którego CreateProcess nie znajdzie po nazwie
+    res = subprocess.run([shutil.which(prog) or prog, *args],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     if res.returncode != 0:
         raise RuntimeError(res.stderr.strip()[:300])
     return res.stdout

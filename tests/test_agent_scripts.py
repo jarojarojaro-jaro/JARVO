@@ -160,11 +160,12 @@ def zbuduj(dist, strony: dict) -> None:
     for rel, html in strony.items():
         (dist / rel).parent.mkdir(parents=True, exist_ok=True)
         (dist / rel).write_text(html, encoding="utf-8")
-    (dist / "robots.txt").write_text("User-agent: *\nAllow: /\nSitemap: https://nova.example/sitemap-index.xml\n")
-    (dist / "llms.txt").write_text("# Nova\n")
+    (dist / "robots.txt").write_text("User-agent: *\nAllow: /\nSitemap: https://nova.example/sitemap-index.xml\n",
+                                      encoding="utf-8")
+    (dist / "llms.txt").write_text("# Nova\n", encoding="utf-8")
     (dist / "og.png").write_bytes(png())
     (dist / "sitemap-0.xml").write_text("<urlset><url><loc>https://nova.example/</loc></url>"
-                                        "<url><loc>https://nova.example/serum/</loc></url></urlset>")
+                                        "<url><loc>https://nova.example/serum/</loc></url></urlset>", encoding="utf-8")
 
 
 def test_seo_dir(tmp_path, capsys):

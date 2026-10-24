@@ -53,7 +53,8 @@ def _wersja_pakietu(kat: Path, nazwa: str) -> str:
 
 
 def sdk_z_npm() -> dict:
-    r = subprocess.run(["npm", "view", "expo", "dist-tags", "--json"], capture_output=True, text=True, timeout=60)
+    r = subprocess.run([ml.program("npm"), "view", "expo", "dist-tags", "--json"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", timeout=60)
     if r.returncode != 0:
         raise ConnectionError(f"npm view expo: {r.stderr.strip()[-300:]}")
     tagi = json.loads(r.stdout)
@@ -62,8 +63,9 @@ def sdk_z_npm() -> dict:
 
 
 def runtime(kat: Path, platforma: str) -> str | None:
-    r = subprocess.run(["npx", "expo-updates", "runtimeversion:resolve", "--platform", platforma], cwd=kat,
-                       capture_output=True, text=True, timeout=300, env={**os.environ, "CI": "1"})
+    r = subprocess.run([ml.program("npx"), "expo-updates", "runtimeversion:resolve", "--platform", platforma], cwd=kat,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
+                       env={**os.environ, "CI": "1"})
     if r.returncode != 0:
         return None
     try:

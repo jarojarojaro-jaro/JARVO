@@ -52,8 +52,8 @@ def main(argv: list[str] | None = None) -> int:
         shutil.copytree(src, dest)
         files = []
         for f in sorted(dest.rglob("*")):
-            if f.is_file():
-                files.append({"path": str(f.relative_to(pack)), "bytes": f.stat().st_size, "sha256": sha256(f)})
+            if f.is_file():                    # ścieżki z „/” także na Windows (jak w pakiet.zip)
+                files.append({"path": f.relative_to(pack).as_posix(), "bytes": f.stat().st_size, "sha256": sha256(f)})
         manifest["roles"][role_dir.name] = {"missing_out": False, "files": files}
 
     (pack / "MANIFEST.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
                 zf.write(f, f.relative_to(pack.parent))
     total = sum(len(r["files"]) for r in manifest["roles"].values())
     missing = [k for k, v in manifest["roles"].items() if v["missing_out"]]
-    print(json.dumps({"pakiet": str(pack), "zip": str(zip_path), "plikow": total, "role": list(manifest["roles"]),
+    print(json.dumps({"pakiet": pack.as_posix(), "zip": zip_path.as_posix(), "plikow": total, "role": list(manifest["roles"]),
                       "brak_out": missing}, ensure_ascii=False, indent=1))
     return 0
 

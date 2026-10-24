@@ -100,8 +100,26 @@ def test_siec_zablokowana_w_czasie_odczytu():
            "m = importlib.util.module_from_spec(s); s.loader.exec_module(m); m.zablokuj_siec()\n"
            "try:\n    socket.create_connection(('example.com', 443), timeout=2)\nexcept PermissionError as e:\n"
            "    print('blokada', e)\n")
-    out = subprocess.run([sys.executable, "-I", "-c", kod], capture_output=True, text=True, timeout=60).stdout
+    # -X utf8: -I pomija PYTHONUTF8, a na Windows potok miałby stronę kodową ANSI (komunikat ma polskie litery)
+    out = subprocess.run([sys.executable, "-I", "-X", "utf8", "-c", kod], capture_output=True, text=True,
+                         encoding="utf-8", timeout=60).stdout
     assert out.startswith("blokada") and "bez sieci" in out
+
+
+def test_przejscie_do_venvu_ocr_oddaje_kod_i_wyjscie(tmp_path, monkeypatch, capfd):
+    """Zwykły python3 bez Indry: ten sam skrypt w venvie OCR w nowym procesie (bez os.execv), z jego kodem wyjścia."""
+    import atrapy
+    py = atrapy.program(tmp_path, "ocr-python", "import sys\nprint('venv', *sys.argv[1:])\nsys.exit(5)\n")
+    monkeypatch.setattr(ocr, "_indra", lambda: None)
+    monkeypatch.setenv("JARVO_OCR_PYTHON", str(py))
+    with pytest.raises(SystemExit) as e:
+        ocr._do_venvu(["zrzut.png", "--szukaj", "Zapisz"])
+    assert e.value.code == 5
+    out = capfd.readouterr().out
+    assert out.split()[:2] == ["venv", "-I"] and "ocr.py" in out and "zrzut.png --szukaj Zapisz" in out
+    assert ("-X utf8" in out) == (sys.platform == "win32")       # Windows: wynik w UTF-8 mimo -I
+    monkeypatch.setenv("JARVO_OCR_PYTHON", sys.executable)        # już w venvie: bez przeskoku i bez pętli
+    ocr._do_venvu(["zrzut.png"])
 
 
 # ------------------------------------------------------------------ obraz, lock, flota, dokumenty
@@ -161,11 +179,11 @@ def test_prawdziwy_odczyt_i_szukanie(tmp_path):
                     "cv2.putText(im, 'Zapisz zmiany', (40, 120), cv2.FONT_HERSHEY_SIMPLEX, 2, 0, 4); "
                     f"cv2.imwrite({str(obraz)!r}, im)"], check=True)
     r = subprocess.run([sys.executable, str(OCR), str(obraz), "--szukaj", "zapisz"], capture_output=True, text=True,
-                       timeout=120)
+                       encoding="utf-8", timeout=120)
     assert r.returncode == 0, r.stderr
     w = json.loads(r.stdout)
     assert w["silnik"] == "indra" and w["trafienia"] and 40 <= w["trafienia"][0]["srodek"][0] <= 400
     if shutil.which("tesseract"):
         r = subprocess.run([sys.executable, str(OCR), str(obraz), "--silnik", "tesseract"], capture_output=True,
-                           text=True, timeout=120)
+                           text=True, encoding="utf-8", timeout=120)
         assert "Zapisz" in r.stdout

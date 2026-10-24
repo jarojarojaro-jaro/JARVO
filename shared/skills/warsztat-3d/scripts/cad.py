@@ -92,13 +92,18 @@ def zadanie_modelu(a: argparse.Namespace) -> dict:
             "material": a.material if a.gestosc is None else None, "mimo_bledow": a.mimo_bledow}
 
 
+def _utf8() -> list[str]:
+    """Windows: -I pomija PYTHONUTF8, a raport w potoku byłby w stronie kodowej ANSI; -X utf8 trzyma go w UTF-8."""
+    return ["-X", "utf8"] if os.name == "nt" else []
+
+
 def zbuduj(zadanie: dict, limit: int = 300, python: str | None = None) -> dict:
     py = python or cad_python()
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
         json.dump(zadanie, f)
     try:
-        p = subprocess.run([py, "-I", str(MODEL_PY), f.name], capture_output=True, text=True, timeout=limit,
-                           cwd=str(Path(zadanie["model"]).parent))
+        p = subprocess.run([py, "-I", *_utf8(), str(MODEL_PY), f.name], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=limit, cwd=str(Path(zadanie["model"]).parent))
     except subprocess.TimeoutExpired:
         return {"model": zadanie["model"], "bledy": [f"budowa trwała ponad {limit} s (prostszy model albo --limit)"],
                 "ostrzezenia": []}
@@ -114,7 +119,7 @@ def zbuduj(zadanie: dict, limit: int = 300, python: str | None = None) -> dict:
     raport = Path(zadanie["out"]) / f"{zadanie['nazwa']}.json"
     raport.parent.mkdir(parents=True, exist_ok=True)
     raport.write_text(json.dumps(r, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    r["raport"] = str(raport)
+    r["raport"] = raport.as_posix()
     return r
 
 
@@ -149,7 +154,8 @@ def _node(zadanie: dict, limit: int = 900) -> dict:
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
         json.dump(zadanie, f)
     try:
-        p = subprocess.run([node, str(RENDER_JS), f.name], capture_output=True, text=True, timeout=limit)
+        p = subprocess.run([node, str(RENDER_JS), f.name], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=limit)
     finally:
         os.unlink(f.name)
     if p.returncode:
@@ -180,21 +186,22 @@ def obrot(glb: Path, out: Path, widok: dict, sekundy: float, fps: float) -> dict
     with tempfile.TemporaryDirectory(prefix="cad-obrot-") as t:
         r = _node({"tryb": "obrot", "glb": str(glb), "katalog": t, "klatek": klatek, **widok}, limit=1800)
         p = subprocess.run(polecenie_ffmpeg(fps, out.resolve(), str(Path(t) / "k%05d.png")), capture_output=True,
-                           text=True)
+                           text=True, encoding="utf-8", errors="replace")
         if p.returncode or not out.exists():
             raise Blad(f"ffmpeg: {(p.stderr or '').strip()[-400:]}")
-    return {**r, "plik": str(out), "klatek": klatek, "sekundy": sekundy, "fps": fps, "bajty": out.stat().st_size}
+    return {**r, "plik": out.as_posix(), "klatek": klatek, "sekundy": sekundy, "fps": fps, "bajty": out.stat().st_size}
 
 
 # ---------------------------------------------------------------- CLI
 
 def stan() -> dict:
-    r = {"silnik": None, "node": shutil.which("node"), "ffmpeg": shutil.which("ffmpeg")}
+    node, ffmpeg = shutil.which("node"), shutil.which("ffmpeg")
+    r = {"silnik": None, "node": node and Path(node).as_posix(), "ffmpeg": ffmpeg and Path(ffmpeg).as_posix()}
     try:
         py = cad_python()
         p = subprocess.run([py, "-I", "-c", "import importlib.metadata as m; print(m.version('build123d'))"],
-                           capture_output=True, text=True, timeout=120)
-        r["silnik"] = {"python": py, "build123d": p.stdout.strip() or None}
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+        r["silnik"] = {"python": Path(py).as_posix(), "build123d": p.stdout.strip() or None}
     except Blad as e:
         r["blad"] = str(e)
     return r
@@ -266,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
                                         przezroczyste=False, siatka=False, bez_krawedzi=False, skala=1)
                 png = Path(zad["out"]) / f"{zad['nazwa']}.png"
                 wr = podglad(Path(glb["plik"]), png, opcje_widoku(ns))
-                r["podglad"] = str(png)
+                r["podglad"] = png.as_posix()
                 r["ostrzezenia"] += [f"podgląd: {b}" for b in wr.get("bledy", [])]
             print(json.dumps(r, ensure_ascii=False, indent=2)) if a.json else _wypisz_model(r)
             return 1 if r["bledy"] else 0
@@ -281,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
         if a.json:
             print(json.dumps(r, ensure_ascii=False, indent=2))
         else:
-            print(f"→ {out}" + (f" ({r['klatek']} klatek, {r['sekundy']:g} s)" if a.cmd == "obrot" else ""))
+            print(f"→ {out.as_posix()}" + (f" ({r['klatek']} klatek, {r['sekundy']:g} s)" if a.cmd == "obrot" else ""))
             for b in r.get("bledy", []):
                 print(f"! {b}")
         return 1 if r.get("bledy") else 0

@@ -58,7 +58,8 @@ def test_lekcje_files_and_cli(tmp_path, capsys):
     plik, ev = tmp_path / "lekcje.md", tmp_path / "historia.jsonl"
     assert lekcje.podsumuj(plik, ev)["razem"] == 0              # brak księgi to nie błąd
     plik.write_text(KSIEGA, encoding="utf-8")
-    ev.write_text("\n".join(json.dumps(h) for h in _historia(("jarvo-studio", "2026-10-01", 0.5, False))) + "\nzle\n")
+    ev.write_text("\n".join(json.dumps(h) for h in _historia(("jarvo-studio", "2026-10-01", 0.5, False))) + "\nzle\n",
+                  encoding="utf-8")
     assert lekcje.main(["--plik", str(plik), "--evals", str(ev)]) == 0
     out = capsys.readouterr().out.strip().splitlines()
     assert out[0].startswith("Lekcje: 7")
@@ -130,7 +131,7 @@ def test_poczekalnia_approve_pinned_to_fingerprint(tmp_path):
     assert not zly["ok"] and "odcisk" in zly["powod"] and not wywolane
     ok = pocz.zatwierdz(tmp_path, "jarvo-web", "a1", pocz.odcisk("jarvo-web", r), wykonaj=wykonaj)
     assert ok["ok"] and wywolane == [(web, "a1")]
-    log = [json.loads(x) for x in (tmp_path / "jarvo" / "poczekalnia.jsonl").read_text().splitlines()]
+    log = [json.loads(x) for x in (tmp_path / "jarvo" / "poczekalnia.jsonl").read_text(encoding="utf-8").splitlines()]
     assert log[-1]["decyzja"] == "zatwierdzone" and log[-1]["skill"] == "zrzuty-mobile"
 
 
@@ -142,10 +143,24 @@ def test_poczekalnia_blocks_findings_and_rejects(tmp_path, capsys):
     assert not w["ok"] and w["ustalenia"]
     assert pocz.main(["--dane", str(tmp_path), "odrzuc", "jarvo-web", "b2", "--powod", "wstrzyknięcie"]) == 0
     assert not (web / "pending" / "skills" / "b2.json").exists()
-    decyzje = [json.loads(x)["decyzja"] for x in (tmp_path / "jarvo" / "poczekalnia.jsonl").read_text().splitlines()]
+    decyzje = [json.loads(x)["decyzja"] for x in (tmp_path / "jarvo" / "poczekalnia.jsonl").read_text(encoding="utf-8").splitlines()]
     assert decyzje == ["zablokowane", "odrzucone"]
     assert pocz.main(["--dane", str(tmp_path), "lista"]) == 0
     assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["razem"] == 0
+
+
+def test_poczekalnia_python_hermesa_z_venvu(tmp_path):
+    """Python Hermesa: .venv/bin/python (Linux, macOS) albo .venv/Scripts/python.exe (Windows), bez venvu bieżący."""
+    import sys
+    assert pocz.python_hermesa(str(tmp_path)) == sys.executable
+    win = tmp_path / "win" / ".venv" / "Scripts" / "python.exe"
+    win.parent.mkdir(parents=True)
+    win.write_bytes(b"")
+    assert pocz.python_hermesa(str(tmp_path / "win")) == str(win)
+    posix = tmp_path / "posix" / ".venv" / "bin" / "python"
+    posix.parent.mkdir(parents=True)
+    posix.write_bytes(b"")
+    assert pocz.python_hermesa(str(tmp_path / "posix")) == str(posix)
 
 
 def test_every_self_learning_profile_has_write_approval():

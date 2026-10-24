@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -35,7 +36,9 @@ REALERT_HOURS = float(os.environ.get("JARVO_PATROL_REALERT_HOURS", "12"))
 
 def _hermes(*args: str) -> str:
     cmd = [os.environ.get("JARVO_HERMES_BIN", "hermes"), *args]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    # pełna ścieżka z PATH: na Windows nakładka hermes bywa plikiem .cmd, którego CreateProcess nie znajdzie po nazwie
+    res = subprocess.run([shutil.which(cmd[0]) or cmd[0], *args], capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=120)
     if res.returncode != 0:
         raise RuntimeError(f"{' '.join(cmd)} → {res.returncode}: {res.stderr.strip()[:300]}")
     return res.stdout

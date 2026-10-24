@@ -37,11 +37,13 @@ TOOLS_PY = "/opt/jarvo/venv/bin/python"
 
 
 def _reexec_in_tools_venv() -> None:
-    """trafilatura żyje w /opt/jarvo/venv; jeśli uruchomiono nas innym Pythonem, przełącz się."""
+    """trafilatura żyje w /opt/jarvo/venv; jeśli uruchomiono nas innym Pythonem, przełącz się: ten sam skrypt
+    w nowym procesie, jego kod wyjścia jest nasz (os.execv na Windows odpina proces od rodzica)."""
     import os
+    import subprocess
 
     if os.path.exists(TOOLS_PY) and os.path.realpath(sys.executable) != os.path.realpath(TOOLS_PY):
-        os.execv(TOOLS_PY, [TOOLS_PY, *sys.argv])
+        sys.exit(subprocess.run([TOOLS_PY, *sys.argv]).returncode)
 
 
 def extract(url: str) -> dict:
@@ -101,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if not args.bez_rejestru and data["text"].strip():
         wpis, plik = zarejestruj(data, args.rejestr, args.tier, args.type)
-        data["zrodlo"], data["tekst"] = wpis["id"], str(plik)
+        data["zrodlo"], data["tekst"] = wpis["id"], plik.as_posix()        # z „/” także na Windows
     full = data["text"]
     data["text"], data["truncated"] = full[:args.max_chars], len(full) > args.max_chars
     if args.json:

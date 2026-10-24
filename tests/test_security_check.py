@@ -181,8 +181,9 @@ def test_source_maps_inline_and_without_code(monkeypatch):
 
 def test_dependencies_missing_young_and_lookalike(tmp_path, monkeypatch):
     (tmp_path / "package.json").write_text(json.dumps({"dependencies": {"react": "^19", "expres": "^4", "zmyslony-pakiet-ai": "1.0.0",
-                                                                         "nowy-pakiet": "0.1.0", "lokalny": "file:../x"}}))
-    (tmp_path / "requirements.txt").write_text("# komentarz\nrequests==2.32\nreqeusts>=1\n-r inne.txt\n")
+                                                                         "nowy-pakiet": "0.1.0", "lokalny": "file:../x"}}),
+                                          encoding="utf-8")
+    (tmp_path / "requirements.txt").write_text("# komentarz\nrequests==2.32\nreqeusts>=1\n-r inne.txt\n", encoding="utf-8")
     rejestr = {
         "https://api.npmjs.org/downloads/point/last-week/react": (200, {"downloads": 40_000_000}),
         "https://api.npmjs.org/downloads/point/last-week/expres": (200, {"downloads": 120}),
@@ -305,10 +306,10 @@ def test_rls_policies_in_sql(tmp_path):
     m.mkdir(parents=True)
     (m / "001_zle.sql").write_text("create table orders (id bigint, user_id uuid);\nalter table orders enable row level security;\n"
                                    "create policy wlasne on orders for select to authenticated\n  using (auth.uid() = user_id);\n"
-                                   "create policy rola on orders using (auth.jwt() ->> 'role' = 'admin');\n")
+                                   "create policy rola on orders using (auth.jwt() ->> 'role' = 'admin');\n", encoding="utf-8")
     (m / "002_dobre.sql").write_text("create policy wlasne on notes for select to authenticated\n  using ((select auth.uid()) = user_id);\n"
-                                     "create index on notes (user_id);\n")
-    (m / "003_bez_polityk.sql").write_text("select auth.uid();\n")                # funkcja, nie polityka
+                                     "create index on notes (user_id);\n", encoding="utf-8")
+    (m / "003_bez_polityk.sql").write_text("select auth.uid();\n", encoding="utf-8")   # funkcja, nie polityka
     wyn = sc.rls_w_sql(tmp_path)
     assert [(x["waga"], x["gdzie"]) for x in wyn] == [("NISKIE", "supabase/migrations/001_zle.sql:4")]
     assert "2× w pliku" in wyn[0]["co"] and "(select auth.uid())" in wyn[0]["poprawka"]

@@ -64,13 +64,16 @@ def _indra():
 
 
 def _do_venvu(argv: list[str]) -> None:
-    """Zwykły python3 bez Indry → ten sam skrypt w venvie OCR (w venvie już bez przeskoku, więc bez pętli)."""
+    """Zwykły python3 bez Indry → ten sam skrypt w venvie OCR (w venvie już bez przeskoku, więc bez pętli).
+    Nowy proces z tym samym wyjściem i kodem wyjścia (os.execv na Windows odpina proces od rodzica); na Windows
+    z -X utf8, bo -I pomija PYTHONUTF8, a wyjście do potoku byłoby w stronie kodowej ANSI."""
     if _indra() is not None:
         return
     py = os.environ.get("JARVO_OCR_PYTHON") or OCR_PYTHON
     if not os.access(py, os.X_OK) or Path(sys.executable).resolve() == Path(py).resolve():
         return
-    os.execv(py, [py, "-I", str(Path(__file__).resolve()), *argv])
+    utf8 = ["-X", "utf8"] if os.name == "nt" else []
+    sys.exit(subprocess.run([py, "-I", *utf8, str(Path(__file__).resolve()), *argv]).returncode)
 
 
 def katalog_modeli() -> Path | None:
@@ -83,7 +86,8 @@ def katalog_modeli() -> Path | None:
 def jezyki_tesseracta(chce: str) -> str:
     """Z „pol+eng” zostają języki, które Tesseract tu ma; nic z listy → pierwszy dostępny."""
     try:
-        out = subprocess.run(["tesseract", "--list-langs"], capture_output=True, text=True, timeout=30).stdout
+        out = subprocess.run(["tesseract", "--list-langs"], capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=30).stdout
     except (OSError, subprocess.TimeoutExpired):
         return chce
     sa = {x.strip() for x in out.splitlines()[1:] if x.strip()}
@@ -93,12 +97,13 @@ def jezyki_tesseracta(chce: str) -> str:
 
 def stan() -> dict:
     ind = _indra()
-    return {
+    modele, tesseract = katalog_modeli(), shutil.which("tesseract")
+    return {                                   # ścieżki z „/” także na Windows (JSON dla agenta)
         "indra": getattr(ind, "__version__", None),
-        "modele": str(katalog_modeli() or "") or None,
-        "tesseract": shutil.which("tesseract"),
-        "jezyki_tesseracta": jezyki_tesseracta("pol+eng") if shutil.which("tesseract") else None,
-        "python": sys.executable,
+        "modele": modele.as_posix() if modele else None,
+        "tesseract": Path(tesseract).as_posix() if tesseract else None,
+        "jezyki_tesseracta": jezyki_tesseracta("pol+eng") if tesseract else None,
+        "python": Path(sys.executable).as_posix(),
     }
 
 
@@ -123,7 +128,7 @@ def klatka(film: Path, czas: float, tmp: Path) -> Path:
         raise Blad("klatka filmu wymaga ffmpeg")
     out = tmp / f"klatka-{czas:g}.png"
     r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{czas}", "-i", str(film), "-frames:v", "1", str(out)],
-                       capture_output=True, text=True, timeout=120)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     if r.returncode or not out.is_file():
         raise Blad(f"nie wyjąłem klatki {czas:g} s z {film.name}: {(r.stderr or '').strip()[:200]}")
     return out
@@ -185,8 +190,8 @@ def czytaj_tesseract(plik: Path, strony: str | None, dpi: float, jezyk: str, tmp
     if plik.read_bytes()[:5] == b"%PDF-":
         if not shutil.which("gs"):
             raise Blad("PDF przez Tesseract wymaga Ghostscripta (gs)")
-        ile = subprocess.run(["qpdf", "--show-npages", str(plik)], capture_output=True, text=True,
-                             timeout=120).stdout.strip() if shutil.which("qpdf") else ""
+        ile = subprocess.run(["qpdf", "--show-npages", str(plik)], capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=120).stdout.strip() if shutil.which("qpdf") else ""
         n = int(ile) if ile.isdigit() else MAKS_STRON
         obrazy = []
         for i in zakres_stron(strony, n):
@@ -202,7 +207,7 @@ def czytaj_tesseract(plik: Path, strony: str | None, dpi: float, jezyk: str, tmp
     wynik = []
     for nr, obraz in obrazy:
         r = subprocess.run(["tesseract", str(obraz), "stdout", "-l", lang, "--psm", "3", "tsv"],
-                           capture_output=True, text=True, timeout=600)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
         if r.returncode:
             raise Blad(f"Tesseract: {(r.stderr or '').strip()[:200]}")
         wynik.append({"strona": nr, "zrodlo": "ocr", "obrot": 0, "linie": _tsv_linie(r.stdout), "markdown": None})
@@ -273,7 +278,7 @@ def odczytaj(plik: Path, a: argparse.Namespace, tmp: Path) -> dict:
             uwagi.append(f"Indra niedostępna ({str(e)[:160]}), czytał Tesseract")
     if strony is None:
         strony, silnik = czytaj_tesseract(zrodlo, a.strony, a.dpi, a.jezyk, tmp), "tesseract"
-    r = {"plik": str(plik), "silnik": silnik, "sek": round(time.monotonic() - t0, 2), "strony": strony}
+    r = {"plik": plik.as_posix(), "silnik": silnik, "sek": round(time.monotonic() - t0, 2), "strony": strony}
     if zrodlo != plik:
         r["klatka_s"] = a.czas or 0.0
     if uwagi:

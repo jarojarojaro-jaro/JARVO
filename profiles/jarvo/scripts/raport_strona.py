@@ -153,11 +153,12 @@ def zapisz(dane: dict, now: float, katalog: Path | None = None) -> dict:
     skrypt = _jarvo_link()
     if skrypt:
         try:
-            r = subprocess.run([sys.executable, str(skrypt), str(plik)], capture_output=True, text=True, timeout=30)
+            r = subprocess.run([sys.executable, str(skrypt), str(plik)], capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=30)
             link = (r.stdout.strip().splitlines() or [None])[-1] if r.returncode == 0 else None
         except (OSError, subprocess.TimeoutExpired):
             link = None
-    return {"plik": str(plik), "link": link}
+    return {"plik": plik.as_posix(), "link": link}
 
 
 def main(argv: list[str] | None = None) -> int:

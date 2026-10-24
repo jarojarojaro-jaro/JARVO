@@ -33,7 +33,7 @@ def _ikony(tmp_path: Path, logo: str, nazwa: str) -> dict:
     plik.write_text(logo, encoding="utf-8")
     out = tmp_path / nazwa
     r = subprocess.run(["node", str(IKONY), "--out", str(out), "--kolor", CZERWONY, "--logo", str(plik), "--litery", "J"],
-                       capture_output=True, text=True, timeout=120)
+                       capture_output=True, text=True, encoding="utf-8", timeout=120)
     assert r.returncode == 0, r.stderr
     wynik = json.loads(r.stdout.strip().splitlines()[-1])
     wynik["out"] = out
@@ -47,7 +47,8 @@ def _piksele(png: Path, punkty: list[tuple[float, float]]) -> list[str]:
   const p = {json.dumps(punkty)}.map(([x, y]) => {{ const i = (Math.floor(y * (info.height - 1)) * info.width + Math.floor(x * (info.width - 1))) * 3;
     return '#' + [data[i], data[i + 1], data[i + 2]].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase(); }});
   console.log(JSON.stringify(p)); }})();"""
-    r = subprocess.run(["node", "-e", prog], capture_output=True, text=True, cwd=MOBILE / "scripts", timeout=60)
+    r = subprocess.run(["node", "-e", prog], capture_output=True, text=True, encoding="utf-8", cwd=MOBILE / "scripts",
+                       timeout=60)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 

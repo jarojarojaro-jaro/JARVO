@@ -128,7 +128,7 @@ def eksportuj(bd, ksztalt, out: Path, nazwa: str, formaty: list[str], dokl: floa
             m.write(str(p))
         else:
             raise ValueError(f"nieznany format {f}")
-        pliki[f] = {"plik": str(p), "bajty": p.stat().st_size}
+        pliki[f] = {"plik": p.as_posix(), "bajty": p.stat().st_size}
     if "stl" in pliki:
         pliki["stl"]["trojkaty"] = max(0, (pliki["stl"]["bajty"] - 84) // 50)   # STL binarny: 84 B nagłówka + 50 B/trójkąt
         # zestaw: każda część także osobno (do druku część idzie sama, ułożona przez slicer)
@@ -136,7 +136,7 @@ def eksportuj(bd, ksztalt, out: Path, nazwa: str, formaty: list[str], dokl: floa
         for c, n in zip(cz, nazwy_czesci(cz)):
             p = out / f"{nazwa}-{n}.stl"
             bd.export_stl(c, p, tolerance=dokl, angular_tolerance=katowa)
-            pliki[f"stl:{n}"] = {"plik": str(p), "bajty": p.stat().st_size}
+            pliki[f"stl:{n}"] = {"plik": p.as_posix(), "bajty": p.stat().st_size}
     return pliki
 
 
@@ -151,7 +151,7 @@ def main(argv: list[str]) -> int:
     t1 = time.monotonic()
     sys.path.insert(0, str(model.parent))               # moduły pomocnicze obok skryptu modelu
     sys.argv = [str(model)]
-    wynik = {"model": str(model), "bledy": [], "ostrzezenia": []}
+    wynik = {"model": model.as_posix(), "bledy": [], "ostrzezenia": []}   # ścieżki w raporcie z „/” (też Windows)
     try:
         g = runpy.run_path(str(model), run_name="__main__")
         ksztalt = ksztalt_wyniku(bd, g.get("wynik"))

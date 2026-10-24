@@ -96,8 +96,8 @@ def test_strony_lista():
 def test_wolna_sciezka_nie_nadpisuje(tmp_path):
     p = tmp_path / "a.pdf"
     assert K.wolna_sciezka(p) == p
-    p.write_text("x")
-    (tmp_path / "a-2.pdf").write_text("x")
+    p.write_text("x", encoding="utf-8")
+    (tmp_path / "a-2.pdf").write_text("x", encoding="utf-8")
     assert K.wolna_sciezka(p) == tmp_path / "a-3.pdf"
 
 
@@ -229,7 +229,7 @@ def test_ffmpeg_zly_pierwszy_krok_probuje_kodowania(silniki, monkeypatch, tmp_pa
 
     def run(cmd, silnik, timeout, cwd=None):
         wolane.append(cmd)
-        Path(cmd[-1]).write_text("x")
+        Path(cmd[-1]).write_text("x", encoding="utf-8")
         if "copy" in cmd:
             raise K.Blad("FFmpeg: zły kontener")
     monkeypatch.setattr(K, "_run", run)
@@ -264,7 +264,7 @@ def test_filtr_lua_odcina_pliki_z_dysku():
 def test_serwer_druku_nie_wychodzi_poza_katalog(tmp_path):
     (tmp_path / "doc").mkdir()
     (tmp_path / "doc" / "logo.png").write_bytes(b"x")
-    (tmp_path / "tajne.txt").write_text("sekret")
+    (tmp_path / "tajne.txt").write_text("sekret", encoding="utf-8")
     h = type("H", (K._Zasoby,), {"strona": tmp_path / "doc" / "s.html", "korzenie": ((tmp_path / "doc").resolve(),)})
     tp = K._Zasoby.translate_path
     assert tp(h, "/__strona.html") == str(tmp_path / "doc" / "s.html")
@@ -321,31 +321,33 @@ def test_konwertuj_wielokrokowo_nie_rusza_zrodla(silniki, monkeypatch, tmp_path)
     def falszywy(nazwa, stron=1):
         def zamien(src, dst, z, na, opt, tmp):
             if stron == 1:
-                dst.write_text(f"{nazwa}:{src.read_text()}")
+                dst.write_text(f"{nazwa}:{src.read_text(encoding='utf-8')}", encoding="utf-8")
                 return [dst]
             out = [dst.with_name(f"{dst.stem}-{i:02d}{dst.suffix}") for i in range(1, stron + 1)]
             for p in out:
-                p.write_text(nazwa)
+                p.write_text(nazwa, encoding="utf-8")
             return out
         return zamien
     monkeypatch.setattr(K.silnik("pandoc"), "zamien", falszywy("pandoc"))
     monkeypatch.setattr(K.silnik("chromium"), "zamien", falszywy("chromium"))
     monkeypatch.setattr(K.silnik("ghostscript"), "zamien", falszywy("gs", stron=2))
     src = tmp_path / "notatka.md"
-    src.write_text("tekst")
+    src.write_text("tekst", encoding="utf-8")
     r = K.konwertuj(src, "pdf")
-    assert r["pliki"] == [str(tmp_path / "notatka.pdf")] and r["trasa"] == ["md→html (pandoc)", "html→pdf (chromium)"]
-    assert (tmp_path / "notatka.pdf").read_text() == "chromium:pandoc:tekst" and src.read_text() == "tekst"
+    # ścieżki wyników z „/” także na Windows
+    assert r["pliki"] == [(tmp_path / "notatka.pdf").as_posix()] and r["trasa"] == ["md→html (pandoc)", "html→pdf (chromium)"]
+    assert (tmp_path / "notatka.pdf").read_text(encoding="utf-8") == "chromium:pandoc:tekst"
+    assert src.read_text(encoding="utf-8") == "tekst" and r["wejscie"] == src.as_posix()
     r = K.konwertuj(src, "png", katalog=tmp_path / "strony")
     assert [Path(p).name for p in r["pliki"]] == ["notatka-01.png", "notatka-02.png"]
-    assert K.konwertuj(src, "pdf")["pliki"] == [str(tmp_path / "notatka-2.pdf")]    # istniejący zostaje
+    assert K.konwertuj(src, "pdf")["pliki"] == [(tmp_path / "notatka-2.pdf").as_posix()]    # istniejący zostaje
 
 
 def test_cli(silniki, monkeypatch, tmp_path, capsys):
     silniki(WSZYSTKIE)
     a, b = tmp_path / "a.png", tmp_path / "b.txt"
     a.write_bytes(b"x")
-    b.write_text("x")
+    b.write_text("x", encoding="utf-8")
     assert K.main([str(a), "--cele"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["format"] == "png" and "jpg" in [c["format"] for c in out["cele"]]
@@ -550,7 +552,7 @@ def test_prawdziwy_film_na_mp3_i_gif(tmp_path):
 def test_prawdziwy_pandoc_nie_wciaga_plikow_z_dysku(tmp_path):
     K._graf.cache_clear()
     tajne = tmp_path / "tajne.txt"
-    tajne.write_text("SEKRET-123")
+    tajne.write_text("SEKRET-123", encoding="utf-8")
     (tmp_path / "doc").mkdir()
     src = tmp_path / "doc" / "a.md"
     src.write_text(f"# Tytuł\n\n![x]({tajne})\n\n<img src=\"../tajne.txt\">\n\n![y](../tajne.txt)\n", encoding="utf-8")
@@ -583,7 +585,8 @@ def test_prawdziwe_usuwanie_metadanych(tmp_path):
     r = K.usun_metadane(jpg)
     out = Path(r["pliki"][0])
     assert K.metadane(out)["czysty"] and out.name == "zdj-bez-metadanych.jpg"
-    o = subprocess.run(["exiftool", "-s3", "-n", "-Orientation", str(out)], capture_output=True, text=True).stdout
+    o = subprocess.run(["exiftool", "-s3", "-n", "-Orientation", str(out)], capture_output=True, text=True,
+                       encoding="utf-8").stdout
     assert o.strip() == "6"                                           # obrót zostaje
     assert K.metadane(Path(K.usun_metadane(mov)["pliki"][0]))["czysty"]
     for na in ("mp4", "mp3"):                                         # zamiana też nie przenosi GPS z Androida

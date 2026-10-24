@@ -14,13 +14,13 @@ KLUCZ = "0123456789abcdef0123456789abcdef"
 
 def test_klucz_tworzy_plik_i_nie_nadpisuje(tmp_path):
     klucz, plik, nowy = ix.utworz_klucz(tmp_path / "public")
-    assert nowy and plik.name == f"{klucz}.txt" and plik.read_text().strip() == klucz
+    assert nowy and plik.name == f"{klucz}.txt" and plik.read_text(encoding="utf-8").strip() == klucz
     assert ix.KLUCZ_WZOR.match(klucz) and len(klucz) == 32
-    (tmp_path / "public" / "robots.txt").write_text("User-agent: *\n")
+    (tmp_path / "public" / "robots.txt").write_text("User-agent: *\n", encoding="utf-8")
     assert ix.utworz_klucz(tmp_path / "public") == (klucz, plik, False)
     # plik .txt o innej treści niż nazwa nie jest kluczem
     (tmp_path / "inne").mkdir()
-    (tmp_path / "inne" / f"{KLUCZ}.txt").write_text("cos innego")
+    (tmp_path / "inne" / f"{KLUCZ}.txt").write_text("cos innego", encoding="utf-8")
     assert ix.znajdz_klucz(tmp_path / "inne") is None
 
 

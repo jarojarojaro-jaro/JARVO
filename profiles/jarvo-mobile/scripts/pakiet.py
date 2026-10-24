@@ -154,7 +154,7 @@ def szkic(kat: Path, nadpisz: bool = False) -> dict:
         kadry = "\n".join(f"  - trasa: {t}\n    naglowek: \"{TODO}: korzyść ekranu {t}\"" for t in trasy)
         pliki.append(ml.zapisz(sc, SCENARIUSZ.format(kadry=kadry) + "\n"))
     todo = sum(f.read_text(encoding="utf-8").count(TODO) for f in pliki)
-    return {"pliki": [str(f.relative_to(kat)) for f in pliki], "do_uzupelnienia": todo,
+    return {"pliki": [f.relative_to(kat).as_posix() for f in pliki], "do_uzupelnienia": todo,
             "dalej": "teksty sprzedażowe (Studio: opisy, słowa kluczowe, nagłówki kadrów), konto demo, potem `pakiet.py zrzuty`"}
 
 
@@ -253,7 +253,8 @@ h1{{font-size:64px;line-height:1.05;margin:0 0 18px;font-weight:800;text-wrap:ba
 def _kadry_cjs(zadania: list[dict], katalog: Path) -> list[dict]:
     plik = katalog / "zadania.json"
     plik.write_text(json.dumps(zadania, ensure_ascii=False), encoding="utf-8")
-    r = subprocess.run(["node", str(TU / "kadry.cjs"), str(plik)], capture_output=True, text=True, timeout=900)
+    r = subprocess.run(["node", str(TU / "kadry.cjs"), str(plik)], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=900)
     if r.returncode not in (0, 1):
         raise Blad(f"kadry.cjs: {(r.stdout + r.stderr).strip()[-1200:]}")
     wyniki = json.loads(r.stdout.strip().splitlines()[-1])
@@ -275,7 +276,7 @@ def grafiki(kat: Path) -> dict:
     (robocze / "promo.html").write_text(html_promo(app, ikona, kolory), encoding="utf-8")
     wyniki = _kadry_cjs([{"ikona": str(ikona), "out": str(obr / "icon.png"), "rozmiar": 512},
                          {"html": str(robocze / "promo.html"), "out": str(obr / "featureGraphic.png"), "w": 1024, "h": 500}], robocze)
-    return {"pliki": [str(Path(w["out"]).relative_to(kat)) for w in wyniki]}
+    return {"pliki": [Path(w["out"]).relative_to(kat).as_posix() for w in wyniki]}
 
 
 # ------------------------------------------------------------------ ekrany ze źródeł
@@ -295,7 +296,7 @@ def ekrany_web(kat: Path, trasy: list[str], urzadzenia: list[str], motyw: str) -
     try:
         r = subprocess.run(["node", str(TU / "zrzuty.cjs"), f"http://127.0.0.1:{port}{prefiks}", str(surowe), "--trasy",
                             ",".join(trasy), "--urzadzenia", ",".join(urzadzenia), "--motywy", motyw],
-                           capture_output=True, text=True, timeout=900)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
     finally:
         srv.shutdown()
     if r.returncode not in (0, 1):
@@ -388,7 +389,7 @@ def zrzuty(kat: Path, zrodlo: str = "web", scenariusz: Path | None = None) -> di
     wyniki = _kadry_cjs(zadania, robocze)
     meta = {"zrodlo": zrodlo, "motyw": motyw, "kadry": [{"trasa": t, "naglowek": k.get("naglowek"), "podtytul": k.get("podtytul")}
                                                         for k, t in zip(kadry, trasy)],
-            "cele": {c: CELE[c][0] for c in cele}, "pliki": [str(Path(w["out"]).relative_to(kat)) for w in wyniki],
+            "cele": {c: CELE[c][0] for c in cele}, "pliki": [Path(w["out"]).relative_to(kat).as_posix() for w in wyniki],
             "uwaga": "źródło web to przybliżenie do szkicu karty; do wysłania przechwyć z buildu (android / ios)" if zrodlo == "web" else ""}
     ml.zapisz(sklep / "zrzuty.json", json.dumps(meta, ensure_ascii=False, indent=2))
     return meta
@@ -460,7 +461,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"✗ {e}", file=sys.stderr)
         return 2 if "brak jarvo.app.json" in str(e) else 1
     if a.cmd != "szkic":
-        r["galeria"] = str(galeria(kat).relative_to(kat))
+        r["galeria"] = galeria(kat).relative_to(kat).as_posix()
     print(json.dumps(r, ensure_ascii=False, indent=2))
     return 0
 

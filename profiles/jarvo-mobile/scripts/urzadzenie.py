@@ -64,7 +64,8 @@ class Adb:
             raise BrakUrzadzenia("brak adb w obrazie floty (pakiet adb; obraz sprzed wersji z usługą android: `jarvo update`)")
         if ":" in self.serial:
             subprocess.run([self.adb, "connect", self.serial], capture_output=True, timeout=20)
-        stan = subprocess.run([self.adb, "-s", self.serial, "get-state"], capture_output=True, text=True, timeout=20)
+        stan = subprocess.run([self.adb, "-s", self.serial, "get-state"], capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=20)
         if stan.stdout.strip() != "device":
             raise BrakUrzadzenia(f"urządzenie {self.serial} niedostępne ({(stan.stderr or stan.stdout).strip()[:200]}); "
                                  "właściciel włącza je poleceniem `jarvo android on` (emulator przy KVM albo Redroid przy binderze, docs/MOBILE.md §5)")
@@ -260,7 +261,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.cmd == "otworz":
             print(otworz(adb, args.cel))
         elif args.cmd == "zrzut":
-            print(zrzut(adb, Path(args.plik)))
+            print(zrzut(adb, Path(args.plik)).as_posix())
         elif args.cmd == "logi":
             out = adb.sh("logcat -d -v brief *:W", timeout=30).splitlines()
             print("\n".join([l for l in out if not args.pakiet or args.pakiet in l or "ReactNativeJS" in l][-args.linie:]))

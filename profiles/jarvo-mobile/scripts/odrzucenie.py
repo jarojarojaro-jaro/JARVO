@@ -222,7 +222,7 @@ def analizuj_plik(kat: Path, plik: Path, platforma: str = "") -> dict:
     ml.zapisz(out / "ANALIZA.md", analiza_md(a, app))
     ml.zapisz(out / "odpowiedz.md", odpowiedz_md(a, app, build))
     ml.zapisz(out / "LEKCJA.md", lekcja_md(a, app))
-    return {**a, "katalog": str(out.relative_to(kat))}
+    return {**a, "katalog": out.relative_to(kat).as_posix()}
 
 
 def naucz(wytyczna: str, opis: str, poprawka: str, wzorzec: str = "", gdzie: str = "oba", app: str = "") -> dict:

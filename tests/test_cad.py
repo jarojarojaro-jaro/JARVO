@@ -12,11 +12,11 @@ import os
 import re
 import shutil
 import socket
-import stat
 import subprocess
 import sys
 from pathlib import Path
 
+import atrapy
 import pytest
 import yaml
 
@@ -41,7 +41,7 @@ def widok(**kw):
 
 def test_zadanie_modelu_formaty_material_nazwa(tmp_path):
     m = tmp_path / "uchwyt.py"
-    m.write_text("wynik = None\n")
+    m.write_text("wynik = None\n", encoding="utf-8")
     z = cad.zadanie_modelu(args(model=str(m), out=str(tmp_path / "out"), formaty="STL, glb,stl"))
     assert z["formaty"] == ["stl", "glb"] and z["nazwa"] == "uchwyt" and z["gestosc"] == 1.24 and z["material"] == "pla"
     z = cad.zadanie_modelu(args(model=str(m), out="o", material="petg"))
@@ -71,31 +71,30 @@ def test_obrot_bez_przezroczystosci_i_ffmpeg(tmp_path):
     with pytest.raises(cad.Blad):
         cad.obrot(tmp_path / "m.glb", tmp_path / "o.mp4", cad.opcje_widoku(widok()), 0.5, 30)
     cmd = cad.polecenie_ffmpeg(30, Path("/x/o.mp4"), "/t/k%05d.png")
-    assert cmd[0] == "ffmpeg" and cmd[cmd.index("-framerate") + 1] == "30" and "yuv420p" in cmd and cmd[-1] == "/x/o.mp4"
+    # ścieżka wyniku idzie do ffmpeg w zapisie systemu (na Windows „\x\o.mp4”)
+    assert cmd[0] == "ffmpeg" and cmd[cmd.index("-framerate") + 1] == "30" and "yuv420p" in cmd
+    assert cmd[-1] == str(Path("/x/o.mp4"))
     with pytest.raises(cad.Blad, match="glb"):
         cad._glb(str(tmp_path / "brak.glb"))
-    (tmp_path / "m.gltf").write_text("{}")
+    (tmp_path / "m.gltf").write_text("{}", encoding="utf-8")
     with pytest.raises(cad.Blad, match=".glb"):
         cad._glb(str(tmp_path / "m.gltf"))
 
 
 def _falszywy_python(tmp_path: Path, raport: dict | None, stderr: str = "") -> str:
-    """Skrypt udający python z venvu CAD: ignoruje argumenty i wypisuje raport (albo błąd)."""
-    p = tmp_path / "fake-python"
-    tresc = "#!/bin/sh\n"
+    """Atrapa pythona z venvu CAD (tests/atrapy.py): ignoruje argumenty i wypisuje raport (albo błąd)."""
+    kod = "import sys\n"
     if stderr:
-        tresc += f"echo {json.dumps(stderr)} >&2\n"
+        kod += f"print({stderr!r}, file=sys.stderr)\n"
     if raport is not None:
-        tresc += "echo 'Fontconfig warning: cos'\n" + f"echo '{json.dumps(raport)}'\n"
-    tresc += "exit 1\n" if stderr else "exit 0\n"
-    p.write_text(tresc)
-    p.chmod(p.stat().st_mode | stat.S_IEXEC)
-    return str(p)
+        kod += "print('Fontconfig warning: cos')\n" + f"print({json.dumps(raport)!r})\n"
+    kod += "sys.exit(1)\n" if stderr else "sys.exit(0)\n"
+    return str(atrapy.program(tmp_path, "fake-python", kod))
 
 
 def test_zbuduj_zapisuje_raport_i_material(tmp_path):
     m = tmp_path / "czesc.py"
-    m.write_text("wynik = None\n")
+    m.write_text("wynik = None\n", encoding="utf-8")
     zad = cad.zadanie_modelu(args(model=str(m), out=str(tmp_path / "out"), material="petg"))
     rap = {"model": str(m), "bledy": [], "ostrzezenia": [], "wymiary_mm": [10, 20, 30], "objetosc_mm3": 6000.0,
            "masa_g": 7.6, "gestosc_g_cm3": 1.27, "bryly": 1, "poprawny": True, "pliki": {}}
@@ -138,8 +137,10 @@ def test_cad_model_blokuje_siec():
            "for f in (lambda: socket.create_connection(('example.com', 443)), lambda: socket.getaddrinfo('example.com', 80),\n"
            "          lambda: socket.socket().connect(('127.0.0.1', 9))):\n"
            "    try:\n        f(); print('POLACZONO')\n    except PermissionError as e:\n        print('BLOK', e)\n")
-    p = subprocess.run([sys.executable, "-I", "-c", kod], capture_output=True, text=True, timeout=30)
-    assert p.stdout.count("BLOK") == 3 and "POLACZONO" not in p.stdout
+    # -X utf8: -I pomija PYTHONUTF8, a na Windows potok miałby stronę kodową ANSI (komunikat ma polskie litery)
+    p = subprocess.run([sys.executable, "-I", "-X", "utf8", "-c", kod], capture_output=True, text=True, encoding="utf-8",
+                       timeout=30)
+    assert p.stdout.count("BLOK") == 3 and "POLACZONO" not in p.stdout, p.stderr
     assert socket.create_connection is not model._odmow                          # w tym procesie bez zmian
 
 
@@ -212,10 +213,10 @@ def test_przyklady_buduja_sie_naprawde(tmp_path):
         assert all(Path(v["plik"]).stat().st_size > 1000 for v in r["pliki"].values())
         if czesci:
             assert [c["nazwa"] for c in r["czesci"]] == czesci and f"stl:{czesci[0]}" in r["pliki"]
-    assert (tmp_path / "katownik.step").read_text(errors="ignore").startswith("ISO-10303-21")
+    assert (tmp_path / "katownik.step").read_text(encoding="utf-8", errors="ignore").startswith("ISO-10303-21")
     zly = tmp_path / "zly.py"
     zly.write_text("from build123d import *\nwynik = Box(10, 10, 10)\nimport urllib.request\n"
-                   "urllib.request.urlopen('https://example.com')\n")
+                   "urllib.request.urlopen('https://example.com')\n", encoding="utf-8")
     r = cad.zbuduj(cad.zadanie_modelu(args(model=str(zly), out=str(tmp_path))))
     assert r["bledy"] and "bez sieci" in r["bledy"][0] and "linia 4" in r["bledy"][0]
 

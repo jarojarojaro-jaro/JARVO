@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
+import os
 import socket
+import subprocess
 import sys
+import threading
+import time
 import types
 
 import pytest
@@ -15,6 +18,16 @@ from conftest import load_script
 
 O = load_script("shared/skills/ostrozna-przegladarka/scripts/ostrozna.py")
 S = load_script("profiles/jarvo-lowca/scripts/strona.py")
+
+
+def _zajmij(f) -> None:
+    """Blokada „innego zadania” mechanizmem systemu, nie funkcją skryptu: flock na POSIX, msvcrt na Windows."""
+    if os.name == "nt":
+        import msvcrt
+        msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
 # ------------------------------------------------------------------ adres i robots.txt
@@ -83,11 +96,42 @@ def test_odstep_i_limit_dzienny(tmp_path, monkeypatch):
 
 def test_jedna_przegladarka_naraz(tmp_path):
     with open(tmp_path / "przegladarka.lock", "w", encoding="utf-8") as inny:
-        fcntl.flock(inny, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _zajmij(inny)
         with pytest.raises(O.Limit, match="zajęta"), O.jedna_naraz(tmp_path, czekaj_s=0):
             pass
     with O.jedna_naraz(tmp_path, czekaj_s=0):
         pass
+
+
+def test_blokada_bez_czekania_i_z_czekaniem(tmp_path):
+    plik = tmp_path / "x.lock"
+    with open(plik, "w", encoding="utf-8") as a, open(plik, "w", encoding="utf-8") as b:
+        O.zablokuj(a, czekaj=False)
+        with pytest.raises(OSError):
+            O.zablokuj(b, czekaj=False)
+        threading.Timer(0.5, O.odblokuj, (a,)).start()     # drugie zadanie zwalnia przeglądarkę po chwili
+        t0 = time.monotonic()
+        O.zablokuj(b)                                       # czeka, aż blokada zniknie
+        assert time.monotonic() - t0 >= 0.3
+        O.odblokuj(b)
+
+
+def test_blokada_widoczna_dla_innego_procesu(tmp_path):
+    """Druga kopia skryptu (osobny proces) nie dostaje przeglądarki, dopóki pierwsza ją trzyma."""
+    kod = ("import importlib.util, sys; s = importlib.util.spec_from_file_location('o', sys.argv[1]); "
+           "m = importlib.util.module_from_spec(s); s.loader.exec_module(m)\n"
+           "f = open(sys.argv[2], 'w', encoding='utf-8')\n"
+           "try:\n    m.zablokuj(f, czekaj=False); print('wolna')\nexcept OSError:\n    print('zajeta')\n")
+    plik = tmp_path / "przegladarka.lock"
+    with open(plik, "w", encoding="utf-8") as f:
+        O.zablokuj(f, czekaj=False)
+        r = subprocess.run([sys.executable, "-c", kod, O.__file__, str(plik)], capture_output=True, text=True,
+                           encoding="utf-8", timeout=60)
+        assert r.stdout.strip() == "zajeta", r.stderr
+        O.odblokuj(f)
+    r = subprocess.run([sys.executable, "-c", kod, O.__file__, str(plik)], capture_output=True, text=True,
+                       encoding="utf-8", timeout=60)
+    assert r.stdout.strip() == "wolna", r.stderr
 
 
 # ------------------------------------------------------------------ atrapa przeglądarki
@@ -275,13 +319,28 @@ def test_sprawdz(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(O, "ma_camoufox", lambda: True)
     monkeypatch.setattr(O, "EXE", str(tmp_path / "camoufox-bin"))
     assert O.sprawdz() == 1 and "brak" in capsys.readouterr().err
-    (tmp_path / "camoufox-bin").write_text("#!/bin/sh\n")
+    (tmp_path / "camoufox-bin").write_text("#!/bin/sh\n", encoding="utf-8")
     (tmp_path / "camoufox-bin").chmod(0o755)
     (tmp_path / "fontconfig" / "linux").mkdir(parents=True)
-    (tmp_path / "fontconfig" / "linux" / "fonts.conf").write_text("<fontconfig/>")
+    (tmp_path / "fontconfig" / "linux" / "fonts.conf").write_text("<fontconfig/>", encoding="utf-8")
     (tmp_path / "fonts" / "linux").mkdir(parents=True)
-    (tmp_path / "properties.json").write_text("[]")
+    (tmp_path / "properties.json").write_text("[]", encoding="utf-8")
     assert O.sprawdz() == 0
+
+
+def test_przejscie_do_venvu_narzedzi_oddaje_kod_i_wyjscie(tmp_path, monkeypatch, capfd):
+    """Inny Python niż venv narzędzi: skrypt w nowym procesie (bez os.execv), kod wyjścia i wyjście dziecka są nasze."""
+    import atrapy
+    py = atrapy.program(tmp_path, "venv-python", "import sys\nprint('dziecko', *sys.argv[1:])\nsys.exit(7)\n")
+    monkeypatch.setattr(O, "TOOLS_PY", str(py))
+    monkeypatch.setattr(sys, "argv", ["ostrozna.py", "https://firma.pl/"])
+    with pytest.raises(SystemExit) as e:
+        O._przelacz_na_venv_narzedzi()
+    assert e.value.code == 7
+    out = capfd.readouterr().out
+    assert "dziecko" in out and "ostrozna.py" in out and "https://firma.pl/" in out
+    monkeypatch.setattr(O, "TOOLS_PY", sys.executable)              # już w venvie: bez przeskoku
+    O._przelacz_na_venv_narzedzi()
 
 
 # ------------------------------------------------------------------ Łowca: strona.py --z-html

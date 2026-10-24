@@ -77,7 +77,7 @@ def werdykt(app: Path, runda: int, ocena: dict) -> dict:
     for warstwa, plik in warstwy.items():
         dane = _json(plik)
         if not dane:
-            niezmierzone.append(f"warstwa {warstwa}: brak wyników ({plik.relative_to(app)})")
+            niezmierzone.append(f"warstwa {warstwa}: brak wyników ({plik.relative_to(app).as_posix()})")
             continue
         zmierzone.append(warstwa)
         for w in dane.get("wyniki", []):
@@ -111,7 +111,7 @@ def werdykt(app: Path, runda: int, ocena: dict) -> dict:
     stan = "BLOCK" if blokady else ("PASS" if punkty >= 90 and not problemy else "REVISE")
     return {"runda": runda, "wynik": punkty, "werdykt": stan, "blokady": blokady, "problemy": problemy,
             "roznice": roznice, "niezmierzone": niezmierzone, "warstwy": zmierzone,
-            "zrzuty": str(app / "out" / "zrzuty")}
+            "zrzuty": (app / "out" / "zrzuty").as_posix()}
 
 
 def werdykt_md(w: dict) -> str:
@@ -142,7 +142,8 @@ def wrogie_web(app: Path, trasy: list[str]) -> dict:
     out = app / "out" / "jakosc" / "wrogie"
     try:
         r = subprocess.run(["node", str(Path(__file__).resolve().parent / "wrogie.cjs"), f"http://127.0.0.1:{port}{prefiks}",
-                            str(out), "--trasy", ",".join(trasy)], capture_output=True, text=True, timeout=900)
+                            str(out), "--trasy", ",".join(trasy)], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=900)
     finally:
         srv.shutdown()
     if r.returncode not in (0, 1) or not (out / "wrogie.json").exists():

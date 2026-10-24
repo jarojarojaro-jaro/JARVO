@@ -240,9 +240,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "klucz":
         klucz, plik, nowy = utworz_klucz(Path(a.katalog))
-        wynik = {"klucz": klucz, "plik": str(plik), "nowy": nowy}
+        wynik = {"klucz": klucz, "plik": plik.as_posix(), "nowy": nowy}
         print(json.dumps(wynik, ensure_ascii=False) if a.json else
-              f"{'utworzony' if nowy else 'już jest'}: {plik} (po wdrożeniu: https://<domena>/{klucz}.txt)")
+              f"{'utworzony' if nowy else 'już jest'}: {wynik['plik']} (po wdrożeniu: https://<domena>/{klucz}.txt)")
         return 0
 
     w = zglos(a)

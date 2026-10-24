@@ -247,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         out.mkdir(parents=True, exist_ok=True)
         (out / "REKOMENDACJA.md").write_text(md, encoding="utf-8")
         (out / "decyzja.json").write_text(json.dumps(w, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"✓ {out}/REKOMENDACJA.md: {w['wyniki'][w['rekomendacja']]['rozwiazanie']}", file=sys.stderr)
+        print(f"✓ {(out / 'REKOMENDACJA.md').as_posix()}: {w['wyniki'][w['rekomendacja']]['rozwiazanie']}", file=sys.stderr)
     print(json.dumps(w, ensure_ascii=False, indent=2) if args.json else md)
     return 0
 

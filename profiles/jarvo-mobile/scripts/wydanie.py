@@ -79,7 +79,7 @@ def jarvo_todo(kat: Path) -> list[str]:
     out = []
     for p in sorted((kat / "src").rglob("*")) if (kat / "src").exists() else []:
         if p.suffix in (".ts", ".tsx", ".js", ".jsx") and p.is_file():
-            out += [f"{p.relative_to(kat)}:{i}" for i, l in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1)
+            out += [f"{p.relative_to(kat).as_posix()}:{i}" for i, l in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1)
                     if "JARVO-TODO" in l]
     for rel in ("store.config.json",):
         if (kat / rel).exists() and "JARVO-TODO" in (kat / rel).read_text(encoding="utf-8"):
@@ -134,8 +134,8 @@ def zapisz_zgode(kat: Path, krok: str, zgoda: str, szczegoly: dict) -> dict:
 def _eas(args: list[str], kat: Path, timeout: int = 1800) -> subprocess.CompletedProcess:
     if not os.environ.get("EXPO_TOKEN"):
         raise BrakKonta("brak EXPO_TOKEN (token robota organizacji Expo właściciela, .env profilu jarvo-mobile)")
-    return subprocess.run(["npx", "--yes", EAS, *args], cwd=kat, capture_output=True, text=True, timeout=timeout,
-                          env={**os.environ, "CI": "1", "EAS_NO_VCS": "1", "EXPO_NO_TELEMETRY": "1"})
+    return subprocess.run([ml.program("npx"), "--yes", EAS, *args], cwd=kat, capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=timeout, env={**os.environ, "CI": "1", "EAS_NO_VCS": "1", "EXPO_NO_TELEMETRY": "1"})
 
 
 def _json_z_wyjscia(tekst: str):
@@ -195,7 +195,7 @@ def status(kat: Path, czekaj_min: int = 0) -> dict:
             if b["status"] == "FINISHED" and url and not b.get("plik"):
                 roz = ROZSZERZENIA.get(str(b.get("platforma")).upper(), "bin")
                 plik = kat / "out" / "build" / f"{kat.name}-{b.get('wersja')}-{b.get('numer')}.{roz}"
-                b["plik"] = str(_pobierz(url, plik).relative_to(kat))
+                b["plik"] = _pobierz(url, plik).relative_to(kat).as_posix()     # „/” także na Windows
             if b["status"] not in ("FINISHED", "ERRORED", "CANCELED"):
                 otwarte += 1
         ml.zapisz(kat / "out" / "wydanie" / "buildy.json", json.dumps(dane, ensure_ascii=False, indent=2))
@@ -338,7 +338,7 @@ def recenzja(kat: Path) -> dict:
                             android_build=(and_b or {}).get("numer", "?"), lista=lista + ("\n\nDo potwierdzenia przed kliknięciem:\n"
                                                                                      + "\n".join(reczne) if reczne else ""))
     p = ml.zapisz(_wyd(kat) / "RECENZJA.md", md)
-    return {"plik": str(p.relative_to(kat)), "do_potwierdzenia": len(reczne)}
+    return {"plik": p.relative_to(kat).as_posix(), "do_potwierdzenia": len(reczne)}
 
 
 PLAN_MD = """# Plan wydania: {nazwa} {wersja}
@@ -373,7 +373,7 @@ def plan(kat: Path) -> dict:
     md = PLAN_MD.format(nazwa=app.get("nazwa"), wersja=app.get("wersja"), bundle=app.get("bundle_ios"), pakiet=app.get("pakiet_android"),
                         bramki="\n".join(f"- ✗ {b}" for b in braki) or "- ✓ wszystkie przed buildem", konto_demo=konto)
     p = ml.zapisz(_wyd(kat) / "PLAN.md", md)
-    return {"plik": str(p.relative_to(kat)), "braki_przed_buildem": braki}
+    return {"plik": p.relative_to(kat).as_posix(), "braki_przed_buildem": braki}
 
 
 def wersja(kat: Path, podnies: str) -> dict:

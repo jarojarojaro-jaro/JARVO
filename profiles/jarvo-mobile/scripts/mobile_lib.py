@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import threading
 import time
 import urllib.error
@@ -32,6 +33,12 @@ CACHE = Path(os.environ.get("MOBILE_CACHE", str(Path.home() / ".cache" / "jarvo-
 EAS_CLI = os.environ.get("JARVO_EAS_CLI", "eas-cli@24.7.0")
 LICZNIK = {"zapytania": 0, "z_pamieci": 0, "bledy": 0}
 DZIS = dt.date.fromisoformat(os.environ["MOBILE_DZIS"]) if os.environ.get("MOBILE_DZIS") else dt.date.today()
+
+
+def program(nazwa: str) -> str:
+    """Pełna ścieżka programu z PATH, a bez niego sama nazwa (błąd zgłosi subprocess). Na Windows npx, npm i eas to
+    pliki .cmd: CreateProcess nie znajdzie ich po gołej nazwie z listy argumentów (WinError 2)."""
+    return shutil.which(nazwa) or nazwa
 
 
 def czytaj_json(p: Path) -> dict:

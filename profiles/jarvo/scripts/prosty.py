@@ -119,7 +119,8 @@ def wiadomosci_tygodnia(dane: Path, now: float, dni: int = 7) -> list[str]:
     baza = dane / "profiles" / "jarvo" / "state.db"
     if not baza.is_file():
         return []
-    conn = sqlite3.connect(f"file:{baza}?mode=ro", uri=True, timeout=5)
+    # URI z as_uri(): litera dysku, spacje, „#” i „?” w ścieżce (f"file:{baza}" psuje się na Windows)
+    conn = sqlite3.connect(baza.absolute().as_uri() + "?mode=ro", uri=True, timeout=5)
     try:
         rows = conn.execute(
             "SELECT s.source, m.content FROM messages m JOIN sessions s ON s.id = m.session_id "

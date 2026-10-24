@@ -29,13 +29,13 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import fcntl
 import html as htmlmod
 import ipaddress
 import json
 import os
 import re
 import socket
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -140,6 +140,35 @@ def oznaka_blokady(kod: int | None, tytul: str, tekst: str, html: str) -> str | 
 
 # ------------------------------------------------------------------ limity
 
+def zablokuj(f, czekaj: bool = True) -> None:
+    """Wyłączna blokada otwartego pliku między procesami: fcntl.flock na POSIX, msvcrt.locking (pierwszy bajt) na
+    Windows. Bez czekania OSError, gdy blokadę trzyma ktoś inny. Zamknięcie pliku też ją zdejmuje."""
+    if os.name != "nt":
+        import fcntl
+        fcntl.flock(f, fcntl.LOCK_EX | (0 if czekaj else fcntl.LOCK_NB))
+        return
+    import msvcrt
+    while True:
+        f.seek(0)                              # msvcrt blokuje bajty od bieżącej pozycji
+        try:
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            return
+        except OSError:
+            if not czekaj:
+                raise
+            time.sleep(0.2)                    # LK_LOCK poddaje się po 10 s, flock czeka do skutku
+
+
+def odblokuj(f) -> None:
+    if os.name != "nt":
+        import fcntl
+        fcntl.flock(f, fcntl.LOCK_UN)
+        return
+    import msvcrt
+    f.seek(0)
+    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+
+
 @contextlib.contextmanager
 def jedna_naraz(katalog: Path = None, czekaj_s: float = None):
     """Jedna przeglądarka naraz na serwerze (subagenci Sherlocka nie odpalą trzech Firefoksów po 800 MB)."""
@@ -150,7 +179,7 @@ def jedna_naraz(katalog: Path = None, czekaj_s: float = None):
         koniec = time.monotonic() + czekaj_s
         while True:
             try:
-                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                zablokuj(f, czekaj=False)
                 break
             except OSError:
                 if time.monotonic() >= koniec:
@@ -159,7 +188,7 @@ def jedna_naraz(katalog: Path = None, czekaj_s: float = None):
         try:
             yield
         finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
+            odblokuj(f)
 
 
 def rezerwuj(host: str, teraz: float | None = None, katalog: Path = None) -> float:
@@ -211,9 +240,10 @@ def ma_camoufox() -> bool:
 
 
 def _przelacz_na_venv_narzedzi() -> None:
-    """camoufox i trafilatura żyją w /opt/jarvo/venv; uruchomieni innym Pythonem przełączamy się."""
+    """camoufox i trafilatura żyją w /opt/jarvo/venv; uruchomieni innym Pythonem przełączamy się: ten sam skrypt
+    w nowym procesie, jego kod wyjścia jest nasz (os.execv na Windows odpina proces od rodzica)."""
     if os.path.exists(TOOLS_PY) and os.path.realpath(sys.executable) != os.path.realpath(TOOLS_PY):
-        os.execv(TOOLS_PY, [TOOLS_PY, os.path.abspath(__file__), *sys.argv[1:]])
+        sys.exit(subprocess.run([TOOLS_PY, os.path.abspath(__file__), *sys.argv[1:]]).returncode)
 
 
 def wersja_firefoksa(katalog: Path | None = None) -> int:

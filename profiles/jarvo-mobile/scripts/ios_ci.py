@@ -75,7 +75,8 @@ def wypchnij(app: Path, repo: str) -> str:
     basic = base64.b64encode(f"x-access-token:{token()}".encode()).decode()      # jak actions/checkout
     env = {**os.environ, "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
            "GIT_CONFIG_VALUE_0": f"AUTHORIZATION: basic {basic}", "GIT_TERMINAL_PROMPT": "0"}
-    git = lambda *a: subprocess.run(["git", *a], cwd=app, env=env, capture_output=True, text=True, timeout=300)  # noqa: E731
+    git = lambda *a: subprocess.run(["git", *a], cwd=app, env=env, capture_output=True, text=True,  # noqa: E731
+                                    encoding="utf-8", errors="replace", timeout=300)
     if not (app / ".git").exists():
         git("init", "-q")
     git("add", "-A")

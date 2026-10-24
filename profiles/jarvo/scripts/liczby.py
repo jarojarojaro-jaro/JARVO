@@ -56,7 +56,8 @@ def jakosc(karty: list[dict], zdarzenia: dict[str, list[dict]]) -> dict[str, dic
 def _ro(path: Path) -> sqlite3.Connection | None:
     if not path.is_file():
         return None
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)
+    # URI z as_uri(): litera dysku, spacje, „#” i „?” w ścieżce (f"file:{path}" psuje się na Windows)
+    conn = sqlite3.connect(path.absolute().as_uri() + "?mode=ro", uri=True, timeout=5)
     conn.row_factory = sqlite3.Row
     return conn
 

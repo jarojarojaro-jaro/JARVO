@@ -107,7 +107,7 @@ def probe(path: Path) -> dict | None:
     if not shutil.which("ffprobe"):
         return None
     r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration",
-                        "-of", "json", str(path)], capture_output=True, text=True)
+                        "-of", "json", str(path)], capture_output=True, text=True, encoding="utf-8", errors="replace")
     try:
         d = json.loads(r.stdout or "{}")
         s = (d.get("streams") or [{}])[0]
@@ -357,7 +357,7 @@ def zbuduj(spec: dict, b: dict, elementy: list[dict], out: Path, w: Wynik) -> di
             for i, p in enumerate(r["_pliki"]):
                 dst = out / "kreacje" / nazwa_kreacji(r, i, p)
                 shutil.copy2(p["plik"], dst)
-                kreacje.append({"reklama": r["nazwa"], "plik": str(dst), **{k: p[k] for k in ("rodzaj", "proporcja") if k in p}})
+                kreacje.append({"reklama": r["nazwa"], "plik": dst.as_posix(), **{k: p[k] for k in ("rodzaj", "proporcja") if k in p}})
         (out / "teksty.md").write_text(teksty_meta(elementy), encoding="utf-8")
         kroki = kroki_meta(spec, b, elementy)
     else:
@@ -380,8 +380,8 @@ def zbuduj(spec: dict, b: dict, elementy: list[dict], out: Path, w: Wynik) -> di
            "i wrzuć go agentowi: dostaniesz raport i listę zmian do wyklikania (`raport-reklam`).",
            "- Coś niepokojącego (wydatki szybciej niż plan, odrzucone reklamy)? Wstrzymanie kampanii jest zawsze bezpieczne."]
     (out / "PUBLIKACJA.md").write_text("\n".join(md) + "\n", encoding="utf-8")
-    pod = {"kampania": k["nazwa"], "platforma": plat, "budzet": b, "katalog": str(out),
-           "publikacja": str(out / "PUBLIKACJA.md"), "teksty": str(out / "teksty.md"), "kreacje": kreacje,
+    pod = {"kampania": k["nazwa"], "platforma": plat, "budzet": b, "katalog": out.as_posix(),    # „/” także na Windows
+           "publikacja": (out / "PUBLIKACJA.md").as_posix(), "teksty": (out / "teksty.md").as_posix(), "kreacje": kreacje,
            "uwagi": w.uwagi}
     (out / "paczka.json").write_text(json.dumps(pod, ensure_ascii=False, indent=1), encoding="utf-8")
     return pod

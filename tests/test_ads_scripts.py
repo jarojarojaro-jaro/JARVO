@@ -1,5 +1,6 @@
 """Skrypty jarvo-ads: statystyka testów, planer mocy, eksport CSV, klient Skarbca bez Skarbca."""
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -58,9 +59,13 @@ def test_export_google_title_rows(tmp_path):
 
 
 def test_ads_client_without_skarbiec():
-    r = subprocess.run([sys.executable, str(S / "ads.py"), "doctor"], capture_output=True, text=True,
-                       env={"SKARBIEC_URL": "http://127.0.0.1:9", "PATH": "/usr/bin:/bin"})
-    assert r.returncode == 3 and "niepodłączony" in r.stderr
+    env = {"SKARBIEC_URL": "http://127.0.0.1:9", "PATH": "/usr/bin:/bin"}
+    if os.name == "nt":   # bez SYSTEMROOT Windows nie otworzy gniazda (WinError 10106) i test nie sprawdziłby połączenia
+        env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
+    # -X utf8: w pustym środowisku na Windows stderr miałby stronę kodową ANSI („niepodłączony”)
+    r = subprocess.run([sys.executable, "-X", "utf8", str(S / "ads.py"), "doctor"], capture_output=True, text=True,
+                       encoding="utf-8", env=env)
+    assert r.returncode == 3 and "niepodłączony" in r.stderr and "10106" not in r.stderr, r.stderr
 
 
 # ------------------------------------------------------------------ paczka do ręcznej publikacji

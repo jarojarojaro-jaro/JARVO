@@ -110,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Brak pliku: {src}", file=sys.stderr)
         return 2
     convert(src, dst)
-    print(f"PDF: {dst} ({dst.stat().st_size // 1024} KB)")
+    print(f"PDF: {dst.as_posix()} ({dst.stat().st_size // 1024} KB)")
     return 0
 
 

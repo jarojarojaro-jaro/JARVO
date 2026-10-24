@@ -192,8 +192,9 @@ def jarvo_app(a: dict, kz: dict) -> dict:
 
 
 def _uruchom(cmd: list[str], cwd: Path, env: dict | None = None, timeout: int = 1200) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=cwd, env={**os.environ, "CI": "1", "EXPO_NO_TELEMETRY": "1", **(env or {})},
-                          capture_output=True, text=True, timeout=timeout)
+    return subprocess.run([ml.program(cmd[0]), *cmd[1:]], cwd=cwd,
+                          env={**os.environ, "CI": "1", "EXPO_NO_TELEMETRY": "1", **(env or {})},
+                          capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
 
 def ustaw(kat: Path, a: dict, zg: dict, logo: str | None = None) -> dict:
@@ -363,19 +364,19 @@ def zasady_jarvo(kat: Path) -> list[dict]:
     for p, t in kod.items():
         for wz, nazwa in SEKRETY:
             if re.search(wz, t):
-                k.append({"id": "J-SEKRET", "ok": False, "opis": f"{p.relative_to(kat)}: {nazwa} w kodzie aplikacji (trafia do paczki)"})
+                k.append({"id": "J-SEKRET", "ok": False, "opis": f"{p.relative_to(kat).as_posix()}: {nazwa} w kodzie aplikacji (trafia do paczki)"})
     wzorce = paczki.zaufane(kat) | set(paczki.POPULARNE)
     for nazwa in sorted(set(pkg.get("dependencies") or {}) | set(pkg.get("devDependencies") or {})):
         wzor = paczki.podszycie(nazwa, wzorce)
         if wzor:
             k.append({"id": "J-PACZKA", "ok": False, "opis": f"package.json: {nazwa} prawie jak {wzor} (literówka albo podszycie)"})
-    todo = [f"{p.relative_to(kat)}:{i + 1}" for p, t in kod.items() for i, l in enumerate(t.splitlines()) if "JARVO-TODO" in l]
+    todo = [f"{p.relative_to(kat).as_posix()}:{i + 1}" for p, t in kod.items() for i, l in enumerate(t.splitlines()) if "JARVO-TODO" in l]
     k.append({"id": "J-TODO", "ok": True, "ostrz": bool(todo),
               "opis": f"znaczniki JARVO-TODO: {len(todo)} ({', '.join(todo[:5])}); blokują wydanie, nie podgląd" if todo
               else "brak znaczników JARVO-TODO"})
     for p, t in kod.items():
         if re.search(r"EXPO_PUBLIC_[A-Z_]*(SECRET|PRIVATE|SERVICE)", t):
-            k.append({"id": "J-PUBLIC", "ok": False, "opis": f"{p.relative_to(kat)}: zmienna EXPO_PUBLIC_ z sekretem (trafia do paczki)"})
+            k.append({"id": "J-PUBLIC", "ok": False, "opis": f"{p.relative_to(kat).as_posix()}: zmienna EXPO_PUBLIC_ z sekretem (trafia do paczki)"})
     if not any(not x["ok"] for x in k if x["id"] != "J-TODO"):
         k.insert(0, {"id": "J-ZASADY", "ok": True, "opis": "elementy zgodności, uprawnienia i sekrety: bez uwag"})
     return k
@@ -406,7 +407,7 @@ def sprawdz(kat: Path, siec: bool = True) -> dict:
                            "wyjscie": "\n".join(f"{w['paczka']}: {'; '.join(w['powody'])}" for w in zle)})
     wyniki += zasady_jarvo(kat)
     zle = [w for w in wyniki if not w["ok"]]
-    return {"katalog": str(kat), "ok": not zle, "kontrole": wyniki,
+    return {"katalog": kat.as_posix(), "ok": not zle, "kontrole": wyniki,
             "podsumowanie": f"{len(wyniki) - len(zle)}/{len(wyniki)} kontroli OK" + (f"; nie przeszły: {', '.join(w['id'] for w in zle)}" if zle else "")}
 
 
@@ -429,7 +430,8 @@ def _jarvo_link() -> list[str]:
 
 
 def link_hq(sciezka: Path) -> str:
-    r = subprocess.run([*_jarvo_link(), str(sciezka)], capture_output=True, text=True, timeout=60)
+    r = subprocess.run([*_jarvo_link(), str(sciezka)], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=60)
     if r.returncode != 0:
         raise Blad(f"jarvo_link: {r.stderr.strip()}")
     return r.stdout.strip().splitlines()[-1]
@@ -496,7 +498,7 @@ def podglad(kat: Path, trasy: list[str], z_eksportem: bool = True) -> dict:
         wynik = zrzuty(f"http://127.0.0.1:{port}/{token}", kat / "out" / "zrzuty", trasy)
     finally:
         srv.shutdown()
-    return {"link": url, "zrzuty": str(kat / "out" / "zrzuty"), "kontrole": wynik.get("podsumowanie"), "wynik": wynik}
+    return {"link": url, "zrzuty": (kat / "out" / "zrzuty").as_posix(), "kontrole": wynik.get("podsumowanie"), "wynik": wynik}
 
 
 # ------------------------------------------------------------------ Expo Go (EAS Update)

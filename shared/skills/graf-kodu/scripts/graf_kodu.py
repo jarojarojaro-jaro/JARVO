@@ -98,7 +98,8 @@ def env() -> dict:
 
 def run(args: list[str], quiet: bool = False) -> subprocess.CompletedProcess:
     b = home() / VERSION / "codebase-memory-mcp"
-    r = subprocess.run([str(b), *args], capture_output=True, text=True, env=env(), timeout=1800)
+    r = subprocess.run([str(b), *args], capture_output=True, text=True, encoding="utf-8", errors="replace", env=env(),
+                       timeout=1800)
     if not quiet and r.returncode != 0:
         raise SystemExit(f"graf kodu: {(r.stderr or r.stdout).strip()[-800:]}")
     return r

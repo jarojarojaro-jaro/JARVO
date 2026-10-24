@@ -172,11 +172,20 @@ print(json.dumps(res, ensure_ascii=False))
 """
 
 
+def python_hermesa(src: str) -> str:
+    """Python z venvu Hermesa (POSIX: .venv/bin/python, Windows: .venv\\Scripts\\python.exe), inaczej bieżący."""
+    for py in (Path(src) / ".venv" / "bin" / "python", Path(src) / ".venv" / "Scripts" / "python.exe"):
+        if py.exists():
+            return str(py)
+    return sys.executable
+
+
 def zastosuj(profil: Path, pid: str) -> dict:
     src = os.environ.get("HERMES_SRC", "/opt/hermes")
-    py = os.environ.get("HERMES_PY") or (f"{src}/.venv/bin/python" if Path(f"{src}/.venv/bin/python").exists() else sys.executable)
+    py = os.environ.get("HERMES_PY") or python_hermesa(src)
     env = {**os.environ, "HERMES_HOME": str(profil), "PYTHONPATH": src}
-    r = subprocess.run([py, "-c", _ZASTOSUJ, pid], cwd=src, env=env, capture_output=True, text=True, timeout=120)
+    r = subprocess.run([py, "-c", _ZASTOSUJ, pid], cwd=src, env=env, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=120)
     try:
         return json.loads(r.stdout.strip().splitlines()[-1])
     except (ValueError, IndexError):

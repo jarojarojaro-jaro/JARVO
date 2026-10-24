@@ -195,7 +195,8 @@ def skala_ffmpeg(spec: tuple | None, parzyste: bool = True) -> str:
 
 def _run(cmd: list[str], silnik: str, timeout: int, cwd: Path | None = None) -> subprocess.CompletedProcess:
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd, stdin=subprocess.DEVNULL)
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                           cwd=cwd, stdin=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
         raise Blad(f"{silnik}: przekroczony czas ({timeout // 60} min)") from None
     except OSError as exc:
@@ -254,7 +255,8 @@ def strony_lista(spec: str | None, liczba: int | None) -> list[int] | None:
 
 def liczba_stron(pdf: Path) -> int | None:
     if shutil.which("qpdf"):
-        r = subprocess.run(["qpdf", "--show-npages", str(pdf)], capture_output=True, text=True)
+        r = subprocess.run(["qpdf", "--show-npages", str(pdf)], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace")
         if r.returncode in (0, 3) and r.stdout.strip().isdigit():
             return int(r.stdout.strip())
     return None
@@ -404,8 +406,9 @@ class FFmpeg(Silnik):
 
     @functools.cached_property
     def _kodeki(self) -> tuple[str, str]:
-        enc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True).stdout
-        dec = subprocess.run(["ffmpeg", "-hide_banner", "-decoders"], capture_output=True, text=True).stdout
+        kw = {"capture_output": True, "text": True, "encoding": "utf-8", "errors": "replace"}
+        enc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], **kw).stdout
+        dec = subprocess.run(["ffmpeg", "-hide_banner", "-decoders"], **kw).stdout
         return enc, dec
 
     def ma(self, enc: str) -> bool:
@@ -433,7 +436,7 @@ class FFmpeg(Silnik):
             return {}
         r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
                             "stream=codec_type,codec_name,color_transfer,color_primaries,color_space",
-                            "-of", "json", str(src)], capture_output=True, text=True)
+                            "-of", "json", str(src)], capture_output=True, text=True, encoding="utf-8", errors="replace")
         try:
             streams = json.loads(r.stdout or "{}").get("streams", [])
         except ValueError:
@@ -840,8 +843,8 @@ def konwertuj(src: Path, na: str, dst: Path | None = None, katalog: Path | None 
     if FORMATY[z][0] in ("obraz", "wideo", "audio"):
         _dopilnuj(wyniki)
     przed, po = src.stat().st_size, _rozmiar(wyniki)
-    wynik = {"wejscie": str(src), "na": na, "trasa": [f"{a}→{b} ({s})" for a, b, s in kroki],
-             "pliki": [str(p) for p in wyniki], "rozmiar_przed": przed, "rozmiar_po": po,
+    wynik = {"wejscie": src.as_posix(), "na": na, "trasa": [f"{a}→{b} ({s})" for a, b, s in kroki],   # „/” też na Windows
+             "pliki": [p.as_posix() for p in wyniki], "rozmiar_przed": przed, "rozmiar_po": po,
              "sek": round(time.monotonic() - t0, 2)}
     if z == na and po >= przed:
         wynik["uwaga"] = "wynik nie jest mniejszy od oryginału: zostaw oryginał"
@@ -876,7 +879,7 @@ def polacz(srcs: list[Path], dst: Path, opt: Opcje | None = None) -> dict:
                 r = konwertuj(s, "pdf", dst=Path(t) / f"{i:03d}.pdf", opt=Opcje(dpi=opt.dpi, zasoby=s.parent))
                 czesci.extend(Path(p) for p in r["pliki"])
             _run(["qpdf", "--empty", "--pages", *map(str, czesci), "--", str(dst)], "qpdf", 600)
-    return {"wejscie": [str(s) for s in srcs], "na": "pdf", "trasa": ["połączenie w jeden PDF"], "pliki": [str(dst)],
+    return {"wejscie": [s.as_posix() for s in srcs], "na": "pdf", "trasa": ["połączenie w jeden PDF"], "pliki": [dst.as_posix()],
             "rozmiar_przed": _rozmiar(srcs), "rozmiar_po": _rozmiar([dst]), "sek": round(time.monotonic() - t0, 2)}
 
 
@@ -1143,7 +1146,7 @@ def metadane(src: Path) -> dict:
     if z not in PAKIETY and not shutil.which("exiftool"):
         raise Blad("Odczyt metadanych wymaga exiftool (jest w obrazie Jarva).")
     w = _opisz(_odczyt(src))
-    wynik = {"plik": str(src), "format": z, "wrazliwe": w, "czysty": not w}
+    wynik = {"plik": src.as_posix(), "format": z, "wrazliwe": w, "czysty": not w}
     if z in PAKIETY and (u := _uwagi_tresci(src)):
         wynik["uwagi"] = u
     return wynik
@@ -1247,8 +1250,8 @@ def usun_metadane(src: Path, dst: Path | None = None, katalog: Path | None = Non
     usuniete = _opisz(przed)
     silnik_ = ("exiftool" if z in FOTO_META else "exiftool + qpdf" if z == "pdf" else "Jarvo (XML w pliku)"
                if z in PAKIETY else "FFmpeg")
-    wynik = {"wejscie": str(src), "na": z, "trasa": [f"bez metadanych ({silnik_})"],
-             "pliki": [str(out)], "usuniete": usuniete, "wpisow_usunietych": len(_wpisy(przed) - _wpisy(po)),
+    wynik = {"wejscie": src.as_posix(), "na": z, "trasa": [f"bez metadanych ({silnik_})"],
+             "pliki": [out.as_posix()], "usuniete": usuniete, "wpisow_usunietych": len(_wpisy(przed) - _wpisy(po)),
              "rozmiar_przed": src.stat().st_size, "rozmiar_po": out.stat().st_size,
              "sek": round(time.monotonic() - t0, 2)}
     if not usuniete and not wynik["wpisow_usunietych"]:
@@ -1317,7 +1320,7 @@ def main(argv: list[str] | None = None) -> int:
         if not pliki:
             ap.error("podaj plik (albo --formaty)")
         if args.cele:
-            dump({"plik": str(pliki[0]), "format": format_pliku(pliki[0]), "cele": cele(format_pliku(pliki[0]))})
+            dump({"plik": pliki[0].as_posix(), "format": format_pliku(pliki[0]), "cele": cele(format_pliku(pliki[0]))})
             return 0
         if args.metadane:
             m = [metadane(p) for p in pliki]
@@ -1344,7 +1347,7 @@ def main(argv: list[str] | None = None) -> int:
             except Blad as exc:
                 if len(pliki) == 1:
                     raise
-                bledy.append({"plik": str(p), "blad": str(exc)})
+                bledy.append({"plik": p.as_posix(), "blad": str(exc)})
         dump(wyniki[0] if len(pliki) == 1 else {"wyniki": wyniki, "bledy": bledy})
         return 1 if bledy and not wyniki else 0
     except Blad as exc:

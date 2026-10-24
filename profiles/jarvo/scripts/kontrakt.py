@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -116,8 +117,9 @@ def main(argv: list[str] | None = None) -> int:
         if a.plik:
             show = json.loads(a.plik.read_text(encoding="utf-8"))
         else:
-            r = subprocess.run([os.environ.get("JARVO_HERMES_BIN", "hermes"), "kanban", "show", a.task_id, "--json"],
-                               capture_output=True, text=True, timeout=60)
+            prog = os.environ.get("JARVO_HERMES_BIN", "hermes")       # Windows: nakładka bywa plikiem .cmd
+            r = subprocess.run([shutil.which(prog) or prog, "kanban", "show", a.task_id, "--json"],
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
             if r.returncode != 0:
                 raise RuntimeError(r.stderr.strip()[:300])
             show = json.loads(r.stdout)

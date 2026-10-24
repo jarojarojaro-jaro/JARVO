@@ -44,8 +44,9 @@ def test_szablon_ma_kazde_miejsce_nakladki_raz():
 def test_kopia_upstreamu_bez_zmian_i_bez_drugiego_skilla():
     kopia = SKILL / "assets" / "iso-glow"
     assert not list(SKILL.rglob("SKILL.md"))[1:], "w skillu może być tylko jeden SKILL.md (Hermes widziałby drugi skill)"
-    assert "April Zhu" in (kopia / "LICENSE").read_text() and "Tolga Cohce" in (kopia / "LICENSE").read_text()
-    assert (kopia / "ISO-GLOW.md").read_text().startswith("---\nname: iso-glow")
+    licencja = (kopia / "LICENSE").read_text(encoding="utf-8")
+    assert "April Zhu" in licencja and "Tolga Cohce" in licencja
+    assert (kopia / "ISO-GLOW.md").read_text(encoding="utf-8").startswith("---\nname: iso-glow")
 
 
 def test_zbuduj_strona_po_polsku_bez_sieci():
@@ -140,7 +141,8 @@ def test_png_i_film_polecenia(tmp_path):
     assert url.endswith("/s.html?render=1&figura=ekspres&tlo=0")
     cmd = ISO.polecenie_wideo(tmp_path / "s.html", tmp_path / "f.mp4", "ekspres", 6, 30, (1080, 1920), "ciemny",
                               True, None, Path("/x/html_wideo.py"))
-    assert cmd[1:5] == ["/x/html_wideo.py", "wideo", str(tmp_path / "s.html"), "--preset"] and "jarvo" in cmd
+    # ścieżki idą do html_wideo.py w zapisie systemu (na Windows „\x\html_wideo.py”)
+    assert cmd[1:5] == [str(Path("/x/html_wideo.py")), "wideo", str(tmp_path / "s.html"), "--preset"] and "jarvo" in cmd
     assert cmd[cmd.index("--query") + 1] == "demo=1&motyw=ciemny&figura=ekspres&podpis=1"
     assert cmd[cmd.index("--rozmiar") + 1] == "1080x1920" and cmd[cmd.index("--dlugosc") + 1] == "6"
 
@@ -154,7 +156,7 @@ def test_cli_zbuduj_i_figury(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out) == [{"id": "ekspres", "nazwa": "Ekspres do kawy"}]
     assert ISO.main(["sprawdz", str(out)]) == 0
     zla = tmp_path / "zla.js"
-    zla.write_text("FIGS.push({ id: 'z', mount(s) { s.innerHTML = '<rect fill=\"#abcdef\"/>'; } });")
+    zla.write_text("FIGS.push({ id: 'z', mount(s) { s.innerHTML = '<rect fill=\"#abcdef\"/>'; } });", encoding="utf-8")
     assert ISO.main(["zbuduj", str(zla), "-o", str(tmp_path / "z.html")]) == 1
     assert ISO.main(["sprawdz", str(zla)]) == 1
     assert "kolor wpisany" in capsys.readouterr().out

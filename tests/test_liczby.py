@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import sqlite3
 
+import pytest
+
 from conftest import load_script
 
 liczby = load_script("profiles/jarvo/scripts/liczby.py", "jarvo_liczby_test")
@@ -105,3 +107,22 @@ def test_brak_tablicy_i_cli(tmp_path, capsys):
     assert liczby.main(["--dane", str(tmp_path), "--teraz", str(NOW)]) == 0
     out = capsys.readouterr().out.strip().splitlines()
     assert out[0].startswith("Liczby floty") and json.loads(out[-1])["okno_dni"] == 7
+
+
+def test_baza_tylko_do_odczytu_w_katalogu_ze_spacja_i_polskimi_znakami(tmp_path):
+    """URI bazy z Path.as_uri(): spacja, polskie litery i „#” w ścieżce (f"file:{ścieżka}" ucina adres na „#”)."""
+    kat = tmp_path / "Michał Żółć #1"
+    kat.mkdir()
+    c = sqlite3.connect(kat / "kanban.db")
+    c.execute("CREATE TABLE t (x INTEGER)")
+    c.execute("INSERT INTO t VALUES (7)")
+    c.commit()
+    c.close()
+    conn = liczby._ro(kat / "kanban.db")
+    try:
+        assert conn.execute("SELECT x FROM t").fetchone()[0] == 7
+        with pytest.raises(sqlite3.OperationalError, match="readonly"):
+            conn.execute("INSERT INTO t VALUES (8)")
+    finally:
+        conn.close()
+    assert liczby._ro(kat / "brak.db") is None

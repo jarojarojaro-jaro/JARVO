@@ -332,8 +332,9 @@ def konfiguracja(kat: Path) -> dict:
     if (kat / "node_modules" / "expo").exists():
         out = {}
         for typ in ("public", "introspect"):
-            r = subprocess.run(["npx", "expo", "config", "--type", typ, "--json"], cwd=kat, capture_output=True, text=True,
-                               timeout=180, env={**os.environ, "CI": "1", "EXPO_NO_TELEMETRY": "1"})
+            r = subprocess.run([ml.program("npx"), "expo", "config", "--type", typ, "--json"], cwd=kat, capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=180,
+                               env={**os.environ, "CI": "1", "EXPO_NO_TELEMETRY": "1"})
             if r.returncode != 0:
                 raise RuntimeError(f"expo config --type {typ}: {(r.stdout + r.stderr).strip()[-600:]}")
             out[typ] = json.loads(r.stdout[r.stdout.find("{"):])
@@ -1174,7 +1175,8 @@ def p36(ctx):
 
 def _ocr(p: Path) -> str:
     try:
-        r = subprocess.run(["tesseract", str(p), "-", "-l", "pol+eng"], capture_output=True, text=True, timeout=60)
+        r = subprocess.run(["tesseract", str(p), "-", "-l", "pol+eng"], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=60)
         return r.stdout if r.returncode == 0 else ""
     except (OSError, subprocess.TimeoutExpired):
         return ""
@@ -1387,7 +1389,7 @@ def sprawdz(ctx: Kontekst) -> dict:
     wyniki += punkty_wyuczone(ctx)
     licz = {s: sum(1 for w in wyniki if w["stan"] == s) for s in ZNAKI}
     blokujace = [w for w in wyniki if w["stan"] == "blad" and w["tryb"] == "auto"]
-    return {"aplikacja": str(ctx.kat), "data": ml.DZIS.isoformat(), "konfiguracja": ctx.cfg.get("zrodlo"),
+    return {"aplikacja": ctx.kat.as_posix(), "data": ml.DZIS.isoformat(), "konfiguracja": ctx.cfg.get("zrodlo"),
             "buildy": {k: b.sciezka.name for k, b in ctx.builds.items()}, "wyniki": wyniki, "liczby": licz,
             "blokujace": [w["nr"] for w in blokujace],
             "gotowe_do_wyslania": licz["ok"] == len(wyniki),

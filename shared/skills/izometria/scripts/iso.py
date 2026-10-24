@@ -424,7 +424,8 @@ def _node(zadanie: dict) -> dict:
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
         json.dump(zadanie, f)
     try:
-        p = subprocess.run([node, str(RENDER_JS), f.name], capture_output=True, text=True, timeout=600)
+        p = subprocess.run([node, str(RENDER_JS), f.name], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=600)
     finally:
         os.unlink(f.name)
     if p.returncode:
@@ -549,7 +550,7 @@ def main(argv: list[str] | None = None) -> int:
             if a.wyjscie.suffix.lower() == ".js":
                 a.wyjscie.parent.mkdir(parents=True, exist_ok=True)
                 a.wyjscie.write_text(js, encoding="utf-8")
-                print(json.dumps({"figura": str(a.wyjscie), "agentow": len(dane["agenci"]) + 1}, ensure_ascii=False))
+                print(json.dumps({"figura": a.wyjscie.as_posix(), "agentow": len(dane["agenci"]) + 1}, ensure_ascii=False))
                 return 0
             a.figury, a.cmd = [("flota.js", js)], "zbuduj"
         if a.cmd == "zbuduj":
@@ -566,7 +567,7 @@ def main(argv: list[str] | None = None) -> int:
             a.wyjscie.parent.mkdir(parents=True, exist_ok=True)
             a.wyjscie.write_text(strona, encoding="utf-8")
             _wypisz_kontrole(r)
-            print(json.dumps({"strona": str(a.wyjscie), "kb": round(len(strona.encode()) / 1024, 1),
+            print(json.dumps({"strona": a.wyjscie.as_posix(), "kb": round(len(strona.encode()) / 1024, 1),
                               "figury": r["figury"], "uwag": len(r["uwagi"]),
                               "paleta": paleta if isinstance(paleta, str) else [x[0] for x in paleta],
                               "stopka": not a.bez_stopki}, ensure_ascii=False))

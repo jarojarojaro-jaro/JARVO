@@ -155,7 +155,7 @@ def pliki(root: Path):
 
 
 def git(root: Path, *a) -> str:
-    r = subprocess.run(["git", "-C", str(root), *a], capture_output=True, text=True)
+    r = subprocess.run(["git", "-C", str(root), *a], capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.stdout if r.returncode == 0 else ""
 
 
@@ -177,7 +177,7 @@ def repo(root: Path) -> list[dict]:
             txt = p.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        rel = str(p.relative_to(root))
+        rel = p.relative_to(root).as_posix()          # „/” także na Windows (wynik i wzorzec PLIK_TESTOW)
         for nazwa, wz in SEKRETY:
             for m in re.finditer(wz, txt):
                 if re.search(r"(?i)(example|placeholder|twoj|your|xxx|dummy|test)", m.group(0)):
@@ -196,8 +196,10 @@ def repo(root: Path) -> list[dict]:
     if hits:
         wyn.append(u("KRYTYCZNE", f"sekrety w historii gita ({len(hits)})", "git log",
                      "UNIEWAŻNIJ klucze (usunięcie z historii nie wystarczy: kopie już istnieją); potem git filter-repo"))
-    if (root / "package.json").exists() and shutil.which("npm"):
-        r = subprocess.run(["npm", "audit", "--json", "--omit=dev"], cwd=root, capture_output=True, text=True)
+    npm = shutil.which("npm")                       # pełna ścieżka: na Windows npm to npm.cmd (goła nazwa: WinError 2)
+    if (root / "package.json").exists() and npm:
+        r = subprocess.run([npm, "audit", "--json", "--omit=dev"], cwd=root, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
         try:
             v = (json.loads(r.stdout or "{}").get("metadata") or {}).get("vulnerabilities") or {}
             for waga, klucz in (("KRYTYCZNE", "critical"), ("WYSOKIE", "high")):
@@ -281,7 +283,7 @@ def rls_w_sql(root: Path) -> list[dict]:
         if zle:
             m = zle[0]
             wyn.append(u("NISKIE", f"polityka RLS liczy auth.{m.group(1)}() dla każdego wiersza ({len(zle)}× w pliku; wydajność)",
-                         f"{p.relative_to(root)}:{txt.count(chr(10), 0, m.start()) + 1}",
+                         f"{p.relative_to(root).as_posix()}:{txt.count(chr(10), 0, m.start()) + 1}",
                          f"(select auth.{m.group(1)}()) zamiast auth.{m.group(1)}() i indeks na kolumnie z polityki (np. user_id)"))
     return wyn
 
@@ -601,7 +603,7 @@ def gps_w_repo(root: Path) -> list[dict]:
         except OSError:
             continue
         if gps:
-            wyn.append(_gps_ustalenie(gps, str(p.relative_to(root)), USUN_GPS + "; potem commit (stara wersja "
+            wyn.append(_gps_ustalenie(gps, p.relative_to(root).as_posix(), USUN_GPS + "; potem commit (stara wersja "
                                       "zostaje w historii gita: jeśli to adres prywatny, powiedz właścicielowi)"))
     return wyn
 
