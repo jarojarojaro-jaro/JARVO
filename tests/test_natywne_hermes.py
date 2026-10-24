@@ -117,7 +117,7 @@ from pathlib import Path
 
 DOMYSLNE = {"security.tirith_enabled": True, "security.allow_lazy_installs": True,
             "auth.adopt_external_logins": True, "updates.check": True, "terminal.home_mode": "auto"}
-for brak in filter(None, os.environ.get("ATRAPA_BEZ_KLUCZY", "").split(",")):
+for brak in filter(None, os.environ.get("ATRAPA_BRAK_POL", "").split(",")):
     DOMYSLNE.pop(brak, None)
 argv = sys.argv[1:]
 profil = None
@@ -410,7 +410,7 @@ def _wersja_tekst(checkout: Path, env: dict) -> str:
 def test_konfiguracja_bezpieczna_przez_cli_hermesa(checkout_cli, tmp_path, monkeypatch):
     dziennik = tmp_path / "dziennik.jsonl"
     monkeypatch.setenv("ATRAPA_DZIENNIK", str(dziennik))
-    monkeypatch.delenv("ATRAPA_BEZ_KLUCZY", raising=False)
+    monkeypatch.delenv("ATRAPA_BRAK_POL", raising=False)
     u = _uklad(tmp_path)
     env = srodowisko.srodowisko(u, os.environ, biez={}, narz={})
     assert "Update available" in _wersja_tekst(checkout_cli, env)       # domyślnie Hermes podpowiada `hermes update`
@@ -440,7 +440,7 @@ def test_konfiguracja_bezpieczna_przez_cli_hermesa(checkout_cli, tmp_path, monke
 
 def test_konfiguracja_profili_i_klucze_ktorych_wersja_nie_zna(checkout_cli, tmp_path, monkeypatch):
     monkeypatch.setenv("ATRAPA_DZIENNIK", str(tmp_path / "dziennik.jsonl"))
-    monkeypatch.setenv("ATRAPA_BEZ_KLUCZY", "terminal.home_mode,security.tirith_enabled")   # np. Hermes 0.22 bez tirith
+    monkeypatch.setenv("ATRAPA_BRAK_POL", "terminal.home_mode,security.tirith_enabled")   # np. Hermes 0.22 bez tirith
     u = _uklad(tmp_path)
     (u.dane / "profiles" / "jarvo").mkdir(parents=True)
     env = srodowisko.srodowisko(u, os.environ, biez={}, narz={})
@@ -451,7 +451,7 @@ def test_konfiguracja_profili_i_klucze_ktorych_wersja_nie_zna(checkout_cli, tmp_
     assert json.loads((u.dane / "profiles" / "jarvo" / "atrapa-config.json").read_text(encoding="utf-8")) == oczekiwane
     assert any("nie dotyczy terminal.home_mode" in x for x in logi) and not (u.dane / "home").exists()
     with pytest.raises(hermes.BladHermesa, match="nie zna klucza updates.check"):
-        hermes.konfiguracja_bezpieczna(u, checkout_cli, dict(env, ATRAPA_BEZ_KLUCZY="updates.check"), log=_cicho)
+        hermes.konfiguracja_bezpieczna(u, checkout_cli, dict(env, ATRAPA_BRAK_POL="updates.check"), log=_cicho)
     with pytest.raises(hermes.BladHermesa, match="Zła nazwa profilu"):
         hermes.konfiguracja_bezpieczna(u, checkout_cli, env, log=_cicho, profile=["../obcy"])
 

@@ -19,7 +19,11 @@ SEKRET = re.compile(r"TOKEN|KEY|SECRET|PASS|HASLO|KLUCZ|AUTH|COOKIE", re.I)   # 
 
 # zmienne, których nie przenosimy z otoczenia właściciela do procesów floty (inny Hermes, inny Python, cudze cache)
 OBCE = ("HERMES_HOME", "HERMES_GATEWAY_LOCK_DIR", "PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV", "CONDA_PREFIX",
-        "UV_PROJECT_ENVIRONMENT", "NODE_OPTIONS", "NODE_PATH", "npm_config_prefix", "HERMES_YOLO_MODE")
+        "UV_PROJECT_ENVIRONMENT", "NODE_OPTIONS", "NODE_PATH", "npm_config_prefix", "HERMES_YOLO_MODE",
+        "TIRITH_ENABLED", "UV_INDEX_URL", "UV_EXTRA_INDEX_URL", "PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL")
+# zmienne otoczenia, które wyglądają na sekrety właściciela (klucze, tokeny, agent ssh), też nie przechodzą: flota dostaje
+# swoje klucze z .env Jarva (mózg, Telegram), a nie z powłoki właściciela; wyjątki to zmienne pulpitu bez sekretu
+POTRZEBNE_MIMO_NAZWY = ("XAUTHORITY",)
 
 
 def wczytaj_json(p: Path) -> dict:
@@ -48,7 +52,8 @@ def hermes_python(checkout: Path) -> Path:
 def srodowisko(u: Uklad, baza: dict | None = None, *, biez: dict | None = None,
                narz: dict | None = None) -> dict[str, str]:
     """Pełne środowisko procesu Jarva: `baza` (domyślnie os.environ) bez zmiennych obcych + katalogi i narzędzia."""
-    env = {k: v for k, v in dict(os.environ if baza is None else baza).items() if k not in OBCE}
+    env = {k: v for k, v in dict(os.environ if baza is None else baza).items()
+           if k not in OBCE and (not SEKRET.search(k) or k in POTRZEBNE_MIMO_NAZWY)}
     biez = biezace(u) if biez is None else biez
     narz = narzedzia(u) if narz is None else narz
     jd = u.jarvo_dane
