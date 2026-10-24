@@ -1,0 +1,5 @@
+name: jarvo-zgody
+version: 0.1.0
+description: "Tryby zgód jak w Claude Code dla natywnego Jarva: pytaj, projekt (domyślny) i pełny (/yolo na sesję). Hak pre_tool_call i polecenie /tryb."
+kind: standalone
+provides_hooks: [pre_tool_call]
