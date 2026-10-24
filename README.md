@@ -119,6 +119,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [RSI.md](docs/RSI.md) | pętla samodoskonalenia floty: research, zasady, etapy R0–R4 (pomiar evals, lekcje, kuźnia skilli), koszty |
 | [RUNBOOK.md](docs/RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
 | [INSTALER.md](docs/INSTALER.md) | instalator jednym poleceniem na Linuksie, macOS i Windowsie: jak działa na każdym systemie, aktualizacje, testy, etapy |
+| [NATYWNIE.md](docs/NATYWNIE.md) | plan przejścia na instalację natywną bez Dockera i WSL (Windows, macOS, Linux): mapa kontener → natywnie, zgody jak w Claude Code, migracja, etapy, ryzyka, decyzje |
 | [ROZWOJ-FLOTY.md](docs/ROZWOJ-FLOTY.md) | plan dopracowania agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności jako skill Weba |
 | [KOMPUTER.md](docs/KOMPUTER.md) | computer use i server use: Komputer Jarva (pulpit w osobnym kontenerze), agent Operator, Ekran w HQ, terminal i serwery, Ręce na Twoim komputerze; bramka sterownika, zasady bezpieczeństwa, etapy K0–K6 |
 | [MOBILE.md](docs/MOBILE.md) | projekt Twórcy aplikacji `jarvo-mobile`: pełny proces od pomysłu do sklepu (darmowy audyt mobilny, prototyp Expo na telefonie, Android w dashboardzie i iOS w chmurze, bramka aplikacji, lista kontrolna sklepów, zrzuty, odrzucenia, aplikacja ze strony, utrzymanie); etapy i stan w §16 |

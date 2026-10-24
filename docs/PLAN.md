@@ -23,6 +23,7 @@ Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa 
 | [WIEDZA.md](WIEDZA.md) | projekt skarbca wiedzy (drugi mózg floty): LLM Wiki w plikach Markdown, wtyczka `jarvo-wiedza`, zakładka „Wiedza” z grafem |
 | [VPS.md](VPS.md) | infrastruktura: topologia, bezpieczeństwo, backupy, monitoring, wdrożenia |
 | [RUNBOOK.md](RUNBOOK.md) | wdrożenie i codzienna obsługa krok po kroku |
+| [NATYWNIE.md](NATYWNIE.md) | plan przejścia na instalację natywną bez Dockera i WSL: mapa kontener → natywnie, etapy, ryzyka, decyzje |
 | [SOURCES.md](SOURCES.md) | źródła, atrybucje i licencje |
 | [JARVO-CALOSC.md](JARVO-CALOSC.md) | całość od A do Z w jednym pliku (kontekst na start sesji) |
 
@@ -274,6 +275,8 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
   etap 2 (gotowy obraz amd64/arm64 w GHCR) i etap 3 (macOS: Homebrew, Colima, wolumeny, LaunchAgent) zbudowane 2026-10-09,
   macOS czeka na próbę na prawdziwym Macu; etap 4 (Windows: WSL2, restart i dalszy ciąg, dystrybucja `Jarvo`, autostart)
   zbudowany 2026-10-09, czeka na próbę na prawdziwym Windowsie.
+- ⬜ Jarvo natywnie na Windows, macOS i Linuksie (bez Dockera i WSL, każda funkcja, jedno polecenie instalacji, macierz CI
+  na 6 runnerach): plan w [NATYWNIE.md](NATYWNIE.md) z 2026-10-24; etapy E0–E14, przed kodem decyzje właściciela (§ (i)).
 
 ### Faza ∞
 Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…

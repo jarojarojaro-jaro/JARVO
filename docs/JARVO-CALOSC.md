@@ -384,7 +384,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 **Dokumenty:** PLAN (wizja/architektura/roadmapa), BOSS (mechanika Main Judge'a), FLEET (specyfikacja
 agentów), PROFILE-SPEC (anatomia agenta: 10 warstw), TOOLBOX (narzędzia open-source), VPS (infra),
 HQ (dashboard), ADS (projekt agenta reklam + Skarbiec), LEADY (Łowca leadów), KLIPY (clipmaker),
-WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku), INSTALER (plan instalatora jednym poleceniem na trzy systemy), ROZWOJ-FLOTY (plan dopracowania agentów), MOBILE (projekt Twórcy aplikacji),
+WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku), INSTALER (plan instalatora jednym poleceniem na trzy systemy), NATYWNIE (plan przejścia na instalację natywną bez Dockera i WSL), ROZWOJ-FLOTY (plan dopracowania agentów), MOBILE (projekt Twórcy aplikacji),
 KOMPUTER (computer use i server use: Komputer Jarva, Operator, Ekran w HQ, Ręce; etapy K0–K6),
 SOURCES (licencje).
 
@@ -487,6 +487,10 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
 5. **PageIndex (MIT, rozważane):** vectorless RAG do czytania długich dokumentów przez lokalny model
    (litellm → Hermes/GLM). Nie jako osobny agent — jako współdzielona umiejętność „czytania długich
    dokumentów”. Do decyzji: zakres (który agent najpierw) + model do indeksowania.
+6. **Jarvo natywnie (kierunek od 2026-10-24), plan w [NATYWNIE.md](NATYWNIE.md):** Jarvo bez Dockera i WSL na Windows,
+   macOS i Linuksie, z każdą funkcją (czat w terminalu ze zgodami jak w Claude Code, flota, panel, skarbiec, rutyny,
+   Telegram, filmy, lektor, OCR, Komputer Jarva, migracja ze starej instalacji). Hermes z przypiętego commitu przez uv,
+   narzędzia z wydań u źródła z sumą sha256, własny nadzorca procesów. Etapy E0–E14; przed kodem decyzje właściciela.
 
 **Odrzucone (nie wpinamy):** RedAmon (offensive pentest — za ciężki, ryzyko prawne),
 terminal-browser (ciężka przeglądarka desktopowa, nie dla agentów na VPS),

@@ -8,6 +8,10 @@ Stan: plan z 2026-09-30; **etap 1 (Linux) zbudowany i przetestowany 2026-09-30**
 i etap 3 (macOS) zbudowane 2026-10-09** (§4b; macOS czeka na próbę na prawdziwym Macu), **etap 4 (Windows)
 zbudowany 2026-10-09** (§4c; czeka na próbę na prawdziwym Windowsie), etap 5 w toku.
 
+**Kierunek od 2026-10-24:** instalacja natywna bez Dockera i bez WSL na trzech systemach. Plan przejścia (mapa
+kontener → natywnie, etapy, ryzyka, decyzje) jest w [NATYWNIE.md](NATYWNIE.md). Do przełączenia (etap E13) ten
+dokument opisuje dzisiejszą instalację.
+
 ---
 
 ## 1. Co jest dziś
