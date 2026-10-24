@@ -295,7 +295,7 @@ RUN set -e; d=/opt/jarvo/models/paradee; mkdir -p "$d" /tmp/spacy-en && \
 #     cyfr przez rozpoznawanie, nie błędy wymowy), RAM ~0,41 GB na głos w obu. Wolniejszy t4 nic nie daje.
 #     Przegląd 2026-10-11 (repozytorium modelu z 2026-10-02, przypięta rewizja z 2026-10-10): pliki = same wagi ONNX
 #     i JSON-y przypięte sha256 (kod fonemizera jest w repo Jarvo, jarvo_tts_matcha.py). Na końcu próba mowy obu głosów.
-ARG MATCHA_PL_URL=https://huggingface.co/machinekind/Matcha-TTS-PL-v2/resolve/93744740ae645648c003abb09e8c617d9c5e34cd
+ARG MATCHA_PL_URL=https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd
 RUN set -e; d=/opt/jarvo/models/matcha-pl; mkdir -p "$d/meski" "$d/damski" && \
     curl -fsSL --retry 3 "$MATCHA_PL_URL/onnx/matcha_pl_t2.onnx" -o "$d/meski/matcha_pl_t2.onnx" && \
     curl -fsSL --retry 3 "$MATCHA_PL_URL/onnx/voices.json" -o "$d/meski/voices.json" && \
@@ -313,7 +313,7 @@ RUN set -e; d=/opt/jarvo/models/matcha-pl; mkdir -p "$d/meski" "$d/damski" && \
       "b661c506b222e914fa03fcdb9a505164f3fcd880983c205c20353381d05bd2c5  $d/ATTRIBUTION.md" \
       "61363f244e4e85534ef47d0d85e3bedd64f9ac384fbab16bef5fc06dd7daae6f  $d/README.md" \
       | sha256sum -c - && \
-    printf '%s\n' "Matcha-TTS-PL v2 (machinekind), CC BY-SA 4.0: https://huggingface.co/machinekind/Matcha-TTS-PL-v2" \
+    printf '%s\n' "Matcha-TTS-PL v2 (machinekind), CC BY-SA 4.0: https://huggingface.co/machinekind/Matcha-TTS-PL" \
       "Rewizja: ${MATCHA_PL_URL##*/}. Pliki bez zmian: meski/ = onnx/ (male_voxcpm_1)," \
       "damski/ = onnx/female_voxcpm_2/. Źródła danych treningowych: ATTRIBUTION.md, licencja: LICENSE." \
       "Głosy są syntetyczne (VoxCPM2, nie nagrania ani klony ludzi): mowę oznaczamy jako syntetyczną." \

@@ -243,10 +243,10 @@ zrodla:
     przejrzane: bd4d90d93214b37f7a159cf205ae85762c2c10aa
     notatka: "MIT: tablica symboli (matcha/text/symbols.py) w fonemizerze polskiego lektora jarvo_tts_matcha.py"
   matcha-tts-pl-v2:
-    repo: https://huggingface.co/machinekind/Matcha-TTS-PL-v2
+    repo: https://huggingface.co/machinekind/Matcha-TTS-PL
     status: uzywane
     przejrzane: 93744740ae645648c003abb09e8c617d9c5e34cd
-    notatka: "CC BY-SA 4.0: polski lektor (jarvo-tts, głosy pl-PL-Matcha-Meski = male_voxcpm_1, pl-PL-Matcha-Damski = female_voxcpm_2), wagi ONNX t2 w obrazie z sha256 w infra/Dockerfile, ATTRIBUTION.md i LICENSE obok; port english/polish_*cleaners.py w jarvo_tts_matcha.py. Repo z 2026-10-02, rewizja z 2026-10-10; przegląd 2026-10-11; pliki = same wagi ONNX przypięte sha256"
+    notatka: "CC BY-SA 4.0: polski lektor (jarvo-tts, głosy pl-PL-Matcha-Meski = male_voxcpm_1, pl-PL-Matcha-Damski = female_voxcpm_2), wagi ONNX t2 w obrazie z sha256 w infra/Dockerfile, ATTRIBUTION.md i LICENSE obok; port english/polish_*cleaners.py w jarvo_tts_matcha.py. Repo z 2026-10-02, rewizja z 2026-10-10; przegląd 2026-10-11; pliki = same wagi ONNX przypięte sha256. Repo przemianowane przez autora 2026-10-11 z Matcha-TTS-PL-v2 (commit 0fe5065931); od 2026-10-23 nazwę -v2 ma inne, nowe repo (osobne źródło, bez przeglądu), więc stary adres zwraca 404. Rewizja 93744740 i sumy plików bez zmian (sprawdzone 2026-10-24 przez API Hugging Face)"
   manimgx:
     repo: https://github.com/academa-labs/manimgx
     status: uzywane

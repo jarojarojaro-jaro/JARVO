@@ -2,7 +2,7 @@
 
 Licencja tego pliku: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/), jak pierwowzór.
 Port plików `english/polish_cleaners.py` i `english/polish_mixed_cleaners.py` z modelu
-Matcha-TTS-PL v2 (machinekind, https://huggingface.co/machinekind/Matcha-TTS-PL-v2, rewizja
+Matcha-TTS-PL v2 (machinekind, https://huggingface.co/machinekind/Matcha-TTS-PL, rewizja
 93744740ae645648c003abb09e8c617d9c5e34cd, CC BY-SA 4.0) oraz poprawki z jego przeglądarkowego portu `cleaner.js`
 („iʲ” → „i” jak w danych treningowych, „?” przyklejony do słowa). Tablica symboli: `matcha/text/symbols.py`
 z Matcha-TTS (Shivam Mehta i in., MIT; https://github.com/shivammehta25/Matcha-TTS) z dopisaną tyldą U+0303
