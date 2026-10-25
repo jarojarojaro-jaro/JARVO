@@ -558,7 +558,16 @@ narzedzia:
         format: zip
         env:
           JARVO_KOMPUTER_CHROME: "{katalog}/chrome-win64/chrome.exe"
-      windows-arm64: *cftk-win64
+      # Chrome for Testing nie ma win-arm64, a win64 w emulacji gubił nowe karty (docs/NATYWNIE.md Z42): natywny
+      # Chromium ARM64 z oficjalnego buildera Google (chromium-browser-snapshots/Win_Arm64), rewizja 1706555 =
+      # main@d6c4da8f, 16 rewizji po punkcie gałęzi 156 (1706539); md5 z metadanych obiektu zgodne
+      windows-arm64:
+        url: https://storage.googleapis.com/chromium-browser-snapshots/Win_Arm64/1706555/chrome-win.zip
+        sha256: 2ae967adbd04ff55d3d6a8a8a316971327aa19907cf5f108e152f03ca049a690
+        rozmiar: 334422917
+        format: zip
+        env:
+          JARVO_KOMPUTER_CHROME: "{katalog}/chrome-win/chrome.exe"
       macos-arm64:
         url: https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/mac-arm64/chrome-mac-arm64.zip
         sha256: ad7f2b49a4dc679af286b1b1b386670d93ca7868079f69012d21ba0ac8293df3

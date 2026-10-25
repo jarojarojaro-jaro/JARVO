@@ -95,3 +95,19 @@ def test_program_przegladarki(tmp_path):
     narz = {"chrome-komputer": {"env": {"JARVO_KOMPUTER_CHROME": str(tmp_path / "chrome")}}}
     assert przegladarka.program({}, narz) == str(tmp_path / "chrome")
     assert przegladarka.program({"JARVO_KOMPUTER_CHROME": "y"}, narz) == "y"
+
+
+def test_x64_w_emulacji_po_naglowku_pe(tmp_path):
+    """Windows ARM64: wyłączone GPU tylko dla przeglądarki x64 (emulacja); natywny Chromium ARM64 i inne systemy nie."""
+    def pe(maszyna: int):
+        dane = bytearray(4096)
+        dane[:2] = b"MZ"
+        dane[0x3C:0x40] = (0x80).to_bytes(4, "little")
+        dane[0x80:0x84] = b"PE\0\0"
+        dane[0x84:0x86] = maszyna.to_bytes(2, "little")
+        p = tmp_path / f"chrome-{maszyna:x}.exe"
+        p.write_bytes(bytes(dane))
+        return p
+    x64, arm = pe(0x8664), pe(0xAA64)
+    assert przegladarka.x64_w_emulacji(x64, "ARM64") and not przegladarka.x64_w_emulacji(arm, "ARM64")
+    assert not przegladarka.x64_w_emulacji(x64, "AMD64") and not przegladarka.x64_w_emulacji(tmp_path / "brak", "ARM64")

@@ -100,7 +100,7 @@ class Usluga:
     def _argumenty(self) -> list[str]:
         return przegladarka.flagi(profil=self.k["profil"], port_proxy=self.proxy.port if self.proxy else None,
                                   okno=self.okno, bez_piaskownicy=self.bez_piaskownicy,
-                                  emulacja=sciezki.WINDOWS and sciezki.maszyna_windows().upper() == "ARM64")
+                                  emulacja=przegladarka.x64_w_emulacji(self.program))
 
     def _env_przegladarki(self) -> dict:
         """Środowisko przeglądarki bez kluczy floty i sekretów właściciela (srodowisko.przechodzi). Linux: katalogi

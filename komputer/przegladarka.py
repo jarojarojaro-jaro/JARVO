@@ -53,6 +53,24 @@ def program(env: dict | None = None, narzedzia: dict | None = None) -> str | Non
     return p or None
 
 
+def x64_w_emulacji(program: str | Path, maszyna: str = "") -> bool:
+    """Przeglądarka x64 na Windows ARM64 (nagłówek PE pliku, bez uruchamiania): działa w emulacji Prism."""
+    if not WINDOWS and not maszyna:
+        return False
+    if not maszyna:
+        from jarvo import sciezki
+        maszyna = sciezki.maszyna_windows()
+    if maszyna.upper() != "ARM64":
+        return False
+    try:
+        with open(program, "rb") as f:
+            naglowek = f.read(4096)
+        pe = int.from_bytes(naglowek[0x3C:0x40], "little")
+        return naglowek[:2] == b"MZ" and int.from_bytes(naglowek[pe + 4:pe + 6], "little") == 0x8664
+    except (OSError, ValueError):
+        return False
+
+
 def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int, int] = EKRAN,
           bez_piaskownicy: bool = False, jezyk: str = "pl", emulacja: bool = False) -> list[str]:
     """Argumenty startu przeglądarki Jarva (bez --remote-debugging-pipe, który dokłada cdp.Przegladarka).

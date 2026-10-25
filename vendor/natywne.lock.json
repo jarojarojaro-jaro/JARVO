@@ -212,12 +212,12 @@
     },
     "windows-arm64": {
      "env": {
-      "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-win64/chrome.exe"
+      "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-win/chrome.exe"
      },
      "format": "zip",
-     "rozmiar": 209154801,
-     "sha256": "a4e0d57245e167e98a9d465af1e3774d2b4ec9f04e483d19bcd97a6f63cf46dd",
-     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/win64/chrome-win64.zip"
+     "rozmiar": 334422917,
+     "sha256": "2ae967adbd04ff55d3d6a8a8a316971327aa19907cf5f108e152f03ca049a690",
+     "url": "https://storage.googleapis.com/chromium-browser-snapshots/Win_Arm64/1706555/chrome-win.zip"
     },
     "macos-arm64": {
      "env": {
