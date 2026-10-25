@@ -90,7 +90,9 @@ def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int,
     if not okno:
         f += ["--headless=new", "--mute-audio"]
     if emulacja:
-        f += ["--disable-gpu", "--disable-software-rasterizer"]
+        # bez GPU i SwiftShadera, a każda karta we własnym procesie renderera: przy małej pamięci Chrome upycha karty
+        # tej samej strony w jednym procesie, a drugi widget w emulacji kończył się błędami mojo (Z42)
+        f += ["--disable-gpu", "--disable-software-rasterizer", "--renderer-process-limit=100"]
     if MACOS:
         f.append("--use-mock-keychain")              # bez okna pęku kluczy (hasła i tak są wyłączone)
     if LINUX:

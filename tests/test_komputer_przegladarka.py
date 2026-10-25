@@ -28,6 +28,7 @@ def test_flagi_proxy_quic_webrtc_i_tryb(tmp_path):
     assert "--disable-gpu" not in f
     emu = przegladarka.flagi(profil=tmp_path, port_proxy=19201, okno=False, emulacja=True)
     assert "--disable-gpu" in emu and "--disable-software-rasterizer" in emu and emu[-1] == "about:blank"
+    assert "--renderer-process-limit=100" in emu and not any(x.startswith("--renderer-process-limit") for x in f)
 
 
 def test_flagi_bez_oslabien_playwrighta_i_portu_cdp(tmp_path):
