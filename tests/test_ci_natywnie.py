@@ -102,7 +102,8 @@ def test_piec_nog_z_planu(zadanie):
 def test_uprawnienia_i_wspolbieznosc(wf, kroki):
     assert wf["permissions"] == {"contents": "read"}
     assert "github.ref" in wf["concurrency"]["group"]
-    assert "refs/tags/" in str(wf["concurrency"]["cancel-in-progress"]), "tagu (wydania) nie przerywamy"
+    # trwającego przebiegu nie przerywamy (także tagu): nogi Windows kończą się, najnowszy commit czeka w kolejce
+    assert wf["concurrency"]["cancel-in-progress"] is False
     checkout = next(k for k in kroki if str(k.get("uses", "")).startswith("actions/checkout@"))
     assert checkout["with"]["persist-credentials"] is False, "token GitHuba nie zostaje w .git/config"
     assert not any("continue-on-error" in k for k in kroki), "błąd ma być widoczny jako czerwona noga"

@@ -39,9 +39,11 @@ on:
 permissions:
   contents: read
 
+# bez przerywania: nogi Windows biegną najdłużej (ok. 90 min), a każdy push na main w trakcie ucinał je, zanim
+# skończyły; trwający przebieg dobiega do końca, a najnowszy commit czeka w kolejce (GitHub trzyma jeden oczekujący)
 concurrency:
   group: natywnie-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: false
 
 jobs:
   instalacja:
