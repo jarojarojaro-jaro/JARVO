@@ -46,6 +46,16 @@ SECRET_PATTERNS = [
 # .claude: lokalny katalog Claude Code (robocze kopie agentów w worktrees), nie należy do repo;
 # .tools: narzędzia deweloperskie spoza pip (scripts/dev-pwsh.sh), poza gitem
 SKIP_DIRS = {".git", ".claude", ".tools", "build", "node_modules", "__pycache__", ".pytest_cache"}
+
+
+def _pominiety(path: Path) -> bool:
+    """Ścieżka w katalogu z SKIP_DIRS liczona OD KORZENIA REPO: repo w worktree pod .claude/worktrees/… (albo w
+    katalogu build) inaczej pomijało każdy plik, a kontrola skryptów i sekretów nie sprawdzała niczego."""
+    try:
+        czesci = path.relative_to(fl.REPO_ROOT).parts
+    except ValueError:
+        czesci = path.parts
+    return any(p in SKIP_DIRS for p in czesci)
 # dokumenty z pełną listą floty: każdy aktywny agent musi w nich wystąpić jako `nazwa`
 DOCS_WITH_FLEET = ["README.md", "docs/FLEET.md", "docs/JARVO-CALOSC.md", "docs/BOSS.md", "docs/TOOLBOX.md"]
 # kolumny tabel w dokumentach, których liczba w wierszu agenta musi zgadzać się z repo
@@ -543,7 +553,7 @@ def check_scripts(r: Report) -> None:
     bash = fl.bash()                # na Windows Git Bash, nigdy System32\bash.exe (WSL)
     bez_basha = 0
     for path in sorted(fl.REPO_ROOT.rglob("*")):
-        if any(p in SKIP_DIRS for p in path.parts) or not path.is_file():
+        if _pominiety(path) or not path.is_file():
             continue
         if path.suffix == ".py":
             # kompilacja w pamięci: repo w kontenerze jest tylko do odczytu (py_compile chce zapisać .pyc)
@@ -570,7 +580,7 @@ def check_scripts(r: Report) -> None:
 
 def check_secrets(r: Report) -> None:
     for path in sorted(fl.REPO_ROOT.rglob("*")):
-        if any(p in SKIP_DIRS for p in path.parts) or not path.is_file() or path.stat().st_size > 2_000_000:
+        if _pominiety(path) or not path.is_file() or path.stat().st_size > 2_000_000:
             continue
         if path.name == ".env" or (path.suffix == ".env" and not path.name.endswith(".example")):
             r.err(f"{w_repo(path)}: plik .env nie może być w repo")

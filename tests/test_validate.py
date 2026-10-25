@@ -80,6 +80,26 @@ def test_env_file_and_secret_detected(repo_copy):
     assert errors_matching(report, r"shared/notatka.md: wygląda na klucz OpenRouter")
 
 
+def test_sekrety_wykryte_tez_w_repo_pod_katalogiem_claude(repo_copy, tmp_path, monkeypatch):
+    """Repo w worktree pod .claude/worktrees/… : SKIP_DIRS liczone od korzenia repo, nie od korzenia dysku
+    (wcześniej każdy plik miał w ścieżce „.claude”, więc kontrola sekretów nic nie sprawdzała)."""
+    import fleetlib as fl
+    worktree = tmp_path / ".claude" / "worktrees" / "wf-1"
+    worktree.parent.mkdir(parents=True)
+    repo_copy.rename(worktree)
+    monkeypatch.setattr(fl, "REPO_ROOT", worktree)
+    fake_key = "sk-or-v1-" + "cd" * 16
+    (worktree / "shared" / "notatka.md").write_text(f"klucz: {fake_key}\n", encoding="utf-8")
+    report = validate.Report()
+    validate.check_secrets(report)
+    assert errors_matching(report, r"shared/notatka.md: wygląda na klucz OpenRouter")
+    (worktree / ".claude").mkdir()                       # katalog .claude W repo dalej pomijany
+    (worktree / ".claude" / "x.md").write_text(f"{fake_key}\n", encoding="utf-8")
+    report = validate.Report()
+    validate.check_secrets(report)
+    assert not errors_matching(report, r"\.claude/x.md")
+
+
 def test_too_few_evals(repo_copy):
     path = repo_copy / "evals/jarvo-reka/scenarios.yaml"
     data = fl.load_yaml(path)

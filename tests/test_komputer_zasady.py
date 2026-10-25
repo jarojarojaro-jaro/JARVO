@@ -517,6 +517,10 @@ def test_luhn_i_numery_kart():
 def test_ukryj_sekrety_w_tekscie_i_strukturze():
     t, n = zasady.ukryj_sekrety("klucz sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX1234567890 i karta 4111111111111111")
     assert n == 2 and "sk-proj" not in t and "4111" not in t and t.count(zasady.ZNACZNIK) == 2
+    # klucz z wyraźnym przedrostkiem doklejony do litery też znika; zwykłe słowo z „sk-” zostaje
+    t, n = zasady.ukryj_sekrety("APIKEYsk-ant-api03-" + "Q" * 30 + " i ghtokenghp_" + "b" * 36)
+    assert n == 2 and "sk-ant" not in t and "ghp_" not in t
+    assert zasady.ukryj_sekrety("desk-reservation-system-version-two")[1] == 0
     sc = {"elements": [{"role": "password text", "label": "Hasło", "value": "tajne"},
                        {"role": "entry", "label": "Uwagi", "value": "ghp_" + "a" * 36},
                        {"role": "entry", "label": "Imię", "value": "Jan"}]}

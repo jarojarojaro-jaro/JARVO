@@ -132,8 +132,8 @@ def ma_ochrone(route) -> bool:
 
 SEKRETY = re.compile("|".join([          # kopia infra/komputer/zasady.py: SEKRETY (tests/test_kontekst.py pilnuje)
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)",
-    r"\bsk-(?:ant-|proj-|or-v1-)?[A-Za-z0-9_-]{20,}",
-    r"\bgh[pousr]_[A-Za-z0-9]{30,}", r"\bgithub_pat_[A-Za-z0-9_]{30,}", r"\bglpat-[A-Za-z0-9_-]{20,}",
+    r"sk-(?:ant-|proj-|or-v1-)[A-Za-z0-9_-]{20,}", r"\bsk-[A-Za-z0-9_-]{20,}",
+    r"gh[pousr]_[A-Za-z0-9]{30,}", r"github_pat_[A-Za-z0-9_]{30,}", r"glpat-[A-Za-z0-9_-]{20,}",
     r"\bAKIA[0-9A-Z]{16}\b", r"\bASIA[0-9A-Z]{16}\b", r"\bxox[abprs]-[A-Za-z0-9-]{10,}",
     r"\bAIza[0-9A-Za-z_-]{35}\b", r"\bhf_[A-Za-z0-9]{30,}", r"\bnpm_[A-Za-z0-9]{36}\b",
     r"\b(?:rk|sk|pk)_live_[A-Za-z0-9]{20,}", r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}",
