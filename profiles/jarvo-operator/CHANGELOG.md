@@ -68,3 +68,17 @@
   które już jest aktywne (`_NET_ACTIVE_WINDOW`); inaczej odmowa `okno_nieaktywne` (scenariusz evals
   `operator-okno-nieaktywne`: nowy `capture`, praca w aktywnym oknie albo prośba do właściciela, bez podnoszenia okien).
 - Skarbiec: rozmowy Operatora nie mają wyciągów (wyniki narzędzi to treść ekranu, cudze dane).
+- Ręce na ekranie właściciela (etap K6, docs/NATYWNIE.md J14, J15, decyzja I19), instalacja natywna, domyślnie
+  wyłączone: właściciel włącza je sam w swoim terminalu (`jarvo komputer rece on --aplikacje <lista> --na 30m`,
+  potwierdzenie TAK; z procesu floty i bez terminala odmowa), wyłącza od razu `jarvo komputer rece off`, a po czasie
+  zgody albo 10 min bez działań gasną same. Zgoda podpisana kluczem HMAC z `<stan>/rece.klucz`, manifest bounded
+  sterownika cua-driver-rs 0.38.0 (tylko aplikacje ze zgody, bez pełnego ekranu, plików, schowka, skryptów,
+  zamykania programów i przeglądarki CDP), telemetria i sprawdzanie aktualizacji sterownika wyłączone. Bramka
+  (`komputer/rece`) przepuszcza `serve` tylko w trybie bounded z tym manifestem, z profilu bez stałych zgód `cua:*`
+  (każde działanie na ekranie właściciela zatwierdza człowiek; „zawsze” w trakcie sesji kończy sesję) i bez praw
+  administratora (okna administratora poza zasięgiem, bez pracownika UIAccess); w rozmowie odrzuca narzędzia spoza
+  rąk, launch_app innych aplikacji, skróty systemu (Win/Super, Alt+Tab, Ctrl+Alt+Del, Cmd+Spacja…) i sekrety
+  w pisanym tekście, a w odpowiedziach ukrywa klucze i karty. Odmowy wracają jako wynik narzędzia z kodem
+  (`rece_wylaczone`, `rece_wygasly`, `poza_zgoda`, `zablokowane`, `stala_zgoda`). Dziennik `<stan>/rece/dziennik.jsonl`
+  bez treści. macOS: Dostępność i Nagrywanie ekranu dla Cua Driver włącza właściciel (instrukcja w `on`). Działa po
+  podpięciu w `komputer/jarvo_cua.py` i `jarvo/cli.py` oraz wpisie sterownika w `vendor/natywne.yaml`.
