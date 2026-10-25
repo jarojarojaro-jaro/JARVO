@@ -88,7 +88,8 @@ platforma() {   # ustawia PLATFORMA
 
 katalogi() {   # ROOT, PROGRAM, POBRANE jak jarvo/sciezki.py
   local cache
-  if [ -n "${JARVO_ROOT:-}" ]; then
+  if [ -n "${JARVO_ROOT:-}" ] && [ "${JARVO_ROOT%/}" != "${XDG_DATA_HOME:-$HOME/.local/share}/jarvo" ]; then
+    # JARVO_ROOT równy domyślnemu korzeniowi niczego nie przenosi (jak jarvo/sciezki.py: logi i cache w XDG)
     ROOT="$JARVO_ROOT"
     case "$ROOT" in "~"/*) ROOT="$HOME/${ROOT#\~/}" ;; esac
     case "$ROOT" in /*) ;; *) ROOT="$PWD/$ROOT" ;; esac

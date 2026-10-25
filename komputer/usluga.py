@@ -36,7 +36,7 @@ _APP = Path(__file__).resolve().parent.parent
 if str(_APP) not in sys.path:
     sys.path.insert(0, str(_APP))
 
-from jarvo import przenosne, sciezki, srodowisko  # noqa: E402
+from jarvo import przenosne, sciezki, srodowisko, zmiany_hosta  # noqa: E402
 from komputer import cdp, filtr, kanal, przegladarka, sterownik_cdp, wejscie_natywne  # noqa: E402
 
 KOD_BLAD = 1
@@ -102,15 +102,39 @@ class Usluga:
                                   okno=self.okno, bez_piaskownicy=self.bez_piaskownicy)
 
     def _env_przegladarki(self) -> dict:
-        """Środowisko przeglądarki bez kluczy floty i sekretów właściciela (srodowisko.przechodzi)."""
+        """Środowisko przeglądarki bez kluczy floty i sekretów właściciela (srodowisko.przechodzi). Linux: katalogi
+        XDG w katalogu Komputera: Chrome trzyma raporty awarii w domyślnym katalogu danych mimo --user-data-dir,
+        a do tego bazę NSS i cache fontconfig (CI natywnie: ~/.config/google-chrome-for-testing, ~/.local/share/pki,
+        ~/.cache/fontconfig zostawały po odinstalowaniu)."""
         env = {k: v for k, v in os.environ.items() if srodowisko.przechodzi(k)
                and not k.upper().startswith(("HERMES_", "JARVO_"))}
         if sciezki.LINUX:
             env["LANGUAGE"] = "pl"                 # Linux: język interfejsu z otoczenia (--lang tam nie działa)
+            xdg = self.k["profil"].parent / "xdg"
+            env.update({"XDG_CONFIG_HOME": str(xdg / "config"), "XDG_CACHE_HOME": str(xdg / "cache"),
+                        "XDG_DATA_HOME": str(xdg / "data")})
         return env
+
+    def _slad_raportow_awarii(self) -> None:
+        """macOS i Windows: Chrome for Testing zakłada domyślny katalog danych dla raportów awarii (Crashpad) mimo
+        --user-data-dir (chrome_paths.cc, DIR_CRASH_DUMPS). Gdy go jeszcze nie ma, wpis w dzienniku zmian hosta przed
+        startem: `jarvo uninstall` usunie go, jeśli w środku są tylko raporty awarii (cudzego nie rusza)."""
+        if sciezki.MACOS:
+            cel = Path.home() / "Library" / "Application Support" / "Google" / "Chrome for Testing"
+            dozwolone = ["Crashpad"]
+        elif sciezki.WINDOWS and os.environ.get("LOCALAPPDATA"):
+            cel = Path(os.environ["LOCALAPPDATA"]) / "Google" / "Chrome for Testing"
+            dozwolone = ["User Data/Crashpad"]
+        else:
+            return
+        try:
+            zmiany_hosta.katalog_przed_zmiana(self.u, cel, dozwolone)
+        except OSError as e:
+            log(f"dziennik zmian hosta: nie zapisałem katalogu raportów przeglądarki ({e})")
 
     def uruchom_przegladarke(self) -> None:
         przegladarka.przygotuj_profil(self.k["profil"], self.k["pobrane"])
+        self._slad_raportow_awarii()
         self.k["log_przegladarki"].parent.mkdir(parents=True, exist_ok=True)
         for proba in range(2):
             b = cdp.Przegladarka(self.program, self._argumenty(), env=self._env_przegladarki(),

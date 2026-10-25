@@ -60,7 +60,9 @@ def test_wtyczka_dodana_po_starcie_bramy(u):
     start = time.time() - 60
     stara = start - 3600
     for dom in (u.dane, u.dane / "profiles" / "jarvo"):
-        os.utime(dom / "plugins" / zc.NAZWA, (stara, stara))
+        os.utime(dom / "plugins", (stara, stara))
+        # import w bramie zakłada __pycache__ w katalogu wtyczki: świeży mtime katalogu wtyczki to nie nowa wtyczka
+        (dom / "plugins" / zc.NAZWA / "__pycache__").mkdir()
     w = zc.sprawdzenie(u, flota_agenci=["jarvo", "jarvo-web"], start=start)
     assert w["stan"] == "uwaga" and "jarvo-web" in w["opis"] and w["rada"] == "jarvo serwis --restart brama"
     assert "jarvo," not in w["opis"] and "host" not in w["opis"]

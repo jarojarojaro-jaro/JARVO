@@ -8,7 +8,8 @@
     cache       Windows i macOS <root>/cache, Linux ${XDG_CACHE_HOME:-~/.cache}/jarvo
     build       <root>/build: wynik scripts/build.py (odtwarzalny)
 
-`JARVO_ROOT` przenosi wszystko pod inny korzeń (testy, CI, druga instalacja). Jarvo nie używa domyślnego katalogu
+`JARVO_ROOT` przenosi wszystko pod inny korzeń (testy, CI, druga instalacja); równy domyślnemu korzeniowi niczego
+nie przenosi (na Linuksie logi i cache zostają w katalogach XDG, inaczej proces z tą zmienną zakładałby drugie). Jarvo nie używa domyślnego katalogu
 Hermesa (%LOCALAPPDATA%\\hermes, ~/.hermes): prywatny Hermes właściciela i Jarvo mają się nie widzieć.
 """
 from __future__ import annotations
@@ -61,6 +62,10 @@ def _korzen(env: dict) -> Path:
         # nie ~/Library/Application Support: spacja w ścieżce psuje niecytowane polecenia w skillach (c1)
         return Path.home() / ".jarvo"
     return Path(env.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "jarvo"
+
+
+def _ta_sama(a: Path, b: Path) -> bool:
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
 
 
 def krotka_sciezka(p: Path) -> Path:
@@ -119,7 +124,7 @@ def uklad(env: dict | None = None) -> Uklad:
     else:
         logi = Path(env.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "jarvo" / "logi"
         cache = Path(env.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "jarvo"
-    if env.get("JARVO_ROOT"):
+    if env.get("JARVO_ROOT") and not _ta_sama(root, _korzen({k: v for k, v in env.items() if k != "JARVO_ROOT"})):
         logi, cache = root / "logi", root / "cache"
     program = root / "program"
     if WINDOWS and not str(program).isascii():

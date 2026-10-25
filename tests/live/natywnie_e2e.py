@@ -1474,8 +1474,7 @@ def polecenie_komputer(a) -> int:
     except BladE2E as e:
         rap.punkt("komputer", nazwa, False, str(e))
         return 1
-    env = inst.env_terminala()
-    env["JARVO_ROOT"] = str(inst.u.root)
+    env = inst.env_terminala()          # JARVO_ROOT tylko z --korzen (Instalacja ustawia go wtedy w os.environ)
     r = uruchom([python, "-I", "-X", "utf8", REPO / "scripts" / "komputer_natywny_test.py", "--uruchom"],
                 czas=a.czas, env=env)
     (art / "komputer.txt").write_text(bez_sekretow(bez_ansi(r.tekst)), encoding="utf-8")

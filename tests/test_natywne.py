@@ -103,6 +103,14 @@ def test_uklad_domyslny_posix(monkeypatch, tmp_path):
     else:
         assert u.root == tmp_path / "xd" / "jarvo" and u.logi == tmp_path / "xs" / "jarvo" / "logi"
         assert u.cache == tmp_path / "xc" / "jarvo"
+        # JARVO_ROOT równy domyślnemu korzeniowi nic nie przenosi (CI natywnie: krok z tą zmienną zakładał drugie
+        # <root>/logi i <root>/cache, które zostawały po odinstalowaniu); inny korzeń przenosi wszystko
+        xdg = {"XDG_DATA_HOME": str(tmp_path / "xd"), "XDG_STATE_HOME": str(tmp_path / "xs"),
+               "XDG_CACHE_HOME": str(tmp_path / "xc")}
+        assert sciezki.uklad({**xdg, "JARVO_ROOT": str(tmp_path / "xd" / "jarvo")}) == u
+        assert sciezki.uklad({**xdg, "JARVO_ROOT": str(tmp_path / "xd" / "jarvo") + "/"}) == u
+        inny = sciezki.uklad({**xdg, "JARVO_ROOT": str(tmp_path / "inny")})
+        assert inny.logi == tmp_path / "inny" / "logi" and inny.cache == tmp_path / "inny" / "cache"
 
 
 def test_srodowisko_procesow_i_plik_bez_sekretow(tmp_path):

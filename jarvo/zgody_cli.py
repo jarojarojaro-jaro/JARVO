@@ -23,7 +23,9 @@ from .sciezki import Uklad
 NAZWA = "jarvo-zgody"
 SPRAWDZENIE = "zgody w profilach"
 # Python Hermesa: dla hosta i każdego profilu z config.yaml {profil, wlaczona, jest, wtyczka_od, blad}; wtyczka_od =
-# czas pojawienia się wtyczki w profilu (mtime dowiązania albo katalogu, bez wchodzenia w cel), bez treści configu
+# czas pojawienia się wtyczki w profilu: mtime katalogu plugins/ (zmienia się, gdy wpis dochodzi albo znika) i samego
+# dowiązania. Nie mtime katalogu wtyczki: import w bramie zakłada w nim __pycache__ (CI natywnie: fałszywa uwaga).
+# Bez treści configu.
 SKRYPT = r"""
 import json, os, sys
 from pathlib import Path
@@ -39,10 +41,15 @@ for imie, dom in domy:
     except Exception as e:
         blad = type(e).__name__
     wt = dom / "plugins" / nazwa
-    try:
-        od = os.lstat(wt).st_mtime
-    except OSError:
-        od = None
+    czasy = []
+    for p in (dom / "plugins", wt):
+        try:
+            st = os.lstat(p)
+        except OSError:
+            continue
+        if p == dom / "plugins" or os.path.islink(p):
+            czasy.append(st.st_mtime)
+    od = max(czasy) if czasy else None
     wynik.append({"profil": imie, "wlaczona": isinstance(wl, list) and nazwa in [str(x) for x in wl],
                   "jest": (wt / "plugin.yaml").is_file(), "wtyczka_od": od, "blad": blad})
 print(json.dumps(wynik))

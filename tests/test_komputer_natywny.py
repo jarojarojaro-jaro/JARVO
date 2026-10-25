@@ -592,3 +592,38 @@ def test_migracja_z_kontenera_bez_profilu(tmp_path):
     assert k["dziennik"].read_text(encoding="utf-8").splitlines()[0] == '{"t": "1", "decyzja": "czlowiek"}'
     assert not k["profil"].exists()
     assert jk.przenies_z_kontenera(u, dom) == {"pobrane": 0, "odrzucone": 1, "dziennik": 0, "pauza": False}
+
+
+def test_przegladarka_bez_sladow_poza_jarvem(tmp_path, monkeypatch):
+    """Chrome for Testing trzyma raporty awarii w domyślnym katalogu danych mimo --user-data-dir: na Linuksie XDG
+    przeglądarki w katalogu Komputera (bez ~/.config, ~/.local/share/pki, ~/.cache/fontconfig), na macOS i Windows
+    wpis w dzienniku zmian hosta przed startem, gdy domyślnego katalogu jeszcze nie ma (uninstall go zdejmie)."""
+    from jarvo import zmiany_hosta
+    from komputer import usluga
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-tajne-wlasciciela")
+    monkeypatch.setenv("JARVO_DATA_DIR", "/x")
+    us = usluga.Usluga(u, program="chrome", okno=False)
+    env = us._env_przegladarki()
+    assert "OPENAI_API_KEY" not in env and "JARVO_DATA_DIR" not in env
+    xdg = us.k["profil"].parent / "xdg"
+    if sciezki.LINUX:
+        assert env["XDG_CONFIG_HOME"] == str(xdg / "config") and env["XDG_DATA_HOME"] == str(xdg / "data")
+        assert env["XDG_CACHE_HOME"] == str(xdg / "cache")
+    else:
+        assert "XDG_CONFIG_HOME" not in env or env["XDG_CONFIG_HOME"] != str(xdg / "config")
+    dom = tmp_path / "dom"
+    monkeypatch.setattr(usluga.Path, "home", staticmethod(lambda: dom))
+    monkeypatch.setenv("LOCALAPPDATA", str(dom / "AppData" / "Local"))
+    (dom / "Library" / "Application Support").mkdir(parents=True)
+    (dom / "AppData" / "Local").mkdir(parents=True)
+    us._slad_raportow_awarii()
+    wpisy = [w for w in zmiany_hosta.wpisy(u) if w["rodzaj"] == "katalog"]
+    if sciezki.MACOS:
+        assert wpisy and wpisy[0]["szczegoly"]["sciezka"] == str(dom / "Library" / "Application Support" / "Google")
+        assert wpisy[0]["szczegoly"]["dozwolone"] == ["Chrome for Testing/Crashpad"]
+    elif sciezki.WINDOWS:
+        assert wpisy and wpisy[0]["szczegoly"]["sciezka"] == str(dom / "AppData" / "Local" / "Google")
+        assert wpisy[0]["szczegoly"]["dozwolone"] == ["Chrome for Testing/User Data/Crashpad"]
+    else:
+        assert wpisy == []

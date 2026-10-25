@@ -19,6 +19,10 @@ Rodzaje i to, co przy cofaniu znaczy „dalej nasze”:
     path-uzytkownika   katalog w PATH użytkownika (Windows, HKCU\\Environment\\Path): usuwamy tylko ten wpis
     blok-rc            oznaczony blok w pliku startowym powłoki o naszej sumie; reszta pliku zostaje
     plik               plik poza katalogiem Jarva o naszej sumie
+    katalog            katalog, którego przed Jarvem nie było, a zakłada go program Jarva (np. Chrome for Testing
+                       Komputera trzyma raporty awarii w domyślnym katalogu danych mimo --user-data-dir): usuwamy cały,
+                       gdy w środku są tylko ścieżki z `dozwolone` (względne, z „/”) i ich przodkowie; coś innego
+                       (np. właściciel zaczął używać tej przeglądarki) = nie nasze, zostaje
 
 `cofnij()` idzie od końca. Zmienione przez kogoś innego zostawia i mówi o tym; wpis, którego nie dało się cofnąć
 (błąd), zostaje w dzienniku do następnej próby. `zapomnij()` usuwa wpis bez cofania (zmianę cofnięto inną drogą).
@@ -30,7 +34,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
 from collections.abc import Callable
 from datetime import datetime
@@ -42,7 +48,7 @@ from .srodowisko import SEKRET
 
 PLIK = "zmiany-hosta.jsonl"
 RODZAJE = ("autostart-windows", "autostart-macos", "autostart-linux", "linger", "path-uzytkownika", "blok-rc",
-           "plik")
+           "plik", "katalog")
 _AUTOSTART = ("autostart-windows", "autostart-macos", "autostart-linux", "linger")
 WYNIKI = {"cofniete": "cofnięte", "brak": "już nie ma", "nie-nasze": "nie nasze", "pominiete": "pominięte",
           "blad": "błąd, wpis zostaje"}
@@ -218,12 +224,50 @@ def _cofnij_jeden(u: Uklad, w: dict, wykonaj: Wykonaj, rejestr) -> tuple[str, st
         return _cofnij_plik(Path(s["sciezka"]), s["sha256"])
     if rodzaj == "blok-rc":
         return _cofnij_blok(Path(s["sciezka"]), s["znacznik"], s["sha256"])
+    if rodzaj == "katalog":
+        return _cofnij_katalog(Path(s["sciezka"]), list(s.get("dozwolone") or []))
     if rodzaj == "path-uzytkownika":
         return _cofnij_path(s["wartosc"], rejestr)
     if rodzaj in _AUTOSTART:
         from . import autostart              # autostart importuje ten moduł, więc import dopiero tutaj
         return autostart.cofnij_wpis(u, w, wykonaj, rejestr=rejestr)
     return "blad", f"nieznany rodzaj {rodzaj!r} (wpis z nowszej wersji Jarva?)"
+
+
+# ---------------------------------------------------------------- katalog
+
+def katalog_przed_zmiana(u: Uklad, cel: Path, dozwolone: list[str]) -> Path | None:
+    """Przed startem programu, który założy `cel` poza katalogiem Jarva: wpis „katalog” dla najwyższego brakującego
+    katalogu na drodze do `cel` (np. ~/Library/Application Support/Google, gdy go nie było). `dozwolone` są względem
+    `cel`; w dzienniku zapisujemy je względem tego katalogu. Gdy `cel` już jest (np. właściciela), nic nie zapisuje
+    i zwraca None."""
+    cel = Path(cel)
+    if cel.exists():
+        return None
+    gora = cel
+    while not gora.parent.exists() and gora.parent != gora:
+        gora = gora.parent
+    przedrostek = cel.relative_to(gora).as_posix()
+    wzgledne = [f"{przedrostek}/{d}".strip("/") if przedrostek != "." else d.strip("/") for d in dozwolone]
+    dopisz(u, "katalog", sciezka=str(gora), dozwolone=sorted(wzgledne))
+    return gora
+
+
+def _cofnij_katalog(p: Path, dozwolone: list[str]) -> tuple[str, str]:
+    if not p.exists():
+        return "brak", f"{p}: już nie ma"
+    prefiksy = [d.strip("/") for d in dozwolone if d.strip("/")]
+
+    def wolno(rel: str) -> bool:
+        return any(rel == d or rel.startswith(d + "/") or d.startswith(rel + "/") for d in prefiksy)
+    for korzen, katalogi, pliki in os.walk(p, followlinks=False):
+        baza = Path(korzen).relative_to(p).as_posix()
+        for nazwa in [*katalogi, *pliki]:
+            rel = nazwa if baza == "." else f"{baza}/{nazwa}"
+            if not wolno(rel):
+                return "nie-nasze", f"{p}: jest w nim {rel} (nie zakładał go Jarvo), zostaje"
+    shutil.rmtree(p)
+    return "cofniete", f"{p}: usunięty (zakładał go program Jarva)"
 
 
 # ---------------------------------------------------------------- plik

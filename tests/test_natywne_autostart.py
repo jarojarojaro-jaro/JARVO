@@ -279,6 +279,34 @@ def _tagi(e) -> list[str]:
 
 # ---------------------------------------------------------------- dziennik zmian hosta
 
+def test_katalog_zakladany_przez_program_jarva(u, tmp_path):
+    """Rodzaj „katalog” (raporty awarii Chrome for Testing mimo --user-data-dir): wpis tylko dla katalogu, którego
+    nie było, od najwyższego brakującego; cofnięcie usuwa go przy samych dozwolonych ścieżkach, cudzy zostawia."""
+    baza = tmp_path / "Application Support"
+    baza.mkdir()
+    cel = baza / "Google" / "Chrome for Testing"
+    gora = zmiany_hosta.katalog_przed_zmiana(u, cel, ["Crashpad"])
+    assert gora == baza / "Google"
+    w = zmiany_hosta.wpisy(u)[-1]
+    assert w["rodzaj"] == "katalog" and w["szczegoly"] == {"sciezka": str(baza / "Google"),
+                                                          "dozwolone": ["Chrome for Testing/Crashpad"]}
+    (cel / "Crashpad" / "reports").mkdir(parents=True)
+    (cel / "Crashpad" / "settings.dat").write_bytes(b"x")
+    assert zmiany_hosta.katalog_przed_zmiana(u, cel, ["Crashpad"]) is None          # już jest: drugi wpis nie powstaje
+    r = zmiany_hosta.cofnij(u, log=None)
+    assert [x["wynik"] for x in r] == ["cofniete"] and not (baza / "Google").exists() and baza.is_dir()
+    # właściciel zaczął używać tej przeglądarki: jego profil = nie nasze, katalog zostaje, wpis znika z dziennika
+    zmiany_hosta.katalog_przed_zmiana(u, cel, ["Crashpad"])
+    (cel / "Crashpad").mkdir(parents=True)
+    (cel / "Default").mkdir()
+    r = zmiany_hosta.cofnij(u, log=None)
+    assert [x["wynik"] for x in r] == ["nie-nasze"] and (cel / "Default").is_dir()
+    assert zmiany_hosta.cofnij(u, log=None) == []
+    # katalog, który był wcześniej (np. Chrome for Testing właściciela): bez wpisu
+    assert zmiany_hosta.katalog_przed_zmiana(u, cel, ["Crashpad"]) is None
+
+
+
 def test_dziennik_bez_powtorzen_bez_sekretow_i_odporny_na_urwany_wiersz(u):
     w = zmiany_hosta.dopisz(u, "plik", sciezka=Path("/dom/a"), sha256="ab")
     assert w["rodzaj"] == "plik" and w["szczegoly"] == {"sciezka": str(Path("/dom/a")), "sha256": "ab"} and w["czas"]
