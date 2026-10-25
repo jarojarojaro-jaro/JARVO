@@ -333,11 +333,12 @@ def katalog_wersji(wersja: str) -> str:
 
 
 def zainstaluj(nazwa: str, wersja: str, plik: dict, katalog_narzedzi: Path, pobrane: Path, *,
-               pasek: bool = True, wyjscie=None) -> Path:
+               pasek: bool = True, wyjscie=None, usun_archiwum: bool = False) -> Path:
     """Narzędzie z jednego wpisu manifestu (url, sha256, rozmiar, format, usun_poziom, nazwa_pliku, usun,
     zmien_nazwe) do `katalog_narzedzi/nazwa/<wersja bez dopisku budowy>`. Format `plik` ląduje pod `nazwa_pliku`
     (domyślnie końcówka adresu), a nie pod nazwą z pamięci podręcznej. Gotowa instalacja z tą samą sumą = bez zmian.
-    Zwraca katalog wersji."""
+    `usun_archiwum`: archiwum znika zaraz po rozpakowaniu (instalacja przy pierwszym użyciu; instalator sprząta
+    archiwa na końcu przebiegu). Zwraca katalog wersji."""
     docelowy = Path(katalog_narzedzi) / nazwa / katalog_wersji(wersja)
     znacznik = docelowy / ".jarvo-suma"
     if znacznik.is_file() and znacznik.read_text(encoding="utf-8").strip() == plik["sha256"]:
@@ -366,6 +367,11 @@ def zainstaluj(nazwa: str, wersja: str, plik: dict, katalog_narzedzi: Path, pobr
         except OSError:
             pass                                     # zajęty plik (Windows): zostaje do następnego sprzątania
     os.replace(nowy, docelowy)
+    if usun_archiwum:
+        try:
+            archiwum.unlink()
+        except OSError:
+            pass                                     # zostaje do sprzątania następnej instalacji
     return docelowy
 
 

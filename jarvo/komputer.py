@@ -140,7 +140,7 @@ def zainstaluj_przegladarke(u: Uklad, app: Path, log=print) -> str:
         log(f"Pobieram przeglądarkę Jarva (Chrome for Testing {wersja}, {plik.get('rozmiar', 0) / 1e6:.0f} MB, "
             "suma sha256 sprawdzana przed rozpakowaniem)…")
     katalog = pobieracz.zainstaluj(_przegladarka().NARZEDZIE, wersja, plik, u.program / "narzedzia",
-                                   u.cache / "pobrane")
+                                   u.cache / "pobrane", usun_archiwum=True)
     # jak każde narzędzie przy pierwszym użyciu: prawo odczytu dla piaskownicy Chromium (Windows) i wpis
     # w narzedzia.json, bez którego sprzątanie `jarvo update` uznawało przeglądarkę za starą wersję i ją usuwało
     przenosne.dla_piaskownicy_chromium(katalog)

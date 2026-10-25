@@ -110,6 +110,7 @@ def test_narzedzie_przy_pierwszym_uzyciu_z_suma_i_wpisem(tmp_path, serwer):
                  "env": {"ATRAPA_DIR": str(katalog), "ATRAPA_TRYB": "0"}}
     assert (katalog / "program.txt").read_text() == "ok" and not (katalog / "zbedny.txt").exists()
     assert "pierwsze użycie" in logi[0] and serwer["pobrania"] == ["/atrapa-1.0.zip"]
+    assert not list((u.cache / "pobrane").glob("*atrapa*"))          # archiwum znika zaraz po rozpakowaniu
     spis = (u.stan / "narzedzia.json").read_text(encoding="utf-8")
     assert json.loads(spis) == {"uv": {"wersja": "0.12.13"}, "atrapa": w}           # inne wpisy zostają
     assert spis == instalator._json(json.loads(spis))                               # format instalatora
@@ -165,7 +166,8 @@ def test_uklad_instalacji_cache_z_zapisu_instalatora(tmp_path, serwer):
     narz = srodowisko.narzedzia(u_inst)
     srodowisko.zapisz(u_inst, srodowisko.srodowisko(u_inst, dict(ust), narz=narz), narz=narz)    # drugi przebieg
     assert (u.stan / "srodowisko.json").read_bytes() == plik
-    assert list((u_inst.cache / "pobrane").iterdir()) and not (u_floty.cache / "pobrane").exists()
+    # pobranie w cache instalacji (archiwum po rozpakowaniu znika, katalog zostaje), nie w cache spod JARVO_ROOT
+    assert (u_inst.cache / "pobrane").is_dir() and not (u_floty.cache / "pobrane").exists()
     (u.stan / "srodowisko.json").unlink()                              # bez zapisu instalatora: układ bez zmian
     assert przy_uzyciu.uklad({"JARVO_ROOT": str(u_floty.root)}).cache == u_floty.cache
 
@@ -181,7 +183,9 @@ def test_uklad_instalacji_linux_domyslny_korzen_z_otoczeniem_floty(tmp_path):
     u_inst.stan.mkdir(parents=True)
     srodowisko.zapisz(u_inst, srodowisko.srodowisko(u_inst, {}, narz={}, biez={}, build={}), narz={}, build={})
     env_floty = srodowisko.srodowisko(u_inst, xdg, narz={}, biez={}, build={})
-    assert sciezki.uklad(env_floty).cache != u_inst.cache                     # sam JARVO_ROOT: cache pod korzeniem
+    # XDG_CACHE_HOME=<cache>/xdg z otoczenia floty wskazuje z powrotem na <cache> (sciezki.uklad), więc oba układy
+    # liczą ten sam cache także bez zapisu instalatora
+    assert sciezki.uklad(env_floty).cache == u_inst.cache
     assert przy_uzyciu.uklad(env_floty).cache == u_inst.cache
 
 

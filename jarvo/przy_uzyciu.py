@@ -247,7 +247,7 @@ def narzedzie(u: Uklad, nazwa: str, *, app: Path | None = None, platforma: str |
                 log(f"{nazwa} {wersja}: pierwsze użycie, pobieram z sumą z manifestu "
                     f"({round(int(plik.get('rozmiar') or 0) / 1e6, 1)} MB)")
                 pobieracz.zainstaluj(nazwa, wersja, plik, u.program / "narzedzia", u.cache / "pobrane", pasek=pasek,
-                                     wyjscie=sys.stderr)
+                                     wyjscie=sys.stderr, usun_archiwum=True)
             if nazwa in przenosne.PRZEGLADARKI_CHROMIUM:
                 przenosne.dla_piaskownicy_chromium(katalog)
             zapisz_wpis(u, nazwa, spis)
