@@ -695,6 +695,7 @@ class AtrapaNadzorcyBezZnacznika:
         self.dziala, self.zatrzymania, self.argv = dziala, 0, None
         self.panel, self.powod_panelu = panel, powod_panelu
         self.stopy: list[dict] = []
+        self.restarty: list[str] = []            # restart(nazwa) z kanału: usługa wstaje z nowym PID-em
 
     def polacz(self, u):
         if not self.dziala:
@@ -702,10 +703,14 @@ class AtrapaNadzorcyBezZnacznika:
         return self
 
     def status(self):
+        def pid(nazwa: str, baza: int) -> int:
+            return baza + 10 * self.restarty.count(nazwa)
         return {"nadzorca": {"pid": 100, "stan": "dziala"},
-                "uslugi": {"brama": {"stan": "dziala", "pid": 101, "pidy": [111], "gotowa": True, "restarty": 0},
-                           "panel": {"stan": self.panel, "pid": 102, "pidy": [112], "gotowa": self.panel == "dziala",
-                                     "restarty": 2, "ostatni_kod": 78 if self.panel == "postoj" else None,
+                "uslugi": {"brama": {"stan": "dziala", "pid": pid("brama", 101), "pidy": [111], "gotowa": True,
+                                     "restarty": self.restarty.count("brama")},
+                           "panel": {"stan": self.panel, "pid": pid("panel", 102), "pidy": [112],
+                                     "gotowa": self.panel == "dziala", "restarty": 2 + self.restarty.count("panel"),
+                                     "ostatni_kod": 78 if self.panel == "postoj" else None,
                                      "powod": self.powod_panelu}}}
 
     def stop(self, czekaj: float = 0.0):
@@ -715,6 +720,7 @@ class AtrapaNadzorcyBezZnacznika:
         return {"ok": True}
 
     def restart(self, nazwa):
+        self.restarty.append(nazwa)
         return {"ok": True}
 
     def stan_z_pliku(self, u):
@@ -901,6 +907,35 @@ class AtrapaHermesa:
         return [str(srodowisko.hermes_python(checkout)), "-m", "hermes_cli.main", *argumenty]
 
 
+class AtrapaFloty:
+    """Jak jarvo/flota.py: zainstaluj_flote (build i install_fleet.py; profil jarvo na dysku), pierwszy przebieg
+    zmienia flotę i chce restartu bramy i panelu, kolejne nie (`zmiany` na następny przebieg); uslugi_do_restartu
+    i potwierdz_restart_panelu jak w module. `blad`: build się nie udał."""
+
+    def __init__(self):
+        self.wywolania: list[dict] = []
+        self.potwierdzenia: list[str] = []
+        self.zmiany = ["profil jarvo", "wtyczka jarvo-hq"]
+        self.blad: str | None = None
+
+    def zainstaluj_flote(self, u, env, *, log=print, pierwsza=None, wznow_rutyny=False):
+        self.wywolania.append({"env": dict(env), "biez": srodowisko.biezace(u)})
+        if self.blad:
+            raise RuntimeError(self.blad)
+        (u.dane / "profiles" / "jarvo").mkdir(parents=True, exist_ok=True)
+        log("▶ Flota (atrapa)")
+        zmiany, self.zmiany = self.zmiany, []
+        return {"wersja": 1, "agenci": ["jarvo"], "zmiany": zmiany, "restart_bramy": bool(zmiany),
+                "restart_panelu": bool(zmiany), "odcisk_panelu": "0123456789abcdef", "ostrzezenia": []}
+
+    def uslugi_do_restartu(self, wynik):
+        return [n for n, pole in (("brama", "restart_bramy"), ("panel", "restart_panelu")) if wynik.get(pole)]
+
+    def potwierdz_restart_panelu(self, u, odcisk):
+        self.potwierdzenia.append(odcisk)
+        return True
+
+
 def _zainstalowane(tmp_path, *, profile=("jarvo",)) -> sciezki.Uklad:
     """Układ jak po instalacji, bez instalatora: current.json (app = to repo), checkout Hermesa na pinie, uv."""
     u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
@@ -1016,6 +1051,8 @@ def test_chat_srodowisko_tryb_i_argumenty_dla_hermesa(tmp_path, capsys):
     assert env["JARVO_TRYB_ZGOD"] == "projekt" and env["HERMES_HOME"] == str(u.dane)   # domyślny tryb (I08)
     assert "HERMES_YOLO_MODE" not in env and "GITHUB_TOKEN" not in env and env["HERMES_DISABLE_LAZY_INSTALLS"] == "1"
     assert env["JARVO_FOLDER_PROJEKTU"] == os.getcwd()                          # folder startu czatu (tryb projekt)
+    # H20: narzędzia plików piszą pod <dane> i w folderze projektu (lista z os.pathsep jak w agent/file_safety.py)
+    assert env["HERMES_WRITE_SAFE_ROOT"].split(os.pathsep) == [str(u.dane), os.getcwd()]
     assert cli.main(["--tryb", "pelny", "--resume", "abc"], otoczenie=ot) == 7
     argv, env = wywolania[-1]
     assert argv[-4:] == ["chat", "--yolo", "--resume", "abc"] and env["JARVO_TRYB_ZGOD"] == "pelny"   # tylko flaga
@@ -1400,7 +1437,7 @@ def stanowisko(tmp_path, serwer, monkeypatch):
     u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
     s = {"www": www, "adres": adres, "dom": dom, "nadzorca": nadzorca, "hermes": AtrapaHermesa(),
          "autostart": AtrapaAutostartu(nadzorca), "zmiany": AtrapaZmian(), "rejestr": RejestrAtrapa(), "w_tle": [],
-         "env_w_tle": [], "log": [], "moduly": {}, "env": {}, "u": u, "git": git}
+         "env_w_tle": [], "log": [], "moduly": {}, "env": {}, "u": u, "git": git, "flota": AtrapaFloty()}
 
     def w_tle(argv, env, log):
         s["w_tle"].append(argv)
@@ -1413,7 +1450,7 @@ def stanowisko(tmp_path, serwer, monkeypatch):
                      zapytaj_http=http_panelu(u, lambda: s["nadzorca"].dziala))
         opcje.update(kw)
         moduly = {"hermes": s["hermes"], "nadzorca": s["nadzorca"], "autostart": s["autostart"],
-                  "zmiany_hosta": s["zmiany"], **s["moduly"]}
+                  "zmiany_hosta": s["zmiany"], "flota": s["flota"], **s["moduly"]}
         return _ot(tmp_path, moduly=moduly, env={"PATH": atrapy.sciezka(tmp_path / "narz", reszta=False),
                                                  "SHELL": "/bin/bash", **s["env"]}, **opcje)
     s["otoczenie"] = otoczenie
@@ -1431,8 +1468,8 @@ def _migawka(katalog: Path) -> dict[str, bytes]:
 
 
 KROKI = ("Sprawdzenie komputera", "Katalogi", "uv", "Python 3.13", "Python 3.12", "Spis narzędzi", "Wersja Jarva",
-         "Hermes", "Front panelu", "Bezpieczne ustawienia Hermesa", "Przełączenie wersji", "Środowisko procesów",
-         "Polecenie jarvo", "Autostart", "Serwis", "Panel")
+         "Hermes", "Front panelu", "Bezpieczne ustawienia Hermesa", "Klucz API bramy", "Przełączenie wersji",
+         "Programy floty", "Flota", "Środowisko procesów", "Polecenie jarvo", "Autostart", "Serwis", "Panel")
 
 
 def test_instaluj_na_atrapach_i_drugi_przebieg_niczego_nie_zmienia(tmp_path, stanowisko):
@@ -1480,14 +1517,23 @@ def test_instaluj_na_atrapach_i_drugi_przebieg_niczego_nie_zmienia(tmp_path, sta
         profil = instalator.plik_rc(s["dom"], "/bin/bash", sciezki.MACOS).read_text(encoding="utf-8")
         assert profil.count("# >>> jarvo >>>") == 1 and ".local/bin" in profil
         assert rodzaje == ["plik", "blok-rc"]
-    assert re.search(r"^Polecenia: jarvo panel, jarvo status, jarvo doctor, jarvo chat --profil default \(profil "
-                     r"jarvo przyjdzie z flotą w etapie E4\) \(.+\)\.$", log, re.M)
+    assert re.search(r"^Polecenia: jarvo panel, jarvo status, jarvo doctor, jarvo chat \(.+\)\.$", log, re.M)
+    # flota po przełączeniu wersji, w środowisku nowej wersji; panel wstał po niej, więc potwierdza odcisk wtyczek
+    f = s["flota"].wywolania
+    assert len(f) == 1 and f[0]["biez"]["wersja"] == SHA_JARVA[:12] and f[0]["env"]["HERMES_HOME"] == str(u.dane)
+    assert s["flota"].potwierdzenia == ["0123456789abcdef"] and "flota" in log
+    # klucz API bramy (H05) w <dane>/.env, port domyślny; sam klucz nie trafia do dziennika
+    env_hosta = instalator.czytaj_env(u.dane / ".env")
+    assert re.fullmatch(r"[0-9a-f]{64}", env_hosta["API_SERVER_KEY"]) and env_hosta["API_SERVER_PORT"] == "8642"
+    assert env_hosta["API_SERVER_KEY"] not in log
+    assert env_hosta["API_SERVER_KEY"] not in (u.logi / "instalacja.log").read_text(encoding="utf-8")
     # drugi przebieg: nic nowego w plikach, dzienniku, PATH ani procesach; serwis działa dalej, front gotowy
     przed = (_migawka(u.root), _migawka(s["dom"]), len(s["zmiany"].lista), list(s["rejestr"].zapisy))
     assert _instaluj(s, app) == 0, "\n".join(s["log"])
     assert "Gotowe. Zmiany w tym przebiegu: brak." in s["log"]
     assert (_migawka(u.root), _migawka(s["dom"]), len(s["zmiany"].lista), s["rejestr"].zapisy) == przed
     assert not s["w_tle"] and s["nadzorca"].zatrzymania == 0 and "    serwis działa" in s["log"]
+    assert s["nadzorca"].restarty == [] and s["flota"].potwierdzenia == ["0123456789abcdef"]
     assert [w for w in s["hermes"].wywolania if w[0] == "web_dist"] == [("web_dist", "buduje", PIN[:12]),
                                                                          ("web_dist", "gotowy", PIN[:12])]
     assert s["autostart"].wywolania[2:] == [("wlacz", False)]

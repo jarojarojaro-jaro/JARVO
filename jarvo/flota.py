@@ -12,7 +12,12 @@
      `<program>/narzedzia-floty`, --hermes-python, --natywnie, --podsumowanie `<stan>/flota.json`; sekrety z
      `<dane>/jarvo/konfig` (host.env i <agent>.env), gdy jest tam host.env, inaczej --bez-sekretow (klucze są
      wtedy od razu w .env w `<dane>`, a do agentów idą przez share_keys.py); --first-run przy pierwszej
-     instalacji (bez profilu Jarva z distribution.yaml, albo `pierwsza=True`), --resume-cron z `wznow_rutyny`.
+     instalacji (bez profilu Jarva z distribution.yaml, albo `pierwsza=True`), --resume-cron z `wznow_rutyny`;
+     --ustawienia-profili `<stan>/flota-ustawienia.json`: klucze configu profili, których build nie zna, bo zależą
+     od instalacji (I13, H24): `updates.check: false` w każdym profilu (bez pytania GitHuba o wersję Hermesa), a na
+     Windows `terminal.shell_init_files` z plikiem `<stan>/powloka/<agent>.sh` (USERPROFILE, APPDATA… w katalogu
+     domowym profilu, jarvo/hermes.py). install_fleet.py ustawia je w tym samym przebiegu co `profile update
+     --force-config`, więc drugi przebieg niczego nie zmienia; plik powłoki i katalogi pisze potem ten moduł.
   3. Wynik: podsumowanie install_fleet.py (agenci, wtyczki, dowiązania, zmiany, `restart_bramy`, `restart_panelu`,
      skarbiec, lint, ostrzeżenia, bez sekretów) i `build` (katalog, użyte opcje, czas).
 
@@ -28,6 +33,7 @@ standardowej (Python Jarva), YAML czytają dopiero skrypty w Pythonie Hermesa.
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import threading
@@ -42,7 +48,9 @@ from .sciezki import WINDOWS, Uklad
 APP = Path(__file__).resolve().parent.parent          # kod tej wersji Jarva (zawiera scripts/ i jarvo/)
 ORKIESTRATOR = "jarvo"                                # jak install_fleet.py: jego profil = flota już zainstalowana
 ZNACZNIK_PANELU = ".odcisk-panelu"                    # <dane>/plugins: odcisk wtyczek panelu po jego restarcie
-CZAS_BUILDU = 3600.0             # pierwszy build klonuje źródła skilli (ok. 2 GB), kolejne biorą je z <cache>/build
+USTAWIENIA_PROFILI = "flota-ustawienia.json"          # <stan>: klucze configu profili zależne od instalacji
+KLUCZE_WSZYSTKICH = {"updates.check": False}          # jak hermes.BEZPIECZNE dla hosta (build ich nie ustawia)
+CZAS_BUILDU = 3600.0             # pierwszy build klonuje 34 repo skilli (ok. 0,9 GB), kolejne biorą je z <cache>/build
 CZAS_INSTALACJI = 3600.0         # profile update kopiuje skille 10 profili, zasiew skarbca, lint
 # Tokeny ścieżek E4 (wspólny kontrakt build.py, install_fleet.py i skilli; docs/NATYWNIE.md S06, F12, F14, F17)
 # → opcje build.py, które je ustawiają; pierwsza nazwa znana tej wersji build.py wygrywa. JARVO_DIR, KNOWLEDGE_DIR,
@@ -83,10 +91,13 @@ def _env(u: Uklad, env: dict, python: Path) -> dict[str, str]:
     return wynik
 
 
+CISZA = 30.0                     # s bez wyjścia programu, po których log dostaje znak życia (build klonuje po cichu)
+
+
 def _strumien(argv: list, *, cwd: Path, env: dict, log: Callable[[str], None], czas: float,
-              wciecie: str = "    ") -> tuple[int, list[str]]:
-    """Program bez wejścia i bez okna konsoli; jego wyjście linia po linii do `log`. Po `czas` sekundach zabity.
-    Zwraca kod wyjścia i ostatnie linie (do komunikatu błędu)."""
+              wciecie: str = "    ", opis_ciszy: str = "") -> tuple[int, list[str]]:
+    """Program bez wejścia i bez okna konsoli; jego wyjście linia po linii do `log`, a po CISZA s bez wyjścia znak
+    życia („… nadal pracuję”, z `opis_ciszy`). Po `czas` sekundach zabity. Zwraca kod wyjścia i ostatnie linie."""
     ogon: deque[str] = deque(maxlen=12)
     try:
         proc = subprocess.Popen([str(a) for a in argv], cwd=str(cwd), env=env, stdin=subprocess.DEVNULL,
@@ -94,23 +105,34 @@ def _strumien(argv: list, *, cwd: Path, env: dict, log: Callable[[str], None], c
                                 errors="replace", creationflags=_FLAGI)
     except OSError as e:
         raise BladFloty(f"Nie uruchomię {Path(str(argv[0])).name}: {e}") from None
-    zabity = threading.Event()
+    zabity, koniec = threading.Event(), threading.Event()
+    start = time.monotonic()
+    ostatnia = [start]
 
     def zabij() -> None:
         zabity.set()
         proc.kill()
 
+    def straznik() -> None:
+        while not koniec.wait(5.0):
+            if time.monotonic() - ostatnia[0] >= CISZA:
+                ostatnia[0] = time.monotonic()
+                log(f"{wciecie}… nadal pracuję ({int(ostatnia[0] - start)} s{', ' + opis_ciszy if opis_ciszy else ''})")
+
     zegar = threading.Timer(czas, zabij)
     zegar.start()
+    threading.Thread(target=straznik, daemon=True).start()
     try:
         with proc:
             for surowa in proc.stdout:
                 linia = _ANSI.sub("", surowa).rstrip()
                 if linia.strip():
+                    ostatnia[0] = time.monotonic()
                     ogon.append(linia)
                     log(wciecie + linia)
             kod = proc.wait()
     finally:
+        koniec.set()
         zegar.cancel()
     if zabity.is_set():
         ogon.append(f"(przerwane po {int(czas)} s)")
@@ -216,18 +238,51 @@ def system() -> str:
     return "windows" if WINDOWS else "macos" if sciezki.MACOS else "linux"
 
 
-def argv_instalacji(u: Uklad, app: Path, python: Path, *, pierwsza: bool, wznow_rutyny: bool) -> list[str]:
+def argv_instalacji(u: Uklad, app: Path, python: Path, *, pierwsza: bool, wznow_rutyny: bool,
+                    ustawienia: Path | None = None) -> list[str]:
     konfig = u.jarvo_dane / "konfig"                   # źródłowe sekrety (D02), gdy właściciel je tam trzyma
     sekrety = ["--sekrety", str(konfig)] if (konfig / "host.env").is_file() else ["--bez-sekretow"]
     return [str(python), "-P", str(Path(app) / "scripts" / "install_fleet.py"), "--dane", str(u.dane),
             "--build", str(u.build), "--repo", str(app), "--narzedzia", str(u.program / "narzedzia-floty"),
             "--hermes-python", str(python), "--natywnie", "--podsumowanie", str(u.stan / "flota.json"), *sekrety,
+            *(["--ustawienia-profili", str(ustawienia)] if ustawienia else []),
             *(["--first-run"] if pierwsza else []), *(["--resume-cron"] if wznow_rutyny else [])]
 
 
 def pierwsza_instalacja(u: Uklad) -> bool:
     """Flota jeszcze niezainstalowana: profil Jarva bez distribution.yaml (wtedy model floty trafia do hosta)."""
     return not (u.dane / "profiles" / ORKIESTRATOR / "distribution.yaml").is_file()
+
+
+def agenci_buildu(u: Uklad) -> list[str]:
+    """Agenci z `<root>/build/BUILD.json` (pusta lista, gdy plik nieczytelny)."""
+    dane = srodowisko.wczytaj_json(u.build / "BUILD.json")
+    return [str(a["agent"]) for a in dane.get("agents") or [] if isinstance(a, dict) and a.get("agent")]
+
+
+def plik_powloki(u: Uklad, agent: str) -> Path:
+    """`<stan>/powloka/<agent>.sh`: plik terminal.shell_init_files profilu na Windows (ten sam co w jarvo/hermes.py)."""
+    return u.stan / "powloka" / f"{agent}.sh"
+
+
+def ustawienia_profili(u: Uklad, agenci: list[str]) -> dict:
+    """Klucze configu profili zależne od instalacji (dla install_fleet.py --ustawienia-profili)."""
+    profile = {}
+    if WINDOWS:
+        profile = {a: {"terminal.shell_init_files": [str(plik_powloki(u, a))]} for a in agenci}
+    return {"wersja": 1, "wszystkie": dict(KLUCZE_WSZYSTKICH), "profile": profile}
+
+
+def przygotuj_powloki(u: Uklad, agenci: list[str]) -> None:
+    """Windows: pliki powłoki profili i katalogi, na które wskazują (Codex CLI odmawia pracy bez CODEX_HOME); ta sama
+    treść = bez zapisu. Moduł jarvo/hermes.py zna treść (H24)."""
+    if not WINDOWS:
+        return
+    from .hermes import _przygotuj_powloke
+    for agent in agenci:
+        home = u.dane / "profiles" / agent
+        if home.is_dir():
+            _przygotuj_powloke(u, agent, home / "home")
 
 
 # --- przebieg -----------------------------------------------------------------------------------------------------
@@ -252,7 +307,8 @@ def zainstaluj_flote(u: Uklad, env: dict, *, log: Callable[[str], None] = print,
         log(f"  ! ta wersja build.py nie zna opcji dla tokenów {', '.join(brak)}: w buildzie zostają ich wartości "
             "kontenerowe (np. /opt/data)")
     start = time.monotonic()
-    kod, ogon = _strumien(argv, cwd=app, env=e, log=log, czas=CZAS_BUILDU)
+    kod, ogon = _strumien(argv, cwd=app, env=e, log=log, czas=CZAS_BUILDU,
+                          opis_ciszy="pierwszy build pobiera źródła skilli, ok. 0,9 GB")
     czas_buildu = round(time.monotonic() - start, 1)
     if kod or not (u.build / "BUILD.json").is_file():
         raise BladFloty(f"build floty nie przeszedł (kod {kod}):\n" + "\n".join(f"    {x}" for x in ogon[-6:]))
@@ -261,12 +317,19 @@ def zainstaluj_flote(u: Uklad, env: dict, *, log: Callable[[str], None] = print,
     log("Instalacja floty" + (" (pierwsza)" if pierwsza else ""))
     podsumowanie = u.stan / "flota.json"
     podsumowanie.unlink(missing_ok=True)
+    agenci = agenci_buildu(u)
+    ustawienia = u.stan / USTAWIENIA_PROFILI
+    tresc = json.dumps(ustawienia_profili(u, agenci), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if not ustawienia.is_file() or ustawienia.read_text(encoding="utf-8") != tresc:
+        przenosne.zapisz_atomowo(ustawienia, tresc)
     start = time.monotonic()
-    kod, ogon = _strumien(argv_instalacji(u, app, python, pierwsza=pierwsza, wznow_rutyny=wznow_rutyny),
+    kod, ogon = _strumien(argv_instalacji(u, app, python, pierwsza=pierwsza, wznow_rutyny=wznow_rutyny,
+                                          ustawienia=ustawienia),
                           cwd=u.dane, env=e, log=log, czas=CZAS_INSTALACJI, wciecie="  ")
     wynik = srodowisko.wczytaj_json(podsumowanie)
     if kod or not wynik:
         raise BladFloty(f"instalacja floty nie przeszła (kod {kod}):\n" + "\n".join(f"    {x}" for x in ogon[-6:]))
+    przygotuj_powloki(u, [str(a) for a in wynik.get("agenci") or agenci])
     wynik["build"] = {"katalog": u.build.as_posix(), "opcje": uzyte, "bez_opcji": brak, "czas_s": czas_buildu,
                       "tokeny": wartosci_tokenow(u, app, py_floty)}
     wynik["czas_instalacji_s"] = round(time.monotonic() - start, 1)

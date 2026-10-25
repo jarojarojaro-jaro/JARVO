@@ -15,7 +15,9 @@ JARVO_ROOT) ustawia korzeń jak JARVO_ROOT: zadanie Harmonogramu nie przekazuje 
                        (sekcja d; tryb egzekwuje wtyczka zgód z etapu E4)
   logs [usługa] [-f]   logi nadzorcy i usług (<logi>) i Hermesa (<dane>/logs) (N04)
   autostart on|off|status                                                                        (N08)
-  doctor [--json]      diagnoza podstawowa z polską radą przy każdym wyniku (N10; pełna w etapie E4)
+  doctor [--json]      diagnoza z polską radą przy każdym wyniku (N10): korzeń, miejsce, Python i SQLite, uv,
+                       Hermes wobec pinu, porty, brama API (klucz w <dane>/.env, GET /health), narzędzia, venvy
+                       i modele z narzedzia.json, programy floty, autostart, polecenie jarvo, git (Windows: z Git Bash)
   version, help        wersja kodu i przypięty Hermes (też --wersja) / pomoc, także jednego polecenia (N16)
   update, uninstall, migruj: w budowie (etapy E4, E13, E12), kod 2
 
@@ -56,7 +58,7 @@ from .sciezki import MACOS, WINDOWS, BladUkladu, Uklad
 TRYBY = ("pytaj", "projekt", "pelny")        # sekcja (d); domyślny „projekt” (decyzja I08)
 PROFIL = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")   # jak _PROFILE_NAME_RE w hermes_cli/main.py
 SQLITE_MIN = (3, 51, 3)                      # błąd WAL-reset naprawiony w 3.51.3 (hermes_state_wal.py)
-PORTY = (("panel", None), ("API bramy", 8642), ("podgląd HQ", 9120), ("ekran telefonu", 9122))
+PORTY = (("panel", None), ("API bramy", None), ("podgląd HQ", 9120), ("ekran telefonu", 9122))
 NASZE_PORTY = {"panel", "API bramy"}         # bez działającego serwisu muszą być wolne
 CZAS_STOPU = instalator.CZAS_STOPU
 W_BUDOWIE = {
@@ -439,7 +441,12 @@ def polecenie_chat(u: Uklad, a, reszta, ot: Otoczenie) -> int:
     env = srodowisko.srodowisko(u, ot.env)
     env.pop("HERMES_YOLO_MODE", None)            # tryb pełny tylko flagą --yolo tej jednej sesji, nigdy w środowisku
     env["JARVO_TRYB_ZGOD"] = a.tryb              # odczytuje go wtyczka jarvo-zgody
-    env["JARVO_FOLDER_PROJEKTU"] = os.getcwd()   # folder, w którym właściciel wpisał polecenie (tryb „projekt”)
+    folder = os.getcwd()                         # folder, w którym właściciel wpisał polecenie (tryb „projekt”)
+    env["JARVO_FOLDER_PROJEKTU"] = folder
+    # H20: narzędzia plików Hermesa piszą tylko pod HERMES_WRITE_SAFE_ROOT (lista z os.pathsep, agent/file_safety.py);
+    # w czacie dochodzi folder projektu, inaczej zapis, na który tryb (albo właściciel w trybie pytaj) się zgodził,
+    # i tak kończy się „Write denied … outside HERMES_WRITE_SAFE_ROOT” (sprawdzone 2026-10-25 na Windows 11)
+    env["HERMES_WRITE_SAFE_ROOT"] = os.pathsep.join(dict.fromkeys([str(u.dane), folder]))
     yolo = ["--yolo"] if a.tryb == "pelny" else []
     argv = [str(x) for x in hermes.argv_hermesa(Path(biez["hermes"]), "-p", a.profil, "chat", *yolo, *reszta)]
     return int((ot.na_pierwszym_planie or uruchom_na_pierwszym_planie)(argv, env))
@@ -535,8 +542,11 @@ def polecenie_down(u: Uklad, _a, _reszta, ot: Otoczenie) -> int:
 
 # ---------------------------------------------------------------- status
 
-def _porty(env: dict) -> list[tuple[str, int]]:
-    return [(nazwa, port if port else port_panelu(env)) for nazwa, port in PORTY]
+def _porty(u: Uklad, env: dict) -> list[tuple[str, int]]:
+    """Porty Jarva: panel (JARVO_PANEL_PORT albo 9119), API bramy (instalator.port_api: JARVO_API_PORT, port
+    z `<dane>/.env` albo 8642), podgląd HQ i ekran telefonu."""
+    dynamiczne = {"panel": port_panelu(env), "API bramy": instalator.port_api(u, env)}
+    return [(nazwa, port if port else dynamiczne[nazwa]) for nazwa, port in PORTY]
 
 
 def zbierz_status(u: Uklad, ot: Otoczenie) -> dict:
@@ -546,7 +556,7 @@ def zbierz_status(u: Uklad, ot: Otoczenie) -> dict:
     if stan is None and u.stan.is_dir():
         with contextlib.suppress(Exception):     # brak modułu albo uszkodzony plik: zostaje tylko powód
             z_pliku = dict(ot.modul("nadzorca").stan_z_pliku(u) or {})
-    porty = {str(port): {"nazwa": nazwa, "zajety": port_zajety(port)} for nazwa, port in _porty(ot.env)}
+    porty = {str(port): {"nazwa": nazwa, "zajety": port_zajety(port)} for nazwa, port in _porty(u, ot.env)}
     panel = {"stan": "brak", "opis": "nikt nie słucha"}
     if porty.get(str(port_panelu(ot.env)), {}).get("zajety"):
         panel = dict(zip(("stan", "opis"), instalator.stan_panelu(u, ot)))
@@ -818,8 +828,9 @@ def sprawdz_miejsce(u: Uklad) -> dict:
         return _wynik("wolne miejsce", "uwaga", f"nie umiem sprawdzić ({e})", "Sprawdź dysk ręcznie.")
     opis = f"{wolne:.1f} GB wolnego na dysku z {p}"
     if wolne < instalator.MIN_MIEJSCA_GB:
-        return _wynik("wolne miejsce", "blad", opis, "Instalacja podstawowa potrzebuje ok. 2 GB: zwolnij miejsce "
-                      "albo ustaw JARVO_ROOT na inny dysk.")
+        return _wynik("wolne miejsce", "blad", opis, f"Jarvo potrzebuje co najmniej {instalator.MIN_MIEJSCA_GB} GB "
+                      f"(cała instalacja z flotą ok. {instalator.ROZMIAR_GB} GB): zwolnij miejsce albo ustaw "
+                      "JARVO_ROOT na inny dysk.")
     if wolne < 10:
         return _wynik("wolne miejsce", "uwaga", opis, "Flota z narzędziami i modelami potrzebuje więcej (kilka GB "
                       "na filmy, przeglądarki i lektora): zwolnij miejsce, zanim je doinstalujesz.")
@@ -933,7 +944,7 @@ def sprawdz_porty(u: Uklad, ot: Otoczenie, stan: dict | None = None) -> list[dic
     dziala = stan is not None
     nasze = _pidy_jarva(stan)
     wyniki = []
-    for nazwa, port in _porty(ot.env):
+    for nazwa, port in _porty(u, ot.env):
         etykieta = f"port {port} ({nazwa})"
         if not port_zajety(port):
             if dziala and nazwa in NASZE_PORTY:
@@ -1002,21 +1013,96 @@ def sprawdz_polecenie(u: Uklad, ot: Otoczenie) -> dict:
     return _wynik("polecenie jarvo", "ok", znalezione)
 
 
-def sprawdz_git(ot: Otoczenie) -> dict:
+def sprawdz_git(u: Uklad, ot: Otoczenie) -> dict:
+    """git: na Windows z manifestu (Git for Windows z Git Bash dla narzędzia terminal Hermesa, I05), na macOS
+    i Linuksie z systemu (manifest ma tam `brak`)."""
+    narz = srodowisko.narzedzia(u)
+    if "git" in narz:
+        git = _bin(narz, "git", "git")
+        bash = Path(str((narz["git"].get("env") or {}).get("HERMES_GIT_BASH_PATH") or ""))
+        if git is None:
+            return _wynik("git", "blad", f"brak git.exe w {narz['git'].get('katalog')}",
+                          "Uruchom instalację ponownie: Git for Windows pobierze się z sumą z manifestu.")
+        if WINDOWS and not bash.is_file():
+            return _wynik("git", "blad", f"{git}, ale bez Git Bash ({bash})",
+                          "Narzędzie terminal agentów potrzebuje Git Bash: uruchom instalację ponownie.")
+        return _wynik("git", "ok", f"{narz['git'].get('wersja')} ({git}" + (f", Git Bash {bash})" if WINDOWS else ")"))
     git = instalator.program_bezwzgledny(ot, "git")
     if git:
         return _wynik("git", "ok", git)
-    rada = ("Zainstaluj Git for Windows (własny z manifestu instalator podłączy w etapie E4, I05)." if WINDOWS else
+    rada = ("Uruchom instalację ponownie: Git for Windows z manifestu (I05)." if WINDOWS else
             "macOS: xcode-select --install; Linux: menedżer pakietów (np. sudo apt install git).")
     return _wynik("git", "uwaga", "brak w PATH (potrzebny do instalacji i aktualizacji Hermesa)", rada)
+
+
+def sprawdz_narzedzia(u: Uklad) -> list[dict]:
+    """Narzędzia, venvy, modele i programy floty z `<stan>/narzedzia.json`: czy są na dysku (bez uruchamiania)."""
+    if not _zainstalowane(u):
+        return []
+    narz = srodowisko.narzedzia(u)
+    brak, venvy, modele = [], [], []
+    for nazwa, wpis in sorted(narz.items()):
+        if not isinstance(wpis, dict):
+            continue
+        katalog = Path(str(wpis.get("katalog") or ""))
+        if nazwa.startswith("venv-"):
+            ok = Path(str(wpis.get("python") or "")).is_file()
+            venvy.append(nazwa[5:])
+        elif nazwa == "tesseract":
+            ok = Path(str(wpis.get("program") or "")).is_file()
+        else:
+            ok = katalog.is_dir()
+            if nazwa.startswith("model-"):
+                modele.append(nazwa[6:])
+        if not ok:
+            brak.append(nazwa)
+    wyniki = []
+    if brak:
+        wyniki.append(_wynik("narzędzia", "blad", f"brak na dysku: {', '.join(brak)}",
+                             "Uruchom instalację ponownie: brakujące pobiorą się z sumą z manifestu."))
+    else:
+        wyniki.append(_wynik("narzędzia", "ok", f"{len(narz)} wpisów (venvy: {', '.join(venvy) or 'brak'}; modele: "
+                             f"{', '.join(modele) or 'brak'})"))
+    if "venv-narzedzia" in narz:
+        from . import bin_floty
+        programy = bin_floty.sprawdz(u)
+        chce = [*bin_floty.NA_ZYWO, *(["tesseract"] if "tesseract" in narz else [])]
+        braki = [p for p in chce if not programy.get(p)]
+        wyniki.append(_wynik("programy floty", "blad" if braki else "ok",
+                             f"brak: {', '.join(braki)} w {u.bin_floty}" if braki else
+                             f"{', '.join(chce)} w {u.bin_floty}",
+                             "Uruchom instalację ponownie (krok „Programy floty”)." if braki else ""))
+    return wyniki
+
+
+def sprawdz_brame(u: Uklad, ot: Otoczenie, stan: dict | None) -> dict:
+    """API bramy (H05): klucz w `<dane>/.env` i brama słucha na 127.0.0.1:<port> (GET /health: hermes-agent)."""
+    nazwa = "API bramy"
+    if not _zainstalowane(u):
+        return _wynik(nazwa, "uwaga", "nie sprawdzone (brak instalacji)", RADA_INSTALACJI)
+    port = instalator.port_api(u, ot.env)
+    if not instalator.klucz_api_dobry(instalator.czytaj_env(u.dane / ".env").get("API_SERVER_KEY", "")):
+        return _wynik(nazwa, "blad", f"brak klucza API_SERVER_KEY w {u.dane / '.env'}: brama nie otworzy API",
+                      "Uruchom instalację ponownie: dopisze klucz (krok „Klucz API bramy”).")
+    if stan is None:
+        return _wynik(nazwa, "uwaga", f"nie sprawdzone: serwis nie działa (port {port})", "Uruchom: jarvo up.")
+    brama = (stan.get("uslugi") or {}).get("brama") if isinstance(stan.get("uslugi"), dict) else None
+    odp = ot.zapytaj_http(f"http://127.0.0.1:{port}/health", 2.0)
+    if odp and odp[0] == 200 and isinstance(odp[1], dict) and odp[1].get("platform") == "hermes-agent":
+        return _wynik(nazwa, "ok", f"brama słucha na http://127.0.0.1:{port} (Hermes {odp[1].get('version', '?')})")
+    opis = "nikt nie odpowiada" if odp is None else f"odpowiedź HTTP {odp[0]} nie od bramy Hermesa"
+    stan_bramy = (brama or {}).get("stan") if isinstance(brama, dict) else None
+    return _wynik(nazwa, "blad", f"http://127.0.0.1:{port}/health: {opis} (brama: {stan_bramy or '?'})",
+                  "Zobacz `jarvo logs brama` (np. port zajęty przez innego Hermesa albo zły klucz), potem `jarvo down` "
+                  "i `jarvo up`; inny port: JARVO_API_PORT i polecenie instalacji jeszcze raz.")
 
 
 def zbierz_diagnoze(u: Uklad, ot: Otoczenie) -> dict:
     app = instalator.katalog_aplikacji(u)
     stan, _ = stan_serwisu(u, ot)
     wyniki = [sprawdz_korzen(u), sprawdz_miejsce(u), sprawdz_python(u), *sprawdz_sqlite(u), sprawdz_uv(u, app),
-              sprawdz_hermesa(u, app), *sprawdz_porty(u, ot, stan), sprawdz_autostart(u, ot),
-              sprawdz_polecenie(u, ot), sprawdz_git(ot)]
+              sprawdz_hermesa(u, app), *sprawdz_porty(u, ot, stan), sprawdz_brame(u, ot, stan),
+              *sprawdz_narzedzia(u), sprawdz_autostart(u, ot), sprawdz_polecenie(u, ot), sprawdz_git(u, ot)]
     return {"root": str(u.root), "czas": time.strftime("%Y-%m-%dT%H:%M:%S"), "serwis": stan is not None,
             "wyniki": wyniki, "bledy": sum(w["stan"] == "blad" for w in wyniki),
             "uwagi": sum(w["stan"] == "uwaga" for w in wyniki)}

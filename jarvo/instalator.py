@@ -1,39 +1,56 @@
-"""Instalator Jarva natywnie: `jarvo instaluj` po bootstrapie (docs/NATYWNIE.md, c3, c1, c4, N01, L01–L03, etap E3).
+"""Instalator Jarva natywnie: `jarvo instaluj` po bootstrapie (docs/NATYWNIE.md, c3, c1, c4, N01, L01–L03, H05,
+S01, S11, F12; etapy E3 i E4).
 
 Bootstrap (jarvo/bootstrap/install.ps1 albo install.sh) pobiera uv i Pythona 3.13 z sumami wpisanymi w skrypt, kod
 Jarva z GitHuba do `<program>/app/<sha12>` i woła `python -I -X utf8 <app>/jarvo/start.py instaluj` (bez
-JARVO_TOKEN: klucz był potrzebny tylko do pobrania kodu). Dalej krok po kroku, z paskiem i nazwą kroku:
+JARVO_TOKEN: klucz był potrzebny tylko do pobrania kodu). Po jednym poleceniu Jarvo działa z flotą. Krok po kroku,
+z paskiem i nazwą kroku:
 
    1. sprawdzenie: platforma (bez Maca z Intelem, I06), stara instalacja z WSL/Dockerem w tym miejscu, korzeń jako
-      osobny katalog (same katalogi Jarva: ochrona dostępu obejmuje całe drzewo), port panelu, wolne miejsce,
+      osobny katalog (same katalogi Jarva: ochrona dostępu obejmuje całe drzewo), porty panelu i API, wolne miejsce,
    2. katalogi z c1; cały korzeń tylko dla właściciela (przenosne.chron z dziedziczeniem w dół: korzeń na innym
       dysku dziedziczyłby zapis dla Użytkowników uwierzytelnionych, a autostart uruchamia kod z `<program>` jako
       właściciel), `<dane>` i `<stan>` jeszcze osobno,
-   3–5. uv, Python 3.13 i 3.12 z manifestu (vendor/natywne.lock.json) przez pobieracz: suma przed rozpakowaniem,
-   6. `<stan>/narzedzia.json`, 7. wersja Jarva (kod tej wersji),
-   8. Hermes: checkout przypiętego commitu i `uv sync --locked` (jarvo/hermes.py, I02),
-   9. front panelu zawsze z checkoutu bieżącego pinu (hermes.web_dist pomija gotowy; `--web-lokalnie` buduje go
-      od nowa); bez Node.js jasna rada,
+   3. narzędzia z manifestu (vendor/natywne.lock.json): każdy wpis z `kiedy: instalacja` z plikiem dla tej platformy
+      (wpis `brak` pomijamy), w kolejności uv, Python 3.13 i 3.12, git (Windows: Git for Windows z Git Bash), Node.js,
+      potem reszta (ffmpeg, Chrome for Testing, pandoc, qpdf, ExifTool, pixi…), każde przez pobieracz: suma przed
+      rozpakowaniem, katalog wersji, drugi przebieg bez sieci (znacznik z sumą),
+   4. venvy z `kiedy: instalacja` (narzedzia, ocr, claude-seo; jarvo/venvy.py: uv venv + uv pip install
+      --require-hashes --no-deps z locka o sumie z manifestu, do `<program>/venvs/<nazwa>-<skrót locka>`),
+   5. modele z `kiedy: instalacja` do `<dane>/jarvo/models` (jarvo/modele.py: lektory, Indra OCR, języki
+      Tesseracta, fonty Noto), potem Tesseract z pixi.lock (jarvo/tesseract.py, TESSDATA_PREFIX na tessdata-fast),
+   6. `<stan>/narzedzia.json` (narzędzia, venvy, modele, Tesseract), 7. wersja Jarva (kod tej wersji),
+   8. Hermes: checkout przypiętego commitu i `uv sync --locked` (jarvo/hermes.py, I02) gitem z manifestu (Windows),
+   9. front panelu zawsze z checkoutu bieżącego pinu npm-em z Node.js z manifestu (hermes.web_dist pomija gotowy;
+      `--web-lokalnie` buduje go od nowa); bez Node.js jasna rada,
   10. bezpieczne ustawienia Hermesa (I13),
-  11. przełączenie wersji: `<program>/current.json` dopiero teraz, atomowo, po udanych krokach 3–10, więc nieudana
+  11. klucz API bramy (H05): API_SERVER_KEY (secrets.token_hex(32)) i API_SERVER_PORT (JARVO_API_PORT, potem port
+      już zapisany, inaczej 8642) w `<dane>/.env` tylko dla właściciela; bez klucza brama nie otwiera /v1/runs,
+  12. przełączenie wersji: `<program>/current.json` dopiero teraz, atomowo, po udanych krokach 3–11, więc nieudana
       aktualizacja zostawia działającą starą wersję; serwis starej zatrzymujemy tuż przed przełączeniem (na ten czas
       znacznik zatrzymania), poprzedni current.json zostaje obok (current.poprzedni.json),
-  12. `<stan>/srodowisko.json` (tylko część Jarva: bez PATH właściciela i przełączników bootstrapu, więc drugi
-      przebieg z innego okna niczego nie zmienia) i `<stan>/ustawienia.json` (JARVO_PANEL_PORT: zadanie
-      Harmonogramu nie przekazuje zmiennych sesji, więc port pamięta instalacja),
-  13. polecenie `jarvo` dla właściciela: Windows `<root>\\bin\\jarvo.cmd` i wpis w PATH użytkownika (HKCU\\Environment,
+  13. programy floty w `<program>/bin-floty` (jarvo/bin_floty.py: python3, jarvo-tts, jarvo-stt, jarvo-klucz,
+      tesseract; S01, F12), tylko w PATH procesów Jarva,
+  14. flota (jarvo/flota.py): build.py w układzie natywnym ze ścieżkami instalacji (--py = Python venvu narzędzi,
+      --bin-dir = bin-floty, --hermes-src = checkout) i install_fleet.py; restart usług zleca krok „Serwis”,
+  15. `<stan>/srodowisko.json` (tylko część Jarva: bez PATH właściciela i przełączników bootstrapu, więc drugi
+      przebieg z innego okna niczego nie zmienia; ze zmiennymi narzędzi i bramy z buildu) i `<stan>/ustawienia.json`
+      (JARVO_PANEL_PORT, JARVO_API_PORT: zadanie Harmonogramu nie przekazuje zmiennych sesji, więc porty pamięta
+      instalacja),
+  16. polecenie `jarvo` dla właściciela: Windows `<root>\\bin\\jarvo.cmd` i wpis w PATH użytkownika (HKCU\\Environment,
       rozgłoszenie WM_SETTINGCHANGE), macOS i Linux `~/.local/bin/jarvo` i oznaczony blok PATH w ~/.zprofile albo
       ~/.profile, gdy trzeba; `--bez-path`: tylko `<root>/bin/jarvo`, bez zmian poza katalogiem Jarva (próby),
-  14. autostart nadzorcy (jarvo/autostart.py), na razie bez startu; błąd (brak user busa systemd, sesja bez GUI na
+  17. autostart nadzorcy (jarvo/autostart.py), na razie bez startu; błąd (brak user busa systemd, sesja bez GUI na
       macOS, polityka Harmonogramu) to uwaga z radą, a instalacja idzie dalej; nowy plist na macOS od razu
       wyładowany ze starą definicją (launchd trzyma ją w pamięci, a `kickstart` uruchomiłby starą),
-  15. serwis: zdjęty znacznik zatrzymania i start mechanizmem autostartu, gdy działa (IgnoreNew trzyma jedną kopię),
+  18. serwis: zdjęty znacznik zatrzymania i start mechanizmem autostartu, gdy działa (IgnoreNew trzyma jedną kopię),
       inaczej `jarvo serwis` w tle z otoczeniem bez sekretów; działający serwis startuje od nowa, gdy ten przebieg
-      zmienił current.json, ustawienia albo definicję autostartu (np. wstał z zapasowego wyzwalacza Harmonogramu
-      ze starym poleceniem po przerwanej aktualizacji, a ponowienie przerejestrowało zadanie),
-  16. czekanie na NASZ panel: /api/status z hermes_home = `<dane>` (port 9119 może trzymać stara flota z WSL albo
+      zmienił current.json, ustawienia, klucz API, środowisko procesów (nadzorca trzyma je od swojego startu) albo
+      definicję autostartu; gdy zmieniła się tylko flota, nadzorca restartuje bramę albo panel (jak install-fleet.sh),
+  19. czekanie na NASZ panel: /api/status z hermes_home = `<dane>` (port 9119 może trzymać stara flota z WSL albo
       prywatny Hermes właściciela; wtedy od razu komunikat, kto trzyma port); serwis, który nie działa, albo panel
-      w postoju to błąd od razu, bez czekania na limit.
+      w postoju to błąd od razu, bez czekania na limit. Panel, który wstał po instalacji floty, potwierdza jej
+      odcisk wtyczek (flota.potwierdz_restart_panelu).
 
 Każda zmiana poza katalogami Jarva idzie przez jarvo/zmiany_hosta.py (wpis w dzienniku przed zmianą, D08), żeby
 `jarvo uninstall` cofnął ją od końca. Przebieg jest idempotentny: drugi niczego nie zmienia (narzędzia ze zgodną
@@ -54,6 +71,7 @@ import inspect
 import json
 import os
 import re
+import secrets
 import shlex
 import shutil
 import socket
@@ -74,10 +92,17 @@ from .sciezki import MACOS, WINDOWS, Uklad
 # ścieżkę ASCII (c1); tak samo w jarvo/start.py
 APP = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # kod tej wersji (jarvo/ i vendor/)
 PORT_PANELU = 9119                                   # jak nadzorca.PORT_PANELU; inny: JARVO_PANEL_PORT
+PORT_API = 8642                                      # API bramy Hermesa (H05); inny: JARVO_API_PORT
 SCIEZKA_PANELU = "/"            # panel Hermesa; adres HQ (/jarvo) dojdzie z wtyczką floty w etapie E4
 ZNACZNIK = "Jarvo natywnie (jarvo instaluj)"         # w poleceniu jarvo: plik jest nasz i wolno go nadpisać
-NARZEDZIA = (("uv", "uv"), ("python313", "Python 3.13"), ("python312", "Python 3.12"))
-MIN_MIEJSCA_GB = 2              # instalacja podstawowa: ok. 1,5–2 GB (c3, pkt 11)
+# kolejność narzędzi (c3): uv → Python → git (Windows: checkout Hermesa i Git Bash) → Node.js (front panelu) → reszta
+PIERWSZE = ("uv", "python313", "python312", "git", "node")
+OPISY = {"uv": "uv", "python313": "Python 3.13", "python312": "Python 3.12", "git": "git i Git Bash",
+         "node": "Node.js i npm"}
+MIN_MIEJSCA_GB = 2              # próg odmowy; cała instalacja z flotą zajmuje więcej (ROZMIAR_GB, uwaga w kroku 1)
+# instalacja z flotą zmierzona 2026-10-25 na Windows 11 x64: 8,5 GB = <program> 4,6 GB (narzędzia 2,1, venvy 1,5,
+# Hermes 1,2) + cache 3,4 GB (koła uv 1,4, źródła skilli 0,94, archiwa narzędzi 0,69, pixi 0,35) + dane 0,46 GB
+ROZMIAR_GB = 9
 CZAS_PANELU = 180.0             # pierwszy start panelu (import Hermesa, bazy) trwa kilkanaście–kilkadziesiąt sekund
 CZAS_NADZORCY = 30.0            # tyle czekamy, aż nadzorca otworzy kanał (start przez autostart, czekanie na panel)
 CZAS_STOPU = 120.0              # drenaż bramy i zatrzymanie panelu; dłużej, gdy nadzorca poda CZAS_ZATRZYMANIA
@@ -89,7 +114,8 @@ W_KORZENIU = frozenset({"program", "dane", "stan", "logi", "cache", "build", "bi
 PRZYKLAD_KORZENIA = "D:\\Jarvo" if WINDOWS else "~/jarvo-natywnie"
 # zmienne instalacji w <stan>/ustawienia.json: polecenie jarvo bierze je, gdy nie ma ich w otoczeniu, bo zadanie
 # Harmonogramu, LaunchAgent i jednostka systemd nie znają zmiennych sesji, w której instalowano
-USTAWIENIA = ("JARVO_PANEL_PORT",)
+USTAWIENIA = ("JARVO_PANEL_PORT", "JARVO_API_PORT")
+_LINIA_ENV = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
 ZATRZYMANIE = "zatrzymany.json"  # <stan>/zatrzymany.json: znacznik `jarvo down` (zapas, gdy nadzorca go nie zna)
 MECHANIZMY_STARTU = ("harmonogram", "launchagent", "systemd")   # autostart, który umie uruchomić serwis od razu
 LOG_STARTU = "serwis-start.log"
@@ -342,6 +368,76 @@ def port_panelu(env: dict | None = None) -> int:
 def adres_panelu(env: dict | None = None) -> str:
     """Zawsze 127.0.0.1, nie localhost (c4): localhost bywa najpierw ::1, a panel słucha tylko na IPv4."""
     return f"http://127.0.0.1:{port_panelu(env)}{SCIEZKA_PANELU}"
+
+
+def czytaj_env(plik: Path) -> dict[str, str]:
+    """{nazwa: wartość} z pliku .env (bez komentarzy, cudzysłowy zdjęte); brak pliku = {}."""
+    try:
+        tekst = Path(plik).read_text(encoding="utf-8-sig")
+    except OSError:
+        return {}
+    wynik = {}
+    for linia in tekst.splitlines():
+        m = _LINIA_ENV.match(linia)
+        if not m or linia.lstrip().startswith("#"):
+            continue
+        wartosc = m.group(2).strip()
+        if len(wartosc) >= 2 and wartosc[0] == wartosc[-1] and wartosc[0] in "'\"":
+            wartosc = wartosc[1:-1]
+        wynik[m.group(1)] = wartosc
+    return wynik
+
+
+def ustaw_w_env(tekst: str, nazwa: str, wartosc: str) -> str:
+    """Treść .env z `nazwa=wartosc`: pierwsza linia tej zmiennej podmieniona (kolejne usunięte), a bez niej dopisana
+    na końcu; reszta pliku bez zmian, LF."""
+    linie = tekst.replace("\r\n", "\n").split("\n")
+    if linie and linie[-1] == "":
+        linie.pop()
+    wynik, jest = [], False
+    for linia in linie:
+        m = _LINIA_ENV.match(linia)
+        if m and m.group(1) == nazwa and not linia.lstrip().startswith("#"):
+            if not jest:
+                wynik.append(f"{nazwa}={wartosc}")
+                jest = True
+            continue
+        wynik.append(linia)
+    if not jest:
+        wynik.append(f"{nazwa}={wartosc}")
+    return "\n".join(wynik) + "\n"
+
+
+def port_api(u: Uklad, env: dict | None = None) -> int:
+    """Port API bramy (H05): JARVO_API_PORT (próby, druga instalacja obok; pamięta go <stan>/ustawienia.json), potem
+    API_SERVER_PORT zapisany w `<dane>/.env`, inaczej 8642."""
+    wartosc = str((os.environ if env is None else env).get("JARVO_API_PORT") or "").strip()
+    if port_poprawny(wartosc):
+        return int(wartosc)
+    zapisany = czytaj_env(u.dane / ".env").get("API_SERVER_PORT", "").strip()
+    return int(zapisany) if port_poprawny(zapisany) else PORT_API
+
+
+def klucz_api_dobry(klucz: str) -> bool:
+    """Klucz, z którym brama otworzy API (Hermes: has_usable_secret, co najmniej 16 znaków, bez zaślepek)."""
+    k = str(klucz or "").strip()
+    return len(k) >= 16 and not re.fullmatch(r"(?i)(changeme|change-me|your[-_].*|x+|\*+|<.*>|\.\.\.+)", k)
+
+
+def narzedzia_instalacji(narz: dict, platforma: str) -> list[str]:
+    """Narzędzia manifestu do instalacji na tej platformie: `kiedy: instalacja` (bez pola: instalacja) i plik dla
+    platformy (wpis `brak` pomijamy, np. git na macOS i Linuksie, Lightpanda na Windows). Kolejność: PIERWSZE, potem
+    reszta alfabetycznie."""
+    nazwy = []
+    for nazwa, wpis in narz.items():
+        if not isinstance(wpis, dict) or (wpis.get("kiedy") or "instalacja") != "instalacja":
+            continue
+        try:
+            manifest.plik(narz, nazwa, platforma)
+        except manifest.BrakNarzedzia:
+            continue
+        nazwy.append(nazwa)
+    return sorted(nazwy, key=lambda n: (PIERWSZE.index(n) if n in PIERWSZE else len(PIERWSZE), n))
 
 
 def ustawienia(u: Uklad) -> dict[str, str]:
@@ -817,6 +913,8 @@ class _Instalacja:
         self.zmiany: list[str] = []          # co zmienił ten przebieg (drugi przebieg: nic)
         self.uwagi: list[str] = []
         self._bufor: list[str] = []
+        self.wynik_floty: dict | None = None  # podsumowanie install_fleet.py z tego przebiegu
+        self.panel_po_flocie = False         # panel wstał (albo wstał od nowa) po instalacji floty w tym przebiegu
 
     # dziennik instalacji: ekran + <logi>/instalacja.log (bez sekretów: komunikaty ich nie zawierają)
     def log(self, tekst: str) -> None:
@@ -834,13 +932,26 @@ class _Instalacja:
         self.log(f"    {tekst}")
 
     def kroki(self) -> list[tuple[str, Callable[[], None]]]:
+        """Kroki tej instalacji: narzędzia, venvy i modele z manifestu dla tej platformy (c3)."""
+        self.platforma = self.platforma or sciezki.platforma()
+        narz = manifest.wczytaj(self.app)
+        nazwy = narzedzia_instalacji(narz, self.platforma)
+        venvy = [n for n, w in manifest.venvy(self.app).items()
+                 if isinstance(w, dict) and (w.get("kiedy") or "instalacja") == "instalacja"]
+        modele = [n for n, m in manifest.modele(self.app).items()
+                  if isinstance(m, dict) and (m.get("kiedy") or "instalacja") == "instalacja"]
         k: list[tuple[str, Callable[[], None]]] = [("Sprawdzenie komputera", self.sprawdzenie),
                                                     ("Katalogi", self.katalogi)]
-        k += [(opis, lambda n=nazwa: self.narzedzie(n)) for nazwa, opis in NARZEDZIA]
+        k += [(OPISY.get(nazwa, nazwa), lambda n=nazwa: self.narzedzie(n)) for nazwa in nazwy]
+        k += [(f"Venv {nazwa}", lambda n=nazwa: self.venv(n)) for nazwa in venvy]
+        k += [(f"Model {nazwa}", lambda n=nazwa: self.model(n)) for nazwa in modele]
+        if "pixi" in nazwy and (self.app / "vendor" / "pixi" / "tesseract" / "pixi.lock").is_file():
+            k.append(("Tesseract", self.tesseract))
         k += [("Spis narzędzi", self.spis_narzedzi), ("Wersja Jarva", self.wersja_jarva), ("Hermes", self.hermes),
               ("Front panelu", self.front), ("Bezpieczne ustawienia Hermesa", self.konfiguracja),
-              ("Przełączenie wersji", self.przelaczenie), ("Środowisko procesów", self.zapis_srodowiska),
-              ("Polecenie jarvo", self.polecenie)]
+              ("Klucz API bramy", self.klucz_api), ("Przełączenie wersji", self.przelaczenie),
+              ("Programy floty", self.programy_floty), ("Flota", self.flota),
+              ("Środowisko procesów", self.zapis_srodowiska), ("Polecenie jarvo", self.polecenie)]
         if self.autostart:
             k.append(("Autostart", self.wlacz_autostart))
         if self.start:
@@ -848,7 +959,13 @@ class _Instalacja:
         return k
 
     def uruchom(self) -> int:
-        kroki = self.kroki()
+        try:
+            kroki = self.kroki()
+        except (sciezki.BladUkladu, OSError, ValueError, KeyError) as e:
+            self.log(f"BŁĄD: {e}" if isinstance(e, sciezki.BladUkladu) else
+                     f"BŁĄD: manifest narzędzi {self.app / manifest.LOCK} jest nieczytelny ({type(e).__name__}: "
+                     f"{e}). Pobierz Jarvo jeszcze raz poleceniem instalacji.")
+            return 1
         self.log(f"Jarvo natywnie: instalacja w {self.u.root}")
         for i, (nazwa, krok) in enumerate(kroki, 1):
             self.log(f"{_pasek(i, len(kroki))}  {nazwa}")
@@ -923,14 +1040,23 @@ class _Instalacja:
             raise BladInstalacji(f"{powod}. Jarvo potrzebuje osobnego katalogu, bo dostęp do całego korzenia dostaje "
                                  f"tylko właściciel: ustaw JARVO_ROOT na nowy katalog (np. {PRZYKLAD_KORZENIA}) i "
                                  "uruchom polecenie instalacji ponownie.")
-        port = str(self.ot.env.get("JARVO_PANEL_PORT") or "").strip()
-        if port and not port_poprawny(port):
-            raise BladInstalacji(f"JARVO_PANEL_PORT={port!r}: potrzebny numer portu od 1 do 65535.")
+        for zmienna in USTAWIENIA:
+            port = str(self.ot.env.get(zmienna) or "").strip()
+            if port and not port_poprawny(port):
+                raise BladInstalacji(f"{zmienna}={port!r}: potrzebny numer portu od 1 do 65535.")
+        if port_api(self.u, self.ot.env) == port_panelu(self.ot.env):
+            raise BladInstalacji(f"panel i API bramy nie mogą mieć tego samego portu ({port_panelu(self.ot.env)}): "
+                                 "zmień JARVO_PANEL_PORT albo JARVO_API_PORT.")
         wolne = _wolne_gb(self.u.root)
         if wolne < MIN_MIEJSCA_GB:
             raise BladInstalacji(f"na dysku z {self.u.root} jest {wolne:.1f} GB wolnego miejsca, a instalacja "
                                  f"potrzebuje co najmniej {MIN_MIEJSCA_GB} GB. Zwolnij miejsce albo ustaw JARVO_ROOT "
                                  "na inny dysk.")
+        if wolne < ROZMIAR_GB and not (self.u.program / "current.json").is_file():
+            uwaga = (f"na dysku z {self.u.root} jest {wolne:.1f} GB wolnego miejsca, a instalacja z flotą zajmuje "
+                     f"ok. {ROZMIAR_GB} GB: może zabraknąć miejsca (JARVO_ROOT na inny dysk)")
+            self.podlog(f"uwaga: {uwaga}")
+            self.uwagi.append(uwaga)
 
     def katalogi(self) -> None:
         nowe = [k for k in [*self.u.katalogi(), self.u.stan / "gateway-locks"] if not k.is_dir()]
@@ -963,6 +1089,45 @@ class _Instalacja:
         if not bylo:
             self.zmiany.append(nazwa)
 
+    def venv(self, nazwa: str) -> None:
+        """Venv z locka manifestu (jarvo/venvy.py) na Pythonie z kroku narzędzi."""
+        wpis = manifest.venvy(self.app)[nazwa]
+        python = str(wpis.get("python") or "python312")
+        if python not in self.narz or "uv" not in self.narz:
+            raise BladInstalacji(f"venv {nazwa} potrzebuje {python} i uv z manifestu, a ich nie ma dla platformy "
+                                 f"{self.platforma}")
+        spis, zmiana = self.ot.modul("venvy").zainstaluj(self.u, self.app, nazwa, wpis, uv=self._bin_narzedzia("uv"),
+                                                          python=self._bin_narzedzia(python), log=self.podlog)
+        self.narz[f"venv-{nazwa}"] = spis
+        self.podlog(f"venv {nazwa}: {'zainstalowany' if zmiana else 'już jest'} ({spis['katalog']})")
+        if zmiana:
+            self.zmiany.append(f"venv {nazwa}")
+
+    def model(self, nazwa: str) -> None:
+        """Model z manifestu do `<dane>/jarvo/models` (jarvo/modele.py), każdy plik z sumą."""
+        wpis = manifest.modele(self.app)[nazwa]
+        spis, zmiana = self.ot.modul("modele").zainstaluj(nazwa, wpis, self.u.jarvo_dane / "models", log=self.podlog)
+        self.narz[f"model-{nazwa}"] = spis
+        self.podlog(f"model {nazwa}: {'pobrany' if zmiana else 'już jest'} ({spis['katalog']})")
+        if zmiana:
+            self.zmiany.append(f"model {nazwa}")
+
+    def tesseract(self) -> None:
+        """Tesseract z pixi.lock (jarvo/tesseract.py) i próba `--list-langs` z językami z modelu tessdata-fast."""
+        t = self.ot.modul("tesseract")
+        pixi = self.narz["pixi"]
+        spis, zmiana = t.zainstaluj(self.u, self.app, pixi=Path(pixi["katalog"]) / ("pixi.exe" if WINDOWS else "pixi"),
+                                    env_narzedzia=pixi.get("env") or {}, platforma=self.platforma,
+                                    modele=self.u.jarvo_dane / "models", log=self.podlog)
+        ok, opis = t.sprawdz(Path(spis["program"]), Path(spis["env"]["TESSDATA_PREFIX"]))
+        if not ok:
+            raise BladInstalacji(f"Tesseract {spis.get('wersja')} nie działa ({opis}). Zobacz <logi>/instalacja.log "
+                                 "i uruchom instalację jeszcze raz.")
+        self.narz["tesseract"] = spis
+        self.podlog(f"Tesseract {spis.get('wersja')}: {'zainstalowany' if zmiana else 'już jest'}, języki: {opis}")
+        if zmiana:
+            self.zmiany.append("tesseract")
+
     def spis_narzedzi(self) -> None:
         spis = {**srodowisko.narzedzia(self.u), **self.narz}
         if _zapisz_jesli_inne(self.u.stan / "narzedzia.json", _json(spis)):
@@ -986,7 +1151,23 @@ class _Instalacja:
             return k / ("uv.exe" if WINDOWS else "uv")
         return k / "python.exe" if WINDOWS else k / "bin" / "python3"
 
+    def _program_narzedzia(self, nazwa: str, program: str) -> Path | None:
+        """Program narzędzia z tego przebiegu (katalogi `bin` wpisu), np. git.exe z Git for Windows, npm.cmd z Node."""
+        wpis = self.narz.get(nazwa) or {}
+        nazwy = [f"{program}.exe", f"{program}.cmd"] if WINDOWS else [program]
+        for katalog in wpis.get("bin") or []:
+            for n in nazwy:
+                if (Path(katalog) / n).is_file():
+                    return Path(katalog) / n
+        return None
+
     def _git(self) -> Path:
+        if "git" in self.narz:                   # Windows: zawsze git z manifestu (I05), nigdy z PATH właściciela
+            git = self._program_narzedzia("git", "git")
+            if git is None:
+                raise BladInstalacji(f"w {self.narz['git']['katalog']} nie ma git.exe (katalog cmd): archiwum Git "
+                                     "for Windows jest niepełne. Usuń ten katalog i uruchom instalację jeszcze raz.")
+            return git
         git = program_bezwzgledny(self.ot, "git")
         ok = False
         if git:
@@ -1038,20 +1219,57 @@ class _Instalacja:
         znacznik = getattr(h, "ZNACZNIK_WEB", None)
         if self.web_lokalnie and isinstance(znacznik, str):
             (checkout / znacznik).unlink(missing_ok=True)          # --web-lokalnie: budowa od nowa
+        npm = self._program_narzedzia("node", "npm")       # Node.js z manifestu, nie z PATH właściciela
         try:
-            dist = h.web_dist(self.u, checkout, npm=None, log=self.podlog)
+            dist = h.web_dist(self.u, checkout, npm=str(npm) if npm else None, log=self.podlog)
         except Exception as e:
-            if not self._jest_npm():
+            if not npm and not self._jest_npm():
                 raise BladInstalacji(rada_npm()) from e
             raise
         self.nowe["web_dist"] = str(dist)
 
+    def _narz(self) -> dict:
+        """narzedzia.json z dysku i wpisy z tego przebiegu (spis zapisuje krok „Spis narzędzi”)."""
+        return {**srodowisko.narzedzia(self.u), **self.narz}
+
     def _env(self) -> dict[str, str]:
         """Środowisko procesu Jarva dla NOWEJ wersji (current.json przełączamy dopiero później)."""
-        return srodowisko.srodowisko(self.u, self.ot.env, biez={**srodowisko.biezace(self.u), **self.nowe})
+        return srodowisko.srodowisko(self.u, self.ot.env, biez={**srodowisko.biezace(self.u), **self.nowe},
+                                     narz=self._narz())
 
     def konfiguracja(self) -> None:
         self.ot.modul("hermes").konfiguracja_bezpieczna(self.u, self._checkout(), self._env(), log=self.podlog)
+
+    def klucz_api(self) -> None:
+        """H05: API_SERVER_KEY i API_SERVER_PORT w `<dane>/.env` (brama i panel czytają go przy starcie; Hermes
+        nadpisuje nim zmienne procesu). Brakujący albo za słaby klucz: nowy secrets.token_hex(32); dobry zostaje.
+        Plik tylko dla właściciela. Klucz nie trafia na ekran ani do dziennika."""
+        plik = self.u.dane / ".env"
+        try:
+            tekst = plik.read_text(encoding="utf-8-sig")
+        except FileNotFoundError:
+            tekst = ""
+        except OSError as e:
+            raise BladInstalacji(f"nie czytam {plik} ({e.strerror or e})") from e
+        wartosci = czytaj_env(plik)
+        port = str(port_api(self.u, self.ot.env))
+        co = []
+        if not klucz_api_dobry(wartosci.get("API_SERVER_KEY", "")):
+            tekst = ustaw_w_env(tekst, "API_SERVER_KEY", secrets.token_hex(32))
+            co.append("klucz API bramy")
+        if wartosci.get("API_SERVER_PORT", "").strip() != port:
+            tekst = ustaw_w_env(tekst, "API_SERVER_PORT", port)
+            co.append(f"port API {port}")
+        if co:
+            przenosne.zapisz_atomowo(plik, tekst)
+            self.zmiany += co
+            self.restart = True                  # brama czyta .env tylko przy starcie
+        try:
+            przenosne.chron(plik, katalog=False)
+        except OSError as e:
+            raise BladInstalacji(f"nie ograniczę dostępu do {plik} do właściciela ({e})") from e
+        self.podlog(f"API bramy: http://127.0.0.1:{port} (klucz w {plik}" + (", nowy)" if co and "klucz API bramy"
+                                                                              in co else ")"))
 
     def przelaczenie(self) -> None:
         biez = srodowisko.biezace(self.u)
@@ -1076,12 +1294,54 @@ class _Instalacja:
         if (ust or cel.is_file()) and _zapisz_jesli_inne(cel, _json(ust)):
             self.zmiany.append("ustawienia.json")
             self.restart = True
-        # tylko część Jarva: bez PATH właściciela i przełączników bootstrapu, więc ta sama treść z każdego okna
+        # tylko część Jarva: bez PATH właściciela i przełączników bootstrapu, więc ta sama treść z każdego okna;
+        # ze zmiennymi narzędzi i bramy z buildu floty (krok „Flota” był przed tym)
         cel = self.u.stan / "srodowisko.json"
         przed = cel.read_bytes() if cel.is_file() else b""
-        srodowisko.zapisz(self.u, srodowisko.srodowisko(self.u, dict(ust)))
+        narz = self._narz()
+        srodowisko.zapisz(self.u, srodowisko.srodowisko(self.u, dict(ust), narz=narz), narz=narz)
         if cel.read_bytes() != przed:
             self.zmiany.append("srodowisko.json")
+            self.restart = True                  # nadzorca trzyma środowisko usług od swojego startu
+
+    def programy_floty(self) -> None:
+        """bin-floty: python3, jarvo-tts, jarvo-stt, jarvo-klucz i tesseract (jarvo/bin_floty.py, S01, F12)."""
+        narz = self._narz()
+        venv = narz.get("venv-narzedzia")
+        if not isinstance(venv, dict) or not venv.get("python"):
+            self.podlog("ta wersja nie ma venvu narzędzi: programy floty pominięte")
+            return
+        tess = (narz.get("tesseract") or {}).get("program")
+        zmiany = self.ot.modul("bin_floty").przygotuj(
+            self.u, venv_python=Path(venv["python"]), uv=self._bin_narzedzia("uv") if "uv" in self.narz else None,
+            tesseract=Path(tess) if tess else None, log=self.podlog)
+        self.podlog(f"programy floty w {self.u.bin_floty}: " + ("zapisane" if zmiany else "bez zmian"))
+        if zmiany:
+            self.zmiany.append("programy floty")
+
+    def flota(self) -> None:
+        """Build profili i instalacja floty (jarvo/flota.py); restart usług zleca krok „Serwis” (nadzorca)."""
+        fl = self.ot.modul("flota")
+        wynik = fl.zainstaluj_flote(self.u, srodowisko.srodowisko(self.u, self.ot.env, narz=self._narz()),
+                                    log=self.podlog)
+        self.wynik_floty = wynik if isinstance(wynik, dict) else {}
+        agenci = self.wynik_floty.get("agenci") or []
+        zmiany = self.wynik_floty.get("zmiany") or []
+        self.podlog(f"flota: {len(agenci)} agentów ({', '.join(agenci)}); "
+                    + (f"zmiany: {', '.join(zmiany[:6])}{'…' if len(zmiany) > 6 else ''}" if zmiany else "bez zmian"))
+        for ostrzezenie in self.wynik_floty.get("ostrzezenia") or []:
+            self.uwagi.append(f"flota: {ostrzezenie}")
+        if zmiany:
+            self.zmiany.append("flota")
+
+    def uslugi_floty(self) -> list[str]:
+        """Usługi nadzorcy do restartu po instalacji floty (brama, panel)."""
+        if not self.wynik_floty:
+            return []
+        try:
+            return list(self.ot.modul("flota").uslugi_do_restartu(self.wynik_floty))
+        except ImportError:
+            return []
 
     def polecenie(self) -> None:
         python = python_jarva(self.u)
@@ -1183,14 +1443,46 @@ class _Instalacja:
             stan = None
         if stan is not None:
             zdejmij_zatrzymanie(self.u, self.ot)
-            self.podlog("serwis działa")
+            uslugi = self.uslugi_floty()
+            if uslugi:
+                self._restart_uslug(stan, uslugi)
+            else:
+                self.podlog("serwis działa")
             return
         sposob = uruchom_serwis(self.u, self.ot, self.podlog, autostart=bool(self.autostart_dziala))
         self.oznaczone = False
+        self.panel_po_flocie = self.wynik_floty is not None
         self.podlog(f"serwis uruchomiony {sposob}")
+
+    def _restart_uslug(self, stan: dict, uslugi: list[str]) -> None:
+        """Działający serwis, zmieniona tylko flota: nadzorca restartuje bramę albo panel (łagodnie: brama kończy
+        tury), a my czekamy, aż usługa wstanie z nowym PID-em i będzie gotowa (najdłużej CZAS_PANELU s)."""
+        nadzorca = self.ot.modul("nadzorca")
+        przed = {n: usluga_nadzorcy(stan, n).get("pid") for n in uslugi}
+        self.podlog(f"flota się zmieniła: restart {' i '.join(uslugi)} przez nadzorcę")
+        for nazwa in uslugi:
+            wywolaj(nadzorca.polacz(self.u).restart, nazwa)
+        koniec = self.ot.zegar() + CZAS_PANELU
+        while True:
+            teraz, _ = stan_serwisu(self.u, self.ot)
+            gotowe = [n for n in uslugi if teraz is not None and usluga_nadzorcy(teraz, n).get("gotowa") is True
+                      and usluga_nadzorcy(teraz, n).get("pid") not in (None, przed[n])]
+            if len(gotowe) == len(uslugi):
+                break
+            if self.ot.zegar() >= koniec:
+                self.uwagi.append(f"po restarcie {' i '.join(sorted(set(uslugi) - set(gotowe)))} nie zgłosiły "
+                                  f"gotowości w {int(CZAS_PANELU)} s: sprawdź `jarvo status` i `jarvo logs`")
+                return
+            self.ot.czekaj(1.0)
+        self.panel_po_flocie = "panel" in uslugi
+        self.podlog(f"po restarcie gotowe: {', '.join(uslugi)}")
 
     def panel(self) -> None:
         self.podlog(f"panel Jarva odpowiada: {czekaj_na_panel(self.u, self.ot, self.log)}")
+        odcisk = (self.wynik_floty or {}).get("odcisk_panelu")
+        if self.panel_po_flocie and odcisk:
+            # panel wstał po instalacji floty: następna instalacja nie zleci jego restartu bez zmian we wtyczkach
+            self.ot.modul("flota").potwierdz_restart_panelu(self.u, odcisk)
 
 
 def wypisz(tekst: str) -> None:

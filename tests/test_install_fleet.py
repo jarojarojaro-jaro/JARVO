@@ -2,7 +2,8 @@
 
 install_fleet.py biegnie jak natywnie (osobny proces, --natywnie, --bez-sekretow) na katalogu tymczasowym z atrapą
 Hermesa (tests/atrapy.py: `python -P -m hermes_cli.main …` z HERMES_HOME) i prawdziwym wiedza.py (zasiew, indeks,
-lint). Pierwszy przebieg instaluje profile, klucze API, wtyczki z dowiązaniami i skarbiec; drugi niczego nie zmienia
+lint). Pierwszy przebieg instaluje profile (z kluczami configu zależnymi od instalacji z --ustawienia-profili, jak
+z jarvo/flota.py), klucze API, wtyczki z dowiązaniami i skarbiec; drugi niczego nie zmienia
 (poza historią skarbca) i nie zleca restartu. Atrapa celowo wypisuje klucze z plików .env: w logu i podsumowaniu mają
 być tylko gwiazdki. flota.py: argumenty build.py z kontraktu tokenów (tylko opcje, które build.py zna), środowisko
 bez zmiennych obcych, podsumowanie i potwierdzenie restartu panelu.
@@ -150,15 +151,18 @@ def zbuduj(build: Path) -> None:
 
 
 def przebieg(swiat: dict, *dodatki: str) -> tuple[subprocess.CompletedProcess, dict]:
-    """install_fleet.py jako osobny proces, z argumentami jak z jarvo/flota.py."""
+    """install_fleet.py jako osobny proces, z argumentami jak z jarvo/flota.py (także --ustawienia-profili)."""
     wynik = swiat["root"] / "flota.json"
     wynik.unlink(missing_ok=True)
+    ustawienia = swiat["root"] / "flota-ustawienia.json"
+    ustawienia.write_text(json.dumps(flota.ustawienia_profili(uklad(swiat["root"]), list(AGENCI))), encoding="utf-8")
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "HERMES_HOME")}
     env.update(PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
     r = subprocess.run([sys.executable, str(SKRYPT), "--dane", str(swiat["dane"]), "--build", str(swiat["build"]),
                         "--repo", str(REPO), "--narzedzia", str(swiat["root"] / "narzedzia-floty"),
                         "--hermes-python", str(swiat["hermes"]), "--natywnie", "--bez-sekretow",
-                        "--podsumowanie", str(wynik), "--czekaj-na-skarbiec", "5", *dodatki],
+                        "--podsumowanie", str(wynik), "--czekaj-na-skarbiec", "5",
+                        "--ustawienia-profili", str(ustawienia), *dodatki],
                        capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=600)
     return r, (json.loads(wynik.read_text(encoding="utf-8")) if wynik.is_file() else {})
 
@@ -227,6 +231,12 @@ def test_pierwszy_przebieg_instaluje_flote(dwa_przebiegi):
     assert not (dane / "profiles" / "jarvo" / "plugins" / "jarvo-zgody").exists()
     assert not any((dane / "profiles" / a / "plugins" / "jarvo-komputer").exists() for a in AGENCI)
     assert not (dane / "profiles" / "jarvo" / "plugins" / "jarvo-hq").exists()    # wtyczka samego panelu
+    # klucze zależne od instalacji (--ustawienia-profili): bez pytania GitHuba, na Windows plik powłoki profilu (H24)
+    import yaml
+    for a in AGENCI:
+        cfg_profilu = yaml.safe_load((dane / "profiles" / a / "config.yaml").read_text(encoding="utf-8"))
+        assert cfg_profilu["updates"] == {"check": False}
+        assert ("shell_init_files" in (cfg_profilu.get("terminal") or {})) is WINDOWS
     # host: model floty (--first-run), zakładki panelu i wtyczka z plugins.enabled configu hosta z buildu
     import yaml
     cfg = yaml.safe_load((dane / "config.yaml").read_text(encoding="utf-8"))

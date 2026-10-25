@@ -4,7 +4,7 @@ K02, H05, H06, H14, H24, H27, W01, W02, W04).
 
     python install_fleet.py [--dane DIR] [--build DIR] [--repo DIR] [--sekrety DIR | --bez-sekretow]
                             [--narzedzia DIR] [--hermes-python PY] [--natywnie] [--first-run] [--resume-cron]
-                            [--podsumowanie PLIK.json] [--czekaj-na-skarbiec S]
+                            [--podsumowanie PLIK.json] [--czekaj-na-skarbiec S] [--ustawienia-profili PLIK.json]
 
 Wartości domyślne to kontener (/opt/data, /opt/jarvo/build, /opt/jarvo/secrets, <dane>/jarvo/narzedzia, profile
 z aliasem), więc tam skrypt robi te same kroki co install-fleet.sh (scripts/deploy.sh woła na razie install-fleet.sh).
@@ -21,7 +21,10 @@ Kroki (numeracja jak w install-fleet.sh):
   2.  profil hosta: scalenie config.yaml (merge_host_config.py; --first-run wymusza model floty), SOUL.md, host.env,
   3.  profile agentów: `hermes profile install` albo `profile update --force-config` z modelem wybranym w panelu
       (profile_model.py), źródło aktualizacji zawsze = bieżący build, skille spoza buildu (prune_skills.py),
-      sekrety <agent>.env; katalog profilu bez distribution.yaml instalujemy z --force (dane profilu zostają),
+      sekrety <agent>.env; katalog profilu bez distribution.yaml instalujemy z --force (dane profilu zostają);
+      klucze configu zależne od instalacji z --ustawienia-profili (JSON {"wszystkie": {klucz: wartość},
+      "profile": {agent: {klucz: wartość}}}, klucze z kropkami, np. updates.check, terminal.shell_init_files)
+      w tym samym przebiegu co `--force-config`, więc drugi przebieg ich nie zmienia,
   3b. klucze API (H05): API_SERVER_KEY hosta i profili, generowane brakujące (secrets.token_hex(32)), istniejących
       nie ruszamy; klucz hosta podany w otoczeniu procesu wygrywa (jak stage2-hook obrazu Hermesa); .env tylko dla
       właściciela (jarvo.przenosne.chron: POSIX 0600, Windows ACL),
@@ -393,6 +396,8 @@ class Flota:
         self.hermes_python = str(a.hermes_python or sys.executable)
         self.pierwsza, self.wznow, self.natywnie = a.first_run, a.resume_cron, a.natywnie
         self.czekaj_skarbiec = float(a.czekaj_na_skarbiec)
+        self.plik_ustawien = Path(a.ustawienia_profili) if getattr(a, "ustawienia_profili", None) else None
+        self._ustawienia: dict | None = None
         self.log = Log(wypisz)
         self.jd = self.dane / "jarvo"
         self.agenci: list[str] = []
@@ -745,8 +750,49 @@ class Flota:
                 self.log(f"  ! brak {plik} (agent nie ma klucza OpenRouter)")
         if self.natywnie:
             (home / "home").mkdir(parents=True, exist_ok=True)   # terminal.home_mode: profile (H24)
+        self.ustaw_klucze_profilu(agent, home / "config.yaml")
         if self.odcisk_profilu(home) != przed:
             self.zmiana(f"profil {agent}")
+
+    def ustawienia_profili(self) -> dict:
+        """--ustawienia-profili: {"wszystkie": {klucz: wartość}, "profile": {agent: {klucz: wartość}}}."""
+        if self._ustawienia is None:
+            self._ustawienia = {}
+            if self.plik_ustawien is not None:
+                try:
+                    dane = json.loads(self.plik_ustawien.read_text(encoding="utf-8-sig"))
+                except (OSError, ValueError) as e:
+                    raise BladFloty(f"{self.plik_ustawien}: nie czytam ustawień profili ({e})") from None
+                self._ustawienia = dane if isinstance(dane, dict) else {}
+        return self._ustawienia
+
+    def ustaw_klucze_profilu(self, agent: str, config: Path) -> None:
+        """Klucze z --ustawienia-profili w config.yaml profilu (po `profile update --force-config`); zapis tylko
+        przy innej wartości, z LF (ruamel zachowuje resztę pliku)."""
+        u = self.ustawienia_profili()
+        klucze = {**(u.get("wszystkie") or {}), **((u.get("profile") or {}).get(agent) or {})}
+        if not klucze or not config.is_file():
+            return
+        import fleetlib
+        load, dump = fleetlib.rt_yaml()
+        cfg = load(config)
+        if cfg is None:
+            cfg = {}
+        zmiana = False
+        for klucz, wartosc in sorted(klucze.items()):
+            *sciezka, ostatni = str(klucz).split(".")
+            wezel = cfg
+            for czesc in sciezka:
+                if not isinstance(wezel.get(czesc), dict):
+                    wezel[czesc] = {}
+                wezel = wezel[czesc]
+            obecna = wezel.get(ostatni)
+            if json.dumps(obecna, sort_keys=True, default=str) != json.dumps(wartosc, sort_keys=True):
+                wezel[ostatni] = wartosc
+                zmiana = True
+        if zmiana:
+            _zapis_yaml_lf(dump)(cfg, config)
+            self.log(f"  ustawienia instalacji w profilu {agent}: {', '.join(sorted(klucze))}")
 
     def klucze_api(self) -> None:
         """API_SERVER_KEY: multipleksowana brama obsługuje /p/<profil>/ tylko z własnym kluczem profilu (z niego
@@ -1018,6 +1064,8 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--podsumowanie", default=None, help="plik JSON z wynikiem (agenci, wtyczki, czy restart)")
     ap.add_argument("--czekaj-na-skarbiec", type=float, default=300.0,
                     help="ile sekund czekać na koniec kompilacji skarbca przed zasiewem")
+    ap.add_argument("--ustawienia-profili", default=None,
+                    help="JSON z kluczami configu profili zależnymi od instalacji (natywnie: jarvo/flota.py)")
     return ap
 
 

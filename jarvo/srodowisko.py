@@ -2,9 +2,12 @@
 i `jarvo doctor`, żeby żadna zmienna nie wychodziła dopiero w jednym narzędziu.
 
 W kontenerze te zmienne ustawiał Dockerfile i compose. Natywnie instalator zapisuje stan narzędzi
-(`<stan>/narzedzia.json`) i bieżącą wersję (`<program>/current.json`), a `srodowisko()` składa z nich słownik.
-Zmienne ustawiamy tylko w procesach Jarva, nigdy w zmiennych użytkownika: odinstalowanie nie zostawia śladów,
-a prywatny Hermes właściciela nie widzi Jarva.
+(`<stan>/narzedzia.json`: narzędzia z manifestu, venvy `venv-<nazwa>`, modele `model-<nazwa>`, Tesseract) i bieżącą
+wersję (`<program>/current.json`), a build floty zmienne bramy (`<root>/build/host/srodowisko.json`, np.
+HERMES_LOCAL_STT_COMMAND). `srodowisko()` składa z nich słownik: katalogi Jarva, wszystkie zmienne `env` wpisów
+narzedzia.json (JARVO_TOOLS_PYTHON, JARVO_OCR_PYTHON, CHROME_PATH, TESSDATA_PREFIX…) i zmienne buildu, a PATH zaczyna
+od `<program>/bin-floty` i katalogów `bin` narzędzi. Zmienne ustawiamy tylko w procesach Jarva, nigdy w zmiennych
+użytkownika: odinstalowanie nie zostawia śladów, a prywatny Hermes właściciela nie widzi Jarva.
 """
 from __future__ import annotations
 
@@ -14,6 +17,11 @@ import re
 from pathlib import Path
 
 from .sciezki import WINDOWS, Uklad, krotka_sciezka
+
+ENV_BUILDU = Path("host") / "srodowisko.json"      # w <root>/build: zmienne bramy z buildu (scripts/build.py)
+# zmienne buildu, które przyjmujemy: build pisze tam polecenia programów floty, a nie ścieżki wyszukiwania ani
+# zmienne, które zmieniłyby interpreter albo HERMES_HOME procesów Jarva
+_NAZWA_ZMIENNEJ = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
 
 SEKRET = re.compile(r"TOKEN|KEY|SECRET|PASS|HASLO|KLUCZ|AUTH|COOKIE", re.I)   # takie nazwy nie trafiają do pliku
 
@@ -56,8 +64,17 @@ def biezace(u: Uklad) -> dict:
 
 
 def narzedzia(u: Uklad) -> dict:
-    """`<stan>/narzedzia.json`: {nazwa: {"wersja", "katalog", "bin": [katalogi do PATH], "env": {zmienna: wartość}}}."""
+    """`<stan>/narzedzia.json`: {nazwa: {"wersja", "katalog", "bin": [katalogi do PATH], "env": {zmienna: wartość}}};
+    venvy (`venv-<nazwa>`) mają też pole "python"."""
     return wczytaj_json(u.stan / "narzedzia.json")
+
+
+def env_buildu(u: Uklad) -> dict[str, str]:
+    """Zmienne bramy z buildu floty (`<root>/build/host/srodowisko.json`, np. HERMES_LOCAL_STT_COMMAND): same napisy,
+    nazwy WIELKIMI literami, bez nazw sekretów i bez zmiennych, które ustawia tylko Jarvo (PATH, HERMES_HOME…)."""
+    return {k: v for k, v in wczytaj_json(u.build / ENV_BUILDU).items()
+            if isinstance(v, str) and _NAZWA_ZMIENNEJ.fullmatch(k) and not SEKRET.search(k)
+            and k not in ("PATH", "PATHEXT", "HERMES_HOME", *OBCE) and not k.startswith("PYTHON")}
 
 
 def hermes_python(checkout: Path) -> Path:
@@ -73,11 +90,13 @@ def przechodzi(nazwa: str) -> bool:
 
 
 def srodowisko(u: Uklad, baza: dict | None = None, *, biez: dict | None = None,
-               narz: dict | None = None) -> dict[str, str]:
-    """Pełne środowisko procesu Jarva: `baza` (domyślnie os.environ) bez zmiennych obcych + katalogi i narzędzia."""
+               narz: dict | None = None, build: dict | None = None) -> dict[str, str]:
+    """Pełne środowisko procesu Jarva: `baza` (domyślnie os.environ) bez zmiennych obcych + katalogi, narzędzia
+    (wszystkie zmienne `env` wpisów narzedzia.json) i zmienne bramy z buildu (`build`, domyślnie env_buildu(u))."""
     env = {k: v for k, v in dict(os.environ if baza is None else baza).items() if przechodzi(k)}
     biez = biezace(u) if biez is None else biez
     narz = narzedzia(u) if narz is None else narz
+    build = env_buildu(u) if build is None else build
     jd = u.jarvo_dane
     modele = jd / "models"
     env.update({
@@ -91,6 +110,7 @@ def srodowisko(u: Uklad, baza: dict | None = None, *, biez: dict | None = None,
         "JARVO_KNOWLEDGE_DIR": str(jd / "knowledge"),
         "JARVO_MISSIONS_DIR": str(jd / "missions"),
         "JARVO_MODELS_DIR": str(modele),
+        "JARVO_WEJSCIE_DIR": str(jd / "wejscie"),                     # jarvo-klucz (klucze jednorazowe panelu)
         "JARVO_NARZEDZIA": str(u.program / "narzedzia-floty"),
         "PYTHONUTF8": "1",
         "PYTHONIOENCODING": "utf-8",
@@ -120,28 +140,33 @@ def srodowisko(u: Uklad, baza: dict | None = None, *, biez: dict | None = None,
         checkout = Path(biez["hermes"])
         env["HERMES_SRC"] = str(checkout)
         hermes = checkout / ".venv" / ("Scripts/hermes.exe" if WINDOWS else "bin/hermes")
-        if hermes.is_file():
-            # bez pliku skrypty floty i panel wołają `hermes` z PATH albo `python -m hermes_cli.main` (W16)
+        if hermes.is_file():                       # skrypty floty wołają go zamiast `hermes` z PATH (F01, W16)
             env["JARVO_HERMES_BIN"] = str(hermes)
+        else:
+            env.pop("JARVO_HERMES_BIN", None)      # nie ścieżka do pliku, którego nie ma, i nie cudzy z otoczenia
     sciezka = [str(u.bin_floty)]
     for nazwa in sorted(narz):
         wpis = narz[nazwa] if isinstance(narz[nazwa], dict) else {}
         sciezka += [str(Path(k)) for k in wpis.get("bin") or []]
         env.update({str(k): str(v) for k, v in (wpis.get("env") or {}).items()})
+    env.update(build)
     env["PATH"] = os.pathsep.join([*dict.fromkeys(sciezka), env.get("PATH", "")]).rstrip(os.pathsep)
     return env
 
 
-def zapisz(u: Uklad, env: dict[str, str], *, narz: dict | None = None) -> Path:
-    """`<stan>/srodowisko.json` bez sekretów (ścieżki i przełączniki): część Jarva (PRZEDROSTKI_PLIKU, NAZWY_PLIKU)
-    i każdy klucz `env` narzędzi z `narz` (domyślnie narzedzia.json), np. GIT_CONFIG_NOSYSTEM, EXIFTOOL_HOME,
-    PIXI_NO_TELEMETRY. Instalator podaje `env` z bazą z samych ustawień instalacji (ustawienia.json), więc PATH
-    i zmienne właściciela nie trafiają do pliku, a drugi przebieg z innego okna niczego nie zmienia."""
+def zapisz(u: Uklad, env: dict[str, str], *, narz: dict | None = None, build: dict | None = None) -> Path:
+    """`<stan>/srodowisko.json` bez sekretów (ścieżki i przełączniki): część Jarva (PRZEDROSTKI_PLIKU, NAZWY_PLIKU),
+    każdy klucz `env` narzędzi z `narz` (domyślnie narzedzia.json), np. GIT_CONFIG_NOSYSTEM, EXIFTOOL_HOME,
+    PIXI_NO_TELEMETRY, i zmienne bramy z buildu (`build`, domyślnie env_buildu(u): HERMES_LOCAL_STT_COMMAND…).
+    Instalator podaje `env` z bazą z samych ustawień instalacji (ustawienia.json), więc PATH i zmienne właściciela
+    nie trafiają do pliku, a drugi przebieg z innego okna niczego nie zmienia."""
     from .przenosne import zapisz_atomowo
     narz = narzedzia(u) if narz is None else narz
     z_narzedzi = {str(k) for w in narz.values() if isinstance(w, dict) for k in (w.get("env") or {})}
+    z_buildu = set(env_buildu(u) if build is None else build)
     jawne = {k: v for k, v in env.items()
-             if (k.startswith(PRZEDROSTKI_PLIKU) or k in NAZWY_PLIKU or k in z_narzedzi) and not SEKRET.search(k)}
+             if (k.startswith(PRZEDROSTKI_PLIKU) or k in NAZWY_PLIKU or k in z_narzedzi or k in z_buildu)
+             and not SEKRET.search(k)}
     cel = u.stan / "srodowisko.json"
-    zapisz_atomowo(cel, json.dumps(jawne, ensure_ascii=False, indent=2) + "\n")
+    zapisz_atomowo(cel, json.dumps(jawne, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
     return cel
