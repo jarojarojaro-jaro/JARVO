@@ -29,9 +29,11 @@ jobs:
         run: python scripts/validate.py
       - name: Testy
         run: python -m pytest -q tests
+      # każdy śledzony plik .sh (instalatory, bootstrap, skrypty repo); skrypty profili są już w Pythonie, więc stary
+      # wzorzec profiles/*/scripts/*.sh nic nie znajdował i bash dostawał dosłowną gwiazdkę (kod 127)
       - name: Składnia skryptów powłoki
         run: |
-          for f in scripts/*.sh profiles/*/scripts/*.sh; do bash -n "$f"; done
+          git ls-files -z '*.sh' | xargs -0 -n1 bash -n
 
   # Jarvo natywnie (docs/NATYWNIE.md, etap E1): te same testy na Windows i macOS, wymagane (pierwszy pełny zielony
   # przebieg na trzech systemach: 743fb81).
