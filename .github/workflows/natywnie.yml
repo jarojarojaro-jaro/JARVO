@@ -27,7 +27,13 @@ on:
       - "jarvo/**"
       - "vendor/natywne*"
       - "infra/python/natywne/**"
-      - "tests/live/natywnie_e2e.py"
+      - "tests/live/natywnie_*.py"
+      - "scripts/komputer_natywny_test.py"
+      - "scripts/build.py"
+      - "scripts/install_fleet.py"
+      - "komputer/**"
+      - "hq/**"
+      - "zgody/**"
       - ".github/workflows/natywnie.yml"
 
 permissions:
@@ -145,6 +151,19 @@ jobs:
         env:
           DOPUSC: ${{ matrix.dopusc }}
         run: python -X utf8 -B tests/live/natywnie_e2e.py sprawdz --dopusc "$DOPUSC"
+
+      # --- panel w przeglądarce (E6): wejście bez hasła, pierwsze spotkanie, mózg z atrapy, pierwsza sesja, pliki,
+      # restart panelu; zrzuty jasny i ciemny 1440 i 390 px w artefaktach (zrzuty/)
+      - name: Panel na żywo (Playwright, zrzuty)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: python -X utf8 -B tests/live/natywnie_e2e.py panel
+
+      # --- Komputer Jarva (E10): przeglądarka z manifestu z sumą, strona testowa przez bramkę jak Hermes, twarde zasady
+      - name: Komputer Jarva na żywo
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: python -X utf8 -B tests/live/natywnie_e2e.py komputer
 
       - name: Prawdziwy model (tylko z sekretem JARVO_TEST_OPENROUTER_KEY)
         if: ${{ !cancelled() && env.JARVO_E2E_KLUCZ == 'tak' }}

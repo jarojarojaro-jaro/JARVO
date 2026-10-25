@@ -1423,6 +1423,70 @@ def polecenie_prawdziwy_model(a) -> int:
         shutil.rmtree(projekt, ignore_errors=True)
 
 
+def python_narzedzia(inst: Instalacja, wpis: str) -> Path:
+    """Python z `<stan>/narzedzia.json`: `venv-narzedzia` (Playwright 1.62 dla testu panelu) albo `python313`."""
+    w = srodowisko.narzedzia(inst.u).get(wpis) or {}
+    if w.get("python"):
+        return Path(str(w["python"]))
+    katalog = Path(str(w.get("katalog") or ""))
+    if wpis.startswith("venv-"):
+        return katalog / ("Scripts/python.exe" if WINDOWS else "bin/python")
+    return katalog / ("python.exe" if WINDOWS else "bin/python3")
+
+
+def polecenie_panel(a) -> int:
+    """Panel w przeglądarce (tests/live/natywnie_panel.py, E6): wejście bez hasła, pierwsze spotkanie, mózg z atrapy,
+    pierwsza sesja, zrzuty jasny i ciemny 1440 i 390 px, pliki, restart panelu. Zrzuty idą do <artefakty>/zrzuty."""
+    art = katalog_artefaktow(a.artefakty)
+    rap = Raport(art)
+    nazwa = "panel w przeglądarce: pierwsze spotkanie, mózg, pierwsza sesja, zrzuty"
+    try:
+        inst = Instalacja(a.korzen, a.jarvo)
+        python = python_narzedzia(inst, "venv-narzedzia")
+    except BladE2E as e:
+        rap.punkt("panel-e6", nazwa, False, str(e))
+        return 1
+    wyniki = art / "zrzuty"
+    wyniki.mkdir(parents=True, exist_ok=True)
+    r = uruchom([python, "-X", "utf8", REPO / "tests" / "live" / "natywnie_panel.py", "--wyniki", wyniki,
+                 "--korzen", inst.u.root, "--restart-panelu"], czas=a.czas, env=inst.env_terminala())
+    (art / "panel.txt").write_text(bez_sekretow(bez_ansi(r.tekst)), encoding="utf-8")
+    raport = wczytaj_json(wyniki / "raport.json")
+    punkty = (raport.get("punkty") if isinstance(raport, dict) else None) or []
+    zle = [f"{x.get('punkt')}. {x.get('opis')}" for x in punkty if isinstance(x, dict) and not x.get("ok")]
+    zrzuty = sorted(x.name for x in wyniki.glob("*.jpg")) + sorted(x.name for x in wyniki.glob("*.png"))
+    ok = r.kod == 0 and not zle
+    rap.punkt("panel-e6", nazwa, ok, f"kod {r.kod}, {r.sekundy:.0f} s, punktów {len(punkty)}"
+              + (f", nie przeszły: {', '.join(zle)}" if zle else "") + f", zrzutów {len(zrzuty)}"
+              + ("" if ok else f": {skrot(r.tekst, 400)}"))
+    return 0 if ok else 1
+
+
+def polecenie_komputer(a) -> int:
+    """Komputer Jarva (scripts/komputer_natywny_test.py --uruchom, E10): przeglądarka z manifestu z sumą, strona
+    testowa, rozmowa MCP przez bramkę floty jak Hermes, twarde zasady, pauza i dziennik bez treści."""
+    art = katalog_artefaktow(a.artefakty)
+    rap = Raport(art)
+    nazwa = "Komputer Jarva: strona testowa, zrzut i twarde zasady przez bramkę"
+    try:
+        inst = Instalacja(a.korzen, a.jarvo)
+        python = python_narzedzia(inst, "python313")
+    except BladE2E as e:
+        rap.punkt("komputer", nazwa, False, str(e))
+        return 1
+    env = inst.env_terminala()
+    env["JARVO_ROOT"] = str(inst.u.root)
+    r = uruchom([python, "-I", "-X", "utf8", REPO / "scripts" / "komputer_natywny_test.py", "--uruchom"],
+                czas=a.czas, env=env)
+    (art / "komputer.txt").write_text(bez_sekretow(bez_ansi(r.tekst)), encoding="utf-8")
+    wynik = re.search(r"(\d+)/(\d+) zaliczone", r.out)
+    ok = r.kod == 0 and bool(wynik) and wynik.group(1) == wynik.group(2)
+    rap.punkt("komputer", nazwa, ok, f"kod {r.kod}, {r.sekundy:.0f} s, "
+              + (f"{wynik.group(1)}/{wynik.group(2)} zaliczone" if wynik else "brak wyniku")
+              + ("" if ok else f": {skrot(r.tekst, 400)}"))
+    return 0 if ok else 1
+
+
 def sekrety_instalacji(u: Uklad) -> dict[str, str]:
     """Wartości sekretów z plików .env instalacji ({wartość: nazwa}): <dane>/.env, profile i <dane>/jarvo/konfig."""
     pliki = [u.dane / ".env", *sorted((u.dane / "profiles").glob("*/.env")),
@@ -1664,6 +1728,16 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--czas-karty", type=float, default=600.0, help="ile sekund czekać na kartę kanbana")
     wspolne(s)
     s.set_defaults(funkcja=polecenie_sprawdz)
+
+    s = sub.add_parser("panel", help="panel w przeglądarce ze zrzutami (tests/live/natywnie_panel.py, E6)")
+    s.add_argument("--czas", type=float, default=900.0, help="limit czasu testu panelu w sekundach")
+    wspolne(s)
+    s.set_defaults(funkcja=polecenie_panel)
+
+    s = sub.add_parser("komputer", help="Komputer Jarva na żywo (scripts/komputer_natywny_test.py --uruchom, E10)")
+    s.add_argument("--czas", type=float, default=900.0, help="limit czasu testu Komputera w sekundach")
+    wspolne(s)
+    s.set_defaults(funkcja=polecenie_komputer)
 
     s = sub.add_parser("drugi-przebieg", help="log drugiego przebiegu instalacji: bez zmian")
     s.add_argument("log")

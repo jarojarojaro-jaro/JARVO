@@ -231,8 +231,8 @@ def test_kroki_po_instalacji_nie_urywaja_sprzatania(kroki):
 def test_polecenia_e2e_istnieja(e2e, kroki):
     podpolecenia = set(next(a for a in e2e.parser()._actions if a.dest == "polecenie").choices)
     uzyte = re.findall(r"python -X utf8 -B tests/live/natywnie_e2e\.py (\S+)", WORKFLOW.read_text(encoding="utf-8"))
-    assert set(uzyte) >= {"migawka", "sprawdz", "drugi-przebieg", "zbierz-logi", "odinstaluj", "roznica", "skan",
-                          "podsumowanie", "prawdziwy-model"}
+    assert set(uzyte) >= {"migawka", "sprawdz", "panel", "komputer", "drugi-przebieg", "zbierz-logi", "odinstaluj",
+                          "roznica", "skan", "podsumowanie", "prawdziwy-model"}
     assert set(uzyte) <= podpolecenia
     przed = _krok(kroki, "Migawka komputera przed")
     assert kroki.index(przed) < kroki.index(_instalacje(kroki)[0]), "migawka przed pierwszą instalacją"
