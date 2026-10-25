@@ -1181,7 +1181,9 @@ ROZPAKOWANIE = {"zip": 3.0, "tar.gz": 3.0, "tgz": 3.0, "tar.xz": 4.5, "tar.bz2":
 HERMES_MB = {"checkout": 850, "cache_uv": 350, "node_modules": 300, "front": 80}
 # flota: źródła skilli buildu w <cache>/build (31 repo, 0,94 GB; zostają, bo aktualizacja buduje flotę), build
 # w <root>/build i profile z wtyczkami w <dane>
-FLOTA_MB = {"zrodla": 1000, "build": 100, "profile": 150}
+# źródła skilli: zmierzone 2026-10-25 (31 źródeł) 2,1 GB na Linuksie i macOS w CI, 0,9 GB na Windows (to samo
+# pobranie git fetch --depth 1); szacunek wg większego, bo sprawdzenie miejsca ma nie zaniżać
+FLOTA_MB = {"zrodla": 2200, "build": 100, "profile": 150}
 # narzędzia npm floty w MB (infra/node, npm ci z locka b5a1f4c9e3b8; zmierzone 2026-10-25 na Windows 11 x64): katalog
 # `<program>/node-floty/<skrót>` bez onnxruntime, 438 MB plików i 483 MB na dysku NTFS (tysiące małych plików; zostaje),
 # i paczki w cache npm `<cache>/npm-floty`, 239 MB (znika po instalacji); do przeniesienia do manifestu (koordynator)

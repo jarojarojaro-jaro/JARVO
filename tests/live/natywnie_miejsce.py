@@ -80,7 +80,7 @@ WINDOWS = os.name == "nt"
 MB, GB = instalator.MB, instalator.GB
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 ZMIANY_BRAK = "Zmiany w tym przebiegu: brak."
-ZNACZNIKI = {"venv-": ".jarvo-venv.json", "model-": ".jarvo-model.json"}
+ZNACZNIKI = {"venv-": ".jarvo-venv.json", "model-": ".jarvo-model.json", "node-floty": ".jarvo-lock"}   # infra/node/node_floty.py
 TOLERANCJA_MB = 50               # części w szacunku: zmierzone ≤ szacunek × (1 + ZAPAS) + tyle MB
 PROBA = "jarvo-proba-miejsca"    # nazwa plików próby trybu zamki
 
@@ -326,6 +326,17 @@ def _martwy_port() -> int:
         return s.getsockname()[1]
 
 
+def _json_stanu(u: sciezki.Uklad, nazwa: str) -> dict:
+    """`<stan>/<nazwa>` jako słownik (brak albo błąd odczytu = pusty), do porównania przed i po przebiegu."""
+    try:
+        d = json.loads((u.stan / nazwa).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if isinstance(d, dict) and isinstance(d.get("env"), dict):          # srodowisko.json: zmienne procesów
+        d = {**{k: v for k, v in d.items() if k != "env"}, **{f"env.{k}": v for k, v in d["env"].items()}}
+    return d if isinstance(d, dict) else {}
+
+
 def tryb_bez_sieci(a) -> int:
     u = uklad(a.korzen)
     art = e2e.katalog_artefaktow(a.artefakty)
@@ -334,6 +345,7 @@ def tryb_bez_sieci(a) -> int:
         p.punkt("instalacja", False, f"Jarvo nie jest zainstalowane w {u.root}")
         return p.koniec(korzen=str(u.root))
     przed = _migawka(u)
+    spisy_przed = {n: _json_stanu(u, n) for n in ("narzedzia.json", "srodowisko.json")}
     proxy = f"http://127.0.0.1:{_martwy_port()}"
     env = {k: v for k, v in os.environ.items() if k.upper() not in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
                                                                     "NO_PROXY")}
@@ -351,8 +363,15 @@ def tryb_bez_sieci(a) -> int:
     (art / "miejsce-bez-sieci.log").write_text(e2e.bez_sekretow(tekst), encoding="utf-8")
     linie = [x.strip() for x in tekst.splitlines()]
     p.punkt("instalacja bez sieci kończy się kodem 0", kod == 0, f"kod {kod} po {czas:.0f} s (proxy {proxy})")
+    roznice = []
+    for n, stare in spisy_przed.items():
+        nowe = _json_stanu(u, n)
+        for klucz in sorted(set(stare) | set(nowe), key=str):
+            if stare.get(klucz) != nowe.get(klucz):
+                roznice.append(f"{n}:{klucz}")
     p.punkt("drugi przebieg niczego nie zmienia", ZMIANY_BRAK in tekst,
-            next((x for x in reversed(linie) if "Zmiany w tym przebiegu" in x), "brak wiersza „Zmiany…”"))
+            next((x for x in reversed(linie) if "Zmiany w tym przebiegu" in x), "brak wiersza „Zmiany…”")
+            + (f" (inne wpisy: {', '.join(roznice[:12])})" if roznice else ""))
     pobrane = [x for x in linie if re.search(r"\bpobieram\b", x, re.I)]
     bledy = [x for x in linie if re.search(r"\bBŁĄD\b", x)]
     p.punkt("nic nie pobrane i bez błędów", not pobrane and not bledy, "; ".join((pobrane + bledy)[:4]) or "tak")
