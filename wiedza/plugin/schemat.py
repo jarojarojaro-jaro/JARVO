@@ -352,13 +352,15 @@ def _hermes_home() -> str:
         return _dane_bez_hermesa()
 
 
-def katalog_schematow() -> Path:
-    h = Path(_hermes_home())
+def katalog_schematow(hermes_home: str | None = None) -> Path:
+    """`<dane>/jarvo/workspaces/jarvo/schematy` z HERMES_HOME profilu, który woła narzędzie (wtyczka podaje swój z
+    initialize); bez niego HERMES_HOME procesu. Inaczej test bez zmiennej pisał do prawdziwego %LOCALAPPDATA%/Jarvo."""
+    h = Path(hermes_home or _hermes_home())
     korzen = h.parent.parent if h.parent.name == "profiles" else h
     return Path(os.environ.get("JARVO_SCHEMATY_DIR") or korzen / "jarvo" / "workspaces" / "jarvo" / "schematy")
 
 
-def obsluz(args: dict, **_kw) -> str:
+def obsluz(args: dict, hermes_home: str | None = None, **_kw) -> str:
     """Handler narzędzia: walidacja, render, wynik JSON z linią MEDIA:."""
     svg, tytul = str((args or {}).get("svg") or ""), str((args or {}).get("tytul") or "schemat").strip()
     if not re.search(r"<svg\b", svg, re.I):
@@ -366,7 +368,7 @@ def obsluz(args: dict, **_kw) -> str:
     if len(svg) > MAX_ZNAKOW:
         return json.dumps({"error": f"SVG ma {len(svg)} znaków (maks. {MAX_ZNAKOW}): uprość rysunek."}, ensure_ascii=False)
     try:
-        png = renderuj(svg, tytul, katalog_schematow())
+        png = renderuj(svg, tytul, katalog_schematow(hermes_home))
     except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
         return json.dumps({"error": f"Nie udało się narysować schematu: {exc}"}, ensure_ascii=False)
     sciezka = png.as_posix()              # na Windows C:/… zamiast C:\…: agent przepisuje linię MEDIA: bez ucieczek „\”

@@ -435,7 +435,7 @@ class SkarbiecProvider(MemoryProvider):
     def handle_tool_call(self, tool_name: str, args: Dict[str, Any], **kwargs) -> str:
         if tool_name == "schemat" and self._agent in SCHEMAT_DLA:       # rysunek nie potrzebuje skarbca
             try:
-                return _schemat().obsluz(args)
+                return _schemat().obsluz(args, hermes_home=self._home or None)
             except Exception as exc:
                 return json.dumps({"error": f"Narzędzie schemat niedostępne: {exc}"[:300]}, ensure_ascii=False)
         sk = self._sk()

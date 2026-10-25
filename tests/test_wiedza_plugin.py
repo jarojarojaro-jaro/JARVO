@@ -306,7 +306,11 @@ def test_schemat_tylko_dla_jarva(srodowisko, tmp_path, monkeypatch):
     nazwy = [s["name"] for s in j.get_tool_schemas()]
     assert nazwy[-1] == "schemat" and len(nazwy) == 5
     monkeypatch.setenv("JARVO_CHROMIUM", str(tmp_path / "nie-ma"))
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.delenv("JARVO_SCHEMATY_DIR", raising=False)
     assert "Nie udało się narysować" in json.loads(j.handle_tool_call("schemat", {"svg": "<svg/>", "tytul": "x"}))["error"]
+    # katalog schematów z profilu wtyczki, nie z prawdziwego korzenia Jarva właściciela
+    assert (root / "jarvo" / "workspaces" / "jarvo" / "schematy").is_dir()
 
 
 def test_awaria_schematu_nie_zabiera_skarbca(srodowisko, tmp_path, monkeypatch):
