@@ -3,24 +3,39 @@
 # Każde narzędzie przechodzi przegląd z docs/SOURCES.md i ma wpis w vendor/zrodla.yaml (`zrodlo`). Plik dla nowej
 # platformy to nowy artefakt: przegląd obejmuje też jego. Bez „latest”: dokładny adres, sha256 i rozmiar.
 # Z tego pliku `scripts/natywne.py generuj` robi vendor/natywne.lock.json, który czyta instalator (sama biblioteka
-# standardowa, bez YAML); validate.py pilnuje, że lock jest aktualny i że każdy wpis jest kompletny.
+# standardowa, bez YAML); `scripts/natywne.py sprawdz` i tests/test_natywne.py pilnują, że lock jest aktualny i że
+# każdy wpis jest kompletny. Przegląd wpisów z etapu E2: 2026-10-24 (docs/SOURCES.md, docs/TOOLBOX.md).
 #
-# platformy: windows-x64, windows-arm64, macos-arm64, linux-x64, linux-arm64 (macOS Intel nie jest wspierany, I06)
+# platformy: windows-x64, windows-arm64, macos-arm64, linux-x64, linux-arm64 (macOS Intel nie jest wspierany, I06).
+#   Windows arm64 bierze pliki x64 w emulacji (tylko Windows 11, I27), gdy nie ma natywnych albo brakuje im funkcji.
+#   macOS: minimum 15. pandoc 3.12.1 i qpdf 12.4.2 mają w LC_BUILD_VERSION minos 15.0, Lightpanda 1.0.0 minos 14.8.9.
 # pliki.<platforma>: url (https), sha256, rozmiar (B), format (zip | tar.gz | tar.xz | tar.bz2 | plik),
 #   usun_poziom (ile katalogów zdjąć z początku ścieżek w archiwum), bin (katalogi do PATH procesów Jarva,
-#   względem katalogu narzędzia), env (zmienne procesów Jarva; {katalog} = katalog narzędzia)
+#   względem katalogu narzędzia), env (zmienne procesów Jarva; {katalog} = katalog narzędzia),
+#   nazwa_pliku (format plik: pod tą nazwą plik ląduje w katalogu narzędzia; domyślnie końcówka adresu),
+#   usun (ścieżki usuwane po rozpakowaniu: zbędne programy), zmien_nazwe ({stara: nowa} po rozpakowaniu)
 #   albo `brak: <powód>` (np. brak wydania na tę platformę) i opcjonalnie `zamiast: <inne narzędzie>`.
+#   Dowiązania z archiwów: na POSIX zostają dowiązaniami (tylko w obrębie katalogu narzędzia), na Windows twarde
+#   z tar są rozpakowane, a symboliczne zastępuje kopia celu (jarvo/pobieracz.py).
 # kiedy: instalacja (domyślnie) | przy-uzyciu (pobierane leniwie, z paskiem i pytaniem) | dodatek (na życzenie)
 #
 # modele.<nazwa>: pliki niezależne od platformy (wagi, słowniki) do <dane>/jarvo/models/<katalog>: zrodlo, rewizja (pełny
 #   commit repo modelu, nigdy tag), licencja, rola, kiedy, katalog, pliki: lista {cel (ścieżka względna w katalogu
 #   modelu), url (https, z rewizją w adresie), sha256, rozmiar}.
+#
+# venvy.<nazwa>: venv Pythona z locka z sumami (c3, krok 6): python (wpis z sekcji narzedzia), lock (plik w
+#   infra/python/, każde wymaganie z --hash), kiedy, rola, bez (paczki celowo pominięte: `uv pip check` je zgłosi),
+#   pobranie_mb (koła dla platformy), venv_mb (zmierzone na Windows 11 x64), torch_backend (cpu: instalator dodaje
+#   `--torch-backend cpu`, torch z indeksu PyTorch, sumy w locku). Instalacja:
+#     uv venv --no-config --python <python312|python313> <program>/venvs/<nazwa>-<12 znaków sha256 locka>
+#     uv pip install --no-config --no-deps --require-hashes --only-binary :all: --compile-bytecode -r <lock>
+#   (Windows: UV_LINK_MODE=copy). Lock z sumą pliku i liczbą paczek trafia do natywne.lock.json.
 
 version: 1
 
 # Hermes: jedno miejsce przypięcia instalacji natywnej. Instalator robi checkout dokładnie tego commitu (sprawdza HEAD)
 # i `uv sync --locked` z dodatkami jak w obrazie (bez matrix: python-olm ma tylko źródła, na Windows bez kompilatora).
-# Obraz dla VPS (infra/Dockerfile, ARG HERMES_IMAGE) ma do etapu E13 ten sam tag: validate.py porównuje.
+# Obraz dla VPS (infra/Dockerfile, ARG HERMES_IMAGE) ma do etapu E13 ten sam tag: scripts/natywne.py porównuje.
 hermes:
   repo: https://github.com/NousResearch/hermes-agent
   tag: v2026.9.24
@@ -135,3 +150,1159 @@ narzedzia:
         rozmiar: 29198711
         format: tar.gz
         usun_poziom: 1
+
+  # ── Toolchain (B03–B05, B08) ──────────────────────────────────────────────────────────────────────────────────────
+  # Node.js 26.12.1 (wydanie bezpieczeństwa z 2026-10-21; linia 26 jest LTS od 2026-10-28) z npm 11.20.0: Hermes
+  # wymaga npm <11.10.0 albo >=11.17.0 (engines w package.json, engine-strict). npm raz na tydzień pyta rejestr
+  # o nową wersję: wyłączamy. Windows arm64: build x64 w emulacji, jak Python (I27, Z08), bo natywne prebuildy npm
+  # floty na Windows są tylko win32-x64 (@napi-rs/canvas, kompozytor Remotion; M09). Natywny node-v26.12.1-win-arm64.zip
+  # (34567581…, 37275911 B) też jest przejrzany, gdyby właściciel wolał go od emulacji.
+  node:
+    zrodlo: nodejs
+    wersja: "26.12.1"
+    licencja: MIT (Node.js) + Artistic-2.0 (npm) + licencje bibliotek w paczce (V8, OpenSSL, ICU, libuv, undici…; plik LICENSE)
+    rola: "Node.js i npm: front panelu Hermesa, serwery MCP i narzędzia Node floty (npm ci --ignore-scripts)"
+    kiedy: instalacja
+    pliki:
+      windows-x64: &node-win-x64
+        url: https://nodejs.org/dist/v26.12.1/node-v26.12.1-win-x64.zip
+        sha256: b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4
+        rozmiar: 41901456
+        format: zip
+        usun_poziom: 1
+        bin: ["."]
+        env: &node-env
+          npm_config_update_notifier: "false"
+      windows-arm64: *node-win-x64
+      macos-arm64:
+        url: https://nodejs.org/dist/v26.12.1/node-v26.12.1-darwin-arm64.tar.gz
+        sha256: 1901d539912c02afa10d1cc126943a8855a7eedebe830119463470db5e6c59e8
+        rozmiar: 58334853
+        format: tar.gz
+        usun_poziom: 1
+        bin: ["bin"]
+        env: *node-env
+      linux-x64:
+        url: https://nodejs.org/dist/v26.12.1/node-v26.12.1-linux-x64.tar.xz
+        sha256: 6170b2d474e1c626f43cff3adc118df9fe3b573258a4fc3d850c8dbc6b079bbd
+        rozmiar: 34122264
+        format: tar.xz
+        usun_poziom: 1
+        bin: ["bin"]
+        env: *node-env
+      linux-arm64:
+        url: https://nodejs.org/dist/v26.12.1/node-v26.12.1-linux-arm64.tar.xz
+        sha256: 42aa04922591ee5d4dbc7740d452621acf28508239daa512f5ee8c47ee224fdb
+        rozmiar: 33053712
+        format: tar.xz
+        usun_poziom: 1
+        bin: ["bin"]
+        env: *node-env
+
+  # Git for Windows 2.56.0.windows.3 (2026-10-22; poprawki bezpieczeństwa względem 2.54.0.windows.1 z instalatora
+  # Hermesa: wincred GHSA-rxqw-wxqg-g7hw, bundle-uri CVE-2026-62960, CA eMudhra, Git LFS 3.8.1 z poprawką
+  # CVE-2026-105803). Pełne archiwum tar.bz2 z Git Bash (bin/bash.exe, usr/bin), nie PortableGit .7z.exe
+  # (samorozpakowujący się). Układ ucrt64 (git w ucrt64/bin; na arm64 clangarm64): Hermes dostaje bash przez
+  # HERMES_GIT_BASH_PATH, a git przez cmd/ w PATH. W archiwum są twarde dowiązania (92 w x64, 90 w arm64, m.in.
+  # ucrt64/libexec/git-core/git-remote-https.exe): pobieracz je rozpakowuje, inaczej git nie zna https; 5 dowiązań
+  # symbolicznych do /proc (dev/fd, dev/std*, etc/mtab) pomija, bo te ścieżki daje runtime MSYS2.
+  # GIT_CONFIG_NOSYSTEM=1 pomija etc/gitconfig paczki: core.autocrlf=true (CRLF psuje skrypty .sh w Git Bash)
+  # i credential.helper=manager (okna logowania w procesach w tle).
+  git:
+    zrodlo: git-for-windows
+    wersja: "2.56.0.windows.3"
+    licencja: GPL-2.0-only (Git) + licencje komponentów MSYS2, UCRT64 i CLANGARM64 (GPL-3.0+, LGPL-3.0+, Artistic/GPL, Apache-2.0, MIT…; usr/share/licenses i ucrt64/share/licenses)
+    rola: "git i Git Bash na Windows: checkout Hermesa, repo skilli (build.py), git skarbca, narzędzie terminal Hermesa (HERMES_GIT_BASH_PATH)"
+    kiedy: instalacja
+    pliki:
+      windows-x64:
+        url: https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.3/Git-2.56.0.3-64-bit.tar.bz2
+        sha256: 2460cdc329f9061e0682672eb9995da9da1da0ffb9761494c7abb3559ecbc40e
+        rozmiar: 123893966
+        format: tar.bz2
+        bin: ["cmd"]
+        env: &git-env
+          HERMES_GIT_BASH_PATH: "{katalog}/bin/bash.exe"
+          GIT_CONFIG_NOSYSTEM: "1"
+      windows-arm64:
+        url: https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.3/Git-2.56.0.3-arm64.tar.bz2
+        sha256: 4e065c301a08b04ceb17e88ba2479acd5d46e214f799d2f915953a1d728ca33f
+        rozmiar: 172807073
+        format: tar.bz2
+        bin: ["cmd"]
+        env: *git-env
+      macos-arm64: &git-system
+        brak: "git z systemu (Xcode CLT, pakiet dystrybucji); doctor sprawdza"
+      linux-x64: *git-system
+      linux-arm64: *git-system
+
+  # ripgrep 15.2.0: Linux musl (statycznie, bez zależności od glibc). Windows arm64: build x64 w emulacji, bo
+  # aarch64-pc-windows-msvc importuje VCRUNTIME140.dll (ripgrep linkuje CRT statycznie tylko dla x86_64 i i686),
+  # a czysty Windows go nie ma (B11); build x64 importuje tylko biblioteki systemu.
+  ripgrep:
+    zrodlo: ripgrep
+    wersja: "15.2.0"
+    licencja: MIT OR Unlicense (+ PCRE2 10.46 BSD-3-Clause w binarce; na Linuksie musl MIT i jemalloc BSD-2-Clause)
+    rola: "wyszukiwanie w plikach (rg): narzędzie search_files Hermesa i polecenia agentów"
+    kiedy: instalacja
+    pliki:
+      windows-x64: &rg-win-x64
+        url: https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip
+        sha256: 71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5
+        rozmiar: 1789611
+        format: zip
+        usun_poziom: 1
+        bin: ["."]
+      windows-arm64: *rg-win-x64
+      macos-arm64:
+        url: https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-apple-darwin.tar.gz
+        sha256: 3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4
+        rozmiar: 1764284
+        format: tar.gz
+        usun_poziom: 1
+        bin: ["."]
+      linux-x64:
+        url: https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz
+        sha256: 33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c
+        rozmiar: 2265718
+        format: tar.gz
+        usun_poziom: 1
+        bin: ["."]
+      linux-arm64:
+        url: https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-unknown-linux-musl.tar.gz
+        sha256: 800b1e7206afe799dfb5a6901f23147cfaabe0e52210538100f61e86e1740915
+        rozmiar: 1982561
+        format: tar.gz
+        usun_poziom: 1
+        bin: ["."]
+
+  # jq 1.8.2 (16 CVE i 2 GHSA poprawione względem 1.8.1; obraz ma 1.7.1 z apt): pojedyncze binarki, statycznie
+  # z oniguruma. Kod floty go nie używa, agenci w poleceniach tak, więc jest przy instalacji jak w obrazie (1 MB).
+  # Atestacja SLSA z wydania potwierdza build z tagu. Windows arm64 natywnie: importuje tylko UCRT i biblioteki systemu.
+  jq:
+    zrodlo: jq
+    wersja: "1.8.2"
+    licencja: MIT (+ oniguruma BSD-2-Clause statycznie, decNumber licencja ICU, jv_dtoa licencja Lucent)
+    rola: "JSON w poleceniach agentów (jak jq z apt w obrazie); kod floty go nie używa"
+    kiedy: instalacja
+    pliki:
+      windows-x64:
+        url: https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-windows-amd64.exe
+        sha256: a6fc67fedaf9128a3309a1e2ebb8b986aeccf70122ee46d2cb4849e423f0c627
+        rozmiar: 1035264
+        format: plik
+        nazwa_pliku: jq.exe
+        bin: ["."]
+      windows-arm64:
+        url: https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-windows-arm64.exe
+        sha256: 083b5377392bc57cf27052b6d20a2d927770683bca844632901ff38b4b7b0ac7
+        rozmiar: 973312
+        format: plik
+        nazwa_pliku: jq.exe
+        bin: ["."]
+      macos-arm64:
+        url: https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-macos-arm64
+        sha256: 2d75340ba57a4b4b4c8708a21c2dc8e958a48aaa8bba13b27f77f6e4c0eca07e
+        rozmiar: 841504
+        format: plik
+        nazwa_pliku: jq
+        bin: ["."]
+      linux-x64:
+        url: https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-amd64
+        sha256: b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f
+        rozmiar: 2267912
+        format: plik
+        nazwa_pliku: jq
+        bin: ["."]
+      linux-arm64:
+        url: https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-arm64
+        sha256: 8b85c817833814ddca00a144c33705546355afccf0cf39b188f3cdb48b852309
+        rozmiar: 1797688
+        format: plik
+        nazwa_pliku: jq
+        bin: ["."]
+
+  # ── Przeglądarki (C01–C07) ────────────────────────────────────────────────────────────────────────────────────────
+  # Chrome for Testing: chrome-headless-shell rewizji Playwrighta 1243 (browsers.json playwright-core 1.63.0 =
+  # CfT 153.0.8010.12) dla skryptów floty, a na Windows także silnik browser_* (C06). Pliki u Google
+  # (storage.googleapis.com; cdn.playwright.dev/builds/cft/... przekierowuje do tych samych obiektów). Google nie
+  # publikuje sha256: policzone przy przeglądzie dwa razy, md5 z x-goog-hash zgodne. Archiwum zostaje z katalogiem
+  # chrome-headless-shell-<platforma>/ (bez usun_poziom), jak w PLAYWRIGHT_BROWSERS_PATH/chromium_headless_shell-1243.
+  # Windows arm64: plik win64 w emulacji x64 (tylko Windows 11), bo CfT nie wydaje win-arm64.
+  chrome-headless-shell:
+    zrodlo: chrome-for-testing
+    wersja: "153.0.8010.12"
+    licencja: BSD-3-Clause (Chromium) + składniki w LICENSE.headless_shell; binarka Google (chrome://terms)
+    rola: "Chromium headless dla skryptów floty (zrzuty, PDF, Lighthouse, Playwright, HyperFrames); na Windows silnik browser_*"
+    pliki:
+      windows-x64: &chs-win64
+        url: https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/win64/chrome-headless-shell-win64.zip
+        sha256: 7aec872f3090e639c4237467624ea863c20fe2878914c93a6556bdbb52aa6c4c
+        rozmiar: 120200717
+        format: zip
+        env:
+          CHROME_PATH: "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe"
+          PUPPETEER_EXECUTABLE_PATH: "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe"
+          HYPERFRAMES_BROWSER_PATH: "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+          PUPPETEER_SKIP_DOWNLOAD: "1"
+      windows-arm64: *chs-win64
+      macos-arm64:
+        url: https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/mac-arm64/chrome-headless-shell-mac-arm64.zip
+        sha256: 89d80a6d26ccd0ccfd51e22d9e1297283862af2b0cd91dce07459b35ca0059f2
+        rozmiar: 98831293
+        format: zip
+        env:
+          CHROME_PATH: "{katalog}/chrome-headless-shell-mac-arm64/chrome-headless-shell"
+          PUPPETEER_EXECUTABLE_PATH: "{katalog}/chrome-headless-shell-mac-arm64/chrome-headless-shell"
+          HYPERFRAMES_BROWSER_PATH: "{katalog}/chrome-headless-shell-mac-arm64/chrome-headless-shell"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+          PUPPETEER_SKIP_DOWNLOAD: "1"
+      linux-x64:
+        url: https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/linux64/chrome-headless-shell-linux64.zip
+        sha256: a9da028861a0cf789ff25c2fed45f5f1aaf969ed9247835b6a7821a4f7af9d1d
+        rozmiar: 119809080
+        format: zip
+        env:
+          CHROME_PATH: "{katalog}/chrome-headless-shell-linux64/chrome-headless-shell"
+          PUPPETEER_EXECUTABLE_PATH: "{katalog}/chrome-headless-shell-linux64/chrome-headless-shell"
+          HYPERFRAMES_BROWSER_PATH: "{katalog}/chrome-headless-shell-linux64/chrome-headless-shell"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+          PUPPETEER_SKIP_DOWNLOAD: "1"
+      linux-arm64:
+        url: https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/linux-arm64/chrome-headless-shell-linux-arm64.zip
+        sha256: d433c45172c7836e38124fe545f767b02210bfb43a6262f08a297473a8e91c99
+        rozmiar: 120278638
+        format: zip
+        env:
+          CHROME_PATH: "{katalog}/chrome-headless-shell-linux-arm64/chrome-headless-shell"
+          PUPPETEER_EXECUTABLE_PATH: "{katalog}/chrome-headless-shell-linux-arm64/chrome-headless-shell"
+          HYPERFRAMES_BROWSER_PATH: "{katalog}/chrome-headless-shell-linux-arm64/chrome-headless-shell"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+          PUPPETEER_SKIP_DOWNLOAD: "1"
+
+  # ffmpeg Playwrighta rewizji 1011 (browsers.json playwright-core 1.63.0): nagrywanie stron (record_video w
+  # demo_strony.py), układ PLAYWRIGHT_BROWSERS_PATH/ffmpeg-1011. FFmpeg n7.0.1 bez --enable-gpl (LGPL) z libvpx
+  # i zlib, tylko pipe/file, MJPEG, PNG i VP8/WebM. Microsoft nie publikuje sum: policzone, Content-MD5 bucketu CDN
+  # zgodne, trzy serwery CDN Playwrighta dają te same bajty. Bez bin: nie zasłania pełnego ffmpeg floty.
+  ffmpeg-playwright:
+    zrodlo: playwright
+    wersja: "1011"
+    licencja: LGPL-2.1-or-later (FFmpeg n7.0.1) + BSD-3-Clause (libvpx) + Zlib, statycznie
+    rola: "ffmpeg Playwrighta do nagrywania stron (record_video w demo_strony.py), układ PLAYWRIGHT_BROWSERS_PATH/ffmpeg-1011"
+    pliki:
+      windows-x64: &ffpw-win64
+        url: https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-win64.zip
+        sha256: 8d08827c019ad36e7b9d49d3648447d884534cb2acf200e71c715f6dd834cc50
+        rozmiar: 1411741
+        format: zip
+      windows-arm64: *ffpw-win64
+      macos-arm64:
+        url: https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-mac-arm64.zip
+        sha256: 7d77eb0d44b59acc4065faa2476c0df1a242cc904c346f820626818c953c5277
+        rozmiar: 1097141
+        format: zip
+      linux-x64:
+        url: https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-linux.zip
+        sha256: ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc
+        rozmiar: 2376500
+        format: zip
+      linux-arm64:
+        url: https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-linux-arm64.zip
+        sha256: 2628c03f05318ff812c8c9baaf207dea2ddf53e818c0dc936714b0fbe3afb009
+        rozmiar: 1717234
+        format: zip
+
+  # Lightpanda 1.0.0: pliki z wydania (Linux = bajt w bajt binarka /usr/bin/lightpanda z obrazu
+  # lightpanda/browser:1.0.0, który przypina infra/Dockerfile; tu bez strip). Telemetria i raporty awarii domyślnie
+  # włączone: wyłączają je zmienne niżej. Windows: żadne wydanie nie ma plików, silnik chrome (C06). Binarka ląduje
+  # jako `lightpanda` (nazwa_pliku), bo agent-browser szuka jej w PATH. macOS: LC_BUILD_VERSION minos 14.8.9, czyli
+  # starszy macOS 14 jej nie uruchomi (minimum Jarva: macOS 15). Linux: glibc 2.35 (x64) i 2.38 (arm64).
+  lightpanda:
+    zrodlo: browser
+    wersja: "1.0.0"
+    licencja: AGPL-3.0
+    rola: "przeglądarka headless dla browser_* (agent-browser --engine lightpanda) i lightpanda fetch"
+    pliki:
+      windows-x64: &lp-brak
+        brak: "Lightpanda nie wydaje plików na Windows (żadne wydanie do 1.0.2)"
+        zamiast: chrome-headless-shell
+      windows-arm64: *lp-brak
+      macos-arm64:
+        url: https://github.com/lightpanda-io/browser/releases/download/1.0.0/lightpanda-aarch64-macos
+        sha256: 955440053a84754dd64c62f970449a56a2b350cdf43ea5f2e809a73047b8173d
+        rozmiar: 90354360
+        format: plik
+        nazwa_pliku: lightpanda
+        bin: ["."]
+        env: &lp-env
+          LIGHTPANDA_DISABLE_TELEMETRY: "1"
+          LIGHTPANDA_DISABLE_CORE_DUMP: "1"
+      linux-x64:
+        url: https://github.com/lightpanda-io/browser/releases/download/1.0.0/lightpanda-x86_64-linux
+        sha256: aa5a4b8ed53d1e38b3c73f5b2647d0a84a82e6744557f45f9a9c85858aa031c3
+        rozmiar: 188268424
+        format: plik
+        nazwa_pliku: lightpanda
+        bin: ["."]
+        env: *lp-env
+      linux-arm64:
+        url: https://github.com/lightpanda-io/browser/releases/download/1.0.0/lightpanda-aarch64-linux
+        sha256: 69791924bcee43b13b224af4c845622c5fe66fdbc1b8143bfaa39ca8f85244f5
+        rozmiar: 192757248
+        format: plik
+        nazwa_pliku: lightpanda
+        bin: ["."]
+        env: *lp-env
+
+  # agent-browser 0.38.1: pojedyncza binarka platformy z wydania v0.38.1 (te same bajty co bin/ w paczce npm
+  # agent-browser-0.38.1.tgz z atestacją SLSA: commit aff6125 = tag v0.38.1). Bez postinstall i bez bin: nakładka
+  # Jarva woła binarkę przez JARVO_AGENT_BROWSER_BIN (bez serwera podglądu, bez `install` i `upgrade`, które
+  # pobierają bez sum). Format plik daje na POSIX tryb 755. Windows arm64: binarka x64 w emulacji, tak samo robi
+  # postinstall producenta (w wydaniu nie ma win32-arm64).
+  agent-browser:
+    zrodlo: agent-browser
+    wersja: "0.38.1"
+    licencja: Apache-2.0 (+ wbudowany axe-core MPL-2.0)
+    rola: "sterownik narzędzi browser_* Hermesa (natywna binarka Rust) za nakładką Jarva bez serwera podglądu"
+    pliki:
+      windows-x64: &ab-win64
+        url: https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-win32-x64.exe
+        sha256: 70bd758b2a5a72b18055f60ff877d2297d036c4104e3bc94af6f7c1ceb941408
+        rozmiar: 17868288
+        format: plik
+        env:
+          JARVO_AGENT_BROWSER_BIN: "{katalog}/agent-browser-win32-x64.exe"
+      windows-arm64: *ab-win64
+      macos-arm64:
+        url: https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-darwin-arm64
+        sha256: 2e61287259053ea964d39e77002c6a34af0e589e55ccff25e659efae7e892e0d
+        rozmiar: 15768448
+        format: plik
+        env:
+          JARVO_AGENT_BROWSER_BIN: "{katalog}/agent-browser-darwin-arm64"
+      linux-x64:
+        url: https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-linux-x64
+        sha256: 5100149a1903211c889de4e545bf36d90803740cea4f99aa22651649f9205ea1
+        rozmiar: 18247376
+        format: plik
+        env:
+          JARVO_AGENT_BROWSER_BIN: "{katalog}/agent-browser-linux-x64"
+      linux-arm64:
+        url: https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-linux-arm64
+        sha256: 937b315ee0761e8a62f7950ddcfef9b3d3d8e8d5eb9c9d2bf9e23e5725664511
+        rozmiar: 15832320
+        format: plik
+        env:
+          JARVO_AGENT_BROWSER_BIN: "{katalog}/agent-browser-linux-arm64"
+
+  # Camoufox 152.0.4-beta.30 (sumy lin.* = infra/Dockerfile = digesty GitHuba): zapasowa przeglądarka ostrozna.py,
+  # pobierana przy pierwszym użyciu (0,3–0,66 GB). JARVO_CAMOUFOX czyta ostrozna.py (executable_path biblioteki).
+  # Windows arm64: build x86_64 w emulacji (tylko Windows 11). Paczka Windows ma fonty macOS, a macOS fonty Windows
+  # (w obrazie pomijane): czy pomijać je natywnie, decyduje właściciel.
+  camoufox:
+    zrodlo: camoufox
+    wersja: "152.0.4-beta.30"
+    kiedy: przy-uzyciu
+    licencja: MPL-2.0 (Camoufox, Firefox) + fonty z paczki (OFL-1.1, Apache-2.0, CC-BY-4.0, Apple, Microsoft) + DLL Microsoftu
+    rola: "zapasowa przeglądarka Łowcy i Sherlocka po odmowie strony (ostrozna.py, skill ostrozna-przegladarka)"
+    pliki:
+      windows-x64: &cf-win64
+        url: https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-win.x86_64.zip
+        sha256: ea52a02fb1cfb1813ef6a326bea03fb2b650c9774143d953a94a27bfc8f10072
+        rozmiar: 493141328
+        format: zip
+        env:
+          JARVO_CAMOUFOX: "{katalog}/camoufox.exe"
+      windows-arm64: *cf-win64
+      macos-arm64:
+        url: https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-mac.arm64.zip
+        sha256: 3b43e766574f286a6a63296cf58b660b7a3120952086c869b4df4c9a71604bc3
+        rozmiar: 312665777
+        format: zip
+        env:
+          JARVO_CAMOUFOX: "{katalog}/Camoufox.app/Contents/MacOS/camoufox"
+      linux-x64:
+        url: https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-lin.x86_64.zip
+        sha256: 5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672
+        rozmiar: 663467670
+        format: zip
+        env:
+          JARVO_CAMOUFOX: "{katalog}/camoufox-bin"
+      linux-arm64:
+        url: https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-lin.arm64.zip
+        sha256: 60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124
+        rozmiar: 653870625
+        format: zip
+        env:
+          JARVO_CAMOUFOX: "{katalog}/camoufox-bin"
+
+  # ── Media (M01, M03) ──────────────────────────────────────────────────────────────────────────────────────────────
+  # FFmpeg 9.0.2 (M01, I20). Windows i Linux: BtbN, wariant gpl (statyczne binarki), wydanie miesięczne
+  # autobuild-2026-09-30-13-08 (ostatni build miesiąca GitHub BtbN trzyma 2 lata, do ok. IX 2028). Build jest z gałęzi
+  # release/9.0: n9.0.2 + 17 poprawek (n9.0.2-17-g2a571b6068; wycieki pamięci, enkoder Opus, mov, h264). Ma wszystko,
+  # czego używa flota: libass + fontconfig, zimg (zscale), vidstab, librsvg, x264, libvpx, libopus, libvorbis, lame,
+  # svt-av1. Windows arm64: build x64 w emulacji (I27), bo winarm64 BtbN nie ma libvpx (VP9 w html_wideo i podglądzie
+  # edytora) ani aom. macOS arm64: Martin Riedl 9.0.2 (bez vidstab i librsvg: montaz.py przechodzi na deshake,
+  # SVG → PNG przez Chromium, E09); Riedl wydaje ffmpeg i ffprobe w osobnych zipach, stąd ffmpeg-macos i ffprobe-macos.
+  ffmpeg:
+    zrodlo: ffmpeg-btbn
+    wersja: "9.0.2"
+    licencja: GPL-3.0-or-later (--enable-gpl --enable-version3, bez nonfree; x264, x265, vidstab, rubberband)
+    rola: "ffmpeg, ffprobe i ffplay: montaż i napisy ASS Wideografa, eksport edytora HQ, konwerter plików, kontrola mediów"
+    pliki:
+      windows-x64: &ffmpeg-win-x64
+        url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-win64-gpl-9.0.zip
+        sha256: a0e45723c72141975f51d8666302e614711745f3102b704ca3f82c897a58d278
+        rozmiar: 194034585
+        format: zip
+        usun_poziom: 1
+        bin: ["bin"]
+      windows-arm64: *ffmpeg-win-x64
+      macos-arm64:
+        brak: "BtbN nie wydaje buildów dla macOS"
+        zamiast: ffmpeg-macos
+      linux-x64:
+        url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linux64-gpl-9.0.tar.xz
+        sha256: 68ee646831adaae2495618346f3bba94ff207ff83bbd34d643e7004730d66269
+        rozmiar: 151017172
+        format: tar.xz
+        usun_poziom: 1
+        bin: ["bin"]
+      linux-arm64:
+        url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linuxarm64-gpl-9.0.tar.xz
+        sha256: 91afcd7695d4bbbb9e0057aa10baaf9875ec4e1a97303f9059ec971336a2ab46
+        rozmiar: 127445692
+        format: tar.xz
+        usun_poziom: 1
+        bin: ["bin"]
+
+  ffmpeg-macos:
+    zrodlo: ffmpeg-riedl
+    wersja: "9.0.2"
+    licencja: GPL-3.0-or-later (--enable-gpl --enable-version3, bez nonfree i bez decklink)
+    rola: "ffmpeg na macOS arm64 (build Riedla, podpis Developer ID); bez vidstab i librsvg"
+    pliki:
+      windows-x64: &ffmpeg-macos-brak
+        brak: "build Riedla tylko dla macOS; na tej platformie ffmpeg z BtbN"
+        zamiast: ffmpeg
+      windows-arm64: *ffmpeg-macos-brak
+      macos-arm64:
+        url: https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip
+        sha256: c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924
+        rozmiar: 28395699
+        format: zip
+        bin: ["."]
+      linux-x64: *ffmpeg-macos-brak
+      linux-arm64: *ffmpeg-macos-brak
+
+  ffprobe-macos:
+    zrodlo: ffmpeg-riedl
+    wersja: "9.0.2"
+    licencja: GPL-3.0-or-later (--enable-gpl --enable-version3, bez nonfree i bez decklink)
+    rola: "ffprobe na macOS arm64 (Riedl wydaje go osobno; na innych platformach ffprobe jest w archiwum ffmpeg)"
+    pliki:
+      windows-x64: &ffprobe-macos-brak
+        brak: "ffprobe jest w archiwum ffmpeg z BtbN"
+        zamiast: ffmpeg
+      windows-arm64: *ffprobe-macos-brak
+      macos-arm64:
+        url: https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffprobe.zip
+        sha256: fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6
+        rozmiar: 28317701
+        format: zip
+        bin: ["."]
+      linux-x64: *ffprobe-macos-brak
+      linux-arm64: *ffprobe-macos-brak
+
+  # Fonty (M03, I28): ten sam plik na każdej platformie, bez instalacji w systemie (fonts.conf przez FONTCONFIG_FILE,
+  # ffmpeg z fontsdir albo fontfile). Inter i DejaVu są tylko w archiwach wydań (repo nie ma zbudowanych TTF/OTF; jedyny
+  # plik Inter w repo to InterVariable.ttf z rodziną „Inter Variable”, której styl ASS „Inter” nie znajdzie), więc tu,
+  # z rozpakowaniem. Noto Sans i Noto Color Emoji są w sekcji modele (pojedyncze pliki z commitem w adresie).
+  fonty-inter:
+    zrodlo: inter
+    wersja: "4.1"
+    licencja: OFL-1.1
+    rola: "krój Inter 4.1 (statyczne OTF, jak fonts-inter w obrazie): napisy ASS filmów (styl „Inter”, pogrubiony), HTML i PDF"
+    pliki:
+      windows-x64: &fonty-inter
+        url: https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip
+        sha256: 9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e
+        rozmiar: 33707794
+        format: zip
+        env: {JARVO_FONTY_INTER: "{katalog}/extras/otf"}
+      windows-arm64: *fonty-inter
+      macos-arm64: *fonty-inter
+      linux-x64: *fonty-inter
+      linux-arm64: *fonty-inter
+
+  fonty-dejavu:
+    zrodlo: dejavu-fonts
+    wersja: "2.37"
+    licencja: Bitstream-Vera + Arev Fonts (glify z Arev) + domena publiczna (zmiany DejaVu)
+    rola: "DejaVu Sans, Sans Mono i Serif 2.37: podpisy na arkuszach Pillow (wideo_lib, krytyka, dwa_ekrany), drawtext bez fontfile"
+    pliki:
+      windows-x64: &fonty-dejavu
+        url: https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip
+        sha256: 7576310b219e04159d35ff61dd4a4ec4cdba4f35c00e002a136f00e96a908b0a
+        rozmiar: 5522795
+        format: zip
+        usun_poziom: 1
+        env: {JARVO_FONTY_DEJAVU: "{katalog}/ttf"}
+      windows-arm64: *fonty-dejavu
+      macos-arm64: *fonty-dejavu
+      linux-x64: *fonty-dejavu
+      linux-arm64: *fonty-dejavu
+
+  # ── Dokumenty i OCR (E01–E03, E05) ────────────────────────────────────────────────────────────────────────────────
+  # pandoc, qpdf i ExifTool z wydań u źródła, pixi tylko na lukę Tesseracta (E05, I22). Windows arm64: pandoc
+  # i ExifTool nie mają wydania arm64, więc plik x64 w emulacji (I27).
+  pandoc:
+    zrodlo: pandoc
+    wersja: "3.12.1"
+    licencja: GPL-2.0-or-later (pandoc-types BSD-3-Clause, wbudowany Lua MIT)
+    rola: "konwersje dokumentów: DOCX, ODT, Markdown, HTML, EPUB, RTF (konwertuj.py, to_pdf.py)"
+    pliki:
+      windows-x64: &pandoc-win-x64
+        url: https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-windows-x86_64.zip
+        sha256: 6ef431cb20b2c24a0371fc19200dc49d452be54b1b5c9239f3462841ef53e587
+        rozmiar: 42154914
+        format: zip
+        usun_poziom: 1
+        bin: ["."]
+      windows-arm64: *pandoc-win-x64
+      # LC_BUILD_VERSION minos 15.0: minimum macOS 15 (macOS 14 go nie uruchomi). Zip ma dowiązania
+      # bin/pandoc-lua i bin/pandoc-server → pandoc, które pobieracz odtwarza.
+      macos-arm64:
+        url: https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-arm64-macOS.zip
+        sha256: c2146cf33a583f3ac93eccddf1bb662371d5cfcce1aad1c87ad860cca1435d46
+        rozmiar: 42313957
+        format: zip
+        usun_poziom: 1
+        bin: ["bin"]
+      linux-x64:
+        url: https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-linux-amd64.tar.gz
+        sha256: d0c90410e90204c9ca83b8539fac5c7aed01fd537207e4585849f8abc5df20b8
+        rozmiar: 35363545
+        format: tar.gz
+        usun_poziom: 1
+        bin: ["bin"]
+      linux-arm64:
+        url: https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-linux-arm64.tar.gz
+        sha256: 445d96fd08801fe636cab1158b4f017ee320ac3b7446328b4fe2f902117b19b9
+        rozmiar: 37892300
+        format: tar.gz
+        usun_poziom: 1
+        bin: ["bin"]
+
+  # macOS i Linux: zip ma lib/libqpdf.30.dylib i lib/libqpdf.so.30 jako dowiązania symboliczne; pobieracz je
+  # odtwarza (bin/qpdf ładuje bibliotekę przez tę nazwę). macOS: LC_BUILD_VERSION minos 15.0, czyli minimum
+  # macOS 15. Linux: glibc >= 2.34, libstdc++ z GLIBCXX_3.4.29, libz i libgmp z systemu.
+  qpdf:
+    zrodlo: qpdf
+    wersja: "12.4.2"
+    licencja: Apache-2.0 (Windows statycznie zlib, libjpeg-turbo, OpenSSL; Linux z bibliotekami gnutls, nettle, libidn2, libunistring, libtasn1 na LGPL i p11-kit, libffi)
+    rola: "PDF: łączenie, liczba stron, przepisanie pliku po usunięciu metadanych (konwertuj.py)"
+    pliki:
+      windows-x64:
+        url: https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-msvc64.zip
+        sha256: db87077e683630c1217e0e8f9a20a9749d952ab676e881c3689187763a5de25d
+        rozmiar: 28183147
+        format: zip
+        usun_poziom: 1
+        bin: ["bin"]
+      windows-arm64:
+        url: https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-msvc-arm64.zip
+        sha256: 2b5d7740a2513d8a841116692dc2cf7efe83f35262386ebab18bed35fbf15ab1
+        rozmiar: 29306496
+        format: zip
+        usun_poziom: 1
+        bin: ["bin"]
+      macos-arm64:
+        url: https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-bin-macos-arm64.zip
+        sha256: 62e46987a30ea167cbc530ccb22690aec3d8c812ed09979a941bcee92e504b79
+        rozmiar: 3269125
+        format: zip
+        bin: ["bin"]
+      linux-x64:
+        url: https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-bin-linux-x86_64.zip
+        sha256: db367d897829f22c4198ce1094143c9d467bd6ee7dfabc44ba6f02056b24f8b1
+        rozmiar: 4040257
+        format: zip
+        bin: ["bin"]
+      linux-arm64:
+        url: https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-bin-linux-aarch64.zip
+        sha256: 8fd9d009eb0838398180a603f2cf76531e5c68a4ecc8847598e0a1ccb1d3b600
+        rozmiar: 3872113
+        format: zip
+        bin: ["bin"]
+
+  # Windows: zip z wbudowanym Strawberry Perl 5.32; po rozpakowaniu exiftool(-k).exe dostaje nazwę exiftool.exe
+  # (nazwa z „(-k)” czeka na Enter po każdym wywołaniu; tak każe README paczki). macOS i Linux: ta sama paczka Perla
+  # (Image-ExifTool) na /usr/bin/perl z systemu (macOS 14–26: Perl 5.34). EXIFTOOL_HOME na katalog narzędzia:
+  # ExifTool nie wczyta wtedy ~/.ExifTool_config właściciela (to kod Perla wykonywany przy starcie).
+  exiftool:
+    zrodlo: exiftool
+    wersja: "13.59"
+    licencja: Artistic-1.0-Perl OR GPL-1.0-or-later (jak Perl); paczka Windows też Strawberry Perl (jak Perl) i launcher O. Betza (CC0-1.0)
+    rola: "metadane: odczyt i usuwanie ze zdjęć i PDF bez przekodowania (konwertuj.py --metadane, --usun-metadane)"
+    pliki:
+      windows-x64: &exiftool-win-x64
+        url: https://downloads.sourceforge.net/project/exiftool/exiftool-13.59_64.zip
+        sha256: 44b512b25af500724ba579d0a53c8fc5851628b692dd5e5d94ae4a15c2cba9ec
+        rozmiar: 11183675
+        format: zip
+        usun_poziom: 1
+        zmien_nazwe: {"exiftool(-k).exe": exiftool.exe}
+        bin: ["."]
+        env: {EXIFTOOL_HOME: "{katalog}"}
+      windows-arm64: *exiftool-win-x64
+      macos-arm64: &exiftool-perl
+        url: https://downloads.sourceforge.net/project/exiftool/Image-ExifTool-13.59.tar.gz
+        sha256: 668ea3acececb7235fbd0f4900e72d5f12c9b07e5c778fd36cb1e9b5828fd65a
+        rozmiar: 7916358
+        format: tar.gz
+        usun_poziom: 1
+        bin: ["."]
+        env: {EXIFTOOL_HOME: "{katalog}"}
+      linux-x64: *exiftool-perl
+      linux-arm64: *exiftool-perl
+
+  # pixi tylko do vendor/pixi/tesseract (pixi.toml, pixi.lock, .pixi/config.toml; Tesseract z conda-forge, E05).
+  # Windows arm64: natywny pixi, ale `pixi install --locked --platform win-64`, bo conda-forge nie ma tesseracta
+  # win-arm64 (I27). Linux: statyczne binarki musl. Nigdy `pixi self-update` ani install.sh/install.ps1 (tylko tam
+  # jest telemetria).
+  pixi:
+    zrodlo: pixi
+    wersja: "0.83.0"
+    licencja: BSD-3-Clause
+    rola: "pakiety conda-forge z pixi.lock tylko na luki (Tesseract 5.5.3, I22)"
+    pliki:
+      windows-x64:
+        url: https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-x86_64-pc-windows-msvc.zip
+        sha256: 77bed9f9d2795c94f9ab5744353892eb82bd3b1eaa09ecbbe7573e22ef70a2f4
+        rozmiar: 32758879
+        format: zip
+        bin: ["."]
+        env: &pixi-env {PIXI_NO_TELEMETRY: "1", PIXI_NO_CONFIG: "1"}
+      windows-arm64:
+        url: https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-aarch64-pc-windows-msvc.zip
+        sha256: 9ed3a4f7c1fdd2a36936e6d44b1492bfd47d84a57bfbd9be3ae4f338bd3cc92c
+        rozmiar: 35462210
+        format: zip
+        bin: ["."]
+        env: *pixi-env
+      macos-arm64:
+        url: https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-aarch64-apple-darwin.tar.gz
+        sha256: b46066fbaf931284a3f4a61d68e0eb352295f4b3ce4330315a3de3dc5da5736c
+        rozmiar: 28789945
+        format: tar.gz
+        bin: ["."]
+        env: *pixi-env
+      linux-x64:
+        url: https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-x86_64-unknown-linux-musl.tar.gz
+        sha256: 064f371e692aaa3400ac581c89da2843c91437f20c2d9155395a5d0037f33551
+        rozmiar: 32008054
+        format: tar.gz
+        bin: ["."]
+        env: *pixi-env
+      linux-arm64:
+        url: https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-aarch64-unknown-linux-musl.tar.gz
+        sha256: d08403d8f048626ec93ba7b7c56e3b747a5f3a95c4e6e0c815ceb264f5f0b9ce
+        rozmiar: 35152082
+        format: tar.gz
+        bin: ["."]
+        env: *pixi-env
+
+  # ── Mobile (F08, U05, I24) ────────────────────────────────────────────────────────────────────────────────────────
+  # scrcpy 5.0.1 (Genymobile, wydanie 2026-10-08): ekran telefonu w osobnym oknie zamiast ws-scrcpy za proxy :9122
+  # (I24, U05). Pliki z GitHub Actions (release.yml), SHA256SUMS.txt podpisany GPG autora, zgodny z digestami GitHuba.
+  # W paczce adb identyczny z platform-tools r37.0.1 (Android SDK License: akceptacja właściciela przed pierwszym
+  # pobraniem, stąd przy-uzyciu), FFmpeg 9.0.2 bez GPL, SDL 3.4.18, libusb 1.0.30, dav1d 1.5.4. Bez Authenticode
+  # (Smart App Control go zablokuje, I26), na macOS tylko podpis ad hoc bez notaryzacji: działa, bo pobieracz nie
+  # nadaje kwarantanny. Linux: glibc >= 2.35 i libudev.
+  scrcpy:
+    zrodlo: scrcpy
+    wersja: "5.0.1"
+    licencja: Apache-2.0 (scrcpy) + w paczce LGPL-2.1-or-later (FFmpeg, libusb), Zlib (SDL3), BSD-2-Clause (dav1d), adb z platform-tools (Android SDK License)
+    rola: "ekran i sterowanie telefonem testowym w osobnym oknie (jarvo android), bez podglądu w HQ"
+    kiedy: przy-uzyciu
+    pliki:
+      windows-x64:
+        url: https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-win64-v5.0.1.zip
+        sha256: b12a2c4ee8be317422451fc7dcf8ee20a71b5ea7ef9ad73ddd825a25316227a5
+        rozmiar: 11264634
+        format: zip
+        usun_poziom: 1
+        bin: ["."]
+      windows-arm64:
+        url: https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-winarm64-v5.0.1.zip
+        sha256: 16c3fc2068df64946f670e3504b4752073ebae47a416a45b46e79a5ab19c689b
+        rozmiar: 9825739
+        format: zip
+        usun_poziom: 1
+        bin: ["."]
+      macos-arm64:
+        url: https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-macos-aarch64-v5.0.1.tar.gz
+        sha256: 33611e51977a8289e2e124b220f727895181ef2eb9060e0987a4dc2db9cf0d6b
+        rozmiar: 12565912
+        format: tar.gz
+        usun_poziom: 1
+        bin: ["."]
+      linux-x64:
+        url: https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-linux-x86_64-v5.0.1.tar.gz
+        sha256: 9f969d30cc574816077edecda65719c1c70b0aee1df1ba5fa00779ac07b8fd6e
+        rozmiar: 17883742
+        format: tar.gz
+        usun_poziom: 1
+        bin: ["."]
+      linux-arm64:
+        brak: "scrcpy nie wydaje binarki na Linux aarch64 (w wydaniu tylko linux-x86_64); bez ekranu w oknie, telefon dalej przez adb z systemu"
+
+  # Android SDK Platform-Tools r37.0.1 (Google, wydanie 2026-07-30): adb i fastboot. PRZEJRZANE 2026-10-24, ale wpis
+  # czeka: źródło nie ma repo git (AOSP nie taguje tego wydania, lustra na GitHubie nie ma), więc w vendor/zrodla.yaml
+  # może być tylko `paczka` .zip, a validate.py (check_zrodla) i zrodla.py (pliki_paczki) przyjmują dziś tylko tar.
+  # Po dopuszczeniu zip odkomentować ten blok, dopisać do zrodla.yaml wpis android-platform-tools (paczka
+  # https://dl.google.com/android/repository/platform-tools-latest-windows.zip, przejrzane = sha256 pliku win niżej,
+  # notatka z przeglądu), potem `python scripts/natywne.py generuj`. Licencja SDK zabrania redystrybucji: tylko
+  # dl.google.com, bez lustra (I21), akceptacja właściciela przed pierwszym pobraniem (stąd przy-uzyciu). Google podaje
+  # w repository2-3.xml tylko SHA-1 i rozmiar (zgodne); sha256 policzone i zgodne z przypięciem w scrcpy v5.0.1
+  # (app/deps/adb_*.sh). Windows: PE32 x86 z podpisem Google, na arm64 ten sam plik w emulacji; macOS: universal
+  # z Developer ID Google i notaryzacją; Linux: tylko x86_64. ADB_MDNS=0: serwer adb nie szuka telefonów multicastem
+  # w sieci lokalnej (Wi-Fi dalej przez adb pair / adb connect <adres>:<port>). `usun`: zostają adb, fastboot, ich
+  # DLL-e (AdbWinApi, AdbWinUsbApi), NOTICE.txt i source.properties; znika sqlite3 3.50.6 (błąd WAL-reset, B06, Z14),
+  # mke2fs, make_f2fs (formatowanie partycji przez fastboot), etc1tool, hprof-conv, lib64/libc++ i libwinpthread-1.dll.
+  # Sprawdzone 2026-10-24 w nagłówkach binarek: adb.exe i fastboot.exe importują z paczki tylko AdbWinApi.dll (bez
+  # importów opóźnionych), a adb i fastboot na macOS i Linuksie nie ładują lib64/libc++ (potrzebują jej tylko usuwane
+  # programy).
+  # platform-tools:
+  #   zrodlo: android-platform-tools
+  #   wersja: "37.0.1"
+  #   licencja: Android SDK License (Google) + licencje open source komponentów AOSP (NOTICE.txt w paczce)
+  #   rola: "adb (i fastboot) Twórcy aplikacji: telefon właściciela albo emulator (urzadzenie.py, jarvo android)"
+  #   kiedy: przy-uzyciu
+  #   pliki:
+  #     windows-x64: &pt-win
+  #       url: https://dl.google.com/android/repository/platform-tools_r37.0.1-win.zip
+  #       sha256: 45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
+  #       rozmiar: 8044989
+  #       format: zip
+  #       usun_poziom: 1
+  #       usun: [sqlite3.exe, mke2fs.exe, mke2fs.conf, make_f2fs.exe, make_f2fs_casefold.exe, etc1tool.exe,
+  #              hprof-conv.exe, libwinpthread-1.dll]
+  #       bin: ["."]
+  #       env: {ADB_MDNS: "0"}
+  #     windows-arm64: *pt-win
+  #     macos-arm64:
+  #       url: https://dl.google.com/android/repository/platform-tools_r37.0.1-darwin.zip
+  #       sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
+  #       rozmiar: 16110554
+  #       format: zip
+  #       usun_poziom: 1
+  #       usun: &pt-usun-posix [sqlite3, mke2fs, mke2fs.conf, make_f2fs, make_f2fs_casefold, etc1tool, hprof-conv, lib64]
+  #       bin: ["."]
+  #       env: {ADB_MDNS: "0"}
+  #     linux-x64:
+  #       url: https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip
+  #       sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
+  #       rozmiar: 9054187
+  #       format: zip
+  #       usun_poziom: 1
+  #       usun: *pt-usun-posix
+  #       bin: ["."]
+  #       env: {ADB_MDNS: "0"}
+  #     linux-arm64:
+  #       brak: "Google nie wydaje platform-tools na Linux arm64 (paczka linux ma tylko binarki x86_64); adb z pakietu systemu, jeśli właściciel go ma (np. apt install adb), doctor to pokazuje"
+
+# Modele i dane niezależne od platformy (przegląd 2026-10-24): pliki z przypiętej rewizji repo modelu, każdy z sumą.
+# Wagi lektorów i OCR to te same pliki i sumy co w infra/Dockerfile. JARVO-ZRODLO.txt (jak w obrazie) pisze instalator.
+modele:
+  # Polski lektor jarvo-tts (Matcha-TTS-PL v2, machinekind): meski/ = onnx/ (male_voxcpm_1), damski/ =
+  # onnx/female_voxcpm_2/; te same pliki i sumy co infra/Dockerfile (MATCHA_PL_URL).
+  matcha-pl:
+    zrodlo: matcha-tts-pl-v2
+    rewizja: 93744740ae645648c003abb09e8c617d9c5e34cd
+    licencja: CC-BY-SA-4.0
+    rola: "polski lektor bez sieci (jarvo-tts: pl-PL-Matcha-Meski, pl-PL-Matcha-Damski), domyślny u Wideografa i w HQ"
+    kiedy: instalacja
+    katalog: matcha-pl
+    pliki:
+      - cel: meski/matcha_pl_t2.onnx
+        url: https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/onnx/matcha_pl_t2.onnx
+        sha256: e2a2ea8bc43fa60ec731299e10dda57459c7375c4f5d40d6506f0514fec2884a
+        rozmiar: 139965159
+      - cel: meski/voices.json
+        url: https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/onnx/voices.json
+        sha256: 89dd8a22e99c1a62c14e6c7fce506708812eb1af8391e2862931ba999e3710b7
+        rozmiar: 13991
+      - cel: damski/matcha_pl_t2.onnx
+        url: https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/onnx/female_voxcpm_2/matcha_pl_t2.onnx
+        sha256: 1e2281636960b30906d79c90288527efa54f00b7ee1117e22b5d359e60430ba5
+        rozmiar: 139965159
+      - cel: damski/voices.json
+        url: https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/onnx/female_voxcpm_2/voices.json
+        sha256: 3c5796e3263b1896bab6a480e7f424c746e3fbcc70bb6434339e8272b9812fd3
+        rozmiar: 14009
+      - cel: LICENSE
+        url: https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/LICENSE
+        sha256: 28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5
+        rozmiar: 20138
+      - cel: ATTRIBUTION.md
+        url: https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/ATTRIBUTION.md
+        sha256: b661c506b222e914fa03fcdb9a505164f3fcd880983c205c20353381d05bd2c5
+        rozmiar: 149774
+      - cel: README.md
+        url: https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/README.md
+        sha256: 61363f244e4e85534ef47d0d85e3bedd64f9ac384fbab16bef5fc06dd7daae6f
+        rozmiar: 8766
+
+  # Angielski lektor jarvo-tts (Paradee-8M v1.0): tag v1.0 jest adnotowany (obiekt 6566cefd), commit = 8f34b01e;
+  # pliki i sumy jak w infra/Dockerfile (tam dziś przez tag: PARADEE_URL .../resolve/v1.0).
+  paradee:
+    zrodlo: paradee-8m
+    rewizja: 8f34b01ef8adcb0bec470b89bf2fd62a7b2369e6
+    licencja: Apache-2.0
+    rola: "angielski lektor bez sieci (jarvo-tts: en-US-Paradee)"
+    kiedy: instalacja
+    katalog: paradee
+    pliki:
+      - cel: paradee_int8.onnx
+        url: https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0/resolve/8f34b01ef8adcb0bec470b89bf2fd62a7b2369e6/onnx/paradee_int8.onnx
+        sha256: 60e8f8a1bc7c546488154e9d99ecac6e9c50baf3f4b684c5b0de48ea03b698eb
+        rozmiar: 9037971
+      - cel: config.json
+        url: https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0/resolve/8f34b01ef8adcb0bec470b89bf2fd62a7b2369e6/config.json
+        sha256: f24046974a3a8c747affefb45c7c504263a99d5081787908b16abe8f5ac94fcd
+        rozmiar: 1774
+      - cel: LICENSE
+        url: https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0/resolve/8f34b01ef8adcb0bec470b89bf2fd62a7b2369e6/LICENSE
+        sha256: cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
+        rozmiar: 11358
+
+  # Modele Indra OCR 0.3.2 (tag v3.1.1 = ed345c7f, HF_REVISION paczki): 15 plików i sumy jak w infra/Dockerfile
+  # (INDRA_OCR_URL). Licencja OpenRAIL-M (zmodyfikowana przez Datalab): § 7 i § 8 czekają na decyzję właściciela.
+  indra-ocr:
+    zrodlo: indra-ocr-modele
+    rewizja: ed345c7f158eddbc7dee0c6a7269afb75a94f7e8
+    licencja: OpenRAIL-M (zmodyfikowana przez Datalab)
+    rola: "główny silnik OCR skilla odczyt-ekranu (ocr.py, INDRA_OCR_MODEL_DIR)"
+    kiedy: instalacja
+    katalog: indra-ocr
+    pliki:
+      - cel: det.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/det.onnx
+        sha256: 46b0050ce4c4692f887a1a9c038480223af1c7a91b3fcced2657d9cf00290dc4
+        rozmiar: 389948
+      - cel: rec.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/rec.onnx
+        sha256: e243be069b357e56a0e867a21d7482e498df42fb19678bfb67a25f48b1f06151
+        rozmiar: 4977797
+      - cel: rec_cjk.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/rec_cjk.onnx
+        sha256: 4cec840b55e1bb7f375daf30a2975404a867a71ac1a5bc5b1629c4909ce16baa
+        rozmiar: 9255441
+      - cel: order.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/order.onnx
+        sha256: 23635dd2324b4ccc00c408af961273a2dedd2e4f0386bc54dba678c41bcf6b46
+        rozmiar: 2973138
+      - cel: orient.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/orient.onnx
+        sha256: 8d7bfce5d08bcad55955f41ca494a7f9d9d3ed5d5b6da1f6f276d5c509590729
+        rozmiar: 371414
+      - cel: script.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/script.onnx
+        sha256: 5ba37030e817affede0097a7503b6829624104166c6e0b6aacecacf919fc7d11
+        rozmiar: 191005
+      - cel: meta.json
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/meta.json
+        sha256: ff6ec58f91c93a475ae9505ad21c73c3ecda0b378f1d889dd83408e10832d1bb
+        rozmiar: 139429
+      - cel: config.json
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/config.json
+        sha256: cd143c66015620865d9d8361b1bb6f9781363b8e010d78c49b10d69009807d1d
+        rozmiar: 569
+      - cel: mathcls.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/mathcls.onnx
+        sha256: 818b1556e9ef337958db6be0c9791299d3f74a4575586b0cd469aaae9534ff96
+        rozmiar: 191005
+      - cel: math_enc.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/math_enc.onnx
+        sha256: d4e4a6c40dad1ee988d32c6403b1590ca42864d4483bbe1e671c5dbb999a5a97
+        rozmiar: 9889575
+      - cel: math_dec_init.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/math_dec_init.onnx
+        sha256: 919417fde9962c3318aeb478c1fe3955dd2bb8cd34476c68debed2ba39e5dcd6
+        rozmiar: 1356364
+      - cel: math_dec_step.onnx
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/math_dec_step.onnx
+        sha256: 5ff6e6cbaf0dea70314f66222a1469736a8c5e7994fab06a5b4e53c90469239f
+        rozmiar: 8429418
+      - cel: math_meta.json
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/math_meta.json
+        sha256: 85d9715fb8a77791b55ef89f57fb41e72eb3170ec58a7c3bee3b394268bf2b10
+        rozmiar: 7797
+      - cel: LICENSE
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/LICENSE
+        sha256: 50c88a018a7ee322e89f6b09401b237beb0cd331685879405b3db48993950a5f
+        rozmiar: 14750
+      - cel: README.md
+        url: https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/README.md
+        sha256: 8e3ca98438d183f40efc036c45b82e8e775f2c04e798ae86c1509d0560a8be8f
+        rozmiar: 18582
+
+  # Rozpoznawanie mowy jarvo-stt (NVIDIA Parakeet TDT 0.6B v3, eksport ONNX istupakov): dokładnie pliki, które
+  # onnx-asr 0.12.0 bierze dla quantization=int8 (config.json, encoder i decoder_joint .int8, vocab.txt); nemo128.onnx
+  # z repo nie jest potrzebny (preprocesor jest w kole onnx-asr). README.md = karta z atrybucją NVIDIA (CC-BY-4.0).
+  # Ładowanie z dysku: onnx_asr.load_model("nemo-parakeet-tdt-0.6b-v3", <models>/parakeet-tdt-0.6b-v3, quantization="int8").
+  parakeet:
+    zrodlo: parakeet-tdt-onnx
+    rewizja: 8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce
+    licencja: CC-BY-4.0
+    rola: "rozpoznawanie mowy jarvo-stt (głosówki Hermesa, napisy, czasy słów w edytorze HQ), ok. 0,67 GB"
+    kiedy: przy-uzyciu
+    katalog: parakeet-tdt-0.6b-v3
+    pliki:
+      - cel: config.json
+        url: https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/config.json
+        sha256: 666903c76b9798caf2c210afd4f6cd60b08a8dbf9800ec8d7a3bc0d2148ac466
+        rozmiar: 97
+      - cel: encoder-model.int8.onnx
+        url: https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/encoder-model.int8.onnx
+        sha256: 6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09
+        rozmiar: 652183999
+      - cel: decoder_joint-model.int8.onnx
+        url: https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/decoder_joint-model.int8.onnx
+        sha256: eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70
+        rozmiar: 18202004
+      - cel: vocab.txt
+        url: https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/vocab.txt
+        sha256: d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d
+        rozmiar: 93939
+      - cel: README.md
+        url: https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/README.md
+        sha256: 95d330fef1070f22cc4d4e380fbf5913253b44f7b71fabae997f6cdf65fe1714
+        rozmiar: 1207
+
+  # VAD przed Parakeetem w jarvo-stt (Silero VAD 6.2): silero_vad.onnx bajt w bajt jak src/silero_vad/data/
+  # w snakers4/silero-vad@1e261b03 (blob 80c5592e). Ładowanie: onnx_asr.load_vad("silero", <models>/silero-vad).
+  silero-vad:
+    zrodlo: silero-vad-onnx
+    rewizja: b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6
+    licencja: MIT
+    rola: "wykrywanie mowy przed Parakeetem (jarvo-stt), tnie nagranie na kawałki do 20 s"
+    kiedy: przy-uzyciu
+    katalog: silero-vad
+    pliki:
+      - cel: config.json
+        url: https://huggingface.co/istupakov/silero-vad-onnx/resolve/b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6/config.json
+        sha256: 1094039d370c82889582ba739a3d1caac5754c8b3a17a66a534200c9f72086e2
+        rozmiar: 30
+      - cel: silero_vad.onnx
+        url: https://huggingface.co/istupakov/silero-vad-onnx/resolve/b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6/silero_vad.onnx
+        sha256: 1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3
+        rozmiar: 2327524
+      - cel: LICENSE.txt
+        url: https://huggingface.co/istupakov/silero-vad-onnx/resolve/b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6/LICENSE.txt
+        sha256: 2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b
+        rozmiar: 1075
+      - cel: README.md
+        url: https://huggingface.co/istupakov/silero-vad-onnx/resolve/b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6/README.md
+        sha256: 39c6c9b7dce6ac255dcaf269a113af426946fd6290fe1ad4a92ffbbde1781b95
+        rozmiar: 576
+
+  # Maska osoby Wideografa (maska.py, MODEL_URL i MODEL_SHA256 w skrypcie): lustro DavG25 bajt w bajt jak plik
+  # z oficjalnego Google Drive autorów MODNet (link w ZHKKKe/MODNet pretrained/README.md). README.md lustra
+  # podaje licencję i pochodzenie (repo nie ma pliku LICENSE).
+  modnet:
+    zrodlo: modnet-onnx
+    rewizja: 903cc06311b3b12071edfa1b42b534e4a31c718a
+    licencja: Apache-2.0
+    rola: "maska osoby do typografii Wideografa (maska.py: napis obok twarzy albo za osobą)"
+    kiedy: przy-uzyciu
+    katalog: modnet
+    pliki:
+      - cel: modnet_photographic_portrait_matting.onnx
+        url: https://huggingface.co/DavG25/modnet-pretrained-models/resolve/903cc06311b3b12071edfa1b42b534e4a31c718a/models/modnet_photographic_portrait_matting.onnx
+        sha256: 07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9
+        rozmiar: 25888640
+      - cel: README.md
+        url: https://huggingface.co/DavG25/modnet-pretrained-models/resolve/903cc06311b3b12071edfa1b42b534e4a31c718a/README.md
+        sha256: ba2e054b72fef5d57532614084716e990a41a1aad5c72c4b2a4f344a0e0d6f0c
+        rozmiar: 1236
+
+  # Twarze w kadrze rolek (twarze.py, MODEL_URL i MODEL_SHA256 w skrypcie): ten sam plik co wskaźnik LFS
+  # w opencv/opencv_zoo@47534e27 (models/face_detection_yunet).
+  yunet:
+    zrodlo: yunet-onnx
+    rewizja: 3cc26e7f1014a5ee5d74a42acee58bafc9d0a310
+    licencja: MIT
+    rola: "wykrywanie twarzy do kadru rolek clipmakera (twarze.py, klipy.py)"
+    kiedy: przy-uzyciu
+    katalog: yunet
+    pliki:
+      - cel: face_detection_yunet_2023mar.onnx
+        url: https://huggingface.co/opencv/face_detection_yunet/resolve/3cc26e7f1014a5ee5d74a42acee58bafc9d0a310/face_detection_yunet_2023mar.onnx
+        sha256: 8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4
+        rozmiar: 232589
+      - cel: LICENSE
+        url: https://huggingface.co/opencv/face_detection_yunet/resolve/3cc26e7f1014a5ee5d74a42acee58bafc9d0a310/LICENSE
+        sha256: c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958
+        rozmiar: 1085
+      - cel: README.md
+        url: https://huggingface.co/opencv/face_detection_yunet/resolve/3cc26e7f1014a5ee5d74a42acee58bafc9d0a310/README.md
+        sha256: a45578c40b04f9aaa1e154bca1d0179ffad6dab840458ac8f7cb0a9362413b72
+        rozmiar: 2745
+
+  # Języki Tesseracta (E05): tessdata_fast 4.1.0 (tag 4.1.0 = ten commit; pliki pol, eng, osd takie same też na
+  # gałęzi main). Te same pliki są w paczce conda-forge tesseract 5.5.3 (ze wszystkimi ~120 językami).
+  tessdata-fast:
+    zrodlo: tessdata-fast
+    rewizja: 65727574dfcd264acbb0c3e07860e4e9e9b22185
+    licencja: Apache-2.0
+    rola: "języki Tesseracta: polski, angielski, wykrywanie orientacji i pisma (osd); TESSDATA_PREFIX zapasowego OCR"
+    katalog: tessdata-fast
+    pliki:
+      - cel: pol.traineddata
+        url: https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/pol.traineddata
+        sha256: c4476cdbc0e33d898d32345122b7be1cbf85ace15f920f06c7714756e1ef79b2
+        rozmiar: 4765518
+      - cel: eng.traineddata
+        url: https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/eng.traineddata
+        sha256: 7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2
+        rozmiar: 4113088
+      - cel: osd.traineddata
+        url: https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/osd.traineddata
+        sha256: 9cf5d576fcc47564f11265841e5ca839001e7e6f38ff7f7aacf46d15a96b00ff
+        rozmiar: 10562727
+      - cel: LICENSE
+        url: https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/LICENSE
+        sha256: cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
+        rozmiar: 11358
+
+  # Fonty jako dane (M03, I28): pojedyncze pliki z commitem w adresie, ten sam plik na każdej platformie. Noto Sans
+  # z oficjalnej dystrybucji zbudowanych fontów Noto (notofonts.github.io; pliki bajt w bajt jak w zipie wydania
+  # NotoSans-v2.015, sprawdzone blobami git i sha256); licencja z repo projektu (latin-greek-cyrillic, commit tagu).
+  fonty-noto-sans:
+    zrodlo: noto-sans
+    rewizja: 28b15b4b43b7bed62b5cf6e6b0b5ff5846270535
+    licencja: OFL-1.1
+    rola: "Noto Sans 2.015 (hinted TTF, 4 style): zapasowy krój z polskimi znakami dla fontconfig (ffmpeg, libass) i krój „Noto Sans” w HTML"
+    kiedy: instalacja
+    katalog: fonty-noto-sans
+    pliki:
+      - cel: NotoSans-Regular.ttf
+        url: https://raw.githubusercontent.com/notofonts/notofonts.github.io/28b15b4b43b7bed62b5cf6e6b0b5ff5846270535/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf
+        sha256: 478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823
+        rozmiar: 621572
+      - cel: NotoSans-Bold.ttf
+        url: https://raw.githubusercontent.com/notofonts/notofonts.github.io/28b15b4b43b7bed62b5cf6e6b0b5ff5846270535/fonts/NotoSans/hinted/ttf/NotoSans-Bold.ttf
+        sha256: 1df075a380fc7cb898acf64c1f7b3b4dd780de3caa860178bf929de35817a913
+        rozmiar: 631484
+      - cel: NotoSans-Italic.ttf
+        url: https://raw.githubusercontent.com/notofonts/notofonts.github.io/28b15b4b43b7bed62b5cf6e6b0b5ff5846270535/fonts/NotoSans/hinted/ttf/NotoSans-Italic.ttf
+        sha256: 467e3f89eeca4108bb8710a2b9e0cf2281ac56d5b0609211a83776d0505eecb5
+        rozmiar: 639124
+      - cel: NotoSans-BoldItalic.ttf
+        url: https://raw.githubusercontent.com/notofonts/notofonts.github.io/28b15b4b43b7bed62b5cf6e6b0b5ff5846270535/fonts/NotoSans/hinted/ttf/NotoSans-BoldItalic.ttf
+        sha256: 1b602a9d6353be42c91df097a4857b69fa2696f26703d7a33b54a15d87c2622c
+        rozmiar: 646092
+      - cel: OFL.txt
+        url: https://raw.githubusercontent.com/notofonts/latin-greek-cyrillic/c4a321e123e4d4ff315f57f4e0adf294fe3a95be/OFL.txt
+        sha256: cee9892f9f0cc8fe882c9e9537ee6a89621d86ee7ceaf70b02e2b2b1c25c061a
+        rozmiar: 4396
+
+  # Noto Color Emoji 2.051 (tag v2.051, ta sama wersja co fonts-noto-color-emoji w obrazie): CBDT (bitmapy PNG),
+  # dla Chromium i fontconfig; libass emoji nie rysuje (film.py ostrzega).
+  fonty-noto-emoji:
+    zrodlo: noto-emoji
+    rewizja: 8998f5dd683424a73e2314a8c1f1e359c19e8742
+    licencja: OFL-1.1
+    rola: "Noto Color Emoji 2.051: emoji w klatkach renderowanych z HTML (Chromium) i w fontconfig"
+    kiedy: instalacja
+    katalog: fonty-noto-emoji
+    pliki:
+      - cel: NotoColorEmoji.ttf
+        url: https://raw.githubusercontent.com/googlefonts/noto-emoji/8998f5dd683424a73e2314a8c1f1e359c19e8742/fonts/NotoColorEmoji.ttf
+        sha256: 72a635cb3d2f3524c51620cdde406b217204e8a6a06c6a096ff8ed4b5fd6e27b
+        rozmiar: 10673480
+      - cel: LICENSE
+        url: https://raw.githubusercontent.com/googlefonts/noto-emoji/8998f5dd683424a73e2314a8c1f1e359c19e8742/fonts/LICENSE
+        sha256: 6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2
+        rozmiar: 4301
+
+# Venvy Jarva (P01, P03, I31; przegląd 2026-10-24): locki z `uv pip compile --universal --generate-hashes` na uv 0.12.13,
+# koła z PyPI dla windows-x64 (windows-arm64 = te same koła x64, I27), macos-arm64 (koła od macOS 14.0) i linux x64
+# i arm64 (manylinux_2_28, glibc >= 2.28); każde koło dla 4 platform policzone też strumieniowo. Locki OCR, CAD
+# i ManimGX to pliki obrazu (kompletne dla 4 platform), nowe locki i ich wejścia są w infra/python/natywne/.
+# pobranie_mb = suma kół z locka dla platformy; venv_mb zmierzone na Windows 11 x64 (docling tylko na sucho).
+venvy:
+  narzedzia:
+    python: python312
+    lock: infra/python/natywne/narzedzia.lock
+    kiedy: instalacja
+    rola: "venv narzędzi floty: trafilatura, yt-dlp, onnx-asr + onnxruntime 1.29.0 (jarvo-stt), misaki + spaCy 3.8.16 z en_core_web_sm 3.8.0, espeakng-loader + phonemizer-fork (jarvo-tts), num2words, camoufox + Playwright 1.62"
+    bez: [docopt]
+    pobranie_mb: {windows-x64: 158, windows-arm64: 158, macos-arm64: 163, linux-x64: 214, linux-arm64: 201}
+    venv_mb: 583
+  ocr:
+    python: python312
+    lock: infra/python/requirements-ocr.txt
+    kiedy: instalacja
+    rola: "odczyt ekranu: Indra OCR 0.3.2, onnxruntime 1.31.0, opencv-python-headless 5.0.0.93, pypdfium2 5.14.0"
+    bez: [huggingface-hub]
+    pobranie_mb: {windows-x64: 76, windows-arm64: 76, macos-arm64: 79, linux-x64: 106, linux-arm64: 81}
+    venv_mb: 227
+  cad:
+    python: python312
+    lock: infra/python/requirements-cad.txt
+    kiedy: przy-uzyciu
+    rola: "warsztat 3D: build123d 0.13.0 na cadquery-ocp-novtk 8.0.1.1.0"
+    bez: [sympy, mpmath, jedi, parso]
+    pobranie_mb: {windows-x64: 215, windows-arm64: 215, macos-arm64: 207, linux-x64: 244, linux-arm64: 236}
+    venv_mb: 597
+  manimgx:
+    python: python313
+    lock: infra/python/requirements-manimgx.txt
+    kiedy: przy-uzyciu
+    rola: "animacje matematyczne Wideografa: ManimGX 0.1.1"
+    pobranie_mb: {windows-x64: 85, windows-arm64: 85, macos-arm64: 64, linux-x64: 109, linux-arm64: 104}
+    venv_mb: 227
+  claude-seo:
+    python: python312
+    lock: infra/python/natywne/claude-seo.lock
+    kiedy: instalacja
+    rola: "runtime skryptów skilli SEO: claude-seo e77e783e (requirements.txt) + playwright==1.63.0; WeasyPrint na Windows bez Pango nie działa (PDF przez Chromium)"
+    pobranie_mb: {windows-x64: 141, windows-arm64: 141, macos-arm64: 148, linux-x64: 166, linux-arm64: 164}
+    venv_mb: 630
+  rembg:
+    python: python312
+    lock: infra/python/natywne/rembg.lock
+    kiedy: dodatek
+    rola: "wycinanie tła: rembg[cpu,cli] 2.0.84"
+    pobranie_mb: {windows-x64: 177, windows-arm64: 173, macos-arm64: 157, linux-x64: 214, linux-arm64: 206}
+    venv_mb: 651
+  mgaudio:
+    python: python312
+    lock: infra/python/natywne/mgaudio.lock
+    kiedy: dodatek
+    rola: "muzyka i efekty kodem (muzyka.py): numba 0.66.0, pedalboard 0.9.25, scipy 1.16.3, soundfile 0.14.0, pyloudnorm 0.2.0"
+    pobranie_mb: {windows-x64: 101, windows-arm64: 101, macos-arm64: 73, linux-x64: 123, linux-arm64: 117}
+    venv_mb: 353
+  lemo-wake:
+    python: python312
+    lock: infra/python/natywne/lemo-wake.lock
+    kiedy: dodatek
+    rola: "lemo-wake (Studio): numpy 2.5.3, pillow 12.3.0, pillow-heif 1.8.0, psd-tools 1.23.0, opencv-python-headless 4.14.0.94, onnxruntime 1.30.0"
+    pobranie_mb: {windows-x64: 83, windows-arm64: 83, macos-arm64: 84, linux-x64: 116, linux-arm64: 89}
+    venv_mb: 264
+  # docling: wariant CPU (decyzja właściciela otwarta). torch i torchvision są w locku z sumami z indeksu PyTorch CPU
+  # (download.pytorch.org/whl/cpu; na macOS inne pliki niż w PyPI), więc instalacja działa tylko z
+  # `--torch-backend cpu` (samo --index-url albo --extra-index-url odpada: 14 paczek locka nie ma na tym indeksie).
+  # Wariant z samego PyPI ciągnie na Linuksie CUDA 13 (ok. 3,2–3,4 GB kół na platformę).
+  docling:
+    python: python312
+    lock: infra/python/natywne/docling-cpu.lock
+    kiedy: dodatek
+    rola: "PDF/DOCX → Markdown: docling 2.126.0 z torch 2.14.1 CPU"
+    torch_backend: cpu
+    pobranie_mb: {windows-x64: 339, windows-arm64: 335, macos-arm64: 317, linux-x64: 430, linux-arm64: 367}

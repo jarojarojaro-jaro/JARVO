@@ -16,6 +16,894 @@
   ]
  },
  "narzedzia": {
+  "agent-browser": {
+   "wersja": "0.38.1",
+   "kiedy": "instalacja",
+   "licencja": "Apache-2.0 (+ wbudowany axe-core MPL-2.0)",
+   "zrodlo": "agent-browser",
+   "pliki": {
+    "windows-x64": {
+     "env": {
+      "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-win32-x64.exe"
+     },
+     "format": "plik",
+     "rozmiar": 17868288,
+     "sha256": "70bd758b2a5a72b18055f60ff877d2297d036c4104e3bc94af6f7c1ceb941408",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-win32-x64.exe"
+    },
+    "windows-arm64": {
+     "env": {
+      "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-win32-x64.exe"
+     },
+     "format": "plik",
+     "rozmiar": 17868288,
+     "sha256": "70bd758b2a5a72b18055f60ff877d2297d036c4104e3bc94af6f7c1ceb941408",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-win32-x64.exe"
+    },
+    "macos-arm64": {
+     "env": {
+      "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-darwin-arm64"
+     },
+     "format": "plik",
+     "rozmiar": 15768448,
+     "sha256": "2e61287259053ea964d39e77002c6a34af0e589e55ccff25e659efae7e892e0d",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-darwin-arm64"
+    },
+    "linux-x64": {
+     "env": {
+      "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-linux-x64"
+     },
+     "format": "plik",
+     "rozmiar": 18247376,
+     "sha256": "5100149a1903211c889de4e545bf36d90803740cea4f99aa22651649f9205ea1",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-linux-x64"
+    },
+    "linux-arm64": {
+     "env": {
+      "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-linux-arm64"
+     },
+     "format": "plik",
+     "rozmiar": 15832320,
+     "sha256": "937b315ee0761e8a62f7950ddcfef9b3d3d8e8d5eb9c9d2bf9e23e5725664511",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-linux-arm64"
+    }
+   }
+  },
+  "camoufox": {
+   "wersja": "152.0.4-beta.30",
+   "kiedy": "przy-uzyciu",
+   "licencja": "MPL-2.0 (Camoufox, Firefox) + fonty z paczki (OFL-1.1, Apache-2.0, CC-BY-4.0, Apple, Microsoft) + DLL Microsoftu",
+   "zrodlo": "camoufox",
+   "pliki": {
+    "windows-x64": {
+     "env": {
+      "JARVO_CAMOUFOX": "{katalog}/camoufox.exe"
+     },
+     "format": "zip",
+     "rozmiar": 493141328,
+     "sha256": "ea52a02fb1cfb1813ef6a326bea03fb2b650c9774143d953a94a27bfc8f10072",
+     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-win.x86_64.zip"
+    },
+    "windows-arm64": {
+     "env": {
+      "JARVO_CAMOUFOX": "{katalog}/camoufox.exe"
+     },
+     "format": "zip",
+     "rozmiar": 493141328,
+     "sha256": "ea52a02fb1cfb1813ef6a326bea03fb2b650c9774143d953a94a27bfc8f10072",
+     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-win.x86_64.zip"
+    },
+    "macos-arm64": {
+     "env": {
+      "JARVO_CAMOUFOX": "{katalog}/Camoufox.app/Contents/MacOS/camoufox"
+     },
+     "format": "zip",
+     "rozmiar": 312665777,
+     "sha256": "3b43e766574f286a6a63296cf58b660b7a3120952086c869b4df4c9a71604bc3",
+     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-mac.arm64.zip"
+    },
+    "linux-x64": {
+     "env": {
+      "JARVO_CAMOUFOX": "{katalog}/camoufox-bin"
+     },
+     "format": "zip",
+     "rozmiar": 663467670,
+     "sha256": "5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672",
+     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-lin.x86_64.zip"
+    },
+    "linux-arm64": {
+     "env": {
+      "JARVO_CAMOUFOX": "{katalog}/camoufox-bin"
+     },
+     "format": "zip",
+     "rozmiar": 653870625,
+     "sha256": "60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124",
+     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-lin.arm64.zip"
+    }
+   }
+  },
+  "chrome-headless-shell": {
+   "wersja": "153.0.8010.12",
+   "kiedy": "instalacja",
+   "licencja": "BSD-3-Clause (Chromium) + składniki w LICENSE.headless_shell; binarka Google (chrome://terms)",
+   "zrodlo": "chrome-for-testing",
+   "pliki": {
+    "windows-x64": {
+     "env": {
+      "CHROME_PATH": "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe",
+      "PUPPETEER_EXECUTABLE_PATH": "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe",
+      "HYPERFRAMES_BROWSER_PATH": "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe",
+      "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1",
+      "PUPPETEER_SKIP_DOWNLOAD": "1"
+     },
+     "format": "zip",
+     "rozmiar": 120200717,
+     "sha256": "7aec872f3090e639c4237467624ea863c20fe2878914c93a6556bdbb52aa6c4c",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/win64/chrome-headless-shell-win64.zip"
+    },
+    "windows-arm64": {
+     "env": {
+      "CHROME_PATH": "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe",
+      "PUPPETEER_EXECUTABLE_PATH": "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe",
+      "HYPERFRAMES_BROWSER_PATH": "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe",
+      "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1",
+      "PUPPETEER_SKIP_DOWNLOAD": "1"
+     },
+     "format": "zip",
+     "rozmiar": 120200717,
+     "sha256": "7aec872f3090e639c4237467624ea863c20fe2878914c93a6556bdbb52aa6c4c",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/win64/chrome-headless-shell-win64.zip"
+    },
+    "macos-arm64": {
+     "env": {
+      "CHROME_PATH": "{katalog}/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+      "PUPPETEER_EXECUTABLE_PATH": "{katalog}/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+      "HYPERFRAMES_BROWSER_PATH": "{katalog}/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+      "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1",
+      "PUPPETEER_SKIP_DOWNLOAD": "1"
+     },
+     "format": "zip",
+     "rozmiar": 98831293,
+     "sha256": "89d80a6d26ccd0ccfd51e22d9e1297283862af2b0cd91dce07459b35ca0059f2",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/mac-arm64/chrome-headless-shell-mac-arm64.zip"
+    },
+    "linux-x64": {
+     "env": {
+      "CHROME_PATH": "{katalog}/chrome-headless-shell-linux64/chrome-headless-shell",
+      "PUPPETEER_EXECUTABLE_PATH": "{katalog}/chrome-headless-shell-linux64/chrome-headless-shell",
+      "HYPERFRAMES_BROWSER_PATH": "{katalog}/chrome-headless-shell-linux64/chrome-headless-shell",
+      "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1",
+      "PUPPETEER_SKIP_DOWNLOAD": "1"
+     },
+     "format": "zip",
+     "rozmiar": 119809080,
+     "sha256": "a9da028861a0cf789ff25c2fed45f5f1aaf969ed9247835b6a7821a4f7af9d1d",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/linux64/chrome-headless-shell-linux64.zip"
+    },
+    "linux-arm64": {
+     "env": {
+      "CHROME_PATH": "{katalog}/chrome-headless-shell-linux-arm64/chrome-headless-shell",
+      "PUPPETEER_EXECUTABLE_PATH": "{katalog}/chrome-headless-shell-linux-arm64/chrome-headless-shell",
+      "HYPERFRAMES_BROWSER_PATH": "{katalog}/chrome-headless-shell-linux-arm64/chrome-headless-shell",
+      "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1",
+      "PUPPETEER_SKIP_DOWNLOAD": "1"
+     },
+     "format": "zip",
+     "rozmiar": 120278638,
+     "sha256": "d433c45172c7836e38124fe545f767b02210bfb43a6262f08a297473a8e91c99",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/linux-arm64/chrome-headless-shell-linux-arm64.zip"
+    }
+   }
+  },
+  "exiftool": {
+   "wersja": "13.59",
+   "kiedy": "instalacja",
+   "licencja": "Artistic-1.0-Perl OR GPL-1.0-or-later (jak Perl); paczka Windows też Strawberry Perl (jak Perl) i launcher O. Betza (CC0-1.0)",
+   "zrodlo": "exiftool",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "EXIFTOOL_HOME": "{katalog}"
+     },
+     "format": "zip",
+     "rozmiar": 11183675,
+     "sha256": "44b512b25af500724ba579d0a53c8fc5851628b692dd5e5d94ae4a15c2cba9ec",
+     "url": "https://downloads.sourceforge.net/project/exiftool/exiftool-13.59_64.zip",
+     "usun_poziom": 1,
+     "zmien_nazwe": {
+      "exiftool(-k).exe": "exiftool.exe"
+     }
+    },
+    "windows-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "EXIFTOOL_HOME": "{katalog}"
+     },
+     "format": "zip",
+     "rozmiar": 11183675,
+     "sha256": "44b512b25af500724ba579d0a53c8fc5851628b692dd5e5d94ae4a15c2cba9ec",
+     "url": "https://downloads.sourceforge.net/project/exiftool/exiftool-13.59_64.zip",
+     "usun_poziom": 1,
+     "zmien_nazwe": {
+      "exiftool(-k).exe": "exiftool.exe"
+     }
+    },
+    "macos-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "EXIFTOOL_HOME": "{katalog}"
+     },
+     "format": "tar.gz",
+     "rozmiar": 7916358,
+     "sha256": "668ea3acececb7235fbd0f4900e72d5f12c9b07e5c778fd36cb1e9b5828fd65a",
+     "url": "https://downloads.sourceforge.net/project/exiftool/Image-ExifTool-13.59.tar.gz",
+     "usun_poziom": 1
+    },
+    "linux-x64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "EXIFTOOL_HOME": "{katalog}"
+     },
+     "format": "tar.gz",
+     "rozmiar": 7916358,
+     "sha256": "668ea3acececb7235fbd0f4900e72d5f12c9b07e5c778fd36cb1e9b5828fd65a",
+     "url": "https://downloads.sourceforge.net/project/exiftool/Image-ExifTool-13.59.tar.gz",
+     "usun_poziom": 1
+    },
+    "linux-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "EXIFTOOL_HOME": "{katalog}"
+     },
+     "format": "tar.gz",
+     "rozmiar": 7916358,
+     "sha256": "668ea3acececb7235fbd0f4900e72d5f12c9b07e5c778fd36cb1e9b5828fd65a",
+     "url": "https://downloads.sourceforge.net/project/exiftool/Image-ExifTool-13.59.tar.gz",
+     "usun_poziom": 1
+    }
+   }
+  },
+  "ffmpeg": {
+   "wersja": "9.0.2",
+   "kiedy": "instalacja",
+   "licencja": "GPL-3.0-or-later (--enable-gpl --enable-version3, bez nonfree; x264, x265, vidstab, rubberband)",
+   "zrodlo": "ffmpeg-btbn",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "zip",
+     "rozmiar": 194034585,
+     "sha256": "a0e45723c72141975f51d8666302e614711745f3102b704ca3f82c897a58d278",
+     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-win64-gpl-9.0.zip",
+     "usun_poziom": 1
+    },
+    "windows-arm64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "zip",
+     "rozmiar": 194034585,
+     "sha256": "a0e45723c72141975f51d8666302e614711745f3102b704ca3f82c897a58d278",
+     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-win64-gpl-9.0.zip",
+     "usun_poziom": 1
+    },
+    "macos-arm64": {
+     "brak": "BtbN nie wydaje buildów dla macOS",
+     "zamiast": "ffmpeg-macos"
+    },
+    "linux-x64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "tar.xz",
+     "rozmiar": 151017172,
+     "sha256": "68ee646831adaae2495618346f3bba94ff207ff83bbd34d643e7004730d66269",
+     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linux64-gpl-9.0.tar.xz",
+     "usun_poziom": 1
+    },
+    "linux-arm64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "tar.xz",
+     "rozmiar": 127445692,
+     "sha256": "91afcd7695d4bbbb9e0057aa10baaf9875ec4e1a97303f9059ec971336a2ab46",
+     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linuxarm64-gpl-9.0.tar.xz",
+     "usun_poziom": 1
+    }
+   }
+  },
+  "ffmpeg-macos": {
+   "wersja": "9.0.2",
+   "kiedy": "instalacja",
+   "licencja": "GPL-3.0-or-later (--enable-gpl --enable-version3, bez nonfree i bez decklink)",
+   "zrodlo": "ffmpeg-riedl",
+   "pliki": {
+    "windows-x64": {
+     "brak": "build Riedla tylko dla macOS; na tej platformie ffmpeg z BtbN",
+     "zamiast": "ffmpeg"
+    },
+    "windows-arm64": {
+     "brak": "build Riedla tylko dla macOS; na tej platformie ffmpeg z BtbN",
+     "zamiast": "ffmpeg"
+    },
+    "macos-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "zip",
+     "rozmiar": 28395699,
+     "sha256": "c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924",
+     "url": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip"
+    },
+    "linux-x64": {
+     "brak": "build Riedla tylko dla macOS; na tej platformie ffmpeg z BtbN",
+     "zamiast": "ffmpeg"
+    },
+    "linux-arm64": {
+     "brak": "build Riedla tylko dla macOS; na tej platformie ffmpeg z BtbN",
+     "zamiast": "ffmpeg"
+    }
+   }
+  },
+  "ffmpeg-playwright": {
+   "wersja": "1011",
+   "kiedy": "instalacja",
+   "licencja": "LGPL-2.1-or-later (FFmpeg n7.0.1) + BSD-3-Clause (libvpx) + Zlib, statycznie",
+   "zrodlo": "playwright",
+   "pliki": {
+    "windows-x64": {
+     "format": "zip",
+     "rozmiar": 1411741,
+     "sha256": "8d08827c019ad36e7b9d49d3648447d884534cb2acf200e71c715f6dd834cc50",
+     "url": "https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-win64.zip"
+    },
+    "windows-arm64": {
+     "format": "zip",
+     "rozmiar": 1411741,
+     "sha256": "8d08827c019ad36e7b9d49d3648447d884534cb2acf200e71c715f6dd834cc50",
+     "url": "https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-win64.zip"
+    },
+    "macos-arm64": {
+     "format": "zip",
+     "rozmiar": 1097141,
+     "sha256": "7d77eb0d44b59acc4065faa2476c0df1a242cc904c346f820626818c953c5277",
+     "url": "https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-mac-arm64.zip"
+    },
+    "linux-x64": {
+     "format": "zip",
+     "rozmiar": 2376500,
+     "sha256": "ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc",
+     "url": "https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-linux.zip"
+    },
+    "linux-arm64": {
+     "format": "zip",
+     "rozmiar": 1717234,
+     "sha256": "2628c03f05318ff812c8c9baaf207dea2ddf53e818c0dc936714b0fbe3afb009",
+     "url": "https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-linux-arm64.zip"
+    }
+   }
+  },
+  "ffprobe-macos": {
+   "wersja": "9.0.2",
+   "kiedy": "instalacja",
+   "licencja": "GPL-3.0-or-later (--enable-gpl --enable-version3, bez nonfree i bez decklink)",
+   "zrodlo": "ffmpeg-riedl",
+   "pliki": {
+    "windows-x64": {
+     "brak": "ffprobe jest w archiwum ffmpeg z BtbN",
+     "zamiast": "ffmpeg"
+    },
+    "windows-arm64": {
+     "brak": "ffprobe jest w archiwum ffmpeg z BtbN",
+     "zamiast": "ffmpeg"
+    },
+    "macos-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "zip",
+     "rozmiar": 28317701,
+     "sha256": "fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6",
+     "url": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffprobe.zip"
+    },
+    "linux-x64": {
+     "brak": "ffprobe jest w archiwum ffmpeg z BtbN",
+     "zamiast": "ffmpeg"
+    },
+    "linux-arm64": {
+     "brak": "ffprobe jest w archiwum ffmpeg z BtbN",
+     "zamiast": "ffmpeg"
+    }
+   }
+  },
+  "fonty-dejavu": {
+   "wersja": "2.37",
+   "kiedy": "instalacja",
+   "licencja": "Bitstream-Vera + Arev Fonts (glify z Arev) + domena publiczna (zmiany DejaVu)",
+   "zrodlo": "dejavu-fonts",
+   "pliki": {
+    "windows-x64": {
+     "env": {
+      "JARVO_FONTY_DEJAVU": "{katalog}/ttf"
+     },
+     "format": "zip",
+     "rozmiar": 5522795,
+     "sha256": "7576310b219e04159d35ff61dd4a4ec4cdba4f35c00e002a136f00e96a908b0a",
+     "url": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip",
+     "usun_poziom": 1
+    },
+    "windows-arm64": {
+     "env": {
+      "JARVO_FONTY_DEJAVU": "{katalog}/ttf"
+     },
+     "format": "zip",
+     "rozmiar": 5522795,
+     "sha256": "7576310b219e04159d35ff61dd4a4ec4cdba4f35c00e002a136f00e96a908b0a",
+     "url": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip",
+     "usun_poziom": 1
+    },
+    "macos-arm64": {
+     "env": {
+      "JARVO_FONTY_DEJAVU": "{katalog}/ttf"
+     },
+     "format": "zip",
+     "rozmiar": 5522795,
+     "sha256": "7576310b219e04159d35ff61dd4a4ec4cdba4f35c00e002a136f00e96a908b0a",
+     "url": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip",
+     "usun_poziom": 1
+    },
+    "linux-x64": {
+     "env": {
+      "JARVO_FONTY_DEJAVU": "{katalog}/ttf"
+     },
+     "format": "zip",
+     "rozmiar": 5522795,
+     "sha256": "7576310b219e04159d35ff61dd4a4ec4cdba4f35c00e002a136f00e96a908b0a",
+     "url": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip",
+     "usun_poziom": 1
+    },
+    "linux-arm64": {
+     "env": {
+      "JARVO_FONTY_DEJAVU": "{katalog}/ttf"
+     },
+     "format": "zip",
+     "rozmiar": 5522795,
+     "sha256": "7576310b219e04159d35ff61dd4a4ec4cdba4f35c00e002a136f00e96a908b0a",
+     "url": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip",
+     "usun_poziom": 1
+    }
+   }
+  },
+  "fonty-inter": {
+   "wersja": "4.1",
+   "kiedy": "instalacja",
+   "licencja": "OFL-1.1",
+   "zrodlo": "inter",
+   "pliki": {
+    "windows-x64": {
+     "env": {
+      "JARVO_FONTY_INTER": "{katalog}/extras/otf"
+     },
+     "format": "zip",
+     "rozmiar": 33707794,
+     "sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e",
+     "url": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip"
+    },
+    "windows-arm64": {
+     "env": {
+      "JARVO_FONTY_INTER": "{katalog}/extras/otf"
+     },
+     "format": "zip",
+     "rozmiar": 33707794,
+     "sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e",
+     "url": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip"
+    },
+    "macos-arm64": {
+     "env": {
+      "JARVO_FONTY_INTER": "{katalog}/extras/otf"
+     },
+     "format": "zip",
+     "rozmiar": 33707794,
+     "sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e",
+     "url": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip"
+    },
+    "linux-x64": {
+     "env": {
+      "JARVO_FONTY_INTER": "{katalog}/extras/otf"
+     },
+     "format": "zip",
+     "rozmiar": 33707794,
+     "sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e",
+     "url": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip"
+    },
+    "linux-arm64": {
+     "env": {
+      "JARVO_FONTY_INTER": "{katalog}/extras/otf"
+     },
+     "format": "zip",
+     "rozmiar": 33707794,
+     "sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e",
+     "url": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip"
+    }
+   }
+  },
+  "git": {
+   "wersja": "2.56.0.windows.3",
+   "kiedy": "instalacja",
+   "licencja": "GPL-2.0-only (Git) + licencje komponentów MSYS2, UCRT64 i CLANGARM64 (GPL-3.0+, LGPL-3.0+, Artistic/GPL, Apache-2.0, MIT…; usr/share/licenses i ucrt64/share/licenses)",
+   "zrodlo": "git-for-windows",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "cmd"
+     ],
+     "env": {
+      "HERMES_GIT_BASH_PATH": "{katalog}/bin/bash.exe",
+      "GIT_CONFIG_NOSYSTEM": "1"
+     },
+     "format": "tar.bz2",
+     "rozmiar": 123893966,
+     "sha256": "2460cdc329f9061e0682672eb9995da9da1da0ffb9761494c7abb3559ecbc40e",
+     "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.3/Git-2.56.0.3-64-bit.tar.bz2"
+    },
+    "windows-arm64": {
+     "bin": [
+      "cmd"
+     ],
+     "env": {
+      "HERMES_GIT_BASH_PATH": "{katalog}/bin/bash.exe",
+      "GIT_CONFIG_NOSYSTEM": "1"
+     },
+     "format": "tar.bz2",
+     "rozmiar": 172807073,
+     "sha256": "4e065c301a08b04ceb17e88ba2479acd5d46e214f799d2f915953a1d728ca33f",
+     "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.3/Git-2.56.0.3-arm64.tar.bz2"
+    },
+    "macos-arm64": {
+     "brak": "git z systemu (Xcode CLT, pakiet dystrybucji); doctor sprawdza"
+    },
+    "linux-x64": {
+     "brak": "git z systemu (Xcode CLT, pakiet dystrybucji); doctor sprawdza"
+    },
+    "linux-arm64": {
+     "brak": "git z systemu (Xcode CLT, pakiet dystrybucji); doctor sprawdza"
+    }
+   }
+  },
+  "jq": {
+   "wersja": "1.8.2",
+   "kiedy": "instalacja",
+   "licencja": "MIT (+ oniguruma BSD-2-Clause statycznie, decNumber licencja ICU, jv_dtoa licencja Lucent)",
+   "zrodlo": "jq",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "."
+     ],
+     "format": "plik",
+     "nazwa_pliku": "jq.exe",
+     "rozmiar": 1035264,
+     "sha256": "a6fc67fedaf9128a3309a1e2ebb8b986aeccf70122ee46d2cb4849e423f0c627",
+     "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-windows-amd64.exe"
+    },
+    "windows-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "plik",
+     "nazwa_pliku": "jq.exe",
+     "rozmiar": 973312,
+     "sha256": "083b5377392bc57cf27052b6d20a2d927770683bca844632901ff38b4b7b0ac7",
+     "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-windows-arm64.exe"
+    },
+    "macos-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "plik",
+     "nazwa_pliku": "jq",
+     "rozmiar": 841504,
+     "sha256": "2d75340ba57a4b4b4c8708a21c2dc8e958a48aaa8bba13b27f77f6e4c0eca07e",
+     "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-macos-arm64"
+    },
+    "linux-x64": {
+     "bin": [
+      "."
+     ],
+     "format": "plik",
+     "nazwa_pliku": "jq",
+     "rozmiar": 2267912,
+     "sha256": "b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f",
+     "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-amd64"
+    },
+    "linux-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "plik",
+     "nazwa_pliku": "jq",
+     "rozmiar": 1797688,
+     "sha256": "8b85c817833814ddca00a144c33705546355afccf0cf39b188f3cdb48b852309",
+     "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-arm64"
+    }
+   }
+  },
+  "lightpanda": {
+   "wersja": "1.0.0",
+   "kiedy": "instalacja",
+   "licencja": "AGPL-3.0",
+   "zrodlo": "browser",
+   "pliki": {
+    "windows-x64": {
+     "brak": "Lightpanda nie wydaje plików na Windows (żadne wydanie do 1.0.2)",
+     "zamiast": "chrome-headless-shell"
+    },
+    "windows-arm64": {
+     "brak": "Lightpanda nie wydaje plików na Windows (żadne wydanie do 1.0.2)",
+     "zamiast": "chrome-headless-shell"
+    },
+    "macos-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "LIGHTPANDA_DISABLE_TELEMETRY": "1",
+      "LIGHTPANDA_DISABLE_CORE_DUMP": "1"
+     },
+     "format": "plik",
+     "nazwa_pliku": "lightpanda",
+     "rozmiar": 90354360,
+     "sha256": "955440053a84754dd64c62f970449a56a2b350cdf43ea5f2e809a73047b8173d",
+     "url": "https://github.com/lightpanda-io/browser/releases/download/1.0.0/lightpanda-aarch64-macos"
+    },
+    "linux-x64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "LIGHTPANDA_DISABLE_TELEMETRY": "1",
+      "LIGHTPANDA_DISABLE_CORE_DUMP": "1"
+     },
+     "format": "plik",
+     "nazwa_pliku": "lightpanda",
+     "rozmiar": 188268424,
+     "sha256": "aa5a4b8ed53d1e38b3c73f5b2647d0a84a82e6744557f45f9a9c85858aa031c3",
+     "url": "https://github.com/lightpanda-io/browser/releases/download/1.0.0/lightpanda-x86_64-linux"
+    },
+    "linux-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "LIGHTPANDA_DISABLE_TELEMETRY": "1",
+      "LIGHTPANDA_DISABLE_CORE_DUMP": "1"
+     },
+     "format": "plik",
+     "nazwa_pliku": "lightpanda",
+     "rozmiar": 192757248,
+     "sha256": "69791924bcee43b13b224af4c845622c5fe66fdbc1b8143bfaa39ca8f85244f5",
+     "url": "https://github.com/lightpanda-io/browser/releases/download/1.0.0/lightpanda-aarch64-linux"
+    }
+   }
+  },
+  "node": {
+   "wersja": "26.12.1",
+   "kiedy": "instalacja",
+   "licencja": "MIT (Node.js) + Artistic-2.0 (npm) + licencje bibliotek w paczce (V8, OpenSSL, ICU, libuv, undici…; plik LICENSE)",
+   "zrodlo": "nodejs",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "npm_config_update_notifier": "false"
+     },
+     "format": "zip",
+     "rozmiar": 41901456,
+     "sha256": "b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4",
+     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-win-x64.zip",
+     "usun_poziom": 1
+    },
+    "windows-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "npm_config_update_notifier": "false"
+     },
+     "format": "zip",
+     "rozmiar": 41901456,
+     "sha256": "b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4",
+     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-win-x64.zip",
+     "usun_poziom": 1
+    },
+    "macos-arm64": {
+     "bin": [
+      "bin"
+     ],
+     "env": {
+      "npm_config_update_notifier": "false"
+     },
+     "format": "tar.gz",
+     "rozmiar": 58334853,
+     "sha256": "1901d539912c02afa10d1cc126943a8855a7eedebe830119463470db5e6c59e8",
+     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-darwin-arm64.tar.gz",
+     "usun_poziom": 1
+    },
+    "linux-x64": {
+     "bin": [
+      "bin"
+     ],
+     "env": {
+      "npm_config_update_notifier": "false"
+     },
+     "format": "tar.xz",
+     "rozmiar": 34122264,
+     "sha256": "6170b2d474e1c626f43cff3adc118df9fe3b573258a4fc3d850c8dbc6b079bbd",
+     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-linux-x64.tar.xz",
+     "usun_poziom": 1
+    },
+    "linux-arm64": {
+     "bin": [
+      "bin"
+     ],
+     "env": {
+      "npm_config_update_notifier": "false"
+     },
+     "format": "tar.xz",
+     "rozmiar": 33053712,
+     "sha256": "42aa04922591ee5d4dbc7740d452621acf28508239daa512f5ee8c47ee224fdb",
+     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-linux-arm64.tar.xz",
+     "usun_poziom": 1
+    }
+   }
+  },
+  "pandoc": {
+   "wersja": "3.12.1",
+   "kiedy": "instalacja",
+   "licencja": "GPL-2.0-or-later (pandoc-types BSD-3-Clause, wbudowany Lua MIT)",
+   "zrodlo": "pandoc",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "."
+     ],
+     "format": "zip",
+     "rozmiar": 42154914,
+     "sha256": "6ef431cb20b2c24a0371fc19200dc49d452be54b1b5c9239f3462841ef53e587",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-windows-x86_64.zip",
+     "usun_poziom": 1
+    },
+    "windows-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "zip",
+     "rozmiar": 42154914,
+     "sha256": "6ef431cb20b2c24a0371fc19200dc49d452be54b1b5c9239f3462841ef53e587",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-windows-x86_64.zip",
+     "usun_poziom": 1
+    },
+    "macos-arm64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "zip",
+     "rozmiar": 42313957,
+     "sha256": "c2146cf33a583f3ac93eccddf1bb662371d5cfcce1aad1c87ad860cca1435d46",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-arm64-macOS.zip",
+     "usun_poziom": 1
+    },
+    "linux-x64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "tar.gz",
+     "rozmiar": 35363545,
+     "sha256": "d0c90410e90204c9ca83b8539fac5c7aed01fd537207e4585849f8abc5df20b8",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-linux-amd64.tar.gz",
+     "usun_poziom": 1
+    },
+    "linux-arm64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "tar.gz",
+     "rozmiar": 37892300,
+     "sha256": "445d96fd08801fe636cab1158b4f017ee320ac3b7446328b4fe2f902117b19b9",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-linux-arm64.tar.gz",
+     "usun_poziom": 1
+    }
+   }
+  },
+  "pixi": {
+   "wersja": "0.83.0",
+   "kiedy": "instalacja",
+   "licencja": "BSD-3-Clause",
+   "zrodlo": "pixi",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "PIXI_NO_TELEMETRY": "1",
+      "PIXI_NO_CONFIG": "1"
+     },
+     "format": "zip",
+     "rozmiar": 32758879,
+     "sha256": "77bed9f9d2795c94f9ab5744353892eb82bd3b1eaa09ecbbe7573e22ef70a2f4",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-x86_64-pc-windows-msvc.zip"
+    },
+    "windows-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "PIXI_NO_TELEMETRY": "1",
+      "PIXI_NO_CONFIG": "1"
+     },
+     "format": "zip",
+     "rozmiar": 35462210,
+     "sha256": "9ed3a4f7c1fdd2a36936e6d44b1492bfd47d84a57bfbd9be3ae4f338bd3cc92c",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-aarch64-pc-windows-msvc.zip"
+    },
+    "macos-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "PIXI_NO_TELEMETRY": "1",
+      "PIXI_NO_CONFIG": "1"
+     },
+     "format": "tar.gz",
+     "rozmiar": 28789945,
+     "sha256": "b46066fbaf931284a3f4a61d68e0eb352295f4b3ce4330315a3de3dc5da5736c",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-aarch64-apple-darwin.tar.gz"
+    },
+    "linux-x64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "PIXI_NO_TELEMETRY": "1",
+      "PIXI_NO_CONFIG": "1"
+     },
+     "format": "tar.gz",
+     "rozmiar": 32008054,
+     "sha256": "064f371e692aaa3400ac581c89da2843c91437f20c2d9155395a5d0037f33551",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-x86_64-unknown-linux-musl.tar.gz"
+    },
+    "linux-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "PIXI_NO_TELEMETRY": "1",
+      "PIXI_NO_CONFIG": "1"
+     },
+     "format": "tar.gz",
+     "rozmiar": 35152082,
+     "sha256": "d08403d8f048626ec93ba7b7c56e3b747a5f3a95c4e6e0c815ceb264f5f0b9ce",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-aarch64-unknown-linux-musl.tar.gz"
+    }
+   }
+  },
   "python312": {
    "wersja": "3.12.15+20261021",
    "kiedy": "instalacja",
@@ -102,6 +990,170 @@
     }
    }
   },
+  "qpdf": {
+   "wersja": "12.4.2",
+   "kiedy": "instalacja",
+   "licencja": "Apache-2.0 (Windows statycznie zlib, libjpeg-turbo, OpenSSL; Linux z bibliotekami gnutls, nettle, libidn2, libunistring, libtasn1 na LGPL i p11-kit, libffi)",
+   "zrodlo": "qpdf",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "zip",
+     "rozmiar": 28183147,
+     "sha256": "db87077e683630c1217e0e8f9a20a9749d952ab676e881c3689187763a5de25d",
+     "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-msvc64.zip",
+     "usun_poziom": 1
+    },
+    "windows-arm64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "zip",
+     "rozmiar": 29306496,
+     "sha256": "2b5d7740a2513d8a841116692dc2cf7efe83f35262386ebab18bed35fbf15ab1",
+     "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-msvc-arm64.zip",
+     "usun_poziom": 1
+    },
+    "macos-arm64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "zip",
+     "rozmiar": 3269125,
+     "sha256": "62e46987a30ea167cbc530ccb22690aec3d8c812ed09979a941bcee92e504b79",
+     "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-bin-macos-arm64.zip"
+    },
+    "linux-x64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "zip",
+     "rozmiar": 4040257,
+     "sha256": "db367d897829f22c4198ce1094143c9d467bd6ee7dfabc44ba6f02056b24f8b1",
+     "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-bin-linux-x86_64.zip"
+    },
+    "linux-arm64": {
+     "bin": [
+      "bin"
+     ],
+     "format": "zip",
+     "rozmiar": 3872113,
+     "sha256": "8fd9d009eb0838398180a603f2cf76531e5c68a4ecc8847598e0a1ccb1d3b600",
+     "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-bin-linux-aarch64.zip"
+    }
+   }
+  },
+  "ripgrep": {
+   "wersja": "15.2.0",
+   "kiedy": "instalacja",
+   "licencja": "MIT OR Unlicense (+ PCRE2 10.46 BSD-3-Clause w binarce; na Linuksie musl MIT i jemalloc BSD-2-Clause)",
+   "zrodlo": "ripgrep",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "."
+     ],
+     "format": "zip",
+     "rozmiar": 1789611,
+     "sha256": "71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5",
+     "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip",
+     "usun_poziom": 1
+    },
+    "windows-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "zip",
+     "rozmiar": 1789611,
+     "sha256": "71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5",
+     "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip",
+     "usun_poziom": 1
+    },
+    "macos-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "tar.gz",
+     "rozmiar": 1764284,
+     "sha256": "3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4",
+     "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-apple-darwin.tar.gz",
+     "usun_poziom": 1
+    },
+    "linux-x64": {
+     "bin": [
+      "."
+     ],
+     "format": "tar.gz",
+     "rozmiar": 2265718,
+     "sha256": "33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c",
+     "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz",
+     "usun_poziom": 1
+    },
+    "linux-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "tar.gz",
+     "rozmiar": 1982561,
+     "sha256": "800b1e7206afe799dfb5a6901f23147cfaabe0e52210538100f61e86e1740915",
+     "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-unknown-linux-musl.tar.gz",
+     "usun_poziom": 1
+    }
+   }
+  },
+  "scrcpy": {
+   "wersja": "5.0.1",
+   "kiedy": "przy-uzyciu",
+   "licencja": "Apache-2.0 (scrcpy) + w paczce LGPL-2.1-or-later (FFmpeg, libusb), Zlib (SDL3), BSD-2-Clause (dav1d), adb z platform-tools (Android SDK License)",
+   "zrodlo": "scrcpy",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "."
+     ],
+     "format": "zip",
+     "rozmiar": 11264634,
+     "sha256": "b12a2c4ee8be317422451fc7dcf8ee20a71b5ea7ef9ad73ddd825a25316227a5",
+     "url": "https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-win64-v5.0.1.zip",
+     "usun_poziom": 1
+    },
+    "windows-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "zip",
+     "rozmiar": 9825739,
+     "sha256": "16c3fc2068df64946f670e3504b4752073ebae47a416a45b46e79a5ab19c689b",
+     "url": "https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-winarm64-v5.0.1.zip",
+     "usun_poziom": 1
+    },
+    "macos-arm64": {
+     "bin": [
+      "."
+     ],
+     "format": "tar.gz",
+     "rozmiar": 12565912,
+     "sha256": "33611e51977a8289e2e124b220f727895181ef2eb9060e0987a4dc2db9cf0d6b",
+     "url": "https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-macos-aarch64-v5.0.1.tar.gz",
+     "usun_poziom": 1
+    },
+    "linux-x64": {
+     "bin": [
+      "."
+     ],
+     "format": "tar.gz",
+     "rozmiar": 17883742,
+     "sha256": "9f969d30cc574816077edecda65719c1c70b0aee1df1ba5fa00779ac07b8fd6e",
+     "url": "https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-linux-x86_64-v5.0.1.tar.gz",
+     "usun_poziom": 1
+    },
+    "linux-arm64": {
+     "brak": "scrcpy nie wydaje binarki na Linux aarch64 (w wydaniu tylko linux-x86_64); bez ekranu w oknie, telefon dalej przez adb z systemu"
+    }
+   }
+  },
   "uv": {
    "wersja": "0.12.13",
    "kiedy": "instalacja",
@@ -159,5 +1211,551 @@
    }
   }
  },
- "modele": {}
+ "modele": {
+  "fonty-noto-emoji": {
+   "rewizja": "8998f5dd683424a73e2314a8c1f1e359c19e8742",
+   "kiedy": "instalacja",
+   "licencja": "OFL-1.1",
+   "zrodlo": "noto-emoji",
+   "katalog": "fonty-noto-emoji",
+   "pliki": [
+    {
+     "cel": "NotoColorEmoji.ttf",
+     "url": "https://raw.githubusercontent.com/googlefonts/noto-emoji/8998f5dd683424a73e2314a8c1f1e359c19e8742/fonts/NotoColorEmoji.ttf",
+     "sha256": "72a635cb3d2f3524c51620cdde406b217204e8a6a06c6a096ff8ed4b5fd6e27b",
+     "rozmiar": 10673480
+    },
+    {
+     "cel": "LICENSE",
+     "url": "https://raw.githubusercontent.com/googlefonts/noto-emoji/8998f5dd683424a73e2314a8c1f1e359c19e8742/fonts/LICENSE",
+     "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+     "rozmiar": 4301
+    }
+   ]
+  },
+  "fonty-noto-sans": {
+   "rewizja": "28b15b4b43b7bed62b5cf6e6b0b5ff5846270535",
+   "kiedy": "instalacja",
+   "licencja": "OFL-1.1",
+   "zrodlo": "noto-sans",
+   "katalog": "fonty-noto-sans",
+   "pliki": [
+    {
+     "cel": "NotoSans-Regular.ttf",
+     "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/28b15b4b43b7bed62b5cf6e6b0b5ff5846270535/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf",
+     "sha256": "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823",
+     "rozmiar": 621572
+    },
+    {
+     "cel": "NotoSans-Bold.ttf",
+     "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/28b15b4b43b7bed62b5cf6e6b0b5ff5846270535/fonts/NotoSans/hinted/ttf/NotoSans-Bold.ttf",
+     "sha256": "1df075a380fc7cb898acf64c1f7b3b4dd780de3caa860178bf929de35817a913",
+     "rozmiar": 631484
+    },
+    {
+     "cel": "NotoSans-Italic.ttf",
+     "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/28b15b4b43b7bed62b5cf6e6b0b5ff5846270535/fonts/NotoSans/hinted/ttf/NotoSans-Italic.ttf",
+     "sha256": "467e3f89eeca4108bb8710a2b9e0cf2281ac56d5b0609211a83776d0505eecb5",
+     "rozmiar": 639124
+    },
+    {
+     "cel": "NotoSans-BoldItalic.ttf",
+     "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/28b15b4b43b7bed62b5cf6e6b0b5ff5846270535/fonts/NotoSans/hinted/ttf/NotoSans-BoldItalic.ttf",
+     "sha256": "1b602a9d6353be42c91df097a4857b69fa2696f26703d7a33b54a15d87c2622c",
+     "rozmiar": 646092
+    },
+    {
+     "cel": "OFL.txt",
+     "url": "https://raw.githubusercontent.com/notofonts/latin-greek-cyrillic/c4a321e123e4d4ff315f57f4e0adf294fe3a95be/OFL.txt",
+     "sha256": "cee9892f9f0cc8fe882c9e9537ee6a89621d86ee7ceaf70b02e2b2b1c25c061a",
+     "rozmiar": 4396
+    }
+   ]
+  },
+  "indra-ocr": {
+   "rewizja": "ed345c7f158eddbc7dee0c6a7269afb75a94f7e8",
+   "kiedy": "instalacja",
+   "licencja": "OpenRAIL-M (zmodyfikowana przez Datalab)",
+   "zrodlo": "indra-ocr-modele",
+   "katalog": "indra-ocr",
+   "pliki": [
+    {
+     "cel": "det.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/det.onnx",
+     "sha256": "46b0050ce4c4692f887a1a9c038480223af1c7a91b3fcced2657d9cf00290dc4",
+     "rozmiar": 389948
+    },
+    {
+     "cel": "rec.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/rec.onnx",
+     "sha256": "e243be069b357e56a0e867a21d7482e498df42fb19678bfb67a25f48b1f06151",
+     "rozmiar": 4977797
+    },
+    {
+     "cel": "rec_cjk.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/rec_cjk.onnx",
+     "sha256": "4cec840b55e1bb7f375daf30a2975404a867a71ac1a5bc5b1629c4909ce16baa",
+     "rozmiar": 9255441
+    },
+    {
+     "cel": "order.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/order.onnx",
+     "sha256": "23635dd2324b4ccc00c408af961273a2dedd2e4f0386bc54dba678c41bcf6b46",
+     "rozmiar": 2973138
+    },
+    {
+     "cel": "orient.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/orient.onnx",
+     "sha256": "8d7bfce5d08bcad55955f41ca494a7f9d9d3ed5d5b6da1f6f276d5c509590729",
+     "rozmiar": 371414
+    },
+    {
+     "cel": "script.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/script.onnx",
+     "sha256": "5ba37030e817affede0097a7503b6829624104166c6e0b6aacecacf919fc7d11",
+     "rozmiar": 191005
+    },
+    {
+     "cel": "meta.json",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/meta.json",
+     "sha256": "ff6ec58f91c93a475ae9505ad21c73c3ecda0b378f1d889dd83408e10832d1bb",
+     "rozmiar": 139429
+    },
+    {
+     "cel": "config.json",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/config.json",
+     "sha256": "cd143c66015620865d9d8361b1bb6f9781363b8e010d78c49b10d69009807d1d",
+     "rozmiar": 569
+    },
+    {
+     "cel": "mathcls.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/mathcls.onnx",
+     "sha256": "818b1556e9ef337958db6be0c9791299d3f74a4575586b0cd469aaae9534ff96",
+     "rozmiar": 191005
+    },
+    {
+     "cel": "math_enc.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/math_enc.onnx",
+     "sha256": "d4e4a6c40dad1ee988d32c6403b1590ca42864d4483bbe1e671c5dbb999a5a97",
+     "rozmiar": 9889575
+    },
+    {
+     "cel": "math_dec_init.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/math_dec_init.onnx",
+     "sha256": "919417fde9962c3318aeb478c1fe3955dd2bb8cd34476c68debed2ba39e5dcd6",
+     "rozmiar": 1356364
+    },
+    {
+     "cel": "math_dec_step.onnx",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/math_dec_step.onnx",
+     "sha256": "5ff6e6cbaf0dea70314f66222a1469736a8c5e7994fab06a5b4e53c90469239f",
+     "rozmiar": 8429418
+    },
+    {
+     "cel": "math_meta.json",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/math_meta.json",
+     "sha256": "85d9715fb8a77791b55ef89f57fb41e72eb3170ec58a7c3bee3b394268bf2b10",
+     "rozmiar": 7797
+    },
+    {
+     "cel": "LICENSE",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/LICENSE",
+     "sha256": "50c88a018a7ee322e89f6b09401b237beb0cd331685879405b3db48993950a5f",
+     "rozmiar": 14750
+    },
+    {
+     "cel": "README.md",
+     "url": "https://huggingface.co/datalab-to/indra-ocr/resolve/ed345c7f158eddbc7dee0c6a7269afb75a94f7e8/README.md",
+     "sha256": "8e3ca98438d183f40efc036c45b82e8e775f2c04e798ae86c1509d0560a8be8f",
+     "rozmiar": 18582
+    }
+   ]
+  },
+  "matcha-pl": {
+   "rewizja": "93744740ae645648c003abb09e8c617d9c5e34cd",
+   "kiedy": "instalacja",
+   "licencja": "CC-BY-SA-4.0",
+   "zrodlo": "matcha-tts-pl-v2",
+   "katalog": "matcha-pl",
+   "pliki": [
+    {
+     "cel": "meski/matcha_pl_t2.onnx",
+     "url": "https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/onnx/matcha_pl_t2.onnx",
+     "sha256": "e2a2ea8bc43fa60ec731299e10dda57459c7375c4f5d40d6506f0514fec2884a",
+     "rozmiar": 139965159
+    },
+    {
+     "cel": "meski/voices.json",
+     "url": "https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/onnx/voices.json",
+     "sha256": "89dd8a22e99c1a62c14e6c7fce506708812eb1af8391e2862931ba999e3710b7",
+     "rozmiar": 13991
+    },
+    {
+     "cel": "damski/matcha_pl_t2.onnx",
+     "url": "https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/onnx/female_voxcpm_2/matcha_pl_t2.onnx",
+     "sha256": "1e2281636960b30906d79c90288527efa54f00b7ee1117e22b5d359e60430ba5",
+     "rozmiar": 139965159
+    },
+    {
+     "cel": "damski/voices.json",
+     "url": "https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/onnx/female_voxcpm_2/voices.json",
+     "sha256": "3c5796e3263b1896bab6a480e7f424c746e3fbcc70bb6434339e8272b9812fd3",
+     "rozmiar": 14009
+    },
+    {
+     "cel": "LICENSE",
+     "url": "https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/LICENSE",
+     "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+     "rozmiar": 20138
+    },
+    {
+     "cel": "ATTRIBUTION.md",
+     "url": "https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/ATTRIBUTION.md",
+     "sha256": "b661c506b222e914fa03fcdb9a505164f3fcd880983c205c20353381d05bd2c5",
+     "rozmiar": 149774
+    },
+    {
+     "cel": "README.md",
+     "url": "https://huggingface.co/machinekind/Matcha-TTS-PL/resolve/93744740ae645648c003abb09e8c617d9c5e34cd/README.md",
+     "sha256": "61363f244e4e85534ef47d0d85e3bedd64f9ac384fbab16bef5fc06dd7daae6f",
+     "rozmiar": 8766
+    }
+   ]
+  },
+  "modnet": {
+   "rewizja": "903cc06311b3b12071edfa1b42b534e4a31c718a",
+   "kiedy": "przy-uzyciu",
+   "licencja": "Apache-2.0",
+   "zrodlo": "modnet-onnx",
+   "katalog": "modnet",
+   "pliki": [
+    {
+     "cel": "modnet_photographic_portrait_matting.onnx",
+     "url": "https://huggingface.co/DavG25/modnet-pretrained-models/resolve/903cc06311b3b12071edfa1b42b534e4a31c718a/models/modnet_photographic_portrait_matting.onnx",
+     "sha256": "07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9",
+     "rozmiar": 25888640
+    },
+    {
+     "cel": "README.md",
+     "url": "https://huggingface.co/DavG25/modnet-pretrained-models/resolve/903cc06311b3b12071edfa1b42b534e4a31c718a/README.md",
+     "sha256": "ba2e054b72fef5d57532614084716e990a41a1aad5c72c4b2a4f344a0e0d6f0c",
+     "rozmiar": 1236
+    }
+   ]
+  },
+  "paradee": {
+   "rewizja": "8f34b01ef8adcb0bec470b89bf2fd62a7b2369e6",
+   "kiedy": "instalacja",
+   "licencja": "Apache-2.0",
+   "zrodlo": "paradee-8m",
+   "katalog": "paradee",
+   "pliki": [
+    {
+     "cel": "paradee_int8.onnx",
+     "url": "https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0/resolve/8f34b01ef8adcb0bec470b89bf2fd62a7b2369e6/onnx/paradee_int8.onnx",
+     "sha256": "60e8f8a1bc7c546488154e9d99ecac6e9c50baf3f4b684c5b0de48ea03b698eb",
+     "rozmiar": 9037971
+    },
+    {
+     "cel": "config.json",
+     "url": "https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0/resolve/8f34b01ef8adcb0bec470b89bf2fd62a7b2369e6/config.json",
+     "sha256": "f24046974a3a8c747affefb45c7c504263a99d5081787908b16abe8f5ac94fcd",
+     "rozmiar": 1774
+    },
+    {
+     "cel": "LICENSE",
+     "url": "https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0/resolve/8f34b01ef8adcb0bec470b89bf2fd62a7b2369e6/LICENSE",
+     "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+     "rozmiar": 11358
+    }
+   ]
+  },
+  "parakeet": {
+   "rewizja": "8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce",
+   "kiedy": "przy-uzyciu",
+   "licencja": "CC-BY-4.0",
+   "zrodlo": "parakeet-tdt-onnx",
+   "katalog": "parakeet-tdt-0.6b-v3",
+   "pliki": [
+    {
+     "cel": "config.json",
+     "url": "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/config.json",
+     "sha256": "666903c76b9798caf2c210afd4f6cd60b08a8dbf9800ec8d7a3bc0d2148ac466",
+     "rozmiar": 97
+    },
+    {
+     "cel": "encoder-model.int8.onnx",
+     "url": "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/encoder-model.int8.onnx",
+     "sha256": "6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09",
+     "rozmiar": 652183999
+    },
+    {
+     "cel": "decoder_joint-model.int8.onnx",
+     "url": "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/decoder_joint-model.int8.onnx",
+     "sha256": "eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70",
+     "rozmiar": 18202004
+    },
+    {
+     "cel": "vocab.txt",
+     "url": "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/vocab.txt",
+     "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+     "rozmiar": 93939
+    },
+    {
+     "cel": "README.md",
+     "url": "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/README.md",
+     "sha256": "95d330fef1070f22cc4d4e380fbf5913253b44f7b71fabae997f6cdf65fe1714",
+     "rozmiar": 1207
+    }
+   ]
+  },
+  "silero-vad": {
+   "rewizja": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+   "kiedy": "przy-uzyciu",
+   "licencja": "MIT",
+   "zrodlo": "silero-vad-onnx",
+   "katalog": "silero-vad",
+   "pliki": [
+    {
+     "cel": "config.json",
+     "url": "https://huggingface.co/istupakov/silero-vad-onnx/resolve/b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6/config.json",
+     "sha256": "1094039d370c82889582ba739a3d1caac5754c8b3a17a66a534200c9f72086e2",
+     "rozmiar": 30
+    },
+    {
+     "cel": "silero_vad.onnx",
+     "url": "https://huggingface.co/istupakov/silero-vad-onnx/resolve/b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6/silero_vad.onnx",
+     "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+     "rozmiar": 2327524
+    },
+    {
+     "cel": "LICENSE.txt",
+     "url": "https://huggingface.co/istupakov/silero-vad-onnx/resolve/b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6/LICENSE.txt",
+     "sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b",
+     "rozmiar": 1075
+    },
+    {
+     "cel": "README.md",
+     "url": "https://huggingface.co/istupakov/silero-vad-onnx/resolve/b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6/README.md",
+     "sha256": "39c6c9b7dce6ac255dcaf269a113af426946fd6290fe1ad4a92ffbbde1781b95",
+     "rozmiar": 576
+    }
+   ]
+  },
+  "tessdata-fast": {
+   "rewizja": "65727574dfcd264acbb0c3e07860e4e9e9b22185",
+   "kiedy": "instalacja",
+   "licencja": "Apache-2.0",
+   "zrodlo": "tessdata-fast",
+   "katalog": "tessdata-fast",
+   "pliki": [
+    {
+     "cel": "pol.traineddata",
+     "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/pol.traineddata",
+     "sha256": "c4476cdbc0e33d898d32345122b7be1cbf85ace15f920f06c7714756e1ef79b2",
+     "rozmiar": 4765518
+    },
+    {
+     "cel": "eng.traineddata",
+     "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/eng.traineddata",
+     "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+     "rozmiar": 4113088
+    },
+    {
+     "cel": "osd.traineddata",
+     "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/osd.traineddata",
+     "sha256": "9cf5d576fcc47564f11265841e5ca839001e7e6f38ff7f7aacf46d15a96b00ff",
+     "rozmiar": 10562727
+    },
+    {
+     "cel": "LICENSE",
+     "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/LICENSE",
+     "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+     "rozmiar": 11358
+    }
+   ]
+  },
+  "yunet": {
+   "rewizja": "3cc26e7f1014a5ee5d74a42acee58bafc9d0a310",
+   "kiedy": "przy-uzyciu",
+   "licencja": "MIT",
+   "zrodlo": "yunet-onnx",
+   "katalog": "yunet",
+   "pliki": [
+    {
+     "cel": "face_detection_yunet_2023mar.onnx",
+     "url": "https://huggingface.co/opencv/face_detection_yunet/resolve/3cc26e7f1014a5ee5d74a42acee58bafc9d0a310/face_detection_yunet_2023mar.onnx",
+     "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+     "rozmiar": 232589
+    },
+    {
+     "cel": "LICENSE",
+     "url": "https://huggingface.co/opencv/face_detection_yunet/resolve/3cc26e7f1014a5ee5d74a42acee58bafc9d0a310/LICENSE",
+     "sha256": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958",
+     "rozmiar": 1085
+    },
+    {
+     "cel": "README.md",
+     "url": "https://huggingface.co/opencv/face_detection_yunet/resolve/3cc26e7f1014a5ee5d74a42acee58bafc9d0a310/README.md",
+     "sha256": "a45578c40b04f9aaa1e154bca1d0179ffad6dab840458ac8f7cb0a9362413b72",
+     "rozmiar": 2745
+    }
+   ]
+  }
+ },
+ "venvy": {
+  "cad": {
+   "python": "python312",
+   "lock": "infra/python/requirements-cad.txt",
+   "sha256": "38147d21e84ac652e15379995ae1b097944807ffd3b9a7a56a0baacf081a8de3",
+   "paczek": 56,
+   "kiedy": "przy-uzyciu",
+   "bez": [
+    "sympy",
+    "mpmath",
+    "jedi",
+    "parso"
+   ],
+   "pobranie_mb": {
+    "windows-x64": 215,
+    "windows-arm64": 215,
+    "macos-arm64": 207,
+    "linux-x64": 244,
+    "linux-arm64": 236
+   },
+   "venv_mb": 597
+  },
+  "claude-seo": {
+   "python": "python312",
+   "lock": "infra/python/natywne/claude-seo.lock",
+   "sha256": "a6dbaf5dff028aa4e1c8cca645ffea8ed25a5de5b4bce10315c5e373e61245f1",
+   "paczek": 70,
+   "kiedy": "instalacja",
+   "bez": [],
+   "pobranie_mb": {
+    "windows-x64": 141,
+    "windows-arm64": 141,
+    "macos-arm64": 148,
+    "linux-x64": 166,
+    "linux-arm64": 164
+   },
+   "venv_mb": 630
+  },
+  "docling": {
+   "python": "python312",
+   "lock": "infra/python/natywne/docling-cpu.lock",
+   "sha256": "f59097d287888fcde5c7cf9e57a0d885aa8906185e7c4de75b00a3a3bd1cb463",
+   "paczek": 104,
+   "kiedy": "dodatek",
+   "bez": [],
+   "pobranie_mb": {
+    "windows-x64": 339,
+    "windows-arm64": 335,
+    "macos-arm64": 317,
+    "linux-x64": 430,
+    "linux-arm64": 367
+   },
+   "torch_backend": "cpu"
+  },
+  "lemo-wake": {
+   "python": "python312",
+   "lock": "infra/python/natywne/lemo-wake.lock",
+   "sha256": "2580b3474a1a3ec4cd23c452a84d011cac8b4f13f8b17afd5b1f84d2d8cdcfd0",
+   "paczek": 11,
+   "kiedy": "dodatek",
+   "bez": [],
+   "pobranie_mb": {
+    "windows-x64": 83,
+    "windows-arm64": 83,
+    "macos-arm64": 84,
+    "linux-x64": 116,
+    "linux-arm64": 89
+   },
+   "venv_mb": 264
+  },
+  "manimgx": {
+   "python": "python313",
+   "lock": "infra/python/requirements-manimgx.txt",
+   "sha256": "abe7f1bdbf1b5d5f1acc9262af67e7669a569755324b336a8a22a2cbf477b9bc",
+   "paczek": 18,
+   "kiedy": "przy-uzyciu",
+   "bez": [],
+   "pobranie_mb": {
+    "windows-x64": 85,
+    "windows-arm64": 85,
+    "macos-arm64": 64,
+    "linux-x64": 109,
+    "linux-arm64": 104
+   },
+   "venv_mb": 227
+  },
+  "mgaudio": {
+   "python": "python312",
+   "lock": "infra/python/natywne/mgaudio.lock",
+   "sha256": "b71be2c42db935bd1dd73c8864764e478ced74ad94cee3662222f5486a47def9",
+   "paczek": 10,
+   "kiedy": "dodatek",
+   "bez": [],
+   "pobranie_mb": {
+    "windows-x64": 101,
+    "windows-arm64": 101,
+    "macos-arm64": 73,
+    "linux-x64": 123,
+    "linux-arm64": 117
+   },
+   "venv_mb": 353
+  },
+  "narzedzia": {
+   "python": "python312",
+   "lock": "infra/python/natywne/narzedzia.lock",
+   "sha256": "d4e6d5905eb8f8e3e5d43b4e47259af63523af74371ba3d9eb2a5ac300c5b5b2",
+   "paczek": 122,
+   "kiedy": "instalacja",
+   "bez": [
+    "docopt"
+   ],
+   "pobranie_mb": {
+    "windows-x64": 158,
+    "windows-arm64": 158,
+    "macos-arm64": 163,
+    "linux-x64": 214,
+    "linux-arm64": 201
+   },
+   "venv_mb": 583
+  },
+  "ocr": {
+   "python": "python312",
+   "lock": "infra/python/requirements-ocr.txt",
+   "sha256": "9f711b026e62110b8ae747d38f741dcf60a0f68c1701a2adad2643dc44796c5d",
+   "paczek": 8,
+   "kiedy": "instalacja",
+   "bez": [
+    "huggingface-hub"
+   ],
+   "pobranie_mb": {
+    "windows-x64": 76,
+    "windows-arm64": 76,
+    "macos-arm64": 79,
+    "linux-x64": 106,
+    "linux-arm64": 81
+   },
+   "venv_mb": 227
+  },
+  "rembg": {
+   "python": "python312",
+   "lock": "infra/python/natywne/rembg.lock",
+   "sha256": "55d523674932da58927c2671a684171ed1cbda380ffebfdc1ab87a68eeb7e4ad",
+   "paczek": 85,
+   "kiedy": "dodatek",
+   "bez": [],
+   "pobranie_mb": {
+    "windows-x64": 177,
+    "windows-arm64": 173,
+    "macos-arm64": 157,
+    "linux-x64": 214,
+    "linux-arm64": 206
+   },
+   "venv_mb": 651
+  }
+ }
 }

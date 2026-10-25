@@ -64,7 +64,7 @@ własną przeglądarkę i ~0,3 GB; całą witrynę audytujemy `audit.sh` po kole
 | [Scrapling](https://github.com/D4Vinci/Scrapling) | odporny scraping (skill [H] `scrapling`) | BSD-3 | 2026-09 | CLI |
 | [Docling](https://github.com/docling-project/docling) | PDF-y, raporty, tabele → Markdown | MIT | 2026-09 | skrypt |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | napisy i transkrypcje z wideo jako źródła | Unlicense | 2026-09 | CLI |
-| [ExifTool](https://github.com/exiftool/exiftool) | metadane zdjęć i plików (weryfikacja pochodzenia) | GPL-3.0 | 2026-05 | CLI |
+| [ExifTool](https://github.com/exiftool/exiftool) | metadane zdjęć i plików (weryfikacja pochodzenia) | GPL/Artistic (jak Perl) | 2026-05 | CLI |
 | [ArchiveBox](https://github.com/ArchiveBox/ArchiveBox) | archiwum dowodów: kopia każdej kluczowej strony-źródła | MIT | 2026-09 | sidecar (opcja) |
 
 Z Hermesa:
@@ -116,10 +116,13 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
 | FFmpeg (libass, libx264, libvidstab, fontconfig) | cały montaż: normalizacja scen, przejścia, napisy ASS, muzyka z duckingiem, loudnorm, stabilizacja nagrań z ręki, kontrola | LGPL/GPL | n/d | `film.py`, `montaz.py`, `qa_wideo.py`, `rytm.py`, `kadry.py` |
-| [Matcha-TTS-PL v2](https://huggingface.co/machinekind/Matcha-TTS-PL) (rewizja `9374474`, ONNX t2, 2 × 140 MB) | domyślny polski lektor bez sieci i bez limitu: głosy `pl-PL-Matcha-Meski` i `pl-PL-Matcha-Damski` (syntetyczne) w `film.py`, `projekt.py lektor` i edytorze HQ; liczby, daty, kwoty i skrótowce czyta słowami (normalizator `jarvo_tts_pl.py`); czasy słów z Parakeeta | CC-BY-SA-4.0 | 2026-10 | `jarvo-tts` (model w obrazie) |
+| [Matcha-TTS-PL v2](https://huggingface.co/machinekind/Matcha-TTS-PL) (rewizja `9374474`, ONNX t2, 2 × 140 MB) | domyślny polski lektor bez sieci i bez limitu: głosy `pl-PL-Matcha-Meski` i `pl-PL-Matcha-Damski` (syntetyczne) w `film.py`, `projekt.py lektor` i edytorze HQ; liczby, daty, kwoty i skrótowce czyta słowami (normalizator `jarvo_tts_pl.py`); czasy słów z Parakeeta | CC-BY-SA-4.0 | 2026-10 | `jarvo-tts` (model w obrazie; w instalacji natywnej `modele.matcha-pl` z `vendor/natywne.yaml`, przegląd 2026-10-24) |
 | [edge-tts](https://github.com/rany2/edge-tts) 7.2.7 | lektor PL za darmo, bez klucza (Marek, Zofia), z czasem słów do napisów karaoke; do wyboru i zapas polskiego lektora lokalnego | LGPL-3.0 | 2026-08 | leniwa instalacja Hermesa (`tts.edge`) |
-| [Paradee-8M](https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0) v1.0 (int8 ONNX, 9 MB) + misaki 0.9.4 | lektor angielski bez sieci i bez limitu: głos `en-US-Paradee` w `film.py`, `projekt.py lektor` i edytorze HQ; czasy słów z Parakeeta | Apache-2.0 | 2026-10 | `jarvo-tts` (model w obrazie) |
-| [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) | transkrypcja z czasem słów: napisy do nagrań, wybór fragmentów, test wymowy lektora | CC-BY-4.0 (model) / MIT | 2026-07 | `jarvo-stt` |
+| [Paradee-8M](https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0) v1.0 (commit `8f34b01`, int8 ONNX, 9 MB) + misaki 0.9.4 | lektor angielski bez sieci i bez limitu: głos `en-US-Paradee` w `film.py`, `projekt.py lektor` i edytorze HQ; czasy słów z Parakeeta | Apache-2.0 | 2026-10 | `jarvo-tts` (model w obrazie; w instalacji natywnej `modele.paradee`, przegląd 2026-10-24) |
+| [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) przez [onnx-asr](https://github.com/istupakov/onnx-asr) (ONNX int8 [istupakov/parakeet-tdt-0.6b-v3-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx) `8f23f0c`, ~0,67 GB) | transkrypcja z czasem słów: napisy do nagrań, wybór fragmentów, test wymowy lektora | CC-BY-4.0 (model) / MIT | 2026-07 | `jarvo-stt` (pobierany przy pierwszym użyciu; w instalacji natywnej `modele.parakeet` z sumą, przegląd 2026-10-24) |
+| [Silero VAD](https://github.com/snakers4/silero-vad) 6.2 (ONNX [istupakov/silero-vad-onnx](https://huggingface.co/istupakov/silero-vad-onnx) `b3e3ee3`, 2,3 MB) | wykrywanie mowy przed Parakeetem: nagranie dzielone na kawałki do 20 s, więc pamięć nie rośnie z długością | MIT | 2026-03 | `jarvo-stt` (`onnx_asr.load_vad`; w instalacji natywnej `modele.silero-vad`, przegląd 2026-10-24) |
+| [YuNet](https://huggingface.co/opencv/face_detection_yunet) 2023mar (OpenCV Zoo, `3cc26e7`, 0,23 MB) | twarze w nagraniu: kadr 9:16 na mówcy, kto mówi (ruch ust), okładka rolki | MIT | 2025-06 | `twarze.py` (onnxruntime bez OpenCV; pobierany przy pierwszym użyciu z sumą; w instalacji natywnej `modele.yunet`, przegląd 2026-10-24) |
+| [MODNet](https://github.com/ZHKKKe/MODNet) (ONNX [DavG25/modnet-pretrained-models](https://huggingface.co/DavG25/modnet-pretrained-models) `903cc06`, 26 MB) | maska osoby: napis obok twarzy albo za osobą (typografia) | Apache-2.0 | 2023-04 | `maska.py` (pobierany przy pierwszym użyciu z sumą; w instalacji natywnej `modele.modnet`, przegląd 2026-10-24) |
 | [Pexels API](https://www.pexels.com/api/) | darmowe ujęcia i zdjęcia stock (klucz `PEXELS_API_KEY`) | Pexels License | n/d | `stock.py` |
 | [Pixabay API](https://pixabay.com/api/docs/) | darmowe ujęcia i zdjęcia stock (klucz `PIXABAY_API_KEY`), cache 24 h | Pixabay Content License | n/d | `stock.py` |
 | [Openverse API](https://api.openverse.org/v1/) (WordPress, bez klucza: 20 zapytań/min, 200/dzień; więcej z `OPENVERSE_CLIENT_ID`/`_SECRET`) | dźwięki do filmów: efekty, tło, muzyka; z indeksu tylko Freesound (Wikimedia to głównie wymowa słów, strony Jamendo nie dają się sprawdzić); CC0 i PDM, CC BY z podpisem, nigdy NC/ND/SA; licencja i to, że dźwięk istnieje, sprawdzane na stronie pliku (indeks pokazuje też usunięte); cache 24 h | licencja każdego pliku (CC0 / CC BY) | 2026-10 | `stock.py --typ dzwiek` |
@@ -201,10 +204,11 @@ API rejestrów (KRS, CEIDG, BZP, TED) go nie dostają.
 | [Expo SDK 57](https://github.com/expo/expo) (szablon `templates/expo-jarvo`) | aplikacje React Native z expo-router; `aplikacja.py nowa/ustaw/sprawdz/eksport/podglad` | MIT | 2026-09 | per projekt (npm, `npx expo install`) |
 | [expo-doctor](https://github.com/expo/expo/tree/main/packages/expo-doctor) 1.21.1 | konfiguracja i zależności projektu (`aplikacja.py sprawdz`) | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
 | [eas-cli](https://github.com/expo/eas-cli) 24.7.0 | projekt w organizacji właściciela i EAS Update do podglądu w Expo Go (`aplikacja.py expo-go`, token robota `EXPO_TOKEN`); wersja w `mobile_lib.EAS_CLI` dla wszystkich skryptów, nadpisywana przez `JARVO_EAS_CLI` | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
-| [adb](https://developer.android.com/tools/adb) (pakiet Debiana) | Android przez adb: instalacja, zrzuty, logi, testy wrogie (`urzadzenie.py`) | Apache-2.0 | 2026-09 | obraz floty |
+| [adb](https://developer.android.com/tools/adb) (pakiet Debiana w obrazie i na VPS; natywnie platform-tools r37.0.1 od Google, przejrzane 2026-10-24, wpis czeka na spis źródeł z paczkami zip) | Android przez adb: instalacja, zrzuty, logi, testy wrogie (`urzadzenie.py`) | Apache-2.0 | 2026-09 | obraz floty |
 | [Redroid](https://github.com/remote-android/redroid-doc) 14.0.0 (`14.0.0_64only-240527`) | telefon testowy na serwerze bez KVM (Android 14 w kontenerze, moduł `binder_linux`) | Apache-2.0 | 2026-10 | usługa `android` (`jarvo android on`) |
 | [docker-android](https://github.com/HQarroum/docker-android) `api-33` | telefon testowy przy KVM: oficjalny emulator Google z usługami Google | MIT | 2026-10 | usługa `android-emulator` (`jarvo android on`) |
-| [ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) (commit `cd6cea6`) | ekran telefonu testowego w przeglądarce (podgląd, klikanie), za proxy HQ `:9122` z tokenem | MIT | 2026-10 | usługa `android-ekran` (`infra/android/`) |
+| [ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) (commit `cd6cea6`) | ekran telefonu testowego w przeglądarce (podgląd, klikanie), za proxy HQ `:9122` z tokenem | MIT | 2026-10 | usługa `android-ekran` (`infra/android/`; Docker i VPS) |
+| [scrcpy](https://github.com/Genymobile/scrcpy) 5.0.1 | instalacja natywna: ekran i sterowanie telefonem w osobnym oknie zamiast ws-scrcpy w HQ (I24); przegląd 2026-10-24: `SHA256SUMS.txt` z podpisem GPG zgodny, bez telemetrii, bez podpisu Authenticode; Linux tylko x86_64 | Apache-2.0 (+ LGPL: FFmpeg, libusb) | 2026-10 | [`vendor/natywne.yaml`](../vendor/natywne.yaml), przy pierwszym użyciu |
 | [GitHub Actions `macos-26`](https://github.com/actions/runner-images) | symulator iOS: zrzuty jasny / ciemny / duża czcionka, logi (`ios_ci.py`, `templates/ci/jarvo-ios.yml`) | usługa GitHub | 2026-09 | workflow w repo aplikacji właściciela |
 | `zgodnosc.py`, `ikony.cjs` (sharp), `zrzuty.cjs` (playwright-core, axe-core) | profil zgodności → wymagania sklepów; ikony bez alfy, adaptacyjne i ekran startowy; zrzuty iPhone 17 Pro Max i Pixel w obu motywach z kontrolami | własny kod | n/d | skrypt |
 
@@ -274,9 +278,9 @@ z nazwiskami skrypt tylko wskazuje.
 | [Pillow](https://github.com/python-pillow/Pillow) + [pillow-heif](https://github.com/bigcat88/pillow_heif) (z obrazu Hermesa) | zdjęcia: HEIC z iPhone'a, AVIF, WebP, PNG, JPG, TIFF, ICO, PSD (odczyt); zdjęcia → PDF | MIT-CMU / BSD-3 | 2026-09 | skrypt |
 | FFmpeg (z obrazu Hermesa) | wideo, audio, GIF, SVG → PNG; H.264 z MOV do MP4 samym przepakowaniem | LGPL/GPL | n/d | skrypt |
 | [Ghostscript](https://www.ghostscript.com) (z OCRmyPDF) | PDF → obrazy stron, tekst, mniejszy PDF | AGPL-3.0 (osobny program) | 2026-09 | CLI |
-| [qpdf](https://github.com/qpdf/qpdf) | łączenie PDF, liczba stron, przepisanie PDF po usunięciu metadanych | Apache-2.0 | 2026-09 | CLI |
-| [Pandoc](https://github.com/jgm/pandoc) | DOCX, ODT, Markdown, HTML, EPUB, RTF między sobą (filtr Lua bez plików z dysku i z sieci) | GPL-2.0 | 2026-09 | CLI |
-| [ExifTool](https://exiftool.org) (w obrazie Jarva) | metadane: odczyt, usuwanie ze zdjęć bez przekodowania (piksele, profil kolorów i obrót zostają) i z PDF, kontrola wyniku każdej zamiany | GPL/Artistic (jak Perl) | n/d | CLI |
+| [qpdf](https://github.com/qpdf/qpdf) (natywnie 12.4.2: zip z wydania, [`vendor/natywne.yaml`](../vendor/natywne.yaml); przegląd 2026-10-24) | łączenie PDF, liczba stron, przepisanie PDF po usunięciu metadanych | Apache-2.0 | 2026-09 | CLI |
+| [Pandoc](https://github.com/jgm/pandoc) (natywnie 3.12.1: zip lub tar.gz z wydania; przegląd 2026-10-24) | DOCX, ODT, Markdown, HTML, EPUB, RTF między sobą (filtr Lua bez plików z dysku i z sieci; natywnie z `--data-dir`, bez katalogu danych pandoca właściciela) | GPL-2.0-or-later | 2026-10 | CLI |
+| [ExifTool](https://exiftool.org) (w obrazie Jarva; natywnie 13.59: Windows zip z Perlem jako `exiftool.exe`, macOS i Linux paczka Perla, `EXIFTOOL_HOME`; przegląd 2026-10-24) | metadane: odczyt, usuwanie ze zdjęć bez przekodowania (piksele, profil kolorów i obrót zostają) i z PDF, kontrola wyniku każdej zamiany | GPL/Artistic (jak Perl) | 2026-05 | CLI |
 | Chromium (z obrazu) | HTML → PDF (serwer druku tylko z katalogu dokumentu, bez sieci) | BSD | n/d | CLI |
 | [LibreOffice](https://www.libreoffice.org) | Excel, PowerPoint, stare .doc/.xls/.ppt, CSV ↔ XLSX (dodatek `office`) | MPL-2.0 | 2026-09 | CLI |
 
@@ -296,7 +300,7 @@ chiński tekst czyta tylko Indra.
 |---|---|---|---|---|
 | [Indra OCR](https://github.com/datalab-to/indra) 0.3.2 (datalab-to) | główny silnik: wykrycie linii, rozpoznanie, kolejność czytania, Markdown z układu, obrót strony, pismo łacińskie, cyrylica, greka, dewanagari, chińskie | kod Apache-2.0; modele zmodyfikowana OpenRAIL-M (do 20 mln USD przychodu, bez produktu konkurującego z Datalab) | modele `ed345c7` (tag `v3.1.1`) | venv `/opt/jarvo/venvs/ocr` ([`requirements-ocr.txt`](../infra/python/requirements-ocr.txt), sha256, `--no-deps` bez `huggingface_hub`), modele `/opt/jarvo/models/indra-ocr` (`INDRA_OCR_MODEL_DIR`) |
 | onnxruntime 1.31.0, opencv-python-headless, pypdfium2, numpy | wnioskowanie modeli na CPU, obraz, PDF | MIT / Apache-2.0 / BSD | n/d | ten sam venv (~0,25 GB) |
-| [Tesseract](https://github.com/tesseract-ocr/tesseract) (apt, pol + eng) | zapas, gdy Indry brak albo padnie, i `--silnik tesseract` | Apache-2.0 | n/d | CLI (`tsv`) |
+| [Tesseract](https://github.com/tesseract-ocr/tesseract) (apt, pol + eng; natywnie 5.5.3 z conda-forge przez [pixi](https://github.com/prefix-dev/pixi) 0.83.0 z `vendor/pixi/tesseract/pixi.lock`, języki pol, eng, osd z [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast) 4.1.0; przegląd 2026-10-24) | zapas, gdy Indry brak albo padnie, i `--silnik tesseract` | Apache-2.0 | n/d | CLI (`tsv`; natywnie TSV przez `-c tessedit_create_tsv=1`, bo na Windows config `tsv` się nie znajduje) |
 | FFmpeg, Ghostscript, qpdf (z obrazu) | klatka filmu; strony PDF dla Tesseracta | LGPL/GPL, AGPL-3.0, Apache-2.0 | n/d | CLI |
 
 ---
@@ -486,4 +490,94 @@ serwerom stdio tylko bezpieczne zmienne środowiska (`PATH`, `HOME`, bez proxy),
 `NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt` (CA dodane do systemu, np. proxy z własnym certyfikatem).
 Proxy wymagające `HTTPS_PROXY` dalej blokuje pobór. Healthcheck (`toolbox.yaml`) startuje serwer z takim samym okrojonym
 środowiskiem i robi prawdziwe `search_screens`, więc zielony wynik znaczy, że katalog się pobrał.
+
+---
+
+## Stan instalacji natywnej (Windows, macOS, Linux)
+
+Instalacja bez Dockera i WSL ([NATYWNIE.md](NATYWNIE.md), etap E2; za flagą `JARVO_NATYWNIE=1` do etapu E13).
+Źródło prawdy: [`vendor/natywne.yaml`](../vendor/natywne.yaml), czyli adres, SHA-256 i rozmiar pliku dla każdej
+platformy albo `brak:` z powodem. Z niego `scripts/natywne.py generuj` robi `vendor/natywne.lock.json`, który czyta
+instalator. Pliki pobiera u źródła [`jarvo/pobieracz.py`](../jarvo/pobieracz.py): sprawdza sumę przed rozpakowaniem
+i rozpakowuje do `<program>/narzedzia/<nazwa>/<wersja>`. Z tego nic nie hostujemy; licencje są w
+[SOURCES.md](SOURCES.md#instalacja-natywna). Dowiązania z archiwów:
+- na macOS i Linuksie zostają dowiązaniami w katalogu narzędzia (np. `lib/libqpdf.so.30` w qpdf), a cel poza nim to błąd;
+- na Windows twarde dowiązania z tar są rozpakowane (Git for Windows ma ich 92, m.in. `git-remote-https.exe`);
+- symboliczne na Windows zastępuje kopia celu z archiwum.
+
+Po rozpakowaniu manifest może usunąć zbędne pliki (`usun`) i zmienić nazwę (`zmien_nazwe`, np.
+`exiftool(-k).exe` → `exiftool.exe`). Plik bez archiwum (`plik`) ląduje pod `nazwa_pliku`.
+
+**Przegląd 2026-10-24.** Każde źródło przeszło 7 kroków z
+[SOURCES.md](SOURCES.md#przegląd-przed-dodaniem-każde-źródło-osobno) i ma wpis w `vendor/zrodla.yaml` z pełnym commitem
+tagu. Każdy plik policzyliśmy co najmniej dwiema drogami: suma wydawcy albo digest GitHuba i własne liczenie
+strumieniowe. Dla Chrome for Testing i ffmpeg Playwrighta, bez sum u wydawcy, drugą drogą było md5 serwera. Żadna suma
+się nie różni. Próba na Windows 11 x64: każde narzędzie z kolumny Windows x64 pobrane pobieraczem Jarva i uruchomione,
+Defender bez zagrożeń. Pliki macOS i Linuksa sprawdziliśmy w nagłówkach binarek (architektura, minimalny system,
+biblioteki, podpis); uruchomienie na tych systemach i na Windows arm64 zrobi macierz CI. Minimalny macOS to 15, bo pandoc
+i qpdf mają minos 15.0, a Lightpanda 14.8.9. Windows arm64 bierze plik x64 w emulacji (I27), gdy nie ma natywnego albo
+natywny ma mniej funkcji.
+
+| Narzędzie | Wersja | Windows x64 | Windows arm64 | macOS arm64 | Linux x64 i arm64 | Kiedy | Wynik |
+|---|---|---|---|---|---|---|---|
+| uv | 0.12.13 | zip | zip arm64 | tar.gz | tar.gz | instalacja | sumy z `.sha256` |
+| Python (python-build-standalone 20261021) | 3.13.17, 3.12.15 | tar.gz | x64 w emulacji | tar.gz | tar.gz | instalacja | SQLite 3.53.1 bez błędu WAL-reset |
+| Node.js | 26.12.1, npm 11.20.0 | zip | x64 w emulacji | tar.gz | tar.xz | instalacja | `SHASUMS256.txt` z podpisem GPG; `npm_config_update_notifier=false` |
+| Git for Windows | 2.56.0.windows.3 | tar.bz2 (ucrt64) | tar.bz2 (clangarm64) | brak: git z systemu | brak: git z systemu | instalacja | `git --version`, `ls-remote` po https i Git Bash 5.3 na Windows 11; `GIT_CONFIG_NOSYSTEM=1` |
+| ripgrep | 15.2.0 | zip | x64 w emulacji | tar.gz | tar.gz (musl) | instalacja | PCRE2 10.46 w binarce |
+| jq | 1.8.2 | `jq.exe` | `jq.exe` arm64 | plik | plik | instalacja | atestacja SLSA; kod floty go nie używa |
+| chrome-headless-shell (Chrome for Testing) | 153.0.8010.12 | zip | x64 w emulacji | zip | zip | instalacja | rewizja 1243 Playwrighta 1.63; na Windows silnik `browser_*` |
+| ffmpeg Playwrighta | 1011 | zip | x64 w emulacji | zip | zip | instalacja | LGPL, tylko VP8/WebM, PNG, MJPEG |
+| Lightpanda | 1.0.0 | brak: silnik `chrome` | brak: silnik `chrome` | plik | plik | instalacja | Linux = binarka z obrazu; telemetria wyłączona zmiennymi |
+| agent-browser | 0.38.1 | plik z wydania | x64 w emulacji | plik | plik | instalacja | te same bajty co w paczce npm z atestacją SLSA |
+| Camoufox | 152.0.4-beta.30 | zip | x64 w emulacji | zip | zip | przy użyciu | paczka Windows ma fonty macOS, a macOS fonty Windows (decyzja właściciela) |
+| FFmpeg (BtbN, gpl) | 9.0.2 | zip | x64 w emulacji (winarm64 bez libvpx) | brak: build Riedla | tar.xz | instalacja | filtry i kodery floty na Windows 11; libass na Windows potrzebuje `fontsdir` |
+| FFmpeg i ffprobe (Martin Riedl) | 9.0.2 | brak: BtbN | brak: BtbN | dwa zipy, Developer ID | brak: BtbN | instalacja | bez vidstab i librsvg |
+| Fonty Inter i DejaVu | 4.1, 2.37 | zip | ten sam zip | ten sam zip | ten sam zip | instalacja | `JARVO_FONTY_INTER`, `JARVO_FONTY_DEJAVU` |
+| pandoc | 3.12.1 | zip | x64 w emulacji | zip (od macOS 15) | tar.gz | instalacja | Authenticode SignPath; natywnie z `--data-dir` |
+| qpdf | 12.4.2 | zip | zip arm64 | zip (od macOS 15) | zip (glibc 2.34+) | instalacja | lista sum z podpisem PGP; dowiązania `lib/libqpdf.*` |
+| ExifTool | 13.59 | zip z Perlem | x64 w emulacji | tar.gz na Perlu systemu | tar.gz na Perlu systemu | instalacja | `exiftool.exe` po zmianie nazwy; `EXIFTOOL_HOME` |
+| pixi (tylko Tesseract) | 0.83.0 | zip | zip arm64 (`--platform win-64`) | tar.gz | tar.gz (musl) | instalacja | projekt [`vendor/pixi/tesseract`](../vendor/pixi/tesseract/pixi.toml); `PIXI_NO_TELEMETRY=1` |
+| scrcpy | 5.0.1 | zip | zip arm64 | tar.gz | x64 tar.gz, arm64 brak | przy użyciu | `SHA256SUMS.txt` z podpisem GPG |
+| Android platform-tools (adb) | r37.0.1 | wpis czeka | wpis czeka | wpis czeka | wpis czeka (arm64 brak) | przy użyciu | przejrzane; spis źródeł przyjmuje dziś paczkę tylko jako tar; `usun` bez sqlite3 3.50.6 |
+
+Tesseract 5.5.3 przychodzi z conda-forge przez [`vendor/pixi/tesseract`](../vendor/pixi/tesseract/pixi.toml):
+- `pixi.lock` ma 31–37 paczek na platformę i sumę każdej z nich;
+- `.pixi/config.toml` wyłącza skrypty post-link i detektory pakietów wirtualnych z kanału;
+- instalator woła `pixi install --locked` (na Windows arm64 z `--platform win-64`).
+
+Venvy Jarva (sekcja `venvy` manifestu) instalator buduje tak: `uv venv --no-config` z Pythona z manifestu, potem
+`uv pip install --no-config --no-deps --require-hashes --only-binary :all: --compile-bytecode -r <lock>`. Katalog
+`<program>/venvs/<nazwa>-<12 znaków sha256 locka>`, na Windows z `UV_LINK_MODE=copy`. Locki ze strumieniowo
+sprawdzoną sumą każdego koła dla windows-x64, macos-arm64 (koła od macOS 14.0) i Linuksa (manylinux_2_28); windows-arm64
+bierze te same koła x64. Nowe locki leżą w [`infra/python/natywne/`](../infra/python/natywne/), razem z wejściami
+i opisem odtworzenia w nagłówku.
+
+| venv | Python | Lock (paczek) | Pobranie Windows / macOS / Linux x64 | Kiedy | Próba na Windows 11 x64 |
+|---|---|---|---|---|---|
+| `narzedzia` | 3.12.15 | [`narzedzia.lock`](../infra/python/natywne/narzedzia.lock) (122) | 158 / 163 / 214 MB | instalacja | 9 z 9 prób bez sieci; bez docopt (ma tylko sdist) |
+| `ocr` | 3.12.15 | [`requirements-ocr.txt`](../infra/python/requirements-ocr.txt) (8) | 76 / 79 / 106 MB | instalacja | Indra odczytała tekst bez sieci |
+| `cad` | 3.12.15 | [`requirements-cad.txt`](../infra/python/requirements-cad.txt) (56) | 215 / 207 / 244 MB | przy użyciu | STEP, STL, GLB i 3MF w 6 s |
+| `manimgx` | 3.13.17 | [`requirements-manimgx.txt`](../infra/python/requirements-manimgx.txt) (18) | 85 / 64 / 109 MB | przy użyciu | 1 s filmu w 3,3 s |
+| `claude-seo` | 3.12.15 | [`claude-seo.lock`](../infra/python/natywne/claude-seo.lock) (70) | 141 / 148 / 166 MB | instalacja | 6 z 7; WeasyPrint bez Pango na Windows nie działa, więc PDF przez Chromium |
+| `rembg` | 3.12.15 | [`rembg.lock`](../infra/python/natywne/rembg.lock) (85) | 177 / 157 / 214 MB | dodatek | `rembg --help` bez sieci; gradio z `GRADIO_ANALYTICS_ENABLED=False` |
+| `mgaudio` | 3.12.15 | [`mgaudio.lock`](../infra/python/natywne/mgaudio.lock) (10) | 101 / 73 / 123 MB | dodatek | numba, pedalboard, głośność −18 LUFS |
+| `lemo-wake` | 3.12.15 | [`lemo-wake.lock`](../infra/python/natywne/lemo-wake.lock) (11) | 83 / 84 / 116 MB | dodatek | cv2, onnxruntime 1.30, HEIC |
+| `docling` | 3.12.15 | [`docling-cpu.lock`](../infra/python/natywne/docling-cpu.lock) (104) | 339 / 317 / 430 MB | dodatek | tylko instalacja na sucho; torch CPU z indeksu PyTorch (`--torch-backend cpu`) |
+
+Modele i dane (sekcja `modele`): pliki z przypiętej rewizji (commit, nie tag) do `<dane>/jarvo/models/<katalog>`, każdy
+z sumą; Matcha, Paradee i Indra mają te same pliki i sumy co obraz.
+
+| Model | Rewizja | Plików | Rozmiar | Kiedy |
+|---|---|---|---|---|
+| `matcha-pl` (Matcha-TTS-PL v2) | `9374474` | 7 | 280 MB | instalacja |
+| `paradee` (Paradee-8M v1.0) | `8f34b01` | 3 | 9 MB | instalacja |
+| `indra-ocr` | `ed345c7` | 15 | 38 MB | instalacja |
+| `parakeet` (TDT 0.6B v3, int8) | `8f23f0c` | 5 | 671 MB | przy użyciu |
+| `silero-vad` | `b3e3ee3` | 4 | 2,3 MB | przy użyciu |
+| `modnet` | `903cc06` | 2 | 26 MB | przy użyciu |
+| `yunet` | `3cc26e7` | 3 | 0,2 MB | przy użyciu |
+| `tessdata-fast` (pol, eng, osd) | `6572757` | 4 | 20 MB | instalacja |
+| `fonty-noto-sans` (Noto Sans 2.015) | `28b15b4` | 5 | 2,5 MB | instalacja |
+| `fonty-noto-emoji` (Noto Color Emoji 2.051) | `8998f5d` | 2 | 11 MB | instalacja |
 

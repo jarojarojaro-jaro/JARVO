@@ -1,0 +1,11 @@
+# Tesseract dla Jarva (docs/NATYWNIE.md E05, I22): jedyna luka, którą wypełnia conda-forge przez pixi.
+# Instalator: `pixi install --locked` (Windows arm64: `--platform win-64`, emulacja x64, I27), bez `pixi run`;
+# Jarvo woła tesseract bezpośrednio z .pixi/envs/default i ustawia TESSDATA_PREFIX na models/tessdata-fast.
+[workspace]
+name = "jarvo-tesseract"
+channels = ["https://conda.anaconda.org/conda-forge"]
+platforms = ["win-64", "osx-arm64", "linux-64", "linux-aarch64"]
+requires-pixi = ">=0.83.0,<0.84"
+
+[dependencies]
+tesseract = "==5.5.3"

@@ -1,0 +1,13 @@
+trafilatura==2.2.0
+yt-dlp==2026.8.19
+onnx-asr[cpu,hub]==0.12.0
+onnxruntime==1.29.0
+misaki==0.9.4
+spacy==3.8.16
+espeakng-loader==0.2.4
+phonemizer-fork==3.3.2
+num2words==0.5.14
+camoufox==0.5.6
+playwright==1.62.0
+# model spaCy dla G2P misaki (V03): koło z wydania explosion/spacy-models, suma jak w infra/Dockerfile
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

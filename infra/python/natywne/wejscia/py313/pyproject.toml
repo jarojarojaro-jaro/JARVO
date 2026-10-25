@@ -1,0 +1,12 @@
+# Jarvo natywnie: ustawienia locków venvów na Pythonie 3.13 (uv pip compile --project <ten katalog> --universal).
+# required-environments: każda paczka bez sdist (a z --only-binary :all: każda) musi mieć koło dla każdej platformy
+# Jarva, inaczej compile kończy się błędem. Platformy: docs/NATYWNIE.md (I06: bez macOS Intel; I27: Windows arm64
+# = Python x64 w emulacji, czyli koła win_amd64). Bez "environments": wtedy uv dopisałby marker do każdej linii,
+# a na nieobsługiwanej platformie instalacja z --no-deps po cichu pominęłaby wszystko zamiast zgłosić brak koła.
+[tool.uv]
+required-environments = [
+  "sys_platform == 'win32' and platform_machine == 'AMD64' and python_version == '3.13'",
+  "sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13'",
+  "sys_platform == 'linux' and platform_machine == 'x86_64' and python_version == '3.13'",
+  "sys_platform == 'linux' and platform_machine == 'aarch64' and python_version == '3.13'",
+]

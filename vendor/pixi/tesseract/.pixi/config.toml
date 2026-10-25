@@ -1,0 +1,6 @@
+# Konfiguracja projektu (pixi czyta ją zawsze, także z PIXI_NO_CONFIG=1).
+# Bez skryptów post-link i bez detektorów pakietów wirtualnych z kanału (to cudzy kod uruchamiany przed instalacją).
+run-post-link-scripts = "false"
+
+[virtual-package-detectors.consent]
+"https://conda.anaconda.org/conda-forge" = "deny"

@@ -58,6 +58,7 @@ zrodla:
     repo: https://github.com/AgriciDaniel/claude-seo
     status: uzywane
     przejrzane: e77e783e38eeb738424eb72117abbd2dacdd88af
+    notatka: "Natywnie (przegląd 2026-10-24): lock venvu z sumami (infra/python/natywne/claude-seo.lock, 70 paczek) zrobiony z requirements.txt tego commitu z ograniczeniem playwright==1.63.0. Koła są na 4 platformy; cryptography 50.0.2 i grpcio 1.84.1 nie mają win_arm64 (I27). WeasyPrint 70.0 się instaluje, ale na Windows bez Pango pada przy imporcie (OSError: libgobject-2.0-0), więc PDF przez Chromium (E12). Najdłuższa ścieżka w venvie ma 167 znaków od katalogu venvu (google-ads v23, plik .pyc), więc bez długich ścieżek Windows katalog venvu może mieć najwyżej 91 znaków"
   codebase-memory-mcp:
     repo: https://github.com/DeusData/codebase-memory-mcp
     status: uzywane
@@ -192,30 +193,32 @@ zrodla:
     repo: https://github.com/vercel-labs/agent-browser
     status: uzywane
     przejrzane: aff6125c023b810ea3f2e5deec5379e9a4270bdc
-    notatka: "agent-browser 0.38.1 (paczka npm przypięta w infra/node/package.json; tag v0.38.1 = commit aff6125, atestacja SLSA paczki npm wskazuje ten sam commit): sterownik narzędzi browser_* Hermesa, w obrazie tylko natywna binarka tej platformy, postinstall zablokowany. Przegląd 2026-10-11. Wcześniej spis miał tu commit 526157c z gałęzi main (po v0.38.2), a nie wersję z obrazu. Nowsze wydania (0.38.2, 0.39.0, 0.39.1) czekają na decyzję właściciela"
+    notatka: "agent-browser 0.38.1 (paczka npm przypięta w infra/node/package.json; tag v0.38.1 = commit aff6125, atestacja SLSA paczki npm wskazuje ten sam commit): sterownik narzędzi browser_* Hermesa, w obrazie tylko natywna binarka tej platformy, postinstall zablokowany. Przegląd 2026-10-11. Wcześniej spis miał tu commit 526157c z gałęzi main (po v0.38.2), a nie wersję z obrazu. Nowsze wydania (0.38.2, 0.39.0, 0.39.1, 0.39.2) czekają na decyzję właściciela. Natywnie (przegląd 2026-10-24): pojedyncze binarki z wydania v0.38.1 (agent-browser-win32-x64.exe, -darwin-arm64, -linux-x64, -linux-arm64); ich sha256 = digesty GitHuba = członkowie archiwum npm agent-browser-0.38.1.tgz z registry.npmjs.org (integrity sha512 i shasum z rejestru zgodne z liczeniem, atestacja SLSA: workflow release.yml, przebieg 35143035258). Wydanie GitHub nie jest niezmienne, więc chroni je przypięta suma. Bez win32-arm64: producent sam bierze x64 w emulacji. Postinstall (pobiera binarkę z GitHuba bez sumy, nadpisuje globalne shimy npm) nie uruchamiamy. Windows bez Authenticode, macOS podpis ad-hoc. `install` i `upgrade` pobierają bez sum: nakładka natywna ma je odrzucać"
   browser:
     repo: https://github.com/lightpanda-io/browser
     status: uzywane
     przejrzane: 588f6223b9cae8a2406aeef035ed9363a3e404fd
+    notatka: "Lightpanda 1.0.0 (AGPL-3.0, tag 1.0.0 = ten commit, workflow release build z tagu): w obrazie binarka z lightpanda/browser:1.0.0 po strip (przegląd 2026-10-11). Natywnie (przegląd 2026-10-24): pliki z wydania GitHub, sumy = digesty GitHuba = własne liczenie; lightpanda-x86_64-linux i lightpanda-aarch64-linux to bajt w bajt /usr/bin/lightpanda z przypiętego obrazu (digest indeksu 5b84708c…), nowy artefakt to tylko lightpanda-aarch64-macos (podpis ad-hoc, minimalny macOS w LC_BUILD_VERSION 14.8.9). Linux: glibc 2.35 (x64) i 2.38 (arm64). Żadne wydanie do 1.0.2 nie ma plików na Windows: tam silnik chrome. Telemetria i raporty awarii domyślnie włączone: LIGHTPANDA_DISABLE_TELEMETRY=1 i LIGHTPANDA_DISABLE_CORE_DUMP=1 w środowisku procesów Jarva"
   build123d:
     repo: https://github.com/gumyr/build123d
     status: uzywane
     przejrzane: 38effd343e1508964673faf59300a5cc68fbedc1
-    notatka: "build123d 0.13.0 (tag v0.13.0): silnik wspólnego skilla warsztat-3d, venv /opt/jarvo/venvs/cad (Python 3.12), koła przypięte sha256 w infra/python/requirements-cad.txt (--no-deps, bez sympy, mpmath, jedi, parso). Przegląd 2026-10-13 (decyzja właściciela): Apache-2.0, zależności MIT/BSD/Apache; bez telemetrii; sieć tylko w jawnym export_to_pcbway i pobieraniu tekstur threejs_materials, zablokowane w cad_model.py; budowa i eksport sprawdzone bez sieci"
+    notatka: "build123d 0.13.0 (tag v0.13.0): silnik wspólnego skilla warsztat-3d, venv /opt/jarvo/venvs/cad (Python 3.12), koła przypięte sha256 w infra/python/requirements-cad.txt (--no-deps, bez sympy, mpmath, jedi, parso). Przegląd 2026-10-13 (decyzja właściciela): Apache-2.0, zależności MIT/BSD/Apache; bez telemetrii; sieć tylko w jawnym export_to_pcbway i pobieraniu tekstur threejs_materials, zablokowane w cad_model.py; budowa i eksport sprawdzone bez sieci. Natywnie (2026-10-24): requirements-cad.txt bez zmian jest kompletnym lockiem dla 4 platform; compile z --excludes sympy, mpmath, jedi, parso odtwarza go co do sumy, bez ręcznego usuwania bloków. Próba na Windows 11 x64: STEP, STL, GLB i 3MF w 6 s. cadquery-ocp-novtk i lib3mf nie mają kół win_arm64 (I27)"
   indra:
     repo: https://github.com/datalab-to/indra
     status: uzywane
     przejrzane: 3d773aeedc5d79d1d0a2a04007a9075cd71a59f4
-    notatka: "Indra OCR 0.3.2 (tag v0.3.2; kod koła z PyPI identyczny z tagiem): główny silnik wspólnego skilla odczyt-ekranu (ocr.py, Tesseract w zapasie), venv /opt/jarvo/venvs/ocr (Python 3.12), koła przypięte sha256 w infra/python/requirements-ocr.txt (--no-deps, bez huggingface_hub: kodu pobierania modeli i dobowego pytania Huba nie ma w obrazie). Kod Apache-2.0. Przegląd 2026-10-17 (decyzja właściciela): autorzy datalab-to (Vik Paruchuri, Surya, Marker), bez telemetrii; sieć tylko w pobieraniu modeli z Hugging Face (u nas modele w obrazie, INDRA_OCR_MODEL_DIR, gniazda zablokowane w ocr.py); przeglądarka wyników `indra_ocr.viewer` ładuje Google Fonts, nie używamy jej. Próba w kontenerze: polski dokument 0,4 s / 98,9 % (Tesseract 1,9 s / 99,4 %, polskie znaki 85/85 w obu), ciemne zrzuty ekranu 0,3–0,5 s (Tesseract 1,1–1,9 s), chiński tylko Indra"
+    notatka: "Indra OCR 0.3.2 (tag v0.3.2; kod koła z PyPI identyczny z tagiem): główny silnik wspólnego skilla odczyt-ekranu (ocr.py, Tesseract w zapasie), venv /opt/jarvo/venvs/ocr (Python 3.12), koła przypięte sha256 w infra/python/requirements-ocr.txt (--no-deps, bez huggingface_hub: kodu pobierania modeli i dobowego pytania Huba nie ma w obrazie). Kod Apache-2.0. Przegląd 2026-10-17 (decyzja właściciela): autorzy datalab-to (Vik Paruchuri, Surya, Marker), bez telemetrii; sieć tylko w pobieraniu modeli z Hugging Face (u nas modele w obrazie, INDRA_OCR_MODEL_DIR, gniazda zablokowane w ocr.py); przeglądarka wyników `indra_ocr.viewer` ładuje Google Fonts, nie używamy jej. Próba w kontenerze: polski dokument 0,4 s / 98,9 % (Tesseract 1,9 s / 99,4 %, polskie znaki 85/85 w obu), ciemne zrzuty ekranu 0,3–0,5 s (Tesseract 1,1–1,9 s), chiński tylko Indra. Natywnie (2026-10-24): requirements-ocr.txt bez zmian jest kompletnym lockiem dla 4 platform (uv pip compile z required-environments i --excludes huggingface-hub odtwarza go co do sumy). Próba na Windows 11 x64 z modelami z rewizji ed345c7 (sumy z infra/Dockerfile): „Jarvo OCR 2026” odczytane bez sieci. opencv-python-headless nie ma koła win_arm64, więc na Windows arm64 Python x64 (I27)"
   indra-ocr-modele:
     repo: https://huggingface.co/datalab-to/indra-ocr
     status: uzywane
     przejrzane: ed345c7f158eddbc7dee0c6a7269afb75a94f7e8
-    notatka: "Modele ONNX Indry (tag v3.1.1 = HF_REVISION paczki 0.3.2), ~37 MB w obrazie (/opt/jarvo/models/indra-ocr, każdy plik sha256 w infra/Dockerfile, LICENSE i karta modelu obok, JARVO-ZRODLO.txt). Licencja: zmodyfikowana OpenRAIL-M: bez opłat do 20 mln USD przychodu albo finansowania i bez produktu konkurującego z Datalab (OCR, parsowanie dokumentów jako usługa); ograniczenia użycia OpenRAIL przechodzą na każdego, komu dajemy modele. Właściciel 2026-10-17: Jarvo nie jest sprzedawany i nie konkuruje z Datalab. Przy zmianie (sprzedaż Jarva albo usługi OCR, przychód lub finansowanie powyżej progu) wraca do przeglądu"
+    notatka: "Modele ONNX Indry (tag v3.1.1 = HF_REVISION paczki 0.3.2), ~37 MB w obrazie (/opt/jarvo/models/indra-ocr, każdy plik sha256 w infra/Dockerfile, LICENSE i karta modelu obok, JARVO-ZRODLO.txt). Licencja: zmodyfikowana OpenRAIL-M: bez opłat do 20 mln USD przychodu albo finansowania i bez produktu konkurującego z Datalab (OCR, parsowanie dokumentów jako usługa); ograniczenia użycia OpenRAIL przechodzą na każdego, komu dajemy modele. Właściciel 2026-10-17: Jarvo nie jest sprzedawany i nie konkuruje z Datalab. Przy zmianie (sprzedaż Jarva albo usługi OCR, przychód lub finansowanie powyżej progu) wraca do przeglądu. Natywnie: modele.indra-ocr w vendor/natywne.yaml (te same 15 plików i sumy, sprawdzone 2026-10-24: sha256 LFS z paths-info, X-Linked-Etag i SHA-1 blobów małych plików zgodne z liczeniem strumieniowym; tag v3.1.1 jest adnotowany: obiekt ff4b1459, commit ed345c7f; próba na Windows 11: „Jarvo OCR 2026” z INDRA_OCR_MODEL_DIR). Na main od 2026-10-19 v1.1.0 (bd02167f), bez przeglądu. Do decyzji właściciela: § 7 i § 8 LICENSE (atrybucja „in connection with any Output” i ta sama licencja także dla Output), w przeglądzie 2026-10-17 nieopisane; natywnie każdy użytkownik pobiera model sam, więc sam staje się licencjobiorcą"
   camoufox:
     repo: https://github.com/daijro/camoufox
     status: uzywane
     przejrzane: 5d06ec1629ac7843508f1e683f83e404fde8db76
+    notatka: "Camoufox 152.0.4-beta.30 (MPL-2.0, tag v152.0.4-beta.30 = ten commit, workflow Build and Release z tagu): w obrazie lin.x86_64 i lin.arm64 (sumy w infra/Dockerfile = digesty GitHuba = własne liczenie 2026-10-24). Natywnie (przegląd 2026-10-24), przy pierwszym użyciu: win.x86_64 (ea52a02f…, 937 MB po rozpakowaniu) i mac.arm64 (3b43e766…, zip bez dowiązań); Windows arm64 = x86_64 w emulacji. Polityki i camoufox.cfg wyłączają aktualizacje, telemetrię, Normandy, Safe Browsing i zdalne ustawienia (w 25 s bezczynności tylko gniazda 127.0.0.1). Windows: camoufox.exe i xul.dll bez Authenticode, w paczce podpisane DLL runtime VC++ i Windows App SDK Microsoftu; macOS: pakiet bez _CodeSignature, Mach-O ad-hoc, bez notaryzacji. Paczka Windows ma płasko fonty macOS (355 plików, 596 MB) i Linuksa, paczka macOS fonty Windows (144, 337 MB); w obrazie fonty macOS i Windows pomijamy, natywnie decyduje właściciel"
   cua:
     repo: https://github.com/trycua/cua
     status: uzywane
@@ -247,12 +250,12 @@ zrodla:
     repo: https://huggingface.co/machinekind/Matcha-TTS-PL
     status: uzywane
     przejrzane: 93744740ae645648c003abb09e8c617d9c5e34cd
-    notatka: "CC BY-SA 4.0: polski lektor (jarvo-tts, głosy pl-PL-Matcha-Meski = male_voxcpm_1, pl-PL-Matcha-Damski = female_voxcpm_2), wagi ONNX t2 w obrazie z sha256 w infra/Dockerfile, ATTRIBUTION.md i LICENSE obok; port english/polish_*cleaners.py w jarvo_tts_matcha.py. Repo z 2026-10-02, rewizja z 2026-10-10; przegląd 2026-10-11; pliki = same wagi ONNX przypięte sha256. Repo przemianowane przez autora 2026-10-11 z Matcha-TTS-PL-v2 (commit 0fe5065931); od 2026-10-23 nazwę -v2 ma inne, nowe repo (osobne źródło, bez przeglądu), więc stary adres zwraca 404. Rewizja 93744740 i sumy plików bez zmian (sprawdzone 2026-10-24 przez API Hugging Face)"
+    notatka: "CC BY-SA 4.0: polski lektor (jarvo-tts, głosy pl-PL-Matcha-Meski = male_voxcpm_1, pl-PL-Matcha-Damski = female_voxcpm_2), wagi ONNX t2 w obrazie z sha256 w infra/Dockerfile, ATTRIBUTION.md i LICENSE obok; port english/polish_*cleaners.py w jarvo_tts_matcha.py. Repo z 2026-10-02, rewizja z 2026-10-10; przegląd 2026-10-11; pliki = same wagi ONNX przypięte sha256. Repo przemianowane przez autora 2026-10-11 z Matcha-TTS-PL-v2 (commit 0fe5065931); od 2026-10-23 nazwę -v2 ma inne, nowe repo (osobne źródło, bez przeglądu), więc stary adres zwraca 404. Rewizja 93744740 i sumy plików bez zmian (sprawdzone 2026-10-24 przez API Hugging Face). Natywnie: modele.matcha-pl w vendor/natywne.yaml (te same 7 plików i sumy; 2026-10-24 ponownie: sha256 LFS z paths-info i X-Linked-Etag, SHA-1 blobów małych plików i własne liczenie strumieniowe zgodne; próba na Windows 11: oba głosy mówią, Parakeet słyszy tekst). Na main (43a1e64a) zmienione voices.json obu głosów (temperatura 0,8): rewizja chroni przed tą zmianą"
   manimgx:
     repo: https://github.com/academa-labs/manimgx
     status: uzywane
     przejrzane: 0507708dc5d731478786de2f46ca8a1660d514d6
-    notatka: "ManimGX 0.1.1 (tag v0.1.1): dodatek obrazu manim zamiast Manim CE, venv /opt/jarvo/venvs/manimgx (Python 3.13), koła przypięte sha256 w infra/python/requirements-manimgx.txt. Przegląd 2026-10-11 (decyzja właściciela, wydanie 2026-10-07): kod MIT, koło Linux GPL-3.0-or-later (x264), fonty OFL-1.1; bez telemetrii i sieci w czasie renderu (sprawdzone bez sieci); self.say() (fal.ai) i present zakazane w film-z-kodu/references/manimgx.md"
+    notatka: "ManimGX 0.1.1 (tag v0.1.1): dodatek obrazu manim zamiast Manim CE, venv /opt/jarvo/venvs/manimgx (Python 3.13), koła przypięte sha256 w infra/python/requirements-manimgx.txt. Przegląd 2026-10-11 (decyzja właściciela, wydanie 2026-10-07): kod MIT, koło Linux GPL-3.0-or-later (x264), fonty OFL-1.1; bez telemetrii i sieci w czasie renderu (sprawdzone bez sieci); self.say() (fal.ai) i present zakazane w film-z-kodu/references/manimgx.md. Natywnie (przegląd 2026-10-24): koła cp313-abi3 win_amd64, macosx_11_0_arm64 i manylinux_2_28 mają te same pliki licencji co linuksowe (LICENSE, LICENSE-THIRD-PARTY, LICENSE-LAVAPIPE, LICENSE-DXC, identyczne sumy). x264 jest w każdym kole, więc każde jako całość jest GPL-3.0-or-later (źródła: manimgx-0.1.1-source.tar.xz w wydaniu). Windows dokłada DirectX Shader Compiler 1.9.2609 (dxcompiler.dll, NCSA, podpis Microsoft), Linux lavapipe i libdrm. _engine.pyd jest bez podpisu, win_arm64 brak. requirements-manimgx.txt bez zmian jest kompletnym lockiem dla 4 platform. Próba na Windows 11 x64: render 1 s 640×360 30 fps z polskim tekstem i wzorem w 3,3 s"
   modnet:
     repo: https://github.com/ZHKKKe/MODNet
     status: uzywane
@@ -261,7 +264,7 @@ zrodla:
     repo: https://github.com/CadQuery/OCP
     status: uzywane
     przejrzane: a6d078cfda3e5e695c68d2bfbfe38e91b0ccb566
-    notatka: "Wiązania Pythona do OpenCascade (OCCT 8.0, LGPL-2.1 z wyjątkiem) z kół cadquery-ocp-novtk 8.0.1.1.0 (tag 8.0.1.1, Apache-2.0): jądro build123d w warsztacie 3D. W kole dołączone biblioteki obrazów (FreeImage, LibRaw, OpenEXR, libtiff i in.) bez zmian. Przegląd 2026-10-13"
+    notatka: "Wiązania Pythona do OpenCascade (OCCT 8.0, LGPL-2.1 z wyjątkiem) z kół cadquery-ocp-novtk 8.0.1.1.0 (tag 8.0.1.1, Apache-2.0): jądro build123d w warsztacie 3D. W kole dołączone biblioteki obrazów (FreeImage, LibRaw, OpenEXR, libtiff i in.) bez zmian. Przegląd 2026-10-13. Natywnie (przegląd 2026-10-24): koła win_amd64 i macosx_11_0_arm64 mają inne wersje bibliotek niż linuksowe: OpenEXR 3 zamiast 2.2, do tego Lerc, OpenJPH, zstd i libdeflate, na Windows msvcp140 i vcomp140 z MSVC, na macOS libc++. Rodziny licencji są te same (FreeImage FIPL/GPL, LibRaw LGPL-2.1/CDDL, OpenEXR BSD-3, Lerc Apache-2.0, OpenJPH BSD-2). Żadne koło nie ma pliku licencji ani podpisu Authenticode, win_arm64 brak. Próba na Windows 11 x64: DLL OCP się ładują, build123d eksportuje STEP, STL, GLB i 3MF"
   onnx-asr:
     repo: https://github.com/istupakov/onnx-asr
     status: uzywane
@@ -270,6 +273,7 @@ zrodla:
     repo: https://github.com/microsoft/onnxruntime
     status: uzywane
     przejrzane: d9b8ddc0c8cc9d4d5c08915f3d00e74875cc5013
+    notatka: "Natywnie (przegląd 2026-10-24): wersje 1.29.0 (venv narzędzi, tag v1.29.0 = 2e2543fbe9fae542f921d47a72d21d5a4ef0b710), 1.30.0 (lemo-wake, v1.30.0 = f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7) i 1.31.0 (OCR, rembg, v1.31.0 = 402979ac1bef89dcd55add41eaa7277c407599eb). MIT, LICENSE i ThirdPartyNotices w każdym kole. Koła win_amd64, win_arm64, macosx_14_0_arm64 i manylinux_2_28 x86_64/aarch64. Na Windows onnxruntime.dll i .pyd mają podpis Authenticode Microsoftu, ale potrzebują msvcp140.dll i msvcp140_1.dll, których nie ma ani koło, ani PBS (I25). Oficjalne koło Windows ma dostawcę ETW TraceLogging Microsoft.ML.ONNXRuntime (telemetria idzie przez diagnostykę Windows), więc jarvo-stt, jarvo-tts i ocr.py na Windows mają wołać onnxruntime.disable_telemetry_events(). Providery: CPU i Azure (Azure nieużywany)"
   opencv-zoo:
     repo: https://github.com/opencv/opencv_zoo
     status: uzywane
@@ -465,3 +469,162 @@ zrodla:
     status: do-wdrozenia
     przejrzane: 0c5e581b54a4736cdbbe68bdd6d7e571a1dca11e
     notatka: "MPL-2.0 (skrypty budowy) + PSF-2.0 (CPython) + licencje bibliotek w paczce (OpenSSL, SQLite, libffi, Tcl/Tk…): wydanie 20261021 (tag = ten commit), CPython 3.13.17 i 3.12.15, SQLite 3.53.1 (bez błędu WAL-reset). Przegląd 2026-10-24: pliki install_only_stripped, sumy z digestów GitHuba zgodne z rozpoznaniem; bez sieci w czasie działania; na Windows arm64 build x64 (I27)"
+  # — instalacja natywna, etap E2: narzędzia, modele i locki venvów (vendor/natywne.yaml, infra/python/natywne/,
+  #   vendor/pixi/tesseract); przegląd 2026-10-24, tag każdego wydania rozwinięty do commitu przez API GitHuba —
+  nodejs:
+    repo: https://github.com/nodejs/node
+    galaz: v26.x
+    status: do-wdrozenia
+    przejrzane: bc2e01dcf6acd5cf7d169b5f26cf89abaaeb41f1
+    notatka: "MIT (OpenJS Foundation; npm Artistic-2.0; w paczce V8, OpenSSL 3.5.9, ICU 78.3, libuv 1.52.1, undici i inne na licencjach permisywnych, plik LICENSE): Node 26.12.1 (tag v26.12.1 = ten commit, wydanie bezpieczeństwa 2026-10-21, tag podpisany przez Antoine'a du Hamel; galaz v26.x, bo main rozjechał się z linią 26). Przegląd 2026-10-24: archiwa z nodejs.org/dist, sumy z SHASUMS256.txt (podpis GPG klucza 5BE8A3F6C8A5C01D106C0AD820B1A390B168D356 z README tagu sprawdzony) zgodne z własnym liczeniem; npm 11.20.0 (Hermes: <11.10.0 albo >=11.17.0), bez corepacka; bez telemetrii, npm raz na tydzień pyta rejestr o nową wersję (wyłączone npm_config_update_notifier=false); node.exe z podpisem Authenticode OpenJS Foundation, node na macOS z Developer ID Node.js Foundation (HX7739G8FX); minimum macOS 13.5, Linux glibc 2.28; install_tools.bat i nodevars.bat z paczki nie uruchamiamy; Windows arm64: build x64 w emulacji (I27; natywny node-v26.12.1-win-arm64.zip 34567581… też sprawdzony). Próba na Windows 11 x64: node v26.12.1, npm.cmd i npx.cmd 11.20.0"
+  git-for-windows:
+    repo: https://github.com/git-for-windows/git
+    status: do-wdrozenia
+    przejrzane: 0e9926caea36270e3e9067b5ac512ac0335a004a
+    notatka: "GPL-2.0-only (Git) + komponenty MSYS2 i UCRT64/CLANGARM64 (bash i coreutils GPL-3.0+, runtime MSYS2 LGPL-3.0+, Perl, OpenSSL, curl, OpenSSH, Git Credential Manager MIT, Git LFS 3.8.1 MIT; licencje w usr/share/licenses i ucrt64/share/licenses): Git for Windows 2.56.0.windows.3 (tag adnotowany 260a6704 podpisany przez Johannesa Schindelina, GitHub „valid”, = ten commit; wydanie niezmienne z 2026-10-22). Nowszy niż 2.54.0.windows.1 z instalatora Hermesa, bo łata wincred (GHSA-rxqw-wxqg-g7hw), bundle-uri (CVE-2026-62960: wyciek NTLM przez adres UNC albo file://), kompromitację pośredniego CA eMudhra i podnosi Git LFS do 3.8.1 (CVE-2026-105803, CVE-2026-105802, CVE-2026-69260, CVE-2026-69261). Przegląd 2026-10-24: tylko Windows, pełne archiwa tar.bz2 (nie PortableGit .7z.exe, który sam się rozpakowuje, i nie wariant -mingw64, który podaje wersję .dirty); sumy = digesty GitHuba = własne liczenie strumieniowe; x64 w układzie ucrt64 (9565 plików, 92 twarde dowiązania, m.in. git-remote-https.exe), arm64 w clangarm64 (90); 5 dowiązań do /proc pobieracz pomija; pobieramy u źródła, bez redystrybucji; exe podpisane (Johannes Schindelin, GitHub, Microsoft), msys-2.0.dll bez podpisu; bez telemetrii i bez sprawdzania aktualizacji; etc/gitconfig paczki (autocrlf=true, credential.helper=manager, filtr lfs) pomijamy przez GIT_CONFIG_NOSYSTEM=1; HTTPS przez schannel (magazyn certyfikatów Windows). Próba na Windows 11 x64 nowym pobieraczem: git version 2.56.0.windows.3, ls-remote po https działa, bin/bash.exe uruchamia się"
+  ripgrep:
+    repo: https://github.com/BurntSushi/ripgrep
+    status: do-wdrozenia
+    przejrzane: e89fff89ac9af12e8d4ce9d5fd07beb408ca730f
+    notatka: "MIT OR Unlicense (Andrew Gallant; w binarce statycznie PCRE2 10.46 BSD-3-Clause, na musl także musl MIT i jemalloc BSD-2-Clause): ripgrep 15.2.0 (tag podpisany = ten commit, 2026-07-15; rg --version podaje rev e89fff89ac). Przegląd 2026-10-24: archiwa z wydania, sumy z plików .sha256 = digesty GitHuba = własne liczenie; napis wersji PCRE2 („10.46 2025-08-27”) sprawdzony w binarkach Windows, macOS i Linuksa; Linux x64 i arm64 musl statycznie; Windows arm64: build x64 w emulacji, bo aarch64-pc-windows-msvc importuje VCRUNTIME140.dll (x64 ma statyczny CRT); bez sieci i telemetrii, plik konfiguracji tylko przez RIPGREP_CONFIG_PATH; binarki bez podpisu (macOS ad-hoc); brak zgłoszeń bezpieczeństwa"
+  jq:
+    repo: https://github.com/jqlang/jq
+    status: do-wdrozenia
+    przejrzane: 34f7186b86743a083a589741b6cea95293524108
+    notatka: "MIT (jqlang; statycznie oniguruma BSD-2-Clause, decNumber licencja ICU, jv_dtoa licencja Lucent; dokumentacja CC-BY-3.0): jq 1.8.2 (tag lekki = ten commit, 2026-06-20; 16 CVE i 2 GHSA poprawione względem 1.8.1). Przegląd 2026-10-24: pojedyncze binarki z wydania, sumy z sha256sum.txt = digesty GitHuba = atestacja SLSA jq-attestation.json (gh attestation verify: build ci.yml z refs/tags/jq-1.8.2 na tym commicie) = własne liczenie; Windows x64 i arm64 importują tylko UCRT i biblioteki systemu; macOS arm64 ad-hoc, minimum macOS 14; Linux statycznie; bez sieci i telemetrii; czyta ~/.jq (HOME profilu)"
+  chrome-for-testing:
+    repo: https://github.com/GoogleChromeLabs/chrome-for-testing
+    status: do-wdrozenia
+    przejrzane: fac3d15c8994e53c20fd6f096983cbf28b408385
+    notatka: "Google Chrome for Testing 153.0.8010.12 = chromium-headless-shell rewizji 1243 z browsers.json playwright-core 1.63.0. To repo (API dostępności CfT, Apache-2.0) nie ma tagów wydań, więc przejrzane = jego stan z dnia przeglądu; tag Chromium 153.0.8010.12 = commit 971a7443b0c9b0a9b2860529b33331b76077ec62 w chromium.googlesource.com/chromium/src (2026-08-25), za duży dla zrodla.py sprawdz. Przegląd 2026-10-24: chrome-headless-shell win64, mac-arm64, linux64 i linux-arm64 z storage.googleapis.com (linux-arm64 Google wydaje od 153.0.8001.0; cdn.playwright.dev/builds/cft/... przekierowuje do tych samych obiektów, ta sama generacja i md5). Google nie publikuje sha256: policzone strumieniowo dwa razy, md5 z x-goog-hash zgodne. Licencja: BSD-3-Clause Chromium + składniki w LICENSE.headless_shell, ABOUT: binarka Google Chrome (warunki chrome://terms); pobieramy u źródła, nie hostujemy. Windows bez Authenticode, macOS tylko podpis ad-hoc; w 20 s bezczynności tylko nasłuch DevTools na 127.0.0.1. To wczesna beta 153 (Stable dziś 156.0.8078.47, ostatnia łatka 153 to 153.0.8010.52): nowsza wersja dopiero z podbiciem Playwrighta"
+  playwright:
+    repo: https://github.com/microsoft/playwright
+    status: do-wdrozenia
+    przejrzane: 1b025d7e20a026371cd5f98ba0cdce48892737c8
+    notatka: "Apache-2.0 (Microsoft): playwright-core 1.63.0 (tag v1.63.0 = ten commit = gitHead paczki npm) przypina w browsers.json chromium-headless-shell 1243 (CfT 153.0.8010.12) i ffmpeg 1011; sam Playwright nie sprawdza sum pobieranych przeglądarek. Przegląd 2026-10-24 ffmpeg 1011 (roll w a239ab3048baae0a0dcc33b1024ce35002087207, 2024-12-19): pliki win64, mac-arm64, linux, linux-arm64 z CDN Playwrighta (bucket cdn.playwright.dev i ESRP playwright.download.prss.microsoft.com dają te same bajty, Content-MD5 bucketu zgodne z liczeniem). FFmpeg n7.0.1 bez --enable-gpl (LGPL-2.1-or-later, COPYING.LGPLv2.1 w paczce) z libvpx i zlib statycznie, tylko protokoły pipe/file, MJPEG, PNG i VP8/WebM; skrypty budowy niepubliczne od 2022 (przeniesione do wewnętrznej infrastruktury), więc build sprawdzamy po linii configure w binarce. Bez sieci; Windows bez Authenticode, macOS podpis ad-hoc"
+  ffmpeg:
+    repo: https://github.com/FFmpeg/FFmpeg
+    galaz: release/9.0
+    status: do-wdrozenia
+    przejrzane: 2a571b606854520cf89804d8030c8b328e621689
+    notatka: "LGPL-2.1-or-later, z --enable-gpl GPL, z --enable-version3 GPL-3.0-or-later (lustro git.ffmpeg.org na GitHubie). 9.0.2 = tag n9.0.2 (commit 946fcce07b6dcd0331c8cc609192aeff5e1924f8, 2026-09-18). Build BtbN z 2026-09-30 to release/9.0 w tym commicie: n9.0.2 + 17 poprawek (wycieki pamięci, enkoder Opus, mov, h264dec, dashenc, vf_convolution), bez nowych funkcji; build Riedla (macOS) to dokładnie 9.0.2. Śledzimy gałąź release/9.0: poprawki bezpieczeństwa = nowy build do przeglądu. Przegląd 2026-10-24: bez telemetrii; sieć tylko, gdy wejściem albo wyjściem jest adres sieciowy (http/https, rtmp, srt, rist, zmq); skok 7.1 (obraz) → 9.0 wymaga testu filtrów floty (Z26)"
+  ffmpeg-btbn:
+    repo: https://github.com/BtbN/FFmpeg-Builds
+    status: do-wdrozenia
+    przejrzane: 6c9aec5fc9a72ec3abedd1fa84db141fa18cf52b
+    notatka: "MIT (skrypty budowy; autor BtbN <btbn@btbn.de>, 929 commitów, ma prawo commitu w FFmpeg), binarki wariantu gpl: GPL-3.0-or-later (--enable-gpl --enable-version3, bez nonfree i fdk-aac). Wydanie autobuild-2026-09-30-13-08 (tag lekki = ten commit; ostatni build miesiąca GitHub BtbN trzyma 2 lata): ffmpeg-n9.0.2-17-g2a571b6068 gpl dla win64, winarm64, linux64, linuxarm64; sumy z checksums.sha256 = digesty GitHuba = własne liczenie strumieniem. Przegląd 2026-10-24: binarki statyczne (Windows 10 22H2+ z UCRT, Linux glibc 2.28+ i jądro 4.18+), Windows bez podpisu Authenticode (Smart App Control, B12); w środku libass (fontconfig, na Windows też DirectWrite), zimg, vidstab, librsvg (glib, cairo, pango), x264, x265, libvpx, opus, vorbis, lame, svt-av1, dav1d, aom, rubberband, soxr; winarm64 bez libvpx i aom (dlatego Windows arm64 bierze build x64, I27); libcurl dopiero dla FFmpeg > 9.0, whisper wyłączony; bez telemetrii; zip z katalogiem nazwa-wersji/bin, doc, presets. Próba na Windows 11 x64: filtry i kodery floty działają, Defender bez zagrożeń"
+  ffmpeg-riedl:
+    paczka: https://git.martin-riedl.de/ffmpeg/build-script/archive/6a611e19870e197bc37c6e4c7fccddebd3715466.tar.gz
+    status: do-wdrozenia
+    przejrzane: 467803813ab9f090052b0913bd12f984dcee888b154eb3644f7b1cbf04b57887
+    notatka: "Apache-2.0 (skrypt budowy Martina Riedla na jego serwerze Gitea, przeniesiony z gitlab.com/martinr92; bez repo na GitHubie, więc paczka = archiwum commitu 6a611e19870e197bc37c6e4c7fccddebd3715466 z gałęzi develop, „chore: ffmpeg (version 9.0.2)”, z którego jest build 9.0.2 z 2026-09-20; dwa pobrania dały tę samą sumę). Binarki GPL-3.0-or-later (--enable-gpl --enable-version3, bez --enable-nonfree i --enable-decklink: sprawdzone w versions.txt buildu). Przegląd 2026-10-24: macOS arm64 ffmpeg.zip i ffprobe.zip (jeden plik w zipie, tryb 755), sumy z plików .sha256 = własne liczenie; Mach-O arm64 od macOS 12.0, podpisany Developer ID Application: Martin Riedl (KU3N25YGLU), zip bez notaryzacji (notaryzowany jest tylko .pkg, którego nie bierzemy; plik pobrany przez urllib nie ma kwarantanny); bez vidstab, librsvg, rubberband i soxr; buildy od 2022 wciąż pod tymi samymi adresami. Paczka commitu się nie zmienia, więc nowe wydania widać tylko na https://ffmpeg.martin-riedl.de/info/history/macos/arm64/release"
+  inter:
+    repo: https://github.com/rsms/inter
+    status: do-wdrozenia
+    przejrzane: e3a3d4c57d5ecc01453a575621882a384c1995a3
+    notatka: "OFL-1.1 (Rasmus Andersson): Inter 4.1 (tag v4.1 = ten commit, wydanie 2024-11-16, wersja fontów 4.001, ostatnie wydanie). Przegląd 2026-10-24: archiwum Inter-4.1.zip bez digestu GitHuba; sha256 z własnego liczenia = Homebrew (font-inter) = Arch (inter-font); w środku statyczne OTF i TTF, Inter.ttc, InterVariable (rodzina „Inter Variable”) i web; fonts-inter w obrazie (Debian 4.1+ds-1) to te same statyczne OTF; LICENSE.txt w zipie = LICENSE.txt w repo (ten sam blob)"
+  dejavu-fonts:
+    repo: https://github.com/dejavu-fonts/dejavu-fonts
+    status: do-wdrozenia
+    przejrzane: 0eda8a319c08835009849583cd090bb5b141ce25
+    notatka: "licencja Bitstream Vera (+ licencja Arev dla przejętych glifów; zmiany DejaVu w domenie publicznej), pozwala używać i rozpowszechniać bez sprzedaży samych fontów: DejaVu 2.37 (tag version_2_37 = ten commit, 2016-07-30, ostatnie wydanie). Przegląd 2026-10-24: dejavu-fonts-ttf-2.37.zip bez digestu GitHuba; sha256 z własnego liczenia = Homebrew (font-dejavu, ten sam plik z SourceForge), tar.bz2 = Buildroot, LICENSE w zipie = suma z Buildroot; ta sama wersja co fonts-dejavu w obrazie (Debian 2.37-8); master ma 18 niewydanych commitów po 2.37"
+  noto-sans:
+    repo: https://github.com/notofonts/latin-greek-cyrillic
+    status: do-wdrozenia
+    przejrzane: c4a321e123e4d4ff315f57f4e0adf294fe3a95be
+    notatka: "OFL-1.1 (Noto Project): Noto Sans 2.015 (tag NotoSans-v2.015, adnotowany, = ten commit; 2024-11-20, ostatnie wydanie Noto Sans). Repo nie trzyma zbudowanych fontów, więc pliki z oficjalnej dystrybucji notofonts.github.io w commicie 28b15b4b43b7bed62b5cf6e6b0b5ff5846270535 (2024-11-21), bajt w bajt jak hinted/ttf w zipie wydania (blob git i sha256 zgodne), OFL.txt z tego repo. Przegląd 2026-10-24: 4 style (Regular, Bold, Italic, BoldItalic); w obrazie starszy fonts-noto-core 20201225"
+  noto-emoji:
+    repo: https://github.com/googlefonts/noto-emoji
+    status: do-wdrozenia
+    przejrzane: 8998f5dd683424a73e2314a8c1f1e359c19e8742
+    notatka: "OFL-1.1 (fonty; narzędzia Apache-2.0): Noto Color Emoji 2.051 (tag v2.051, adnotowany, = ten commit; 2025-09-15, Unicode 17), ta sama wersja co fonts-noto-color-emoji w obrazie. Przegląd 2026-10-24: fonts/NotoColorEmoji.ttf (CBDT) i fonts/LICENSE z adresów z commitem; blob git z własnego liczenia = drzewo repo. Nowsze wydanie v2026-09-24-unicode18_0 (2D v2.057, Unicode 18, plik w 2D/fonts/) czeka na decyzję właściciela"
+  pandoc:
+    repo: https://github.com/jgm/pandoc
+    status: do-wdrozenia
+    przejrzane: e51c9c6054c8f4ec5c3209d5abe10939dfe2963e
+    notatka: "GPL-2.0-or-later (pandoc-types BSD-3-Clause, wbudowany Lua MIT; John MacFarlane): pandoc 3.12.1 (tag = ten commit, wydanie niezmienne z 2026-10-08 z atestacją GitHuba). Przegląd 2026-10-24: zip i tar.gz z wydania, sumy = digesty GitHuba = własne liczenie = recepta conda-forge; Windows z podpisem Authenticode (SignPath Foundation), macOS Developer ID (John MacFarlane), ale minimum macOS 15.0 (LC_BUILD_VERSION; zip ma dowiązania bin/pandoc-lua i bin/pandoc-server); Linux statyczny; bez telemetrii, sieć tylko po zasoby z adresów w dokumencie (filtr Lua i --sandbox); natywnie czyta katalog danych użytkownika (%APPDATA%\\pandoc), więc wołać z --data-dir"
+  qpdf:
+    repo: https://github.com/qpdf/qpdf
+    status: do-wdrozenia
+    przejrzane: 4eba95899886e851cc41d76886483b347612f2a8
+    notatka: "Apache-2.0 (Jay Berkenbilt, Manfred Holger; Windows statycznie z OpenSSL, zlib, libjpeg-turbo, Linux z gnutls, nettle, libidn2, libunistring, libtasn1 na LGPL): qpdf 12.4.2 (tag podpisany PGP = ten commit, wydanie z 2026-09-27). Przegląd 2026-10-24: zipy z binarkami (bez AppImage), sumy z qpdf-12.4.2.sha256 (podpis PGP klucza C2C96B10011FE009E6D1DF828A75D10998012C7E poprawny, sigstore ejb@ql.org) = digesty GitHuba = własne liczenie; bez sieci; Windows bez Authenticode, macOS podpis ad-hoc i minimum macOS 15.0, Linux glibc >= 2.34; zipy macOS i Linux mają dowiązania lib/libqpdf.30.dylib i lib/libqpdf.so.30, które pobieracz odtwarza"
+  exiftool:
+    repo: https://github.com/exiftool/exiftool
+    status: do-wdrozenia
+    przejrzane: 2200871d9cef988051d2a99d67df3bda6cbb30a8
+    notatka: "Artistic-1.0-Perl OR GPL-1.0-or-later (Phil Harvey): ExifTool 13.59 (tag = ten commit, 2026-05-27, dziś bieżąca). Przegląd 2026-10-24: pliki z SourceForge (tam kieruje exiftool.org), sumy z exiftool.org/checksums-13.59.txt = własne liczenie; paczka Perla to repo przy tagu (1237 z 1240 plików identycznych z blobami gita, inne tylko META.json, META.yml, html/index.html), zip Windows: 248 plików ExifTool jak w repo + Strawberry Perl 5.32 + launcher Olivera Betza (CC0), bez Authenticode; exiftool(-k).exe po rozpakowaniu dostaje nazwę exiftool.exe (z „(-k)” czeka na Enter); bez sieci; ~/.ExifTool_config to kod Perla, więc EXIFTOOL_HOME na katalog narzędzia; macOS 14–26 ma /usr/bin/perl 5.34 (apple-oss-distributions)"
+  pixi:
+    repo: https://github.com/prefix-dev/pixi
+    status: do-wdrozenia
+    przejrzane: 0e967d38d40f4f2d6fe58f23c037d4c865220d20
+    notatka: "BSD-3-Clause (prefix.dev GmbH): pixi 0.83.0 (tag = ten commit, wydanie niezmienne z 2026-10-22 z atestacją GitHuba), tylko do vendor/pixi/tesseract (pixi.lock z Tesseractem, I22). Przegląd 2026-10-24: pliki .sha256 i sha256.sum = digesty GitHuba = własne liczenie; Windows z Authenticode i macOS z Developer ID (prefix.dev GmbH), Linux statyczny musl; telemetria tylko po install.sh/install.ps1 i self-update (nie używamy, PIXI_NO_TELEMETRY=1), PIXI_NO_CONFIG=1; skrypty post-link domyślnie wyłączone, detektory pakietów wirtualnych z kanału (nowość 0.83.0) zablokowane w .pixi/config.toml; sprawdza sha256 każdej paczki z locka"
+  tesseract:
+    repo: https://github.com/tesseract-ocr/tesseract
+    status: do-wdrozenia
+    przejrzane: db0ec62f81b0737fbbe184d8fea40af5738f8eef
+    notatka: "Apache-2.0: Tesseract 5.5.3 (tag podpisany przez Stefana Weila = ten commit, 2026-07-24) jako paczka conda-forge tesseract 5.5.3 build 0 z vendor/pixi/tesseract/pixi.lock (na Windows wydanie ma tylko instalator NSIS z UAC). Przegląd 2026-10-24: recepta buduje z tego źródła (sha256 archiwum zgodny) i dokłada tessdata_fast 4.1.0, czyli wszystkie języki (179 MB do pobrania, 340 MB po instalacji); bez telemetrii; z libcurl (adres URL jako wejście, ocr.py podaje plik albo stdin); na Windows nie znajduje configs/tsv, więc TSV przez -c tessedit_create_tsv=1"
+  tesseract-feedstock:
+    repo: https://github.com/conda-forge/tesseract-feedstock
+    status: do-wdrozenia
+    przejrzane: 568e7986182393275d0cda725438219077d489b5
+    notatka: "BSD-3-Clause (recepta conda-forge, repo bez tagów wydań): ten commit buduje tesseract 5.5.3 build 0 (2026-07-27), szkolenie wyłączone. pixi.lock: 31–37 paczek na platformę (210–222 MB), sumy zgodne z API anaconda.org i własnym liczeniem (139 z 139). Licencje zależności: BSD, MIT, zlib, curl, ISC, HPND (libtiff), LGPL (libiconv, keyutils), GPL-2.0-or-later (lzo przez libarchive w wariancie gpl), GCC z wyjątkiem runtime, licencje Microsoft (ucrt, vc14_runtime, vcomp14); pobieramy u źródła, nie hostujemy"
+  tessdata-fast:
+    repo: https://github.com/tesseract-ocr/tessdata_fast
+    status: do-wdrozenia
+    przejrzane: 65727574dfcd264acbb0c3e07860e4e9e9b22185
+    notatka: "Apache-2.0: tessdata_fast 4.1.0 (tag podpisany przez Stefana Weila = ten commit, 2019-10-30); pol, eng i osd bez zmian aż do main 8741641. Przegląd 2026-10-24: pliki z raw.githubusercontent.com przy commicie, sha1 blobów gita = drzewo commitu, sha256 = te same pliki w paczce conda-forge tesseract 5.5.3; same dane, bez kodu. Natywnie: modele.tessdata-fast"
+  scrcpy:
+    repo: https://github.com/Genymobile/scrcpy
+    status: do-wdrozenia
+    przejrzane: a60891aea193d92e7e5c3942700eca63f9d19a5f
+    notatka: "Apache-2.0 (Genymobile, autor Romain Vimont): scrcpy 5.0.1 (tag podpisany GPG autora = ten commit, wydanie 2026-10-08). Przegląd 2026-10-24: pliki zbudowane w GitHub Actions (release.yml, przebieg 37737030700 na dc8a55a, rodzicu tagu, różnica tylko w dokumentacji), SHA256SUMS.txt z podpisem GPG rom1v (klucz 456958E85A185DD5C2D1E4E80C822B298461FA03 z profilu GitHub) zgodny z digestami GitHuba, artefaktem CI i własnym liczeniem; win64, winarm64 (natywnie ARM64), macos-aarch64, linux-x86_64, bez linux-aarch64; w paczkach adb identyczny z platform-tools r37.0.1, FFmpeg 9.0.2 bez GPL, SDL 3.4.18, libusb 1.0.30, dav1d 1.5.4; bez telemetrii i sprawdzania aktualizacji, sieć tylko przez adb i tunel 127.0.0.1:27183+; bez Authenticode i notaryzacji (macOS ad hoc). Android platform-tools r37.0.1 (adb, fastboot) przejrzane tego samego dnia, ale wpis czeka: źródło bez repo git, a spis przyjmuje paczkę tylko jako tar (vendor/natywne.yaml, blok platform-tools)"
+  paradee-8m:
+    repo: https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0
+    status: do-wdrozenia
+    przejrzane: 8f34b01ef8adcb0bec470b89bf2fd62a7b2369e6
+    notatka: "Apache-2.0 (Sahil Mahendrakar; destylacja z hexgrad/Kokoro-82M, Apache-2.0, na 12 000 zdań WikiText-103 czytanych przez Kokoro): wagi lektora en-US-Paradee (jarvo-tts), w obrazie od 2026-10 przez tag v1.0. Tag v1.0 jest adnotowany: obiekt 6566cefd (to podaje /api/models/.../refs jako targetCommit), commit 8f34b01e z 2026-09-25 (git ls-remote: refs/tags/v1.0^{}); po nim na main tylko karta modelu (f662642d, c7f83f86). Przegląd 2026-10-24: onnx/paradee_int8.onnx, config.json i LICENSE przy 8f34b01e mają sumy z infra/Dockerfile; sha256 LFS z paths-info i X-Linked-Etag zgodne z własnym liczeniem, małe pliki zgodne z SHA-1 blobu gita z API; same wagi ONNX i JSON, bez kodu. Natywnie: modele.paradee"
+  parakeet-tdt-onnx:
+    repo: https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx
+    status: do-wdrozenia
+    przejrzane: 8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce
+    notatka: "CC-BY-4.0 (model NVIDIA nvidia/parakeet-tdt-0.6b-v3; eksport ONNX i int8 zrobił autor onnx-asr, istupakov, kod eksportu w karcie): rozpoznawanie mowy jarvo-stt. Rewizja = main od 2026-02-17 (wagi z 2025-08-16, commit b9f397ca). Przegląd 2026-10-24: pliki, które bierze onnx-asr 0.12.0 dla quantization=int8 (resolver.py i models/nemo.py w tagu v0.12.0 = b9e0ce0a): config.json, encoder-model.int8.onnx (6139d2fa…), decoder_joint-model.int8.onnx (eea7483e…), vocab.txt; nemo128.onnx z repo nieużywany (preprocesor jest w kole onnx-asr). sha256 LFS z paths-info i X-Linked-Etag zgodne z własnym liczeniem, małe pliki zgodne z SHA-1 blobu; same wagi i tekst, bez kodu. CC-BY: atrybucja NVIDIA i opis zmiany (eksport, int8) w docs/SOURCES.md i w README.md obok modelu. Obraz pobiera dziś bez rewizji (V05); natywnie modele.parakeet przy pierwszym użyciu"
+  silero-vad-onnx:
+    repo: https://huggingface.co/istupakov/silero-vad-onnx
+    status: do-wdrozenia
+    przejrzane: b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6
+    notatka: "MIT (Silero Team): Silero VAD 6.2 w ONNX dla onnx-asr (load_vad(\"silero\") w jarvo-stt). Rewizja = main od 2026-03-22. Przegląd 2026-10-24: silero_vad.onnx (2 327 524 B, 1a153a22…) bajt w bajt jak src/silero_vad/data/silero_vad.onnx w snakers4/silero-vad@1e261b03 (blob gita liczony z pobranego pliku = blob w GitHubie, 80c5592e); config.json = {model_type: silero}; LICENSE.txt = MIT Silero; bez kodu. Obraz pobiera dziś bez rewizji (V05); natywnie modele.silero-vad"
+  modnet-onnx:
+    repo: https://huggingface.co/DavG25/modnet-pretrained-models
+    status: do-wdrozenia
+    przejrzane: 903cc06311b3b12071edfa1b42b534e4a31c718a
+    notatka: "Apache-2.0 (README ZHKKKe/MODNet: kod, modele i dema na Apache-2.0): lustro wag MODNet (DavG25, 2023-04-28, bez zmian od tego dnia), z którego maska.py pobiera modnet_photographic_portrait_matting.onnx. Przegląd 2026-10-24: plik (25 888 640 B, 07c308cf…) bajt w bajt jak plik z oficjalnego folderu Google Drive autorów (link w pretrained/README.md, ZHKKKe/MODNet@28165a45); ta sama suma w tabeli README lustra, w paths-info i X-Linked-Etag. Repo bez pliku LICENSE (licencja w karcie). Natywnie: modele.modnet"
+  yunet-onnx:
+    repo: https://huggingface.co/opencv/face_detection_yunet
+    status: do-wdrozenia
+    przejrzane: 3cc26e7f1014a5ee5d74a42acee58bafc9d0a310
+    notatka: "MIT (Shiqi Yu; OpenCV Zoo): YuNet 2023mar na Hugging Face organizacji opencv (lustro models/face_detection_yunet z opencv/opencv_zoo), z którego twarze.py pobiera face_detection_yunet_2023mar.onnx. Przegląd 2026-10-24: plik (232 589 B, 8f2383e4…) = wskaźnik LFS w opencv/opencv_zoo@47534e27 (ten sam sha256 i rozmiar), LICENSE = blob 4cdf89a4 z opencv_zoo. W opencv_zoo jest nowszy face_detection_yunet_2026may.onnx (bez przeglądu, poza Hugging Face). Natywnie: modele.yunet"
+  espeakng-loader:
+    repo: https://github.com/thewh1teagle/espeakng-loader
+    status: do-wdrozenia
+    przejrzane: 146599e29be31bf17d99f0bcb7dbb2f92aef3d95
+    notatka: "espeakng-loader 0.2.4 (PyPI 2025-01-17; repo nie ma tagu v0.2.4, ten commit to „bump version to 0.2.4”): koła win_amd64, win_arm64, macosx_11_0_arm64, manylinux2014_x86_64 i manylinux_2_28_aarch64 niosą bibliotekę espeak-ng 1.52 z danymi (GPL-3.0-or-later; espeak-ng tag 1.52.0 = 4870adfa25b1a32b4361592f1be8a40337c58d6c). Przegląd 2026-10-24: kod loadera tylko podaje ścieżki biblioteki i danych, bez sieci i telemetrii; koła NIE mają pliku ani metadanych licencji (LICENSE MIT trafił do repo dopiero 2025-11-01, 0ddc87a), więc licencję espeak-ng i adres źródeł podajemy sami w docs/SOURCES.md; espeak-ng.dll bez podpisu Authenticode. Próba na Windows 11 x64: fonemy pl przez phonemizer-fork 3.3.2 (GPL-3.0) bez sieci"
+  opencv-python:
+    repo: https://github.com/opencv/opencv-python
+    status: do-wdrozenia
+    przejrzane: b83046cda41133f1bf2e73e99dba16a1248f103a
+    notatka: "opencv-python-headless 5.0.0.93 (tag 93 = ten commit, PyPI 2026-07-02; venvy OCR i docling) i 4.14.0.94 (tag 94 = 2ba8bf62f2f1215ab620416b041c9659005fa25c; lemo-wake), Apache-2.0. Przegląd 2026-10-24: koła cp37-abi3 win_amd64, macosx_13_0_arm64, manylinux_2_28 x86_64 i aarch64, bez win_arm64 (I27). Windows: cv2.pyd i opencv_videoio_ffmpeg500_64.dll (FFmpeg LGPL), bez podpisu; Linux: FFmpeg LGPL, aom, vpx, avif, OpenBLAS, libgfortran; macOS arm64: FFmpeg z około 100 bibliotekami Homebrew, w tym libx264, libx265, libpostproc, librubberband i libvidstab (GPL-2.0-or-later), choć LICENSE-3RD-PARTY w kole opisuje tylko LGPL-2.1. Bez sieci poza jawnym otwieraniem strumieni wideo. Pobieramy z PyPI bez zmian i nie redystrybuujemy; lustro (I21) dopiero po ocenie GPL"
+  pypdfium2:
+    repo: https://github.com/pypdfium2-team/pypdfium2
+    status: do-wdrozenia
+    przejrzane: 21f85e273036f3bade4f67d896e1d05927e5f4b1
+    notatka: "pypdfium2 5.14.0 (tag 5.14.0 = ten commit, PyPI 2026-10-04): BSD-3-Clause i Apache-2.0, PDFium z pdfium-binaries, licencje jego zależności w kole (BUILD_LICENSES dla każdej platformy: abseil, freetype, icu, lcms, libjpeg-turbo, openjpeg, libpng, zlib i inne). Przegląd 2026-10-24: koła py3-none na 6 platform (także win_arm64), bez sieci w czasie działania, pdfium.dll bez podpisu Authenticode; w venvie OCR, planowo także zamiast Ghostscriptu (E04)"
+  playwright-python:
+    repo: https://github.com/microsoft/playwright-python
+    status: do-wdrozenia
+    przejrzane: 8cb967b3e4199bef5ce38e1cf34df1bf79cb8a8d
+    notatka: "Playwright for Python 1.63.0 (tag v1.63.0 = ten commit; venv claude-seo) i 1.62.0 (tag v1.62.0 = 3b7c24c3e67dc84f7b0eddd0c5fd2ca685705021; venv narzędzi dla Camoufoxa), Apache-2.0. Przegląd 2026-10-24: koła py3-none win_amd64, win_arm64, macosx_11_0_arm64, manylinux x86_64 i aarch64; w kole sterownik z Node.js (LICENSE, NOTICE, ThirdPartyNotices; na Windows node.exe podpisany przez OpenJS Foundation). Przeglądarek sam nie pobiera, robi to tylko `playwright install` (u nas zablokowane, przeglądarka z CfT). Próba na Windows 11 x64: `python -m playwright --version` daje 1.62.0 i 1.63.0"
+  spacy-models:
+    repo: https://github.com/explosion/spacy-models
+    status: do-wdrozenia
+    przejrzane: 374ece89b2099818244f5a65ef466b89c0c392ae
+    notatka: "en_core_web_sm 3.8.0 (tag en_core_web_sm-3.8.0 = ten commit), MIT: model spaCy dla G2P misaki. W natywnym locku venvu narzędzi (infra/python/natywne/narzedzia.lock) jest kołem z adresem wydania GitHub i sumą 1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85 (ta sama co w infra/Dockerfile; zasób nie ma digestu GitHuba, więc sumę policzyłem strumieniowo i przez uv; 12806118 B jak w API). Przegląd 2026-10-24; próba na Windows: misaki en.G2P działa bez sieci"

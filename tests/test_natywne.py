@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import stat
 import subprocess
 import sys
 import tarfile
@@ -201,6 +202,232 @@ def test_zainstaluj_atomowo_i_bez_ponownego_pobrania(serwer, tmp_path):
     (www / "uv.zip").unlink()                       # drugi raz: bez sieci, bo suma w znaczniku się zgadza
     assert pobieracz.zainstaluj("uv", "0.12.13+x", wpis, tmp_path / "n", tmp_path / "pob", pasek=False) == kat
     assert not list((tmp_path / "n" / "uv").glob("*.new"))
+
+
+def test_plik_laduje_pod_nazwa_z_manifestu(serwer, tmp_path):
+    """Format plik: binarka w katalogu narzędzia ma nazwę z `nazwa_pliku` (albo zdekodowaną końcówkę adresu), a nie
+    nazwę z pamięci podręcznej z przedrostkiem sumy (wtedy `jq` ani `lightpanda` nie byłoby w PATH)."""
+    www, adres = serwer
+    tresc = b"MZ udawane jq"
+    (www / "jq-windows-amd64.exe").write_bytes(tresc)
+    wpis = {"url": f"{adres}/jq-windows-amd64.exe", "sha256": _sha(tresc), "rozmiar": len(tresc), "format": "plik",
+            "nazwa_pliku": "jq.exe"}
+    kat = pobieracz.zainstaluj("jq", "1.8.2", wpis, tmp_path / "n", tmp_path / "pob", pasek=False)
+    assert sorted(p.name for p in kat.iterdir()) == [".jarvo-suma", "jq.exe"]
+    assert (kat / "jq.exe").read_bytes() == tresc
+    if os.name != "nt":
+        assert (kat / "jq.exe").stat().st_mode & 0o777 == 0o755
+    (www / "agent+b").write_bytes(b"ab")                      # bez nazwa_pliku: końcówka adresu po zdekodowaniu
+    wpis = {"url": f"{adres}/agent%2Bb", "sha256": _sha(b"ab"), "rozmiar": 2, "format": "plik"}
+    kat = pobieracz.zainstaluj("ab", "1", wpis, tmp_path / "n", tmp_path / "pob", pasek=False)
+    assert (kat / "agent+b").read_bytes() == b"ab"
+    adres_pbs = "https://x/a/cpython-3.13.17%2B20261021-x.tar.gz?y=1"
+    assert pobieracz.nazwa_z_adresu(adres_pbs) == "cpython-3.13.17+20261021-x.tar.gz" == \
+        natywne.nazwa_pliku({"url": adres_pbs})
+    # w prawdziwym manifeście env formatu plik wskazuje dokładnie ten plik (agent-browser, lightpanda, jq)
+    for nazwa, w in natywne.wczytaj()["narzedzia"].items():
+        for platforma, p in w["pliki"].items():
+            if p.get("format") == "plik":
+                assert pobieracz.nazwa_z_adresu(p["url"]) == natywne.nazwa_pliku(dict(p, nazwa_pliku=None))
+                for v in (p.get("env") or {}).values():
+                    assert not v.startswith("{katalog}/") or v == "{katalog}/" + natywne.nazwa_pliku(p), (nazwa, v)
+
+
+def _zip_unix(sciezka: Path, wpisy: list[tuple[str, bytes, int]]) -> Path:
+    """Zip jak z Uniksa: tryb pliku (z typem) w górnych bitach external_attr, dowiązanie = treść z jego celem."""
+    with zipfile.ZipFile(sciezka, "w") as zf:
+        for nazwa, dane, tryb in wpisy:
+            zi = zipfile.ZipInfo(nazwa)
+            zi.create_system = 3
+            zi.external_attr = tryb << 16
+            zf.writestr(zi, dane)
+    return sciezka
+
+
+LINK = stat.S_IFLNK | 0o777
+
+
+def test_zip_dowiazania_i_uprawnienia(tmp_path):
+    """qpdf (lib/libqpdf.so.30 → libqpdf.so.30.4.2) i pandoc dla macOS (bin/pandoc-lua → pandoc) mają w zipie
+    dowiązania: na POSIX względne dowiązanie w katalogu, na Windows kopia celu; tryb 0o777 z zipa → 0o755."""
+    z = _zip_unix(tmp_path / "qpdf.zip", [
+        ("qpdf-12/lib/libqpdf.so.30.4.2", b"biblioteka", stat.S_IFREG | 0o777),
+        ("qpdf-12/lib/libqpdf.so.30", b"libqpdf.so.30.4.2", LINK),
+        ("qpdf-12/bin/pandoc", b"pandoc", stat.S_IFREG | 0o755),
+        ("qpdf-12/bin/pandoc-server", b"pandoc-lua", LINK),               # łańcuch: server → lua → pandoc
+        ("qpdf-12/bin/pandoc-lua", b"pandoc", LINK),
+        ("qpdf-12/share/doc", b"../lib", LINK),                          # dowiązanie do katalogu w archiwum
+        ("qpdf-12/README", b"r", stat.S_IFREG | 0o644)])
+    kat = tmp_path / "q"
+    pobieracz.rozpakuj(z, kat, "zip", usun_poziom=1)
+    so, lua, server = kat / "lib" / "libqpdf.so.30", kat / "bin" / "pandoc-lua", kat / "bin" / "pandoc-server"
+    assert so.read_bytes() == b"biblioteka" and lua.read_bytes() == server.read_bytes() == b"pandoc"
+    assert (kat / "share" / "doc" / "libqpdf.so.30.4.2").read_bytes() == b"biblioteka"
+    if os.name == "nt":
+        assert not so.is_symlink() and not lua.is_symlink() and (kat / "share" / "doc").is_dir()
+    else:
+        assert os.readlink(so) == "libqpdf.so.30.4.2" and os.readlink(server) == "pandoc-lua"
+        assert (kat / "lib" / "libqpdf.so.30.4.2").stat().st_mode & 0o777 == 0o755
+        assert (kat / "README").stat().st_mode & 0o777 == 0o644
+    for zly, cel in (("poza", b"../../poza"), ("abs", b"/etc/passwd"), ("dysk", b"C:/Windows/notepad.exe"),
+                     ("pusty", b"")):
+        z = _zip_unix(tmp_path / f"{zly}.zip", [("a/plik", b"x", stat.S_IFREG | 0o644), (f"a/{zly}", cel, LINK)])
+        with pytest.raises(pobieracz.BladPobierania, match="poza katalog|bez celu"):
+            pobieracz.rozpakuj(z, tmp_path / f"r-{zly}", "zip", usun_poziom=1)
+    z = _zip_unix(tmp_path / "petla.zip", [("a/k/plik", b"x", stat.S_IFREG | 0o644), ("a/k/petla", b".", LINK)])
+    if os.name == "nt":
+        with pytest.raises(pobieracz.BladPobierania, match="pętla"):
+            pobieracz.rozpakuj(z, tmp_path / "r-petla", "zip", usun_poziom=1)
+    else:                                                              # na POSIX zostaje dowiązaniem jak w archiwum
+        pobieracz.rozpakuj(z, tmp_path / "r-petla", "zip", usun_poziom=1)
+        assert os.readlink(tmp_path / "r-petla" / "k" / "petla") == "."
+
+
+def _tar(sciezka: Path, wpisy: list[tuple[str, str, bytes | str]]) -> Path:
+    """tar.bz2 z plikami (`f`), twardymi (`h`, cel od korzenia archiwum) i symbolicznymi (`s`) dowiązaniami."""
+    with tarfile.open(sciezka, "w:bz2") as tf:
+        for rodzaj, nazwa, dane in wpisy:
+            info = tarfile.TarInfo(nazwa)
+            if rodzaj == "f":
+                info.size, info.mode = len(dane), 0o755
+                tf.addfile(info, io.BytesIO(dane))
+                continue
+            info.type = tarfile.LNKTYPE if rodzaj == "h" else tarfile.SYMTYPE
+            info.linkname = dane
+            tf.addfile(info)
+    return sciezka
+
+
+def test_tar_twarde_i_symboliczne_dowiazania(tmp_path):
+    """Git for Windows: git-remote-https.exe to twarde dowiązanie (bez niego git nie zna https), cel liczony od
+    korzenia archiwum, więc przy usun_poziom też przycięty. Symboliczne do /proc na Windows pomijamy, do pliku
+    w archiwum zastępuje kopia; na POSIX tarfile odtwarza dowiązania, a te poza katalog odrzuca."""
+    t = _tar(tmp_path / "git.tar.bz2", [
+        ("f", "Git/ucrt64/libexec/git-core/git-remote-ftp.exe", b"git-remote"),
+        ("h", "Git/ucrt64/libexec/git-core/git-remote-https.exe", "Git/ucrt64/libexec/git-core/git-remote-ftp.exe"),
+        ("f", "Git/usr/bin/vim.exe", b"vim"),
+        ("s", "Git/usr/bin/vi.exe", "vim.exe")])
+    kat = tmp_path / "g"
+    pobieracz.rozpakuj(t, kat, "tar.bz2", usun_poziom=1)
+    https = kat / "ucrt64" / "libexec" / "git-core" / "git-remote-https.exe"
+    assert https.read_bytes() == b"git-remote" and (kat / "usr" / "bin" / "vi.exe").read_bytes() == b"vim"
+    assert (kat / "usr" / "bin" / "vi.exe").is_symlink() == (os.name != "nt")
+    proc = _tar(tmp_path / "proc.tar.bz2", [("f", "Git/etc/profile", b"p"), ("s", "Git/dev/fd", "/proc/self/fd"),
+                                            ("s", "Git/etc/mtab", "/proc/mounts")])
+    if os.name == "nt":
+        pobieracz.rozpakuj(proc, tmp_path / "p", "tar.bz2", usun_poziom=1)
+        assert (tmp_path / "p" / "etc" / "profile").is_file() and not (tmp_path / "p" / "dev" / "fd").exists()
+    else:
+        with pytest.raises(pobieracz.BladPobierania, match="archiwum"):
+            pobieracz.rozpakuj(proc, tmp_path / "p", "tar.bz2", usun_poziom=1)
+
+
+@pytest.mark.windows_only
+def test_tar_na_windows_twarde_dowiazanie_to_ten_sam_plik(tmp_path):
+    """NTFS: tarfile robi twarde dowiązanie (os.link, bez admina), więc 92 kopie gita nie zajmują miejsca."""
+    t = _tar(tmp_path / "g.tar.bz2", [("f", "a/git.exe", b"git" * 1000), ("h", "a/git-upload-pack.exe", "a/git.exe")])
+    pobieracz.rozpakuj(t, tmp_path / "g", "tar.bz2")
+    a, b = tmp_path / "g" / "a" / "git.exe", tmp_path / "g" / "a" / "git-upload-pack.exe"
+    assert a.read_bytes() == b.read_bytes() and os.stat(a).st_nlink == 2 and os.path.samefile(a, b)
+
+
+def test_usun_i_zmien_nazwe_po_rozpakowaniu(serwer, tmp_path):
+    """platform-tools bez sqlite3 3.50.6 (błąd WAL-reset) i innych zbędnych programów, ExifTool jako exiftool.exe.
+    Brak pliku z manifestu albo ścieżka poza katalog = błąd, a połowa narzędzia nie zostaje."""
+    www, adres = serwer
+    bufor = io.BytesIO()
+    with zipfile.ZipFile(bufor, "w") as zf:
+        for nazwa in ("adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll", "fastboot.exe", "sqlite3.exe", "mke2fs.exe",
+                      "mke2fs.conf", "make_f2fs.exe", "make_f2fs_casefold.exe", "etc1tool.exe", "hprof-conv.exe",
+                      "libwinpthread-1.dll", "NOTICE.txt", "source.properties", "lib64/libc++.so",
+                      "exiftool(-k).exe"):
+            zf.writestr(f"platform-tools/{nazwa}", nazwa)
+    (www / "pt.zip").write_bytes(bufor.getvalue())
+    wpis = {"url": f"{adres}/pt.zip", "sha256": _sha(bufor.getvalue()), "rozmiar": len(bufor.getvalue()),
+            "format": "zip", "usun_poziom": 1, "zmien_nazwe": {"exiftool(-k).exe": "exiftool.exe"},
+            "usun": ["sqlite3.exe", "mke2fs.exe", "mke2fs.conf", "make_f2fs.exe", "make_f2fs_casefold.exe",
+                     "etc1tool.exe", "hprof-conv.exe", "libwinpthread-1.dll", "lib64"]}
+    kat = pobieracz.zainstaluj("platform-tools", "37.0.1", wpis, tmp_path / "n", tmp_path / "pob", pasek=False)
+    assert sorted(p.name for p in kat.iterdir()) == [".jarvo-suma", "AdbWinApi.dll", "AdbWinUsbApi.dll", "NOTICE.txt",
+                                                     "adb.exe", "exiftool.exe", "fastboot.exe", "source.properties"]
+    for zle, komunikat in ((dict(wpis, usun=["nie-ma.exe"]), "usun: nie ma nie-ma.exe"),
+                           (dict(wpis, usun=["../poza"]), "ścieżką względną"),
+                           (dict(wpis, zmien_nazwe={"adb.exe": "fastboot.exe"}), "fastboot.exe już jest"),
+                           (dict(wpis, zmien_nazwe={"nie-ma": "x"}), "zmien_nazwe: nie ma nie-ma")):
+        with pytest.raises(pobieracz.BladPobierania, match=komunikat):
+            pobieracz.zainstaluj("pt-zle", "1", zle, tmp_path / "n", tmp_path / "pob", pasek=False)
+        assert not (tmp_path / "n" / "pt-zle").exists() or not list((tmp_path / "n" / "pt-zle").iterdir())
+
+
+def test_manifest_waliduje_nowe_pola(tmp_path):
+    """nazwa_pliku, env, usun, zmien_nazwe (natywne.py) i czekający blok platform-tools (zakomentowany, bo spis
+    przyjmuje paczkę tylko jako tar): po odkomentowaniu przejdzie walidację."""
+    dobry = {"url": "https://example.com/pt.zip", "sha256": "a" * 64, "rozmiar": 1, "format": "zip"}
+    narz = {"pt": {"zrodlo": "uv", "wersja": "1", "licencja": "MIT", "rola": "x",
+                   "pliki": {p: dict(dobry) for p in natywne.PLATFORMY}}}
+    narz["pt"]["pliki"]["windows-x64"].update(usun=["../poza", "a", "a"], zmien_nazwe={"a": "/abs"},
+                                              nazwa_pliku="kat/plik", env={"ZŁA-NAZWA": 1})
+    narz["pt"]["pliki"]["linux-x64"].update(format="plik", usun=["x"], env={"JARVO_X": "{katalog}/inna-nazwa"})
+    b = "\n".join(natywne.bledy({"version": 1, "hermes": HERMES_OK, "narzedzia": narz}, {"uv": {}}))
+    for fragment in ("windows-x64: usun to lista", "windows-x64: zmien_nazwe to słownik", "nazwa_pliku to sama nazwa",
+                     "windows-x64: env to słownik", "linux-x64: format plik nie ma czego usuwać",
+                     "linux-x64: env JARVO_X wskazuje {katalog}/inna-nazwa, a plik ląduje jako {katalog}/pt.zip"):
+        assert fragment in b
+    tekst = (REPO / "vendor" / "natywne.yaml").read_text(encoding="utf-8")
+    if "  # platform-tools:\n" in tekst:                    # wpis czeka na paczki zip w vendor/zrodla.yaml
+        linie = []
+        for linia in tekst[tekst.index("  # platform-tools:\n"):].splitlines():
+            if not linia.startswith("  #"):
+                break
+            linie.append(linia.replace("  # ", "  ", 1) if linia.startswith("  # ") else "")
+        blok = __import__("yaml").safe_load("narzedzia:\n" + "\n".join(linie))["narzedzia"]
+    else:                                                    # po odkomentowaniu: ten sam wpis z manifestu
+        blok = {"platform-tools": natywne.wczytaj()["narzedzia"]["platform-tools"]}
+    assert set(blok) == {"platform-tools"}
+    pt = blok["platform-tools"]
+    assert "sqlite3.exe" in pt["pliki"]["windows-x64"]["usun"] and "sqlite3" in pt["pliki"]["macos-arm64"]["usun"]
+    assert not {"adb", "adb.exe", "fastboot", "fastboot.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"} & \
+        {u for p in pt["pliki"].values() for u in p.get("usun") or []}
+    assert natywne.bledy({"version": 1, "hermes": HERMES_OK, "narzedzia": blok}, {"android-platform-tools": {}}) == []
+
+
+def _lock_venvu(sciezka: Path, tekst: str) -> Path:
+    sciezka.parent.mkdir(parents=True, exist_ok=True)
+    sciezka.write_text(tekst, encoding="utf-8", newline="\n")
+    return sciezka
+
+
+def test_venvy_w_manifescie_i_locku(tmp_path):
+    """Sekcja venvy: lock z sumami w infra/python/, Python z sekcji narzedzia, pobranie_mb dla 5 platform; do locka
+    trafia suma pliku (katalog venvu i kontrola zmiany), liczba paczek i --torch-backend dla instalatora."""
+    h = "--hash=sha256:" + "b" * 64
+    _lock_venvu(tmp_path / "infra" / "python" / "natywne" / "a.lock",
+                f"# komentarz\nnumpy==2.4.6 \\\n    {h}\nen-core-web-sm @ https://example.com/e.whl \\\n    {h}\n")
+    py = {"zrodlo": "uv", "wersja": "3.12", "licencja": "PSF", "rola": "x",
+          "pliki": {p: {"brak": "test"} for p in natywne.PLATFORMY}}
+    mb = {p: 10 for p in natywne.PLATFORMY}
+    venv = {"python": "python312", "lock": "infra/python/natywne/a.lock", "rola": "x", "kiedy": "dodatek",
+            "bez": ["docopt"], "pobranie_mb": mb, "torch_backend": "cpu"}
+    dane = {"version": 1, "hermes": HERMES_OK, "narzedzia": {"python312": py}, "venvy": {"a": venv}}
+    assert natywne.bledy(dane, {"uv": {}}, repo=tmp_path) == []
+    v = natywne.lock(dane, repo=tmp_path)["venvy"]["a"]
+    assert v["paczek"] == 2 and v["torch_backend"] == "cpu" and v["kiedy"] == "dodatek" and v["bez"] == ["docopt"]
+    assert v["sha256"] == _sha((tmp_path / "infra" / "python" / "natywne" / "a.lock").read_bytes())
+    _lock_venvu(tmp_path / "infra" / "python" / "natywne" / "zly.lock",
+                f"--index-url https://example.com/simple\nrequests==2.0\ndocopt==0.6.2 \\\n    {h}\n")
+    zle = {"python": "python399", "lock": "infra/python/natywne/zly.lock", "rola": "", "bez": ["docopt"],
+           "pobranie_mb": {"windows-x64": 1}, "torch_backend": "cuda", "indeks": "x"}
+    b = "\n".join(natywne.bledy(dict(dane, venvy={"zly": zle, "poza": dict(venv, lock="../a.lock"),
+                                                  "brak": dict(venv, lock="infra/python/nie-ma.lock")}),
+                                {"uv": {}}, repo=tmp_path))
+    for fragment in ("nieznane pola ['indeks']", "python to wpis Pythona", "brak pola rola", "pobranie_mb to MB",
+                     "torch_backend spoza", "opcja --index-url w locku", "requests: bez --hash=sha256",
+                     "docopt jest w `bez`", "poza: lock to plik w infra/python/", "nie ma pliku infra/python/nie-ma"):
+        assert fragment in b
+    prawdziwe = manifest.venvy(REPO)
+    assert set(prawdziwe) == set(natywne.wczytaj()["venvy"]) and prawdziwe["docling"]["torch_backend"] == "cpu"
+    for nazwa, w in prawdziwe.items():                     # lock w repo = ten, którego sumę ma natywne.lock.json
+        assert _sha((REPO / w["lock"]).read_bytes()) == w["sha256"] and w["paczek"] > 0, nazwa
 
 
 def test_zapisz_atomowo_i_zamek(tmp_path):

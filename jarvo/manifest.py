@@ -1,7 +1,9 @@
 """Manifest narzędzi z sumami (vendor/natywne.lock.json, generowany z vendor/natywne.yaml przez scripts/natywne.py).
 
-Instalator czyta go samą biblioteką standardową. Wpis platformy to plik do pobrania (url, sha256, rozmiar, format)
-albo `brak` z powodem: wtedy narzędzia na tym systemie nie ma i `jarvo doctor` mówi to wprost.
+Instalator czyta go samą biblioteką standardową. Wpis platformy to plik do pobrania (url, sha256, rozmiar, format,
+opcjonalnie usun_poziom, nazwa_pliku, usun, zmien_nazwe, bin, env: wszystko to wykonuje jarvo/pobieracz.py) albo
+`brak` z powodem: wtedy narzędzia na tym systemie nie ma i `jarvo doctor` mówi to wprost. Sekcja `venvy` mówi,
+z którego locka w infra/python/ i na którym Pythonie z sekcji narzedzia zbudować venv (c3, krok 6).
 """
 from __future__ import annotations
 
@@ -32,6 +34,14 @@ def modele(app: Path) -> dict:
     """Modele niezależne od platformy: {nazwa: {"rewizja", "katalog", "kiedy", "pliki": [{"cel", "url", "sha256",
     "rozmiar"}]}}."""
     return json.loads((Path(app) / LOCK).read_text(encoding="utf-8")).get("modele") or {}
+
+
+def venvy(app: Path) -> dict:
+    """Venvy Jarva: {nazwa: {"python", "lock", "sha256", "paczek", "kiedy", "bez", "pobranie_mb", opcjonalnie
+    "venv_mb", "torch_backend"}}. `lock` to ścieżka od korzenia kodu, `sha256` = suma tego pliku (instalator
+    sprawdza ją przed `uv pip install` i bierze 12 znaków do nazwy katalogu venvu); `torch_backend` przekazuje
+    jako `uv pip install --torch-backend <wartość>`."""
+    return json.loads((Path(app) / LOCK).read_text(encoding="utf-8")).get("venvy") or {}
 
 
 def plik(narzedzia: dict, nazwa: str, platforma: str) -> dict:
