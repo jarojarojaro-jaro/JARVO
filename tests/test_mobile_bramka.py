@@ -134,8 +134,12 @@ def test_android_wrogie_ok_i_przywraca_ustawienia(tmp_path, monkeypatch):
     assert st["start"] == "ok" and st["duza-czcionka"] == "ok" and st["uprawnienia"] == "ok"
     assert st["offline"] == "blad"            # atrapa nie pokazuje „Brak internetu” → test działa
     for przywroc in ("settings put system font_scale 1.0", "wm size reset", "wm density reset", "cmd uimode night no",
-                     "cmd connectivity airplane-mode disable", "svc wifi enable", "svc data enable"):
+                     "cmd connectivity airplane-mode disable", "svc wifi enable"):
         assert przywroc in adb.polecenia          # kontener: wartości nieodczytane wracają do domyślnych, jak dotąd
+    # danych komórkowych test offline nie rusza (dwie karty SIM: ustawienie per karta), a tryb samolotowy wraca przed
+    # Wi-Fi (Wi-Fi włączone w trybie samolotowym zostawiłoby w Androidzie „Wi-Fi zostaje w trybie samolotowym”)
+    assert not any(p.startswith("svc data") for p in adb.polecenia)
+    assert adb.polecenia.index("cmd connectivity airplane-mode disable") < adb.polecenia.index("svc wifi enable")
     assert "pm revoke pl.salonola.app android.permission.CAMERA" in adb.polecenia
     assert "pm grant pl.salonola.app android.permission.CAMERA" in adb.polecenia      # uprawnienie oddane po teście
     assert not any("/sdcard" in p for p in adb.polecenia)                             # zrzut widoku w /data/local/tmp

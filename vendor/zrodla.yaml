@@ -618,11 +618,26 @@ zrodla:
     status: do-wdrozenia
     przejrzane: b83046cda41133f1bf2e73e99dba16a1248f103a
     notatka: "opencv-python-headless 5.0.0.93 (tag 93 = ten commit, PyPI 2026-07-02; venvy OCR i docling) i 4.14.0.94 (tag 94 = 2ba8bf62f2f1215ab620416b041c9659005fa25c; lemo-wake), Apache-2.0. Przegląd 2026-10-24: koła cp37-abi3 win_amd64, macosx_13_0_arm64, manylinux_2_28 x86_64 i aarch64, bez win_arm64 (I27). Windows: cv2.pyd i opencv_videoio_ffmpeg500_64.dll (FFmpeg LGPL), bez podpisu; Linux: FFmpeg LGPL, aom, vpx, avif, OpenBLAS, libgfortran; macOS arm64: FFmpeg z około 100 bibliotekami Homebrew, w tym libx264, libx265, libpostproc, librubberband i libvidstab (GPL-2.0-or-later), choć LICENSE-3RD-PARTY w kole opisuje tylko LGPL-2.1. Bez sieci poza jawnym otwieraniem strumieni wideo. Pobieramy z PyPI bez zmian i nie redystrybuujemy; lustro (I21) dopiero po ocenie GPL"
+  pikepdf:
+    repo: https://github.com/pikepdf/pikepdf
+    status: do-wdrozenia
+    przejrzane: b8ee8f0388373325e43873ede541758020253ad1
+    notatka: "pikepdf 10.17.0 (tag v10.17.0, obiekt tagu c2fad837 → ten commit; PyPI 2026-10-11), MPL-2.0, James R. Barlow i współtwórcy (autorzy OCRmyPDF). Przegląd 2026-10-25: koła cp312 win_amd64, macosx_15_0_arm64, manylinux_2_28 x86_64 i aarch64 niosą libqpdf (qpdf30.dll, Apache-2.0), libjpeg-turbo, zlib, OpenSSL i msvcp140 (licencja Microsoft), licencje w dist-info/licenses/third-party-licenses; adresy w kodzie Pythona to tylko przestrzenie nazw XMP, bez połączeń; _core.pyd bez Authenticode. Zależności lxml 6.1.3 i packaging 26.3 są już w locku venvu narzędzi. W venvie narzędzi (infra/python/natywne/narzedzia.lock) dla konwertuj.py: mniejszy PDF (mniejszy_pdf), a Konwerter panelu woła go przez --pikepdf-zadanie w Pythonie tego venvu. Sumy 43 plików w locku zgodne z JSON API PyPI, koła 4 platform liczone strumieniowo. Próba na Windows 11 x64: PDF ze zdjęciem 1600×1200 przy --jakosc 40: 93 860 → 13 932 B (CLI i panel)."
+  pillow:
+    repo: https://github.com/python-pillow/Pillow
+    status: do-wdrozenia
+    przejrzane: bb1d8e8ab8d29048624d96e3ee53cecf7c13d13d
+    notatka: "Pillow 12.3.0 (tag 12.3.0 = ten commit), MIT-CMU; koła z libjpeg-turbo, libpng, zlib, FreeType (FTL), lcms2, OpenJPEG, libwebp i innymi (spis w dist-info/licenses/LICENSE, SBOM w dist-info/sboms). Przegląd 2026-10-25: ta sama wersja co w venvie Hermesa f97608f (uv.lock) i w lockach lemo-wake, rembg i docling; w venvie narzędzi dla konwertuj.py (zdjęcia, zdjęcia → PDF, pikepdf). Sumy 87 plików w locku zgodne z JSON API PyPI, koła cp312 4 platform liczone strumieniowo; bez sieci w czasie działania."
+  pillow-heif:
+    repo: https://github.com/bigcat88/pillow_heif
+    status: do-wdrozenia
+    przejrzane: 16c3dd8249f56fa07ab4f1350bd73e7a20b95bb1
+    notatka: "pillow-heif 1.5.0 (tag v1.5.0 = ten commit), kod BSD-3-Clause; koło jako całość GPL-2.0 (LICENSES_bundled.txt: x265 do zapisu HEIC, libheif i libde265 LGPL-3.0, libaom BSD-3-Clause; w kole Windows libheif 1.23.1, libde265 1.1.1, x265 4.2, choć spis w kole podaje starsze wersje). Przegląd 2026-10-25: ta sama wersja co w venvie Hermesa f97608f (Konwerter panelu); lemo-wake ma 1.8.0. W venvie narzędzi dla konwertuj.py (HEIC z iPhone'a). Pobieramy z PyPI bez zmian i nie redystrybuujemy (jak opencv na macOS). Sumy 54 plików w locku zgodne z JSON API PyPI, koła cp312 4 platform liczone strumieniowo; bez sieci w czasie działania."
   pypdfium2:
     repo: https://github.com/pypdfium2-team/pypdfium2
     status: do-wdrozenia
     przejrzane: 21f85e273036f3bade4f67d896e1d05927e5f4b1
-    notatka: "pypdfium2 5.14.0 (tag 5.14.0 = ten commit, PyPI 2026-10-04): BSD-3-Clause i Apache-2.0, PDFium z pdfium-binaries, licencje jego zależności w kole (BUILD_LICENSES dla każdej platformy: abseil, freetype, icu, lcms, libjpeg-turbo, openjpeg, libpng, zlib i inne). Przegląd 2026-10-24: koła py3-none na 6 platform (także win_arm64), bez sieci w czasie działania, pdfium.dll bez podpisu Authenticode; w venvie OCR, planowo także zamiast Ghostscriptu (E04)"
+    notatka: "pypdfium2 5.14.0 (tag 5.14.0 = ten commit, PyPI 2026-10-04): BSD-3-Clause i Apache-2.0, PDFium z pdfium-binaries, licencje jego zależności w kole (BUILD_LICENSES dla każdej platformy: abseil, freetype, icu, lcms, libjpeg-turbo, openjpeg, libpng, zlib i inne). Przegląd 2026-10-24: koła py3-none na 6 platform (także win_arm64), bez sieci w czasie działania, pdfium.dll bez podpisu Authenticode; w venvie OCR i w venvie narzędzi (te same sumy co w requirements-ocr.txt); w konwertuj.py i ocr.py zamiast Ghostscriptu (E04), sprawdzone na Windows 11 2026-10-25"
   playwright-python:
     repo: https://github.com/microsoft/playwright-python
     status: do-wdrozenia

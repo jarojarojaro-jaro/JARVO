@@ -453,7 +453,13 @@ def przywroc_wpisy(adb: Adb, wpisy: list[dict]) -> list[dict]:
     reszty nie próbuje: zostaje na następny raz."""
     nieudane: list[dict] = []
     zniknal = False
-    for w in reversed(wpisy):
+    kolejnosc = list(reversed(wpisy))
+    # tryb samolotowy przed Wi-Fi: włączenie Wi-Fi w trybie samolotowym zapamiętuje w Androidzie „Wi-Fi zostaje
+    # w trybie samolotowym” (wifi_apm_state), czego właściciel nie wybrał; po zdjęciu trybu Wi-Fi wraca samo
+    samoloty = [w for w in kolejnosc if w.get("ustawienie") == "samolot"]
+    if samoloty:
+        kolejnosc = samoloty + [w for w in kolejnosc if w.get("ustawienie") != "samolot"]
+    for w in kolejnosc:
         if zniknal:
             nieudane.append(w)
             continue
@@ -723,14 +729,15 @@ def scenariusz(adb: Adb, id_: str, cel: str, outdir: Path, urz: dict | None = No
                 r.update(status="not_run", dlaczego="adb łączy się z telefonem przez Wi-Fi: tryb samolotowy odciąłby "
                          "sam adb (i flotę od telefonu); test offline przez kabel USB albo na emulatorze")
                 return r
-            if not (v := wartosci("samolot", "wifi", "dane")):
+            # danych komórkowych nie ruszamy wcale: tryb samolotowy wyłącza radio, a _ma_siec sprawdza brak sieci.
+            # Przy dwóch kartach SIM ustawienie jest per karta (mobile_data<subId>), a `svc data` zmienia kartę
+            # domyślną: odczyt klucza bez numeru brał 1 i przywrócenie włączało dane, które właściciel miał wyłączone
+            if not (v := wartosci("samolot", "wifi")):
                 return r
             if v["samolot"][0] != "1":
                 zmien(v, "samolot", ["cmd connectivity airplane-mode enable"])
             if v["wifi"][0] == "1":
                 zmien(v, "wifi", ["svc wifi disable"])
-            if v["dane"][0] == "1":
-                zmien(v, "dane", ["svc data disable"])
             time.sleep(2)
             if _ma_siec(adb):
                 r.update(status="not_run", dlaczego="urządzenie nie odcina sieci (np. Redroid po ethernecie): sprawdź na telefonie")

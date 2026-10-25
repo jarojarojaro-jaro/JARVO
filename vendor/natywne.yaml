@@ -1339,10 +1339,10 @@ venvy:
     python: python312
     lock: infra/python/natywne/narzedzia.lock
     kiedy: instalacja
-    rola: "venv narzędzi floty: trafilatura, yt-dlp, onnx-asr + onnxruntime 1.29.0 (jarvo-stt), misaki + spaCy 3.8.16 z en_core_web_sm 3.8.0, espeakng-loader + phonemizer-fork (jarvo-tts), num2words, camoufox + Playwright 1.62"
+    rola: "venv narzędzi floty: trafilatura, yt-dlp, onnx-asr + onnxruntime 1.29.0 (jarvo-stt), misaki + spaCy 3.8.16 z en_core_web_sm 3.8.0, espeakng-loader + phonemizer-fork (jarvo-tts), num2words, camoufox + Playwright 1.62, pikepdf 10.17.0 + Pillow 12.3.0 + pillow-heif 1.5.0 + pypdfium2 5.14.0 (konwertuj.py: mniejszy PDF, zdjęcia, HEIC, strony PDF)"
     bez: [docopt]
-    pobranie_mb: {windows-x64: 158, windows-arm64: 158, macos-arm64: 163, linux-x64: 214, linux-arm64: 201}
-    venv_mb: 583
+    pobranie_mb: {windows-x64: 180, windows-arm64: 180, macos-arm64: 178, linux-x64: 233, linux-arm64: 220}
+    venv_mb: 646
   ocr:
     python: python312
     lock: infra/python/requirements-ocr.txt

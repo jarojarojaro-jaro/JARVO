@@ -253,7 +253,8 @@ def _venv_wpis(app: Path) -> dict:
     lock = app / "lock.txt"
     lock.write_text("x==1 --hash=sha256:" + "0" * 64 + "\n", encoding="utf-8")
     return {"cad": {"python": "python312", "lock": "lock.txt", "sha256": hashlib.sha256(lock.read_bytes()).hexdigest(),
-                    "paczek": 1, "kiedy": "przy-uzyciu", "pobranie_mb": {PLATFORMA: 215}, "venv_mb": 597}}
+                    "paczek": 1, "kiedy": "przy-uzyciu", "venv_mb": 597,
+                    "pobranie_mb": {PLATFORMA: 215, sciezki.platforma(): 215}}}  # komunikat liczy dla tego systemu
 
 
 def _uv_i_python(u: Path, tmp_path: Path) -> None:

@@ -263,6 +263,8 @@ def test_nowy_klucz_adb_w_dzienniku_zmian_hosta_przed_zmiana(inst, monkeypatch, 
     assert len(_pliki_w_dzienniku(inst.u)) == 2
     raport = zmiany_hosta.cofnij(inst.u, log=None)                            # jarvo uninstall (E13)
     assert {r["wynik"] for r in raport} == {"cofniete"} and not (inst.klucze / "adbkey").exists()
+    assert not inst.klucze.exists()                  # katalog .android założył Jarvo: po plikach znika i on (pusty)
+    inst.klucze.mkdir(parents=True)
     (inst.klucze / "adbkey").write_text("KLUCZ ANDROID STUDIO")              # cudzy klucz: zostaje poza dziennikiem
     (inst.klucze / "adbkey.pub").write_text("pub")
     assert android.polecenie_on(inst.u, _a()) == 0
@@ -286,15 +288,21 @@ def test_przerwany_on_zostawia_wpis_ktory_konczy_nastepny(inst):
 
 
 def test_katalog_klucza_w_dzienniku_gdy_dziennik_zna_katalogi(inst, monkeypatch):
-    """Rodzaj „katalog” (pusty katalog .android usuwany przy odinstalowaniu) dopisuje koordynator w zmiany_hosta;
-    android.py go używa, gdy jest, a bez niego nie zgaduje."""
+    """Rodzaj „katalog” w zmiany_hosta (bez `dozwolone`: usuwany przy odinstalowaniu tylko pusty): android.py go
+    używa, gdy dziennik go zna, a bez niego nie zgaduje."""
     assert not inst.klucze.exists()
+    rodzaje = zmiany_hosta.RODZAJE
+    monkeypatch.setattr(zmiany_hosta, "RODZAJE", tuple(r for r in rodzaje if r != "katalog"))
     android.slady_przed(inst.u)
     assert [w for w in zmiany_hosta.wpisy(inst.u) if w["rodzaj"] == "katalog"] == []
-    monkeypatch.setattr(zmiany_hosta, "RODZAJE", (*zmiany_hosta.RODZAJE, "katalog"))
+    monkeypatch.setattr(zmiany_hosta, "RODZAJE", rodzaje)      # bez undo(): to cofnęłoby też ustawienia fixtury
     android.slady_przed(inst.u)
     assert [w["szczegoly"] for w in zmiany_hosta.wpisy(inst.u) if w["rodzaj"] == "katalog"] == [
         {"sciezka": str(inst.klucze)}]
+    inst.klucze.mkdir(parents=True)
+    (inst.klucze / "adb_usb.ini").write_text("x")   # cudzy plik w katalogu: przy cofaniu zostaje razem z katalogiem
+    raport = zmiany_hosta.cofnij(inst.u, rodzaje=["katalog"], log=None)
+    assert [r["wynik"] for r in raport] == ["nie-nasze"] and (inst.klucze / "adb_usb.ini").exists()
 
 
 def test_on_wifi_parowanie_kodem_i_polaczenie(inst, monkeypatch, capsys):

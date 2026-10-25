@@ -1942,20 +1942,20 @@
   "narzedzia": {
    "python": "python312",
    "lock": "infra/python/natywne/narzedzia.lock",
-   "sha256": "d4e6d5905eb8f8e3e5d43b4e47259af63523af74371ba3d9eb2a5ac300c5b5b2",
-   "paczek": 122,
+   "sha256": "09b11e6e7af1ec732dd64bfbff118451fe04756af3675d8161df8af13de2e7fe",
+   "paczek": 126,
    "kiedy": "instalacja",
    "bez": [
     "docopt"
    ],
    "pobranie_mb": {
-    "windows-x64": 158,
-    "windows-arm64": 158,
-    "macos-arm64": 163,
-    "linux-x64": 214,
-    "linux-arm64": 201
+    "windows-x64": 180,
+    "windows-arm64": 180,
+    "macos-arm64": 178,
+    "linux-x64": 233,
+    "linux-arm64": 220
    },
-   "venv_mb": 583
+   "venv_mb": 646
   },
   "ocr": {
    "python": "python312",
