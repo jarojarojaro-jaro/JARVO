@@ -48,7 +48,8 @@ LIMIT_NOTATEK = 5
 DZIENNIK_PRZYPOMNIEN = "wiedza-przypomnienia.jsonl"   # w state/: co agent dostał ze skarbca przed turą (do sprawdzenia w zakładce i w pliku)
 DZIENNIK_MAX_B = 5_000_000
 KOMPILACJA_CO_S = 3600                # kompilacja najwyżej raz na godzinę, gdy są szkice; do tego co noc (KOMPILACJA_NOC)
-KOMPILACJA_NOC = (3, 10)              # godzina, minuta: nocny przebieg (strefa kontenera)
+KOMPILACJA_NOC = (3, 10)              # godzina, minuta: nocny przebieg (czas lokalny komputera, w kontenerze jego strefa);
+                                      # komputer uśpiony o tej porze nadrabia przebieg raz, po wybudzeniu
 TYPY_SZKICU = ["fakt", "decyzja", "lekcja", "podmiot", "pojecie", "projekt"]
 
 WYCIAG_SYSTEM = (
@@ -104,15 +105,28 @@ def _schemat_schema() -> List[Dict[str, Any]]:
         return []
 
 
+def _dane_bez_hermesa() -> str:
+    """Bez HERMES_HOME i bez Hermesa (testy, skrypt): korzeń Jarva (JARVO_ROOT, %LOCALAPPDATA%/Jarvo, ~/.jarvo) albo
+    /opt/data w kontenerze; nigdy goły /opt na Windows (trafiłby do C:/opt bieżącego dysku)."""
+    if os.environ.get("JARVO_ROOT"):
+        return str(Path(os.environ["JARVO_ROOT"]) / "dane")
+    if os.name == "nt":
+        return str(Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "Jarvo" / "dane")
+    if sys.platform == "darwin":
+        return str(Path.home() / ".jarvo" / "dane")
+    return "/opt/data"
+
+
 def _hermes_home() -> str:
-    """HERMES_HOME procesu; bez zmiennej katalog domowy Hermesa (hermes_constants), poza Hermesem /opt/data (kontener)."""
+    """HERMES_HOME procesu; bez zmiennej katalog domowy Hermesa (hermes_constants), poza Hermesem korzeń
+    Jarva albo /opt/data (kontener)."""
     if os.environ.get("HERMES_HOME"):
         return os.environ["HERMES_HOME"]
     try:
         from hermes_constants import get_hermes_home
         return str(get_hermes_home())
     except Exception:
-        return "/opt/data"
+        return _dane_bez_hermesa()
 
 
 def _korzen(hermes_home: str) -> Path:
@@ -130,6 +144,16 @@ def _sciezki(hermes_home: str) -> tuple[Path, Path]:
     root = _korzen(hermes_home)
     return (Path(os.environ.get("JARVO_KNOWLEDGE_DIR") or root / "jarvo" / "knowledge"),
             Path(os.environ.get("JARVO_STATE_DIR") or root / "jarvo" / "state"))
+
+
+def ostatnia_noc(teraz: float, pora: tuple = KOMPILACJA_NOC) -> float:
+    """Ostatnia pora nocnego przebiegu nie później niż `teraz` (dziś o 03:10 albo wczoraj), w czasie lokalnym."""
+    import datetime as dt
+    chwila = dt.datetime.fromtimestamp(teraz)
+    noc = chwila.replace(hour=pora[0], minute=pora[1], second=0, microsecond=0)
+    if noc > chwila:
+        noc -= dt.timedelta(days=1)
+    return noc.timestamp()
 
 
 def _bez_ogonkow(s: str) -> str:
@@ -554,18 +578,17 @@ class SkarbiecProvider(MemoryProvider):
         except (OSError, ValueError, TypeError):
             return 0.0
 
-    def _moze_kompilowac(self) -> bool:
+    def _moze_kompilowac(self, teraz: Optional[float] = None) -> bool:
+        """Szkice w skrzynce i: godzina od poprzedniej kompilacji albo nocny przebieg, którego jeszcze nie było (ostatnia
+        kompilacja przed ostatnią porą KOMPILACJA_NOC). Komputer uśpiony o 03:10 nadrabia go raz po wybudzeniu, zamiast
+        czekać do następnej nocy (docs/NATYWNIE.md K03)."""
         if self._kontekst != "primary" or not self._skarbiec or not (self._skarbiec / "skrzynka").is_dir():
             return False
         if not any((self._skarbiec / "skrzynka").glob("*.md")):
             return False
-        teraz = time.time()
+        teraz = time.time() if teraz is None else teraz
         ostatnia = self._ostatnia_kompilacja()
-        if teraz - ostatnia >= KOMPILACJA_CO_S:
-            return True
-        lt = time.localtime(teraz)
-        noc = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, KOMPILACJA_NOC[0], KOMPILACJA_NOC[1], 0, 0, 0, -1))
-        return noc <= teraz < noc + 600 and ostatnia < noc
+        return teraz - ostatnia >= KOMPILACJA_CO_S or ostatnia < ostatnia_noc(teraz)
 
     def kompiluj(self, powod: str = "ręcznie") -> Dict[str, Any]:
         """Przebieg kompilacji skrzynki głównym modelem (wiedza/kompilacja.py); zwraca raport."""

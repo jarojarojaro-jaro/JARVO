@@ -2,8 +2,9 @@
 
 Czyta skarbiec przez wiedza.py (indeks FTS5, notatki, linki, lint, graf, LOG). Zapisuje tylko: orzeczenia (formularz),
 uwagi do notatek (szkic w skrzynce), a kompilację i reindeks uruchamia jako osobne procesy/wywołania. Ścieżki notatek
-przechodzą przez Skarbiec.plik() (nic spoza skarbca). Kompilacja: w kontenerze scripts/wiedza-kompiluj.sh, na Windows
-kompilacja.py wprost (bash z Pythona to tam WSL, docs/NATYWNIE.md K03).
+przechodzą przez Skarbiec.plik() (nic spoza skarbca). Kompilacja: kompilacja.py Pythonem dashboardu (venv Hermesa) na
+każdym systemie i w kontenerze, z HERMES_HOME profilu jarvo i w katalogu Hermesa, jak `jarvo wiedza kompiluj`; bez
+basha (na Windows bash z Pythona to WSL, docs/NATYWNIE.md K03). Jeden piszący pilnuje wiedza.Blokada.
 """
 from __future__ import annotations
 
@@ -20,7 +21,6 @@ from typing import Any, Dict, List, Optional
 
 _HERE = Path(__file__).resolve().parent
 LOG_RE = re.compile(r"^## \[(\d{4}-\d{2}-\d{2})\] (\w+) \| (.*)$")
-WINDOWS = os.name == "nt"
 
 
 def _lib():
@@ -41,12 +41,6 @@ def korzen_danych(hermes_home: str) -> Path:
     h = Path(hermes_home)
     return h.parent.parent if h.parent.name == "profiles" else h
 
-
-
-
-def w_kontenerze() -> bool:
-    """Czy dashboard działa w obrazie jarvo-hermes (układ /opt/hermes); natywnie (docs/NATYWNIE.md) nie."""
-    return Path("/opt/hermes/.venv").is_dir()
 
 class Panel:
     def __init__(self, skarbiec: str | Path, stan: str | Path, repo: str | Path = "/opt/jarvo/repo", profil_kompilacji: str = "jarvo",
@@ -263,22 +257,20 @@ class Panel:
         self._lint_cache = (0.0, {})
         return {**r, "index": n, "huby": h}
 
-    # ---- kompilacja jako osobny proces (model z profilu `jarvo`: scripts/wiedza-kompiluj.sh, na Windows kompilacja.py)
+    # ---- kompilacja jako osobny proces (model z profilu `jarvo`: kompilacja.py Pythonem dashboardu)
     def _kompilacja_py(self) -> Optional[Path]:
         """kompilacja.py obok wiedza.py (build kopiuje oba do katalogu wtyczki, w repo leżą w wiedza/)."""
         p = Path(self.lib.__file__).with_name("kompilacja.py")
         return p if p.is_file() else None
 
     def compile_command(self) -> Optional[List[str]]:
-        # skrypt bash zna tylko układ kontenera (/opt/data, /opt/hermes); natywnie (Windows, macOS, Linux bez
-        # kontenera) kompilacja.py Pythonem dashboardu (venv Hermesa); na Windows bash z Pythona to i tak WSL
-        if WINDOWS or not w_kontenerze():
-            k = self._kompilacja_py()
-            return [sys.executable, str(k), "--skarbiec", str(self.sk.root), "--stan", str(self.sk.stan), "--json"] if k else None
-        skrypt = self.repo / "scripts" / "wiedza-kompiluj.sh"
-        if skrypt.exists():
-            return ["bash", str(skrypt), "--json"]
-        return None
+        """kompilacja.py Pythonem dashboardu (venv Hermesa: agent.auxiliary_client), w trybie izolowanym (-I: bez
+        PYTHONPATH i katalogu skryptu) i z UTF-8 (-X utf8); bez basha na każdym systemie."""
+        k = self._kompilacja_py()
+        if not k:
+            return None
+        return [sys.executable, "-I", "-X", "utf8", str(k), "--skarbiec", str(self.sk.root), "--stan", str(self.sk.stan),
+                "--profil", self.profil, "--json"]
 
     def compile_start(self) -> dict:
         with self._lock:
@@ -286,25 +278,30 @@ class Panel:
                 return {"trwa": True, "start": self._kompilacja["start"]}
             cmd = self.compile_command()
             if not cmd:
-                return {"trwa": False, "blad": "brak kompilacja.py obok wiedza.py" if WINDOWS
-                        else "brak scripts/wiedza-kompiluj.sh (repo poza kontenerem?)"}
+                return {"trwa": False, "blad": "brak kompilacja.py obok wiedza.py"}
             self._kompilacja.update({"trwa": True, "start": time.time(), "koniec": 0.0, "wynik": None, "blad": ""})
             threading.Thread(target=self._compile_run, args=(cmd,), name="jarvo-wiedza-kompilacja", daemon=True).start()
             return {"trwa": True, "start": self._kompilacja["start"]}
 
     def _srodowisko_kompilacji(self) -> Dict[str, str]:
-        env = {**os.environ, "JARVO_WIEDZA_PROFIL": self.profil}
-        if WINDOWS:                # to, co w kontenerze ustawia wiedza-kompiluj.sh: profil z modelem zadania jarvo_wiedza
-            profil = self.dane / "profiles" / self.profil if self.dane else None
-            if profil is not None and profil.is_dir():
-                env["HERMES_HOME"] = str(profil)
-            env.update({"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"})
+        """Środowisko dashboardu + HERMES_HOME profilu z modelem zadania jarvo_wiedza (gdy jest zainstalowany) i wyjście
+        w UTF-8. HERMES_SRC zostaje z otoczenia (natywnie ustawia go jarvo/srodowisko.py, w kontenerze /opt/hermes)."""
+        env = {**os.environ, "JARVO_WIEDZA_PROFIL": self.profil, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+        profil = self.dane / "profiles" / self.profil if self.dane else None
+        if profil is not None and profil.is_dir():
+            env["HERMES_HOME"] = str(profil)
         return env
+
+    def _katalog_kompilacji(self) -> Optional[str]:
+        """Katalog Hermesa jako bieżący (jak `cd "$HERMES_SRC"` w dawnym skrypcie kontenera), gdy jest."""
+        src = os.environ.get("HERMES_SRC") or "/opt/hermes"
+        return src if Path(src).is_dir() else None
 
     def _compile_run(self, cmd: List[str]) -> None:
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3600,
-                               env=self._srodowisko_kompilacji(), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                               env=self._srodowisko_kompilacji(), cwd=self._katalog_kompilacji(),
+                               stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             wynik = None
             for kandydat in (r.stdout, (r.stdout.strip().splitlines() or [""])[-1]):   # cały JSON (--json z wcięciami) albo ostatnia linia
                 try:
@@ -313,6 +310,8 @@ class Panel:
                 except ValueError:
                     continue
             blad = "" if r.returncode == 0 else (r.stderr.strip().splitlines()[-1] if r.stderr.strip() else f"kod {r.returncode}")
+            if not blad and isinstance(wynik, dict) and wynik.get("zablokowana"):     # jeden piszący: inny przebieg trwa
+                blad = f"skarbiec zajęty ({wynik.get('powod_blokady') or 'inna kompilacja trwa'}): spróbuj za chwilę"
             self._kompilacja.update({"wynik": wynik, "blad": blad[:300]})
         except Exception as e:
             self._kompilacja.update({"blad": str(e)[:300]})

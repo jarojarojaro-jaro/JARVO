@@ -155,15 +155,26 @@ def test_zly_json_ponowienie_licznik_prob_i_odrzucenie_sekretu(sk):
     assert r["szkice"] == 0
 
 
+def _proces_spiacy():
+    """Żywy proces innego właściciela (jak install_fleet.py w trakcie zasiewu): jego PID trafia do znacznika."""
+    return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], stdin=subprocess.DEVNULL)
+
+
 def test_limity_blokada_i_na_sucho(sk):
     for i in range(3):
         szkic(sk, "fakt", f"Fakt {i}", f"Treść faktu numer {i}.")
     r = k.Kompilacja(sk, None).uruchom()                                             # na sucho: bez zapisu, lista kandydatów
     assert r["na_sucho"] and r["nowe"] == 0 and len(r["wpisy"]) == 3 and "kandydaci:" in r["wpisy"][0]
     assert len(list((sk.root / "skrzynka").glob("*.md"))) == 3
-    (sk.stan / "wiedza.lock").write_text("1 0\n", encoding="utf-8")
-    r = k.Kompilacja(sk, model_z([])).uruchom()
-    assert r["zablokowana"] and len(list((sk.root / "skrzynka").glob("*.md"))) == 3
+    obcy = _proces_spiacy()
+    try:                                                                             # znacznik żywego procesu (zasiew) blokuje
+        (sk.stan / "wiedza.lock").write_text(f"{obcy.pid} {int(time.time())}\n", encoding="utf-8")
+        r = k.Kompilacja(sk, model_z([])).uruchom()
+        assert r["zablokowana"] and "proces" in r["powod_blokady"] and len(list((sk.root / "skrzynka").glob("*.md"))) == 3
+        assert (sk.stan / "wiedza.lock").read_text(encoding="utf-8").split()[0] == str(obcy.pid)   # cudzego nie ruszamy
+    finally:
+        obcy.kill()
+        obcy.wait()
     (sk.stan / "wiedza.lock").unlink()
     odp = {"wyniki": [{"decyzja": "nowa", "sciezka": "pojecia/x", "typ": "fakt", "tytul": "X", "streszczenie": "x", "tresc": "y", "tagi": [], "linki": [], "wazne_do": None, "powod": "p"}]}
     r = k.Kompilacja(sk, model_z([odp, odp, odp]), limit_szkicow=2).uruchom()
@@ -220,3 +231,113 @@ def test_sprzatanie_zrobione_po_30_dniach(sk):
     odp = {"wyniki": [{"decyzja": "odrzuc", "powod": "test"}]}
     r = k.Kompilacja(sk, model_z([odp])).uruchom()
     assert r["sprzatniete"] == 1 and not stary.exists() and nowy.exists()
+
+
+# ---------------------------------------------------------------- jeden piszący na 3 systemach (docs/NATYWNIE.md K03)
+
+TRZYMAJ_BLOKADE = """import sys, time
+sys.path.insert(0, sys.argv[1])
+import wiedza
+b = wiedza.Blokada(sys.argv[2])
+assert b.wez(), b.powod
+print("wzieta", flush=True)
+sys.stdin.readline()            # trzyma, aż test zamknie wejście
+b.zwolnij()
+"""
+
+
+def test_blokada_systemu_miedzy_procesami(sk, tmp_path):
+    """Drugi proces trzyma blokadę (msvcrt na Windows, fcntl na POSIX): kompilacja tu nic nie robi; po jego końcu
+    (także przez zabicie, bez sprzątania) rusza, bo blokada systemu znika z procesem, a znacznik martwego PID-u to
+    resztka po awarii."""
+    szkic(sk, "fakt", "Coś", "Treść.")
+    odp = {"wyniki": [{"decyzja": "odrzuc", "powod": "test"}]}
+    skrypt = tmp_path / "trzymaj.py"
+    skrypt.write_text(TRZYMAJ_BLOKADE, encoding="utf-8")
+    p = subprocess.Popen([sys.executable, str(skrypt), str(REPO / "wiedza"), str(sk.stan)], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, text=True, encoding="utf-8")
+    try:
+        assert p.stdout.readline().strip() == "wzieta"
+        r = k.Kompilacja(sk, model_z([odp])).uruchom()
+        assert r["zablokowana"] and r["powod_blokady"] and len(list((sk.root / "skrzynka").glob("*.md"))) == 1
+        assert w.znacznik_blokady(sk.stan)["aktualny"]
+    finally:
+        p.kill()                                                  # awaria: znacznik zostaje, blokada systemu znika
+        p.wait()
+    assert w.znacznik_blokady(sk.stan)["zywy"] is False
+    r = k.Kompilacja(sk, model_z([odp])).uruchom()
+    assert not r["zablokowana"] and r["odrzucone"] == 1 and not (sk.stan / "wiedza.lock").exists()
+
+
+def test_blokada_w_jednym_procesie_i_znacznik_dla_wdrozenia(sk):
+    """Dwie Blokady w jednym procesie (wątki bramy z dziesięciu profili): druga nie bierze. Znacznik ma format,
+    który czyta scripts/install_fleet.py („PID czas”), i znika po zwolnieniu tylko, gdy jest nasz."""
+    a, b = w.Blokada(sk.stan), w.Blokada(sk.stan)
+    assert a.wez()
+    try:
+        assert not b.wez() and b.powod
+        pid, czas = (sk.stan / "wiedza.lock").read_text(encoding="utf-8").split()
+        assert int(pid) == os.getpid() and abs(int(czas) - time.time()) < 60
+    finally:
+        a.zwolnij()
+    assert not (sk.stan / "wiedza.lock").exists()
+    assert b.wez()                                               # po zwolnieniu bierze następny
+    (sk.stan / "wiedza.lock").write_text("123 0\n", encoding="utf-8")   # w trakcie ktoś nadpisał znacznik
+    b.zwolnij()
+    assert (sk.stan / "wiedza.lock").read_text(encoding="utf-8") == "123 0\n"
+
+
+def test_stary_znacznik_zywego_procesu_to_resztka(sk):
+    """Znacznik starszy niż 2 h nie blokuje, nawet gdy PID (np. użyty ponownie przez system) żyje."""
+    szkic(sk, "fakt", "Coś", "Treść.")
+    (sk.stan / "wiedza.lock").write_text(f"{os.getpid()} 0\n", encoding="utf-8")
+    dawno = time.time() - 3 * 3600
+    os.utime(sk.stan / "wiedza.lock", (dawno, dawno))
+    r = k.Kompilacja(sk, model_z([{"wyniki": [{"decyzja": "odrzuc", "powod": "test"}]}])).uruchom()
+    assert not r["zablokowana"] and r["odrzucone"] == 1
+
+
+def test_lint_przed_i_po_oraz_zapis_pod_blokada(sk, monkeypatch):
+    """Lint przed kompilacją i po niej (LINT.md i state/wiedza-lint.json ze stanem po), a LOG, punkt zapisu
+    i state/wiedza-kompilacja.json powstają jeszcze pod blokadą (zasiew przy wdrożeniu nie wejdzie w środek)."""
+    szkic(sk, "fakt", "Nowy fakt", "Treść nowego faktu.")
+    odp = {"wyniki": [{"decyzja": "nowa", "sciezka": "pojecia/nowy fakt", "typ": "fakt", "tytul": "Nowy fakt", "streszczenie": "Nowy fakt o czymś",
+                       "tresc": "Treść nowego faktu. " * 6, "tagi": [], "linki": [], "wazne_do": None, "powod": "p"}]}
+    prawdziwy, w_trakcie = sk.punkt_zapisu, []
+
+    def punkt(komunikat):
+        w_trakcie.append(w.znacznik_blokady(sk.stan))
+        return prawdziwy(komunikat)
+    monkeypatch.setattr(sk, "punkt_zapisu", punkt)
+    r = k.Kompilacja(sk, model_z([odp])).uruchom()
+    assert r["nowe"] == 1 and set(r["lint_przed"]) == {"bledy", "ostrzezenia", "informacje"} and r["lint"]["bledy"] == 0
+    assert w_trakcie and w_trakcie[0]["pid"] == os.getpid() and w_trakcie[0]["aktualny"]
+    lint = json.loads((sk.stan / "wiedza-lint.json").read_text(encoding="utf-8"))
+    assert lint["bledy"] == 0 and lint["notatek"] >= 3 and lint["data"] == "2026-09-30"
+    assert (sk.root / "LINT.md").read_text(encoding="utf-8").startswith("# Lint skarbca (2026-09-30)")
+    assert json.loads((sk.stan / "wiedza-kompilacja.json").read_text(encoding="utf-8"))["raport"]["lint"]["bledy"] == 0
+    assert not list(sk.stan.glob("*.tmp")) and not (sk.stan / "wiedza.lock").exists()
+
+
+def test_szkic_z_crlf_i_polskimi_znakami(sk):
+    """Szkic zapisany na Windows z CRLF (np. edytorem): kompilacja czyta go jak z LF, a notatka ma same LF."""
+    rel = szkic(sk, "fakt", "Żółta łódź", "Pierwsza linia.\nDruga linia.")
+    p = sk.root / f"{rel}.md"
+    p.write_bytes(p.read_bytes().replace(b"\n", b"\r\n"))
+    model = model_z([{"wyniki": [{"decyzja": "nowa", "sciezka": "pojecia/żółta łódź", "typ": "fakt", "tytul": "Żółta łódź",
+                                  "streszczenie": "Łódź jest żółta", "tresc": "Żółta łódź pływa po jeziorze. " * 5, "tagi": [],
+                                  "linki": [], "wazne_do": None, "powod": "p"}]}])
+    r = k.Kompilacja(sk, model).uruchom()
+    assert r["nowe"] == 1 and "Żółta łódź" in model.prompty[0]
+    dane = (sk.root / "pojecia/żółta łódź.md").read_bytes()
+    assert b"\r\n" not in dane and "Żółta łódź pływa".encode("utf-8") in dane
+
+
+def test_main_przestawia_home_na_profil(tmp_path):
+    """HERMES_HOME katalogu danych (dashboard, `jarvo wiedza kompiluj`, kontener) → profil jarvo z modelem zadania
+    jarvo_wiedza; profil podany wprost zostaje; bez profilu na dysku nic się nie zmienia."""
+    (tmp_path / "dane" / "profiles" / "jarvo").mkdir(parents=True)
+    env = {"HERMES_HOME": str(tmp_path / "dane")}
+    assert k.home_profilu("jarvo", env) == str(tmp_path / "dane" / "profiles" / "jarvo")
+    assert k.home_profilu("jarvo", {"HERMES_HOME": str(tmp_path / "dane" / "profiles" / "jarvo")}) is None
+    assert k.home_profilu("inny", env) is None

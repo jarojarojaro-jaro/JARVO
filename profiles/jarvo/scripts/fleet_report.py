@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import shutil
 import subprocess
 import sys
 import time
@@ -20,21 +18,20 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _sciezki  # noqa: E402  (katalogi z HERMES_HOME, nie z /opt)
 import lekcje  # noqa: E402
 import liczby  # noqa: E402  (ta sama definicja jakości co w Jarvo HQ)
 import poczekalnia  # noqa: E402
 import prosty  # noqa: E402  (prosty polski: wiadomości Jarva do właściciela)
 import raport_strona  # noqa: E402  (przegląd tygodnia jako strona w HQ)
 
-MISSIONS_DIR = Path(os.environ.get("JARVO_MISSIONS_DIR", "/opt/data/jarvo/missions"))
+MISSIONS_DIR = _sciezki.misje()
 DAY = 86400
 
 
 def _hermes(*args: str) -> str:
-    prog = os.environ.get("JARVO_HERMES_BIN", "hermes")
-    # pełna ścieżka z PATH: na Windows nakładka hermes bywa plikiem .cmd, którego CreateProcess nie znajdzie po nazwie
-    res = subprocess.run([shutil.which(prog) or prog, *args],
-                         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+    res = subprocess.run([_sciezki.hermes(), *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                         timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if res.returncode != 0:
         raise RuntimeError(res.stderr.strip()[:300])
     return res.stdout

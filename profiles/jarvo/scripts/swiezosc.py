@@ -2,20 +2,23 @@
 """Rutyna „Świeżość wiedzy” bez modelu: skille floty z `metadata.jarvo.reviewed` starszym niż 120 dni oraz notatki
 skarbca po terminie `wazne_do` albo ze `status: do-sprawdzenia` (docs/WIEDZA.md).
 
-    python3 swiezosc.py [--build /opt/jarvo/build] [--skarbiec /opt/data/jarvo/knowledge] [--dzis RRRR-MM-DD]
+    python3 swiezosc.py [--build <build floty>] [--skarbiec <dane>/jarvo/knowledge] [--dzis RRRR-MM-DD]
 
 Cron uruchamia go jako zadanie bez agenta (no_agent): wyjście trafia do właściciela tak, jak jest, a puste
-wyjście to cisza. Ten sam próg co ostrzeżenie walidatora (fleetlib.SWIEZOSC_DNI).
+wyjście to cisza. Ten sam próg co ostrzeżenie walidatora (fleetlib.SWIEZOSC_DNI). Domyślne katalogi z HERMES_HOME
+i JARVO_*_DIR (_sciezki.py), w kontenerze /opt/jarvo/build i /opt/data/jarvo/knowledge.
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _sciezki  # noqa: E402  (katalogi z HERMES_HOME, nie z /opt)
 
 SWIEZOSC_DNI = 120
 FRONT_RE = re.compile(r"\A---\n(.*?)\n---", re.S)
@@ -60,11 +63,12 @@ def notatki(skarbiec: Path, dzis: dt.date) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--build", type=Path, default=Path(os.environ.get("JARVO_BUILD_DIR", "/opt/jarvo/build")))
-    ap.add_argument("--skarbiec", type=Path,
-                    default=Path(os.environ.get("JARVO_KNOWLEDGE_DIR", "/opt/data/jarvo/knowledge")))
+    ap.add_argument("--build", type=Path, default=None, help="build floty (domyślnie JARVO_BUILD_DIR albo z HERMES_HOME)")
+    ap.add_argument("--skarbiec", type=Path, default=None, help="skarbiec (domyślnie JARVO_KNOWLEDGE_DIR albo z HERMES_HOME)")
     ap.add_argument("--dzis", default=None)
     a = ap.parse_args(argv)
+    a.build = a.build or _sciezki.build()
+    a.skarbiec = a.skarbiec or _sciezki.skarbiec()
     dzis = dt.date.fromisoformat(a.dzis) if a.dzis else dt.date.today()
     lista = stare(a.build, dzis)
     if lista:                                   # brak przestarzałych = puste wyjście = cisza

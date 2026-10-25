@@ -28,7 +28,10 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 11. **Bez sekretów i bez cudzych danych ponad potrzebę.** Klucze, hasła, loginy, tokeny: nigdy (lint i `zapisz` odrzucają).
     Osoby trzecie tylko w rolach publicznych, ze źródłem. Listy leadów zostają w projektach Łowcy.
 12. **Po polsku, krótko, konkretnie.** Tryb oznajmujący, sprawdzalne zdania. Nazwa pliku = tytuł, jak się go mówi: małe litery,
-    spacje i polskie znaki dozwolone, bez `* " \ / < > : | ? # ^ [ ]`, do 70 znaków. Foldery zostają ASCII.
+    spacje i polskie znaki dozwolone, bez `* " \ / < > : | ? # ^ [ ]`, do 70 znaków. Foldery zostają ASCII. Nazwa przechodzi
+    na każdy system (Windows, macOS, Linux): bez nazw urządzeń Windows (`con`, `nul`, `aux`, `prn`, `com1`…, `lpt1`…; tytuł
+    „Con” daje plik `con (notatka).md`), bez kropki i spacji na końcu katalogu, polskie litery w NFC, bez dwóch nazw różnych
+    tylko wielkością liter w jednym katalogu, pełna ścieżka do 240 znaków. Lint zgłasza odstępstwa jako ostrzeżenia.
 
 ## Foldery
 

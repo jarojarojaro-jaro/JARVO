@@ -29,15 +29,28 @@ def _load(name: str, plik: str):
     return mod
 
 
+def _dane_bez_hermesa() -> str:
+    """Bez HERMES_HOME i bez Hermesa (testy, skrypt): korzeń Jarva (JARVO_ROOT, %LOCALAPPDATA%/Jarvo, ~/.jarvo) albo
+    /opt/data w kontenerze; nigdy goły /opt na Windows (trafiłby do C:/opt bieżącego dysku)."""
+    if os.environ.get("JARVO_ROOT"):
+        return str(Path(os.environ["JARVO_ROOT"]) / "dane")
+    if os.name == "nt":
+        return str(Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "Jarvo" / "dane")
+    if sys.platform == "darwin":
+        return str(Path.home() / ".jarvo" / "dane")
+    return "/opt/data"
+
+
 def _hermes_home() -> str:
-    """HERMES_HOME dashboardu; bez zmiennej katalog domowy Hermesa (hermes_constants), poza Hermesem /opt/data (kontener)."""
+    """HERMES_HOME dashboardu; bez zmiennej katalog domowy Hermesa (hermes_constants), poza Hermesem korzeń
+    Jarva albo /opt/data (kontener)."""
     if os.environ.get("HERMES_HOME"):
         return os.environ["HERMES_HOME"]
     try:
         from hermes_constants import get_hermes_home
         return str(get_hermes_home())
     except Exception:
-        return "/opt/data"
+        return _dane_bez_hermesa()
 
 
 panel_mod = _load("jarvo_wiedza_panel", "panel.py")

@@ -31,16 +31,17 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _sciezki  # noqa: E402  (katalogi z HERMES_HOME, nie z /opt)
+
 BLOKUJE = {"high", "critical"}
 POLA_TEKSTU = ("content", "file_content", "new_string")
 STARE_DNI = 14
 
 
 def dane_domyslne() -> Path:
-    if os.environ.get("JARVO_DATA_DIR"):
-        return Path(os.environ["JARVO_DATA_DIR"])
-    h = Path(os.environ.get("HERMES_HOME", "/opt/data"))
-    return h.parent.parent if h.parent.name == "profiles" else h
+    """`<dane>` = HERMES_HOME Jarva (także z HERMES_HOME profilu); JARVO_DATA_DIR to `<dane>/jarvo` (_sciezki.py)."""
+    return _sciezki.dane()
 
 
 def _skan():

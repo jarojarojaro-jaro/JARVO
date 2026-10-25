@@ -20,6 +20,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _sciezki  # noqa: E402  (katalogi z HERMES_HOME, nie z /opt)
+
 CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
 
 
@@ -128,9 +131,8 @@ footer{{color:var(--szary);font-size:13px;margin-top:20px}}
 
 
 def katalog_raportow() -> Path:
-    h = Path(os.environ.get("HERMES_HOME", "/opt/data"))
-    korzen = h.parent.parent if h.parent.name == "profiles" else h
-    return Path(os.environ.get("JARVO_RAPORTY_DIR") or korzen / "jarvo" / "workspaces" / "jarvo" / "raporty")
+    """`<dane>/jarvo/workspaces/jarvo/raporty` (katalogi z HERMES_HOME, _sciezki.py) albo JARVO_RAPORTY_DIR."""
+    return Path(os.environ.get("JARVO_RAPORTY_DIR") or _sciezki.jarvo() / "workspaces" / "jarvo" / "raporty")
 
 
 def _jarvo_link() -> Path | None:

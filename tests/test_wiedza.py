@@ -509,19 +509,28 @@ def test_sciezki_nfc_na_macos(skarbiec):
 
 
 def test_domyslny_skarbiec(monkeypatch, tmp_path):
-    """Bez --skarbiec: JARVO_KNOWLEDGE_DIR; w kontenerze (Linux) /opt/data/jarvo/knowledge jak dotąd; na Windows i macOS
-    <dane>/jarvo/knowledge z HERMES_HOME (profil: dwa katalogi wyżej) albo z domyślnego korzenia Jarva."""
+    """Bez --skarbiec: JARVO_KNOWLEDGE_DIR; potem <dane>/jarvo/knowledge z HERMES_HOME (profil: dwa katalogi wyżej) na
+    każdym systemie (kontener ma HERMES_HOME=/opt/data, więc jak dotąd), z JARVO_ROOT, a bez obu z domyślnego korzenia
+    Jarva: Windows %LOCALAPPDATA%\\Jarvo, macOS ~/.jarvo, Linux /opt/data w kontenerze albo ~/.local/share/jarvo."""
     monkeypatch.setenv("JARVO_KNOWLEDGE_DIR", str(tmp_path / "k"))
     assert w._domyslny_skarbiec() == str(tmp_path / "k")
     monkeypatch.delenv("JARVO_KNOWLEDGE_DIR")
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "dane" / "profiles" / "jarvo"))
+    assert Path(w._domyslny_skarbiec()) == tmp_path / "dane" / "jarvo" / "knowledge"
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "dane"))
+    assert Path(w._domyslny_skarbiec()) == tmp_path / "dane" / "jarvo" / "knowledge"
+    monkeypatch.delenv("HERMES_HOME")
+    monkeypatch.setenv("JARVO_ROOT", str(tmp_path / "Michał Żółć"))
+    assert Path(w._domyslny_skarbiec()) == tmp_path / "Michał Żółć" / "dane" / "jarvo" / "knowledge"
+    monkeypatch.delenv("JARVO_ROOT")
     if os.name == "nt" or sys.platform == "darwin":
-        assert Path(w._domyslny_skarbiec()) == tmp_path / "dane" / "jarvo" / "knowledge"
-        monkeypatch.delenv("HERMES_HOME")
         korzen = Path(os.environ["LOCALAPPDATA"]) / "Jarvo" if os.name == "nt" else Path.home() / ".jarvo"
         assert Path(w._domyslny_skarbiec()) == korzen / "dane" / "jarvo" / "knowledge"
-    else:
+    elif Path("/opt/data").is_dir():
         assert w._domyslny_skarbiec() == "/opt/data/jarvo/knowledge"
+    else:
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+        assert Path(w._domyslny_skarbiec()) == tmp_path / "xdg" / "jarvo" / "dane" / "jarvo" / "knowledge"
 
 
 def test_odswiezenie_bez_zmian_nie_rozwiazuje_sciezek(skarbiec, monkeypatch):
@@ -571,3 +580,104 @@ def test_cli_pisze_utf8_takze_do_potoku(tmp_path):
                         "zasiej"], capture_output=True, env=env, timeout=120)
     assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
     assert r.stdout.decode("utf-8").startswith("✓ zasiew:")
+
+
+# ---------------------------------------------------------------- nazwy przenośne (docs/NATYWNIE.md K07)
+
+def _surowy(p: Path) -> str:
+    """Ścieżka do utworzenia nazwy, której Win32 nie przyjmie wprost (urządzenie CON, NUL…): prefiks \\\\?\\ na
+    Windows omija zamianę nazw urządzeń; na POSIX bez zmian."""
+    return "\\\\?\\" + str(p.resolve()) if os.name == "nt" else str(p)
+
+
+def test_nazwa_pliku_bez_nazw_urzadzen_i_w_nfc():
+    """Tytuł → nazwa, która przejdzie na każdy system: nazwy urządzeń Windows dostają dopisek, kropka i spacja na
+    końcu znikają, zapis polskich liter w NFC (NFD z macOS daje tę samą nazwę co NFC)."""
+    assert w.nazwa_pliku("CON") == "con (notatka)" and w.nazwa_pliku("Nul.txt") == "nul.txt (notatka)"
+    assert w.nazwa_pliku("Com1") == "com1 (notatka)" and w.nazwa_pliku("Konsola CON") == "konsola con"
+    assert w.nazwa_pliku("Kropka na końcu. ") == "kropka na końcu"
+    assert w.nazwa_pliku(unicodedata.normalize("NFD", "Żółw")) == "żółw" == unicodedata.normalize("NFC", "żółw")
+    assert w.urzadzenie_windows("aux") and w.urzadzenie_windows("LPT9.md") and w.urzadzenie_windows("nul .md")
+    assert not w.urzadzenie_windows("auxy") and not w.urzadzenie_windows("com10")
+    assert w.nieprzenosna("katalog.") and w.nieprzenosna("katalog ") and not w.nieprzenosna("zwykła nazwa.md")
+
+
+def test_lint_zglasza_nazwy_nieprzenosne(skarbiec):
+    """Lint (K07): nazwa urządzenia Windows, katalog z kropką albo spacją na końcu, zapis spoza NFC i pełna ścieżka
+    dłuższa niż 240 znaków to ostrzeżenia (stary skarbiec z kontenera dostaje je przy pierwszym lincie)."""
+    sk = skarbiec
+    tresc = "---\ntyp: fakt\nutworzono: 2026-09-30\nzmieniono: 2026-09-30\nstatus: aktualna\nzrodlo: test\n---\n# X\n\n**X.**\n"
+    with open(_surowy(sk.root / "pojecia" / "nul.md"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(tresc)
+    nfd = unicodedata.normalize("NFD", "żółw")
+    (sk.root / "pojecia" / f"{nfd}.md").write_text(tresc, encoding="utf-8", newline="\n")
+    if os.name != "nt":                                   # Win32 obetnie spację na końcu katalogu przy tworzeniu
+        (sk.root / "projekty " / "x.md").parent.mkdir()
+        (sk.root / "projekty " / "x.md").write_text(tresc, encoding="utf-8")
+    gleboki = sk.root / "projekty" / ("d" * 60) / ("e" * 60)
+    gleboki.mkdir(parents=True)
+    dlugi = gleboki / (("f" * max(1, 245 - len(str(gleboki)) - 4)) + ".md")
+    dlugi.write_text(tresc, encoding="utf-8")
+    assert len(str(dlugi)) > w.MAX_SCIEZKI
+    ix = w.Indeks(sk)
+    try:
+        r = w.lint(sk, ix)
+    finally:
+        ix.zamknij()
+    ostrz = "\n".join(r["ostrzezenia"])
+    assert "nazwa nieprzenośna (nazwa urządzenia Windows): `pojecia/nul.md`" in ostrz
+    assert f"`pojecia/{nfd}.md`" in ostrz and "spoza NFC" in ostrz
+    assert f"ścieżka dłuższa niż {w.MAX_SCIEZKI} znaków" in ostrz
+    if os.name != "nt":
+        assert "kropka albo spacja na końcu" in ostrz and "`projekty `" in ostrz
+    stan = json.loads((sk.stan / w.LINT_JSON).read_text(encoding="utf-8"))
+    assert stan["ostrzezenia"] == len(r["ostrzezenia"]) and stan["bledy"] == len(r["bledy"]) and stan["data"] == "2026-09-30"
+
+
+def test_lint_zglasza_nazwy_rozne_tylko_wielkoscia_liter(skarbiec):
+    """Dwie nazwy różne tylko wielkością liter w jednym katalogu (Linux) to jeden plik na Windows i macOS."""
+    sk = skarbiec
+    (sk.root / "pojecia" / "Audyt.md").write_text("# A\n", encoding="utf-8")
+    if (sk.root / "pojecia" / "audyt.md").exists():
+        pytest.skip("system plików bez rozróżniania wielkości liter (Windows, macOS)")
+    (sk.root / "pojecia" / "audyt.md").write_text("# a\n", encoding="utf-8")
+    ostrz = "\n".join(w.nazwy_nieprzenosne(sk))
+    assert "różnią się tylko wielkością liter" in ostrz and "`pojecia/Audyt.md`" in ostrz and "`pojecia/audyt.md`" in ostrz
+
+
+@pytest.mark.windows_only
+def test_nazwy_urzadzen_odrzucone_na_windows(skarbiec):
+    """Windows: zapis do „nul.md” albo „aux/…” połknąłby treść albo trafił do urządzenia, więc Skarbiec.plik odmawia."""
+    sk = skarbiec
+    for rel in ("pojecia/nul", "pojecia/CON.md", "aux/notatka", "pojecia/com1"):
+        with pytest.raises(ValueError, match="urządzenia"):
+            sk.plik(rel)
+    assert not sk.istnieje("pojecia/nul")
+
+
+TRZYMAJ_PLIK = """import sys, time
+f = open(sys.argv[1], "rb")
+print("otwarty", flush=True)
+time.sleep(float(sys.argv[2]))
+f.close()
+"""
+
+
+def test_lint_gdy_drugi_proces_trzyma_lint_md(skarbiec, tmp_path):
+    """LINT.md otwarty w drugim procesie (Obsidian, antywirus, podgląd): na Windows zamiana pliku pada z WinError 5/32,
+    więc zapis ponawia, aż czytelnik puści plik; na POSIX zamiana przechodzi od razu."""
+    sk = skarbiec
+    skrypt = tmp_path / "trzymaj.py"
+    skrypt.write_text(TRZYMAJ_PLIK, encoding="utf-8")
+    p = subprocess.Popen([sys.executable, str(skrypt), str(sk.root / "LINT.md"), "0.6"], stdout=subprocess.PIPE, text=True)
+    try:
+        assert p.stdout.readline().strip() == "otwarty"
+        ix = w.Indeks(sk)
+        try:
+            w.lint(sk, ix)
+        finally:
+            ix.zamknij()
+    finally:
+        p.wait(timeout=30)
+    assert (sk.root / "LINT.md").read_text(encoding="utf-8").startswith("# Lint skarbca (2026-09-30)")
+    assert not list(sk.root.glob("*.tmp"))

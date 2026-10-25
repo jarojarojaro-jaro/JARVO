@@ -5,12 +5,17 @@ Czyta szkice ze `skrzynka/` (od agentów, z wyciągów rozmów, z kart, z lustra
 notatek-kandydatów (FTS5) i pyta główny model o decyzję: nowa notatka, aktualizacja, sprzeczność (obie wersje zostają)
 albo odrzucenie. Notatki pisze według schematu (frontmatter, streszczenie, linki: hub + sąsiedzi + inny folder; linki tylko
 do istniejących ścieżek), dopisuje LOG.md, przenosi szkic do `skrzynka/zrobione/`, odświeża INDEX i huby, robi punkt zapisu
-git. Całość pod blokadą `state/wiedza.lock`. Limity na przebieg: 40 szkiców, 60 dotkniętych notatek.
+git. Całość pod blokadą (wiedza.Blokada: blokada systemu na `state/wiedza.zamek` i znacznik `state/wiedza.lock`, ten sam,
+który stawia zasiew przy wdrożeniu). Przed przebiegiem i po nim lint (docs/WIEDZA.md §6, NATYWNIE K02): LINT.md
+i state/wiedza-lint.json pokazują stan po kompilacji, a raport przebiegu ma liczby z obu. Limity na przebieg: 40 szkiców,
+60 dotkniętych notatek.
 
-Uruchomienie: wątek wtyczki jarvo-wiedza (co godzinę przy szkicach, co noc) albo ręcznie w kontenerze:
-  scripts/wiedza-kompiluj.sh [--na-sucho] [--limit N]
-Na Windows przycisk w zakładce Wiedza woła ten plik wprost Pythonem z venvu Hermesa (bash z Pythona to tam WSL).
-Model: zadanie pomocnicze Hermesa `jarvo_wiedza` (auxiliary.jarvo_wiedza.model, poziom frontier); testy podstawiają funkcję.
+Uruchomienie: wątek wtyczki jarvo-wiedza (co godzinę przy szkicach, co noc, także nadrabiane po uśpieniu), przycisk
+w zakładce Wiedza i `jarvo wiedza kompiluj` (jarvo/wiedza_cli.py) wołają ten plik Pythonem z venvu Hermesa, bez basha
+(na Windows bash z Pythona to WSL). Ręcznie w kontenerze: scripts/wiedza-kompiluj.sh [--na-sucho] [--limit N].
+Model: zadanie pomocnicze Hermesa `jarvo_wiedza` (auxiliary.jarvo_wiedza.model, poziom frontier) w HERMES_HOME profilu
+`--profil` (domyślnie jarvo: gdy HERMES_HOME to katalog danych, main() przestawia go na <dane>/profiles/jarvo); kod
+Hermesa z HERMES_SRC (domyślnie /opt/hermes w kontenerze). Testy podstawiają funkcję modelu.
 """
 from __future__ import annotations
 
@@ -42,8 +47,7 @@ DECYZJE = ("nowa", "aktualizacja", "sprzecznosc", "odrzuc")
 LIMIT_SZKICOW = 40
 LIMIT_NOTATEK = 60
 LIMIT_PROB = 3                      # nieudane wywołania modelu na szkic, potem szkic ląduje w zrobione/ z wpisem w LOG
-BLOKADA_STARA_S = 2 * 3600
-ZROBIONE_DNI = 30                   # szkice po kompilacji zostają tyle dni (źródła są w zrodla/, decyzje w LOG.md)
+ZROBIONE_DNI = 30                  # szkice po kompilacji zostają tyle dni (źródła są w zrodla/, decyzje w LOG.md)
 KANDYDATOW = 6
 PELNA_TRESC_KANDYDATOW = 2
 MAX_LINKOW = 8
@@ -117,21 +121,26 @@ class Kompilacja:
         return sorted((p for p in kat.glob("*.md") if p.is_file()), key=lambda p: (p.stat().st_mtime, p.name))
 
     def _blokada(self) -> bool:
-        p = self.sk.stan / "wiedza.lock"
-        try:
-            if p.exists() and time.time() - p.stat().st_mtime < BLOKADA_STARA_S:
-                return False
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(f"{os.getpid()} {int(time.time())}\n", encoding="utf-8", newline="\n")
+        """Jeden piszący: blokada systemu i znacznik (wiedza.Blokada). Zajęta = ten przebieg nic nie robi."""
+        self._blok = self.lib.Blokada(self.sk.stan)
+        if self._blok.wez():
             return True
-        except OSError:
-            return False
+        self.raport["powod_blokady"] = self._blok.powod
+        return False
 
     def _odblokuj(self) -> None:
+        blok = getattr(self, "_blok", None)
+        if blok is not None:
+            blok.zwolnij()
+
+    def _lint(self, ix) -> Dict[str, int]:
+        """Lint bez modelu (LINT.md, state/wiedza-lint.json); jego błąd nie zatrzymuje kompilacji."""
         try:
-            (self.sk.stan / "wiedza.lock").unlink()
-        except OSError:
-            pass
+            r = self.lib.lint(self.sk, ix)
+        except Exception as e:                  # noqa: BLE001 - lint to informacja, nie warunek kompilacji
+            self.raport.setdefault("bledy_opis", []).append(f"lint: {e}")
+            return {}
+        return {"bledy": len(r["bledy"]), "ostrzezenia": len(r["ostrzezenia"]), "informacje": len(r["informacje"])}
 
     def _huby(self) -> List[str]:
         out = [f"{f}/{h}" for f, (h, _t) in self.lib.HUBY.items() if f]
@@ -360,6 +369,8 @@ class Kompilacja:
         wpisy: List[str] = []
         try:
             ix.odswiez()
+            if not self.na_sucho:
+                self.raport["lint_przed"] = self._lint(ix)      # docs/WIEDZA.md §6: lint przed każdą kompilacją
             for p in szkice[:self.limit_szkicow]:
                 if self._dotkniete >= self.limit_notatek:
                     self.raport["pominiete"] += 1
@@ -396,29 +407,40 @@ class Kompilacja:
                 wpisy.append(f"{p.name}: " + "; ".join(opisy or ["bez wyników"]))
                 ix.odswiez()                     # kolejne szkice widzą nowe notatki
             self.raport["pominiete"] += max(0, len(szkice) - self.limit_szkicow)
+            self.raport["wpisy"] = wpisy
             if not self.na_sucho:
                 self.raport["sprzatniete"] = self.sprzatnij_zrobione()
                 ix.odswiez()
                 lib.zbuduj_index(self.sk, ix)
                 lib.odswiez_listy_hubow(self.sk, ix)
                 ix.odswiez()
+                self.raport["lint"] = self._lint(ix)            # LINT.md i doctor widzą stan po kompilacji
+                self._zapisz_wynik(len(szkice), wpisy)          # LOG, punkt zapisu git i stan: jeszcze pod blokadą
         finally:
             ix.zamknij()
             if not self.na_sucho:
                 self._odblokuj()
-        self.raport["wpisy"] = wpisy
-        if not self.na_sucho:
-            r = self.raport
-            self.sk.dopisz_log("kompilacja", f"szkice: {len(szkice)} · nowe: {r['nowe']} · aktualizacje: {r['aktualizacje']} · "
-                                             f"sprzeczne: {r['sprzeczne']} · odrzucone: {r['odrzucone']} · błędy: {r['bledy']}" +
-                                             (f" · pominięte (limit): {r['pominiete']}" if r["pominiete"] else "") + "\n" +
-                                             "\n".join(f"- {w}" for w in wpisy))
-            r["git"] = self.sk.punkt_zapisu(f"kompilacja: {r['nowe']} nowych, {r['aktualizacje']} aktualizacji, {r['sprzeczne']} sprzecznych")
+        return self.raport
+
+    def _zapisz_wynik(self, ile: int, wpisy: List[str]) -> None:
+        lib, r = self.lib, self.raport
+        self.sk.dopisz_log("kompilacja", f"szkice: {ile} · nowe: {r['nowe']} · aktualizacje: {r['aktualizacje']} · "
+                                         f"sprzeczne: {r['sprzeczne']} · odrzucone: {r['odrzucone']} · błędy: {r['bledy']}" +
+                                         (f" · pominięte (limit): {r['pominiete']}" if r["pominiete"] else "") + "\n" +
+                                         "\n".join(f"- {w}" for w in wpisy))
+        r["git"] = self.sk.punkt_zapisu(f"kompilacja: {r['nowe']} nowych, {r['aktualizacje']} aktualizacji, {r['sprzeczne']} sprzecznych")
+        cel = self.sk.stan / "wiedza-kompilacja.json"
+        tmp = cel.with_name(f"{cel.name}.{os.getpid()}.tmp")
+        try:
+            tmp.write_text(json.dumps({"ostatnia": time.time(), "data": lib.dzis(),
+                                       "raport": {k: v for k, v in r.items() if k != "wpisy"}}, ensure_ascii=False, indent=1),
+                           encoding="utf-8", newline="\n")
+            lib.zamien_plik(tmp, cel)                    # zakładka i doctor czytają go w trakcie: zapis atomowy
+        except OSError:
             try:
-                (self.sk.stan / "wiedza-kompilacja.json").write_text(json.dumps({"ostatnia": time.time(), "data": lib.dzis(), "raport": {k: v for k, v in r.items() if k != "wpisy"}}, ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")
+                tmp.unlink()
             except OSError:
                 pass
-        return self.raport
 
 
 def model_hermes(max_tokens: int = 2000) -> Callable[[str, str], str]:
@@ -438,6 +460,21 @@ def model_hermes(max_tokens: int = 2000) -> Callable[[str, str], str]:
     return f
 
 
+def home_profilu(profil: str, env: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """HERMES_HOME z modelem zadania jarvo_wiedza: profil `profil`, gdy HERMES_HOME wskazuje katalog danych (dashboard,
+    `jarvo wiedza kompiluj`, kontener: /opt/data) i profil jest zainstalowany; profil podany wprost zostaje. None =
+    bez zmiany (brak profilu: Hermes weźmie model hosta)."""
+    env = os.environ if env is None else env
+    home = env.get("HERMES_HOME") or ("/opt/data" if Path("/opt/data/profiles").is_dir() else "")
+    if not home:
+        return None
+    h = Path(home)
+    if h.parent.name == "profiles":
+        return None
+    kandydat = h / "profiles" / profil
+    return str(kandydat) if kandydat.is_dir() else None
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     lib = _lib()
     lib.utf8_wyjscie()
@@ -445,6 +482,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--skarbiec", default=lib.DOMYSLNY_SKARBIEC)
     ap.add_argument("--stan", default=None)
     ap.add_argument("--limit", type=int, default=LIMIT_SZKICOW)
+    ap.add_argument("--profil", default=os.environ.get("JARVO_WIEDZA_PROFIL") or "jarvo",
+                    help="profil z modelem zadania jarvo_wiedza (domyślnie jarvo)")
     ap.add_argument("--na-sucho", action="store_true", help="tylko lista szkiców i kandydatów, bez modelu i bez zapisu")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
@@ -454,27 +493,32 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
     model = None
     if not a.na_sucho:
-        hermes_src = os.environ.get("HERMES_SRC", "/opt/hermes")
+        home = home_profilu(a.profil)
+        if home:
+            os.environ["HERMES_HOME"] = home              # przed importem Hermesa: config profilu (auxiliary.jarvo_wiedza)
+        hermes_src = os.environ.get("HERMES_SRC") or "/opt/hermes"
         if hermes_src not in sys.path and Path(hermes_src).is_dir():
             sys.path.insert(0, hermes_src)
         try:
             model = model_hermes()
         except Exception as e:
-            gdzie = ("uruchom Pythonem z venvu Hermesa z HERMES_HOME profilu jarvo" if lib.WINDOWS
-                     else "uruchom w kontenerze przez scripts/wiedza-kompiluj.sh")
-            print(f"✗ brak dostępu do modelu Hermesa ({e}); {gdzie} albo użyj --na-sucho", file=sys.stderr)
+            print(f"✗ brak dostępu do modelu Hermesa ({e}); uruchom `jarvo wiedza kompiluj` (Python z venvu Hermesa, "
+                  "HERMES_HOME profilu jarvo; w kontenerze scripts/wiedza-kompiluj.sh) albo użyj --na-sucho", file=sys.stderr)
             return 2
     r = Kompilacja(sk, model, limit_szkicow=a.limit, na_sucho=a.na_sucho).uruchom()
     if a.json:
         print(json.dumps(r, ensure_ascii=False, indent=1))
     else:
         if r["zablokowana"]:
-            print("✗ inna kompilacja trwa (state/wiedza.lock)")
+            print(f"✗ {r.get('powod_blokady') or 'inna kompilacja trwa'} (state/wiedza.lock); spróbuj za chwilę")
             return 1
         print(f"{'na sucho: ' if r['na_sucho'] else ''}szkice: {r['szkice']} · nowe: {r['nowe']} · aktualizacje: {r['aktualizacje']} · "
               f"sprzeczne: {r['sprzeczne']} · odrzucone: {r['odrzucone']} · błędy: {r['bledy']} · git: {'tak' if r['git'] else 'nie'}")
         for w in r.get("wpisy") or []:
             print(f"  - {w}")
+        if r.get("lint"):
+            print(f"lint po kompilacji: błędy: {r['lint'].get('bledy', 0)} · ostrzeżenia: {r['lint'].get('ostrzezenia', 0)} "
+                  f"· informacje: {r['lint'].get('informacje', 0)} (LINT.md)")
     return 0
 
 

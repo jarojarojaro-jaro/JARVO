@@ -14,15 +14,22 @@ Skarbiec to katalog zwykłych plików Markdown (projekt: docs/WIEDZA.md). Ten sk
   cofnij      cofa ostatni punkt zapisu git
   status      liczby
 
-Używane przez wtyczkę jarvo-wiedza (import), rutyny (CLI), testy (tests/test_wiedza.py).
-Domyślne ścieżki: JARVO_KNOWLEDGE_DIR (albo /opt/data/jarvo/knowledge w kontenerze, a na Windows i macOS
-<dane>/jarvo/knowledge, docs/NATYWNIE.md c1) i JARVO_STATE_DIR (albo <skarbiec>/../state).
-Przenośność (docs/NATYWNIE.md K01): notatki zawsze z LF, git w UTF-8 bez zamiany końców linii, zamiana pliku
-ponawiana, gdy na Windows trzyma go inny program, na Windows nazwy bez „:” i „\\”, na macOS ścieżki w NFC.
+Używane przez wtyczkę jarvo-wiedza (import), rutyny (CLI), `jarvo wiedza` (jarvo/wiedza_cli.py), testy
+(tests/test_wiedza.py). Domyślne ścieżki: JARVO_KNOWLEDGE_DIR, a bez niej <dane>/jarvo/knowledge, gdzie <dane> to
+HERMES_HOME (profil: dwa katalogi wyżej), bez HERMES_HOME domyślny korzeń Jarva (docs/NATYWNIE.md c1; w kontenerze
+/opt/data), i JARVO_STATE_DIR (albo <skarbiec>/../state).
+Przenośność (docs/NATYWNIE.md K01, K07): notatki zawsze z LF, git w UTF-8 bez zamiany końców linii, zamiana pliku
+ponawiana, gdy na Windows trzyma go inny program, na Windows nazwy bez „:”, „\\” i nazw urządzeń (CON, NUL…), na macOS
+ścieżki w NFC. Lint zgłasza nazwy, które nie przejdą na inny system (nazwy urządzeń Windows, kropka albo spacja na
+końcu, zapis spoza NFC, ta sama nazwa inną wielkością liter, ścieżka dłuższa niż 240 znaków) i zapisuje podsumowanie
+w state/wiedza-lint.json (czyta je `jarvo doctor`, który sam niczego nie zapisuje).
+Jeden piszący (§6): `Blokada` = blokada systemu (msvcrt na Windows, fcntl na POSIX) na state/wiedza.zamek i znacznik
+state/wiedza.lock z PID-em i czasem (ten sam format czyta i stawia scripts/install_fleet.py przy zasiewie).
 """
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -42,19 +49,24 @@ MACOS = sys.platform == "darwin"
 
 
 def _domyslny_skarbiec() -> str:
-    """JARVO_KNOWLEDGE_DIR; bez niej w kontenerze /opt/data/jarvo/knowledge, a na Windows i macOS <dane>/jarvo/knowledge,
-    gdzie <dane> to HERMES_HOME (profil: dwa katalogi wyżej), domyślnie %LOCALAPPDATA%\\Jarvo\\dane albo ~/.jarvo/dane."""
-    if not (WINDOWS or MACOS):
-        return os.environ.get("JARVO_KNOWLEDGE_DIR", "/opt/data/jarvo/knowledge")
+    """JARVO_KNOWLEDGE_DIR; bez niej <dane>/jarvo/knowledge, gdzie <dane> to HERMES_HOME (profil: dwa katalogi wyżej),
+    a bez HERMES_HOME domyślny korzeń Jarva: %LOCALAPPDATA%\\Jarvo\\dane, ~/.jarvo/dane, w kontenerze /opt/data,
+    na Linuksie natywnie ${XDG_DATA_HOME:-~/.local/share}/jarvo/dane (jarvo/sciezki.py)."""
     if os.environ.get("JARVO_KNOWLEDGE_DIR"):
         return os.environ["JARVO_KNOWLEDGE_DIR"]
     if os.environ.get("HERMES_HOME"):
         dane = Path(os.environ["HERMES_HOME"])
         dane = dane.parent.parent if dane.parent.name == "profiles" else dane
+    elif os.environ.get("JARVO_ROOT"):
+        dane = Path(os.environ["JARVO_ROOT"]).expanduser() / "dane"
     elif WINDOWS:
         dane = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "Jarvo" / "dane"
-    else:
+    elif MACOS:
         dane = Path.home() / ".jarvo" / "dane"
+    elif Path("/opt/data").is_dir():
+        return "/opt/data/jarvo/knowledge"
+    else:
+        dane = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "jarvo" / "dane"
     return str(dane / "jarvo" / "knowledge")
 
 
@@ -125,6 +137,17 @@ GITIGNORE_SYSTEMU = (".DS_Store",) if MACOS else ("Thumbs.db", "desktop.ini") if
 BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0)            # Windows: git bez migającego okna konsoli
 ZAJETY_PLIK = (5, 32, 33)          # WinError: odmowa dostępu, plik otwarty przez inny proces, zablokowany fragment
 PROBY_ZAMIANY = 10
+# nazwy urządzeń Windows: „con.md” otwiera konsolę, „nul.md” połyka zapis (także z rozszerzeniem i spacją przed kropką)
+ZAREZERWOWANE = frozenset({"con", "prn", "aux", "nul", "conin$", "conout$", *(f"com{i}" for i in range(1, 10)),
+                           *(f"lpt{i}" for i in range(1, 10))})
+MAX_SCIEZKI = 240                  # pełna ścieżka pliku: Windows bez LongPathsEnabled nie otworzy dłuższej niż 260 (K07)
+# jeden piszący skarbca (docs/WIEDZA.md §6): znacznik z PID-em i czasem (czyta go też scripts/install_fleet.py, zasiew
+# przy wdrożeniu) i osobny plik blokady systemu: na Windows bajt zablokowany przez msvcrt nie da się nawet przeczytać,
+# więc znacznika samego nie blokujemy
+ZNACZNIK_BLOKADY = "wiedza.lock"
+PLIK_ZAMKA = "wiedza.zamek"
+BLOKADA_STARA_S = 2 * 3600         # starszy znacznik to resztka po awarii (jak w install_fleet.py)
+LINT_JSON = "wiedza-lint.json"     # state/: podsumowanie ostatniego lintu dla `jarvo doctor` i statusu
 
 
 def dzis() -> str:
@@ -142,6 +165,148 @@ def zamien_plik(zrodlo: str | Path, cel: str | Path) -> None:
             if getattr(e, "winerror", None) not in ZAJETY_PLIK or proba == PROBY_ZAMIANY - 1:
                 raise
             time.sleep(0.05 * (proba + 1))
+
+
+def pid_zyje(pid: int) -> bool:
+    """Czy proces o tym PID-zie działa (znacznik blokady bez żywego właściciela to resztka po awarii), jak w
+    scripts/install_fleet.py: POSIX kill(pid, 0), Windows OpenProcess + GetExitCodeProcess (STILL_ACTIVE)."""
+    if pid <= 0:
+        return False
+    if not WINDOWS:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        except OSError:
+            return False
+        return True
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.OpenProcess.restype = wintypes.HANDLE
+    k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    k32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    uchwyt = k32.OpenProcess(0x1000, False, pid)              # PROCESS_QUERY_LIMITED_INFORMATION
+    if not uchwyt:
+        return ctypes.get_last_error() == 5                   # odmowa dostępu: proces jest, tylko cudzy
+    try:
+        kod = wintypes.DWORD()
+        return bool(k32.GetExitCodeProcess(uchwyt, ctypes.byref(kod))) and kod.value == 259    # STILL_ACTIVE
+    finally:
+        k32.CloseHandle(uchwyt)
+
+
+def znacznik_blokady(stan: str | Path) -> dict | None:
+    """Znacznik state/wiedza.lock: {"pid", "wiek_s", "zywy", "aktualny"} albo None (brak). `aktualny` = blokuje: proces
+    żyje, a znacznik jest młodszy niż BLOKADA_STARA_S; inaczej to resztka po awarii."""
+    p = Path(stan) / ZNACZNIK_BLOKADY
+    try:
+        tresc = p.read_text(encoding="utf-8", errors="replace").split()
+        wiek = max(0.0, time.time() - p.stat().st_mtime)
+    except OSError:
+        return None
+    pid = int(tresc[0]) if tresc and tresc[0].isdigit() else 0
+    zywy = pid_zyje(pid)
+    return {"pid": pid, "wiek_s": round(wiek, 1), "zywy": zywy, "aktualny": zywy and wiek < BLOKADA_STARA_S}
+
+
+def _sprobuj_zamek(f) -> bool | None:
+    """Jedna próba blokady systemu bez czekania: True wzięta, False zajęta, None system plików bez blokad."""
+    try:
+        if WINDOWS:
+            import msvcrt
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except (BlockingIOError, PermissionError):     # POSIX: EWOULDBLOCK, Windows: EACCES
+        return False
+    except OSError:
+        return None
+
+
+class Blokada:
+    """Jeden piszący skarbca (kompilacja: wątek bramy, przycisk w panelu, `jarvo wiedza kompiluj`). Blokada systemu
+    (msvcrt.locking, fcntl.flock) na state/wiedza.zamek wyklucza drugi przebieg także w tym samym procesie (każde
+    `wez()` ma własny uchwyt) i znika sama, gdy proces padnie. Znacznik state/wiedza.lock („PID czas”) widzi zasiew
+    z scripts/install_fleet.py, który blokady systemu nie zna: czeka na żywy znacznik i stawia własny. Dlatego po
+    wzięciu blokady żywy, świeży znacznik innego właściciela (wdrożenie w toku) też oznacza „zajęte”."""
+
+    def __init__(self, stan: str | Path, czekaj_s: float = 0.0):
+        self.stan = Path(stan)
+        self.czekaj_s = czekaj_s
+        self._f = None
+        self._moj = ""
+        self.powod = ""
+
+    def wez(self) -> bool:
+        try:
+            self.stan.mkdir(parents=True, exist_ok=True)
+            f = open(self.stan / PLIK_ZAMKA, "a+b")
+        except OSError as e:
+            self.powod = f"brak zapisu w {self.stan} ({e.strerror or e})"
+            return False
+        koniec = time.monotonic() + self.czekaj_s
+        wynik = _sprobuj_zamek(f)
+        while wynik is False and time.monotonic() < koniec:
+            time.sleep(0.05)
+            wynik = _sprobuj_zamek(f)
+        if wynik is False:
+            f.close()
+            self.powod = "inna kompilacja trwa"
+            return False
+        self._f = f
+        z = znacznik_blokady(self.stan)
+        if z and z["aktualny"]:
+            self._zwolnij_zamek()
+            self.powod = f"skarbiec zajęty (proces {z['pid']}, np. zasiew przy wdrożeniu)"
+            return False
+        self._moj = f"{os.getpid()} {int(time.time())}\n"
+        p = self.stan / ZNACZNIK_BLOKADY
+        tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")
+        try:
+            tmp.write_text(self._moj, encoding="utf-8", newline="\n")
+            zamien_plik(tmp, p)
+        except OSError as e:
+            with contextlib.suppress(OSError):
+                tmp.unlink()
+            self._zwolnij_zamek()
+            self.powod = f"nie zapiszę znacznika {p} ({e.strerror or e})"
+            return False
+        return True
+
+    def zwolnij(self) -> None:
+        p = self.stan / ZNACZNIK_BLOKADY
+        if self._moj:
+            with contextlib.suppress(OSError):
+                if p.read_text(encoding="utf-8") == self._moj:     # cudzego znacznika (wdrożenie po awarii) nie ruszamy
+                    p.unlink()
+            self._moj = ""
+        self._zwolnij_zamek()
+
+    def _zwolnij_zamek(self) -> None:
+        f, self._f = self._f, None
+        if f is None:
+            return
+        try:
+            if WINDOWS:
+                import msvcrt
+                with contextlib.suppress(OSError):
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+        finally:
+            f.close()                                    # POSIX: zamknięcie zwalnia flock
+
+    def __enter__(self) -> bool:
+        return self.wez()
+
+    def __exit__(self, *_exc) -> None:
+        self.zwolnij()
 
 
 def utf8_wyjscie() -> None:
@@ -213,11 +378,30 @@ def _nfc(rel: str) -> str:
 
 
 def nazwa_pliku(tytul: str) -> str:
-    """Tytuł, jak się go mówi → nazwa pliku: małe litery, polskie znaki i spacje zostają, bez znaków zakazanych."""
-    s = tytul.strip().lower()
+    """Tytuł, jak się go mówi → nazwa pliku: małe litery, polskie znaki (w NFC) i spacje zostają, bez znaków
+    zakazanych, kropki i spacji na końcu i bez nazw urządzeń Windows („con” → „con (notatka)”), więc plik przejdzie
+    na każdy system (K07)."""
+    s = unicodedata.normalize("NFC", tytul).strip().lower()
     s = "".join(c if (c.isalnum() or c in " ,-.()") else " " for c in s)
     s = re.sub(r"\s+", " ", s).strip(" .-")
-    return s[:70].rstrip(" .-") or "notatka"
+    s = s[:70].rstrip(" .-") or "notatka"
+    return f"{s} (notatka)" if urzadzenie_windows(s) else s
+
+
+def urzadzenie_windows(nazwa: str) -> bool:
+    """Nazwa urządzenia Windows (CON, NUL, COM1…), także z rozszerzeniem i spacją przed kropką („nul .md”)."""
+    return nazwa.split(".", 1)[0].strip().lower() in ZAREZERWOWANE
+
+
+def nieprzenosna(czesc: str) -> str | None:
+    """Powód, dla którego ta część ścieżki (katalog albo plik z rozszerzeniem) nie przejdzie na każdy system, albo None."""
+    if urzadzenie_windows(czesc):
+        return "nazwa urządzenia Windows"
+    if czesc != czesc.rstrip(". "):
+        return "kropka albo spacja na końcu (Windows ją obetnie)"
+    if unicodedata.normalize("NFC", czesc) != czesc:
+        return "znaki zapisane spoza NFC (inny zapis polskich liter: link i nazwa się rozjadą)"
+    return None
 
 
 def slug_ascii(tytul: str, n: int = 40) -> str:
@@ -295,6 +479,8 @@ class Skarbiec:
             raise ValueError(f"nazwa z „:” albo „\\” (Windows jej nie przyjmie): {rel}")
         if not rel.endswith(".md"):
             rel += ".md"
+        if WINDOWS and any(urzadzenie_windows(c) for c in rel.split("/")):    # „nul.md” połknąłby zapis bez śladu
+            raise ValueError(f"nazwa urządzenia Windows (CON, NUL, COM1…): {rel}")
         p = (self.root / rel).resolve()
         if p != self.root and self.root not in p.parents:
             raise ValueError(f"ścieżka poza skarbcem: {rel}")
@@ -312,6 +498,8 @@ class Skarbiec:
                 continue
             if len(r.parts) == 1 and r.name in PLIKI_SPECJALNE:
                 continue
+            if WINDOWS and any(urzadzenie_windows(part) for part in r.parts):   # „nul.md” ze skarbca z Linuksa: Win32
+                continue                                                       # go nie otworzy; lint go zgłasza (K07)
             out.append(_nfc(r.as_posix()[:-3]))
         return sorted(out)
 
@@ -1056,13 +1244,52 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
     stare = [p.name for p in szkice if (dt.datetime.now().timestamp() - p.stat().st_mtime) > 7 * 86400]
     if szkice:
         info.append(f"szkice w skrzynce: {len(szkice)}" + (f" (starsze niż 7 dni: {len(stare)})" if stare else ""))
+    ostrz += nazwy_nieprzenosne(sk)
     raport = {"bledy": bledy, "ostrzezenia": ostrz, "informacje": info, "notatek": len([r for r in notatki if not r.startswith(POZA_WYSZUKIWANIEM)]),
               "data": dzis()}
     linie = [f"# Lint skarbca ({dzis()})", "", f"Notatek: {raport['notatek']} · błędy: {len(bledy)} · ostrzeżenia: {len(ostrz)} · informacje: {len(info)}", ""]
     for naglowek, lista in (("Błędy", bledy), ("Ostrzeżenia", ostrz), ("Informacje", info)):
         linie += [f"## {naglowek}", ""] + ([f"- {x}" for x in lista] or ["- brak"]) + [""]
-    (sk.root / "LINT.md").write_text("\n".join(linie), encoding="utf-8", newline="\n")
+    sk.zapisz_plik("LINT", "\n".join(linie))        # zapis atomowy: Obsidian może mieć LINT.md otwarty
+    # podsumowanie dla `jarvo doctor` (doctor sam niczego nie zapisuje); ta sama treść = bez zapisu, więc drugi przebieg
+    # wdrożenia niczego nie zmienia (data dnia zamiast znacznika czasu)
+    tresc = json.dumps({"data": dzis(), "notatek": raport["notatek"], "bledy": len(bledy), "ostrzezenia": len(ostrz),
+                        "informacje": len(info), "pierwsze_bledy": bledy[:5]}, ensure_ascii=False, indent=1) + "\n"
+    with contextlib.suppress(OSError):
+        cel = sk.stan / LINT_JSON
+        if not cel.is_file() or cel.read_text(encoding="utf-8") != tresc:
+            sk.stan.mkdir(parents=True, exist_ok=True)
+            tmp = sk.stan / f"{LINT_JSON}.{os.getpid()}.tmp"
+            tmp.write_text(tresc, encoding="utf-8", newline="\n")
+            zamien_plik(tmp, cel)
     return raport
+
+
+def nazwy_nieprzenosne(sk: Skarbiec) -> list[str]:
+    """Ostrzeżenia K07 dla nazw, które nie przejdą na inny system (skarbiec przenosimy z kontenera na Windows i macOS,
+    a Obsidian otwiera go na każdym): nazwy urządzeń Windows, kropka albo spacja na końcu, zapis spoza NFC, nazwy
+    różniące się tylko wielkością liter w jednym katalogu i pełna ścieżka dłuższa niż MAX_SCIEZKI. Nazwy z dysku, nie
+    z indeksu (na macOS indeks ma już NFC), bez katalogów z kropką (.git, .obsidian)."""
+    out: list[str] = []
+    for katalog, podkatalogi, pliki in os.walk(sk.root):
+        podkatalogi[:] = sorted(d for d in podkatalogi if not d.startswith("."))
+        baza = Path(katalog)
+        rel_kat = baza.relative_to(sk.root).as_posix()
+        wg_liter: dict[str, list[str]] = {}
+        for nazwa in sorted([*podkatalogi, *(p for p in pliki if p.endswith(".md"))]):
+            rel = nazwa if rel_kat == "." else f"{rel_kat}/{nazwa}"
+            wg_liter.setdefault(unicodedata.normalize("NFC", nazwa).casefold(), []).append(rel)
+            powod = nieprzenosna(nazwa)              # pełna nazwa z dysku (katalog albo plik z .md)
+            if powod:
+                out.append(f"nazwa nieprzenośna ({powod}): `{rel}`")
+            elif nazwa.endswith(".md") and len(str(baza / nazwa)) > MAX_SCIEZKI:
+                out.append(f"ścieżka dłuższa niż {MAX_SCIEZKI} znaków ({len(str(baza / nazwa))}; Windows bez długich ścieżek "
+                           f"jej nie otworzy): `{rel}`")
+        for rels in wg_liter.values():
+            if len(rels) > 1:
+                out.append("nazwy różnią się tylko wielkością liter (Windows i macOS widzą jeden plik): "
+                           + ", ".join(f"`{r}`" for r in rels))
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ status
@@ -1078,9 +1305,19 @@ def status(sk: Skarbiec, ix: Indeks) -> dict:
     if log.exists():
         wpisy = re.findall(r"^## \[(\d{4}-\d{2}-\d{2})\] (\w+)", log.read_text(encoding="utf-8"), re.M)
         ostatni = " ".join(wpisy[-1]) if wpisy else ""
+    def z_json(nazwa: str) -> dict:
+        try:
+            d = json.loads((sk.stan / nazwa).read_text(encoding="utf-8"))
+            return d if isinstance(d, dict) else {}
+        except (OSError, ValueError):
+            return {}
+    komp = z_json("wiedza-kompilacja.json")
     return {"skarbiec": sk.root.as_posix(), "indeks": (sk.stan / "wiedza.db").as_posix(), "wg_folderu": wg_folderu, "szkice": szkice,
             "linki": ix.db.execute("SELECT COUNT(*) FROM linki WHERE rozwiazany = 1").fetchone()[0],
-            "git": (sk.root / ".git").exists(), "ostatni_wpis": ostatni}
+            "git": (sk.root / ".git").exists(), "ostatni_wpis": ostatni,
+            "kompilacja": {"ostatnia": komp.get("ostatnia") or 0, "data": komp.get("data") or "",
+                           "raport": komp.get("raport") or {}},
+            "lint": z_json(LINT_JSON), "blokada": znacznik_blokady(sk.stan)}
 
 
 # ------------------------------------------------------------------------------------------------ CLI

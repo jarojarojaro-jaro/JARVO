@@ -7,6 +7,8 @@ a w ostatniej linii JSON dla schedulera:
     {"wakeAgent": true, "context": {...}}     → Jarvo dostaje raport i działa (skill `patrol`)
 
 Ta sama anomalia nie budzi Jarva częściej niż co JARVO_PATROL_REALERT_HOURS (domyślnie 12 h).
+Brak dziennika misji (`<misje>/INDEX.md`) to też sygnał: bez niego patrol nie widzi misji i dawniej milczał.
+Ścieżki z HERMES_HOME (_sciezki.py), nie z /opt: natywnie cron uruchamia skrypt z HERMES_HOME profilu jarvo.
 
 Tryb testowy: --fixture plik.json (tasks/events/diagnostics/index) zamiast wywołań `hermes`.
 """
@@ -17,14 +19,16 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-MISSIONS_DIR = Path(os.environ.get("JARVO_MISSIONS_DIR", "/opt/data/jarvo/missions"))
-STATE_FILE = Path(os.environ.get("JARVO_PATROL_STATE", "/opt/data/jarvo/state/patrol.json"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _sciezki  # noqa: E402
+
+MISSIONS_DIR = _sciezki.misje()
+STATE_FILE = Path(os.environ.get("JARVO_PATROL_STATE") or _sciezki.stan() / "patrol.json")
 
 READY_STALE_MIN = int(os.environ.get("JARVO_PATROL_READY_STALE_MIN", "20"))
 REVIEW_STALE_MIN = int(os.environ.get("JARVO_PATROL_REVIEW_STALE_MIN", "60"))
@@ -35,12 +39,11 @@ REALERT_HOURS = float(os.environ.get("JARVO_PATROL_REALERT_HOURS", "12"))
 # ------------------------------------------------------------------ data access
 
 def _hermes(*args: str) -> str:
-    cmd = [os.environ.get("JARVO_HERMES_BIN", "hermes"), *args]
-    # pełna ścieżka z PATH: na Windows nakładka hermes bywa plikiem .cmd, którego CreateProcess nie znajdzie po nazwie
-    res = subprocess.run([shutil.which(cmd[0]) or cmd[0], *args], capture_output=True, text=True, encoding="utf-8",
-                         errors="replace", timeout=120)
+    cmd = [_sciezki.hermes(), *args]
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if res.returncode != 0:
-        raise RuntimeError(f"{' '.join(cmd)} → {res.returncode}: {res.stderr.strip()[:300]}")
+        raise RuntimeError(f"hermes {' '.join(args)} → {res.returncode}: {res.stderr.strip()[:300]}")
     return res.stdout
 
 
@@ -63,7 +66,8 @@ def load_live() -> dict:
             diagnostics.append(d)
     index_file = MISSIONS_DIR / "INDEX.md"
     index = index_file.read_text(encoding="utf-8") if index_file.exists() else ""
-    return {"tasks": tasks, "events": events, "diagnostics": diagnostics, "index": index}
+    return {"tasks": tasks, "events": events, "diagnostics": diagnostics, "index": index,
+            **({} if index_file.exists() else {"index_brak": index_file.as_posix()})}
 
 
 # --------------------------------------------------------------------- analysis
@@ -148,6 +152,10 @@ def analyze(data: dict, now: float) -> list[dict]:
         add(f"diag:{d.get('task_id')}:{d.get('code') or msg[:40]}", d.get("severity", "warning"),
             "diagnostic", f"Diagnostyka Hermesa: {msg}", task_id=d.get("task_id"))
 
+    if data.get("index_brak"):
+        add("mission_index_missing", "medium", "mission_index_missing",
+            f"Brak dziennika misji {data['index_brak']}: patrol nie widzi misji. Odtwórz go z szablonu skilla "
+            "mission-ledger (references/INDEX.template.md).")
     for m in parse_index(data.get("index", "")):
         cards = m["cards"]
         if not cards:

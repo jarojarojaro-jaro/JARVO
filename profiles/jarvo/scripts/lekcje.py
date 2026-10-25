@@ -22,10 +22,12 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import os
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _sciezki  # noqa: E402  (katalogi z HERMES_HOME, nie z /opt)
 
 PROG = 0.03
 DNI_WAZNOSCI = 60
@@ -125,12 +127,8 @@ def ocen(lekcje: list[dict], historia: list[dict], dzis: dt.date) -> dict:
 
 
 def domyslne() -> tuple[Path, Path]:
-    dane = Path(os.environ.get("JARVO_DATA_DIR") or "")
-    if not str(dane) or str(dane) == ".":
-        h = Path(os.environ.get("HERMES_HOME", "/opt/data"))
-        dane = h.parent.parent if h.parent.name == "profiles" else h
-    jarvo = dane / "jarvo"
-    return jarvo / "knowledge" / "fleet" / "lekcje.md", jarvo / "evals" / "historia.jsonl"
+    """Księga w skarbcu i historia evals w `<dane>/jarvo` (JARVO_DATA_DIR = `<dane>/jarvo`, _sciezki.py)."""
+    return _sciezki.skarbiec() / "fleet" / "lekcje.md", _sciezki.jarvo() / "evals" / "historia.jsonl"
 
 
 def podsumuj(plik: Path, evals: Path, dzis: dt.date | None = None) -> dict:

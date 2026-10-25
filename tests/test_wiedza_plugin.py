@@ -330,3 +330,37 @@ def test_awaria_schematu_nie_zabiera_skarbca(srodowisko, tmp_path, monkeypatch):
     with pytest.raises(RuntimeError):
         pl._modul("jarvo_zly_test", "zly.py")
     assert "jarvo_zly_test" not in sys.modules
+
+
+def _chwila(tekst: str) -> float:
+    """Czas lokalny (daty z dala od zmiany czasu: 25.10.2026 godzina 02:00–03:00 jest dwa razy)."""
+    import datetime as dt
+    return dt.datetime.strptime(tekst, "%Y-%m-%d %H:%M").timestamp()
+
+
+def test_ostatnia_pora_nocnego_przebiegu():
+    """Ostatnia pora 03:10 nie później niż teraz: przed 03:10 to wczorajsza, po niej dzisiejsza (czas lokalny)."""
+    assert pl.ostatnia_noc(_chwila("2026-10-20 02:59")) == _chwila("2026-10-19 03:10")
+    assert pl.ostatnia_noc(_chwila("2026-10-20 03:10")) == _chwila("2026-10-20 03:10")
+    assert pl.ostatnia_noc(_chwila("2026-10-20 23:00")) == _chwila("2026-10-20 03:10")
+
+
+def test_nocny_przebieg_nadrabiany_po_uspieniu(srodowisko):
+    """Laptop uśpiony o 03:10: nocny przebieg nie przepada do następnej nocy, tylko rusza raz po wybudzeniu; potem
+    obowiązuje zwykły rytm (najwyżej raz na godzinę przy szkicach). Bez szkiców nic nie rusza."""
+    root, home, sk, p = srodowisko
+    stan = root / "jarvo" / "state" / "wiedza-kompilacja.json"
+
+    def ostatnia(t):
+        stan.write_text(json.dumps({"ostatnia": t}), encoding="utf-8")
+    ostatnia(_chwila("2026-10-20 02:50"))
+    assert not p._moze_kompilowac(_chwila("2026-10-20 07:30"))           # skrzynka pusta
+    w.zapisz_szkic(sk, "fakt", "Nocny fakt", "Treść.", "karta t_5", "jarvo-web")
+    assert p._moze_kompilowac(_chwila("2026-10-20 03:05")) is False       # 15 min od poprzedniej, przed porą nocną
+    assert p._moze_kompilowac(_chwila("2026-10-20 03:11"))                # pora nocna (dawniej tylko okno 10 min)
+    assert p._moze_kompilowac(_chwila("2026-10-20 07:30"))                # po wybudzeniu: nadrabia
+    ostatnia(_chwila("2026-10-20 07:31"))                                # po nadrobieniu: zwykły rytm
+    assert not p._moze_kompilowac(_chwila("2026-10-20 08:00"))
+    assert p._moze_kompilowac(_chwila("2026-10-20 08:32"))               # godzina od poprzedniej
+    p._kontekst = "subagent"
+    assert not p._moze_kompilowac(_chwila("2026-10-20 08:32"))           # tylko kontekst główny (jedna kompilacja)
