@@ -275,8 +275,10 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
   etap 2 (gotowy obraz amd64/arm64 w GHCR) i etap 3 (macOS: Homebrew, Colima, wolumeny, LaunchAgent) zbudowane 2026-10-09,
   macOS czeka na próbę na prawdziwym Macu; etap 4 (Windows: WSL2, restart i dalszy ciąg, dystrybucja `Jarvo`, autostart)
   zbudowany 2026-10-09, czeka na próbę na prawdziwym Windowsie.
-- ⬜ Jarvo natywnie na Windows, macOS i Linuksie (bez Dockera i WSL, każda funkcja, jedno polecenie instalacji, macierz CI
-  na 6 runnerach): plan w [NATYWNIE.md](NATYWNIE.md) z 2026-10-24; etapy E0–E14; decyzje właściciela z 2026-10-24 w § (i) (bez macOS Intel, domyślne zgody „projekt”).
+- 🟡 Jarvo natywnie na Windows, macOS i Linuksie (bez Dockera i WSL, każda funkcja, jedno polecenie instalacji, macierz CI
+  na 5 runnerach): plan w [NATYWNIE.md](NATYWNIE.md) z 2026-10-24; etapy E0–E14; decyzje właściciela z 2026-10-24 w § (i) (bez macOS Intel, minimum macOS 15, domyślne zgody „projekt”).
+  W toku E0–E4 (stan w § (g) planu): manifest i pobieracz, Hermes z przypięcia, nadzorca, autostart, polecenie `jarvo`,
+  instalator z bootstrapem `jarvo/bootstrap/` (osobny adres do E13) i wtyczka zgód; sprawdzone na Windows 11.
 
 ### Faza ∞
 Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…

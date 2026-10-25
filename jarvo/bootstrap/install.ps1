@@ -8,7 +8,7 @@
 #   1. korzen: $env:JARVO_ROOT (wzgledny albo z ~ liczony od biezacego katalogu, pelny wraca do zmiennej) albo
 #      %LOCALAPPDATA%\Jarvo; katalog programu ma sciezke ASCII (przy polskich znakach
 #      krotka nazwa 8.3 korzenia, jak jarvo/sciezki.py); stara instalacja z WSL w tym miejscu = odmowa (migracja E12),
-#   2. uv i Python do <root>\program\narzedzia\<nazwa>\<wersja>: suma przed rozpakowaniem (Get-FileHash), tar.exe
+#   2. uv i Python do <root>\program\narzedzia\<nazwa>\<wersja>: suma przed rozpakowaniem (SHA-256 z .NET), tar.exe
 #      dla tar.gz, Expand-Archive dla zip; znacznik .jarvo-suma jak w jarvo/pobieracz.py, wiec instalator
 #      w Pythonie niczego nie pobiera drugi raz,
 #   3. kod Jarva: ref ($env:JARVO_REF albo main) -> SHA przez API GitHuba, archiwum tego commitu do

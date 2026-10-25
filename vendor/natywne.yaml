@@ -859,60 +859,58 @@ narzedzia:
       linux-arm64:
         brak: "scrcpy nie wydaje binarki na Linux aarch64 (w wydaniu tylko linux-x86_64); bez ekranu w oknie, telefon dalej przez adb z systemu"
 
-  # Android SDK Platform-Tools r37.0.1 (Google, wydanie 2026-07-30): adb i fastboot. PRZEJRZANE 2026-10-24, ale wpis
-  # czeka: źródło nie ma repo git (AOSP nie taguje tego wydania, lustra na GitHubie nie ma), więc w vendor/zrodla.yaml
-  # może być tylko `paczka` .zip, a validate.py (check_zrodla) i zrodla.py (pliki_paczki) przyjmują dziś tylko tar.
-  # Po dopuszczeniu zip odkomentować ten blok, dopisać do zrodla.yaml wpis android-platform-tools (paczka
-  # https://dl.google.com/android/repository/platform-tools-latest-windows.zip, przejrzane = sha256 pliku win niżej,
-  # notatka z przeglądu), potem `python scripts/natywne.py generuj`. Licencja SDK zabrania redystrybucji: tylko
-  # dl.google.com, bez lustra (I21), akceptacja właściciela przed pierwszym pobraniem (stąd przy-uzyciu). Google podaje
-  # w repository2-3.xml tylko SHA-1 i rozmiar (zgodne); sha256 policzone i zgodne z przypięciem w scrcpy v5.0.1
-  # (app/deps/adb_*.sh). Windows: PE32 x86 z podpisem Google, na arm64 ten sam plik w emulacji; macOS: universal
-  # z Developer ID Google i notaryzacją; Linux: tylko x86_64. ADB_MDNS=0: serwer adb nie szuka telefonów multicastem
-  # w sieci lokalnej (Wi-Fi dalej przez adb pair / adb connect <adres>:<port>). `usun`: zostają adb, fastboot, ich
-  # DLL-e (AdbWinApi, AdbWinUsbApi), NOTICE.txt i source.properties; znika sqlite3 3.50.6 (błąd WAL-reset, B06, Z14),
-  # mke2fs, make_f2fs (formatowanie partycji przez fastboot), etc1tool, hprof-conv, lib64/libc++ i libwinpthread-1.dll.
+  # Android SDK Platform-Tools r37.0.1 (Google, wydanie 2026-07-30): adb i fastboot, przegląd 2026-10-24. Źródło nie ma
+  # repo git (AOSP nie taguje tego wydania, lustra na GitHubie nie ma), więc w vendor/zrodla.yaml jest jako `paczka`
+  # .zip (android-platform-tools: platform-tools-latest-windows.zip, przejrzane = sha256 pliku win niżej). Licencja
+  # SDK zabrania redystrybucji: tylko dl.google.com, bez lustra (I21), akceptacja właściciela przed pierwszym
+  # pobraniem (stąd przy-uzyciu). Google podaje w repository2-3.xml tylko SHA-1 i rozmiar (zgodne); sha256 policzone
+  # i zgodne z przypięciem w scrcpy v5.0.1 (app/deps/adb_*.sh). Windows: PE32 x86 z podpisem Google, na arm64 ten sam
+  # plik w emulacji; macOS: universal z Developer ID Google i notaryzacją; Linux: tylko x86_64. ADB_MDNS=0: serwer adb
+  # nie szuka telefonów multicastem w sieci lokalnej (Wi-Fi dalej przez adb pair / adb connect <adres>:<port>).
+  # `usun`: zostają adb, fastboot, ich DLL-e (AdbWinApi, AdbWinUsbApi), NOTICE.txt i source.properties; znika sqlite3
+  # 3.50.6 (błąd WAL-reset, B06, Z14), mke2fs, make_f2fs (formatowanie partycji przez fastboot), etc1tool, hprof-conv,
+  # lib64/libc++ i libwinpthread-1.dll.
   # Sprawdzone 2026-10-24 w nagłówkach binarek: adb.exe i fastboot.exe importują z paczki tylko AdbWinApi.dll (bez
   # importów opóźnionych), a adb i fastboot na macOS i Linuksie nie ładują lib64/libc++ (potrzebują jej tylko usuwane
   # programy).
-  # platform-tools:
-  #   zrodlo: android-platform-tools
-  #   wersja: "37.0.1"
-  #   licencja: Android SDK License (Google) + licencje open source komponentów AOSP (NOTICE.txt w paczce)
-  #   rola: "adb (i fastboot) Twórcy aplikacji: telefon właściciela albo emulator (urzadzenie.py, jarvo android)"
-  #   kiedy: przy-uzyciu
-  #   pliki:
-  #     windows-x64: &pt-win
-  #       url: https://dl.google.com/android/repository/platform-tools_r37.0.1-win.zip
-  #       sha256: 45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
-  #       rozmiar: 8044989
-  #       format: zip
-  #       usun_poziom: 1
-  #       usun: [sqlite3.exe, mke2fs.exe, mke2fs.conf, make_f2fs.exe, make_f2fs_casefold.exe, etc1tool.exe,
-  #              hprof-conv.exe, libwinpthread-1.dll]
-  #       bin: ["."]
-  #       env: {ADB_MDNS: "0"}
-  #     windows-arm64: *pt-win
-  #     macos-arm64:
-  #       url: https://dl.google.com/android/repository/platform-tools_r37.0.1-darwin.zip
-  #       sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
-  #       rozmiar: 16110554
-  #       format: zip
-  #       usun_poziom: 1
-  #       usun: &pt-usun-posix [sqlite3, mke2fs, mke2fs.conf, make_f2fs, make_f2fs_casefold, etc1tool, hprof-conv, lib64]
-  #       bin: ["."]
-  #       env: {ADB_MDNS: "0"}
-  #     linux-x64:
-  #       url: https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip
-  #       sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
-  #       rozmiar: 9054187
-  #       format: zip
-  #       usun_poziom: 1
-  #       usun: *pt-usun-posix
-  #       bin: ["."]
-  #       env: {ADB_MDNS: "0"}
-  #     linux-arm64:
-  #       brak: "Google nie wydaje platform-tools na Linux arm64 (paczka linux ma tylko binarki x86_64); adb z pakietu systemu, jeśli właściciel go ma (np. apt install adb), doctor to pokazuje"
+  platform-tools:
+    zrodlo: android-platform-tools
+    wersja: "37.0.1"
+    licencja: Android SDK License (Google) + licencje open source komponentów AOSP (NOTICE.txt w paczce)
+    rola: "adb (i fastboot) Twórcy aplikacji: telefon właściciela albo emulator (urzadzenie.py, jarvo android)"
+    kiedy: przy-uzyciu
+    pliki:
+      windows-x64: &pt-win
+        url: https://dl.google.com/android/repository/platform-tools_r37.0.1-win.zip
+        sha256: 45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
+        rozmiar: 8044989
+        format: zip
+        usun_poziom: 1
+        usun: [sqlite3.exe, mke2fs.exe, mke2fs.conf, make_f2fs.exe, make_f2fs_casefold.exe, etc1tool.exe,
+               hprof-conv.exe, libwinpthread-1.dll]
+        bin: ["."]
+        env: {ADB_MDNS: "0"}
+      windows-arm64: *pt-win
+      macos-arm64:
+        url: https://dl.google.com/android/repository/platform-tools_r37.0.1-darwin.zip
+        sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
+        rozmiar: 16110554
+        format: zip
+        usun_poziom: 1
+        usun: &pt-usun-posix [sqlite3, mke2fs, mke2fs.conf, make_f2fs, make_f2fs_casefold, etc1tool, hprof-conv, lib64]
+        bin: ["."]
+        env: {ADB_MDNS: "0"}
+      linux-x64:
+        url: https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip
+        sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
+        rozmiar: 9054187
+        format: zip
+        usun_poziom: 1
+        usun: *pt-usun-posix
+        bin: ["."]
+        env: {ADB_MDNS: "0"}
+      linux-arm64:
+        brak: "Google nie wydaje platform-tools na Linux arm64 (paczka linux ma tylko binarki x86_64); adb z pakietu systemu, jeśli właściciel go ma (np. apt install adb), doctor to pokazuje"
 
 # Modele i dane niezależne od platformy (przegląd 2026-10-24): pliki z przypiętej rewizji repo modelu, każdy z sumą.
 # Wagi lektorów i OCR to te same pliki i sumy co w infra/Dockerfile. JARVO-ZRODLO.txt (jak w obrazie) pisze instalator.

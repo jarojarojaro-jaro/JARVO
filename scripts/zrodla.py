@@ -9,10 +9,12 @@
 `sprawdz` pyta każde repo o obecny commit (git ls-remote, równolegle) i dla tych, które zmieniły się od
 `przejrzane`, pobiera tylko historię od tamtej chwili (bez plików, same drzewa): liczba i tytuły commitów,
 pliki dodane / zmienione / usunięte, nowe katalogi (do 2 poziomów), nowe i zmienione SKILL.md, zmiana pliku
-licencji (⚠). Źródło z `galaz` (gałąź wydań, np. valkey 8.1) śledzimy na tej gałęzi zamiast domyślnej. Źródło bez repo git (`paczka`: adres archiwum .tar.gz, np. iso-glow) ma w `przejrzane` SHA-256
-paczki: inna suma = nowa wersja, a pliki paczki porównujemy z naszą kopią w repo (`kopia`, `nazwy`). Raport jest po polsku w Markdownie (albo JSON); z niego rutyna pon/śr/pt robi propozycje dla
-właściciela. Skrypt niczego nie wdraża: `przejrzane` i `status` zmieniają tylko spis, a wersja kopiowana do
-floty (`rev` w skills.lock.yaml, stałe w narzędziach) zmienia się osobno, po zgodzie właściciela.
+licencji (⚠). Źródło z `galaz` (gałąź wydań, np. valkey 8.1) śledzimy na tej gałęzi zamiast domyślnej. Źródło
+bez repo git (`paczka`: adres archiwum tar albo zip, np. iso-glow, platform-tools) ma w `przejrzane` SHA-256
+paczki: inna suma = nowa wersja, a pliki paczki porównujemy z naszą kopią w repo (`kopia`, `nazwy`). Raport jest
+po polsku w Markdownie (albo JSON); z niego rutyna pon/śr/pt robi propozycje dla właściciela. Skrypt niczego nie
+wdraża: `przejrzane` i `status` zmieniają tylko spis, a wersja kopiowana do floty (`rev` w skills.lock.yaml, stałe
+w narzędziach) zmienia się osobno, po zgodzie właściciela.
 Kod wyjścia 0 także przy nowościach; 1 przy błędzie spisu, nieznanej nazwie albo niedostępnym repo.
 """
 
@@ -158,19 +160,43 @@ def pobierz(url: str) -> bytes:
     return dane
 
 
-def pliki_paczki(dane: bytes) -> dict[str, str]:
-    """ścieżka (bez katalogu głównego archiwum) → SHA-256 pliku; nic nie rozpakowujemy na dysk."""
+def _sha_strumienia(f) -> str:
     import hashlib
+    h = hashlib.sha256()
+    for kawalek in iter(lambda: f.read(1 << 20), b""):
+        h.update(kawalek)
+    return h.hexdigest()
+
+
+def pliki_paczki(dane: bytes) -> dict[str, str]:
+    """ścieżka (bez katalogu głównego archiwum) → SHA-256 pliku z archiwum tar (.tar.gz, .tgz, .tar.xz, .tar.bz2,
+    .tar) albo zip (np. platform-tools od Google); same pliki, bez katalogów i dowiązań; nic nie rozpakowujemy na
+    dysk."""
     import io
+    import stat
     import tarfile
+    import zipfile
     out = {}
-    with tarfile.open(fileobj=io.BytesIO(dane), mode="r:*") as tar:
+
+    def dodaj(nazwa: str, otworz) -> None:
+        czesci = nazwa.replace("\\", "/").lstrip("./").split("/", 1)
+        if len(czesci) == 2 and czesci[1]:
+            with otworz() as f:
+                out[czesci[1]] = _sha_strumienia(f)
+
+    bufor = io.BytesIO(dane)
+    if zipfile.is_zipfile(bufor):
+        with zipfile.ZipFile(bufor) as zf:
+            for info in zf.infolist():
+                if info.is_dir() or stat.S_ISLNK(info.external_attr >> 16):
+                    continue
+                dodaj(info.filename, lambda i=info: zf.open(i))
+        return out
+    bufor.seek(0)
+    with tarfile.open(fileobj=bufor, mode="r:*") as tar:
         for m in tar.getmembers():
-            if not m.isfile():
-                continue
-            czesci = m.name.lstrip("./").split("/", 1)
-            if len(czesci) == 2 and czesci[1]:
-                out[czesci[1]] = hashlib.sha256(tar.extractfile(m).read()).hexdigest()
+            if m.isfile():
+                dodaj(m.name, lambda m=m: tar.extractfile(m))
     return out
 
 

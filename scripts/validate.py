@@ -414,8 +414,9 @@ def check_zrodla(r: Report) -> None:
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", str(name)):
             r.err(f"zrodla: nazwa {name!r} tylko z małych liter, cyfr i myślników")
         if spec.get("paczka"):          # źródło bez repo git: archiwum, przejrzane = SHA-256 paczki
-            if not re.fullmatch(r"https://[^\s]+\.(tar\.gz|tgz|tar\.xz|tar\.bz2|tar)", str(spec["paczka"])):
-                r.err(f"zrodla/{name}: paczka musi być adresem https archiwum .tar.gz / .tgz / .tar.xz")
+            if not re.fullmatch(r"https://[^\s]+\.(tar\.gz|tgz|tar\.xz|tar\.bz2|tar|zip)", str(spec["paczka"])):
+                r.err(f"zrodla/{name}: paczka musi być adresem https archiwum .tar.gz / .tgz / .tar.xz / .tar.bz2 "
+                      "/ .tar / .zip")
             if not re.fullmatch(r"[0-9a-f]{64}", str(spec.get("przejrzane", ""))):
                 r.err(f"zrodla/{name}: przejrzane paczki musi być jej SHA-256 (64 znaki)")
             if spec.get("kopia") and not (fl.REPO_ROOT / str(spec["kopia"])).is_dir():

@@ -10,8 +10,8 @@
 #         czeka         = przejrzane, czeka na decyzję właściciela
 #         odlozone      = właściciel odłożył; nowości tylko w skrócie
 # repo = GitHub albo model z Hugging Face (huggingface.co/<właściciel>/<model>, sprawdzany tak samo przez ls-remote).
-# przejrzane = ostatni commit, który przejrzeliśmy (pełny SHA); źródło bez repo git (`paczka`: adres archiwum .tar.gz)
-# ma tu SHA-256 przejrzanej paczki. galaz = gałąź wydań, którą śledzimy zamiast domyślnej (np. valkey 8.1).
+# przejrzane = ostatni commit, który przejrzeliśmy (pełny SHA); źródło bez repo git (`paczka`: adres archiwum tar albo
+# zip) ma tu SHA-256 przejrzanej paczki. galaz = gałąź wydań, którą śledzimy zamiast domyślnej (np. valkey 8.1).
 # validate.py pilnuje, żeby każde repo z SOURCES.md i skills.lock.yaml było w spisie.
 
 version: 1
@@ -577,7 +577,12 @@ zrodla:
     repo: https://github.com/Genymobile/scrcpy
     status: do-wdrozenia
     przejrzane: a60891aea193d92e7e5c3942700eca63f9d19a5f
-    notatka: "Apache-2.0 (Genymobile, autor Romain Vimont): scrcpy 5.0.1 (tag podpisany GPG autora = ten commit, wydanie 2026-10-08). Przegląd 2026-10-24: pliki zbudowane w GitHub Actions (release.yml, przebieg 37737030700 na dc8a55a, rodzicu tagu, różnica tylko w dokumentacji), SHA256SUMS.txt z podpisem GPG rom1v (klucz 456958E85A185DD5C2D1E4E80C822B298461FA03 z profilu GitHub) zgodny z digestami GitHuba, artefaktem CI i własnym liczeniem; win64, winarm64 (natywnie ARM64), macos-aarch64, linux-x86_64, bez linux-aarch64; w paczkach adb identyczny z platform-tools r37.0.1, FFmpeg 9.0.2 bez GPL, SDL 3.4.18, libusb 1.0.30, dav1d 1.5.4; bez telemetrii i sprawdzania aktualizacji, sieć tylko przez adb i tunel 127.0.0.1:27183+; bez Authenticode i notaryzacji (macOS ad hoc). Android platform-tools r37.0.1 (adb, fastboot) przejrzane tego samego dnia, ale wpis czeka: źródło bez repo git, a spis przyjmuje paczkę tylko jako tar (vendor/natywne.yaml, blok platform-tools)"
+    notatka: "Apache-2.0 (Genymobile, autor Romain Vimont): scrcpy 5.0.1 (tag podpisany GPG autora = ten commit, wydanie 2026-10-08). Przegląd 2026-10-24: pliki zbudowane w GitHub Actions (release.yml, przebieg 37737030700 na dc8a55a, rodzicu tagu, różnica tylko w dokumentacji), SHA256SUMS.txt z podpisem GPG rom1v (klucz 456958E85A185DD5C2D1E4E80C822B298461FA03 z profilu GitHub) zgodny z digestami GitHuba, artefaktem CI i własnym liczeniem; win64, winarm64 (natywnie ARM64), macos-aarch64, linux-x86_64, bez linux-aarch64; w paczkach adb identyczny z platform-tools r37.0.1, FFmpeg 9.0.2 bez GPL, SDL 3.4.18, libusb 1.0.30, dav1d 1.5.4; bez telemetrii i sprawdzania aktualizacji, sieć tylko przez adb i tunel 127.0.0.1:27183+; bez Authenticode i notaryzacji (macOS ad hoc). Android platform-tools r37.0.1 (adb, fastboot) przejrzane tego samego dnia: wpis android-platform-tools"
+  android-platform-tools:
+    paczka: https://dl.google.com/android/repository/platform-tools-latest-windows.zip
+    status: do-wdrozenia
+    przejrzane: 45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
+    notatka: "Android SDK License (Google) + licencje open source komponentów AOSP (NOTICE.txt w paczce): Android SDK Platform-Tools r37.0.1 (adb 1.0.41 i fastboot, wydanie 2026-07-30). Źródło bez repo git (AOSP nie taguje tego wydania, lustra na GitHubie nie ma), więc paczka = najnowsze wydanie dla Windows z dl.google.com, a przejrzane = SHA-256 pliku platform-tools_r37.0.1-win.zip: inna suma pod tym adresem to nowe wydanie do przeglądu. Przegląd 2026-10-24: pliki win, darwin i linux z dl.google.com; rozmiar i SHA-1 zgodne z repository2-3.xml (Google nie podaje SHA-256), SHA-256 policzone i zgodne z przypięciem w scrcpy v5.0.1 (app/deps/adb_*.sh). Windows: PE32 x86 z podpisem Google, na arm64 ten sam plik w emulacji; adb.exe i fastboot.exe importują z paczki tylko AdbWinApi.dll. macOS: universal z Developer ID Google i notaryzacją; Linux tylko x86_64; adb i fastboot nie ładują lib64/libc++. W paczce sqlite3 3.50.6 (błąd WAL-reset), mke2fs, make_f2fs, etc1tool i hprof-conv: vendor/natywne.yaml usuwa je po rozpakowaniu (`usun`). ADB_MDNS=0: serwer adb nie szuka telefonów multicastem w sieci lokalnej. Licencja SDK zabrania redystrybucji: tylko dl.google.com, bez lustra (I21), akceptacja właściciela przed pierwszym pobraniem (przy-uzyciu). Próba na Windows 11 x64 pobieraczem Jarva: po `usun` działają adb version i fastboot --version z samymi AdbWinApi.dll i AdbWinUsbApi.dll"
   paradee-8m:
     repo: https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.0
     status: do-wdrozenia

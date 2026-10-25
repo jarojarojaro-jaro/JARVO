@@ -1006,7 +1006,7 @@ def sprawdz_git(ot: Otoczenie) -> dict:
     git = instalator.program_bezwzgledny(ot, "git")
     if git:
         return _wynik("git", "ok", git)
-    rada = ("Zainstaluj Git for Windows (własny PortableGit przyjdzie z manifestem, I05)." if WINDOWS else
+    rada = ("Zainstaluj Git for Windows (własny z manifestu instalator podłączy w etapie E4, I05)." if WINDOWS else
             "macOS: xcode-select --install; Linux: menedżer pakietów (np. sudo apt install git).")
     return _wynik("git", "uwaga", "brak w PATH (potrzebny do instalacji i aktualizacji Hermesa)", rada)
 

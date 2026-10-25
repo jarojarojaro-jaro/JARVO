@@ -367,18 +367,20 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `security/redteam/` | promptfoo: prowider, config, scenariusze ataków |
 | `vendor/skills.lock.yaml` | skille zewnętrzne przypięte do commitów (licencje w docs/SOURCES.md) |
 | `vendor/zrodla.yaml` | spis wszystkich repo, z których bierzemy kod, skille albo wzorce (status, ostatni przejrzany commit); `scripts/zrodla.py sprawdz` pokazuje nowości, rutyna pon/śr/pt robi z nich propozycje do zatwierdzenia |
-| `vendor/natywne.yaml` | narzędzia instalacji natywnej: wersja i plik z sumą sha256 na każdą platformę (lock `vendor/natywne.lock.json` z `scripts/natywne.py generuj`) |
+| `vendor/natywne.yaml` | instalacja natywna: narzędzia (wersja i plik z sumą sha256 na każdą platformę albo `brak:` z powodem), modele (pliki z rewizją i sumą) i venvy (locki w `infra/python/natywne/`); lock `vendor/natywne.lock.json` z `scripts/natywne.py generuj` |
+| `vendor/pixi/tesseract/` | Tesseract 5.5.3 z conda-forge dla instalacji natywnej (`pixi.toml`, `pixi.lock` z sumą każdej paczki, `.pixi/config.toml` bez skryptów post-link) |
 | `vendor/skan-wyjatki.yaml` | przejrzane fałszywe alarmy skanu skilli zewnętrznych, przypięte do commitu źródła |
 | `evals/<agent>/` | scenariusze testów zachowań (w zakresie, poza zakresem, routing, protokół, bezpieczeństwo) |
 | `scripts/` | build, walidator, deploy, instalacja floty, backupy, evals (runner, pomiar `evalslib.py`, `evals-wyniki.py`), migracja, narzędzia |
 | `hq/` | aplikacja Jarvo, HQ (backend, frontend, demo) |
-| `infra/` | obraz jarvo-hermes, obraz Komputera Jarva (`infra/komputer`), docker-compose z sidecarami, szablony env |
+| `infra/` | obraz jarvo-hermes, obraz Komputera Jarva (`infra/komputer`), docker-compose z sidecarami, szablony env; `infra/python/natywne/`: locki venvów instalacji natywnej z wejściami i opisem odtworzenia |
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
 | `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`), wtyczka Operatora `plugin/` (narzędzie `komputer`); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo, motyw i tłumaczenie dashboardu), łatka powłoki `/jarvo` (`powloka.json`, `powloka.js`) |
 | `site/` | landing jarvo.pl |
-| `jarvo/` | Jarvo natywnie, w budowie ([NATYWNIE.md](NATYWNIE.md)): katalogi (`sciezki.py`), środowisko procesów (`srodowisko.py`), manifest i pobieracz z sumą i paskiem (`manifest.py`, `pobieracz.py`), przenośne blokady i zapisy (`przenosne.py`) |
+| `jarvo/` | Jarvo natywnie, w budowie ([NATYWNIE.md](NATYWNIE.md)): `sciezki.py` (katalogi i platforma na trzy systemy), `srodowisko.py` (zmienne procesów Jarva z narzędziami i modelami, bez sekretów i zmiennych obcych), `przenosne.py` (przenośne blokady, zapisy atomowe i ochrona dostępu), `manifest.py` (odczyt `vendor/natywne.lock.json`), `pobieracz.py` (pobieranie z sumą sha256, paskiem i wznawianiem, rozpakowanie z dowiązaniami, `usun` i `zmien_nazwe`), `hermes.py` (Hermes z przypięcia: checkout, uv z sumami także dla zależności budowy, front, bezpieczna konfiguracja), `nadzorca.py` (`jarvo serwis`: brama i panel Hermesa, restart, logi z rotacją, kanał sterowania, trwałe zatrzymanie), `autostart.py` (zadanie Harmonogramu `Jarvo-<SID>`, LaunchAgent `pl.jarvo.nadzorca`, `jarvo.service` w systemd --user), `zmiany_hosta.py` (dziennik `<stan>/zmiany-hosta.jsonl`, cofany od końca przy odinstalowaniu), `cli.py` (polecenie `jarvo`: instaluj, serwis, up, down, status, panel, chat, logs, autostart, doctor, version, help), `instalator.py` (`jarvo instaluj` w 16 krokach z paskiem), `start.py` (launcher `python -I -X utf8` dla polecenia i autostartu), `bootstrap/` (instalacja jednym poleceniem: `install.ps1` i `install.sh`, do etapu E13 obok starego instalatora) |
+| `zgody/` | wtyczka zgód `jarvo-zgody` dla instalacji natywnej: tryby pytaj, projekt (domyślny) i pełny jak w Claude Code (hak `pre_tool_call`, polecenie `/tryb`); opis w `zgody/README.md`, budowa i instalacja we flocie w etapie E4 |
 | `install.sh`, `install.ps1`, `bin/jarvo` | instalator jednym poleceniem (Linux/WSL2: sam instaluje pakiety i Docker Engine; macOS: Homebrew, Colima, dane w wolumenach Dockera, LaunchAgent; Windows: WSL2 z restartem i dalszym ciągiem, własna dystrybucja `Jarvo`, Docker Engine w niej, autostart): repo do `~/jarvo`, gotowy obraz z GHCR, klucz dostępu do prywatnego repo (`JARVO_TOKEN`), polecenie `jarvo` (`up`, `status`, `update` = `git pull` + instalator, `uninstall`…); opis i plan w [INSTALER.md](INSTALER.md) |
 | `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`: pytest, pyyaml, shellcheck) |
 | `tests/`, `docs/` | testy pytest (w `tests/live/` test aplikacji w przeglądarce dla `scripts/jarvo-e2e.sh`), dokumentacja |
@@ -492,8 +494,14 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
 6. **Jarvo natywnie (kierunek od 2026-10-24), plan w [NATYWNIE.md](NATYWNIE.md):** Jarvo bez Dockera i WSL na Windows,
    macOS i Linuksie, z każdą funkcją (czat w terminalu ze zgodami jak w Claude Code, flota, panel, skarbiec, rutyny,
    Telegram, filmy, lektor, OCR, Komputer Jarva, migracja ze starej instalacji). Hermes z przypiętego commitu przez uv,
-   narzędzia z wydań u źródła z sumą sha256, własny nadzorca procesów. Etapy E0–E14; decyzje właściciela z 2026-10-24 w planie (bez macOS Intel, domyślne zgody „projekt”,
-   wyszukiwarka: najlepsza dostępna).
+   narzędzia z wydań u źródła z sumą sha256, własny nadzorca procesów. Etapy E0–E14; decyzje właściciela z 2026-10-24 w planie (bez macOS Intel, minimum macOS 15, domyślne zgody „projekt”,
+   wyszukiwarka: najlepsza dostępna). Stan 2026-10-25 (NATYWNIE § g): E1–E4 w toku. W kodzie są: manifest z 23 narzędziami,
+   10 modelami i 9 venvami, pobieracz, Hermes z przypięcia, nadzorca `jarvo serwis`, autostart, dziennik zmian hosta,
+   polecenie `jarvo`, instalator i bootstrap pod osobnym adresem `jarvo/bootstrap/install.ps1|sh` (do etapu E13 obok
+   starego instalatora), wtyczka zgód `zgody/`; próby na żywo na Windows 11, macOS i Linux na razie tylko w testach
+   (CI na prawdziwych systemach przed nami). Po instalacji:
+   `jarvo panel`, `jarvo status`, `jarvo doctor`, `jarvo down`/`up` i `jarvo chat --profil default` (profil `jarvo`
+   przyjdzie z flotą w E4).
 
 **Odrzucone (nie wpinamy):** RedAmon (offensive pentest — za ciężki, ryzyko prawne),
 terminal-browser (ciężka przeglądarka desktopowa, nie dla agentów na VPS),

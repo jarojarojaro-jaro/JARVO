@@ -904,6 +904,109 @@
     }
    }
   },
+  "platform-tools": {
+   "wersja": "37.0.1",
+   "kiedy": "przy-uzyciu",
+   "licencja": "Android SDK License (Google) + licencje open source komponentów AOSP (NOTICE.txt w paczce)",
+   "zrodlo": "android-platform-tools",
+   "pliki": {
+    "windows-x64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "ADB_MDNS": "0"
+     },
+     "format": "zip",
+     "rozmiar": 8044989,
+     "sha256": "45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99",
+     "url": "https://dl.google.com/android/repository/platform-tools_r37.0.1-win.zip",
+     "usun": [
+      "sqlite3.exe",
+      "mke2fs.exe",
+      "mke2fs.conf",
+      "make_f2fs.exe",
+      "make_f2fs_casefold.exe",
+      "etc1tool.exe",
+      "hprof-conv.exe",
+      "libwinpthread-1.dll"
+     ],
+     "usun_poziom": 1
+    },
+    "windows-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "ADB_MDNS": "0"
+     },
+     "format": "zip",
+     "rozmiar": 8044989,
+     "sha256": "45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99",
+     "url": "https://dl.google.com/android/repository/platform-tools_r37.0.1-win.zip",
+     "usun": [
+      "sqlite3.exe",
+      "mke2fs.exe",
+      "mke2fs.conf",
+      "make_f2fs.exe",
+      "make_f2fs_casefold.exe",
+      "etc1tool.exe",
+      "hprof-conv.exe",
+      "libwinpthread-1.dll"
+     ],
+     "usun_poziom": 1
+    },
+    "macos-arm64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "ADB_MDNS": "0"
+     },
+     "format": "zip",
+     "rozmiar": 16110554,
+     "sha256": "ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d",
+     "url": "https://dl.google.com/android/repository/platform-tools_r37.0.1-darwin.zip",
+     "usun": [
+      "sqlite3",
+      "mke2fs",
+      "mke2fs.conf",
+      "make_f2fs",
+      "make_f2fs_casefold",
+      "etc1tool",
+      "hprof-conv",
+      "lib64"
+     ],
+     "usun_poziom": 1
+    },
+    "linux-x64": {
+     "bin": [
+      "."
+     ],
+     "env": {
+      "ADB_MDNS": "0"
+     },
+     "format": "zip",
+     "rozmiar": 9054187,
+     "sha256": "d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1",
+     "url": "https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip",
+     "usun": [
+      "sqlite3",
+      "mke2fs",
+      "mke2fs.conf",
+      "make_f2fs",
+      "make_f2fs_casefold",
+      "etc1tool",
+      "hprof-conv",
+      "lib64"
+     ],
+     "usun_poziom": 1
+    },
+    "linux-arm64": {
+     "brak": "Google nie wydaje platform-tools na Linux arm64 (paczka linux ma tylko binarki x86_64); adb z pakietu systemu, jeśli właściciel go ma (np. apt install adb), doctor to pokazuje"
+    }
+   }
+  },
   "python312": {
    "wersja": "3.12.15+20261021",
    "kiedy": "instalacja",

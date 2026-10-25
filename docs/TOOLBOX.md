@@ -204,7 +204,7 @@ API rejestrów (KRS, CEIDG, BZP, TED) go nie dostają.
 | [Expo SDK 57](https://github.com/expo/expo) (szablon `templates/expo-jarvo`) | aplikacje React Native z expo-router; `aplikacja.py nowa/ustaw/sprawdz/eksport/podglad` | MIT | 2026-09 | per projekt (npm, `npx expo install`) |
 | [expo-doctor](https://github.com/expo/expo/tree/main/packages/expo-doctor) 1.21.1 | konfiguracja i zależności projektu (`aplikacja.py sprawdz`) | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
 | [eas-cli](https://github.com/expo/eas-cli) 24.7.0 | projekt w organizacji właściciela i EAS Update do podglądu w Expo Go (`aplikacja.py expo-go`, token robota `EXPO_TOKEN`); wersja w `mobile_lib.EAS_CLI` dla wszystkich skryptów, nadpisywana przez `JARVO_EAS_CLI` | MIT | 2026-09 | `npx`, przy pierwszym użyciu |
-| [adb](https://developer.android.com/tools/adb) (pakiet Debiana w obrazie i na VPS; natywnie platform-tools r37.0.1 od Google, przejrzane 2026-10-24, wpis czeka na spis źródeł z paczkami zip) | Android przez adb: instalacja, zrzuty, logi, testy wrogie (`urzadzenie.py`) | Apache-2.0 | 2026-09 | obraz floty |
+| [adb](https://developer.android.com/tools/adb) (pakiet Debiana w obrazie i na VPS; natywnie platform-tools r37.0.1 od Google z [`vendor/natywne.yaml`](../vendor/natywne.yaml), przy pierwszym użyciu; przegląd 2026-10-24) | Android przez adb: instalacja, zrzuty, logi, testy wrogie (`urzadzenie.py`) | Apache-2.0 | 2026-09 | obraz floty |
 | [Redroid](https://github.com/remote-android/redroid-doc) 14.0.0 (`14.0.0_64only-240527`) | telefon testowy na serwerze bez KVM (Android 14 w kontenerze, moduł `binder_linux`) | Apache-2.0 | 2026-10 | usługa `android` (`jarvo android on`) |
 | [docker-android](https://github.com/HQarroum/docker-android) `api-33` | telefon testowy przy KVM: oficjalny emulator Google z usługami Google | MIT | 2026-10 | usługa `android-emulator` (`jarvo android on`) |
 | [ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) (commit `cd6cea6`) | ekran telefonu testowego w przeglądarce (podgląd, klikanie), za proxy HQ `:9122` z tokenem | MIT | 2026-10 | usługa `android-ekran` (`infra/android/`; Docker i VPS) |
@@ -495,7 +495,7 @@ Proxy wymagające `HTTPS_PROXY` dalej blokuje pobór. Healthcheck (`toolbox.yaml
 
 ## Stan instalacji natywnej (Windows, macOS, Linux)
 
-Instalacja bez Dockera i WSL ([NATYWNIE.md](NATYWNIE.md), etap E2; za flagą `JARVO_NATYWNIE=1` do etapu E13).
+Instalacja bez Dockera i WSL ([NATYWNIE.md](NATYWNIE.md), etap E2; do etapu E13 pod osobnym adresem `jarvo/bootstrap/`).
 Źródło prawdy: [`vendor/natywne.yaml`](../vendor/natywne.yaml), czyli adres, SHA-256 i rozmiar pliku dla każdej
 platformy albo `brak:` z powodem. Z niego `scripts/natywne.py generuj` robi `vendor/natywne.lock.json`, który czyta
 instalator. Pliki pobiera u źródła [`jarvo/pobieracz.py`](../jarvo/pobieracz.py): sprawdza sumę przed rozpakowaniem
@@ -539,7 +539,7 @@ natywny ma mniej funkcji.
 | ExifTool | 13.59 | zip z Perlem | x64 w emulacji | tar.gz na Perlu systemu | tar.gz na Perlu systemu | instalacja | `exiftool.exe` po zmianie nazwy; `EXIFTOOL_HOME` |
 | pixi (tylko Tesseract) | 0.83.0 | zip | zip arm64 (`--platform win-64`) | tar.gz | tar.gz (musl) | instalacja | projekt [`vendor/pixi/tesseract`](../vendor/pixi/tesseract/pixi.toml); `PIXI_NO_TELEMETRY=1` |
 | scrcpy | 5.0.1 | zip | zip arm64 | tar.gz | x64 tar.gz, arm64 brak | przy użyciu | `SHA256SUMS.txt` z podpisem GPG |
-| Android platform-tools (adb) | r37.0.1 | wpis czeka | wpis czeka | wpis czeka | wpis czeka (arm64 brak) | przy użyciu | przejrzane; spis źródeł przyjmuje dziś paczkę tylko jako tar; `usun` bez sqlite3 3.50.6 |
+| Android platform-tools (adb) | r37.0.1 | zip (x86, podpis Google) | ten sam zip w emulacji | zip (universal) | x64 zip, arm64 brak | przy użyciu | `usun` bez sqlite3 3.50.6 (WAL-reset), mke2fs, make_f2fs, etc1tool, hprof-conv; `ADB_MDNS=0`; `adb version` i `fastboot --version` na Windows 11 |
 
 Tesseract 5.5.3 przychodzi z conda-forge przez [`vendor/pixi/tesseract`](../vendor/pixi/tesseract/pixi.toml):
 - `pixi.lock` ma 31–37 paczek na platformę i sumę każdej z nich;

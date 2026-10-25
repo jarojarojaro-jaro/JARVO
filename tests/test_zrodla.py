@@ -109,10 +109,51 @@ def test_przejrzane_i_status_zmieniaja_tylko_jedno_pole(upstream, tmp_path, caps
     assert "pełny SHA" in capsys.readouterr().err
 
 
+def _zip(pliki: dict[str, bytes], dowiazanie: bool = False) -> bytes:
+    import io
+    import stat
+    import zipfile
+    bufor = io.BytesIO()
+    with zipfile.ZipFile(bufor, "w") as zf:
+        zf.writestr("platform-tools/", "")                               # wpis katalogu
+        for rel, dane in pliki.items():
+            zf.writestr(f"platform-tools/{rel}", dane)
+        if dowiazanie:                                                    # dowiązanie z zipa macOS/Linuksa
+            info = zipfile.ZipInfo("platform-tools/lib64/libc++.so.1")
+            info.external_attr = (stat.S_IFLNK | 0o777) << 16
+            zf.writestr(info, "libc++.so")
+    return bufor.getvalue()
+
+
+def test_paczka_zip_bez_gita(tmp_path):
+    """Źródło bez repo git jako zip (platform-tools od Google): pliki bez katalogu głównego archiwum, bez wpisów
+    katalogów i dowiązań; nowa wersja paczki pokazuje zmiany względem kopii, także pliku NOTICE (licencja)."""
+    import hashlib
+    sha = lambda b: hashlib.sha256(b).hexdigest()                        # noqa: E731
+    stara = _zip({"adb": b"adb", "NOTICE.txt": b"n"}, dowiazanie=True)
+    assert zrodla.pliki_paczki(stara) == {"adb": sha(b"adb"), "NOTICE.txt": sha(b"n")}
+    kopia = tmp_path / "kopia"
+    kopia.mkdir()
+    (kopia / "adb").write_bytes(b"adb")
+    (kopia / "NOTICE.txt").write_bytes(b"n")
+    spec = {"paczka": "https://x/platform-tools-latest-windows.zip", "kopia": str(kopia), "status": "do-wdrozenia",
+            "przejrzane": sha(stara)}
+    assert zrodla.sprawdz_paczke("pt", spec, pobieranie=lambda url: stara)["zmiany"] is False
+    nowa = _zip({"adb": b"adb 2", "NOTICE.txt": b"n 2", "fastboot": b"f"})
+    w = zrodla.sprawdz_paczke("pt", spec, pobieranie=lambda url: nowa)
+    assert w["zmiany"] and w["glowa"] == sha(nowa) and not w.get("blad")
+    assert w["dodane"] == ["fastboot"] and w["zmienione"] == ["NOTICE.txt", "adb"] and w["licencja"] == ["NOTICE.txt"]
+    assert "## pt (do-wdrozenia): nowa wersja paczki" in zrodla.raport([w])
+    w = zrodla.sprawdz_paczke("pt", spec, pobieranie=lambda url: b"ani tar, ani zip")
+    assert w["blad"].startswith("nie da się otworzyć paczki")
+
+
 def test_spis_repo_jest_kompletny():
     report = validate.Report()
     validate.check_zrodla(report)
     assert report.errors == []
+    spis = zrodla.wczytaj()
+    assert spis["android-platform-tools"]["paczka"].endswith(".zip")       # platform-tools: paczka zip od Google
 
 
 def test_walidacja_spisu(repo_copy):

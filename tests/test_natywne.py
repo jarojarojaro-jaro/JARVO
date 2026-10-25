@@ -123,6 +123,49 @@ def test_srodowisko_procesow_i_plik_bez_sekretow(tmp_path):
     assert "tajne" not in tekst and "JARVO_TOKEN" not in tekst and json.loads(tekst)["HERMES_HOME"] == str(u.dane)
 
 
+def test_srodowisko_narzedzia_modele_i_zmienne_obce(tmp_path):
+    """srodowisko.json ma każdy klucz `env` narzędzi (git, Lightpanda, ExifTool, pixi, HyperFrames, adb), katalogi
+    modeli z manifestu (jarvo-tts, ocr.py; TESSDATA_PREFIX dopiero z językami na dysku), a JARVO_HERMES_BIN tylko
+    przy istniejącym pliku. Zmienne obce i sekrety z otoczenia właściciela odpadają bez względu na wielkość liter."""
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
+    narz = {"git": {"bin": [], "env": {"GIT_CONFIG_NOSYSTEM": "1", "HERMES_GIT_BASH_PATH": "/g/bin/bash.exe"}},
+            "lightpanda": {"env": {"LIGHTPANDA_DISABLE_TELEMETRY": "1", "LIGHTPANDA_DISABLE_CORE_DUMP": "1"}},
+            "exiftool": {"env": {"EXIFTOOL_HOME": "/e"}}, "pixi": {"env": {"PIXI_NO_TELEMETRY": "1",
+                                                                          "PIXI_NO_CONFIG": "1"}},
+            "chrome-headless-shell": {"env": {"HYPERFRAMES_BROWSER_PATH": "/c/chs"}},
+            "platform-tools": {"env": {"ADB_MDNS": "0"}}}
+    checkout = tmp_path / "hermes"
+    baza = {"PATH": "", "npm_config_PREFIX": "/obcy", "NPM_CONFIG_PREFIX": "/obcy", "ripgrep_config_path": "/rc",
+            "Jarvo_Hermes_Bin": "/prywatny/hermes", "Openai_Api_Key": "sk-tajne", "xauthority": "/x/.Xauthority",
+            "INDRA_OCR_MODEL_DIR": "/stare", "TESSDATA_PREFIX": "/tessdata-wlasciciela"}
+    env = srodowisko.srodowisko(u, baza, biez={"hermes": str(checkout)}, narz=narz)
+    assert not {"npm_config_PREFIX", "NPM_CONFIG_PREFIX", "ripgrep_config_path", "Jarvo_Hermes_Bin",
+                "Openai_Api_Key"} & set(env) and env["xauthority"] == "/x/.Xauthority"
+    assert "JARVO_HERMES_BIN" not in env                     # w checkoucie nie ma pliku: skrypty wezmą `hermes`
+    modele = u.jarvo_dane / "models"
+    katalogi = {n: m["katalog"] for n, m in manifest.modele(REPO).items()}
+    assert env["JARVO_TTS_MODEL_DIR"] == str(modele / katalogi["paradee"])
+    assert env["JARVO_TTS_MATCHA_DIR"] == str(modele / katalogi["matcha-pl"])
+    assert env["INDRA_OCR_MODEL_DIR"] == str(modele / katalogi["indra-ocr"])
+    assert srodowisko.TESSDATA == katalogi["tessdata-fast"]
+    assert env["TESSDATA_PREFIX"] == "/tessdata-wlasciciela"   # bez naszych języków zostaje Tesseract właściciela
+    zapis = json.loads(srodowisko.zapisz(u, env, narz=narz).read_text(encoding="utf-8"))
+    for wpis in narz.values():
+        for k, v in wpis["env"].items():
+            assert zapis[k] == v, k
+    assert zapis["INDRA_OCR_MODEL_DIR"] == env["INDRA_OCR_MODEL_DIR"] and "xauthority" not in zapis
+    (modele / "tessdata-fast").mkdir(parents=True)
+    (modele / "tessdata-fast" / "pol.traineddata").write_bytes(b"x")
+    bin_hermesa = checkout / ".venv" / ("Scripts/hermes.exe" if os.name == "nt" else "bin/hermes")
+    bin_hermesa.parent.mkdir(parents=True)
+    bin_hermesa.write_bytes(b"")
+    env = srodowisko.srodowisko(u, baza, biez={"hermes": str(checkout)}, narz=narz)
+    assert env["TESSDATA_PREFIX"] == str(modele / "tessdata-fast") and env["JARVO_HERMES_BIN"] == str(bin_hermesa)
+    zapis = json.loads(srodowisko.zapisz(u, env, narz=narz).read_text(encoding="utf-8"))
+    assert zapis["TESSDATA_PREFIX"] == env["TESSDATA_PREFIX"] and zapis["JARVO_HERMES_BIN"] == str(bin_hermesa)
+    assert srodowisko.przechodzi("PATH") and not srodowisko.przechodzi("node_path")
+
+
 class _Cichy(SimpleHTTPRequestHandler):
     def log_message(self, *_a):
         pass
@@ -360,8 +403,8 @@ def test_usun_i_zmien_nazwe_po_rozpakowaniu(serwer, tmp_path):
 
 
 def test_manifest_waliduje_nowe_pola(tmp_path):
-    """nazwa_pliku, env, usun, zmien_nazwe (natywne.py) i czekający blok platform-tools (zakomentowany, bo spis
-    przyjmuje paczkę tylko jako tar): po odkomentowaniu przejdzie walidację."""
+    """nazwa_pliku, env, usun, zmien_nazwe (natywne.py) i wpis platform-tools (źródło jako paczka zip w spisie):
+    adb i fastboot zostają, sqlite3 3.50.6 z błędem WAL-reset znika."""
     dobry = {"url": "https://example.com/pt.zip", "sha256": "a" * 64, "rozmiar": 1, "format": "zip"}
     narz = {"pt": {"zrodlo": "uv", "wersja": "1", "licencja": "MIT", "rola": "x",
                    "pliki": {p: dict(dobry) for p in natywne.PLATFORMY}}}
@@ -373,18 +416,9 @@ def test_manifest_waliduje_nowe_pola(tmp_path):
                      "windows-x64: env to słownik", "linux-x64: format plik nie ma czego usuwać",
                      "linux-x64: env JARVO_X wskazuje {katalog}/inna-nazwa, a plik ląduje jako {katalog}/pt.zip"):
         assert fragment in b
-    tekst = (REPO / "vendor" / "natywne.yaml").read_text(encoding="utf-8")
-    if "  # platform-tools:\n" in tekst:                    # wpis czeka na paczki zip w vendor/zrodla.yaml
-        linie = []
-        for linia in tekst[tekst.index("  # platform-tools:\n"):].splitlines():
-            if not linia.startswith("  #"):
-                break
-            linie.append(linia.replace("  # ", "  ", 1) if linia.startswith("  # ") else "")
-        blok = __import__("yaml").safe_load("narzedzia:\n" + "\n".join(linie))["narzedzia"]
-    else:                                                    # po odkomentowaniu: ten sam wpis z manifestu
-        blok = {"platform-tools": natywne.wczytaj()["narzedzia"]["platform-tools"]}
-    assert set(blok) == {"platform-tools"}
+    blok = {"platform-tools": natywne.wczytaj()["narzedzia"]["platform-tools"]}
     pt = blok["platform-tools"]
+    assert pt["kiedy"] == "przy-uzyciu" and pt["pliki"]["linux-arm64"]["brak"]
     assert "sqlite3.exe" in pt["pliki"]["windows-x64"]["usun"] and "sqlite3" in pt["pliki"]["macos-arm64"]["usun"]
     assert not {"adb", "adb.exe", "fastboot", "fastboot.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"} & \
         {u for p in pt["pliki"].values() for u in p.get("usun") or []}

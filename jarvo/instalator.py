@@ -352,12 +352,9 @@ def ustawienia(u: Uklad) -> dict[str, str]:
 
 
 def env_floty(env: dict) -> dict[str, str]:
-    """Otoczenie procesu Jarva bez sekretów i zmiennych obcych (reguły srodowisko.py: SEKRET, OBCE; bez wielkości
+    """Otoczenie procesu Jarva bez sekretów i zmiennych obcych (srodowisko.przechodzi: SEKRET, OBCE; bez wielkości
     liter): JARVO_TOKEN, klucze API i agent ssh z powłoki właściciela nie trafiają do nadzorcy, bramy ani panelu."""
-    obce = {o.upper() for o in srodowisko.OBCE}
-    zostaw = {z.upper() for z in srodowisko.POTRZEBNE_MIMO_NAZWY}
-    return {k: v for k, v in env.items() if k.upper() not in obce
-            and (not srodowisko.SEKRET.search(k) or k.upper() in zostaw)}
+    return {k: v for k, v in env.items() if srodowisko.przechodzi(k)}
 
 
 def stan_serwisu(u: Uklad, ot: Otoczenie | None = None) -> tuple[dict | None, str]:
@@ -1003,7 +1000,8 @@ class _Instalacja:
             return Path(git)
         if WINDOWS:
             rada = ("Na razie potrzebny jest Git for Windows w PATH (https://git-scm.com/download/win); własny "
-                    "PortableGit z sumą przyjdzie z manifestem w etapie E2 (decyzja I05).")
+                    "Git for Windows z sumą (wpis w vendor/natywne.yaml) instalator podłączy w etapie E4 "
+                    "(decyzja I05).")
         elif MACOS:
             rada = "Zainstaluj narzędzia wiersza poleceń Xcode: xcode-select --install."
         else:

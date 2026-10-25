@@ -102,6 +102,20 @@ def test_cron_script_must_exist(repo_copy):
     assert errors_matching(validate.run(), r"jarvo/cron/jarvo-daily-brief: brak skryptu scripts/brief_daily.py")
 
 
+def test_zrodla_paczka_tylko_tar_albo_zip(repo_copy):
+    """Źródło bez repo git (`paczka` w vendor/zrodla.yaml): archiwum tar albo zip (platform-tools), inne nie."""
+    p = repo_copy / "vendor" / "zrodla.yaml"
+    p.write_text(p.read_text(encoding="utf-8")
+                 + f"  paczka-zip:\n    paczka: https://example.com/narzedzie.zip\n    status: czeka\n"
+                   f"    przejrzane: {'c' * 64}\n"
+                   f"  paczka-rar:\n    paczka: https://example.com/narzedzie.rar\n    status: czeka\n"
+                   f"    przejrzane: {'d' * 64}\n", encoding="utf-8")
+    report = validate.Report()
+    validate.check_zrodla(report)
+    assert errors_matching(report, r"zrodla/paczka-rar: paczka musi być adresem https archiwum .* / \.zip")
+    assert not errors_matching(report, r"paczka-zip|android-platform-tools")
+
+
 def test_profile_without_fleet_entry(repo_copy):
     (repo_copy / "profiles/jarvo-nieznany").mkdir()
     assert errors_matching(validate.run(), r"profiles/jarvo-nieznany: brak wpisu w fleet.yaml")

@@ -12,6 +12,31 @@ zbudowany 2026-10-09** (§4c; czeka na próbę na prawdziwym Windowsie), etap 5 
 kontener → natywnie, etapy, ryzyka, decyzje) jest w [NATYWNIE.md](NATYWNIE.md). Do przełączenia (etap E13) ten
 dokument opisuje dzisiejszą instalację.
 
+**Bootstrap natywny (etap E3, na razie obok tej instalacji).** Osobny adres, domyślnym stanie się w etapie E13:
+
+```
+Windows        irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.ps1 | iex
+macOS, Linux   curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.sh | bash
+```
+
+- Bez Dockera, WSL, admina i sudo. Bootstrap (`jarvo/bootstrap/install.ps1`, `install.sh`) pobiera uv i Pythona 3.13
+  z sumami wpisanymi w skrypt oraz kod Jarva z GitHuba, potem woła `jarvo instaluj` (16 kroków, [NATYWNIE.md](NATYWNIE.md)
+  c3). macOS tylko na Apple Silicon, od macOS 15.
+- Zmienne (opcjonalne): `JARVO_ROOT` (katalog instalacji; względny i z `~` zamieniany na pełną ścieżkę), `JARVO_REF`
+  (gałąź, tag albo pełny SHA), `JARVO_TOKEN` (klucz do prywatnej kopii repo: tylko w nagłówku do api.github.com,
+  instalator w Pythonie go nie dostaje), `JARVO_NO_AUTOSTART=1`, `JARVO_WEB_LOKALNIE=1` (front panelu od nowa),
+  `JARVO_BEZ_PATH=1` (polecenie `jarvo` tylko w `<root>/bin`), `JARVO_DRY_RUN=1` (sam plan; w install.ps1 razem
+  z `JARVO_FAKE_ARCH`).
+- Na razie potrzebne są w PATH git (na Windows Git for Windows) i Node.js z npm do budowy frontu panelu: Node.js 24.11+,
+  22.22+ albo 26+. Bez nich instalator kończy krok radą, skąd je wziąć.
+- Polecenia: `jarvo panel`, `jarvo status`, `jarvo doctor`, `jarvo up`, `jarvo down` (serwis stoi do `jarvo up`),
+  `jarvo logs`, `jarvo autostart on|off|status`, `jarvo chat --profil default` (profil `jarvo` przyjdzie z flotą
+  w etapie E4), `jarvo version`, `jarvo help`; `update`, `uninstall` i `migruj` są w budowie (E4, E13, E12).
+- Linux: polecenie `jarvo` działa w nowym terminalu dopiero po ponownym zalogowaniu (terminal w GNOME i KDE nie czyta
+  `~/.profile`).
+- Starą instalację z WSL albo Dockerem w tym samym katalogu bootstrap rozpoznaje i odmawia (migracja w etapie E12);
+  wtedy natywnie tylko w osobnym katalogu (`JARVO_ROOT`).
+
 ---
 
 ## 1. Co jest dziś
