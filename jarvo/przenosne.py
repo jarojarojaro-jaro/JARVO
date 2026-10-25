@@ -139,6 +139,30 @@ def chron(sciezka: Path, katalog: bool | None = None) -> None:
         raise OSError(f"icacls {p}: {(wynik.stderr or wynik.stdout).strip()[:200]}")
 
 
+# Windows: piaskownica Chromium (usługa sieciowa jako LPAC, renderery z ograniczonym tokenem) czyta pliki przeglądarki
+# tylko z prawem dla ALL RESTRICTED APPLICATION PACKAGES; Program Files je daje, katalog Jarva (tylko dla właściciela)
+# nie. Bez niego Chromium pisze „Sandbox cannot access executable”, usługa sieciowa pada i wstaje bez piaskownicy.
+PRZEGLADARKI_CHROMIUM = ("chrome-komputer", "chrome-headless-shell")
+SID_PIASKOWNICY = "*S-1-15-2-2"
+ZNACZNIK_PIASKOWNICY = ".jarvo-piaskownica"
+
+
+def dla_piaskownicy_chromium(katalog: Path) -> bool:
+    """Odczyt i uruchamianie plików przeglądarki w `katalog` dla piaskownicy Chromium (Windows, icacls z System32,
+    dziedziczone w dół); znacznik w katalogu, więc drugi raz nic. Poza Windows nic. True, gdy nadał prawo."""
+    k = Path(katalog)
+    if not WINDOWS or (k / ZNACZNIK_PIASKOWNICY).is_file():
+        return False
+    icacls = Path(os.environ.get("SystemRoot") or r"C:\Windows") / "System32" / "icacls.exe"
+    wynik = subprocess.run([str(icacls), str(k), "/grant", f"{SID_PIASKOWNICY}:(OI)(CI)(RX)", "/q"],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if wynik.returncode:
+        raise OSError(f"icacls {k}: {(wynik.stderr or wynik.stdout).strip()[:200]}")
+    (k / ZNACZNIK_PIASKOWNICY).write_text("ALL RESTRICTED APPLICATION PACKAGES: RX\n", encoding="utf-8")
+    return True
+
+
 def program(nazwa: str, sciezka: str | None = None) -> str | None:
     """Pełna ścieżka programu albo None. Na Windows shutil.which zna PATHEXT (.exe, .cmd), a goła nazwa w argv nie."""
     return shutil.which(nazwa, path=sciezka)

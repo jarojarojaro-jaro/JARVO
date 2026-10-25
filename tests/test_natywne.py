@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -524,6 +525,30 @@ def test_chron_tylko_wlasciciel(tmp_path):
     else:
         assert p.stat().st_mode & 0o777 == 0o600
     assert p.read_text(encoding="utf-8") == "A=1\n"
+
+
+def test_piaskownica_chromium_czyta_pliki_przegladarki(tmp_path):
+    """Windows: katalog przeglądarki z prawem RX dla ALL RESTRICTED APPLICATION PACKAGES (usługa sieciowa Chromium
+    w piaskownicy LPAC), dziedziczonym przez pliki; raz, ze znacznikiem. Poza Windows nic."""
+    k = tmp_path / "chrome"
+    (k / "chrome-win64").mkdir(parents=True)
+    (k / "chrome-win64" / "chrome.exe").write_bytes(b"MZ")
+    przenosne.chron(tmp_path, katalog=True)
+    assert przenosne.dla_piaskownicy_chromium(k) is (os.name == "nt")
+    assert przenosne.dla_piaskownicy_chromium(k) is False                     # znacznik: drugi raz nic
+    if os.name == "nt":
+        # SID-y wpisów (nazwy grup w icacls zależą od języka Windows)
+        sidy = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                               f"(Get-Acl -LiteralPath '{k / 'chrome-win64' / 'chrome.exe'}').GetAccessRules($true, $true, "
+                               "[System.Security.Principal.SecurityIdentifier]) | ForEach-Object "
+                               "{ $_.IdentityReference.Value + ' ' + $_.FileSystemRights }"],
+                              capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
+        assert re.search(r"^S-1-15-2-2 ReadAndExecute", sidy, re.M), sidy
+        assert (k / przenosne.ZNACZNIK_PIASKOWNICY).is_file()
+    else:
+        assert not (k / przenosne.ZNACZNIK_PIASKOWNICY).exists()
+    assert set(przenosne.PRZEGLADARKI_CHROMIUM) <= set(json.loads(
+        (REPO / "vendor" / "natywne.lock.json").read_text(encoding="utf-8"))["narzedzia"])
 
 
 def test_modele_w_manifescie_i_instalacja(serwer, tmp_path):

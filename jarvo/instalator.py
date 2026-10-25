@@ -2025,6 +2025,8 @@ class _Instalacja:
         except OSError:
             bylo = False
         katalog = pobieracz.zainstaluj(nazwa, wersja, wpis, self.u.program / "narzedzia", self.u.cache / "pobrane")
+        if nazwa in przenosne.PRZEGLADARKI_CHROMIUM and przenosne.dla_piaskownicy_chromium(katalog):
+            self.podlog(f"{nazwa}: odczyt dla piaskownicy Chromium (ALL RESTRICTED APPLICATION PACKAGES)")
         self.narz[nazwa] = {
             "wersja": wersja, "katalog": str(katalog),
             "bin": [str(katalog / b) for b in wpis.get("bin") or []],

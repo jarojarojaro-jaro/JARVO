@@ -237,6 +237,8 @@ def narzedzie(u: Uklad, nazwa: str, *, app: Path | None = None, platforma: str |
     spis = _spis_narzedzia(wersja, plik, katalog)
     try:
         if _gotowy_katalog(katalog, plik):
+            if nazwa in przenosne.PRZEGLADARKI_CHROMIUM:        # instalacje sprzed tej poprawki: raz, ze znacznikiem
+                przenosne.dla_piaskownicy_chromium(katalog)
             if wpis(u, nazwa) != spis:
                 zapisz_wpis(u, nazwa, spis)
             return spis
@@ -246,6 +248,8 @@ def narzedzie(u: Uklad, nazwa: str, *, app: Path | None = None, platforma: str |
                     f"({round(int(plik.get('rozmiar') or 0) / 1e6, 1)} MB)")
                 pobieracz.zainstaluj(nazwa, wersja, plik, u.program / "narzedzia", u.cache / "pobrane", pasek=pasek,
                                      wyjscie=sys.stderr)
+            if nazwa in przenosne.PRZEGLADARKI_CHROMIUM:
+                przenosne.dla_piaskownicy_chromium(katalog)
             zapisz_wpis(u, nazwa, spis)
     except pobieracz.BladPobierania as e:
         raise BladPrzyUzyciu(f"{str(e).rstrip('.')}. Przy błędzie sieci spróbuj jeszcze raz (pobieranie "
