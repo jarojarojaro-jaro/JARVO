@@ -1,10 +1,10 @@
 # Instalator na prawdziwych systemach (docs/INSTALER.md): każda zmiana instalatora i obrazu przechodzi przez Linuksa
-# od zera, macOS z jego bashem 3.2 i Windows z Windows PowerShell 5.1, zanim trafi do ludzi.
+# od zera i macOS z jego bashem 3.2, zanim trafi do ludzi.
 #  - linux: świeży kontener Ubuntu bez gita, Pythona i Dockera → install.sh → Docker Engine → jarvo up pobiera
 #    gotowy obraz z GHCR → dashboard → aktualizacja → down → uninstall (scripts/install-test.sh, JARVO_TEST_PULL=1);
 #  - macos: próba na sucho na prawdziwym macOS (bash 3.2, sw_vers, sysctl, Homebrew), jarvo i plist LaunchAgenta;
 #    pełna instalacja z Colimą tylko na żądanie (mac_pelna), bo minuty macOS są drogie;
-#  - windows: składnia, PSScriptAnalyzer i próby na sucho install.ps1 w Windows PowerShell 5.1 i PowerShell 7.
+#  - Windows: instalacja natywna (install.ps1 przekierowuje na jarvo/bootstrap/install.ps1), test w natywnie.yml.
 name: installer
 
 on:
@@ -12,7 +12,6 @@ on:
     branches: [main]
     paths:
       - install.sh
-      - install.ps1
       - bin/jarvo
       - scripts/local-up.sh
       - scripts/deploy.sh
@@ -26,8 +25,6 @@ on:
       - infra/bin/**
       - infra/autostart/**
       - tests/test_installer.py
-      - tests/test_install_ps1.py
-      - PSScriptAnalyzerSettings.psd1
       - .github/workflows/installer.yml
   workflow_dispatch:
     inputs:
@@ -115,24 +112,3 @@ jobs:
           docker compose version
           jarvo version
 
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: PSScriptAnalyzer 1.24.0
-        shell: pwsh
-        run: Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0 -Scope CurrentUser -Force
-      - name: Testy install.ps1 w Windows PowerShell 5.1
-        env:
-          JARVO_TEST_PWSH: powershell
-        run: |
-          pip install -q pytest
-          python -m pytest -q tests/test_install_ps1.py
-      - name: Testy install.ps1 w PowerShell 7
-        env:
-          JARVO_TEST_PWSH: pwsh
-        run: python -m pytest -q tests/test_install_ps1.py

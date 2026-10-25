@@ -19,5 +19,3 @@ infra/env/secrets/*.env
 # lokalny katalog Claude Code (robocze kopie agentów)
 .claude/worktrees/
 
-# narzędzia deweloperskie spoza pip (scripts/dev-pwsh.sh)
-/.tools/

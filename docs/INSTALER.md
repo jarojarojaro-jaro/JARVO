@@ -59,19 +59,23 @@ Krótszy adres po wgraniu strony: `curl -fsSL https://jarvo.pl/install.sh | bash
 
 ---
 
+**Sekcje 1–8 to historia drogi z Dockerem i WSL** (instalator z katalogu głównego repo, do etapu E13). Na Windowsie
+`install.ps1` z katalogu głównego tylko przekierowuje już na `jarvo/bootstrap/install.ps1` (stare linki dają wersję
+natywną); `install.sh` i `bin/jarvo` służą jeszcze serwerowi (VPS, [RUNBOOK.md](RUNBOOK.md)) i starym instalacjom.
+
 ## 1. Co jest dziś
 
 | Element | Plik | Co robi |
 |---|---|---|
 | Instalator Linux/WSL/macOS | [`install.sh`](../install.sh) | Linux i WSL: sprawdza sprzęt, doinstalowuje `git curl python3 openssl` i Docker Engine, grupa `docker`, klon do `~/jarvo`, polecenie `jarvo`, `jarvo up`, autostart pomocnika, dashboard w przeglądarce; ponowne wklejenie = aktualizacja. macOS (12+): Homebrew (z narzędziami Xcode), `bash git python openssl@3`, Docker w Colimie (działający Docker Desktop/OrbStack zostaje), dane w wolumenach, LaunchAgent. Prywatne repo: klucz dostępu (`JARVO_TOKEN` albo pytanie tylko wtedy, gdy GitHub odmówi dostępu; chwilowy błąd gita, np. równoległy `git fetch` pomocnika aktualizacji starej instalacji, instalator ponawia do 3 razy bez pytania), zapisany tylko w `.git/config` repo (0600). `sudo` dopiero wtedy, gdy coś naprawdę go wymaga |
-| Instalator Windows | [`install.ps1`](../install.ps1) | Windows 10 2004+ / 11, x64 i ARM64: WSL2 bez dystrybucji (jedno okno zgody administratora), restart i dalszy ciąg sam (RunOnce), własna dystrybucja `Jarvo` z oficjalnego obrazu Ubuntu 24.04 (SHA256), użytkownik `jarvo` z sudo bez hasła i systemd, w środku `install.sh` (Docker Engine, obraz, flota), autostart z folderu Autostart, dashboard. Bez Docker Desktop i Microsoft Store. Istniejąca instalacja w innej dystrybucji (np. Ubuntu z Docker Desktop) jest aktualizowana na miejscu |
+| Instalator Windows | [`install.ps1`](../install.ps1) | od etapu E13 przekierowanie na `jarvo/bootstrap/install.ps1` (instalacja natywna bez WSL); dawniej: WSL2, własna dystrybucja `Jarvo` i Docker Engine w niej |
 | Polecenie użytkownika | [`bin/jarvo`](../bin/jarvo) | `up`, `down`, `status`, `logs`, `update` (`git pull` + ten sam `install.sh`, więc nowe wymagania hosta też dochodzą), `chat`, `open`, `haslo` (login i hasło do HQ: tylko na ekran, nie do `install.log`), `pliki` (macOS: `docker cp` z wolumenu do `~/Jarvo`), `autostart on\|off\|status`, `android on\|off\|status` (telefon testowy Twórcy aplikacji, [MOBILE.md](MOBILE.md) §5), `komputer on\|off\|status\|pauza\|wznow\|dziennik\|wyczysc\|odswiez` (Komputer Jarva, [KOMPUTER.md](KOMPUTER.md)), `uninstall [--yes] [--all]`, `version`; sam sięga po grupę `docker` przez `sg`, gdy sesja jeszcze jej nie ma |
 | Postawienie floty | [`scripts/local-up.sh`](../scripts/local-up.sh) | pyta o dostawcę modeli i klucz (albo bierze z `JARVO_PROVIDER`/`JARVO_KEY`/`JARVO_YES=1`), tworzy `~/jarvo-local` (`compose/`, `secrets/`, `build/`, `data/`), buduje obraz (albo `JARVO_NO_BUILD=1`), woła `deploy.sh`, startuje pomocnika aktualizacji; `--prepare` tylko przygotowuje katalog |
 | Autostart | [`infra/autostart/jarvo-updater.service`](../infra/autostart/jarvo-updater.service), [`infra/autostart/pl.jarvo.updater.plist`](../infra/autostart/pl.jarvo.updater.plist) | Linux: usługa `systemd --user` pomocnika aktualizacji (`jarvo autostart on` renderuje i włącza linger). macOS: LaunchAgent `pl.jarvo.updater` uruchamia przy logowaniu `jarvo updater`, który najpierw stawia Dockera (`colima start` albo Docker Desktop). Kontenery wstają same (`restart: unless-stopped`) |
 | Wdrożenie | [`scripts/deploy.sh`](../scripts/deploy.sh) | compose build/up, build dystrybucji i instalacja profili w kontenerze, healthchecki |
 | Gotowy obraz | [`scripts/obraz.sh`](../scripts/obraz.sh), [`.github/workflows/obraz.yml`](../.github/workflows/obraz.yml) | GitHub Actions buduje `jarvo-hermes` dla amd64 i arm64 i publikuje w GHCR jako `src-<klucz>` (klucz = skrót `infra/Dockerfile`, `infra/node`, `infra/python`, `infra/bin`, `branding`); `deploy.sh` najpierw pobiera obraz dla klucza swojej wersji repo, a buduje na miejscu tylko, gdy go nie ma (`JARVO_BUILD_IMAGE=1`: zawsze buduj). Wersja Hermesa przypięta w `infra/Dockerfile` (tag + digest), więc klucz obejmuje i ją; własny `HERMES_IMAGE` w `compose/.env` albo dodatki obrazu w `JARVO_EXTRAS` (`rembg media docling manim office`) = budowa na miejscu |
 | Serwer (VPS) | [`scripts/bootstrap-vps.sh`](../scripts/bootstrap-vps.sh) | jednorazowe przygotowanie Ubuntu/Debian (Docker, użytkownik, UFW, Tailscale) |
-| Testy | [`tests/test_installer.py`](../tests/test_installer.py), [`tests/test_install_ps1.py`](../tests/test_install_ps1.py), [`scripts/install-test.sh`](../scripts/install-test.sh), [`.github/workflows/installer.yml`](../.github/workflows/installer.yml) | pytest: składnia, shellcheck, próby na sucho na udawanych dystrybucjach, macOS i Windowsie, sprzęt, `jarvo`, `local-up.sh --prepare`; instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem (piaskownica i CI z obrazem z GHCR); CI na prawdziwym macOS i Windowsie |
+| Testy | [`tests/test_installer.py`](../tests/test_installer.py), [`scripts/install-test.sh`](../scripts/install-test.sh), [`.github/workflows/installer.yml`](../.github/workflows/installer.yml) | pytest: składnia, shellcheck, próby na sucho na udawanych dystrybucjach, macOS i Windowsie, sprzęt, `jarvo`, `local-up.sh --prepare`; instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem (piaskownica i CI z obrazem z GHCR); CI na prawdziwym macOS i Windowsie |
 
 Polecenia ze strony: `curl -fsSL …/install.sh | bash` oraz `irm …/install.ps1 | iex`.
 
@@ -339,9 +343,8 @@ Czego nie sprawdzono: instalacji na prawdziwym Macu (protokół §6).
 
 ### 4c. Etap 4 (Windows): co zbudowano i jak sprawdzono
 
-Zbudowane 2026-10-09: `install.ps1` od nowa (§3 Windows), `scripts/dev-pwsh.sh` (`make dev-pwsh`: PowerShell 7.5.5
-i PSScriptAnalyzer 1.24.0, przypięte sumami, do `.tools/`), `PSScriptAnalyzerSettings.psd1` (wyłączone reguły
-z uzasadnieniem), `tests/test_install_ps1.py`, instalatory na jarvo.pl (`scripts/deploy-site.sh`, typ
+Zbudowane 2026-10-09 (zastąpione 2026-10-25 instalacją natywną; narzędzia lintu PowerShella i testy tej wersji
+usunięte w etapie E13): `install.ps1` od nowa (§3 Windows), instalatory na jarvo.pl (`scripts/deploy-site.sh`, typ
 `text/plain; charset=utf-8` i `no-cache` w `site/.htaccess`).
 
 Sprawdzone (PowerShell 7 na Linuksie, Windows udawany zmiennymi `JARVO_FAKE_*`): składnia, PSScriptAnalyzer bez
@@ -404,12 +407,11 @@ Na świeżym koncie użytkownika (albo maszynie wirtualnej), bez Dockera:
 | Plik | Rola | Stan |
 |---|---|---|
 | `install.sh` | bootstrap: system, pakiety, Docker (Engine / Colima / istniejący), klucz dostępu, klon, `jarvo up`, autostart, dashboard, `HOST_VERSION` | ✅ Linux/WSL; ✅ macOS (czeka na próbę na Macu) |
-| `install.ps1` | bootstrap Windows: WSL, restart + `RunOnce`, dystrybucja `Jarvo`, `install.sh` w WSL, autostart (`Jarvo.vbs`), odinstalowanie | ✅ (czeka na próbę na Windowsie) |
-| `scripts/dev-pwsh.sh`, `PSScriptAnalyzerSettings.psd1`, `tests/test_install_ps1.py` | PowerShell 7 i PSScriptAnalyzer do testów, reguły lintu, próby na sucho `install.ps1` | ✅ |
+| `install.ps1` | od 2026-10-25 przekierowanie na `jarvo/bootstrap/install.ps1` (instalacja natywna; stara z WSL przenoszona za zgodą) | ✅ |
 | `scripts/local-up.sh` | postawienie floty; tryb bez pytań, `--prepare`, `JARVO_NO_BUILD`, wolumeny (`JARVO_VOLUMES`, macOS domyślnie) | ✅ |
 | `bin/jarvo` | polecenie użytkownika (`up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall`, `version`); macOS: Colima, LaunchAgent, wolumeny | ✅ |
 | `infra/autostart/` | `jarvo-updater.service` (systemd user), `pl.jarvo.updater.plist` (LaunchAgent macOS) | ✅ |
 | `scripts/install-test.sh` | instalacja od zera w świeżym kontenerze Ubuntu/Debian z własnym Dockerem: piaskownica (obrazy z zewnętrznego Dockera) albo CI / zwykła maszyna (`JARVO_TEST_PULL=1`: `jarvo up` pobiera obraz z GHCR) | ✅ |
 | `tests/test_installer.py` | składnia, shellcheck, próby na sucho (Linux i macOS), klucz dostępu, `jarvo`, `local-up.sh --prepare`, wolumeny, przypięty Hermes | ✅ |
 | `.github/workflows/obraz.yml`, `scripts/obraz.sh` | obraz amd64+arm64 do GHCR, pobieranie zamiast budowy | ✅ |
-| `.github/workflows/installer.yml` | przy każdej zmianie instalatora i obrazu floty (`infra/Dockerfile`, `infra/node`, `infra/python`, `infra/bin`): Linux od zera w świeżym Ubuntu z obrazem z GHCR (`install-test.sh`, `JARVO_TEST_PULL=1`), macOS (bash 3.2, próba na sucho, `jarvo` i plik LaunchAgent sprawdzony `plutil`; pełna instalacja z Colimą na żądanie: `mac_pelna`), Windows (testy `install.ps1` w PowerShell 5.1 i 7, PSScriptAnalyzer) | ✅ |
+| `.github/workflows/installer.yml` | przy każdej zmianie instalatora i obrazu floty (`infra/Dockerfile`, `infra/node`, `infra/python`, `infra/bin`): Linux od zera w świeżym Ubuntu z obrazem z GHCR (`install-test.sh`, `JARVO_TEST_PULL=1`), macOS (bash 3.2, próba na sucho, `jarvo` i plik LaunchAgent sprawdzony `plutil`; pełna instalacja z Colimą na żądanie: `mac_pelna`) | ✅ |

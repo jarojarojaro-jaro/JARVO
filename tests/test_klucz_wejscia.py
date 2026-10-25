@@ -178,5 +178,3 @@ def test_jarvo_open_i_link_nie_wypisuja_klucza_do_logu():
     assert "jarvo-klucz nowy" in jarvo and "link) cmd_link ;;" in jarvo
     otworz = jarvo[jarvo.index("cmd_open() {"):jarvo.index("cmd_link() {")]
     assert 'echo "$URL"' in otworz and "echo \"$u\"" not in otworz
-    ps1 = (REPO / "install.ps1").read_text(encoding="utf-8")
-    assert "jarvo link" in ps1 and "#klucz=JRV" in ps1

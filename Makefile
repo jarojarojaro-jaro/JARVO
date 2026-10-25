@@ -2,11 +2,10 @@
 PY ?= python3
 HERMES_SRC ?=
 
-.PHONY: help dev-deps dev-pwsh validate test build models pins zrodla hq-demo deploy harvest new-agent
+.PHONY: help dev-deps validate test build models pins zrodla hq-demo deploy harvest new-agent
 
 help:
 	@echo "make dev-deps           zależności do testów i walidacji (pytest, pyyaml, shellcheck)"
-	@echo "make dev-pwsh           PowerShell 7 i PSScriptAnalyzer do testów install.ps1 (przypięte, do .tools/)"
 	@echo "make validate           walidacja repo (fleet, profile, skille, evals, sekrety, docs)"
 	@echo "make test               testy (pytest): walidatory, patrol, raporty, skrypty"
 	@echo "make build HERMES_SRC=… build dystrybucji do build/ (wymaga drzewa Hermesa)"
@@ -20,9 +19,6 @@ help:
 
 dev-deps:
 	$(PY) -m pip install -r requirements-dev.txt
-
-dev-pwsh:
-	bash scripts/dev-pwsh.sh
 
 validate:
 	$(PY) scripts/validate.py

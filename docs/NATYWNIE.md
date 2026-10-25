@@ -705,7 +705,7 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 | **T04** Końce linii i kodowanie | brak .gitattributes; 987 plików z CRLF na Windows; `text=True` bez kodowania | `.gitattributes`; PYTHONUTF8=1 w CI i w launcherach; bramka EncodingWarning | etap E0 |
 | **T05** Testy node | `node -e` z 79 014 znakami (WinError 206), ESM ze str(ścieżki) | program w pliku tymczasowym; Path.as_uri() | |
 | **T06** Lint powłoki | `bash -n` w validate.py i drugi raz w ci.yml | tylko dla skryptów, które zostają (install.sh, shim jarvo); shellcheck z przypiętej binarki | |
-| **T07** PowerShell | testy install.ps1 na sucho wokół WSL; PSScriptAnalyzer 1.24.0 bez sumy | testy nowego install.ps1 w PS 5.1 i 7 na W64 i WARM; PSScriptAnalyzer z nupkg z sumą | |
+| **T07** PowerShell | testy install.ps1 na sucho wokół WSL; PSScriptAnalyzer 1.24.0 bez sumy | testy bootstrapu `jarvo/bootstrap/install.ps1` w PS 5.1 na W64 i WARM (tests/test_natywne_cli.py: składnia, ASCII, sumy, na sucho, `irm \| iex`); stary install.ps1 to przekierowanie (E13), jego testy i PSScriptAnalyzer usunięte | PSScriptAnalyzer dla bootstrapu: później |
 | **T08** Testy instalatora | Docker w Dockerze (install-test.sh), macOS tylko na sucho, Windows tylko na sucho | prawdziwa instalacja od zera na 5 nogach (fazy: przygotowanie, instalacja, aktualizacja, odinstalowanie); próby JARVO_FAKE_* zostają jako jednostkowe | wzór: install-e2e*.yml Hermesa |
 | **T09** Atrapy programów | pliki `#!/bin/sh` i PATH sklejany przez „:” | tests/atrapy.py (Python + .cmd, os.pathsep); w kodzie jawne ścieżki narzędzi | na Windows env nie zmienia PATH dla CreateProcess |
 | **T10** Uprawnienia w testach | 26 plików sprawdza tryby 0600/0700 | wspólna funkcja ochrony + test DACL (windows_only) | |

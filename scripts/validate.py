@@ -44,8 +44,7 @@ SECRET_PATTERNS = [
     (re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"), "klucz prywatny"),
 ]
 # .claude: lokalny katalog Claude Code (robocze kopie agentów w worktrees), nie należy do repo;
-# .tools: narzędzia deweloperskie spoza pip (scripts/dev-pwsh.sh), poza gitem
-SKIP_DIRS = {".git", ".claude", ".tools", "build", "node_modules", "__pycache__", ".pytest_cache"}
+SKIP_DIRS = {".git", ".claude", "build", "node_modules", "__pycache__", ".pytest_cache"}
 
 
 def _pominiety(path: Path) -> bool:

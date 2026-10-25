@@ -233,10 +233,23 @@ def test_bootstrap_ps1_tylko_ascii_bez_bom():
                              r"^\s*\$klucz = \$env:JARVO_TOKEN$|\{ \$env:JARVO_TOKEN = \$klucz \}", linia), linia
 
 
-def test_bootstrap_ps1_parsuje_sie():
+@pytest.mark.parametrize("skrypt", [PS1, REPO / "install.ps1"], ids=["bootstrap", "stary-adres"])
+def test_bootstrap_ps1_parsuje_sie(skrypt):
     r = _ps("$e = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("
-            f"'{PS1}', [ref]$null, [ref]$e); $e | ForEach-Object {{ $_.ToString() }}; exit $e.Count")
+            f"'{skrypt}', [ref]$null, [ref]$e); $e | ForEach-Object {{ $_.ToString() }}; exit $e.Count")
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_stary_adres_install_ps1_przekierowuje_na_bootstrap():
+    """install.ps1 z katalogu głównego (stare linki, jarvo.pl przed wgraniem strony): ten sam bootstrap natywny
+    z tego samego refu, bez WSL; ASCII bez BOM jak bootstrap; klucz tylko w nagłówku."""
+    dane = (REPO / "install.ps1").read_bytes()
+    assert dane.isascii() and not dane.startswith(b"\xef\xbb\xbf")
+    tekst = dane.decode("ascii")
+    assert "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/$ref/jarvo/bootstrap/install.ps1" in tekst
+    assert "$ref = $env:JARVO_REF" in tekst and "Invoke-Expression $skrypt" in tekst
+    assert "wsl.exe" not in tekst and "wsl --" not in tekst and "Tls12" in tekst
+    assert "\"Bearer $($env:JARVO_TOKEN)\"" in tekst and "Write-Host $env:JARVO_TOKEN" not in tekst
 
 
 @pytest.mark.wymaga_bash
