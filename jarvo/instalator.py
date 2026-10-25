@@ -64,6 +64,7 @@ testy podmieniają atrapami.
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import dataclasses
 import http.client
 import importlib
@@ -1315,9 +1316,22 @@ class _Instalacja:
         zmiany = self.ot.modul("bin_floty").przygotuj(
             self.u, venv_python=Path(venv["python"]), uv=self._bin_narzedzia("uv") if "uv" in self.narz else None,
             tesseract=Path(tess) if tess else None, log=self.podlog)
+        zmiany = list(zmiany or []) + self._agent_browser(narz)
         self.podlog(f"programy floty w {self.u.bin_floty}: " + ("zapisane" if zmiany else "bez zmian"))
         if zmiany:
             self.zmiany.append("programy floty")
+
+    def _agent_browser(self, narz: dict) -> list:
+        """Program `agent-browser` w bin-floty (nakładka Jarva z infra/bin/agent_browser.py tej wersji: wyłącza serwer
+        podglądu demona, C05) dla Pythona z instalacji; na macOS i Linuksie także `chromium` dla chrome-headless-shell."""
+        if not isinstance(narz.get("agent-browser"), dict):
+            return []
+        zrodlo = self.app / "infra" / "bin" / "agent_browser.py"
+        spec = importlib.util.spec_from_file_location("jarvo_agent_browser", zrodlo)
+        modul = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(modul)
+        chrome = ((narz.get("chrome-headless-shell") or {}).get("env") or {}).get("CHROME_PATH")
+        return [str(p) for p in modul.zainstaluj(self.u.bin_floty, self._bin_narzedzia("python313"), chrome=chrome)]
 
     def flota(self) -> None:
         """Build profili i instalacja floty (jarvo/flota.py); restart usług zleca krok „Serwis” (nadzorca)."""

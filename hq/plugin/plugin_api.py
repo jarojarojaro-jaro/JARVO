@@ -988,7 +988,12 @@ def _klasa_serwera(baza):
         def server_bind(self):
             if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-            super().server_bind()
+            # bez HTTPServer.server_bind: ten woła socket.getfqdn(adres), a odwrotny DNS adresu pętli zwrotnej
+            # potrafi trwać sekundami (macOS w CI); nazwy serwera handler i tak nie używa
+            import socketserver
+            socketserver.TCPServer.server_bind(self)
+            host, port = self.server_address[:2]
+            self.server_name, self.server_port = str(host), port
 
     return Serwer
 

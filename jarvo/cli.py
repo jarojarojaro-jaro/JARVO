@@ -168,6 +168,9 @@ def _parser() -> argparse.ArgumentParser:
     s.add_argument("akcja", choices=("on", "off", "status"), metavar="on|off|status")
     s.set_defaults(funkcja=polecenie_autostart)
 
+    from . import wiedza_cli                # skarbiec, rutyny, Telegram (etap E7): jarvo wiedza|rutyny|telegram
+    wiedza_cli.dodaj_polecenia(sub)
+
     s = sub.add_parser("doctor", help="diagnoza instalacji z radą przy każdym wyniku")
     s.add_argument("--json", action="store_true", help="wynik w JSON (CI)")
     s.set_defaults(funkcja=polecenie_doctor)
@@ -1103,6 +1106,9 @@ def zbierz_diagnoze(u: Uklad, ot: Otoczenie) -> dict:
     wyniki = [sprawdz_korzen(u), sprawdz_miejsce(u), sprawdz_python(u), *sprawdz_sqlite(u), sprawdz_uv(u, app),
               sprawdz_hermesa(u, app), *sprawdz_porty(u, ot, stan), sprawdz_brame(u, ot, stan),
               *sprawdz_narzedzia(u), sprawdz_autostart(u, ot), sprawdz_polecenie(u, ot), sprawdz_git(u, ot)]
+    if (u.dane / "profiles").is_dir():          # skarbiec, rutyny i Telegram mają sens dopiero z flotą (K08)
+        from . import wiedza_cli
+        wyniki += wiedza_cli.sprawdzenia(u, ot)
     return {"root": str(u.root), "czas": time.strftime("%Y-%m-%dT%H:%M:%S"), "serwis": stan is not None,
             "wyniki": wyniki, "bledy": sum(w["stan"] == "blad" for w in wyniki),
             "uwagi": sum(w["stan"] == "uwaga" for w in wyniki)}

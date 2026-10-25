@@ -7,7 +7,7 @@
 Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, przenosne.py, sciezki.py, ochrona.py, edytor.py,
 animacja.py, rozmowy.py, czytnik.py, wzmianki.py, kontekst.py, agenci.py, brama.py, strumien.py, przebiegi.py, scalanie.py,
 budzenia.py, prace.py, obserwator.py, silnik.py, trasy_rozmow.py, aplikacja.py, podpowiedzi.py, glos.py, mozg.py,
-trasy_aplikacji.py, pomiar.py, liczby.py, konwertuj.py, izometria/, fleet.json, dzwieki/, dist/index.js, dist/zasoby/,
+trasy_aplikacji.py, pomiar.py, liczby.py, _sciezki.py, konwertuj.py, izometria/, fleet.json, dzwieki/, dist/index.js, dist/zasoby/,
 dist/fonts/}. Pakiet, loader i pliki demo mają końce linii „\\n” także na Windows (te same bajty na każdym systemie).
 Pakiet aplikacji to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku; trafia do
 dist/zasoby/app-<sha256[:12]>.js (z bliźniakiem .gz), style do app-<h>.css, kroje aplikacji do zasoby/kroje/.
@@ -239,6 +239,8 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     shutil.copy2(fl.REPO_ROOT / "profiles" / "jarvo-wideo" / "scripts" / "pomiar.py", dash / "pomiar.py")
     # liczby floty: HQ liczy jakość agentów tą samą funkcją co przegląd tygodnia Jarva
     shutil.copy2(fl.REPO_ROOT / "profiles" / "jarvo" / "scripts" / "liczby.py", dash / "liczby.py")
+    # liczby.py importuje _sciezki (katalogi danych w kontenerze i natywnie, E7): bez niego HQ nie policzy liczb
+    shutil.copy2(fl.REPO_ROOT / "profiles" / "jarvo" / "scripts" / "_sciezki.py", dash / "_sciezki.py")
     # konwerter plików w Centrali: ten sam skrypt co wspólny skill floty `konwersja-plikow`
     shutil.copy2(fl.REPO_ROOT / "shared" / "skills" / "konwersja-plikow" / "scripts" / "konwertuj.py", dash / "konwertuj.py")
     # figura floty w Centrali („Jak działa usługa”): ten sam iso.py co wspólny skill `izometria`, z szablonem,
