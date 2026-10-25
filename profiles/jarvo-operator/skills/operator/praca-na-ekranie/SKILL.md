@@ -1,7 +1,7 @@
 ---
 name: praca-na-ekranie
 description: "Pętla pracy na ekranie: patrz, działaj, sprawdź"
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-operator
     autonomy: A1
-    reviewed: "2026-10-19"
+    reviewed: "2026-10-25"
 ---
 
 # Praca na ekranie
@@ -45,6 +45,9 @@ zawężasz widok (przewiń, `app`). Zrzut z obrazem ma `screenshot_path`: to Tw�
 - Odmowa `element_zmieniony`: wejście sprawdziło numer w świeżym drzewie i leży pod nim już inny element (strona
   coś dodała, usunęła albo zmieniła od Twojego `capture`). Nowy `capture` i ten sam element po nowym numerze; nie
   klikaj w punkt, żeby to ominąć.
+- Błąd `fokus_zmieniony` (przeglądarka Jarva): strona przeniosła fokus z pola, w które piszesz (np. do pola hasła),
+  więc nic nie zostało wpisane. Nowy `capture`, klik w pole i pisanie jeszcze raz; gdy fokus znowu ucieka do pola
+  hasła albo kodu, to krok właściciela (`oddaj-ekran`).
 - Klik po `element` (także prawy) w tle, bez `delivery_mode`. Klik w punkt (`coordinate`) tylko z
   `delivery_mode: foreground`: w tle sterownik klika wtedy najmniejszy element programu w tym miejscu okna, także
   niewidoczny albo w innym oknie, więc wejście go odrzuca (`punkt_w_tle`). `type`, `key`, `scroll`, `drag`

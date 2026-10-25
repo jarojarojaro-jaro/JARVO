@@ -1,0 +1,26 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Zamówienie testowe Jarvo</title>
+<style>body{font:16px sans-serif;margin:24px}label{display:block;margin:8px 0}iframe{border:2px solid #888}
+#baner{position:fixed;left:0;top:380px;width:640px;height:70px;background:#ffd;display:none}</style></head><body>
+<h1>Zamówienie</h1>
+<form id="zamowienie" onsubmit="return false">
+<label>Imię i nazwisko <input name="imie" autocomplete="name"></label>
+<label>E-mail <input name="email" type="email" autocomplete="email"></label>
+<label>Telefon <input name="telefon" type="tel" autocomplete="tel"></label>
+<label>Adres dostawy <textarea name="adres"></textarea></label>
+<label>Dostawa <select name="dostawa"><option>Kurier</option><option>Paczkomat</option><option>Odbiór osobisty</option></select></label>
+<label><input type="checkbox" name="regulamin"> Akceptuję regulamin sklepu</label>
+<label>Hasło do konta <input name="haslo" type="password" autocomplete="new-password"></label>
+<label>Kod BLIK <input name="blik" autocomplete="one-time-code"></label>
+<label>Faktura (PDF) <input type="file" name="faktura"></label>
+<button type="button" id="plik" onclick="document.querySelector('[name=faktura]').click()">Dodaj załącznik</button>
+<button type="button" id="sprawdz" onclick="document.getElementById('wynik').textContent='Dane sprawdzone'">Sprawdź dane</button>
+<button type="button" id="podsumowanie" onclick="window.potwierdzone = confirm('Czy na pewno zapłacić 129 zł kartą?')">Podsumowanie</button>
+<button type="button" id="usun" onclick="window.usunieto = confirm('Usunąć pozycję z koszyka?')">Usuń pozycję</button>
+<button type="button" id="pokaz" onclick="document.getElementById('baner').style.display='block'">Pokaż baner</button>
+<button type="submit">Zapłać 129 zł</button>
+</form>
+<p id="wynik"></p>
+<p><a href="/pobierz/faktura.pdf">Pobierz fakturę</a> <a href="/pobierz/instalator.exe">Pobierz instalator</a></p>
+<iframe title="Płatność kartą" src="https://jarvo-platnosci.test/platnosci.html" width="420" height="140"></iframe>
+<div id="baner">Ten baner przykrywa dół strony</div>
+</body></html>

@@ -1,7 +1,10 @@
 # jarvo-operator: Operator
 
 Computer use floty: praca na Komputerze Jarva (osobny pulpit z Chromium w kontenerze `jarvo-komputer`, bez kluczy
-floty), który właściciel widzi i może przejąć. Projekt, twarde zasady i etapy: [docs/KOMPUTER.md](../../docs/KOMPUTER.md).
+floty), który właściciel widzi i może przejąć. W instalacji natywnej (bez Dockera) Komputerem jest osobna
+przeglądarka Jarva: Chrome for Testing z własnym profilem, sterowana przez CDP z tymi samymi twardymi zasadami
+i tym samym narzędziem `computer_use` (komputer/usluga.py, docs/NATYWNIE.md, etap E10). Projekt, twarde zasady
+i etapy: [docs/KOMPUTER.md](../../docs/KOMPUTER.md).
 
 | Element | Zawartość |
 |---|---|

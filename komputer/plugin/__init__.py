@@ -5,19 +5,78 @@ Rozmawia z wejściem Komputera Jarva przez gniazdo sterowania (`ster.sock`, docs
   dziennik   ostatnie decyzje twardych zasad (bez treści: narzędzie, decyzja, zasada, cel),
   oddaj      prośba do właściciela: pauza z powodem („zaloguj się do panelu sklepu”). Komputer stoi, dopóki
              właściciel go nie wznowi (`jarvo komputer wznow`, w K4 przycisk w Ekranie HQ).
-Wznowić agent nie może: wejście przepuszcza `wznow` tylko od właściciela (SO_PEERCRED), a narzędzie go nie wysyła.
+Wznowić agent nie może: wejście przepuszcza `wznow` tylko od właściciela (kontener: SO_PEERCRED; natywnie: token
+właściciela, którego narzędzie nie zna i nie wysyła).
 build.py kopiuje wtyczkę do plugins/jarvo-komputer, install-fleet.sh dowiązuje ją w profilach z `komputer: true`.
+
+Natywnie (jest JARVO_ROOT, nie ma JARVO_KOMPUTER_GNIAZDO) kanał `ster` usługi Komputera liczy się z korzenia tym
+samym przepisem co komputer/kanal.py: potok `\\\\.\\pipe\\jarvo-komputer-ster-<skrót>` na Windows, gniazdo
+`<root>/stan/komputer/ster.sock` na macOS i Linuksie (wtyczka leży w kopii w `<dane>/plugins`, więc go nie importuje).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import socket
+import tempfile
+from pathlib import Path
 from typing import Any, Dict
 
 NAZWA = "jarvo-komputer"
 STER = os.path.join(os.path.dirname(os.environ.get("JARVO_KOMPUTER_GNIAZDO", "/opt/jarvo/komputer/cua.sock")),
                     "ster.sock")
+
+
+def natywnie() -> bool:
+    return not os.environ.get("JARVO_KOMPUTER_GNIAZDO") and bool(os.environ.get("JARVO_ROOT"))
+
+
+def adres_natywny(root: str) -> str:
+    """Kanał `ster` usługi Komputera dla korzenia `root` (ten sam przepis co komputer/kanal.py `adres`)."""
+    norm = os.path.normcase(str(Path(root).expanduser().resolve(strict=False)))
+    skrot = hashlib.sha256(norm.encode("utf-8")).hexdigest()[:16]
+    if os.name == "nt":
+        return rf"\\.\pipe\jarvo-komputer-ster-{skrot}"
+    p = Path(root) / "stan" / "komputer" / "ster.sock"
+    if len(os.fsencode(str(p))) <= 100:
+        return str(p)
+    for baza in (tempfile.gettempdir(), "/tmp"):
+        p = Path(baza) / f"jarvo-{os.getuid()}-{skrot}-k" / "ster.sock"
+        if len(os.fsencode(str(p))) <= 100:
+            break
+    return str(p)
+
+
+def _zapytaj_potok(adres: str, dane: bytes, czas: float) -> bytes:
+    """Windows: jedno pytanie przez potok nazwany (open na \\\\.\\pipe\\… to CreateFile); odpowiedź do końca wiersza."""
+    import threading
+    wynik: list = []
+
+    def rozmowa():
+        try:
+            with open(adres, "r+b", buffering=0) as p:
+                p.write(dane)
+                odp = b""
+                while not odp.endswith(b"\n") and len(odp) < (1 << 20):
+                    k = p.read(65536)
+                    if not k:
+                        break
+                    odp += k
+                wynik.append(odp)
+        except OSError as e:
+            wynik.append(e)
+
+    w = threading.Thread(target=rozmowa, daemon=True)
+    w.start()
+    w.join(czas)
+    if not wynik:
+        raise TimeoutError("Komputer nie odpowiedział")
+    if isinstance(wynik[0], OSError):
+        raise wynik[0]
+    return wynik[0]
+
+
 WYLACZONY = ("Komputer Jarva jest wyłączony albo jeszcze startuje. Właściciel włącza go na komputerze z Jarvem: "
              "jarvo komputer on (docs/KOMPUTER.md).")
 MAKS_PROSBA = 300
@@ -46,21 +105,29 @@ SCHEMAT: Dict[str, Any] = {
 
 
 def _ster(polecenie: Dict[str, Any], czas: float = 5.0) -> Dict[str, Any]:
-    """Jedno polecenie JSON do ster.sock; odpowiedź albo {"ok": False, "blad": ...}."""
-    if not os.path.exists(STER):
+    """Jedno polecenie JSON do kanału sterowania Komputera; odpowiedź albo {"ok": False, "blad": ...}."""
+    dane = (json.dumps(polecenie, ensure_ascii=False) + "\n").encode()
+    adres = adres_natywny(os.environ["JARVO_ROOT"]) if natywnie() else STER
+    if os.name == "nt" and natywnie():
+        try:
+            odp = json.loads(_zapytaj_potok(adres, dane, czas) or b"{}")
+        except (OSError, ValueError, TimeoutError) as e:
+            return {"ok": False, "dziala": False, "blad": f"{WYLACZONY} ({type(e).__name__})"}
+        return odp if isinstance(odp, dict) else {"ok": False, "blad": "wejście odpowiedziało nie po JSON-owemu"}
+    if not os.path.exists(adres):
         return {"ok": False, "dziala": False, "blad": WYLACZONY}
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(czas)
     try:
-        s.connect(STER)
-        s.sendall((json.dumps(polecenie, ensure_ascii=False) + "\n").encode())
-        dane = b""
-        while not dane.endswith(b"\n") and len(dane) < (1 << 20):
+        s.connect(adres)
+        s.sendall(dane)
+        odp = b""
+        while not odp.endswith(b"\n") and len(odp) < (1 << 20):
             k = s.recv(65536)
             if not k:
                 break
-            dane += k
-        odp = json.loads(dane or b"{}")
+            odp += k
+        odp = json.loads(odp or b"{}")
         return odp if isinstance(odp, dict) else {"ok": False, "blad": "wejście odpowiedziało nie po JSON-owemu"}
     except (OSError, ValueError) as e:
         return {"ok": False, "dziala": False, "blad": f"{WYLACZONY} ({type(e).__name__})"}

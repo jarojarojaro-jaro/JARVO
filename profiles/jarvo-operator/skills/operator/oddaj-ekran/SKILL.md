@@ -1,7 +1,7 @@
 ---
 name: oddaj-ekran
 description: "Krok właściciela: logowanie, płatność, CAPTCHA, prośba"
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-operator
     autonomy: A1
-    reviewed: "2026-10-19"
+    reviewed: "2026-10-25"
 ---
 
 # Oddaj ekran właścicielowi
@@ -24,6 +24,9 @@ Ty przygotowujesz wszystko do tego kroku i prosisz właściciela dokładnie o te
 - Wejście Komputera odmówiło z `code: wymaga_czlowieka` (`next_step: ask_owner`).
 - Widzisz na ekranie krok z listy wyżej, zanim w niego klikniesz (nie czekaj na odmowę).
 - Serwis odmówił automatowi (CAPTCHA, „potwierdź, że nie jesteś robotem”, blokada): to też blokada, nie zagadka.
+- Przeglądarka Jarva (Komputer natywnie) dokłada trzy kroki właściciela: wybór pliku z jego dysku (`wybor_pliku`),
+  OK w oknie potwierdzenia płatności, zakupu, logowania albo wysyłki (`okno_wrazliwe`; Anuluj klikasz sam)
+  i CAPTCHA (`captcha`). Prośba jak zawsze: gdzie i co kliknąć albo który plik wybrać (nazwa, nie zawartość).
 
 ## Jak
 1. `capture` `mode: som`: ekran w stanie gotowym do kroku właściciela (formularz wypełniony, koszyk z sumą).

@@ -6,6 +6,7 @@ karty, BLIK, przyciskami Kup teraz, Zapłać, Zaloguj się, kluczem API w treśc
 Wznowienie po pauzie robi właściciel: klient wypisuje `@@wznow`, a komputer-test.sh wznawia jako pulpit.
 Każdy krok sprawdza decyzję wejścia: co przechodzi do sterownika, co wraca z wymaga_czlowieka, co jest
 zablokowane, co znika z odpowiedzi. Kod wyjścia 0 tylko przy komplecie zaliczeń.
+Komputer natywnie (przeglądarka Jarva na CDP, bez kontenera) sprawdza scripts/komputer_natywny_test.py.
 """
 
 from __future__ import annotations

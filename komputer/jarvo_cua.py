@@ -1,16 +1,24 @@
 #!/usr/bin/python3 -I
-"""Bramka sterownika ekranu dla Hermesa: HERMES_CUA_DRIVER_CMD wskazuje ten plik (infra/docker-compose.yml).
+"""Bramka sterownika ekranu dla Hermesa: HERMES_CUA_DRIVER_CMD wskazuje ten plik (infra/docker-compose.yml) albo,
+natywnie, nakładkę `jarvo-cua` (`jarvo komputer on`: `<program>/bin-floty/jarvo-cua.cmd` na Windows,
+`<program>/bin-floty/jarvo-cua` na macOS i Linuksie), która uruchamia ją Pythonem Jarva.
 
 Hermes woła „cua-driver” z kilkoma czasownikami. Bramka przepuszcza tylko te, których potrzebuje narzędzie
 computer_use, i niczego nie pobiera:
-  --help, --version, manifest   odpowiedzi stałe (wersja sterownika z obrazu Komputera Jarva),
+  --help, --version, manifest   odpowiedzi stałe (wersja kontraktu sterownika Komputera Jarva),
   mcp [--no-overlay]            rozmowa MCP ze sterownikiem w Komputerze Jarva: bramka tylko przepuszcza bajty
-                                między Hermesem a gniazdem cua.sock; zasady sprawdza wejście w Komputerze
-                                (infra/komputer/wejscie.py, docs/KOMPUTER.md §6),
+                                między Hermesem a kanałem wejścia; zasady sprawdza wejście (kontener:
+                                infra/komputer/wejscie.py; natywnie: komputer/wejscie_natywne.py, docs/KOMPUTER.md §6),
   status                        czy Komputer Jarva odpowiada.
 Odmawia wszystkiego innego, m.in. check-update i update (sterownik nie aktualizuje się sam ani nie łączy z GitHubem),
 serve (tryb bez ograniczeń: /yolo i approvals.mode off zamykają computer_use zamiast go otwierać) oraz install.
 Ustawiona zmienna wyłącza też w Hermesie automatyczną „naprawę” sterownika przez curl|bash.
+
+Kontener: gniazdo `JARVO_KOMPUTER_GNIAZDO` (domyślnie /opt/jarvo/komputer/cua.sock w wolumenie gniazd). Natywnie
+(jest JARVO_ROOT, nie ma JARVO_KOMPUTER_GNIAZDO): kanał `cua` usługi Komputera tego korzenia (komputer/kanal.py:
+potok nazwany z DACL właściciela na Windows, gniazdo 0600 na macOS i Linuksie), a potok musi trzymać proces usługi
+z `<stan>/komputer/usluga.json`. Manifest podaje wtedy jako polecenie MCP Pythona z tą bramką, bo Windows nie
+uruchomi pliku .py wprost.
 """
 
 from __future__ import annotations
@@ -18,16 +26,20 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 
-WERSJA_STEROWNIKA = "0.21.0"          # cua-driver-rs w obrazie jarvo-komputer (infra/komputer, vendor/zrodla.yaml)
+WERSJA_STEROWNIKA = "0.21.0"          # kontrakt cua-driver-rs (obraz jarvo-komputer; natywnie sterownik CDP)
 GNIAZDO = os.environ.get("JARVO_KOMPUTER_GNIAZDO", "/opt/jarvo/komputer/cua.sock")   # wolumen gniazd Komputera
 EKRAN = os.path.join(os.path.dirname(GNIAZDO), "rfb.sock")                             # ekran Komputera (Xvnc)
 WYLACZONY = ("Komputer Jarva jest wyłączony albo jeszcze startuje. Włącz go na komputerze z Jarvem: "
              "jarvo komputer on (docs/KOMPUTER.md).")
 BEZ_KANALU = ("Komputer Jarva działa, ale wejście sterownika (cua.sock) nie odpowiada: "
               "jarvo komputer status, jarvo logs komputer (docs/KOMPUTER.md).")
+BEZ_KANALU_NATYWNIE = ("Komputer Jarva działa, ale jego kanał sterownika nie odpowiada: jarvo komputer status, "
+                       "jarvo logs komputer (docs/KOMPUTER.md).")
 KOD_ODMOWY = 64                        # EX_USAGE: czasownik zablokowany przez bramkę
 KOD_BRAK_KOMPUTERA = 69                # EX_UNAVAILABLE
+PO_KONCU_WEJSCIA = 2.0                 # s: ostatnie odpowiedzi po zamknięciu stdin przez Hermesa (potok bez półzamknięcia)
 
 POMOC = """cua-driver (bramka Jarvo)
 
@@ -41,6 +53,20 @@ Pozostałe czasowniki (check-update, update, serve, install, skills, extension, 
 """
 
 
+def natywnie() -> bool:
+    """Instalacja natywna: korzeń Jarva w otoczeniu (srodowisko.py) i bez gniazda kontenera."""
+    return not os.environ.get("JARVO_KOMPUTER_GNIAZDO") and bool(os.environ.get("JARVO_ROOT"))
+
+
+def _kanal():
+    """Moduł kanałów usługi (komputer/kanal.py, sama biblioteka standardowa) z kodu tej wersji Jarva."""
+    app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if app not in sys.path:
+        sys.path.insert(0, app)
+    from komputer import kanal
+    return kanal
+
+
 def manifest() -> dict:
     """Manifest w formacie, który sprawdza Hermes (kontrakt 0.20: wersja, wywołanie MCP, flagi czasowników)."""
     sciezka = os.path.abspath(__file__)
@@ -48,8 +74,11 @@ def manifest() -> dict:
              "serve": ["--socket", "--permission-mode", "--capability-manifest", "--approve-capability-manifest",
                        "--embedded"],
              "stop": ["--socket"], "status": ["--socket"]}
+    wywolanie = {"command": sciezka, "args": ["mcp"]}
+    if natywnie():                     # Windows nie uruchomi .py wprost: Python Jarva z tą bramką, bez powłoki
+        wywolanie = {"command": sys.executable, "args": ["-I", "-X", "utf8", sciezka, "mcp"]}
     return {"binary_version": WERSJA_STEROWNIKA, "binary_path": sciezka, "gateway": "jarvo",
-            "mcp_invocation": {"command": sciezka, "args": ["mcp"]},
+            "backend": "cdp" if natywnie() else "cua-driver", "mcp_invocation": wywolanie,
             "subcommands": [{"name": n, "args": [{"name": f} for f in f_]} for n, f_ in flagi.items()]}
 
 
@@ -69,6 +98,13 @@ def odpowiada(sciezka: str) -> bool:
 
 
 def komputer_dostepny() -> bool:
+    if natywnie():
+        kanal, root = _kanal(), os.environ["JARVO_ROOT"]
+        try:
+            return bool(kanal.zapytaj(kanal.adres(root, "ster"), {"polecenie": "stan"}, 3.0,
+                                      kanal.pid_uslugi(root)).get("ok"))
+        except kanal.BladKanalu:
+            return False
     return odpowiada(GNIAZDO)
 
 
@@ -108,8 +144,58 @@ def pompuj(sciezka: str) -> int:
     return 0
 
 
+def pompuj_natywnie(root: str) -> int:
+    """MCP na stdin/stdout ↔ kanał `cua` usługi Komputera (potok albo gniazdo), bajt w bajt. Potok Windows nie ma
+    półzamknięcia: po końcu stdin bramka czyta jeszcze najwyżej PO_KONCU_WEJSCIA s i kończy."""
+    import socket
+    import threading
+    kanal = _kanal()
+    try:
+        s = kanal.polacz(kanal.adres(root, "cua"), 5.0, kanal.pid_uslugi(root))
+    except kanal.BladKanalu as e:
+        print(f"{powod_braku()} ({e})", file=sys.stderr)
+        return KOD_BRAK_KOMPUTERA
+    koniec_wejscia: list[float] = []
+
+    def do_komputera() -> None:
+        try:
+            while dane := os.read(0, 1 << 16):
+                s.sendall(dane)
+        except OSError:
+            pass
+        finally:
+            koniec_wejscia.append(time.monotonic())
+            try:
+                s.shutdown(socket.SHUT_WR)          # gniazdo: wejście kończy sesję; potok: nic
+            except (OSError, AttributeError):
+                pass
+
+    threading.Thread(target=do_komputera, daemon=True).start()
+    s.settimeout(0.5)
+    try:
+        while True:
+            try:
+                dane = s.recv(1 << 16)
+            except (TimeoutError, socket.timeout):
+                if koniec_wejscia and time.monotonic() - koniec_wejscia[0] > PO_KONCU_WEJSCIA:
+                    break
+                continue
+            if not dane:
+                break
+            widok = memoryview(dane)
+            while widok:
+                widok = widok[os.write(1, widok):]
+    except (BrokenPipeError, ConnectionResetError, OSError):
+        pass
+    finally:
+        s.close()
+    return 0
+
+
 def powod_braku() -> str:
     """Wyłączony Komputer albo działający pulpit bez odpowiadającego wejścia sterownika: różne rady dla właściciela."""
+    if natywnie():
+        return BEZ_KANALU_NATYWNIE if _kanal().pid_uslugi(os.environ["JARVO_ROOT"]) else WYLACZONY
     return BEZ_KANALU if odpowiada(EKRAN) else WYLACZONY
 
 
@@ -131,6 +217,8 @@ def main(argv: list[str]) -> int:
         print(powod_braku(), file=sys.stderr)
         return 1
     if czas == "mcp":
+        if natywnie():
+            return pompuj_natywnie(os.environ["JARVO_ROOT"])
         if not os.path.exists(GNIAZDO):
             print(powod_braku(), file=sys.stderr)
             return KOD_BRAK_KOMPUTERA
