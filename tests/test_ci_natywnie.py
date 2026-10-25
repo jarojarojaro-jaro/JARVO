@@ -357,6 +357,10 @@ def test_wyjatki_szumu_systemu(e2e):
     assert r["library:LaunchAgents"], "pusty katalog LaunchAgentów"
     assert r["dom:.cache"] is None, "~/.cache z treścią nie jest pustym katalogiem XDG"
     assert r["localappdata:Jarvo"] is None
+    # Firefox z obrazu runnera (W64: katalogi Mozilli doszły w trakcie przebiegu), ale nie inne programy w AppData
+    r = {z["klucz"]: z["wyjasnienie"] for z in e2e.roznica({"wpisy": {}}, {"wpisy": {
+        "appdata:Mozilla": "d", "localappdata:Mozilla": "d0", "appdata:Jarvo": "d"}})["zmiany"]}
+    assert r["appdata:Mozilla"] and r["localappdata:Mozilla"] and r["appdata:Jarvo"] is None
 
 
 def test_skan_usuwa_plik_z_sekretem(e2e, tmp_path, monkeypatch):

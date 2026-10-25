@@ -989,7 +989,9 @@ def _utworz_dowiazanie(korzen: Path, rel: str, cel_linku: str, mapa: Mapa | None
     Windows: katalog = junction (bez administratora), plik = kopia celu. Zwraca opis problemu albo None."""
     link = _w_srodku(korzen, rel)
     if cel_linku.startswith("/"):
-        nowy = mapa.zamien(cel_linku) if mapa else None
+        # najpierw normpath: „/opt/data/../../etc/passwd” to „/etc/passwd”, poza mapą; bez tego prefiks /opt/data
+        # przepuściłby cel z „..”, który po zamianie wychodzi z <dane>
+        nowy = mapa.zamien(posixpath.normpath(cel_linku)) if mapa else None
         if nowy is None:
             return f"{rel} → {cel_linku}: cel poza danymi Jarva, dowiązania nie odtwarzam"
         docel = Path(nowy)
@@ -1201,7 +1203,7 @@ def porownaj(przed: dict, po: dict, *, przepisane: Iterable[str] = (), mapa: dic
             if rel not in po.get("pliki", {}):         # Windows: dowiązanie do pliku zostaje kopią celu
                 roznice.append(f"brak dowiązania {rel}")
             continue
-        oczekiwany = (m.zamien(cel) or cel) if cel.startswith("/") else cel
+        oczekiwany = (m.zamien(posixpath.normpath(cel)) or cel) if cel.startswith("/") else cel
         if _norm_cel(jest) != _norm_cel(oczekiwany) and not (not cel.startswith("/") and WINDOWS):
             roznice.append(f"dowiązanie {rel}: {jest} zamiast {oczekiwany}")
     return roznice

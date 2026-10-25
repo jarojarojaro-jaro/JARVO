@@ -950,6 +950,44 @@ def test_zapytaj_brame_przez_potok_sterujacy(tmp_path):
         assert nadzorca.zapytaj_brame(dane2) is None
 
 
+def test_port_api_bramy_z_env_danych(tmp_path):
+    assert nadzorca.port_api_bramy(tmp_path) is None                                # brak .env
+    env = tmp_path / ".env"
+    env.write_text("API_SERVER_KEY=krotki\n", encoding="utf-8")
+    assert nadzorca.port_api_bramy(tmp_path) is None                                # Hermes wymaga co najmniej 16 znaków
+    env.write_text("﻿export API_SERVER_KEY='" + "k" * 32 + "'\n", encoding="utf-8")
+    assert nadzorca.port_api_bramy(tmp_path) == 8642
+    env.write_text("API_SERVER_KEY=" + "k" * 32 + "\nAPI_SERVER_PORT=19177\n", encoding="utf-8")
+    assert nadzorca.port_api_bramy(tmp_path) == 19177
+
+
+def test_brama_z_api_gotowa_dopiero_z_health(tmp_path):
+    """Po restarcie brama odpowiada na identify, zanim jej API słucha (CI natywnie: doctor 5 s przed API): z kluczem
+    API gotowość wymaga też GET /health = 200."""
+    dane = tmp_path / "dane"
+    dane.mkdir()
+    port = wolny_port()
+    (dane / ".env").write_text(f"API_SERVER_KEY={'k' * 32}\nAPI_SERVER_PORT={port}\n", encoding="utf-8")
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200 if self.path == "/health" else 404)
+            self.end_headers()
+
+        def log_message(self, *_a):
+            pass
+
+    with atrapa_kontroli_bramy(dane, {"ok": True, "protocol": 1, "result": {"kind": "gateway", "pid": 4242}}):
+        assert nadzorca.zapytaj_brame(dane) and nadzorca.brama_gotowa(dane) is False   # API jeszcze nie słucha
+        httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            assert nadzorca.brama_gotowa(dane) is True
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
 LAUNCHER = r'''
 import ctypes, signal, subprocess, sys
 ctypes.windll.kernel32.SetConsoleCtrlHandler(None, 1)

@@ -133,6 +133,11 @@ WYJATKI: list[tuple[str, str, str]] = [
     ("localappdata:crashdumps", "zmieniony", "zrzuty awarii innych programów runnera"),
     ("localappdata:connecteddevicesplatform", "dowolnie", "usługa Windows (CDP) zakłada go sama"),
     ("localappdata:packages", "zmieniony", "aplikacje Sklepu Windows"),
+    # obraz windows-2025 i windows-11-arm ma Firefoksa (C:\ProgramData\Mozilla-1de4eec8-…, katalog jego aktualizatora):
+    # zadanie w tle zakłada te katalogi samo (WARM: były już przed instalacją, W64: pojawiły się w trakcie); Jarvo nie
+    # uruchamia przeglądarek Mozilli (Camoufox pobiera się dopiero przy pierwszym użyciu, CI go nie pobiera)
+    ("appdata:mozilla", "dowolnie", "Firefox z obrazu runnera (zadanie aktualizatora w tle)"),
+    ("localappdata:mozilla", "dowolnie", "Firefox z obrazu runnera (zadanie aktualizatora w tle)"),
     ("localappdata:microsoft", "zmieniony", "dane systemu Windows"),
     ("dom:ntuser*", "dowolnie", "pliki gałęzi rejestru użytkownika i ich dzienniki transakcji (system)"),
     ("dom:.bash_history", "dowolnie", "historia powłoki runnera"),
@@ -1147,6 +1152,15 @@ def _status(inst: Instalacja, rap: Raport, art: Path, ident: str, nazwa: str) ->
 def _doctor_status_panel(inst: Instalacja, rap: Raport, art: Path, dopusc: list, tylko_odczyt: bool = False) -> dict:
     r = inst.jarvo_cmd("version", czas=120)
     rap.punkt("wersja", "jarvo version", r.kod == 0, skrot(r.tekst, 300))
+    # po instalacji brama restartuje się z flotą i łączy platformy: doctor dopiero, gdy nadzorca widzi ją gotową
+    # (brama_gotowa: identify i /health API), najwyżej 120 s
+    koniec = time.monotonic() + 120
+    while time.monotonic() < koniec:
+        s = json_z_wyjscia(inst.jarvo_cmd("status", "--json", czas=60).out) or {}
+        brama = (((s.get("serwis") or {}).get("stan") or {}).get("uslugi") or {}).get("brama") or {}
+        if brama.get("gotowa"):
+            break
+        time.sleep(3)
     r = inst.jarvo_cmd("doctor", "--json", czas=300)
     d = json_z_wyjscia(r.out)
     if d is not None:
@@ -1290,11 +1304,22 @@ def _test_czatu_i_floty(inst: Instalacja, rap: Raport, art: Path, czas_karty: fl
         if karty:                                   # dyspozytor nie będzie ponawiał karty profilu, który zaraz znika
             inst.hermes("kanban", "archive", *karty, czas=120)
         reszta = [x for x in (usun_profil(inst, p) for p in (PROFIL_CZAT, PROFIL_SPEC)) if x]
+        uwaga = ""
+        if reszta and WINDOWS:
+            # brama, która obsłużyła przebieg profilu, trzyma jego logs/.__agent.lock (Hermes kieruje logi do profili
+            # i zwalnia je tylko we własnym procesie); Windows nie usunie otwartego pliku, więc usuwamy przy
+            # zatrzymanym serwisie, jak zrobiłby to właściciel
+            inst.jarvo_cmd("down", czas=180)
+            reszta = [x for x in (usun_profil(inst, p) for p in (PROFIL_CZAT, PROFIL_SPEC)) if x]
+            r = inst.jarvo_cmd("up", czas=300)
+            uwaga = f" (przy zatrzymanym serwisie: brama trzymała logi profilu; jarvo up: kod {r.kod})"
+            if r.kod != 0:
+                reszta.append(f"jarvo up po sprzątaniu: kod {r.kod}: {skrot(r.tekst, 200)}")
         shutil.rmtree(zgody_dir, ignore_errors=True)
         shutil.rmtree(projekt, ignore_errors=True)
         atrapa.zamknij()
         rap.punkt("sprzatanie", "profile testowe usunięte", not reszta,
-                  "; ".join(reszta) or f"{PROFIL_CZAT} i {PROFIL_SPEC} usunięte (hermes profile delete)")
+                  "; ".join(reszta) or f"{PROFIL_CZAT} i {PROFIL_SPEC} usunięte (hermes profile delete){uwaga}")
 
 
 def polecenie_sprawdz(a) -> int:

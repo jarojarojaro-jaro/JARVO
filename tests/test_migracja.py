@@ -1129,6 +1129,7 @@ def test_migracja_linux_sudo_tar(posix):
     assert (sr["dom"] / ".config" / "systemd" / "user" / mig.JEDNOSTKA).is_file()   # jednostkę rusza skrypt (root)
 
 
+@pytest.mark.posix_only          # U4 dotyczy gospodarza Linux/macOS: cel dowiązania to ścieżka POSIX (…/bin/jarvo)
 @pytest.mark.wymaga_symlinku
 def test_linux_stare_polecenie_w_local_bin(posix):
     sr = posix("linux")
@@ -1512,3 +1513,20 @@ def test_sekrety_bez_prawa_odczytu_ida_przez_sudo_tar(posix):
         assert not mig._czytelne_env(sr["l"] / "secrets") and mig._czytelne_env(sr["l"] / "compose")
     finally:
         sekret.chmod(0o600)
+
+
+def test_dowiazanie_bezwzgledne_z_kropkami_nie_wychodzi_poza_dane(tmp_path):
+    """Cel z „..” pod starym prefiksem (/opt/data/../../etc/passwd) po samej zamianie prefiksu wskazywałby poza
+    <dane>; po normpath to /etc/passwd, poza mapą, więc dowiązania nie ma. Cel w danych z „.” i „..” działa."""
+    dane = tmp_path / "dane"
+    (dane / "jarvo" / "knowledge").mkdir(parents=True)
+    mapa = mig.Mapa((("/opt/data", str(dane)),))
+    for cel in ("/opt/data/../../etc/passwd", "/opt/data/jarvo/../../../etc", "/opt/data/./jarvo/../../.."):
+        opis = mig._utworz_dowiazanie(dane, "w/ucieczka", cel, mapa, junction=WINDOWS)
+        assert opis and "poza danymi" in opis, cel
+        assert not os.path.lexists(dane / "w" / "ucieczka"), cel
+    assert mig._utworz_dowiazanie(dane, "w/skarbiec", "/opt/data/jarvo/./x/../knowledge", mapa, junction=WINDOWS) is None
+    assert (dane / "w" / "skarbiec").resolve() == (dane / "jarvo" / "knowledge").resolve()
+    przed = {"dowiazania": {"w/skarbiec": "/opt/data/jarvo/./x/../knowledge"}, "pliki": {}, "bazy": {}, "git": {}}
+    po = {"dowiazania": {"w/skarbiec": str(dane / "jarvo" / "knowledge")}, "pliki": {}, "bazy": {}, "git": {}}
+    assert mig.porownaj(przed, po, mapa={"/opt/data": str(dane)}, bez=()) == []

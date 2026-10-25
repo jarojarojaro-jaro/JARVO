@@ -1104,9 +1104,32 @@ def zapytaj_brame(dane: Path, polecenie: str = "identify", limit: float = 2.0) -
     return wynik if isinstance(wynik, dict) else None
 
 
+def port_api_bramy(dane: Path) -> int | None:
+    """Port API bramy (/v1/runs, /health), gdy instalacja go włączyła: API_SERVER_KEY (co najmniej 16 znaków, jak
+    wymaga Hermes) w <dane>/.env; port z API_SERVER_PORT albo 8642 (H05). Bez klucza brama nie otwiera API: None."""
+    wartosci: dict[str, str] = {}
+    try:
+        for linia in (Path(dane) / ".env").read_text(encoding="utf-8-sig").splitlines():
+            klucz, _, wartosc = linia.strip().removeprefix("export ").partition("=")
+            wartosci[klucz.strip()] = wartosc.strip().strip("'\"")
+    except OSError:
+        return None
+    if len(wartosci.get("API_SERVER_KEY", "")) < 16:
+        return None
+    try:
+        return int(wartosci.get("API_SERVER_PORT") or 8642)
+    except ValueError:
+        return 8642
+
+
 def brama_gotowa(dane: Path) -> bool:
-    """Brama tego HERMES_HOME odpowiada na `identify` (to jest jej dowód życia, bez zgadywania po PID-ach)."""
-    return zapytaj_brame(dane) is not None
+    """Brama tego HERMES_HOME odpowiada na `identify` (dowód życia, bez zgadywania po PID-ach), a gdy ma włączone API,
+    także GET /health: po restarcie brama łączy platformy kilka sekund i dopiero potem API słucha (CI natywnie: doctor
+    w tej przerwie widział „nikt nie odpowiada”)."""
+    if zapytaj_brame(dane) is None:
+        return False
+    port = port_api_bramy(dane)
+    return port is None or http_gotowa(f"http://127.0.0.1:{port}/health")
 
 
 _BEZ_PROXY = urllib.request.build_opener(urllib.request.ProxyHandler({}))

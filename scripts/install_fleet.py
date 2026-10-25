@@ -960,7 +960,10 @@ class Flota:
         wzor = self.repo / "branding" / "skin-jarvo.yaml"
         if not wzor.is_file():
             return
-        domy = [self.dane, *sorted(p for p in (self.dane / "profiles").glob("*") if p.is_dir())]
+        # tylko prawdziwe profile (z config.yaml): katalog po usuniętym profilu, w którym pracownik kanbana zostawił
+        # logi, nie dostaje skórki (inaczej każdy kolejny przebieg zgłaszał zmianę, CI natywnie)
+        domy = [self.dane, *sorted(p for p in (self.dane / "profiles").glob("*")
+                                   if p.is_dir() and (p / "config.yaml").is_file())]
         if any([_kopiuj_plik(wzor, home / "skins" / "jarvo.yaml") for home in domy]):
             self.zmiana("skórka terminala", brama=False)
 
