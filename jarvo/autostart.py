@@ -3,35 +3,53 @@
 Mechanizm systemu uruchamia `jarvo serwis` po zalogowaniu i podnosi go po awarii. Procesami Jarva zarządza już sam
 nadzorca (zasada 5: bez NSSM, WinSW i supervisord). Wszystko bez admina i bez sudo:
 
-- Windows: zadanie Harmonogramu z pliku XML w UTF-16, `schtasks /Create /TN <nazwa> /XML <plik> /F` bez
-  wcześniejszego kasowania (nieudana rejestracja nie zabiera działającego zadania), start `/Run`, usunięcie
-  `/Delete /F`, stan `/Query`. Wyzwalacze: logowanie z opóźnieniem PT15S, a zapasowo odblokowanie sesji i co
-  5 minut (gdy nadzorca działa, IgnoreNew nic nie robi). Każdy wyzwalacz ma UserId bieżącego użytkownika (SID):
-  wyzwalacza „dowolny użytkownik” Harmonogram nie przyjmuje bez admina (tak `schtasks /SC ONLOGON` i Hermes bez
-  UserId kończą na „Odmowa dostępu”). Dokumentacja wymaga admina tylko przy wyzwalaczu startu systemu; konta bez
-  admina z zapasowymi wyzwalaczami nikt jeszcze nie sprawdził (runner CI jest adminem), więc gdy Harmonogram
-  odrzuci pełną definicję, rejestrujemy sam wyzwalacz logowania, a gdy odmówi w ogóle (polityka), wpis HKCU Run
-  (start po zalogowaniu, bez podtrzymania po awarii). Ustawienia: bez zatrzymania na baterii, bez limitu czasu
-  (PT0S), priorytet 5 (normalny), ponowienie co minutę do 999 razy. Domyślne `schtasks /SC ONLOGON` zatrzymałoby
-  nadzorcę na baterii i po 72 godzinach.
+- Windows: zadanie Harmonogramu `Jarvo-<SID>`. Folder główny Harmonogramu jest jeden na cały komputer, a instalacja
+  jest na konto, więc nazwa niesie SID właściciela (tak robi OneDrive). Definicja z pliku XML w UTF-16,
+  `schtasks /Create /TN <nazwa> /XML <plik> /F` bez wcześniejszego kasowania (nieudana rejestracja nie zabiera
+  działającego zadania), start `/Run`, usunięcie `/Delete /F`, stan `/Query`. Zadanie wyłączone w Harmonogramie
+  (taskschd.msc, program „przyspieszający start”) `jarvo autostart on` włącza z powrotem: `/Change /ENABLE`, a gdy
+  to nie przejdzie albo wyłączono same wyzwalacze, rejestracja od nowa. Wyzwalacze: logowanie z opóźnieniem PT15S,
+  a zapasowo odblokowanie sesji i co 5 minut (gdy nadzorca działa, IgnoreNew nic nie robi). Każdy wyzwalacz ma
+  UserId bieżącego użytkownika (SID): wyzwalacza „dowolny użytkownik” Harmonogram nie przyjmuje bez admina (tak
+  `schtasks /SC ONLOGON` i Hermes bez UserId kończą na „Odmowa dostępu”). Dokumentacja wymaga admina tylko przy
+  wyzwalaczu startu systemu; konta bez admina z zapasowymi wyzwalaczami nikt jeszcze nie sprawdził (runner CI jest
+  adminem), więc gdy Harmonogram odrzuci pełną definicję, rejestrujemy sam wyzwalacz logowania, a gdy odmówi
+  w ogóle (polityka), wpis HKCU Run (start po zalogowaniu, bez podtrzymania po awarii). Ustawienia: bez zatrzymania
+  na baterii, bez limitu czasu (PT0S), priorytet 5 (normalny), ponowienie co minutę do 999 razy. Czy Harmonogram
+  ponawia zadanie zakończone kodem innym niż 0, a nie tylko takie, które nie wystartowało, nie jest sprawdzone:
+  awarię nadzorcy pewnie łapie dopiero wyzwalacz co 5 minut. Domyślne `schtasks /SC ONLOGON` zatrzymałoby nadzorcę
+  na baterii i po 72 godzinach.
 - macOS: LaunchAgent `~/Library/LaunchAgents/pl.jarvo.nadzorca.plist`: RunAtLoad, KeepAlive przy wyjściu z błędem,
   ThrottleInterval 30, ExitTimeOut 45, logi do `<logi>`, bez ProcessType Background (dławiłby render);
-  `launchctl bootstrap/bootout/print` w domenie gui/<uid>. Powiadomienie „Background Items” jest normalne.
-- Linux: `~/.config/systemd/user/jarvo.service`: Restart=on-failure, KillMode=mixed, TimeoutStopSec=45 (dłużej niż
-  30 s drenażu bramy), `systemctl --user`. Bez user busa (WSL bez systemd, kontener, su) jasny komunikat. Linger
-  (start bez logowania) tylko na wyraźne życzenie: osobne `wlacz_linger()` z wpisem w dzienniku.
+  `launchctl bootstrap/bootout/print` w domenie gui/<uid>. Usługę wyłączoną w launchd (`launchctl disable`, stan
+  przetrwa restart) `on` włącza z powrotem (`launchctl enable`). Powiadomienie „Background Items” jest normalne.
+- Linux: `jarvo.service` w katalogu jednostek, w którym naprawdę szuka menedżer usług użytkownika (jego UnitPath,
+  zwykle `~/.config/systemd/user`): Restart=on-failure, KillMode=mixed, TimeoutStopSec=45 (dłużej niż 30 s
+  drenażu bramy), `systemctl --user`. Cudzej jednostki o tej nazwie (bez naszego znacznika, w tym katalogu albo
+  w innym, który nasza by przesłoniła) ani maski nie ruszamy. Bez user busa (WSL bez systemd, kontener, su) jasny
+  komunikat. Linger (start bez logowania) tylko na wyraźne życzenie: `wlacz_linger()` zapisuje go w dzienniku po
+  udanym włączeniu, z odciskiem pliku lingera, a `wylacz_linger()` usuwa wpis, więc `jarvo uninstall` nie wyłączy
+  lingera, który właściciel włączył sam (także po wyłączeniu naszego poza Jarvem: plik ma wtedy inny odcisk).
 
-Instalacja spod JARVO_ROOT (próby, CI) dostaje nazwy z przyrostkiem skrótu korzenia (`Jarvo-1a2b3c4d`,
+launchd i systemd --user nie czytają ~/.zprofile ani ~/.profile, więc LaunchAgent i jednostka dostają jawne
+środowisko z chwili instalacji (`zmienne_uslugi`): nadzorca ma wyliczyć ten sam układ katalogów co instalator.
+Instalacja spod JARVO_ROOT (próby, CI) dostaje nazwy z przyrostkiem skrótu korzenia (`Jarvo-<SID>-1a2b3c4d`,
 `pl.jarvo.nadzorca-1a2b3c4d`, `jarvo-1a2b3c4d.service`), więc nie rusza prawdziwego autostartu właściciela.
 Każde włączenie trafia do dziennika zmian hosta przed zmianą (jarvo/zmiany_hosta.py), więc `jarvo uninstall` je
 cofnie. Polecenia systemu idą przez `wykonaj(argv) -> (kod, wyjście)`: domyślnie subprocess, w testach atrapa.
 
-Umowa z nadzorcą: zwykłe zatrzymanie kończy `jarvo serwis` kodem 0 (launchd i systemd go wtedy nie podnoszą),
-a na Windows zapasowe wyzwalacze uruchomią go znowu, więc nadzorca przy starcie szanuje znacznik planowanego
-zatrzymania i trzyma blokadę jednej instancji. `wylacz()` na Windows nie zatrzymuje działającego nadzorcy
-(`schtasks /End` zabiłby go bez drenażu bramy); na macOS i Linuksie system wysyła mu SIGTERM. Zadanie
-Harmonogramu nie ustawia zmiennych środowiska: próbna instalacja spod JARVO_ROOT podaje korzeń w argv albo launcher
-bierze go ze swojej ścieżki; LaunchAgent i jednostka dostają JARVO_ROOT w środowisku.
+Umowa z nadzorcą (jarvo/nadzorca.py):
+- planowane zatrzymanie kończy `jarvo serwis` kodem 0 (launchd i systemd go wtedy nie podnoszą); start przy już
+  działającym nadzorcy też powinien kończyć się kodem 0, bo inaczej launchd podnosi go co 30 s, a systemd co 10 s;
+- na Windows zapasowe wyzwalacze uruchomią go znowu po `jarvo stop`, więc nadzorca przy starcie szanuje znacznik
+  planowanego zatrzymania i trzyma blokadę jednej instancji;
+- Linux, KillMode=mixed: SIGTERM dostaje tylko nadzorca, a to, co zostało w grupie (brama, panel), systemd zabija
+  SIGKILL-em zaraz po jego wyjściu, więc nadzorca kończy się dopiero po bramie i panelu, wszystko w 45 s
+  (pracownicy kanbana żyją w osobnym scope, `systemd-run --user --scope` Hermesa);
+- `wylacz()` na Windows nie zatrzymuje działającego nadzorcy (`schtasks /End` zabiłby go bez drenażu bramy); na
+  macOS i Linuksie system wysyła mu SIGTERM i czeka 45 s;
+- zadanie Harmonogramu nie ustawia zmiennych środowiska: instalacja spod JARVO_ROOT podaje korzeń w argv
+  (`jarvo --korzen <root> serwis`, jarvo/instalator.py), a domyślną wyznacza %LOCALAPPDATA%.
 """
 from __future__ import annotations
 
@@ -66,10 +84,17 @@ LIMIT_ZATRZYMANIA = 45                   # s: dłużej niż drenaż bramy (30 s,
 KLUCZ_RUN = r"Software\Microsoft\Windows\CurrentVersion\Run"
 LAUNCHCTL = "/bin/launchctl"
 PRZERWA_LAUNCHCTL = 1.0                  # s między próbami bootstrap: po bootout launchd chwilę sprząta
+KATALOG_LINGER = "/var/lib/systemd/linger"   # logind: plik <użytkownik> w nim = linger włączony
 WYNIK_DZIALA = "267009"                  # SCHED_S_TASK_RUNNING (0x41301) w kolumnie „Last Result” schtasks /V
 # wartości, które Harmonogram przyjmuje, gdy elementu nie ma (eksport pomija domyślne)
 DOMYSLNE = {"MultipleInstancesPolicy": "IgnoreNew", "DisallowStartIfOnBatteries": "true",
             "StopIfGoingOnBatteries": "true", "ExecutionTimeLimit": "PT72H", "Priority": "7"}
+WYZWALACZE = {"LogonTrigger": "logowanie", "SessionStateChangeTrigger": "odblokowanie sesji",
+              "TimeTrigger": "co 5 minut"}       # nazwy wyzwalaczy naszego zadania w `jarvo status`
+# katalogi XDG, od których zależy układ Jarva na Linuksie (jarvo/sciezki.py) i katalog jednostek, z domyślnymi
+XDG = (("XDG_DATA_HOME", (".local", "share")), ("XDG_STATE_HOME", (".local", "state")),
+       ("XDG_CACHE_HOME", (".cache",)), ("XDG_CONFIG_HOME", (".config",)))
+NAZWA_ZMIENNEJ = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 class BladAutostartu(RuntimeError):
@@ -92,6 +117,14 @@ def _system(system: str | None) -> str:
     if s not in SYSTEMY:
         raise ValueError(f"system {s!r}: znane są {', '.join(SYSTEMY)}")
     return s
+
+
+def _env(env: dict | None) -> dict:
+    return dict(os.environ if env is None else env)
+
+
+def _dom(dom) -> Path:
+    return Path(dom) if dom else Path.home()
 
 
 def _linia(tekst: str) -> str:
@@ -124,7 +157,7 @@ def _argv(argv, system: str) -> list[str]:
     return argv
 
 
-# ---------------------------------------------------------------- nazwy
+# ---------------------------------------------------------------- nazwy i środowisko usługi
 
 def _klucz_korzenia(p: Path) -> str:
     return os.path.normcase(os.path.abspath(str(p)))
@@ -132,7 +165,7 @@ def _klucz_korzenia(p: Path) -> str:
 
 def _przyrostek(u: Uklad, env: dict | None = None) -> str:
     """"" dla domyślnego korzenia, "-<8 znaków sha256 korzenia>" dla każdego innego (JARVO_ROOT)."""
-    env = {k: v for k, v in (os.environ if env is None else env).items() if k != "JARVO_ROOT"}
+    env = {k: v for k, v in _env(env).items() if k != "JARVO_ROOT"}
     try:
         domyslny = sciezki.uklad(env).root
     except sciezki.BladUkladu:
@@ -142,19 +175,61 @@ def _przyrostek(u: Uklad, env: dict | None = None) -> str:
     return "-" + hashlib.sha256(_klucz_korzenia(u.root).encode("utf-8")).hexdigest()[:8]
 
 
-def nazwa_zadania(u: Uklad, env: dict | None = None) -> str:
-    """Windows: „Jarvo” dla domyślnego korzenia, „Jarvo-<8 znaków skrótu korzenia>” dla JARVO_ROOT."""
-    return "Jarvo" + _przyrostek(u, env)
+def _konto_w_nazwie(kto: str) -> str:
+    """Konto w nazwie zadania: SID bez zmian. Zapasowe DOMENA\\użytkownik (gdy SID-u nie ma) tylko w znakach, które
+    nazwa zadania może mieć (ukośnik to folder Harmonogramu) i które schtasks odda wiernie w stronie OEM, z sumą
+    pełnej nazwy, żeby „Michał” i „Michaś” nie dostały tego samego zadania."""
+    if re.fullmatch(r"S-1-\d+(?:-\d+)+", kto):
+        return kto
+    czytelne = re.sub(r"[^0-9A-Za-z.-]+", "_", kto.replace("\\", "-")).strip("_.")[:40]
+    return f"{czytelne or 'konto'}-{_sha(kto.casefold())[:8]}"
+
+
+def nazwa_zadania(u: Uklad, env: dict | None = None, *, kto: str | None = None) -> str:
+    """Windows: „Jarvo-<SID>” dla domyślnego korzenia, „Jarvo-<SID>-<8 znaków skrótu korzenia>” dla JARVO_ROOT.
+    Folder Harmonogramu jest wspólny dla wszystkich kont komputera, więc bez SID-u drugie konto trafiłoby na zadanie
+    pierwszego (zwykłe: „Odmowa dostępu”, administrator: nadpisanie). `kto` (SID) jest dla testów."""
+    return f"Jarvo-{_konto_w_nazwie(kto or _uzytkownik_windows())}{_przyrostek(u, env)}"
 
 
 def etykieta_agenta(u: Uklad, env: dict | None = None) -> str:
-    """macOS: etykieta LaunchAgenta (pl.jarvo.nadzorca, z przyrostkiem jak nazwa_zadania)."""
+    """macOS: etykieta LaunchAgenta (pl.jarvo.nadzorca, z przyrostkiem korzenia jak nazwa_zadania)."""
     return ETYKIETA + _przyrostek(u, env)
 
 
 def nazwa_jednostki(u: Uklad, env: dict | None = None) -> str:
-    """Linux: jednostka systemd --user (jarvo.service, z przyrostkiem jak nazwa_zadania)."""
+    """Linux: jednostka systemd --user (jarvo.service, z przyrostkiem korzenia jak nazwa_zadania)."""
     return f"{JEDNOSTKA}{_przyrostek(u, env)}.service"
+
+
+def zmienne_uslugi(u: Uklad, system: str, env: dict | None = None, dom: Path | None = None) -> dict[str, str]:
+    """Środowisko LaunchAgenta (macOS) i jednostki (Linux) z chwili instalacji: launchd i systemd --user nie czytają
+    plików startowych powłoki, a nadzorca ma wyliczyć ten sam układ katalogów co instalator (jarvo/sciezki.py).
+    macOS: JARVO_ROOT zawsze (układ z nim i bez niego jest ten sam) i te zmienne XDG, które miała powłoka.
+    Linux: XDG_DATA_HOME, XDG_STATE_HOME, XDG_CACHE_HOME i XDG_CONFIG_HOME zawsze (bez zmiennej domyślne ze
+    specyfikacji), bo wyznaczają domyślny korzeń, logi i cache. JARVO_ROOT tylko wtedy, gdy układ instalatora z niego
+    wyszedł (zmienna w `env` albo korzeń inny niż domyślny): w sciezki.uklad JARVO_ROOT przenosi logi i cache
+    z katalogów XDG do korzenia, więc dla zwykłej instalacji korzeń przypina samo XDG_DATA_HOME."""
+    env = _env(env)
+    wynik: dict[str, str] = {}
+    if system == "macos" or env.get("JARVO_ROOT") or _przyrostek(u, env):
+        wynik["JARVO_ROOT"] = str(u.root)
+    for nazwa, domyslna in XDG:
+        if env.get(nazwa):
+            wynik[nazwa] = os.path.abspath(env[nazwa])      # względną sciezki.uklad liczy od bieżącego katalogu
+        elif system == "linux":
+            wynik[nazwa] = str(_dom(dom).joinpath(*domyslna))
+    return wynik
+
+
+def _zmienne(zmienne: dict | None) -> dict[str, str]:
+    wynik = {}
+    for nazwa, wartosc in (zmienne or {}).items():
+        wartosc = str(wartosc)
+        if not NAZWA_ZMIENNEJ.fullmatch(nazwa) or any(z in wartosc for z in "\0\r\n"):
+            raise ValueError(f"autostart: zmienna środowiska {nazwa}={wartosc!r}")
+        wynik[nazwa] = wartosc
+    return wynik
 
 
 def _pusty_stan(system: str, nazwa: str, plik) -> dict:
@@ -171,10 +246,18 @@ def _opis(s: dict) -> str:
     czesci = [f"{nazwy[s['mechanizm']]} {s['nazwa']}"]
     if s["mechanizm"] == "run":
         czesci.append("bez podtrzymania po awarii")
-    if not s.get("nasz"):
+    if s.get("nasz") is None:
+        czesci.append("nie wiadomo, czy założył go Jarvo")
+    elif not s["nasz"]:
         czesci.append("nie założył go Jarvo")
-    elif not s.get("wlaczony") and not s.get("blad"):
-        czesci.append("wyłączone w systemie")
+    elif not s.get("blad"):
+        # Windows osobno: wyłączone całe zadanie i wyłączone wyzwalacze; macOS i Linux znają tylko „wyłączone”
+        wylaczone = ["wyłączone w systemie"] if s.get("wylaczone_w_systemie", not s.get("wlaczony")) else []
+        if s.get("wylaczone_wyzwalacze"):
+            wylaczone.append("wyłączone wyzwalacze: " + ", ".join(WYZWALACZE.get(w, w)
+                                                                    for w in s["wylaczone_wyzwalacze"]))
+        if wylaczone:
+            czesci.append(", ".join(wylaczone) + " (włączy je jarvo autostart on)")
     if s.get("dziala") is True:
         czesci.append("działa" + (f", pid {s['pid']}" if s.get("pid") else ""))
     elif s.get("dziala") is False:
@@ -313,31 +396,36 @@ def xml_zadania(argv, uzytkownik: str, *, katalog=None, zapasowe: bool = True) -
 
 
 def _czytaj_xml(tekst: str) -> dict:
-    """Najważniejsze pola z `schtasks /Query /XML` (eksport pomija wartości domyślne: uzupełniamy je)."""
+    """Najważniejsze pola z `schtasks /Query /XML` (eksport pomija wartości domyślne: uzupełniamy je).
+    `wlaczone`: Settings/Enabled (wyłączenie całego zadania), `wylaczone_wyzwalacze`: wyzwalacze z Enabled=false."""
     pusty = {"opis": "", "polecenie": "", "argumenty": "", "wlaczone": True, "ustawienia": dict(DOMYSLNE),
-             "wyzwalacze": []}
+             "wyzwalacze": [], "wylaczone_wyzwalacze": []}
     try:
         korzen = ET.fromstring(re.sub(r"^\s*<\?xml[^>]*\?>", "", tekst.lstrip("\ufeff")))
     except ET.ParseError:
         return pusty
     ns = {"t": NS}
 
-    def pole(sciezka: str, domyslna: str = "") -> str:
-        e = korzen.find(sciezka, ns)
+    def pole(sciezka: str, domyslna: str = "", w=korzen) -> str:
+        e = w.find(sciezka, ns)
         return (e.text or "").strip() if e is not None else domyslna
 
     ustawienia = {k: pole(f"t:Settings/t:{k}", d) for k, d in DOMYSLNE.items()}
     ustawienia["RestartOnFailureInterval"] = pole("t:Settings/t:RestartOnFailure/t:Interval")
     ustawienia["RestartOnFailureCount"] = pole("t:Settings/t:RestartOnFailure/t:Count")
-    wyzwalacze = korzen.find("t:Triggers", ns)
+    e = korzen.find("t:Triggers", ns)                # nie `or []`: prawdziwość elementu jest przestarzała (3.12)
+    wyzwalacze = list(e) if e is not None else []
     return {"opis": pole("t:RegistrationInfo/t:Description"), "polecenie": pole("t:Actions/t:Exec/t:Command"),
             "argumenty": pole("t:Actions/t:Exec/t:Arguments"),
             "wlaczone": pole("t:Settings/t:Enabled", "true").lower() != "false", "ustawienia": ustawienia,
-            "wyzwalacze": [e.tag.rsplit("}", 1)[-1] for e in wyzwalacze] if wyzwalacze is not None else []}
+            "wyzwalacze": [e.tag.rsplit("}", 1)[-1] for e in wyzwalacze],
+            "wylaczone_wyzwalacze": [e.tag.rsplit("}", 1)[-1] for e in wyzwalacze
+                                     if pole("t:Enabled", "true", e).lower() == "false"]}
 
 
 def _zadanie(wykonaj: Wykonaj, nazwa: str) -> tuple[str, dict | str | None]:
-    """("jest", pola) / ("brak", None) / ("blad", powód). Brak potwierdza pełna lista zadań, bo komunikat
+    """("jest", pola) / ("brak", None) / ("nieczytelne", powód): jest na liście, ale definicji nie da się odczytać /
+    ("blad", powód): Harmonogram nie podaje nawet listy. Brak potwierdza pełna lista zadań, bo komunikat
     „nie ma takiego zadania” schtasks podaje w języku systemu."""
     kod, wyj = wykonaj([_schtasks(), "/Query", "/TN", nazwa, "/XML"])
     if kod == 0 and "<Task" in wyj:
@@ -348,7 +436,7 @@ def _zadanie(wykonaj: Wykonaj, nazwa: str) -> tuple[str, dict | str | None]:
     szukane = "\\" + nazwa.casefold()
     for wiersz in csv.reader(io.StringIO(lista.replace("\r", ""))):
         if wiersz and wiersz[0].strip().casefold() == szukane:
-            return "blad", _linia(wyj)                   # jest na liście, a definicji nie dało się odczytać
+            return "nieczytelne", _linia(wyj)
     return "brak", None
 
 
@@ -379,24 +467,38 @@ def _usun_run(u: Uklad, nazwa: str, r) -> bool:
     return True
 
 
-def _windows_wlacz(u: Uklad, argv: list[str], wykonaj: Wykonaj, start: bool, rejestr) -> dict:
-    nazwa = nazwa_zadania(u)
+def _windows_wlacz(u: Uklad, argv: list[str], wykonaj: Wykonaj, start: bool, rejestr, env) -> dict:
     kto = _uzytkownik_windows()
+    nazwa = nazwa_zadania(u, env, kto=kto)
     plik = u.stan / "autostart" / f"{nazwa}.xml"
     wynik = {"system": "windows", "mechanizm": "harmonogram", "nazwa": nazwa, "plik": str(plik),
              "zmieniony": False, "uruchomiony": None, "uwagi": []}
     jest, z = _zadanie(wykonaj, nazwa)
+    if jest == "nieczytelne":
+        raise BladAutostartu(f"W Harmonogramie zadań jest zadanie {nazwa}, ale jego definicji nie da się odczytać "
+                             f"({z}), więc go nie nadpisuję. Sprawdź je w taskschd.msc (starą kopię Jarva usuń) "
+                             "i włącz autostart jeszcze raz.")
     if jest == "jest" and ZNACZNIK not in z["opis"]:
         raise BladAutostartu(f"W Harmonogramie zadań jest już zadanie {nazwa}, którego nie założył Jarvo. Zmień "
                              "jego nazwę albo je usuń (taskschd.msc) i włącz autostart jeszcze raz.")
+    wylaczone = jest == "jest" and (not z["wlaczone"] or bool(z["wylaczone_wyzwalacze"]))
     # najpierw pełna definicja; gdy Harmonogram jej nie przyjmie (np. polityka nie pozwala na zapasowe
-    # wyzwalacze), sam wyzwalacz logowania z ponowieniem po awarii; dopiero potem wpis HKCU Run
+    # wyzwalacze), sam wyzwalacz logowania; dopiero potem wpis HKCU Run
     powody: list[str] = []
     for zapasowe in (True, False):
         xml, odcisk = _xml_i_odcisk(argv, kto, u.root, zapasowe)
         zmiany_hosta.dopisz(u, "autostart-windows", tryb="harmonogram", nazwa=nazwa, odcisk=odcisk)
         if jest == "jest" and f"odcisk={odcisk}" in z["opis"]:
-            break
+            if not wylaczone:
+                break                                   # ta sama definicja i włączona: nic do zrobienia
+            if not z["wylaczone_wyzwalacze"]:
+                # wyłączone całe zadanie (taskschd.msc, program „przyspieszający start”): sam przełącznik
+                kod, wyj = wykonaj([_schtasks(), "/Change", "/TN", nazwa, "/ENABLE"])
+                if kod == 0:
+                    wynik["zmieniony"] = True
+                    break
+                powody.append(_linia(wyj))
+            # wyłączone wyzwalacze albo /Change nie przeszedł: nasza definicja od nowa (Enabled=true wszędzie)
         zapisz_atomowo(plik, xml)
         kod, wyj = wykonaj([_schtasks(), "/Create", "/TN", nazwa, "/XML", str(plik), "/F"])
         if kod == 0:
@@ -405,10 +507,13 @@ def _windows_wlacz(u: Uklad, argv: list[str], wykonaj: Wykonaj, start: bool, rej
         powody.append(_linia(wyj))
     else:
         return _windows_run(u, argv, nazwa, rejestr, powody[0], wynik)
+    if wylaczone and wynik["zmieniony"]:
+        wynik["uwagi"].append(f"Zadanie {nazwa} było wyłączone w Harmonogramie: włączone z powrotem.")
     if not zapasowe:
         wynik["uwagi"].append("Harmonogram nie przyjął zapasowych wyzwalaczy (odblokowanie sesji, co 5 minut"
-                              + (f": {powody[0]}" if powody else "") + "). Zostaje start po zalogowaniu i "
-                              "ponowienie po awarii.")
+                              + (f": {powody[0]}" if powody else "") + "). Zostaje start po zalogowaniu; czy po "
+                              "awarii Harmonogram podniesie nadzorcę sam, nie wiadomo, więc gdy serwis nie działa, "
+                              "uruchom go: jarvo up.")
     r = _rejestr(rejestr)
     if r is not None and _usun_run(u, nazwa, r):     # zapas z czasu odmowy Harmonogramu: dwa starty to za dużo
         wynik["zmieniony"] = True
@@ -444,43 +549,52 @@ def _windows_run(u: Uklad, argv: list[str], nazwa: str, rejestr, powod: str, wyn
     return wynik
 
 
-def _windows_wylacz(u: Uklad, wykonaj: Wykonaj, rejestr) -> dict:
-    nazwa = nazwa_zadania(u)
+def _windows_wylacz(u: Uklad, wykonaj: Wykonaj, rejestr, env) -> dict:
+    nazwa = nazwa_zadania(u, env)
     wynik = {"system": "windows", "nazwa": nazwa, "usuniety": False, "uwagi": []}
+    r = _rejestr(rejestr)
+    if r is not None and _usun_run(u, nazwa, r):     # zapas z czasu, gdy Harmonogram odmawiał (może dalej odmawia)
+        wynik["usuniety"] = True
     jest, z = _zadanie(wykonaj, nazwa)
-    if jest == "blad":
-        raise BladAutostartu(f"Nie mogę sprawdzić zadania {nazwa} w Harmonogramie: {z}")
-    if jest == "jest" and ZNACZNIK not in z["opis"]:
+    if jest in ("blad", "nieczytelne"):
+        if not wynik["usuniety"]:
+            raise BladAutostartu(f"Nie mogę sprawdzić zadania {nazwa} w Harmonogramie: {z}")
+        wynik["uwagi"].append(f"Zadania {nazwa} w Harmonogramie nie mogę sprawdzić ({z}): zostaje.")
+    elif jest == "jest" and ZNACZNIK not in z["opis"]:
         wynik["uwagi"].append(f"Zadanie {nazwa} w Harmonogramie nie jest Jarva: zostawiam je.")
     elif jest == "jest":
         kod, wyj = wykonaj([_schtasks(), "/Delete", "/TN", nazwa, "/F"])
         if kod:
             raise BladAutostartu(f"schtasks /Delete /TN {nazwa}: {_linia(wyj)}")
         wynik["usuniety"] = True
-    r = _rejestr(rejestr)
-    if r is not None and _usun_run(u, nazwa, r):
-        wynik["usuniety"] = True
     if wynik["usuniety"]:
         wynik["uwagi"].append("Działający nadzorca pracuje dalej, aż zatrzyma go `jarvo stop` albo wylogowanie.")
     return wynik
 
 
-def _windows_stan(u: Uklad, wykonaj: Wykonaj, rejestr) -> dict:
-    nazwa = nazwa_zadania(u)
+def _windows_stan(u: Uklad, wykonaj: Wykonaj, rejestr, env) -> dict:
+    nazwa = nazwa_zadania(u, env)
     wynik = _pusty_stan("windows", nazwa, u.stan / "autostart" / f"{nazwa}.xml")
     wynik["ustawienia"] = {}
     jest, z = _zadanie(wykonaj, nazwa)
     if jest == "jest":
-        wynik.update(mechanizm="harmonogram", wlaczony=z["wlaczone"], nasz=ZNACZNIK in z["opis"],
-                     ustawienia=z["ustawienia"], wyzwalacze=z["wyzwalacze"], polecenie=z["polecenie"],
+        # włączony = samo zadanie włączone i choć jeden wyzwalacz, który może je uruchomić
+        sam_start = len(z["wyzwalacze"]) > len(z["wylaczone_wyzwalacze"])
+        wynik.update(mechanizm="harmonogram", wlaczony=z["wlaczone"] and sam_start,
+                     wylaczone_w_systemie=not z["wlaczone"], nasz=ZNACZNIK in z["opis"],
+                     ustawienia=z["ustawienia"], wyzwalacze=z["wyzwalacze"],
+                     wylaczone_wyzwalacze=z["wylaczone_wyzwalacze"], polecenie=z["polecenie"],
                      argumenty=z["argumenty"], dziala=_dziala_windows(wykonaj, nazwa))
-    elif jest == "blad":
+        return wynik
+    if jest == "nieczytelne":
+        wynik.update(mechanizm="harmonogram", nasz=None, blad=f"definicji zadania nie da się odczytać: {z}")
+        return wynik
+    if jest == "blad":
         wynik["blad"] = f"Harmonogram nie odpowiada: {z}"
-    else:
-        r = _rejestr(rejestr)
-        obecna = r.czytaj(KLUCZ_RUN, nazwa) if r is not None else None
-        if obecna is not None:
-            wynik.update(mechanizm="run", wlaczony=True, nasz=_run_nasz(obecna[0], u))
+    r = _rejestr(rejestr)
+    obecna = r.czytaj(KLUCZ_RUN, nazwa) if r is not None else None
+    if obecna is not None:
+        wynik.update(mechanizm="run", wlaczony=True, nasz=_run_nasz(obecna[0], u))
     return wynik
 
 
@@ -500,7 +614,7 @@ def _cofnij_windows(s: dict, wykonaj: Wykonaj, rejestr) -> tuple[str, str]:
     jest, z = _zadanie(wykonaj, nazwa)
     if jest == "brak":
         return "brak", f"zadanie Harmonogramu {nazwa}: już go nie ma"
-    if jest == "blad":
+    if jest != "jest":
         return "blad", f"zadanie Harmonogramu {nazwa}: nie mogę go sprawdzić ({z})"
     if f"odcisk={s['odcisk']}" not in z["opis"]:
         return "nie-nasze", f"zadanie Harmonogramu {nazwa}: to już inna definicja, zostaje"
@@ -517,18 +631,17 @@ def _uid() -> int:
 
 
 def _plik_agenta(dom: Path | None, etykieta: str) -> Path:
-    return (Path(dom) if dom else Path.home()) / "Library" / "LaunchAgents" / f"{etykieta}.plist"
+    return _dom(dom) / "Library" / "LaunchAgents" / f"{etykieta}.plist"
 
 
-def plist_agenta(argv, u: Uklad, etykieta: str = ETYKIETA, *, jarvo_root: bool = False) -> bytes:
-    """LaunchAgent nadzorcy. `jarvo_root=True` przekazuje korzeń próbnej instalacji (JARVO_ROOT); domyślnej nie,
-    bo na Linuksie JARVO_ROOT przenosi logi i cache z katalogów XDG (jarvo/sciezki.py)."""
+def plist_agenta(argv, u: Uklad, etykieta: str = ETYKIETA, *, zmienne: dict | None = None) -> bytes:
+    """LaunchAgent nadzorcy; `zmienne` idą do EnvironmentVariables (zwykle zmienne_uslugi(u, "macos"))."""
     log = str(u.logi / "autostart.log")
     dane = {"Label": etykieta, "ProgramArguments": _argv(argv, "macos"), "WorkingDirectory": str(u.root),
             "RunAtLoad": True, "KeepAlive": {"SuccessfulExit": False}, "ThrottleInterval": 30,
             "ExitTimeOut": LIMIT_ZATRZYMANIA, "StandardOutPath": log, "StandardErrorPath": log}
-    if jarvo_root:
-        dane["EnvironmentVariables"] = {"JARVO_ROOT": str(u.root)}
+    if zmienne:
+        dane["EnvironmentVariables"] = _zmienne(zmienne)
     return plistlib.dumps(dane, sort_keys=False)
 
 
@@ -543,11 +656,22 @@ def _bootstrap(wykonaj: Wykonaj, domena: str, plik: Path, proby: int = 3) -> tup
     return kod, wyj
 
 
-def _macos_wlacz(u: Uklad, argv: list[str], wykonaj: Wykonaj, start: bool, dom) -> dict:
-    et = etykieta_agenta(u)
+def _wylaczony_w_launchd(wykonaj: Wykonaj, domena: str, etykieta: str) -> bool | None:
+    """Czy usługę wyłączono w launchd (`launchctl disable`; stan przetrwa restart i blokuje bootstrap).
+    `print-disabled` podaje wiersz `"etykieta" => disabled` (starsze macOS: `=> true`); None: nie wiadomo."""
+    kod, wyj = wykonaj([LAUNCHCTL, "print-disabled", domena])
+    if kod != 0:
+        return None
+    m = re.search(rf'^\s*"{re.escape(etykieta)}"\s*=>\s*(\w+)', wyj, re.M)
+    return bool(m) and m.group(1).lower() in ("disabled", "true")
+
+
+def _macos_wlacz(u: Uklad, argv: list[str], wykonaj: Wykonaj, start: bool, dom, env) -> dict:
+    et = etykieta_agenta(u, env)
     plik = _plik_agenta(dom, et)
-    dane = plist_agenta(argv, u, et, jarvo_root=bool(_przyrostek(u)))
-    domena, cel = f"gui/{_uid()}", f"gui/{_uid()}/{et}"
+    dane = plist_agenta(argv, u, et, zmienne=zmienne_uslugi(u, "macos", env, dom))
+    domena = f"gui/{_uid()}"
+    cel = f"{domena}/{et}"
     wynik = {"system": "macos", "mechanizm": "launchagent", "nazwa": et, "plik": str(plik), "zmieniony": False,
              "uruchomiony": None, "uwagi": []}
     zmiany_hosta.dopisz(u, "autostart-macos", etykieta=et, sciezka=str(plik), sha256=_sha(dane))
@@ -557,6 +681,13 @@ def _macos_wlacz(u: Uklad, argv: list[str], wykonaj: Wykonaj, start: bool, dom) 
         u.logi.mkdir(parents=True, exist_ok=True)
         zapisz_atomowo(plik, dane, tryb=0o644)
         wynik["zmieniony"] = True
+    if _wylaczony_w_launchd(wykonaj, domena, et):
+        kod, wyj = wykonaj([LAUNCHCTL, "enable", cel])
+        if kod:
+            raise BladAutostartu(f"LaunchAgent {et} jest wyłączony w launchd (launchctl disable), a launchctl enable "
+                                 f"{cel} odmówił: {_linia(wyj)}")
+        wynik["zmieniony"] = True
+        wynik["uwagi"].append(f"LaunchAgent {et} był wyłączony w launchd (launchctl disable): włączony z powrotem.")
     wynik["komunikat"] = f"Autostart {'włączony' if wynik['zmieniony'] else 'bez zmian'}: LaunchAgent {et} ({plik})."
     if not start:
         if wynik["zmieniony"] or not zaladowany:
@@ -577,8 +708,8 @@ def _macos_wlacz(u: Uklad, argv: list[str], wykonaj: Wykonaj, start: bool, dom) 
     return wynik
 
 
-def _macos_wylacz(u: Uklad, wykonaj: Wykonaj, dom) -> dict:
-    et = etykieta_agenta(u)
+def _macos_wylacz(u: Uklad, wykonaj: Wykonaj, dom, env) -> dict:
+    et = etykieta_agenta(u, env)
     plik, cel = _plik_agenta(dom, et), f"gui/{_uid()}/{et}"
     wynik = {"system": "macos", "nazwa": et, "usuniety": False, "uwagi": []}
     if wykonaj([LAUNCHCTL, "print", cel])[0] == 0:
@@ -592,17 +723,19 @@ def _macos_wylacz(u: Uklad, wykonaj: Wykonaj, dom) -> dict:
     return wynik
 
 
-def _macos_stan(u: Uklad, wykonaj: Wykonaj, dom) -> dict:
-    et = etykieta_agenta(u)
+def _macos_stan(u: Uklad, wykonaj: Wykonaj, dom, env) -> dict:
+    et = etykieta_agenta(u, env)
     plik = _plik_agenta(dom, et)
+    domena = f"gui/{_uid()}"
     wynik = _pusty_stan("macos", et, plik)
     if plik.is_file():
         try:
             nasz = plistlib.loads(plik.read_bytes()).get("Label") == et
         except Exception:  # noqa: BLE001 - uszkodzony plist to po prostu „nie nasz”
             nasz = False
-        wynik.update(mechanizm="launchagent", wlaczony=True, nasz=nasz)
-    kod, wyj = wykonaj([LAUNCHCTL, "print", f"gui/{_uid()}/{et}"])
+        wylaczony = _wylaczony_w_launchd(wykonaj, domena, et)
+        wynik.update(mechanizm="launchagent", wlaczony=wylaczony is not True, nasz=nasz)
+    kod, wyj = wykonaj([LAUNCHCTL, "print", f"{domena}/{et}"])
     if kod == 0:
         stan = re.search(r"^\s*state = (\S+)", wyj, re.M)
         pid = re.search(r"^\s*pid = (\d+)", wyj, re.M)
@@ -633,21 +766,74 @@ def _loginctl() -> str:
     return shutil.which("loginctl") or "/usr/bin/loginctl"
 
 
-def _katalog_jednostek(dom: Path | None) -> Path:
-    if dom:
-        return Path(dom) / ".config" / "systemd" / "user"
-    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
+def _menedzer(wykonaj: Wykonaj) -> tuple[dict | None, str]:
+    """Środowisko menedżera usług użytkownika (`systemctl --user show-environment`); None, gdy nie ma user busa."""
+    kod, wyj = wykonaj([_systemctl(), "--user", "show-environment"])
+    if kod != 0:
+        return None, wyj
+    return {m.group(1): m.group(2) for m in re.finditer(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", wyj, re.M)}, wyj
 
 
-def _slowo_systemd(s: str, *, zmienne: bool = True) -> str:
+def _kandydaci_jednostek(env: dict, dom, menedzer: dict) -> list[Path]:
+    """Gdzie może być katalog jednostek użytkownika: XDG_CONFIG_HOME z powłoki, z menedżera i domyślne ~/.config."""
+    wynik: list[Path] = []
+    for baza in (env.get("XDG_CONFIG_HOME"), menedzer.get("XDG_CONFIG_HOME")):
+        if baza and os.path.isabs(baza) and Path(baza) / "systemd" / "user" not in wynik:
+            wynik.append(Path(baza) / "systemd" / "user")
+    domyslny = _dom(dom) / ".config" / "systemd" / "user"
+    return wynik if domyslny in wynik else [*wynik, domyslny]
+
+
+def _katalog_jednostek(wykonaj: Wykonaj, env: dict, dom, menedzer: dict | None, nazwa: str) -> Path:
+    """Katalog jednostek, w którym menedżer usług użytkownika naprawdę szuka (jego UnitPath). systemd --user nie
+    czyta ~/.profile, więc XDG_CONFIG_HOME ustawione tylko w powłoce bywa mu obce, a jednostka obok jego ścieżki
+    to „Unit file does not exist”. Bez busa: kandydat, w którym jest już nasz plik."""
+    kandydaci = _kandydaci_jednostek(env, dom, menedzer or {})
+    if menedzer is None:
+        return next((k for k in kandydaci if (k / nazwa).exists()), kandydaci[0])
+    kod, wyj = wykonaj([_systemctl(), "--user", "show", "--property=UnitPath"])
+    sciezki_menedzera = f" {wyj.strip().removeprefix('UnitPath=')} " if kod == 0 else ""
+    for k in kandydaci:
+        if f" {k} " in sciezki_menedzera:
+            return k
+    # starszy systemd albo własna ścieżka jednostek: tak jak liczy ją sam menedżer
+    baza = menedzer.get("XDG_CONFIG_HOME") or ""
+    return (Path(baza) if os.path.isabs(baza) else _dom(dom) / ".config") / "systemd" / "user"
+
+
+def _obca_jednostka(wykonaj: Wykonaj, plik: Path, nazwa: str) -> str | None:
+    """Dlaczego nie wolno zapisać jednostki `nazwa` (None: wolno): w naszym katalogu leży cudzy plik bez znacznika,
+    menedżer ma jednostkę o tej nazwie gdzie indziej (nasza by ją przesłoniła) albo usługa jest zamaskowana."""
+    rada = "Cudzej jednostki Jarvo nie nadpisuje: zmień jej nazwę albo ją usuń i włącz autostart jeszcze raz."
+    if plik.is_file() and ZNACZNIK not in plik.read_text(encoding="utf-8", errors="replace"):
+        return f"w {plik} jest już jednostka {nazwa}, której nie założył Jarvo. {rada}"
+    kod, wyj = wykonaj([_systemctl(), "--user", "show", nazwa, "--property=FragmentPath"])
+    fragment = wyj.strip().removeprefix("FragmentPath=").strip() if kod == 0 else ""
+    if fragment == "/dev/null":
+        return (f"usługa {nazwa} jest zamaskowana (systemctl --user mask). Odblokuj ją: systemctl --user unmask "
+                f"{nazwa} i włącz autostart jeszcze raz.")
+    if fragment and Path(fragment) != plik:
+        try:
+            nasza = ZNACZNIK in Path(fragment).read_text(encoding="utf-8", errors="replace")
+        except FileNotFoundError:
+            nasza = True          # nieaktualna pamięć menedżera (plik usunięty bez daemon-reload): nic nie przesłonimy
+        except OSError:
+            nasza = False
+        if not nasza:
+            return (f"menedżer usług ma już jednostkę {nazwa} w {fragment}, której nie założył Jarvo, a nasza by ją "
+                    f"przesłoniła. {rada}")
+    return None
+
+
+def _slowo_systemd(s: str, *, dolar: bool = True) -> str:
     """Jedno słowo wiersza systemd w cudzysłowie: ucieczki C (\\\\ i \\"), %% zamiast % (specyfikatory) i, gdy
-    `zmienne`, $$ zamiast $ (ExecStart podstawia $ZMIENNE; Environment= nie). Program dostaje dokładnie `s`."""
+    `dolar`, $$ zamiast $ (ExecStart podstawia $ZMIENNE; Environment= nie). Program dostaje dokładnie `s`."""
     s = s.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
-    return '"' + (s.replace("$", "$$") if zmienne else s) + '"'
+    return '"' + (s.replace("$", "$$") if dolar else s) + '"'
 
 
-def jednostka_systemd(argv, u: Uklad, *, jarvo_root: bool = False) -> str:
-    """Jednostka systemd --user nadzorcy. `jarvo_root` jak w plist_agenta."""
+def jednostka_systemd(argv, u: Uklad, *, zmienne: dict | None = None) -> str:
+    """Jednostka systemd --user nadzorcy; `zmienne` idą do Environment= (zwykle zmienne_uslugi(u, "linux"))."""
     argv = _argv(argv, "linux")
     if str(u.root) != str(u.root).strip():
         raise ValueError(f"autostart: korzeń ze spacją na brzegu: {u.root!r}")
@@ -660,11 +846,12 @@ def jednostka_systemd(argv, u: Uklad, *, jarvo_root: bool = False) -> str:
              "Type=simple",
              "ExecStart=" + " ".join(_slowo_systemd(a) for a in argv),
              "WorkingDirectory=" + str(u.root).replace("%", "%%")]
-    if jarvo_root:
-        linie.append("Environment=" + _slowo_systemd(f"JARVO_ROOT={u.root}", zmienne=False))
+    linie += ["Environment=" + _slowo_systemd(f"{k}={v}", dolar=False) for k, v in _zmienne(zmienne).items()]
     linie += ["Restart=on-failure",
               "RestartSec=10",
-              "KillMode=mixed",                               # SIGTERM do nadzorcy, reszta grupy po limicie
+              # SIGTERM tylko do nadzorcy; resztę grupy systemd zabija SIGKILL-em zaraz po jego wyjściu, więc
+              # nadzorca kończy się dopiero po bramie i panelu
+              "KillMode=mixed",
               f"TimeoutStopSec={LIMIT_ZATRZYMANIA}",
               "",
               "[Install]",
@@ -675,18 +862,21 @@ def jednostka_systemd(argv, u: Uklad, *, jarvo_root: bool = False) -> str:
 
 def _bez_busa(wyj: str) -> BladAutostartu:
     return BladAutostartu("Brak usług systemd użytkownika: `systemctl --user` nie odpowiada "
-                          f"({_linia(wyj)}). Tak bywa w WSL bez systemd, w kontenerze i w sesji z su albo sudo. "
-                          "Zaloguj się zwykłą sesją (pulpit, konsola albo ssh) i włącz autostart jeszcze raz; "
-                          "do tego czasu nadzorcę uruchamia `jarvo serwis`.")
+                          f"({_linia(wyj)}). Tak bywa w WSL bez systemd, w kontenerze, w sesji z su albo sudo "
+                          "i w systemie bez systemd. Zaloguj się zwykłą sesją (pulpit, konsola albo ssh) i włącz "
+                          "autostart jeszcze raz; do tego czasu (a bez systemd zawsze) nadzorcę uruchamia jarvo up.")
 
 
-def _linux_wlacz(u: Uklad, argv: list[str], wykonaj: Wykonaj, start: bool, dom) -> dict:
-    nazwa = nazwa_jednostki(u)
-    kod, wyj = wykonaj([_systemctl(), "--user", "show-environment"])
-    if kod != 0:
+def _linux_wlacz(u: Uklad, argv: list[str], wykonaj: Wykonaj, start: bool, dom, env) -> dict:
+    nazwa = nazwa_jednostki(u, env)
+    menedzer, wyj = _menedzer(wykonaj)
+    if menedzer is None:
         raise _bez_busa(wyj)
-    plik = _katalog_jednostek(dom) / nazwa
-    tresc = jednostka_systemd(argv, u, jarvo_root=bool(_przyrostek(u)))
+    plik = _katalog_jednostek(wykonaj, env, dom, menedzer, nazwa) / nazwa
+    powod = _obca_jednostka(wykonaj, plik, nazwa)
+    if powod:
+        raise BladAutostartu(f"Autostartu nie włączam: {powod}")
+    tresc = jednostka_systemd(argv, u, zmienne=zmienne_uslugi(u, "linux", env, dom))
     wynik = {"system": "linux", "mechanizm": "systemd", "nazwa": nazwa, "plik": str(plik), "zmieniony": False,
              "uruchomiony": None, "uwagi": []}
     zmiany_hosta.dopisz(u, "autostart-linux", jednostka=nazwa, sciezka=str(plik), sha256=_sha(tresc))
@@ -719,9 +909,9 @@ def _usun_jednostke(wykonaj: Wykonaj, plik: Path, nazwa: str) -> None:
     wykonaj([_systemctl(), "--user", "daemon-reload"])
 
 
-def _linux_wylacz(u: Uklad, wykonaj: Wykonaj, dom) -> dict:
-    nazwa = nazwa_jednostki(u)
-    plik = _katalog_jednostek(dom) / nazwa
+def _linux_wylacz(u: Uklad, wykonaj: Wykonaj, dom, env) -> dict:
+    nazwa = nazwa_jednostki(u, env)
+    plik = _katalog_jednostek(wykonaj, env, dom, _menedzer(wykonaj)[0], nazwa) / nazwa
     wynik = {"system": "linux", "nazwa": nazwa, "usuniety": False, "uwagi": []}
     if not plik.is_file():
         return wynik
@@ -733,11 +923,12 @@ def _linux_wylacz(u: Uklad, wykonaj: Wykonaj, dom) -> dict:
     return wynik
 
 
-def _linux_stan(u: Uklad, wykonaj: Wykonaj, dom) -> dict:
-    nazwa = nazwa_jednostki(u)
-    plik = _katalog_jednostek(dom) / nazwa
+def _linux_stan(u: Uklad, wykonaj: Wykonaj, dom, env) -> dict:
+    nazwa = nazwa_jednostki(u, env)
+    menedzer, _ = _menedzer(wykonaj)
+    plik = _katalog_jednostek(wykonaj, env, dom, menedzer, nazwa) / nazwa
     wynik = _pusty_stan("linux", nazwa, plik)
-    wynik["bus"] = wykonaj([_systemctl(), "--user", "show-environment"])[0] == 0
+    wynik["bus"] = menedzer is not None
     if plik.is_file():
         wynik.update(mechanizm="systemd", nasz=ZNACZNIK in plik.read_text(encoding="utf-8", errors="replace"))
         if wynik["bus"]:
@@ -776,40 +967,70 @@ def _linger(wykonaj: Wykonaj, kto: str) -> bool | None:
     return wyj.strip().lower() == "yes" if kod == 0 else None
 
 
+def _odcisk_lingera(kto: str) -> str | None:
+    """Czas zapisu (ns) pliku `<KATALOG_LINGER>/<użytkownik>`: logind zakłada go albo dotyka przy enable-linger,
+    a usuwa przy disable-linger. Inny odcisk niż we wpisie = linger włączył potem ktoś inny. None: brak pliku."""
+    try:
+        return str((Path(KATALOG_LINGER) / kto).stat().st_mtime_ns)
+    except OSError:
+        return None
+
+
+def _nasz_linger(s: dict) -> bool:
+    """Czy włączony linger to dalej ten z wpisu. Wpis bez odcisku (plik był nieczytelny przy włączaniu): tak."""
+    return not s.get("odcisk") or _odcisk_lingera(s["uzytkownik"]) == s["odcisk"]
+
+
 def wlacz_linger(u: Uklad, wykonaj: Wykonaj | None = None, *, log=print) -> bool:
     """Linux: nadzorca wstaje po uruchomieniu komputera, także bez logowania (`loginctl enable-linger`). Tylko na
-    wyraźne życzenie właściciela (N08), z wpisem w dzienniku. Zwraca True, gdy coś zmienił; linger włączony
-    wcześniej przez kogoś innego zostaje bez wpisu (to nie nasza zmiana)."""
+    wyraźne życzenie właściciela (N08). Zwraca True, gdy coś zmienił; linger włączony wcześniej przez kogoś innego
+    zostaje bez wpisu (to nie nasza zmiana). Wpis w dzienniku powstaje dopiero po udanym włączeniu (wyjątek od
+    zasady „wpis przed zmianą”), z odciskiem pliku lingera: wpis bez zmiany albo bez odcisku kazałby
+    `jarvo uninstall` wyłączyć linger, który właściciel włączy kiedyś sam."""
     wykonaj = wykonaj or zmiany_hosta.uruchom_domyslnie
     log = log or (lambda *_: None)
     kto = _uzytkownik_posix()
     if _linger(wykonaj, kto):
         log(f"Linger dla {kto} był już włączony: nic nie zmieniam.")
         return False
-    zmiany_hosta.dopisz(u, "linger", uzytkownik=kto)
     kod, wyj = wykonaj([_loginctl(), "enable-linger", kto])
     if kod:
         raise BladAutostartu(f"loginctl enable-linger {kto}: {_linia(wyj)}. Bez uprawnień zrobi to administrator: "
                              f"sudo loginctl enable-linger {kto}")
+    zmiany_hosta.dopisz(u, "linger", uzytkownik=kto, odcisk=_odcisk_lingera(kto))
     log(f"Linger włączony: usługi {kto} (w tym nadzorca Jarva) wstają po uruchomieniu komputera bez logowania.")
     return True
 
 
 def wylacz_linger(u: Uklad, wykonaj: Wykonaj | None = None, *, log=print) -> bool:
-    """Wyłącza linger tylko wtedy, gdy włączył go Jarvo (jest wpis w dzienniku)."""
+    """Wyłącza linger tylko wtedy, gdy włączył go Jarvo (wpis w dzienniku i ten sam plik lingera), i usuwa wpis:
+    linger, który właściciel włączy potem sam, nie jest już nasz i `jarvo uninstall` go nie ruszy. Gdy ktoś
+    wyłączył nasz linger albo włączył go od nowa po swojemu, też tylko usuwa wpis. Zwraca True, gdy wyłączył."""
     wykonaj = wykonaj or zmiany_hosta.uruchom_domyslnie
     log = log or (lambda *_: None)
     kto = _uzytkownik_posix()
-    if not any(w["rodzaj"] == "linger" and w["szczegoly"].get("uzytkownik") == kto for w in zmiany_hosta.wpisy(u)):
+    nasze = [w["szczegoly"] for w in zmiany_hosta.wpisy(u)
+             if w["rodzaj"] == "linger" and w["szczegoly"].get("uzytkownik") == kto]
+    if not nasze:
         log(f"Linger dla {kto} nie włączał Jarvo: zostawiam.")
         return False
-    if not _linger(wykonaj, kto):
-        return False
-    kod, wyj = wykonaj([_loginctl(), "disable-linger", kto])
-    if kod:
-        raise BladAutostartu(f"loginctl disable-linger {kto}: {_linia(wyj)}")
-    log(f"Linger wyłączony: usługi {kto} startują dopiero po zalogowaniu.")
-    return True
+    stan = _linger(wykonaj, kto)
+    if stan is None:
+        raise BladAutostartu(f"loginctl show-user {kto} nie odpowiada: nie wiem, czy linger jest włączony. Wpis "
+                             "w dzienniku zostaje do następnej próby.")
+    wylacza = bool(stan) and _nasz_linger(nasze[-1])
+    if wylacza:
+        kod, wyj = wykonaj([_loginctl(), "disable-linger", kto])
+        if kod:
+            raise BladAutostartu(f"loginctl disable-linger {kto}: {_linia(wyj)}")
+    for s in nasze:
+        zmiany_hosta.zapomnij(u, "linger", **s)
+    if wylacza:
+        log(f"Linger wyłączony: usługi {kto} startują dopiero po zalogowaniu.")
+    else:
+        log(f"Linger dla {kto} " + ("włączył po Jarvie ktoś inny: zostawiam go" if stan else "był już wyłączony")
+            + " i usuwam tylko wpis z dziennika.")
+    return wylacza
 
 
 def _cofnij_linger(s: dict, wykonaj: Wykonaj) -> tuple[str, str]:
@@ -819,6 +1040,8 @@ def _cofnij_linger(s: dict, wykonaj: Wykonaj) -> tuple[str, str]:
         return "blad", f"linger {kto}: loginctl nie odpowiada"
     if not stan:
         return "brak", f"linger {kto}: już wyłączony"
+    if not _nasz_linger(s):
+        return "nie-nasze", f"linger {kto}: włączony ponownie po Jarvie, zostaje"
     kod, wyj = wykonaj([_loginctl(), "disable-linger", kto])
     if kod:
         return "blad", f"loginctl disable-linger {kto}: {_linia(wyj)}"
@@ -828,21 +1051,23 @@ def _cofnij_linger(s: dict, wykonaj: Wykonaj) -> tuple[str, str]:
 # ---------------------------------------------------------------- polecenia
 
 def wlacz(u: Uklad, argv, wykonaj: Wykonaj | None = None, *, start: bool = True, system: str | None = None,
-          dom: Path | None = None, rejestr=None, log=print) -> dict:
-    """Włącza autostart nadzorcy i domyślnie od razu go uruchamia. `argv` to pełne polecenie z bezwzględną
-    ścieżką programu, np. [<python>/pythonw.exe, -I, -X, utf8, <app>/jarvo/start.py, serwis]. Wpis w dzienniku
-    zmian hosta powstaje przed zmianą; drugi raz z tym samym argv niczego nie zmienia. Zwraca {"system",
-    "mechanizm", "nazwa", "plik", "zmieniony", "uruchomiony", "uwagi", "komunikat"}. `system`, `dom` (katalog
-    domowy) i `rejestr` (atrapa winreg) są dla testów."""
+          dom: Path | None = None, rejestr=None, env: dict | None = None, log=print) -> dict:
+    """Włącza autostart nadzorcy i domyślnie od razu go uruchamia; wyłączony w systemie (Harmonogram, launchd,
+    systemctl disable) włącza z powrotem. `argv` to pełne polecenie z bezwzględną ścieżką programu, np.
+    [<python>/pythonw.exe, -I, -X, utf8, <app>/jarvo/start.py, serwis]. Wpis w dzienniku zmian hosta powstaje
+    przed zmianą; drugi raz z tym samym argv niczego nie zmienia. Zwraca {"system", "mechanizm", "nazwa", "plik",
+    "zmieniony", "uruchomiony", "uwagi", "komunikat"}. `env` (domyślnie os.environ) daje przyrostek nazwy
+    i środowisko usługi; `system`, `dom` (katalog domowy) i `rejestr` (atrapa winreg) są dla testów."""
     s = _system(system)
     wykonaj = wykonaj or zmiany_hosta.uruchom_domyslnie
+    env = _env(env)
     argv = _argv(argv, s)
     if s == "windows":
-        wynik = _windows_wlacz(u, argv, wykonaj, start, rejestr)
+        wynik = _windows_wlacz(u, argv, wykonaj, start, rejestr, env)
     elif s == "macos":
-        wynik = _macos_wlacz(u, argv, wykonaj, start, dom)
+        wynik = _macos_wlacz(u, argv, wykonaj, start, dom, env)
     else:
-        wynik = _linux_wlacz(u, argv, wykonaj, start, dom)
+        wynik = _linux_wlacz(u, argv, wykonaj, start, dom, env)
     if log:
         for linia in [wynik.get("komunikat"), *wynik["uwagi"]]:
             if linia:
@@ -851,18 +1076,19 @@ def wlacz(u: Uklad, argv, wykonaj: Wykonaj | None = None, *, start: bool = True,
 
 
 def wylacz(u: Uklad, wykonaj: Wykonaj | None = None, *, system: str | None = None, dom: Path | None = None,
-           rejestr=None, log=print) -> dict:
-    """Wyłącza autostart (`jarvo autostart off`): usuwa zadanie, LaunchAgenta albo jednostkę, jeśli są Jarva.
-    Wpisy w dzienniku zostają (cofnięcie przy odinstalowaniu powie wtedy „już nie ma”). Zwraca {"system",
-    "nazwa", "usuniety", "uwagi"}."""
+           rejestr=None, env: dict | None = None, log=print) -> dict:
+    """Wyłącza autostart (`jarvo autostart off`): usuwa zadanie, wpis HKCU Run, LaunchAgenta albo jednostkę, jeśli
+    są Jarva. Wpisy w dzienniku zostają (cofnięcie przy odinstalowaniu powie wtedy „już nie ma”). Zwraca
+    {"system", "nazwa", "usuniety", "uwagi"}."""
     s = _system(system)
     wykonaj = wykonaj or zmiany_hosta.uruchom_domyslnie
+    env = _env(env)
     if s == "windows":
-        wynik = _windows_wylacz(u, wykonaj, rejestr)
+        wynik = _windows_wylacz(u, wykonaj, rejestr, env)
     elif s == "macos":
-        wynik = _macos_wylacz(u, wykonaj, dom)
+        wynik = _macos_wylacz(u, wykonaj, dom, env)
     else:
-        wynik = _linux_wylacz(u, wykonaj, dom)
+        wynik = _linux_wylacz(u, wykonaj, dom, env)
     if log:
         log(f"Autostart wyłączony ({wynik['nazwa']})." if wynik["usuniety"] else "Autostart nie był włączony.")
         for linia in wynik["uwagi"]:
@@ -871,18 +1097,21 @@ def wylacz(u: Uklad, wykonaj: Wykonaj | None = None, *, system: str | None = Non
 
 
 def stan(u: Uklad, wykonaj: Wykonaj | None = None, *, system: str | None = None, dom: Path | None = None,
-         rejestr=None) -> dict:
+         rejestr=None, env: dict | None = None) -> dict:
     """Stan autostartu dla `jarvo status` i doctora: {"system", "mechanizm" (harmonogram, run, launchagent,
-    systemd albo None), "nazwa", "plik", "wlaczony", "nasz", "dziala" (None = nie wiadomo), "pid", "opis"};
-    Windows dodaje "ustawienia" i "wyzwalacze" z zarejestrowanego zadania, Linux "bus" i "linger"."""
+    systemd albo None), "nazwa", "plik", "wlaczony" (False także dla wyłączonego w systemie i dla zadania bez
+    żadnego włączonego wyzwalacza), "nasz" (None = nie wiadomo), "dziala" (None = nie wiadomo), "pid", "opis"};
+    Windows dodaje "ustawienia", "wyzwalacze", "wylaczone_wyzwalacze" i "wylaczone_w_systemie" z zarejestrowanego
+    zadania, Linux "bus" i "linger"."""
     s = _system(system)
     wykonaj = wykonaj or zmiany_hosta.uruchom_domyslnie
+    env = _env(env)
     if s == "windows":
-        wynik = _windows_stan(u, wykonaj, rejestr)
+        wynik = _windows_stan(u, wykonaj, rejestr, env)
     elif s == "macos":
-        wynik = _macos_stan(u, wykonaj, dom)
+        wynik = _macos_stan(u, wykonaj, dom, env)
     else:
-        wynik = _linux_stan(u, wykonaj, dom)
+        wynik = _linux_stan(u, wykonaj, dom, env)
     wynik["opis"] = _opis(wynik)
     return wynik
 

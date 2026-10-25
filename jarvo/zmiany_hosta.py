@@ -1,24 +1,28 @@
 """Dziennik zmian hosta (docs/NATYWNIE.md: D08, N08 i c4 „jarvo uninstall”, krok 4).
 
 Wszystko, co Jarvo zmienia poza swoim katalogiem (autostart, PATH użytkownika, blok w pliku startowym powłoki,
-pliki w katalogu domowym), trafia do `<stan>/zmiany-hosta.jsonl`: jeden wiersz JSON na zmianę,
-{"czas": ISO 8601, "rodzaj": …, "szczegoly": {…}}. W szczegółach są tylko ścieżki, nazwy i skróty sha256,
-nigdy treść plików ani sekrety (pole o nazwie jak TOKEN, KEY czy KLUCZ to błąd programisty). Wpis powstaje PRZED zmianą:
-przerwana instalacja zostawia najwyżej wpis bez zmiany (cofnięcie powie „już nie ma”), nigdy zmianę bez wpisu.
-Ten sam wpis drugi raz nie powstaje, więc ponowna instalacja nie zmienia dziennika (E3: drugi przebieg instalatora
-niczego nie zmienia).
+pliki w katalogu domowym), trafia do `<stan>/zmiany-hosta.jsonl`: jeden wiersz JSON na zmianę (UTF-8, wiersze
+kończy samo LF), {"czas": ISO 8601, "rodzaj": …, "szczegoly": {…}}. W szczegółach są tylko ścieżki, nazwy i skróty
+sha256, nigdy treść plików ani sekrety (pole o nazwie jak TOKEN, KEY czy KLUCZ to błąd programisty). Wpis powstaje
+PRZED zmianą: przerwana instalacja zostawia najwyżej wpis bez zmiany (cofnięcie powie „już nie ma”), nigdy zmianę
+bez wpisu. Wyjątek to linger: wpis dopiero po udanym `loginctl enable-linger`, bo w nim nie ma czego porównać,
+a wpis bez zmiany kazałby cofnięciu wyłączyć linger, który właściciel włączy kiedyś sam. Ten sam wpis drugi raz
+nie powstaje, więc ponowna instalacja nie zmienia dziennika (E3: drugi przebieg instalatora niczego nie zmienia).
 
 Rodzaje i to, co przy cofaniu znaczy „dalej nasze”:
     autostart-windows  zadanie Harmonogramu z naszym odciskiem w opisie albo wpis HKCU Run o naszej wartości
     autostart-macos    LaunchAgent: plik plist o naszej sumie (potem launchctl bootout)
     autostart-linux    jednostka systemd --user: plik o naszej sumie (potem disable --now)
-    linger             loginctl enable-linger, włączony przez Jarvo na wyraźne życzenie właściciela
+    linger             loginctl enable-linger, włączony przez Jarvo na wyraźne życzenie właściciela: ten sam plik
+                       lingera (odcisk); wpis znika przy `autostart.wylacz_linger()`, więc linger, który właściciel
+                       włączy potem sam, zostaje
     path-uzytkownika   katalog w PATH użytkownika (Windows, HKCU\\Environment\\Path): usuwamy tylko ten wpis
     blok-rc            oznaczony blok w pliku startowym powłoki o naszej sumie; reszta pliku zostaje
     plik               plik poza katalogiem Jarva o naszej sumie
 
 `cofnij()` idzie od końca. Zmienione przez kogoś innego zostawia i mówi o tym; wpis, którego nie dało się cofnąć
-(błąd), zostaje w dzienniku do następnej próby. Polecenia systemu idą przez `wykonaj(argv) -> (kod, wyjście)`:
+(błąd), zostaje w dzienniku do następnej próby. `zapomnij()` usuwa wpis bez cofania (zmianę cofnięto inną drogą).
+Polecenia systemu idą przez `wykonaj(argv) -> (kod, wyjście)`:
 domyślnie `uruchom_domyslnie` (subprocess), w testach atrapa. Rejestr Windows idzie przez `Rejestr` (winreg),
 w testach też atrapa.
 """
@@ -116,13 +120,17 @@ def _jawne(wartosc, klucz: str = ""):
 
 
 def wpisy(u: Uklad) -> list[dict]:
-    """Wpisy dziennika w kolejności zapisu. Urwany albo uszkodzony wiersz (np. po awarii zasilania) pomijamy."""
+    """Wpisy dziennika w kolejności zapisu. Urwany albo uszkodzony wiersz (np. po awarii zasilania) pomijamy.
+    Dzielimy tylko po LF: json.dumps zostawia U+2028, U+2029 i U+0085 w wartościach (np. w ścieżce), a
+    str.splitlines() przeciąłby po nich wpis i następny zapis by go zgubił. BOM (plik z Notatnika) pomijamy."""
     try:
-        tekst = sciezka(u).read_text(encoding="utf-8", errors="replace")
+        tekst = sciezka(u).read_text(encoding="utf-8-sig", errors="replace")
     except FileNotFoundError:
         return []
     wynik = []
-    for linia in tekst.splitlines():
+    for linia in tekst.split("\n"):
+        if not linia.strip():
+            continue
         try:
             w = json.loads(linia)
         except ValueError:
@@ -132,13 +140,24 @@ def wpisy(u: Uklad) -> list[dict]:
     return wynik
 
 
+def _wiersz(w: dict) -> str:
+    tekst = json.dumps(w, ensure_ascii=False)
+    try:
+        tekst.encode("utf-8")
+    except UnicodeEncodeError:
+        # samotny surogat (nazwa pliku spoza UTF-8 na Linuksie, surrogateescape): ucieczka \udcxx wraca bez strat
+        tekst = json.dumps(w)
+    return tekst + "\n"
+
+
 def _zapisz(u: Uklad, lista: list[dict]) -> None:
-    zapisz_atomowo(sciezka(u), "".join(json.dumps(w, ensure_ascii=False) + "\n" for w in lista))
+    zapisz_atomowo(sciezka(u), "".join(_wiersz(w) for w in lista))
 
 
 def dopisz(u: Uklad, rodzaj: str, **szczegoly) -> dict:
-    """Zapisuje zmianę hosta przed jej wykonaniem. Ten sam rodzaj z tymi samymi szczegółami drugi raz nie
-    powstaje (zwraca wtedy istniejący wpis). Szczegóły: ścieżki, nazwy, sumy; bez treści i bez sekretów."""
+    """Zapisuje zmianę hosta przed jej wykonaniem (linger: po, opis modułu). Ten sam rodzaj z tymi samymi
+    szczegółami drugi raz nie powstaje (zwraca wtedy istniejący wpis). Szczegóły: ścieżki, nazwy, sumy; bez treści
+    i bez sekretów."""
     if rodzaj not in RODZAJE:
         raise ValueError(f"nieznany rodzaj zmiany hosta {rodzaj!r} (znane: {', '.join(RODZAJE)})")
     jawne = _jawne(szczegoly)
@@ -151,6 +170,20 @@ def dopisz(u: Uklad, rodzaj: str, **szczegoly) -> dict:
                 "szczegoly": jawne}
         _zapisz(u, [*lista, wpis])
     return wpis
+
+
+def zapomnij(u: Uklad, rodzaj: str, **szczegoly) -> int:
+    """Usuwa z dziennika wpisy tego rodzaju o tych szczegółach, bez cofania zmiany: gdy naszą zmianę cofnięto inną
+    drogą (np. `autostart.wylacz_linger()`) albo cofnął ją już ktoś inny. Zwraca liczbę usuniętych wpisów."""
+    jawne = _jawne(szczegoly)
+    if not sciezka(u).exists():
+        return 0
+    with Zamek(_zamek(u)):
+        lista = wpisy(u)
+        zostaja = [w for w in lista if not (w["rodzaj"] == rodzaj and w["szczegoly"] == jawne)]
+        if len(zostaja) != len(lista):
+            _zapisz(u, zostaja)
+    return len(lista) - len(zostaja)
 
 
 def cofnij(u: Uklad, wykonaj: Wykonaj = uruchom_domyslnie, *, rodzaje=None, rejestr=None, log=print) -> list[dict]:
