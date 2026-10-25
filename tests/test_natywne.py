@@ -81,6 +81,21 @@ def test_platforma_bez_intela_na_macu():
         sciezki.platforma("darwin", "x86_64")
 
 
+@pytest.mark.windows_only
+def test_platforma_windows_z_rejestru_a_nie_z_procesu(monkeypatch):
+    """Python x64 w emulacji na ARM64 widzi PROCESSOR_ARCHITECTURE=AMD64 (albo ARM64, zależnie od otoczenia), a klucz
+    platformy ma być ten sam w każdym przebiegu: architektura procesora z rejestru, jak w bootstrapie install.ps1."""
+    import winreg
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, sciezki.KLUCZ_ARCHITEKTURY) as k:
+        prawdziwa = str(winreg.QueryValueEx(k, "PROCESSOR_ARCHITECTURE")[0])
+    for udawana in ("AMD64", "ARM64", "x86"):
+        monkeypatch.setenv("PROCESSOR_ARCHITECTURE", udawana)
+        monkeypatch.setattr(sciezki.platform, "machine", lambda u=udawana: u)
+        assert sciezki.maszyna_windows() == prawdziwa
+        assert sciezki.platforma() == ("windows-arm64" if prawdziwa.upper() == "ARM64" else "windows-x64")
+    assert sciezki.platforma("win32", "ARM64") == "windows-arm64"           # jawna maszyna wygrywa (testy, CI)
+
+
 def test_uklad_z_jarvo_root(tmp_path):
     u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j"), "PATH": ""})
     assert u.root == tmp_path / "j" and u.dane == u.root / "dane" and u.program == u.root / "program"

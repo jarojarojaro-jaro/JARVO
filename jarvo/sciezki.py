@@ -31,9 +31,29 @@ class BladUkladu(RuntimeError):
     """Nie da się ustalić katalogów (komunikat po polsku dla właściciela)."""
 
 
+KLUCZ_ARCHITEKTURY = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+
+
+def maszyna_windows() -> str:
+    """Architektura procesora Windows z rejestru (jak bootstrap install.ps1), także z procesu x64 w emulacji na
+    ARM64: Python Jarva na Windows arm64 to x64 (python-build-standalone), a platform.machine() podaje wtedy AMD64
+    albo ARM64 zależnie od otoczenia, w którym go uruchomiono (CI natywnie, WARM: dwa przebiegi, dwie platformy)."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, KLUCZ_ARCHITEKTURY) as k:
+            wartosc = str(winreg.QueryValueEx(k, "PROCESSOR_ARCHITECTURE")[0] or "")
+        if wartosc:
+            return wartosc
+    except (ImportError, OSError):
+        pass
+    return os.environ.get("PROCESSOR_ARCHITEW6432") or platform.machine() or ""
+
+
 def platforma(system: str | None = None, maszyna: str | None = None) -> str:
     """Klucz platformy z manifestu (vendor/zrodla.yaml, pole `pliki`). macOS Intel nie jest wspierany (decyzja I06)."""
     system = (system or sys.platform).lower()
+    if maszyna is None and (system.startswith("win") or system == "nt") and WINDOWS:
+        maszyna = maszyna_windows()
     maszyna = (maszyna or platform.machine() or "").lower()
     arm = maszyna in ("arm64", "aarch64", "armv8", "armv8l") or maszyna.startswith("arm64")
     if system.startswith("win") or system == "nt":
