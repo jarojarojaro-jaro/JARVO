@@ -256,6 +256,13 @@ class Blokada:
             return False
         koniec = time.monotonic() + self.czekaj_s
         wynik = _sprobuj_zamek(f)
+        if wynik is False and WINDOWS:
+            # Windows zwalnia blokadę zakresu pliku zmarłego procesu z opóźnieniem („zależnie od dostępnych zasobów
+            # systemu”, dokumentacja LockFileEx): przy znaczniku martwego właściciela chwilę czekamy, zamiast mówić
+            # „inna kompilacja trwa” o procesie, którego już nie ma
+            z = znacznik_blokady(self.stan)
+            if z and z.get("zywy") is False:
+                koniec = max(koniec, time.monotonic() + 5.0)
         while wynik is False and time.monotonic() < koniec:
             time.sleep(0.05)
             wynik = _sprobuj_zamek(f)
