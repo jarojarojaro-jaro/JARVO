@@ -75,7 +75,16 @@
   }
 
   function JarvoSuma([string]$Plik) {
-    return (Get-FileHash -LiteralPath $Plik -Algorithm SHA256).Hash.ToLowerInvariant()
+    # SHA-256 wprost z .NET: Get-FileHash jest w module Microsoft.PowerShell.Utility, ktorego PowerShell nie laduje
+    # przy okrojonym PSModulePath (np. w procesie z wyczyszczonym srodowiskiem)
+    $strumien = [System.IO.File]::OpenRead($Plik)
+    try {
+      $sha = [System.Security.Cryptography.SHA256]::Create()
+      try { $bajty = $sha.ComputeHash($strumien) } finally { $sha.Dispose() }
+    } finally {
+      $strumien.Dispose()
+    }
+    return (-join ($bajty | ForEach-Object { $_.ToString('x2') }))
   }
 
   function JarvoArchitektura {
