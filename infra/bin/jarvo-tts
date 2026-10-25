@@ -24,8 +24,11 @@ syntetyczną (karta modelu) i nie udajemy nim prawdziwej osoby.
 Angielski: tekst → fonemy (misaki, ten sam G2P co Kokoro, na którym uczono model; słowa spoza słownika przez
 espeak-ng) → tokeny → jeden graf ONNX → fala 24 kHz. Logika jak w paradee/tts.py (github.com/sahilmahendrakar/paradee).
 
-Modele leżą w obrazie: $JARVO_TTS_MODEL_DIR (Paradee, domyślnie /opt/jarvo/models/paradee) i
-$JARVO_TTS_MATCHA_DIR (domyślnie /opt/jarvo/models/matcha-pl: meski/, damski/, LICENSE, ATTRIBUTION.md).
+Modele: $JARVO_TTS_MODEL_DIR (Paradee) i $JARVO_TTS_MATCHA_DIR (Matcha: meski/, damski/, LICENSE, ATTRIBUTION.md).
+W obrazie leżą w /opt/jarvo/models/paradee i /opt/jarvo/models/matcha-pl (wartości domyślne, sumy w infra/Dockerfile);
+natywnie instalator pobiera je z manifestu (vendor/natywne.yaml, modele.matcha-pl i modele.paradee: rewizja i sha256
+każdego pliku) do <dane>/jarvo/models, a jarvo/srodowisko.py ustawia obie zmienne. Program floty
+`<program>/bin-floty/jarvo-tts(.exe)` uruchamia ten skrypt Pythonem venvu narzędzi (jarvo/programy_floty.py).
 """
 
 from __future__ import annotations

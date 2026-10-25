@@ -408,7 +408,9 @@ def assemble(clips: list[Path], durs: list[float], total: float, w: int, h: int,
         vlast = "[vc]"
     if ass:
         fonts = build / "fonts"
-        extra = ":fontsdir=fonts" if fonts.is_dir() else ""
+        # krój marki obok (cwd = build); bez niego natywnie Inter z instalacji Jarva (ścieżka bezwzględna, na Windows
+        # z zabezpieczonym dwukropkiem), w obrazie kroje z fontconfig systemu
+        extra = ":fontsdir=fonts" if fonts.is_dir() else wl.opcja_fontsdir()
         fc.append(f"{vlast}ass={ass.name}{extra}[vs]")
         vlast = "[vs]"
     idx = n
@@ -504,7 +506,7 @@ def render_variant(plan: dict, name: str, suffix: str, fmts: list[str], draft: b
     if words:
         srt = target / f"{slug}{suffix}.srt"
         srt.write_text(wl.build_srt(words), encoding="utf-8")
-        result["srt"] = str(srt)
+        result["srt"] = srt.as_posix()
 
     for fmt in fmts:
         w, h = wl.parse_format(fmt)
@@ -529,7 +531,7 @@ def render_variant(plan: dict, name: str, suffix: str, fmts: list[str], draft: b
         if not draft:
             thumb = target / f"{slug}{suffix}-{wl.fmt_slug(fmt)}-miniatura.jpg"
             wl.run(["ffmpeg", "-y", "-ss", f"{min(durs[0] * 0.5, 1.2):.2f}", "-i", str(out), "-frames:v", "1", "-q:v", "2", str(thumb)])
-            info["miniatura"] = str(thumb)
+            info["miniatura"] = thumb.as_posix()
         result["pliki"][fmt] = info
         if not result["sceny"]:
             for i, (s, src, d) in enumerate(zip(scenes, sources, durs), 1):

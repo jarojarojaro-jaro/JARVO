@@ -195,3 +195,42 @@ def test_eksport_cichsze_pauzy_i_usta_w_czasie(tmp_path):
     assert pauza[0] < pauza[1] - 6, pauza
     p0, p1 = poczatek(sredni), poczatek(bez)
     assert len(p0) == len(p1) >= 2 and all(abs(x - y) < 0.005 for x, y in zip(p0, p1)), (p0, p1)
+
+
+# ------------------------------------------------------------------ głos Jarva w aplikacji natywnie (hq/plugin/glos.py)
+
+def test_glos_aplikacji_z_programu_floty(monkeypatch, tmp_path):
+    """Natywnie lektor aplikacji to program floty z PATH panelu (`<program>/bin-floty/jarvo-tts`, na Windows .exe,
+    tu atrapa .cmd), bez /opt/jarvo/bin z obrazu; JARVO_TTS wygrywa."""
+    import atrapy
+    G = load_script("hq/plugin/glos.py", "jarvo_test_glos_natywnie")
+    floty = tmp_path / "program" / "bin-floty"
+    atrapy.program(floty, "jarvo-tts", "print('ok')")
+    monkeypatch.setenv("PATH", atrapy.sciezka(floty, reszta=False))
+    monkeypatch.delenv("JARVO_TTS", raising=False)
+    assert Path(G.program_glosu()).parent == floty
+    monkeypatch.setenv("JARVO_TTS", str(atrapy.program(tmp_path / "inny", "jarvo-tts", "print('ok')")))
+    assert Path(G.program_glosu()).parent == tmp_path / "inny"
+
+
+def test_glos_aplikacji_przypina_lektora_do_zadania(monkeypatch):
+    """Lektor aplikacji startuje w przenosne.uruchom z przy_starcie = edytor.przypnij_drzewo: na Windows własny Job
+    Object, więc restart albo upadek dashboardu nie zostawia jarvo-tts z Pythonem w tle; limit czasu = BladGlosu."""
+    import asyncio
+    G = load_script("hq/plugin/glos.py", "jarvo_test_glos_zadanie")
+    widziane = {}
+
+    class P:
+        DEVNULL = subprocess.DEVNULL
+
+        async def uruchom(self, argv, **kw):
+            widziane.update(kw, argv=argv)
+            if kw.get("timeout") == 0.01:
+                raise asyncio.TimeoutError
+            return 0, b"", b""
+
+    monkeypatch.setattr(G, "_przenosne", lambda: P())
+    assert asyncio.run(G._uruchom(["jarvo-tts", "Dzień dobry.", "-o", "a.wav"], 5)) == 0
+    assert widziane["przy_starcie"] is G._edytor().przypnij_drzewo and widziane["argv"][0] == "jarvo-tts"
+    with pytest.raises(G.BladGlosu):
+        asyncio.run(G._uruchom(["jarvo-tts", "x"], 0.01))

@@ -1,5 +1,6 @@
-"""Głos Jarva w aplikacji (docs/HQ.md „Pierwsze spotkanie”): krótkie zdania z lokalnego lektora `jarvo-tts` z obrazu
-(polski Matcha-TTS-PL v2, dwa głosy; angielski Paradee), bez sieci i bez modelu językowego.
+"""Głos Jarva w aplikacji (docs/HQ.md „Pierwsze spotkanie”): krótkie zdania z lokalnego lektora `jarvo-tts` z instalacji
+Jarva (polski Matcha-TTS-PL v2, dwa głosy; angielski Paradee), bez sieci i bez modelu językowego. W obrazie
+/opt/jarvo/bin/jarvo-tts, natywnie program floty `<program>/bin-floty/jarvo-tts(.exe)` w PATH panelu.
 
 - `POST /app/glos` `{tekst, glos, tempo, jezyk}` → WAV. Głos `meski` / `damski` (polski), tempo `spokojnie` /
   `normalnie` / `zwawo` (szybkość 0,9 / 1,0 / 1,12); `jezyk: en` = Paradee niezależnie od głosu.
@@ -7,6 +8,8 @@
   model ładowany raz), żeby stałe kwestie rozmowy grały od razu.
 - Pamięć podręczna: `<katalog>/<sha256(wersja|głos|szybkość|tekst)>.wav`, najwyżej PLIKI_MAKS plików (najstarsze
   użycie znika). Jeden proces lektora naraz (zamek), limit czasu, tekst najwyżej TEKST_MAKS znaków jednej linii.
+- Na Windows lektor dostaje własny Job Object (edytor.przypnij_drzewo): limit czasu i restart dashboardu kończą też
+  jego Pythona.
 - Brak programu (stary obraz, testy na hoście) = `BrakGlosu`: trasa odpowiada 503 `brak_glosu`, a aplikacja mówi
   głosem przeglądarki (speechSynthesis) albo pokazuje sam tekst.
 Testy: tests/test_aplikacja.py.
@@ -64,7 +67,8 @@ def plik(katalog: Path | str, tekst: str, model: str, szybkosc_: float) -> Path:
 
 
 def program_glosu() -> str | None:
-    """`JARVO_TTS`, potem lektor z obrazu, potem `jarvo-tts` z PATH; None = nie ma."""
+    """`JARVO_TTS`, potem lektor z obrazu, potem `jarvo-tts` z PATH (natywnie bin-floty, na Windows `jarvo-tts.exe`);
+    None = nie ma."""
     for kandydat in (os.environ.get("JARVO_TTS"), PROGRAM_OBRAZU):
         if kandydat and os.path.isfile(kandydat) and os.access(kandydat, os.X_OK):
             return kandydat
@@ -91,23 +95,39 @@ def sprzataj(katalog: Path | str, maks: int = PLIKI_MAKS) -> int:
     return usuniete
 
 
-def _przenosne():
-    """przenosne.py wtyczki (załadowany przez plugin_api jako jarvo_hq_przenosne albo z pliku obok)."""
-    mod = sys.modules.get("jarvo_hq_przenosne")
+def _modul(nazwa: str, plik: str):
+    """Moduł wtyczki załadowany przez plugin_api (`nazwa` w sys.modules) albo z pliku obok."""
+    mod = sys.modules.get(nazwa)
     if mod is None:
-        spec = importlib.util.spec_from_file_location("jarvo_hq_przenosne", Path(__file__).with_name("przenosne.py"))
+        spec = importlib.util.spec_from_file_location(nazwa, Path(__file__).with_name(plik))
         mod = importlib.util.module_from_spec(spec)
-        sys.modules["jarvo_hq_przenosne"] = mod
+        sys.modules[nazwa] = mod
         spec.loader.exec_module(mod)
     return mod
 
 
+def _przenosne():
+    """przenosne.py wtyczki (załadowany przez plugin_api jako jarvo_hq_przenosne albo z pliku obok)."""
+    return _modul("jarvo_hq_przenosne", "przenosne.py")
+
+
+def _edytor():
+    """edytor.py wtyczki (jarvo_hq_edytor): przypnij_drzewo, Job Object programu na Windows."""
+    return _modul("jarvo_hq_edytor", "edytor.py")
+
+
 async def _uruchom(argv: list[str], timeout: float) -> int:
     """Lektor w wątku (przenosne.uruchom: także na Windows, gdzie pętla dashboardu nie ma podprocesów asyncio);
-    po limicie czasu program jest zabity i skończony."""
+    po limicie czasu program jest zabity i skończony. Na Windows program dostaje od razu własny Job Object
+    (edytor.przypnij_drzewo): padnięty albo zrestartowany dashboard nie zostawia lektora z Pythonem w tle."""
     p = _przenosne()
     try:
-        kod, _out, _err = await p.uruchom(argv, timeout=timeout, stdin=p.DEVNULL, stdout=p.DEVNULL, stderr=p.DEVNULL)
+        przypnij = _edytor().przypnij_drzewo
+    except (OSError, ImportError, AttributeError):
+        przypnij = None
+    try:
+        kod, _out, _err = await p.uruchom(argv, timeout=timeout, stdin=p.DEVNULL, stdout=p.DEVNULL, stderr=p.DEVNULL,
+                                          przy_starcie=przypnij)
     except asyncio.TimeoutError:
         raise BladGlosu("limit czasu") from None
     return kod

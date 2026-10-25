@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         out = video.with_name(video.stem + ".napisy.mp4")
         with tempfile.TemporaryDirectory(prefix="jarvo-napisy-") as tmp:
             shutil.copy2(ass, Path(tmp) / "n.ass")
-            extra = ""
+            extra = wl.opcja_fontsdir()          # natywnie Inter z instalacji Jarva; w obrazie fontconfig systemu
             if args.font_plik:
                 (Path(tmp) / "fonts").mkdir()
                 shutil.copy2(args.font_plik, Path(tmp) / "fonts")

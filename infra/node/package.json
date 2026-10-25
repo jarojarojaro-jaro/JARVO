@@ -1,7 +1,7 @@
 {
   "name": "jarvo-node-tools",
   "private": true,
-  "description": "Narzędzia Node floty Jarvo (instalowane w obrazie do /opt/jarvo/node). Wersje przypięte i przejrzane przed dodaniem (docs/SOURCES.md); aktualizacja = PR + `make pins`. playwright-core musi odpowiadać Chromium z obrazu Hermesa (Dockerfile to sprawdza).",
+  "description": "Narzędzia Node floty Jarvo: w obrazie /opt/jarvo/node, natywnie z package-lock.json obok (sumy integrity każdej paczki, `npm ci --ignore-scripts`, docs/NATYWNIE.md P02 i I32). Wersje przypięte i przejrzane przed dodaniem (docs/SOURCES.md); aktualizacja = PR, `make pins` i nowy lock (`npm install --package-lock-only --ignore-scripts`). playwright-core musi odpowiadać Chromium z obrazu Hermesa (Dockerfile to sprawdza) i chrome-headless-shell z vendor/natywne.yaml; hyperframes w tej samej wersji co skille HyperFrames z vendor/skills.lock.yaml.",
   "license": "MIT",
   "dependencies": {
     "agent-browser": "0.38.1",
@@ -9,6 +9,7 @@
     "dembrandt": "0.32.2",
     "favicons": "7.3.1",
     "html-validate": "11.15.0",
+    "hyperframes": "0.8.78",
     "inspo-mcp": "0.1.16",
     "lighthouse": "13.4.1",
     "linkinator": "8.1.0",

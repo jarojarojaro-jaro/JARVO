@@ -576,6 +576,13 @@ def kamera_filter(typo: dict, F: float) -> str:
             f":x3='W*(1+{xp})':y3='H*(1+{yd})':interpolation=linear:eval=frame:enable='{enable}'")
 
 
+def plik_listy(p: Path | str) -> str:
+    """Wpis `file …` listy demuxera concat: ścieżka w apostrofach (w środku „\\” z Windows i spacje są dosłowne),
+    apostrof z nazwy jako `'\\''`: zamknięcie, apostrof ze znakiem ucieczki, otwarcie (docs/NATYWNIE.md M10), więc
+    „Ania's film” z katalogu projektu nie urywa ścieżki."""
+    return "file '" + str(p).replace("'", "'\\''") + "'"
+
+
 def typo_concat(segments: list[tuple[float, Path | None]], blank: Path, dest: Path) -> Path | None:
     """Warstwa typografii jako lista demuxera concat: (czas trwania, PNG albo None = przezroczysta klatka).
     Klatki rysuje przeglądarka tylko tam, gdzie obraz się zmienia (typoOdcinki), reszta to długie odcinki."""
@@ -584,8 +591,8 @@ def typo_concat(segments: list[tuple[float, Path | None]], blank: Path, dest: Pa
     lines = ["ffconcat version 1.0"]
     for dur, png in segments:
         if dur >= 0.0005:
-            lines.extend([f"file '{png or blank}'", f"duration {dur:.4f}"])
-    lines.append(f"file '{blank}'")
+            lines.extend([plik_listy(png or blank), f"duration {dur:.4f}"])
+    lines.append(plik_listy(blank))
     dest.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")   # lista ffconcat: „\n” też na Windows
     return dest
 
@@ -788,7 +795,7 @@ def karaoke_concat(p: dict, pngs: dict[int, list[Path]], blank: Path, dest: Path
 
     def add(path: Path, dur: float) -> None:
         if dur >= 0.001:
-            lines.extend([f"file '{path}'", f"duration {dur:.3f}"])
+            lines.extend([plik_listy(path), f"duration {dur:.3f}"])
     for a, b, png in events:
         if b <= t:
             continue                       # nakładające się napisy karaoke: wygrywa wcześniejszy
@@ -797,7 +804,7 @@ def karaoke_concat(p: dict, pngs: dict[int, list[Path]], blank: Path, dest: Path
         add(png, b - a)
         t = b
     add(blank, max(0.0, p["duration"] - t))
-    lines.append(f"file '{blank}'")        # demuxer concat potrzebuje ostatniego pliku jeszcze raz
+    lines.append(plik_listy(blank))        # demuxer concat potrzebuje ostatniego pliku jeszcze raz
     dest.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")   # lista ffconcat: „\n” też na Windows
     return dest
 
@@ -1483,7 +1490,117 @@ def kroje_css(root: Path | None, rodziny: set[str] | None = None) -> str:
 
 
 def tools() -> dict:
+    """ffmpeg, ffprobe i jarvo-stt z PATH procesu: w obrazie /usr/bin i /opt/jarvo/bin, natywnie narzędzia
+    z manifestu (`<program>/narzedzia/ffmpeg/<wersja>/bin`) i bin-floty, które jarvo/srodowisko.py daje panelowi."""
     return {"ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe"), "stt": stt_bin()}
+
+
+# ----------------------------------------------------------------------------- programy z dziećmi (Windows)
+# Dashboard uruchamia programy, które mają własne dzieci: lektor (`python film.py lektor` → jarvo-tts.exe →
+# Python), jarvo-stt.exe (trampolina uv → Python → ffmpeg). Na Windows TerminateProcess kończy tylko sam program,
+# a launcher venvu Pythona wypuszcza wnuki ze swojego zadania (sprawdzone 2026-10-25 na Windows 11: po zabiciu
+# `python.exe` venvu jarvo-tts.exe i jego Python żyły dalej; zabita trampolina uv kończy swoje dzieci sama).
+# `przypnij_drzewo(proc)` zaraz po starcie daje programowi własny Job Object z JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+# którego uchwyt trzyma dashboard: dzieci programu dziedziczą zadanie, `zabij_drzewo(proc)` kończy całe drzewo
+# (anulowanie eksportu, limit czasu), a uchwyt zamyka się z obiektem procesu albo z samym dashboardem (padnięty
+# dashboard = koniec jego programów, bez sierot piszących pliki). Na Linuksie i macOS bez zmian: proc.kill().
+# Używa ich lektor aplikacji (glos.py: przy_starcie w przenosne.uruchom); trasy edytora w plugin_api.py (eksport,
+# lektor, analiza mowy) podłącza się tak samo: przy_starcie=przypnij_drzewo, anulowanie przez zabij_drzewo.
+_JOB_KILL_ON_JOB_CLOSE = 0x2000
+_JOB_EXTENDED_LIMIT_INFORMATION = 9
+
+
+def _k32():
+    """kernel32 z typami funkcji Job Object (ctypes, bez pywin32)."""
+    import ctypes
+    from ctypes import wintypes
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CreateJobObjectW.restype = wintypes.HANDLE
+    k.CreateJobObjectW.argtypes = (ctypes.c_void_p, wintypes.LPCWSTR)
+    k.SetInformationJobObject.restype = wintypes.BOOL
+    k.SetInformationJobObject.argtypes = (wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD)
+    k.AssignProcessToJobObject.restype = wintypes.BOOL
+    k.AssignProcessToJobObject.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
+    k.TerminateJobObject.restype = wintypes.BOOL
+    k.TerminateJobObject.argtypes = (wintypes.HANDLE, wintypes.UINT)
+    k.CloseHandle.restype = wintypes.BOOL
+    k.CloseHandle.argtypes = (wintypes.HANDLE,)
+    return k
+
+
+def _limity_zadania():
+    """JOBOBJECT_EXTENDED_LIMIT_INFORMATION z samym KILL_ON_JOB_CLOSE (bez limitów pamięci i czasu)."""
+    import ctypes
+    from ctypes import wintypes
+
+    class Podstawowe(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD)]
+
+    class Io(ctypes.Structure):
+        _fields_ = [(n, ctypes.c_uint64) for n in ("ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+                                                    "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+    class Rozszerzone(ctypes.Structure):
+        _fields_ = [("BasicLimitInformation", Podstawowe), ("IoInfo", Io), ("ProcessMemoryLimit", ctypes.c_size_t),
+                    ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                    ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    info = Rozszerzone()
+    info.BasicLimitInformation.LimitFlags = _JOB_KILL_ON_JOB_CLOSE
+    return info
+
+
+def _zamknij_zadanie(uchwyt: int) -> None:
+    try:
+        _k32().CloseHandle(uchwyt)
+    except OSError:
+        pass
+
+
+def przypnij_drzewo(proc: subprocess.Popen) -> bool:
+    """Windows: program `proc` (zaraz po starcie) w nowym Job Object z KILL_ON_JOB_CLOSE; jego dzieci dziedziczą
+    zadanie. Uchwyt zostaje przy `proc` (`_jarvo_zadanie`) i zamyka się razem z obiektem procesu (weakref.finalize),
+    a zamknięcie kończy procesy drzewa, które jeszcze żyją. False poza Windows albo gdy system odmówi (program
+    działa wtedy jak dotąd, bez zadania)."""
+    if os.name != "nt" or getattr(proc, "_jarvo_zadanie", None):
+        return False
+    import ctypes
+    import weakref
+    try:
+        k = _k32()
+        uchwyt = k.CreateJobObjectW(None, None)
+        if not uchwyt:
+            return False
+        info = _limity_zadania()
+        if not (k.SetInformationJobObject(uchwyt, _JOB_EXTENDED_LIMIT_INFORMATION, ctypes.byref(info),
+                                          ctypes.sizeof(info))
+                and k.AssignProcessToJobObject(uchwyt, int(proc._handle))):
+            k.CloseHandle(uchwyt)
+            return False
+    except (OSError, AttributeError, ValueError):
+        return False
+    proc._jarvo_zadanie = uchwyt
+    weakref.finalize(proc, _zamknij_zadanie, uchwyt)
+    return True
+
+
+def zabij_drzewo(proc: subprocess.Popen) -> None:
+    """Koniec programu i jego dzieci bez czekania: Windows z zadaniem z `przypnij_drzewo` = TerminateJobObject, potem
+    zawsze kill() samego programu (SIGKILL na POSIX, TerminateProcess na Windows); zakończony pomija."""
+    uchwyt = getattr(proc, "_jarvo_zadanie", None)
+    if uchwyt and os.name == "nt":
+        try:
+            _k32().TerminateJobObject(uchwyt, 1)
+        except OSError:
+            pass
+    if proc.poll() is None:
+        try:
+            proc.kill()
+        except OSError:              # skończył się między poll() a kill()
+            pass
 
 
 # ----------------------------------------------------------------------------- audio: biblioteka, wyodrębnienie, lektor

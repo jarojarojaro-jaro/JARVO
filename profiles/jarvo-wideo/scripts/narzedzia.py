@@ -221,12 +221,19 @@ def _build_no(d: Path) -> int:
 
 
 def headless_shell() -> str | None:
+    """Chromium headless dla Playwrighta: rewizja z PLAYWRIGHT_BROWSERS_PATH (obraz Hermesa), a natywnie, gdzie tego
+    katalogu nie ma, chrome-headless-shell z manifestu Jarva (CHROME_PATH, PUPPETEER_EXECUTABLE_PATH z narzedzia.json;
+    docs/NATYWNIE.md C01); niczego nie pobieramy."""
     base = Path(browsers_path())
     for d in sorted(base.glob("chromium_headless_shell-*"), key=_build_no, reverse=True):
         for sub, exe in SHELL_LAYOUTS:
             path = d / sub / exe
             if path.exists():
                 return str(path)
+    for zmienna in ("CHROME_PATH", "PUPPETEER_EXECUTABLE_PATH"):
+        p = os.environ.get(zmienna)
+        if p and Path(p).is_file():
+            return p
     return None
 
 

@@ -378,6 +378,126 @@ def test_real_export_karaoke_layer(tmp_path):
     assert green[1] > 90 and green[0] < 90 and green[2] < 90
 
 
+def test_lista_concat_z_apostrofem_w_sciezce(tmp_path):
+    """Lista demuxera concat (typografia, karaoke, maska): apostrof z nazwy katalogu projektu jako `'\\''`, więc ścieżka
+    „Ania's film” nie urywa się w pół (docs/NATYWNIE.md M10); zwykła ścieżka bez zmian (na Windows z „\\”)."""
+    kat = tmp_path / "Ania's film"
+    kat.mkdir()
+    png = ed.blank_png(kat / "a.png", 8, 8)
+    assert ed.plik_listy(tmp_path / "x.png") == f"file '{tmp_path / 'x.png'}'"
+    assert ed.plik_listy(png) == "file '" + str(png).replace("'", "'\\''") + "'" and "'\\''" in ed.plik_listy(png)
+    lst = ed.typo_concat([(0.5, png), (0.5, None)], png, kat / "t.ffconcat").read_text(encoding="utf-8").splitlines()
+    assert lst[1] == ed.plik_listy(png) and lst[-1] == ed.plik_listy(png)
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_real_concat_z_apostrofem_i_polskimi_literami(tmp_path):
+    """Prawdziwy ffmpeg czyta listę concat z katalogu „Ania's Żółć” (apostrof, polskie litery, spacja)."""
+    kat = tmp_path / "Ania's Żółć"
+    kat.mkdir()
+    png = ed.blank_png(kat / "pusty.png", 16, 16)
+    lista = ed.typo_concat([(0.2, png), (0.2, None)], png, kat / "t.ffconcat")
+    r = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(lista),
+                        "-f", "null", "-"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    assert r.returncode == 0, r.stderr
+
+
+def _pid_zyje(pid: int) -> bool:
+    """Windows: czy proces `pid` jeszcze działa (OpenProcess + GetExitCodeProcess, STILL_ACTIVE = 259)."""
+    import ctypes
+    from ctypes import wintypes
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.OpenProcess.restype = wintypes.HANDLE
+    h = k.OpenProcess(0x1000, False, pid)            # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return False
+    kod = wintypes.DWORD()
+    try:
+        return bool(k.GetExitCodeProcess(h, ctypes.byref(kod))) and kod.value == 259
+    finally:
+        k.CloseHandle(h)
+
+
+def _drzewo() -> tuple[subprocess.Popen, bool, int]:
+    """Program z dzieckiem (jak `python film.py lektor` → jarvo-tts), przypięty do zadania zaraz po starcie (jak
+    przy_starcie w przenosne.uruchom), zanim zdąży uruchomić dziecko; rodzic wypisuje PID dziecka i czeka."""
+    import sys
+    dziecko = "import time; time.sleep(60)"
+    rodzic = (f"import subprocess, sys, time; p = subprocess.Popen([sys.executable, '-c', {dziecko!r}]); "
+              "print(p.pid, flush=True); time.sleep(60)")
+    proc = subprocess.Popen([sys.executable, "-c", rodzic], stdout=subprocess.PIPE, text=True)
+    przypiety = ed.przypnij_drzewo(proc)
+    return proc, przypiety, int(proc.stdout.readline())
+
+
+@pytest.mark.windows_only
+def test_zabij_drzewo_konczy_dzieci_programu():
+    """Windows: program z Job Object (przypnij_drzewo zaraz po starcie) kończy się razem z dziećmi
+    (zabij_drzewo = TerminateJobObject); sam TerminateProcess zostawiłby dziecko (launcher venvu tak robi)."""
+    import time
+    proc, przypiety, dziecko = _drzewo()
+    try:
+        assert przypiety is True and proc._jarvo_zadanie
+        assert ed.przypnij_drzewo(proc) is False                      # drugi raz: już ma zadanie
+        assert _pid_zyje(dziecko)
+        ed.zabij_drzewo(proc)
+        proc.wait(10)
+        for _ in range(50):
+            if not _pid_zyje(dziecko):
+                break
+            time.sleep(0.1)
+        assert not _pid_zyje(dziecko)
+    finally:
+        ed.zabij_drzewo(proc)
+
+
+@pytest.mark.windows_only
+def test_zadanie_zamyka_sie_z_obiektem_procesu():
+    """Windows: uchwyt zadania zamyka się z obiektem procesu (weakref.finalize), a KILL_ON_JOB_CLOSE kończy dziecko,
+    które przeżyło zabicie samego programu: tak samo, gdy padnie dashboard, który trzyma uchwyty."""
+    import gc
+    import time
+    proc, przypiety, dziecko = _drzewo()
+    assert przypiety
+    proc.kill()                                       # sam program: dziecko jeszcze żyje (zadanie otwarte)
+    proc.wait(10)
+    time.sleep(0.3)
+    assert _pid_zyje(dziecko)
+    proc.stdout.close()
+    del proc
+    gc.collect()
+    for _ in range(50):
+        if not _pid_zyje(dziecko):
+            break
+        time.sleep(0.1)
+    assert not _pid_zyje(dziecko)
+
+
+@pytest.mark.posix_only
+def test_zabij_drzewo_poza_windows_jak_kill():
+    """Linux i macOS: bez Job Object (False), zabij_drzewo = kill() programu, jak dotąd."""
+    import sys
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    assert ed.przypnij_drzewo(proc) is False
+    ed.zabij_drzewo(proc)
+    assert proc.wait(10) != 0
+    ed.zabij_drzewo(proc)                             # zakończony: bez błędu
+
+
+def test_narzedzia_edytora_z_path_instalacji(tmp_path, monkeypatch):
+    """ffmpeg, ffprobe i jarvo-stt z PATH procesu (natywnie narzędzia z manifestu i bin-floty z jarvo/srodowisko.py),
+    na Windows pliki .exe; JARVO_STT_BIN wygrywa."""
+    import atrapy
+    bin_ = tmp_path / "narzedzia" / "ffmpeg" / "bin"
+    floty = tmp_path / "program" / "bin-floty"
+    for nazwa, katalog in (("ffmpeg", bin_), ("ffprobe", bin_), ("jarvo-stt", floty)):
+        atrapy.program(katalog, nazwa, "print('ok')")
+    monkeypatch.setenv("PATH", atrapy.sciezka(floty, bin_, reszta=False))
+    monkeypatch.delenv("JARVO_STT_BIN", raising=False)
+    t = ed.tools()
+    assert Path(t["ffmpeg"]).parent == bin_ and Path(t["ffprobe"]).parent == bin_ and Path(t["stt"]).parent == floty
+
+
 def test_karaoke_js_rule_same_as_python(tmp_path):
     """karaokeWords / karaokeIndex z 44-napisy.js dają te same słowa i okna co edytor.py."""
     if not shutil.which("node"):

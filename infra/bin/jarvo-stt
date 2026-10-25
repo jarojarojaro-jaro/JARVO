@@ -4,14 +4,22 @@
     jarvo-stt <audio|wideo> [--output-dir DIR]          → DIR/<nazwa>.txt   (tryb Hermesa, local_command)
     jarvo-stt <audio|wideo> --srt out.srt [--max-chars 32] → napisy z czasami (subtitles.py)
     jarvo-stt <audio|wideo> --json slowa.json            → słowa z czasem (edytor filmów HQ)
-    jarvo-stt --prefetch                                 → pobierz model z góry (~0,65 GB)
+    jarvo-stt --prefetch                                 → pobierz modele z góry (~0,67 GB) i sprawdź, że się ładują
 
-Hermes woła go jako komendę STT (HERMES_LOCAL_STT_COMMAND w docker-compose.yml):
+Hermes woła go jako komendę STT (HERMES_LOCAL_STT_COMMAND: w obrazie z infra/Dockerfile, natywnie z buildu floty):
 proces startuje na czas jednej transkrypcji i znika, więc w spoczynku nie zajmuje RAM-u
 (w trakcie ok. 1,1–1,3 GB). Blokada pliku pilnuje, żeby naraz działała jedna transkrypcja
 (/tmp/jarvo-stt.lock z fcntl na Linuksie i macOS, plik w %TEMP% z msvcrt na Windows).
 Parakeet v3 sam rozpoznaje język (25 języków europejskich, w tym polski), --language jest ignorowane.
-Model pobiera się przy pierwszym użyciu do $JARVO_MODELS_DIR (domyślnie /opt/data/jarvo/models).
+
+Modele (docs/NATYWNIE.md V05, V10): Parakeet (`modele.parakeet`: encoder i decoder int8, config.json, vocab.txt)
+i Silero VAD (`modele.silero-vad`) z manifestu Jarva (vendor/natywne.lock.json): adres z przypiętą rewizją repo
+modelu, suma sha256 i rozmiar każdego pliku. Przy pierwszym użyciu pobieracz Jarva (jarvo/pobieracz.py: pasek na
+stderr, wznawianie, suma przed użyciem) kładzie je w $JARVO_MODELS_DIR/<katalog z manifestu> (domyślnie
+/opt/data/jarvo/models), pod tą samą blokadą co transkrypcja; onnx-asr ładuje je stamtąd bez sieci (żadnego
+huggingface_hub bez rewizji i sumy). Pliki, które starszy jarvo-stt pobrał do $JARVO_MODELS_DIR/huggingface, przechodzą
+do nowego katalogu po sprawdzeniu sumy, bez drugiego pobierania. Manifest i pobieracz bierzemy z kodu Jarva: JARVO_REPO,
+katalog nad infra/bin tego skryptu albo /opt/jarvo/repo w obrazie.
 """
 
 from __future__ import annotations
@@ -19,15 +27,20 @@ from __future__ import annotations
 import argparse
 import contextlib
 import errno
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-MODEL = os.environ.get("JARVO_STT_MODEL", "nemo-parakeet-tdt-0.6b-v3")
-QUANT = os.environ.get("JARVO_STT_QUANT", "int8") or None
+MODEL = "nemo-parakeet-tdt-0.6b-v3"          # typ modelu w onnx-asr dla plików z modele.parakeet
+QUANT = "int8"                               # manifest przypina pliki int8 (encoder-model.int8.onnx…)
+MODELE = {"parakeet": MODEL, "silero-vad": "silero"}   # wpisy sekcji modele manifestu → nazwa w onnx-asr
+LOCK_MANIFESTU = Path("vendor") / "natywne.lock.json"
+REPO_OBRAZU = "/opt/jarvo/repo"              # kod Jarva w kontenerze (montowany tylko do odczytu)
 MODELS_DIR = Path(os.environ.get("JARVO_MODELS_DIR", "/opt/data/jarvo/models"))
 THREADS = int(os.environ.get("JARVO_STT_THREADS", "2"))
 # jedna blokada dla wszystkich wywołań: /tmp na Linuksie i macOS (jak w obrazie, niezależnie od TMPDIR wołającego),
@@ -72,8 +85,108 @@ def to_wav(src: Path, tmp: Path) -> Path:
     return out
 
 
-def load():
-    os.environ.setdefault("HF_HOME", str(MODELS_DIR / "huggingface"))
+# ------------------------------------------------------------------ modele z manifestu (V05, V10)
+
+class BrakModelu(RuntimeError):
+    """Modeli nie da się przygotować (komunikat po polsku, bez śladu)."""
+
+
+def _na_stderr(tekst: str) -> None:
+    print(tekst, file=sys.stderr, flush=True)
+
+
+def repo_jarva() -> Path:
+    """Kod Jarva z manifestem modeli i pobieraczem: JARVO_REPO (procesy Jarva), katalog nad infra/bin tego skryptu
+    (natywnie program floty uruchamia `<app>/infra/bin/jarvo-stt` aktywnej wersji), w obrazie /opt/jarvo/repo."""
+    obok = Path(os.path.abspath(__file__)).parent.parent.parent
+    for kandydat in (os.environ.get("JARVO_REPO"), str(obok), REPO_OBRAZU):
+        if kandydat and (Path(kandydat) / LOCK_MANIFESTU).is_file() and (Path(kandydat) / "jarvo" / "modele.py").is_file():
+            return Path(kandydat)
+    raise BrakModelu(f"nie znalazłem manifestu modeli ({LOCK_MANIFESTU.as_posix()} w kodzie Jarva: JARVO_REPO, {obok} "
+                     f"ani {REPO_OBRAZU}); bez przypiętej rewizji i sumy jarvo-stt niczego nie pobiera")
+
+
+def _jarvo(repo: Path):
+    """Moduły `modele` i `pobieracz` z pakietu jarvo w `repo` (sama biblioteka standardowa). Repo jest na sys.path
+    tylko na czas importu, więc nic z niego nie przesłoni paczek venvu."""
+    sys.path.insert(0, str(repo))
+    try:
+        from jarvo import modele, pobieracz  # type: ignore
+    finally:
+        with contextlib.suppress(ValueError):
+            sys.path.remove(str(repo))
+    return modele, pobieracz
+
+
+def wpisy_modeli(repo: Path) -> dict[str, dict]:
+    """Wpisy MODELE z sekcji `modele` manifestu (pliki z adresem z rewizją, sha256 i rozmiarem)."""
+    try:
+        dane = json.loads((repo / LOCK_MANIFESTU).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise BrakModelu(f"manifest {repo / LOCK_MANIFESTU} jest nieczytelny ({type(e).__name__})") from None
+    modele = dane.get("modele") or {}
+    brak = [n for n in MODELE if not (isinstance(modele.get(n), dict) and modele[n].get("pliki"))]
+    if brak:
+        raise BrakModelu(f"manifest {repo / LOCK_MANIFESTU} nie ma modeli: {', '.join(brak)}")
+    return {n: modele[n] for n in MODELE}
+
+
+_PLIK_HF = re.compile(r"^https://huggingface\.co/([^/]+)/([^/]+)/resolve/[0-9a-f]{40}/")
+
+
+def z_cache_hf(katalog_modelu: Path, wpis: dict, sha256_pliku, log=_na_stderr) -> int:
+    """Pliki modelu, które starszy jarvo-stt pobrał przez huggingface_hub (HF_HOME = <modele>/huggingface): plik LFS
+    leży tam jako blob nazwany sumą sha256 treści. Blob o sumie i rozmiarze z manifestu (suma sprawdzona) kopiujemy
+    na miejsce zamiast pobierać drugi raz. Zwraca liczbę skopiowanych plików."""
+    n = 0
+    for p in wpis.get("pliki") or []:
+        m = _PLIK_HF.match(str(p.get("url") or ""))
+        cel = Path(katalog_modelu) / str(p["cel"])
+        if not m or cel.exists():
+            continue
+        blob = MODELS_DIR / "huggingface" / "hub" / f"models--{m[1]}--{m[2]}" / "blobs" / str(p["sha256"])
+        try:
+            if not blob.is_file() or (p.get("rozmiar") and blob.stat().st_size != int(p["rozmiar"])):
+                continue
+            if sha256_pliku(blob) != p["sha256"]:
+                continue
+            cel.parent.mkdir(parents=True, exist_ok=True)
+            tmp = cel.with_name(cel.name + ".z-cache")
+            shutil.copyfile(blob, tmp)
+            os.replace(tmp, cel)
+        except OSError:
+            continue
+        n += 1
+    if n:
+        log(f"jarvo-stt: {n} plików modelu z dawnego cache Hugging Face ({MODELS_DIR / 'huggingface'}), suma zgodna; "
+            "ten katalog można potem usunąć")
+    return n
+
+
+def przygotuj_modele(log=_na_stderr) -> dict[str, Path]:
+    """Katalogi Parakeeta i Silero w MODELS_DIR. Brakujące pliki pobiera przy pierwszym użyciu pobieracz Jarva z sumą
+    z manifestu (pasek na stderr, wznawianie po przerwie); gotowy model (znacznik z sumami i rozmiary plików)
+    zostaje bez sieci. Wołamy pod blokadą `jedna_naraz`: dwa procesy nie piszą tego samego pliku."""
+    repo = repo_jarva()
+    modele, pobieracz = _jarvo(repo)
+    katalogi: dict[str, Path] = {}
+    for nazwa, wpis in wpisy_modeli(repo).items():
+        kat = modele.katalog(MODELS_DIR, wpis)
+        if not modele.gotowy(kat, wpis):
+            z_cache_hf(kat, wpis, pobieracz.sha256_pliku, log)
+            log(f"jarvo-stt: pierwsze użycie, model {nazwa} z manifestu Jarva (suma każdego pliku) → {kat}")
+            try:
+                modele.zainstaluj(nazwa, wpis, MODELS_DIR, log=log, pasek=True)
+            except modele.BladModelu as e:
+                raise BrakModelu(f"model {nazwa} się nie pobrał: {e}") from None
+        katalogi[nazwa] = kat
+    return katalogi
+
+
+def load(katalogi: dict[str, Path] | None = None):
+    """Parakeet z VAD Silero i czasami tokenów, z plików na dysku (onnx-asr z katalogiem nie pyta Hugging Face)."""
+    katalogi = przygotuj_modele() if katalogi is None else katalogi
+    os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
     import onnx_asr  # type: ignore
     import onnxruntime as ort  # type: ignore
@@ -81,8 +194,8 @@ def load():
     so = ort.SessionOptions()
     so.intra_op_num_threads = THREADS
     so.inter_op_num_threads = 1
-    model = onnx_asr.load_model(MODEL, quantization=QUANT, sess_options=so)
-    vad = onnx_asr.load_vad("silero", sess_options=so)
+    model = onnx_asr.load_model(MODEL, str(katalogi["parakeet"]), quantization=QUANT, sess_options=so)
+    vad = onnx_asr.load_vad("silero", str(katalogi["silero-vad"]), sess_options=so)
     return model.with_vad(vad, max_speech_duration_s=MAX_SPEECH_S).with_timestamps()
 
 
@@ -146,12 +259,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-chars", type=int, default=32, help="maks. znaków w linii napisu")
     ap.add_argument("--language", default="", help="ignorowane: Parakeet v3 sam rozpoznaje język")
     ap.add_argument("--model", default="", help="ignorowane (zgodność z szablonem Hermesa)")
-    ap.add_argument("--prefetch", action="store_true", help="tylko pobierz model i zakończ")
+    ap.add_argument("--prefetch", action="store_true",
+                    help="tylko pobierz modele (z sumą z manifestu), sprawdź, że się ładują, i zakończ")
     args = ap.parse_args(argv)
 
     if args.prefetch:
-        load()
-        print(f"Model {MODEL} ({QUANT or 'fp32'}) gotowy w {MODELS_DIR}")
+        try:
+            with jedna_naraz(LOCK):
+                MODELS_DIR.mkdir(parents=True, exist_ok=True)
+                katalogi = przygotuj_modele()
+                load(katalogi)
+        except BrakModelu as e:
+            print(f"jarvo-stt: {e}", file=sys.stderr)
+            return 1
+        print(f"Modele gotowe: Parakeet ({MODEL}, {QUANT}) w {katalogi['parakeet']}, Silero VAD w "
+              f"{katalogi['silero-vad']}")
         return 0
     if not args.input:
         ap.error("podaj plik audio lub wideo")
@@ -160,9 +282,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Brak pliku: {src}", file=sys.stderr)
         return 2
 
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    with jedna_naraz(LOCK), tempfile.TemporaryDirectory(prefix="jarvo-stt-") as tmp:   # jedna transkrypcja naraz (RAM)
-        segments = list(load().recognize(str(to_wav(src, Path(tmp)))))
+    try:
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        # jedna transkrypcja naraz (RAM); pod tą samą blokadą modele przy pierwszym użyciu
+        with jedna_naraz(LOCK), tempfile.TemporaryDirectory(prefix="jarvo-stt-") as tmp:
+            segments = list(load().recognize(str(to_wav(src, Path(tmp)))))
+    except BrakModelu as e:
+        print(f"jarvo-stt: {e}", file=sys.stderr)
+        return 1
 
     text = " ".join(s.text.strip() for s in segments if s.text.strip())
     if args.srt:
@@ -171,7 +298,6 @@ def main(argv: list[str] | None = None) -> int:
                                           for i, (a, b, t) in enumerate(lines, 1)), encoding="utf-8", newline="\n")
         print(f"SRT: {args.srt} ({len(lines)} linii)")
     if args.json:
-        import json
         ws = [list(w) for s in segments for w in spoken(s)]
         Path(args.json).write_text(json.dumps({"words": ws}, ensure_ascii=False), encoding="utf-8", newline="\n")
         print(f"JSON: {args.json} ({len(ws)} słów)")

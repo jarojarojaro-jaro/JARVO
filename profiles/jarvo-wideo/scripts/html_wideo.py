@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Animacja HTML albo Lottie → klatki, arkusz do oceny i wideo (przeglądarka z obrazu, bez pobierania).
+"""Animacja HTML albo Lottie → klatki, arkusz do oceny i wideo (przeglądarka z obrazu Hermesa albo chrome-headless-shell
+z instalacji natywnej Jarva, bez pobierania).
 
     python3 html_wideo.py klatki anim.html --czasy 0,1.5,3 [--preset iart] [--out katalog] [--arkusz arkusz.jpg]
     python3 html_wideo.py wideo  anim.html --dlugosc 6 [--fps 30] -o film.mp4 [--preset …] [--alfa]
@@ -37,7 +38,9 @@ czeka na miejsce: najwyżej 2 naraz na maszynie, drugi tylko przy wolnej pamięc
 --serwer: strona z http://127.0.0.1 (fetch plików obok, moduły ES, /_lib/ = wspólne node_modules narzędzi).
 lottie: renderer Skottie z oficjalnego playera (canvaskit-wasm, `narzedzia.py instaluj lottie`), ten sam co w playerze.
 Wyjście: .mp4 (H.264, yuv420p, zakres TV, faststart), .mov (ProRes; z --alfa 4444 z przezroczystością),
-.webm (VP9; z --alfa przezroczyste), .gif. Wymaga: playwright w Pythonie (`narzedzia.py instaluj html`), ffmpeg.
+.webm (VP9; z --alfa przezroczyste), .gif. Wymaga: playwright w Pythonie (natywnie jest w venvie narzędzi Jarva,
+w obrazie `narzedzia.py instaluj html`), ffmpeg. Natywnie klatki robocze leżą w cache Wideografa na dysku instalacji
+(wl.katalog_roboczy), a przeglądarka dostaje fonts.conf Jarva.
 """
 
 from __future__ import annotations
@@ -52,7 +55,6 @@ import math
 import os
 import shutil
 import sys
-import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -224,8 +226,14 @@ def ensure_playwright() -> None:
 
 
 def launch(p):
+    """Chromium headless: rewizja z obrazu Hermesa albo natywnie chrome-headless-shell z manifestu (nz.headless_shell),
+    bez pobierania. Natywnie z fonts.conf Jarva (wl.env_krojow: Inter, DejaVu, Noto i emoji dla fontconfig na
+    Linuksie); w obrazie środowisko bez zmian."""
     exe = nz.headless_shell()
     kwargs = {"args": BROWSER_ARGS, **({"executable_path": exe} if exe else {})}
+    env = wl.env_krojow()
+    if env.get("FONTCONFIG_FILE") and env.get("FONTCONFIG_FILE") != os.environ.get("FONTCONFIG_FILE"):
+        kwargs["env"] = env
     return p.chromium.launch(**kwargs)
 
 
@@ -511,7 +519,7 @@ def lottie_render(src: Path, frames_sel: list[float] | None, fps_out: float | No
     scene = src.parent
     assets = sorted(p.name for p in scene.iterdir()
                     if p.is_file() and p.name not in (src.name, "controls.json") and p.suffix.lower() in LOTTIE_ASSET_EXT)
-    tmp = Path(tempfile.mkdtemp(prefix="jarvo-lottie-"))
+    tmp = wl.katalog_roboczy("jarvo-lottie-")
     httpd = None
     try:
         html = (LOTTIE_PAGE.replace("__BG__", "transparent" if alfa else bg).replace("__NAME__", json.dumps(src.name))
@@ -743,7 +751,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "lottie":
         if not a.wyjscie and not a.klatki:
             raise SystemExit("lottie: podaj -o film.mp4 albo --klatki 0,45,89")
-        work = Path(a.out) if a.klatki else Path(tempfile.mkdtemp(prefix="jarvo-lottie-klatki-"))
+        work = Path(a.out) if a.klatki else wl.katalog_roboczy("jarvo-lottie-klatki-")
         with wl.miejsce_renderu("html_wideo lottie") if a.wyjscie else contextlib.nullcontext():
             frames, labels, info = lottie_render(Path(a.plik).resolve(), parse_times(a.klatki) if a.klatki else None,
                                                  a.fps, work, a.alfa, a.tlo, a.skala)
@@ -776,7 +784,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     times = frame_times(a.dlugosc, a.fps)
-    work = Path(tempfile.mkdtemp(prefix="jarvo-html-klatki-"))
+    work = wl.katalog_roboczy("jarvo-html-klatki-")     # natywnie na dysku instalacji, nie w %TEMP% właściciela
     n = max(1, a.subklatki)
     przegladarki = ile_przegladarek(len(times) * n, a.rownolegle)
     if not zrzut_na_dysk(len(times) * (n + (n > 1)), size, a.skala, shutil.disk_usage(work).free):

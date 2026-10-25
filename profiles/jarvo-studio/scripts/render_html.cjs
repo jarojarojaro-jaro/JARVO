@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * Render grafiki HTML/CSS do PNG w dokładnych wymiarach (Chromium z obrazu Hermesa).
+ * Render grafiki HTML/CSS do PNG w dokładnych wymiarach (Chromium z obrazu Hermesa albo natywnie chrome-headless-shell
+ * z instalacji Jarva: CHROME_PATH; playwright-core z NODE_PATH narzędzi npm floty).
  *
  *   node render_html.cjs <plik.html> <out-prefix> --size 1080x1350 [--size 1080x1920 ...] [--scale 1]
  *
- * Wynik: <out-prefix>-<szer>x<wys>.png dla każdego rozmiaru. Czeka na fonty (document.fonts.ready).
+ * Wynik: <out-prefix>-<szer>x<wys>.png dla każdego rozmiaru (ścieżki z „/” także na Windows). Czeka na fonty
+ * (document.fonts.ready).
  */
 const fs = require('fs');
 const path = require('path');
@@ -15,6 +17,18 @@ function browserPath() {
   if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) return process.env.CHROME_PATH;
   const f = '/etc/hermes/agent-browser-executable-path';
   return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim() : undefined;
+}
+
+// --no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy (jak audit.py, har.cjs i Hermes): Linux jako root,
+// w kontenerze albo z zakazem przestrzeni nazw użytkownika bez profilu AppArmor (Ubuntu 23.10+). Windows i macOS
+// (instalacja natywna): z piaskownicą.
+function argsPiaskownicy() {
+  if (process.platform !== 'linux') return [];
+  const czytaj = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } };
+  const bez = (process.getuid && process.getuid() === 0) || fs.existsSync('/.dockerenv')
+    || czytaj('/proc/1/cgroup').includes('docker')
+    || czytaj('/proc/sys/kernel/apparmor_restrict_unprivileged_userns').trim() === '1';
+  return bez ? ['--no-sandbox'] : [];
 }
 
 (async () => {
@@ -33,7 +47,7 @@ function browserPath() {
     process.exit(2);
   }
   fs.mkdirSync(path.dirname(path.resolve(prefix)), { recursive: true });
-  const browser = await chromium.launch({ executablePath: browserPath(), args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: browserPath(), args: argsPiaskownicy() });
   const outputs = [];
   try {
     for (const s of sizes) {
@@ -43,7 +57,8 @@ function browserPath() {
       await page.evaluate(() => document.fonts && document.fonts.ready);
       const file = `${prefix}-${w}x${h}.png`;
       await page.screenshot({ path: file, clip: { x: 0, y: 0, width: w, height: h } });
-      outputs.push({ file, width: w * scale, height: h * scale, bytes: fs.statSync(file).size });
+      outputs.push({ file: file.split(path.sep).join('/'), width: w * scale, height: h * scale,
+                     bytes: fs.statSync(file).size });
       await page.close();
     }
   } finally {

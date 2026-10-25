@@ -1,7 +1,8 @@
 """Wspólne klocki skryptów Wideografa: formaty, FFmpeg/ffprobe, lektor, napisy ASS/SRT, cache.
 
 Lektor domyślnie lokalny: polski Matcha-TTS-PL v2 (`pl-PL-Matcha-Meski`, `pl-PL-Matcha-Damski`) i angielski Paradee
-przez /opt/jarvo/bin/jarvo-tts z obrazu, bez sieci; Edge TTS do wyboru i jako zapas.
+przez jarvo-tts (w obrazie /opt/jarvo/bin, natywnie program floty w PATH procesów Jarva), bez sieci; Edge TTS do
+wyboru i jako zapas.
 Bez zależności poza biblioteką standardową, FFmpeg i (tylko dla Edge) edge-tts. Edge TTS jest darmowy
 i nie wymaga klucza; pakiet leży w katalogu leniwych instalacji Hermesa (HERMES_LAZY_INSTALL_TARGET),
 a gdy go brak, doinstalowujemy go tym samym mechanizmem, którego używa narzędzie `text_to_speech`.
@@ -48,15 +49,15 @@ TV_RANGE = "scale=out_range=tv,format=yuv420p"
 THREADS = os.environ.get("JARVO_WIDEO_WATKI", "2")
 ENC_LIMITS = ["-threads", THREADS, "-filter_threads", "2", "-x264-params", "rc-lookahead=10"]
 PARALLEL = max(1, int(os.environ.get("JARVO_WIDEO_ROWNOLEGLE", "1")))   # sceny normalizowane naraz
-# domyślny lektor: polski Matcha-TTS-PL v2 w obrazie (/opt/jarvo/bin/jarvo-tts, bez sieci i limitu, głos syntetyczny);
+# domyślny lektor: polski Matcha-TTS-PL v2 (jarvo-tts z instalacji Jarva, bez sieci i limitu, głos syntetyczny);
 # Edge TTS (Marek, Zofia) zostaje do wyboru i jako zapas, gdy lokalnego lektora nie ma albo zawiedzie
 DEFAULT_VOICE = "pl-PL-Matcha-Meski"
 PL_VOICES = {"pl-PL-MarekNeural": "męski, spokojny", "pl-PL-ZofiaNeural": "żeński, ciepły"}
-# lektory lokalne (jarvo-tts w obrazie): polski Matcha i angielski Paradee-8M; czasy słów z Parakeeta
+# lektory lokalne (jarvo-tts z instalacji Jarva): polski Matcha i angielski Paradee-8M; czasy słów z Parakeeta
 LOCAL_VOICES = {"pl-PL-Matcha-Meski": "polski, męski, lokalny (Matcha, bez sieci, głos syntetyczny)",
                 "pl-PL-Matcha-Damski": "polski, żeński, lokalny (Matcha, bez sieci, głos syntetyczny)",
                 "en-US-Paradee": "angielski, lokalny (Paradee, bez sieci)"}
-# zapas Edge TTS dla polskich lektorów lokalnych (brak jarvo-tts poza obrazem albo błąd syntezy)
+# zapas Edge TTS dla polskich lektorów lokalnych (brak jarvo-tts poza instalacją Jarva albo błąd syntezy)
 EDGE_FALLBACK = {"pl-PL-Matcha-Meski": "pl-PL-MarekNeural", "pl-PL-Matcha-Damski": "pl-PL-ZofiaNeural"}
 
 
@@ -88,13 +89,29 @@ def even(n: float) -> int:
 # ------------------------------------------------------------------ cache i ścieżki
 
 def cache_dir(*parts: str) -> Path:
-    """Wspólny cache Wideografa (pobrane ujęcia, lektor, znormalizowane sceny): między kartami i wariantami."""
+    """Wspólny cache Wideografa (pobrane ujęcia, lektor, znormalizowane sceny): między kartami i wariantami.
+    JARVO_WIDEO_CACHE, natywnie `<dane>/jarvo/cache/wideo` (JARVO_DATA_DIR, jak @@JARVO_DIR@@ w skillach; nie katalog
+    domowy właściciela), w obrazie /opt/data/jarvo/cache/wideo, poza Jarvem ~/.cache/jarvo-wideo."""
     base = os.environ.get("JARVO_WIDEO_CACHE")
+    if not base and os.environ.get("JARVO_DATA_DIR"):
+        base = str(Path(os.environ["JARVO_DATA_DIR"]) / "cache" / "wideo")
     if not base:
         base = "/opt/data/jarvo/cache/wideo" if Path("/opt/data/jarvo").is_dir() else str(Path.home() / ".cache" / "jarvo-wideo")
     p = Path(base, *parts)
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def baza_robocza() -> str | None:
+    """Katalog na katalogi robocze renderu (`dir` dla tempfile): natywnie `<dane>/jarvo/cache/wideo/robocze` (dysk
+    instalacji Jarva, nie %TEMP% w profilu właściciela, który bywa pełny), w obrazie i poza Jarvem None = katalog
+    tymczasowy systemu, jak dotąd."""
+    return str(cache_dir("robocze")) if os.environ.get("JARVO_DATA_DIR") else None
+
+
+def katalog_roboczy(prefix: str) -> Path:
+    """Nowy katalog na pliki robocze renderu (klatki, listy) w baza_robocza(), który wołający usuwa sam."""
+    return Path(tempfile.mkdtemp(prefix=prefix, dir=baza_robocza()))
 
 
 # ------------------------------------------------------------------ miejsca renderu
@@ -292,15 +309,17 @@ class FFError(RuntimeError):
 def need(tool: str) -> str:
     path = shutil.which(tool)
     if not path:
-        raise SystemExit(f"Brak {tool} w PATH (obraz Hermesa ma FFmpeg w /usr/bin).")
+        raise SystemExit(f"Brak {tool} w PATH (instalacja Jarva ma FFmpeg z manifestu, obraz Hermesa w /usr/bin).")
     return path
 
 
 def run(cmd: list[str], cwd: Path | None = None, quiet: bool = True) -> subprocess.CompletedProcess:
-    """Uruchom FFmpeg/ffprobe; przy błędzie pokaż ogon stderr (sam komunikat, bez całego logu)."""
+    """Uruchom FFmpeg/ffprobe; przy błędzie pokaż ogon stderr (sam komunikat, bez całego logu). Natywnie z fonts.conf
+    Jarva w FONTCONFIG_FILE (env_krojow: zapas libass i drawtext); w obrazie środowisko bez zmian."""
     if cmd and cmd[0] == "ffmpeg":
         cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error" if quiet else "info", *cmd[1:]]
-    res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                         env=env_krojow())
     if res.returncode != 0:
         lines = (res.stderr or res.stdout or "").strip().splitlines()
         # pierwsza przyczyna bywa na początku (filtr), a na końcu tylko skutki (koder bez danych)
@@ -369,9 +388,124 @@ def sdr(path: Path) -> str:
     return v.get("sdr") or ""
 
 
+# ------------------------------------------------------------------ kroje (docs/NATYWNIE.md M03, I28)
+# Natywnie kroje są w instalacji Jarva, nie w systemie: Inter 4.1 (statyczne OTF) i DejaVu 2.37 jako narzędzia
+# manifestu (JARVO_FONTY_INTER, JARVO_FONTY_DEJAVU), Noto Sans i Noto Color Emoji jako modele (JARVO_FONTY_NOTO_*).
+# ffmpeg dostaje je wprost: napisy ASS przez `fontsdir` (na Windows libass wybiera DirectWrite i kroju „Inter”
+# z systemu nie znajdzie), drawtext przez `fontfile`, a fontconfig (zapas libass i drawtext, Chromium na Linuksie)
+# przez fonts.conf Jarva w FONTCONFIG_FILE. W obrazie tych zmiennych nie ma: kroje z apt w fontconfig systemu.
+ZMIENNE_KROJOW = ("JARVO_FONTY_INTER", "JARVO_FONTY_DEJAVU", "JARVO_FONTY_NOTO_SANS", "JARVO_FONTY_NOTO_EMOJI")
+
+
+def katalogi_krojow() -> list[Path]:
+    """Katalogi krojów instalacji Jarva, które są na dysku (kolejność ZMIENNE_KROJOW); w obrazie pusta lista."""
+    out = []
+    for zmienna in ZMIENNE_KROJOW:
+        k = os.environ.get(zmienna)
+        if k and Path(k).is_dir():
+            out.append(Path(k))
+    return out
+
+
+def sciezka_filtra(p: Path | str) -> str:
+    """Ścieżka jako wartość opcji filtra ffmpeg (drawtext fontfile, ass fontsdir): „/” zamiast „\\”, w apostrofach,
+    dwukropek po literze dysku zabezpieczony (`'C\\:/…'`: inaczej „:” rozdziela opcje filtra). Apostrofu w ścieżce
+    nie da się tak podać: wtedy ValueError (wołający wybiera wtedy inną drogę albo kopię obok)."""
+    s = Path(p).as_posix() if os.name == "nt" else str(p)
+    if "'" in s:
+        raise ValueError(f"apostrof w ścieżce: {s}")
+    return "'" + s.replace(":", "\\:") + "'"
+
+
+def kroje_napisow() -> Path | None:
+    """Katalog krojów dla napisów ASS (`fontsdir`): Inter z instalacji Jarva (styl „Inter” z build_ass), gdy jest
+    na dysku z plikami OTF; w obrazie None (fontconfig systemu ma fonts-inter)."""
+    k = os.environ.get("JARVO_FONTY_INTER")
+    if k and Path(k).is_dir() and any(Path(k).glob("Inter-*.otf")):
+        return Path(k)
+    return None
+
+
+def opcja_fontsdir(katalog: Path | None = None) -> str:
+    """`:fontsdir=…` filtra `ass` z krojami Jarva (kroje_napisow, gdy `katalog` nie podano) albo "" (obraz, brak
+    krojów, apostrof w ścieżce: wtedy libass bierze kroje systemu)."""
+    katalog = katalog or kroje_napisow()
+    if katalog is None:
+        return ""
+    try:
+        return ":fontsdir=" + sciezka_filtra(katalog)
+    except ValueError:
+        return ""
+
+
+def fonts_conf(katalogi: list[Path], cache: Path) -> str:
+    """fonts.conf: najpierw kroje Jarva, potem jako zapas kroje systemu (Windows: WINDOWSFONTDIR, macOS: katalogi
+    systemu, Linux: konfiguracja systemu, gdy jest), pamięć podręczna fontconfig w cache Wideografa."""
+    from xml.sax.saxutils import escape
+
+    def sciezka(p: Path | str) -> str:
+        return escape(Path(p).as_posix() if os.name == "nt" else str(p))
+    wiersze = ['<?xml version="1.0"?>', '<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">',
+               "<!-- Jarvo: kroje Wideografa (profiles/jarvo-wideo/scripts/wideo_lib.py, fonts_conf); plik odtwarzany -->",
+               "<fontconfig>"]
+    wiersze += [f"  <dir>{sciezka(k)}</dir>" for k in katalogi]
+    if os.name == "nt":
+        wiersze.append("  <dir>WINDOWSFONTDIR</dir>")
+    elif sys.platform == "darwin":
+        wiersze += [f"  <dir>{d}</dir>" for d in ("/System/Library/Fonts", "/Library/Fonts", "~/Library/Fonts")]
+    elif Path("/etc/fonts/fonts.conf").is_file():
+        wiersze.append('  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>')
+    wiersze += [f"  <cachedir>{sciezka(cache)}</cachedir>", "</fontconfig>", ""]
+    return "\n".join(wiersze)
+
+
+_FONTS_CONF: list[str | None] = []
+
+
+def plik_fonts_conf() -> str | None:
+    """fonts.conf Jarva w cache Wideografa (`fontconfig/fonts.conf`, zapis tylko przy innej treści), raz na proces;
+    None, gdy krojów Jarva nie ma (obraz) albo zapis się nie udał."""
+    if _FONTS_CONF:
+        return _FONTS_CONF[0]
+    wynik = None
+    katalogi = katalogi_krojow()
+    if katalogi:
+        cel = cache_dir("fontconfig") / "fonts.conf"
+        tresc = fonts_conf(katalogi, cel.parent / "cache")
+        try:
+            if not cel.is_file() or cel.read_text(encoding="utf-8") != tresc:
+                tmp = cel.with_name(f".fonts.conf.{os.getpid()}.tmp")
+                tmp.write_text(tresc, encoding="utf-8", newline="\n")
+                os.replace(tmp, cel)
+            wynik = str(cel)
+        except OSError:
+            wynik = str(cel) if cel.is_file() else None    # Windows: plik czyta właśnie inny ffmpeg
+    _FONTS_CONF.append(wynik)
+    return wynik
+
+
+def env_krojow(env: dict | None = None) -> dict:
+    """Kopia środowiska (domyślnie os.environ) z FONTCONFIG_FILE na fonts.conf Jarva, gdy kroje Jarva są, a nikt nie
+    ustawił innego pliku; w obrazie bez zmian."""
+    env = dict(os.environ if env is None else env)
+    if not env.get("FONTCONFIG_FILE"):
+        p = plik_fonts_conf()
+        if p:
+            env["FONTCONFIG_FILE"] = p
+    return env
+
+
 def pliki_krojow(gruby: bool = False) -> list[Path]:
-    """Kroje z polskimi znakami do podpisów (Pillow, drawtext), po kolei, bez pobierania: DejaVu z obrazu (Linux),
-    Arial Unicode i Arial z katalogu systemu (macOS), Segoe UI i Arial z katalogu Fonts (Windows)."""
+    """Kroje z polskimi znakami do podpisów (Pillow, drawtext), po kolei, bez pobierania: DejaVu z instalacji Jarva
+    (JARVO_FONTY_DEJAVU, każdy system), potem DejaVu z obrazu (Linux), Arial Unicode i Arial z katalogu systemu
+    (macOS), Segoe UI i Arial z katalogu Fonts (Windows)."""
+    jarva = os.environ.get("JARVO_FONTY_DEJAVU")
+    pierwsze = ([Path(jarva) / ("DejaVuSans-Bold.ttf" if gruby else "DejaVuSans.ttf")]
+                if jarva and Path(jarva).is_dir() else [])
+    return [*pierwsze, *_kroje_systemu(gruby)]
+
+
+def _kroje_systemu(gruby: bool) -> list[Path]:
     if sys.platform == "darwin":
         sup = Path("/System/Library/Fonts/Supplemental")
         return [*([sup / "Arial Bold.ttf"] if gruby else []), Path("/Library/Fonts/Arial Unicode.ttf"),
@@ -396,15 +530,19 @@ def czcionka(rozmiar: int, gruby: bool = False):
 
 
 def drawtext_kroj() -> str:
-    """`:fontfile='…'` do filtra drawtext poza Linuksem: ffmpeg z paczki (Windows, macOS) bez fonts.conf nie znajduje
-    kroju sam. Ścieżka z „/” w apostrofach, dwukropek po literze dysku zabezpieczony (`C\\:/…`). Na Linuksie ""
-    (krój z fontconfig obrazu, jak dotąd); bez kroju systemu też "" (drawtext spróbuje sam)."""
-    if sys.platform.startswith("linux"):
+    """`:fontfile='…'` do filtra drawtext: DejaVu z instalacji Jarva na każdym systemie (ffmpeg z paczki bez
+    fonts.conf nie znajduje kroju sam), poza Jarvem na Windows i macOS krój systemu. Ścieżka z „/” w apostrofach,
+    dwukropek po literze dysku zabezpieczony (`C\\:/…`, sciezka_filtra). W obrazie (Linux bez krojów Jarva) ""
+    (krój z fontconfig obrazu, jak dotąd); bez żadnego kroju też "" (drawtext spróbuje sam)."""
+    if sys.platform.startswith("linux") and not os.environ.get("JARVO_FONTY_DEJAVU"):
         return ""
     p = next((p for p in pliki_krojow() if p.exists()), None)
-    if p is None or "'" in str(p):
+    if p is None:
         return ""
-    return ":fontfile='" + p.as_posix().replace(":", "\\:") + "'"
+    try:
+        return ":fontfile=" + sciezka_filtra(p)
+    except ValueError:
+        return ""
 
 
 def z_sdr(chain: str, sdr_vf: str) -> str:
@@ -601,7 +739,8 @@ def _speak_local(todo: list[tuple]) -> None:
     if not os.path.exists(tts):
         tts = shutil.which("jarvo-tts") or ""
     if not tts:
-        raise SystemExit("Brak jarvo-tts (obraz Jarvo: /opt/jarvo/bin/jarvo-tts); głosy lokalne działają tylko w obrazie.")
+        raise SystemExit("Brak jarvo-tts (w obrazie /opt/jarvo/bin/jarvo-tts, natywnie <program>/bin-floty): głosy "
+                         "lokalne działają tylko w instalacji Jarva.")
     with tempfile.TemporaryDirectory(prefix="jarvo-tts-") as tmpd:
         tmp = Path(tmpd)
         jobs = [{"tekst": it["text"], "wyjscie": str(tmp / f"{n}.wav"), "szybkosc": _speed(it.get("rate", "+0%")),
@@ -947,7 +1086,7 @@ def transcribe_words(media: Path) -> list[Word]:
     if not os.path.exists(stt):
         stt = shutil.which("jarvo-stt") or ""
     if not stt:
-        raise SystemExit("Brak jarvo-stt (obraz Jarvo: /opt/jarvo/bin/jarvo-stt).")
+        raise SystemExit("Brak jarvo-stt (w obrazie /opt/jarvo/bin/jarvo-stt, natywnie <program>/bin-floty).")
     tmp = cache_dir("transkrypcje") / f"{digest('stt-v1', file_key(media))}.srt"
     if not tmp.exists():
         part = tmp.with_suffix(".part.srt")

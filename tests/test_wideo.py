@@ -832,7 +832,8 @@ def test_od_nowa_execv_na_posix_podproces_na_windows(monkeypatch, windows):
 def test_kroje_podpisow_i_drawtext_poza_linuksem(monkeypatch, tmp_path):
     """Podpisy arkuszy (Pillow) i drawtext biorą krój z polskimi znakami z katalogu systemu: DejaVu na Linuksie
     (drawtext bez fontfile, jak dotąd), Segoe UI/Arial na Windows, Arial na macOS; drawtext z fontfile w apostrofach
-    i z zabezpieczonym dwukropkiem po literze dysku."""
+    i z zabezpieczonym dwukropkiem po literze dysku. Bez krojów instalacji Jarva (to osobny test niżej)."""
+    monkeypatch.delenv("JARVO_FONTY_DEJAVU", raising=False)
     kroje = wl.pliki_krojow()
     if sys.platform.startswith("linux"):
         assert kroje[0] == Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf") and wl.drawtext_kroj() == ""
@@ -849,6 +850,301 @@ def test_kroje_podpisow_i_drawtext_poza_linuksem(monkeypatch, tmp_path):
         assert tekst == ":fontfile='" + kroj.as_posix().replace(":", "\\:") + "'" and "\\:/" in tekst
     monkeypatch.setattr(wl, "pliki_krojow", lambda gruby=False: [tmp_path / "brak.ttf"])
     assert wl.drawtext_kroj() == ""                                       # bez kroju: drawtext spróbuje sam
+
+
+def _kroje_jarva(monkeypatch, tmp_path) -> dict[str, Path]:
+    """Kroje jak w instalacji natywnej (vendor/natywne.yaml: fonty-inter, fonty-dejavu, modele fonty-noto-*)."""
+    k = {"inter": tmp_path / "program" / "fonty-inter" / "extras" / "otf",
+         "dejavu": tmp_path / "program" / "fonty-dejavu" / "ttf",
+         "noto": tmp_path / "dane" / "models" / "fonty-noto-sans", "emoji": tmp_path / "dane" / "models" / "fonty-noto-emoji"}
+    for nazwa, plik in (("inter", "Inter-Bold.otf"), ("dejavu", "DejaVuSans.ttf"), ("dejavu", "DejaVuSans-Bold.ttf"),
+                        ("noto", "NotoSans-Regular.ttf"), ("emoji", "NotoColorEmoji.ttf")):
+        k[nazwa].mkdir(parents=True, exist_ok=True)
+        (k[nazwa] / plik).write_bytes(b"kroj")
+    for zmienna, nazwa in (("JARVO_FONTY_INTER", "inter"), ("JARVO_FONTY_DEJAVU", "dejavu"),
+                           ("JARVO_FONTY_NOTO_SANS", "noto"), ("JARVO_FONTY_NOTO_EMOJI", "emoji")):
+        monkeypatch.setenv(zmienna, str(k[nazwa]))
+    monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "cache"))
+    monkeypatch.delenv("FONTCONFIG_FILE", raising=False)
+    monkeypatch.setattr(wl, "_FONTS_CONF", [])
+    return k
+
+
+def test_kroje_z_instalacji_jarva_na_kazdym_systemie(monkeypatch, tmp_path):
+    """Natywnie (docs/NATYWNIE.md M03): podpisy i drawtext biorą DejaVu z instalacji Jarva na każdym systemie, także na
+    Linuksie (ffmpeg z paczki bez fontconfig obrazu), a napisy ASS dostają `fontsdir` z Interem; ścieżka filtra z „/”,
+    w apostrofach, z zabezpieczonym dwukropkiem po literze dysku. Bez zmiennych (obraz): jak dotąd."""
+    k = _kroje_jarva(monkeypatch, tmp_path)
+    assert wl.pliki_krojow()[0] == k["dejavu"] / "DejaVuSans.ttf"
+    assert wl.pliki_krojow(gruby=True)[0] == k["dejavu"] / "DejaVuSans-Bold.ttf"
+    assert wl.drawtext_kroj() == ":fontfile=" + wl.sciezka_filtra(k["dejavu"] / "DejaVuSans.ttf")
+    assert wl.kroje_napisow() == k["inter"]
+    assert wl.opcja_fontsdir() == ":fontsdir=" + wl.sciezka_filtra(k["inter"])
+    assert wl.opcja_fontsdir(tmp_path / "marka") == ":fontsdir=" + wl.sciezka_filtra(tmp_path / "marka")
+    assert wl.sciezka_filtra(Path("C:/Users/Ala Nowak/kroje")) == "'C\\:/Users/Ala Nowak/kroje'"
+    if os.name == "nt":
+        assert wl.sciezka_filtra(Path(r"D:\Jarvo\kroje")) == "'D\\:/Jarvo/kroje'"
+    with pytest.raises(ValueError):
+        wl.sciezka_filtra(tmp_path / "Ania's")
+    assert wl.opcja_fontsdir(tmp_path / "Ania's") == ""                     # apostrof: libass weźmie kroje systemu
+    for zmienna in wl.ZMIENNE_KROJOW:
+        monkeypatch.delenv(zmienna)
+    assert wl.kroje_napisow() is None and wl.opcja_fontsdir() == "" and wl.katalogi_krojow() == []
+    assert wl.pliki_krojow()[0] != k["dejavu"] / "DejaVuSans.ttf"
+
+
+def test_fonts_conf_jarva_dla_ffmpeg_i_przegladarki(monkeypatch, tmp_path):
+    """fonts.conf w cache Wideografa: najpierw kroje Jarva, potem kroje systemu jako zapas, cache fontconfig obok;
+    FONTCONFIG_FILE dostaje go środowisko ffmpeg (wl.run) i przeglądarki, gdy nikt nie ustawił innego pliku."""
+    k = _kroje_jarva(monkeypatch, tmp_path)
+    plik = Path(wl.plik_fonts_conf())
+    assert plik == tmp_path / "cache" / "fontconfig" / "fonts.conf"
+    tresc = plik.read_text(encoding="utf-8")
+    katalogi = re.findall(r"<dir>([^<]+)</dir>", tresc)
+    zapis = (lambda p: p.as_posix()) if os.name == "nt" else str
+    assert katalogi[:4] == [zapis(k["inter"]), zapis(k["dejavu"]), zapis(k["noto"]), zapis(k["emoji"])]
+    assert f"<cachedir>{zapis(plik.parent / 'cache')}</cachedir>" in tresc and tresc.startswith("<?xml")
+    if os.name == "nt":
+        assert "<dir>WINDOWSFONTDIR</dir>" in tresc
+    from xml.dom import minidom
+    minidom.parseString(tresc.encode("utf-8"))                             # poprawny XML
+    assert wl.env_krojow({"PATH": "x"}) == {"PATH": "x", "FONTCONFIG_FILE": str(plik)}
+    assert wl.env_krojow({"FONTCONFIG_FILE": "/inny.conf"})["FONTCONFIG_FILE"] == "/inny.conf"
+    widziane = []
+    monkeypatch.setattr(wl.subprocess, "run", lambda cmd, **kw: widziane.append(kw.get("env")) or
+                        subprocess.CompletedProcess(cmd, 0, "", ""))
+    wl.run(["ffprobe", "-version"])
+    assert widziane[0]["FONTCONFIG_FILE"] == str(plik)
+    mtime = plik.stat().st_mtime_ns
+    monkeypatch.setattr(wl, "_FONTS_CONF", [])
+    assert wl.plik_fonts_conf() == str(plik) and plik.stat().st_mtime_ns == mtime     # ta sama treść: bez zapisu
+
+
+def test_obraz_bez_krojow_jarva_bez_zmian(monkeypatch, tmp_path):
+    """W obrazie (bez JARVO_FONTY_*) nie ma fonts.conf Jarva: środowisko ffmpeg bez FONTCONFIG_FILE, ASS bez fontsdir."""
+    for zmienna in wl.ZMIENNE_KROJOW:
+        monkeypatch.delenv(zmienna, raising=False)
+    monkeypatch.delenv("FONTCONFIG_FILE", raising=False)
+    monkeypatch.setattr(wl, "_FONTS_CONF", [])
+    assert wl.plik_fonts_conf() is None and "FONTCONFIG_FILE" not in wl.env_krojow({"A": "1"})
+
+
+def test_cache_i_pliki_robocze_w_danych_jarva(monkeypatch, tmp_path):
+    """Natywnie cache Wideografa i klatki robocze idą do `<dane>/jarvo/cache/wideo` (JARVO_DATA_DIR, dysk instalacji),
+    a nie do katalogu domowego właściciela i %TEMP%; JARVO_WIDEO_CACHE wygrywa; bez zmiennych katalog systemu."""
+    monkeypatch.delenv("JARVO_WIDEO_CACHE", raising=False)
+    monkeypatch.setenv("JARVO_DATA_DIR", str(tmp_path / "dane" / "jarvo"))
+    assert wl.cache_dir("lektor") == tmp_path / "dane" / "jarvo" / "cache" / "wideo" / "lektor"
+    roboczy = wl.katalog_roboczy("jarvo-html-klatki-")
+    assert roboczy.parent == tmp_path / "dane" / "jarvo" / "cache" / "wideo" / "robocze" and roboczy.is_dir()
+    assert roboczy.name.startswith("jarvo-html-klatki-")
+    monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "inny"))
+    assert wl.cache_dir("sceny") == tmp_path / "inny" / "sceny"
+    monkeypatch.delenv("JARVO_DATA_DIR")
+    import tempfile
+    roboczy = wl.katalog_roboczy("x-")
+    assert roboczy.parent == Path(tempfile.gettempdir()) and roboczy.is_dir()
+    roboczy.rmdir()
+
+
+def test_przegladarka_renderu_z_manifestu(monkeypatch, tmp_path):
+    """Bez Chromium w PLAYWRIGHT_BROWSERS_PATH (natywnie nie ma /opt/hermes/.playwright) html_wideo bierze
+    chrome-headless-shell z manifestu (CHROME_PATH z narzedzia.json); rewizja z obrazu wygrywa, gdy jest."""
+    nz = load_script("profiles/jarvo-wideo/scripts/narzedzia.py")
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path / "pw"))
+    chs = tmp_path / "narzedzia" / "chrome-headless-shell" / ("chrome-headless-shell.exe" if os.name == "nt"
+                                                                 else "chrome-headless-shell")
+    chs.parent.mkdir(parents=True)
+    chs.write_bytes(b"")
+    monkeypatch.delenv("PUPPETEER_EXECUTABLE_PATH", raising=False)
+    monkeypatch.setenv("CHROME_PATH", str(tmp_path / "brak"))
+    assert nz.headless_shell() is None
+    monkeypatch.setenv("CHROME_PATH", str(chs))
+    assert nz.headless_shell() == str(chs)
+    obraz = tmp_path / "pw" / "chromium_headless_shell-1243" / Path(*nz.SHELL_LAYOUTS[0])
+    obraz.parent.mkdir(parents=True)
+    obraz.write_bytes(b"")
+    assert nz.headless_shell() == str(obraz)
+
+
+def test_montaz_filmu_napisy_ass_z_krojami_jarva(monkeypatch, tmp_path):
+    """film.py: napisy ASS natywnie z `fontsdir` na Interze z instalacji (bez niego libass na Windows nie znajdzie kroju
+    „Inter”), z krojem marki obok (`fonts/` w katalogu budowy) jak dotąd, w obrazie bez fontsdir."""
+    k = _kroje_jarva(monkeypatch, tmp_path)
+    polecenia = []
+    monkeypatch.setattr(wl, "run", lambda cmd, cwd=None, quiet=True: polecenia.append(cmd))
+    build, out = tmp_path / "build", tmp_path / "film.mp4"
+    build.mkdir()
+    ass = build / "napisy-9x16.ass"
+    ass.write_text("[Script Info]\n", encoding="utf-8")
+    for p in ("a.mp4", "b.mp4", "dzwiek.wav"):
+        (tmp_path / p).write_bytes(b"")
+    (tmp_path / "film.part.mp4").write_bytes(b"x")
+
+    def graf() -> str:
+        polecenia.clear()
+        film.assemble([tmp_path / "a.mp4", tmp_path / "b.mp4"], [1.0, 1.0], 2.0, 540, 960, build, out,
+                      tmp_path / "dzwiek.wav", ass, None, "gora-prawo", False, True)
+        (tmp_path / "film.part.mp4").write_bytes(b"x")
+        cmd = polecenia[0]
+        return cmd[cmd.index("-filter_complex") + 1]
+
+    assert f"ass=napisy-9x16.ass:fontsdir={wl.sciezka_filtra(k['inter'])}[vs]" in graf()
+    (build / "fonts").mkdir()
+    assert "ass=napisy-9x16.ass:fontsdir=fonts[vs]" in graf()
+    (build / "fonts").rmdir()
+    for zmienna in wl.ZMIENNE_KROJOW:
+        monkeypatch.delenv(zmienna)
+    assert "ass=napisy-9x16.ass[vs]" in graf()
+
+
+def _ffmpeg_z(*filtry: str) -> bool:
+    if not (shutil.which("ffmpeg") and shutil.which("ffprobe")):
+        return False
+    out = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True).stdout
+    return all(f" {f} " in out for f in filtry)
+
+
+@pytest.mark.skipif(not _ffmpeg_z("ass", "drawtext"), reason="brak FFmpeg z libass i drawtext")
+def test_napisy_ass_z_fontsdir_i_drawtext_na_prawdziwym_ffmpeg(monkeypatch, tmp_path):
+    """Prawdziwy ffmpeg: `ass` z `fontsdir` w ścieżce bezwzględnej (na Windows z literą dysku i spacją) i drawtext
+    z `fontfile` z sciezka_filtra rysują polskie litery (jasne piksele na czarnym tle); zły zapis ścieżki zatrzymałby
+    filtr albo zostawił klatkę czarną."""
+    rodziny = {"DejaVuSans.ttf": "DejaVu Sans", "segoeui.ttf": "Segoe UI", "arial.ttf": "Arial", "Arial.ttf": "Arial",
+               "Arial Unicode.ttf": "Arial Unicode MS"}         # nazwa rodziny w pliku kroju (dla stylu ASS)
+    kroj = next((p for p in wl._kroje_systemu(False) if p.is_file() and p.name in rodziny), None)
+    if kroj is None:
+        pytest.skip("brak kroju systemu do próby")
+    kroje = tmp_path / "kroje napisow"
+    kroje.mkdir()
+    shutil.copy2(kroj, kroje / kroj.name)
+    rodzina = rodziny[kroj.name]
+    monkeypatch.setenv("JARVO_FONTY_DEJAVU", str(kroje))           # drawtext z fontfile także na Linuksie
+    monkeypatch.setenv("JARVO_WIDEO_CACHE", str(tmp_path / "cache"))   # fonts.conf Jarva w tmp_path
+    monkeypatch.delenv("FONTCONFIG_FILE", raising=False)
+    monkeypatch.setattr(wl, "_FONTS_CONF", [])
+    styl = wl.SubStyle(styl="zwykle", font=rodzina, wielkie=False)
+    (tmp_path / "n.ass").write_text(wl.build_ass(320, 180, [W(0.0, 1.0, "Żółć"), W(0.0, 1.0, "gęś")], styl),
+                                    encoding="utf-8")
+
+    def jasnosc(vf: str) -> int:
+        r = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=320x180:d=1",
+                            "-vf", f"{vf},format=gray", "-frames:v", "1", "-f", "rawvideo", "-"], cwd=tmp_path,
+                           capture_output=True, env=wl.env_krojow())
+        assert r.returncode == 0, r.stderr.decode("utf-8", "replace")[-400:]
+        return max(r.stdout)
+
+    assert jasnosc("ass=n.ass" + wl.opcja_fontsdir(kroje)) > 128
+    monkeypatch.setattr(wl, "pliki_krojow", lambda gruby=False: [kroje / kroj.name])
+    assert jasnosc(f"drawtext=text='Zażółć'{wl.drawtext_kroj()}:fontsize=40:fontcolor=white:x=10:y=60") > 128
+
+
+# ------------------------------------------------------------------ narzędzia npm floty natywnie (infra/node, HyperFrames)
+
+NODE = REPO / "infra" / "node"
+
+
+def test_lock_npm_floty_z_hyperframes_i_sumami():
+    """infra/node/package-lock.json (docs/NATYWNIE.md P02, I32): te same paczki co package.json, HyperFrames 0.8.78
+    w tym samym locku, każda paczka z sumą integrity z registry.npmjs.org; wersja jak w toolbox.yaml Wideografa."""
+    pkg = json.loads((NODE / "package.json").read_text(encoding="utf-8"))
+    lock = json.loads((NODE / "package-lock.json").read_text(encoding="utf-8"))
+    assert lock["lockfileVersion"] == 3 and lock["name"] == pkg["name"]
+    assert lock["packages"][""]["dependencies"] == pkg["dependencies"]
+    paczki = {k: v for k, v in lock["packages"].items() if k}
+    for nazwa, wersja in pkg["dependencies"].items():
+        assert paczki[f"node_modules/{nazwa}"]["version"] == wersja, nazwa
+    assert pkg["dependencies"]["hyperframes"] == "0.8.78"
+    for k, v in paczki.items():
+        if v.get("link"):
+            continue
+        assert v["integrity"].startswith("sha512-") and v["resolved"].startswith("https://registry.npmjs.org/"), k
+    toolbox = (REPO / "profiles" / "jarvo-wideo" / "toolbox.yaml").read_text(encoding="utf-8")
+    assert re.search(r"name: hyperframes, .*version: 0\.8\.78, ", toolbox)
+    assert b"\r\n" not in (NODE / "package-lock.json").read_bytes()
+
+
+def _node_floty():
+    return load_script("infra/node/node_floty.py", "jarvo_test_node_floty")
+
+
+def test_node_floty_npm_ci_z_locka(monkeypatch, tmp_path):
+    """npm ci --ignore-scripts z locka tej wersji do `<program>/node-floty/<skrót locka>` (npm bez npmrc właściciela,
+    node obok npm w PATH), bez onnxruntime-node; wpis narzedzia.json: node_modules/.bin w PATH, NODE_PATH, HyperFrames
+    bez telemetrii i autoaktualizacji, ffmpeg i ffprobe z manifestu (na macOS z dwóch katalogów). Drugi przebieg bez
+    npm; nieudany npm ci nie zostawia katalogu."""
+    import atrapy
+    nf = _node_floty()
+    zapis = tmp_path / "npm-wywolania.jsonl"
+    npm = atrapy.program(tmp_path / "node", "npm", f"""
+import json, os, sys
+from pathlib import Path
+with open({str(zapis)!r}, "a", encoding="utf-8") as f:
+    f.write(json.dumps({{"argv": sys.argv[1:], "cwd": os.getcwd(), "userconfig": os.environ.get("npm_config_userconfig"),
+                        "cache": os.environ.get("npm_config_cache"), "path0": os.environ["PATH"].split(os.pathsep)[0]}}) + "\\n")
+if os.environ.get("NPM_PADA"):
+    sys.exit(3)
+for p in {list(nf.SPRAWDZ) + ["onnxruntime-node"]!r}:
+    d = Path("node_modules") / p
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "package.json").write_text("{{}}", encoding="utf-8")
+""")
+    rozsz = ".exe" if os.name == "nt" else ""
+    (tmp_path / "ffmpeg" / "bin").mkdir(parents=True)
+    (tmp_path / "ffmpeg" / "bin" / f"ffmpeg{rozsz}").write_bytes(b"")
+    (tmp_path / "ffprobe").mkdir()
+    (tmp_path / "ffprobe" / f"ffprobe{rozsz}").write_bytes(b"")
+    monkeypatch.setenv("npm_config_registry", "https://obcy.example")       # konfiguracja właściciela nie przechodzi
+    program = tmp_path / "program"
+    wpis, zmiana = nf.zainstaluj(program, npm, cache=tmp_path / "cache", log=lambda t: None,
+                                 bin_ffmpeg=[tmp_path / "ffmpeg" / "bin", tmp_path / "ffprobe"])
+    kat = program / "node-floty" / nf.suma_locka()[:12]
+    assert zmiana and wpis["katalog"] == str(kat) and wpis["bin"] == [str(kat / "node_modules" / ".bin")]
+    assert wpis["env"]["NODE_PATH"] == str(kat / "node_modules")
+    assert {wpis["env"][k] for k in ("HYPERFRAMES_NO_TELEMETRY", "HYPERFRAMES_NO_UPDATE_CHECK",
+                                     "HYPERFRAMES_NO_AUTO_INSTALL")} == {"1"}
+    assert wpis["env"]["HYPERFRAMES_FFMPEG_PATH"] == str(tmp_path / "ffmpeg" / "bin" / f"ffmpeg{rozsz}")
+    assert wpis["env"]["HYPERFRAMES_FFPROBE_PATH"] == str(tmp_path / "ffprobe" / f"ffprobe{rozsz}")
+    assert wpis["env"]["HYPERFRAMES_EXTRACT_CACHE_DIR"] == str(tmp_path / "cache" / "hyperframes")
+    wywolania = [json.loads(x) for x in zapis.read_text(encoding="utf-8").splitlines()]
+    assert len(wywolania) == 1 and wywolania[0]["argv"][:3] == ["ci", "--ignore-scripts", "--omit=dev"]
+    assert Path(wywolania[0]["cache"]) == tmp_path / "cache" / "npm"
+    assert Path(wywolania[0]["path0"]) == npm.parent                         # node obok npm na początku PATH
+    assert Path(wywolania[0]["userconfig"]).name == ".npmrc-uzytkownika"     # pusty plik zamiast ~/.npmrc
+    assert not (kat / "node_modules" / "onnxruntime-node").exists() and (kat / ".jarvo-lock").is_file()
+    assert (kat / "package-lock.json").read_bytes() == (NODE / "package-lock.json").read_bytes()
+    assert not list(kat.glob(".npmrc*"))
+    assert nf.zainstaluj(program, npm, cache=tmp_path / "cache", log=lambda t: None)[1] is False   # bez npm
+    assert len(zapis.read_text(encoding="utf-8").splitlines()) == 1
+    shutil.rmtree(kat)
+    monkeypatch.setenv("NPM_PADA", "1")
+    with pytest.raises(nf.BladNodeFloty, match="npm ci"):
+        nf.zainstaluj(program, npm, cache=tmp_path / "cache", log=lambda t: None)
+    assert not kat.exists()
+
+
+def test_test_na_zywo_mediow_bez_instalacji(tmp_path):
+    """tests/live/natywnie_media.py: osiem punktów jak w opisie, PNG napisu poprawny, kod STT i TTS bramy się
+    kompiluje, a bez instalacji raport z błędem i kod 1 (bez śladu na ekranie i bez plików poza katalogiem wyników)."""
+    import base64
+    nm = load_script("tests/live/natywnie_media.py", "jarvo_test_natywnie_media")
+    assert [nr for nr, _o, _f in nm.PUNKTY] == ["1", "2", "3", "4", "5", "6", "7", "8"]
+    compile(nm.GLOS_BRAMY, "glos_bramy", "exec")
+    assert all(f"  {nr}. " in nm.__doc__ for nr, _o, _f in nm.PUNKTY)
+    png = base64.b64decode(nm.png_napisu(8, 10).split(",", 1)[1])
+    assert png.startswith(b"\x89PNG\r\n\x1a\n") and struct.unpack(">II", png[16:24]) == (8, 10)
+    assert nm.main(["--wyniki", str(tmp_path / "wyniki"), "--korzen", str(tmp_path / "brak")]) == 1
+    raport = json.loads((tmp_path / "wyniki" / "raport.json").read_text(encoding="utf-8"))
+    assert raport["ok"] is False and "brak instalacji Jarva" in raport["blad"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["wyniki"]
+
+
+def test_render_html_studia_z_piaskownica_poza_kontenerem():
+    """render_html.cjs Studia: --no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy (Linux jako root,
+    kontener), jak har.cjs i audit.py; natywnie na Windows i macOS z piaskownicą."""
+    js = (REPO / "profiles" / "jarvo-studio" / "scripts" / "render_html.cjs").read_text(encoding="utf-8")
+    assert "args: argsPiaskownicy()" in js and "args: ['--no-sandbox']" not in js
+    assert "process.platform !== 'linux'" in js and "/.dockerenv" in js
 
 
 # ------------------------------------------------------------------ html_wideo (animacja HTML / Lottie → wideo)
