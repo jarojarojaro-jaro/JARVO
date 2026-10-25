@@ -1183,6 +1183,10 @@ HERMES_MB = {"checkout": 850, "cache_uv": 350, "node_modules": 300, "front": 80}
 # w <root>/build i profile z wtyczkami w <dane>
 # źródła skilli: zmierzone 2026-10-25 (31 źródeł) 2,1 GB na Linuksie i macOS w CI, 0,9 GB na Windows (to samo
 # pobranie git fetch --depth 1); szacunek wg większego, bo sprawdzenie miejsca ma nie zaniżać
+# katalogi HyperFrames w katalogu domowym (ustawienia i cache rejestru; fonty, whisper.cpp, przeglądarka): co wolno
+# w nich zastać, żeby `jarvo uninstall` usunął je w całości (zmiany_hosta.katalog_przed_zmiana)
+KATALOGI_HYPERFRAMES = ((".hyperframes", ["config.json", "install-state.json", "cache"]),
+                        (".cache/hyperframes", ["fonts", "whisper", "chrome"]))
 FLOTA_MB = {"zrodla": 2200, "build": 100, "profile": 150}
 # narzędzia npm floty w MB (infra/node, npm ci z locka b5a1f4c9e3b8; zmierzone 2026-10-25 na Windows 11 x64): katalog
 # `<program>/node-floty/<skrót>` bez onnxruntime, 438 MB plików i 483 MB na dysku NTFS (tysiące małych plików; zostaje),
@@ -2110,6 +2114,11 @@ class _Instalacja:
                                  f"w {self.u.cache / nf.CACHE_NPM}.") from None
         self.narz["node-floty"] = spis
         self.podlog(f"narzędzia npm floty: {'zainstalowane' if zmiana else 'już są'} ({spis['katalog']})")
+        # HyperFrames pisze do katalogu domowego (homedir(), bez zmiennej do przeniesienia): gdy tych katalogów nie
+        # było, wpis w dzienniku zmian hosta, więc `jarvo uninstall` je usuwa (CI natywnie: migawka po odinstalowaniu)
+        zm = self.ot.modul("zmiany_hosta")
+        for cel, dozwolone in KATALOGI_HYPERFRAMES:
+            zm.katalog_przed_zmiana(self.u, Path.home() / cel, dozwolone)
         if zmiana:
             self.zmiany.append("narzędzia npm floty")
 

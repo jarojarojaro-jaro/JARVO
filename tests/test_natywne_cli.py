@@ -896,6 +896,12 @@ class AtrapaZmian:
     def wpisy(self, u):
         return [dict(w) for w in self.lista]
 
+    def katalog_przed_zmiana(self, u, cel, dozwolone):
+        if Path(cel).exists():
+            return None
+        self.dopisz(u, "katalog", sciezka=str(cel), dozwolone=sorted(dozwolone))
+        return Path(cel)
+
     def zapisz_plik(self, u, sciezka, tresc, tryb=0o644):
         if self.blad_pliku:
             raise OSError(self.blad_pliku)

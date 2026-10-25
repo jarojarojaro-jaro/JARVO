@@ -1449,7 +1449,12 @@ def test_narzedzia_npm_floty_krok_instalatora_i_drugi_przebieg(tmp_path, stanowi
     potrzeby = {p.opis: p for p in instalator.potrzebne_miejsce(u, app, sciezki.platforma())}
     assert potrzeby["narzędzia npm floty"].zostaje == instalator.NODE_FLOTY_MB["katalog"] * MB
     assert potrzeby["cache npm narzędzi floty"].zostaje == 0 and potrzeby["cache npm narzędzi floty"].gdzie == u.cache
+    dom = tmp_path / "dom-hf"
+    (dom / ".hyperframes").mkdir(parents=True)                         # był przed Jarvem: zostaje bez wpisu
+    monkeypatch.setattr(instalator.Path, "home", staticmethod(lambda: dom))
     assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
+    katalogi = [w["szczegoly"] for w in s["zmiany"].lista if w["rodzaj"] == "katalog"]
+    assert katalogi == [{"sciezka": str(dom / ".cache" / "hyperframes"), "dozwolone": ["chrome", "fonts", "whisper"]}]
     log = "\n".join(s["log"])
     kroki = re.findall(r"^\[[#-]+\] +\d+/\d+  (.+)$", log, re.M)
     assert kroki.index("Tesseract") < kroki.index("Narzędzia npm floty") == kroki.index("Spis narzędzi") - 1
