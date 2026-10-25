@@ -349,10 +349,16 @@ agents:
 
 shared:
   user_memory: builtin          # MVP: pamięć wbudowana + wspólny profil użytkownika; faza 3: honcho
-  user_profile: knowledge/user/USER.md      # na VPS: /opt/data/jarvo/knowledge/user/USER.md
-  brand_kits: knowledge/brands              # na VPS: /opt/data/jarvo/knowledge/brands/
-  missions_dir: /opt/data/jarvo/missions
-  workspaces_dir: /opt/data/jarvo/workspaces
+  user_profile: knowledge/user/USER.md      # w skarbcu: @@KNOWLEDGE_DIR@@/user/USER.md
+  brand_kits: knowledge/brands              # w skarbcu: @@KNOWLEDGE_DIR@@/brands/
+  # Katalogi danych floty względem <dane> (HERMES_HOME: w kontenerze /opt/data, natywnie <root>/dane,
+  # docs/NATYWNIE.md c1). scripts/build.py składa z nich tokeny @@JARVO_DIR@@, @@KNOWLEDGE_DIR@@, @@MISSIONS_DIR@@,
+  # @@WORKSPACES_DIR@@ i @@INBOX_DIR@@ (w kontenerze np. /opt/data/jarvo/missions, jak przed układem natywnym).
+  jarvo_dir: jarvo
+  knowledge_dir: jarvo/knowledge
+  missions_dir: jarvo/missions
+  workspaces_dir: jarvo/workspaces
+  inbox_dir: jarvo/inbox
   protocol: shared/protocol/kontrakt-zlecenia.md
   timezone: Europe/Warsaw
 

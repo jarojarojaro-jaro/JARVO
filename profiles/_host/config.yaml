@@ -1,6 +1,9 @@
-# Profil hosta (default, /opt/data): gateway, multipleks profili, dispatcher kanbana, trasy.
-# Z Tobą nie rozmawia. Trasy gateway.profile_routes dopisuje scripts/build.py z fleet.yaml
-# i zmiennych TELEGRAM_* (DM właściciela → jarvo, wątki grupy "Jarvo HQ" → agenci).
+# Profil hosta (default, HERMES_HOME: w kontenerze /opt/data, natywnie <dane>): gateway, multipleks profili,
+# dispatcher kanbana, trasy. Z Tobą nie rozmawia. Trasy gateway.profile_routes dopisuje scripts/build.py z fleet.yaml
+# i zmiennych TELEGRAM_* (DM właściciela → jarvo, wątki grupy "Jarvo HQ" → agenci). W układzie natywnym
+# (build.py --uklad natywny) build dopisuje też wtyczkę zgód jarvo-zgody w plugins.enabled,
+# security.tirith_enabled, security.allow_lazy_installs i auth.adopt_external_logins: false
+# oraz terminal.home_mode: profile i terminal.auto_source_bashrc: false (docs/NATYWNIE.md, sekcja d).
 
 model:                      # nadpisywane przez scripts/build.py: dostawca floty i model `fast`
   provider: openrouter
@@ -23,6 +26,8 @@ kanban:
   max_in_progress_per_profile: 2
 
 # Wiadomości głosowe z Telegrama transkrybuje gateway: Parakeet przez jarvo-stt (bez faster-whisper).
+# Polecenie to HERMES_LOCAL_STT_COMMAND: w kontenerze ENV w infra/Dockerfile, natywnie build/host/srodowisko.json
+# z scripts/build.py (pełna ścieżka jarvo-stt, na Windows .exe, z „/” i w cudzysłowie: Hermes dzieli je shlex.split).
 stt:
   provider: local_command
   language: pl
@@ -30,6 +35,8 @@ stt:
 # Głos floty (odpowiedzi głosowe na Telegramie, tryb /voice, i narzędzie text_to_speech): lokalny polski
 # Matcha-TTS-PL v2 z obrazu przez jarvo-tts, bez sieci i bez klucza. scripts/build.py kopiuje ten blok do
 # każdego profilu bez własnego `tts`. Głos żeński: voice: pl-PL-Matcha-Damski. WAV → Opus robi Hermes (dymek głosowy).
+# Ścieżka programu to ścieżka obrazu; w układzie natywnym build wpisuje w jej miejsce program floty z instalacji
+# ("<program>/bin-floty/jarvo-tts.exe" na Windows), z „/” i w cudzysłowie, a argumenty zostają.
 tts:
   provider: matcha
   providers:

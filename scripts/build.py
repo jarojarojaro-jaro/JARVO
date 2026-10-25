@@ -2,20 +2,30 @@
 """Buduje gotowe dystrybucje profili Hermesa z tego repo.
 
     python scripts/build.py --hermes-src /opt/hermes [--env-file /srv/jarvo/compose/jarvo.env]
+    python scripts/build.py --uklad natywny --dane <HERMES_HOME> --hermes-src <checkout Hermesa> --out <root>/build
+        [--repo-dir <kod Jarva>] [--bin-dir <program>/bin-floty] [--tools-dir <program>/narzedzia-floty] [--py <python>]
+        [--system windows|macos|linux]
 
 Wynik: build/
   profiles/<agent>/   dystrybucja gotowa do `hermes profile install` / `update`
   host/config.yaml    config profilu hosta (default): gateway, trasy Telegrama, kanban
-  BUILD.json          manifest (commit repo, źródła skilli, agenci)
+  host/srodowisko.json  (tylko natywnie) zmienne bramy z buildu: HERMES_LOCAL_STT_COMMAND
+  plugins/            jarvo-hq, jarvo-wiedza, jarvo-komputer; natywnie także jarvo-zgody (tryby zgód, zgody/)
+  BUILD.json          manifest (commit repo, źródła skilli, agenci; natywnie także układ i ścieżki)
+
+Układ (`--uklad`, docs/NATYWNIE.md S06): `kontener` (domyślny) daje dzisiejsze ścieżki obrazu (/opt/data, /opt/jarvo/…),
+bajt w bajt jak przed układem natywnym; `natywny` bierze ścieżki instalacji (`--dane` i katalogi programu, zawsze z „/”)
+i wartości zależne od systemu: silnik przeglądarki, wyszukiwarka (autodetekcja Hermesa, decyzja I14), polecenia STT i TTS
+bramy, zakazy dla katalogu danych w każdej pisowni, wtyczka zgód i tryb zgód profilu czatu.
 
 Kroki dla każdego aktywnego agenta z fleet.yaml:
   1. kopia profiles/<agent>/ (bez plików roboczych),
   2. SOUL.md: wstawienie wspólnego protokołu (i skrótu floty dla Jarva),
   3. profile.yaml z opisem z fleet.yaml (routing kanbana, roster),
-  4. config.yaml: podstawienie tokenów @@...@@ (modele, katalogi, strefa czasowa),
+  4. config.yaml: podstawienie tokenów @@...@@ (modele, katalogi, strefa czasowa) i wartości układu,
   5. skille zewnętrzne z vendor/skills.lock.yaml (+ licencje, + DESCRIPTION.md kategorii); każdy przechodzi
      skan bezpieczeństwa (scripts/skan_skilli.py): high/critical bez wyjątku z vendor/skan-wyjatki.yaml
-     zatrzymuje build,
+     zatrzymuje build; wspólne skille Jarva (shared/skills) dostają tokeny jak skille własne,
   6. dla Jarva: skill `roster` i rubryki sędziego generowane z fleet.yaml i quality/rubric.md,
   7. cron/jobs.yaml → cron/jobs.json (przez API crona Hermesa, stałe ID zadań).
 """
@@ -31,7 +41,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fleetlib as fl  # noqa: E402
@@ -92,6 +103,298 @@ def read_env_file(path: Path | None) -> dict[str, str]:
     return env
 
 
+# --------------------------------------------------------------------------- układ
+
+UKLADY = ("kontener", "natywny")
+SYSTEMY = ("windows", "macos", "linux")
+
+
+@dataclass(frozen=True)
+class Uklad:
+    """Instalacja, dla której budujemy (docs/NATYWNIE.md S06). `kontener`: ścieżki obrazu, te same napisy co przed
+    układem natywnym (kontener działa bez zmian do etapu E13). `natywny`: ścieżki instalacji natywnej i wartości
+    zależne od systemu. Ścieżki zawsze z „/” (as_posix): w YAML w podwójnym cudzysłowie „\\” zaczyna sekwencję
+    ucieczki („C:\\Users” to ScannerError), a w poleceniach powłoki „\\” poza cudzysłowem znika."""
+    nazwa: str = "kontener"
+    system: str = "linux"
+    dane: str = "/opt/data"                        # HERMES_HOME (@@DATA_DIR@@)
+    repo: str = "/opt/jarvo/repo"                  # kod Jarva (@@REPO_DIR@@)
+    build: str = "/opt/jarvo/build"                # ten build w działającej instalacji (@@BUILD_DIR@@)
+    narzedzia: str = "/opt/data/jarvo/narzedzia"   # instalacje narzędzi floty w locie (@@TOOLS_DIR@@)
+    bin: str = "/opt/jarvo/bin"                    # programy floty (@@BIN_DIR@@)
+    py: str = "python3"                            # Python skryptów floty jako słowo polecenia (@@PY@@)
+    dom: str = ""                                  # katalog domowy właściciela: zakazy w pisowni „~” (natywnie)
+
+    @property
+    def natywny(self) -> bool:
+        return self.nazwa == "natywny"
+
+    @property
+    def windows(self) -> bool:
+        return self.natywny and self.system == "windows"
+
+
+KONTENER = Uklad()
+# katalogi danych floty względem <dane>: klucz w fleet.yaml `shared` i wartość, gdy go brak
+KATALOGI_DANYCH = (("JARVO_DIR", "jarvo_dir", "jarvo"), ("KNOWLEDGE_DIR", "knowledge_dir", "jarvo/knowledge"),
+                   ("MISSIONS_DIR", "missions_dir", "jarvo/missions"),
+                   ("WORKSPACES_DIR", "workspaces_dir", "jarvo/workspaces"), ("INBOX_DIR", "inbox_dir", "jarvo/inbox"))
+KOMPUTER_KONTENERA = "/opt/jarvo/komputer"         # gniazda Komputera w kontenerze; natywnie <dane>/jarvo/komputer (c1)
+
+
+def system_tego_komputera() -> str:
+    return "windows" if os.name == "nt" else "macos" if sys.platform == "darwin" else "linux"
+
+
+def sciezka_ukladu(wartosc: str | os.PathLike, system: str, opcja: str) -> str:
+    """Ścieżka bezwzględna z „/” dla systemu docelowego. Bez resolve(): na Windows rozwinąłby krótką nazwę 8.3,
+    a <program> ma zostać w ścieżce ASCII, którą podał instalator (docs/NATYWNIE.md B13)."""
+    tekst = str(wartosc).strip()
+    na_tym = system == system_tego_komputera()
+    if na_tym:
+        tekst = os.path.abspath(os.path.expanduser(tekst))
+    p = PureWindowsPath(tekst) if system == "windows" else PurePosixPath(tekst)
+    if not p.is_absolute():
+        raise SystemExit(f"--{opcja}: {wartosc!r} nie jest ścieżką bezwzględną dla systemu {system}")
+    tekst = p.as_posix()
+    # znaki, których nie da się bezpiecznie wstawić do YAML w cudzysłowie i do poleceń w cudzysłowie
+    zle = sorted({c for c in tekst if c in '"`$\n\r' or (c == "\\" and system != "windows")})
+    if zle:
+        raise SystemExit(f"--{opcja}: ścieżka {tekst!r} ma znaki {''.join(zle)!r}, których build nie wstawi do YAML i "
+                         "poleceń; wybierz katalog bez nich")
+    return tekst
+
+
+def slowo_polecenia(sciezka: str) -> str:
+    """Program jako słowo polecenia powłoki: bez zmian, gdy ma same bezpieczne znaki (kontener: `python3`),
+    inaczej w podwójnym cudzysłowie (spacja albo polskie litery w nazwie użytkownika)."""
+    return sciezka if re.fullmatch(r"[A-Za-z0-9_./:@%+=,-]+", sciezka) else f'"{sciezka}"'
+
+
+def uklad_z_argumentow(args: argparse.Namespace) -> Uklad:
+    """Układ z opcji build.py. Kontener: dzisiejsze ścieżki obrazu (każdą można nadpisać opcją). Natywnie domyślne
+    wartości idą za układem katalogów z docs/NATYWNIE.md (c1): <root>/dane, <root>/program/{bin-floty,
+    narzedzia-floty}; instalator podaje je jawnie (<program> w ścieżce ASCII)."""
+    if args.uklad != "natywny":
+        if args.system not in (None, "linux"):
+            raise SystemExit("--system dotyczy układu natywnego (kontener to zawsze Linux)")
+
+        def k(wartosc, domyslna: str, opcja: str) -> str:
+            return sciezka_ukladu(wartosc, "linux", opcja) if wartosc else domyslna
+        return Uklad(dane=k(args.dane, KONTENER.dane, "dane"), repo=k(args.repo_dir, KONTENER.repo, "repo-dir"),
+                     build=k(args.runtime_build_dir, KONTENER.build, "runtime-build-dir"),
+                     narzedzia=k(args.tools_dir, KONTENER.narzedzia, "tools-dir"),
+                     bin=k(args.bin_dir, KONTENER.bin, "bin-dir"),
+                     py=slowo_polecenia(args.py) if args.py else KONTENER.py)
+    system = args.system or system_tego_komputera()
+    if args.dane:
+        dane = sciezka_ukladu(args.dane, system, "dane")
+    elif system == system_tego_komputera():
+        sys.path.insert(0, str(fl.REPO_ROOT))
+        from jarvo import sciezki            # katalogi tej instalacji (JARVO_ROOT, %LOCALAPPDATA%\Jarvo, ~/.jarvo…)
+        try:
+            dane = sciezka_ukladu(sciezki.uklad().dane, system, "dane")
+        except sciezki.BladUkladu as e:
+            raise SystemExit(f"--dane: {e}") from e
+    else:
+        raise SystemExit("--dane jest wymagane przy budowie dla innego systemu niż ten komputer")
+    program = dane.rsplit("/", 1)[0] + "/program"
+    py = str(args.py or sys.executable)
+    py = slowo_polecenia(sciezka_ukladu(py, system, "py") if re.search(r"[/\\]", py) else py)
+    dom = ""
+    if system == system_tego_komputera() and os.path.expanduser("~") != "~":
+        try:                                 # katalog domowy z dziwnym znakiem: bez pisowni „~” w zakazach
+            dom = sciezka_ukladu(os.path.expanduser("~"), system, "dom")
+        except SystemExit:
+            dom = ""
+    return Uklad(nazwa="natywny", system=system, dane=dane,
+                 repo=sciezka_ukladu(args.repo_dir or fl.REPO_ROOT, system, "repo-dir"),
+                 build=sciezka_ukladu(args.runtime_build_dir or args.out, system, "runtime-build-dir"),
+                 narzedzia=sciezka_ukladu(args.tools_dir or program + "/narzedzia-floty", system, "tools-dir"),
+                 bin=sciezka_ukladu(args.bin_dir or program + "/bin-floty", system, "bin-dir"), py=py, dom=dom)
+
+
+def sciezki_floty(fleet: fl.Fleet, u: Uklad) -> dict[str, str]:
+    """Tokeny ścieżek (wspólny kontrakt etapu E4, docs/NATYWNIE.md (e) p. 2): katalogi danych floty z fleet.yaml
+    `shared` (względem <dane>) i katalogi programu z układu. W kontenerze te same napisy co przed układem natywnym."""
+    shared = fleet.raw.get("shared") or {}
+    out = {"DATA_DIR": u.dane}
+    for token, klucz, domyslnie in KATALOGI_DANYCH:
+        rel = str(shared.get(klucz) or domyslnie).strip()
+        czesci = rel.split("/")
+        if rel.startswith(("/", "~")) or re.match(r"[A-Za-z]:", rel) or "\\" in rel or {"", ".", ".."} & set(czesci):
+            raise SystemExit(f"fleet.yaml shared.{klucz}: {rel!r} ma być ścieżką względną do katalogu danych "
+                             f"(np. {domyslnie})")
+        out[token] = f"{u.dane.rstrip('/')}/{rel}"
+    out.update({"REPO_DIR": u.repo, "BUILD_DIR": u.build, "TOOLS_DIR": u.narzedzia, "BIN_DIR": u.bin, "PY": u.py})
+    return out
+
+
+def program(u: Uklad, nazwa: str) -> str:
+    """Program floty z @@BIN_DIR@@ jako pierwsze słowo polecenia bramy. Kontener: goła ścieżka jak w obrazie.
+    Natywnie pełna ścieżka (na Windows z .exe), z „/” i w cudzysłowie: HERMES_LOCAL_STT_COMMAND Hermes dzieli przez
+    shlex.split w trybie POSIX (tools/transcription_local.py:261-288), więc „\\” poza cudzysłowem znika, a spacja
+    rozcina ścieżkę; komendę TTS uruchamia powłoka (tools/tts_command_provider.py:153, na Windows cmd.exe). Klamry
+    podwajamy, bo obie komendy przechodzą przez str.format albo szablon {nazwa} Hermesa."""
+    if not u.natywny:
+        return f"{u.bin}/{nazwa}"
+    sciezka = f"{u.bin}/{nazwa}{'.exe' if u.system == 'windows' else ''}"
+    return '"' + sciezka.replace("{", "{{").replace("}", "}}") + '"'
+
+
+# wiadomości głosowe (stt.provider: local_command): w kontenerze tę wartość ustawia ENV w infra/Dockerfile
+STT_ARGUMENTY = "{input_path} --output-dir {output_dir} --language {language}"
+
+
+def polecenie_stt(u: Uklad) -> str:
+    """HERMES_LOCAL_STT_COMMAND bramy. W kontenerze to ENV obrazu (tests/test_build.py pilnuje, że build zna tę samą
+    wartość), natywnie build zapisuje go w host/srodowisko.json dla środowiska bramy."""
+    return f"{program(u, 'jarvo-stt')} {STT_ARGUMENTY}"
+
+
+def polecenie_programu(polecenie: str, u: Uklad) -> str:
+    """Komenda z programem obrazu (`/opt/jarvo/bin/<nazwa> …`, np. tts.providers.matcha.command z profilu hosta)
+    → ten sam program floty w układzie natywnym; argumenty bez zmian."""
+    pierwsze, _, reszta = str(polecenie).strip().partition(" ")
+    if not u.natywny or not pierwsze.startswith(KONTENER.bin + "/"):
+        return polecenie
+    return f"{program(u, pierwsze[len(KONTENER.bin) + 1:])} {reszta}".rstrip()
+
+
+def mapa_kontenera(fleet: fl.Fleet, u: Uklad) -> dict[str, str]:
+    """Ścieżki obrazu → ścieżki układu, dla tekstów z repo, które podają ścieżkę kontenera (approvals.smart_policy,
+    zakazy z shared/security/deny.yaml)."""
+    k, n = sciezki_floty(fleet, KONTENER), sciezki_floty(fleet, u)
+    mapa = {k[t]: n[t] for t in ("TOOLS_DIR", "KNOWLEDGE_DIR", "MISSIONS_DIR", "WORKSPACES_DIR", "INBOX_DIR",
+                                 "JARVO_DIR", "DATA_DIR", "REPO_DIR", "BUILD_DIR", "BIN_DIR")}
+    mapa[KOMPUTER_KONTENERA] = n["JARVO_DIR"] + "/komputer"
+    return mapa
+
+
+def _wzor_kontenera(mapa: dict[str, str]) -> re.Pattern:
+    """Najdłuższa ścieżka obrazu najpierw, cała nazwa katalogu: `/opt/data` nie trafia w `/opt/database` ani
+    w `/opt/data.bak`, a kropka na końcu zdania („… /opt/data/jarvo/missions.”) nie przeszkadza."""
+    return re.compile("(" + "|".join(re.escape(k) for k in sorted(mapa, key=len, reverse=True))
+                      + r")(?![\w-]|\.[\w-])")
+
+
+def przenies_sciezki(tekst: str, mapa: dict[str, str]) -> str:
+    return _wzor_kontenera(mapa).sub(lambda m: mapa[m.group(1)], tekst)
+
+
+# Zakazy natywnie (docs/NATYWNIE.md F15). Hermes porównuje approvals.deny (fnmatch bez wielkości liter) z kilkoma
+# wariantami polecenia: surowym, z katalogiem domowym i HERMES_HOME zwiniętymi do ~ i ~/.hermes oraz z „\” zamienionym
+# na „/” (tools/approval_floors.py:23-43, tools/approval_detection.py:489-509, 1398-1421). Ścieżka katalogu danych
+# może więc przyjść jako C:/…, C:\…, /c/… (Git Bash), ~/… albo $HERMES_HOME/…, często w cudzysłowie (spacja w nazwie
+# użytkownika). Zakaz to podpowiedź dla modelu, nie granica.
+USUWANIE_WINDOWS = ("Remove-Item", "rmdir /s", "rd /s", "del /s", "erase /s", "rmdir -*r", "rd -*r", "del -*r")
+
+
+def _glob(tekst: str) -> str:
+    """Tekst jako dosłowny fragment wzorca fnmatch."""
+    return re.sub(r"([\[*?])", r"[\1]", tekst)
+
+
+def _pod(sciezka: str, baza: str, system: str) -> bool:
+    s, b = (sciezka.lower(), baza.lower()) if system in ("windows", "macos") else (sciezka, baza)
+    return s == b or s.startswith(b.rstrip("/") + "/")
+
+
+def pisownie(sciezka: str, u: Uklad) -> list[str]:
+    """Ścieżka układu (z „/”) we wszystkich pisowniach, w których agent poda ją w terminalu."""
+    out = [sciezka]
+    if u.system == "windows":
+        out.append(sciezka.replace("/", "\\"))
+        if m := re.match(r"([A-Za-z]):/(.*)", sciezka):
+            out.append(f"/{m.group(1).lower()}/{m.group(2)}")
+    for baza, zamiennik in ((u.dom, "~"), (u.dane, "$HERMES_HOME"), (u.dane, "${HERMES_HOME}")):
+        if baza and _pod(sciezka, baza, u.system):
+            out.append(zamiennik + sciezka[len(baza.rstrip("/")):])
+    return list(dict.fromkeys(out))
+
+
+def zakazy(deny: list[str], fleet: fl.Fleet, u: Uklad) -> list[str]:
+    """approvals.deny w układzie: w kontenerze bez zmian; natywnie wzorce ze ścieżką obrazu dostają ścieżkę instalacji
+    w każdej pisowni (dokładny katalog także z „/”, „\\” i cudzysłowem na końcu), a na Windows dochodzą polecenia
+    usuwania Windows dla wszystkiego pod katalogiem danych (sprzątanie katalogów roboczych zostaje dla `rm`)."""
+    if not u.natywny:
+        return deny
+    mapa = mapa_kontenera(fleet, u)
+    wzor = _wzor_kontenera(mapa)
+    out: list[str] = []
+    for d in deny:
+        m = wzor.search(d)
+        if not m:
+            out.append(d)
+            continue
+        przed, po = d[:m.start()], przenies_sciezki(d[m.end():], mapa)
+        if przed.endswith(" "):
+            przed += "*"                     # ścieżka natywnie bywa w cudzysłowie
+        for s in pisownie(mapa[m.group(1)], u):
+            g = przed + _glob(s)
+            if po in ("", "/"):
+                out += [g, g + "[/\\\"']", g + "[/\\][\"']"]
+            else:
+                out.append(g + (po.replace("/", "\\") if "\\" in s else po))
+    if u.windows:
+        for s in pisownie(u.dane, u):
+            out += [f"*{polecenie}*{_glob(s)}*" for polecenie in USUWANIE_WINDOWS]
+    return list(dict.fromkeys(out))
+
+
+# Profil, z którym rozmawia `jarvo chat` (jarvo/cli.py, --profil domyślnie jarvo), czyli orkiestrator: natywnie
+# approvals.mode manual (decyzja I08; jedno pytanie, bez wstępnej oceny modelu); tryby zgód daje wtyczka jarvo-zgody,
+# a tryb pełny tylko --yolo albo /yolo na sesję (nigdy HERMES_YOLO_MODE w środowisku ani `mode: off`).
+TRYB_ZGOD_CZATU = "manual"
+
+
+def _sekcja(cfg: dict, klucz: str) -> dict:
+    if not isinstance(cfg.get(klucz), dict):
+        cfg[klucz] = {}
+    return cfg[klucz]
+
+
+def ustaw_bezpieczenstwo(cfg: dict) -> None:
+    """Natywnie bez kontenera (docs/NATYWNIE.md (d), H03, H15, H23, H24, I13): bez skanera tirith pobieranego bez pinu,
+    bez leniwych instalacji Hermesa, bez cudzych logowań (~/.codex, ~/.claude), HOME agenta w <profil>/home (katalog
+    zakłada instalacja; bez niego Hermes zostawia prawdziwy HOME) i bez wczytywania ~/.bashrc właściciela."""
+    sec = _sekcja(cfg, "security")
+    sec["tirith_enabled"] = False
+    sec["allow_lazy_installs"] = False
+    _sekcja(cfg, "auth")["adopt_external_logins"] = False
+    term = _sekcja(cfg, "terminal")
+    term["home_mode"] = "profile"
+    term["auto_source_bashrc"] = False
+
+
+def ustaw_glos(cfg: dict, u: Uklad) -> None:
+    """Komendy lektora (tts.providers.<nazwa>.command) z programem floty w układzie (V11)."""
+    for dostawca in ((cfg.get("tts") or {}).get("providers") or {}).values():
+        if isinstance(dostawca, dict) and dostawca.get("command"):
+            dostawca["command"] = polecenie_programu(dostawca["command"], u)
+
+
+def ustaw_natywnie(cfg: dict, fleet: fl.Fleet, u: Uklad, czat: bool) -> None:
+    """Wartości profilu zależne od systemu w układzie natywnym (docs/NATYWNIE.md C06, U01, V11, F15, (d))."""
+    browser = cfg.get("browser")
+    if u.windows and isinstance(browser, dict) and browser.get("engine") == "lightpanda":
+        browser["engine"] = "chrome"         # Lightpanda nie ma wydania na Windows (Z01); macOS i Linux bez zmian
+    web = cfg.get("web")
+    if isinstance(web, dict) and str(web.get("search_backend", "")).lower() == "searxng":
+        # I14: bez wymuszonej wyszukiwarki; autodetekcja Hermesa (tools/web_tools.py:99-135): klucz API, potem
+        # SEARXNG_URL (VPS), potem ddgs, na końcu darmowy pierścień. SearXNG natywnie nie ruszy (Z06)
+        del web["search_backend"]
+        if not web:
+            del cfg["web"]
+    ustaw_glos(cfg, u)
+    appr = _sekcja(cfg, "approvals")
+    if czat:
+        appr["mode"] = TRYB_ZGOD_CZATU
+    if isinstance(appr.get("smart_policy"), str):
+        appr["smart_policy"] = przenies_sciezki(appr["smart_policy"], mapa_kontenera(fleet, u))
+    ustaw_bezpieczenstwo(cfg)
+
+
 # -------------------------------------------------------------------------- tokens
 
 def render_tokens(text: str, tokens: dict[str, str]) -> str:
@@ -100,9 +403,12 @@ def render_tokens(text: str, tokens: dict[str, str]) -> str:
     return text
 
 
-def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: dict[str, str]) -> dict[str, str]:
+def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: dict[str, str],
+                uklad: Uklad | None = None) -> dict[str, str]:
+    """Tokeny @@…@@ profilu. Bez `uklad`: kontener z buildem pod `runtime_build_dir` (dawne wywołanie)."""
     shared = fleet.raw.get("shared", {})
     owner = env.get("TELEGRAM_OWNER_ID", "").strip()
+    u = uklad or Uklad(build=runtime_build_dir)
     return {
         "PROVIDER": fleet.provider,
         "MODEL": fleet.model_for(agent.model_tier),
@@ -111,10 +417,9 @@ def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: d
         "MODEL_STRONG": fleet.model_for("strong"),
         "MODEL_FAST": fleet.model_for("fast"),
         "TIMEZONE": shared.get("timezone", "Europe/Warsaw"),
-        "MISSIONS_DIR": shared.get("missions_dir", "/opt/data/jarvo/missions"),
-        "WORKSPACES_DIR": shared.get("workspaces_dir", "/opt/data/jarvo/workspaces"),
-        "KNOWLEDGE_DIR": "/opt/data/jarvo/knowledge",
-        "BUILD_DIR": runtime_build_dir,
+        # ścieżki (wspólny kontrakt E4): DATA_DIR, JARVO_DIR, KNOWLEDGE_DIR, MISSIONS_DIR, WORKSPACES_DIR, INBOX_DIR,
+        # REPO_DIR, BUILD_DIR, TOOLS_DIR, BIN_DIR i PY
+        **sciezki_floty(fleet, u),
         "AGENT": agent.name,
         "REVIEWER": fleet.reviewer,
         "ORCHESTRATOR": fleet.orchestrator,
@@ -168,7 +473,9 @@ def _git(args: list[str], cwd: Path | None = None) -> str:
 
 
 def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceResolver, report: list,
-                  straznik: skan_skilli.Straznik | None = None) -> None:
+                  straznik: skan_skilli.Straznik | None = None, tokens: dict[str, str] | None = None) -> None:
+    """Skille z locka. Wspólne skille Jarva (źródło repo-tree, shared/skills) dostają tokeny @@…@@ w plikach .md jak
+    skille własne (wspólny kontrakt ścieżek E4); cudzych plików nie zmieniamy."""
     for entry in lock.get("agents", {}).get(agent, []) or []:
         source = entry["source"]
         spec = lock["sources"][source]
@@ -185,6 +492,11 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
             straznik.sprawdz(dest, agent, source, spec["type"], rev, entry["path"])
         if source == "jarvo" and (dest / "scripts" / "iso.py").exists():
             fl.kopiuj_kroje_izometrii(dest / "scripts")     # izometria: krój OFL obok iso.py, bez Google Fonts
+        if tokens and spec["type"] == "repo-tree":
+            for md in dest.rglob("*.md"):
+                tekst = md.read_text(encoding="utf-8")
+                if (nowy := render_tokens(tekst, tokens)) != tekst:      # pliki bez tokenów zostają bajt w bajt
+                    zapisz(md, nowy)
         # licencja
         if spec.get("license_file") == "per-skill":
             lic = next((p for p in dest.iterdir() if p.name.lower().startswith("license")), None)
@@ -295,6 +607,7 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
 
 WIEDZA_PLUGIN = "jarvo-wiedza"
 KOMPUTER_PLUGIN = "jarvo-komputer"     # narzędzie `komputer` (komputer/plugin) dla agentów z `komputer: true`
+ZGODY_PLUGIN = "jarvo-zgody"           # tryby zgód pytaj/projekt/pełny (zgody/plugin), tylko w układzie natywnym
 
 
 def glos_floty() -> dict | None:
@@ -595,8 +908,10 @@ shutil.copy2(store, out)
 
 # ---------------------------------------------------------------------------- host
 
-def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str]) -> list[str]:
-    """Config profilu hosta: gateway + multipleks + trasy Telegrama + dispatcher."""
+def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str], uklad: Uklad | None = None) -> list[str]:
+    """Config profilu hosta: gateway + multipleks + trasy Telegrama + dispatcher. Natywnie także program lektora
+    z instalacji, wtyczka zgód, ustawienia bezpieczeństwa i host/srodowisko.json (HERMES_LOCAL_STT_COMMAND bramy)."""
+    u = uklad or KONTENER
     notes: list[str] = []
     template = fl.REPO_ROOT / "profiles" / "_host" / "config.yaml"
     config = fl.load_yaml(template)
@@ -627,21 +942,37 @@ def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str]) -> list[str]:
     config["timezone"] = fleet.raw.get("shared", {}).get("timezone", "Europe/Warsaw")
     # host (gateway, zadania pomocnicze kanbana) używa dostawcy floty i jej najszybszego modelu
     config["model"] = {"provider": fleet.provider, "default": fleet.model_for("fast")}
+    if u.natywny:
+        ustaw_glos(config, u)
+        wtyczki = _sekcja(config, "plugins")
+        wtyczki["enabled"] = list(dict.fromkeys([*(wtyczki.get("enabled") or []), ZGODY_PLUGIN]))
+        ustaw_bezpieczenstwo(config)
     out.mkdir(parents=True, exist_ok=True)
     header = "# Wygenerowane przez scripts/build.py z profiles/_host/config.yaml + fleet.yaml. Nie edytuj na serwerze.\n"
+    if u.natywny:
+        header += f"# Układ natywny ({u.system}): katalog danych {u.dane}.\n"
     zapisz(out / "config.yaml", header + fl.dump_yaml(config))
     shutil.copy2(fl.REPO_ROOT / "profiles" / "_host" / "SOUL.md", out / "SOUL.md")
+    # zmienne bramy, które w kontenerze daje obraz (ENV w infra/Dockerfile): natywnie stosuje je środowisko procesów
+    # Jarva (jarvo/srodowisko.py, docs/NATYWNIE.md S11); bez sekretów
+    srodowisko = out / "srodowisko.json"
+    if u.natywny:
+        fl.write_json(srodowisko, {"HERMES_LOCAL_STT_COMMAND": polecenie_stt(u)})
+    elif srodowisko.exists():
+        srodowisko.unlink()                  # resztka buildu natywnego w tym samym katalogu
     return notes
 
 
 # ---------------------------------------------------------------------------- main
 
 def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_dir, env, hermes_src, report,
-                straznik=None):
+                straznik=None, uklad: Uklad | None = None):
+    """Dystrybucja jednego agenta. Bez `uklad`: kontener z buildem pod `runtime_build_dir` (dawne wywołanie)."""
+    u = uklad or Uklad(build=runtime_build_dir)
     src = agent.dir
     dest = out_root / agent.name
     shutil.copytree(src, dest, ignore=COPY_IGNORE)
-    tokens = base_tokens(fleet, agent, runtime_build_dir, env)
+    tokens = base_tokens(fleet, agent, u.build, env, u)
     # workflowy, którym brakuje usługi (`metadata.jarvo.wymaga`), nie trafiają do profilu: agent nie ma martwych ścieżek
     _, pominiete = fl.available_skills(src / "skills")
     for name in pominiete:
@@ -678,32 +1009,44 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         "display_name": f"{agent.emoji} {agent.title}".strip(),
     }))
 
-    # config.yaml i skrypty: tokeny
+    # config.yaml i skrypty: tokeny; plik musi zostać poprawnym YAML (np. @@PY@@ ma własny cudzysłów, gdy ścieżka
+    # ma spację, więc nie stoi w podwójnym cudzysłowie YAML)
     for rel in ["config.yaml", "distribution.yaml"]:
         p = dest / rel
         if p.exists():
-            zapisz(p, render_tokens(p.read_text(encoding="utf-8"), tokens))
+            tekst = render_tokens(p.read_text(encoding="utf-8"), tokens)
+            try:
+                fl.loads_yaml(tekst)
+            except Exception as e:  # noqa: BLE001 - każdy błąd parsera YAML
+                raise SystemExit(f"[{agent.name}] {rel} po podstawieniu tokenów nie jest poprawnym YAML: {e}") from e
+            zapisz(p, tekst)
     # wspólne zakazy floty (shared/security/deny.yaml) → approvals.deny każdego profilu;
     # skarbiec wiedzy (docs/WIEDZA.md): dostawca pamięci jarvo-wiedza u każdego agenta, wtyczka włączona,
     # zadanie pomocnicze jarvo_wiedza (wyciągi z rozmów, kompilacja) na głównym modelu (poziom frontier, jak Jarvo):
     # do skarbca trafia najważniejsza wiedza floty, więc nie oszczędzamy na niej na tanim modelu (decyzja właściciela)
+    # układ natywny (docs/NATYWNIE.md S06): zakazy dla katalogu danych w każdej pisowni, wartości per system,
+    # wtyczka zgód jarvo-zgody w każdym profilu i approvals.mode manual w profilu czatu (I08)
     deny_src = fl.REPO_ROOT / "shared" / "security" / "deny.yaml"
     if (dest / "config.yaml").exists():
         cfg = fl.load_yaml(dest / "config.yaml")
         if deny_src.exists():
             appr = cfg.setdefault("approvals", {})
             wlasne = list(appr.get("deny") or [])
-            appr["deny"] = wlasne + [d for d in fl.load_yaml(deny_src).get("deny", []) if d not in wlasne]
+            appr["deny"] = zakazy(wlasne + [d for d in fl.load_yaml(deny_src).get("deny", []) if d not in wlasne],
+                                  fleet, u)
         cfg.setdefault("memory", {})["provider"] = WIEDZA_PLUGIN
         if "tts" not in cfg and (glos := glos_floty()):
             cfg["tts"] = glos
         wtyczki = cfg.setdefault("plugins", {})
         wlaczone = list(wtyczki.get("enabled") or [])
         wtyczki["enabled"] = wlaczone + [w for w in [WIEDZA_PLUGIN] + ([KOMPUTER_PLUGIN] if agent.komputer else [])
-                                         if w not in wlaczone]
+                                         + ([ZGODY_PLUGIN] if u.natywny else []) if w not in wlaczone]
         cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("frontier")}
-        zapisz(dest / "config.yaml", "# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty).\n"
-               + fl.dump_yaml(cfg))
+        naglowek = "# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty)."
+        if u.natywny:
+            ustaw_natywnie(cfg, fleet, u, czat=agent.name == fleet.orchestrator)
+            naglowek += f"\n# Układ natywny ({u.system}): katalog danych {u.dane}."
+        zapisz(dest / "config.yaml", naglowek + "\n" + fl.dump_yaml(cfg))
     # model zapasowy zestawu: agent nie milknie, gdy główny model odmówi (np. poza planem)
     if fleet.fallback and (dest / "config.yaml").exists():
         fb = fleet.fallback
@@ -724,8 +1067,8 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         zapisz(roster, render_roster_skill(fleet))
         copy_rubrics(fleet, dest / "skills" / "fleet" / "sdlc-review" / "references")
 
-    # skille zewnętrzne
-    vendor_skills(agent.name, dest / "skills", lock, resolver, report, straznik)
+    # skille zewnętrzne (wspólne skille Jarva z tokenami jak własne)
+    vendor_skills(agent.name, dest / "skills", lock, resolver, report, straznik, tokens)
     if (dest / "skills").exists():
         write_category_descriptions(dest / "skills")
 
@@ -750,11 +1093,31 @@ def main(argv: list[str] | None = None) -> int:
                     help="nazwa=ścieżka: użyj lokalnego klonu źródła (musi być na commicie z locka)")
     ap.add_argument("--env-file", default=None, help="plik z TELEGRAM_OWNER_ID, TELEGRAM_HQ_CHAT_ID, TELEGRAM_TOPIC_*")
     ap.add_argument("--wybor-modelu", default=None,
-                    help="dostawca wybrany w aplikacji (/opt/data/jarvo/state/dostawca-modeli.json, hq/plugin/mozg.py)")
-    ap.add_argument("--runtime-build-dir", default="/opt/jarvo/build",
-                    help="ścieżka, pod którą build będzie widoczny w kontenerze (external_dirs prawej ręki)")
+                    help="dostawca wybrany w aplikacji (<dane>/jarvo/state/dostawca-modeli.json, hq/plugin/mozg.py)")
+    ap.add_argument("--uklad", choices=UKLADY, default="kontener",
+                    help="kontener (domyślnie): ścieżki obrazu /opt, bez zmian do etapu E13; natywny: ścieżki instalacji "
+                         "natywnej i wartości per system (docs/NATYWNIE.md S06)")
+    ap.add_argument("--system", choices=SYSTEMY, default=None,
+                    help="system docelowy układu natywnego (domyślnie ten komputer)")
+    ap.add_argument("--dane", default=None,
+                    help="HERMES_HOME instalacji, @@DATA_DIR@@ (kontener /opt/data; natywnie domyślnie <root>/dane "
+                         "z jarvo/sciezki.py)")
+    ap.add_argument("--repo-dir", default=None,
+                    help="kod Jarva widziany przez flotę, @@REPO_DIR@@ (kontener /opt/jarvo/repo; natywnie to repo)")
+    ap.add_argument("--runtime-build-dir", default=None,
+                    help="ścieżka, pod którą build będzie widoczny w działającej instalacji, @@BUILD_DIR@@ "
+                         "(external_dirs prawej ręki; kontener /opt/jarvo/build, natywnie --out)")
+    ap.add_argument("--bin-dir", default=None,
+                    help="programy floty, @@BIN_DIR@@ (kontener /opt/jarvo/bin; natywnie <root>/program/bin-floty)")
+    ap.add_argument("--tools-dir", default=None,
+                    help="instalacje narzędzi floty w locie, @@TOOLS_DIR@@ (kontener /opt/data/jarvo/narzedzia; "
+                         "natywnie <root>/program/narzedzia-floty)")
+    ap.add_argument("--py", default=None,
+                    help="Python skryptów floty w poleceniach skilli, @@PY@@ (kontener python3; natywnie pełna ścieżka, "
+                         "domyślnie Python tego buildu)")
     ap.add_argument("--agent", action="append", default=[], help="buduj tylko wskazanych agentów")
     args = ap.parse_args(argv)
+    uklad = uklad_z_argumentow(args)
 
     fleet = fl.load_fleet()
     lock = fl.load_lock()
@@ -778,6 +1141,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Dostawca z aplikacji: {env['JARVO_MODEL_PROVIDER']}")
     fleet.apply_model_overrides(env)
     print(f"Modele: {fleet.provider} · " + ", ".join(f"{t}={m}" for t, m in fleet.tiers.items()))
+    if uklad.natywny:
+        print(f"Układ natywny ({uklad.system}): dane {uklad.dane}, program {uklad.bin.rsplit('/', 1)[0]}, "
+              f"Python skryptów {uklad.py}")
     protocol = (fl.REPO_ROOT / fleet.raw["shared"]["protocol"]).read_text(encoding="utf-8")
 
     profiles_out = out / "profiles"
@@ -793,7 +1159,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.agent and agent.name not in args.agent:
             continue
         n_jobs = build_agent(fleet, agent, profiles_out, lock, resolver, protocol,
-                             args.runtime_build_dir, env, hermes_src, report, straznik)
+                             uklad.build, env, hermes_src, report, straznik, uklad)
         n_skills = len(list(fl.iter_skill_files(profiles_out / agent.name / "skills")))
         summary.append({"agent": agent.name, "skills": n_skills, "cron_jobs": n_jobs})
         print(f"✓ {agent.name}: {n_skills} skilli, {n_jobs} rutyn cron")
@@ -823,8 +1189,18 @@ def main(argv: list[str] | None = None) -> int:
         remove_tree(kp)
     shutil.copytree(fl.REPO_ROOT / "komputer" / "plugin", kp, ignore=COPY_IGNORE)
     print(f"✓ plugins/{KOMPUTER_PLUGIN}: agenci z Komputerem: {', '.join(a.name for a in fleet.active() if a.komputer) or 'brak'}")
+    # tryby zgód (zgody/README.md, docs/NATYWNIE.md (d)): tylko natywnie; w kontenerze zgody jak dziś (approvals.mode)
+    zp = out / "plugins" / ZGODY_PLUGIN
+    if zp.exists():
+        remove_tree(zp)
+    wtyczki = ["jarvo-hq", WIEDZA_PLUGIN, KOMPUTER_PLUGIN]
+    if uklad.natywny:
+        shutil.copytree(fl.REPO_ROOT / "zgody" / "plugin", zp, ignore=COPY_IGNORE)
+        wtyczki.append(ZGODY_PLUGIN)
+        print(f"✓ plugins/{ZGODY_PLUGIN}: tryby zgód w każdym profilu i w hoście, profil czatu {fleet.orchestrator} "
+              f"z approvals.mode {TRYB_ZGOD_CZATU}")
 
-    notes = build_host(fleet, out / "host", env)
+    notes = build_host(fleet, out / "host", env, uklad)
     for note in notes:
         print(f"! {note}")
 
@@ -832,17 +1208,21 @@ def main(argv: list[str] | None = None) -> int:
         repo_rev = _git(["rev-parse", "HEAD"], cwd=fl.REPO_ROOT).strip()
     except Exception:
         repo_rev = "unknown"
-    fl.write_json(out / "BUILD.json", {
+    manifest = {
         "built_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "repo_rev": repo_rev,
         "agents": summary,
         # JARVO_MODEL_PROVIDER z jarvo.env przy tym buildzie: aplikacja zapisuje go jako `nad` przy wyborze dostawcy
         "modele": {"env": provider_env, "dostawca": fleet.provider, "z_aplikacji": z_aplikacji},
-        "plugins": ["jarvo-hq", WIEDZA_PLUGIN, KOMPUTER_PLUGIN],
+        "plugins": wtyczki,
         "vendored": report,
         "skan_skilli": skan,
         "notes": notes,
-    })
+    }
+    if uklad.natywny:
+        # dla instalacji i doctor: dla jakiego katalogu danych i systemu powstał ten build (ścieżki tokenów)
+        manifest["uklad"] = {"nazwa": uklad.nazwa, "system": uklad.system, "sciezki": sciezki_floty(fleet, uklad)}
+    fl.write_json(out / "BUILD.json", manifest)
     print(f"Build gotowy: {out}")
     return 0
 
