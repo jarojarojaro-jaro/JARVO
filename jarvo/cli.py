@@ -432,9 +432,16 @@ def polecenie_chat(u: Uklad, a, reszta, ot: Otoczenie) -> int:
     except ImportError as e:
         print(f"BŁĄD: brak modułu Hermesa ({e}). Uruchom instalację ponownie.", file=sys.stderr)
         return 1
+    if a.tryb == "pelny" and a.profil == "jarvo-operator":
+        print("Tryb pełny nie jest dostępny dla jarvo-operator (praca na ekranie zawsze z pytaniem o zgodę).",
+              file=sys.stderr)
+        return 1
     env = srodowisko.srodowisko(u, ot.env)
-    env["JARVO_TRYB_ZGOD"] = a.tryb               # odczyta go wtyczka zgód (etap E4); bez niej działa zgoda Hermesa
-    argv = [str(x) for x in hermes.argv_hermesa(Path(biez["hermes"]), "-p", a.profil, "chat", *reszta)]
+    env.pop("HERMES_YOLO_MODE", None)            # tryb pełny tylko flagą --yolo tej jednej sesji, nigdy w środowisku
+    env["JARVO_TRYB_ZGOD"] = a.tryb              # odczytuje go wtyczka jarvo-zgody
+    env["JARVO_FOLDER_PROJEKTU"] = os.getcwd()   # folder, w którym właściciel wpisał polecenie (tryb „projekt”)
+    yolo = ["--yolo"] if a.tryb == "pelny" else []
+    argv = [str(x) for x in hermes.argv_hermesa(Path(biez["hermes"]), "-p", a.profil, "chat", *yolo, *reszta)]
     return int((ot.na_pierwszym_planie or uruchom_na_pierwszym_planie)(argv, env))
 
 

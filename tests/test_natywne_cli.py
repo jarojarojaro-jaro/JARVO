@@ -1015,9 +1015,11 @@ def test_chat_srodowisko_tryb_i_argumenty_dla_hermesa(tmp_path, capsys):
     assert argv[1:] == ["-m", "hermes_cli.main", "-p", "jarvo", "chat"]
     assert env["JARVO_TRYB_ZGOD"] == "projekt" and env["HERMES_HOME"] == str(u.dane)   # domyślny tryb (I08)
     assert "HERMES_YOLO_MODE" not in env and "GITHUB_TOKEN" not in env and env["HERMES_DISABLE_LAZY_INSTALLS"] == "1"
+    assert env["JARVO_FOLDER_PROJEKTU"] == os.getcwd()                          # folder startu czatu (tryb projekt)
     assert cli.main(["--tryb", "pelny", "--resume", "abc"], otoczenie=ot) == 7
     argv, env = wywolania[-1]
-    assert argv[-3:] == ["chat", "--resume", "abc"] and env["JARVO_TRYB_ZGOD"] == "pelny"
+    assert argv[-4:] == ["chat", "--yolo", "--resume", "abc"] and env["JARVO_TRYB_ZGOD"] == "pelny"   # tylko flaga
+    assert "HERMES_YOLO_MODE" not in env
     assert cli.main(["chat", "--tryb", "pytaj", "--profil", "default", "--", "-q", "hej"], otoczenie=ot) == 7
     argv, env = wywolania[-1]
     assert argv[3:] == ["-p", "default", "chat", "-q", "hej"] and env["JARVO_TRYB_ZGOD"] == "pytaj"
@@ -1025,6 +1027,9 @@ def test_chat_srodowisko_tryb_i_argumenty_dla_hermesa(tmp_path, capsys):
     assert "etap E4" in capsys.readouterr().err
     assert cli.main(["chat", "--profil", "../x"], otoczenie=ot) == 2
     assert cli.main(["chat", "--tryb", "yolo"], otoczenie=ot) == 2
+    (u.dane / "profiles" / "jarvo-operator").mkdir(parents=True)
+    assert cli.main(["chat", "--tryb", "pelny", "--profil", "jarvo-operator"], otoczenie=ot) == 1   # nigdy pełny
+    assert "jarvo-operator" in capsys.readouterr().err
     assert len(wywolania) == 3
 
 

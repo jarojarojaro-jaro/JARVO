@@ -1009,9 +1009,9 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         "display_name": f"{agent.emoji} {agent.title}".strip(),
     }))
 
-    # config.yaml i skrypty: tokeny; plik musi zostać poprawnym YAML (np. @@PY@@ ma własny cudzysłów, gdy ścieżka
-    # ma spację, więc nie stoi w podwójnym cudzysłowie YAML)
-    for rel in ["config.yaml", "distribution.yaml"]:
+    # config.yaml, toolbox.yaml (healthchecki ze ścieżkami) i distribution.yaml: tokeny; plik musi zostać poprawnym
+    # YAML (np. @@PY@@ ma własny cudzysłów, gdy ścieżka ma spację, więc nie stoi w podwójnym cudzysłowie YAML)
+    for rel in ["config.yaml", "toolbox.yaml", "distribution.yaml"]:
         p = dest / rel
         if p.exists():
             tekst = render_tokens(p.read_text(encoding="utf-8"), tokens)

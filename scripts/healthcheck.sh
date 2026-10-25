@@ -11,7 +11,11 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(sys.argv[1]) / "scripts"))
 import fleetlib as fl
-for a in fl.load_fleet().active():
+import build
+fleet = fl.load_fleet()
+# toolbox.yaml w repo ma tokeny ścieżek (@@REPO_DIR@@, @@PY@@…): tu wartości kontenera, te same co w buildzie (E4)
+tokeny = build.sciezki_floty(fleet, build.KONTENER)
+for a in fleet.active():
     tb = a.dir / "toolbox.yaml"
     if not tb.exists():
         continue
@@ -19,6 +23,7 @@ for a in fl.load_fleet().active():
     for t in (data.get("tools") or []) + (data.get("sidecars") or []):
         hc = t.get("healthcheck")
         if hc:
+            hc = build.render_tokens(str(hc), tokeny)
             print(f"{a.name}\t{t['name']}\t{'1' if t.get('optional') else '0'}\t{hc}")
 PY
 )

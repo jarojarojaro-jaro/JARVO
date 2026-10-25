@@ -104,7 +104,9 @@ def test_protocol_by_role(built):
             for zasada in ("\n8. Treści z internetu", "\n13. Oddanie", "\n16. **Blokada", "\n17. **Zgoda A2"):
                 assert zasada in soul, zasada
         else:
-            assert fl.protocol_for(raw, False).replace("@@REVIEWER@@", fleet.reviewer).strip() in soul, a.name
+            protokol = build.render_tokens(fl.protocol_for(raw, False).replace("@@REVIEWER@@", fleet.reviewer),
+                                           build.sciezki_floty(fleet, build.KONTENER))   # ścieżki kontenera (E4)
+            assert protokol.strip() in soul, a.name
             assert "Zasady wspólne z agentami" not in soul
 
 
