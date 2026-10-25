@@ -1026,8 +1026,11 @@ def test_dyski_lokalne_posix_z_katalogiem_domowym(tmp_path):
     dom = instalator.wolumin_posix(Path.home(), woluminy)
     # katalog domowy, gdy jego wolumin jest lokalny i z ochroną dostępu (w kontenerze z overlay: nie wiadomo, więc nie)
     assert (Path.home() in dyski) == (dom is not None and instalator.polecany(dom, systemowy=True))
-    if sys.platform == "darwin":
-        assert dyski and dyski[0] == Path.home()                         # APFS bez noowners (/System/Volumes/Data)
+    if sys.platform == "darwin":                                          # APFS bez noowners (/System/Volumes/Data)
+        mount = instalator.systemowy("mount")
+        opis = (f"dom={dom!r} st_dev={os.stat(Path.home()).st_dev} mount={mount!r}\n"
+                + (instalator._uruchom([mount]).stdout if mount else ""))
+        assert dyski and dyski[0] == Path.home(), opis
     punkty = {w.punkt: w for w in woluminy}                               # ostatnie montowanie w punkcie
     for d in dyski:
         if d != Path.home():
