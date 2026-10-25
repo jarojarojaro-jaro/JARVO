@@ -1,0 +1,210 @@
+# Jarvo natywnie: pełna macierz instalacji (docs/NATYWNIE.md: T08, T14, T15, T17, T18, (g) „Runnery CI” i „Kiedy co
+# biegnie”, (l) „Kiedy całość jest gotowa”). Na 5 runnerach instalacja od zera DOKŁADNIE poleceniem z README, ale
+# z kodem z tego commitu: bootstrap spod raw.githubusercontent.com/<repo>/<SHA>/… i JARVO_REF=<SHA> (bootstrap
+# pobiera wtedy archiwum tego commitu). Potem tests/live/natywnie_e2e.py:
+#   - jarvo doctor --json zielony poza jawnymi wyjątkami runnera (`dopusc` w macierzy), jarvo status, panel, flota,
+#   - czat z atrapą modelu (scripts/atrapa_modelu.py): jarvo chat -q i /v1/runs bramy z prośbą o zgodę wtyczki
+#     jarvo-zgody, zgodą i odmową; zlecenie specjaliście (karta kanbana, którą robi pracownik bramy na atrapie),
+#   - opcjonalnie jedna tura z prawdziwym modelem: tylko z sekretem JARVO_TEST_OPENROUTER_KEY, który trafia wyłącznie
+#     do otoczenia tego jednego kroku i skanu (nigdy do echo ani do artefaktów),
+#   - drugi przebieg tego samego polecenia instalacji niczego nie zmienia,
+#   - jarvo uninstall --all --yes, a migawka katalogów, PATH i autostartu po nim jest taka jak przed instalacją
+#     (różnica pusta poza listą wyjątków z powodami w natywnie_e2e.py).
+# Linux: runner nie ma sesji systemd użytkownika (user bus), więc instalacja z JARVO_NO_AUTOSTART=1 (oba przebiegi,
+# inaczej drugi włączałby autostart). Artefakty (logi instalacji i usług, doctor.json, raport, różnica migawek, zrzuty
+# z obszaru e6 w <artefakty>/zrzuty, gdy będą) idą zawsze, ale dopiero po skanie sekretów i z retencją 14 dni: logi
+# i artefakty repo publicznego widzi każdy. Minuty macOS liczą się ×10 (przy repo prywatnym), więc bez pushy na każdy
+# commit: ręcznie, przy tagach v* i przy pushu na main w plikach instalatora i manifestu (dla tagów GitHub nie
+# sprawdza `paths`). Akcje przypięte pełnym SHA (T17); tests/test_ci_natywnie.py pilnuje struktury tego pliku.
+name: natywnie
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+    branches: [main]
+    paths:
+      - "jarvo/**"
+      - "vendor/natywne*"
+      - "infra/python/natywne/**"
+      - "tests/live/natywnie_e2e.py"
+      - ".github/workflows/natywnie.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: natywnie-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  instalacja:
+    name: ${{ matrix.noga }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        # nogi z docs/NATYWNIE.md (g) „Runnery CI”; `dopusc` = jawne wyjątki doctora tego runnera (NAZWA=stan:powód;…)
+        include:
+          - noga: W64
+            os: windows-2025
+            bez_autostartu: ""
+            dopusc: "wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego"
+          - noga: WARM
+            os: windows-11-arm
+            bez_autostartu: ""
+            dopusc: "wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego"
+          - noga: MARM
+            os: macos-15
+            bez_autostartu: ""
+            dopusc: "wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego"
+          - noga: L64
+            os: ubuntu-24.04
+            bez_autostartu: "1"
+            dopusc: >-
+              wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
+              autostart=uwaga:runner bez user busa systemd, instalacja z JARVO_NO_AUTOSTART=1
+          - noga: LARM
+            os: ubuntu-24.04-arm
+            bez_autostartu: "1"
+            dopusc: >-
+              wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
+              autostart=uwaga:runner bez user busa systemd, instalacja z JARVO_NO_AUTOSTART=1
+    env:
+      JARVO_E2E_NOGA: ${{ matrix.noga }} (${{ matrix.os }})
+      # tylko „tak” albo „nie”: sama wartość sekretu nie trafia do otoczenia zadania (instalatora, usług, kroków)
+      JARVO_E2E_KLUCZ: ${{ secrets.JARVO_TEST_OPENROUTER_KEY != '' && 'tak' || 'nie' }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Python do skryptu testu (sama biblioteka standardowa; Jarvo bierze własnego Pythona z bootstrapu)
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+
+      # Node w wersji z vendor/natywne.yaml: instalator buduje front panelu npm-em z PATH, dopóki Node z manifestu
+      # (B03) nie jest jego krokiem; potem ten krok tylko przypina wersję obecną na runnerze
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "26.12.1"
+          package-manager-cache: false
+
+      - name: Środowisko runnera
+        run: |
+          mkdir -p "$RUNNER_TEMP/natywnie-artefakty"
+          python -c "import platform, sys; print(platform.platform(), platform.machine(), 'Python', sys.version.split()[0])"
+          git --version
+          node --version
+          npm --version
+          df -h "$HOME" || true
+
+      - name: Migawka komputera przed instalacją
+        run: python -X utf8 -B tests/live/natywnie_e2e.py migawka --wyjscie "$RUNNER_TEMP/natywnie-artefakty/migawka-przed.json"
+
+      # --- instalacja poleceniem z README (Windows PowerShell 5.1 jak u zwykłego użytkownika; macOS i Linux bash)
+      - name: Instalacja (Windows, irm | iex)
+        if: runner.os == 'Windows'
+        shell: powershell
+        timeout-minutes: 90
+        env:
+          JARVO_REF: ${{ github.sha }}
+        run: |
+          try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { Write-Verbose "OutputEncoding: $_" }
+          $log = Join-Path $env:RUNNER_TEMP 'natywnie-artefakty\instalacja-1.log'
+          irm "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/$env:JARVO_REF/jarvo/bootstrap/install.ps1" | iex 6>&1 | Tee-Object -FilePath $log
+
+      # macOS: najpierw katalogi systemu, jak na Macu bez Homebrew: `bash` to /bin/bash 3.2, git z narzędzi Xcode
+      - name: Instalacja (macOS i Linux, curl | bash)
+        if: runner.os != 'Windows'
+        timeout-minutes: 90
+        env:
+          JARVO_REF: ${{ github.sha }}
+          JARVO_NO_AUTOSTART: ${{ matrix.bez_autostartu }}
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"; fi
+          curl -fsSL "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/$JARVO_REF/jarvo/bootstrap/install.sh" | bash 2>&1 | tee "$RUNNER_TEMP/natywnie-artefakty/instalacja-1.log"
+
+      # --- na żywo: doctor, status, panel, flota, czat i zgody na atrapie modelu, karta kanbana dla specjalisty
+      - name: Test na żywo (doctor, status, panel, czat, zgody, kanban)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 45
+        env:
+          DOPUSC: ${{ matrix.dopusc }}
+        run: python -X utf8 -B tests/live/natywnie_e2e.py sprawdz --dopusc "$DOPUSC"
+
+      - name: Prawdziwy model (tylko z sekretem JARVO_TEST_OPENROUTER_KEY)
+        if: ${{ !cancelled() && env.JARVO_E2E_KLUCZ == 'tak' }}
+        timeout-minutes: 15
+        env:
+          JARVO_TEST_OPENROUTER_KEY: ${{ secrets.JARVO_TEST_OPENROUTER_KEY }}
+        run: python -X utf8 -B tests/live/natywnie_e2e.py prawdziwy-model
+
+      # --- drugi przebieg tego samego polecenia: „Zmiany w tym przebiegu: brak.”, nic pobrane ponownie
+      - name: Drugi przebieg instalacji (Windows, irm | iex)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: powershell
+        timeout-minutes: 45
+        env:
+          JARVO_REF: ${{ github.sha }}
+        run: |
+          try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { Write-Verbose "OutputEncoding: $_" }
+          $log = Join-Path $env:RUNNER_TEMP 'natywnie-artefakty\instalacja-2.log'
+          irm "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/$env:JARVO_REF/jarvo/bootstrap/install.ps1" | iex 6>&1 | Tee-Object -FilePath $log
+
+      - name: Drugi przebieg instalacji (macOS i Linux, curl | bash)
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        timeout-minutes: 45
+        env:
+          JARVO_REF: ${{ github.sha }}
+          JARVO_NO_AUTOSTART: ${{ matrix.bez_autostartu }}
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"; fi
+          curl -fsSL "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/$JARVO_REF/jarvo/bootstrap/install.sh" | bash 2>&1 | tee "$RUNNER_TEMP/natywnie-artefakty/instalacja-2.log"
+
+      - name: Drugi przebieg niczego nie zmienił
+        if: ${{ !cancelled() }}
+        run: python -X utf8 -B tests/live/natywnie_e2e.py drugi-przebieg "$RUNNER_TEMP/natywnie-artefakty/instalacja-2.log"
+
+      # --- odinstalowanie i migawka po: komputer jak przed instalacją
+      - name: Logi instalacji i usług do artefaktów
+        if: ${{ !cancelled() }}
+        run: python -X utf8 -B tests/live/natywnie_e2e.py zbierz-logi
+
+      - name: Odinstalowanie (jarvo uninstall --all --yes)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: python -X utf8 -B tests/live/natywnie_e2e.py odinstaluj
+
+      - name: Migawka po odinstalowaniu i różnica
+        if: ${{ !cancelled() }}
+        run: |
+          python -X utf8 -B tests/live/natywnie_e2e.py migawka --wyjscie "$RUNNER_TEMP/natywnie-artefakty/migawka-po.json"
+          python -X utf8 -B tests/live/natywnie_e2e.py roznica "$RUNNER_TEMP/natywnie-artefakty/migawka-przed.json" "$RUNNER_TEMP/natywnie-artefakty/migawka-po.json"
+
+      # --- artefakty: najpierw skan sekretów (plik z trafieniem znika), potem podsumowanie i wysyłka
+      - name: Skan sekretów przed wysyłką
+        id: skan
+        if: always()
+        env:
+          JARVO_TEST_OPENROUTER_KEY: ${{ secrets.JARVO_TEST_OPENROUTER_KEY }}
+        run: python -X utf8 -B tests/live/natywnie_e2e.py skan "$RUNNER_TEMP/natywnie-artefakty"
+
+      - name: Podsumowanie
+        if: always()
+        run: python -X utf8 -B tests/live/natywnie_e2e.py podsumowanie
+
+      - name: Artefakty
+        if: always() && steps.skan.outputs.gotowe == 'tak'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: natywnie-${{ matrix.noga }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/natywnie-artefakty
+          retention-days: 14
+          if-no-files-found: warn
+          include-hidden-files: false
