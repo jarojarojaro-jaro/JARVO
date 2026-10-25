@@ -85,7 +85,12 @@ if tryb == "http":
             self.wfile.write(b"{}")
         def log_message(self, *a):
             pass
-    HTTPServer(("127.0.0.1", int(sys.argv[3])), H).serve_forever()
+    class Szybki(HTTPServer):
+        def server_bind(self):          # bez socket.getfqdn: odwrotny DNS 127.0.0.1 na runnerze macOS trwa sekundami
+            import socketserver
+            socketserver.TCPServer.server_bind(self)
+            self.server_name, self.server_port = "127.0.0.1", self.server_address[1]
+    Szybki(("127.0.0.1", int(sys.argv[3])), H).serve_forever()
 while True:
     time.sleep(0.05)
 '''
@@ -1057,5 +1062,6 @@ def test_windows_potok_kanalu_tylko_dla_wlasciciela(u, tmp_path):
         sddl = _sddl_potoku(adres)
         assert _klient(u) is not None                                    # kanał przeżył obce połączenie
     sid = nadzorca._sid_uzytkownika()
-    assert sid and sid in sddl and sddl.startswith("D:P")
+    ja = (sid,) + (("LA",) if sid and sid.endswith("-500") else ())   # wbudowany Administrator (runner CI): SDDL „LA”
+    assert sid and any(f";;;{x})" in sddl for x in ja) and sddl.startswith("D:P")
     assert ";;;WD)" not in sddl and ";;;AN)" not in sddl and ";;;BU)" not in sddl
