@@ -43,10 +43,15 @@ jobs:
     timeout-minutes: 120
     env:
       PYTHONUTF8: "1"
-      JARVO_ROOT: ${{ runner.temp }}/jarvo-natywnie
-      KATALOG: ${{ runner.temp }}/migracja
-      WYNIKI: ${{ runner.temp }}/wyniki
     steps:
+      # kontekst runner nie istnieje na poziomie zadania (GitHub odrzucał cały plik), więc katalogi idą przez GITHUB_ENV
+      - name: Katalogi robocze
+        run: |
+          {
+            echo "JARVO_ROOT=$RUNNER_TEMP/jarvo-natywnie"
+            echo "KATALOG=$RUNNER_TEMP/migracja"
+            echo "WYNIKI=$RUNNER_TEMP/wyniki"
+          } >> "$GITHUB_ENV"
       - name: Kod tej wersji (instalacja natywna i jarvo migruj)
         uses: actions/checkout@v4
       - name: Stara wersja z Dockerem
