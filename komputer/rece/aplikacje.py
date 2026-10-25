@@ -13,6 +13,10 @@
 Nigdy na ekranie właściciela: powłoki i terminale (ręce nie dają agentowi terminala), interpretery, narzędzia
 systemu i administracji, powłoka pulpitu (explorer.exe to też pasek zadań), menedżery haseł, Jarvo, Hermes
 i sam sterownik. Tej listy nie da się wyłączyć flagą.
+
+launch_app w rozmowie (poza_zgoda): nazwa musi wskazywać aplikację ze zgody (pasuje), a każda ścieżka (`path`,
+`launch_path` i nazwa, która wygląda na ścieżkę) dokładnie jej tożsamość (ta_sama_tozsamosc); program o tej samej
+nazwie w innym katalogu (np. Pobrane\\notepad.exe) to odmowa.
 """
 from __future__ import annotations
 
@@ -231,6 +235,62 @@ def rozpoznaj(nazwy: list[str], *, system: str | None = None, which: Callable[[s
     if not wynik:
         raise BladAplikacji("Podaj co najmniej jedną aplikację (--aplikacje notatnik,mspaint).")
     return wynik
+
+
+def _sciezka(tekst: str) -> bool:
+    """Napis wygląda na ścieżkę programu (katalog, dysk albo końcówka pliku programu), a nie na nazwę."""
+    t = tekst.strip().strip('"')
+    return bool(re.search(r"[\\/]", t) or re.match(r"^[A-Za-z]:", t)
+                or t.casefold().endswith((".exe", ".app", ".cmd", ".bat", ".com", ".lnk", ".ps1", ".vbs", ".sh",
+                                          ".desktop", ".appimage", ".scr", ".pif", ".msi")))
+
+
+def ta_sama_tozsamosc(zgoda_aplikacje, sciezka: str, platforma: str) -> bool:
+    """Ścieżka programu to dokładnie tożsamość z zgody: Windows pełna ścieżka .exe (bez wielkości liter, bez
+    przedrostka \\\\?\\), Linux rzeczywista ścieżka programu; macOS nie przyjmuje ścieżek (tylko bundle id)."""
+    s = sciezka.strip().strip('"')
+    if platforma.startswith("windows"):
+        if s.startswith("\\\\?\\"):
+            s = s[4:]
+        if not re.match(r"^[A-Za-z]:[\\/]", s):
+            return False
+        klucz = ntpath.normcase(ntpath.normpath(s))
+        return any(ntpath.normcase(ntpath.normpath(str(a.tozsamosc["bundle_id"]))) == klucz
+                   for a in zgoda_aplikacje if isinstance(a.tozsamosc.get("bundle_id"), str))
+    if platforma.startswith("linux"):
+        if not s.startswith("/"):
+            return False
+        import posixpath
+        klucz = posixpath.normpath(s)
+        return any(posixpath.normpath(str(a.tozsamosc["executable"])) == klucz
+                   for a in zgoda_aplikacje if isinstance(a.tozsamosc.get("executable"), str))
+    return False
+
+
+def poza_zgoda(zgoda_aplikacje, args: dict, platforma: str) -> str | None:
+    """Powód odmowy launch_app albo None. Każdy podany identyfikator musi wskazywać aplikację ze zgody: ścieżka
+    (`path`, `launch_path` i każda nazwa, która wygląda na ścieżkę) dokładnie tę ze zgody, bundle id na macOS
+    dokładnie ten ze zgody, a nazwa nazwę albo program ze zgody (pasuje)."""
+    pola = {k: args.get(k) for k in ("name", "bundle_id", "path", "launch_path") if args.get(k) is not None}
+    if not pola:
+        return "launch_app bez nazwy aplikacji"
+    for klucz, wartosc in pola.items():
+        if not isinstance(wartosc, str) or not wartosc.strip() or len(wartosc) > 1024 \
+                or any(ord(z) < 32 for z in wartosc):
+            return f"launch_app: {klucz} to nie nazwa aplikacji"
+        if klucz in ("path", "launch_path") or _sciezka(wartosc):
+            if platforma.startswith("macos"):
+                return "launch_app na macOS tylko po bundle id albo nazwie aplikacji ze zgody, bez ścieżek"
+            if not ta_sama_tozsamosc(zgoda_aplikacje, wartosc, platforma):
+                return f"launch_app: {klucz} {wartosc[:80]!r} to nie program ze zgody (ścieżka musi być dokładnie tą " \
+                       "ze zgody)"
+        elif klucz == "bundle_id" and platforma.startswith("macos") and BUNDLE.match(wartosc.strip()):
+            if not any(str(a.tozsamosc.get("bundle_id", "")).casefold() == wartosc.strip().casefold()
+                       for a in zgoda_aplikacje):
+                return f"launch_app: bundle id {wartosc[:80]!r} jest poza zgodą"
+        elif not pasuje(zgoda_aplikacje, wartosc):
+            return f"launch_app: tej aplikacji ({wartosc[:60]!r}) nie ma w zgodzie właściciela"
+    return None
 
 
 def pasuje(zgoda_aplikacje, nazwa: str | None = None, bundle_id: str | None = None) -> bool:

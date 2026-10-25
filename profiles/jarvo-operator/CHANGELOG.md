@@ -80,5 +80,22 @@
   rąk, launch_app innych aplikacji, skróty systemu (Win/Super, Alt+Tab, Ctrl+Alt+Del, Cmd+Spacja…) i sekrety
   w pisanym tekście, a w odpowiedziach ukrywa klucze i karty. Odmowy wracają jako wynik narzędzia z kodem
   (`rece_wylaczone`, `rece_wygasly`, `poza_zgoda`, `zablokowane`, `stala_zgoda`). Dziennik `<stan>/rece/dziennik.jsonl`
-  bez treści. macOS: Dostępność i Nagrywanie ekranu dla Cua Driver włącza właściciel (instrukcja w `on`). Działa po
-  podpięciu w `komputer/jarvo_cua.py` i `jarvo/cli.py` oraz wpisie sterownika w `vendor/natywne.yaml`.
+  bez treści. macOS: Dostępność i Nagrywanie ekranu dla Cua Driver włącza właściciel (instrukcja w `on`).
+- Ręce (K6, docs/KOMPUTER.md §9): na ekranie właściciela Operator pracuje w osobnym profilu rąk `jarvo-ekran`, a nie
+  w `jarvo-operator` (tu `approvals.mode: smart` i stałe zgody `cua:*` zostają dla Komputera Jarva). `jarvo komputer
+  rece on` zakłada go sam (domyślny `--profil`): bounded z manifestem zgody, `approvals.mode: manual`, cron_mode,
+  single_query_mode i unattended_mode deny, bez stałych zgód, tylko narzędzia computer_use, clarify i todo (bez
+  terminala, plików, delegacji, rutyn i kanbana), wtyczka jarvo-zgody, model z jarvo-operator, własny SOUL rąk;
+  nowy profil powstaje w całości i dopiero gotowy dostaje swoją nazwę, a po jego zmianie działająca brama restartuje
+  się przez nadzorcę (ryzyko Z39). Rozmowa: `jarvo chat --profil jarvo-ekran`. Bramka czyta zgody profilu tak jak
+  Hermes (ścisły czytnik `komputer/rece/konfig.py`: `mode: false`, `no`, brak mode = smart, `cron_mode: approve`,
+  zgody w nawiasach, kotwice, tagi, powtórzone klucze, `cua:*` w nawiasach albo z sekwencją ucieczki, także config
+  z HERMES_HOME i nakładka administratora) i odmawia przy trybie pełnym (HERMES_YOLO_MODE). W rozmowie dochodzą:
+  set_config bez innych kluczy obok max_image_dimension, launch_app tylko z dokładną ścieżką ze zgody, bez schowka
+  (Ctrl/Cmd+C, V, X, Shift+Insert, Ctrl+Insert, Shift+Delete, środkowy przycisk na Linuksie), zrzutu ekranu i skrótów
+  systemu (Alt+Esc, Alt+Spacja, Alt+F4, Ctrl+Alt+Tab, Ctrl+Q, Cmd+Q, Ctrl+strzałki na macOS…), w type_text bez
+  Entera i Tab (Enter tylko przez key, który właściciel zatwierdza osobno), bez adresów javascript:, file:, data:,
+  about:, chrome: i ścieżek plików; twarde zasady jak w Komputerze na elementach z ostatniego capture (pole hasła,
+  karty i kodu, przycisk płatności, logowania i wysyłki, CAPTCHA: `wymaga_czlowieka`; element spoza migawki:
+  `nieznany_cel`); ukrywanie sekretów pomija już tylko prawdziwe obrazy. Bramka `komputer/jarvo_cua.py` natywnie
+  przekazuje czasowniki rąk (serve, stop, call, mcp i status z --socket) do `komputer/rece/bramka.py`.

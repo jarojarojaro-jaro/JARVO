@@ -15,7 +15,7 @@ odtwarzamy własnym kodem na Hermesie i otwartym sterowniku `cua-driver` (MIT).
 | **Operator** (`jarvo-operator`): agent, który steruje ekranem (najpierw drzewo dostępności, zrzut tylko gdy trzeba) | wszędzie tam, gdzie Komputer | działa (K3) |
 | **Ekran w HQ**: podgląd na żywo, Przejmij, Oddaj, Zatrzymaj | zalogowany dashboard | etap K4 |
 | **Terminal i serwery**: powłoka w Komputerze, ekrany programów tekstowych, Twoje serwery przez SSH | wszędzie | etap K5 |
-| **Ręce**: Twój komputer na czas, który sam ustawisz, tylko w aplikacjach, które wskażesz | Windows, macOS, Linux (X11) | etap K6 |
+| **Ręce**: Twój komputer na czas, który sam ustawisz, tylko w aplikacjach, które wskażesz | Windows, macOS, Linux (X11 albo XWayland), instalacja natywna | działa w kodzie (K6, §9): `jarvo komputer rece on/off/status`, zgoda, bramka, profil rąk `jarvo-ekran`; próba na żywo z prawdziwym sterownikiem przed nami |
 
 Czego agent nigdy nie zrobi sam:
 - nie zapłaci, nie kupi, nie zaloguje się, nie wyśle i nie opublikuje: te kliknięcia zostawia Tobie
@@ -35,7 +35,7 @@ Czego agent nigdy nie zrobi sam:
 | K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi), skarbiec bez wyciągów, 5 skilli, 20 evals, 2 ataki red teamu, pokój Sterownia w HQ, wzorzec w `dispatch-playbook`, dokumentacja | zrobione |
 | K4 | Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj | planowane |
 | K5 | Terminal Operatora w Komputerze (SSH przez gniazdo), ekrany programów tekstowych (tmux), serwery | planowane |
-| K6 | Ręce na Twoim komputerze: podpisany `cua-driver` 0.36, pomocnik na Linux, macOS i Windows, zgoda na aplikację na Twoim ekranie | planowane |
+| K6 | Ręce na Twoim komputerze (§9): `cua-driver-rs` 0.38.0 po przeglądzie (suma programu, podpis Authenticode i Developer ID) w trybie bounded z manifestem z podpisanej zgody, `jarvo komputer rece on/off/status`, profil rąk `jarvo-ekran`, bramka `komputer/rece` z twardymi zasadami, Windows, macOS i Linux | zrobione w kodzie (testy na atrapie sterownika); próba na żywo z prawdziwym sterownikiem przed nami |
 
 ## 3. Jak to jest spięte
 
@@ -74,7 +74,8 @@ w kontenerze tylko do odczytu, więc agent nie zmieni bramki). Bramka odpowiada 
 | `--help`, `--version`, `manifest` | stałe odpowiedzi z wersją sterownika z obrazu Komputera (kontrakt Hermesa 0.20) |
 | `mcp [--no-overlay]` | przepuszcza rozmowę MCP (bajty w obie strony) do wejścia w Komputerze na `cua.sock`; zasady sprawdza wejście (§6), bramka nie zna treści. Gdy Komputer jest wyłączony: komunikat „jarvo komputer on” i kod 69; gdy pulpit działa, ale wejście nie odpowiada: komunikat z `jarvo komputer status` i `jarvo logs komputer` i kod 69 |
 | `status` | 0, gdy sterownik w Komputerze odpowiada; inaczej 1 i ten sam komunikat co `mcp` |
-| wszystko inne | odmowa i kod 64: `check-update` i `update` (sterownik nie łączy się z GitHubem), `serve` (tryb bez ograniczeń, więc `/yolo` i `approvals.mode: off` zamykają computer_use zamiast go otwierać), `install`, `skills`, `extension` |
+| `serve`, `stop`, `call` oraz `mcp` i `status` z `--socket` (tylko natywnie) | ręce na Twoim ekranie (§9): bramka rąk `komputer/rece/bramka.py`; bez podpisanej zgody `serve` i `mcp` kończą się kodem 69, tryb inny niż bounded i `call` zawsze kodem 64 |
+| wszystko inne | odmowa i kod 64: `check-update` i `update` (sterownik nie łączy się z GitHubem), w kontenerze `serve` (tryb bez ograniczeń, więc `/yolo` i `approvals.mode: off` zamykają computer_use zamiast go otwierać), `install`, `skills`, `extension` |
 
 Reguły walidatora (`scripts/validate.py`, `check_komputer`):
 - toolset `computer_use` i klucze `cua:*` w `command_allowlist` tylko u agenta z `komputer: true` we `fleet.yaml`;
@@ -326,8 +327,8 @@ u innych agentów.
 - **Ryzyko resztkowe: wspólny użytkownik w `jarvo-hermes`.** Wszystkie procesy floty działają jako uid `hermes`,
   więc agent z lokalnym terminalem technicznie sięga do plików innych agentów (to stan sprzed Komputera).
   Komputer Jarva tego nie pogarsza dla kluczy floty (w Komputerze ich nie ma), ale zalogowana w nim przeglądarka
-  jest osiągalna przez gniazda. Dlatego twarde reguły siedzą w Komputerze, a nie w `jarvo-hermes`, a pełne
-  rozdzielenie użytkowników terminali to osobny etap przed Rękami (K6).
+  jest osiągalna przez gniazda. Dlatego twarde reguły siedzą w Komputerze, a nie w `jarvo-hermes`. Ręce (K6, §9)
+  działają w profilu bez terminala i plików, a pełne rozdzielenie użytkowników terminali zostaje osobnym etapem.
 - **Ryzyka resztkowe wejścia (K2):** Chromium działa z `--no-sandbox` (piaskownica wymaga przestrzeni nazw
   użytkownika, a kontener ma `no-new-privileges`; granicą jest kontener bez kluczy i z filtrem ruchu); strony
   rysowane w całości na `canvas` nie mają drzewa dostępności, więc wrażliwy przycisk bez napisu przejdzie jak
@@ -360,11 +361,101 @@ u innych agentów.
   okna), a ramki elementów przesuwa o położenie okna z zapytania: w oknie poza rogiem ekranu ramki są przesunięte
   drugi raz. Wejście nie liczy z nich punktów (bierze położenie okna z X11), a agent w punkt klika ze zrzutu.
 
-## 9. Źródła
+## 9. Ręce: Twój ekran (K6)
+
+Ręce dają Operatorowi Twój własny ekran (Windows, macOS, Linux z X11 albo XWayland) przez sterownik `cua-driver-rs`
+0.38.0, tylko w instalacji natywnej, domyślnie wyłączone i tylko po Twojej osobnej, podpisanej zgodzie (docs/NATYWNIE.md
+J14, J15, decyzja I19). Kod: `komputer/rece/` (zgoda, aplikacje, konfig, profil, sterownik, procesy, dziennik,
+bramka) i polecenie `jarvo/rece.py`; Hermes woła sterownik przez tę samą bramkę `komputer/jarvo_cua.py` (§4), która
+natywnie przekazuje czasowniki rąk do `komputer/rece/bramka.py`.
+
+| Polecenie | Co robi |
+|---|---|
+| `jarvo komputer rece on --aplikacje notatnik,mspaint [--na 30m] [--bezczynnosc 10m] [--profil jarvo-ekran] [--bez-pobierania]` | tylko Ty, w swoim terminalu (proces floty, karta, rutyna i brak terminala to odmowa), bez praw administratora, po wpisaniu TAK. Sprawdza aplikacje (bez terminali, powłok, interpreterów, narzędzi systemu, menedżerów haseł, aplikacji ze Sklepu i samego Jarva), sterownik (suma programu, podpis; brak = pobranie z sumą z manifestu, na macOS instrukcja kopii `CuaDriver.app` i zgód Dostępność oraz Nagrywanie ekranu), zakłada albo odświeża profil rąk i zapisuje zgodę podpisaną HMAC (`<stan>/rece/zgoda.json`) z manifestem bounded (`<stan>/rece/manifest.yaml`) |
+| `jarvo komputer rece off` | od razu: usuwa zgodę (następne działanie to `rece_wylaczone`) i zatrzymuje działające sterowniki rąk, także z innego okna (nadzór kończy je w ok. 0,5 s); może każdy. Profil rąk zostaje, ale bez zgody nic nie zrobi |
+| `jarvo komputer rece status [--json]` | zgoda (do kiedy, aplikacje), sterownik, działające demony, profil rąk (czy bramka go wpuści, a jeśli nie, dlaczego) i ostatnie wpisy dziennika |
+| `jarvo chat --profil jarvo-ekran` | rozmowa z rękami: każde działanie na ekranie zatwierdzasz w niej |
+
+Ręce gasną same po czasie zgody (najwyżej 8 h) i po czasie bez działań (domyślnie 10 min, `idle_timeout` sterownika).
+Osobnej pauzy nie ma: `off` działa od razu i bez nowych procesów, a ponowne `on` to nowa zgoda.
+
+### Profil rąk `jarvo-ekran`
+
+Osobny profil Hermesa w `<dane>/profiles/jarvo-ekran`, nie agent floty: nie ma go we `fleet.yaml`, nie dostaje kart
+kanbana, rutyn ani delegacji, nie ma terminala ani narzędzi plików. `jarvo-operator` zostaje przy Komputerze Jarva:
+tam `approvals.mode: smart` i stałe zgody `cua:*` są na miejscu, na Twoim ekranie nie. Każde `on` zapisuje profil od
+nowa (`komputer/rece/profil.py`):
+
+- `config.yaml`: model z profilu `jarvo-operator` (bez niego z configu hosta), `computer_use.permission_mode: bounded`
+  z `capability_manifest` = manifest zgody, `approvals.mode: manual`, `cron_mode`, `single_query_mode`
+  i `unattended_mode: deny`, pusta `command_allowlist`, narzędzia `computer_use`, `clarify` i `todo` (reszta
+  w `agent.disabled_toolsets`, rutyny bez narzędzi), wtyczka `jarvo-zgody` jak w profilach natywnych (gdy jest
+  w `<dane>/plugins`) i bezpieczne ustawienia z `scripts/build.py` oraz `updates.check: false`;
+- `SOUL.md` rąk, `profile.yaml`, `.env` ze wspólnymi kluczami dostawców (`scripts/share_keys.py`) i katalog `home/`.
+
+Nowy profil powstaje w ukrytym katalogu obok i dostaje swoją nazwę jedną zmianą nazwy, więc działająca brama, która
+zauważy nowy katalog w `profiles/`, od razu widzi go całego (menedżer wtyczek profilu brama wypełnia raz, przy
+pierwszym spojrzeniu: docs/NATYWNIE.md, ryzyko Z39). Gdy `on` zmienia profil (nowy, config, wtyczka, SOUL), mówi to
+przed TAK i potem restartuje działającą bramę przez nadzorcę (jak `jarvo serwis --restart brama`); brama bez nadzorcy
+dostaje radę, jak ją zrestartować. Inny `--profil` musi już być profilem rąk, czytanym tak samo (np. `--profil
+jarvo-operator` to odmowa z powodami).
+
+### Jak bramka czyta zgody profilu
+
+Hermes czyta config PyYAML-em (YAML 1.1), łączy go z wartościami domyślnymi (`approvals.mode` domyślnie smart)
+i z nakładką administratora. Bramka rąk działa na Pythonie Jarva bez PyYAML, więc ma własny ścisły czytnik
+(`komputer/rece/konfig.py`): czyta tylko to, co da się przeczytać bez zgadywania (testy porównują go z PyYAML na
+configach floty, ich zrzutach i mutacjach), a resztę odrzuca. `serve` i `mcp` przechodzą tylko wtedy, gdy:
+
+| Klucz | Jak czyta go Hermes | Ręce przechodzą przy |
+|---|---|---|
+| `approvals.mode` | brak: smart; `false`, `no`, `off`: off; `true`, `yes`: manual; napis bez wielkości liter i spacji | `manual` (albo `true`, `yes`) zapisane wprost |
+| `approvals.cron_mode`, `single_query_mode`, `unattended_mode` | `str(wartość).lower()` równe approve, off, allow albo yes: Hermes zatwierdza sam; brak: deny | brak albo deny (gołe `off` i `yes` to dla Hermesa wartość logiczna, czyli deny) |
+| `command_allowlist` | lista dokładnych kluczy, także `cua:<akcja>:<tryb>` | żadnego `cua:` w żadnej pisowni (cudzysłów, apostrofy, nawiasy, sekwencje ucieczki) |
+
+Bramka sprawdza config profilu ze zgody, config z `HERMES_HOME` procesu (gdy wskazuje inny katalog) i nakładkę
+administratora (`$HERMES_MANAGED_DIR/config.yaml` albo `/etc/hermes/config.yaml`, liczą się jej klucze). Odmową
+kończą się też: zgody w nawiasach (`approvals: {mode: off}`), kotwice, aliasy, tagi, scalanie (`<<`), klucze
+złożone, powtórzone i w cudzysłowie, drugi dokument, tabulatory i znaki sterujące, `${ZMIENNA}` i wartości na kilka
+wierszy w zgodach, `HERMES_YOLO_MODE` w otoczeniu (`--yolo`) i tryb inny niż bounded. Nadzór `serve` sprawdza config
+co 0,5 s, więc „zawsze” w trakcie sesji (Hermes dopisuje wtedy klucz `cua:*`) kończy ręce.
+
+### Rozmowa: co bramka przepuszcza
+
+| Co | Zasada |
+|---|---|
+| narzędzia | tylko 20 narzędzi rąk (patrzenie, klik, pisanie, klawisze, przewijanie, przeciąganie, `set_value`, `launch_app`, okno na wierzch); bez pełnego ekranu, skryptów, schowka, zamykania programów, nagrywania, przeglądarki CDP i historii |
+| `launch_app` | tylko aplikacja ze zgody: nazwa albo program ze zgody, a ścieżka (`path`, `launch_path` i nazwa, która wygląda na ścieżkę) dokładnie ta ze zgody (Windows bez wielkości liter, Linux dokładnie; na macOS tylko bundle id ze zgody); bez dodatkowych argumentów, adresy tylko http(s) |
+| `set_config` | tylko `max_image_dimension` 1456 (`key`, `value`, `session`), bez innych kluczy obok |
+| klawisze | jeden klawisz naraz; bez schowka (Ctrl/Cmd+C, V, X, Shift+Insert, Ctrl+Insert, Shift+Delete, środkowy przycisk na Linuksie), zrzutu ekranu (PrintScreen, Cmd+Shift+3–6) i skrótów systemu: Win/Super, Alt+Tab, Alt+Esc, Alt+Spacja, Alt+F<n> (Alt+F4 zamyka program), Ctrl+Esc, Ctrl+Alt+Del, Tab, T, L, D, strzałki i F<n>, Ctrl+Q; na macOS Cmd+Spacja, Cmd+Tab, Cmd+Q, Cmd+Option+Esc, D, H, Q, Ctrl+Cmd+Q i F, Ctrl+Spacja, Ctrl+strzałki, Ctrl+F1–F8, Fn+litera. Modyfikatory w każdej nazwie (Control_L, lwin, option, menu) i jako jeden napis („ctrl+v”) |
+| `type_text`, `set_value` | napis; w `type_text` bez Entera, Tab i znaków sterujących (Enter idzie tylko przez `press_key`, który zatwierdzasz osobno, bo może wysłać formularz logowania, płatności albo wiadomość; w `set_value` nowe linie wolno); bez kluczy, tokenów i numerów kart; bez adresów `javascript:` i `vbscript:` (także ze spacją, w pełnej szerokości i ze znakami niewidocznymi), `file:`, `data:`, `about:`, `chrome:`, `view-source:`, `shell:`, `ms-…:` i podobnych, bez innego schematu niż http(s) na początku tekstu i bez ścieżek dysku albo sieci |
+| elementy okna | jak w Komputerze Jarva, na ostatnim `get_window_state` tej rozmowy: pisanie (także znak po znaku i Enter) w polu hasła, karty, PIN-u, kodu BLIK albo 2FA, klik, Enter i spacja na przycisku płatności, zakupu, logowania, wysyłki albo publikacji oraz CAPTCHA to `wymaga_czlowieka`; element spoza migawki to `nieznany_cel`; w oknie z polem hasła po Tab pisanie dopiero po kliknięciu pola |
+| odpowiedzi | sekrety (klucze, tokeny, karty, wartości pól haseł) w tekście i w kluczach ukryte; bez zmian zostają tylko obrazy (część `image` i cały napis będący obrazem PNG, JPEG, GIF albo WebP w base64) |
+
+Odmowa wraca do agenta jako wynik narzędzia (`isError` i `structuredContent`: code, rule, decision, next_step), jak
+w Komputerze (§6). Dziennik `<stan>/rece/dziennik.jsonl` ma decyzje, kody i reguły bez treści (bez wpisywanego
+tekstu, napisów z ekranu i adresów).
+
+### Ryzyka resztkowe
+
+- **„Na sesję” w pytaniu Hermesa.** Hermes pyta o rodzaj działania (`cua:<akcja>:<tryb>`) i daje odpowiedź „raz”,
+  „na sesję” albo „zawsze”. „Zawsze” zapisuje klucz w configu i kończy ręce, ale „na sesję” Hermes trzyma w pamięci
+  procesu: do końca tej rozmowy kolejne działania tego rodzaju przechodzą bez pytania (twarde zasady bramki dalej
+  działają). Na swoim ekranie odpowiadaj „raz”.
+- Klik w punkt (współrzędne) bramka przepuszcza bez sprawdzania elementu: ocenia go tylko Twoje zatwierdzenie.
+- Okna plików aplikacji ze zgody (Otwórz, Zapisz jako) należą do tej aplikacji: agent może w nich chodzić po
+  folderach (ścieżek dysku nie wpisze), a każdy krok zatwierdzasz.
+- Zrzuty ekranu nie są zamazywane (jak w Komputerze, §8).
+- Klucz zgody (`<stan>/rece.klucz`) może przeczytać każdy proces właściciela, także agent z terminalem w trybie
+  pełnym: to kontrola, nie izolacja (docs/NATYWNIE.md, sekcja d). Sam profil rąk nie ma terminala ani plików.
+- macOS: Hermes f97608f uruchamia demona bounded tylko z `CuaDriver.app`, którego ścieżka niesie polecenie
+  sterownika, więc `serve` przez bramkę wymaga tam zmiany po stronie Hermesa.
+
+## 10. Źródła
 
 | Źródło | Licencja | Stan |
 |---|---|---|
-| `cua-driver` (trycua/cua, `cua-driver-rs` 0.21.0, później 0.36) | MIT | w obrazie `jarvo-komputer` (K1): przegląd, próba w kontenerze, sumy SHA-256 dla amd64 i arm64 w `vendor/zrodla.yaml` (architekturę wybiera `dpkg --print-architecture` obrazu bazowego, nie `TARGETARCH`, który bez BuildKit jest pusty); 0.21.0, bo z nią działa przypięty Hermes (nowsze zmieniają argumenty kliknięcia); telemetrię i sprawdzanie aktualizacji wyłączają zmienne, pliki konfiguracji i bramka |
+| `cua-driver` (trycua/cua, `cua-driver-rs`) | MIT | 0.21.0 w obrazie `jarvo-komputer` (K1): przegląd, próba w kontenerze, sumy SHA-256 dla amd64 i arm64 w `vendor/zrodla.yaml` (architekturę wybiera `dpkg --print-architecture` obrazu bazowego, nie `TARGETARCH`, który bez BuildKit jest pusty); 0.21.0, bo z nią działa przypięty Hermes (nowsze zmieniają argumenty kliknięcia); telemetrię i sprawdzanie aktualizacji wyłączają zmienne, pliki konfiguracji i bramka. 0.38.0 dla rąk (K6, §9): wpis w `vendor/natywne.yaml` (pobiera go `jarvo komputer rece on`, z sumą archiwum), sumy samego programu dla 5 platform i podpisujący (Authenticode „Cua AI, Inc.”, Developer ID zespołu YCK386LBJ7) w `komputer/rece/__init__.py`, sprawdzane przed każdym uruchomieniem; przegląd w `vendor/zrodla.yaml` i docs/SOURCES.md |
 | Codex Computer Use (OpenAI) | zamknięte | tylko wzorce zachowania z materiałów publicznych; kodu nie bierzemy |
 | Pakiety Debiana w obrazie (TigerVNC, xfwm4, Chromium, D-Bus, AT-SPI, `python3-gi` z `gir1.2-atspi-2.0`, iptables) | GPL-2.0, BSD, LGPL i inne | `docs/SOURCES.md`, tabela komponentów obrazu `jarvo-komputer` |
 | LCU (amontlabs/lcu) | MIT | odrzucone (uruchamia zamknięty program OpenAI); wzorce: zgoda na aplikację, dziennik bez treści, sprzątanie po turze |

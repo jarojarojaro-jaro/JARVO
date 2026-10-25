@@ -10,9 +10,12 @@ computer_use, i niczego nie pobiera:
                                 między Hermesem a kanałem wejścia; zasady sprawdza wejście (kontener:
                                 infra/komputer/wejscie.py; natywnie: komputer/wejscie_natywne.py, docs/KOMPUTER.md §6),
   status                        czy Komputer Jarva odpowiada.
+Natywnie czasowniki rąk na ekranie właściciela (K6) idą do komputer/rece/bramka.py: `serve`, `stop`, `call`
+oraz `mcp` i `status` z `--socket` (tak woła je Hermes w trybie bounded); bez `--socket` `mcp` i `status` to dalej
+Komputer Jarva. Bramka rąk przepuszcza je tylko przy podpisanej zgodzie właściciela (`jarvo komputer rece on`).
 Odmawia wszystkiego innego, m.in. check-update i update (sterownik nie aktualizuje się sam ani nie łączy z GitHubem),
-serve (tryb bez ograniczeń: /yolo i approvals.mode off zamykają computer_use zamiast go otwierać) oraz install.
-Ustawiona zmienna wyłącza też w Hermesie automatyczną „naprawę” sterownika przez curl|bash.
+w kontenerze serve (tryb bez ograniczeń: /yolo i approvals.mode off zamykają computer_use zamiast go otwierać) oraz
+install. Ustawiona zmienna wyłącza też w Hermesie automatyczną „naprawę” sterownika przez curl|bash.
 
 Kontener: gniazdo `JARVO_KOMPUTER_GNIAZDO` (domyślnie /opt/jarvo/komputer/cua.sock w wolumenie gniazd). Natywnie
 (jest JARVO_ROOT, nie ma JARVO_KOMPUTER_GNIAZDO): kanał `cua` usługi Komputera tego korzenia (komputer/kanal.py:
@@ -49,7 +52,9 @@ Użycie: cua-driver <czasownik>
   status               czy Komputer Jarva odpowiada
   --version            wersja sterownika
 
-Pozostałe czasowniki (check-update, update, serve, install, skills, extension, ...) są wyłączone.
+Natywnie, z podpisaną zgodą właściciela (jarvo komputer rece on), także ręce na jego ekranie: serve, stop
+oraz mcp i status z --socket (bramka komputer/rece). Pozostałe czasowniki (check-update, update, install, skills,
+extension, call, ...) są wyłączone.
 """
 
 
@@ -65,6 +70,24 @@ def _kanal():
         sys.path.insert(0, app)
     from komputer import kanal
     return kanal
+
+
+def _bramka_rak():
+    """Bramka rąk (komputer/rece/bramka.py) z kodu tej wersji Jarva; pakiet `rece` jak w jarvo/rece.py."""
+    katalog = os.path.dirname(os.path.abspath(__file__))
+    if katalog not in sys.path:
+        sys.path.insert(0, katalog)
+    from rece import bramka
+    return bramka
+
+
+def dla_rak(argv: list[str]) -> bool:
+    """Czasownik rąk na ekranie właściciela: tylko natywnie (w kontenerze nie ma ekranu właściciela)."""
+    if not natywnie() or not argv:
+        return False
+    if argv[0] in ("serve", "stop", "call"):
+        return True
+    return argv[0] in ("mcp", "status") and any(a == "--socket" or a.startswith("--socket=") for a in argv[1:])
 
 
 def manifest() -> dict:
@@ -210,6 +233,8 @@ def main(argv: list[str]) -> int:
     if czas == "manifest":
         print(json.dumps(manifest(), ensure_ascii=False))
         return 0
+    if dla_rak(argv):
+        return _bramka_rak().obsluz(argv)
     if czas == "status":
         if komputer_dostepny():
             print("Komputer Jarva odpowiada.")

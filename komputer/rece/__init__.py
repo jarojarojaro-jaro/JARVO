@@ -1,19 +1,24 @@
 """Ręce: Operator na ekranie właściciela (docs/KOMPUTER.md, etap K6; docs/NATYWNIE.md J14, J15, decyzja I19).
 
 Domyślnie wyłączone. Włącza je tylko właściciel, ze swojego terminala, na czas i tylko w aplikacjach, które sam
-wskaże: `jarvo komputer rece on --aplikacje notatnik,mspaint --na 30m` (jarvo/rece.py). Polecenie zapisuje zgodę
-podpisaną kluczem HMAC z `<stan>/rece.klucz` i manifest trybu bounded sterownika. Bramka `komputer/jarvo_cua.py`
-przekazuje tu czasowniki rąk (`serve`, `mcp --socket`, `status --socket`, `stop`, `call`), a ten pakiet
-przepuszcza je tylko przy ważnej zgodzie i sprawdzonym sterowniku cua-driver-rs 0.38.0.
+wskaże: `jarvo komputer rece on --aplikacje notatnik,mspaint --na 30m` (jarvo/rece.py). Polecenie zakłada albo
+odświeża profil rąk `jarvo-ekran` (profil.py) i zapisuje zgodę podpisaną kluczem HMAC z `<stan>/rece.klucz` oraz
+manifest trybu bounded sterownika. Bramka `komputer/jarvo_cua.py` przekazuje tu czasowniki rąk (`serve`,
+`mcp --socket`, `status --socket`, `stop`, `call`), a ten pakiet przepuszcza je tylko przy ważnej zgodzie,
+profilu, w którym Hermes pyta o każde działanie, i sprawdzonym sterowniku cua-driver-rs 0.38.0.
 
 Moduły:
   zgoda      klucz, podpisana zgoda (`<stan>/rece/zgoda.json`), manifest bounded sterownika (`manifest.yaml`)
-  aplikacje  nazwy z --aplikacje → tożsamości sterownika (ścieżka programu na Windows i Linuksie, bundle id na macOS)
+  aplikacje  nazwy z --aplikacje → tożsamości sterownika (ścieżka programu na Windows i Linuksie, bundle id na macOS);
+             launch_app tylko z tożsamością ze zgody
+  konfig     ścisły odczyt config.yaml Hermesa bez PyYAML: zgody (approvals, command_allowlist) tak, jak przeczyta je
+             Hermes, a wszystko niepewne to odmowa
+  profil     profil rąk `jarvo-ekran` (bounded z manifestem zgody, approvals manual, bez terminala i plików)
   sterownik  miejsce programu, suma sha256 z przeglądu, podpis (Authenticode, codesign), środowisko bez telemetrii,
              prawa procesu (okna administratora poza zasięgiem), ekran na Linuksie
   procesy    odcisk procesu, rejestr działających sterowników rąk, zatrzymanie
   dziennik   `<stan>/rece/dziennik.jsonl`: decyzje bez treści (bez wpisywanego tekstu i bez zawartości ekranu)
-  bramka     serve (nadzór sterownika), mcp (filtr rozmowy), status, stop
+  bramka     serve (nadzór sterownika), mcp (filtr rozmowy i twarde zasady), status, stop
 
 Pakiet działa samą biblioteką standardową. Moduły `jarvo` (układ katalogów, zapis atomowy, ACL) bierze z katalogu
 kodu Jarva, w którym leży (`<app>/komputer/rece` → `<app>/jarvo`).
@@ -75,4 +80,6 @@ CZAS_DOMYSLNY = 30 * 60                 # s
 CZAS_MIN = 60
 CZAS_MAKS = 8 * 60 * 60                 # sterownik przyjmuje do 24 h; na ekranie właściciela najwyżej 8 h
 BEZCZYNNOSC = 10 * 60                   # idle_timeout sterownika: bez działań przez 10 min ręce gasną same
-PROFIL = "jarvo-operator"
+# profil rąk (profil.py): osobny od jarvo-operator, który na Komputerze Jarva ma approvals.mode smart i stałe zgody
+# cua:* (tam słuszne, na ekranie właściciela nie); nie `jarvo-rece`, bo myli się z agentem jarvo-reka
+PROFIL = "jarvo-ekran"

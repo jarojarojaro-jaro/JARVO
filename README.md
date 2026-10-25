@@ -106,7 +106,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`bin/jarvo`](bin/jarvo) | polecenie użytkownika po instalacji: `up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall` |
 | [`requirements-dev.txt`](requirements-dev.txt) | zależności testów i walidacji (`make dev-deps`) |
 | [`tests/`](tests) | testy pytest (w `tests/live/` test aplikacji w przeglądarce dla `scripts/jarvo-e2e.sh`) |
-| [`komputer/`](komputer) | computer use: bramka sterownika ekranu `jarvo_cua.py` (Hermes woła ją zamiast `cua-driver`); pulpit włączasz `jarvo komputer on`; projekt w [docs/KOMPUTER.md](docs/KOMPUTER.md) |
+| [`komputer/`](komputer) | computer use: bramka sterownika ekranu `jarvo_cua.py` (Hermes woła ją zamiast `cua-driver`); pulpit włączasz `jarvo komputer on`; ręce na Twoim ekranie `rece/` (zgoda, bramka z twardymi zasadami, profil rąk `jarvo-ekran`; `jarvo komputer rece on`); projekt w [docs/KOMPUTER.md](docs/KOMPUTER.md) |
 | [`wiedza/`](wiedza) | skarbiec wiedzy floty (drugi mózg): `wiedza.py` i `SCHEMA.md`, projekt w [docs/WIEDZA.md](docs/WIEDZA.md) |
 | [`docs/`](docs) | dokumentacja (niżej) |
 

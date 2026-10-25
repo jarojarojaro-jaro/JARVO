@@ -1,18 +1,24 @@
 """`jarvo komputer rece on|off|status`: ręce Operatora na ekranie właściciela (docs/KOMPUTER.md, etap K6;
 docs/NATYWNIE.md J14, J15, N13; decyzja I19). Domyślnie wyłączone.
 
-  on --aplikacje A,B [--na 30m] [--profil jarvo-operator] [--bezczynnosc 10m] [--bez-pobierania]
+  on --aplikacje A,B [--na 30m] [--profil jarvo-ekran] [--bezczynnosc 10m] [--bez-pobierania]
         tylko właściciel, w swoim terminalu (bez terminala i z procesu floty: odmowa), po wpisaniu TAK.
         Sprawdza prawa (nie administrator), ekran (Linux: X11 albo XWayland), aplikacje (bez terminali, narzędzi
-        systemu, menedżerów haseł i samego Jarva), profil (bez stałych zgód cua:*) i sterownik cua-driver-rs 0.38.0
-        (suma programu, podpis; brak = pobranie z sumą z manifestu, na macOS instrukcja kopii do /Applications).
-        Zapisuje zgodę podpisaną kluczem HMAC z <stan>/rece.klucz i manifest bounded sterownika.
+        systemu, menedżerów haseł i samego Jarva) i sterownik cua-driver-rs 0.38.0 (suma programu, podpis; brak =
+        pobranie z sumą z manifestu, na macOS instrukcja kopii do /Applications). Domyślny profil rąk `jarvo-ekran`
+        zakłada albo odświeża sam (komputer/rece/profil.py: bounded z manifestem zgody, approvals manual, bez
+        terminala i plików, model z jarvo-operator); nowy powstaje w całości obok i dopiero gotowy dostaje swoją
+        nazwę, a po zmianie profilu działająca brama Jarva restartuje się przez nadzorcę (bez nadzorcy: rada, jak
+        ją zrestartować). Inny --profil musi już być profilem rąk: bramka czyta go tak jak Hermes (approvals.mode
+        manual, tryby bez człowieka deny, bez stałych zgód cua:*). Zapisuje zgodę podpisaną kluczem HMAC
+        z <stan>/rece.klucz i manifest bounded sterownika.
   off   wyłącza od razu: usuwa zgodę, zatrzymuje działające sterowniki rąk (także z innego okna); może każdy.
+        Profil rąk zostaje, ale bez zgody nic nie zrobi.
   status [--json]   zgoda, czas, aplikacje, sterownik, działające demony, profil i ostatnie wpisy dziennika.
 
-Podpięcie w jarvo/cli.py (koordynator): parser `komputer` z `add_help=False`, a dla `jarvo komputer rece ...`
-`return rece.main(reszta_po_słowie_rece)`; kod wyjścia jak tutaj (0 dobrze, 1 błąd, 2 złe argumenty albo brak
-wpisu sterownika w manifeście, 3 potrzebny krok właściciela na macOS).
+Podpięcie w jarvo/cli.py: `jarvo komputer rece …` → `rece.main(reszta_po_słowie_rece, env=…)`; kod wyjścia jak
+tutaj (0 dobrze, 1 błąd, 2 złe argumenty, profil, którego bramka nie wpuści, albo brak wpisu sterownika
+w manifeście, 3 potrzebny krok właściciela na macOS).
 
 Kod rąk (zgoda, bramka, sterownik) leży w `komputer/rece/` obok tego katalogu; bramka `komputer/jarvo_cua.py`
 woła ten sam kod przy każdym `serve` i `mcp` sterownika.
@@ -74,7 +80,8 @@ def _parser() -> argparse.ArgumentParser:
     s.add_argument("--aplikacje", action="append", required=True, metavar="LISTA",
                    help="aplikacje po przecinku (np. notatnik,mspaint; macOS: TextEdit albo com.apple.TextEdit)")
     s.add_argument("--na", default="30m", metavar="CZAS", help="na jak długo: 30m (domyślnie), 1h, 90s; najwyżej 8h")
-    s.add_argument("--profil", default=None, metavar="PROFIL", help="profil rąk (domyślnie jarvo-operator)")
+    s.add_argument("--profil", default=None, metavar="PROFIL",
+                   help="profil rąk (domyślnie jarvo-ekran: zakładany i odświeżany sam)")
     s.add_argument("--bezczynnosc", default="10m", metavar="CZAS",
                    help="ręce gasną same po tym czasie bez działań (domyślnie 10m)")
     s.add_argument("--bez-pobierania", action="store_true", help="nie pobieraj sterownika, gdy go nie ma")
@@ -108,8 +115,9 @@ class Wyjscie:
 def main(argv: list[str] | None = None, *, env: dict | None = None, wejscie: Callable[[str], str] | None = None,
          tty: bool | None = None, teraz: Callable[[], float] | None = None, sprawdz_sterownik=None,
          podwyzszone: Callable[[], bool] | None = None, zainstaluj=None, rozpoznaj=None, wyjscie=None,
-         platforma: str | None = None) -> int:
-    """`jarvo komputer rece <akcja>`. Parametry poza `argv` podstawiają testy (atrapa sterownika, terminal, zegar)."""
+         platforma: str | None = None, restart_bramy: Callable | None = None) -> int:
+    """`jarvo komputer rece <akcja>`. Parametry poza `argv` podstawiają testy (atrapa sterownika, terminal, zegar,
+    restart bramy)."""
     argv = list(sys.argv[1:] if argv is None else argv)
     env = dict(os.environ if env is None else env)
     pisz = Wyjscie(wyjscie)
@@ -138,7 +146,7 @@ def main(argv: list[str] | None = None, *, env: dict | None = None, wejscie: Cal
                             podwyzszone=podwyzszone)
     return wlacz(a, u, pliki, plat, env, pisz, wejscie=wejscie, tty=tty, teraz=teraz,
                  sprawdz_sterownik=sprawdz_sterownik, podwyzszone=podwyzszone, zainstaluj=zainstaluj,
-                 rozpoznaj=rozpoznaj)
+                 rozpoznaj=rozpoznaj, restart_bramy=restart_bramy)
 
 
 # ---------------------------------------------------------------- off
@@ -171,26 +179,67 @@ def config_profilu(u, profil: str) -> Path:
 
 
 def ustawienia_profilu(tekst: str, manifest: Path) -> list[str]:
-    """Czego brakuje w configu profilu rąk (Hermes w trybie bounded z manifestem rąk)."""
-    import re
+    """Czego brakuje w configu profilu rąk (Hermes w trybie bounded z manifestem rąk), czytanym tak jak przez bramkę
+    (komputer/rece/konfig.py)."""
+    kf = _modul("konfig")
+    try:
+        m = kf.czytaj(tekst)
+    except kf.Niepewne as e:
+        return [f"config.yaml, który da się przeczytać bez zgadywania ({e})"]
     brak = []
-    if not re.search(r"^\s+permission_mode\s*:\s*[\"']?bounded[\"']?\s*(#.*)?$", tekst, re.M):
+    if (kf.napis(m, "computer_use", "permission_mode") or "").strip().lower() != "bounded":
         brak.append("computer_use.permission_mode: bounded")
-    wpisy = []
-    for cudzyslow, wartosc in re.findall(r"^\s+capability_manifest\s*:\s*([\"']?)(.+?)\1\s*(?:#.*)?$", tekst, re.M):
-        if cudzyslow == '"':                     # YAML w cudzysłowie: \\ to jeden ukośnik (jak w JSON-ie)
-            with contextlib.suppress(ValueError):
-                wartosc = json.loads(f'"{wartosc}"')
-        wpisy.append(wartosc.strip())
-    if not any(os.path.normcase(os.path.abspath(w)) == os.path.normcase(os.path.abspath(manifest)) for w in wpisy):
+    wpis = kf.napis(m, "computer_use", "capability_manifest")
+    # Hermes: os.path.abspath(os.path.expanduser(...)), tools/computer_use/cua_backend_daemon.py
+    if not wpis or os.path.normcase(os.path.abspath(os.path.expanduser(wpis.strip()))) != \
+            os.path.normcase(os.path.abspath(manifest)):
         brak.append(f"computer_use.capability_manifest: {manifest}")
     return brak
 
 
+def zrestartuj_brame(u) -> str:
+    """Brama Jarva widzi zmieniony profil dopiero po restarcie (docs/NATYWNIE.md, ryzyko Z39): restart przez nadzorcę,
+    gdy brama działa pod nim. Wynik: "zrestartowana", "nie_dziala", "bez_nadzorcy" (brama odpowiada, a nadzorcy
+    nie ma) albo "blad: <powód>"."""
+    from . import instalator, nadzorca
+    stan, _ = instalator.stan_serwisu(u)
+    if stan is not None:
+        brama = instalator.usluga_nadzorcy(stan, "brama")
+        if brama.get("stan") in (None, "zatrzymana") and not brama.get("pid"):
+            return "nie_dziala"
+        try:
+            nadzorca.polacz(u).restart("brama")
+        except nadzorca.BladNadzorcy as e:
+            return f"blad: {e}"
+        return "zrestartowana"
+    return "bez_nadzorcy" if nadzorca.brama_gotowa(u.dane) else "nie_dziala"
+
+
+def _opis_restartu(wynik: str, profil: str) -> str | None:
+    if wynik == "zrestartowana":
+        return f"Brama Jarva zrestartowana przez nadzorcę: widzi już profil rąk {profil}."
+    if wynik == "bez_nadzorcy":
+        return (f"Brama Jarva działa bez nadzorcy i nie widzi jeszcze zmian profilu {profil}: zrestartuj ją "
+                "(jarvo serwis --restart brama albo zatrzymaj i uruchom ją od nowa). `jarvo chat --profil "
+                f"{profil}` działa od razu.")
+    if wynik.startswith("blad"):
+        return (f"Bramy Jarva nie udało się zrestartować ({wynik[5:].strip()}): zrób to sam (jarvo serwis --restart "
+                f"brama), zanim użyjesz profilu {profil} przez bramę (HQ, Telegram).")
+    return None
+
+
+def _odrzuc_profil(pisz, profil: str, plik: Path, problemy: list, domyslny: str) -> int:
+    pisz(f"Profil {profil}: bramka nie wpuści rąk z tym profilem ({plik}):")
+    for o in problemy:
+        pisz(f"  - {o.powod}")
+    pisz(f"Bez --profil ręce działają w profilu {domyslny}, który `jarvo komputer rece on` zakłada sam.")
+    return 2
+
+
 def wlacz(a, u, pliki, plat: str, env: dict, pisz, *, wejscie, tty, teraz, sprawdz_sterownik, podwyzszone,
-          zainstaluj, rozpoznaj) -> int:
-    pk, zg, apl, st_mod, bramka, dz = (pakiet(), _modul("zgoda"), _modul("aplikacje"), _modul("sterownik"),
-                                      _modul("bramka"), _modul("dziennik"))
+          zainstaluj, rozpoznaj, restart_bramy=None) -> int:
+    pk, zg, apl, st_mod, bramka, dz, prof = (pakiet(), _modul("zgoda"), _modul("aplikacje"), _modul("sterownik"),
+                                            _modul("bramka"), _modul("dziennik"), _modul("profil"))
     if (znak := proces_floty(env, u.dane)) is not None:
         pisz(f"Ręce włącza tylko właściciel, w swoim terminalu. To polecenie wywołał proces Jarva ({znak}): odmowa.")
         return 1
@@ -221,20 +270,23 @@ def wlacz(a, u, pliki, plat: str, env: dict, pisz, *, wejscie, tty, teraz, spraw
         pisz(f"BŁĄD: {e}")
         return 2
     plik_profilu = config_profilu(u, profil)
-    try:
-        tekst = plik_profilu.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        pisz(f"Nie ma profilu {profil} ({plik_profilu}). Ręce działają przez profil Hermesa w trybie bounded "
-             "(docs/KOMPUTER.md, K6).")
-        return 2
-    if stale := bramka.stale_zgody(tekst):
-        pisz(f"Profil {profil} ma stałe zgody {', '.join(stale[:4])}{' …' if len(stale) > 4 else ''}: na Twoim ekranie "
-             "każde działanie zatwierdzasz sam, więc bramka nie wpuści rąk z tym profilem. Usuń klucze cua:* "
-             f"z command_allowlist w {plik_profilu} albo wskaż profil rąk bez nich (--profil).")
-        return 2
-    if bramka.zgody_wylaczone(tekst):
-        pisz(f"Profil {profil} ma approvals.mode: off: ręce nie startują.")
-        return 2
+    plan = None
+    if profil == pk.PROFIL:                      # profil rąk Jarva: zakładamy go albo odświeżamy sami
+        try:
+            plan = prof.zaplanuj(u.dane, pliki.manifest, profil)
+        except prof.BladProfilu as e:
+            pisz(f"BŁĄD: {e}")
+            return 2
+        tekst = plan.config
+    else:
+        try:
+            tekst = plik_profilu.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            pisz(f"Nie ma profilu {profil} ({plik_profilu}). Bez --profil ręce działają w profilu {pk.PROFIL}, "
+                 "który to polecenie zakłada samo (docs/KOMPUTER.md, K6).")
+            return 2
+    if problemy := bramka.problemy_profilu(tekst, plik=plik_profilu):
+        return _odrzuc_profil(pisz, profil, plik_profilu, problemy, pk.PROFIL)
     sterownik = _sterownik(u, plat, pisz, a.bez_pobierania, sprawdz_sterownik, zainstaluj)
     if isinstance(sterownik, int):
         return sterownik
@@ -244,9 +296,16 @@ def wlacz(a, u, pliki, plat: str, env: dict, pisz, *, wejscie, tty, teraz, spraw
     for x in lista:
         pisz(f"              {x.nazwa}: {next(iter(x.tozsamosc.values()))}")
     pisz(f"  na:         {zg.opis_czasu(sekundy)} (do {zg.iso(do)}), po {zg.opis_czasu(bezczynnosc)} bez działań gasną same")
-    pisz(f"  profil:     {profil}; każde działanie zatwierdzasz w rozmowie (bez stałych zgód)")
+    pisz(f"  profil:     {profil}; każde działanie zatwierdzasz w rozmowie (approvals manual, bez stałych zgód)")
+    if plan is not None:
+        stan = "nowy" if plan.nowy else ("odświeżony: " + ", ".join(plan.zmiany)) if plan.zmiany else "bez zmian"
+        pisz(f"              {stan}; model z {plan.model_z}; bez terminala, plików i innych agentów")
+        if plan.zmiany:
+            pisz("              działająca brama Jarva zrestartuje się, żeby zobaczyć profil (rozmowy w toku "
+                 "przerwą się na kilka sekund)")
     pisz(f"  sterownik:  cua-driver-rs {pk.WERSJA} ({sterownik.podpis or 'suma z przeglądu'}), telemetria wyłączona")
-    pisz("  poza zasięgiem: pełny ekran, inne aplikacje, okna administratora, terminale, schowek, zamykanie programów")
+    pisz("  poza zasięgiem: pełny ekran, inne aplikacje, okna administratora, terminale, schowek, zrzut ekranu, "
+         "zamykanie programów, logowanie, płatności i wysyłka")
     try:
         odp = (wejscie or input)("Wpisz TAK, żeby włączyć ręce: ")
     except EOFError:
@@ -254,16 +313,34 @@ def wlacz(a, u, pliki, plat: str, env: dict, pisz, *, wejscie, tty, teraz, spraw
     if odp.strip().casefold() != "tak":
         pisz("Nie włączyłem rąk.")
         return 1
+    if plan is not None:
+        try:
+            prof.zapisz(plan, u.dane)
+            tekst = plik_profilu.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            pisz(f"BŁĄD: nie zapisałem profilu rąk {profil} ({e}).")
+            return 1
+        if problemy := bramka.problemy_profilu(tekst, plik=plik_profilu):  # zapisany profil czytamy tak jak bramka
+            return _odrzuc_profil(pisz, profil, plik_profilu, problemy, pk.PROFIL)
     try:
         z = zg.utworz(pliki, lista, sekundy, platforma=plat, profil=profil, bezczynnosc=bezczynnosc,
                       teraz=teraz() if teraz else None)
     except zg.BladZgody as e:
         pisz(f"BŁĄD: {e}")
         return 1
+    brama = None
+    if plan is not None and plan.zmiany:
+        try:
+            brama = (restart_bramy or zrestartuj_brame)(u)
+        except Exception as e:                    # noqa: BLE001 - kanał nadzorcy, moduł: rada zamiast awarii
+            brama = f"blad: {e}"
     dz.zapisz(pliki.dziennik, "on", zgoda=z.id, profil=profil, aplikacje=z.nazwy(), do=zg.iso(z.wygasa),
-              na=sekundy, platforma=plat, sterownik=pk.WERSJA)
+              na=sekundy, platforma=plat, sterownik=pk.WERSJA, brama=brama.split(":")[0] if brama else None)
     pisz(f"Ręce włączone do {zg.iso(z.wygasa)} ({zg.opis_czasu(sekundy)}). Wyłączysz je od razu: jarvo komputer rece off")
-    if brak := ustawienia_profilu(tekst, pliki.manifest):
+    if brama and (opis := _opis_restartu(brama, profil)):
+        pisz(opis)
+    pisz(f"Rozmowa z rękami: jarvo chat --profil {profil}")
+    if plan is None and (brak := ustawienia_profilu(tekst, pliki.manifest)):
         pisz(f"Uwaga: profil {profil} nie jest jeszcze ustawiony na ręce. W {plik_profilu} potrzebne: "
              + "; ".join(brak) + " (docs/KOMPUTER.md, K6).")
     if plat.startswith("macos"):
@@ -344,12 +421,16 @@ def zbierz_status(u, pliki, plat: str, env: dict, *, teraz=None, sprawdz_sterown
                         "profil": w.get("profil")} for w in wpisy]
     plik_profilu = config_profilu(u, profil)
     try:
-        tekst = plik_profilu.read_text(encoding="utf-8", errors="replace")
-        wynik["profil"] = {"nazwa": profil, "stale_zgody": bramka.stale_zgody(tekst),
-                           "zgody_wylaczone": bramka.zgody_wylaczone(tekst),
-                           "brakuje": ustawienia_profilu(tekst, pliki.manifest)}
-    except OSError:
-        wynik["profil"] = {"nazwa": profil, "brak": str(plik_profilu)}
+        tekst = plik_profilu.read_text(encoding="utf-8")
+        problemy = bramka.problemy_profilu(tekst, plik=plik_profilu)
+        wynik["profil"] = {"nazwa": profil, "rak_jarva": profil == pk.PROFIL, "plik": str(plik_profilu),
+                           "stale_zgody": bramka.stale_zgody(tekst),
+                           "zgody_wylaczone": any(o.kod != "stala_zgoda" for o in problemy),
+                           "problemy": [{"kod": o.kod, "powod": o.powod} for o in problemy],
+                           "brakuje": ustawienia_profilu(tekst, pliki.manifest),
+                           "wtyczka_zgod": (plik_profilu.parent / "plugins" / "jarvo-zgody").exists()}
+    except (OSError, UnicodeDecodeError):
+        wynik["profil"] = {"nazwa": profil, "rak_jarva": profil == pk.PROFIL, "brak": str(plik_profilu)}
     wynik["administrator"] = bool((podwyzszone or st_mod.podwyzszone)())
     if plat.startswith("linux"):
         wynik["ekran"] = st_mod.ekran_linux(env)
@@ -372,14 +453,17 @@ def opis_statusu(s: dict) -> str:
         w.append(f"Działające demony rąk: {len(s['demony'])} ({sum(d['gotowy'] for d in s['demony'])} gotowe)")
     p = s["profil"]
     if p.get("brak"):
-        w.append(f"Profil {p['nazwa']}: nie ma go ({p['brak']})")
-    elif p["stale_zgody"] or p["zgody_wylaczone"]:
-        w.append(f"Profil {p['nazwa']}: bramka nie wpuści rąk (stałe zgody: {', '.join(p['stale_zgody'][:4]) or '-'}; "
-                 f"approvals off: {'tak' if p['zgody_wylaczone'] else 'nie'})")
+        w.append(f"Profil {p['nazwa']}: nie ma go jeszcze ({p['brak']})"
+                 + ("; jarvo komputer rece on założy go sam" if p.get("rak_jarva") else ""))
+    elif p["problemy"]:
+        w.append(f"Profil {p['nazwa']}: bramka nie wpuści rąk:")
+        w += [f"  - {o['powod']}" for o in p["problemy"]]
     elif p["brakuje"]:
         w.append(f"Profil {p['nazwa']}: brakuje w config.yaml: {'; '.join(p['brakuje'])}")
     else:
-        w.append(f"Profil {p['nazwa']}: gotowy (bounded, bez stałych zgód)")
+        w.append(f"Profil {p['nazwa']}: gotowy (bounded, approvals manual, bez stałych zgód"
+                 + (", wtyczka zgód" if p.get("wtyczka_zgod") else "") + "); rozmowa: jarvo chat --profil "
+                 + p["nazwa"] + ("" if s["zgoda"]["wlaczone"] else " (bez zgody nic nie zrobi)"))
     if s.get("administrator"):
         w.append("Uwaga: ten proces ma prawa administratora, ręce nie wystartują.")
     if s.get("ekran"):

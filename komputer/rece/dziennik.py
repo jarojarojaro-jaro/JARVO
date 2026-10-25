@@ -1,9 +1,10 @@
 """Dziennik rąk `<stan>/rece/dziennik.jsonl`: kto, kiedy i co zdecydowano, bez treści.
 
 Jeden obiekt JSON na wiersz: czas, zdarzenie (on, off, serve, serve_odmowa, mcp, narzedzie, stop, koniec) i tylko
-pola z listy POLA. Nigdy wpisywany tekst (zostaje liczba znaków), zawartość ekranu, tytuły okien, adresy ani
-sekrety: wartości to nazwy narzędzi, kody decyzji, nazwy aplikacji podane przez właściciela, klawisze skrótów
-i liczby. Plik do 2 MB i jedna kopia (`dziennik.jsonl.1`), zapis pod blokadą (kilka procesów bramki naraz).
+pola z listy POLA. Nigdy wpisywany tekst (zostaje liczba znaków), zawartość ekranu, napisy elementów, tytuły okien,
+adresy ani sekrety: wartości to nazwy narzędzi, kody decyzji i reguł, nazwy aplikacji podane przez właściciela,
+klawisze skrótów i liczby. Plik do 2 MB i jedna kopia (`dziennik.jsonl.1`), zapis pod blokadą (kilka procesów
+bramki naraz).
 """
 from __future__ import annotations
 
@@ -14,8 +15,8 @@ import time
 from pathlib import Path
 
 MAKS = 2 * 1024 * 1024
-POLA = frozenset({"zgoda", "profil", "aplikacje", "aplikacja", "do", "na", "narzedzie", "decyzja", "kod", "znaki",
-                  "klawisze", "pid", "sterownik", "powod", "zatrzymane", "platforma"})
+POLA = frozenset({"zgoda", "profil", "aplikacje", "aplikacja", "do", "na", "narzedzie", "decyzja", "kod", "regula",
+                  "znaki", "klawisze", "pid", "sterownik", "powod", "zatrzymane", "platforma", "brama"})
 KLAWISZ = re.compile(r"^[A-Za-z0-9_+\- ]{1,24}$")
 
 

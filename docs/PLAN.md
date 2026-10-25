@@ -243,8 +243,9 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - 🟡 **Computer use i server use** ([KOMPUTER.md](KOMPUTER.md)): Komputer Jarva (pulpit z Chromium w osobnym kontenerze,
   `jarvo komputer on`), kanał z twardymi zasadami (logowanie, płatność, wysyłka, hasła i karty = człowiek) i agent
   **Operator** `jarvo-operator` (5 skilli, 20 scenariuszy evals, 2 ataki red teamu, pokój „Sterownia”): etapy K0–K3 gotowe;
-  K4 (Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj), K5 (terminal i serwery) i K6 (Ręce: Twój komputer z Linuksem,
-  macOS albo Windows) w kolejce.
+  K6 (Ręce: Twój komputer z Linuksem, macOS albo Windows, `jarvo komputer rece on`, profil rąk `jarvo-ekran`) w kodzie,
+  przed pierwszą próbą na żywo z prawdziwym sterownikiem; K4 (Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj) i K5
+  (terminal i serwery) w kolejce.
 - 🟡 Dopracowanie słabszych agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności (cookies, zgody, Omnibus)
   jako skill Weba: plan w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md); naprawy z §3 (ocena leadów, tabela Ręki, martwe ścieżki Ads)
   zrobione 2026-10-01. Nowi specjaliści: na razie żadni (dwie rundy propozycji odłożone, [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md) §6).

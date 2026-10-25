@@ -375,7 +375,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `hq/` | aplikacja Jarvo, HQ (backend, frontend, demo) |
 | `infra/` | obraz jarvo-hermes, obraz Komputera Jarva (`infra/komputer`), docker-compose z sidecarami, szablony env; `infra/python/natywne/`: locki venvów instalacji natywnej z wejściami i opisem odtworzenia |
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
-| `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`), wtyczka Operatora `plugin/` (narzędzie `komputer`); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
+| `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`), wtyczka Operatora `plugin/` (narzędzie `komputer`), ręce na ekranie właściciela `rece/` (K6: podpisana zgoda, bramka z twardymi zasadami i ścisłym odczytem zgód profilu, profil rąk `jarvo-ekran`, sterownik cua-driver-rs 0.38.0); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo, motyw i tłumaczenie dashboardu), łatka powłoki `/jarvo` (`powloka.json`, `powloka.js`) |
 | `site/` | landing jarvo.pl |

