@@ -5,14 +5,16 @@
 # Bez administratora, bez WSL, bez Dockera i bez restartu. Skrypt zna tylko dwa pliki dla architektury komputera:
 # uv i Pythona 3.13 (python-build-standalone). Adresy i sumy sha256 sa wpisane ponizej, te same co
 # w vendor/natywne.lock.json (tests/test_natywne_cli.py pilnuje zgodnosci). Kroki:
-#   1. korzen: $env:JARVO_ROOT albo %LOCALAPPDATA%\Jarvo; katalog programu ma sciezke ASCII (przy polskich znakach
+#   1. korzen: $env:JARVO_ROOT (wzgledny albo z ~ liczony od biezacego katalogu, pelny wraca do zmiennej) albo
+#      %LOCALAPPDATA%\Jarvo; katalog programu ma sciezke ASCII (przy polskich znakach
 #      krotka nazwa 8.3 korzenia, jak jarvo/sciezki.py); stara instalacja z WSL w tym miejscu = odmowa (migracja E12),
 #   2. uv i Python do <root>\program\narzedzia\<nazwa>\<wersja>: suma przed rozpakowaniem (Get-FileHash), tar.exe
 #      dla tar.gz, Expand-Archive dla zip; znacznik .jarvo-suma jak w jarvo/pobieracz.py, wiec instalator
 #      w Pythonie niczego nie pobiera drugi raz,
 #   3. kod Jarva: ref ($env:JARVO_REF albo main) -> SHA przez API GitHuba, archiwum tego commitu do
 #      <root>\program\app\<sha12> (nowa wersja obok starej),
-#   4. python -I -X utf8 <app>\jarvo\start.py instaluj: dalej instalator w Pythonie (jarvo/instalator.py).
+#   4. python -I -X utf8 <app>\jarvo\start.py instaluj: dalej instalator w Pythonie (jarvo/instalator.py), juz bez
+#      JARVO_TOKEN w otoczeniu (klucz byl potrzebny tylko do pobrania kodu).
 # Drugie uruchomienie niczego nie psuje: sprawdzone pliki zostaja, gotowe kroki sa pomijane.
 #
 # Zmienne (opcjonalne): JARVO_ROOT, JARVO_REF (galaz, tag albo pelny SHA), JARVO_TOKEN (klucz do prywatnej kopii
@@ -98,13 +100,27 @@
     JarvoBlad "Jarvo potrzebuje 64-bitowego Windowsa 10 albo 11 (x64 albo ARM64), a ten komputer ma architekture '$Architektura'."
   }
 
+  # JARVO_ROOT wzgledny albo z ~ liczymy od biezacego katalogu PowerShella (GetFullPath liczylby od katalogu procesu
+  # .NET, ktory po cd w PowerShellu jest inny), a pelna sciezka wraca do $env:JARVO_ROOT: instalator w Pythonie,
+  # jarvo.cmd (--korzen) i autostart dostaja ten sam korzen
   function JarvoKorzen {
     $r = $env:JARVO_ROOT
     if (-not $r) {
       if (-not $env:LOCALAPPDATA) { JarvoBlad 'brak zmiennej LOCALAPPDATA: ustaw JARVO_ROOT na katalog instalacji.' }
-      $r = Join-Path $env:LOCALAPPDATA 'Jarvo'
+      return [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Jarvo'))
     }
-    return [IO.Path]::GetFullPath($r)
+    try {
+      $pelna = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($r)
+    } catch {
+      $pelna = ''
+    }
+    if ($pelna -notmatch '^([A-Za-z]:\\|\\\\[^\\])') {
+      JarvoBlad "JARVO_ROOT='$r' to nie sciezka katalogu na dysku: podaj pelna sciezke (np. D:\Jarvo) i uruchom polecenie ponownie."
+    }
+    $pelna = [IO.Path]::GetFullPath($pelna).TrimEnd('\')
+    if ($pelna -match '^[A-Za-z]:$') { $pelna += '\' }
+    $env:JARVO_ROOT = $pelna
+    return $pelna
   }
 
   # <program> jak w jarvo/sciezki.py: sciezka ASCII (espeak-ng, OpenCV i Tesseract maja waskie API sciezek)
@@ -267,6 +283,18 @@
     Remove-Item -LiteralPath $archiwum -Force -ErrorAction SilentlyContinue
   }
 
+  # Instalator w Pythonie bez JARVO_TOKEN: klucz byl potrzebny tylko do pobrania kodu, a z otoczenia instalatora
+  # przeszedlby do gita, uv, npm i serwisu Jarva. W sesji uzytkownika (irm | iex) klucz wraca po zakonczeniu.
+  function JarvoUruchomInstalator([string]$Python, [string[]]$Argumenty) {
+    $klucz = $env:JARVO_TOKEN
+    Remove-Item -LiteralPath 'Env:JARVO_TOKEN' -ErrorAction SilentlyContinue
+    try {
+      JarvoProgram $Python $Argumenty 'instalator Jarva zakonczyl sie bledem (opis wyzej)'
+    } finally {
+      if ($klucz) { $env:JARVO_TOKEN = $klucz }
+    }
+  }
+
   function JarvoInstaluj {
     JarvoKrok 'Jarvo natywnie: instalacja bez WSL i bez Dockera'
     $platforma = JarvoPlatforma (JarvoArchitektura)
@@ -295,14 +323,15 @@
       JarvoPlan ("$python " + ($argumenty -join ' '))
       return
     }
-    JarvoProgram $python $argumenty 'instalator Jarva zakonczyl sie bledem (opis wyzej)'
+    JarvoUruchomInstalator $python $argumenty
     $bin = Join-Path $korzen 'bin'
     if ($env:JARVO_BEZ_PATH -eq '1') {
-      JarvoKrok "Gotowe. Polecenie: $bin\jarvo.cmd (PATH bez zmian: JARVO_BEZ_PATH=1)."
+      JarvoKrok "Gotowe. Polecenie: $bin\jarvo.cmd (PATH bez zmian: JARVO_BEZ_PATH=1), np. $bin\jarvo.cmd panel."
       return
     }
     if (-not (@($env:Path -split ';') -contains $bin)) { $env:Path = "$env:Path;$bin" }   # to okno tez
-    JarvoKrok 'Gotowe. Polecenie jarvo dziala w tym oknie i w kazdym nowym (jarvo chat, jarvo panel, jarvo status).'
+    JarvoKrok ('Gotowe. Polecenie jarvo dziala w tym oknie i w kazdym nowym: jarvo panel, jarvo status, ' +
+               'jarvo chat --profil default (profil jarvo przyjdzie z flota w etapie E4).')
   }
 
   JarvoInstaluj

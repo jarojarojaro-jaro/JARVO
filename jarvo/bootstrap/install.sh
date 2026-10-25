@@ -13,7 +13,8 @@
 #      przed rozpakowaniem, tar; znacznik .jarvo-suma jak w jarvo/pobieracz.py, więc instalator w Pythonie
 #      niczego nie pobiera drugi raz,
 #   3. kod Jarva: ref ($JARVO_REF albo main) -> SHA przez API GitHuba, archiwum commitu do <root>/program/app/<sha12>,
-#   4. python3 -I -X utf8 <app>/jarvo/start.py instaluj: dalej instalator w Pythonie (jarvo/instalator.py).
+#   4. python3 -I -X utf8 <app>/jarvo/start.py instaluj: dalej instalator w Pythonie (jarvo/instalator.py), już bez
+#      JARVO_TOKEN w otoczeniu (klucz był potrzebny tylko do pobrania kodu).
 #
 # Zmienne (opcjonalne): JARVO_ROOT, JARVO_REF (gałąź, tag albo pełny SHA), JARVO_TOKEN (klucz do prywatnej kopii
 # repo: curl dostaje go na wejściu (-K -), więc nie widać go w liście procesów ani na ekranie), JARVO_NO_AUTOSTART=1,
@@ -225,6 +226,9 @@ instalator() {   # python -I -X utf8 <app>/jarvo/start.py instaluj [opcje]
     plan "$py $*"
     return 0
   fi
+  # bez JARVO_TOKEN: klucz był potrzebny tylko do pobrania kodu, a z otoczenia instalatora przeszedłby do gita, uv,
+  # npm i serwisu Jarva (skrypt działa we własnym procesie, więc powłoka właściciela go nie traci)
+  unset JARVO_TOKEN
   # przy `curl | bash` wejściem jest sam skrypt: pytania instalatora czytają z terminala, a bez niego z /dev/null
   if [ -t 0 ]; then
     "$py" "$@" || die "Instalator Jarva zakończył się błędem (opis wyżej)."
@@ -252,12 +256,14 @@ main() {
   instalator ${1+"$@"}
   if [ "$DRY" = 1 ]; then return 0; fi
   if [ "${JARVO_BEZ_PATH:-}" = 1 ]; then
-    say "Gotowe. Polecenie: $ROOT/bin/jarvo (PATH bez zmian: JARVO_BEZ_PATH=1)."
+    say "Gotowe. Polecenie: $ROOT/bin/jarvo (PATH bez zmian: JARVO_BEZ_PATH=1), np. $ROOT/bin/jarvo panel."
     return 0
   fi
   case ":$PATH:" in
-    *":$HOME/.local/bin:"*) say "Gotowe. Polecenie jarvo: jarvo chat, jarvo panel, jarvo status." ;;
-    *) say "Gotowe. Otwórz nowy terminal (albo: export PATH=\"\$HOME/.local/bin:\$PATH\"), żeby działało polecenie jarvo." ;;
+    *":$HOME/.local/bin:"*) say "Gotowe. Polecenia: jarvo panel, jarvo status, jarvo chat --profil default (profil jarvo przyjdzie z flotą w etapie E4)." ;;
+    *) if [ "$PLATFORMA" = macos-arm64 ]; then kiedy="w nowym oknie Terminala"
+       else kiedy="po ponownym zalogowaniu (terminal w GNOME i KDE nie czyta ~/.profile)"; fi
+       say "Gotowe. Polecenie jarvo zadziała $kiedy; od razu: pełną ścieżką z wiersza „Polecenia” wyżej albo po export PATH=\"\$HOME/.local/bin:\$PATH\"." ;;
   esac
 }
 

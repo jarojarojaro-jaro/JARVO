@@ -6,7 +6,9 @@ JARVO_ROOT) ustawia korzeń jak JARVO_ROOT: zadanie Harmonogramu nie przekazuje 
 
   instaluj             instalacja albo naprawa (jarvo/instalator.py; bootstrap woła ją sam)
   serwis               nadzorca bramy i panelu na pierwszym planie (jarvo/nadzorca.py; autostart woła go w tle)
-  up, down             start serwisu w tle i czekanie na panel / zatrzymanie serwisu (N02)
+  up, down             start serwisu (mechanizmem autostartu, gdy jest) i czekanie na panel, a bez instalacji
+                       instalacja jak `jarvo instaluj` / zatrzymanie serwisu ze znacznikiem `<stan>/zatrzymany.json`:
+                       autostart nie podniesie go sam, aż `jarvo up`, `jarvo panel` albo instalacja (N02)
   status [--json]      serwis z kanału nadzorcy (bez niego z <stan>/nadzorca.json), wersje, autostart, porty (N03)
   panel                startuje serwis, gdy nie działa, czeka na panel i otwiera go w przeglądarce (N06)
   chat                 rozmowa w terminalu: `hermes -p <profil> chat` w środowisku Jarva, tryb zgód w JARVO_TRYB_ZGOD
@@ -14,7 +16,15 @@ JARVO_ROOT) ustawia korzeń jak JARVO_ROOT: zadanie Harmonogramu nie przekazuje 
   logs [usługa] [-f]   logi nadzorcy i usług (<logi>) i Hermesa (<dane>/logs) (N04)
   autostart on|off|status                                                                        (N08)
   doctor [--json]      diagnoza podstawowa z polską radą przy każdym wyniku (N10; pełna w etapie E4)
+  version, help        wersja kodu i przypięty Hermes (też --wersja) / pomoc, także jednego polecenia (N16)
   update, uninstall, migruj: w budowie (etapy E4, E13, E12), kod 2
+
+Panel liczy się tylko NASZ: /api/status z hermes_home = <dane> tej instalacji (instalator.stan_panelu). Port 9119
+może trzymać stara flota z WSL albo prywatny Hermes właściciela; wtedy polecenie mówi, kto trzyma port.
+
+Na starcie procesu (Windows) NoDefaultCurrentDirectoryInExePath=1: shutil.which i cmd.exe nie szukają programów
+w katalogu bieżącym. Bez konsoli (pythonw.exe z Harmonogramu) wyjście i błędy idą do <logi>/serwis-start.log.
+Zmienne instalacji z <stan>/ustawienia.json (JARVO_PANEL_PORT) obowiązują, gdy nie ma ich w otoczeniu.
 
 Moduły nadzorcy, Hermesa, autostartu i dziennika zmian hosta ładujemy dopiero przy użyciu (instalator.modul), więc
 `jarvo --help`, status i doctor działają też na pustym katalogu i przy niepełnej instalacji. Status i doctor niczego
@@ -24,12 +34,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import io
 import json
 import os
 import re
 import shutil
 import signal
-import socket
 import sqlite3
 import subprocess
 import sys
@@ -39,15 +49,16 @@ import webbrowser
 from pathlib import Path
 
 from . import instalator, manifest, sciezki, srodowisko
-from .instalator import Otoczenie, adres_panelu, port_panelu, stan_serwisu
-from .sciezki import WINDOWS, BladUkladu, Uklad
+from .instalator import (Otoczenie, _uruchom, adres_panelu, kto_slucha, port_panelu, port_zajety,  # noqa: F401
+                         stan_serwisu)
+from .sciezki import MACOS, WINDOWS, BladUkladu, Uklad
 
 TRYBY = ("pytaj", "projekt", "pelny")        # sekcja (d); domyślny „projekt” (decyzja I08)
 PROFIL = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")   # jak _PROFILE_NAME_RE w hermes_cli/main.py
 SQLITE_MIN = (3, 51, 3)                      # błąd WAL-reset naprawiony w 3.51.3 (hermes_state_wal.py)
 PORTY = (("panel", None), ("API bramy", 8642), ("podgląd HQ", 9120), ("ekran telefonu", 9122))
 NASZE_PORTY = {"panel", "API bramy"}         # bez działającego serwisu muszą być wolne
-CZAS_STOPU = 120.0                           # drenaż bramy (30 s) i zatrzymanie panelu
+CZAS_STOPU = instalator.CZAS_STOPU
 W_BUDOWIE = {
     "update": ("E4", "procedura z docs/NATYWNIE.md (c4): nowa wersja obok starej, drenaż bramy, przełączenie i "
                      "powrót przy błędzie. Do tego czasu nową wersję daje ponowne polecenie instalacji (stare pliki "
@@ -111,7 +122,8 @@ def _parser() -> argparse.ArgumentParser:
                        description="Instaluje albo naprawia Jarvo w katalogu z JARVO_ROOT (domyślnie %LOCALAPPDATA%"
                        "\\Jarvo, ~/.jarvo albo ~/.local/share/jarvo). Drugi przebieg niczego nie zmienia.")
     s.add_argument("--bez-autostartu", action="store_true", help="bez startu nadzorcy po zalogowaniu")
-    s.add_argument("--web-lokalnie", action="store_true", help="zbuduj front panelu na tym komputerze (npm)")
+    s.add_argument("--web-lokalnie", action="store_true",
+                   help="zbuduj front panelu od nowa na tym komputerze (npm), także gdy jest gotowy")
     s.add_argument("--bez-startu", action="store_true", help="nie uruchamiaj serwisu i nie czekaj na panel")
     s.add_argument("--bez-path", action="store_true",
                    help="polecenie jarvo tylko w <korzeń>/bin, bez PATH i plików startowych powłoki (próby)")
@@ -123,7 +135,7 @@ def _parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("up", help="uruchom serwis w tle i poczekaj na panel")
     s.set_defaults(funkcja=polecenie_up)
-    s = sub.add_parser("down", help="zatrzymaj serwis (brama kończy trwające tury)")
+    s = sub.add_parser("down", help="zatrzymaj serwis (brama kończy trwające tury); wstanie dopiero po jarvo up")
     s.set_defaults(funkcja=polecenie_down)
 
     s = sub.add_parser("status", help="czy serwis działa: brama, panel, wersje, autostart, porty")
@@ -158,10 +170,25 @@ def _parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true", help="wynik w JSON (CI)")
     s.set_defaults(funkcja=polecenie_doctor)
 
+    s = sub.add_parser("version", aliases=["wersja"], help="wersja kodu Jarva i przypięty Hermes (jak --wersja)")
+    s.set_defaults(funkcja=lambda u, _a, _r, _ot: polecenie_wersja(u))
+    s = sub.add_parser("help", aliases=["pomoc"], help="pomoc: lista poleceń albo opis jednego (jarvo help status)")
+    s.add_argument("temat", nargs="?", metavar="polecenie", help="polecenie, którego opis pokazać")
+    s.set_defaults(funkcja=polecenie_help)
+
     for nazwa, (etap, _opis) in W_BUDOWIE.items():
         s = sub.add_parser(nazwa, add_help=False, help=f"w budowie (etap {etap})")
         s.set_defaults(funkcja=polecenie_w_budowie)
     return p
+
+
+# ---------------------------------------------------------------- start procesu
+
+def _przygotuj_proces() -> None:
+    """Windows: shutil.which (Python 3.12+) i cmd.exe nie szukają programu w katalogu bieżącym (obcy uv.exe albo
+    git.cmd w katalogu, w którym wpisano polecenie, nie wygra z prawdziwym); dziedziczą to też procesy potomne."""
+    if WINDOWS:
+        os.environ["NoDefaultCurrentDirectoryInExePath"] = "1"
 
 
 def _bezpieczne_wyjscie() -> None:
@@ -174,6 +201,56 @@ def _bezpieczne_wyjscie() -> None:
                 strumien.reconfigure(errors="replace")
 
 
+class _LogBledow(io.TextIOBase):
+    """sys.stdout i sys.stderr procesu bez konsoli (pythonw.exe z Harmonogramu: oba są None, więc komunikaty i błędy
+    startu `jarvo serwis` by zginęły). Plik otwieramy przy pierwszym zapisie, z nagłówkiem: czas, PID i polecenie."""
+
+    def __init__(self, sciezka: Path, argv: list[str]):
+        super().__init__()
+        self.sciezka, self.argv, self._f = sciezka, list(argv), None
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, tekst: str) -> int:
+        if not tekst:
+            return 0
+        if self._f is None:
+            try:
+                self.sciezka.parent.mkdir(parents=True, exist_ok=True)
+                instalator.przytnij_log(self.sciezka)
+                self._f = open(self.sciezka, "a", encoding="utf-8", errors="replace", buffering=1)
+                self._f.write(f"=== {time.strftime('%Y-%m-%d %H:%M:%S')} jarvo {' '.join(self.argv)} "
+                              f"(PID {os.getpid()}, bez konsoli)\n")
+            except OSError:
+                return len(tekst)
+        with contextlib.suppress(OSError, ValueError):
+            self._f.write(tekst)
+        return len(tekst)
+
+    def flush(self) -> None:
+        if self._f is not None:
+            with contextlib.suppress(OSError, ValueError):
+                self._f.flush()
+
+    def close(self) -> None:
+        if self._f is not None:
+            with contextlib.suppress(OSError, ValueError):
+                self._f.close()
+        super().close()
+
+
+def _log_bez_konsoli(env: dict) -> Path:
+    """`<logi>/serwis-start.log` instalacji, a gdy korzenia jeszcze nie ma: plik w katalogu tymczasowym."""
+    try:
+        u = sciezki.uklad(env)
+        if u.root.is_dir():
+            return u.logi / instalator.LOG_STARTU
+    except BladUkladu:
+        pass
+    return Path(tempfile.gettempdir()) / "jarvo-serwis-start.log"
+
+
 def _zdejmij_korzen(argv: list[str]) -> tuple[str | None, list[str]]:
     if argv[:1] == ["--korzen"] and len(argv) >= 2:
         return argv[1], argv[2:]
@@ -182,11 +259,54 @@ def _zdejmij_korzen(argv: list[str]) -> tuple[str | None, list[str]]:
     return None, argv
 
 
+def _ustal_korzen(ot: Otoczenie, korzen: str | None, prawdziwy: bool) -> None:
+    """--korzen albo JARVO_ROOT jako ścieżka bezwzględna (względną liczymy od katalogu bieżącego, `~` rozwijamy):
+    trafia do jarvo.cmd i argv autostartu, a te startują w innym katalogu."""
+    wartosc = korzen or ot.env.get("JARVO_ROOT")
+    if not wartosc:
+        return
+    pelna = os.path.abspath(os.path.expanduser(wartosc))
+    ot.env["JARVO_ROOT"] = pelna
+    if prawdziwy:                                 # nadzorca i procesy potomne biorą korzeń z os.environ
+        os.environ["JARVO_ROOT"] = pelna
+
+
+def _uklad(ot: Otoczenie, polecenie: str | None) -> Uklad | None:
+    """Układ katalogów. Korzeń z polskimi znakami, którego jeszcze nie ma (krótką nazwę 8.3 system poda dopiero dla
+    istniejącego katalogu, c1): `instaluj` go zakłada, a status, doctor i reszta mówią „nie zainstalowane” bez
+    tworzenia czegokolwiek. None = błąd (komunikat wypisany)."""
+    try:
+        return sciezki.uklad(ot.env)
+    except BladUkladu as e:
+        blad = e
+    root = sciezki._korzen(ot.env)
+    if not root.exists():
+        if polecenie not in ("instaluj", "up"):              # `up` bez instalacji instaluje (N02)
+            return Uklad(root=root, program=root / "program", dane=root / "dane", stan=root / "stan",
+                         logi=root / "logi", cache=root / "cache", build=root / "build")
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            return sciezki.uklad(ot.env)
+        except (OSError, BladUkladu) as e:
+            blad = e
+    print(f"BŁĄD: {blad}", file=sys.stderr)
+    return None
+
+
 def main(argv: list[str] | None = None, *, otoczenie: Otoczenie | None = None) -> int:
     """`jarvo <polecenie>`; kod wyjścia: 0 dobrze, 1 błąd albo serwis nie działa (status), 2 złe argumenty
     i polecenia w budowie, 130 przerwane przez Ctrl+C."""
+    prawdziwy = otoczenie is None
+    if prawdziwy:
+        _przygotuj_proces()
     _bezpieczne_wyjscie()
     korzen, argv = _zdejmij_korzen(list(sys.argv[1:] if argv is None else argv))
+    ot = otoczenie or Otoczenie()
+    _ustal_korzen(ot, korzen, prawdziwy)
+    if prawdziwy and (sys.stderr is None or sys.stdout is None):   # pythonw.exe bez konsoli: do serwis-start.log
+        log = _LogBledow(_log_bez_konsoli(ot.env), argv)
+        sys.stdout = sys.stdout or log
+        sys.stderr = sys.stderr or log
     if not argv or (argv[0].startswith("-") and argv[0] not in ("-h", "--help", "--wersja")):
         argv = ["chat", *argv]                    # samo `jarvo` albo same opcje rozmowy (`jarvo --tryb pytaj`)
     try:
@@ -197,16 +317,14 @@ def main(argv: list[str] | None = None, *, otoczenie: Otoczenie | None = None) -
                 parser.error(f"nieznane argumenty: {' '.join(reszta)}")
     except SystemExit as e:                       # --help albo błąd argumentów: argparse już wypisał komunikat
         return e.code if isinstance(e.code, int) else (0 if e.code is None else 2)
-    ot = otoczenie or Otoczenie()
-    if korzen:
-        ot.env["JARVO_ROOT"] = korzen
-        if otoczenie is None:                     # nadzorca i procesy potomne biorą korzeń z os.environ
-            os.environ["JARVO_ROOT"] = korzen
-    try:
-        u = sciezki.uklad(ot.env)
-    except BladUkladu as e:
-        print(f"BŁĄD: {e}", file=sys.stderr)
+    u = _uklad(ot, args.polecenie)
+    if u is None:
         return 1
+    for klucz, wartosc in instalator.ustawienia(u).items():   # port panelu z instalacji (autostart nie zna sesji)
+        if not str(ot.env.get(klucz) or "").strip():
+            ot.env[klucz] = wartosc
+            if prawdziwy:
+                os.environ[klucz] = wartosc
     if args.wersja:
         return polecenie_wersja(u)
     if reszta[:1] == ["--"]:
@@ -242,6 +360,24 @@ def polecenie_wersja(u: Uklad) -> int:
     except (OSError, ValueError, KeyError):
         hermes = "Hermes: brak manifestu"
     print(f"Jarvo {instalator.wersja_aplikacji(app)} ({app}); {hermes}")
+    return 0
+
+
+def polecenie_help(_u: Uklad, a, _reszta, _ot: Otoczenie) -> int:
+    """`jarvo help [polecenie]`: pomoc całości albo jednego polecenia (jak `jarvo <polecenie> --help`)."""
+    with _po_polsku():
+        parser = _parser()
+        polecenia = next(ak.choices for ak in parser._actions if isinstance(ak, argparse._SubParsersAction))
+        if not a.temat:
+            parser.print_help()
+            return 0
+        if a.temat not in polecenia:
+            print(f"Nie znam polecenia {a.temat!r}. Są: {', '.join(sorted(polecenia))}.", file=sys.stderr)
+            return 2
+        if a.temat == "serwis":                   # argumenty idą do nadzorcy, on ma własną pomoc
+            print("jarvo serwis: nadzorca bramy i panelu. Jego opcje: jarvo serwis --help")
+            return 0
+        polecenia[a.temat].print_help()
     return 0
 
 
@@ -303,18 +439,29 @@ def polecenie_chat(u: Uklad, a, reszta, ot: Otoczenie) -> int:
 
 
 def _serwis_z_panelem(u: Uklad, ot: Otoczenie) -> str | None:
-    """Panel odpowiada albo serwis rusza w tle i panel wstaje; adres albo None (komunikat już wypisany)."""
+    """Panel tej instalacji odpowiada albo serwis rusza w tle i panel wstaje; adres albo None (komunikat już
+    wypisany). Najpierw zdejmujemy znacznik `jarvo down`. Port zajęty przez inny program (stara flota z WSL,
+    prywatny Hermes) to od razu błąd z radą: panel Jarva na nim nie wstanie."""
+    try:
+        instalator.zdejmij_zatrzymanie(u, ot)
+    except instalator.BladInstalacji as e:
+        print(f"BŁĄD: {e}", file=sys.stderr)
+        return None
     adres = adres_panelu(ot.env)
-    if ot.odpowiada(adres, 2.0):
+    panel, opis = instalator.stan_panelu(u, ot)
+    if panel == "nasz":
         return adres
     stan, powod = stan_serwisu(u, ot)
-    if stan is None:
-        if powod.startswith("brak modułu"):
-            print(f"BŁĄD: {powod}. Uruchom instalację ponownie.", file=sys.stderr)
-            return None
-        print("Serwis nie działa: uruchamiam go w tle…")
-        instalator.uruchom_serwis(u, ot)
+    if stan is None and powod.startswith("brak modułu"):
+        print(f"BŁĄD: {powod}. Uruchom instalację ponownie.", file=sys.stderr)
+        return None
+    if panel == "obcy":
+        print(f"BŁĄD: {instalator.opis_obcego_portu(port_panelu(ot.env), opis, ot)}", file=sys.stderr)
+        return None
     try:
+        if stan is None:
+            print("Serwis nie działa: uruchamiam go…")
+            print(f"Serwis uruchomiony {instalator.uruchom_serwis(u, ot, print)}.")
         return instalator.czekaj_na_panel(u, ot, print)
     except instalator.BladInstalacji as e:
         print(f"BŁĄD: {e}", file=sys.stderr)
@@ -335,7 +482,12 @@ def polecenie_panel(u: Uklad, a, _reszta, ot: Otoczenie) -> int:
 
 def polecenie_up(u: Uklad, _a, _reszta, ot: Otoczenie) -> int:
     if not _zainstalowane(u):
-        return _brak_instalacji(u)
+        # N02: `up` bez instalacji instaluje (jak `jarvo instaluj`, z autostartem; serwis i panel na końcu)
+        print(f"Jarvo nie jest zainstalowane w {u.root}: instaluję (jak `jarvo instaluj`).")
+        kod = instalator.instaluj(u, instalator.APP, otoczenie=ot)
+        if kod == 0:
+            print(f"Jarvo działa. Panel: {adres_panelu(ot.env)}")
+        return kod
     adres = _serwis_z_panelem(u, ot)
     if adres is None:
         return 1
@@ -344,45 +496,40 @@ def polecenie_up(u: Uklad, _a, _reszta, ot: Otoczenie) -> int:
 
 
 def polecenie_down(u: Uklad, _a, _reszta, ot: Otoczenie) -> int:
+    """Zatrzymanie ze znacznikiem `<stan>/zatrzymany.json`: nadzorca nie wstanie sam (zapasowe wyzwalacze
+    Harmonogramu co 5 minut, odblokowanie, logowanie), aż `jarvo up`, `jarvo panel` albo instalacja go zdejmie.
+    Najpierw znacznik (nowy nadzorca, który go zobaczy, zatrzymuje się sam), potem stop kanałem i czekanie."""
+    if not u.stan.is_dir():
+        print("Serwis nie działa (Jarvo nie jest zainstalowane w tym katalogu).")
+        return 0
     stan, powod = stan_serwisu(u, ot)
+    try:
+        zna = instalator.oznacz_zatrzymanie(u, ot, "jarvo down")
+    except instalator.BladInstalacji as e:
+        print(f"Uwaga: {e}.", file=sys.stderr)
+        zna = None
     if stan is None:
         print(f"Serwis nie działa ({powod}).")
-        return 0
-    print("Zatrzymuję serwis (brama kończy trwające tury)…")
-    ot.modul("nadzorca").polacz(u).stop()
-    koniec = ot.zegar() + CZAS_STOPU
-    while stan is not None and ot.zegar() < koniec:
-        ot.czekaj(1.0)
-        stan, _ = stan_serwisu(u, ot)
-    if stan is not None:
-        print(f"BŁĄD: serwis nie zatrzymał się w {int(CZAS_STOPU)} s; zobacz `jarvo logs nadzorca`.", file=sys.stderr)
-        return 1
-    print("Serwis zatrzymany. Autostart uruchomi go po następnym zalogowaniu (wyłączenie: jarvo autostart off).")
+    else:
+        print("Zatrzymuję serwis (brama kończy trwające tury)…")
+        try:
+            instalator.zatrzymaj_serwis(u, ot, "jarvo down")
+        except instalator.BladInstalacji as e:
+            print(f"BŁĄD: {e}", file=sys.stderr)
+            return 1
+        print("Serwis zatrzymany.")
+    if zna:
+        print("Nie wstanie sam, także z autostartu, dopóki nie wpiszesz `jarvo up` albo `jarvo panel`.")
+    elif zna is False:
+        print("Uwaga: ta wersja nadzorcy nie zna znacznika zatrzymania, więc autostart może go podnieść (Windows: "
+              "zapasowe wyzwalacze co 5 minut). Wznowienie: jarvo up; na stałe bez startu: jarvo autostart off.")
     return 0
 
 
 # ---------------------------------------------------------------- status
 
-def port_zajety(port: int, czas: float = 0.3) -> bool:
-    """Czy ktoś słucha na 127.0.0.1:<port> (połączenie TCP, bez wysyłania danych)."""
-    try:
-        with socket.create_connection(("127.0.0.1", port), timeout=czas):
-            return True
-    except OSError:
-        return False
-
-
 def _porty(env: dict) -> list[tuple[str, int]]:
     return [(nazwa, port if port else port_panelu(env)) for nazwa, port in PORTY]
-
-
-def _stan_autostartu(u: Uklad, ot: Otoczenie) -> dict:
-    if not u.stan.is_dir():
-        return {"sprawdzony": False, "powod": "brak instalacji"}
-    try:
-        return dict(ot.modul("autostart").stan(u) or {})
-    except Exception as e:                        # noqa: BLE001 - brak modułu albo narzędzia systemu: tylko opis
-        return {"sprawdzony": False, "powod": f"{type(e).__name__}: {str(e)[:120]}"}
 
 
 def zbierz_status(u: Uklad, ot: Otoczenie) -> dict:
@@ -392,6 +539,10 @@ def zbierz_status(u: Uklad, ot: Otoczenie) -> dict:
     if stan is None and u.stan.is_dir():
         with contextlib.suppress(Exception):     # brak modułu albo uszkodzony plik: zostaje tylko powód
             z_pliku = dict(ot.modul("nadzorca").stan_z_pliku(u) or {})
+    porty = {str(port): {"nazwa": nazwa, "zajety": port_zajety(port)} for nazwa, port in _porty(ot.env)}
+    panel = {"stan": "brak", "opis": "nikt nie słucha"}
+    if porty.get(str(port_panelu(ot.env)), {}).get("zajety"):
+        panel = dict(zip(("stan", "opis"), instalator.stan_panelu(u, ot)))
     return {
         "root": str(u.root),
         "zainstalowane": bool(biez.get("app")),
@@ -399,10 +550,12 @@ def zbierz_status(u: Uklad, ot: Otoczenie) -> dict:
         "narzedzia": {n: w.get("wersja") for n, w in sorted(srodowisko.narzedzia(u).items()) if isinstance(w, dict)},
         "serwis": {"dziala": stan is not None, "powod": powod, "stan": stan if stan is not None else z_pliku,
                    "z_pliku": stan is None and bool(z_pliku),
-                   "proces_zyje": bool(stan is not None or z_pliku.get("dziala"))},
-        "autostart": _stan_autostartu(u, ot),
-        "porty": {str(port): {"nazwa": nazwa, "zajety": port_zajety(port)} for nazwa, port in _porty(ot.env)},
+                   "proces_zyje": bool(stan is not None or z_pliku.get("dziala")),
+                   "zatrzymanie": instalator.zatrzymanie(u) if u.stan.is_dir() else None},
+        "autostart": instalator.stan_autostartu(u, ot),
+        "porty": porty,
         "panel": adres_panelu(ot.env),
+        "panel_jarva": panel,
     }
 
 
@@ -441,6 +594,14 @@ def _opis_autostartu(a: dict) -> str:
     return ", ".join(f"{k}: {v}" for k, v in a.items()) or "?"
 
 
+def _opis_panelu(p: dict) -> str:
+    if p.get("stan") == "nasz":
+        return "odpowiada panel Jarva"
+    if p.get("stan") == "obcy":
+        return f"port trzyma inny program: {p.get('opis')}"
+    return f"nie odpowiada ({p.get('opis')})"
+
+
 def opis_statusu(r: dict) -> str:
     w = [f"Jarvo: {r['root']}"]
     if not r["zainstalowane"]:
@@ -451,8 +612,13 @@ def opis_statusu(r: dict) -> str:
         if r["narzedzia"]:
             w.append("  narzędzia:  " + ", ".join(f"{n} {v}" for n, v in r["narzedzia"].items()))
     s = r["serwis"]
+    z = s.get("zatrzymanie")
     if s["dziala"]:
         w.append("  serwis:     działa")
+    elif z is not None:
+        opis = ", ".join(str(z[k]) for k in ("powod", "kiedy") if z.get(k))
+        w.append(f"  serwis:     zatrzymany{f' ({opis})' if opis else ''}: autostart go nie uruchomi, start: jarvo up"
+                 + ("; ostatni stan z pliku:" if s["z_pliku"] else ""))
     elif s["proces_zyje"]:
         w.append(f"  serwis:     proces nadzorcy żyje, ale kanał nie odpowiada ({s['powod']}); ostatni stan z pliku:")
     else:
@@ -462,7 +628,7 @@ def opis_statusu(r: dict) -> str:
     w.append(f"  autostart:  {_opis_autostartu(r['autostart'])}")
     w.append("  porty:      " + ", ".join(f"{port} {'zajęty' if p['zajety'] else 'wolny'} ({p['nazwa']})"
                                           for port, p in r["porty"].items()))
-    w.append(f"  panel:      {r['panel']}")
+    w.append(f"  panel:      {r['panel']} ({_opis_panelu(r.get('panel_jarva') or {})})")
     return "\n".join(w)
 
 
@@ -564,11 +730,18 @@ def polecenie_autostart(u: Uklad, a, _reszta, ot: Otoczenie) -> int:
     except ImportError as e:
         print(f"BŁĄD: brak modułu autostartu ({e}). Uruchom instalację ponownie.", file=sys.stderr)
         return 1
-    if a.akcja == "on":
-        auto.wlacz(u, instalator.polecenie_jarva(u, "serwis", okno=False, env=ot.env))
-    elif a.akcja == "off":
-        auto.wylacz(u)
-    print(f"Autostart: {_opis_autostartu(dict(auto.stan(u) or {}))}")
+    try:
+        if a.akcja == "on":
+            instalator.wywolaj(auto.wlacz, u, instalator.polecenie_jarva(u, "serwis", okno=False, env=ot.env),
+                               env=ot.env)
+        elif a.akcja == "off":
+            instalator.wywolaj(auto.wylacz, u, env=ot.env)
+    except instalator.bledy_autostartu(auto) as e:
+        print(f"BŁĄD: {e}", file=sys.stderr)
+        if a.akcja == "on":
+            print(f"Rada: {instalator.rada_autostartu(False)}", file=sys.stderr)
+        return 1
+    print(f"Autostart: {_opis_autostartu(instalator.stan_autostartu(u, ot))}")
     return 0
 
 
@@ -576,40 +749,6 @@ def polecenie_autostart(u: Uklad, a, _reszta, ot: Otoczenie) -> int:
 
 def _wynik(nazwa: str, stan: str, opis: str, rada: str = "") -> dict:
     return {"nazwa": nazwa, "stan": stan, "opis": opis, "rada": rada}
-
-
-def _uruchom(argv: list, czas: float = 20) -> subprocess.CompletedProcess:
-    return subprocess.run([str(x) for x in argv], capture_output=True, text=True, encoding="utf-8",
-                          errors="replace", timeout=czas, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-
-
-def kto_slucha(port: int) -> str | None:
-    """Program i PID, który słucha na porcie (najlepiej jak się da: netstat + tasklist na Windows, lsof na POSIX).
-    Gniazdo słuchające rozpoznajemy po adresie obcym *:0, bo nazwa stanu (LISTENING) zależy od języka Windowsa."""
-    try:
-        if WINDOWS:
-            netstat = shutil.which("netstat")
-            if not netstat:
-                return None
-            for linia in _uruchom([netstat, "-ano", "-p", "TCP"]).stdout.splitlines():
-                cz = linia.split()
-                if len(cz) == 5 and cz[1].rsplit(":", 1)[-1] == str(port) and cz[2] in ("0.0.0.0:0", "[::]:0"):
-                    wynik = _uruchom(["tasklist", "/FI", f"PID eq {cz[4]}", "/FO", "CSV", "/NH"]).stdout.strip()
-                    nazwa = wynik.split(",")[0].strip('"') if wynik.startswith('"') else "?"
-                    return f"{nazwa} (PID {cz[4]})"
-            return None
-        lsof = shutil.which("lsof")
-        if not lsof:
-            return None
-        pid = nazwa = None
-        for linia in _uruchom([lsof, "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-Fpc"]).stdout.splitlines():
-            if linia.startswith("p") and pid is None:
-                pid = linia[1:]
-            elif linia.startswith("c") and nazwa is None:
-                nazwa = linia[1:]
-        return f"{nazwa or '?'} (PID {pid})" if pid else None
-    except (OSError, subprocess.SubprocessError):
-        return None
 
 
 def _sqlite_ok(wersja: tuple) -> bool:
@@ -628,11 +767,18 @@ def _fts5_ok() -> bool:
 
 
 def _bin(narz: dict, nazwa: str, program: str) -> Path | None:
-    """Program narzędzia z narzedzia.json (katalogi `bin`, inaczej katalog wersji); na Windows z PATHEXT."""
+    """Program narzędzia z narzedzia.json (katalogi `bin`, inaczej katalog wersji), sprawdzany wprost w tych
+    katalogach: shutil.which na Windows zajrzałby najpierw do katalogu bieżącego (także z podanym path=)."""
     wpis = narz.get(nazwa) or {}
-    katalogi = [str(k) for k in (wpis.get("bin") or [wpis.get("katalog")]) if k]
-    znaleziony = shutil.which(program, path=os.pathsep.join(katalogi)) if katalogi else None
-    return Path(znaleziony) if znaleziony else None
+    nazwy = [program + r for r in (".exe", ".cmd", ".bat")] if WINDOWS else [program]
+    for katalog in wpis.get("bin") or [wpis.get("katalog")]:
+        if not katalog or not os.path.isabs(str(katalog)):
+            continue
+        for n in nazwy:
+            p = Path(katalog) / n
+            if p.is_file() and (WINDOWS or os.access(p, os.X_OK)):
+                return p
+    return None
 
 
 def sprawdz_korzen(u: Uklad) -> dict:
@@ -757,32 +903,69 @@ def sprawdz_hermesa(u: Uklad, app: Path) -> dict:
     return _wynik("Hermes", "ok", f"{pin.get('wersja', '?')} ({head[:7]} = pin {pin.get('tag', '?')}) w {checkout}")
 
 
-def sprawdz_porty(u: Uklad, ot: Otoczenie, dziala: bool) -> list[dict]:
+def _pidy_jarva(stan: dict | None) -> set[int]:
+    """PID-y nadzorcy i jego usług (z dziećmi launchera venvu na Windows) z kanału nadzorcy."""
+    pidy: set[int] = set()
+    if not isinstance(stan, dict):
+        return pidy
+    n = stan.get("nadzorca")
+    if isinstance(n, dict) and isinstance(n.get("pid"), int):
+        pidy.add(n["pid"])
+    uslugi = stan.get("uslugi")
+    for us in (uslugi.values() if isinstance(uslugi, dict) else []):
+        if isinstance(us, dict):
+            if isinstance(us.get("pid"), int):
+                pidy.add(us["pid"])
+            pidy.update(p for p in us.get("pidy") or [] if isinstance(p, int))
+    return pidy
+
+
+def sprawdz_porty(u: Uklad, ot: Otoczenie, stan: dict | None = None) -> list[dict]:
+    """Porty Jarva: wolne albo zajęte przez Jarvo. Panel rozpoznajemy po /api/status (stan_panelu), resztę po PID
+    procesu, który słucha (sluchacz), wobec PID-ów usług z nadzorcy: sam zajęty port nie znaczy, że to Jarvo."""
+    dziala = stan is not None
+    nasze = _pidy_jarva(stan)
     wyniki = []
     for nazwa, port in _porty(ot.env):
-        zajety = port_zajety(port)
         etykieta = f"port {port} ({nazwa})"
-        if dziala:
-            if nazwa in NASZE_PORTY and not zajety:
+        if not port_zajety(port):
+            if dziala and nazwa in NASZE_PORTY:
                 usluga = "panel" if nazwa == "panel" else "brama"
                 wyniki.append(_wynik(etykieta, "uwaga", "serwis działa, ale nikt nie słucha",
                                      f"Zobacz `jarvo logs {usluga}` i `jarvo status`."))
             else:
-                wyniki.append(_wynik(etykieta, "ok", "używa go Jarvo" if zajety else "wolny"))
-        elif zajety:
-            kto = kto_slucha(port) or "inny program"
-            wyniki.append(_wynik(etykieta, "blad" if nazwa in NASZE_PORTY else "uwaga", f"zajęty przez {kto}",
-                                 f"Zamknij ten program albo zmień jego port; Jarvo potrzebuje {port} na 127.0.0.1."
-                                 + (" Inny port panelu: JARVO_PANEL_PORT." if nazwa == "panel" else "")))
+                wyniki.append(_wynik(etykieta, "ok", "wolny"))
+            continue
+        if nazwa == "panel":
+            panel, opis = instalator.stan_panelu(u, ot)
+            if panel == "nasz":
+                wyniki.append(_wynik(etykieta, "ok", "panel Jarva"))
+                continue
+            if panel == "obcy":
+                wyniki.append(_wynik(etykieta, "blad", f"zajęty: {opis}",
+                                     instalator.opis_obcego_portu(port, opis, ot)))
+                continue
+        s = ot.sluchacz(port)
+        if s and s[0] in nasze:
+            wyniki.append(_wynik(etykieta, "ok", f"używa go Jarvo ({s[1]}, PID {s[0]})"))
+            continue
+        kto = f"{s[1]} (PID {s[0]})" if s else "inny program"
+        rada = (f"Zamknij ten program albo zmień jego port; Jarvo potrzebuje {port} na 127.0.0.1."
+                + (" Inny port panelu: JARVO_PANEL_PORT i polecenie instalacji jeszcze raz." if nazwa == "panel"
+                   else ""))
+        if dziala and s is None:
+            wyniki.append(_wynik(etykieta, "uwaga", "zajęty; nie umiem sprawdzić, przez kogo (brak netstat albo "
+                                 "lsof)", rada))
         else:
-            wyniki.append(_wynik(etykieta, "ok", "wolny"))
+            wyniki.append(_wynik(etykieta, "blad" if nazwa in NASZE_PORTY and not dziala else "uwaga",
+                                 f"zajęty przez {kto}" + (", nie przez usługę Jarva" if dziala else ""), rada))
     return wyniki
 
 
 def sprawdz_autostart(u: Uklad, ot: Otoczenie) -> dict:
     if not _zainstalowane(u):
         return _wynik("autostart", "uwaga", "nie sprawdzony (brak instalacji)", "Po instalacji: jarvo autostart on.")
-    stan = _stan_autostartu(u, ot)
+    stan = instalator.stan_autostartu(u, ot)
     if stan.get("sprawdzony") is False:
         return _wynik("autostart", "uwaga", _opis_autostartu(stan), "Uruchom instalację ponownie.")
     if not stan.get("wlaczony") or stan.get("nasz") is False:
@@ -800,9 +983,11 @@ def sprawdz_polecenie(u: Uklad, ot: Otoczenie) -> dict:
         nasze.insert(0, Path.home() / ".local" / "bin" / "jarvo")
     znalezione = shutil.which("jarvo", path=ot.env.get("PATH"))
     if znalezione is None:
+        kiedy = ("otwórz nowe okno terminala" if WINDOWS else "otwórz nowe okno Terminala" if MACOS else
+                 "zaloguj się ponownie (terminal w GNOME i KDE nie czyta ~/.profile, w którym jest blok PATH)")
         return _wynik("polecenie jarvo", "uwaga", f"nie ma go w PATH tego terminala (plik: {nasze[0]})",
-                      "Otwórz nowe okno terminala (PATH zmienia się dla nowych okien; na macOS i Linuksie blok PATH "
-                      "jest w ~/.zprofile albo ~/.profile). Po instalacji z --bez-path uruchamiaj pełną ścieżką.")
+                      f"PATH zmienia się dla nowych sesji: {kiedy}, albo uruchamiaj pełną ścieżką. Po instalacji "
+                      "z --bez-path zawsze pełną ścieżką.")
     if all(Path(znalezione).resolve() != p.resolve() for p in nasze):
         return _wynik("polecenie jarvo", "uwaga", f"w PATH najpierw jest {znalezione}, a nie {nasze[0]}",
                       "To zwykle polecenie starej instalacji (Docker, WSL) albo innej kopii Jarva: usuń je albo "
@@ -811,7 +996,7 @@ def sprawdz_polecenie(u: Uklad, ot: Otoczenie) -> dict:
 
 
 def sprawdz_git(ot: Otoczenie) -> dict:
-    git = ot.program("git")
+    git = instalator.program_bezwzgledny(ot, "git")
     if git:
         return _wynik("git", "ok", git)
     rada = ("Zainstaluj Git for Windows (własny PortableGit przyjdzie z manifestem, I05)." if WINDOWS else
@@ -823,7 +1008,7 @@ def zbierz_diagnoze(u: Uklad, ot: Otoczenie) -> dict:
     app = instalator.katalog_aplikacji(u)
     stan, _ = stan_serwisu(u, ot)
     wyniki = [sprawdz_korzen(u), sprawdz_miejsce(u), sprawdz_python(u), *sprawdz_sqlite(u), sprawdz_uv(u, app),
-              sprawdz_hermesa(u, app), *sprawdz_porty(u, ot, stan is not None), sprawdz_autostart(u, ot),
+              sprawdz_hermesa(u, app), *sprawdz_porty(u, ot, stan), sprawdz_autostart(u, ot),
               sprawdz_polecenie(u, ot), sprawdz_git(ot)]
     return {"root": str(u.root), "czas": time.strftime("%Y-%m-%dT%H:%M:%S"), "serwis": stan is not None,
             "wyniki": wyniki, "bledy": sum(w["stan"] == "blad" for w in wyniki),

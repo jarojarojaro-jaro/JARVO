@@ -3,9 +3,11 @@
 Bootstrapy: adresy i sumy uv i Pythona 3.13 w jarvo/bootstrap/install.ps1 i install.sh są te same co
 w vendor/natywne.lock.json; install.ps1 ma samo ASCII bez BOM i parsuje się w PowerShellu; install.sh przechodzi
 `bash -n` (na Windows Git Bash z conftest.bash()); suchy przebieg wybiera pliki platformy, Mac z Intelem dostaje
-odmowę, JARVO_TOKEN nie pojawia się na ekranie, a pobranie, suma i rozpakowanie działają na plikach z serwera
-na 127.0.0.1 (porty 19100–19199). CLI i instalator biegną na atrapach (instalator.Otoczenie): nie dotykają PATH,
-rejestru, autostartu ani procesów właściciela, a drugi przebieg instalatora niczego nie zmienia.
+odmowę, JARVO_TOKEN nie pojawia się na ekranie ani w otoczeniu instalatora w Pythonie, a pobranie, suma
+i rozpakowanie działają na plikach z serwera na 127.0.0.1 (porty 19100–19199). CLI i instalator biegną na atrapach
+(instalator.Otoczenie, wirtualny zegar): nie dotykają PATH, rejestru, autostartu ani procesów właściciela, a drugi
+przebieg instalatora niczego nie zmienia. Panel liczy się tylko nasz (/api/status z hermes_home = <dane>), current.json
+przełącza się dopiero po udanym Hermesie, froncie i konfiguracji, a `jarvo down` zostawia znacznik zatrzymania.
 """
 from __future__ import annotations
 
@@ -17,13 +19,14 @@ import os
 import re
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import tarfile
 import threading
 import zipfile
 from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 
 import pytest
@@ -41,6 +44,7 @@ PIN = LOCK["hermes"]["commit"]
 SHA_JARVA = "fb7e3ffa0e77b125f7f24457f8316026bbb3a07b"
 PLATFORMY_PS1 = ("windows-x64", "windows-arm64")
 PLATFORMY_SH = ("macos-arm64", "linux-x64", "linux-arm64")
+ZMIENNE_PROCESU = ("NoDefaultCurrentDirectoryInExePath", "JARVO_ROOT", "JARVO_PANEL_PORT")
 
 
 # ---------------------------------------------------------------- pomocnicze
@@ -55,23 +59,38 @@ class _Serwer(ThreadingHTTPServer):
     daemon_threads = True
 
 
+def _serwer_na_porcie(handler) -> tuple[ThreadingHTTPServer, int]:
+    for port in range(19100, 19200):
+        try:
+            return _Serwer(("127.0.0.1", port), handler), port
+        except OSError:
+            continue
+    pytest.skip("brak wolnego portu 19100–19199")
+
+
 @pytest.fixture
 def serwer(tmp_path):
     """Serwer plików na 127.0.0.1, port z zakresu prób 19100–19199."""
     katalog = tmp_path / "www"
     katalog.mkdir()
-    for port in range(19100, 19200):
-        try:
-            httpd = _Serwer(("127.0.0.1", port), partial(_Cichy, directory=str(katalog)))
-            break
-        except OSError:
-            continue
-    else:
-        pytest.skip("brak wolnego portu 19100–19199")
+    httpd, port = _serwer_na_porcie(partial(_Cichy, directory=str(katalog)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield katalog, f"http://127.0.0.1:{port}"
     httpd.shutdown()
     httpd.server_close()
+
+
+@pytest.fixture
+def bez_zmian_procesu():
+    """cli.main bez atrapy Otoczenia ustawia zmienne procesu (Windows: NoDefaultCurrentDirectoryInExePath,
+    JARVO_ROOT, JARVO_PANEL_PORT): po teście wracają do stanu sprzed niego."""
+    przed = {k: os.environ.get(k) for k in ZMIENNE_PROCESU}
+    yield
+    for k, v in przed.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
 
 
 def wolny_port() -> int:
@@ -204,10 +223,12 @@ def test_bootstrap_ps1_tylko_ascii_bez_bom():
     tekst = dane.decode("ascii")
     assert "$ErrorActionPreference = 'Stop'" in tekst and "Tls12" in tekst
     assert "Get-FileHash" in tekst and "tar.exe" in tekst and "Expand-Archive" in tekst
-    # wartość klucza tylko w nagłówku; nigdy w napisie dla człowieka ani w argv programu (nazwa zmiennej może być)
+    # wartość klucza tylko w nagłówku (i przechowana na czas instalatora, żeby wróciła do sesji); nigdy w napisie dla
+    # człowieka ani w argv programu (nazwa zmiennej może być)
     for linia in tekst.splitlines():
         if "$env:JARVO_TOKEN" in linia and not linia.lstrip().startswith("#"):
-            assert re.search(r"if \(\$env:JARVO_TOKEN\)|'Bearer ' \+ \$env:JARVO_TOKEN", linia), linia
+            assert re.search(r"if \(\$env:JARVO_TOKEN\)|'Bearer ' \+ \$env:JARVO_TOKEN|"
+                             r"^\s*\$klucz = \$env:JARVO_TOKEN$|\{ \$env:JARVO_TOKEN = \$klucz \}", linia), linia
 
 
 def test_bootstrap_ps1_parsuje_sie():
@@ -332,6 +353,47 @@ def test_bootstrap_ps1_pobiera_sprawdza_sume_i_rozpakowuje(tmp_path, serwer):
     assert not (program / "narzedzia" / "zly").exists() and not list(pobrane.glob("*.czesc"))
 
 
+@pytest.mark.windows_only
+def test_bootstrap_ps1_korzen_wzgledny_i_z_tylda_od_katalogu_powershella(tmp_path):
+    """Względny JARVO_ROOT i `~` liczy się od katalogu PowerShella (nie procesu .NET), a pełna ścieżka wraca do
+    $env:JARVO_ROOT, którą potem dostaje instalator w Pythonie, jarvo.cmd i autostart."""
+    wstep = _PS_FUNKCJE.format(skrypt=PS1)
+    r = _ps(wstep + f"Set-Location -LiteralPath '{tmp_path}'\n"
+            "$env:JARVO_ROOT = 'wzgledny\\kat'; 'A=' + (JarvoKorzen); 'E=' + $env:JARVO_ROOT\n"
+            "$env:JARVO_ROOT = '~\\jarvo-proba'; 'B=' + (JarvoKorzen)\n"
+            "$env:JARVO_ROOT = 'C:\\JarvoProba\\'; 'C=' + (JarvoKorzen)\n"
+            "$env:JARVO_ROOT = 'HKCU:\\Software'; try { JarvoKorzen } catch { 'D=' + $_.Exception.Message }\n"
+            "Remove-Item Env:JARVO_ROOT; $env:LOCALAPPDATA = 'C:\\Lokalne'; 'F=' + (JarvoKorzen); "
+            "'G=' + [bool]$env:JARVO_ROOT\n")
+    assert r.returncode == 0, r.stdout + r.stderr
+    wiersze = dict(w.split("=", 1) for w in r.stdout.splitlines() if re.match(r"^[A-G]=", w))
+    assert wiersze["A"] == str(tmp_path / "wzgledny" / "kat") == wiersze["E"]
+    assert wiersze["B"] == str(Path.home() / "jarvo-proba")
+    assert wiersze["C"] == r"C:\JarvoProba"
+    assert "nie sciezka katalogu na dysku" in wiersze["D"]
+    assert wiersze["F"] == r"C:\Lokalne\Jarvo" and wiersze["G"] == "False"     # domyślny korzeń nie idzie do zmiennej
+
+
+@pytest.mark.windows_only
+def test_bootstrap_ps1_instalator_bez_jarvo_token(tmp_path):
+    """Instalator w Pythonie (tu atrapa .cmd) nie dostaje JARVO_TOKEN, a sesja PowerShella odzyskuje go po
+    zakończeniu, także po błędzie instalatora."""
+    atrapa = tmp_path / "python.cmd"
+    atrapa.write_text("@if defined JARVO_TOKEN (echo TOKEN-JEST) else (echo TOKEN-BRAK)\r\n@echo ARGV=%*\r\n"
+                      "@if \"%1\"==\"blad\" exit /b 3\r\n", encoding="ascii", newline="")
+    wstep = _PS_FUNKCJE.format(skrypt=PS1)
+    r = _ps(wstep + "$env:JARVO_TOKEN = 'tajny-klucz-0123456789'\n"
+            f"JarvoUruchomInstalator '{atrapa}' @('instaluj', '--bez-path')\n"
+            "'PO=' + $env:JARVO_TOKEN\n"
+            f"try {{ JarvoUruchomInstalator '{atrapa}' @('blad') }} catch {{ 'BLAD=' + $_.Exception.Message }}\n"
+            "'PO2=' + $env:JARVO_TOKEN\n")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout.count("TOKEN-BRAK") == 2 and "TOKEN-JEST" not in r.stdout and "tajny" not in r.stdout.split("PO=")[0]
+    assert "ARGV=instaluj --bez-path" in r.stdout
+    assert "PO=tajny-klucz-0123456789" in r.stdout and "PO2=tajny-klucz-0123456789" in r.stdout
+    assert "BLAD=JARVO: instalator Jarva zakonczyl sie bledem" in r.stdout
+
+
 # ---------------------------------------------------------------- bootstrap macOS i Linux
 
 @pytest.mark.wymaga_bash
@@ -375,6 +437,22 @@ def test_bootstrap_sh_klucz_nie_wycieka_i_stare_polecenie(tmp_path):
     assert r.returncode == 1 and "należy do innej instalacji" in r.stderr
     stare.write_text(instalator.tresc_jarvo_sh(Path("/x/python3"), Path("/x/start.py")), encoding="utf-8")
     assert _sh_na_sucho(tmp_path, "Linux", "x86_64").returncode == 0      # nasze polecenie: aktualizacja
+
+
+@pytest.mark.wymaga_bash
+def test_bootstrap_sh_instalator_bez_jarvo_token(tmp_path):
+    """Instalator w Pythonie (tu atrapa python3) nie dostaje JARVO_TOKEN: klucz był potrzebny tylko do pobrania."""
+    py_kat = tmp_path / "py"
+    (py_kat / "bin").mkdir(parents=True)
+    atrapa = py_kat / "bin" / "python3"
+    atrapa.write_text('#!/usr/bin/env bash\necho "TOKEN=${JARVO_TOKEN:-BRAK} ARGV=$*"\n', encoding="utf-8",
+                      newline="\n")
+    atrapa.chmod(0o755)
+    r = _sh(f'source "{_msys(SH)}"\nPY_KAT="{_msys(py_kat)}"; APP=/x/app; DRY=0\n'
+            "JARVO_TOKEN=tajny-klucz-0123456789; export JARVO_TOKEN\ninstalator --bez-startu\n")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "TOKEN=BRAK" in r.stdout and "tajny" not in r.stdout + r.stderr
+    assert "ARGV=-I -X utf8 /x/app/jarvo/start.py instaluj --bez-startu" in r.stdout
 
 
 @pytest.mark.wymaga_bash
@@ -463,19 +541,53 @@ def test_start_py_w_trybie_izolowanym_ignoruje_cudzy_pythonpath(tmp_path):
     assert r.returncode == 0 and "--json" in r.stdout
 
 
-def test_pomoc_po_polsku_i_argparse_bez_trwalej_zmiany(capsys):
+def test_start_py_wylacza_szukanie_programow_w_katalogu_biezacym(tmp_path):
+    """Windows: launcher ustawia NoDefaultCurrentDirectoryInExePath=1 przed importem CLI (shutil.which i cmd.exe
+    nie biorą uv.exe ani git.cmd z katalogu, w którym wpisano polecenie); na POSIX niczego nie zmienia."""
+    kod = ("import os, runpy, sys\n"
+           "os.environ.pop('NoDefaultCurrentDirectoryInExePath', None)\n"
+           f"sys.argv = [{str(REPO / 'jarvo' / 'start.py')!r}, '--help']\n"
+           "try:\n    runpy.run_path(sys.argv[0], run_name='__main__')\nexcept SystemExit:\n    pass\n"
+           "print('ZMIENNA=' + str(os.environ.get('NoDefaultCurrentDirectoryInExePath')))\n")
+    r = subprocess.run([sys.executable, "-I", "-X", "utf8", "-c", kod], cwd=tmp_path, capture_output=True, text=True,
+                       encoding="utf-8", timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert ("ZMIENNA=1" if WINDOWS else "ZMIENNA=None") in r.stdout
+
+
+@pytest.mark.windows_only
+def test_start_py_zostawia_krotka_nazwe_8_3(tmp_path):
+    """Kod Jarva spod ścieżki z polskimi znakami uruchomiony przez krótką nazwę 8.3 zostaje pod nią (c1: `<program>`
+    w ASCII): bez Path.resolve(), który rozwinąłby ją do pełnej."""
+    dlugi = tmp_path / "Michał Żółć"
+    shutil.copytree(REPO / "jarvo", dlugi / "jarvo", ignore=shutil.ignore_patterns("__pycache__"))
+    krotki = sciezki.krotka_sciezka(dlugi)
+    if krotki == dlugi or not str(krotki).isascii():
+        pytest.skip("ten wolumen nie ma krótkich nazw 8.3")
+    r = subprocess.run([sys.executable, "-I", "-X", "utf8", str(krotki / "jarvo" / "start.py"), "--korzen",
+                        str(tmp_path / "root"), "--wersja"], capture_output=True, text=True, encoding="utf-8",
+                       timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert f"({krotki})" in r.stdout and "Żółć" not in r.stdout
+
+
+def test_pomoc_po_polsku_i_argparse_bez_trwalej_zmiany(capsys, bez_zmian_procesu):
     assert cli.main(["--help"]) == 0
     out = capsys.readouterr().out
     for slowo in ("użycie: jarvo", "opcje:", "--korzen", "instaluj", "serwis", "up", "down", "status", "panel",
-                  "chat", "logs", "autostart", "doctor", "update", "uninstall", "migruj"):
+                  "chat", "logs", "autostart", "doctor", "version", "help", "update", "uninstall", "migruj"):
         assert slowo in out
     assert cli.main(["autostart", "wlacz"]) == 2
     assert "błąd:" in capsys.readouterr().err
     assert cli.main(["status", "--nieznana"]) == 2
     assert argparse._("usage: ") == "usage: "       # podmiana tylko na czas parsowania
+    if WINDOWS:                                     # cli.main na starcie procesu (bez atrapy Otoczenia)
+        assert os.environ.get("NoDefaultCurrentDirectoryInExePath") == "1"
 
 
 def _ot(tmp_path, **kw) -> instalator.Otoczenie:
+    """Otoczenie na atrapach: moduły z `moduly`, zmienne bez JARVO_* właściciela, wirtualny zegar (czekaj przesuwa
+    go od razu, bez spania), nikt nie słucha na portach (sluchacz)."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("JARVO_")}
     env.update({"JARVO_ROOT": str(tmp_path / "j"), "JARVO_PANEL_PORT": str(kw.pop("port", 19199))})
     env.update(kw.pop("env", {}))
@@ -485,8 +597,21 @@ def _ot(tmp_path, **kw) -> instalator.Otoczenie:
         if nazwa not in moduly:
             raise ImportError(f"No module named 'jarvo.{nazwa}'")
         return moduly[nazwa]
-    kw.setdefault("czekaj", lambda s: None)
+    teraz = [0.0]
+    kw.setdefault("czekaj", lambda s: teraz.__setitem__(0, teraz[0] + s))
+    kw.setdefault("zegar", lambda: teraz[0])
+    kw.setdefault("sluchacz", lambda port: None)
     return instalator.Otoczenie(modul=modul, env=env, **kw)
+
+
+def http_panelu(u: sciezki.Uklad, warunek=lambda: True, **pola):
+    """Atrapa zapytaj_http: /api/status dashboardu tej instalacji (hermes_home = <dane>), gdy warunek(), inaczej
+    nikt nie odpowiada."""
+    def zapytaj(url, czas):
+        if not warunek():
+            return None
+        return 200, {"version": "0.21.5", "hermes_home": str(u.dane), "auth_required": False, **pola}
+    return zapytaj
 
 
 def test_w_budowie_kod_2(tmp_path, capsys):
@@ -496,8 +621,24 @@ def test_w_budowie_kod_2(tmp_path, capsys):
         assert "w budowie" in err and f"etap {etap}" in err
 
 
-def test_korzen_z_argv_jak_jarvo_root(tmp_path, capsys):
-    """Launcher i autostart instalacji spod JARVO_ROOT podają korzeń w argv (Harmonogram nie przekazuje zmiennych)."""
+def test_version_i_help(tmp_path, capsys):
+    """N16: `jarvo version` (i `wersja`, `--wersja`) oraz `jarvo help [polecenie]`."""
+    ot = _ot(tmp_path)
+    for polecenie in (["version"], ["wersja"], ["--wersja"]):
+        assert cli.main(polecenie, otoczenie=ot) == 0
+        out = capsys.readouterr().out
+        assert out.startswith("Jarvo ") and f"Hermes {LOCK['hermes']['wersja']}" in out and PIN[:7] in out
+    assert cli.main(["help"], otoczenie=ot) == 0 and "użycie: jarvo" in capsys.readouterr().out
+    assert cli.main(["help", "status"], otoczenie=ot) == 0
+    assert "jarvo status" in (out := capsys.readouterr().out) and "--json" in out
+    assert cli.main(["help", "serwis"], otoczenie=ot) == 0 and "jarvo serwis --help" in capsys.readouterr().out
+    assert cli.main(["help", "nie-ma"], otoczenie=ot) == 2 and "Nie znam polecenia" in capsys.readouterr().err
+    assert not (tmp_path / "j").exists()
+
+
+def test_korzen_z_argv_jak_jarvo_root(tmp_path, capsys, monkeypatch):
+    """Launcher i autostart instalacji spod JARVO_ROOT podają korzeń w argv (Harmonogram nie przekazuje zmiennych);
+    względny korzeń liczymy od katalogu bieżącego i podajemy dalej jako pełną ścieżkę."""
     ot = _ot(tmp_path, port=wolny_port())
     ot.env.pop("JARVO_ROOT")
     assert cli.main(["--korzen", str(tmp_path / "inny"), "status", "--json"], otoczenie=ot) == 1
@@ -505,6 +646,10 @@ def test_korzen_z_argv_jak_jarvo_root(tmp_path, capsys):
     assert cli.main([f"--korzen={tmp_path / 'trzeci'}", "status", "--json"], otoczenie=ot) == 1
     assert json.loads(capsys.readouterr().out)["root"] == str(tmp_path / "trzeci")
     assert "JARVO_ROOT" not in os.environ or os.environ["JARVO_ROOT"] != str(tmp_path / "trzeci")   # tylko atrapa
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["--korzen", "wzgledny", "status", "--json"], otoczenie=ot) == 1
+    assert json.loads(capsys.readouterr().out)["root"] == str(tmp_path / "wzgledny")
+    assert ot.env["JARVO_ROOT"] == str(tmp_path / "wzgledny")
 
 
 def test_status_i_doctor_na_pustym_katalogu_niczego_nie_tworza(tmp_path, capsys):
@@ -524,16 +669,32 @@ def test_status_i_doctor_na_pustym_katalogu_niczego_nie_tworza(tmp_path, capsys)
     assert d["bledy"] >= 3
     assert cli.main(["doctor"], otoczenie=ot) == 1
     assert "rada:" in capsys.readouterr().out
-    for polecenie in (["panel"], ["up"], ["chat"], ["autostart", "on"]):
+    for polecenie in (["panel"], ["chat"], ["autostart", "on"]):
         assert cli.main(polecenie, otoczenie=ot) == 1
         assert "nie jest zainstalowane" in capsys.readouterr().err
     assert cli.main(["down"], otoczenie=ot) == 0
     assert not (tmp_path / "j").exists()
 
 
-class AtrapaNadzorcy:
-    def __init__(self, dziala=False):
+def test_status_i_doctor_korzen_z_polskimi_znakami_przed_instalacja(tmp_path, capsys):
+    """Korzeń z polskimi znakami, którego jeszcze nie ma: status i doctor mówią „brak instalacji” (krótką nazwę 8.3
+    system poda dopiero dla istniejącego katalogu), zamiast błędu układu; niczego nie tworzą."""
+    ot = _ot(tmp_path, port=wolny_port(), env={"JARVO_ROOT": str(tmp_path / "Michał Żółć")})
+    assert cli.main(["status"], otoczenie=ot) == 1
+    assert "instalacja: brak" in capsys.readouterr().out
+    assert cli.main(["doctor", "--json"], otoczenie=ot) == 1
+    assert json.loads(capsys.readouterr().out)["bledy"] >= 1
+    assert not (tmp_path / "Michał Żółć").exists()
+
+
+class AtrapaNadzorcyBezZnacznika:
+    """Jak jarvo/nadzorca.py sprzed znacznika trwałego zatrzymania: kanał (polacz, status, stop) i stan z pliku."""
+    CZAS_ZATRZYMANIA = 110.0
+
+    def __init__(self, dziala=False, *, panel="dziala", powod_panelu=None):
         self.dziala, self.zatrzymania, self.argv = dziala, 0, None
+        self.panel, self.powod_panelu = panel, powod_panelu
+        self.stopy: list[dict] = []
 
     def polacz(self, u):
         if not self.dziala:
@@ -542,12 +703,15 @@ class AtrapaNadzorcy:
 
     def status(self):
         return {"nadzorca": {"pid": 100, "stan": "dziala"},
-                "uslugi": {"brama": {"stan": "dziala", "pid": 101, "gotowa": True, "restarty": 0},
-                           "panel": {"stan": "dziala", "pid": 102, "gotowa": True, "restarty": 2}}}
+                "uslugi": {"brama": {"stan": "dziala", "pid": 101, "pidy": [111], "gotowa": True, "restarty": 0},
+                           "panel": {"stan": self.panel, "pid": 102, "pidy": [112], "gotowa": self.panel == "dziala",
+                                     "restarty": 2, "ostatni_kod": 78 if self.panel == "postoj" else None,
+                                     "powod": self.powod_panelu}}}
 
-    def stop(self):
+    def stop(self, czekaj: float = 0.0):
         self.dziala = False
         self.zatrzymania += 1
+        self.stopy.append({"czekaj": czekaj})
         return {"ok": True}
 
     def restart(self, nazwa):
@@ -562,31 +726,62 @@ class AtrapaNadzorcy:
         return 0
 
 
+class AtrapaNadzorcy(AtrapaNadzorcyBezZnacznika):
+    """Jak jarvo/nadzorca.py ze znacznikiem `<stan>/zatrzymany.json` (oznacz, zdejmij, zatrzymany; stop z powodem)."""
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.znaczniki: list[tuple] = []
+
+    def stop(self, czekaj: float = 0.0, powod: str = ""):
+        wynik = super().stop(czekaj)
+        self.stopy[-1]["powod"] = powod
+        return {**wynik, "trwale": True}
+
+    def oznacz_zatrzymanie(self, u, powod=""):
+        self.znaczniki.append(("oznacz", powod))
+        (u.stan / "zatrzymany.json").write_text(json.dumps({"wersja": 1, "kiedy": "2026-10-25T10:00:00",
+                                                            "powod": powod, "pid": 1}), encoding="utf-8")
+
+    def zdejmij_zatrzymanie(self, u):
+        self.znaczniki.append(("zdejmij",))
+        (u.stan / "zatrzymany.json").unlink(missing_ok=True)
+        return True
+
+    def zatrzymany(self, u):
+        return (u.stan / "zatrzymany.json").is_file()
+
+
 class AtrapaAutostartu:
-    """Jak jarvo/autostart.py: wlacz(start=True) od razu uruchamia nadzorcę mechanizmem systemu."""
+    """Jak jarvo/autostart.py: wlacz(start=True) od razu uruchamia nadzorcę mechanizmem systemu; `blad` = wlacz
+    rzuca BladAutostartu (np. brak user busa systemd)."""
 
-    def __init__(self, nadzorca: AtrapaNadzorcy | None = None):
-        self.nadzorca, self.wlaczony, self.argv, self.wywolania = nadzorca, False, None, []
+    class BladAutostartu(RuntimeError):
+        pass
 
-    def wlacz(self, u, argv, wykonaj=None, *, start=True, log=print, **_kw):
-        zmieniony = not self.wlaczony or self.argv != list(argv)
-        self.wlaczony, self.argv = True, list(argv)
+    def __init__(self, nadzorca: AtrapaNadzorcyBezZnacznika | None = None, *, mechanizm="harmonogram", blad=None):
+        self.nadzorca, self.mechanizm, self.blad = nadzorca, mechanizm, blad
+        self.wlaczony, self.argv, self.env, self.wywolania = False, None, None, []
+
+    def wlacz(self, u, argv, wykonaj=None, *, start=True, log=print, env=None, **_kw):
         self.wywolania.append(("wlacz", start))
+        if self.blad:
+            raise self.BladAutostartu(self.blad)
+        zmieniony = not self.wlaczony or self.argv != list(argv)
+        self.wlaczony, self.argv, self.env = True, list(argv), env
         if start and self.nadzorca is not None:
             self.nadzorca.dziala = True
-        return {"zmieniony": zmieniony, "uruchomiony": start, "uwagi": []}
+        return {"system": "atrapa", "mechanizm": self.mechanizm, "zmieniony": zmieniony, "uruchomiony": start,
+                "uwagi": []}
 
-    def wylacz(self, u, wykonaj=None, **_kw):
-        self.wlaczony = False
+    def wylacz(self, u, wykonaj=None, *, env=None, log=print, **_kw):
+        self.wlaczony, self.argv = False, None
         self.wywolania.append(("wylacz",))
         return {"usuniety": True, "uwagi": []}
 
-    def stan(self, u, wykonaj=None, **_kw):
-        return {"wlaczony": self.wlaczony, "nasz": True, "mechanizm": "harmonogram" if self.wlaczony else None,
+    def stan(self, u, wykonaj=None, *, env=None, **_kw):
+        return {"wlaczony": self.wlaczony, "nasz": True, "mechanizm": self.mechanizm if self.wlaczony else None,
                 "opis": "włączony (zadanie Harmonogramu Jarvo)" if self.wlaczony else "wyłączony"}
-
-    def nazwa_zadania(self, u):
-        return "Jarvo"
 
 
 class RejestrAtrapa:
@@ -612,10 +807,11 @@ class RejestrAtrapa:
 
 class AtrapaZmian:
     """Dziennik zmian hosta w pamięci z tymi samymi pomocnikami co jarvo/zmiany_hosta.py (plik, blok-rc,
-    path-uzytkownika); pliki i bloki zapisuje naprawdę (w katalogu testu)."""
+    path-uzytkownika); pliki i bloki zapisuje naprawdę (w katalogu testu). `blad_pliku`: zapisz_plik rzuca OSError."""
 
     def __init__(self):
         self.lista = []
+        self.blad_pliku: str | None = None
 
     def dopisz(self, u, rodzaj, **szczegoly):
         wpis = {"rodzaj": rodzaj, "szczegoly": {k: str(v) if isinstance(v, Path) else v for k, v in szczegoly.items()}}
@@ -627,6 +823,8 @@ class AtrapaZmian:
         return [dict(w) for w in self.lista]
 
     def zapisz_plik(self, u, sciezka, tresc, tryb=0o644):
+        if self.blad_pliku:
+            raise OSError(self.blad_pliku)
         dane = tresc.encode("utf-8") if isinstance(tresc, str) else tresc
         self.dopisz(u, "plik", sciezka=str(sciezka), sha256=hashlib.sha256(dane).hexdigest())
         if Path(sciezka).is_file() and Path(sciezka).read_bytes() == dane:
@@ -660,8 +858,14 @@ class AtrapaZmian:
 
 
 class AtrapaHermesa:
+    """Jak jarvo/hermes.py: checkout `<program>/hermes/<commit12>`, front ze znacznikiem commitu w checkoucie
+    (gotowy = bez budowy), konfiguracja. `blad_web` i `blad_konfiguracji`: krok rzuca wyjątek."""
+    ZNACZNIK_WEB = ".jarvo-web-dist.json"
+
     def __init__(self):
         self.wywolania = []
+        self.blad_web: str | None = None
+        self.blad_konfiguracji: str | None = None
 
     def zainstaluj(self, u, pin, *, git, uv, python, log=print):
         self.wywolania.append(("zainstaluj", pin["commit"], Path(git), Path(uv), Path(python)))
@@ -675,14 +879,23 @@ class AtrapaHermesa:
         return checkout
 
     def web_dist(self, u, checkout, *, npm=None, log=print):
-        self.wywolania.append(("web_dist", npm))
         dist = checkout / "hermes_cli" / "web_dist"
+        if (checkout / self.ZNACZNIK_WEB).is_file() and (dist / "index.html").is_file():
+            self.wywolania.append(("web_dist", "gotowy", checkout.name))
+            return dist
+        if self.blad_web:
+            raise RuntimeError(self.blad_web)
+        self.wywolania.append(("web_dist", "buduje", checkout.name))
         dist.mkdir(parents=True, exist_ok=True)
         (dist / "index.html").write_text("<html></html>", encoding="utf-8")
+        (checkout / self.ZNACZNIK_WEB).write_text(json.dumps({"commit": checkout.name}), encoding="utf-8")
         return dist
 
     def konfiguracja_bezpieczna(self, u, checkout, env, log=print):
-        self.wywolania.append(("konfiguracja", env["HERMES_HOME"], env["HERMES_DISABLE_LAZY_INSTALLS"]))
+        if self.blad_konfiguracji:
+            raise RuntimeError(self.blad_konfiguracji)
+        self.wywolania.append(("konfiguracja", env["HERMES_HOME"], env["HERMES_DISABLE_LAZY_INSTALLS"],
+                               env.get("JARVO_REPO")))
 
     def argv_hermesa(self, checkout, *argumenty):
         return [str(srodowisko.hermes_python(checkout)), "-m", "hermes_cli.main", *argumenty]
@@ -718,6 +931,7 @@ def test_status_z_nadzorcy_albo_z_pliku(tmp_path, capsys):
     assert "serwis:     działa" in out and "brama: dziala, gotowa, PID 101" in out
     assert "panel: dziala, gotowa, PID 102, restarty 2" in out
     assert "wersja:     abc123def456" in out and "uv 0.12.13" in out and "autostart:  wyłączony" in out
+    assert "nie odpowiada" in out                                               # na porcie panelu nikt nie słucha
     nadzorca.dziala = False
     assert cli.main(["status"], otoczenie=ot) == 1
     out = capsys.readouterr().out
@@ -726,7 +940,7 @@ def test_status_z_nadzorcy_albo_z_pliku(tmp_path, capsys):
 
 
 def test_serwis_up_down(tmp_path, capsys):
-    _zainstalowane(tmp_path)
+    u = _zainstalowane(tmp_path)
     nadzorca = AtrapaNadzorcy()
     assert cli.main(["serwis", "--status", "-v"], otoczenie=_ot(tmp_path, moduly={"nadzorca": nadzorca})) == 0
     assert nadzorca.argv == ["--status", "-v"]
@@ -735,28 +949,72 @@ def test_serwis_up_down(tmp_path, capsys):
     w_tle = []
 
     def start(argv, env, log):
-        w_tle.append(argv)
+        w_tle.append((argv, env))
         nadzorca.dziala = True
         return 1
-    ot = _ot(tmp_path, moduly={"nadzorca": nadzorca}, uruchom_w_tle=start, odpowiada=lambda a, c: nadzorca.dziala)
+    ot = _ot(tmp_path, moduly={"nadzorca": nadzorca}, uruchom_w_tle=start,
+             zapytaj_http=http_panelu(u, lambda: nadzorca.dziala),
+             env={"JARVO_TOKEN": "tajny-klucz", "OPENAI_API_KEY": "sk-tajny", "SSH_AUTH_SOCK": "/tmp/agent"})
     assert cli.main(["up"], otoczenie=ot) == 0 and len(w_tle) == 1
-    assert "Jarvo działa. Panel: http://127.0.0.1:19199/" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Serwis nie działa: uruchamiam go" in out and "Serwis uruchomiony w tle (PID 1)." in out
+    assert "Jarvo działa. Panel: http://127.0.0.1:19199/" in out
+    env = w_tle[0][1]                                                            # bez sekretów z powłoki właściciela
+    assert not {"JARVO_TOKEN", "OPENAI_API_KEY", "SSH_AUTH_SOCK"} & set(env) and env["JARVO_ROOT"] == str(u.root)
     assert cli.main(["up"], otoczenie=ot) == 0 and len(w_tle) == 1              # działa: bez drugiego startu
     assert cli.main(["down"], otoczenie=ot) == 0 and nadzorca.zatrzymania == 1
     assert "Serwis zatrzymany" in capsys.readouterr().out
     assert cli.main(["down"], otoczenie=ot) == 0 and nadzorca.zatrzymania == 1  # już nie działa
 
 
+def test_down_znacznik_zatrzymania_i_up_go_zdejmuje(tmp_path, capsys):
+    """`jarvo down` zostawia znacznik `<stan>/zatrzymany.json` (nadzorca.oznacz_zatrzymanie, stop z powodem): autostart
+    nie podniesie floty sam (Windows: zapasowe wyzwalacze co 5 minut), `status` to pokazuje, a `jarvo up` zdejmuje
+    znacznik przed startem."""
+    u = _zainstalowane(tmp_path)
+    nadzorca = AtrapaNadzorcy(dziala=True)
+    w_tle = []
+    ot = _ot(tmp_path, moduly={"nadzorca": nadzorca}, zapytaj_http=http_panelu(u, lambda: nadzorca.dziala),
+             uruchom_w_tle=lambda argv, env, log: w_tle.append(argv) or nadzorca.__setattr__("dziala", True) or 7)
+    assert cli.main(["down"], otoczenie=ot) == 0
+    out = capsys.readouterr().out
+    assert "Serwis zatrzymany" in out and "Nie wstanie sam" in out
+    assert nadzorca.znaczniki == [("oznacz", "jarvo down")] and (u.stan / "zatrzymany.json").is_file()
+    assert nadzorca.stopy[0]["powod"] == "jarvo down" and nadzorca.stopy[0]["czekaj"] >= instalator.CZAS_STOPU
+    assert cli.main(["status"], otoczenie=ot) == 1
+    assert "serwis:     zatrzymany (jarvo down, 2026-10-25T10:00:00): autostart go nie uruchomi" in \
+        capsys.readouterr().out
+    assert cli.main(["status", "--json"], otoczenie=ot) == 1
+    assert json.loads(capsys.readouterr().out)["serwis"]["zatrzymanie"]["powod"] == "jarvo down"
+    assert cli.main(["up"], otoczenie=ot) == 0 and len(w_tle) == 1
+    assert ("zdejmij",) in nadzorca.znaczniki and not (u.stan / "zatrzymany.json").exists()
+
+
+def test_down_ze_starszym_nadzorca_zostawia_sam_plik(tmp_path, capsys):
+    """Nadzorca bez funkcji znacznika (moduł sprzed poprawki): `down` zapisuje sam plik w tym samym formacie i mówi,
+    że autostart może podnieść serwis; `up` plik usuwa."""
+    u = _zainstalowane(tmp_path)
+    nadzorca = AtrapaNadzorcyBezZnacznika(dziala=True)
+    ot = _ot(tmp_path, moduly={"nadzorca": nadzorca}, zapytaj_http=http_panelu(u, lambda: nadzorca.dziala),
+             uruchom_w_tle=lambda argv, env, log: nadzorca.__setattr__("dziala", True) or 7)
+    assert cli.main(["down"], otoczenie=ot) == 0
+    assert "nie zna znacznika zatrzymania" in capsys.readouterr().out
+    znacznik = json.loads((u.stan / "zatrzymany.json").read_text(encoding="utf-8"))
+    assert znacznik["powod"] == "jarvo down" and znacznik["kiedy"] and nadzorca.zatrzymania == 1
+    assert cli.main(["up"], otoczenie=ot) == 0 and not (u.stan / "zatrzymany.json").exists()
+
+
 def test_chat_srodowisko_tryb_i_argumenty_dla_hermesa(tmp_path, capsys):
     u = _zainstalowane(tmp_path)
     wywolania = []
-    ot = _ot(tmp_path, moduly={"hermes": AtrapaHermesa()}, env={"HERMES_YOLO_MODE": "1", "HERMES_HOME": "/obcy"},
+    ot = _ot(tmp_path, moduly={"hermes": AtrapaHermesa()}, env={"HERMES_YOLO_MODE": "1", "HERMES_HOME": "/obcy",
+                                                                "GITHUB_TOKEN": "ghp_tajny"},
              na_pierwszym_planie=lambda argv, env: wywolania.append((argv, env)) or 7)
     assert cli.main([], otoczenie=ot) == 7                                       # samo `jarvo` = rozmowa
     argv, env = wywolania[-1]
     assert argv[1:] == ["-m", "hermes_cli.main", "-p", "jarvo", "chat"]
     assert env["JARVO_TRYB_ZGOD"] == "projekt" and env["HERMES_HOME"] == str(u.dane)   # domyślny tryb (I08)
-    assert "HERMES_YOLO_MODE" not in env and env["HERMES_DISABLE_LAZY_INSTALLS"] == "1"
+    assert "HERMES_YOLO_MODE" not in env and "GITHUB_TOKEN" not in env and env["HERMES_DISABLE_LAZY_INSTALLS"] == "1"
     assert cli.main(["--tryb", "pelny", "--resume", "abc"], otoczenie=ot) == 7
     argv, env = wywolania[-1]
     assert argv[-3:] == ["chat", "--resume", "abc"] and env["JARVO_TRYB_ZGOD"] == "pelny"
@@ -780,24 +1038,125 @@ def test_panel_startuje_serwis_czeka_i_otwiera_przegladarke(tmp_path, capsys):
         nadzorca.dziala = True
         return 4242
     ot = _ot(tmp_path, moduly={"nadzorca": nadzorca}, port=port, uruchom_w_tle=w_tle,
-             odpowiada=lambda adres, czas: nadzorca.dziala, otworz=otwarte.append)
+             zapytaj_http=http_panelu(u, lambda: nadzorca.dziala), otworz=otwarte.append)
     assert cli.main(["panel"], otoczenie=ot) == 0
     assert otwarte == [f"http://127.0.0.1:{port}/"]
     argv, env, log = uruchomione[0]
     assert argv[-1] == "serwis" and argv[1:4] == ["-I", "-X", "utf8"] and log == u.logi / "serwis-start.log"
     assert argv[-3:-1] == ["--korzen", str(u.root)]                       # korzeń spod JARVO_ROOT idzie w argv
     assert env["JARVO_ROOT"] == str(u.root) and env["JARVO_PANEL_PORT"] == str(port)
-    assert "uruchamiam go w tle" in capsys.readouterr().out
+    assert "Serwis uruchomiony w tle (PID 4242)" in capsys.readouterr().out
     assert cli.main(["panel", "--bez-przegladarki"], otoczenie=ot) == 0          # działa: bez drugiego startu
     assert len(uruchomione) == 1 and len(otwarte) == 1
-    nadzorca.dziala = False                                                      # nie wstaje: limit czasu z radą
-    zegar = iter(range(0, 10_000, 5))
+    # serwis działa, ale panel nie odpowiada: limit czasu z radą
     ot2 = _ot(tmp_path, moduly={"nadzorca": nadzorca}, port=port, uruchom_w_tle=lambda *a: 1,
-              odpowiada=lambda adres, czas: False, otworz=otwarte.append, zegar=lambda: float(next(zegar)))
+              zapytaj_http=lambda url, czas: None, otworz=otwarte.append)
     assert cli.main(["panel"], otoczenie=ot2) == 1
-    assert "jarvo logs panel" in capsys.readouterr().err
+    assert "nie odpowiada po 180 s" in (err := capsys.readouterr().err) and "jarvo logs panel" in err
+    # serwis nie wstał (np. błąd startu): bez czekania na limit panelu, z radą o logu startu
+    nadzorca.dziala = False
+    assert cli.main(["panel"], otoczenie=ot2) == 1
+    assert "serwis Jarva nie działa" in (err := capsys.readouterr().err) and "serwis-start" in err
     assert cli.main(["panel"], otoczenie=_ot(tmp_path, port=port)) == 1          # bez nadzorcy: od razu błąd
     assert "brak modułu nadzorcy" in capsys.readouterr().err
+
+
+def test_up_przy_cudzym_panelu_na_porcie_mowi_kto_go_trzyma(tmp_path, capsys):
+    """Port 9119 trzyma stara flota z WSL (wslrelay) albo prywatny Hermes: `jarvo up` i `jarvo panel` nie uznają go
+    za panel Jarva, nie czekają 3 minut i mówią, kto trzyma port, z radą JARVO_PANEL_PORT."""
+    u = _zainstalowane(tmp_path)
+    nadzorca, w_tle, otwarte = AtrapaNadzorcy(), [], []
+    obcy = {"version": "0.20.1", "hermes_home": "/opt/data", "auth_required": False}
+    ot = _ot(tmp_path, moduly={"nadzorca": nadzorca}, zapytaj_http=lambda url, czas: (200, obcy),
+             sluchacz=lambda port: (4321, "wslrelay.exe"), uruchom_w_tle=lambda *a: w_tle.append(a) or 1,
+             otworz=otwarte.append)
+    assert cli.main(["up"], otoczenie=ot) == 1
+    err = capsys.readouterr().err
+    assert "wslrelay.exe (PID 4321)" in err and "WSL" in err and "JARVO_PANEL_PORT" in err
+    assert "HERMES_HOME /opt/data" in err and not w_tle
+    ot.zapytaj_http = lambda url, czas: (404, None)                         # coś innego niż Hermes
+    assert cli.main(["panel"], otoczenie=ot) == 1 and not otwarte
+    assert "nie odpowiada jak panel Hermesa" in capsys.readouterr().err
+    nadzorca.dziala = True                                                   # nasz serwis działa, ale port zajęty
+    assert cli.main(["panel"], otoczenie=ot) == 1 and not otwarte
+
+
+def test_stan_panelu_tylko_dashboard_tej_instalacji(tmp_path):
+    u = _zainstalowane(tmp_path)
+
+    def stan(odp):
+        return instalator.stan_panelu(u, _ot(tmp_path, zapytaj_http=lambda url, czas: odp))
+    assert stan(None) == ("brak", "brak odpowiedzi")
+    assert stan((503, None)) == ("brak", "HTTP 503")
+    assert stan((200, {"version": "0.21.5", "hermes_home": str(u.dane)})) == ("nasz", "")
+    if WINDOWS:                                                             # bez wielkości liter na Windows
+        assert stan((200, {"version": "0.21.5", "hermes_home": str(u.dane).upper()}))[0] == "nasz"
+    assert stan((200, {"version": "0.21.5", "hermes_home": str(tmp_path / "inny")}))[0] == "obcy"
+    assert stan((404, None))[0] == "obcy" and "HTTP 404" in stan((404, None))[1]
+    assert stan((0, None)) == ("obcy", "program, który nie odpowiada jak panel Hermesa (odpowiedź spoza HTTP)")
+    assert stan((200, {"cos": "innego"}))[0] == "obcy"
+    # za bramką logowania (tryb LAN) dashboard nie podaje hermes_home: rozpoznaje go install_id z <dane>
+    (u.dane / "install_id").write_text("a" * 32 + "\n", encoding="utf-8")
+    assert stan((200, {"version": "0.21.5", "install_id": "a" * 32}))[0] == "nasz"
+    assert stan((200, {"version": "0.21.5", "install_id": "b" * 32}))[0] == "obcy"
+    adresy = []
+    instalator.stan_panelu(u, _ot(tmp_path, port=19150, zapytaj_http=lambda url, czas: adresy.append(url)))
+    assert adresy == ["http://127.0.0.1:19150/api/status"]
+
+
+class _Status(BaseHTTPRequestHandler):
+    tresc: dict = {}
+
+    def do_GET(self):  # noqa: N802 - nazwa z http.server
+        dane = json.dumps(self.tresc).encode("utf-8") if self.path == "/api/status" else b"nie ma"
+        self.send_response(200 if self.path == "/api/status" else 404)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(dane)))
+        self.end_headers()
+        self.wfile.write(dane)
+
+    def log_message(self, *_a):
+        pass
+
+
+def test_zapytaj_http_prawdziwy_serwer_bez_proxy(tmp_path, monkeypatch):
+    """Prawdziwe zapytanie na 127.0.0.1 (port z zakresu prób) mimo proxy w zmiennych: /api/status z hermes_home
+    tej instalacji to nasz panel, inny HERMES_HOME to cudzy."""
+    u = _zainstalowane(tmp_path)
+    handler = type("StatusTestu", (_Status,), {"tresc": {"version": "0.21.5", "hermes_home": str(u.dane)}})
+    httpd, port = _serwer_na_porcie(handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")    # proxy z ustawień nie może przechwycić 127.0.0.1
+    monkeypatch.setenv("NO_PROXY", "")
+    try:
+        assert instalator.zapytaj_http(f"http://127.0.0.1:{port}/api/status", 2.0) == (200, handler.tresc)
+        assert instalator.zapytaj_http(f"http://127.0.0.1:{port}/inne", 2.0) == (404, None)
+        ot = instalator.Otoczenie(modul=lambda n: (_ for _ in ()).throw(ImportError(n)),
+                                  env={"JARVO_ROOT": str(u.root), "JARVO_PANEL_PORT": str(port)})
+        assert instalator.stan_panelu(u, ot) == ("nasz", "")
+        handler.tresc = {"version": "0.21.5", "hermes_home": str(tmp_path / "prywatny-hermes")}
+        assert instalator.stan_panelu(u, ot)[0] == "obcy"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert instalator.zapytaj_http(f"http://127.0.0.1:{wolny_port()}/api/status", 0.5) is None
+
+
+def test_czekaj_na_panel_postoj_i_martwy_serwis(tmp_path):
+    u = _zainstalowane(tmp_path)
+    nadzorca = AtrapaNadzorcy(dziala=True, panel="postoj", powod_panelu="port 19199 zajęty")
+    ot = _ot(tmp_path, moduly={"nadzorca": nadzorca}, zapytaj_http=lambda url, czas: None)
+    with pytest.raises(instalator.BladInstalacji, match="kod 78: port 19199 zajęty"):
+        instalator.czekaj_na_panel(u, ot, lambda t: None)
+    assert ot.zegar() < 5                                    # od razu, bez czekania na limit
+    nadzorca.dziala = False
+    with pytest.raises(instalator.BladInstalacji, match="serwis Jarva nie działa"):
+        instalator.czekaj_na_panel(u, ot, lambda t: None)
+    nadzorca.dziala, nadzorca.panel = True, "dziala"
+    log: list[str] = []
+    with pytest.raises(instalator.BladInstalacji, match="nie odpowiada po 180 s"):
+        instalator.czekaj_na_panel(u, ot, log.append)
+    assert "    czekam na panel… 15 s" in log
 
 
 def test_logs_ogon_wybor_i_sledzenie(tmp_path, capsys):
@@ -832,6 +1191,7 @@ def test_autostart_on_off_status(tmp_path, capsys):
     assert cli.main(["autostart", "on"], otoczenie=ot) == 0
     assert auto.argv[-1] == "serwis" and auto.argv[1:4] == ["-I", "-X", "utf8"]
     assert auto.argv[4].endswith(os.path.join("jarvo", "start.py")) and auto.argv[5:7] == ["--korzen", str(u.root)]
+    assert auto.env is ot.env                                    # przyrostek nazwy i środowisko usługi z instalacji
     assert "Autostart: włączony (zadanie Harmonogramu Jarvo)" in capsys.readouterr().out
     assert cli.main(["autostart", "off"], otoczenie=ot) == 0
     assert [w[0] for w in auto.wywolania] == ["wlacz", "wylacz"]
@@ -839,6 +1199,10 @@ def test_autostart_on_off_status(tmp_path, capsys):
     assert "Autostart: wyłączony" in capsys.readouterr().out
     pusty = _ot(tmp_path / "inny", moduly={"autostart": auto})
     assert cli.main(["autostart", "on"], otoczenie=pusty) == 1 and len(auto.wywolania) == 2
+    auto.blad = "Brak usług systemd użytkownika: `systemctl --user` nie odpowiada"
+    assert cli.main(["autostart", "on"], otoczenie=ot) == 1
+    err = capsys.readouterr().err
+    assert "BŁĄD: Brak usług systemd użytkownika" in err and "Rada:" in err and "Traceback" not in err
 
 
 def test_doctor_na_zainstalowanym(tmp_path, capsys, monkeypatch):
@@ -867,13 +1231,36 @@ def test_doctor_na_zainstalowanym(tmp_path, capsys, monkeypatch):
     (checkout / ".git" / "HEAD").write_text("0" * 40 + "\n", encoding="utf-8")
     wynik = cli.sprawdz_hermesa(u, REPO)
     assert wynik["stan"] == "blad" and "hermes update" in wynik["rada"]
-    # zajęty port panelu bez serwisu Jarva: błąd z nazwą programu, jeśli system ją poda
+    # zajęty port panelu bez serwisu Jarva: błąd z radą JARVO_PANEL_PORT
+    ot.zapytaj_http = lambda url, czas: None
     with socket.socket() as s:
         s.bind(("127.0.0.1", port))
         s.listen()
-        wyniki = {w["nazwa"]: w for w in cli.sprawdz_porty(u, ot, dziala=False)}
+        wyniki = {w["nazwa"]: w for w in cli.sprawdz_porty(u, ot, None)}
     panel = wyniki[f"port {port} (panel)"]
     assert panel["stan"] == "blad" and "JARVO_PANEL_PORT" in panel["rada"]
+
+
+def test_doctor_porty_po_pid_uslug_nadzorcy(tmp_path):
+    """Przy działającym serwisie zajęty port to Jarvo tylko wtedy, gdy słucha proces którejś usługi nadzorcy (PID
+    albo dziecko launchera venvu); panel rozpoznaje /api/status. Cudzy proces to uwaga z nazwą programu."""
+    u = _zainstalowane(tmp_path)
+    port = wolny_port()
+    nadzorca = AtrapaNadzorcy(dziala=True)
+    stan = nadzorca.status()
+    ot = _ot(tmp_path, moduly={"nadzorca": nadzorca}, port=port, zapytaj_http=lambda url, czas: None,
+             sluchacz=lambda p: (112, "python.exe"))
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", port))
+        s.listen()
+        assert {w["nazwa"]: w for w in cli.sprawdz_porty(u, ot, stan)}[f"port {port} (panel)"]["opis"] == \
+            "używa go Jarvo (python.exe, PID 112)"
+        ot.sluchacz = lambda p: (999, "obcy.exe")
+        wynik = {w["nazwa"]: w for w in cli.sprawdz_porty(u, ot, stan)}[f"port {port} (panel)"]
+        assert wynik["stan"] == "uwaga" and "obcy.exe (PID 999), nie przez usługę Jarva" in wynik["opis"]
+        ot.zapytaj_http = http_panelu(u)
+        assert {w["nazwa"]: w for w in cli.sprawdz_porty(u, ot, stan)}[f"port {port} (panel)"]["opis"] == \
+            "panel Jarva"
 
 
 def test_kto_slucha_i_port_zajety():
@@ -888,14 +1275,90 @@ def test_kto_slucha_i_port_zajety():
     assert not cli.port_zajety(port)
 
 
+@pytest.mark.windows_only
+def test_programy_tylko_z_pelnej_sciezki_nie_z_katalogu_biezacego(tmp_path, monkeypatch):
+    """shutil.which na Windows bez NoDefaultCurrentDirectoryInExePath zagląda najpierw do katalogu bieżącego (także
+    z podanym path=): doctor sprawdza pliki narzędzi wprost, programy systemu woła z System32, a gita bierze tylko
+    z pełną ścieżką."""
+    obcy = tmp_path / "cwd"
+    obcy.mkdir()
+    (obcy / "uv.exe").write_bytes(b"MZ obcy")
+    monkeypatch.chdir(obcy)
+    monkeypatch.delenv("NoDefaultCurrentDirectoryInExePath", raising=False)
+    assert cli._bin({}, "uv", "uv") is None
+    assert cli._bin({"uv": {"bin": [str(tmp_path / "nie-ma")]}}, "uv", "uv") is None
+    assert cli._bin({"uv": {"bin": ["."], "katalog": "."}}, "uv", "uv") is None      # katalog względny: pomijamy
+    prawdziwy = tmp_path / "uv-kat"
+    prawdziwy.mkdir()
+    (prawdziwy / "uv.exe").write_bytes(b"MZ")
+    assert cli._bin({"uv": {"bin": [str(prawdziwy)]}}, "uv", "uv") == prawdziwy / "uv.exe"
+    for program in ("netstat", "tasklist"):
+        assert instalator.systemowy(program).lower().endswith(f"\\system32\\{program}.exe")
+    assert instalator.program_bezwzgledny(instalator.Otoczenie(program=lambda n: "git.exe"), "git") is None
+    assert instalator.program_bezwzgledny(instalator.Otoczenie(program=lambda n: r"C:\Git\cmd\git.exe"), "git") \
+        == r"C:\Git\cmd\git.exe"
+
+
+def test_przygotuj_proces_na_starcie(monkeypatch):
+    monkeypatch.setenv("NoDefaultCurrentDirectoryInExePath", "0")
+    monkeypatch.delenv("NoDefaultCurrentDirectoryInExePath")
+    cli._przygotuj_proces()
+    assert os.environ.get("NoDefaultCurrentDirectoryInExePath") == ("1" if WINDOWS else None)
+
+
+def test_bez_konsoli_wyjscie_i_bledy_do_logu_startu(tmp_path):
+    """pythonw.exe z Harmonogramu nie ma stdout ani stderr: komunikaty i błędy startu `jarvo` idą do
+    <logi>/serwis-start.log (z nagłówkiem: czas, PID, polecenie), a nie giną. Tu proces z sys.stdout = None."""
+    root = tmp_path / "root"
+    root.mkdir()
+    kod = (f"import sys\nsys.path.insert(0, {str(REPO)!r})\nfrom jarvo import cli\n"
+           "sys.stdout = sys.stderr = None\n"
+           f"raise SystemExit(cli.main(['--korzen', {str(root)!r}, 'nieznane-polecenie']))\n")
+    r = subprocess.run([sys.executable, "-I", "-X", "utf8", "-c", kod], capture_output=True, text=True,
+                       encoding="utf-8", timeout=60)
+    assert r.returncode == 2 and not r.stdout and not r.stderr
+    log = (root / "logi" / "serwis-start.log").read_text(encoding="utf-8")
+    assert "bez konsoli" in log and "nieznane-polecenie" in log and "błąd:" in log
+    zapis = cli._LogBledow(tmp_path / "nowy" / "x.log", ["serwis"])
+    assert zapis.write("") == 0 and not (tmp_path / "nowy").exists()          # plik dopiero przy pierwszym zapisie
+    zapis.write("Serwis Jarva jest zatrzymany\n")
+    zapis.close()
+    tekst = (tmp_path / "nowy" / "x.log").read_text(encoding="utf-8")
+    assert "jarvo serwis" in tekst and "Serwis Jarva jest zatrzymany" in tekst
+
+
+def test_wywolaj_pomija_argumenty_ktorych_funkcja_nie_zna():
+    def stara(u, argv, *, start=True):
+        return ("stara", start)
+
+    def nowa(u, argv, *, start=True, env=None):
+        return ("nowa", start, env)
+
+    def dowolna(u, **kw):
+        return ("dowolna", kw)
+    assert instalator.wywolaj(stara, 1, 2, start=False, env={"A": "1"}) == ("stara", False)
+    assert instalator.wywolaj(nowa, 1, 2, start=False, env={"A": "1"}) == ("nowa", False, {"A": "1"})
+    assert instalator.wywolaj(dowolna, 1, env={"A": "1"}, powod="x") == ("dowolna", {"env": {"A": "1"}, "powod": "x"})
+
+
+def test_env_floty_bez_sekretow_i_zmiennych_obcych():
+    env = {"PATH": "/bin", "JARVO_ROOT": "/j", "JARVO_TOKEN": "t", "jarvo_token": "t", "OPENAI_API_KEY": "k",
+           "SSH_AUTH_SOCK": "/s", "PIP_INDEX_URL": "https://u:haslo@x", "UV_INDEX_URL": "https://y",
+           "HERMES_HOME": "/obcy", "PYTHONPATH": "/x", "XAUTHORITY": "/x/.Xauthority", "LANG": "pl_PL.UTF-8"}
+    assert instalator.env_floty(env) == {"PATH": "/bin", "JARVO_ROOT": "/j", "XAUTHORITY": "/x/.Xauthority",
+                                         "LANG": "pl_PL.UTF-8"}
+
+
 # ---------------------------------------------------------------- instalator
 
 HERMES_PIN = {"repo": "https://github.com/NousResearch/hermes-agent", "tag": "v2026.9.24", "commit": PIN,
               "wersja": "0.21.5", "dodatki": ["all"]}
 
 
-def _aplikacja(tmp_path: Path, adres: str, www: Path, nazwa: str = "app", sha: str = SHA_JARVA) -> Path:
-    """Kod Jarva z manifestem atrap: uv, python313 i python312 z serwera 127.0.0.1 (ten sam plik na 5 platform)."""
+def _aplikacja(tmp_path: Path, adres: str, www: Path, nazwa: str = "app", sha: str = SHA_JARVA,
+               commit: str = PIN) -> Path:
+    """Kod Jarva z manifestem atrap: uv, python313 i python312 z serwera 127.0.0.1 (ten sam plik na 5 platform)
+    i pinem Hermesa `commit`."""
     archiwa = {
         "uv": _tar_gz({"uv-x/uv.exe": b"uv", "uv-x/uv": b"uv"}),
         "python313": _tar_gz({"python/python.exe": b"py", "python/pythonw.exe": b"pyw", "python/bin/python3": b"py"}),
@@ -911,7 +1374,8 @@ def _aplikacja(tmp_path: Path, adres: str, www: Path, nazwa: str = "app", sha: s
                    "pliki": {p: wpis for p in sciezki.PLATFORMY}}
     app = tmp_path / nazwa
     (app / "vendor").mkdir(parents=True)
-    (app / "vendor" / "natywne.lock.json").write_text(json.dumps({"version": 1, "hermes": HERMES_PIN,
+    (app / "vendor" / "natywne.lock.json").write_text(json.dumps({"version": 1, "hermes": {**HERMES_PIN,
+                                                                                         "commit": commit},
                                                                   "narzedzia": narz}), encoding="utf-8")
     (app / "jarvo").mkdir()
     (app / "jarvo" / "start.py").write_text("# atrapa\n", encoding="utf-8")
@@ -928,25 +1392,26 @@ def stanowisko(tmp_path, serwer, monkeypatch):
     monkeypatch.setenv("HOME", str(dom))
     git = atrapy.program(tmp_path / "narz", "git", "print('git version 2.54.0 (atrapa)')\n")
     nadzorca = AtrapaNadzorcy()
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
     s = {"www": www, "adres": adres, "dom": dom, "nadzorca": nadzorca, "hermes": AtrapaHermesa(),
          "autostart": AtrapaAutostartu(nadzorca), "zmiany": AtrapaZmian(), "rejestr": RejestrAtrapa(), "w_tle": [],
-         "log": [], "moduly": {}}
+         "env_w_tle": [], "log": [], "moduly": {}, "env": {}, "u": u, "git": git}
 
     def w_tle(argv, env, log):
         s["w_tle"].append(argv)
+        s["env_w_tle"].append(env)
         nadzorca.dziala = True
         return 4242
 
     def otoczenie(**kw):
         opcje = dict(rejestr=s["rejestr"], program=lambda n: str(git) if n == "git" else None, uruchom_w_tle=w_tle,
-                     odpowiada=lambda a, c: nadzorca.dziala)
+                     zapytaj_http=http_panelu(u, lambda: s["nadzorca"].dziala))
         opcje.update(kw)
-        moduly = {"hermes": s["hermes"], "nadzorca": nadzorca, "autostart": s["autostart"],
+        moduly = {"hermes": s["hermes"], "nadzorca": s["nadzorca"], "autostart": s["autostart"],
                   "zmiany_hosta": s["zmiany"], **s["moduly"]}
         return _ot(tmp_path, moduly=moduly, env={"PATH": atrapy.sciezka(tmp_path / "narz", reszta=False),
-                                                 "SHELL": "/bin/bash"}, **opcje)
+                                                 "SHELL": "/bin/bash", **s["env"]}, **opcje)
     s["otoczenie"] = otoczenie
-    s["u"] = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
     return s
 
 
@@ -960,38 +1425,47 @@ def _migawka(katalog: Path) -> dict[str, bytes]:
             if p.is_file() and p.name != "instalacja.log"}
 
 
+KROKI = ("Sprawdzenie komputera", "Katalogi", "uv", "Python 3.13", "Python 3.12", "Spis narzędzi", "Wersja Jarva",
+         "Hermes", "Front panelu", "Bezpieczne ustawienia Hermesa", "Przełączenie wersji", "Środowisko procesów",
+         "Polecenie jarvo", "Autostart", "Serwis", "Panel")
+
+
 def test_instaluj_na_atrapach_i_drugi_przebieg_niczego_nie_zmienia(tmp_path, stanowisko):
     s, u = stanowisko, stanowisko["u"]
     app = _aplikacja(tmp_path, s["adres"], s["www"])
     assert _instaluj(s, app) == 0, "\n".join(s["log"])
     log = "\n".join(s["log"])
-    for krok in ("Sprawdzenie komputera", "Katalogi", "uv", "Python 3.13", "Python 3.12", "Spis narzędzi",
-                 "Wersja Jarva", "Hermes", "Front panelu", "Bezpieczne ustawienia Hermesa", "Środowisko procesów",
-                 "Polecenie jarvo", "Autostart", "Serwis", "Panel"):
-        assert re.search(rf"\[[#-]+\] +\d+/15  {re.escape(krok)}$", log, re.M), krok
-    assert "Panel: http://127.0.0.1:19199/" in log and "serwis działa (uruchomił go autostart)" in log
+    for i, krok in enumerate(KROKI, 1):
+        assert re.search(rf"\[[#-]+\] +{i}/{len(KROKI)}  {re.escape(krok)}$", log, re.M), krok
+    assert "Panel: http://127.0.0.1:19199/" in log and "serwis uruchomiony przez autostart" in log
+    assert "panel Jarva odpowiada" in log
     narz = srodowisko.narzedzia(u)
     assert set(narz) == {"uv", "python313", "python312"}
     assert Path(narz["python313"]["katalog"]) == u.program / "narzedzia" / "python313" / "3.13.17"
     assert narz["uv"]["bin"] == [str(u.program / "narzedzia" / "uv" / "0.12.13")]
     biez = srodowisko.biezace(u)
-    assert biez["app"] == str(app.resolve()) and biez["wersja"] == SHA_JARVA[:12]
-    assert biez["hermes"] == str(u.program / "hermes" / PIN[:12]) and biez["web_dist"].endswith("web_dist")
+    assert biez["app"] == os.path.abspath(app) and biez["wersja"] == SHA_JARVA[:12]
+    assert biez["hermes"] == str(u.program / "hermes" / PIN[:12])
+    assert biez["web_dist"] == str(u.program / "hermes" / PIN[:12] / "hermes_cli" / "web_dist")
+    assert not (u.program / "current.poprzedni.json").exists()
     assert json.loads((u.stan / "srodowisko.json").read_text(encoding="utf-8"))["HERMES_HOME"] == str(u.dane)
     h = s["hermes"].wywolania
     assert h[0][0] == "zainstaluj" and h[0][1] == PIN and h[0][2].name.startswith("git")
     assert h[0][3].parent == u.program / "narzedzia" / "uv" / "0.12.13" and h[0][4].is_file()
-    assert ("web_dist", None) in h and ("konfiguracja", str(u.dane), "1") in h
+    assert ("web_dist", "buduje", PIN[:12]) in h
+    assert ("konfiguracja", str(u.dane), "1", os.path.abspath(app)) in h      # środowisko NOWEJ wersji
     argv = s["autostart"].argv
     assert argv[-3:] == ["--korzen", str(u.root), "serwis"]
     assert argv[0].endswith("pythonw.exe" if WINDOWS else "python3")
-    assert s["autostart"].wywolania == [("wlacz", True)] and not s["w_tle"]       # serwis wystartował autostartem
+    # rejestracja bez startu, potem start tym samym mechanizmem (krok „Serwis”); bez procesu obok zadania
+    assert s["autostart"].wywolania == [("wlacz", False), ("wlacz", True)] and not s["w_tle"]
+    assert s["autostart"].env["JARVO_ROOT"] == str(u.root)
     rodzaje = [w["rodzaj"] for w in s["zmiany"].lista]
     if WINDOWS:
         cmd = u.root / "bin" / "jarvo.cmd"
         tekst = cmd.read_bytes()
         assert tekst.isascii() and b"\r\n" in tekst and b" -I -X utf8 " in tekst and b"%*" in tekst
-        assert str(app.resolve() / "jarvo" / "start.py").encode() in tekst
+        assert os.path.join(os.path.abspath(app), "jarvo", "start.py").encode() in tekst
         assert f'--korzen "{u.root}" %*'.encode() in tekst
         assert s["rejestr"].czytaj("Environment", "Path") == (rf"C:\Narzedzia;%USERPROFILE%\bin;{u.root / 'bin'}", 2)
         assert s["rejestr"].ogloszenia == 1 and rodzaje == ["plik", "path-uzytkownika"]
@@ -1001,27 +1475,246 @@ def test_instaluj_na_atrapach_i_drugi_przebieg_niczego_nie_zmienia(tmp_path, sta
         profil = instalator.plik_rc(s["dom"], "/bin/bash", sciezki.MACOS).read_text(encoding="utf-8")
         assert profil.count("# >>> jarvo >>>") == 1 and ".local/bin" in profil
         assert rodzaje == ["plik", "blok-rc"]
-    # drugi przebieg: nic nowego w plikach, dzienniku, PATH ani procesach
+    assert re.search(r"^Polecenia: jarvo panel, jarvo status, jarvo doctor, jarvo chat --profil default \(profil "
+                     r"jarvo przyjdzie z flotą w etapie E4\) \(.+\)\.$", log, re.M)
+    # drugi przebieg: nic nowego w plikach, dzienniku, PATH ani procesach; serwis działa dalej, front gotowy
     przed = (_migawka(u.root), _migawka(s["dom"]), len(s["zmiany"].lista), list(s["rejestr"].zapisy))
     assert _instaluj(s, app) == 0, "\n".join(s["log"])
     assert "Gotowe. Zmiany w tym przebiegu: brak." in s["log"]
     assert (_migawka(u.root), _migawka(s["dom"]), len(s["zmiany"].lista), s["rejestr"].zapisy) == przed
-    assert not s["w_tle"] and [w for w in s["hermes"].wywolania if w[0] == "web_dist"] == [("web_dist", None)]
+    assert not s["w_tle"] and s["nadzorca"].zatrzymania == 0 and "    serwis działa" in s["log"]
+    assert [w for w in s["hermes"].wywolania if w[0] == "web_dist"] == [("web_dist", "buduje", PIN[:12]),
+                                                                         ("web_dist", "gotowy", PIN[:12])]
+    assert s["autostart"].wywolania[2:] == [("wlacz", False)]
     assert (u.logi / "instalacja.log").read_text(encoding="utf-8").count("Jarvo natywnie: instalacja w") == 2
 
 
 def test_instaluj_nowa_wersja_obok_starej_i_restart_serwisu(tmp_path, stanowisko):
     s, u = stanowisko, stanowisko["u"]
-    assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"])) == 0
+    stara = _aplikacja(tmp_path, s["adres"], s["www"])
+    assert _instaluj(s, stara) == 0
     nowa = _aplikacja(tmp_path, s["adres"], s["www"], nazwa="app2", sha="a" * 40)
     assert _instaluj(s, nowa) == 0, "\n".join(s["log"])
-    assert srodowisko.biezace(u)["app"] == str(nowa.resolve()) and srodowisko.biezace(u)["wersja"] == "a" * 12
+    assert srodowisko.biezace(u)["app"] == os.path.abspath(nowa) and srodowisko.biezace(u)["wersja"] == "a" * 12
     poprzedni = json.loads((u.program / "current.poprzedni.json").read_text(encoding="utf-8"))
-    assert poprzedni["app"] == str((tmp_path / "app").resolve())
+    assert poprzedni["app"] == os.path.abspath(stara)
     assert s["nadzorca"].zatrzymania == 1 and s["nadzorca"].dziala            # stary zatrzymany, nowy z autostartu
-    assert "nowa wersja: zatrzymuję serwis poprzedniej" in "\n".join(s["log"])
+    assert s["nadzorca"].stopy[0]["powod"] == "aktualizacja Jarva"
+    assert "zatrzymuję serwis poprzedniej wersji" in "\n".join(s["log"])
+    assert s["autostart"].argv[4] == os.path.join(os.path.abspath(nowa), "jarvo", "start.py")
+    assert not (u.stan / "zatrzymany.json").exists() and ("zdejmij",) in s["nadzorca"].znaczniki
     polecenie = (u.root / "bin" / "jarvo.cmd") if WINDOWS else (s["dom"] / ".local" / "bin" / "jarvo")
     assert "app2" in polecenie.read_text(encoding="utf-8")
+
+
+def test_nieudana_aktualizacja_zostawia_dzialajaca_stara_wersje(tmp_path, stanowisko):
+    """current.json przełącza się dopiero po udanym Hermesie, froncie i konfiguracji: błąd w nich nie zatrzymuje
+    serwisu, a działająca wersja zostaje w current.json."""
+    s, u = stanowisko, stanowisko["u"]
+    stara = _aplikacja(tmp_path, s["adres"], s["www"])
+    assert _instaluj(s, stara) == 0
+    przed = srodowisko.biezace(u)
+    nowa = _aplikacja(tmp_path, s["adres"], s["www"], nazwa="app2", sha="a" * 40, commit="b" * 40)
+    s["hermes"].blad_konfiguracji = "config set security.tirith_enabled: odmowa"
+    assert _instaluj(s, nowa) == 1
+    assert "BŁĄD w kroku „Bezpieczne ustawienia Hermesa”" in "\n".join(s["log"])
+    s["hermes"].blad_konfiguracji = None
+    s["hermes"].blad_web = "npm run build w web nie przeszedł (kod 1)"
+    trzecia = _aplikacja(tmp_path, s["adres"], s["www"], nazwa="app3", sha="c" * 40, commit="c" * 40)
+    ot_z_npm = s["otoczenie"](program=lambda n: str(s["git"]) if n in ("git", "npm") else None)
+    log: list[str] = []
+    assert instalator.instaluj(u, trzecia, log=log.append, otoczenie=ot_z_npm) == 1
+    assert "BŁĄD w kroku „Front panelu”: npm run build" in "\n".join(log)      # npm jest: zostaje błąd npm
+    assert srodowisko.biezace(u) == przed and not (u.program / "current.poprzedni.json").exists()
+    assert s["nadzorca"].dziala and s["nadzorca"].zatrzymania == 0 and not (u.stan / "zatrzymany.json").exists()
+    assert (u.program / "hermes" / ("b" * 12)).is_dir()                         # nowa wersja obok, gotowa na ponowienie
+
+
+def test_ponowienie_po_przerwanej_aktualizacji_uruchamia_nowa_wersje(tmp_path, stanowisko):
+    """Aktualizacja przerwana po przełączeniu (tu: zapis polecenia jarvo): serwis stoi, znacznik zdjęty, więc
+    zapasowy wyzwalacz Harmonogramu może podnieść go ze STARYM poleceniem. Ponowienie przerejestrowuje autostart
+    i uruchamia działający serwis od nowa, więc rusza kod z current.json."""
+    s, u = stanowisko, stanowisko["u"]
+    assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"])) == 0
+    nowa = _aplikacja(tmp_path, s["adres"], s["www"], nazwa="app2", sha="a" * 40)
+    s["zmiany"].blad_pliku = "Brak miejsca na dysku"
+    assert _instaluj(s, nowa) == 1
+    log = "\n".join(s["log"])
+    assert "BŁĄD w kroku „Polecenie jarvo”: Brak miejsca na dysku" in log and "Serwis Jarva stoi" in log
+    assert srodowisko.biezace(u)["app"] == os.path.abspath(nowa) and not s["nadzorca"].dziala
+    assert not (u.stan / "zatrzymany.json").exists()                          # to nie `jarvo down`
+    s["nadzorca"].dziala = True                                               # zapasowy wyzwalacz, stare polecenie
+    assert s["autostart"].argv[4] != os.path.join(os.path.abspath(nowa), "jarvo", "start.py")
+    s["zmiany"].blad_pliku = None
+    assert _instaluj(s, nowa) == 0, "\n".join(s["log"])
+    assert "uruchamiam go od nowa" in "\n".join(s["log"]) and s["nadzorca"].zatrzymania == 2
+    assert s["nadzorca"].dziala and s["autostart"].argv[4] == os.path.join(os.path.abspath(nowa), "jarvo", "start.py")
+
+
+def test_front_zawsze_z_checkoutu_biezacego_pinu(tmp_path, stanowisko):
+    """Po zmianie pinu Hermesa front pochodzi z nowego checkoutu (stary web_dist leży obok, ale nie zostaje w
+    current.json); --web-lokalnie buduje go od nowa także wtedy, gdy jest gotowy."""
+    s, u = stanowisko, stanowisko["u"]
+    assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"])) == 0
+    nowa = _aplikacja(tmp_path, s["adres"], s["www"], nazwa="app2", sha="a" * 40, commit="b" * 40)
+    assert _instaluj(s, nowa) == 0, "\n".join(s["log"])
+    biez = srodowisko.biezace(u)
+    assert biez["hermes"] == str(u.program / "hermes" / ("b" * 12))
+    assert biez["web_dist"] == str(u.program / "hermes" / ("b" * 12) / "hermes_cli" / "web_dist")
+    assert (u.program / "hermes" / PIN[:12] / "hermes_cli" / "web_dist" / "index.html").is_file()   # stary obok
+    assert _instaluj(s, nowa, web_lokalnie=True) == 0
+    budowy = [w for w in s["hermes"].wywolania if w[:2] == ("web_dist", "buduje")]
+    assert budowy == [("web_dist", "buduje", PIN[:12]), ("web_dist", "buduje", "b" * 12),
+                      ("web_dist", "buduje", "b" * 12)]
+
+
+def test_nowa_definicja_autostartu_restartuje_dzialajacy_serwis(tmp_path, stanowisko):
+    """Ten sam kod, ale inne polecenie autostartu (np. nowy Python 3.13): działający serwis ma stare polecenie,
+    więc startuje od nowa przez autostart."""
+    s = stanowisko
+    app = _aplikacja(tmp_path, s["adres"], s["www"])
+    assert _instaluj(s, app) == 0
+    s["autostart"].argv = ["stare", "polecenie"]
+    assert _instaluj(s, app) == 0, "\n".join(s["log"])
+    assert "uruchamiam go od nowa" in "\n".join(s["log"]) and s["nadzorca"].zatrzymania == 1
+    assert s["nadzorca"].dziala and s["autostart"].wywolania[-2:] == [("wlacz", False), ("wlacz", True)]
+
+
+def test_macos_nowy_plist_wyladowuje_stara_definicje(tmp_path, stanowisko):
+    """macOS: launchd trzyma wczytaną definicję, a kickstart uruchomiłby starą. Nowy plist: działający serwis
+    zatrzymany kanałem, agent wyładowany (wylacz), plist zapisany bez wczytania, a krok „Serwis” go wczytuje."""
+    s = stanowisko
+    s["autostart"] = AtrapaAutostartu(s["nadzorca"], mechanizm="launchagent")
+    app = _aplikacja(tmp_path, s["adres"], s["www"])
+    assert _instaluj(s, app) == 0, "\n".join(s["log"])
+    s["autostart"].argv = ["stary", "plist"]
+    s["autostart"].wywolania.clear()
+    assert _instaluj(s, app) == 0, "\n".join(s["log"])
+    log = "\n".join(s["log"])
+    assert "nowa definicja LaunchAgenta: zatrzymuję serwis" in log and s["nadzorca"].zatrzymania == 1
+    assert s["autostart"].wywolania == [("wlacz", False), ("wylacz",), ("wlacz", False), ("wlacz", True)]
+    assert s["nadzorca"].dziala and not (s["u"].stan / "zatrzymany.json").exists()
+
+
+def test_blad_autostartu_nie_przerywa_instalacji(tmp_path, stanowisko):
+    """Brak user busa systemd (WSL, kontener, su) albo sesji GUI na macOS: uwaga z radą, serwis startuje wprost."""
+    s = stanowisko
+    s["autostart"] = AtrapaAutostartu(s["nadzorca"], blad="Brak usług systemd użytkownika: `systemctl --user` "
+                                                          "nie odpowiada")
+    assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"])) == 0, "\n".join(s["log"])
+    log = "\n".join(s["log"])
+    assert "autostart nie włączony: Brak usług systemd" in log
+    assert "Uwaga: autostart nie działa (Brak usług systemd" in log and "Serwis uruchamiam bezpośrednio" in log
+    assert "JARVO_NO_AUTOSTART=1" in log and "--bez-autostartu" in log
+    assert len(s["w_tle"]) == 1 and "serwis uruchomiony w tle (PID 4242)" in log and "Panel: http" in log
+
+
+def test_brak_node_jasna_rada(tmp_path, stanowisko):
+    s, u = stanowisko, stanowisko["u"]
+    s["hermes"].blad_web = "Nie znalazłem programu npm."
+    assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"])) == 1
+    log = "\n".join(s["log"])
+    assert "BŁĄD w kroku „Front panelu”" in log and "Node.js 24 LTS" in log and "https://nodejs.org" in log
+    assert "jeszcze raz" in log and srodowisko.biezace(u) == {}                # current.json nie powstał
+
+
+def test_caly_korzen_tylko_dla_wlasciciela(tmp_path, stanowisko):
+    """Korzeń (z program, bin, logi i cache) tylko dla właściciela: na innym dysku dziedziczyłby ACL dysku z zapisem
+    dla Użytkowników uwierzytelnionych, a autostart uruchamia kod z `<program>` jako właściciel."""
+    s = stanowisko
+    dysk = tmp_path / "dysk"
+    dysk.mkdir()
+    icacls = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "icacls.exe")
+    if WINDOWS:
+        # jak D:\ właściciela: Użytkownicy uwierzytelnieni (S-1-5-11) mogą zmieniać, wpisy dziedziczone zwykłym
+        # mechanizmem (katalog testu pytest zakłada przez mkdir(0o700), z DACL bez auto-dziedziczenia, więc jego
+        # dzieci dostają kopie wpisów jako jawne i nie nadają się do tej próby)
+        kto = f"{os.environ['USERDOMAIN']}\\{os.environ['USERNAME']}"
+        subprocess.run([icacls, str(dysk), "/inheritance:r", "/grant:r", "*S-1-5-11:(OI)(CI)M", f"{kto}:(OI)(CI)F"],
+                       check=True, capture_output=True)
+    u = s["u"] = sciezki.uklad({"JARVO_ROOT": str(dysk / "Jarvo")})
+    s["env"]["JARVO_ROOT"] = str(u.root)
+    sprzed = u.program / "app" / "kod-z-bootstrapu.py"                        # plik sprzed instalatora w Pythonie
+    sprzed.parent.mkdir(parents=True)
+    sprzed.write_text("# kod\n", encoding="utf-8")
+    assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"]), start=False, autostart=False) == 0, \
+        "\n".join(s["log"])
+    plik = u.program / "narzedzia" / "uv" / "0.12.13" / ".jarvo-suma"
+    if WINDOWS:
+        for p, wpis in ((u.root, "(OI)(CI)(F)"), (plik, "(I)(F)"), (sprzed, "(I)(F)"), (u.root / "bin", "(I)")):
+            wyj = subprocess.run([icacls, str(p)], capture_output=True, text=True, encoding="utf-8",
+                                 errors="replace").stdout
+            assert wyj.count(":(") == 1 and wpis in wyj, wyj                  # jeden wpis: właściciel
+            assert os.environ["USERNAME"].casefold() in wyj.casefold()
+    else:
+        assert stat.S_IMODE(u.root.stat().st_mode) == 0o700
+
+
+def test_korzen_musi_byc_osobnym_katalogiem(tmp_path, stanowisko):
+    def uklad(root: Path) -> sciezki.Uklad:
+        return sciezki.Uklad(root=root, program=root / "program", dane=root / "dane", stan=root / "stan",
+                             logi=root / "logi", cache=root / "cache", build=root / "build")
+    assert "katalog główny dysku" in instalator.korzen_nieosobny(uklad(Path(tmp_path.anchor)))
+    assert "katalog domowy" in instalator.korzen_nieosobny(uklad(Path.home()))
+    zdjecia = tmp_path / "zdjecia"
+    (zdjecia / "program").mkdir(parents=True)
+    (zdjecia / "wakacje.jpg").write_bytes(b"jpg")
+    (zdjecia / "desktop.ini").write_text("", encoding="utf-8")
+    assert "pliki spoza Jarva: wakacje.jpg" in instalator.korzen_nieosobny(uklad(zdjecia))
+    (zdjecia / "wakacje.jpg").unlink()
+    assert instalator.korzen_nieosobny(uklad(zdjecia)) is None
+    assert instalator.korzen_nieosobny(uklad(tmp_path / "nie-ma")) is None
+    s, u = stanowisko, stanowisko["u"]
+    u.root.mkdir(parents=True)
+    (u.root / "dokument.docx").write_bytes(b"x")
+    assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"])) == 1
+    log = "\n".join(s["log"])
+    assert "BŁĄD w kroku „Sprawdzenie komputera”" in log and "osobnego katalogu" in log and "JARVO_ROOT" in log
+    assert not u.program.exists()
+
+
+def test_srodowisko_json_tylko_czesc_jarva_i_ustawienia_instalacji(tmp_path, stanowisko, capsys):
+    """srodowisko.json nie zawiera PATH właściciela ani przełączników bootstrapu (drugi przebieg z innego okna niczego
+    nie zmienia), a JARVO_PANEL_PORT pamięta <stan>/ustawienia.json: zadanie Harmonogramu nie zna zmiennych sesji."""
+    s, u = stanowisko, stanowisko["u"]
+    app = _aplikacja(tmp_path, s["adres"], s["www"])
+    s["env"] = {"JARVO_PANEL_PORT": "19157", "JARVO_BEZ_PATH": "1", "JARVO_REF": "main"}
+    assert _instaluj(s, app, start=False) == 0
+    zapis = json.loads((u.stan / "srodowisko.json").read_text(encoding="utf-8"))
+    assert str(tmp_path / "narz") not in zapis["PATH"] and "JARVO_BEZ_PATH" not in zapis and "JARVO_REF" not in zapis
+    assert zapis["JARVO_PANEL_PORT"] == "19157" and str(u.bin_floty) in zapis["PATH"]
+    assert json.loads((u.stan / "ustawienia.json").read_text(encoding="utf-8")) == {"JARVO_PANEL_PORT": "19157"}
+    s["env"] = {"JARVO_PANEL_PORT": "19157", "PATH": os.pathsep.join([str(tmp_path / "inne"), str(tmp_path / "narz")])}
+    assert _instaluj(s, app, start=False) == 0 and "Gotowe. Zmiany w tym przebiegu: brak." in s["log"]
+    ot = s["otoczenie"]()
+    ot.env.pop("JARVO_PANEL_PORT")
+    assert cli.main(["status", "--json"], otoczenie=ot) == 1
+    assert json.loads(capsys.readouterr().out)["panel"] == "http://127.0.0.1:19157/"
+    s["env"] = {"JARVO_PANEL_PORT": "zły"}
+    assert _instaluj(s, app, start=False) == 1 and "JARVO_PANEL_PORT='zły'" in "\n".join(s["log"])
+
+
+def test_instaluj_zdejmuje_znacznik_i_nie_przekazuje_sekretow(tmp_path, stanowisko):
+    s, u = stanowisko, stanowisko["u"]
+    s["env"] = {"JARVO_TOKEN": "tajny-klucz", "GITHUB_TOKEN": "ghp_x", "ANTHROPIC_API_KEY": "sk-x"}
+    app = _aplikacja(tmp_path, s["adres"], s["www"])
+    assert _instaluj(s, app, start=False, autostart=False) == 0
+    s["nadzorca"].oznacz_zatrzymanie(u, "jarvo down")                         # właściciel zatrzymał flotę
+    assert _instaluj(s, app, autostart=False) == 0, "\n".join(s["log"])
+    assert not (u.stan / "zatrzymany.json").exists() and ("zdejmij",) in s["nadzorca"].znaczniki
+    assert len(s["w_tle"]) == 1 and s["w_tle"][0][-1] == "serwis"
+    env = s["env_w_tle"][0]
+    assert not {"JARVO_TOKEN", "GITHUB_TOKEN", "ANTHROPIC_API_KEY"} & set(env) and env["JARVO_PANEL_PORT"] == "19199"
+
+
+def test_up_bez_instalacji_instaluje(tmp_path, stanowisko, monkeypatch, capsys):
+    """N02: `jarvo up` bez instalacji robi instalację (jak `jarvo instaluj`), potem serwis i panel."""
+    s, u = stanowisko, stanowisko["u"]
+    monkeypatch.setattr(instalator, "APP", _aplikacja(tmp_path, s["adres"], s["www"]))
+    assert cli.main(["up"], otoczenie=s["otoczenie"]()) == 0
+    out = capsys.readouterr().out
+    assert f"Jarvo nie jest zainstalowane w {u.root}: instaluję" in out and "Jarvo działa. Panel: http" in out
+    assert srodowisko.biezace(u)["app"] == os.path.abspath(instalator.APP) and s["nadzorca"].dziala
 
 
 def test_instaluj_bez_autostartu_startuje_serwis_w_tle(tmp_path, stanowisko):
@@ -1039,9 +1732,11 @@ def test_instaluj_bez_path_nie_rusza_niczego_poza_korzeniem(tmp_path, stanowisko
         stare.parent.mkdir(parents=True)
         stare.write_text("#!/bin/sh\nexec docker exec jarvo-hermes hermes\n", encoding="utf-8")
     assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"]), bez_path=True, start=False, autostart=False) == 0
-    assert (u.root / "bin" / ("jarvo.cmd" if WINDOWS else "jarvo")).is_file()
+    cel = u.root / "bin" / ("jarvo.cmd" if WINDOWS else "jarvo")
+    assert cel.is_file()
     assert [w["rodzaj"] for w in s["zmiany"].lista] == ["plik"] and not s["rejestr"].zapisy
     assert not list(s["dom"].glob(".*profile")) and any("--bez-path" in w for w in s["log"]) == WINDOWS
+    assert f"(pełną ścieżką {cel})." in s["log"][-1]
 
 
 def test_polecenie_posix_nie_podmienia_polecenia_innej_instalacji(tmp_path, stanowisko):
@@ -1113,10 +1808,22 @@ def test_polecenie_posix_blok_rc_tylko_raz(tmp_path, stanowisko):
     rc3.write_text('if [ -d "$HOME/.local/bin" ]; then PATH="$HOME/.local/bin:$PATH"; fi\n', encoding="utf-8")
     inst.polecenie_posix(dom3, PurePosixPath("/p"), PurePosixPath("/s"), korzen)
     assert "# >>> jarvo >>>" not in rc3.read_text(encoding="utf-8")            # plik sam dokłada ~/.local/bin
+    assert any(instalator.kiedy_dziala_path() in w for w in s["log"])
     assert instalator.plik_rc(dom3, "/bin/zsh", False) == dom3 / ".zprofile"
     assert instalator.plik_rc(dom3, "/bin/bash", True) == dom3 / ".zprofile"
     (dom3 / ".bash_profile").write_text("", encoding="utf-8")
     assert instalator.plik_rc(dom3, "/bin/bash", False) == dom3 / ".bash_profile"
+
+
+def test_kiedy_dziala_nowy_path():
+    """Linux: terminal w GNOME i KDE nie czyta ~/.profile, więc wpis PATH działa dopiero po ponownym zalogowaniu."""
+    tekst = instalator.kiedy_dziala_path()
+    if WINDOWS:
+        assert tekst == "w nowym oknie terminala"
+    elif sciezki.MACOS:
+        assert tekst == "w nowym oknie Terminala"
+    else:
+        assert "po ponownym zalogowaniu" in tekst
 
 
 def test_tresc_polecen_jarvo_i_korzen_w_nich():
@@ -1181,13 +1888,36 @@ def test_stan_serwisu_i_adres_panelu(tmp_path):
     assert instalator.adres_panelu({}) == "http://127.0.0.1:9119/"
 
 
-def test_odpowiada_bez_proxy(serwer, monkeypatch):
-    www, adres = serwer
-    (www / "index.html").write_text("ok", encoding="utf-8")
-    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")    # proxy z ustawień nie może przechwycić 127.0.0.1
-    monkeypatch.setenv("NO_PROXY", "")
-    assert instalator.odpowiada(adres + "/", 2.0)
-    assert not instalator.odpowiada(f"http://127.0.0.1:{wolny_port()}/", 0.5)
+def test_zatrzymaj_serwis_czeka_na_koniec_procesu(tmp_path):
+    """Stop kanałem z powodem i limitem z nadzorcy (CZAS_ZATRZYMANIA); starszy nadzorca bez `powod` też działa,
+    a „już się zatrzymuje” (wyjątek ze stop) nie jest błędem, gdy proces kończy się w limicie."""
+    u = _zainstalowane(tmp_path)
+    nowy = AtrapaNadzorcy(dziala=True)
+    assert instalator.zatrzymaj_serwis(u, _ot(tmp_path, moduly={"nadzorca": nowy}), "jarvo down") is True
+    assert nowy.stopy == [{"czekaj": 120.0, "powod": "jarvo down"}]           # max(CZAS_STOPU, 110 + 10)
+    stary = AtrapaNadzorcyBezZnacznika(dziala=True)
+    assert instalator.zatrzymaj_serwis(u, _ot(tmp_path, moduly={"nadzorca": stary}), "x") is True
+    assert stary.stopy == [{"czekaj": 120.0}]
+    assert instalator.zatrzymaj_serwis(u, _ot(tmp_path, moduly={"nadzorca": stary})) is False   # już nie działa
+
+    class Zatrzymujacy(AtrapaNadzorcy):
+        def __init__(self):
+            super().__init__(dziala=True)
+            self.zostalo = 3
+
+        def stop(self, czekaj=0.0, powod=""):
+            raise RuntimeError("Nadzorca właśnie się zatrzymuje.")
+
+        def polacz(self, u):
+            self.zostalo -= 1
+            if self.zostalo <= 0:
+                self.dziala = False
+            return super().polacz(u)
+    assert instalator.zatrzymaj_serwis(u, _ot(tmp_path, moduly={"nadzorca": Zatrzymujacy()})) is True
+    wieczny = AtrapaNadzorcy(dziala=True)
+    wieczny.stop = lambda czekaj=0.0, powod="": {"ok": True}                  # nie kończy się: limit z radą
+    with pytest.raises(instalator.BladInstalacji, match="nie zatrzymał się w 120 s"):
+        instalator.zatrzymaj_serwis(u, _ot(tmp_path, moduly={"nadzorca": wieczny}))
 
 
 # ---------------------------------------------------------------- z prawdziwymi modułami (po scaleniu etapu E3)
@@ -1216,7 +1946,13 @@ def test_instaluj_z_prawdziwym_dziennikiem_zmian_i_nadzorca(tmp_path, stanowisko
     assert _migawka(s["dom"]) == dom_przed
     if WINDOWS:
         assert s["rejestr"].czytaj("Environment", "Path")[0] == r"C:\Narzedzia;%USERPROFILE%\bin;".rstrip(";")
-    # prawdziwy klient nadzorcy bez działającego nadzorcy: status mówi „nie działa”, nic nie startuje
+    # prawdziwy klient nadzorcy bez działającego nadzorcy: status mówi „nie działa”, nic nie startuje; znacznik
+    # zatrzymania przez ten moduł (albo plik, gdy moduł go jeszcze nie zna) w tym samym miejscu
     s["moduly"].update({"nadzorca": nadzorca})
-    stan, powod = instalator.stan_serwisu(u, s["otoczenie"]())
+    ot = s["otoczenie"]()
+    stan, powod = instalator.stan_serwisu(u, ot)
     assert stan is None and powod
+    instalator.oznacz_zatrzymanie(u, ot, "próba")
+    assert instalator.zatrzymanie(u)["powod"] == "próba"
+    instalator.zdejmij_zatrzymanie(u, ot)
+    assert instalator.zatrzymanie(u) is None
