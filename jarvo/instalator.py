@@ -133,8 +133,10 @@ CZAS_STOPU = 120.0              # drenaż bramy i zatrzymanie panelu; dłużej, 
 PATH_RC = ('case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac  '
            "# polecenie jarvo (usunie je jarvo uninstall)")
 # korzeń to osobny katalog Jarva: chron obejmuje całe drzewo, więc katalogu z cudzymi plikami nie ruszamy
-W_KORZENIU = frozenset({"program", "dane", "stan", "logi", "cache", "build", "bin", "desktop.ini", "thumbs.db",
-                        ".ds_store"})
+# migracja: kopia, kopia zapasowa i raport `jarvo migruj` (jarvo/migracja.py KATALOG): bez niej każda aktualizacja
+# po przeniesieniu starej instalacji kończyła się „pliki spoza Jarva” (u właściciela 2026-10-25)
+W_KORZENIU = frozenset({"program", "dane", "stan", "logi", "cache", "build", "bin", "migracja", "desktop.ini",
+                        "thumbs.db", ".ds_store"})
 PRZYKLAD_KORZENIA = "D:\\Jarvo" if WINDOWS else "~/jarvo-natywnie"
 # zmienne instalacji w <stan>/ustawienia.json: polecenie jarvo bierze je, gdy nie ma ich w otoczeniu, bo zadanie
 # Harmonogramu, LaunchAgent i jednostka systemd nie znają zmiennych sesji, w której instalowano

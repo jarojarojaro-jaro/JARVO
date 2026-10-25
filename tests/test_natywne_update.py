@@ -1343,7 +1343,8 @@ def _do_odinstalowania(tmp_path: Path, dom: Path, rejestr: Rejestr) -> sciezki.U
     (dom / ".profile").write_text("export A=1\n", encoding="utf-8")
     zmiany_hosta.dodaj_blok_rc(u, dom / ".profile", instalator.PATH_RC)
     zmiany_hosta.dodaj_do_path(u, u.root / "bin", rejestr=rejestr)
-    for k, plik in ((u.dane, "config.yaml"), (u.logi, "nadzorca.log"), (u.cache / "uv", "x"), (u.build, "y")):
+    for k, plik in ((u.dane, "config.yaml"), (u.logi, "nadzorca.log"), (u.cache / "uv", "x"), (u.build, "y"),
+                    (u.root / "migracja", "kopia.tar")):                       # kopia `jarvo migruj`
         k.mkdir(parents=True, exist_ok=True)
         (k / plik).write_text("x", encoding="utf-8")
     ro = u.program / "hermes" / "f97608f178d1" / ".git" / "objects" / "pack.idx"
@@ -1369,14 +1370,15 @@ def test_odinstalowanie_bez_danych(tmp_path, dom):
     assert nadzorca.stopy == ["jarvo uninstall"] and auto.wylaczenia == 1
     for k in (u.program, u.stan, u.root / "bin", u.logi, u.cache, u.build):
         assert not k.exists(), k
-    assert (u.dane / "config.yaml").is_file() and sorted(x.name for x in u.root.iterdir()) == ["dane"]
+    assert (u.dane / "config.yaml").is_file() and sorted(x.name for x in u.root.iterdir()) == ["dane", "migracja"]
+    assert (u.root / "migracja" / "kopia.tar").is_file()                          # kopia migracji zostaje z danymi
     assert not (dom / ".local" / "bin" / "jarvo").exists()                         # cofnięty plik poza korzeniem
     assert (dom / ".profile").read_text(encoding="utf-8") == "export A=1\n"         # blok jarvo cofnięty
     assert rejestr.wartosci[("Environment", "Path")][0] == r"C:\Narzedzia"
     wyniki = {(r["rodzaj"], r["wynik"]) for r in raport["cofniete"]}
     assert {("plik", "cofniete"), ("blok-rc", "cofniete"), ("path-uzytkownika", "cofniete")} <= wyniki
     assert all("jarvo.cmd" not in r["opis"] for r in raport["cofniete"]), "plik z korzenia: zapomniany"
-    assert [c["rodzaj"] for c in raport["celowo"]] == ["dane"] and not raport["slady"]
+    assert [c["rodzaj"] for c in raport["celowo"]] == ["dane", "kopia migracji"] and not raport["slady"]
     assert "Zostaje celowo" in log and "Śladów Jarva na komputerze nie ma" in log
 
 

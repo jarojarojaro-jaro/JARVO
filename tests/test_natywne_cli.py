@@ -1813,6 +1813,10 @@ def test_korzen_musi_byc_osobnym_katalogiem(tmp_path, stanowisko):
     (zdjecia / "wakacje.jpg").unlink()
     assert instalator.korzen_nieosobny(uklad(zdjecia)) is None
     assert instalator.korzen_nieosobny(uklad(tmp_path / "nie-ma")) is None
+    # kopia `jarvo migruj` w korzeniu to katalog Jarva: aktualizacja po migracji nie może jej uznać za obcy plik
+    from jarvo import migracja
+    (zdjecia / migracja.KATALOG / "kopia-zapasowa").mkdir(parents=True)
+    assert instalator.korzen_nieosobny(uklad(zdjecia)) is None
     s, u = stanowisko, stanowisko["u"]
     u.root.mkdir(parents=True)
     (u.root / "dokument.docx").write_bytes(b"x")

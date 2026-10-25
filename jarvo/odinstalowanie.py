@@ -64,6 +64,8 @@ from . import instalator, sciezki, zmiany_hosta
 from .instalator import Otoczenie
 from .sciezki import LINUX, MACOS, WINDOWS, Uklad
 
+KATALOG_MIGRACJI = "migracja"            # <root>/migracja: kopia i raport jarvo migruj (migracja.KATALOG)
+
 KLUCZ_APLIKACJI = r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
 KLUCZ_RUNONCE = r"Software\Microsoft\Windows\CurrentVersion\RunOnce"
 NAZWA_APLIKACJI = "Jarvo"
@@ -888,10 +890,18 @@ def skan_sladow(u: Uklad, ot: Otoczenie, z: Zaplecze, *, dane_zostaja: bool, na_
                                          "je jarvo uninstall --all albo ręcznie")
         else:
             slad("katalog", f"dane: {u.dane}", usun)
+    kopia = u.root / KATALOG_MIGRACJI
+    if kopia.exists():
+        if dane_zostaja:
+            zostaje("kopia migracji", str(kopia), "bez --all zostaje kopia danych starej instalacji (do jarvo migruj "
+                                                  "--wycofaj); usunie ją jarvo uninstall --all albo jarvo migruj --sprzatanie")
+        else:
+            slad("katalog", f"kopia migracji: {kopia}", usun)
     if u.root.is_dir():
         try:
             obce = sorted(e.name for e in os.scandir(u.root)
-                          if e.name not in ("program", "dane", "stan", "logi", "cache", "build", "bin"))
+                          if e.name not in ("program", "dane", "stan", "logi", "cache", "build", "bin",
+                                            KATALOG_MIGRACJI))
         except OSError:
             obce = []
         if obce:
@@ -1271,7 +1281,7 @@ class _Odinstalowanie:
                 self.na_pozniej.append(u.root / "bin")     # cmd.exe dokończy jarvo.cmd po końcu tego procesu
         cele = [u.program, u.stan, u.root / "bin", u.build, u.logi, u.cache]
         if self.usun_dane:
-            cele.append(u.dane)
+            cele += [u.dane, u.root / KATALOG_MIGRACJI]          # kopia migracji ma dane i sekrety starej floty
         with contextlib.suppress(OSError):
             cele += [Path(e.path) for e in os.scandir(u.root) if e.name.startswith(".doctor-")]
         for cel in cele:

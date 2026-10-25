@@ -40,7 +40,7 @@ Krótszy adres po wgraniu strony: `curl -fsSL https://jarvo.pl/install.sh | bash
   - `jarvo update` (`--sprawdz`, `--ref REF`, `--json`): nowa wersja obok starej w `<program>/app/<sha12>`, instalator
     nowej wersji, `jarvo doctor`, powrót przy błędzie; nie używa HOST_VERSION (zawsze instalator nowej wersji);
     zmienne JARVO_UPDATE_TIMEOUT (3600 s), JARVO_UPDATE_ROZGRZEWKA (120 s), JARVO_UPDATE_CHECK (3600 s, pomocnik);
-  - `jarvo uninstall` (`--all` z danymi po pytaniu, `--yes` bez pytań, `--json`);
+  - `jarvo uninstall` (`--all` z danymi i z kopią migracji `<root>/migracja` po pytaniu, `--yes` bez pytań, `--json`; bez `--all` dane i kopia migracji zostają);
   - `jarvo migruj`: przeniesienie danych ze starej instalacji z Dockerem i WSL (docs/NATYWNIE.md, sekcja f).
 - Linux: polecenie `jarvo` działa w nowym terminalu dopiero po ponownym zalogowaniu (terminal w GNOME i KDE nie czyta
   `~/.profile`).
