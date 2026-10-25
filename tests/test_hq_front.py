@@ -236,9 +236,18 @@ ZRODLO_FETCH = r"""
 const vm = require("vm"), fs = require("fs");
 const kod = fs.readFileSync(process.argv[2], "utf8");
 const czekaj = (ms) => new Promise((ok) => setTimeout(ok, ms));
-function strumien(kawalki) {
+// otwarty: odpowiedź po ostatnim kawałku nie kończy się sama, tylko jak w prawdziwym fetch przerwaniem (AbortError
+// w read()); bez tego „zamknięty” ścigał się z końcem strumienia (Linux: trzy kawałki po 1 ms przed close() po 5 ms)
+function strumien(kawalki, { otwarty = false, signal = null } = {}) {
   const enc = new TextEncoder();
-  return new ReadableStream({ async pull(c) { if (!kawalki.length) { c.close(); return; } await czekaj(1);
+  return new ReadableStream({ async pull(c) {
+    if (!kawalki.length) {
+      if (!otwarty) { c.close(); return; }
+      if (!signal.aborted) await new Promise((ok) => signal.addEventListener("abort", ok, { once: true }));
+      c.error(new DOMException("przerwane", "AbortError"));
+      return;
+    }
+    await czekaj(1);
     c.enqueue(enc.encode(kawalki.shift())); } });
 }
 async function przypadek(odp, { zamknij = false } = {}) {
@@ -247,7 +256,8 @@ async function przypadek(odp, { zamknij = false } = {}) {
     authHeaders: (h) => Object.assign({ "X-Jarvo-Request": "1", "X-Hermes-Session-Token": "tok" }, h || {}),
     fetch: async (url, init) => { zapytania.push({ url, init: { ...init, signal: !!init.signal } });
       if (odp === "siec") throw new TypeError("Failed to fetch");
-      return { ok: odp.status === 200, status: odp.status, body: strumien([...(odp.kawalki || [])]) }; } };
+      return { ok: odp.status === 200, status: odp.status,
+        body: strumien([...(odp.kawalki || [])], { otwarty: !!odp.otwarty, signal: init.signal }) }; } };
   vm.runInNewContext(kod + "\nthis.ZrodloFetch = ZrodloFetch;", ctx);
   const z = new ctx.ZrodloFetch("/api/plugins/jarvo-hq/strumien?klient=k&watki=");
   for (const typ of ["hello", "watek.wpis", "message"]) z.addEventListener(typ, (e) => zdarzenia.push([e.type, e.data, e.lastEventId]));
@@ -262,7 +272,8 @@ async function przypadek(odp, { zamknij = false } = {}) {
       ":2}\r\n\r\n", "data: linia1\ndata:linia2\n\nretry: 10\n\n"] }),
     nieupowazniony: await przypadek({ status: 401 }),
     siec: await przypadek("siec"),
-    zamkniety: await przypadek({ status: 200, kawalki: ["data: a\n\n", "data: b\n\n", "data: c\n\n"] }, { zamknij: true }),
+    zamkniety: await przypadek({ status: 200, otwarty: true, kawalki: ["data: a\n\n", "data: b\n\n", "data: c\n\n"] },
+      { zamknij: true }),
   };
   console.log(JSON.stringify(wynik));
 })();

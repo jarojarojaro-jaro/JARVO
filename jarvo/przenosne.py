@@ -1,6 +1,7 @@
 """Przenośne prymitywy dla Windows, macOS i Linuksa (docs/NATYWNIE.md, sekcja e, punkt 3).
 
 - `zapisz_atomowo`: zapis przez plik tymczasowy i os.replace, z ponawianiem, gdy Windows trzyma plik (WinError 5/32/33).
+- `czytaj_tekst`: odczyt pliku podmienianego przez `zapisz_atomowo` w innym procesie (Windows: chwilowa odmowa dostępu).
 - `Zamek`: blokada między procesami na pliku (msvcrt.locking na Windows, fcntl.flock na POSIX).
 - `chron`: plik albo katalog tylko dla właściciela (POSIX chmod 0600/0700, Windows ACL przez icacls).
 - `program`: pełna ścieżka programu przez shutil.which (na Windows także .exe i .cmd).
@@ -45,6 +46,20 @@ def zapisz_atomowo(cel: Path, tresc: str | bytes, tryb: int | None = None, proby
                 os.unlink(tmp)
             except OSError:
                 pass
+
+
+def czytaj_tekst(p: Path, kodowanie: str = "utf-8", proby: int = 10) -> str:
+    """Cały plik jako tekst. Na Windows otwarcie w chwili, gdy inny proces podmienia plik (os.replace w
+    `zapisz_atomowo`), kończy się odmową dostępu (próba: 19 na 53 tys. odczytów `nadzorca.json`), choć plik jest
+    i ma pełną treść, więc kilka prób, zanim błąd pójdzie dalej."""
+    for i in range(proby):
+        try:
+            return Path(p).read_text(encoding=kodowanie)
+        except PermissionError:
+            if not WINDOWS or i == proby - 1:
+                raise
+            time.sleep(0.01 * (i + 1))
+    raise AssertionError("nieosiągalne")
 
 
 class Zamek:

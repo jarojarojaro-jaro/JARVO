@@ -481,6 +481,30 @@ def test_zapisz_atomowo_i_zamek(tmp_path):
     assert wynik.stdout.strip() == "wolny"
 
 
+def test_odczyt_w_trakcie_podmiany_pliku(tmp_path, monkeypatch):
+    """Windows: otwarcie pliku w chwili os.replace z innego procesu daje chwilową odmowę dostępu (CI: komunikat
+    „już działa” bez pid, bo odczyt nadzorca.json zwrócił {}); czytaj_tekst i wczytaj_json próbują ponownie."""
+    p = tmp_path / "nadzorca.json"
+    przenosne.zapisz_atomowo(p, '{"nadzorca": {"pid": 7}}\n')
+    prawdziwy, proby = Path.read_text, []
+
+    def chwilowo_zajety(self, *a, **kw):
+        proby.append(1)
+        if len(proby) < 3:
+            raise PermissionError(13, "Odmowa dostępu")
+        return prawdziwy(self, *a, **kw)
+    monkeypatch.setattr(Path, "read_text", chwilowo_zajety)
+    if os.name == "nt":
+        assert srodowisko.wczytaj_json(p) == {"nadzorca": {"pid": 7}} and len(proby) == 3
+    else:                                          # POSIX: rename nie blokuje czytelników, błąd dostępu jest prawdziwy
+        with pytest.raises(PermissionError):
+            przenosne.czytaj_tekst(p)
+        assert len(proby) == 1
+    proby.clear()
+    monkeypatch.setattr(Path, "read_text", lambda self, *a, **kw: (_ for _ in ()).throw(PermissionError(13, "x")))
+    assert srodowisko.wczytaj_json(p) == {}                              # trwała odmowa: jak brak pliku
+
+
 def test_chron_tylko_wlasciciel(tmp_path):
     p = tmp_path / ".env"
     p.write_text("A=1\n", encoding="utf-8")

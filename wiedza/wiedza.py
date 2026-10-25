@@ -130,8 +130,11 @@ SEKRETY = [
     ("klucz API w tekście", re.compile(r"(?i)\b(api[_ -]?key|secret|token)\s*[:=]\s*[A-Za-z0-9_\-]{16,}")),
 ]
 GIT_TOZSAMOSC = ["-c", "user.name=Jarvo", "-c", "user.email=jarvo@localhost", "-c", "commit.gpgsign=false"]
-# pliki w historii bajt w bajt jak na dysku (bez CRLF z core.autocrlf=true Git for Windows), długie ścieżki na Windows
-GIT_PRZENOSNIE = ["-c", "core.autocrlf=false", "-c", "core.longpaths=true"]
+# pliki w historii bajt w bajt jak na dysku (bez CRLF z core.autocrlf=true Git for Windows), długie ścieżki na Windows;
+# automatyczne porządki gita po commicie od razu, nie w tle: nowy git (macOS) pakował obiekty w odłączonym procesie,
+# który zostawał po poleceniu (zmieniał skarbiec po `jarvo doctor`, na Windows trzymałby pliki przy deinstalacji)
+GIT_PRZENOSNIE = ["-c", "core.autocrlf=false", "-c", "core.longpaths=true", "-c", "gc.autoDetach=false",
+                  "-c", "maintenance.autoDetach=false"]
 # .gitignore skarbca: *.tmp (zapis atomowy) i śmieci menedżera plików tego systemu (Finder, Eksplorator)
 GITIGNORE_SYSTEMU = (".DS_Store",) if MACOS else ("Thumbs.db", "desktop.ini") if WINDOWS else ()
 BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0)            # Windows: git bez migającego okna konsoli

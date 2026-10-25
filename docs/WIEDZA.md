@@ -237,7 +237,8 @@ z dziesięciu profili kompilował jeden); ręcznie: przycisk w zakładce Wiedza 
 4. przenosi szkic do `skrzynka/zrobione/` (odpowiedź modelu bez JSON: ponowienie, po 3 nieudanych próbach szkic idzie do
    `zrobione/` z wpisem w LOG; sekret w wyniku = odrzucenie; próba nadpisania huba = nowa notatka; zły folder = folder z typu).
 Cała partia to jedna transakcja: blokada `state/wiedza.lock`, zapis do plików `.tmp` → rename, na końcu `git add -A && git commit`
-w skarbcu (punkt zapisu; `wiedza.py cofnij` przywraca poprzedni). Limity na przebieg: 40 szkiców, 60 notatek dotkniętych,
+w skarbcu (punkt zapisu; `wiedza.py cofnij` przywraca poprzedni; automatyczne porządki gita po commicie biegną od razu,
+nie w odłączonym procesie, więc po poleceniu nic nie zmienia skarbca w tle). Limity na przebieg: 40 szkiców, 60 notatek dotkniętych,
 1 model; reszta czeka na następny przebieg. Wynik przebiegu widać w LOG i w zakładce.
 
 **Lint** (`wiedza.py lint`, 0 tokenów, co tydzień w niedzielę przed przeglądem tygodnia i przed każdą kompilacją):

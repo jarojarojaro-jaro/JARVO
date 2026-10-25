@@ -539,6 +539,7 @@ def test_doctor_narzedzia_programy_i_git_z_manifestu(tmp_path):
     git = u.program / "narzedzia" / "git" / "2.56.0"
     (git / "cmd").mkdir(parents=True)
     (git / "cmd" / ("git.exe" if WINDOWS else "git")).write_bytes(b"")
+    (git / "cmd" / ("git.exe" if WINDOWS else "git")).chmod(0o755)    # POSIX: _bin bierze tylko plik wykonywalny
     narz = json.loads((u.stan / "narzedzia.json").read_text(encoding="utf-8"))
     narz.update({"venv-narzedzia": venvy.wpis_spisu("narzedzia", {"sha256": "a" * 64}, venv_py.parent.parent),
                  "model-paradee": {"wersja": "8f34", "katalog": str(tmp_path / "brak-modelu"), "bin": [], "env": {}},

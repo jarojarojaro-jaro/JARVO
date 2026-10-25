@@ -107,7 +107,13 @@ def test_padnieta_przegladarka_konczy_czekajacych(program):
 
 @pytest.mark.posix_only
 def test_posix_tylko_deskryptory_3_i_4(program, tmp_path):
-    """Przeglądarka nie dziedziczy innych deskryptorów rodzica (PEP 446) ani jego końców potoków."""
+    """Przeglądarka nie dziedziczy innych deskryptorów rodzica (PEP 446) ani jego końców potoków, także tych, które
+    proces dostał od swojego rodzica bez CLOEXEC (CI: runner zostawiał 142–145)."""
+    import fcntl
+    plik = os.open(str(tmp_path / "odziedziczony"), os.O_WRONLY | os.O_CREAT, 0o600)
+    obcy = fcntl.fcntl(plik, fcntl.F_DUPFD, 150)        # jak od rodzica: wysoki numer, bez CLOEXEC
+    os.close(plik)
+    os.set_inheritable(obcy, True)
     b = cdp.Przegladarka(program, [])
     b.start()
     try:
@@ -115,6 +121,8 @@ def test_posix_tylko_deskryptory_3_i_4(program, tmp_path):
         fds = sorted(int(x) for x in os.listdir(f"/proc/{pid}/fd")) if Path(f"/proc/{pid}/fd").is_dir() else None
         if fds is not None:
             assert {0, 1, 2, 3, 4} <= set(fds) and max(fds) < 10
+        assert not os.get_inheritable(obcy)               # macOS bez /proc: ten sam warunek po stronie rodzica
         assert os.getpgid(pid) == pid                     # własna grupa procesów: zatrzymanie całej grupy
     finally:
         b.zamknij(5)
+        os.close(obcy)

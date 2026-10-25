@@ -8,7 +8,9 @@ inny program właściciela ani agent z terminalem nie podłączy się do niej po
   je w `--remote-debugging-io-pipes=<odczyt>,<zapis>` (sprawdzone na Chrome for Testing 153: Browser.getVersion
   przez potok, bez portu).
 - POSIX: `os.posix_spawn` z dup2 na deskryptory 3 (polecenia) i 4 (odpowiedzi), których oczekuje
-  `--remote-debugging-pipe`; przeglądarka we własnej grupie procesów (zatrzymanie całej grupy).
+  `--remote-debugging-pipe`; przeglądarka we własnej grupie procesów (zatrzymanie całej grupy). posix_spawn nie zamyka
+  innych deskryptorów, więc te, które proces dostał od rodzica bez CLOEXEC (runner CI, terminal), dostają CLOEXEC
+  przed startem: przeglądarka ma tylko 0–4.
 
 Wątek czytający rozdziela odpowiedzi (po `id`) i zdarzenia; zdarzenia idą do słuchaczy z osobnego wątku, więc
 słuchacz może sam wysłać polecenie i czekać na odpowiedź.
@@ -96,8 +98,26 @@ def _wyzej(fd: int) -> int:
     return nowy
 
 
+def _bez_dziedziczenia() -> None:
+    """CLOEXEC na każdym deskryptorze ≥ 3 tego procesu. Własne deskryptory Pythona już go mają (PEP 446), ale te
+    odziedziczone od rodzica bez niego (CI: 142–145 od runnera) posix_spawn przekazałby przeglądarce."""
+    for katalog in ("/proc/self/fd", "/dev/fd"):
+        try:
+            fds = [int(x) for x in os.listdir(katalog)]
+        except (OSError, ValueError):
+            continue
+        for fd in fds:
+            try:
+                if fd > 2 and os.get_inheritable(fd):
+                    os.set_inheritable(fd, False)
+            except OSError:
+                pass                      # deskryptor katalogu z listdir, już zamknięty
+        return
+
+
 def _uruchom_posix(program: str, argv: list[str], env: dict, log) -> tuple[_ProcesPosix, int, int]:
     """Przeglądarka z poleceniami na fd 3 i odpowiedziami na fd 4."""
+    _bez_dziedziczenia()
     r_pol, w_pol = os.pipe()          # rodzic pisze polecenia, dziecko czyta (3)
     r_odp, w_odp = os.pipe()          # dziecko pisze odpowiedzi (4), rodzic czyta
     r_pol, w_odp = _wyzej(r_pol), _wyzej(w_odp)

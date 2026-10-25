@@ -16,6 +16,7 @@ import os
 import re
 from pathlib import Path
 
+from . import przenosne
 from .sciezki import WINDOWS, Uklad, krotka_sciezka
 
 ENV_BUILDU = Path("host") / "srodowisko.json"      # w <root>/build: zmienne bramy z buildu (scripts/build.py)
@@ -51,7 +52,7 @@ _POTRZEBNE = frozenset(z.upper() for z in POTRZEBNE_MIMO_NAZWY)
 
 def wczytaj_json(p: Path) -> dict:
     try:
-        dane = json.loads(p.read_text(encoding="utf-8-sig"))
+        dane = json.loads(przenosne.czytaj_tekst(p, "utf-8-sig"))
     except (OSError, ValueError):
         return {}
     return dane if isinstance(dane, dict) else {}
