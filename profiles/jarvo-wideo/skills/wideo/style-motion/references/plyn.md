@@ -5,7 +5,7 @@ Poznasz go po gęstym, szklistym połysku, szyjkach, które się wyciągają i p
 Wzór: okładka `$MGSTYLES/videos/07-liquid.jpg`, kod `$MGSTYLES/demos/07-liquid/` (MIT), ocena jury 7,57;
 1920×1080, 30 kl./s, 10 s, czysty WebGL2 (shader pola odległości). Klatki wzoru (4,2 s = zalew, 6,5 s = znak):
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/07-liquid/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/07-liquid/index.html" --preset mg \
   --query mb=1 --czasy 1.2,4.2,6.5,8.5 --arkusz out/wideo/wzor-07-liquid.jpg
 ```
 `mb=1` wyłącza rozmycie liczone w stronie (10–24 stanów na klatkę): klatka ok. 11 s zamiast do 90 s (CPU, bez GPU).

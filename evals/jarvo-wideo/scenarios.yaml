@@ -114,7 +114,7 @@ scenarios:
     expect:
       should:
         - "film-z-kodu → lemo-opuscar dark-keynote, uzasadnienie wyboru w RAPORT"
-        - "narzedzia.py instaluj/env zamiast pobierania przeglądarki; lektor PL przez lektor_linie.py, nie Kokoro"
+        - "narzedzia.py instaluj/uruchom zamiast pobierania przeglądarki; lektor PL przez lektor_linie.py, nie Kokoro"
         - "montaz.py napraw + qa_wideo.py + kontrola-wideo przed oddaniem"
       should_not:
         - "npx playwright install albo setup.sh deps pobierające przeglądarkę"

@@ -49,21 +49,26 @@ lemo-wake ma licencję CC BY-NC 4.0, czyli wolno go używać tylko niekomercyjni
 
 ## Start (każde polecenie)
 ```bash
-python3 $HERMES_HOME/scripts/lemo_wake.py sprawdz        # JSON: biblioteka, python, playwright, przeglądarka, modele, zgoda
-python3 $HERMES_HOME/scripts/lemo_wake.py instaluj       # raz (ok. 350 MB, ok. minuty); też gdy "biblioteka": false
-eval "$(python3 $HERMES_HOME/scripts/lemo_wake.py env)"  # na początku KAŻDEGO polecenia: zmienne nie przeżywają między poleceniami
-# bez eval: python3 $HERMES_HOME/scripts/lemo_wake.py uruchom -- <polecenie>   ({LW}, {LW_PY}… w argumentach)
+@@PY@@ "$HERMES_HOME/scripts/lemo_wake.py" sprawdz        # JSON: biblioteka, python, playwright, przeglądarka, modele, zgoda
+@@PY@@ "$HERMES_HOME/scripts/lemo_wake.py" instaluj       # raz (ok. 350 MB, ok. minuty); też gdy "biblioteka": false
+@@PY@@ "$HERMES_HOME/scripts/lemo_wake.py" uruchom -- <polecenie>   # KAŻDY program lemo-wake: zmienne tylko w tym poleceniu
 ```
+`uruchom` ustawia zmienne lemo-wake (`LW`, `LW_WARSTWY`, `LW_PY`, `LEMO_WAKE_MODELS`, `LW_HISTORIA`, `CHROME`) tylko
+dla tego jednego polecenia, tak samo w każdej powłoce i na każdym systemie, bez `eval`. W argumentach piszesz je jako
+`{LW}`, `{LW_PY}`…, bo `$LW` powłoka rozwinie, zanim zmienna istnieje. Niżej `uruchom --` to skrót od
+`@@PY@@ "$HERMES_HOME/scripts/lemo_wake.py" uruchom --`. Pliki do czytania: `LW="@@TOOLS_DIR@@/lemo-wake/skills/wake"`,
+`LW_WARSTWY="@@TOOLS_DIR@@/lemo-wake/skills/layers"`, `LW_HISTORIA="@@TOOLS_DIR@@/lemo-wake-dane/history.jsonl"`
+(przypisanie na początku polecenia: zmienne nie przeżywają między poleceniami).
 
 ## Różnice wobec instrukcji lemo-wake
 Instrukcja `$LW/SKILL.md` (ten sam tekst co skill `lemo-wake`) zakłada laptopa z Claude Code. U nas:
 
 | W instrukcji | U nas |
 |---|---|
-| `$S` (folder skilla) | `$LW`; przy warstwach `$L` = `$LW_WARSTWY`, `$W` = `$LW/scripts` |
-| `$S/scripts/x.py …` (przez `uv run`) | `$LW_PY $LW/scripts/x.py …`: pakiety przypięte; nigdy `uv run`, nic nie doinstalowujesz |
-| `node $S/scripts/doctor.mjs --fix` | bez `--fix` (pobiera przeglądarkę); stan z `lemo_wake.py sprawdz`, przeglądarka z obrazu (`CHROME`) |
-| `LEMO_WAKE_MODELS=…`, `${CLAUDE_PLUGIN_DATA}` | ustawia `env` (modele poza biblioteką, przeżywają aktualizację) |
+| `$S` (folder skilla) | `$LW`; przy warstwach `$L` = `$LW_WARSTWY`, `$W` = `$LW/scripts` (w `uruchom --`: `{LW}`, `{LW_WARSTWY}`) |
+| `$S/scripts/x.py …` (przez `uv run`) | `uruchom -- {LW_PY} {LW}/scripts/x.py …`: pakiety przypięte; nigdy `uv run`, nic nie doinstalowujesz |
+| `node $S/scripts/doctor.mjs --fix` | bez `--fix` (pobiera przeglądarkę); stan z `lemo_wake.py sprawdz`, przeglądarka Jarva (`CHROME`) |
+| `LEMO_WAKE_MODELS=…`, `${CLAUDE_PLUGIN_DATA}` | ustawia `uruchom` (modele poza biblioteką, przeżywają aktualizację) |
 | `history.jsonl` | `$LW_HISTORIA` |
 | projekt w bieżącym katalogu | `mkdir -p out/zywe && cd out/zywe` w workspace karty, potem `new_project.py` |
 | pytanie o rozmiar i formaty | z karty (tabela wejść); pytasz tylko, gdy karta nic nie mówi, a cel jest niejasny |
@@ -75,8 +80,8 @@ Instrukcja `$LW/SKILL.md` (ten sam tekst co skill `lemo-wake`) zakłada laptopa 
 Pięć modeli ONNX, razem ok. 600 MB z Hugging Face: głębia, wycięcie głównego obiektu, wycięcie osoby z włosami,
 wybór elementu (SAM) i wypełnienie dziury (LaMa). Model, który jest już na dysku, działa bez pytania.
 - **Kod 10:** zapytaj właściciela raz, jedną wiadomością: które modele, po co, ile MB, skąd, gdzie leżą
-  (`/opt/data/jarvo/narzedzia/lemo-wake-dane/models`) i co stracisz bez nich. Odpowiedź zapisz:
-  `$LW_PY $LW/scripts/models.py consent yes` (albo `no`), potem uruchom krok jeszcze raz. Drugi raz nie pytasz.
+  (`@@TOOLS_DIR@@/lemo-wake-dane/models`) i co stracisz bez nich. Odpowiedź zapisz:
+  `uruchom -- {LW_PY} {LW}/scripts/models.py consent yes` (albo `no`), potem uruchom krok jeszcze raz. Drugi raz nie pytasz.
 - **Kod 11 (odmowa):** nie pytasz ponownie, robisz obejście kodem: maski po kolorze, `inpaint.py --engine opencv`,
   paralaksa warstwami zamiast głębi.
 - **Kod 12 (pobieranie nie wyszło):** jedna powtórka, potem obejście i wpis w RAPORT.
@@ -89,7 +94,7 @@ wybór elementu (SAM) i wypełnienie dziury (LaMa). Model, który jest już na d
    (jedna akcja, która należy tylko do tego obrazu), `index.html`, kadry kontrolne (`render.mjs … stills`, `sheet.py`),
    pełny render, pętla, kodowanie (`encode.py`) i `qa.py`.
 4. **Marka:** dodatki (napis, CTA, kolor tła przy innym formacie) z brand kitu `@@KNOWLEDGE_DIR@@/brands/<marka>/`.
-5. **Kontrola:** `qa.py` bez FAIL, `python3 $HERMES_HOME/scripts/check_media.py out/zywe/<slug>-alive/<slug>.mp4 --auto`
+5. **Kontrola:** `qa.py` bez FAIL, `@@PY@@ "$HERMES_HOME/scripts/check_media.py" out/zywe/<slug>-alive/<slug>.mp4 --auto`
    (sam plik: katalog projektu ma też setki klatek), obejrzyj
    `qa_sheet.jpg` (ostatni kafel to pierwsza klatka: szew pętli) i pierwszą klatkę, bo to okładka w wielu aplikacjach.
 6. **Warstwy (PSD), gdy ktoś o nie prosi:** instrukcja `$LW_WARSTWY/SKILL.md` z podstawieniami z tabeli wyżej.
@@ -107,9 +112,9 @@ wybór elementu (SAM) i wypełnienie dziury (LaMa). Model, który jest już na d
 - [ ] pierwsza klatka wygląda dobrze
 
 ## Typowe błędy
-- Skrypt bez `$LW_PY` albo przez `uv run` → inne wersje pakietów pobierane od nowa.
+- Skrypt bez `{LW_PY}` albo przez `uv run` → inne wersje pakietów pobierane od nowa.
 - `doctor.mjs --fix` → zbędne 190 MB przeglądarki w profilu.
-- Brak `eval "$(… env)"` w poleceniu → modele szukane w złym miejscu i drugie pytanie o zgodę.
+- Program lemo-wake bez `uruchom --` → modele szukane w złym miejscu i drugie pytanie o zgodę.
 - Karta komercyjna zrobiona bez zgody autora.
 
 ## Format raportu

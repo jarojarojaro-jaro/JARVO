@@ -27,7 +27,7 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
 - „zrób audyt bezpieczeństwa”, „czy moja strona jest bezpieczna”, przejęty projekt „vibe-coded”.
 
 ## Kroki
-1. **Skan kodu:** `python3 $HERMES_HOME/scripts/security_check.py repo <projekt> --json > out/bezpieczenstwo/repo.json`
+1. **Skan kodu:** `@@PY@@ "$HERMES_HOME/scripts/security_check.py" repo <projekt> --json > out/bezpieczenstwo/repo.json`
    (sekrety w plikach i w **historii gita**, `.env` w repo, `npm audit`, wzorce ryzyka: token w localStorage,
    SQL sklejany z danych, eval, HTML bez oczyszczenia, sekret w zmiennej publicznej frontu, CORS *, debug; niebezpieczne
    ustawienia domyślne: sekret z wartością zapasową, zabezpieczenie wyłączone przy braku konfiguracji, TLS bez weryfikacji,
@@ -40,12 +40,12 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
    Nowa zależność w trakcie pracy: przed `npm install` sprawdź ją w rejestrze (istnieje, wiek, pobrania, repozytorium).
 1b. **Zależności** (jest `package.json`, `pyproject.toml`, `requirements*.txt` albo `go.mod`): skill
    `supply-chain-risk-auditor`, skrypty bez `uv` i poza badanym repo:
-   `D=$HERMES_HOME/skills/bezpieczenstwo/supply-chain-risk-auditor/scripts`,
-   `python3 $D/collect.py <projekt> --json out/bezpieczenstwo/zaleznosci.json` →
-   `python3 $D/render.py out/bezpieczenstwo/zaleznosci.json --out out/bezpieczenstwo/zaleznosci.md`.
+   `D="$HERMES_HOME/skills/bezpieczenstwo/supply-chain-risk-auditor/scripts"`,
+   `@@PY@@ "$D/collect.py" <projekt> --json out/bezpieczenstwo/zaleznosci.json` →
+   `@@PY@@ "$D/render.py" out/bezpieczenstwo/zaleznosci.json --out out/bezpieczenstwo/zaleznosci.md`.
    Podatności z lockfile'a (OSV), porzucone repo, jeden wydawca pakietu npm, skrypty instalacyjne. Brak danych
    (np. limit GitHuba bez tokenu) to „nie oceniono”, nigdy „czysto”; kod ≠ 0 z `collect.py` przekazujesz dosłownie.
-2. **Skan działającej strony** (podgląd albo produkcja): `python3 $HERMES_HOME/scripts/security_check.py url <URL>`
+2. **Skan działającej strony** (podgląd albo produkcja): `@@PY@@ "$HERMES_HOME/scripts/security_check.py" url <URL>`
    (HTTPS, HSTS, CSP, clickjacking, nosniff, Referrer/Permissions-Policy, flagi ciasteczek sesji, CORS z obcej domeny,
    ślady błędów, publiczne `/.env`, `/.git`, kopie zapasowe, **klucze serwerowe w JS wysyłanym do przeglądarki**;
    klucz `anon` Supabase i klucze Google Maps/Firebase są publiczne z założenia, liczy się ich ograniczenie;
@@ -56,7 +56,7 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
 2b. **Próby na działającej aplikacji** (podgląd z backendem): dwa konta testowe (A i B) zakładasz sam na podglądzie,
    ich nagłówki sesji bierzesz z odpowiedzi logowania, potem:
    ```bash
-   python3 $HERMES_HOME/scripts/security_check.py atak http://localhost:4321 --json \
+   @@PY@@ "$HERMES_HOME/scripts/security_check.py" atak http://localhost:4321 --json \
      --chronione /api/admin /api/orders --sesja-a "Cookie: sid=…" --sesja-b "Cookie: sid=…" --zasob-a /api/orders/<id A> \
      --logowanie /api/login --upload /api/upload:file --wyloguj /api/logout > out/bezpieczenstwo/atak.json
    ```

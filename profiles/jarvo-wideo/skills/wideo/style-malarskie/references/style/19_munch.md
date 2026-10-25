@@ -4,7 +4,7 @@ Długie, wygięte pociągnięcia cienkiej farby płyną po polu kierunków, a ca
 się po sinusie, razem z ludźmi, kotem i stołem („Krzyk”, 1893). Poznasz go po krwistym niebie w pasach, które same się
 wiją, i po małej postaci z dłońmi przy twarzy. Jakość wzoru: ★★ (rozpoznawalny, ale z wyraźną słabością); słabość
 wzoru: ścianę brano za Van Gogha (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 19_munch --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-19_munch.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 19_munch --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-19_munch.jpg`;
 kod `$HUASHU/scripts/engine/scenes/19_munch.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę,
 nie scenę.
 
@@ -37,7 +37,7 @@ nie scenę.
 - Napisy wzoru: tytuł `LXGWWenKai-500`, podtytuł `IMFellEnglish-400` (ma polskie znaki).
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 19_munch`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 19_munch`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js`, `paint.js`, `brush.js` (`PAINT.flowSeeds`, `PAINT.flowLines`), `kit.js`
    (`KIT.warpRows`, `KIT.warpCols`, `KIT.nearArm`, `KIT.choreo`, `KIT.label`), `rig.js` (`RIG.drawGirl`,
    `RIG.drawCat`).

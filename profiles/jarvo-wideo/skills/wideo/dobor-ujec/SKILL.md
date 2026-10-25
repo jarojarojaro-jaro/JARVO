@@ -28,7 +28,7 @@ Skrypt wybiera szybko, ale nie widzi. Każde ujęcie w finale oglądam na arkusz
 ## Kroki
 1. **Arkusz kandydatów:**
    - stock: `stock.py szukaj "<zapytanie>" --arkusz out/wideo/kandydaci-s<N>.jpg` (numer = kolejność na liście),
-   - pliki (nagrania, generacje AI): `python3 $HERMES_HOME/scripts/kadry.py arkusz a.mp4 b.mp4 c.mp4 --klatek 4 -o out/wideo/kandydaci.jpg`
+   - pliki (nagrania, generacje AI): `@@PY@@ "$HERMES_HOME/scripts/kadry.py" arkusz a.mp4 b.mp4 c.mp4 --klatek 4 -o out/wideo/kandydaci.jpg`
      (rząd = klip, klatki równo rozłożone, podpis `klip.klatka czas`).
 2. **Ocena** (`vision_analyze` na arkuszu, pytanie konkretne): dla każdego kandydata 0–2 w kryteriach:
    | Kryterium | 0 | 2 |

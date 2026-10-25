@@ -16,13 +16,13 @@ metadata:
 
 Człowiek wkleja link (YouTube, Shorts, TikTok, Instagram, Facebook, X…) albo wysyła plik i chce wiedzieć, co
 w filmie jest powiedziane. Robisz **transkrypcję**, nie analizę filmu: nie oglądasz obrazu, nie oceniasz montażu.
-Skrypt działa na serwerze, bez klucza API i bez tokenów modelu.
+Skrypt działa na tym komputerze, bez klucza API i bez tokenów modelu.
 
 ## Kroki
 ```bash
-T=$HERMES_HOME/skills/media/transkrypcja-filmu/scripts/transkrybuj.py
-python3 $T "<link albo plik>" -o out/transkrypcja     # napisy platformy, a bez nich Parakeet z samego dźwięku
-python3 $T "<link>" -o out/transkrypcja --zawsze-mowa  # napisy platformy są złe → rozpoznaj mowę
+T="$HERMES_HOME/skills/media/transkrypcja-filmu/scripts/transkrybuj.py"
+@@PY@@ "$T" "<link albo plik>" -o out/transkrypcja     # napisy platformy, a bez nich Parakeet z samego dźwięku
+@@PY@@ "$T" "<link>" -o out/transkrypcja --zawsze-mowa  # napisy platformy są złe → rozpoznaj mowę
 ```
 1. Przeczytaj `out/transkrypcja/transkrypcja.md`: pełny tekst i fragmenty z czasem.
 2. Oddaj tekst: krótko wprost w odpowiedzi, długi jako plik `transkrypcja.md`. Na prośbę dodaj streszczenie

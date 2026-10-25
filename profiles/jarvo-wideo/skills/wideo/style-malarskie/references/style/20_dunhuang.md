@@ -4,7 +4,7 @@ Buddyjskie malowidło ścienne: czerwonoziemne tło, kolory z minerałów (malac
 „żelaznego drutu”, latające apsary z długimi wstęgami i ślady wieku: łuszcząca się farba odsłaniająca tynk, spękania,
 wyblaknięcie, kopeć. Jakość wzoru: ★★ (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: apsara narysowana
 zgrubnie (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 20_dunhuang --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-20_dunhuang.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 20_dunhuang --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-20_dunhuang.jpg`;
 kod `$HUASHU/scripts/engine/scenes/20_dunhuang.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -41,7 +41,7 @@ technikę, nie scenę.
   Tabliczka z napisem to jasny prostokąt z podwójną ramką i plamkami odprysków.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 20_dunhuang`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 20_dunhuang`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js`, `paint.js` (`PAINT.texture`, `PAINT.fbm`, `PAINT.noise`, `PAINT.particles`),
    `kit.js` (`KIT.ribbon`, `KIT.densify`, `KIT.blob`, `KIT.choreo`, `KIT.label`), `rig.js`.
 2. Kolejność: czerwonoziemny grunt (cache) → okno = azurytowe niebo z chmurami i apsarą → rama okna z pnączy →

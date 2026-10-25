@@ -4,7 +4,7 @@ Obraz impresjonistyczny (1874, w duchu Moneta): krótkie, nieobwiedzione pociąg
 fioletowe ściany w słońcu, ogród za oknem, migające plamy światła na podłodze i stole. Poznasz go po tym, że cały obraz
 jest z krótkich kresek w kilku barwach na każdą strefę, bez konturów, a światło „skacze” po powierzchniach.
 Jakość wzoru: ★★ (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: pędzel rozbija twarz i dłonie (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 08_impressionism --czasy 0.35,0.5,0.65 --arkusz out/wideo/wzor-08_impressionism.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 08_impressionism --czasy 0.35,0.5,0.65 --arkusz out/wideo/wzor-08_impressionism.jpg`; kod
 `$HUASHU/scripts/engine/scenes/08_impressionism.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -39,7 +39,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 08_impressionism --czasy 0.3
   oba mają polskie znaki.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 08_impressionism`; `P` = `PAINT`,
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 08_impressionism`; `P` = `PAINT`,
    `RIG`, `U`.
 2. Płaski podkład `impBase` (`P.scratch`) co klatkę od nowa, bo maki, chmury, bukiet, roślina i zasłony się ruszają:
    ściana z plamą słońca; ogród za oknem (niebo, las, dom z czerwonym dachem, łąka, 70 maków, kobieta z parasolką

@@ -16,7 +16,7 @@ metadata:
 
 # Lektor i dźwięk
 
-Lektor: domyślnie lokalny polski Matcha-TTS-PL v2 (w obrazie, bez sieci i limitów, **głos syntetyczny**); Edge TTS
+Lektor: domyślnie lokalny polski Matcha-TTS-PL v2 (w instalacji Jarva, bez sieci i limitów, **głos syntetyczny**); Edge TTS
 (darmowy, bez klucza) do wyboru i jako zapas; po angielsku lokalny Paradee (bez sieci). Muzyka: tylko z prawem użycia. Cel głośności
 dla platform społecznościowych: −14 LUFS zintegrowane, true peak ≤ −1 dBTP.
 
@@ -32,7 +32,7 @@ dla platform społecznościowych: −14 LUFS zintegrowane, true peak ≤ −1 dB
 | `pl-PL-MarekNeural` | męski, spokojny, rzeczowy (Edge, sieć) | poradniki, B2B, explainery |
 | `pl-PL-ZofiaNeural` | żeński, ciepły, energiczny (Edge, sieć) | lifestyle, produkt, social |
 | `en-US-AndrewMultilingualNeural`, `en-US-AvaMultilingualNeural` | wielojęzyczne (czytają PL z lekkim akcentem) | inny charakter, testy A/B |
-| `en-US-Paradee` | angielski, męski, lokalny (model w obrazie, bez sieci i limitów) | film po angielsku; **tylko angielski tekst** |
+| `en-US-Paradee` | angielski, męski, lokalny (model w instalacji Jarva, bez sieci i limitów) | film po angielsku; **tylko angielski tekst** |
 
 Głosy lokalne (`pl-PL-Matcha-*`, `en-US-Paradee`) działają jak inne (`--glos`, `glos` w scenie, edytor HQ), tempo
 `--tempo` też; `wysokosc` pomijają. Czasy słów daje Parakeet (pierwsze użycie pobiera jego model, ~0,65 GB), bez niego:
@@ -50,7 +50,7 @@ nagrania ani klony ludzi. Film z tym lektorem oznaczasz: w opisie filmu i w RAPO
 „Lektor: głos syntetyczny (Matcha-TTS-PL v2, machinekind, CC BY-SA 4.0)”. Nigdy nie przedstawiasz go jako prawdziwej
 osoby (ekspert, klient, pracownik marki z imienia) ani nie udajesz nim kogoś istniejącego.
 
-Lista na żywo: `python3 $HERMES_HOME/scripts/film.py glosy`. Tempo: `+0%` spokojnie, `+5…+12%` social,
+Lista na żywo: `@@PY@@ "$HERMES_HOME/scripts/film.py" glosy`. Tempo: `+0%` spokojnie, `+5…+12%` social,
 powyżej `+15%` traci zrozumiałość. Wysokość: `wysokosc: "-2Hz"` cieplej. Dialog: `glos` w pojedynczej scenie.
 
 ## Lektor filmu z kodu (narracja)
@@ -74,8 +74,8 @@ napisy, `slowa.json` i chwile `{nazwa}` zostają w pisowni z tekstu.
   W narracji fakt zostaje cyframi (sprawdzany z briefem, napis pokazuje „30%”), a brzmienie poprawia `--wymowa`.
 - Obce nazwy marek: zapis fonetyczny w tekście lektora, poprawny zapis w `tekst_ekranowy` i SRT; w narracji
   zapis poprawny w tekście, a fonetyczny w słowniczku briefu albo `--wymowa`.
-- Test wymowy („odsłuch” uszami Parakeet): `film.py lektor "<zdanie>" -o /tmp/test.mp3`, potem
-  `montaz.py transkrypcja /tmp/test.mp3 -o /tmp/test` i porównaj `/tmp/test.txt` z tekstem. Słowo rozpoznane
+- Test wymowy („odsłuch” uszami Parakeet): `film.py lektor "<zdanie>" -o out/test.mp3`, potem
+  `montaz.py transkrypcja out/test.mp3 -o out/test` i porównaj `out/test.txt` z tekstem. Słowo rozpoznane
   inaczej = niewyraźna wymowa: zmień zapis (fonetycznie, prościej) i powtórz.
 
 ## Czysty głos (nagranie właściciela, telefon, laptop)
@@ -100,7 +100,7 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
   z sieci zapisz w RAPORT link do jego strony i nazwę licencji: część darmowych utworów ma zgłoszenia Content ID,
   a ten link pozwala właścicielowi odwołać zgłoszenie.
 - **Muzyka pisana kodem pod obraz** (film z kodu, motion graphics, logo, promo; mgaudio z mg-styles-15, MIT,
-  sample VCSL CC0, więc bez licencji do sprawdzania): `python3 $HERMES_HOME/scripts/muzyka.py zrob obraz.mp4
+  sample VCSL CC0, więc bez licencji do sprawdzania): `@@PY@@ "$HERMES_HOME/scripts/muzyka.py" zrob obraz.mp4
   -o final.mp4 --cues cues.json --styl <styl ze style-motion>` albo `--przepis` (`muzyka.py przepisy`: 15 gatunków
   od synthwave po explainer). Utwór powstaje pod ten film: takt 0 kulminacji w chwili najmocniejszego uderzenia
   z `cues.json` (albo `--kulminacja T`), od logo (ostatni błysk albo `--koniec T`) gra końcowy akord do ostatniej
@@ -120,7 +120,7 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
 - Głośność pod lektorem 0,08–0,16, czyli −22…−16 dB względem głosu (plan: `glosnosc`, domyślnie 0,14); `film.py` ścisza muzykę automatycznie, gdy mówi lektor
   (sidechain) i wycisza ją na końcu.
 - Nigdy: muzyka z list przebojów, „znalezione na YouTube”, muzyka z cudzych filmów.
-- Rytm: `python3 $HERMES_HOME/scripts/rytm.py muzyka.mp3 [--json rytm.json]` (BPM, takty, drop, perkusja): cięcia
+- Rytm: `@@PY@@ "$HERMES_HOME/scripts/rytm.py" muzyka.mp3 [--json rytm.json]` (BPM, takty, drop, perkusja): cięcia
   na taktach, najmocniejsza scena na dropie. Najpierw `siatka`: „pewna” i „dobra” to bity pod cięcia, „niepewna”
   (swobodne tempo, mowa, brak perkusji) to tylko wskazówka, sprawdź uchem.
   Perkusja w trzech pasmach mówi, jaki ruch (za video-shotcraft, Apache-2.0): **stopa** = uderzenie (skok skali,
@@ -135,7 +135,7 @@ hałas (tło ~−15 dB, mowa równiejsza, szczyty do −1 dBFS). `auto` dobiera 
 
 ## Efekty dźwiękowe
 Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność źródeł:
-1. **Biblioteka CC0 (najpierw, montaż i projekt z edytora HQ):** `python3 $HERMES_HOME/scripts/projekt.py dzwieki
+1. **Biblioteka CC0 (najpierw, montaż i projekt z edytora HQ):** `@@PY@@ "$HERMES_HOME/scripts/projekt.py" dzwieki
    [--kategoria K] [--rola R] [--szukaj fraza]`: 157 efektów w 13 kategoriach (przejścia, reakcje, pieniądze, uderzenia,
    akcja, interfejs, technika, natura, zwierzęta, codzienne, zabawne, gry i retro, dżingle) i 9 podkładów (`--muzyka`);
    ta sama biblioteka co menu Audio w edytorze HQ, licencja CC0, bez podpisu. Przy efekcie: szczyt (s od początku
@@ -148,14 +148,14 @@ Prawdziwe nagrania na kliknięcia, świsty, przejścia i lądowania. Kolejność
    Efekt gra od razu w chwili `--start` (cisza na początku pliku jest przycięta). `--na T` zamiast `--start` kładzie
    efekt tak, by jego szczyt trafił w T (narastanie zaczyna się ok. 2 s wcześniej): tak stawiasz efekt na cięciu i akcji.
 2. **Synteza z osi animacji (film z kodu, wiele zdarzeń co do klatki):** efekty bez plików i licencji:
-   `node $ANIM/scripts/sound.mjs cues.json film.mp4 final.mp4 --lufs -14 [--bed muzyka.wav --bed-at 2.0]`
-   (`eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env animacja)"`). `cues.json`: `[{"sfx":"click","t":0.94},
+   `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" uruchom animacja -- node {ANIM}/scripts/sound.mjs cues.json film.mp4 final.mp4 --lufs -14 [--bed muzyka.wav --bed-at 2.0]`
+   (`uruchom animacja` ustawia `ANIM` i `NODE_PATH`). `cues.json`: `[{"sfx":"click","t":0.94},
    {"sfx":"whoosh","t":1.08,"dur":0.5}]`; dźwięki: pop, whoosh, whip, tick, thump, crack, sparkle, buzz, scratch,
    drip, boing, riser, splash, click, step, fall, chime, chirp, burner (+ `vol`, `pan`, `pitch` 0,9–1,3, żeby się nie powtarzały).
    Czasy: zdarzenia w obrazie (klik, zmiana stanu, cięcie) i bity z `rytm.py`; cue **~0,03 s przed** klatką zdarzenia.
    Bez ciągłego „skrobania” pod rysowaniem: dźwięk mają kontakty, nie rysowanie.
 3. **Brak w bibliotece:** biblioteka marki, `@@KNOWLEDGE_DIR@@/wideo/sfx/`, potem **Openverse** (Freesound, bez klucza,
-   bez przeglądarki): `python3 $HERMES_HOME/scripts/stock.py szukaj "whoosh" --typ dzwiek --arkusz out/wideo/fale.png`
+   bez przeglądarki): `@@PY@@ "$HERMES_HOME/scripts/stock.py" szukaj "whoosh" --typ dzwiek --arkusz out/wideo/fale.png`
    (`--rodzaj efekt|tlo|muzyka`; zapytanie prostym słowem po angielsku: whoosh, click, rain, crowd, door). Arkusz fal
    oglądasz `vision_analyze` (ostre uderzenie, narastanie, ciągłe tło), potem `stock.py pobierz openverse:<id>
    --typ dzwiek --do out/wideo/src/sfx`: pobranie sprawdza licencję na stronie pliku i odrzuca dźwięki usunięte przez

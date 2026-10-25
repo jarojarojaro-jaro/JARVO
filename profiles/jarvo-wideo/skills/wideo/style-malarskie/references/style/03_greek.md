@@ -5,7 +5,7 @@ linie wydrapane w czerni), do tego purpurowe pasy z białymi kropkami i pasy orn
 Poznasz go po trzech rzeczach naraz: czarna sylwetka bez obrysu, jasny ryt, purpura z białymi kropkami; gdy są
 wszystkie trzy, żadna faktura nie jest potrzebna. Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia);
 słabość wzoru: dół szaty za gruby (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 03_greek --czasy 0.4,0.6,0.9 --arkusz out/wideo/wzor-03_greek.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 03_greek --czasy 0.4,0.6,0.9 --arkusz out/wideo/wzor-03_greek.jpg`; kod
 `$HUASHU/scripts/engine/scenes/03_greek.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -44,7 +44,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 03_greek --czasy 0.4,0.6,0.9
   podpis `Cinzel-700` 29 px; Cinzel ma polskie znaki. Greckich liter krój nie ma: tylko tabela kresek.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 03_greek`; `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 03_greek`; `P` = `PAINT`
    (`/_lib/huashu/lib/paint.js`), `RIG`, `U`.
 2. Glina (`gr_bg`, cache): w 480×270 per piksel `fbm(×0.016, 4 okt.)` plamy ±30 + `noise(x*0.006, y*0.85)` poziome
    pasy ±9, potem skala do 1920×1080 (16× mniej liczenia, niska częstotliwość i tak jest miękka). Dalej 560 poziomych

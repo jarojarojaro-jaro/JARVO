@@ -9,12 +9,12 @@ Pomysł briefu (sekcje, liczby z oceną i przeliczeniem, analogie z miejscem, w 
 filmu) za anything2explainer; ich licencja jest niekomercyjna, więc bierzemy myśl i liczby, a opis i kod są nasze.
 
 ## Kroki
-1. `python3 $HERMES_HOME/scripts/fakty.py szablon --temat "<temat>" --dlugosc <s>` → `out/fakty.json` z opisem pól.
+1. `@@PY@@ "$HERMES_HOME/scripts/fakty.py" szablon --temat "<temat>" --dlugosc <s>` → `out/fakty.json` z opisem pól.
 2. Śledztwo jak zwykle (metoda-sherlocka): każda strona przez `extract.py`, każda liczba ze źródła A–C
    z cytatem-dowodem (`sources.py quote`). Liczbę wpisujesz cyframi dokładnie tak, jak stoi w źródle albo
    z mnożnikiem („3,5 mln” pokrywa „3 500 000” i „3.5 million”).
 3. Wypełniasz pola (niżej). Wszystko, czego nie potwierdziło źródło A–C, idzie do `niepewne`.
-4. `python3 $HERMES_HOME/scripts/fakty.py sprawdz out/fakty.json` kończy się ✓ (rejestr `out/zrodla.json` obok).
+4. `@@PY@@ "$HERMES_HOME/scripts/fakty.py" sprawdz out/fakty.json` kończy się ✓ (rejestr `out/zrodla.json` obok).
 5. `out/RAPORT.md` krótko: przesłanie, sprzeczności, luki, metoda z wynikiem `sprawdz`, blok „Źródła” z rejestru.
 
 ## Pola

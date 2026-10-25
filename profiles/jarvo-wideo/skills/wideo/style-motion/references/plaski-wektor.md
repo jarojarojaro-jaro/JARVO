@@ -5,7 +5,7 @@ bez cięć, w którym kropka przechodzi z kształtu w kształt. Widz poznaje sty
 Wzór: okładka `$MGSTYLES/videos/01-flat-vector.jpg`, kod `$MGSTYLES/demos/01-flat-vector/` (MIT), ocena jury 7,64;
 1920×1080, 30 kl./s, 10 s (300 klatek), jedno SVG i jeden skrypt, bez bibliotek; ok. 0,2 s na klatkę na CPU:
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/01-flat-vector/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/01-flat-vector/index.html" --preset mg \
   --czasy 0.5,1.4,3,3.5,5.1,6,8.5,9.5 --arkusz out/wideo/wzor-01-flat-vector.jpg
 ```
 
@@ -85,7 +85,7 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/01-flat-vector
 - Przelot przez okno w skali liniowej: najpierw stoi, potem skacze. Zoom tylko w skali log.
 
 ## Kontrola
-- `python3 $HERMES_HOME/scripts/html_wideo.py klatki out/wideo/src/index.html --preset jarvo
+- `@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki out/wideo/src/index.html --preset jarvo
   --czasy 0.5,0.8,2,4,11.9,12,16.5,19.5 --arkusz out/wideo/arkusz.jpg`: w każdej klatce jeden bohater; w kodzie
   strony zero `Gradient`, `filter` i `blur`.
 - `krytyka.py pasek out/wideo/film.mp4 --t 0.5 --klatek 12`: ściśnięcie w 1–2 klatkach kontaktu, kształt wraca

@@ -10,10 +10,12 @@ Protokół [IndexNow](https://www.indexnow.org/documentation): strona ma plik `h
 a my wysyłamy listę zmienionych adresów. Wyszukiwarki IndexNow (m.in. Bing, Yandex, Seznam, Naver) dzielą się
 zgłoszeniami, więc jedno zgłoszenie do `api.indexnow.org` wystarcza. Google IndexNow nie obsługuje.
 
-- Klucz powstaje raz, przy zakładaniu projektu: `python3 indexnow.py klucz <projekt>/public` (skill `nowa-strona`).
+- Klucz powstaje raz, przy zakładaniu projektu: `@@PY@@ "@@REPO_DIR@@/profiles/jarvo-web/scripts/indexnow.py" klucz <projekt>/public`
+  (skill `nowa-strona`).
   Plik trafia do `dist/`, więc jest w odcisku zgody. Klucz jest jawny z założenia, to nie sekret.
   Starszy projekt bez klucza: klucz dodajemy przed buildem, który idzie do zgody, nigdy po zgodzie.
-- Po wdrożeniu: `python3 indexnow.py zglos https://domena.pl --katalog <projekt>/public`. Skrypt czyta sitemapę z produkcji,
+- Po wdrożeniu: `@@PY@@ "@@REPO_DIR@@/profiles/jarvo-web/scripts/indexnow.py" zglos https://domena.pl --katalog <projekt>/public`.
+  Skrypt czyta sitemapę z produkcji,
   sprawdza, że plik klucza jest na stronie, i dopiero wtedy wysyła. Po zmianie kilku podstron: `--url` dla każdej z nich.
 - Odpowiedź 200 albo 202 jest w porządku (202: klucz jeszcze sprawdzany, adresy przyjęte). 403: plik klucza nie
   dotarł na produkcję. 422: adres spoza domeny. 429: za często, zgłaszamy tylko po zmianach, nie codziennie.

@@ -19,7 +19,7 @@ Zasady wyciągnięte z kart gramatyk, które działają po zmianie gramatyki. W 
 
 ## Biblioteka – ściąga
 
-Strona filmu (kontrakt jarvo) ładuje biblioteki z `/_lib/huashu/` (= `$HUASHU/scripts/engine/`, instalacja: `python3 $HERMES_HOME/scripts/narzedzia.py instaluj huashu`). Ładuj wszystkie w kolejności z ich `clip.html`, bo wołają się nawzajem (`CH` i `TOON` używają `TY`, `DG` używa `CAM`, `TY` używa `CL`): `lib/fonts.js`, `lib/util.js` (`U`: `clamp/lerp/hash/rng`…), `lib/paint.js` (`PAINT`: `hex/cached`…), `lib/kit.js`, potem pliki z tabeli; do tego polska nakładka `/_lib/jarvo/huashu_pl.js` (kroje z polskimi znakami, polski `TY.fmt`).
+Strona filmu (kontrakt jarvo) ładuje biblioteki z `/_lib/huashu/` (= `$HUASHU/scripts/engine/`, instalacja: `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" instaluj huashu`). Ładuj wszystkie w kolejności z ich `clip.html`, bo wołają się nawzajem (`CH` i `TOON` używają `TY`, `DG` używa `CAM`, `TY` używa `CL`): `lib/fonts.js`, `lib/util.js` (`U`: `clamp/lerp/hash/rng`…), `lib/paint.js` (`PAINT`: `hex/cached`…), `lib/kit.js`, potem pliki z tabeli; do tego polska nakładka `/_lib/jarvo/huashu_pl.js` (kroje z polskimi znakami, polski `TY.fmt`).
 
 ```html
 <script src="/_lib/huashu/lib/fonts.js"></script>

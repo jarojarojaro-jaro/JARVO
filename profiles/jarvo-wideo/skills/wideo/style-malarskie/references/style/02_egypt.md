@@ -5,7 +5,7 @@ ludzie w kanonie (twarz z profilu, oko en face, oba ramiona od przodu), kolumny 
 Poznasz go po ręcznie rysowanych hieroglifach, czterokolorowych ramach i promieniach Atona zakończonych dłońmi.
 Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: łokieć ręki z naczyniem zbyt sztywny
 (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 02_egypt --czasy 0.45,0.7,0.9 --arkusz out/wideo/wzor-02_egypt.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 02_egypt --czasy 0.45,0.7,0.9 --arkusz out/wideo/wzor-02_egypt.jpg`; kod
 `$HUASHU/scripts/engine/scenes/02_egypt.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -48,7 +48,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 02_egypt --czasy 0.45,0.7,0.
   oba mają polskie znaki.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 02_egypt`; `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 02_egypt`; `P` = `PAINT`
    (`/_lib/huashu/lib/paint.js`), `RIG` (`lib/rig.js`), `U` (`lib/util.js`).
 2. Warstwa statyczna `eg_static` (cache raz): tynk → kolumny hieroglifów → okno (gzyms, rama z bloków, białe tło,
    dysk Atona, ureusz) → 3 dzbany → stół ofiarny z darami → złote krzesło → niebieska misa → linia ziemi i fryzy

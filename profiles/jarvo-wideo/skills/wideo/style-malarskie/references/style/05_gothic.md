@@ -4,7 +4,7 @@ Strona iluminowanego rękopisu z ok. 1290 r.: pergamin, płatkowe złoto z tłoc
 witraż, łaciński tekst frakturą z czerwonymi inicjałami, drolerie na marginesach (wici, ślimak, mysz, rycerzyk).
 Poznasz go po złocie: ma szczotkowaną fakturę i przesuwa się po nim skośny błysk. Jakość wzoru: ★★★ (rozpoznawalny od
 razu, gotowy do użycia); słabość wzoru: złote włosy postaci wyglądają jak kaptur (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 05_gothic --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-05_gothic.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 05_gothic --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-05_gothic.jpg`; kod
 `$HUASHU/scripts/engine/scenes/05_gothic.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -40,7 +40,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 05_gothic --czasy 0.3,0.6,0.
   biel `#f8f2e2`; drewno `#8a5a2c` / `#5a3818`; skóra `#f5dcc2`; włosy `#e9b746` / `#9a6618`.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 05_gothic`; `P` = `PAINT`, `RIG`, `U`.
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 05_gothic`; `P` = `PAINT`, `RIG`, `U`.
 2. Warstwa statyczna `goth_static` (cache w `init()`): pergamin
    `P.texture('goth_parch', C.parch, { scale: 0.0028, amt: 20, grain: 9, dark: C.parchDk, seed: 3 })` → złoto
    (`goth_goldTex`) → romby → szczyt, pinakle, kolumny boczne → ostrołukowe okno z witrażem → stół i tron →

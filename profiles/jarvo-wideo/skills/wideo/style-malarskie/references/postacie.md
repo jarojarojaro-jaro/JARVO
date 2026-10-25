@@ -14,7 +14,7 @@ kitu); nigdy wizerunek realnej osoby. Metoda całości: `metoda.md`.
 
 Ludzie i postacie uczłowieczone: B albo C. Postacie geometryczne mogą zostać w kodzie. Znane słabości postaci
 w danym stylu opisuje karta stylu. Efekt drogi C widać we wzorach gramatyk:
-`python3 $HERMES_HOME/scripts/gramatyka.py wzor kurzgesagt --arkusz out/wideo/wzor-kurzgesagt.jpg` i `… wzor tablica …`.
+`@@PY@@ "$HERMES_HOME/scripts/gramatyka.py" wzor kurzgesagt --arkusz out/wideo/wzor-kurzgesagt.jpg` i `… wzor tablica …`.
 
 ## B: wklejanie gotowej biblioteki klatek
 
@@ -48,12 +48,12 @@ w danym stylu opisuje karta stylu. Efekt drogi C widać we wzorach gramatyk:
 3. **Wycięcie i cięcie na klatki** (`malarz.py`, port ich `key_split.py` i `key_green.py`; ich `uv` nie używamy):
    ```sh
    # zielone tło → przezroczystość, usunięcie zielonej poświaty, cięcie na pozy po pustych kolumnach
-   python3 $HERMES_HOME/scripts/malarz.py potnij out/wideo/src/surowe/chod.png --out out/wideo/src/klatki/chod
+   @@PY@@ "$HERMES_HOME/scripts/malarz.py" potnij out/wideo/src/surowe/chod.png --out out/wideo/src/klatki/chod
    #   → chod_0.png, chod_1.png, …; --pick 2 zapisuje tylko trzecią pozę (chod.png)
    # linia z tablicy na białym tle: bez wycinania, samo przycięcie; w scenie wklejasz z multiply
-   python3 $HERMES_HOME/scripts/malarz.py potnij out/wideo/src/surowe/tablica.png --out out/wideo/src/klatki/tablica --white
+   @@PY@@ "$HERMES_HOME/scripts/malarz.py" potnij out/wideo/src/surowe/tablica.png --out out/wideo/src/klatki/tablica --white
    # postać ma zostać w miejscu z klatki (warstwy drogi B): przycięcie z zapisem pozycji w sprites.json
-   python3 $HERMES_HOME/scripts/malarz.py wytnij out/wideo/src/surowe/*.png --out out/wideo/src/sprites
+   @@PY@@ "$HERMES_HOME/scripts/malarz.py" wytnij out/wideo/src/surowe/*.png --out out/wideo/src/sprites
    ```
    `potnij` tnie tylko po kolumnach: pozy muszą dzielić pasy tła (przerwy węższe niż 12 px łączą pozy,
    kawałki węższe niż 40 px odpadają), a pozy jednej kolumny zostają razem. Arkusz 4×2 najpierw przetnij na dwa

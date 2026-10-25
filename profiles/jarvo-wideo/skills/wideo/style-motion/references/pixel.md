@@ -5,7 +5,7 @@ a całość świeci przez kineskop. Poznasz go po ostrych pikselach, ditheringu 
 Wzór: okładka `$MGSTYLES/videos/20-pixel.jpg`, kod `$MGSTYLES/demos/20-pixel/` (MIT), ocena jury 8,07;
 1920×1080 (bufor 320×180 × 6), 30 kl./s, 10 s. Klatki wzoru (6,4 s = otwarcie skrzyni; ok. 0,45 s na klatkę):
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/20-pixel/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/20-pixel/index.html" --preset mg \
   --czasy 0.2,2.4,4.6,6.4,7.4,9 --arkusz out/wideo/wzor-20-pixel.jpg
 ```
 `--query nocrt=1` pokazuje obraz bez kineskopu, `--query sheet=1` arkusz sprite'ów.

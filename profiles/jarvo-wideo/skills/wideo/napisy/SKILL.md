@@ -35,7 +35,7 @@ Pozycja domyślna: dół poza strefą opisu i przycisków (9:16: 26% od dołu, n
 Tekst ekranowy (hook) jest u góry i nie koliduje z napisami.
 
 ## Kroki
-1. **Transkrypcja:** `python3 $HERMES_HOME/scripts/napisy.py <wideo>` → `<wideo>.srt` (+ `.ass`).
+1. **Transkrypcja:** `@@PY@@ "$HERMES_HOME/scripts/napisy.py" <wideo>` → `<wideo>.srt` (+ `.ass`).
 2. **Korekta SRT** (obowiązkowa): nazwy własne i marki (z brand kitu), liczby i jednostki, polskie znaki, wulgaryzmy
    (wyciąć albo wygwiazdkować wg karty), podział na sensowne frazy. Czasów nie ruszam, chyba że linia jest pusta.
 3. **Wypalenie:** `napisy.py <wideo> --srt <poprawiony.srt> --wypal [--styl zwykle] [--akcent "#FFD400"]

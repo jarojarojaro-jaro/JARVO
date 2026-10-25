@@ -34,7 +34,7 @@ Adres strony firmy (wymagany) i nazwa firmy (z karty albo z KRS); opcjonalnie ID
 Bez adresu strony: pytasz (`kanban_block(kind="needs_input")`), nie zgadujesz domeny.
 
 ## Kroki
-1. **Przebieg:** `python3 $HERMES_HOME/scripts/audyt_mobilny.py audyt <url> --nazwa "<firma>" --opinie
+1. **Przebieg:** `@@PY@@ "$HERMES_HOME/scripts/audyt_mobilny.py" audyt <url> --nazwa "<firma>" --opinie
    --out out/audyt-mobilny/<slug>` (z `--ios <id>` / `--android <pakiet>`, gdy je znasz). Trwa 30–90 s (limit iTunes API).
    Kod 3 = źródło odmówiło (blokada): raz ponów po kilku minutach, potem oddaj z opisem blokady. Kod 1 = sieć: ponów raz.
 2. **Aplikacje firmy:** skrypt bierze je z linków na stronie, banera, `apple-app-site-association`, `assetlinks.json`

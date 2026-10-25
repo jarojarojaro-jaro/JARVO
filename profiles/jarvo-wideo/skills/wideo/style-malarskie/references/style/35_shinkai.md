@@ -4,7 +4,7 @@ Japońska animacja kinowa z 2016 roku: prawie fotograficzne tło, niebo z wielki
 światła (efekt Tyndalla), postać rysunkowa z twardymi pasmami cienia i jasną obwódką od światła (cel-shading), flara
 obiektywu, poświata (bloom) i drobinki światła w powietrzu. Jakość wzoru: ★★ (rozpoznawalny, ale z wyraźną
 słabością); słabość wzoru: tło we wnętrzu ma za mało szczegółów (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 35_shinkai --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-35_shinkai.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 35_shinkai --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-35_shinkai.jpg`;
 kod `$HUASHU/scripts/engine/scenes/35_shinkai.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -48,7 +48,7 @@ technikę, nie scenę.
 - Krój plakietki we wzorze: `Poppins-600`; ma polskie znaki.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 35_shinkai`. `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 35_shinkai`. `P` = `PAINT`
    (`paint.js`, `render.js` z `P.cel`, `post.js` z `P.lensFlare`/`P.bloom`), `RIG`.
 2. Realistyczne wnętrze (ściana z gradientem ciepło-zimnym, perspektywiczne szczeliny podłogi z odbiciem, aluminiowa
    rama okna, kalendarz, biurko) raz do cache (`sk_room`).

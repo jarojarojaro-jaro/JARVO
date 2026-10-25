@@ -33,13 +33,13 @@ motywy Jarva, polskie kroje i kontrolę, a `html_wideo.py` (preset `livepanel`) 
    klienta, `fleet.yaml`) albo jest poglądowa i ekran to mówi (linia `credit`: „liczby poglądowe”). Nie zmyślamy
    wyników ani pomiarów.
 2. **Config JSON.** Start: `references/flota-jarva.json` (motyw jasny, Instagram 4:5, jedna maszyna `cycle` z 8 krokami
-   po 3,5 s, która steruje obwódkami, strzałkami i listą) albo konfiguracje z `$HERMES_HOME/skills/video/live-panel/examples/`.
+   po 3,5 s, która steruje obwódkami, strzałkami i listą) albo konfiguracje z `"$HERMES_HOME/skills/video/live-panel/examples/"`.
    Pola: `live-panel/references/config-schema.md`. **Przed wyborem maszyn przeczytaj `live-panel/references/motion-grammar.md`.**
-   Format `canvas.preset` (`python3 $HERMES_HOME/scripts/zywy_schemat.py formaty`): `x`, `ig`, `pion`, `kwadrat`, `poziom`.
+   Format `canvas.preset` (`@@PY@@ "$HERMES_HOME/scripts/zywy_schemat.py" formaty`): `x`, `ig`, `pion`, `kwadrat`, `poziom`.
    Motyw `theme.preset`: `jarvo-jasny`, `jarvo-ciemny` albo marka klienta (`colors` z przewodnika marki, krój z zestawu Jarva).
    Pozycje są w pikselach płótna: inny format to osobny config. Współrzędne licz skryptem (pętla po ramkach), nie
    wpisuj ręcznie. Tekst w bezpiecznych marginesach: 6% boków, 8% góry i dołu (pion: strefy UI platformy).
-3. **Strona:** `python3 $HERMES_HOME/scripts/zywy_schemat.py strona schemat.json -o out/wideo/<projekt>/schemat.html`
+3. **Strona:** `@@PY@@ "$HERMES_HOME/scripts/zywy_schemat.py" strona schemat.json -o out/wideo/<projekt>/schemat.html`
    (uwagi `!` o braku źródeł i krojach spoza zestawu poprawiasz od razu). Strona działa offline w każdej przeglądarce, w pętli.
 4. **Kontrola** (wszystko na tej samej stronie, `P=out/wideo/<projekt>`):
    - `zywy_schemat.py sprawdz $P/schemat.html`: kod 0 (tekst w ramkach, ramki nie nachodzą na siebie, brak błędów strony);

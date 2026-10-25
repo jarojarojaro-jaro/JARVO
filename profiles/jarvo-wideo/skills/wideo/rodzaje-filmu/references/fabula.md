@@ -49,4 +49,4 @@ Dźwięk (muzyka, efekty, głos):                  Marka (czy i gdzie, subtelnie
 - Test opowiedzenia: czy da się streścić film jednym zdaniem zgodnym z premisą z briefu.
 
 ## Inspiracje
-`python3 $HERMES_HOME/scripts/inspiracje.py fabula --ile 3` (albo `--szukaj storybook`).
+`@@PY@@ "$HERMES_HOME/scripts/"inspiracje.py fabula --ile 3` (albo `--szukaj storybook`).

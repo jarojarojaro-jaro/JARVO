@@ -17,7 +17,7 @@ metadata:
 Bryła 3D opisana kodem Pythona (build123d na jądrze OpenCascade, tym samym co FreeCAD): wymiary w milimetrach,
 parametry na górze skryptu, zmiana wymiaru = jedna liczba i ponowna budowa. Z jednego skryptu powstaje komplet:
 **STEP** (CAD, CNC, wycena u wykonawcy), **STL** i **3MF** (druk 3D), **GLB** (strona, aplikacja, scena Three.js),
-raport (wymiary, objętość, masa, poprawność) oraz podgląd **PNG** i **film obrotu MP4**. Wszystko na serwerze,
+raport (wymiary, objętość, masa, poprawność) oraz podgląd **PNG** i **film obrotu MP4**. Wszystko na tym komputerze,
 bez sieci i bez tokenów na render.
 
 ## Kiedy użyć
@@ -38,12 +38,12 @@ bez sieci i bez tokenów na render.
 
 ## Kroki
 ```bash
-C=$HERMES_HOME/skills/design/warsztat-3d/scripts/cad.py
-python3 $C stan                                            # silnik, node, ffmpeg na miejscu
-python3 $C zbuduj model.py -o out/3d/uchwyt --podglad      # STEP, STL, GLB, 3MF, raport JSON i PNG
-python3 $C zbuduj model.py -o out/3d/uchwyt --formaty stl,3mf --material petg
-python3 $C podglad out/3d/uchwyt/model.glb -o out/3d/uchwyt/spod.png --wysokosc -40 --siatka
-python3 $C obrot out/3d/uchwyt/model.glb -o out/3d/uchwyt/obrot.mp4 --sekundy 6 --rozmiar 1080x1080
+C="$HERMES_HOME/skills/design/warsztat-3d/scripts/cad.py"
+@@PY@@ "$C" stan                                            # silnik, node, ffmpeg na miejscu
+@@PY@@ "$C" zbuduj model.py -o out/3d/uchwyt --podglad      # STEP, STL, GLB, 3MF, raport JSON i PNG
+@@PY@@ "$C" zbuduj model.py -o out/3d/uchwyt --formaty stl,3mf --material petg
+@@PY@@ "$C" podglad out/3d/uchwyt/model.glb -o out/3d/uchwyt/spod.png --wysokosc -40 --siatka
+@@PY@@ "$C" obrot out/3d/uchwyt/model.glb -o out/3d/uchwyt/obrot.mp4 --sekundy 6 --rozmiar 1080x1080
 ```
 1. **Wymagania w liczbach.** Zanim napiszesz kod: wymiary (mm), do czego pasuje (śruba M4? płytka 50 × 30?),
    materiał i sposób wykonania (druk FDM, frez, tylko wizualizacja). Brakuje kluczowego wymiaru → jedno pytanie
@@ -59,7 +59,7 @@ python3 $C obrot out/3d/uchwyt/model.glb -o out/3d/uchwyt/obrot.mp4 --sekundy 6 
    właściciela: wymiary, masa w wybranym materiale (przy 100% wypełnienia; realny wydruk 15–20% wypełnienia waży
    mniej), które pliki do slicera (3MF albo STL; zestaw: osobny STL każdej części).
 6. **Oddaj:** PNG i (na prośbę albo do filmu) MP4 liniami `MEDIA:<ścieżka>`; pliki CAD (STEP, STL, 3MF, GLB) też
-   `MEDIA:`, a przy wielu plikach link do katalogu `python3 /opt/jarvo/repo/scripts/jarvo_link.py <katalog>`.
+   `MEDIA:`, a przy wielu plikach link do katalogu `@@PY@@ "@@REPO_DIR@@/scripts/jarvo_link.py" <katalog>`.
    W odpowiedzi: co to jest, wymiary, masa, co przyjąłeś bez danych od właściciela, jak zmienić (parametr w skrypcie).
 
 ## Opcje

@@ -30,4 +30,4 @@ Wątki: <lista>. Wyszukiwania: <liczba>, języki: PL/EN. Źródła pierwotne: <l
 Sprawdzenie cytowań: <linia `info:` z `sources.py verify out/RAPORT.md --min-coverage 0.5`>.
 
 ## Źródła
-<blok z `python3 $HERMES_HOME/scripts/sources.py render --replace-in out/RAPORT.md`; podmienia tę sekcję>
+<blok z `@@PY@@ "$HERMES_HOME/scripts/sources.py" render --replace-in out/RAPORT.md`; podmienia tę sekcję>

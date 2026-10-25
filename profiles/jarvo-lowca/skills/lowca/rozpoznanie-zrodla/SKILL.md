@@ -38,17 +38,17 @@ klikasz strony przy każdym przebiegu i nie piszesz 800 linii automatyzacji prze
    czasem rekordy są już w dokumencie i żadne dodatkowe żądanie nie jest potrzebne.
 2. **Dwa nagrania różniące się JEDNĄ rzeczą** (strona 2 zamiast 1, inna fraza, jeden filtr):
    ```bash
-   S=$HERMES_HOME/scripts; Z=@@WORKSPACES_DIR@@/jarvo-lowca/zrodla/<nazwa>
-   python3 $S/zrodlo.py nagraj "<url z frazą/stroną 1>" -o $Z/a.har [--przewin]
-   python3 $S/zrodlo.py nagraj "<ten sam url, strona 2>" -o $Z/b.har
-   python3 $S/zrodlo.py har $Z/a.har            # żądania z danymi, parametry, kształt odpowiedzi, ETag, zależności
-   python3 $S/zrodlo.py roznice $Z/a.har $Z/b.har
+   S="$HERMES_HOME/scripts"; Z="@@WORKSPACES_DIR@@/jarvo-lowca/zrodla/<nazwa>"
+   @@PY@@ "$S/zrodlo.py" nagraj "<url z frazą/stroną 1>" -o "$Z/a.har" [--przewin]
+   @@PY@@ "$S/zrodlo.py" nagraj "<ten sam url, strona 2>" -o "$Z/b.har"
+   @@PY@@ "$S/zrodlo.py" har "$Z/a.har"            # żądania z danymi, parametry, kształt odpowiedzi, ETag, zależności
+   @@PY@@ "$S/zrodlo.py" roznice "$Z/a.har" "$Z/b.har"
    ```
    Powtarzasz dla wyszukiwania, filtra i stronicowania osobno. Z różnic składasz **model zapytań**: który parametr
    to fraza, który filtr, jak działa stronicowanie (numer strony, offset, kursor z poprzedniej odpowiedzi), które
    wywołanie musi być pierwsze (token, identyfikator; `zrodlo.py har` pokazuje to jako „zależność”).
-3. **Schemat z 20–30 RÓŻNYCH odpowiedzi** (inne frazy, filtry, typy rekordów, dalsze strony), zapisanych w `$Z/odp/`
-   albo jako kolejne nagrania: `python3 $S/zrodlo.py schemat $Z/odp $Z/*.har --zadanie <ścieżka z har>` (bez
+3. **Schemat z 20–30 RÓŻNYCH odpowiedzi** (inne frazy, filtry, typy rekordów, dalsze strony), zapisanych w `"$Z/odp/"`
+   albo jako kolejne nagrania: `@@PY@@ "$S/zrodlo.py" schemat "$Z/odp" "$Z"/*.har --zadanie <ścieżka z har>` (bez
    `--zadanie` dostajesz listę żądań do wyboru; schemat liczy się dla jednego). Pola opcjonalne, `null`, niespójne
    typy (id raz liczbą, raz tekstem) idą do `ZRODLO.md`: skrypt zbudowany na pierwszych 100 rekordach po cichu gubi
    pola, które pojawiają się dalej.
@@ -57,7 +57,7 @@ klikasz strony przy każdym przebiegu i nie piszesz 800 linii automatyzacji prze
    serwer oddaje więcej, niż widać na ekranie: bierzesz tylko pola potrzebne do sygnału i kontaktu firmy.
 5. **Przyrostowo:** ETag, Last-Modified, daty zmian w rekordach, stałe identyfikatory (`zrodlo.py har` wypisuje nagłówki). Opisujesz,
    jak monitoring pobierze tylko zmiany zamiast całego zbioru przy każdym przebiegu.
-6. **`ZRODLO.md`** w `$Z/`: adres i właściciel źródła, granice (API oficjalne, robots, regulamin, decyzja człowieka),
+6. **`ZRODLO.md`** w `"$Z/"`: adres i właściciel źródła, granice (API oficjalne, robots, regulamin, decyzja człowieka),
    żądania (metoda, ścieżka, parametry, kolejność), stronicowanie, limity i pauzy, schemat z polami opcjonalnymi,
    mapowanie na `sygnaly.jsonl` (typ sygnału, data, firma: NIP / KRS / www), sposób pobierania przyrostowego.
 

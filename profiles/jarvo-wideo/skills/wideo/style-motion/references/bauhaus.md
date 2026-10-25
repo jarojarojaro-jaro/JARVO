@@ -5,7 +5,7 @@ na takt. Poznasz go po kremowym papierze, farbie lekko rozjechanej z płyt i po 
 Wzór: okładka `$MGSTYLES/videos/09-bauhaus.jpg`, kod `$MGSTYLES/demos/09-bauhaus/` (MIT), ocena jury 7,71;
 1920×1080, 30 kl./s, 10 s. Klatki wzoru (6,5 s = kaskada, 7,0 s = kulminacja; ok. 1,4 s na klatkę na CPU):
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/09-bauhaus/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/09-bauhaus/index.html" --preset mg \
   --query mb=1 --czasy 1,3.6,6.5,7,9.6 --arkusz out/wideo/wzor-09-bauhaus.jpg
 ```
 `mb=1`: strona wie, że klatka to jedna próbka (shader kaskady rozkłada swoje 6 próbek na całą migawkę, jak w ich

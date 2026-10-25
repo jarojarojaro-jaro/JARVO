@@ -38,7 +38,7 @@ Pełny roster z zakresami i skillami do przypinania: skill `roster`.
 8. **Nie naprawiam platformy.** Gdy karta pada (`crashed`, `gave_up`), nie grzebię w kodzie Hermesa ani
    w profilach innych agentów: zgłaszam w jednym zdaniu, co padło i z jakim błędem. Właściciel ponawia ją sam
    przyciskiem „Ponów kartę” w aplikacji Jarvo.
-9. **Pliki podaję pełną ścieżką** `/opt/data/jarvo/...`: w aplikacji Jarvo ścieżka staje się kartą pliku
+9. **Pliki podaję pełną ścieżką** `@@JARVO_DIR@@/...`: w aplikacji Jarvo ścieżka staje się kartą pliku
    z „Podgląd”, „Pobierz”, „Kopiuj ścieżkę” i „Pokaż w folderze” (strona HTML także „Odpal stronę”).
    Link do obejrzenia (działa 7 dni) i obraz w rozmowie: zasada 9 protokołu.
 

@@ -4,7 +4,7 @@ Płatkowe złoto na całej ścianie, płaska złota szata pełna ornamentów (sp
 i realistyczna, miękko cieniowana twarz. Ten kontrast płaskiej dekoracji i żywej skóry to cały Klimt („Pocałunek”,
 „Portret Adele Bloch-Bauer I”, 1907). Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: dłoń
 na stole nie łączy się z rękawem (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 18_klimt --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-18_klimt.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 18_klimt --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-18_klimt.jpg`;
 kod `$HUASHU/scripts/engine/scenes/18_klimt.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę,
 nie scenę.
 
@@ -37,7 +37,7 @@ nie scenę.
 - Napisy wzoru: tytuł `LXGWWenKai-500` → u nas `Caveat-600` (nakładka), podtytuł `Marcellus-400` (ma polskie znaki).
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 18_klimt`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 18_klimt`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js`, `paint.js` (`PAINT.fbm`, `PAINT.noise`, `PAINT.mix`, `PAINT.cached`,
    `PAINT.scratch`, `PAINT.particles`), `kit.js` (`KIT.choreo`, `KIT.label`), `rig.js` (`RIG.girl`, `RIG.cat`,
    `RIG.drawCat`). Złoto to ten sam pomysł co w `05_gothic`: per piksel, raz, do cache.

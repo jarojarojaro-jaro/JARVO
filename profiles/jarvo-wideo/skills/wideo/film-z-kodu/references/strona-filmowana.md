@@ -7,7 +7,7 @@ w slocie) i video-talkcraft (licencja niekomercyjna: wzięte tylko pomysły i li
 
 ## 1. Zrzut (`assety.py --film`)
 ```bash
-python3 $HERMES_HOME/scripts/assety.py <URL> --film --out out/wideo/src/<nazwa>/assets [--podstrony /cennik] [--wycinki "cta=.btn-primary"]
+@@PY@@ "$HERMES_HOME/scripts/assety.py" <URL> --film --out out/wideo/src/<nazwa>/assets [--podstrony /cennik] [--wycinki "cta=.btn-primary"]
 ```
 `--out` w katalogu animacji: `html_wideo.py` serwuje tylko katalog strony (`out/wideo/src/<nazwa>/`).
 | Plik w `assets/` | Co |

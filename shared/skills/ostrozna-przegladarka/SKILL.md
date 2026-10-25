@@ -31,11 +31,11 @@ jest stan bieżący albo kopii nie ma.
 
 ## Krok
 ```bash
-O=$HERMES_HOME/skills/web/ostrozna-przegladarka/scripts/ostrozna.py
-python3 $O "<url>"                              # Markdown głównej treści (z linkami)
-python3 $O "<url>" -o out/strony/firma.md       # to samo do pliku (cała treść)
-python3 $O "<url>" --html -o out/strony/a.html  # HTML po JavaScripcie
-python3 $O "<url>" --zrzut out/strony/a.png     # zrzut całej strony
+O="$HERMES_HOME/skills/web/ostrozna-przegladarka/scripts/ostrozna.py"
+@@PY@@ "$O" "<url>"                              # Markdown głównej treści (z linkami)
+@@PY@@ "$O" "<url>" -o out/strony/firma.md       # to samo do pliku (cała treść)
+@@PY@@ "$O" "<url>" --html -o out/strony/a.html  # HTML po JavaScripcie
+@@PY@@ "$O" "<url>" --zrzut out/strony/a.png     # zrzut całej strony
 ```
 Kody: 0 strona przeczytana, 1 błąd (sieć, 404), 2 zły adres, **3 blokada**, 4 limit.
 
@@ -48,7 +48,7 @@ Kody: 0 strona przeczytana, 1 błąd (sieć, 404), 2 zły adres, **3 blokada**, 
 - **4:** limit domeny albo przeglądarka zajęta. Nie omijasz go: odłóż stronę albo zgłoś.
 
 ## Granice (pilnuje ich skrypt)
-- jedna strona na wywołanie; jedna przeglądarka naraz na serwerze (~0,8 GB RAM, zwykła ~0,03–0,3 GB),
+- jedna strona na wywołanie; jedna przeglądarka naraz na tym komputerze (~0,8 GB RAM, zwykła ~0,03–0,3 GB),
 - co najmniej 20 s między stronami jednej domeny, najwyżej 30 stron domeny na dobę; nie przeglądasz katalogu strona
   po stronie: do wielu rekordów służy API albo rozpoznanie źródła (`rozpoznanie-zrodla`) i decyzja człowieka,
 - robots.txt czytany tą samą przeglądarką: zakaz albo robots.txt niedostępny = blokada,

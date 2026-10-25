@@ -53,4 +53,4 @@ Muzyka (BPM, takty, licencja):                  Pętla tak/nie, długość, form
 - Klatka pierwsza obok ostatniej (pętla); czytelność na 360 px szerokości (zmniejsz arkusz i obejrzyj).
 
 ## Inspiracje
-`python3 $HERMES_HOME/scripts/inspiracje.py motion-graphics --ile 3` (albo `--szukaj "infinite zoom"`, `--tag shader`).
+`@@PY@@ "$HERMES_HOME/scripts/"inspiracje.py motion-graphics --ile 3` (albo `--szukaj "infinite zoom"`, `--tag shader`).

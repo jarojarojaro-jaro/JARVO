@@ -4,7 +4,7 @@ Nowy Jork 1982, od kredowych rysunków w metrze do sklepu Pop Shop: płaskie czy
 jednakowo grubą czarną linią z zaokrąglonymi końcami, tańczące ludziki, „promieniste dziecko”, krótkie kreski ruchu
 wokół przedmiotów, a całość podskakuje do rytmu. Postacie bez twarzy. Jakość wzoru: ★★★ (rozpoznawalny od razu,
 gotowy do użycia); słabość wzoru: dziewczyna jest za mało „haringowa” (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 31_haring --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-31_haring.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 31_haring --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-31_haring.jpg`;
 kod `$HUASHU/scripts/engine/scenes/31_haring.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -37,7 +37,7 @@ technikę, nie scenę.
 - Krój plakietki we wzorze: `Kalam-700`; ma polskie znaki.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 31_haring`. `P` = `PAINT`,
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 31_haring`. `P` = `PAINT`,
    `RIG` (`lib/rig.js`: `RIG.limb`, `RIG.girl`, `RIG.cat`, `RIG.drawGirl`, `RIG.drawCat`).
 2. Tło płaskie i linia horyzontu.
 3. Okno: gruba czarna rama, niebieskie tło, w środku promieniste dziecko (biała sylwetka obrysowana 22 px, 14

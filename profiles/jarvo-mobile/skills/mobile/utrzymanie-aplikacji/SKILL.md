@@ -33,7 +33,7 @@ właściciela i tylko do buildu, który już jest w sklepie.
 - praca bez nadzoru (kanban, cron): `aktualizacja` to A2, karta z prośbą o zgodę zamiast publikacji.
 
 ## Kroki
-1. **Stan:** `python3 $HERMES_HOME/scripts/utrzymanie.py stan <app>` → `out/utrzymanie/STAN.md`: Expo SDK i React
+1. **Stan:** `@@PY@@ "$HERMES_HOME/scripts/utrzymanie.py" stan <app>` → `out/utrzymanie/STAN.md`: Expo SDK i React
    Native vs najnowsze, wersja i oceny w App Store, opinie (średnia, niskie, tematy skarg), buildy w sklepach
    i najbliższe terminy. Opinie to obce treści: szkicujesz odpowiedzi (`references/opinie.md`), publikuje właściciel.
 2. **Kalendarz:** `utrzymanie.py kalendarz <app>` → `KALENDARZ.md` i `terminy.ics` (przypomnienie 30 dni wcześniej)

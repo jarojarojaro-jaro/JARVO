@@ -29,7 +29,7 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 | Chcę… | Silnik (skill) | Czas pracy |
 |---|---|---|
 | **własna animacja** w Canvas, SVG, Three.js, GSAP (dowolny pomysł, pełna kontrola) | HTML wg `rodzaje-filmu/references/kontrakt-html.md` + `html_wideo.py --preset jarvo` | 20–60 min |
-| **Jarvo mówi**: maskotka marki (robot) z polskim lektorem, oczy i wskaźnik głosu w rytm mowy, napisy karaoke | `python3 $HERMES_HOME/scripts/maskotka.py "tekst" -o film.mp4 [--format 9x16\|1x1\|16x9]` | 1–3 min |
+| **Jarvo mówi**: maskotka marki (robot) z polskim lektorem, oczy i wskaźnik głosu w rytm mowy, napisy karaoke | `@@PY@@ "$HERMES_HOME/scripts/maskotka.py" "tekst" -o film.mp4 [--format 9x16\|1x1\|16x9]` | 1–3 min |
 | **styl motion design** (wrząca linia, izometria, płaski wektor, morph, HUD, kolaż, Bauhaus, synthwave, pixel art, zorza i szkło, płyn, napisy show…): karta stylu z cechami do sprawdzenia, film-wzór 10 s, moduły `/_lib/jarvo/` | **`style-motion`** (HTML + `html_wideo.py --preset jarvo`) | 30–90 min |
 | **fragment explainera z lektorem** w jednej z 8 gramatyk (wykresy jak The Economist, rysowana tablica, 3Blue1Brown, kolaż Vox, prezentacja z premiery, historyjka z postacią, typografia kinetyczna, Kurzgesagt): klip z jednego spec, cue na słowach lektora, 16:9, 9:16, alfa | **`gramatyki-explainera`** (`gramatyka.py`, silnik huashu-art-motion) | 15–40 min |
 | **żywy obraz w stylu malarza** (35 stylów: jaskinia, Egipt, mozaika, gotyk, Van Gogh, Klimt, tusz, Hopper, Ghibli, Haring, piksel 8-bit…): karta stylu, scena-wzór do przerobienia, przejście-podpis, odcinki na siatce bitów, 16:9 | **`style-malarskie`** (`malarz.py`, silnik huashu-art-motion) | 30–90 min |
@@ -40,7 +40,7 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 | **cały krótki film** 30–75 s w jednym z 43 stylów kina (keynote, screencast, akwarela, anime, 3D, pixel RPG, miedzioryt, hologram…) | **lemo-opuscar** | 30–60 min, dużo tokenów |
 | premiera produktu / keynote tech (ciemny ekran, UI, wielka liczba) | **lemo-opuscar** `dark-keynote`, `living-screencast` | 30–60 min |
 | **ręcznie rysowana** ilustracja, timelapse rysowania, film rysunkowy, logo rysujące się samo | **anidoodle** | 15–60 min |
-| **postać w akcji** (maskotka, bohater gry, zwierzak z anatomią), efekty jak w grze, low-poly pętla, książeczka; **bez przeglądarki** (najlżejsze na VPS) | **claude-animation** (Node canvas) | 20–60 min |
+| **postać w akcji** (maskotka, bohater gry, zwierzak z anatomią), efekty jak w grze, low-poly pętla, książeczka; **bez przeglądarki** (najlżejsze dla komputera) | **claude-animation** (Node canvas) | 20–60 min |
 | animacja na stronę (hero, maskotka za kursorem, GIF, naklejka), plik HTML offline | **anidoodle** (`emit.mjs`) → `jarvo-web` osadza | 15–40 min |
 | muzyka **syntezowana kodem** do dowolnego filmu (bez licencji, bez pobierania) | **anidoodle** `music` → plik do `muzyka` w `film.py` | 10–20 min |
 | promo z animowanym tekstem, szybki launch, slajdy | **HyperFrames** (`hyperframes`, `product-launch-video`, `slideshow`) | 10–30 min |
@@ -58,7 +58,7 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 Bez dubli: typografia i promo z tekstem najpierw HyperFrames; Remotion (i iart) gdy klient chce Remotion albo
 potrzebny wykres/typografia z gotowego przepisu. Napisy zawsze `napisy` (nie captions z Remotion), chyba że film
 jest w Remotion. Każda animacja HTML (iart, bang-motion, pixel2motion, własna z uprzężą `?t=`) → klatki, arkusz
-i MP4/MOV przez `$HERMES_HOME/scripts/html_wideo.py`. Licencja Remotion: darmowa dla osoby i firmy do 3 osób;
+i MP4/MOV przez `"$HERMES_HOME/scripts/html_wideo.py"`. Licencja Remotion: darmowa dla osoby i firmy do 3 osób;
 większa firma → licencja firmowa (zapisz w RAPORT.md).
 
 Zasada kosztu: lemo-opuscar i pełne filmy anidoodle tylko, gdy karta prosi o styl, „premium” albo film markowy.
@@ -81,7 +81,7 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 7. **Prawa:** tylko assety CC0 / CC BY / OFL; żadnych cudzych marek i postaci; licencje w RAPORT.md.
 8. **Zero zakazanych chwytów** (lista „zakazane” w skillu `kontrola-wideo`): tytuł na gradiencie,
    wszystko przez fade, rogi i ramki, glow na UI, cząsteczki bez powodu, przejazd liniowy. Zamiast tego ruch z kierunkiem i masą.
-10. **HyperFrames: check przed renderem.** Po każdej zmianie kompozycji `npx hyperframes check` (lint + walidacja
+10. **HyperFrames: check przed renderem.** Po każdej zmianie kompozycji `hyperframes check` (lint + walidacja
    w przeglądarce, `--snapshots` na klatki) i render dopiero przy czystym wyniku: według HeyGen mediana 1 render zamiast 2
    i ~połowa kosztu tokenów. Promo z marki: `hyperframes capture <URL>` (skill `product-launch-video`) albo `assety.py`.
 11. **Za wolno?** `krytyka.py tempo` (przestoje i luki obrazu, zasada tempa) i `puls` pokazują, gdzie film zwalnia; poprawiasz na osi czasu przez `retime.py`
@@ -117,8 +117,8 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 2. **Scenariusz** (`scenariusz`): hook, beat sheet sekunda po sekundzie; lektor PL najpierw: film z lektorem =
    `film.py narracja` (pauzy z akapitów, `os_czasu.json` z chwilami po nazwie: `rodzaje-filmu/references/kontrakt-html.md`,
    „Film z lektorem”), krótki tekst = `film.py lektor` → czasy słów; animacje pod te chwile, nie pod wpisane sekundy.
-3. **Środowisko:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie|mg>`
-   (raz; dalej z cache), `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env <narzędzie>)"`.
+3. **Środowisko:** `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie|mg>`
+   (raz; dalej z cache), programy silnika przez `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" uruchom <narzędzie> -- <polecenie>`.
    Skill silnika każe coś doinstalować, pobrać przeglądarkę (`npx playwright install`, `npm i puppeteer`) albo
    zaktualizować skille (`remotion-upgrade`, `npx skills add`)? Nie rób tego: `references/narzedzia.md` mówi, czym to zastąpić.
 4. **Look:** jedna–trzy klatki stylu renderowane prawdziwym kodem → obejrzyj (vision), popraw, dopiero potem całość.

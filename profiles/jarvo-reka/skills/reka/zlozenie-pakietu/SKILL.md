@@ -24,7 +24,7 @@ Karta „złożenie” ma rodziców: karty merytoryczne misji (już zaakceptowan
    Twojego workspace (`$HERMES_KANBAN_WORKSPACE/..`).
 2. Automat:
    ```bash
-   python3 $HERMES_HOME/scripts/pack.py "$HERMES_KANBAN_WORKSPACE/.." --out "$HERMES_KANBAN_WORKSPACE/out"
+   @@PY@@ "$HERMES_HOME/scripts/pack.py" "$HERMES_KANBAN_WORKSPACE/.." --out "$HERMES_KANBAN_WORKSPACE/out"
    ```
    Skrypt zbiera `*/out/` wszystkich kart, kopiuje do `out/pakiet/<rola>/`, liczy pliki i wagi, zapisuje
    `out/pakiet/MANIFEST.json` i robi `out/pakiet.zip`.

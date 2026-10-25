@@ -5,7 +5,7 @@ sylwetki z węglowym konturem o rozpylonym brzegu, negatywy dłoni, migotanie og
 reliefie ściany, który przebija przez farbę, i po ziarnie węgla, które „wrze”, choć linia stoi w miejscu.
 Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: postać ludzka zbyt kreskówkowa, za mało
 pierwotna (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 01_cave --czasy 0.4,0.9,1.3 --arkusz out/wideo/wzor-01_cave.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 01_cave --czasy 0.4,0.9,1.3 --arkusz out/wideo/wzor-01_cave.jpg`; kod
 `$HUASHU/scripts/engine/scenes/01_cave.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -44,7 +44,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 01_cave --czasy 0.4,0.9,1.3 
   `GochiHand-400` 84 px `#f3ead8` (w nakładce `huashu_pl.js` → `Caveat-600`), podpis `Kalam-700` 38 px.
 
 ## Jak go zbudować
-1. Szkielet strony: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 01_cave`. Biblioteki:
+1. Szkielet strony: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 01_cave`. Biblioteki:
    `/_lib/huashu/lib/paint.js` (`P` = `PAINT`), `/_lib/huashu/lib/rig.js` (`RIG`), `/_lib/huashu/lib/util.js` (`U`).
 2. Ściana do cache (`P.cached('cave_relief', …)`, `P.cached('cave_bg', …)`): pole wysokości w pół rozdzielczości
    960×540: `fbm(x·0.0022, 4 okt.)·1.0 + fbm(x·0.011, 3 okt.)·0.16 + noise(x·0.05)·0.03` (współrzędne w pikselach

@@ -35,7 +35,7 @@ Plik: `out/RAPORT.md`. Szablon: `references/RAPORT.template.md`.
 ## Brief do filmu
 Karta `fakty` przed filmem, który coś wyjaśnia: zamiast długiego raportu `out/fakty.json` dla Wideografa (liczby
 z oceną, przeliczeniem i źródłem, analogie, słowniczek z wymową, lista niepewnych) i krótki `out/RAPORT.md`.
-Format i kroki: `references/brief-do-filmu.md`. Przed oddaniem `$HERMES_HOME/scripts/fakty.py sprawdz out/fakty.json`
+Format i kroki: `references/brief-do-filmu.md`. Przed oddaniem `@@PY@@ "$HERMES_HOME/scripts/fakty.py" sprawdz out/fakty.json`
 kończy się ✓.
 
 ## Dla Jarva

@@ -23,7 +23,7 @@ reviewed: 2026-10-01
   floty: agent łączy się przez adb (`JARVO_ANDROID_ADB`, domyślnie `jarvo-android:5555`).
 - `urzadzenie.py status` z kodem 3 = telefon wyłączony: poproś właściciela o `jarvo android on` (albo zostaw warstwę
   Androida jako „niezmierzoną”), nie udawaj wyniku.
-- Właściciel może patrzeć na ekran i klikać razem z Tobą: link `python3 /opt/jarvo/repo/scripts/jarvo_link.py --android`
+- Właściciel może patrzeć na ekran i klikać razem z Tobą: link `@@PY@@ "@@REPO_DIR@@/scripts/jarvo_link.py" --android`
   (12 h) albo przycisk 📱 w Twoim panelu w HQ. Dawaj go, gdy prosisz o ręczny test albo pokazujesz przepływ.
 - Albo telefon właściciela z debugowaniem USB podłączony do komputera z flotą (adb), albo emulator Android Studio.
 - Redroid nie ma usług Google: powiadomień FCM, logowania Google i Map nie sprawdzi (→ emulator przy KVM albo telefon

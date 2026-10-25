@@ -5,7 +5,7 @@ płaszczyzn, każda z jasną i ciemną stroną, w brązach, ochrach i szarościa
 które wystają poza kontur; szablonowe litery, gazeta, imitacja drewna. Poznasz go po przezroczystych, przenikających
 się płaszczyznach, prostych krawędziach zamiast krzywych i twarzy z dwóch punktów widzenia naraz. Jakość wzoru: ★★
 (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: za jasny, za mało dużych ciemnobrązowych płaszczyzn (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 11_cubism --czasy 0.34,0.4,0.46 --arkusz out/wideo/wzor-11_cubism.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 11_cubism --czasy 0.34,0.4,0.46 --arkusz out/wideo/wzor-11_cubism.jpg`; kod
 `$HUASHU/scripts/engine/scenes/11_cubism.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -47,7 +47,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 11_cubism --czasy 0.34,0.4,0
   `#e8dfc9`.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 11_cubism`; `P` = `PAINT`, `RIG`, `U`.
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 11_cubism`; `P` = `PAINT`, `RIG`, `U`.
 2. Tło w całości do cache `cb_bg`: `plane(g, pts, col, alpha, r, dark = 0.4, light = 0.25)` dla wszystkich płaszczyzn,
    potem faktury, kreski Braque'a, passage, `wood(g, x, y, w, h, vertical, seed)`, wiklina.
 3. Okno: widok w cache 560×540 (`cb_win`: 55 niebieskoszarych ścian, 3 ukośne smugi światła, wieża Eiffla, łuki mew);

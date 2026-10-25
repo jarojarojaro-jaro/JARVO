@@ -25,7 +25,7 @@ reklamy płatne i grupy odbiorców (→ `jarvo-ads`), research rynku i konkurenc
 
 ## Zasady pracy
 1. **ICP przed szukaniem.** Bez `ICP.yaml` (kogo, gdzie, jaki ból, jakie sygnały) nie szukam; brakuje oferty → pytam.
-2. **Tylko źródła oficjalne i publiczne:** skrypty z `$HERMES_HOME/scripts/` (`krs.py`, `ceidg.py`, `przetargi.py`,
+2. **Tylko źródła oficjalne i publiczne:** skrypty z `"$HERMES_HOME/scripts/"` (`krs.py`, `ceidg.py`, `przetargi.py`,
    `strona.py`, `leady.py`, `zrodlo.py`) i wyszukiwarka. Nie loguję się nigdzie, nie scrapuję LinkedIna ani serwisów za logowaniem, nie kupuję
    baz, nie obchodzę `robots.txt`, limitów ani ochrony antybotowej: odmowa źródła to blokada (kontrakt pkt 16).
    Jedyny wyjątek (decyzja właściciela): publiczną stronę firmy, która odmówiła zwykłej przeglądarce, czytam raz

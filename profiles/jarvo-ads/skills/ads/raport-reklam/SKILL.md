@@ -19,7 +19,7 @@ metadata:
 ## Źródła danych
 - podłączone konto: `ads.py statystyki --konto … --od … --do … --poziom reklama --json`,
 - bez podłączenia: eksport CSV z Ads Managera (Raporty → Eksportuj) albo Google Ads (Raporty → Pobierz CSV) →
-  `$HERMES_HOME/scripts/eksport.py plik.csv` (tabela) / `--json` (dla `eksperyment.py`).
+  `@@PY@@ "$HERMES_HOME/scripts/eksport.py" plik.csv` (tabela) / `--json` (dla `eksperyment.py`).
 
 ## Rodzaje
 - **krótki** (Telegram, ≤ 8 linii): wydane / koperta, wynik i CPA vs cel, co się zmieniło, decyzja do podjęcia,
@@ -32,7 +32,7 @@ metadata:
 - przy teście wielu zmiennych: „wygrał pakiet B”, nie „wygrał hook z pytaniem”,
 - atrybucja: okno Mety (domyślnie 7 dni po kliknięciu, 1 dzień po obejrzeniu) i Google różnią się; nie sumuj konwersji
   z dwóch platform jako faktów (skill `attribution`),
-- wykresy: HTML → PNG (Chromium z obrazu), jedna myśl na wykres, podpisane osie.
+- wykresy: HTML → PNG (Chromium Jarva), jedna myśl na wykres, podpisane osie.
 
 ## Zmiany do wyklikania (bez podłączonego konta)
 Gdy dane są z eksportu CSV, a kampanię prowadzi właściciel (`publikacja-reczna`), raport kończy się listą zmian,

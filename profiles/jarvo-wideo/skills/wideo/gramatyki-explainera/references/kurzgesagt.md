@@ -1,6 +1,6 @@
 # Kurzgesagt – płaska animacja popularnonaukowa (`kurzgesagt`, w kodzie `y1_kurzgesagt`)
 
-Pojęcie staje się świecącą planetą w świecie, który da się powiększać bez końca: kamera przechodzi między skalami, a w kadrze zawsze coś lekko się rusza. Wzór: `python3 $HERMES_HOME/scripts/gramatyka.py wzor kurzgesagt --arkusz out/wideo/wzor-kurzgesagt.jpg`; start: `python3 $HERMES_HOME/scripts/gramatyka.py szablon kurzgesagt [--format 9:16] -o out/wideo/src/klip-kurzgesagt/spec.json`.
+Pojęcie staje się świecącą planetą w świecie, który da się powiększać bez końca: kamera przechodzi między skalami, a w kadrze zawsze coś lekko się rusza. Wzór: `@@PY@@ "$HERMES_HOME/scripts/gramatyka.py" wzor kurzgesagt --arkusz out/wideo/wzor-kurzgesagt.jpg`; start: `@@PY@@ "$HERMES_HOME/scripts/gramatyka.py" szablon kurzgesagt [--format 9:16] -o out/wideo/src/klip-kurzgesagt/spec.json`.
 
 Kod: klip `$HUASHU/scripts/engine/clips/y1_kurzgesagt.js`, przykład `$HUASHU/scripts/engine/examples/y1_kurzgesagt.json` (wnętrze dużego modelu: 3 punkty, `enter` w jedną warstwę, 2 punkty, `highlight`), film pokazowy `$HUASHU/scripts/engine/demos/y1_kurzgesagt/` (MIT). Film pokazowy ma 8 s, 3 ujęcia i 2 przejścia, czyli ok. 3 razy gęściej niż prawdziwy film: bierz technikę, nie tempo.
 Potok: `szablon` → polskie teksty i `slowo` → `gramatyka.py sprawdz` → `gramatyka.py render … --klatki 0.5,2,4` (stopklatki) → pełny `render`.

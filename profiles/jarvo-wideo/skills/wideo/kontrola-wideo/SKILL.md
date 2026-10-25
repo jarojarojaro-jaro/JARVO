@@ -23,7 +23,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 - Przed oddaniem każdego filmu, klipu i wariantu. Także na szkicu, gdy rytm budzi wątpliwości.
 
 ## Kroki
-1. **Technika:** `python3 $HERMES_HOME/scripts/qa_wideo.py <film.mp4> --platforma <tiktok|ig-reel|…> --lektor
+1. **Technika:** `@@PY@@ "$HERMES_HOME/scripts/qa_wideo.py" <film.mp4> --platforma <tiktok|ig-reel|…> --lektor
    --arkusz out/wideo/<film>/qa.jpg --json`.
    Sprawdza też klatki: **duch** (jedna klatka z plamą, której nie ma obok: zgubiony stan, słowo napisów na 1 klatkę)
    i **szew pętli** (`--petla`) to błąd, **zamrożona klatka w ruchu** błąd w filmie z kodu (`--z-kodu`); **skok**
@@ -33,20 +33,20 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    Błąd (`bledy`) = poprawka przed oceną; typowe: głośność → `montaz.py glosnosc`, format → ponowny render,
    czarny początek → pierwsza scena z obrazem, film w HDR → `montaz.py napraw` (przelicza na zwykły obraz).
    - ✅ Punkt kontrolny: `ok: true`.
-1a. **Tempo (każdy film):** `python3 $HERMES_HOME/scripts/krytyka.py tempo <film.mp4> [--mowa <lektor>.srt]` (`.srt`
+1a. **Tempo (każdy film):** `@@PY@@ "$HERMES_HOME/scripts/krytyka.py" tempo <film.mp4> [--mowa <lektor>.srt]` (`.srt`
    obok filmu bierze sam; film bez lektora: bez opcji). Zasada tempa (`rodzaje-filmu`, `ruch-i-kompozycja.md` rozdz. 2):
    nigdy ≥ 2 s bez mowy i bez nowej rzeczy na ekranie, pod mową nowa rzecz najdalej co 6 s. `przestoje` i `luki_obrazu`
    z poziomem „błąd” poprawiasz przed oceną: zagęść (powtarzalne po 2–3 naraz, krótsze rysowanie), dołóż zdanie lektora
    albo skróć ujęcie (film z kodu: `retime.py`). Ostrzeżenia oglądasz w tych sekundach.
    - ✅ Punkt kontrolny: `ok: true`.
-1b. **Animacja HTML (nasz kontrakt, `--preset jarvo`):** `python3 $HERMES_HOME/scripts/html_wideo.py pomiar <strona>
+1b. **Animacja HTML (nasz kontrakt, `--preset jarvo`):** `@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" pomiar <strona>
    --preset jarvo --dlugosc <s> --platforma <…>` mierzy z DOM i klatek: czas czytania, tekst poza kadrem i pod UI
    platformy, kontrast, dwa napisy na sobie, tekst w pasie napisów lektora (przy lektorze, `--napisy`), kroje zastępcze, czarne przerwy, martwe odcinki, rytm, pusta scena, brak oddechu przed
    cięciem i na końcu, uderzenia całego kadru, błędy JS i zasobów (`pomiar.md` obok
    strony). Ustalenia to fakty, nie opinie: poprawiasz albo zapisujesz świadomy wyjątek z powodem (`--wyjatek`).
    **„Gotowe” tylko z pełnym i aktualnym raportem** (`html_wideo.py aktualny <strona>` = 0); po każdej zmianie
    pliku animacji raport jest nieaktualny. Ostrzeżenia (martwy odcinek, rytm, kompozycja) sprawdzasz okiem w kroku 4a.
-1c. **Cięcia** (każdy film z cięciami: montaż nagrania, rolka, projekt edytora): `python3 $HERMES_HOME/scripts/krytyka.py
+1c. **Cięcia** (każdy film z cięciami: montaż nagrania, rolka, projekt edytora): `@@PY@@ "$HERMES_HOME/scripts/krytyka.py"
    ciecia <film.mp4> --projekt <oryginał>` (film z `projekt.py render`; rolka clipmakera ma projekt obok i nie
    potrzebuje opcji), `--czasy` z listy `ciecia` z `montaz.py`, bez nich cięcia z obrazu. Na każde cięcie jeden obraz:
    4 klatki przed i 4 za czerwonym paskiem, fala dźwięku z cieniem ciszy, słowa, linia cięcia. Każdy obraz
@@ -56,10 +56,10 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
      początek, z zapasem 40–200 ms. `uwagi` (cięcie tuż przy słowie, przeskok w tym samym kadrze) słuchasz i oglądasz;
      przeskok gasi przybliżenie drugiej części (`projekt.py kadr <id> --wypelnij --zoom 1.15`) albo przebitka.
    - Po poprawce i renderze sprawdzasz tylko poprawione cięcia: `--tylko 2,5`.
-   - Cięcia pod muzykę: `python3 $HERMES_HOME/scripts/rytm.py sprawdz <film.mp4> [--plan cues.json | --projekt
+   - Cięcia pod muzykę: `@@PY@@ "$HERMES_HOME/scripts/rytm.py" sprawdz <film.mp4> [--plan cues.json | --projekt
      <oryginał>]` liczy bity z dźwięku gotowego filmu; ✗ (ponad 3 klatki od bitu) poprawiasz, a wspólne przesunięcie
      wszystkich cięć poprawiasz jednym przesunięciem muzyki i efektów (zasady w `lektor-i-dzwiek`).
-   - Efekty dźwiękowe: `python3 $HERMES_HOME/scripts/projekt.py slychac <oryginał>` (projekt) albo
+   - Efekty dźwiękowe: `@@PY@@ "$HERMES_HOME/scripts/projekt.py" slychac <oryginał>` (projekt) albo
      `projekt.py slychac final.mp4 --cues cues.json --bed glos.wav` (film z kodu): „Wynik: OK”, czyli żaden efekt bez
      dźwięku, zagłuszonych najwyżej połowa, dość czysto słyszalnych; poprawki według rad przy efektach.
      Muzyka z `muzyka.py` sprawdza to sama przy renderze (`kontrola.ok` w `*.muzyka.json`, „Wynik: OK”).
@@ -80,7 +80,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    ```
    `werdykt`: PASS (≥ 85 i technika czysta), REVISE (< 85), BLOCK (błąd blokujący z rubryki: prawa, twarz, publikacja).
 4a. **Krytyka reżyserska** (filmy z kodu, motion graphics, reelsy z animacją; film ze stocku: tylko punkty 2–4):
-   bądź surowym motion directorem, nie dumnym autorem. Narzędzia (`$HERMES_HOME/scripts/krytyka.py`):
+   bądź surowym motion directorem, nie dumnym autorem. Narzędzia (`"$HERMES_HOME/scripts/krytyka.py"`):
    - `telefon <film>`: 1 klatka/s w 360 px szerokości (czy każdy tekst da się przeczytać na telefonie?),
    - `pasek <film> --t <s>`: 12 kolejnych klatek wokół każdej szybkiej akcji i każdej zmiany stanu,
    - `martwe <film>`: odcinki bez zmiany obrazu > 2,5 s (martwy takt; tempo z mową liczy krok 1a),

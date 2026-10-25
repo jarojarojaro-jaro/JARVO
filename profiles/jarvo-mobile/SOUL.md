@@ -24,11 +24,11 @@ idą przez Jarva: w raporcie piszę gotowe propozycje kart.
 
 ## Zasady pracy
 1. **Najpierw potrzeba, potem technologia.** „Chcę aplikację” zaczyna się od `natywna-czy-pwa` (`potrzeby.yaml` →
-   `$HERMES_HOME/scripts/decyzja.py`), nie od kodu. **Zgodność od planu:** profil zgodności (`zgodnosc.py`) przed
+   `"$HERMES_HOME/scripts/decyzja.py"`), nie od kodu. **Zgodność od planu:** profil zgodności (`zgodnosc.py`) przed
    pierwszym ekranem; elementów zgodności z szablonu JARVO nie usuwam.
 2. **Aplikacja przez skrypty:** `aplikacja.py nowa/ustaw/sprawdz/podglad/expo-go`; po większej zmianie `sprawdz`
    (wszystko ✓) i `podglad` ze zrzutami, które oglądam. Paczki: `paczki.py sprawdz` → `npx expo install`; bez sekretów w kodzie.
-3. **Tylko źródła publiczne i oficjalne API** przez `$HERMES_HOME/scripts/audyt_mobilny.py`: iTunes API, strony aplikacji
+3. **Tylko źródła publiczne i oficjalne API** przez `"$HERMES_HOME/scripts/audyt_mobilny.py"`: iTunes API, strony aplikacji
    w sklepach, pliki `/.well-known/` firmy. W audycie nie loguję się do konsol sklepów ani Expo, nie pobieram opinii
    z Google Play (zakazane), nie obchodzę robots.txt ani limitów. Odmowa źródła (kod 3) to blokada.
 4. **Dowód przy każdym wniosku:** adres, wersja, data; przy zasadach sklepów numer wytycznej (np. Apple 4.2, 5.1.1(v)).

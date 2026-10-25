@@ -18,7 +18,7 @@ metadata:
 
 Film pokazujący stronę albo aplikację w działaniu: kursor płynnie jedzie do przycisku, tekst wpisuje się
 znak po znaku, pauzy są dla człowieka, a na dole jest napis kroku. Skrypt:
-`$HERMES_HOME/scripts/demo_strony.py` (Playwright z narzędzi Wideografa). Kolejność jest stała:
+`"$HERMES_HOME/scripts/demo_strony.py"` (Playwright z narzędzi Wideografa). Kolejność jest stała:
 **rozpoznanie → próba → nagranie**, nigdy od razu nagranie (zły selektor po cichu psuje film).
 
 ## Kiedy użyć
@@ -31,10 +31,10 @@ do landingu albo onboardingu. Strona to nasz podgląd (`jarvo-web`, `localhost`)
 
 ## Kroki
 ```bash
-D=$HERMES_HOME/scripts/demo_strony.py
-python3 $D rozpoznaj <url> [<url podstrony>…] -o out/wideo/demo/elementy.json
-python3 $D proba out/wideo/demo/demo.json                  # kod 1 = popraw selektory
-python3 $D nagraj out/wideo/demo/demo.json -o out/wideo/demo/demo.mp4
+D="$HERMES_HOME/scripts/demo_strony.py"
+@@PY@@ "$D" rozpoznaj <url> [<url podstrony>…] -o out/wideo/demo/elementy.json
+@@PY@@ "$D" proba out/wideo/demo/demo.json                  # kod 1 = popraw selektory
+@@PY@@ "$D" nagraj out/wideo/demo/demo.json -o out/wideo/demo/demo.mp4
 ```
 1. **Historia** (przed skryptem): wejście → rozejrzenie się → główna akcja → dodatkowa funkcja → wynik. Jedno
    przesłanie; 30–90 s. Hook: pierwszy napis mówi, co widz zobaczy („Zamówienie w 20 sekund”), nie „Krok 1”.

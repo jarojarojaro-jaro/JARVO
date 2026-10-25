@@ -38,7 +38,7 @@ co dostanie i po czym poznamy sukces.
    Google: frazy o intencji zakupowej, dopasowanie do frazy/ścisłe na start, lista wykluczeń od dnia 1.
 5. **Budżet i czas.** Meta: ≥ 50 wyników/tydzień na zestaw, żeby wyjść z fazy uczenia; jeśli budżet nie pozwala,
    optymalizuj na zdarzenie wyżej w lejku (np. dodanie do koszyka, lead zamiast zakupu). Min. 7 dni.
-6. **Prognoza.** `$HERMES_HOME/scripts/planer.py prognoza --budzet … --dni … --cpm … --ctr … --cvr …`. Założenia z konta
+6. **Prognoza.** `@@PY@@ "$HERMES_HOME/scripts/planer.py" prognoza --budzet … --dni … --cpm … --ctr … --cvr …`. Założenia z konta
    (`ads.py statystyki`) albo jawnie oznaczone jako założenie z widełkami.
 7. **Testy (opcjonalnie).** Kilka wersji reklam → `plan-testu`. Jedna dobra reklama też jest ok: wtedy mierzymy względem celu.
 8. **Koperta.** Budżet łączny, maks. dziennie, daty, konta, co wolno w kopercie (wyłączać słabe, przesuwać budżet).

@@ -67,4 +67,4 @@ Format, długość, CTA:                 Dźwięk (muzyka, efekty):
 - Test „wyciszony telefon”: bez dźwięku film nadal da się zrozumieć z obrazu i napisów.
 
 ## Inspiracje
-`python3 $HERMES_HOME/scripts/inspiracje.py explainer --ile 3` (albo `--szukaj whiteboard`, `--tag threejs`).
+`@@PY@@ "$HERMES_HOME/scripts/"inspiracje.py explainer --ile 3` (albo `--szukaj whiteboard`, `--tag threejs`).

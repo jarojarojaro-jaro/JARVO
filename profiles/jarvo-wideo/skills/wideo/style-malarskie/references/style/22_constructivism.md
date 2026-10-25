@@ -5,7 +5,7 @@ geometryczne litery złożone z prostokątów i fotomontaż w rastrze (zdjęcie 
 obok płaskich wycinanek. Litery rysujesz ścieżkami, nie krojem, więc tak samo narysujesz polskie hasło. Jakość wzoru:
 ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: brak lejka z liter (hasło rozchodzące się klinem z ust
 albo megafonu, typowe dla Rodczenki) (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 22_constructivism --czasy 0.1,0.4,0.9 --arkusz out/wideo/wzor-22_constructivism.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 22_constructivism --czasy 0.1,0.4,0.9 --arkusz out/wideo/wzor-22_constructivism.jpg`;
 kod `$HUASHU/scripts/engine/scenes/22_constructivism.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -43,7 +43,7 @@ technikę, nie scenę.
   zawsze ścieżkami.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 22_constructivism`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 22_constructivism`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js` (`U.poly`, `U.ease`), `paint.js` (`PAINT.texture`, `PAINT.cached`, `PAINT.canvas`,
    `PAINT.choreo`), `render.js` (`PAINT.halftoneGray`, `PAINT.shadeDots`), `rig.js` (`RIG.drawCup`).
 2. Tło w cache `cs_bg`: papier `PAINT.texture('cs_paper', '#e9dfc4', {scale: 0.0035, amt: 16, grain: 18,

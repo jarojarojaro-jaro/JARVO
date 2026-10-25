@@ -30,7 +30,7 @@ polecenia. Do recenzji wysyła właściciel jednym kliknięciem, z listą krokó
 - praca bez nadzoru (kanban, cron): kroki A2 są wtedy odrzucane; oddaj kartę z prośbą o zgodę.
 
 ## Kroki
-1. **Plan:** `python3 $HERMES_HOME/scripts/wydanie.py plan <app>` → `out/wydanie/PLAN.md`: bramki i jednorazowe
+1. **Plan:** `@@PY@@ "$HERMES_HOME/scripts/wydanie.py" plan <app>` → `out/wydanie/PLAN.md`: bramki i jednorazowe
    przygotowanie kont właściciela (`references/konta.md`). Pokaż właścicielowi listę braków jego słowami.
 2. **Zgoda na build:** zapytaj wprost („Zbudować wersję 1.2.0 na iOS i Androida? To zużywa buildy EAS z Twojej
    organizacji.”). Tylko odpowiedź „tak” od właściciela w tej rozmowie jest zgodą; cytuj ją dosłownie:

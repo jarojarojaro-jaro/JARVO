@@ -2,8 +2,8 @@
 
 Jak zbudować scenę, która jest „żywym obrazem” w danym stylu, i jak złożyć z takich scen film (przegląd stylów,
 przemiana jednego miejsca, podróż przez epoki). Źródło: repo huashu-art-motion (MIT). Kod biblioteki:
-`python3 $HERMES_HOME/scripts/narzedzia.py instaluj huashu`, potem
-`eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env huashu)"` → `$HUASHU`, silnik w `$HUASHU/scripts/engine/`.
+`@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" instaluj huashu`; katalog biblioteki
+`$HUASHU` = `@@TOOLS_DIR@@/huashu-art-motion` (pliki czytasz wprost), silnik w `$HUASHU/scripts/engine/`.
 Postacie: `postacie.md`. Długi zwój (bohater idzie przez obrazy): `dlugi-zwoj.md`. Rytm i muzyka: `rytm.md`.
 Sprawdzone zasady z dowodami: `zasady-huashu.md`.
 
@@ -99,7 +99,7 @@ Niezależnie od drogi najpierw powstaje jedna „właściwa” klatka.
   „zachowaj dokładnie kompozycję, kadr, położenie i wielkość każdego przedmiotu, kolory i pociągnięcia z obrazu
   referencyjnego; zmień tylko dwie rzeczy: …”. W teście nałożenie 50% na oryginał pokrywa się prawie piksel
   w piksel. Kompozycję trzyma obraz referencyjny, nie współrzędne opisane w tekście. Ostatnie klatki odcinków
-  w pełnym kadrze: `python3 $HERMES_HOME/scripts/kadry.py wzor film-wzor.mp4 -o out/wideo/wzor` → `ref/odc01.png` ….
+  w pełnym kadrze: `@@PY@@ "$HERMES_HOME/scripts/kadry.py" wzor film-wzor.mp4 -o out/wideo/wzor` → `ref/odc01.png` ….
 - **Nie ma wzoru:** najpierw ustal szkielet sceny (współrzędne kompozycji wzorcowej), zrób zrzut makiety szkieletu
   i użyj go jako referencji.
 - **Bramka trzech kierunków:** interpretację postaci (w replice: strój epoki / ta sama osoba w podróży / oryginał
@@ -128,7 +128,7 @@ Wygenerowana postać stoi już we współrzędnych klatki. Przy wycinaniu **nie 
 pozycji**: `malarz.py wytnij` (port ich `key_green.py`) przycina i zapisuje lewy górny róg w `sprites.json` (`x`, `y`, `w`, `h` w kadrze
 1920×1080), więc przy składaniu wklejasz w oryginalne miejsce i wszystko trafia za pierwszym razem:
 ```sh
-python3 $HERMES_HOME/scripts/malarz.py wytnij out/wideo/src/surowe/*.png --out out/wideo/src/sprites [--soft 40 --hard 110]
+@@PY@@ "$HERMES_HOME/scripts/malarz.py" wytnij out/wideo/src/surowe/*.png --out out/wideo/src/sprites [--soft 40 --hard 110]
 ```
 (Domyślnie `--soft 30 --hard 100 --pad 4`; numpy i Pillow bierze z Pythona narzędzi sam. W `sprites.json` jest też
 `kadr` = rozmiar klatki źródłowej.)
@@ -169,7 +169,7 @@ Obecna wersja ładuje też wspólne biblioteki `lib/brush.js` (pędzle), `lib/re
 
 W Jarvie nie używamy ich `render.py` ani `compare.py`:
 - szkielet naszej strony (kontrakt jarvo, `window.__seek(t)`):
-  `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl <id>[,<id>…]` robi `index.html`
+  `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl <id>[,<id>…]` robi `index.html`
   (biblioteki z `/_lib/huashu/`, polska nakładka `/_lib/jarvo/huashu_pl.js`, ich `transitions.js`,
   `scenes/index.js` i `engine.js`; bez `lib/rig_huashu.js`, czyli postaci autora), `eras.js` (Twoja tabela
   odcinków: ósemki przy `window.BPM`, przejście-podpis wchodzącego stylu z galerii) i `sceny/<id>.js` (kopia
@@ -178,11 +178,11 @@ W Jarvie nie używamy ich `render.py` ani `compare.py`:
 - katalog i galeria: `malarz.py style [--szukaj …]`, `malarz.py galeria -o out/wideo/galeria-stylow.jpg`
   (jeden kadr każdego z 35 stylów z podpisem);
 - stopklatki sceny-wzoru w czasie lokalnym odcinka:
-  `python3 $HERMES_HOME/scripts/malarz.py wzor <id> --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-<id>.jpg`;
-- klatki i film z naszej strony: `python3 $HERMES_HOME/scripts/html_wideo.py klatki out/wideo/src/film/index.html
+  `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor <id> --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-<id>.jpg`;
+- klatki i film z naszej strony: `@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki out/wideo/src/film/index.html
   --preset jarvo --czasy … --arkusz …` oraz `html_wideo.py wideo … --dlugosc <s> -o out/wideo/film.mp4`
   (klatki w kilku przeglądarkach naraz same, `--rownolegle N`; bez motion bluru, `--subklatki` zostaje 1);
-- porównanie wzoru i Twojej wersji obok siebie (zamiast `compare.py`): `python3 $HERMES_HOME/scripts/kadry.py
+- porównanie wzoru i Twojej wersji obok siebie (zamiast `compare.py`): `@@PY@@ "$HERMES_HOME/scripts/kadry.py"
   arkusz wzor.mp4 moja.mp4 --klatek 6 -o out/wideo/porownanie.jpg` (każdy klip w jednym rzędzie).
 
 Szybkość w źródle: cały film 15 s w 60 kl./s ok. 90 s (Mac z procesorem serii M); pojedynczy odcinek zwykle
@@ -339,7 +339,7 @@ SCENES['<id>'] = { draw(c, lt, t) { /* maluje cały kadr 1920×1080 */ }, init(I
    postaci, visibleLines), `kit.js` i inne. **Najpierw sprawdź, czy biblioteka to ma, dopiero potem pisz sam.**
 
 ### Dwa punkty startu
-**Jest film-wzór:** `python3 $HERMES_HOME/scripts/kadry.py wzor film-wzor.mp4 -o out/wideo/wzor` daje arkusze klatek
+**Jest film-wzór:** `@@PY@@ "$HERMES_HOME/scripts/kadry.py" wzor film-wzor.mp4 -o out/wideo/wzor` daje arkusze klatek
 z czasem, cięcia, rytm i rozbiór ruchu (port ich `breakdown.py`): starty przejść na siatce bitów, arkusz każdego
 przejścia co 2 klatki (`przejscia/P01.jpg`), mapę ruchu odcinków (`ruch-1.jpg`) i klatki kluczowe (`ref/odc01.png`
 w pełnym kadrze). Klatki wzoru decydują o kompozycji, motywach i kolorach; co w obrazie się rusza, pokazuje mapa
@@ -379,15 +379,15 @@ ruchu, szczegół akcji gęstszy arkusz (`--fps`) i `krytyka.py pasek`.
 ### Samokontrola i oddanie
 ```sh
 # stopklatki Twojej sceny (czas lokalny odcinka)
-python3 $HERMES_HOME/scripts/html_wideo.py klatki out/wideo/src/film/index.html --preset jarvo \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki out/wideo/src/film/index.html --preset jarvo \
   --czasy 0.4,0.6,0.8,1.0 --arkusz out/wideo/klatki-<id>.jpg
 # wzór do porównania
-python3 $HERMES_HOME/scripts/malarz.py wzor <id> --czasy 0.4,0.6,0.8,1.0 --arkusz out/wideo/wzor-<id>.jpg
+@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor <id> --czasy 0.4,0.6,0.8,1.0 --arkusz out/wideo/wzor-<id>.jpg
 # deterministyczność: ta sama klatka 2× = ten sam obraz
-python3 $HERMES_HOME/scripts/krytyka.py determinizm out/wideo/src/film/index.html --czasy 1.3,4.2 --preset jarvo
+@@PY@@ "$HERMES_HOME/scripts/krytyka.py" determinizm out/wideo/src/film/index.html --czasy 1.3,4.2 --preset jarvo
 # liczby: błędy JS, kroje zastępcze, martwe odcinki; po renderze duchy, skoki i zamrożone klatki
-python3 $HERMES_HOME/scripts/html_wideo.py pomiar out/wideo/src/film/index.html --preset jarvo --dlugosc <s>
-python3 $HERMES_HOME/scripts/qa_wideo.py out/wideo/film.mp4 --json
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" pomiar out/wideo/src/film/index.html --preset jarvo --dlugosc <s>
+@@PY@@ "$HERMES_HOME/scripts/qa_wideo.py" out/wideo/film.mp4 --json
 ```
 Każdy odcinek co najmniej 3 rundy: stopklatki obok oryginału albo wzoru → liczby (ruch, statyczne pary klatek,
 skoki, czas, deterministyczność) → poprawka. Cztery pytania:

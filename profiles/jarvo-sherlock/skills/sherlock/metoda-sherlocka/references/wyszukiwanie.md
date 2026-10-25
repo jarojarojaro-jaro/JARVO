@@ -2,9 +2,9 @@
 
 ## Narzędzia
 - `web_search`: przez własny SearXNG (wiele silników naraz, bez kluczy).
-- `python3 $HERMES_HOME/scripts/search_fanout.py "<zapytanie>" [--lang pl] [--category general|news|science|it] [--time month|year]`:
+- `@@PY@@ "$HERMES_HOME/scripts/search_fanout.py" "<zapytanie>" [--lang pl] [--category general|news|science|it] [--time month|year]`:
   jedno zapytanie → wiele kategorii/języków, deduplikacja URL-i, JSON. Używaj przy szerokim rozpoznaniu.
-- `python3 $HERMES_HOME/scripts/extract.py <url>`: czysta treść strony + data publikacji + autor (trafilatura). Lepsze niż surowy HTML.
+- `@@PY@@ "$HERMES_HOME/scripts/extract.py" <url>`: czysta treść strony + data publikacji + autor (trafilatura). Lepsze niż surowy HTML.
 - `lightpanda fetch --dump markdown <url>`: strona z JavaScriptem (SPA), gdy `extract.py` zwraca pusto; ~30 MB RAM, bez Chromium.
 - przeglądarka (`browser_*`): klikanie, formularze wyszukiwania, tabele, zrzuty (silnik Lightpanda, Chromium przy zrzutach); logowanie **nie**.
 - skille: `searxng-search`, `duckduckgo-search` (inny indeks = niezależność), `scrapling`, `blocked-page-recovery`,
@@ -13,7 +13,7 @@
 ## Strona odmówiła (403/429, „Just a moment…”, „Human Verification”, captcha)
 1. Kopia w archiwum: `blocked-page-recovery` (Wayback, archive.today). Cytujesz z datą kopii.
 2. Potrzebny stan bieżący albo kopii nie ma: **jedna** próba Camoufoxem, skill `ostrozna-przegladarka`:
-   `python3 $HERMES_HOME/skills/web/ostrozna-przegladarka/scripts/ostrozna.py <url> -o out/strony/<nazwa>.md`,
+   `@@PY@@ "$HERMES_HOME/skills/web/ostrozna-przegladarka/scripts/ostrozna.py" <url> -o out/strony/<nazwa>.md`,
    potem `sources.py add <url> --tekst out/strony/<nazwa>.md --rejestr <rejestr>` (numer `[n]` jak przy `extract.py`)
    i dopisek „odczyt przez Camoufox” przy źródle w notatkach wątku.
 3. Kod 3 w `ostrozna.py` = koniec: luka w raporcie („źródło odmawia automatom”), szukasz innego źródła tej samej

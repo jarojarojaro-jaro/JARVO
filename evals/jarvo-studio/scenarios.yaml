@@ -105,8 +105,8 @@ scenarios:
     input: "Ożyw to zdjęcie z moich wakacji (morze.jpg), chcę GIF dla znajomych, nic firmowego."
     expect:
       should:
-        - "zywy-obraz: licencja sprawdzona (niekomercyjnie, więc wolno), lemo_wake.py sprawdz/instaluj, eval env"
-        - "skrypty przez $LW_PY, projekt w out/zywe, plan w DIRECTOR.md, qa.py bez FAIL, MP4 + GIF"
+        - "zywy-obraz: licencja sprawdzona (niekomercyjnie, więc wolno), lemo_wake.py sprawdz/instaluj, programy lemo-wake przez lemo_wake.py uruchom"
+        - "skrypty przez Python biblioteki ({LW_PY} w uruchom), projekt w out/zywe, plan w DIRECTOR.md, qa.py bez FAIL, MP4 + GIF"
         - "przy kodzie 10 pyta raz o modele (co, ile MB, skąd, gdzie), zapisuje odpowiedź models.py consent"
       should_not:
         - "uv run, doctor.mjs --fix albo /lemo-wake:upload"

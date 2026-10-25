@@ -35,12 +35,12 @@ i wypisuje przepis każdego ruchu. Biblioteka to cinetic (MIT, Leonxlnx), przepi
 
 ## Kroki
 ```bash
-R=$HERMES_HOME/scripts/ruchy.py
-python3 $R losuj --rodzaj promo --sekundy 30 --json out/wideo/src/ruchy.json   # plan na film
-python3 $R losuj --rodzaj pion --energia spokojna                               # spokojnie (bez uderzeń i śmignięć)
-python3 $R losuj --kategoria przejscie --ile 2 --rodzaj promo --bez tr-shape-match-cut  # ponowne losowanie
-python3 $R karta cam-living-hold                                                # jedna technika w całości
-python3 $R lista --kategoria dane --rodzaj funkcja                              # przegląd po losowaniu
+R="$HERMES_HOME/scripts/ruchy.py"
+@@PY@@ "$R" losuj --rodzaj promo --sekundy 30 --json out/wideo/src/ruchy.json   # plan na film
+@@PY@@ "$R" losuj --rodzaj pion --energia spokojna                               # spokojnie (bez uderzeń i śmignięć)
+@@PY@@ "$R" losuj --kategoria przejscie --ile 2 --rodzaj promo --bez tr-shape-match-cut  # ponowne losowanie
+@@PY@@ "$R" karta cam-living-hold                                                # jedna technika w całości
+@@PY@@ "$R" lista --kategoria dane --rodzaj funkcja                              # przegląd po losowaniu
 ```
 1. **Rodzaj**: `promo` (premiera, reklama), `funkcja` (jedna funkcja produktu), `aplikacja` (przejście przez
    aplikację), `logo` (logo-intro, sting), `petla` (pętla, tło), `pion` (rolka 9:16). Explainer, dane, typografia

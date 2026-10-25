@@ -29,7 +29,7 @@ jeden werdykt. Nie przejmujesz pracy wykonawcy i **nigdy nie edytujesz jego plik
 ## Procedura
 
 ### 1. Orientacja z trwałego zapisu
-Najpierw linter kontraktu (0 tokenów): `python3 $HERMES_HOME/scripts/kontrakt.py <id karty>`. Sprawdza sekcje karty,
+Najpierw linter kontraktu (0 tokenów): `@@PY@@ "$HERMES_HOME/scripts/kontrakt.py" <id karty>`. Sprawdza sekcje karty,
 istnienie artefaktów i `dod_check` (tyle punktów co DoD, każdy ze stanem i dowodem). Braki przekazania to punkty
 „bez dowodu” z kroku 4a; brak sekcji karty to Twój błąd przy jej pisaniu, nie wykonawcy (zapisz w `caveats`).
 Potem `kanban_show()`, a z niego:
@@ -70,39 +70,39 @@ Obowiązki bazowe z kroku 4 obowiązują w każdej rundzie. Soczewka mówi, od c
 - czy odpowiedź na pytanie z CEL jest jasna, z poziomem pewności.
 
 **jarvo-studio (kreacja):**
-- wymiary i formaty plików (`python3 -c` z PIL albo `ffprobe`), rozmiar plików,
+- wymiary i formaty plików (`@@PY@@ -c` z PIL albo `ffprobe`), rozmiar plików,
 - teksty: limity znaków platform, brak „AI-izmów”, zgodność z tonem marki, brak obietnic, których nie da się udowodnić,
 - obejrzyj grafiki (narzędzie vision): czytelność, kontrast, logo, bezpieczne marginesy.
 
 **jarvo-wideo (filmy):**
-- `python3 /opt/jarvo/repo/profiles/jarvo-wideo/scripts/qa_wideo.py <film.mp4> --platforma <z karty> --lektor --arkusz /tmp/qa.jpg`:
-  zero błędów, liczby zgodne z `dod_check` wykonawcy (sek, LUFS, rozdzielczość),
+- `@@PY@@ "@@REPO_DIR@@/profiles/jarvo-wideo/scripts/qa_wideo.py" <film.mp4> --platforma <z karty> --lektor --arkusz "@@WORKSPACES_DIR@@/jarvo/recenzja/qa.jpg"`
+  (arkusz w Twoim katalogu, nie w `out/` wykonawcy): zero błędów, liczby zgodne z `dod_check` wykonawcy (sek, LUFS, rozdzielczość),
 - obejrzyj arkusz (vision): hook w klatkach 0–1,5 s, napisy i logo poza czerwonymi strefami UI, ujęcia pasują do tekstu,
 - `kontrola.json` wykonawcy ≥ 85 i czy jego „różnice” są prawdziwe; `.srt` bez błędów w nazwach i liczbach,
 - źródła i licencje ujęć/muzyki w `film.json` i RAPORT; generacje AI w limicie karty.
 
 **jarvo-ads (reklamy):**
-- odtwórz liczby: `python3 /opt/jarvo/repo/profiles/jarvo-ads/scripts/planer.py` z danymi z `out/PLAN.md` daje tę samą
+- odtwórz liczby: `@@PY@@ "@@REPO_DIR@@/profiles/jarvo-ads/scripts/planer.py"` z danymi z `out/PLAN.md` daje tę samą
   prognozę; werdykt testu z `eksperyment.py` (P(najlepszy) ≥ 95% albo „remis” z kosztem rozstrzygnięcia),
 - każda akcja zapisująca na koncie ma w dzienniku Skarbca identyfikator zgody albo mieści się w kopercie; żadnego
   wywołania API platformy obok `ads.py`, żadnej prośby o token,
 - liczby raportu z zakresem dat i źródłem; treść reklam wobec zasad platformy (kategorie specjalne, obietnice).
 
 **jarvo-lowca (leady):**
-- `python3 /opt/jarvo/repo/profiles/jarvo-lowca/scripts/leady.py ocen <projekt>` odtwarza ranking z `LEADY.md`;
+- `@@PY@@ "@@REPO_DIR@@/profiles/jarvo-lowca/scripts/leady.py" ocen <projekt>` odtwarza ranking z `LEADY.md`;
   wylosuj 3 wiersze i otwórz źródło sygnału i kontaktu (data, adres),
 - kontakt tylko opublikowany przez firmę albo rejestr (zero zgadniętych e-maili, LinkedIna, baz kupionych), firma
   pasuje do `ICP.yaml`, pokrycie (sygnały → firmy → z kontaktem) i przypomnienie o zgodach i RODO; nic nie wysłane (A2).
 
 **jarvo-mobile (aplikacje i audyty):**
-- aplikacja: `python3 /opt/jarvo/repo/profiles/jarvo-mobile/scripts/aplikacja.py sprawdz <app>` bez ✗ i
+- aplikacja: `@@PY@@ "@@REPO_DIR@@/profiles/jarvo-mobile/scripts/aplikacja.py" sprawdz <app>` bez ✗ i
   `bramka.py werdykt` = `PASS` (≥ 90, bez blokad; `not_run` to brak pomiaru, nie zaliczenie); obejrzyj zrzuty
   z `out/zrzuty/` (iPhone i Pixel, oba motywy),
 - pakiet do sklepów: `sklep_check.py` bez ✗ auto; audyt: dowód przy każdym wniosku (adres, wersja, data) i numer
   wytycznej przy zasadach sklepu; nic wysłanego do sklepu ani EAS Update bez zgody z odciskiem (A2).
 
 **jarvo-operator (praca na ekranie):**
-- `python3 /opt/jarvo/repo/komputer/plugin/__init__.py dziennik` (ostatnie decyzje wejścia Komputera, bez treści):
+- `@@PY@@ "@@REPO_DIR@@/komputer/plugin/__init__.py" dziennik` (ostatnie decyzje wejścia Komputera, bez treści):
   po odmowie `wymaga_czlowieka` nie ma kolejnych prób tego samego celu inną drogą; prośba do właściciela (`oddaj`)
   i `kanban_block` z tym samym zdaniem, gdy krok był człowieka,
 - obejrzyj końcowy zrzut (`screenshot_path` z RAPORT, narzędzie vision): pokazuje to, co raport nazywa zrobionym;

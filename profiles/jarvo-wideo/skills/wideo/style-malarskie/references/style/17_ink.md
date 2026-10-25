@@ -5,7 +5,7 @@ się dokłada, dużo pustego papieru. Poznasz go po pociągnięciach pędzla z s
 rozlewających się w papier, czerwonej pieczęci i obrazie, który na początku sam się pisze. Jakość wzoru: ★★
 (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: postać za mało swobodna, za mało xieyi (ocena przeglądu 6/10)
 (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 17_ink --czasy 0.1,0.45,0.9 --arkusz out/wideo/wzor-17_ink.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 17_ink --czasy 0.1,0.45,0.9 --arkusz out/wideo/wzor-17_ink.jpg`;
 kod `$HUASHU/scripts/engine/scenes/17_ink.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę,
 nie scenę.
 
@@ -36,7 +36,7 @@ nie scenę.
   wyciętymi `destination-out` i plamkami; u nas 1–2 litery (inicjały marki) wycięte tak samo.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 17_ink`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 17_ink`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js`, `paint.js`, `kit.js` (`KIT.resample`, `KIT.label`, `KIT.choreo`), `brush.js`
    (`PAINT.brush`, `PAINT.leaf`, `PAINT.inkWash`), `rig.js`. Nie zamalowuj całości: tusz tylko dochodzi.
 2. Kolejność warstw: papier (cache `ink_paper`) → plamy: jasny tusz gór, cynobrowe słońce → pasma mgły (rozmyte

@@ -5,7 +5,7 @@ zachodzące słońce pocięte poziomymi szczelinami, okienko Windows 95 i marmur
 rozjechane kanały RGB, pas zakłóceń, linie skanowania, napis „PLAY” i kod czasu. Poznasz go po tym, że cały kadr
 lekko drga jak odtwarzany z kasety. Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru:
 świecą też styki części postaci (talia, ramię przy tułowiu) (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 26_vaporwave --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-26_vaporwave.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 26_vaporwave --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-26_vaporwave.jpg`;
 kod `$HUASHU/scripts/engine/scenes/26_vaporwave.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -46,7 +46,7 @@ technikę, nie scenę.
   `Exo2-800i`. Wszystkie mają polskie znaki (sprawdzone w plikach `lib/fonts`), nie są podmieniane.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 26_vaporwave`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 26_vaporwave`. Biblioteki z
    `/_lib/huashu/lib/` (`paint.js`, `render.js`, `post.js`, `rig.js`), `P` = `PAINT`.
 2. Cały obraz rysuj najpierw do bufora poza ekranem `S` (`P.scratch`), dopiero potem przepuść go przez VHS do `c`.
    Plakietkę, licznik i napisy rysuj na wierzchu, już po VHS, żeby nie dostały aberracji.

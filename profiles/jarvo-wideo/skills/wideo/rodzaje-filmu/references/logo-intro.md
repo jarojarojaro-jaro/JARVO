@@ -44,4 +44,4 @@ Warianty: alfa / tło / Lottie / GIF, formaty:   Belka: imię, funkcja (dokładn
 - Belka na jasnym i ciemnym kadrze testowym; `lottie.json` przechodzi weryfikację w playerze (`?frame=N`).
 
 ## Inspiracje
-`python3 $HERMES_HOME/scripts/inspiracje.py logo-intro --ile 3`.
+`@@PY@@ "$HERMES_HOME/scripts/"inspiracje.py logo-intro --ile 3`.

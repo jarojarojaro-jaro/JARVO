@@ -6,7 +6,7 @@ ramki zaciskających się na celu i po liniach skanu.
 Wzór: okładka `$MGSTYLES/videos/22-hud.jpg`, kod `$MGSTYLES/demos/22-hud/` (MIT), ocena jury 7,93; 1920×1080,
 30 kl./s, 10 s. Klatki wzoru (6,4 s = namierzenie, kulminacja; Three.js z bloomem, ok. 1,5 s na klatkę na CPU):
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/22-hud/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/22-hud/index.html" --preset mg \
   --czasy 1.5,4,6.4,6.6,9 --arkusz out/wideo/wzor-22-hud.jpg
 ```
 

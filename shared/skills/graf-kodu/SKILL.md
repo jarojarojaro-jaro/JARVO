@@ -29,13 +29,13 @@ i bez tokenów modelu.
 
 ## Kroki
 ```bash
-G=$HERMES_HOME/skills/kod/graf-kodu/scripts/graf_kodu.py
-python3 $G indeks <repo>                          # na początku zadania (pierwszy raz pobiera silnik, ~41 MB)
-python3 $G architektura <repo>                    # nieznany projekt: języki, pakiety, trasy, gorące miejsca
-python3 $G kto-wola <repo> <funkcja>              # przed zmianą funkcji
-python3 $G co-wola <repo> <funkcja> --glebokosc 3
-python3 $G szukaj <repo> '.*Checkout.*' --rodzaj Function
-python3 $G wplyw <repo>                           # po zmianach, przed oddaniem: co dotknięte i z jakim ryzykiem
+G="$HERMES_HOME/skills/kod/graf-kodu/scripts/graf_kodu.py"
+@@PY@@ "$G" indeks <repo>                          # na początku zadania (pierwszy raz pobiera silnik, ~41 MB)
+@@PY@@ "$G" architektura <repo>                    # nieznany projekt: języki, pakiety, trasy, gorące miejsca
+@@PY@@ "$G" kto-wola <repo> <funkcja>              # przed zmianą funkcji
+@@PY@@ "$G" co-wola <repo> <funkcja> --glebokosc 3
+@@PY@@ "$G" szukaj <repo> '.*Checkout.*' --rodzaj Function
+@@PY@@ "$G" wplyw <repo>                           # po zmianach, przed oddaniem: co dotknięte i z jakim ryzykiem
 ```
 Nazwa niejednoznaczna → skrypt wypisze pełne nazwy (`projekt.moduł.funkcja`), podaj właściwą.
 Po większych zmianach `indeks` jeszcze raz (ok. 7 s na repo wielkości Jarvo; jedno pytanie ok. 5 s).

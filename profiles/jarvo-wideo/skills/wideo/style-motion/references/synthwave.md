@@ -7,7 +7,7 @@ Wzór: okładka `$MGSTYLES/videos/10-synthwave.jpg`, kod `$MGSTYLES/demos/10-syn
 1920×1080, 30 kl./s, 10 s, Three.js. Klatki wzoru (4,3 s = uderzenie tytułu, 6,7 s = zapłon neonu; ok. 3,7 s
 na klatkę na CPU; krój Mr Dafoe instaluje `narzedzia.py instaluj mg`, bez niego strona nie jest gotowa):
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/10-synthwave/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/10-synthwave/index.html" --preset mg \
   --czasy 0.5,2.25,4.3,6.7,9 --arkusz out/wideo/wzor-10-synthwave.jpg
 ```
 

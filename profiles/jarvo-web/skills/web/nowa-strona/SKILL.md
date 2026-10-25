@@ -41,12 +41,13 @@ metadata:
      i `npx astro add sitemap --yes` (`sitemap-index.xml` w buildzie),
    - `public/robots.txt`: `User-agent: *`, `Allow: /`, `Sitemap: https://domena.pl/sitemap-index.xml`,
    - `public/llms.txt` wg szablonu z `audyt-strony/references/widocznosc.md`,
-   - klucz IndexNow: `python3 /opt/jarvo/repo/profiles/jarvo-web/scripts/indexnow.py klucz public` (plik `<klucz>.txt`
+   - klucz IndexNow: `@@PY@@ "@@REPO_DIR@@/profiles/jarvo-web/scripts/indexnow.py" klucz public` (plik `<klucz>.txt`
      w `public/`; po wdrożeniu skill `wdrozenie` zgłasza nim adresy do Binga i innych wyszukiwarek IndexNow),
    - `src/pages/404.astro`: ten sam layout, krótki tekst, link do strony głównej, `<meta name="robots" content="noindex">`,
    - obraz OG 1200×630 (PNG albo JPEG) w `public/og.png`: od `jarvo-studio` albo roboczy (zrzut sekcji hero
      przycięty do 1200×630), roboczy oznaczony w RAPORT.md.
-6. **Build i podgląd:** `npm run build` → `npx astro preview --host 0.0.0.0 --port 4321` (w tle) albo statyczny serwer z `dist/`.
+6. **Build i podgląd:** `npm run build` → `npx astro preview --host 127.0.0.1 --port 4321` (w tle) albo statyczny serwer z `dist/`
+   (adres działa tylko na tym komputerze, do Twoich testów; człowiekowi link z `jarvo_link.py`, zasada 9 protokołu).
    Build, skrypt albo test pada → `systematic-debugging`: najpierw przyczyna (odtworzenie, jedna hipoteza naraz),
    potem jedna poprawka; bez zgadywania kolejnych zmian.
 7. **Kontrola jakości:** `audyt-strony` na podglądzie → popraw do budżetów → zapisz wyniki przed/po.

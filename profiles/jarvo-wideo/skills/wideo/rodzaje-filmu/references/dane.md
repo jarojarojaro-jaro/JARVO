@@ -48,4 +48,4 @@ Format, długość, marka, lektor tak/nie:
 - Teza zgodna z danymi (bez nadinterpretacji); źródło i data danych na ekranie i w RAPORT.
 
 ## Inspiracje
-`python3 $HERMES_HOME/scripts/inspiracje.py dane --ile 3` (albo `--szukaj "bar chart"`).
+`@@PY@@ "$HERMES_HOME/scripts/"inspiracje.py dane --ile 3` (albo `--szukaj "bar chart"`).

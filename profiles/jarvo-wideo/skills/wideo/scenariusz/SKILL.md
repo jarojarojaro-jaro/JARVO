@@ -57,7 +57,7 @@ formie bierz tylko zasady (hak = zwrot wartości, jedna scena = jedna zmiana), n
 5. **Obraz do każdej sceny:** co widać (konkretny obiekt i kadr, nie „coś o kawie”), zapytanie stock po angielsku.
 6. **CTA** jedno, na końcu (i opcjonalnie wpleciony w połowie przy > 40 s).
 7. **Czytanie na głos:** zdania krótkie, bez nawiasów, skrótów i cyfr rzymskich; liczby tak, jak mają być czytane
-   („dwa razy”, „30 procent”). Test: `film.py lektor "<hook>" -o /tmp/hook.mp3` → czas hooka ≤ 2,5 s.
+   („dwa razy”, „30 procent”). Test: `film.py lektor "<hook>" -o out/hook.mp3` → czas hooka ≤ 2,5 s.
 
 ## Wyjścia
 - `out/wideo/SCENARIUSZ.md`: przesłanie, odbiorca, długość, tabela scen (nr, tekst lektora, tekst ekranowy, obraz,

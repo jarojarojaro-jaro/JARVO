@@ -29,10 +29,10 @@ czego dany podgląd nie pokazuje.
 - sprawdzanie jakości przed oddaniem → bramka aplikacji (rubryka i testy na urządzeniu).
 
 ## Kroki
-1. **HQ (zawsze, bez kont):** `python3 $HERMES_HOME/scripts/aplikacja.py podglad <app> --trasy / /wiecej …`
+1. **HQ (zawsze, bez kont):** `@@PY@@ "$HERMES_HOME/scripts/aplikacja.py" podglad <app> --trasy / /wiecej …`
    (wszystkie ekrany z planu). Wynik: link (serwer podglądu HQ), `out/zrzuty/<iphone|pixel>-<jasny|ciemny>/` i
    `zrzuty.json` (konsola, przewijanie, cele dotyku, axe). Obejrzyj zrzuty; błędy poprawiasz przed pokazaniem.
-2. **Expo Go na telefonie** (gdy właściciel ma organizację Expo): `python3 $HERMES_HOME/scripts/aplikacja.py expo-go <app>`
+2. **Expo Go na telefonie** (gdy właściciel ma organizację Expo): `@@PY@@ "$HERMES_HOME/scripts/aplikacja.py" expo-go <app>`
    publikuje aktualizację (EAS Update, gałąź `podglad`) tokenem robota tej organizacji i robi stronę z przyciskiem
    „Otwórz w Expo Go” i kodem QR (link w HQ). Aktualizację widzą tylko członkowie organizacji właściciela (A1).
    Brak `EXPO_TOKEN` albo `wlasciciel_expo` → instrukcja jednorazowa dla właściciela (`references/expo-go.md`), a do
@@ -46,7 +46,8 @@ czego dany podgląd nie pokazuje.
 ## Zasady
 - Nie uruchamiasz serwera deweloperskiego dla iPhone'a: wymagałby osobistego tokenu właściciela z pełnym dostępem do
   jego konta Expo. Zawsze EAS Update i token robota.
-- Adresy typu `localhost` z kontenera nie działają u właściciela: tylko link z `aplikacja.py podglad` (serwer HQ).
+- Adres typu `localhost` działa tylko na tym komputerze, nie na telefonie właściciela ani w Telegramie: tylko link
+  z `aplikacja.py podglad` (serwer HQ).
 - Zrzuty z wersji webowej nie idą do sklepów (to robi pakiet do sklepów z prawdziwej aplikacji).
 
 ## Wyjścia

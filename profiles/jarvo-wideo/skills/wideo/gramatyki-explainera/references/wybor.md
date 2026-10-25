@@ -3,9 +3,9 @@
 Osiem gramatyk animacji do filmów z lektorem (explainery YouTube, technologia, AI, finanse). Każda ma klip: plik spec (JSON) → odcinek animacji o dokładnej długości (`kontrakt-spec.md`). Dziewiąta, `prowadzacy`, to tylko wzór i metoda, bez klipu. Zasady wspólne dla wszystkich: `wspolne-zasady.md`; szczegóły jednej gramatyki: jej karta `<nazwa>.md`.
 
 ```bash
-G=$HERMES_HOME/scripts/gramatyka.py
-python3 $G wzor <nazwa> --arkusz out/wideo/wzor-<nazwa>.jpg                 # stopklatki filmu pokazowego
-python3 $G szablon <nazwa> [--format 9:16] -o out/wideo/src/klip-<nazwa>/spec.json       # start
+G="$HERMES_HOME/scripts/gramatyka.py"
+@@PY@@ "$G" wzor <nazwa> --arkusz out/wideo/wzor-<nazwa>.jpg                 # stopklatki filmu pokazowego
+@@PY@@ "$G" szablon <nazwa> [--format 9:16] -o out/wideo/src/klip-<nazwa>/spec.json       # start
 ```
 
 Filmy pokazowe mają ok. 8 s i są 2,5–3 razy gęstsze niż prawdziwe tempo, żeby w krótkim pokazie zmieścić całą gramatykę. W filmie zwolnij do długości ujęć z tabeli.

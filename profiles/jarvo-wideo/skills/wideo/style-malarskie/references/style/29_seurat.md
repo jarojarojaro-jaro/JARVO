@@ -4,7 +4,7 @@ Neoimpresjonizm z 1884 roku („Niedzielne popołudnie na wyspie Grande Jatte”
 farb, które mieszają się dopiero w oku (mieszanie optyczne), z kropkami barwy dopełniającej, prześwitem światła na
 granicach jasne/ciemne i kropkowaną ramą malowaną przez samego Seurata. Spokojny, prawie nieruchomy. Jakość wzoru:
 ★★ (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: za statyczny, siatka kropek zbyt regularna (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 29_seurat --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-29_seurat.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 29_seurat --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-29_seurat.jpg`;
 kod `$HUASHU/scripts/engine/scenes/29_seurat.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -37,7 +37,7 @@ technikę, nie scenę.
 - Krój plakietki we wzorze: `Marcellus-400`; ma polskie znaki.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 29_seurat`. `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 29_seurat`. `P` = `PAINT`
    (`paint.js` + `render.js` z `P.pointillism`).
 2. Cały podkład płasko, razem z postacią, na płótnie poza ekranem (`P.scratch`, kontekst `willReadFrequently`,
    co klatkę `g.reset()`); ok. 3 ms na klatkę.

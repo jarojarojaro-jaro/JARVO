@@ -23,7 +23,7 @@ e-mail i strona, jeśli przedsiębiorca je podał). Każdy kontakt ma adres źr�
 ## Kroki
 1. Strona firmy: z sygnału (`www`), z KRS (`krs.py odpis <KRS> --json`) albo z wyszukiwarki (`"<nazwa firmy>" <miasto>`;
    sprawdź NIP w stopce, zanim uznasz stronę za tej firmy).
-2. `python3 $HERMES_HOME/scripts/strona.py kontakt <www> --json > <projekt>/strony/<domena>.json`: e-maile (z typem
+2. `@@PY@@ "$HERMES_HOME/scripts/strona.py" kontakt <www> --json > <projekt>/strony/<domena>.json`: e-maile (z typem
    i kontekstem, np. „Anna Nowak, dyrektor sprzedaży”), telefony, formularz, kariera, technologie, NIP, social.
    Skrypt czyta też dane ukryte w HTML (schema.org JSON-LD, `__NEXT_DATA__`, Nuxt, React Server Components):
    nazwa i adres firmy, telefon, e-mail i NIP, których strona nie pokazuje w tekście. Takie pole ma `skad`
@@ -32,14 +32,14 @@ e-mail i strona, jeśli przedsiębiorca je podał). Każdy kontakt ma adres źr�
    Kod 3 = strona odmówiła. Zakaz w `robots.txt` → zostaje bez kontaktu. Ochrona przed automatami (403/429,
    „Human Verification”) → **jedna** próba skillem `ostrozna-przegladarka` na stronie kontaktu (albo głównej):
    ```bash
-   O=$HERMES_HOME/skills/web/ostrozna-przegladarka/scripts/ostrozna.py
-   python3 $O <url> --html -o <projekt>/strony/<domena>.html
-   python3 $HERMES_HOME/scripts/strona.py kontakt <url> --z-html <projekt>/strony/<domena>.html --json > <projekt>/strony/<domena>.json
+   O="$HERMES_HOME/skills/web/ostrozna-przegladarka/scripts/ostrozna.py"
+   @@PY@@ "$O" <url> --html -o <projekt>/strony/<domena>.html
+   @@PY@@ "$HERMES_HOME/scripts/strona.py" kontakt <url> --z-html <projekt>/strony/<domena>.html --json > <projekt>/strony/<domena>.json
    ```
    Wynik ma `"odczyt": "camoufox"`; w raporcie przy tym kontakcie dopisz „odczyt przez Camoufox”. Kod 3 także
    w `ostrozna.py` → firma zostaje bez kontaktu (blokada w raporcie), bez kolejnej drogi.
-3. `python3 $HERMES_HOME/scripts/leady.py kontakt <projekt> <projekt>/strony/*.json`, potem `leady.py ocen` od nowa.
-   **Jednoosobowa działalność** (NIP bez KRS, np. zwycięzca przetargu): `python3 $HERMES_HOME/scripts/ceidg.py firma
+3. `@@PY@@ "$HERMES_HOME/scripts/leady.py" kontakt <projekt> <projekt>/strony/*.json`, potem `leady.py ocen` od nowa.
+   **Jednoosobowa działalność** (NIP bez KRS, np. zwycięzca przetargu): `@@PY@@ "$HERMES_HOME/scripts/ceidg.py" firma
    --nip <NIP> -o <projekt>/ceidg.jsonl` i `leady.py dodaj`: wpis `ceidg-firma` dokłada PKD i kontakt z CEIDG (ze
    źródłem i `stan_na`) bez podbijania oceny. Brak tokenu (kod 2): kontakt tylko ze strony, w raporcie „CEIDG bez tokenu”.
 4. Kolejność w liście: ogólny (`biuro@`) → rolowy (`sprzedaz@`, `marketing@`) → osobowy (imię i nazwisko albo skrzynka

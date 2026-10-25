@@ -4,7 +4,7 @@ Pusta złota równina pod granatowo-żółtym niebem, długie cienie, które ros
 i słoń na szczudłowatych nogach na horyzoncie. Bryła akademicka, bez konturów: tylko gradient i rozmyty ciemny brzeg
 od środka. Jakość wzoru: ★★ (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: postać wygląda jak ilustracja
 wektorowa (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 23_dali --czasy 0.1,0.6,1.1 --arkusz out/wideo/wzor-23_dali.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 23_dali --czasy 0.1,0.6,1.1 --arkusz out/wideo/wzor-23_dali.jpg`;
 kod `$HUASHU/scripts/engine/scenes/23_dali.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę,
 nie scenę.
 
@@ -38,7 +38,7 @@ nie scenę.
 - Napisy w filmie pokazowym: `PlayfairDisplay-700i / 400i` (mają polskie znaki), jasne litery z ciemnym cieniem.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 23_dali`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 23_dali`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js`, `paint.js` (`PAINT.cached`, `PAINT.steam`, `PAINT.grain`, `PAINT.choreo`),
    `render.js` (`PAINT.vol`, `PAINT.castShadow`), `rig.js` (`RIG.drawCup`). Ze sceny skopiuj `softMap`,
    `softClock`, `elephant`, `antWatch`.

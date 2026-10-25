@@ -1,6 +1,6 @@
 # Tablica rysowana ręcznie, typ RSA (`tablica`, w kodzie `y3_whiteboard`)
 
-Lektor mówi zdanie, a ręka z markerem pisze je i rysuje obok na jednej dużej białej tablicy; kamera idzie za argumentem, a na końcu oddala się i cały wywód widać jako jedną mapę. Wzór: `python3 $HERMES_HOME/scripts/gramatyka.py wzor tablica --arkusz out/wideo/wzor-tablica.jpg`; start: `python3 $HERMES_HOME/scripts/gramatyka.py szablon tablica [--format 9:16] -o out/wideo/src/klip-tablica/spec.json`.
+Lektor mówi zdanie, a ręka z markerem pisze je i rysuje obok na jednej dużej białej tablicy; kamera idzie za argumentem, a na końcu oddala się i cały wywód widać jako jedną mapę. Wzór: `@@PY@@ "$HERMES_HOME/scripts/gramatyka.py" wzor tablica --arkusz out/wideo/wzor-tablica.jpg`; start: `@@PY@@ "$HERMES_HOME/scripts/gramatyka.py" szablon tablica [--format 9:16] -o out/wideo/src/klip-tablica/spec.json`.
 
 Kod: klip `$HUASHU/scripts/engine/clips/y3_whiteboard.js`, przykład `$HUASHU/scripts/engine/examples/y3_whiteboard.json` (tytuł, trzy punkty z ikonami `stack`, `network`, `chat`, `highlight`), film pokazowy `$HUASHU/scripts/engine/demos/y3_whiteboard/` (MIT). Film pokazowy ma 8 s, 3 bloki (ok. 2,5 razy gęściej niż prawdziwy film), a pióro jedzie 2 razy szybciej niż w RSA: bierz technikę, nie tempo.
 Potok: `szablon` → polskie teksty i `slowo` → `gramatyka.py sprawdz` → `gramatyka.py render … --klatki 0.5,2,4` → pełny `render`.

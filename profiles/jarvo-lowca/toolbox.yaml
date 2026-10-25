@@ -19,7 +19,7 @@ tools:
     install: {method: api, spec: "CEIDG_TOKEN (darmowy token JWT z dane.biznes.gov.pl)"}
     integration: skill-script
     used_by_skills: [sygnaly, kontakt-firmy, kwalifikacja, lista-leadow, monitoring-leadow]
-    healthcheck: "python3 /opt/jarvo/repo/profiles/jarvo-lowca/scripts/ceidg.py --help"
+    healthcheck: "python3 @@REPO_DIR@@/profiles/jarvo-lowca/scripts/ceidg.py --help"
     autonomy: A0
     optional: true
     notes: "ceidg.py szukaj/firma: jednoosobowe działalności (KRS = spółki). Limit 1000 zapytań/h, skrypt ≥ 4 s między zapytaniami; 429 = czeka i ponawia, potem kod 3. Token tylko w nagłówku, nigdy w wyjściu. Minimum danych osoby: bez imienia i nazwiska, ulicy, adresu korespondencyjnego; `ceidg.py sprawdz` sprawdza token."
@@ -30,7 +30,7 @@ tools:
     install: {method: none, spec: "HTTP, bez klucza"}
     integration: skill-script
     used_by_skills: [sygnaly, monitoring-leadow]
-    healthcheck: "python3 /opt/jarvo/repo/profiles/jarvo-lowca/scripts/przetargi.py sprawdz bzp"
+    healthcheck: "python3 @@REPO_DIR@@/profiles/jarvo-lowca/scripts/przetargi.py sprawdz bzp"
     autonomy: A0
     optional: true
     notes: "przetargi.py bzp: ogłoszenia i wyniki ze zwycięzcą. Odcina za serię ciężkich zapytań: pauza 4 s, dzień dzielony na województwa."
@@ -41,7 +41,7 @@ tools:
     install: {method: none, spec: "HTTP, bez klucza"}
     integration: skill-script
     used_by_skills: [sygnaly, monitoring-leadow]
-    healthcheck: "python3 /opt/jarvo/repo/profiles/jarvo-lowca/scripts/przetargi.py sprawdz ted"
+    healthcheck: "python3 @@REPO_DIR@@/profiles/jarvo-lowca/scripts/przetargi.py sprawdz ted"
     autonomy: A0
     optional: true
     notes: "przetargi.py ted: ogłoszenia unijne z CPV."
@@ -52,7 +52,7 @@ tools:
     install: {method: binary, spec: "infra/Dockerfile: wydanie v152.0.4-beta.30, SHA-256 amd64 i arm64; camoufox==0.5.6 + playwright==1.62.0 w /opt/jarvo/venv"}
     integration: skill-script
     used_by_skills: [ostrozna-przegladarka, kontakt-firmy, sygnaly, rozpoznanie-zrodla]
-    healthcheck: "python3 /opt/jarvo/repo/shared/skills/ostrozna-przegladarka/scripts/ostrozna.py --sprawdz"
+    healthcheck: "python3 @@REPO_DIR@@/shared/skills/ostrozna-przegladarka/scripts/ostrozna.py --sprawdz"
     autonomy: A1
     notes: "Zapasowa przeglądarka tylko po odmowie zwykłej (strona.py kod 3, browser_* z 403/429 albo „Human Verification”; nie dla API rejestrów): `ostrozna.py <url>`. Jedna naraz, ~0,8 GB RAM, 20 s odstępu i 30 stron domeny na dobę, robots.txt, bez klikania captchy i logowania; jej odmowa = blokada. Serwisy za Cloudflare zwykle odmawiają dalej."
-  - {name: indra-ocr, source: https://github.com/datalab-to/indra, license: "Apache-2.0 (kod); modele: zmodyfikowana OpenRAIL-M (do 20 mln USD, bez produktu konkurującego z Datalab)", version: "0.3.2 (modele v3.1.1)", install: {method: image, spec: "venv /opt/jarvo/venvs/ocr (Python 3.12), infra/python/requirements-ocr.txt (sha256, --require-hashes, --no-deps, bez huggingface_hub); modele /opt/jarvo/models/indra-ocr (sha256)"}, integration: skill-script, used_by_skills: [odczyt-ekranu], healthcheck: "python3 /opt/jarvo/repo/shared/skills/odczyt-ekranu/scripts/ocr.py --stan", autonomy: A0, notes: "Wspólny odczyt ekranu (decyzja właściciela 2026-10-17): zrzut ekranu, skan, PDF, klatka filmu → tekst, ramki, --szukaj; bez sieci (modele w obrazie, gniazda zablokowane). Zapas: Tesseract pol+eng."}
+  - {name: indra-ocr, source: https://github.com/datalab-to/indra, license: "Apache-2.0 (kod); modele: zmodyfikowana OpenRAIL-M (do 20 mln USD, bez produktu konkurującego z Datalab)", version: "0.3.2 (modele v3.1.1)", install: {method: image, spec: "venv /opt/jarvo/venvs/ocr (Python 3.12), infra/python/requirements-ocr.txt (sha256, --require-hashes, --no-deps, bez huggingface_hub); modele /opt/jarvo/models/indra-ocr (sha256)"}, integration: skill-script, used_by_skills: [odczyt-ekranu], healthcheck: "python3 @@REPO_DIR@@/shared/skills/odczyt-ekranu/scripts/ocr.py --stan", autonomy: A0, notes: "Wspólny odczyt ekranu (decyzja właściciela 2026-10-17): zrzut ekranu, skan, PDF, klatka filmu → tekst, ramki, --szukaj; bez sieci (modele w obrazie, gniazda zablokowane). Zapas: Tesseract pol+eng."}

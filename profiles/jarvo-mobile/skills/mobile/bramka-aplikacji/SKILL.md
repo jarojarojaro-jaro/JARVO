@@ -31,13 +31,13 @@ Android, symulator iOS). „Szablonowa” aplikacja nie przechodzi: to nie tylko
 ## Kroki
 1. **Kontrole i zrzuty z tej samej wersji:** `aplikacja.py sprawdz <app>` (wszystko ✓) i `aplikacja.py podglad <app>
    --trasy …` (wszystkie ekrany z planu). Ocena bez świeżych zrzutów nie istnieje.
-2. **Testy wrogie, warstwa web (zawsze):** `python3 $HERMES_HOME/scripts/bramka.py wrogie <app> --trasy …`
+2. **Testy wrogie, warstwa web (zawsze):** `@@PY@@ "$HERMES_HOME/scripts/bramka.py" wrogie <app> --trasy …`
    (mały ekran, tryb ciemny z axe, brak sieci, długie polskie słowa, ograniczony ruch, nieznany adres, konsola).
-3. **Warstwa Android (gdy jest urządzenie):** `python3 $HERMES_HOME/scripts/urzadzenie.py status`; jest →
+3. **Warstwa Android (gdy jest urządzenie):** `@@PY@@ "$HERMES_HOME/scripts/urzadzenie.py" status`; jest →
    `urzadzenie.py wrogie <pakiet albo exp://…> <app>/out/jakosc/wrogie-android` (duża czcionka, mały ekran, ciemny,
    offline, odebrane uprawnienia, „wstecz”, śmierć procesu, świeża instalacja; awarie z logów). Kod 3 = nie ma
    urządzenia: zapisz to jako „niezmierzone”, nie zgaduj.
-4. **Warstwa iOS (gdy właściciel podłączył repo i token):** `python3 $HERMES_HOME/scripts/ios_ci.py przygotuj <app>`,
+4. **Warstwa iOS (gdy właściciel podłączył repo i token):** `@@PY@@ "$HERMES_HOME/scripts/ios_ci.py" przygotuj <app>`,
    `wypchnij`, `uruchom --tryb expo-go` (symulator iPhone 17 Pro Max: jasny, ciemny, największa czcionka, logi).
    Bez `GITHUB_TOKEN` → niezmierzone + instrukcja z `references/wrogie.md`.
 5. **Ocena rubryką** (`references/rubryka.md`): `bramka.py ocena-szablon > <app>/out/jakosc/ocena-runda-N.json`,

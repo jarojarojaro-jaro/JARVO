@@ -4,7 +4,7 @@ Barok z 1642 roku: prawie cały obraz tonie w ciepłym brązowym mroku, światł
 i filiżankę. Grubo nałożona farba (impast) tylko w światłach, ciemna strona postaci rozpływa się w tle, na wierzchu
 spękania, ziarno, winieta i złotobrązowy werniks. Jakość wzoru: ★ (do zrobienia od nowa); słabość wzoru: postać jest
 płaska (ocena 5/10), ten styl najbardziej wymaga przebudowy (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 32_rembrandt --czasy 0.4,0.8,1.2 --arkusz out/wideo/wzor-32_rembrandt.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 32_rembrandt --czasy 0.4,0.8,1.2 --arkusz out/wideo/wzor-32_rembrandt.jpg`;
 kod `$HUASHU/scripts/engine/scenes/32_rembrandt.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -44,7 +44,7 @@ technikę, nie scenę.
 
 ## Jak go zbudować
 Kolejność warstw:
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 32_rembrandt`. `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 32_rembrandt`. `P` = `PAINT`
    (`paint.js`, `brush.js` z `P.impasto`, `render.js` z `P.lightMap`/`P.applyLight`/`P.pool`).
 2. Jasny podkład, czyli kolory „w pełnym świetle”: pokój, okno z ołowianymi szprosami w romby, turecki kilim na stole.
 3. Brązowe szerokie pociągnięcia na tle (`P.strokes`, parametry wyżej), rozmycie 2,2 px w 75%. Statyczne, więc do

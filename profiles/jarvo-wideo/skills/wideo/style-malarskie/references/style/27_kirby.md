@@ -6,7 +6,7 @@ cienia z kreskowaniem i „krackle” Kirby'ego – skupiska czarnych kropek ene
 i ramki narratora. Jakość wzoru: ★★ (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: wygląda bardziej
 jak czysty pop-art Lichtensteina niż Kirby – brak kanciastych dłoni, przesadzonej perspektywy i napięcia mięśni
 (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 27_kirby --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-27_kirby.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 27_kirby --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-27_kirby.jpg`;
 kod `$HUASHU/scripts/engine/scenes/27_kirby.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -43,7 +43,7 @@ technikę, nie scenę.
 - Krój: `Bangers-400` (onomatopeja 132 px × 0.82, ramki 38 i 34 px). Ma polskie znaki, nie jest podmieniany.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 27_kirby`. `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 27_kirby`. `P` = `PAINT`
    (`/_lib/huashu/lib/paint.js` + `render.js` z `dotPattern`), `RIG` (`lib/rig.js`).
 2. Ta sama geometria dwa razy, na dwóch płótnach poza ekranem (`P.scratch`):
    - warstwa koloru: papier, płaskie kolory, raster; potem całą warstwę narysuj z przesunięciem (4,3);

@@ -4,7 +4,7 @@ Grafika komputerowa z początku lat 90. bez silnika 3D: zwykłe Canvas 2D udaje 
 cieniowania. Poznasz go po plastikowym połysku każdej części (ciemny brzeg, turkusowy odblask, twardy biały blik),
 szachownicy na podłodze z odbiciem, chromowanej kuli, wirującym pierścieniu z kulek i flarach obiektywu. Jakość wzoru:
 ★★ (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: nogi kota jak proste kolumny, twarz jak maska (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 15_raytrace --czasy 0.1,0.3,0.6 --arkusz out/wideo/wzor-15_raytrace.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 15_raytrace --czasy 0.1,0.3,0.6 --arkusz out/wideo/wzor-15_raytrace.jpg`;
 kod `$HUASHU/scripts/engine/scenes/15_raytrace.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -41,7 +41,7 @@ technikę, nie scenę.
 - Krój napisów w filmie pokazowym: `Exo2-800i` (ma polskie znaki, nie jest podmieniany).
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 15_raytrace`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 15_raytrace`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js`, `paint.js` (`PAINT.cached`, `PAINT.scratch`, `PAINT.steam`, `PAINT.choreo`),
    `rig.js`. Funkcje `plastic` i `cyl` skopiuj ze sceny.
 2. Statyczne tło (ściana, okno, góry z siatką) do cache. Szachownicę podłogi licz per piksel raz i też trzymaj

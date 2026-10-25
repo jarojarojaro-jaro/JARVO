@@ -4,7 +4,7 @@ Animacja z 1930 roku (Fleischer, wczesny Disney, dzisiejszy Cuphead): jeden kolo
 okrągłe głowy, oczy „pie-cut” z wyciętym klinem, ręce jak gumowe węże bez łokci, białe rękawiczki, wszystko
 podskakuje do bitu w 12 klatkach na sekundę, a na wierzchu rysy, kurz i migotanie starej taśmy. Jakość wzoru: ★★★
 (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: większość ruchu to szum taśmy, nie postacie (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 33_rubberhose --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-33_rubberhose.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 33_rubberhose --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-33_rubberhose.jpg`;
 kod `$HUASHU/scripts/engine/scenes/33_rubberhose.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -41,7 +41,7 @@ technikę, nie scenę.
   `huashu_pl.js`, bo oba oryginały nie mają polskich znaków).
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 33_rubberhose`. `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 33_rubberhose`. `P` = `PAINT`
    (`paint.js`, `post.js` z `P.film`/`P.gateWeave`/`P.fade`), `RIG`, `U.stepTime`.
 2. Tło papierowe raz do cache (`P.cached('rh_bg', …)`): tapeta w pionowe pasy z rombami, szczeliny płytek podłogi,
    akwarelowe przyciemnienie rogów.

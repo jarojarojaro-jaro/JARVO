@@ -5,7 +5,7 @@ na kremowym, postarzonym papierze, pionowy napis bezszeryfowy, krata w duchu Mon
 Schlemmera z tarczami w stawach. Poznasz go po tym, że nie ma ani jednej krzywej linii obrysu: tylko figury i drążki.
 Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: głowa kota przesunięta względem szkieletu
 (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 12_bauhaus --czasy 0.2,0.34,0.46 --arkusz out/wideo/wzor-12_bauhaus.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 12_bauhaus --czasy 0.2,0.34,0.46 --arkusz out/wideo/wzor-12_bauhaus.jpg`; kod
 `$HUASHU/scripts/engine/scenes/12_bauhaus.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -49,7 +49,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 12_bauhaus --czasy 0.2,0.34,
   `#b9cee0` / `#a6c0da`; szarość `#c6c3bb`; krem `#f2ecdf`; pomarańcz `#ee8a2a` / `#c25a14`; chrom `#c9c9c6`.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 12_bauhaus`; `P` = `PAINT`, `RIG`, `U`.
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 12_bauhaus`; `P` = `PAINT`, `RIG`, `U`.
 2. Tło w całości do cache `bh_bg` (papier, plamy `mottle`, linie, pasy, napisy, trójkąt, stół `tube`, krzesło, ziarno).
 3. Czerwone koło osobno do cache `bh_red` (520²).
 4. Co klatkę: krata (`grid`), drążek-wskazówka (`rod`), łuki (`arcs`), lalka (`doll`, stawy `joint`, drążki `bar`),

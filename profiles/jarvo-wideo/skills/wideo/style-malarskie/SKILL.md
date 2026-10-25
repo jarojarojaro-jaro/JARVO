@@ -35,7 +35,7 @@ obraz cały czas żyje. Silnik i 35 scen-wzorów to huashu-art-motion (MIT, 花�
 - Kopia cudzego obrazu, postaci albo logo (Marvel, Ghibli, plakat z prawami): bierzesz gramatykę formy, nie dzieło.
 
 ## Przebieg (wszystko samo, bez zatwierdzania po drodze)
-1. **Silnik raz:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj huashu`.
+1. **Silnik raz:** `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" instaluj huashu`.
 2. **Styl:** `references/wybor.md` (tabela 35 stylów i zasady wyboru), obraz wszystkich naraz:
    `malarz.py galeria -o out/wideo/galeria-stylow.jpg`. Czytasz tylko kartę wybranego stylu
    (`references/style/<id>.md`) i raz `references/metoda.md` (mechanizm, pięć warstw, renderery, pułapki).

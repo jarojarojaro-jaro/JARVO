@@ -21,12 +21,12 @@ Szablon: `@@KNOWLEDGE_DIR@@/brands/_szablon/BRAND.md`.
 
 ## Kroki
 1. **Slug marki:** małe litery, myślniki (np. `nova-kosmetyki`). Sprawdź, czy kit już istnieje. Jeśli tak, aktualizujesz go, nie nadpisujesz w ciemno.
-2. **Ekstrakcja tokenów:** `bash $HERMES_HOME/scripts/brand_extract.sh <url> <slug>`. Skrypt uruchamia dembrandt
+2. **Ekstrakcja tokenów:** `bash "$HERMES_HOME/scripts/brand_extract.sh" <url> <slug>`. Skrypt uruchamia dembrandt
    (`--design-md --dtcg --wcag --crawl 3`), zapisuje `DESIGN.md`, `tokens.json`, raport kontrastu i zrzuty.
    - ✅ Punkt kontrolny: `DESIGN.md` i `tokens.json` istnieją, paleta ma kolor główny i kolor tekstu.
 3. **Logo:** znajdź w `<head>` (favicon, apple-touch-icon, `og:image`) i w nagłówku strony (SVG/PNG).
    Zapisz do `logo/` (oryginały + `logo.svg` jeśli jest wektor). Nie generuj logo od nowa.
-4. **Zrzuty:** `node $HERMES_HOME/scripts/screenshots.cjs <url> <kit>/screenshots` (375/768/1440).
+4. **Zrzuty:** `node "$HERMES_HOME/scripts/screenshots.cjs" <url> <kit>/screenshots` (375/768/1440).
 5. **Ton komunikacji:** przeczytaj stronę główną i 2–3 podstrony (`extract`/przeglądarka): forma zwracania się,
    długość zdań, słowa charakterystyczne, obietnice. Wpisz do BRAND.md → „Ton komunikacji”. Nie wymyślaj; tylko to, co widać.
 6. **BRAND.md:** wypełnij szablon (tożsamość, wizualne, ton, produkty). `approved_by_owner: false`.

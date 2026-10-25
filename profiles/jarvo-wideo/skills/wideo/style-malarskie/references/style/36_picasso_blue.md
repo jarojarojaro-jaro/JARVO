@@ -4,7 +4,7 @@ Picasso z 1903 roku: obraz ściśle w jednym kolorze – błękity od granatu do
 pociągnięcia, grube spokojne kontury pruskim błękitem, wydłużone i wychudzone postacie, smutek i bardzo powolny ruch.
 Jakość wzoru: ★★ (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: kształt postaci za mało melancholijny
 (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 36_picasso_blue --czasy 0.4,0.8,1.2 --arkusz out/wideo/wzor-36_picasso_blue.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 36_picasso_blue --czasy 0.4,0.8,1.2 --arkusz out/wideo/wzor-36_picasso_blue.jpg`;
 kod `$HUASHU/scripts/engine/scenes/36_picasso_blue.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -35,7 +35,7 @@ technikę, nie scenę.
 - Krój plakietki we wzorze: `Caveat-600`; ma polskie znaki.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 36_picasso_blue`. `P` = `PAINT`,
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 36_picasso_blue`. `P` = `PAINT`,
    `RIG` (`RIG.visibleLines`, `RIG.drawGirl`, `RIG.drawCat`).
 2. Jednobarwny płaski podkład: ściana, podłoga, za oknem nocne morze i księżyc.
 3. Szerokie suche pociągnięcia (`P.strokes`, parametry wyżej) → rozmycie 7 px α0.8 → bardzo słabe nitki suchego

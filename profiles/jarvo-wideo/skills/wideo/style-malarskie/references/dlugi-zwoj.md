@@ -28,7 +28,7 @@ Podgląd w przeglądarce: strona silnika `$HUASHU/scripts/engine/index.html?film
 marszu. Silnik wystawia `renderFrame(t)` i ustawia `window.__ready`; stopklatki i film robi nasz `html_wideo.py`
 (nie ich `render.py`):
 ```sh
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $HUASHU/scripts/engine/index.html --serwer \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/huashu-art-motion/scripts/engine/index.html" --serwer \
   --query "film=demos/long_scroll" --seek "t => renderFrame(t)" --gotowe "window.__ready === true" \
   --selektor "#c" --czasy 1,5,9 --arkusz out/wideo/zwoj-klatki.jpg
 ```
@@ -77,7 +77,7 @@ prędkość `v`. Bohater startuje w x = 320 pierwszego świata (cały widoczny o
    Model maluje je w stylu tego świata, na zielonym tle, potem wycięcie i cięcie na klatki (`malarz.py potnij`,
    `postacie.md`). Wrzuć je do `frames/<key>/` i napisz `meta.json`.
 3. Dopisz `<id>` do `FILM_ORDER` w `eras.js`.
-4. Zrób stopklatki po obu stronach każdej granicy; potem `python3 $HERMES_HOME/scripts/krytyka.py determinizm`
+4. Zrób stopklatki po obu stronach każdej granicy; potem `@@PY@@ "$HERMES_HOME/scripts/krytyka.py" determinizm`
    na stronie filmu: deterministyczność musi przejść. Po renderze `qa_wideo.py` (duchy, skoki, zamrożone klatki).
 
 ## Ustalenia stałe (wspólne dla filmu, wpisane w szkielet)

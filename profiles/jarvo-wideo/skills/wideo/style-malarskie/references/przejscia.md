@@ -4,8 +4,8 @@ Przejście między stylami to podpis następnego stylu, a nie ogólne wycieranie
 tak, jak w tym stylu obraz pojawia się naprawdę: topnienie to ciecz, Hopper to światło, akwarela to woda, VHS to
 taśma, Matisse to arkusz papieru, teatr cieni to zapalona lampa. Przy wyborze albo pisaniu przejścia zadaj jedno
 pytanie: „W jaki fizyczny sposób pojawia się obraz w tym stylu?”.
-Kod: `$HUASHU/scripts/engine/transitions.js` (MIT, biblioteka huashu: `python3 $HERMES_HOME/scripts/narzedzia.py
-instaluj huashu`, potem `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env huashu)"`). W naszej stronie:
+Kod: `$HUASHU/scripts/engine/transitions.js` (MIT, biblioteka huashu: `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py"
+instaluj huashu`; `$HUASHU` = `@@TOOLS_DIR@@/huashu-art-motion`). W naszej stronie:
 `<script src="/_lib/huashu/transitions.js">`, po bibliotekach, których używa: `lib/util.js` (`U`), `lib/paint.js`
 i `lib/render.js` (`PAINT`), `lib/rig.js` (`RIG`), `lib/kit.js` (`KIT`), `lib/motion.js` (`MO`).
 

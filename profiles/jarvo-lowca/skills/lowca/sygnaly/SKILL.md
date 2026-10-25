@@ -24,13 +24,13 @@ wygrała przetarg, rekrutuje, zmieniła stronę. Zbierasz je do `sygnaly.jsonl` 
 1. Z `ICP.yaml` wybierz 2–4 typy sygnałów o najwyższej wadze. Nie zbieraj wszystkiego „na zapas”.
 2. **Skrypty (0 tokenów):**
    ```bash
-   S=$HERMES_HOME/scripts; P=@@WORKSPACES_DIR@@/jarvo-lowca/leady/<projekt>
-   python3 $S/krs.py biuletyn <wczoraj> --nowe --pkd 62,73 --woj MAZOWIECKIE --limit 800 -o $P/nowe.jsonl
-   python3 $S/ceidg.py szukaj --pkd 62.01.Z,73.11.Z --woj MAZOWIECKIE --od-daty <30 dni temu> --limit 100 -o $P/jdg.jsonl
-   python3 $S/przetargi.py bzp --od <tydzień temu> --cpv 72 [--woj PL14] -o $P/bzp.jsonl          # zamawiający
-   python3 $S/przetargi.py bzp --od <tydzień temu> --cpv 45 --wyniki -o $P/wygrane.jsonl          # zwycięzcy
-   python3 $S/przetargi.py ted --od <miesiąc temu> --cpv 72 -o $P/ted.jsonl
-   python3 $S/leady.py dodaj $P $P/nowe.jsonl $P/bzp.jsonl …                                       # bez duplikatów
+   S="$HERMES_HOME/scripts"; P="@@WORKSPACES_DIR@@/jarvo-lowca/leady/<projekt>"
+   @@PY@@ "$S/krs.py" biuletyn <wczoraj> --nowe --pkd 62,73 --woj MAZOWIECKIE --limit 800 -o "$P/nowe.jsonl"
+   @@PY@@ "$S/ceidg.py" szukaj --pkd 62.01.Z,73.11.Z --woj MAZOWIECKIE --od-daty <30 dni temu> --limit 100 -o "$P/jdg.jsonl"
+   @@PY@@ "$S/przetargi.py" bzp --od <tydzień temu> --cpv 72 [--woj PL14] -o "$P/bzp.jsonl"          # zamawiający
+   @@PY@@ "$S/przetargi.py" bzp --od <tydzień temu> --cpv 45 --wyniki -o "$P/wygrane.jsonl"          # zwycięzcy
+   @@PY@@ "$S/przetargi.py" ted --od <miesiąc temu> --cpv 72 -o "$P/ted.jsonl"
+   @@PY@@ "$S/leady.py" dodaj "$P" "$P/nowe.jsonl" "$P/bzp.jsonl" …                                       # bez duplikatów
    ```
    Kod 3 = źródło odmówiło (blokada): zapisz w `risks`, nie próbuj innej drogi (API rejestrów i przetargów nie
    dostają `ostrozna-przegladarka`; ta jest tylko na pojedynczą stronę firmy, skill `kontakt-firmy`).

@@ -1,6 +1,6 @@
 # Typografia kinetyczna (`kinetyczna`, w kodzie `y5_kinetic_type`)
 
-Słowa są aktorami: każde kluczowe słowo wpada na akcent, główne słowo jest tak duże, że czyta się je w mgnieniu oka, a w kadrze zawsze jest jeden punkt skupienia; kamera i tło ciągle się ruszają, słowa po wylądowaniu stoją. Wzór: `python3 $HERMES_HOME/scripts/gramatyka.py wzor kinetyczna --arkusz out/wideo/wzor-kinetyczna.jpg`; start: `python3 $HERMES_HOME/scripts/gramatyka.py szablon kinetyczna [--format 9:16] -o out/wideo/src/klip-kinetyczna/spec.json`.
+Słowa są aktorami: każde kluczowe słowo wpada na akcent, główne słowo jest tak duże, że czyta się je w mgnieniu oka, a w kadrze zawsze jest jeden punkt skupienia; kamera i tło ciągle się ruszają, słowa po wylądowaniu stoją. Wzór: `@@PY@@ "$HERMES_HOME/scripts/gramatyka.py" wzor kinetyczna --arkusz out/wideo/wzor-kinetyczna.jpg`; start: `@@PY@@ "$HERMES_HOME/scripts/gramatyka.py" szablon kinetyczna [--format 9:16] -o out/wideo/src/klip-kinetyczna/spec.json`.
 
 Kod: klip `$HUASHU/scripts/engine/clips/y5_kinetic_type.js`, przykład `$HUASHU/scripts/engine/examples/y5_kinetic_type.json` (tytuł z `sub`, trzy etapy z `label` i `key`, `highlight` na ostatnim), film pokazowy `$HUASHU/scripts/engine/demos/y5_kinetic_type/` (MIT). Film pokazowy: 8,5 s, 60 fps, muzyka 120 BPM, 4 ujęcia; jego gęstość zdarzeń (jedno na ósemkę) jest dwa razy większa niż w filmach z tekstem piosenek: bierz technikę, nie tempo.
 Potok: `szablon` → polskie teksty i `slowo` → `gramatyka.py sprawdz` → `gramatyka.py render … --klatki 0.5,2,4` → pełny `render`.

@@ -6,7 +6,7 @@ kolory. Poznasz go po skórze i ścianach z regularnych kropek, czarnym konturze
 włosach z czarnych łuków w kształcie C. Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru:
 indeks źródła żadnej nie podaje; brakuje łzy, białego kołnierzyka i dymka z dialogiem (przebij ją, jeśli film tego
 potrzebuje).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 13_pop --czasy 0.2,0.34,0.46 --arkusz out/wideo/wzor-13_pop.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 13_pop --czasy 0.2,0.34,0.46 --arkusz out/wideo/wzor-13_pop.jpg`; kod
 `$HUASHU/scripts/engine/scenes/13_pop.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -51,7 +51,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 13_pop --czasy 0.2,0.34,0.46
   tła Warhola `#9ccf3a #e0359a #2fc0b0 #f08a2a`.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 13_pop`; `P` = `PAINT`, `RIG`, `U`.
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 13_pop`; `P` = `PAINT`, `RIG`, `U`.
 2. Kafle kropek: `dotPattern(c, key, pitch, r, col, bg)` → `P.cached('pop_tile_…')` → `createPattern`; skórę wypełniaj
    `fillStyle = pattern; fill(path)`. To o dwa rzędy wielkości szybciej niż `PAINT.halftone` (odczyt pikseli punkt po
    punkcie).

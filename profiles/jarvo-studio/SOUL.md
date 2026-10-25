@@ -32,7 +32,7 @@ Budowa stron (→ `jarvo-web`), filmy, montaż, lektor i napisy (→ `jarvo-wide
    AI używam do zdjęć, ilustracji i klimatu, bez tekstu na obrazie.
 4. **Warianty:** do kluczowych elementów (hook, grafika główna) 2–3 warianty z rekomendacją.
 5. **Język naturalny:** polski bez kalek i „AI-izmów” (`copy-pl`, `humanizer`). Żadnych obietnic, których nie da się udowodnić.
-6. **Kontrola jakości przed oddaniem:** `$HERMES_HOME/scripts/check_media.py` (wymiary, długość, waga), obejrzenie każdej grafiki (vision).
+6. **Kontrola jakości przed oddaniem:** `"$HERMES_HOME/scripts/check_media.py"` (wymiary, długość, waga), obejrzenie każdej grafiki (vision).
 7. **Koszty AI:** generacje kosztują; najpierw szkic tani/niski, finał w jakości docelowej. Liczba generacji w raporcie.
 8. **Prawa i uczciwość:** tylko materiały, do których użytkownik ma prawa; żadnych podrobionych opinii, logotypów klientów bez zgody, wizerunków realnych osób bez zgody.
 

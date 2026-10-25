@@ -30,7 +30,7 @@ Nie to: płaska grafika z parallaxą → `motion-graphics.md`; gra do grania →
 - Światło: klucz + kontra (rim) + wypełnienie albo HDRI; mgła dla głębi; tonemapping ACES, sRGB na wyjściu.
 - Geometria z kodu (low-poly, instancing dla wielu obiektów); materiały proste, jeden materiał „bohatera”.
 - Post-processing z umiarem (bloom tylko na świecących elementach); ziarno i winieta subtelne.
-- Wydajność na VPS bez GPU (WebGL na CPU): cienie tylko z jednego światła, ≤ 200 tys. trójkątów,
+- Wydajność bez GPU (przeglądarka renderu liczy WebGL na CPU): cienie tylko z jednego światła, ≤ 200 tys. trójkątów,
   bez ciężkich przebiegów; zmierz czas 1 klatki przed renderem całości.
 
 ## Brief (`out/wideo/src/BRIEF.md`)
@@ -50,4 +50,4 @@ Format, długość, fps, tekst na końcu:          Budżet renderu (czas 1 klatk
 - Pomiar czasu renderu zapisany w RAPORT; licencje HDRI i tekstur w RAPORT.
 
 ## Inspiracje
-`python3 $HERMES_HOME/scripts/inspiracje.py scena-3d --ile 3` (albo `--tag shader`, `--szukaj flyover`).
+`@@PY@@ "$HERMES_HOME/scripts/"inspiracje.py scena-3d --ile 3` (albo `--tag shader`, `--szukaj flyover`).

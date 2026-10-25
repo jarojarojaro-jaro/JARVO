@@ -55,10 +55,10 @@
 
 ## Polecenia
 ```bash
-python3 $HERMES_HOME/scripts/film.py sprawdz out/wideo/src/plan.json
-python3 $HERMES_HOME/scripts/film.py render out/wideo/src/plan.json --szkic
-python3 $HERMES_HOME/scripts/film.py render out/wideo/src/plan.json [--format 9:16,16:9] [--wariant B | --wszystkie]
-python3 $HERMES_HOME/scripts/film.py lektor "Tekst." -o out/wideo/src/lektor.mp3 --glos pl-PL-ZofiaNeural
-python3 $HERMES_HOME/scripts/film.py glosy
-python3 $HERMES_HOME/scripts/film.py cache [--starsze-niz 14]
+@@PY@@ "$HERMES_HOME/scripts/film.py" sprawdz out/wideo/src/plan.json
+@@PY@@ "$HERMES_HOME/scripts/film.py" render out/wideo/src/plan.json --szkic
+@@PY@@ "$HERMES_HOME/scripts/film.py" render out/wideo/src/plan.json [--format 9:16,16:9] [--wariant B | --wszystkie]
+@@PY@@ "$HERMES_HOME/scripts/film.py" lektor "Tekst." -o out/wideo/src/lektor.mp3 --glos pl-PL-ZofiaNeural
+@@PY@@ "$HERMES_HOME/scripts/film.py" glosy
+@@PY@@ "$HERMES_HOME/scripts/film.py" cache [--starsze-niz 14]
 ```

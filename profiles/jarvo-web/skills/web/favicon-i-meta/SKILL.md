@@ -18,7 +18,7 @@ metadata:
 
 ## Ikony
 ```bash
-node $HERMES_HOME/scripts/favicons.cjs <logo.svg|png> out/icons \
+node "$HERMES_HOME/scripts/favicons.cjs" <logo.svg|png> out/icons \
   --name "<Nazwa>" --short "<Krótka>" --color "<#kolor marki>" --bg "<#tło>" --lang pl
 ```
 Skrypt (pakiet `favicons`) tworzy: `favicon.ico` (16/32/48), `favicon.svg` (jeśli wejście SVG),
@@ -47,6 +47,6 @@ mały rozmiar = uproszczony sygnet, nie pełne logo z tekstem.
 JSON-LD: minimum `Organization` (name, url, logo, sameAs) i `WebSite`; więcej przez skill `seo-schema`.
 
 ## Weryfikacja
-`python3 $HERMES_HOME/scripts/seo_check.py <url-podglądu> --podglad` → brak błędów w sekcjach `head`, `icons`, `og`,
+`@@PY@@ "$HERMES_HOME/scripts/seo_check.py" <url-podglądu> --podglad` → brak błędów w sekcjach `head`, `icons`, `og`,
 `jsonld` (obraz OG pobrany: HTTP 200, `image/*`, 1200×630). Cała witryna:
 `seo_check.py --dir dist --base-url <adres produkcyjny>` (title i description inne na każdej podstronie).

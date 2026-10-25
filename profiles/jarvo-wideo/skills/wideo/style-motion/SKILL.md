@@ -59,8 +59,8 @@ zdaniem uzasadnienia w RAPORT.md.
 1. **Styl.** Z briefu albo z marki: tabela wyżej. Niejasne → styl, który najlepiej niesie cel z karty filmu.
 2. **Karta.** Czytasz tylko kartę swojego stylu (inne to półka, nie lektura).
 3. **Wzór.** Okładka `$MGSTYLES/videos/<slug>.jpg`, klatki wzoru `html_wideo.py klatki … --preset mg` (polecenie
-   w karcie) i kod z miejsc, które karta wskazuje. Instalacja: `python3 $HERMES_HOME/scripts/narzedzia.py instaluj mg`,
-   potem `eval "$(python3 $HERMES_HOME/scripts/narzedzia.py env mg)"`. Z wzoru bierzesz techniki, liczby i proporcje,
+   w karcie) i kod z miejsc, które karta wskazuje. Instalacja: `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" instaluj mg`;
+   `$MGSTYLES` = `@@TOOLS_DIR@@/mg-styles-15` (pliki wzoru czytasz wprost). Z wzoru bierzesz techniki, liczby i proporcje,
    nigdy fabułę, teksty, postacie ani zdjęcia.
 4. **Brief** (`out/wideo/src/BRIEF.md`): styl i jego cechy z karty, paleta z marki (role kolorów jak we wzorze),
    oś zdarzeń w `out/wideo/src/cues.json` (jedno źródło czasu dla obrazu i dźwięku).

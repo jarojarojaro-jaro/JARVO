@@ -143,8 +143,8 @@ Przed tobą {kolejka}dziesięć osób. | Każdy czeka.   ← | = podział napisu
 To pół godziny dziennie.{zegar}             ← {nazwa} na końcu linii = koniec zdania
 ```
 ```bash
-python3 $HERMES_HOME/scripts/film.py narracja out/wideo/src/narracja.txt --sprawdz          # tekst, szacunek długości
-python3 $HERMES_HOME/scripts/film.py narracja out/wideo/src/narracja.txt -o out/wideo/src/lektor.wav \
+@@PY@@ "$HERMES_HOME/scripts/film.py" narracja out/wideo/src/narracja.txt --sprawdz          # tekst, szacunek długości
+@@PY@@ "$HERMES_HOME/scripts/film.py" narracja out/wideo/src/narracja.txt -o out/wideo/src/lektor.wav \
   --os out/wideo/src/<nazwa>/os_czasu.json --cel 60-90 [--glos pl-PL-ZofiaNeural] [--tempo -5%]
 ```
 Każde zdanie jest syntezowane osobno, przycięte do słyszalnej mowy i położone z pauzą: 0,33 s w akapicie, 1 s po
@@ -177,10 +177,10 @@ const napis = O.napis(t);                             // grupa napisów w chwili
 
 ## Render
 ```bash
-H=$HERMES_HOME/scripts/html_wideo.py
-python3 $H klatki out/wideo/src/<nazwa>/index.html --preset jarvo --czasy 0,1.5,3,6,9,11.9 --arkusz out/wideo/qa-look.jpg
-python3 $H pomiar out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 --platforma tiktok   # przed finałem
-python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 --fps 30 -o out/wideo/<nazwa>.mp4
+H="$HERMES_HOME/scripts/html_wideo.py"
+@@PY@@ "$H" klatki out/wideo/src/<nazwa>/index.html --preset jarvo --czasy 0,1.5,3,6,9,11.9 --arkusz out/wideo/qa-look.jpg
+@@PY@@ "$H" pomiar out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 --platforma tiktok   # przed finałem
+@@PY@@ "$H" wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 --fps 30 -o out/wideo/<nazwa>.mp4
 ```
 - Najpierw arkusz (1 klatka na scenę) → vision → poprawki; dopiero potem całość.
 - **Pomiar** (`pomiar.json` + `pomiar.md` obok strony): czas czytania (błąd poniżej 70% minimum dla szybkiego
@@ -194,7 +194,7 @@ python3 $H wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 -
   film oddajesz tylko z pełnym i aktualnym raportem bez błędów (`html_wideo.py aktualny <strona>` = 0). Świadomy
   wyjątek z powodem: `--wyjatek "czas_czytania@Logo=znak marki, nie tekst do czytania"`.
 - `--subklatki N` = motion blur (render N× dłuższy): tylko na wyraźną prośbę właściciela. `--alfa -o x.mov` = przezroczyste tło.
-- WebGL liczy się na CPU (VPS bez GPU): zmierz czas 1 klatki (`klatki --czasy 5`) i oszacuj całość, zanim ruszysz 60 s w 60 fps.
+- WebGL liczy się na CPU (przeglądarka renderu bez GPU): zmierz czas 1 klatki (`klatki --czasy 5`) i oszacuj całość, zanim ruszysz 60 s w 60 fps.
   `wideo` renderuje w kilku przeglądarkach naraz (samo: do 4, według rdzeni i pamięci; `--rownolegle N`) i czeka
   na miejsce, gdy na maszynie trwają już 2 pełne rendery albo przy trwającym renderze wolnej pamięci jest < 30%.
 - Dźwięk (lektor, muzyka, efekty) dokłada `film.py` (`"plik"` + `"koniec": "stop"`) albo `montaz.py`; potem `qa_wideo.py`.

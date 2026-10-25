@@ -5,7 +5,7 @@ przełączane wycinaniem po kształcie plamy. Plama powoli przesuwa się po ści
 postaci na ścianie. Samotność, poranek, cisza („Poranne słońce”, „Nocne marki”, „Wczesny niedzielny poranek”).
 Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: kot przez cały czas siedzi w cieniu
 (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 24_hopper --czasy 0.1,0.6,1.1 --arkusz out/wideo/wzor-24_hopper.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 24_hopper --czasy 0.1,0.6,1.1 --arkusz out/wideo/wzor-24_hopper.jpg`;
 kod `$HUASHU/scripts/engine/scenes/24_hopper.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę,
 nie scenę.
 
@@ -42,7 +42,7 @@ nie scenę.
 - Napisy w filmie pokazowym: `LibreBaskerville-700 / 400` (mają polskie znaki).
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 24_hopper`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 24_hopper`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js`, `paint.js` (`PAINT.fbm`, `PAINT.cached`, `PAINT.scratch`, `PAINT.particles`,
    `PAINT.steam`, `PAINT.choreo`), `render.js` (`PAINT.litClip`), `rig.js` (`RIG.drawCup`).
 2. Narysuj pokój dwa razy tą samą funkcją, z dwiema paletami, do dwóch cache (cień, światło).

@@ -4,7 +4,7 @@ Letni pokój jak ręcznie malowane tło japońskiego filmu animowanego: przezroc
 brzegiem wody, białe kłębiaste chmury, zielony stok z trawą falującą na wietrze, firanka wydymana przez podmuch,
 plamy światła przez liście i postacie w dwóch tonach (kolor + sierp cienia). Jakość wzoru: ★★ (rozpoznawalny, ale
 z wyraźną słabością); słabość wzoru: postać słabsza od tła (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 25_ghibli --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-25_ghibli.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 25_ghibli --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-25_ghibli.jpg`;
 kod `$HUASHU/scripts/engine/scenes/25_ghibli.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę,
 nie scenę.
 
@@ -47,7 +47,7 @@ nie scenę.
 - Napisy w filmie pokazowym: `Kalam-700`, `Caveat-600` (mają polskie znaki).
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 25_ghibli`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 25_ghibli`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js`, `paint.js` (`PAINT.texture`, `PAINT.noise`, `PAINT.cached`), `brush.js`
    (`PAINT.watercolor`, `PAINT.deform`, `PAINT.rectPts`, `PAINT.ellipsePts`), `render.js` (`PAINT.cel`), `post.js`
    (`PAINT.textureInside`), `rig.js` (`RIG.smooth`).

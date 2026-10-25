@@ -16,8 +16,8 @@ metadata:
 
 # Montaż nagrań użytkownika
 
-Surowe nagranie (telefon, kamera, ekran) → gotowy film. Narzędzie: `$HERMES_HOME/scripts/montaz.py`
-(wszystko przekodowane, dokładne co do klatki). Pliki od użytkownika leżą w `/opt/data/jarvo/inbox/`.
+Surowe nagranie (telefon, kamera, ekran) → gotowy film. Narzędzie: `"$HERMES_HOME/scripts/montaz.py"`
+(wszystko przekodowane, dokładne co do klatki). Pliki od użytkownika leżą w `@@INBOX_DIR@@/`.
 
 ## Kiedy użyć
 - „Obrób to nagranie”, „wytnij wpadki i ciszę”, „zrób pion z poziomego”, „dodaj napisy”, „wyrównaj dźwięk”,
@@ -53,7 +53,7 @@ zostaw jego napisy albo zapytaj o wersję „czystą”.
    → `.txt` z czasami: wpadki, powtórzenia, fragmenty do wycięcia.
 4. **Cięcie:** `montaz.py wytnij <nagranie> -o out/wideo/src/ciecie.mp4 --zakresy "0:03-0:41.5,0:47-1:20"`.
 5. **Cisza:** `montaz.py cisza <plik> -o out/wideo/src/bez-ciszy.mp4` (próg −35 dB; głośne tło: `--prog -30`;
-   wolniejszy rytm: `--min 0.8`). Alternatywa z obrazu: `auto-editor`, jeśli jest (`command -v auto-editor`).
+   wolniejszy rytm: `--min 0.8`). Alternatywa: `auto-editor`, jeśli jest zainstalowany (`command -v auto-editor`).
    - ✅ Punkt kontrolny: `krytyka.py ciecia <plik> --czasy <lista „ciecia” z wyniku wytnij/cisza>` i każdy obraz
      przez `vision_analyze`: nie ucięte słowa (słowo na czerwonej linii, kolec fali), brak „skoków” w pół gestu.
      Słowo ucięte → zakres o 0,1–0,2 s dalej od słowa (`wytnij`) albo większy `--zapas` (`cisza`).

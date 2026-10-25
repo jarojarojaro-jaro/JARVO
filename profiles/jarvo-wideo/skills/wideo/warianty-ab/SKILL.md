@@ -41,7 +41,7 @@ z pola `warianty` planu; ujęcia i lektor wspólnych scen idą z cache, więc ka
    to inna **taktyka** ze skilla `hooki` (nie pięć pytań), trzy warstwy wypisane, a rozbieg (sceny 2+) wspólny;
    zmieniony rozbieg psuje werdykt „hook przegrał”.
 2. Warianty w planie (`nazwa`: A = bazowy, potem B, C…); maks. 4 naraz; różnica w jednej zmiennej na wariant.
-3. `python3 $HERMES_HOME/scripts/film.py render out/wideo/src/plan.json --wszystkie` (szkic: `--szkic`).
+3. `@@PY@@ "$HERMES_HOME/scripts/film.py" render out/wideo/src/plan.json --wszystkie` (szkic: `--szkic`).
 4. `kontrola-wideo` dla każdego wariantu; odpada wariant z błędem technicznym, nie „gorszy w moim guście”.
 5. Tabela w RAPORT.md: wariant, zmienna, hipoteza, plik, długość, wynik kontroli, rekomendacja kolejności testu.
    Wyniki testu (zatrzymanie, CTR) zbiera użytkownik po publikacji; propozycja, co mierzyć: 3-sekundowe wyświetlenia

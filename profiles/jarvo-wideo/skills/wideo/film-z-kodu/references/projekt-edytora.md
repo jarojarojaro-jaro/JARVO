@@ -18,12 +18,12 @@ napisy lektora.
 
 ## Polecenie
 ```bash
-P=$HERMES_HOME/scripts/projekt.py
-python3 $P z-kodu out/wideo/<film>.mp4 --obraz <czysty-obraz.mp4> --ciecia <cięcia> \
+P="$HERMES_HOME/scripts/projekt.py"
+@@PY@@ "$P" z-kodu out/wideo/<film>.mp4 --obraz <czysty-obraz.mp4> --ciecia <cięcia> \
   [--glos lektor.wav[@od]] [--efekty efekty.wav] [--muzyka muzyka.wav] [--audio Tło=room.wav] [--z-muzyki plan.muzyka.json] \
   [--napisy film.srt | --slowa lektor.slowa.json[@od]] [--karaoke [#hex]] [--kroj <krój>] [--styl box] [--kolor #hex] [--tlo #hex] \
   --render
-python3 $HERMES_HOME/scripts/qa_wideo.py out/wideo/<film>.mp4 --z-kodu --lektor
+@@PY@@ "$HERMES_HOME/scripts/qa_wideo.py" out/wideo/<film>.mp4 --z-kodu --lektor
 ```
 - `--ciecia`: lista sekund (`5.4,9.6`), `events.json` lemo (zdarzenia `cut`) albo `os_czasu.json` z `film.py narracja`.
   Bez cięć cały film to jeden klip (da się go ciąć w edytorze, ale ujęcia są wygodniejsze).
@@ -38,21 +38,23 @@ python3 $HERMES_HOME/scripts/qa_wideo.py out/wideo/<film>.mp4 --z-kodu --lektor
 ## Silniki
 **Animacja HTML + `muzyka.py`** (najczęstszy przypadek):
 ```bash
-H=$HERMES_HOME/scripts/html_wideo.py
-python3 $H wideo out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc N -o out/wideo/src/obraz.mp4
-python3 $HERMES_HOME/scripts/muzyka.py zrob out/wideo/src/obraz.mp4 -o out/wideo/src/final.mp4 --lektor src/lektor.wav --cues cues.json
-python3 $P z-kodu out/wideo/<film>.mp4 --obraz out/wideo/src/obraz.mp4 --z-muzyki out/wideo/src/final.muzyka.json \
+H="$HERMES_HOME/scripts/html_wideo.py"
+@@PY@@ "$H" wideo out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc N -o out/wideo/src/obraz.mp4
+@@PY@@ "$HERMES_HOME/scripts/muzyka.py" zrob out/wideo/src/obraz.mp4 -o out/wideo/src/final.mp4 --lektor src/lektor.wav --cues cues.json
+@@PY@@ "$P" z-kodu out/wideo/<film>.mp4 --obraz out/wideo/src/obraz.mp4 --z-muzyki out/wideo/src/final.muzyka.json \
   --ciecia out/wideo/src/os_czasu.json --slowa out/wideo/src/lektor.slowa.json --karaoke --render
 ```
 `muzyka.py zrob` zostawia warstwy miksu w `<wynik>.muzyka.sciezki/` (muzyka, efekty, głos) i podaje je w planie
 (`"sciezki"`), więc `--z-muzyki` bierze wszystkie trzy. Muzyka w warstwie jest już ściszona pod lektora: gdy
 właściciel usunie głos, muzyka dalej przysiada w tych miejscach. Napisy: strona nie rysuje ich z `O.napis(t)`.
 
-**lemo-opuscar** (`PR` = katalog projektu, polecenia z `cd "$LIB"`): strona ma `?nosub=1` (dema stylów to mają; we własnym `film.js` napisy rysuj tylko bez `nosub`).
+**lemo-opuscar** (`PR` = katalog projektu, polecenia z `cd "$LIB"`, programy biblioteki przez `uruchom lemo --`
+jak w `narzedzia.md`): strona ma `?nosub=1` (dema stylów to mają; we własnym `film.js` napisy rysuj tylko bez `nosub`).
 ```bash
-RENDER_SLOTS=1 node core/render/video.mjs "$PR" --fps 24 --workers 2 --q nosub=1 --out "$PR/out/video24.mp4"
-LEMO_COLOR=bt709 sh core/render/mux.sh "$PR/out/video24.mp4" "$PR/out/mix.wav" "$PR/out/obraz.mp4" 24 2   # ziarno i kolor
-python3 $P z-kodu "$PR/out/<nazwa>.mp4" --obraz "$PR/out/obraz.mp4" --ciecia "$PR/events.json" \
+N="$HERMES_HOME/scripts/narzedzia.py"; P="$HERMES_HOME/scripts/projekt.py"; LIB="@@TOOLS_DIR@@/lemo-opuscar"; cd "$LIB"
+RENDER_SLOTS=1 @@PY@@ "$N" uruchom lemo -- node core/render/video.mjs "$PR" --fps 24 --workers 2 --q nosub=1 --out "$PR/out/video24.mp4"
+LEMO_COLOR=bt709 @@PY@@ "$N" uruchom lemo -- sh core/render/mux.sh "$PR/out/video24.mp4" "$PR/out/mix.wav" "$PR/out/obraz.mp4" 24 2   # ziarno i kolor
+@@PY@@ "$P" z-kodu "$PR/out/<nazwa>.mp4" --obraz "$PR/out/obraz.mp4" --ciecia "$PR/events.json" \
   --glos "$PR/out/sciezki/glos.wav" --efekty "$PR/out/sciezki/efekty.wav" --muzyka "$PR/out/sciezki/muzyka.wav" \
   --napisy "$PR/out/<nazwa>.srt" --kroj <krój napisów stylu> --styl box --kolor <tusz> --tlo <papier> --render
 ```

@@ -36,7 +36,7 @@ liczby po polsku, neutralna postać), a spec, render i kontrola są nasze (`gram
 - Prowadzący z klatkami postaci (`prowadzacy`): to tylko wzór i metoda, bez klipu (`references/prowadzacy.md`).
 
 ## Przebieg (wszystko samo, bez zatwierdzania po drodze)
-1. **Silnik raz:** `python3 $HERMES_HOME/scripts/narzedzia.py instaluj huashu` (ok. 45 MB z gitem, potem sekundy).
+1. **Silnik raz:** `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" instaluj huashu` (ok. 45 MB z gitem, potem sekundy).
 2. **Lektor najpierw:** `film.py narracja narracja.txt -o out/wideo/src/lektor.wav` daje `os_czasu.json` (słowa
    z czasem). Fakty i liczby z briefu Sherlocka `out/wideo/src/fakty.json`; zmyślone tylko ze znaczkiem „dane przykładowe”.
 3. **Gramatyka fragmentu:** `references/wybor.md` (tabela „ten fragment lektora… → wybierz”). W jednym fragmencie

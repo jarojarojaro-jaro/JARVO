@@ -31,17 +31,17 @@ u seniora product designu (klasa Linear / Stripe / Supabase). **Technicznie czys
 1. **Kierunek.** Nazwij kierunek z karty i brand kitu: *operacyjny* (narzędzie, dane), *minimalistyczny/edytorski*,
    *premium/miękki* albo *odważny/ekspresyjny*. Oceniasz w jego ramach: narzędzie nie traci punktów za brak blichtru,
    strona premium traci.
-2. **Zrzuty.** `node $HERMES_HOME/scripts/screenshots.cjs <url> out/jakosc/runda-N --full` (375/768/1440) plus stany:
+2. **Zrzuty.** `node "$HERMES_HOME/scripts/screenshots.cjs" <url> out/jakosc/runda-N --full` (375/768/1440) plus stany:
    hover, fokus (Tab), formularz z błędem, pusty stan, jeśli strona je ma. Ocena bez świeżych zrzutów nie istnieje.
-3. **Testy wrogie.** `node $HERMES_HOME/scripts/hostile.cjs <url> out/jakosc/wrogie` → `hostile.json`
+3. **Testy wrogie.** `node "$HERMES_HOME/scripts/hostile.cjs" <url> out/jakosc/wrogie` → `hostile.json`
    (wolne łącze, słaby telefon: procesor 4× wolniejszy i 4G z klikaniem menu, przycisków i formularza, reakcja
    ≤ 200 ms jak INP; brak JS, 320 px, sama klawiatura, długie polskie słowa, reduced motion, konsola).
    `offline` (zasoby z innych serwerów) liczy się, gdy DoD mówi „offline”, „jeden plik” albo „bez zależności
    zewnętrznych”. Scenariusz z `not_run` to brak pomiaru, nie zaliczenie.
-   **Znaki AI (bez modelu):** `sh $HERMES_HOME/skills/design/impeccable/scripts/impeccable detect <katalog|url> --json`
+   **Znaki AI (bez modelu):** `sh "$HERMES_HOME/skills/design/impeccable/scripts/impeccable" detect <katalog|url> --json`
    → `out/jakosc/impeccable.json` (fioletowe gradienty, sprężynujący easing, oklepane fonty…); każde trafienie to
    różnica w werdykcie albo świadomy wyjątek z uzasadnieniem. Animacje strony: przegląd wg `review-animations`.
-3a. **Bezpieczeństwo.** `python3 $HERMES_HOME/scripts/security_check.py url <url>` zawsze; strona z backendem,
+3a. **Bezpieczeństwo.** `@@PY@@ "$HERMES_HOME/scripts/security_check.py" url <url>` zawsze; strona z backendem,
    logowaniem albo formularzem: cały skill `bezpieczenstwo-aplikacji`. KRYTYCZNE lub WYSOKIE = **BLOCK**, niezależnie od wyniku rubryki.
 4. **Ocena rubryką.** Przejdź 10 osi z `references/rubryka.md`. Każda oś: zaliczona albo różnica z dowodem
    (który zrzut, co widać) i **najmniejszą zmianą**, która ją naprawi.

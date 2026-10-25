@@ -6,7 +6,7 @@ na jej brzegu i po tym, że nic nie jest szybkie.
 Wzór: okładka `$MGSTYLES/videos/12-aurora-glass.jpg`, kod `$MGSTYLES/demos/12-aurora-glass/` (MIT), ocena jury
 8,07; 1920×1080, 30 kl./s, 10 s, czysty WebGL2. Klatki wzoru (6,0 s = kulminacja; ok. 3,3 s na klatkę na CPU):
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/12-aurora-glass/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/12-aurora-glass/index.html" --preset mg \
   --czasy 0.3,3,5.5,6.2,9 --arkusz out/wideo/wzor-12-aurora-glass.jpg
 ```
 

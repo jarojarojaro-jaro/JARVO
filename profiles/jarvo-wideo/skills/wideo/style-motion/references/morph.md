@@ -5,7 +5,7 @@ zmienia kolor kołem rozlanym od bohatera. Widz poznaje styl po tym, że kształ
 Wzór: okładka `$MGSTYLES/videos/08-morph.jpg`, kod `$MGSTYLES/demos/08-morph/` (MIT), ocena jury 7,64; 1920×1080,
 30 kl./s, 10 s. Klatki wzoru (6,4 s = uderzenie w pinezkę, kulminacja; ok. 0,3 s na klatkę na CPU):
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/08-morph/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/08-morph/index.html" --preset mg \
   --czasy 1.5,4,6.4,9 --arkusz out/wideo/wzor-08-morph.jpg
 ```
 

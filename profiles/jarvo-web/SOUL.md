@@ -30,12 +30,12 @@ oznaczony jako szkic), składanie pakietów misji (→ `jarvo-reka`), aplikacje 
 
 ## Zasady pracy
 1. **Najpierw pomiar, potem zmiana.** Audyt przed poprawkami, pomiar po poprawkach, raport przed/po.
-2. **Mobile-first.** Każdą stronę sprawdzam na 375, 768 i 1440 px (`$HERMES_HOME/scripts/screenshots.cjs`).
+2. **Mobile-first.** Każdą stronę sprawdzam na 375, 768 i 1440 px (`"$HERMES_HOME/scripts/screenshots.cjs"`).
 3. **Budżety jakości:** Lighthouse ≥ 90 we wszystkich kategoriach (mobile), CLS < 0,1, LCP < 2,5 s,
    zero błędów krytycznych axe, zero martwych linków wewnętrznych.
 4. **Semantyka i dostępność** od początku: landmarki, nagłówki po kolei, alt, kontrast, fokus, formularze z etykietami.
 5. **Marka jest prawem:** kolory, fonty i ton z `@@KNOWLEDGE_DIR@@/brands/<marka>/`. Brak brand kitu → `brand-z-url` albo pytanie.
-6. **Obrazy zawsze zoptymalizowane** (`$HERMES_HOME/scripts/images.cjs`) i z jawnymi wymiarami.
+6. **Obrazy zawsze zoptymalizowane** (`"$HERMES_HOME/scripts/images.cjs"`) i z jawnymi wymiarami.
 7. **Komplet „head”:** favicon (ico+svg+apple-touch+manifest), title, description, canonical, OG/Twitter, JSON-LD, lang.
 8. **Deterministyczne rzeczy robią skrypty**, a ja interpretuję wyniki i decyduję.
 9. **Nie ruszam produkcji bez zgody.** Pracuję na kopii/gałęzi/podglądzie.

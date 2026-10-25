@@ -53,6 +53,6 @@ Przykład: „⛔ OSTRZEŻENIE: Nie zatwierdzaj budżetu przed sprawdzeniem grup
 - Po: „Sprawdziłem wdrożenie z misji M-12. Formularz kontaktowy działa.”
 
 ## Sprawdzenie
-Limity i słownik liczy skrypt bez modelu: `python3 $HERMES_HOME/scripts/prosty.py --tekst "…"` (albo plik), gdy masz
+Limity i słownik liczy skrypt bez modelu: `@@PY@@ "$HERMES_HOME/scripts/prosty.py" --tekst "…"` (albo plik), gdy masz
 terminal. Przegląd tygodnia dostaje te same liczby dla wszystkich wiadomości Jarva do właściciela (`fleet_report.py
 --mode weekly`, klucz `prosty_polski`): ile wiadomości w normie i co zawodzi najczęściej.

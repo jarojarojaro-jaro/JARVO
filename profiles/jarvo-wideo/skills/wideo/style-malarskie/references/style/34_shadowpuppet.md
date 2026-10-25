@@ -5,7 +5,7 @@ do prowadzenia, oglądane przez płócienny ekran podświetlony od tyłu lampą 
 przez witraż, nakładki ciemnieją, ruch jest sztywny i skokowy (10 fps), tylko nadgarstek luźno macha. Jakość wzoru:
 ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: nakładające się części ciemnieją prawie do czerni,
 a 121 ms na klatkę to wolno (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 34_shadowpuppet --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-34_shadowpuppet.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 34_shadowpuppet --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-34_shadowpuppet.jpg`;
 kod `$HUASHU/scripts/engine/scenes/34_shadowpuppet.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -45,7 +45,7 @@ technikę, nie scenę.
 - Krój plakietki we wzorze: `LXGWWenKai-500` → u nas Caveat-600 (podmienia `huashu_pl.js`).
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 34_shadowpuppet`. `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 34_shadowpuppet`. `P` = `PAINT`
    (`paint.js`, `render.js` z `P.piece`/`P.carve`/`P.stamp`), `RIG` (`RIG.smooth`, `RIG.taper`), `U.stepTime`.
 2. Ekran: radialne światło lampy, gorący punkt knota w `screen`, faktura płótna w cache (`py_weave`).
 3. Rekwizyty (okno-krata, stół, wazon z kwiatami, krzesło z kwadratowym oparciem) raz do cache (`py_props`).

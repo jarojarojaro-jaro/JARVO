@@ -6,7 +6,7 @@ Wzór: okładka `$MGSTYLES/videos/03-isometric.jpg`, kod `$MGSTYLES/demos/03-iso
 1920×1080, 30 kl./s, 10 s (300 klatek), Three.js. Wzór liczy 16 podklatek na klatkę: na 4 rdzeniach bez GPU
 ponad 25 s na klatkę, z `--query spp=1` ok. 4,6 s (start strony ok. 20 s). Podgląd zawsze z `spp=1`:
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/03-isometric/index.html --preset mg --query spp=1 \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/03-isometric/index.html" --preset mg --query spp=1 \
   --czasy 1,3,5,6.2,8,9.5 --arkusz out/wideo/wzor-03-isometric.jpg
 ```
 
@@ -89,7 +89,7 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/03-isometric/i
 - Kroje wzoru: brak Unbounded zawiesza stronę (opentype), HarmonyOS Sans ma licencję Huawei. U nas tylko kroje.css.
 
 ## Kontrola
-- Czas 1 klatki: `python3 $HERMES_HOME/scripts/html_wideo.py klatki out/wideo/src/index.html --preset jarvo
+- Czas 1 klatki: `@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki out/wideo/src/index.html --preset jarvo
   --czasy 9 --arkusz out/wideo/arkusz.jpg`; szacunek = czas × klatki / przeglądarki (`wideo` robi do 4 naraz).
 - Arkusz 20 s: `--czasy 1,4,8,12,12.4,16,19.5`; `krytyka.py pasek out/wideo/film.mp4 --t 12 --klatek 12`:
   przygotowanie, uderzenie i fala koloru płynnie, cienie nie migoczą, krawędzie równoległe (skos 30°, brak zbiegu).

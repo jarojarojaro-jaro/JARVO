@@ -5,7 +5,7 @@ obrysem, które płyną wzdłuż pola kierunków (ściana pionowo, podłoga do p
 odcieni w każdej strefie, granatowa, lekko drżąca linia wokół przedmiotów. Poznasz go po wirach na niebie, ścianie
 z pionowych smug „jak płomienie” i podłodze z kresek biegnących w głąb. Jakość wzoru: ★★★ (wzorzec biblioteki: inne
 style budowano według jego struktury); słabość wzoru: najcięższy, ~110–120 ms na klatkę (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 09_postimp --czasy 0.35,0.5,0.65 --arkusz out/wideo/wzor-09_postimp.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 09_postimp --czasy 0.35,0.5,0.65 --arkusz out/wideo/wzor-09_postimp.jpg`; kod
 `$HUASHU/scripts/engine/scenes/09_postimp.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -46,7 +46,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 09_postimp --czasy 0.35,0.5,
   `huashu_pl.js` `LilitaOne` → `Poppins-800` (Lilita nie ma polskich znaków).
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 09_postimp`; `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 09_postimp`; `P` = `PAINT`
    (`/_lib/huashu/lib/paint.js`), `RIG` (`lib/rig.js`), `U`. To wzorzec pięciu warstw: płaski podkład → renderer
    stylu → rekwizyty osobno → postacie → ruchome światła.
 2. Płaski podkład `base(g, t)` do `P.scratch('vgBase')`: ściana, podłoga ze szparami zbiegającymi się do VP=(960, 330),

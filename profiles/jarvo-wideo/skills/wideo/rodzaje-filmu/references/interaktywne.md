@@ -44,4 +44,4 @@ Tryb demo (bot / sekwencja wejść / ziarno):                  Formaty, długoś
 - Każda mechanika czytelna bez dźwięku; CTA i link poprawne.
 
 ## Inspiracje
-`python3 $HERMES_HOME/scripts/inspiracje.py interaktywne --ile 3` (albo `--tag playable`).
+`@@PY@@ "$HERMES_HOME/scripts/"inspiracje.py interaktywne --ile 3` (albo `--tag playable`).

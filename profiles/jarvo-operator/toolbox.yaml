@@ -8,7 +8,7 @@ tools:
     install: {method: image, spec: "usługa compose `komputer` (profil komputer), włącza właściciel: jarvo komputer on"}
     integration: hermes-plugin
     used_by_skills: [praca-na-ekranie, formularze, dane-z-ekranu, przejscie-strony, oddaj-ekran]
-    healthcheck: "python3 /opt/jarvo/repo/komputer/plugin/__init__.py stan"
+    healthcheck: "python3 @@REPO_DIR@@/komputer/plugin/__init__.py stan"
     autonomy: A1
     optional: true
     notes: "computer_use Hermesa → bramka jarvo_cua.py → cua.sock → wejście (twarde zasady, ukrywanie sekretów, dziennik) → cua-driver. Wtyczka jarvo-komputer: stan, dziennik, oddanie ekranu właścicielowi. Bez włączonego Komputera Operator nie ma ekranu (healthcheck opcjonalny)."

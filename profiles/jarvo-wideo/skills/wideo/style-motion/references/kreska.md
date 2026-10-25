@@ -4,9 +4,9 @@ Animacja rysunkowa jak z tuszu i papieru: kreska „wrze” (każdy rysunek jest
 kolor wyjeżdża poza kontur. Widz poznaje styl po drżącej linii i rytmie 12 rysunków na sekundę.
 Wzór: okładka `$MGSTYLES/videos/05-cel-boil.jpg`, kod `$MGSTYLES/demos/05-cel-boil/` (MIT), ocena jury 8,07;
 1920×1080, 24 kl./s, 10 s (240 klatek). Klatki wzoru (0,375 smear, 0,417 kopie, 6,5 i 6,542 klatki uderzenia;
-ok. 0,3 s na klatkę na 4 rdzeniach bez GPU; `$MGSTYLES` z `narzedzia.py env mg`):
+ok. 0,3 s na klatkę na 4 rdzeniach bez GPU; `$MGSTYLES` = `@@TOOLS_DIR@@/mg-styles-15`):
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/05-cel-boil/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/05-cel-boil/index.html" --preset mg \
   --czasy 0.375,0.417,1.5,4,6.5,6.542,9 --arkusz out/wideo/wzor-05-cel-boil.jpg
 ```
 
@@ -87,7 +87,7 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/05-cel-boil/in
 - Szkielety liter wzoru to tylko H, A, N, D, M, E (+ F, R, B, Y): polskie litery dorysowujesz sam.
 
 ## Kontrola
-- `python3 $HERMES_HOME/scripts/html_wideo.py klatki out/wideo/src/index.html --preset jarvo --fps 24
+- `@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki out/wideo/src/index.html --preset jarvo --fps 24
   --czasy 0.5,0.542,9.5,9.542,14.5 --arkusz out/wideo/arkusz.jpg` (smear i kopie, dwie klatki uderzenia, koniec).
 - `krytyka.py pasek out/wideo/film.mp4 --t 9.5 --klatek 12`: na dwójkach pary klatek z tą samą pozą, kreska zmienia
   się co rysunek; stojący przedmiot ma 4 różne rysunki, piąty = pierwszy.

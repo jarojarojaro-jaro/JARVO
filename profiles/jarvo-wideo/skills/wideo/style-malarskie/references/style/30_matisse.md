@@ -4,7 +4,7 @@ Późny Matisse: kształty wycięte nożyczkami z papieru pomalowanego gwaszem i
 kolory, nierówne „cięte” krawędzie, pod każdym kawałkiem cień papieru, morskie wodorosty z zaokrąglonymi palcami,
 gwiazdy, Ikar. Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: smugi gwaszu są za mocne
 (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 30_matisse --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-30_matisse.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 30_matisse --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-30_matisse.jpg`;
 kod `$HUASHU/scripts/engine/scenes/30_matisse.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -40,7 +40,7 @@ technikę, nie scenę.
 - Krój plakietki we wzorze: `Caveat-600`; ma polskie znaki.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 30_matisse`. `P` = `PAINT`
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 30_matisse`. `P` = `PAINT`
    (`paint.js`, `brush.js` z `P.cut`, `render.js` z `P.roughen`).
 2. Tło raz do cache (`P.cached('mt_bg', W, H, …)`): szachownica, okno z Ikarem, podłoga, listwa; każdy kształt
    przez `cut`, każdy z cieniem papieru.

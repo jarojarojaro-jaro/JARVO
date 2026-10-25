@@ -26,19 +26,19 @@ z kolumną źródeł i odpowiedzi w czacie, które podają fakty.
 
 ## Polecenia
 
-`S=$HERMES_HOME/scripts`
+`S="$HERMES_HOME/scripts"`
 
 | Co | Polecenie |
 |---|---|
-| Czysty rejestr na nowe zlecenie | `python3 $S/sources.py reset` |
-| Przeczytaj stronę, zarejestruj ją i zapisz jej tekst | `python3 $S/extract.py <url> --tier A --type pierwotne` (wypisze `[n]`) |
-| Źródło przeczytane inaczej (PDF, transkrypcja, rejestr) | `python3 $S/sources.py add <url> --tekst plik.txt --tier B --type wtorne` |
-| Ocena albo data dla już zapisanego źródła | `python3 $S/sources.py add <url> --tier C --type opinia --date 2026-05-02` |
-| Kopia strony na wypadek zmiany | `python3 $S/sources.py add <url> --archive` |
-| Cytat-dowód (dosłowne słowa ze strony) | `python3 $S/sources.py quote <n> --text "dokładne słowa"` |
-| Podgląd rejestru | `python3 $S/sources.py list [--min-tier B]` |
-| Blok „Źródła” w raporcie | `python3 $S/sources.py render --replace-in out/RAPORT.md [--styl dowody]` |
-| Sprawdzenie raportu | `python3 $S/sources.py verify out/RAPORT.md --min-coverage 0.5 [--dowody]` |
+| Czysty rejestr na nowe zlecenie | `@@PY@@ "$S/sources.py" reset` |
+| Przeczytaj stronę, zarejestruj ją i zapisz jej tekst | `@@PY@@ "$S/extract.py" <url> --tier A --type pierwotne` (wypisze `[n]`) |
+| Źródło przeczytane inaczej (PDF, transkrypcja, rejestr) | `@@PY@@ "$S/sources.py" add <url> --tekst plik.txt --tier B --type wtorne` |
+| Ocena albo data dla już zapisanego źródła | `@@PY@@ "$S/sources.py" add <url> --tier C --type opinia --date 2026-05-02` |
+| Kopia strony na wypadek zmiany | `@@PY@@ "$S/sources.py" add <url> --archive` |
+| Cytat-dowód (dosłowne słowa ze strony) | `@@PY@@ "$S/sources.py" quote <n> --text "dokładne słowa"` |
+| Podgląd rejestru | `@@PY@@ "$S/sources.py" list [--min-tier B]` |
+| Blok „Źródła” w raporcie | `@@PY@@ "$S/sources.py" render --replace-in out/RAPORT.md [--styl dowody]` |
+| Sprawdzenie raportu | `@@PY@@ "$S/sources.py" verify out/RAPORT.md --min-coverage 0.5 [--dowody]` |
 
 Rejestr leży w `out/zrodla.json` w katalogu karty, teksty stron w `out/strony/<n>.txt`. Ocenę A–D i typ
 źródła bierzesz ze skali w `weryfikacja-faktow`.

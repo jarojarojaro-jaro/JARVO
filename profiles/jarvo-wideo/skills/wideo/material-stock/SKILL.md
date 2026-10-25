@@ -16,7 +16,7 @@ metadata:
 
 # Materiał stock (Pexels, Pixabay, Openverse)
 
-Darmowe ujęcia wideo i zdjęcia do scen: `$HERMES_HOME/scripts/stock.py`. Klucz: `PEXELS_API_KEY` albo `PIXABAY_API_KEY`
+Darmowe ujęcia wideo i zdjęcia do scen: `"$HERMES_HOME/scripts/stock.py"`. Klucz: `PEXELS_API_KEY` albo `PIXABAY_API_KEY`
 (darmowy, dashboard → Keys przy profilu głównym). Wyniki i pliki trafiają do wspólnego cache, drugi raz bez pobierania.
 
 ## Kiedy użyć
@@ -31,7 +31,7 @@ Darmowe ujęcia wideo i zdjęcia do scen: `$HERMES_HOME/scripts/stock.py`. Klucz
 1. **Zapytanie:** 2–4 słowa po angielsku, obiekt + ujęcie + nastrój („barista pouring milk slow motion”, „city night rain”).
    Polskie zapytania też działają (locale pl-PL), ale angielskie dają więcej wyników.
 2. **Szukaj z arkuszem:**
-   `python3 $HERMES_HOME/scripts/stock.py szukaj "barista latte art" --format 9:16 --min-sek 5 --arkusz out/wideo/kandydaci-s2.jpg`
+   `@@PY@@ "$HERMES_HOME/scripts/stock.py" szukaj "barista latte art" --format 9:16 --min-sek 5 --arkusz out/wideo/kandydaci-s2.jpg`
    (numery na arkuszu = kolejność na liście). Zdjęcia: `--typ zdjecie`.
 3. **Obejrzyj** arkusz (`dobor-ujec`, `vision_analyze`) i wybierz id; słabe wyniki → zmień zapytanie (synonim, szerszy plan).
    - ✅ Punkt kontrolny: orientacja zgodna z formatem, min. 1080 px krótszego boku, długość ≥ sceny.

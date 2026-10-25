@@ -1,6 +1,6 @@
 # build123d: ściąga do warsztatu 3D
 
-Wersja w obrazie: build123d 0.13.0 (dokumentacja: <https://build123d.readthedocs.io/en/stable/>). Jednostki: mm.
+Wersja w instalacji Jarva: build123d 0.13.0 (dokumentacja: <https://build123d.readthedocs.io/en/stable/>). Jednostki: mm.
 Oś Z w górę, podłoga = płaszczyzna XY. Każdy fragment niżej jest sprawdzony w tej wersji.
 
 ## Szkielet skryptu
@@ -77,7 +77,7 @@ wynik = Compound(children=[dno.part, Pos(0, 0, 30) * pokrywa.part])   # albo: wy
 Części obok siebie albo rozsunięte (widok złożenia): `Pos(...) *`. Raport: `czesci` z wymiarami każdej.
 
 ## Pliki od właściciela (tylko lokalne)
-`import_step("/opt/data/jarvo/inbox/…/czesc.step")` (bryła z CAD), `import_svg("logo.svg")` (obrys do szkicu;
+`import_step("@@INBOX_DIR@@/…/czesc.step")` (bryła z CAD), `import_svg("logo.svg")` (obrys do szkicu;
 potem `extrude`). Z internetu nic nie pobierasz.
 
 ## Sprawdzenie w skrypcie (gdy trzeba)

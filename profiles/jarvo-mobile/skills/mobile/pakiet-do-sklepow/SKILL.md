@@ -32,7 +32,7 @@ wysyła: to robi właściciel ze swoich kont albo skill `wydanie` (A2).
 - cudza aplikacja w sklepie → `audyt-mobilny`.
 
 ## Kroki
-1. **Szkic:** `python3 $HERMES_HOME/scripts/pakiet.py szkic <app>` → `store.config.json` (EAS Metadata, pl-PL),
+1. **Szkic:** `@@PY@@ "$HERMES_HOME/scripts/pakiet.py" szkic <app>` → `store.config.json` (EAS Metadata, pl-PL),
    karta Google `out/sklep/google/pl-PL/*.txt` (układ fastlane), `out/sklep/zrzuty.yaml`. Pola na teksty
    sprzedażowe mają `JARVO-TODO`, który blokuje listę, dopóki ich nie uzupełnisz.
 2. **Teksty:** opis, podtytuł, krótki opis i nagłówki kadrów zamawiasz u Studia (`jarvo-studio`, kanban) albo piszesz
@@ -47,7 +47,7 @@ wysyła: to robi właściciel ze swoich kont albo skill `wydanie` (A2).
    `web` do szkicu karty (przybliżenie), do wysłania `android` (telefon testowy z zainstalowanym buildem, pasek stanu
    w trybie demo) i `ios` (artefakt `ios_ci.py`, pasek 9:41). Oglądasz każdy kadr (vision): czy widać korzyść,
    czy nagłówek jest czytelny, czy nic nie jest ucięte. Szczegóły: `references/zrzuty.md`.
-6. **Lista kontrolna:** `python3 $HERMES_HOME/scripts/sklep_check.py <app> [--aab out/build/….aab] [--ipa …]
+6. **Lista kontrolna:** `@@PY@@ "$HERMES_HOME/scripts/sklep_check.py" <app> [--aab out/build/….aab] [--ipa …]
    [--zgodnosc out/zgodnosc.yaml]` → `out/sklep/CHECK.md`. Każdy ✗ poprawiasz u źródła (kod, konfiguracja, teksty,
    strona u Weba), nie w raporcie. Punkty „?” oceniasz na dowodach i pokazujesz właścicielowi; ☐ to jego lista
    w konsolach sklepów. Potwierdzenie człowieka: `sklep_check.py potwierdz <app> <nr> --kto … --uwaga …`.

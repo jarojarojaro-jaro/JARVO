@@ -5,7 +5,7 @@ horyzont, a na końcu znak marki, który zalewa się kolorem. Widz poznaje styl 
 Wzór: okładka `$MGSTYLES/videos/02-line-art.jpg`, kod `$MGSTYLES/demos/02-line-art/` (MIT), ocena jury 7,64;
 1920×1080, 30 kl./s, 10 s, Canvas 2D (nie SVG `stroke-dashoffset`); podgląd bez podklatek, ok. 0,45 s na klatkę:
 ```
-python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/02-line-art/index.html --preset mg \
+@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki "@@TOOLS_DIR@@/mg-styles-15/demos/02-line-art/index.html" --preset mg \
   --czasy 1,2.2,3.6,5,6.5,7.6,8.5,9.8 --arkusz out/wideo/wzor-02-line-art.jpg
 ```
 
@@ -87,7 +87,7 @@ python3 $HERMES_HOME/scripts/html_wideo.py klatki $MGSTYLES/demos/02-line-art/in
 - Gaszenie starych odcinków do 35% (prompt) zjada linię na telefonie: zostań przy 60% z kodu.
 
 ## Kontrola
-- Czas najcięższej klatki (zalanie) przed całością: `python3 $HERMES_HOME/scripts/html_wideo.py klatki
+- Czas najcięższej klatki (zalanie) przed całością: `@@PY@@ "$HERMES_HOME/scripts/html_wideo.py" klatki
   out/wideo/src/index.html --preset jarvo --czasy 0,3,6,9.5,9.6,9.9,12,14.8 --arkusz out/wideo/arkusz.jpg`;
   w klatce 0 linia już jest (hak), żadnego pustego tła dłużej niż 0,3 s.
 - `krytyka.py pasek out/wideo/film.mp4 --t 9.5 --klatek 12`: zalanie od obwodu, przestrzelenie widoczne, bez mrugnięć.

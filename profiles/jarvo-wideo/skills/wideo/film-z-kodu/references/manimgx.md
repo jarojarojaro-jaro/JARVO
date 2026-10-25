@@ -55,7 +55,7 @@ klatki do pełnej długości z kontenera, zakres TV, yuv420p), dopiero potem skl
 
 ```bash
 for s in scena1 scena2 scena3; do
-  python3 $HERMES_HOME/scripts/montaz.py napraw out/$s.mp4 -o out/$s-30.mp4 --fps 30
+  @@PY@@ "$HERMES_HOME/scripts/montaz.py" napraw out/$s.mp4 -o out/$s-30.mp4 --fps 30
 done
 printf "file '%s'\n" "$PWD"/out/scena{1,2,3}-30.mp4 > sceny.txt      # ścieżki pełne: concat liczy je od listy
 ffmpeg -y -f concat -safe 0 -i sceny.txt -c copy out/obraz.mp4          # -c copy bezpieczne: sceny mają te same parametry
@@ -72,7 +72,7 @@ ffmpeg -y -f concat -safe 0 -i sceny.txt -c copy out/obraz.mp4          # -c cop
 | 2D, 1920×1080, 60 kl./s | ~4–5 s | ~2,5 min |
 | 3D (powierzchnie), 1920×1080, 60 kl./s | ~25 s | ~12 min |
 
-RAM 0,5–1,25 GB na render: na VPS 8 GB jeden render naraz (sceny po kolei, nie równolegle). Hasło „90× szybciej
+RAM 0,5–1,25 GB na render: przy 8 GB RAM jeden render naraz (sceny po kolei, nie równolegle). Hasło „90× szybciej
 od Manim CE” dotyczy GPU; u nas na CPU jest mniej więcej tak szybko jak CE. 3D: szkic 720p30, finał 1080p30, a gdy
 render przekroczy kilka minut, najpierw mówisz właścicielowi, ile potrwa.
 

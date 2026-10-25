@@ -56,7 +56,7 @@ tools:
     install: {method: binary, spec: "infra/Dockerfile: wydanie v152.0.4-beta.30, SHA-256 amd64 i arm64; camoufox==0.5.6 + playwright==1.62.0 w /opt/jarvo/venv"}
     integration: skill-script
     used_by_skills: [ostrozna-przegladarka, metoda-sherlocka]
-    healthcheck: "python3 /opt/jarvo/repo/shared/skills/ostrozna-przegladarka/scripts/ostrozna.py --sprawdz"
+    healthcheck: "python3 @@REPO_DIR@@/shared/skills/ostrozna-przegladarka/scripts/ostrozna.py --sprawdz"
     autonomy: A1
     notes: "Zapasowa przeglądarka tylko po odmowie zwykłej (extract.py albo browser_* z 403/429, „Just a moment…”, captcha; archiwum z blocked-page-recovery nie wystarcza): `ostrozna.py <url>`. Jedna naraz, ~0,8 GB RAM, 20 s odstępu i 30 stron domeny na dobę, robots.txt, bez klikania captchy i logowania; jej odmowa = blokada. Serwisy za Cloudflare zwykle odmawiają dalej."
   - name: exiftool
@@ -68,7 +68,7 @@ tools:
     used_by_skills: [weryfikacja-faktow]
     healthcheck: "exiftool -ver"
     autonomy: A0
-  - {name: indra-ocr, source: https://github.com/datalab-to/indra, license: "Apache-2.0 (kod); modele: zmodyfikowana OpenRAIL-M (do 20 mln USD, bez produktu konkurującego z Datalab)", version: "0.3.2 (modele v3.1.1)", install: {method: image, spec: "venv /opt/jarvo/venvs/ocr (Python 3.12), infra/python/requirements-ocr.txt (sha256, --require-hashes, --no-deps, bez huggingface_hub); modele /opt/jarvo/models/indra-ocr (sha256)"}, integration: skill-script, used_by_skills: [odczyt-ekranu], healthcheck: "python3 /opt/jarvo/repo/shared/skills/odczyt-ekranu/scripts/ocr.py --stan", autonomy: A0, notes: "Wspólny odczyt ekranu (decyzja właściciela 2026-10-17): zrzut ekranu, skan, PDF, klatka filmu → tekst, ramki, --szukaj; bez sieci (modele w obrazie, gniazda zablokowane). Zapas: Tesseract pol+eng."}
+  - {name: indra-ocr, source: https://github.com/datalab-to/indra, license: "Apache-2.0 (kod); modele: zmodyfikowana OpenRAIL-M (do 20 mln USD, bez produktu konkurującego z Datalab)", version: "0.3.2 (modele v3.1.1)", install: {method: image, spec: "venv /opt/jarvo/venvs/ocr (Python 3.12), infra/python/requirements-ocr.txt (sha256, --require-hashes, --no-deps, bez huggingface_hub); modele /opt/jarvo/models/indra-ocr (sha256)"}, integration: skill-script, used_by_skills: [odczyt-ekranu], healthcheck: "python3 @@REPO_DIR@@/shared/skills/odczyt-ekranu/scripts/ocr.py --stan", autonomy: A0, notes: "Wspólny odczyt ekranu (decyzja właściciela 2026-10-17): zrzut ekranu, skan, PDF, klatka filmu → tekst, ramki, --szukaj; bez sieci (modele w obrazie, gniazda zablokowane). Zapas: Tesseract pol+eng."}
 
 sidecars:
   - name: searxng

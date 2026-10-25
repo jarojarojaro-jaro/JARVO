@@ -40,7 +40,7 @@ pola rozdzielone „ · ”: tak czyta je `lekcje.py` (0 tokenów).
 - **Propozycja zmiany dopiero przy 3 potwierdzeniach z różnych kart** (albo 1, gdy błąd dotyczy bezpieczeństwa,
   pieniędzy lub akcji A2). Mniej = lekcja czeka w księdze.
 - Lekcja bez nowego potwierdzenia przez 60 dni wypada z księgi (przegląd tygodnia). Wdrożonych nie przycinasz.
-- `python3 $HERMES_HOME/scripts/lekcje.py` liczy to za Ciebie: `gotowe` (do propozycji), `przeterminowane` (do usunięcia),
+- `@@PY@@ "$HERMES_HOME/scripts/lekcje.py"` liczy to za Ciebie: `gotowe` (do propozycji), `przeterminowane` (do usunięcia),
   `wdrozone` ze `skutek` (za ACE: pomogło / zaszkodziło z wyniku evals przed i po dacie wdrożenia). `zaszkodziło` albo
   `uwaga` o powrotach → propozycja poprawki albo cofnięcia tej zmiany (dowód: wynik przed i po, commit, karty powrotów).
   `brak pomiaru` → nic nie wnioskuj, napisz, że brak przebiegu evals po wdrożeniu.
@@ -58,7 +58,7 @@ Ryzyko: <co może się pogorszyć>
 
 ## Poczekalnia skilli (zapisy agentów czekają na zgodę)
 Specjaliści mają `skills.write_approval: true`: skill, który agent sam utworzy albo poprawi, nie wchodzi od razu do
-profilu, tylko czeka w poczekalni. Zbiera je `python3 $HERMES_HOME/scripts/poczekalnia.py lista` (skan tymi samymi wzorcami
+profilu, tylko czeka w poczekalni. Zbiera je `@@PY@@ "$HERMES_HOME/scripts/poczekalnia.py" lista` (skan tymi samymi wzorcami
 co skille zewnętrzne, odcisk każdej wersji, wiek wpisu).
 1. Każdy wpis oceń jak propozycję: czy dubluje istniejący skill albo SOUL, czy jest sprawdzalny, czy nie rozszerza
    uprawnień agenta. `blokuje: true` (ustalenie high/critical) → zaproponuj odrzucenie, nigdy zatwierdzenie.
@@ -75,7 +75,7 @@ Gdy propozycja dotyczy jednego skilla specjalisty, a agent ma evals, zaproponuj 
 zamiast wdrażania na wiarę: `bash scripts/kuznia.sh --agent <agent> --skill <kategoria/skill> --proponuj` (albo
 `--kandydat` z Twoim tekstem) uruchamia na stagingu on, nie Ty; koszt ok. 2–5 $ za sędziego (docs/RSI.md §6).
 Kuźnia porównuje poprawkę z obecną wersją w evals i przepuszcza ją tylko przez komplet bramek.
-- Karta „Kuźnia: <agent> / <skill>, decyzja” czeka na właściciela w HQ (raport i patch w `/opt/data/jarvo/kuznia/<id>/`).
+- Karta „Kuźnia: <agent> / <skill>, decyzja” czeka na właściciela w HQ (raport i patch w `@@JARVO_DIR@@/kuznia/<id>/`).
   Po jego odpowiedzi: „ok” → wpis w księdze lekcji z odnośnikiem do raportu (`· kuźnia: <id>`) i przypomnienie, że
   patch wchodzi do repo i wdrożenia jak każda zmiana; „nie” → powód w księdze. Patcha nie stosujesz sam.
 - Raport z werdyktem „odrzucony” albo „bez pomiaru” nie jest dowodem przeciw lekcji: mówi tylko, że ta poprawka

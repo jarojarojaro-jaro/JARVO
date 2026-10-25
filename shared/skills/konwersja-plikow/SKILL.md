@@ -18,7 +18,7 @@ Człowiek (albo inny agent) potrzebuje pliku w innym formacie: „zamień na PDF
 dźwięk z filmu”, „zmniejsz to zdjęcie”, „połącz te skany w jeden PDF”, „HEIC z iPhone'a nie otwiera się”,
 „usuń lokalizację ze zdjęcia”, „wyślę to klientowi, wyczyść metadane”, „co jest w tym pliku o mnie?”,
 „usuń autora i firmę z tego Worda / PDF-a”.
-Robisz to sam, od razu, na serwerze: plik nie wychodzi na żaden zewnętrzny konwerter. Skrypt nie zużywa tokenów
+Robisz to sam, od razu, na tym komputerze: plik nie wychodzi na żaden zewnętrzny konwerter. Skrypt nie zużywa tokenów
 modelu. To samo narzędzie właściciel ma w HQ (Centrala → Konwerter): prostą zamianę może zrobić sam.
 
 Bez narzędzia `terminal` (Jarvo na czacie) nie uruchomisz skryptu: jedna karta dla `jarvo-reka` bez misji
@@ -27,28 +27,28 @@ w HQ możesz też wskazać Centrala → Konwerter: zrobi to sam w kilka sekund.
 
 ## Kroki
 ```bash
-K=$HERMES_HOME/skills/pliki/konwersja-plikow/scripts/konwertuj.py
-python3 $K <plik> --cele                       # na co da się zamienić ten plik (gdy prośba jest niejasna)
-python3 $K <plik> --na pdf                     # wynik obok pliku: <nazwa>.pdf (istniejący: <nazwa>-2.pdf)
-python3 $K zdjecie.heic --na jpg --rozmiar 2000 --jakosc 85
-python3 $K film.mov --na mp4                   # H.264 z MOV/MKV: samo przepakowanie, sekundy
-python3 $K film.mp4 --na mp3                   # dźwięk z filmu
-python3 $K film.mp4 --na mp4 --rozmiar 720p    # mniejszy film (ten sam format + rozmiar/jakość)
-python3 $K dokument.pdf --na png --strony 1-3 --dpi 200
-python3 $K skan1.jpg skan2.jpg umowa.pdf --polacz -o razem.pdf
-python3 $K katalog/ --na webp --katalog out/webp   # cały katalog (-r z podkatalogami)
-python3 $K IMG_2041.heic film.mov --metadane   # co plik mówi o człowieku: miejsce GPS, telefon, data, autor, opis
-python3 $K IMG_2041.heic --usun-metadane       # ten sam plik bez metadanych: IMG_2041-bez-metadanych.heic
-python3 $K zdjecia/ --usun-metadane --katalog czyste/   # cały katalog bez metadanych
-python3 $K oferta.docx umowa.pdf --usun-metadane  # dokument bez autora, firmy, programu, dat i historii zmian
+K="$HERMES_HOME/skills/pliki/konwersja-plikow/scripts/konwertuj.py"
+@@PY@@ "$K" <plik> --cele                       # na co da się zamienić ten plik (gdy prośba jest niejasna)
+@@PY@@ "$K" <plik> --na pdf                     # wynik obok pliku: <nazwa>.pdf (istniejący: <nazwa>-2.pdf)
+@@PY@@ "$K" zdjecie.heic --na jpg --rozmiar 2000 --jakosc 85
+@@PY@@ "$K" film.mov --na mp4                   # H.264 z MOV/MKV: samo przepakowanie, sekundy
+@@PY@@ "$K" film.mp4 --na mp3                   # dźwięk z filmu
+@@PY@@ "$K" film.mp4 --na mp4 --rozmiar 720p    # mniejszy film (ten sam format + rozmiar/jakość)
+@@PY@@ "$K" dokument.pdf --na png --strony 1-3 --dpi 200
+@@PY@@ "$K" skan1.jpg skan2.jpg umowa.pdf --polacz -o razem.pdf
+@@PY@@ "$K" katalog/ --na webp --katalog out/webp   # cały katalog (-r z podkatalogami)
+@@PY@@ "$K" IMG_2041.heic film.mov --metadane   # co plik mówi o człowieku: miejsce GPS, telefon, data, autor, opis
+@@PY@@ "$K" IMG_2041.heic --usun-metadane       # ten sam plik bez metadanych: IMG_2041-bez-metadanych.heic
+@@PY@@ "$K" zdjecia/ --usun-metadane --katalog czyste/   # cały katalog bez metadanych
+@@PY@@ "$K" oferta.docx umowa.pdf --usun-metadane  # dokument bez autora, firmy, programu, dat i historii zmian
 ```
-1. Plik od człowieka leży w `/opt/data/jarvo/inbox/` (ścieżka po 📎 w zleceniu). Format wyniku z prośby;
+1. Plik od człowieka leży w `@@INBOX_DIR@@/` (ścieżka po 📎 w zleceniu). Format wyniku z prośby;
    niejasny („zrób, żeby się otwierało”) → wybierz najprostszy powszechny (zdjęcie: JPG, film: MP4, dźwięk: MP3,
    dokument: PDF) i powiedz, co wybrałeś.
 2. Uruchom skrypt. Wynik to JSON: `pliki` (ścieżki), `trasa` (kroki i silniki), `rozmiar_przed` i `rozmiar_po`,
    `uwaga` (np. wynik nie jest mniejszy).
 3. Oddaj plik: każdy wynik linią `MEDIA:<ścieżka>` (Telegram wyśle go jako plik). Dużo plików (np. 40 stron PDF
-   jako obrazy) albo duży film: link `python3 /opt/jarvo/repo/scripts/jarvo_link.py <katalog albo plik>`.
+   jako obrazy) albo duży film: link `@@PY@@ "@@REPO_DIR@@/scripts/jarvo_link.py" <katalog albo plik>`.
    W odpowiedzi jedno zdanie: co na co, rozmiar przed i po.
 
 ## Opcje

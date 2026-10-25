@@ -4,14 +4,14 @@ Klip = jedna gramatyka i jeden plik spec (JSON) → odcinek animacji o dokładni
 
 ## Polecenia
 ```bash
-G=$HERMES_HOME/scripts/gramatyka.py
-python3 $G szablon wykresy [--format 9:16] -o out/wideo/src/klip-wykres/spec.json     # szkielet spec po polsku
-python3 $G sprawdz out/wideo/src/klip-wykres/spec.json                                 # przed każdym renderem
-python3 $G render out/wideo/src/klip-wykres/spec.json --klatki 0.5,2,4        # stopklatki → klatki/spec-arkusz.jpg
-python3 $G render out/wideo/src/klip-wykres/spec.json -o out/wideo/klip.mp4            # bez dźwięku, H.264 yuv420p
-python3 $G render out/wideo/src/klip-wykres/spec.json -o out/wideo/klip.mov --alfa     # ProRes 4444 z przezroczystym tłem
-python3 $G pomiar out/wideo/src/klip-wykres/spec.json [--platforma tiktok]    # html_wideo.py pomiar strony klipu
-python3 $G strona out/wideo/src/klip-wykres/spec.json                          # sama strona spec.html (podgląd, własny render)
+G="$HERMES_HOME/scripts/gramatyka.py"
+@@PY@@ "$G" szablon wykresy [--format 9:16] -o out/wideo/src/klip-wykres/spec.json     # szkielet spec po polsku
+@@PY@@ "$G" sprawdz out/wideo/src/klip-wykres/spec.json                                 # przed każdym renderem
+@@PY@@ "$G" render out/wideo/src/klip-wykres/spec.json --klatki 0.5,2,4        # stopklatki → klatki/spec-arkusz.jpg
+@@PY@@ "$G" render out/wideo/src/klip-wykres/spec.json -o out/wideo/klip.mp4            # bez dźwięku, H.264 yuv420p
+@@PY@@ "$G" render out/wideo/src/klip-wykres/spec.json -o out/wideo/klip.mov --alfa     # ProRes 4444 z przezroczystym tłem
+@@PY@@ "$G" pomiar out/wideo/src/klip-wykres/spec.json [--platforma tiktok]    # html_wideo.py pomiar strony klipu
+@@PY@@ "$G" strona out/wideo/src/klip-wykres/spec.json                          # sama strona spec.html (podgląd, własny render)
 ```
 Kolejność: `szablon` → teksty po polsku i `slowo` → `sprawdz` → `render --klatki` (vision, poprawki) → `pomiar` → pełny `render` → kontrola (`qa_wideo.py`, skill `kontrola-wideo`).
 

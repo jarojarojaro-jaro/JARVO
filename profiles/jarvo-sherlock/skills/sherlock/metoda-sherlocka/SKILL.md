@@ -40,14 +40,14 @@ Limit: **maks. 5 wątków**. Więcej = źle zdefiniowane pytanie.
 Wątki niezależne → `delegate_task(tasks=[...])`. **Każdy subagent dostaje samowystarczalną instrukcję**
 (nie widzi Twojej rozmowy ani innych wątków), bez skrótów i akronimów, z:
 - dokładnym pytaniem wątku, zakresem czasu i geografii,
-- poleceniem użycia `web_search` (SearXNG) + `$HERMES_HOME/scripts/extract.py` do czytania stron,
+- poleceniem użycia `web_search` (SearXNG) + `"$HERMES_HOME/scripts/extract.py"` do czytania stron,
 - wspólnym rejestrem źródeł: w każdym wywołaniu `extract.py` i `sources.py` opcja `--rejestr <pełna ścieżka do
   out/zrodla.json>` (każda przeczytana strona dostaje wtedy numer w jednym rejestrze, a nie własne `[1]` w każdym wątku),
 - wymaganiem zwrotu w formacie „learnings” (niżej) + listy URL-i z datami,
 - budżetem: proste pytanie 2–3 wyszukiwania, złożone do 6, stop po 2 wyszukiwaniach bez nowych informacji,
 - zasadą dla stron, które odmówiły (403/429, „Just a moment…”, captcha): kopia z archiwum (`blocked-page-recovery`),
   a gdy potrzebny stan bieżący, jedna próba `ostrozna-przegladarka`; jej odmowa to luka, nie zagadka
-  (`references/wyszukiwanie.md`). Subagenci czekają na siebie: jedna taka przeglądarka naraz na serwerze.
+  (`references/wyszukiwanie.md`). Subagenci czekają na siebie: jedna taka przeglądarka naraz na tym komputerze.
 
 Format „learnings” (dla każdego źródła):
 ```

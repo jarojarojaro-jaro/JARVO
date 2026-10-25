@@ -28,7 +28,7 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
 - Nie: film z lektorem i stockiem (tam karaoke z `napisy`), film z samego tekstu bez osoby (`rodzaje-filmu` → typografia).
 
 ## Kroki
-1. **Plan** (0 tokenów, reżyser z reguł): `python3 $HERMES_HOME/scripts/typografia.py plan <film> --motyw <styl>
+1. **Plan** (0 tokenów, reżyser z reguł): `@@PY@@ "$HERMES_HOME/scripts/typografia.py" plan <film> --motyw <styl>
    [--akcent <kolor marki>] [--tempo spokojne|normalne|ostre]`; styl z tabeli „Styl filmu”, kamera ze stylu (sekcja
    „Kamera i głębia”; `--efekty` = 1–2 efekty wow, sekcja „Efekty wow”). Projekt powstaje sam z filmu, a zwykłe napisy znikają
    (zostają z `--zostaw-napisy`). Kolory dobiera sam z kadru (sekcja „Kolor”). **Gdy plan już jest, nie układam go
@@ -52,7 +52,7 @@ właściciel poprawia na osi każde słowo i blok (pas „Typografia”).
 5. **Oglądam:** `typografia.py arkusz <film> -o out/wideo/typografia.jpg` → `vision_analyze` (lista „Kontrola”).
    Najwyżej dwie rundy poprawek. Gdy styl nie jest oczywisty albo właściciel pyta o inne: `typografia.py style <film>`
    (ten sam blok filmu w każdym stylu, linia MEDIA:) i polecam jeden albo dwa z powodem.
-6. **Render:** `python3 $HERMES_HOME/scripts/projekt.py render <film>` → linia MEDIA:, a w odpowiedzi jedno zdanie, że
+6. **Render:** `@@PY@@ "$HERMES_HOME/scripts/projekt.py" render <film>` → linia MEDIA:, a w odpowiedzi jedno zdanie, że
    wszystko poprawi się w edytorze HQ (pas „Typografia”).
 
 Prośba z HQ o sylwetkę (blok ustawiony „za osobą”): `typografia.py sylwetki <film>` → arkusz tego miejsca → odpowiedź.

@@ -18,7 +18,7 @@ metadata:
 
 **A2: tylko z wyraźną zgodą użytkownika**, zapisaną w karcie albo komentarzu (data + zakres + wersja, np.
 „Decyzja użytkownika 2026-10-03: publikuj posty 1–5 z kalendarza na LinkedIn i IG, wersja 3f9c0a1b2d4e”).
-Brak zgody → odcisk paczki (`python3 /opt/jarvo/repo/scripts/odcisk.py out/do-publikacji out/kalendarz.csv`) i
+Brak zgody → odcisk paczki (`@@PY@@ "@@REPO_DIR@@/scripts/odcisk.py" out/do-publikacji out/kalendarz.csv`) i
 `kanban_block(kind="needs_input", reason="Pakiet gotowy (wersja <odcisk>). Publikować? <co, gdzie, kiedy>")`.
 
 ## Ze zgodą

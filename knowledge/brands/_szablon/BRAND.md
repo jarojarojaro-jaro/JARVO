@@ -1,6 +1,6 @@
 # Brand kit: {{Nazwa marki}}
 
-<!-- Szablon. Prawdziwe brand kity żyją na VPS w data/knowledge/brands/<marka>/ (poza git),
+<!-- Szablon. Prawdziwe brand kity żyją w skarbcu Jarva, w danych instalacji: jarvo/knowledge/brands/<marka>/ (poza git),
      tworzone przez workflow `brand-z-url` (jarvo-web / jarvo-studio). Korzystają z nich obaj agenci. -->
 
 source: {{URL strony, z której wyciągnięto brand}}

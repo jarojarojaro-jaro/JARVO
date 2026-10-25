@@ -17,7 +17,7 @@ metadata:
 # Dwa ekrany (split screen)
 
 Dwie rzeczy naraz w jednym kadrze: porównanie, przed/po, reakcja, „ja vs kolega”, stara i nowa strona, dwa
-ujęcia tej samej chwili. Narzędzie: `$HERMES_HOME/scripts/dwa_ekrany.py` (FFmpeg, ramki i podpisy rysowane kodem,
+ujęcia tej samej chwili. Narzędzie: `"$HERMES_HOME/scripts/dwa_ekrany.py"` (FFmpeg, ramki i podpisy rysowane kodem,
 bez cudzych zdjęć i bez sieci). Zasada: dwa okna, jedna oś czasu, w każdej chwili coś się rusza.
 
 ## Kiedy użyć
@@ -39,12 +39,12 @@ bez cudzych zdjęć i bez sieci). Zasada: dwa okna, jedna oś czasu, w każdej c
 1. **Plan na piśmie przed renderem:** co robi okno A i okno B w każdej sekundzie. Test pauzy: w każdej chwili
    w co najmniej jednym oknie coś się dzieje (nagranie gra, strona się przewija, kreska jedzie). Dwa stojące
    zrzuty to nie film: zdjęcia tylko w `przed-po` (tam rusza się kreska) albo jako krótki przerywnik.
-2. **Materiał:** pliki od właściciela z `/opt/data/jarvo/inbox/`, nagrania ekranu (`demo-strony`), własne filmy.
+2. **Materiał:** pliki od właściciela z `@@INBOX_DIR@@/`, nagrania ekranu (`demo-strony`), własne filmy.
    Cudzych postów, kont i liczników nie pobieramy ani nie wymyślamy: treść jest właściciela, klienta albo z
    licencją (`material-stock`). Nagranie z ręki → najpierw `montaz.py stabilizuj`, za długie → `montaz.py wytnij`.
 3. **Złożenie:**
    ```bash
-   python3 $HERMES_HOME/scripts/dwa_ekrany.py A.mp4 B.mp4 -o out/wideo/<temat>/dwa.mp4 \
+   @@PY@@ "$HERMES_HOME/scripts/dwa_ekrany.py" A.mp4 B.mp4 -o out/wideo/<temat>/dwa.mp4 \
      --format 9:16 --podpisy "Przed" "Po" [--uklad gora-dol|obok|przed-po|telefony] \
      [--dzwiek auto|a|b|oba|brak] [--sek 12] [--kadr-a 0.5,0.4] [--kadr-b 0.5,0.4] \
      [--kreska "0=0,2=0.5,5=0.5,7=1"] [--tlo "#0e0f13"] [--kolor "#ffffff"]

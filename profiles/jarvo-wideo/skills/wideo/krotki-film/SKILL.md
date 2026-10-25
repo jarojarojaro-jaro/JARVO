@@ -17,7 +17,7 @@ metadata:
 # Krótki film z tematu
 
 Temat albo brief → gotowy film na TikTok, Reels, Shorts (i 16:9, 1:1, 4:5). Pomysł pipeline'u za MoneyPrinterTurbo
-(temat → scenariusz → ujęcia → lektor → napisy → muzyka → montaż), implementacja własna: `$HERMES_HOME/scripts/film.py`
+(temat → scenariusz → ujęcia → lektor → napisy → muzyka → montaż), implementacja własna: `"$HERMES_HOME/scripts/film.py"`
 na FFmpeg i darmowym lektorze (domyślnie lokalny Matcha, głos syntetyczny; Edge TTS do wyboru). Plik planu opisuje
 `references/plan.md`.
 
@@ -47,13 +47,13 @@ na FFmpeg i darmowym lektorze (domyślnie lokalny Matcha, głos syntetyczny; Edg
    generacja AI (`wideo-ai`, płatna) → plansza (`"kolor"` + `tekst_ekranowy`).
 3. **Ujęcia obejrzane** (`dobor-ujec`): arkusz kandydatów → `vision_analyze` → wybrane id wpisane jako `stock_id`.
    - ✅ Punkt kontrolny: każde ujęcie pasuje do zdania sceny; zero znaków wodnych, obcych logo i tekstu w kadrze.
-4. **Plan** `out/wideo/src/plan.json` (`references/plan.md`), potem `python3 $HERMES_HOME/scripts/film.py sprawdz out/wideo/src/plan.json`.
+4. **Plan** `out/wideo/src/plan.json` (`references/plan.md`), potem `@@PY@@ "$HERMES_HOME/scripts/film.py" sprawdz out/wideo/src/plan.json`.
    - ✅ Punkt kontrolny: `ok: true`; ostrzeżenia o hooku i długości scen rozważone.
 5. **Szkic:** `film.py render out/wideo/src/plan.json --szkic`; obejrzyj arkusz klatek
    (`qa_wideo.py <szkic> --arkusz out/wideo/qa-szkic.jpg` → `vision_analyze`): rytm, czytelność napisów, strefy UI.
 6. **Finał:** `film.py render out/wideo/src/plan.json` (albo `--format 9:16,16:9`, warianty: `warianty-ab`).
 7. **Kontrola** (`kontrola-wideo`): `qa_wideo.py` bez błędów, ocena ≥ 85 w `kontrola.json`; poniżej: poprawki, najwyżej 2 rundy.
-8. **Oddanie:** link do obejrzenia `python3 /opt/jarvo/repo/scripts/jarvo_link.py out/wideo/<film>/`, miniatura linią
+8. **Oddanie:** link do obejrzenia `@@PY@@ "@@REPO_DIR@@/scripts/jarvo_link.py" out/wideo/<film>/`, miniatura linią
    `MEDIA:<ścieżka>`, `out/INDEX.md`, `out/RAPORT.md` (koncepcja, sceny, źródła i licencje z `film.json`, koszty AI).
    Opis posta i hashtagi tylko jako szkic; copy kampanii robi `jarvo-studio`.
 
@@ -69,5 +69,5 @@ na FFmpeg i darmowym lektorze (domyślnie lokalny Matcha, głos syntetyczny; Edg
 - [ ] link do obejrzenia i miniatura w raporcie; nic nie opublikowane.
 
 ## Wydajność
-Cache (`/opt/data/jarvo/cache/wideo`): lektor, pobrane ujęcia, sceny po normalizacji. Poprawka jednej sceny renderuje
+Cache (`@@JARVO_DIR@@/cache/wideo`): lektor, pobrane ujęcia, sceny po normalizacji. Poprawka jednej sceny renderuje
 tylko ją i montaż; warianty współdzielą ujęcia. Porządek na dysku: `film.py cache --starsze-niz 14`.

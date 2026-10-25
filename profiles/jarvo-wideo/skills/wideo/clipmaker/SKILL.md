@@ -30,10 +30,10 @@ człowiek otwiera rolkę w HQ („✎ Edytuj”) i poprawia cięcia, kadr, napis
 
 ## Kroki
 ```bash
-K=$HERMES_HOME/scripts/klipy.py
-python3 $K przygotuj <nagranie> -o out/wideo/klipy        # mowa (Parakeet), cięcia ujęć, arkusze klatek, transkrypcja.txt z oknami ~90 s
-python3 $K sprawdz out/wideo/klipy/plan.json              # po napisaniu planu
-python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
+K="$HERMES_HOME/scripts/klipy.py"
+@@PY@@ "$K" przygotuj <nagranie> -o out/wideo/klipy        # mowa (Parakeet), cięcia ujęć, arkusze klatek, transkrypcja.txt z oknami ~90 s
+@@PY@@ "$K" sprawdz out/wideo/klipy/plan.json              # po napisaniu planu
+@@PY@@ "$K" zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
 ```
 1. **Przygotuj.** Do rolek potrzebny jest **plik wideo** (`transkrypcja-filmu` pobiera tylko dźwięk). Jest tylko
    link → `kanban_block(needs_input)` z prośbą o plik (YouTube z serwera bywa blokowany).
@@ -68,7 +68,7 @@ python3 $K zbuduj out/wideo/klipy/plan.json -o out/wideo/klipy
    początek najwyżej 0,25 s w ciszę przed pierwszym słowem; nie ma dobrej → „⚠ pierwsza klatka” (zmień `od` segmentu).
    Okładka `klip-N-<slug>-okladka.jpg` to klatka rolki z dużą, ostrą twarzą do kamery z otwartymi oczami, w kadrze
    rolki, bez napisów (tekst na okładkę to zlecenie dla Studia przez Jarva).
-7. **Kontrola każdej rolki:** `python3 $HERMES_HOME/scripts/qa_wideo.py <rolka>.mp4` + 2–3 klatki (`vision_analyze`):
+7. **Kontrola każdej rolki:** `@@PY@@ "$HERMES_HOME/scripts/qa_wideo.py" <rolka>.mp4` + 2–3 klatki (`vision_analyze`):
    twarz w kadrze, napisy czytelne i poza strefą UI, tytuł nie zasłania twarzy. Cięcia: `krytyka.py ciecia <rolka>.mp4`
    (projekt leży obok, słowa z analizy mowy nagrania) i każdy obraz cięcia przez `vision_analyze`; słowo przecięte
    albo trzask = poprawka (`kontrola-wideo`, krok 1c). Poprawka jednej rolki: zmień plan

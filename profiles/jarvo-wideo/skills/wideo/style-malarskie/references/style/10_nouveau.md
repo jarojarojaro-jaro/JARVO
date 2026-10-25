@@ -6,7 +6,7 @@ kwiaty, kuta ornamentyka, łuk okna z witrażem i wschodzącym słońcem, pastel
 litografii. Poznasz go po grubym konturze zewnętrznym (z prawej i od dołu najgrubszym) przy cienkich liniach w środku
 i po „oddychającej” grubości każdej linii.
 Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru: kot w sztywnej pozie (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 10_nouveau --czasy 0.35,0.5,0.65 --arkusz out/wideo/wzor-10_nouveau.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 10_nouveau --czasy 0.35,0.5,0.65 --arkusz out/wideo/wzor-10_nouveau.jpg`; kod
 `$HUASHU/scripts/engine/scenes/10_nouveau.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -47,7 +47,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 10_nouveau --czasy 0.35,0.5,
   `#c0672c`, oczy `#e6c040`; aureola róż `#ebb8b2`, pierścień morski `#5f9a8a`, aureola kota czerwona `#b8473a`.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 10_nouveau`; `P` = `PAINT`, `RIG`, `U`.
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 10_nouveau`; `P` = `PAINT`, `RIG`, `U`.
 2. Tło w całości do cache `nv_bg`: gradient, wzór kółek, plamy litografii, pas mozaiki, baner, tytuł, złota rama.
 3. Linia o zmiennej grubości `ribbon(pts, w(q))`: punkty zagęść krzywą Catmulla–Roma (`dense`, 4–10 punktów na odcinek),
    w każdym punkcie odsuń w obie strony po normalnej o w/2, połącz w zamknięty wielokąt i wypełnij. Szerokość:

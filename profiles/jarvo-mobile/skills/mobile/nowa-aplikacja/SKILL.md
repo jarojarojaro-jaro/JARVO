@@ -38,25 +38,25 @@ firmy → `kanban_block(kind="needs_input")` z propozycją; identyfikatora aplik
 1. **Plan** `out/PLAN.md` (szablon: `references/plan.md`): cel, użytkownik, mapa ekranów (najwyżej 5 zakładek),
    na każdym ekranie dane i stany, **funkcje ponad stronę** (Apple 4.2: powiadomienia, offline, aparat, karta),
    dane i backend, konta, płatności, powiadomienia (kiedy i po co), miary sukcesu. Teksty roboczo z `[SZKIC]`.
-2. **Profil zgodności** `out/zgodnosc.yaml` (`python3 $HERMES_HOME/scripts/zgodnosc.py szablon`): logowanie, płatności,
+2. **Profil zgodności** `out/zgodnosc.yaml` (`@@PY@@ "$HERMES_HOME/scripts/zgodnosc.py" szablon`): logowanie, płatności,
    treści użytkowników, AI, uprawnienia z polskim powodem (≥ 40 znaków, z przykładem użycia), reklamy, dzieci, tablet,
    branża, konto Google. `zgodnosc.py sprawdz out/zgodnosc.yaml --md out/ZGODNOSC.md` bez błędów, zanim powstanie kod.
-3. **Konfiguracja** `out/aplikacja.yaml` (`python3 $HERMES_HOME/scripts/aplikacja.py konfiguracja`): `bundle` z odwróconej
+3. **Konfiguracja** `out/aplikacja.yaml` (`@@PY@@ "$HERMES_HOME/scripts/aplikacja.py" konfiguracja`): `bundle` z odwróconej
    domeny firmy (`salonola.pl` → `pl.salonola.app`; nie do zmiany po pierwszym wgraniu), kolor z brand kitu, dane
    firmy, `usuwanie_konta_url`, gdy są konta (stronę robi Web).
-4. **Aplikacja z szablonu:** `python3 $HERMES_HOME/scripts/aplikacja.py nowa <projekt>/app --aplikacja out/aplikacja.yaml
+4. **Aplikacja z szablonu:** `@@PY@@ "$HERMES_HOME/scripts/aplikacja.py" nowa <projekt>/app --aplikacja out/aplikacja.yaml
    --zgodnosc out/zgodnosc.yaml [--logo <brand>/logo/logo.svg]` (ok. 1 min: szablon, paleta WCAG, ikony, moduły
    uprawnień przez `expo install`). Przeczytaj `app/AGENTS.md`.
 5. **Ekrany z planu** (zasady: `references/ekrany.md`): komponenty z `src/components/`, kolory z `useKolory()`, na
    każdym ekranie z danymi stany ładowania, pustki i błędu, formularze z typem klawiatury i autouzupełnianiem, prośba
    o uprawnienie w momencie użycia z ekranem wyjaśnienia przed oknem systemowym, nic za logowaniem bez potrzeby.
-   Nowa paczka: najpierw `python3 $HERMES_HOME/scripts/paczki.py sprawdz <projekt>/app <paczka>` (literówka,
+   Nowa paczka: najpierw `@@PY@@ "$HERMES_HOME/scripts/paczki.py" sprawdz <projekt>/app <paczka>` (literówka,
    podszycie, nazwa zmyślona, świeża albo ze skryptem instalacyjnym = ✗, nie instalujesz), potem tylko
    `npx expo install <paczka>`; w prototypie trzymaj się modułów dostępnych w Expo Go (podgląd bez builda). Backend: Supabase z kluczem `anon` (nigdy `service_role` w aplikacji).
 6. **Pętla po każdej większej zmianie:**
-   - `python3 $HERMES_HOME/scripts/aplikacja.py sprawdz <projekt>/app`: typy, lint, wersje SDK, expo-doctor, zasady
+   - `@@PY@@ "$HERMES_HOME/scripts/aplikacja.py" sprawdz <projekt>/app`: typy, lint, wersje SDK, expo-doctor, zasady
      JARVO (pliki zgodności, uprawnienia ↔ moduły, sekrety). Wszystko ✓; `J-TODO` dozwolone tylko z listą w ryzykach,
-   - `python3 $HERMES_HOME/scripts/aplikacja.py podglad <projekt>/app --trasy / /wiecej …`: link w HQ i zrzuty iPhone
+   - `@@PY@@ "$HERMES_HOME/scripts/aplikacja.py" podglad <projekt>/app --trasy / /wiecej …`: link w HQ i zrzuty iPhone
      i Pixel w jasnym i ciemnym motywie z kontrolami (konsola, przewijanie, cele dotyku, axe). **Obejrzyj zrzuty**
      (vision): każdy ekran z planu, oba motywy; popraw, zanim pójdziesz dalej.
    Kontrola pada → najpierw przyczyna (komunikat, odtworzenie), potem jedna poprawka; nie osłabiasz kontroli.

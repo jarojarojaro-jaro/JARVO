@@ -5,7 +5,7 @@ ciemne wnętrze z łukowym oknem, za nim błękitniejący pejzaż (perspektywa p
 werniks z siatką spękań. Poznasz go po miękkich krawędziach przy czytelnych rysach twarzy, ciepłym półmroku, smudze
 światła z kurzem i krakelurze. Jakość wzoru: ★★ (rozpoznawalny, ale z wyraźną słabością); słabość wzoru: kot zbyt
 kreskówkowy, całość zbyt statyczna (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 06_renaissance --czasy 0.4,0.8,1.2 --arkusz out/wideo/wzor-06_renaissance.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 06_renaissance --czasy 0.4,0.8,1.2 --arkusz out/wideo/wzor-06_renaissance.jpg`; kod
 `$HUASHU/scripts/engine/scenes/06_renaissance.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -39,7 +39,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 06_renaissance --czasy 0.4,0
   oba mają polskie znaki.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 06_renaissance`; `P` = `PAINT`, `RIG`, `U`.
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 06_renaissance`; `P` = `PAINT`, `RIG`, `U`.
 2. Warstwa statyczna `ren_static`: najpierw pokój na zwykłym płótnie (ściana
    `P.texture('ren_wall', '#43321f', { scale: 0.0024, amt: 30, grain: 12, dark: '#22180e', seed: 21 })`
    + gradient wokół okna, okno, pejzaż, posadzka, stół z białym obrusem, krzesło z oparciem drabinkowym), potem

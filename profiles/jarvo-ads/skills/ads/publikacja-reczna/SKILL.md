@@ -31,7 +31,7 @@ pytasz, ile najwyżej), pliki kreacji (od Studia i Wideografa), URL strony docel
 1. **Zgodność** treści (`zgodnosc-reklam`): obietnice, kategorie specjalne, oznaczenie reklamy.
 2. **`out/kampania.json`** według `references/kampania.md`: platforma, kampania (nazwa wg konwencji, cel, budżet,
    **data końca zawsze**), zestawy/grupy, reklamy z plikami i tekstami, URL z UTM.
-3. **Sprawdzenie:** `$HERMES_HOME/scripts/paczka.py out/kampania.json --sprawdz --limit <zgoda>`. Każdy błąd
+3. **Sprawdzenie:** `@@PY@@ "$HERMES_HOME/scripts/paczka.py" out/kampania.json --sprawdz --limit <zgoda>`. Każdy błąd
    poprawiasz w pliku (krótszy tekst, data końca, mniejszy budżet); uwagi oceniasz i opisujesz właścicielowi.
    Budżet ponad zgodę = błąd: nie podnosisz `--limit` sam.
 4. **Paczka:** `paczka.py out/kampania.json -o out/paczka --limit <zgoda>` → `PUBLIKACJA.md` (krok po kroku, lista

@@ -17,7 +17,7 @@ metadata:
 # Optymalizacja obrazów
 
 ```bash
-node $HERMES_HOME/scripts/images.cjs <plik|katalog> out/img --widths 480,960,1440,1920 --formats avif,webp,jpg --quality 70
+node "$HERMES_HOME/scripts/images.cjs" <plik|katalog> out/img --widths 480,960,1440,1920 --formats avif,webp,jpg --quality 70
 ```
 Wynik: warianty plików + `out/img/manifest.json` (dla każdego obrazu: wymiary, warianty, gotowy `<picture>`).
 

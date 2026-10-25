@@ -22,7 +22,7 @@ sprawdź aktualną dokumentację platformy i zaktualizuj tabelę w repo).
 ## Użycie
 1. Z karty ustal platformy i typ publikacji (post, karuzela, stories/reels, miniatura, OG, reklama).
 2. Z tabeli weź wymiary, proporcje, długość, limity tekstu i **bezpieczne strefy** (UI platformy zasłania krawędzie w 9:16).
-3. Po wyprodukowaniu: `python3 $HERMES_HOME/scripts/check_media.py out/ --spec <klucz>` sprawdza wymiary, długość i wagę plików.
+3. Po wyprodukowaniu: `@@PY@@ "$HERMES_HOME/scripts/check_media.py" out/ --spec <klucz>` sprawdza wymiary, długość i wagę plików.
 
 ## Zasady ogólne
 - Projektuj w natywnej rozdzielczości (1080 px szerokości dla social), eksport PNG dla grafik z tekstem, JPEG/WebP dla zdjęć.

@@ -26,7 +26,7 @@ Opis wpisu z KRS i CEIDG to tylko branża (PKD), więc słowa kluczowe sprawdzas
 z innym sygnałem. ICP bez jednoosobowych firm: `wyklucz_formy: [JEDNOOSOBOWA]`.
 
 ## Kroki
-1. `python3 $HERMES_HOME/scripts/leady.py ocen <projekt> --top 30` → `leady.csv`, `LEADY.md`.
+1. `@@PY@@ "$HERMES_HOME/scripts/leady.py" ocen <projekt> --top 30` → `leady.csv`, `LEADY.md`.
 2. Przejrzyj czołówkę (top 30) i próbkę odrzuconych: szukasz fałszywych dopasowań (nazwa zawiera słowo, ale to inna
    branża; firma w likwidacji; konkurent użytkownika; własny klient). Poprawiasz **ICP** (wykluczenia, próg, wagi),
    nie wynik ręcznie, i liczysz od nowa.

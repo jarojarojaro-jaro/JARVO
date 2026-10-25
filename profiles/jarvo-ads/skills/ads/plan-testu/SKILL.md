@@ -30,7 +30,7 @@ albo wszystkim (wtedy wiemy tylko, KTÓRY pakiet wygrał). Oba są w porządku, 
 2. **Metryka z drabiny** (od najtańszej): hook rate (wideo, 3 s / wyświetlenia) → CTR → CVR → CPA.
    Wybierz najdroższą metrykę, którą budżet rozstrzygnie. Metryka pasuje do zmienianej warstwy (lejek w `hooki`):
    test hooka → hook rate, test rozbiegu → hold rate (15 s / 3 s); słaby CVR naprawia strona, nie nowe hooki.
-3. **Moc:** `$HERMES_HOME/scripts/planer.py test --metryka … --warianty … --budzet-dzienny … --dni … (--bazowa | --cpa)`.
+3. **Moc:** `@@PY@@ "$HERMES_HOME/scripts/planer.py" test --metryka … --warianty … --budzet-dzienny … --dni … (--bazowa | --cpa)`.
    Kod 1 = niewykonalny: zastosuj rekomendację (mniej wariantów, tańsza metryka, dłużej) i przelicz. Nie planuj testu,
    który z góry nic nie rozstrzygnie.
 4. **Tryb na platformie:**

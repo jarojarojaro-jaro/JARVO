@@ -45,4 +45,4 @@ Format, długość, tło (jednolite / ruch / wideo):
 - Pasek klatek na wejściu: kierunek zgodny z czytaniem; tekst = karta 1:1 (wielkość liter, interpunkcja).
 
 ## Inspiracje
-`python3 $HERMES_HOME/scripts/inspiracje.py typografia --ile 3` (albo `--szukaj lyric`).
+`@@PY@@ "$HERMES_HOME/scripts/"inspiracje.py typografia --ile 3` (albo `--szukaj lyric`).

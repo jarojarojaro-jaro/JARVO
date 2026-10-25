@@ -30,7 +30,7 @@ z kosztami, ryzykiem odrzucenia w sklepie i następnym krokiem. Decyzję podejmu
 
 ## Wejścia
 Cel aplikacji jednym zdaniem i kto z niej korzysta. Resztę zbierasz do `potrzeby.yaml`
-(`python3 $HERMES_HOME/scripts/decyzja.py szablon > out/decyzja/potrzeby.yaml`).
+(`@@PY@@ "$HERMES_HOME/scripts/decyzja.py" szablon > out/decyzja/potrzeby.yaml`).
 
 ## Kroki
 1. **Potrzeby.** Wypełnij `potrzeby.yaml` z karty, rozmowy, strony firmy i `audyt-mobilny` (gdy był). Brakuje ważnej
@@ -41,7 +41,7 @@ Cel aplikacji jednym zdaniem i kto z niej korzysta. Resztę zbierasz do `potrzeb
    - kto używa: klienci czy pracownicy; budżet roczny na licencje.
    „Musi” to tylko to, bez czego aplikacja nie ma sensu: „chcę być w App Store” wpisujesz jako `obecnosc-w-sklepie`,
    nie udajesz innej potrzeby.
-2. **Ocena:** `python3 $HERMES_HOME/scripts/decyzja.py ocen out/decyzja/potrzeby.yaml --out out/decyzja`.
+2. **Ocena:** `@@PY@@ "$HERMES_HOME/scripts/decyzja.py" ocen out/decyzja/potrzeby.yaml --out out/decyzja`.
 3. **Interpretacja** (`references/macierz.md`):
    - pokazujesz zwycięzcę **i** to, co jest „blisko” (≤ 5 pkt): tam decyduje właściciel, opisz różnicę w jednym zdaniu,
    - ryzyko 4.2 (aplikacja nie daje więcej niż strona) mówisz wprost; jeśli właściciel i tak chce aplikację, wypisz,

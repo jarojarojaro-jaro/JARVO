@@ -20,7 +20,7 @@ metadata:
 Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
 
 ## Kroki
-1. **Automaty:** `bash $HERMES_HOME/scripts/audit.sh <url> out/audyt`
+1. **Automaty:** `bash "$HERMES_HOME/scripts/audit.sh" <url> out/audyt`
    - Lighthouse mobile + desktop (JSON + HTML); w `summary.json` także waga strony (`strona_kb`) i firmy trzecie
      (`firmy_trzecie`: analityka, czaty, piksele, CDN; KB i czas na wątku głównym),
    - axe-core (pełna lista naruszeń WCAG),
@@ -32,7 +32,7 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
    - ✅ Punkt kontrolny: `out/audyt/summary.json` istnieje; błędy narzędzi są opisane, nie przemilczane.
 2. **Ocena eksperta:** przejdź checklisty `web-quality-audit` i `seo-technical` z wynikami automatów w ręku.
    Obejrzyj zrzuty (vision): czytelność, hierarchia, CTA, spójność z marką.
-   Odporność: `node $HERMES_HOME/scripts/hostile.cjs <url> out/audyt/wrogie` (wolne łącze, słaby telefon w działaniu:
+   Odporność: `node "$HERMES_HOME/scripts/hostile.cjs" <url> out/audyt/wrogie` (wolne łącze, słaby telefon w działaniu:
    procesor 4× wolniejszy, 4G, klikanie i pisanie, czas reakcji jak INP ≤ 200 ms; brak JS, 320 px, klawiatura, długie
    polskie słowa, reduced motion, konsola); porażki trafiają do priorytetów jak inne problemy. Lighthouse mobile mierzy
    samo wejście na stronę (też na udawanym słabym telefonie), `lowend` w `hostile.cjs` mierzy używanie jej.
@@ -60,5 +60,5 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
 ## Uwagi
 - Audytujesz **tylko** wskazane strony. Gdy karta prosi o całą witrynę: weź URL-e z `sitemap.xml`, wybierz
   reprezentatywne (strona główna, po 1–2 z każdego typu, maks. 10) i puść `audit.sh` **po kolei**, nie równolegle
-  (jedna Chromium naraz; VPS ma 8 GB RAM).
+  (jedna Chromium naraz: każda bierze kilkaset MB pamięci, a komputer może mieć tylko 8 GB).
 - Wyniki Lighthouse wahają się: przy wątpliwościach 3 pomiary i mediana.

@@ -4,7 +4,7 @@ Impresjonizm Moneta z 1899 roku: obraz złożony z krótkich, poziomych pociągn
 liście nenufarów z różowymi kwiatami, zielony mostek japoński z glicynią i światło drżące na wodzie. Poznasz go po
 fiołkowo-niebieskiej wodzie i po tym, że nic nie ma obrysu. Jakość wzoru: ★★ (rozpoznawalny, ale z wyraźną
 słabością); słabość wzoru: przestrzeń jest dziwna – ściana to staw, a podłoga to drewno (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 28_monet --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-28_monet.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 28_monet --czasy 0.3,0.6,0.9 --arkusz out/wideo/wzor-28_monet.jpg`;
 kod `$HUASHU/scripts/engine/scenes/28_monet.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz
 technikę, nie scenę.
 
@@ -43,7 +43,7 @@ technikę, nie scenę.
 
 ## Jak go zbudować
 Struktura jak we wzorcowym `09_postimp`.
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 28_monet`. `P` = `PAINT`.
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 28_monet`. `P` = `PAINT`.
 2. Podkład `moBase` rysuj co klatkę (nenufary płyną, cienie się kołyszą): woda, odbicia nieba, cienie wierzby,
    nenufary, widok w oknie, podłoga, obrus.
 3. 4 przebiegi `P.strokes(c, podklad, { cell, len, width, angle, seed, t, boil, outline: 0, palette, mask })`

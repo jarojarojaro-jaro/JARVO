@@ -36,15 +36,15 @@ Czysty SVG bez bibliotek: strona z jedną figurą waży ~40 KB (z krojem ~115 KB
 
 ## Kroki
 ```bash
-I=$HERMES_HOME/skills/design/izometria/scripts/iso.py
-python3 $I zbuduj fig.js -o out/iso/ekspres.html --tytul "Ekspres"            # nasze materiały (stopka zostaje)
-python3 $I zbuduj fig.js -o public/iso/kasa.html --kadr --bez-stopki --akcent "#E4572E" --demo   # strona klienta
-python3 $I sprawdz out/iso/ekspres.html --przegladarka                         # zawsze przed oddaniem
-python3 $I png out/iso/ekspres.html -o out/iso/ekspres.png --czas 1.6 --rozmiar 1080x1350 --podpis
-python3 $I png out/iso/seria.html -o out/iso/ikony.png --wszystkie --przezroczyste --rozmiar 800x800
-python3 $I wideo out/iso/ekspres.html -o out/wideo/ekspres.mp4 --dlugosc 6 --rozmiar 1080x1920   # Wideograf
-python3 $I flota -o out/iso/flota.html --podpis                               # flota z fleet.yaml (bez fig.js)
-python3 $I png out/iso/flota.html -o out/iso/flota.png --czas 7 --rozmiar 1200x1200 --podpis
+I="$HERMES_HOME/skills/design/izometria/scripts/iso.py"
+@@PY@@ "$I" zbuduj fig.js -o out/iso/ekspres.html --tytul "Ekspres"            # nasze materiały (stopka zostaje)
+@@PY@@ "$I" zbuduj fig.js -o public/iso/kasa.html --kadr --bez-stopki --akcent "#E4572E" --demo   # strona klienta
+@@PY@@ "$I" sprawdz out/iso/ekspres.html --przegladarka                         # zawsze przed oddaniem
+@@PY@@ "$I" png out/iso/ekspres.html -o out/iso/ekspres.png --czas 1.6 --rozmiar 1080x1350 --podpis
+@@PY@@ "$I" png out/iso/seria.html -o out/iso/ikony.png --wszystkie --przezroczyste --rozmiar 800x800
+@@PY@@ "$I" wideo out/iso/ekspres.html -o out/wideo/ekspres.mp4 --dlugosc 6 --rozmiar 1080x1920   # Wideograf
+@@PY@@ "$I" flota -o out/iso/flota.html --podpis                               # flota z fleet.yaml (bez fig.js)
+@@PY@@ "$I" png out/iso/flota.html -o out/iso/flota.png --czas 7 --rozmiar 1200x1200 --podpis
 ```
 1. **Nazwij wynik figury, zanim narysujesz:** co daje naciśnięcie (napis, liczba, światło, ruch). Figura, na którą
    można tylko patrzeć, to dekoracja: wybierz inny przedmiot albo dodaj działanie.
@@ -56,7 +56,7 @@ python3 $I png out/iso/flota.html -o out/iso/flota.png --czas 7 --rozmiar 1200x1
    tekst, nic nie świeci po demo. Popraw każdy błąd i uwagę, zanim oddasz.
 4. Obejrzyj PNG (`vision_analyze`): świecenie ma być wyraźne w miniaturze, napisy czytelne, nic nie wystaje.
 5. Oddaj: plik linią `MEDIA:<ścieżka>` (HTML, PNG, film), dużo plików linkiem
-   `python3 /opt/jarvo/repo/scripts/jarvo_link.py <katalog>`. Powiedz, co kliknąć albo nacisnąć.
+   `@@PY@@ "@@REPO_DIR@@/scripts/jarvo_link.py" <katalog>`. Powiedz, co kliknąć albo nacisnąć.
 
 ## Opcje
 - `--paleta ember` (ciepłe, przedmioty) | `city` (miasto, budynki); `--akcent` = kolor marki klienta (z tokenów marki

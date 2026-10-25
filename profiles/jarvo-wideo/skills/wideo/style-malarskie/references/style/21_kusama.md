@@ -4,7 +4,7 @@ Czerwony pokój cały w białych kropkach, które oddychają falą rozchodzącą
 kropki i okno jak lustrzany pokój nieskończoności z kolorowymi światłami („Infinity Mirror Room”, dynia z 1994).
 Jedna funkcja fali ożywia cały ekran. Jakość wzoru: ★★★ (rozpoznawalny od razu, gotowy do użycia); słabość wzoru:
 postać ma ten sam kolor co ściana i trzyma się tylko na konturze (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 21_kusama --czasy 0.3,0.9,1.15 --arkusz out/wideo/wzor-21_kusama.jpg`;
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 21_kusama --czasy 0.3,0.9,1.15 --arkusz out/wideo/wzor-21_kusama.jpg`;
 kod `$HUASHU/scripts/engine/scenes/21_kusama.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę,
 nie scenę.
 
@@ -37,7 +37,7 @@ nie scenę.
   tabliczka to żółta pigułka w czarne kropki.
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 21_kusama`. Biblioteki z
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 21_kusama`. Biblioteki z
    `/_lib/huashu/lib/`: `util.js`, `paint.js` (`PAINT.scratch`), `kit.js` (`KIT.nearArm`, `KIT.choreo`,
    `KIT.label`), `rig.js` (`RIG.girl`, `RIG.cat`, `RIG.drawGirl`, `RIG.drawCat`). Ze sceny skopiuj `wave`, `grid`
    (siatka sześciokątna z rozrzutem) i `dot` (elipsa z obrotem).

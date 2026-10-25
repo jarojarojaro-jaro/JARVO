@@ -5,7 +5,7 @@ Czasy w sekundach **źródła** (z `transkrypcja.txt`: `[mm:ss.s–mm:ss.s]`, cz
 
 ```json
 {
-  "zrodlo": "/opt/data/jarvo/inbox/2026-09-30/podcast.mp4",
+  "zrodlo": "@@INBOX_DIR@@/2026-09-30/podcast.mp4",
   "format": "9:16",
   "styl": {
     "napisy": "karaoke",

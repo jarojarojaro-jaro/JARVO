@@ -5,7 +5,7 @@ zaprawy, białą obwódką wokół postaci i przedmiotów oraz bordiurą z fali 
 biegnących równolegle do brzegu każdego kształtu, nierównych fugach 1,5–2,5 px i skosie światła na kamieniach.
 Ruch wygląda jak w mozaice: kamienie stoją, kolor przepływa przez nie. Jakość wzoru: ★★★ (rozpoznawalny od razu,
 gotowy do użycia); słabość wzoru: w małej skali twarz ma mało szczegółów (przebij ją).
-Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 04_roman --czasy 0.4,0.65,0.9 --arkusz out/wideo/wzor-04_roman.jpg`; kod
+Wzór: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" wzor 04_roman --czasy 0.4,0.65,0.9 --arkusz out/wideo/wzor-04_roman.jpg`; kod
 `$HUASHU/scripts/engine/scenes/04_roman.js` (MIT). Wzór to scena z dziewczyną, kotem i stołem: bierzesz technikę, nie scenę.
 
 ## Do czego
@@ -54,7 +54,7 @@ Wzór: `python3 $HERMES_HOME/scripts/malarz.py wzor 04_roman --czasy 0.4,0.65,0.
   podpis `Cinzel-400` 26 px; Cinzel ma polskie znaki, ale napisów w samej mozaice nie składaj krojem (Pułapki).
 
 ## Jak go zbudować
-1. Szkielet: `python3 $HERMES_HOME/scripts/malarz.py nowy out/wideo/src/film --styl 04_roman`; `P` = `PAINT`, `RIG`, `U`.
+1. Szkielet: `@@PY@@ "$HERMES_HOME/scripts/malarz.py" nowy out/wideo/src/film --styl 04_roman`; `P` = `PAINT`, `RIG`, `U`.
    Zasada: układ kamieni liczony raz (`build()` w `init`, 206 ms), kolor co klatkę.
 2. Wynik `build()`: `ID` (Int32, numer kamienia dla każdego piksela, −1 = fuga) i `SH` (Uint8, jasność skosu,
    128 = 1,0).
