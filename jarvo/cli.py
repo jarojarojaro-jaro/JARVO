@@ -19,7 +19,14 @@ JARVO_ROOT) ustawia korzeń jak JARVO_ROOT: zadanie Harmonogramu nie przekazuje 
                        Hermes wobec pinu, porty, brama API (klucz w <dane>/.env, GET /health), narzędzia, venvy
                        i modele z narzedzia.json, programy floty, autostart, polecenie jarvo, git (Windows: z Git Bash)
   version, help        wersja kodu i przypięty Hermes (też --wersja) / pomoc, także jednego polecenia (N16)
-  update, uninstall, migruj: w budowie (etapy E4, E13, E12), kod 2
+  update [--sprawdz] [--ref REF] [--json]
+                       aktualizacja (N09, c4; jarvo/aktualizacja.py): wersja z GitHuba obok starej, instalator nowej
+                       wersji, doctor, powrót do poprzedniej przy błędzie, sprzątanie starych wersji; ta sama wersja =
+                       nic. `--pomocnik`: pomocnik aktualizacji dla przycisku w panelu (S09, rola nadzorcy)
+  uninstall [--all] [--yes] [--json]
+                       odinstalowanie (N11, c4; jarvo/odinstalowanie.py): stop, autostart off, cofnięcie dziennika
+                       zmian hosta, usunięcie programu, logów i cache; dane tylko z --all po pytaniu; skan śladów
+  migruj               w budowie (etap E12), kod 2
 
 Panel liczy się tylko NASZ: /api/status z hermes_home = <dane> tej instalacji (instalator.stan_panelu). Port 9119
 może trzymać stara flota z WSL albo prywatny Hermes właściciela; wtedy polecenie mówi, kto trzyma port.
@@ -62,10 +69,6 @@ PORTY = (("panel", None), ("API bramy", None), ("podgląd HQ", 9120), ("ekran te
 NASZE_PORTY = {"panel", "API bramy"}         # bez działającego serwisu muszą być wolne
 CZAS_STOPU = instalator.CZAS_STOPU
 W_BUDOWIE = {
-    "update": ("E4", "procedura z docs/NATYWNIE.md (c4): nowa wersja obok starej, drenaż bramy, przełączenie i "
-                     "powrót przy błędzie. Do tego czasu nową wersję daje ponowne polecenie instalacji (stare pliki "
-                     "zostają, gotowe kroki są pomijane)."),
-    "uninstall": ("E13", "stop, cofnięcie dziennika zmian hosta od końca, usunięcie programu; dane tylko z --all."),
     "migruj": ("E12", "przeniesienie danych ze starej instalacji z Dockerem i WSL (docs/NATYWNIE.md, sekcja f)."),
 }
 BOOTSTRAP = "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap"
@@ -174,6 +177,31 @@ def _parser() -> argparse.ArgumentParser:
     s = sub.add_parser("doctor", help="diagnoza instalacji z radą przy każdym wyniku")
     s.add_argument("--json", action="store_true", help="wynik w JSON (CI)")
     s.set_defaults(funkcja=polecenie_doctor)
+
+    s = sub.add_parser("update", help="aktualizacja do nowej wersji z GitHuba (obok starej, powrót przy błędzie)",
+                       description="Sprawdza wersję na GitHubie (ref instalacji, zwykle main), pobiera ją do "
+                       "<program>/app obok bieżącej, uruchamia jej instalator i jarvo doctor; przy błędzie wraca do "
+                       "poprzedniej wersji. Ta sama wersja: nic nie zmienia. Prywatna kopia repo: JARVO_TOKEN albo "
+                       "klucz w magazynie systemu (jarvo-github).")
+    s.add_argument("--sprawdz", action="store_true", help="tylko sprawdź, czy jest nowa wersja")
+    s.add_argument("--ref", metavar="REF", help="gałąź, tag albo pełny SHA (zapamiętany dla następnych aktualizacji)")
+    s.add_argument("--json", action="store_true", help="wynik w JSON (CI); komunikaty na stderr")
+    s.add_argument("--pomocnik", action="store_true",
+                   help="pomocnik aktualizacji dla panelu: prośby z <dane>/jarvo/state/update-request (uruchamia go "
+                        "nadzorca)")
+    s.add_argument("--raz", action="store_true", help=argparse.SUPPRESS)     # pomocnik: jeden obieg (testy)
+    s.set_defaults(funkcja=polecenie_update)
+
+    s = sub.add_parser("uninstall", help="odinstalowanie: stop, autostart, PATH i pliki Jarva; dane tylko z --all",
+                       description="Zatrzymuje Jarvo, wyłącza autostart, cofa zmiany poza katalogiem Jarva (PATH, "
+                       "plik startowy powłoki, polecenie jarvo) i usuwa program, logi i cache. Dane (profile, "
+                       "rozmowy, skarbiec, klucze) zostają, chyba że podasz --all (wtedy po pytaniu). Na końcu skan "
+                       "śladów.")
+    s.add_argument("--all", dest="wszystko", action="store_true", help="usuń też dane (<dane>), po pytaniu")
+    s.add_argument("--yes", "-y", dest="tak", action="store_true",
+                   help="bez pytań (CI, skrypty); z --all usuwa też dane")
+    s.add_argument("--json", action="store_true", help="raport w JSON (CI); komunikaty na stderr")
+    s.set_defaults(funkcja=polecenie_uninstall)
 
     s = sub.add_parser("version", aliases=["wersja"], help="wersja kodu Jarva i przypięty Hermes (jak --wersja)")
     s.set_defaults(funkcja=lambda u, _a, _r, _ot: polecenie_wersja(u))
@@ -402,6 +430,29 @@ def polecenie_serwis(u: Uklad, _a, reszta, ot: Otoczenie) -> int:
             return int(nadzorca.main(list(reszta)) or 0)
         except SystemExit as e:                   # --help i złe argumenty z argparse nadzorcy
             return e.code if isinstance(e.code, int) else (0 if e.code is None else 2)
+
+
+def polecenie_update(u: Uklad, a, _reszta, ot: Otoczenie) -> int:
+    """`jarvo update` (jarvo/aktualizacja.py, ładowany przy użyciu jak nadzorca)."""
+    if not _zainstalowane(u):
+        return _brak_instalacji(u)
+    try:
+        aktualizacja = ot.modul("aktualizacja")
+    except ImportError as e:
+        print(f"BŁĄD: brak modułu aktualizacji ({e}). Uruchom polecenie instalacji ponownie.", file=sys.stderr)
+        return 1
+    return int(aktualizacja.polecenie(u, a, ot) or 0)
+
+
+def polecenie_uninstall(u: Uklad, a, _reszta, ot: Otoczenie) -> int:
+    """`jarvo uninstall` (jarvo/odinstalowanie.py, ładowany przy użyciu)."""
+    try:
+        odinstalowanie = ot.modul("odinstalowanie")
+    except ImportError as e:
+        print(f"BŁĄD: brak modułu odinstalowania ({e}). Uruchom polecenie instalacji ponownie albo usuń {u.root} "
+              "ręcznie.", file=sys.stderr)
+        return 1
+    return int(odinstalowanie.polecenie(u, a, ot) or 0)
 
 
 def polecenie_w_budowie(_u: Uklad, a, _reszta, _ot: Otoczenie) -> int:

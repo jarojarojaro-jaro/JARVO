@@ -166,6 +166,7 @@ ukryty() { if [ -n "${JARVO_TOKEN:-}" ]; then printf ' (Authorization: Bearer <u
 
 wersja() {   # ustawia SHA: pełny SHA z JARVO_REF albo z API (Accept: application/vnd.github.sha = sam SHA, bez JSON)
   local ref="${JARVO_REF:-main}" adres
+  REF="$ref"                       # do .jarvo-ref: `jarvo update` sprawdza potem ten sam ref (jarvo/aktualizacja.py)
   if printf '%s' "$ref" | grep -Eq '^[0-9a-fA-F]{40}$'; then
     SHA="$(printf '%s' "$ref" | tr 'A-F' 'a-f')"
     return 0
@@ -211,6 +212,7 @@ kod() {   # kod Jarva z commitu $SHA do $PROGRAM/app/<sha12> (bez .git); ustawia
   tar -xzf "$arch" -C "$APP.new" --strip-components=1 || die "Nie udało się rozpakować kodu Jarva."
   [ -f "$APP.new/jarvo/start.py" ] || die "Archiwum $adres nie ma jarvo/start.py (zły ref? ustaw JARVO_REF)."
   printf '%s\n' "$SHA" > "$APP.new/.jarvo-wersja"
+  if [ -n "${REF:-}" ]; then printf '%s\n' "$REF" > "$APP.new/.jarvo-ref"; fi
   rm -rf "$APP"                    # niepełny katalog po przerwanej próbie: mv wsunąłby nowy do środka
   mv "$APP.new" "$APP"
   rm -f "$arch"

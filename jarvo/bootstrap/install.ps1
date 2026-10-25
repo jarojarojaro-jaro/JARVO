@@ -256,8 +256,9 @@
     return "https://codeload.github.com/$JarvoRepo/tar.gz/$Sha"
   }
 
-  # Kod Jarva z commitu $Sha do $Cel (bez .git); .jarvo-wersja = pelny SHA dla instalatora i `jarvo --wersja`
-  function JarvoKod([string]$Sha, [string]$Cel, [string]$Pobrane) {
+  # Kod Jarva z commitu $Sha do $Cel (bez .git); .jarvo-wersja = pelny SHA dla instalatora i `jarvo --wersja`,
+  # .jarvo-ref = ref z JARVO_REF (albo main): `jarvo update` sprawdza potem ten sam ref (jarvo/aktualizacja.py)
+  function JarvoKod([string]$Sha, [string]$Cel, [string]$Pobrane, [string]$Ref) {
     $archiwum = Join-Path $Pobrane "jarvo-$Sha.tar.gz"
     $adres = JarvoAdresKodu $Sha
     if ($JarvoNaSucho) {
@@ -286,6 +287,7 @@
       JarvoBlad "archiwum $adres nie ma jarvo\start.py (zly ref? ustaw JARVO_REF)."
     }
     [IO.File]::WriteAllText((Join-Path $nowy '.jarvo-wersja'), "$Sha`n")
+    if ($Ref) { [IO.File]::WriteAllText((Join-Path $nowy '.jarvo-ref'), "$Ref`n") }
     # niepelny katalog po przerwanej probie (bez jarvo\start.py): Move-Item wsunalby nowy do srodka
     if (Test-Path -LiteralPath $Cel) { Remove-Item -LiteralPath $Cel -Recurse -Force }
     Move-Item -LiteralPath $nowy -Destination $Cel
@@ -323,7 +325,7 @@
     $sha = JarvoWersja $ref
     if (-not $sha) { $sha = 'SHA-z-' + ($ref -replace '[^\w.-]', '_') }     # tylko na sucho: SHA zna dopiero API
     $app = Join-Path $program ('app\' + $sha.Substring(0, [math]::Min(12, $sha.Length)))
-    JarvoKod $sha $app $pobrane
+    JarvoKod $sha $app $pobrane $ref
     $argumenty = @('-I', '-X', 'utf8', (Join-Path $app 'jarvo\start.py'), 'instaluj')
     if ($env:JARVO_NO_AUTOSTART -eq '1') { $argumenty += '--bez-autostartu' }
     if ($env:JARVO_WEB_LOKALNIE -eq '1') { $argumenty += '--web-lokalnie' }

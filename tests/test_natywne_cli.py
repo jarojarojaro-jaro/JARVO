@@ -618,7 +618,8 @@ def http_panelu(u: sciezki.Uklad, warunek=lambda: True, **pola):
 
 
 def test_w_budowie_kod_2(tmp_path, capsys):
-    for polecenie, etap in (("update", "E4"), ("uninstall", "E13"), ("migruj", "E12")):
+    # update i uninstall działają od obszaru update-uninstall (tests/test_natywne_update.py)
+    for polecenie, etap in (("migruj", "E12"),):
         assert cli.main([polecenie, "--all"], otoczenie=_ot(tmp_path)) == 2
         err = capsys.readouterr().err
         assert "w budowie" in err and f"etap {etap}" in err
