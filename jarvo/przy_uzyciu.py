@@ -191,7 +191,7 @@ def _plik(app: Path, nazwa: str, platforma: str | None) -> tuple[str, dict]:
     return wersja, plik
 
 
-def _spis_narzedzia(wersja: str, plik: dict, katalog: Path) -> dict:
+def spis_narzedzia(wersja: str, plik: dict, katalog: Path) -> dict:
     """Wpis jak instalator._Instalacja.narzedzie: wersja, katalog, bin, env ({katalog} rozwinięty)."""
     return {"wersja": wersja, "katalog": str(katalog),
             "bin": [str(katalog / b) for b in plik.get("bin") or []],
@@ -221,7 +221,7 @@ def gotowe_narzedzie(u: Uklad, nazwa: str, *, app: Path | None = None, platforma
     except BladPrzyUzyciu:
         return None
     katalog = u.program / "narzedzia" / nazwa / pobieracz.katalog_wersji(wersja)
-    return _spis_narzedzia(wersja, plik, katalog) if _gotowy_katalog(katalog, plik) else None
+    return spis_narzedzia(wersja, plik, katalog) if _gotowy_katalog(katalog, plik) else None
 
 
 def narzedzie(u: Uklad, nazwa: str, *, app: Path | None = None, platforma: str | None = None,
@@ -234,7 +234,7 @@ def narzedzie(u: Uklad, nazwa: str, *, app: Path | None = None, platforma: str |
     app = Path(app) if app else app_instalacji(u)
     wersja, plik = _plik(app, nazwa, platforma)
     katalog = u.program / "narzedzia" / nazwa / pobieracz.katalog_wersji(wersja)
-    spis = _spis_narzedzia(wersja, plik, katalog)
+    spis = spis_narzedzia(wersja, plik, katalog)
     try:
         if _gotowy_katalog(katalog, plik):
             if nazwa in przenosne.PRZEGLADARKI_CHROMIUM:        # instalacje sprzed tej poprawki: raz, ze znacznikiem

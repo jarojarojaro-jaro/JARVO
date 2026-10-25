@@ -507,6 +507,11 @@ def test_pin_przegladarki_z_manifestu_i_odswiez(tmp_path, monkeypatch, capsys):
     assert pierwszy.endswith(os.path.join("156.0.8078.47", "chrome-win64", "chrome.exe")) and pobrania == ["156.0.8078.47"]
     assert jk.ustawienia(u)["sha256"] == "a" * 64 and jk.przegladarka_aktualna(u, *wpis(REPO))
     assert jk.przegladarka_do_startu(u, REPO, env, log=lambda t: None) == pierwszy and len(pobrania) == 1
+    # wpis w narzedzia.json jak przy każdym narzędziu przy pierwszym użyciu: sprzątanie `jarvo update` go nie rusza
+    from jarvo import aktualizacja, srodowisko
+    spis = srodowisko.narzedzia(u)["chrome-komputer"]
+    assert spis["wersja"] == "156.0.8078.47" and spis["env"]["JARVO_KOMPUTER_CHROME"].endswith("chrome.exe")
+    assert not [k for k in aktualizacja.do_sprzatniecia(u) if "chrome-komputer" in str(k)]
     ot = instalator.Otoczenie(env=env)
     assert jk.main(["odswiez"], u=u, ot=ot) == 0 and "aktualna" in capsys.readouterr().out
     pin.update(wersja="157.0.8100.5", sha256="b" * 64)                  # jarvo update przyniósł nowy pin CfT

@@ -141,6 +141,11 @@ def zainstaluj_przegladarke(u: Uklad, app: Path, log=print) -> str:
             "suma sha256 sprawdzana przed rozpakowaniem)…")
     katalog = pobieracz.zainstaluj(_przegladarka().NARZEDZIE, wersja, plik, u.program / "narzedzia",
                                    u.cache / "pobrane")
+    # jak każde narzędzie przy pierwszym użyciu: prawo odczytu dla piaskownicy Chromium (Windows) i wpis
+    # w narzedzia.json, bez którego sprzątanie `jarvo update` uznawało przeglądarkę za starą wersję i ją usuwało
+    przenosne.dla_piaskownicy_chromium(katalog)
+    from . import przy_uzyciu
+    przy_uzyciu.zapisz_wpis(u, _przegladarka().NARZEDZIE, przy_uzyciu.spis_narzedzia(wersja, plik, katalog))
     zmienna = _przegladarka().ZMIENNA_PROGRAMU
     sciezka = str((plik.get("env") or {}).get(zmienna) or "").replace("{katalog}", str(katalog))
     sciezka = os.path.normpath(sciezka) if sciezka else ""
