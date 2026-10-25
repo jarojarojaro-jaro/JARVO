@@ -1,5 +1,5 @@
 {
- "_opis": "Powłoka /jarvo w dashboardzie Hermesa (branding/patch_dashboard.py, docs/HQ.md „Powłoka”). js: podmiany w dist z dokładną liczbą trafień (inna liczba = budowa obrazu staje); gotowe = ślad już wykonanej podmiany. css: elementy powłoki, które chowa data-jarvo-app i data-jarvo-embed; dowod = napis w dist, liczony tak samo. Nawigacji Hermesa na /sessions po restarcie gatewaya i aktualizacji nie zmieniamy: tam jest dziennik akcji.",
+ "_opis": "Powłoka /jarvo w dashboardzie Hermesa (branding/patch_dashboard.py, docs/HQ.md „Powłoka”). js: podmiany w dist z dokładną liczbą trafień (inna liczba = budowa obrazu staje); gotowe = ślad już wykonanej podmiany. css: elementy powłoki, które chowa data-jarvo-app i data-jarvo-embed; dowod = napis w dist, liczony tak samo. natywnie: podmiany tylko w instalacji natywnej (patch_dashboard.py --natywnie, jarvo/hermes.py), tak samo ścisłe: Hermes poza kontenerem pokazuje „Update Hermes” i sam pyta GitHuba o nowe wersje, a `hermes update` zerwałby pin z vendor/natywne.yaml (docs/NATYWNIE.md H16). Nawigacji Hermesa na /sessions po restarcie gatewaya i aktualizacji nie zmieniamy: tam jest dziennik akcji.",
  "wersja": 1,
  "js": [
   {
@@ -15,6 +15,22 @@
    "zamiana": "\\1(typeof window.__JARVO_CEL__==\"function\"?window.__JARVO_CEL__:function(){return\"/sessions\"})()\\2",
    "ile": 2,
    "gotowe": "\\{to:\\(typeof window\\.__JARVO_CEL__==\"function\"\\?"
+  }
+ ],
+ "natywnie": [
+  {
+   "nazwa": "bez_aktualizacji_hermesa",
+   "wzor": "(?<![\\w$.])[\\w$]+\\?\\.can_update_hermes(?![\\w$])",
+   "zamiana": "!1/*jarvo-bez-aktualizacji*/",
+   "ile": 5,
+   "gotowe": "!1/\\*jarvo-bez-aktualizacji\\*/"
+  },
+  {
+   "nazwa": "bez_sprawdzania_aktualizacji",
+   "wzor": "(?<![\\w$.])[\\w$]+\\.checkHermesUpdate\\(!1\\)",
+   "zamiana": "Promise.resolve(null)/*jarvo-bez-sprawdzania*/",
+   "ile": 2,
+   "gotowe": "Promise\\.resolve\\(null\\)/\\*jarvo-bez-sprawdzania\\*/"
   }
  ],
  "css": [

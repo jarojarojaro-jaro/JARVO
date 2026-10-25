@@ -115,6 +115,44 @@ def test_status_hermesa_bez_hermesa_to_none(tmp_path):
     assert A.status_hermesa(tmp_path, "openai-codex", timeout=20) is None
 
 
+def test_status_hermesa_bez_okna_konsoli(tmp_path, monkeypatch):
+    """Natywnie dashboard działa bez konsoli: proces statusu (co 30 s) na Windows z CREATE_NO_WINDOW, inaczej
+    właścicielowi migałoby okno; tryb UTF-8 także przy -I (PYTHONUTF8 nie działa z -I)."""
+    wywolania = []
+
+    def run(argv, **kw):
+        wywolania.append((argv, kw))
+        return SimpleNamespace(stdout='{"sposob": "oauth", "polaczony": true, "zmienne": []}\n', returncode=0)
+    monkeypatch.setattr(A.subprocess, "run", run)
+    assert A.status_hermesa(tmp_path, "openai-codex", python="py") == {"sposob": "oauth", "polaczony": True,
+                                                                        "zmienne": []}
+    argv, kw = wywolania[0]
+    assert argv[:4] == ["py", "-I", "-X", "utf8"] and kw["env"]["HERMES_HOME"] == str(tmp_path)
+    oczekiwane = getattr(A.subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+    assert kw["creationflags"] == oczekiwane
+
+
+def test_zapis_poznania_i_pierwszej_sesji_ponawia_podmiane(tmp_path, monkeypatch):
+    """W08: USER.md czytają też agenci, a na Windows czytany plik nie da się podmienić (WinError 5/32): zapis ponawia
+    podmianę zamiast zgłaszać błąd 500 pierwszego spotkania."""
+    prz = A._przenosne()
+    monkeypatch.setattr(prz, "WINDOWS", True)
+    monkeypatch.setattr(prz.time, "sleep", lambda _s: None)
+    prawdziwy, proby = os.replace, []
+
+    def zajety(z, do):
+        proby.append(Path(do).name)
+        if len(proby) % 2:
+            raise PermissionError(13, "plik czyta inny proces")
+        prawdziwy(z, do)
+    monkeypatch.setattr(os, "replace", zajety)
+    user = tmp_path / "USER.md"
+    assert A.zapisz_poznanie(user, {"imie": "Ola", "firma": "Piekarnia"}, "2026-10-25")["imie"] == "Ola"
+    A.zapisz_pierwsza_sesja(tmp_path / "pierwsza-sesja.json", "w_" + "a" * 21, 1.0)
+    assert proby == ["USER.md", "USER.md", "pierwsza-sesja.json", "pierwsza-sesja.json"]
+    assert A.pierwsza_sesja(tmp_path / "pierwsza-sesja.json")["watek_id"] == "w_" + "a" * 21
+
+
 # ----------------------------------------------------------------------------------------------- brama
 def test_brama_z_logu_startow_i_zdrowia(tmp_path):
     teraz = time.time()

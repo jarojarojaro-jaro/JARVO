@@ -138,11 +138,20 @@ PRZYCZYNY = {      # turn_exit_reason → krótka przyczyna po polsku (nieznana:
     "rate_limited": "Dostawca modelu ogranicza zapytania", "interrupted": "Tura przerwana",
 }
 RYZYKA = (         # pattern_key / opis polecenia → zdanie o ryzyku (karta zgody); reszta: zdanie ogólne
-    (re.compile(r"rm\b|delet|remov|unlink|rmdir|shred", re.I), "Agent chce usunąć pliki"),
-    (re.compile(r"sudo|root|chmod|chown|privileg", re.I), "Agent chce uruchomić polecenie z uprawnieniami administratora"),
+    # natywnie (docs/NATYWNIE.md W17) także polecenia Windows (Remove-Item, del, rd /s, icacls, takeown, reg delete,
+    # Set-ExecutionPolicy, Stop-Process, taskkill) i macOS (diskutil, launchctl), a na końcu zapis pliku z wtyczki
+    # zgód (klucz plugin_rule:jarvo-zgody:write_file|patch:…); ta sama lista w hq/web/src/15-os.js (Os.ryzyko)
+    (re.compile(r"rm\b|(?<!reg )(?<!reg\.exe )delet|remov|unlink|rmdir|shred|\bdel\b|\berase\b|\brd\s+/s", re.I),
+     "Agent chce usunąć pliki"),
+    (re.compile(r"sudo|root|chmod|chown|privileg|icacls|takeown|\breg(?:\.exe)?\s+(?:delete|add)\b|"
+                r"set-executionpolicy|runas|diskutil", re.I),
+     "Agent chce uruchomić polecenie z uprawnieniami administratora"),
     (re.compile(r"git.?push|force.?push|publish|deploy", re.I), "Agent chce wysłać zmiany na zewnątrz"),
-    (re.compile(r"curl|wget|network|http|ssh|scp", re.I), "Agent chce połączyć się z innym komputerem albo pobrać plik"),
-    (re.compile(r"kill|shutdown|reboot|systemctl", re.I), "Agent chce zatrzymać albo zrestartować program"),
+    (re.compile(r"curl|wget|network|http|ssh|scp|invoke-webrequest|\biwr\b", re.I),
+     "Agent chce połączyć się z innym komputerem albo pobrać plik"),
+    (re.compile(r"kill|shutdown|reboot|systemctl|stop-process|restart-computer|launchctl", re.I),
+     "Agent chce zatrzymać albo zrestartować program"),
+    (re.compile(r":write_file:|:patch:|write_file|\bpatch\b", re.I), "Agent chce zapisać albo zmienić plik"),
 )
 RYZYKO_DOMYSLNE = "Agent chce uruchomić polecenie, które wymaga Twojej zgody"
 CZAS_ZGODY_RE = re.compile(r"^approvals:\s*\n((?:[ \t]+.*\n?)*)", re.M)

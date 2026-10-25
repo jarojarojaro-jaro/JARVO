@@ -222,3 +222,155 @@ def test_pakiet_sklejony_ma_poprawna_skladnie(tmp_path):
     r = subprocess.run([NODE, "--check", str(plik)], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     assert "window.__JARVO_APP__ = { App: AppJarvo, StaraBaza, wersja: 2 };" in plik.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------- panel bez logowania (docs/NATYWNIE.md W11, I11)
+
+def _wycinek(plik: str, od: str, do: str) -> str:
+    t = _tekst(plik)
+    i = t.index(od)
+    return t[i:t.index(do, i)]
+
+
+ZRODLO_FETCH = r"""
+const vm = require("vm"), fs = require("fs");
+const kod = fs.readFileSync(process.argv[2], "utf8");
+const czekaj = (ms) => new Promise((ok) => setTimeout(ok, ms));
+function strumien(kawalki) {
+  const enc = new TextEncoder();
+  return new ReadableStream({ async pull(c) { if (!kawalki.length) { c.close(); return; } await czekaj(1);
+    c.enqueue(enc.encode(kawalki.shift())); } });
+}
+async function przypadek(odp, { zamknij = false } = {}) {
+  const zapytania = [], zdarzenia = [], bledy = [];
+  const ctx = { TextDecoder, AbortController, console,
+    authHeaders: (h) => Object.assign({ "X-Jarvo-Request": "1", "X-Hermes-Session-Token": "tok" }, h || {}),
+    fetch: async (url, init) => { zapytania.push({ url, init: { ...init, signal: !!init.signal } });
+      if (odp === "siec") throw new TypeError("Failed to fetch");
+      return { ok: odp.status === 200, status: odp.status, body: strumien([...(odp.kawalki || [])]) }; } };
+  vm.runInNewContext(kod + "\nthis.ZrodloFetch = ZrodloFetch;", ctx);
+  const z = new ctx.ZrodloFetch("/api/plugins/jarvo-hq/strumien?klient=k&watki=");
+  for (const typ of ["hello", "watek.wpis", "message"]) z.addEventListener(typ, (e) => zdarzenia.push([e.type, e.data, e.lastEventId]));
+  z.onerror = () => bledy.push(z.readyState);
+  if (zamknij) { await czekaj(5); z.close(); }
+  await czekaj(80);
+  return { zapytania, zdarzenia, bledy, stan: z.readyState, status: z.status };
+}
+(async () => {
+  const wynik = {
+    sse: await przypadek({ status: 200, kawalki: ["event: hello\ndata: {\"a\":1}\n", "\n: komentarz\nid: e1.5\r\nevent: watek.wpis\r\ndata: {\"x\"",
+      ":2}\r\n\r\n", "data: linia1\ndata:linia2\n\nretry: 10\n\n"] }),
+    nieupowazniony: await przypadek({ status: 401 }),
+    siec: await przypadek("siec"),
+    zamkniety: await przypadek({ status: 200, kawalki: ["data: a\n\n", "data: b\n\n", "data: c\n\n"] }, { zamknij: true }),
+  };
+  console.log(JSON.stringify(wynik));
+})();
+"""
+
+
+@pytest.mark.skipif(not NODE, reason="brak node")
+def test_strumien_przez_fetch_z_tokenem(tmp_path):
+    """W11: bez logowania EventSource nie wyśle nagłówka z tokenem sesji, więc lider czyta SSE przez fetch: nagłówki
+    panelu (token, X-Jarvo-Request), Accept text/event-stream, parser ramek („event:”, „data:” w kilku wierszach,
+    „id:” zostaje dla następnych, komentarze i „retry:” pominięte, CRLF), status ≠ 200, sieć i koniec odpowiedzi =
+    readyState 2 i jedno onerror; close() nie zgłasza błędu."""
+    h = tmp_path / "zrodlo.cjs"
+    h.write_text(ZRODLO_FETCH, encoding="utf-8")
+    klasa = tmp_path / "klasa.js"
+    klasa.write_text(_wycinek("11-strumien.js", "class ZrodloFetch", "const Strumien = "), encoding="utf-8")
+    r = subprocess.run([NODE, str(h), str(klasa)], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    w = __import__("json").loads(r.stdout)
+    sse = w["sse"]
+    assert sse["zdarzenia"] == [["hello", '{"a":1}', ""], ["watek.wpis", '{"x":2}', "e1.5"],
+                                ["message", "linia1\nlinia2", "e1.5"]]
+    assert sse["bledy"] == [2] and sse["stan"] == 2 and sse["status"] == 200
+    init = sse["zapytania"][0]["init"]
+    assert init["headers"]["X-Hermes-Session-Token"] == "tok" and init["headers"]["Accept"] == "text/event-stream"
+    assert init["credentials"] == "include" and init["cache"] == "no-store" and init["signal"]
+    assert w["nieupowazniony"]["bledy"] == [2] and w["nieupowazniony"]["status"] == 401
+    assert not w["nieupowazniony"]["zdarzenia"]
+    assert w["siec"]["bledy"] == [2] and w["siec"]["stan"] == 2
+    assert w["zamkniety"]["bledy"] == [] and w["zamkniety"]["stan"] == 2
+
+
+LOGOWANIE = r"""
+const vm = require("vm"), fs = require("fs");
+const kod = fs.readFileSync(process.argv[2], "utf8");
+function przypadek(auth, schowek) {
+  const ruchy = [], zapamietane = [];
+  const pamiec = new Map(Object.entries(schowek || {}));
+  const ctx = { Date, Number, String, window: { __HERMES_AUTH_REQUIRED__: auth },
+    sessionStorage: { getItem: (k) => (pamiec.has(k) ? pamiec.get(k) : null), setItem: (k, v) => pamiec.set(k, v) },
+    location: { replace: (u) => ruchy.push(["replace", u]), assign: (u) => ruchy.push(["assign", u]) },
+    Trasa: { zapamietaj: () => zapamietane.push(1) }, basePath: () => "/hermes" };
+  vm.runInNewContext(kod + "\nnaLogowanie(); naLogowanie();", ctx);
+  return { ruchy, zapamietane: zapamietane.length, pamiec: [...pamiec.keys()] };
+}
+console.log(JSON.stringify({
+  bez: przypadek(false),
+  bez_zaraz_po: przypadek(false, { "jarvo.odswiezenie_401": String(Date.now() - 5000) }),
+  bez_dawno: przypadek(false, { "jarvo.odswiezenie_401": String(Date.now() - 60000) }),
+  z_logowaniem: przypadek(true),
+}));
+"""
+
+
+@pytest.mark.skipif(not NODE, reason="brak node")
+def test_401_bez_logowania_przeladowuje_strone_raz(tmp_path):
+    """W11, I11: bez logowania 401 to nowy token po restarcie panelu, więc strona /jarvo wczytuje się od nowa (hash
+    w sessionStorage), najwyżej raz na 20 s; z logowaniem (tryb LAN, kontener) jak dotąd strona logowania."""
+    h = tmp_path / "logowanie.cjs"
+    h.write_text(LOGOWANIE, encoding="utf-8")
+    kod = tmp_path / "kod.js"
+    kod.write_text(_wycinek("10-api.js", "const bezLogowania", "if (typeof window !== \"undefined\")"), encoding="utf-8")
+    r = subprocess.run([NODE, str(h), str(kod)], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    w = __import__("json").loads(r.stdout)
+    assert w["bez"]["ruchy"] == [["replace", "/hermes/jarvo"]] and w["bez"]["zapamietane"] == 1
+    assert w["bez_zaraz_po"]["ruchy"] == [] and w["bez_zaraz_po"]["zapamietane"] == 0     # bez pętli przeładowań
+    assert w["bez_dawno"]["ruchy"] == [["replace", "/hermes/jarvo"]]
+    assert w["z_logowaniem"]["ruchy"] == [["assign", "/hermes/login?next=%2Fhermes%2Fjarvo"]]
+
+
+@pytest.mark.skipif(not NODE, reason="brak node")
+def test_ryzyko_zgody_w_przegladarce_jak_na_serwerze(tmp_path):
+    """W17: Os.ryzyko (15-os.js) zna te same polecenia Windows i macOS co przebiegi.ryzyko na serwerze."""
+    import json as _json
+    kod = tmp_path / "ryzyko.js"
+    kod.write_text(_wycinek("15-os.js", "const RYZYKA", "// przyciski zgody"), encoding="utf-8")
+    przypadki = {"Remove-Item -Recurse C:\\x": "usun", "del /s /q C:\\x": "usun", "rd /s /q build": "usun",
+                 "reg delete HKCU\\Software\\X /f": "admin", "icacls C:\\x /grant Everyone:F": "admin",
+                 "takeown /f C:\\x": "admin", "Set-ExecutionPolicy Bypass": "admin", "diskutil eraseDisk": "admin",
+                 "Stop-Process -Name chrome": "restart", "launchctl unload x.plist": "restart",
+                 "Invoke-WebRequest https://x": "siec", "delegate_task do Web": "inne", "rm -rf /tmp/x": "usun"}
+    harness = tmp_path / "h.cjs"
+    harness.write_text(
+        'const vm = require("vm"), fs = require("fs");'
+        'const ctx = {}; vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8") + "\\nthis.ryzyko = ryzyko;", ctx);'
+        'const p = JSON.parse(process.argv[3]); const out = {};'
+        'for (const o of Object.keys(p)) out[o] = ctx.ryzyko({ opis: o });'
+        'out.zapis = ctx.ryzyko({ klucz_wzorca: "plugin_rule:jarvo-zgody:write_file:a:b" });'
+        'console.log(JSON.stringify(out));', encoding="utf-8")
+    r = subprocess.run([NODE, str(harness), str(kod), _json.dumps(przypadki)], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert _json.loads(r.stdout) == {**przypadki, "zapis": "zapis"}
+    sl = validate.slownik_i18n(_tekst("04-i18n.js"))
+    assert "zgoda.r_zapis" in sl["pl"] and "zgoda.r_zapis" in sl["en"]
+
+
+def test_pliki_bez_logowania_bez_adresu_file():
+    """W11: w trybie z tokenem SVG idzie jako data:, a nowa karta i PDF przez link podglądu :9120; adres /file zostaje
+    tylko dla ciasteczka (z logowaniem). Ramka PDF z :9120 bez atrybutu sandbox (inne pochodzenie z CSP sandbox)."""
+    api, pliki = _tekst("10-api.js"), _tekst("34-pliki.js")
+    assert "const zTokenem = () => !!window.__HERMES_SESSION_TOKEN__;" in api
+    for f in ("useSvgUrl", "useAdresPliku", "otworzPlik"):
+        assert f"function {f}(" in api and f in pliki, f
+    assert 'readAsDataURL(new Blob([b], { type: "image/svg+xml" }))' in api
+    assert "window.open(urlPliku" not in pliki and "src=${urlPliku" not in pliki and "href=${urlPliku" not in pliki
+    assert 'sandbox=${zTokenem() ? undefined : ""}' in pliki
+    strumien = _tekst("11-strumien.js")
+    assert "zTokenem() ? new ZrodloFetch(url) : new EventSource(url)" in strumien
+    assert "headers: authHeaders() })).status" in strumien
+    assert 'bezLogowania()\n        ? html`<${Wiersz} ikona="logout" tytul=${T("szuflada.bez_logowania")}' in _tekst("61-szuflada.js")

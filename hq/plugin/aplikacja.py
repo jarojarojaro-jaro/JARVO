@@ -19,7 +19,7 @@
     stan to `starting`/`restarting`; w pozostałych przypadkach `niedostepna`.
   - `profil_wlasciciela`: w USER.md jest imię.
   - `pierwsza_sesja`: id wątku „Pierwsza sesja” albo pusty napis (sesji jeszcze nie było); plik
-    `/opt/data/jarvo/state/pierwsza-sesja.json`, zapisuje go trasa `POST /app/pierwsza-sesja` (raz na instalację).
+    `<HERMES_HOME>/jarvo/state/pierwsza-sesja.json`, zapisuje go trasa `POST /app/pierwsza-sesja` (raz na instalację).
 - **Pierwsze spotkanie** (`zapisz_poznanie`, trasa `POST /app/poznanie`): imię, firma, czym się zajmuje, linki i cele
   z rozmowy w aplikacji (bez modelu) trafiają do tych samych pól USER.md, które wypełnia skill `onboarding-interview`.
   Brak pliku = szablon skillu. Pola wpisujemy jedną linią (bez znaków Markdownu), listy „Cele” i „Narzędzia i konta”
@@ -235,8 +235,21 @@ def zapisz_poznanie(sciezka: Path | str, dane: dict, dzis: str) -> dict:
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(f".{p.name}.{os.getpid()}.tmp")
     tmp.write_text("\n".join(linie).rstrip("\n") + "\n", encoding="utf-8", newline="\n")   # skarbiec: „\n” też na Windows
-    os.replace(tmp, p)
+    _przenosne().zastap(tmp, p)              # USER.md czytają też agenci: na Windows czytany plik = ponowienie (W08)
     return wlasciciel(p)
+
+
+def _przenosne():
+    """przenosne.py wtyczki (załadowany przez plugin_api jako jarvo_hq_przenosne albo z pliku obok)."""
+    import importlib.util
+
+    mod = sys.modules.get("jarvo_hq_przenosne")
+    if mod is None:
+        spec = importlib.util.spec_from_file_location("jarvo_hq_przenosne", Path(__file__).with_name("przenosne.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["jarvo_hq_przenosne"] = mod
+        spec.loader.exec_module(mod)
+    return mod
 
 
 # ----------------------------------------------------------------------------------------------- model
@@ -280,13 +293,16 @@ def zmienna_obecna(profil: Path | str, nazwy) -> bool:
 
 def status_hermesa(profil: Path | str, dostawca_: str, *, python: str | None = None,
                    timeout: float = STATUS_TIMEOUT_S) -> dict | None:
-    """Status logowania dostawcy z Hermesa w osobnym procesie (HERMES_HOME = profil); None = Hermesa nie ma."""
+    """Status logowania dostawcy z Hermesa w osobnym procesie (HERMES_HOME = profil); None = Hermesa nie ma.
+    Na Windows bez okna konsoli: dashboard natywnie działa bez konsoli, a nowy proces konsolowy dostałby własne
+    okno, które mignęłoby właścicielowi co 30 s."""
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH",)}
     env["HERMES_HOME"] = str(profil)
     try:
-        r = subprocess.run([python or sys.executable, "-I", "-c", SKRYPT_STATUSU, dostawca_], capture_output=True,
-                           text=True, encoding="utf-8", errors="replace", timeout=timeout, env=env,
-                           cwd=str(profil) if Path(profil).is_dir() else None)
+        r = subprocess.run([python or sys.executable, "-I", "-X", "utf8", "-c", SKRYPT_STATUSU, dostawca_],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                           env=env, cwd=str(profil) if Path(profil).is_dir() else None,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0)
         out = json.loads((r.stdout or "").strip().splitlines()[-1])
     except (OSError, subprocess.SubprocessError, ValueError, IndexError):
         return None
@@ -341,7 +357,7 @@ def zapisz_pierwsza_sesja(sciezka: Path | str, watek_id: str, at: float) -> None
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(p.name + ".tmp")
     tmp.write_text(json.dumps({"watek_id": watek_id, "at": at}), encoding="utf-8")
-    os.replace(tmp, p)
+    _przenosne().zastap(tmp, p)              # gotowość czyta go przy każdym GET /app (W08)
 
 
 # ----------------------------------------------------------------------------------------------- brama

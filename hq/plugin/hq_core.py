@@ -51,6 +51,11 @@ HOME = _hermes_root(os.environ.get("HERMES_HOME", "/opt/data"))
 JARVO_DIR = Path(os.environ.get("JARVO_DATA_DIR", str(HOME / "jarvo")))
 MISSIONS_INDEX = Path(os.environ.get("JARVO_MISSIONS_DIR", str(JARVO_DIR / "missions"))) / "INDEX.md"
 
+
+def natywnie(env: dict | None = None) -> bool:
+    """Instalacja natywna (docs/NATYWNIE.md): procesy Jarva mają JARVO_ROOT z jarvo/srodowisko.py; kontener go nie ma."""
+    return bool(str((os.environ if env is None else env).get("JARVO_ROOT") or "").strip())
+
 OPEN = {"triage", "todo", "ready", "running", "blocked", "review", "scheduled"}
 HEARTBEAT_STALE_S = 180          # pracownik bez sygnału dłużej niż 3 min = „cisza”
 FEED_LIMIT = 40
@@ -614,13 +619,23 @@ ATTACH_MARK = "📎 "            # linia wiadomości ze ścieżką załącznika 
 UPLOAD_MAX = 50 * 1024 * 1024
 
 
+# nazwy urządzeń Windows (docs/NATYWNIE.md W18): „CON”, „nul.txt” czy „COM1.tar.gz” nie dają się zapisać jako plik
+ZAREZERWOWANE = frozenset({"con", "prn", "aux", "nul", *(f"{p}{n}" for p in ("com", "lpt") for n in "0123456789¹²³")})
+
+
 def safe_upload_name(raw: str | None) -> str:
-    """Nazwa pliku z przeglądarki → bezpieczna nazwa w inbox (bez katalogów, ukrycia i znaków innych niż litery, cyfry, „._-”)."""
-    name = Path(str(raw or "").replace("\\", "/")).name
+    """Nazwa pliku z przeglądarki → bezpieczna nazwa w inbox (bez katalogów, ukrycia i znaków innych niż litery, cyfry,
+    „._-”), w NFC (macOS podaje litery z ogonkami rozłożone) i z „_” przed nazwą urządzenia Windows (W18). Ta sama
+    nazwa na każdym systemie: plik z inbox przenosi się między komputerami."""
+    import unicodedata
+
+    name = Path(unicodedata.normalize("NFC", str(raw or "")).replace("\\", "/")).name
     stem, dot, ext = name.rpartition(".")
     if not dot:
         stem, ext = name, ""
     stem = re.sub(r"[^\w.-]+", "_", stem, flags=re.UNICODE).strip("._-")[:80] or "plik"
+    if stem.split(".", 1)[0].lower() in ZAREZERWOWANE:   # Windows patrzy na nazwę przed pierwszą kropką
+        stem = f"_{stem}"
     ext = re.sub(r"[^A-Za-z0-9]", "", ext)[:8].lower()
     return f"{stem}.{ext}" if ext else stem
 
@@ -925,6 +940,57 @@ def site_file(root: Path, rel: str, roots: Roots) -> Path | None:
     if not _within(p, root.resolve()) or not p.is_file():
         return None
     return p if safe_path(str(p), roots) else None
+
+
+# Typy plików serwera podglądu (docs/NATYWNIE.md W10): jawna mapa, bo mimetypes na Windows czyta rejestr, a tam
+# program właściciela potrafi przypisać .js „text/plain” (moduły ES wtedy nie ruszają) albo .svg nic. Reszta:
+# mimetypes, na końcu application/octet-stream.
+TYPY_MIME = {
+    ".html": "text/html", ".htm": "text/html", ".js": "text/javascript", ".mjs": "text/javascript",
+    ".css": "text/css", ".json": "application/json", ".map": "application/json", ".txt": "text/plain",
+    ".md": "text/markdown", ".csv": "text/csv", ".xml": "application/xml", ".svg": "image/svg+xml",
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
+    ".avif": "image/avif", ".ico": "image/x-icon", ".bmp": "image/bmp", ".woff": "font/woff", ".woff2": "font/woff2",
+    ".ttf": "font/ttf", ".otf": "font/otf", ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
+    ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".oga": "audio/ogg", ".m4a": "audio/mp4",
+    ".aac": "audio/aac", ".flac": "audio/flac", ".opus": "audio/opus", ".pdf": "application/pdf",
+    ".wasm": "application/wasm", ".glb": "model/gltf-binary", ".gltf": "model/gltf+json", ".zip": "application/zip",
+}
+TEKSTOWE = ("application/javascript", "application/json", "application/xml", "image/svg+xml", "model/gltf+json")
+
+
+def typ_pliku(nazwa: str) -> str:
+    """Content-Type pliku strony: z TYPY_MIME, potem mimetypes; tekst z `; charset=utf-8`."""
+    import mimetypes
+
+    typ = TYPY_MIME.get(Path(nazwa).suffix.lower()) or mimetypes.guess_type(nazwa)[0] or "application/octet-stream"
+    return f"{typ}; charset=utf-8" if typ.startswith("text/") or typ in TEKSTOWE else typ
+
+
+def polecenie_folderu(plik: Path | str, *, system: str | None = None, env: dict | None = None,
+                      which=None) -> list[str] | str | None:
+    """„Pokaż w folderze” natywnie (docs/NATYWNIE.md W13), wołane z procesu dashboardu: Windows `explorer.exe
+    /select,"<plik>"` (napis linii poleceń: Eksplorator sam dzieli argumenty, a ścieżka Windows nie ma cudzysłowu),
+    macOS `open -R <plik>` (Finder z zaznaczonym plikiem), Linux `xdg-open <katalog>` tylko na pulpicie (DISPLAY albo
+    WAYLAND_DISPLAY). None = tu się nie da (serwer bez pulpitu, brak programu, znak, którego nie przekażemy)."""
+    import shutil
+
+    system = sys.platform if system is None else system
+    env = os.environ if env is None else env
+    which = which or shutil.which
+    s = str(plik)
+    if not s or any(c in s for c in '"\r\n\x00'):
+        return None
+    if system.startswith("win"):
+        explorer = str(env.get("SystemRoot") or env.get("SYSTEMROOT") or r"C:\Windows").rstrip("\\/") + r"\explorer.exe"
+        sciezka = s.replace("/", "\\")
+        return f'"{explorer}" /select,"{sciezka}"'
+    if system == "darwin":
+        return ["/usr/bin/open", "-R", s]
+    if not (env.get("DISPLAY") or env.get("WAYLAND_DISPLAY")):
+        return None
+    xdg = which("xdg-open")
+    return [xdg, str(Path(s).parent)] if xdg else None
 
 
 def _liczby():

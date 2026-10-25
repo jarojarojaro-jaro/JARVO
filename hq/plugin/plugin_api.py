@@ -952,12 +952,11 @@ async def edit_cancel(jid: str):
 # tokenem (wydaje go zalogowany dashboard albo agent przez scripts/jarvo_link.py; wspólny plik linków). Nagłówek CSP sandbox daje jej nieprzezroczyste
 # pochodzenie: skrypty strony działają, ale nie widzą sesji dashboardu i nie wyślą do niego ciasteczek.
 PREVIEW_PORT = int(os.environ.get("JARVO_PREVIEW_PORT", "9120"))
+# instalacja natywna (JARVO_ROOT od jarvo/srodowisko.py): wszystko tylko na 127.0.0.1 (docs/NATYWNIE.md W10)
+NATYWNIE = core.natywnie()
 # adres nasłuchu podglądu i proxy ekranu: w kontenerze wszystkie interfejsy (port wystawia compose na JARVO_BIND_IP),
-# na Windows (tylko natywnie) sam komputer: 0.0.0.0 otworzyłoby okno zapory i port w sieci lokalnej
-PREVIEW_BIND = os.environ.get("JARVO_PREVIEW_BIND") or ("127.0.0.1" if os.name == "nt" else "0.0.0.0")
-# adres, pod którym przeglądarka widzi serwer podglądu (compose: IP z JARVO_BIND_IP); agenci biorą go
-# z env albo z pliku state/preview.json, który zapisujemy przy starcie
-PREVIEW_URL = os.environ.get("JARVO_PREVIEW_URL") or f"http://localhost:{PREVIEW_PORT}"
+# natywnie i na Windows sam komputer: 0.0.0.0 otworzyłoby okno zapory i port w sieci lokalnej
+PREVIEW_BIND = os.environ.get("JARVO_PREVIEW_BIND") or ("127.0.0.1" if os.name == "nt" or NATYWNIE else "0.0.0.0")
 PREVIEW_CSP = ("sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads "
                "allow-popups-to-escape-sandbox")
 # stan wspólny dla ponownych importów pluginu (dashboard może przeładować pluginy w tym samym procesie)
@@ -966,8 +965,47 @@ if not hasattr(_preview, "error"):
     _preview.error = None
 
 
+def _port_podgladu() -> int:
+    """Port, na którym serwer podglądu naprawdę słucha (po zapasowym porcie od systemu inny niż JARVO_PREVIEW_PORT)."""
+    return getattr(_preview, "port", None) or PREVIEW_PORT
+
+
+def _adres_podgladu() -> str:
+    """Adres serwera podglądu dla agentów (state/preview.json, scripts/jarvo_link.py): JARVO_PREVIEW_URL (compose: IP
+    z JARVO_BIND_IP), natywnie 127.0.0.1 (localhost bywa najpierw ::1, a serwer słucha tylko na IPv4)."""
+    return os.environ.get("JARVO_PREVIEW_URL") or f"http://{'127.0.0.1' if NATYWNIE else 'localhost'}:{_port_podgladu()}"
+
+
+def _klasa_serwera(baza):
+    """Serwer nasłuchu podglądu i ekranu. Na Windows SO_EXCLUSIVEADDRUSE zamiast SO_REUSEADDR: z SO_REUSEADDR inny
+    proces może przypiąć się do tego samego portu i przejąć połączenia (W10)."""
+    import socket
+
+    class Serwer(baza):
+        daemon_threads = True
+        allow_reuse_address = os.name != "nt"
+
+        def server_bind(self):
+            if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            super().server_bind()
+
+    return Serwer
+
+
+def nasluch(baza, adres: str, port: int, handler):
+    """Serwer na (adres, port). Windows: WinError 10013 (port w zakresie, który Hyper-V albo WinNAT zarezerwował po
+    starcie systemu) = zapasowo port od systemu (0); wołający czyta prawdziwy z `server_address`."""
+    klasa = _klasa_serwera(baza)
+    try:
+        return klasa((adres, port), handler)
+    except PermissionError as exc:
+        if os.name != "nt" or getattr(exc, "winerror", None) != 10013 or not port:
+            raise
+        return klasa((adres, 0), handler)
+
+
 def _preview_handler():
-    import mimetypes
     from http.server import BaseHTTPRequestHandler
     from urllib.parse import unquote, urlsplit
 
@@ -1016,10 +1054,7 @@ def _preview_handler():
                 lib = core.lib_file(path[len("/_lib/"):])
                 if lib is None:
                     return self._fail(404, "Nie ma takiej biblioteki.")
-                ctype = mimetypes.guess_type(lib.name)[0] or "application/octet-stream"
-                if lib.suffix in (".js", ".mjs"):
-                    ctype = "text/javascript; charset=utf-8"
-                return self._static(lib.read_bytes(), ctype, body)
+                return self._static(lib.read_bytes(), core.typ_pliku(lib.name), body)
             token, _, rel = path.lstrip("/").partition("/")
             root = core.link_root(core.LINKS_FILE, token, time.time())
             if root is None or root == core.SCREEN_ROOT:
@@ -1032,9 +1067,7 @@ def _preview_handler():
             p = core.site_file(root, rel, ROOTS)
             if p is None:
                 return self._fail(404, "Nie ma takiego pliku.")
-            ctype = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
-            if ctype.startswith("text/") or ctype in ("application/javascript", "application/json", "image/svg+xml"):
-                ctype += "; charset=utf-8"
+            ctype = core.typ_pliku(p.name)              # jawna mapa: rejestr Windows nie zmieni typów (W10)
             data = p.read_bytes()
             if "jarvo-podglad=1" in parts.query and p.suffix.lower() in (".html", ".htm"):
                 data = anim.wstrzyknij_most(data)          # tylko podgląd animacji w HQ, nie „▶ Odpal”
@@ -1066,18 +1099,19 @@ def _start_preview() -> None:
     from http.server import ThreadingHTTPServer
 
     try:
-        srv = ThreadingHTTPServer((PREVIEW_BIND, PREVIEW_PORT), _preview_handler())
+        srv = nasluch(ThreadingHTTPServer, PREVIEW_BIND, PREVIEW_PORT, _preview_handler())
     except OSError as exc:
         _preview.error = f"port {PREVIEW_PORT} zajęty ({exc.strerror})"
         return
-    srv.daemon_threads = True
-    _preview.server = srv
+    _preview.server, _preview.port = srv, srv.server_address[1]
     threading.Thread(target=srv.serve_forever, name="jarvo-preview", daemon=True).start()
     try:
         info = core.JARVO_DIR / "state" / "preview.json"
         info.parent.mkdir(parents=True, exist_ok=True)
-        info.write_text(json.dumps({"url": PREVIEW_URL, "port": PREVIEW_PORT,
-                                    "android_url": os.environ.get("JARVO_ANDROID_SCREEN_URL")}), encoding="utf-8")
+        tmp = info.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"url": _adres_podgladu(), "port": _port_podgladu(),
+                                   "android_url": os.environ.get("JARVO_ANDROID_SCREEN_URL")}), encoding="utf-8")
+        przenosne.zastap(tmp, info)              # agenci czytają ten plik (scripts/jarvo_link.py)
     except OSError:
         pass
 
@@ -1099,8 +1133,10 @@ async def site(request: Request):
         raise HTTPException(503, f"Podgląd stron nie działa: {_preview.error or 'serwer nie wystartował'}")
     root = core.site_root(p, ROOTS)
     token = await asyncio.to_thread(core.link_for, core.LINKS_FILE, root, time.time())
-    rel = p.relative_to(root).as_posix()
-    return {"port": PREVIEW_PORT, "path": f"/{token}/{rel}"}
+    # nazwy z „#”, „?”, „%” i spacjami (np. „raport #1.html”) jako jeden adres; serwer podglądu robi unquote
+    from urllib.parse import quote
+    rel = quote(p.relative_to(root).as_posix(), safe="/")
+    return {"port": _port_podgladu(), "path": f"/{token}/{rel}"}
 
 
 # ------------------------------------------- animacja HTML: podgląd na żywo i parametry (animacja.py)
@@ -1121,9 +1157,11 @@ async def anim_info(request: Request):
         raise HTTPException(404, "To nie animacja z kontraktem __seek (kontrakt-html.md) albo plik poza katalogami floty")
     if not getattr(_preview, "server", None):
         raise HTTPException(503, f"Podgląd stron nie działa: {_preview.error or 'serwer nie wystartował'}")
+    from urllib.parse import quote
     root = p.parent
     token = await asyncio.to_thread(core.link_for, core.LINKS_FILE, root, time.time())
-    return {"plik": p.as_posix(), "podglad": {"port": PREVIEW_PORT, "path": f"/{token}/{p.name}?render=1&jarvo-podglad=1"},
+    return {"plik": p.as_posix(), "podglad": {"port": _port_podgladu(),
+                                              "path": f"/{token}/{quote(p.name)}?render=1&jarvo-podglad=1"},
             "parametry": await asyncio.to_thread(anim.wczytaj, p), "pomiar": await asyncio.to_thread(anim.pomiar, p)}
 
 
@@ -1275,19 +1313,20 @@ def _screen_handler():
 def _start_screen() -> None:
     if getattr(_screen, "server", None) or SCREEN_PORT == 0:
         return
+    if NATYWNIE and not os.environ.get("JARVO_ANDROID_SCREEN_UPSTREAM"):
+        # natywnie nie ma ws-scrcpy (I24): ekran telefonu to scrcpy w osobnym oknie; proxy tylko z jawnym celem
+        # (Linux: `jarvo android on`), bez nasłuchu na porcie, którego nikt nie używa (W10)
+        _screen.error = "natywnie ekran telefonu pokazuje scrcpy w osobnym oknie (jarvo android on)"
+        return
     import socketserver
     import threading
 
-    class Server(socketserver.ThreadingTCPServer):
-        allow_reuse_address = True
-        daemon_threads = True
-
     try:
-        srv = Server((PREVIEW_BIND, SCREEN_PORT), _screen_handler())
+        srv = nasluch(socketserver.ThreadingTCPServer, PREVIEW_BIND, SCREEN_PORT, _screen_handler())
     except OSError as exc:
         _screen.error = f"port {SCREEN_PORT} zajęty ({exc.strerror})"
         return
-    _screen.server = srv
+    _screen.server, _screen.port = srv, srv.server_address[1]
     threading.Thread(target=srv.serve_forever, name="jarvo-android-screen", daemon=True).start()
 
 
@@ -1315,13 +1354,26 @@ async def android_screen():
     if not await asyncio.to_thread(_screen_online):
         raise HTTPException(503, "Telefon testowy jest wyłączony. Włącz go na serwerze: jarvo android on.")
     token = await asyncio.to_thread(core.link_for, core.LINKS_FILE, SCREEN_ROOT, time.time(), core.SCREEN_TTL)
-    return {"port": SCREEN_PORT, "path": f"/{token}/"}
+    return {"port": getattr(_screen, "port", None) or SCREEN_PORT, "path": f"/{token}/"}
 
 
-# ------------------------------------------------------ „Pokaż w folderze”: Eksplorator Windows (WSL)
-# Folder otwiera pomocnik na hoście (scripts/updater.py), bo tylko on ma explorer.exe. Dashboard
-# zostawia prośbę z samą ścieżką pliku; pomocnik sprawdza ją jeszcze raz po swojej stronie.
+# ------------------------------------------------------ „Pokaż w folderze”
+# Natywnie (W13) folder otwiera sam dashboard: Eksplorator z zaznaczonym plikiem (Windows), Finder (`open -R`, macOS),
+# menedżer plików z katalogiem (`xdg-open`, Linux z pulpitem); ścieżka po safe_path, program bez powłoki.
+# W kontenerze otwiera go pomocnik na hoście (scripts/updater.py), bo tylko on ma explorer.exe (WSL): dashboard
+# zostawia prośbę z samą ścieżką pliku, a pomocnik sprawdza ją jeszcze raz po swojej stronie.
 REVEAL_REQUEST = core.JARVO_DIR / "state" / "reveal-request"
+
+
+def _otworz_folder(polecenie: list[str] | str) -> None:
+    """Program menedżera plików bez czekania (explorer.exe kończy się kodem 1 także po sukcesie); wątek zbiera kod
+    wyjścia, żeby na POSIX nie zostawał proces zombie."""
+    import subprocess
+    import threading
+
+    proc = subprocess.Popen(polecenie, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL, close_fds=True)
+    threading.Thread(target=proc.wait, name="jarvo-folder", daemon=True).start()
 
 
 @router.post("/reveal")
@@ -1330,6 +1382,17 @@ async def reveal(request: Request):
     p = core.safe_path(str(body.get("path") or ""), ROOTS)
     if p is None:
         raise HTTPException(404, "Plik poza katalogami floty albo nie istnieje")
+    if NATYWNIE:
+        polecenie = core.polecenie_folderu(p)
+        if polecenie is None:
+            raise HTTPException(503, "Na tym komputerze nie ma pulpitu, więc folderu nie otworzę. Ścieżkę możesz "
+                                     "skopiować.")
+        try:
+            await asyncio.to_thread(_otworz_folder, polecenie)
+        except OSError as exc:
+            raise HTTPException(503, f"Nie udało się otworzyć folderu ({exc.__class__.__name__}). Ścieżkę możesz "
+                                     "skopiować.") from None
+        return JSONResponse({"ok": True}, status_code=202)
     host = _update_state()
     if not host.get("online") or not (host.get("host") or {}).get("explorer"):
         raise HTTPException(503, "Otwieranie folderu działa w lokalnej instalacji (WSL) z uruchomionym "
@@ -1343,15 +1406,16 @@ async def reveal(request: Request):
 
 @router.get("/host")
 async def host_info():
-    """Co umie host: otwieranie folderów (WSL), ścieżka danych po stronie Windows, port podglądu,
-    telefon testowy (włączony profil android i działające proxy ekranu), korzeń danych (`katalog_danych`, z „/”:
-    przeglądarka rozpoznaje po nim ścieżki floty w tekście, hq/web/src/07-sciezki.js)."""
+    """Co umie host: otwieranie folderów (natywnie sam dashboard, w kontenerze pomocnik w WSL), ścieżka danych po
+    stronie Windows, port podglądu, telefon testowy (włączony profil android i działające proxy ekranu), korzeń
+    danych (`katalog_danych`, z „/”: przeglądarka rozpoznaje po nim ścieżki floty w tekście, 07-sciezki.js)."""
     st = _update_state()
     h = st.get("host") or {}
     android = bool(getattr(_screen, "server", None)) and await asyncio.to_thread(_screen_online)
-    return {"explorer": bool(st.get("online") and h.get("explorer")), "data_win": h.get("data_win"),
+    folder = core.polecenie_folderu(HOME) is not None if NATYWNIE else bool(st.get("online") and h.get("explorer"))
+    return {"explorer": folder, "data_win": h.get("data_win"),
             "data_host": h.get("data_host"), "preview": bool(getattr(_preview, "server", None)),
-            "preview_port": PREVIEW_PORT, "android": android, "katalog_danych": sciezki.jako_tekst(HOME)}
+            "preview_port": _port_podgladu(), "android": android, "katalog_danych": sciezki.jako_tekst(HOME)}
 
 
 # --------------------------------------------------------------------------- czat
@@ -1388,7 +1452,7 @@ def _save_sessions(data: dict) -> None:
     SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = SESSIONS_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
-    tmp.replace(SESSIONS_FILE)
+    przenosne.zastap(tmp, SESSIONS_FILE)          # czytany równolegle przez inne trasy czatu (W08)
 
 
 async def _ensure_session(client: httpx.AsyncClient, name: str, base: str, key: str) -> str:
@@ -1802,7 +1866,7 @@ async def flota():
         raise HTTPException(503, "Figura floty niedostępna: brak iso.py w pluginie (przebuduj HQ).")
     if not getattr(_preview, "server", None):
         raise HTTPException(503, f"Podgląd stron nie działa: {_preview.error or 'serwer nie wystartował'}")
-    return {"port": PREVIEW_PORT, "path": FLOTA_PATH}
+    return {"port": _port_podgladu(), "path": FLOTA_PATH}
 
 
 @router.post("/chat/{name}/reset")

@@ -14,9 +14,10 @@ odczyty listy i osi idą przez `asyncio.to_thread` (krótkie połączenia tylko 
   sygnał zamknięcia od razu kończył otwarte strumienie SSE (`Hub.zamknij_wszystkie`); uvicorn czeka na otwarte
   odpowiedzi bez limitu. Wtyczki ładują się przy imporcie web_server, przed `capture_signals`, więc owinięta metoda
   trafia do `signal.signal`.
-- **Dziennik** `jarvo.hq`: stdout dashboardu (docker logs) i `/opt/data/logs/jarvo-hq.log` (5 × 2 MB, tryb 0600);
-  linie bez treści rozmów: wyjątki tylko nazwą typu, także nieodebrane wyjątki zadań pętli (własna obsługa
-  `loop.set_exception_handler` zamiast domyślnej, która wypisuje pełny tekst i ślad).
+- **Dziennik** `jarvo.hq`: stdout dashboardu (docker logs, natywnie plik logu panelu u nadzorcy) i
+  `<HERMES_HOME>/logs/jarvo-hq.log` (5 × 2 MB, tryb 0600, na Windows ACL właściciela i rotacja przez
+  ConcurrentRotatingFileHandler); linie bez treści rozmów: wyjątki tylko nazwą typu, także nieodebrane wyjątki zadań
+  pętli (własna obsługa `loop.set_exception_handler` zamiast domyślnej, która wypisuje pełny tekst i ślad).
 Wyłączenie (testy, diagnoza): `JARVO_HQ_SILNIK=0`.
 """
 
@@ -67,6 +68,19 @@ def _przenosne():
     return mod
 
 
+def _klasa_dziennika():
+    """Rotacja dziennika (docs/NATYWNIE.md W14): na Windows ConcurrentRotatingFileHandler z zależności Hermesa
+    (concurrent-log-handler, tylko win32, jak hermes_logging.py), bo zwykły os.rename przy rotacji pada na WinError 32,
+    gdy plik trzyma inny proces (`jarvo logs -f`, antywirus); bez tej paczki (i na POSIX) zwykły RotatingFileHandler."""
+    if os.name == "nt":
+        try:
+            from concurrent_log_handler import ConcurrentRotatingFileHandler  # noqa: PLC0415
+            return ConcurrentRotatingFileHandler
+        except ImportError:
+            pass
+    return logging.handlers.RotatingFileHandler
+
+
 def ustaw_dziennik(plik: Path | str | None) -> logging.Logger:
     """Logger `jarvo.hq`: stdout i plik rotowany (5 × 2 MB, 0600). Bez pliku, gdy katalogu nie da się utworzyć."""
     log = logging.getLogger("jarvo.hq")
@@ -86,8 +100,7 @@ def ustaw_dziennik(plik: Path | str | None) -> logging.Logger:
                 fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
                 os.close(fd)
             _przenosne().tryb_pliku(p, 0o600)            # na Windows ACL tylko dla właściciela
-            fh = logging.handlers.RotatingFileHandler(p, maxBytes=DZIENNIK_MAKS, backupCount=DZIENNIK_KOPIE,
-                                                      encoding="utf-8")
+            fh = _klasa_dziennika()(p, maxBytes=DZIENNIK_MAKS, backupCount=DZIENNIK_KOPIE, encoding="utf-8")
             fh.setFormatter(fmt)
             log.addHandler(fh)
         except OSError as exc:

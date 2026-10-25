@@ -91,8 +91,10 @@ function SekcjaKonto() {
     <${Wybor} etykieta=${T("szuflada.jezyk")} wartosc=${jezyk} onWybierz=${ustawJezyk} opcje=${[["pl", "Polski"], ["en", "English"]]}/>
     <p class="j-sz-uwaga">${T("szuflada.jezyk_opis")}</p>
     <div class="j-karta">
-      <${Wiersz} ikona="logout" tytul=${T("szuflada.wyloguj")} opis=${T("szuflada.wyloguj_opis")}>
-        <${Przycisk} maly data-akcja="wyloguj" onClick=${() => api.wyloguj()}>${T("szuflada.wyloguj")}</${Przycisk}></${Wiersz}>
+      ${bezLogowania()
+        ? html`<${Wiersz} ikona="logout" tytul=${T("szuflada.bez_logowania")} opis=${T("szuflada.bez_logowania_opis")}/>`
+        : html`<${Wiersz} ikona="logout" tytul=${T("szuflada.wyloguj")} opis=${T("szuflada.wyloguj_opis")}>
+          <${Przycisk} maly data-akcja="wyloguj" onClick=${() => api.wyloguj()}>${T("szuflada.wyloguj")}</${Przycisk}></${Wiersz}>`}
       <${Wiersz} ikona="ext" tytul=${T("szuflada.klasyczny")} opis=${T("szuflada.klasyczny_opis")}>
         <a class="j-btn j-btn-zwykly is-maly" data-akcja="klasyczny" href=${`${basePath()}/sessions`}>${T("ui.otworz")}</a></${Wiersz}>
       <${Wiersz} ikona="spark" tytul=${T("szuflada.wersja")} opis=${T("szuflada.wersja_opis")}>

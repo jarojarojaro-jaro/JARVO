@@ -4,14 +4,15 @@
   Klucz ma 20–300 znaków `[A-Za-z0-9_.-]`; inny kształt = nie zapisujemy.
 - **Sprawdzenie.** Jedno zapytanie do dostawcy (lista modeli albo opis klucza): 200 i 429 = klucz działa, 401/403 = zły,
   reszta (brak sieci, 5xx) = nie wiadomo, więc nie zapisujemy.
-- **Zapis.** Klucz idzie do głównego `.env` (`/opt/data/.env`, plik 600); share_keys.py rozdaje go agentom (wątek
-  wtyczki i jednorazowe `sync` od razu). Wartość klucza nie trafia do dziennika, odpowiedzi ani wyjątku.
+- **Zapis.** Klucz idzie do głównego `.env` (`<HERMES_HOME>/.env`, plik 600, na Windows ACL właściciela);
+  share_keys.py rozdaje go agentom (wątek wtyczki i jednorazowe `sync` od razu). Wartość klucza nie trafia do dziennika,
+  odpowiedzi ani wyjątku.
 - **Przełączenie floty.** Każdy profil floty (fleet.json wtyczki) dostaje zestaw dostawcy z `fleet.yaml` (`modele`):
   `model.provider/default` (poziom agenta), `delegation.provider/model` (poziom delegacji), model kompilacji skarbca
   (`auxiliary.jarvo_wiedza`) i `fallback_providers` zestawu (brak = bez zapasowego); profil główny dostaje model `fast`.
   ruamel zachowuje komentarze (bez ruamel PyYAML, jak fleetlib.rt_yaml); zapis atomowy.
-- **Trwałość.** Wybór ląduje w `/opt/data/jarvo/state/dostawca-modeli.json` razem z `JARVO_MODEL_PROVIDER` ostatniego
-  buildu (`nad`, z BUILD.json); build przy każdej aktualizacji stosuje go, dopóki jarvo.env się nie zmieni
+- **Trwałość.** Wybór ląduje w `<HERMES_HOME>/jarvo/state/dostawca-modeli.json` razem z `JARVO_MODEL_PROVIDER`
+  ostatniego buildu (`nad`, z BUILD.json); build przy każdej aktualizacji stosuje go, dopóki jarvo.env się nie zmieni
   (fleetlib.Fleet.apply_app_choice). Kalibracja SOUL pod rodzinę modelu dochodzi przy najbliższej aktualizacji.
 Testy: tests/test_mozg.py.
 """

@@ -249,10 +249,13 @@ const Os = (() => {
     return id;
   }
 
-  // zgoda: zdanie o ryzyku z klucza wzorca i opisu (jak przebiegi.ryzyko na serwerze), klucz tekstu `zgoda.r_*`
-  const RYZYKA = [[/rm\b|delet|remov|unlink|rmdir|shred/i, "usun"], [/sudo|root|chmod|chown|privileg/i, "admin"],
-    [/git.?push|force.?push|publish|deploy/i, "wysyla"], [/curl|wget|network|http|ssh|scp/i, "siec"],
-    [/kill|shutdown|reboot|systemctl/i, "restart"]];
+  // zgoda: zdanie o ryzyku z klucza wzorca i opisu (jak przebiegi.ryzyko na serwerze), klucz tekstu `zgoda.r_*`;
+  // natywnie także polecenia Windows i macOS oraz zapis pliku z wtyczki zgód (docs/NATYWNIE.md W17)
+  const RYZYKA = [[/rm\b|(?<!reg )(?<!reg\.exe )delet|remov|unlink|rmdir|shred|\bdel\b|\berase\b|\brd\s+\/s/i, "usun"],
+    [/sudo|root|chmod|chown|privileg|icacls|takeown|\breg(?:\.exe)?\s+(?:delete|add)\b|set-executionpolicy|runas|diskutil/i, "admin"],
+    [/git.?push|force.?push|publish|deploy/i, "wysyla"], [/curl|wget|network|http|ssh|scp|invoke-webrequest|\biwr\b/i, "siec"],
+    [/kill|shutdown|reboot|systemctl|stop-process|restart-computer|launchctl/i, "restart"],
+    [/:write_file:|:patch:|write_file|\bpatch\b/i, "zapis"]];
   function ryzyko(zgoda) {
     const t = `${(zgoda && zgoda.klucz_wzorca) || ""} ${(zgoda && zgoda.opis) || ""}`;
     const r = RYZYKA.find(([w]) => w.test(t));

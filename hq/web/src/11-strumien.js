@@ -8,6 +8,9 @@
 // błędem (odpowiedź inna niż 200) → sprawdzenie sesji: 401 = logowanie z zachowanym hashem, inaczej ponowienie po
 // 1, 2, 4, 8, 15 s i pasek „Połączenie przerwane” po 5 s. Migawki (GET z `seq`) nie rwą tekstu: ramki wątku z czasu
 // pobierania czekają w buforze i po migawce wchodzą tylko te o kursorze późniejszym niż jej `seq`.
+// Bez logowania (127.0.0.1, docs/NATYWNIE.md W11) EventSource nie wyśle nagłówka z tokenem sesji, a Hermes wpuszcza
+// wtedy /api/ tylko z nim: lider czyta ten sam strumień przez fetch (ZrodloFetch, ten sam interfejs); jego koniec
+// albo błąd sieci to readyState 2 i to samo ponowienie z ?od= co po zamkniętym EventSource.
 
 const WERSJA_PAKIETU = (() => {
   try {
@@ -15,6 +18,80 @@ const WERSJA_PAKIETU = (() => {
     return m ? m[1] : null;
   } catch (_) { return null; }
 })();
+
+// Strumień SSE przez fetch z nagłówkami panelu (authHeaders: token sesji i X-Jarvo-Request). Interfejs jak EventSource
+// w tym pliku: addEventListener(typ, f), onerror, readyState (0 łączy, 1 otwarty, 2 zamknięty), close(), do tego status
+// odpowiedzi; zdarzenie ma data i lastEventId (ostatnie id zostaje dla kolejnych zdarzeń bez id, jak w EventSource).
+// Parser: „event:”, „data:” (kilka wierszy łączy „\n”), „id:”; komentarze „:” i „retry:” pomijane, pusty wiersz kończy
+// zdarzenie. Koniec odpowiedzi, błąd sieci albo status inny niż 200 = readyState 2 i jedno onerror.
+class ZrodloFetch {
+  constructor(url) {
+    this.url = url;
+    this.readyState = 0;
+    this.status = 0;
+    this.onerror = null;
+    this.lastEventId = "";
+    this.sluchacze = new Map();
+    this.przerwij = new AbortController();
+    this.czytaj();
+  }
+
+  addEventListener(typ, f) {
+    if (!this.sluchacze.has(typ)) this.sluchacze.set(typ, []);
+    this.sluchacze.get(typ).push(f);
+  }
+
+  close() {
+    this.readyState = 2;
+    try { this.przerwij.abort(); } catch (_) { /* już przerwane */ }
+  }
+
+  koniec() {
+    if (this.readyState === 2) return;
+    this.close();
+    if (this.onerror) this.onerror({ type: "error" });
+  }
+
+  nadaj(typ, data) {
+    for (const f of this.sluchacze.get(typ) || []) f({ type: typ, data, lastEventId: this.lastEventId });
+  }
+
+  async czytaj() {
+    let r;
+    try {
+      r = await fetch(this.url, { credentials: "include", cache: "no-store", signal: this.przerwij.signal,
+        headers: authHeaders({ Accept: "text/event-stream" }) });
+    } catch (_) { this.koniec(); return; }
+    this.status = r.status;
+    if (!r.ok || !r.body || this.readyState === 2) { this.koniec(); return; }
+    this.readyState = 1;
+    const czytnik = r.body.getReader(), dek = new TextDecoder();
+    let bufor = "", typ = "", dane = [];
+    try {
+      for (;;) {
+        const { value, done } = await czytnik.read();
+        if (done) break;
+        bufor += dek.decode(value, { stream: true });
+        for (let i = bufor.indexOf("\n"); i >= 0; i = bufor.indexOf("\n")) {
+          const linia = bufor.slice(0, i).replace(/\r$/, "");
+          bufor = bufor.slice(i + 1);
+          if (!linia) {
+            if (dane.length) this.nadaj(typ || "message", dane.join("\n"));
+            typ = ""; dane = [];
+          } else if (linia[0] !== ":") {
+            const d = linia.indexOf(":");
+            const pole = d < 0 ? linia : linia.slice(0, d);
+            const wartosc = d < 0 ? "" : linia.slice(d + (linia[d + 1] === " " ? 2 : 1));
+            if (pole === "event") typ = wartosc;
+            else if (pole === "data") dane.push(wartosc);
+            else if (pole === "id" && !wartosc.includes("\0")) this.lastEventId = wartosc;
+          }
+        }
+      }
+    } catch (_) { /* przerwane: close() albo sieć */ }
+    this.koniec();
+  }
+}
 
 const Strumien = (() => {
   const ZDARZENIA = ["hello", "reset", "kursor", "watek.zmiana", "watek.usuniety", "watek.wpis", "watek.os", "przebieg.stan",
@@ -98,7 +175,8 @@ const Strumien = (() => {
     const watki = [...suma()].sort().slice(0, 200);
     wyslane = watki.join(",");
     const od = kursor ? `&od=${encodeURIComponent(kursor)}` : "";
-    const zrodlo = es = new EventSource(`${basePath()}${API_ROOT}/strumien?klient=${klient}&watki=${wyslane}${od}`);
+    const url = `${basePath()}${API_ROOT}/strumien?klient=${klient}&watki=${wyslane}${od}`;
+    const zrodlo = es = zTokenem() ? new ZrodloFetch(url) : new EventSource(url);
     for (const typ of ZDARZENIA) {
       zrodlo.addEventListener(typ, (e) => {
         if (zrodlo !== es) return;
@@ -124,7 +202,9 @@ const Strumien = (() => {
 
   async function sprawdz() {
     let status = 0;
-    try { status = (await fetch(`${basePath()}${API_ROOT}/update`, { credentials: "include", cache: "no-store" })).status; } catch (_) { /* sieć */ }
+    try {
+      status = (await fetch(`${basePath()}${API_ROOT}/update`, { credentials: "include", cache: "no-store", headers: authHeaders() })).status;
+    } catch (_) { /* sieć */ }
     if (!dziala || !lider) return;
     if (status === 401) { nadaj({ t: "wyloguj" }); naLogowanie(); return; }
     const s = PONOW_S[Math.min(proba++, PONOW_S.length - 1)];

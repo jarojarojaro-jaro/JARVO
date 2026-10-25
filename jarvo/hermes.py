@@ -32,7 +32,14 @@ vendor/natywne.yaml, czytany przez `manifest.hermes(app)`.
 `web_dist`    Front dashboardu z web/: `npm ci --ignore-scripts --no-audit --no-fund --include=dev` (package-lock.json
               z sumami integrity; --include=dev, bo odziedziczone NODE_ENV=production pomija tsc i vite, por.
               hermes_cli/main_web_build.py:317) i `npm run build` do hermes_cli/web_dist, cache npm w <cache>/npm.
-              Docelowo dist z łatkami Jarva zbuduje CI (I12, S12, P05); ta droga jest dla dewelopera i na zapas.
+              Potem `dist_jarva`: kopia w <program>/web-dist/<skrót> z łatkami Jarva (branding/patch_dashboard.py
+              --web --natywnie: tytuł i marka, powłoka /jarvo z przekierowaniem z „/”, polski, bez przycisku
+              „Update Hermes” i bez sprawdzania aktualizacji, H16) i to ją web_dist zwraca (HERMES_WEB_DIST panelu,
+              S12). hermes_cli/web_dist w checkoucie zostaje bez zmian, pliki Pythona Hermesa też. Skrót liczymy
+              z treści dista i plików brandingu: nowa wersja Jarva albo Hermesa = nowy katalog obok, a stary zostaje
+              dla działającego panelu do przełączenia current.json (c4). Łatka, która nie pasuje do dista (nowy układ
+              plików Hermesa), to ostrzeżenie i front bez brandingu: ścisłe wzory zatrzymują CI (test E2E panelu),
+              nie instalację u właściciela (S12). Docelowo gotowy dist z łatkami zbuduje CI (I12, P05).
 `konfiguracja_bezpieczna`  config.yaml w HERMES_HOME Jarva przez CLI Hermesa (`config get --json` i `config set`,
               hermes_cli/config.py:3479 i :3603). Klucze z f97608f (I13):
               - security.tirith_enabled: false (domyślne true, config_defaults.py:1753; czyta
@@ -80,6 +87,7 @@ zamek hermes.lock.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -103,6 +111,10 @@ from .sciezki import WINDOWS, Uklad
 
 ZNACZNIK = ".jarvo-hermes.json"          # w checkoucie: commit, dodatki i Python zainstalowanego venvu
 ZNACZNIK_WEB = ".jarvo-web-dist.json"    # w checkoucie: commit, z którego zbudowano hermes_cli/web_dist
+# kod tej wersji Jarva (branding/ z łatkami dista); bez resolve(), jak instalator: krótka nazwa 8.3 zostaje ASCII
+APP = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# pliki brandingu, od których zależy łatana kopia dista (patch_dashboard.py --web --natywnie); zmiana = nowy katalog
+PLIKI_BRANDINGU = ("patch_dashboard.py", "powloka.json", "powloka.js", "i18n/pl.json", "favicon.ico", "favicon.svg")
 # git: długie ścieżki i LF z repo na Windows; bez gc i maintenance w tle (trzymałyby pliki przy zmianie nazwy);
 # lowSpeed zrywa zastygłe pobieranie także w fetch i w leniwym dociąganiu blobów przy checkoucie (dzieci gita
 # dziedziczą -c przez GIT_CONFIG_PARAMETERS)
@@ -669,9 +681,10 @@ def _web_gotowy(checkout: Path, dist: Path, commit: str) -> bool:
             and (dist / "index.html").is_file())
 
 
-def web_dist(u: Uklad, checkout: Path, *, npm=None, log: Callable[[str], None] = print) -> Path:
-    """Buduje front dashboardu z `web/` do `hermes_cli/web_dist` i zwraca ten katalog (HERMES_WEB_DIST panelu).
-    Zbudowany front dla tego commitu (znacznik) = bez wywołań npm."""
+def web_dist(u: Uklad, checkout: Path, *, npm=None, log: Callable[[str], None] = print, jarva: bool = True) -> Path:
+    """Buduje front dashboardu z `web/` do `hermes_cli/web_dist` i zwraca katalog dla HERMES_WEB_DIST panelu: kopię
+    z łatkami Jarva (`dist_jarva`), a bez nich (`jarva=False` albo łatka nie pasuje) sam front Hermesa. Zbudowany
+    front dla tego commitu (znacznik) = bez wywołań npm."""
     checkout = Path(checkout)
     dist = checkout / "hermes_cli" / "web_dist"
     commit = srodowisko.wczytaj_json(checkout / ZNACZNIK).get("commit")
@@ -679,7 +692,7 @@ def web_dist(u: Uklad, checkout: Path, *, npm=None, log: Callable[[str], None] =
         raise BladHermesa(f"{checkout}: brak znacznika instalacji Hermesa ({ZNACZNIK}); najpierw zainstaluj().")
     if _web_gotowy(checkout, dist, commit):
         log(f"Hermes: front dashboardu już zbudowany ({dist})")
-        return dist
+        return dist_jarva(u, dist, log=log) if jarva else dist
     web = checkout / "web"
     if not (web / "package.json").is_file():
         raise BladHermesa(f"{checkout}: brak web/package.json, nie ma z czego zbudować frontu.")
@@ -704,7 +717,75 @@ def web_dist(u: Uklad, checkout: Path, *, npm=None, log: Callable[[str], None] =
         przenosne.zapisz_atomowo(checkout / ZNACZNIK_WEB, json.dumps(
             {"commit": commit, "zbudowano": _teraz()}, indent=2) + "\n")
     log(f"Hermes: front dashboardu gotowy ({dist})")
-    return dist
+    return dist_jarva(u, dist, log=log) if jarva else dist
+
+
+def _skrot_dista(dist: Path, brand: Path) -> str:
+    """sha256 treści dista (ścieżki względne z „/” i skróty plików, w stałej kolejności) i plików brandingu."""
+    h = hashlib.sha256(b"jarvo-dist/1\0")
+    pliki = sorted((p for p in dist.rglob("*") if p.is_file()), key=lambda p: p.relative_to(dist).as_posix())
+    for p in pliki:
+        h.update(p.relative_to(dist).as_posix().encode("utf-8") + b"\0" + hashlib.sha256(p.read_bytes()).digest())
+    for nazwa in PLIKI_BRANDINGU:
+        p = brand / nazwa
+        h.update(f"branding/{nazwa}\0".encode("utf-8") + (hashlib.sha256(p.read_bytes()).digest() if p.is_file() else b"-"))
+    return h.hexdigest()
+
+
+def _linia_latki(linia: str) -> bool:
+    """Wiersze „✓ …” i „· …” łatki zostają w ogonie (do komunikatu błędu), ale nie zasypują logu instalacji."""
+    return linia.lstrip().startswith(("✓", "·"))
+
+
+def dist_jarva(u: Uklad, dist: Path, *, brand: Path | None = None, log: Callable[[str], None] = print) -> Path:
+    """Kopia frontu `dist` z łatkami Jarva w `<program>/web-dist/<skrót>` (S12, H16; docstring modułu) i jej katalog;
+    obok `<skrót>.json` z opisem (poza katalogiem dista: dashboard podaje każdy plik dista pod `/`). Gotowa kopia
+    = bez łatania. Łatka, której nie ma albo która nie pasuje do dista = ostrzeżenie w logu i `dist` bez zmian."""
+    dist = Path(dist)
+    brand = Path(brand) if brand else APP / "branding"
+    latka = brand / "patch_dashboard.py"
+    if not latka.is_file():
+        log(f"Hermes: UWAGA: nie ma {latka}, więc panel dostaje front Hermesa bez brandingu Jarva.")
+        return dist
+    skrot = _skrot_dista(dist, brand)
+    katalog = u.program / "web-dist"
+    docelowy, opis = katalog / skrot[:16], katalog / f"{skrot[:16]}.json"
+
+    def gotowy() -> bool:
+        return (docelowy / "index.html").is_file() and srodowisko.wczytaj_json(opis).get("skrot") == skrot
+
+    if gotowy():
+        log(f"Hermes: front z łatkami Jarva już jest ({docelowy})")
+        return docelowy
+    with przenosne.Zamek(u.stan / "hermes.lock"):
+        if gotowy():                                   # drugi instalator skończył, gdy czekaliśmy
+            return docelowy
+        nowy = katalog / f"{skrot[:16]}.new"
+        for stary in (nowy, docelowy):                 # resztki przerwanej łatki albo kopia bez opisu: od nowa
+            if stary.exists():
+                _usun_drzewo(stary)
+        katalog.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(dist, nowy)
+        log("Hermes: łatki Jarva we froncie panelu (powłoka /jarvo, marka, polski, bez „Update Hermes”)…")
+        argv = [sys.executable, "-I", "-X", "utf8", str(latka), str(brand), "--web", str(nowy), "--natywnie"]
+        try:
+            kod, ogon = _strumien(argv, cwd=brand, env=_baza(), log=log, przemilcz=_linia_latki)
+        except BladHermesa as e:
+            kod, ogon = -1, [str(e)]
+        if kod:
+            try:
+                _usun_drzewo(nowy)
+            except OSError:
+                pass
+            log(f"Hermes: UWAGA: łatki Jarva nie pasują do frontu tej wersji Hermesa (kod {kod}). Panel działa z "
+                "frontem Hermesa bez brandingu, a jego przycisku „Update Hermes” nie używaj (zrywa przypiętą wersję; "
+                "Jarvo aktualizuje `jarvo update`). Ostatnie linie:\n" + _koncowka(*ogon))
+            return dist
+        _przenies(nowy, docelowy)
+        przenosne.zapisz_atomowo(opis, json.dumps({"skrot": skrot, "zrodlo": str(dist), "branding": str(brand),
+                                                   "zbudowano": _teraz()}, ensure_ascii=False, indent=2) + "\n")
+    log(f"Hermes: front z łatkami Jarva gotowy ({docelowy})")
+    return docelowy
 
 
 # --- konfiguracja ---------------------------------------------------------------------------------------------------

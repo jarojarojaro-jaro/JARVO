@@ -2,16 +2,20 @@
 // Odpal dla HTML, Otwórz w nowej karcie, Kopiuj obraz, Pokaż w folderze), ścieżka floty w tekście (klik = podgląd),
 // obraz z dysku floty w Markdownie i okno podglądu. Bezpieczeństwo (§16.4): blob tylko jako src obrazu, wideo i dźwięku
 // albo <a download>; SVG nigdy jako blob (<img> z adresem /file, który ma CSP sandbox); „Otwórz w nowej karcie” zawsze
-// na /file; PDF w <iframe sandbox> z /file, z linkiem zapasowym, gdy przeglądarka nie pokaże PDF w ramce.
+// na /file; PDF w <iframe sandbox> z /file, z linkiem zapasowym, gdy przeglądarka nie pokaże PDF w ramce. Bez logowania
+// (127.0.0.1, docs/NATYWNIE.md W11) /file nie dostanie tokenu sesji: SVG jako data:, a nowa karta i PDF przez link
+// podglądu :9120 (useSvgUrl, useAdresPliku, otworzPlik w 10-api.js); PDF z :9120 w ramce bez atrybutu sandbox, bo to
+// inne pochodzenie z CSP sandbox z serwera, a w ramce z sandbox Chrome nie uruchomi przeglądarki PDF.
 
 const jestSvg = (path) => /\.svg$/i.test(String(path || ""));
 const krotkaSciezka = (path) => Sciezki.krotka(path);
 
-// obraz z dysku floty: SVG z /file (bez bloba), reszta przez blob z autoryzacją (działa też bez logowania)
+// obraz z dysku floty: SVG z /file albo data: (bez bloba), reszta przez blob z autoryzacją (działa też bez logowania)
 function useObrazPliku(path) {
   const svg = jestSvg(path);
   const blob = useBlobUrl(path && !svg ? path : null);
-  return svg ? urlPliku(path) : blob;
+  const svgUrl = useSvgUrl(path && svg ? path : null);
+  return svg ? svgUrl : blob;
 }
 
 function SciezkaPliku({ sciezka, kod, children }) {
@@ -50,7 +54,7 @@ function akcjePliku(plik, host, uwaga) {
   if (plik.kind === "image" && !jestSvg(plik.path)) {
     p.push({ id: "obraz", ikona: "copy", tekst: T("plik.kopiuj_obraz"), akcja: wykonaj(() => copyImage(plik), T("plik.obraz_w_schowku")) });
   }
-  p.push({ id: "karta", ikona: "ext", tekst: T("plik.nowa_karta"), akcja: () => window.open(urlPliku(plik.path), "_blank", "noopener,noreferrer") });
+  p.push({ id: "karta", ikona: "ext", tekst: T("plik.nowa_karta"), akcja: wykonaj(() => otworzPlik(plik.path)) });
   if (host.explorer) p.push({ id: "folder", ikona: "folder", tekst: T("plik.w_folderze"), akcja: wykonaj(() => api.reveal(plik.path), T("plik.otwieram_folder")) });
   return p;
 }
@@ -105,6 +109,7 @@ function OknoPodgladu({ plik }) {
   const media = ["image", "video", "audio"].includes(plik.kind);
   const src = useObrazPliku(plik.kind === "image" ? plik.path : null);
   const blob = useBlobUrl(media && plik.kind !== "image" ? plik.path : null);
+  const pdf = useAdresPliku(plik.kind === "pdf" ? plik.path : null);
   const [tekst, setTekst] = useState(null);
   const [blad, setBlad] = useState(false);
   useEffect(() => {
@@ -123,8 +128,11 @@ function OknoPodgladu({ plik }) {
   else if (plik.kind === "video") tresc = blob ? html`<video class="j-podglad-obraz" src=${blob} controls playsinline></video>` : html`<${Spinner}/>`;
   else if (plik.kind === "audio") tresc = blob ? html`<audio class="j-podglad-audio" src=${blob} controls></audio>` : html`<${Spinner}/>`;
   else if (plik.kind === "pdf") {
-    tresc = html`<iframe class="j-podglad-pdf" sandbox="" src=${urlPliku(plik.path)} title=${plik.name} referrerpolicy="no-referrer"></iframe>
-      <p class="j-podglad-uwaga">${T("plik.pdf_zapas")} <a class="j-link" href=${urlPliku(plik.path)} target="_blank" rel="noopener noreferrer">${T("plik.nowa_karta")}</a></p>`;
+    // /file (to samo pochodzenie co panel) tylko w <iframe sandbox>; link podglądu :9120 to inne pochodzenie z CSP
+    // sandbox z serwera, więc ramka bez atrybutu sandbox (z nim Chrome blokuje przeglądarkę PDF w każdej ramce)
+    tresc = pdf ? html`<iframe class="j-podglad-pdf" sandbox=${zTokenem() ? undefined : ""} src=${pdf} title=${plik.name} referrerpolicy="no-referrer"></iframe>
+      <p class="j-podglad-uwaga">${T("plik.pdf_zapas")} <a class="j-link" href=${pdf} target="_blank" rel="noopener noreferrer">${T("plik.nowa_karta")}</a></p>`
+      : pdf === false ? html`<p class="j-podglad-uwaga">${T("plik.nie_wczytano")}</p>` : html`<${Spinner}/>`;
   } else if (plik.kind === "text" || plik.kind === "html") {
     tresc = blad ? html`<p class="j-podglad-uwaga">${T("plik.nie_wczytano")}</p>`
       : html`<pre class="j-podglad-tekst" tabIndex="0">${tekst == null ? T("plik.wczytuje") : tekst}</pre>`;

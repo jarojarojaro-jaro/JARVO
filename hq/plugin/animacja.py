@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -136,8 +137,23 @@ def zapisz(anim: Path, wartosci: dict) -> list[dict]:
             surowe["wartosc"] = nowe[surowe["klucz"]]
     tmp = f.with_name(f".{f.name}.part")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
-    tmp.replace(f)
+    _zastap(tmp, f)
     return schemat(data)
+
+
+def _zastap(tmp: Path, cel: Path, proby: int = 40) -> None:
+    """os.replace z ponawianiem na Windows (docs/NATYWNIE.md W08): parametry.json czyta w tej chwili strona animacji
+    z serwera podglądu albo Wideograf, a czytany plik nie da się tam podmienić (WinError 5/32)."""
+    import time
+
+    for proba in range(proby):
+        try:
+            os.replace(tmp, cel)
+            return
+        except PermissionError:
+            if os.name != "nt" or proba == proby - 1:
+                raise
+            time.sleep(0.05)
 
 
 def _pomiar_mod():

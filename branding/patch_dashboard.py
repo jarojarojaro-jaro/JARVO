@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Branding Jarvo w statycznych zasobach dashboardu Hermesa (uruchamiane przy budowie obrazu).
+"""Branding Jarvo w statycznych zasobach dashboardu Hermesa (budowa obrazu i instalacja natywna).
 
-    python3 patch_dashboard.py <katalog-z-favicon>
+    python3 patch_dashboard.py <katalog-z-favicon>                              # obraz: /opt/hermes
+    python3 patch_dashboard.py <katalog-z-favicon> --web <dist> --natywnie      # instalacja natywna: kopia dista
 
 Zmienia teksty i ikony widoczne dla użytkownika (tytuł karty, logo w menu, nazwę marki, etykiety motywów,
 stronę logowania) i zakłada powłokę /jarvo (branding/powloka.json, docs/HQ.md „Powłoka”): Jarvo pierwszy w menu,
@@ -14,10 +15,20 @@ czego nie znalazła. Powłoka jest ścisła: każdy wzór z powloka.json musi tr
 inaczej skrypt kończy się kodem 1 i budowa obrazu staje (tak samo brak tytułu karty).
 
     JARVO_HERMES_DIR=<katalog>   inny katalog Hermesa niż /opt/hermes (testy na dist z próbki)
+    --web <dist>                 łata tylko ten katalog dista (instalacja natywna: kopia web_dist w
+                                 <program>/web-dist/, jarvo/hermes.py; docs/NATYWNIE.md S12, I12). Pliki Pythona
+                                 Hermesa (strona logowania, motywy na serwerze, klucz jednorazowy) zostają bez zmian,
+                                 więc checkout Hermesa jest czysty: na 127.0.0.1 nie ma logowania (I11), a w trybie
+                                 LAN logowanie daje dostawca Hermesa.
+    --natywnie                   także grupa „natywnie” z powloka.json, tak samo ściśle: bez przycisku „Update
+                                 Hermes” i bez sprawdzania aktualizacji w panelu (H16: `hermes update` zerwałby pin
+                                 z vendor/natywne.yaml; Jarvo aktualizuje `jarvo update`). W kontenerze Hermes sam
+                                 chowa ten przycisk (aktualizację robi obraz).
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -94,11 +105,12 @@ def powloka_css(dane: dict) -> str:
             .replace("@@EMBED@@", ",\n".join(f"html[data-jarvo-embed] {x}" for x in sel)))
 
 
-def patch_powloka(assets: list[Path], index: Path, brand: Path) -> int:
-    """Powłoka /jarvo: menu, przekierowania i dowody selektorów w dist (ściśle), CSS i skrypt w index.html (raz)."""
+def patch_powloka(assets: list[Path], index: Path, brand: Path, natywnie: bool = False) -> int:
+    """Powłoka /jarvo: menu, przekierowania i dowody selektorów w dist (ściśle), CSS i skrypt w index.html (raz).
+    `natywnie`: także grupa „natywnie” (instalacja bez kontenera: bez aktualizacji Hermesa z panelu, H16)."""
     dane = json.loads((brand / "powloka.json").read_text(encoding="utf-8"))
     n = 0
-    for w in dane["js"]:
+    for w in dane["js"] + ((dane.get("natywnie") or []) if natywnie else []):
         n += sub_exact(assets, w["wzor"], w["zamiana"], w["ile"], f"powłoka: {w['nazwa']}", w.get("gotowe"))
     teksty = [f.read_text(encoding="utf-8") for f in assets]
     for c in dane["css"]:
@@ -436,15 +448,31 @@ def patch_klucz(basic: Path) -> None:
               1, "logowanie: klucz jednorazowy zamiast hasła", gotowe=r"if _jarvo_klucz\(password\)")
 
 
+def _argumenty(argv: list[str]) -> argparse.Namespace:
+    ap = argparse.ArgumentParser(prog="patch_dashboard.py", description="Branding Jarvo w dashboardzie Hermesa.")
+    ap.add_argument("brand", help="katalog brandingu (favicon, powloka.json, powloka.js, i18n/pl.json)")
+    ap.add_argument("--web", metavar="DIST", help="łatany katalog dista (kopia web_dist); bez plików Pythona Hermesa")
+    ap.add_argument("--natywnie", action="store_true",
+                    help="instalacja natywna: także grupa „natywnie” z powloka.json (bez aktualizacji Hermesa z panelu)")
+    return ap.parse_args(argv)
+
+
 def main(argv: list[str]) -> int:
-    brand = Path(argv[0])
-    for d in (WEB, HERMES / "web" / "public"):
+    global HERMES, WEB
+    a = _argumenty(argv)
+    brand = Path(a.brand)
+    if a.web:
+        HERMES, WEB = None, Path(a.web)               # tylko dist: checkout Hermesa zostaje bez zmian
+        if not (WEB / "index.html").is_file():
+            print(f"Nie ma {WEB / 'index.html'} (zbuduj front dashboardu)", file=sys.stderr)
+            return 1
+    for d in (WEB, HERMES / "web" / "public") if HERMES is not None else (WEB,):
         if d.is_dir():
             for name in ("favicon.ico", "favicon.svg"):
                 shutil.copy(brand / name, d / name)
     assets = sorted((WEB / "assets").glob("*.js"))
     index = [WEB / "index.html"]
-    print("Branding Jarvo w dashboardzie:")
+    print("Branding Jarvo w dashboardzie:" + (" (instalacja natywna)" if a.natywnie else ""))
     if not sub_all(index, r"<title>[^<]*</title>", "<title>Jarvo</title>", "tytuł karty"):
         print("Nie znaleziono <title> w index.html", file=sys.stderr)
         return 1
@@ -452,14 +480,18 @@ def main(argv: list[str]) -> int:
     # logo w menu: dwie linie "Hermes" / "Agent" → jedno słowo "Jarvo"
     sub_all(assets, r"children:\[`Hermes`,(\(0,[\w$]+\.jsx\)\(`br`,\{\}\)),`Agent`\]",
             r"children:[`Jarvo`]", "logo w menu")
-    # powłoka /jarvo: zakładka Jarvo w głównym menu nad CHAT (nie w sekcji „Plugins”), przekierowania, index.html
-    patch_powloka(assets, index[0], brand)
+    # powłoka /jarvo: zakładka Jarvo w głównym menu nad CHAT (nie w sekcji „Plugins”), przekierowania, index.html;
+    # natywnie bez przycisku „Update Hermes” i bez sprawdzania aktualizacji (H16)
+    patch_powloka(assets, index[0], brand, natywnie=a.natywnie)
     sub_all(assets, r"brand:`Hermes Agent`,brandShort:`HA`", "brand:`Jarvo`,brandShort:`J`", "nazwa marki (i18n)")
     sub_all(assets, r"label:`Hermes Teal", "label:`Jarvo Teal", "etykiety motywów")
     # stopka menu: marka Jarvo i silnik (Hermes Agent, MIT) zamiast nazwy firmy Nous Research (wszystkie języki)
     sub_all(assets, r"footer:\{org:`Nous Research`\}", "footer:{org:`Jarvo · Hermes Agent`}", "stopka menu")
     add_polish(assets, index[0], brand / "i18n" / "pl.json")
     patch_sessions(assets)
+    if HERMES is None:                                # --web: bez plików Pythona (S12)
+        bust_cache(WEB / "assets", WEB / "index.html")
+        return 0
     themes = HERMES / "hermes_cli" / "web_server_dashboard.py"
     if themes.is_file():
         sub_all([themes], r'"label": "Hermes Teal', '"label": "Jarvo Teal', "etykiety motywów (serwer)")

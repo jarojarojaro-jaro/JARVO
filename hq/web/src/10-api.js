@@ -214,12 +214,29 @@ class BladApi extends Error {
   }
 }
 
+// Panel bez logowania (instalacja natywna na 127.0.0.1, docs/NATYWNIE.md I11): Hermes nie ma wtedy strony logowania,
+// tylko wstrzykuje token sesji do index.html, a token żyje tyle, co proces dashboardu.
+const bezLogowania = () => window.__HERMES_AUTH_REQUIRED__ === false;
+const KLUCZ_ODSWIEZENIA = "jarvo.odswiezenie_401";
+
 // 401: sesja wygasła albo wylogowano w innej karcie. Hash zostaje w sessionStorage i wraca po zalogowaniu.
 // Tylko jedno przejście: kilka zapytań z 401 naraz (lista, strumień, subskrypcje) dałoby kilka location.assign,
 // a każde następne przerywa poprzednie; powrót z bfcache (pageshow) znów pozwala przejść.
+// Bez logowania 401 znaczy, że panel wstał od nowa z nowym tokenem: świeża strona go ma, więc przeładowanie /jarvo
+// (hash wraca z sessionStorage); najwyżej raz na 20 s, żeby 401 z innej przyczyny nie kręciło stroną w kółko (W11).
 let wLogowaniu = false;
 function naLogowanie() {
   if (wLogowaniu) return;
+  if (bezLogowania()) {
+    let ostatnie = 0;
+    try { ostatnie = Number(sessionStorage.getItem(KLUCZ_ODSWIEZENIA)) || 0; } catch (_) { /* tryb prywatny */ }
+    if (Date.now() - ostatnie < 20000) return;
+    try { sessionStorage.setItem(KLUCZ_ODSWIEZENIA, String(Date.now())); } catch (_) { /* jw. */ }
+    wLogowaniu = true;
+    Trasa.zapamietaj();
+    location.replace(`${basePath()}/jarvo`);
+    return;
+  }
   wLogowaniu = true;
   Trasa.zapamietaj();
   location.assign(`${basePath()}/login?next=${encodeURIComponent(basePath() + "/jarvo")}`);
@@ -330,8 +347,10 @@ Object.assign(liveApi, {
   glosPrzygotuj: (cialo) => zadanie("POST", "/app/glos/przygotuj", cialo),
   subskrypcje: (klient, cialo) => zadanie("POST", `/strumien/${kodujUrl(klient)}/subskrypcje`, cialo),
   // jak AuthWidget Hermesa: POST /auth/logout; pozostałe karty dostają „wyloguj” przez BroadcastChannel i idą na
-  // logowanie z next=/jarvo (hash zostaje w sessionStorage każdej karty), ta karta też
+  // logowanie z next=/jarvo (hash zostaje w sessionStorage każdej karty), ta karta też. Bez logowania (127.0.0.1) nie
+  // ma z czego się wylogować: szuflada nie pokazuje wtedy przycisku, a wywołanie nic nie robi.
   async wyloguj() {
+    if (bezLogowania()) return;
     try { await fetch(`${basePath()}/auth/logout`, { method: "POST", credentials: "include" }); } catch (_) { /* i tak na logowanie */ }
     try { const k = new BroadcastChannel("jarvo"); k.postMessage({ t: "wyloguj" }); k.close(); } catch (_) { /* bez kanału: karty pójdą na 401 */ }
     naLogowanie();
@@ -388,8 +407,7 @@ async function openTokenLink(get) {
   const w = window.open("", "_blank");
   if (w) { w.opener = null; w.document.title = "Uruchamiam…"; }
   try {
-    const r = await get();
-    const url = r.url || `${location.protocol}//${location.hostname}:${r.port}${r.path}`;
+    const url = adresPodgladu(await get());
     if (w) w.location.href = url; else window.open(url, "_blank", "noopener");
   } catch (e) {
     if (w) w.close();
@@ -413,6 +431,59 @@ function pobierzBlob(b, nazwa) {
 // adres pliku floty na /file (CSP sandbox, nosniff, HTML jako tekst): „Otwórz w nowej karcie”, SVG w <img>, PDF
 // w <iframe sandbox>. Dashboard z logowaniem rozpoznaje sesję po ciasteczku, więc zwykły adres działa.
 const urlPliku = (path, pobierz) => `${basePath()}${API_ROOT}/file?path=${encodeURIComponent(path)}${pobierz ? "&download=1" : ""}`;
+
+// Bez logowania (127.0.0.1, docs/NATYWNIE.md W11) /api/ wpuszcza tylko z nagłówkiem tokenu sesji, a <img>, <iframe>
+// i nowa karta go nie wyślą. Wtedy SVG idzie jako data: (otwarty osobno ma nieprzezroczyste pochodzenie; blob miałby
+// pochodzenie panelu i jego skrypty działałyby w sesji), a nowa karta i PDF przez link podglądu :9120 (CSP sandbox,
+// osobny port, jak „Odpal”). Z logowaniem (ciasteczko) wszystko zostaje na /file.
+const zTokenem = () => !!window.__HERMES_SESSION_TOKEN__;
+
+function adresPodgladu(r) {
+  return r.url || `${location.protocol}//${location.hostname}:${r.port}${r.path}`;
+}
+
+async function svgDataUrl(path) {
+  const b = await api.fileBlob(path);
+  return new Promise((ok, bad) => {
+    const r = new FileReader();
+    r.onload = () => ok(r.result);
+    r.onerror = bad;
+    r.readAsDataURL(new Blob([b], { type: "image/svg+xml" }));
+  });
+}
+
+// adres obrazu SVG z dysku floty do <img>: /file albo (bez logowania) data:
+function useSvgUrl(path) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    if (!path) return undefined;
+    if (!zTokenem()) { setUrl(urlPliku(path)); return undefined; }
+    let alive = true;
+    svgDataUrl(path).then((u) => alive && setUrl(u), () => alive && setUrl(null));
+    return () => { alive = false; };
+  }, [path]);
+  return url;
+}
+
+// adres pliku do ramki i linku „w nowej karcie”: /file albo (bez logowania) link podglądu :9120; null = jeszcze nie
+// ma, false = nie da się (podgląd stron nie działa)
+function useAdresPliku(path) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    if (!path) return undefined;
+    if (!zTokenem()) { setUrl(urlPliku(path)); return undefined; }
+    let alive = true;
+    api.site(path).then((r) => alive && setUrl(adresPodgladu(r)), () => alive && setUrl(false));
+    return () => { alive = false; };
+  }, [path]);
+  return url;
+}
+
+// „Otwórz w nowej karcie”: /file albo (bez logowania) link podglądu :9120 w karcie odciętej od panelu
+function otworzPlik(path) {
+  if (!zTokenem()) { window.open(urlPliku(path), "_blank", "noopener,noreferrer"); return Promise.resolve(); }
+  return openTokenLink(() => api.site(path));
+}
 
 // Ścieżka do wklejenia w Eksploratorze/terminalu: po stronie Windows (WSL), hosta albo kontenera; w instalacji
 // natywnej ścieżka na tym komputerze (stare /opt/data/… pod faktycznym korzeniem, na dysku Windows z „\”).

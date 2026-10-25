@@ -906,3 +906,233 @@ def test_updater_heartbeat_and_timeout(tmp_path, monkeypatch):
     assert final["state"] == "failed" and "Przerwano" in final["log"]
     assert any(w.get("beat") for w in writes)                    # znak życia bez nowych linii logu
     assert writes[-1]["state"] == "failed"                       # ostatni zapis to wynik, nie „updating”
+
+
+# ------------------------------------------------------------ instalacja natywna: panel (docs/NATYWNIE.md E6)
+
+def test_nazwa_pliku_z_przegladarki_bez_nazw_urzadzen_i_w_nfc():
+    """W18: nazwa urządzenia Windows (także z rozszerzeniem, przed pierwszą kropką) dostaje „_”, reszta bez zmian;
+    nazwa z macOS (litery z ogonkami rozłożone, NFD) wraca jako NFC, a nie z podkreśleniami zamiast znaków łączących."""
+    assert core.safe_upload_name("CON") == "_CON"
+    assert core.safe_upload_name("nul.txt") == "_nul.txt"
+    assert core.safe_upload_name("com1.tar.gz") == "_com1.tar.gz"
+    assert core.safe_upload_name("LPT9.PDF") == "_LPT9.pdf"
+    assert core.safe_upload_name("Aux") == "_Aux"
+    for zwykla in ("console.txt", "conan.png", "nule.txt", "com10.txt", "raport-con.txt"):
+        assert core.safe_upload_name(zwykla) == zwykla
+    assert core.safe_upload_name("Z\u0307o\u0301\u0142c\u0301.png") == "Żółć.png"
+    assert core.safe_upload_name("../../CON.json") == "_CON.json"
+
+
+@pytest.mark.parametrize("system,env,which,oczekiwane", [
+    ("win32", {"SystemRoot": "C:\\Windows"}, None,
+     '"C:\\Windows\\explorer.exe" /select,"D:\\Dane\\Michał Żółć\\raport strony.pdf"'),
+    ("win32", {}, None, '"C:\\Windows\\explorer.exe" /select,"D:\\Dane\\Michał Żółć\\raport strony.pdf"'),
+    ("darwin", {}, None, ["/usr/bin/open", "-R", "D:/Dane/Michał Żółć/raport strony.pdf"]),
+    ("linux", {"DISPLAY": ":0"}, "/usr/bin/xdg-open", ["/usr/bin/xdg-open", str(Path("D:/Dane/Michał Żółć"))]),
+    ("linux", {"WAYLAND_DISPLAY": "wayland-0"}, "/usr/bin/xdg-open",
+     ["/usr/bin/xdg-open", str(Path("D:/Dane/Michał Żółć"))]),
+    ("linux", {}, "/usr/bin/xdg-open", None),                      # serwer bez pulpitu
+    ("linux", {"DISPLAY": ":0"}, None, None),                      # bez xdg-open
+])
+def test_pokaz_w_folderze_polecenie_per_system(system, env, which, oczekiwane):
+    """W13: Eksplorator z zaznaczonym plikiem (napis linii poleceń, ścieżka z „\\” w cudzysłowie), Finder `open -R`,
+    xdg-open katalogu tylko na pulpicie."""
+    wynik = core.polecenie_folderu("D:/Dane/Michał Żółć/raport strony.pdf", system=system, env=env,
+                                   which=lambda _n: which)
+    assert wynik == oczekiwane
+
+
+def test_pokaz_w_folderze_odrzuca_znaki_spoza_sciezki():
+    for zla in ('D:/a"b.txt', "D:/a\nb.txt", ""):
+        assert core.polecenie_folderu(zla, system="win32", env={}) is None
+
+
+def test_typy_plikow_podgladu_z_jawnej_mapy(monkeypatch):
+    """W10: rejestr Windows potrafi podać .js jako text/plain (moduły ES wtedy nie ruszają): typ z jawnej mapy."""
+    import mimetypes
+    monkeypatch.setattr(mimetypes, "guess_type", lambda *a, **k: ("text/plain", None))
+    assert core.typ_pliku("app.js") == "text/javascript; charset=utf-8"
+    assert core.typ_pliku("modul.MJS") == "text/javascript; charset=utf-8"
+    assert core.typ_pliku("logo.svg") == "image/svg+xml; charset=utf-8"
+    assert core.typ_pliku("dane.json") == "application/json; charset=utf-8"
+    assert core.typ_pliku("zdjecie.PNG") == "image/png"
+    assert core.typ_pliku("film.mov") == "video/quicktime"
+    assert core.typ_pliku("silnik.wasm") == "application/wasm"
+    assert core.typ_pliku("kroj.woff2") == "font/woff2"
+    assert core.typ_pliku("raport.pdf") == "application/pdf"
+    monkeypatch.setattr(mimetypes, "guess_type", lambda *a, **k: (None, None))
+    assert core.typ_pliku("plik.nieznane") == "application/octet-stream"
+
+
+def test_instalacja_natywna_po_jarvo_root():
+    assert core.natywnie({"JARVO_ROOT": "D:/Jarvo"}) and core.natywnie({"JARVO_ROOT": "/home/x/.jarvo"})
+    assert not core.natywnie({}) and not core.natywnie({"JARVO_ROOT": "  "})
+
+
+def _wolny_port() -> int:
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+@pytest.fixture
+def api_natywnie(tmp_path, monkeypatch):
+    """plugin_api w instalacji natywnej (JARVO_ROOT): podgląd na wolnym porcie, bez celu ekranu telefonu."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    dane = tmp_path / "dane"
+    (dane / "jarvo" / "workspaces").mkdir(parents=True)
+    port = _wolny_port()
+    monkeypatch.setenv("HERMES_HOME", str(dane))
+    monkeypatch.setenv("JARVO_ROOT", str(tmp_path))
+    monkeypatch.setenv("JARVO_PREVIEW_PORT", str(port))
+    monkeypatch.setenv("JARVO_ANDROID_SCREEN_PORT", str(_wolny_port()))
+    monkeypatch.setenv("JARVO_SHARE_KEYS", "0")
+    for zmienna in ("JARVO_PREVIEW_BIND", "JARVO_PREVIEW_URL", "JARVO_ANDROID_SCREEN_UPSTREAM", "JARVO_DATA_DIR"):
+        monkeypatch.delenv(zmienna, raising=False)
+    for modul in ("jarvo_hq_preview_state", "jarvo_hq_screen_state"):
+        monkeypatch.delitem(sys.modules, modul, raising=False)
+    api = load_script("hq/plugin/plugin_api.py", "jarvo_hq_plugin_api_natywnie")
+    yield api, dane, port
+    for stan in (api._preview, api._screen):
+        srv = getattr(stan, "server", None)
+        if srv is not None:
+            srv.shutdown()
+            srv.server_close()
+
+
+def test_podglad_natywnie_tylko_na_127_i_bez_proxy_ekranu(api_natywnie):
+    """W10: natywnie (każdy system) podgląd słucha tylko na 127.0.0.1, preview.json podaje 127.0.0.1 (localhost bywa
+    najpierw ::1), a proxy ekranu telefonu (ws-scrcpy) bez jawnego celu nie startuje."""
+    import urllib.request
+    api, dane, port = api_natywnie
+    assert api.NATYWNIE and api.PREVIEW_BIND == "127.0.0.1"
+    assert api._preview.server.server_address[0] == "127.0.0.1" and api._port_podgladu() == port
+    info = json.loads((dane / "jarvo" / "state" / "preview.json").read_text(encoding="utf-8"))
+    assert info["url"] == f"http://127.0.0.1:{port}" and info["port"] == port
+    assert getattr(api._screen, "server", None) is None and "scrcpy" in api._screen.error
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/_jarvo/most.js", timeout=10) as r:   # noqa: S310
+        assert r.headers["Content-Type"] == "text/javascript; charset=utf-8"
+
+
+@pytest.mark.windows_only
+def test_podglad_na_windows_bez_przejecia_portu(api_natywnie):
+    """W10: SO_EXCLUSIVEADDRUSE zamiast SO_REUSEADDR: drugi proces z SO_REUSEADDR nie przypnie się do portu podglądu."""
+    import socket
+    api, _dane, port = api_natywnie
+    s = socket.socket()
+    try:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        with pytest.raises(OSError):
+            s.bind(("127.0.0.1", port))
+    finally:
+        s.close()
+
+
+@pytest.mark.windows_only
+def test_podglad_na_windows_port_zastepczy_przy_10013(monkeypatch):
+    """W10: port w zakresie zarezerwowanym przez Hyper-V (WinError 10013) = port od systemu; inny błąd idzie dalej."""
+    pytest.importorskip("fastapi")
+    monkeypatch.setenv("JARVO_PREVIEW_PORT", "0")
+    api = load_script("hq/plugin/plugin_api.py", "jarvo_hq_plugin_api_10013")
+    porty = []
+
+    class Baza:
+        def __init__(self, adres, handler):
+            porty.append(adres[1])
+            if adres[1]:
+                raise PermissionError(13, "zarezerwowany", None, 10013)
+            self.server_address = (adres[0], 55555)
+
+    srv = api.nasluch(Baza, "127.0.0.1", 9120, None)
+    assert porty == [9120, 0] and srv.server_address[1] == 55555
+
+    class Inny(Baza):
+        def __init__(self, adres, handler):
+            raise PermissionError(13, "odmowa", None, 5)
+
+    with pytest.raises(PermissionError):
+        api.nasluch(Inny, "127.0.0.1", 9120, None)
+
+
+def test_pokaz_w_folderze_natywnie_z_dashboardu(api_natywnie, monkeypatch):
+    """W13: natywnie folder otwiera sam dashboard (bez pomocnika hosta), tylko plik z katalogów floty; /host mówi,
+    czy ten komputer to umie (np. Linux bez pulpitu: nie, i wtedy 503 z radą)."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    api, dane, _port = api_natywnie
+    plik = dane / "jarvo" / "workspaces" / "jarvo-web" / "out" / "raport strony.pdf"
+    plik.parent.mkdir(parents=True)
+    plik.write_bytes(b"%PDF-1.4\n")
+    otwarte = []
+    monkeypatch.setattr(api, "_otworz_folder", otwarte.append)
+    monkeypatch.setattr(api.core, "polecenie_folderu", lambda p, **k: ["menedzer", str(p)])
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api/plugins/jarvo-hq")
+    k = TestClient(app, headers={"X-Jarvo-Request": "1"})
+    assert k.get("/api/plugins/jarvo-hq/host").json()["explorer"] is True
+    r = k.post("/api/plugins/jarvo-hq/reveal", json={"path": plik.as_posix()})
+    assert r.status_code == 202 and otwarte == [["menedzer", str(plik.resolve())]]
+    assert k.post("/api/plugins/jarvo-hq/reveal", json={"path": str(dane / "config.yaml")}).status_code == 404
+    assert not api.REVEAL_REQUEST.exists()                    # bez prośby do pomocnika hosta
+    monkeypatch.setattr(api.core, "polecenie_folderu", lambda p, **k: None)
+    assert k.get("/api/plugins/jarvo-hq/host").json()["explorer"] is False
+    r = k.post("/api/plugins/jarvo-hq/reveal", json={"path": plik.as_posix()})
+    assert r.status_code == 503 and "skopiować" in r.json()["detail"]
+    assert len(otwarte) == 1
+
+
+def test_link_podgladu_koduje_nazwe_pliku(api_natywnie):
+    """„Odpal” i nowa karta (bez logowania przez :9120): nazwa z „#”, „?”, „%” i spacją jest jednym adresem."""
+    import urllib.request
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    api, dane, port = api_natywnie
+    plik = dane / "jarvo" / "workspaces" / "jarvo-web" / "raport #1 50% ę.html"
+    plik.parent.mkdir(parents=True, exist_ok=True)
+    plik.write_text("<h1>Raport</h1>", encoding="utf-8")
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api/plugins/jarvo-hq")
+    k = TestClient(app, headers={"X-Jarvo-Request": "1"})
+    r = k.post("/api/plugins/jarvo-hq/site", json={"path": plik.as_posix()})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["port"] == port and "#" not in d["path"] and " " not in d["path"] and d["path"].endswith("%C4%99.html")
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}{d['path']}", timeout=10) as odp:   # noqa: S310
+        assert odp.read() == b"<h1>Raport</h1>" and odp.headers["Content-Type"] == "text/html; charset=utf-8"
+
+
+def test_dziennik_hq_rotacja_miedzy_procesami_na_windows(monkeypatch):
+    """W14: na Windows jarvo-hq.log rotuje ConcurrentRotatingFileHandler (zależność Hermesa na win32), bo zwykła
+    zmiana nazwy pada, gdy plik trzyma inny proces; bez tej paczki i na POSIX zwykły RotatingFileHandler."""
+    import logging.handlers
+    import types
+    sil = load_script("hq/plugin/silnik.py", "jarvo_hq_silnik_dziennik")
+
+    class Wspolny(logging.handlers.RotatingFileHandler):
+        pass
+    monkeypatch.setitem(sys.modules, "concurrent_log_handler",
+                        types.SimpleNamespace(ConcurrentRotatingFileHandler=Wspolny))
+    assert sil._klasa_dziennika() is (Wspolny if os.name == "nt" else logging.handlers.RotatingFileHandler)
+    monkeypatch.setitem(sys.modules, "concurrent_log_handler", None)          # brak paczki: import się nie udaje
+    assert sil._klasa_dziennika() is logging.handlers.RotatingFileHandler
+
+
+def test_ryzyko_zgody_dla_polecen_windows_i_zapisu():
+    """W17: karty zgody nazywają też polecenia Windows (Remove-Item, del, icacls, takeown, reg delete,
+    Set-ExecutionPolicy, Stop-Process), macOS (diskutil, launchctl) i zapis pliku z wtyczki zgód."""
+    prz = load_script("hq/plugin/przebiegi.py", "jarvo_hq_przebiegi_ryzyko")
+    usun, admin, restart = "Agent chce usunąć pliki", "uprawnieniami administratora", "zrestartować"
+    for opis, zdanie in (("Remove-Item -Recurse C:\\x", usun), ("del /s /q C:\\x", usun), ("rd /s /q build", usun),
+                         ("icacls C:\\x /grant Everyone:F", admin), ("takeown /f C:\\x", admin),
+                         ("reg delete HKCU\\Software\\X /f", admin), ("Set-ExecutionPolicy Bypass", admin),
+                         ("diskutil eraseDisk", admin), ("Stop-Process -Name chrome", restart),
+                         ("taskkill /IM node.exe /F", restart), ("launchctl unload x.plist", restart)):
+        assert zdanie in prz.ryzyko({"description": opis}), opis
+    zapis = prz.ryzyko({"pattern_key": "plugin_rule:jarvo-zgody:write_file:abc:def", "description": "jarvo-zgody: C:/x"})
+    assert zapis == "Agent chce zapisać albo zmienić plik"
+    assert prz.ryzyko({"description": "delegate_task do Web"}) == prz.RYZYKO_DOMYSLNE     # „del” tylko jako słowo
+    assert prz.ryzyko({"description": "ls -la"}) == prz.RYZYKO_DOMYSLNE

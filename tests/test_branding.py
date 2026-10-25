@@ -1,10 +1,192 @@
-"""Branding dashboardu: nowe nazwy zmienionych plików (cache przeglądarki) i skórka terminala."""
+"""Branding dashboardu: nowe nazwy zmienionych plików (cache przeglądarki) i skórka terminala; w instalacji natywnej
+łatka kopii dista (--web --natywnie: bez „Update Hermes”, checkout Hermesa czysty) i jej katalog w <program>/web-dist
+(jarvo/hermes.py, dist_jarva)."""
 
 from __future__ import annotations
 
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+import pytest
 import yaml
 
 from conftest import REPO, load_script
+
+sys.path.insert(0, str(REPO))
+from jarvo import hermes, sciezki  # noqa: E402
+
+PATCH = REPO / "branding" / "patch_dashboard.py"
+NODE = shutil.which("node")
+
+# fragmenty dista Hermesa 0.21.5 (index-*.js i SystemPage-*.js) z innymi nazwami zmiennych niż w oryginale: powłoka
+# (jak w tests/test_powloka.py) i miejsca aktualizacji Hermesa (H16): 5 × can_update_hermes, 2 × checkHermesUpdate(!1)
+DIST_INDEX = """import{a as Zx}from"./vendor-1a2b3c.js";
+function Qn(e,t){let n=Zx(e,t),r=new Set(e.map(e=>e.path));return n.filter(x=>!r.has(x.path))}
+function Korzen(){return(0,$q.jsx)(Nv,{to:`/sessions`,replace:!0})}
+function Nieznany(){return(0,$q.jsx)(Nv,{to:`/sessions`,replace:!0})}
+const Pasek={id:`app-sidebar`,className:`fixed`};
+const Nagl=`lg:hidden fixed top-0 left-0 right-0 z-40 min-h-14`,Zasl=`lg:hidden fixed inset-0 z-40 p-0 block`;
+const Odst=`h-14 shrink-0 lg:hidden`;
+export function On(a,X,T){let m=a?.can_update_hermes===!0;return T(!0),X.checkHermesUpdate(!1).then(t=>[m,t])}
+export const strona=()=>import("./SystemPage-5d6e7f.js");
+"""
+DIST_SYSTEM = """export async function Laduj(N,r,t){const on=async(e=!1)=>{if(r?.can_update_hermes!==!1){await N.checkHermesUpdate(e)}};
+const deps=[t,r?.can_update_hermes];const ap=()=>{if(r?.can_update_hermes===!1)return `poza`;return `aktualizuj`};
+let fn=r?.can_update_hermes!==!1;const [h,u]=await Promise.all([N.getHooks(),N.checkHermesUpdate(!1)]);
+return {fn,deps:deps.length,ap:ap(),u,on:typeof on}}
+"""
+INDEX_HTML = """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hermes Agent - Dashboard</title>
+    <script type="module" crossorigin src="/assets/index-9f8e7d.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+"""
+
+
+def _dist(katalog, index: str = DIST_INDEX, system: str = DIST_SYSTEM):
+    (katalog / "assets").mkdir(parents=True)
+    (katalog / "index.html").write_text(INDEX_HTML, encoding="utf-8")
+    (katalog / "assets" / "index-9f8e7d.js").write_text(index, encoding="utf-8")
+    (katalog / "assets" / "SystemPage-5d6e7f.js").write_text(system, encoding="utf-8")
+    (katalog / "assets" / "vendor-1a2b3c.js").write_text("export const a=(e,t)=>e;\n", encoding="utf-8")
+    return katalog
+
+
+def _latka(*argv, env=None):
+    return subprocess.run([sys.executable, str(PATCH), str(REPO / "branding"), *map(str, argv)], capture_output=True,
+                          text=True, encoding="utf-8", timeout=120, env={**os.environ, **(env or {})})
+
+
+def _plik(katalog, przedrostek: str) -> str:
+    pliki = list((katalog / "assets").glob(f"{przedrostek}-*.js"))
+    assert len(pliki) == 1, pliki
+    return pliki[0].read_text(encoding="utf-8")
+
+
+def test_latka_natywna_kopii_dista_bez_aktualizacji_hermesa(tmp_path):
+    """--web --natywnie: powłoka /jarvo jak w obrazie i ściśle 5 + 2 miejsca aktualizacji Hermesa (H16); pliki
+    Pythona checkoutu (strona logowania) zostają bez zmian, nawet gdy JARVO_HERMES_DIR wskazuje checkout."""
+    hermes_dir = tmp_path / "hermes"
+    login = hermes_dir / "hermes_cli" / "dashboard_auth" / "login_page.py"
+    login.parent.mkdir(parents=True)
+    login.write_text(LOGIN_FIXTURE, encoding="utf-8")
+    dist = _dist(tmp_path / "web-dist" / "abc")
+    r = _latka("--web", dist, "--natywnie", env={"JARVO_HERMES_DIR": str(hermes_dir)})
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "bez_aktualizacji_hermesa: 5" in r.stdout and "bez_sprawdzania_aktualizacji: 2" in r.stdout
+    index, system = _plik(dist, "index"), _plik(dist, "SystemPage")
+    assert "can_update_hermes" not in index + system
+    assert "m=!1/*jarvo-bez-aktualizacji*/===!0" in index
+    assert "Promise.resolve(null)/*jarvo-bez-sprawdzania*/.then(" in index
+    assert system.count("/*jarvo-bez-aktualizacji*/") == 4 and "N.checkHermesUpdate(e)" in system
+    assert 'new Set([...e.map(e=>e.path),"/jarvo"])' in index           # powłoka jak w obrazie
+    html = (dist / "index.html").read_text(encoding="utf-8")
+    assert "<title>Jarvo</title>" in html and 'id="jarvo-powloka-js"' in html
+    assert login.read_text(encoding="utf-8") == LOGIN_FIXTURE          # checkout Hermesa czysty (S12)
+    assert (dist / "favicon.ico").is_file()
+    # druga łatka niczego nie zmienia
+    przed = {p.name: p.read_bytes() for p in (dist / "assets").iterdir()}
+    r = _latka("--web", dist, "--natywnie")
+    assert r.returncode == 0 and r.stdout.count("już jest") == 4
+    assert {p.name: p.read_bytes() for p in (dist / "assets").iterdir()} == przed
+
+
+@pytest.mark.skipif(not NODE, reason="brak node")
+def test_latka_natywna_daje_poprawny_js_z_wylaczona_aktualizacja(tmp_path):
+    """Kod po łatce się wykonuje: przycisk aktualizacji ukryty (fn i m = false), sprawdzenia nie ma (null bez sieci),
+    a „Aktualizuj” w System mówi, że aktualizacje są poza panelem."""
+    dist = _dist(tmp_path / "dist")
+    assert _latka("--web", dist, "--natywnie").returncode == 0
+    system = next((dist / "assets").glob("SystemPage-*.js"))
+    index = next((dist / "assets").glob("index-*.js"))
+    proba = tmp_path / "proba.mjs"
+    proba.write_text(
+        f'import{{Laduj}}from"./dist/assets/{system.name}";import{{On}}from"./dist/assets/{index.name}";'
+        'const N={getHooks:async()=>1,checkHermesUpdate:async()=>{throw new Error("sieć")}};'
+        'const w=await Laduj(N,{can_update_hermes:true},"t");const z=await On({can_update_hermes:true},N,()=>0);'
+        'console.log(JSON.stringify([w,z]))', encoding="utf-8")
+    out = subprocess.run([NODE, str(proba)], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert out.returncode == 0, out.stderr
+    w, z = json.loads(out.stdout)
+    assert w == {"fn": False, "deps": 2, "ap": "poza", "u": None, "on": "function"}
+    assert z == [False, None]
+
+
+def test_bez_flagi_natywnie_obraz_bez_zmian(tmp_path):
+    """W obrazie (bez --natywnie) Hermes sam chowa aktualizację (kontener): miejsca can_update_hermes zostają."""
+    dist = _dist(tmp_path / "dist")
+    r = _latka("--web", dist)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "bez_aktualizacji" not in r.stdout and _plik(dist, "SystemPage").count("can_update_hermes") == 4
+
+
+def test_latka_natywna_scisla(tmp_path):
+    """Inna liczba miejsc aktualizacji (nowy Hermes) = kod 1 i nazwa wpisu; index.html bez powłoki."""
+    dist = _dist(tmp_path / "dist", system=DIST_SYSTEM + "export const x=(r)=>r?.can_update_hermes;\n")
+    r = _latka("--web", dist, "--natywnie")
+    assert r.returncode == 1 and "bez_aktualizacji_hermesa" in r.stderr
+    assert 'id="jarvo-powloka' not in (dist / "index.html").read_text(encoding="utf-8")
+    pusty = tmp_path / "pusty"
+    pusty.mkdir()
+    r = _latka("--web", pusty, "--natywnie")
+    assert r.returncode == 1 and "index.html" in r.stderr
+
+
+def _uklad(tmp_path) -> sciezki.Uklad:
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "jarvo")})
+    u.stan.mkdir(parents=True, exist_ok=True)
+    return u
+
+
+def test_dist_jarva_w_katalogu_programu(tmp_path):
+    """jarvo/hermes.py: kopia dista z łatkami w <program>/web-dist/<skrót> i opis obok (poza distem, bo dashboard
+    podaje każdy plik dista); front w checkoucie bez zmian; gotowa kopia = bez łatania; inny branding = nowy katalog."""
+    u = _uklad(tmp_path)
+    zrodlo = _dist(tmp_path / "checkout" / "hermes_cli" / "web_dist")
+    przed = {p.relative_to(zrodlo).as_posix(): p.read_bytes() for p in zrodlo.rglob("*") if p.is_file()}
+    logi: list[str] = []
+    wynik = hermes.dist_jarva(u, zrodlo, log=logi.append)
+    assert wynik.parent == u.program / "web-dist" and len(wynik.name) == 16
+    assert 'id="jarvo-powloka"' in (wynik / "index.html").read_text(encoding="utf-8")
+    opis = json.loads((u.program / "web-dist" / f"{wynik.name}.json").read_text(encoding="utf-8"))
+    assert opis["skrot"].startswith(wynik.name) and opis["zrodlo"] == str(zrodlo)
+    assert not list(wynik.glob("*.json")) and not list((u.program / "web-dist").glob("*.new"))
+    assert {p.relative_to(zrodlo).as_posix(): p.read_bytes() for p in zrodlo.rglob("*") if p.is_file()} == przed
+    assert not any("✓" in x for x in logi)                           # wiersze łatki nie zasypują logu instalacji
+    # drugi przebieg: ta sama kopia, bez łatania
+    znacznik = (wynik / "index.html").stat().st_mtime_ns
+    assert hermes.dist_jarva(u, zrodlo, log=logi.append) == wynik
+    assert (wynik / "index.html").stat().st_mtime_ns == znacznik and "już jest" in logi[-1]
+    # nowa wersja brandingu = nowy katalog obok (stary zostaje dla działającego panelu)
+    brand = tmp_path / "branding"
+    shutil.copytree(REPO / "branding", brand)
+    (brand / "powloka.js").write_text((brand / "powloka.js").read_text(encoding="utf-8") + "\n// zmiana\n",
+                                      encoding="utf-8")
+    nowy = hermes.dist_jarva(u, zrodlo, brand=brand, log=logi.append)
+    assert nowy != wynik and nowy.parent == wynik.parent and (wynik / "index.html").is_file()
+
+
+def test_dist_jarva_niepasujaca_latka_zostawia_front_hermesa(tmp_path):
+    """Łatka nie pasuje do dista (nowy układ plików Hermesa) albo nie ma brandingu: ostrzeżenie w logu i front
+    Hermesa bez zmian (panel działa; CI łapie to testem E2E), bez resztek kopii."""
+    u = _uklad(tmp_path)
+    zrodlo = _dist(tmp_path / "web_dist", index=DIST_INDEX.replace("id:`app-sidebar`,", ""))
+    logi: list[str] = []
+    assert hermes.dist_jarva(u, zrodlo, log=logi.append) == zrodlo
+    assert any("UWAGA" in x and "Update Hermes" in x for x in logi)
+    assert not list((u.program / "web-dist").iterdir())
+    logi.clear()
+    assert hermes.dist_jarva(u, zrodlo, brand=tmp_path / "brak", log=logi.append) == zrodlo
+    assert "UWAGA" in logi[-1]
 
 
 def test_bust_cache_renames_changed_files_and_importers(tmp_path):
