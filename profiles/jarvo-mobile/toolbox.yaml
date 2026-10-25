@@ -96,7 +96,7 @@ tools:
     healthcheck: "adb version"
     autonomy: A1
     optional: true
-    notes: "urzadzenie.py: telefon testowy floty. Obraz: jarvo android on (emulator Google przy KVM albo Redroid) w sieci jarvo-net, port adb nigdy publicznie, ekran dla właściciela jarvo_link.py --android. Natywnie: telefon właściciela przez USB albo Wi-Fi (adb pair/connect na adres podany wprost, ADB_MDNS=0) albo emulator Android Studio; stan i urządzenie z <stan>/android.json (jarvo android on|off), ekran w oknie scrcpy (jarvo android ekran), podgląd w HQ wyłączony (I24)."
+    notes: "urzadzenie.py: telefon testowy floty. Obraz: jarvo android on (emulator Google przy KVM albo Redroid) w sieci jarvo-net, port adb nigdy publicznie, ekran dla właściciela jarvo_link.py --android. Natywnie: telefon właściciela przez USB albo Wi-Fi (adb pair/connect na adres podany wprost, ADB_MDNS=0) albo emulator Android Studio; stan i urządzenie z <stan>/android.json (jarvo android on|off), ekran w oknie scrcpy (jarvo android ekran), podgląd w HQ wyłączony (I24: jarvo_link.py --android kod 3). Testy wrogie i tryb demo zrzutów: każda zmieniona wartość zapisana przed zmianą w <stan>/android-przywroc.json, przywrócona i sprawdzona po teście (kod 4 + urzadzenie.py przywroc, gdy telefon zniknął w trakcie); pm clear tylko na emulatorze albo telefonie testowym (jarvo android on --telefon-testowy). Serwer adb z logiem w <logi>/adb.log, na macOS i Linuksie z HOME <stan>/adb-dom."
   - name: github-actions-macos
     source: https://github.com/actions/runner-images (macos-26)
     license: usługa GitHub (minuty macOS)

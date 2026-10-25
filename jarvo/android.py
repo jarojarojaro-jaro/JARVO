@@ -8,49 +8,68 @@ W kontenerze telefonem testowym był emulator Google albo Redroid w usłudze flo
 (I24): zamiast strony w panelu jest okno scrcpy na tym komputerze.
 
   jarvo android on [--akceptuje-licencje] [--wifi ADRES:PORT] [--paruj ADRES:PORT [--kod KOD]] [--urzadzenie SERIAL]
+                   [--telefon-testowy | --telefon-prywatny]
         platform-tools przy pierwszym użyciu (licencja Google: akceptacja właściciela przed pierwszym pobraniem,
         zapamiętana w <stan>/android.json), serwer adb z ADB_MDNS=0 (bez szukania telefonów w sieci lokalnej),
         parowanie i połączenie przez Wi-Fi na adres podany wprost, wybór urządzenia. Flota (urzadzenie.py) bierze adb
-        z <stan>/narzedzia.json, a stan i numer urządzenia z <stan>/android.json
+        z <stan>/narzedzia.json, a stan i numer urządzenia z <stan>/android.json. --telefon-testowy: to urządzenie
+        jest do testów (wolno czyścić dane testowanej aplikacji), --telefon-prywatny cofa to oznaczenie
   jarvo android ekran [--urzadzenie SERIAL] [--bez-dzwieku] [--rozmiar PIKSELE]
         okno scrcpy z ekranem telefonu (scrcpy przy pierwszym użyciu, ten sam adb co flota); zamknięcie okna
         kończy podgląd, a `jarvo android off` zamyka je razem z serwerem adb
   jarvo android off [--zostaw-adb]
-        flota przestaje używać telefonu: znacznik w <stan>/android.json, rozłączenie Wi-Fi, zatrzymanie serwera adb
+        flota przestaje używać telefonu: zaległe przywrócenia ustawień z przerwanego testu, znacznik w
+        <stan>/android.json, rozłączenie Wi-Fi, zatrzymanie serwera adb
   jarvo android status [--json]
-        adb, licencja, stan, urządzenia (serwera adb nie uruchamia, gdy telefon jest wyłączony), scrcpy, podgląd w HQ
+        adb, licencja, stan, urządzenia (serwera adb nie uruchamia, gdy telefon jest wyłączony), scrcpy, podgląd w HQ,
+        zaległe przywrócenia ustawień telefonu
+
+`on` i `ekran` (i akceptację licencji Google) robi tylko właściciel w swoim terminalu: wywołane przez proces Jarva
+(agent z terminalem, rutyna, karta kanbana; znaczniki jak w jarvo/rece.py) kończą się odmową. `off` i `status` może
+każdy. Testy wrogie Twórcy aplikacji zmieniają na chwilę ustawienia telefonu i przywracają je z dziennika przywróceń
+(`<stan>/android-przywroc.json`, profiles/jarvo-mobile/scripts/urzadzenie.py); czego test nie zdążył przywrócić,
+przywraca `on` i `off` (tym samym kodem urzadzenie.py z aktywnej wersji Jarva).
 
 Integracja z jarvo/cli.py jak jarvo/wiedza_cli.py: `dodaj_polecenia(sub)` dopisuje polecenie `android`,
 `sprawdzenia(u, ot)` daje wyniki dla `jarvo doctor` (telefon nie jest wymagany: brak platform-tools to „ok” z opisem).
 Moduł działa też sam: `python -I -X utf8 jarvo/android.py status`. Wyjście adb idzie do pliku, nie do potoku: serwer
 adb, który polecenie uruchamia w tle, dziedziczy uchwyty, więc potok nie dostałby końca (Windows), jak przy demonie
-agent-browsera. Na macOS i Linuksie klucz adb właściciela (~/.android/adbkey z katalogu domowego konta) idzie do
-serwera przez ADB_VENDOR_KEYS: terminal agenta ma inny HOME (H24), a bez tego telefon pytałby o zgodę dla nowego
-klucza po restarcie serwera z terminala agenta (Windows: adb bierze profil z konta, nie z USERPROFILE).
+agent-browsera. Log serwera adb idzie do `<logi>/adb.log` (ANDROID_ADB_LOG_PATH), a nie do katalogu tymczasowego
+systemu. Na macOS i Linuksie serwer adb Jarva ma katalog domowy `<stan>/adb-dom` (adb bierze klucz z HOME), więc jego
+klucz i plik sparowanych telefonów leżą w katalogu Jarva, a klucz adb właściciela (~/.android/adbkey z katalogu konta,
+gdy jest) dostaje przez ADB_VENDOR_KEYS: telefon, który go zna, nie pyta o zgodę jeszcze raz. Na Windows adb bierze
+klucz zawsze z profilu konta (SHGetFolderPath, nie USERPROFILE ani HOME): pliki, które tam założy (adbkey, adbkey.pub,
+adb_known_hosts.pb), trafiają do dziennika zmian hosta PRZED poleceniem adb (D08), z sumą „oczekuje” do chwili, gdy adb
+je zapisze, więc `jarvo uninstall` je usunie.
 """
 from __future__ import annotations
 
 import argparse
 import contextlib
 import hashlib
+import importlib.util
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
 import time
+from datetime import datetime
 from pathlib import Path
 
 if __package__ in (None, ""):                         # `python jarvo/android.py`: pakiet jarvo z katalogu wyżej
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from jarvo import przenosne, przy_uzyciu, sciezki, srodowisko  # noqa: E402
+from jarvo.rece import proces_floty  # noqa: E402
 from jarvo.sciezki import WINDOWS, Uklad  # noqa: E402
 
 STAN = "android.json"                                  # <stan>/android.json: licencja, włączony, urządzenie, Wi-Fi
+PRZYWROCENIA = "android-przywroc.json"                 # <stan>/…: ustawienia telefonu do przywrócenia (urzadzenie.py)
 KLUCZE_ADB = ("adbkey", "adbkey.pub")                  # klucz adb w <katalog konta>/.android
+ZNANE_HOSTY = "adb_known_hosts.pb"                     # telefony sparowane przez Wi-Fi (adb pair)
+OCZEKUJE = "oczekuje-na-adb"                           # suma w dzienniku zmian hosta, zanim adb zapisze plik
 PLATFORM_TOOLS = "platform-tools"
 SCRCPY = "scrcpy"
 LICENCJA_URL = "https://developer.android.com/studio/terms"
@@ -75,6 +94,14 @@ JAK_PODLACZYC = ("Telefon: Ustawienia → Informacje o telefonie → 7 razy „N
                  "Emulator z Android Studio adb widzi sam.")
 PODGLAD_HQ = ("podgląd ekranu w HQ (przycisk 📱, port 9122) jest w instalacji natywnej wyłączony (decyzja I24): "
               "ekran pokazuje okno scrcpy, `jarvo android ekran`")
+CO_ZMIENIAJA = ("Co testy Twórcy aplikacji robią na tym urządzeniu: instalują i uruchamiają testowaną aplikację, robią "
+                "zrzuty ekranu i na chwilę zmieniają ustawienia (rozmiar czcionki i ekranu, tryb ciemny, tryb "
+                "samolotowy z Wi-Fi i danymi tylko przy kablu USB, uprawnienia testowanej aplikacji, tryb demo paska "
+                "stanu przy zrzutach do sklepów). Każdą wartość zapisują przed zmianą i przywracają po teście, także "
+                "po błędzie; czego nie zdążą (telefon odłączony w trakcie), przywróci następne użycie albo "
+                "jarvo android off. Danych aplikacji nie czyszczą na Twoim telefonie, tylko na emulatorze albo "
+                "telefonie oznaczonym jako testowy (jarvo android on --telefon-testowy). Najlepiej podłącz telefon "
+                "testowy, nie prywatny.")
 
 
 def _wynik(nazwa: str, stan: str, opis: str, rada: str = "") -> dict:
@@ -85,10 +112,15 @@ def _teraz() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S")
 
 
+def _sha(p: Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
 # ---------------------------------------------------------------- stan i programy
 
 def stan_androida(u: Uklad) -> dict:
-    """`<stan>/android.json`: {"licencja_sdk": {"zaakceptowano", "adres"}, "wlaczony", "serial", "wifi", "kiedy"}."""
+    """`<stan>/android.json`: {"licencja_sdk": {"zaakceptowano", "adres"}, "wlaczony", "serial", "wifi", "kiedy",
+    "telefon_testowy": [numery], "log_adb"}."""
     return srodowisko.wczytaj_json(u.stan / STAN)
 
 
@@ -110,7 +142,7 @@ def scrcpy(u: Uklad) -> Path | None:
 
 
 def katalog_adb() -> Path | None:
-    """`.android` w katalogu domowym konta, gdzie adb trzyma klucz (adbkey, adbkey.pub): Windows z profilu konta
+    """`.android` w katalogu domowym konta (adbkey właściciela, gdy używał adb): Windows z profilu konta
     (SHGetFolderPathW, jak adb: USERPROFILE z terminala agenta nic tu nie zmienia, sprawdzone), POSIX z bazy kont,
     nie z HOME (terminal agenta ma HOME profilu, H24)."""
     if WINDOWS:
@@ -129,6 +161,18 @@ def katalog_adb() -> Path | None:
         return None
 
 
+def dom_adb(u: Uklad) -> Path | None:
+    """HOME serwera adb Jarva na macOS i Linuksie: `<stan>/adb-dom` (adb bierze klucz z $HOME/.android), więc klucz
+    i sparowane telefony zostają w katalogu Jarva i znikają z nim; Windows: None (adb bierze profil konta)."""
+    return None if WINDOWS else u.stan / "adb-dom"
+
+
+def katalog_klucza(u: Uklad) -> Path | None:
+    """Gdzie serwer adb uruchomiony przez Jarvo trzyma klucz: POSIX `<stan>/adb-dom/.android`, Windows profil konta."""
+    dom = dom_adb(u)
+    return dom / ".android" if dom is not None else katalog_adb()
+
+
 def klucz_wlasciciela() -> Path | None:
     """Klucz adb właściciela dla ADB_VENDOR_KEYS: na macOS i Linuksie `<katalog konta>/.android/adbkey`; na Windows
     None, bo adb i tak bierze profil z konta, a nie z USERPROFILE."""
@@ -138,38 +182,108 @@ def klucz_wlasciciela() -> Path | None:
     return k / "adbkey" if k is not None else None
 
 
-def klucze_przed() -> set[str]:
-    k = katalog_adb()
-    return {n for n in KLUCZE_ADB if k is not None and (k / n).is_file()}
+def _w_korzeniu(p: Path, u: Uklad) -> bool:
+    a, b = os.path.normcase(os.path.abspath(p)), os.path.normcase(os.path.abspath(u.root))
+    return a == b or a.startswith(b.rstrip("\\/") + os.sep)
 
 
-def zapisz_klucze(u: Uklad, przed: set[str]) -> list[Path]:
-    """Klucz adb, który założył serwer uruchomiony przez `jarvo android on` (nie było go wcześniej): wpis „plik”
-    w dzienniku zmian hosta (D08) po fakcie, jak linger, bo treść generuje adb; `jarvo uninstall` usunie go, gdy się nie
-    zmienił. Klucza, który był (Android Studio, wcześniejszy adb), nie zapisujemy: nie jest nasz."""
+# ---------------------------------------------------------------- ślady adb poza katalogiem Jarva (D08)
+
+def slady_przed(u: Uklad, nazwy: tuple[str, ...] = KLUCZE_ADB) -> dict[Path, str]:
+    """Pliki adb poza katalogiem Jarva (Windows: profil konta), które polecenie adb może założyć albo zmienić: wpis
+    „plik” w dzienniku zmian hosta PRZED zmianą (nigdy zmiana bez wpisu). Nowy plik dostaje sumę OCZEKUJE (treść
+    wygeneruje adb), nasz plik (wpis z jego obecną sumą) zostaje przy swojej; cudzego (Android Studio, wcześniejszy
+    adb) nie ruszamy. Zwraca {ścieżka: suma w dzienniku przed poleceniem}."""
+    k = katalog_klucza(u)
+    if k is None or _w_korzeniu(k, u):
+        return {}
     from jarvo import zmiany_hosta
-    k = katalog_adb()
+    if not k.exists() and "katalog" in zmiany_hosta.RODZAJE:   # rodzaj „katalog” (pusty zostaje usunięty), gdy jest
+        zmiany_hosta.dopisz(u, "katalog", sciezka=str(k))
+    nasze = {w["szczegoly"].get("sciezka"): w["szczegoly"].get("sha256") for w in zmiany_hosta.wpisy(u)
+             if w["rodzaj"] == "plik"}
+    wynik = {}
+    for n in nazwy:
+        p = k / n
+        if not p.exists():
+            zmiany_hosta.dopisz(u, "plik", sciezka=str(p), sha256=OCZEKUJE)
+            wynik[p] = OCZEKUJE
+        elif p.is_file() and nasze.get(str(p)) == _sha(p):
+            wynik[p] = nasze[str(p)]
+    return wynik
+
+
+def slady_po(u: Uklad, przed: dict[Path, str]) -> list[Path]:
+    """Po poleceniu adb: wpis z prawdziwą sumą pliku (nowy wpis przed usunięciem starego); wpis OCZEKUJE pliku, który
+    nie powstał, znika. Zwraca pliki Jarva poza jego katalogiem (do `jarvo uninstall`)."""
+    if not przed:
+        return []
+    from jarvo import zmiany_hosta
     zapisane = []
-    for nazwa in KLUCZE_ADB:
-        p = k / nazwa if k is not None else None
-        if p is not None and nazwa not in przed and p.is_file():
-            zmiany_hosta.dopisz(u, "plik", sciezka=str(p), sha256=hashlib.sha256(p.read_bytes()).hexdigest())
+    for p, stara in przed.items():
+        if p.is_file():
+            nowa = _sha(p)
+            if nowa != stara:
+                zmiany_hosta.dopisz(u, "plik", sciezka=str(p), sha256=nowa)
+                zmiany_hosta.zapomnij(u, "plik", sciezka=str(p), sha256=stara)
             zapisane.append(p)
+        elif stara == OCZEKUJE:
+            zmiany_hosta.zapomnij(u, "plik", sciezka=str(p), sha256=OCZEKUJE)
     return zapisane
 
 
+def dokoncz_slady(u: Uklad) -> None:
+    """Wpisy OCZEKUJE z przerwanego `jarvo android on` (adb założył plik, a sumy już nie zapisaliśmy): plik nowszy niż
+    wpis dostaje prawdziwą sumę, a starszy (nie nasz) albo nieistniejący traci wpis."""
+    from jarvo import zmiany_hosta
+    for w in zmiany_hosta.wpisy(u):
+        s = w["szczegoly"]
+        if w["rodzaj"] != "plik" or s.get("sha256") != OCZEKUJE:
+            continue
+        p = Path(str(s.get("sciezka")))
+        try:
+            od = datetime.fromisoformat(str(w.get("czas"))).timestamp() - 2
+        except ValueError:
+            od = None
+        if p.is_file() and od is not None and p.stat().st_mtime >= od:
+            zmiany_hosta.dopisz(u, "plik", sciezka=str(p), sha256=_sha(p))
+        zmiany_hosta.zapomnij(u, "plik", sciezka=str(p), sha256=OCZEKUJE)
+
+
 def env_adb(u: Uklad, baza: dict | None = None) -> dict:
-    """Otoczenie adb: ADB_MDNS=0 (z manifestu platform-tools) i na macOS i Linuksie klucz adb właściciela
-    w ADB_VENDOR_KEYS (telefon zna już ten klucz, więc po restarcie serwera z terminala agenta nie pyta o zgodę)."""
+    """Otoczenie adb: ADB_MDNS=0 (z manifestu platform-tools), log serwera w `<logi>/adb.log`, na macOS i Linuksie
+    HOME `<stan>/adb-dom` i klucz adb właściciela w ADB_VENDOR_KEYS (telefon zna już ten klucz, więc po restarcie
+    serwera z terminala agenta nie pyta o zgodę)."""
     env = dict(os.environ if baza is None else baza)
     w = przy_uzyciu.gotowe_narzedzie(u, PLATFORM_TOOLS) or {}
     env.update({str(k): str(v) for k, v in (w.get("env") or {}).items()})
     env.setdefault("ADB_MDNS", "0")
+    env["ANDROID_ADB_LOG_PATH"] = str(plik_logu_adb(u))
+    dom = dom_adb(u)
+    if dom is not None:
+        env["HOME"] = str(dom)
     klucz = klucz_wlasciciela()
     if klucz is not None and klucz.is_file():
         obecne = [x for x in str(env.get("ADB_VENDOR_KEYS") or "").split(os.pathsep) if x]
         env["ADB_VENDOR_KEYS"] = os.pathsep.join(dict.fromkeys([*obecne, str(klucz)]))
     return env
+
+
+def plik_logu_adb(u: Uklad) -> Path:
+    """`<logi>/adb.log` (ANDROID_ADB_LOG_PATH; bez niej serwer pisze do katalogu tymczasowego systemu); na Windows
+    z krótką nazwą 8.3, gdy ścieżka ma znaki spoza ASCII (B13)."""
+    logi = u.logi
+    if WINDOWS and not str(logi).isascii() and logi.exists():
+        logi = sciezki.krotka_sciezka(logi)
+    return logi / "adb.log"
+
+
+def _katalogi_adb(u: Uklad) -> None:
+    """Katalog logu (serwer adb bez niego nie wstaje: „cannot open” log) i HOME adb na macOS i Linuksie."""
+    u.logi.mkdir(parents=True, exist_ok=True)
+    dom = dom_adb(u)
+    if dom is not None:
+        dom.mkdir(parents=True, exist_ok=True)
 
 
 def uruchom_adb(program: Path | str, argv: list[str], env: dict, czas: float = CZAS_ADB) -> tuple[int, str]:
@@ -250,7 +364,68 @@ def _android_wersja(program: Path, serial: str, env: dict) -> str | None:
     return tekst.strip().splitlines()[-1] if kod == 0 and tekst.strip() else None
 
 
-# ---------------------------------------------------------------- licencja
+# ---------------------------------------------------------------- ustawienia telefonu zostawione przez testy floty
+
+def _urzadzenie_floty(u: Uklad):
+    """profiles/jarvo-mobile/scripts/urzadzenie.py aktywnej wersji Jarva (ścieżka bezwzględna z current.json, nigdy
+    z katalogu bieżącego): to samo przywracanie ustawień telefonu co we flocie. None, gdy go nie ma."""
+    p = przy_uzyciu.app_instalacji(u) / "profiles" / "jarvo-mobile" / "scripts" / "urzadzenie.py"
+    if not p.is_absolute() or not p.is_file():
+        return None
+    spec = importlib.util.spec_from_file_location("jarvo_urzadzenie_floty", p)
+    modul = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modul)
+    return modul
+
+
+def zalegle_przywrocenia(u: Uklad) -> dict[str, list[str]]:
+    """{numer urządzenia: opisy ustawień} z `<stan>/android-przywroc.json`: zmiany z testu, który się nie skończył."""
+    dane = srodowisko.wczytaj_json(u.stan / PRZYWROCENIA)
+    ur = _urzadzenie_floty(u) if dane else None
+    wynik = {}
+    for serial, wpisy in dane.items():
+        opisy = [ur.opis(w) if ur else str(w.get("ustawienie")) for w in (wpisy if isinstance(wpisy, list) else [])
+                 if isinstance(w, dict) and (ur is None or ur._znany(w))]
+        if opisy:
+            wynik[str(serial)] = opisy
+    return wynik
+
+
+def przywroc_zalegle(u: Uklad, program: Path, env: dict, widoczne: set[str] | None = None) -> list[str]:
+    """Przywraca zaległe ustawienia telefonów (serwer adb już działa); `widoczne` zawęża do urządzeń gotowych w adb.
+    Wypisuje wynik, zwraca opisy tego, co zostało nieprzywrócone."""
+    zalegle = zalegle_przywrocenia(u)
+    if not zalegle:
+        return []
+    ur = _urzadzenie_floty(u)
+    if ur is None:
+        return [x for v in zalegle.values() for x in v]
+    zostaly = []
+    for serial, opisy in zalegle.items():
+        if widoczne is not None and serial not in widoczne:
+            zostaly += opisy
+            continue
+        przywrocone, nie = ur.przywroc_zalegle(ur.Adb(serial, str(program), korzen=u.root, env=env))
+        if przywrocone:
+            print(f"Przywróciłem ustawienia {serial} zostawione przez przerwany test: {', '.join(przywrocone)}.")
+        zostaly += nie
+    if zostaly:
+        print("Na telefonie zostały ustawienia zmienione przez przerwany test: " + ", ".join(zostaly)
+              + ". Podłącz telefon i uruchom jarvo android off (albo on) jeszcze raz.", file=sys.stderr)
+    return zostaly
+
+
+# ---------------------------------------------------------------- licencja i właściciel
+
+def _odmowa_floty(u: Uklad, co: str) -> int | None:
+    """Kod 1 z komunikatem, gdy polecenie wywołał proces Jarva (agent, rutyna, karta kanbana), a nie właściciel."""
+    znak = proces_floty(dict(os.environ), u.dane)
+    if znak is None:
+        return None
+    print(f"{co} tylko właściciel, w swoim terminalu. To polecenie wywołał proces Jarva ({znak}): odmowa. Poproś "
+          "właściciela o to polecenie.", file=sys.stderr)
+    return 1
+
 
 def tekst_licencji(app: Path | None = None, u: Uklad | None = None) -> str:
     mb = przy_uzyciu.rozmiar_mb(app or przy_uzyciu.app_instalacji(u), PLATFORM_TOOLS) if (app or u) else None
@@ -262,15 +437,19 @@ def tekst_licencji(app: Path | None = None, u: Uklad | None = None) -> str:
 
 def zgoda_na_licencje(u: Uklad, a, wejscie=None, wyjscie=None) -> bool:
     """Zgoda właściciela na licencję SDK przed pierwszym pobraniem: zapamiętana, --akceptuje-licencje albo pytanie
-    w terminalu (bez terminala: odmowa z radą)."""
+    w terminalu (bez terminala: odmowa z radą). Proces Jarva nie akceptuje licencji za właściciela."""
     st = stan_androida(u)
     if st.get("licencja_sdk"):
         return True
     wejscie = wejscie or sys.stdin
     wyjscie = wyjscie or sys.stdout
+    if (znak := proces_floty(dict(os.environ), u.dane)) is not None:
+        print(f"Licencję Android SDK akceptuje tylko właściciel, w swoim terminalu (to polecenie wywołał proces "
+              f"Jarva, {znak}): odmowa.", file=wyjscie)
+        return False
     print(tekst_licencji(u=u), file=wyjscie)
     if not getattr(a, "akceptuje_licencje", False):
-        if wejscie is None or not getattr(wejscie, "isatty", lambda: False)():
+        if not przy_uzyciu.terminal(wejscie):            # NUL na Windows też „isatty”: liczy się prawdziwa konsola
             print("Bez terminala nie zapytam o licencję: uruchom jarvo android on --akceptuje-licencje, jeśli ją "
                   "akceptujesz.", file=wyjscie)
             return False
@@ -314,6 +493,8 @@ def _zapewnij_adb(u: Uklad, a) -> Path | None:
 def polecenie_on(u: Uklad, a, _reszta=(), _ot=None) -> int:
     if not przy_uzyciu.natywnie(u):
         return _bez_instalacji(u)
+    if (kod := _odmowa_floty(u, "Telefon testowy włącza")) is not None:
+        return kod
     for nazwa, wartosc, wzor in (("--wifi", a.wifi, ADRES), ("--paruj", a.paruj, ADRES),
                                  ("--urzadzenie", a.urzadzenie, SERIAL)):
         if wartosc and not wzor.match(wartosc):
@@ -321,28 +502,36 @@ def polecenie_on(u: Uklad, a, _reszta=(), _ot=None) -> int:
                                                         if wzor is ADRES else "numer z `adb devices`"),
                   file=sys.stderr)
             return 2
+    testowy, prywatny = getattr(a, "telefon_testowy", False), getattr(a, "telefon_prywatny", False)
+    if testowy and prywatny:
+        print("--telefon-testowy i --telefon-prywatny naraz: wybierz jedno.", file=sys.stderr)
+        return 2
     program = _zapewnij_adb(u, a)
     if program is None:
         return 1
     st = stan_androida(u)
     env = env_adb(u)
     wersja = wersja_adb(program, env)
-    przed = klucze_przed()
+    _katalogi_adb(u)
+    dokoncz_slady(u)
+    przed = slady_przed(u)
     kod, tekst = uruchom_adb(program, ["start-server"], env)
+    slady_po(u, przed)                                   # klucz adb, który założył serwer: ślad poza katalogiem Jarva
     if kod:
         print(f"BŁĄD: serwer adb nie wstał (kod {kod}): {tekst[-300:]}", file=sys.stderr)
         return 1
-    zapisz_klucze(u, przed)                              # nowy klucz adb: ślad poza katalogiem Jarva (D08)
     env = env_adb(u)                                     # klucz właściciela już jest (adb założył go przy starcie)
     if a.paruj:
         kodp = a.kod
-        if not kodp and getattr(sys.stdin, "isatty", lambda: False)():
+        if not kodp and przy_uzyciu.terminal(sys.stdin):
             print("Kod parowania z telefonu (6 cyfr): ", end="", flush=True)
             kodp = (sys.stdin.readline() or "").strip()
         if not kodp or not KOD.match(kodp):
             print("--kod: 6 cyfr z okna „Paruj urządzenie za pomocą kodu” na telefonie.", file=sys.stderr)
             return 2
+        przed = slady_przed(u, (ZNANE_HOSTY,))
         kod, tekst = uruchom_adb(program, ["pair", a.paruj, kodp], env)
+        slady_po(u, przed)
         if kod or "Successfully paired" not in tekst:
             print(f"BŁĄD: parowanie z {a.paruj} się nie udało: {tekst[-300:]}", file=sys.stderr)
             return 1
@@ -365,15 +554,27 @@ def polecenie_on(u: Uklad, a, _reszta=(), _ot=None) -> int:
         print(f"BŁĄD: {powod}. Urządzenia: " + ("; ".join(_opis_urzadzenia(d) for d in lista) or "brak"),
               file=sys.stderr)
         return 1
-    st.update(wlaczony=True, serial=serial, kiedy=_teraz())
+    if (testowy or prywatny) and serial is None:
+        print(f"BŁĄD: {'--telefon-testowy' if testowy else '--telefon-prywatny'} dotyczy urządzenia floty, a nie jest "
+              f"wybrane ({powod}).", file=sys.stderr)
+        return 2
+    testowe = [x for x in (st.get("telefon_testowy") or []) if isinstance(x, str) and x != serial]
+    if testowy or (serial in (st.get("telefon_testowy") or []) and not prywatny):
+        testowe.append(serial)
+    st.update(wlaczony=True, serial=serial, kiedy=_teraz(), log_adb=str(plik_logu_adb(u)),
+              telefon_testowy=sorted(testowe))
     zapisz_stan(u, st)
     print(f"Telefon testowy Twórcy aplikacji: włączony (adb {wersja or '?'}, {program}).")
     for d in lista:
         print(f"  {_opis_urzadzenia(d)}" + (f"; rada: {RADY[d['stan']]}" if d["stan"] in RADY else ""))
     if serial:
         android = _android_wersja(program, serial, env)
-        print(f"Urządzenie floty: {serial}" + (f" (Android {android})" if android else "") + f" [{powod}]. Twórca "
-              "aplikacji instaluje na nim aplikację, robi zrzuty i testy wrogie (urzadzenie.py).")
+        rodzaj = "telefon testowy: wolno czyścić dane testowanej aplikacji" if serial in testowe else \
+            "telefon właściciela: bez czyszczenia danych aplikacji (telefon testowy: --telefon-testowy)"
+        print(f"Urządzenie floty: {serial}" + (f" (Android {android})" if android else "") + f" [{powod}; {rodzaj}]. "
+              "Twórca aplikacji instaluje na nim aplikację, robi zrzuty i testy wrogie (urzadzenie.py).")
+        przywroc_zalegle(u, program, env, {d["serial"] for d in lista if d["stan"] == "device"})
+        print(CO_ZMIENIAJA)
     else:
         print(f"Urządzenie floty: jeszcze nie wybrane ({powod}). " + (JAK_PODLACZYC if not lista else
               "Gdy będzie jedno gotowe urządzenie, flota weźmie je sama."))
@@ -386,8 +587,20 @@ def polecenie_off(u: Uklad, a, _reszta=(), _ot=None) -> int:
         return _bez_instalacji(u)
     st = stan_androida(u)
     program = adb(u)
+    zostaly: list[str] = []
     if program is not None:
         env = env_adb(u)
+        _katalogi_adb(u)
+        zalegle = zalegle_przywrocenia(u)
+        if zalegle or st.get("wifi"):                     # oba potrzebują serwera adb: start z wyjściem do pliku
+            dokoncz_slady(u)
+            przed = slady_przed(u)
+            uruchom_adb(program, ["start-server"], env)
+            slady_po(u, przed)
+        if zalegle:                                       # przerwany test: najpierw ustawienia telefonu
+            if st.get("wifi"):
+                uruchom_adb(program, ["connect", st["wifi"]], env, czas=20)
+            zostaly = przywroc_zalegle(u, program, env)
         if st.get("wifi"):
             uruchom_adb(program, ["disconnect", st["wifi"]], env, czas=20)
         if not getattr(a, "zostaw_adb", False):
@@ -396,7 +609,7 @@ def polecenie_off(u: Uklad, a, _reszta=(), _ot=None) -> int:
     zapisz_stan(u, st)
     print("Telefon testowy wyłączony: Twórca aplikacji go nie używa (aplikacje na telefonie zostają). Włączenie: "
           "jarvo android on.")
-    return 0
+    return 1 if zostaly else 0
 
 
 def uruchom_okno(argv: list[str], **kw) -> subprocess.Popen:
@@ -407,6 +620,8 @@ def uruchom_okno(argv: list[str], **kw) -> subprocess.Popen:
 def polecenie_ekran(u: Uklad, a, _reszta=(), _ot=None) -> int:
     if not przy_uzyciu.natywnie(u):
         return _bez_instalacji(u)
+    if (kod := _odmowa_floty(u, "Okno z ekranem telefonu otwiera")) is not None:
+        return kod
     st = stan_androida(u)
     program = adb(u)
     if not st.get("wlaczony") or program is None:
@@ -435,7 +650,10 @@ def polecenie_ekran(u: Uklad, a, _reszta=(), _ot=None) -> int:
             return 1
     env = env_adb(u)
     env["ADB"] = str(program)                            # ten sam adb co flota, nie kopia z paczki scrcpy
-    lista, blad = lista_urzadzen(program, env)
+    _katalogi_adb(u)
+    przed = slady_przed(u)
+    lista, blad = lista_urzadzen(program, env)           # uruchamia serwer adb, gdy go nie ma
+    slady_po(u, przed)
     serial, powod = wybierz(lista, a.urzadzenie, st.get("serial"))
     if blad or serial is None:
         print(f"Nie pokażę ekranu: {blad or powod}. {JAK_PODLACZYC}", file=sys.stderr)
@@ -446,7 +664,6 @@ def polecenie_ekran(u: Uklad, a, _reszta=(), _ot=None) -> int:
         argv.append("--no-audio")
     if a.rozmiar:
         argv += ["--max-size", str(a.rozmiar)]
-    u.logi.mkdir(parents=True, exist_ok=True)
     log = u.logi / "scrcpy.log"
     with open(log, "ab") as f:
         f.write(f"\n=== {_teraz()} {' '.join(argv)}\n".encode("utf-8"))
@@ -482,11 +699,16 @@ def opis_stanu(u: Uklad) -> dict:
              "licencja_sdk": (st.get("licencja_sdk") or {}).get("zaakceptowano") if isinstance(
                  st.get("licencja_sdk"), dict) else None,
              "wlaczony": bool(st.get("wlaczony")), "serial": st.get("serial"), "wifi": st.get("wifi"),
+             "telefon_testowy": list(st.get("telefon_testowy") or []),
              "urzadzenia": None, "scrcpy": str(ekran) if ekran else None,
              "pobranie_mb": {n: przy_uzyciu.rozmiar_mb(app, n) for n in (PLATFORM_TOOLS, SCRCPY)},
-             "podglad_hq": "wyłączony natywnie (I24)", "wlaczano": bool(st)}
+             "podglad_hq": "wyłączony natywnie (I24)", "wlaczano": bool(st),
+             "zalegle_przywrocenia": zalegle_przywrocenia(u)}
     if program is not None and st.get("wlaczony"):
+        _katalogi_adb(u)
+        przed = slady_przed(u)
         wynik["urzadzenia"], wynik["blad_adb"] = lista_urzadzen(program, env)
+        slady_po(u, przed)
     return wynik
 
 
@@ -509,9 +731,13 @@ def polecenie_status(u: Uklad, a, _reszta=(), _ot=None) -> int:
     if s["urzadzenia"] is not None:
         if s["urzadzenia"]:
             for d in s["urzadzenia"]:
-                print(f"  {_opis_urzadzenia(d)}" + (" ← flota" if d["serial"] == s["serial"] else ""))
+                print(f"  {_opis_urzadzenia(d)}" + (" ← flota" if d["serial"] == s["serial"] else "")
+                      + (", telefon testowy" if d["serial"] in s["telefon_testowy"] else ""))
         else:
             print(f"  urządzenia: brak{' (' + s['blad_adb'] + ')' if s.get('blad_adb') else ''}. {JAK_PODLACZYC}")
+    for serial, opisy in s["zalegle_przywrocenia"].items():
+        print(f"  UWAGA: na {serial} zostały ustawienia zmienione przez przerwany test ({', '.join(opisy)}); przywróci "
+              "je jarvo android off albo następne użycie przez flotę, gdy telefon będzie podłączony")
     print("  ekran: " + (f"scrcpy w osobnym oknie ({s['scrcpy']}): jarvo android ekran" if s["scrcpy"] else
                          f"scrcpy pobierze się przy pierwszym jarvo android ekran ({mb.get(SCRCPY) or '?'} MB)"))
     print(f"  {PODGLAD_HQ}")
@@ -547,6 +773,12 @@ def sprawdzenia(u: Uklad, ot=None) -> list[dict]:
                                  + ("włączony" + (f", urządzenie {st['serial']}" if st.get("serial") else
                                                   ", urządzenie jeszcze nie wybrane") if st.get("wlaczony") else
                                     "wyłączony (jarvo android on)")))
+    zalegle = zalegle_przywrocenia(u)
+    if zalegle:
+        wyniki.append(_wynik("ustawienia telefonu", "uwaga", "przerwany test zostawił zmienione ustawienia: "
+                             + "; ".join(f"{k}: {', '.join(v)}" for k, v in zalegle.items()),
+                             "Podłącz telefon i uruchom jarvo android off (przywraca je, potem wyłącza telefon dla "
+                             "floty) albo jarvo android on."))
     ekran = scrcpy(u)
     wyniki.append(_wynik("ekran telefonu", "ok", ("scrcpy w osobnym oknie: jarvo android ekran" if ekran else
                                                  "scrcpy pobierze się przy pierwszym jarvo android ekran")
@@ -578,6 +810,10 @@ def dodaj_polecenia(sub) -> None:
     k.add_argument("--kod", metavar="KOD", help="6 cyfr kodu parowania (bez niego: pytanie w terminalu)")
     k.add_argument("--urzadzenie", metavar="SERIAL", help="urządzenie floty, gdy jest ich kilka (numer z jarvo "
                    "android status)")
+    k.add_argument("--telefon-testowy", action="store_true", help="to urządzenie jest do testów: testy wrogie mogą "
+                   "czyścić dane testowanej aplikacji")
+    k.add_argument("--telefon-prywatny", action="store_true", help="cofa --telefon-testowy (domyślnie: bez "
+                   "czyszczenia danych)")
     k.set_defaults(funkcja=polecenie_on)
     k = t.add_parser("off", help="wyłącz: flota nie używa telefonu, serwer adb zatrzymany")
     k.add_argument("--zostaw-adb", action="store_true", help="bez zatrzymania serwera adb (np. dla Android Studio)")
@@ -601,7 +837,7 @@ def main(argv: list[str] | None = None) -> int:
     dodaj_polecenia(sub)
     a = p.parse_args(["android", *(sys.argv[1:] if argv is None else argv)])
     try:
-        u = sciezki.uklad()
+        u = przy_uzyciu.uklad()                      # układ instalacji (na Linuksie cache jak u instalatora)
     except sciezki.BladUkladu as e:
         print(f"BŁĄD: {e}", file=sys.stderr)
         return 1

@@ -20,7 +20,7 @@ kadry:
 | Źródło | Skąd | Do czego |
 |---|---|---|
 | `web` | eksport `dist-web` (`aplikacja.py podglad`), Playwright w profilach iPhone 17 Pro Max, Pixel, iPad 13″; pasek stanu 9:41 dorysowany | szkic karty dla właściciela; **nie do wysłania** (lista kontrolna oznacza go „?”) |
-| `android` | telefon testowy floty (`urzadzenie.py`), zainstalowany build, tryb demo paska stanu (9:41, pełna bateria, bez powiadomień), trasy przez `schemat://trasa` | zrzuty Google Play |
+| `android` | telefon testowy floty (`urzadzenie.py`), zainstalowany build, tryb demo paska stanu (9:41, pełna bateria, bez powiadomień; po zrzutach tryb demo i zgoda na niego wracają do stanu sprzed nich, także po błędzie), trasy przez `schemat://trasa` | zrzuty Google Play |
 | `ios` | artefakt `ios_ci.py` (symulator iPhone 17 Pro Max, `simctl status_bar override` 9:41), pliki `jasny-<trasa>.png` | zrzuty App Store 6,9″ |
 
 **Kompozycja:** HTML w dokładnych wymiarach (kolor marki z gradientem, nagłówek bez polskich „sierotek”, ekran

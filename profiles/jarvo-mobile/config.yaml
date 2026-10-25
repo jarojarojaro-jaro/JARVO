@@ -62,6 +62,7 @@ approvals:
     an app, replying to store reviews, buying anything, logging into any website. Never use passwords pasted in chat.
   deny:
     - "*submit-expo-feedback*"        # skille Expo każą wysyłać opinię do Expo: dane projektu klienta nie wychodzą
+    - "*--akceptuje-licencje*"        # licencję Android SDK akceptuje tylko właściciel (jarvo/android.py też odmawia flocie)
     - "rm -rf /*"
     - "git push --force*"
     - "* | sh"

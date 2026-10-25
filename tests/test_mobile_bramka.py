@@ -112,7 +112,7 @@ class FakeAdb(ur.Adb):
             return "package:host.exp.exponent\n"
         if p.startswith("logcat -d"):
             return self.crash
-        if p.startswith("cat /sdcard/jarvo-ui.xml"):
+        if p.startswith("cat /data/local/tmp/jarvo-ui.xml"):
             return '<node text="Start"/><node text="Salon Ola"/>'
         if p.startswith("dumpsys package"):
             return "\n".join(f"      {x}: granted=true" for x in self.perms)
@@ -134,9 +134,12 @@ def test_android_wrogie_ok_i_przywraca_ustawienia(tmp_path, monkeypatch):
     assert st["start"] == "ok" and st["duza-czcionka"] == "ok" and st["uprawnienia"] == "ok"
     assert st["offline"] == "blad"            # atrapa nie pokazuje „Brak internetu” → test działa
     for przywroc in ("settings put system font_scale 1.0", "wm size reset", "wm density reset", "cmd uimode night no",
-                     "cmd connectivity airplane-mode disable"):
-        assert przywroc in adb.polecenia
+                     "cmd connectivity airplane-mode disable", "svc wifi enable", "svc data enable"):
+        assert przywroc in adb.polecenia          # kontener: wartości nieodczytane wracają do domyślnych, jak dotąd
     assert "pm revoke pl.salonola.app android.permission.CAMERA" in adb.polecenia
+    assert "pm grant pl.salonola.app android.permission.CAMERA" in adb.polecenia      # uprawnienie oddane po teście
+    assert not any("/sdcard" in p for p in adb.polecenia)                             # zrzut widoku w /data/local/tmp
+    assert "rm -f /data/local/tmp/jarvo-ui.xml" in adb.polecenia
     assert (tmp_path / "wrogie.json").exists() and (tmp_path / "start-ekran.png").read_bytes().startswith(b"\x89PNG")
 
 

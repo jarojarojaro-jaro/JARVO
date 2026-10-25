@@ -7,6 +7,7 @@ scrcpy): tests/live/natywnie_telefon_3d.py.
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import http.server
 import io
@@ -140,6 +141,84 @@ def test_srodowisko_json_jak_z_instalatora(tmp_path, serwer, monkeypatch):
     assert not przy_uzyciu.odswiez_srodowisko(u)
 
 
+def test_uklad_instalacji_cache_z_zapisu_instalatora(tmp_path, serwer):
+    """Linux z domyślnym korzeniem: instalator (bez JARVO_ROOT) ma cache w ~/.cache/jarvo, a proces floty ma JARVO_ROOT,
+    który w sciezki.uklad przenosi cache pod korzeń. Pierwsze użycie z procesu floty ma pobierać do cache instalacji
+    i zapisać srodowisko.json tak jak instalator: jego następny przebieg nie widzi zmiany (bajt w bajt)."""
+    dane = _zip({"atrapa-1.0/program.txt": b"ok", "atrapa-1.0/zbedny.txt": b"x"})
+    u_floty, _app = _instalacja(tmp_path, _wpis_atrapy(serwer, dane))          # układ spod JARVO_ROOT: cache w korzeniu
+    u_inst = dataclasses.replace(u_floty, cache=tmp_path / "xdg-cache" / "jarvo",
+                                 logi=tmp_path / "xdg-state" / "jarvo" / "logi")
+    ust = {"JARVO_PANEL_PORT": "19260"}
+    (u_inst.stan / "ustawienia.json").write_text(json.dumps(ust), encoding="utf-8")
+    narz0 = {"uv": {"wersja": "0.12.13"}}
+    (u_inst.stan / "narzedzia.json").write_text(instalator._json(narz0), encoding="utf-8")
+    srodowisko.zapisz(u_inst, srodowisko.srodowisko(u_inst, dict(ust), narz=narz0), narz=narz0)   # krok instalatora
+    assert przy_uzyciu.uklad({"JARVO_ROOT": str(u_floty.root)}).cache == u_inst.cache
+    u = przy_uzyciu.uklad({"JARVO_ROOT": str(u_floty.root)})
+    assert (u.root, u.program, u.stan, u.dane) == (u_floty.root, u_floty.program, u_floty.stan, u_floty.dane)
+    przy_uzyciu.narzedzie(u, "atrapa", platforma=PLATFORMA, log=lambda t: None, pasek=False)
+    plik = (u.stan / "srodowisko.json").read_bytes()
+    env = json.loads(plik)
+    assert env["UV_CACHE_DIR"] == str(u_inst.cache / "uv") and env["HF_HOME"] == str(u_inst.cache / "huggingface")
+    assert env["ATRAPA_DIR"] == str(u.program / "narzedzia" / "atrapa" / "1.0")
+    narz = srodowisko.narzedzia(u_inst)
+    srodowisko.zapisz(u_inst, srodowisko.srodowisko(u_inst, dict(ust), narz=narz), narz=narz)    # drugi przebieg
+    assert (u.stan / "srodowisko.json").read_bytes() == plik
+    assert list((u_inst.cache / "pobrane").iterdir()) and not (u_floty.cache / "pobrane").exists()
+    (u.stan / "srodowisko.json").unlink()                              # bez zapisu instalatora: układ bez zmian
+    assert przy_uzyciu.uklad({"JARVO_ROOT": str(u_floty.root)}).cache == u_floty.cache
+
+
+@pytest.mark.linux_only
+def test_uklad_instalacji_linux_domyslny_korzen_z_otoczeniem_floty(tmp_path):
+    """Prawdziwe reguły sciezki.uklad na Linuksie: instalator z katalogami XDG, proces floty z otoczeniem
+    srodowisko.srodowisko (JARVO_ROOT i XDG_CACHE_HOME=<cache>/xdg) liczy ten sam cache co instalator."""
+    xdg = {"XDG_DATA_HOME": str(tmp_path / "d"), "XDG_CACHE_HOME": str(tmp_path / "c"),
+           "XDG_STATE_HOME": str(tmp_path / "s"), "HOME": str(tmp_path / "dom")}
+    u_inst = sciezki.uklad(xdg)
+    assert u_inst.cache == tmp_path / "c" / "jarvo" and u_inst.root == tmp_path / "d" / "jarvo"
+    u_inst.stan.mkdir(parents=True)
+    srodowisko.zapisz(u_inst, srodowisko.srodowisko(u_inst, {}, narz={}, biez={}, build={}), narz={}, build={})
+    env_floty = srodowisko.srodowisko(u_inst, xdg, narz={}, biez={}, build={})
+    assert sciezki.uklad(env_floty).cache != u_inst.cache                     # sam JARVO_ROOT: cache pod korzeniem
+    assert przy_uzyciu.uklad(env_floty).cache == u_inst.cache
+
+
+def test_bledy_instalacji_jako_blad_przy_uzyciu(tmp_path, monkeypatch, serwer):
+    """Agent dostaje komunikat z radą, nie ślad stosu: uv zablokowany (BladHermesa z hermes._strumien), zapis na
+    dysku (OSError) przy venvie i przy narzędziu."""
+    from jarvo import hermes
+    u, app = _instalacja(tmp_path)
+    (app / "vendor" / "natywne.lock.json").write_text(json.dumps({"version": 1, "narzedzia": {},
+                                                                  "venvy": _venv_wpis(app)}), encoding="utf-8")
+    _uv_i_python(u, tmp_path)
+    for wyjatek, tekst in ((hermes.BladHermesa("Nie uruchomię uv.exe: [WinError 1260] zablokowany przez zasady"),
+                            "Smart App Control"), (PermissionError(13, "Brak dostępu"), "miejsce na dysku")):
+        def zainstaluj(*_a, _w=wyjatek, **_k):
+            raise _w
+        monkeypatch.setattr(venvy, "zainstaluj", zainstaluj)
+        with pytest.raises(przy_uzyciu.BladPrzyUzyciu, match=tekst):
+            przy_uzyciu.venv(u, "cad", log=lambda t: None)
+    dane = _zip({"atrapa-1.0/program.txt": b"ok", "atrapa-1.0/zbedny.txt": b"x"})
+    (app / "vendor" / "natywne.lock.json").write_text(json.dumps({"version": 1, "narzedzia": _wpis_atrapy(serwer, dane),
+                                                                  "venvy": {}}), encoding="utf-8")
+
+    def zapis(*_a, **_k):
+        raise OSError(28, "No space left on device")
+    monkeypatch.setattr(przy_uzyciu.przenosne, "zapisz_atomowo", zapis)
+    with pytest.raises(przy_uzyciu.BladPrzyUzyciu, match="No space left"):
+        przy_uzyciu.narzedzie(u, "atrapa", platforma=PLATFORMA, log=lambda t: None, pasek=False)
+    (app / "vendor" / "natywne.lock.json").write_text(json.dumps({"version": 1, "narzedzia": {"zle": {"wersja": "1"}},
+                                                                  "venvy": {"cad": {"python": "python312"}}}),
+                                                      encoding="utf-8")
+    with pytest.raises(przy_uzyciu.BladPrzyUzyciu):
+        przy_uzyciu.narzedzie(u, "zle", platforma=PLATFORMA, log=lambda t: None)
+    with pytest.raises(przy_uzyciu.BladPrzyUzyciu, match="bez locka"):
+        przy_uzyciu.venv(u, "cad", log=lambda t: None)
+    assert przy_uzyciu.gotowy_venv(u, "cad") is None
+
+
 def test_narzedzie_zla_suma_brak_platformy_i_bez_instalacji(tmp_path, serwer):
     dane = _zip({"atrapa-1.0/program.txt": b"podmieniony"})
     u, _app = _instalacja(tmp_path, _wpis_atrapy(serwer, dane, suma="0" * 64))
@@ -254,16 +333,10 @@ def test_manimgx_znajduje_venv_albo_mowi_co_zrobic(tmp_path, monkeypatch):
     assert s["gotowy"] is False and s["program"] is None
 
 
-def test_manimgx_instaluje_venv_przy_pierwszym_wywolaniu(tmp_path, monkeypatch):
-    """W instalacji natywnej (JARVO_ROOT z current.json) brak venvu = przy_uzyciu.venv; argumenty bez zmian,
-    MANIMGX_CACHE_DIR w <dane>/jarvo/cache/manimgx, katalog pliku z -o założony przed renderem."""
-    u, app = _instalacja(tmp_path)
-    monkeypatch.setattr(MG, "VENV_KONTENER", tmp_path / "nie-ma")
-    venv = tmp_path / "venvs" / "manimgx-abc"
-    zlecone = []
-
+def _atrapa_przy_uzyciu(venv: Path, zlecone: list):
     class Atrapa:
         BladPrzyUzyciu = przy_uzyciu.BladPrzyUzyciu
+        terminal = staticmethod(przy_uzyciu.terminal)
 
         def gotowy_venv(self, _u, nazwa):
             return {"katalog": str(venv)} if (venv / "gotowe").is_file() else None
@@ -277,11 +350,30 @@ def test_manimgx_instaluje_venv_przy_pierwszym_wywolaniu(tmp_path, monkeypatch):
             return {"katalog": str(venv)}
 
         def opis_venvu(self, _u, nazwa):
-            return {"venv": nazwa, "pobranie_mb": 85}
+            return {"venv": nazwa, "pobranie_mb": 85, "venv_mb": 227}
 
-    monkeypatch.setattr(MG, "przy_uzyciu", lambda env: (Atrapa(), u))
-    with pytest.raises(MG.BladManimgx, match="nie jest jeszcze zainstalowany"):
-        MG.znajdz({}, instaluj=False)
+    return Atrapa()
+
+
+class Tty(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
+def test_manimgx_bez_zgody_nie_pobiera_a_za_zgoda_instaluje(tmp_path, monkeypatch, capsys):
+    """c3 pkt 9 („z paskiem i pytaniem”): w instalacji natywnej (JARVO_ROOT z current.json) brak venvu = kod 127
+    z tym, ile pobierze i jak zainstalować (także `--version`: bez pobierania); `--jarvo-zainstaluj` (zgoda
+    właściciela przez agenta) instaluje przez przy_uzyciu.venv. Potem argumenty bez zmian, MANIMGX_CACHE_DIR
+    w <dane>/jarvo/cache/manimgx, katalog pliku z -o założony przed renderem."""
+    u, app = _instalacja(tmp_path)
+    monkeypatch.setattr(MG, "VENV_KONTENER", tmp_path / "nie-ma")
+    monkeypatch.setattr(MG.sys, "stdin", io.StringIO(""))                          # bez terminala
+    venv = tmp_path / "venvs" / "manimgx-abc"
+    zlecone = []
+    monkeypatch.setattr(MG, "przy_uzyciu", lambda env: (_atrapa_przy_uzyciu(venv, zlecone), u))
+    with pytest.raises(MG.BladManimgx, match="nie jest jeszcze zainstalowany") as e:
+        MG.znajdz({})
+    assert e.value.do_instalacji and "85 MB" in e.value.opis and "227 MB" in e.value.opis
     assert MG.stan({"JARVO_DATA_DIR": str(u.jarvo_dane)})["przy_uzyciu"]["pobranie_mb"] == 85
     uruchomione = []
     monkeypatch.setattr(MG, "uruchom", lambda program, args, env: uruchomione.append((program, args, env)) or 7)
@@ -289,12 +381,49 @@ def test_manimgx_instaluje_venv_przy_pierwszym_wywolaniu(tmp_path, monkeypatch):
     argv = ["render", "scena.py", "Proba", "-r", "640x360", "-o", "out/szkic/proba.mp4"]
     monkeypatch.setenv("JARVO_DATA_DIR", str(u.jarvo_dane))
     monkeypatch.delenv("MANIMGX_CACHE_DIR", raising=False)
+    for przed in (["--version"], argv):
+        assert MG.main(przed) == 127 and zlecone == [] and uruchomione == []
+        err = capsys.readouterr().err
+        assert "manimgx --jarvo-zainstaluj" in err and "Zapytaj właściciela" in err and "85 MB" in err
+    assert MG.main(["--jarvo-zainstaluj"]) == 0 and zlecone == ["manimgx"]
+    assert "ManimGX gotowy" in capsys.readouterr().out
     assert MG.main(argv) == 7 and zlecone == ["manimgx"]
     program, args, env = uruchomione[0]
     assert program == MG.program_venvu(venv) and args == argv
     assert env["MANIMGX_CACHE_DIR"] == str(u.jarvo_dane / "cache" / "manimgx")
     assert (tmp_path / "out" / "szkic").is_dir() and Path(env["MANIMGX_CACHE_DIR"]).is_dir()
     assert MG.main(["--version"]) == 7 and zlecone == ["manimgx"]                     # drugi raz bez instalacji
+
+
+def test_terminal_tylko_prawdziwa_konsola():
+    """Pytanie właściciela tylko w terminalu: proces w tle ma stdin z NUL, a na Windows NUL też „isatty” (wtedy liczy
+    się GetConsoleMode); atrapa bez deskryptora = jej isatty()."""
+    assert przy_uzyciu.terminal(Tty("")) and not przy_uzyciu.terminal(io.StringIO(""))
+    assert not przy_uzyciu.terminal(None)
+    with open(os.devnull, encoding="utf-8") as nul:
+        assert not przy_uzyciu.terminal(nul)
+
+
+@pytest.mark.parametrize("odpowiedz,flota,instaluje", [("t\n", None, True), ("n\n", None, False),
+                                                        ("t\n", "HERMES_KANBAN_TASK", False)])
+def test_manimgx_pyta_tylko_w_terminalu_wlasciciela(tmp_path, monkeypatch, capsys, odpowiedz, flota, instaluje):
+    """Pytanie „Pobrać teraz? [t/N]” tylko w terminalu właściciela; proces floty (agent z terminalem, który może być
+    pseudoterminalem) nie dostaje pytania, tylko kod 127 z radą."""
+    u, _app = _instalacja(tmp_path)
+    monkeypatch.setattr(MG, "VENV_KONTENER", tmp_path / "nie-ma")
+    venv = tmp_path / "venvs" / "manimgx-abc"
+    zlecone = []
+    monkeypatch.setattr(MG, "przy_uzyciu", lambda env: (_atrapa_przy_uzyciu(venv, zlecone), u))
+    monkeypatch.setattr(MG, "uruchom", lambda program, args, env: 0)
+    monkeypatch.setattr(MG.sys, "stdin", Tty(odpowiedz))
+    from jarvo import rece
+    for z in (*rece.ZNACZNIKI_FLOTY, "HERMES_HOME"):
+        monkeypatch.delenv(z, raising=False)
+    if flota:
+        monkeypatch.setenv(flota, "karta-1")
+    assert MG.main(["--version"]) == (0 if instaluje else 127)
+    assert zlecone == (["manimgx"] if instaluje else [])
+    assert ("Pobrać teraz?" in capsys.readouterr().err) is (flota is None)
 
 
 def test_manimgx_natywnie_venv_tej_wersji_a_nie_zmienna(tmp_path, monkeypatch):

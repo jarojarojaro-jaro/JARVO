@@ -5,11 +5,15 @@ Odpowiednik nakładki sh z obrazu (infra/bin/manimgx); tu, a nie w infra/bin, bo
 (profiles/jarvo-wideo/skills/wideo/film-z-kodu/references/manimgx.md). W obrazie venv /opt/jarvo/venvs/manimgx
 przychodzi z dodatkiem obrazu `manim` (JARVO_EXTRAS). Natywnie venv `manimgx` z manifestu (vendor/natywne.yaml,
 `kiedy: przy-uzyciu`: ManimGX 0.1.1 na Pythonie 3.13 z locka infra/python/requirements-manimgx.txt z sumami sha256)
-instaluje pierwsze wywołanie przez jarvo/przy_uzyciu.py, z postępem na stderr (ok. 85 MB pobrania na Windows,
-64 MB na macOS, ok. 230 MB na dysku; próba na Windows 11: 12 s). Potem program przekazuje argumenty do
-`Scripts\\manimgx.exe` (macOS i Linux: bin/manimgx) venvu, z MANIMGX_CACHE_DIR w `<dane>/jarvo/cache/manimgx`
-(układy tekstu i kroje, jak /opt/data/jarvo/cache/manimgx w obrazie), i zwraca jego kod wyjścia. Katalog pliku z
-`render -o` zakłada przed renderem (ManimGX sam tego nie robi).
+instaluje jarvo/przy_uzyciu.py, z postępem na stderr (ok. 85 MB pobrania na Windows, 64 MB na macOS, ok. 230 MB na
+dysku; próba na Windows 11: 12 s), ale dopiero za zgodą (docs/NATYWNIE.md c3 pkt 9: „z paskiem i pytaniem”): w
+terminalu właściciela pierwsze wywołanie pyta „Pobrać teraz? [t/N]”, a proces floty (agent, rutyna, karta kanbana;
+znaczniki jak w jarvo/rece.py) albo wywołanie bez terminala dostaje kod 127 z tym, ile pobierze i jak zainstalować:
+agent pyta właściciela w rozmowie i za jego zgodą woła `manimgx --jarvo-zainstaluj`. Także `--version` przed
+instalacją niczego nie pobiera. Potem program przekazuje argumenty do `Scripts\\manimgx.exe` (macOS i Linux:
+bin/manimgx) venvu, z MANIMGX_CACHE_DIR w `<dane>/jarvo/cache/manimgx` (układy tekstu i kroje, jak
+/opt/data/jarvo/cache/manimgx w obrazie), i zwraca jego kod wyjścia. Katalog pliku z `render -o` zakłada przed
+renderem (ManimGX sam tego nie robi).
 
 Program w `<program>/bin-floty` zakłada `zainstaluj(bin_floty, python)`, jak infra/bin/agent_browser.zainstaluj
 (krok „Programy floty” instalatora, Python 3.13 z instalacji): na Windows `manimgx.exe` = launcher distlib z koła
@@ -19,6 +23,7 @@ jarvo z siebie: kod Jarva bierze z JARVO_REPO albo `<program>/current.json`. Sam
 
     manimgx --version | inspect scena.py Scena | render scena.py Scena -r 1280x720 --fps 30 -o out/scena.mp4
     manimgx --jarvo-stan          # JSON: gdzie venv, czy gotowy, ile pobierze (bez instalacji i bez uruchamiania)
+    manimgx --jarvo-zainstaluj    # instalacja przy pierwszym użyciu (za zgodą właściciela), pasek na stderr
 """
 from __future__ import annotations
 
@@ -38,7 +43,12 @@ NAGLOWEK_SH = "# Jarvo: ManimGX (jarvo/manimgx.py); plik pisze instalacja Jarva,
 
 
 class BladManimgx(RuntimeError):
-    pass
+    """`do_instalacji`: instalacja natywna bez venvu, który da się teraz zainstalować (za zgodą); `opis` = co pobierze,
+    `rada` = jak zainstalować bez terminala właściciela."""
+
+    def __init__(self, opis: str, rada: str = "", *, do_instalacji: bool = False):
+        super().__init__(f"{opis} {rada}".strip())
+        self.opis, self.rada, self.do_instalacji = opis, rada, do_instalacji
 
 
 def _czytaj_json(p: Path) -> dict:
@@ -93,16 +103,29 @@ def _log(tekst: str) -> None:
     print(f"manimgx: {tekst}", file=sys.stderr, flush=True)
 
 
-def znajdz(env: dict, instaluj: bool = True) -> Path:
+def _przed_instalacja(pu, u) -> BladManimgx:
+    """Błąd „jeszcze nie zainstalowany” z tym, ile pobierze pierwsza instalacja (manifest tej wersji, bez sieci)."""
+    try:
+        o = pu.opis_venvu(u, VENV)
+    except pu.BladPrzyUzyciu:
+        o = {}
+    opis = ("ManimGX nie jest jeszcze zainstalowany na tym komputerze: pierwsza instalacja pobierze ok. "
+            f"{o.get('pobranie_mb') or '?'} MB (ok. {o.get('venv_mb') or '?'} MB na dysku, zwykle 1–2 min).")
+    rada = ("Zapytaj właściciela, czy pobrać; za jego zgodą: manimgx --jarvo-zainstaluj (limit czasu polecenia co "
+            "najmniej 300 s), potem to samo polecenie jeszcze raz. Bez zgody wybierz inny silnik.")
+    return BladManimgx(opis, rada, do_instalacji=True)
+
+
+def znajdz(env: dict, instaluj: bool = False) -> Path:
     """Program manimgx venvu. Instalacja natywna: venv dla locka tej wersji Jarva (po aktualizacji nowy, a nie stary
-    ze zmiennej sprzed restartu bramy), przy pierwszym użyciu instalowany teraz, gdy `instaluj`. Poza nią:
-    JARVO_MANIMGX_VENV, obok JARVO_MANIMGX_PYTHON, obraz Jarva."""
+    ze zmiennej sprzed restartu bramy); brak venvu = BladManimgx(do_instalacji=True), a z `instaluj` (zgoda już
+    jest) instalacja teraz. Poza nią: JARVO_MANIMGX_VENV, obok JARVO_MANIMGX_PYTHON, obraz Jarva."""
     pu, u = przy_uzyciu(env)
     if pu is not None:
         gotowy = pu.gotowy_venv(u, VENV)
         if gotowy is None:
             if not instaluj:
-                raise BladManimgx("ManimGX nie jest jeszcze zainstalowany (pierwsze wywołanie manimgx go zainstaluje)")
+                raise _przed_instalacja(pu, u)
             try:
                 gotowy = pu.venv(u, VENV, log=_log)
             except pu.BladPrzyUzyciu as e:
@@ -122,7 +145,8 @@ def znajdz(env: dict, instaluj: bool = True) -> Path:
         if p.is_file():
             return p
     raise BladManimgx("brak ManimGX: w obrazie to dodatek `manim` (JARVO_EXTRAS=\"manim\" w compose/.env, potem "
-                      "deploy.sh --rebuild); natywnie instaluje go pierwsze wywołanie w instalacji Jarva")
+                      "deploy.sh --rebuild); w instalacji natywnej instaluje go za zgodą właściciela program manimgx "
+                      "(manimgx --jarvo-zainstaluj)")
 
 
 def katalog_cache(env: dict) -> Path:
@@ -168,17 +192,50 @@ def stan(env: dict) -> dict:
         return wynik
 
 
+def zgoda_w_terminalu(env: dict, blad: BladManimgx, wejscie=None, wyjscie=None) -> bool:
+    """Pytanie przed pobraniem (c3 pkt 9), tylko w terminalu właściciela. Bez terminala albo w procesie floty (agent,
+    rutyna, karta kanbana: jarvo/rece.py proces_floty) bez pytania: wtedy pyta agent w rozmowie i woła
+    `manimgx --jarvo-zainstaluj`."""
+    wejscie = sys.stdin if wejscie is None else wejscie
+    wyjscie = sys.stderr if wyjscie is None else wyjscie
+    pu, u = przy_uzyciu(env)
+    if pu is None or u is None or not pu.terminal(wejscie):    # NUL na Windows też „isatty”: tylko prawdziwa konsola
+        return False
+    try:
+        flota = importlib.import_module("jarvo.rece").proces_floty(env, u.dane)
+    except (ImportError, AttributeError):
+        return False                              # bez znaczników floty nie wiemy, kto pyta: bez pytania
+    if flota is not None:
+        return False
+    print(f"manimgx: {blad.opis} Pobrać teraz? [t/N] ", end="", file=wyjscie, flush=True)
+    return (wejscie.readline() or "").strip().lower() in ("t", "tak", "y", "yes")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     env = dict(os.environ)
     if args[:1] == ["--jarvo-stan"]:
         print(json.dumps(stan(env), ensure_ascii=False, indent=2))
         return 0
+    if args[:1] == ["--jarvo-zainstaluj"]:        # zgoda właściciela już jest (agent zapytał w rozmowie)
+        try:
+            program = znajdz(env, instaluj=True)
+        except BladManimgx as e:
+            print(f"manimgx: {e}", file=sys.stderr)
+            return 127
+        print(f"ManimGX gotowy: {program}")
+        return 0
     try:
         program = znajdz(env)
     except BladManimgx as e:
-        print(f"manimgx: {e}", file=sys.stderr)
-        return 127
+        if not (e.do_instalacji and zgoda_w_terminalu(env, e)):
+            print(f"manimgx: {e}", file=sys.stderr)
+            return 127
+        try:
+            program = znajdz(env, instaluj=True)
+        except BladManimgx as e2:
+            print(f"manimgx: {e2}", file=sys.stderr)
+            return 127
     cache = katalog_cache(env)
     env["MANIMGX_CACHE_DIR"] = str(cache)
     for katalog in (cache, katalog_wyniku(args)):

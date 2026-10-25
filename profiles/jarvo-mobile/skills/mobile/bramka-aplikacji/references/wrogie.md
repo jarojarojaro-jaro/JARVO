@@ -9,11 +9,11 @@ reviewed: 2026-10-01
 | mały ekran | iPhone SE 375×667, Android 360×640 | `wm size 720x1280`, `wm density 320` | — |
 | duża czcionka | — (`not_run`) | `font_scale 2.0` | `content_size accessibility-extra-extra-extra-large` |
 | tryb ciemny | `colorScheme: dark` + axe | `cmd uimode night yes` | `ui appearance dark` |
-| brak sieci | `setOffline` + pasek „Brak internetu” | tryb samolotowy (`not_run`, gdy urządzenie nie odcina sieci) | — |
-| uprawnienia | — | `pm revoke` wszystkich przyznanych (na buildzie) | — |
+| brak sieci | `setOffline` + pasek „Brak internetu” | tryb samolotowy, Wi-Fi i dane wyłączone (`not_run`, gdy urządzenie nie odcina sieci albo adb idzie przez Wi-Fi) | — |
+| uprawnienia | — | `pm revoke` wszystkich przyznanych w czasie działania, potem `pm grant` (na buildzie) | — |
 | „wstecz” | — | `KEYCODE_BACK` ×2 | — |
 | śmierć procesu | — | HOME + `am kill` + powrót | — |
-| świeża instalacja | — | `pm clear` (na buildzie) | — |
+| świeża instalacja | — | `pm clear` (na buildzie; tylko emulator albo telefon testowy) | — |
 | długie słowa | podmiana tekstów | — | — |
 | awarie | konsola, błędy strony | bufor `crash`, ReactNativeJS | logi symulatora |
 
@@ -28,11 +28,22 @@ reviewed: 2026-10-01
     (`JARVO_ANDROID_ADB`).
 - `urzadzenie.py status` z kodem 3 = telefon wyłączony albo nie widać urządzenia: komunikat mówi, co zrobić; poproś
   właściciela o `jarvo android on` (albo zostaw warstwę Androida jako „niezmierzoną”), nie udawaj wyniku. Okno
-  „Zezwolić na debugowanie USB?” na telefonie akceptuje właściciel, nigdy Ty.
+  „Zezwolić na debugowanie USB?” na telefonie akceptuje właściciel, nigdy Ty. `jarvo android on`, `ekran` i licencję
+  Google robi tylko właściciel w swoim terminalu: z Twojego terminala to odmowa.
+- Na komputerze właściciela urządzeniem bywa jego **prywatny telefon**, więc test zostawia go takim, jakim był: przed
+  każdą zmianą (czcionka, rozmiar ekranu, tryb ciemny, tryb samolotowy z Wi-Fi i danymi, uprawnienia, tryb demo przy
+  zrzutach do sklepów) skrypt zapisuje obecną wartość w dzienniku przywróceń, a po teście przywraca ją i sprawdza,
+  także po błędzie. Wartości, której nie odczyta, nie zmienia (`not_run`); offline przez Wi-Fi to `not_run` (tryb
+  samolotowy odciąłby adb), a `pm clear` tylko na emulatorze albo telefonie, który właściciel oznaczył jako testowy
+  (`jarvo android on --telefon-testowy`). Kod 4 = coś zostało zmienione (np. telefon odłączony w trakcie): powiedz to
+  właścicielowi tymi słowami, co jest zmienione; `urzadzenie.py przywroc` przywraca resztę, gdy telefon znów
+  odpowiada (robi to też każde następne polecenie i `jarvo android off`), a `wrogie` nie ruszy, dopóki coś zalega.
+  Gdy prosisz o telefon do testów, dodaj, że najlepszy jest telefon testowy, nie prywatny.
 - Właściciel może patrzeć na ekran i klikać razem z Tobą: na komputerze właściciela okno `jarvo android ekran` (scrcpy
-  w osobnym oknie, pobierane przy pierwszym użyciu; podgląd w HQ jest tam wyłączony), na serwerze z kontenerem link
-  `@@PY@@ "@@REPO_DIR@@/scripts/jarvo_link.py" --android` (12 h) albo przycisk 📱 w Twoim panelu w HQ. Proponuj go,
-  gdy prosisz o ręczny test albo pokazujesz przepływ.
+  w osobnym oknie, pobierane przy pierwszym użyciu; otwiera je właściciel), na serwerze z kontenerem link
+  `@@PY@@ "@@REPO_DIR@@/scripts/jarvo_link.py" --android` (12 h) albo przycisk 📱 w Twoim panelu w HQ. Na komputerze
+  właściciela podglądu w HQ nie ma: `jarvo_link.py --android` kończy się tam kodem 3 z tym komunikatem, więc nie
+  podawaj linku, tylko poproś o okno. Proponuj podgląd, gdy prosisz o ręczny test albo pokazujesz przepływ.
 - Redroid nie ma usług Google: powiadomień FCM, logowania Google i Map nie sprawdzi (→ emulator przy KVM albo telefon
   właściciela).
 

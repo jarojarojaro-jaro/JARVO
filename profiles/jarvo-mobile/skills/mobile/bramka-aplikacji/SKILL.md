@@ -36,7 +36,10 @@ Android, symulator iOS). „Szablonowa” aplikacja nie przechodzi: to nie tylko
 3. **Warstwa Android (gdy jest urządzenie):** `@@PY@@ "$HERMES_HOME/scripts/urzadzenie.py" status`; jest →
    `urzadzenie.py wrogie <pakiet albo exp://…> <app>/out/jakosc/wrogie-android` (duża czcionka, mały ekran, ciemny,
    offline, odebrane uprawnienia, „wstecz”, śmierć procesu, świeża instalacja; awarie z logów). Kod 3 = nie ma
-   urządzenia: zapisz to jako „niezmierzone”, nie zgaduj.
+   urządzenia: zapisz to jako „niezmierzone”, nie zgaduj. Telefon to często prywatny telefon właściciela: skrypt
+   przywraca po każdym teście każde ustawienie, a czego nie da się bezpiecznie zrobić (offline przez Wi-Fi, `pm clear`
+   na nie-testowym telefonie), daje `not_run` z powodem. Kod 4 = na telefonie zostały zmienione ustawienia (lista na
+   stderr): powiedz o tym właścicielowi od razu, a gdy telefon znów odpowiada, `urzadzenie.py przywroc`.
 4. **Warstwa iOS (gdy właściciel podłączył repo i token):** `@@PY@@ "$HERMES_HOME/scripts/ios_ci.py" przygotuj <app>`,
    `wypchnij`, `uruchom --tryb expo-go` (symulator iPhone 17 Pro Max: jasny, ciemny, największa czcionka, logi).
    Bez `GITHUB_TOKEN` → niezmierzone + instrukcja z `references/wrogie.md`.

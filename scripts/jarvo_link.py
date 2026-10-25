@@ -12,6 +12,9 @@ Link jest ważny 7 dni; ten sam katalog dostaje ten sam link.
     python3 /opt/jarvo/repo/scripts/jarvo_link.py --android
 
 Link do ekranu telefonu testowego z Androidem (proxy Jarvo HQ, port 9122; profil compose „android”), ważny 12 godzin.
+W instalacji natywnej (JARVO_ROOT z program/current.json) podglądu w HQ nie ma (decyzja I24, docs/NATYWNIE.md U05):
+zamiast linku, który by nie działał, kod 3 i komunikat; ekran telefonu pokazuje okno scrcpy na komputerze
+właściciela (`jarvo android ekran`, otwiera je właściciel).
 """
 
 from __future__ import annotations
@@ -41,6 +44,17 @@ def base_url(env: str = "JARVO_PREVIEW_URL", klucz: str = "url", domyslny: str =
     return (url or domyslny).rstrip("/")
 
 
+ANDROID_NATYWNIE = ("✗ podgląd ekranu telefonu w HQ (port 9122) jest w instalacji natywnej wyłączony (decyzja I24), "
+                    "więc link by nie działał. Ekran telefonu pokazuje okno scrcpy na komputerze właściciela: poproś "
+                    "go o `jarvo android ekran` (otwiera je w swoim terminalu).")
+
+
+def natywnie() -> bool:
+    """Instalacja natywna Jarva: JARVO_ROOT procesów floty z `program/current.json` (w kontenerze go nie ma)."""
+    k = os.environ.get("JARVO_ROOT")
+    return bool(k) and (Path(k) / "program" / "current.json").is_file()
+
+
 def link_android(now: float) -> str:
     token = core.link_for(core.LINKS_FILE, core.SCREEN_ROOT, now, core.SCREEN_TTL)
     return f"{base_url('JARVO_ANDROID_SCREEN_URL', 'android_url', 'http://localhost:9122')}/{token}/"
@@ -64,6 +78,9 @@ def main(argv: list[str]) -> int:
         return 0 if argv else 2
     roots, now, bad = core.Roots(), time.time(), 0
     if argv == ["--android"]:
+        if natywnie():
+            print(ANDROID_NATYWNIE, file=sys.stderr)
+            return 3
         print(link_android(now))
         return 0
     for raw in argv:

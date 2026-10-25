@@ -17,11 +17,17 @@ JARVO_CAD_PYTHON, ADB_MDNS); procesy, które już działają (brama i panel), do
 programy floty pytają o narzędzie tym modułem (`gotowe_narzedzie`, `gotowy_venv`), a nie tylko o zmienną.
 
 Wołają go procesy Jarva i floty (`jarvo android`, cad.py w terminalu agenta, manimgx): korzeń z JARVO_ROOT albo
-domyślny (jarvo/sciezki.py), kod aktywnej wersji z `<program>/current.json`. Bez instalacji natywnej (kontener:
-narzędzia są w obrazie) `natywnie()` daje False i nic nie instalujemy. Sama biblioteka standardowa.
+domyślny (jarvo/sciezki.py), kod aktywnej wersji z `<program>/current.json`, katalog cache instalacji z jej zapisu
+(`uklad_instalacji`: na Linuksie JARVO_ROOT z otoczenia floty przeniósłby cache pod korzeń). Bez instalacji natywnej
+(kontener: narzędzia są w obrazie) `natywnie()` daje False i nic nie instalujemy. Każdy błąd instalacji (sieć, suma,
+uv zablokowany przez ochronę systemu, zapis na dysku) to BladPrzyUzyciu z radą, nigdy ślad stosu. Pobieraniem
+sterują wołający (c3 pkt 9: „z paskiem i pytaniem”): `jarvo android` pyta o licencję Google, a program manimgx
+instaluje venv dopiero za zgodą (pytanie w terminalu właściciela albo `manimgx --jarvo-zainstaluj`). Sama biblioteka
+standardowa.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import sys
@@ -46,8 +52,49 @@ def _stderr(tekst: str) -> None:
 
 
 def uklad(env: dict | None = None) -> Uklad:
-    """Układ katalogów instalacji: JARVO_ROOT z otoczenia (procesy Jarva i floty go mają) albo domyślny korzeń."""
-    return sciezki.uklad(env)
+    """Układ katalogów instalacji: JARVO_ROOT z otoczenia (procesy Jarva i floty go mają) albo domyślny korzeń,
+    z katalogiem cache tej instalacji (uklad_instalacji)."""
+    return uklad_instalacji(sciezki.uklad(env))
+
+
+def uklad_instalacji(u: Uklad) -> Uklad:
+    """Układ z katalogiem cache, z którym działa instalacja. Procesy floty mają JARVO_ROOT w otoczeniu
+    (jarvo/srodowisko.py), a na Linuksie JARVO_ROOT przenosi cache z katalogów XDG pod korzeń (sciezki.uklad), więc
+    przy domyślnym korzeniu pierwsze użycie z terminala agenta zapisałoby w srodowisko.json inne UV_CACHE_DIR,
+    PIP_CACHE_DIR, npm_config_cache, HF_HOME i XDG_CACHE_HOME niż instalator (następny przebieg instalacji: zmiana
+    srodowisko.json i restart usług), a pobrania i cache uv trafiłyby do drugiego katalogu. Cache bierzemy z zapisu
+    instalatora: UV_CACHE_DIR = <cache>/uv w <stan>/srodowisko.json (krok „Środowisko procesów” pisze go zawsze).
+    Bez pliku (instalacja niedokończona) układ bez zmian."""
+    zapis = srodowisko.wczytaj_json(u.stan / "srodowisko.json").get("UV_CACHE_DIR")
+    if isinstance(zapis, str) and os.path.isabs(zapis) and Path(zapis).name == "uv":
+        cache = Path(zapis).parent
+        if os.path.normcase(os.path.abspath(cache)) != os.path.normcase(os.path.abspath(u.cache)):
+            return dataclasses.replace(u, cache=cache)
+    return u
+
+
+def terminal(strumien) -> bool:
+    """Czy `strumien` (zwykle sys.stdin) to terminal, w którym można zapytać właściciela. Na Windows isatty() daje True
+    także dla NUL (stdin=DEVNULL procesu w tle, zadanie Harmonogramu), więc tam liczy się jeszcze GetConsoleMode
+    uchwytu. Strumień bez deskryptora (atrapa w testach) = to, co mówi jego isatty()."""
+    try:
+        if strumien is None or not strumien.isatty():
+            return False
+    except (AttributeError, ValueError, OSError):
+        return False
+    try:
+        fd = strumien.fileno()
+    except (AttributeError, ValueError, OSError):
+        return True
+    if not WINDOWS:
+        return True
+    try:
+        import ctypes
+        import msvcrt
+        tryb = ctypes.c_ulong()
+        return bool(ctypes.windll.kernel32.GetConsoleMode(msvcrt.get_osfhandle(fd), ctypes.byref(tryb)))
+    except (AttributeError, ValueError, OSError):
+        return False
 
 
 def natywnie(u: Uklad) -> bool:
@@ -133,9 +180,15 @@ def _plik(app: Path, nazwa: str, platforma: str | None) -> tuple[str, dict]:
         raise BladPrzyUzyciu(f"{nazwa}: nie ma go w manifeście tej wersji Jarva ({Path(app) / manifest.LOCK})")
     try:
         plik = manifest.plik(narz, nazwa, platforma or sciezki.platforma())
+        wersja = manifest.wersja(narz, nazwa)
     except manifest.BrakNarzedzia as e:
         raise BladPrzyUzyciu(str(e)) from None
-    return manifest.wersja(narz, nazwa), plik
+    except (KeyError, TypeError, ValueError, sciezki.BladUkladu) as e:
+        raise BladPrzyUzyciu(f"{nazwa}: wpis w manifeście {Path(app) / manifest.LOCK} jest niepełny ({e}): uruchom "
+                             "instalację Jarva jeszcze raz") from None
+    if not isinstance(plik, dict) or not plik.get("sha256"):
+        raise BladPrzyUzyciu(f"{nazwa}: wpis w manifeście bez pliku z sumą dla tej platformy")
+    return wersja, plik
 
 
 def _spis_narzedzia(wersja: str, plik: dict, katalog: Path) -> dict:
@@ -182,24 +235,26 @@ def narzedzie(u: Uklad, nazwa: str, *, app: Path | None = None, platforma: str |
     wersja, plik = _plik(app, nazwa, platforma)
     katalog = u.program / "narzedzia" / nazwa / pobieracz.katalog_wersji(wersja)
     spis = _spis_narzedzia(wersja, plik, katalog)
-    if _gotowy_katalog(katalog, plik):
-        if wpis(u, nazwa) != spis:
-            zapisz_wpis(u, nazwa, spis)
-        return spis
-    with przenosne.Zamek(u.stan / ZAMEK):
-        if not _gotowy_katalog(katalog, plik):          # drugi proces mógł skończyć, gdy czekaliśmy
-            log(f"{nazwa} {wersja}: pierwsze użycie, pobieram z sumą z manifestu "
-                f"({round(int(plik.get('rozmiar') or 0) / 1e6, 1)} MB)")
-            try:
+    try:
+        if _gotowy_katalog(katalog, plik):
+            if wpis(u, nazwa) != spis:
+                zapisz_wpis(u, nazwa, spis)
+            return spis
+        with przenosne.Zamek(u.stan / ZAMEK):
+            if not _gotowy_katalog(katalog, plik):          # drugi proces mógł skończyć, gdy czekaliśmy
+                log(f"{nazwa} {wersja}: pierwsze użycie, pobieram z sumą z manifestu "
+                    f"({round(int(plik.get('rozmiar') or 0) / 1e6, 1)} MB)")
                 pobieracz.zainstaluj(nazwa, wersja, plik, u.program / "narzedzia", u.cache / "pobrane", pasek=pasek,
                                      wyjscie=sys.stderr)
-            except pobieracz.BladPobierania as e:
-                raise BladPrzyUzyciu(f"{str(e).rstrip('.')}. Przy błędzie sieci spróbuj jeszcze raz (pobieranie "
-                                     "wznowi się); inna suma albo uszkodzone archiwum to sprawa do zgłoszenia, "
-                                     "nie do obejścia.") from None
-            except OSError as e:
-                raise BladPrzyUzyciu(f"{nazwa}: instalacja w {katalog} się nie udała ({e.strerror or e})") from None
-        zapisz_wpis(u, nazwa, spis)
+            zapisz_wpis(u, nazwa, spis)
+    except pobieracz.BladPobierania as e:
+        raise BladPrzyUzyciu(f"{str(e).rstrip('.')}. Przy błędzie sieci spróbuj jeszcze raz (pobieranie "
+                             "wznowi się); inna suma albo uszkodzone archiwum to sprawa do zgłoszenia, "
+                             "nie do obejścia.") from None
+    except OSError as e:
+        raise BladPrzyUzyciu(f"{nazwa}: instalacja w {katalog} albo zapis w {u.stan} się nie udał "
+                             f"({e.strerror or e}): sprawdź miejsce na dysku i uprawnienia, potem spróbuj jeszcze "
+                             "raz") from None
     log(f"{nazwa} {wersja}: gotowe ({katalog})")
     return spis
 
@@ -209,10 +264,12 @@ def narzedzie(u: Uklad, nazwa: str, *, app: Path | None = None, platforma: str |
 def _wpis_venvu(app: Path, nazwa: str) -> dict:
     try:
         w = manifest.venvy(app).get(nazwa)
-    except (OSError, ValueError) as e:
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
         raise BladPrzyUzyciu(f"manifest narzędzi {Path(app) / manifest.LOCK} jest nieczytelny ({e})") from None
     if not isinstance(w, dict):
         raise BladPrzyUzyciu(f"venv {nazwa}: nie ma go w manifeście tej wersji Jarva ({Path(app) / manifest.LOCK})")
+    if not w.get("sha256") or not w.get("lock"):
+        raise BladPrzyUzyciu(f"venv {nazwa}: wpis w manifeście bez locka albo jego sumy ({Path(app) / manifest.LOCK})")
     return w
 
 
@@ -234,10 +291,10 @@ def gotowy_venv(u: Uklad, nazwa: str, *, app: Path | None = None) -> dict | None
     try:
         w = _wpis_venvu(app, nazwa)
         _uv, py = _programy_venvu(u, w, nazwa)
-    except BladPrzyUzyciu:
+        kat = venvy.katalog(u, nazwa, w)
+        return venvy.wpis_spisu(nazwa, w, kat) if venvy.gotowy(kat, w, py) else None
+    except (BladPrzyUzyciu, OSError):
         return None
-    kat = venvy.katalog(u, nazwa, w)
-    return venvy.wpis_spisu(nazwa, w, kat) if venvy.gotowy(kat, w, py) else None
 
 
 def opis_venvu(u: Uklad, nazwa: str, *, app: Path | None = None, platforma: str | None = None) -> dict:
@@ -254,19 +311,27 @@ def venv(u: Uklad, nazwa: str, *, app: Path | None = None, log: Callable[[str], 
     z wyjściem uv w `log` i wpis `venv-<nazwa>` w narzedzia.json. Zwraca wpis (katalog, python, env)."""
     if not natywnie(u):
         raise BladPrzyUzyciu(f"venv {nazwa}: brak instalacji natywnej Jarva w {u.root}")
+    from .hermes import BladHermesa                 # venvy uruchamia uv przez hermes._strumien
     app = Path(app) if app else app_instalacji(u)
     w = _wpis_venvu(app, nazwa)
     uv, py = _programy_venvu(u, w, nazwa)
-    kat = venvy.katalog(u, nazwa, w)
-    if not venvy.gotowy(kat, w, py):
-        o = opis_venvu(u, nazwa, app=app)
-        log(f"venv {nazwa}: pierwsze użycie, instaluję z locka z sumami ({o['paczek'] or '?'} paczek, ok. "
-            f"{o['pobranie_mb'] or '?'} MB pobrania, ok. {o['venv_mb'] or '?'} MB na dysku; zwykle 1–3 min)")
     try:
+        kat = venvy.katalog(u, nazwa, w)
+        if not venvy.gotowy(kat, w, py):
+            o = opis_venvu(u, nazwa, app=app)
+            log(f"venv {nazwa}: pierwsze użycie, instaluję z locka z sumami ({o['paczek'] or '?'} paczek, ok. "
+                f"{o['pobranie_mb'] or '?'} MB pobrania, ok. {o['venv_mb'] or '?'} MB na dysku; zwykle 1–3 min)")
         spis, _zmiana = venvy.zainstaluj(u, app, nazwa, w, uv=uv, python=py, log=log)
+        zapisz_wpis(u, f"venv-{nazwa}", spis)
     except venvy.BladVenvu as e:
         raise BladPrzyUzyciu(str(e)) from None
-    zapisz_wpis(u, f"venv-{nazwa}", spis)
+    except BladHermesa as e:
+        raise BladPrzyUzyciu(f"venv {nazwa}: {str(e).rstrip('.')}. Gdy system blokuje uv ({uv}), np. Smart App "
+                             "Control albo antywirus, dopuść program instalacji Jarva i spróbuj jeszcze raz.") from None
+    except (OSError, KeyError, TypeError, ValueError) as e:
+        raise BladPrzyUzyciu(f"venv {nazwa}: instalacja albo zapis w {u.program / 'venvs'} i {u.stan} się nie udał "
+                             f"({getattr(e, 'strerror', None) or e}): sprawdź miejsce na dysku i uprawnienia, potem "
+                             "spróbuj jeszcze raz") from None
     return spis
 
 

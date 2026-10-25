@@ -309,30 +309,54 @@ def ekrany_web(kat: Path, trasy: list[str], urzadzenia: list[str], motyw: str) -
 
 
 def ekrany_android(kat: Path, trasy: list[str]) -> dict[str, Path]:
+    """Zrzuty z telefonu testowego floty w trybie demo paska stanu (9:41, pełna bateria, bez powiadomień). Zgoda na
+    tryb demo i sam tryb wracają po zrzutach do stanu sprzed nich (urzadzenie.Zmiany: wartość zapisana przed zmianą,
+    przywrócona i sprawdzona także po błędzie); telefon właściciela, którego ustawienia nie da się odczytać, nie
+    dostaje trybu demo (zrzut pokazałby jego powiadomienia), tylko błąd z radą."""
     import urzadzenie as ur
     app = _app(kat)
     adb = ur.Adb()
-    adb.polacz()
+    try:
+        adb.polacz()
+    except ur.BrakUrzadzenia as e:
+        raise Blad(f"telefon testowy: {e}") from None
     surowe = kat / "out" / "sklep" / ".robocze" / "surowe" / "android"
     pakiet, schemat = app.get("pakiet_android"), app.get("scheme")
-    if pakiet not in adb.sh(f"pm list packages {pakiet}"):
-        raise Blad(f"na telefonie testowym nie ma {pakiet}: zainstaluj build (`urzadzenie.py zainstaluj plik.apk`)")
-    demo = ["settings put global sysui_demo_allowed 1",
-            "am broadcast -a com.android.systemui.demo -e command enter",
+    demo = ["am broadcast -a com.android.systemui.demo -e command enter",
             "am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941",
             "am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false",
             "am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 -e mobile show -e datatype none -e level 4",
             "am broadcast -a com.android.systemui.demo -e command notifications -e visible false"]
-    out = {}
+    out: dict[str, Path] = {}
+    zm = ur.Zmiany(adb, "zrzuty-do-sklepu")
+    blad: Blad | None = None
     try:
-        for p in demo:
-            adb.sh(p)
+        if pakiet not in adb.sh(f"pm list packages {pakiet}"):
+            raise Blad(f"na telefonie testowym nie ma {pakiet}: zainstaluj build (`urzadzenie.py zainstaluj plik.apk`)")
+        jednorazowe = ur.urzadzenie_testowe(adb)["jednorazowe"]
+        zgoda, odczytana = ur.odczytaj(adb, "demo_zgoda", jednorazowe)
+        if zgoda is None:
+            raise Blad("nie odczytam ustawienia sysui_demo_allowed telefonu, więc nie włączę trybu demo paska stanu "
+                       "(nie umiałbym go przywrócić, a zrzut bez niego pokazałby powiadomienia właściciela); zrzuty "
+                       "Androida z emulatora albo telefonu testowego")
+        if zgoda != "1":
+            zm.zmien("demo_zgoda", zgoda, ["settings put global sysui_demo_allowed 1"], sprawdz=odczytana)
+        zm.zmien("demo", "1", demo)
         for t in trasy:
             adb.sh(f"am start -a android.intent.action.VIEW -d '{schemat}://{t.lstrip('/')}' {pakiet}")
             time.sleep(float(ur.CZEKAJ_S))
             out[f"android:{t}"] = ur.zrzut(adb, surowe / f"{_nazwa(t)}.png")
+    except RuntimeError as e:
+        blad = Blad(f"telefon testowy (adb): {e}")
+    except Blad as e:
+        blad = e
     finally:
-        adb.sh("am broadcast -a com.android.systemui.demo -e command exit")
+        nie = zm.przywroc()
+    if nie:
+        raise Blad(f"na telefonie zostały zmienione ustawienia: {', '.join(nie)}; przywróci je `urzadzenie.py przywroc`, "
+                   "gdy telefon znów odpowiada (powiedz o tym właścicielowi)" + (f"; wcześniej: {blad}" if blad else ""))
+    if blad is not None:
+        raise blad
     return out
 
 

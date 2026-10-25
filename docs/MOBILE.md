@@ -100,13 +100,28 @@ telefon właściciela przez Expo Go albo TestFlight i wynajęty na minuty Mac w 
 
 | Gdzie stoi flota | Urządzenie do testów | Uwagi |
 |---|---|---|
+| **Komputer właściciela, Jarvo bez kontenera** (Windows, macOS, Linux) | **telefon właściciela** przez USB z debugowaniem albo przez Wi-Fi (Android 11+: `jarvo android on --paruj ADRES:PORT --kod KOD`, potem `--wifi ADRES:PORT`), albo emulator z Android Studio | adb z Android SDK Platform-Tools r37.0.1 (pierwsze `jarvo android on` pobiera je od Google po akceptacji licencji przez właściciela; Linux arm64: adb z systemu); ekran w osobnym oknie scrcpy 5.0.1 (`jarvo android ekran`); podgląd 📱 w HQ wyłączony (I24) |
 | **Serwer Ubuntu z KVM** (`ls /dev/kvm`) | **oficjalny emulator Androida (AVD) w Dockerze**: obraz [docker-android](https://github.com/HQarroum/docker-android) `api-33` (MIT, x86_64 `google_apis`, gotowy na Docker Hub, aktualizowany 05.2026); nowsze API przez jego `API_LEVEL` przy własnym budowaniu | emulator Google z usługami Google, pełna zgodność z Expo; 3–4 GB RAM, 2–4 rdzenie. [budtmo/docker-android](https://github.com/budtmo/docker-android) odrzucony: licencja wymaga zgody na zbieranie danych |
 | **Windows 11 (WSL2)** | ten sam emulator w Docker Engine **wewnątrz** dystrybucji WSL (zagnieżdżona wirtualizacja jest domyślnie włączona, [wsl-config](https://learn.microsoft.com/en-us/windows/wsl/wsl-config)) | Docker Desktop może nie przekazać kontenerom KVM, dlatego `jarvo android on` sprawdza to próbnym kontenerem zamiast zgadywać; Redroid w WSL wymaga własnego jądra, więc odpada |
 | **Serwer Ubuntu bez KVM, VPS 8 GB** | **[Redroid](https://github.com/remote-android/redroid-doc)** (Android 14 w kontenerze, bez wirtualizacji), moduł jądra `binder_linux` z pakietu `linux-modules-extra` | ok. 1,5–2 GB RAM; obraz `14.0.0` (15 i 16 mają znany błąd bindera); kontener `--privileged`; grafika programowa (ok. 15 kl./s); **bez usług Google** |
 | VPS bez możliwości ładowania modułów (OpenVZ, LXC) | brak urządzenia lokalnie | telefon właściciela + chmura (§5.4) |
 | **Serwer z procesorem ARM** (Ampere, Graviton, Raspberry Pi) | Redroid (obraz jest też dla arm64) | obraz emulatora jest tylko dla x86_64, więc `jarvo android on` na ARM od razu wybiera Redroid (`--emulator` odmawia); Windows na ARM (WSL2): prawdziwy telefon |
 
-**Włączenie jednym poleceniem:** `jarvo android on` wybiera wariant sam: `/dev/kvm` dostępne dla Dockera → emulator
+**Na komputerze właściciela** (instalacja natywna, jarvo/android.py) `jarvo android on` uruchamia serwer adb
+(ADB_MDNS=0: bez szukania telefonów w sieci lokalnej; log w `<logi>/adb.log`, na macOS i Linuksie katalog domowy adb
+w `<stan>/adb-dom`), wybiera urządzenie floty (jedyne gotowe albo `--urzadzenie SERIAL`) i zapisuje je
+w `<stan>/android.json`; `urzadzenie.py` bierze stamtąd urządzenie, a przy kilku albo żadnym kończy się kodem 3
+z radą. `on`, `ekran` i akceptację licencji Google robi tylko właściciel w swoim terminalu (z procesu floty odmowa).
+`jarvo android off` = flota nie używa telefonu (serwer adb zatrzymany, okno scrcpy zamyka się samo). Pliki, które adb
+zakłada poza katalogiem Jarva (Windows: klucz w profilu konta), trafiają do dziennika zmian hosta przed poleceniem adb,
+więc `jarvo uninstall` je usuwa. Urządzeniem bywa prywatny telefon właściciela, więc testy wrogie (§6) i tryb demo
+zrzutów do sklepów zapisują każdą zmienianą wartość przed zmianą (`<stan>/android-przywroc.json`), przywracają ją po
+teście i sprawdzają; czego nie zdążą (telefon odłączony w trakcie), przywraca `urzadzenie.py przywroc`, następne
+użycie albo `jarvo android off`. Wartości nieczytelnej nie zmieniają, offline przez Wi-Fi to `not_run`, a dane
+aplikacji (`pm clear`) czyszczą tylko na emulatorze albo telefonie oznaczonym jako testowy
+(`jarvo android on --telefon-testowy`). Najlepiej podłączyć telefon testowy, nie prywatny.
+
+**Włączenie jednym poleceniem (serwer z kontenerem):** `jarvo android on` wybiera wariant sam: `/dev/kvm` dostępne dla Dockera → emulator
 (profil compose `android-kvm`), inaczej binder w jądrze → Redroid (profil `android`; brakujący moduł `binder_linux`
 ładuje, w razie potrzeby doinstalowuje `linux-modules-extra`, i zapisuje go w `modules-load.d`), inaczej wyjaśnia, czemu
 się nie da (macOS, WSL bez KVM albo z Docker Desktop, VPS na OpenVZ/LXC) i odsyła do prawdziwego telefonu. Wybór
@@ -125,6 +140,8 @@ i z Redroidem. Sam nie ma żadnej autoryzacji, więc działa tylko w sieci floty
 HQ na porcie 9122: link z tokenem (12 h) z przycisku **📱 Ekran telefonu** w panelu Twórcy aplikacji albo od agenta
 (`scripts/jarvo_link.py --android`), token zamieniany na ciasteczko `HttpOnly`, każde żądanie i WebSocket sprawdzane
 (szczegóły: [HQ.md](HQ.md)). Port adb (5555) nigdy nie jest publikowany na zewnątrz, urządzenie żyje w sieci wewnętrznej floty.
+W instalacji natywnej tego podglądu nie ma (decyzja I24): `jarvo_link.py --android` kończy się tam kodem 3
+z komunikatem zamiast linku, który by nie działał, a ekran telefonu pokazuje okno `jarvo android ekran`.
 
 **Automatyzacja.** `adb` w kontenerze agenta (instalacja, zrzuty `screencap`, logi `logcat`), przepływy
 [Maestro](https://github.com/mobile-dev-inc/Maestro) 2.11 (Apache-2.0, Java 17, wbudowany serwer MCP; rozmawia tylko z adb na
