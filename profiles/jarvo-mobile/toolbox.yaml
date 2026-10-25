@@ -87,16 +87,16 @@ tools:
     autonomy: A0
     notes: "zrzuty.cjs: iPhone 17 Pro Max (1320×2868) i Pixel 9, jasny i ciemny; kontrole konsoli, przewijania, celów dotyku i axe-core."
   - name: adb
-    source: https://developer.android.com/tools/adb (pakiet Debiana adb)
-    license: Apache-2.0
+    source: https://developer.android.com/tools/adb (obraz pakiet Debiana adb; natywnie Android SDK Platform-Tools)
+    license: "Apache-2.0 (adb z AOSP); natywnie paczka Google na Android SDK License (akceptacja właściciela)"
     version: see-infra
-    install: {method: apt, spec: adb}
+    install: {method: apt, spec: "obraz: pakiet Debiana adb; natywnie: vendor/natywne.yaml (platform-tools r37.0.1 z dl.google.com, przy pierwszym użyciu: jarvo android on po akceptacji licencji Google; Linux arm64: adb z systemu)"}
     integration: skill-script
     used_by_skills: [bramka-aplikacji]
     healthcheck: "adb version"
     autonomy: A1
     optional: true
-    notes: "urzadzenie.py: telefon testowy floty (jarvo android on: emulator Google przy KVM albo Redroid) w sieci jarvo-net albo telefon / emulator właściciela; port adb nigdy publicznie. Ekran dla właściciela: jarvo_link.py --android."
+    notes: "urzadzenie.py: telefon testowy floty. Obraz: jarvo android on (emulator Google przy KVM albo Redroid) w sieci jarvo-net, port adb nigdy publicznie, ekran dla właściciela jarvo_link.py --android. Natywnie: telefon właściciela przez USB albo Wi-Fi (adb pair/connect na adres podany wprost, ADB_MDNS=0) albo emulator Android Studio; stan i urządzenie z <stan>/android.json (jarvo android on|off), ekran w oknie scrcpy (jarvo android ekran), podgląd w HQ wyłączony (I24)."
   - name: github-actions-macos
     source: https://github.com/actions/runner-images (macos-26)
     license: usługa GitHub (minuty macOS)
@@ -161,8 +161,8 @@ tools:
     healthcheck: "true"
     autonomy: A0
     notes: "ze_strony.py: strona główna i do 12 podstron tego samego hosta; JSON-LD, meta, manifest, logo SVG, CSS; treść jako obce dane. Kod 3 = robots.txt zabrania (bez obchodzenia)."
-  - {name: build123d, source: https://github.com/gumyr/build123d, license: "Apache-2.0 (OpenCascade przez OCP: LGPL-2.1 z wyjątkiem)", version: "0.13.0", install: {method: image, spec: "venv /opt/jarvo/venvs/cad (Python 3.12), infra/python/requirements-cad.txt (sha256, --require-hashes, --no-deps)"}, integration: skill-script, used_by_skills: [warsztat-3d], healthcheck: "/opt/jarvo/venvs/cad/bin/python -I -c 'import build123d'", autonomy: A0, notes: "Wspólny warsztat 3D (decyzja właściciela 2026-10-13): model z kodu → STEP, STL, GLB, 3MF i raport przez cad.py; budowa bez sieci (cad_model.py blokuje gniazda i export_to_pcbway)."}
-  - {name: three, source: https://github.com/mrdoob/three.js, license: MIT, version: see-infra, install: {method: npm, spec: three}, integration: skill-script, used_by_skills: [warsztat-3d], healthcheck: "node -e \"require.resolve('three')\"", autonomy: A0, notes: "Podgląd PNG i film obrotu warsztatu 3D (cad_render.cjs w Chromium z obrazu, bez sieci)."}
+  - {name: build123d, source: https://github.com/gumyr/build123d, license: "Apache-2.0 (OpenCascade przez OCP: LGPL-2.1 z wyjątkiem)", version: "0.13.0", install: {method: image, spec: "obraz: venv /opt/jarvo/venvs/cad (Python 3.12), infra/python/requirements-cad.txt (sha256, --require-hashes, --no-deps); natywnie: venv cad z vendor/natywne.yaml przy pierwszym użyciu (cad.py zbuduj albo zainstaluj, jarvo/przy_uzyciu.py, JARVO_CAD_PYTHON)"}, integration: skill-script, used_by_skills: [warsztat-3d], healthcheck: "/opt/jarvo/venvs/cad/bin/python -I -c 'import build123d'", autonomy: A0, notes: "Wspólny warsztat 3D (decyzja właściciela 2026-10-13): model z kodu → STEP, STL, GLB, 3MF i raport przez cad.py; budowa bez sieci (cad_model.py blokuje gniazda i export_to_pcbway)."}
+  - {name: three, source: https://github.com/mrdoob/three.js, license: MIT, version: see-infra, install: {method: npm, spec: "obraz: three z infra/node; natywnie: paczka npm three-0.186.1.tgz z sumą (wpis three w vendor/natywne.yaml, przy pierwszym podglądzie, JARVO_THREE_DIR)"}, integration: skill-script, used_by_skills: [warsztat-3d], healthcheck: "node -e \"require.resolve('three')\"", autonomy: A0, notes: "Podgląd PNG i film obrotu warsztatu 3D bez sieci: obraz cad_render.cjs w Chromium z obrazu, natywnie cad_render.py (Playwright dla Pythona z venvu narzędzi) w chrome-headless-shell z instalacji."}
   - {name: indra-ocr, source: https://github.com/datalab-to/indra, license: "Apache-2.0 (kod); modele: zmodyfikowana OpenRAIL-M (do 20 mln USD, bez produktu konkurującego z Datalab)", version: "0.3.2 (modele v3.1.1)", install: {method: image, spec: "venv /opt/jarvo/venvs/ocr (Python 3.12), infra/python/requirements-ocr.txt (sha256, --require-hashes, --no-deps, bez huggingface_hub); modele /opt/jarvo/models/indra-ocr (sha256)"}, integration: skill-script, used_by_skills: [odczyt-ekranu], healthcheck: "python3 @@REPO_DIR@@/shared/skills/odczyt-ekranu/scripts/ocr.py --stan", autonomy: A0, notes: "Wspólny odczyt ekranu (decyzja właściciela 2026-10-17): zrzut ekranu, skan, PDF, klatka filmu → tekst, ramki, --szukaj; bez sieci (modele w obrazie, gniazda zablokowane). Zapas: Tesseract pol+eng."}
 
 sidecars: []

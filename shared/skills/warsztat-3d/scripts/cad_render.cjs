@@ -39,8 +39,17 @@ function threeRoot() {
 }
 
 const TYPY = { '.js': 'text/javascript', '.html': 'text/html', '.glb': 'model/gltf-binary' };
-const ARGS = ['--no-sandbox', '--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader',
-              '--enable-unsafe-swiftshader'];
+const ARGS = ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
+
+// Piaskownica Chromium tam, gdzie działa (jak cad_render.py i audit.py Weba): bez niej tylko na Linuksie jako root,
+// w kontenerze Dockera (obraz Jarva: jak dotąd --no-sandbox) albo z zakazem przestrzeni nazw użytkownika bez profilu
+// AppArmor (Ubuntu 23.10+). Playwright domyślnie sam dodaje --no-sandbox, więc chromiumSandbox ustawiamy jawnie.
+function bezPiaskownicy() {
+  if (process.platform !== 'linux') return false;
+  const czytaj = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return ''; } };
+  return (process.getuid && process.getuid() === 0) || fs.existsSync('/.dockerenv')
+    || czytaj('/proc/sys/kernel/apparmor_restrict_unprivileged_userns').trim() === '1';
+}
 
 async function strona(browser, z, bledy) {
   const three = threeRoot();
@@ -76,7 +85,9 @@ async function strona(browser, z, bledy) {
 (async () => {
   const z = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
   const { chromium } = playwright();
-  const browser = await chromium.launch({ executablePath: browserPath(), args: ARGS });
+  const bez = bezPiaskownicy();
+  const browser = await chromium.launch({ executablePath: browserPath(), args: bez ? ['--no-sandbox', ...ARGS] : ARGS,
+                                          chromiumSandbox: !bez });
   const bledy = [];
   try {
     const page = await strona(browser, z, bledy);

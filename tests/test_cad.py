@@ -1,7 +1,9 @@
-"""Warsztat 3D (shared/skills/warsztat-3d): cad.py, cad_model.py, przypięcie silnika w obrazie.
+"""Warsztat 3D (shared/skills/warsztat-3d): cad.py, cad_model.py, cad_render.py, przypięcie silnika w obrazie
+i instalacja natywna (venv cad i Three.js przy pierwszym użyciu, docs/NATYWNIE.md E11).
 
-Część z prawdziwym silnikiem (build123d) i podglądem (node + three + Chromium) idzie tylko tam, gdzie są
-(kontener Jarva albo JARVO_CAD_PYTHON / NODE_PATH lokalnie); reszta działa bez nich.
+Część z prawdziwym silnikiem (build123d) i podglądem idzie tylko tam, gdzie są: kontener Jarva (node + three +
+Chromium), instalacja natywna albo JARVO_CAD_PYTHON z CHROME_PATH i JARVO_THREE_DIR (Playwright dla Pythona w tym
+interpreterze albo w JARVO_TOOLS_PYTHON); reszta działa bez nich. Na żywo w instalacji: tests/live/natywnie_telefon_3d.py.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from conftest import REPO, load_script
 SKILL = REPO / "shared" / "skills" / "warsztat-3d"
 cad = load_script("shared/skills/warsztat-3d/scripts/cad.py")
 model = load_script("shared/skills/warsztat-3d/scripts/cad_model.py")
+render = load_script("shared/skills/warsztat-3d/scripts/cad_render.py")
 
 
 def args(**kw):
@@ -185,6 +188,236 @@ def test_obraz_przypina_silnik_sumami_bez_zbednych_paczek():
     assert f"three@{pkg['dependencies']['three']}" in narz                       # ta sama wersja co /_lib/three Wideografa
 
 
+# ------------------------------------------------------------------ instalacja natywna (E11): silnik i Three.js przy użyciu
+
+class AtrapaPrzyUzyciu:
+    """Atrapa jarvo/przy_uzyciu.py: venv cad i narzędzie three „instalowane” do katalogu tymczasowego."""
+
+    class BladPrzyUzyciu(RuntimeError):
+        pass
+
+    def __init__(self, tmp: Path, *, venv: bool = False, three: bool = False, blad: str = ""):
+        self.tmp, self.blad = tmp, blad
+        self.wywolania: list[str] = []
+        self.python = tmp / "venvs" / "cad-abc" / "python.exe"
+        self.three = tmp / "narzedzia" / "three" / "0.186.1"
+        if venv:
+            self._venv()
+        if three:
+            self._three()
+
+    def _venv(self):
+        self.python.parent.mkdir(parents=True, exist_ok=True)
+        self.python.write_bytes(b"")
+
+    def _three(self):
+        for rel in ("build/three.module.js", "examples/jsm/loaders/GLTFLoader.js"):
+            (self.three / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.three / rel).write_text("//", encoding="utf-8")
+
+    def gotowy_venv(self, _u, nazwa):
+        assert nazwa == "cad"
+        return {"python": str(self.python), "katalog": str(self.python.parent)} if self.python.is_file() else None
+
+    def venv(self, _u, nazwa, log=print):
+        self.wywolania.append(f"venv {nazwa}")
+        if self.blad:
+            raise self.BladPrzyUzyciu(self.blad)
+        log("venv cad: pierwsze użycie")
+        self._venv()
+        return self.gotowy_venv(_u, nazwa)
+
+    def gotowe_narzedzie(self, _u, nazwa):
+        return {"katalog": str(self.three)} if nazwa == "three" and self.three.is_dir() else None
+
+    def narzedzie(self, _u, nazwa, log=print):
+        self.wywolania.append(f"narzedzie {nazwa}")
+        if self.blad:
+            raise self.BladPrzyUzyciu(self.blad)
+        self._three()
+        return {"katalog": str(self.three)}
+
+    def wpis(self, _u, _nazwa):
+        return None
+
+    def opis_venvu(self, _u, nazwa):
+        return {"venv": nazwa, "pobranie_mb": 215, "venv_mb": 597, "paczek": 56}
+
+    def app_instalacji(self, _u):
+        return REPO
+
+    def rozmiar_mb(self, _app, nazwa):
+        return 4.6 if nazwa == "three" else None
+
+
+@pytest.fixture
+def natywnie(monkeypatch, tmp_path):
+    """Instalacja natywna bez silnika w obrazie: JARVO_CAD_PYTHON i ścieżki obrazu wskazują w próżnię."""
+    monkeypatch.delenv("JARVO_CAD_PYTHON", raising=False)
+    monkeypatch.delenv("JARVO_THREE_DIR", raising=False)
+    monkeypatch.delenv("JARVO_NARZEDZIA", raising=False)
+    monkeypatch.setenv("NODE_PATH", "")
+    monkeypatch.setattr(cad, "CAD_PYTHON", str(tmp_path / "nie-ma" / "python"))
+    monkeypatch.setattr(cad, "THREE_KONTENER", str(tmp_path / "nie-ma" / "three"))
+
+    def ustaw(**kw) -> AtrapaPrzyUzyciu:
+        pu = AtrapaPrzyUzyciu(tmp_path, **kw)
+        monkeypatch.setattr(cad, "_przy_uzyciu", lambda: (pu, object()))
+        return pu
+    return ustaw
+
+
+def test_przy_uzyciu_tylko_w_instalacji_natywnej(monkeypatch, tmp_path):
+    monkeypatch.delenv("JARVO_ROOT", raising=False)
+    assert cad._przy_uzyciu() == (None, None)                                 # kontener: silnik w obrazie
+    monkeypatch.setenv("JARVO_ROOT", str(tmp_path))
+    assert cad._przy_uzyciu() == (None, None)                                 # bez current.json
+    (tmp_path / "program").mkdir()
+    (tmp_path / "program" / "current.json").write_text(json.dumps({"app": ""}), encoding="utf-8")
+    monkeypatch.delenv("JARVO_REPO", raising=False)
+    monkeypatch.chdir(REPO)                                                   # w katalogu bieżącym jest jarvo/
+    assert cad._przy_uzyciu() == (None, None)                                 # pusta ścieżka: nie z katalogu bieżącego
+    monkeypatch.setenv("JARVO_REPO", ".")
+    assert cad._przy_uzyciu() == (None, None)                                 # względna też nie
+    monkeypatch.delenv("JARVO_REPO")
+    (tmp_path / "program" / "current.json").write_text(json.dumps({"app": str(REPO)}), encoding="utf-8")
+    pu, u = cad._przy_uzyciu()
+    assert pu.__name__ == "jarvo.przy_uzyciu" and Path(u.root) == tmp_path and u.stan == tmp_path / "stan"
+
+
+def test_silnik_natywnie_instaluje_sie_przy_pierwszym_uzyciu(natywnie, capsys):
+    pu = natywnie()
+    with pytest.raises(cad.Blad, match="pierwsze `cad.py zbuduj`"):
+        cad.cad_python(instaluj=False)
+    assert pu.wywolania == []
+    assert cad.cad_python() == str(pu.python) and pu.wywolania == ["venv cad"]
+    assert "pierwsze użycie" in capsys.readouterr().err                       # postęp na stderr, stdout dla raportu
+    assert cad.cad_python() == str(pu.python) and pu.wywolania == ["venv cad"]   # drugi raz bez instalacji
+    pu.python.unlink()
+    natywnie(blad="brak sieci")
+    with pytest.raises(cad.Blad, match="silnik CAD: brak sieci"):
+        cad.cad_python()
+
+
+def test_three_kolejnosc_zrodel_i_pobranie_przy_uzyciu(natywnie, monkeypatch, tmp_path):
+    def paczka(k: Path) -> Path:
+        for rel in ("build/three.module.js", "examples/jsm/loaders/GLTFLoader.js"):
+            (k / rel).parent.mkdir(parents=True, exist_ok=True)
+            (k / rel).write_text("//", encoding="utf-8")
+        return k
+
+    pu = natywnie()
+    with pytest.raises(cad.Blad, match="Three.js"):
+        cad.three_root(instaluj=False)
+    (tmp_path / "niepelny" / "three").mkdir(parents=True)                      # katalog bez plików paczki: pomijany
+    z_node = paczka(tmp_path / "node_modules" / "three")
+    monkeypatch.setenv("NODE_PATH", os.pathsep.join([str(tmp_path / "niepelny"), str(tmp_path / "node_modules")]))
+    assert cad.three_root() == z_node and pu.wywolania == []                  # paczka z NODE_PATH: bez pobierania
+    monkeypatch.setenv("NODE_PATH", "")
+    assert cad.three_root() == pu.three and pu.wywolania == ["narzedzie three"]
+    wlasny = paczka(tmp_path / "wlasny-three")
+    monkeypatch.setenv("JARVO_THREE_DIR", str(wlasny))
+    assert cad.three_root() == pu.three                     # instalacja: wersja z manifestu, nie zmienna sprzed restartu
+    monkeypatch.setattr(cad, "_przy_uzyciu", lambda: (None, None))
+    assert cad.three_root() == wlasny                                          # bez instalacji natywnej: zmienna
+
+
+def test_silnik_natywnie_wygrywa_ze_zmienna_sprzed_aktualizacji(natywnie, monkeypatch, tmp_path):
+    """Po aktualizacji locka JARVO_CAD_PYTHON bramy wskazuje jeszcze stary venv: instalacja natywna bierze venv dla
+    locka tej wersji (gotowy albo instalowany teraz), a sama zmienna liczy się tylko poza nią."""
+    stary = tmp_path / "venvs" / "cad-stary" / "python.exe"
+    stary.parent.mkdir(parents=True)
+    stary.write_bytes(b"")
+    monkeypatch.setenv("JARVO_CAD_PYTHON", str(stary))
+    pu = natywnie()
+    assert cad.cad_python() == str(pu.python) and pu.wywolania == ["venv cad"]
+    monkeypatch.setattr(cad, "_przy_uzyciu", lambda: (None, None))
+    assert cad.cad_python() == str(stary)
+
+
+def test_render_node_w_obrazie_python_natywnie(monkeypatch):
+    wywolane = []
+    monkeypatch.setattr(cad, "_node", lambda z, limit=900, node=None: wywolane.append(("node", node)) or {"ok": 1})
+    monkeypatch.setattr(cad, "_python", lambda z, limit=900: wywolane.append(("python", None)) or {"ok": 1})
+    monkeypatch.delenv("JARVO_CAD_RENDER", raising=False)
+    monkeypatch.setattr(cad, "node_podglad", lambda: "/usr/bin/node")
+    cad.render({"tryb": "png"})
+    monkeypatch.setattr(cad, "node_podglad", lambda: None)
+    cad.render({"tryb": "png"})
+    monkeypatch.setenv("JARVO_CAD_RENDER", "python")
+    monkeypatch.setattr(cad, "node_podglad", lambda: pytest.fail("python wymuszony: bez sprawdzania Node"))
+    cad.render({"tryb": "png"})
+    assert wywolane == [("node", "/usr/bin/node"), ("python", None), ("python", None)]
+    monkeypatch.setenv("JARVO_CAD_RENDER", "node")
+    monkeypatch.setattr(cad, "node_podglad", lambda: None)
+    with pytest.raises(cad.Blad, match="JARVO_CAD_RENDER=node"):
+        cad.render({"tryb": "png"})
+
+
+def test_podglad_python_przekazuje_chromium_i_three(natywnie, monkeypatch, tmp_path):
+    pu = natywnie(three=True)
+    chrome = tmp_path / "chrome-headless-shell.exe"
+    chrome.write_bytes(b"")
+    monkeypatch.setenv("CHROME_PATH", str(chrome))
+    zlecone = {}
+
+    def uruchom(argv, zadanie, limit, nazwa):
+        zlecone.update(argv=argv, zadanie=zadanie, nazwa=nazwa)
+        return {"plik": zadanie.get("out"), "bledy": []}
+    monkeypatch.setattr(cad, "_uruchom_render", uruchom)
+    monkeypatch.setattr(cad, "python_playwright", lambda: sys.executable)
+    cad._python({"tryb": "png", "out": "x.png"})
+    assert zlecone["argv"][:2] == [sys.executable, "-I"] and zlecone["argv"][-1] == str(cad.RENDER_PY)
+    assert zlecone["zadanie"]["chrome"] == str(chrome) and zlecone["zadanie"]["three"] == str(pu.three)
+    monkeypatch.delenv("CHROME_PATH")
+    monkeypatch.setattr(cad, "PRZEGLADARKA_KONTENER", tmp_path / "nie-ma")
+    with pytest.raises(cad.Blad, match="CHROME_PATH"):
+        cad._python({"tryb": "png"})
+    monkeypatch.setattr(cad, "python_playwright", lambda: None)
+    with pytest.raises(cad.Blad, match="Playwright"):
+        cad._python({"tryb": "png"})
+
+
+def test_stan_mowi_co_pobierze_pierwsze_uzycie(natywnie, monkeypatch, tmp_path):
+    natywnie()
+    chrome = tmp_path / "chrome.exe"
+    chrome.write_bytes(b"")
+    monkeypatch.setenv("CHROME_PATH", str(chrome))
+    monkeypatch.setattr(cad, "node_podglad", lambda: None)
+    monkeypatch.setattr(cad, "python_playwright", lambda: sys.executable)
+    monkeypatch.setattr(cad, "program_ffmpeg", lambda: str(tmp_path / "ffmpeg.exe"))
+    r = cad.stan()
+    assert r["silnik"] is None and r["silnik_przy_uzyciu"]["pobranie_mb"] == 215
+    assert r["podglad"]["sposob"] == "python" and r["podglad"]["three_przy_uzyciu_mb"] == 4.6
+    assert cad.stan_gotowy(r) and "pobierze się przy pierwszym" in cad._opis_stanu(r)
+    assert not cad.stan_gotowy({**r, "ffmpeg": None})
+    assert not cad.stan_gotowy({**r, "silnik_przy_uzyciu": None})
+
+
+def test_cad_render_adresy_bez_sieci_i_piaskownica(tmp_path):
+    three = tmp_path / "three"
+    (three / "build").mkdir(parents=True)
+    z = {"glb": str(tmp_path / "m.glb"), "three": str(three)}
+    assert render.plik_adresu("http://cad.jarvo/", z) == render.TU / "cad_podglad.html"
+    assert render.plik_adresu("http://cad.jarvo/model.glb", z) == Path(z["glb"])
+    assert render.plik_adresu("http://cad.jarvo/three/build/three.module.js", z) == (three / "build" /
+                                                                                    "three.module.js").resolve()
+    assert render.plik_adresu("http://cad.jarvo/three/../../sekret.txt", z) is None          # poza paczką three
+    assert render.plik_adresu("http://cad.jarvo/three/%2e%2e/%2e%2e/sekret.txt", z) is None
+    assert render.plik_adresu("https://example.com/three/build/three.module.js", z) is None   # inny host
+    assert render.plik_adresu("http://cad.jarvo/inne", z) is None
+    assert not render.bez_piaskownicy("win32") and not render.bez_piaskownicy("darwin")
+    o = render.opcje({"tryb": "obrot", "w": 10, "h": 20, "kat": 5, "wysokosc": 25, "tlo": "#FFFFFF"})
+    assert o["obrot"] and o["w"] == 10 and "three" not in o
+    html = (SKILL / "scripts" / "cad_podglad.html").read_text(encoding="utf-8")
+    assert '"/three/build/three.module.js"' in html                            # te same adresy co page.route
+
+
+def test_ffmpeg_pelna_sciezka_z_instalacji():
+    cmd = cad.polecenie_ffmpeg(24, Path("o.mp4"), "k%05d.png", "C:/Jarvo/ffmpeg/bin/ffmpeg.exe")
+    assert cmd[0] == "C:/Jarvo/ffmpeg/bin/ffmpeg.exe" and cmd[cmd.index("-framerate") + 1] == "24"
+
+
 # ------------------------------------------------------------------ z prawdziwym silnikiem i przeglądarką
 
 def _silnik() -> str | None:
@@ -195,11 +428,17 @@ def _silnik() -> str | None:
 
 
 def _podglad_dostepny() -> bool:
-    if not shutil.which("node"):
+    """Podgląd z obrazu (node + three + playwright-core) albo natywny (Playwright dla Pythona, CHROME_PATH, three)."""
+    if shutil.which("node"):
+        p = subprocess.run(["node", "-e", "require.resolve('three'); require('playwright-core')"], capture_output=True)
+        if p.returncode == 0 and (Path("/etc/hermes/agent-browser-executable-path").exists()
+                                  or bool(os.environ.get("CHROME_PATH"))):
+            return True
+    try:
+        cad.three_root(instaluj=False)
+    except cad.Blad:
         return False
-    p = subprocess.run(["node", "-e", "require.resolve('three'); require('playwright-core')"], capture_output=True)
-    return p.returncode == 0 and (Path("/etc/hermes/agent-browser-executable-path").exists()
-                                  or bool(os.environ.get("CHROME_PATH")))
+    return bool(cad.python_playwright() and cad.przegladarka())
 
 
 @pytest.mark.skipif(_silnik() is None, reason="brak venvu CAD (kontener Jarva albo JARVO_CAD_PYTHON)")

@@ -1,7 +1,7 @@
 ---
 name: warsztat-3d
 description: "Model 3D z kodu (build123d): STEP, STL, GLB, 3MF, podgląd PNG, film obrotu."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo (silnik: build123d, Apache-2.0, na OpenCascade, LGPL-2.1; podgląd: Three.js, MIT)"
 license: MIT
 metadata:
@@ -9,7 +9,7 @@ metadata:
     tags: [3d, cad, build123d, opencascade, step, stl, gltf, glb, 3mf, 3d-printing, threejs, turntable]
   jarvo:
     autonomy: A0
-    reviewed: "2026-10-13"
+    reviewed: "2026-10-25"
 ---
 
 # Warsztat 3D: model z kodu
@@ -17,8 +17,8 @@ metadata:
 Bryła 3D opisana kodem Pythona (build123d na jądrze OpenCascade, tym samym co FreeCAD): wymiary w milimetrach,
 parametry na górze skryptu, zmiana wymiaru = jedna liczba i ponowna budowa. Z jednego skryptu powstaje komplet:
 **STEP** (CAD, CNC, wycena u wykonawcy), **STL** i **3MF** (druk 3D), **GLB** (strona, aplikacja, scena Three.js),
-raport (wymiary, objętość, masa, poprawność) oraz podgląd **PNG** i **film obrotu MP4**. Wszystko na tym komputerze,
-bez sieci i bez tokenów na render.
+raport (wymiary, objętość, masa, poprawność) oraz podgląd **PNG** i **film obrotu MP4**. Wszystko na tym komputerze
+i bez tokenów na render; sieć tylko raz, gdy na komputerze właściciela pierwsze użycie instaluje silnik (niżej).
 
 ## Kiedy użyć
 - **Druk 3D:** uchwyt, obudowa, zaślepka, podkładka, organizer, część zamienna z wymiarami od właściciela.
@@ -39,12 +39,20 @@ bez sieci i bez tokenów na render.
 ## Kroki
 ```bash
 C="$HERMES_HOME/skills/design/warsztat-3d/scripts/cad.py"
-@@PY@@ "$C" stan                                            # silnik, node, ffmpeg na miejscu
+@@PY@@ "$C" stan                                            # silnik, podgląd, ffmpeg (albo co pobierze 1. użycie)
+@@PY@@ "$C" zainstaluj                                      # 1. użycie u właściciela: silnik i Three.js teraz
 @@PY@@ "$C" zbuduj model.py -o out/3d/uchwyt --podglad      # STEP, STL, GLB, 3MF, raport JSON i PNG
 @@PY@@ "$C" zbuduj model.py -o out/3d/uchwyt --formaty stl,3mf --material petg
 @@PY@@ "$C" podglad out/3d/uchwyt/model.glb -o out/3d/uchwyt/spod.png --wysokosc -40 --siatka
 @@PY@@ "$C" obrot out/3d/uchwyt/model.glb -o out/3d/uchwyt/obrot.mp4 --sekundy 6 --rozmiar 1080x1080
 ```
+**Pierwsze użycie na komputerze właściciela.** W instalacji Jarva na komputerze (bez kontenera) silnika i Three.js
+do podglądu na początku nie ma: `stan` mówi wtedy „pobierze się przy pierwszym…” (z `--json`: `silnik_przy_uzyciu`,
+ok. 215 MB, i `three_przy_uzyciu_mb`). Pierwsze `zbuduj` albo `podglad` pobiera je z sumami z manifestu (1–3 min),
+więc najpierw `cad.py zainstaluj` z limitem czasu terminala ok. 900 s i jedno zdanie do właściciela („instaluję raz
+silnik 3D, ok. 2 min”). Przerwane pobieranie wznowi się przy następnym poleceniu. Błąd instalacji (brak sieci, inna
+suma) zgłaszasz właścicielowi, nie obchodzisz go.
+
 1. **Wymagania w liczbach.** Zanim napiszesz kod: wymiary (mm), do czego pasuje (śruba M4? płytka 50 × 30?),
    materiał i sposób wykonania (druk FDM, frez, tylko wizualizacja). Brakuje kluczowego wymiaru → jedno pytanie
    do właściciela, z propozycją („przyjmuję ściankę 2 mm, dobrze?”). Nie zgadujesz wymiarów pod coś istniejącego.
@@ -76,11 +84,12 @@ C="$HERMES_HOME/skills/design/warsztat-3d/scripts/cad.py"
   i masą każdej, a STL powstaje też osobno dla każdej części.
 
 ## Czas i rozmiar
-Budowa z eksportem i podglądem PNG ~10 s. Film obrotu liczy WebGL na procesorze (SwiftShader, sam bierze wszystkie
-rdzenie, więc kilka renderów naraz nie przyspiesza): ~0,65 s na klatkę 1080 × 1080, ~0,45 s na 720 × 720
-(pomiar na 4 rdzeniach). Film 6 s × 30 kl./s (180 klatek) w 1080 × 1080 to ~2 min; wersja robocza
-`--rozmiar 720x720 --fps 24` ~1 min. Najpierw sprawdź kadr na PNG (`podglad`), film dopiero z dobrym ujęciem.
-Film dłuższy niż kilka minut renderu (np. 20 s w 1080 × 1080 ≈ 6–7 min) → najpierw powiedz właścicielowi, ile potrwa.
+Budowa z eksportem i podglądem PNG ~10–20 s. Film obrotu liczy WebGL na procesorze (SwiftShader, sam bierze wszystkie
+rdzenie, więc kilka renderów naraz nie przyspiesza): na serwerze z 4 rdzeniami ~0,65 s na klatkę 1080 × 1080,
+~0,45 s na 720 × 720, czyli film 6 s × 30 kl./s (180 klatek) w 1080 × 1080 ~2 min, a wersja robocza
+`--rozmiar 720x720 --fps 24` ~1 min; na komputerze właściciela z 12 wątkami ~0,16 s na klatkę 1080 × 1080
+(ten sam film ~30 s). Najpierw sprawdź kadr na PNG (`podglad`), film dopiero z dobrym ujęciem. Film dłuższy niż kilka
+minut renderu (np. 20 s w 1080 × 1080 na serwerze ≈ 6–7 min) → najpierw powiedz właścicielowi, ile potrwa.
 
 ## Nigdy
 - **Bez sieci w skrypcie modelu:** żadnych pobrań, `requests`, `urllib`; `cad_model.py` blokuje gniazda.

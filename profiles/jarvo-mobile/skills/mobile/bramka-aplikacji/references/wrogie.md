@@ -18,14 +18,21 @@ reviewed: 2026-10-01
 | awarie | konsola, błędy strony | bufor `crash`, ReactNativeJS | logi symulatora |
 
 ## Urządzenie z Androidem
-- Telefon testowy floty włącza właściciel: `jarvo android on`. Przy KVM to oficjalny emulator Google (Android 13
-  z usługami Google), bez KVM Redroid (Android 14 w kontenerze, moduł `binder_linux`). Oba pod tym samym adresem w sieci
-  floty: agent łączy się przez adb (`JARVO_ANDROID_ADB`, domyślnie `jarvo-android:5555`).
-- `urzadzenie.py status` z kodem 3 = telefon wyłączony: poproś właściciela o `jarvo android on` (albo zostaw warstwę
-  Androida jako „niezmierzoną”), nie udawaj wyniku.
-- Właściciel może patrzeć na ekran i klikać razem z Tobą: link `@@PY@@ "@@REPO_DIR@@/scripts/jarvo_link.py" --android`
-  (12 h) albo przycisk 📱 w Twoim panelu w HQ. Dawaj go, gdy prosisz o ręczny test albo pokazujesz przepływ.
-- Albo telefon właściciela z debugowaniem USB podłączony do komputera z flotą (adb), albo emulator Android Studio.
+- Telefon testowy floty włącza właściciel: `jarvo android on`. Gdzie stoi flota, decyduje, czym on jest:
+  - **komputer właściciela (Jarvo bez kontenera):** telefon właściciela z debugowaniem USB albo bezprzewodowym
+    (Android 11+, `jarvo android on --wifi ADRES:PORT`) albo emulator z Android Studio, przez adb z Android
+    platform-tools (pierwsze `jarvo android on` pobiera je od Google po akceptacji licencji). Gdy podłączonych jest
+    kilka, właściciel wskazuje jedno (`--urzadzenie SERIAL`), a jedyne gotowe `urzadzenie.py` bierze samo;
+  - **serwer z kontenerem:** przy KVM oficjalny emulator Google (Android 13 z usługami Google), bez KVM Redroid
+    (Android 14 w kontenerze, moduł `binder_linux`), oba pod adresem `jarvo-android:5555` w sieci floty
+    (`JARVO_ANDROID_ADB`).
+- `urzadzenie.py status` z kodem 3 = telefon wyłączony albo nie widać urządzenia: komunikat mówi, co zrobić; poproś
+  właściciela o `jarvo android on` (albo zostaw warstwę Androida jako „niezmierzoną”), nie udawaj wyniku. Okno
+  „Zezwolić na debugowanie USB?” na telefonie akceptuje właściciel, nigdy Ty.
+- Właściciel może patrzeć na ekran i klikać razem z Tobą: na komputerze właściciela okno `jarvo android ekran` (scrcpy
+  w osobnym oknie, pobierane przy pierwszym użyciu; podgląd w HQ jest tam wyłączony), na serwerze z kontenerem link
+  `@@PY@@ "@@REPO_DIR@@/scripts/jarvo_link.py" --android` (12 h) albo przycisk 📱 w Twoim panelu w HQ. Proponuj go,
+  gdy prosisz o ręczny test albo pokazujesz przepływ.
 - Redroid nie ma usług Google: powiadomień FCM, logowania Google i Map nie sprawdzi (→ emulator przy KVM albo telefon
   właściciela).
 

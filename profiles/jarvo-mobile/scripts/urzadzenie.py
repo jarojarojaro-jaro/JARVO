@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Telefon testowy z Androidem przez adb (warstwa 2 bramki aplikacji): instalacja, zrzuty, logi i testy wrogie na
-prawdziwym systemie Android (emulator Google albo Redroid w usłudze floty, albo telefon podłączony przez adb).
+prawdziwym systemie Android (telefon właściciela przez USB albo Wi-Fi, emulator z Android Studio, a w kontenerze
+emulator Google albo Redroid w usłudze floty).
 
     urzadzenie.py status [--json]                        # czy jest urządzenie, wersja Androida, ekran
     urzadzenie.py zainstaluj <plik.apk>
@@ -9,8 +10,17 @@ prawdziwym systemie Android (emulator Google albo Redroid w usłudze floty, albo
     urzadzenie.py logi [--pakiet p] [--linie 200]
     urzadzenie.py wrogie <pakiet | exp://…> <outdir> [--tylko duza-czcionka,ciemny,…]
 
-Urządzenie: `JARVO_ANDROID_ADB` (domyślnie `jarvo-android:5555`, usługa floty `android` w sieci wewnętrznej; włącza ją
-właściciel: `jarvo android on`). Port adb nigdy nie wychodzi poza sieć floty.
+Urządzenie i adb:
+- instalacja natywna (jest `<JARVO_ROOT>/program/current.json`): telefon włącza właściciel poleceniem
+  `jarvo android on` (jarvo/android.py: platform-tools przy pierwszym użyciu po akceptacji licencji Google). adb
+  z `<stan>/narzedzia.json` (wpis platform-tools; na Linuksie arm64 adb z systemu), stan i urządzenie z
+  `<stan>/android.json`; bez wybranego urządzenia bierzemy jedyne gotowe z `adb devices`. `jarvo android off` =
+  flota nie używa telefonu (kod 3). Serwer adb startuje z wyjściem do pliku (proces w tle dziedziczy uchwyty, potok by
+  nie dostał końca), z ADB_MDNS=0 i kluczem adb właściciela (ADB_VENDOR_KEYS na macOS i Linuksie: terminal agenta ma
+  inny HOME, a telefon zna tylko klucz właściciela),
+- kontener: `JARVO_ANDROID_ADB` (domyślnie `jarvo-android:5555`, usługa floty `android` w sieci wewnętrznej; włącza
+  ją właściciel: `jarvo android on`), adb z obrazu. Port adb nigdy nie wychodzi poza sieć floty.
+`JARVO_ADB` i `JARVO_ANDROID_ADB` z otoczenia wygrywają w obu przypadkach.
 
 Testy wrogie (każdy: ustawienie → uruchomienie → zrzut → awarie z bufora `crash` i błędy ReactNativeJS → przywrócenie
 ustawień): start, duza-czcionka (font_scale 2.0), maly-ekran (720×1280, 320 dpi), ciemny, offline (tryb samolotowy;
@@ -24,15 +34,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
-ADB = os.environ.get("JARVO_ADB", "adb")
-SERIAL = os.environ.get("JARVO_ANDROID_ADB", "jarvo-android:5555")
+SERIAL_KONTENERA = "jarvo-android:5555"                # usługa floty `android` w sieci kontenera
+WINDOWS = os.name == "nt"
 EXPO_GO = "host.exp.exponent"
 CZEKAJ_S = float(os.environ.get("JARVO_ANDROID_CZEKAJ", "6"))
 SCENARIUSZE = ["start", "duza-czcionka", "maly-ekran", "ciemny", "offline", "uprawnienia", "wstecz", "smierc-procesu",
@@ -44,14 +56,86 @@ class BrakUrzadzenia(Exception):
     pass
 
 
-class Adb:
-    """Cienka warstwa nad adb (podmieniana w testach)."""
+# ------------------------------------------------------------------ instalacja natywna (jarvo android, docs/NATYWNIE.md U04)
 
-    def __init__(self, serial: str = SERIAL, adb: str = ADB):
-        self.serial, self.adb = serial, adb
+WLACZ = ("właściciel włącza go poleceniem `jarvo android on` (telefon z debugowaniem USB albo bezprzewodowym, "
+         "emulator z Android Studio; docs/MOBILE.md §5)")
+
+
+def korzen_natywny() -> Path | None:
+    """Korzeń instalacji natywnej Jarva (JARVO_ROOT z `program/current.json`); w kontenerze None."""
+    k = os.environ.get("JARVO_ROOT")
+    return Path(k) if k and (Path(k) / "program" / "current.json").is_file() else None
+
+
+def _json(p: Path) -> dict:
+    try:
+        d = json.loads(p.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def stan_natywny(korzen: Path) -> dict:
+    """`<stan>/android.json` z `jarvo android on|off`: wlaczony, serial, wifi."""
+    return _json(korzen / "stan" / "android.json")
+
+
+def _platform_tools(korzen: Path) -> dict:
+    w = _json(korzen / "stan" / "narzedzia.json").get("platform-tools")
+    return w if isinstance(w, dict) else {}
+
+
+def adb_natywny(korzen: Path) -> str | None:
+    """adb z platform-tools instalacji (`jarvo android on` pobiera je przy pierwszym użyciu); Linux arm64: z systemu."""
+    w = _platform_tools(korzen)
+    for k in (w.get("bin") or []) or [w.get("katalog")]:
+        p = Path(str(k)) / ("adb.exe" if WINDOWS else "adb")
+        if k and p.is_file():
+            return str(p)
+    if sys.platform.startswith("linux") and platform.machine().lower() in ("aarch64", "arm64"):
+        return shutil.which("adb")
+    return None
+
+
+def klucz_wlasciciela() -> Path | None:
+    """~/.android/adbkey z katalogu domowego konta (POSIX; nie z HOME, które terminal agenta ma z profilu). Windows:
+    None, bo adb i tak bierze profil z konta, a nie z USERPROFILE."""
+    if WINDOWS:
+        return None
+    import pwd
+    try:
+        return Path(pwd.getpwuid(os.getuid()).pw_dir) / ".android" / "adbkey"
+    except (KeyError, OSError):
+        return None
+
+
+def env_adb(korzen: Path) -> dict:
+    """Otoczenie adb instalacji natywnej: zmienne z wpisu platform-tools (ADB_MDNS=0) i klucz adb właściciela."""
+    env = dict(os.environ)
+    env.update({str(k): str(v) for k, v in (_platform_tools(korzen).get("env") or {}).items()})
+    env.setdefault("ADB_MDNS", "0")
+    klucz = klucz_wlasciciela()
+    if klucz is not None and klucz.is_file():
+        obecne = [x for x in env.get("ADB_VENDOR_KEYS", "").split(os.pathsep) if x]
+        env["ADB_VENDOR_KEYS"] = os.pathsep.join(dict.fromkeys([*obecne, str(klucz)]))
+    return env
+
+
+class Adb:
+    """Cienka warstwa nad adb (podmieniana w testach). Bez argumentów: urządzenie i adb z otoczenia, instalacji
+    natywnej (jarvo android) albo kontenera (jarvo-android:5555, adb z obrazu)."""
+
+    def __init__(self, serial: str | None = None, adb: str | None = None):
+        self.korzen = korzen_natywny() if serial is None or adb is None else None
+        natywny = (stan_natywny(self.korzen).get("serial") or None) if self.korzen else None
+        self.serial = serial or os.environ.get("JARVO_ANDROID_ADB") or natywny or (
+            None if self.korzen else SERIAL_KONTENERA)
+        self.adb = adb or os.environ.get("JARVO_ADB") or (adb_natywny(self.korzen) if self.korzen else None) or "adb"
+        self.env = env_adb(self.korzen) if self.korzen else None
 
     def run(self, *args: str, timeout: int = 60, binarnie: bool = False):
-        r = subprocess.run([self.adb, "-s", self.serial, *args], capture_output=True, timeout=timeout)
+        r = subprocess.run([self.adb, "-s", self.serial, *args], capture_output=True, timeout=timeout, env=self.env)
         if r.returncode != 0 and not binarnie:
             raise RuntimeError(f"adb {' '.join(args)}: {r.stderr.decode(errors='replace').strip()[:300]}")
         return r.stdout if binarnie else r.stdout.decode(errors="replace")
@@ -59,14 +143,61 @@ class Adb:
     def sh(self, polecenie: str, timeout: int = 60) -> str:
         return self.run("shell", polecenie, timeout=timeout)
 
+    def _serwer(self) -> None:
+        """Serwer adb (instalacja natywna): start z wyjściem do pliku, bo proces w tle dziedziczy uchwyty polecenia,
+        a potok nie dostałby końca (Windows); potem odnowienie połączenia Wi-Fi z `jarvo android on --wifi`."""
+        with tempfile.TemporaryFile() as f:
+            try:
+                r = subprocess.run([self.adb, "start-server"], stdin=subprocess.DEVNULL, stdout=f,
+                                   stderr=subprocess.STDOUT, env=self.env, timeout=60)
+            except (OSError, subprocess.TimeoutExpired) as e:
+                raise BrakUrzadzenia(f"serwer adb nie wstał ({e}); {WLACZ}") from None
+            f.seek(0)
+            wyjscie = f.read().decode("utf-8", errors="replace").strip()
+        if r.returncode:
+            raise BrakUrzadzenia(f"serwer adb nie wstał (kod {r.returncode}: {wyjscie[-200:]}); {WLACZ}")
+        wifi = stan_natywny(self.korzen).get("wifi")
+        if wifi and self.serial in (None, wifi):
+            subprocess.run([self.adb, "connect", wifi], capture_output=True, timeout=20, env=self.env)
+
+    def _jedyne(self) -> str:
+        """Jedyne gotowe urządzenie z `adb devices` (instalacja natywna bez wybranego urządzenia)."""
+        r = subprocess.run([self.adb, "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=20, env=self.env)
+        wiersze = [w.split() for w in r.stdout.splitlines()[1:] if w.strip() and not w.startswith("*")]
+        gotowe = [w[0] for w in wiersze if len(w) >= 2 and w[1] == "device"]
+        if len(gotowe) == 1:
+            return gotowe[0]
+        if gotowe:
+            raise BrakUrzadzenia(f"kilka urządzeń ({', '.join(gotowe)}): właściciel wybiera urządzenie floty "
+                                 "poleceniem `jarvo android on --urzadzenie SERIAL`")
+        inne = ", ".join(" ".join(w[:2]) for w in wiersze)
+        raise BrakUrzadzenia("nie widzę telefonu" + (f" ({inne}: odblokuj telefon i zaakceptuj na nim debugowanie)"
+                                                     if inne else "") + f"; {WLACZ}")
+
     def polacz(self) -> None:
+        if self.korzen is not None and not os.environ.get("JARVO_ANDROID_ADB"):
+            st = stan_natywny(self.korzen)
+            if not st.get("wlaczony"):
+                raise BrakUrzadzenia("telefon testowy " + ("wyłączony (jarvo android off)" if st else
+                                                           "nie jest włączony") + f"; {WLACZ}")
         if not shutil.which(self.adb) and not Path(self.adb).exists():
+            if self.korzen is not None:
+                raise BrakUrzadzenia(f"brak adb w instalacji Jarva (platform-tools pobiera `jarvo android on` po "
+                                     f"akceptacji licencji Google); {WLACZ}")
             raise BrakUrzadzenia("brak adb w obrazie floty (pakiet adb; obraz sprzed wersji z usługą android: `jarvo update`)")
+        if self.korzen is not None:
+            self._serwer()
+            if not self.serial:
+                self.serial = self._jedyne()
         if ":" in self.serial:
-            subprocess.run([self.adb, "connect", self.serial], capture_output=True, timeout=20)
+            subprocess.run([self.adb, "connect", self.serial], capture_output=True, timeout=20, env=self.env)
         stan = subprocess.run([self.adb, "-s", self.serial, "get-state"], capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=20)
+                              errors="replace", timeout=20, env=self.env)
         if stan.stdout.strip() != "device":
+            if self.korzen is not None:
+                raise BrakUrzadzenia(f"urządzenie {self.serial} niedostępne ({(stan.stderr or stan.stdout).strip()[:200]}); "
+                                     f"{WLACZ}")
             raise BrakUrzadzenia(f"urządzenie {self.serial} niedostępne ({(stan.stderr or stan.stdout).strip()[:200]}); "
                                  "właściciel włącza je poleceniem `jarvo android on` (emulator przy KVM albo Redroid przy binderze, docs/MOBILE.md §5)")
 
