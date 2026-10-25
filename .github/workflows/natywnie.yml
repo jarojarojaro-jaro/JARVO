@@ -7,7 +7,14 @@
 #     jarvo-zgody, zgodą i odmową; zlecenie specjaliście (karta kanbana, którą robi pracownik bramy na atrapie),
 #   - opcjonalnie jedna tura z prawdziwym modelem: tylko z sekretem JARVO_TEST_OPENROUTER_KEY, który trafia wyłącznie
 #     do otoczenia tego jednego kroku i skanu (nigdy do echo ani do artefaktów),
+#   - funkcje na żywo: media (tests/live/natywnie_media.py: lektor, STT, film, HTML, HyperFrames, edytor, głos,
+#     narzędzia npm), dokumenty i OCR (natywnie_dokumenty.py --pytest), miejsce na dysku (natywnie_miejsce.py:
+#     sprzątanie, szacunek, dyski, przebieg bez sieci, zamki, odmowy), telefon, 3D i ManimGX przy pierwszym użyciu
+#     (natywnie_telefon_3d.py; adb, android i scrcpy pominięte bez akceptacji licencji Android SDK przez właściciela),
 #   - drugi przebieg tego samego polecenia instalacji niczego nie zmienia,
+#   - aktualizacja na żywo (tests/live/natywnie_update.py, wersje testowe przez JARVO_FAKE_KOD, bez sieci i pushy):
+#     ta sama wersja, nowsza obok starej, zepsuta wraca do poprzedniej, przycisk w panelu przez pomocnika pod
+#     nadzorcą (usługa aktualizacje), sprzątanie starych wersji,
 #   - jarvo uninstall --all --yes, a migawka katalogów, PATH i autostartu po nim jest taka jak przed instalacją
 #     (różnica pusta poza listą wyjątków z powodami w natywnie_e2e.py).
 # Linux: runner nie ma sesji systemd użytkownika (user bus), więc instalacja z JARVO_NO_AUTOSTART=1 (oba przebiegi,
@@ -34,6 +41,18 @@ on:
       - "komputer/**"
       - "hq/**"
       - "zgody/**"
+      - "infra/node/**"
+      - "infra/bin/jarvo-stt"
+      - "infra/bin/jarvo-tts"
+      - "profiles/jarvo-wideo/scripts/**"
+      - "profiles/jarvo-studio/scripts/render_html.cjs"
+      - "profiles/jarvo-reka/scripts/**"
+      - "profiles/jarvo-mobile/scripts/**"
+      - "shared/skills/warsztat-3d/**"
+      - "shared/skills/konwersja-plikow/**"
+      - "shared/skills/odczyt-ekranu/**"
+      - "tests/test_konwertuj.py"
+      - "tests/test_ocr.py"
       - ".github/workflows/natywnie.yml"
 
 permissions:
@@ -49,7 +68,7 @@ jobs:
   instalacja:
     name: ${{ matrix.noga }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 180
+    timeout-minutes: 330
     strategy:
       fail-fast: false
       matrix:
@@ -58,24 +77,32 @@ jobs:
           - noga: W64
             os: windows-2025
             bez_autostartu: ""
+            dopusc_media: ""
+            dopusc_e11: "manimgx=render ManimGX na runnerze bez GPU niesprawdzony (docs/NATYWNIE.md M04)"
             dopusc: >-
               wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
               rutyny=uwaga:świeża instalacja bez Telegrama, rutyny czekają na jarvo telegram test albo jarvo rutyny on; Telegram=uwaga:CI bez bota, jarvo telegram ustaw robi właściciel
           - noga: WARM
             os: windows-11-arm
             bez_autostartu: ""
+            dopusc_media: ""
+            dopusc_e11: "manimgx=render ManimGX na Windows arm64 (koło x64 w emulacji) niesprawdzony"
             dopusc: >-
               wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
               rutyny=uwaga:świeża instalacja bez Telegrama, rutyny czekają na jarvo telegram test albo jarvo rutyny on; Telegram=uwaga:CI bez bota, jarvo telegram ustaw robi właściciel
           - noga: MARM
             os: macos-15
             bez_autostartu: ""
+            dopusc_media: ""
+            dopusc_e11: "manimgx=render ManimGX przez Metal na runnerze macOS niesprawdzony"
             dopusc: >-
               wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
               rutyny=uwaga:świeża instalacja bez Telegrama, rutyny czekają na jarvo telegram test albo jarvo rutyny on; Telegram=uwaga:CI bez bota, jarvo telegram ustaw robi właściciel
           - noga: L64
             os: ubuntu-24.04
             bez_autostartu: "1"
+            dopusc_media: ""
+            dopusc_e11: ""
             dopusc: >-
               wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
               autostart=uwaga:runner bez user busa systemd, instalacja z JARVO_NO_AUTOSTART=1;
@@ -83,6 +110,8 @@ jobs:
           - noga: LARM
             os: ubuntu-24.04-arm
             bez_autostartu: "1"
+            dopusc_media: ""
+            dopusc_e11: ""
             dopusc: >-
               wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
               autostart=uwaga:runner bez user busa systemd, instalacja z JARVO_NO_AUTOSTART=1;
@@ -154,6 +183,35 @@ jobs:
           DOPUSC: ${{ matrix.dopusc }}
         run: python -X utf8 -B tests/live/natywnie_e2e.py sprawdz --dopusc "$DOPUSC"
 
+      # --- E9 i narzędzia npm floty: media na żywo (pierwsze STT pobiera Parakeeta 0,67 GB)
+      - name: Media na żywo (lektor, STT, film, HTML, HyperFrames, edytor, głos, narzędzia npm)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 40
+        env:
+          DOPUSC_MEDIA: ${{ matrix.dopusc_media }}
+        run: python -X utf8 -B tests/live/natywnie_media.py --wyniki "$RUNNER_TEMP/natywnie-artefakty/media" --dopusc "$DOPUSC_MEDIA"
+
+      # --- dokumenty i OCR na żywo (E8): konwerter, OCR, to_pdf.py, pack.py, Konwerter w panelu, SVG → PNG, a z --pytest
+      #     tests/test_konwertuj.py i tests/test_ocr.py na programach i venvach z instalacji (pytest i PyYAML jak
+      #     w requirements-dev.txt; bez shellcheck-py, który nie ma koła win_arm64)
+      - name: Dokumenty i OCR na żywo (konwerter, OCR, to_pdf.py, pack.py, Konwerter w panelu, pytest)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 25
+        run: |
+          python -m pip install --disable-pip-version-check -q "pytest>=8,<10" "PyYAML>=6,<7"
+          python -X utf8 -B tests/live/natywnie_dokumenty.py --pytest --wyniki "$RUNNER_TEMP/natywnie-artefakty/dokumenty"
+
+      # --- miejsce: sprzątanie po instalacji, każda część w szacunku z manifestu, dyski do polecenia
+      - name: Miejsce na dysku po instalacji (sprzątanie, szacunek, doctor)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 15
+        run: python -X utf8 -B tests/live/natywnie_miejsce.py sprawdz
+
+      - name: Dyski do polecenia i system plików korzenia
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        run: python -X utf8 -B tests/live/natywnie_miejsce.py dyski
+
       # --- panel w przeglądarce (E6): wejście bez hasła, pierwsze spotkanie, mózg z atrapy, pierwsza sesja, pliki,
       # restart panelu; zrzuty jasny i ciemny 1440 i 390 px w artefaktach (zrzuty/)
       - name: Panel na żywo (Playwright, zrzuty)
@@ -173,6 +231,18 @@ jobs:
         env:
           JARVO_TEST_OPENROUTER_KEY: ${{ secrets.JARVO_TEST_OPENROUTER_KEY }}
         run: python -X utf8 -B tests/live/natywnie_e2e.py prawdziwy-model
+
+      # --- telefon, 3D i ManimGX przy pierwszym użyciu (E11); licencję Android SDK akceptuje właściciel, więc bez
+      #     --akceptuje-licencje-sdk punkty adb, android i scrcpy są pominięte
+      - name: Telefon, 3D i ManimGX (pierwsze użycie)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 40
+        env:
+          DOPUSC_E11: ${{ matrix.dopusc_e11 }}
+        run: >-
+          python -X utf8 -B tests/live/natywnie_telefon_3d.py
+          --wyniki "$RUNNER_TEMP/natywnie-artefakty/telefon-3d"
+          --limit 2100 --raport-e2e --dopusc "$DOPUSC_E11"
 
       # --- drugi przebieg tego samego polecenia: „Zmiany w tym przebiegu: brak.”, nic pobrane ponownie
       - name: Drugi przebieg instalacji (Windows, irm | iex)
@@ -199,6 +269,30 @@ jobs:
       - name: Drugi przebieg niczego nie zmienił
         if: ${{ !cancelled() }}
         run: python -X utf8 -B tests/live/natywnie_e2e.py drugi-przebieg "$RUNNER_TEMP/natywnie-artefakty/instalacja-2.log"
+
+      # --- aktualizacja na żywo: jarvo update i przycisk w panelu (pomocnik pod nadzorcą)
+      - name: Aktualizacja na żywo (jarvo update, przycisk w panelu)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 80
+        run: python -X utf8 -B tests/live/natywnie_update.py aktualizacja --limit 4500
+
+      # --- miejsce: przebieg bez sieci, sprzątanie przy drugim instalatorze, odmowy przed zapisem
+      - name: Przebieg instalacji bez sieci (HTTPS_PROXY na martwy port)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 30
+        env:
+          FLAGI: ${{ matrix.bez_autostartu == '1' && '--bez-autostartu' || '' }}
+        run: python -X utf8 -B tests/live/natywnie_miejsce.py bez-sieci -- $FLAGI
+
+      - name: Sprzątanie przy drugim instalatorze (zamki)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        run: python -X utf8 -B tests/live/natywnie_miejsce.py zamki
+
+      - name: Odmowa przy braku miejsca i na dysku bez ochrony (atrapy, niczego nie instaluje)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        run: python -X utf8 -B tests/live/natywnie_miejsce.py odmowa
 
       # --- odinstalowanie i migawka po: komputer jak przed instalacją
       - name: Logi instalacji i usług do artefaktów

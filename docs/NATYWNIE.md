@@ -605,7 +605,7 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 
 **Runnery CI.** W64 = windows-2025 (PowerShell 5.1 i 7), WARM = windows-11-arm, MARM = macos-15 (arm64), L64 = ubuntu-24.04 (+ kontener debian:13 jako czysty system), LARM = ubuntu-24.04-arm.
 
-**Kiedy co biegnie.** Szybki CI na każdy push i PR: L64 pełny pytest i validate, W64 i MARM testy jednostkowe z markerami. Pełna macierz (5 nóg, instalacja od zera, E2E) przy `workflow_dispatch`, przy pushu do main w plikach instalatora i manifestu, nocą i przy tagach `v*`. Repo jest publiczne, więc standardowe runnery są darmowe; w prywatnym ostatnie 4 tygodnie kosztowałyby ok. 3316 min, czyli więcej niż plan Free (2000) i Pro (3000).
+**Kiedy co biegnie.** Szybki CI na każdy push i PR: L64 pełny pytest i validate, W64 i MARM testy jednostkowe z markerami. Pełna macierz (5 nóg, instalacja od zera, E2E, a od 2026-10-25 także funkcje na żywo: media z lektorem, STT, filmem i HyperFrames, dokumenty i OCR z pytestem na programach instalacji, miejsce na dysku, telefon/3D/ManimGX przy pierwszym użyciu bez akceptacji licencji Android SDK, aktualizacja na żywo z przyciskiem w panelu, przebieg bez sieci; limit zadania 330 min) przy `workflow_dispatch`, przy pushu do main w plikach instalatora i manifestu, nocą i przy tagach `v*`. Repo jest publiczne, więc standardowe runnery są darmowe; w prywatnym ostatnie 4 tygodnie kosztowałyby ok. 3316 min, czyli więcej niż plan Free (2000) i Pro (3000).
 
 ### E0. Pilne poprawki w dzisiejszej instalacji (bez natywności)
 - **Co:** każda pozycja osobnym commitem.

@@ -521,3 +521,29 @@ def test_migawka_prawdziwego_systemu_tylko_czyta(e2e, tmp_path, monkeypatch):
             assert wartosc.endswith(":<sekret>"), klucz
         if WINDOWS and klucz.startswith(("zmienna:", "run:", "runonce:")) and klucz.lower() != "zmienna:path":
             assert re.fullmatch(r"\d+:(?:[0-9a-f]{16}|<sekret>)", wartosc), f"{klucz}: wartość tylko jako skrót"
+
+
+def test_funkcje_na_zywo_w_macierzy(kroki, zadanie):
+    """Media, dokumenty i OCR, miejsce, telefon/3D/ManimGX i aktualizacja biegną na każdej nodze po instalacji
+    (!cancelled()), skrypty są w push.paths, a kolejność trzyma sens: telefon przed drugim przebiegiem (sprawdza
+    srodowisko.json po pierwszym użyciu), aktualizacja po nim, przed logami i odinstalowaniem."""
+    nazwy = [str(k.get("name", "")) for k in kroki]
+    for poczatek, skrypt in (("Media na żywo", "natywnie_media.py"), ("Dokumenty i OCR na żywo", "natywnie_dokumenty.py"),
+                             ("Miejsce na dysku po instalacji", "natywnie_miejsce.py sprawdz"),
+                             ("Dyski do polecenia", "natywnie_miejsce.py dyski"),
+                             ("Telefon, 3D i ManimGX", "natywnie_telefon_3d.py"),
+                             ("Aktualizacja na żywo", "natywnie_update.py aktualizacja"),
+                             ("Przebieg instalacji bez sieci", "natywnie_miejsce.py bez-sieci"),
+                             ("Sprzątanie przy drugim instalatorze", "natywnie_miejsce.py zamki"),
+                             ("Odmowa przy braku miejsca", "natywnie_miejsce.py odmowa")):
+        k = _krok(kroki, poczatek)
+        assert skrypt in " ".join(str(k["run"]).split()), poczatek
+        assert k["if"].replace(" ", "") == "${{!cancelled()}}", poczatek
+    i = {n.split(" (")[0]: nr for nr, n in enumerate(nazwy)}
+    drugi = next(nr for nr, n in enumerate(nazwy) if n.startswith("Drugi przebieg niczego"))
+    logi = next(nr for nr, n in enumerate(nazwy) if n.startswith("Logi instalacji"))
+    assert i["Telefon, 3D i ManimGX"] < drugi < i["Aktualizacja na żywo"] < logi
+    assert "--akceptuje-licencje-sdk" not in str(_krok(kroki, "Telefon, 3D i ManimGX")["run"])   # decyzja właściciela
+    for noga in zadanie["strategy"]["matrix"]["include"]:
+        assert "dopusc_media" in noga and "dopusc_e11" in noga, noga["noga"]
+    assert zadanie["timeout-minutes"] >= 300
